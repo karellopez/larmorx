@@ -296,6 +296,30 @@ pub fn binary_erosion<T: NdElement, M: MaskElement>(
     args: BinaryErosion<'_>,
     mask: Option<(&[M], &Layout)>,
 ) -> Result<Vec<u8>, NdimageError> {
+    erosion(input, layout, args, mask, true)
+}
+
+/// [`binary_erosion`] as SciPy computes it into a `float32` or `float64` output array (SCI-25,
+/// reproduced): the later passes of the propagation strategy (`iterations` other than 1, the
+/// structure's centre true, no `brute_force`) protect no element outside the mask, as
+/// `NI_BinaryErosion2` marks those elements by the first byte of each output element, which
+/// is 0 for both 0.0 and 1.0; the first pass reads the mask as [`binary_erosion`] does.
+pub fn binary_erosion_unprotected<T: NdElement, M: MaskElement>(
+    input: &[T],
+    layout: &Layout,
+    args: BinaryErosion<'_>,
+    mask: Option<(&[M], &Layout)>,
+) -> Result<Vec<u8>, NdimageError> {
+    erosion(input, layout, args, mask, false)
+}
+
+fn erosion<T: NdElement, M: MaskElement>(
+    input: &[T],
+    layout: &Layout,
+    args: BinaryErosion<'_>,
+    mask: Option<(&[M], &Layout)>,
+    protect_later: bool,
+) -> Result<Vec<u8>, NdimageError> {
     let structure = args.structure;
     if input.len() < layout.span() {
         return Err(NdimageError::Shape(
@@ -374,7 +398,8 @@ pub fn binary_erosion<T: NdElement, M: MaskElement>(
             &mut out,
             true,
         );
-        let mask_c: Option<Vec<bool>> = mask.map(|(m, ml)| {
+        let later = if protect_later { mask } else { None };
+        let mask_c: Option<Vec<bool>> = later.map(|(m, ml)| {
             let mut idx = vec![0usize; ml.ndim()];
             (0..out.len())
                 .map(|lin| {

@@ -101,6 +101,42 @@ fn binary_erosion_and_dilation() {
 }
 
 #[test]
+fn erosion_into_a_float_output_protects_nothing_outside_the_mask() {
+    // SCI-25: scipy.ndimage.binary_erosion(ones(5), iterations=4, mask=[1, 1, 1, 0, 0]) is
+    // [0, 0, 0, 1, 1] into a bool output and [0, 0, 0, 0, 1] into a float64 output array
+    // (its later passes erode the element outside the mask); with iterations=-1 [0, 0, 0, 0, 0]
+    let a = [1u8; 5];
+    let m = [1u8, 1, 1, 0, 0];
+    let l = Layout::c(&[5]);
+    let st = generate_binary_structure(1, 1);
+    let args = BinaryErosion {
+        structure: &st,
+        origins: &[0],
+        iterations: 4,
+        border_value: false,
+        invert: false,
+        brute_force: false,
+    };
+    let mk = Some((&m[..], &l));
+    assert_eq!(
+        binary_erosion::<u8, u8>(&a, &l, args, mk).unwrap(),
+        [0, 0, 0, 1, 1]
+    );
+    assert_eq!(
+        binary_erosion_unprotected::<u8, u8>(&a, &l, args, mk).unwrap(),
+        [0, 0, 0, 0, 1]
+    );
+    let until = BinaryErosion {
+        iterations: -1,
+        ..args
+    };
+    assert_eq!(
+        binary_erosion_unprotected::<u8, u8>(&a, &l, until, mk).unwrap(),
+        [0, 0, 0, 0, 0]
+    );
+}
+
+#[test]
 fn structures() {
     let s = generate_binary_structure(2, 1);
     assert_eq!(

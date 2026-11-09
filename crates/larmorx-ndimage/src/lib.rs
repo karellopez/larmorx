@@ -82,8 +82,8 @@ pub use filters::{
 };
 pub use measurements::{LabelValue, Labels, label, sum_labels_bincount};
 pub use morphology::{
-    BinaryErosion, MaskElement, binary_erosion, center_is_true, dilation_arguments,
-    generate_binary_structure, iterate_structure,
+    BinaryErosion, MaskElement, binary_erosion, binary_erosion_unprotected, center_is_true,
+    dilation_arguments, generate_binary_structure, iterate_structure,
 };
 pub use watershed::{
     MarkerValue, Watershed, WatershedEvents, WatershedInput, watershed_ift, watershed_ift_run,

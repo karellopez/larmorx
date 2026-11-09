@@ -1327,6 +1327,63 @@ def generate_binary_structure(rank: int, connectivity: int) -> np.ndarray:
     return output <= connectivity
 
 
+def _morph_type(dtype: np.dtype) -> np.dtype:
+    """``NI_BinaryErosion``'s type switches (the mask's, the input's and the output's, in that
+    order at the first element): the canonical type larmorx computes in (bool as uint8,
+    ``longlong`` as int64), or SciPy's ``RuntimeError``. A byte-swapped array is a native copy
+    by then (``NI_ObjectToInputArray``; the output's write-back copy)."""
+    if dtype == np.bool_:
+        return np.dtype(np.uint8)
+    if (dtype.kind in "iu" and dtype.itemsize in (1, 2, 4, 8)) or (
+        dtype.kind == "f" and dtype.itemsize in (4, 8)
+    ):
+        return np.dtype(f"{dtype.kind}{dtype.itemsize}")
+    raise RuntimeError("data type not supported")
+
+
+def _c_int(v: Any) -> int:
+    """``PyArg_ParseTuple``'s ``"i"``: CPython's ``PyLong_AsLong`` (``__index__``, so a float, a
+    string or numpy's bool is a ``TypeError``; beyond a C ``long``, 64-bit on Linux and macOS:
+    "Python int too large to convert to C long"), then the C ``int`` range."""
+    v = operator.index(v)
+    if v > 2**63 - 1 or v < -(2**63):
+        raise OverflowError("Python int too large to convert to C long")
+    if v > 2**31 - 1:
+        raise OverflowError("signed integer is greater than maximum")
+    if v < -(2**31):
+        raise OverflowError("signed integer is less than minimum")
+    return v
+
+
+def _center_is_true(structure: np.ndarray, origin: list) -> bool:
+    """SciPy's ``_center_is_true``: the structure's element at its centre moved by the origins
+    (numpy's indexing: a float origin is an ``IndexError``, a negative index counts from the
+    end)."""
+    structure = np.asarray(structure)
+    coor = tuple([oo + ss // 2 for ss, oo in zip(structure.shape, origin, strict=False)])
+    return bool(structure[coor])
+
+
+def _needs_writeback(out_arr: np.ndarray, shares: bool) -> bool:
+    """Whether ``NI_ObjectToInputOutputArray`` (``NPY_ARRAY_BEHAVED_NS``) gives
+    ``NI_BinaryErosion2`` a write-back copy of the output: a byte-swapped or misaligned array
+    (SciPy's temporary of the output's type, when the output shares the input's memory)."""
+    if not out_arr.dtype.isnative:
+        return True
+    return not shares and not out_arr.flags.aligned
+
+
+#: The register's text for the binary erosion's events (``docs/api/upstream-defects.md``).
+_SCI10 = (
+    "the passes after the first read the mask cast to int8 (values such as 0.5 or 256 false), "
+    "the first its truth"
+)
+_SCI25 = (
+    "into a float32 or float64 output array the later passes erode elements outside the mask "
+    "(SciPy marks them by the first byte of each element, 0 for 0.0 and 1.0)"
+)
+
+
 def _binary_erosion(
     input,
     structure,
@@ -1341,18 +1398,29 @@ def _binary_erosion(
     n_threads,
     upstream_defects="fix",
 ) -> np.ndarray:
+    """SciPy's ``_binary_erosion``, check for check: its Python checks, then
+    ``Py_BinaryErosion``'s parser (the output's write access, ``border_value`` as a C ``int``,
+    the origins by numpy's ``PyArray_IntpConverter``) and ``NI_BinaryErosion``'s type switches
+    (none for an empty input); for the propagation strategy (``iterations`` other than 1, the
+    centre true, no ``brute_force``) the mask cast to ``int8`` and ``iterations - 1`` as a C
+    ``int`` (SciPy's second C call); then the passes in Rust.
+
+    Defects (``upstream_defects``): SCI-10 (the later passes read the mask cast to ``int8``),
+    SCI-25 (into a float output array the later passes erode outside the mask), SCI-26 (numpy's
+    write-back warning for a byte-swapped or misaligned output array; ``reproduce`` only)."""
     _defects.check(upstream_defects)
     try:
         iterations = operator.index(iterations)
     except TypeError as e:
         raise TypeError("iterations parameter should be an integer") from e
-    a = np.asarray(input)
-    if not a.flags.c_contiguous and not a.flags.f_contiguous:
-        a = np.ascontiguousarray(a)
-    ndim = a.ndim
-    if np.iscomplexobj(a):
+    input = np.asarray(input)
+    # (SciPy 1.18.1; 1.15.3 reads a broadcast input as it is, with the same result)
+    if not input.flags.c_contiguous and not input.flags.f_contiguous:
+        input = np.ascontiguousarray(input)
+    ndim = input.ndim
+    if np.iscomplexobj(input):
         raise TypeError("Complex type not supported")
-    axes = _check_axes(axes, a.ndim)
+    axes = _check_axes(axes, input.ndim)
     num_axes = len(axes)
     if structure is None:
         structure = generate_binary_structure(num_axes, 1)
@@ -1360,70 +1428,110 @@ def _binary_erosion(
         structure = np.asarray(structure, dtype=bool)
     if ndim > num_axes:
         structure = _expand_footprint(ndim, axes, structure, "structure")
-    if structure.ndim != a.ndim:
+    if structure.ndim != input.ndim:
         raise RuntimeError("structure and input must have same dimensionality")
     structure = np.ascontiguousarray(structure)
     if structure.size < 1:
         raise RuntimeError("structure must not be empty")
     if mask is not None:
         mask = np.asarray(mask)
-        if mask.shape != a.shape:
+        if mask.shape != input.shape:
             raise RuntimeError("mask and input must have equal sizes")
-        if mask.dtype == np.bool_:
-            mask = mask.view(np.uint8)
-        if not mask.dtype.isnative:
-            mask = mask.astype(mask.dtype.newbyteorder("="))
     origin = _normalize_sequence(origin, num_axes)
     origin = _expand_origin(ndim, axes, origin)
-    if isinstance(output, np.ndarray) and np.iscomplexobj(output):
-        raise TypeError("Complex output type not supported")
-    data, _ = _input(a)
-
-    def run(m):
-        return _core.ndimage_binary_erosion(
-            data,
-            structure,
-            [int(o) for o in origin],
-            int(iterations),
-            bool(border_value),
-            bool(invert),
-            bool(brute_force),
-            m,
-            int(n_threads),
-        )
-
-    # SCI-10: SciPy's passes after the first read the mask cast to int8 (0.5 and 256 are false
-    # there, true in the first pass); corrected, every pass reads the mask's truth
-    truth = None
-    if mask is not None and iterations != 1 and mask.dtype not in (np.uint8, np.int8):
-        t = mask != 0
-        if not np.array_equal(t, mask.astype(np.int8) != 0):
-            truth = t.view(np.uint8)
-    out = run(mask if truth is None or upstream_defects == "reproduce" else truth)
-    if truth is not None:
-        other = run(truth if upstream_defects == "reproduce" else mask)
-        if not np.array_equal(out, other):
-            _defects.warn(
-                [
-                    (
-                        "SCI-10",
-                        "SciPy ndimage",
-                        upstream_defects,
-                        "the passes after the first read the mask cast to int8 (values such as "
-                        "0.5 or 256 false), the first its truth",
-                    )
-                ],
-                stacklevel=3,
-            )
-    res = out.view(np.bool_)
-    if output is None:
-        return res
+    cit = _center_is_true(structure, origin)
+    out_arr = None
     if isinstance(output, np.ndarray):
-        if output.shape != a.shape:
+        if np.iscomplexobj(output):
+            raise TypeError("Complex output type not supported")
+        # (any other output is ignored: SciPy's output is then a new bool array)
+        if output.shape != input.shape:
             raise RuntimeError("output shape not correct")
-        np.copyto(output, out, casting="unsafe")
-        return output
-    return out.astype(np.dtype(output))
+        out_arr = output
+    # Py_BinaryErosion's parser ("O&O&O&O&iO&iii")
+    _c_output(out_arr)
+    border = _c_int(border_value)
+    origins = [_intp(o) for o in origin]
+    out_dtype = np.dtype(bool) if out_arr is None else out_arr.dtype
+    # NI_BinaryErosion's type switches, at the first element
+    if input.size:
+        if mask is not None:
+            _morph_type(mask.dtype)
+        _morph_type(input.dtype)
+        _morph_type(out_dtype)
+    shares = out_arr is not None and np.may_share_memory(input, out_arr)
+    lists = iterations != 1 and bool(cit) and not brute_force
+    reproduce = upstream_defects == "reproduce"
+    if input.size == 0:
+        out = np.zeros(input.shape, np.uint8)
+        if lists:
+            if mask is not None and reproduce:
+                np.asarray(mask, dtype=np.int8)
+            _c_int(iterations - 1)
+    else:
+        data = _native(input, _morph_type(input.dtype))
+        st = structure
+        mdata = None if mask is None else _native(mask, _morph_type(mask.dtype))
+        if ndim == 0:
+            # a 0-d array: a single element, its own neighbourhood
+            data, st, origins = data.reshape(1), st.reshape(1), [0]
+            mdata = None if mdata is None else mdata.reshape(1)
+
+        def run(m, its=iterations, protect=True):
+            return _core.ndimage_binary_erosion(
+                data,
+                st,
+                origins,
+                int(its),
+                border != 0,
+                bool(invert),
+                bool(brute_force),
+                m,
+                int(n_threads),
+                protect,
+            )
+
+        if lists:
+            # SciPy's steps before its second C call: the mask cast to int8 (numpy's warnings
+            # for NaN and values out of int8's range: SCI-10's cast, with reproduce), then
+            # iterations - 1 as a C int, which fails after the first pass wrote the output
+            if mask is not None and reproduce:
+                np.asarray(mask, dtype=np.int8)
+            try:
+                _c_int(iterations - 1)
+            except OverflowError:
+                if out_arr is not None and not shares:
+                    first = run(mdata, 1).reshape(input.shape)
+                    np.copyto(out_arr, first, casting="unsafe")
+                raise
+        # SCI-10: the int8 cast of a mask of another type than bool and 8-bit integers
+        truth = None
+        if lists and mask is not None and mask.dtype not in (np.bool_, np.uint8, np.int8):
+            truth = (mask != 0).view(np.uint8)
+            truth = truth.reshape(1) if ndim == 0 else truth
+        # SCI-25: an erosion into a float output array
+        sci25 = lists and mask is not None and not invert and out_dtype.kind == "f"
+        m_fix = mdata if truth is None else truth
+        out = run(mdata, protect=not sci25) if reproduce else run(m_fix)
+        notices = []
+        if truth is not None:
+            other = run(m_fix, protect=not sci25) if reproduce else run(mdata)
+            if not np.array_equal(out, other):
+                notices.append(("SCI-10", "SciPy ndimage", upstream_defects, _SCI10))
+        if sci25:
+            other = run(mdata) if reproduce else run(m_fix, protect=False)
+            if not np.array_equal(out, other):
+                notices.append(("SCI-25", "SciPy ndimage", upstream_defects, _SCI25))
+        if notices:
+            _defects.warn(notices, stacklevel=3)
+        out = out.reshape(input.shape)
+    if lists and reproduce and out_arr is not None and _needs_writeback(out_arr, shares):
+        # SCI-26 reproduced: NI_BinaryErosion2's write-back copy is never resolved
+        _writeback_warning()
+    if out_arr is None:
+        return out.view(np.bool_)
+    np.copyto(out_arr, out, casting="unsafe")
+    return out_arr
 
 
 def binary_erosion(
@@ -1440,7 +1548,9 @@ def binary_erosion(
     n_threads: int = 1,
     upstream_defects: UpstreamDefectsName = "fix",
 ) -> np.ndarray:
-    """``scipy.ndimage.binary_erosion`` (SCI-10, ``upstream_defects``: :func:`binary_propagation`)."""
+    """``scipy.ndimage.binary_erosion`` (SCI-10, SCI-25 and SCI-26: ``upstream_defects``,
+    ``docs/api/ndimage-filters.md``). An ``output`` that is not an array is ignored, as SciPy
+    ignores it (the result is a new ``bool`` array)."""
     return _binary_erosion(
         input,
         structure,
@@ -1473,8 +1583,8 @@ def binary_dilation(
 ) -> np.ndarray:
     """``scipy.ndimage.binary_dilation``: the erosion of the complement with the reversed
     structure."""
-    a = np.asarray(input)
-    axes = _check_axes(axes, a.ndim)
+    input = np.asarray(input)
+    axes = _check_axes(axes, input.ndim)
     num_axes = len(axes)
     if structure is None:
         structure = generate_binary_structure(num_axes, 1)
@@ -1486,7 +1596,7 @@ def binary_dilation(
         if not structure.shape[ii] & 1:
             origin[ii] -= 1
     return _binary_erosion(
-        a,
+        input,
         structure,
         iterations,
         mask,
@@ -1516,12 +1626,13 @@ def binary_opening(
     upstream_defects: UpstreamDefectsName = "fix",
 ) -> np.ndarray:
     """``scipy.ndimage.binary_opening``: an erosion, then a dilation."""
-    a = np.asarray(input)
-    axes = _check_axes(axes, a.ndim)
+    input = np.asarray(input)
+    axes = _check_axes(axes, input.ndim)
+    num_axes = len(axes)
     if structure is None:
-        structure = generate_binary_structure(len(axes), 1)
+        structure = generate_binary_structure(num_axes, 1)
     tmp = binary_erosion(
-        a,
+        input,
         structure,
         iterations,
         mask,
@@ -1563,12 +1674,13 @@ def binary_closing(
     upstream_defects: UpstreamDefectsName = "fix",
 ) -> np.ndarray:
     """``scipy.ndimage.binary_closing``: a dilation, then an erosion."""
-    a = np.asarray(input)
-    axes = _check_axes(axes, a.ndim)
+    input = np.asarray(input)
+    axes = _check_axes(axes, input.ndim)
+    num_axes = len(axes)
     if structure is None:
-        structure = generate_binary_structure(len(axes), 1)
+        structure = generate_binary_structure(num_axes, 1)
     tmp = binary_dilation(
-        a,
+        input,
         structure,
         iterations,
         mask,
@@ -1605,10 +1717,12 @@ def binary_hit_or_miss(
     *,
     axes: Any = None,
     n_threads: int = 1,
-) -> np.ndarray:
-    """``scipy.ndimage.binary_hit_or_miss``."""
-    a = np.asarray(input)
-    axes = _check_axes(axes, a.ndim)
+) -> np.ndarray | None:
+    """``scipy.ndimage.binary_hit_or_miss``: the elements where ``structure1`` fits the input
+    and ``structure2`` its complement; ``None`` when ``output`` is an array (the result is
+    written there), as SciPy returns."""
+    input = np.asarray(input)
+    axes = _check_axes(axes, input.ndim)
     num_axes = len(axes)
     if structure1 is None:
         structure1 = generate_binary_structure(num_axes, 1)
@@ -1618,14 +1732,16 @@ def binary_hit_or_miss(
         structure2 = np.logical_not(structure1)
     origin1 = _normalize_sequence(origin1, num_axes)
     origin2 = origin1 if origin2 is None else _normalize_sequence(origin2, num_axes)
-    tmp1 = _binary_erosion(a, structure1, 1, None, None, 0, origin1, 0, False, axes, n_threads)
+    tmp1 = _binary_erosion(input, structure1, 1, None, None, 0, origin1, 0, False, axes, n_threads)
     inplace = isinstance(output, np.ndarray)
-    result = _binary_erosion(a, structure2, 1, None, output, 0, origin2, 1, False, axes, n_threads)
+    result = _binary_erosion(
+        input, structure2, 1, None, output, 0, origin2, 1, False, axes, n_threads
+    )
     if inplace:
         np.logical_not(output, output)
         np.logical_and(tmp1, output, output)
-        return output
-    result = np.logical_not(result)
+        return None
+    np.logical_not(result, result)
     return np.logical_and(tmp1, result)
 
 
@@ -1647,7 +1763,9 @@ def binary_propagation(
     type other than bool and 8-bit integers and more than one pass (``iterations`` other than 1,
     as here), SciPy's first pass reads the mask's truth and the later ones the mask cast to
     ``int8``, so a value such as 0.5 or 256 is true in the first pass and false afterwards;
-    larmorx reads its truth in every pass, with a warning when that changes the result."""
+    larmorx reads its truth in every pass, with a warning when that changes the result. SCI-26:
+    a byte-swapped or misaligned ``output`` array gets numpy's write-back warning with
+    ``reproduce`` only."""
     return binary_dilation(
         input,
         structure,
@@ -1670,18 +1788,44 @@ def binary_fill_holes(
     *,
     axes: Any = None,
     n_threads: int = 1,
-) -> np.ndarray:
-    """``scipy.ndimage.binary_fill_holes``."""
-    a = np.asarray(input)
-    mask = np.logical_not(a)
+    upstream_defects: UpstreamDefectsName = "fix",
+) -> np.ndarray | None:
+    """``scipy.ndimage.binary_fill_holes``: the complement of the background reached from the
+    array's edges; ``None`` when ``output`` is an array (the result is written there), as
+    SciPy returns (SCI-26: :func:`binary_propagation`)."""
+    input = np.asarray(input)
+    mask = np.logical_not(input)
     tmp = np.zeros(mask.shape, bool)
     inplace = isinstance(output, np.ndarray)
     if inplace:
-        binary_dilation(tmp, structure, -1, mask, output, 1, origin, axes=axes, n_threads=n_threads)
+        binary_dilation(
+            tmp,
+            structure,
+            -1,
+            mask,
+            output,
+            1,
+            origin,
+            axes=axes,
+            n_threads=n_threads,
+            upstream_defects=upstream_defects,
+        )
         np.logical_not(output, output)
-        return output
-    out = binary_dilation(tmp, structure, -1, mask, None, 1, origin, axes=axes, n_threads=n_threads)
-    return np.logical_not(out)
+        return None
+    output = binary_dilation(
+        tmp,
+        structure,
+        -1,
+        mask,
+        None,
+        1,
+        origin,
+        axes=axes,
+        n_threads=n_threads,
+        upstream_defects=upstream_defects,
+    )
+    np.logical_not(output, output)
+    return output
 
 
 def iterate_structure(structure: Any, iterations: int, origin: Any = None) -> Any:
@@ -1707,80 +1851,292 @@ def iterate_structure(structure: Any, iterations: int, origin: Any = None) -> An
 # --- measurements ----------------------------------------------------------------------------
 
 
-def label(input: Any, structure: Any = None, output: Any = None) -> Any:
+def _label_type(dtype: np.dtype) -> np.dtype:
+    """``_ni_label``'s fused type ``data_t`` (Cython's dispatch by kind and size): the canonical
+    type, or Cython's ``TypeError``."""
+    if (dtype.kind in "iu" and dtype.itemsize in (1, 2, 4, 8)) or (
+        dtype.kind == "f" and dtype.itemsize in (4, 8)
+    ):
+        return np.dtype(f"{dtype.kind}{dtype.itemsize}")
+    raise TypeError("No matching signature found")
+
+
+_BIG_ENDIAN = "Big-endian buffer not supported on little-endian compiler"
+_SCI27 = "SciPy's label refuses a big-endian {what} ({error}); labelled as its native copy"
+_SCI28 = (
+    "SciPy's label writes the labels into a read-only output array; "
+    "upstream_defects='reproduce' does where numpy lets the array be written"
+)
+_SCI29 = (
+    "SciPy's label writes labels above 1 into a bool output as their bytes ({n} labels): an "
+    "invalid bool array; corrected, labels that do not fit are refused as in any other type"
+)
+
+
+def _iter_axis(a: np.ndarray) -> int:
+    """numpy's ``PyArray_IterAllButAxis`` with ``axis = -1``, the axis ``_ni_label`` runs its
+    lines along (the output's): the axis of the smallest positive stride, starting from the
+    first non-zero stride counted as axis 0's."""
+    minaxis, minstride, i = 0, 0, 0
+    while minstride == 0 and i < a.ndim:
+        minstride = a.strides[i]
+        i += 1
+    for i in range(1, a.ndim):
+        if 0 < a.strides[i] < minstride:
+            minaxis, minstride = i, a.strides[i]
+    return minaxis
+
+
+def _provisional_labels(fg: np.ndarray, structure: np.ndarray) -> int:
+    """The number of working labels ``_ni_label`` gives out (its lines along the last axis):
+    the foreground elements none of whose earlier neighbours (the structure's elements before
+    its centre, in C order) is foreground. Its working labels run from 2 up."""
+    has = np.zeros(fg.shape, bool)
+    for lin in range((structure.size - 1) // 2):
+        if not structure.flat[lin]:
+            continue
+        d = [int(k) - 1 for k in np.unravel_index(lin, structure.shape)]
+        src = tuple(slice(max(0, di), n + min(0, di)) for di, n in zip(d, fg.shape, strict=True))
+        dst = tuple(slice(max(0, -di), n - max(0, di)) for di, n in zip(d, fg.shape, strict=True))
+        has[dst] |= fg[src]
+    return int(np.count_nonzero(fg & ~has))
+
+
+def _write_labels(output: np.ndarray, labels: np.ndarray) -> bool:
+    """``output[...] = labels`` (numpy's cast) and whether every label fits (SciPy's check after
+    its ``NeedMoreBits`` retry)."""
+    output[...] = labels
+    return bool(np.all(output == labels))
+
+
+def label(
+    input: Any,
+    structure: Any = None,
+    output: Any = None,
+    *,
+    upstream_defects: UpstreamDefectsName = "fix",
+) -> Any:
     """``scipy.ndimage.label``: the connected components of the non-zero elements, numbered
     from 1 by their first element in C order; ``(labels, number)``, or ``number`` when an
-    ``output`` array is given."""
-    a = np.asarray(input)
-    if np.iscomplexobj(a):
+    ``output`` array is given.
+
+    SciPy's checks in its order (the output made from a dtype first, scalars and empty arrays,
+    ``_ni_label``'s symmetry check, then the input's and the output's types). Corrected by
+    default (``upstream_defects="reproduce"`` gives SciPy's behaviour): SCI-27, a big-endian
+    input or output is labelled as its native copy (SciPy: ``ValueError``); SCI-28, a read-only
+    output array is refused (SciPy writes into it); SCI-29, labels above 1 into a ``bool``
+    output are refused as labels that do not fit any type (SciPy writes their bytes into the
+    bool array, up to 255)."""
+    _defects.check(upstream_defects)
+    reproduce = upstream_defects == "reproduce"
+    input = np.asarray(input)
+    if np.iscomplexobj(input):
         raise TypeError("Complex type not supported")
     if structure is None:
-        structure = generate_binary_structure(a.ndim, 1)
+        structure = generate_binary_structure(input.ndim, 1)
     structure = np.asarray(structure, dtype=bool)
-    if structure.ndim != a.ndim:
+    if structure.ndim != input.ndim:
         raise RuntimeError("structure and input must have equal rank")
     for ii in structure.shape:
         if ii != 3:
             raise ValueError("structure dimensions must be equal to 3")
-    need_64bits = a.size >= (2**31 - 2)
-    caller_provided_output = isinstance(output, np.ndarray)
-    if caller_provided_output and output.shape != a.shape:
-        raise ValueError("output shape not correct")
-    if a.ndim == 0 or a.size == 0:
-        maxlabel = (1 if (a != 0) else 0) if a.ndim == 0 else 0
-        if caller_provided_output:
+    need_64bits = input.size >= (2**31 - 2)
+    if isinstance(output, np.ndarray):
+        if output.shape != input.shape:
+            raise ValueError("output shape not correct")
+        caller_provided_output = True
+    else:
+        caller_provided_output = False
+        if output is None:
+            output = np.empty(input.shape, np.intp if need_64bits else np.int32)
+        else:
+            output = np.empty(input.shape, output)
+    if input.ndim == 0 or input.size == 0:
+        if input.ndim == 0:
+            maxlabel = 1 if (input != 0) else 0
             output[...] = maxlabel
+        else:
+            maxlabel = 0
+        if caller_provided_output:
             return maxlabel
-        out = np.empty(a.shape, np.intp if need_64bits else np.int32 if output is None else output)
-        out[...] = maxlabel
-        return out, maxlabel
+        return output, maxlabel
+    # _ni_label._label
     if not np.all(structure == structure[(np.s_[::-1],) * structure.ndim]):
         raise AssertionError("Structuring element is not symmetric")
-    data, _ = _input(a)
-    labels, n = _core.ndimage_label(data, np.ascontiguousarray(structure))
+    notices = []
+    in_dtype = np.dtype(np.uint8) if input.dtype == np.bool_ else input.dtype
+    in_t = _label_type(in_dtype)
+    if not in_dtype.isnative:
+        if reproduce:
+            raise ValueError(_BIG_ENDIAN)
+        notices.append(("SCI-27", "SciPy ndimage", upstream_defects, "input"))
+    out_dtype = np.dtype(np.uint8) if output.dtype == np.bool_ else output.dtype
+    _label_type(out_dtype)
+    if not out_dtype.isnative:
+        if reproduce:
+            raise ValueError(_BIG_ENDIAN)
+        notices.append(("SCI-27", "SciPy ndimage", upstream_defects, "output"))
+    if notices:
+        what = " and ".join(n[3] for n in notices)
+        _defects.warn(
+            [
+                (
+                    "SCI-27",
+                    "SciPy ndimage",
+                    upstream_defects,
+                    _SCI27.format(what=what, error=f"ValueError: {_BIG_ENDIAN}"),
+                )
+            ],
+            stacklevel=2,
+        )
+    lifted = False
+    if not output.flags.writeable:
+        if not reproduce:
+            raise ValueError(
+                "output array is read-only. (SCI-28: SciPy's label writes into it; "
+                "upstream_defects='reproduce' does)"
+            )
+        try:
+            output.flags.writeable = True
+            lifted = True
+        except ValueError:
+            raise ValueError(
+                "output array is read-only. (SCI-28: numpy does not let this array be "
+                "written, so SciPy's write into it is not reproduced)"
+            ) from None
+        _defects.warn([("SCI-28", "SciPy ndimage", upstream_defects, _SCI28)], stacklevel=2)
+    try:
+        # the lines run along the output's axis of the smallest stride: the components are
+        # numbered by their first element in C order with that axis last
+        axis = _iter_axis(output.view(np.uint8) if output.dtype == np.bool_ else output)
+        x = _native(input, in_t)
+        st = structure
+        last = axis == input.ndim - 1
+        if not last:
+            x, st = np.moveaxis(x, axis, -1), np.moveaxis(st, axis, -1)
+        st = np.ascontiguousarray(st)
+        labels, n = _core.ndimage_label(x, st)
+        # SciPy views a bool output as uint8: when its working labels fit in a byte
+        # (NeedMoreBits otherwise: the labels cast, refused), the labels are written as their
+        # bytes
+        if output.dtype == np.bool_ and n > 1 and _provisional_labels(x != 0, st) + 1 <= 255:
+            _defects.warn(
+                [("SCI-29", "SciPy ndimage", upstream_defects, _SCI29.format(n=n))],
+                stacklevel=2,
+            )
+            if reproduce:
+                output.view(np.uint8)[...] = labels if last else np.moveaxis(labels, -1, axis)
+                return n if caller_provided_output else (output, n)
+        if not last:
+            labels = np.moveaxis(labels, -1, axis)
+        if not _write_labels(output, labels):
+            raise RuntimeError("insufficient bit-depth in requested output type")
+    finally:
+        if lifted:
+            output.flags.writeable = False
     if caller_provided_output:
-        output[...] = labels
-        if not np.all(output == labels):
-            raise RuntimeError("insufficient bit-depth in requested output type")
         return n
-    if output is not None:
-        res = labels.astype(output)
-        if not np.all(res == labels):
-            raise RuntimeError("insufficient bit-depth in requested output type")
-        return res, n
-    return labels, n
+    return output, n
 
 
-def sum_labels(input: Any, labels: Any = None, index: Any = None) -> Any:
-    """``scipy.ndimage.sum_labels``: the sum of the input over each label of ``index``; over
-    the positive labels (``index`` None) or all of it (``labels`` None)."""
-    a = np.asarray(input)
+def _safely_castable_to_int(dt: np.dtype) -> bool:
+    """SciPy's ``_safely_castable_to_int``: labels ``bincount`` takes as they are."""
+    int_size = np.dtype(int).itemsize
+    return bool(
+        (np.issubdtype(dt, np.signedinteger) and dt.itemsize <= int_size)
+        or (np.issubdtype(dt, np.unsignedinteger) and dt.itemsize < int_size)
+    )
+
+
+_SCI30 = "SciPy's sums per label fail on {what}; corrected: {fix}"
+
+
+def _stats(input, labels, index, single, mode: str):
+    """SciPy's ``_stats`` (not centred): ``(counts, sums)`` of the whole input, of the positive
+    labels, of one label or per label of a sequence ``index`` (``bincount``, through
+    ``unique`` for labels it cannot take); ``single(values)`` sums a selection. SCI-30 (rule A):
+    a 0-d index array and an empty input with a sequence index, where SciPy fails, give the
+    sums per label (a scalar for the 0-d index; zeros for the empty input)."""
+
+    def single_group(vals):
+        return vals.size, single(vals)
+
+    input = np.asarray(input)
     if labels is None:
-        return a.sum()
-    lab = np.asarray(labels)
-    a, lab = np.broadcast_arrays(a, lab)
+        return single_group(input)
+    labels = np.asarray(labels)
+    input, labels = np.broadcast_arrays(input, labels)
     if index is None:
-        return a[lab > 0].sum()
+        return single_group(input[labels > 0])
     if np.isscalar(index):
-        return a[lab == index].sum()
-    if a.dtype.kind not in "biuf" or lab.dtype.kind not in "biu":
-        # SciPy's unique path for labels of other types: the same sums by value
-        uniq, inv = np.unique(lab, return_inverse=True)
-        sums = np.bincount(inv.reshape(-1), weights=a.ravel())
-        idxs = np.searchsorted(uniq, index)
-        idxs[idxs >= uniq.size] = 0
-        found = uniq[idxs] == index
-        out = sums[idxs]
-        out[~found] = 0
-        return out
-    data, _ = _input(np.ascontiguousarray(a))
-    lab = np.ascontiguousarray(lab)
-    if lab.dtype == np.bool_:
-        lab = lab.view(np.uint8)
-    idx = np.asanyarray(index)
-    flat = [int(v) for v in idx.ravel()]
-    res = np.asarray(_core.ndimage_sum_labels(data, lab, flat), dtype=np.float64)
-    return res.reshape(idx.shape)
+        return single_group(input[labels == index])
+    if mode != "reproduce":
+        if isinstance(index, np.ndarray) and index.ndim == 0:
+            what = "a 0-d index array (TypeError)"
+            if input.size:
+                counts, sums = _stats(input, labels, index.reshape(1), single, "reproduce")
+                fix = "the sums per label of its one label"
+                counts, sums = counts.reshape(())[()], sums.reshape(())[()]
+            else:
+                counts, sums = np.intp(0), np.float64(0.0)
+                fix = "zeros"
+            _defects.warn(
+                [("SCI-30", "SciPy ndimage", mode, _SCI30.format(what=what, fix=fix))],
+                stacklevel=4,
+            )
+            return counts, sums
+        if input.size == 0:
+            shape = np.shape(index)
+            _defects.warn(
+                [
+                    (
+                        "SCI-30",
+                        "SciPy ndimage",
+                        mode,
+                        _SCI30.format(
+                            what="an empty input with a sequence index (ValueError or IndexError)",
+                            fix="zero counts and sums",
+                        ),
+                    )
+                ],
+                stacklevel=4,
+            )
+            return np.zeros(shape, np.intp), np.zeros(shape, np.float64)
+    if not _safely_castable_to_int(labels.dtype) or labels.min() < 0 or labels.max() > labels.size:
+        unique_labels, new_labels = np.unique(labels, return_inverse=True)
+        new_labels = np.reshape(new_labels, (-1,))
+        counts = np.bincount(new_labels)
+        sums = np.bincount(new_labels, weights=input.ravel())
+        idxs = np.searchsorted(unique_labels, index)
+        idxs[idxs >= unique_labels.size] = 0
+        found = unique_labels[idxs] == index
+    else:
+        counts = np.bincount(labels.ravel())
+        sums = np.bincount(labels.ravel(), weights=input.ravel())
+        idxs = np.asanyarray(index, np.int_).copy()
+        found = (idxs >= 0) & (idxs < counts.size)
+        idxs[~found] = 0
+    counts = counts[idxs]
+    counts[~found] = 0
+    sums = sums[idxs]
+    sums[~found] = 0
+    return counts, sums
+
+
+def sum_labels(
+    input: Any,
+    labels: Any = None,
+    index: Any = None,
+    *,
+    upstream_defects: UpstreamDefectsName = "fix",
+) -> Any:
+    """``scipy.ndimage.sum_labels``: the sum of the input over each label of ``index`` (float64,
+    numpy's ``bincount``), over the positive labels (``index`` None), one label (a scalar
+    ``index``) or all of it (``labels`` None), numpy's sums of the selection. SCI-30
+    (``upstream_defects``): a 0-d ``index`` array and an empty input with a sequence ``index``
+    give the sums where SciPy fails."""
+    _defects.check(upstream_defects)
+    return _stats(input, labels, index, lambda v: v.sum(), upstream_defects)[1]
 
 
 def _sum_in_order(a: np.ndarray, numpy_version: str) -> Any:
@@ -1797,26 +2153,13 @@ def _sum_in_order(a: np.ndarray, numpy_version: str) -> Any:
     return a.sum()
 
 
-def _sum_labels_in_order(a: np.ndarray, labels: Any, index: Any, numpy_version: str) -> Any:
-    """``sum_labels(a, labels, index)`` with the whole-array and selected sums in numpy
-    ``numpy_version``'s order (``_stats``' ``single_group``)."""
-    if labels is None:
-        return _sum_in_order(a, numpy_version)
-    lab = np.asarray(labels)
-    a, lab = np.broadcast_arrays(a, lab)
-    if index is None:
-        return _sum_in_order(a[lab > 0], numpy_version)
-    if np.isscalar(index):
-        return _sum_in_order(a[lab == index], numpy_version)
-    return sum_labels(a, lab, index)
-
-
 def center_of_mass(
     input: Any,
     labels: Any = None,
     index: Any = None,
     *,
     numpy_version: str = NUMPY_NEWEST,
+    upstream_defects: UpstreamDefectsName = "fix",
 ) -> Any:
     """``scipy.ndimage.center_of_mass``: the centre of mass of the values (of each label of
     ``index``, of the positive labels, or of the whole array), a tuple per centre; each
@@ -1826,22 +2169,38 @@ def center_of_mass(
     whole-array and selected sums of float32 and float64 values follow ``numpy_version`` (the
     newest release by default) for arrays contiguous in C or Fortran order, the installed
     numpy's for other layouts and types; the sums per label of a sequence ``index`` are
-    numpy's ``bincount`` (in C order, the same in every release)."""
+    numpy's ``bincount`` (in C order, the same in every release). SCI-30: :func:`sum_labels`
+    (one notice per call)."""
+    _defects.check(upstream_defects)
+
+    def single(v):
+        return _sum_in_order(v, numpy_version)
+
     input = np.asarray(input)
-    normalizer = _sum_labels_in_order(input, labels, index, numpy_version)
-    grids = np.ogrid[[slice(0, i) for i in input.shape]]
-    results = [
-        _sum_labels_in_order(input * grids[dir].astype(float), labels, index, numpy_version)
-        / normalizer
-        for dir in range(input.ndim)
-    ]
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        normalizer = _stats(input, labels, index, single, upstream_defects)[1]
+        grids = np.ogrid[[slice(0, i) for i in input.shape]]
+        results = [
+            _stats(input * grids[dir].astype(float), labels, index, single, upstream_defects)[1]
+            / normalizer
+            for dir in range(input.ndim)
+        ]
+    seen = set()
+    for w in caught:
+        if isinstance(w.message, _defects.UpstreamDefectWarning):
+            if w.message.entry in seen:
+                continue
+            seen.add(w.message.entry)
+            warnings.warn(w.message, stacklevel=2)
+        else:
+            warnings.warn_explicit(w.message, w.category, w.filename, w.lineno)
     if np.isscalar(results[0]):
         return tuple(results)
     return [tuple(v) for v in np.array(results).T]
 
 
-#: The register's entries for ``watershed_ift``'s events (provisional IDs: the part registers
-#: them, ``docs/findings/scipy-ndimage-filters.md``, candidates 8 to 11).
+#: The register's entries for ``watershed_ift``'s events (``docs/api/upstream-defects.md``).
 _WATERSHED_DEFECTS = (
     ("SCI-13", "SciPy links elements across the array's edges (it checks only the C-order index)"),
     ("SCI-14", "SciPy left an element alone in its queue there when its cost dropped"),
@@ -1909,6 +2268,8 @@ def watershed_ift(
         out_dtype = output.dtype
     else:
         out_dtype = markers.dtype
+    # Py_WatershedIFT's parser ("O&O&O&O&": the output's write access), then NI_WatershedIFT
+    _c_output(output if given else None)
     if input.ndim > 7:
         raise RuntimeError("too many dimensions")
     if not input.dtype.isnative:
@@ -1943,6 +2304,12 @@ def watershed_ift(
     return labels.astype(out_dtype)
 
 
-def sum(input: Any, labels: Any = None, index: Any = None) -> Any:
+def sum(
+    input: Any,
+    labels: Any = None,
+    index: Any = None,
+    *,
+    upstream_defects: UpstreamDefectsName = "fix",
+) -> Any:
     """``scipy.ndimage.sum``: an alias of :func:`sum_labels`."""
-    return sum_labels(input, labels, index)
+    return sum_labels(input, labels, index, upstream_defects=upstream_defects)

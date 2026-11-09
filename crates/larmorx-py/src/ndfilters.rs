@@ -451,13 +451,18 @@ fn erosion_with_mask<'py, T: NdElement + Element, M: MaskElement + Element>(
     args: BinaryErosion<'_>,
     mask: Option<PyReadonlyArrayDyn<'py, M>>,
     n_threads: usize,
+    protect_later: bool,
 ) -> PyResult<Vec<u8>> {
     let mview = mask.as_ref().map(|m| m.as_array());
     let mparts = mview.as_ref().map(strided);
     let m = mparts.as_ref().map(|(d, l)| (&d[..], l));
     py.detach(|| {
         larmorx_core::parallel::with_threads(n_threads, || {
-            nd::binary_erosion::<T, M>(data, layout, args, m)
+            if protect_later {
+                nd::binary_erosion::<T, M>(data, layout, args, m)
+            } else {
+                nd::binary_erosion_unprotected::<T, M>(data, layout, args, m)
+            }
         })
     })
     .map_err(threads_err)?
@@ -470,32 +475,35 @@ fn erosion_t<'py, T: NdElement + Element>(
     args: BinaryErosion<'_>,
     mask: Option<&Bound<'py, PyAny>>,
     n_threads: usize,
+    protect_later: bool,
 ) -> PyResult<Bound<'py, PyAny>> {
     let view = input.as_array();
     let (data, layout) = strided(&view);
     let out = match mask {
-        None => erosion_with_mask::<T, u8>(py, &data, &layout, args, None, n_threads)?,
+        None => {
+            erosion_with_mask::<T, u8>(py, &data, &layout, args, None, n_threads, protect_later)?
+        }
         Some(m) => {
             if let Ok(x) = m.extract::<PyReadonlyArrayDyn<'_, u8>>() {
-                erosion_with_mask(py, &data, &layout, args, Some(x), n_threads)?
+                erosion_with_mask(py, &data, &layout, args, Some(x), n_threads, protect_later)?
             } else if let Ok(x) = m.extract::<PyReadonlyArrayDyn<'_, f32>>() {
-                erosion_with_mask(py, &data, &layout, args, Some(x), n_threads)?
+                erosion_with_mask(py, &data, &layout, args, Some(x), n_threads, protect_later)?
             } else if let Ok(x) = m.extract::<PyReadonlyArrayDyn<'_, f64>>() {
-                erosion_with_mask(py, &data, &layout, args, Some(x), n_threads)?
+                erosion_with_mask(py, &data, &layout, args, Some(x), n_threads, protect_later)?
             } else if let Ok(x) = m.extract::<PyReadonlyArrayDyn<'_, i8>>() {
-                erosion_with_mask(py, &data, &layout, args, Some(x), n_threads)?
+                erosion_with_mask(py, &data, &layout, args, Some(x), n_threads, protect_later)?
             } else if let Ok(x) = m.extract::<PyReadonlyArrayDyn<'_, u16>>() {
-                erosion_with_mask(py, &data, &layout, args, Some(x), n_threads)?
+                erosion_with_mask(py, &data, &layout, args, Some(x), n_threads, protect_later)?
             } else if let Ok(x) = m.extract::<PyReadonlyArrayDyn<'_, i16>>() {
-                erosion_with_mask(py, &data, &layout, args, Some(x), n_threads)?
+                erosion_with_mask(py, &data, &layout, args, Some(x), n_threads, protect_later)?
             } else if let Ok(x) = m.extract::<PyReadonlyArrayDyn<'_, u32>>() {
-                erosion_with_mask(py, &data, &layout, args, Some(x), n_threads)?
+                erosion_with_mask(py, &data, &layout, args, Some(x), n_threads, protect_later)?
             } else if let Ok(x) = m.extract::<PyReadonlyArrayDyn<'_, i32>>() {
-                erosion_with_mask(py, &data, &layout, args, Some(x), n_threads)?
+                erosion_with_mask(py, &data, &layout, args, Some(x), n_threads, protect_later)?
             } else if let Ok(x) = m.extract::<PyReadonlyArrayDyn<'_, u64>>() {
-                erosion_with_mask(py, &data, &layout, args, Some(x), n_threads)?
+                erosion_with_mask(py, &data, &layout, args, Some(x), n_threads, protect_later)?
             } else if let Ok(x) = m.extract::<PyReadonlyArrayDyn<'_, i64>>() {
-                erosion_with_mask(py, &data, &layout, args, Some(x), n_threads)?
+                erosion_with_mask(py, &data, &layout, args, Some(x), n_threads, protect_later)?
             } else {
                 return Err(PyRuntimeError::new_err("data type not supported"));
             }
@@ -508,7 +516,7 @@ fn erosion_t<'py, T: NdElement + Element>(
 /// brute_force)` after the wrapper's checks (and, for a dilation, its reversed structure):
 /// the result as `uint8` 0/1 values, C-ordered.
 #[pyfunction]
-#[pyo3(signature = (input, structure, origins, iterations, border_value, invert, brute_force, mask = None, n_threads = 1))]
+#[pyo3(signature = (input, structure, origins, iterations, border_value, invert, brute_force, mask = None, n_threads = 1, protect_later = true))]
 #[allow(clippy::too_many_arguments)]
 fn ndimage_binary_erosion<'py>(
     py: Python<'py>,
@@ -521,6 +529,7 @@ fn ndimage_binary_erosion<'py>(
     brute_force: bool,
     mask: Option<Bound<'py, PyAny>>,
     n_threads: usize,
+    protect_later: bool,
 ) -> PyResult<Bound<'py, PyAny>> {
     let st = self::footprint(&structure)?;
     let args = BinaryErosion {
@@ -531,7 +540,15 @@ fn ndimage_binary_erosion<'py>(
         invert,
         brute_force,
     };
-    by_dtype!(input, erosion_t, py, args, mask.as_ref(), n_threads)
+    by_dtype!(
+        input,
+        erosion_t,
+        py,
+        args,
+        mask.as_ref(),
+        n_threads,
+        protect_later
+    )
 }
 
 fn label_t<'py, T: NdElement + Element>(

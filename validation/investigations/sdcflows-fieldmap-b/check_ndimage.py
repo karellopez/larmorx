@@ -1099,6 +1099,37 @@ def arguments(t: Tally) -> None:
     _sci21(t)
     _sci22(t)
     _sci23(t)
+    _morph_arguments(t)
+
+
+def _morph_arguments(t: Tally) -> None:
+    """Binary morphology's, ``label``'s, ``sum_labels``' (and ``sum``'s), ``center_of_mass``'
+    and ``watershed_ift``'s argument handling (relay 22, ``relay22/morph_cases.py``): every case
+    with ``reproduce`` = SciPy's, the default = SciPy's or a registered correction; the SCI-25
+    family and ``label``'s numbering into outputs of every layout."""
+    import importlib.util
+    from pathlib import Path
+
+    path = Path(__file__).resolve().parent / "relay22" / "morph_cases.py"
+    spec = importlib.util.spec_from_file_location("larmorx_relay22_morph_cases", path)
+    mc = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mc)
+    cats: dict[str, int] = defaultdict(int)
+    for name, rep, ok, cat, detail in mc.cases():
+        fn = name.split(" ")[0]
+        t.add(f"arguments: {fn} (reproduce = SciPy)", rep, f"{name}: {detail}")
+        t.add(
+            f"arguments: {fn} (the default = SciPy or a registered correction)",
+            ok,
+            f"{name}: {detail}",
+        )
+        cats[cat] += 1
+    print(
+        "INFO the binary morphology's, labels' and sums' defaults: "
+        + ", ".join(f"{k} {v}" for k, v in sorted(cats.items()))
+    )
+    for name, ok, detail in (*mc.sci25_family(), *mc.label_order_family()):
+        t.add(f"arguments: {name}", ok, detail)
 
 
 def _scipy115_system_error(o: tuple) -> bool:
@@ -1253,7 +1284,8 @@ def main() -> int:
         "--sections",
         default="filters,binary,labels,arguments",
         help="comma-separated: filters, binary, labels, arguments (the filters' argument "
-        "handling, SCI-21 to SCI-23; relay 21)",
+        "handling, SCI-21 to SCI-23, relay 21; binary morphology's, label's, the sums' and "
+        "watershed_ift's, SCI-10, SCI-25 to SCI-30, relay 22)",
     )
     args = ap.parse_args()
     sections = set(args.sections.split(","))

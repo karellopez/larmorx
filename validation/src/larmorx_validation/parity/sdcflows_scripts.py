@@ -605,8 +605,11 @@ def _box() -> int | None:
 
 
 def _reported(text: str) -> str:
-    """A reported line without its times (they differ from run to run)."""
-    return _TIMES.sub("<time>", text.strip())[:300]
+    """A reported line without its times (they differ from run to run) and without the
+    machine's paths (records are published)."""
+    from larmorx_validation.report import redact
+
+    return _TIMES.sub("<time>", redact(text.strip()))[:300]
 
 
 class _Parsed:

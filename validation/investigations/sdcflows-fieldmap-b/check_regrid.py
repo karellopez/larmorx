@@ -213,6 +213,7 @@ def sec_filters(t: cw.Tally, nt: int) -> None:
     )
     sec_derivatives(t, nt)
     sec_complex(t, nt)
+    sec_longdouble(t, nt)
 
 
 def run_w(fn):
@@ -239,6 +240,76 @@ def both_w(t: cw.Tally, what: str, label: str, ref_fn, mine_fn) -> None:
         t.add(what, same(v1, v2), f"{label}: values differ")
     else:
         t.add(what, v1 == v2, f"{label}: {v1!r} / {v2!r}")
+
+
+def sec_longdouble(t: cw.Tally, nt: int) -> None:
+    """A ``numpy.longdouble`` sigma (relay 21): larmorx takes it as float64 (its kernel is
+    SciPy's of ``float(sigma)``, bit for bit, with one warning where the long double is wider
+    than float64); SciPy computes that kernel in numpy's long double (x86-64's 80-bit
+    extended precision here), so the difference from SciPy's own is measured and reported."""
+    from scipy.ndimage._filters import _gaussian_kernel1d as sp_kernel
+
+    from larmorx._ndimage_filters import _gaussian_kernel1d as lx_kernel
+
+    rng = np.random.default_rng(20261121)
+    wide = np.dtype(np.longdouble).itemsize > 8
+    sigmas = [0.5, 1.0, 1.5, 2.0, 0.3, 3.7, 10.0, 0.05, *rng.uniform(0.1, 12.0, 40)]
+    kernels = differ = 0
+    largest = 0.0
+    largest_ulp = 0.0
+    for sg in sigmas:
+        ld = np.longdouble(sg)
+        for order in range(4):
+            radius = int(4.0 * float(ld) + 0.5)
+            ref = sp_kernel(float(ld), order, radius)
+            with warnings.catch_warnings(record=True) as w:
+                warnings.simplefilter("always")
+                mine = lx_kernel(ld, order, radius, np.__version__)
+            t.add(
+                "longdouble sigma: kernel = SciPy's of float(sigma)",
+                same(ref, mine),
+                f"{sg} {order}",
+            )
+            t.add(
+                "longdouble sigma: one warning where it is wider than float64",
+                len(w) == (1 if wide else 0)
+                and all(x.category is UserWarning and "as float64" in str(x.message) for x in w),
+                f"{sg} {order}: {[str(x.message) for x in w]}",
+            )
+            theirs = np.asarray(sp_kernel(ld, order, radius), dtype=np.float64)
+            kernels += 1
+            d = np.abs(theirs - mine)
+            if (theirs != mine).any():
+                differ += 1
+                peak = float(np.abs(theirs).max())
+                largest = max(largest, float(d.max()) / peak)
+                if order == 0:  # the Gaussian's weights, in float64 units in the last place
+                    ulps = np.abs(theirs - mine) / np.spacing(np.abs(theirs))
+                    largest_ulp = max(largest_ulp, float(ulps.max()))
+    # the filters themselves: SciPy's with float(sigma) against larmorx's with the long double
+    a = rng.normal(size=(9, 11, 7))
+    for sg in (np.longdouble(1.5), np.array([0.7, 2.2, 1.0], dtype=np.longdouble)):
+        for order in (0, 1, 2):
+            both(
+                t,
+                "longdouble sigma: gaussian_filter = SciPy's of float64 sigmas",
+                f"{sg} {order}",
+                lambda: snd.gaussian_filter(a, np.asarray(sg, dtype=np.float64), order),
+                lambda: lnd.gaussian_filter(a, sg, order, n_threads=nt),
+            )
+        both(
+            t,
+            "longdouble sigma: gaussian_filter1d = SciPy's of float64 sigmas",
+            f"{sg}",
+            lambda: snd.gaussian_filter1d(a, float(np.ravel(sg)[0]), 1, 1),
+            lambda: lnd.gaussian_filter1d(a, np.ravel(sg)[0], 1, 1, n_threads=nt),
+        )
+    print(
+        f"INFO longdouble sigma: SciPy's kernels in {np.dtype(np.longdouble).name} against "
+        f"larmorx's float64 kernels: {differ} of {kernels} differ, the largest difference "
+        f"{largest:.3e} of the kernel's largest weight; the order-0 kernels' weights at most "
+        f"{largest_ulp:.1f} units in the last place apart"
+    )
 
 
 def sec_derivatives(t: cw.Tally, nt: int) -> None:

@@ -841,22 +841,437 @@ def labels(t: Tally, rng, nt: int) -> None:
         compare(t, "label errors", desc, f_sp, f_lx)
 
 
+# --- the filters' argument handling (relay 21) -------------------------------------------------
+
+
+def _outcome(f) -> tuple[tuple, list[str], list[str]]:
+    """``f()``'s result (type, shape, bytes) or exception (type, message), its warnings
+    (category and text) and the upstream-defect entries larmorx's notices name."""
+    from larmorx._defects import UpstreamDefectWarning
+
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        try:
+            r = np.asarray(f())
+            res: tuple = ("ok", r.dtype.str, r.shape, np.ascontiguousarray(r).tobytes())
+        except Exception as e:
+            res = (type(e).__name__, str(e))
+    msgs = [
+        f"{x.category.__name__}: {x.message}" for x in w if x.category is not UpstreamDefectWarning
+    ]
+    ids = [x.message.entry for x in w if x.category is UpstreamDefectWarning]
+    return res, msgs, ids
+
+
+def _show(o: tuple) -> str:
+    return str(o if o[0] != "ok" else (*o[:3], o[3].hex()[:48]))
+
+
+_ARG_BASE = np.arange(12.0).reshape(3, 4) % 5
+_ARG_LINE = np.array([3.0, 1, 4, 1, 5, 9, 2, 6, 5])
+
+
+def _arg_filters() -> dict:
+    """name -> (call(module, input, **kw), 1-D input?)"""
+    fp = [[1, 0, 1], [0, 1, 0]]
+    return {
+        "minimum_filter1d": (lambda m, x, **k: m.minimum_filter1d(x, 3, **k), False),
+        "maximum_filter1d": (lambda m, x, **k: m.maximum_filter1d(x, 3, **k), False),
+        "minimum_filter size": (lambda m, x, **k: m.minimum_filter(x, 3, **k), False),
+        "maximum_filter footprint": (
+            lambda m, x, **k: m.maximum_filter(x, footprint=fp, **k),
+            False,
+        ),
+        "grey_erosion structure": (
+            lambda m, x, **k: m.grey_erosion(x, structure=np.ones((2, 2)), **k),
+            False,
+        ),
+        "grey_dilation size": (lambda m, x, **k: m.grey_dilation(x, size=2, **k), False),
+        "grey_opening": (lambda m, x, **k: m.grey_opening(x, size=2, **k), False),
+        "grey_closing": (lambda m, x, **k: m.grey_closing(x, size=2, **k), False),
+        "rank_filter": (lambda m, x, **k: m.rank_filter(x, 1, 3, **k), False),
+        "median_filter": (lambda m, x, **k: m.median_filter(x, 3, **k), False),
+        "percentile_filter": (lambda m, x, **k: m.percentile_filter(x, 40, 3, **k), False),
+        "median_filter 1-D": (lambda m, x, **k: m.median_filter(x, 3, **k), True),
+        "rank_filter 1-D": (lambda m, x, **k: m.rank_filter(x, 1, 3, **k), True),
+        "percentile_filter 1-D": (lambda m, x, **k: m.percentile_filter(x, 50, 3, **k), True),
+        "minimum_filter1d 1-D": (lambda m, x, **k: m.minimum_filter1d(x, 3, **k), True),
+    }
+
+
+def _arg_cases(line: bool) -> list[tuple[str, np.ndarray, dict]]:
+    """(label, input, keyword arguments): inputs of unsupported and odd types, outputs as
+    types, strings and arrays, ``cval``, origins, modes, axes, sizes and ranks of every Python
+    and numpy kind. Values that would make SciPy write outside its arrays are not among them
+    (SCI-21: :func:`_sci21`)."""
+    b = _ARG_LINE if line else _ARG_BASE
+    shape = b.shape
+    ro = np.zeros(shape)
+    ro.flags.writeable = False
+    cases: list[tuple[str, np.ndarray, dict]] = []
+    for k, dt in {
+        "float16": np.float16,
+        "longdouble": np.longdouble,
+        "object": object,
+        "complex64": np.complex64,
+        "bool": np.bool_,
+        "str": "U3",
+        "int8": np.int8,
+        "uint64": np.uint64,
+        ">i8": ">i8",
+        ">f8 (n-D)": ">f8",
+    }.items():
+        if line and k == ">f8 (n-D)":
+            continue
+        cases.append((f"input {k}", b.astype(dt), {}))
+    cases.append(("input empty float16", np.zeros((0,) if line else (0, 3), np.float16), {}))
+    outputs = {
+        "type float16": np.float16,
+        "str 'bool'": "bool",
+        "str 'object'": "object",
+        "str 'U3'": "U3",
+        "str 'float16'": "float16",
+        "type bool": np.bool_,
+        "type complex64": np.complex64,
+        "array of another shape": lambda: np.zeros((*shape[:-1], shape[-1] + 1)),
+        "read-only array": lambda: ro,
+        "list": lambda: np.zeros(shape).tolist(),
+        "list of another shape": lambda: [0.0],
+    }
+    if line:
+        # SciPy's running rank writes a float64 input's values into any output of another type
+        # (SCI-21, past its end when its items are smaller): those are SCI-21's own cases
+        for k in ("type float16", "str 'float16'", "type bool", "type complex64"):
+            del outputs[k]
+        outputs.update(
+            {
+                "type float64": np.float64,
+                "array float64": lambda: np.zeros(shape),
+                "array int8 (int16 input)": lambda: np.zeros(shape, np.int8),
+            }
+        )
+    else:
+        outputs.update(
+            {
+                "array float16": lambda: np.zeros(shape, np.float16),
+                "array int8": lambda: np.zeros(shape, np.int8),
+                "array complex64": lambda: np.zeros(shape, np.complex64),
+                "dtype float32": np.dtype(np.float32),
+                "str 'f4'": "f4",
+                "array strided": lambda: np.zeros((*shape, 2))[..., 0],
+                "array >f8": lambda: np.zeros(shape, ">f8"),
+            }
+        )
+    for k, v in outputs.items():
+        x = b.astype(np.int16) if "int16 input" in k else b
+        cases.append((f"output {k}", x, {"output": v}))
+    for k, v in {
+        "complex": 1j,
+        "numpy complex": np.complex128(1 + 0j),
+        "str": "x",
+        "None": None,
+        "numpy int": np.int64(3),
+        "numpy str": np.str_("1"),
+        "bool": True,
+        "NaN": float("nan"),
+        "0-d array": np.array(2.0),
+        "1-element array": np.array([2.0]),
+        "float32 7.1": np.float32(7.1),
+    }.items():
+        cases.append((f"cval {k}", b, {"mode": "constant", "cval": v}))
+        if line:
+            cases.append((f"cval {k} (int8)", b.astype(np.int8), {"mode": "constant", "cval": v}))
+    for k, v in {
+        "float 0.0": 0.0,
+        "float 1.0": 1.0,
+        "float -1.0": -1.0,
+        "numpy int": np.int64(1),
+        "True": True,
+        "numpy True": np.True_,
+        "-1": -1,
+        "beyond": 5,
+    }.items():
+        cases.append((f"origin {k}", b, {"origin": v}))
+    for k, v in {
+        "unknown": "bogus",
+        "grid-wrap": "grid-wrap",
+        "grid-constant": "grid-constant",
+    }.items():
+        cases.append((f"mode {k}", b, {"mode": v}))
+    if not line:
+        cases.append(("mode sequence", b, {"mode": ["reflect", "nearest"]}))
+        for k, v in {"float": (1.0,), "repeated": (0, 0), "beyond": (5,), "int": 1}.items():
+            cases.append((f"axes {k}", b, {"axes": v}))
+    return cases
+
+
+def _arg_axis_cases() -> list[tuple[str, dict]]:
+    return [(f"axis {k}", {"axis": v}) for k, v in
+            {"float": 1.0, "numpy int": np.int64(0), "beyond": 5, "-3": -3, "True": True}.items()]  # fmt: skip
+
+
+def _arg_extra() -> list[tuple[str, object, object]]:
+    """Sizes, ranks and percentiles of every kind, the separable path with nothing to filter,
+    input arrays as output arrays."""
+    b, x = _ARG_BASE, _ARG_LINE
+    f16 = b.astype(np.float16)
+    out: list[tuple[str, object, object]] = []
+    for k, v in {"float 3.0": 3.0, "True": True, "numpy int": np.int64(3), "0": 0}.items():
+        out.append((f"minimum_filter1d size {k}", lambda m, v=v: m.minimum_filter1d(x, v), None))
+        out.append((f"minimum_filter size {k}", lambda m, v=v: m.minimum_filter(b, v), None))
+    for k, v in {"float 1.0": 1.0, "numpy int": np.int64(1), "True": True, "-1": -1}.items():
+        out.append((f"rank_filter rank {k}", lambda m, v=v: m.rank_filter(x, v, 3), None))
+        out.append((f"rank_filter n-D rank {k}", lambda m, v=v: m.rank_filter(b, v, 3), None))
+    for k, v in {
+        "str": "50",
+        "50.5": 50.5,
+        "float32": np.float32(50),
+        "-30": -30,
+        "101": 101,
+    }.items():
+        out.append((f"percentile_filter {k}", lambda m, v=v: m.percentile_filter(x, v, 3), None))
+    for k, v in {"float16": f16, "object": b.astype(object), "str cval": None}.items():
+        kw = {"cval": "x"} if v is None else {}
+        arr = b if v is None else v
+        out.append(
+            (f"separable size 1 {k}", lambda m, a=arr, kw=kw: m.minimum_filter(a, 1, **kw), None)
+        )
+    for name, fn in {
+        "minimum_filter": lambda m, a: m.minimum_filter(a, 3, output=a),
+        "maximum_filter footprint": lambda m, a: m.maximum_filter(
+            a, footprint=[[1, 0, 1]], output=a
+        ),
+        "median_filter": lambda m, a: m.median_filter(a, 3, output=a),
+        "median_filter 1-D": lambda m, a: m.median_filter(a.reshape(-1), 3, output=a.reshape(-1)),
+    }.items():
+        out.append((f"{name} into its input", None, fn))
+    return out
+
+
+def arguments(t: Tally) -> None:
+    """The filters' argument handling against SciPy's: the default and ``reproduce`` both
+    (outside SCI-21 to SCI-23 they agree), every result, error and warning."""
+    for fname, (call, line) in _arg_filters().items():
+        cases = _arg_cases(line)
+        if "1d" in fname and not line:
+            cases += [(lab, _ARG_BASE, kw) for lab, kw in _arg_axis_cases()]
+        for label, x, kw in cases:
+            if line and fname.startswith("minimum_filter1d") and label.startswith("output"):
+                continue
+
+            def run(m, mode=None, x=x, kw=kw, call=call):
+                kk = {k: (v() if callable(v) else v) for k, v in kw.items()}
+                if mode is not None:
+                    kk["upstream_defects"] = mode
+                return call(m, x, **kk)
+
+            want = _outcome(lambda: run(sp))
+            fixed = _outcome(lambda: run(lx))
+            if "rank" in fname or "median" in fname or "percentile" in fname:
+                repro = _outcome(lambda: run(lx, "reproduce"))
+            else:
+                repro = fixed
+            if _scipy115_system_error(want[0]):
+                # SCI-24 (SciPy 1.15.3; fixed in 1.18.1): larmorx gives 1.18.1's error
+                t.add(
+                    "arguments: SCI-24 (SciPy 1.15.3's SystemError; 1.18.1's error given)",
+                    fixed[0][0] == repro[0][0] == "TypeError" and not fixed[2],
+                    f"{fname} {label}: {_show(fixed[0])}",
+                )
+                continue
+            t.add(
+                f"arguments: {fname}",
+                want[:2] == fixed[:2] == repro[:2] and not fixed[2],
+                f"{label}: scipy {_show(want[0])} {want[1]}; larmorx {_show(fixed[0])} "
+                f"{fixed[1]} {fixed[2]}; reproduce {_show(repro[0])}",
+            )
+    for label, call, into in _arg_extra():
+        if into is None:
+            want, got = _outcome(lambda: call(sp)), _outcome(lambda: call(lx))
+        else:
+            a1, a2 = _ARG_BASE.reshape(3, 4).copy(), _ARG_BASE.reshape(3, 4).copy()
+            want, got = (
+                _outcome(lambda: (into(sp, a1), a1)[1]),
+                _outcome(lambda: (into(lx, a2), a2)[1]),
+            )
+        t.add("arguments: sizes, ranks, outputs", want[:2] == got[:2] and not got[2],
+              f"{label}: scipy {_show(want[0])} {want[1]}; larmorx {_show(got[0])} {got[1]} {got[2]}")  # fmt: skip
+    _sci21(t)
+    _sci22(t)
+    _sci23(t)
+
+
+def _scipy115_system_error(o: tuple) -> bool:
+    """SCI-24: SciPy 1.15.3's running rank returns with a Python error set (an unknown type
+    number, a ``cval`` its type cannot take), which CPython turns into a ``SystemError``."""
+    return (
+        scipy.__version__.startswith("1.15.")
+        and o[0] == "SystemError"
+        and "returned a result with an exception set" in o[1]
+    )
+
+
+def _scipy_in_process(code: str) -> tuple[str, str]:
+    """SciPy's result of ``code`` (which prints it) in a process of its own: SCI-21's calls
+    write past their output's end, which corrupts the heap (the process may crash at exit,
+    after the result is printed)."""
+    import subprocess
+
+    try:
+        p = subprocess.run(
+            [sys.executable, "-I", "-c", code], capture_output=True, text=True, timeout=30
+        )
+    except subprocess.TimeoutExpired:  # the corrupted heap can make the process hang
+        return "", "hung"
+    return p.stdout.strip(), f"exit {p.returncode}"
+
+
+def _sci21(t: Tally) -> None:
+    """SCI-21: SciPy's running rank of a float32, float64 or int64 input writes the input
+    type's values into an output of another type (another type or byte order), past its end
+    when its items are smaller. ``reproduce`` = SciPy's bytes where they are its output's (each
+    case's SciPy in its own process); the default = the values cast into the output, with the
+    notice."""
+    x = _ARG_LINE
+    cases = {
+        "float64 into float32": ("float64", "np.float32"),
+        "float64 into int16": ("float64", "np.int16"),
+        "float64 into uint8": ("float64", "np.uint8"),
+        "float32 into float64": ("float32", "np.float64"),
+        "float32 into int64": ("float32", "np.int64"),
+        "int64 into float64": ("int64", "np.float64"),
+        "int64 into int32": ("int64", "np.int32"),
+        "float64 into >f8": ("float64", "np.dtype('>f8')"),
+        "float32 into >f4": ("float32", "np.dtype('>f4')"),
+        "float64 into a float32 array": ("float64", "np.full(9, 7, np.float32)"),
+        "float32 into a float64 array": ("float32", "np.full(9, 7.0)"),
+        # (into a strided float32 array SciPy's copy overflows and its process hangs)
+        "float32 into a strided float64 array": ("float32", "np.full((9, 2), 7.0)[:, 0]"),
+    }
+    for label, (src, out) in cases.items():
+        for fn in ("median_filter(x, 3", "rank_filter(x, 1, 3", "percentile_filter(x, 50, 3"):
+            code = (
+                "import warnings, numpy as np\nfrom scipy import ndimage as sp\n"
+                f"x = np.array({x.tolist()}, dtype='{src}')\n"
+                "with warnings.catch_warnings(record=True) as w:\n"
+                "    warnings.simplefilter('always')\n"
+                f"    r = sp.{fn}, output={out})\n"
+                "print(r.dtype.str, np.ascontiguousarray(r).tobytes().hex(), "
+                "repr([f'{type(m.message).__name__}: {m.message}' for m in w]), flush=True)\n"
+            )
+            sp_out, status = _scipy_in_process(code)
+            if not sp_out:
+                print(f"INFO SCI-21 {label} {fn}: SciPy's process gave no result ({status})")
+                continue
+            xs = x.astype(src)
+            repro = _outcome(
+                lambda: eval(
+                    f"lx.{fn}, output={out}, upstream_defects='reproduce')",
+                    {"lx": lx, "np": np, "x": xs},
+                )
+            )
+            fixed = _outcome(lambda: eval(f"lx.{fn}, output={out})", {"lx": lx, "np": np, "x": xs}))
+            mine = ""
+            if repro[0][0] == "ok":
+                mine = f"{repro[0][1]} {repro[0][3].hex()} {[m for m in repro[1]]!r}"
+            t.add("arguments: SCI-21 reproduced (SciPy's own bytes)", sp_out == mine and repro[2] == ["SCI-21"],
+                  f"{label} {fn}: scipy {sp_out[:120]}; larmorx {mine[:120]} {repro[2]}")  # fmt: skip
+            # corrected: SciPy's own result of the input's type, cast into the output
+            plain = getattr(sp, fn.split("(")[0])(xs, *eval("[" + fn.split(", ", 1)[1] + "]"))
+            target = eval(out, {"np": np})
+            if isinstance(target, np.ndarray):
+                target = target.copy()
+                np.copyto(target, plain, casting="unsafe")
+                want = target
+            else:
+                want = plain.astype(target)
+            ok = (
+                fixed[0][0] == "ok"
+                and fixed[0][1] == want.dtype.str
+                and fixed[0][3] == np.ascontiguousarray(want).tobytes()
+            )
+            t.add("arguments: SCI-21 corrected (the values cast into the output)", ok and fixed[2] == ["SCI-21"] and not fixed[1],
+                  f"{label} {fn}: larmorx {_show(fixed[0])} {fixed[1]} {fixed[2]}")  # fmt: skip
+
+
+def _sci22(t: Tally) -> None:
+    """SCI-22: SciPy's running rank refuses big-endian float32 and float64 inputs (by dtype
+    equality) and numpy's ``longlong`` (its C++ switch knows only the type number of
+    ``int64``; SciPy 1.15.3's returns with the error set: a ``SystemError``). ``reproduce`` =
+    SciPy's error (1.18.1's); the default = SciPy's result of the native copy, with the notice."""
+    x = _ARG_LINE
+    for label, dt in {">f8": ">f8", ">f4": ">f4", "longlong": np.longlong}.items():
+        xs = x.astype(dt)
+        native = xs.astype(np.dtype(xs.dtype.kind + str(xs.dtype.itemsize)))
+        for fn in ("median_filter", "rank_filter", "percentile_filter"):
+            args = {"median_filter": (3,), "rank_filter": (1, 3), "percentile_filter": (50, 3)}[fn]
+            want = _outcome(lambda: getattr(sp, fn)(xs, *args))
+            repro = _outcome(lambda: getattr(lx, fn)(xs, *args, upstream_defects="reproduce"))
+            if label == "longlong" and _scipy115_system_error(want[0]):
+                t.add("arguments: SCI-24 (SciPy 1.15.3's SystemError; 1.18.1's error given)",
+                      repro[0] == ("TypeError", "Unsupported array type"), f"{label} {fn}: {_show(repro[0])}")  # fmt: skip
+            else:
+                t.add("arguments: SCI-22 reproduced (SciPy's error)", want[:2] == repro[:2],
+                      f"{label} {fn}: scipy {_show(want[0])}; larmorx {_show(repro[0])}")  # fmt: skip
+            fixed = _outcome(lambda: getattr(lx, fn)(xs, *args))
+            ref = _outcome(lambda: getattr(sp, fn)(native, *args))
+            t.add("arguments: SCI-22 corrected (SciPy's result of the native copy)",
+                  fixed[0] == ref[0] and fixed[2] == ["SCI-22"], f"{label} {fn}: {_show(fixed[0])} {fixed[2]}")  # fmt: skip
+
+
+def _sci23(t: Tally) -> None:
+    """SCI-23: SciPy's running rank into a non-contiguous output of its input's type never
+    resolves numpy's write-back copy: numpy warns when the copy is freed (its text per
+    release) and writes it back. ``reproduce`` = the values and numpy's warning; the default =
+    the values without it."""
+    x = _ARG_LINE
+    for fn, args in {
+        "median_filter": (3,),
+        "rank_filter": (1, 3),
+        "percentile_filter": (50, 3),
+    }.items():
+        for dt in (np.float64, np.float32, np.int64):
+            xs = x.astype(dt)
+            o1, o2, o3 = (np.zeros((9, 2), dt)[:, 0] for _ in range(3))
+            want = _outcome(lambda: getattr(sp, fn)(xs, *args, output=o1))
+            repro = _outcome(
+                lambda: getattr(lx, fn)(xs, *args, output=o2, upstream_defects="reproduce")
+            )
+            fixed = _outcome(lambda: getattr(lx, fn)(xs, *args, output=o3))
+            t.add("arguments: SCI-23 reproduced (numpy's warning)", want[:2] == repro[:2] and o1.tobytes() == o2.tobytes(),
+                  f"{fn} {np.dtype(dt).name}: scipy {want[1]}; larmorx {repro[1]}")  # fmt: skip
+            t.add("arguments: SCI-23 corrected (no warning)", want[0] == fixed[0] and not fixed[1] and o1.tobytes() == o3.tobytes(),
+                  f"{fn} {np.dtype(dt).name}: {fixed[1]}")  # fmt: skip
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--quick", action="store_true")
     ap.add_argument("--threads", type=int, default=2)
     ap.add_argument("--verbose", action="store_true")
+    ap.add_argument(
+        "--sections",
+        default="filters,binary,labels,arguments",
+        help="comma-separated: filters, binary, labels, arguments (the filters' argument "
+        "handling, SCI-21 to SCI-23; relay 21)",
+    )
     args = ap.parse_args()
+    sections = set(args.sections.split(","))
     global VERBOSE
     VERBOSE = args.verbose
     print(f"numpy {np.__version__}, SciPy {scipy.__version__}")
     rng = np.random.default_rng(20261108)
     t = Tally()
-    filters(t, rng, args.quick, args.threads)
-    print("filters done", flush=True)
-    binary(t, rng, args.quick, args.threads)
-    print("binary morphology done", flush=True)
-    labels(t, rng, args.threads)
+    if "filters" in sections:
+        filters(t, rng, args.quick, args.threads)
+        print("filters done", flush=True)
+    if "binary" in sections:
+        binary(t, rng, args.quick, args.threads)
+        print("binary morphology done", flush=True)
+    if "labels" in sections:
+        labels(t, rng, args.threads)
+    if "arguments" in sections:
+        arguments(t)
     bad = t.report()
     print("ALL OK" if bad == 0 else f"FAIL {bad}")
     return 0 if bad == 0 else 1

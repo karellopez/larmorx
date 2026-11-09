@@ -330,6 +330,20 @@ def sec_rw(t: Tally, nt: int) -> None:
                 )
             except Exception as e:
                 got = e
+        if not isinstance(want, Exception):
+            # copy=False: scikit-image marks the isolated unlabeled pixels in the caller's labels
+            l1, l2 = labels.copy(), labels.copy()
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                try:
+                    random_walker(data, l1, copy=False, **kw)
+                    lsk.random_walker(data, l2, copy=False, scipy_version=SP,
+                                      upstream_defects="reproduce" if reproduce else "fix",
+                                      n_threads=nt, **kw)  # fmt: skip
+                except Exception as e:
+                    l1 = l2 = e
+            t.add("random_walker copy=False: the caller's labels afterwards",
+                  not isinstance(l1, Exception) and same(l1, l2), name)  # fmt: skip
         msgs1 = [str(x.message) for x in w1 if "random_walker" not in str(x.filename) or True]
         msgs1 = [
             m

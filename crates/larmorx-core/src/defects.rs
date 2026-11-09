@@ -376,7 +376,13 @@ defects! {
         "the byte offsets are 32-bit C ints: above 2 GiB of input or output it reads and writes outside its arrays";
     SCI_18 = "SCI-18", "SciPy linalg.inv", true,
         "SciPy 1.18's inverse of a general matrix whose norm overflows (its largest row sum is infinite) returns the LU factors: the condition estimate (LAPACK gecon) stops with info -5 and the inverse (getri) is skipped without an error";
-    SDC_01 = "SDC-01", "sdcflows", true,
+    SCI_21 = "SCI-21", "SciPy ndimage", true,
+        "the 1-D rank, median and percentile filters of a float32, float64 or int64 input write the input type's values into an output of another type or byte order (its bytes reinterpreted), past the output's end when its items are smaller (the heap corrupted: a crash or a hang)";
+    SCI_22 = "SCI-22", "SciPy ndimage", true,
+        "the 1-D rank, median and percentile filters refuse a big-endian float32 or float64 input (RuntimeError) and numpy's longlong (TypeError), which the n-dimensional filters take";
+    SCI_23 = "SCI-23", "SciPy ndimage", true,
+        "the 1-D rank, median and percentile filters into a non-contiguous output of the input's type never resolve numpy's write-back copy: numpy warns (RuntimeWarning) when the copy is freed";
+    SDC_01 ="SDC-01", "sdcflows", true,
         "grid_bspline_weights gives a sampling position beyond the first or the last control point (within distance 2 of it) the end interval's polynomial continued (SciPy's BSpline extrapolation) instead of the cubic B-spline's value: at 1.5 control spacings beyond the grid the weight is -3.27 instead of 0.0208, so a field evaluated there (B0FieldTransform.fit's grid of an oblique target, a target larger than the field map) is wrong by up to the field's own size";
     SDC_02 = "SDC-02", "sdcflows", true,
         "grid_bspline_weights on a sampling grid rotated relative to the control grid warns that the grids are not aligned and still multiplies per-axis weights, each taken from one index of the voxel, which is not the B-spline field at the voxel (measured on a real field rotated 0.5 degrees: 2.3 Hz RMS, 40 Hz at most; at 5 degrees: 20 Hz RMS, 345 Hz); B0FieldTransform.fit meets it on the projected grid of any rotating registration (fMRIPrep's registrations of the oracle runs, about 1 degree: 1.5 to 4.6 Hz RMS, up to 49 Hz, in the brain)";

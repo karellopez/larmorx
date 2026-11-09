@@ -278,7 +278,6 @@ def random_walker(
             data = data[:, :, np.newaxis, :]
     labels_shape = labels.shape
     labels_dtype = labels.dtype
-    user_labels = labels
     if copy:
         labels = np.copy(labels)
     if mode is None:
@@ -338,6 +337,8 @@ def random_walker(
         numpy_version,
     )
     kind = res["kind"]
+    if not copy and kind != "nozero":
+        _mark_isolated(labels)
     if kind == "nozero":
         warnings.warn(
             "Random walker only segments unlabeled areas, where labels == 0. No zero valued "
@@ -350,8 +351,6 @@ def random_walker(
     if kind == "isolated":
         isolated = res["labels"].reshape(labels_shape) == -1
         labels[isolated] = -1
-        if not copy:
-            user_labels[isolated] = -1
         warnings.warn(
             "All unlabeled pixels are isolated, they could not be determined by the random "
             "walker algorithm.",
@@ -401,6 +400,27 @@ def random_walker(
                 if mode == "fix":
                     return mapped.astype(labels_dtype)
     return out.astype(labels_dtype)
+
+
+def _mark_isolated(labels: np.ndarray) -> None:
+    """scikit-image's ``_preprocess`` on the caller's labels (``copy=False``): where some labels
+    are negative or a seed is cut off from every unlabeled pixel, the unlabeled pixels no seed
+    reaches through the non-negative ones are set to -1 in that array (the result is computed
+    from the labels as given)."""
+    from larmorx import ndimage as ndi
+
+    values = np.unique(labels)
+    null_mask = labels == 0
+    pos_mask = labels > 0
+    mask = labels >= 0
+    fill = ndi.binary_propagation(null_mask, mask=mask)
+    isolated = np.logical_and(pos_mask, np.logical_not(fill))
+    pos_mask[isolated] = False
+    if values[0] < 0 or np.any(isolated):
+        isolated = np.logical_and(
+            np.logical_not(ndi.binary_propagation(pos_mask, mask=mask)), null_mask
+        )
+        labels[isolated] = -1
 
 
 def _seeds_as_probabilities(labels: np.ndarray, upstream_defects: str) -> np.ndarray:

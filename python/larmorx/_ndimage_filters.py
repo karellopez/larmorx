@@ -398,15 +398,38 @@ def _dot(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     )
 
 
+def _longdouble_kind() -> str:
+    """numpy's long double on this platform, in words (its significand's width)."""
+    nmant = np.finfo(np.longdouble).nmant
+    names = {63: "x86-64's 80-bit extended precision", 112: "IEEE quadruple precision"}
+    return names.get(nmant, f"a {nmant + 1}-bit significand")
+
+
 def _gaussian_kernel1d(sigma: Any, order: Any, radius: int, numpy_version: str) -> np.ndarray:
     """SciPy's ``_gaussian_kernel1d``: ``exp(-0.5 / sigma**2 * x**2)`` for ``x`` from
     ``-radius`` to ``radius``, divided by its sum, with numpy's float64 ``exp`` (glibc's, the
     path without AVX-512) and its sum (``numpy_version``'s order); for ``order > 0`` times the
     derivative's polynomial, its coefficients ``q`` from ``order`` products with the matrix
     ``D + P`` (``q' + q·p'``) and its values ``x**k · q``, numpy's ``dot`` (OpenBLAS's ``dgemv``)
-    both."""
+    both.
+
+    A ``numpy.longdouble`` sigma is taken as float64: SciPy computes that kernel in numpy's long
+    double, a different type per platform (x86-64's 80-bit extended precision on Linux and
+    macOS Intel, IEEE quadruple precision on Linux aarch64, float64 itself on Windows and Apple
+    silicon), so its weights differ between platforms in their last bits; larmorx gives the
+    float64 kernel everywhere, with a warning where the long double is wider than float64."""
     if order < 0:
         raise ValueError("order must be non-negative")
+    if np.asarray(sigma).dtype.char == "g":
+        if np.dtype(np.longdouble).itemsize > 8:
+            warnings.warn(
+                f"a {np.dtype(np.longdouble).name} sigma ({_longdouble_kind()} on this "
+                "platform): larmorx computes the Gaussian kernel from the sigma as float64, "
+                "where SciPy computes it in numpy's long double (docs/api/ndimage-filters.md)",
+                UserWarning,
+                stacklevel=4,
+            )
+        sigma = float(sigma)
     exponent_range = np.arange(order + 1)
     sigma2 = sigma * sigma
     x = np.arange(-radius, radius + 1)
@@ -517,31 +540,88 @@ def gaussian_filter(
 # --- the minimum, maximum and rank filters ---------------------------------------------------
 
 
+def _intp(v: Any) -> int:
+    """numpy's ``PyArray_PyIntAsIntp``, which ``PyArray_IntpConverter`` applies to each origin
+    of the n-dimensional filters: a bool (Python's or numpy's) is refused with "an integer is
+    required", anything else is converted by ``__index__``."""
+    if isinstance(v, bool | np.bool_):
+        raise TypeError("an integer is required")
+    return operator.index(v)
+
+
+def _nd_type(dtype: np.dtype) -> np.dtype:
+    """The n-dimensional filters' type switch (``NI_MinOrMaxFilter``, ``NI_RankFilter``): the
+    canonical type larmorx computes in (bool as uint8), or SciPy's ``RuntimeError``."""
+    if dtype == np.bool_:
+        return np.dtype(np.uint8)
+    if (dtype.kind in "iu" and dtype.itemsize in (1, 2, 4, 8)) or (
+        dtype.kind == "f" and dtype.itemsize in (4, 8)
+    ):
+        return np.dtype(f"{dtype.kind}{dtype.itemsize}")
+    raise RuntimeError("array type not supported")
+
+
+def _native(a: np.ndarray, canonical: np.dtype) -> np.ndarray:
+    """``a`` in native byte order, viewed as ``canonical`` (bool as uint8, ``longlong`` as int64)."""
+    if not a.dtype.isnative:
+        a = a.astype(a.dtype.newbyteorder("="))
+    if a.dtype != canonical:
+        a = a.view(canonical)
+    return a
+
+
+def _c_output(out_arr: np.ndarray | None) -> None:
+    """``NI_ObjectToOutputArray``: a read-only output array is refused."""
+    if out_arr is not None and not out_arr.flags.writeable:
+        raise ValueError("output array is read-only.")
+
+
+def _min_or_max_1d_c(
+    input, size, axis, target, out_arr, check_out, mode, cval, origin, minimum, n_threads
+) -> np.ndarray:
+    """``_nd_image.min_or_max_filter1d``: its arguments (``"O&niO&idni"``: the size and the
+    origin by ``__index__``, the axis likewise, the output's write access, ``cval`` as a C
+    double) and ``NI_InitLineBuffer``'s types (the input's, then the output's), then the
+    filter in Rust."""
+    size = operator.index(size)
+    axis = operator.index(axis)
+    if check_out:
+        _c_output(out_arr)
+    cval = _c_double(cval)
+    origin = operator.index(origin)
+    in_type = _line_type(input.dtype)
+    out_type = _line_type(target)
+    return _core.ndimage_min_or_max_filter1d(
+        _native(input, in_type),
+        size,
+        axis,
+        mode,
+        cval,
+        origin,
+        bool(minimum),
+        int(n_threads),
+        "bool" if target == np.bool_ else out_type.name,
+    )
+
+
 def _min_or_max_filter1d(
     input, size, axis, output, mode, cval, origin, minimum, n_threads
 ) -> np.ndarray:
-    a, dtype = _input(input)
-    axis = operator.index(axis)
-    if not -a.ndim <= axis < max(a.ndim, 1):
-        raise np.exceptions.AxisError(axis, a.ndim)
-    axis = axis % max(a.ndim, 1)
+    """SciPy's ``minimum_filter1d`` and ``maximum_filter1d``, check for check."""
+    input = np.asarray(input)
+    if np.iscomplexobj(input):
+        raise TypeError("Complex type not supported")
+    axis = _normalize_axis_index(axis, input.ndim)
     if size < 1:
         raise RuntimeError("incorrect filter size")
+    target, out_arr = _get_output(output, input)
     if (size // 2 + origin < 0) or (size // 2 + origin >= size):
         raise ValueError("invalid origin")
-    target = _out_dtype(output, dtype, a.shape)
-    out = _core.ndimage_min_or_max_filter1d(
-        a,
-        int(size),
-        axis,
-        _mode(mode),
-        float(cval),
-        int(origin),
-        bool(minimum),
-        int(n_threads),
-        target.name,
+    mode = _mode(mode)
+    out = _min_or_max_1d_c(
+        input, size, axis, target, out_arr, True, mode, cval, origin, minimum, n_threads
     )
-    return _result(out, target, output)
+    return _write(out, target, out_arr)
 
 
 def minimum_filter1d(
@@ -550,7 +630,7 @@ def minimum_filter1d(
     axis: int = -1,
     output: Any = None,
     mode: str = "reflect",
-    cval: float = 0.0,
+    cval: Any = 0.0,
     origin: int = 0,
     *,
     n_threads: int = 1,
@@ -565,7 +645,7 @@ def maximum_filter1d(
     axis: int = -1,
     output: Any = None,
     mode: str = "reflect",
-    cval: float = 0.0,
+    cval: Any = 0.0,
     origin: int = 0,
     *,
     n_threads: int = 1,
@@ -574,9 +654,19 @@ def maximum_filter1d(
     return _min_or_max_filter1d(input, size, axis, output, mode, cval, origin, False, n_threads)
 
 
+def _empty_result(input: np.ndarray, target: np.dtype, out_arr: np.ndarray | None) -> np.ndarray:
+    """The n-dimensional filters of an empty input: SciPy's loop over its elements never reaches
+    the type switch, so the output (zeros of its type, or the given array) is returned as is."""
+    return np.zeros(input.shape, dtype=target) if out_arr is None else out_arr
+
+
 def _min_or_max_filter(
     input, size, footprint, structure, output, mode, cval, origin, minimum, axes, n_threads
 ) -> np.ndarray:
+    """SciPy's ``_min_or_max_filter`` (the minimum and maximum filters and grey morphology),
+    check for check: a box (``size``, or a footprint of ones) as 1-D filters along each axis in
+    turn, each into the output's type; any other footprint, or a structure, by
+    ``NI_MinOrMaxFilter``."""
     if (size is not None) and (footprint is not None):
         warnings.warn("ignoring size because footprint is set", UserWarning, stacklevel=3)
     if structure is None:
@@ -601,9 +691,14 @@ def _min_or_max_filter(
             footprint = np.ones(structure.shape, bool)
         else:
             footprint = np.asarray(footprint, dtype=bool)
-    a, dtype = _input(input)
-    target = _out_dtype(output, dtype, a.shape)
-    axes = _check_axes(axes, a.ndim)
+    input = np.asarray(input)
+    if np.iscomplexobj(input):
+        raise TypeError("Complex type not supported")
+    target, out_arr = _get_output(output, input)
+    # SciPy filters into a new array when the output shares memory with the input; larmorx's
+    # filters always do, and only skip the output's write check (that new array is writable)
+    check_out = not (out_arr is not None and np.may_share_memory(input, out_arr))
+    axes = _check_axes(axes, input.ndim)
     num_axes = len(axes)
     if separable:
         origins = _normalize_sequence(origin, num_axes)
@@ -614,31 +709,37 @@ def _min_or_max_filter(
             for ii in range(len(axes))
             if sizes[ii] > 1
         ]
-        cur = a
-        if len(todo) > 0:
-            # the first axis filters into the output's type, the others the output in place
-            for axis, sz, org, md in todo:
-                sz = int(sz)
-                if (sz // 2 + org < 0) or (sz // 2 + org >= sz):
-                    raise ValueError("invalid origin")
-                cur = _core.ndimage_min_or_max_filter1d(
-                    cur,
-                    sz,
-                    int(axis),
-                    _mode(md),
-                    float(cval),
-                    int(org),
-                    bool(minimum),
-                    int(n_threads),
-                    target.name,
-                )
-        else:
-            cur = np.ascontiguousarray(a).astype(np.uint8 if target == np.bool_ else target)
-        return _result(cur, target, output)
-    footprint = _expand_footprint(a.ndim, axes, footprint)
-    origins = _expand_origin(a.ndim, axes, origin)
+        if not todo:
+            out = np.zeros(input.shape, dtype=target) if out_arr is None else out_arr
+            out[...] = input[...]
+            return out
+        # each axis is minimum_filter1d's (or maximum_filter1d's) call into the output array:
+        # the first from the input, the others from the output's values
+        cur = input
+        for k, (axis, sz, org, md) in enumerate(todo):
+            sz = int(sz)
+            axis = _normalize_axis_index(axis, cur.ndim)
+            if (sz // 2 + org < 0) or (sz // 2 + org >= sz):
+                raise ValueError("invalid origin")
+            md = _mode(md)
+            cur = _min_or_max_1d_c(
+                cur if k == 0 else _write(cur, target, None),
+                sz,
+                axis,
+                target,
+                out_arr,
+                check_out,
+                md,
+                cval,
+                org,
+                minimum,
+                n_threads,
+            )
+        return _write(cur, target, out_arr)
+    footprint = _expand_footprint(input.ndim, axes, footprint)
+    origins = _expand_origin(input.ndim, axes, origin)
     fshape = [ii for ii in footprint.shape if ii > 0]
-    if len(fshape) != a.ndim:
+    if len(fshape) != input.ndim:
         raise RuntimeError(f"footprint.ndim ({footprint.ndim}) must match len(axes) ({len(axes)})")
     for org, lenf in zip(origins, fshape, strict=False):
         if (lenf // 2 + org < 0) or (lenf // 2 + org >= lenf):
@@ -656,18 +757,28 @@ def _min_or_max_filter(
             raise RuntimeError("structure array has incorrect shape")
     if not isinstance(mode, str) and isinstance(mode, Iterable):
         raise RuntimeError("A sequence of modes is not supported for non-separable footprints")
+    mode = _mode(mode)
+    # _nd_image.min_or_max_filter's arguments ("O&O&O&O&idO&i"), in order
+    if check_out:
+        _c_output(out_arr)
+    cval = _c_double(cval)
+    origins = [_intp(o) for o in origins]
+    if input.size == 0:
+        return _empty_result(input, target, out_arr)
+    in_type = _nd_type(input.dtype)
+    out_type = _nd_type(target)
     out = _core.ndimage_min_or_max_filter(
-        a,
+        _native(input, in_type),
         footprint,
         structure,
-        _mode(mode),
-        float(cval),
-        [int(o) for o in origins],
+        mode,
+        cval,
+        origins,
         bool(minimum),
         int(n_threads),
-        target.name,
+        "bool" if target == np.bool_ else out_type.name,
     )
-    return _result(out, target, output)
+    return _write(out, target, out_arr)
 
 
 def minimum_filter(
@@ -676,7 +787,7 @@ def minimum_filter(
     footprint: Any = None,
     output: Any = None,
     mode: Any = "reflect",
-    cval: float = 0.0,
+    cval: Any = 0.0,
     origin: Any = 0,
     *,
     axes: Any = None,
@@ -694,7 +805,7 @@ def maximum_filter(
     footprint: Any = None,
     output: Any = None,
     mode: Any = "reflect",
-    cval: float = 0.0,
+    cval: Any = 0.0,
     origin: Any = 0,
     *,
     axes: Any = None,
@@ -704,6 +815,146 @@ def maximum_filter(
     return _min_or_max_filter(
         input, size, footprint, None, output, mode, cval, origin, False, axes, n_threads
     )
+
+
+#: numpy's warning when an array with a pending write-back copy is freed (SCI-23), per release.
+_WRITEBACK_WARNING = (
+    "WRITEBACKIFCOPY detected in {where}.  Required call to PyArray_ResolveWritebackIfCopy or "
+    "PyArray_DiscardWritebackIfCopy is missing."
+)
+
+
+def _writeback_warning() -> None:
+    """SCI-23 reproduced: numpy's ``RuntimeWarning`` for the write-back copy SciPy's 1-D rank
+    filter never resolves ("array_dealloc" up to numpy 2.3, "clearing of array" since)."""
+    major, minor = (int(p) for p in np.__version__.split(".")[:2])
+    where = "array_dealloc" if (major, minor) <= (2, 3) else "clearing of array"
+    warnings.warn(_WRITEBACK_WARNING.format(where=where), RuntimeWarning, stacklevel=5)
+
+
+def _rank_1d(
+    input: np.ndarray,
+    rank: int,
+    footprint: np.ndarray,
+    target: np.dtype,
+    out_arr: np.ndarray | None,
+    check_out: bool,
+    mode: str,
+    cval: Any,
+    origin: Any,
+    operation: str,
+    upstream_defects: str,
+    nd: Any,
+) -> np.ndarray:
+    """SciPy 1.18.1's running rank of a 1-D input (``_rank_filter_1d``), its type dispatch and
+    arguments (``"OiiOiOi"``) included, with SCI-09, SCI-21, SCI-22 and SCI-23."""
+    notices: list[tuple[str, str, str, str]] = []
+    dt = input.dtype
+    # its own types are compared by equality: big-endian float32 and float64 are refused (SCI-22)
+    direct = dt in (np.int64, np.float64, np.float32)
+    if direct:
+        x = input
+    elif dt == np.float16:
+        x = input.astype("float32")
+    elif np.result_type(input, np.int64) == np.int64 or dt.kind in "biu":
+        x = input.astype("int64")
+    elif dt.kind == "f" and dt.itemsize in (4, 8) and upstream_defects == "fix":
+        x = input.astype(dt.newbyteorder("="))
+        notices.append(
+            (
+                "SCI-22",
+                "SciPy ndimage",
+                upstream_defects,
+                f"the 1-D {operation} filter refuses a {dt} input",
+            )
+        )
+    else:
+        raise RuntimeError("Unsupported array type")
+    cv = x.dtype.type(cval)
+    origin = operator.index(origin)
+    # the array SciPy's C++ writes into: the output itself for its three types (x_out = output)
+    if direct:
+        own = out_arr is not None and check_out
+        dest = out_arr if own else np.zeros(input.shape, dtype=target)
+        if own and not dest.flags.writeable:
+            raise ValueError("WRITEBACKIFCOPY base is read-only")
+    # the C++ switches on the input's type number: numpy's longlong is not its int64 (SCI-22)
+    if x.dtype.kind == "i" and x.dtype.num != np.dtype(np.int64).num:
+        if upstream_defects != "fix":
+            raise TypeError("Unsupported array type")
+        notices.append(
+            (
+                "SCI-22",
+                "SciPy ndimage",
+                upstream_defects,
+                f"the 1-D {operation} filter refuses a {x.dtype.char!r} (longlong) input",
+            )
+        )
+    xc = _native(x, np.dtype(f"{x.dtype.kind}{x.dtype.itemsize}"))
+    code = {"grid-wrap": "wrap", "grid-mirror": "reflect", "grid-constant": "constant"}.get(
+        mode, mode
+    )
+    # the C++ reads cval by the input's type: PyLong_AsLongLong (by __index__) or PyFloat_AsDouble
+    cv_c = float(operator.index(cv)) if x.dtype.kind == "i" else _c_double(cv)
+    res = _core.ndimage_rank_filter_1d(xc, int(rank), int(footprint.size), code, cv_c, origin)
+    # SCI-09: SciPy's running rank takes the whole window, the footprint's false elements
+    # included; corrected, a footprint with holes is filtered by the n-dimensional filter
+    if not footprint.all():
+        fixed = nd(xc)
+        if not np.array_equal(fixed, res, equal_nan=res.dtype.kind == "f"):
+            notices.append(
+                (
+                    "SCI-09",
+                    "SciPy ndimage",
+                    upstream_defects,
+                    f"the 1-D {operation} filter's footprint has false elements, which "
+                    "SciPy's running rank counts in its window",
+                )
+            )
+        if upstream_defects == "fix":
+            res = fixed
+    if not direct:
+        out = np.zeros(input.shape, dtype=target) if out_arr is None else out_arr
+        np.copyto(out, res, casting="unsafe")
+        _defects.warn(notices, stacklevel=4)
+        return out
+    contiguous = dest.flags.c_contiguous and dest.flags.aligned
+    if dest.dtype == res.dtype:
+        np.copyto(dest, res)
+        if not contiguous and upstream_defects != "fix":
+            _writeback_warning()
+    elif upstream_defects == "fix":
+        np.copyto(dest, res, casting="unsafe")
+        notices.append(
+            (
+                "SCI-21",
+                "SciPy ndimage",
+                upstream_defects,
+                f"the 1-D {operation} filter of a {res.dtype} input into a {dest.dtype} output",
+            )
+        )
+    else:
+        # SciPy's C++ writes the input type's values into the output's (contiguous) buffer
+        buf = dest if contiguous else np.ascontiguousarray(dest)
+        raw = np.ascontiguousarray(res).reshape(-1).view(np.uint8)
+        flat = buf.reshape(-1).view(np.uint8)
+        n = min(raw.size, flat.size)
+        flat[:n] = raw[:n]
+        detail = f"the 1-D {operation} filter of a {res.dtype} input into a {dest.dtype} output"
+        if raw.size > flat.size:
+            detail += (
+                f": SciPy writes {raw.size - flat.size} bytes past the output's end, which "
+                "larmorx does not write"
+            )
+        notices.append(("SCI-21", "SciPy ndimage", upstream_defects, detail))
+        if buf is not dest:
+            dest[...] = buf
+            _writeback_warning()
+    _defects.warn(notices, stacklevel=4)
+    if out_arr is not None and not check_out:  # SciPy's temporary output, copied into the given one
+        out_arr[...] = dest
+        return out_arr
+    return dest
 
 
 def _rank_filter(
@@ -720,11 +971,16 @@ def _rank_filter(
     n_threads,
     upstream_defects="fix",
 ) -> np.ndarray:
+    """SciPy's ``_rank_filter`` (the rank, median and percentile filters), check for check:
+    the smallest and largest ranks as the minimum and maximum filters, a 1-D input by SciPy's
+    running rank, any other by ``NI_RankFilter``."""
     _defects.check(upstream_defects)
     if (size is not None) and (footprint is not None):
         warnings.warn("ignoring size because footprint is set", UserWarning, stacklevel=3)
-    a, dtype = _input(input)
-    axes = _check_axes(axes, a.ndim)
+    input = np.asarray(input)
+    if np.iscomplexobj(input):
+        raise TypeError("Complex type not supported")
+    axes = _check_axes(axes, input.ndim)
     num_axes = len(axes)
     if footprint is None:
         if size is None:
@@ -733,13 +989,13 @@ def _rank_filter(
         footprint = np.ones(sizes, dtype=bool)
     else:
         footprint = np.asarray(footprint, dtype=bool)
-    footprint = _expand_footprint(a.ndim, axes, footprint)
-    origins = _expand_origin(a.ndim, axes, origin)
-    mode = _expand_mode(a.ndim, axes, mode)
+    footprint = _expand_footprint(input.ndim, axes, footprint)
+    origins = _expand_origin(input.ndim, axes, origin)
+    mode = _expand_mode(input.ndim, axes, mode)
     fshape = [ii for ii in footprint.shape if ii > 0]
-    if len(fshape) != a.ndim:
+    if len(fshape) != input.ndim:
         raise RuntimeError(f"footprint.ndim ({footprint.ndim}) must match len(axes) ({len(axes)})")
-    # (SciPy's loop rebinds `origin`: the 1-D test below reads the last axis' origin)
+    # (SciPy's loop rebinds `origin`: the 1-D path below reads the last axis' origin)
     for origin, lenf in zip(origins, fshape, strict=False):
         if (lenf // 2 + origin < 0) or (lenf // 2 + origin >= lenf):
             raise ValueError("invalid origin")
@@ -769,59 +1025,65 @@ def _rank_filter(
         return maximum_filter(
             input, None, footprint, output, mode, cval, origins, axes=None, n_threads=n_threads
         )
+    target, out_arr = _get_output(output, input)
+    check_out = not (out_arr is not None and np.may_share_memory(input, out_arr))
     if not isinstance(mode, str) and isinstance(mode, Iterable):
         raise RuntimeError("A sequence of modes is not supported by non-separable rank filters")
-    target = _out_dtype(output, dtype, a.shape)
     mode = _mode(mode)
+
     # SciPy 1.18.1 sends 1-D inputs to its running-rank code unless the footprint is too large
     # for the input (gh-23293); it passes the footprint's size, its false elements included
-    lim2 = a.size - ((footprint.size - 1) // 2 - origin)
+    lim2 = input.size - ((footprint.size - 1) // 2 - origin)
+    if input.ndim == 1 and ((lim2 >= 0) or (input.size == 1)):
 
-    def nd():
-        return _core.ndimage_rank_filter(
-            a,
-            int(rank),
+        def nd_1d(xc: np.ndarray) -> np.ndarray:
+            # SCI-09's correction: the n-dimensional filter of the running rank's own input,
+            # in its type (the values a rank filter returns are its input's)
+            return _core.ndimage_rank_filter(
+                xc,
+                int(rank),
+                footprint,
+                mode,
+                float(xc.dtype.type(cval)),
+                [int(o) for o in origins],
+                int(n_threads),
+                xc.dtype.name,
+            )
+
+        return _rank_1d(
+            input,
+            rank,
             footprint,
+            target,
+            out_arr,
+            check_out,
             mode,
-            float(cval),
-            [int(o) for o in origins],
-            int(n_threads),
-            target.name,
+            cval,
+            origin,
+            operation,
+            upstream_defects,
+            nd_1d,
         )
-
-    if a.ndim == 1 and ((lim2 >= 0) or (a.size == 1)):
-        x = a if dtype in (np.int64, np.float64, np.float32) else a.astype("int64")
-        cv = x.dtype.type(cval)
-        code = {"grid-wrap": "wrap", "grid-mirror": "reflect", "grid-constant": "constant"}.get(
-            mode, mode
-        )
-        x_out = _core.ndimage_rank_filter_1d(
-            x, int(rank), int(footprint.size), code, float(cv), int(origin)
-        )
-        res = np.empty(a.shape, dtype=target)
-        np.copyto(res, x_out, casting="unsafe")
-        res = res.view(np.uint8) if target == np.bool_ else res
-        # SCI-09: SciPy's running rank takes the whole window, the footprint's false elements
-        # included; corrected, a footprint with holes is filtered by the n-dimensional filter
-        if not footprint.all():
-            fixed = nd()
-            if not np.array_equal(fixed, res, equal_nan=res.dtype.kind == "f"):
-                _defects.warn(
-                    [
-                        (
-                            "SCI-09",
-                            "SciPy ndimage",
-                            upstream_defects,
-                            f"the 1-D {operation} filter's footprint has false elements, which "
-                            "SciPy's running rank counts in its window",
-                        )
-                    ],
-                    stacklevel=4,
-                )
-            if upstream_defects == "fix":
-                return _result(fixed, target, output)
-        return _result(res, target, output)
-    return _result(nd(), target, output)
+    # _nd_image.rank_filter's arguments ("O&iO&O&idO&"), in order
+    if check_out:
+        _c_output(out_arr)
+    cval = _c_double(cval)
+    origins = [_intp(o) for o in origins]
+    if input.size == 0:
+        return _empty_result(input, target, out_arr)
+    in_type = _nd_type(input.dtype)
+    out_type = _nd_type(target)
+    out = _core.ndimage_rank_filter(
+        _native(input, in_type),
+        int(rank),
+        footprint,
+        mode,
+        cval,
+        origins,
+        int(n_threads),
+        "bool" if target == np.bool_ else out_type.name,
+    )
+    return _write(out, target, out_arr)
 
 
 def rank_filter(

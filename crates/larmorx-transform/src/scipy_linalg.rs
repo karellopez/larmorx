@@ -228,6 +228,7 @@ fn bound(anorm: f64, inverse: &Mat4) -> Condition {
 
 /// 1.18's `invert_slice_diagonal`: `1 / a(j, j)` in order, stopping at a zero element; the
 /// condition is `max|a| · max|1/a| > 1/eps`.
+#[allow(clippy::needless_range_loop)]
 fn diagonal(mut a: [[f64; 4]; 4]) -> Outcome {
     let (mut maxa, mut maxinva) = (0.0f64, 0.0f64);
     for j in 0..4 {
@@ -352,6 +353,8 @@ fn getri(a: &mut [[f64; 4]; 4], ipiv: &[usize; 4]) {
         }
         if k & 1 != 0 {
             // dgemv_kernel_4x1 (SSE2): x0·alpha, then y + a·x0.
+            // The kernel's `mulsd` by alpha (a NaN keeps its sign, as `-x` would not).
+            #[allow(clippy::neg_multiply)]
             let x0 = work[c] * -1.0;
             for r in 0..4 {
                 a[j][r] += a[c][r] * x0;

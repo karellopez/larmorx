@@ -325,18 +325,18 @@ new file with its SHA-256 and the original's in `RUN_INFO.txt`; no image data ch
 and every program node is classified by the pipeline-stage catalogue (the SyN nodes by a roadmap entry until the part
 ports them).
 
-The seven field-map runs were made again on 2026-11-09 with OpenBLAS's Haswell kernels (`OPENBLAS_CORETYPE=Haswell` in
+All nine runs were made again on 2026-11-09 with OpenBLAS's Haswell kernels (`OPENBLAS_CORETYPE=Haswell` in
 the container, the setting `scripts/run_fmriprep_oracle.sh` has passed since then), as every earlier run on the AVX2
 laptop had: on this machine's AVX-512 CPU the image otherwise picks OpenBLAS's AVX-512 kernels, which change numpy's and
 FSL's last bits (`topup`'s field up to 0.197 Hz on ds004958's PEPOLAR pair, measured by
 `validation/investigations/fmap-oracle-runs/topup_kernel_probe.sh`). Their RUN_INFO below is the new runs'; the first
 runs are archived (`<workspace>/archive/2026-11-08-fmriprep-runs-avx512-kernels/`, with a README). The table's minutes are
-the new runs'. The two multi-echo runs follow.
+the new runs'.
 
 | Run | What it adds | Minutes |
 |---|---|---:|
-| `ds000210-sub-02-noreconall` | three-echo BOLD (`t2smap`): the cued-SGT task and a rest run | 39 |
-| `ds000258-sub-21262-noreconall` | three-echo BOLD (`t2smap`; echoes 12, 28, 44 ms) | 35 |
+| `ds000210-sub-02-noreconall` | three-echo BOLD (`t2smap`): the cued-SGT task and a rest run | 38 |
+| `ds000258-sub-21262-noreconall` | three-echo BOLD (`t2smap`; echoes 12, 28, 44 ms) | 34 |
 | `ds000228-sub-pixar008-noreconall-syn` | `--use-syn-sdc` on the panel's child (SyN field-map-less estimation) | 47 |
 | `ds004884-sub-M2079-noreconall-syn` | `--use-syn-sdc` on the panel's stroke | 74 |
 | `ds005003-sub-RS001-noreconall-syn` | `--use-syn-sdc` on the panel's glioma | 69 |
@@ -357,11 +357,13 @@ BIDS input: <workspace>/oracles/bids-views/ds000210
 participant: 02
 arguments: /data /out participant --participant-label 02 -w /work --fs-license-file /opt/license.txt --skip-bids-validation --notrack --stop-on-first-crash --nprocs 4 --omp-nthreads 4 --random-seed 0 --skull-strip-fixed-seed --output-spaces MNI152NLin2009cAsym:res-2 T1w func --fs-no-reconall
 seeds: --random-seed 0 --skull-strip-fixed-seed; threads: --nprocs 4 --omp-nthreads 4
+OpenBLAS kernels: OPENBLAS_CORETYPE=Haswell in the container
 host: Linux 6.8.0-124-generic x86_64, 32 CPUs, 124 GB RAM
-started: 2026-11-08T12:37:10Z
-finished: 2026-11-08T13:16:32Z
+started: 2026-11-09T03:28:09Z
+finished: 2026-11-09T04:06:14Z
 exit status: 0
 BIDS view: <workspace>/oracles/bids-views/ds000210, the catalog collection openneuro-ds000210's cached files hard-linked (larmorx-testdata 52124bc; made by the orchestrator, 2026-11-08, for tedana's t2smap: its two 3-echo runs)
+made again with Haswell's OpenBLAS kernels; the first run (the CPU's AVX-512 kernels) is archived in archive/2026-11-08-fmriprep-runs-avx512-kernels/ds000210-sub-02-noreconall
 ```
 
 ### ds000258-sub-21262-noreconall
@@ -376,11 +378,13 @@ BIDS input: <workspace>/oracles/bids-views/ds000258
 participant: 21262
 arguments: /data /out participant --participant-label 21262 -w /work --fs-license-file /opt/license.txt --skip-bids-validation --notrack --stop-on-first-crash --nprocs 4 --omp-nthreads 4 --random-seed 0 --skull-strip-fixed-seed --output-spaces MNI152NLin2009cAsym:res-2 T1w func --fs-no-reconall
 seeds: --random-seed 0 --skull-strip-fixed-seed; threads: --nprocs 4 --omp-nthreads 4
+OpenBLAS kernels: OPENBLAS_CORETYPE=Haswell in the container
 host: Linux 6.8.0-124-generic x86_64, 32 CPUs, 124 GB RAM
-started: 2026-11-08T13:16:59Z
-finished: 2026-11-08T13:51:40Z
+started: 2026-11-09T04:06:26Z
+finished: 2026-11-09T04:40:51Z
 exit status: 0
 BIDS view: <workspace>/oracles/bids-views/ds000258, the catalog collection openneuro-ds000258's cached files hard-linked (larmorx-testdata 52e371a: echoes 1-3 added for this run; made by the orchestrator, 2026-11-08, for tedana's t2smap: one 4-echo run)
+made again with Haswell's OpenBLAS kernels; the first run (the CPU's AVX-512 kernels) is archived in archive/2026-11-08-fmriprep-runs-avx512-kernels/ds000258-sub-21262-noreconall
 ```
 
 ### ds000228-sub-pixar008-noreconall-syn

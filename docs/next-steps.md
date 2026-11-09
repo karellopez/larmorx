@@ -754,12 +754,11 @@ The items below keep their history.
     `validation/investigations/t2smap/`, the replica's suite module, difftest descriptor and permanent cases);
     the audit's tedana family (R07) is in place. Its brief also forbids the replica's record, evidence module and
     site page (their descriptions name a few things of tedana's source: decision log, the replica's entry).
-  - *Before the clean-room part:* fMRIPrep's runs `ds000210-sub-02-noreconall` and `ds000258-sub-21262-noreconall`
-    were made with OpenBLAS's AVX-512 kernels (the main machine's own; the earlier runs had Haswell's, an AVX2
-    laptop; `scripts/run_fmriprep_oracle.sh` sets Haswell's since 2026-11-08, its `RUN_INFO.txt` says which): make
-    them again with Haswell's (archive the present ones), then re-make the replica record's real calls and the
-    page's fMRIPrep panels from them in the clean-room part (ds000258's 581 values that numpy's AVX-512 kernels
-    explain should then agree).
+  - *In the clean-room part:* fMRIPrep's runs `ds000210-sub-02-noreconall` and `ds000258-sub-21262-noreconall`
+    were made with OpenBLAS's AVX-512 kernels at first (the main machine's own; the earlier runs had Haswell's, an
+    AVX2 laptop) and made again with Haswell's on 2026-11-09 (the first ones archived; `docs/validation/oracle-runs.md`):
+    re-make the replica record's real calls and the page's fMRIPrep panels from the new runs in the clean-room part
+    (ds000258's 581 values that numpy's AVX-512 kernels explain should then agree).
   - *Duplicates to merge:* `larmorx_sdcflows`' own numpy mean and pairwise sum (`npy.rs`, `approx.rs`) could use
     `larmorx_core::numpy`; `larmorx_sdcflows::npy::py_repr` duplicates `larmorx_core::python::number::float_repr`.
   - *Formats* (D5): inputs nibabel reads but `larmorx-io` does not (AFNI's BRIK, MINC, PAR/REC) are refused with

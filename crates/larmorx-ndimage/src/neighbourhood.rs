@@ -234,6 +234,45 @@ impl Neighbourhood {
         })
     }
 
+    /// The positions `x` along the last axis where the footprint around `p` (its last
+    /// coordinate replaced by `x`) stays inside the array on every axis: `lo..hi` (empty when
+    /// another axis crosses a border).
+    #[inline]
+    pub(crate) fn line_interior(&self, p: &[usize]) -> (usize, usize) {
+        let last = self.ndim - 1;
+        let others = (0..last).all(|d| {
+            let p = p[d] as isize;
+            p - self.centre[d] >= 0
+                && p + (self.fshape[d] as isize - 1 - self.centre[d]) < self.shape[d] as isize
+        });
+        let lo = self.centre[last].max(0);
+        let hi = self.shape[last] as isize - (self.fshape[last] as isize - 1 - self.centre[last]);
+        if !others || hi <= lo {
+            return (0, 0);
+        }
+        (lo as usize, hi as usize)
+    }
+
+    /// The last axis' stride.
+    #[inline]
+    pub(crate) fn last_stride(&self) -> usize {
+        self.strides[self.ndim - 1]
+    }
+
+    /// The 3-D footprint's mapped coordinates around `p` on each axis (`[k]` for footprint
+    /// coordinate `k`, [`BORDER`] outside in the constant modes), with the input's strides.
+    #[inline]
+    pub(crate) fn axes3(&self, p: &[usize]) -> ([&[usize]; 3], [usize; 3]) {
+        let t = |d: usize| {
+            let f = self.fshape[d];
+            &self.tables[d][p[d] * f..(p[d] + 1) * f]
+        };
+        (
+            [t(0), t(1), t(2)],
+            [self.strides[0], self.strides[1], self.strides[2]],
+        )
+    }
+
     /// The input offset of every element around `p` (`out[e]`, [`BORDER`] outside in the
     /// constant modes).
     #[inline]

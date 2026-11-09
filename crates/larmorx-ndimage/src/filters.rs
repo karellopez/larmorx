@@ -123,29 +123,205 @@ pub fn min_or_max_filter<T: NdElement, O: NdElement>(
     let nb = Neighbourhood::new(layout, footprint, origins, mode);
     let n = nb.len();
     let cv = T::from_f64(cval);
+    // Where no NaN can arise (an input without NaN, a finite structure), the interior's
+    // values are computed with plain arithmetic and the structure cast to the type once: the
+    // same values as `extreme`'s (SSE's results differ from IEEE's only in NaNs).
+    let sst: Option<Vec<T>> = ss
+        .as_ref()
+        .map(|v| v.iter().map(|&d| T::from_f64(d)).collect());
+    let plain = !T::any_nan(input)
+        && ss.as_ref().is_none_or(|v| v[0].is_finite())
+        && sst.as_ref().is_none_or(|v| v.iter().all(|t| t.finite()));
+    // near the border, the constant modes' value must not be a NaN either
+    let plain_border = plain && !T::any_nan(&[cv]);
+    let s0 = ss.as_ref().map(|v| v[0]);
+    // One position's value (the module's rules).
+    let point = |p: &[usize], offs: &mut Vec<usize>| -> f64 {
+        if nb.interior(p) {
+            let base = nb.base(p) as isize;
+            let rel = nb.relative();
+            if plain {
+                extreme_plain(input, base, rel, s0, sst.as_deref(), minimum)
+            } else {
+                extreme(n, ss.as_deref(), minimum, |e| {
+                    input[(base + rel[e]) as usize]
+                })
+            }
+        } else if plain_border && p.len() == 3 {
+            let (axes, strides) = nb.axes3(p);
+            extreme_plain_3d(
+                input,
+                &footprint.mask,
+                axes,
+                strides,
+                cv,
+                s0,
+                sst.as_deref(),
+                minimum,
+            )
+        } else {
+            nb.offsets(p, offs);
+            extreme(n, ss.as_deref(), minimum, |e| {
+                let off = offs[e];
+                if off == BORDER { cv } else { input[off] }
+            })
+        }
+    };
     let mut out = vec![O::default(); layout.len()];
+    let ndim = layout.ndim();
+    if plain && ndim > 0 && nb.last_stride() == 1 && !out.is_empty() {
+        // A contiguous last axis: each line's interior positions all at once, element by
+        // element in the footprint's order (every position sees its elements in that order, as
+        // one at a time), the others one at a time.
+        let line = layout.shape[ndim - 1];
+        let rel = nb.relative();
+        out.par_chunks_mut(line).enumerate().for_each_init(
+            || (vec![0usize; n], vec![0usize; ndim], Vec::<f64>::new()),
+            |(offs, p, acc), (li, chunk)| {
+                unravel(li * line, &layout.shape, p);
+                let (lo, hi) = nb.line_interior(p);
+                for x in (0..lo).chain(hi.max(lo)..line) {
+                    p[ndim - 1] = x;
+                    chunk[x] = O::from_f64_safe(point(p, offs));
+                }
+                if lo < hi {
+                    p[ndim - 1] = lo;
+                    let base = nb.base(p) as isize;
+                    let len = hi - lo;
+                    lines_plain(input, base, rel, len, s0, sst.as_deref(), minimum, acc);
+                    for (o, &a) in chunk[lo..hi].iter_mut().zip(acc.iter()) {
+                        *o = O::from_f64_safe(a);
+                    }
+                }
+            },
+        );
+        return Ok(out);
+    }
     for_each_point(
         &layout.shape,
         &mut out,
         || vec![0usize; n],
         |p, o, offs| {
-            let res = if nb.interior(p) {
-                let base = nb.base(p) as isize;
-                let rel = nb.relative();
-                extreme(n, ss.as_deref(), minimum, |e| {
-                    input[(base + rel[e]) as usize]
-                })
-            } else {
-                nb.offsets(p, offs);
-                extreme(n, ss.as_deref(), minimum, |e| {
-                    let off = offs[e];
-                    if off == BORDER { cv } else { input[off] }
-                })
-            };
-            *o = O::from_f64_safe(res);
+            *o = O::from_f64_safe(point(p, offs));
         },
     );
     Ok(out)
+}
+
+/// [`extreme_plain`] at `len` consecutive interior positions of a contiguous last axis (the
+/// first at `base`), into `acc`: element by element in the footprint's order, every position
+/// updated by each element in turn.
+#[allow(clippy::too_many_arguments)]
+fn lines_plain<T: NdElement>(
+    input: &[T],
+    base: isize,
+    rel: &[isize],
+    len: usize,
+    s0: Option<f64>,
+    sst: Option<&[T]>,
+    minimum: bool,
+    acc: &mut Vec<f64>,
+) {
+    acc.clear();
+    let start = (base + rel[0]) as usize;
+    acc.extend(input[start..start + len].iter().map(|x| x.to_f64_plain()));
+    if let Some(s0) = s0 {
+        acc.iter_mut().for_each(|a| *a += s0);
+    }
+    for e in 1..rel.len() {
+        let start = (base + rel[e]) as usize;
+        let src = &input[start..start + len];
+        match (sst, minimum) {
+            (Some(sst), true) => {
+                let s = sst[e];
+                for (a, &x) in acc.iter_mut().zip(src) {
+                    let t = x.add_plain(s).to_f64_plain();
+                    *a = if t < *a { t } else { *a };
+                }
+            }
+            (Some(sst), false) => {
+                let s = sst[e];
+                for (a, &x) in acc.iter_mut().zip(src) {
+                    let t = x.add_plain(s).to_f64_plain();
+                    *a = if t > *a { t } else { *a };
+                }
+            }
+            (None, true) => {
+                for (a, &x) in acc.iter_mut().zip(src) {
+                    let t = x.to_f64_plain();
+                    *a = if t < *a { t } else { *a };
+                }
+            }
+            (None, false) => {
+                for (a, &x) in acc.iter_mut().zip(src) {
+                    let t = x.to_f64_plain();
+                    *a = if t > *a { t } else { *a };
+                }
+            }
+        }
+    }
+}
+
+/// [`extreme_plain`] at a 3-D position near the border: the footprint visited in its order
+/// (C order of `mask`), each element at its mapped coordinates (`axes`, [`BORDER`] giving
+/// `cv`).
+#[allow(clippy::too_many_arguments)]
+#[inline(always)]
+fn extreme_plain_3d<T: NdElement>(
+    input: &[T],
+    mask: &[bool],
+    axes: [&[usize]; 3],
+    strides: [usize; 3],
+    cv: T,
+    s0: Option<f64>,
+    sst: Option<&[T]>,
+    minimum: bool,
+) -> f64 {
+    let mut res = 0.0f64;
+    let mut e = 0usize;
+    let mut lin = 0usize;
+    for &c0 in axes[0] {
+        for &c1 in axes[1] {
+            let row = if c0 == BORDER || c1 == BORDER {
+                BORDER
+            } else {
+                c0 * strides[0] + c1 * strides[1]
+            };
+            for &c2 in axes[2] {
+                let on = mask[lin];
+                lin += 1;
+                if !on {
+                    continue;
+                }
+                let v = if row == BORDER || c2 == BORDER {
+                    cv
+                } else {
+                    input[row + c2 * strides[2]]
+                };
+                if e == 0 {
+                    res = v.to_f64_plain();
+                    if let Some(s0) = s0 {
+                        res += s0;
+                    }
+                } else {
+                    let t = match sst {
+                        Some(sst) => v.add_plain(sst[e]),
+                        None => v,
+                    }
+                    .to_f64_plain();
+                    if minimum {
+                        if t < res {
+                            res = t;
+                        }
+                    } else if t > res {
+                        res = t;
+                    }
+                }
+                e += 1;
+            }
+        }
+    }
+    res
 }
 
 /// `NI_MinOrMaxFilter`'s value at one position from the footprint's `n` elements (`get(e)`), in
@@ -174,6 +350,51 @@ fn extreme<T: NdElement>(
             }
         } else if t > res {
             res = t;
+        }
+    }
+    res
+}
+
+/// [`extreme`] at an interior position where no NaN can arise: the first element plus the
+/// structure's first value in `f64`, then each element plus the structure's value cast to the
+/// type (`sst`), compared in `f64`.
+#[inline(always)]
+fn extreme_plain<T: NdElement>(
+    input: &[T],
+    base: isize,
+    rel: &[isize],
+    s0: Option<f64>,
+    sst: Option<&[T]>,
+    minimum: bool,
+) -> f64 {
+    let mut res = input[(base + rel[0]) as usize].to_f64_plain();
+    if let Some(s0) = s0 {
+        res += s0;
+    }
+    match sst {
+        Some(sst) => {
+            for (&r, &s) in rel[1..].iter().zip(&sst[1..]) {
+                let t = input[(base + r) as usize].add_plain(s).to_f64_plain();
+                if minimum {
+                    if t < res {
+                        res = t;
+                    }
+                } else if t > res {
+                    res = t;
+                }
+            }
+        }
+        None => {
+            for &r in &rel[1..] {
+                let t = input[(base + r) as usize].to_f64_plain();
+                if minimum {
+                    if t < res {
+                        res = t;
+                    }
+                } else if t > res {
+                    res = t;
+                }
+            }
         }
     }
     res

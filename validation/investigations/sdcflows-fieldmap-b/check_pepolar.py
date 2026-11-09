@@ -938,7 +938,12 @@ def main() -> int:
     if "wf" in secs:
         sec_wf(t, args.threads, ests, times)
     if "image" in secs:
+        # fMRIPrep's own files: its image's numpy 2.2.6 (LAPACK 3.12.0) in nibabel's set_qform,
+        # whichever environment runs the check (as check_fmap_stage and check_derivatives
+        # compare fMRIPrep's files; relay 25: ds006736's fix_coeff quatern_d in newest)
+        use_lapack("3.12.0")
         sec_image(t, args.threads, ests)
+        use_lapack(numpy_lapack())
     bad = t.report()
     print(
         f"sdcflows' graphs {times[0]:.1f} s (programs through the oracle cache), larmorx "

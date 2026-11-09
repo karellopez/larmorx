@@ -397,12 +397,21 @@ SUITES: dict[str, dict[str, Script]] = {
         ),
         "pepolar-workflow": _s(
             "check_pepolar.py",
-            ["--sections", "wf,image"],
+            ["--sections", "wf"],
             "full",
-            "topup_workflow, both wirings (sdcflows 2.15 and 2.17.1), and fMRIPrep's own runs",
+            "topup_workflow, both wirings (sdcflows 2.15 and 2.17.1), against sdcflows' own graphs",
             gib=24,
             nc=True,
             timeout=7200,
+        ),
+        "pepolar-image": _s(
+            "check_pepolar.py",
+            ["--sections", "image"],
+            "full",
+            "the PEPOLAR steps with fMRIPrep's libraries against fMRIPrep's own node files",
+            gib=24,
+            nc=True,
+            timeout=5400,
         ),
         "contract-audit": _s(
             "relay22/audit_contract.py",

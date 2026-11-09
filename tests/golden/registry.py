@@ -4354,7 +4354,26 @@ def _(ctx: Context) -> dict[str, Any]:
         "hit_or_miss": lx.ndimage.binary_hit_or_miss(blob, structure1=st),
         "structure": lx.ndimage.generate_binary_structure(4, 2),
         "iterate": lx.ndimage.iterate_structure(st, 3),
+        **_binary_float_outputs(blob, mask > 0.5),
     }
+
+
+def _binary_float_outputs(blob: np.ndarray, mask: np.ndarray) -> dict[str, Any]:
+    """Relay 22: an iterated erosion with a mask into a float32 output array, corrected (the
+    elements outside the mask kept) and as SciPy computes it (SCI-25: its later passes erode
+    them); a longlong input and a 0-d one."""
+    out: dict[str, Any] = {}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")  # the SCI-25 notices
+        for mode in ("fix", "reproduce"):
+            o = np.zeros(blob.shape, np.float32)
+            lx.ndimage.binary_erosion(
+                blob, iterations=3, mask=mask, output=o, upstream_defects=mode
+            )
+            out[f"erosion.mask.float32.{mode}"] = o
+    out["erosion.longlong"] = lx.ndimage.binary_erosion(blob.astype(np.longlong), iterations=2)
+    out["dilation.0d"] = lx.ndimage.binary_dilation(np.array(True), iterations=2)
+    return out
 
 
 @case("py.ndimage.label", covers=("lx.ndimage.label", "lx.ndimage.sum_labels", "lx.ndimage.sum"))
@@ -4374,6 +4393,25 @@ def _(ctx: Context) -> dict[str, Any]:
         "sizes": lx.ndimage.sum(blob.astype(np.uint8), lab, range(n + 1)),
         "sums": lx.ndimage.sum_labels(w, lab, np.arange(-1, n + 2)),
         "sum.scalar": np.asarray(lx.ndimage.sum_labels(w, lab, 3)),
+        **_labels_into_outputs(blob, lab, w),
+    }
+
+
+def _labels_into_outputs(blob: np.ndarray, lab: np.ndarray, w: np.ndarray) -> dict[str, Any]:
+    """Relay 22: labels into a Fortran-ordered output (numbered along its axis of the smallest
+    stride, as SciPy's ``_ni_label``) and into a big-endian one (SCI-27, labelled as the native
+    copy); sums per label with uint64 labels (``unique``'s path: an index compared by value)."""
+    of = np.zeros(blob.shape, np.int32, order="F")
+    n_f = lx.ndimage.label(blob, output=of)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")  # the SCI-27 notice
+        ob, _ = lx.ndimage.label(blob, output=">i4")
+    idx = np.array([0.0, 1.0, 1.5, 3.0, 2.0**40])
+    return {
+        "label.F": of,
+        "label.F.count": np.asarray([n_f]),
+        "label.>i4": ob,
+        "sums.uint64": lx.ndimage.sum_labels(w, lab.astype(np.uint64), idx),
     }
 
 

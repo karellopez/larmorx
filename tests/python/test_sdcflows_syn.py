@@ -138,3 +138,20 @@ def test_norm_lap_sdc14(tmp_path: Path) -> None:
         lx.sdcflows.norm_lap(flat, out_dir=tmp_path / "f")
     with pytest.raises(IndexError):
         lx.sdcflows.norm_lap(flat, out_dir=tmp_path / "f", upstream_defects="reproduce")
+
+
+def test_warp_dir_sdc16(tmp_path: Path) -> None:
+    """A fixed grid whose voxel axes are not in R, A, S order: ANTs weighs the physical axes."""
+    epi = _plain(tmp_path / "epi.nii.gz", (6, 7, 5), (3.0, 3.0, 3.3))
+    aff = np.zeros((4, 4))
+    aff[2, 0] = aff[0, 1] = aff[1, 2] = 2.0  # voxel axes S, R, A
+    aff[3, 3] = 1.0
+    fixed = _write(tmp_path / "sra.nii.gz", np.zeros((5, 6, 7), np.float32), aff)
+    with pytest.warns(lx.UpstreamDefectWarning, match="SDC-16"):
+        assert lx.sdcflows.warp_dir(epi, fixed, "j-") == [[0.1, 1.0, 0.1]] * 2
+    with pytest.warns(lx.UpstreamDefectWarning, match="SDC-16"):
+        rd = lx.sdcflows.warp_dir(epi, fixed, "j-", upstream_defects="reproduce")
+    assert rd == [[0.1, 0.1, 1.0]] * 2
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", lx.UpstreamDefectWarning)
+        assert lx.sdcflows.warp_dir(epi, epi, "i", nlevels=1) == [[1.0, 0.1, 0.1]]

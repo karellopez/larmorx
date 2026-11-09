@@ -7421,8 +7421,8 @@ def _(ctx: Context) -> dict[str, Any]:
     """sdcflows' init_syn_sdc_wf on init_syn_preprocessing_wf's outputs of the synthetic head
     (the registration seeded; the sloppy settings, the B-spline fit at 4 mm, debug's warped
     images and interval volumes, Laplacian weights clipped to 0.5: fMRIPrep's call differs only
-    by its settings file), its helpers' values, and _norm_lap's constant image (SDC-14 fixed
-    and reproduced)."""
+    by its settings file), its helpers' values, _warp_dir on a fixed grid in S, R, A order
+    (SDC-16) and _norm_lap's constant image (SDC-14), each fixed and reproduced."""
     inp = _syn_inputs(ctx)
     meta = {"PhaseEncodingDirection": "j-", "TotalReadoutTime": 0.0315}
     with warnings.catch_warnings():
@@ -7447,6 +7447,16 @@ def _(ctx: Context) -> dict[str, Any]:
     out["warp_dir"] = np.asarray(
         lx.sdcflows.warp_dir(res.files["clip_epi"], pre.anat_ref, "j-", nlevels=3)
     )
+    sra = ctx.out("sra.nii.gz")
+    perm = np.zeros((4, 4))
+    perm[2, 0] = perm[0, 1] = perm[1, 2] = 2.0
+    perm[3, 3] = 1.0
+    lx.save((np.zeros((5, 6, 7), np.float32), perm), sra)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        out["sdc16"] = np.asarray(
+            [lx.sdcflows.warp_dir(res.files["clip_epi"], sra, "j-", 1, upstream_defects=m)[0] for m in ("fix", "reproduce")]
+        )  # fmt: skip
     cfg = json.loads(lx.sdcflows.registration_settings("sd_syn_sloppy.json").read_text())
     out["mm2vox"] = np.asarray(
         lx.sdcflows.mm2vox(res.files["clip_epi"], pre.anat_ref, "i", cfg), dtype=np.float64

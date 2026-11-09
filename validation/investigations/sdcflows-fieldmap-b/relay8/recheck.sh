@@ -3,7 +3,8 @@
 # The part's checks on one re-made fMRIPrep oracle run (the 2026-11-08 field-map runs, re-made
 # with OPENBLAS_CORETYPE=Haswell), each boxed: check_bold_steps.py and check_bold_stage.py in both
 # kept environments, check_bold_fmap.py's nodes, and check_pepolar.py's image section (PEPOLAR)
-# or check_workflows.py's direct section (a direct field map).
+# or check_workflows.py's direct section (a direct field map), or for a SyN run (relay 10)
+# check_syn_preprocessing.py's nodes and check_syn_sdc.py's nodes in both environments.
 #
 # usage: LARMORX_WORKSPACE=<workspace> LARMORX_NC_BIN=<larmorx-nc> \
 #        recheck.sh <full run name> [pepolar|direct|syn] > <workspace>/oracles/logs/<log> 2>&1
@@ -34,6 +35,14 @@ if [ "$kind" = direct ]; then
   for env in shared newest; do
     echo "##### check_workflows direct $env"
     box "$(py $env)" -P "$HERE/check_workflows.py" --sections direct --threads 6
+  done
+fi
+if [ "$kind" = syn ]; then
+  echo "##### check_syn_preprocessing nodes shared"
+  box "$(py shared)" -P "$HERE/check_syn_preprocessing.py" --sections nodes --runs "$run" --threads 6
+  for env in shared newest; do
+    echo "##### check_syn_sdc nodes $env"
+    box "$(py $env)" -P "$HERE/check_syn_sdc.py" --sections nodes --runs "$run" --threads 6
   done
 fi
 echo "RECHECK-END $run"

@@ -25,6 +25,13 @@ nibabel's ``obliquity`` (radians) with ``OBLIQUE_THRESHOLD_DEG = 0.5`` (meant as
 ``Deoblique`` and ``Reoblique`` act only beyond 28.6 degrees; and ``_deoblique``'s plumb grid
 centres the image in voxels, not millimetres, and compares the axis codes with ``RAS`` by
 position. Both modes give sdcflows' behaviour until the measurement decides.
+
+Corrected by default (``upstream_defects="reproduce"`` gives sdcflows' behaviour): SDC-14
+(``_norm_lap`` of an image without positive or negative values: a ``ValueError`` instead of
+numpy's ``IndexError``), SDC-16 (``_warp_dir`` restricts the deformation along the world axis
+of the phase encoding: ANTs weighs physical axes, sdcflows indexes the fixed image's voxel
+axes). SDC-15: ``init_syn_sdc_wf``'s ``zooms_epi`` node, whose output nothing reads, is not
+computed.
 """
 
 from __future__ import annotations
@@ -631,15 +638,25 @@ def warp_dir(
     fixed_image: str | os.PathLike[str],
     pe_dir: str,
     nlevels: int = 2,
+    *,
+    upstream_defects: UpstreamDefectsName = "fix",
 ) -> list[list[float]]:
     """sdcflows' ``_warp_dir``: ``antsRegistration``'s ``restrict_deformation`` for each of
-    ``nlevels`` levels: 0.1 on every axis of the fixed image but the one closest to the moving
-    image's phase-encoding axis (``pe_dir``: ``i``, ``j``, ``k``, signed or not), 1.0 there.
-    Logs sdcflows' warning (``larmorx.sdcflows``) when the fixed image is oblique (nibabel's
+    ``nlevels`` levels: 0.1 on two axes and 1.0 on the world axis closest to the moving
+    image's phase-encoding axis (``pe_dir``: ``i``, ``j``, ``k``, signed or not). Logs
+    sdcflows' warning (``larmorx.sdcflows``) when the fixed image is oblique (nibabel's
     obliquity above 0.05 radians on an axis). A ``pe_dir`` or an axis it cannot match raises
-    the ``ValueError`` sdcflows' ``str.index``/``tuple.index`` raise."""
+    the ``ValueError`` sdcflows' ``str.index``/``tuple.index`` raise.
+
+    ANTs weighs the deformation's physical components (x, y, z), while sdcflows puts the 1.0
+    at the position of that axis among the fixed image's voxel axes: the same position for a
+    fixed grid in R, A, S order (fMRIPrep's axial EPIs), another world axis for a sagittal or
+    coronal grid, where the deformation along the phase encoding is then held at 0.1 (SDC-16,
+    rule A). larmorx puts the 1.0 on that world axis; ``"reproduce"`` gives sdcflows'
+    position; an ``lx.UpstreamDefectWarning`` says when the two differ."""
     import logging
 
+    _defects.check(upstream_defects)
     moving = nibabel_affine(_header_of(moving_image))
     fixed = nibabel_affine(_header_of(fixed_image))
     if np.any(obliquity(fixed) > _WARP_DIR_OBLIQUITY):
@@ -648,8 +665,25 @@ def warp_dir(
         )
     moving_pe_axis = _unsigned_axcodes(moving)["ijk".index(pe_dir[0])]
     fixed_axcodes = _unsigned_axcodes(fixed)
+    position = fixed_axcodes.index(moving_pe_axis)
+    world = "RAS".index(moving_pe_axis)
+    if position != world:
+        _defects.warn(
+            [
+                (
+                    "SDC-16",
+                    "sdcflows",
+                    upstream_defects,
+                    f"the deformation is restricted to world axis {'xyz'[world]} (the phase "
+                    f"encoding's, {moving_pe_axis}); sdcflows frees world axis "
+                    f"{'xyz'[position]} instead (the position of {moving_pe_axis} among the "
+                    f"fixed image's voxel axes {''.join(str(c) for c in fixed_axcodes)}), and "
+                    "ANTs weighs the physical axes",
+                )
+            ]
+        )
     deformation = [0.1, 0.1, 0.1]
-    deformation[fixed_axcodes.index(moving_pe_axis)] = 1.0
+    deformation[position if upstream_defects == "reproduce" else world] = 1.0
     return nlevels * [deformation]
 
 
@@ -922,7 +956,9 @@ def syn_sdc_workflow(
     zooms = adjust_zooms(anat_ref, epi_file)
     # warp_dir, vox_params
     node("warp_dir")
-    restrict = warp_dir(clip_epi, anat_ref, ro.pe_direction, nlevels=2)
+    restrict = warp_dir(
+        clip_epi, anat_ref, ro.pe_direction, nlevels=2, upstream_defects=upstream_defects
+    )
     settings_file = registration_settings(f"sd_syn{'_sloppy' * bool(sloppy)}.json")
     node("vox_params")
     config = json.loads(settings_file.read_text(encoding="utf-8"))

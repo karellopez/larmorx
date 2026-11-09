@@ -2,7 +2,7 @@
  "environment": {
   "cpu": "AMD Ryzen 9 7945HX with Radeon Graphics",
   "larmorx": "0.0.1",
-  "larmorx_commit": "ab5ffe99467a",
+  "larmorx_commit": "3e2340a8880b",
   "larmorx_testdata_commit": "52e371aab0ac",
   "logical_cpus": 32,
   "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
@@ -44,7 +44,7 @@
     "the script's exit status": 0
    },
    "reason": "",
-   "seconds": 30.775,
+   "seconds": 33.749,
    "status": "pass"
   },
   {
@@ -70,7 +70,7 @@
     "the script's exit status": 0
    },
    "reason": "",
-   "seconds": 32.391,
+   "seconds": 34.033,
    "status": "pass"
   },
   {
@@ -108,7 +108,7 @@
     "INFO one slice (length-1 axis)": "(30, 34, 1), 583 voxels; centre (15, 17, 0); fix: 0 voxels differ []; reproduce warned []; sdcflows <time>, larmorx <time>",
     "INFO scaled int16": "(30, 34, 22), 193 voxels; centre (15, 17, 11); fix: 0 voxels differ []; reproduce warned []; sdcflows <time>, larmorx <time>"
    },
-   "seconds": 6.512,
+   "seconds": 6.931,
    "status": "pass"
   },
   {
@@ -157,7 +157,7 @@
     "INFO uint8 onto int16 with negatives (SKI-02) fix": "uint8, 0 NaN, range [0, 255]",
     "INFO uint8 onto uint8 (bincount)": "uint8 (14, 12, 10), identical"
    },
-   "seconds": 21.026,
+   "seconds": 24.15,
    "status": "pass"
   },
   {
@@ -222,7 +222,7 @@
     "INFO fmriprep_25_2_wf/sub_ON01016_ses_01_wf/fmap_preproc_wf/wf_auto_00000 masker/clipped_probseg.nii.gz": "0.0875 of voxels identical, max |diff| 0.001627",
     "INFO fmriprep_25_2_wf/sub_ON01016_ses_01_wf/fmap_preproc_wf/wf_auto_00000 n4/clipped_corrected.nii.gz": "0.4232 of voxels identical, max |diff| 0.1713"
    },
-   "seconds": 340.412,
+   "seconds": 333.831,
    "status": "pass"
   },
   {
@@ -259,7 +259,7 @@
     "the script's exit status": 0
    },
    "reason": "",
-   "seconds": 1376.77,
+   "seconds": 1288.595,
    "status": "pass"
   },
   {
@@ -275,7 +275,7 @@
     "the script's exit status": 0
    },
    "reason": "",
-   "seconds": 0.49,
+   "seconds": 0.513,
    "status": "pass"
   },
   {
@@ -309,7 +309,7 @@
     "INFO flatten nothing": "sdcflows ('ValueError', \"Flatten requires a value for input 'in_data'. For a list of required inputs, see Flatten.help()\"); larmorx ('ValueError', 'not enough values to unpack (expected 2, got 0)')",
     "INFO qwarp2ants one slice (SDC-24)": "sdcflows (7, 6, 1, 3), larmorx (fix) (7, 6, 1, 1, 3)"
    },
-   "seconds": 1.148,
+   "seconds": 1.159,
    "status": "pass"
   },
   {
@@ -386,7 +386,7 @@
     "INFO ds005003-sub-RS001-noreconall-syn/syn_preprocessing_auto_00001 #3": "ref_anat against fMRIPrep's file (its threads, glibc's maths): data (9291938/9437184 equal)",
     "INFO ds005003-sub-RS001-noreconall-syn/syn_preprocessing_auto_00001 #4": "epi2anat differs from fMRIPrep's (its threads), max |parameter| diff 0.00762"
    },
-   "seconds": 255.671,
+   "seconds": 230.793,
    "status": "pass"
   },
   {
@@ -425,26 +425,73 @@
     "zooms_field: command line": "5/5"
    },
    "reason": "",
-   "seconds": 36.382,
+   "seconds": 32.006,
    "status": "pass"
   },
   {
    "case": "estimators",
    "category": "check_estimators",
-   "checks_passed": 9,
-   "checks_total": 9,
+   "checks_passed": 54,
+   "checks_total": 54,
    "failed_checks": [],
    "measured": {
     "== apps": "8/8",
     "== fmriprep": "2567/2567",
     "== index": "306/306",
+    "== roots": "168/168",
     "== runs": "92/92",
     "== units": "577/577",
     "== wrangler": "2790/2790",
     "the script's exit status": 0
    },
    "reason": "",
-   "seconds": 228.935,
+   "reported": {
+    "INFO roots andres-lab/ds000228-sub-pixar008-noreconall-syn 2.15.2": "larmorx's notices ['SDC-45']; sdcflows: [\"list\", [[\"FieldmapEstimation\", \"ANAT\", \"auto_00000\", \"auto_00000\", [[\"FieldmapFile\", \"<root>/sub-pixar008/anat/sub-pixar008_T1w.nii.gz\", \"T1w\", [\"dict\", \"dict",
+    "INFO roots andres-lab/ds000228-sub-pixar008-noreconall-syn 2.17.1": "larmorx's notices ['SDC-45']; sdcflows: [\"error\", \"ValueError\", \"'res' is not a recognized entity. If you're sure you want to impose this constraint, set invalid_filters='allow'.\"]",
+    "INFO roots andres-lab/ds000228-sub-pixar008-noreconall-syn fMRIPrep get_sbrefs (PIPE-36)": "[\"error\", \"ValueError\", \"'res' is not a recognized entity. If you're sure you want to impose this constraint, set invalid_filters='allow'.\"]",
+    "INFO roots andres-lab/fmapless_sbref 2.15.2": "larmorx's notices ['SDC-45']; sdcflows: [\"list\", [[\"FieldmapEstimation\", \"ANAT\", \"auto_00000\", \"auto_00000\", [[\"FieldmapFile\", \"<root>/sub-01/anat/sub-01_T1w.nii.gz\", \"T1w\", [\"dict\", \"dict\", [[[\"str\",",
+    "INFO roots andres-lab/fmapless_sbref 2.17.1": "larmorx's notices ['SDC-45']; sdcflows: [\"error\", \"ValueError\", \"'res' is not a recognized entity. If you're sure you want to impose this constraint, set invalid_filters='allow'.\"]",
+    "INFO roots andres-lab/fmapless_sbref fMRIPrep get_sbrefs (PIPE-36)": "[\"error\", \"ValueError\", \"'res' is not a recognized entity. If you're sure you want to impose this constraint, set invalid_filters='allow'.\"]",
+    "INFO roots andres-lab/pepolar 2.15.2": "larmorx's notices ['SDC-45']; sdcflows: [\"list\", [[\"FieldmapEstimation\", \"PEPOLAR\", \"auto_00000\", \"auto_00000\", [[\"FieldmapFile\", \"<root>/sub-01/ses-01/fmap/sub-01_ses-01_dir-AP_epi.nii.gz\", \"epi\", [\"",
+    "INFO roots andres-lab/pepolar 2.17.1": "larmorx's notices ['SDC-45']; sdcflows: [\"error\", \"ValueError\", \"'res' is not a recognized entity. If you're sure you want to impose this constraint, set invalid_filters='allow'.\"]",
+    "INFO roots andres-lab/pepolar fMRIPrep get_sbrefs (PIPE-36)": "[\"error\", \"ValueError\", \"'res' is not a recognized entity. If you're sure you want to impose this constraint, set invalid_filters='allow'.\"]",
+    "INFO roots andres-lab/phasediff 2.15.2": "larmorx's notices ['SDC-45']; sdcflows: [\"list\", [[\"FieldmapEstimation\", \"PHASEDIFF\", \"auto_00000\", \"auto_00000\", [[\"FieldmapFile\", \"<root>/sub-01/ses-01/fmap/sub-01_ses-01_phasediff.nii.gz\", \"phasedi",
+    "INFO roots andres-lab/phasediff 2.17.1": "larmorx's notices ['SDC-45']; sdcflows: [\"error\", \"ValueError\", \"'res' is not a recognized entity. If you're sure you want to impose this constraint, set invalid_filters='allow'.\"]",
+    "INFO roots andres-lab/phasediff fMRIPrep get_sbrefs (PIPE-36)": "[\"error\", \"ValueError\", \"'res' is not a recognized entity. If you're sure you want to impose this constraint, set invalid_filters='allow'.\"]",
+    "INFO roots func/ds000228-sub-pixar008-noreconall-syn": "pybids' index differs from its index below plain/ (PIPE-37)",
+    "INFO roots func/ds000228-sub-pixar008-noreconall-syn fMRIPrep get_sbrefs (PIPE-36)": "[]",
+    "INFO roots func/fmapless_sbref": "pybids' index differs from its index below plain/ (PIPE-37)",
+    "INFO roots func/fmapless_sbref fMRIPrep get_sbrefs (PIPE-36)": "[\"<root>/sub-01/func/sub-01_task-rest_sbref.nii.gz\"]",
+    "INFO roots func/pepolar": "pybids' index differs from its index below plain/ (PIPE-37)",
+    "INFO roots func/pepolar fMRIPrep get_sbrefs (PIPE-36)": "[]",
+    "INFO roots func/phasediff": "pybids' index differs from its index below plain/ (PIPE-37)",
+    "INFO roots func/phasediff fMRIPrep get_sbrefs (PIPE-36)": "[]",
+    "INFO roots golden-x/ds000228-sub-pixar008-noreconall-syn 2.15.2": "larmorx's notices ['SDC-45']; sdcflows: [\"list\", [[\"FieldmapEstimation\", \"ANAT\", \"auto_00000\", \"auto_00000\", [[\"FieldmapFile\", \"<root>/sub-pixar008/anat/sub-pixar008_T1w.nii.gz\", \"T1w\", [\"dict\", \"dict",
+    "INFO roots golden-x/ds000228-sub-pixar008-noreconall-syn 2.17.1": "larmorx's notices ['SDC-45']; sdcflows: [\"error\", \"ValueError\", \"'den' is not a recognized entity. If you're sure you want to impose this constraint, set invalid_filters='allow'.\"]",
+    "INFO roots golden-x/ds000228-sub-pixar008-noreconall-syn fMRIPrep get_sbrefs (PIPE-36)": "[\"error\", \"ValueError\", \"'den' is not a recognized entity. If you're sure you want to impose this constraint, set invalid_filters='allow'.\"]",
+    "INFO roots golden-x/fmapless_sbref 2.15.2": "larmorx's notices ['SDC-45']; sdcflows: [\"list\", [[\"FieldmapEstimation\", \"ANAT\", \"auto_00000\", \"auto_00000\", [[\"FieldmapFile\", \"<root>/sub-01/anat/sub-01_T1w.nii.gz\", \"T1w\", [\"dict\", \"dict\", [[[\"str\",",
+    "INFO roots golden-x/fmapless_sbref 2.17.1": "larmorx's notices ['SDC-45']; sdcflows: [\"error\", \"ValueError\", \"'den' is not a recognized entity. If you're sure you want to impose this constraint, set invalid_filters='allow'.\"]",
+    "INFO roots golden-x/fmapless_sbref fMRIPrep get_sbrefs (PIPE-36)": "[\"error\", \"ValueError\", \"'den' is not a recognized entity. If you're sure you want to impose this constraint, set invalid_filters='allow'.\"]",
+    "INFO roots golden-x/pepolar 2.15.2": "larmorx's notices ['SDC-45']; sdcflows: [\"list\", [[\"FieldmapEstimation\", \"PEPOLAR\", \"auto_00000\", \"auto_00000\", [[\"FieldmapFile\", \"<root>/sub-01/ses-01/fmap/sub-01_ses-01_dir-AP_epi.nii.gz\", \"epi\", [\"",
+    "INFO roots golden-x/pepolar 2.17.1": "larmorx's notices ['SDC-45']; sdcflows: [\"error\", \"ValueError\", \"'den' is not a recognized entity. If you're sure you want to impose this constraint, set invalid_filters='allow'.\"]",
+    "INFO roots golden-x/pepolar fMRIPrep get_sbrefs (PIPE-36)": "[\"error\", \"ValueError\", \"'den' is not a recognized entity. If you're sure you want to impose this constraint, set invalid_filters='allow'.\"]",
+    "INFO roots golden-x/phasediff 2.15.2": "larmorx's notices ['SDC-45']; sdcflows: [\"list\", [[\"FieldmapEstimation\", \"PHASEDIFF\", \"auto_00000\", \"auto_00000\", [[\"FieldmapFile\", \"<root>/sub-01/ses-01/fmap/sub-01_ses-01_phasediff.nii.gz\", \"phasedi",
+    "INFO roots golden-x/phasediff 2.17.1": "larmorx's notices ['SDC-45']; sdcflows: [\"error\", \"ValueError\", \"'den' is not a recognized entity. If you're sure you want to impose this constraint, set invalid_filters='allow'.\"]",
+    "INFO roots golden-x/phasediff fMRIPrep get_sbrefs (PIPE-36)": "[\"error\", \"ValueError\", \"'den' is not a recognized entity. If you're sure you want to impose this constraint, set invalid_filters='allow'.\"]",
+    "INFO roots plain/ds000228-sub-pixar008-noreconall-syn fMRIPrep get_sbrefs (PIPE-36)": "[]",
+    "INFO roots plain/fmapless_sbref fMRIPrep get_sbrefs (PIPE-36)": "[\"<root>/sub-01/func/sub-01_task-rest_sbref.nii.gz\"]",
+    "INFO roots plain/pepolar fMRIPrep get_sbrefs (PIPE-36)": "[]",
+    "INFO roots plain/phasediff fMRIPrep get_sbrefs (PIPE-36)": "[]",
+    "INFO roots sub-pilot/ds000228-sub-pixar008-noreconall-syn": "pybids' index differs from its index below plain/ (PIPE-37)",
+    "INFO roots sub-pilot/fmapless_sbref": "pybids' index differs from its index below plain/ (PIPE-37)",
+    "INFO roots sub-pilot/pepolar": "pybids' index differs from its index below plain/ (PIPE-37)",
+    "INFO roots sub-pilot/phasediff": "pybids' index differs from its index below plain/ (PIPE-37)",
+    "INFO roots workspace-2024/ds000228-sub-pixar008-noreconall-syn fMRIPrep get_sbrefs (PIPE-36)": "[]",
+    "INFO roots workspace-2024/fmapless_sbref fMRIPrep get_sbrefs (PIPE-36)": "[\"<root>/sub-01/func/sub-01_task-rest_sbref.nii.gz\"]",
+    "INFO roots workspace-2024/pepolar fMRIPrep get_sbrefs (PIPE-36)": "[]",
+    "INFO roots workspace-2024/phasediff fMRIPrep get_sbrefs (PIPE-36)": "[]"
+   },
+   "seconds": 254.583,
    "status": "pass"
   },
   {
@@ -493,10 +540,10 @@
    "reason": "",
    "reported": {
     "INFO compress_short_pipe28 with upstream_defects='fix'": "ValueError('compress has 2 values for 3 input files (PIPE-28: niworkflows fails with an IndexError)')",
-    "INFO mask_int16_pipe29 with upstream_defects='fix'": "(['/tmp/lxpb_derivatives_p9iwgli0/scratch/synthetic/mine-fix/mask_int16_pipe29/niworkflows/sub-01/fmap/sub-01_acq-a_run-01_desc-brain_mask.nii.gz'], None)",
-    "INFO rt_3d_pipe30 with upstream_defects='fix'": "(['/tmp/lxpb_derivatives_p9iwgli0/scratch/synthetic/mine-fix/rt_3d_pipe30/niworkflows/sub-01/func/sub-01_task-x_desc-preproc_boldref.nii.gz'], '/tmp/lxpb_derivatives_p9iwgli0/scratch/synthetic/mine-fix/rt_3d_pipe30/niworkflows/sub-01/func/sub-01_task-x_"
+    "INFO mask_int16_pipe29 with upstream_defects='fix'": "(['/tmp/lxpb_derivatives_5l6cgnm9/scratch/synthetic/mine-fix/mask_int16_pipe29/niworkflows/sub-01/fmap/sub-01_acq-a_run-01_desc-brain_mask.nii.gz'], None)",
+    "INFO rt_3d_pipe30 with upstream_defects='fix'": "(['/tmp/lxpb_derivatives_5l6cgnm9/scratch/synthetic/mine-fix/rt_3d_pipe30/niworkflows/sub-01/func/sub-01_task-x_desc-preproc_boldref.nii.gz'], '/tmp/lxpb_derivatives_5l6cgnm9/scratch/synthetic/mine-fix/rt_3d_pipe30/niworkflows/sub-01/func/sub-01_task-x_"
    },
-   "seconds": 15.473,
+   "seconds": 15.822,
    "status": "pass"
   },
   {
@@ -554,7 +601,7 @@
     "INFO synthetic ['good', 'soph'] {}": "fMRIPrep ('NotImplementedError', 'Sophisticated PEPOLAR schemes are unsupported.'), larmorx ('NotImplementedError', 'Sophisticated PEPOLAR schemes are unsupported.')",
     "INFO synthetic ['soph'] {'fallback'": "0.05}: fMRIPrep ('NotImplementedError', 'Sophisticated PEPOLAR schemes are unsupported.'), larmorx ('NotImplementedError', 'Sophisticated PEPOLAR schemes are unsupported.')"
    },
-   "seconds": 14.595,
+   "seconds": 13.326,
    "status": "pass"
   },
   {
@@ -597,7 +644,7 @@
     "INFO error #2": "no readout time, no fallback: sdcflows '\\tValueError: Unknown total-readout time specification'; larmorx 'ValueError: Unknown total-readout time specification'",
     "INFO error #3": "a list as the target: sdcflows 'TraitError: The \\'in_data\\' trait of a _ApplyCoeffsFieldInputSpec instance must be a pathlike object or string representing a file, but a value of \"[\\'~'; larmorx \"TypeError: The 'in_data' trait of a _ApplyCoeffsFieldInputSpec instance must be a pathlike object or str"
    },
-   "seconds": 39.934,
+   "seconds": 31.178,
    "status": "pass"
   },
   {
@@ -631,12 +678,12 @@
     "EXPECTED SDC-33 '16g'": "sdcflows KeyError, larmorx: sdcflows: error: argument --mem-gb: invalid _to_gb value: '16g'",
     "EXPECTED SDC-33 '3m'": "sdcflows KeyError, larmorx: sdcflows: error: argument --mem-gb: invalid _to_gb value: '3m'",
     "EXPECTED SDC-33 'G16'": "sdcflows KeyError, larmorx: sdcflows: error: argument --mem-gb: invalid _to_gb value: 'G16'",
-    "EXPECTED SDC-33 filters-bad": "sdcflows json.decoder.JSONDecodeError: Expecting property name enclosed in double quotes: line 1 column 2 (char 1); larmorx sdcflows: error: JSON syntax error in: </tmp/lxpb_app_1br74j_r/scratch/settings/bad.json>.",
-    "EXPECTED SDC-33 filters-missing": "sdcflows FileNotFoundError: [Errno 2] No such file or directory: '/tmp/lxpb_app_1br74j_r/scratch/settings/none.json'; larmorx sdcflows: error: Path does not exist: </tmp/lxpb_app_1br74j_r/scratch/settings/none.json>.",
-    "EXPECTED SDC-33 plugin-missing": "sdcflows FileNotFoundError: [Errno 2] No such file or directory: '/tmp/lxpb_app_1br74j_r/scratch/settings/none.yml'; larmorx sdcflows: error: Path does not exist: </tmp/lxpb_app_1br74j_r/scratch/settings/none.yml>.",
+    "EXPECTED SDC-33 filters-bad": "sdcflows json.decoder.JSONDecodeError: Expecting property name enclosed in double quotes: line 1 column 2 (char 1); larmorx sdcflows: error: JSON syntax error in: </tmp/lxpb_app_pdyohzed/scratch/settings/bad.json>.",
+    "EXPECTED SDC-33 filters-missing": "sdcflows FileNotFoundError: [Errno 2] No such file or directory: '/tmp/lxpb_app_pdyohzed/scratch/settings/none.json'; larmorx sdcflows: error: Path does not exist: </tmp/lxpb_app_pdyohzed/scratch/settings/none.json>.",
+    "EXPECTED SDC-33 plugin-missing": "sdcflows FileNotFoundError: [Errno 2] No such file or directory: '/tmp/lxpb_app_pdyohzed/scratch/settings/none.yml'; larmorx sdcflows: error: Path does not exist: </tmp/lxpb_app_pdyohzed/scratch/settings/none.yml>.",
     "EXPECTED SDC-35": "sdcflows TypeError: load() missing 1 required positional argument: 'Loader'; larmorx runs"
    },
-   "seconds": 6.533,
+   "seconds": 6.5,
    "status": "pass"
   },
   {
@@ -670,7 +717,7 @@
     "INFO no-readout #2": "larmorx's: ValueError: Unknown total-readout time specification",
     "NOTICES SDC-17": "4 (larmorx's notices of corrected defects on standard error)"
    },
-   "seconds": 75.27,
+   "seconds": 133.329,
    "status": "pass"
   },
   {
@@ -716,7 +763,7 @@
     "INFO ds005752-sub-ON01016-noreconall-direct/bold_ses_01_task_rest_dir_reverse_wf": "coregister differs from fMRIPrep's, max |parameter| diff 1.93e-12",
     "INFO ds006736-sub-004-noreconall/bold_task_freeRecall_wf": "coregister differs from fMRIPrep's, max |parameter| diff 4.32e-12"
    },
-   "seconds": 47.301,
+   "seconds": 42.825,
    "status": "pass"
   },
   {
@@ -758,7 +805,7 @@
     "INFO concat": "the '%g' rounding moves the BOLD grid's corners by at most 7.9e-05 mm (PIPE-22)",
     "INFO recon paths": "{'direct': 0, 'resampled': 28}"
    },
-   "seconds": 254.515,
+   "seconds": 85.661,
    "status": "pass"
   },
   {
@@ -808,7 +855,7 @@
     "INFO ds005040-sub-002/bold_task_clip_run_1_wf (registered)": "coregister differs from fMRIPrep's, max |parameter| diff 2.91e-13",
     "INFO ds005454-sub-16/bold_task_rest_wf (registered)": "coregister differs from fMRIPrep's, max |parameter| diff 1.32e-13"
    },
-   "seconds": 59.724,
+   "seconds": 48.618,
    "status": "pass"
   }
  ],

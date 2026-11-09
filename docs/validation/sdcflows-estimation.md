@@ -8,7 +8,7 @@
 - **Generated:** 2026-11-09 on Linux x86_64, with `python -m larmorx_validation parity sdcflows-estimation --tier standard --python newest`
 - **Original programs:** 0 runs: 0 from the oracle cache, 0 run; cache `<workspace>/oracles/cache`, mode `use`
 
-323 comparison lines in 19 script runs.
+324 comparison lines in 19 script runs.
 The originals' own step (numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 → numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1): 6 comparisons, 0 changed with a known reason, 0 varying in the shared releases, the rest identical.
 
 ## Thresholds
@@ -46,7 +46,7 @@ The originals' own step (numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3 → numpy 2
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (ab5ffe99467a) |
+| larmorx | 0.0.1 (3e2340a8880b) |
 | larmorx-testdata | 52e371aab0ac |
 | Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
@@ -78,7 +78,7 @@ Each case is one of the investigation's check scripts (some of its sections), ru
 | `qwarp-steps` | pass | 22/22 | 3dQwarp's Python steps (Flatten, _sorted_pe, qwarp2ants) and the workflow's refusal |
 | `syn-preprocessing` | pass | 65/65 | init_syn_preprocessing_wf's nodes on fMRIPrep's --use-syn-sdc runs and its library steps |
 | `syn-sdc` | pass | 29/29 | init_syn_sdc_wf's nodes on fMRIPrep's --use-syn-sdc estimators |
-| `estimators` | pass | 9/9 | lx.bids' index, sdcflows' wrangler and estimators, fMRIPrep's estimator selection on every oracle run |
+| `estimators` | pass | 54/54 | lx.bids' index, sdcflows' wrangler and estimators (datasets below folders named like entities too: SDC-45, PIPE-37), fM… |
 | `derivatives` | pass | 40/40 | DerivativesDataSink, build_path, the derivatives and fmap_preproc workflows |
 | `fmap-stage` | pass | 46/46 | larmorprepx's field-map estimation stage against fMRIPrep 25.2.6's graph and nodes |
 | `unwarp` | pass | 31/31 | unwarp_workflow (threads, cases, errors) |

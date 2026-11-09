@@ -180,6 +180,33 @@ def _s(script, args, tier, description, **kw) -> Script:
     return Script(script, tuple(args), tier, description, **kw)
 
 
+#: sdcflows 2.17.1's own runs (``<workspace>/oracles/sdcflows-2.17.1``, decision D8 (d) of the
+#: part) that the BIDS app's whole runs repeat, one case each: short name, run, estimators.
+APP_RUNS = (
+    ("ds005752", "ds005752-sub-ON01016-direct", "a direct field map"),
+    (
+        "ds001600",
+        "ds001600-sub-1",
+        "three phase-difference field maps, two of them from two phases, and a PEPOLAR pair",
+    ),
+    ("ds002422", "ds002422-sub-02", "two phase differences at 1.5 T"),
+    (
+        "ds002603",
+        "ds002603-sub-01",
+        "Philips: a phase difference with one magnitude and two "
+        "PEPOLAR estimators each pairing an EPI with a BOLD run",
+    ),
+    (
+        "ds004958",
+        "ds004958-sub-fsm64ps-pepolar",
+        "a phase difference and a PEPOLAR pair, multiband-8",
+    ),
+    ("ds005040", "ds005040-sub-002", "a PEPOLAR pair"),
+    ("ds005454", "ds005454-sub-16", "a phase difference named by its B0FieldIdentifier, multiband"),
+    ("ds006736", "ds006736-sub-004", "a PEPOLAR pair"),
+)
+
+
 #: suite -> case id -> what the case runs.
 SUITES: dict[str, dict[str, Script]] = {
     "ndimage-skimage": {
@@ -491,16 +518,19 @@ SUITES: dict[str, dict[str, Script]] = {
             nc=True,
             scratch=True,
         ),
-        "app-run": _s(
-            "check_app.py",
-            ["--sections", "run"],
-            "full",
-            "sdcflows' BIDS app run whole on a dataset, against sdcflows' own",
-            gib=16,
-            nc=True,
-            scratch=True,
-            timeout=5400,
-        ),
+        **{
+            f"app-run-{short}": _s(
+                "check_app.py",
+                ["--sections", "run", "--datasets", dataset],
+                "full",
+                f"sdcflows' BIDS app run whole on {dataset} ({what}), against sdcflows' own",
+                gib=16,
+                nc=True,
+                scratch=True,
+                timeout=7200,
+            )
+            for short, dataset, what in APP_RUNS
+        },
         "bold-fmap": _s(
             "check_bold_fmap.py",
             [],
@@ -747,8 +777,9 @@ def parse(stdout: str) -> _Parsed:
             out.add(f"== {m['name']}", passed=d == 0, value=f"{k}/{k + d}", compared=True)
             continue
         if m := _GAPS.match(s):
-            out.add(f"contract: {m['name']}", passed=m["g"] == "0", value=m["rest"][:200],
-                    compared=True)  # fmt: skip
+            out.add(
+                f"contract: {m['name']}", passed=m["g"] == "0", value=m["rest"][:200], compared=True
+            )
             continue
         if m := _SAME.match(s):
             out.add(m["name"], passed=True, value=m["what"][:200], compared=True)

@@ -25,7 +25,8 @@
 - ``run``: the whole run on chosen datasets (``--datasets``; sdcflows with ANTs' N4 at one
   thread with correctly rounded maths, FSL's ``prelude`` and ``topup`` and AFNI's ``3dvolreg``
   through the oracle cache, nipype's ``Linear`` plugin; larmorx with the replicas,
-  ``reproduce``): every derivative file (names, uncompressed and gzip bytes, sidecars), the
+  ``reproduce``, following this environment's numpy and SciPy, ``LARMORX_SDCFLOWS_LIBRARIES``):
+  every derivative file (names, uncompressed and gzip bytes, sidecars), the
   standard output's lines (time stamps apart), the settings files.
 
 Usage: ``LARMORX_WORKSPACE=<workspace> LARMORX_NC_BIN=<larmorx-nc> python -P check_app.py
@@ -774,6 +775,22 @@ def _no_times(text: str) -> str:
 # --- the whole run ------------------------------------------------------------------------
 
 
+def _libraries() -> str:
+    """The library releases larmorx's app follows (``LARMORX_SDCFLOWS_LIBRARIES``): this
+    environment's, so that sdcflows and larmorx run on the same numpy and SciPy (the kept
+    two: ``shared`` numpy 2.3.5 / SciPy 1.15.3, ``newest`` 2.5.4 / 1.18.1)."""
+    import numpy
+    import scipy
+
+    if (numpy.__version__, scipy.__version__) == ("2.3.5", "1.15.3"):
+        return "shared"
+    if (numpy.__version__, scipy.__version__) == ("2.5.4", "1.18.1"):
+        return "newest"
+    raise SystemExit(
+        f"numpy {numpy.__version__} / SciPy {scipy.__version__}: not a kept environment"
+    )
+
+
 def sec_run(t: cw.Tally, scratch: Path, datasets: list[str], threads: int) -> None:
     base = scratch / "run"
     base.mkdir(parents=True, exist_ok=True)
@@ -829,6 +846,7 @@ def sec_run(t: cw.Tally, scratch: Path, datasets: list[str], threads: int) -> No
                     {
                         "LARMORX_IMPLEMENTATION": "replica",
                         "FSLDIR": __import__("check_pepolar").fsldir(),
+                        "LARMORX_SDCFLOWS_LIBRARIES": _libraries(),
                     },
                 )
             print(f"INFO {name} {side}: {time.time() - t0:.0f} s, exit {r['code']}")

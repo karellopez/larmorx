@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
-"""sdcflows' init_unwarp_wf as lx.sdcflows.unwarp_workflow: the thread setting, the errors and
-the outputs on a small generated EPI (sdcflows' own graph against it on real data:
-validation/investigations/sdcflows-fieldmap-b/check_unwarp.py)."""
+"""sdcflows' init_unwarp_wf as lx.sdcflows.unwarp_workflow (the thread setting, the errors, the
+outputs on a small generated EPI) and sdcflows' match_histogram (SKI-02, SDC-27); sdcflows' own
+code against them on real data: validation/investigations/sdcflows-fieldmap-b/check_unwarp.py
+and check_match_histogram.py."""
 
 from __future__ import annotations
 
@@ -98,3 +99,31 @@ def test_outputs(tmp_path: Path) -> None:
         warnings.simplefilter("ignore")
         tmp = lx.sdcflows.unwarp_workflow(epi, META, coeff, jacobian=False)
     assert tmp.corrected is None and tmp.fieldmap is None
+
+
+def test_match_histogram(tmp_path: Path) -> None:
+    i, j, k = np.indices(SHAPE)
+    base = (i * 37 + j * 11 + k * 5) % 211
+    ref = str(tmp_path / "ref.nii.gz")
+    lx.save(((base * 1.75 - 20).astype(np.float32), AFF), ref)
+    wide = str(tmp_path / "wide.nii.gz")
+    lx.save(((base * 400 - 9000).astype(np.float32), AFF), wide)
+    u16 = str(tmp_path / "img_u16.nii.gz")
+    lx.save((((base * 31) % 4001).astype(np.uint16), AFF), u16)
+    i16 = str(tmp_path / "img_i16.nii.gz")
+    lx.save((((base * 13) % 997 - 300).astype(np.int16), AFF), i16)
+    out = lx.sdcflows.match_histogram(ref, i16, out_dir=tmp_path / "a")
+    assert Path(out).name == "img_i16_matched.nii.gz"
+    got = np.asarray(lx.io.load(out).data)
+    assert got.dtype == np.int16 and got.min() >= -20
+    # SKI-02: scikit-image's bincount refuses a float reference for an unsigned image
+    with pytest.raises(TypeError, match="safe"):
+        lx.sdcflows.match_histogram(ref, u16, out_dir=tmp_path / "b", upstream_defects="reproduce")
+    with pytest.warns(UpstreamDefectWarning, match="SKI-02"):
+        lx.sdcflows.match_histogram(ref, u16, out_dir=tmp_path / "c")
+    # SDC-27: values beyond int16 clamped with a warning
+    with pytest.warns(UpstreamDefectWarning, match="SDC-27"):
+        clamped = lx.sdcflows.match_histogram(wide, i16, out_dir=tmp_path / "d")
+    assert np.asarray(lx.io.load(clamped).data).max() == 32767
+    with pytest.raises(ValueError, match="same number of channels"):
+        lx.skimage.match_histograms(np.zeros((3, 4)), np.zeros(5))

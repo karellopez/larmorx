@@ -419,6 +419,7 @@ Jacobian). The nodes write into `out_dir/<name>/<node>` as nipype's (fMRIPrep na
 | `mm2vox(moving_image, fixed_image, pe_dir, registration_config)` | `fit/syn._mm2vox` | each level's third transform parameter divided by the fixed image's voxel size along that axis (numpy's float64) |
 | `adjust_zooms(in_anat, in_epi, z_max=2.2, z_min=1.8)` | `fit/syn._adjust_zooms` | `min(round(max(0.5 * (anat + epi), z_min), 2), z_max)` three times, numpy 2's float32 arithmetic (a float32, or the Python bound) |
 | `norm_lap(in_file, *, out_dir=".", upstream_defects="fix", n_threads=1)` → path | `fit/syn._norm_lap` | minus the median; positives over their 99.8th percentile, negatives over minus their 0.2th; clipped to [-1, 1]; float32 `<name>_norm`; SDC-14 |
+| `match_histogram(reference, image, ref_mask=None, img_mask=None, *, out_dir=None, upstream_defects="fix", n_threads=1)` → path | `fit/syn.match_histogram` (no workflow calls it) | the image's values in `img_mask` (`> 0`; all without it) matched onto the reference's in `ref_mask` (`lx.skimage.match_histograms`, SKI-02), assigned back into nibabel's `dataobj` values (an integer image truncates them toward zero, as numpy's assignment: kept), written with the image's header as `<image>_matched` in `out_dir` (the current folder without it); masks of another shape: numpy's `IndexError`; an empty reference mask: numpy's `ValueError`; SDC-27 |
 
 Not computed: `zooms_epi` (niworkflows' `RegridToZooms` of the clipped EPI to `find_zooms`'
 size), whose output sdcflows never connects (SDC-15); its port comes with `RegridToZooms`
@@ -525,6 +526,7 @@ changed) a result. Rules A to D and the evidence:
 | SDC-24 | `_qwarp2ants` squeezes every axis of length one before it adds the vector axis: the warp of a one-slice (or one-row) image loses that spatial axis and becomes a 4D image ANTs does not read as a displacement field | only the axes after the third dropped (rule A) | `qwarp2ants` |
 | SDC-25 | `init_unwarp_wf`'s `fieldwarp` output (the displacement field, says its docstring) is connected to nothing: nipype leaves it undefined | kept (rule C: no caller reads it): `None`; the displacement field of the same coefficients is `B0FieldTransform.to_displacements` | `unwarp_workflow` |
 | SDC-26 | `init_unwarp_wf` given both `fmap2data_xfm` and `data2fmap_xfm`: `ApplyCoeffsField` declares them exclusive, but the graph's connections set both (nipype's `xor` is not checked there) and `_run_interface` uses `data2fmap_xfm`, ignoring the other without a word | a `ValueError` (rule B) | `unwarp_workflow` |
+| SDC-27 | `match_histogram` assigns the matched float values into an integer image with numpy's cast: values its type cannot hold (a reference with a wider range, or negative values for an unsigned image) and NaN (a reference with NaN) have an undefined conversion (on x86-64 a wrapped value) | clamped to the type's range (NaN to 0) with a warning (D13's rule for undefined conversions) | `match_histogram` |
 
 fMRIPrep 25.2.6 reaches none of them on its own paths (it reconstructs fields with its own
 `ReconstructFieldmap` on the field map's grid, passes FSL's letters to `TOPUPCoeffReorient`,

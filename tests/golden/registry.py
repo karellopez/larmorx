@@ -8326,3 +8326,56 @@ def _(ctx: Context) -> dict[str, Any]:
         dtype=np.int64,
     )  # fmt: skip
     return out
+
+
+@case(
+    "py.sdcflows.match_histogram",
+    covers=("lx.sdcflows.match_histogram", "lx.skimage.match_histograms"),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """Histogram matching (sdcflows' ``match_histogram`` over scikit-image's
+    ``match_histograms``): a scaled int16 image onto a float32 reference with masks (float64
+    values), uint8 onto uint8 (``bincount``), uint16 onto float32 (SKI-02: corrected, and
+    scikit-image's error with ``reproduce``), int16 onto a wider range (SDC-27: clamped), and
+    arrays with channels on the first axis and float16."""
+    shape = (14, 12, 10)
+    aff = affine(shape, (2.0, 2.0, 2.5), oblique=False)
+    base = ints(170, shape, 0, 211).astype(np.float64)
+    files = {}
+    for name, data in (
+        ("ref_f", (base * 1.75 - 20).astype(np.float32)),
+        ("ref_wide", (base * 400 - 9000).astype(np.float32)),
+        ("ref_u8", ((base * 3) % 251).astype(np.uint8)),
+        ("img_i16", ((base * 13) % 997 - 300).astype(np.int16)),
+        ("img_u8", ((base * 5) % 199).astype(np.uint8)),
+        ("img_u16", ((base * 31) % 4001).astype(np.uint16)),
+        ("mask", (ints(171, shape, 0, 3) != 0).astype(np.uint8)),
+    ):
+        files[name] = ctx.out(f"{name}.nii.gz")
+        lx.save((data, aff), files[name])
+    scaled = ctx.out("img_scaled.nii.gz")
+    lx.save((((base * 7) % 401).astype(np.int16), aff), scaled)
+    hdr = lx.io.load(scaled).header.replace(scl_slope=0.5, scl_inter=3.0)
+    lx.save(lx.io.load(scaled, scaled=False).replace(header=hdr), scaled)
+    out: dict[str, Any] = {}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        for label, args in (
+            ("scaled", (files["ref_f"], scaled, files["mask"], files["mask"])),
+            ("u8", (files["ref_u8"], files["img_u8"])),
+            ("u16_float", (files["ref_f"], files["img_u16"])),
+            ("wide", (files["ref_wide"], files["img_i16"])),
+        ):
+            out[label] = Nifti(lx.sdcflows.match_histogram(*args, out_dir=ctx.out(label)))
+        # scikit-image's error (its type: numpy's message names the platform's intp)
+        err = _sdc_error(lambda: lx.sdcflows.match_histogram(
+            files["ref_f"], files["img_u16"], out_dir=ctx.out("r"), upstream_defects="reproduce"))  # fmt: skip
+        out["u16_float.reproduce"] = np.frombuffer(
+            err.split(":")[0].encode(), dtype=np.uint8
+        ).copy()
+    g = np.indices((6, 5, 4)).sum(0)
+    rgb = np.stack([g * 3 % 17, g * 5 % 23, g * 7 % 29], 0).astype(np.float32)
+    ref = np.stack([g * 2 % 19, g * 3 % 13, g % 7], 0).astype(np.float64) * 1.5
+    out["arrays.channels"] = lx.skimage.match_histograms(rgb, ref, channel_axis=0)
+    out["arrays.float16"] = lx.skimage.match_histograms((g / 3).astype(np.float16), ref[0])
+    return out

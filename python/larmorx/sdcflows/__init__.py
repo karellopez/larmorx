@@ -53,7 +53,9 @@ Rust (``larmorx-sdcflows``):
   :func:`merge_meta`, :func:`obliquity`, :func:`fmap_atlas`, :func:`fmap_atlas_affine`: the
   fieldmap-less (SyN) preprocessing (``init_syn_preprocessing_wf``) and its helpers.
 - :func:`syn_sdc_workflow`, :func:`warp_dir`, :func:`mm2vox`, :func:`adjust_zooms`,
-  :func:`norm_lap`: the fieldmap-less (SyN) estimation (``init_syn_sdc_wf``) and its helpers.
+  :func:`norm_lap`, :func:`match_histogram`: the fieldmap-less (SyN) estimation
+  (``init_syn_sdc_wf``) and its helpers (``match_histogram``: scikit-image's histogram matching
+  of an image onto a reference, which no workflow calls).
 - :class:`FieldmapFile`, :class:`FieldmapEstimation`, :class:`EstimatorType`,
   :class:`FieldmapRegistry` (:data:`REGISTRY`), :func:`get_identifier`, :func:`clear_registry`,
   :func:`find_estimators`, :func:`find_anatomical_estimators`: the estimators of a BIDS dataset
@@ -194,6 +196,7 @@ from larmorx.sdcflows.syn import (
     deoblique,
     fmap_atlas,
     fmap_atlas_affine,
+    match_histogram,
     merge_meta,
     mm2vox,
     norm_lap,
@@ -309,6 +312,7 @@ __all__ = [
     "getsourcetype",
     "grid_bspline_weights",
     "magnitude_workflow",
+    "match_histogram",
     "merge_meta",
     "mm2vox",
     "norm_lap",

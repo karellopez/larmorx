@@ -768,9 +768,9 @@ the stage: sdcflows 2.15's PEPOLAR graph (`wiring="2.15"`), the image's numpy 2.
 replicas of PRELUDE, TOPUP and 3dvolreg, `upstream_defects="reproduce"`; on five oracle runs
 with nine estimators of every kind fMRIPrep ran (ds005752's direct field map, ds001600's three
 phase-difference estimators and its PEPOLAR one on two grids, ds005040's PEPOLAR, ds002422's two
-phase-difference estimators, ds006736's PEPOLAR; 1 to 74 s each at 8 threads, both kept
-environments' larmorx being the same here). Each of the 36 NIfTI derivatives (and 9 sidecars)
-is compared with fMRIPrep's own file in `out/`:
+phase-difference estimators, ds006736's PEPOLAR; 1 to 74 s each at 8 threads; the same
+results in both kept environments). Each of the 36 NIfTI derivatives (and 9 sidecars) is
+compared with fMRIPrep's own file in `out/`:
 
 - **13 identical** byte for byte (uncompressed and gzip), and the 9 sidecars (`RawSources` with
   the dataset at `/data`).
@@ -825,6 +825,27 @@ the target); the `resample` node's `num_threads` and `mem_gb` for 48 settings. T
   (shown with two different transforms: sdcflows' files are those of `data2fmap_xfm` alone).
   larmorx raises a `ValueError`; `reproduce` uses `data2fmap_xfm` with a warning.
 
+## `match_histogram` and scikit-image's `match_histograms` (relay 14)
+
+sdcflows' `match_histogram` (in `workflows/fit/syn.py`; no workflow calls it) maps an image's
+histogram onto a reference's with scikit-image's `match_histograms` on the masked values. Its
+arithmetic is numpy's `unique` (or `bincount` for an unsigned image), `cumsum`, a division by
+the count and `interp`: the same bits in every numpy release kept, so the port calls them
+(`check_match_histogram.py`: the three SyN runs' anatomy in the EPI's space onto their clipped
+EPI, ds000228's raw int16 T1w, 12 synthetic files and 10 array cases identical in both
+environments). Three behaviours:
+
+- Into an integer image the matched (float) values are **truncated toward zero** by numpy's
+  assignment, not rounded (kept: the defined behaviour of the code; no caller).
+- **SDC-27** (D13's rule for undefined conversions): matched values beyond the integer type's
+  range, or NaN from a reference with NaN, are cast by numpy's undefined conversion (a wrapped
+  value on x86-64; the check's case: a reference from -9,000 to 75,000 matched into int16);
+  larmorx clamps them to the range (NaN to 0) and warns; `reproduce` gives numpy's cast.
+- **SKI-02** (rule A, scikit-image): for an unsigned-integer image scikit-image counts the
+  reference with `bincount`, which refuses a float reference (`TypeError`) and negative values
+  (`ValueError`); larmorx counts it with `unique` (the same quantiles and values: identical
+  wherever scikit-image works).
+
 ## Candidates for the register (the part's defects relay decides them)
 
 - **SDC-h** `brain_masker`: a rough mask without a connected component makes the background
@@ -845,6 +866,6 @@ the target); the `resample` node's `num_threads` and `mem_gb` for 48 settings. T
   `lx.niworkflows.concatenate_xfms` (PIPE-20's pipeline level in
   `larmorx.pipelines.larmorprepx.fieldmaps`, relay 8), PIPE-23 to PIPE-25 (relays 9 and 11),
   PIPE-26 to PIPE-30 in `lx.niworkflows.derivatives_data_sink`, PIPE-31 in
-  `larmorx.pipelines.larmorprepx.estimators` (relay 13) and SDC-12 to SDC-26 in `lx.sdcflows`
-  (relays 5 to 14); the register's entries and `larmorx_core::defects` wait for the part's
-  defects relay.
+  `larmorx.pipelines.larmorprepx.estimators` (relay 13), SDC-12 to SDC-27 in `lx.sdcflows`
+  (relays 5 to 14) and SKI-02 in `lx.skimage` (relay 14); the register's entries and
+  `larmorx_core::defects` wait for the part's defects relay.

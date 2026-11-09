@@ -1,8 +1,10 @@
-# scikit-image's ball, Otsu threshold and random walker
+# scikit-image's ball, Otsu threshold, random walker and histogram matching
 
 `lx.skimage` holds a replica of the three scikit-image functions under sdcflows' `brain_masker`:
 `skimage.morphology.ball`, `skimage.filters.threshold_otsu` and
-`skimage.segmentation.random_walker`. They are ported from **scikit-image 0.26.0**
+`skimage.segmentation.random_walker`, and of `skimage.exposure.match_histograms` (under sdcflows'
+`match_histogram`; `exposure/histogram_matching.py`, numpy's `unique`, `bincount`, `cumsum` and
+`interp` underneath). They are ported from **scikit-image 0.26.0**
 (`morphology/footprints.py`, `filters/thresholding.py`, `exposure/exposure.py`,
 `segmentation/random_walker_segmentation.py`, `util/dtype.py`); their arithmetic is the same in
 scikit-image 0.25.2, fMRIPrep 25.2.6's. Under them run SciPy's sparse matrices and conjugate
@@ -44,6 +46,7 @@ prob = lx.skimage.random_walker(
 | `mode='cg'` | the same | no preconditioner; scikit-image's UMFPACK warning |
 | `mode='cg_mg'` | falls back to `'cg_j'` with scikit-image's warning | scikit-image does the same without pyamg; pyamg's multigrid is not ported |
 | `mode='bf'` | `NotImplementedError` | SciPy's `spsolve` (SuperLU) is not ported yet |
+| `exposure.match_histograms(image, reference, *, channel_axis=None)` | `lx.skimage.match_histograms(..., upstream_defects="fix")` | numpy's `unique`/`bincount`, `cumsum` and `interp` (the same bits in numpy 2.2.6, 2.3.5 and 2.5.4); `channel_as_last_axis`'s moves and errors; float32 for a float32 or float16 image, else float64; SKI-02 (relay 14 of field maps part B) |
 
 ## What decides the bits
 
@@ -70,6 +73,15 @@ prob = lx.skimage.random_walker(
   off by up to 0.59 on the check's cases). larmorx numbers both by the mask by default and warns
   (`UpstreamDefectWarning`); `upstream_defects='reproduce'` gives scikit-image's result bit for
   bit. Rule A (the input makes sense; the result is wrong).
+- **SKI-02** (scikit-image's `match_histograms` of an unsigned-integer image): it counts the
+  reference's values with numpy's `bincount`, which refuses a reference with non-integer values
+  (`TypeError`: a float anatomy) or negative ones (`ValueError`: a signed image), and a `uint64`
+  image (`TypeError`). The input makes sense (rule A): larmorx counts them with `unique`, as
+  scikit-image does for every other image; the quantiles are the same, so the result is
+  scikit-image's wherever scikit-image gives one. `upstream_defects='reproduce'` raises
+  scikit-image's error. Checked on 6 array cases and sdcflows' `match_histogram` on 12 files
+  and 7 real ones (`validation/investigations/sdcflows-fieldmap-b/check_match_histogram.py`, both
+  kept environments).
 - Candidates for the register (decided in the part's defects relay): the labels returned by
   `random_walker` are the renumbered ones (consecutive from 1), not the input's values, when these
   are not consecutive; `return_full_prob=True` without unlabeled pixels returns a boolean

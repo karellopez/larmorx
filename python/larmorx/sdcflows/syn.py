@@ -6,7 +6,8 @@ restricted to the phase-encoding axis, its field map smoothed by sdcflows' B-spl
 
 Ported from sdcflows 2.17.1 (Apache-2.0, the NiPreps developers; the same in 2.15.1, fMRIPrep
 25.2.6's): ``workflows/fit/syn.py`` (``init_syn_preprocessing_wf``, ``init_syn_sdc_wf``,
-``_set_dtype``, ``_merge_meta``, ``_warp_dir``, ``_mm2vox``, ``_adjust_zooms``, ``_norm_lap``)
+``_set_dtype``, ``_merge_meta``, ``_warp_dir``, ``_mm2vox``, ``_adjust_zooms``, ``_norm_lap``,
+``match_histogram``)
 and ``interfaces/utils.py`` (``Deoblique``, ``Reoblique``: ``_deoblique``,
 ``_reoblique``, ``OBLIQUE_THRESHOLD_DEG``). The nodes run as nipype runs them, in the graph's
 order, each in its folder under ``out_dir`` (``syn_preprocessing_wf/...``), through larmorx's
@@ -32,8 +33,8 @@ Corrected by default (``upstream_defects="reproduce"`` gives sdcflows' behaviour
 (``_norm_lap`` of an image without positive or negative values: a ``ValueError`` instead of
 numpy's ``IndexError``), SDC-16 (``_warp_dir`` restricts the deformation along the world axis
 of the phase encoding: ANTs weighs physical axes, sdcflows indexes the fixed image's voxel
-axes). SDC-15: ``init_syn_sdc_wf``'s ``zooms_epi`` node, whose output nothing reads, is not
-computed.
+axes), SDC-27 (``match_histogram``'s undefined integer conversions clamped, with a warning).
+SDC-15: ``init_syn_sdc_wf``'s ``zooms_epi`` node, whose output nothing reads, is not computed.
 """
 
 from __future__ import annotations
@@ -68,6 +69,7 @@ __all__ = [
     "deoblique",
     "fmap_atlas",
     "fmap_atlas_affine",
+    "match_histogram",
     "merge_meta",
     "mm2vox",
     "norm_lap",
@@ -787,6 +789,84 @@ def norm_lap(
         dtype=np.dtype(np.float32),
         n_threads=n_threads,
     )
+    return out_file
+
+
+def match_histogram(
+    reference: str | os.PathLike[str],
+    image: str | os.PathLike[str],
+    ref_mask: str | os.PathLike[str] | None = None,
+    img_mask: str | os.PathLike[str] | None = None,
+    *,
+    out_dir: str | os.PathLike[str] | None = None,
+    upstream_defects: UpstreamDefectsName = "fix",
+    n_threads: int = 1,
+) -> str:
+    """sdcflows' ``match_histogram`` (``workflows/fit/syn.py``; no workflow calls it): the
+    values of ``image`` inside ``img_mask`` (``> 0``; all without it) mapped onto the histogram
+    of ``reference``'s inside ``ref_mask`` (scikit-image's ``match_histograms`` on the masked
+    values: :func:`larmorx.skimage.match_histograms`), assigned back into the image's values
+    (nibabel's ``dataobj``: the stored type, or float64 when the header scales the data) and
+    written with the image's header as ``<image>_matched`` in ``out_dir`` (the current folder
+    without it, as sdcflows). The path.
+
+    The matched values are float; numpy's assignment into an integer image truncates them
+    toward zero (kept). Corrected by default (``upstream_defects="reproduce"`` gives sdcflows'
+    behaviour): SDC-27, matched values the image's integer type cannot hold (a reference with a
+    wider range or negative values for an unsigned image) or NaN (a reference with NaN) have an
+    undefined conversion (numpy's cast: on x86-64 a wrapped value); larmorx clamps them to the
+    type's range (NaN to 0) with a warning; and SKI-02 (scikit-image's ``bincount`` of a
+    reference for an unsigned-integer image). Masks of another shape than their image raise
+    numpy's ``IndexError``."""
+    from larmorx import skimage
+
+    _defects.check(upstream_defects)
+    image = os.fspath(image)
+    img = load_nibabel(image, n_threads=n_threads)
+    img_data = np.array(np.asanyarray(img.data))
+    ref_data = np.asanyarray(load_nibabel(reference, n_threads=n_threads).data)
+    ref_m = (
+        np.ones_like(ref_data, dtype=bool)
+        if ref_mask is None
+        else np.asanyarray(load_nibabel(ref_mask, n_threads=n_threads).data) > 0
+    )
+    img_m = (
+        np.ones_like(img_data, dtype=bool)
+        if img_mask is None
+        else np.asanyarray(load_nibabel(img_mask, n_threads=n_threads).data) > 0
+    )
+    newpath = os.path.abspath(os.fspath(out_dir)) if out_dir is not None else os.getcwd()
+    out_file = _nipype.fname_presuffix(image, suffix="_matched", newpath=newpath)
+    matched = skimage.match_histograms(
+        img_data[img_m], ref_data[ref_m], upstream_defects=upstream_defects
+    )
+    if (
+        img_data.dtype.kind in "iu"
+        and matched.dtype.kind == "f"
+        and upstream_defects != "reproduce"
+    ):
+        info = np.iinfo(img_data.dtype)
+        cut = np.trunc(matched)
+        bad = np.isnan(cut) | (cut < info.min) | (cut > info.max)
+        if bad.any():
+            _defects.warn(
+                [
+                    (
+                        "SDC-27",
+                        "sdcflows match_histogram",
+                        "fix",
+                        f"{int(bad.sum())} matched values of {image} out of {img_data.dtype}'s "
+                        "range or NaN, whose integer conversion is undefined: clamped to the "
+                        "range (NaN to 0)",
+                    )
+                ],
+                stacklevel=2,
+            )
+            matched = np.clip(np.nan_to_num(cut, nan=0.0), info.min, info.max)
+    img_data[img_m] = matched
+    if out_dir is not None:
+        os.makedirs(newpath, exist_ok=True)
+    save_nibabel(Image(img_data, img.affine, img.header), out_file, n_threads=n_threads)
     return out_file
 
 

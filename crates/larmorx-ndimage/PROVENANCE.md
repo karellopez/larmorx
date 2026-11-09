@@ -46,5 +46,11 @@ boolean branches), the early returns and scikit-image's warnings. Not ported: `m
 (SciPy's `spsolve`), pyamg's `cg_mg` (scikit-image's own fallback to `cg_j` without pyamg is),
 `ball(decomposition='sequence')`.
 
-**The D13 switch** (`upstream_defects`): SKI-01, a masked Laplacian numbered by the edges' ends
-(`docs/api/skimage.md`).
+`match_histograms` (relay 14 of field maps part B, `python/larmorx/skimage.py` only, numpy
+underneath): scikit-image 0.26.0's `src/skimage/exposure/histogram_matching.py`
+(`_match_cumulative_cdf`, `match_histograms`; byte-identical in 0.25.2) and
+`src/skimage/_shared/utils.py` (`channel_as_last_axis`, `_supported_float_type`'s table);
+SKI-02.
+
+**The D13 switch** (`upstream_defects`): SKI-01, a masked Laplacian numbered by the edges' ends;
+SKI-02, `match_histograms`' `bincount` of a reference it refuses (`docs/api/skimage.md`).

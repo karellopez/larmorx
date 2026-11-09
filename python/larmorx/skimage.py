@@ -7,6 +7,14 @@ arithmetic in 0.25.2, fMRIPrep 25.2.6's) with the SciPy and numpy arithmetic und
 - :func:`random_walker` (``skimage.segmentation.random_walker``, the conjugate-gradient modes,
   with SciPy's sparse matrices and ``cg``; ``scipy_version`` picks SciPy 1.15's or 1.18's order of
   the Laplacian's rows, which changes the probabilities' last bits).
+- :func:`match_histograms` (``skimage.exposure.match_histograms``: numpy's ``unique``,
+  ``bincount``, ``cumsum`` and ``interp``, which give the same bits in every numpy release kept).
+
+Corrected by default (``upstream_defects="reproduce"`` gives scikit-image's behaviour): SKI-02,
+``match_histograms`` of an unsigned-integer image counts the reference's values with numpy's
+``bincount``, which refuses a reference with negative or non-integer values (a float or signed
+anatomy) and a ``uint64`` image; larmorx counts them with ``unique`` as for other images (the
+same quantiles: the result is scikit-image's wherever scikit-image gives one).
 
 The results are scikit-image's bit for bit (``docs/api/skimage.md``). The work runs in Rust
 (``larmorx_ndimage::skimage``); the argument checks, warnings and messages are scikit-image's.
@@ -21,7 +29,7 @@ import numpy as np
 
 from larmorx import _core
 
-__all__ = ["ball", "random_walker", "threshold_otsu"]
+__all__ = ["ball", "match_histograms", "random_walker", "threshold_otsu"]
 
 #: SciPy's newest release (the default arithmetic of :func:`random_walker`).
 SCIPY_NEWEST = "1.18.1"
@@ -43,6 +51,101 @@ def ball(
         raise ValueError(f"Unrecognized decomposition: {decomposition}")
     mask = _core.skimage_ball(float(radius), bool(strict_radius))
     return np.array(mask, dtype=dtype)
+
+
+def _bincountable(a: np.ndarray) -> bool:
+    """numpy's ``bincount`` takes ``a``: a type it casts safely to ``intp``, no negative value."""
+    return bool(np.can_cast(a.dtype, np.intp, "safe") and (a.size == 0 or a.min() >= 0))
+
+
+def _match_cumulative_cdf(source: np.ndarray, template: np.ndarray, mode: str) -> np.ndarray:
+    """scikit-image's ``_match_cumulative_cdf``: each source value mapped to the template value
+    at the same quantile (numpy's ``interp`` between the template's cumulative frequencies),
+    float64; SKI-02 for an unsigned source whose values or template ``bincount`` refuses."""
+    if source.dtype.kind == "u" and (
+        mode == "reproduce"
+        or (_bincountable(source.reshape(-1)) and _bincountable(template.reshape(-1)))
+    ):
+        src_lookup = source.reshape(-1)
+        src_counts = np.bincount(src_lookup)
+        tmpl_counts = np.bincount(template.reshape(-1))
+        tmpl_values = np.nonzero(tmpl_counts)[0]
+        tmpl_counts = tmpl_counts[tmpl_values]
+    else:
+        if source.dtype.kind == "u":
+            from larmorx._defects import UpstreamDefectWarning
+
+            warnings.warn(
+                UpstreamDefectWarning(
+                    "SKI-02",
+                    "scikit-image match_histograms",
+                    "fix",
+                    f"an unsigned-integer image ({source.dtype}) with a reference of type "
+                    f"{template.dtype} that numpy's bincount refuses (negative, non-integer "
+                    "or too wide values): the values counted with unique instead",
+                ),
+                stacklevel=3,
+            )
+        _src_values, src_lookup, src_counts = np.unique(
+            source.reshape(-1), return_inverse=True, return_counts=True
+        )
+        tmpl_values, tmpl_counts = np.unique(template.reshape(-1), return_counts=True)
+    src_quantiles = np.cumsum(src_counts) / source.size
+    tmpl_quantiles = np.cumsum(tmpl_counts) / template.size
+    interp_a_values = np.interp(src_quantiles, tmpl_quantiles, tmpl_values)
+    return interp_a_values[src_lookup].reshape(source.shape)  # type: ignore[no-any-return]
+
+
+_FLOAT_TYPES = {"f": np.float32, "d": np.float64, "e": np.float32, "g": np.float64}
+
+
+def match_histograms(
+    image: Any,
+    reference: Any,
+    *,
+    channel_axis: int | tuple[int, ...] | None = None,
+    upstream_defects: str = "fix",
+) -> np.ndarray:
+    """``skimage.exposure.match_histograms(image, reference, channel_axis=...)``: the image's
+    values mapped so that their cumulative histogram matches the reference's (each channel
+    apart with ``channel_axis``); float32 for a float32 or float16 image, else float64.
+    ``ValueError`` when the dimensions or the channels differ. SKI-02 (``upstream_defects``:
+    scikit-image's ``TypeError``/``ValueError`` with ``"reproduce"``)."""
+    from larmorx import _defects
+
+    _defects.check(upstream_defects)
+    image = np.asanyarray(image)
+    reference = np.asanyarray(reference)
+    if channel_axis is not None:
+        # scikit-image's channel_as_last_axis decorator
+        axes = (channel_axis,) if np.isscalar(channel_axis) else tuple(channel_axis)  # type: ignore[arg-type]
+        if len(axes) > 1:
+            raise ValueError("only a single channel axis is currently supported")
+    if channel_axis is not None and not (channel_axis == (-1,) or channel_axis == -1):
+        axis = axes[0]
+        image = np.moveaxis(image, axis, -1)
+        reference = np.moveaxis(reference, axis, -1)
+        out = match_histograms(image, reference, channel_axis=-1, upstream_defects=upstream_defects)
+        return np.moveaxis(out, -1, axis)
+    if image.ndim != reference.ndim:
+        raise ValueError("Image and reference must have the same number of channels.")
+    if channel_axis is not None:
+        if image.shape[-1] != reference.shape[-1]:
+            raise ValueError(
+                "Number of channels in the input image and reference image must match!"
+            )
+        matched = np.empty(image.shape, dtype=image.dtype)
+        for channel in range(image.shape[-1]):
+            matched[..., channel] = _match_cumulative_cdf(
+                image[..., channel], reference[..., channel], upstream_defects
+            )
+    else:
+        matched = _match_cumulative_cdf(image, reference, upstream_defects)
+    if matched.dtype.kind == "f":
+        if image.dtype.kind == "c":
+            raise ValueError("complex valued input is not supported")
+        matched = matched.astype(_FLOAT_TYPES.get(image.dtype.char, np.float64), copy=False)
+    return matched
 
 
 def threshold_otsu(image: Any = None, nbins: int = 256, *, hist: Any = None) -> Any:

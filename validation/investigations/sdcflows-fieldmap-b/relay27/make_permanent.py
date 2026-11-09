@@ -9,7 +9,10 @@ TOOL:SEED:N``), written as ``validation/difftest/cases/<tool>/<id>.json`` in the
 
 ``--check`` runs each case through its suite's runner and prints its checks (all must pass in
 the newest environment, the suites' own; in the shared one ``reorient-rotation-with-two-candidates``
-differs, as numpy's LAPACK 3.12.0 picks the other axis: the step LAPACK-3.12.1).
+differs, as numpy's LAPACK 3.12.0 picks the other axis: the step LAPACK-3.12.1). A case whose
+file exists is checked as committed, never written again (relay 28: the draws changed in
+e88326b6, so the seeds of ``brain-masker-no-positive-value`` and ``brain-masker-padding-0`` now
+draw other calls).
 """
 
 from __future__ import annotations
@@ -199,9 +202,12 @@ def main() -> int:
         }  # fmt: skip
         d = inputs.CASES / tool
         d.mkdir(parents=True, exist_ok=True)
-        (d / f"{cid}.json").write_text(
-            json.dumps(doc, indent=1, sort_keys=True) + "\n", encoding="utf-8"
-        )
+        # Relay 28: an existing case is never written again (e88326b6 changed the draws, so two
+        # of the seeds below now draw other calls; the committed files keep the probes' recipes)
+        if not (d / f"{cid}.json").exists():
+            (d / f"{cid}.json").write_text(
+                json.dumps(doc, indent=1, sort_keys=True) + "\n", encoding="utf-8"
+            )
         if args.check:
             from larmorx_validation.difftest import permanent
             from larmorx_validation.parity.harness import CheckList, Outcome

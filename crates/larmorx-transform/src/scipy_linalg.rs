@@ -20,21 +20,23 @@
 //!   is copied to column-major order and its structure detected (`bandwidth`, `is_sym_or_herm`):
 //!   a **diagonal** matrix has its diagonal replaced by `1 / a` (C++); an **upper** or **lower
 //!   triangular** one goes to OpenBLAS's `dtrtri` (`trti2_U`, or `trti2_L` with `trmv_NLN`), its
-//!   other triangle set to +0; a **general** one to `getrf`, `gecon` (the condition estimate,
-//!   which changes nothing but the warning) and `getri`, as 1.15. A **symmetric** one (every
-//!   non-diagonal, non-triangular `m == m.T`) goes to Cholesky (`potrf`, `pocon`, `potri`) and,
-//!   when that fails, to `sytrf`/`sycon`/`sytri`: not ported ([`Outcome::SymmetricNotPorted`];
-//!   an image affine is symmetric only with a zero translation).
-//! - **The warning** 1.18 raises for an ill-conditioned matrix (`rcond < eps`): exact for the
-//!   diagonal path (`max|a| · max|1/a| > 1/eps`, the value SciPy prints; SCI-20 in
-//!   `larmorx.transforms._linalg`); for the other paths it depends on LAPACK's condition
-//!   estimate (`dgecon`, `dtrcon`: Hager's estimator with `dlatrs`), which is not ported. The
-//!   estimate of `‖A⁻¹‖₁` is at most its true value, so `rcond ≥ 1 / (‖A‖ · ‖A⁻¹‖₁)` computed
-//!   from the inverse; when that bound is at least `1000 · eps` there is no warning
-//!   ([`Condition::WellConditioned`]), else [`Condition::EstimateNeeded`].
-//! - 1.18's `gecon` returns `info = -5` without estimating when `‖A‖` (SciPy's `norm1_`, the
-//!   largest row sum of the column-major copy) overflows, and the inverse is then never
-//!   computed: SciPy returns the LU factors ([`Outcome::NormOverflow`]; SCI-18).
+//!   other triangle set to +0, and `dtrcon` estimates the condition of the inverse; a
+//!   **general** one to `getrf`, `gecon` (the condition estimate, which changes nothing but the
+//!   warning) and `getri`, as 1.15; a **symmetric** one (every non-diagonal, non-triangular
+//!   `m == m.T`; an image affine with a zero translation can be one) to Cholesky (`potrf`,
+//!   `pocon`, `potri`) and, when `potrf` finds a pivot that is not positive, to Bunch-Kaufman
+//!   (`sytrf`, `sycon`, `sytri`), the lower triangle then filled from the upper
+//!   (`scipy_lapack`).
+//! - **The warning** 1.18 raises for an ill-conditioned matrix (`rcond < eps` or NaN, eps =
+//!   2⁻⁵²), with the `rcond` it prints: the diagonal path's `max|a| · max|1/a|` (the condition
+//!   number itself, under the name `rcond`: SCI-20, kept), and LAPACK's estimates for the others
+//!   (`dgecon`, `dtrcon`, `dpocon`, `dsycon`: Higham's estimator `dlacn2` with `dlatrs`' scaled
+//!   solves, or `dsytrs`), ported operation for operation. The general path's `anorm` is SciPy's
+//!   `norm1_`, which sums the rows of the column-major copy: the infinity norm, passed to
+//!   `gecon` as the 1-norm (SCI-19, a message only: kept in both modes).
+//! - 1.18's `gecon` returns `info = -5` without estimating when `‖A‖` (SciPy's `norm1_`)
+//!   overflows, and the inverse is then never computed: SciPy returns the LU factors
+//!   ([`Outcome::NormOverflow`]; SCI-18).
 //!
 //! Upstream files: SciPy 1.18.1 and 1.15.3 (BSD-3-Clause) as named; OpenBLAS 0.3.30 release
 //! tarball (the kernels on these paths are those of 0.3.28 and 0.3.31.dev; validated against
@@ -43,7 +45,8 @@
 //! `lapack/getf2/getf2_k.c`, `lapack/trtri/trtri_U_single.c`, `trtri_L_single.c`,
 //! `lapack/trti2/trti2_U.c`, `trti2_L.c`, `driver/level2/trmv_U.c`, `trmv_L.c`,
 //! `kernel/x86_64/daxpy.c`, `dscal.c`, `dgemv_n_4.c`, `dgemv_n_microk_haswell-4.c`,
-//! `KERNEL.HASWELL`; the reference LAPACK in `lapack-netlib/SRC/dgetri.f`, `dgecon.f`. The
+//! `KERNEL.HASWELL`; the reference LAPACK in `lapack-netlib/SRC/dgetri.f` (the condition
+//! estimates and the symmetric path: `scipy_lapack`). The
 //! logic is re-expressed in Rust; no code was copied. OpenBLAS's notice is in
 //! [`crate::openblas`] and NOTICE; SciPy's (BSD-3-Clause, Copyright (c) 2001-2002 Enthought, Inc.
 //! 2003, SciPy Developers) in NOTICE.
@@ -51,6 +54,7 @@
 use larmorx_core::linalg::Mat4;
 
 use crate::openblas::getf2;
+use crate::scipy_lapack;
 
 /// The SciPy release whose `linalg.inv` is followed.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -86,30 +90,22 @@ impl Structure {
     }
 }
 
-/// What 1.18 decides about its ill-conditioned warning (1.15 never warns).
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum Condition {
-    /// No warning (exact for the diagonal path; proved by the bound for the others).
-    WellConditioned,
-    /// The diagonal path's warning, with the value SciPy prints as `rcond` (the product
-    /// `max|a| · max|1/a|`).
-    IllConditioned(f64),
-    /// The warning depends on LAPACK's condition estimate, not ported (see the module).
-    EstimateNeeded,
-}
-
 /// The result of [`inv4`].
 #[derive(Clone, Debug, PartialEq)]
 pub enum Outcome {
-    /// The inverse (row-major) and the warning decision.
-    Inverse(Mat4, Condition),
+    /// The inverse (row-major), the `rcond` SciPy 1.18 computes (the value its warning prints;
+    /// 0 for 1.15, which estimates nothing) and whether 1.18 warns (`rcond < eps` or NaN; the
+    /// diagonal path's test `max|a| · max|1/a| > 1/eps`).
+    Inverse {
+        inverse: Mat4,
+        rcond: f64,
+        ill_conditioned: bool,
+    },
     /// SciPy raises `LinAlgError` (an exactly zero pivot or diagonal element).
     Singular,
     /// SCI-18 (1.18, general path): `‖A‖` overflows, `gecon` returns `info = -5` and SciPy
     /// returns `lu`, the LU factors; `inverse` is what `getri` gives (1.15's result).
     NormOverflow { lu: Mat4, inverse: Mat4 },
-    /// 1.18's symmetric path (Cholesky, Bunch-Kaufman): not ported.
-    SymmetricNotPorted,
 }
 
 /// `scipy.linalg.inv(m)` of a finite 4×4 matrix (SciPy's `check_finite` refuses others before
@@ -125,14 +121,23 @@ pub fn inv4(m: &Mat4, release: ScipyRelease) -> (Structure, Outcome) {
     };
     let outcome = match (release, structure) {
         (ScipyRelease::V1_15, _) => match general(a) {
-            General::Inverse(inv) => Outcome::Inverse(row_major(&inv), Condition::WellConditioned),
+            General::Inverse(inv) => Outcome::Inverse {
+                inverse: row_major(&inv),
+                rcond: 0.0,
+                ill_conditioned: false,
+            },
             General::Singular => Outcome::Singular,
         },
         (_, Structure::Diagonal) => diagonal(a),
         (_, Structure::UpperTriangular | Structure::LowerTriangular) => {
-            triangular(a, m, structure == Structure::UpperTriangular)
+            triangular(a, structure == Structure::UpperTriangular)
         }
-        (_, Structure::Symmetric) => Outcome::SymmetricNotPorted,
+        (_, Structure::Symmetric) => match scipy_lapack::invert_symmetric(&flat(&a)) {
+            scipy_lapack::Symmetric::Inverse { inverse, rcond, .. } => {
+                inverse_outcome(row_major(&unflat(&inverse)), rcond)
+            }
+            scipy_lapack::Symmetric::Singular => Outcome::Singular,
+        },
         (_, Structure::General) => {
             let anorm = norm1_rows(&a);
             let mut lu = a;
@@ -140,9 +145,10 @@ pub fn inv4(m: &Mat4, release: ScipyRelease) -> (Structure, Outcome) {
             if getf2(&mut lu, &mut ipiv) != 0 {
                 return (structure, Outcome::Singular);
             }
+            let (rcond, info) = scipy_lapack::dgecon(&flat(&lu), anorm);
             let mut inv = lu;
             getri(&mut inv, &ipiv);
-            if anorm.is_infinite() {
+            if info < 0 {
                 // dgecon: ANORM > HUGEVAL -> INFO = -5, so SciPy skips getri.
                 return (
                     structure,
@@ -152,11 +158,28 @@ pub fn inv4(m: &Mat4, release: ScipyRelease) -> (Structure, Outcome) {
                     },
                 );
             }
-            let inv = row_major(&inv);
-            Outcome::Inverse(inv, bound(anorm, &inv))
+            inverse_outcome(row_major(&inv), rcond)
         }
     };
     (structure, outcome)
+}
+
+/// An inverse with LAPACK's `rcond` and SciPy's test `rcond != rcond || rcond < eps`.
+fn inverse_outcome(inverse: Mat4, rcond: f64) -> Outcome {
+    Outcome::Inverse {
+        inverse,
+        rcond,
+        ill_conditioned: rcond.is_nan() || rcond < f64::EPSILON,
+    }
+}
+
+/// The column-major `[column][row]` copy as LAPACK's flat array (`a[r + 4 c]`).
+fn flat(a: &[[f64; 4]; 4]) -> scipy_lapack::Cm {
+    std::array::from_fn(|k| a[k / 4][k % 4])
+}
+
+fn unflat(a: &scipy_lapack::Cm) -> [[f64; 4]; 4] {
+    std::array::from_fn(|c| std::array::from_fn(|r| a[r + 4 * c]))
 }
 
 /// The structure 1.18's `bandwidth` and `is_sym_or_herm` find (exact comparisons with zero:
@@ -209,23 +232,6 @@ fn norm1_rows(a: &[[f64; 4]; 4]) -> f64 {
     rwork.iter().fold(0.0, |t, &w| if w > t { w } else { t })
 }
 
-/// The largest column sum of `|m|` (row-major input).
-fn norm1_columns(m: &Mat4) -> f64 {
-    (0..4)
-        .map(|c| (0..4).map(|r| m[r][c].abs()).sum::<f64>())
-        .fold(0.0, f64::max)
-}
-
-/// The warning decision from the bound `rcond >= 1 / (anorm · ‖A⁻¹‖₁)` (see the module).
-fn bound(anorm: f64, inverse: &Mat4) -> Condition {
-    let lower = (1.0 / norm1_columns(inverse)) / anorm;
-    if lower >= 1000.0 * f64::EPSILON {
-        Condition::WellConditioned
-    } else {
-        Condition::EstimateNeeded
-    }
-}
-
 /// 1.18's `invert_slice_diagonal`: `1 / a(j, j)` in order, stopping at a zero element; the
 /// condition is `max|a| · max|1/a| > 1/eps`.
 #[allow(clippy::needless_range_loop)]
@@ -246,17 +252,16 @@ fn diagonal(mut a: [[f64; 4]; 4]) -> Outcome {
         }
     }
     let product = maxa * maxinva;
-    let condition = if product > 1.0 / f64::EPSILON {
-        Condition::IllConditioned(product)
-    } else {
-        Condition::WellConditioned
-    };
-    Outcome::Inverse(row_major(&a), condition)
+    Outcome::Inverse {
+        inverse: row_major(&a),
+        rcond: product,
+        ill_conditioned: product > 1.0 / f64::EPSILON,
+    }
 }
 
 /// 1.18's `invert_slice_triangular`: OpenBLAS's `dtrtri` (a zero diagonal element is singular:
-/// its `AMIN_K` check), then `zero_other_triangle` (+0). `m` is the row-major input.
-fn triangular(mut a: [[f64; 4]; 4], m: &Mat4, upper: bool) -> Outcome {
+/// its `AMIN_K` check), `dtrcon` of the inverse, then `zero_other_triangle` (+0).
+fn triangular(mut a: [[f64; 4]; 4], upper: bool) -> Outcome {
     if (0..4).any(|j| a[j][j] == 0.0) {
         return Outcome::Singular;
     }
@@ -265,6 +270,8 @@ fn triangular(mut a: [[f64; 4]; 4], m: &Mat4, upper: bool) -> Outcome {
     } else {
         trti2_lower(&mut a);
     }
+    // dtrcon('1', uplo, 'N') reads only the triangle, before the other one is cleared.
+    let rcond = scipy_lapack::dtrcon(upper, &flat(&a));
     for (c, col) in a.iter_mut().enumerate() {
         for (r, v) in col.iter_mut().enumerate() {
             if (upper && r > c) || (!upper && r < c) {
@@ -272,9 +279,7 @@ fn triangular(mut a: [[f64; 4]; 4], m: &Mat4, upper: bool) -> Outcome {
             }
         }
     }
-    let inv = row_major(&a);
-    // dtrcon on the inverse: rcond = (1 / ‖A⁻¹‖₁) / est‖A‖₁, est ≤ ‖A‖₁.
-    Outcome::Inverse(inv, bound(norm1_columns(m), &inv))
+    inverse_outcome(row_major(&a), rcond)
 }
 
 /// OpenBLAS's `trti2_U` (non-unit) on a column-major 4×4 upper triangle, in place: for each
@@ -283,7 +288,7 @@ fn triangular(mut a: [[f64; 4]; 4], m: &Mat4, upper: bool) -> Outcome {
 /// `-1 / a(j, j)`. The C kernels round every product and sum (no FMA).
 // The loops keep OpenBLAS's indices, so the port can be checked line by line.
 #[allow(clippy::needless_range_loop)]
-fn trti2_upper(a: &mut [[f64; 4]; 4]) {
+pub(crate) fn trti2_upper(a: &mut [[f64; 4]; 4]) {
     for j in 0..4 {
         let ajj = 1.0 / a[j][j];
         a[j][j] = ajj;
@@ -390,7 +395,7 @@ mod tests {
 
     fn inverse(m: &Mat4, release: ScipyRelease) -> (Structure, Mat4) {
         match inv4(m, release) {
-            (s, Outcome::Inverse(x, _)) => (s, x),
+            (s, Outcome::Inverse { inverse, .. }) => (s, inverse),
             other => panic!("not an inverse: {other:?}"),
         }
     }
@@ -456,10 +461,10 @@ mod tests {
             [0.0, 0.0, -1.0, 0.0],
             [0.0, 0.0, 0.0, 1.0],
         ];
-        assert_eq!(
-            inv4(&sym, ScipyRelease::V1_18),
-            (Structure::Symmetric, Outcome::SymmetricNotPorted)
-        );
+        // A symmetric one (an axis swap with a zero origin): Bunch-Kaufman, exact.
+        let (s, x) = inverse(&sym, ScipyRelease::V1_18);
+        assert_eq!(s, Structure::Symmetric);
+        assert!(near_identity(&product(&sym, &x), 0.0));
         let mut big = A;
         big[0][3] = f64::MAX;
         big[0][0] = f64::MAX;
@@ -471,7 +476,11 @@ mod tests {
         let mut ill = d;
         ill[2][2] = 1e-17;
         match inv4(&ill, ScipyRelease::V1_18).1 {
-            Outcome::Inverse(_, Condition::IllConditioned(c)) => assert!(c > 1e16),
+            Outcome::Inverse {
+                rcond,
+                ill_conditioned: true,
+                ..
+            } => assert!(rcond > 1e16),
             other => panic!("{other:?}"),
         }
     }

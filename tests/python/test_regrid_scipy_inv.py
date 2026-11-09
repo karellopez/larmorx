@@ -51,10 +51,68 @@ def test_scipy_inv_errors_and_messages():
         scipy_inv(np.ones((3, 4)))
     with pytest.raises(NotImplementedError):
         scipy_inv(np.eye(3))
-    with pytest.raises(NotImplementedError, match="symmetric"):
-        scipy_inv(np.array([[0, 1, 0, 0], [1, 0, 0, 0], [0, 0, -1, 0], [0, 0, 0, 1.0]]))
+    sym = np.array([[0, 1, 0, 0], [1, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 1.0]])
+    with pytest.raises(np.linalg.LinAlgError, match=r"slice\(s\) \[0\] are singular"):
+        scipy_inv(sym)
     with pytest.raises(ValueError, match=r"1\.15 or 1\.18"):
         scipy_inv(OBLIQUE, scipy_version="1.16.0")
+
+
+def test_scipy_inv_symmetric_paths():
+    """1.18's symmetric path: Cholesky for a definite matrix, Bunch-Kaufman (a 2 x 2 pivot)
+    for an axis swap with a zero origin; the lower triangle filled from the upper."""
+    spd = np.array(
+        [[4.0, 1.0, 0.5, 0.25], [1.0, 3.0, 0.2, 0.1], [0.5, 0.2, 2.0, 0.3], [0.25, 0.1, 0.3, 1.5]]
+    )
+    swap = np.array([[0, 2, 0, 0], [2, 0, 0, 0], [0, 0, -1.5, 0], [0, 0, 0, 1.0]])
+    for m in (spd, swap):
+        x = scipy_inv(m)
+        assert np.array_equal(x, x.T)
+        assert np.allclose(x @ m, np.eye(4), atol=1e-14)
+    # SciPy 1.18.1's bits (its wheel, OPENBLAS_CORETYPE=Haswell), signed zeros included.
+    expected = np.array(
+        [
+            [-0.0, 0.5, 0.0, 0.0],
+            [0.5, -0.0, 0.0, 0.0],
+            [0.0, 0.0, -2 / 3, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ]
+    )
+    assert scipy_inv(swap).tobytes() == expected.tobytes()
+
+
+@pytest.mark.parametrize(
+    ("matrix", "rcond"),
+    [
+        # SciPy 1.18.1's warnings, every path (the values its LAPACK estimates print).
+        (np.diag([1.0, 2.0, 1e-17, 1.0]), "2e+17"),  # diagonal: the condition number (SCI-20)
+        (
+            np.array([[1, 1, 0, 0], [1, 1 + 2**-52, 0, 0], [0, 0, 1, 0], [0, 0, 1, 1.0]]),
+            "5.551115123125783e-17",
+        ),  # general: gecon
+        (
+            np.array([[1e-17, 1, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1.0]]),
+            "5e-18",
+        ),  # upper triangular: trcon
+        (
+            np.array([[1, 1, 0, 0], [1, 1 + 2**-51, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1.0]]),
+            "1.110223024625156e-16",
+        ),  # symmetric definite: pocon
+        (
+            np.array([[1e-17, 1, 0, 0], [1, 1e-17, 0, 0], [0, 0, 1e-17, 0], [0, 0, 0, 1.0]]),
+            "1e-17",
+        ),  # symmetric indefinite: sycon
+    ],
+)
+def test_scipy_inv_warning_texts(matrix, rcond):
+    with pytest.warns(LinAlgWarning) as w:
+        scipy_inv(matrix)
+    assert [str(x.message) for x in w] == [
+        f"An ill-conditioned matrix detected: slice 0 has rcond = {rcond}."
+    ]
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        scipy_inv(matrix, scipy_version="1.15.3")  # 1.15 never warns
 
 
 def test_scipy_inv_warning_and_sci18():

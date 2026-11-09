@@ -576,8 +576,8 @@ def linalg_scipy_inv4(
 ) -> tuple[str, str, np.ndarray | None, np.ndarray | None, float]:
     """``scipy.linalg.inv`` of a finite float64 4×4 matrix as SciPy ``scipy_version`` (1.15 or
     1.18) computes it: ``(structure, status, inverse, lu, rcond)``; ``status`` is "ok",
-    "ill_conditioned", "estimate_needed", "singular", "norm_overflow" (SCI-18: ``lu`` is
-    SciPy's result) or "symmetric_not_ported"."""
+    "ill_conditioned", "singular" or "norm_overflow" (SCI-18: ``lu`` is SciPy's result);
+    ``rcond`` is the value 1.18 computes and prints (0 for 1.15 and for SCI-18)."""
 
 def linalg_affine_points(affine: np.ndarray, points: np.ndarray, n_threads: int = 1) -> np.ndarray:
     """``affine.dot(np.vstack((points.T, ones)))[:3].T`` for ``(n, 3)`` float64 points, in the

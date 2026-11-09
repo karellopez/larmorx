@@ -3,24 +3,32 @@
 
 nilearn's ``resample_img`` inverts the image's affine with ``scipy.linalg.inv`` (niworkflows'
 ``GenerateSamplingReference``, sdcflows' SyN preprocessing). larmorx follows SciPy 1.18.1 (the
-newest: structure detection, then ``trtri``, ``1 / a`` or ``getrf``/``gecon``/``getri``) and
-1.15 (``getrf``/``getri``) with their wheels' OpenBLAS on the Haswell kernels
-(``larmorx_transform::scipy_linalg``). Run in each kept environment (the shared ``.venv``:
-SciPy 1.15.3 with OpenBLAS 0.3.28; ``oracles/python-newest``: SciPy 1.18.1 with OpenBLAS
-0.3.31.dev), with ``PYTHONPATH=<repo>/python``:
+newest: structure detection, then ``1 / a``, ``trtri``/``trcon``, ``getrf``/``gecon``/``getri``,
+or for a symmetric matrix Cholesky's ``potrf``/``pocon``/``potri`` and Bunch-Kaufman's
+``sytrf``/``sycon``/``sytri``) and 1.15 (``getrf``/``getri``) with their wheels' OpenBLAS on the
+Haswell kernels (``larmorx_transform::scipy_linalg``, ``scipy_lapack``). Run in each kept
+environment (the shared ``.venv``: SciPy 1.15.3 with OpenBLAS 0.3.28; ``oracles/python-newest``:
+SciPy 1.18.1 with OpenBLAS 0.3.31.dev), with ``PYTHONPATH=<repo>/python``:
 
     OPENBLAS_CORETYPE=Haswell OPENBLAS_NUM_THREADS=1 python -P check_scipy_inv.py [--n 20000]
         [--images <file.nii.gz> ...]
 
 Families (seeded, ``--n`` each): random, oblique affines, plumb affines (upper triangular for
 1.18), axis-permuted affines, diagonal, lower and upper triangular, rows and columns scaled by
-2^+-300, condition 10^3 to 10^12, entries in {+-1, +-2} (tied pivots), near-permutations,
-integers; and one by one: singular matrices, a symmetric one (1.18: not ported), an
-ill-conditioned diagonal (the warning's text), an overflowing norm (SCI-18 both modes),
-non-finite and non-square input (the messages), ``--images``' affines (nibabel's). Every value
-is compared bit for bit (signed zeros included); a case larmorx refuses
-(``NotImplementedError``) is counted apart. Prints one line per family; ``ALL OK`` or
-``FAIL <n>``.
+2^+-300 and 2^+-500, condition 10^3 to 10^12 and 10^8 to 10^20 (the ill-conditioned warning),
+entries in {+-1, +-2} (tied pivots), near-permutations, integers; symmetric: definite and
+indefinite, each well and ill conditioned (10^8 to 10^20), small integers, a zero diagonal
+(Bunch-Kaufman's 2 x 2 pivots), scaled by 2^+-1000, affines with a zero origin (axis swaps);
+triangular with a tiny diagonal (10^-18 to 1), scaled by 2^+-500, and with column sums that
+overflow (``dlatrs``' rescaled paths); and one by one: singular matrices (general, diagonal,
+triangular, symmetric), an ill-conditioned diagonal (the warning's text), an overflowing norm
+(SCI-18 both modes), non-finite and non-square input (the messages), ``--images``' affines
+(nibabel's). Every value is compared bit for bit (signed zeros included), the warnings' texts
+(which print 1.18's ``rcond`` in full) and the errors' messages; with SciPy 1.18 every
+non-diagonal ``rcond`` is also compared with SciPy's own LAPACK calls on the same factors
+(``scipy.linalg.lapack``: ``dgecon``, ``dtrcon``, ``dpocon``, ``dsycon``), warning or not. A
+case larmorx refuses (``NotImplementedError``) is counted apart. Prints one line per family;
+``ALL OK`` or ``FAIL <n>``.
 """
 
 from __future__ import annotations
@@ -62,23 +70,91 @@ def ours(m, mode="fix"):
     return scipy_inv(m, scipy_version=VERSION, upstream_defects=mode)
 
 
-def refused_values(m, scipy_value) -> bool:
-    """For a matrix larmorx refuses because 1.18's warning needs LAPACK's condition estimate:
-    whether its values (``_core.linalg_scipy_inv4``) are SciPy's."""
+def _norm_rows(a) -> float:
+    """SciPy 1.18's ``norm1_`` (the row sums of the column-major copy, in column order)."""
+    best = 0.0
+    for r in range(4):
+        t = abs(a[r, 0])
+        for c in range(1, 4):
+            t += abs(a[r, c])
+        if t > best:
+            best = t
+    return best
+
+
+def _norm_symmetric(a) -> float:
+    """SciPy 1.18's ``norm1_sym_herm('U')`` (the upper triangle, in its order)."""
+    rw = [0.0] * 4
+    for i in range(4):
+        rw[i] += abs(a[i, i])
+        for j in range(i):
+            t = abs(a[j, i])
+            rw[j] += t
+            rw[i] += t
+    best = 0.0
+    for w in rw:
+        if w > best:
+            best = w
+    return best
+
+
+def scipy_rcond(m, structure):
+    """The ``rcond`` SciPy 1.18's ``inv`` computes, from SciPy's own LAPACK wrappers (the same
+    library) on the same factors; None where there is none (singular, overflowing norm)."""
+    from scipy.linalg import lapack
+
+    a = np.asarray(m, dtype=np.float64)
+    if structure == "general":
+        lu, _, info = lapack.dgetrf(a)
+        if info != 0:
+            return None
+        rc, info = lapack.dgecon(lu, _norm_rows(a), norm="1")
+        return rc if info >= 0 else None
+    if structure.endswith("triangular"):
+        low = structure.startswith("lower")
+        inv, info = lapack.dtrtri(a, lower=low)
+        if info != 0:
+            return None
+        return lapack.dtrcon(inv, norm="1", uplo="L" if low else "U", diag="N")[0]
+    if structure == "symmetric":
+        anorm = _norm_symmetric(a)
+        c, info = lapack.dpotrf(a, lower=0, clean=0)
+        if info == 0:
+            return lapack.dpocon(c, anorm, uplo="U")[0]
+        ldu, ipiv, info = lapack.dsytrf(a, lower=0)
+        if info != 0:
+            return None
+        return lapack.dsycon(ldu, ipiv, anorm, lower=0)[0]
+    return None
+
+
+def rcond_same(m) -> bool | None:
+    """With SciPy 1.18: whether larmorx's ``rcond`` is SciPy's LAPACK estimate (None: not
+    applicable)."""
     from larmorx import _core
 
+    if not VERSION.startswith("1.18"):
+        return None
     a = np.ascontiguousarray(np.asarray(m, dtype=np.float64))
-    _, status, inverse, _, _ = _core.linalg_scipy_inv4(a, VERSION)
-    return status == "estimate_needed" and same(inverse, scipy_value)
+    structure, status, _, _, rcond = _core.linalg_scipy_inv4(a, VERSION)
+    if structure == "diagonal" or status in ("singular", "norm_overflow"):
+        return None
+    ref = scipy_rcond(a, structure)
+    if ref is None:
+        return None
+    return np.float64(ref).tobytes() == np.float64(rcond).tobytes()
+
+
+WARNED: list[int] = [0]
 
 
 def compare(m) -> str:
-    """'same', 'refused', 'refused, values same' or a description of the difference."""
+    """'same', 'refused' or a description of the difference (SciPy's warnings counted in
+    ``WARNED``)."""
     k1, v1, w1 = outcome(linalg.inv, m)
+    WARNED[0] += bool(w1)
     k2, v2, w2 = outcome(ours, m)
     if k2 == "refused":
-        if k1 == "ok" and refused_values(m, v1):
-            return "refused, values same"
         return "refused"
     if k1 != k2:
         return f"scipy {k1} {v1!r} / larmorx {k2} {v2!r}"
@@ -142,16 +218,73 @@ def families(rng, n):
         "entries +-1 +-2": lambda: rng.choice([-2.0, -1.0, 1.0, 2.0], (4, 4)),
         "near-permutation": lambda: np.eye(4)[rng.permutation(4)] + rng.normal(0, 1e-9, (4, 4)),
         "integers": lambda: rng.integers(-5, 6, (4, 4)),
+        "condition 1e8..1e20": lambda: conditioned(rng, 8, 20),
+        "scaled 2^+-500": lambda: (
+            rng.normal(size=(4, 4))
+            * (2.0 ** rng.integers(-500, 501, 4))[:, None]
+            * (2.0 ** rng.integers(-500, 501, 4))[None, :]
+        ),
+        "symmetric definite": lambda: (lambda b: b @ b.T + 0.1 * np.eye(4))(
+            rng.normal(size=(4, 4))
+        ),
+        "symmetric definite 1e8..1e20": lambda: symmetric_conditioned(rng, False),
+        "symmetric indefinite": lambda: sym(rng.normal(size=(4, 4))),
+        "symmetric indefinite 1e8..1e20": lambda: symmetric_conditioned(rng, True),
+        "symmetric integers": lambda: sym(rng.integers(-3, 4, (4, 4)).astype(np.float64)),
+        "symmetric zero diagonal": lambda: (lambda m: m - np.diag(np.diag(m)))(
+            sym(rng.normal(size=(4, 4)))
+        ),
+        "symmetric 2^+-1000": lambda: sym(
+            rng.normal(size=(4, 4)) * 2.0 ** rng.integers(-1000, 1000)
+        ),
+        "affine symmetric (zero origin)": lambda: symmetric_affine(rng),
+        "upper tiny diagonal": lambda: tiny_diagonal(np.triu(rng.normal(size=(4, 4))), rng),
+        "lower tiny diagonal": lambda: tiny_diagonal(np.tril(rng.normal(size=(4, 4))), rng),
+        "upper 2^+-500": lambda: (
+            np.triu(rng.normal(size=(4, 4)))
+            * (2.0 ** rng.integers(-500, 501, 4))[:, None]
+            * (2.0 ** rng.integers(-500, 501, 4))[None, :]
+        ),
+        "lower column sums overflow": lambda: (
+            np.tril(rng.normal(size=(4, 4)) * 2.0**1020, -1) + np.diag(rng.uniform(0.5, 2, 4))
+        ),
     }
     for name, make in fam.items():
         yield name, (make() for _ in range(n))
 
 
-def conditioned(rng):
+def conditioned(rng, lo=3, hi=12):
     u, _ = np.linalg.qr(rng.normal(size=(4, 4)))
     v, _ = np.linalg.qr(rng.normal(size=(4, 4)))
-    s = np.logspace(0, -rng.uniform(3, 12), 4)
+    s = np.logspace(0, -rng.uniform(lo, hi), 4)
     return (u * s) @ v.T
+
+
+def sym(m):
+    """The upper triangle mirrored (exactly symmetric)."""
+    return np.triu(m) + np.triu(m, 1).T
+
+
+def symmetric_conditioned(rng, indefinite):
+    q, _ = np.linalg.qr(rng.normal(size=(4, 4)))
+    s = np.logspace(0, -rng.uniform(8, 20), 4)
+    if indefinite:
+        s = s * rng.choice([-1, 1], 4)
+    return sym((q * s) @ q.T)
+
+
+def symmetric_affine(rng):
+    """An affine whose 3 x 3 part is a symmetric permutation with zooms and a zero origin."""
+    a = np.eye(4)
+    a[:3, :3] = sym(np.eye(3)[rng.permutation(3)] * rng.choice([0.8, 1.0, 2.0, 2.5], 3))
+    return a
+
+
+def tiny_diagonal(t, rng):
+    """A triangle whose diagonal is replaced by +-10^-18 .. +-1."""
+    t = t.copy()
+    np.fill_diagonal(t, 10.0 ** rng.uniform(-18, 0, 4) * rng.choice([-1, 1], 4))
+    return t
 
 
 def singles(rng):
@@ -165,7 +298,16 @@ def singles(rng):
     t = np.triu(rng.normal(size=(4, 4)))
     t[1, 1] = 0.0
     out.append(("singular triangular", t))
+    out.append(
+        ("singular symmetric", np.array([[0, 1, 0, 0], [1, 0, 0, 0], [0, 0, 0, 0.0], [0, 0, 0, 1]]))
+    )
     out.append(("ill-conditioned diagonal", np.diag([1.0, 2.0, 1e-17, 1.0])))
+    out.append(
+        (
+            "ill-conditioned general",
+            np.array([[1, 1, 0, 0], [1, 1 + 1e-17, 0, 0], [0, 0, 1, 0], [0, 0, 1, 1.0]]),
+        )
+    )
     neg = np.diag([2.0, -4.0, 0.5, 1.0])
     neg[0, 1] = -0.0
     out.append(("diagonal with -0", neg))
@@ -190,11 +332,18 @@ def main() -> int:
     print(f"SciPy {VERSION}, numpy {np.__version__}")
     fails = 0
     for name, gen in families(rng, args.n):
-        tot = good = refused = rvals = 0
+        tot = good = refused = rvals = rtot = rgood = 0
+        WARNED[0] = 0
         first = None
         for m in gen:
             tot += 1
             r = compare(m)
+            rs = rcond_same(m)
+            if rs is not None:
+                rtot += 1
+                rgood += rs
+                if not rs and first is None:
+                    first = "rcond differs"
             if r == "same":
                 good += 1
             elif r.startswith("refused"):
@@ -203,10 +352,12 @@ def main() -> int:
             elif first is None:
                 first = r
         bad = tot - good - refused
-        fails += bad
+        fails += bad + (rtot - rgood)
         extra = f" (their values: {rvals} identical)" if refused else ""
+        rc = f", rcond {rgood}/{rtot} identical" if rtot else ""
+        rc += f", {WARNED[0]} warned" if WARNED[0] else ""
         print(
-            f"{name}: {tot} cases, {good} identical, {refused} refused{extra}, {bad} differ"
+            f"{name}: {tot} cases, {good} identical{rc}, {refused} refused{extra}, {bad} differ"
             + (f" (first: {first})" if first else "")
         )
     for name, m in singles(rng):
@@ -214,9 +365,11 @@ def main() -> int:
         if not (r == "same" or r.startswith("refused")):
             fails += 1
         print(f"{name}: {r}")
-    # 1.18's symmetric path is not ported.
-    sym = np.array([[0, 1, 0, 0], [1, 0, 0, 0], [0, 0, -1, 0], [0, 0, 0, 1.0]])
-    print(f"symmetric: {compare(sym)}")
+    # An axis swap with a zero origin: symmetric for 1.18 (Bunch-Kaufman's 2 x 2 pivot).
+    swap = np.array([[0, 1, 0, 0], [1, 0, 0, 0], [0, 0, -1, 0], [0, 0, 0, 1.0]])
+    r = compare(swap)
+    fails += r != "same"
+    print(f"symmetric axis swap: {r}")
     # SCI-18: an overflowing norm (1.18 returns the LU factors; 1.15 the inverse).
     big = np.array([[1.7e308, 1.7e308, 0, 1], [0.5, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1.0]])
     with warnings.catch_warnings():
@@ -238,6 +391,8 @@ def main() -> int:
             m = nb.load(path).affine
             tot += 1
             r = compare(m)
+            if rcond_same(m) is False:
+                r = "rcond differs"
             good += r == "same"
             if r != "same":
                 print(f"  {path}: {r}")

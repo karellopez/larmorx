@@ -1090,10 +1090,11 @@ OpenBLAS 0.3.28, 1.18.1 OpenBLAS 0.3.31.dev, both `DYNAMIC_ARCH`, Haswell kernel
   triangular) goes to OpenBLAS's `dtrtri` (`trti2_U`, `trti2_L`), the other triangle set to +0;
   a general one to `getrf`, `gecon` (only the warning) and `getri`, the values as 1.15's; a
   symmetric one to Cholesky (`potrf`, `pocon`, `potri`), then Bunch-Kaufman when that fails:
-  **not ported** (`NotImplementedError`; an image affine is symmetric only with a zero
-  translation). 1.18 warns (`LinAlgWarning`, "An ill-conditioned matrix detected: slice 0 has
+  **not ported** by relay 18 (`NotImplementedError`; an image affine is symmetric only with a
+  zero translation; ported by relay 19, the next section). 1.18 warns (`LinAlgWarning`, "An ill-conditioned matrix detected: slice 0 has
   rcond = ...") below `rcond = eps`: exact for the diagonal path; for the others it needs LAPACK's
-  estimate (`gecon`/`trcon`: Hager's estimator with `dlatrs`), not ported: LAPACK's estimate of
+  estimate (`gecon`/`trcon`: Hager's estimator with `dlatrs`), not ported by relay 18 (relay 19
+  ported them, the next section): LAPACK's estimate of
   `‖A⁻¹‖₁` is at most the true one, so `rcond >= 1 / (‖A‖ ‖A⁻¹‖₁)` from the inverse; at or above
   `1000 eps` there is no warning, below larmorx refuses (`NotImplementedError`; never an image
   affine: in the checks only the matrices scaled by `2^±300` and numerically singular integer
@@ -1159,3 +1160,70 @@ sigma 0 for every real call), so only `get_fdata()`'s `float64` copy is reached 
 
 `syn_sdc_workflow` now computes `zooms_epi` (SDC-15 stays rule C: its output is unused) and
 `syn_preprocessing_workflow(debug=True)` regrids the anatomy (`regrid_anat`).
+
+## SciPy 1.18.1's `inv` complete: its condition estimates and its symmetric path (relay 19)
+
+Relay 18 left two paths of SciPy 1.18.1's `scipy.linalg.inv` refused (`NotImplementedError`):
+a symmetric matrix (an affine whose 3 x 3 part is symmetric, an axis swap, with a zero origin, is
+one nilearn's `resample_img` can meet) and the `LinAlgWarning` of a non-diagonal matrix within a
+factor 1000 of the threshold. Both are now ported (`larmorx_transform::scipy_lapack`, called by
+`scipy_linalg`), read from SciPy 1.18.1's `_linalg_inv.hh` and `_common_array_utils.hh`, the
+reference LAPACK 3.12.0 of OpenBLAS's `lapack-netlib` and OpenBLAS's own routines and kernels:
+
+- **The condition estimates**, operation for operation: `dgecon` (on `getrf`'s factors, with
+  `dlatrs` on the unit lower and the upper factor, `kase` 1 forwards and 2 transposed), `dtrcon`
+  (on the *inverse*: SciPy calls `trtri` first; `dlantr`'s 1-norm, `rcond = (1 / anorm) / est`),
+  `dpocon` (both `dlatrs` solves with the Cholesky factor each step) and `dsycon` (`dsytrs`
+  with one right-hand side), all through Higham's estimator `dlacn2` (its five reverse-
+  communication states, `ITMAX = 5`) and `drscl`. `dlatrs` is complete: the column norms, the
+  rescaling of norms above `bignum = 2^970` (`tscal`, and `dlange`'s maximum when a norm
+  overflows), the growth bounds, `dtrsv` when they allow it and otherwise the careful solves
+  (`scale`, the `uscal` path of the transposed solve), the norms rescaled at the end. The
+  warning: `rcond != rcond || rcond < eps` (eps = 2^-52), the text with Python's shortest
+  `repr` of `rcond`.
+- **The symmetric path**: SciPy's `norm1_sym_herm('U')` (the upper triangle, in its order);
+  OpenBLAS's `dpotrf` (`potf2_U`: `ddot` of the column, `dgemv_t`'s strided tail, `dscal` along
+  the row) and, when it succeeds, `dpocon` and LAPACK's `dpotri` (OpenBLAS's `dtrtri` and
+  `dlauum` = `lauu2_U`: `dscal`, the strided `ddot`, `dgemv_n`'s tail); when a pivot is not
+  positive, the original matrix again through LAPACK's `dsytrf` (= `dsytf2` for this size:
+  Bunch-Kaufman's `alpha = (1 + sqrt(17)) / 8`, the strided `idamax` of the row, 1 x 1 pivots
+  through `dsyr`'s small path and `dscal`, 2 x 2 pivots through the Fortran loop), `dsycon` and
+  `dsytri` (`dsymv_U`'s path below 16 rows, `ddot`, the swaps); the lower triangle filled from
+  the upper. A zero pivot in `dsytrf` or a zero 1 x 1 block in `dsytri` is SciPy's
+  `LinAlgError`.
+- **The kernels on these lengths** (at most 4), checked in the disassembly of SciPy 1.18.1's
+  `libscipy_openblas` (0.3.31.dev): no fused multiply-add in `dasum_k`, `ddot_k`, `daxpy_k`,
+  `dscal_k`, `dger_k`, `dsymv_U`, `dgemv_n` (its tails), the `dtrsv_*` drivers, `dpotf2_U`,
+  `dlauu2_U`, `dtrti2_UN` and the LAPACK Fortran (`dlatrs`, `dlacn2`, `dgecon`, `dtrcon`,
+  `dpocon`, `dsycon`, `dsytf2`, `dsytrs`, `dsytri`, `drscl`, `dlantr`); `dgemv_t`'s tails are
+  contracted (`fma(a0, x0, a1 x1)`, then `fma(a2, x2, ·)`, added to `y`; one row
+  `fma(a, x, y)`), its strided-`y` loop as its unit one.
+- **Measured** (`check_scipy_inv.py`, both environments, logs
+  `oracles/logs/fmapb-r19-scipy-inv-{shared,newest}.log`): 27 families of 20,000 seeded
+  matrices (relay 18's 13; condition `1e8` to `1e20`; scaled by `2^±500`; symmetric definite and
+  indefinite, each also with condition `1e8` to `1e20`; symmetric small integers, with a zero
+  diagonal (2 x 2 pivots), scaled by `2^±1000`; affines with a symmetric 3 x 3 part and a zero
+  origin; triangles with a diagonal of `±1e-18` to `±1`, scaled by `2^±500`, with column sums
+  that overflow) and the 513 image affines: **540,513 cases per environment identical**
+  (values with their signed zeros, warnings' texts, errors' messages). With SciPy 1.18.1 every
+  non-diagonal `rcond` (506,565 cases where LAPACK computes one) is also identical to SciPy's
+  own LAPACK calls on the same factors (`scipy.linalg.lapack`'s `dgecon`, `dtrcon`, `dpocon`,
+  `dsycon`), warning or not; 1.18 warned for 141,272 cases (every case of the scaled general and
+  triangular families and of the overflowing column sums, 6,854 of the
+  `1e8`-`1e20` general matrices, about 7,600 of each ill-conditioned symmetric family, 19,450 of
+  each tiny-diagonal triangle family), so the estimate's last bits are seen in the printed
+  `rcond`. The singular symmetric matrix and an ill-conditioned general one identical too.
+- **OpenBLAS's sources (the orchestrator's (c))**: every kernel and LAPACK routine these paths
+  reach was ported from the 0.3.30 release tarball and is identical bit for bit to SciPy 1.18.1's
+  0.3.31.dev library on the 540,513 cases (1.15.3's 0.3.28 reaches only `getrf`/`getri`,
+  validated by relay 18), so OpenBLAS 0.3.28 and 0.3.31.dev are not pinned separately: the
+  evidence for their equivalence on these paths is that agreement.
+- **SCI-19** (class f, kept): the general path's `norm1_` sums the rows of the column-major copy,
+  so `dgecon`'s 1-norm estimate of `A⁻¹` is combined with the infinity norm of `A`; the symmetric
+  path's norm is right (its comment: "NB: transpose for the F order"). Only the warning's test
+  and the `rcond` it prints change (the two estimates are within a factor 4 for 4 x 4; measured
+  3.83 at most): near the threshold (condition `1e14` to `1e17`) SciPy warns for 10,249 of
+  20,000 matrices, the 1-norm would for 10,234; random and row-scaled matrices: no warning
+  either way (`probe_sci19_norm.py`, `oracles/logs/fmapb-r19-sci19-norm.log`). A message only:
+  both modes SciPy's. **SCI-20** (class f, kept): the diagonal path prints the condition number
+  `max|a| · max|1/a|` as "rcond" ("rcond = 2e+17"); its threshold is right.

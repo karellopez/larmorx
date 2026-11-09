@@ -111,8 +111,21 @@ tarball, `tags/OpenBLAS-0.3.30`: `interface/lapack/getrf.c`, `trtri.c`, `interfa
 `kernel/x86_64/daxpy.c`, `dscal.c`, `dgemv_n_4.c`, `dgemv_n_microk_haswell-4.c`,
 `KERNEL.HASWELL`; the reference LAPACK in `lapack-netlib/SRC/dgetri.f`, `dgecon.f`), BSD-3-Clause.
 `getf2` is `openblas::getf2` (numpy's path). Validated against both SciPy wheels
-(`validation/investigations/sdcflows-fieldmap-b/check_scipy_inv.py`). Not ported: 1.18's
-symmetric path (Cholesky, Bunch-Kaufman) and its condition estimates (`gecon`, `trcon`).
+(`validation/investigations/sdcflows-fieldmap-b/check_scipy_inv.py`).
+**Relay 19** (`scipy_lapack`): 1.18's condition estimates and symmetric path, from SciPy 1.18.1
+(`src/_linalg_inv.hh` `invert_slice_cholesky`, `invert_slice_sym_herm`, the `POS_DEF` fallback of
+`_inverse`; `src/_common_array_utils.hh` `norm1_sym_herm`, `norm1_sym_herm_lower`,
+`fill_other_triangle`, `fill_other_triangle_noconj`, `init_status`, `_detect_problems`) and
+OpenBLAS 0.3.30 (`lapack-netlib/SRC/dgecon.f`, `dtrcon.f`, `dpocon.f`, `dsycon.f`, `dlacn2.f`,
+`dlatrs.f`, `drscl.f`, `dlantr.f`, `dlange.f`, `dpotri.f`, `dsytrf.f`, `dsytf2.f`, `dsytri.f`,
+`dsytrs.f`, `INSTALL/dlamch.f`; `interface/asum.c`, `dot.c`, `axpy.c`, `scal.c`, `imax.c`,
+`trsv.c`, `symv.c`, `syr.c`, `ger.c`, `gemv.c`, `lapack/potrf.c`, `lapack/trtri.c`,
+`lapack/lauum.c`; `lapack/potf2/potf2_U.c`, `lapack/lauu2/lauu2_U.c`,
+`lapack/potrf/potrf_U_single.c`, `lapack/lauum/lauum_U_single.c`; `driver/level2/trsv_U.c`,
+`trsv_L.c`; `kernel/x86_64/dasum.c`, `dasum_microk_haswell-2.c`, `ddot.c`, `daxpy.c`, `dscal.c`,
+`dsymv_U.c`, `dgemv_n_4.c`, `dgemv_t_4.c`; `kernel/generic/ger.c`), BSD-3-Clause; validated
+against SciPy 1.18.1's wheel (0.3.31.dev) on 540,513 cases, every `rcond` against SciPy's own
+LAPACK calls (`check_scipy_inv.py`). `openblas::iamax` is now `pub(crate)` (shared).
 `openblas::affine_points` (relay 18): numpy's `dgemm`/`dgemv` of homogeneous points, as
 `point_row`/`point_row_single`.
 

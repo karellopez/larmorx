@@ -85,13 +85,16 @@ def scipy_inv(
 
     SciPy 1.15 takes LAPACK ``getrf`` and ``getri`` for every matrix; 1.18 detects the structure
     first: a diagonal matrix has its diagonal inverted, a triangular one goes to ``trtri``, a
-    general one to ``getrf``, ``gecon`` and ``getri``. Not ported (``NotImplementedError``):
-    other shapes, stacks, float32 and complex matrices; 1.18's symmetric path (Cholesky, then
-    Bunch-Kaufman: an affine is symmetric only with a zero translation); and 1.18's
-    ill-conditioned warning for a non-diagonal matrix when it needs LAPACK's condition estimate
-    (``rcond`` within a factor 1000 of the machine epsilon: never an image affine). Defects:
-    SCI-18 (1.18 returns the LU factors as the inverse when the matrix's norm overflows),
-    SCI-20 (the diagonal path's warning prints the condition number as ``rcond``; kept)."""
+    general one to ``getrf``, ``gecon`` and ``getri``, a symmetric one to Cholesky (``potrf``,
+    ``pocon``, ``potri``) or, when that fails, Bunch-Kaufman (``sytrf``, ``sycon``, ``sytri``);
+    its ``LinAlgWarning`` for an ill-conditioned matrix comes from LAPACK's condition estimate
+    (``gecon``, ``trcon``, ``pocon``, ``sycon``), ported with the value it prints. Not ported
+    (``NotImplementedError``): other shapes, stacks, float32 and complex matrices; SciPy's
+    ``assume_a``, ``lower``, ``overwrite_a`` and ``check_finite`` are not offered (its defaults
+    are followed). Defects: SCI-18 (1.18 returns the LU factors as the inverse when the matrix's
+    norm overflows), SCI-19 (1.18's general path passes the infinity norm to ``gecon`` as the
+    1-norm: the warning's ``rcond`` is a mixed estimate; a message only, kept), SCI-20 (the
+    diagonal path's warning prints the condition number as ``rcond``; kept)."""
     from larmorx import _defects
 
     _defects.check(upstream_defects)
@@ -112,24 +115,13 @@ def scipy_inv(
         raise NotImplementedError(f"scipy_inv is ported for one 4 x 4 matrix, not shape {a1.shape}")
     if a1.dtype.kind not in "biuf" or (a1.dtype.kind == "f" and a1.dtype != np.float64):
         raise NotImplementedError(f"scipy_inv is ported for float64 matrices, not {a1.dtype}")
-    structure, status, inverse, lu, rcond = _core.linalg_scipy_inv4(
+    _structure, status, inverse, lu, rcond = _core.linalg_scipy_inv4(
         np.ascontiguousarray(a1, dtype=np.float64), str(scipy_version)
     )
     if status == "singular":
         if new:
             raise np.linalg.LinAlgError("A singular matrix detected: slice(s) [0] are singular.")
         raise np.linalg.LinAlgError("singular matrix")
-    if status == "symmetric_not_ported":
-        raise NotImplementedError(
-            "SciPy 1.18 inverts a symmetric matrix with its Cholesky factors (LAPACK potrf, "
-            "pocon, potri; Bunch-Kaufman's sytrf, sycon, sytri when that fails): not ported"
-        )
-    if status == "estimate_needed":
-        raise NotImplementedError(
-            f"SciPy 1.18 warns about an ill-conditioned {structure} matrix from LAPACK's "
-            "condition estimate (gecon, trcon), which is not ported; this matrix's condition "
-            "is within a factor 1000 of the machine epsilon"
-        )
     if status == "norm_overflow":
         detail = (
             "the matrix's norm overflows, so SciPy 1.18's condition estimate (gecon) stops with "

@@ -179,7 +179,7 @@ pub fn rows3_single(h: &Mat4, p: [f64; 3]) -> [f64; 3] {
 /// lanes, and then searches from the start with `comisd`/`je`, which also matches when either
 /// value is NaN. For 2 and 3 elements it compares the first two and otherwise returns the next
 /// index without comparing; `getf2_k` clamps an index past the end to the last element.
-fn iamax(x: &[f64]) -> usize {
+pub(crate) fn iamax(x: &[f64]) -> usize {
     let m = |d: f64, s: f64| if d > s { d } else { s };
     let a: Vec<f64> = x.iter().map(|v| v.abs()).collect();
     let max = match a.len() {

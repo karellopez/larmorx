@@ -4217,7 +4217,11 @@ def _(ctx: Context) -> dict[str, Any]:
 def _(ctx: Context) -> dict[str, Any]:
     """niworkflows' RegridToZooms: an int16 image on an oblique grid (a 3-4-5 rotation) regridded
     to coarser and finer voxels, with smooth=True and a sigma, order 1 without clipping, and a
-    float32 image whose header has no x-form codes."""
+    float32 image whose header has no x-form codes. With them SciPy 1.18's inverse, which
+    nilearn's resample_img (resample_img_nearest) takes: an image whose affine is symmetric (an
+    axis swap with a zero origin: Bunch-Kaufman) resampled, and the inverse with its rcond on
+    every path (Cholesky, Bunch-Kaufman with 2 x 2 pivots, general, triangular, ill-conditioned,
+    rescaled by dlatrs), from matrices made with plain arithmetic."""
     aff = np.array([[0.96 * 1.5, -0.28 * 1.25, 0.0, -20.0], [0.28 * 1.5, 0.96 * 1.25, 0.0, 12.0],
                     [0.0, 0.0, 2.0, 7.5], [0.0, 0.0, 0.0, 1.0]])  # fmt: skip
     src = ctx.out("regrid_in.nii.gz")
@@ -4239,6 +4243,31 @@ def _(ctx: Context) -> dict[str, Any]:
     res = lx.niworkflows.resample_by_spacing(flt, (2.0, 2.0, 2.0))
     out["image"] = np.asarray(res.data)
     out["image.affine"] = np.asarray(res.affine)
+    swap = np.array([[0.0, 2.0, 0.0, 0.0], [2.0, 0.0, 0.0, 0.0], [0.0, 0.0, 2.5, 0.0],
+                     [0.0, 0.0, 0.0, 1.0]])  # fmt: skip
+    sw = lx.Image(ints(58, (10, 9, 8), -50, 200).astype(np.int16), swap, None)
+    out["resample.symmetric"] = np.asarray(lx.niworkflows.resample_img_nearest(sw, aff, (12, 10, 8)).data)  # fmt: skip
+    r = ints(60, (4, 4), -9, 10) / 8
+    sym = np.triu(r) + np.triu(r, 1).T
+    near = np.eye(4)
+    near[:2, :2] = ((1.0, 1.0), (1.0, 1.0 + 2.0**-51))
+    tiny = np.triu(r)
+    np.fill_diagonal(tiny, (2.0**-60, 1.0, -0.5, 2.0))
+    ill = near.copy()
+    ill[3, 2] = 1.0
+    mats = {
+        "cholesky": sym + 8 * np.eye(4),
+        "bunch_kaufman": sym - np.diag(np.diag(sym)),
+        "general": r,
+        "ill_cholesky": near,
+        "ill_general": ill,
+        "ill_upper": tiny,
+        "rescaled": r * 2.0**1000 + np.diag((1.0, 1.0, 1.0, 1.0)),
+    }
+    for tag, m in mats.items():
+        _, status, inv, _, rcond = _core.linalg_scipy_inv4(np.ascontiguousarray(m), "1.18.1")
+        out[f"scipy_inv.{tag}"] = np.asarray(inv)
+        out[f"scipy_inv.{tag}.rcond"] = np.asarray([rcond, status == "ill_conditioned"])
     return out
 
 

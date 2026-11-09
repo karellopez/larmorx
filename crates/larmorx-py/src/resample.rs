@@ -325,16 +325,15 @@ fn linalg_inv4<'py>(py: Python<'py>, a: PyReadonlyArray3<'_, f64>) -> PyResult<I
 /// `scipy.linalg.inv` of a float64 4×4 matrix as SciPy `scipy_version` ("1.18.1", or a 1.15
 /// release) computes it (`larmorx_transform::scipy_linalg::inv4`; finite input, checked by the
 /// caller): `(structure, status, inverse, lu, rcond)` with `status` one of "ok",
-/// "ill_conditioned" (the diagonal path's warning, `rcond` the value SciPy prints),
-/// "estimate_needed", "singular", "norm_overflow" (SCI-18: `lu` is what SciPy returns) and
-/// "symmetric_not_ported".
+/// "ill_conditioned" (1.18's warning), "singular" and "norm_overflow" (SCI-18: `lu` is what
+/// SciPy returns); `rcond` is the value 1.18 computes and prints (0 for 1.15 and for SCI-18).
 #[pyfunction]
 fn linalg_scipy_inv4<'py>(
     py: Python<'py>,
     a: PyReadonlyArray2<'_, f64>,
     scipy_version: &str,
 ) -> PyResult<Bound<'py, PyTuple>> {
-    use larmorx_transform::scipy_linalg::{self, Condition, Outcome, ScipyRelease};
+    use larmorx_transform::scipy_linalg::{self, Outcome, ScipyRelease};
     let m = mat4(&a)?;
     let release = match scipy_version
         .split('.')
@@ -356,14 +355,22 @@ fn linalg_scipy_inv4<'py>(
     };
     let none = || py.None().into_bound(py);
     let (status, inverse, lu, rcond) = match outcome {
-        Outcome::Inverse(x, Condition::WellConditioned) => ("ok", mat(&x), none(), 0.0),
-        Outcome::Inverse(x, Condition::IllConditioned(r)) => {
-            ("ill_conditioned", mat(&x), none(), r)
-        }
-        Outcome::Inverse(x, Condition::EstimateNeeded) => ("estimate_needed", mat(&x), none(), 0.0),
+        Outcome::Inverse {
+            inverse,
+            rcond,
+            ill_conditioned,
+        } => (
+            if ill_conditioned {
+                "ill_conditioned"
+            } else {
+                "ok"
+            },
+            mat(&inverse),
+            none(),
+            rcond,
+        ),
         Outcome::Singular => ("singular", none(), none(), 0.0),
         Outcome::NormOverflow { lu, inverse } => ("norm_overflow", mat(&inverse), mat(&lu), 0.0),
-        Outcome::SymmetricNotPorted => ("symmetric_not_ported", none(), none(), 0.0),
     };
     let items: Vec<Bound<'py, PyAny>> = vec![
         structure.name().into_pyobject(py)?.into_any(),

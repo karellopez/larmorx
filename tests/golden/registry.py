@@ -8049,27 +8049,10 @@ def _(ctx: Context) -> dict[str, Any]:
     return out
 
 
-@case(
-    "py.sdcflows.fmap_preproc",
-    covers=(
-        "lx.sdcflows.fmap_preproc_workflow",
-        "lx.sdcflows.estimator_workflow",
-        "lx.sdcflows.check_readout",
-        "lx.sdcflows.workflow_options",
-        "lx.sdcflows.fmap_derivatives_workflow",
-        "lx.sdcflows.gendesc",
-        "lx.sdcflows.getname",
-        "lx.sdcflows.getsourcetype",
-        "lx.sdcflows.selectintent",
-        "lx.sdcflows.FieldmapEstimation.get_workflow",
-        "lx.sdcflows.EstimatorWorkflow.run",
-    ),
-)
-def _(ctx: Context) -> dict[str, Any]:
-    """sdcflows' init_fmap_preproc_wf on a small BIDS dataset: a direct field map (Hz) with its
-    magnitude estimated and written as derivatives (field, reference, mask, coefficients,
-    sidecar); a PEPOLAR estimator's workflow built (inputs, readout check) and the helpers."""
-    root = Path(ctx.out("bids"))
+def _fmap_bids(ctx: Context, name: str = "bids") -> Path:
+    """A small BIDS dataset: a direct field map (Hz) with its magnitude, an EPI pair (AP, PA)
+    and the BOLD run both are intended for."""
+    root = Path(ctx.out(name))
     (root / "sub-01" / "fmap").mkdir(parents=True)
     (root / "sub-01" / "func").mkdir(parents=True)
     (root / "dataset_description.json").write_text(
@@ -8096,6 +8079,30 @@ def _(ctx: Context) -> dict[str, Any]:
         '{"PhaseEncodingDirection": "j", "TotalReadoutTime": 0.05, "RepetitionTime": 2.0}',
         encoding="utf-8",
     )
+    return root
+
+
+@case(
+    "py.sdcflows.fmap_preproc",
+    covers=(
+        "lx.sdcflows.fmap_preproc_workflow",
+        "lx.sdcflows.estimator_workflow",
+        "lx.sdcflows.check_readout",
+        "lx.sdcflows.workflow_options",
+        "lx.sdcflows.fmap_derivatives_workflow",
+        "lx.sdcflows.gendesc",
+        "lx.sdcflows.getname",
+        "lx.sdcflows.getsourcetype",
+        "lx.sdcflows.selectintent",
+        "lx.sdcflows.FieldmapEstimation.get_workflow",
+        "lx.sdcflows.EstimatorWorkflow.run",
+    ),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """sdcflows' init_fmap_preproc_wf on a small BIDS dataset: a direct field map (Hz) with its
+    magnitude estimated and written as derivatives (field, reference, mask, coefficients,
+    sidecar); a PEPOLAR estimator's workflow built (inputs, readout check) and the helpers."""
+    root = _fmap_bids(ctx)
     registry = lx.sdcflows.FieldmapRegistry()
     lay = lx.bids.BIDSLayout(root, validate=False)
     with warnings.catch_warnings():
@@ -8138,4 +8145,132 @@ def _(ctx: Context) -> dict[str, Any]:
          lx.sdcflows.getsourcetype(["p/sub-01_epi.nii"]), lx.sdcflows.getsourcetype(["p/m.nii.gz"]),
          lx.sdcflows.selectintent([{"IntendedFor": ["b", "a"]}, {"IntendedFor": "a"}, {}])], root,
     )  # fmt: skip
+    return out
+
+
+@case(
+    "py.larmorprepx.fmap_estimation",
+    covers=(
+        "lx.pipelines.larmorprepx.estimators.precomputed_fieldmaps",
+        "lx.pipelines.larmorprepx.estimators.plan_fieldmap_estimation",
+        "lx.pipelines.larmorprepx.estimators.FieldmapEstimationPlan.run",
+        "lx.pipelines.larmorprepx.estimators.estimate_fieldmaps",
+        "lx.pipelines.larmorprepx.estimators.merge_buffers",
+        "lx.sdcflows.build_workflows",
+    ),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """fMRIPrep's field-map estimation stage on a small BIDS dataset: the PEPOLAR estimator's
+    field map precomputed in a derivatives folder, the direct field map estimated (its
+    derivatives written as fMRIPrep writes them, out_path_base ''), the buffers merged; the plan
+    with both estimated (the PEPOLAR inputs set, not run) and its boilerplate."""
+    root = _fmap_bids(ctx, "bids-est")
+    lay = lx.bids.BIDSLayout(root, validate=False)
+    le = lx.pipelines.larmorprepx.estimators
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        ests = lx.sdcflows.find_estimators(
+            layout=lay, subject="01", fmapless=False, registry=lx.sdcflows.FieldmapRegistry()
+        )
+    pepolar = next(e for e in ests if e.method == lx.sdcflows.EstimatorType.PEPOLAR)
+    fid = re.sub(r"[^a-zA-Z0-9]", "", pepolar.bids_id)
+    pre = Path(ctx.out("precomputed"))
+    (pre / "sub-01" / "fmap").mkdir(parents=True)
+    (pre / "dataset_description.json").write_text(
+        '{"Name": "pre", "BIDSVersion": "1.8.0", "DatasetType": "derivative"}', encoding="utf-8"
+    )
+    aff = affine(SHAPE_FMAP, (2.0, 2.0, 2.5), oblique=False)
+    for desc in ("preproc", "coeff", "epi"):
+        lx.save((ints(140, SHAPE_FMAP, 0, 50).astype(np.float32), aff),
+                str(pre / "sub-01" / "fmap" / f"sub-01_fmapid-{fid}_desc-{desc}_fieldmap.nii.gz"))  # fmt: skip
+    out: dict[str, Any] = {}
+    cache = le.precomputed_fieldmaps({"pre": pre}, "01")
+    out["cache"] = _portable(cache, pre)
+    planned = le.plan_fieldmap_estimation(
+        ests, output_dir="/out", subject="01", omp_nthreads=2, fallback_total_readout_time=0.05
+    )
+    built = lx.sdcflows.build_workflows([pepolar], omp_nthreads=2, fallback_total_readout_time=0.05)
+    out["plan.all"] = _portable(
+        [[e.bids_id for e in planned.estimators], sorted((k, v.name) for k, v in planned.estimator_types.items()),
+         sorted(planned.preproc_options.items()), planned.inputs, planned.desc, planned.needs_anat,
+         [w.name for w in planned.workflows], [w.name for w in built]], root,
+    )  # fmt: skip
+    deriv = Path(ctx.out("deriv-est"))
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        res = le.estimate_fieldmaps(
+            ests, cache, output_dir=deriv, subject="01", work_dir=ctx.out("work-est")
+        )
+    est = res.estimates
+
+    def rel(v: Any) -> Any:
+        if isinstance(v, (list, tuple)):
+            return [rel(x) for x in v]
+        if v == "MISSING":
+            return v
+        return Path(v).relative_to(deriv if str(v).startswith(str(deriv)) else pre).as_posix()
+
+    out["buffers"] = _portable(
+        [rel(list(est.fmap)), rel(list(est.fmap_ref)), rel(list(est.fmap_coeff)),
+         rel(list(est.fmap_mask)), list(est.fmap_id), list(est.sdc_method), res.std2anat_xfm,
+         sorted(res.syn_preprocessing)], root,
+    )  # fmt: skip
+    for f in sorted(deriv.rglob("*")):
+        if f.is_file():
+            r = f.relative_to(deriv).as_posix()
+            out[f"deriv.{r}"] = _text(str(f), root) if f.suffix == ".json" else Nifti(str(f))
+    merged = le.merge_buffers({}, res.preproc)
+    out["merge_buffers"] = _portable([rel(list(merged.fmap_coeff)), list(merged.fmap_id)], root)
+    return out
+
+
+@case(
+    "py.sdcflows.qwarp",
+    covers=(
+        "lx.sdcflows.flatten",
+        "lx.sdcflows.sorted_pe",
+        "lx.sdcflows.qwarp2ants",
+        "lx.sdcflows.qwarp_workflow",
+    ),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """The Python steps of sdcflows' 3dQwarp estimation: a scaled int16 series and a 3D file
+    flattened (max_trs 3), the phase-encoding order of three files, a float32 warp
+    (X x Y x Z x 1 x 3) converted for ANTs, a one-slice warp as sdcflows writes it and corrected
+    (SDC-24), the workflow's NotImplementedError."""
+    aff = affine(SHAPE_FMAP, (2.0, 2.0, 2.5), oblique=True)
+    series = ctx.out("sub-01_dir-PA_epi.nii.gz")
+    lx.save((ints(150, (*SHAPE_FMAP, 4), -300, 900).astype(np.int16), aff), series)
+    hdr = lx.io.load(series).header.replace(scl_slope=0.25, scl_inter=3.0)
+    lx.save(lx.io.load(series, scaled=False).replace(header=hdr), series)
+    vol = ctx.out("sub-01_dir-AP_epi.nii.gz")
+    lx.save((ints(151, SHAPE_FMAP, 0, 500).astype(np.int16), aff), vol)
+    out: dict[str, Any] = {}
+    meta = [{"PhaseEncodingDirection": "j-"}, {"PhaseEncodingDirection": "j"}]
+    res = lx.sdcflows.flatten([vol, series], meta, 3, out_dir=ctx.out("flatten"))
+    names = [Path(f).name for f in res.out_data]
+    out["flatten"] = np.frombuffer(json.dumps([names, list(res.out_meta)]).encode(), dtype=np.uint8).copy()  # fmt: skip
+    for f in res.out_data[1:]:
+        out[f"flatten.{Path(f).name}"] = Nifti(f)
+    order = lx.sdcflows.sorted_pe([(vol, meta[0]), (series, meta[1]), ("x.nii.gz", meta[0])])
+    out["sorted_pe"] = np.frombuffer(
+        json.dumps([[[Path(f).name for f in fs] for fs in order[0]], order[1]]).encode(), dtype=np.uint8
+    ).copy()  # fmt: skip
+    i, j, k = np.indices(SHAPE_FMAP)
+    disp = np.stack([(i - 9) / 7, (j - 8) / 5, (k - 5) / 3], axis=-1).astype(np.float32)
+    warp = ctx.out("w_WARP.nii.gz")
+    lx.save((disp[:, :, :, np.newaxis, :], aff), warp)
+    out["qwarp2ants"] = Nifti(lx.sdcflows.qwarp2ants(warp, out_dir=ctx.out("q")))
+    slab = ctx.out("slab_WARP.nii.gz")
+    lx.save((np.ascontiguousarray(disp[:, :, :1, np.newaxis, :]), aff), slab)
+    for mode in ("fix", "reproduce"):
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            f = lx.sdcflows.qwarp2ants(slab, out_dir=ctx.out(f"q-{mode}"), upstream_defects=mode)
+        out[f"qwarp2ants.slab.{mode}"] = Nifti(f)
+    try:
+        lx.sdcflows.qwarp_workflow([vol, series], meta)
+        out["qwarp_workflow"] = np.frombuffer(b"built", dtype=np.uint8).copy()
+    except NotImplementedError as err:
+        out["qwarp_workflow"] = np.frombuffer(str(err).encode(), dtype=np.uint8).copy()
     return out

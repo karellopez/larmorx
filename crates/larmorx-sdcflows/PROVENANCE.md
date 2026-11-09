@@ -216,3 +216,18 @@ TemplateFlow 25.1.2's `api.templates()` list (as `STANDARD_SPACES`). Into
 (`build_path`, `_expand_options`, `_expand_entities`). Into `python/larmorx/_nipype.py`: nipype
 1.12.0 (Apache-2.0) `utils/filemanip.py` (`copyfile` with `copy=True`, `get_related_files`,
 `related_filetype_sets`).
+
+Into `python/larmorx/pipelines/larmorprepx/estimators.py` (relay 13): fMRIPrep 25.2.7
+(Apache-2.0; the same lines in 25.2.6's image) `workflows/base.py`, `init_single_subject_wf`'s
+field-map estimation stage (`fmap_cache` from `collect_fieldmaps`, the precomputed buffers, the
+`init_fmap_preproc_wf` call and its `EX_DATAERR` exit, the `out_path_base` override,
+`fmap_select_std`, the per-estimator PEPOLAR inputs and `init_syn_preprocessing_wf`, the
+`fmap_buffers` and the boilerplate); nipype 1.12.0 (Apache-2.0) `interfaces/utility/base.py`
+(`Merge`'s `vstack`, through `fieldmaps._merge`). Into `python/larmorx/sdcflows/base.py`
+(`build_workflows`, relay 13): sdcflows 2.17.1's `init_fmap_preproc_wf` loop (unchanged code,
+moved). Into `python/larmorx/sdcflows/qwarp.py` (relay 13): sdcflows 2.17.1 (Apache-2.0; the
+same in 2.15.1 and 2.15.2) `interfaces/utils.py` (`Flatten`, `_flatten`, `ConvertWarp`,
+`_qwarp2ants`) and `workflows/fit/pepolar.py` (`_sorted_pe`; `init_3dQwarp_wf`'s description);
+nibabel 5.4.2 (MIT) `spatialimages.py` (`SpatialFirstSlicer`: the 4th-axis slice and its "Empty
+slice requested" error), `funcs.py` (`four_to_three`), `nifti1.py` (`set_intent`), through
+`lx.io`; nipype 1.12.0 `utils/filemanip.py` (`fname_presuffix`'s prefix argument).

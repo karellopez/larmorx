@@ -252,6 +252,30 @@ cache) and against fMRIPrep 25.2.6's own node files of its two PEPOLAR estimator
 `validation/investigations/sdcflows-fieldmap-b/check_pepolar.py`
 ([findings](../findings/sdcflows-estimation.md)).
 
+## The PEPOLAR estimation with 3dQwarp: its Python steps (part B)
+
+sdcflows' `init_3dQwarp_wf` (`workflows/fit/pepolar.py`, the same in 2.15.1, 2.15.2 and 2.17.1)
+needs AFNI's `3dQwarp` (`QwarpPlusMinus`), FreeSurfer's `mri_robust_template` (niworkflows'
+`StructuralReference` of several files) and niworkflows' `init_enhance_and_skullstrip_bold_wf`,
+which larmorx has not ported yet; sdcflows never chooses it (its `get_workflow` estimates every
+PEPOLAR field map with `topup`, and fMRIPrep's image has no `3dQwarp`). Its Python steps
+(`python/larmorx/sdcflows/qwarp.py`):
+
+| larmorx | sdcflows | Notes |
+|---|---|---|
+| `flatten(in_data, in_meta, max_trs=50, *, out_dir=None, n_threads=1)` → `FlattenResult(out_list, out_data, out_meta)` | `interfaces/utils.Flatten` (`_flatten`) | a 3D file kept with its metadata; a 4D file's first `max_trs` volumes (nibabel's `slicer` and `four_to_three`: scaled data re-quantised with the header, `pixdim[4]` reset to 1) written as `<stem>_idx-NNN.nii.gz` in `out_dir` (absolute; the current folder without it); files and metadata paired in order, the longer list cut (`zip`); `max_trs` 0: nibabel's `IndexError('Empty slice requested')`; five axes: `ValueError('Expecting four dimensions')`; nothing to pair: `_flatten`'s unpacking `ValueError` (nipype refuses the empty mandatory input first); a missing file: `FileNotFoundError` (nipype's `File(exists=True)`); the outputs always tuples (nipype's `OutputMultiObject` gives a one-item list as its item) |
+| `sorted_pe(inlist)` → `([same, opposite], args)` | `workflows/fit/pepolar._sorted_pe` | the files of the first file's `PhaseEncodingDirection` and of its opposite, in order, and `3dQwarp`'s options for that axis (`QWARP_ARGS`: `i` → `-noYdis -noZdis`, `j` → `-noXdis -noZdis`, `k` → `-noXdis -noYdis`); another axis: `ValueError('Cannot handle orthogonal PE encodings.')`; no direction: `KeyError`; no file: `IndexError` |
+| `qwarp2ants(in_file, *, out_dir=None, upstream_defects="fix", n_threads=1)` | `interfaces/utils.ConvertWarp` (`_qwarp2ants`) | float32 (`get_fdata(dtype='float32')`), the intent `vector` without parameters or name, the components on the fifth axis (`X x Y x Z x 1 x 3`), the input's header otherwise; named `_warpfield<in>` (sdcflows gives `'_warpfield'` as `fname_presuffix`'s second argument, its prefix: kept); SDC-24 |
+| `qwarp_workflow(in_data=None, metadata=None, *, omp_nthreads=1, debug=False, name="pepolar_estimate_wf", out_dir=None, n_threads=1)` | `init_3dQwarp_wf` | `NotImplementedError` naming the programs it waits for, before any work; SDC-23 |
+
+Checked (`validation/investigations/sdcflows-fieldmap-b/check_qwarp_steps.py`, both kept
+environments): sdcflows 2.17.1's own `Flatten`, `_sorted_pe` and `ConvertWarp` on 13 flattening
+cases (3D and 4D, int16 with and without scaling, big-endian float32, float64 with a repetition
+time, one volume, five axes, `max_trs` 0, -1, 2, 3 and 50, lists of unequal lengths, `.nii` and
+dotted names), nine phase-encoding orders and eight warps (5D and 4D, float32, float64, scaled
+int16, big-endian, oblique, without sform, one slice): names, metadata and uncompressed bytes
+identical, the same errors.
+
 ## The field map's registration to the EPI (part B)
 
 `coeff2epi_workflow` is sdcflows' `init_coeff2epi_wf` (`python/larmorx/sdcflows/registration.py`;
@@ -300,7 +324,8 @@ above `atlas_threshold` (`Binarize`).
 | `t1w_inversion=False` | `t1w_inversion` | accepted and unused, as in sdcflows |
 | `prior_file=None` | (`data/fmap_atlas.nii.gz`) | a larmorx addition: another prior image (tests); by default sdcflows' atlas (`fmap_atlas()`) |
 | `ants_random_seed=None` | the environment's `ANTS_RANDOM_SEED` | as `coeff2epi_workflow` |
-| `niworkflows_version="1.15.4"`, `numpy_version="2.5.4"`, `scipy_version="1.18.1"`, `nilearn_version="0.14.1"`, `volreg_implementation="auto"`, `upstream_defects="fix"`, `n_threads=1`, `out_dir` | | the libraries' arithmetic where their releases differ (fMRIPrep 25.2.6's image: `"1.15.2"`, `"2.2.6"`, `"1.15.2"`, `"0.11.1"`); the nodes' folders under `out_dir/syn_preprocessing_wf` |
+| `niworkflows_version="1.15.4"`, `numpy_version="2.5.4"`, `scipy_version="1.18.1"`, `nilearn_version="0.14.1"`, `volreg_implementation="auto"`, `upstream_defects="fix"`, `n_threads=1`, `out_dir` | | the libraries' arithmetic where their releases differ (fMRIPrep 25.2.6's image: `"1.15.2"`, `"2.2.6"`, `"1.15.2"`, `"0.11.1"`); the nodes' folders under `out_dir/<name>` |
+| `name="syn_preprocessing_wf"` | `name` | the workflow's folder; fMRIPrep's is `syn_preprocessing_<sanitized_id>` |
 | → `SynPreprocessingResult(epi_ref, epi_mask, anat_ref, anat_mask, sd_prior, epi_reference, deob_epi, sampling_ref, epi2anat_xfm, files, commands)` | `outputnode` | `epi_ref` is `(file, the first input's metadata)` (`_merge_meta`); `commands`: nipype's lines |
 
 | Helper | sdcflows | Notes |
@@ -417,6 +442,7 @@ sdcflows' `FieldmapEstimation.get_workflow` (`fieldmaps.py`), `workflows/base.py
 | `estimator_workflow(estimator, set_inputs=True, *, upstream_defects="fix", **kwargs)` → `EstimatorWorkflow(name, method, function, options, inputs)`; `FieldmapEstimation.get_workflow(...)` | `FieldmapEstimation.get_workflow` | the workflow by method: `fmap_workflow` (mode `phasediff` or `mapped`), `topup_workflow`, `syn_sdc_workflow`; named `wf_<sanitized_id>`; the keyword arguments each takes (`workflow_options()`: sdcflows' and larmorx's own, such as `wiring`, `fsldir`, `numpy_version`, the implementations), the others left for the other workflows as sdcflows' `**kwargs` (none takes it: SDC-22); `set_inputs`: the magnitudes and `(path, metadata)` field maps of a field-map estimator (absolute paths; 2.17.1's `FileNotFoundError` "File path <...> does not exist, is a broken link, or it is not a file" first), every source and its metadata for PEPOLAR, nothing for fieldmap-less; the first workflow is kept by the estimator and returned again (sdcflows' `_wf`) |
 | `EstimatorWorkflow.run(out_dir=None, **inputs)` | running the workflow | the inputs given replace those set (nipype's connections to its `inputnode`); a missing one is a `ValueError` naming it; the files in `out_dir/<name>` |
 | `check_readout(estimator, *, use_metadata_estimates=False)` | the loop at the top of `init_fmap_preproc_wf` | every `bold`, `dwi`, `epi`, `sbref`, `asl`, `m0scan` source: `RuntimeError("Missing readout timing information for <path>.")` from `get_trt`'s `ValueError` |
+| `build_workflows(estimators, *, omp_nthreads, use_metadata_estimates=False, fallback_total_readout_time=None, sloppy=False, debug=False, upstream_defects="fix", n_threads=1, **kwargs)` → `[EstimatorWorkflow]` | `init_fmap_preproc_wf`'s graph, built and not run | for each estimator in turn its readout check (without a fallback) and its workflow, with the options `fmap_preproc_workflow` gives it: the errors sdcflows raises while it builds (the `RuntimeError` of a missing readout time, fMRIPrep's exit status 65; the `FileNotFoundError` of a field-map file; SDC-22's `TypeError`) come from here, in sdcflows' order; the workflows stay with the estimators (sdcflows' cache), so `fmap_preproc_workflow` runs these; larmorprepx's `plan_fieldmap_estimation` calls it |
 | `fmap_preproc_workflow(estimators, *, omp_nthreads, output_dir, subject=None, use_metadata_estimates=False, fallback_total_readout_time=None, sloppy=False, debug=False, name="fmap_preproc_wf", inputs=None, out_path_base="sdcflows", work_dir=None, upstream_defects="fix", n_threads=1, **kwargs)` → `FmapPreprocResult(fmap, fmap_coeff, fmap_ref, fmap_mask, fmap_id, method, estimators)` | `init_fmap_preproc_wf` | the readout checks of every estimator before any work (without a fallback; sdcflows builds the graph first), then each estimator's workflow (`work_dir/<name>/wf_<id>`) and its derivatives (coefficients and mask written; named by the sources other than `T1w`/`T2w`, with every source's metadata); `inputs[<sanitized_id>]` is the `in_<sanitized_id>` node fMRIPrep feeds (PEPOLAR `in_data`/`metadata`, without them the sources; fieldmap-less: `syn_preprocessing_workflow`'s five outputs); the outputs one per estimator in their order (`fmap_coeff`: each estimator's tuple, nipype's `no_flatten`); `subject` unused, as in sdcflows; `out_path_base` `''` for fMRIPrep's derivatives |
 | `fmap_derivatives_workflow(source_files, fieldmap, fmap_ref, fmap_coeff=None, fmap_mask=None, fmap_meta=(), *, output_dir, bids_fmap_id=None, custom_entities=None, write_coeff=False, write_mask=False, out_path_base="sdcflows", out_dir=None, upstream_defects="fix", n_threads=1)` → `FmapDerivativesResult(fieldmap, fmap_ref, fmap_coeff, fmap_mask, merge_fmap, sinks)` | `init_fmap_derivatives_wf` | `merge_fmap` (`MergeSeries`), `ds_reference` (`desc-epi` or `desc-magnitude`: `_getsourcetype`), `ds_fieldmap` (`desc-preproc`, the sidecar's `Units`, `B0FieldIdentifier`, `RawSources`, `AnatomicalReference`, `IntendedFor` (`_selectintent`), `AssociatedCoefficients`), `ds_mask` (`desc-brain_mask`), `ds_coeff` (`desc-coeff[N]`: `_gendesc`); the `fmapid` entity is the identifier without non-alphanumeric characters |
 | `gendesc`, `getname`, `getsourcetype`, `selectintent` | `_gendesc`, `_getname`, `_getsourcetype`, `_selectintent` | |
@@ -462,6 +488,8 @@ changed) a result. Rules A to D and the evidence:
 | SDC-20 | `get_identifier`'s `KeyError` for an unknown `by` is the literal text `'{by}'` (a raw string, not an f-string) | the table's name (rule A for the message) | `get_identifier` |
 | SDC-21 | the files whose `B0FieldIdentifier` is a list are found by a case-insensitive regular-expression search of *every* filter: subject `01` also matches `010` and `101`, `part-mag` matches `part-imag`, and the identifier `pe` matches `"PE"`, so other subjects' or identifiers' files join the estimator | exact filters and the identifier a member of the list (rule A) | `find_estimators` |
 | SDC-22 | `get_workflow` and `init_fmap_preproc_wf` pass every keyword argument on to the estimator's `init_*_wf`, which ignores the ones it does not take: a misspelt option (`slopy=True`) is ignored without a word | a `TypeError` for an argument no estimator workflow takes (rule B); the others are passed to the workflows that take them, as sdcflows does | `estimator_workflow`, `fmap_preproc_workflow` |
+| SDC-23 | `init_3dQwarp_wf` connects `inputnode.in_reference` to the reference's resampling, a field its `inputnode` does not have (`in_data`, `metadata`): its `fmap_ref` can never be computed | (the workflow waits for `3dQwarp`: `NotImplementedError`); when ported, a clear error (rule B) | `qwarp_workflow` |
+| SDC-24 | `_qwarp2ants` squeezes every axis of length one before it adds the vector axis: the warp of a one-slice (or one-row) image loses that spatial axis and becomes a 4D image ANTs does not read as a displacement field | only the axes after the third dropped (rule A) | `qwarp2ants` |
 
 fMRIPrep 25.2.6 reaches none of them on its own paths (it reconstructs fields with its own
 `ReconstructFieldmap` on the field map's grid, passes FSL's letters to `TOPUPCoeffReorient`,

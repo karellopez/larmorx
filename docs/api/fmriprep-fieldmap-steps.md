@@ -188,3 +188,50 @@ filters, with their log messages; `collect_fieldmaps` on sdcflows' eight own run
 the 23 fMRIPrep oracle runs: the estimators set up, the "Several fieldmaps" and "estimated with
 the following" lines of each `fmriprep.log` and its `fmap_preproc_wf/wf_*` folders, identical
 (fMRIPrep 25.2.6's image, pybids 0.20.0, sdcflows 2.15.1: `reproduce`).
+
+## larmorprepx: the field-map estimation stage of a subject
+
+`larmorx.pipelines.larmorprepx.estimators` also holds fMRIPrep 25.2.7's (= 25.2.6's)
+field-map estimation stage of `init_single_subject_wf` (`workflows/base.py`, from
+`fmap_cache = {}` to the BOLD workflows): the caller of sdcflows' `init_fmap_preproc_wf`
+([`lx.sdcflows.fmap_preproc_workflow`](sdcflows-fieldmap.md)). It is split as fMRIPrep's graph
+is: what is set up when the graph is built (the **plan**: its checks, messages and inputs) and
+what runs with the anatomical workflow's outputs (**run**), into the six field-map buffers every
+BOLD workflow reads (`FieldmapEstimates`, the input of `bold_fit_fieldmap` and
+`resampling_fieldmap` above).
+
+| larmorx | fMRIPrep | Notes |
+|---|---|---|
+| `precomputed_fieldmaps(derivatives, subject, *, logger=None)` → `{fmapid: {"fieldmap", "coeffs", "magnitude"}}` | `fmap_cache` (`--derivatives`) | `collect_fieldmaps` of every derivatives folder (a mapping of names to folders, a sequence of folders or one folder) in order, a later folder's identifier replacing an earlier one's; the debug line "Detected precomputed fieldmaps in ... for fieldmap IDs: [...]" |
+| `plan_fieldmap_estimation(all_estimators, fmap_cache=None, *, output_dir, subject, omp_nthreads=1, fallback_total_readout_time=None, debug=False, sloppy=False, exit_on_missing_readout=True, syn_options=None, logger=None, upstream_defects="fix", n_threads=1, **workflow_options)` → `FieldmapEstimationPlan` | the graph's construction | `split_precomputed` (its messages); `init_fmap_preproc_wf` built (`lx.sdcflows.build_workflows`) with `use_metadata_estimates` for `--fallback-total-readout-time estimated`, the fallback when it is a number (an integer too; another string: `ValueError`, fMRIPrep's parser refuses it), `debug` (`--debug fieldmaps`), `omp_nthreads`, `output_dir`, `subject`, `out_path_base=''` (fMRIPrep's data sinks); a missing readout time: fMRIPrep's critical "Missing readout time information. See documentation for `--fallback-total-readout-time`." with the traceback and `SystemExit(65)` (`os.EX_DATAERR`, the same number on Windows; `exit_on_missing_readout=False`: sdcflows' `RuntimeError`); then for each estimator its "Setting up fieldmap" line, a PEPOLAR one's scheme checked (`NotImplementedError('Sophisticated PEPOLAR schemes are unsupported.')`) and its `in_data` and `metadata` set, a fieldmap-less one's `init_syn_preprocessing_wf` (`SynPreprocessingCall`: `name="syn_preprocessing_<sanitized_id>"`, its `bold` and `sbref` sources and their metadata, `omp_nthreads`, `debug=sloppy` (`--sloppy`), `auto_bold_nss=True`, `t1w_inversion=False`); `workflow_options` go to the estimators' workflows (the libraries' versions, the implementations, sdcflows 2.15's `wiring`, `ants_random_seed`, ...), `syn_options` to `syn_preprocessing_workflow`; PIPE-31 |
+| `FieldmapEstimationPlan(all_estimators, estimator_types, precomputed, precomputed_buffers, estimators, preproc_options, inputs, syn_preprocessing, desc, workflows)`, `.needs_anat` | the graph | `estimator_types`: each estimator's method by identifier (fMRIPrep's Jacobian rule: `fieldmap_jacobian`); `precomputed_buffers`: the buffers' first inputs (the precomputed files, `'MISSING'` masks, the identifiers, `'precomputed'`); `estimators`: those left to estimate; `desc`: the boilerplate ("A total of N fieldmaps were found available ..."); `needs_anat`: whether `fmap_select_std` is connected |
+| `FieldmapEstimationPlan.run(*, work_dir, t1w_preproc=None, t1w_mask=None, std2anat_xfm=None, templates=None)` → `FieldmapEstimationResult(estimates, estimator_types, std2anat_xfm, syn_preprocessing, preproc)` | running it | `fmap_select_std` (niworkflows' `KeySelect` of MNI152NLin2009cAsym in `templates`; without `templates`, `std2anat_xfm` is that transform), each `syn_preprocessing_workflow` in `work_dir/<name>` (`t1w_preproc` → `in_anat`, `t1w_mask` → `mask_anat`), `fmap_preproc_workflow` in `work_dir/fmap_preproc_wf` (the PEPOLAR inputs and the preprocessing's five outputs as its `in_<sanitized_id>` inputs), the buffers merged; `work_dir` is the subject's workflow folder (fMRIPrep's `sub_<label>_wf`); a fieldmap-less estimator without the anatomical inputs: `ValueError` |
+| `estimate_fieldmaps(all_estimators, fmap_cache=None, *, output_dir, subject, work_dir, t1w_preproc=None, t1w_mask=None, std2anat_xfm=None, templates=None, **options)` | the stage | `plan_fieldmap_estimation(...)` then `.run(...)` |
+| `merge_buffers(precomputed_buffers, preproc)` → `FieldmapEstimates` | `fmap_buffers` (`Merge(2)`) | the precomputed field maps first, then `init_fmap_preproc_wf`'s outputs (`preproc`: `fmap_preproc_workflow`'s result or `None`); each input's items appended, a coefficient item a list (or one file, as the derivatives held it) |
+| `BUFFER_FIELDS`, `EX_DATAERR`, `SYN_PRIOR_TEMPLATE`, `FMAP_PREPROC_DESC` | | `fmap`, `fmap_ref`, `fmap_coeff`, `fmap_mask`, `fmap_id`, `sdc_method`; 65; `MNI152NLin2009cAsym`; the boilerplate |
+
+| ID | Rule | What fMRIPrep does | larmorx by default | `reproduce` |
+|---|---|---|---|---|
+| PIPE-31 | B | a precomputed field map whose derivatives lack its field map, reference or coefficients file (`collect_fieldmaps` finds only some of the three) stops the graph's construction with a bare `KeyError` (`'fieldmap'`, `'magnitude'` or `'coeffs'`) after the "Precomputed ... found" line | a `ValueError` naming the identifier, the missing files and the files found | fMRIPrep's `KeyError` |
+
+Checked (`validation/investigations/sdcflows-fieldmap-b/check_fmap_stage.py`, shared
+environment): `graph`, fMRIPrep 25.2.7's own code of the stage (its source lines, the same in
+25.2.6's image) executed as `init_single_subject_wf` executes it to build its nipype graph, on
+larmorx's estimators of the 12 fMRIPrep oracle runs with field maps (sdcflows' estimators made
+from the same sources) with fMRIPrep's options and five variants (`estimated`, a fallback of
+0.05, `--debug fieldmaps`, `--sloppy`, the run's own derivatives), a derivatives folder holding
+one of two estimators, PIPE-31 and synthetic cases (a missing readout time: exit status 65; a
+sophisticated PEPOLAR scheme), 85 cases: the log lines, the errors, `init_fmap_preproc_wf`'s
+arguments, the `in_<id>` inputs, each `init_syn_preprocessing_wf`'s arguments and inputs, the
+buffers' first inputs, the data sinks' `out_path_base`, every connection, the boilerplate and the
+estimator types identical; `nodes`, the 12 runs' work folders: the folders fMRIPrep made, the
+PEPOLAR inputs (6 estimators), the fieldmap-less inputs and `fmap_select_std`'s transform (5
+estimators), the six buffers (each `*_merge` node's output) and the log lines identical; `run`,
+`estimate_fieldmaps` end to end on ds005752's direct field map and ds001600's four estimators
+(fMRIPrep's choice): all 25 derivative files byte for byte as sdcflows 2.17.1's own
+`init_fmap_preproc_wf` writes them, and the buffers' files named as the runs' (against fMRIPrep's
+own files, as information: every field-map estimator's brain mask and coefficients identical
+and ds005752's field map too; the magnitude references not (fMRIPrep's N4 ran at four threads
+with glibc's `exp`/`log`), nor ds001600's three phase-difference field maps (their coefficients
+are identical: an open question for the records); the PEPOLAR estimator not, as expected: this
+run used sdcflows 2.17.1's wiring, fMRIPrep 2.15's).

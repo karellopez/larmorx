@@ -697,6 +697,74 @@ workflow it built whatever the later arguments (its cache), and a PEPOLAR estima
 uses the estimator's sources when no inputs are given (the values `get_workflow` sets, and
 sdcflows' app uses).
 
+## fMRIPrep's field-map estimation stage and 3dQwarp's Python steps (relay 13)
+
+**The stage, split as fMRIPrep's graph is.** fMRIPrep's `init_single_subject_wf` decides
+everything about the field maps while it builds its graph: which estimators are precomputed,
+the arguments of `init_fmap_preproc_wf` (and its readout checks, which stop fMRIPrep with exit
+status 65 before anything runs), the PEPOLAR inputs, the fieldmap-less estimators'
+`init_syn_preprocessing_wf`; only then do the anatomical outputs flow in. larmorprepx keeps the
+same two moments: `plan_fieldmap_estimation` (checks, messages, inputs; sdcflows' estimator
+workflows built by `lx.sdcflows.build_workflows`, so `fmap_preproc_workflow` later runs those
+same workflows: sdcflows' cache) and `FieldmapEstimationPlan.run` (the anatomical inputs, the
+preprocessing, the estimation, the buffers). The plan is what is compared with fMRIPrep's graph.
+
+**fMRIPrep's own code as the reference.** The stage is not a function in fMRIPrep: it is ~170
+lines inside `init_single_subject_wf`. `check_fmap_stage.py` runs those lines themselves (taken
+from fMRIPrep 25.2.7's source; byte-identical to 25.2.6's in its image) at module level with a
+stand-in `config`, `anat_fit_wf` and `map_fieldmap_estimation`, so nipype, niworkflows and
+sdcflows build the real graph; on 85 cases (12 oracle runs, 5 option variants each, mixed and
+missing derivatives, synthetic errors) every observable of the graph equals the plan: log lines
+and the critical line's exception, the errors, `init_fmap_preproc_wf`'s arguments, the
+`in_<id>` inputs, the `init_syn_preprocessing_wf` arguments and inputs, the buffers' first
+inputs, every connection, the data sinks' `out_path_base`, the boilerplate. On the 12 runs'
+work folders, the folders fMRIPrep made, the PEPOLAR and fieldmap-less inputs, the transform
+`fmap_select_std` chose and the six buffers' outputs (through `merge_buffers` from
+`fmap_preproc_wf`'s own outputs) are identical too.
+
+**Merge's flattening.** fMRIPrep's buffers are nipype's `Merge(2)`: each input's list is
+extended into the output, so the estimated coefficients stay one list per estimator (sdcflows'
+`no_flatten` merge before), while a precomputed estimator's coefficients are what
+`collect_fieldmaps` found: one file (a string) or a list. Every BOLD step downstream lists an
+item before use (`ReconstructFieldmap`'s `InputMultiObject`; larmorx's `_listify`), so both
+shapes work.
+
+**PIPE-31 (rule B).** A derivatives folder with a field map's preprocessed map and
+coefficients but no reference (or another of the three) makes `collect_fieldmaps` return only
+the keys it found, and fMRIPrep's `fmap['magnitude']` raises a bare `KeyError: 'magnitude'`
+while it builds the graph (after the "Precomputed ... found" line). larmorx raises a
+`ValueError` naming the identifier, the missing files and those found; `reproduce` gives the
+`KeyError` (both checked on four runs' derivatives with the reference removed).
+
+**End to end.** `estimate_fieldmaps` on ds005752's direct field map (about 1 s at 8 threads)
+and ds001600's three phase-difference estimators and its PEPOLAR one (197 s at 8 threads, mostly
+TOPUP's replica) writes the 25 derivative files byte for byte as sdcflows 2.17.1's own
+`init_fmap_preproc_wf` (run in nipype by `check_derivatives.py --sections preproc`), and the
+buffers name the runs' files. Against fMRIPrep's own derivatives (information only): every
+field-map estimator's brain mask and coefficients are identical, and ds005752's field map; the
+magnitude references are not (fMRIPrep's N4 ran at four threads with glibc's `exp`/`log`, the
+reference larmorx follows is one thread with correctly rounded functions), nor ds001600's three
+phase-difference field maps although their coefficients are identical (left for the records
+relay to explain); the PEPOLAR estimator differs as expected (this run used sdcflows 2.17.1's
+wiring, fMRIPrep's is 2.15's).
+
+**3dQwarp's Python steps.** `init_3dQwarp_wf` waits for AFNI's `3dQwarp`, FreeSurfer's
+`mri_robust_template` and niworkflows' `init_enhance_and_skullstrip_bold_wf`
+(`qwarp_workflow` raises `NotImplementedError` before any work); sdcflows itself never builds it
+(`get_workflow` uses `topup` for every PEPOLAR estimator) and fMRIPrep's image has no `3dQwarp`.
+Its Python steps are ported and equal sdcflows' own interfaces (`check_qwarp_steps.py`, both
+environments: names, metadata and uncompressed bytes; errors). Three behaviours worth knowing:
+nipype's `OutputMultiObject` returns a one-item list as its item, so `Flatten` of one 3-D file
+gives a bare `(path, metadata)` pair, which `_sorted_pe` would then index character by character
+(the workflow needs two files anyway; larmorx always returns lists); `_qwarp2ants` names its
+output `_warpfield<name>` because sdcflows passes `'_warpfield'` as `fname_presuffix`'s second
+argument, which is the prefix (kept: rule C, a name); and **SDC-24** (rule A): `np.squeeze`
+drops a spatial axis of length one too, so a one-slice warp `X x Y x 1 x 1 x 3` becomes
+`X x Y x 1 x 3`, which ITK reads as a 4-D scalar image, not a displacement field; larmorx drops
+only the axes after the third. **SDC-23** (rule B when the workflow is ported):
+`init_3dQwarp_wf` connects `inputnode.in_reference`, a field its `inputnode` lacks, so its
+`fmap_ref` can never be computed.
+
 ## Candidates for the register (the part's defects relay decides them)
 
 - **SDC-h** `brain_masker`: a rough mask without a connected component makes the background
@@ -716,6 +784,7 @@ sdcflows' app uses).
   (`intra_modal_merge`), PIPE-20 to PIPE-22 (relay 7) in `lx.transforms` and
   `lx.niworkflows.concatenate_xfms` (PIPE-20's pipeline level in
   `larmorx.pipelines.larmorprepx.fieldmaps`, relay 8), PIPE-23 to PIPE-25 (relays 9 and 11),
-  PIPE-26 to PIPE-30 in `lx.niworkflows.derivatives_data_sink` and SDC-12 to SDC-22 in
-  `lx.sdcflows` (relays 5 to 12); the register's entries and `larmorx_core::defects` wait for
-  the part's defects relay.
+  PIPE-26 to PIPE-30 in `lx.niworkflows.derivatives_data_sink`, PIPE-31 in
+  `larmorx.pipelines.larmorprepx.estimators` (relay 13) and SDC-12 to SDC-24 in `lx.sdcflows`
+  (relays 5 to 13); the register's entries and `larmorx_core::defects` wait for the part's
+  defects relay.

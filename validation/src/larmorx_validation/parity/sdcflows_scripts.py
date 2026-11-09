@@ -13,8 +13,9 @@ Three suites (decision D12 of the part, ``docs/parts/``):
   (``larmorx_core::numpy``), against the environment's SciPy, numpy and scikit-image;
 - ``niworkflows-helpers``: niworkflows' interfaces (``IntraModalMerge``, ``MergeSeries``,
   ``RobustAverage``, ``RegridToZooms``, ``IntensityClip``) and nipype's command lines
-  (``lx.niworkflows``), against niworkflows 1.15.4 and nipype in-process and fMRIPrep 25.2.6's
-  own files;
+  (``lx.niworkflows``), against niworkflows 1.15.3 (the environments' release, whose code on
+  these paths is 1.15.4's, the port's source) and nipype in-process and fMRIPrep 25.2.6's own
+  files;
 - ``sdcflows-estimation``: sdcflows' masks, workflows (direct field maps, PEPOLAR with TOPUP,
   3dQwarp's Python steps, fieldmap-less SyN), the estimators' discovery, the derivatives, the
   correction (``unwarp_workflow``), sdcflows' BIDS app and fMRIPrep's own field-map steps
@@ -43,7 +44,7 @@ script that prints ``STEP <sha256> <name>`` lines (the digest of the originals' 
 the comparison ``<name>``: SciPy's, numpy's or scikit-image's side, ``steplines.py`` beside the
 scripts) gets one more check per line, whether those outputs are the same under both releases.
 A run in ``newest`` first runs the step's cases in the shared environment, twice; the workflow
-scripts carry no step (sdcflows 2.17.1, niworkflows 1.15.4 and nipype are the same in both
+scripts carry no step (sdcflows 2.17.1, niworkflows 1.15.3 and nipype are the same in both
 environments, and the libraries under them have their own), so the step's passes skip them.
 """
 
@@ -570,8 +571,10 @@ ABOUT = {
     "niworkflows-helpers": (
         "niworkflows' helpers and nipype's command lines on the field maps' paths",
         "`lx.niworkflows`, `larmorx._nipype`",
-        "niworkflows 1.15.4 and nipype in-process (sdcflows 2.17.1's calls), and fMRIPrep "
-        "25.2.6's own files and command lines of the oracle runs",
+        "niworkflows 1.15.3 (the environments' release; of its Python files only "
+        "interfaces/confounds.py and the version differ from 1.15.4's, the port's source) and "
+        "nipype 1.12.0 in-process (sdcflows 2.17.1's calls), and fMRIPrep 25.2.6's own files and "
+        "command lines of the oracle runs",
     ),
     "sdcflows-estimation": (
         "sdcflows' field-map estimation and correction, its BIDS app and fMRIPrep's own "

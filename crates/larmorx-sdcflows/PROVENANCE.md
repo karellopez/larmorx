@@ -198,3 +198,21 @@ on these paths in 25.2.6) `config.py` (`execution.init`'s ignore patterns), `wor
 (`map_fieldmap_estimation`, `get_estimator`, `init_single_subject_wf`'s precomputed field maps,
 "Setting up fieldmap" and PEPOLAR checks), `utils/bids.py` (`collect_fieldmaps`, `_get_layout`)
 and `data/fmap_spec.json` (its queries, as `FMAP_SPEC`).
+
+Into `python/larmorx/sdcflows/base.py` and `outputs.py` (relay 12): sdcflows 2.17.1 (Apache-2.0)
+`fieldmaps.py` (`FieldmapEstimation.get_workflow`; 2.15.1/2.15.2 lack its file check),
+`workflows/base.py` (`init_fmap_preproc_wf`) and `workflows/outputs.py`
+(`init_fmap_derivatives_wf`, the `DerivativesDataSink` subclass's `out_path_base`, `_gendesc`,
+`_getname`, `_getsourcetype`, `_selectintent`; both the same in 2.15.1 and 2.15.2). Into
+`python/larmorx/niworkflows/bids.py`: niworkflows 1.15.4 (Apache-2.0; the same in 1.15.2 and
+1.15.3) `interfaces/bids.py` (`DerivativesDataSink`, `DEFAULT_DTYPES`, `_get_tf_resolution`),
+`utils/misc.py` (`_copy_any`, `unlink`), `utils/images.py` (`unsafe_write_nifti_header_and_data`,
+`set_consumables`); nibabel 5.4.2 (MIT) `nifti1.py`/`analyze.py` (`get_xyzt_units`,
+`set_xyzt_units`, `get_zooms`, `set_zooms`, `get_slope_inter`, `set_slope_inter`,
+`set_data_dtype`, `write_to`, `may_contain_header`), `arrayproxy.py` (the scaling defaults),
+`volumeutils.py` (`array_to_file`'s seek), `cifti2/parse_cifti2.py` (the CIFTI-2 intent codes);
+TemplateFlow 25.1.2's `api.templates()` list (as `STANDARD_SPACES`). Into
+`python/larmorx/bids/writing.py`: pybids 0.22.0 (MIT; = 0.20.0) `layout/writing.py`
+(`build_path`, `_expand_options`, `_expand_entities`). Into `python/larmorx/_nipype.py`: nipype
+1.12.0 (Apache-2.0) `utils/filemanip.py` (`copyfile` with `copy=True`, `get_related_files`,
+`related_filetype_sets`).

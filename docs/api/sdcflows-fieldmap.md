@@ -384,7 +384,7 @@ on a [`lx.bids.BIDSLayout`](bids.md) instead of pybids'.
 | larmorx | sdcflows | Notes |
 |---|---|---|
 | `FieldmapFile(path, *, metadata=None, find_meta=True, sdcflows_version="2.17.1")` | `fieldmaps.FieldmapFile` | path checks (missing, not NIfTI, suffix not in `MODALITIES`), entities (`parse_file_entities`), the sidecar beside it (no inheritance) updated with `metadata` (the same dictionary object kept when no sidecar is read), `bids_root` (niworkflows' `relative_to_root`), T1w/T2w's `TotalReadoutTime = 0.0`, the metadata each suffix needs (`MetadataError`), the readout-time warning (`larmorx.sdcflows.fieldmaps`, silent at sdcflows' `ERROR` level); an unreadable header in the readout time is nibabel's `ImageFileError`/`FileNotFoundError` text, not a `ValueError`; `sdcflows_version="2.15"` (fMRIPrep 25.2.6's): a broken link refused |
-| `FieldmapEstimation(sources, *, bids_id=None, registry=None, sdcflows_version="2.17.1")` → `.method`, `.bids_id`, `.sanitized_id`, `.sources`, `.paths()` | `fieldmaps.FieldmapEstimation` | the strategy from the suffixes (missing `phase1`/`phase2` and magnitudes found by name), the common `B0FieldIdentifier` or an automatic name, registered in `registry`; sdcflows' errors and messages; the method cannot change, the identifier never (attrs' setters). `get_workflow`: with `fmap_preproc_workflow` (the next relay) |
+| `FieldmapEstimation(sources, *, bids_id=None, registry=None, sdcflows_version="2.17.1")` → `.method`, `.bids_id`, `.sanitized_id`, `.sources`, `.paths()` | `fieldmaps.FieldmapEstimation` | the strategy from the suffixes (missing `phase1`/`phase2` and magnitudes found by name), the common `B0FieldIdentifier` or an automatic name, registered in `registry`; sdcflows' errors and messages; the method cannot change, the identifier never (attrs' setters). `get_workflow(set_inputs=True, **kwargs)`: `estimator_workflow` (below) |
 | `EstimatorType`, `MODALITIES`, `MetadataError`, `ImageFileError` | the same | |
 | `FieldmapRegistry()` (`.estimators`, `.intents`, `.clear()`), `REGISTRY` | the module globals `_estimators`, `_intents` | every function takes `registry=None`: `REGISTRY`, which behaves as sdcflows' globals (fMRIPrep's subjects share it: the `auto_` names go on) |
 | `bidict`, `EstimatorRegistry` (`.sources`, `.get_key(value)`, `.add(value)`) | `utils/bimap.py` | `add` takes the *last* free `auto_` index in `range(len(used) + 1)` (SDC-18, kept) |
@@ -404,6 +404,32 @@ with fMRIPrep's and sdcflows' tests' indexers, over sdcflows' tests' argument se
 sessions, `fmapless`, `force_fmapless`, `anat_suffix`); every layout call sdcflows makes, replayed
 on larmorx's index, gives pybids' result; fMRIPrep's image's sdcflows 2.15.1 with pybids 0.20.0
 too; and sdcflows 2.17.1's own BIDS-app runs found the estimators larmorx finds.
+
+## The estimators' workflows and their derivatives (part B)
+
+sdcflows' `FieldmapEstimation.get_workflow` (`fieldmaps.py`), `workflows/base.py`
+(`init_fmap_preproc_wf`) and `workflows/outputs.py` (`init_fmap_derivatives_wf`, 2.17.1 = 2.15.1
+= 2.15.2) in `python/larmorx/sdcflows/base.py` and `outputs.py`, the files written by niworkflows'
+`DerivativesDataSink` ([`lx.niworkflows.derivatives_data_sink`](niworkflows-helpers.md)).
+
+| larmorx | sdcflows | Notes |
+|---|---|---|
+| `estimator_workflow(estimator, set_inputs=True, *, upstream_defects="fix", **kwargs)` → `EstimatorWorkflow(name, method, function, options, inputs)`; `FieldmapEstimation.get_workflow(...)` | `FieldmapEstimation.get_workflow` | the workflow by method: `fmap_workflow` (mode `phasediff` or `mapped`), `topup_workflow`, `syn_sdc_workflow`; named `wf_<sanitized_id>`; the keyword arguments each takes (`workflow_options()`: sdcflows' and larmorx's own, such as `wiring`, `fsldir`, `numpy_version`, the implementations), the others left for the other workflows as sdcflows' `**kwargs` (none takes it: SDC-22); `set_inputs`: the magnitudes and `(path, metadata)` field maps of a field-map estimator (absolute paths; 2.17.1's `FileNotFoundError` "File path <...> does not exist, is a broken link, or it is not a file" first), every source and its metadata for PEPOLAR, nothing for fieldmap-less; the first workflow is kept by the estimator and returned again (sdcflows' `_wf`) |
+| `EstimatorWorkflow.run(out_dir=None, **inputs)` | running the workflow | the inputs given replace those set (nipype's connections to its `inputnode`); a missing one is a `ValueError` naming it; the files in `out_dir/<name>` |
+| `check_readout(estimator, *, use_metadata_estimates=False)` | the loop at the top of `init_fmap_preproc_wf` | every `bold`, `dwi`, `epi`, `sbref`, `asl`, `m0scan` source: `RuntimeError("Missing readout timing information for <path>.")` from `get_trt`'s `ValueError` |
+| `fmap_preproc_workflow(estimators, *, omp_nthreads, output_dir, subject=None, use_metadata_estimates=False, fallback_total_readout_time=None, sloppy=False, debug=False, name="fmap_preproc_wf", inputs=None, out_path_base="sdcflows", work_dir=None, upstream_defects="fix", n_threads=1, **kwargs)` → `FmapPreprocResult(fmap, fmap_coeff, fmap_ref, fmap_mask, fmap_id, method, estimators)` | `init_fmap_preproc_wf` | the readout checks of every estimator before any work (without a fallback; sdcflows builds the graph first), then each estimator's workflow (`work_dir/<name>/wf_<id>`) and its derivatives (coefficients and mask written; named by the sources other than `T1w`/`T2w`, with every source's metadata); `inputs[<sanitized_id>]` is the `in_<sanitized_id>` node fMRIPrep feeds (PEPOLAR `in_data`/`metadata`, without them the sources; fieldmap-less: `syn_preprocessing_workflow`'s five outputs); the outputs one per estimator in their order (`fmap_coeff`: each estimator's tuple, nipype's `no_flatten`); `subject` unused, as in sdcflows; `out_path_base` `''` for fMRIPrep's derivatives |
+| `fmap_derivatives_workflow(source_files, fieldmap, fmap_ref, fmap_coeff=None, fmap_mask=None, fmap_meta=(), *, output_dir, bids_fmap_id=None, custom_entities=None, write_coeff=False, write_mask=False, out_path_base="sdcflows", out_dir=None, upstream_defects="fix", n_threads=1)` → `FmapDerivativesResult(fieldmap, fmap_ref, fmap_coeff, fmap_mask, merge_fmap, sinks)` | `init_fmap_derivatives_wf` | `merge_fmap` (`MergeSeries`), `ds_reference` (`desc-epi` or `desc-magnitude`: `_getsourcetype`), `ds_fieldmap` (`desc-preproc`, the sidecar's `Units`, `B0FieldIdentifier`, `RawSources`, `AnatomicalReference`, `IntendedFor` (`_selectintent`), `AssociatedCoefficients`), `ds_mask` (`desc-brain_mask`), `ds_coeff` (`desc-coeff[N]`: `_gendesc`); the `fmapid` entity is the identifier without non-alphanumeric characters |
+| `gendesc`, `getname`, `getsourcetype`, `selectintent` | `_gendesc`, `_getname`, `_getsourcetype`, `_selectintent` | |
+| (none) | `init_fmap_reports_wf`, `FieldmapReportlet` | the figures belong to larmorprepx's reports part (decision D7): none are written |
+
+Checked (`validation/investigations/sdcflows-fieldmap-b/check_derivatives.py`): `workflow`, every
+estimator of the fMRIPrep oracle runs (19, fMRIPrep's choice of estimators, `out_path_base=''`)
+and of sdcflows 2.17.1's own BIDS-app runs (15), larmorx's estimators with the estimation outputs
+of the run's work folder: every derivative file (names, uncompressed and gzip bytes, sidecars)
+identical in both kept environments; `preproc`, sdcflows 2.17.1's own `init_fmap_preproc_wf`
+(nipype, its programs through the oracle cache) against `fmap_preproc_workflow` on ds005752's
+direct field map and on ds001600's three phase-difference estimators and its PEPOLAR one (2.17.1's
+wiring, TOPUP's replica): all 25 derivative files byte for byte.
 
 ## Upstream defects (D13)
 
@@ -435,6 +461,7 @@ changed) a result. Rules A to D and the evidence:
 | SDC-19 | the `B0FieldIdentifier` estimators are built in a Python `set`'s order, which changes between processes | pybids' natural order of the identifiers, in both modes (nondeterminism is never reproduced) | `find_estimators` |
 | SDC-20 | `get_identifier`'s `KeyError` for an unknown `by` is the literal text `'{by}'` (a raw string, not an f-string) | the table's name (rule A for the message) | `get_identifier` |
 | SDC-21 | the files whose `B0FieldIdentifier` is a list are found by a case-insensitive regular-expression search of *every* filter: subject `01` also matches `010` and `101`, `part-mag` matches `part-imag`, and the identifier `pe` matches `"PE"`, so other subjects' or identifiers' files join the estimator | exact filters and the identifier a member of the list (rule A) | `find_estimators` |
+| SDC-22 | `get_workflow` and `init_fmap_preproc_wf` pass every keyword argument on to the estimator's `init_*_wf`, which ignores the ones it does not take: a misspelt option (`slopy=True`) is ignored without a word | a `TypeError` for an argument no estimator workflow takes (rule B); the others are passed to the workflows that take them, as sdcflows does | `estimator_workflow`, `fmap_preproc_workflow` |
 
 fMRIPrep 25.2.6 reaches none of them on its own paths (it reconstructs fields with its own
 `ReconstructFieldmap` on the field map's grid, passes FSL's letters to `TOPUPCoeffReorient`,

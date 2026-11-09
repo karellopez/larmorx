@@ -651,6 +651,52 @@ sdcflows 2.15.1 and fMRIPrep 25.2.6 inside fMRIPrep's image (index, wrangler, fM
 selection) against `pybids_version="0.20.0"`, `sdcflows_version="2.15"`, `reproduce`: identical.
 Logs `oracles/logs/fmapb-r11-est-*.log`.
 
+## The derivatives and `init_fmap_preproc_wf` (relay 12)
+
+niworkflows' `DerivativesDataSink` (`lx.niworkflows.derivatives_data_sink`, with pybids'
+`build_path` in `lx.bids`), sdcflows' `init_fmap_derivatives_wf`, `FieldmapEstimation.get_workflow`
+and `init_fmap_preproc_wf` (`lx.sdcflows`); checked by
+`validation/investigations/sdcflows-fieldmap-b/check_derivatives.py`.
+
+**Every field-map derivative of the oracle runs goes through the header fix.** The 135 sinks of
+the fMRIPrep runs (fMRIPrep 25.2.6's image) and of sdcflows 2.17.1's own runs all rewrite their
+file instead of copying it: the estimators' files carry nibabel's defaults (`xyzt_units` 10, mm
+and seconds, which a derivative that is not `bold` must not have) or xform codes other than 1.
+So the data sink recomputes every quaternion with nibabel's `set_qform`, whose numpy SVD and
+`eigh` follow the LAPACK under numpy: fMRIPrep's image (numpy 2.2.6, LAPACK 3.12.0) and the
+newest environment (LAPACK 3.12.1) give different last bits on one of the 19 fMRIPrep estimators
+(ds006736's PEPOLAR coefficients: `quatern_d` -1.4631351e-16 against -1.463135e-16), so the
+check selects 3.12.0 for the image's files (`lx.io.nibabel_header.use_lapack`); then all 135
+files are identical, their gzip bytes included (Python's `gzip` at level 9 with no name and a
+zero time stamp, on the same zlib). The copy path (`_copy_any`, nipype's hard link) and the data
+type coercion are reached only by synthetic cases (38, against niworkflows' own sink): none of
+the estimators' masks needs a cast.
+
+**The derivatives workflow and `init_fmap_preproc_wf` are sdcflows' end to end.** With the
+estimators larmorx finds (fMRIPrep's choice for its runs, sdcflows' app's search for its own) and
+the estimation outputs of each run's work folder, `fmap_derivatives_workflow` writes the 34
+estimators' files (field, reference, mask, coefficients, sidecar) byte for byte as the runs did;
+`RawSources` holds the sources' paths as the program saw them (`/data/...` in fMRIPrep's image).
+sdcflows' own `init_fmap_preproc_wf`, run in nipype with its programs through the oracle cache,
+and `fmap_preproc_workflow` give the same 25 derivative files on ds005752's direct field map and
+on ds001600's four estimators (three phase differences and a PEPOLAR pair on two grids, 2.17.1's
+wiring): 227 s for sdcflows' graph at one thread, 198 s for larmorx at eight (most of it TOPUP's
+replica). The sidecar's `IntendedFor` is the sorted union of every source's (T1w and T2w
+included); its `RawSources`, like the derivatives' names, leaves the anatomical sources out in
+`init_fmap_preproc_wf` and keeps them in sdcflows' app (`init_sdcflows_wf`).
+
+**Defects found (rules A to D).** PIPE-26 (nondeterminism: the order of two or more list-valued
+entity inputs is a Python `set`'s), PIPE-27 (rule A, a message: the data type warning names the
+original type twice), PIPE-28 (rule B: `compress` shorter than the files fails with an
+`IndexError`), PIPE-29 (the rule for undefined conversions: out-of-range values and NaN cast to an
+integer type), PIPE-30 (rule A: a `RepetitionTime` input for an image that is not 4-D stops the
+sink with nibabel's `HeaderDataError`), SDC-22 (rule B: an option no estimator workflow takes is
+ignored without a word). Kept and documented: sdcflows' `get_workflow` returns the first
+workflow it built whatever the later arguments (its cache), and a PEPOLAR estimator inside
+`init_fmap_preproc_wf` takes its inputs from the `in_<id>` node, which fMRIPrep fills; larmorx
+uses the estimator's sources when no inputs are given (the values `get_workflow` sets, and
+sdcflows' app uses).
+
 ## Candidates for the register (the part's defects relay decides them)
 
 - **SDC-h** `brain_masker`: a rough mask without a connected component makes the background
@@ -669,5 +715,7 @@ Logs `oracles/logs/fmapb-r11-est-*.log`.
 - PIPE-18 and PIPE-19 (above) are already numbered and switched in `lx.niworkflows`
   (`intra_modal_merge`), PIPE-20 to PIPE-22 (relay 7) in `lx.transforms` and
   `lx.niworkflows.concatenate_xfms` (PIPE-20's pipeline level in
-  `larmorx.pipelines.larmorprepx.fieldmaps`, relay 8); the register's entries and
-  `larmorx_core::defects` wait for the part's defects relay.
+  `larmorx.pipelines.larmorprepx.fieldmaps`, relay 8), PIPE-23 to PIPE-25 (relays 9 and 11),
+  PIPE-26 to PIPE-30 in `lx.niworkflows.derivatives_data_sink` and SDC-12 to SDC-22 in
+  `lx.sdcflows` (relays 5 to 12); the register's entries and `larmorx_core::defects` wait for
+  the part's defects relay.

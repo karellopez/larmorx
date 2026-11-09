@@ -57,9 +57,20 @@ layout.get(suffix="epi", IntendedFor=lx.bids.Query.REQUIRED)
   breaks them by plain string order. Not reachable on a valid dataset (BIDS labels are unique).
 - Not ported (nothing on fMRIPrep's or sdcflows' field-map paths calls them): file associations
   (`get_associations`, `get_fieldmap`, `get_nearest`, `get_bval`, `get_bvec`, `get_tr`),
-  `build_path`, `write_to_file`, `copy_files`, `get_collections`, `to_df`, `clone`, `save`/`load`
+  `write_to_file`, `copy_files`, `get_collections`, `to_df`, `clone`, `save`/`load`
   and database files, the `bids-schema` configuration, `BIDSImageFile.get_image`,
   `BIDSDataFile.get_df`, `get_dataset_description`.
+
+## `build_path`: a file's path from entities
+
+`lx.bids.build_path(entities, path_patterns, strict=False)` is pybids 0.22.0's
+`layout/writing.build_path` (the same in 0.20.0): the first pattern the entities match (`{name}`,
+`{name<a|b>}` for valid values with `[ab]` alternatives, `{name|default}`, optional `[...]`
+parts kept when they hold a given entity; entities `None` or empty dropped, zeros kept; list
+values give one path per combination, the first entity's values varying slowest), or `None`.
+niworkflows' `DerivativesDataSink` names every derivative with it
+([`lx.niworkflows.derivatives_data_sink`](niworkflows-helpers.md)); checked through it on every
+field-map derivative of the oracle runs and on pybids' own examples (the golden case).
 
 ## Validation
 

@@ -35,7 +35,8 @@ Differences, each on purpose:
   ported: :class:`BIDSLayoutIndexer` raises ``NotImplementedError`` (fMRIPrep and sdcflows index
   with ``validate=False``; the root's checks of ``BIDSLayout(validate=True)`` are ported).
 - pybids' file associations (``get_associations``, ``get_fieldmap``, ``get_nearest``), its BIDS
-  schema configuration (``config='bids-schema'``), ``build_path``/``write_to_file``,
+  schema configuration (``config='bids-schema'``), ``write_to_file`` (``build_path`` is in
+  :mod:`larmorx.bids.writing`),
   ``get_collections``, ``to_df`` and database files are not ported: nothing on fMRIPrep's and
   sdcflows' field-map paths calls them.
 """

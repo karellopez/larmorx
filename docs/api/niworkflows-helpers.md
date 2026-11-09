@@ -158,9 +158,64 @@ niworkflows, nipype and nilearn in both kept environments on seeded inputs (its 
 section: every row of `ValidateImage`'s table, oblique, plumb, LPS, 4D and non-finite images for
 `GenerateSamplingReference` with and without its options).
 
+## `derivatives_data_sink`: `DerivativesDataSink` (the derivatives' names and files)
+
+`python/larmorx/niworkflows/bids.py`: niworkflows 1.15.4's `interfaces/bids.DerivativesDataSink`
+(the same in 1.15.2, fMRIPrep 25.2.6's image, and 1.15.3) with its `utils/misc._copy_any`,
+`utils/images.unsafe_write_nifti_header_and_data` and `set_consumables`, `data/nipreps.json`
+(the derivatives' entities and patterns, [`lx.bids`](bids.md)), pybids 0.22.0's
+`parse_file_entities` and `build_path` (`lx.bids.build_path`), nipype 1.12.0's `copyfile` and
+nibabel 5.4.2's header setters and writer.
+
+| larmorx | niworkflows | Notes |
+|---|---|---|
+| `derivatives_data_sink(in_file, source_file, ...)` → `DerivativesDataSinkResult(out_file, out_meta, compression, fixed_hdr)` (`.out`: the path for one file, as nipype passes it on) | `DerivativesDataSink().run()` | one call is one run of the interface |
+| `in_file`, `source_file` | the same | a missing `in_file` is a `FileNotFoundError` (nipype's trait check) |
+| `base_directory=None` | the same | `None`: the current directory (nipype's node directory) |
+| `out_path_base="niworkflows"` | the class attribute (sdcflows' subclass: `'sdcflows'`; fMRIPrep sets `''` on its sinks) | |
+| `check_hdr=True`, `compress=()`, `data_dtype=None`, `dismiss_entities=()`, `meta_dict=None` | the inputs of the same names | `compress`: one value for every file, or one per file (PIPE-28); `data_dtype`: a numpy type, `'source'` (the first source's), or by default the suffix's (`DEFAULT_DTYPES`: `mask` uint8, `dseg` int16, `probseg` and `boldref` float32) |
+| `allowed_entities=()`, `entities={...}` | the constructor's `allowed_entities` and the entity inputs (`desc`, `suffix`, `datatype`, `space`, `resolution`, `fmapid`, ..., and the allowed ones) | a name that is neither (`ValueError`) belongs in `metadata` |
+| `metadata={...}`, `init_metadata={...}` | the metadata inputs set on the interface, and the constructor's other keyword arguments | the sidecar: `meta_dict`, then `init_metadata`, then `metadata`; only `metadata`'s `RepetitionTime` sets the header's fourth voxel size, as niworkflows' input does |
+| `standard_spaces=STANDARD_SPACES`, `template_metadata=None`, `templateflow_version=None` | TemplateFlow's `templates()` and `get_metadata(space)`, its version | TemplateFlow 25.1.2's list (both kept environments'); a standard space's `resolution` needs the template's `template_description.json` metadata (`NotImplementedError` without it: TemplateFlow comes with larmorx's templates part); `get_tf_resolution(space, resolution, metadata, version)` gives the text |
+| `copy_any(src, dst)` | `utils/misc._copy_any` | gzip level 9, no name, time stamp 0; plain files: a hard link to the real file, else a copy, with the related `.mat`, `.img`, `.HEAD` files (nipype's `copyfile`) |
+
+What it does, as niworkflows: the entities common to every source (`relative_to_root` of each,
+with pybids' `bids` and `derivatives` configurations and `nipreps.json`'s), less
+`dismiss_entities`, the input files' extensions (compressed or not by `compress`), the entity
+inputs on top; `resolution: native` dropped with a `space`; custom entities inserted before the
+suffix of every pattern; the first `nipreps.json` pattern that builds a path for each file
+(`ValueError` "Could not build path ..." or "Input files (n) not matched ..."). A file already
+at its destination is left. A NIfTI file (nibabel's `load` gives a `Nifti1Image`: the NIfTI-1
+magic `ni1`/`n+1`, or a NIfTI-2 header that is not CIFTI-2) is rewritten when `check_hdr` finds
+its xform codes (1, or 4 for a standard `space`, 2 for another), units (`mm` kept or set,
+`sec` for `bold`, else none) or voxel sizes not a derivative's (the qform and sform set from its
+affine with nibabel's arithmetic, its scaling and data offset kept, its stored data copied), or
+when its data type is not `data_dtype` (the scaled data rounded and cast for an integer type,
+scaling 1 and 0); otherwise it is copied. One file gets a sidecar `<name>.json` with the metadata
+(keys sorted, two-space indents). The files are niworkflows' bytes: header block, extensions,
+padding and data the same, and the gzip stream Python's (the compressed bytes are the platform's
+zlib's; the contents are the same everywhere).
+
+Checked (`validation/investigations/sdcflows-fieldmap-b/check_derivatives.py`): every
+field-map sink of the fMRIPrep oracle runs (95 files of 19 estimators, fMRIPrep 25.2.6's image)
+and of sdcflows 2.17.1's own BIDS-app runs (75 files of 15 estimators), given each node's own
+inputs: every name, uncompressed and gzip byte and sidecar identical (every one of them fixed the
+header: the estimators' files carry `sec` units or other codes); and 38 edge cases against
+niworkflows' own sink in this environment (`synthetic`: copies and (de)compression with the
+related `.mat`, xform codes and oblique affines, units, `RepetitionTime` as input and in
+`meta_dict`, spaces and resolutions with TemplateFlow's metadata, masks, `dseg`, `'source'`,
+scaled and big-endian data, extensions, NIfTI-2, the `ni1` and an unknown magic, a non-NIfTI file,
+several files and sources, `dismiss_entities`, the errors): all identical, the defects' cases with
+`upstream_defects="reproduce"`.
+
 ## Upstream defects of these steps (D13)
 
 | ID | Defect | larmorx by default (`upstream_defects="reproduce"`: the original) | Functions |
 |---|---|---|---|
 | PIPE-23 | nipype's `is_outlier` divides by the median absolute deviation: 0 when more than half of the values are equal (a constant signal, a padded series), so the values at the median get `0/0 = NaN`, fail the `<= thresh` test and count as outliers; `NonsteadyStatesDetector` then calls every leading volume non-steady (rule A) | the values at the median have a z-score of 0 (not outliers; the others, away from a zero spread, stay infinite) | `is_outlier`, `nonsteady_states_detector`, `epi_reference_workflow` |
 | PIPE-24 | `ValidateImage`'s report names the translation's unit with nibabel's `get_xyzt_units`, which raises `KeyError` for a spatial unit code 4 to 7 (rule A: a readable header) | the translation reported in mm, as for an unknown unit | `validate_image` |
+| PIPE-26 | `DerivativesDataSink` with two or more list-valued entity inputs matches the files to the names in the order of a Python `set` of the entity names, which changes between processes | the names in the entities' sorted order (nondeterminism is never reproduced; a warning says so) | `derivatives_data_sink` |
+| PIPE-27 | its warning about a changed data type names the original type twice ("from float32 to float32") | the new type named (rule A, a message) | `derivatives_data_sink` |
+| PIPE-28 | `compress` with fewer values than files (but more than one) fails with Python's `IndexError` | a `ValueError` saying so (rule B) | `derivatives_data_sink` |
+| PIPE-29 | the data type coercion casts values out of the integer type's range and NaN with numpy's cast (undefined in C; on x86-64 a wrapped or arbitrary value) | clamped to the range, NaN to 0, with a warning (the rule for undefined conversions) | `derivatives_data_sink`, `fmap_derivatives_workflow` |
+| PIPE-30 | a `RepetitionTime` input for an image that is not 4-D makes the header fix set four voxel sizes on it, and nibabel's `HeaderDataError` stops the sink (rule A: a 3-D reference of a BOLD series is a sensible input) | the fourth voxel size set only on an image with a fourth axis (its other sizes kept), the sidecar with the value | `derivatives_data_sink` |

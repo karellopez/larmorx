@@ -39,6 +39,9 @@ Rust (``larmorx-sdcflows``):
   :func:`select_topup_config`, :func:`topup_config_file`, :func:`topup_node`,
   :func:`topup_mats_to_world`, :func:`topup_workflow`: the PEPOLAR estimation
   (``init_topup_wf`` in sdcflows 2.17.1's and 2.15's wirings, FSL's ``topup`` through ``lx.fsl``).
+- :func:`flatten`, :func:`sorted_pe`, :func:`qwarp2ants`, :func:`qwarp_workflow`: the Python
+  steps of the PEPOLAR estimation with AFNI's ``3dQwarp`` (``init_3dQwarp_wf``, which waits for
+  its programs: ``NotImplementedError``).
 - :func:`brainextraction_workflow`, :func:`magnitude_workflow`, :func:`fmap_workflow`:
   ``init_brainextraction_wf``, ``init_magnitude_wf`` and ``init_fmap_wf`` (phase difference
   and direct field maps) as plain functions, each node through larmorx's ports.
@@ -55,9 +58,10 @@ Rust (``larmorx-sdcflows``):
   (``fieldmaps.py``, ``utils/bimap.py``, ``utils/wrangler.py``), on a
   :class:`larmorx.bids.BIDSLayout`.
 - :func:`estimator_workflow` (:meth:`FieldmapEstimation.get_workflow`),
-  :func:`fmap_preproc_workflow`, :func:`fmap_derivatives_workflow`: each estimator's workflow,
-  a subject's estimators run with their derivatives (``init_fmap_preproc_wf``) and the
-  derivatives (``init_fmap_derivatives_wf``, with niworkflows' ``DerivativesDataSink``).
+  :func:`build_workflows`, :func:`fmap_preproc_workflow`, :func:`fmap_derivatives_workflow`:
+  each estimator's workflow, ``init_fmap_preproc_wf``'s graph built (its checks), a subject's
+  estimators run with their derivatives (``init_fmap_preproc_wf``) and the derivatives
+  (``init_fmap_derivatives_wf``, with niworkflows' ``DerivativesDataSink``).
 
 sdcflows' files are written as nibabel writes them (the header's data type, scaled into an
 integer type): :func:`larmorx.io.save_nibabel`.
@@ -69,6 +73,7 @@ from larmorx.sdcflows.base import (
     EstimatorRun,
     EstimatorWorkflow,
     FmapPreprocResult,
+    build_workflows,
     check_readout,
     estimator_workflow,
     fmap_preproc_workflow,
@@ -160,6 +165,14 @@ from larmorx.sdcflows.phase import (
     phdiff_workflow,
     subtract_phases,
 )
+from larmorx.sdcflows.qwarp import (
+    QWARP_ARGS,
+    FlattenResult,
+    flatten,
+    qwarp2ants,
+    qwarp_workflow,
+    sorted_pe,
+)
 from larmorx.sdcflows.registration import (
     Coeff2EpiResult,
     coeff2epi_workflow,
@@ -207,6 +220,7 @@ __all__ = [
     "EPI_LIKE_SUFFIXES",
     "MODALITIES",
     "NOT_ALIGNED",
+    "QWARP_ARGS",
     "REGISTRY",
     "SDCFLOWS_OUT_PATH_BASE",
     "SDCFLOWS_VERSIONS",
@@ -227,6 +241,7 @@ __all__ = [
     "FieldmapEstimation",
     "FieldmapFile",
     "FieldmapRegistry",
+    "FlattenResult",
     "FmapDerivativesResult",
     "FmapPreprocResult",
     "FmapWorkflowResult",
@@ -254,6 +269,7 @@ __all__ = [
     "brainextraction_workflow",
     "bspline_approx",
     "bspline_grid",
+    "build_workflows",
     "check_b0_units",
     "check_readout",
     "check_register",
@@ -268,6 +284,7 @@ __all__ = [
     "estimator_workflow",
     "find_anatomical_estimators",
     "find_estimators",
+    "flatten",
     "fmap_atlas",
     "fmap_atlas_affine",
     "fmap_derivatives_workflow",
@@ -289,6 +306,8 @@ __all__ = [
     "pad_slices",
     "phdiff2fmap",
     "phdiff_workflow",
+    "qwarp2ants",
+    "qwarp_workflow",
     "registration_settings",
     "relative_to_root",
     "reoblique",
@@ -302,6 +321,7 @@ __all__ = [
     "selectintent",
     "set_dtype",
     "sort_pe_blips",
+    "sorted_pe",
     "subtract_phases",
     "syn_preprocessing_workflow",
     "syn_sdc_workflow",

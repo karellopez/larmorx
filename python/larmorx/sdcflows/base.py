@@ -38,6 +38,7 @@ __all__ = [
     "EstimatorRun",
     "EstimatorWorkflow",
     "FmapPreprocResult",
+    "build_workflows",
     "check_readout",
     "estimator_workflow",
     "fmap_preproc_workflow",
@@ -244,6 +245,48 @@ def check_readout(
                 raise RuntimeError(f"Missing readout timing information for <{f.path}>.") from e
 
 
+def build_workflows(
+    estimators: Sequence[Any],
+    *,
+    omp_nthreads: int,
+    use_metadata_estimates: bool = False,
+    fallback_total_readout_time: float | None = None,
+    sloppy: bool = False,
+    debug: bool = False,
+    upstream_defects: UpstreamDefectsName = "fix",
+    n_threads: int = 1,
+    **kwargs: Any,
+) -> list[EstimatorWorkflow]:
+    """``init_fmap_preproc_wf``'s graph, built and not run: for each estimator in turn, the
+    readout check of its EPI-like sources (:func:`check_readout`, skipped with a
+    ``fallback_total_readout_time``) and its workflow (:func:`estimator_workflow`, with the same
+    options :func:`fmap_preproc_workflow` gives it). The errors sdcflows raises while it builds
+    the graph come from here, in its order: the ``RuntimeError`` of a missing readout time
+    (fMRIPrep's exit status 65), the ``FileNotFoundError`` of a field-map file, SDC-22's
+    ``TypeError``. The workflows stay with their estimators (sdcflows' cache), so a later
+    :func:`fmap_preproc_workflow` with the same estimators runs these."""
+    _defects.check(upstream_defects)
+    _check_options(kwargs, upstream_defects)
+    workflows = []
+    for estimator in estimators:
+        if fallback_total_readout_time is None:
+            check_readout(estimator, use_metadata_estimates=use_metadata_estimates)
+        workflows.append(
+            estimator_workflow(
+                estimator,
+                use_metadata_estimates=use_metadata_estimates,
+                fallback_total_readout_time=fallback_total_readout_time,
+                omp_nthreads=omp_nthreads,
+                debug=debug,
+                sloppy=sloppy,
+                n_threads=n_threads,
+                upstream_defects=upstream_defects,
+                **kwargs,
+            )
+        )
+    return workflows
+
+
 @dataclass(frozen=True)
 class EstimatorRun:
     """One estimator of :func:`fmap_preproc_workflow`: the estimator, its workflow (built), the
@@ -316,7 +359,6 @@ def fmap_preproc_workflow(
     from larmorx.sdcflows.outputs import fmap_derivatives_workflow
 
     _defects.check(upstream_defects)
-    _check_options(kwargs, upstream_defects)
     inputs = dict(inputs or {})
     by_id = {e.sanitized_id: e for e in estimators}
     for key, values in inputs.items():
@@ -332,23 +374,17 @@ def fmap_preproc_workflow(
             raise ValueError(f"inputs for {key!r}: unknown field(s) {sorted(unknown)}")
 
     # The graph is built first: the readout checks and the workflows
-    workflows = []
-    for estimator in estimators:
-        if fallback_total_readout_time is None:
-            check_readout(estimator, use_metadata_estimates=use_metadata_estimates)
-        workflows.append(
-            estimator_workflow(
-                estimator,
-                use_metadata_estimates=use_metadata_estimates,
-                fallback_total_readout_time=fallback_total_readout_time,
-                omp_nthreads=omp_nthreads,
-                debug=debug,
-                sloppy=sloppy,
-                n_threads=n_threads,
-                upstream_defects=upstream_defects,
-                **kwargs,
-            )
-        )
+    workflows = build_workflows(
+        estimators,
+        omp_nthreads=omp_nthreads,
+        use_metadata_estimates=use_metadata_estimates,
+        fallback_total_readout_time=fallback_total_readout_time,
+        sloppy=sloppy,
+        debug=debug,
+        upstream_defects=upstream_defects,
+        n_threads=n_threads,
+        **kwargs,
+    )
 
     tmp = None if work_dir is not None else tempfile.TemporaryDirectory(prefix="larmorx-fmap-")
     root = os.path.join(os.fspath(work_dir) if work_dir is not None else tmp.name, name)  # type: ignore[union-attr]

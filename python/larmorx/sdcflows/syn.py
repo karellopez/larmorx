@@ -387,6 +387,7 @@ def syn_preprocessing_workflow(
     auto_bold_nss: bool = False,
     t1w_inversion: bool = False,
     sd_prior: bool = True,
+    name: str = "syn_preprocessing_wf",
     prior_file: str | os.PathLike[str] | None = None,
     ants_random_seed: int | None = None,
     niworkflows_version: str = NIWORKFLOWS_VERSION,
@@ -408,7 +409,8 @@ def syn_preprocessing_workflow(
     the inverse registration (``Linear``, ``MultiLabel``; the mask stored as ``uint8``); and,
     with ``sd_prior``, sdcflows' prior (:func:`fmap_atlas`) brought there through
     ``[epi2anat (inverted), std2anat_xfm, the atlas's affine to MNI]`` and thresholded above
-    ``atlas_threshold`` (``Binarize``). The nodes write into ``out_dir`` as nipype's do.
+    ``atlas_threshold`` (``Binarize``). The nodes write into ``out_dir/<name>`` as nipype's do
+    (fMRIPrep names the workflow ``syn_preprocessing_<sanitized_id>``).
 
     fMRIPrep 25.2.6 calls it with ``auto_bold_nss=True``, its BOLD and SBRef files and their
     metadata, the T1w and its mask, and the MNI-to-T1w transform. ``prior_file`` replaces
@@ -435,7 +437,7 @@ def syn_preprocessing_workflow(
         )
     if sd_prior and std2anat_xfm is None:
         raise ValueError("std2anat_xfm is needed for the prior (sd_prior=True)")
-    wf = os.path.join(os.path.abspath(os.fspath(out_dir)), "syn_preprocessing_wf")
+    wf = os.path.join(os.path.abspath(os.fspath(out_dir)), name)
 
     def node(name: str) -> str:
         p = os.path.join(wf, name)

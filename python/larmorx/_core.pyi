@@ -412,9 +412,11 @@ def ndimage_min_or_max_filter(
     origins: list[int],
     minimum: bool,
     n_threads: int = 1,
+    output: str | None = None,
 ) -> np.ndarray:
     """``_nd_image.min_or_max_filter``: the minimum or maximum over a boolean ``footprint``,
-    with an optional float64 ``structure`` of the footprint's shape."""
+    with an optional float64 ``structure`` of the footprint's shape; ``output``: the name of
+    the type written (``"bool"`` or a numpy type name; the input's by default)."""
 
 def ndimage_min_or_max_filter1d(
     input: np.ndarray,
@@ -425,8 +427,10 @@ def ndimage_min_or_max_filter1d(
     origin: int,
     minimum: bool,
     n_threads: int = 1,
+    output: str | None = None,
 ) -> np.ndarray:
-    """``_nd_image.min_or_max_filter1d``: the minimum or maximum over ``size`` along ``axis``."""
+    """``_nd_image.min_or_max_filter1d``: the minimum or maximum over ``size`` along ``axis``;
+    ``output``: the name of the type written (the input's by default)."""
 
 def ndimage_correlate1d(
     input: np.ndarray,
@@ -449,8 +453,17 @@ def ndimage_rank_filter(
     cval: float,
     origins: list[int],
     n_threads: int = 1,
+    output: str | None = None,
 ) -> np.ndarray:
-    """``_nd_image.rank_filter``: the ``rank``-th smallest over a boolean ``footprint``."""
+    """``_nd_image.rank_filter``: the ``rank``-th smallest over a boolean ``footprint``;
+    ``output``: the name of the type written (the input's by default)."""
+
+def ndimage_rank_filter_1d(
+    input: np.ndarray, rank: int, win_len: int, mode: str, cval: float, origin: int
+) -> np.ndarray:
+    """``_rank_filter_1d.rank_filter(x, rank, win_len, x_out, mode, cval, origin)`` of a
+    float32, float64 or int64 1-D array (Ashelly's running rank): an array of the input's type
+    (``cval`` cast to it)."""
 
 def ndimage_binary_erosion(
     input: np.ndarray,

@@ -66,8 +66,8 @@ transform puts the target; measured), SDC-11 (`resample_to_zooms` onto a grid of
 nitransforms' bare assertion; found by relay 7's random-testing trial). SDC-03 (`CheckRegister`'s signed translation test) waits
 for its FreeSurfer branch.
 
-Not ported (private, used by no workflow): `_split_itk_file`, `_b0_resampler`; `init_fmap_wf`
-needs part B's magnitude preparation and masks.
+Not ported (private, used by no workflow): `_split_itk_file`, `_b0_resampler`. (`init_fmap_wf`,
+which needed part B's magnitude preparation and masks, is part B's, relay 4: below.)
 
 ## Part B: `brain_masker` (`src/masker.rs`)
 
@@ -82,6 +82,23 @@ its `skimage` module (`ball`, `threshold_otsu`, `random_walker`), and numpy's `p
 (`validation/investigations/sdcflows-fieldmap-b/check_skimage.py`). Its switches: the rough mask
 without a component (SDC-37) and no brain seed after the erosion (SDC-38): errors by default,
 `upstream_defects='reproduce'` gives sdcflows' results (rule B).
+
+
+## Part B: the brain-extraction, magnitude and field-map workflows (`python/larmorx/sdcflows/workflows.py`, relays 2 to 4)
+
+**Ported** in Python from sdcflows 2.17.1 (Apache-2.0; the same in 2.15.1):
+`workflows/ancillary.py` (`init_brainextraction_wf`), `workflows/fit/fieldmap.py`
+(`init_magnitude_wf`, `init_fmap_wf` in both modes, with part A's `init_phdiff_wf`), each node
+through larmorx's ports (ANTs' `N4BiasFieldCorrection` with nipype 1.12.0's command line and its
+`copy_header`, sdcflows' `BrainExtraction`, `CheckRegister`, `CheckB0Units`, `BSplineApprox`), in
+the order the graph connects them. niworkflows 1.15.4 (Apache-2.0; the same in 1.15.2):
+`interfaces/nibabel.py`'s `IntensityClip` (`_advanced_clip`, relay 2: `python/larmorx/niworkflows/
+nibabel.py`, on `lx.ndimage.median_filter`, `lx.skimage.ball` and numpy's percentile and `clip`
+in `larmorx_core::numpy`; switch PIPE-33) and `interfaces/images.py`'s `IntraModalMerge` (relay 4:
+`python/larmorx/niworkflows/images.py`, with `utils/images.py`'s `reorient`, nibabel 5.4.2's
+`as_closest_canonical`, `squeeze_image`, `four_to_three`, `concat_images` (MIT), FSL's `mcflirt`
+through `larmorx fsl mcflirt`; switch PIPE-18). Every node's files = sdcflows' own graphs'
+(`validation/investigations/sdcflows-fieldmap-b/check_workflows.py`, `check_masker_steps.py`).
 
 
 ## Part B: the PEPOLAR estimation (`python/larmorx/sdcflows/pepolar.py`, relay 5)

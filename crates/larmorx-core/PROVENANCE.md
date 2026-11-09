@@ -231,6 +231,18 @@ numpy's notice. Each `fmadd` is `mul_add`; an FMA-compiled copy is chosen at run
 the AVX-512 and the AVX2/FMA3 dispatch paths) on all 2^32 inputs
 (`validation/investigations/t2smap/numerics/`); unit tests check recorded values.
 
+## numpy's float32 exponential (`src/math/expf_numpy.rs`, the field maps' part B)
+
+**Ported** from numpy 2.5.4 (BSD-3-Clause, `tags/numpy-2.5.4`, identical in 2.3.5):
+`numpy/_core/src/umath/loops_exponent_log.dispatch.c.src` (`simd_exp_FLOAT`, one lane of it, and
+its helpers `simd_range_reduction`, `fma_scalef_ps`, `avx512_scalef_ps`), the constants
+`NPY_COEFF_*_EXPf`, `NPY_CODY_WAITE_LOGE_2_*f`, `NPY_RINT_CVT_MAGICf` of
+`numpy/_core/src/umath/npy_simd_data.h` and `NPY_LOG2Ef` of `numpy/_core/include/numpy/
+npy_math.h`. The file carries numpy's notice. Each `fmadd` is `mul_add`. Equal to `numpy.exp` on
+`float32` arrays (numpy 2.3.5 and 2.5.4, Linux x86-64) on all 2^32 inputs, on the AVX-512 and the
+AVX2/FMA3 paths (`validation/investigations/sdcflows-fieldmap-b/check_numpy.py --expf`); it
+serves `reproduce` (scikit-image's random walker), `expf` stays larmorx's default.
+
 ## numpy's reductions and percentiles (`src/numpy/`)
 
 **Ported** from numpy 2.5.4 (BSD-3-Clause; the same code paths in 2.3.5) and SciPy 1.18.1

@@ -109,7 +109,7 @@ stage 4's field-map branch, for a run with a field map:
 
 | Node (fMRIPrep) | larmorx | Inputs |
 |---|---|---|
-| `fmapref_buffer` (`_select_ref`) | `select_ref(sbref_files, hmc_boldref)` | the first single-band reference, else the motion-correction reference |
+| `fmapref_buffer` (`_select_ref`) | `select_ref(sbref_files, boldref_files)` (the motion-correction reference as `boldref_files`) | the first single-band reference, else the motion-correction reference |
 | `fmap_select` (`KeySelect`) | `lx.niworkflows.key_select` | `estimates` (`FieldmapEstimates`: `fmap_id`, `fmap_ref`, `fmap_coeff`, `fmap_mask`, `sdc_method`) at `fieldmap_id` |
 | `fmapreg_wf` (sdcflows' `init_coeff2epi_wf`) | `lx.sdcflows.coeff2epi_workflow` | `coreg_ref`, `coreg_mask` (`init_enhance_and_skullstrip_bold_wf`'s `bias_corrected_file`, `mask_file`), the estimator's reference and mask; `sloppy`, `debug`, `ants_random_seed`; skipped when `boldref2fmap_xfm` is given ("Found fieldmap transform - skipping registration") |
 | `itk_mat2txt` (`ConcatenateXFMs(out_fmt='itk')`) | `lx.niworkflows.concatenate_xfms` | the registration's transform; then the `desc-fmap_xfm` derivative (`sink`) |
@@ -143,7 +143,7 @@ coregistration reference) and of each `init_bold_volumetric_resample_wf` (`bold_
 `[boldref2anat]` or `[boldref2anat, anat2std]`; `target_ref_file` `gen_ref`'s grid):
 `fmap_select`, `distortion_params` (`in_file`: the raw BOLD in `bold_native_wf`, the minimally
 processed one in the resampling workflows), `fmap2target` (`[boldref2fmap_xfm, *boldref2target]`,
-nipype's `Merge`), `inverses` (`gen_inverses`: `[True, False, ...]`) and `boldref_fmap` /
+nipype's `Merge`), `inverses` (`gen_inverses(inlist)`: `[True, False, ...]`) and `boldref_fmap` /
 `fmap_recon` (written to `out_dir` when given). The result (`fmap_ref`, `fmap_coeff`,
 `transforms`, `inverse`, `fieldmap`, `out_file`, `readout_time`, `pe_direction`) feeds
 `lx.transforms.resample_series` (`fieldmap`, `ro_time`, `pe_dir`). fMRIPrep gives the resampling

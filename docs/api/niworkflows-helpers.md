@@ -71,9 +71,9 @@ is clipped once more and its median over the volumes written as `<in>_average`. 
 
 | larmorx | niworkflows | Notes |
 |---|---|---|
-| `merge_series(in_files, allow_4D=True, affine_tolerance=None, *, out_dir=None)` → the path | `nibabel.MergeSeries` | each file squeezed; 3D images and (with `allow_4D`) 4D ones' volumes merged (nibabel's `concat_images`), `<first>_merged`; another dimension: `ValueError('Input image has an incorrect number of dimensions (…).')`; with `affine_tolerance`, `np.allclose(atol=…)` against the first (`ValueError('Difference in affines greater than allowed tolerance …')`) and the first's affine kept; without, affines must be identical |
-| `reorient_file(in_file, *, target_file=None, target_ornt=None, newpath=None)` → the path | `nibabel.ReorientImage` (`reorient_file`) | to `target_file`'s axis codes or `target_ornt`'s (`TypeError('No target orientation or file is specified.')`), `reoriented.nii.gz` |
-| `reorient_image(img, target_ornt)`, `as_reoriented(img, ornt)`, `axcodes2ornt`, `aff2axcodes`, `ornt_transform`, `squeeze_image`, `four_to_three` | `nibabel.reorient_image`; nibabel 5.4.2's functions (MIT) | in memory; nibabel's errors (`Not all axis codes … in label set …`) |
+| `merge_series(in_files, allow_4D=True, affine_tolerance=None, *, out_dir=None, n_threads=1)` → the path | `nibabel.MergeSeries` | each file squeezed; 3D images and (with `allow_4D`) 4D ones' volumes merged (nibabel's `concat_images`), `<first>_merged`; another dimension: `ValueError('Input image has an incorrect number of dimensions (…).')`; with `affine_tolerance`, `np.allclose(atol=…)` against the first (`ValueError('Difference in affines greater than allowed tolerance …')`) and the first's affine kept; without, affines must be identical |
+| `reorient_file(in_file, *, target_file=None, target_ornt=None, newpath=None, n_threads=1)` → the path | `nibabel.ReorientImage` (`reorient_file`) | to `target_file`'s axis codes or `target_ornt`'s (`TypeError('No target orientation or file is specified.')`), `reoriented.nii.gz` |
+| `reorient_image(img, target_ornt)`, `as_reoriented(img, ornt)`, `axcodes2ornt(axcodes)`, `aff2axcodes(affine)`, `ornt_transform(start, end)`, `squeeze_image`, `four_to_three` | `nibabel.reorient_image`; nibabel 5.4.2's functions (MIT) | in memory; nibabel's errors (`Not all axis codes … in label set …`) |
 
 Checked file for file against niworkflows and sdcflows on the oracle runs' PEPOLAR estimators
 (every option of `RobustAverage`, its one-volume, 3D and error paths) and against fMRIPrep's own

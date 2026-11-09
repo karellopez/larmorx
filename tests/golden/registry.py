@@ -45,6 +45,7 @@ from typing import Any
 import numpy as np
 
 import larmorx as lx
+import larmorx.pipelines.larmorprepx.estimators  # lx.pipelines, for NAMESPACES
 import larmorx.pipelines.larmorprepx.fieldmaps  # lx.pipelines, for NAMESPACES
 from larmorx import _core
 from larmorx.io import NiftiHeader
@@ -1042,6 +1043,8 @@ NAMESPACES = (
     "lx.skimage",
     "lx.niworkflows",
     "lx.pipelines.larmorprepx.fieldmaps",
+    "lx.pipelines.larmorprepx.estimators",
+    "lx.bids",
     "lx",
 )
 
@@ -7563,4 +7566,393 @@ def _(ctx: Context) -> dict[str, Any]:
         except NotImplementedError:
             two = True
     out["two_inputs_refused"] = np.asarray([two])
+    return out
+
+
+def _bids_tree(root: Path) -> Path:
+    """A small BIDS dataset (files of zero bytes, one real header for a readout time from the
+    echo spacing): two sessions, an EPI pair, a phase difference, a single-direction EPI with its
+    targets, a direct field map with B0FieldIdentifier, inheritance, an ignored folder."""
+
+    def put(rel: str, meta: dict[str, Any] | None = None) -> None:
+        f = root / rel
+        f.parent.mkdir(parents=True, exist_ok=True)
+        f.write_bytes(b"")
+        if meta is not None:
+            f.with_name(f.name.split(".")[0] + ".json").write_text(
+                json.dumps(meta), encoding="utf-8"
+            )
+
+    root.mkdir(parents=True)
+    (root / "dataset_description.json").write_text(
+        '{"Name": "g", "BIDSVersion": "1.8.0"}', encoding="utf-8"
+    )
+    (root / "task-rest_bold.json").write_text(
+        '{"RepetitionTime": 2, "PhaseEncodingDirection": "j"}', encoding="utf-8"
+    )
+    put("code/sub-01_T1w.nii.gz")
+    for ses in ("a", "b"):
+        p = f"sub-01/ses-{ses}/"
+        put(p + f"anat/sub-01_ses-{ses}_T1w.nii.gz")
+        for run in ("1", "02"):
+            put(
+                p + f"func/sub-01_ses-{ses}_task-rest_run-{run}_bold.nii.gz",
+                {"TotalReadoutTime": 0.05, "Zeta": [1, 2.5]},
+            )
+        put(p + f"func/sub-01_ses-{ses}_task-rest_run-02_sbref.nii.gz", {"TotalReadoutTime": 0.04})
+    put(
+        "sub-01/ses-a/fmap/sub-01_ses-a_phasediff.nii.gz",
+        {
+            "EchoTime1": 0.004,
+            "EchoTime2": 0.006,
+            "IntendedFor": "bids::sub-01/ses-a/func/sub-01_ses-a_task-rest_run-1_bold.nii.gz",
+        },
+    )
+    put("sub-01/ses-a/fmap/sub-01_ses-a_magnitude1.nii.gz")
+    put("sub-01/ses-a/fmap/sub-01_ses-a_magnitude2.nii.gz")
+    for d, pe in (("AP", "j-"), ("PA", "j")):
+        put(
+            f"sub-01/ses-b/fmap/sub-01_ses-b_dir-{d}_epi.nii.gz",
+            {
+                "PhaseEncodingDirection": pe,
+                "TotalReadoutTime": 0.05,
+                "IntendedFor": ["ses-b/func/sub-01_ses-b_task-rest_run-1_bold.nii.gz"],
+            },
+        )
+    put(
+        "sub-01/ses-b/fmap/sub-01_ses-b_acq-one_epi.nii.gz",
+        {
+            "PhaseEncodingDirection": "j-",
+            "TotalReadoutTime": 0.05,
+            "IntendedFor": [
+                "ses-b/func/sub-01_ses-b_task-rest_run-02_sbref.nii.gz",
+                "ses-b/func/sub-01_ses-b_task-rest_run-02_bold.nii.gz",
+            ],
+        },
+    )
+    put(
+        "sub-01/ses-a/fmap/sub-01_ses-a_acq-map_fieldmap.nii.gz",
+        {"Units": "Hz", "B0FieldIdentifier": ["map", "x"]},
+    )
+    put("sub-01/ses-a/fmap/sub-01_ses-a_acq-map_magnitude.nii.gz", {"B0FieldIdentifier": "map"})
+    lx.save(
+        (np.arange(10 * 12 * 3, dtype=np.int16).reshape(10, 12, 3), np.eye(4)),
+        str(root / "sub-01/ses-b/fmap/sub-01_ses-b_acq-ees_dir-AP_epi.nii.gz"),
+    )
+    (root / "sub-01/ses-b/fmap/sub-01_ses-b_acq-ees_dir-AP_epi.json").write_text(
+        '{"PhaseEncodingDirection": "j", "EffectiveEchoSpacing": 0.0005}', encoding="utf-8"
+    )
+    return root
+
+
+def _portable(obj: Any, root: Path) -> Any:
+    """Values as JSON text with the dataset's root and the platform's separator removed."""
+
+    def walk(v: Any) -> Any:
+        if isinstance(v, dict):
+            return [[walk(k), walk(x)] for k, x in v.items()]
+        if isinstance(v, (list, tuple)):
+            return [walk(x) for x in v]
+        if isinstance(v, (set, frozenset)):
+            return sorted(json.dumps(walk(x)) for x in v)
+        if isinstance(v, (bool, int, float)) or v is None:
+            return [type(v).__name__, repr(v)]
+        if hasattr(v, "relpath"):
+            return ["file", type(v).__name__, Path(v.path).relative_to(root).as_posix()]
+        if hasattr(v, "bids_id") and hasattr(v, "sources"):
+            return [
+                "estimation",
+                v.method.name,
+                v.bids_id,
+                v.sanitized_id,
+                walk(v.sources),
+                repr(v),
+            ]
+        if hasattr(v, "suffix") and hasattr(v, "find_meta"):
+            return ["fieldmapfile", walk(v.path), v.suffix, walk(v.entities), walk(v.metadata)]
+        text = str(v).replace(str(root), "<root>").replace("\\", "/")
+        return [type(v).__name__, text]
+
+    return np.frombuffer(json.dumps(walk(obj)).encode(), dtype=np.uint8).copy()
+
+
+@case(
+    "py.bids.layout",
+    covers=(
+        "lx.bids.BIDSLayout.get",
+        "lx.bids.BIDSLayout.get_entities",
+        "lx.bids.BIDSLayout.get_file",
+        "lx.bids.BIDSLayout.get_files",
+        "lx.bids.BIDSLayout.get_metadata",
+        "lx.bids.BIDSLayout.parse_file_entities",
+        "lx.bids.BIDSLayout.add_derivatives",
+        "lx.bids.BIDSFile.get_entities",
+        "lx.bids.BIDSFile.get_metadata",
+        "lx.bids.BIDSJSONFile.get_dict",
+        "lx.bids.BIDSJSONFile.get_json",
+        "lx.bids.Entity.match_file",
+        "lx.bids.Config.load",
+        "lx.bids.parse_file_entities",
+        "lx.bids.listify",
+        "lx.bids.natural_sort",
+    ),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """pybids 0.22.0's index of a small dataset (both pybids versions' entity order): files,
+    entities, inherited metadata, the get_<entity>s values, queries with lists, None, Query's
+    values, regular expressions, integer entities, return types, a derivatives dataset."""
+    root = _bids_tree(Path(ctx.out("ds")))
+    deriv = root / "derivatives" / "pipe"
+    deriv.mkdir(parents=True)
+    (deriv / "dataset_description.json").write_text(
+        '{"Name": "p", "BIDSVersion": "1.8.0", "DatasetType": "derivative", "GeneratedBy": [{"Name": "pipe"}]}',
+        encoding="utf-8",
+    )
+    (deriv / "sub-01" / "fmap").mkdir(parents=True)
+    (
+        deriv / "sub-01" / "fmap" / "sub-01_fmapid-auto00000_desc-preproc_fieldmap.nii.gz"
+    ).write_bytes(b"")
+    Q = lx.bids.Query
+    out: dict[str, Any] = {}
+    for version in lx.bids.PYBIDS_VERSIONS:
+        lay = lx.bids.BIDSLayout(root, validate=False, pybids_version=version)
+        files = lay.get()
+        out[f"files_{version}"] = _portable(
+            [[f, f.entities, f.get_entities(), f.get_entities(metadata=True), f.get_metadata(), lay.get_metadata(f.path, include_entities=True)] for f in files],
+            root,
+        )  # fmt: skip
+    lay = lx.bids.BIDSLayout(root, validate=False, derivatives=True)
+    lay2 = lx.bids.BIDSLayout(root, validate=False)
+    lay2.add_derivatives(deriv)
+    queries = [
+        dict(suffix="bold", extension="nii.gz"), dict(run=1), dict(run=["02", 1]), dict(session=None),
+        dict(session=Q.REQUIRED, suffix="epi"), dict(IntendedFor=Q.REQUIRED), dict(acquisition=[None, "one"]),
+        dict(B0FieldIdentifier='"MAP"', regex_search=True), dict(suffix="fieldmap", scope="derivatives"),
+        dict(return_type="id", target="run"), dict(return_type="id", target="B0FieldIdentifier"),
+        dict(return_type="dir", target="session"), dict(return_type="filename", suffix="T1w"),
+    ]  # fmt: skip
+    out["queries"] = _portable([lay.get(**q) for q in queries], root)
+    out["derivatives"] = _portable(
+        [lay2.get(desc="preproc"), sorted(lay2.derivatives), lay2.get_files(scope="derivatives")],
+        root,
+    )
+    out["targets"] = _portable(
+        [
+            lay.get_subjects(),
+            lay.get_sessions(),
+            lay.get_runs(),
+            lay.get_directions(),
+            lay.get_B0FieldIdentifiers(),
+            sorted(lay.get_entities()),
+        ],
+        root,
+    )
+    errors = []
+    for call in (
+        lambda: lay.get(subjekt="01"),
+        lambda: lay.get(return_type="id"),
+        lambda: lay.get_unknowns(),
+        lambda: lx.bids.BIDSLayout(root / "sub-01"),
+    ):
+        try:
+            call()
+        except Exception as err:
+            errors.append([type(err).__name__, str(err)])
+    out["errors"] = _portable(errors, root)
+    bold = lay.get_file("sub-01/ses-a/func/sub-01_ses-a_task-rest_run-1_bold.nii.gz")
+    js = lay.get(suffix="bold", extension=".json")[0]
+    ents = lx.bids.Config.load("bids").entities
+    out["misc"] = _portable([
+        lay.parse_file_entities(bold.path), lx.bids.parse_file_entities("sub-01_ses-x_desc-y_bold.nii.gz"),
+        js.get_dict(), js.get_json(), ents["run"].match_file(bold.path), lx.bids.listify("a"), lx.bids.listify(None),
+        lx.bids.natural_sort(["a10", "a9", "B1"]), lay2.get_file("nothing"),
+    ], root)  # fmt: skip
+    return out
+
+
+@case(
+    "py.sdcflows.estimators",
+    covers=(
+        "lx.sdcflows.find_estimators",
+        "lx.sdcflows.find_anatomical_estimators",
+        "lx.sdcflows.get_identifier",
+        "lx.sdcflows.clear_registry",
+        "lx.sdcflows.relative_to_root",
+        "lx.sdcflows.FieldmapEstimation.paths",
+        "lx.sdcflows.FieldmapRegistry.clear",
+        "lx.sdcflows.bidict.add",
+        "lx.sdcflows.bidict.clear",
+        "lx.sdcflows.EstimatorRegistry.get_key",
+    ),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """sdcflows' estimators of the small dataset, fixed (2.15.2's search) and reproduced
+    (2.17.1's), with filters, sessions and fieldmap-less estimators; the registries; the
+    FieldmapFile and FieldmapEstimation errors; bidict's automatic names (SDC-18)."""
+    root = _bids_tree(Path(ctx.out("ds")))
+    lay = lx.bids.BIDSLayout(root, validate=False)
+    out: dict[str, Any] = {}
+    cases = [{}, {"force_fmapless": True}, {"fmapless": False}, {"bids_filters": {"session": "b"}, "force_fmapless": True},
+             {"bids_filters": {"acquisition": "one"}, "force_fmapless": True}, {"bids_filters": {"datatype": "fmap"}, "force_fmapless": True},
+             {"sessions": ["a"], "anat_suffix": ["T1w", "T2w"]}]  # fmt: skip
+    for mode in ("fix", "reproduce"):
+        results = []
+        for kw in cases:
+            reg = lx.sdcflows.FieldmapRegistry()
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                found = lx.sdcflows.find_estimators(
+                    layout=lay, subject="01", registry=reg, upstream_defects=mode, **kw
+                )
+            results.append([found, [e.paths() for e in found], sorted(reg.estimators.items()), sorted((k, sorted(v)) for k, v in reg.intents.items()),
+                            lx.sdcflows.get_identifier("ses-b/func/sub-01_ses-b_task-rest_run-1_bold.nii.gz", registry=reg)])  # fmt: skip
+        out[f"wrangler_{mode}"] = _portable(results, root)
+    t1 = lay.get(suffix="T1w", extension=".nii.gz")[0]
+    specs = lx.sdcflows.find_anatomical_estimators(
+        anat_file=t1,
+        layout=lay,
+        subject="01",
+        sessions=["b"],
+        base_entities={"subject": "01", "extension": [".nii", ".nii.gz"]},
+        suffixes=["bold"],
+    )
+    out["anat"] = _portable(specs, root)
+    errors = []
+    reg = lx.sdcflows.FieldmapRegistry()
+    fmap = root / "sub-01/ses-b/fmap"
+    for srcs in ([fmap / "sub-01_ses-b_dir-AP_epi.nii.gz"], [fmap / "sub-01_ses-b_dir-AP_epi.nii.gz", fmap / "sub-01_ses-b_acq-one_epi.nii.gz"],
+                 [fmap / "nothing_epi.nii.gz"], [fmap / "sub-01_ses-b_dir-AP_epi.json"], [root / "sub-01/ses-a/anat/sub-01_ses-a_T1w.nii.gz"]):  # fmt: skip
+        try:
+            lx.sdcflows.FieldmapEstimation(srcs, registry=reg)
+            errors.append("built")
+        except Exception as err:
+            errors.append([type(err).__name__, str(err)])
+    for mode in ("fix", "reproduce"):
+        try:
+            lx.sdcflows.get_identifier("x", "bogus", upstream_defects=mode)
+        except KeyError as err:
+            errors.append(str(err))
+    out["errors"] = _portable(errors, root)
+    d = lx.sdcflows.bidict()
+    d["auto_00001"] = "a"
+    keys = [d.add("b")]
+    d["auto_00005"] = "c"
+    keys += [d.add("e"), d.add("f")]
+    er = lx.sdcflows.EstimatorRegistry()
+    er.add(("f3", "f4"))
+    er.add(("f1", "f2"))
+    keys += [er.get_key("f3"), er.get_key("zz"), er.sources]
+    d.clear()
+    reg.clear()
+    lx.sdcflows.clear_registry(lx.sdcflows.FieldmapRegistry())
+    keys += [
+        dict(d),
+        dict(reg.estimators),
+        lx.sdcflows.relative_to_root("/x/sub-01/ses-a/anat/sub-01_T1w.nii.gz"),
+    ]
+    out["bidict"] = _portable(keys, root)
+    return out
+
+
+@case(
+    "py.larmorprepx.estimators",
+    covers=(
+        "lx.pipelines.larmorprepx.estimators.fmriprep_layout",
+        "lx.pipelines.larmorprepx.estimators.map_fieldmap_estimation",
+        "lx.pipelines.larmorprepx.estimators.get_estimator",
+        "lx.pipelines.larmorprepx.estimators.collect_fieldmaps",
+        "lx.pipelines.larmorprepx.estimators.split_precomputed",
+        "lx.pipelines.larmorprepx.estimators.setting_up_message",
+        "lx.pipelines.larmorprepx.estimators.check_pepolar_scheme",
+    ),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """fMRIPrep's estimator selection on the small dataset for each combination of
+    --use-syn-sdc, --force syn-sdc and --ignore fieldmaps; its log lines; precomputed field
+    maps from a derivatives folder; the PEPOLAR scheme check."""
+    le = lx.pipelines.larmorprepx.estimators
+    root = _bids_tree(Path(ctx.out("ds")))
+    lay = le.fmriprep_layout(root, ["01"])
+    bold = [[f.path] for f in lay.get(suffix="bold", extension=".nii.gz")]
+    import logging
+
+    class Lines(logging.Handler):
+        def __init__(self) -> None:
+            super().__init__()
+            self.lines: list[str] = []
+
+        def emit(self, record: logging.LogRecord) -> None:
+            self.lines.append(f"{record.levelname} {record.getMessage()}")
+
+    logger = logging.getLogger("golden.larmorprepx")
+    logger.propagate = False
+    logger.setLevel(logging.DEBUG)
+    cap = Lines()
+    logger.handlers[:] = [cap]
+    results = []
+    for ign in (False, True):
+        for syn in (False, "error"):
+            for force in (False, True):
+                reg = lx.sdcflows.FieldmapRegistry()
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    try:
+                        ests, emap = le.map_fieldmap_estimation(
+                            lay,
+                            "01",
+                            None,
+                            bold,
+                            ign,
+                            syn,
+                            force,
+                            None,
+                            logger=logger,
+                            registry=reg,
+                        )
+                        res: Any = [
+                            ests,
+                            {Path(k).relative_to(root).as_posix(): v for k, v in emap.items()},
+                            [le.setting_up_message(e) for e in ests],
+                        ]
+                        for e in ests:
+                            le.check_pepolar_scheme(e)
+                        res.append([le.get_estimator(lay, b[0], registry=reg) for b in bold])
+                    except Exception as err:
+                        res = [type(err).__name__, str(err)]
+                results.append(res)
+    out: dict[str, Any] = {"select": _portable(results, root), "log": _portable(cap.lines, root)}
+    deriv = Path(ctx.out("deriv"))
+    (deriv / "sub-01" / "fmap").mkdir(parents=True)
+    (deriv / "dataset_description.json").write_text(
+        '{"Name": "d", "BIDSVersion": "1.8.0", "DatasetType": "derivative", "GeneratedBy": [{"Name": "sdcflows"}]}',
+        encoding="utf-8",
+    )
+    for desc in ("preproc", "coeff", "magnitude"):
+        (
+            deriv / "sub-01" / "fmap" / f"sub-01_fmapid-auto00000_desc-{desc}_fieldmap.nii.gz"
+        ).write_bytes(b"")
+    cache = le.collect_fieldmaps(deriv, {"subject": "01"})
+    reg = lx.sdcflows.FieldmapRegistry()
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        ests = lx.sdcflows.find_estimators(layout=lay, subject="01", registry=reg)
+    cap.lines.clear()
+    todo, pared = le.split_precomputed(ests, cache, logger=logger)
+    rel = {
+        k: {kk: Path(vv).relative_to(deriv).as_posix() for kk, vv in v.items()}
+        for k, v in cache.items()
+    }
+    out["precomputed"] = _portable([rel, [e.bids_id for e in todo], list(pared), cap.lines], root)
+    two = lx.sdcflows.FieldmapEstimation(
+        [root / "sub-01/ses-b/fmap/sub-01_ses-b_dir-AP_epi.nii.gz", root / "sub-01/ses-b/fmap/sub-01_ses-b_acq-ees_dir-AP_epi.nii.gz",
+         lx.sdcflows.FieldmapFile(root / "sub-01/ses-b/func/sub-01_ses-b_task-rest_run-1_bold.nii.gz",
+                                  metadata=lay.get_metadata(str(root / "sub-01/ses-b/func/sub-01_ses-b_task-rest_run-1_bold.nii.gz")))],
+        registry=lx.sdcflows.FieldmapRegistry(),
+    )  # fmt: skip
+    try:
+        le.check_pepolar_scheme(two)
+        refused = "accepted"
+    except NotImplementedError as err:
+        refused = str(err)
+    out["sophisticated"] = _portable(refused, root)
     return out

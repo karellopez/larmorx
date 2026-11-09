@@ -26,6 +26,7 @@ if TYPE_CHECKING:
     from larmorx import (
         afni,
         ants,
+        bids,
         fsl,
         io,
         mri,
@@ -44,6 +45,7 @@ _SUBMODULES = frozenset(
     {
         "afni",
         "ants",
+        "bids",
         "fsl",
         "io",
         "mri",
@@ -75,6 +77,7 @@ __all__ = [
     "afni",
     "ants",
     "as_image",
+    "bids",
     "fsl",
     "io",
     "load",

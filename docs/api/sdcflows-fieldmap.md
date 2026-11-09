@@ -375,6 +375,36 @@ metric depends: up to 0.74 mm apart); and the whole function gives every file of
 graph (`validation/investigations/sdcflows-fieldmap-b/check_syn_sdc.py`; 333 s on 8 threads
 where sdcflows' graph takes 1,036 s at one).
 
+## The estimators of a BIDS dataset (part B)
+
+sdcflows' `fieldmaps.py`, `utils/bimap.py` and `utils/wrangler.py` (2.17.1; the wrangler also
+as 2.15.2's, the default: SDC-17) in `python/larmorx/sdcflows/estimators.py` and `wrangler.py`,
+on a [`lx.bids.BIDSLayout`](bids.md) instead of pybids'.
+
+| larmorx | sdcflows | Notes |
+|---|---|---|
+| `FieldmapFile(path, *, metadata=None, find_meta=True, sdcflows_version="2.17.1")` | `fieldmaps.FieldmapFile` | path checks (missing, not NIfTI, suffix not in `MODALITIES`), entities (`parse_file_entities`), the sidecar beside it (no inheritance) updated with `metadata` (the same dictionary object kept when no sidecar is read), `bids_root` (niworkflows' `relative_to_root`), T1w/T2w's `TotalReadoutTime = 0.0`, the metadata each suffix needs (`MetadataError`), the readout-time warning (`larmorx.sdcflows.fieldmaps`, silent at sdcflows' `ERROR` level); an unreadable header in the readout time is nibabel's `ImageFileError`/`FileNotFoundError` text, not a `ValueError`; `sdcflows_version="2.15"` (fMRIPrep 25.2.6's): a broken link refused |
+| `FieldmapEstimation(sources, *, bids_id=None, registry=None, sdcflows_version="2.17.1")` → `.method`, `.bids_id`, `.sanitized_id`, `.sources`, `.paths()` | `fieldmaps.FieldmapEstimation` | the strategy from the suffixes (missing `phase1`/`phase2` and magnitudes found by name), the common `B0FieldIdentifier` or an automatic name, registered in `registry`; sdcflows' errors and messages; the method cannot change, the identifier never (attrs' setters). `get_workflow`: with `fmap_preproc_workflow` (the next relay) |
+| `EstimatorType`, `MODALITIES`, `MetadataError`, `ImageFileError` | the same | |
+| `FieldmapRegistry()` (`.estimators`, `.intents`, `.clear()`), `REGISTRY` | the module globals `_estimators`, `_intents` | every function takes `registry=None`: `REGISTRY`, which behaves as sdcflows' globals (fMRIPrep's subjects share it: the `auto_` names go on) |
+| `bidict`, `EstimatorRegistry` (`.sources`, `.get_key(value)`, `.add(value)`) | `utils/bimap.py` | `add` takes the *last* free `auto_` index in `range(len(used) + 1)` (SDC-18, kept) |
+| `get_identifier(filename, by="IntendedFor", *, registry=None, upstream_defects="fix")`, `clear_registry(registry=None)` | the same | SDC-20 |
+| `find_estimators(*, layout, subject, sessions=None, fmapless=True, force_fmapless=False, logger=None, bids_filters=None, anat_suffix="T1w", registry=None, sdcflows_version="2.17.1", upstream_defects="fix")` | `utils/wrangler.find_estimators` | `B0FieldIdentifier` first (SDC-19, SDC-21), then the heuristics (field maps, phase differences, EPI pairs by session, acquisition and contrast agent grouped by `IntendedFor`, single-direction EPIs with their targets and single-band references), then the fieldmap-less estimators; the debug messages through `logger` (by default silent, as sdcflows'); `"fix"`: 2.15.2's search (SDC-17) |
+| `find_anatomical_estimators(*, anat_file, layout, subject, sessions, base_entities, suffixes, sdcflows_version="2.17.1")` | the same | single-band reference before the run, shortest echo first, every echo intended |
+| `relative_to_root(path)` | niworkflows' `utils/bids.relative_to_root` | |
+
+`IntendedFor` paths that sdcflows writes with the platform's separator are written with `/` on
+every platform (fMRIPrep's lookup strips `sub-<label>/` with a `/`).
+
+Checked (`validation/investigations/sdcflows-fieldmap-b/check_estimators.py`: `wrangler`,
+`units`, `apps`, `image`): the estimators (method, identifier, sources with their entities and
+metadata, `repr`), both registries, the debug log and the errors are sdcflows 2.17.1's
+(`reproduce`) and sdcflows 2.15.2's wrangler's (the default) on every dataset of the index check
+with fMRIPrep's and sdcflows' tests' indexers, over sdcflows' tests' argument sets (filters,
+sessions, `fmapless`, `force_fmapless`, `anat_suffix`); every layout call sdcflows makes, replayed
+on larmorx's index, gives pybids' result; fMRIPrep's image's sdcflows 2.15.1 with pybids 0.20.0
+too; and sdcflows 2.17.1's own BIDS-app runs found the estimators larmorx finds.
+
 ## Upstream defects (D13)
 
 Corrected by default; `upstream_defects="reproduce"` gives sdcflows' result bit for bit, and
@@ -400,6 +430,11 @@ changed) a result. Rules A to D and the evidence:
 | SDC-14 | `_norm_lap` of an image with no positive (or no negative) value after the median's subtraction fails with numpy's `IndexError` (the percentile of nothing) | a `ValueError` saying so (rule B) | `norm_lap`, `syn_sdc_workflow` |
 | SDC-16 | `_warp_dir` puts the weight 1.0 at the position of the phase-encoding axis among the fixed image's voxel axes, while ANTs' `--restrict-deformation` weighs the physical axes (x, y, z): a sagittal or coronal fixed grid frees another world axis and holds the phase encoding at 0.1 | the 1.0 on the phase encoding's world axis (rule A); the same restriction for a grid in R, A, S order (fMRIPrep's axial EPIs) | `warp_dir`, `syn_sdc_workflow` |
 | SDC-15 | `init_syn_sdc_wf`'s `zooms_epi` regrids the clipped EPI and nothing reads it | kept as sdcflows (rule C: no result depends on it); larmorx does not compute it (`zooms` holds its voxel size) | `syn_sdc_workflow` |
+| SDC-17 | sdcflows 2.17.1 lacks three corrections of its 2.15.2 (published after 2.17.1): `bids_filters` also restrict the fieldmap-less estimation's anatomical reference and targets (a `datatype: fmap` filter finds no T1w), no sessionless anatomical reference serves sessioned runs, and the `acquisition`/`ceagent` filters never reach the EPI heuristics (it reads the key `acquisitions`) | 2.15.2's search (rule A, the upstream's own correction) | `find_estimators`, `map_fieldmap_estimation` |
+| SDC-18 | `bidict.add` names a new estimator with the last free `auto_` index in `range(len(used) + 1)`, not the first | kept (rule C: the names are in fMRIPrep's and sdcflows' derivatives and logs) | `bidict.add`, `FieldmapEstimation`, `find_estimators` |
+| SDC-19 | the `B0FieldIdentifier` estimators are built in a Python `set`'s order, which changes between processes | pybids' natural order of the identifiers, in both modes (nondeterminism is never reproduced) | `find_estimators` |
+| SDC-20 | `get_identifier`'s `KeyError` for an unknown `by` is the literal text `'{by}'` (a raw string, not an f-string) | the table's name (rule A for the message) | `get_identifier` |
+| SDC-21 | the files whose `B0FieldIdentifier` is a list are found by a case-insensitive regular-expression search of *every* filter: subject `01` also matches `010` and `101`, `part-mag` matches `part-imag`, and the identifier `pe` matches `"PE"`, so other subjects' or identifiers' files join the estimator | exact filters and the identifier a member of the list (rule A) | `find_estimators` |
 
 fMRIPrep 25.2.6 reaches none of them on its own paths (it reconstructs fields with its own
 `ReconstructFieldmap` on the field map's grid, passes FSL's letters to `TOPUPCoeffReorient`,

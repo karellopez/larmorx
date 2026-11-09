@@ -49,6 +49,11 @@ Rust (``larmorx-sdcflows``):
   fieldmap-less (SyN) preprocessing (``init_syn_preprocessing_wf``) and its helpers.
 - :func:`syn_sdc_workflow`, :func:`warp_dir`, :func:`mm2vox`, :func:`adjust_zooms`,
   :func:`norm_lap`: the fieldmap-less (SyN) estimation (``init_syn_sdc_wf``) and its helpers.
+- :class:`FieldmapFile`, :class:`FieldmapEstimation`, :class:`EstimatorType`,
+  :class:`FieldmapRegistry` (:data:`REGISTRY`), :func:`get_identifier`, :func:`clear_registry`,
+  :func:`find_estimators`, :func:`find_anatomical_estimators`: the estimators of a BIDS dataset
+  (``fieldmaps.py``, ``utils/bimap.py``, ``utils/wrangler.py``), on a
+  :class:`larmorx.bids.BIDSLayout`.
 
 sdcflows' files are written as nibabel writes them (the header's data type, scaled into an
 integer type): :func:`larmorx.io.save_nibabel`.
@@ -70,6 +75,22 @@ from larmorx.sdcflows.coeffs import (
     reorient_pedir,
     topup_coeff_reorient,
     transform_coefficients,
+)
+from larmorx.sdcflows.estimators import (
+    MODALITIES,
+    REGISTRY,
+    SDCFLOWS_VERSIONS,
+    EstimatorRegistry,
+    EstimatorType,
+    FieldmapEstimation,
+    FieldmapFile,
+    FieldmapRegistry,
+    ImageFileError,
+    MetadataError,
+    bidict,
+    clear_registry,
+    get_identifier,
+    relative_to_root,
 )
 from larmorx.sdcflows.fmap import (
     DisplacementsResult,
@@ -154,12 +175,16 @@ from larmorx.sdcflows.workflows import (
     fmap_workflow,
     magnitude_workflow,
 )
+from larmorx.sdcflows.wrangler import find_anatomical_estimators, find_estimators
 
 __all__ = [
     "DEFAULT_HF_ZOOMS_MM",
     "DEFAULT_LF_ZOOMS_MM",
     "DEFAULT_ZOOMS_MM",
+    "MODALITIES",
     "NOT_ALIGNED",
+    "REGISTRY",
+    "SDCFLOWS_VERSIONS",
     "ApplyCoeffsFieldResult",
     "B0FieldTransform",
     "BSplineApproxResult",
@@ -170,9 +195,16 @@ __all__ = [
     "CoefficientsResult",
     "CsrMatrix",
     "DisplacementsResult",
+    "EstimatorRegistry",
+    "EstimatorType",
+    "FieldmapEstimation",
+    "FieldmapFile",
+    "FieldmapRegistry",
     "FmapWorkflowResult",
     "GetReadoutTimeResult",
+    "ImageFileError",
     "MagnitudeWorkflowResult",
+    "MetadataError",
     "PhaseResult",
     "PhdiffWorkflowResult",
     "RidgeResult",
@@ -186,6 +218,7 @@ __all__ = [
     "adjust_zooms",
     "apply_coeffs_field",
     "au2rads",
+    "bidict",
     "binary_dilation",
     "brain_extraction",
     "brain_masker",
@@ -194,6 +227,7 @@ __all__ = [
     "bspline_grid",
     "check_b0_units",
     "check_register",
+    "clear_registry",
     "coeff2epi_workflow",
     "collocation_matrix",
     "delta_te",
@@ -201,10 +235,13 @@ __all__ = [
     "deoblique_and_zooms",
     "disp_to_fmap",
     "displacements_field_to_fieldmap",
+    "find_anatomical_estimators",
+    "find_estimators",
     "fmap_atlas",
     "fmap_atlas_affine",
     "fmap_to_disp",
     "fmap_workflow",
+    "get_identifier",
     "get_readout_time",
     "get_trt",
     "grid_bspline_weights",
@@ -217,6 +254,7 @@ __all__ = [
     "phdiff2fmap",
     "phdiff_workflow",
     "registration_settings",
+    "relative_to_root",
     "reoblique",
     "reorient_image_and_metadata",
     "reorient_pedir",

@@ -90,6 +90,19 @@ class _Undefined:
 UNDEFINED: Any = _Undefined()
 
 
+class TraitError(Exception):
+    """traits' ``TraitError``: an interface's input or output of the wrong type (nipype
+    validates an interface's outputs against its output spec)."""
+
+
+def trait_error(spec: str, name: str, info: str, value: Any) -> TraitError:
+    """traits' message for ``value`` set on the trait ``name`` of a ``spec`` instance."""
+    return TraitError(
+        f"The '{name}' trait of a {spec} instance must be {info}, but a value of {value!r} "
+        f"{type(value)!r} was specified."
+    )
+
+
 def isdefined(value: Any) -> bool:
     return value is not UNDEFINED
 
@@ -1175,9 +1188,11 @@ class _DenoiseImage(_AntsCommand):
         return super().format_arg(t, value)
 
     def list_outputs(self) -> dict[str, Any]:
+        # nipype's CommandLine._list_outputs lists every name_source input's file name, so
+        # noise_image is listed whether or not the program writes it (save_noise False and no
+        # noise_image: no such file; PIPE-38, rule C: nipype's listing kept)
         out = super().list_outputs()
-        if self.get("save_noise") or self.defined("noise_image"):
-            out["noise_image"] = self.abspath(self.filename_from_source("noise_image"))
+        out["noise_image"] = self.abspath(self.filename_from_source("noise_image"))
         return out
 
 

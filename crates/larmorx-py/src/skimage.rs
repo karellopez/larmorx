@@ -344,7 +344,10 @@ fn sdcflows_brain_masker<'py>(
             larmorx_core::parallel::with_threads(n_threads, || brain_masker(&v, shape, zooms, opts))
         })
         .map_err(|e| PyValueError::new_err(e.to_string()))?
-        .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        .map_err(|e| match e {
+            larmorx_sdcflows::SdcError::Index(m) => PyIndexError::new_err(m),
+            other => PyValueError::new_err(other.to_string()),
+        })?;
     Ok((
         to_py(py, &sh, out.probseg)?,
         to_py(py, &sh, out.mask)?,

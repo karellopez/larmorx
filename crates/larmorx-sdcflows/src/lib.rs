@@ -45,6 +45,10 @@ pub enum SdcError {
     /// Arguments sdcflows (or numpy under it) rejects; the message is the original's.
     #[error("{0}")]
     Invalid(String),
+    /// What numpy raises as `IndexError` (the percentile of an empty array); the message is
+    /// numpy's.
+    #[error("{0}")]
+    Index(String),
     /// `numpy.linalg.inv` of a singular matrix.
     #[error("Singular matrix")]
     Singular,

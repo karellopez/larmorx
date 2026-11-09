@@ -811,6 +811,11 @@ def cases(suite: str, tier: str) -> list[Case]:
 
 
 def run_case(case: Case, checks: CheckList) -> None:
+    if case.payload[0] == "random":  # random testing's case or a permanent one
+        from larmorx_validation.parity import fieldmaps_b_random
+
+        fieldmaps_b_random.run_case(case, checks)
+        return
     suite, cid = case.payload
     spec = SUITES[suite][cid]
     if os.environ.get(pv.STEP_RECORD) and not spec.step:

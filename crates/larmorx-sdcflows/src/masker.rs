@@ -140,8 +140,11 @@ pub fn brain_masker(
     }
     // data[data < percentile(data[data > 0], 15)] = 0
     let pos: Vec<f32> = d.iter().copied().filter(|&x| x > 0.0).collect();
-    let p15 = quantile::percentile_linear_weak(&pos, 15.0, opts.numpy)
-        .map_err(|e| SdcError::Invalid(e.to_string()))?;
+    // (no positive value: numpy's IndexError of the empty array's percentile)
+    let p15 = quantile::percentile_linear_weak(&pos, 15.0, opts.numpy).map_err(|e| match e {
+        quantile::PercentileError::Empty => SdcError::Index(e.to_string()),
+        quantile::PercentileError::Range => SdcError::Invalid(e.to_string()),
+    })?;
     drop(pos);
     for x in &mut d {
         if *x < p15 {

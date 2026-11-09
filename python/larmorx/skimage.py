@@ -280,25 +280,10 @@ def random_walker(
     labels_dtype = labels.dtype
     if copy:
         labels = np.copy(labels)
-    if mode is None:
-        mode = "cg_j"
-    if mode == "cg_mg":
-        warnings.warn(
-            '"cg_mg" not available, it requires pyamg to be installed. The "cg_j" mode will '
-            "be used instead.",
-            stacklevel=2,
-        )
-        mode = "cg_j"
-    if mode == "bf":
-        raise NotImplementedError(
-            "random_walker(mode='bf') (SciPy's spsolve) is not ported; use 'cg_j' or 'cg'"
-        )
-    if mode == "cg":
-        warnings.warn(
-            '"cg" mode may be slow because UMFPACK is not available. Consider building Scipy '
-            'with UMFPACK or use a preconditioned version of CG ("cg_j" or "cg_mg" modes).',
-            stacklevel=2,
-        )
+    # scikit-image's _solve_linear_system names the mode it replaces (and refuses nothing)
+    # only when there is a system to solve: after _preprocess's early returns, below
+    asked = "cg_j" if mode is None else mode
+    mode = "cg_j" if asked in ("cg_mg", "bf") else asked
     gtype = np.result_type(data.dtype, spacing.dtype)
     sp = np.ascontiguousarray(spacing, dtype=np.float32 if gtype == np.float32 else np.float64)
     if data.dtype not in (np.float32, np.float64):
@@ -359,6 +344,22 @@ def random_walker(
         if return_full_prob:
             return _seeds_as_probabilities(labels, upstream_defects)
         return labels
+    if asked == "cg_mg":
+        warnings.warn(
+            '"cg_mg" not available, it requires pyamg to be installed. The "cg_j" mode will '
+            "be used instead.",
+            stacklevel=2,
+        )
+    if asked == "bf":
+        raise NotImplementedError(
+            "random_walker(mode='bf') (SciPy's spsolve) is not ported; use 'cg_j' or 'cg'"
+        )
+    if asked == "cg":
+        warnings.warn(
+            '"cg" mode may be slow because UMFPACK is not available. Consider building Scipy '
+            'with UMFPACK or use a preconditioned version of CG ("cg_j" or "cg_mg" modes).',
+            stacklevel=2,
+        )
     for w in res["warnings"]:
         warnings.warn(w, stacklevel=2)
     if res["numbering_differs"]:

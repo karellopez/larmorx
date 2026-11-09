@@ -396,6 +396,8 @@ defects! {
         "label into a bool output writes the labels as their bytes (2, 3, ... up to 255): an invalid bool array, where labels that do not fit any other type are refused (RuntimeError)";
     SCI_30 = "SCI-30", "SciPy ndimage", true,
         "sum_labels (sum, center_of_mass) with a sequence index fails on a 0-d index array (TypeError: numpy.int64 does not support item assignment) and on an empty input (ValueError of labels.min(), or IndexError for uint64 labels)";
+    SCI_31 = "SCI-31", "SciPy ndimage", true,
+        "a binary erosion or dilation of more than one pass (the propagation strategy: the structure's centre true, no brute_force; binary_opening, binary_closing and binary_propagation too) with an int8 mask array uses the caller's mask as its scratch, as SciPy's cast to int8 does not copy it: the mask is left -1 where it was true and the first pass's output where it was false, and binary_closing's erosion then reads that overwritten mask, so its result differs";
     SDC_01 ="SDC-01", "sdcflows", true,
         "grid_bspline_weights gives a sampling position beyond the first or the last control point (within distance 2 of it) the end interval's polynomial continued (SciPy's BSpline extrapolation) instead of the cubic B-spline's value: at 1.5 control spacings beyond the grid the weight is -3.27 instead of 0.0208, so a field evaluated there (B0FieldTransform.fit's grid of an oblique target, a target larger than the field map) is wrong by up to the field's own size";
     SDC_02 = "SDC-02", "sdcflows", true,
@@ -458,6 +460,8 @@ defects! {
         "brain_masker with no brain seed left after the rough mask's erosion takes the background's probability as the brain's";
     SDC_45 = "SDC-45", "sdcflows", true,
         "FieldmapFile takes its entities from the file's absolute path, where pybids' derivatives patterns (den-, res-, desc-, label-, ...) have no separator before them: a dataset below a folder such as golden-clone or andres-lab gives every file den or res, and the fieldmap-less search queries the layout with them and stops (ValueError: 'den' is not a recognized entity)";
+    SDC_46 = "SDC-46", "sdcflows", true,
+        "brain_masker with padding=0 crops its random walker's probabilities with [..., 0:-0, 0:-0, 0:-0], an empty slice: the probability and the mask are written as empty (0 x 0 x 0) images and the brain is written unmasked (an empty boolean index changes nothing)";
     SKI_01 = "SKI-01", "scikit-image random_walker", true,
         "with a mask (negative labels or isolated seeds) the Laplacian's nodes are numbered by the remaining edges' ends but the labels by the mask, so a mask pixel without a neighbour in it shifts every later node and the system pairs labels with the wrong pixels";
     SKI_02 = "SKI-02", "scikit-image match_histograms", true,

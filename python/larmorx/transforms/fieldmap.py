@@ -458,7 +458,7 @@ def distortion_parameters(
     them undefined (PIPE-20, kept: the run is then resampled without its field map); larmorx
     warns when it happens (``upstream_defects="fix"``). Other errors (``in_file`` needed but
     not given) are raised, as in fMRIPrep."""
-    from larmorx.sdcflows.pepolar import _float_trait, get_trt
+    from larmorx.sdcflows.pepolar import _enum_trait, _float_trait, get_trt
 
     _defects.check(upstream_defects)
     fb = _fallback(fallback)
@@ -482,14 +482,13 @@ def distortion_parameters(
                 UserWarning,
                 stacklevel=2,
             )
+    spec = "DistortionParametersOutputSpec"
     ro = (
-        _float_trait(results["readout_time"], "readout_time") if "readout_time" in results else None
+        _float_trait(results["readout_time"], "readout_time", spec)
+        if "readout_time" in results
+        else None
     )
     pe = results.get("pe_direction")
-    if pe is not None and pe not in _PE_DIRECTIONS:
-        raise TypeError(
-            "The 'pe_direction' trait of a DistortionParametersOutputSpec instance must be "
-            + " or ".join(repr(p) for p in _PE_DIRECTIONS)
-            + f", but a value of {pe!r} {type(pe)} was specified."
-        )
+    if pe is not None:
+        _enum_trait(pe, "pe_direction", spec, _PE_DIRECTIONS)
     return DistortionParametersResult(ro, pe)

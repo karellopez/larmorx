@@ -1387,6 +1387,11 @@ _SCI25 = (
     "into a float32 or float64 output array the later passes erode elements outside the mask "
     "(SciPy marks them by the first byte of each element, 0 for 0.0 and 1.0)"
 )
+_SCI31 = (
+    "the passes after the first use an int8 mask array as their scratch (SciPy's cast to int8 "
+    "does not copy it): the caller's mask is left -1 where it was true and the first pass's "
+    "output where it was false (binary_closing's erosion then reads that mask)"
+)
 
 
 def _binary_erosion(
@@ -1412,7 +1417,9 @@ def _binary_erosion(
 
     Defects (``upstream_defects``): SCI-10 (the later passes read the mask cast to ``int8``),
     SCI-25 (into a float output array the later passes erode outside the mask), SCI-26 (numpy's
-    write-back warning for a byte-swapped or misaligned output array; ``reproduce`` only)."""
+    write-back warning for a byte-swapped or misaligned output array; ``reproduce`` only),
+    SCI-31 (the later passes overwrite the caller's ``int8`` mask array: ``reproduce`` writes
+    SciPy's values into it, the default leaves it as given)."""
     _defects.check(upstream_defects)
     try:
         iterations = operator.index(iterations)
@@ -1438,6 +1445,8 @@ def _binary_erosion(
     structure = np.ascontiguousarray(structure)
     if structure.size < 1:
         raise RuntimeError("structure must not be empty")
+    # SCI-31: the caller's own int8 array (numpy's cast to int8 returns it, or a view of it)
+    caller_int8 = isinstance(mask, np.ndarray) and mask.dtype == np.int8
     if mask is not None:
         mask = np.asarray(mask)
         if mask.shape != input.shape:
@@ -1527,8 +1536,24 @@ def _binary_erosion(
             other = run(mdata) if reproduce else run(m_fix, protect=False)
             if not np.array_equal(out, other):
                 notices.append(("SCI-25", "SciPy ndimage", upstream_defects, _SCI25))
+        scratch = None
+        if lists and caller_int8:
+            # SCI-31: NI_BinaryErosion2 marks the mask's elements (-1 where true; where false,
+            # the first byte of the output element after the first pass, which it then sets
+            # false) and restores only the output; the mask stays so
+            first = run(mdata, 1).reshape(input.shape)
+            odt = out_dtype.newbyteorder("=")
+            b0 = np.ascontiguousarray(first.astype(odt)).view(np.uint8)
+            b0 = b0.reshape(first.size, odt.itemsize)[:, 0].view(np.int8).reshape(input.shape)
+            scratch = np.where(mask != 0, np.int8(-1), b0)
+            if np.array_equal(scratch, mask):
+                scratch = None
+            else:
+                notices.append(("SCI-31", "SciPy ndimage", upstream_defects, _SCI31))
         if notices:
             _defects.warn(notices, stacklevel=3)
+        if scratch is not None and reproduce:
+            _write_scratch(mask, scratch)
         out = out.reshape(input.shape)
     if lists and reproduce and out_arr is not None and _needs_writeback(out_arr, shares):
         # SCI-26 reproduced: NI_BinaryErosion2's write-back copy is never resolved
@@ -1537,6 +1562,23 @@ def _binary_erosion(
         return out.view(np.bool_)
     np.copyto(out_arr, out, casting="unsafe")
     return out_arr
+
+
+def _write_scratch(mask: np.ndarray, scratch: np.ndarray) -> None:
+    """SCI-31 reproduced: SciPy's values written into the caller's mask (a read-only one too,
+    as SciPy's C writes through its pointer, where numpy lets the flag be lifted)."""
+    lifted = False
+    if not mask.flags.writeable:
+        try:
+            mask.flags.writeable = True
+            lifted = True
+        except ValueError:
+            return  # memory numpy does not let be written: never written
+    try:
+        mask[...] = scratch
+    finally:
+        if lifted:
+            mask.flags.writeable = False
 
 
 def binary_erosion(

@@ -49,7 +49,7 @@ from typing import Any, Literal
 
 import numpy as np
 
-from larmorx import _core, _defects, _replica
+from larmorx import _core, _defects, _nipype, _replica
 from larmorx._defects import UpstreamDefectsName
 from larmorx.image import Image
 from larmorx.io.nibabel_header import load_nibabel
@@ -192,13 +192,19 @@ class GetReadoutTimeResult:
     pe_dir_fsl: str
 
 
-def _float_trait(value: Any, name: str) -> float:
-    """nipype's ``traits.Float`` check of an output: an int or float (bools are ints)."""
+def _float_trait(value: Any, name: str, spec: str) -> float:
+    """nipype's ``traits.Float`` check of an output of a ``spec`` instance: an int or float
+    (bools are ints), else traits' ``TraitError``."""
     if isinstance(value, (bool, int, float, np.integer, np.floating)):
         return float(value)
-    raise TypeError(
-        f"The '{name}' trait of an output must be a float, but a value of {value!r} was specified."
-    )
+    raise _nipype.trait_error(spec, name, "a float", value)
+
+
+def _enum_trait(value: Any, name: str, spec: str, values: tuple[str, ...]) -> Any:
+    """nipype's ``traits.Enum`` check of an output."""
+    if value in values:
+        return value
+    raise _nipype.trait_error(spec, name, " or ".join(repr(v) for v in values), value)
 
 
 def get_readout_time(
@@ -209,11 +215,18 @@ def get_readout_time(
 ) -> GetReadoutTimeResult:
     """sdcflows' ``GetReadoutTime``: :func:`get_trt` (``fallback`` 0 or ``None`` is no
     fallback) and the metadata's ``PhaseEncodingDirection`` (``KeyError`` when absent), in
-    FSL's letters too (``i`` -> ``x``, ``j`` -> ``y``, ``k`` -> ``z``)."""
+    FSL's letters too (``i`` -> ``x``, ``j`` -> ``y``, ``k`` -> ``z``). The outputs are
+    checked as nipype checks them (traits' ``TraitError``), in their declared order (nipype's
+    order follows the process's string hashes: PIPE-39)."""
     trt = get_trt(metadata, in_file, use_estimate=use_estimate, fallback=fallback or None)
     pe = metadata["PhaseEncodingDirection"]
     fsl = pe.replace("i", "x").replace("j", "y").replace("k", "z")
-    return GetReadoutTimeResult(_float_trait(trt, "readout_time"), pe, fsl)
+    spec = "_GetReadoutTimeOutputSpec"
+    return GetReadoutTimeResult(
+        _float_trait(trt, "readout_time", spec),
+        _enum_trait(pe, "pe_direction", spec, ("i", "i-", "j", "j-", "k", "k-")),
+        _enum_trait(fsl, "pe_dir_fsl", spec, ("x", "x-", "y", "y-", "z", "z-")),
+    )
 
 
 # ------------------------------------------------------------------------------------------
@@ -318,11 +331,8 @@ def _regridded(nii: Image, ref: Image, n_threads: int) -> np.ndarray:
     from larmorx.ndimage import map_coordinates
 
     data = np.asanyarray(nii.data)
-    if data.ndim != 3:
-        raise NotImplementedError(
-            "UniformGrid resamples 3D images here (sdcflows' PEPOLAR averages and volumes); "
-            f"this input has {data.ndim} dimensions"
-        )
+    # (an image of other than three dimensions: SciPy's RuntimeError "invalid shape for
+    # coordinate array" from map_coordinates, as nitransforms' apply raises it)
     shape3 = tuple(int(n) for n in ref.shape[:3])
     coords = _core.sdcflows_affine_coordinates(
         shape3,

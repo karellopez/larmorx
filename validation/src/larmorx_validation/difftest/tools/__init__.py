@@ -53,6 +53,9 @@ TOOLS: dict[str, tuple[str, str]] = {
     "fsl-prelude-original": ("fsl_prelude_original", "TOOL"),
     "resample-series": ("resample_series", "TOOL"),
     "sdcflows-fieldmap": ("sdcflows_fieldmap", "TOOL"),
+    "ndimage-skimage": ("fieldmaps_b", "NDIMAGE"),
+    "niworkflows-helpers": ("fieldmaps_b", "NIWORKFLOWS"),
+    "sdcflows-estimation": ("fieldmaps_b", "ESTIMATION"),
 }
 
 #: Tools that test the harness itself: run only when named, never part of ``all``.

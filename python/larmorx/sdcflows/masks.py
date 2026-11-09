@@ -67,6 +67,12 @@ def _load(obj: Any, dtype: Any = None) -> Image:
     return img
 
 
+_SDC46 = (
+    "with padding=0 the probabilities are cropped to an empty slice ([..., 0:-0, ...]): sdcflows "
+    "writes the probability and the mask as empty images and the brain unmasked"
+)
+
+
 def _with_dtype(img: Image, data: np.ndarray, dtype: Any) -> Image:
     """``hdr = img.header.copy(); hdr.set_data_dtype(dtype)``; the image of ``data`` (the type
     is given to :func:`larmorx.io.save_nibabel` when written)."""
@@ -97,7 +103,9 @@ def brain_masker(
 
     Corrected by default (``upstream_defects='reproduce'`` gives sdcflows' results): an image
     whose rough mask has no component (sdcflows takes the whole image) and an image whose eroded
-    mask is empty (sdcflows takes the background's probability as the brain's) are errors."""
+    mask is empty (sdcflows takes the background's probability as the brain's) are errors
+    (SDC-37, SDC-38); ``padding=0`` gives the whole image's probability and mask, where sdcflows
+    writes them empty and the brain unmasked (SDC-46)."""
     _defects.check(upstream_defects)
     img = _load(in_file, np.float32)
     data = np.ascontiguousarray(img.data, dtype=np.float32)
@@ -118,9 +126,15 @@ def brain_masker(
 
     for w in warns:
         warnings.warn(w, stacklevel=2)
+    if int(padding) == 0:
+        # SDC-46: sdcflows crops with [..., padding:-padding, ...], empty for padding 0
+        _defects.warn([("SDC-46", "sdcflows brain_masker", upstream_defects, _SDC46)], stacklevel=2)
+        if upstream_defects == "reproduce":
+            prob = np.zeros((0, 0, 0), np.float32)
+            mask = np.zeros((0, 0, 0), np.uint8)
     raw = _load(in_file) if isinstance(in_file, (str, os.PathLike)) else as_image(in_file)
     brain_data = np.array(np.asanyarray(raw.data), copy=True)
-    brain_data[prob < 0.5] = 0
+    brain_data[prob < 0.5] = 0  # (an empty boolean index changes nothing: SDC-46)
     mask_img = _with_dtype(img, mask, np.uint8)
     prob_img = _with_dtype(img, prob, np.float32)
     brain_img = Image(brain_data, raw.affine, raw.header)

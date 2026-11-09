@@ -106,6 +106,9 @@ SUITES: dict[str, tuple[str, str]] = {
             "nifti-io",
             "resample-series",
             "sdcflows-fieldmap",
+            "ndimage-skimage",
+            "niworkflows-helpers",
+            "sdcflows-estimation",
         )
     },
     "itk-hdf5": ("itk-transforms", "port"),

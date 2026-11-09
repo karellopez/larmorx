@@ -73,7 +73,14 @@ STEP_SUITES = (
     "ndimage-skimage",
 )
 #: Random testing's tools of the same originals.
-TOOLS = ("resample-series", "nifti-io", "sdcflows-fieldmap")
+TOOLS = (
+    "resample-series",
+    "nifti-io",
+    "sdcflows-fieldmap",
+    "ndimage-skimage",
+    "niworkflows-helpers",
+    "sdcflows-estimation",
+)
 STEP_RECORD = "LARMORX_PYTHON_STEP_RECORD"
 STEP_FROM = "LARMORX_PYTHON_STEP_FROM"
 #: How many times the step runs the shared releases' cases (their originals' own variation).

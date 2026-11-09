@@ -836,8 +836,8 @@ def match_histogram(
     _defects.check(upstream_defects)
     image = os.fspath(image)
     img = load_nibabel(image, n_threads=n_threads)
-    img_data = np.array(np.asanyarray(img.data))
-    ref_data = np.asanyarray(load_nibabel(reference, n_threads=n_threads).data)
+    img_data = _dataobj(img, copy=True)
+    ref_data = _dataobj(load_nibabel(reference, n_threads=n_threads))
     ref_m = (
         np.ones_like(ref_data, dtype=bool)
         if ref_mask is None
@@ -881,6 +881,23 @@ def match_histogram(
         os.makedirs(newpath, exist_ok=True)
     save_nibabel(Image(img_data, img.affine, img.header), out_file, n_threads=n_threads)
     return out_file
+
+
+def _dataobj(img: Image, copy: bool = False) -> np.ndarray:
+    """``np.asanyarray(nb.load(f).dataobj)``: the stored type with the header's byte order
+    (``'<f4'``, which numpy's messages print as such) when the data are not scaled, else the
+    scaled values (float64, native)."""
+    data = np.asanyarray(img.data)
+    h = img.header
+    dt = None if h is None else getattr(h, "data_dtype", None)
+    if (
+        dt is not None
+        and h.slope_inter in (None, (1.0, 0.0))
+        and data.dtype == dt
+        and data.dtype.byteorder != dt.byteorder
+    ):
+        data = data.view(dt) if dt.isnative else data.astype(dt)
+    return np.array(data) if copy else data
 
 
 def _laplacian(op1: str, cwd: str, upstream_defects: str, n_threads: int) -> tuple[str, str]:

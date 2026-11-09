@@ -88,48 +88,71 @@ def nmi(a: np.ndarray, b: np.ndarray, bins: int = 64) -> float:
     return (ent(px) + ent(py)) / ent(p.ravel())
 
 
-def one(name: str, inp: dict, out: Path, seed: int, nt: int, as_meant: bool) -> dict:
-    from larmorx import sdcflows as sd
+def _3d(path: str) -> np.ndarray:
     from larmorx.io.nibabel_header import load_nibabel
+
+    a = np.asarray(load_nibabel(path).data, dtype=np.float64)
+    return a.reshape(a.shape[:3])
+
+
+def one(name: str, inp: dict, out: Path, seed: int, nt: int, as_meant: bool) -> dict:
+    """One run (its files' paths kept in ``<out>/<name>/paths.json``: a later call reuses
+    them), and its numbers."""
+    import json
+
+    from larmorx import sdcflows as sd
     from larmorx.sdcflows import syn as synmod
 
-    original = synmod.deoblique
-    if as_meant:
-        synmod.deoblique = deoblique_as_meant
-    try:
-        t0 = time.perf_counter()
-        pre = sd.syn_preprocessing_workflow(
-            **inp,
-            out_dir=out / name,
-            auto_bold_nss=True,
-            omp_nthreads=nt,
-            ants_random_seed=seed,
-            n_threads=nt,
-        )
-        res = sd.syn_sdc_workflow(
-            pre.epi_ref,
-            pre.epi_mask,
-            pre.anat_ref,
-            pre.anat_mask,
-            pre.sd_prior,
-            out_dir=out / name,
-            omp_nthreads=nt,
-            ants_random_seed=seed,
-            n_threads=nt,
-        )
-        dt = time.perf_counter() - t0
-    finally:
-        synmod.deoblique = original
-    epi = pre.epi_ref[0]
-    anat = on_epi(pre.anat_ref, epi, "Linear", out / name / "probe_anat", nt)
-    mask = on_epi(pre.anat_mask, epi, "MultiLabel", out / name / "probe_mask", nt) > 0
-    dist = np.asarray(load_nibabel(epi).data, dtype=np.float64)
-    corr = np.asarray(load_nibabel(res.fmap_ref).data, dtype=np.float64)
-    field = np.asarray(load_nibabel(res.fmap).data, dtype=np.float64)
+    record = out / name / "paths.json"
+    if record.exists():
+        paths = json.loads(record.read_text(encoding="utf-8"))
+    else:
+        original = synmod.deoblique
+        if as_meant:
+            synmod.deoblique = deoblique_as_meant
+        try:
+            t0 = time.perf_counter()
+            pre = sd.syn_preprocessing_workflow(
+                **inp,
+                out_dir=out / name,
+                auto_bold_nss=True,
+                omp_nthreads=nt,
+                ants_random_seed=seed,
+                n_threads=nt,
+            )
+            res = sd.syn_sdc_workflow(
+                pre.epi_ref,
+                pre.epi_mask,
+                pre.anat_ref,
+                pre.anat_mask,
+                pre.sd_prior,
+                out_dir=out / name,
+                omp_nthreads=nt,
+                ants_random_seed=seed,
+                n_threads=nt,
+            )
+            dt = time.perf_counter() - t0
+        finally:
+            synmod.deoblique = original
+        paths = {
+            "time": dt,
+            "epi": pre.epi_ref[0],
+            "reference": pre.epi_reference.epi_ref_file,
+            "anat_ref": pre.anat_ref,
+            "anat_mask": pre.anat_mask,
+            "fmap": res.fmap,
+            "fmap_ref": res.fmap_ref,
+        }
+        record.write_text(json.dumps(paths, indent=1), encoding="utf-8")
+    epi = paths["epi"]
+    anat = on_epi(paths["anat_ref"], epi, "Linear", out / name / "probe_anat", nt)
+    mask = on_epi(paths["anat_mask"], epi, "MultiLabel", out / name / "probe_mask", nt) > 0
+    anat, mask = anat.reshape(mask.shape[:3]), mask.reshape(mask.shape[:3])
+    dist, corr, field = _3d(epi), _3d(paths["fmap_ref"]), _3d(paths["fmap"])
     a = anat[mask]
     return {
-        "time": dt,
-        "plumb": epi != pre.epi_reference.epi_ref_file,
+        "time": paths["time"],
+        "plumb": epi != paths["reference"],
         "field": field,
         "mask": mask,
         "nmi_dist": nmi(dist[mask], a),

@@ -474,12 +474,43 @@ two `IntensityClip`s, N4, `StructuralReference`'s one-file shortcut), `GenerateS
   20.7 degrees (pixar008: 12.2, 20.7, 18.8 degrees per axis; ds004884: 2.5, 6.3, 5.8; ds005003:
   plumb), below the 28.6 degrees sdcflows' radians make of its threshold, so `Deoblique` and
   `Reoblique` pass them through; with the threshold in degrees pixar008's and ds004884's would be
-  made plumb. The measurement needs the SyN registration itself (relay 10).
+  made plumb. Measured with the SyN registration in relay 10 (below).
 - **ValidateImage's report**: the angle of a qform that only changes at a qform's precision is
   rounding noise (1e-17 radians); niworkflows' text needs the qform as the header stores it
   (`float32`) and transforms3d's `decompose44` as it computes it, then the same numpy `eig`.
 - **PIPE-23** (nipype's `is_outlier`, rule A) and **PIPE-24** (`ValidateImage`'s report with an
   unknown unit code, rule A): `docs/api/niworkflows-helpers.md`.
+
+## The fieldmap-less (SyN) estimation (relay 10)
+
+`lx.sdcflows.syn_sdc_workflow` (`init_syn_sdc_wf`) with its helpers `warp_dir`, `mm2vox`,
+`adjust_zooms`, `norm_lap` (`check_syn_sdc.py`):
+
+- **fMRIPrep's own nodes, each fed fMRIPrep's inputs** (the five SyN estimators of the three
+  `--use-syn-sdc` runs; after the registration, fMRIPrep's own warp): `readout_time`,
+  `clip_epi` (numpy 2.2.6's percentiles), `lap_anat` and `lap_epi` (ANTs' `ImageMath Laplacian`
+  with nipype's `copy_header`) and their command lines, `lap_anat_norm`, `lap_epi_norm`,
+  `anat_dilmsk`, `amask2epi`, `epi_umask`, `find_zooms` (numpy 2's float32 scalars, compared by
+  their reprs), `warp_dir`, `vox_params` (numpy's float64 scalars), the registration's command
+  line, `extract_field`, `zooms_field`, `zooms_bmask` (and their command lines), `bs_filter` and
+  `unwarp` are fMRIPrep's files and values. RESULTS_NODES
+- **The registration** (sdcflows' `sd_syn.json`: two SyN stages with two Mattes metrics each,
+  80 % of the voxels sampled at random in the first): RESULTS_SYN
+- **The whole function against sdcflows' own graph**: RESULTS_WORKFLOW
+- **SDC-16 (`_warp_dir`'s axis, rule A)**: ANTs' `--restrict-deformation` weighs the
+  deformation's physical components (x, y, z): on a fixed image whose voxel axes are S, R, A,
+  the weights `1x0x0` move only physical x, in larmorx's port and in ANTs 2.6.5 itself, whose
+  warps are identical (`relay10/probe_restrict_axes.py`). sdcflows puts the 1.0 at the position
+  of the phase-encoding axis among the fixed image's voxel axes, which is the physical axis only
+  for a grid in R, A, S order: for a sagittal or coronal EPI (the fixed grid has the EPI's
+  orientation) the deformation along the phase encoding is held at 0.1 and another axis is
+  freed. larmorx frees the phase encoding's world axis (`reproduce`: sdcflows' position, with a
+  warning when they differ). fMRIPrep's SyN EPIs are axial: no change on its runs.
+- **SDC-13 (Deoblique's threshold, rule D), measured**: RESULTS_SDC13
+- **SDC-14** (`_norm_lap` of an image without positive or negative values: numpy's
+  `IndexError`, rule B) and **SDC-15** (`zooms_epi`, a node whose output nothing reads, rule C:
+  not computed): `docs/api/sdcflows-fieldmap.md`. `_warp_dir`'s `Logger.warn` is not a defect:
+  the deprecated alias still logs a warning in every Python larmorx supports.
 
 ## Candidates for the register (the part's defects relay decides them)
 

@@ -2,9 +2,9 @@
 """SciPy-compatible filters, morphology and labelling for ``lx.ndimage`` (imported there).
 
 A replica of ``scipy.ndimage``'s minimum, maximum, rank, median and percentile filters, grey
-and binary morphology, ``label``, ``sum_labels``, ``generate_binary_structure`` and
-``iterate_structure`` (SciPy 1.18.1; the C and Cython code of these functions is the same in
-SciPy 1.15.3), computed in Rust (``larmorx_ndimage``) with SciPy's results bit for bit: the
+and binary morphology, ``label``, ``sum_labels``, ``center_of_mass``, ``watershed_ift``,
+``generate_binary_structure`` and ``iterate_structure`` (SciPy 1.18.1; the C and Cython code
+of these functions is the same in SciPy 1.15.3), computed in Rust (``larmorx_ndimage``) with SciPy's results bit for bit: the
 boundary modes, the order a footprint is visited in, the comparisons (NaNs and signed zeros
 travel as in SciPy), the additions of a non-flat structuring element in the input's type,
 SciPy's quickselect for the rank filters and C's casts. The argument handling and messages
@@ -16,7 +16,9 @@ Differences from SciPy: complex inputs are not supported; ``output`` may be a dt
 integers beyond 2^53 cast to floats); the n-dimensional ``reflect`` boundary maps a coordinate
 two or more whole periods before an axis to index 0 where SciPy reads before the array (a
 footprint more than eight times the axis); a binary erosion or dilation iterated until nothing
-changes that alternates for ever raises instead of looping (``docs/api/ndimage-filters.md``).
+changes that alternates for ever raises instead of looping; ``watershed_ift`` corrects SciPy's
+neighbours across the array's edges, its queue that keeps an element alone in it and its 32-bit
+markers by default (``upstream_defects``; ``docs/api/ndimage-filters.md``).
 The work runs on ``n_threads`` threads with the GIL released; the result does not depend on
 the thread count.
 """
@@ -30,7 +32,8 @@ from typing import Any
 
 import numpy as np
 
-from larmorx import _core
+from larmorx import _core, _defects
+from larmorx._defects import UpstreamDefectsName
 
 __all__ = [
     "binary_closing",
@@ -40,6 +43,7 @@ __all__ = [
     "binary_hit_or_miss",
     "binary_opening",
     "binary_propagation",
+    "center_of_mass",
     "generate_binary_structure",
     "grey_closing",
     "grey_dilation",
@@ -56,6 +60,7 @@ __all__ = [
     "rank_filter",
     "sum",
     "sum_labels",
+    "watershed_ift",
 ]
 
 _FILTER_MODES = (
@@ -82,6 +87,9 @@ _TYPES = (
     np.int64,
 )
 
+
+#: The newest numpy release (the order of ``center_of_mass``'s sums by default).
+NUMPY_NEWEST = "2.5.4"
 
 # --- _ni_support ---------------------------------------------------------------------------
 
@@ -1069,6 +1077,166 @@ def sum_labels(input: Any, labels: Any = None, index: Any = None) -> Any:
     flat = [int(v) for v in idx.ravel()]
     res = np.asarray(_core.ndimage_sum_labels(data, lab, flat), dtype=np.float64)
     return res.reshape(idx.shape)
+
+
+def _sum_in_order(a: np.ndarray, numpy_version: str) -> Any:
+    """``a.sum()`` as numpy ``numpy_version`` adds it: float32 and float64 arrays contiguous in
+    C or Fortran order (their elements in memory order) by larmorx's port of numpy's sums
+    (pairwise from numpy 2.3, chunks of 8192 before); others by the installed numpy."""
+    if (
+        a.dtype in (np.float32, np.float64)
+        and a.dtype.isnative
+        and (a.flags.c_contiguous or a.flags.f_contiguous)
+    ):
+        flat = a.ravel(order="K")
+        return a.dtype.type(_core.numpy_add_reduce(flat, numpy_version))
+    return a.sum()
+
+
+def _sum_labels_in_order(a: np.ndarray, labels: Any, index: Any, numpy_version: str) -> Any:
+    """``sum_labels(a, labels, index)`` with the whole-array and selected sums in numpy
+    ``numpy_version``'s order (``_stats``' ``single_group``)."""
+    if labels is None:
+        return _sum_in_order(a, numpy_version)
+    lab = np.asarray(labels)
+    a, lab = np.broadcast_arrays(a, lab)
+    if index is None:
+        return _sum_in_order(a[lab > 0], numpy_version)
+    if np.isscalar(index):
+        return _sum_in_order(a[lab == index], numpy_version)
+    return sum_labels(a, lab, index)
+
+
+def center_of_mass(
+    input: Any,
+    labels: Any = None,
+    index: Any = None,
+    *,
+    numpy_version: str = NUMPY_NEWEST,
+) -> Any:
+    """``scipy.ndimage.center_of_mass``: the centre of mass of the values (of each label of
+    ``index``, of the positive labels, or of the whole array), a tuple per centre; each
+    coordinate is ``sum_labels(input * grid) / sum_labels(input)`` in float64.
+
+    numpy's sums depend on its release (pairwise from numpy 2.3, chunks of 8192 before): the
+    whole-array and selected sums of float32 and float64 values follow ``numpy_version`` (the
+    newest release by default) for arrays contiguous in C or Fortran order, the installed
+    numpy's for other layouts and types; the sums per label of a sequence ``index`` are
+    numpy's ``bincount`` (in C order, the same in every release)."""
+    input = np.asarray(input)
+    normalizer = _sum_labels_in_order(input, labels, index, numpy_version)
+    grids = np.ogrid[[slice(0, i) for i in input.shape]]
+    results = [
+        _sum_labels_in_order(input * grids[dir].astype(float), labels, index, numpy_version)
+        / normalizer
+        for dir in range(input.ndim)
+    ]
+    if np.isscalar(results[0]):
+        return tuple(results)
+    return [tuple(v) for v in np.array(results).T]
+
+
+#: The register's entries for ``watershed_ift``'s events (provisional IDs: the part registers
+#: them, ``docs/findings/scipy-ndimage-filters.md``, candidates 8 to 11).
+_WATERSHED_DEFECTS = (
+    ("SCI-W1", "SciPy links elements across the array's edges (it checks only the C-order index)"),
+    ("SCI-W2", "SciPy left an element alone in its queue there when its cost dropped"),
+    ("SCI-W3", "SciPy reads markers beyond 32 bits as C ints"),
+    (
+        "SCI-W4",
+        "SciPy's int byte offsets overflow above 2 GiB (it reads and writes outside its "
+        "arrays; never reproduced)",
+    ),
+)
+
+
+def watershed_ift(
+    input: Any,
+    markers: Any,
+    structure: Any = None,
+    output: Any = None,
+    *,
+    upstream_defects: UpstreamDefectsName = "fix",
+) -> np.ndarray:
+    """``scipy.ndimage.watershed_ift``: the watershed of a ``uint8`` or ``uint16`` image from
+    integer ``markers`` (positive: objects; negative: background, processed after them) by the
+    image foresting transform, with the ``structure``'s connectivity (``3`` along each axis; the
+    faces by default). The labels have the markers' type, or the integer ``output`` array's
+    (a non-array ``output`` is ignored, as SciPy ignores it).
+
+    Corrected by default (``upstream_defects="reproduce"`` gives SciPy's labels, bit for bit,
+    in 1.15.3 and 1.18.1): SciPy's neighbours across the array's edges (the last element of a
+    row neighbours the first of the next; an axis of length 1 has neighbours along it), its
+    queue that keeps an element alone in it when the element's cost drops, and its markers
+    read as 32-bit ``int``; an ``UpstreamDefectWarning`` says which, when the labels differ.
+    Arrays over 2 GiB are labelled with 64-bit offsets in both modes (SciPy's ``int`` offsets
+    read and write outside its arrays there)."""
+    _defects.check(upstream_defects)
+    input = np.asarray(input)
+    if input.dtype.type not in [np.uint8, np.uint16]:
+        raise TypeError("only 8 and 16 unsigned inputs are supported")
+
+    if structure is None:
+        structure = generate_binary_structure(input.ndim, 1)
+    structure = np.asarray(structure, dtype=bool)
+    if structure.ndim != input.ndim:
+        raise RuntimeError("structure and input must have equal rank")
+    for ii in structure.shape:
+        if ii != 3:
+            raise RuntimeError("structure dimensions must be equal to 3")
+
+    if not structure.flags.contiguous:
+        structure = structure.copy()
+    markers = np.asarray(markers)
+    if input.shape != markers.shape:
+        raise RuntimeError("input and markers must have equal shape")
+
+    integral_types = [np.int8, np.int16, np.int32, np.int64, np.intc, np.intp]
+
+    if markers.dtype.type not in integral_types:
+        raise RuntimeError("marker should be of integer type")
+
+    given = isinstance(output, np.ndarray)
+    if given:
+        if output.dtype.type not in integral_types:
+            raise RuntimeError("output should be of integer type")
+        if output.shape != input.shape:
+            raise RuntimeError("output shape not correct")
+        out_dtype = output.dtype
+    else:
+        out_dtype = markers.dtype
+    if input.ndim > 7:
+        raise RuntimeError("too many dimensions")
+    if not input.dtype.isnative:
+        input = input.astype(input.dtype.newbyteorder("="))
+    if not markers.dtype.isnative:
+        markers = markers.astype(markers.dtype.newbyteorder("="))
+    labels, events, differ = _core.ndimage_watershed_ift(
+        input, markers, structure, 8 * out_dtype.itemsize, upstream_defects == "reproduce"
+    )
+    if differ:
+        _defects.warn(
+            [
+                (
+                    entry,
+                    "SciPy watershed_ift",
+                    upstream_defects,
+                    f"the labels of {differ} of {labels.size} elements differ ({what})",
+                )
+                for (entry, what), happened in zip(_WATERSHED_DEFECTS, events, strict=True)
+                if happened
+            ],
+            stacklevel=2,
+        )
+    elif events[3]:
+        entry, what = _WATERSHED_DEFECTS[3]
+        _defects.warn([(entry, "SciPy watershed_ift", upstream_defects, what)], stacklevel=2)
+    if given:
+        output[...] = labels
+        return output
+    if out_dtype == labels.dtype:
+        return labels
+    return labels.astype(out_dtype)
 
 
 def sum(input: Any, labels: Any = None, index: Any = None) -> Any:

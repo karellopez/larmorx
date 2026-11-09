@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
-//! Bindings for `larmorx_ndimage` (SciPy's filters, morphology and labelling) and for the parts
-//! of `larmorx_core::numpy` that `lx.ndimage`, the field-map ports and their checks call
-//! (percentiles, medians, `clip`, float32 `exp`).
+//! Bindings for `larmorx_ndimage` (SciPy's filters, morphology, labelling and watershed) and
+//! for the parts of `larmorx_core::numpy` that `lx.ndimage`, the field-map ports and their
+//! checks call (percentiles, medians, `clip`, float32 `exp`).
 //!
 //! Arrays of any layout are read in place when they are contiguous in some axis order, else
 //! copied once; results are C-ordered (SciPy's). Boolean arrays come in as `uint8` views. The
@@ -560,6 +560,87 @@ fn ndimage_sum_labels<'py>(
     by_dtype!(input, sum_labels_t, py, labels, &index)
 }
 
+/// A C-ordered view of an array's values: borrowed when the array is C-contiguous, else
+/// copied in C order.
+fn c_order<'a, T: Copy>(a: &ArrayViewD<'a, T>) -> Cow<'a, [T]> {
+    match a.to_slice() {
+        Some(s) => Cow::Borrowed(s),
+        None => Cow::Owned(a.iter().copied().collect()),
+    }
+}
+
+/// The labels and events of one watershed, for Python.
+type WatershedOut<'py> = (Bound<'py, PyArrayDyn<i64>>, (bool, bool, bool, bool), usize);
+
+fn watershed_m<'py, T: nd::WatershedInput + Element, M: nd::MarkerValue + Element>(
+    py: Python<'py>,
+    input: &[T],
+    shape: &[usize],
+    markers: PyReadonlyArrayDyn<'py, M>,
+    st: &Footprint,
+    output_bits: u32,
+    reproduce: bool,
+) -> PyResult<WatershedOut<'py>> {
+    let mv = markers.as_array();
+    let m = c_order(&mv);
+    let (w, differ) = py
+        .detach(|| nd::watershed_ift(input, shape, &m, st, output_bits, reproduce))
+        .map_err(nd_err)?;
+    let e = w.events;
+    Ok((
+        to_py(py, shape, w.labels)?,
+        (e.across_edge, e.stale_queue, e.truncated, e.oversize),
+        differ,
+    ))
+}
+
+fn watershed_t<'py, T: nd::WatershedInput + Element>(
+    input: PyReadonlyArrayDyn<'py, T>,
+    py: Python<'py>,
+    markers: &Bound<'py, PyAny>,
+    st: &Footprint,
+    output_bits: u32,
+    reproduce: bool,
+) -> PyResult<WatershedOut<'py>> {
+    let view = input.as_array();
+    let shape = view.shape().to_vec();
+    let data = c_order(&view);
+    if let Ok(m) = markers.extract::<PyReadonlyArrayDyn<'_, i64>>() {
+        watershed_m(py, &data, &shape, m, st, output_bits, reproduce)
+    } else if let Ok(m) = markers.extract::<PyReadonlyArrayDyn<'_, i32>>() {
+        watershed_m(py, &data, &shape, m, st, output_bits, reproduce)
+    } else if let Ok(m) = markers.extract::<PyReadonlyArrayDyn<'_, i16>>() {
+        watershed_m(py, &data, &shape, m, st, output_bits, reproduce)
+    } else if let Ok(m) = markers.extract::<PyReadonlyArrayDyn<'_, i8>>() {
+        watershed_m(py, &data, &shape, m, st, output_bits, reproduce)
+    } else {
+        Err(PyRuntimeError::new_err("marker should be of integer type"))
+    }
+}
+
+/// `NI_WatershedIFT(input, markers, structure, output)` with an output of `output_bits` bits
+/// (signed): `(int64 labels, (across_edge, stale_queue, truncated, oversize), differ)`, SciPy's
+/// labels with `reproduce`, else the corrected ones; the events are SciPy's run's, `differ` the
+/// number of elements the two runs label differently (`larmorx_ndimage::watershed_ift`).
+#[pyfunction]
+fn ndimage_watershed_ift<'py>(
+    py: Python<'py>,
+    input: &Bound<'py, PyAny>,
+    markers: &Bound<'py, PyAny>,
+    structure: PyReadonlyArrayDyn<'py, bool>,
+    output_bits: u32,
+    reproduce: bool,
+) -> PyResult<WatershedOut<'py>> {
+    let st = self::footprint(&structure)?;
+    if let Ok(x) = input.extract::<PyReadonlyArrayDyn<'_, u8>>() {
+        watershed_t(x, py, markers, &st, output_bits, reproduce)
+    } else if let Ok(x) = input.extract::<PyReadonlyArrayDyn<'_, u16>>() {
+        watershed_t(x, py, markers, &st, output_bits, reproduce)
+    } else {
+        Err(PyRuntimeError::new_err("data type not supported"))
+    }
+}
+
 fn release(name: &str) -> PyResult<NumpyRelease> {
     NumpyRelease::from_version(name)
         .ok_or_else(|| PyValueError::new_err(format!("not a numpy 2 version: {name:?}")))
@@ -713,6 +794,7 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(ndimage_binary_erosion, m)?)?;
     m.add_function(wrap_pyfunction!(ndimage_label, m)?)?;
     m.add_function(wrap_pyfunction!(ndimage_sum_labels, m)?)?;
+    m.add_function(wrap_pyfunction!(ndimage_watershed_ift, m)?)?;
     m.add_function(wrap_pyfunction!(numpy_percentile_weak, m)?)?;
     m.add_function(wrap_pyfunction!(numpy_percentile, m)?)?;
     m.add_function(wrap_pyfunction!(numpy_add_reduce, m)?)?;

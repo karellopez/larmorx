@@ -2,8 +2,8 @@
 """SciPy-compatible spline interpolation, filters, morphology and labelling: ``lx.ndimage``.
 
 The filters (minimum, maximum, rank, median, percentile), grey and binary morphology,
-``label`` and ``sum_labels`` are SciPy 1.18.1's, bit for bit, from ``larmorx._ndimage_filters``
-(``docs/api/ndimage-filters.md``). The rest of this text is about the interpolation.
+``label``, ``sum_labels``, ``center_of_mass`` and ``watershed_ift`` are SciPy 1.18.1's, bit for
+bit, from ``larmorx._ndimage_filters`` (``docs/api/ndimage-filters.md``). The rest of this text is about the interpolation.
 
 A replica of ``scipy.ndimage``'s ``map_coordinates``, ``affine_transform`` (3-D arrays),
 ``spline_filter`` and ``spline_filter1d`` (SciPy 1.18.1; first ported from 1.15.2), in Rust. Results are
@@ -41,6 +41,7 @@ from larmorx._ndimage_filters import (
     binary_hit_or_miss,
     binary_opening,
     binary_propagation,
+    center_of_mass,
     generate_binary_structure,
     grey_closing,
     grey_dilation,
@@ -57,6 +58,7 @@ from larmorx._ndimage_filters import (
     rank_filter,
     sum,
     sum_labels,
+    watershed_ift,
 )
 
 __all__ = [
@@ -69,6 +71,7 @@ __all__ = [
     "binary_hit_or_miss",
     "binary_opening",
     "binary_propagation",
+    "center_of_mass",
     "generate_binary_structure",
     "grey_closing",
     "grey_dilation",
@@ -88,6 +91,7 @@ __all__ = [
     "spline_filter1d",
     "sum",
     "sum_labels",
+    "watershed_ift",
 ]
 
 #: SciPy's boundary modes.

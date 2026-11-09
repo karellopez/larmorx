@@ -4,7 +4,8 @@
 //! environment's): the minimum and maximum filters (with a footprint, a non-flat structuring
 //! element, or separable by axis), the rank, median and percentile filters, grey erosion,
 //! dilation, opening and closing, binary erosion, dilation, opening, closing, propagation and
-//! hole filling, `label`, `sum_labels`, `generate_binary_structure` and `iterate_structure`.
+//! hole filling, `label`, `sum_labels`, `watershed_ift`, `generate_binary_structure` and
+//! `iterate_structure`.
 //!
 //! They serve the ports of sdcflows' `brain_masker` and niworkflows' `IntensityClip` (grey
 //! closing with `ball(1)`, a median filter with `ball(3)`, binary openings, closings, erosions and
@@ -74,12 +75,16 @@ mod neighbourhood;
 pub mod skimage;
 #[cfg(test)]
 mod tests;
+pub mod watershed;
 
 pub use filters::{Rank1d, min_or_max_filter, min_or_max_filter1d, rank_filter, rank_filter_1d};
 pub use measurements::{LabelValue, Labels, label, sum_labels_bincount};
 pub use morphology::{
     BinaryErosion, MaskElement, binary_erosion, center_is_true, dilation_arguments,
     generate_binary_structure, iterate_structure,
+};
+pub use watershed::{
+    MarkerValue, Watershed, WatershedEvents, WatershedInput, watershed_ift, watershed_ift_run,
 };
 
 /// How a filter extends the input beyond its edges (SciPy's `NI_ExtendMode` as these filters
@@ -303,6 +308,25 @@ pub trait NdElement: Copy + Send + Sync + PartialOrd + Default + 'static {
         let _ = values;
         None
     }
+    /// `x += s` for an `s` already cast to the type ([`NdElement::add_cast`] with
+    /// `s = from_f64(d)`), where no NaN can arise (the operands are not NaN and the structure's
+    /// values are finite): IEEE's addition for the floats, C's for the integers.
+    fn add_plain(self, s: Self) -> Self;
+    /// `(double)value` of a value that is not a NaN.
+    #[inline(always)]
+    fn to_f64_plain(self) -> f64 {
+        self.to_f64()
+    }
+    /// Whether the value is a finite number (every integer is).
+    #[inline(always)]
+    fn finite(self) -> bool {
+        true
+    }
+    /// Whether any value is a NaN.
+    fn any_nan(values: &[Self]) -> bool {
+        let _ = values;
+        false
+    }
 }
 
 macro_rules! narrow_int {
@@ -336,6 +360,10 @@ macro_rules! narrow_int {
             fn add_cast(self, s: f64) -> Self {
                 (self as i32).wrapping_add(Self::from_f64(s) as i32) as $t
             }
+            #[inline(always)]
+            fn add_plain(self, s: Self) -> Self {
+                (self as i32).wrapping_add(s as i32) as $t
+            }
         }
     };
 }
@@ -367,6 +395,10 @@ impl NdElement for i32 {
     fn add_cast(self, s: f64) -> Self {
         self.wrapping_add(cvtt_i32(s))
     }
+    #[inline(always)]
+    fn add_plain(self, s: Self) -> Self {
+        self.wrapping_add(s)
+    }
 }
 
 impl NdElement for u32 {
@@ -394,6 +426,10 @@ impl NdElement for u32 {
     fn add_cast(self, s: f64) -> Self {
         self.wrapping_add(Self::from_f64(s))
     }
+    #[inline(always)]
+    fn add_plain(self, s: Self) -> Self {
+        self.wrapping_add(s)
+    }
 }
 
 impl NdElement for i64 {
@@ -412,6 +448,10 @@ impl NdElement for i64 {
     #[inline]
     fn add_cast(self, s: f64) -> Self {
         self.wrapping_add(cvtt_i64(s))
+    }
+    #[inline(always)]
+    fn add_plain(self, s: Self) -> Self {
+        self.wrapping_add(s)
     }
 }
 
@@ -440,6 +480,10 @@ impl NdElement for u64 {
     fn add_cast(self, s: f64) -> Self {
         self.wrapping_add(cvtt_u64(s))
     }
+    #[inline(always)]
+    fn add_plain(self, s: Self) -> Self {
+        self.wrapping_add(s)
+    }
 }
 
 // The floating-point conversions and additions are SSE's on every platform, NaNs included
@@ -465,6 +509,21 @@ impl NdElement for f32 {
     fn add_cast(self, s: f64) -> Self {
         NpFloat::add(self, <f32 as NpFloat>::from_f64(s))
     }
+    #[inline(always)]
+    fn add_plain(self, s: Self) -> Self {
+        self + s
+    }
+    #[inline(always)]
+    fn to_f64_plain(self) -> f64 {
+        self as f64
+    }
+    #[inline(always)]
+    fn finite(self) -> bool {
+        self.is_finite()
+    }
+    fn any_nan(values: &[Self]) -> bool {
+        values.iter().any(|v| v.is_nan())
+    }
 }
 
 impl NdElement for f64 {
@@ -487,6 +546,21 @@ impl NdElement for f64 {
     #[inline]
     fn add_cast(self, s: f64) -> Self {
         NpFloat::add(self, s)
+    }
+    #[inline(always)]
+    fn add_plain(self, s: Self) -> Self {
+        self + s
+    }
+    #[inline(always)]
+    fn to_f64_plain(self) -> f64 {
+        self
+    }
+    #[inline(always)]
+    fn finite(self) -> bool {
+        self.is_finite()
+    }
+    fn any_nan(values: &[Self]) -> bool {
+        values.iter().any(|v| v.is_nan())
     }
 }
 

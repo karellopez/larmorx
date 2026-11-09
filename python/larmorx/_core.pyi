@@ -459,6 +459,18 @@ def ndimage_label(input: np.ndarray, structure: np.ndarray) -> tuple[np.ndarray,
 def ndimage_sum_labels(input: np.ndarray, labels: np.ndarray, index: list[int]) -> list[float]:
     """``sum_labels`` for a sequence ``index``: the float64 sum per label, in C order."""
 
+def ndimage_watershed_ift(
+    input: np.ndarray,
+    markers: np.ndarray,
+    structure: np.ndarray,
+    output_bits: int,
+    reproduce: bool,
+) -> tuple[np.ndarray, tuple[bool, bool, bool, bool], int]:
+    """``NI_WatershedIFT`` (uint8 or uint16 input, int8 to int64 markers, a signed output of
+    ``output_bits`` bits): ``(int64 labels, (across_edge, stale_queue, truncated, oversize),
+    differ)``; SciPy's labels with ``reproduce``, else the corrected ones; the events are SciPy's
+    run's and ``differ`` the number of elements the two runs label differently."""
+
 def numpy_percentile_weak(a: np.ndarray, q: float, numpy_version: str) -> float:
     """``numpy.percentile(a, q)`` (linear) with a Python-number ``q`` as numpy
     ``numpy_version`` (``"2.3"``, ``"2.5"``, ...) computes it; the value in the array's type."""

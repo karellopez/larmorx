@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
 """sdcflows' masks (``sdcflows/utils/tools.py``'s ``brain_masker``; ``interfaces/brainmask.py``'s
-``BrainExtraction``, ``BinaryDilation`` and ``Union``), ported from sdcflows 2.17.1 (the same in
-2.15.1) with scikit-image's, SciPy's and numpy's arithmetic under them.
+``BrainExtraction``, ``BinaryDilation`` and ``Union``; ``utils/epimanip.py``'s ``epi_mask``),
+ported from sdcflows 2.17.1 (the same in 2.15.1) with scikit-image's, SciPy's and numpy's
+arithmetic under them.
 
 ``brain_masker``'s result depends on two library releases (``docs/findings/sdcflows-estimation.md``):
 numpy's ``percentile`` of a Python-number ``q`` (numpy 2.2/2.3 compute it in ``float32``, numpy
@@ -29,9 +30,11 @@ from larmorx.sdcflows.approx import _fname_presuffix
 
 __all__ = [
     "BrainMaskerResult",
+    "EpiMaskResult",
     "binary_dilation",
     "brain_extraction",
     "brain_masker",
+    "epi_mask",
     "union",
 ]
 
@@ -207,3 +210,113 @@ def union(
         path = _fname_presuffix(os.fspath(in1), "_union", out_dir or os.getcwd())
         save_nibabel(out, path, dtype=np.uint8, n_threads=n_threads)
     return out, path
+
+
+@dataclass(frozen=True)
+class EpiMaskResult:
+    """``epi_mask``'s mask (``uint8``, the input's header and affine), the voxel its object
+    marker was put at (the rounded centre of mass) and the path when written."""
+
+    mask: Image
+    centre: tuple[int, ...]
+    out_file: str | None
+
+
+def _x86_int64(v: float) -> int:
+    """numpy's cast of a float64 to int64 on x86-64 (``cvttsd2si``): NaN, infinities and values
+    out of range give ``-2**63``."""
+    if not np.isfinite(v) or v >= 2.0**63 or v < -(2.0**63):
+        return -(2**63)
+    return int(v)
+
+
+def _uint16_levels(wshed: np.ndarray, upstream_defects: str) -> np.ndarray:
+    """``np.round(1e3 * wshed / wshed.max()).astype(np.uint16)`` in float32. A flat residual
+    (``0 / 0``) or one with a NaN or an infinity gives NaN (or infinity, where ``1e3 * wshed``
+    overflows), whose conversion is undefined (numpy on x86-64: 0). SDC-28: clamped to the
+    type's range (NaN to 0) with a warning; ``reproduce``: x86-64's 0."""
+    levels = np.round(1e3 * wshed / wshed.max())
+    bad = ~np.isfinite(levels)
+    if bad.any():
+        n = int(bad.sum())
+        if upstream_defects == "reproduce":
+            levels = np.where(bad, np.float32(0), levels)
+            detail = f"{n} levels NaN or infinite, whose uint16 conversion is undefined: x86-64's 0"
+        else:
+            levels = np.where(np.isnan(levels), np.float32(0), levels)
+            levels = np.clip(levels, np.float32(0), np.float32(65535))
+            detail = (
+                f"{n} levels NaN or infinite, whose uint16 conversion is undefined: clamped to "
+                "the range (NaN to 0)"
+            )
+        _defects.warn([("SDC-28", "sdcflows epi_mask", upstream_defects, detail)], stacklevel=3)
+    return levels.astype(np.uint16)
+
+
+def epi_mask(
+    in_file: Any,
+    out_file: str | os.PathLike[str] | None = None,
+    *,
+    write: bool = True,
+    numpy_version: str = NUMPY_NEWEST,
+    upstream_defects: UpstreamDefectsName = "fix",
+    n_threads: int = 1,
+) -> EpiMaskResult:
+    """sdcflows' ``epi_mask(in_file, out_file)`` (``utils/epimanip.py``; no workflow calls it):
+    a quick mask of an EPI by grey-level morphology and a watershed. The image (float32) is
+    opened with the non-flat ``ball(3)`` structure and closed with ``ball(2)``; the closed image,
+    less its 30th percentile, is clipped to ``[0, p90]`` of its positive values; the watershed of
+    the opened image less the closed one's ``ball(5)`` grey erosion (scaled to ``0..1000`` in
+    ``uint16``) grows the object marker at the clipped image's rounded centre of mass against a
+    background marker at voxel ``[0, 0, -1]``; the object, dilated with ``ball(2)``, is the mask
+    (``uint8``, the input's header), written at ``out_file`` (default ``mask.nii.gz`` in the
+    working directory) when ``write``.
+
+    numpy's release changes the percentiles (numpy 2.2 and 2.3 compute them in float32, 2.5 in
+    float64) and the centre of mass's sums (pairwise from 2.3, in chunks of 8192 before):
+    ``numpy_version``, the newest release by default. Corrected by default
+    (``upstream_defects="reproduce"`` gives sdcflows' mask): SDC-28, undefined ``uint16``
+    conversions of a flat or non-finite residual (clamped, NaN to 0, with a warning), and the
+    defects of SciPy's ``watershed_ift`` (:func:`larmorx.ndimage.watershed_ift`: neighbours
+    across the image's edges, a queue that keeps an element alone in it). An image that is not
+    3-D raises SciPy's ``RuntimeError``; one with no positive value left after its 30th
+    percentile (a flat image) numpy's ``IndexError``, as sdcflows."""
+    from larmorx import ndimage, skimage
+
+    _defects.check(upstream_defects)
+    img = _load(in_file, np.float32)
+    data = np.asanyarray(img.data)
+    # First open to blur out the skull around the brain
+    opened = ndimage.grey_opening(data, structure=skimage.ball(3), n_threads=n_threads)
+    # Second, close large vessels and the ventricles
+    closed = ndimage.grey_closing(opened, structure=skimage.ball(2), n_threads=n_threads)
+    # Window filter on percentile 30
+    closed -= np.float32(
+        _core.numpy_percentile_weak(np.ascontiguousarray(closed), 30.0, numpy_version)
+    )
+    # Window filter on percentile 90 of data
+    maxnorm = np.float32(
+        _core.numpy_percentile_weak(np.ascontiguousarray(closed[closed > 0]), 90.0, numpy_version)
+    )
+    closed = _core.numpy_clip_f32(np.ascontiguousarray(closed), 0.0, float(maxnorm))
+    # Calculate index of center of masses
+    com = np.round(ndimage.center_of_mass(closed, numpy_version=numpy_version))
+    cm = tuple(_x86_int64(float(c)) for c in com)
+    # Erode the picture of the brain by a lot
+    eroded = ndimage.grey_erosion(closed, structure=skimage.ball(5), n_threads=n_threads)
+    # Calculate the residual
+    wshed = opened - eroded
+    wshed -= wshed.min()
+    wshed = _uint16_levels(wshed, upstream_defects)
+    markers = np.zeros_like(wshed, dtype=int)
+    markers[cm] = 2
+    markers[0, 0, -1] = -1
+    # Run watershed
+    labels = ndimage.watershed_ift(wshed, markers, upstream_defects=upstream_defects)
+    mask = ndimage.binary_dilation(labels == 2, skimage.ball(2), n_threads=n_threads)
+    mask_img = _with_dtype(img, mask.astype(np.uint8), np.uint8)
+    path = None
+    if write:
+        path = str(Path(out_file if out_file is not None else "mask.nii.gz").absolute())
+        save_nibabel(mask_img, path, dtype=np.uint8, n_threads=n_threads)
+    return EpiMaskResult(mask_img, tuple(int(c) for c in cm), path)

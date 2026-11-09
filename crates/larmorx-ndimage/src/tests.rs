@@ -165,3 +165,78 @@ fn one_dimensional_rank_filter() {
         assert_eq!(rank_filter_1d(&a, 1, 3, mode, 2.0, 0), nd, "{mode:?}");
     }
 }
+
+#[test]
+fn watershed_ift_neighbours_across_an_edge() {
+    // scipy.ndimage.watershed_ift(a, m) with a wall in column 1 and markers 1 at (0, 0) and 2
+    // at (2, 3): SciPy's index arithmetic makes (0, 3) a neighbour of (1, 0), so label 2 floods
+    // column 0 below the first row: [[1, 2, 2, 2], [2, 2, 2, 2], [2, 2, 2, 2]] (SciPy 1.15.3
+    // and 1.18.1); corrected, column 0 keeps label 1.
+    let mut a = [0u8; 12];
+    for r in 0..3 {
+        a[r * 4 + 1] = 200;
+    }
+    let mut m = [0i64; 12];
+    m[0] = 1;
+    m[11] = 2;
+    let st = generate_binary_structure(2, 1);
+    let (w, differ) = watershed_ift(&a, &[3, 4], &m, &st, 64, true).unwrap();
+    assert_eq!(w.labels, [1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2]);
+    assert!(w.events.across_edge && !w.events.truncated && !w.events.oversize);
+    assert_eq!(differ, 2);
+    let (w, _) = watershed_ift(&a, &[3, 4], &m, &st, 64, false).unwrap();
+    assert_eq!(w.labels, [1, 2, 2, 2, 1, 2, 2, 2, 1, 2, 2, 2]);
+}
+
+#[test]
+fn watershed_ift_labels_beyond_32_bits() {
+    // markers 2^32 + 5 and 2^31 on a flat image: SciPy reads them as C ints (5 and -2^31, a
+    // background marker): [[5, 5], [5, -2147483648]]; corrected, both are object markers.
+    let a = [0u8; 4];
+    let m = [(1i64 << 32) + 5, 0, 0, 1i64 << 31];
+    let st = generate_binary_structure(2, 1);
+    let (w, differ) = watershed_ift(&a, &[2, 2], &m, &st, 64, true).unwrap();
+    assert_eq!(w.labels, [5, 5, 5, -2147483648]);
+    assert!(w.events.truncated);
+    assert_eq!(differ, 4);
+    let (w, _) = watershed_ift(&a, &[2, 2], &m, &st, 64, false).unwrap();
+    assert_eq!(w.labels, [(1i64 << 32) + 5, 1 << 31, 1 << 31, 1 << 31]);
+}
+
+#[test]
+fn watershed_ift_stores_labels_in_the_output_type() {
+    // int32 markers 300 and 128 into an int8 output: 44 and -128, and -128 (a negative label)
+    // spreads from the end of its queue: [[44, -128], [-128, -128]] (SciPy, both modes).
+    let a = [0u8, 5, 9, 0];
+    let m = [300i32, 0, 0, 128];
+    let st = generate_binary_structure(2, 1);
+    for faithful in [true, false] {
+        let (w, differ) = watershed_ift(&a, &[2, 2], &m, &st, 8, faithful).unwrap();
+        assert_eq!(w.labels, [44, -128, -128, -128]);
+        assert_eq!(differ, 0);
+    }
+    // a 0-d array keeps its marker; an empty one gives no label
+    let st0 = generate_binary_structure(0, 1);
+    let (w, _) = watershed_ift(&[3u8], &[], &[7i64], &st0, 64, false).unwrap();
+    assert_eq!(w.labels, [7]);
+    let st2 = generate_binary_structure(2, 1);
+    let (w, _) = watershed_ift::<u8, i64>(&[], &[0, 3], &[], &st2, 64, true).unwrap();
+    assert!(w.labels.is_empty());
+}
+
+#[test]
+fn watershed_ift_an_element_alone_in_its_queue() {
+    // 1-D (no neighbour across an edge): element 1 is alone in queue 1 when element 2 lowers it
+    // to 0; SciPy leaves it there, links element 3 behind it, and element 4, queued behind 3, is
+    // never processed: element 5 keeps label 0 ([-1, -1, -1, -1, -1, 0], SciPy 1.15.3 and
+    // 1.18.1); corrected, every element is labelled.
+    let a = [1u8, 0, 0, 1, 1, 2];
+    let m = [-1i64, 0, -1, 0, 0, 0];
+    let st = generate_binary_structure(1, 1);
+    let (w, differ) = watershed_ift(&a, &[6], &m, &st, 64, true).unwrap();
+    assert_eq!(w.labels, [-1, -1, -1, -1, -1, 0]);
+    assert!(w.events.stale_queue && !w.events.across_edge);
+    assert_eq!(differ, 1);
+    let (w, _) = watershed_ift(&a, &[6], &m, &st, 64, false).unwrap();
+    assert_eq!(w.labels, [-1; 6]);
+}

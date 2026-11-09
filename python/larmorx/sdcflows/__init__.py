@@ -31,8 +31,9 @@ Rust (``larmorx-sdcflows``):
   phase-difference preparation (``PhaseMap2rads``, ``SubtractPhases``, ``Phasediff2Fieldmap``,
   ``CheckB0Units``, ``CheckRegister``, ``init_phdiff_wf`` with PRELUDE through ``lx.fsl``).
 
-- :func:`brain_masker`, :func:`brain_extraction`, :func:`binary_dilation`, :func:`union`:
-  sdcflows' masks (``brain_masker``, ``BrainExtraction``, ``BinaryDilation``, ``Union``), with
+- :func:`brain_masker`, :func:`brain_extraction`, :func:`binary_dilation`, :func:`union`,
+  :func:`epi_mask`: sdcflows' masks (``brain_masker``, ``BrainExtraction``, ``BinaryDilation``,
+  ``Union``, ``epi_mask``: no workflow calls the last one), with
   scikit-image's random walker (:mod:`larmorx.skimage`).
 - :func:`get_trt`, :func:`get_readout_time`, :func:`select_pe_volumes`, :func:`sort_pe_blips`,
   :func:`uniform_grid`, :func:`pad_slices`, :func:`reorient_image_and_metadata`,
@@ -129,9 +130,11 @@ from larmorx.sdcflows.fmap import (
 )
 from larmorx.sdcflows.masks import (
     BrainMaskerResult,
+    EpiMaskResult,
     binary_dilation,
     brain_extraction,
     brain_masker,
+    epi_mask,
     union,
 )
 from larmorx.sdcflows.outputs import (
@@ -246,6 +249,7 @@ __all__ = [
     "CoefficientsResult",
     "CsrMatrix",
     "DisplacementsResult",
+    "EpiMaskResult",
     "EstimatorRegistry",
     "EstimatorRun",
     "EstimatorType",
@@ -294,6 +298,7 @@ __all__ = [
     "deoblique_and_zooms",
     "disp_to_fmap",
     "displacements_field_to_fieldmap",
+    "epi_mask",
     "estimator_workflow",
     "find_anatomical_estimators",
     "find_estimators",

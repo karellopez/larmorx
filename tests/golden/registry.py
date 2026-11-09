@@ -4251,6 +4251,59 @@ def _(ctx: Context) -> dict[str, Any]:
     }
 
 
+@case("py.ndimage.watershed_ift", covers=("lx.ndimage.watershed_ift",))
+def _(ctx: Context) -> dict[str, Any]:
+    """The watershed from markers: a uint8 image with object and background markers (both
+    modes: SciPy's neighbours across the edges, corrected by default), uint16 with the full
+    structure and an int8 output array, a 1-D image whose queue keeps an element alone in it
+    (SciPy leaves one element unlabelled; corrected), and int64 markers beyond 32 bits."""
+    img = ints(213, (16, 14, 12), 0, 200).astype(np.uint8)
+    markers = np.zeros((16, 14, 12), np.int64)
+    markers[8, 7, 6] = 2
+    markers[3, 10, 2] = 1
+    markers[0, 0, -1] = -1
+    markers[15, 0, 11] = -3
+    u16 = (ints(214, (13, 11, 9), 0, 1001) * 3).astype(np.uint16)
+    full = lx.ndimage.generate_binary_structure(3, 3)
+    out8 = np.zeros((13, 11, 9), np.int8)
+    line = np.array([1, 0, 0, 1, 1, 2], np.uint8)
+    lmark = np.array([-1, 0, -1, 0, 0, 0], np.int64)
+    flat = np.zeros((2, 2), np.uint8)
+    big = np.array([[2**32 + 5, 0], [0, 2**31]], np.int64)
+    out: dict[str, Any] = {}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        for mode in ("fix", "reproduce"):
+            out[f"uint8.{mode}"] = lx.ndimage.watershed_ift(img, markers, upstream_defects=mode)
+            out[f"uint16.int8.{mode}"] = lx.ndimage.watershed_ift(
+                u16, markers[:13, :11, :9].astype(np.int32) * 100, full, out8.copy(),
+                upstream_defects=mode,
+            )  # fmt: skip
+            out[f"queue.{mode}"] = lx.ndimage.watershed_ift(line, lmark, upstream_defects=mode)
+            out[f"wide.{mode}"] = lx.ndimage.watershed_ift(flat, big, upstream_defects=mode)
+    return out
+
+
+@case("py.ndimage.center_of_mass", covers=("lx.ndimage.center_of_mass",))
+def _(ctx: Context) -> dict[str, Any]:
+    """Centres of mass: float32 in C and Fortran order with numpy 2.5's, 2.3's and 2.2's sums,
+    float64, labels with no index, a scalar index and a sequence of indexes, integers."""
+    # 26,970 elements: numpy 2.2 sums them in chunks of 8192, 2.3 onwards pairwise
+    w = (ints(215, (30, 31, 29), 0, 4000) / 7).astype(np.float32)
+    lab = ints(216, (30, 31, 29), 0, 4).astype(np.int32)
+    out: dict[str, Any] = {}
+    for ver in ("2.5.4", "2.3.5", "2.2.6"):
+        out[f"float32.C.{ver}"] = np.asarray(
+            lx.ndimage.center_of_mass(np.ascontiguousarray(w), numpy_version=ver)
+        )
+        out[f"float32.F.{ver}"] = np.asarray(lx.ndimage.center_of_mass(w, numpy_version=ver))
+    out["float64.labels"] = np.asarray(lx.ndimage.center_of_mass(w.astype(np.float64) / 3, lab))
+    out["index.scalar"] = np.asarray(lx.ndimage.center_of_mass(w, lab, 2))
+    out["index.list"] = np.asarray(lx.ndimage.center_of_mass(w, lab, [0, 1, 3]))
+    out["int16"] = np.asarray(lx.ndimage.center_of_mass((w - 500).astype(np.int16)))
+    return out
+
+
 # --- FSL ----------------------------------------------------------------------------------------
 
 
@@ -8378,4 +8431,41 @@ def _(ctx: Context) -> dict[str, Any]:
     ref = np.stack([g * 2 % 19, g * 3 % 13, g % 7], 0).astype(np.float64) * 1.5
     out["arrays.channels"] = lx.skimage.match_histograms(rgb, ref, channel_axis=0)
     out["arrays.float16"] = lx.skimage.match_histograms((g / 3).astype(np.float16), ref[0])
+    return out
+
+
+@case("py.sdcflows.epi_mask", covers=("lx.sdcflows.epi_mask",))
+def _(ctx: Context) -> dict[str, Any]:
+    """sdcflows' quick EPI mask: a noisy float32 head image (grey opening and closing with
+    balls, the percentile window, the centre of mass, the watershed) in both modes (SciPy's
+    watershed across the edges and its queue change 7 voxels; corrected by default) and with
+    numpy 2.3's arithmetic, a scaled int16 image whose object touches the edges, and the mask's
+    file."""
+    shape = (26, 28, 20)
+    aff = affine(shape, (3.0, 3.0, 3.5), oblique=False)
+    i, j, k = np.indices(shape)
+    r2 = ((i - 13) / 9.0) ** 2 + ((j - 14) / 11.0) ** 2 + ((k - 10) / 7.0) ** 2
+    noise = ints(252, shape, 0, 400)
+    head = np.where(r2 < 1, 600 + noise, noise // 3) + 25 * ((i + 2 * j + k) % 3)
+    edge = np.where(((i - 2) / 12.0) ** 2 + ((j - 14) / 16.0) ** 2 < 1, 800, 30) + (k % 4) * 9
+    f32 = ctx.out("head.nii.gz")
+    lx.save(((head / 7).astype(np.float32), aff), f32)
+    i16 = ctx.out("edge.nii.gz")
+    lx.save(((edge // 2).astype(np.int16), aff), i16)
+    hdr = lx.io.load(i16).header.replace(scl_slope=2.0, scl_inter=3.0)
+    lx.save(lx.io.load(i16, scaled=False).replace(header=hdr), i16)
+    out: dict[str, Any] = {}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        for label, path, ver, mode in (
+            ("head", f32, "2.5.4", "fix"),
+            ("head.reproduce", f32, "2.5.4", "reproduce"),
+            ("head.2.3", f32, "2.3.5", "fix"),
+            ("edge", i16, "2.5.4", "fix"),
+        ):
+            res = lx.sdcflows.epi_mask(
+                path, ctx.out(f"{label}_mask.nii.gz"), numpy_version=ver, upstream_defects=mode
+            )
+            out[label] = Nifti(res.out_file)
+            out[f"{label}.centre"] = np.asarray(res.centre, dtype=np.int64)
     return out

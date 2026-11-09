@@ -495,7 +495,7 @@ two `IntensityClip`s, N4, `StructuralReference`'s one-file shortcut), `GenerateS
   line, `extract_field`, `zooms_field`, `zooms_bmask` (and their command lines), `bs_filter` and
   `unwarp` are fMRIPrep's files and values: 25 checks per estimator, about 6 s each, in both
   kept environments. On the re-made (Haswell) runs every check is identical (ds000228's
-  estimator: RESULTS_HASWELL); on the five estimators of the first runs (AVX-512 kernels,
+  estimator and ds004884's two, in both environments, `bs_filter` included); on the five estimators of the first runs (AVX-512 kernels,
   archived) all but `bs_filter`, whose ridge fit's dot products ran on the AVX-512 kernels there
   (0 of 2,548 coefficients equal on pixar008's; the same cause as relay 6's and relay 9's notes).
   The check found a mistake of larmorx's command lines: nipype's `Registration(from_file=...)`
@@ -518,7 +518,8 @@ two `IntensityClip`s, N4, `StructuralReference`'s one-file shortcut), `GenerateS
   `ImageMath` at one thread with correctly rounded maths as stand-ins through the oracle cache):
   every NIfTI file of the graph's folders identical (18 of 18 on ds004884's second estimator,
   the registration included), `zooms_epi`'s regridded EPI the only file larmorx does not write
-  (SDC-15); sdcflows' graph 1,036 s at one thread, larmorx 333 s on 8 threads. RESULTS_NEWEST
+  (SDC-15); sdcflows' graph 1,036 s at one thread, larmorx 333 s on 8 threads; the same 18 of 18 in the
+  newest environment (numpy 2.5.4, SciPy 1.18.1; 1,115 s against larmorx's 518 s on 3 threads).
 - **SDC-16 (`_warp_dir`'s axis, rule A)**: ANTs' `--restrict-deformation` weighs the
   deformation's physical components (x, y, z): on a fixed image whose voxel axes are S, R, A,
   the weights `1x0x0` move only physical x, in larmorx's port and in ANTs 2.6.5 itself, whose
@@ -528,7 +529,27 @@ two `IntensityClip`s, N4, `StructuralReference`'s one-file shortcut), `GenerateS
   orientation) the deformation along the phase encoding is held at 0.1 and another axis is
   freed. larmorx frees the phase encoding's world axis (`reproduce`: sdcflows' position, with a
   warning when they differ). fMRIPrep's SyN EPIs are axial: no change on its runs.
-- **SDC-13 (Deoblique's threshold, rule D), measured**: RESULTS_SDC13
+- **SDC-13 (Deoblique's threshold, rule D), measured: rule C** (`relay10/probe_sdc13.py`). On
+  an estimator's own inputs, larmorx's preprocessing and estimation three times: A as sdcflows
+  runs it (`Deoblique` a pass-through below 28.6 degrees), B with `Deoblique` as meant (0.5
+  degrees; the plumb grid keeping the image's centre in millimetres and each voxel axis on its
+  closest world axis), C as A with another ANTs seed (the estimation's own spread). Each EPI
+  voxel is the same voxel in the three, so the field maps are compared voxel by voxel inside
+  the anatomical mask, and each unwarped EPI reference against its run's anatomical reference
+  on the EPI's grid (normalised mutual information, 64 bins):
+
+  | estimator (largest obliquity) | field A vs B, mean / p95 / max | A vs C (seed) | NMI unwarped: A, B, C | B's NMI against A | the unwarping's own gain (A) |
+  |---|---|---|---|---|---|
+  | ds000228 pixar008 (20.7 degrees) | 2.18 / 8.19 / 30.9 Hz | 0.68 / 1.70 / 5.07 Hz | 1.0374, 1.0366, 1.0375 | -0.0008 (seed: 0.0001) | +0.0027 |
+  | ds004884 first (6.3 degrees) | 2.73 / 6.12 / 23.6 Hz | 0.95 / 2.40 / 5.19 Hz | 1.0374, 1.0348, 1.0371 | -0.0025 (seed: 0.0003) | +0.0047 |
+
+  Making the EPI plumb changes the field well beyond the seed's spread (p95 about 3 to 5 times
+  it), yet the unwarped reference agrees less with the anatomy, not more (B's own gain over its
+  distorted reference, +0.0032 and +0.0044, is A's and C's; its distorted reference already
+  starts lower: the anatomy is resampled onto a grid rotated by the registration). The EPI-to-
+  anatomy registration absorbs the plumb grid's rotation (21.3 degrees on pixar008, scales as
+  A's). So the correction brings no measured gain: sdcflows' behaviour is kept (rule C) in both
+  modes, documented on the API page; the as-meant variant stays in the probe.
 - **SDC-14** (`_norm_lap` of an image without positive or negative values: numpy's
   `IndexError`, rule B) and **SDC-15** (`zooms_epi`, a node whose output nothing reads, rule C:
   not computed): `docs/api/sdcflows-fieldmap.md`. `_warp_dir`'s `Logger.warn` is not a defect:

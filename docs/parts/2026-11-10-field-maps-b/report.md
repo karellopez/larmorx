@@ -80,3 +80,23 @@ Relay 1 a4cf64edc320dd324 (+ the stopped attempt aaea7f61392fc0d27), 2 a33e6cc1a
 - HANDOFF.toml's 89 operations applied (19 files; `NOTICE` and its two copies identical); `tables --site`,
   `tables --check`; `register_counts.py` 541 entries, no decide, no yes; the summary re-exported; the site build
   0 problems. Added by the orchestrator: CLAUDE.md's agents lines (one agent at a time since 2026-11-09).
+- The merge's own fixes (9f65b4a7): `Cargo.lock` gains `larmorx-ndimage` (`cargo metadata`), and `cargo fmt` on the
+  two merged hunks (numpy's module order, `dbdsqr_upper`'s call).
+- `verify-merge.sh` on 9f65b4a7 (clean; boxed 96 GiB, 24 threads; oracle cache `use`): the Rust gates of the three
+  workspaces, the GPL and NC builds, the Python gates, the ten suites and the evidence re-export passed. The
+  records against the committed ones (`compare_records.py`): no status differs in any suite; `sdcflows-fieldmap`
+  37, `numpy-linalg` 28, `nifti-io` 257, `resample-series` 139, `ants-apply-transforms` 258, `fsl-topup-replica`
+  177 identical; the detail differences, each explained, the committed records kept: 13 permanent random-testing
+  cases newer than the records, all passing (`ndimage-skimage` 3, `niworkflows-helpers` 2, `sdcflows-estimation`
+  8); `match-histogram`'s SKI-02 message now spelled as sdcflows spells it (`dtype('<f4')`, a later relay's
+  permanent case); `ndimage`'s count of SCI-31 (5 calls, counted as the same before SCI-31 was registered); the
+  contract audit's count of the part's source files (its diff against main: 0 after the merge); `tedana-t2smap-
+  replica`'s three real calls follow the fMRIPrep runs made again with Haswell's kernels (known; re-made by
+  t2smap's clean-room part). The evidence re-export changed only the exporter's stamp.
+- The golden step failed there, because of how it was started: the checkout given as `.` made `PYTHONPATH`
+  relative, and the four memory tests of the field-map steps, which start larmorx in a temporary folder, could
+  not import it (each failed in 0.1 s). The memory and thread files run again with absolute paths: 237 passed.
+  `verify-merge.sh` now makes the checkout's path absolute (5ecc08db).
+- The golden record from 5ecc08db (`record_golden.py`, boxed): the parity smoke tier 2,968 passed, 0 failed (24
+  workers 279 s, then the memory and thread files serially 1,319 s); 303 cases, 2,660 outputs, every checksum the
+  same (only the header changed).

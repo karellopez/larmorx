@@ -121,3 +121,4 @@ Relay 1 a4cf64edc320dd324 (+ the stopped attempt aaea7f61392fc0d27), 2 a33e6cc1a
   path (another drive: an error). On Windows the words now keep backslashes (quotes removed as before) and BET's
   relative name is the quoted path's (the path itself on another drive); nothing changes elsewhere
   (`tests/python/test_nipype_windows.py`).
+- CI on 8f5eff7f: all 13 jobs green (the six platforms' tests, the GPL program's, the lint).

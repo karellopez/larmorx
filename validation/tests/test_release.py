@@ -99,6 +99,35 @@ def test_set_version_rewrites_every_place(tmp_path, monkeypatch):
     assert {p: p.read_bytes() for p in before} == before
 
 
+def test_citation_version(tmp_path, monkeypatch):
+    """CITATION.cff, once it exists, holds the release's version and date."""
+    (tmp_path / "CITATION.cff").write_text(
+        'cff-version: 1.2.0\nversion: "0.0.9"\ndate-released: "2026-01-01"\n', encoding="utf-8"
+    )
+    for ws in ("", "crates-gpl/", "crates-nc/"):
+        (tmp_path / ws).mkdir(parents=True, exist_ok=True)
+        for name in ("Cargo.toml", "Cargo.lock"):
+            shutil.copy(ROOT / ws / name, tmp_path / ws / name)
+    shutil.copy(ROOT / "pyproject.toml", tmp_path / "pyproject.toml")
+    monkeypatch.setattr(set_version, "ROOT", tmp_path)
+    monkeypatch.setattr(
+        set_version,
+        "WORKSPACES",
+        {
+            "larmorx": tmp_path,
+            "larmorx-gpl": tmp_path / "crates-gpl",
+            "larmorx-nc": tmp_path / "crates-nc",
+        },
+    )
+    assert any("CITATION.cff" in p for p in set_version.check())
+    set_version.set_version(set_version.version(), "2026-11-12")
+    text = (tmp_path / "CITATION.cff").read_text(encoding="utf-8")
+    assert f'version: "{set_version.version()}"' in text and 'date-released: "2026-11-12"' in text
+    assert set_version.check() == []
+    with pytest.raises(ValueError):
+        set_version.set_version(set_version.version(), "2026-13-01")
+
+
 def test_licence_expressions_cover_the_contents():
     """Each pyproject's licence expression names every licence of what the package holds."""
     if shutil.which("cargo") is None:

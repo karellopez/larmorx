@@ -5,12 +5,14 @@ The version lives in the three Cargo workspaces (`Cargo.toml`, `crates-gpl/Cargo
 `crates-nc/Cargo.toml`: `[workspace.package] version` and the `version` of every path
 dependency in `[workspace.dependencies]`), in their three `Cargo.lock` files (the entries of the
 crates that take the workspace's version) and in the main package's `[all]` extra, which pins the
-two companions to the same release. Cargo writes it in its own form (`0.1.0-rc.1`); PyPI, the
+two companions to the same release; and, once it exists, in `CITATION.cff` (`version`, with
+`date-released` set when the version is). Cargo writes it in its own form (`0.1.0-rc.1`); PyPI, the
 wheels and the release's tag use PEP 440's (`0.1.0rc1`, tag `v0.1.0rc1`); maturin converts the
 first into the second, and `larmorx_core::VERSION` holds the second (its build script).
 
 Usage:
     python -P scripts/release/set_version.py 0.1.0rc1        # set it everywhere (PEP 440 form)
+    python -P scripts/release/set_version.py 0.1.0rc1 --date 2026-11-12   # CITATION.cff's date
     python -P scripts/release/set_version.py --check         # every place agrees; exit 1 if not
     python -P scripts/release/set_version.py --check v0.1.0rc1   # ... and equals the tag
     python -P scripts/release/set_version.py --print         # the version, PEP 440 form
@@ -23,6 +25,7 @@ converts one to one.
 from __future__ import annotations
 
 import argparse
+import datetime
 import re
 import sys
 import tomllib
@@ -33,6 +36,8 @@ ROOT = Path(__file__).resolve().parents[2]
 WORKSPACES = {"larmorx": ROOT, "larmorx-gpl": ROOT / "crates-gpl", "larmorx-nc": ROOT / "crates-nc"}
 #: The companions the `[all]` extra pins.
 COMPANIONS = ("larmorx-nc", "larmorx-gpl")
+#: The citation file (relay 5a writes it); its `version` is the release's, PEP 440 form.
+CITATION = "CITATION.cff"
 
 _PEP440 = re.compile(r"(\d+)\.(\d+)\.(\d+)(?:(a|b|rc)(\d+))?")
 _CARGO = re.compile(r"(\d+)\.(\d+)\.(\d+)(?:-(alpha|beta|rc)\.(\d+))?")
@@ -105,8 +110,9 @@ def _section(text: str, header: str) -> tuple[int, int]:
     return start, nxt.start() if nxt else len(text)
 
 
-def set_version(pep440: str) -> list[Path]:
-    """Write the version (PEP 440 form) everywhere; returns the files changed."""
+def set_version(pep440: str, date: str | None = None) -> list[Path]:
+    """Write the version (PEP 440 form) everywhere, and ``date`` (default: today) as
+    CITATION.cff's ``date-released``; returns the files changed."""
     cargo = to_cargo(pep440)
     crates = workspace_crates()
     changed = []
@@ -150,7 +156,26 @@ def set_version(pep440: str) -> list[Path]:
     if new != text:
         _write(pyproject, new)
         changed.append(pyproject)
+    citation = ROOT / CITATION
+    if citation.is_file():
+        text = _read(citation)
+        day = date or datetime.date.today().isoformat()
+        datetime.date.fromisoformat(day)  # a valid date, or ValueError
+        new = re.sub(r"(?m)^version: .*$", f'version: "{pep440}"', text, count=1)
+        new = re.sub(r"(?m)^date-released: .*$", f'date-released: "{day}"', new, count=1)
+        if new != text:
+            _write(citation, new)
+            changed.append(citation)
     return changed
+
+
+def citation_version() -> str | None:
+    """CITATION.cff's ``version`` (without quotes), or ``None`` when there is no such file."""
+    citation = ROOT / CITATION
+    if not citation.is_file():
+        return None
+    m = re.search(r"(?m)^version: *['\"]?([^'\"\s]*)['\"]? *$", _read(citation))
+    return m.group(1) if m else ""
 
 
 def check(tag: str | None = None) -> list[str]:
@@ -184,6 +209,9 @@ def check(tag: str | None = None) -> list[str]:
         pins = [r for r in extra.get("all", []) if re.match(rf"{re.escape(name)}(?![-\w])", r)]
         if pins != [f"{name}=={pep440}"]:
             problems.append(f"pyproject.toml [all]: {pins} (not ['{name}=={pep440}'])")
+    cited = citation_version()
+    if cited is not None and cited != pep440:
+        problems.append(f"{CITATION} version: {cited!r} (not '{pep440}')")
     if tag is not None and tag != f"v{pep440}":
         problems.append(f"the tag {tag!r} is not 'v{pep440}'")
     return problems
@@ -201,6 +229,7 @@ def main(argv: list[str] | None = None) -> int:
     group.add_argument("version", nargs="?", help="the new version, PEP 440 form (0.1.0rc1)")
     group.add_argument("--check", nargs="?", const="", metavar="TAG", help="check (and the tag)")
     group.add_argument("--print", action="store_true", help="print the version, PEP 440 form")
+    parser.add_argument("--date", help="CITATION.cff's date-released when setting (default today)")
     args = parser.parse_args(argv)
     if args.print:
         print(version())
@@ -216,7 +245,7 @@ def main(argv: list[str] | None = None) -> int:
             )
         return 1 if problems else 0
     try:
-        changed = set_version(args.version)
+        changed = set_version(args.version, args.date)
     except ValueError as e:
         parser.error(str(e))
     for path in changed:

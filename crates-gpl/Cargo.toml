@@ -46,3 +46,15 @@ tempfile = "3.27.0"
 # dev-dependencies of the golden tests (as the root workspace's)
 flate2 = { version = "1.1.10", default-features = false, features = ["zlib-rs", "runtime_detection"] }
 sha2 = { version = "0.11.0", default-features = false }
+
+# The released files' profile (`maturin build --profile dist`, `cargo build --profile dist`): the
+# release profile with the whole program optimised as one unit (fat LTO, one codegen unit) and the
+# symbols stripped, for smaller files (docs/next-steps.md, "Releases on PyPI": "Size"). The same
+# bits as `release` (no fast-math, the same opt-level; the golden tests and the parity smoke tier
+# pass on it, validation/investigations/release-0.1/README.md). Everyday builds, CI, verify-merge
+# and the agents keep `release`: fat LTO adds minutes of single-threaded linking.
+[profile.dist]
+inherits = "release"
+lto = "fat"
+codegen-units = 1
+strip = "symbols"

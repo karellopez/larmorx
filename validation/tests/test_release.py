@@ -1,14 +1,18 @@
 # SPDX-License-Identifier: Apache-2.0
 """The release's helpers (scripts/release/): one version everywhere, the licence expressions,
-PyPI's descriptions and the companions' source distributions."""
+PyPI's descriptions, the companions' source distributions, the third-party crates' licence texts
+and the check of Windows files' imported DLLs."""
 
 from __future__ import annotations
 
+import fnmatch
 import importlib.util
 import re
 import shutil
+import struct
 import sys
 import tomllib
+import zipfile
 from pathlib import Path
 from types import ModuleType
 
@@ -31,6 +35,8 @@ set_version = load("set_version")
 licences = load("licences")
 pypi_readme = load("pypi_readme")
 companion_sdist = load("companion_sdist")
+third_party = load("third_party")
+pe_imports = load("pe_imports")
 
 
 def test_one_version_everywhere():
@@ -225,3 +231,147 @@ def test_glob_regex():
     assert rx.match("crates-nc/larmorx-nc-core/src/a/b/c.rs")
     assert not rx.match("crates-nc/larmorx-nc-core/tools/x/src/main.rs")
     assert not rx.match("crates-nc/larmorx-nc-bet/Cargo.toml")
+
+
+@pytest.mark.parametrize("package", third_party.PACKAGES, ids=lambda p: p.name)
+def test_third_party_crates_match_cargo_lock(package):
+    """The crates of third-party-rust.txt's sections 1 to 3 are exactly the registry crates that
+    Cargo.lock's graph reaches from the package's programs, each in one section only, with its
+    version; every crate of 1 and 2 names its licence texts, and every text named is there."""
+    text = package.output.read_text(encoding="utf-8")
+    sections = third_party.listed(text)
+    reachable = third_party.lock_reachable(package.lock, [c for c, _ in package.programs])
+    assert sections["1"], "no crate compiled into the programs"
+    assert sections["1"] | sections["2"] | sections["3"] == reachable
+    assert not (sections["1"] & sections["2"] or sections["1"] & sections["3"])
+    assert not sections["2"] & sections["3"]
+    blocks = set(re.findall(r"(?m)^\[(T\d+)\] ", text))
+    for line in text.split("\n4. ", 1)[0].splitlines():
+        if third_party._ENTRY.match(line) and "[" in line:
+            named = set(re.findall(r"\b(T\d+) ", line.split("[", 1)[1]))
+            assert named <= blocks, line
+    for name, version in sections["1"] | sections["2"]:
+        assert re.search(rf"(?m)^- {re.escape(name)} {re.escape(version)}: .*\[T\d+ ", text), name
+
+
+def test_third_party_texts_are_where_the_packages_ship_them():
+    """Each package's licence files (so its wheel and sdist) hold its third-party-rust.txt, and
+    bzip2-1.0.6's copyright notice is in the files of the packages that link libbz2-rs-sys."""
+    for package in third_party.PACKAGES:
+        pyproject = tomllib.loads((package.workspace / "pyproject.toml").read_text("utf-8"))
+        rel = package.output.relative_to(package.workspace).as_posix()
+        assert any(fnmatch.fnmatch(rel, g) for g in pyproject["project"]["license-files"]), rel
+        text = package.output.read_text(encoding="utf-8")
+        linked = third_party.listed(text)["1"]
+        if any(name == "libbz2-rs-sys" for name, _ in linked):
+            assert "Copyright (C) 1996-2021 Julian R Seward." in text
+    gpl = companion_sdist.REQUIRED["gpl"]
+    assert "LICENSES/third-party-rust.txt" in gpl or "LICENSES/*" in gpl
+
+
+def test_third_party_files_are_up_to_date():
+    """The files equal what the generator writes from the registry's sources (needs cargo)."""
+    if shutil.which("cargo") is None:
+        pytest.skip("cargo is needed (cargo tree, cargo metadata)")
+    assert third_party.main(["--check"]) == 0
+
+
+def _pe(dlls=(), delayed=(), machine=0x8664, plus=True, old_delay=False) -> bytes:
+    """A minimal PE image: a DOS header, the COFF and optional headers and one section with an
+    import directory naming ``dlls`` and a delay-load directory naming ``delayed``."""
+    va, raw = 0x1000, 0x200
+    image_base = 0x140000000 if plus else 0x400000
+    imports_size = 20 * (len(dlls) + 1)
+    delay_size = 32 * (len(delayed) + 1)
+    names = b""
+    name_rvas = []
+    for dll in (*dlls, *delayed):
+        name_rvas.append(va + imports_size + delay_size + len(names))
+        names += dll.encode("ascii") + b"\0"
+    body = b"".join(struct.pack("<IIIII", 1, 0, 0, r, 1) for r in name_rvas[: len(dlls)])
+    body += b"\0" * 20
+    for r in name_rvas[len(dlls) :]:
+        name = r + image_base if old_delay else r
+        body += struct.pack("<8I", 0 if old_delay else 1, name, 0, 1, 1, 0, 0, 0)
+    body += b"\0" * 32 + names
+    n_dirs = 16
+    opt_size = (112 if plus else 96) + 8 * n_dirs
+    dirs = [(0, 0)] * n_dirs
+    if dlls:
+        dirs[1] = (va, imports_size)
+    if delayed:
+        dirs[13] = (va + imports_size, delay_size)
+    opt = bytearray(opt_size)
+    struct.pack_into("<H", opt, 0, 0x20B if plus else 0x10B)
+    if plus:
+        struct.pack_into("<Q", opt, 24, image_base)
+    else:
+        struct.pack_into("<I", opt, 28, image_base)
+    struct.pack_into("<I", opt, 108 if plus else 92, n_dirs)
+    for k, (rva, size) in enumerate(dirs):
+        struct.pack_into("<II", opt, (112 if plus else 96) + 8 * k, rva, size)
+    coff = struct.pack("<HHIIIHH", machine, 1, 0, 0, 0, opt_size, 0x22)
+    section = struct.pack("<8sIIIIIIHHI", b".idata", len(body), va, len(body), raw, 0, 0, 0, 0, 0)
+    head = bytearray(0x40)
+    head[:2] = b"MZ"
+    struct.pack_into("<I", head, 0x3C, 0x40)
+    image = bytes(head) + b"PE\0\0" + coff + bytes(opt) + section
+    return image + b"\0" * (raw - len(image)) + body
+
+
+def test_pe_imports_reads_the_import_tables():
+    info = pe_imports.parse(_pe(["KERNEL32.dll", "python3.dll"], ["bcryptprimitives.dll"]))
+    assert (info.machine, info.imports) == ("x86_64", ["KERNEL32.dll", "python3.dll"])
+    assert info.delay_imports == ["bcryptprimitives.dll"] and info.forbidden == []
+    info = pe_imports.parse(_pe(["kernel32.dll"], ["VCRUNTIME140_1.dll"], 0x14C, plus=False))
+    assert (info.machine, info.forbidden) == ("i386", ["VCRUNTIME140_1.dll"])
+    arm = pe_imports.parse(_pe(["KERNEL32.dll"], ["api-ms-win-crt-math-l1-1-0.dll"], 0xAA64))
+    assert (arm.machine, arm.forbidden) == ("aarch64", ["api-ms-win-crt-math-l1-1-0.dll"])
+    # The old delay-load form (addresses, not RVAs) of PE32 images.
+    old = pe_imports.parse(_pe([], ["MSVCR90.dll"], 0x14C, plus=False, old_delay=True))
+    assert (old.imports, old.forbidden) == ([], ["MSVCR90.dll"])
+    for dll in (
+        "MSVCP140.dll",
+        "ucrtbase.dll",
+        "vcruntime140d.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+    ):
+        assert pe_imports.FORBIDDEN.match(dll), dll
+    for dll in (
+        "KERNEL32.dll",
+        "ntdll.dll",
+        "python3.dll",
+        "msvcrt.dll",
+        "api-ms-win-core-synch-l1-2-0.dll",
+    ):
+        assert not pe_imports.FORBIDDEN.match(dll), dll
+    with pytest.raises(pe_imports.NotPE):
+        pe_imports.parse(b"\x7fELF" + b"\0" * 200)
+    with pytest.raises(pe_imports.NotPE):
+        pe_imports.parse(_pe(["KERNEL32.dll"])[:300])
+
+
+def test_pe_imports_command_line(tmp_path, capsys):
+    good, bad = tmp_path / "good", tmp_path / "bad"
+    good.mkdir()
+    bad.mkdir()
+    (good / "larmorx.exe").write_bytes(_pe(["KERNEL32.dll", "ntdll.dll"]))
+    with zipfile.ZipFile(good / "larmorx-0-cp312-abi3-win_amd64.whl", "w") as z:
+        z.writestr("larmorx/_core.pyd", _pe(["python3.dll", "KERNEL32.dll"]))
+        z.writestr("larmorx/__init__.py", "")
+    (good / "notes.txt").write_text("not a PE file", encoding="utf-8")
+    assert pe_imports.main([str(good), "--machine", "x86_64"]) == 0
+    out = capsys.readouterr().out
+    assert "_core.pyd: x86_64: python3.dll, KERNEL32.dll" in out and "PE-IMPORTS ok: 2 PE" in out
+    assert pe_imports.main([str(good), "--machine", "aarch64", "--quiet"]) == 1
+    (bad / "larmorx-nc.exe").write_bytes(_pe(["KERNEL32.dll", "VCRUNTIME140.dll"]))
+    assert pe_imports.main([str(bad)]) == 1
+    assert "imports the C runtime: VCRUNTIME140.dll" in capsys.readouterr().err
+    (bad / "broken.dll").write_bytes(b"MZ" + b"\0" * 10)
+    assert pe_imports.main([str(bad / "broken.dll")]) == 2
+    assert pe_imports.main([str(tmp_path / "nothing-here")]) == 1
+    assert "no such file or directory" in capsys.readouterr().err
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    assert pe_imports.main([str(empty)]) == 1
+    assert "no PE file found" in capsys.readouterr().err

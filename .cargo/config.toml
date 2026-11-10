@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: Apache-2.0
+# Cargo's configuration for every build started inside the repository (Cargo reads it from the
+# working directory upwards, so it serves the three workspaces: the root, crates-nc and crates-gpl).
+#
+# Windows' C runtime linked statically for the MSVC targets (x86_64 and aarch64): the `.exe`
+# programs (the standalone larmorx and lx, larmorx-nc, larmorx-gpl) and the extension
+# (`_core.pyd`) then need no Visual C++ runtime (vcruntime140.dll) or Universal CRT DLLs on the
+# user's machine (docs/next-steps.md, "Windows' C runtime"). scripts/release/pe_imports.py checks
+# the built files' import tables. An environment variable RUSTFLAGS, if set, replaces these flags.
+[target.'cfg(all(windows, target_env = "msvc"))']
+rustflags = ["-C", "target-feature=+crt-static"]

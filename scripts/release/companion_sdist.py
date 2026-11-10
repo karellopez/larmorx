@@ -59,6 +59,7 @@ REQUIRED = {
         "LICENSES/LGPL-2.1-tedana.txt",
         "LICENSES/Apache-2.0.txt",
         "LICENSES/NOTICE-larmorx.txt",
+        "LICENSES/third-party-rust.txt",
         "Cargo.toml",
         "Cargo.lock",
         "larmorx-gpl-*/Cargo.toml",

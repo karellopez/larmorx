@@ -36,6 +36,7 @@ files read as the program reads them), as nipype runs it.
 
 from __future__ import annotations
 
+import ntpath
 import os
 import shlex
 from collections.abc import Callable, Mapping, Sequence
@@ -276,12 +277,41 @@ class Command:
 
     def argv(self) -> list[str]:
         """The program's arguments as the shell splits nipype's line (``shlex``: words, quotes
-        removed)."""
-        return shlex.split(" ".join(self.args))
+        removed; on Windows a backslash is a path's separator, :func:`_split_line`)."""
+        return _split_line(" ".join(self.args))
 
     def run_argv(self) -> list[str]:
         """:meth:`argv` with the node directory's output names absolute."""
-        return shlex.split(" ".join(self.args if self.run_args is None else self.run_args))
+        return _split_line(" ".join(self.args if self.run_args is None else self.run_args))
+
+
+def _split_line(line: str, windows: bool = os.name == "nt") -> list[str]:
+    """The words of nipype's command line as a POSIX shell splits it (``shlex.split``: nipype
+    quotes paths with ``shlex.quote``). On Windows a backslash separates a path's folders, so it
+    is no escape there: the same words, quotes removed, backslashes kept."""
+    if not windows:
+        return shlex.split(line)
+    lex = shlex.shlex(line, posix=True)
+    lex.whitespace_split = True
+    lex.commenters = ""
+    lex.escape = ""
+    return list(lex)
+
+
+def _bet_relpath(path: str, start: str, windows: bool = os.name == "nt") -> str:
+    """nipype's BET makes its input and output names relative to the node's folder
+    (``os.path.relpath``: BET fails with long paths). On Windows nipype's quotes around a path
+    (``shlex.quote`` quotes a backslash) are kept around the relative path, and a path on
+    another drive than the folder stays as it is (no relative path joins two drives)."""
+    if not windows:
+        return os.path.relpath(path, start=start)
+    quoted = len(path) > 1 and path[0] == path[-1] == "'"
+    inner = path[1:-1] if quoted else path
+    try:
+        rel = ntpath.relpath(inner, start=start)
+    except ValueError:
+        rel = inner
+    return shlex.quote(rel) if quoted else rel
 
 
 @dataclass(frozen=True)
@@ -1300,7 +1330,7 @@ class _Bet(_FslCommand):
         out = self.get("out_file")
         if not isdefined(out) and self.defined("in_file"):
             out = self.gen_fname(self.get("in_file"), suffix="_brain")
-            return os.path.relpath(out, start=self.cwd)
+            return _bet_relpath(out, self.cwd)
         return out
 
     def gen_filename(self, name: str) -> Any:
@@ -1309,7 +1339,7 @@ class _Bet(_FslCommand):
     def format_arg(self, t: _Trait, value: Any) -> str | None:
         formatted = super().format_arg(t, value)
         if t.name == "in_file" and formatted is not None:
-            return os.path.relpath(formatted, start=self.cwd)
+            return _bet_relpath(formatted, self.cwd)
         return formatted
 
     def list_outputs(self) -> dict[str, Any]:

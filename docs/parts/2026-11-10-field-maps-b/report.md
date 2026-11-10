@@ -114,3 +114,10 @@ Relay 1 a4cf64edc320dd324 (+ the stopped attempt aaea7f61392fc0d27), 2 a33e6cc1a
   annotations named one test, `test_sci22_both_modes`, which asked for SCI-22's notice of a `longlong` input
   before its own Windows exception (there numpy's `longlong` is its `int64`, nothing to correct): the test's
   order fixed (a test-only change; the golden record stands).
+- CI on 4de979f6 and 1643c56b: the annotations widened to every failure but a golden mismatch (a golden case
+  that raises had none); on both Windows jobs six golden cases raised: `larmorx._nipype` split nipype's
+  command lines as a POSIX shell (`shlex`), so a Windows path lost its backslashes (antsRegistration, topup and
+  BET given `C:Users...`), and BET's relative names (`os.path.relpath`) took nipype's quotes as part of the
+  path (another drive: an error). On Windows the words now keep backslashes (quotes removed as before) and BET's
+  relative name is the quoted path's (the path itself on another drive); nothing changes elsewhere
+  (`tests/python/test_nipype_windows.py`).

@@ -94,16 +94,18 @@ def builtin_stub(monkeypatch) -> BuiltinStub:
 
 
 def pytest_terminal_summary(terminalreporter):
-    """In GitHub Actions, each failing test as a workflow annotation, as the golden tests' own
-    (which this leaves to them): GitHub's API serves a public repository's annotations without a
-    login, its job logs not."""
+    """In GitHub Actions, each failing test (or collection) as a workflow annotation, but a golden
+    case's mismatch, which the golden test annotates itself (a golden case that raises is
+    annotated here): GitHub's API serves a public repository's annotations without a login, its
+    job logs not."""
     if os.environ.get("GITHUB_ACTIONS") != "true":
         return
     stats = terminalreporter.stats
     for report in [*stats.get("failed", []), *stats.get("error", [])]:
-        if "tests/golden/" in report.nodeid.replace("\\", "/"):
+        text = str(report.longrepr)
+        if "differs from larmorx on Linux x86_64" in text:
             continue
-        lines = str(report.longrepr).strip().splitlines()
+        lines = text.strip().splitlines()
         detail = " / ".join(lines[-12:]).replace("%", "%25").replace("\r", " ").replace("\n", " ")
         title = f"pytest {report.nodeid} ({report.when})"
         title = title.replace("%", "%25").replace(":", "%3A").replace(",", "%2C")

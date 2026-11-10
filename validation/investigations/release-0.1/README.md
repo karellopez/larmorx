@@ -150,3 +150,8 @@ Fixed in the test (the variable read once, at import, as `test_tedana.py` does);
 51 skipped (that test with the variable 5 of 5 in its file; without it and without a build:
 skipped, as in CI). `larmorx[all]` from the built files: 21 s, `pip check` clean, the smoke's
 checks all pass but the glibc ones, the `[prep]` modules present.
+
+**The rehearsal again, with the test job's steps (2026-11-11, at `4b5c5d4d`; log
+`oracles/logs/release-3a-rehearsal-2.log`):** every step passed, the same times within seconds;
+`pytest tests/python tests/golden` on the installed wheels 885 passed, 51 skipped; the smoke 47 of
+53 (the 6 expected glibc checks); `larmorx[all]` from the built files 18 s, `pip check` clean.

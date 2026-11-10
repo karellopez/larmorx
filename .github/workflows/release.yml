@@ -375,7 +375,8 @@ jobs:
           [ "$RUNNER_OS" = Windows ] && vpy=.venv-programs/Scripts/python.exe
           "$vpy" -m pip install --no-index --no-deps \
             "programs/larmorx_nc-$VERSION"-*.whl "programs/larmorx_gpl-$VERSION"-*.whl
-          which() { "$vpy" -c "import shutil, sys, sysconfig; print(shutil.which(sys.argv[1], path=sysconfig.get_path('scripts')))" "$1"; }
+          # a program of the environment, without a newline (Git Bash would keep print's "\r")
+          which() { "$vpy" -c "import pathlib, shutil, sys, sysconfig; p = shutil.which(sys.argv[1], path=sysconfig.get_path('scripts')); sys.exit(f'{sys.argv[1]} is not installed') if p is None else sys.stdout.write(pathlib.Path(p).as_posix())" "$1"; }
           nc=$(which larmorx-nc)
           gpl=$(which larmorx-gpl)
           "$nc" --version
@@ -482,8 +483,12 @@ jobs:
         env:
           LARMORX_GOLDEN_MISMATCHES: ${{ github.workspace }}/golden-mismatches
         run: |
-          which() { python -c "import shutil, sys, sysconfig; print(shutil.which(sys.argv[1], path=sysconfig.get_path('scripts')))" "$1"; }
-          LARMORX_NC_BIN=$(which larmorx-nc) LARMORX_GPL_BIN=$(which larmorx-gpl) python -m pytest
+          # a program of the environment, without a newline (Git Bash would keep print's "\r")
+          which() { python -c "import pathlib, shutil, sys, sysconfig; p = shutil.which(sys.argv[1], path=sysconfig.get_path('scripts')); sys.exit(f'{sys.argv[1]} is not installed') if p is None else sys.stdout.write(pathlib.Path(p).as_posix())" "$1"; }
+          LARMORX_NC_BIN=$(which larmorx-nc)
+          LARMORX_GPL_BIN=$(which larmorx-gpl)
+          export LARMORX_NC_BIN LARMORX_GPL_BIN
+          python -m pytest
       - name: Upload golden-test mismatches
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -828,6 +833,9 @@ jobs:
       - name: The smoke checks and the golden tests
         run: |
           python -P scripts/release/smoke.py --version "$VERSION" --installed
-          which() { python -c "import shutil, sys, sysconfig; print(shutil.which(sys.argv[1], path=sysconfig.get_path('scripts')))" "$1"; }
-          LARMORX_NC_BIN=$(which larmorx-nc) LARMORX_GPL_BIN=$(which larmorx-gpl) \
-            python -m pytest tests/golden tests/python/test_smoke.py
+          # a program of the environment, without a newline (Git Bash would keep print's "\r")
+          which() { python -c "import pathlib, shutil, sys, sysconfig; p = shutil.which(sys.argv[1], path=sysconfig.get_path('scripts')); sys.exit(f'{sys.argv[1]} is not installed') if p is None else sys.stdout.write(pathlib.Path(p).as_posix())" "$1"; }
+          LARMORX_NC_BIN=$(which larmorx-nc)
+          LARMORX_GPL_BIN=$(which larmorx-gpl)
+          export LARMORX_NC_BIN LARMORX_GPL_BIN
+          python -m pytest tests/golden tests/python/test_smoke.py

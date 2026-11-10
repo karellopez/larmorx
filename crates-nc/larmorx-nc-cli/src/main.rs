@@ -27,6 +27,10 @@ const EXIT_USAGE: u8 = 2;
 /// Exit code when the output streams cannot be written.
 const EXIT_IO_ERROR: u8 = 1;
 
+/// The version in PEP 440's form (`0.1.0rc1`; Cargo's is `0.1.0-rc.1`), as pip and PyPI show the
+/// larmorx-nc wheel's and `larmorx --version` prints larmorx's (build.rs).
+const VERSION: &str = env!("LARMORX_NC_PEP440_VERSION");
+
 /// A tool of the `fsl` family: its name and the function that runs it with the original
 /// arguments, the settings, D13's mode and the thread count.
 type ToolFn =
@@ -120,7 +124,7 @@ where
         .next()
         .map_or_else(|| "larmorx-nc".to_owned(), |a| program_name(a.as_ref()));
     let (code, written) = match args.next().as_ref().map(AsRef::as_ref) {
-        Some("-V" | "--version") => (0, writeln!(out, "larmorx-nc {}", env!("CARGO_PKG_VERSION"))),
+        Some("-V" | "--version") => (0, writeln!(out, "larmorx-nc {VERSION}")),
         Some("-h" | "--help") => (0, out.write_all(usage(&prog).as_bytes())),
         None => (EXIT_USAGE, err.write_all(usage(&prog).as_bytes())),
         Some("fsl") => {
@@ -218,7 +222,7 @@ Environment:
                             results bit for bit
   OMP_NUM_THREADS           threads (default: all logical CPUs); results do not depend on it
 ",
-        version = env!("CARGO_PKG_VERSION"),
+        version = VERSION,
         fsl = tool_names(),
     )
 }
@@ -250,9 +254,10 @@ mod tests {
     fn version_and_help() {
         let (code, out, _) = run_capture(&["larmorx-nc", "--version"]);
         assert_eq!(code, 0);
-        assert_eq!(out, format!("larmorx-nc {}\n", env!("CARGO_PKG_VERSION")));
+        assert_eq!(out, format!("larmorx-nc {VERSION}\n"));
         let (code, out, _) = run_capture(&["dir/larmorx-nc.exe", "-h"]);
         assert_eq!(code, 0);
+        assert!(out.starts_with(&format!("larmorx-nc {VERSION}: ")), "{out}");
         assert!(out.contains("Usage: larmorx-nc <family> <tool>"), "{out}");
         assert!(
             out.contains("fsl    mcflirt, bet, bet2, betsurf, flirt, convert_xfm, avscale, img2imgcoord, std2imgcoord, img2stdcoord, rmsdiff, makerot, midtrans, pointflirt, applyxfm4D, pairreg, extracttxt, aff2rigid, fast, topup, applytopup, fslmaths, fslstats, fslroi, standard_space_roi"),
@@ -261,6 +266,19 @@ mod tests {
         let (code, out, err) = run_capture(&["larmorx-nc"]);
         assert_eq!((code, out.as_str()), (EXIT_USAGE, ""));
         assert!(err.contains("Usage:"), "{err}");
+    }
+
+    /// The version is Cargo's in PEP 440's form, the wheel's: the pre-release `-alpha.N`,
+    /// `-beta.N` or `-rc.N` written `aN`, `bN` or `rcN` (checked here independently of build.rs).
+    #[test]
+    fn version_in_pep440_form() {
+        let cargo = env!("CARGO_PKG_VERSION");
+        let expected = cargo
+            .replacen("-alpha.", "a", 1)
+            .replacen("-beta.", "b", 1)
+            .replacen("-rc.", "rc", 1);
+        assert_eq!(VERSION, expected, "Cargo's version {cargo}");
+        assert!(!VERSION.contains('-'), "{VERSION}");
     }
 
     #[test]

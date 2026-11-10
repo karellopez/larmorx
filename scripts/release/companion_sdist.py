@@ -50,6 +50,8 @@ REQUIRED = {
         "wheel-data/**/*",
         "larmorx-nc-*/Cargo.toml",
         "larmorx-nc-*/src/**/*",
+        # the program's version in PEP 440's form (it includes crates/larmorx-core/src/pep440.rs)
+        "larmorx-nc-cli/build.rs",
     ),
     "gpl": (
         "LICENSE",
@@ -64,6 +66,8 @@ REQUIRED = {
         "Cargo.lock",
         "larmorx-gpl-*/Cargo.toml",
         "larmorx-gpl-*/src/**/*",
+        # the program's version in PEP 440's form (it includes crates/larmorx-core/src/pep440.rs)
+        "larmorx-gpl-cli/build.rs",
     ),
 }
 FORBIDDEN = {"nc": (), "gpl": ("tools/",)}

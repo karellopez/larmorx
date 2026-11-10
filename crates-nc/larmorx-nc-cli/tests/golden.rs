@@ -19,12 +19,18 @@
 //! (`LARMORX_GOLDEN_ALLOW_DIRTY=1` to record from uncommitted changes). On a mismatch the
 //! outputs are saved in `$LARMORX_GOLDEN_MISMATCHES` (CI uploads it), else in
 //! `target/tmp/golden-mismatches`.
+//!
+//! The installed program: `LARMORX_GOLDEN_PROGRAM=<path or name> cargo test --locked -p
+//! larmorx-nc-cli --test golden` runs that `larmorx-nc` instead of cargo's build (e.g. the
+//! program a wheel installs, `<venv>/bin/larmorx-nc`; `Scripts\larmorx-nc.exe` on Windows),
+//! after checking that its `--version` is this checkout's.
 
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::io::Read as _;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::OnceLock;
 
 use sha2::{Digest, Sha256};
 
@@ -32,6 +38,65 @@ const EXE: &str = env!("CARGO_BIN_EXE_larmorx-nc");
 const GOLDEN: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/golden.tsv");
 /// Values kept per image, at fixed positions, to tell how large a mismatch is.
 const N_SAMPLES: usize = 8;
+
+/// This crate's version in PEP 440's form, as `larmorx-nc --version` prints it (build.rs).
+const VERSION: &str = env!("LARMORX_NC_PEP440_VERSION");
+
+/// The program the cases run: cargo's build of `larmorx-nc` (the test's own), or the one
+/// `LARMORX_GOLDEN_PROGRAM` names, e.g. the program the larmorx-nc wheel installs: a path (a
+/// relative one from this crate's directory, where cargo runs the tests) or a name looked up on
+/// `PATH` (`.exe` added on Windows). Its `--version` must be this crate's.
+fn program() -> &'static Path {
+    static PROGRAM: OnceLock<PathBuf> = OnceLock::new();
+    PROGRAM.get_or_init(|| match std::env::var_os("LARMORX_GOLDEN_PROGRAM") {
+        Some(given) if !given.is_empty() => installed(Path::new(&given)),
+        _ => PathBuf::from(EXE),
+    })
+}
+
+/// `LARMORX_GOLDEN_PROGRAM`'s program as an absolute path, once its `--version` is checked.
+fn installed(given: &Path) -> PathBuf {
+    let with_exe = |p: PathBuf| {
+        let exe = p.with_extension(std::env::consts::EXE_EXTENSION);
+        [p, exe]
+    };
+    let bare = given.parent().is_some_and(|p| p.as_os_str().is_empty());
+    let found = if bare {
+        std::env::var_os("PATH").and_then(|path| {
+            std::env::split_paths(&path)
+                .flat_map(|dir| with_exe(dir.join(given)))
+                .find(|p| p.is_file())
+        })
+    } else {
+        with_exe(given.to_path_buf())
+            .into_iter()
+            .find(|p| p.is_file())
+    };
+    let found = found.unwrap_or_else(|| {
+        panic!(
+            "LARMORX_GOLDEN_PROGRAM={}: no such program",
+            given.display()
+        )
+    });
+    let path = std::path::absolute(&found).unwrap_or_else(|e| panic!("{}: {e}", found.display()));
+    let out = Command::new(&path)
+        .arg("--version")
+        .output()
+        .unwrap_or_else(|e| panic!("LARMORX_GOLDEN_PROGRAM={}: {e}", path.display()));
+    let reported = String::from_utf8_lossy(&out.stdout).trim_end().to_owned();
+    assert!(
+        out.status.success() && reported == format!("larmorx-nc {VERSION}"),
+        "LARMORX_GOLDEN_PROGRAM={}: --version printed {reported:?} (exit status {:?}), not \
+         this checkout's larmorx-nc {VERSION}",
+        path.display(),
+        out.status.code()
+    );
+    eprintln!(
+        "golden: running {} ({reported}), not cargo's build",
+        path.display()
+    );
+    path
+}
 
 /// The series: 16 × 14 × 8 voxels of 3 × 3 × 3.5 mm, 4 volumes.
 const SHAPE: [usize; 4] = [16, 14, 8, 4];
@@ -3240,7 +3305,7 @@ fn run_bet(
     output_type: &str,
 ) -> std::process::Output {
     let (family, tool) = tool.split_once(' ').unwrap();
-    let mut command = Command::new(EXE);
+    let mut command = Command::new(program());
     command
         .arg(family)
         .arg(tool)
@@ -3323,7 +3388,7 @@ fn golden() {
                 other => other.to_owned(),
             });
         }
-        let out = Command::new(EXE)
+        let out = Command::new(program())
             .args(&args)
             .current_dir(&run)
             .env_remove("FSLDIR")
@@ -3358,7 +3423,7 @@ fn golden() {
         args.extend(["-in".into(), inputs[&Input::Int16].display().to_string()]);
         args.extend(["-out".into(), case.id.to_owned()]);
         args.extend(case.args.iter().map(|a| (*a).to_owned()));
-        let out = Command::new(EXE)
+        let out = Command::new(program())
             .args(&args)
             .current_dir(&run)
             .env_remove("FSLDIR")
@@ -3578,8 +3643,9 @@ fn golden() {
             }
         }
         panic!(
-            "larmorx-nc differs from its Linux x86_64 output (recorded from {source}):\n  {}\n\
-             The outputs are saved in {}.",
+            "larmorx-nc ({}) differs from its Linux x86_64 output (recorded from {source}):\n  \
+             {}\nThe outputs are saved in {}.",
+            program().display(),
             problems.join("\n  "),
             root.display()
         );
@@ -3589,7 +3655,7 @@ fn golden() {
 #[test]
 fn every_tool_has_a_golden_case() {
     // The families and tools as the binary lists them in its help.
-    let out = Command::new(EXE).arg("--help").output().unwrap();
+    let out = Command::new(program()).arg("--help").output().unwrap();
     let help = String::from_utf8(out.stdout).unwrap();
     let tools: Vec<String> = help
         .split("Tools:\n")

@@ -23,6 +23,10 @@ use larmorx_gpl_tedana::workflow::Env;
 const EXIT_USAGE: u8 = 2;
 const EXIT_IO_ERROR: u8 = 1;
 
+/// The version in PEP 440's form (`0.1.0rc1`; Cargo's is `0.1.0-rc.1`), as pip and PyPI show the
+/// larmorx-gpl wheel's and `larmorx --version` prints larmorx's (build.rs).
+const VERSION: &str = env!("LARMORX_GPL_PEP440_VERSION");
+
 /// A tool: its name and the function that runs it with the original arguments.
 type ToolFn = fn(&[String], &Env, &mut dyn Write, &mut dyn Write) -> u8;
 
@@ -56,10 +60,7 @@ where
         .next()
         .map_or_else(|| "larmorx-gpl".to_owned(), |a| program_name(a.as_ref()));
     let (code, written) = match args.next().as_ref().map(AsRef::as_ref) {
-        Some("-V" | "--version") => (
-            0,
-            writeln!(out, "larmorx-gpl {}", env!("CARGO_PKG_VERSION")),
-        ),
+        Some("-V" | "--version") => (0, writeln!(out, "larmorx-gpl {VERSION}")),
         Some("-h" | "--help") => (0, out.write_all(usage(&prog).as_bytes())),
         None => (EXIT_USAGE, err.write_all(usage(&prog).as_bytes())),
         Some("tedana") => {
@@ -148,7 +149,7 @@ Environment:
   LARMORX_TEDANA_LIBRARIES  newest (default): numpy 2.5.4 and SciPy 1.18.1's arithmetic;
                             shared: numpy 2.3.5 and SciPy 1.15.3's
 ",
-        version = env!("CARGO_PKG_VERSION"),
+        version = VERSION,
         tedana = tool_names(),
     )
 }
@@ -179,11 +180,29 @@ mod tests {
     #[test]
     fn version_help_and_errors() {
         let (c, o, _) = run_capture(&["larmorx-gpl", "--version"]);
-        assert_eq!((c, o.starts_with("larmorx-gpl ")), (0, true));
+        assert_eq!((c, o), (0, format!("larmorx-gpl {VERSION}\n")));
+        let (c, o, _) = run_capture(&["larmorx-gpl", "-h"]);
+        assert_eq!(
+            (c, o.starts_with(&format!("larmorx-gpl {VERSION}: "))),
+            (0, true)
+        );
         let (c, _, e) = run_capture(&["larmorx-gpl", "tedana", "nope"]);
         assert_eq!(c, EXIT_USAGE);
         assert!(e.contains("unknown tedana tool 'nope'"));
         let (c, o, _) = run_capture(&["larmorx-gpl", "tedana", "t2smap", "-v"]);
         assert_eq!((c, o.as_str()), (0, "t2smap v26.0.3\n"));
+    }
+
+    /// The version is Cargo's in PEP 440's form, the wheel's: the pre-release `-alpha.N`,
+    /// `-beta.N` or `-rc.N` written `aN`, `bN` or `rcN` (checked here independently of build.rs).
+    #[test]
+    fn version_in_pep440_form() {
+        let cargo = env!("CARGO_PKG_VERSION");
+        let expected = cargo
+            .replacen("-alpha.", "a", 1)
+            .replacen("-beta.", "b", 1)
+            .replacen("-rc.", "rc", 1);
+        assert_eq!(VERSION, expected, "Cargo's version {cargo}");
+        assert!(!VERSION.contains('-'), "{VERSION}");
     }
 }

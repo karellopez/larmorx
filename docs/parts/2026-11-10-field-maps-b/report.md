@@ -100,3 +100,5 @@ Relay 1 a4cf64edc320dd324 (+ the stopped attempt aaea7f61392fc0d27), 2 a33e6cc1a
 - The golden record from 5ecc08db (`record_golden.py`, boxed): the parity smoke tier 2,968 passed, 0 failed (24
   workers 279 s, then the memory and thread files serially 1,319 s); 303 cases, 2,660 outputs, every checksum the
   same (only the header changed).
+- `resample-series-jacobian` (a script, `python -m larmorx_validation.parity.resample_jacobian`, not a suite):
+  run again on ds000005 with the oracles ds005040 and ds005454, its rows identical to the record.

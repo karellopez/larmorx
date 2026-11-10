@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: Apache-2.0 AND BSD-2-Clause AND BSD-3-Clause
 """scikit-image's functions under sdcflows' masks, ported from scikit-image 0.26.0 (the same
 arithmetic in 0.25.2, fMRIPrep 25.2.6's) with the SciPy and numpy arithmetic under them:
 
@@ -18,6 +18,37 @@ same quantiles: the result is scikit-image's wherever scikit-image gives one).
 
 The results are scikit-image's bit for bit (``docs/api/skimage.md``). The work runs in Rust
 (``larmorx_ndimage::skimage``); the argument checks, warnings and messages are scikit-image's.
+
+scikit-image's notices (also in ``crates/larmorx-ndimage/src/skimage/`` and NOTICE): its
+``LICENSE.txt``, "Files: *": Copyright (c) 2009-2022, the scikit-image team, under the 3-clause
+BSD licence; ``skimage/filters/thresholding.py`` (``threshold_otsu``'s checks and messages):
+Copyright (c) 2009-2015 Board of Regents of the University of Wisconsin-Madison, Broad
+Institute of MIT and Harvard, and Max Planck Institute of Molecular Cell Biology and Genetics;
+2009 Zachary Pincus; 2009 Almar Klein, under the 2-clause BSD licence::
+
+    Redistribution and use in source and binary forms, with or without
+    modification, are permitted provided that the following conditions
+    are met:
+    1. Redistributions of source code must retain the above copyright
+       notice, this list of conditions and the following disclaimer.
+    2. Redistributions in binary form must reproduce the above copyright
+       notice, this list of conditions and the following disclaimer in the
+       documentation and/or other materials provided with the distribution.
+    3. (3-clause licence only) Neither the name of the University nor the
+       names of its contributors may be used to endorse or promote products
+       derived from this software without specific prior written permission.
+
+    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+    ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+    LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+    A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE HOLDERS OR
+    CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+    EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+    PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+    PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+    LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+    NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+    SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 
 from __future__ import annotations

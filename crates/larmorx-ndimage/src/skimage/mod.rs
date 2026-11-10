@@ -6,7 +6,9 @@
 //! `skimage.segmentation.random_walker` (`segmentation/random_walker_segmentation.py`, with
 //! SciPy's sparse matrices and conjugate gradients under it: [`random_walker`]).
 //!
-//! scikit-image: Copyright (C) 2019, the scikit-image team. All rights reserved.
+//! scikit-image (its `LICENSE.txt`, "Files: *"): Copyright (c) 2009-2022, the scikit-image team.
+//! All rights reserved. `filters/thresholding.py` is under the 2-clause BSD licence: its notice
+//! is in [`otsu`].
 //!
 //! Redistribution and use in source and binary forms, with or without modification, are
 //! permitted provided that the following conditions are met:

@@ -875,7 +875,7 @@ SCI = [
         "none (sdcflows' and niworkflows' median filters are 3-D)",
         "rule A: the values cast into the output (SciPy's own handling of every other input type), with a notice; `reproduce` SciPy's bytes where they are the output's own (never past its end; the notice gives the count)",
         "–",
-        f"validated (`check_ndimage.py --sections arguments`: 36 cases, each SciPy call in a process of its own, both modes, both environments); {N}",
+        f"validated (`check_ndimage.py --sections arguments`: 36 cases, each SciPy call in a process of its own, both modes, both environments; SciPy's process after the write is random: it crashes before or after printing, or hangs (15 of 36 calls had more than one outcome in 10 processes per environment, `relay24/probe_sci21.py`), its printed bytes never differed, so each call is one case whatever its processes did); {N}",
     ),
     (
         "SCI-22",

@@ -1,6 +1,6 @@
 {
  "about": "SHA-256 of larmorx's outputs on Linux x86_64 for the golden cases in registry.py; every platform must reproduce them (docs/validation/golden.md). Written by scripts/record_golden.py; do not edit by hand.",
- "recorded": {"commit": "5ecc08db4a3d5789f17806c98e40d9ebdd62d724", "date": "2026-11-10", "numpy": "2.3.5", "parity": "passed (pytest tests/parity, smoke tier)", "platform": "Linux x86_64", "python": "3.12.16"},
+ "recorded": {"commit": "e3d29cd99d7f79c9e9df67ddd183817d1401e33a", "date": "2026-11-10", "numpy": "2.3.5", "parity": "passed (pytest tests/parity, smoke tier)", "platform": "Linux x86_64", "python": "3.12.16"},
  "cases": {
   "cli.afni.3dAutomask": {
    "depth:data": {"dtype": "<i2", "sample": "00000000020000000000020000000000", "sha256": "5eb371e03027e458585e506ca5feeb8a4a1673ee77a63e6a8442b5b23c1c3c85", "shape": [24, 20, 16], "sum": "2792.0"},
@@ -1564,7 +1564,7 @@
   "cli.sdcflows.sdcflows": {
    "dry.code": {"dtype": "<i8", "sample": "0000000000000000", "sha256": "af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc", "shape": [1], "sum": "0.0"},
    "dry.listing": {"dtype": "|u1", "sample": "45642e664654300a", "sha256": "6e910014f7bdab539a706871082fce5546b67e1cdc840bfe9672d202d2c37e6b", "shape": [386], "sum": "32102.0"},
-   "py.workflow": {"dtype": "|u1", "sample": "5b725d205b2c5b5d", "sha256": "08119cb180ea5d0bb190d6b42e7516320de75f8a5d06c55c6bb5ffbf6068f241", "shape": [1943], "sum": "152464.0"},
+   "py.workflow": {"dtype": "|u1", "sample": "5b2c20222073735d", "sha256": "5b766dbeea4ebf18bf3e96760a626e8b8eb52af32c87530f2abb4dacbeffd555", "shape": [1923], "sum": "150340.0"},
    "run.code": {"dtype": "<i8", "sample": "0000000000000000", "sha256": "af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc", "shape": [1], "sum": "0.0"},
    "run.sdcflows/sub-01/fmap/sub-01_fmapid-auto00000_desc-brain_mask.nii.gz:data": {"dtype": "|u1", "sample": "0000000000000000", "sha256": "76886b71e8311c1aba61da03777dec3e372bc39a3ffc785cb0afedbbdacf89c1", "shape": [30, 28, 26], "sum": "5272.0"},
    "run.sdcflows/sub-01/fmap/sub-01_fmapid-auto00000_desc-brain_mask.nii.gz:header": {"bytes": 352, "sha256": "b10e3822c5eaba9c98bbdcde70f0308bc754985f6932b989f30d6e0af8b87888"},
@@ -2271,7 +2271,7 @@
   "py.larmorprepx.estimators": {
    "log": {"dtype": "|u1", "sample": "5b6569737322655d", "sha256": "03f7fdbecae438556b3f1a822a639b3b96def18ee3f1adb8275691711a0f3863", "shape": [498], "sum": "43251.0"},
    "precomputed": {"dtype": "|u1", "sample": "5b2f63655f70645d", "sha256": "b590557450a445843f17504332e2290485803f5b91d39405addcaee3d9467faf", "shape": [477], "sum": "39973.0"},
-   "select": {"dtype": "|u1", "sample": "5b6f225d2275225d", "sha256": "b1371e8888805ad3211a02bcee993d427788b0700d032200c43d9e0cec057a31", "shape": [20976], "sum": "1672332.0"},
+   "select": {"dtype": "|u1", "sample": "5b72225b61305b5d", "sha256": "f2e8a96fa11fa0bbfd46b57ac861bbe15d0eee188944c8ca8be278ac3b3a7dbb", "shape": [20816], "sum": "1655340.0"},
    "sophisticated": {"dtype": "|u1", "sample": "5b2269456372705d", "sha256": "bf884fe500dfcbc7ef63ec105ee06a428d4b4664b6ab1269d1403e748e3b9a4a", "shape": [57], "sum": "5091.0"}
   },
   "py.larmorprepx.fieldmaps": {
@@ -2857,11 +2857,11 @@
    "head:header": {"bytes": 352, "sha256": "7efc1ad76c038dc0045e68456da85c296115b5097c1c4366107e75dfe43bc4b0"}
   },
   "py.sdcflows.estimators": {
-   "anat": {"dtype": "|u1", "sample": "5b2f2220615d205d", "sha256": "84750d4c2443c5b3bf603aa51d7b7d5909bd0166428d43860316f7c85012d550", "shape": [1781], "sum": "140567.0"},
-   "below_entity_folders": {"dtype": "|u1", "sample": "5b695b207564725d", "sha256": "d0dac01a64a2e20aaeeb43998b2d6def96d0870e464a70ae58a04983238bd288", "shape": [5009], "sum": "396836.0"},
-   "bidict": {"dtype": "|u1", "sample": "5b203020225d315d", "sha256": "b9bcc31ec6523c9504c9e3e936c36459ab7368b8f1ed5fd3f0b5e70041697fe5", "shape": [222], "sum": "15875.0"},
+   "anat": {"dtype": "|u1", "sample": "5b7573505d5d325d", "sha256": "ed3f13f359a9d10b5cc69fb1d744538df77d4f1b9bafd9fcacda09c216ca22f7", "shape": [1761], "sum": "138443.0"},
+   "below_entity_folders": {"dtype": "|u1", "sample": "5b642c2263492c5d", "sha256": "4db892e777ba7fcc844cd7f4db8242b33d80a810ed2bc34651656dbce6d41005", "shape": [4959], "sum": "391526.0"},
+   "bidict": {"dtype": "|u1", "sample": "5b2c305d22662f5d", "sha256": "73e8affb2fe83bea684ba77ff55e88f1f05dc6a20c0ebbb2994982194ebb346d", "shape": [217], "sum": "15344.0"},
    "errors": {"dtype": "|u1", "sample": "5b2275705b6f655d", "sha256": "5546261c348d34a5ed9ff63b5d4e5ebfa7f8920c11dd382996fb25fc60dcfd70", "shape": [598], "sum": "50675.0"},
-   "wrangler_fix": {"dtype": "|u1", "sample": "5b542e227374305d", "sha256": "426610d1347f5c13d180a2c62336747e153b34d010adcd8766fb85561c09c6e9", "shape": [28031], "sum": "2254543.0"},
+   "wrangler_fix": {"dtype": "|u1", "sample": "5b61222c61667a5d", "sha256": "e9d2a7daa27d9d2fd063356c8c000a896761ebc087e11919c4dd319980518001", "shape": [27831], "sum": "2233303.0"},
    "wrangler_reproduce": {"dtype": "|u1", "sample": "5b5b72702e70655d", "sha256": "998d2000babd87efc2cdaa1b0a7b0d9a462cf320a021a005dd858ee22a018556", "shape": [1492], "sum": "124244.0"}
   },
   "py.sdcflows.fmap_preproc": {
@@ -2874,7 +2874,7 @@
    "deriv.sdcflows/sub-01/fmap/sub-01_fmapid-auto00000_desc-preproc_fieldmap.json": {"dtype": "|u1", "sample": "7b67202022203e7d", "sha256": "15b379a4d537b9f09dcd59684ca8bfe21fcd8dcccedc4ed82d0088a067195356", "shape": [416], "sum": "33254.0"},
    "deriv.sdcflows/sub-01/fmap/sub-01_fmapid-auto00000_desc-preproc_fieldmap.nii.gz:data": {"dtype": "<f4", "sample": "38e32abed3f5073c8a5beabf9225e0bfd9c7c5bd43f525c0816eabbfa0fe293e", "sha256": "7c4a57dd6ad1893f520ecd218c25ed957592bd61d39bae87e17af332bb4e42b7", "shape": [30, 28, 26, 1], "sum": "0.16566070071712602"},
    "deriv.sdcflows/sub-01/fmap/sub-01_fmapid-auto00000_desc-preproc_fieldmap.nii.gz:header": {"bytes": 352, "sha256": "ed5abee659a4a64bf5b93e55b3b50f44161022fae3d40ebe170a50438692a8e1"},
-   "estimators": {"dtype": "|u1", "sample": "5b6462692266795d", "sha256": "4ef1524783403eff0808defc9f6c3278703aa4133677fa2210021b7bdd9379e3", "shape": [1423], "sum": "112330.0"},
+   "estimators": {"dtype": "|u1", "sample": "5b612f226669225d", "sha256": "31bc18b13a5be1e5934e38da6f6e3d79ad3eb60d3bffec5fe43f5574681af359", "shape": [1403], "sum": "110206.0"},
    "helpers": {"dtype": "|u1", "sample": "5b732c225d72725d", "sha256": "1f1c2ded1c4ecf5f3778a7618e98b2097dee28e3335f18cdd94d1b080598df92", "shape": [160], "sum": "11687.0"},
    "options": {"dtype": "|u1", "sample": "5b705f5f5d6d725d", "sha256": "cc0e3d142b8192593154ab43f9bbb2aa3ce4da4a94ca2f439b1edd96e6f85d8f", "shape": [998], "sum": "85679.0"},
    "outputs": {"dtype": "|u1", "sample": "5b7030222e302c5d", "sha256": "077a4d4dbdff4bc14c51e116b1ea514ffdebe28c5e5830d3765351cb7a730e52", "shape": [431], "sum": "36895.0"},

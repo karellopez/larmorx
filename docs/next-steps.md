@@ -825,6 +825,12 @@ The items below keep their history.
     check were "unexplained" only because the references were not run); the data panel's field maps with
     every estimator; random testing at length; pybids' validator (`validate=True`) and the file associations
     (`get_fieldmap`) if a later pipeline needs them.
+  - *Line endings on Windows* (CI, 2026-11-10): part B's text outputs now write `\n` on every platform
+    (`newline="\n"`: niworkflows' report, the ITK transforms, the derivatives' sidecars, topup's and nipype's
+    command files); the earlier tools' command and settings files still take the platform's (`fsl/flirt.py`,
+    `fsl/flirt_tools.py`, `fsl/topup.py`, `fsl/fast.py`, `ants/registration.py`, `mri/hmc.py`,
+    `afni/tshift.py`): the same change, and a golden case that hashes such a file's bytes (`File`, not `_text`,
+    which reads text back with Python's universal newlines and so cannot see `\r\n`).
 - **From tedana's `t2smap` replica (2026-11-08; thirteen relays; [findings](findings/tedana-t2smap.md),
   restricted; record [tedana-t2smap-replica](validation/tedana-t2smap-replica.md),
   [benchmarks](benchmarks/tedana-t2smap.md), [API](api/tedana-t2smap.md), [spec](../specs/t2smap.md)).** Done

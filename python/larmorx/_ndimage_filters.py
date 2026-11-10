@@ -886,16 +886,23 @@ def _rank_1d(
         dest = out_arr if own else np.zeros(input.shape, dtype=target)
         if own and not dest.flags.writeable:
             raise ValueError("WRITEBACKIFCOPY base is read-only")
-    # the C++ switches on the input's type number: numpy's longlong is not its int64 (SCI-22)
-    if x.dtype.kind == "i" and x.dtype.num != np.dtype(np.int64).num:
+    # the C++ switches on the input's type number: numpy's longlong is not its int64, nor its long
+    # double its float64 where both have 8 bytes (Windows, macOS on Apple silicon) (SCI-22)
+    long_int = x.dtype.kind == "i" and x.dtype.num != np.dtype(np.int64).num
+    long_float = x.dtype.kind == "f" and x.dtype.num not in (
+        np.dtype(np.float32).num,
+        np.dtype(np.float64).num,
+    )
+    if long_int or long_float:
         if upstream_defects != "fix":
             raise TypeError("Unsupported array type")
+        name = "longlong" if long_int else "long double"
         notices.append(
             (
                 "SCI-22",
                 "SciPy ndimage",
                 upstream_defects,
-                f"the 1-D {operation} filter refuses a {x.dtype.char!r} (longlong) input",
+                f"the 1-D {operation} filter refuses a {x.dtype.char!r} ({name}) input",
             )
         )
     xc = _native(x, np.dtype(f"{x.dtype.kind}{x.dtype.itemsize}"))

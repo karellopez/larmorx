@@ -60,8 +60,6 @@ def outcome(fn, *args, **kwargs):
         # numpy's PyArray_IntpConverter (the n-dimensional filters' origins)
         (lambda: nd.median_filter(BASE, 3, origin=np.True_), TypeError, "an integer is required"),
         # the 1-D running rank
-        (lambda: nd.median_filter(LINE.astype(np.longdouble), 3), RuntimeError,
-         "Unsupported array type"),
         (lambda: nd.median_filter(LINE, 3, output=_read_only(LINE.shape)), ValueError,
          "WRITEBACKIFCOPY base is read-only"),
         (lambda: nd.median_filter(LINE.astype(np.int8), 3, mode="constant", cval=np.array([2.0])),
@@ -126,6 +124,23 @@ def test_sci22_both_modes():
             continue  # numpy's longlong is its int64 here (Windows): SciPy takes it
         with pytest.raises(error, match=r"^Unsupported array type$"):
             nd.median_filter(x, 3, upstream_defects="reproduce")
+
+
+def test_sci22_long_double():
+    """numpy's long double: where it has 8 bytes (Windows, macOS on Apple silicon) SciPy's Python
+    takes it as float64 and its C++ refuses its type number (rule A: filtered, with a notice);
+    where it is wider (x86-64: 80 bits; Linux aarch64: 128) SciPy's Python refuses it, in both
+    modes."""
+    x = LINE.astype(np.longdouble)
+    if np.dtype(np.longdouble).itemsize == 8:
+        fixed, ids, _ = outcome(nd.median_filter, x, 3)
+        assert ids == ["SCI-22"] and fixed.tolist() == MEDIAN
+        with pytest.raises(TypeError, match=r"^Unsupported array type$"):
+            nd.median_filter(x, 3, upstream_defects="reproduce")
+    else:
+        for mode in ("fix", "reproduce"):
+            with pytest.raises(RuntimeError, match=r"^Unsupported array type$"):
+                nd.median_filter(x, 3, upstream_defects=mode)
 
 
 def test_sci23_both_modes():

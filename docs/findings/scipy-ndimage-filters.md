@@ -191,7 +191,10 @@ SciPy's running rank of a 1-D input (`_rank_filter_1d`) has three defects of its
    type")` (big-endian integers are cast to int64 and pass), and numpy's `longlong` equals int64
    but has another type number on Linux and macOS, which the C++ switch refuses
    (`TypeError("Unsupported array type")`; on Windows `longlong` is numpy's int64 and passes). The
-   n-dimensional filters take both. Rule A: filtered by default (the native copy's result, a
+   same holds for numpy's long double where it has 8 bytes (Windows, macOS on Apple silicon): equal
+   to float64, so SciPy's Python passes it on, but of another type number, which the C++ refuses
+   (found by CI on 2026-11-10; wider long doubles, x86-64's 80 bits and Linux aarch64's 128, are
+   refused by SciPy's Python). The n-dimensional filters take them all. Rule A: filtered by default (the native copy's result, a
    warning); `reproduce` raises SciPy's errors.
 3. **numpy's write-back copy never resolved** (SCI-23, class f). Into a non-contiguous output of
    the input's type the C++ writes into numpy's `WRITEBACKIFCOPY` copy and drops it without

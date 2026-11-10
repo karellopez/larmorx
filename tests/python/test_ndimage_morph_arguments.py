@@ -68,9 +68,6 @@ def _read_only(shape, dtype=bool):
         # _ni_label's fused types
         (lambda: nd.label(A.astype(np.float16)), TypeError, "No matching signature found"),
         (lambda: nd.label(A, output=np.complex64), TypeError, "No matching signature found"),
-        # numpy's bincount of a long double input
-        (lambda: nd.sum_labels(VALUES.astype(np.longdouble), GROUPS, [1]), TypeError,
-         "Cannot cast array data from dtype('float128') to dtype('float64')"),
         # Py_WatershedIFT's parser
         (lambda: nd.watershed_ift(A.astype(np.uint8), A.astype(np.int32),
                                   output=_read_only(A.shape, np.int32)),
@@ -81,6 +78,26 @@ def test_scipy_refusals(call, error, message):
     with pytest.raises(error) as e:
         call()
     assert str(e.value).startswith(message)
+
+
+def test_sum_labels_long_double():
+    """A long double input as numpy's bincount (SciPy's sums per label) takes it on this platform:
+    refused where it is wider than float64 (x86-64: 80 bits; Linux aarch64: 128), where it has 8
+    bytes (Windows, macOS on Apple silicon) whatever the installed numpy does."""
+    x = VALUES.astype(np.longdouble)
+    try:
+        np.bincount(GROUPS.ravel(), x.ravel())
+    except TypeError as err:
+        with pytest.raises(TypeError) as e:
+            nd.sum_labels(x, GROUPS, [1])
+        assert str(e.value) == str(err)
+        if np.dtype(np.longdouble).itemsize > 8:
+            assert str(err).startswith(
+                f"Cannot cast array data from {np.dtype(np.longdouble)!r} to dtype('float64')"
+            )
+    else:
+        assert np.dtype(np.longdouble).itemsize == 8
+        assert nd.sum_labels(x, GROUPS, [1]).tolist() == nd.sum_labels(VALUES, GROUPS, [1]).tolist()
 
 
 def test_scipy_acceptances():

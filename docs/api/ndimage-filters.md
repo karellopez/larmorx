@@ -182,8 +182,9 @@ part B, 2026-11-09):
   the output's own (the bytes past its end are never written; the warning says how many).
 - The same path compares types by equality with numpy's native ones: a big-endian float32 or
   float64 input is refused (`RuntimeError("Unsupported array type")`) and numpy's `longlong`
-  (whose type number is not `int64`'s on Linux and macOS) is refused by the C++
-  (`TypeError("Unsupported array type")`), although the n-dimensional filters take both.
+  (whose type number is not `int64`'s on Linux and macOS), and numpy's long double where it has
+  8 bytes (Windows, macOS on Apple silicon: equal to float64, another type number), are refused by
+  the C++ (`TypeError("Unsupported array type")`), although the n-dimensional filters take them.
   **SCI-22**, rule A: filtered by default (the native copy's result, with a warning);
   `"reproduce"` raises SciPy's errors.
 - Into a non-contiguous output of the input's type the C++ writes into numpy's write-back copy

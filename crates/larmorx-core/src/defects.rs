@@ -383,7 +383,7 @@ defects! {
     SCI_21 = "SCI-21", "SciPy ndimage", true,
         "the 1-D rank, median and percentile filters of a float32, float64 or int64 input write the input type's values into an output of another type or byte order (its bytes reinterpreted), past the output's end when its items are smaller (the heap corrupted: a crash or a hang)";
     SCI_22 = "SCI-22", "SciPy ndimage", true,
-        "the 1-D rank, median and percentile filters refuse a big-endian float32 or float64 input (RuntimeError) and numpy's longlong (TypeError), which the n-dimensional filters take";
+        "the 1-D rank, median and percentile filters refuse a big-endian float32 or float64 input (RuntimeError), numpy's longlong and, where it has 8 bytes (Windows, macOS on Apple silicon), numpy's long double (TypeError), which the n-dimensional filters take";
     SCI_23 = "SCI-23", "SciPy ndimage", true,
         "the 1-D rank, median and percentile filters into a non-contiguous output of the input's type never resolve numpy's write-back copy: numpy warns (RuntimeWarning) when the copy is freed";
     SCI_25 = "SCI-25", "SciPy ndimage", true,

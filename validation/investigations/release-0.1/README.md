@@ -90,6 +90,6 @@ the median of 12 timed runs per row, 4 for the rows that take over 5 s per run; 
 
 `dist` is as fast or faster: 5 to 12 % on the ITK-based calls and the B-spline fit at one thread,
 within the runs' spread (about 3 %) on 3dvolreg and the resampler; every output the same bytes in
-both builds (the SHA-256 of every output file, decompressed, equal across the 160 runs of a row
-pair). Nothing is left out of a `dist` build: the same crates and features, only the code layout
+both builds (one SHA-256 over every output file, decompressed, the same in every run of both
+builds, warm-ups included). Nothing is left out of a `dist` build: the same crates and features, only the code layout
 (cross-crate inlining) and the symbol table differ.

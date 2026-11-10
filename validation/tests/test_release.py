@@ -1,16 +1,20 @@
 # SPDX-License-Identifier: Apache-2.0
 """The release's helpers (scripts/release/): one version everywhere, the licence expressions,
-PyPI's descriptions, the companions' source distributions, the third-party crates' licence texts
-and the check of Windows files' imported DLLs."""
+PyPI's descriptions, the companions' source distributions, the third-party crates' licence texts,
+the check of Windows files' imported DLLs, and the release workflow's own: the release notes, the
+standalone archives, the set of files with SHA256SUMS, PyPI's state, the tagged commit's CI, and
+the workflow's environments and pins."""
 
 from __future__ import annotations
 
 import fnmatch
+import hashlib
 import importlib.util
 import re
 import shutil
 import struct
 import sys
+import tarfile
 import tomllib
 import zipfile
 from pathlib import Path
@@ -375,3 +379,301 @@ def test_pe_imports_command_line(tmp_path, capsys):
     empty.mkdir()
     assert pe_imports.main([str(empty)]) == 1
     assert "no PE file found" in capsys.readouterr().err
+
+
+# The release workflow's helpers (relay 3a): the notes, the archives, the set of files, PyPI's
+# state, the tagged commit's CI, and the workflow itself.
+changelog = load("changelog")
+archives = load("archives")
+assemble = load("assemble")
+pypi_state = load("pypi_state")
+ci_green = load("ci_green")
+
+CHANGES = """\
+# Changelog
+
+## [Unreleased]
+
+- next
+
+## [0.2.0rc1] - 2026-12-01
+
+The second, with [the licences](docs/licensing.md) and [this page](#changelog).
+
+```
+## [0.2.0rc1] in a fence is not a heading
+```
+
+## 0.2.0 (2026-12-24)
+
+Final.
+
+### Fixed
+- a thing
+
+## [0.1.0rc1] - 2026-11-12
+- first
+
+[0.2.0rc1]: https://github.com/karellopez/larmorx/releases/tag/v0.2.0rc1
+[0.1.0rc1]: https://github.com/karellopez/larmorx/releases/tag/v0.1.0rc1
+"""
+
+
+def test_changelog_sections():
+    second = changelog.section(CHANGES, "0.2.0rc1")
+    assert second.startswith("The second") and second.endswith("```")
+    assert "in a fence is not a heading" in second and "Final." not in second
+    final = changelog.section(CHANGES, "0.2.0")
+    assert final.startswith("Final.") and final.endswith("- a thing")
+    assert changelog.section(CHANGES, "0.1.0rc1") == "- first"  # the link definitions left out
+
+
+@pytest.mark.parametrize(
+    ("text", "version", "message"),
+    [
+        (CHANGES, "0.3.0", "no section for 0.3.0: add a heading '## [0.3.0] - YYYY-MM-DD'"),
+        (CHANGES, "0.1.0", "the versions it has: 0.2.0rc1, 0.2.0, 0.1.0rc1"),
+        ("## [1.0.0]\ntext\n## 1.0.0 (again)\nmore\n", "1.0.0", "2 sections for 1.0.0"),
+        ("## [1.0.0] - 2027-01-01\n\n## [0.9.0]\n- x\n", "1.0.0", "has no text"),
+        ("# Changelog\n", "1.0.0", "the versions it has: none"),
+    ],
+)
+def test_changelog_refuses_a_missing_section(text, version, message):
+    with pytest.raises(changelog.ChangelogError, match=re.escape(message)):
+        changelog.section(text, version)
+
+
+def test_changelog_notes_have_absolute_links_and_the_footer():
+    text = changelog.notes(CHANGES, "0.2.0rc1", "v0.2.0rc1", ROOT / "CHANGELOG.md")
+    blob = "https://github.com/karellopez/larmorx/blob/v0.2.0rc1"
+    assert f"[the licences]({blob}/docs/licensing.md)" in text
+    assert f"[this page]({blob}/CHANGELOG.md#changelog)" in text
+    assert 'pip install "larmorx[all]==0.2.0rc1"' in text and "SHA256SUMS" in text
+    assert pypi_readme.relative_links(text) == []
+
+
+def test_changelog_command_line(tmp_path, capsys):
+    (tmp_path / "CHANGELOG.md").write_text("## [1.0.0] - 2027-01-01\n- done\n", encoding="utf-8")
+    out = tmp_path / "notes.md"
+    assert (
+        changelog.main(
+            [
+                "1.0.0",
+                "--ref",
+                "v1.0.0",
+                "--file",
+                str(tmp_path / "CHANGELOG.md"),
+                "--out",
+                str(out),
+            ]
+        )
+        == 0
+    )
+    assert out.read_text(encoding="utf-8").startswith("- done\n\n---\n")
+    assert (
+        changelog.main(["1.0.1", "--ref", "v1.0.1", "--file", str(tmp_path / "CHANGELOG.md")]) == 1
+    )
+    assert changelog.main(["1.0.0", "--ref", "v1.0.0", "--file", str(tmp_path / "none.md")]) == 1
+    err = capsys.readouterr().err
+    assert "no section for 1.0.1" in err and "none.md does not exist" in err
+
+
+def _program_wheels(folder: Path, version: str, exe: str = "") -> None:
+    """Small stand-ins of the three program wheels, laid out as maturin makes them."""
+    folder.mkdir(parents=True, exist_ok=True)
+    for dist, programs, sub in (
+        ("larmorx_cli", ("larmorx", "lx"), None),
+        ("larmorx_nc", ("larmorx-nc",), "crates-nc"),
+        ("larmorx_gpl", ("larmorx-gpl",), "crates-gpl"),
+    ):
+        with zipfile.ZipFile(folder / f"{dist}-{version}-py3-none-any.whl", "w") as z:
+            for p in programs:
+                info = zipfile.ZipInfo(f"{dist}-{version}.data/scripts/{p}{exe}")
+                info.external_attr = 0o100755 << 16
+                z.writestr(info, f"program {p}")
+            z.writestr(f"{dist}-{version}.dist-info/METADATA", "Name: x\n")
+            if sub is None:
+                continue
+            lic = f"{dist}-{version}.dist-info/licenses/{sub}"
+            for name in ("LICENSE", "NOTICE", "LICENSES/third-party-rust.txt", "Cargo.toml"):
+                z.writestr(f"{lic}/{name}", f"{sub} {name}")
+            z.writestr(f"{lic}/{dist.replace('_', '-')}-cli/src/main.rs", "fn main() {}")
+            z.writestr(f"{dist}-{version}.dist-info/sboms/{dist}.cyclonedx.json", "{}")
+            if dist == "larmorx_nc":
+                z.writestr(f"{lic}/fsl-source/MANIFEST.tsv", "file\n")
+                data = f"{dist}-{version}.data/data/share/larmorx-nc/fsl-data"
+                z.writestr(f"{data}/MANIFEST.tsv", "file\tbytes\tsha256\n")
+
+
+def test_archives_unix(tmp_path):
+    _program_wheels(tmp_path / "wheels", "1.2.3")
+    made = archives.build("1.2.3", "x86_64-unknown-linux-gnu", tmp_path / "wheels")
+    assert [a.filename for a in made] == [
+        "larmorx-1.2.3-x86_64-unknown-linux-gnu.tar.gz",
+        "larmorx-nc-1.2.3-x86_64-unknown-linux-gnu.tar.gz",
+        "larmorx-gpl-1.2.3-x86_64-unknown-linux-gnu.tar.gz",
+    ]
+    main, nc, gpl = (a.entries for a in made)
+    assert main["bin/lx"].link == "larmorx" and main["bin/larmorx"].executable
+    assert main["LICENSE"].data == (ROOT / "LICENSE").read_bytes()
+    assert "LICENSES/third-party-rust.txt" in main and "source/Cargo.toml" not in main
+    assert nc["LICENSE"].data == b"crates-nc LICENSE" and "source/Cargo.toml" in nc
+    assert "source/fsl-source/MANIFEST.tsv" in nc and "share/larmorx-nc/fsl-data/MANIFEST.tsv" in nc
+    assert "source/larmorx-nc-cli/src/main.rs" in nc and "sbom/larmorx_nc.cyclonedx.json" in nc
+    assert "bin/larmorx-gpl" in gpl and "source/larmorx-gpl-cli/src/main.rs" in gpl
+    (tmp_path / "a").mkdir()
+    (tmp_path / "b").mkdir()
+    first = archives.write(made[0], tmp_path / "a", 1_700_000_000)
+    again = archives.write(made[0], tmp_path / "b", 1_700_000_000)
+    assert first.read_bytes() == again.read_bytes()  # the same files give the same bytes
+    with tarfile.open(first) as t:
+        members = {m.name: m for m in t.getmembers()}
+    top = "larmorx-1.2.3-x86_64-unknown-linux-gnu"
+    assert members[f"{top}/bin/lx"].issym() and members[f"{top}/bin/lx"].linkname == "larmorx"
+    assert members[f"{top}/bin/larmorx"].mode == 0o755 and members[f"{top}/LICENSE"].mode == 0o644
+    assert {m.uid for m in members.values()} == {0} and members[f"{top}/bin"].isdir()
+    assert {m.mtime for m in members.values()} == {1_700_000_000}
+
+
+def test_archives_windows(tmp_path):
+    _program_wheels(tmp_path / "wheels", "1.2.3", exe=".exe")
+    made = archives.build("1.2.3", "aarch64-pc-windows-msvc", tmp_path / "wheels")
+    assert made[0].filename == "larmorx-1.2.3-aarch64-pc-windows-msvc.zip"
+    path = archives.write(made[0], tmp_path, 0)
+    with zipfile.ZipFile(path) as z:
+        names = z.namelist()
+        top = "larmorx-1.2.3-aarch64-pc-windows-msvc"
+        assert z.read(f"{top}/bin/lx.cmd") == b'@"%~dp0larmorx.exe" %*\r\n'
+        assert z.read(f"{top}/README.txt").count(b"\r\n") > 5
+    assert f"{top}/bin/larmorx.exe" in names and f"{top}/bin/lx.exe" not in names
+    assert "bin/larmorx-nc.exe" in made[1].entries
+
+
+def test_archives_refuse_what_is_missing(tmp_path):
+    _program_wheels(tmp_path / "wheels", "1.2.3")
+    with pytest.raises(ValueError, match=re.escape("expected one larmorx_cli-1.2.4")):
+        archives.build("1.2.4", "x86_64-unknown-linux-gnu", tmp_path / "wheels")
+    with pytest.raises(ValueError, match="not a release target"):
+        archives.build("1.2.3", "x86_64-unknown-linux-musl", tmp_path / "wheels")
+    with pytest.raises(ValueError, match=r"no program larmorx\.exe"):
+        archives.build("1.2.3", "x86_64-pc-windows-msvc", tmp_path / "wheels")
+
+
+def _release_files(folder: Path, version: str) -> None:
+    for i, name in enumerate(sorted(assemble.expected(version))):
+        sub = folder / ("a" if i % 2 else "b")  # any layout
+        sub.mkdir(parents=True, exist_ok=True)
+        (sub / name).write_bytes(name.encode())
+
+
+def test_assemble_the_whole_set(tmp_path, capsys):
+    want = assemble.expected("0.1.0rc1")
+    assert len(want) == 39
+    assert sum(folder == "pypi" for folder, _ in want.values()) == 21
+    assert "larmorx-0.1.0rc1-cp312-abi3-manylinux_2_28_x86_64.whl" in want
+    assert "larmorx_nc-0.1.0rc1-py3-none-macosx_11_0_arm64.whl" in want
+    assert "larmorx-gpl-0.1.0rc1-aarch64-pc-windows-msvc.zip" in want
+    _release_files(tmp_path / "in", "0.1.0rc1")
+    assert (
+        assemble.main(
+            ["--version", "0.1.0rc1", "--in", str(tmp_path / "in"), "--out", str(tmp_path / "out")]
+        )
+        == 0
+    )
+    assert "ASSEMBLE ok: 39 files" in capsys.readouterr().out
+    sums = (tmp_path / "out" / "SHA256SUMS").read_text(encoding="ascii").splitlines()
+    assert len(sums) == 39 and sums == sorted(sums, key=lambda line: line.split("  ")[1])
+    digest, name = sums[0].split("  ")
+    assert digest == hashlib.sha256(name.encode()).hexdigest()
+    assert len(list((tmp_path / "out" / "pypi").iterdir())) == 21
+    assert len(list((tmp_path / "out" / "archives").iterdir())) == 18
+
+
+def test_assemble_refuses_an_incomplete_set(tmp_path, capsys):
+    _release_files(tmp_path / "in", "0.1.0rc1")
+    gone = next((tmp_path / "in").rglob("larmorx_gpl-0.1.0rc1-py3-none-win_arm64.whl"))
+    gone.unlink()
+    (tmp_path / "in" / "larmorx-0.1.0rc1-cp312-abi3-manylinux_2_34_x86_64.whl").write_bytes(b"x")
+    (tmp_path / "in" / "c").mkdir()
+    (tmp_path / "in" / "c" / "larmorx-0.1.0rc1.tar.gz").write_bytes(b"x")
+    assert (
+        assemble.main(
+            ["--version", "0.1.0rc1", "--in", str(tmp_path / "in"), "--out", str(tmp_path / "out")]
+        )
+        == 1
+    )
+    err = capsys.readouterr().err
+    assert "missing: larmorx_gpl-0.1.0rc1-py3-none-win_arm64.whl" in err
+    assert "not a file of 0.1.0rc1's release: larmorx-0.1.0rc1-cp312-abi3-manylinux_2_34" in err
+    assert "larmorx-0.1.0rc1.tar.gz found twice" in err
+    assert not (tmp_path / "out").exists()
+
+
+def test_pypi_state_names_and_comparison():
+    assert pypi_state.project("larmorx_nc-0.1.0rc1-py3-none-win_amd64.whl") == "larmorx-nc"
+    assert pypi_state.project("larmorx_gpl-0.1.0rc1.tar.gz") == "larmorx-gpl"
+    assert pypi_state.project("larmorx-0.1.0rc1-cp312-abi3-win_arm64.whl") == "larmorx"
+    want = {"a.whl": "1", "b.whl": "2", "c.tar.gz": "3"}
+    assert pypi_state.compare(want, None) == (["a.whl", "b.whl", "c.tar.gz"], [])
+    assert pypi_state.compare(want, {"a.whl": "1", "b.whl": "9"}) == (["c.tar.gz"], ["b.whl"])
+    assert pypi_state.compare(want, {**want, "d.whl": "4"}) == ([], [])
+
+
+def test_ci_green_ignores_what_ci_ignores():
+    """ci_green.py's paths are ci.yml's `paths-ignore`, for the push to main and pull requests."""
+    ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    found = re.findall(r"paths-ignore:\s*\[([^\]]*)\]", ci)
+    assert found and all(
+        [p.strip().strip("'\"") for p in f.split(",")] == list(ci_green.IGNORED) for f in found
+    )
+    assert ci_green.ignored("README.md") and ci_green.ignored("crates-nc/PYPI.md")
+    assert ci_green.ignored("docs/validation/x.json") and not ci_green.ignored("scripts/x.py")
+    assert not ci_green.ignored("mydocs/x.json") and not ci_green.ignored("CHANGELOG.mdx")
+
+
+def test_ci_green_verdict(tmp_path, monkeypatch):
+    git = shutil.which("git")
+    if git is None:
+        pytest.skip("git is not installed")
+    monkeypatch.chdir(tmp_path)
+    for var in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE"):
+        monkeypatch.delenv(var, raising=False)
+
+    def commit(path: str, text: str) -> str:
+        (tmp_path / path).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / path).write_text(text, encoding="utf-8")
+        ci_green.git("add", path)
+        ci_green.git("-c", "user.name=t", "-c", "user.email=t@example.org", "commit", "-qm", path)
+        return ci_green.git("rev-parse", "HEAD").strip()
+
+    ci_green.git("init", "-q")
+    code = commit("src/a.py", "1")
+    docs = commit("docs/a.md", "1")
+    readme = commit("README.md", "1")
+    more = commit("src/a.py", "2")
+    ci_green.git("update-ref", "refs/remotes/origin/main", more)
+    assert ci_green.verdict(readme, {code: 1}) == (
+        True,
+        f"CI passed for {code[:12]} (run 1); since then documentation only (2 files)",
+    )
+    assert ci_green.verdict(code, {code: 1})[0] and ci_green.verdict(docs, {code: 1})[0]
+    ok, why = ci_green.verdict(more, {code: 1})
+    assert not ok and "differs in code (src/a.py)" in why
+    assert not ci_green.verdict(more, {})[0]
+    ci_green.git("checkout", "-q", "-b", "side", readme)
+    side = commit("src/b.py", "1")
+    ok, why = ci_green.verdict(side, {side: 2})
+    assert not ok and "is not on origin/main" in why
+
+
+def test_release_workflow_names_and_pins():
+    """The environments PyPI's trusted publishers name (the user's, 2026-11-10), every action
+    pinned by its commit, the publish jobs' permissions, and only a v* tag publishes."""
+    text = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
+    assert re.findall(r"^\s+name: (pypi[-a-z]*)$", text, re.M) == ["pypi-nc", "pypi-gpl", "pypi"]
+    uses = re.findall(r"^\s+(?:- )?uses: (\S+)", text, re.M)
+    assert uses and all(re.fullmatch(r"[\w.-]+/[\w.-]+@[0-9a-f]{40}", u) for u in uses), uses
+    assert text.count("id-token: write # trusted publishing") == 3
+    assert re.search(r"^permissions: \{\}$", text, re.M)
+    assert 'tags: ["v*"]' in text and 'branches: ["release/dry-run"]' in text
+    assert text.count("if: needs.check.outputs.publish == 'true'") == 5

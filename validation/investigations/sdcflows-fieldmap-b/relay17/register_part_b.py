@@ -632,7 +632,7 @@ PIPE = [
     (
         "PIPE-39",
         "nipype checks an interface's outputs in a hash-dependent order",
-        "n",
+        "b",
         "nipype `BaseInterface.aggregate_outputs`",
         "the outputs are set (and checked by traits) in the order of `set(predicted_outputs)`, which follows the process's string hashes (`PYTHONHASHSEED`): with several invalid outputs the `TraitError` names any of them, from process to process (`GetReadoutTime` of `PhaseEncodingDirection` `'j+'`: `pe_direction` or `pe_dir_fsl`; with a string readout time also `readout_time`)",
         "none (a message of a failing run)",
@@ -860,7 +860,7 @@ SCI = [
         "SciPy 1.18's diagonal `inv` prints the condition number as `rcond`",
         "f",
         "SciPy 1.18.1 `scipy.linalg.inv`",
-        'for a diagonal matrix the warning\'s test `max|a| · max|1/a| > 1/eps` is right, but the value printed as "rcond" is that product, the condition number ("rcond = 2e+17")',
+        'for a diagonal matrix the warning\'s test `max(abs(a)) · max(abs(1/a)) > 1/eps` is right, but the value printed as "rcond" is that product, the condition number ("rcond = 2e+17")',
         "none (a message)",
         "kept in both modes (SciPy's text)",
         "–",

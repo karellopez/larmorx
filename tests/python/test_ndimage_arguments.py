@@ -118,10 +118,13 @@ def test_sci22_both_modes():
     for dt in (">f8", ">f4", np.longlong):
         x = LINE.astype(dt)
         fixed, ids, _ = outcome(nd.median_filter, x, 3)
-        assert ids == ["SCI-22"] and fixed.tolist() == MEDIAN
-        error = TypeError if dt is np.longlong and np.dtype(np.longlong).num != np.dtype(np.int64).num else RuntimeError  # fmt: skip
         if dt is np.longlong and np.dtype(np.longlong).num == np.dtype(np.int64).num:
-            continue  # numpy's longlong is its int64 here (Windows): SciPy takes it
+            # numpy's longlong is its int64 here (Windows): SciPy takes it, nothing to correct
+            assert ids == [] and fixed.tolist() == MEDIAN
+            assert nd.median_filter(x, 3, upstream_defects="reproduce").tolist() == MEDIAN
+            continue
+        assert ids == ["SCI-22"] and fixed.tolist() == MEDIAN
+        error = TypeError if dt is np.longlong else RuntimeError
         with pytest.raises(error, match=r"^Unsupported array type$"):
             nd.median_filter(x, 3, upstream_defects="reproduce")
 

@@ -110,3 +110,7 @@ Relay 1 a4cf64edc320dd324 (+ the stopped attempt aaea7f61392fc0d27), 2 a33e6cc1a
   (part B's text outputs with `\n` on every platform; the golden helper's "Path"; each failing Python test a
   workflow annotation in GitHub Actions, readable without a login) and e3d29cd9 (SCI-22); the gates passed;
   the golden record from e3d29cd9: the parity smoke tier 2,968 passed, four cases re-recorded, 299 the same.
+- CI on 6efb5e9c (the second push): 11 of 13 green, macOS on Apple silicon included; on both Windows jobs the new
+  annotations named one test, `test_sci22_both_modes`, which asked for SCI-22's notice of a `longlong` input
+  before its own Windows exception (there numpy's `longlong` is its `int64`, nothing to correct): the test's
+  order fixed (a test-only change; the golden record stands).

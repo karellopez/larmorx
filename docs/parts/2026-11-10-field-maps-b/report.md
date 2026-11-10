@@ -102,3 +102,11 @@ Relay 1 a4cf64edc320dd324 (+ the stopped attempt aaea7f61392fc0d27), 2 a33e6cc1a
   same (only the header changed).
 - `resample-series-jacobian` (a script, `python -m larmorx_validation.parity.resample_jacobian`, not a suite):
   run again on ds000005 with the oracles ds005040 and ds005454, its rows identical to the record.
+- CI on 9288dea0 (the first push): 10 of 13 jobs green. Windows x64 and arm64: five golden cases, four of them
+  the golden helper's path class name (`PosixPath` here, `WindowsPath` there: two bytes a path) and one
+  niworkflows' report written with `\r\n`; macOS on Apple silicon: Python tests of numpy's long double, which
+  has 8 bytes there (and on Windows), as float64 by equality but another type number: SciPy's 1-D rank filters'
+  C++ refuses it (SCI-22 extended: filtered by default, `reproduce` SciPy's `TypeError`). Fixed in 10feee97
+  (part B's text outputs with `\n` on every platform; the golden helper's "Path"; each failing Python test a
+  workflow annotation in GitHub Actions, readable without a login) and e3d29cd9 (SCI-22); the gates passed;
+  the golden record from e3d29cd9: the parity smoke tier 2,968 passed, four cases re-recorded, 299 the same.

@@ -39,7 +39,7 @@ import shutil
 import warnings
 from collections.abc import Callable
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePath
 from typing import Any
 
 import numpy as np
@@ -7995,7 +7995,8 @@ def _portable(obj: Any, root: Path) -> Any:
         if hasattr(v, "suffix") and hasattr(v, "find_meta"):
             return ["fieldmapfile", walk(v.path), v.suffix, walk(v.entities), walk(v.metadata)]
         text = str(v).replace(str(root), "<root>").replace("\\", "/")
-        return [type(v).__name__, text]
+        # a path as "Path": its class is PosixPath or WindowsPath by platform
+        return ["Path" if isinstance(v, PurePath) else type(v).__name__, text]
 
     return np.frombuffer(json.dumps(walk(obj)).encode(), dtype=np.uint8).copy()
 

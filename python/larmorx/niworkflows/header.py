@@ -296,7 +296,7 @@ def validate_image(
     report = os.path.join(os.path.abspath(os.fspath(out_dir)), "report.html")
 
     def unchanged() -> ValidateImageResult:
-        open(report, "w").close()
+        open(report, "w", encoding="utf-8").close()
         return ValidateImageResult(in_file, report, None)
 
     sform_code = int(fields["sform_code"])
@@ -391,7 +391,7 @@ def validate_image(
     out_fname = _nipype.fname_presuffix(in_file, suffix="_valid", newpath=out_dir)
     header = NiftiHeader.from_dict(fields)
     save_nibabel(Image(img.data, nibabel_affine(header), header), out_fname, n_threads=n_threads)
-    with open(report, "w", encoding="utf-8") as fobj:
+    with open(report, "w", encoding="utf-8", newline="\n") as fobj:
         fobj.write(indent(snippet, "\t" * 3))
     return ValidateImageResult(out_fname, report, warning_txt)
 

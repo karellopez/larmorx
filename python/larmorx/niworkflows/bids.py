@@ -710,7 +710,9 @@ def derivatives_data_sink(
             sidecar = out_file.parent / f"{out_file.name.split('.', 1)[0]}.json"
             if sidecar.exists() or sidecar.is_symlink():
                 sidecar.unlink()
-            sidecar.write_text(json.dumps(meta, sort_keys=True, indent=2), encoding="utf-8")
+            sidecar.write_text(
+                json.dumps(meta, sort_keys=True, indent=2), encoding="utf-8", newline="\n"
+            )
             out_meta = str(sidecar)
     return DerivativesDataSinkResult(
         tuple(out_files), out_meta, tuple(compression), tuple(fixed_hdr)

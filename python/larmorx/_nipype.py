@@ -1681,7 +1681,7 @@ def run(
     _defects.check(upstream_defects)  # type: ignore[arg-type]
     os.makedirs(cmd.cwd, exist_ok=True)
     for path, text in cmd.files.items():
-        with open(path, "w", encoding="utf-8") as f:
+        with open(path, "w", encoding="utf-8", newline="\n") as f:
             f.write(text)
     threads = n_threads
     if threads is None:

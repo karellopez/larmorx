@@ -581,7 +581,7 @@ def _encfile(path: str, encoding_direction: Sequence[str], readout_times: Sequen
         row = [float(val[0] == encdir[0]) * direction for val in ["x", "y", "z"]] + [durations[idx]]
         # np.savetxt formats with "%"
         lines.append("%d %d %d %.8f" % tuple(np.array(row, dtype=np.float64)))  # noqa: UP031
-    with open(path, "w", encoding="utf-8") as f:
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
         f.write("".join(line + "\n" for line in lines))
 
 
@@ -618,7 +618,7 @@ def topup_node(
         config=os.fspath(config),
     )
     for path, text in cmd.files.items():
-        with open(path, "w", encoding="utf-8") as f:
+        with open(path, "w", encoding="utf-8", newline="\n") as f:
             f.write(text)
     enc = cmd.outputs["out_enc_file"]
     args = cmd.argv()

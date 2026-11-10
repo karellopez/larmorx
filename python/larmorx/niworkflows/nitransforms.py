@@ -114,8 +114,8 @@ def concatenate_xfms(
     if out_dir is not None:
         os.makedirs(out_dir, exist_ok=True)
         out_xfm = Path(os.path.abspath(os.fspath(out_dir))) / "out_fwd.tfm"
-        out_xfm.write_text(text, encoding="utf-8")
+        out_xfm.write_text(text, encoding="utf-8", newline="\n")
         if inv_text is not None:
             out_inv = out_xfm.with_name("out_inv.tfm")
-            out_inv.write_text(inv_text, encoding="utf-8")
+            out_inv.write_text(inv_text, encoding="utf-8", newline="\n")
     return ConcatenateXfmsResult(matrix, text, inv_text, out_xfm, out_inv)

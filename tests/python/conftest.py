@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import os
 import shutil
 from pathlib import Path
 
@@ -90,3 +91,20 @@ def builtin_stub(monkeypatch) -> BuiltinStub:
     stub = BuiltinStub()
     monkeypatch.setattr(_core, "replica_run_builtin", stub)
     return stub
+
+
+def pytest_terminal_summary(terminalreporter):
+    """In GitHub Actions, each failing test as a workflow annotation, as the golden tests' own
+    (which this leaves to them): GitHub's API serves a public repository's annotations without a
+    login, its job logs not."""
+    if os.environ.get("GITHUB_ACTIONS") != "true":
+        return
+    stats = terminalreporter.stats
+    for report in [*stats.get("failed", []), *stats.get("error", [])]:
+        if "tests/golden/" in report.nodeid.replace("\\", "/"):
+            continue
+        lines = str(report.longrepr).strip().splitlines()
+        detail = " / ".join(lines[-12:]).replace("%", "%25").replace("\r", " ").replace("\n", " ")
+        title = f"pytest {report.nodeid} ({report.when})"
+        title = title.replace("%", "%25").replace(":", "%3A").replace(",", "%2C")
+        terminalreporter.write_line(f"::error title={title}::{detail[:1500]}")

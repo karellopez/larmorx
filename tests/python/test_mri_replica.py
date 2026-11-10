@@ -167,9 +167,15 @@ def test_reference_mean_and_options_only_the_original_has(scripts, tmp_path):
         lx.mri.hmc(path, normcorr_count="weights", implementation="replica")
 
 
+#: ``LARMORX_NC_BIN`` as the tests start: the ``no_replica`` fixture removes it before the test's
+#: body runs, which then took the repository's build or, without one, ``None`` (the release
+#: workflow sets it to the installed program on every platform).
+_NC_BIN = os.environ.get("LARMORX_NC_BIN")
+
+
 def _built_replica() -> Path | None:
-    if env := os.environ.get("LARMORX_NC_BIN"):
-        return Path(env)
+    if _NC_BIN:
+        return Path(_NC_BIN)
     root = Path(__file__).resolve().parents[2] / "crates-nc" / "target" / "release"
     exe = root / ("larmorx-nc.exe" if os.name == "nt" else "larmorx-nc")
     return exe if exe.is_file() else None

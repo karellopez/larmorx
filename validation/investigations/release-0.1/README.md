@@ -110,3 +110,43 @@ program instead of cargo's build, after checking that its `--version` is the che
 |---|---|
 | `gpl_golden_version_only.py --old OLD.tsv --new NEW.tsv --outputs DIR` | the gpl golden record before (`--old`, recorded at 0.0.1) and after the re-recording (`--new`) hold the same outputs and differ in exactly the 9 `dataset_description.json` lines; each of those saved files (`DIR`: the harness's `LARMORX_GOLDEN_MISMATCHES` folder from the run just before the re-recording), its `Node` block dropped, hashes to the old record with the version it names written as `0.0.1` and to the new one with `<version>` (result 2026-11-10: 203 outputs, 9 changed, 9 of 9 equal to both). To make it again: at `13013f21`, `LARMORX_GOLDEN_MISMATCHES=DIR cargo test --locked -p larmorx-gpl-cli --test golden` in `crates-gpl` (it fails with the 9 cases and saves them), `--old` from `git show 13013f21:crates-gpl/larmorx-gpl-cli/tests/golden.tsv`, `--new` from `8ffd5448` |
 | `installed_golden.sh <checkout> <out> [<larmorx-gpl of another version>]` | the companions' sdists made, a wheel built from each with the `dist` profile (pip, build isolation), installed in a fresh venv of the system's CPython 3.12, and both golden harnesses run on the installed programs through `LARMORX_GOLDEN_PROGRAM`, with the negative controls (result 2026-11-10 at `8ffd5448`: the programs print `larmorx-nc 0.1.0rc1` and `larmorx-gpl 0.1.0rc1`; every golden case of both passes on them, larmorx-gpl's also by its name on `PATH`; larmorx-nc's golden test in 21 s on the installed program against about 60 s on cargo's debug build; a missing program and relay 2b's larmorx-gpl, which prints `0.1.0-rc.1`, fail with the reason named) |
+
+## Relay 3a: the release workflow
+
+`.github/workflows/release.yml` builds, tests and (on a `v*` tag only, after the maintainer's
+approval) publishes the release; its helpers are `scripts/release/changelog.py` (the release
+notes), `archives.py` (the standalone archives), `smoke.py` (the installed packages' and the
+archives' checks), `assemble.py` (the whole set and `SHA256SUMS`), `pypi_state.py` (the version
+absent from PyPI before, every file there after) and `ci_green.py` (the tagged commit on main,
+CI green), tested by `validation/tests/test_release.py`. Checked here with actionlint 1.7.12
+(shellcheck 0.11.0 on every `run:` script) and zizmor 1.32.0 (`--offline`; no findings, also none
+above "info" with `--persona=auditor`).
+
+| Helper | What it shows |
+|---|---|
+| `workflow_rehearsal.sh <checkout> <out> [<maturin>]` | the workflow's Linux steps on a fresh clone of the commit, outside GitHub, with the workflow's maturin (1.15.0): the three sdists (PyPI's descriptions rewritten at the commit, `twine check --strict`), the companions' wheels built from their unpacked sdists inside the clone, the standalone `larmorx` as a program wheel, the companions' golden tests on the programs their wheels install, the archives, the main wheel, and the smoke checks in a fresh venv of the system's CPython 3.12. The host's glibc (2.35) tags the wheels and makes the smoke's glibc 2.28 check fail (the workflow builds in the manylinux_2_28 container): that failure is expected there, every other check must pass |
+
+**The rehearsal (2026-11-11, at `46ed4455`, maturin 1.15.0, 28 threads, build caches of relays 1
+and 2b; log `oracles/logs/release-3a-rehearsal.log`):** every step passed: the three sdists
+(3 s; larmorx 3.22 MB, larmorx-nc 3.27 MB, larmorx-gpl 0.90 MB; `twine check --strict` passed),
+larmorx-nc's wheel from its unpacked sdist (44 s, 6.21 MB), larmorx-gpl's (15 s, 1.06 MB), the
+standalone `larmorx` and `lx` as a program wheel (271 s, two LTO links; 20.5 MB, not published),
+the companions' golden tests on the programs their wheels install (42 s: larmorx-nc 2 of 2 tests,
+larmorx-gpl 3 of 3, every case), the archives (4 s: `larmorx-0.1.0rc1-x86_64-unknown-linux-gnu.tar.gz`
+10.0 MB holding the 25 MB program once and `lx` as a link to it, `larmorx-nc-...` 5.82 MB with
+300 files (the FSL data, FSL's original source and the amended source), `larmorx-gpl-...`
+1.01 MB), larmorx's wheel (335 s); the smoke checks on a fresh venv with the three wheels: 47 of
+53 passed, the other 6 the glibc 2.28 check of the six programs and extensions, built against this
+host's glibc 2.35 (they need `GLIBC_2.34`: the check works; the workflow builds them in the
+manylinux_2_28 container).
+
+**The test job's steps** (on the rehearsal's files, in fresh venvs of CPython 3.12; 2026-11-11, log
+`oracles/logs/release-3a-testjob.log`; since then part of `workflow_rehearsal.sh`): `pytest
+tests/python tests/golden` with `LARMORX_NC_BIN` and `LARMORX_GPL_BIN` at the installed programs
+failed one test, `tests/python/test_mri_replica.py::test_the_replica_itself` ("LARMORX_NC_BIN is
+set to 'None'"): the test read the variable after its `no_replica` fixture had removed it, so it
+ran only beside a repository build (CI sets no variable and has no build: it skipped there).
+Fixed in the test (the variable read once, at import, as `test_tedana.py` does); then 885 passed,
+51 skipped (that test with the variable 5 of 5 in its file; without it and without a build:
+skipped, as in CI). `larmorx[all]` from the built files: 21 s, `pip check` clean, the smoke's
+checks all pass but the glibc ones, the `[prep]` modules present.

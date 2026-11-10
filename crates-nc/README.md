@@ -80,11 +80,10 @@ The parity suites find the binary through `LARMORX_NC_BIN`, else `crates-nc/targ
 
 ## Using it from larmorx
 
-Installed, the replicas are used by `larmorx fsl mcflirt ...` and `lx.mri.hmc(...)` with
-`implementation="auto"` (the default) or `"replica"`; `"original"` (or
-`LARMORX_IMPLEMENTATION=original` on the command line) runs the clean-room original. BET has no
-clean-room original yet: `larmorx fsl bet|bet2|betsurf ...`, `lx.fsl.bet(...)` and
-`lx.fsl.betsurf(...)` run the replica, and say how to install it when it is missing. The
+Installed, the replicas are used by `larmorx fsl <program> ...` and the Python wrappers
+(`lx.mri.hmc(...)`, `lx.fsl.bet(...)`, ...) with `implementation="auto"` (the default) or
+`"replica"`; `"original"` (or `LARMORX_IMPLEMENTATION=original` on the command line) runs the
+clean-room original, which every one of these tools has in larmorx itself. The
 program is found through `LARMORX_NC_BIN`, the Python environment's scripts directory, or the
 `PATH` (`larmorx_cli::replica`).
 
@@ -99,10 +98,15 @@ current; the MIT licence of Arm's Optimized Routines), FSL's original source (`f
 and the amended source (the crates' Rust code, `Cargo.toml` and `Cargo.lock`), as the FSL
 Licence requires.
 
-Not on PyPI. It is installed by name, so that its licence is accepted knowingly:
+On PyPI from 0.1.0rc1, with the same version as larmorx (its description there is `PYPI.md`).
+It is installed by name, or with `pip install "larmorx[all]"`, so that its licence is accepted
+knowingly:
 
 ```bash
-cd crates-nc
-maturin build --release --locked --out ../dist      # dist/larmorx_nc-<version>-py3-none-<platform>.whl
-pip install --find-links ../dist larmorx-nc
+pip install larmorx-nc
 ```
+
+A local build: `maturin build --release --locked --out ../dist` in this directory, then
+`pip install --find-links ../dist larmorx-nc`. Its source distribution is made from the repository
+by `scripts/release/companion_sdist.py` (`maturin sdist` cannot make it here: this workspace uses the
+root workspace's crates by path).

@@ -53,18 +53,54 @@ pub use itk_real::{IndexFloor, ItkReal, Precision, same_value};
 pub use ndarray;
 pub use num_complex::Complex;
 
-/// Version shared by every larmorx crate, the CLI and the Python package.
-pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+/// Version shared by every larmorx crate, the CLI and the Python package, in PEP 440's form, as
+/// pip and PyPI show it: Cargo's `0.1.0-rc.1` is `0.1.0rc1` (build.rs, `src/pep440.rs`).
+pub const VERSION: &str = env!("LARMORX_CORE_PEP440_VERSION");
+
+#[cfg(test)]
+mod pep440;
 
 #[cfg(test)]
 mod tests {
     use super::VERSION;
+    use super::pep440::cargo_to_pep440;
 
     #[test]
-    fn version_is_major_minor_patch() {
-        let release = VERSION.split(['-', '+']).next().unwrap();
+    fn version_is_the_packages_in_pep440_form() {
+        assert_eq!(
+            cargo_to_pep440(env!("CARGO_PKG_VERSION")).as_deref(),
+            Ok(VERSION)
+        );
+        let release = VERSION.split(['a', 'b', 'r']).next().unwrap();
         let parts: Vec<&str> = release.split('.').collect();
         assert_eq!(parts.len(), 3, "{VERSION}");
         assert!(parts.iter().all(|p| p.parse::<u64>().is_ok()), "{VERSION}");
+    }
+
+    #[test]
+    fn pep440_forms() {
+        for (cargo, pep440) in [
+            ("0.0.1", "0.0.1"),
+            ("0.1.0", "0.1.0"),
+            ("0.1.0-rc.1", "0.1.0rc1"),
+            ("0.2.0-alpha.3", "0.2.0a3"),
+            ("1.10.0-beta.12", "1.10.0b12"),
+        ] {
+            assert_eq!(cargo_to_pep440(cargo).as_deref(), Ok(pep440), "{cargo}");
+        }
+        for refused in [
+            "0.1",
+            "0.1.0.1",
+            "0.1.0-rc1",
+            "0.1.0-rc",
+            "0.1.0-dev.1",
+            "0.1.0+build",
+            "01.0.0",
+            "0.1.0-rc.01",
+            "0.1.0-",
+            "x.1.0",
+        ] {
+            assert!(cargo_to_pep440(refused).is_err(), "{refused}");
+        }
     }
 }

@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: LicenseRef-FSL
 # The larmorx-nc wheel: the `larmorx-nc` program only (maturin's "bin" bindings), no Python
 # module. larmorx (Apache-2.0) runs it as a separate process; nothing imports it
-# (docs/licensing.md). Build: `maturin build --release --locked` in this directory.
+# (docs/licensing.md). Build: `maturin build --release --locked` in this directory; the source
+# distribution: `python -P scripts/release/companion_sdist.py nc --out <dir>` (from the repository).
 #
 # The FSL Licence requires "all original and amended source code" in every transmitted product:
 # the wheel carries both as licence files (in its .dist-info/licenses/): FSL's original source
@@ -12,10 +13,16 @@ build-backend = "maturin"
 
 [project]
 name = "larmorx-nc"
-description = "Bit-exact replicas of FSL tools (mcflirt, bet, flirt, fast, topup, fslmaths, fslstats, prelude), run by larmorx as a separate program; FSL Licence: non-commercial use only"
-readme = "README.md"
+description = "Non-commercial use only (FSL Licence): bit-exact Rust replicas of FSL tools (mcflirt, bet, flirt, fast, topup, fslmaths, fslstats, prelude), run by larmorx as a separate program"
+# PyPI's description (PYPI.md); README.md is this directory's page for developers.
+readme = "PYPI.md"
 requires-python = ">=3.12"
-license = "LicenseRef-FSL"
+authors = [{ name = "Karel Lopez Vilaret" }]
+# The FSL Licence (LICENSE) first; then every licence of the code the wheel holds: the works its
+# NOTICE names (Armadillo, Kiss FFT, OpenBLAS, LAPACK, fslpy, fdlibm, Arm's routines, the SGI STL),
+# the Apache-2.0 crate larmorx-core with the works it translates (LICENSES/NOTICE-larmorx.txt) and
+# the Rust crates it is built with (the wheel's SBOM). scripts/release/licences.py derives it.
+license = "LicenseRef-FSL AND Apache-2.0 AND BSD-2-Clause AND BSD-3-Clause AND bzip2-1.0.6 AND HPND-sell-variant AND MIT AND MPL-2.0 AND PSF-2.0 AND SunPro AND Zlib"
 # The FSL Licence (LICENSE); the FSL, Armadillo, fdlibm and Arm notices (NOTICE); the texts and
 # notices of the Apache-2.0 larmorx crate and of Arm's MIT code (LICENSES/); FSL's original
 # source (fsl-source/) and the amended source, the Rust translation (the crates below).
@@ -38,20 +45,25 @@ license-files = [
 ]
 keywords = ["neuroimaging", "mri", "fmri", "fsl", "motion-correction"]
 classifiers = [
-    "Development Status :: 2 - Pre-Alpha",
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
     "Intended Audience :: Science/Research",
     "Operating System :: MacOS",
     "Operating System :: Microsoft :: Windows",
     "Operating System :: POSIX :: Linux",
     "Programming Language :: Rust",
+    "Topic :: Scientific/Engineering :: Image Processing",
     "Topic :: Scientific/Engineering :: Medical Science Apps.",
 ]
 dynamic = ["version"]
 
 [project.urls]
+Homepage = "https://karellopez.github.io/larmorx_documentation/"
+Documentation = "https://karellopez.github.io/larmorx_documentation/"
 Repository = "https://github.com/karellopez/larmorx"
 Source = "https://github.com/karellopez/larmorx/tree/main/crates-nc"
 Issues = "https://github.com/karellopez/larmorx/issues"
+Changelog = "https://github.com/karellopez/larmorx/blob/main/CHANGELOG.md"
 
 [tool.maturin]
 bindings = "bin"
@@ -59,3 +71,6 @@ manifest-path = "larmorx-nc-cli/Cargo.toml"
 # FSL's standard images the bet and standard_space_roi replicas read, installed at
 # <prefix>/share/larmorx-nc/fsl-data (wheel-data/data/share/larmorx-nc/fsl-data/README.md).
 data = "wheel-data"
+# The wheel data in the source distribution too, so that a wheel built from it has them
+# (scripts/release/companion_sdist.py makes it; `maturin sdist` cannot here).
+include = [{ path = "wheel-data/**/*", format = "sdist" }]

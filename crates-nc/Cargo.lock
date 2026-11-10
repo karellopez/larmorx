@@ -183,7 +183,7 @@ dependencies = [
 
 [[package]]
 name = "larmorx-core"
-version = "0.0.1"
+version = "0.1.0-rc.1"
 dependencies = [
  "bytemuck",
  "ndarray",
@@ -194,7 +194,7 @@ dependencies = [
 
 [[package]]
 name = "larmorx-nc-avwutils"
-version = "0.0.1"
+version = "0.1.0-rc.1"
 dependencies = [
  "larmorx-core",
  "larmorx-nc-core",
@@ -203,7 +203,7 @@ dependencies = [
 
 [[package]]
 name = "larmorx-nc-bet"
-version = "0.0.1"
+version = "0.1.0-rc.1"
 dependencies = [
  "larmorx-core",
  "larmorx-nc-avwutils",
@@ -215,7 +215,7 @@ dependencies = [
 
 [[package]]
 name = "larmorx-nc-cli"
-version = "0.0.1"
+version = "0.1.0-rc.1"
 dependencies = [
  "bzip2",
  "flate2",
@@ -235,7 +235,7 @@ dependencies = [
 
 [[package]]
 name = "larmorx-nc-core"
-version = "0.0.1"
+version = "0.1.0-rc.1"
 dependencies = [
  "bzip2",
  "flate2",
@@ -246,7 +246,7 @@ dependencies = [
 
 [[package]]
 name = "larmorx-nc-fast"
-version = "0.0.1"
+version = "0.1.0-rc.1"
 dependencies = [
  "larmorx-core",
  "larmorx-nc-core",
@@ -256,7 +256,7 @@ dependencies = [
 
 [[package]]
 name = "larmorx-nc-flirt"
-version = "0.0.1"
+version = "0.1.0-rc.1"
 dependencies = [
  "larmorx-core",
  "larmorx-nc-avwutils",
@@ -266,7 +266,7 @@ dependencies = [
 
 [[package]]
 name = "larmorx-nc-fugue"
-version = "0.0.1"
+version = "0.1.0-rc.1"
 dependencies = [
  "larmorx-core",
  "larmorx-nc-core",
@@ -275,7 +275,7 @@ dependencies = [
 
 [[package]]
 name = "larmorx-nc-mcflirt"
-version = "0.0.1"
+version = "0.1.0-rc.1"
 dependencies = [
  "larmorx-core",
  "larmorx-nc-core",
@@ -285,7 +285,7 @@ dependencies = [
 
 [[package]]
 name = "larmorx-nc-topup"
-version = "0.0.1"
+version = "0.1.0-rc.1"
 dependencies = [
  "larmorx-core",
  "larmorx-nc-core",

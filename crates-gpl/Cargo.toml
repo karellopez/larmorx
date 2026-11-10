@@ -22,20 +22,23 @@ members = [
 ]
 
 [workspace.package]
-version = "0.0.1"
+# One version for larmorx, larmorx-gpl and larmorx-nc: scripts/release/set_version.py sets it.
+version = "0.1.0-rc.1"
 edition = "2024"
+# The compiler a build from source needs at least: the one rust-toolchain.toml pins.
+rust-version = "1.99"
 license = "GPL-3.0-or-later"
 repository = "https://github.com/karellopez/larmorx"
 
 # Pure-Rust dependencies only (CLAUDE.md rule 5): no C, C++, Fortran or HDF5 libraries.
 [workspace.dependencies]
-larmorx-core = { path = "../crates/larmorx-core", version = "0.0.1" }
-larmorx-io = { path = "../crates/larmorx-io", version = "0.0.1" }
-larmorx-interp = { path = "../crates/larmorx-interp", version = "0.0.1" }
-larmorx-transform = { path = "../crates/larmorx-transform", version = "0.0.1" }
-larmorx-optim = { path = "../crates/larmorx-optim", version = "0.0.1" }
-larmorx-gpl-tedana = { path = "larmorx-gpl-tedana", version = "0.0.1" }
-larmorx-afni-replica = { path = "../crates/larmorx-afni-replica", version = "0.0.1" }
+larmorx-core = { path = "../crates/larmorx-core", version = "0.1.0-rc.1" }
+larmorx-io = { path = "../crates/larmorx-io", version = "0.1.0-rc.1" }
+larmorx-interp = { path = "../crates/larmorx-interp", version = "0.1.0-rc.1" }
+larmorx-transform = { path = "../crates/larmorx-transform", version = "0.1.0-rc.1" }
+larmorx-optim = { path = "../crates/larmorx-optim", version = "0.1.0-rc.1" }
+larmorx-gpl-tedana = { path = "larmorx-gpl-tedana", version = "0.1.0-rc.1" }
+larmorx-afni-replica = { path = "../crates/larmorx-afni-replica", version = "0.1.0-rc.1" }
 glibc-reference = { path = "tools/glibc-reference" }
 rayon = "1.12.0"
 thiserror = "2.0.21"

@@ -18,7 +18,7 @@ fn version() {
     assert!(out.status.success(), "{out:?}");
     assert_eq!(
         String::from_utf8(out.stdout).unwrap(),
-        format!("larmorx {}\n", env!("CARGO_PKG_VERSION"))
+        format!("larmorx {}\n", larmorx_core::VERSION)
     );
     let out = common::run(EXE, &["no-such-family"]);
     assert_eq!(out.status.code(), Some(2));

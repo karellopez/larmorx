@@ -3892,11 +3892,15 @@ def _(ctx: Context) -> dict[str, Any]:
 
 def _h5_structure(path: str) -> tuple[str, np.ndarray]:
     """What larmorx reads back from an HDF5 file: every group and dataset (name, datatype,
-    shape, and the strings), and the floating-point values in file order."""
+    shape, and the strings), and the floating-point values in file order. ITK's ``/OSVersion``
+    string, which larmorx's writer fills with larmorx's version by default, is recorded as
+    ``<version>``: the same checksum at every release."""
     lines, values = [], []
     for name, kind, shape, value in _core.hdf5_datasets(path):
         text = f"{name} {kind} {list(shape)}"
         if kind == "string":
+            if name.rsplit("/", 1)[-1] == "OSVersion" and value == [_core.__version__.encode()]:
+                value = [b"<version>"]
             text += " " + repr(value)
         elif kind.startswith("float"):
             values.append(np.asarray(value, np.float64).ravel())

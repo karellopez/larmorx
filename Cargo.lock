@@ -206,7 +206,7 @@ dependencies = [
 
 [[package]]
 name = "larmorx-afni"
-version = "0.0.1"
+version = "0.1.0-rc.1"
 dependencies = [
  "larmorx-core",
  "larmorx-io",
@@ -217,7 +217,7 @@ dependencies = [
 
 [[package]]
 name = "larmorx-afni-replica"
-version = "0.0.1"
+version = "0.1.0-rc.1"
 dependencies = [
  "larmorx-core",
  "larmorx-io",
@@ -229,7 +229,7 @@ dependencies = [
 
 [[package]]
 name = "larmorx-ants"
-version = "0.0.1"
+version = "0.1.0-rc.1"
 dependencies = [
  "larmorx-core",
  "larmorx-image",
@@ -244,7 +244,7 @@ dependencies = [
 
 [[package]]
 name = "larmorx-cli"
-version = "0.0.1"
+version = "0.1.0-rc.1"
 dependencies = [
  "larmorx-afni",
  "larmorx-afni-replica",
@@ -259,7 +259,7 @@ dependencies = [
 
 [[package]]
 name = "larmorx-core"
-version = "0.0.1"
+version = "0.1.0-rc.1"
 dependencies = [
  "bytemuck",
  "ndarray",
@@ -270,7 +270,7 @@ dependencies = [
 
 [[package]]
 name = "larmorx-fsl"
-version = "0.0.1"
+version = "0.1.0-rc.1"
 dependencies = [
  "bytemuck",
  "bzip2",
@@ -286,7 +286,7 @@ dependencies = [
 
 [[package]]
 name = "larmorx-hdf5"
-version = "0.0.1"
+version = "0.1.0-rc.1"
 dependencies = [
  "flate2",
  "larmorx-core",
@@ -298,7 +298,7 @@ dependencies = [
 
 [[package]]
 name = "larmorx-image"
-version = "0.0.1"
+version = "0.1.0-rc.1"
 dependencies = [
  "larmorx-core",
  "rayon",
@@ -307,7 +307,7 @@ dependencies = [
 
 [[package]]
 name = "larmorx-interp"
-version = "0.0.1"
+version = "0.1.0-rc.1"
 dependencies = [
  "larmorx-core",
  "libm",
@@ -317,7 +317,7 @@ dependencies = [
 
 [[package]]
 name = "larmorx-io"
-version = "0.0.1"
+version = "0.1.0-rc.1"
 dependencies = [
  "bytemuck",
  "crc32fast",
@@ -333,7 +333,7 @@ dependencies = [
 
 [[package]]
 name = "larmorx-mri"
-version = "0.0.1"
+version = "0.1.0-rc.1"
 dependencies = [
  "bytemuck",
  "bzip2",
@@ -348,7 +348,7 @@ dependencies = [
 
 [[package]]
 name = "larmorx-ndimage"
-version = "0.0.1"
+version = "0.1.0-rc.1"
 dependencies = [
  "larmorx-core",
  "rayon",
@@ -357,7 +357,7 @@ dependencies = [
 
 [[package]]
 name = "larmorx-optim"
-version = "0.0.1"
+version = "0.1.0-rc.1"
 dependencies = [
  "larmorx-core",
  "larmorx-transform",
@@ -366,7 +366,7 @@ dependencies = [
 
 [[package]]
 name = "larmorx-py"
-version = "0.0.1"
+version = "0.1.0-rc.1"
 dependencies = [
  "larmorx-afni",
  "larmorx-ants",
@@ -386,7 +386,7 @@ dependencies = [
 
 [[package]]
 name = "larmorx-registration"
-version = "0.0.1"
+version = "0.1.0-rc.1"
 dependencies = [
  "larmorx-core",
  "larmorx-image",
@@ -398,7 +398,7 @@ dependencies = [
 
 [[package]]
 name = "larmorx-sdcflows"
-version = "0.0.1"
+version = "0.1.0-rc.1"
 dependencies = [
  "larmorx-core",
  "larmorx-interp",
@@ -410,7 +410,7 @@ dependencies = [
 
 [[package]]
 name = "larmorx-transform"
-version = "0.0.1"
+version = "0.1.0-rc.1"
 dependencies = [
  "larmorx-core",
  "larmorx-interp",

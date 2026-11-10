@@ -3,7 +3,10 @@ name = "larmorx-gpl-cli"
 description = "The larmorx-gpl command line: bit-exact replicas of GPL-family tools (tedana's t2smap) with the original programs' arguments"
 version.workspace = true
 edition.workspace = true
-license.workspace = true
+rust-version.workspace = true
+# GPL-3.0-only: the program includes tedana's translation (larmorx-gpl-tedana, GPL-3.0-only), so
+# the whole is under version 3 only (pyproject.toml, NOTICE); the workspace's tools are -or-later.
+license = "GPL-3.0-only"
 repository.workspace = true
 autobins = false
 

@@ -6,7 +6,8 @@ Usage: python -P compare_records.py <dir with re-run JSON records> <suite> [<sui
        (run from the checkout; the committed records are docs/validation/<suite>.json, or those
        in --against's directory: two re-runs compared with each other)
 
-Times, temporary paths and memory addresses are ignored. Prints, per suite, the cases whose status
+Times, temporary paths, memory addresses and larmorx's own version (``larmorx 0.1.0rc1``,
+``larmorx-nc 0.1.0-rc.1``: a release changes it in every record) are ignored. Prints, per suite, the cases whose status
 differs and those whose details differ, with the first differing fields. Exit status 1 if a status
 differs. Values the original measures afresh (its own runs with the clock's seed, compressed bytes)
 may differ legitimately: read the fields before concluding.
@@ -16,6 +17,10 @@ import json
 import re
 import sys
 from pathlib import Path
+
+#: larmorx's, larmorx-nc's and larmorx-gpl's version, in PEP 440's form or Cargo's.
+_V = r"\d+\.\d+\.\d+(?:(?:a|b|rc)\d+|-(?:alpha|beta|rc)\.\d+)?\b"
+VERSION = re.compile(rf"\b(larmorx(?:-nc|-gpl)? |package='larmorx(?:-nc|-gpl)?', version='){_V}")
 
 
 def strip(x):
@@ -28,6 +33,7 @@ def strip(x):
     if isinstance(x, list):
         return [strip(v) for v in x]
     if isinstance(x, str):
+        x = VERSION.sub(r"\1<version>", x)
         return re.sub(r"/tmp/[^ '\"]*", "<tmp>", re.sub(r"0x[0-9a-f]+", "<addr>", x))
     return x
 

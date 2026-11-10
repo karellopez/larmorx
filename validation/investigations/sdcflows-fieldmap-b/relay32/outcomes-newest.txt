@@ -1,0 +1,97 @@
+scipy 1.18.1 numpy 2.5.4 pybids 0.22.0 sdcflows 2.17.1 fmriprep 26.0.0.dev1+g21a490fb8
+PIPE-32 pipe32_shared_identifier.py  [1/1]:
+    exit 1
+    sub-01: ['pepolar']
+    stderr: KeyError: "'pepolar' is already  in mapping"
+PIPE-32 pipe32_shared_identifier.py 02 [1/1]:
+    exit 0
+    sub-02: ['pepolar']
+PIPE-32 pipe32_automatic_names.py  [1/1]:
+    exit 0
+    participants 01 02: sub-01 ['auto_00000']
+    participants 01 02: sub-02 ['auto_00001']
+    participants 02: sub-02 ['auto_00000']
+SDC-45 sdc45_fieldmapfile_entities.py  [1/1]:
+    exit 0
+    plain entities: {'subject': '01', 'task': 'rest', 'datatype': 'func'}
+    plain estimators: ['ANAT'] IntendedFor: [['func/sub-01_task-rest_bold.nii.gz'], None]
+    golden-x entities: {'subject': '01', 'task': 'rest', 'datatype': 'func', 'den': 'x'}
+    golden-x ValueError: 'den' is not a recognized entity. If you're sure you want to impose this constraint, set invalid_filters='allow'.
+    motion entities: {'subject': '01', 'task': 'rest', 'datatype': 'motion'}
+    motion estimators: [] IntendedFor: []
+PIPE-36 pipe36_extract_entities.py  [1/1]:
+    exit 0
+    plain entities: {'subject': '01', 'task': 'rest', 'suffix': 'bold', 'datatype': 'func', 'extension': '.nii.gz'}
+    plain sbrefs: ['sub-01_task-rest_sbref.nii.gz']
+    golden-x entities: {'subject': '01', 'task': 'rest', 'suffix': 'bold', 'datatype': 'func', 'extension': '.nii.gz', 'den': 'x'}
+    golden-x ValueError: 'den' is not a recognized entity. If you're sure you want to impose this constraint, set invalid_filters='allow'.
+    motion entities: {'subject': '01', 'task': 'rest', 'suffix': 'bold', 'datatype': 'motion', 'extension': '.nii.gz'}
+    motion sbrefs: ['sub-01_task-rest_sbref.nii.gz']
+PIPE-37 pipe37_pybids_parent_folders.py  [1/1]:
+    exit 0
+    plain: subjects ['01', '02']; raw T1w datatype ['anat']; derivative res ['2']; get(res='2') 1
+    sub-pilot: subjects ['pilot']; raw T1w datatype ['anat']; derivative res ['2']; get(res='2') 1
+    func: subjects ['01', '02']; raw T1w datatype ['func']; derivative res ['2']; get(res='2') 1
+    andres-lab: subjects ['01', '02']; raw T1w datatype ['anat']; derivative res ['lab']; get(res='2') 0
+SCI-21 sci21_rank_filter_output_type.py float64 [1/1]:
+    exit 0
+    float64: 1-D [0.0, 1.0, 2.0, 3.0, 4.0], 2-D [0.0, 1.0, 2.0, 3.0, 4.0]
+SCI-21 sci21_rank_filter_output_type.py int64 [1/1]:
+    exit 0
+    int64: 1-D [0, 4607182418800017408, 4611686018427387904, 4613937818241073152, 4616189618054758400], 2-D [0, 1, 2, 3, 4]
+SCI-21 sci21_rank_filter_output_type.py float32 [7/10]:
+    exit 0
+    float32: 1-D [0.0, 0.0, 0.0, 1.875, 0.0], 2-D [0.0, 1.0, 2.0, 3.0, 4.0]
+SCI-21 sci21_rank_filter_output_type.py float32 [1/10]:
+    exit -6
+    stderr: double free or corruption (out)
+SCI-21 sci21_rank_filter_output_type.py float32 [1/10]:
+    exit -7
+    float32: 1-D [0.0, 0.0, 0.0, 1.875, 0.0], 2-D [0.0, 1.0, 2.0, 3.0, 4.0]
+    stderr: 
+SCI-21 sci21_rank_filter_output_type.py float32 [1/10]:
+    exit 1
+    stderr: ValueError: array is too big; `arr.size * arr.dtype.itemsize` is larger than the maximum possible size.
+SCI-21 sci21_rank_filter_output_type.py float32 (glibc's checking allocator) [3/10]:
+    exit -6
+    float32: 1-D [0.0, 0.0, 0.0, 1.875, 0.0], 2-D [0.0, 1.0, 2.0, 3.0, 4.0]
+    stderr: corrupted size vs. prev_size
+SCI-21 sci21_rank_filter_output_type.py float32 (glibc's checking allocator) [7/10]:
+    exit 0
+    float32: 1-D [0.0, 0.0, 0.0, 1.875, 0.0], 2-D [0.0, 1.0, 2.0, 3.0, 4.0]
+SCI-21 sci21_rank_filter_output_type.py int16 [8/10]:
+    exit 0
+    int16: 1-D [0, 0, 0, 0, 0], 2-D [0, 1, 2, 3, 4]
+SCI-21 sci21_rank_filter_output_type.py int16 [1/10]:
+    exit 1
+    stderr: ValueError: array is too big; `arr.size * arr.dtype.itemsize` is larger than the maximum possible size.
+SCI-21 sci21_rank_filter_output_type.py int16 [1/10]:
+    exit -6
+    int16: 1-D [0, 0, 0, 0, 0], 2-D [0, 1, 2, 3, 4]
+    stderr: corrupted size vs. prev_size
+SCI-21 sci21_rank_filter_output_type.py int16 (glibc's checking allocator) [3/10]:
+    exit -6
+    int16: 1-D [0, 0, 0, 0, 0], 2-D [0, 1, 2, 3, 4]
+    stderr: corrupted size vs. prev_size
+SCI-21 sci21_rank_filter_output_type.py int16 (glibc's checking allocator) [7/10]:
+    exit 0
+    int16: 1-D [0, 0, 0, 0, 0], 2-D [0, 1, 2, 3, 4]
+SCI-21 sci21_related.py  [1/1]:
+    exit 0
+    '>f8' 1-D RuntimeError: Unsupported array type
+    '>f8' 2-D [0.0, 1.0, 2.0, 3.0, 4.0]
+    longlong 1-D TypeError: Unsupported array type
+    longlong 2-D [0, 1, 2, 3, 4]
+    strided output: [0.0, 1.0, 2.0, 3.0, 4.0] ['RuntimeWarning: WRITEBACKIFCOPY detected in clearing of array.  Required call to PyArray_ResolveWritebackIfCopy or PyArray_DiscardWritebackIfCopy is missing.']
+SCI-25 sci25_erosion_float_output.py  [1/1]:
+    exit 0
+    bool: [0, 0, 0, 1, 1] (brute_force: [0, 0, 0, 1, 1])
+    uint8: [0, 0, 0, 1, 1] (brute_force: [0, 0, 0, 1, 1])
+    float32: [0, 0, 0, 0, 1] (brute_force: [0, 0, 0, 1, 1])
+    float64: [0, 0, 0, 0, 1] (brute_force: [0, 0, 0, 1, 1])
+SCI-29 sci29_label_bool_output.py  [1/1]:
+    exit 0
+    output=array: 3 [True, False, True, False, True] bytes [1, 0, 2, 0, 3]
+    output=bool: 3 bool bytes [1, 0, 2, 0, 3]
+    in place: 3 bytes [1, 0, 2, 0, 3]
+    int8, 200 labels: RuntimeError: insufficient bit-depth in requested output type

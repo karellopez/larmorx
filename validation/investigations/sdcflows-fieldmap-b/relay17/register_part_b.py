@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""The register's text for the field maps' part B (relay 17, the defects relay; relay 19 added PIPE-35, SCI-18, SCI-19 and SCI-20; relay 21 SCI-21 to SCI-24; relay 22 SCI-25 to SCI-30): summary rows and
+"""The register's text for the field maps' part B (relay 17, the defects relay; relay 19 added PIPE-35, SCI-18, SCI-19 and SCI-20; relay 21 SCI-21 to SCI-24; relay 22 SCI-25 to SCI-30; relay 32 the upstream status of the entries with a report, ``UPSTREAM``): summary rows and
 sections of every new entry, for the part's handoff (relay 21 = R12 integrates it with
 apply_handoff.py; the reasons are in NOTES.md). Run: python3 register_part_b.py > register-part-b.md
 Each entry: (id, title, class, tool, short defect, fMRIPrep users, larmorx today, gap,
@@ -1006,10 +1006,30 @@ def row(e):
     return f"| {i} | {tool} | {short} | {cls} | {users} | {today} ({D}) | {gap} |"
 
 
+U = "../upstream-reports/"
+#: The upstream status found while drafting the reports (relay 32, 2026-11-10: each project's
+#: issues searched first; the drafts' reproducers and outcomes in ``relay32/``), after the evidence.
+UPSTREAM = {
+    "PIPE-32": f"sdcflows' open issue #455 (fMRIPrep's #3354, closed as not planned, is the same failure); a comment with a reproducer and a contained fix drafted, [sdcflows-shared-b0fieldidentifier.md]({U}sdcflows-shared-b0fieldidentifier.md) (not yet posted)",
+    "SDC-36": f"sdcflows' open issue #455; the comment drafted for PIPE-32 covers it, [sdcflows-shared-b0fieldidentifier.md]({U}sdcflows-shared-b0fieldidentifier.md) (not yet posted)",
+    "SDC-45": f"a report drafted, [sdcflows-entities-from-parent-folders.md]({U}sdcflows-entities-from-parent-folders.md) (not yet filed); pybids' fix of PIPE-37 (#1273) leaves it, and below a folder named as a datatype makes it silent (an empty `IntendedFor`; measured)",
+    "PIPE-36": f"a report drafted, [fmriprep-entities-from-parent-folders.md]({U}fmriprep-entities-from-parent-folders.md) (not yet filed); pybids' fix of PIPE-37 (#1273) leaves it, and below a folder named as a datatype makes it silent (no single-band reference found; measured)",
+    "PIPE-37": f"reported as pybids #1270 and fixed on pybids' master by #1273 (2026-08-24), not yet released (0.22.0 the newest on 2026-11-10): nothing to file; `lx.bids`' default index = that fix's on the reproducer's four folders (`relay32/pipe37_against_pybids_master.py`), [pybids-entities-from-parent-folders.md]({U}pybids-entities-from-parent-folders.md)",
+    "SCI-21": f"a report drafted (with SCI-22 and SCI-23), [scipy-rank-filter-1d-output-type.md]({U}scipy-rank-filter-1d-output-type.md) (not yet filed)",
+    "SCI-22": f"in SCI-21's report, [scipy-rank-filter-1d-output-type.md]({U}scipy-rank-filter-1d-output-type.md) (not yet filed)",
+    "SCI-23": f"in SCI-21's report, [scipy-rank-filter-1d-output-type.md]({U}scipy-rank-filter-1d-output-type.md) (not yet filed); SciPy's #25646 (the write-back of three `nd_image.c` functions) does not cover `_rank_filter_1d.cpp`",
+    "SCI-25": f"a report drafted, [scipy-binary-erosion-float-output-mask.md]({U}scipy-binary-erosion-float-output-mask.md) (not yet filed)",
+    "SCI-26": 'fixed on SciPy\'s main by #25646 (2026-08-16, milestone 2.0.0; issue #25641), after 1.18.1: "fixed upstream and followed" when larmorx follows that release',
+    "SCI-29": f"SciPy's open issue #24502 (its PR #24579 closed unmerged); a comment drafted, [scipy-label-bool-output.md]({U}scipy-label-bool-output.md) (not yet posted)",
+}
+
+
 def section(e):
     i, title, cls, tool, short, users, today, gap, ev = e
     c = cls.replace("?", "?")
     gaptext = "done." if gap == "–" else f"{gap}."
+    if i in UPSTREAM:
+        ev = f"{ev}; upstream: {UPSTREAM[i]}"
     return (
         f"### {i} {title} — ({c})\n- **What:** {tool}: {short}.\n- **Evidence:** {ev}.\n"
         f"- **fMRIPrep:** {users}.\n- **larmorx:** {today} (field maps part B, {D}).\n"

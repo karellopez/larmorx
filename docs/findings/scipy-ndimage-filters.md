@@ -333,6 +333,14 @@ an array return `None`; `CPython`'s `"i"` conversion overflows at a C `long` wit
 large to convert to C long", the Linux and macOS text (a C `long` is 32-bit on Windows, where
 CPython says so already above 2^31 - 1: larmorx gives Linux's message on every platform).
 
+**Upstream (relay 32, 2026-11-10).** SCI-21 (with SCI-22 and SCI-23) and SCI-25 have new reports
+drafted for SciPy (`docs/upstream-reports/scipy-rank-filter-1d-output-type.md`,
+`scipy-binary-erosion-float-output-mask.md`; no issue found, SciPy's main unchanged); SCI-29 is
+SciPy's open issue #24502, for which a comment is drafted (`scipy-label-bool-output.md`). SCI-26 was
+fixed on SciPy's main by #25646 (2026-08-16, milestone 2.0.0, after 1.18.1; issue #25641); the
+1-D rank filter's write-back (SCI-23, `_rank_filter_1d.cpp`) was not part of it. The reproducers
+and their outcomes in both environments: `validation/investigations/sdcflows-fieldmap-b/relay32/`.
+
 ## Found by random testing (relay 27: SCI-31, SCI-32)
 
 The difftest tool `ndimage-skimage` (`validation/src/larmorx_validation/difftest/tools/fieldmaps_b.py`)

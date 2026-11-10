@@ -1474,6 +1474,51 @@ passes its fix pass: 726 s for sdcflows and larmorx's two modes). Per tool:
 `validation/difftest/triage.toml`, block "field maps part B (2026-11-09)" (17 entries: the probes'
 differences and the timeouts).
 
+## The upstream reports (relay 32, 2026-11-10)
+
+Seven of part B's defects have a report drafted for their project (`docs/upstream-reports/`, each
+"not yet filed" until the user files it), each with its smallest reproducer, run in both kept
+environments and kept with its outcomes (`validation/investigations/sdcflows-fieldmap-b/relay32/`).
+Searching the projects' issues first changed three of them:
+
+- **PIPE-32** (and SDC-36, sdcflows' BIDS app) is sdcflows' open issue #455 (2024-08-16; fMRIPrep's
+  #3354 is the same failure, closed as not planned): the draft is a comment there, with a
+  reproducer on fMRIPrep's `map_fieldmap_estimation` (25.2.7's source and master 21a490fb: the
+  same `KeyError`) and a contained fix (clear the registry per participant: nothing reads an
+  earlier participant's entries). Measured on the way: with `IntendedFor` alone, a participant's
+  automatic name depends on the participants built before it in the same process (sub-02 is
+  `auto_00001` after sub-01, `auto_00000` alone), and it names the field-map derivatives
+  (`fmapid-auto00001`); larmorprepx keeps fMRIPrep's counter (the default and `reproduce` alike).
+- **PIPE-37** was reported as pybids #1270 (a dataset in `.../motion/BIDS`: every file
+  `datatype` `motion`) and fixed on pybids' master by #1273 (2026-08-24: the patterns matched below
+  the root), not in a release yet (0.22.0 is PyPI's newest): nothing to file. `lx.bids`' default
+  index is that fix's (`relay32/pipe37_against_pybids_master.py`: every file's entities, raw and
+  derivatives, below `plain`, `sub-pilot`, `func` and `andres-lab`, identical to pybids' master).
+- **SCI-29** is SciPy's open issue #24502 (2026-02-03; its PR #24579 closed unmerged): the draft
+  is a comment there, with the bytes a bool output then holds and a fix inside the documented
+  contract (the bool's range {0, 1} in the overflow check, so the existing retry raises for more
+  than one feature and a single feature still labels in place).
+
+**pybids' fix makes SDC-45 and PIPE-36 worse, not better, for a folder named as a datatype.**
+#1273 leaves `parse_file_entities` parsing the path it is given (an API), and sdcflows'
+`FieldmapFile` and fMRIPrep's `extract_entities` give it absolute paths. With pybids 0.22.0,
+below a folder named `motion` the index and those parses agree in their mistake (sdcflows finds
+no estimator at all; fMRIPrep's `get_sbrefs` finds the reference); with pybids' master the index
+is right and they are not: sdcflows' fieldmap-less estimator is built with an empty
+`IntendedFor` (it corrects nothing) and `get_sbrefs` silently finds no single-band reference.
+Below `golden-x` both stop with `'den' is not a recognized entity` with either pybids. Both
+reports say so; larmorx's defaults (SDC-45 corrected, PIPE-36 when the BOLD stages are ported)
+take the entities from the BIDS part, so they do not depend on pybids' release.
+
+SciPy, the other four: **SCI-21** (with SCI-22 and SCI-23 of the same function) and **SCI-25**
+are new reports (no issue found; SciPy's main still has the code on 2026-11-10). The 5-element
+reproducer of SCI-21 writes 40 bytes into a 20-byte (float32) or 10-byte (int16) output: in two
+rounds of 10 processes per case and release, every process that printed printed the same values,
+but 1 to 4 of 10 did not end normally (aborted after or before printing, or the next allocation
+raised numpy's `array is too big`), up to 7 of 10 with glibc's checking allocator. **SCI-26** (the iterated erosion's write-back copy) was fixed on SciPy's main
+by #25646 (2026-08-16, milestone 2.0.0; issue #25641), after 1.18.1: when larmorx follows that
+release, SCI-26 becomes "fixed upstream and followed", as SCI-17 and SCI-24 are.
+
 ## Part B's register entries at a glance (relay 29)
 
 Every entry the part registered (`docs/findings/upstream-defects.md`, through the part's handoff), one row each, from the register's text of the part (`validation/investigations/sdcflows-fieldmap-b/relay17/register_part_b.py`; this table: `relay29/findings_table.py`). The class is the register's (a: a crash, undefined behaviour or a read out of bounds, never reproduced; b: a race or nondeterminism, never reproduced; c: a deterministic bug that changes results; e: a command-line or parsing quirk; f: documentation or a message only; c?: questionable, decided by the rules A to D). The site's sdcflows-estimation page shows this table.

@@ -93,3 +93,20 @@ within the runs' spread (about 3 %) on 3dvolreg and the resampler; every output 
 both builds (one SHA-256 over every output file, decompressed, the same in every run of both
 builds, warm-ups included). Nothing is left out of a `dist` build: the same crates and features, only the code layout
 (cross-crate inlining) and the symbol table differ.
+
+## Relay 2c: the companions' version and their golden tests on installed programs
+
+`larmorx-nc --version` and `larmorx-gpl --version` (and their `--help`'s first line) print the
+version in PEP 440's form, `0.1.0rc1`, as pip, PyPI and `larmorx --version` do: a `build.rs` in
+each CLI crate converts Cargo's version with larmorx-core's `src/pep440.rs` (included as it is).
+tedana's `dataset_description.json` still names `larmorx-gpl 0.1.0-rc.1` (Cargo's form; the same
+string from 0.1.0 on). The gpl golden harness writes larmorx-gpl's own version, in either form,
+as `<version>` in that file's `"Python"` field, so a release changes no checksum; its 9 cases
+were re-recorded once, from the clean commit `13013f21`. Both companion harnesses take
+`LARMORX_GOLDEN_PROGRAM` (a path, or a name found on `PATH`): the golden cases then run that
+program instead of cargo's build, after checking that its `--version` is the checkout's.
+
+| Helper | What it shows |
+|---|---|
+| `gpl_golden_version_only.py --old OLD.tsv --new NEW.tsv --outputs DIR` | the gpl golden record before (`--old`, recorded at 0.0.1) and after the re-recording (`--new`) hold the same outputs and differ in exactly the 9 `dataset_description.json` lines; each of those saved files (`DIR`: the harness's `LARMORX_GOLDEN_MISMATCHES` folder from the run just before the re-recording), its `Node` block dropped, hashes to the old record with the version it names written as `0.0.1` and to the new one with `<version>` (result 2026-11-10: 203 outputs, 9 changed, 9 of 9 equal to both). To make it again: at `13013f21`, `LARMORX_GOLDEN_MISMATCHES=DIR cargo test --locked -p larmorx-gpl-cli --test golden` in `crates-gpl` (it fails with the 9 cases and saves them), `--old` from `git show 13013f21:crates-gpl/larmorx-gpl-cli/tests/golden.tsv`, `--new` from `8ffd5448` |
+| `installed_golden.sh <checkout> <out> [<larmorx-gpl of another version>]` | the companions' sdists made, a wheel built from each with the `dist` profile (pip, build isolation), installed in a fresh venv of the system's CPython 3.12, and both golden harnesses run on the installed programs through `LARMORX_GOLDEN_PROGRAM`, with the negative controls (result 2026-11-10 at `8ffd5448`: the programs print `larmorx-nc 0.1.0rc1` and `larmorx-gpl 0.1.0rc1`; every golden case of both passes on them, larmorx-gpl's also by its name on `PATH`; larmorx-nc's golden test in 21 s on the installed program against about 60 s on cargo's debug build; a missing program and relay 2b's larmorx-gpl, which prints `0.1.0-rc.1`, fail with the reason named) |

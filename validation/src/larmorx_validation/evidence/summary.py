@@ -242,6 +242,12 @@ PAGES = [
         [("port", "sdcflows-fieldmap", "validated", None, None)],
     ),
     (
+        "/tools/sdcflows-estimation/",
+        "sdcflows' PEPOLAR, direct and fieldmap-less estimation",
+        "larmorx",
+        [("port", "sdcflows-estimation", "validated", None, None)],
+    ),
+    (
         "/tools/nifti-io/",
         "NIfTI I/O",
         "larmorx",

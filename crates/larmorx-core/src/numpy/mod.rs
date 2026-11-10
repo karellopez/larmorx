@@ -46,8 +46,8 @@
 //! OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 //! POSSIBILITY OF SUCH DAMAGE.
 
-pub mod format;
 pub mod dot;
+pub mod format;
 pub mod histograms;
 pub mod quantile;
 pub mod reduce;

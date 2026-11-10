@@ -1591,7 +1591,15 @@ fn dbdsqr_upper(
     clear_negative_zero: bool,
 ) -> usize {
     let (ncvt, nru) = (n, n);
-    dbdsqr_upper_ncc(n, d, e, (vt, ncvt, n), (u, nru, n), (&mut [], 0, 1), clear_negative_zero)
+    dbdsqr_upper_ncc(
+        n,
+        d,
+        e,
+        (vt, ncvt, n),
+        (u, nru, n),
+        (&mut [], 0, 1),
+        clear_negative_zero,
+    )
 }
 
 /// `DBDSQR('U', N, NCVT, NRU, NCC, D, E, VT, LDVT, U, LDU, C, LDC, ...)`: `vt` (`ncvt` columns,

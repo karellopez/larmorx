@@ -20,14 +20,19 @@ helper's `case SyN` and its observer).
   virtual domain, computes the metric's derivative twice (once per direction, the roles of the
   images swapped), smooths and scales the two updates, composes them into the fields, smooths
   the total fields, and inverts each field twice.
-- **ANTs' SyN is (almost) independent of its thread count.** The metric derivative of a
-  displacement field is stored per voxel, not summed; only the metric values (and Mattes' joint
-  histogram) are reduced per work unit. At 2, 4 and 8 threads the fields moved by 0 (CC,
-  MeanSquares) to 3.6e-14 mm (Mattes) from ANTs' one-thread fields. Two exceptions: the
-  point-set metrics, whose points' derivatives race into the field (ITK-34: 0.025 mm with ICP,
-  different from run to run), and stages after thread-dependent linear stages (sMRIPrep's
-  registrations on every third voxel: 1.4 to 1.7 mm). larmorx gives the one-thread result at any
-  thread count.
+- **ANTs' SyN depends on its thread count where the metric's reductions reach the field.** The
+  metric derivative of a displacement field is stored per voxel, not summed; only the metric
+  values (and Mattes' joint histogram) are reduced per work unit. On this part's cases, at 2, 4
+  and 8 threads the fields moved by 0 (CC, MeanSquares) to 3.6e-14 mm (Mattes) from ANTs'
+  one-thread fields. Exceptions: the point-set metrics, whose points' derivatives race into the
+  field (ITK-34: 0.025 mm with ICP, different from run to run); stages after thread-dependent
+  linear stages (sMRIPrep's registrations on every third voxel: 1.4 to 1.7 mm); and sdcflows'
+  fieldmap-less registration (fMRIPrep's `--use-syn-sdc` call on ds000228, two Mattes metrics
+  with Random sampling 0.8 in its first stage; the field maps' part B, 2026-11-10, its evidence
+  example `syn-ds000228`): four threads move the warp by up to 0.835 mm from one thread's and
+  0.659 mm from run to run (the field by up to 1.70 and 0.70 Hz), through the Mattes joint
+  histograms' sums per work unit, so ANTs 2.6.5 at four threads does not repeat itself on that
+  call. larmorx gives the one-thread result at any thread count.
 - **Bit-identical to ANTs at one thread**: every compared SyN case, most against the unmodified
   binary, the rest (Mattes, MI2, float runs: glibc's `logf`/`log`/`exp`) once CORE-MATH's
   correctly rounded functions are preloaded. On sMRIPrep's registrations glibc's few ulps of

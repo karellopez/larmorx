@@ -1,0 +1,35 @@
+scipy 1.18.1 numpy 2.5.4 pybids 0+unknown sdcflows 2.17.1 fmriprep 26.0.0.dev1+g21a490fb8
+PIPE-32 pipe32_shared_identifier.py  [1/1]:
+    exit 1
+    sub-01: ['pepolar']
+    stderr: KeyError: "'pepolar' is already  in mapping"
+PIPE-32 pipe32_shared_identifier.py 02 [1/1]:
+    exit 0
+    sub-02: ['pepolar']
+PIPE-32 pipe32_automatic_names.py  [1/1]:
+    exit 0
+    participants 01 02: sub-01 ['auto_00000']
+    participants 01 02: sub-02 ['auto_00001']
+    participants 02: sub-02 ['auto_00000']
+SDC-45 sdc45_fieldmapfile_entities.py  [1/1]:
+    exit 0
+    plain entities: {'subject': '01', 'task': 'rest', 'datatype': 'func'}
+    plain estimators: ['ANAT'] IntendedFor: [['func/sub-01_task-rest_bold.nii.gz'], None]
+    golden-x entities: {'subject': '01', 'task': 'rest', 'datatype': 'func', 'den': 'x'}
+    golden-x ValueError: 'den' is not a recognized entity. If you're sure you want to impose this constraint, set invalid_filters='allow'.
+    motion entities: {'subject': '01', 'task': 'rest', 'datatype': 'motion'}
+    motion estimators: ['ANAT'] IntendedFor: [[], None]
+PIPE-36 pipe36_extract_entities.py  [1/1]:
+    exit 0
+    plain entities: {'subject': '01', 'task': 'rest', 'suffix': 'bold', 'datatype': 'func', 'extension': '.nii.gz'}
+    plain sbrefs: ['sub-01_task-rest_sbref.nii.gz']
+    golden-x entities: {'subject': '01', 'task': 'rest', 'suffix': 'bold', 'datatype': 'func', 'extension': '.nii.gz', 'den': 'x'}
+    golden-x ValueError: 'den' is not a recognized entity. If you're sure you want to impose this constraint, set invalid_filters='allow'.
+    motion entities: {'subject': '01', 'task': 'rest', 'suffix': 'bold', 'datatype': 'motion', 'extension': '.nii.gz'}
+    motion sbrefs: []
+PIPE-37 pipe37_pybids_parent_folders.py  [1/1]:
+    exit 0
+    plain: subjects ['01', '02']; raw T1w datatype ['anat']; derivative res ['2']; get(res='2') 1
+    sub-pilot: subjects ['01', '02']; raw T1w datatype ['anat']; derivative res ['2']; get(res='2') 1
+    func: subjects ['01', '02']; raw T1w datatype ['anat']; derivative res ['2']; get(res='2') 1
+    andres-lab: subjects ['01', '02']; raw T1w datatype ['anat']; derivative res ['2']; get(res='2') 1

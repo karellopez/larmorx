@@ -133,7 +133,16 @@ at a time:
    fits included, also against fMRIPrep's own files; SDC-01 to SDC-11; the fit 6.5 to 7.8 times scikit-learn's
    speed at 14 threads with 22 to 32 % of sdcflows' peak memory; with it nibabel's scaled writer and header
    arithmetic in `lx.io`; follow-ups below); (7) part B (PEPOLAR's and SyN's Python steps, sdcflows' masks,
-   niworkflows' helpers, `init_fmap_wf` complete, fMRIPrep's own field-map steps; last, sdcflows' command line);
+   niworkflows' helpers, `init_fmap_wf` complete, fMRIPrep's own field-map steps; last, sdcflows' command line;
+   **done** 2026-11-10: an exact port of sdcflows 2.17.1 (with 2.15.2's estimator search), niworkflows 1.15.4,
+   nipype's command lines, pybids' dataset index and fMRIPrep 25.2.7's field-map steps, with SciPy's ndimage
+   filters, morphology and measurements, its 4 × 4 `inv`, scikit-image's random walker and numpy's percentiles
+   and dot products in Rust; every case of its six records bit-identical to the originals (57 of 57), sdcflows'
+   BIDS app whole on its eight oracle datasets in both library environments and fMRIPrep's own field-map
+   derivatives included, the fieldmap-less registration ANTs' one-thread warp byte for byte; SDC-12 to SDC-46,
+   PIPE-18 to PIPE-40, SCI-06 to SCI-32, SKI-01 to SKI-04 (42 corrected by default, 15 refused, 61 with
+   `reproduce`); the BIDS app 1.2 to 5.3 times sdcflows' speed at one thread with 16 to 72 % of the originals'
+   peak memory; follow-ups below);
    (8) multi-echo, tedana's `t2smap` (LGPL-2.1: a replica in its licence family's package and a clean-room original;
    the replica **done** 2026-11-08: an exact replica of tedana 26.0.3's `t2smap` in `larmorx-gpl` (GPL-3.0 under
    LGPL-2.1's section 3; the user, 2026-11-08), every compared case of its record bit-identical to tedana in both
@@ -738,6 +747,84 @@ The items below keep their history.
 10. **Releases on PyPI** (below).
 
 ## Follow-ups, when they fit
+- **From the field maps' part B (sdcflows' port continued, 2026-11-08 to 10; 32 relays;
+  [findings](findings/sdcflows-estimation.md) and [SciPy's filters](findings/scipy-ndimage-filters.md), records
+  [sdcflows-estimation](validation/sdcflows-estimation.md), [niworkflows-helpers](validation/niworkflows-helpers.md),
+  [ndimage-skimage](validation/ndimage-skimage.md), [benchmarks](benchmarks/sdcflows-estimation.md), API
+  [sdcflows](api/sdcflows-fieldmap.md), [niworkflows](api/niworkflows-helpers.md),
+  [ndimage](api/ndimage-filters.md), [skimage](api/skimage.md), [bids](api/bids.md)).** Done in the part besides
+  the port: SciPy's ndimage filters, morphology, labels and watershed (`crates/larmorx-ndimage`), SciPy 1.18.1's
+  4 × 4 `inv` complete (`larmorx_transform::scipy_linalg`), scikit-image's random walker, Otsu threshold and
+  histogram matching, numpy's percentiles, dot products and histograms (`larmorx_core::numpy`), a BIDS index
+  without pybids (`lx.bids`), nipype's command lines (`larmorx._nipype`) and niworkflows' `DerivativesDataSink`,
+  for the next ports to build on. Left:
+  - *Waiting for other ports:* `qwarp_workflow` (sdcflows' `init_3dQwarp_wf`) runs once AFNI's `3dQwarp`,
+    FreeSurfer's `mri_robust_template` (niworkflows' `StructuralReference` with several files) and niworkflows'
+    `init_enhance_and_skullstrip_bold_wf` are ported (SDC-23's switch then); the `.lta` path of
+    `ConcatenateXFMs` (fMRIPrep's `itk2lta`, `concat_xfm`) and `StructuralReference`'s identity LTA with
+    FreeSurfer's part; `init_enhance_and_skullstrip_bold_wf` itself with the templates part (D6); the reports
+    (`FieldmapReportlet`, SDC-42's switch) with larmorprepx's reports (D7); the data sink's TemplateFlow
+    resolution (`template_metadata`) with the templates part; PIPE-36 (fMRIPrep's `extract_entities` on absolute
+    BOLD paths, rule A decided) and niworkflows' `ReadSidecarJSON` and `BIDSInfo` without `bids_dir` (decide by
+    the rules when ported) with larmorprepx's BOLD stages; fMRIPrep's `ANTS_RANDOM_SEED` for every later ANTs call
+    that reads it (SyN is done; the templates, larmorprepx).
+  - *PIPE-35* (rule D, agreed): measure with the anatomical brain extraction's port whether niworkflows'
+    `RegridToZooms(smooth=True)`, which never smooths a coarser grid, changes antsAI's initialisation and the
+    mask; then rule A or C.
+  - *Duplicates to merge:* SciPy's `gaussian_filter1d`, `correlate1d` (reflect), binary erosion and dilation
+    and `label` exist twice: `larmorx_interp::ndimage::{filters, morphology}` (tedana's replica, for nilearn's
+    `compute_epi_mask`) and `crates/larmorx-ndimage` (this part's, every mode and type); move nilearn's mask
+    onto `larmorx-ndimage` after checking its bits on the t2smap replica's cases. t2smap's
+    `nanpercentile_linear_axis0` subtracts the float floor in gamma (numpy differs only for q = −0.0): align it
+    with `larmorx_core::numpy::quantile` when that module is next touched.
+  - *Speed:* `lx.niworkflows.intensity_clip` and `robust_average` (`mc_method=None`) at one thread 0.86 and
+    0.89 times niworkflows' speed on fMRIPrep's calls (7.4 and 1.2 times faster at 14 threads); the grey
+    filters' per-point path for inputs whose last axis is not contiguous (nibabel's Fortran order: 1.35 times
+    SciPy's time at one thread) and the 64² references' slower first erosion; the median and rank filters'
+    one-thread gap (0.97 s against 0.81); larmorx's antsRegistration SyN uses about 3.4 of 12 cores (465 s at
+    12 threads on ds000228's estimator; the ANTs port's threading); `bspline_approx`'s one-thread time on small
+    fields (684 conjugate-gradient iterations on the golden-size field) against sdcflows on the same field.
+    The clean-room originals are the fast ones.
+  - *Random testing:* the three tools compare the Gaussian kernels, `RegridToZooms` and the float64 random
+    walker only where numpy's float64 `exp` is the C library's (AVX-512 off; elsewhere skipped): a night on
+    this machine runs them a second time with numpy's AVX-512 dispatch off (as the trial did,
+    `NPY_DISABLE_CPU_FEATURES`); `difftest-nightly.sh` could do the same. `brain_masker`'s weight (0.3, set
+    while larmorx's random walker was the slow side) can return to 1, its 900 s limit kept. nipype's `requires`
+    checks that change no command line are not ported (random testing draws valid combinations only).
+  - *The harness:* the parity smoke tier and `record_golden.py` run in a checkout at its usual place (a scratch
+    clone fails tests that compare headers holding the repository's path, e.g.
+    `test_afni_automask_parity[options/default]`): make those tests ignore the path; the records' reported
+    lines carry the cases' `/tmp/lxpb_*` folder names in a few places (five in `sdcflows-estimation.json`;
+    `compare_records.py` strips them): `_reported` could put `<case folder>` there; the oracle cache keys a
+    one-thread ANTs run with nipype's `NSLOTS`, so a direct call and nipype's stand-in do not share it (give
+    direct calls nipype's environment where a check wants one run); `test_mri_replica.py::test_the_replica_itself`
+    fails when `LARMORX_NC_BIN` is set and the checkout has no `crates-nc/target/release/larmorx-nc` (its
+    fixture sets the variable to `"None"`; CI does not set it); `sdcflows-estimation`'s workflow cases need
+    a box above 32 GiB for `--jobs` above 2.
+  - *Oracle runs:* sdcflows 2.17.1's own runs (`oracles/sdcflows-2.17.1/`, 2026-11-08) do not record numpy's
+    OpenBLAS kernels in their `RUN_INFO.txt` (they ran with Haswell's): record `OPENBLAS_CORETYPE` in such runs.
+  - *Upstream reports* (`docs/upstream-reports/`, the user's to file or post; each project's issues searched
+    on 2026-11-10): new issues for sdcflows (SDC-45), fMRIPrep (PIPE-36) and SciPy (SCI-21 with SCI-22 and
+    SCI-23; SCI-25); comments for the open sdcflows#455 (PIPE-32, SDC-36) and SciPy#24502 (SCI-29). PIPE-37
+    needs none: fixed on pybids' master by #1273 (2026-08-24), not yet released; `lx.bids`' default is that
+    fix's, so pybids' next release is a step for `reproduce` only. SCI-26 is fixed on SciPy's main by #25646
+    (milestone 2.0.0): follow it with that release. Worth drafting later: SCI-31 and SCI-32 (SciPy), SDC-46,
+    SDC-21 (sdcflows), PIPE-25 (fMRIPrep), PIPE-40 (niworkflows), PIPE-39 (nipype).
+  - *Licence headers:* `scripts/check_spdx.py` checks a file's licence family, not the terms of a compound
+    expression: two files that translate 2-clause BSD code (scikit-image's `filters/thresholding.py`,
+    transforms3d's `decompose44`) passed with `Apache-2.0` alone until relay 31 read them; a check that every
+    upstream licence a crate's `PROVENANCE.md` names for a file appears in its header would catch that.
+  - *The clean-room original* (the user, 2026-11-06), in another crate (never `larmorx-sdcflows` or
+    `larmorx-ndimage`), from a spec of sdcflows', niworkflows' and SciPy's behaviour; its implementer reads none
+    of their sources nor these ports. The audit's restriction table then needs the sdcflows family (part A's
+    files and part B's: `docs/findings/sdcflows-estimation.md`, `scipy-ndimage-filters.md`,
+    `crates/larmorx-ndimage/`, `python/larmorx/{sdcflows,niworkflows,bids,skimage.py,_nipype.py,_ndimage_filters.py}`,
+    `validation/investigations/sdcflows-fieldmap-b/`, the part's parity, difftest and evidence modules).
+  - *The final comparisons and validation phase:* a stage record of a `--use-syn-sdc` run (stages S04 to S07)
+    with the references (fMRIPrep's container re-runs, the ANTs oracle; two nodes of ds000228-syn's scratch
+    check were "unexplained" only because the references were not run); the data panel's field maps with
+    every estimator; random testing at length; pybids' validator (`validate=True`) and the file associations
+    (`get_fieldmap`) if a later pipeline needs them.
 - **From tedana's `t2smap` replica (2026-11-08; thirteen relays; [findings](findings/tedana-t2smap.md),
   restricted; record [tedana-t2smap-replica](validation/tedana-t2smap-replica.md),
   [benchmarks](benchmarks/tedana-t2smap.md), [API](api/tedana-t2smap.md), [spec](../specs/t2smap.md)).** Done
@@ -785,12 +872,7 @@ The items below keep their history.
   `load_nibabel`, `nibabel_affine`, `larmorx.io.nibabel_header`, with numpy's `svd`, `eigh` and `det` of
   small matrices replicated for LAPACK 3.12.0 and 3.12.1 in `larmorx_transform::numpy_linalg`), for
   fMRIPrep's other Python steps to write through. Left:
-  - *Part B* (next): PEPOLAR's and SyN's Python steps, sdcflows' masks (`brain_masker`), niworkflows'
-    helpers, `init_fmap_wf` complete (the magnitude preparation: `IntraModalMerge`,
-    `init_brainextraction_wf`; part A takes the magnitude reference and mask as inputs), fMRIPrep's own
-    field-map steps (`ReconstructFieldmap`), and last sdcflows' command line (its BIDS app; the
-    orchestrator, 2026-11-08). `check_b0_units` (direct field maps) is ported; its workflow comes with
-    part B.
+  - *Part B*: **done** 2026-11-10 (its block above).
   - *With FreeSurfer:* `lx.sdcflows.check_register`'s two-magnitude branch (FreeSurfer's
     `mri_robust_register --auto_sens`) and SDC-03's switch (item 8).
   - *The resampler's orientation:* `lx.transforms.ensure_positive_cosines` (fMRIPrep's resampler) decides

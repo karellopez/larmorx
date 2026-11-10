@@ -66,5 +66,227 @@ transform puts the target; measured), SDC-11 (`resample_to_zooms` onto a grid of
 nitransforms' bare assertion; found by relay 7's random-testing trial). SDC-03 (`CheckRegister`'s signed translation test) waits
 for its FreeSurfer branch.
 
-Not ported (private, used by no workflow): `_split_itk_file`, `_b0_resampler`; `init_fmap_wf`
-needs part B's magnitude preparation and masks.
+Not ported (private, used by no workflow): `_split_itk_file`, `_b0_resampler`. (`init_fmap_wf`,
+which needed part B's magnitude preparation and masks, is part B's, relay 4: below.)
+
+## Part B: `brain_masker` (`src/masker.rs`)
+
+**Ported** from sdcflows 2.17.1 `sdcflows/utils/tools.py` (`brain_masker`; identical in 2.15.1),
+on `larmorx-ndimage` (SciPy's `grey_closing`, `median_filter`, `binary_*`, `label`, `sum`) and
+its `skimage` module (`ball`, `threshold_otsu`, `random_walker`), and numpy's `percentile` and
+`std` (`larmorx_core::numpy`). The Python wrapper `python/larmorx/sdcflows/masks.py` ports
+`brain_masker`'s file names and writes, `interfaces/brainmask.py`'s `BrainExtraction`,
+`BinaryDilation` (`_dilate`) and `Union` (`_union`). Bit-identical to sdcflows' own
+`brain_masker` in both kept environments and to fMRIPrep 25.2.6's own `masker` files (numpy
+2.2's sums, SciPy 1.15's order) on the nine `brainextraction_wf` nodes of the oracle runs
+(`validation/investigations/sdcflows-fieldmap-b/check_skimage.py`). Its switches: the rough mask
+without a component (SDC-37) and no brain seed after the erosion (SDC-38): errors by default,
+`upstream_defects='reproduce'` gives sdcflows' results (rule B).
+
+
+## Part B: the brain-extraction, magnitude and field-map workflows (`python/larmorx/sdcflows/workflows.py`, relays 2 to 4)
+
+**Ported** in Python from sdcflows 2.17.1 (Apache-2.0; the same in 2.15.1):
+`workflows/ancillary.py` (`init_brainextraction_wf`), `workflows/fit/fieldmap.py`
+(`init_magnitude_wf`, `init_fmap_wf` in both modes, with part A's `init_phdiff_wf`), each node
+through larmorx's ports (ANTs' `N4BiasFieldCorrection` with nipype 1.12.0's command line and its
+`copy_header`, sdcflows' `BrainExtraction`, `CheckRegister`, `CheckB0Units`, `BSplineApprox`), in
+the order the graph connects them. niworkflows 1.15.4 (Apache-2.0; the same in 1.15.2):
+`interfaces/nibabel.py`'s `IntensityClip` (`_advanced_clip`, relay 2: `python/larmorx/niworkflows/
+nibabel.py`, on `lx.ndimage.median_filter`, `lx.skimage.ball` and numpy's percentile and `clip`
+in `larmorx_core::numpy`; switch PIPE-33) and `interfaces/images.py`'s `IntraModalMerge` (relay 4:
+`python/larmorx/niworkflows/images.py`, with `utils/images.py`'s `reorient`, nibabel 5.4.2's
+`as_closest_canonical`, `squeeze_image`, `four_to_three`, `concat_images` (MIT), FSL's `mcflirt`
+through `larmorx fsl mcflirt`; switch PIPE-18). Every node's files = sdcflows' own graphs'
+(`validation/investigations/sdcflows-fieldmap-b/check_workflows.py`, `check_masker_steps.py`).
+
+
+## Part B: the PEPOLAR estimation (`python/larmorx/sdcflows/pepolar.py`, relay 5)
+
+**Ported** in Python (no new Rust; numpy's add-reduce order is `larmorx_core::numpy::reduce`,
+bound as `_core.numpy_add_reduce`) from sdcflows 2.17.1 (Apache-2.0): `utils/epimanip.py`
+(`get_trt`), `interfaces/epi.py` (`GetReadoutTime`, `SelectPEVolumes`, `SortPEBlips`),
+`interfaces/utils.py` (`UniformGrid`, `ReorientImageAndMetadata`, `PadSlices` /
+`_pad_num_slices`), `workflows/fit/pepolar.py` (`init_topup_wf`, `_select_topup_config`,
+`_topup_mats_to_world`), and, for `wiring="2.15"`, sdcflows 2.15.1's `workflows/fit/pepolar.py`
+(identical in 2.15.2); nipype 1.12.0's `interfaces/fsl/epi.py` (`TOPUP`: the command line,
+`_generate_encfile`, `_list_outputs`; Apache-2.0); nitransforms 25.1.0's
+`resampling.apply` (one affine, a 3D image: `tools::affine_coordinates` above) and `io/fsl.py`
+(`FSLLinearTransform.to_ras`, `_fsl_aff_adapt`; MIT). sdcflows' own topup configurations
+(`python/larmorx/sdcflows/data/flirtsch/b02b0.cnf`, `b02b0_quick.cnf`, `b02b0_{1,2,4}_quick.cnf`)
+are copied unchanged from sdcflows 2.17.1's `sdcflows/data/flirtsch/` (Apache-2.0); FSL's
+`b02b0_{1,2,4}.cnf` (FSL Licence) are not shipped (D9). niworkflows' `RobustAverage`,
+`MergeSeries` and `ReorientImage` (with nibabel 5.4.2's `axcodes2ornt`, `aff2axcodes`,
+`ornt_transform`, `as_reoriented`, `squeeze_image`, `four_to_three`, `concat_images`; MIT) are in
+`python/larmorx/niworkflows/` (niworkflows 1.15.4, Apache-2.0; the same in 1.15.2). Switch:
+SDC-12 (`ReorientImageAndMetadata` reorients to the upper-cased code it checked).
+
+## Part B: nipype's command lines, the field map's registration and the BOLD skull-stripping (relay 6)
+
+**Ported** in Python (no new Rust): nipype 1.12.0 (Apache-2.0) `interfaces/base/core.py`
+(`CommandLine._parse_inputs`, `_format_arg`, `_filename_from_source`, `_list_outputs`),
+`utils/filemanip.py` (`split_filename`, `fname_presuffix`, `ensure_list`),
+`interfaces/ants/registration.py` (`Registration`), `interfaces/ants/resampling.py`
+(`ApplyTransforms`), `interfaces/ants/segmentation.py` (`N4BiasFieldCorrection`, `DenoiseImage`),
+`interfaces/ants/utils.py` (`ImageMath`), `interfaces/ants/base.py` (`ANTSCommand`'s `NSLOTS`,
+`_format_xarray`), `interfaces/fsl/preprocess.py` (`BET`), `interfaces/fsl/maths.py`
+(`MultiImageMaths`, `BinaryMaths`), `interfaces/fsl/epi.py` (`TOPUP`), `interfaces/fsl/base.py`
+(`_gen_fname`), `interfaces/afni/preprocess.py` (`Automask`, `Volreg`), `interfaces/afni/base.py`
+(`_overload_extension`, `_list_outputs`), and niworkflows 1.15.4's `interfaces/fixes.py`
+(`FixHeaderRegistration`, `FixHeaderApplyTransforms`), into `python/larmorx/_nipype.py`;
+niworkflows 1.15.4 (Apache-2.0; the same in 1.15.2) `utils/images.py` (`_copyxform`),
+`interfaces/header.py` (`CopyHeader`), `interfaces/nibabel.py` (`ApplyMask`),
+`interfaces/utility.py` (`KeySelect`) and `func/util.py` (`init_skullstrip_bold_wf`) into
+`python/larmorx/niworkflows/header.py`; sdcflows 2.17.1 (Apache-2.0; the same in 2.15.1)
+`workflows/apply/registration.py` (`init_coeff2epi_wf`) into
+`python/larmorx/sdcflows/registration.py`. sdcflows' ANTs settings files
+(`python/larmorx/sdcflows/data/fmap-any_registration.json`, `fmap-any_registration_testing.json`,
+`affine.json`, `sd_syn.json`, `sd_syn_sloppy.json`, `translation_rigid.json`) are copied
+unchanged from sdcflows 2.17.1's `sdcflows/data/` (Apache-2.0; identical in 2.15.1).
+
+## Part B: the fieldmap-less (SyN) preprocessing (`python/larmorx/sdcflows/syn.py`, relay 9)
+
+sdcflows 2.17.1 (Apache-2.0; the same in 2.15.1) `workflows/fit/syn.py` (`init_syn_preprocessing_wf`,
+`_set_dtype`, `_merge_meta`) and `interfaces/utils.py` (`Deoblique`, `Reoblique`: `_deoblique`,
+`_reoblique`, `OBLIQUE_THRESHOLD_DEG`); sdcflows' `data/fmap_atlas_2_MNI152NLin2009cAsym_affine.mat`
+(Apache-2.0, shipped as `python/larmorx/sdcflows/data/`; SHA-256
+`588820bdaefab4f98c42b3a394c7c975ad9764bc5d8b095718f47419a9ea6ffc`); `data/fmap_atlas.nii.gz` is
+fetched, not shipped (SHA-256 `72b8d2cc7ff3324f3bfaf52712bc191256e795bcff5ee168563b89e584aa40bb`, from
+`https://raw.githubusercontent.com/nipreps/sdcflows/2.17.1/sdcflows/data/fmap_atlas.nii.gz`); sdcflows'
+`DenoiseImage` (`interfaces/utils.py`) with nipype 1.12.0's `CopyHeaderInterface` and
+`utils/imagemanip.copy_header` (Apache-2.0); nibabel 5.4.2's `affines.obliquity` (MIT). Into
+`python/larmorx/niworkflows/`: niworkflows 1.15.4 (Apache-2.0; the same in 1.15.2)
+`interfaces/header.py` (`ValidateImage`), `interfaces/bold.py` (`NonsteadyStatesDetector`),
+`interfaces/nibabel.py` (`Binarize`, `GenerateSamplingReference`, `_gen_reference`),
+`interfaces/freesurfer.py` (`StructuralReference`'s one-file shortcut), `workflows/epi/refmap.py`
+(`init_epi_reference_wf`, `_post_merge`); nipype 1.12.0 `algorithms/confounds.py` (`is_outlier`);
+nilearn 0.14.1 and 0.11.1 (BSD-3-Clause; tags `nilearn-0.14.1`, `nilearn-0.11.1`) `image/resampling.py`
+(`resample_img`, `get_bounds`, `to_matrix_vector`, `_resampling_not_needed`,
+`_check_resample_img_inputs`, `_resample_one_img`) and `image/image.py` (`new_img_like`, `crop_img`,
+`_downcast_from_int64_if_possible`); transforms3d 0.4.2 (BSD-2-Clause) `affines.decompose44` and
+`axangles.mat2axangle` (`ValidateImage`'s report). nibabel 5.4.2's `ArrayWriter(check_scaling=False)`
+path into `python/larmorx/io/nibabel_writer.py` (`save_nibabel(scale=False)`).
+
+## Part B: the fieldmap-less (SyN) estimation (`python/larmorx/sdcflows/syn.py`, relay 10)
+
+sdcflows 2.17.1 (Apache-2.0; the same in 2.15.1) `workflows/fit/syn.py` (`init_syn_sdc_wf`,
+`INPUT_FIELDS`, `MAX_LAPLACIAN_WEIGHT`, `_warp_dir`, `_mm2vox`, `_adjust_zooms`, `_norm_lap`) and
+`utils/misc.py` (`front`, `last`); nipype 1.12.0's `interfaces/ants/utils.py` (`ImageMath`, its
+`copy_header` through `interfaces/mixins/fixheader.py`'s `CopyHeaderInterface`; Apache-2.0);
+nibabel 5.4.2's `orientations.aff2axcodes` with sdcflows' unsigned labels and `affines.voxel_sizes`
+(MIT). The nodes run through larmorx's earlier ports (`lx.niworkflows.intensity_clip`, sdcflows'
+`BinaryDilation`, `Union`, `GetReadoutTime`, `DisplacementsField2Fieldmap`, `BSplineApprox`,
+`ApplyCoeffsField`; ANTs' `ImageMath`, `antsRegistration`, `antsApplyTransforms`).
+
+## Part B: the estimators of a BIDS dataset (relay 11)
+
+Into `python/larmorx/bids/` (`layout.py`, Apache-2.0 AND MIT): pybids 0.22.0 (MIT, Copyright (c)
+2016-2026 The PyBIDS Developers; tag `pybids-0.22.0`, sources under `src/bids`)
+`layout/layout.py` (`BIDSLayout`: `get`, `get_file`, `get_metadata`, `get_entities`,
+`parse_file_entities`, `add_derivatives`, `__getattr__`, `_in_scope`, `_get_layouts_in_scope`,
+`_sanitize_query_dtypes`, `_build_file_query`; `Query`), `layout/index.py` (`BIDSLayoutIndexer`,
+`_regexfy`, `_check_path_matches_patterns`, `_validate_path`, `_index_dir`, `_index_file`,
+`_index_metadata`, `_resolve_intent`), `layout/models.py` (`Config`, `Entity`, `Tag`,
+`_create_tag_dict`, `BIDSFile`, `BIDSDataFile`, `BIDSImageFile`, `BIDSJSONFile`),
+`layout/validation.py` (`validate_root`, `validate_derivative_path`, `validate_indexing_args`,
+`_sort_patterns`, `DEFAULT_LOCATIONS_TO_IGNORE`, `ALWAYS_IGNORE`), `layout/utils.py`
+(`BIDSMetadata`, `PaddedInt`, `parse_file_entities`), `layout/db.py` (the `regexp` function),
+`utils.py` (`listify`, `hashablefy`, `natural_sort`, `make_bidsfile`, `bids_sort` with
+bidsschematools 2.0.0's `rules.entities` order), `exceptions.py`; pybids 0.20.0 (tag `pybids-0.20.0`, sdist SHA-256
+`a68b577426942e50e6ac37e011463361d00a378d19b75df817619450357ebbb6`, the same files as fMRIPrep 25.2.6's image) for the step (`get_entities` unsorted, `index.py`'s
+`IntendedFor` join). Shipped unchanged:
+`python/larmorx/bids/config/bids.json` and `derivatives.json` (pybids 0.22.0, MIT; SHA-256
+`bc8d7ef6b9b5f922a4b435c66598b068d03ce2afdd1a826d2adca4dca4542ad0`,
+`9b05f472ba5ca236496abe1cb46b204f94cc54bed572bbd5fcc338d97b77314d`) and `nipreps.json` (niworkflows
+1.15.4, Apache-2.0, the same in 1.15.2; `40935adf9e3af887150874ab7481a3ed639946ae695f3b632592a630c788fc4d`).
+
+Into `python/larmorx/sdcflows/estimators.py` and `wrangler.py`: sdcflows 2.17.1 (Apache-2.0)
+`fieldmaps.py` (`MetadataError`, `EstimatorType`, `MODALITIES`, `FieldmapFile`,
+`FieldmapEstimation`, `get_identifier`, `clear_registry`; 2.15.1/2.15.2's path check as
+`sdcflows_version="2.15"`), `utils/bimap.py` (`bidict`, `EstimatorRegistry`; the same in 2.15.x),
+`utils/misc.py` (`create_logger`), `utils/wrangler.py` (`find_estimators`,
+`find_anatomical_estimators`, `_normalize_intent`, `_resolve_intent`, `_filter_metadata`,
+`_log_debug_estimation`, `_log_debug_estimator_fail`; = 2.15.1's) and sdcflows 2.15.2's
+`utils/wrangler.py` (tag `sdcflows-2.15.2`: the default search, SDC-17); niworkflows 1.15.4
+`utils/bids.py` (`relative_to_root`).
+
+Into `python/larmorx/pipelines/larmorprepx/estimators.py`: fMRIPrep 25.2.7 (Apache-2.0; the same
+on these paths in 25.2.6) `config.py` (`execution.init`'s ignore patterns), `workflows/base.py`
+(`map_fieldmap_estimation`, `get_estimator`, `init_single_subject_wf`'s precomputed field maps,
+"Setting up fieldmap" and PEPOLAR checks), `utils/bids.py` (`collect_fieldmaps`, `_get_layout`)
+and `data/fmap_spec.json` (its queries, as `FMAP_SPEC`).
+
+Into `python/larmorx/sdcflows/base.py` and `outputs.py` (relay 12): sdcflows 2.17.1 (Apache-2.0)
+`fieldmaps.py` (`FieldmapEstimation.get_workflow`; 2.15.1/2.15.2 lack its file check),
+`workflows/base.py` (`init_fmap_preproc_wf`) and `workflows/outputs.py`
+(`init_fmap_derivatives_wf`, the `DerivativesDataSink` subclass's `out_path_base`, `_gendesc`,
+`_getname`, `_getsourcetype`, `_selectintent`; both the same in 2.15.1 and 2.15.2). Into
+`python/larmorx/niworkflows/bids.py`: niworkflows 1.15.4 (Apache-2.0; the same in 1.15.2 and
+1.15.3) `interfaces/bids.py` (`DerivativesDataSink`, `DEFAULT_DTYPES`, `_get_tf_resolution`),
+`utils/misc.py` (`_copy_any`, `unlink`), `utils/images.py` (`unsafe_write_nifti_header_and_data`,
+`set_consumables`); nibabel 5.4.2 (MIT) `nifti1.py`/`analyze.py` (`get_xyzt_units`,
+`set_xyzt_units`, `get_zooms`, `set_zooms`, `get_slope_inter`, `set_slope_inter`,
+`set_data_dtype`, `write_to`, `may_contain_header`), `arrayproxy.py` (the scaling defaults),
+`volumeutils.py` (`array_to_file`'s seek), `cifti2/parse_cifti2.py` (the CIFTI-2 intent codes);
+TemplateFlow 25.1.2's `api.templates()` list (as `STANDARD_SPACES`). Into
+`python/larmorx/bids/writing.py`: pybids 0.22.0 (MIT; = 0.20.0) `layout/writing.py`
+(`build_path`, `_expand_options`, `_expand_entities`). Into `python/larmorx/_nipype.py`: nipype
+1.12.0 (Apache-2.0) `utils/filemanip.py` (`copyfile` with `copy=True`, `get_related_files`,
+`related_filetype_sets`).
+
+Into `python/larmorx/pipelines/larmorprepx/estimators.py` (relay 13): fMRIPrep 25.2.7
+(Apache-2.0; the same lines in 25.2.6's image) `workflows/base.py`, `init_single_subject_wf`'s
+field-map estimation stage (`fmap_cache` from `collect_fieldmaps`, the precomputed buffers, the
+`init_fmap_preproc_wf` call and its `EX_DATAERR` exit, the `out_path_base` override,
+`fmap_select_std`, the per-estimator PEPOLAR inputs and `init_syn_preprocessing_wf`, the
+`fmap_buffers` and the boilerplate); nipype 1.12.0 (Apache-2.0) `interfaces/utility/base.py`
+(`Merge`'s `vstack`, through `fieldmaps._merge`). Into `python/larmorx/sdcflows/base.py`
+(`build_workflows`, relay 13): sdcflows 2.17.1's `init_fmap_preproc_wf` loop (unchanged code,
+moved). Into `python/larmorx/sdcflows/qwarp.py` (relay 13): sdcflows 2.17.1 (Apache-2.0; the
+same in 2.15.1 and 2.15.2) `interfaces/utils.py` (`Flatten`, `_flatten`, `ConvertWarp`,
+`_qwarp2ants`) and `workflows/fit/pepolar.py` (`_sorted_pe`; `init_3dQwarp_wf`'s description);
+nibabel 5.4.2 (MIT) `spatialimages.py` (`SpatialFirstSlicer`: the 4th-axis slice and its "Empty
+slice requested" error), `funcs.py` (`four_to_three`), `nifti1.py` (`set_intent`), through
+`lx.io`; nipype 1.12.0 `utils/filemanip.py` (`fname_presuffix`'s prefix argument).
+
+Into `python/larmorx/sdcflows/correction.py` (relay 14): sdcflows 2.17.1 (Apache-2.0; the same
+in 2.15.1 and 2.15.2) `workflows/apply/correction.py` (`init_unwarp_wf`: the nodes and their
+wiring, `mem_per_thread` and the thread setting); `interfaces/bspline.py` (`ApplyCoeffsField`'s
+`_run_interface`: `data2fmap_xfm` before `fmap2data_xfm`, SDC-26); `utils/misc.py` (`front`).
+
+Into `python/larmorx/sdcflows/masks.py` (relay 15): sdcflows 2.17.1 (Apache-2.0; the same in
+2.15.1 and 2.15.2) `utils/epimanip.py` (`epi_mask`), with nibabel 5.4.2's `get_fdata(dtype=
+'float32')` and `Nifti1Image(..., hdr).to_filename` through `lx.io`, scikit-image 0.26.0's `ball`
+(`lx.skimage`), SciPy 1.18.1's `grey_opening`, `grey_closing`, `grey_erosion`, `center_of_mass`,
+`watershed_ift` and `binary_dilation` (`lx.ndimage`, `crates/larmorx-ndimage/PROVENANCE.md`) and
+numpy 2.5.4's and 2.3.5's `percentile` and `clip` (`larmorx_core::numpy`); numpy's float-to-integer
+casts on x86-64 (`astype(int)` of a NaN centre, `astype(np.uint16)` of NaN levels, SDC-28) made
+explicitly.
+
+## Part B: sdcflows' BIDS app (`python/larmorx/sdcflows/app.py`, relay 16)
+
+Into `python/larmorx/sdcflows/app.py`: sdcflows 2.17.1 (Apache-2.0, the NiPreps developers)
+`cli/parser.py` (`_parse_participant_labels`, `_parser`: every option, its help text, default and
+converter, `parse_args`: its checks and folders), `cli/main.py` (`main`: the settings file, the
+analysis level, the dry run's listing, the "no jobs" exit, the threads' warning, the final
+message), `cli/workflow.py` (`build_workflow`'s message), `config.py` (the `environment`,
+`execution`, `workflow` and `nipype` sections and their keys, `_Config.get`, `from_dict`,
+`execution.init`'s ignore patterns, `loggers`' format and level names, `get`, `dumps`) and
+`workflows/fit/base.py` (`init_sdcflows_wf`); niworkflows 1.15.4 (Apache-2.0) `utils/debug.py`
+(`setup_exceptionhook`, `is_interactive`); toml 0.10.2 (MIT, Copyright 2013-2019 William Pearson,
+2015-2016 Julien Enselme, 2016 Google Inc., 2017 Samuel Vasko, 2017 Nate Prewitt, 2017 Jack
+Evans, 2019 Filippo Broggini) `encoder.py` (`dumps`, `_dump_str`, `_dump_float`, `dump_list`,
+`dump_value`, `dump_sections`: `toml_dumps`). Into `python/larmorx/niworkflows/participants.py`:
+niworkflows 1.15.4 (the same in 1.15.2) `utils/bids.py` (`BIDSError`, `BIDSWarning`,
+`collect_participants`).
+
+## Part B: niworkflows' `RegridToZooms` (`python/larmorx/niworkflows/regrid.py`, relay 18)
+
+Into `python/larmorx/niworkflows/regrid.py`: niworkflows 1.15.4 (Apache-2.0, the NiPreps
+developers; the same in 1.15.2) `interfaces/images.py` and `interfaces/nibabel.py`
+(`RegridToZooms`, its input spec) and `utils/images.py` (`resample_by_spacing`), with nibabel
+5.4.2 (MIT) `affines.from_matvec` and the header's `get_zooms`/`set_zooms`. Into
+`python/larmorx/sdcflows/syn.py`: sdcflows 2.17.1's `zooms_epi` (`init_syn_sdc_wf`) and
+`regrid_anat` (`init_syn_preprocessing_wf(debug=True)`). nilearn's second inverse of
+`resample_img` (`python/larmorx/niworkflows/sampling.py`) now through SciPy's `linalg.inv`
+(`larmorx_transform::scipy_linalg`).

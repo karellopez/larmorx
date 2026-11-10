@@ -130,6 +130,19 @@ pub fn main_with(
     out: &mut dyn Write,
     err: &mut dyn Write,
 ) -> u8 {
+    main_with_threads(args, loader, mode, None, out, err)
+}
+
+/// [`main_with`] on `n_threads` threads (`None`: ITK's default from the environment, as
+/// `antsApplyTransforms` reads it). The result never depends on the thread count.
+pub fn main_with_threads(
+    args: &[String],
+    loader: &dyn TransformLoader,
+    mode: UpstreamDefects,
+    n_threads: Option<usize>,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> u8 {
     if args.is_empty() {
         let _ = err.write_all(USAGE.as_bytes());
         return 1;
@@ -146,7 +159,7 @@ pub fn main_with(
         return 0;
     }
     let mut notices = Notices::new(mode);
-    let code = match run(&parsed, loader, &mut notices, out) {
+    let code = match run(&parsed, loader, &mut notices, n_threads, out) {
         Ok(()) => 0,
         Err(message) => {
             let _ = writeln!(err, "{message}");
@@ -409,6 +422,7 @@ fn run(
     p: &Parsed,
     loader: &dyn TransformLoader,
     notices: &mut Notices,
+    threads: Option<usize>,
     out: &mut dyn Write,
 ) -> Result<(), String> {
     let verbose = flag(p.last("verbose"));
@@ -478,7 +492,7 @@ fn run(
             atof(&v.name)
         }
     });
-    let n_threads = itk_threads();
+    let n_threads = threads.unwrap_or_else(itk_threads);
 
     let output = match self::output(p)? {
         Output::Image(path) => path,

@@ -2139,3 +2139,37 @@ the user: "Ye please go ahead":
   replica's file (bit for bit), and by the clean-room audit. The values are necessarily FSL's (a different number
   gives a different field); what the clean-room version adds is an origin the audit proves. Until then the interim
   stays (a clear error without FSL or larmorx-nc).
+
+## 2026-11-10: The field maps' part B, sdcflows' port continued (the orchestrator's decisions and the rules)
+
+The part's decisions, from its notes ("FROM THE ORCHESTRATOR", 2026-11-08 to 10; `docs/parts/` keeps them whole):
+- **The design (D1 to D12, 2026-11-08):** both PEPOLAR wirings, sdcflows 2.17.1's by default and 2.15's for
+  fMRIPrep's own runs (D1); sdcflows 2.15.2's estimator-search corrections by default (rule A, upstream's own fix;
+  `reproduce` 2.17.1's: SDC-17) (D2); an own BIDS index, `lx.bids`, validated against pybids 0.22.0 and 0.20.0, no
+  pybids dependency (D3); SciPy's ndimage functions in `lx.ndimage` with their Rust in a new crate,
+  `larmorx-ndimage`, `lx.niworkflows` and `lx.skimage` as families, fMRIPrep's steps in `lx.transforms` and
+  larmorprepx, scikit-image's defect family SKI- (D4); one home for numpy's arithmetic, `larmorx_core::numpy` (D5);
+  niworkflows' `init_enhance_and_skullstrip_bold_wf` with the templates part (D6); the reportlets with
+  larmorprepx's reports, `DerivativesDataSink` in this part (D7); twelve new oracle runs made by the orchestrator
+  (three `--use-syn-sdc`, four PEPOLAR and direct views, sdcflows 2.17.1's own eight app runs in a separate
+  environment) (D8); `3dQwarp`'s workflow and `StructuralReference` with several files refuse with a clear error
+  until their programs are ported (D10); sdcflows' SyN prior fetched on first use with its SHA-256, its small
+  JSON and `.mat` files shipped (D11); three records beside `sdcflows-fieldmap` (`sdcflows-estimation`,
+  `niworkflows-helpers`, `ndimage-skimage`), each with the step between the two library environments (D12).
+  D9 (FSL's `topup` settings files) was the user's (2026-11-09, the entry above).
+- **The nine fMRIPrep runs of 2026-11-08 made again with OpenBLAS's Haswell kernels** (the machine's AVX-512 kernels
+  changed topup's field; the old laptop's runs had Haswell's): the reference of exactness claims against
+  fMRIPrep's own files.
+- **The rules' outcomes:** 89 entries, SDC-12 to SDC-46, PIPE-18 to PIPE-40, SCI-06 to SCI-32, SKI-01 to SKI-04 (42
+  rule A, 15 rule B, 6 rule C, 2 rule D then C, PIPE-35 rule D pending its measurement); SciPy's watershed
+  corrected by default (SCI-13, SCI-14: rule A on its measurement, the corrected `epi_mask` better than SciPy's on
+  three of four oracle references against fMRIPrep's own BOLD masks and worse on none); SDC-45 and PIPE-37 rule A (a
+  dataset below any folder is a sensible input); OpenBLAS's threaded `dgemv` above 460,800 elements followed at one
+  thread (results independent of the thread count; no register entry); a `np.longdouble` sigma takes the float64
+  kernel on every platform, with a warning; SCI-21's calls each one case whatever SciPy's processes do (memory
+  SciPy never defines, never cached); `_core.ndimage_sum_labels` kept as the Rust function's binding.
+- **The parity suites:** each case a subprocess of the environment's interpreter, one check per summary line; the
+  originals' step for the library scripts only (the workflow scripts' originals are the same in both environments).
+- **The fieldmap-less (SyN) viewer made in the part** (the site shows every estimator): LARMORX's warp ANTs 2.6.5's at
+  one thread with correctly rounded maths byte for byte; ANTs at four threads does not repeat itself on this call
+  (0.659 mm run to run), so `docs/findings/ants-syn.md`'s thread paragraph was scoped to its own cases.

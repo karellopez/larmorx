@@ -206,6 +206,48 @@ STAGES: tuple[Stage, ...] = (
         "itk-interpolation",
         absent="no field map applied to a BOLD run",
     ),
+    Stage(
+        "S04",
+        "fieldmap",
+        "Fieldmap-less (SyN) preprocessing: denoise the anatomical reference (`DenoiseImage`)",
+        r"syn_preprocessing_\w+/ref_anat$",
+        "cli",
+        "lx.ants.denoise_image",
+        "n4-denoise",
+        absent="runs only with `--use-syn-sdc` (fieldmap-less estimation)",
+    ),
+    Stage(
+        "S05",
+        "fieldmap",
+        "Fieldmap-less (SyN) preprocessing: N4 of the EPI references",
+        r"syn_preprocessing_\w+/epi_reference_wf/n4_avgs$",
+        "cli",
+        "lx.ants.n4_bias_field_correction",
+        "n4-denoise",
+        absent="runs only with `--use-syn-sdc` (fieldmap-less estimation)",
+    ),
+    Stage(
+        "S06",
+        "fieldmap",
+        "Fieldmap-less (SyN): the anatomical image, masks and prior onto the EPI; the field and "
+        "its mask on the field's zooms (`antsApplyTransforms`)",
+        r"(syn_preprocessing_\w+/(anat2epi|mask2epi|prior2epi)|fmap_preproc_wf/wf_\w+/"
+        r"(amask2epi|zooms_bmask|zooms_field))$",
+        "cli",
+        "lx.ants.apply_transforms",
+        "itk-interpolation",
+        absent="runs only with `--use-syn-sdc` (fieldmap-less estimation)",
+    ),
+    Stage(
+        "S07",
+        "fieldmap",
+        "Fieldmap-less (SyN): Laplacians of the anatomical and EPI references (`ImageMath`)",
+        r"fmap_preproc_wf/wf_\w+/lap_(anat|epi)$",
+        "cli",
+        "lx.ants.image_math",
+        "arithmetic",
+        absent="runs only with `--use-syn-sdc` (fieldmap-less estimation)",
+    ),
     # --- functional --------------------------------------------------------------------------
     Stage(
         "F01",
@@ -398,8 +440,10 @@ MISSING: tuple[Missing, ...] = (
     Missing(
         "mri_robust_template",
         ("mri_robust_template",),
-        "anatomical template of several T1w images",
+        "anatomical template of several T1w images; sdcflows' EPI reference of several runs "
+        "(`epi_merge`, niworkflows' `StructuralReference`, which runs `echo` for one run)",
         "FreeSurfer",
+        names=("epi_merge",),
     ),
     Missing(
         "field-map B-splines",

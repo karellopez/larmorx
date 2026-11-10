@@ -10,11 +10,19 @@
 //!   weighted `average`, over one axis of a C-ordered array.
 //! - [`quantile`]: `numpy.percentile(..., method="higher")`, `numpy.nanpercentile` (the default
 //!   `"linear"` method) along the first axis, SciPy's `scoreatpercentile(...,
-//!   interpolation_method="lower")`.
+//!   interpolation_method="lower")`; `numpy.percentile` with the default method of a whole array
+//!   (a Python-number `q`, as numpy 2.3 or 2.5 computes it, [`NumpyRelease`], or a list of
+//!   them), `numpy.median` of a whole array and along an axis (sdcflows' `brain_masker`,
+//!   niworkflows' `IntensityClip` and `RobustAverage`).
 //!
 //! - [`format`]: numpy's `str()` of a float array (the messages' numbers).
 //! - [`umath`]: numpy's elementwise `exp` and `log` as its x86-64 Linux wheels compute them
-//!   (for `reproduce`).
+//!   (for `reproduce`), and `clip` with scalar bounds.
+//! - [`dot`]: `np.dot` and `np.linalg.norm` of float32 and float64 vectors (OpenBLAS's Haswell
+//!   `sdot` and `ddot`), under SciPy's conjugate gradients; `a.dot(x)` of a float64 matrix and a
+//!   vector (OpenBLAS's Haswell `dgemv_t`), under SciPy's Gaussian derivatives.
+//! - [`histograms`]: `numpy.linspace` and `numpy.histogram` with equal bins (scikit-image's Otsu
+//!   threshold).
 //!
 //! The arithmetic is x86-64's (SSE) in every respect, NaNs included (`math::x86_nan`), so the
 //! results are the same on every platform.
@@ -39,11 +47,48 @@
 //! POSSIBILITY OF SUCH DAMAGE.
 
 pub mod format;
+pub mod dot;
+pub mod histograms;
 pub mod quantile;
 pub mod reduce;
 pub mod umath;
 
 use crate::math::x86_nan;
+
+/// The numpy release whose arithmetic a call follows where numpy's releases differ.
+///
+/// numpy 2.5 changed `percentile` and `quantile` for a Python-number `q` (`weak_q`): numpy 2.2
+/// and 2.3 divide `q` by the array's own type's 100 and compute the virtual index and the
+/// interpolation weight in that type (`float32` for `float32` data); numpy 2.5 computes them in
+/// `float64` and rounds the weight to the array's type only in the interpolation
+/// ([`quantile::percentile_linear_weak`]).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum NumpyRelease {
+    /// numpy 2.2.6 (fMRIPrep 25.2.6's image) and 2.3.5 (the shared environment).
+    V2_3,
+    /// numpy 2.5.4 (the newest environment). The default.
+    #[default]
+    V2_5,
+}
+
+impl NumpyRelease {
+    /// The release for a version string (`"2.3.5"`, `"2.5.4"`; 2.2 and 2.3 are `V2_3`, 2.4 and
+    /// later `V2_5`). `None` for numpy 1.x or text that is not a version.
+    pub fn from_version(version: &str) -> Option<Self> {
+        let mut it = version.split('.');
+        let major: u32 = it.next()?.parse().ok()?;
+        let minor: u32 = it
+            .next()?
+            .trim_end_matches(|c: char| !c.is_ascii_digit())
+            .parse()
+            .ok()?;
+        match (major, minor) {
+            (2, 0..=3) => Some(NumpyRelease::V2_3),
+            (2, _) | (3.., _) => Some(NumpyRelease::V2_5),
+            _ => None,
+        }
+    }
+}
 
 /// The two numpy floating types the reductions run in, with x86-64's arithmetic.
 pub trait NpFloat: Copy + PartialOrd + Send + Sync + 'static {
@@ -61,6 +106,11 @@ pub trait NpFloat: Copy + PartialOrd + Send + Sync + 'static {
     fn mul(self, b: Self) -> Self;
     /// `a / b` as SSE computes it.
     fn div(self, b: Self) -> Self;
+    /// numpy's elementwise `exp` in this type ([`umath::exp_f32`], [`umath::exp_f64`]).
+    fn np_exp(self) -> Self;
+    /// `np.dot(x, y)` of two contiguous vectors of this type ([`dot::dot_f32`],
+    /// [`dot::dot_f64`]).
+    fn np_dot(x: &[Self], y: &[Self]) -> Self;
     /// The square root (IEEE: exact rounding; a NaN passes on).
     fn sqrt(self) -> Self;
     /// The value as `f64` (exact).
@@ -91,6 +141,14 @@ impl NpFloat for f32 {
     #[inline(always)]
     fn div(self, b: Self) -> Self {
         x86_nan::div_f32(self, b)
+    }
+    #[inline(always)]
+    fn np_exp(self) -> Self {
+        umath::exp_f32(self)
+    }
+    #[inline]
+    fn np_dot(x: &[Self], y: &[Self]) -> Self {
+        dot::dot_f32(x, y)
     }
     #[inline(always)]
     fn sqrt(self) -> Self {
@@ -153,6 +211,14 @@ impl NpFloat for f64 {
     #[inline(always)]
     fn div(self, b: Self) -> Self {
         x86_nan::div_f64(self, b)
+    }
+    #[inline(always)]
+    fn np_exp(self) -> Self {
+        umath::exp_f64(self)
+    }
+    #[inline]
+    fn np_dot(x: &[Self], y: &[Self]) -> Self {
+        dot::dot_f64(x, y)
     }
     #[inline(always)]
     fn sqrt(self) -> Self {

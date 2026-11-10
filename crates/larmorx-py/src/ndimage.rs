@@ -274,7 +274,138 @@ fn ndimage_prepared_coefficients<'py>(
     Ok(PyArray::from_owned_array(py, a))
 }
 
+#[allow(clippy::too_many_arguments)]
+fn affine3<T: Sample + Element, O: Output + Element>(
+    py: Python<'_>,
+    input: PyReadonlyArrayDyn<'_, T>,
+    map: &ndimage::AffineMap,
+    out_shape: [usize; 3],
+    order: u32,
+    mode: Mode,
+    cval: f64,
+    prefilter: bool,
+    n_threads: usize,
+    defects: UpstreamDefects,
+) -> PyResult<(Vec<O>, Vec<Notice>)> {
+    let view = input.as_array();
+    let shape: [usize; 3] = view
+        .shape()
+        .try_into()
+        .map_err(|_| PyRuntimeError::new_err("affine_transform takes a 3-D input here"))?;
+    let values = fortran_values(&view);
+    let mut out = vec![O::default(); out_shape.iter().product()];
+    let notices = py
+        .detach(|| {
+            larmorx_core::parallel::with_threads(n_threads, || {
+                ndimage::affine_transform3(
+                    &values, shape, map, out_shape, &mut out, order, mode, cval, prefilter, defects,
+                )
+            })
+        })
+        .map_err(|e| PyValueError::new_err(e.to_string()))?
+        .map_err(err)?;
+    Ok((out, notices))
+}
+
+macro_rules! dispatch_affine {
+    ($py:expr, $input:expr, $out:ty, $($rest:expr),*) => {{
+        let input = $input;
+        let r = if let Ok(a) = input.extract::<PyReadonlyArrayDyn<'_, f32>>() {
+            affine3::<f32, $out>($py, a, $($rest),*)
+        } else if let Ok(a) = input.extract::<PyReadonlyArrayDyn<'_, f64>>() {
+            affine3::<f64, $out>($py, a, $($rest),*)
+        } else if let Ok(a) = input.extract::<PyReadonlyArrayDyn<'_, i16>>() {
+            affine3::<i16, $out>($py, a, $($rest),*)
+        } else if let Ok(a) = input.extract::<PyReadonlyArrayDyn<'_, u8>>() {
+            affine3::<u8, $out>($py, a, $($rest),*)
+        } else if let Ok(a) = input.extract::<PyReadonlyArrayDyn<'_, i8>>() {
+            affine3::<i8, $out>($py, a, $($rest),*)
+        } else if let Ok(a) = input.extract::<PyReadonlyArrayDyn<'_, u16>>() {
+            affine3::<u16, $out>($py, a, $($rest),*)
+        } else if let Ok(a) = input.extract::<PyReadonlyArrayDyn<'_, i32>>() {
+            affine3::<i32, $out>($py, a, $($rest),*)
+        } else if let Ok(a) = input.extract::<PyReadonlyArrayDyn<'_, u32>>() {
+            affine3::<u32, $out>($py, a, $($rest),*)
+        } else if let Ok(a) = input.extract::<PyReadonlyArrayDyn<'_, i64>>() {
+            affine3::<i64, $out>($py, a, $($rest),*)
+        } else if let Ok(a) = input.extract::<PyReadonlyArrayDyn<'_, u64>>() {
+            affine3::<u64, $out>($py, a, $($rest),*)
+        } else {
+            Err(PyRuntimeError::new_err("data type not supported"))
+        };
+        r.map(|(v, n)| (to_py($py, v), notices_to_py(n)))
+    }};
+}
+
+/// `scipy.ndimage.affine_transform` of a 3-D `input`: `matrix` is a 3 x 3 matrix (9 values, row
+/// by row: `geometric_transform`'s path, `offset` added first, or last before SciPy 1.16:
+/// `scipy_version`) or a diagonal (3 values:
+/// `zoom_shift`'s path, `offset` divided by it as SciPy divides); returns the output's values in
+/// Fortran order (`output_shape`, `output` dtype) and the upstream-defect notices.
+#[pyfunction]
+#[pyo3(signature = (input, matrix, offset, output_shape, order = 3, mode = "constant", cval = 0.0, prefilter = true, output = "float64", n_threads = 1, upstream_defects = "fix", scipy_version = "1.18.1"))]
+#[allow(clippy::too_many_arguments)]
+fn ndimage_affine_transform3<'py>(
+    py: Python<'py>,
+    input: &Bound<'py, PyAny>,
+    matrix: Vec<f64>,
+    offset: [f64; 3],
+    output_shape: [usize; 3],
+    order: u32,
+    mode: &str,
+    cval: f64,
+    prefilter: bool,
+    output: &str,
+    n_threads: usize,
+    upstream_defects: &str,
+    scipy_version: &str,
+) -> PyResult<(Bound<'py, PyAny>, Vec<PyNotice>)> {
+    let mode = mode_from_py(mode)?;
+    let defects = defects_mode(upstream_defects)?;
+    let mut it = scipy_version.split('.');
+    let major: u32 = it.next().and_then(|s| s.parse().ok()).unwrap_or(0);
+    let minor: u32 = it
+        .next()
+        .map(|s| s.trim_end_matches(|c: char| !c.is_ascii_digit()))
+        .and_then(|s| s.parse().ok())
+        .ok_or_else(|| PyValueError::new_err(format!("not a SciPy version: {scipy_version:?}")))?;
+    let offset_last = major == 1 && minor < 16;
+    if order > 5 {
+        return Err(PyRuntimeError::new_err("spline order not supported"));
+    }
+    let map = match matrix.len() {
+        9 => ndimage::AffineMap::Matrix {
+            matrix: std::array::from_fn(|h| std::array::from_fn(|l| matrix[3 * h + l])),
+            offset,
+            offset_last,
+        },
+        3 => ndimage::AffineMap::Zoom {
+            zoom: [matrix[0], matrix[1], matrix[2]],
+            shift: std::array::from_fn(|h| offset[h] / matrix[h]),
+        },
+        _ => return Err(PyRuntimeError::new_err("no proper affine matrix provided")),
+    };
+    let (m, sh, ord, md, cv, pf, nt) =
+        (&map, output_shape, order, mode, cval, prefilter, n_threads);
+    match output {
+        "float64" => dispatch_affine!(py, input, f64, m, sh, ord, md, cv, pf, nt, defects),
+        "float32" => dispatch_affine!(py, input, f32, m, sh, ord, md, cv, pf, nt, defects),
+        "int16" => dispatch_affine!(py, input, i16, m, sh, ord, md, cv, pf, nt, defects),
+        "uint8" => dispatch_affine!(py, input, u8, m, sh, ord, md, cv, pf, nt, defects),
+        "int32" => dispatch_affine!(py, input, i32, m, sh, ord, md, cv, pf, nt, defects),
+        "uint16" => dispatch_affine!(py, input, u16, m, sh, ord, md, cv, pf, nt, defects),
+        "int8" => dispatch_affine!(py, input, i8, m, sh, ord, md, cv, pf, nt, defects),
+        "uint32" => dispatch_affine!(py, input, u32, m, sh, ord, md, cv, pf, nt, defects),
+        "int64" => dispatch_affine!(py, input, i64, m, sh, ord, md, cv, pf, nt, defects),
+        "uint64" => dispatch_affine!(py, input, u64, m, sh, ord, md, cv, pf, nt, defects),
+        other => Err(PyRuntimeError::new_err(format!(
+            "output type {other:?} not supported"
+        ))),
+    }
+}
+
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_function(wrap_pyfunction!(ndimage_affine_transform3, m)?)?;
     m.add_function(wrap_pyfunction!(ndimage_map_coordinates, m)?)?;
     m.add_function(wrap_pyfunction!(ndimage_spline_filter1d, m)?)?;
     m.add_function(wrap_pyfunction!(ndimage_spline_filter, m)?)?;

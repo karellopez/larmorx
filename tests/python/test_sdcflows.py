@@ -406,3 +406,39 @@ def test_error_map_in_fortran_order_for_numpys_max():
     fmap = lx.Image(rng.normal(0, 10, (9, 8, 7)).astype(np.float32), np.diag([2.0, 2.0, 2.0, 1]))
     r = lx.sdcflows.bspline_approx(fmap)
     assert np.asarray(r.error.data).flags.f_contiguous
+
+
+def test_topup_configurations_fsldir_then_larmorx_ncs_copy(tmp_path, monkeypatch):
+    """FSL's ``b02b0_{1,2,4}.cnf`` (D9 and the user's decision of 2026-11-09): from ``fsldir``,
+    else from larmorx-nc's copy beside its program, else a clear error naming both; sdcflows' own
+    files always from larmorx."""
+    import pathlib
+
+    from larmorx.sdcflows import pepolar
+
+    prefix = tmp_path / "nc ~1"
+    (prefix / "bin").mkdir(parents=True)
+    program = prefix / "bin" / "larmorx-nc"
+    program.write_text("")
+    copy = prefix / "share" / "larmorx-nc" / "fsl-data" / "etc" / "flirtsch"
+    copy.mkdir(parents=True)
+    fsldir = tmp_path / "fsl"
+    (fsldir / "etc" / "flirtsch").mkdir(parents=True)
+    for d, names in ((copy, pepolar.FSL_CONFIGS), (fsldir / "etc" / "flirtsch", ["b02b0_2.cnf"])):
+        for n in names:
+            (d / n).write_text("--miter=1\n")
+    monkeypatch.setattr(pepolar._replica, "find", lambda family, tool: str(program))
+    monkeypatch.setattr(pepolar.sys, "prefix", str(tmp_path / "elsewhere"))
+    got = pepolar.topup_config_file("b02b0_2.cnf", fsldir)
+    assert got == str((fsldir / "etc" / "flirtsch" / "b02b0_2.cnf").resolve())
+    got = pepolar.topup_config_file("b02b0_4.cnf", fsldir)
+    assert got == str((copy / "b02b0_4.cnf").resolve())
+    assert pepolar.topup_config_file("b02b0_1.cnf") == str((copy / "b02b0_1.cnf").resolve())
+    own = pathlib.Path(pepolar.topup_config_file("b02b0.cnf")).parts[-4:]
+    assert own == ("sdcflows", "data", "flirtsch", "b02b0.cnf")
+    monkeypatch.setattr(pepolar._replica, "find", lambda family, tool: None)
+    with pytest.raises(FileNotFoundError, match="clean-room settings come with t2smap") as e:
+        pepolar.topup_config_file("b02b0_1.cnf", fsldir)
+    assert str(fsldir / "etc" / "flirtsch" / "b02b0_1.cnf") in str(e.value)
+    with pytest.raises(ValueError, match="not a topup configuration of sdcflows"):
+        pepolar.topup_config_file("b02b0_7T.cnf")

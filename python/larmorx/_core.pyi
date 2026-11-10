@@ -353,6 +353,25 @@ def ndimage_map_coordinates(
     """``scipy.ndimage.map_coordinates`` for a 1- to 4-D ``input`` and ``(ndim, n)`` float64
     ``coordinates``: the ``n`` values in the ``output`` dtype, and upstream-defect notices."""
 
+def ndimage_affine_transform3(
+    input: np.ndarray,
+    matrix: list[float],
+    offset: list[float],
+    output_shape: list[int],
+    order: int = 3,
+    mode: str = "constant",
+    cval: float = 0.0,
+    prefilter: bool = True,
+    output: str = "float64",
+    n_threads: int = 1,
+    upstream_defects: str = "fix",
+    scipy_version: str = "1.18.1",
+) -> tuple[np.ndarray, list[Notice]]:
+    """``scipy.ndimage.affine_transform`` of a 3-D ``input``: ``matrix`` 9 values (a 3 x 3
+    matrix, row by row: its offset added first, or last before SciPy 1.16, ``scipy_version``) or
+    3 (a diagonal: SciPy's ``zoom_shift`` path); the output's values in Fortran order and the
+    upstream-defect notices."""
+
 def ndimage_spline_filter1d(
     input: np.ndarray,
     order: int = 3,
@@ -381,6 +400,190 @@ def ndimage_prepared_coefficients(
 ) -> np.ndarray:
     """The padded, prefiltered coefficients ``map_coordinates`` interpolates (3D float32)."""
 
+# --- SciPy-compatible filters, morphology, labelling (larmorx/_ndimage_filters.py) ------------
+# Inputs of any layout (bool as uint8 views); C-ordered results of the input's type.
+
+def ndimage_min_or_max_filter(
+    input: np.ndarray,
+    footprint: np.ndarray,
+    structure: np.ndarray | None,
+    mode: str,
+    cval: float,
+    origins: list[int],
+    minimum: bool,
+    n_threads: int = 1,
+    output: str | None = None,
+) -> np.ndarray:
+    """``_nd_image.min_or_max_filter``: the minimum or maximum over a boolean ``footprint``,
+    with an optional float64 ``structure`` of the footprint's shape; ``output``: the name of
+    the type written (``"bool"`` or a numpy type name; the input's by default)."""
+
+def ndimage_min_or_max_filter1d(
+    input: np.ndarray,
+    size: int,
+    axis: int,
+    mode: str,
+    cval: float,
+    origin: int,
+    minimum: bool,
+    n_threads: int = 1,
+    output: str | None = None,
+) -> np.ndarray:
+    """``_nd_image.min_or_max_filter1d``: the minimum or maximum over ``size`` along ``axis``;
+    ``output``: the name of the type written (the input's by default)."""
+
+def ndimage_correlate1d(
+    input: np.ndarray,
+    weights: list[float],
+    axis: int,
+    mode: str,
+    cval: float,
+    origin: int,
+    n_threads: int = 1,
+    output: str | None = None,
+) -> np.ndarray:
+    """``_nd_image.correlate1d``: the lines along ``axis`` correlated with ``weights`` and cast
+    to ``output`` (the input's type by default)."""
+
+def ndimage_rank_filter(
+    input: np.ndarray,
+    rank: int,
+    footprint: np.ndarray,
+    mode: str,
+    cval: float,
+    origins: list[int],
+    n_threads: int = 1,
+    output: str | None = None,
+) -> np.ndarray:
+    """``_nd_image.rank_filter``: the ``rank``-th smallest over a boolean ``footprint``;
+    ``output``: the name of the type written (the input's by default)."""
+
+def ndimage_rank_filter_1d(
+    input: np.ndarray, rank: int, win_len: int, mode: str, cval: float, origin: int
+) -> np.ndarray:
+    """``_rank_filter_1d.rank_filter(x, rank, win_len, x_out, mode, cval, origin)`` of a
+    float32, float64 or int64 1-D array (Ashelly's running rank): an array of the input's type
+    (``cval`` cast to it)."""
+
+def ndimage_binary_erosion(
+    input: np.ndarray,
+    structure: np.ndarray,
+    origins: list[int],
+    iterations: int,
+    border_value: bool,
+    invert: bool,
+    brute_force: bool,
+    mask: np.ndarray | None = None,
+    n_threads: int = 1,
+    protect_later: bool = True,
+) -> np.ndarray:
+    """``_binary_erosion`` after the wrapper's checks (``invert``: a dilation with the reversed
+    structure): uint8 0/1 values. ``protect_later=False``: SciPy's later passes into a float
+    output array, which protect no element outside the mask (SCI-25 reproduced)."""
+
+def ndimage_label(input: np.ndarray, structure: np.ndarray) -> tuple[np.ndarray, int]:
+    """``_ni_label._label`` with SciPy's default output: ``(int32 or int64 labels, number)``."""
+
+def ndimage_sum_labels(input: np.ndarray, labels: np.ndarray, index: list[int]) -> list[float]:
+    """The Rust kernel of ``sum_labels`` for a sequence ``index``
+    (``larmorx_ndimage::sum_labels_bincount``): the float64 sum per label, the elements added
+    in C order, an absent label 0 (SciPy's ``bincount`` and ``unique`` paths give the same
+    sums). The Python wrapper ``lx.ndimage.sum_labels`` does not call it: it follows SciPy's
+    ``_stats`` with numpy's ``bincount`` itself (SciPy's argument handling, relay 22 of the
+    field maps' part B); this binding exposes the crate's own kernel, kept equal to that path
+    by ``tests/python/test_ndimage_sum_labels_binding.py``."""
+
+def ndimage_watershed_ift(
+    input: np.ndarray,
+    markers: np.ndarray,
+    structure: np.ndarray,
+    output_bits: int,
+    reproduce: bool,
+) -> tuple[np.ndarray, tuple[bool, bool, bool, bool], int]:
+    """``NI_WatershedIFT`` (uint8 or uint16 input, int8 to int64 markers, a signed output of
+    ``output_bits`` bits): ``(int64 labels, (across_edge, stale_queue, truncated, oversize),
+    differ)``; SciPy's labels with ``reproduce``, else the corrected ones; the events are SciPy's
+    run's and ``differ`` the number of elements the two runs label differently."""
+
+def numpy_percentile_weak(a: np.ndarray, q: float, numpy_version: str) -> float:
+    """``numpy.percentile(a, q)`` (linear) with a Python-number ``q`` as numpy
+    ``numpy_version`` (``"2.3"``, ``"2.5"``, ...) computes it; the value in the array's type."""
+
+def numpy_add_reduce(a: np.ndarray, numpy_version: str) -> float:
+    """``numpy.add.reduce(a, axis=None)`` of a float32 or float64 array taken in C order, as
+    numpy ``numpy_version`` adds it (pairwise from 2.3; chunks of 8192 before)."""
+
+def numpy_percentile(a: np.ndarray, q: list[float]) -> list[float]:
+    """``numpy.percentile(a, q)`` (linear) with a list ``q``: float64 values."""
+
+def numpy_median(a: np.ndarray, axis: int | None = None) -> np.ndarray:
+    """``numpy.median(a, axis)`` of a float32 or float64 array."""
+
+def numpy_exp_f32(a: np.ndarray) -> np.ndarray:
+    """numpy's float32 ``exp`` (its AVX2/AVX-512 kernel), elementwise."""
+
+def numpy_exp_f64(a: np.ndarray) -> np.ndarray:
+    """numpy's float64 ``exp`` on its path without AVX-512 (glibc's), elementwise."""
+
+def numpy_matvec_f64(a: np.ndarray, x: np.ndarray) -> np.ndarray:
+    """numpy's ``a.dot(x)`` of a 2-D float64 matrix and a float64 vector (``cblas_matrixproduct``'s
+    shapes; OpenBLAS's Haswell ``dgemv_t``, one thread)."""
+
+def numpy_clip_f32(a: np.ndarray, a_min: float, a_max: float) -> np.ndarray:
+    """``numpy.clip`` of a float32 array with float32 bounds."""
+
+def numpy_histogram(a: np.ndarray, nbins: int) -> tuple[np.ndarray, np.ndarray]:
+    """``numpy.histogram(a, bins=nbins)`` of a float32 or float64 array: ``(int64 counts,
+    edges)``."""
+
+def numpy_dot(x: np.ndarray, y: np.ndarray) -> float:
+    """``np.dot`` of two float32 or float64 vectors (OpenBLAS's Haswell kernels)."""
+
+# --- scikit-image (larmorx/skimage) and sdcflows' brain_masker -------------------------------
+
+def skimage_ball(radius: float, strict_radius: bool) -> np.ndarray:
+    """``skimage.morphology.ball`` as a bool array."""
+
+def skimage_threshold_otsu(image: np.ndarray, nbins: int) -> float:
+    """``threshold_otsu`` of a float32 or float64 image (the value in its type)."""
+
+def skimage_threshold_otsu_int(image: np.ndarray) -> int:
+    """``threshold_otsu`` of an integer image (int64 values)."""
+
+def skimage_threshold_otsu_hist(counts: np.ndarray, centers: np.ndarray) -> int:
+    """``threshold_otsu(hist=(counts, centers))``: float32 counts, float32 or float64 centres;
+    the index of the chosen centre."""
+
+def skimage_random_walker(
+    data: np.ndarray,
+    labels: np.ndarray,
+    multichannel: bool,
+    spacing: np.ndarray,
+    std: float | None,
+    beta: float,
+    mode: str,
+    tol: float,
+    prob_tol: float,
+    scipy_version: str,
+    numbering: str,
+    return_full_prob: bool,
+    n_threads: int,
+    numpy_version: str | None = None,
+) -> dict[str, Any]:
+    """``random_walker`` after scikit-image's checks (``larmorx.skimage.random_walker``)."""
+
+def sdcflows_brain_masker(
+    data: np.ndarray,
+    zooms: list[float],
+    padding: int,
+    numpy_version: str,
+    scipy_version: str,
+    reproduce: bool,
+    n_threads: int,
+) -> tuple[np.ndarray, np.ndarray, float, list[int], list[str]]:
+    """sdcflows' ``brain_masker`` of a float32 3-D array: ``(probseg, mask, threshold,
+    iterations, warnings)``."""
+
 # --- nitransforms chains and fMRIPrep's one-shot resampler (larmorx/transforms) ---------------
 
 Step = tuple[Any, ...]  # ("affine", 4x4) or ("field", deltas (x, y, z, 3), affine, inverse)
@@ -392,6 +595,18 @@ def linalg_matmul4(a: np.ndarray, b: np.ndarray) -> np.ndarray:
 def linalg_inv4(a: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """``np.linalg.inv`` of an ``(n, 4, 4)`` float64 stack as OpenBLAS's ``dgesv`` computes it;
     NaN for singular matrices, and which were singular (bool, ``(n,)``)."""
+
+def linalg_scipy_inv4(
+    a: np.ndarray, scipy_version: str
+) -> tuple[str, str, np.ndarray | None, np.ndarray | None, float]:
+    """``scipy.linalg.inv`` of a finite float64 4×4 matrix as SciPy ``scipy_version`` (1.15 or
+    1.18) computes it: ``(structure, status, inverse, lu, rcond)``; ``status`` is "ok",
+    "ill_conditioned", "singular" or "norm_overflow" (SCI-18: ``lu`` is SciPy's result);
+    ``rcond`` is the value 1.18 computes and prints (0 for 1.15 and for SCI-18)."""
+
+def linalg_affine_points(affine: np.ndarray, points: np.ndarray, n_threads: int = 1) -> np.ndarray:
+    """``affine.dot(np.vstack((points.T, ones)))[:3].T`` for ``(n, 3)`` float64 points, in the
+    operation order of numpy's OpenBLAS Haswell ``dgemm`` (``dgemv`` for one point)."""
 
 def linalg_closest_orthogonal(rs: np.ndarray) -> np.ndarray:
     """nibabel's ``io_orientation`` polar step for a 3×3 matrix (vnl's SVD)."""
@@ -448,6 +663,13 @@ def ants_program(
     writes to ``outputs`` names are returned:
     ``(exit_code, stdout, stderr, {name: (data, ras_affine, descrip)})``. The program runs in
     the D13 mode ``upstream_defects``; its notices are lines of ``stderr``."""
+
+def ants_file_program(
+    program: str, args: list[str], n_threads: int, upstream_defects: str
+) -> tuple[int, str, str]:
+    """Run ``antsApplyTransforms`` with ``args`` on files (transform files read as the program
+    reads them), on ``n_threads`` threads, in the D13 mode ``upstream_defects``:
+    ``(exit_code, stdout, stderr)``."""
 
 def ants_image_math_operations() -> list[tuple[str, str]]:
     """The ImageMath operations larmorx implements: ``(name, usage)``."""

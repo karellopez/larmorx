@@ -1,17 +1,26 @@
-FSL's standard images in larmorx-nc
-===================================
+FSL's standard images and topup's settings in larmorx-nc
+========================================================
 
 This directory holds three files of FSL's standard-space data, copied byte for byte from FSL
 6.0.7.23's data package fsl-data_standard 2208.0 (FSL's conda channel,
 https://fsl.fmrib.ox.ac.uk/fsldownloads/fslconda/public/noarch/fsl-data_standard-2208.0-0.tar.bz2,
 SHA-256 2faefb4d366b6427cbf4e5c3e54c63c040ec9bcfe11b1f10848f89a1571b828a), where they are
-${FSLDIR}/data/standard/<file>. MANIFEST.tsv lists each file, its size and its SHA-256. They are
-the images FSL's bet script (its options -S, -B, -A, -A2) and standard_space_roi read, and
-larmorx-nc's replicas of those scripts read them from here when no FSL installation is given.
+${FSLDIR}/data/standard/<file>. They are the images FSL's bet script (its options -S, -B, -A,
+-A2) and standard_space_roi read, and larmorx-nc's replicas of those scripts read them from here
+when no FSL installation is given.
+
+It also holds six files of FSL's topup settings (etc/flirtsch/b02b0.cnf, b02b0_1.cnf,
+b02b0_2.cnf, b02b0_4.cnf, b02b0_7T.cnf, test_acqp.cnf), copied byte for byte from FSL 6.0.7.23's
+package fsl-topup 2203.5 (FSL's conda channel,
+https://fsl.fmrib.ox.ac.uk/fsldownloads/fslconda/public/linux-64/fsl-topup-2203.5-ha905fa9_6.conda,
+SHA-256 24381a8ab0d7410bc86c440a57666a9c166aef3a48fcf0fb1080a81a60d8909f), where they are
+${FSLDIR}/etc/flirtsch/<file>: the settings topup --config=<name> reads, which larmorx-nc's topup
+replica and larmorx's port of sdcflows read from here when no FSL installation is given.
+MANIFEST.tsv lists each file, its size and its SHA-256.
 
 FSL (FMRIB Software Library), The University of Oxford - the FSL Licence (LICENSE)
-  FSL's data package names no licence of its own; it is distributed as part of FSL, under the
-  FSL Licence (LICENSE, a copy of crates-nc/LICENSE): solely for non-commercial use, without
+  FSL's data package and fsl-topup's settings files name no licence of their own; they are
+  distributed as part of FSL, under the FSL Licence (LICENSE, a copy of crates-nc/LICENSE): solely for non-commercial use, without
   financial return, with the licence's conditions passed on to every receiver. FSL is
   Copyright (C) 1999-2023 University of Oxford. For commercial use of FSL, contact Oxford
   University Innovation (fsl@innovation.ox.ac.uk, Reference Project 9564, FSL).
@@ -20,6 +29,7 @@ FSL (FMRIB Software Library), The University of Oxford - the FSL Licence (LICENS
   Baillet S (2012). Brain templates and atlases. NeuroImage 62(2):911-922,
   doi:10.1016/j.neuroimage.2012.01.024; https://fsl.fmrib.ox.ac.uk/fsl/fslwiki/Atlases).
   MNI152_T1_2mm_brain_mask_dil and MNI152_T1_2mm_eye_mask are FSL's masks on its grid.
+  The topup settings files are part of FSL's topup (University of Oxford), unchanged.
 
 The McConnell Brain Imaging Centre, Montreal Neurological Institute - MNI's notice
   The MNI152 average is made from the International Consortium for Brain Mapping's 152 scans

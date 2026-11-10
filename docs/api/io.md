@@ -53,14 +53,17 @@ Header fields that nibabel fixes when it reads a file (zero or negative voxel si
 
 The header is the image's header, updated as nibabel updates it: the qform/sform and their codes are kept when the image affine is still `allclose` to the header's, and replaced by the affine (sform code 2 "aligned", qform code 0 "unknown") otherwise. Without a header, the result is the header nibabel writes for a new `Nifti1Image(data, affine)`.
 
-## `lx.io.save_nibabel(image, path, *, dtype=None, version=None, compression_level=2, n_threads=1)`
+## `lx.io.save_nibabel(image, path, *, dtype=None, version=None, compression_level=2, scale=True, n_threads=1)`
 
 Writes the image as nibabel's `img.to_filename(path)` writes it, for ports of Python programs
 that write through nibabel (sdcflows' interfaces, fMRIPrep's own steps): the voxel data are
 stored in the **header's** data type (`dtype` overrides it; without a header, the array's
 type), and float data that do not fit an integer type are scaled by nibabel's rules, with the
 `scl_slope` and `scl_inter` nibabel writes. The header is the one `lx.save` writes (nibabel's
-`update_header`). The same options as `lx.save`.
+`update_header`). The same options as `lx.save`. `scale=False` is nibabel's path for a header
+whose `scl_slope` and `scl_inter` are set (a loaded image's are NaN; nilearn's `new_img_like`
+sets them to 0): no scaling is computed, the values are cast as `ArrayWriter(check_scaling=False)`
+casts them, and the header's `scl_slope` and `scl_inter` are written as they are.
 
 | nibabel 5.4.2 | larmorx |
 |---|---|

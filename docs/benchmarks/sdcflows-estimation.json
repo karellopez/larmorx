@@ -1,0 +1,384 @@
+{
+ "generated_by": "validation/investigations/sdcflows-fieldmap-b/bench_estimation.py (relay 28)",
+ "calls": {
+  "machine": {
+   "platform": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
+   "machine": "x86_64",
+   "cpus": 32,
+   "load_average_at_start": [
+    1.18,
+    2.42,
+    4.29
+   ],
+   "numpy": "2.5.4",
+   "scipy": "1.18.1",
+   "OPENBLAS_CORETYPE": "Haswell",
+   "OPENBLAS_NUM_THREADS": "1",
+   "commit": "91fb9e73a6d3"
+  },
+  "part": "calls",
+  "repeats": 3,
+  "rows": [
+   {
+    "call": "masker-ds002603",
+    "original": 8.036083329003304,
+    "original_runs": [
+     8.036083329003304,
+     8.044160809135064,
+     7.972236319910735
+    ],
+    "larmorx_1": 6.927305903052911,
+    "larmorx_1_runs": [
+     6.951783543918282,
+     6.822444391902536,
+     6.927305903052911
+    ],
+    "identical_1": true,
+    "larmorx_14": 2.470997401047498,
+    "larmorx_14_runs": [
+     2.470997401047498,
+     2.5014707478694618,
+     2.4592800098471344
+    ],
+    "identical_14": true
+   },
+   {
+    "call": "clip-ds002603",
+    "original": 1.4032947069499642,
+    "original_runs": [
+     1.4032296629156917,
+     1.47302018199116,
+     1.4032947069499642
+    ],
+    "larmorx_1": 1.6284176739864051,
+    "larmorx_1_runs": [
+     1.655303836101666,
+     1.5817975429818034,
+     1.6284176739864051
+    ],
+    "identical_1": true,
+    "larmorx_14": 0.1891718888655305,
+    "larmorx_14_runs": [
+     0.1891718888655305,
+     0.1876854421570897,
+     0.2576436980161816
+    ],
+    "identical_14": true
+   },
+   {
+    "call": "ravg-ds004958",
+    "original": 0.2048911980818957,
+    "original_runs": [
+     0.20563859795220196,
+     0.2048911980818957,
+     0.2037204671651125
+    ],
+    "larmorx_1": 0.22937262011691928,
+    "larmorx_1_runs": [
+     0.22964179888367653,
+     0.22937262011691928,
+     0.2281859389040619
+    ],
+    "identical_1": true,
+    "larmorx_14": 0.1769241241272539,
+    "larmorx_14_runs": [
+     0.24501773994415998,
+     0.1769241241272539,
+     0.17558492510579526
+    ],
+    "identical_14": true
+   },
+   {
+    "call": "recon-ds005454",
+    "original": 0.8905624779872596,
+    "original_runs": [
+     0.8905624779872596,
+     0.8293935081455857,
+     0.8937650159932673
+    ],
+    "larmorx_1": 0.30018148198723793,
+    "larmorx_1_runs": [
+     0.30018148198723793,
+     0.29620034503750503,
+     0.3664484079927206
+    ],
+    "identical_1": true,
+    "larmorx_14": 0.14006155589595437,
+    "larmorx_14_runs": [
+     0.1433677680324763,
+     0.14006155589595437,
+     0.13683497300371528
+    ],
+    "identical_14": true
+   }
+  ]
+ },
+ "masker_nan": {
+  "relay28_build": {
+   "machine": {
+    "platform": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
+    "machine": "x86_64",
+    "cpus": 32,
+    "load_average_at_start": [
+     0.93,
+     1.57,
+     2.75
+    ],
+    "numpy": "2.5.4",
+    "scipy": "1.18.1",
+    "OPENBLAS_CORETYPE": "Haswell",
+    "OPENBLAS_NUM_THREADS": "1",
+    "commit": "8828f241dcd6"
+   },
+   "part": "masker-nan",
+   "rows": [
+    {
+     "case": "sdcflows-estimation:fmapb-try1:492",
+     "original": 22.00469404598698,
+     "larmorx_1": 0.052862761076539755,
+     "identical_1": true,
+     "build": "b7a9b6bd91cb4019"
+    }
+   ]
+  },
+  "relay27_build": {
+   "machine": {
+    "platform": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
+    "machine": "x86_64",
+    "cpus": 32,
+    "load_average_at_start": [
+     0.95,
+     1.53,
+     2.71
+    ],
+    "numpy": "2.5.4",
+    "scipy": "1.18.1",
+    "OPENBLAS_CORETYPE": "Haswell",
+    "OPENBLAS_NUM_THREADS": "1",
+    "commit": "8828f241dcd6"
+   },
+   "part": "masker-nan",
+   "rows": [
+    {
+     "case": "sdcflows-estimation:fmapb-try1:492",
+     "original": 22.25912380986847,
+     "larmorx_1": 210.4860582659021,
+     "identical_1": true,
+     "build": "638cfde05e991b91"
+    }
+   ]
+  }
+ },
+ "app": [
+  {
+   "machine": {
+    "platform": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
+    "machine": "x86_64",
+    "cpus": 32,
+    "load_average_at_start": [
+     1.93,
+     2.21,
+     3.62
+    ],
+    "numpy": "2.5.4",
+    "scipy": "1.18.1",
+    "OPENBLAS_CORETYPE": "Haswell",
+    "OPENBLAS_NUM_THREADS": "1",
+    "commit": "8828f241dcd6"
+   },
+   "part": "app",
+   "rows": [
+    {
+     "dataset": "ds005752-sub-ON01016-direct",
+     "sdcflows": 21.0,
+     "larmorx_1": 4.0,
+     "identical": true,
+     "checks": [
+      "run: exit status 0: 1 cases, identical 1",
+      "run: the cli logger's lines: 1 cases, identical 1",
+      "run: the derivative files: 1 cases, identical 1",
+      "run: names: 5 cases, identical 5",
+      "run: contents (uncompressed bytes): 4 cases, identical 4",
+      "run: gzip bytes: 4 cases, identical 4",
+      "run: JSON bytes: 1 cases, identical 1",
+      "run: logs folder: 1 cases, identical 1",
+      "settings: file written: 1 cases, identical 1",
+      "settings: [execution]: 1 cases, identical 1",
+      "settings: [workflow]: 1 cases, identical 1",
+      "settings: [nipype]: 1 cases, identical 1",
+      "settings: [environment] keys: 1 cases, identical 1",
+      "settings: [environment] values: 6 cases, identical 6"
+     ]
+    }
+   ]
+  },
+  {
+   "machine": {
+    "platform": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
+    "machine": "x86_64",
+    "cpus": 32,
+    "load_average_at_start": [
+     1.96,
+     2.2,
+     3.58
+    ],
+    "numpy": "2.5.4",
+    "scipy": "1.18.1",
+    "OPENBLAS_CORETYPE": "Haswell",
+    "OPENBLAS_NUM_THREADS": "1",
+    "commit": "8828f241dcd6"
+   },
+   "part": "app",
+   "rows": [
+    {
+     "dataset": "ds005454-sub-16",
+     "sdcflows": 50.0,
+     "larmorx_1": 23.0,
+     "identical": true,
+     "checks": [
+      "run: exit status 0: 1 cases, identical 1",
+      "run: the cli logger's lines: 1 cases, identical 1",
+      "run: the derivative files: 1 cases, identical 1",
+      "run: names: 5 cases, identical 5",
+      "run: contents (uncompressed bytes): 4 cases, identical 4",
+      "run: gzip bytes: 4 cases, identical 4",
+      "run: JSON bytes: 1 cases, identical 1",
+      "run: logs folder: 1 cases, identical 1",
+      "settings: file written: 1 cases, identical 1",
+      "settings: [execution]: 1 cases, identical 1",
+      "settings: [workflow]: 1 cases, identical 1",
+      "settings: [nipype]: 1 cases, identical 1",
+      "settings: [environment] keys: 1 cases, identical 1",
+      "settings: [environment] values: 6 cases, identical 6"
+     ]
+    }
+   ]
+  },
+  {
+   "machine": {
+    "platform": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
+    "machine": "x86_64",
+    "cpus": 32,
+    "load_average_at_start": [
+     1.98,
+     2.14,
+     3.45
+    ],
+    "numpy": "2.5.4",
+    "scipy": "1.18.1",
+    "OPENBLAS_CORETYPE": "Haswell",
+    "OPENBLAS_NUM_THREADS": "1",
+    "commit": "8828f241dcd6"
+   },
+   "part": "app",
+   "rows": [
+    {
+     "dataset": "ds002422-sub-02",
+     "sdcflows": 27.0,
+     "larmorx_1": 7.0,
+     "identical": true,
+     "checks": [
+      "run: exit status 0: 1 cases, identical 1",
+      "run: the cli logger's lines: 1 cases, identical 1",
+      "run: the derivative files: 1 cases, identical 1",
+      "run: names: 10 cases, identical 10",
+      "run: contents (uncompressed bytes): 8 cases, identical 8",
+      "run: gzip bytes: 8 cases, identical 8",
+      "run: JSON bytes: 2 cases, identical 2",
+      "run: logs folder: 1 cases, identical 1",
+      "settings: file written: 1 cases, identical 1",
+      "settings: [execution]: 1 cases, identical 1",
+      "settings: [workflow]: 1 cases, identical 1",
+      "settings: [nipype]: 1 cases, identical 1",
+      "settings: [environment] keys: 1 cases, identical 1",
+      "settings: [environment] values: 6 cases, identical 6"
+     ]
+    }
+   ]
+  },
+  {
+   "machine": {
+    "platform": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
+    "machine": "x86_64",
+    "cpus": 32,
+    "load_average_at_start": [
+     1.87,
+     2.09,
+     3.38
+    ],
+    "numpy": "2.5.4",
+    "scipy": "1.18.1",
+    "OPENBLAS_CORETYPE": "Haswell",
+    "OPENBLAS_NUM_THREADS": "1",
+    "commit": "8828f241dcd6"
+   },
+   "part": "app",
+   "rows": [
+    {
+     "dataset": "ds005040-sub-002",
+     "sdcflows": 103.0,
+     "larmorx_1": 87.0,
+     "identical": true,
+     "checks": [
+      "run: exit status 0: 1 cases, identical 1",
+      "run: the cli logger's lines: 1 cases, identical 1",
+      "run: the derivative files: 1 cases, identical 1",
+      "run: names: 5 cases, identical 5",
+      "run: contents (uncompressed bytes): 4 cases, identical 4",
+      "run: gzip bytes: 4 cases, identical 4",
+      "run: JSON bytes: 1 cases, identical 1",
+      "run: logs folder: 1 cases, identical 1",
+      "settings: file written: 1 cases, identical 1",
+      "settings: [execution]: 1 cases, identical 1",
+      "settings: [workflow]: 1 cases, identical 1",
+      "settings: [nipype]: 1 cases, identical 1",
+      "settings: [environment] keys: 1 cases, identical 1",
+      "settings: [environment] values: 6 cases, identical 6"
+     ]
+    }
+   ]
+  },
+  {
+   "machine": {
+    "platform": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
+    "machine": "x86_64",
+    "cpus": 32,
+    "load_average_at_start": [
+     1.81,
+     1.94,
+     3.07
+    ],
+    "numpy": "2.5.4",
+    "scipy": "1.18.1",
+    "OPENBLAS_CORETYPE": "Haswell",
+    "OPENBLAS_NUM_THREADS": "1",
+    "commit": "8828f241dcd6"
+   },
+   "part": "app",
+   "rows": [
+    {
+     "dataset": "ds006736-sub-004",
+     "sdcflows": 79.0,
+     "larmorx_1": 56.0,
+     "identical": true,
+     "checks": [
+      "run: exit status 0: 1 cases, identical 1",
+      "run: the cli logger's lines: 1 cases, identical 1",
+      "run: the derivative files: 1 cases, identical 1",
+      "run: names: 5 cases, identical 5",
+      "run: contents (uncompressed bytes): 4 cases, identical 4",
+      "run: gzip bytes: 4 cases, identical 4",
+      "run: JSON bytes: 1 cases, identical 1",
+      "run: logs folder: 1 cases, identical 1",
+      "settings: file written: 1 cases, identical 1",
+      "settings: [execution]: 1 cases, identical 1",
+      "settings: [workflow]: 1 cases, identical 1",
+      "settings: [nipype]: 1 cases, identical 1",
+      "settings: [environment] keys: 1 cases, identical 1",
+      "settings: [environment] values: 6 cases, identical 6"
+     ]
+    }
+   ]
+  }
+ ]
+}

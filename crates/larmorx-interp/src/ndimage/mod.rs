@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0 AND BSD-3-Clause
-//! SciPy's `ndimage` spline interpolation: `map_coordinates`, `spline_filter` and
-//! `spline_filter1d` (and, in [`filters`] and [`morphology`], SciPy 1.18.1's `gaussian_filter1d`,
-//! `correlate1d` in mode `reflect`, binary erosion and dilation and `label` with the default
-//! structure, for nilearn's `compute_epi_mask`), ported from SciPy 1.15.2 (`scipy/ndimage/_interpolation.py`,
+//! SciPy's `ndimage` spline interpolation: `map_coordinates`, `affine_transform` (3-D),
+//! `spline_filter` and `spline_filter1d` (and, in [`filters`] and [`morphology`], SciPy 1.18.1's
+//! `gaussian_filter1d`, `correlate1d` in mode `reflect`, binary erosion and dilation and `label`
+//! with the default structure, for nilearn's `compute_epi_mask`), ported from SciPy 1.15.2
+//! (`scipy/ndimage/_interpolation.py`,
 //! `_ni_support.py`, `src/ni_interpolation.c`, `src/ni_splines.c`; BSD-3-Clause, see the
 //! notices in [`splines`] and [`geometric`] and in NOTICE).
 //!
@@ -642,6 +643,122 @@ pub fn map_coordinates<T: Sample, O: Output, const D: usize>(
                 for (o, p) in out.iter_mut().zip(pts) {
                     *o = convert(spline.sample(*p));
                 }
+            }
+        });
+    let mut notices = spline.notices();
+    let n = undefined.into_inner();
+    if n > 0 {
+        let detail = match defects {
+            UpstreamDefects::Fix => format!(
+                "{n} NaN value(s) written to the integer output are 0; SciPy's cast is undefined \
+                 (x86-64 gives the integer type's minimum, or 0 once narrowed)"
+            ),
+            UpstreamDefects::Reproduce => format!(
+                "{n} NaN value(s) written to the integer output are converted as SciPy on x86-64 \
+                 converts them"
+            ),
+        };
+        notices.push(Notice::new(&defects::SCI_02, defects, detail));
+    }
+    Ok(notices)
+}
+
+/// The input coordinate of an output point in SciPy's `affine_transform` (SciPy 1.18.1's
+/// `_interpolation.py` and `ni_interpolation.c`; the same in 1.15).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum AffineMap {
+    /// A matrix (`geometric_transform` with `matrix`): `cc[h] = offset[h] + io[0] · m[h][0] +
+    /// io[1] · m[h][1] + io[2] · m[h][2]`, added in this order (`NI_GeometricTransform`, SciPy
+    /// 1.16 onwards); with `offset_last` SciPy 1.15's order: `((0 + io[0] · m[h][0]) + io[1] ·
+    /// m[h][1] + io[2] · m[h][2]) + offset[h]`.
+    Matrix {
+        matrix: [[f64; 3]; 3],
+        offset: [f64; 3],
+        offset_last: bool,
+    },
+    /// A diagonal given as a vector (`zoom_shift(input, matrix, offset / matrix, ...)`):
+    /// `cc[h] = (io[h] + shift[h]) · zoom[h]` (`NI_ZoomShift`, `grid_mode` false), where `shift`
+    /// is the caller's `offset / matrix` (numpy's division).
+    Zoom { zoom: [f64; 3], shift: [f64; 3] },
+}
+
+impl AffineMap {
+    /// The coordinate SciPy computes for the output index `io`.
+    #[inline]
+    #[must_use]
+    pub fn point(&self, io: [usize; 3]) -> [f64; 3] {
+        match self {
+            AffineMap::Matrix {
+                matrix,
+                offset,
+                offset_last,
+            } => std::array::from_fn(|h| {
+                let mut t = if *offset_last { 0.0 } else { offset[h] };
+                for (l, &c) in io.iter().enumerate() {
+                    t += c as f64 * matrix[h][l];
+                }
+                if *offset_last {
+                    t += offset[h];
+                }
+                t
+            }),
+            AffineMap::Zoom { zoom, shift } => std::array::from_fn(|h| {
+                let mut cc = io[h] as f64;
+                cc += shift[h];
+                cc *= zoom[h];
+                cc
+            }),
+        }
+    }
+}
+
+/// `scipy.ndimage.affine_transform(input, matrix, offset, output_shape, output, order, mode,
+/// cval, prefilter)` for a 3-D array in Fortran order: the output (Fortran order, `out_shape`)
+/// holds the input interpolated at [`AffineMap::point`] of every output index, as
+/// [`map_coordinates`] interpolates (the same prefilter, boundary rules and conversion to the
+/// output type). Points are evaluated in parallel on the current rayon pool; each point's value
+/// does not depend on the others.
+#[allow(clippy::too_many_arguments)]
+pub fn affine_transform3<T: Sample, O: Output>(
+    input: &[T],
+    shape: [usize; 3],
+    map: &AffineMap,
+    out_shape: [usize; 3],
+    output: &mut [O],
+    order: u32,
+    mode: Mode,
+    cval: f64,
+    prefilter: bool,
+    defects: UpstreamDefects,
+) -> Result<Vec<Notice>, NdimageError> {
+    if output.len() != out_shape.iter().product::<usize>() {
+        return Err(NdimageError::Output);
+    }
+    let spline = Spline::new(input, shape, order, mode, cval, prefilter, true, defects)?;
+    const CHUNK: usize = 4096;
+    let undefined = std::sync::atomic::AtomicUsize::new(0);
+    let convert = |t: f64| -> O {
+        if O::interp_undefined(t) {
+            undefined.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            if defects.fix() {
+                return O::from_interp_clamped(t);
+            }
+        }
+        O::from_interp(t)
+    };
+    let (nx, ny) = (out_shape[0], out_shape[1]);
+    output
+        .par_chunks_mut(CHUNK)
+        .enumerate()
+        .for_each(|(c, out)| {
+            let start = c * CHUNK;
+            let pts: Vec<[f64; 3]> = (start..start + out.len())
+                .map(|n| map.point([n % nx, (n / nx) % ny, n / (nx * ny)]))
+                .collect();
+            let mut t = vec![0.0f64; pts.len()];
+            spline.sample_batch(&pts, &mut t);
+            for (o, t) in out.iter_mut().zip(t) {
+                *o = convert(t);
             }
         });
     let mut notices = spline.notices();

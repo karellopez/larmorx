@@ -87,6 +87,20 @@ def test_slice_timing_stage():
     topup = _node("fmriprep_25_2_wf/sub_1_wf/fmap_preproc_wf/wf_auto_00000/topup", "topup --a")
     assert catalogue.stage_of(topup) is None
     assert catalogue.missing_of(topup).tool == "topup"
+    # the fieldmap-less (SyN) stages of --use-syn-sdc (ds000228, ds004884, ds005003)
+    syn = "fmriprep_25_2_wf/sub_pixar008_wf/syn_preprocessing_auto_00000"
+    fmap = "fmriprep_25_2_wf/sub_pixar008_wf/fmap_preproc_wf/wf_auto_00000"
+    for path, program, sid in (
+        (f"{syn}/ref_anat", "DenoiseImage -i a.nii.gz", "S04"),
+        (f"{syn}/epi_reference_wf/n4_avgs/mapflow/_n4_avgs0", "N4BiasFieldCorrection -d 3", "S05"),
+        (f"{syn}/anat2epi", "antsApplyTransforms --float 0", "S06"),
+        (f"{fmap}/zooms_field", "antsApplyTransforms -u float", "S06"),
+        (f"{fmap}/lap_epi", "ImageMath 3 o.nii.gz Laplacian i.nii.gz", "S07"),
+    ):
+        assert catalogue.stage_of(_node(path, program)).id == sid
+    merge = _node(f"{syn}/epi_reference_wf/epi_merge", "echo Only one time point!")
+    assert catalogue.stage_of(merge) is None
+    assert catalogue.missing_of(merge).tool == "mri_robust_template"
 
 
 def test_multi_echo_nodes():

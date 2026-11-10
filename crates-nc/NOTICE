@@ -220,6 +220,16 @@ Licence (LICENSE)
     injury to subjects or patients resulting from the use or misuse of this software
     package.
 
+FSL 6.0.7.23's topup settings files (fsl-topup 2203.5), The University of Oxford - the FSL
+Licence (LICENSE)
+  etc/flirtsch/b02b0.cnf, b02b0_1.cnf, b02b0_2.cnf, b02b0_4.cnf, b02b0_7T.cnf and test_acqp.cnf,
+  unchanged (the user's decision of 2026-11-09): the settings topup --config=<name> reads, which
+  larmorx-nc's topup looks for there after FSL's own places, and the three sdcflows 2.17.1
+  chooses among for a PEPOLAR estimate (wheel-data/data/share/larmorx-nc/fsl-data/etc/flirtsch/,
+  installed at <prefix>/share/larmorx-nc/fsl-data/etc/flirtsch; listed with their sizes and
+  SHA-256s in the same MANIFEST.tsv; from FSL's conda package fsl-topup-2203.5-ha905fa9_6.conda,
+  SHA-256 24381a8ab0d7410bc86c440a57666a9c166aef3a48fcf0fb1080a81a60d8909f).
+
 
 Apache-2.0 code included
 ========================

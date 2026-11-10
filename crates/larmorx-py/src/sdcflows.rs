@@ -25,6 +25,7 @@ use crate::defects::mode_from_py;
 fn sdc_err(e: SdcError) -> PyErr {
     match e {
         SdcError::Threads(m) | SdcError::Runtime(m) => PyRuntimeError::new_err(m),
+        SdcError::Index(m) => pyo3::exceptions::PyIndexError::new_err(m),
         // numpy.linalg.LinAlgError is a ValueError subclass; the wrapper re-raises it as one.
         other => PyValueError::new_err(other.to_string()),
     }

@@ -40,7 +40,7 @@ from larmorx.io.nibabel_header import io_orientation as _io_orientation
 from larmorx.io.nibabel_header import load_nibabel, nibabel_affine
 from larmorx.io.nibabel_writer import save_nibabel
 from larmorx.io.nifti import NiftiHeader
-from larmorx.sdcflows.approx import _fname_presuffix
+from larmorx.sdcflows.approx import _fname_presuffix, _split_filename
 from larmorx.sdcflows.tools import _as_loaded, _header
 from larmorx.transforms.resample import _ornt2axcodes
 
@@ -423,8 +423,11 @@ def phdiff_workflow(
     name = _name(src, "phasediff.nii.gz")
     unwrapped_path = None
     if out_dir is not None:
-        # nipype's PRELUDE: <phase>_unwrapped, the file FSL's prelude writes
-        unwrapped_path = Path(_fname_presuffix(name, "_unwrapped", out_dir))
+        # nipype's PRELUDE: <phase>_unwrapped, the file FSL's prelude writes, with the extension
+        # of FSL's output type (NIFTI_GZ, as fMRIPrep's and sdcflows' environments set it), also
+        # for an uncompressed phase map
+        _, stem, _ext = _split_filename(name)
+        unwrapped_path = Path(os.path.abspath(os.fspath(out_dir))) / f"{stem}_unwrapped.nii.gz"
         unwrapped.save(unwrapped_path)
     fmap = phdiff2fmap(
         unwrapped_path if unwrapped_path is not None else unwrapped,

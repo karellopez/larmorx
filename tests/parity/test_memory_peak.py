@@ -1588,3 +1588,111 @@ def test_sdcflows_port_needs_no_more_memory_than_sdcflows(tmp_path, name, call, 
         )
         if mode == "reproduce":
             assert _stored(s_dir) == _stored(r_dir), name
+
+
+#: The field maps' part B (2026-11-09): sdcflows' ``brain_masker`` on fMRIPrep's ds002603 magnitude
+#: (``masker``'s input, 128 x 128 x 128 once padded: sdcflows' largest Python step, its Laplacian
+#: held several times), niworkflows' ``IntensityClip`` on the merged magnitude before it
+#: (``clipper_pre``), niworkflows' ``RobustAverage``'s own steps on ds004958's PEPOLAR series
+#: (``mc_method=None``: the 3dvolreg it runs otherwise is a program of its own, measured by the
+#: 3dvolreg calls) and fMRIPrep's ``ReconstructFieldmap`` onto ds005454's T1w grid through two
+#: transforms (``bold_anat_wf.fmap_recon``), the originals in the newest Python environment, each
+#: in a process of its own (``validation/investigations/sdcflows-fieldmap-b/memory_call.py``),
+#: one thread; larmorx in both D13 modes, its files the originals' byte for byte in
+#: ``reproduce`` (decompressed). The originals' runs go through the oracle cache, the releases an
+#: argument of the call (as the calls above). The allowance is the memory rule's.
+FIELDMAP_B_CASES = [
+    ("masker-ds002603", "masker"),
+    ("clip-ds002603", "clip"),
+    ("ravg-ds004958", "ravg"),
+    ("recon-ds005454", "recon"),
+]
+
+
+def _fieldmap_b_inputs(ws: Path, call: str) -> list[str] | None:
+    runs = ws / "oracles" / SDCFLOWS_RUNS
+    mag = (
+        runs / "ds002603-sub-01-noreconall" / "work" / "fmriprep_25_2_wf" / "sub_01_wf"
+        / "fmap_preproc_wf" / "wf_auto_00000" / "magnitude_wf"
+    )  # fmt: skip
+    r54 = runs / "ds005454-sub-16-noreconall"
+    data = Path.home() / ".cache" / "larmorx-testdata" / "data" / "openneuro"
+    if call == "masker":
+        paths = [mag / "brainextraction_wf" / "clipper_post" / "clipped.nii.gz"]
+        extra: list[str] = []
+    elif call == "clip":
+        paths = [mag / "magmrg" / "sub-01_acq-Mm2_magnitude1_merged.nii.gz"]
+        extra = ["35.0", "99.98"]
+    elif call == "ravg":
+        paths = [
+            data / "ds004958" / "sub-fsm64ps" / "fmap" / "sub-fsm64ps_acq-se_dir-AP_epi.nii.gz"
+        ]
+        extra = []
+    else:
+        fmap, func = r54 / "out" / "sub-16" / "fmap", r54 / "out" / "sub-16" / "func"
+        paths = [
+            fmap / "sub-16_fmapid-gre16_desc-coeff_fieldmap.nii.gz",
+            fmap / "sub-16_fmapid-gre16_desc-magnitude_fieldmap.nii.gz",
+            r54 / "work" / "fmriprep_25_2_wf" / "sub_16_wf" / "bold_task_rest_wf" / "bold_anat_wf"
+            / "gen_ref" / "sub-16_desc-preproc_T1w_reference.nii.gz",
+            func / "sub-16_task-rest_from-boldref_to-gre16_mode-image_desc-fmap_xfm.txt",
+            func / "sub-16_task-rest_from-boldref_to-T1w_mode-image_desc-coreg_xfm.txt",
+        ]  # fmt: skip
+        extra = ["--inverse", "true,false"]
+    if not all(p.is_file() for p in paths):
+        return None
+    return [str(p) for p in paths] + extra
+
+
+@pytest.mark.parametrize(("name", "call"), FIELDMAP_B_CASES)
+def test_fieldmap_steps_need_no_more_memory_than_the_originals(tmp_path, name, call):
+    pv = pytest.importorskip("larmorx_validation.parity.python_versions")
+    newest = pv.prefix(pv.NEWEST)
+    if newest is None:
+        pytest.skip("the newest Python environment (oracles/python-newest) was not found")
+    if not Path("/usr/bin/time").is_file():
+        pytest.skip("/usr/bin/time was not found")
+    inputs = _fieldmap_b_inputs(pv.workspace(), call)
+    if inputs is None:
+        pytest.skip(f"{name}'s oracle run or input series was not found")
+    script = (
+        Path(__file__).resolve().parents[2]
+        / "validation" / "investigations" / "sdcflows-fieldmap-b" / "memory_call.py"
+    )  # fmt: skip
+    py = str(newest / "bin" / "python")
+    env = {
+        **{k: v for k, v in os.environ.items() if k != "PYTHONPATH"},
+        "OMP_NUM_THREADS": "1",
+        "OPENBLAS_NUM_THREADS": "1",
+        "MKL_NUM_THREADS": "1",
+        "OPENBLAS_CORETYPE": os.environ.get("OPENBLAS_CORETYPE", "Haswell"),
+    }
+    done = subprocess.run(
+        [py, "-P", "-c", f"import runpy; print(runpy.run_path({str(script)!r})['releases']())"],
+        capture_output=True, text=True, env=env, check=True,
+    )  # fmt: skip
+    releases = done.stdout.strip()
+    o_dir = tmp_path / "original"
+    o_dir.mkdir()
+    code, orig_mib = _original_peak(
+        [py, "-P", str(script), "original", call, *inputs, "--env", releases],
+        env,
+        None,
+        _emptier(o_dir),
+        o_dir,
+    )
+    assert code == 0
+    for mode in ("reproduce", "fix"):
+        r_dir = tmp_path / f"larmorx-{mode}"
+        r_dir.mkdir()
+        l_env = {**env, "PYTHONPATH": os.environ.get("PYTHONPATH", "")}
+        code, mib = _peak(
+            [py, "-P", str(script), "larmorx", call, *inputs, "--defects", mode], l_env, r_dir
+        )
+        assert code == 0
+        print(f"{name} ({mode}): larmorx {mib:.1f} MiB, the original {orig_mib:.1f} MiB")
+        assert mib <= allowance(orig_mib), (
+            f"{name} ({mode}): larmorx {mib:.0f} MiB, the original {orig_mib:.0f} MiB"
+        )
+        if mode == "reproduce":
+            assert _stored(o_dir) == _stored(r_dir), name

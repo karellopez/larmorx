@@ -82,6 +82,21 @@ def matrices(rng):
         zooms = np.sqrt(np.sum(a * a, axis=0))
         out["affine-like"].append(a / zooms)
         out["random"].append(rng.normal(0, 1, (3, 3)))
+    # Exactly singular integer matrices (a zero row or column, dependent rows or columns): LAPACK
+    # 3.12.0 returns their zero singular value as -0 in about 3 % of them, 3.12.1 as +0.
+    out["singular"] = []
+    for _ in range(N_RANDOM):
+        m = rng.integers(-3, 4, (3, 3)).astype(float)
+        k = rng.integers(0, 4)
+        if k == 0:
+            m[rng.integers(0, 3)] = 0
+        elif k == 1:
+            m[:, rng.integers(0, 3)] = 0
+        elif k == 2:
+            m[2] = m[0] * rng.integers(-2, 3) + m[1] * rng.integers(-2, 3)
+        else:
+            m[:, 2] = m[:, 0] * rng.integers(-2, 3)
+        out["singular"].append(m)
     return out
 
 

@@ -222,4 +222,9 @@ calls, the template registration, the T1w in MNI space, head-motion estimation; 
 composite; the NIfTI files of its run; its raw T1w: 3dUnifize), ds005040 sub-002 (CC0-1.0;
 BOLD: slice timing, the one-shot resampling with its field map; its BOLD reference: 3dUnifize
 and 3dAutomask as fMRIPrep calls them; the raw series: 3dAutomask), MNI152NLin2009cAsym (the MNI notice) and OASIS30ANTs
-(CC-BY 4.0) from TemplateFlow.
+(CC-BY 4.0) from TemplateFlow; for sdcflows' estimation (the field maps' part B, 2026-11-10): ds006736
+sub-004 (CC0-1.0; PEPOLAR, sdcflows' BIDS app), ds005752 sub-ON01016 (CC0-1.0; a direct field map, its BIDS
+view), ds000228 sub-pixar008 (CC0-1.0; the fieldmap-less (SyN) estimation of fMRIPrep's `--use-syn-sdc` run),
+ds002603 sub-01 (CC0-1.0; `brain_masker` as fMRIPrep calls it), ds003592 sub-280 (CC0-1.0; `epi_mask` on its BOLD
+reference) and ds000228, ds005040 and ds004958 (`epi_mask`'s table), each image shown only inside its step's
+mask, dilated.

@@ -14,11 +14,13 @@ mod defects;
 mod fsl;
 mod hdf5;
 mod mri;
+mod ndfilters;
 mod ndimage;
 mod nifti;
 mod replica;
 mod resample;
 mod sdcflows;
+mod skimage;
 
 /// Runs the `larmorx` command line with `argv` (program name first).
 ///
@@ -76,6 +78,8 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     hdf5::register(m)?;
     mri::register(m)?;
     ndimage::register(m)?;
+    ndfilters::register(m)?;
+    skimage::register(m)?;
     replica::register(m)?;
     resample::register(m)?;
     sdcflows::register(m)?;

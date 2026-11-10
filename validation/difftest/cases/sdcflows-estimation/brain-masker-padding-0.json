@@ -1,0 +1,148 @@
+{
+ "defect": "SDC-46",
+ "description": "brain_masker with padding=0: sdcflows crops its probabilities with [..., 0:-0, ...] and writes empty probability and mask images, the brain unmasked (SDC-46)",
+ "expect": "pass",
+ "found": {
+  "detail": "relay 27's first probe (r27/try_cases.py)",
+  "n": 104,
+  "seed": "try1",
+  "shrink_moves": [],
+  "signature": [
+   "brain_masker: every output bit-identical"
+  ]
+ },
+ "id": "brain-masker-padding-0",
+ "implementations": [
+  "port"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "call": "brain_masker",
+   "padding": 0,
+   "threads": 3
+  },
+  "features": {
+   "axis0": 1.0,
+   "axis1": 1.1,
+   "axis2": 1.25,
+   "bias0": 0.0,
+   "bias1": 0.0025,
+   "bias2": -0.005,
+   "bias3": 0.01,
+   "call": "brain_masker",
+   "centre0": -5.5,
+   "centre1": -5.0,
+   "centre2": -5.0,
+   "content": "head",
+   "dtype": "uint8",
+   "extreme": false,
+   "inter": 0.0,
+   "noise": 1.0,
+   "orientation": "oblique",
+   "origin0": 19.5,
+   "origin1": -6.75,
+   "origin2": -9.25,
+   "padding": 0,
+   "qfac": 1,
+   "qform_code": 1,
+   "range": "plain",
+   "sform": "same",
+   "sform_code": 3,
+   "shape": "20x14x18",
+   "size": 23.5,
+   "slope": 0.5,
+   "spacing0": 1.2,
+   "spacing1": 1.2,
+   "spacing2": 1.0,
+   "threads": 3,
+   "tissues": "t2",
+   "units": "unknown"
+  },
+  "groups": [
+   {
+    "args": [
+     "brain_masker"
+    ],
+    "name": "brain_masker",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "in": {
+    "content": {
+     "axes": [
+      1.0,
+      1.1,
+      1.25
+     ],
+     "bias": [
+      0.0,
+      0.0025,
+      -0.005,
+      0.01
+     ],
+     "centre": [
+      -5.5,
+      -5.0,
+      -5.0
+     ],
+     "noise": 1.0,
+     "seed": 113262933,
+     "size": 23.5,
+     "tissues": "t2",
+     "type": "head"
+    },
+    "dtype": "uint8",
+    "geometry": {
+     "origin": [
+      19.5,
+      -6.75,
+      -9.25
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      39,
+      -1,
+      1,
+      2
+     ],
+     "sform": "same",
+     "sform_code": 3,
+     "spacing": [
+      1.2,
+      1.2,
+      1.0
+     ],
+     "units": "unknown"
+    },
+    "scaling": {
+     "inter": 0.0,
+     "slope": 0.5
+    },
+    "shape": [
+     20,
+     14,
+     18
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 104,
+  "options": [
+   "brain_masker"
+  ],
+  "seed": "try1",
+  "tool": "sdcflows-estimation"
+ },
+ "rule": "A",
+ "status": "register",
+ "suite": "sdcflows-estimation",
+ "tier": "smoke",
+ "tool": "sdcflows-estimation"
+}

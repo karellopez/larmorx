@@ -76,6 +76,59 @@ ITK readers (`io/itk.py`: `ITKLinearTransform`, `ITKLinearTransformArray`,
 (`orientations.py`: `io_orientation`, `ornt_transform`, `ornt2axcodes`, `inv_ornt_aff`,
 `apply_orientation`; `affines.from_matvec`).
 
+**fMRIPrep's field-map steps** (field maps part B, relay 7; Python, no new Rust):
+`python/larmorx/transforms/fieldmap.py` ports fMRIPrep 25.2.7's `interfaces/resampling.py`
+(Apache-2.0; the same file in 25.2.6): `ReconstructFieldmap._run_interface`,
+`reconstruct_fieldmap`, `as_affine`, `aligned` and `DistortionParameters._run_interface`, with
+nitransforms 25.1.0's (MIT) `manip.TransformChain.asaffine`, `linear.Affine.__matmul__` and
+`resampling.apply` (`base.ImageGrid.ndcoords`/`index`, `_as_homogeneous`), and sdcflows
+2.17.1's `utils/tools.ensure_positive_cosines` (Apache-2.0; the B-spline sum is part A's
+`larmorx_sdcflows::bspline`). `chain.py`'s `_itk_linear_text` ports nitransforms 25.1.0's
+`io/itk.py` writer (`ITKLinearTransform.from_ras`, `__str__`, `to_string`), used by
+`python/larmorx/niworkflows/nitransforms.py` (niworkflows 1.15.4's `interfaces/nitransforms.py`:
+`ConcatenateXFMs`, `concatenate_xfms`, `XFM_FMT`; Apache-2.0, the same in 1.15.2).
+
+**fMRIPrep's field-map nodes of a BOLD run** (field maps part B, relay 8; Python, no new Rust):
+`python/larmorx/pipelines/larmorprepx/fieldmaps.py` ports fMRIPrep 25.2.7's (Apache-2.0; the same
+in 25.2.6) wiring of them as plain functions: `workflows/bold/fit.py` (`init_bold_fit_wf`'s stage 3
+and stage 4's field-map branch, `init_bold_native_wf`'s field-map nodes, `_select_ref`),
+`workflows/bold/apply.py` (`init_bold_volumetric_resample_wf`'s field-map nodes, `_gen_inverses`),
+`workflows/bold/outputs.py` (the `DerivativesDataSink` settings of `init_ds_registration_wf`,
+`init_ds_boldref_wf`, `init_ds_boldmask_wf`), `utils/bids.py` (`dismiss_echo`'s default) and
+`workflows/base.py` (the Jacobian rule, the missing-readout-time message), with niworkflows
+1.15.4's `utils/connections.listify` and nipype 1.12.0's `Merge` (Apache-2.0).
+
+## SciPy's 4 × 4 inverse (`scipy_linalg`, field maps part B, relay 18)
+
+**Ported** from SciPy 1.18.1 (`scipy/linalg/_basic.py` `inv`, `src/_linalg_inv.hh`
+`invert_slice_general`, `invert_slice_triangular`, `invert_slice_diagonal`, `_inverse`,
+`src/_common_array_utils.hh` `bandwidth`, `is_sym_or_herm`, `norm1_`, `swap_cf`,
+`zero_other_triangle`, `_calc_lwork`) and SciPy 1.15.3 (`scipy/linalg/_basic.py` `inv`), BSD-3-Clause;
+with the OpenBLAS their wheels bundle (0.3.31.dev and 0.3.28; read in the 0.3.30 release
+tarball, `tags/OpenBLAS-0.3.30`: `interface/lapack/getrf.c`, `trtri.c`, `interface/gemv.c`,
+`lapack/getrf/getrf_single.c`, `lapack/trtri/trtri_U_single.c`, `trtri_L_single.c`,
+`lapack/trti2/trti2_U.c`, `trti2_L.c`, `driver/level2/trmv_U.c`, `trmv_L.c`,
+`kernel/x86_64/daxpy.c`, `dscal.c`, `dgemv_n_4.c`, `dgemv_n_microk_haswell-4.c`,
+`KERNEL.HASWELL`; the reference LAPACK in `lapack-netlib/SRC/dgetri.f`, `dgecon.f`), BSD-3-Clause.
+`getf2` is `openblas::getf2` (numpy's path). Validated against both SciPy wheels
+(`validation/investigations/sdcflows-fieldmap-b/check_scipy_inv.py`).
+**Relay 19** (`scipy_lapack`): 1.18's condition estimates and symmetric path, from SciPy 1.18.1
+(`src/_linalg_inv.hh` `invert_slice_cholesky`, `invert_slice_sym_herm`, the `POS_DEF` fallback of
+`_inverse`; `src/_common_array_utils.hh` `norm1_sym_herm`, `norm1_sym_herm_lower`,
+`fill_other_triangle`, `fill_other_triangle_noconj`, `init_status`, `_detect_problems`) and
+OpenBLAS 0.3.30 (`lapack-netlib/SRC/dgecon.f`, `dtrcon.f`, `dpocon.f`, `dsycon.f`, `dlacn2.f`,
+`dlatrs.f`, `drscl.f`, `dlantr.f`, `dlange.f`, `dpotri.f`, `dsytrf.f`, `dsytf2.f`, `dsytri.f`,
+`dsytrs.f`, `INSTALL/dlamch.f`; `interface/asum.c`, `dot.c`, `axpy.c`, `scal.c`, `imax.c`,
+`trsv.c`, `symv.c`, `syr.c`, `ger.c`, `gemv.c`, `lapack/potrf.c`, `lapack/trtri.c`,
+`lapack/lauum.c`; `lapack/potf2/potf2_U.c`, `lapack/lauu2/lauu2_U.c`,
+`lapack/potrf/potrf_U_single.c`, `lapack/lauum/lauum_U_single.c`; `driver/level2/trsv_U.c`,
+`trsv_L.c`; `kernel/x86_64/dasum.c`, `dasum_microk_haswell-2.c`, `ddot.c`, `daxpy.c`, `dscal.c`,
+`dsymv_U.c`, `dgemv_n_4.c`, `dgemv_t_4.c`; `kernel/generic/ger.c`), BSD-3-Clause; validated
+against SciPy 1.18.1's wheel (0.3.31.dev) on 540,513 cases, every `rcond` against SciPy's own
+LAPACK calls (`check_scipy_inv.py`). `openblas::iamax` is now `pub(crate)` (shared).
+`openblas::affine_points` (relay 18): numpy's `dgemm`/`dgemv` of homogeneous points, as
+`point_row`/`point_row_single`.
+
 ## numpy's small linear algebra (`numpy_linalg`)
 
 **Ported** from the OpenBLAS 0.3.34 and 0.3.30 release tarballs (BSD-3-Clause; the LAPACK they

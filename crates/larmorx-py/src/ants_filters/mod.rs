@@ -305,6 +305,46 @@ fn ants_program<'py>(
     )
 }
 
+/// Runs an ANTs program's command line on files, as the program runs it (`antsApplyTransforms`:
+/// transform files read by the command line's loader), on `n_threads` threads, in the D13 mode
+/// `upstream_defects`: `(exit code, stdout, stderr)`. nipype's ``ApplyTransforms`` runs through
+/// it (`larmorx._nipype.run`).
+#[pyfunction]
+fn ants_file_program(
+    py: Python<'_>,
+    program: &str,
+    args: Vec<String>,
+    n_threads: usize,
+    upstream_defects: &str,
+) -> PyResult<(u8, String, String)> {
+    let mode = crate::defects::mode_from_py(upstream_defects)?;
+    if program != "antsApplyTransforms" {
+        return Err(PyValueError::new_err(format!(
+            "unknown ANTs file program {program:?} (antsApplyTransforms)"
+        )));
+    }
+    let (mut out, mut err) = (Vec::new(), Vec::new());
+    let code = py.detach(|| {
+        let code = larmorx_ants::cli::apply_transforms::main_with_threads(
+            &args,
+            &larmorx_ants::cli::FileLoader,
+            mode,
+            Some(n_threads.max(1)),
+            &mut out,
+            &mut err,
+        );
+        for w in larmorx_io::itk_output::take() {
+            err.extend_from_slice(w.as_bytes());
+        }
+        code
+    });
+    Ok((
+        code,
+        String::from_utf8_lossy(&out).into_owned(),
+        String::from_utf8_lossy(&err).into_owned(),
+    ))
+}
+
 /// The ImageMath operations larmorx implements and their usage lines.
 #[pyfunction]
 fn ants_image_math_operations<'py>(py: Python<'py>) -> PyResult<Bound<'py, PyList>> {
@@ -348,6 +388,7 @@ fn ants_read_float<'py>(
 
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(ants_program, m)?)?;
+    m.add_function(wrap_pyfunction!(ants_file_program, m)?)?;
     m.add_function(wrap_pyfunction!(ants_image_math_operations, m)?)?;
     m.add_function(wrap_pyfunction!(ants_read_float, m)?)?;
     image_math::register(m)?;

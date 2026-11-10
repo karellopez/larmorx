@@ -1579,10 +1579,19 @@ fn dgebd2(
 }
 
 /// `DBDSQR('U', N, NCVT, NRU, 0, D, E, VT, LDVT, U, LDU, ...)` with `NCVT = NRU = N` (`vt`
-/// and `u` column-major `n × n`). Returns LAPACK's `info` (0 on convergence).
-fn dbdsqr_upper(n: usize, d: &mut [f64], e: &mut [f64], vt: &mut [f64], u: &mut [f64]) -> usize {
+/// and `u` column-major `n × n`). `clear_negative_zero`: LAPACK 3.12.1's "avoid -ZERO" when the
+/// singular values are made positive (3.12.0 has no such step: a -0 stays -0). Returns LAPACK's
+/// `info` (0 on convergence).
+fn dbdsqr_upper(
+    n: usize,
+    d: &mut [f64],
+    e: &mut [f64],
+    vt: &mut [f64],
+    u: &mut [f64],
+    clear_negative_zero: bool,
+) -> usize {
     let (ncvt, nru) = (n, n);
-    dbdsqr_upper_ncc(n, d, e, (vt, ncvt, n), (u, nru, n), (&mut [], 0, 1), true)
+    dbdsqr_upper_ncc(n, d, e, (vt, ncvt, n), (u, nru, n), (&mut [], 0, 1), clear_negative_zero)
 }
 
 /// `DBDSQR('U', N, NCVT, NRU, NCC, D, E, VT, LDVT, U, LDU, C, LDC, ...)`: `vt` (`ncvt` columns,
@@ -1977,8 +1986,16 @@ fn dbdsqr_upper_ncc(
 }
 
 /// `DBDSDC('U', 'I', N, D, E, U, LDU, VT, LDVT, ...)` for `N <= 25`: `DLASDQ` (→ `DBDSQR`,
-/// then its ascending sort), then the descending selection sort. Returns `info`.
-fn dbdsdc_upper(n: usize, d: &mut [f64], e: &mut [f64], u: &mut [f64], vt: &mut [f64]) -> usize {
+/// then its ascending sort), then the descending selection sort, with the release's `DBDSQR`
+/// (3.12.0 keeps a -0 singular value, 3.12.1 makes it +0). Returns `info`.
+fn dbdsdc_upper(
+    release: LapackRelease,
+    n: usize,
+    d: &mut [f64],
+    e: &mut [f64],
+    u: &mut [f64],
+    vt: &mut [f64],
+) -> usize {
     if n == 0 {
         return 0;
     }
@@ -1997,7 +2014,7 @@ fn dbdsdc_upper(n: usize, d: &mut [f64], e: &mut [f64], u: &mut [f64], vt: &mut 
         vt[i + i * n] = 1.0;
     }
     // DLASDQ('U', 0, N, N, N, 0, ...): upper, square: straight to DBDSQR, then its sort.
-    let info = dbdsqr_upper(n, d, e, vt, u);
+    let info = dbdsqr_upper(n, d, e, vt, u, release == LapackRelease::V3_12_1);
     if info != 0 {
         return info;
     }
@@ -2076,7 +2093,7 @@ pub fn svd3(
     let (mut s, mut e, tauq, taup) = dgebd2(release, N, N, &mut am, N);
     let mut u = [0.0f64; N * N];
     let mut vt = [0.0f64; N * N];
-    if dbdsdc_upper(N, &mut s, &mut e, &mut u, &mut vt) != 0 {
+    if dbdsdc_upper(release, N, &mut s, &mut e, &mut u, &mut vt) != 0 {
         return None;
     }
     // DORMBR('Q', 'L', 'N', M, M, N, A, LDA, TAUQ, U, LDU): NQ = M >= K → DORMQR → DORM2R
@@ -2224,6 +2241,20 @@ mod tests {
         assert_eq!(round_to_f64((1u128 << 54) - 1, 970), f64::INFINITY);
         // The largest subnormal rounding up into the normal range.
         assert_eq!(round_to_f64((1u128 << 53) - 1, -1075), f64::MIN_POSITIVE);
+    }
+
+    /// An exactly singular matrix: numpy 2.3.5 (LAPACK 3.12.0) returns the zero singular value
+    /// as -0, numpy 2.5.4 (3.12.1, "avoid -ZERO") as +0; the other two are the same in both.
+    #[test]
+    fn singular_value_zero_sign_follows_the_release() {
+        let a = [[0.0, -2.0, 0.0], [0.0, 1.0, 0.0], [-1.0, -3.0, -0.0]];
+        let (_, s0, _) = svd3(&a, LapackRelease::V3_12_0).unwrap();
+        let (_, s1, _) = svd3(&a, LapackRelease::V3_12_1).unwrap();
+        assert_eq!(s0[2].to_bits(), (-0.0f64).to_bits());
+        assert_eq!(s1[2].to_bits(), 0);
+        assert_eq!(s0[..2], s1[..2]);
+        assert_eq!(s0[0], 3.828_695_669_759_896);
+        assert_eq!(s0[1], 0.584_028_653_716_428);
     }
 
     #[test]

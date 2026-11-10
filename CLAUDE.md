@@ -42,7 +42,7 @@ replica (2026-11-02), FAST's clean-room original and topup's replica, topup's cl
 `fslmaths` and `fslstats`'s replica and the spec answers for topup, FAST and FLIRT (2026-11-03), `fslmaths`' and
 `fslstats`' clean-room originals, glibc's exact maths for `reproduce` (both halves) and BET's `-S`/`-B`/`-A`/`-A2` replica with `standard_space_roi` and `fslroi`
 (2026-11-04) and the clean-room catch-up (topup, FAST, FLIRT, BET with these options' original, `lx.mri.hmc`; 2026-11-05)
-complete, the clean-room audit (2026-11-06: [docs/validation/clean-room-audit.md](docs/validation/clean-room-audit.md); it runs at every merge), PRELUDE's replica and clean-room original (2026-11-06 and 07) and 3dvolreg's replica (2026-11-07), its clean-room original, the field maps' part A (sdcflows' port, 2026-11-08) and tedana's `t2smap` replica (2026-11-08, in `larmorx-gpl`) complete; next, before FreeSurfer (the user, 2026-11-06; decision log): the field maps' part B, `t2smap`'s clean-room original, the confounds, the templates; then FreeSurfer, surfaces, larmorprepx; each a bounded part with a stop after it and its site page from its tests.
+complete, the clean-room audit (2026-11-06: [docs/validation/clean-room-audit.md](docs/validation/clean-room-audit.md); it runs at every merge), PRELUDE's replica and clean-room original (2026-11-06 and 07) and 3dvolreg's replica (2026-11-07), its clean-room original, the field maps' part A (sdcflows' port, 2026-11-08), tedana's `t2smap` replica (2026-11-08, in `larmorx-gpl`) and the field maps' part B (the rest of sdcflows with niworkflows' helpers, a BIDS index, SciPy's ndimage filters and fMRIPrep's field-map steps, 2026-11-10) complete; next, before FreeSurfer (the user, 2026-11-06; decision log): `t2smap`'s clean-room original (first the main package's own `topup` settings), the confounds, the templates; then FreeSurfer, surfaces, larmorprepx; each a bounded part with a stop after it and its site page from its tests.
 Then the final validation phase (the data panel's part b and every new tool, full tiers, heavy and
 nightly random testing, the extensive evidence, reviews, the scripts triage) and the comparisons
 with fMRIPrep. Machine-only runs meanwhile: 8 heavy random-testing cases wait for the lab's server.
@@ -70,8 +70,10 @@ with fMRIPrep. Machine-only runs meanwhile: 8 heavy random-testing cases wait fo
 
 - **Newest upstream versions, updated in steps** (user, 2026-10-27): each tool is ported from the newest release; a newer release is brought in by a planned part (source changes ported, records re-made), the old oracle kept. fMRIPrep's own versions are only a reference for the final comparisons (the user: "I would not like larmorx to be limited by fmriprep. The idea was that it reproduces fmriprep, but also to bring a solution in which user can simple use whatever they want to make software"). AFNI (25.2.09, newest 26.3.x) and FSL (6.0.7.17, newest 6.0.7.23) are updated after the move (decision log 2026-10-27).
 - **Port every tool first, compare with fMRIPrep at the end** (user, 2026-10-16). Each port is validated against its own original program; stage-by-stage and end-to-end comparisons with fMRIPrep wait until all tools are ported.
-- **Agents: in bounded parts with a stop after each; two at once at most, by role, with relay
-  agents** (confirmed for the parts before FreeSurfer, user 2026-11-06) (the user, 2026-11-02: "can we try this new method after this flirt clean room? The idea
+- **Agents: in bounded parts with a stop after each; ONE AT A TIME since 2026-11-09, with relay
+  agents** (the user, 2026-11-09: "We will do one agent at a time now, until I tell you the opposite": relays one
+  after the other, nothing beside them; decision log 2026-11-09). Before that: two at once at most, by role
+  (confirmed for the parts before FreeSurfer, user 2026-11-06) (the user, 2026-11-02: "can we try this new method after this flirt clean room? The idea
   is to go faster, spending less tokens and also maintaining quality"; before: one at a time, the
   user's decisions of 2026-10-10, 10-17, 10-22, 10-24 and 10-26 in the decision log): the user
   watches the weekly usage limit (only they can see it, with `/usage`) and starts each next part;
@@ -136,6 +138,7 @@ larmorx/scripts/bootstrap_workspace.sh --venv .venv --install-rust
    - SciPy 1.18.1, numpy 2.5.4 with OpenBLAS 0.3.34 (since 2026-10-29: the resampler and numpy's 4 × 4 arithmetic; SciPy 1.15.3 / numpy 2.3.5 stay in the shared environment for the step); FSL's own OpenBLAS 0.3.33 with its reference LAPACK 3.12.0 and Armadillo 14.2.1 (the FSL replicas' 4 × 4 arithmetic)
    - AFNI 26.3.05 (since 2026-10-29, both implementations; 25.2.09 kept for the step between the two)
    - sdcflows 2.17.1 (since 2026-11-08, `lx.sdcflows`; 2.15.1, fMRIPrep 25.2.6's, kept for the final comparisons) with scikit-learn 1.9.1 (1.6.1, fMRIPrep's); SciPy 1.15.3's sdist for the shared environment's step
+   - niworkflows 1.15.4, nipype 1.12.0, pybids 0.22.0 (0.20.0, fMRIPrep 25.2.6's, for the step), scikit-image 0.26.0 (0.25.2, fMRIPrep's), toml 0.10.2, transforms3d 0.4.2, nilearn 0.14.1 (0.11.1, fMRIPrep's), sdcflows 2.15.2's estimator search and fMRIPrep 25.2.7's field-map steps (since 2026-11-09, the field maps' part B: `lx.niworkflows`, `lx.bids`, `lx.skimage`, `crates/larmorx-ndimage`, larmorprepx's field-map stages)
    - tedana 26.0.3 (since 2026-11-08, the `larmorx-gpl` replica; 25.0.1, fMRIPrep 25.2.6's, kept for the final comparisons) with numpy 2.5.4 / SciPy 1.18.1 (numpy 2.3.5 / SciPy 1.15.3 for the step), nilearn 0.14.1 and CPython 3.12.16's `argparse`, `textwrap`, `json` and number formats
    - Arm's Optimized Routines v19.11 (the code glibc 2.35 ships; MIT) and fdlibm as glibc 2.35 carries it (Sun's notice): `larmorx_core::math`'s `*_glibc` since 2026-11-04 (`sinf`, `cosf`, `sincosf`, `logf`, `expf`, `powf`, `exp`, `log`, `pow`; `atanf`, `atan2f`), one translation for `reproduce` and the AFNI and FSL replicas
    - glibc 2.35 itself (LGPL-2.1-or-later): never copied or translated; behaviour specs only (`specs/cbrtf.md`, `specs/glibc-dbl.md`)
@@ -223,7 +226,8 @@ Every agent reads this file first, then `docs/porting-guide.md`, its section of 
   `standard_space_roi` (about 1.5 MB, under `crates-nc/`, with FSL's Licence, MNI's notice and a checksum manifest).
 - The FreeSurfer licence file (`/usr/local/freesurfer/license.txt`) is only mounted read-only into containers; never copied or committed.
 - **Machines** (user, 2026-10-25; moved 2026-10-27 and 28): the main machine is the new laptop (`karelo-Alienware-m18-R1-AMD`: AMD, 16 cores / 32 threads, 124 GiB, AVX-512, RTX 4090, Ubuntu 22.04); every agent and every record runs there. The old laptop (`karelo-GE75-Raider-8SF`: Intel i7-8750H, 12 threads, 31 GiB, AVX2) is the helper `old-laptop`: the quiet benchmark machine and a second Linux reference, reached by `ssh old-laptop` and the git remote `old-laptop` (`docs/helper-machines.md`); no development starts there. A Windows laptop serves Windows checks (`win-laptop`); the lab's server (1 TB RAM, shared, Ubuntu 24.04: originals in an Ubuntu 22.04 container) only giant jobs. Helpers are reached by key-based SSH from the main machine, never with passwords; macOS stays with CI.
-- **Agents at once:** two at most, by role ("The user's direction"): 14 threads and at most 32 GiB of
+- **Agents at once:** one since 2026-11-09 ("The user's direction"): up to 28 threads and about 90 GiB of
+  memory boxes in total. When two run (by role, if the user says so again): 14 threads and at most 32 GiB of
   memory boxes each; the orchestrator's verification beside them at most 32 GiB and 8 threads. Brief
   every agent to commit as soon as its work passes the gates; when pausing one, ask for a WIP
   checkpoint commit and a NOTES file first.

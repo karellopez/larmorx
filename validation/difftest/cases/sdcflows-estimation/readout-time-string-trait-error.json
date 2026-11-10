@@ -1,0 +1,137 @@
+{
+ "defect": null,
+ "description": "GetReadoutTime of a TotalReadoutTime given as a string: traits' TraitError of the output spec, with its message (larmorx raised a TypeError of its own words)",
+ "expect": "pass",
+ "found": {
+  "detail": "relay 27's first probe (r27/try_cases.py)",
+  "n": 19,
+  "seed": "try1",
+  "shrink_moves": [],
+  "signature": [
+   "readout_time: every output bit-identical"
+  ]
+ },
+ "id": "readout-time-string-trait-error",
+ "implementations": [
+  "port"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "call": "readout_time",
+   "fallback": null,
+   "meta": {
+    "EffectiveEchoSpacing": "0.0005",
+    "MagneticFieldStrength": 1.5,
+    "PhaseEncodingDirection": "k-",
+    "PixelBandwidth": 2290.0,
+    "TotalReadoutTime": "0.05"
+   },
+   "threads": 3,
+   "use_estimate": false
+  },
+  "features": {
+   "call": "readout_time",
+   "content": "constant",
+   "dtype": "int16",
+   "extreme": false,
+   "fallback": 0,
+   "inter": 0.0,
+   "meta EffectiveEchoSpacing": "0.0005",
+   "meta MagneticFieldStrength": 1.5,
+   "meta PhaseEncodingDirection": "k-",
+   "meta PixelBandwidth": 2290.0,
+   "meta TotalReadoutTime": "0.05",
+   "metadata keys": 3,
+   "orientation": "axes",
+   "origin0": 33.75,
+   "origin1": -22.25,
+   "origin2": 0.75,
+   "qfac": -1,
+   "qform_code": 1,
+   "range": "plain",
+   "readout form": "TotalReadoutTime",
+   "readout keys": true,
+   "sform": "same",
+   "sform_code": 0,
+   "shape": "8x16x12",
+   "slope": 0.5,
+   "spacing0": 3.0,
+   "spacing1": 1.2,
+   "spacing2": 1.0,
+   "threads": 3,
+   "units": "mm"
+  },
+  "groups": [
+   {
+    "args": [
+     "readout_time"
+    ],
+    "name": "readout_time",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "in": {
+    "content": {
+     "seed": 132992429,
+     "type": "constant"
+    },
+    "dtype": "int16",
+    "geometry": {
+     "origin": [
+      33.75,
+      -22.25,
+      0.75
+     ],
+     "qfac": -1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      -1,
+      -1,
+      -1
+     ],
+     "sform": "same",
+     "sform_code": 0,
+     "spacing": [
+      3.0,
+      1.2,
+      1.0
+     ],
+     "units": "mm"
+    },
+    "scaling": {
+     "inter": 0.0,
+     "slope": 0.5
+    },
+    "shape": [
+     8,
+     16,
+     12
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 19,
+  "options": [
+   "EffectiveEchoSpacing",
+   "MagneticFieldStrength",
+   "PhaseEncodingDirection",
+   "PixelBandwidth",
+   "TotalReadoutTime",
+   "readout_time"
+  ],
+  "seed": "try1",
+  "tool": "sdcflows-estimation"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "sdcflows-estimation",
+ "tier": "smoke",
+ "tool": "sdcflows-estimation"
+}

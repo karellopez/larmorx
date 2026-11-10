@@ -231,6 +231,18 @@ numpy's notice. Each `fmadd` is `mul_add`; an FMA-compiled copy is chosen at run
 the AVX-512 and the AVX2/FMA3 dispatch paths) on all 2^32 inputs
 (`validation/investigations/t2smap/numerics/`); unit tests check recorded values.
 
+## numpy's float32 exponential (`src/math/expf_numpy.rs`, the field maps' part B)
+
+**Ported** from numpy 2.5.4 (BSD-3-Clause, `tags/numpy-2.5.4`, identical in 2.3.5):
+`numpy/_core/src/umath/loops_exponent_log.dispatch.c.src` (`simd_exp_FLOAT`, one lane of it, and
+its helpers `simd_range_reduction`, `fma_scalef_ps`, `avx512_scalef_ps`), the constants
+`NPY_COEFF_*_EXPf`, `NPY_CODY_WAITE_LOGE_2_*f`, `NPY_RINT_CVT_MAGICf` of
+`numpy/_core/src/umath/npy_simd_data.h` and `NPY_LOG2Ef` of `numpy/_core/include/numpy/
+npy_math.h`. The file carries numpy's notice. Each `fmadd` is `mul_add`. Equal to `numpy.exp` on
+`float32` arrays (numpy 2.3.5 and 2.5.4, Linux x86-64) on all 2^32 inputs, on the AVX-512 and the
+AVX2/FMA3 paths (`validation/investigations/sdcflows-fieldmap-b/check_numpy.py --expf`); it
+serves `reproduce` (scikit-image's random walker), `expf` stays larmorx's default.
+
 ## numpy's reductions and percentiles (`src/numpy/`)
 
 **Ported** from numpy 2.5.4 (BSD-3-Clause; the same code paths in 2.3.5) and SciPy 1.18.1
@@ -251,6 +263,27 @@ the AVX-512 and the AVX2/FMA3 dispatch paths) on all 2^32 inputs
   `exp` and `log` without AVX-512 (`loops_exponent_log.dispatch.c.src`'s `DOUBLE_exp`,
   `DOUBLE_log`; the symbols `exp@GLIBC_2.2.5`, `log@GLIBC_2.2.5` they bind, whose negative
   logarithm is C's positive `NAN`: measured, glibc's source not read).
+
+- `numpy/reduce.rs`'s `SumOrder`, `add_reduce_ordered`, `std_ordered` (field maps part B): numpy
+  2.2 and older add a whole contiguous array in chunks of `NPY_BUFSIZE` (8192) elements (the
+  buffered reduction's inner loop), numpy 2.3 onwards pairwise over the whole array (the
+  iterator's buffering rewrite); established by measurement against numpy 2.2.6 (fMRIPrep
+  25.2.6's image) and 2.3.5 (`validation/investigations/sdcflows-fieldmap-b/`).
+- `numpy/dot.rs` (field maps part B; moved from `larmorx-sdcflows`' `blas.rs`): numpy's
+  `FLOAT_dot`/`DOUBLE_dot` and `cblas_matrixproduct`'s one-element case
+  (`numpy/_core/src/multiarray/arraytypes.c.src`, `common/cblasfuncs.c`) over OpenBLAS 0.3.34's
+  Haswell `sdot`/`ddot` (`kernel/x86_64/sdot.c`, `sdot_microk_haswell-2.c`, `ddot.c`,
+  `ddot_microk_haswell-2.c`; BSD-3-Clause, the OpenBLAS notice in the file): the kernels' lane
+  order, the tails (the `ddot` tail measured unfused). `matvec_f64` (field maps part B, relay 20):
+  `cblas_matrixproduct`'s matrix-vector shapes (`common/cblasfuncs.c`, numpy 2.5.4 and 2.3.5)
+  over OpenBLAS 0.3.34's `cblas_dgemv` (`interface/gemv.c`: row-major to the transposed
+  column-major product, one thread below 460,800 elements) and the Haswell `dgemv_t`
+  (`kernel/x86_64/dgemv_t_4.c`, `dgemv_t_microk_haswell-4.c`; the same files in 0.3.30): the
+  blocks of 2048 rows, the 4 x 4 assembly kernel's lanes, the SSE2 4 x 2 and 4 x 1 kernels,
+  `add_y`, the C tails' contractions (measured against numpy 2.3.5 and 2.5.4).
+- `numpy/histograms.rs` (field maps part B): `linspace` (`numpy/_core/function_base.py`) and
+  `histogram`'s equal-bin path with `_get_outer_edges`, `_get_bin_edges`, `_unsigned_subtract`
+  (`numpy/lib/_histograms_impl.py`), numpy 2.5.4 (the same values in 2.3.5).
 
 Each file carries numpy's (and SciPy's) notice. Bit-identical to numpy 2.3.5 / SciPy 1.15.3 and
 numpy 2.5.4 / SciPy 1.18.1 on the seeded cases of

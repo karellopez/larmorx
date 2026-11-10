@@ -54,6 +54,9 @@ TOOLS: dict[str, tuple[str, str]] = {
     "resample-series": ("resample_series", "TOOL"),
     "sdcflows-fieldmap": ("sdcflows_fieldmap", "TOOL"),
     "tedana-t2smap": ("tedana_t2smap", "TOOL"),
+    "ndimage-skimage": ("fieldmaps_b", "NDIMAGE"),
+    "niworkflows-helpers": ("fieldmaps_b", "NIWORKFLOWS"),
+    "sdcflows-estimation": ("fieldmaps_b", "ESTIMATION"),
 }
 
 #: Tools that test the harness itself: run only when named, never part of ``all``.

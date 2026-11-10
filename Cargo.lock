@@ -368,6 +368,7 @@ dependencies = [
  "larmorx-interp",
  "larmorx-io",
  "larmorx-mri",
+ "larmorx-ndimage",
  "larmorx-sdcflows",
  "larmorx-transform",
  "numpy",
@@ -392,6 +393,7 @@ version = "0.0.1"
 dependencies = [
  "larmorx-core",
  "larmorx-interp",
+ "larmorx-ndimage",
  "larmorx-transform",
  "rayon",
  "thiserror",

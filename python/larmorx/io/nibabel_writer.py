@@ -680,6 +680,23 @@ def nibabel_stored(data: Any, out_dtype: Any) -> tuple[np.ndarray, float, float]
     return stored, float(writer.slope), float(writer.inter)
 
 
+def _unscaled_stored(data: np.ndarray, out_dtype: np.dtype) -> np.ndarray:
+    """The values nibabel's ``ArrayWriter(data, out_dtype, check_scaling=False)`` writes (no
+    scaling: floats written to an integer type are rounded and clipped to its range, NaNs set
+    to 0)."""
+    writer = _SlopeInterWriter.__new__(_SlopeInterWriter)
+    writer.array = data
+    writer._range = None
+    writer._has_nan = None
+    mn = mx = None
+    if out_dtype.kind in "iu" and data.dtype.kind == "f":
+        mn, mx = writer.finite_range()
+        if (mn, mx) == (np.inf, -np.inf):
+            mn, mx = 0, 0
+    nan2zero = data.dtype.kind in "fc" and out_dtype.kind in "iu" and writer.has_nan
+    return _array_to_stored(data, out_dtype, 0.0, 1.0, mn, mx, nan2zero)
+
+
 def save_nibabel(
     image: Any,
     path: str | os.PathLike[str],
@@ -687,13 +704,19 @@ def save_nibabel(
     dtype: Any = None,
     version: int | None = None,
     compression_level: int = 2,
+    scale: bool = True,
     n_threads: int = 1,
 ) -> None:
     """Write ``image`` as nibabel's ``img.to_filename(path)`` writes it: the voxel data in the
     header's data type (``dtype`` overrides it; without a header, the array's type), scaled
     by nibabel's rules when the values do not fit it, with the ``scl_slope``/``scl_inter``
     nibabel writes, and the header nibabel's ``update_header`` makes for the image's affine
-    and shape."""
+    and shape.
+
+    ``scale=False`` is nibabel's path for a header whose ``scl_slope`` and ``scl_inter`` are set
+    (not NaN, as a loaded image's are: nilearn's ``new_img_like`` sets them to 0): no scaling
+    is computed, the values are cast (``ArrayWriter(check_scaling=False)``) and the header's
+    ``scl_slope`` and ``scl_inter`` are written as they are."""
     from larmorx.image import as_image
 
     img = as_image(image)
@@ -707,8 +730,13 @@ def save_nibabel(
         out = np.dtype(header.data_dtype)
     else:
         out = data.dtype
-    stored, slope, inter = nibabel_stored(data, out.newbyteorder("="))
     template = header.to_dict() if header is not None else None
+    if scale:
+        stored, slope, inter = nibabel_stored(data, out.newbyteorder("="))
+    else:
+        stored = _unscaled_stored(data, out.newbyteorder("="))
+        slope = template["scl_slope"] if template is not None else float("nan")
+        inter = template["scl_inter"] if template is not None else float("nan")
     from larmorx.io.nibabel_header import header_for_image
 
     fields = header_for_image(

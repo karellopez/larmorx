@@ -322,6 +322,90 @@ fn linalg_inv4<'py>(py: Python<'py>, a: PyReadonlyArray3<'_, f64>) -> PyResult<I
     Ok((to_stack(py, &out), PyArray1::from_vec(py, singular)))
 }
 
+/// `scipy.linalg.inv` of a float64 4×4 matrix as SciPy `scipy_version` ("1.18.1", or a 1.15
+/// release) computes it (`larmorx_transform::scipy_linalg::inv4`; finite input, checked by the
+/// caller): `(structure, status, inverse, lu, rcond)` with `status` one of "ok",
+/// "ill_conditioned" (1.18's warning), "singular" and "norm_overflow" (SCI-18: `lu` is what
+/// SciPy returns); `rcond` is the value 1.18 computes and prints (0 for 1.15 and for SCI-18).
+#[pyfunction]
+fn linalg_scipy_inv4<'py>(
+    py: Python<'py>,
+    a: PyReadonlyArray2<'_, f64>,
+    scipy_version: &str,
+) -> PyResult<Bound<'py, PyTuple>> {
+    use larmorx_transform::scipy_linalg::{self, Outcome, ScipyRelease};
+    let m = mat4(&a)?;
+    let release = match scipy_version
+        .split('.')
+        .take(2)
+        .collect::<Vec<_>>()
+        .as_slice()
+    {
+        ["1", "15"] => ScipyRelease::V1_15,
+        ["1", "18"] => ScipyRelease::V1_18,
+        _ => {
+            return Err(PyValueError::new_err(format!(
+                "scipy_version must be a 1.15 or 1.18 release, not {scipy_version:?}"
+            )));
+        }
+    };
+    let (structure, outcome) = scipy_linalg::inv4(&m, release);
+    let mat = |x: &Mat4| -> Bound<'py, PyAny> {
+        PyArray::from_owned_array(py, Array2::from_shape_fn((4, 4), |(i, j)| x[i][j])).into_any()
+    };
+    let none = || py.None().into_bound(py);
+    let (status, inverse, lu, rcond) = match outcome {
+        Outcome::Inverse {
+            inverse,
+            rcond,
+            ill_conditioned,
+        } => (
+            if ill_conditioned {
+                "ill_conditioned"
+            } else {
+                "ok"
+            },
+            mat(&inverse),
+            none(),
+            rcond,
+        ),
+        Outcome::Singular => ("singular", none(), none(), 0.0),
+        Outcome::NormOverflow { lu, inverse } => ("norm_overflow", mat(&inverse), mat(&lu), 0.0),
+    };
+    let items: Vec<Bound<'py, PyAny>> = vec![
+        structure.name().into_pyobject(py)?.into_any(),
+        status.into_pyobject(py)?.into_any(),
+        inverse,
+        lu,
+        rcond.into_pyobject(py)?.into_any(),
+    ];
+    PyTuple::new(py, items)
+}
+
+/// `affine.dot(np.vstack((points.T, ones)))[:3].T` as numpy computes it with OpenBLAS's Haswell
+/// kernels (`larmorx_transform::openblas::affine_points`) for `(n, 3)` float64 points.
+#[pyfunction]
+#[pyo3(signature = (affine, points, n_threads = 1))]
+fn linalg_affine_points<'py>(
+    py: Python<'py>,
+    affine: PyReadonlyArray2<'_, f64>,
+    points: PyReadonlyArray2<'_, f64>,
+    n_threads: usize,
+) -> PyResult<Bound<'py, PyArray2<f64>>> {
+    let m = mat4(&affine)?;
+    let a = points.as_array();
+    if a.ncols() != 3 {
+        return Err(PyValueError::new_err("points must have shape (n, 3)"));
+    }
+    let mut pts: Vec<[f64; 3]> = a.rows().into_iter().map(|r| [r[0], r[1], r[2]]).collect();
+    py.detach(|| parallel::with_threads(n_threads, || openblas::affine_points(&m, &mut pts)))
+        .map_err(value_err)?;
+    Ok(PyArray::from_owned_array(
+        py,
+        Array2::from_shape_fn((pts.len(), 3), |(i, j)| pts[i][j]),
+    ))
+}
+
 /// nibabel's `io_orientation` polar step for a 3×3 matrix of unit columns
 /// (`larmorx_transform::nitransforms::closest_orthogonal`).
 #[pyfunction]
@@ -345,6 +429,8 @@ fn linalg_closest_orthogonal<'py>(
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(linalg_matmul4, m)?)?;
     m.add_function(wrap_pyfunction!(linalg_inv4, m)?)?;
+    m.add_function(wrap_pyfunction!(linalg_scipy_inv4, m)?)?;
+    m.add_function(wrap_pyfunction!(linalg_affine_points, m)?)?;
     m.add_function(wrap_pyfunction!(linalg_closest_orthogonal, m)?)?;
     m.add_function(wrap_pyfunction!(nitransforms_ndcoords, m)?)?;
     m.add_function(wrap_pyfunction!(nitransforms_map, m)?)?;

@@ -54,11 +54,33 @@ NEWEST = "newest"
 SHARED = "shared"
 ENV = "LARMORX_PYTHON"
 #: The parity suites whose originals are Python libraries (they default to ``newest``).
-SUITES = ("resample-series", "resample-series-jacobian", "numpy-linalg", "sdcflows-fieldmap")
-#: The suites that report the originals' own step (their comparisons record digests).
-STEP_SUITES = ("resample-series", "sdcflows-fieldmap")
+SUITES = (
+    "resample-series",
+    "resample-series-jacobian",
+    "numpy-linalg",
+    "sdcflows-fieldmap",
+    "sdcflows-estimation",
+    "niworkflows-helpers",
+    "ndimage-skimage",
+)
+#: The suites that report the originals' own step (their comparisons record digests; the
+#: field maps' part B's three run only their library scripts in the step's passes).
+STEP_SUITES = (
+    "resample-series",
+    "sdcflows-fieldmap",
+    "sdcflows-estimation",
+    "niworkflows-helpers",
+    "ndimage-skimage",
+)
 #: Random testing's tools of the same originals.
-TOOLS = ("resample-series", "nifti-io", "sdcflows-fieldmap")
+TOOLS = (
+    "resample-series",
+    "nifti-io",
+    "sdcflows-fieldmap",
+    "ndimage-skimage",
+    "niworkflows-helpers",
+    "sdcflows-estimation",
+)
 STEP_RECORD = "LARMORX_PYTHON_STEP_RECORD"
 STEP_FROM = "LARMORX_PYTHON_STEP_FROM"
 #: How many times the step runs the shared releases' cases (their originals' own variation).

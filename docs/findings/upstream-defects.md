@@ -2,9 +2,10 @@
 
 Every defect or questionable behaviour found so far in the tools and pipelines larmorx
 reproduces: ANTs and ITK, AFNI, FSL, fMRIPrep and its libraries (nipype, niworkflows,
-sMRIPrep, sdcflows, nitransforms; sdcflows' field-map estimation, ported bit for bit in the
-field maps' part A, has its own family, SDC-; tedana's `t2smap`, translated bit for bit in the
-`larmorx-gpl` replica, has the family TED-), SciPy, numpy and OpenBLAS, nibabel, glibc and ANTsPy. For
+sMRIPrep, sdcflows, nitransforms, pybids; sdcflows' field-map estimation, ported bit for bit in
+the field maps' parts A and B, has its own family, SDC-; tedana's `t2smap`, translated bit for bit in the
+`larmorx-gpl` replica, has the family TED-), SciPy, scikit-image (SKI-, since the field maps' part B),
+numpy and OpenBLAS, nibabel, glibc and ANTsPy. For
 each: the evidence, what it does to fMRIPrep users, what larmorx does today, and what decision
 D13 ("correct by default, faithful on request", CLAUDE.md) requires. Collected 2026-10-11 from
 the other files in `docs/findings/`, the specs, the validation records and `docs/analysis/`.
@@ -235,11 +236,61 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | PIPE-15 | nipype `MCFLIRT` | emits `-edge`; expects names mcflirt does not write | e | none | – | – |
 | PIPE-16 | nipype `N4BiasFieldCorrection` | `copy_header` writes the corrected image in the input's (integer) type | c? | field-map references (int16) | not a tool defect; decided 2026-10-21: larmorprepx keeps N4's float32 result, `reproduce` fMRIPrep's int16 | – (larmorprepx) |
 | PIPE-17 | nitransforms | the first group of an `.h5` file skipped as if it were the composite: one transform fails, a list without a composite loses its first, an empty composite fails | c | none (fMRIPrep's composites) | corrected by default (`upstream_defects`, 2026-10-16) | – |
+| PIPE-18 | niworkflows `IntraModalMerge` | `grand_mean_scaling` indexes the series with a mask of the wrong shape: numpy's `IndexError` for every series of two or more volumes | c | none (fMRIPrep leaves it off) | rule A: each volume scaled by the largest median over its own in the mask, with a warning; `reproduce` the `IndexError` (2026-11-09) | – |
+| PIPE-19 | niworkflows `IntraModalMerge` | a 6- or 7-dimensional image passes the check for more than four dimensions and is averaged over its fourth axis | c | none | rule B: niworkflows' own error; `reproduce` numpy's mean (2026-11-09) | – |
+| PIPE-20 | fMRIPrep `DistortionParameters` | a missing readout time or phase-encoding direction becomes undefined outputs: the run is resampled without its field map, the report still names the correction | c | BOLD runs without readout metadata whose estimator has it | the interface: rule C (its documented design) with a warning; larmorprepx's pipeline: rule B, fMRIPrep's own "Missing readout time information" error; `reproduce` the silent skip with a warning (2026-11-09) | – |
+| PIPE-21 | fMRIPrep `ReconstructFieldmap` | the field on the target projected into the field map's space and made positive (a LAS target's voxels reversed), while the resampler reads it on the target's grid: up to 159 Hz on a synthetic LAS target | c | direct field maps on LAS targets (the SyN runs' path) | rule A: the values on the target's grid; `reproduce` fMRIPrep's image (2026-11-09) | – |
+| PIPE-22 | nitransforms (fMRIPrep's `itk_mat2txt`) | the `desc-fmap_xfm` parameters written with `"%g"`, read back by every later `ReconstructFieldmap` | c? | every run with a field map (corners within 7.9e-05 mm) | rule C: kept (a correction measured to bring no gain) (2026-11-09) | – |
+| PIPE-23 | nipype `is_outlier` (`NonsteadyStatesDetector`) | a median absolute deviation of 0 makes the values at the median 0/0, NaN outliers: every leading volume non-steady | c | none in the oracle runs (a constant or padded series) | rule A: a z-score of 0 at the median; `reproduce` nipype's (2026-11-09) | – |
+| PIPE-24 | niworkflows `ValidateImage` | nibabel's `get_xyzt_units` raises `KeyError` for a spatial unit code 4 to 7 | c | none | rule A: the translation reported in mm; `reproduce` the `KeyError` (2026-11-09) | – |
+| PIPE-25 | fMRIPrep `get_estimator` | with several `B0FieldIdentifier` values on the sources, the estimator is named after one in a set's order; a run whose `B0FieldSource` is another gets none | c | datasets with aliases (sdcflows' own test data) | rule A: the alias reaches its estimator, with a warning; `reproduce` fMRIPrep's (2026-11-09) | – |
+| PIPE-26 | niworkflows `DerivativesDataSink` | with two or more list-valued entity inputs the files are matched to the names in a Python `set`'s order | b | none (fMRIPrep's field-map sinks have one) | the entities' sorted order, with a warning (nondeterminism is never reproduced) (2026-11-09) | – |
+| PIPE-27 | niworkflows `DerivativesDataSink` | "from float32 to float32": the original type named twice | f | every coerced derivative's log line | rule A (a message): the new type; `reproduce` niworkflows' text (2026-11-09) | – |
+| PIPE-28 | niworkflows `DerivativesDataSink` | fewer `compress` values than files (but more than one): Python's `IndexError` | e | none | rule B: a `ValueError`; `reproduce` the `IndexError` (2026-11-09) | – |
+| PIPE-29 | niworkflows `DerivativesDataSink` | values out of the integer type's range and NaN cast with numpy's cast (undefined in C) | a | none in the oracle runs | D13's rule: clamped (NaN to 0) with a warning; `reproduce` x86-64's casts (2026-11-09) | – |
+| PIPE-30 | niworkflows `DerivativesDataSink` | the header fix sets four voxel sizes on an image that is not 4-D: nibabel's `HeaderDataError` | c | none | rule A: the fourth size only on a 4-D image, the sidecar with the value; `reproduce` the error (2026-11-09) | – |
+| PIPE-31 | fMRIPrep `init_single_subject_wf` | derivatives lacking the field map, reference or coefficients file stop the graph's construction with a bare `KeyError` | e | `--derivatives` users with incomplete field-map derivatives | rule B: a `ValueError` naming the identifier and the files; `reproduce` the `KeyError` (2026-11-09) | – |
+| PIPE-32 | fMRIPrep `map_fieldmap_estimation` | every participant of a run goes into sdcflows' one registry: a second participant with a `B0FieldIdentifier` an earlier one used stops it with `KeyError: "'<id>' is already  in mapping"` | c | multi-participant runs whose participants share field-map identifiers (allowed by BIDS) | rule A: each participant searched in its own registry (automatic names kept), entries added to the shared one where free, with a warning; `reproduce` the `KeyError` (2026-11-09) | – |
+| PIPE-33 | niworkflows `IntensityClip` | an image constant between its percentiles divided by its maximum, 0: NaN, cast to `int16`/`uint8` by an undefined conversion (0 on x86-64) | c | none | rule B: a `ValueError`; `reproduce` niworkflows' result with x86-64's NaN and casts on every platform (2026-11-09) | – |
+| PIPE-34 | niworkflows `RobustAverage` | a gathered volume whose mean is 0 after the clipping is divided by it: NaN or infinite voxels, registered and averaged | c | none | rule B: a `ValueError` naming the volumes; `reproduce` niworkflows' (2026-11-09) | – |
+| PIPE-35 | niworkflows `resample_by_spacing`, `RegridToZooms` | `smooth=True` sets the Gaussian's sigma to `max(0, (old / new - 1) / 2)` voxels, positive only for a finer grid: the coarser grid (the anti-aliasing case) is never smoothed (scikit-image's `rescale`: `(new / old - 1) / 2`) | c? | every run's brain extraction regrids the 1 mm T1w and the OASIS template to 4 mm with `smooth=True`, so unsmoothed, before antsAI's initialisation (`res_tmpl`, `res_target`) | rule D (agreed 2026-11-09): niworkflows' sigma in both modes until the measurement, with the anatomical brain extraction's port, of whether smoothing the 4 mm grids changes antsAI's initialisation and the brain mask; then rule A (a switch and a `larmorx_core::defects` entry) or C (2026-11-09) | measure (anatomical brain extraction) |
+| PIPE-36 | fMRIPrep `extract_entities`, `get_sbrefs`, `collect_derivatives`' entities | `extract_entities` parses the absolute BOLD paths (pybids' `parse_file_entities`, whose derivatives patterns `den-`, `res-`, `desc-`, ... have no separator before them) and `get_sbrefs` queries the raw layout with them: below a folder such as `golden-x` or `andres-lab` every BOLD run stops `init_bold_fit_wf` with `ValueError: 'den' is not a recognized entity` | a | every BOLD run of a dataset stored below such a folder (outside the container wrappers, which mount it at `/data`) | not ported yet (larmorprepx's BOLD stages): rule A when ported, the entities of the BIDS part, `reproduce` fMRIPrep's (2026-11-09) | switch (larmorprepx's BOLD stages) |
+| PIPE-37 | pybids `BIDSLayout` (`BIDSLayoutIndexer`) | the index matches the entity patterns against each file's absolute path (`Entity.match_file`): below a folder named `func`, `sub-pilot` or `run-2` every file gets `datatype` `func`, `subject` `pilot` (its own label lost) or `run` 2; with the derivatives configuration (unanchored `den-`, `res-`, `desc-`, ...) below `golden-x` or `andres-lab` every file gets `den` or `res` | a | a dataset (or a derivatives dataset) stored below such a folder: participants not found, derivatives not matched (outside the container wrappers) | rule A: the patterns matched against the path below the root (`/`-rooted, as the ignore patterns), with a warning when that changed an entity; `reproduce` pybids' index; `parse_file_entities` parses the path it is given, as pybids' (2026-11-09) | – |
+| PIPE-38 | nipype `DenoiseImage` (`CommandLine._list_outputs`) | nipype lists every `name_source` input's file name, so `noise_image` (`<in>_noise`) is among the outputs without `save_noise` or `noise_image`, a file the program never writes | c | none (fMRIPrep and sdcflows use `output_image` only) | rule C: nipype's listing kept (`larmorx._nipype.denoise_image`; nothing larmorx runs reads it) (2026-11-09) | – |
+| PIPE-39 | nipype `BaseInterface.aggregate_outputs` | the outputs are set (and checked by traits) in the order of `set(predicted_outputs)`, which follows the process's string hashes (`PYTHONHASHSEED`): with several invalid outputs the `TraitError` names any of them, from process to process (`GetReadoutTime` of `PhaseEncodingDirection` `'j+'`: `pe_direction` or `pe_dir_fsl`; with a string readout time also `readout_time`) | b | none (a message of a failing run) | the outputs checked in their declared order, traits' `TraitError` and message (`GetReadoutTime`, `DistortionParameters`); not reproduced (nondeterministic) (2026-11-09) | – |
+| PIPE-40 | niworkflows `IntraModalMerge` | with `to_ras` the inputs are reoriented to RAS but `in_mask` is not, so `grand_mean_scaling` indexes the RAS series with the mask on the input's grid: numpy's `IndexError` when the shapes differ, a mirrored or permuted mask when they agree (its indexing fails anyway for two or more volumes: PIPE-18) | a | none (fMRIPrep's `IntraModalMerge` calls have no grand-mean scaling) | rule A: the mask reoriented with the series, with a notice; `reproduce` niworkflows' (2026-11-09) | – |
 | SCI-01 | SciPy `map_coordinates` | huge or NaN coordinates read outside the array | a | none | NaN | – |
 | SCI-02 | SciPy `map_coordinates` | undefined conversions answered as x86-64 does | a | none | clamps and warns by default; `reproduce` gives x86-64's answers (2026-10-12) | – |
 | SCI-03 | SciPy splines | `reflect`, `grid-mirror` do not interpolate on short axes (SciPy up to 1.17) | c | none | fixed in SciPy 1.18, whose initialisation larmorx follows in both modes since 2026-10-29 (corrected by default from 2026-10-11 until then) | – |
 | SCI-04 | SciPy on aarch64 | fused multiply-adds change last bits | d | ARM machines | never fuses | – |
 | SCI-05 | SciPy `map_coordinates` | a NaN coordinate with orders 2 to 5 and mode `nearest` (the suite's 3D float32 inputs, `prefilter=False` mostly): the output there is NaN in every run, but its sign and payload vary between runs on the same inputs (SciPy 1.15.3 and 1.18.1 alike) | b | none known (fMRIPrep's resampling uses other modes) | deterministic (larmorx follows SciPy 1.18.1, bit for bit; NaN values compared alike); not reproduced; the resample-series step counts NaN values alike and runs the shared releases twice (2026-10-30) | – |
+| SCI-06 | SciPy `binary_erosion`, `binary_dilation` | an origin that puts the centre before the structure: a segmentation fault or memory's values | a | none | rule B: `ValueError("invalid origin")` (never reproduced) (2026-11-09) | – |
+| SCI-07 | SciPy n-dimensional filters | a coordinate two whole periods before an axis maps to index -1 (a footprint over eight times the axis) | a | none | index 0, the reflection's value (never reproduced) (2026-11-09) | – |
+| SCI-08 | SciPy `_rank_filter_1d` | a window much larger than the input, or a large `wrap` origin, reads before or after it | a | none | the mode's extension (never reproduced) (2026-11-09) | – |
+| SCI-09 | SciPy `rank_filter`, `median_filter`, `percentile_filter` | on a 1-D input the running rank takes the footprint's whole window, its false elements included | c | none (sdcflows' filters are 3-D) | rule A: the n-dimensional filter, with a warning; `reproduce` SciPy's (2026-11-09) | – |
+| SCI-10 | SciPy binary morphology | more than one pass: the first reads the mask's truth, the later ones the mask cast to `int8` (0.5, 256 false) | c | none (sdcflows' masks are boolean) | rule A: the truth in every pass, with a warning; `reproduce` SciPy's (2026-11-09) | – |
+| SCI-11 | SciPy binary morphology | until nothing changes, with a structure whose centre is false: two states alternate for ever | a | none | rule B: `RuntimeError` when a state repeats (never reproduced) (2026-11-09) | – |
+| SCI-12 | SciPy grey morphology | the structure's values added in the input's type (a `uint8` dilation wraps), the running result in double | c? | none (float images) | rule C: kept (SciPy's definition) (2026-11-09) | – |
+| SCI-13 | SciPy `watershed_ift` | neighbours by C-order offsets checked only against the size: the last element of a row neighbours the first of the next | c | none (sdcflows' `epi_mask` only) | rule A, measured (rule D): corrected by default, `reproduce` SciPy's; `epi_mask`'s masks better on 3 of 4 oracle references against fMRIPrep's own BOLD masks, the same on 1 (2026-11-09) | – |
+| SCI-14 | SciPy `watershed_ift` | an element alone in its queue is not taken out when its cost drops: queues join, elements are never processed or processed at the wrong level | c | none (sdcflows' `epi_mask` only) | rule A (with SCI-13's measurement): corrected by default, `reproduce` SciPy's (2026-11-09) | – |
+| SCI-15 | SciPy `watershed_ift` | markers and labels read as C `int`s: `2**32 + 5` is 5 | c | none | rule A: 64 bits; `reproduce` SciPy's (2026-11-09) | – |
+| SCI-16 | SciPy `watershed_ift` | above 2 GiB of input or output it reads and writes outside its arrays | a | none | 64-bit offsets in both modes, with a warning (never reproduced) (2026-11-09) | – |
+| SCI-17 | SciPy 1.15 `_rank_filter_1d` | an input shorter than half the footprint returns before writing (gh-23293) | c | none | fixed in SciPy 1.18, which larmorx follows in both modes (2026-11-09) | – |
+| SCI-18 | SciPy 1.18.1 `scipy.linalg.inv` | for a general matrix whose norm (SciPy's `norm1_`) overflows, LAPACK `dgecon` returns `info = -5` without an estimate, `getri` is skipped and SciPy returns the LU factors as the inverse, with no error or warning | c | none (an image affine's entries are far from 1e308) | rule A: the inverse (`getri`, SciPy 1.15's result), with a notice; `reproduce` the LU factors (2026-11-09) | – |
+| SCI-19 | SciPy 1.18.1 `scipy.linalg.inv` | the general path's `norm1_` sums the rows of its column-major copy (the infinity norm) and `dgecon` combines it with its 1-norm estimate of the inverse: the `LinAlgWarning`'s test `rcond < eps` and the `rcond` it prints use a mixed estimate (within a factor 4 of the 1-norm's for 4 x 4; the symmetric path's norm is right) | f | none (only the warning; the inverse is unchanged) | kept in both modes, documented (a message: near the threshold the 1-norm would warn about 10,234 of 20,000 matrices instead of 10,249, `probe_sci19_norm.py`; no inverse changes) (2026-11-09) | – |
+| SCI-20 | SciPy 1.18.1 `scipy.linalg.inv` | for a diagonal matrix the warning's test `max(abs(a)) · max(abs(1/a)) > 1/eps` is right, but the value printed as "rcond" is that product, the condition number ("rcond = 2e+17") | f | none (a message) | kept in both modes (SciPy's text) (2026-11-09) | – |
+| SCI-21 | SciPy `rank_filter`, `median_filter`, `percentile_filter` (`_rank_filter_1d`) | for a float32, float64 or int64 1-D input SciPy hands its C++ the output array itself, which writes the input's type into it: an output of another type or byte order gets the bytes reinterpreted (`output=np.float32` of a float64 input, `">f8"`, an int16 array), past its end when its items are smaller (the heap corrupted: a crash at exit, or a hang) | a | none (sdcflows' and niworkflows' median filters are 3-D) | rule A: the values cast into the output (SciPy's own handling of every other input type), with a notice; `reproduce` SciPy's bytes where they are the output's own (never past its end; the notice gives the count) (2026-11-09) | – |
+| SCI-22 | SciPy `rank_filter`, `median_filter`, `percentile_filter` (`_rank_filter_1d`) | the type dispatch compares dtypes by equality with native ones: `>f4`/`>f8` inputs raise `RuntimeError("Unsupported array type")`, numpy's `longlong` (another type number than `int64` on Linux and macOS) the C++'s `TypeError("Unsupported array type")`; the n-dimensional filters take both | c | none | rule A: filtered (the native copy's result), with a notice; `reproduce` SciPy's errors (2026-11-09) | – |
+| SCI-23 | SciPy `rank_filter`, `median_filter`, `percentile_filter` (`_rank_filter_1d`) | into a non-contiguous output of the input's type the C++ writes into numpy's `WRITEBACKIFCOPY` copy and drops it without resolving it: numpy writes it back and warns (`RuntimeWarning: WRITEBACKIFCOPY detected in clearing of array. ...`; numpy 2.3: `in array_dealloc.`) | f | none (a warning) | rule A (the values are right; the warning reports SciPy's mistake): no warning by default; `reproduce` numpy's warning, its text by the running numpy's release (2026-11-09) | – |
+| SCI-24 | SciPy 1.15.3 `_rank_filter_1d` | an error its C++ raises (a `longlong` input, a `cval` its type cannot take) is left set while it returns `None`: CPython raises `SystemError: <built-in function rank_filter> returned a result with an exception set` | f | none | fixed in SciPy 1.18.1 (it checks `PyErr_Occurred`), whose error larmorx gives in both modes (2026-11-09) | – |
+| SCI-25 | SciPy `binary_erosion`, `binary_closing` (`NI_BinaryErosion2`) | for more than one pass with the structure's centre true and no `brute_force`, the later passes mark each element outside the mask by the first byte of its output element (restored at the end), which is 0 for both 0.0 and 1.0 in a float32 or float64 output array: those elements are eroded (`binary_erosion(ones(5), iterations=4, mask=[1, 1, 1, 0, 0], output=zeros(5))` gives `[0, 0, 0, 0, 1]`, a bool output `[0, 0, 0, 1, 1]`) | a | none (sdcflows' and niworkflows' binary morphology writes bool results) | rule A: the outside elements kept (every other output type's result), with a notice when SciPy's differs; `reproduce` SciPy's (2026-11-09) | – |
+| SCI-26 | SciPy `binary_erosion`, `binary_dilation`, `binary_opening`, `binary_closing`, `binary_propagation`, `binary_fill_holes` (`Py_BinaryErosion2`) | the propagation strategy's second C call takes the output through `NI_ObjectToInputOutputArray` and never resolves its write-back copy: into a byte-swapped or misaligned output array numpy warns when the copy is freed (`RuntimeWarning: WRITEBACKIFCOPY detected in clearing of array. ...`; numpy 2.3: `in array_dealloc.`) and writes it back | f | none (a warning) | rule A (the values are right): no warning by default; `reproduce` numpy's warning, its text by the running numpy's release (2026-11-09) | – |
+| SCI-27 | SciPy `label` (`_ni_label._label`) | Cython's typed buffers refuse a byte-swapped input or output (`ValueError: Big-endian buffer not supported on little-endian compiler`, also for `output=">i4"`), which every other function of `ndimage` takes (a big-endian NIfTI file's data are such an array) | c | none | rule A: labelled as the native copy (the labels written into a big-endian output), with a notice; `reproduce` SciPy's error (2026-11-09) | – |
+| SCI-28 | SciPy `label` (`_ni_label._label`) | the labels are written through the output's data pointer whatever its flags | f | none | rule B: `ValueError("output array is read-only. ...")` (SciPy's message for its other functions); `reproduce` writes them as SciPy (numpy's flag lifted for the write where numpy allows it; memory numpy does not own as writeable is never written) (2026-11-09) | – |
+| SCI-29 | SciPy `label` (`_ni_label._label`) | a bool output is viewed as `uint8` and its overflow check passes up to 255, so labels above 1 are written as their bytes: a `bool` array holding 2, 3, ... (beyond 255 working labels SciPy retries and refuses, as for any type the labels do not fit) | a | none | rule A: labels above 1 refused as labels that do not fit (`insufficient bit-depth in requested output type`), with a notice; `reproduce` SciPy's bytes (its working labels counted as `_ni_label` counts them) (2026-11-09) | – |
+| SCI-30 | SciPy `sum_labels`, `sum`, `center_of_mass` (`_stats`) | with a 0-d index array SciPy indexes its sums with it (a numpy scalar) and assigns into it (`TypeError: 'numpy.int64' object does not support item assignment`); an empty input with a sequence index fails in `labels.min()` (`ValueError: zero-size array to reduction operation minimum which has no identity`) or, for `uint64` labels, in numpy's `IndexError` | f | none | rule A: the 0-d index's one sum as a scalar, the empty input's zero counts and sums of the index's shape, with a notice (one per `center_of_mass` call); `reproduce` SciPy's errors (2026-11-09) | – |
+| SCI-31 | SciPy `binary_erosion`, `binary_dilation`, `binary_opening`, `binary_closing`, `binary_propagation` (`NI_BinaryErosion2`) | the propagation strategy (iterations other than 1, the structure's centre true, no `brute_force`) casts the mask with `np.asarray(mask, dtype=np.int8)`, which returns the caller's own `int8` array, and uses it as its scratch: the mask is left `-1` where it was true and the first pass's output (its first byte) where it was false; `binary_closing`'s erosion then reads the overwritten mask, so its result differs (456 of 589 closings with an `int8` mask and more than one pass) | a | none (sdcflows' and niworkflows' masks are boolean) | rule A: the caller's mask left as given, with a notice; `reproduce` writes SciPy's values into it (a read-only one where numpy lets its flag be lifted) (2026-11-09) | – |
+| SCI-32 | SciPy `binary_dilation`, `binary_propagation`, `binary_fill_holes`, the dilations of `binary_opening` and `binary_closing` (`NI_BinaryErosion2`) | with a valid non-zero origin and the propagation strategy (iterations other than 1, no `brute_force`) the result sometimes differs from SciPy's own brute force, and the process sometimes dies (heap corruption: `malloc(): unsorted double linked list corrupted`, aborts and segmentation faults, at the call or at exit); a zero origin, the brute force and the erosion are unaffected | a | none (sdcflows' and niworkflows' binary morphology has no origin) | the brute force's result in both modes (memory is never reproduced) (2026-11-09) | – |
 | NP-01 | numpy, OpenBLAS, Accelerate | 4×4 products and inverses depend on the CPU's kernel | d | every run | one order everywhere | – |
 | NP-02 | nibabel, numpy SVD | axis choice at exactly 45° follows the SVD's rounding | d | none | vnl's SVD (`lx.transforms`); numpy's own SVD, as x86-64 Linux computes it, in `lx.sdcflows`' orientation decisions (2026-11-08) | – |
 | NP-03 | numpy float32 `log` | on x86-64 CPUs with AVX2 and FMA3 or AVX-512 numpy's own kernel, not correctly rounded (10,947,841 of the 201,326,593 floats in [1, 2^24] up to 3 units in the last place from the exact value; 78.4 million of all positive floats, up to 4), the C library's `logf` on other CPUs: results depend on the CPU | d | every multi-echo run's T2* and S0 (tedana's log-linear fit and the curve fit's start: 32,950 values of fMRIPrep's ds003592 call) | correctly rounded by default, named exactly where a written value or printed line changes; `reproduce` numpy's kernel (`larmorx_core::math::logf_numpy`, numpy's on all 2^32 inputs; the t2smap replica, 2026-11-08) | – |
@@ -269,6 +320,45 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | SDC-09 | sdcflows `SubtractPhases` | no `EchoTime`: Python's `TypeError` of a comparison with None | c | none | rule B: a `ValueError` naming the metadata; `reproduce` the `TypeError` (field maps part A, 2026-11-08) | – |
 | SDC-10 | sdcflows `B0FieldTransform.fit(approx=True)` (`ApplyCoeffsField`, sdcflows' unwarping workflow) | on a target not aligned with the coefficients the intermediate grid is built around, and resampled at, the target as given: `xfm_data2fmap` is ignored (ds002603's BOLD references: 7.7 to 8.5 Hz RMS, up to 87 Hz, in the brain) | c | none (fMRIPrep uses its own reconstruction) | rule A: built and sampled where the transform puts the target, named; `reproduce` sdcflows' field (field maps part A, 2026-11-08) | – |
 | SDC-11 | sdcflows `resample_to_zooms` (`BSplineApprox`'s resize to `zooms_min`) | onto a grid of a single voxel it fails with nitransforms' bare `AssertionError` (`assert targets.ndim == 2` after numpy's squeeze of the one target point): a field map whose whole extent is below `zooms_min` cannot be fitted | c | none (fMRIPrep's field maps are larger than `zooms_min`) | rule A: the one voxel resampled and the fit made, named; `reproduce` the `AssertionError` (field maps part A, 2026-11-08: its random-testing trial) | – |
+| SDC-12 | sdcflows `ReorientImageAndMetadata` | checks the upper-cased orientation code but reorients to the code as given: a lower-case one (`las`) fails in nibabel | c | none (fMRIPrep's PEPOLAR wiring passes `LAS`) | rule A: the upper-cased code; `reproduce` nibabel's error (`lx.sdcflows`, field maps part B) (2026-11-09) | – |
+| SDC-13 | sdcflows `Deoblique`, `Reoblique` | nibabel's obliquity (radians) against `OBLIQUE_THRESHOLD_DEG = 0.5`: they act only beyond 28.6°; `_deoblique` centres the plumb grid in voxels and compares axis codes by position | c | the SyN runs' EPIs (oblique up to 20.7°): left as they are | rule D measured, then C: kept in both modes (made plumb as meant, fMRIPrep's most oblique SyN EPI gets a field 8.2 Hz apart at the 95th percentile, another ANTs seed 1.7 Hz, and an unwarped reference no closer to the anatomy) (2026-11-09) | – |
+| SDC-14 | sdcflows `_norm_lap` | an image with no positive (or no negative) value after the median's subtraction fails with numpy's `IndexError` (the percentile of nothing) | c | none | rule B: a `ValueError` saying so; `reproduce` numpy's `IndexError` (2026-11-09) | – |
+| SDC-15 | sdcflows `init_syn_sdc_wf` | the `zooms_epi` node regrids the clipped EPI and nothing reads it | c | every SyN run (dead work) | rule C: kept as sdcflows (no result depends on it); larmorx does not compute it (2026-11-09) | – |
+| SDC-16 | sdcflows `_warp_dir` | the restriction's 1.0 at the phase-encoding axis's position among the fixed image's voxel axes, while ANTs weighs the physical axes: a sagittal or coronal grid frees another axis | c | none (fMRIPrep's SyN EPIs are axial) | rule A: the phase encoding's world axis; `reproduce` sdcflows' position, with a warning (2026-11-09) | – |
+| SDC-17 | sdcflows `find_estimators` (2.17.1) | `bids_filters` also restrict the fieldmap-less anatomy and targets, no sessionless T1w serves sessioned runs, the `acquisition`/`ceagent` filters never reach the EPI heuristics (`acquisitions`) | c | none (fMRIPrep 25.2.x runs sdcflows 2.15, which has the corrections) | rule A (the upstream's own correction): 2.15.2's search; `reproduce` 2.17.1's, with notices (2026-11-09) | – |
+| SDC-18 | sdcflows `bidict` | a new estimator gets the last free `auto_` index in `range(len(used) + 1)`, not the first | c | every run with unnamed estimators (the names in its derivatives) | rule C: kept (the names are in fMRIPrep's and sdcflows' derivatives and logs) (2026-11-09) | – |
+| SDC-19 | sdcflows `find_estimators` | the named estimators are built in a `set`'s order, which changes between processes | b | runs with several named estimators (their order) | pybids' natural order in both modes (nondeterminism is never reproduced) (2026-11-09) | – |
+| SDC-20 | sdcflows `get_identifier` | the `KeyError` for an unknown index table is the raw string `'{by}'` | f | none | rule A (a message): the table's name; `reproduce` the literal text (2026-11-09) | – |
+| SDC-21 | sdcflows `find_estimators` | case-insensitive regex filters: subject `01` matches `010`, `part-mag` matches `part-imag`, `pe` matches `PE`: other subjects' or identifiers' files join the estimator | c | datasets with list-valued `B0FieldIdentifier`s and several subjects in one index | rule A: exact filters and list membership; `reproduce` sdcflows' (2026-11-09) | – |
+| SDC-22 | sdcflows `get_workflow`, `init_fmap_preproc_wf` | every keyword argument goes to the estimator's `init_*_wf`, which ignores the ones it does not take: a misspelt option is ignored | e | none | rule B: a `TypeError` for an argument no estimator workflow takes; `reproduce` sdcflows' (2026-11-09) | – |
+| SDC-23 | sdcflows `init_3dQwarp_wf` | `inputnode.in_reference` is connected but not declared (`in_data`, `metadata`): its `fmap_ref` can never be computed | a | none (fMRIPrep does not run 3dQwarp's estimation) | the workflow waits for `3dQwarp`'s port (`NotImplementedError`); then rule B, a clear error (2026-11-09) | switch (with 3dQwarp) |
+| SDC-24 | sdcflows `_qwarp2ants` | `np.squeeze` drops every axis of length one before the vector axis: a one-slice warp loses a spatial axis and ANTs does not read it as a displacement field | c | none | rule A: only the axes after the third dropped; `reproduce` sdcflows' (2026-11-09) | – |
+| SDC-25 | sdcflows `init_unwarp_wf` | the output documented as the displacement field is never connected: nipype leaves it undefined | c | none (no caller reads it) | rule C: kept (`None`); the same field is `B0FieldTransform.to_displacements` (2026-11-09) | – |
+| SDC-26 | sdcflows `init_unwarp_wf`, `ApplyCoeffsField` | `fmap2data_xfm` and `data2fmap_xfm`, declared exclusive, are both set by the graph and `data2fmap_xfm` wins without a word | e | none | rule B: a `ValueError`; `reproduce` sdcflows' (2026-11-09) | – |
+| SDC-27 | sdcflows `match_histogram` | matched float values assigned into an integer image with numpy's cast: values its type cannot hold and NaN convert undefined (x86-64: wrapped) | a | none (no workflow calls it) | D13's rule: clamped (NaN to 0) with a warning; `reproduce` x86-64's casts (2026-11-09) | – |
+| SDC-28 | sdcflows `epi_mask` | `np.round(1e3 * wshed / wshed.max())` cast to `uint16`: a flat residual, NaN, infinity or overflow converts undefined (x86-64: 0) | a | none (no workflow calls it) | D13's rule: clamped (NaN 0, infinity 65,535) with a warning; `reproduce` x86-64's 0 (2026-11-09) | – |
+| SDC-29 | sdcflows' BIDS app | a participant without field maps gets SyN estimators without their anatomical inputs: they fail when run, after the other estimators' work | e | none (fMRIPrep wires them) | rule B: the run stops before any work naming them and `--no-fmapless`; `reproduce` sdcflows' order and failure (2026-11-09) | – |
+| SDC-30 | sdcflows' BIDS app | recorded and never used: every session is estimated | e | none | rule A: the sessions given; `reproduce` every session (2026-11-09) | – |
+| SDC-31 | sdcflows' BIDS app | read and never used | e | none | rule A: its `fmap` entry restricts the field maps (fMRIPrep's convention); `reproduce` ignored (2026-11-09) | – |
+| SDC-32 | sdcflows' BIDS app | recorded, and every estimator built with `sloppy=False, debug=False` | e | none | rule A: they reach the workflows; `reproduce` ignored (2026-11-09) | – |
+| SDC-33 | sdcflows' BIDS app | a `--mem-gb` unit `_to_gb` cannot look up, a missing or non-JSON `--bids-filter-file`, a missing `--use-plugin` file: a traceback, exit 1 | e | none | rule B: argparse's error (exit 2); `reproduce` the traceback (2026-11-09) | – |
+| SDC-34 | sdcflows' BIDS app | a non-integer `--nprocs` is named by a `functools.partial` representation; missing labels and `analysis_level` in a `set`'s order | b | none | `invalid _min_one value`; sorted (nondeterminism is never reproduced) (2026-11-09) | – |
+| SDC-35 | sdcflows' BIDS app | the file is read with PyYAML's `load` without the `Loader` PyYAML 6 requires (`TypeError`) | e | none | rule A: accepted (it must exist; no effect); `reproduce` the `TypeError` (2026-11-09) | – |
+| SDC-36 | sdcflows' BIDS app | one registry for every participant: two participants with the same `B0FieldIdentifier` (unique only within a participant in BIDS) stop it with `KeyError` | c | none (fMRIPrep: PIPE-32) | rule A: a registry per participant (the automatic names kept); `reproduce` the `KeyError` (2026-11-09) | – |
+| SDC-37 | sdcflows `brain_masker` | the rough mask's largest component is the background (size 0): the whole image is the brain; a constant image divides 0 by 0 | c | none | rule B: a `ValueError`; `reproduce` sdcflows' (2026-11-09) | – |
+| SDC-38 | sdcflows `brain_masker` | with no seed left after the rough mask's erosion by `ball(5)` the random walker renumbers label 2 as 1 and the background's probability is taken as the brain's | c | none | rule B: a `ValueError`; `reproduce` sdcflows' (2026-11-09) | – |
+| SDC-39 | sdcflows `brain_masker` | `grey_closing(structure=ball(1))` is SciPy's non-flat closing where the flat closing by the ball is meant (last-bit differences) | c? | every phase-difference and PEPOLAR estimate (probabilities in their last bits) | rule D measured, then C: kept (14 inputs of the oracle runs: probabilities at most 1.7e-06 apart, the masks on no voxel) (2026-11-09) | – |
+| SDC-40 | sdcflows' BIDS app | the database is built first, so an output folder equal to the dataset (refused next) gets `.bids_db` written into the dataset | e | none | larmorx writes no database (nothing to reproduce) (2026-11-09) | – |
+| SDC-41 | sdcflows `config` | `os.path.join(os.getenv('HOME'), ...)` for TemplateFlow's folder: a `TypeError` at import where `HOME` is unset (Windows) | a | none (Linux images) | the home folder Python finds (a crash, never reproduced) (2026-11-09) | – |
+| SDC-42 | sdcflows `init_sdcflows_wf` | the figures are named `desc-EstimatorType.PEPOLAR_fieldmap.svg` (the enum's text), not the method's name | c | sdcflows' app's reports (fMRIPrep names them itself) | the reports are larmorprepx's (D7): rule A there, `reproduce` the enum's text (2026-11-09) | switch (with the reports) |
+| SDC-43 | sdcflows `get_trt` | a zero or empty `TotalReadoutTime` raises `ValueError` whose message is only the value in quotes (`'0'`) | f | none | the same message (kept) (2026-11-09) | – |
+| SDC-44 | sdcflows `_warp_dir` | the oblique-dataset message goes through `Logger.warn` (a `DeprecationWarning`) | f | every oblique SyN run (a deprecation warning) | the same message through `warning` (2026-11-09) | – |
+| SDC-45 | sdcflows `FieldmapFile`, `find_anatomical_estimators` | `FieldmapFile` parses its entities from the file's absolute path, where pybids' derivatives patterns (`den-`, `res-`, `desc-`, `label-`, ...) have no separator before them, and the fieldmap-less search queries the raw layout with every entity of its targets: a dataset below a folder such as `golden-clone` or `andres-lab` stops it with `ValueError: 'den' is not a recognized entity` | a | `--use-syn-sdc` (and sdcflows' BIDS app) on a dataset stored below such a folder (outside the container wrappers, which mount it at `/data`) | rule A: the entities of the path from the participant's `sub-*` folder (niworkflows' `relative_to_root`; a file below none keeps sdcflows' parse), with a warning when they changed; `reproduce` sdcflows' entities and error (2026-11-09) | – |
+| SDC-46 | sdcflows `brain_masker` | the random walker's probabilities are cropped with `[..., padding:-padding, ...]`, an empty slice for `padding=0`: the probability and the mask are written as 0 x 0 x 0 images and the brain unmasked (an empty boolean index changes nothing) | a | none (sdcflows' `BrainExtraction` pads by 5) | rule A: the whole image's probability and mask, with a notice; `reproduce` sdcflows' empty images and unmasked brain (2026-11-09) | – |
+| SKI-01 | scikit-image `random_walker` | with a mask, nodes numbered by the remaining edges' ends but labels by the mask: a mask pixel without neighbours shifts every later node (probabilities off by up to 0.59) | c | none (`brain_masker`'s markers isolate no pixel) | rule A: both numbered by the mask, with a warning; `reproduce` scikit-image's (2026-11-09) | – |
+| SKI-02 | scikit-image `match_histograms` | an unsigned image's reference counted with `bincount`: a float or negative reference, or a `uint64` image, refused | c | none (no workflow calls it) | rule A: counted with `unique`, scikit-image's result wherever it gives one; `reproduce` its error (2026-11-09) | – |
+| SKI-03 | scikit-image `random_walker` | labels that are not consecutive come back as their consecutive renumbering (3 and 7 as 1 and 2) | c | none (`brain_masker`'s labels are 1 and 2) | rule A: the labels given, with a warning; `reproduce` scikit-image's (2026-11-09) | – |
+| SKI-04 | scikit-image `random_walker` | `return_full_prob` with no pixel to segment returns the seeds' boolean masks along the last axis, not `(nlabels, ...)` probabilities | c | none | rule A: the documented probabilities, with a warning; `reproduce` scikit-image's (2026-11-09) | – |
 | TED-01 † | tedana `t2smap` (adaptive mask) | a NaN among the first echo's temporal means (a NaN sample, or no volume left) makes the dropout method's 33rd percentile NaN: `ValueError: attempt to get argmax of an empty sequence` | c | none | rule A: the percentile and the reference voxels from the finite means (no finite mean at all: a clear error), named; `reproduce` tedana's error (the t2smap replica, 2026-11-08) | – |
 | TED-02 † | tedana `t2smap --exclude` | an index equal to the number of volumes is accepted, then numpy's `IndexError` | e | none | rule B: refused with the check's own message, as a larger index is; `reproduce` tedana's error (2026-11-08) | – |
 | TED-03 † | tedana `t2smap` without `--mask` | when nilearn's `compute_epi_mask` finds no voxel (its `MaskWarning`) the run goes on and fails with `IndexError: index -1 is out of bounds for axis 0 with size 0`; with too few voxels for the adaptive mask's threshold, the argmax `ValueError` | c | none (fMRIPrep passes its BOLD mask) | rule B: a clear error; `reproduce` tedana's (2026-11-08) | – |
@@ -509,23 +599,24 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | FSL-272 † | prelude | the phase range check (more than 3π refused) and the rewrap to [−π, π] (beyond 1.001π) take the image's maximum and minimum from its first value on: a NaN first value (the first voxel of a masked or divided phase map) makes both NaN, so a phase from 0 to 2π is not rewrapped and is unwrapped with whole cycles wrong in some regions, and a phase of any range is not refused (measured with FSL's runs, `validation/investigations/prelude-spec/fsl272_measure.py`: fMRIPrep's seven prelude calls and a synthetic map moved to [0, 2π) with the first value NaN: 7 of 8 unwrapped whole cycles from FSL's own result without the NaN, in 0.1 to 100 % of the mask, up to 18.8 rad; a 4π range processed, exit 0) | c | none for fMRIPrep's calls (sdcflows' `au2rads` rescales the phase to [0, 2π] from its minimum and maximum, so a NaN anywhere would make every value NaN); other users' phase maps in [0, 2π] with a NaN first voxel | rule D measured, then A: the replica (2026-11-06) takes the extrema of the values that are not NaN by default (the rewrap, or FSL's range error with status 255, as without the NaN), FSL's with `reproduce`, named when the two decide differently; the clean-room original the same in both modes since 2026-11-06 (record `fsl-prelude`), from `specs/prelude.md` §4.2 and §9.1 (suite cases `opt/nan-first-twopi`, `opt/nan-first-range`; the site's example on ds002603's map: the default gives FSL's own result without the NaN bit for bit) | – |
 | FSL-273 † | applytopup | `--method=jac` divides the field's derivatives by the field's own voxel sizes (a coefficient field's intent parameters, a field image's header) while the displacement it applies is laid at the images' voxel indices in the images' voxel sizes: a field of the images' shape whose voxel sizes differ from the images' gets a Jacobian determinant scaled along each encoded axis by their ratio (`dx/fx`, `dy/fy`; a field image `dx/fx`, `dx/fy` with FSL-134), not the Jacobian of the displacement applied, so the intensities are modulated wrongly (black box: FSL's outputs on one image's data stored with 6, 4 and 3 mm voxels are `S (1 + c g)` with `c = dy/fy`, `validation/investigations/spec-answers-4/jac_scales.py`) | c | none on fMRIPrep's calls (sdcflows applies its own field; topup's coefficients are on the images' grid) | rule A: the replica (2026-11-06) computes the Jacobian of the mapping applied by default (the same numbers wherever the voxel sizes agree), FSL's scales with `reproduce`, named when an encoded axis' voxel sizes differ (suite cases `at/jac-coef-aniso`, `at/jac-field-aniso`); the clean-room original: a field image already so, a coefficient field since 2026-11-07 (PRELUDE's clean-room original part: scale 1 by default, FSL's `dx / fx` with `reproduce`, named; `at/jac-coef-aniso`; `validation/investigations/cleanroom-topup/jac_fsl273.py`) | – |
 
-**Counts** (452 entries, recounted from the table on 2026-11-08, after tedana's `t2smap` replica (TED-01 to TED-18, NP-03 and NP-04 new; TED-19 to TED-30 unused); before it the field maps' part A (SDC-01 to SDC-11 new; SDC-12 to SDC-30 unused)
+**Counts** (541 entries, recounted from the table on 2026-11-10, after the field maps' part B (SDC-12 to SDC-46, PIPE-18 to PIPE-40, SCI-06 to SCI-32 and SKI-01 to SKI-04 new; SDC-47 to SDC-55 and SCI-33 to SCI-40 unused); before it tedana's `t2smap` replica (TED-01 to TED-18, NP-03 and NP-04 new; TED-19 to TED-30 unused) and the field maps' part A (SDC-01 to SDC-11 new)
 (`scripts/orchestration/register_counts.py`); an entry with two classes counts under its first; "c (c? until …)"
 entries, decided, count as (c)):
 
 | Class | Entries | of them questionable (c?) |
 |---|---|---|
-| (a) crash, undefined behaviour, out of bounds | 99 | |
-| (b) race, nondeterminism | 13 | |
-| (c) deterministic bug that changes results | 227 | 10 |
+| (a) crash, undefined behaviour, out of bounds | 119 | |
+| (b) race, nondeterminism | 17 | |
+| (c) deterministic bug that changes results | 270 | 14 |
 | (d) imprecision | 27 | |
-| (e) command-line or parsing quirk | 68 | |
-| (f) documentation or message only | 16 | |
+| (e) command-line or parsing quirk | 79 | |
+| (f) documentation or message only | 27 | |
 | explained, not a defect | 2 | |
 
-The gap column today (2026-11-08): no **decide**; no **yes** (FSL-67 measured in FLIRT's part 2 and
+The gap column today (2026-11-10): no **decide**; no **yes** (FSL-67 measured in FLIRT's part 2 and
 kept, rule C); one rule 8; **switch** for SDC-03 (with the FreeSurfer part: `CheckRegister`'s
-registration branch is not ported yet); no **original** (3dvolreg's clean-room original closed AFNI-86 to AFNI-99's thirteen, AFNI-91 unused, on 2026-11-08; PRELUDE's clean-room original FSL-261 to FSL-273's on 2026-11-07); **replica** for FSL-191 to FSL-193, FSL-241 and FSL-242.
+registration branch is not ported yet), SDC-23 (with AFNI's `3dQwarp`), SDC-42 (with larmorprepx's reports) and PIPE-36 (with
+larmorprepx's BOLD stages); **measure** for PIPE-35 (rule D, with the anatomical brain extraction's port); no **original** (3dvolreg's clean-room original closed AFNI-86 to AFNI-99's thirteen, AFNI-91 unused, on 2026-11-08; PRELUDE's clean-room original FSL-261 to FSL-273's on 2026-11-07); **replica** for FSL-191 to FSL-193, FSL-241 and FSL-242.
 
 Sixteen entries have a second class: ANTS-12, FSL-03 and SDC-03 (f), ANTS-24 (f), FSL-04, FSL-09, FSL-134,
 FSL-135, FSL-159, FSL-268 and FSL-269 (a), FSL-08 and AFNI-90 (e), FSL-171, FSL-174 and FSL-179 (c). ANTS-46 (an early stop) was explained by A4 part 2 as ITK's design, and FSL-18 (Woods' cost) by the mcflirt replica (2026-10-24) as Woods' own criterion. Gap
@@ -906,6 +997,24 @@ entries: NP-03 (numpy's float32 `log` kernel; switch and notice), NP-04 (numpy's
 `log`; a reference choice, no switch) and GLIBC-07's numpy and SciPy uses (switch and notice). Kept
 as tedana's, not defects: `--debug`'s help promising a TSV log file, the dropout mask appended twice,
 RepLGR lines that go nowhere (the findings).
+**The field maps' part B** (`lx.sdcflows`, `lx.niworkflows`, `lx.ndimage`, `lx.skimage`, `lx.bids`,
+larmorprepx's field-map stages and `larmorx sdcflows sdcflows`, 2026-11-09 and 10; sdcflows 2.17.1 with
+2.15.2's estimator search, niworkflows 1.15.4, nipype 1.12.0, pybids 0.22.0, scikit-image 0.26.0, SciPy
+1.18.1 and fMRIPrep 25.2.7's field-map steps; [sdcflows-estimation.md](sdcflows-estimation.md),
+[scipy-ndimage-filters.md](scipy-ndimage-filters.md)): SDC-12 to SDC-46, PIPE-18 to PIPE-40, SCI-06 to
+SCI-32 and SKI-01 to SKI-04 (89 entries; SDC-47 to SDC-55, SCI-33 to SCI-40, NP-05 to NP-08 and NIB-05
+to NIB-08 unused), 61 with `reproduce` (the original's result, messages and exit status bit for bit;
+`larmorx_core::defects`): corrected by default PIPE-18, PIPE-21, PIPE-23, PIPE-24, PIPE-25, PIPE-27, PIPE-30, PIPE-32, PIPE-37, PIPE-40, SCI-09, SCI-10, SCI-13, SCI-14, SCI-15, SCI-18, SCI-21, SCI-22, SCI-23, SCI-25, SCI-26, SCI-27, SCI-29, SCI-30, SCI-31, SDC-12, SDC-16, SDC-17, SDC-20, SDC-21, SDC-24, SDC-30, SDC-31, SDC-32, SDC-35, SDC-36, SDC-45, SDC-46, SKI-01, SKI-02, SKI-03 and SKI-04 (rule A); a clear error by
+default PIPE-19, PIPE-28, PIPE-31, PIPE-33, PIPE-34, SCI-06, SCI-11, SCI-28, SDC-14, SDC-22, SDC-26, SDC-29, SDC-33, SDC-37 and SDC-38 (rule B); kept and documented PIPE-22, PIPE-38, SCI-12, SDC-13, SDC-15, SDC-18, SDC-25 and SDC-39 (rule C, SDC-13 and SDC-39 measured
+first); undefined conversions clamped with a warning (D13's rule) SDC-27, SDC-28 and PIPE-29; never
+reproduced (nondeterminism or memory never written: D13) SDC-19, SDC-34, PIPE-26, PIPE-39, SCI-07,
+SCI-08, SCI-16 and SCI-32; fixed upstream and followed SCI-17 and SCI-24; messages kept SCI-19,
+SCI-20, SDC-43 and SDC-44. Open: PIPE-35 (rule D: measured with the anatomical brain extraction's
+port), the switches of SDC-23 (with AFNI's `3dQwarp`), SDC-42 (with larmorprepx's reports) and PIPE-36
+(with larmorprepx's BOLD stages). Upstream (`docs/upstream-reports/`, drafts not yet filed): reports for
+SDC-45, PIPE-36, SCI-21 (with SCI-22 and SCI-23) and SCI-25, comments for the open issues sdcflows#455
+(PIPE-32, SDC-36) and SciPy#24502 (SCI-29); PIPE-37 is fixed on pybids' master (#1273, not yet released),
+SCI-26 on SciPy's main (#25646, for 2.0.0).
 
 **Random testing's gaps** (2026-10-25, open; found by differential random testing,
 [validation/difftest.md](../validation/difftest.md); every default is already correct, these are
@@ -3344,7 +3453,10 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
 ## fMRIPrep and its libraries
 
 fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.2, sdcflows
-2.15.1, nipype 1.12.0, nitransforms 25.1.0. Details in [fmriprep-oracle.md](fmriprep-oracle.md),
+2.15.1, nipype 1.12.0, nitransforms 25.1.0. The field maps' part B (2026-11-09) ported niworkflows
+1.15.4's, nipype 1.12.0's, pybids 0.22.0's and fMRIPrep 25.2.7's field-map steps and SciPy 1.18.1's
+ndimage filters, morphology and measurements: PIPE-18 to PIPE-40 and SCI-06 to SCI-32
+([sdcflows-estimation.md](sdcflows-estimation.md), [scipy-ndimage-filters.md](scipy-ndimage-filters.md)). Details in [fmriprep-oracle.md](fmriprep-oracle.md),
 [fmriprep-resampling.md](fmriprep-resampling.md), [scipy-ndimage.md](scipy-ndimage.md) and
 `docs/analysis/01-04`.
 
@@ -3595,6 +3707,167 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
   nitransforms.
 - **D13 / gap:** done. No gap.
 
+### PIPE-18 `IntraModalMerge`'s grand-mean scaling cannot run — (c)
+- **What:** niworkflows `IntraModalMerge`: `grand_mean_scaling` indexes the series with a mask of the wrong shape: numpy's `IndexError` for every series of two or more volumes.
+- **Evidence:** validated (`check_merge.py`); [sdcflows-estimation.md](sdcflows-estimation.md).
+- **fMRIPrep:** none (fMRIPrep leaves it off).
+- **larmorx:** rule A: each volume scaled by the largest median over its own in the mask, with a warning; `reproduce` the `IndexError` (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### PIPE-19 `IntraModalMerge` averages a 6- or 7-D image — (c)
+- **What:** niworkflows `IntraModalMerge`: a 6- or 7-dimensional image passes the check for more than four dimensions and is averaged over its fourth axis.
+- **Evidence:** validated (`check_merge.py`); [sdcflows-estimation.md](sdcflows-estimation.md).
+- **fMRIPrep:** none.
+- **larmorx:** rule B: niworkflows' own error; `reproduce` numpy's mean (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### PIPE-20 A missing readout time silently skips the field map — (c)
+- **What:** fMRIPrep `DistortionParameters`: a missing readout time or phase-encoding direction becomes undefined outputs: the run is resampled without its field map, the report still names the correction.
+- **Evidence:** validated (`check_bold_fmap.py`); [sdcflows-estimation.md](sdcflows-estimation.md).
+- **fMRIPrep:** BOLD runs without readout metadata whose estimator has it.
+- **larmorx:** the interface: rule C (its documented design) with a warning; larmorprepx's pipeline: rule B, fMRIPrep's own "Missing readout time information" error; `reproduce` the silent skip with a warning (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### PIPE-21 The direct field evaluation returns a mirrored field — (c)
+- **What:** fMRIPrep `ReconstructFieldmap`: the field on the target projected into the field map's space and made positive (a LAS target's voxels reversed), while the resampler reads it on the target's grid: up to 159 Hz on a synthetic LAS target.
+- **Evidence:** validated (`check_bold_steps.py`); [sdcflows-estimation.md](sdcflows-estimation.md).
+- **fMRIPrep:** direct field maps on LAS targets (the SyN runs' path).
+- **larmorx:** rule A: the values on the target's grid; `reproduce` fMRIPrep's image (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### PIPE-22 nitransforms writes ITK text with six digits — (c?)
+- **What:** nitransforms (fMRIPrep's `itk_mat2txt`): the `desc-fmap_xfm` parameters written with `"%g"`, read back by every later `ReconstructFieldmap`.
+- **Evidence:** measured on the 7 transforms; [sdcflows-estimation.md](sdcflows-estimation.md).
+- **fMRIPrep:** every run with a field map (corners within 7.9e-05 mm).
+- **larmorx:** rule C: kept (a correction measured to bring no gain) (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### PIPE-23 nipype's `is_outlier` with a zero spread — (c)
+- **What:** nipype `is_outlier` (`NonsteadyStatesDetector`): a median absolute deviation of 0 makes the values at the median 0/0, NaN outliers: every leading volume non-steady.
+- **Evidence:** validated (`check_syn_preprocessing.py`); [sdcflows-estimation.md](sdcflows-estimation.md).
+- **fMRIPrep:** none in the oracle runs (a constant or padded series).
+- **larmorx:** rule A: a z-score of 0 at the median; `reproduce` nipype's (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### PIPE-24 `ValidateImage`'s report fails on unit codes 4 to 7 — (c)
+- **What:** niworkflows `ValidateImage`: nibabel's `get_xyzt_units` raises `KeyError` for a spatial unit code 4 to 7.
+- **Evidence:** validated; [sdcflows-estimation.md](sdcflows-estimation.md).
+- **fMRIPrep:** none.
+- **larmorx:** rule A: the translation reported in mm; `reproduce` the `KeyError` (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### PIPE-25 A BOLD run naming an estimator's alias gets no field map — (c)
+- **What:** fMRIPrep `get_estimator`: with several `B0FieldIdentifier` values on the sources, the estimator is named after one in a set's order; a run whose `B0FieldSource` is another gets none.
+- **Evidence:** measured on the `sdc21` tree (`check_estimators.py`); [sdcflows-estimation.md](sdcflows-estimation.md).
+- **fMRIPrep:** datasets with aliases (sdcflows' own test data).
+- **larmorx:** rule A: the alias reaches its estimator, with a warning; `reproduce` fMRIPrep's (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### PIPE-26 `DerivativesDataSink` matches list entities in a set's order — (b)
+- **What:** niworkflows `DerivativesDataSink`: with two or more list-valued entity inputs the files are matched to the names in a Python `set`'s order.
+- **Evidence:** read; [sdcflows-estimation.md](sdcflows-estimation.md).
+- **fMRIPrep:** none (fMRIPrep's field-map sinks have one).
+- **larmorx:** the entities' sorted order, with a warning (nondeterminism is never reproduced) (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### PIPE-27 `DerivativesDataSink`'s data-type warning names one type twice — (f)
+- **What:** niworkflows `DerivativesDataSink`: "from float32 to float32": the original type named twice.
+- **Evidence:** validated (`check_derivatives.py`); [sdcflows-estimation.md](sdcflows-estimation.md).
+- **fMRIPrep:** every coerced derivative's log line.
+- **larmorx:** rule A (a message): the new type; `reproduce` niworkflows' text (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### PIPE-28 `compress` shorter than the files — (e)
+- **What:** niworkflows `DerivativesDataSink`: fewer `compress` values than files (but more than one): Python's `IndexError`.
+- **Evidence:** validated (`check_derivatives.py`); [sdcflows-estimation.md](sdcflows-estimation.md).
+- **fMRIPrep:** none.
+- **larmorx:** rule B: a `ValueError`; `reproduce` the `IndexError` (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### PIPE-29 `DerivativesDataSink`'s undefined integer coercion — (a)
+- **What:** niworkflows `DerivativesDataSink`: values out of the integer type's range and NaN cast with numpy's cast (undefined in C).
+- **Evidence:** validated (`check_derivatives.py`); [sdcflows-estimation.md](sdcflows-estimation.md).
+- **fMRIPrep:** none in the oracle runs.
+- **larmorx:** D13's rule: clamped (NaN to 0) with a warning; `reproduce` x86-64's casts (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### PIPE-30 A `RepetitionTime` for a 3-D image stops the sink — (c)
+- **What:** niworkflows `DerivativesDataSink`: the header fix sets four voxel sizes on an image that is not 4-D: nibabel's `HeaderDataError`.
+- **Evidence:** validated (`check_derivatives.py`); [sdcflows-estimation.md](sdcflows-estimation.md).
+- **fMRIPrep:** none.
+- **larmorx:** rule A: the fourth size only on a 4-D image, the sidecar with the value; `reproduce` the error (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### PIPE-31 A precomputed field map with a missing file — (e)
+- **What:** fMRIPrep `init_single_subject_wf`: derivatives lacking the field map, reference or coefficients file stop the graph's construction with a bare `KeyError`.
+- **Evidence:** validated (`check_fmap_stage.py`); [sdcflows-estimation.md](sdcflows-estimation.md).
+- **fMRIPrep:** `--derivatives` users with incomplete field-map derivatives.
+- **larmorx:** rule B: a `ValueError` naming the identifier and the files; `reproduce` the `KeyError` (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### PIPE-32 Participants sharing an identifier stop fMRIPrep — (c)
+- **What:** fMRIPrep `map_fieldmap_estimation`: every participant of a run goes into sdcflows' one registry: a second participant with a `B0FieldIdentifier` an earlier one used stops it with `KeyError: "'<id>' is already  in mapping"`.
+- **Evidence:** verified with fMRIPrep 25.2.7's own function (`relay17/probe_shared_identifier.py`); [sdcflows-estimation.md](sdcflows-estimation.md); upstream: sdcflows' open issue #455 (fMRIPrep's #3354, closed as not planned, is the same failure); a comment with a reproducer and a contained fix drafted, [sdcflows-shared-b0fieldidentifier.md](../upstream-reports/sdcflows-shared-b0fieldidentifier.md) (not yet posted).
+- **fMRIPrep:** multi-participant runs whose participants share field-map identifiers (allowed by BIDS).
+- **larmorx:** rule A: each participant searched in its own registry (automatic names kept), entries added to the shared one where free, with a warning; `reproduce` the `KeyError` (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### PIPE-33 `IntensityClip` of a constant image — (c)
+- **What:** niworkflows `IntensityClip`: an image constant between its percentiles divided by its maximum, 0: NaN, cast to `int16`/`uint8` by an undefined conversion (0 on x86-64).
+- **Evidence:** validated (`tests/python/test_fmap_defects.py`); [sdcflows-estimation.md](sdcflows-estimation.md).
+- **fMRIPrep:** none.
+- **larmorx:** rule B: a `ValueError`; `reproduce` niworkflows' result with x86-64's NaN and casts on every platform (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### PIPE-34 `RobustAverage` of a zero-mean volume — (c)
+- **What:** niworkflows `RobustAverage`: a gathered volume whose mean is 0 after the clipping is divided by it: NaN or infinite voxels, registered and averaged.
+- **Evidence:** validated (`tests/python/test_fmap_defects.py`); [sdcflows-estimation.md](sdcflows-estimation.md).
+- **fMRIPrep:** none.
+- **larmorx:** rule B: a `ValueError` naming the volumes; `reproduce` niworkflows' (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### PIPE-35 `RegridToZooms(smooth=True)` never smooths a coarser grid — (c?)
+- **What:** niworkflows `resample_by_spacing`, `RegridToZooms`: `smooth=True` sets the Gaussian's sigma to `max(0, (old / new - 1) / 2)` voxels, positive only for a finer grid: the coarser grid (the anti-aliasing case) is never smoothed (scikit-image's `rescale`: `(new / old - 1) / 2`).
+- **Evidence:** read and validated (`check_regrid.py`: fMRIPrep's 46 `res_tmpl`/`res_target` nodes; `relay18/probe_regrid_edges.py`); [sdcflows-estimation.md](sdcflows-estimation.md).
+- **fMRIPrep:** every run's brain extraction regrids the 1 mm T1w and the OASIS template to 4 mm with `smooth=True`, so unsmoothed, before antsAI's initialisation (`res_tmpl`, `res_target`).
+- **larmorx:** rule D (agreed 2026-11-09): niworkflows' sigma in both modes until the measurement, with the anatomical brain extraction's port, of whether smoothing the 4 mm grids changes antsAI's initialisation and the brain mask; then rule A (a switch and a `larmorx_core::defects` entry) or C (field maps part B, 2026-11-09).
+- **D13 / gap:** measure (anatomical brain extraction).
+
+### PIPE-36 fMRIPrep's `extract_entities` from the folders above the dataset — (a)
+- **What:** fMRIPrep `extract_entities`, `get_sbrefs`, `collect_derivatives`' entities: `extract_entities` parses the absolute BOLD paths (pybids' `parse_file_entities`, whose derivatives patterns `den-`, `res-`, `desc-`, ... have no separator before them) and `get_sbrefs` queries the raw layout with them: below a folder such as `golden-x` or `andres-lab` every BOLD run stops `init_bold_fit_wf` with `ValueError: 'den' is not a recognized entity`.
+- **Evidence:** verified with fMRIPrep 25.2.7's own `extract_entities` and `get_sbrefs` (from its source) on pybids 0.22.0 (`check_estimators.py --sections roots`, its INFO lines); [sdcflows-estimation.md](sdcflows-estimation.md), "Entities from the folders above a dataset"; upstream: a report drafted, [fmriprep-entities-from-parent-folders.md](../upstream-reports/fmriprep-entities-from-parent-folders.md) (not yet filed); pybids' fix of PIPE-37 (#1273) leaves it, and below a folder named as a datatype makes it silent (no single-band reference found; measured).
+- **fMRIPrep:** every BOLD run of a dataset stored below such a folder (outside the container wrappers, which mount it at `/data`).
+- **larmorx:** not ported yet (larmorprepx's BOLD stages): rule A when ported, the entities of the BIDS part, `reproduce` fMRIPrep's (field maps part B, 2026-11-09).
+- **D13 / gap:** switch (larmorprepx's BOLD stages).
+
+### PIPE-37 pybids' index takes entities from the folders above the dataset — (a)
+- **What:** pybids `BIDSLayout` (`BIDSLayoutIndexer`): the index matches the entity patterns against each file's absolute path (`Entity.match_file`): below a folder named `func`, `sub-pilot` or `run-2` every file gets `datatype` `func`, `subject` `pilot` (its own label lost) or `run` 2; with the derivatives configuration (unanchored `den-`, `res-`, `desc-`, ...) below `golden-x` or `andres-lab` every file gets `den` or `res`.
+- **Evidence:** validated (`check_estimators.py --sections roots`, and `index` on every other dataset: the same as pybids; `test_pipe37_*`); [sdcflows-estimation.md](sdcflows-estimation.md), "Entities from the folders above a dataset"; upstream: reported as pybids #1270 and fixed on pybids' master by #1273 (2026-08-24), not yet released (0.22.0 the newest on 2026-11-10): nothing to file; `lx.bids`' default index = that fix's on the reproducer's four folders (`relay32/pipe37_against_pybids_master.py`), [pybids-entities-from-parent-folders.md](../upstream-reports/pybids-entities-from-parent-folders.md).
+- **fMRIPrep:** a dataset (or a derivatives dataset) stored below such a folder: participants not found, derivatives not matched (outside the container wrappers).
+- **larmorx:** rule A: the patterns matched against the path below the root (`/`-rooted, as the ignore patterns), with a warning when that changed an entity; `reproduce` pybids' index; `parse_file_entities` parses the path it is given, as pybids' (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### PIPE-38 `DenoiseImage` lists a noise image it does not write — (c)
+- **What:** nipype `DenoiseImage` (`CommandLine._list_outputs`): nipype lists every `name_source` input's file name, so `noise_image` (`<in>_noise`) is among the outputs without `save_noise` or `noise_image`, a file the program never writes.
+- **Evidence:** verified (random testing, relay 27: the permanent case `denoise-image-lists-noise-image`; `test_pipe38_*`); [sdcflows-estimation.md](sdcflows-estimation.md).
+- **fMRIPrep:** none (fMRIPrep and sdcflows use `output_image` only).
+- **larmorx:** rule C: nipype's listing kept (`larmorx._nipype.denoise_image`; nothing larmorx runs reads it) (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### PIPE-39 nipype checks an interface's outputs in a hash-dependent order — (b)
+- **What:** nipype `BaseInterface.aggregate_outputs`: the outputs are set (and checked by traits) in the order of `set(predicted_outputs)`, which follows the process's string hashes (`PYTHONHASHSEED`): with several invalid outputs the `TraitError` names any of them, from process to process (`GetReadoutTime` of `PhaseEncodingDirection` `'j+'`: `pe_direction` or `pe_dir_fsl`; with a string readout time also `readout_time`).
+- **Evidence:** measured (four processes, three orders; random testing, relay 27: the permanent cases `readout-time-*`); [sdcflows-estimation.md](sdcflows-estimation.md).
+- **fMRIPrep:** none (a message of a failing run).
+- **larmorx:** the outputs checked in their declared order, traits' `TraitError` and message (`GetReadoutTime`, `DistortionParameters`); not reproduced (nondeterministic) (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### PIPE-40 `IntraModalMerge` reorients the series but not its mask — (a)
+- **What:** niworkflows `IntraModalMerge`: with `to_ras` the inputs are reoriented to RAS but `in_mask` is not, so `grand_mean_scaling` indexes the RAS series with the mask on the input's grid: numpy's `IndexError` when the shapes differ, a mirrored or permuted mask when they agree (its indexing fails anyway for two or more volumes: PIPE-18).
+- **Evidence:** validated (random testing, relay 27: the permanent case `intra-modal-merge-ras-mask`; `test_pipe40_*`); [sdcflows-estimation.md](sdcflows-estimation.md).
+- **fMRIPrep:** none (fMRIPrep's `IntraModalMerge` calls have no grand-mean scaling).
+- **larmorx:** rule A: the mask reoriented with the series, with a notice; `reproduce` niworkflows' (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
 ### SCI-01 `map_coordinates` reads outside its array — (a)
 - **What:** coordinates go through `(npy_intp)floor(cc)`, undefined for NaN and beyond ±2^63; on
   x86-64 the start index wraps, the edge test is skipped, and SciPy reads memory outside its
@@ -3665,6 +3938,195 @@ fMRIPrep 25.2.6 (the oracle runs) or its source at `21a490fb`, niworkflows 1.15.
   twice, reporting a comparison whose original varies between the two as varying, never as changed
   or identical (`parity.python_versions`, `STEP_PASSES`, `VARIES`).
 - **D13 / gap:** class (b), never reproduced.
+### SCI-06 Binary morphology with an origin before its structure — (a)
+- **What:** SciPy `binary_erosion`, `binary_dilation`: an origin that puts the centre before the structure: a segmentation fault or memory's values.
+- **Evidence:** verified (`probe_origin_crash.py`); [scipy-ndimage-filters.md](scipy-ndimage-filters.md).
+- **fMRIPrep:** none.
+- **larmorx:** rule B: `ValueError("invalid origin")` (never reproduced) (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### SCI-07 The `reflect` filters read before the array — (a)
+- **What:** SciPy n-dimensional filters: a coordinate two whole periods before an axis maps to index -1 (a footprint over eight times the axis).
+- **Evidence:** read and verified; [scipy-ndimage-filters.md](scipy-ndimage-filters.md).
+- **fMRIPrep:** none.
+- **larmorx:** index 0, the reflection's value (never reproduced) (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### SCI-08 The 1-D rank filter reads outside a short input — (a)
+- **What:** SciPy `_rank_filter_1d`: a window much larger than the input, or a large `wrap` origin, reads before or after it.
+- **Evidence:** read and verified (`check_ndimage.py`); [scipy-ndimage-filters.md](scipy-ndimage-filters.md).
+- **fMRIPrep:** none.
+- **larmorx:** the mode's extension (never reproduced) (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### SCI-09 The 1-D rank filter ignores the footprint's holes — (c)
+- **What:** SciPy `rank_filter`, `median_filter`, `percentile_filter`: on a 1-D input the running rank takes the footprint's whole window, its false elements included.
+- **Evidence:** validated (`tests/python/test_fmap_defects.py`); [scipy-ndimage-filters.md](scipy-ndimage-filters.md).
+- **fMRIPrep:** none (sdcflows' filters are 3-D).
+- **larmorx:** rule A: the n-dimensional filter, with a warning; `reproduce` SciPy's (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### SCI-10 The binary propagation's `int8` mask — (c)
+- **What:** SciPy binary morphology: more than one pass: the first reads the mask's truth, the later ones the mask cast to `int8` (0.5, 256 false).
+- **Evidence:** validated (`tests/python/test_fmap_defects.py`); [scipy-ndimage-filters.md](scipy-ndimage-filters.md).
+- **fMRIPrep:** none (sdcflows' masks are boolean).
+- **larmorx:** rule A: the truth in every pass, with a warning; `reproduce` SciPy's (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### SCI-11 Binary iterations that never end — (a)
+- **What:** SciPy binary morphology: until nothing changes, with a structure whose centre is false: two states alternate for ever.
+- **Evidence:** verified; [scipy-ndimage-filters.md](scipy-ndimage-filters.md).
+- **fMRIPrep:** none.
+- **larmorx:** rule B: `RuntimeError` when a state repeats (never reproduced) (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### SCI-12 Non-flat structures added in the element type — (c?)
+- **What:** SciPy grey morphology: the structure's values added in the input's type (a `uint8` dilation wraps), the running result in double.
+- **Evidence:** verified (`probe_int_casts.py`); [scipy-ndimage-filters.md](scipy-ndimage-filters.md).
+- **fMRIPrep:** none (float images).
+- **larmorx:** rule C: kept (SciPy's definition) (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### SCI-13 `watershed_ift` links elements across the edges — (c)
+- **What:** SciPy `watershed_ift`: neighbours by C-order offsets checked only against the size: the last element of a row neighbours the first of the next.
+- **Evidence:** validated (600 cases, `check_epi_mask.py`; `measure_watershed_masks.py`); [scipy-ndimage-filters.md](scipy-ndimage-filters.md).
+- **fMRIPrep:** none (sdcflows' `epi_mask` only).
+- **larmorx:** rule A, measured (rule D): corrected by default, `reproduce` SciPy's; `epi_mask`'s masks better on 3 of 4 oracle references against fMRIPrep's own BOLD masks, the same on 1 (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### SCI-14 `watershed_ift` leaves an element alone in its queue — (c)
+- **What:** SciPy `watershed_ift`: an element alone in its queue is not taken out when its cost drops: queues join, elements are never processed or processed at the wrong level.
+- **Evidence:** validated (`probe_watershed_queue.py`: 37 of 20,000 1-D cases); [scipy-ndimage-filters.md](scipy-ndimage-filters.md).
+- **fMRIPrep:** none (sdcflows' `epi_mask` only).
+- **larmorx:** rule A (with SCI-13's measurement): corrected by default, `reproduce` SciPy's (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### SCI-15 `watershed_ift`'s 32-bit markers — (c)
+- **What:** SciPy `watershed_ift`: markers and labels read as C `int`s: `2**32 + 5` is 5.
+- **Evidence:** validated (`check_epi_mask.py`); [scipy-ndimage-filters.md](scipy-ndimage-filters.md).
+- **fMRIPrep:** none.
+- **larmorx:** rule A: 64 bits; `reproduce` SciPy's (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### SCI-16 `watershed_ift`'s 32-bit byte offsets — (a)
+- **What:** SciPy `watershed_ift`: above 2 GiB of input or output it reads and writes outside its arrays.
+- **Evidence:** read; [scipy-ndimage-filters.md](scipy-ndimage-filters.md).
+- **fMRIPrep:** none.
+- **larmorx:** 64-bit offsets in both modes, with a warning (never reproduced) (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### SCI-17 SciPy 1.15's short-input 1-D rank filter returns zeros — (c)
+- **What:** SciPy 1.15 `_rank_filter_1d`: an input shorter than half the footprint returns before writing (gh-23293).
+- **Evidence:** verified (SciPy 1.15.3, 30 of 30 cases); [scipy-ndimage-filters.md](scipy-ndimage-filters.md).
+- **fMRIPrep:** none.
+- **larmorx:** fixed in SciPy 1.18, which larmorx follows in both modes (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### SCI-18 SciPy 1.18's `inv` returns the LU factors when the norm overflows — (c)
+- **What:** SciPy 1.18.1 `scipy.linalg.inv`: for a general matrix whose norm (SciPy's `norm1_`) overflows, LAPACK `dgecon` returns `info = -5` without an estimate, `getri` is skipped and SciPy returns the LU factors as the inverse, with no error or warning.
+- **Evidence:** validated (`check_scipy_inv.py`, the "norm overflow" case, both environments); [sdcflows-estimation.md](sdcflows-estimation.md).
+- **fMRIPrep:** none (an image affine's entries are far from 1e308).
+- **larmorx:** rule A: the inverse (`getri`, SciPy 1.15's result), with a notice; `reproduce` the LU factors (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### SCI-19 SciPy 1.18's `inv` passes the infinity norm to `gecon` as the 1-norm — (f)
+- **What:** SciPy 1.18.1 `scipy.linalg.inv`: the general path's `norm1_` sums the rows of its column-major copy (the infinity norm) and `dgecon` combines it with its 1-norm estimate of the inverse: the `LinAlgWarning`'s test `rcond < eps` and the `rcond` it prints use a mixed estimate (within a factor 4 of the 1-norm's for 4 x 4; the symmetric path's norm is right).
+- **Evidence:** read and measured (`check_scipy_inv.py`: every non-diagonal `rcond` = SciPy's LAPACK estimate on the same factors; `probe_sci19_norm.py`); [sdcflows-estimation.md](sdcflows-estimation.md).
+- **fMRIPrep:** none (only the warning; the inverse is unchanged).
+- **larmorx:** kept in both modes, documented (a message: near the threshold the 1-norm would warn about 10,234 of 20,000 matrices instead of 10,249, `probe_sci19_norm.py`; no inverse changes) (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### SCI-20 SciPy 1.18's diagonal `inv` prints the condition number as `rcond` — (f)
+- **What:** SciPy 1.18.1 `scipy.linalg.inv`: for a diagonal matrix the warning's test `max(abs(a)) · max(abs(1/a)) > 1/eps` is right, but the value printed as "rcond" is that product, the condition number ("rcond = 2e+17").
+- **Evidence:** validated (`check_scipy_inv.py`, `tests/python/test_regrid_scipy_inv.py`); [sdcflows-estimation.md](sdcflows-estimation.md).
+- **fMRIPrep:** none (a message).
+- **larmorx:** kept in both modes (SciPy's text) (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### SCI-21 The 1-D rank filters write the input's type into an output of another type — (a)
+- **What:** SciPy `rank_filter`, `median_filter`, `percentile_filter` (`_rank_filter_1d`): for a float32, float64 or int64 1-D input SciPy hands its C++ the output array itself, which writes the input's type into it: an output of another type or byte order gets the bytes reinterpreted (`output=np.float32` of a float64 input, `">f8"`, an int16 array), past its end when its items are smaller (the heap corrupted: a crash at exit, or a hang).
+- **Evidence:** validated (`check_ndimage.py --sections arguments`: 36 cases, each SciPy call in a process of its own, both modes, both environments; SciPy's process after the write is random: it crashes before or after printing, or hangs (15 of 36 calls had more than one outcome in 10 processes per environment, `relay24/probe_sci21.py`), its printed bytes never differed, so each call is one case whatever its processes did); [scipy-ndimage-filters.md](scipy-ndimage-filters.md); upstream: a report drafted (with SCI-22 and SCI-23), [scipy-rank-filter-1d-output-type.md](../upstream-reports/scipy-rank-filter-1d-output-type.md) (not yet filed).
+- **fMRIPrep:** none (sdcflows' and niworkflows' median filters are 3-D).
+- **larmorx:** rule A: the values cast into the output (SciPy's own handling of every other input type), with a notice; `reproduce` SciPy's bytes where they are the output's own (never past its end; the notice gives the count) (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### SCI-22 The 1-D rank filters refuse big-endian floats and `longlong` — (c)
+- **What:** SciPy `rank_filter`, `median_filter`, `percentile_filter` (`_rank_filter_1d`): the type dispatch compares dtypes by equality with native ones: `>f4`/`>f8` inputs raise `RuntimeError("Unsupported array type")`, numpy's `longlong` (another type number than `int64` on Linux and macOS) the C++'s `TypeError("Unsupported array type")`; the n-dimensional filters take both.
+- **Evidence:** validated (`check_ndimage.py --sections arguments`, both modes, both environments); [scipy-ndimage-filters.md](scipy-ndimage-filters.md); upstream: in SCI-21's report, [scipy-rank-filter-1d-output-type.md](../upstream-reports/scipy-rank-filter-1d-output-type.md) (not yet filed).
+- **fMRIPrep:** none.
+- **larmorx:** rule A: filtered (the native copy's result), with a notice; `reproduce` SciPy's errors (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### SCI-23 The 1-D rank filters leave numpy's write-back copy unresolved — (f)
+- **What:** SciPy `rank_filter`, `median_filter`, `percentile_filter` (`_rank_filter_1d`): into a non-contiguous output of the input's type the C++ writes into numpy's `WRITEBACKIFCOPY` copy and drops it without resolving it: numpy writes it back and warns (`RuntimeWarning: WRITEBACKIFCOPY detected in clearing of array. ...`; numpy 2.3: `in array_dealloc.`).
+- **Evidence:** validated (`check_ndimage.py --sections arguments`, both modes, both environments); [scipy-ndimage-filters.md](scipy-ndimage-filters.md); upstream: in SCI-21's report, [scipy-rank-filter-1d-output-type.md](../upstream-reports/scipy-rank-filter-1d-output-type.md) (not yet filed); SciPy's #25646 (the write-back of three `nd_image.c` functions) does not cover `_rank_filter_1d.cpp`.
+- **fMRIPrep:** none (a warning).
+- **larmorx:** rule A (the values are right; the warning reports SciPy's mistake): no warning by default; `reproduce` numpy's warning, its text by the running numpy's release (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### SCI-24 SciPy 1.15.3's 1-D rank filter returns with an error set — (f)
+- **What:** SciPy 1.15.3 `_rank_filter_1d`: an error its C++ raises (a `longlong` input, a `cval` its type cannot take) is left set while it returns `None`: CPython raises `SystemError: <built-in function rank_filter> returned a result with an exception set`.
+- **Evidence:** verified (SciPy 1.15.3, `check_ndimage.py --sections arguments`: 6 cases); [scipy-ndimage-filters.md](scipy-ndimage-filters.md).
+- **fMRIPrep:** none.
+- **larmorx:** fixed in SciPy 1.18.1 (it checks `PyErr_Occurred`), whose error larmorx gives in both modes (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### SCI-25 An iterated binary erosion into a float output erodes outside the mask — (a)
+- **What:** SciPy `binary_erosion`, `binary_closing` (`NI_BinaryErosion2`): for more than one pass with the structure's centre true and no `brute_force`, the later passes mark each element outside the mask by the first byte of its output element (restored at the end), which is 0 for both 0.0 and 1.0 in a float32 or float64 output array: those elements are eroded (`binary_erosion(ones(5), iterations=4, mask=[1, 1, 1, 0, 0], output=zeros(5))` gives `[0, 0, 0, 0, 1]`, a bool output `[0, 0, 0, 1, 1]`).
+- **Evidence:** validated (`relay22/morph_cases.py`'s SCI-25 family: 600 of 2,520 float results differ from SciPy's bool result; `reproduce` = SciPy in 2,880 of 2,880, both environments); [scipy-ndimage-filters.md](scipy-ndimage-filters.md); upstream: a report drafted, [scipy-binary-erosion-float-output-mask.md](../upstream-reports/scipy-binary-erosion-float-output-mask.md) (not yet filed).
+- **fMRIPrep:** none (sdcflows' and niworkflows' binary morphology writes bool results).
+- **larmorx:** rule A: the outside elements kept (every other output type's result), with a notice when SciPy's differs; `reproduce` SciPy's (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### SCI-26 The iterated binary erosion leaves numpy's write-back copy unresolved — (f)
+- **What:** SciPy `binary_erosion`, `binary_dilation`, `binary_opening`, `binary_closing`, `binary_propagation`, `binary_fill_holes` (`Py_BinaryErosion2`): the propagation strategy's second C call takes the output through `NI_ObjectToInputOutputArray` and never resolves its write-back copy: into a byte-swapped or misaligned output array numpy warns when the copy is freed (`RuntimeWarning: WRITEBACKIFCOPY detected in clearing of array. ...`; numpy 2.3: `in array_dealloc.`) and writes it back.
+- **Evidence:** validated (`check_ndimage.py --sections arguments`, 13 cases, both modes, both environments); [scipy-ndimage-filters.md](scipy-ndimage-filters.md); upstream: fixed on SciPy's main by #25646 (2026-08-16, milestone 2.0.0; issue #25641), after 1.18.1: "fixed upstream and followed" when larmorx follows that release.
+- **fMRIPrep:** none (a warning).
+- **larmorx:** rule A (the values are right): no warning by default; `reproduce` numpy's warning, its text by the running numpy's release (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### SCI-27 `label` refuses big-endian arrays — (c)
+- **What:** SciPy `label` (`_ni_label._label`): Cython's typed buffers refuse a byte-swapped input or output (`ValueError: Big-endian buffer not supported on little-endian compiler`, also for `output=">i4"`), which every other function of `ndimage` takes (a big-endian NIfTI file's data are such an array).
+- **Evidence:** validated (`check_ndimage.py --sections arguments`, 5 cases, both modes, both environments); [scipy-ndimage-filters.md](scipy-ndimage-filters.md).
+- **fMRIPrep:** none.
+- **larmorx:** rule A: labelled as the native copy (the labels written into a big-endian output), with a notice; `reproduce` SciPy's error (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### SCI-28 `label` writes into a read-only output array — (f)
+- **What:** SciPy `label` (`_ni_label._label`): the labels are written through the output's data pointer whatever its flags.
+- **Evidence:** validated (`check_ndimage.py --sections arguments`, both modes, both environments); [scipy-ndimage-filters.md](scipy-ndimage-filters.md).
+- **fMRIPrep:** none.
+- **larmorx:** rule B: `ValueError("output array is read-only. ...")` (SciPy's message for its other functions); `reproduce` writes them as SciPy (numpy's flag lifted for the write where numpy allows it; memory numpy does not own as writeable is never written) (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### SCI-29 `label` writes label bytes into a bool output — (a)
+- **What:** SciPy `label` (`_ni_label._label`): a bool output is viewed as `uint8` and its overflow check passes up to 255, so labels above 1 are written as their bytes: a `bool` array holding 2, 3, ... (beyond 255 working labels SciPy retries and refuses, as for any type the labels do not fit).
+- **Evidence:** validated (`check_ndimage.py --sections arguments`: 37 cases, both modes, both environments); [scipy-ndimage-filters.md](scipy-ndimage-filters.md); upstream: SciPy's open issue #24502 (its PR #24579 closed unmerged); a comment drafted, [scipy-label-bool-output.md](../upstream-reports/scipy-label-bool-output.md) (not yet posted).
+- **fMRIPrep:** none.
+- **larmorx:** rule A: labels above 1 refused as labels that do not fit (`insufficient bit-depth in requested output type`), with a notice; `reproduce` SciPy's bytes (its working labels counted as `_ni_label` counts them) (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### SCI-30 The sums per label fail on a 0-d index or an empty input — (f)
+- **What:** SciPy `sum_labels`, `sum`, `center_of_mass` (`_stats`): with a 0-d index array SciPy indexes its sums with it (a numpy scalar) and assigns into it (`TypeError: 'numpy.int64' object does not support item assignment`); an empty input with a sequence index fails in `labels.min()` (`ValueError: zero-size array to reduction operation minimum which has no identity`) or, for `uint64` labels, in numpy's `IndexError`.
+- **Evidence:** validated (`check_ndimage.py --sections arguments`: 12 cases, both modes, both environments); [scipy-ndimage-filters.md](scipy-ndimage-filters.md).
+- **fMRIPrep:** none.
+- **larmorx:** rule A: the 0-d index's one sum as a scalar, the empty input's zero counts and sums of the index's shape, with a notice (one per `center_of_mass` call); `reproduce` SciPy's errors (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### SCI-31 The iterated binary morphology overwrites the caller's `int8` mask — (a)
+- **What:** SciPy `binary_erosion`, `binary_dilation`, `binary_opening`, `binary_closing`, `binary_propagation` (`NI_BinaryErosion2`): the propagation strategy (iterations other than 1, the structure's centre true, no `brute_force`) casts the mask with `np.asarray(mask, dtype=np.int8)`, which returns the caller's own `int8` array, and uses it as its scratch: the mask is left `-1` where it was true and the first pass's output (its first byte) where it was false; `binary_closing`'s erosion then reads the overwritten mask, so its result differs (456 of 589 closings with an `int8` mask and more than one pass).
+- **Evidence:** validated (`relay27/probe_sci31.py`: SciPy 1.18.1 and 1.15.3, 3,000 calls of the five functions, `reproduce` = SciPy in result and mask afterwards; `test_sci31_the_callers_int8_mask`; the permanent case `binary-erosion-int8-mask-overwritten`); [scipy-ndimage-filters.md](scipy-ndimage-filters.md).
+- **fMRIPrep:** none (sdcflows' and niworkflows' masks are boolean).
+- **larmorx:** rule A: the caller's mask left as given, with a notice; `reproduce` writes SciPy's values into it (a read-only one where numpy lets its flag be lifted) (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### SCI-32 The dilation's propagation strategy with an origin reads and writes outside its arrays — (a)
+- **What:** SciPy `binary_dilation`, `binary_propagation`, `binary_fill_holes`, the dilations of `binary_opening` and `binary_closing` (`NI_BinaryErosion2`): with a valid non-zero origin and the propagation strategy (iterations other than 1, no `brute_force`) the result sometimes differs from SciPy's own brute force, and the process sometimes dies (heap corruption: `malloc(): unsorted double linked list corrupted`, aborts and segmentation faults, at the call or at exit); a zero origin, the brute force and the erosion are unaffected.
+- **Evidence:** measured (`relay27/probe_sci32.py`, one process per case: of 120 dilations with an origin 1 differed from the brute force, of 120 propagations 1 differed and 2 died, every larmorx result = the brute force; none with a zero origin); [scipy-ndimage-filters.md](scipy-ndimage-filters.md).
+- **fMRIPrep:** none (sdcflows' and niworkflows' binary morphology has no origin).
+- **larmorx:** the brute force's result in both modes (memory is never reproduced) (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
 ### NP-01 numpy's matrices depend on the CPU — (d)
 - **What:** numpy's 4×4 products and inverses run in BLAS and LAPACK kernels chosen at run time:
   OpenBLAS's Haswell, SkylakeX, SandyBridge, Nehalem or Prescott kernels on x86-64, others on
@@ -3947,6 +4409,14 @@ between numpy 2.3.5 and 2.5.4 changes nibabel's quaternions, a change of release
 findings, not a defect. PIPE-14 (head motion ignored by `apply`, with sdcflows' warning) stays
 under fMRIPrep's libraries above.
 
+The field maps' part B (2026-11-09 and 10) ported the rest of sdcflows 2.17.1 bit for bit: the PEPOLAR,
+fieldmap-less (SyN) and direct estimation, `brain_masker` and the other masks, the estimators of a
+BIDS dataset (with sdcflows 2.15.2's search corrections, SDC-17), the workflows, the derivatives and
+the BIDS app (`larmorx sdcflows sdcflows`): SDC-12 to SDC-46, with the evidence in
+[sdcflows-estimation.md](sdcflows-estimation.md). Its libraries' entries are under their families:
+niworkflows', nipype's, pybids' and fMRIPrep's PIPE-18 to PIPE-40, SciPy's SCI-06 to SCI-32 and
+scikit-image's SKI-01 to SKI-04 (below).
+
 ### SDC-01 Weights beyond the control grid continue the end polynomial — (c)
 - **What:** `grid_bspline_weights` evaluates `BSpline(arange(-3, K + 3), eye(K + 2), 3)` with
   SciPy's extrapolation, whose base interval is `[0, K - 1]`: a sampling position beyond the
@@ -4099,6 +4569,287 @@ under fMRIPrep's libraries above.
 - **fMRIPrep:** none (its field maps are much larger than `zooms_min`).
 - **larmorx:** rule A: the one voxel resampled and the fit made, named; `reproduce` gives the
   `AssertionError` (2026-11-08).
+- **D13 / gap:** done.
+
+### SDC-12 `ReorientImageAndMetadata` reorients to the code as given — (c)
+- **What:** sdcflows `ReorientImageAndMetadata`: checks the upper-cased orientation code but reorients to the code as given: a lower-case one (`las`) fails in nibabel.
+- **Evidence:** validated (`check_pepolar.py`); [sdcflows-estimation.md](sdcflows-estimation.md), "The PEPOLAR estimation".
+- **fMRIPrep:** none (fMRIPrep's PEPOLAR wiring passes `LAS`).
+- **larmorx:** rule A: the upper-cased code; `reproduce` nibabel's error (`lx.sdcflows`, field maps part B) (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### SDC-13 `Deoblique` compares radians with a threshold in degrees — (c)
+- **What:** sdcflows `Deoblique`, `Reoblique`: nibabel's obliquity (radians) against `OBLIQUE_THRESHOLD_DEG = 0.5`: they act only beyond 28.6°; `_deoblique` centres the plumb grid in voxels and compares axis codes by position.
+- **Evidence:** measured (`relay10/probe_sdc13.py`); [sdcflows-estimation.md](sdcflows-estimation.md).
+- **fMRIPrep:** the SyN runs' EPIs (oblique up to 20.7°): left as they are.
+- **larmorx:** rule D measured, then C: kept in both modes (made plumb as meant, fMRIPrep's most oblique SyN EPI gets a field 8.2 Hz apart at the 95th percentile, another ANTs seed 1.7 Hz, and an unwarped reference no closer to the anatomy) (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### SDC-14 `_norm_lap` of an image without positive or negative values — (c)
+- **What:** sdcflows `_norm_lap`: an image with no positive (or no negative) value after the median's subtraction fails with numpy's `IndexError` (the percentile of nothing).
+- **Evidence:** validated (`check_syn_sdc.py`); [sdcflows-estimation.md](sdcflows-estimation.md).
+- **fMRIPrep:** none.
+- **larmorx:** rule B: a `ValueError` saying so; `reproduce` numpy's `IndexError` (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### SDC-15 `init_syn_sdc_wf`'s `zooms_epi` is never read — (c)
+- **What:** sdcflows `init_syn_sdc_wf`: the `zooms_epi` node regrids the clipped EPI and nothing reads it.
+- **Evidence:** read; [sdcflows-estimation.md](sdcflows-estimation.md).
+- **fMRIPrep:** every SyN run (dead work).
+- **larmorx:** rule C: kept as sdcflows (no result depends on it); larmorx does not compute it (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### SDC-16 `_warp_dir` frees the wrong world axis on a non-axial grid — (c)
+- **What:** sdcflows `_warp_dir`: the restriction's 1.0 at the phase-encoding axis's position among the fixed image's voxel axes, while ANTs weighs the physical axes: a sagittal or coronal grid frees another axis.
+- **Evidence:** validated (`check_syn_sdc.py`, `relay10/probe_restrict_axes.py` with ANTs 2.6.5); [sdcflows-estimation.md](sdcflows-estimation.md).
+- **fMRIPrep:** none (fMRIPrep's SyN EPIs are axial).
+- **larmorx:** rule A: the phase encoding's world axis; `reproduce` sdcflows' position, with a warning (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### SDC-17 2.17.1 lacks 2.15.2's three estimator-search corrections — (c)
+- **What:** sdcflows `find_estimators` (2.17.1): `bids_filters` also restrict the fieldmap-less anatomy and targets, no sessionless T1w serves sessioned runs, the `acquisition`/`ceagent` filters never reach the EPI heuristics (`acquisitions`).
+- **Evidence:** validated (`check_estimators.py`); [sdcflows-estimation.md](sdcflows-estimation.md).
+- **fMRIPrep:** none (fMRIPrep 25.2.x runs sdcflows 2.15, which has the corrections).
+- **larmorx:** rule A (the upstream's own correction): 2.15.2's search; `reproduce` 2.17.1's, with notices (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### SDC-18 `bidict.add` takes the last free automatic index — (c)
+- **What:** sdcflows `bidict`: a new estimator gets the last free `auto_` index in `range(len(used) + 1)`, not the first.
+- **Evidence:** read and validated (`check_estimators.py`); [sdcflows-estimation.md](sdcflows-estimation.md).
+- **fMRIPrep:** every run with unnamed estimators (the names in its derivatives).
+- **larmorx:** rule C: kept (the names are in fMRIPrep's and sdcflows' derivatives and logs) (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### SDC-19 `B0FieldIdentifier` estimators in a Python set's order — (b)
+- **What:** sdcflows `find_estimators`: the named estimators are built in a `set`'s order, which changes between processes.
+- **Evidence:** read; [sdcflows-estimation.md](sdcflows-estimation.md).
+- **fMRIPrep:** runs with several named estimators (their order).
+- **larmorx:** pybids' natural order in both modes (nondeterminism is never reproduced) (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### SDC-20 `get_identifier`'s message is the literal `'{by}'` — (f)
+- **What:** sdcflows `get_identifier`: the `KeyError` for an unknown index table is the raw string `'{by}'`.
+- **Evidence:** validated; [sdcflows-estimation.md](sdcflows-estimation.md).
+- **fMRIPrep:** none.
+- **larmorx:** rule A (a message): the table's name; `reproduce` the literal text (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### SDC-21 List-valued identifiers found by a regular-expression search of every filter — (c)
+- **What:** sdcflows `find_estimators`: case-insensitive regex filters: subject `01` matches `010`, `part-mag` matches `part-imag`, `pe` matches `PE`: other subjects' or identifiers' files join the estimator.
+- **Evidence:** measured on the `sdc21` tree (`check_estimators.py`); [sdcflows-estimation.md](sdcflows-estimation.md).
+- **fMRIPrep:** datasets with list-valued `B0FieldIdentifier`s and several subjects in one index.
+- **larmorx:** rule A: exact filters and list membership; `reproduce` sdcflows' (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### SDC-22 Estimator options passed on and ignored silently — (e)
+- **What:** sdcflows `get_workflow`, `init_fmap_preproc_wf`: every keyword argument goes to the estimator's `init_*_wf`, which ignores the ones it does not take: a misspelt option is ignored.
+- **Evidence:** validated (`check_derivatives.py`); [sdcflows-estimation.md](sdcflows-estimation.md).
+- **fMRIPrep:** none.
+- **larmorx:** rule B: a `TypeError` for an argument no estimator workflow takes; `reproduce` sdcflows' (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### SDC-23 `init_3dQwarp_wf` reads a field its input node lacks — (a)
+- **What:** sdcflows `init_3dQwarp_wf`: `inputnode.in_reference` is connected but not declared (`in_data`, `metadata`): its `fmap_ref` can never be computed.
+- **Evidence:** read; [sdcflows-estimation.md](sdcflows-estimation.md).
+- **fMRIPrep:** none (fMRIPrep does not run 3dQwarp's estimation).
+- **larmorx:** the workflow waits for `3dQwarp`'s port (`NotImplementedError`); then rule B, a clear error (field maps part B, 2026-11-09).
+- **D13 / gap:** switch (with 3dQwarp).
+
+### SDC-24 `_qwarp2ants` squeezes a spatial axis of length one — (c)
+- **What:** sdcflows `_qwarp2ants`: `np.squeeze` drops every axis of length one before the vector axis: a one-slice warp loses a spatial axis and ANTs does not read it as a displacement field.
+- **Evidence:** validated (`check_qwarp_steps.py`); [sdcflows-estimation.md](sdcflows-estimation.md).
+- **fMRIPrep:** none.
+- **larmorx:** rule A: only the axes after the third dropped; `reproduce` sdcflows' (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### SDC-25 `init_unwarp_wf`'s `fieldwarp` output is connected to nothing — (c)
+- **What:** sdcflows `init_unwarp_wf`: the output documented as the displacement field is never connected: nipype leaves it undefined.
+- **Evidence:** read and validated (`check_unwarp.py`); [sdcflows-estimation.md](sdcflows-estimation.md).
+- **fMRIPrep:** none (no caller reads it).
+- **larmorx:** rule C: kept (`None`); the same field is `B0FieldTransform.to_displacements` (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### SDC-26 `init_unwarp_wf` given both transforms uses one silently — (e)
+- **What:** sdcflows `init_unwarp_wf`, `ApplyCoeffsField`: `fmap2data_xfm` and `data2fmap_xfm`, declared exclusive, are both set by the graph and `data2fmap_xfm` wins without a word.
+- **Evidence:** validated (`check_unwarp.py`); [sdcflows-estimation.md](sdcflows-estimation.md).
+- **fMRIPrep:** none.
+- **larmorx:** rule B: a `ValueError`; `reproduce` sdcflows' (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### SDC-27 `match_histogram`'s undefined integer casts — (a)
+- **What:** sdcflows `match_histogram`: matched float values assigned into an integer image with numpy's cast: values its type cannot hold and NaN convert undefined (x86-64: wrapped).
+- **Evidence:** validated (`check_match_histogram.py`); [sdcflows-estimation.md](sdcflows-estimation.md).
+- **fMRIPrep:** none (no workflow calls it).
+- **larmorx:** D13's rule: clamped (NaN to 0) with a warning; `reproduce` x86-64's casts (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### SDC-28 `epi_mask`'s undefined `uint16` levels — (a)
+- **What:** sdcflows `epi_mask`: `np.round(1e3 * wshed / wshed.max())` cast to `uint16`: a flat residual, NaN, infinity or overflow converts undefined (x86-64: 0).
+- **Evidence:** validated (`check_epi_mask.py`); [sdcflows-estimation.md](sdcflows-estimation.md).
+- **fMRIPrep:** none (no workflow calls it).
+- **larmorx:** D13's rule: clamped (NaN 0, infinity 65,535) with a warning; `reproduce` x86-64's 0 (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### SDC-29 The BIDS app builds fieldmap-less estimators without inputs — (e)
+- **What:** sdcflows' BIDS app: a participant without field maps gets SyN estimators without their anatomical inputs: they fail when run, after the other estimators' work.
+- **Evidence:** validated (`check_app.py`); [sdcflows-estimation.md](sdcflows-estimation.md).
+- **fMRIPrep:** none (fMRIPrep wires them).
+- **larmorx:** rule B: the run stops before any work naming them and `--no-fmapless`; `reproduce` sdcflows' order and failure (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### SDC-30 The BIDS app ignores `--session-label` — (e)
+- **What:** sdcflows' BIDS app: recorded and never used: every session is estimated.
+- **Evidence:** validated (`check_app.py`); [sdcflows-estimation.md](sdcflows-estimation.md).
+- **fMRIPrep:** none.
+- **larmorx:** rule A: the sessions given; `reproduce` every session (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### SDC-31 The BIDS app ignores `--bids-filter-file` — (e)
+- **What:** sdcflows' BIDS app: read and never used.
+- **Evidence:** validated (`check_app.py`); [sdcflows-estimation.md](sdcflows-estimation.md).
+- **fMRIPrep:** none.
+- **larmorx:** rule A: its `fmap` entry restricts the field maps (fMRIPrep's convention); `reproduce` ignored (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### SDC-32 The BIDS app ignores `--sloppy` and `--debug` — (e)
+- **What:** sdcflows' BIDS app: recorded, and every estimator built with `sloppy=False, debug=False`.
+- **Evidence:** validated (`check_app.py`); [sdcflows-estimation.md](sdcflows-estimation.md).
+- **fMRIPrep:** none.
+- **larmorx:** rule A: they reach the workflows; `reproduce` ignored (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### SDC-33 The BIDS app accepts values it then fails on — (e)
+- **What:** sdcflows' BIDS app: a `--mem-gb` unit `_to_gb` cannot look up, a missing or non-JSON `--bids-filter-file`, a missing `--use-plugin` file: a traceback, exit 1.
+- **Evidence:** validated (`check_app.py`); [sdcflows-estimation.md](sdcflows-estimation.md).
+- **fMRIPrep:** none.
+- **larmorx:** rule B: argparse's error (exit 2); `reproduce` the traceback (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### SDC-34 The BIDS app's messages hold a memory address and a set's order — (b)
+- **What:** sdcflows' BIDS app: a non-integer `--nprocs` is named by a `functools.partial` representation; missing labels and `analysis_level` in a `set`'s order.
+- **Evidence:** validated (`check_app.py`); [sdcflows-estimation.md](sdcflows-estimation.md).
+- **fMRIPrep:** none.
+- **larmorx:** `invalid _min_one value`; sorted (nondeterminism is never reproduced) (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### SDC-35 `--use-plugin` always stops the BIDS app — (e)
+- **What:** sdcflows' BIDS app: the file is read with PyYAML's `load` without the `Loader` PyYAML 6 requires (`TypeError`).
+- **Evidence:** validated (`check_app.py`); [sdcflows-estimation.md](sdcflows-estimation.md).
+- **fMRIPrep:** none.
+- **larmorx:** rule A: accepted (it must exist; no effect); `reproduce` the `TypeError` (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### SDC-36 Participants sharing an identifier stop the BIDS app — (c)
+- **What:** sdcflows' BIDS app: one registry for every participant: two participants with the same `B0FieldIdentifier` (unique only within a participant in BIDS) stop it with `KeyError`.
+- **Evidence:** validated (`check_app.py`, relay 16's two-participant tree); [sdcflows-estimation.md](sdcflows-estimation.md); upstream: sdcflows' open issue #455; the comment drafted for PIPE-32 covers it, [sdcflows-shared-b0fieldidentifier.md](../upstream-reports/sdcflows-shared-b0fieldidentifier.md) (not yet posted).
+- **fMRIPrep:** none (fMRIPrep: PIPE-32).
+- **larmorx:** rule A: a registry per participant (the automatic names kept); `reproduce` the `KeyError` (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### SDC-37 `brain_masker` with no connected component takes the whole image — (c)
+- **What:** sdcflows `brain_masker`: the rough mask's largest component is the background (size 0): the whole image is the brain; a constant image divides 0 by 0.
+- **Evidence:** validated (`check_skimage.py`); [sdcflows-estimation.md](sdcflows-estimation.md).
+- **fMRIPrep:** none.
+- **larmorx:** rule B: a `ValueError`; `reproduce` sdcflows' (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### SDC-38 `brain_masker` with no brain seed takes the background's probability — (c)
+- **What:** sdcflows `brain_masker`: with no seed left after the rough mask's erosion by `ball(5)` the random walker renumbers label 2 as 1 and the background's probability is taken as the brain's.
+- **Evidence:** validated; [sdcflows-estimation.md](sdcflows-estimation.md).
+- **fMRIPrep:** none.
+- **larmorx:** rule B: a `ValueError`; `reproduce` sdcflows' (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### SDC-39 `brain_masker`'s non-flat closing — (c?)
+- **What:** sdcflows `brain_masker`: `grey_closing(structure=ball(1))` is SciPy's non-flat closing where the flat closing by the ball is meant (last-bit differences).
+- **Evidence:** measured (`relay17/probe_sdc39.py`); [sdcflows-estimation.md](sdcflows-estimation.md).
+- **fMRIPrep:** every phase-difference and PEPOLAR estimate (probabilities in their last bits).
+- **larmorx:** rule D measured, then C: kept (14 inputs of the oracle runs: probabilities at most 1.7e-06 apart, the masks on no voxel) (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### SDC-40 The BIDS app writes pybids' database before its checks — (e)
+- **What:** sdcflows' BIDS app: the database is built first, so an output folder equal to the dataset (refused next) gets `.bids_db` written into the dataset.
+- **Evidence:** verified (`check_app.py`); [sdcflows-estimation.md](sdcflows-estimation.md).
+- **fMRIPrep:** none.
+- **larmorx:** larmorx writes no database (nothing to reproduce) (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### SDC-41 sdcflows' configuration fails to import without `HOME` — (a)
+- **What:** sdcflows `config`: `os.path.join(os.getenv('HOME'), ...)` for TemplateFlow's folder: a `TypeError` at import where `HOME` is unset (Windows).
+- **Evidence:** read; [sdcflows-estimation.md](sdcflows-estimation.md).
+- **fMRIPrep:** none (Linux images).
+- **larmorx:** the home folder Python finds (a crash, never reproduced) (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### SDC-42 The reports' figures named after the method enum — (c)
+- **What:** sdcflows `init_sdcflows_wf`: the figures are named `desc-EstimatorType.PEPOLAR_fieldmap.svg` (the enum's text), not the method's name.
+- **Evidence:** verified (the D8(d) runs' `figures/`); [sdcflows-estimation.md](sdcflows-estimation.md).
+- **fMRIPrep:** sdcflows' app's reports (fMRIPrep names them itself).
+- **larmorx:** the reports are larmorprepx's (D7): rule A there, `reproduce` the enum's text (field maps part B, 2026-11-09).
+- **D13 / gap:** switch (with the reports).
+
+### SDC-43 `get_trt`'s message for a zero readout time — (f)
+- **What:** sdcflows `get_trt`: a zero or empty `TotalReadoutTime` raises `ValueError` whose message is only the value in quotes (`'0'`).
+- **Evidence:** read; [sdcflows-estimation.md](sdcflows-estimation.md).
+- **fMRIPrep:** none.
+- **larmorx:** the same message (kept) (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### SDC-44 `_warp_dir` logs through the deprecated `Logger.warn` — (f)
+- **What:** sdcflows `_warp_dir`: the oblique-dataset message goes through `Logger.warn` (a `DeprecationWarning`).
+- **Evidence:** read; [sdcflows-estimation.md](sdcflows-estimation.md).
+- **fMRIPrep:** every oblique SyN run (a deprecation warning).
+- **larmorx:** the same message through `warning` (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### SDC-45 `FieldmapFile`'s entities from the folders above the dataset — (a)
+- **What:** sdcflows `FieldmapFile`, `find_anatomical_estimators`: `FieldmapFile` parses its entities from the file's absolute path, where pybids' derivatives patterns (`den-`, `res-`, `desc-`, `label-`, ...) have no separator before them, and the fieldmap-less search queries the raw layout with every entity of its targets: a dataset below a folder such as `golden-clone` or `andres-lab` stops it with `ValueError: 'den' is not a recognized entity`.
+- **Evidence:** validated (`check_estimators.py --sections roots`: three of sdcflows' test skeletons and ds000228's BIDS input below six folders, both modes against sdcflows 2.17.1 and 2.15.2, 168 comparisons; `relay25/probe_root_entities.py`; `test_sdc45_*`); [sdcflows-estimation.md](sdcflows-estimation.md), "Entities from the folders above a dataset"; upstream: a report drafted, [sdcflows-entities-from-parent-folders.md](../upstream-reports/sdcflows-entities-from-parent-folders.md) (not yet filed); pybids' fix of PIPE-37 (#1273) leaves it, and below a folder named as a datatype makes it silent (an empty `IntendedFor`; measured).
+- **fMRIPrep:** `--use-syn-sdc` (and sdcflows' BIDS app) on a dataset stored below such a folder (outside the container wrappers, which mount it at `/data`).
+- **larmorx:** rule A: the entities of the path from the participant's `sub-*` folder (niworkflows' `relative_to_root`; a file below none keeps sdcflows' parse), with a warning when they changed; `reproduce` sdcflows' entities and error (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### SDC-46 `brain_masker` with `padding=0` writes empty images — (a)
+- **What:** sdcflows `brain_masker`: the random walker's probabilities are cropped with `[..., padding:-padding, ...]`, an empty slice for `padding=0`: the probability and the mask are written as 0 x 0 x 0 images and the brain unmasked (an empty boolean index changes nothing).
+- **Evidence:** validated (random testing, relay 27: the permanent case `brain-masker-padding-0`; `test_sdc46_brain_masker_without_padding`); [sdcflows-estimation.md](sdcflows-estimation.md).
+- **fMRIPrep:** none (sdcflows' `BrainExtraction` pads by 5).
+- **larmorx:** rule A: the whole image's probability and mask, with a notice; `reproduce` sdcflows' empty images and unmasked brain (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+## scikit-image (SKI-)
+
+scikit-image 0.26.0's `ball`, `threshold_otsu`, `random_walker` and `match_histograms` (the same
+arithmetic in 0.25.2, fMRIPrep 25.2.6's), ported bit for bit in `lx.skimage`
+(`crates/larmorx-ndimage/src/skimage`, the field maps' part B, 2026-11-09; BSD-3-Clause,
+`filters/thresholding.py` BSD-2-Clause): open to everyone. The evidence:
+[sdcflows-estimation.md](sdcflows-estimation.md), [api/skimage.md](../api/skimage.md).
+
+### SKI-01 The random walker's masked Laplacian is misnumbered — (c)
+- **What:** scikit-image `random_walker`: with a mask, nodes numbered by the remaining edges' ends but labels by the mask: a mask pixel without neighbours shifts every later node (probabilities off by up to 0.59).
+- **Evidence:** validated (`check_skimage.py`); [sdcflows-estimation.md](sdcflows-estimation.md).
+- **fMRIPrep:** none (`brain_masker`'s markers isolate no pixel).
+- **larmorx:** rule A: both numbered by the mask, with a warning; `reproduce` scikit-image's (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### SKI-02 `match_histograms` refuses non-integer references of unsigned images — (c)
+- **What:** scikit-image `match_histograms`: an unsigned image's reference counted with `bincount`: a float or negative reference, or a `uint64` image, refused.
+- **Evidence:** validated (`check_match_histogram.py`); [sdcflows-estimation.md](sdcflows-estimation.md).
+- **fMRIPrep:** none (no workflow calls it).
+- **larmorx:** rule A: counted with `unique`, scikit-image's result wherever it gives one; `reproduce` its error (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### SKI-03 `random_walker` returns renumbered labels — (c)
+- **What:** scikit-image `random_walker`: labels that are not consecutive come back as their consecutive renumbering (3 and 7 as 1 and 2).
+- **Evidence:** validated (`tests/python/test_fmap_defects.py`, scikit-image 0.26.0); [sdcflows-estimation.md](sdcflows-estimation.md).
+- **fMRIPrep:** none (`brain_masker`'s labels are 1 and 2).
+- **larmorx:** rule A: the labels given, with a warning; `reproduce` scikit-image's (field maps part B, 2026-11-09).
+- **D13 / gap:** done.
+
+### SKI-04 `random_walker`'s full probabilities without a pixel to segment — (c)
+- **What:** scikit-image `random_walker`: `return_full_prob` with no pixel to segment returns the seeds' boolean masks along the last axis, not `(nlabels, ...)` probabilities.
+- **Evidence:** validated (`tests/python/test_fmap_defects.py`); [sdcflows-estimation.md](sdcflows-estimation.md).
+- **fMRIPrep:** none.
+- **larmorx:** rule A: the documented probabilities, with a warning; `reproduce` scikit-image's (field maps part B, 2026-11-09).
 - **D13 / gap:** done.
 
 ## FSL: black-box findings (open to everyone)

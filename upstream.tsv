@@ -63,3 +63,14 @@ scikit-learn-1.6.1	https://files.pythonhosted.org/packages/source/s/scikit-learn
 scipy-1.15.3	https://files.pythonhosted.org/packages/source/s/scipy/scipy-1.15.3.tar.gz	sha256:eae3cf522bc7df64b42cad3925c876e1b0b6c35c1337c93e12c0f366f55b0eaf	BSD-3-Clause	tags
 tedana-26.0.3	https://files.pythonhosted.org/packages/source/t/tedana/tedana-26.0.3.tar.gz	sha256:3d767a09c2ae3a1e8fc0c62e8c86655de677ebd6424af1f7818af0e3c3aa5b2f	LGPL-2.1-only	tags
 tedana-25.0.1	https://files.pythonhosted.org/packages/source/t/tedana/tedana-25.0.1.tar.gz	sha256:b85742f83f7c853dc709cae8c9aa37f34fd964971fe986296861ad5286c4ccfa	LGPL-2.1-only	tags
+niworkflows-1.15.4	https://files.pythonhosted.org/packages/source/n/niworkflows/niworkflows-1.15.4.tar.gz	sha256:58e514502c4ccacd25557bca305e427e1b137defbd0de3974e9407bd9be07dd3	Apache-2.0	tags
+fmriprep-25.2.7	https://files.pythonhosted.org/packages/source/f/fmriprep/fmriprep-25.2.7.tar.gz	sha256:739fd88af47ff62c2677e789fd85764f44538b7210797ce52ebf95737c189c3e	Apache-2.0	tags
+sdcflows-2.15.2	https://files.pythonhosted.org/packages/source/s/sdcflows/sdcflows-2.15.2.tar.gz	sha256:7f7c6c4abd01dce37a34dff1217820e07b32df34630c5e3331e8da2d8b1775b3	Apache-2.0	tags
+scikit-image-0.26.0	https://files.pythonhosted.org/packages/source/s/scikit-image/scikit_image-0.26.0.tar.gz	sha256:f5f970ab04efad85c24714321fcc91613fcb64ef2a892a13167df2f3e59199fa	BSD-3-Clause	tags
+scikit-image-0.25.2	https://files.pythonhosted.org/packages/source/s/scikit-image/scikit_image-0.25.2.tar.gz	sha256:e5a37e6cd4d0c018a7a55b9d601357e3382826d3888c10d0213fc63bff977dde	BSD-3-Clause	tags
+nipype-1.12.0	https://files.pythonhosted.org/packages/source/n/nipype/nipype-1.12.0.tar.gz	sha256:784098a8a54839836fa0eba2fa1c2040a365a272d0b28692578b5b15b475aeeb	Apache-2.0	tags
+pybids-0.22.0	https://files.pythonhosted.org/packages/source/p/pybids/pybids-0.22.0.tar.gz	sha256:98e7957e47c08d3c131de6f6cef629d009abce888849102b33820ca6a9930152	MIT	tags
+pybids-0.20.0	https://files.pythonhosted.org/packages/source/p/pybids/pybids-0.20.0.tar.gz	sha256:a68b577426942e50e6ac37e011463361d00a378d19b75df817619450357ebbb6	MIT	tags
+toml-0.10.2	https://files.pythonhosted.org/packages/source/t/toml/toml-0.10.2.tar.gz	sha256:b3bda1d108d5dd99f4a20d24d9c348e91c4db7ab1b749200bded2f839ccbe68f	MIT	tags
+nilearn-0.14.1	https://files.pythonhosted.org/packages/source/n/nilearn/nilearn-0.14.1.tar.gz	sha256:6f7ec639be2c9e4a3625ebc4f25c3de31ae3af21331c8d03e27201c482609672	BSD-3-Clause	tags
+nilearn-0.11.1	https://files.pythonhosted.org/packages/source/n/nilearn/nilearn-0.11.1.tar.gz	sha256:a01df08fc6c8ded3cd6fb7a211634603ad46a6df780504b6d05222c2e7a972fe	BSD-3-Clause	tags

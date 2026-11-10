@@ -45,6 +45,8 @@ from typing import Any
 import numpy as np
 
 import larmorx as lx
+import larmorx.pipelines.larmorprepx.estimators  # lx.pipelines, for NAMESPACES
+import larmorx.pipelines.larmorprepx.fieldmaps  # lx.pipelines, for NAMESPACES
 from larmorx import _core
 from larmorx.io import NiftiHeader
 from larmorx.transforms import ItkTransform
@@ -1039,6 +1041,11 @@ NAMESPACES = (
     "lx.io",
     "lx.sdcflows",
     "lx.tedana",
+    "lx.skimage",
+    "lx.niworkflows",
+    "lx.pipelines.larmorprepx.fieldmaps",
+    "lx.pipelines.larmorprepx.estimators",
+    "lx.bids",
     "lx",
 )
 
@@ -4147,6 +4154,349 @@ def _(ctx: Context) -> dict[str, Any]:
     }
 
 
+def _ball(r: int) -> np.ndarray:
+    """scikit-image's ``ball(r)`` from integer arithmetic."""
+    g = np.arange(-r, r + 1)
+    z, y, x = np.meshgrid(g, g, g, indexing="ij")
+    return (x * x + y * y + z * z <= r * r).astype(np.uint8)
+
+
+@case("py.ndimage.filters", covers=("lx.ndimage.minimum_filter", "lx.ndimage.maximum_filter", "lx.ndimage.minimum_filter1d", "lx.ndimage.maximum_filter1d", "lx.ndimage.rank_filter", "lx.ndimage.median_filter", "lx.ndimage.percentile_filter"))  # fmt: skip
+def _(ctx: Context) -> dict[str, Any]:
+    """The minimum, maximum and rank filters: a non-flat footprint (every mode), a full box
+    (separable), the 1-D filters, a ball median, a percentile, a 1-D rank filter (the running
+    rank), integer and boolean inputs, an output type, origins, NaN and signed zeros."""
+    data = (ints(51, (14, 11, 9), -500, 500) / 8).astype(np.float32)
+    data[3, 4, 5] = np.nan
+    data[5, 5, 5] = -0.0
+    fp = ints(52, (3, 2, 3), 0, 2).astype(bool)
+    fp[1, 0, 1] = True
+    out: dict[str, Any] = {}
+    for mode in ("reflect", "constant", "nearest", "mirror", "wrap"):
+        out[f"min.{mode}"] = lx.ndimage.minimum_filter(data, footprint=fp, mode=mode, cval=1.5)
+    out["max.origin"] = lx.ndimage.maximum_filter(data, footprint=fp, origin=(1, 0, -1))
+    out["max.size"] = lx.ndimage.maximum_filter(data, size=(3, 1, 4), mode="nearest")
+    out["min1d"] = lx.ndimage.minimum_filter1d(data, 4, axis=1, mode="constant", cval=-2.0)
+    out["max1d"] = lx.ndimage.maximum_filter1d(data, 5, axis=0, origin=-1)
+    out["median.ball"] = lx.ndimage.median_filter(data, footprint=_ball(2))
+    out["rank"] = lx.ndimage.rank_filter(data, -3, footprint=fp, mode="mirror")
+    out["percentile"] = lx.ndimage.percentile_filter(data, 30.0, size=3, mode="wrap")
+    u8 = ints(53, (12, 10), 0, 256).astype(np.uint8)
+    out["median.uint8"] = lx.ndimage.median_filter(u8, size=3)
+    out["max.bool"] = lx.ndimage.maximum_filter(u8 > 128, footprint=fp[:, 0, :])
+    out["min.output"] = lx.ndimage.minimum_filter(u8, size=2, output=np.float64)
+    line = (ints(54, (31,), -40, 40) / 4).astype(np.float64)
+    out["rank1d"] = lx.ndimage.rank_filter(line, 2, size=5, mode="reflect")
+    out["median1d.int16"] = lx.ndimage.median_filter(line.astype(np.int16), size=4)
+    return out
+
+
+@case("py.ndimage.gaussian", covers=("lx.ndimage.correlate1d", "lx.ndimage.gaussian_filter1d", "lx.ndimage.gaussian_filter"))  # fmt: skip
+def _(ctx: Context) -> dict[str, Any]:
+    """correlate1d with a symmetric, an anti-symmetric and an asymmetric kernel (modes, an
+    origin, an output type), the Gaussian filters (sigmas per axis with a zero, truncate, a
+    radius, axes, an integer input and output); Gaussian derivatives (orders 2, 3 and 5: numpy's
+    dot through every dgemv_t kernel and tail; radius 0: a dot product); complex inputs and
+    weights (complex64 and 128, a real input with complex weights, a complex cval)."""
+    data = (ints(55, (14, 11, 9), -500, 500) / 8).astype(np.float64)
+    out: dict[str, Any] = {}
+    for name, w in (
+        ("sym", [0.25, 0.5, 0.25]),
+        ("anti", [-0.5, 0.0, 0.5]),
+        ("asym", [0.75, -0.125, 0.5, 0.25]),
+    ):
+        for mode in ("reflect", "constant", "nearest", "mirror", "wrap"):
+            out[f"corr.{name}.{mode}"] = lx.ndimage.correlate1d(
+                data, w, axis=1, mode=mode, cval=2.5
+            )
+    out["corr.origin"] = lx.ndimage.correlate1d(data, [0.5, 0.25, 0.125], axis=0, origin=-1)
+    out["corr.int16"] = lx.ndimage.correlate1d(data.astype(np.int16), [1.5, -0.5], output=np.int16)
+    out["g1d"] = lx.ndimage.gaussian_filter1d(data, 1.25, axis=2)
+    out["g"] = lx.ndimage.gaussian_filter(data, (0.75, 0.0, 1.5), mode="nearest", truncate=3.0)
+    out["g.radius.axes"] = lx.ndimage.gaussian_filter(data, (1.0, 2.0), axes=(0, 2), radius=(2, 3))
+    out["g.uint8"] = lx.ndimage.gaussian_filter(ints(56, (12, 10), 0, 256).astype(np.uint8), 0.8)
+    out["g.zero"] = lx.ndimage.gaussian_filter(data, 0.0, output=np.float32)
+    out["g1d.order2"] = lx.ndimage.gaussian_filter1d(data, 1.25, axis=2, order=2)
+    out["g1d.order5"] = lx.ndimage.gaussian_filter1d(data, 0.8, axis=0, order=5, mode="wrap")
+    out["g1d.order2.radius0"] = lx.ndimage.gaussian_filter1d(data, 1.0, order=2, radius=0)
+    out["g.orders"] = lx.ndimage.gaussian_filter(data, (0.75, 1.0, 1.5), (1, 0, 3), mode="nearest")
+    cdata = data + 1j * (ints(57, data.shape, -300, 300) / 16)
+    out["corr.complex"] = lx.ndimage.correlate1d(
+        cdata, [0.5 + 0.25j, 1 - 1j, 0.125j], axis=1, mode="constant", cval=1 - 2j
+    )
+    out["corr.real.cweights"] = lx.ndimage.correlate1d(
+        data.astype(np.float32), [0.25j, 0.5, -0.75 + 0.5j, 0.125], axis=0, origin=1
+    )
+    out["g.complex64"] = lx.ndimage.gaussian_filter(cdata.astype(np.complex64), 1.1, (0, 1, 0))
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")  # numpy's long double is wider than float64 here
+        # a long-double sigma: the float64 kernel on every platform (relay 21)
+        out["g.longdouble"] = lx.ndimage.gaussian_filter(data, np.longdouble(1.3), (0, 2, 1))
+    return out
+
+
+@case("py.ndimage.rank1d", covers=("lx.ndimage.rank_filter", "lx.ndimage.median_filter", "lx.ndimage.percentile_filter"))  # fmt: skip
+def _(ctx: Context) -> dict[str, Any]:
+    """SciPy's running rank of a 1-D input with its own type dispatch (relay 21): float16
+    through float32, an int8 input through int64, and SciPy's defects corrected: a float64
+    input into a float32 and a big-endian output (SCI-21, the values cast), big-endian float
+    and longlong inputs (SCI-22, filtered), a strided output of the input's type (SCI-23)."""
+    line = (ints(61, (37,), -60, 60) / 4).astype(np.float64)
+    out: dict[str, Any] = {}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")  # the SCI-21 and SCI-22 notices
+        out["median.float16"] = lx.ndimage.median_filter(line.astype(np.float16), 5)
+        out["rank.int8"] = lx.ndimage.rank_filter(
+            line.astype(np.int8), 2, 4, mode="constant", cval=3
+        )
+        out["median.into.float32"] = lx.ndimage.median_filter(line, 3, output=np.float32)
+        out["percentile.into.>f8"] = lx.ndimage.percentile_filter(line.astype(np.float32), 50, 5, output=np.dtype(">f8"))  # fmt: skip
+        out["median.>f8"] = lx.ndimage.median_filter(line.astype(">f8"), 3, mode="nearest")
+        out["rank.longlong"] = lx.ndimage.rank_filter(line.astype(np.longlong), -2, 5, mode="wrap")
+        strided = np.zeros((37, 2))[:, 0]
+        lx.ndimage.median_filter(line, 7, output=strided, mode="mirror")
+        out["median.strided"] = strided.copy()
+    return out
+
+
+@case("py.niworkflows.regrid", covers=("lx.niworkflows.regrid_to_zooms", "lx.niworkflows.resample_by_spacing"))  # fmt: skip
+def _(ctx: Context) -> dict[str, Any]:
+    """niworkflows' RegridToZooms: an int16 image on an oblique grid (a 3-4-5 rotation) regridded
+    to coarser and finer voxels, with smooth=True and a sigma, order 1 without clipping, and a
+    float32 image whose header has no x-form codes. With them SciPy 1.18's inverse, which
+    nilearn's resample_img (resample_img_nearest) takes: an image whose affine is symmetric (an
+    axis swap with a zero origin: Bunch-Kaufman) resampled, and the inverse with its rcond on
+    every path (Cholesky, Bunch-Kaufman with 2 x 2 pivots, general, triangular, ill-conditioned,
+    rescaled by dlatrs), from matrices made with plain arithmetic."""
+    aff = np.array([[0.96 * 1.5, -0.28 * 1.25, 0.0, -20.0], [0.28 * 1.5, 0.96 * 1.25, 0.0, 12.0],
+                    [0.0, 0.0, 2.0, 7.5], [0.0, 0.0, 0.0, 1.0]])  # fmt: skip
+    src = ctx.out("regrid_in.nii.gz")
+    lx.io.save_nibabel(lx.Image(ints(57, (20, 18, 12), -300, 900).astype(np.int16), aff, None), src)
+    out: dict[str, Any] = {}
+    for tag, zooms, kw in (
+        ("coarse", (3.0, 3.0, 3.0), {}),
+        ("fine", (1.0, 1.0, 1.0), {"smooth": True}),
+        ("sigma", (2.0, 2.0, 2.0), {"smooth": 0.8}),
+        ("order1", (2.5, 1.5, 2.0), {"order": 1, "clip": False}),
+    ):
+        out[tag] = Nifti(
+            lx.niworkflows.regrid_to_zooms(src, zooms, out_dir=ctx.out(tag), **kw).out_file
+        )
+    img = lx.io.load_nibabel(src)
+    assert img.header is not None
+    hdr = img.header.replace(qform_code=0, sform_code=0)
+    flt = lx.Image(np.asarray(img.data).astype(np.float32) / 4, img.affine, hdr)
+    res = lx.niworkflows.resample_by_spacing(flt, (2.0, 2.0, 2.0))
+    out["image"] = np.asarray(res.data)
+    out["image.affine"] = np.asarray(res.affine)
+    swap = np.array([[0.0, 2.0, 0.0, 0.0], [2.0, 0.0, 0.0, 0.0], [0.0, 0.0, 2.5, 0.0],
+                     [0.0, 0.0, 0.0, 1.0]])  # fmt: skip
+    sw = lx.Image(ints(58, (10, 9, 8), -50, 200).astype(np.int16), swap, None)
+    out["resample.symmetric"] = np.asarray(lx.niworkflows.resample_img_nearest(sw, aff, (12, 10, 8)).data)  # fmt: skip
+    r = ints(60, (4, 4), -9, 10) / 8
+    sym = np.triu(r) + np.triu(r, 1).T
+    near = np.eye(4)
+    near[:2, :2] = ((1.0, 1.0), (1.0, 1.0 + 2.0**-51))
+    tiny = np.triu(r)
+    np.fill_diagonal(tiny, (2.0**-60, 1.0, -0.5, 2.0))
+    ill = near.copy()
+    ill[3, 2] = 1.0
+    mats = {
+        "cholesky": sym + 8 * np.eye(4),
+        "bunch_kaufman": sym - np.diag(np.diag(sym)),
+        "general": r,
+        "ill_cholesky": near,
+        "ill_general": ill,
+        "ill_upper": tiny,
+        "rescaled": r * 2.0**1000 + np.diag((1.0, 1.0, 1.0, 1.0)),
+    }
+    for tag, m in mats.items():
+        _, status, inv, _, rcond = _core.linalg_scipy_inv4(np.ascontiguousarray(m), "1.18.1")
+        out[f"scipy_inv.{tag}"] = np.asarray(inv)
+        out[f"scipy_inv.{tag}.rcond"] = np.asarray([rcond, status == "ill_conditioned"])
+    return out
+
+
+@case("py.ndimage.grey", covers=("lx.ndimage.grey_erosion", "lx.ndimage.grey_dilation", "lx.ndimage.grey_opening", "lx.ndimage.grey_closing"))  # fmt: skip
+def _(ctx: Context) -> dict[str, Any]:
+    """Grey morphology with a footprint, a size and a non-flat structure (brain_masker's
+    ``grey_closing`` with ``ball(1)``), float32 and uint8 (the structure added in the type)."""
+    data = (ints(55, (13, 12, 10), 0, 2000) / 1999).astype(np.float32)
+    st = ints(56, (3, 3, 3), -2, 3) / 2
+    u8 = ints(57, (16, 15), 0, 256).astype(np.uint8)
+    return {
+        "closing.ball1": lx.ndimage.grey_closing(data, structure=_ball(1)),
+        "opening.structure": lx.ndimage.grey_opening(
+            data, structure=st, mode="constant", cval=0.25
+        ),
+        "erosion.footprint": lx.ndimage.grey_erosion(data, footprint=_ball(1)),
+        "dilation.size": lx.ndimage.grey_dilation(data, size=(2, 3, 2), mode="mirror"),
+        "dilation.uint8": lx.ndimage.grey_dilation(u8, structure=st[1, :, :2], origin=(0, -1)),
+    }
+
+
+@case("py.ndimage.binary", covers=("lx.ndimage.binary_erosion", "lx.ndimage.binary_dilation", "lx.ndimage.binary_opening", "lx.ndimage.binary_closing", "lx.ndimage.binary_propagation", "lx.ndimage.binary_fill_holes", "lx.ndimage.binary_hit_or_miss", "lx.ndimage.generate_binary_structure", "lx.ndimage.iterate_structure"))  # fmt: skip
+def _(ctx: Context) -> dict[str, Any]:
+    """Binary morphology: one pass, iterations (both strategies), until nothing changes, a
+    mask (its first pass and its int8 propagation), the border value, origins, the balls of
+    brain_masker, propagation, hole filling, hit-or-miss, the structures."""
+    g = np.indices((20, 18, 16)).sum(axis=0)
+    blob = ints(58, (20, 18, 16), 0, 100) < 55 + (g < 25) * 30
+    mask = ints(59, (20, 18, 16), 0, 4) / 2
+    st = lx.ndimage.generate_binary_structure(3, 2)
+    return {
+        "erosion": lx.ndimage.binary_erosion(blob, st, border_value=1),
+        "erosion.iter3": lx.ndimage.binary_erosion(blob, iterations=3),
+        "erosion.iter3.brute": lx.ndimage.binary_erosion(blob, iterations=3, brute_force=True),
+        "dilation.mask": lx.ndimage.binary_dilation(blob, iterations=2, mask=mask),
+        "dilation.until": lx.ndimage.binary_dilation(blob, st, iterations=0, mask=mask > 0.5),
+        "dilation.origin": lx.ndimage.binary_dilation(blob, _ball(1), origin=(1, 0, -1)),
+        "opening.ball3": lx.ndimage.binary_opening(blob.astype(np.float32), _ball(3)),
+        "closing.ball5": lx.ndimage.binary_closing(blob, _ball(5)).astype(np.uint8),
+        "propagation": lx.ndimage.binary_propagation(blob & (g < 12), mask=blob),
+        "fill_holes": lx.ndimage.binary_fill_holes(~blob),
+        "hit_or_miss": lx.ndimage.binary_hit_or_miss(blob, structure1=st),
+        "structure": lx.ndimage.generate_binary_structure(4, 2),
+        "iterate": lx.ndimage.iterate_structure(st, 3),
+        **_binary_float_outputs(blob, mask > 0.5),
+    }
+
+
+def _binary_float_outputs(blob: np.ndarray, mask: np.ndarray) -> dict[str, Any]:
+    """Relay 22: an iterated erosion with a mask into a float32 output array, corrected (the
+    elements outside the mask kept) and as SciPy computes it (SCI-25: its later passes erode
+    them); a longlong input and a 0-d one."""
+    out: dict[str, Any] = {}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")  # the SCI-25 notices
+        for mode in ("fix", "reproduce"):
+            o = np.zeros(blob.shape, np.float32)
+            lx.ndimage.binary_erosion(
+                blob, iterations=3, mask=mask, output=o, upstream_defects=mode
+            )
+            out[f"erosion.mask.float32.{mode}"] = o
+    out["erosion.longlong"] = lx.ndimage.binary_erosion(blob.astype(np.longlong), iterations=2)
+    out["dilation.0d"] = lx.ndimage.binary_dilation(np.array(True), iterations=2)
+    return out
+
+
+@case("py.ndimage.binary.int8_mask", covers=("lx.ndimage.binary_erosion", "lx.ndimage.binary_closing"))  # fmt: skip
+def _(ctx: Context) -> dict[str, Any]:
+    """Relay 28: an iterated erosion and closing with an ``int8`` mask, corrected (the caller's
+    mask left as it is) and as SciPy computes them (SCI-31: the later passes write into the
+    caller's mask, and the closing's erosion reads what its dilation wrote there): the outputs
+    and the masks afterwards."""
+    g = np.indices((20, 18, 16)).sum(axis=0)
+    blob = ints(58, (20, 18, 16), 0, 100) < 55 + (g < 25) * 30
+    out: dict[str, Any] = {}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")  # the SCI-31 notices
+        for mode in ("fix", "reproduce"):
+            m = (ints(62, (20, 18, 16), 0, 4) > 0).astype(np.int8)
+            out[f"erosion.{mode}"] = lx.ndimage.binary_erosion(
+                blob, iterations=3, mask=m, upstream_defects=mode
+            )
+            out[f"erosion.{mode}.mask"] = m
+            m = (ints(63, (20, 18, 16), 0, 4) > 0).astype(np.int8)
+            out[f"closing.{mode}"] = lx.ndimage.binary_closing(
+                blob, iterations=2, mask=m, upstream_defects=mode
+            )
+            out[f"closing.{mode}.mask"] = m
+    return out
+
+
+@case("py.ndimage.label", covers=("lx.ndimage.label", "lx.ndimage.sum_labels", "lx.ndimage.sum"))
+def _(ctx: Context) -> dict[str, Any]:
+    """Labelling (6- and 26-connectivity, a Fortran-ordered input) and the sums per label
+    (brain_masker's largest component)."""
+    blob = ints(60, (17, 15, 13), 0, 100) < 45
+    lab, n = lx.ndimage.label(blob)
+    lab26, n26 = lx.ndimage.label(
+        np.asfortranarray(blob), lx.ndimage.generate_binary_structure(3, 3)
+    )
+    w = (ints(61, (17, 15, 13), -50, 50) / 4).astype(np.float32)
+    return {
+        "label": lab,
+        "count": np.asarray([n, n26]),
+        "label26": lab26,
+        "sizes": lx.ndimage.sum(blob.astype(np.uint8), lab, range(n + 1)),
+        "sums": lx.ndimage.sum_labels(w, lab, np.arange(-1, n + 2)),
+        "sum.scalar": np.asarray(lx.ndimage.sum_labels(w, lab, 3)),
+        **_labels_into_outputs(blob, lab, w),
+    }
+
+
+def _labels_into_outputs(blob: np.ndarray, lab: np.ndarray, w: np.ndarray) -> dict[str, Any]:
+    """Relay 22: labels into a Fortran-ordered output (numbered along its axis of the smallest
+    stride, as SciPy's ``_ni_label``) and into a big-endian one (SCI-27, labelled as the native
+    copy); sums per label with uint64 labels (``unique``'s path: an index compared by value)."""
+    of = np.zeros(blob.shape, np.int32, order="F")
+    n_f = lx.ndimage.label(blob, output=of)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")  # the SCI-27 notice
+        ob, _ = lx.ndimage.label(blob, output=">i4")
+    idx = np.array([0.0, 1.0, 1.5, 3.0, 2.0**40])
+    return {
+        "label.F": of,
+        "label.F.count": np.asarray([n_f]),
+        "label.>i4": ob,
+        "sums.uint64": lx.ndimage.sum_labels(w, lab.astype(np.uint64), idx),
+    }
+
+
+@case("py.ndimage.watershed_ift", covers=("lx.ndimage.watershed_ift",))
+def _(ctx: Context) -> dict[str, Any]:
+    """The watershed from markers: a uint8 image with object and background markers (both
+    modes: SciPy's neighbours across the edges, corrected by default), uint16 with the full
+    structure and an int8 output array, a 1-D image whose queue keeps an element alone in it
+    (SciPy leaves one element unlabelled; corrected), and int64 markers beyond 32 bits."""
+    img = ints(213, (16, 14, 12), 0, 200).astype(np.uint8)
+    markers = np.zeros((16, 14, 12), np.int64)
+    markers[8, 7, 6] = 2
+    markers[3, 10, 2] = 1
+    markers[0, 0, -1] = -1
+    markers[15, 0, 11] = -3
+    u16 = (ints(214, (13, 11, 9), 0, 1001) * 3).astype(np.uint16)
+    full = lx.ndimage.generate_binary_structure(3, 3)
+    out8 = np.zeros((13, 11, 9), np.int8)
+    line = np.array([1, 0, 0, 1, 1, 2], np.uint8)
+    lmark = np.array([-1, 0, -1, 0, 0, 0], np.int64)
+    flat = np.zeros((2, 2), np.uint8)
+    big = np.array([[2**32 + 5, 0], [0, 2**31]], np.int64)
+    out: dict[str, Any] = {}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        for mode in ("fix", "reproduce"):
+            out[f"uint8.{mode}"] = lx.ndimage.watershed_ift(img, markers, upstream_defects=mode)
+            out[f"uint16.int8.{mode}"] = lx.ndimage.watershed_ift(
+                u16, markers[:13, :11, :9].astype(np.int32) * 100, full, out8.copy(),
+                upstream_defects=mode,
+            )  # fmt: skip
+            out[f"queue.{mode}"] = lx.ndimage.watershed_ift(line, lmark, upstream_defects=mode)
+            out[f"wide.{mode}"] = lx.ndimage.watershed_ift(flat, big, upstream_defects=mode)
+    return out
+
+
+@case("py.ndimage.center_of_mass", covers=("lx.ndimage.center_of_mass",))
+def _(ctx: Context) -> dict[str, Any]:
+    """Centres of mass: float32 in C and Fortran order with numpy 2.5's, 2.3's and 2.2's sums,
+    float64, labels with no index, a scalar index and a sequence of indexes, integers."""
+    # 26,970 elements: numpy 2.2 sums them in chunks of 8192, 2.3 onwards pairwise
+    w = (ints(215, (30, 31, 29), 0, 4000) / 7).astype(np.float32)
+    lab = ints(216, (30, 31, 29), 0, 4).astype(np.int32)
+    out: dict[str, Any] = {}
+    for ver in ("2.5.4", "2.3.5", "2.2.6"):
+        out[f"float32.C.{ver}"] = np.asarray(
+            lx.ndimage.center_of_mass(np.ascontiguousarray(w), numpy_version=ver)
+        )
+        out[f"float32.F.{ver}"] = np.asarray(lx.ndimage.center_of_mass(w, numpy_version=ver))
+    out["float64.labels"] = np.asarray(lx.ndimage.center_of_mass(w.astype(np.float64) / 3, lab))
+    out["index.scalar"] = np.asarray(lx.ndimage.center_of_mass(w, lab, 2))
+    out["index.list"] = np.asarray(lx.ndimage.center_of_mass(w, lab, [0, 1, 3]))
+    out["int16"] = np.asarray(lx.ndimage.center_of_mass((w - 500).astype(np.int16)))
+    return out
+
+
 # --- FSL ----------------------------------------------------------------------------------------
 
 
@@ -6460,3 +6810,2016 @@ def _(ctx: Context) -> dict[str, Any]:
         "fieldmap": Nifti(os.fspath(r.fieldmap.out_file)),
         "metadata": repr(sorted(r.fieldmap.metadata.items())),
     }
+
+
+# --- sdcflows' masks, scikit-image and niworkflows (field maps part B) -------------------------
+
+#: The synthetic head of the masks' cases: a bright ellipsoid in dim noise (within 32³).
+SHAPE_HEAD = (30, 28, 26)
+
+
+def _head_file(ctx: Context) -> str:
+    """The head as an int16 NIfTI file (2 x 2 x 2.5 mm, axis-aligned)."""
+    brain = ellipsoid(SHAPE_HEAD, 4, 5)
+    data = np.where(brain, 120 + ints(70, SHAPE_HEAD, 0, 60), ints(71, SHAPE_HEAD, 0, 6))
+    path = ctx.out("head.nii.gz")
+    lx.save((data.astype(np.int16), affine(SHAPE_HEAD, (2.0, 2.0, 2.5), oblique=False)), path)
+    return path
+
+
+@case(
+    "py.skimage",
+    covers=("lx.skimage.ball", "lx.skimage.threshold_otsu", "lx.skimage.random_walker"),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """scikit-image's ball, Otsu threshold (float, integer, histogram) and random walker (a 3-D
+    float32 system with float32 zooms in both SciPy orders, a 2-D float64 one with labels out,
+    a masked one with SKI-01 corrected and reproduced)."""
+    shape = (14, 12, 10)
+    data = (ints(80, shape, 0, 1000) / 4000).astype(np.float32)
+    data[3:10, 3:9, 2:8] += 1
+    labels = np.zeros(shape, np.int8)
+    labels[0] = 2
+    labels[-1] = 2
+    labels[6, 6, 5] = 1
+    zooms = np.array([2.0, 2.0, 2.5], np.float32)
+    prob = {
+        sp: lx.skimage.random_walker(
+            data, labels, spacing=zooms, return_full_prob=True, scipy_version=sp
+        )
+        for sp in ("1.15.3", "1.18.1")
+    }
+    d2 = (ints(81, (16, 15), 0, 1000) / 1000).astype(np.float64)
+    l2 = np.zeros((16, 15), np.int32)
+    l2[1, 1] = 1
+    l2[12, 11] = 3
+    masked = labels.astype(np.int32)
+    masked[:, :2, :] = -1
+    masked[4, 0, 4] = 1
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        fix = lx.skimage.random_walker(data, masked, spacing=zooms, return_full_prob=True)
+        rep = lx.skimage.random_walker(
+            data, masked, spacing=zooms, return_full_prob=True, upstream_defects=REPRODUCE
+        )
+    img = ints(82, (20, 20), 0, 200)
+    return {
+        "ball3": lx.skimage.ball(3),
+        "ball2.5": lx.skimage.ball(2.5, strict_radius=False),
+        "otsu.f32": np.asarray(lx.skimage.threshold_otsu(data)),
+        "otsu.int": np.asarray(lx.skimage.threshold_otsu(img)),
+        "otsu.hist": np.asarray(lx.skimage.threshold_otsu(hist=np.bincount(img.ravel()))),
+        "rw.115": prob["1.15.3"],
+        "rw.118": prob["1.18.1"],
+        "rw.2d": lx.skimage.random_walker(d2, l2, mode="cg_j"),
+        "rw.mask.fix": fix,
+        "rw.mask.reproduce": rep,
+    }
+
+
+@case("py.skimage.random_walker.nan", covers=("lx.skimage.random_walker",))
+def _(ctx: Context) -> dict[str, Any]:
+    """Relay 28: the random walker of an image with NaNs (sdcflows' ``brain_masker`` of an image
+    whose grey closing is 0 everywhere divides 0 by 0): every weight is a NaN, the conjugate
+    gradients' vectors turn NaN and never change again, SciPy runs them to ``maxiter`` and
+    larmorx stops there with the same result. A float32 system (float32 zooms) and a float64
+    one, both solvers; the NaN is x86-64's default NaN, given by its bits."""
+    shape = (12, 10, 9)
+    nan = np.array([0xFFC00000], np.uint32).view(np.float32)[0]
+    data = (ints(84, shape, 0, 1000) / 1000).astype(np.float32)
+    data[2:9, 3:8, 2:7] = nan
+    labels = np.zeros(shape, np.int8)
+    labels[0] = 2
+    labels[-1] = 2
+    labels[6, 5, 4] = 1
+    zooms = np.array([2.0, 2.0, 2.5], np.float32)
+    out: dict[str, Any] = {}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")  # convergence not achieved
+        for mode in ("cg", "cg_j"):
+            out[f"f32.{mode}"] = lx.skimage.random_walker(
+                data, labels, spacing=zooms, mode=mode, return_full_prob=True
+            )
+            out[f"f32.{mode}.labels"] = lx.skimage.random_walker(
+                data, labels, spacing=zooms, mode=mode
+            )
+        out["f64.cg_j"] = lx.skimage.random_walker(
+            data.astype(np.float64), labels, mode="cg_j", return_full_prob=True
+        )
+    return out
+
+
+@case(
+    "py.sdcflows.masks",
+    covers=(
+        "lx.sdcflows.brain_masker",
+        "lx.sdcflows.brain_extraction",
+        "lx.sdcflows.binary_dilation",
+        "lx.sdcflows.union",
+    ),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """sdcflows' brain_masker (numpy 2.2's and 2.5's arithmetic, SciPy 1.15's and 1.18's) on
+    the synthetic head, BrainExtraction's files, BinaryDilation and Union of its mask."""
+    head = _head_file(ctx)
+    old = lx.sdcflows.brain_masker(
+        head, ctx.out("old_mask.nii.gz"), numpy_version="2.2.6", scipy_version="1.15.2"
+    )
+    new = lx.sdcflows.brain_extraction(head, out_dir=ctx.out("be"))
+    _, dil_path = lx.sdcflows.binary_dilation(new.out_mask, 3, out_dir=ctx.out("dil"))
+    _, uni_path = lx.sdcflows.union(new.out_mask, dil_path, out_dir=ctx.out("uni"))
+    return {
+        "old.probseg": Nifti(old.out_probseg),
+        "old.mask": Nifti(old.out_mask),
+        "brain": Nifti(new.out_brain),
+        "probseg": Nifti(new.out_probseg),
+        "mask": Nifti(new.out_mask),
+        "dilated": Nifti(dil_path),
+        "union": Nifti(uni_path),
+    }
+
+
+@case("py.sdcflows.brain_masker.no_padding", covers=("lx.sdcflows.brain_masker",))
+def _(ctx: Context) -> dict[str, Any]:
+    """Relay 28: sdcflows' brain_masker with ``padding=0``, corrected (the probabilities of the
+    whole grid) and as sdcflows writes it (SDC-46: ``[..., 0:-0, ...]`` is empty, so the mask
+    and the probabilities are empty images and the brain is not masked)."""
+    head = _head_file(ctx)
+    out: dict[str, Any] = {}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")  # the SDC-46 notices
+        for mode in ("fix", "reproduce"):
+            r = lx.sdcflows.brain_masker(
+                head, ctx.out(f"{mode}_mask.nii.gz"), 0, upstream_defects=mode
+            )
+            out[f"{mode}.mask"] = Nifti(r.out_mask)
+            out[f"{mode}.probseg"] = Nifti(r.out_probseg)
+            out[f"{mode}.brain"] = Nifti(r.out_brain)
+    return out
+
+
+def _magnitude_files(
+    ctx: Context,
+    oblique: bool = False,
+    prefix: str = "",
+    zooms: tuple[float, float, float] = (2.0, 2.0, 2.5),
+) -> list[str]:
+    """Two int16 magnitudes of the synthetic head (the second dimmer and noisier), as a field
+    map's magnitude1 and magnitude2."""
+    brain = ellipsoid(SHAPE_HEAD, 4, 5)
+    aff = affine(SHAPE_HEAD, zooms, oblique=oblique)
+    out = []
+    for i, (lo, seed) in enumerate(((120, 90), (80, 92))):
+        data = np.where(brain, lo + ints(seed, SHAPE_HEAD, 0, 60), ints(seed + 1, SHAPE_HEAD, 0, 9))
+        path = ctx.out(f"{prefix}sub-01_magnitude{i + 1}.nii.gz")
+        lx.save((data.astype(np.int16), aff), path)
+        out.append(path)
+    return out
+
+
+@case(
+    "py.niworkflows.intra_modal_merge",
+    covers=(
+        "lx.niworkflows.intra_modal_merge",
+        "lx.niworkflows.as_closest_canonical",
+        "lx.niworkflows.reorient",
+    ),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """niworkflows' IntraModalMerge: sdcflows' magnitude merge (two int16 files, no head
+    motion, not reoriented), a field map's (not zero-based), the RAS reorientation of an oblique
+    pair, head-motion correction (mcflirt's clean-room original), grand-mean scaling (PIPE-18
+    corrected) and one 3D file (passed through)."""
+    mags = _magnitude_files(ctx)
+    obl = _magnitude_files(ctx, oblique=True, prefix="obl-")
+    out: dict[str, Any] = {}
+    runs = {
+        "magmrg": (mags, {"hmc": False, "to_ras": False}),
+        "fmapmrg": (mags, {"hmc": False, "to_ras": False, "zero_based_avg": False}),
+        "ras": (obl, {"hmc": False, "to_ras": True}),
+        "hmc": (mags, {"hmc": True, "to_ras": False, "hmc_implementation": "original"}),
+        "one": (mags[:1], {"hmc": False, "to_ras": False}),
+    }
+    for name, (files, kw) in runs.items():
+        r = lx.niworkflows.intra_modal_merge(files, out_dir=ctx.out(name), **kw)
+        out[f"{name}.merged"] = Nifti(r.out_file)
+        out[f"{name}.avg"] = Nifti(r.out_avg)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        g = lx.niworkflows.intra_modal_merge(
+            mags, hmc=False, to_ras=False, grand_mean_scaling=True, out_dir=ctx.out("gms")
+        )
+    out["gms.avg"] = Nifti(g.out_avg)
+    can = lx.niworkflows.as_closest_canonical(lx.io.load_nibabel(obl[0]))
+    out["canonical.data"] = np.asarray(can.data)
+    out["canonical.affine"] = np.asarray(can.affine)
+    os.makedirs(ctx.out("reor"), exist_ok=True)
+    out["reorient"] = Nifti(lx.niworkflows.reorient(obl[1], newpath=ctx.out("reor")))
+    return out
+
+
+@case("py.niworkflows.intra_modal_merge.ras_mask", covers=("lx.niworkflows.intra_modal_merge",))
+def _(ctx: Context) -> dict[str, Any]:
+    """Relay 28: IntraModalMerge of an oblique pair reoriented to RAS with grand-mean scaling
+    inside a mask in the files' own orientation, corrected (PIPE-40: the mask reoriented with
+    the series; PIPE-18: the scaling indexed as intended) and as niworkflows computes it (the
+    mask not reoriented, numpy's IndexError of niworkflows' own indexing: its message)."""
+    obl = _magnitude_files(ctx, oblique=True, prefix="p40-")
+    mask = ctx.out("p40-mask.nii.gz")
+    brain = ellipsoid(SHAPE_HEAD, 3, 5, shift=3)
+    lx.save((brain.astype(np.uint8), affine(SHAPE_HEAD, (2.0, 2.0, 2.5), oblique=True)), mask)
+    kw: dict[str, Any] = {"hmc": False, "to_ras": True, "grand_mean_scaling": True}
+    out: dict[str, Any] = {}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")  # the PIPE-18 and PIPE-40 notices
+        r = lx.niworkflows.intra_modal_merge(obl, mask, **kw, out_dir=ctx.out("p40-fix"))
+        out["fix.merged"] = Nifti(r.out_file)
+        out["fix.avg"] = Nifti(r.out_avg)
+        try:
+            lx.niworkflows.intra_modal_merge(
+                obl, mask, **kw, upstream_defects=REPRODUCE, out_dir=ctx.out("p40-reproduce")
+            )
+            out["reproduce.error"] = ""
+        except IndexError as e:
+            out["reproduce.error"] = str(e)
+    return out
+
+
+@case(
+    "py.sdcflows.workflows",
+    covers=(
+        "lx.sdcflows.brainextraction_workflow",
+        "lx.sdcflows.magnitude_workflow",
+        "lx.sdcflows.fmap_workflow",
+    ),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """sdcflows' brain-extraction, magnitude and field-map workflows on the synthetic head:
+    the brain extraction of one magnitude, the magnitude workflow of two, and the field-map
+    workflow from a phase difference (PRELUDE's clean-room original) and from a field map in
+    rad/s (smooth fields; 1 mm voxels: a small control grid, so the fits are quick)."""
+    mags = _magnitude_files(ctx, zooms=(1.0, 1.0, 1.0))
+    out: dict[str, Any] = {}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        bx = lx.sdcflows.brainextraction_workflow(mags[0], out_dir=ctx.out("bx"))
+    for k in ("out_file", "out_mask", "out_probseg", "out_brain"):
+        out[f"bx.{k}"] = Nifti(getattr(bx, k))
+    out["bx.n4"] = Nifti(bx.n4_file)
+    mw = lx.sdcflows.magnitude_workflow(mags, out_dir=ctx.out("mag"))
+    out["mag.ref"] = Nifti(mw.fmap_ref)
+    out["mag.mask"] = Nifti(mw.fmap_mask)
+    brain = ellipsoid(SHAPE_HEAD, 4, 5)
+    aff = affine(SHAPE_HEAD, (1.0, 1.0, 1.0), oblique=False)
+    # smooth fields (plain arithmetic) inside the head, so the fits converge quickly
+    i, j, k = np.indices(SHAPE_HEAD)
+    phase = np.where(brain, 1800 + 6 * i - 4 * j + 3 * k, ints(95, SHAPE_HEAD, 0, 4096))
+    pd = ctx.out("sub-01_phasediff.nii.gz")
+    lx.save((phase.astype(np.int16), aff), pd)
+    hz = ctx.out("sub-01_fieldmap.nii.gz")
+    field = ((5 * i - 3 * j + 2 * k) - 40).astype(np.float32) / np.float32(4.0)
+    lx.save((field, aff), hz)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        fw = lx.sdcflows.fmap_workflow(
+            mags,
+            [(pd, {"EchoTime1": 0.00492, "EchoTime2": 0.00738})],
+            out_dir=ctx.out("fmap-phasediff"),
+            prelude_implementation="original",
+        )
+        mapped = lx.sdcflows.fmap_workflow(
+            mags[:1], [(hz, {"Units": "rad/s"})], "mapped", out_dir=ctx.out("fmap-mapped")
+        )
+    for name, r in (("phasediff", fw), ("mapped", mapped)):
+        out[f"fmap.{name}.fmap"] = Nifti(r.fmap)
+        out[f"fmap.{name}.coeff"] = Nifti(r.fmap_coeff[0])
+        out[f"fmap.{name}.mask"] = Nifti(r.fmap_mask)
+    return out
+
+
+def _epi_pair(ctx: Context, volumes: int = 2) -> list[str]:
+    """Two int16 EPI series of the synthetic head (1 mm voxels), the brain shifted one voxel
+    each way along the first axis (the phase encoding: ``i`` and ``i-``), with a little noise
+    and a dimmer second volume."""
+    aff = affine(SHAPE_HEAD, (1.0, 1.0, 1.0), oblique=False)
+    out = []
+    for name, shift, seed in (("dir-RL", 1, 110), ("dir-LR", -1, 120)):
+        brain = ellipsoid(SHAPE_HEAD, 4, 5, shift=shift)
+        vols = [
+            np.where(
+                brain,
+                140 - 10 * v + ints(seed + v, SHAPE_HEAD, 0, 30),
+                ints(seed + 9, SHAPE_HEAD, 0, 5),
+            )
+            for v in range(volumes)
+        ]
+        path = ctx.out(f"sub-01_{name}_epi.nii.gz")
+        lx.save((np.stack(vols, axis=-1).astype(np.int16), aff), path)
+        out.append(path)
+    return out
+
+
+@case(
+    "py.niworkflows.robust_average",
+    covers=(
+        "lx.niworkflows.robust_average",
+        "lx.niworkflows.merge_series",
+        "lx.niworkflows.reorient_file",
+        "lx.niworkflows.reorient_image",
+        "lx.niworkflows.as_reoriented",
+        "lx.niworkflows.axcodes2ornt",
+        "lx.niworkflows.aff2axcodes",
+        "lx.niworkflows.ornt_transform",
+        "lx.niworkflows.squeeze_image",
+        "lx.niworkflows.four_to_three",
+    ),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """niworkflows' RobustAverage (3dvolreg's replica; numpy 2.2's and 2.5's arithmetic; without
+    registration, selected volumes, without the positive clip), MergeSeries (with a tolerance)
+    and ReorientImage; nibabel's orientation helpers."""
+    epis = _epi_pair(ctx, volumes=3)
+    out: dict[str, Any] = {}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        for name, kw in (
+            ("afni", {}),
+            ("afni.np22", {"numpy_version": "2.2.6"}),
+            ("none", {"mc_method": None, "nonnegative": False}),
+            ("mask", {"t_mask": [True, False, True], "two_pass": False}),
+        ):
+            r = lx.niworkflows.robust_average(epis[0], out_dir=ctx.out(f"ravg-{name}"), **kw)
+            out[f"ravg.{name}.average"] = Nifti(r.out_file)
+            out[f"ravg.{name}.sliced"] = Nifti(r.out_volumes)
+            out[f"ravg.{name}.drift"] = np.asarray(r.out_drift)
+    merged = lx.niworkflows.merge_series(epis, affine_tolerance=1e-4, out_dir=ctx.out("merge"))
+    out["merged"] = Nifti(merged)
+    out["reoriented"] = Nifti(
+        lx.niworkflows.reorient_file(merged, target_ornt="PIL", newpath=ctx.out("reor"))
+    )
+    img = lx.io.load_nibabel(epis[1])
+    vols = lx.niworkflows.four_to_three(lx.niworkflows.squeeze_image(img))
+    out["volume1"] = np.asarray(vols[1].data)
+    ras = lx.niworkflows.reorient_image(vols[0], "LPS")
+    out["lps.data"] = np.asarray(ras.data)
+    out["lps.affine"] = np.asarray(ras.affine)
+    xfm = lx.niworkflows.ornt_transform(
+        lx.niworkflows.axcodes2ornt(lx.niworkflows.aff2axcodes(img.affine)),
+        lx.niworkflows.axcodes2ornt(("A", "I", "L")),
+    )
+    out["air"] = np.asarray(lx.niworkflows.as_reoriented(vols[0], xfm).data)
+    return out
+
+
+@case(
+    "py.sdcflows.pepolar",
+    covers=(
+        "lx.sdcflows.get_trt",
+        "lx.sdcflows.get_readout_time",
+        "lx.sdcflows.select_pe_volumes",
+        "lx.sdcflows.sort_pe_blips",
+        "lx.sdcflows.uniform_grid",
+        "lx.sdcflows.pad_slices",
+        "lx.sdcflows.reorient_image_and_metadata",
+        "lx.sdcflows.select_topup_config",
+        "lx.sdcflows.topup_config_file",
+        "lx.sdcflows.topup_node",
+        "lx.sdcflows.topup_mats_to_world",
+        "lx.sdcflows.topup_workflow",
+    ),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """sdcflows' PEPOLAR estimation on a synthetic pair: init_topup_wf in 2.15's wiring (sdcflows'
+    quick configuration) and 2.17.1's (a given configuration; debug: ApplyCoeffsField with
+    TOPUP's matrices), topup's clean-room original; the steps on their own (a resampled grid, an
+    odd slice count, LAS, the readout times)."""
+    epis = _epi_pair(ctx)
+    metas = [
+        {"PhaseEncodingDirection": "i", "TotalReadoutTime": 0.05},
+        {"PhaseEncodingDirection": "i-", "EffectiveEchoSpacing": 0.0005},
+    ]
+    out: dict[str, Any] = {}
+    cfg = lx.sdcflows.topup_config_file("b02b0_2_quick.cnf")
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        w15 = lx.sdcflows.topup_workflow(
+            epis, metas, wiring="2.15", sloppy=True, out_dir=ctx.out("w15"),
+            topup_implementation="original",
+        )  # fmt: skip
+        w17 = lx.sdcflows.topup_workflow(
+            epis, metas, wiring="2.17", topup_config=cfg, debug=True, max_vols_per_pe=1,
+            out_dir=ctx.out("w17"), topup_implementation="original",
+        )  # fmt: skip
+    for name, w in (("w15", w15), ("w17", w17)):
+        out[f"{name}.fmap"] = Nifti(w.fmap)
+        out[f"{name}.coeff"] = Nifti(w.fmap_coeff[0])
+        out[f"{name}.ref"] = Nifti(w.fmap_ref)
+        out[f"{name}.mask"] = Nifti(w.fmap_mask)
+    out["w17.xfms"] = np.asarray(w17.nodes["convert_xfms"])
+    out["trt"] = np.asarray([lx.sdcflows.get_readout_time(m, epis[0]).readout_time for m in metas])
+    sel = lx.sdcflows.select_pe_volumes(epis, ["x", "x-"], [0.05, 0.05], 1, out_dir=ctx.out("sel"))
+    srt = lx.sdcflows.sort_pe_blips(sel.out_data, ["x-", "x"], [0.04, 0.05])
+    out["sorted"] = np.asarray(
+        [os.path.basename(p) == os.path.basename(sel.out_data[1]) for p in srt.out_data]
+    )
+    small = ctx.out("small.nii.gz")
+    aff = affine((16, 15, 13), (1.6, 1.7, 1.9), oblique=True)
+    lx.save((ints(130, (16, 15, 13), 0, 900).astype(np.int16), aff), small)
+    grid = lx.sdcflows.uniform_grid([sel.out_data[0], small], out_dir=ctx.out("grid"))
+    out["regrid"] = Nifti(grid.out_data[1])
+    padded, _ = lx.sdcflows.pad_slices(small, out_dir=ctx.out("pad"))
+    out["padded"] = Nifti(padded)
+    las, pe = lx.sdcflows.reorient_image_and_metadata(small, "las", ["j-"], out_dir=ctx.out("las"))
+    out["las"] = Nifti(las)
+    out["las.pe"] = np.asarray(["ijk".index(pe[0][0])])
+    out["mats"] = np.asarray(lx.sdcflows.topup_mats_to_world(w15.xfms, w15.nodes["to_las"][0]))
+    out["tier"] = np.asarray(
+        [int(os.path.basename(lx.sdcflows.select_topup_config(small, True))[6])]
+    )
+    out["topup.cmd"] = np.asarray([len(w15.nodes["topup"].cmdline)])
+    return out
+
+
+@case("py.niworkflows.intensity_clip", covers=("lx.niworkflows.intensity_clip",))
+def _(ctx: Context) -> dict[str, Any]:
+    """niworkflows' IntensityClip: the defaults (int16), uint8 inverted, float32 without the
+    positive-only percentiles, with numpy 2.2's and 2.5's percentile arithmetic."""
+    head = _head_file(ctx)
+    out = {}
+    for name, kw in (
+        ("int16", {}),
+        ("uint8", {"dtype": "uint8", "invert": True, "p_min": 10.0, "p_max": 99.9}),
+        ("float32", {"dtype": "float32", "nonnegative": False}),
+    ):
+        for npv in ("2.2.6", "2.5.4"):
+            r = lx.niworkflows.intensity_clip(
+                head, out_dir=ctx.out(f"{name}-{npv}"), numpy_version=npv, **kw
+            )
+            out[f"{name}.{npv}"] = Nifti(r.out_file)
+    return out
+
+
+@case(
+    "py.niworkflows.skullstrip",
+    covers=(
+        "lx.niworkflows.skullstrip_bold_workflow",
+        "lx.niworkflows.apply_mask",
+        "lx.niworkflows.copy_xform",
+        "lx.niworkflows.copy_header",
+        "lx.niworkflows.key_select",
+    ),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """niworkflows' init_skullstrip_bold_wf on the synthetic head (BET's and fslmaths' clean-room
+    originals: the replicas are not installed everywhere; 3dAutomask's replica), ApplyMask with a
+    4D image, _copyxform onto an oblique image, CopyHeader, KeySelect."""
+    head = _head_file(ctx)
+    out: dict[str, Any] = {}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        ss = lx.niworkflows.skullstrip_bold_workflow(
+            head,
+            out_dir=ctx.out("ss"),
+            bet_implementation="original",
+            maths_implementation="original",
+        )
+    for name in ("bet_brain", "bet_mask", "automask_mask", "automask_brain", "mask_file"):
+        out[f"ss.{name}"] = Nifti(getattr(ss, name))
+    out["ss.masked"] = Nifti(ss.skull_stripped_file)
+    epi = _epi_pair(ctx)[0]
+    mask4 = ctx.out("mask4.nii.gz")
+    lx.save(
+        (
+            ellipsoid(SHAPE_HEAD, 3, 5).astype(np.uint8),
+            affine(SHAPE_HEAD, (1.0, 1.0, 1.0), oblique=False),
+        ),
+        mask4,
+    )
+    out["masked4d"] = Nifti(lx.niworkflows.apply_mask(epi, mask4, out_dir=ctx.out("am4")))
+    obl = ctx.out("oblique.nii.gz")
+    lx.save(
+        (
+            ints(91, (12, 11, 10), 0, 50).astype(np.float32),
+            affine((12, 11, 10), (1.5, 1.6, 2.0), oblique=True),
+        ),
+        obl,
+    )
+    fixed = ctx.out("fixed.nii.gz")
+    lx.save(
+        (ints(92, (12, 11, 10), 0, 50).astype(np.int16), affine((12, 11, 10), (1.0, 1.0, 1.0))),
+        fixed,
+    )
+    out["copyxform"] = Nifti(lx.niworkflows.copy_xform(obl, fixed, message="golden"))
+    out["copyheader"] = Nifti(lx.niworkflows.copy_header(obl, mask4, out_dir=ctx.out("ch")))
+    sel = lx.niworkflows.key_select(["a", "b", "c"], "b", fmap=[1, 2, 3], ref=["x", "y", "z"])
+    out["keyselect"] = np.asarray([sel["fmap"], ord(sel["ref"]), ord(sel["key"])])
+    return out
+
+
+@case(
+    "py.sdcflows.coeff2epi",
+    covers=("lx.sdcflows.coeff2epi_workflow", "lx.sdcflows.registration_settings"),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """sdcflows' init_coeff2epi_wf on the synthetic EPI pair (the field map's reference the
+    first, the target the second, their brains as masks), sdcflows' sloppy settings, with debug's
+    warped images (their x-forms copied) and an ANTs seed."""
+    epis = _epi_pair(ctx, volumes=1)
+    masks = []
+    for i, shift in enumerate((1, -1)):
+        m = ctx.out(f"mask{i}.nii.gz")
+        lx.save(
+            (
+                ellipsoid(SHAPE_HEAD, 4, 5, shift=shift).astype(np.uint8),
+                affine(SHAPE_HEAD, (1.0, 1.0, 1.0), oblique=False),
+            ),
+            m,
+        )
+        masks.append(m)
+    refs = []
+    for i, e in enumerate(epis):
+        img = lx.io.load_nibabel(e)
+        r = ctx.out(f"ref{i}.nii.gz")
+        lx.io.save_nibabel(lx.Image(np.asarray(img.data)[..., 0], img.affine, None), r)
+        refs.append(r)
+    res = lx.sdcflows.coeff2epi_workflow(
+        refs[1], masks[1], refs[0], masks[0], sloppy=True, debug=True,
+        ants_random_seed=42, out_dir=ctx.out("c2e"),
+    )  # fmt: skip
+    out: dict[str, Any] = {
+        "xfm": lx.transforms.read(res.target2fmap_xfm[0])[0].parameters,
+        "warped": Nifti(res.target_ref),
+        "dil": Nifti(res.dilate_fmap_mask),
+        "settings": np.asarray(
+            [len(lx.sdcflows.registration_settings("sd_syn.json").read_bytes())]
+        ),
+    }
+    return out
+
+
+# --- fMRIPrep's field-map steps of the BOLD workflows --------------------------------------------
+
+
+def _coeff_grid(ctx: Context) -> tuple[str, str, str, str]:
+    """A B-spline coefficient grid (LAS, 12 mm knots), its field map's reference (LAS, 3 mm,
+    inside the grid), a LAS target (2.5 mm) and an ITK transform with a small shear (not aligned
+    with the grid: fMRIPrep's resampled path)."""
+    las = np.diag([-12.0, 12.0, 12.0, 1.0])
+    las[:3, 3] = (48.0, -54.0, -42.0)
+    coeff = ctx.out("fmap_coeff.nii.gz")
+    lx.io.save_nibabel(
+        lx.Image((ints(140, (9, 10, 8), -64, 65) / 2).astype(np.float32), las, None), coeff
+    )
+    ref_aff = np.diag([-3.0, 3.0, 3.0, 1.0])
+    ref_aff[:3, 3] = (36.0, -42.0, -30.0)
+    fref = ctx.out("fmap_ref.nii.gz")
+    lx.io.save_nibabel(
+        lx.Image(ints(141, (24, 26, 20), 0, 100).astype(np.int16), ref_aff, None), fref
+    )
+    t_aff = np.diag([-2.5, 2.5, 3.0, 1.0])
+    t_aff[:3, 3] = (30.0, -35.0, -24.0)
+    target = ctx.out("boldref.nii.gz")
+    lx.io.save_nibabel(
+        lx.Image(ints(142, (24, 28, 16), 0, 200).astype(np.int16), t_aff, None), target
+    )
+    xfm = ctx.out("boldref2fmap.txt")
+    lx.transforms.write(
+        xfm,
+        ItkTransform(
+            "AffineTransform_double_3_3",
+            np.array([1.0, 0.03, 0.0, -0.02, 1.0, 0.01, 0.0, 0.0, 1.0, 1.25, -0.5, 0.75]),
+            np.array([0.5, -1.0, 2.0]),
+        ),
+    )
+    return coeff, fref, target, xfm
+
+
+@case(
+    "py.transforms.reconstruct_fieldmap",
+    covers=(
+        "lx.transforms.reconstruct_fieldmap",
+        "lx.transforms.reconstruct_fieldmap_node",
+        "lx.transforms.aligned",
+        "lx.transforms.as_affine",
+    ),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """fMRIPrep's ReconstructFieldmap: the resampled path (a sheared transform, inverted: the
+    field on the reference's positive grid, then nitransforms' cubic resampling onto the LAS
+    target) and the direct path (the identity: the B-spline sum on the projected target), with
+    PIPE-21 corrected (the target's grid) and reproduced (mirrored along x, fMRIPrep's)."""
+    coeff, fref, target, xfm = _coeff_grid(ctx)
+    res = lx.transforms.reconstruct_fieldmap_node(
+        [coeff], target, fref, [xfm], [True], out_dir=ctx.out("rec")
+    )
+    out: dict[str, Any] = {"resampled": Nifti(str(res.out_file))}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        for mode in ("fix", "reproduce"):
+            img = lx.transforms.reconstruct_fieldmap(
+                coeff, fref, target, None, upstream_defects=mode, n_threads=2
+            )
+            out[f"direct.{mode}"] = np.ascontiguousarray(img.data)
+            out[f"direct.{mode}.affine"] = img.affine
+    chain = lx.transforms.load_transforms([xfm, xfm], [True, False])
+    combined = lx.transforms.as_affine(chain)
+    out["as_affine"] = combined.matrix
+    out["aligned"] = np.asarray(
+        [
+            lx.transforms.aligned(combined.matrix, np.eye(4)),
+            lx.transforms.aligned(np.eye(4), np.diag([-2.0, 3.0, 1.0, 1.0])),
+        ]
+    )
+    return out
+
+
+@case("py.transforms.distortion_parameters", covers=("lx.transforms.distortion_parameters",))
+def _(ctx: Context) -> dict[str, Any]:
+    """fMRIPrep's DistortionParameters: the readout time from the echo spacing and the number of
+    phase-encoding steps, the estimated one, a fallback, and no readout time (PIPE-20: None)."""
+    epi = ctx.out("epi.nii.gz")
+    lx.io.save_nibabel(lx.Image(np.zeros((8, 10, 6), np.float32), np.eye(4), None), epi)
+    base = {"PhaseEncodingDirection": "j-"}
+    rows = []
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        for meta, fb in (
+            ({"EffectiveEchoSpacing": 0.000625, **base}, None),
+            ({"EstimatedEffectiveEchoSpacing": 0.00075, **base}, "estimated"),
+            (dict(base), 0.0375),
+            (dict(base), None),
+        ):
+            r = lx.transforms.distortion_parameters(meta, epi, fb)
+            rows.append(
+                [
+                    np.nan if r.readout_time is None else r.readout_time,
+                    -1.0 if r.pe_direction is None else float(len(r.pe_direction)),
+                ]
+            )
+    return {"params": np.asarray(rows, dtype=np.float64)}
+
+
+@case("py.niworkflows.concatenate_xfms", covers=("lx.niworkflows.concatenate_xfms",))
+def _(ctx: Context) -> dict[str, Any]:
+    """niworkflows' ConcatenateXFMs: an ITK text and a MATLAB file combined (numpy's products),
+    written with nitransforms' "%g" (six digits, the centre folded in), with the inverse."""
+    txt, mat = ctx.out("a.txt"), ctx.out("b.mat")
+    lx.transforms.write(txt, AFFINE_XFM)
+    lx.transforms.write(
+        mat,
+        ItkTransform(
+            "AffineTransform_double_3_3",
+            np.array([0.99, 0.02, -0.01, -0.03, 1.01, 0.02, 0.01, -0.02, 0.98, -0.75, 1.5, 2.25]),
+            np.array([1.0, -2.0, 0.5]),
+        ),
+    )
+    res = lx.niworkflows.concatenate_xfms([txt, mat], inverse=True, out_dir=ctx.out("cat"))
+    return {
+        "affine": res.affine,
+        "text": res.text,
+        "inverse_text": res.inverse_text,
+    }
+
+
+# --- larmorprepx: fMRIPrep's field-map nodes of a BOLD run ----------------------------------
+
+
+@case(
+    "py.larmorprepx.fieldmaps",
+    covers=(
+        "lx.pipelines.larmorprepx.fieldmaps.bold_fit_fieldmap",
+        "lx.pipelines.larmorprepx.fieldmaps.resampling_fieldmap",
+        "lx.pipelines.larmorprepx.fieldmaps.select_ref",
+        "lx.pipelines.larmorprepx.fieldmaps.gen_inverses",
+        "lx.pipelines.larmorprepx.fieldmaps.fieldmap_jacobian",
+    ),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """fMRIPrep's field-map nodes of a BOLD fit on the synthetic EPI pair (the field map's
+    reference the first, the BOLD the second; 8 mm B-spline knots; a single-band reference
+    chosen; sloppy registration with a seed; BET's and fslmaths' clean-room originals) with a
+    sink copying the derivatives, the same with the transform given, a resampling workflow's
+    nodes onto a 2 mm grid through one more affine, and PIPE-20 (no readout time) reproduced."""
+    from larmorx.pipelines.larmorprepx import fieldmaps as fm
+
+    epis = _epi_pair(ctx, volumes=1)
+    masks, refs = [], []
+    for i, (e, shift) in enumerate(zip(epis, (1, -1), strict=True)):
+        m = ctx.out(f"fmask{i}.nii.gz")
+        lx.save(
+            (
+                ellipsoid(SHAPE_HEAD, 4, 5, shift=shift).astype(np.uint8),
+                affine(SHAPE_HEAD, (1.0, 1.0, 1.0), oblique=False),
+            ),
+            m,
+        )
+        masks.append(m)
+        img = lx.io.load_nibabel(e)
+        r = ctx.out(f"fref{i}.nii.gz")
+        lx.io.save_nibabel(lx.Image(np.asarray(img.data)[..., 0], img.affine, None), r)
+        refs.append(r)
+    coeff = ctx.out("sub-01_fmapid-auto00000_desc-coeff_fieldmap.nii.gz")
+    lx.io.save_nibabel(
+        lx.Image(
+            (ints(150, (6, 6, 6), -40, 41) / 4).astype(np.float32),
+            affine((6, 6, 6), (8.0, 8.0, 8.0), oblique=False),
+            None,
+        ),
+        coeff,
+    )
+    estimates = fm.FieldmapEstimates(
+        fmap_id=["auto_00000", "auto_00001"],
+        fmap_ref=[refs[0], refs[1]],
+        fmap_coeff=[[coeff], [coeff]],
+        fmap_mask=[masks[0], masks[1]],
+        sdc_method=["PEB/PEPOLAR (phase-encoding based / PE-POLARity)", "FMB"],
+    )
+    meta = {"PhaseEncodingDirection": "i", "EffectiveEchoSpacing": 0.0005}
+
+    def sink(req: Any) -> str:
+        folder = Path(ctx.out("derivatives"))
+        folder.mkdir(exist_ok=True)
+        dst = folder / f"{req.role}{''.join(Path(req.in_file).suffixes)}"
+        shutil.copyfile(req.in_file, dst)
+        return str(dst)
+
+    out: dict[str, Any] = {}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        fit = fm.bold_fit_fieldmap(
+            epis[1], meta, "auto_00000", estimates, refs[1], refs[1], masks[1],
+            out_dir=ctx.out("fit"), sbref_files=[refs[1]], jacobian=True, sloppy=True,
+            ants_random_seed=42, sink=sink, fsl_implementation="original", n_threads=2,
+        )  # fmt: skip
+        pre = fm.bold_fit_fieldmap(
+            epis[1], meta, "auto_00000", estimates, refs[1], refs[1], masks[1],
+            out_dir=ctx.out("pre"), boldref2fmap_xfm=fit.boldref2fmap_xfm,
+            fsl_implementation="original",
+        )  # fmt: skip
+        target = ctx.out("t1w_ref.nii.gz")
+        lx.save(
+            (
+                np.zeros((16, 15, 14), np.int16),
+                affine((16, 15, 14), (2.0, 2.0, 2.0), oblique=False),
+            ),
+            target,
+        )
+        to_anat = ctx.out("boldref2anat.txt")
+        lx.transforms.write(to_anat, AFFINE_XFM)
+        rs = fm.resampling_fieldmap(
+            "auto_00000", estimates, target, fit.boldref2fmap_xfm, meta, epis[1], [to_anat],
+            out_dir=ctx.out("rs"),
+        )  # fmt: skip
+        p20 = fm.bold_fit_fieldmap(
+            epis[1], {"PhaseEncodingDirection": "i"}, "auto_00000", estimates, refs[1], refs[1],
+            masks[1], out_dir=ctx.out("p20"), boldref2fmap_xfm=fit.boldref2fmap_xfm,
+            fsl_implementation="original", upstream_defects="reproduce",
+        )  # fmt: skip
+    out["fit.xfm"] = Path(fit.boldref2fmap_xfm).read_text(encoding="utf-8")
+    for name in ("fieldmap", "unwarped_boldref", "coreg_boldref", "bold_mask"):
+        out[f"fit.{name}"] = Nifti(getattr(fit, name))
+        out[f"pre.{name}"] = Nifti(getattr(pre, name))
+    out["fit.params"] = np.asarray([fit.readout_time, float(len(fit.pe_direction))])
+    out["rs.fieldmap"] = Nifti(rs.out_file)
+    out["rs.inverse"] = np.asarray(rs.inverse)
+    out["p20.unwarped"] = Nifti(p20.unwarped_boldref)
+    out["helpers"] = np.asarray(
+        [
+            fit.sdc_boldref == refs[1],
+            fm.select_ref([], [refs[0]]) == refs[0],
+            fm.gen_inverses(None) == [True],
+            fm.fieldmap_jacobian("PEPOLAR"),
+            fm.fieldmap_jacobian("PHASEDIFF"),
+            fm.fieldmap_jacobian("MAPPED", force=["fmap-jacobian"]),
+            p20.readout_time is None,
+        ]
+    )
+    try:
+        fm.bold_fit_fieldmap(
+            epis[1], {"PhaseEncodingDirection": "i"}, "auto_00000", estimates, refs[1],
+            refs[1], masks[1], out_dir=ctx.out("err"), boldref2fmap_xfm=fit.boldref2fmap_xfm,
+        )  # fmt: skip
+        out["pipe20.error"] = ""
+    except fm.FieldmapMetadataError as err:
+        out["pipe20.error"] = str(err).split(" (")[0]
+    return out
+
+
+# --- SciPy's affine_transform; sdcflows' SyN preprocessing and niworkflows' EPI reference ----
+
+
+@case("py.ndimage.affine_transform", covers=("lx.ndimage.affine_transform",))
+def _(ctx: Context) -> dict[str, Any]:
+    """A general matrix (SciPy 1.16's and 1.15's order of its sums), a diagonal given as a
+    vector (``zoom_shift``) and a homogeneous 4 x 4 matrix, at orders 0, 1 and 3, an integer
+    output and two boundary modes."""
+    data = _ndimage_input()
+    m = np.array([[0.75, 0.125, 0.0], [-0.0625, 0.875, 0.25], [0.03125, 0.0, 1.125]])
+    off = np.array([0.5, -1.25, 0.75])
+    out: dict[str, Any] = {}
+    for order in (0, 1, 3):
+        for spv in ("1.15.3", "1.18.1"):
+            out[f"matrix.{order}.{spv}"] = lx.ndimage.affine_transform(
+                data, m, off, output_shape=(13, 9, 8), order=order, scipy_version=spv
+            )
+        out[f"zoom.{order}"] = lx.ndimage.affine_transform(
+            data, np.array([1 / 3, 0.5, 1.25]), off, output_shape=(20, 18, 6), order=order,
+            mode="nearest",
+        )  # fmt: skip
+    h = np.eye(4)
+    h[:3, :3] = m
+    h[:3, 3] = off
+    out["homogeneous.int16"] = lx.ndimage.affine_transform(
+        data.astype(np.int16), h, output=np.int16, order=0, mode="grid-constant", cval=-3.0
+    )
+    return out
+
+
+def _syn_inputs(ctx: Context) -> dict[str, Any]:
+    """A 4-volume oblique EPI series (beyond 28.6 degrees: sdcflows makes it plumb), a T1w-like
+    head (1.5 mm, axis-aligned), its brain mask, an MNI-to-T1w affine and a coarse prior on the
+    atlas's grid."""
+    shape = SHAPE_HEAD
+    brain = ellipsoid(shape, 4, 5)
+    vols = [
+        np.where(brain, 220 - (40 if v == 0 else 0) + ints(200 + v, shape, 0, 25), ints(209, shape, 0, 6))
+        for v in range(4)
+    ]  # fmt: skip
+    epi = ctx.out("sub-01_task-rest_bold.nii.gz")
+    lx.save((np.stack(vols, axis=-1).astype(np.int16), affine(shape, (2.5, 2.5, 2.75))), epi)
+    ashape = (32, 30, 28)
+    anat = ctx.out("sub-01_desc-preproc_T1w.nii.gz")
+    aff = affine(ashape, (2.25, 2.25, 2.5), oblique=False)
+    lx.save((phantom(ashape, 210).astype(np.int16), aff), anat)
+    mask = ctx.out("sub-01_desc-brain_mask.nii.gz")
+    lx.save((ellipsoid(ashape, 7, 10).astype(np.uint8), aff), mask)
+    xfm = ctx.out("from-MNI_to-T1w.txt")
+    lx.transforms.write(
+        xfm,
+        ItkTransform(
+            "AffineTransform_double_3_3",
+            np.array([1.0, 0.02, 0.0, -0.01, 1.0, 0.0, 0.0, 0.0, 1.0, 1.5, -2.0, 0.5]),
+            np.array([0.0, 0.0, 0.0]),
+        ),
+    )
+    prior = ctx.out("prior.nii.gz")
+    paff = np.diag([8.0, 8.0, 8.0, 1.0])
+    paff[:3, 3] = (1.0, 1.0, 1.0)
+    lx.save(((ints(211, (32, 32, 32), 0, 8)).astype(np.float32), paff), prior)
+    return {"epi": epi, "anat": anat, "mask": mask, "xfm": xfm, "prior": prior}
+
+
+@case(
+    "py.sdcflows.syn_preprocessing",
+    covers=(
+        "lx.sdcflows.syn_preprocessing_workflow",
+        "lx.sdcflows.deoblique",
+        "lx.sdcflows.reoblique",
+        "lx.sdcflows.set_dtype",
+        "lx.sdcflows.merge_meta",
+        "lx.sdcflows.obliquity",
+        "lx.sdcflows.fmap_atlas",
+        "lx.sdcflows.fmap_atlas_affine",
+    ),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """sdcflows' init_syn_preprocessing_wf as fMRIPrep calls it (non-steady states detected, the
+    prior: a synthetic one through sdcflows' atlas affine), Reoblique of its plumb reference, and
+    the atlas's checksum refusing another file."""
+    inp = _syn_inputs(ctx)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        res = lx.sdcflows.syn_preprocessing_workflow(
+            [inp["epi"]], [{"PhaseEncodingDirection": "j-"}], inp["anat"], inp["mask"], inp["xfm"],
+            out_dir=ctx.out("syn"), auto_bold_nss=True, prior_file=inp["prior"],
+            ants_random_seed=7,
+        )  # fmt: skip
+    out: dict[str, Any] = {
+        name: Nifti(getattr(res, name))
+        for name in ("deob_epi", "sampling_ref", "epi_mask", "anat_ref", "anat_mask", "sd_prior")
+    }
+    out["epi_ref"] = Nifti(res.epi_ref[0])
+    out["xfm"] = lx.transforms.read(res.epi2anat_xfm[0])[0].parameters
+    out["meta"] = np.asarray([ord(c) for c in res.epi_ref[1]["PhaseEncodingDirection"]])
+    out["plumb"] = np.asarray(
+        [lx.sdcflows.obliquity(lx.io.load_nibabel(p).affine).max() > 0.5 for p in (inp["epi"], res.deob_epi)]
+    )  # fmt: skip
+    field = ctx.out("field.nii.gz")
+    lx.io.save_nibabel(
+        lx.Image(ints(212, SHAPE_HEAD, -40, 40).astype(np.float32), lx.io.load_nibabel(res.deob_epi).affine, None),
+        field,
+    )  # fmt: skip
+    epi3 = ctx.out("epi3.nii.gz")
+    img = lx.io.load_nibabel(inp["epi"])
+    lx.io.save_nibabel(lx.Image(np.asarray(img.data)[..., 0], img.affine, img.header), epi3)
+    r = lx.sdcflows.reoblique(epi3, res.deob_epi, field, res.epi_mask, out_dir=ctx.out("reob"))
+    out["reob.epi"] = Nifti(r[0])
+    out["reob.field"] = Nifti(r[1])
+    out["reob.mask"] = Nifti(r[2])
+    out["int16"] = np.asarray([lx.sdcflows.set_dtype(epi3) == epi3])
+    out["atlas_affine"] = File(lx.sdcflows.fmap_atlas_affine())
+    old = os.environ.get("LARMORX_SDCFLOWS_ATLAS")
+    os.environ["LARMORX_SDCFLOWS_ATLAS"] = inp["prior"]
+    try:
+        lx.sdcflows.fmap_atlas()
+        refused = False
+    except ValueError:
+        refused = True
+    finally:
+        if old is None:
+            os.environ.pop("LARMORX_SDCFLOWS_ATLAS", None)
+        else:
+            os.environ["LARMORX_SDCFLOWS_ATLAS"] = old
+    out["atlas_refused"] = np.asarray([refused])
+    return out
+
+
+@case(
+    "py.sdcflows.syn_sdc",
+    covers=(
+        "lx.sdcflows.syn_sdc_workflow",
+        "lx.sdcflows.warp_dir",
+        "lx.sdcflows.mm2vox",
+        "lx.sdcflows.adjust_zooms",
+        "lx.sdcflows.norm_lap",
+    ),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """sdcflows' init_syn_sdc_wf on init_syn_preprocessing_wf's outputs of the synthetic head
+    (the registration seeded; the sloppy settings, the B-spline fit at 4 mm, debug's warped
+    images and interval volumes, Laplacian weights clipped to 0.5: fMRIPrep's call differs only
+    by its settings file), its helpers' values, _warp_dir on a fixed grid in S, R, A order
+    (SDC-16) and _norm_lap's constant image (SDC-14), each fixed and reproduced."""
+    inp = _syn_inputs(ctx)
+    meta = {"PhaseEncodingDirection": "j-", "TotalReadoutTime": 0.0315}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        pre = lx.sdcflows.syn_preprocessing_workflow(
+            [inp["epi"]], [meta], inp["anat"], inp["mask"], inp["xfm"], out_dir=ctx.out("pre"),
+            auto_bold_nss=True, prior_file=inp["prior"], ants_random_seed=7,
+        )  # fmt: skip
+        res = lx.sdcflows.syn_sdc_workflow(
+            pre.epi_ref, pre.epi_mask, pre.anat_ref, pre.anat_mask, pre.sd_prior,
+            out_dir=ctx.out("syn"), name="wf_auto_00000", sloppy=True, debug=True,
+            laplacian_weight=(0.3, 0.7), ants_random_seed=7,
+        )  # fmt: skip
+    out: dict[str, Any] = {
+        name: Nifti(getattr(res, name)) for name in ("fmap", "fmap_ref", "fmap_mask")
+    }
+    out["fmap_coeff"] = Nifti(res.fmap_coeff[0])
+    out["warped"] = Nifti(res.files["syn_warped_image"])
+    for name in ("lap_anat_norm", "lap_epi_norm", "epi_umask", "extract_field", "zooms_field"):
+        out[name] = Nifti(res.files[name])
+    out["ro"] = np.asarray([res.readout_time])
+    out["warp_dir"] = np.asarray(
+        lx.sdcflows.warp_dir(res.files["clip_epi"], pre.anat_ref, "j-", nlevels=3)
+    )
+    sra = ctx.out("sra.nii.gz")
+    perm = np.zeros((4, 4))
+    perm[2, 0] = perm[0, 1] = perm[1, 2] = 2.0
+    perm[3, 3] = 1.0
+    lx.save((np.zeros((5, 6, 7), np.float32), perm), sra)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        out["sdc16"] = np.asarray(
+            [lx.sdcflows.warp_dir(res.files["clip_epi"], sra, "j-", 1, upstream_defects=m)[0] for m in ("fix", "reproduce")]
+        )  # fmt: skip
+    cfg = json.loads(lx.sdcflows.registration_settings("sd_syn_sloppy.json").read_text())
+    out["mm2vox"] = np.asarray(
+        lx.sdcflows.mm2vox(res.files["clip_epi"], pre.anat_ref, "i", cfg), dtype=np.float64
+    )
+    out["zooms"] = np.asarray(
+        [*lx.sdcflows.adjust_zooms(pre.anat_ref, pre.epi_ref[0]), *res.zooms], dtype=np.float64
+    )
+    flat = ctx.out("flat.nii.gz")
+    lx.save((np.full((6, 5, 4), 3.0, dtype=np.float32), np.eye(4)), flat)
+    errors = []
+    for mode in ("fix", "reproduce"):
+        try:
+            lx.sdcflows.norm_lap(flat, out_dir=ctx.out("flat"), upstream_defects=mode)
+            errors.append(0)
+        except ValueError:
+            errors.append(1)
+        except IndexError:
+            errors.append(2)
+    out["sdc14"] = np.asarray(errors)
+    return out
+
+
+@case(
+    "py.niworkflows.epi_reference",
+    covers=(
+        "lx.niworkflows.epi_reference_workflow",
+        "lx.niworkflows.validate_image",
+        "lx.niworkflows.nonsteady_states_detector",
+        "lx.niworkflows.is_outlier",
+        "lx.niworkflows.binarize",
+        "lx.niworkflows.generate_sampling_reference",
+        "lx.niworkflows.resample_img_nearest",
+    ),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """niworkflows' ValidateImage (a valid header, a missing sform, no x-form at all),
+    NonsteadyStatesDetector and nipype's is_outlier (PIPE-23 fixed and reproduced), Binarize,
+    GenerateSamplingReference (nilearn 0.14 and 0.11, a field-of-view mask, a target resolution,
+    xform code 4), nilearn 0.11's whole-voxel copy, and init_epi_reference_wf (one input; two
+    need mri_robust_template)."""
+    inp = _syn_inputs(ctx)
+    out: dict[str, Any] = {}
+    img = lx.io.load_nibabel(inp["epi"])
+    hdr = img.header
+    assert hdr is not None
+    for name, fields in (
+        ("valid", {}),
+        ("sform0", {"sform_code": 0}),
+        ("none", {"sform_code": 0, "qform_code": 0}),
+    ):
+        p = ctx.out(f"val_{name}.nii.gz")
+        lx.io.save_nibabel(lx.Image(img.data, img.affine, hdr.replace(**fields)), p)
+        v = lx.niworkflows.validate_image(p, out_dir=ctx.out(f"v_{name}"))
+        out[f"validate.{name}"] = Nifti(v.out_file)
+        out[f"validate.{name}.report"] = File(v.out_report)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        nss = lx.niworkflows.nonsteady_states_detector(inp["epi"], n_volumes=10)
+        out["nss"] = np.asarray([*nss.t_mask, nss.n_dummy])
+        flat = np.asarray([5.0, 5.0, 5.0, 9.0, 5.0], dtype=np.float32)
+        out["is_outlier"] = np.asarray(
+            [
+                lx.niworkflows.is_outlier(np.asarray([9.0, 8.5, 1.0, 1.2, 0.9, 1.1, 1.0])),
+                lx.niworkflows.is_outlier(flat),
+                lx.niworkflows.is_outlier(flat, upstream_defects="reproduce"),
+            ]
+        )
+        b = lx.niworkflows.binarize(inp["prior"], 3.0, out_dir=ctx.out("bin"))
+        out["binarize.masked"] = Nifti(b.out_file)
+        out["binarize.mask"] = Nifti(b.out_mask)
+        for tag, kw in (
+            ("0.14", {}),
+            ("0.11", {"nilearn_version": "0.11.1", "scipy_version": "1.15.3"}),
+            ("fov", {"fov_mask": None}),
+            ("res", {"target_resolution": (2.0, 2.5, 3.0), "xform_code": 4}),
+        ):
+            if "fov_mask" in kw:
+                fm = ctx.out("fov_mask.nii.gz")
+                lx.save((ellipsoid(SHAPE_HEAD, 1, 2).astype(np.uint8), img.affine), fm)
+                kw = {"fov_mask": fm}
+            ref3 = ctx.out(f"epi3_{tag}.nii.gz")
+            lx.io.save_nibabel(lx.Image(np.asarray(img.data)[..., 0], img.affine, hdr), ref3)
+            out[f"sampling.{tag}"] = Nifti(
+                lx.niworkflows.generate_sampling_reference(ref3, inp["anat"], out_dir=ctx.out(f"s_{tag}"), **kw)
+            )  # fmt: skip
+        anat = lx.io.load_nibabel(inp["anat"])
+        shifted = np.array(anat.affine, copy=True)
+        shifted[:3, 3] += (3.0, -1.5, 4.5)
+        copy = lx.niworkflows.resample_img_nearest(
+            anat, shifted, (30, 30, 24), nilearn_version="0.11.1"
+        )
+        out["copy011"] = np.asarray(copy.data)
+        ref = lx.niworkflows.epi_reference_workflow(
+            inp["epi"], auto_bold_nss=True, out_dir=ctx.out("ref")
+        )
+        out["ref"] = Nifti(ref.epi_ref_file)
+        out["ref.n4"] = Nifti(ref.per_run_ref_files[0])
+        out["ref.drift"] = np.asarray(ref.drift_factors[0])
+        try:
+            lx.niworkflows.epi_reference_workflow(
+                [inp["epi"], inp["epi"]], t_masks=[None, None], out_dir=ctx.out("ref2")
+            )
+            two = False
+        except NotImplementedError:
+            two = True
+    out["two_inputs_refused"] = np.asarray([two])
+    return out
+
+
+def _bids_tree(root: Path) -> Path:
+    """A small BIDS dataset (files of zero bytes, one real header for a readout time from the
+    echo spacing): two sessions, an EPI pair, a phase difference, a single-direction EPI with its
+    targets, a direct field map with B0FieldIdentifier, inheritance, an ignored folder."""
+
+    def put(rel: str, meta: dict[str, Any] | None = None) -> None:
+        f = root / rel
+        f.parent.mkdir(parents=True, exist_ok=True)
+        f.write_bytes(b"")
+        if meta is not None:
+            f.with_name(f.name.split(".")[0] + ".json").write_text(
+                json.dumps(meta), encoding="utf-8"
+            )
+
+    root.mkdir(parents=True)
+    (root / "dataset_description.json").write_text(
+        '{"Name": "g", "BIDSVersion": "1.8.0"}', encoding="utf-8"
+    )
+    (root / "task-rest_bold.json").write_text(
+        '{"RepetitionTime": 2, "PhaseEncodingDirection": "j"}', encoding="utf-8"
+    )
+    put("code/sub-01_T1w.nii.gz")
+    for ses in ("a", "b"):
+        p = f"sub-01/ses-{ses}/"
+        put(p + f"anat/sub-01_ses-{ses}_T1w.nii.gz")
+        for run in ("1", "02"):
+            put(
+                p + f"func/sub-01_ses-{ses}_task-rest_run-{run}_bold.nii.gz",
+                {"TotalReadoutTime": 0.05, "Zeta": [1, 2.5]},
+            )
+        put(p + f"func/sub-01_ses-{ses}_task-rest_run-02_sbref.nii.gz", {"TotalReadoutTime": 0.04})
+    put(
+        "sub-01/ses-a/fmap/sub-01_ses-a_phasediff.nii.gz",
+        {
+            "EchoTime1": 0.004,
+            "EchoTime2": 0.006,
+            "IntendedFor": "bids::sub-01/ses-a/func/sub-01_ses-a_task-rest_run-1_bold.nii.gz",
+        },
+    )
+    put("sub-01/ses-a/fmap/sub-01_ses-a_magnitude1.nii.gz")
+    put("sub-01/ses-a/fmap/sub-01_ses-a_magnitude2.nii.gz")
+    for d, pe in (("AP", "j-"), ("PA", "j")):
+        put(
+            f"sub-01/ses-b/fmap/sub-01_ses-b_dir-{d}_epi.nii.gz",
+            {
+                "PhaseEncodingDirection": pe,
+                "TotalReadoutTime": 0.05,
+                "IntendedFor": ["ses-b/func/sub-01_ses-b_task-rest_run-1_bold.nii.gz"],
+            },
+        )
+    put(
+        "sub-01/ses-b/fmap/sub-01_ses-b_acq-one_epi.nii.gz",
+        {
+            "PhaseEncodingDirection": "j-",
+            "TotalReadoutTime": 0.05,
+            "IntendedFor": [
+                "ses-b/func/sub-01_ses-b_task-rest_run-02_sbref.nii.gz",
+                "ses-b/func/sub-01_ses-b_task-rest_run-02_bold.nii.gz",
+            ],
+        },
+    )
+    put(
+        "sub-01/ses-a/fmap/sub-01_ses-a_acq-map_fieldmap.nii.gz",
+        {"Units": "Hz", "B0FieldIdentifier": ["map", "x"]},
+    )
+    put("sub-01/ses-a/fmap/sub-01_ses-a_acq-map_magnitude.nii.gz", {"B0FieldIdentifier": "map"})
+    lx.save(
+        (np.arange(10 * 12 * 3, dtype=np.int16).reshape(10, 12, 3), np.eye(4)),
+        str(root / "sub-01/ses-b/fmap/sub-01_ses-b_acq-ees_dir-AP_epi.nii.gz"),
+    )
+    (root / "sub-01/ses-b/fmap/sub-01_ses-b_acq-ees_dir-AP_epi.json").write_text(
+        '{"PhaseEncodingDirection": "j", "EffectiveEchoSpacing": 0.0005}', encoding="utf-8"
+    )
+    return root
+
+
+def _portable(obj: Any, root: Path) -> Any:
+    """Values as JSON text with the dataset's root and the platform's separator removed."""
+
+    def walk(v: Any) -> Any:
+        if isinstance(v, dict):
+            return [[walk(k), walk(x)] for k, x in v.items()]
+        if isinstance(v, (list, tuple)):
+            return [walk(x) for x in v]
+        if isinstance(v, (set, frozenset)):
+            return sorted(json.dumps(walk(x)) for x in v)
+        if isinstance(v, (bool, int, float)) or v is None:
+            return [type(v).__name__, repr(v)]
+        if hasattr(v, "relpath"):
+            return ["file", type(v).__name__, Path(v.path).relative_to(root).as_posix()]
+        if hasattr(v, "bids_id") and hasattr(v, "sources"):
+            return [
+                "estimation",
+                v.method.name,
+                v.bids_id,
+                v.sanitized_id,
+                walk(v.sources),
+                repr(v),
+            ]
+        if hasattr(v, "suffix") and hasattr(v, "find_meta"):
+            return ["fieldmapfile", walk(v.path), v.suffix, walk(v.entities), walk(v.metadata)]
+        text = str(v).replace(str(root), "<root>").replace("\\", "/")
+        return [type(v).__name__, text]
+
+    return np.frombuffer(json.dumps(walk(obj)).encode(), dtype=np.uint8).copy()
+
+
+@case(
+    "py.bids.layout",
+    covers=(
+        "lx.bids.BIDSLayout.get",
+        "lx.bids.BIDSLayout.get_entities",
+        "lx.bids.BIDSLayout.get_file",
+        "lx.bids.BIDSLayout.get_files",
+        "lx.bids.BIDSLayout.get_metadata",
+        "lx.bids.BIDSLayout.parse_file_entities",
+        "lx.bids.BIDSLayout.add_derivatives",
+        "lx.bids.BIDSFile.get_entities",
+        "lx.bids.BIDSFile.get_metadata",
+        "lx.bids.BIDSJSONFile.get_dict",
+        "lx.bids.BIDSJSONFile.get_json",
+        "lx.bids.Entity.match_file",
+        "lx.bids.Config.load",
+        "lx.bids.parse_file_entities",
+        "lx.bids.listify",
+        "lx.bids.natural_sort",
+    ),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """pybids 0.22.0's index of a small dataset (both pybids versions' entity order): files,
+    entities, inherited metadata, the get_<entity>s values, queries with lists, None, Query's
+    values, regular expressions, integer entities, return types, a derivatives dataset."""
+    root = _bids_tree(Path(ctx.out("ds")))
+    deriv = root / "derivatives" / "pipe"
+    deriv.mkdir(parents=True)
+    (deriv / "dataset_description.json").write_text(
+        '{"Name": "p", "BIDSVersion": "1.8.0", "DatasetType": "derivative", "GeneratedBy": [{"Name": "pipe"}]}',
+        encoding="utf-8",
+    )
+    (deriv / "sub-01" / "fmap").mkdir(parents=True)
+    (
+        deriv / "sub-01" / "fmap" / "sub-01_fmapid-auto00000_desc-preproc_fieldmap.nii.gz"
+    ).write_bytes(b"")
+    Q = lx.bids.Query
+    out: dict[str, Any] = {}
+    for version in lx.bids.PYBIDS_VERSIONS:
+        lay = lx.bids.BIDSLayout(root, validate=False, pybids_version=version)
+        files = lay.get()
+        out[f"files_{version}"] = _portable(
+            [[f, f.entities, f.get_entities(), f.get_entities(metadata=True), f.get_metadata(), lay.get_metadata(f.path, include_entities=True)] for f in files],
+            root,
+        )  # fmt: skip
+    lay = lx.bids.BIDSLayout(root, validate=False, derivatives=True)
+    lay2 = lx.bids.BIDSLayout(root, validate=False)
+    lay2.add_derivatives(deriv)
+    queries = [
+        dict(suffix="bold", extension="nii.gz"), dict(run=1), dict(run=["02", 1]), dict(session=None),
+        dict(session=Q.REQUIRED, suffix="epi"), dict(IntendedFor=Q.REQUIRED), dict(acquisition=[None, "one"]),
+        dict(B0FieldIdentifier='"MAP"', regex_search=True), dict(suffix="fieldmap", scope="derivatives"),
+        dict(return_type="id", target="run"), dict(return_type="id", target="B0FieldIdentifier"),
+        dict(return_type="dir", target="session"), dict(return_type="filename", suffix="T1w"),
+    ]  # fmt: skip
+    out["queries"] = _portable([lay.get(**q) for q in queries], root)
+    out["derivatives"] = _portable(
+        [lay2.get(desc="preproc"), sorted(lay2.derivatives), lay2.get_files(scope="derivatives")],
+        root,
+    )
+    out["targets"] = _portable(
+        [
+            lay.get_subjects(),
+            lay.get_sessions(),
+            lay.get_runs(),
+            lay.get_directions(),
+            lay.get_B0FieldIdentifiers(),
+            sorted(lay.get_entities()),
+        ],
+        root,
+    )
+    errors = []
+    for call in (
+        lambda: lay.get(subjekt="01"),
+        lambda: lay.get(return_type="id"),
+        lambda: lay.get_unknowns(),
+        lambda: lx.bids.BIDSLayout(root / "sub-01"),
+    ):
+        try:
+            call()
+        except Exception as err:
+            errors.append([type(err).__name__, str(err)])
+    out["errors"] = _portable(errors, root)
+    bold = lay.get_file("sub-01/ses-a/func/sub-01_ses-a_task-rest_run-1_bold.nii.gz")
+    js = lay.get(suffix="bold", extension=".json")[0]
+    ents = lx.bids.Config.load("bids").entities
+    out["misc"] = _portable([
+        lay.parse_file_entities("/" + bold.relpath), lx.bids.parse_file_entities("sub-01_ses-x_desc-y_bold.nii.gz"),
+        js.get_dict(), js.get_json(), ents["run"].match_file(bold.path), lx.bids.listify("a"), lx.bids.listify(None),
+        lx.bids.natural_sort(["a10", "a9", "B1"]), lay2.get_file("nothing"),
+    ], root)  # fmt: skip
+    return out
+
+
+@case(
+    "py.sdcflows.estimators",
+    covers=(
+        "lx.sdcflows.find_estimators",
+        "lx.sdcflows.find_anatomical_estimators",
+        "lx.sdcflows.get_identifier",
+        "lx.sdcflows.clear_registry",
+        "lx.sdcflows.relative_to_root",
+        "lx.sdcflows.FieldmapEstimation.paths",
+        "lx.sdcflows.FieldmapRegistry.clear",
+        "lx.sdcflows.bidict.add",
+        "lx.sdcflows.bidict.clear",
+        "lx.sdcflows.EstimatorRegistry.get_key",
+    ),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """sdcflows' estimators of the small dataset, fixed (2.15.2's search) and reproduced
+    (2.17.1's), with filters, sessions and fieldmap-less estimators; the registries; the
+    FieldmapFile and FieldmapEstimation errors; bidict's automatic names (SDC-18)."""
+    root = _bids_tree(Path(ctx.out("ds")))
+    lay = lx.bids.BIDSLayout(root, validate=False)
+    out: dict[str, Any] = {}
+    cases = [{}, {"force_fmapless": True}, {"fmapless": False}, {"bids_filters": {"session": "b"}, "force_fmapless": True},
+             {"bids_filters": {"acquisition": "one"}, "force_fmapless": True}, {"bids_filters": {"datatype": "fmap"}, "force_fmapless": True},
+             {"sessions": ["a"], "anat_suffix": ["T1w", "T2w"]}]  # fmt: skip
+    for mode in ("fix", "reproduce"):
+        results = []
+        for kw in cases:
+            if (
+                mode == "reproduce"
+                and kw.get("force_fmapless")
+                and "datatype" not in kw.get("bids_filters", {})
+            ):
+                # SDC-45: sdcflows' fieldmap-less search takes entities from the folders above the
+                # dataset, so its reproduced result depends on the temporary folder's name
+                continue
+            reg = lx.sdcflows.FieldmapRegistry()
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                found = lx.sdcflows.find_estimators(
+                    layout=lay, subject="01", registry=reg, upstream_defects=mode, **kw
+                )
+            # reproduced, the files' entities hold the folders above the dataset (SDC-45)
+            shown = found if mode == "fix" else [(e.method.name, e.bids_id) for e in found]
+            results.append([shown, [e.paths() for e in found], sorted(reg.estimators.items()), sorted((k, sorted(v)) for k, v in reg.intents.items()),
+                            lx.sdcflows.get_identifier("ses-b/func/sub-01_ses-b_task-rest_run-1_bold.nii.gz", registry=reg)])  # fmt: skip
+        out[f"wrangler_{mode}"] = _portable(results, root)
+    t1 = lay.get(suffix="T1w", extension=".nii.gz")[0]
+    specs = lx.sdcflows.find_anatomical_estimators(
+        anat_file=t1,
+        layout=lay,
+        subject="01",
+        sessions=["b"],
+        base_entities={"subject": "01", "extension": [".nii", ".nii.gz"]},
+        suffixes=["bold"],
+    )
+    out["anat"] = _portable(specs, root)
+    # SDC-45, PIPE-37: below a folder whose name holds pybids' den- and sub- patterns, the same
+    deep = _bids_tree(Path(ctx.out("golden-x")) / "sub-pilot" / "ds")
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        lay2 = lx.bids.BIDSLayout(deep, validate=False)
+        again = lx.sdcflows.find_estimators(
+            layout=lay2, subject="01", registry=lx.sdcflows.FieldmapRegistry(), force_fmapless=True
+        )
+        first = lx.sdcflows.find_estimators(
+            layout=lay, subject="01", registry=lx.sdcflows.FieldmapRegistry(), force_fmapless=True
+        )
+    out["below_entity_folders"] = _portable(again, deep)
+    if not np.array_equal(out["below_entity_folders"], _portable(first, root)):
+        raise AssertionError("SDC-45, PIPE-37: other estimators below golden-x/sub-pilot/")
+    errors = []
+    reg = lx.sdcflows.FieldmapRegistry()
+    fmap = root / "sub-01/ses-b/fmap"
+    for srcs in ([fmap / "sub-01_ses-b_dir-AP_epi.nii.gz"], [fmap / "sub-01_ses-b_dir-AP_epi.nii.gz", fmap / "sub-01_ses-b_acq-one_epi.nii.gz"],
+                 [fmap / "nothing_epi.nii.gz"], [fmap / "sub-01_ses-b_dir-AP_epi.json"], [root / "sub-01/ses-a/anat/sub-01_ses-a_T1w.nii.gz"]):  # fmt: skip
+        try:
+            lx.sdcflows.FieldmapEstimation(srcs, registry=reg)
+            errors.append("built")
+        except Exception as err:
+            errors.append([type(err).__name__, str(err)])
+    for mode in ("fix", "reproduce"):
+        try:
+            lx.sdcflows.get_identifier("x", "bogus", upstream_defects=mode)
+        except KeyError as err:
+            errors.append(str(err))
+    out["errors"] = _portable(errors, root)
+    d = lx.sdcflows.bidict()
+    d["auto_00001"] = "a"
+    keys = [d.add("b")]
+    d["auto_00005"] = "c"
+    keys += [d.add("e"), d.add("f")]
+    er = lx.sdcflows.EstimatorRegistry()
+    er.add(("f3", "f4"))
+    er.add(("f1", "f2"))
+    keys += [er.get_key("f3"), er.get_key("zz"), er.sources]
+    d.clear()
+    reg.clear()
+    lx.sdcflows.clear_registry(lx.sdcflows.FieldmapRegistry())
+    keys += [
+        dict(d),
+        dict(reg.estimators),
+        lx.sdcflows.relative_to_root("/x/sub-01/ses-a/anat/sub-01_T1w.nii.gz"),
+    ]
+    out["bidict"] = _portable(keys, root)
+    return out
+
+
+@case(
+    "py.larmorprepx.estimators",
+    covers=(
+        "lx.pipelines.larmorprepx.estimators.fmriprep_layout",
+        "lx.pipelines.larmorprepx.estimators.map_fieldmap_estimation",
+        "lx.pipelines.larmorprepx.estimators.get_estimator",
+        "lx.pipelines.larmorprepx.estimators.collect_fieldmaps",
+        "lx.pipelines.larmorprepx.estimators.split_precomputed",
+        "lx.pipelines.larmorprepx.estimators.setting_up_message",
+        "lx.pipelines.larmorprepx.estimators.check_pepolar_scheme",
+    ),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """fMRIPrep's estimator selection on the small dataset for each combination of
+    --use-syn-sdc, --force syn-sdc and --ignore fieldmaps; its log lines; precomputed field
+    maps from a derivatives folder; the PEPOLAR scheme check."""
+    le = lx.pipelines.larmorprepx.estimators
+    root = _bids_tree(Path(ctx.out("ds")))
+    lay = le.fmriprep_layout(root, ["01"])
+    bold = [[f.path] for f in lay.get(suffix="bold", extension=".nii.gz")]
+    import logging
+
+    class Lines(logging.Handler):
+        def __init__(self) -> None:
+            super().__init__()
+            self.lines: list[str] = []
+
+        def emit(self, record: logging.LogRecord) -> None:
+            self.lines.append(f"{record.levelname} {record.getMessage()}")
+
+    logger = logging.getLogger("golden.larmorprepx")
+    logger.propagate = False
+    logger.setLevel(logging.DEBUG)
+    cap = Lines()
+    logger.handlers[:] = [cap]
+    results = []
+    for ign in (False, True):
+        for syn in (False, "error"):
+            for force in (False, True):
+                reg = lx.sdcflows.FieldmapRegistry()
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    try:
+                        ests, emap = le.map_fieldmap_estimation(
+                            lay,
+                            "01",
+                            None,
+                            bold,
+                            ign,
+                            syn,
+                            force,
+                            None,
+                            logger=logger,
+                            registry=reg,
+                        )
+                        res: Any = [
+                            ests,
+                            {Path(k).relative_to(root).as_posix(): v for k, v in emap.items()},
+                            [le.setting_up_message(e) for e in ests],
+                        ]
+                        for e in ests:
+                            le.check_pepolar_scheme(e)
+                        res.append([le.get_estimator(lay, b[0], registry=reg) for b in bold])
+                    except Exception as err:
+                        res = [type(err).__name__, str(err)]
+                results.append(res)
+    out: dict[str, Any] = {"select": _portable(results, root), "log": _portable(cap.lines, root)}
+    deriv = Path(ctx.out("deriv"))
+    (deriv / "sub-01" / "fmap").mkdir(parents=True)
+    (deriv / "dataset_description.json").write_text(
+        '{"Name": "d", "BIDSVersion": "1.8.0", "DatasetType": "derivative", "GeneratedBy": [{"Name": "sdcflows"}]}',
+        encoding="utf-8",
+    )
+    for desc in ("preproc", "coeff", "magnitude"):
+        (
+            deriv / "sub-01" / "fmap" / f"sub-01_fmapid-auto00000_desc-{desc}_fieldmap.nii.gz"
+        ).write_bytes(b"")
+    cache = le.collect_fieldmaps(deriv, {"subject": "01"})
+    reg = lx.sdcflows.FieldmapRegistry()
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        ests = lx.sdcflows.find_estimators(layout=lay, subject="01", registry=reg)
+    cap.lines.clear()
+    todo, pared = le.split_precomputed(ests, cache, logger=logger)
+    rel = {
+        k: {kk: Path(vv).relative_to(deriv).as_posix() for kk, vv in v.items()}
+        for k, v in cache.items()
+    }
+    out["precomputed"] = _portable([rel, [e.bids_id for e in todo], list(pared), cap.lines], root)
+    two = lx.sdcflows.FieldmapEstimation(
+        [root / "sub-01/ses-b/fmap/sub-01_ses-b_dir-AP_epi.nii.gz", root / "sub-01/ses-b/fmap/sub-01_ses-b_acq-ees_dir-AP_epi.nii.gz",
+         lx.sdcflows.FieldmapFile(root / "sub-01/ses-b/func/sub-01_ses-b_task-rest_run-1_bold.nii.gz",
+                                  metadata=lay.get_metadata(str(root / "sub-01/ses-b/func/sub-01_ses-b_task-rest_run-1_bold.nii.gz")))],
+        registry=lx.sdcflows.FieldmapRegistry(),
+    )  # fmt: skip
+    try:
+        le.check_pepolar_scheme(two)
+        refused = "accepted"
+    except NotImplementedError as err:
+        refused = str(err)
+    out["sophisticated"] = _portable(refused, root)
+    return out
+
+
+def _text(path: str, root: Path) -> np.ndarray:
+    """A text file's bytes with the folder ``root`` and the platform's separator removed."""
+    text = Path(path).read_text(encoding="utf-8")
+    text = text.replace(json.dumps(str(root))[1:-1], "<root>").replace(str(root), "<root>")
+    text = text.replace("\\\\", "/")
+    return np.frombuffer(text.encode(), dtype=np.uint8).copy()
+
+
+@case(
+    "py.niworkflows.derivatives_data_sink",
+    covers=(
+        "lx.niworkflows.derivatives_data_sink",
+        "lx.niworkflows.copy_any",
+        "lx.niworkflows.get_tf_resolution",
+        "lx.bids.build_path",
+    ),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """niworkflows' DerivativesDataSink on small files: a copy with compression, a header fix
+    (xform codes 0, time units), a float mask coerced to uint8, a non-NIfTI file, two files
+    named by a list-valued custom entity, the sidecar's metadata (meta_dict, constructor and
+    input metadata), a template's resolution; pybids' build_path on its own examples."""
+    brain = ellipsoid(SHAPE_HEAD, 4, 5)
+    aff = affine(SHAPE_HEAD, (2.0, 2.0, 2.5), oblique=True)
+    field = (ints(130, SHAPE_HEAD, 0, 2000).astype(np.float32) - np.float32(1000)) / np.float32(8)
+    plain = ctx.out("in_plain.nii")
+    lx.save((field, aff), plain)
+    series = ctx.out("in_series.nii.gz")
+    lx.save((np.stack([field, field * np.float32(2)], axis=-1), aff), series)
+    hdr = lx.io.load(series).header.replace(qform_code=0, sform_code=0, xyzt_units=10)
+    lx.save(lx.io.load(series).replace(header=hdr), series)
+    mask = ctx.out("in_mask.nii.gz")
+    lx.save((brain.astype(np.float32), aff), mask)
+    other = ctx.out("in_other.json")
+    Path(other).write_text('{"a": 1}', encoding="utf-8")
+    base = Path(ctx.out("deriv"))
+    src = "/bids/sub-01/ses-a/fmap/sub-01_ses-a_acq-x_run-02_fieldmap.nii.gz"
+    fm = {"suffix": "fieldmap", "datatype": "fmap", "desc": "preproc", "fmapid": "auto00000"}
+    tpl = {"res": {"02": {"zooms": [2.0, 2.0, 2.0]}}}
+    out: dict[str, Any] = {}
+    calls = {
+        "copy": dict(in_file=plain, compress=True, entities=fm, metadata={"Units": "Hz"}),
+        "fix": dict(in_file=series, compress=True, entities=fm, meta_dict={"B": 1, "C": 2},
+                    init_metadata={"C": 3}, metadata={"RepetitionTime": 2.0}),
+        "mask": dict(in_file=mask, compress=True, dismiss_entities=("run",),
+                     entities={"suffix": "mask", "datatype": "fmap", "desc": "brain"}),
+        "other": dict(in_file=other, entities={"suffix": "fieldmap", "datatype": "fmap"}),
+        "two": dict(in_file=[plain, mask], compress=[True], allowed_entities=("custom",),
+                    entities={**fm, "custom": ["a", "b"]}),
+        "template": dict(in_file=plain, entities={"suffix": "bold", "datatype": "func", "desc": "preproc", "space": "MNI152NLin2009cAsym", "resolution": "2"},
+                         template_metadata={"MNI152NLin2009cAsym": tpl}, templateflow_version="25.1.2"),
+    }  # fmt: skip
+    for name, kw in calls.items():
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            res = lx.niworkflows.derivatives_data_sink(
+                source_file=src, base_directory=base / name, **kw
+            )
+        rel = [Path(f).relative_to(base / name).as_posix() for f in res.out_file]
+        out[f"{name}.names"] = np.frombuffer(json.dumps([rel, res.compression, res.fixed_hdr]).encode(), dtype=np.uint8).copy()  # fmt: skip
+        for i, f in enumerate(res.out_file):
+            out[f"{name}.file{i}"] = Nifti(f) if ".nii" in f else File(f)
+        if res.out_meta:
+            out[f"{name}.json"] = _text(res.out_meta, base)
+    copied = ctx.out("copied.nii.gz")
+    lx.niworkflows.copy_any(plain, copied)
+    out["copy_any"] = Nifti(copied)
+    out["tf"] = np.frombuffer(
+        json.dumps([lx.niworkflows.get_tf_resolution("X", r, tpl, "1") for r in ("2", "02", "3")]).encode(),
+        dtype=np.uint8,
+    ).copy()  # fmt: skip
+    pats = [
+        "sub-{subject}[/ses-{session}]/anat/sub-{subject}[_ses-{session}][_acq-{acquisition}]_{suffix<T[12]w|inplaneT[12]>}{extension<.nii|.nii.gz|.json>|.nii.gz}",
+        "sub-{subject}[/ses-{session}]/anat/sub-{subject}[_space-{space}][_desc-{desc}]_{suffix<T1w|T2w|inplaneT[12]>}{extension<.nii|.nii.gz|.json>|.nii.gz}",
+        "sub-{subject}[/ses-{session}]/{datatype|dwi}/sub-{subject}_{suffix|dwi}{extension<.bval|.bvec|.json|.nii.gz|.nii>|.nii.gz}",
+    ]  # fmt: skip
+    ents = [
+        ({"extension": ".nii", "space": "MNI", "subject": "001", "suffix": "inplaneT2"}, False),
+        ({"extension": ".nii", "space": "MNI", "subject": "001", "suffix": "inplaneT2"}, True),
+        ({"extension": "", "subject": "001", "suffix": "inplaneT2", "space": None}, True),
+        ({"extension": ".bvec", "subject": ["01", "02", "03"]}, True),
+        ({"extension": ".nii", "subject": "001", "suffix": "bold"}, False),
+        ({"extension": ".nii", "subject": "001", "suffix": "T1w", "datatype": "anat"}, True),
+    ]
+    out["build_path"] = np.frombuffer(
+        json.dumps([lx.bids.build_path(e, pats, strict=s) for e, s in ents]).encode(),
+        dtype=np.uint8,
+    ).copy()
+    return out
+
+
+def _fmap_bids(ctx: Context, name: str = "bids") -> Path:
+    """A small BIDS dataset: a direct field map (Hz) with its magnitude, an EPI pair (AP, PA)
+    and the BOLD run both are intended for."""
+    root = Path(ctx.out(name))
+    (root / "sub-01" / "fmap").mkdir(parents=True)
+    (root / "sub-01" / "func").mkdir(parents=True)
+    (root / "dataset_description.json").write_text(
+        '{"Name": "golden", "BIDSVersion": "1.8.0"}', encoding="utf-8"
+    )
+    mags = _magnitude_files(ctx, zooms=(1.0, 1.0, 1.0))
+    aff = affine(SHAPE_HEAD, (1.0, 1.0, 1.0), oblique=False)
+    i, j, k = np.indices(SHAPE_HEAD)
+    field = ((5 * i - 3 * j + 2 * k) - 40).astype(np.float32) / np.float32(4.0)
+    fmap = root / "sub-01" / "fmap"
+    lx.save((field, aff), str(fmap / "sub-01_fieldmap.nii.gz"))
+    shutil.copyfile(mags[0], fmap / "sub-01_magnitude.nii.gz")
+    intent = '"IntendedFor": ["func/sub-01_task-rest_bold.nii.gz"]'
+    (fmap / "sub-01_fieldmap.json").write_text(f'{{"Units": "Hz", {intent}}}', encoding="utf-8")
+    (fmap / "sub-01_magnitude.json").write_text("{}", encoding="utf-8")
+    for d, pe in (("AP", "j-"), ("PA", "j")):
+        shutil.copyfile(mags[1], fmap / f"sub-01_dir-{d}_epi.nii.gz")
+        (fmap / f"sub-01_dir-{d}_epi.json").write_text(
+            f'{{"PhaseEncodingDirection": "{pe}", "TotalReadoutTime": 0.05, {intent}}}',
+            encoding="utf-8",
+        )
+    lx.save((np.stack([field] * 2, axis=-1), aff), str(root / "sub-01" / "func" / "sub-01_task-rest_bold.nii.gz"))  # fmt: skip
+    (root / "sub-01" / "func" / "sub-01_task-rest_bold.json").write_text(
+        '{"PhaseEncodingDirection": "j", "TotalReadoutTime": 0.05, "RepetitionTime": 2.0}',
+        encoding="utf-8",
+    )
+    return root
+
+
+@case(
+    "py.sdcflows.fmap_preproc",
+    covers=(
+        "lx.sdcflows.fmap_preproc_workflow",
+        "lx.sdcflows.estimator_workflow",
+        "lx.sdcflows.check_readout",
+        "lx.sdcflows.workflow_options",
+        "lx.sdcflows.fmap_derivatives_workflow",
+        "lx.sdcflows.gendesc",
+        "lx.sdcflows.getname",
+        "lx.sdcflows.getsourcetype",
+        "lx.sdcflows.selectintent",
+        "lx.sdcflows.FieldmapEstimation.get_workflow",
+        "lx.sdcflows.EstimatorWorkflow.run",
+    ),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """sdcflows' init_fmap_preproc_wf on a small BIDS dataset: a direct field map (Hz) with its
+    magnitude estimated and written as derivatives (field, reference, mask, coefficients,
+    sidecar); a PEPOLAR estimator's workflow built (inputs, readout check) and the helpers."""
+    root = _fmap_bids(ctx)
+    registry = lx.sdcflows.FieldmapRegistry()
+    lay = lx.bids.BIDSLayout(root, validate=False)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        ests = lx.sdcflows.find_estimators(
+            layout=lay, subject="01", fmapless=False, registry=registry
+        )
+    out: dict[str, Any] = {}
+    out["estimators"] = _portable([(e.method.name, e.bids_id, e.sources) for e in ests], root)
+    mapped = [e for e in ests if e.method == lx.sdcflows.EstimatorType.MAPPED]
+    pepolar = [e for e in ests if e.method == lx.sdcflows.EstimatorType.PEPOLAR]
+    wf = pepolar[0].get_workflow(sloppy=True, topup_config="b02b0.cnf")
+    lx.sdcflows.check_readout(pepolar[0])
+    out["pepolar.workflow"] = _portable(
+        [wf.name, wf.function, sorted(wf.options.items()), wf.inputs, wf.input_fields,
+         lx.sdcflows.estimator_workflow(pepolar[0]) is wf], root,
+    )  # fmt: skip
+    out["options"] = _portable(
+        {k: sorted(v) for k, v in lx.sdcflows.workflow_options().items()}, root
+    )
+    deriv = Path(ctx.out("deriv"))
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        res = lx.sdcflows.fmap_preproc_workflow(
+            mapped, omp_nthreads=1, output_dir=deriv, subject="01", work_dir=ctx.out("work")
+        )
+    out["outputs"] = _portable(
+        [[Path(f).relative_to(deriv).as_posix() for f in res.fmap + res.fmap_ref + res.fmap_mask],
+         [[Path(c).relative_to(deriv).as_posix() for c in cs] for cs in res.fmap_coeff],
+         res.fmap_id, res.method], root,
+    )  # fmt: skip
+    for f in sorted(deriv.rglob("*")):
+        if f.is_file():
+            rel = f.relative_to(deriv).as_posix()
+            out[f"deriv.{rel}"] = _text(str(f), root) if f.suffix == ".json" else Nifti(str(f))
+    run = res.estimators[0].workflow.run(ctx.out("rerun"))
+    out["rerun.fmap"] = Nifti(str(run.fmap))
+    out["helpers"] = _portable(
+        [lx.sdcflows.gendesc("a"), lx.sdcflows.gendesc(["a", "b"]), lx.sdcflows.getname(["x/a.nii", "b"]),
+         lx.sdcflows.getsourcetype(["p/sub-01_epi.nii"]), lx.sdcflows.getsourcetype(["p/m.nii.gz"]),
+         lx.sdcflows.selectintent([{"IntendedFor": ["b", "a"]}, {"IntendedFor": "a"}, {}])], root,
+    )  # fmt: skip
+    return out
+
+
+@case(
+    "cli.sdcflows.sdcflows",
+    covers=(
+        "cli:sdcflows sdcflows",
+        "lx.sdcflows.run_app",
+        "lx.sdcflows.sdcflows_workflow",
+        "lx.sdcflows.SdcflowsWorkflow.run",
+        "lx.niworkflows.collect_participants",
+    ),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """sdcflows' BIDS app (``larmorx sdcflows sdcflows``) on a small dataset: the dry run's
+    listing of a direct field map and an EPI pair (the command line's route), the direct field
+    map estimated end to end and written as derivatives, ``init_sdcflows_wf`` built in Python."""
+    import contextlib
+    import io
+
+    from larmorx.cli import run
+
+    root = _fmap_bids(ctx)
+    env = {"OMP_NUM_THREADS": "1"}
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf), warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        code = run(["larmorx", "sdcflows", "sdcflows", str(root), ctx.out("dry"), "participant",
+                    "-w", ctx.out("dry-work"), "-n"])  # fmt: skip
+    text = buf.getvalue().replace(str(root), "<root>").replace("\\", "/")
+    out: dict[str, Any] = {
+        "dry.code": np.array([code]),
+        "dry.listing": np.frombuffer(text.encode(), np.uint8).copy(),
+    }
+    # the direct field map alone, estimated through the command line
+    mapped = _fmap_bids(ctx, "bids-mapped")
+    for f in (mapped / "sub-01" / "fmap").glob("*_epi.*"):
+        f.unlink()
+    deriv = Path(ctx.out("deriv"))
+    with contextlib.redirect_stdout(io.StringIO()):
+        code = lx.sdcflows.run_app(
+            [str(mapped), str(deriv), "participant", "-w", ctx.out("work"), "--no-fmapless",
+             "--nprocs", "1", "--omp-nthreads", "1", "--notrack"],
+            upstream_defects="fix", env=env,
+        )  # fmt: skip
+    out["run.code"] = np.array([code])
+    for f in sorted(deriv.rglob("*")):
+        if f.is_file():
+            rel = f.relative_to(deriv).as_posix()
+            out[f"run.{rel}"] = _text(str(f), mapped) if f.suffix == ".json" else Nifti(str(f))
+    lay = lx.bids.BIDSLayout(str(root), validate=False)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        wf = lx.sdcflows.sdcflows_workflow(lay, output_dir=ctx.out("py"), fmapless=False)
+    out["py.workflow"] = _portable(
+        [wf.subjects, [(e.method.name, e.bids_id, e.sources) for e in wf.all_estimators],
+         [(w.name, w.function, sorted(w.options.items())) for w in wf.workflows],
+         lx.niworkflows.collect_participants(lay)], root,
+    )  # fmt: skip
+    return out
+
+
+@case(
+    "py.larmorprepx.fmap_estimation",
+    covers=(
+        "lx.pipelines.larmorprepx.estimators.precomputed_fieldmaps",
+        "lx.pipelines.larmorprepx.estimators.plan_fieldmap_estimation",
+        "lx.pipelines.larmorprepx.estimators.FieldmapEstimationPlan.run",
+        "lx.pipelines.larmorprepx.estimators.estimate_fieldmaps",
+        "lx.pipelines.larmorprepx.estimators.merge_buffers",
+        "lx.sdcflows.build_workflows",
+    ),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """fMRIPrep's field-map estimation stage on a small BIDS dataset: the PEPOLAR estimator's
+    field map precomputed in a derivatives folder, the direct field map estimated (its
+    derivatives written as fMRIPrep writes them, out_path_base ''), the buffers merged; the plan
+    with both estimated (the PEPOLAR inputs set, not run) and its boilerplate."""
+    root = _fmap_bids(ctx, "bids-est")
+    lay = lx.bids.BIDSLayout(root, validate=False)
+    le = lx.pipelines.larmorprepx.estimators
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        ests = lx.sdcflows.find_estimators(
+            layout=lay, subject="01", fmapless=False, registry=lx.sdcflows.FieldmapRegistry()
+        )
+    pepolar = next(e for e in ests if e.method == lx.sdcflows.EstimatorType.PEPOLAR)
+    fid = re.sub(r"[^a-zA-Z0-9]", "", pepolar.bids_id)
+    pre = Path(ctx.out("precomputed"))
+    (pre / "sub-01" / "fmap").mkdir(parents=True)
+    (pre / "dataset_description.json").write_text(
+        '{"Name": "pre", "BIDSVersion": "1.8.0", "DatasetType": "derivative"}', encoding="utf-8"
+    )
+    aff = affine(SHAPE_FMAP, (2.0, 2.0, 2.5), oblique=False)
+    for desc in ("preproc", "coeff", "epi"):
+        lx.save((ints(140, SHAPE_FMAP, 0, 50).astype(np.float32), aff),
+                str(pre / "sub-01" / "fmap" / f"sub-01_fmapid-{fid}_desc-{desc}_fieldmap.nii.gz"))  # fmt: skip
+    out: dict[str, Any] = {}
+    cache = le.precomputed_fieldmaps({"pre": pre}, "01")
+    out["cache"] = _portable(cache, pre)
+    planned = le.plan_fieldmap_estimation(
+        ests, output_dir="/out", subject="01", omp_nthreads=2, fallback_total_readout_time=0.05
+    )
+    built = lx.sdcflows.build_workflows([pepolar], omp_nthreads=2, fallback_total_readout_time=0.05)
+    out["plan.all"] = _portable(
+        [[e.bids_id for e in planned.estimators], sorted((k, v.name) for k, v in planned.estimator_types.items()),
+         sorted(planned.preproc_options.items()), planned.inputs, planned.desc, planned.needs_anat,
+         [w.name for w in planned.workflows], [w.name for w in built]], root,
+    )  # fmt: skip
+    deriv = Path(ctx.out("deriv-est"))
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        res = le.estimate_fieldmaps(
+            ests, cache, output_dir=deriv, subject="01", work_dir=ctx.out("work-est")
+        )
+    est = res.estimates
+
+    def rel(v: Any) -> Any:
+        if isinstance(v, (list, tuple)):
+            return [rel(x) for x in v]
+        if v == "MISSING":
+            return v
+        return Path(v).relative_to(deriv if str(v).startswith(str(deriv)) else pre).as_posix()
+
+    out["buffers"] = _portable(
+        [rel(list(est.fmap)), rel(list(est.fmap_ref)), rel(list(est.fmap_coeff)),
+         rel(list(est.fmap_mask)), list(est.fmap_id), list(est.sdc_method), res.std2anat_xfm,
+         sorted(res.syn_preprocessing)], root,
+    )  # fmt: skip
+    for f in sorted(deriv.rglob("*")):
+        if f.is_file():
+            r = f.relative_to(deriv).as_posix()
+            out[f"deriv.{r}"] = _text(str(f), root) if f.suffix == ".json" else Nifti(str(f))
+    merged = le.merge_buffers({}, res.preproc)
+    out["merge_buffers"] = _portable([rel(list(merged.fmap_coeff)), list(merged.fmap_id)], root)
+    return out
+
+
+@case(
+    "py.sdcflows.qwarp",
+    covers=(
+        "lx.sdcflows.flatten",
+        "lx.sdcflows.sorted_pe",
+        "lx.sdcflows.qwarp2ants",
+        "lx.sdcflows.qwarp_workflow",
+    ),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """The Python steps of sdcflows' 3dQwarp estimation: a scaled int16 series and a 3D file
+    flattened (max_trs 3), the phase-encoding order of three files, a float32 warp
+    (X x Y x Z x 1 x 3) converted for ANTs, a one-slice warp as sdcflows writes it and corrected
+    (SDC-24), the workflow's NotImplementedError."""
+    aff = affine(SHAPE_FMAP, (2.0, 2.0, 2.5), oblique=True)
+    series = ctx.out("sub-01_dir-PA_epi.nii.gz")
+    lx.save((ints(150, (*SHAPE_FMAP, 4), -300, 900).astype(np.int16), aff), series)
+    hdr = lx.io.load(series).header.replace(scl_slope=0.25, scl_inter=3.0)
+    lx.save(lx.io.load(series, scaled=False).replace(header=hdr), series)
+    vol = ctx.out("sub-01_dir-AP_epi.nii.gz")
+    lx.save((ints(151, SHAPE_FMAP, 0, 500).astype(np.int16), aff), vol)
+    out: dict[str, Any] = {}
+    meta = [{"PhaseEncodingDirection": "j-"}, {"PhaseEncodingDirection": "j"}]
+    res = lx.sdcflows.flatten([vol, series], meta, 3, out_dir=ctx.out("flatten"))
+    names = [Path(f).name for f in res.out_data]
+    out["flatten"] = np.frombuffer(json.dumps([names, list(res.out_meta)]).encode(), dtype=np.uint8).copy()  # fmt: skip
+    for f in res.out_data[1:]:
+        out[f"flatten.{Path(f).name}"] = Nifti(f)
+    order = lx.sdcflows.sorted_pe([(vol, meta[0]), (series, meta[1]), ("x.nii.gz", meta[0])])
+    out["sorted_pe"] = np.frombuffer(
+        json.dumps([[[Path(f).name for f in fs] for fs in order[0]], order[1]]).encode(), dtype=np.uint8
+    ).copy()  # fmt: skip
+    i, j, k = np.indices(SHAPE_FMAP)
+    disp = np.stack([(i - 9) / 7, (j - 8) / 5, (k - 5) / 3], axis=-1).astype(np.float32)
+    warp = ctx.out("w_WARP.nii.gz")
+    lx.save((disp[:, :, :, np.newaxis, :], aff), warp)
+    out["qwarp2ants"] = Nifti(lx.sdcflows.qwarp2ants(warp, out_dir=ctx.out("q")))
+    slab = ctx.out("slab_WARP.nii.gz")
+    lx.save((np.ascontiguousarray(disp[:, :, :1, np.newaxis, :]), aff), slab)
+    for mode in ("fix", "reproduce"):
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            f = lx.sdcflows.qwarp2ants(slab, out_dir=ctx.out(f"q-{mode}"), upstream_defects=mode)
+        out[f"qwarp2ants.slab.{mode}"] = Nifti(f)
+    try:
+        lx.sdcflows.qwarp_workflow([vol, series], meta)
+        out["qwarp_workflow"] = np.frombuffer(b"built", dtype=np.uint8).copy()
+    except NotImplementedError as err:
+        out["qwarp_workflow"] = np.frombuffer(str(err).encode(), dtype=np.uint8).copy()
+    return out
+
+
+@case(
+    "py.sdcflows.unwarp",
+    covers=("lx.sdcflows.unwarp_workflow", "lx.sdcflows.unwarp_num_threads"),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """sdcflows' ``init_unwarp_wf`` on a synthetic two-volume int16 EPI (LAS) with coefficients
+    on its control grid: the series with an ITK transform (``data2fmap_xfm``) and head-motion
+    matrices (ignored), its first volume without the Jacobian and with a fallback readout time,
+    both transforms with ``reproduce`` (SDC-26: ``data2fmap_xfm`` used) and refused by default,
+    the thread settings."""
+    shape = (24, 22, 16)
+    aff = affine(shape, (3.0, 3.0, 3.5), oblique=False)
+    aff[0, :] = -aff[0, :]
+    head = ellipsoid(shape, 9, 10)
+    vol = np.where(head, 300 + ints(160, shape, 0, 50), ints(161, shape, 0, 7))
+    series = ctx.out("sub-01_task-x_bold.nii.gz")
+    lx.save((np.stack([vol, vol + 4], -1).astype(np.int16), aff), series)
+    first = ctx.out("sub-01_task-x_boldref.nii.gz")
+    lx.save((vol.astype(np.int16), aff), first)
+    grid = lx.sdcflows.bspline_grid(lx.Image(vol.astype(np.float32), aff), SDC_HF)
+    coeff = ctx.out("coeff.nii.gz")
+    lx.save((((ints(162, tuple(grid.shape), 0, 9) - 4) * 1.5).astype(np.float32), np.asarray(grid.affine)), coeff)  # fmt: skip
+    xfm = _sdc_xfm(ctx.out("xfm.txt"))
+    meta = {"PhaseEncodingDirection": "j-", "TotalReadoutTime": 0.05}
+    hmc = [np.eye(4).tolist(), np.eye(4).tolist()]
+    out: dict[str, Any] = {}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        a = lx.sdcflows.unwarp_workflow(series, meta, [coeff], data2fmap_xfm=xfm, hmc_xforms=hmc,
+                                        out_dir=ctx.out("a"))  # fmt: skip
+        b = lx.sdcflows.unwarp_workflow(first, {"PhaseEncodingDirection": "i"}, coeff,
+                                        jacobian=False, fallback_total_readout_time=0.04,
+                                        out_dir=ctx.out("b"))  # fmt: skip
+        c = lx.sdcflows.unwarp_workflow(first, meta, coeff, data2fmap_xfm=xfm, fmap2data_xfm=xfm,
+                                        out_dir=ctx.out("c"), upstream_defects="reproduce")  # fmt: skip
+    for name, r in (("a", a), ("b", b), ("c", c)):
+        for k in ("fieldmap", "corrected", "corrected_ref", "corrected_mask"):
+            out[f"{name}.{k}"] = Nifti(getattr(r, k))
+    out["c.both_refused"] = np.frombuffer(
+        _sdc_error(lambda: lx.sdcflows.unwarp_workflow(first, meta, coeff, data2fmap_xfm=xfm,
+                                                       fmap2data_xfm=xfm)).encode(),
+        dtype=np.uint8,
+    ).copy()  # fmt: skip
+    out["num_threads"] = np.array(
+        [a.num_threads, b.num_threads]
+        + [lx.sdcflows.unwarp_num_threads(o, f, d) for o in (1, 8) for f in (None, 0.5, 12.5)
+           for d in (False, True)],
+        dtype=np.int64,
+    )  # fmt: skip
+    return out
+
+
+@case(
+    "py.sdcflows.match_histogram",
+    covers=("lx.sdcflows.match_histogram", "lx.skimage.match_histograms"),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """Histogram matching (sdcflows' ``match_histogram`` over scikit-image's
+    ``match_histograms``): a scaled int16 image onto a float32 reference with masks (float64
+    values), uint8 onto uint8 (``bincount``), uint16 onto float32 (SKI-02: corrected, and
+    scikit-image's error with ``reproduce``), int16 onto a wider range (SDC-27: clamped), and
+    arrays with channels on the first axis and float16."""
+    shape = (14, 12, 10)
+    aff = affine(shape, (2.0, 2.0, 2.5), oblique=False)
+    base = ints(170, shape, 0, 211).astype(np.float64)
+    files = {}
+    for name, data in (
+        ("ref_f", (base * 1.75 - 20).astype(np.float32)),
+        ("ref_wide", (base * 400 - 9000).astype(np.float32)),
+        ("ref_u8", ((base * 3) % 251).astype(np.uint8)),
+        ("img_i16", ((base * 13) % 997 - 300).astype(np.int16)),
+        ("img_u8", ((base * 5) % 199).astype(np.uint8)),
+        ("img_u16", ((base * 31) % 4001).astype(np.uint16)),
+        ("mask", (ints(171, shape, 0, 3) != 0).astype(np.uint8)),
+    ):
+        files[name] = ctx.out(f"{name}.nii.gz")
+        lx.save((data, aff), files[name])
+    scaled = ctx.out("img_scaled.nii.gz")
+    lx.save((((base * 7) % 401).astype(np.int16), aff), scaled)
+    hdr = lx.io.load(scaled).header.replace(scl_slope=0.5, scl_inter=3.0)
+    lx.save(lx.io.load(scaled, scaled=False).replace(header=hdr), scaled)
+    out: dict[str, Any] = {}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        for label, args in (
+            ("scaled", (files["ref_f"], scaled, files["mask"], files["mask"])),
+            ("u8", (files["ref_u8"], files["img_u8"])),
+            ("u16_float", (files["ref_f"], files["img_u16"])),
+            ("wide", (files["ref_wide"], files["img_i16"])),
+        ):
+            out[label] = Nifti(lx.sdcflows.match_histogram(*args, out_dir=ctx.out(label)))
+        # scikit-image's error (its type: numpy's message names the platform's intp)
+        err = _sdc_error(lambda: lx.sdcflows.match_histogram(
+            files["ref_f"], files["img_u16"], out_dir=ctx.out("r"), upstream_defects="reproduce"))  # fmt: skip
+        out["u16_float.reproduce"] = np.frombuffer(
+            err.split(":")[0].encode(), dtype=np.uint8
+        ).copy()
+    g = np.indices((6, 5, 4)).sum(0)
+    rgb = np.stack([g * 3 % 17, g * 5 % 23, g * 7 % 29], 0).astype(np.float32)
+    ref = np.stack([g * 2 % 19, g * 3 % 13, g % 7], 0).astype(np.float64) * 1.5
+    out["arrays.channels"] = lx.skimage.match_histograms(rgb, ref, channel_axis=0)
+    out["arrays.float16"] = lx.skimage.match_histograms((g / 3).astype(np.float16), ref[0])
+    return out
+
+
+@case("py.sdcflows.epi_mask", covers=("lx.sdcflows.epi_mask",))
+def _(ctx: Context) -> dict[str, Any]:
+    """sdcflows' quick EPI mask: a noisy float32 head image (grey opening and closing with
+    balls, the percentile window, the centre of mass, the watershed) in both modes (SciPy's
+    watershed across the edges and its queue change 7 voxels; corrected by default) and with
+    numpy 2.3's arithmetic, a scaled int16 image whose object touches the edges, and the mask's
+    file."""
+    shape = (26, 28, 20)
+    aff = affine(shape, (3.0, 3.0, 3.5), oblique=False)
+    i, j, k = np.indices(shape)
+    r2 = ((i - 13) / 9.0) ** 2 + ((j - 14) / 11.0) ** 2 + ((k - 10) / 7.0) ** 2
+    noise = ints(252, shape, 0, 400)
+    head = np.where(r2 < 1, 600 + noise, noise // 3) + 25 * ((i + 2 * j + k) % 3)
+    edge = np.where(((i - 2) / 12.0) ** 2 + ((j - 14) / 16.0) ** 2 < 1, 800, 30) + (k % 4) * 9
+    f32 = ctx.out("head.nii.gz")
+    lx.save(((head / 7).astype(np.float32), aff), f32)
+    i16 = ctx.out("edge.nii.gz")
+    lx.save(((edge // 2).astype(np.int16), aff), i16)
+    hdr = lx.io.load(i16).header.replace(scl_slope=2.0, scl_inter=3.0)
+    lx.save(lx.io.load(i16, scaled=False).replace(header=hdr), i16)
+    out: dict[str, Any] = {}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        for label, path, ver, mode in (
+            ("head", f32, "2.5.4", "fix"),
+            ("head.reproduce", f32, "2.5.4", "reproduce"),
+            ("head.2.3", f32, "2.3.5", "fix"),
+            ("edge", i16, "2.5.4", "fix"),
+        ):
+            res = lx.sdcflows.epi_mask(
+                path, ctx.out(f"{label}_mask.nii.gz"), numpy_version=ver, upstream_defects=mode
+            )
+            out[label] = Nifti(res.out_file)
+            out[f"{label}.centre"] = np.asarray(res.centre, dtype=np.int64)
+    return out

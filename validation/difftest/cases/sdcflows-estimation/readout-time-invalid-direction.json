@@ -1,0 +1,135 @@
+{
+ "defect": null,
+ "description": "GetReadoutTime of an invalid PhaseEncodingDirection ('j+'): traits' TraitError of the output spec (larmorx returned the direction); nipype checks the outputs in a hash-ordered set (PIPE-39), larmorx and the comparison in their declared order",
+ "expect": "pass",
+ "found": {
+  "detail": "relay 27's first probe (r27/try_cases.py)",
+  "n": 30,
+  "seed": "try1",
+  "shrink_moves": [],
+  "signature": [
+   "readout_time: every output bit-identical"
+  ]
+ },
+ "id": "readout-time-invalid-direction",
+ "implementations": [
+  "port"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "call": "readout_time",
+   "fallback": 0.0,
+   "meta": {
+    "EPIFactor": 1,
+    "EchoSpacing": 0.00119341,
+    "EffectiveEchoSpacing": 0.000510012,
+    "ParallelReductionFactorInPlane": 1.5,
+    "PhaseEncodingDirection": "j+",
+    "WaterFatShift": 9.2227266
+   },
+   "threads": 1,
+   "use_estimate": false
+  },
+  "features": {
+   "call": "readout_time",
+   "content": "constant",
+   "dtype": "int16",
+   "extreme": false,
+   "fallback": 0.0,
+   "meta EPIFactor": 1,
+   "meta EchoSpacing": 0.00119341,
+   "meta EffectiveEchoSpacing": 0.000510012,
+   "meta ParallelReductionFactorInPlane": 1.5,
+   "meta PhaseEncodingDirection": "j+",
+   "meta WaterFatShift": 9.2227266,
+   "metadata keys": 4,
+   "orientation": "axes",
+   "origin0": 10.0,
+   "origin1": -17.75,
+   "origin2": -31.5,
+   "qfac": 1,
+   "qform_code": 0,
+   "range": "plain",
+   "readout form": "EchoSpacing",
+   "readout keys": true,
+   "sform": "same",
+   "sform_code": 1,
+   "shape": "10x5x20",
+   "spacing0": 0.5,
+   "spacing1": 0.8,
+   "spacing2": 1.0,
+   "threads": 1,
+   "units": "mm"
+  },
+  "groups": [
+   {
+    "args": [
+     "readout_time"
+    ],
+    "name": "readout_time",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "in": {
+    "content": {
+     "seed": 615197393,
+     "type": "constant"
+    },
+    "dtype": "int16",
+    "geometry": {
+     "origin": [
+      10.0,
+      -17.75,
+      -31.5
+     ],
+     "qfac": 1,
+     "qform_code": 0,
+     "quaternion": [
+      0,
+      0,
+      0,
+      1
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     10,
+     5,
+     20
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 30,
+  "options": [
+   "EPIFactor",
+   "EchoSpacing",
+   "EffectiveEchoSpacing",
+   "ParallelReductionFactorInPlane",
+   "PhaseEncodingDirection",
+   "WaterFatShift",
+   "readout_time"
+  ],
+  "seed": "try1",
+  "tool": "sdcflows-estimation"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "sdcflows-estimation",
+ "tier": "smoke",
+ "tool": "sdcflows-estimation"
+}

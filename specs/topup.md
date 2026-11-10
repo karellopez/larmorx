@@ -201,6 +201,78 @@ sdcflows' `b02b0.cnf` (fMRIPrep's call; MD5 025014fc26cf49e82840f6971d35cd11), s
 with `--ssqlambda=1 --regmod=bending_energy --estmov=0 --splineorder=3 --numprec=double
 --interp=spline --scale=1 --regrid=1` (read the file itself for the exact values).
 
+**FSL's six settings files** (FSL 6.0.7.23, fsl-topup 2203.5; spec writer, 2026-11-09). What
+each file sets, option by option; an option a file does not name keeps topup's default (§2.2) or
+the command line's value, and none of them names `--regrid` (so 1) or `--nthr`. A value is a
+decimal number: any spelling of the same number reads to the same double (the tables write
+`5e-10` for a file's `0.0000000005`). The files' own bytes are FSL's and are carried only by the
+replica (larmorx-nc, `fsl-data/etc/flirtsch/`); a clean-room original carries these settings, by
+the same names, written from this section. Each option's meaning, as each file's comment lines
+give it: `--warpres` the knot spacing of the field's splines in mm, per level; `--subsamp` the
+subsampling factor (a factor *s* collapses each *s* × *s* × *s* neighbourhood into one voxel,
+§4.4); `--fwhm` the full width at half maximum of the Gaussian smoothing in mm; `--miter` the
+largest number of iterations; `--lambda` the relative weight of the regularisation;
+`--ssqlambda=1` multiplies that weight by the current mean squared difference; `--regmod` the
+regularisation model; `--estmov` 1 estimates the movements with the field; `--minmet` 0 is
+Levenberg-Marquardt (LM), 1 the scaled conjugate gradient (SCG); `--splineorder` quadratic (2)
+or cubic (3) splines; `--numprec` the precision the Hessian is computed and stored in;
+`--interp` linear or spline interpolation; `--scale=1` scales the images individually to a
+common mean intensity (§4.1).
+
+`b02b0.cnf`, `b02b0_1.cnf`, `b02b0_2.cnf` and `b02b0_4.cnf`: nine levels, alike but for
+`--subsamp` and `--lambda`; `b02b0.cnf` and `b02b0_2.cnf` set the same values (the same file):
+
+| Level | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |
+|---|---|---|---|---|---|---|---|---|---|
+| `--warpres` (mm) | 20 | 16 | 14 | 12 | 10 | 6 | 4 | 4 | 4 |
+| `--fwhm` (mm) | 8 | 6 | 4 | 3 | 3 | 2 | 1 | 0 | 0 |
+| `--miter` | 5 | 5 | 5 | 5 | 5 | 10 | 10 | 20 | 20 |
+| `--estmov` | 1 | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
+| `--minmet` | LM | LM | LM | LM | LM | SCG | SCG | SCG | SCG |
+| `--subsamp`, `b02b0`, `b02b0_2` | 2 | 2 | 2 | 2 | 2 | 1 | 1 | 1 | 1 |
+| `--subsamp`, `b02b0_1` | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 |
+| `--subsamp`, `b02b0_4` | 4 | 4 | 2 | 2 | 2 | 1 | 1 | 1 | 1 |
+| `--lambda`, `b02b0`, `b02b0_2` | 0.005 | 0.001 | 0.0001 | 1.5e-05 | 5e-06 | 5e-07 | 5e-08 | 5e-10 | 1e-11 |
+| `--lambda`, `b02b0_1` | 0.0005 | 0.0001 | 1e-05 | 1.5e-06 | 5e-07 | 5e-07 | 5e-08 | 5e-10 | 1e-11 |
+| `--lambda`, `b02b0_4` | 0.035 | 0.006 | 0.0001 | 1.5e-05 | 5e-06 | 5e-07 | 5e-08 | 5e-10 | 1e-11 |
+
+with `--ssqlambda=1 --regmod=bending_energy --splineorder=3 --numprec=double --interp=spline
+--scale=1`. The suffix names the largest subsampling factor, which must divide the image's three
+sizes (§2.6): `b02b0_1` suits any grid, `b02b0_2` grids of even sizes, `b02b0_4` sizes divisible
+by 4; the coarser the subsampling, the heavier the first levels' regularisation.
+
+`b02b0_7T.cnf`: twelve levels, for 7 T data:
+
+| Level | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| `--warpres` (mm) | 30 | 25 | 20 | 18 | 16 | 14 | 12 | 10 | 6 | 4 | 4 | 4 |
+| `--subsamp` | 2 | 2 | 2 | 2 | 2 | 2 | 2 | 2 | 1 | 1 | 1 | 1 |
+| `--fwhm` (mm) | 14 | 12 | 10 | 8 | 6 | 4 | 3 | 3 | 2 | 1 | 0 | 0 |
+| `--miter` | 5 | 5 | 5 | 5 | 5 | 5 | 5 | 5 | 10 | 10 | 20 | 20 |
+| `--lambda` | 0.0003 | 0.0002 | 0.0001 | 5e-05 | 2.5e-05 | 1e-05 | 2.5e-06 | 5e-07 | 5e-08 | 5e-09 | 5e-11 | 1e-12 |
+| `--estmov` | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
+| `--minmet` | LM | LM | LM | LM | LM | LM | LM | LM | SCG | SCG | SCG | SCG |
+
+with the same six single values as above.
+
+`test_acqp.cnf`: a rough, quick estimation whose use is to check an acquisition-parameter file
+(`--datain`, §3.2): two levels, `--warpres=20,14 --subsamp=2,2 --fwhm=8,4 --miter=5,5
+--lambda=0.005,0.0001`, one value for every level of `--estmov=0` (no movements) and
+`--minmet=0` (LM), the same six single values as above, and two outputs named by the file:
+`--fout=field_test` (the field) and `--iout=iout_test` (the corrected images), relative to the
+working directory as any output name (§6) **(observed:** FSL's topup with `--config=test_acqp`
+and no output name of its own writes `field_test`, `iout_test` and `iout_test_mean` (§6) in the
+working directory, beside `--out`'s files**)**. A command line's `--fout` or `--iout` wins over
+them.
+
+**How sdcflows chooses a file** (sdcflows 2.17.1's PEPOLAR estimate, `init_topup_wf`, when no
+configuration of its own is given): from the first three sizes of the merged series given to
+topup (after its reorientation to LAS), `b02b0_4.cnf` when all three are divisible by 4, else
+`b02b0_2.cnf` when all three are even, else `b02b0_1.cnf`; with its `sloppy` option sdcflows'
+own three-level `b02b0_4_quick.cnf`, `b02b0_2_quick.cnf` or `b02b0_1_quick.cnf` (sdcflows'
+files, not FSL's). A configuration given to the workflow is used as given. sdcflows 2.15 (the
+version fMRIPrep 25.2.x runs) always uses its own `b02b0.cnf` (`b02b0_quick.cnf` with `sloppy`).
+
 ### 2.6 Messages of the command line and the settings (standard error, exit status 1)
 
 - An unknown option: the usage text, an empty line, `<option>: Option doesn't exist!`; a value
@@ -1017,6 +1089,12 @@ with `implementation="original"` and the oracle cache's stored FSL runs):
   bits run after run); at other thread counts it varies (§9.3): that spread is reported.
 - **Speed**: against FSL and the replica on fMRIPrep's two calls (single thread and all cores),
   reported, not gated.
+- **The main package's own settings** (§2.5's six tables; the user, 2026-11-09): each setting the
+  clean-room original carries, given by its name (`b02b0`, `b02b0_1`, `_2`, `_4`, `b02b0_7T`,
+  `test_acqp`), against larmorx-nc's copy of FSL's file of that name: the replica program's
+  results with either (the parsed settings of its log, the field, the coefficients, the
+  movements, the corrected images) identical, bit for bit, on the half-resolution pair and
+  fMRIPrep's two calls; and sdcflows' choice (§2.5) on grids of odd, even and fourfold sizes.
 
 ## 13. The clean-room questions of 2026-11-03
 

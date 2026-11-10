@@ -40,6 +40,7 @@ TOOLS: dict[str, str] = {
     "resample-series": "resample_series",
     "sdcflows-fieldmap": "sdcflows_fieldmap",
     "tedana-t2smap": "tedana_t2smap",
+    "sdcflows-estimation": "sdcflows_estimation",
     "nifti-io": "nifti_io",
 }
 

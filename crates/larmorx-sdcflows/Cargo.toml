@@ -1,6 +1,6 @@
 [package]
 name = "larmorx-sdcflows"
-description = "sdcflows' field-map estimation for larmorx, ported from sdcflows 2.17.1 (B-spline field fit and evaluation, phase-difference preparation)"
+description = "sdcflows' field-map estimation for larmorx, ported from sdcflows 2.17.1 (B-spline field fit and evaluation, phase-difference preparation, brain_masker)"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -9,6 +9,7 @@ repository.workspace = true
 [dependencies]
 larmorx-core.workspace = true
 larmorx-interp.workspace = true
+larmorx-ndimage.workspace = true
 larmorx-transform.workspace = true
 rayon.workspace = true
 thiserror.workspace = true

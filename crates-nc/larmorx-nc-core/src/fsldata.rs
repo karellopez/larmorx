@@ -19,6 +19,10 @@
 //!
 //! When none has it, the script refuses before it runs anything, naming the file and every
 //! place looked ([`find`]).
+//!
+//! The copy also holds FSL's `topup` settings files ([`BUNDLED_SETTINGS`], under
+//! `etc/flirtsch/` as in `${FSLDIR}`), which topup's `--config` looks for after FSL's own
+//! places.
 
 use std::path::PathBuf;
 
@@ -35,6 +39,20 @@ pub const BUNDLED_IMAGES: [&str; 3] = [
     "standard/MNI152_T1_2mm",
     "standard/MNI152_T1_2mm_brain_mask_dil",
     "standard/MNI152_T1_2mm_eye_mask",
+];
+
+/// FSL's `topup` settings files the copy holds (relative to the copy, as they are relative to
+/// `${FSLDIR}`), from FSL 6.0.7.23's fsl-topup 2203.5 (the user's decision of 2026-11-09): the
+/// files `topup --config=<name>` reads when neither the name nor `${FSLDIR}/etc/flirtsch/`
+/// holds them (larmorx-nc-topup's `existing_conf_file`), and the three sdcflows 2.17.1 chooses
+/// among for a PEPOLAR estimate (`b02b0_1`, `_2`, `_4`; larmorx's `lx.sdcflows`).
+pub const BUNDLED_SETTINGS: [&str; 6] = [
+    "etc/flirtsch/b02b0.cnf",
+    "etc/flirtsch/b02b0_1.cnf",
+    "etc/flirtsch/b02b0_2.cnf",
+    "etc/flirtsch/b02b0_4.cnf",
+    "etc/flirtsch/b02b0_7T.cnf",
+    "etc/flirtsch/test_acqp.cnf",
 ];
 
 /// The data directory larmorx-nc's wheel installs beside its program, if the program runs from

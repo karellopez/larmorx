@@ -139,6 +139,16 @@ It returns an `ApplytopupResult`: `corrected` (an `lx.Image`) and `stdout` (the 
 iterations). FSL's settings are the call's (CLAUDE.md rule 6): the outputs are NIfTI-1 read
 back, and no FSL variable of the process reaches the program.
 
+**FSL's settings files without FSL.** larmorx-nc carries FSL 6.0.7.23's six `topup` settings
+files byte for byte (`b02b0.cnf`, `b02b0_1.cnf`, `b02b0_2.cnf`, `b02b0_4.cnf`, `b02b0_7T.cnf`,
+`test_acqp.cnf`, from fsl-topup 2203.5; the user's decision of 2026-11-09), installed by its wheel
+in `<prefix>/share/larmorx-nc/fsl-data/etc/flirtsch/`: the replica program (`larmorx-nc fsl topup
+--config=b02b0`) looks for a name without a directory there after FSL's own places (as named,
+with `.cnf`, `$FSLDIR/etc/flirtsch/`), so the name works without an FSL installation; when
+neither has it, FSL's messages (and FSL-121's) are unchanged. The main package's own settings,
+a clean-room original written from `specs/topup.md` §2.5, come with `t2smap`'s clean-room part;
+until then `config` given by name needs `fsldir` here.
+
 **File names on Windows.** FSL finds a name's directory and extension at the last `/`. On Windows,
 where FSL does not run, `\` separates directories as well. So a configuration given without
 `.cnf`, and applytopup's `--topup` base name, behave as on Linux when a directory's name holds a dot

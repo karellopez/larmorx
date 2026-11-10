@@ -1,0 +1,287 @@
+{
+ "defect": null,
+ "description": "UniformGrid of a 4-D image on another grid: nitransforms' map_coordinates raises SciPy's RuntimeError('invalid shape for coordinate array'); larmorx refused with NotImplementedError",
+ "expect": "pass",
+ "found": {
+  "detail": "relay 27's first probe (r27/try_cases.py)",
+  "n": 59,
+  "seed": "try1",
+  "shrink_moves": [],
+  "signature": [
+   "uniform_grid: every output bit-identical"
+  ]
+ },
+ "id": "uniform-grid-4d-off-the-grid",
+ "implementations": [
+  "port"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "call": "uniform_grid",
+   "reference": 0,
+   "threads": 1
+  },
+  "features": {
+   "axis0": 1.1,
+   "axis1": 1.0,
+   "axis2": 1.0,
+   "bias0": -0.005,
+   "bias1": -0.0025,
+   "bias2": 0.01,
+   "bias3": 0.0075,
+   "blobs": 5,
+   "call": "uniform_grid",
+   "centre0": 0.5,
+   "centre1": -3.5,
+   "centre2": 0.5,
+   "content": "ramp",
+   "dtype": "float32",
+   "extreme": false,
+   "images": 3,
+   "in1 same grid": false,
+   "in2 same grid": true,
+   "inter": 10.0,
+   "ndim0": 4,
+   "ndim1": 4,
+   "ndim2": 3,
+   "noise": 0.0,
+   "orientation": "axes+oblique",
+   "origin0": 47.25,
+   "origin1": -22.75,
+   "origin2": 51.25,
+   "qfac": 1,
+   "qform_code": 1,
+   "ramp0": 1,
+   "ramp1": 2,
+   "ramp2": -1,
+   "range": "plain",
+   "reference": 0,
+   "sform": "other",
+   "sform_code": 3,
+   "shape": "7x9x9",
+   "shear0": -0.1,
+   "shear1": -0.025,
+   "shear2": -0.025,
+   "size": 29.0,
+   "slice_code": 4,
+   "slope": 0.01,
+   "spacing0": 3.0,
+   "spacing1": 1.0,
+   "spacing2": 1.0,
+   "threads": 1,
+   "tissues": "epi",
+   "tr": 2.5,
+   "tunits": "sec",
+   "units": "mm"
+  },
+  "groups": [
+   {
+    "args": [
+     "uniform_grid"
+    ],
+    "name": "uniform_grid",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "in0": {
+    "content": {
+     "axes": [
+      1.0,
+      1.0,
+      1.1
+     ],
+     "centre": [
+      -5.0,
+      -2.5,
+      3.5
+     ],
+     "n": 5,
+     "seed": 832360681,
+     "size": 24.0,
+     "type": "blobs"
+    },
+    "dtype": "int16",
+    "geometry": {
+     "origin": [
+      -8.25,
+      -24.0,
+      31.25
+     ],
+     "qfac": -1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      2.0,
+      2.0,
+      2.0
+     ],
+     "units": "mm"
+    },
+    "scaling": {
+     "inter": 10.0,
+     "slope": 0.01
+    },
+    "shape": [
+     17,
+     5,
+     8,
+     2
+    ],
+    "suffix": ".nii.gz",
+    "timing": {
+     "slice_code": 6,
+     "slice_duration": 0.3125,
+     "slice_end": 7,
+     "slice_start": 0,
+     "tr": 2.5,
+     "tunits": "sec"
+    },
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   },
+   "in1": {
+    "content": {
+     "axes": [
+      1.1,
+      1.0,
+      1.0
+     ],
+     "bias": [
+      -0.005,
+      -0.0025,
+      0.01,
+      0.0075
+     ],
+     "centre": [
+      0.5,
+      -3.5,
+      0.5
+     ],
+     "noise": 0.0,
+     "seed": 1641003473,
+     "size": 29.0,
+     "tissues": "epi",
+     "type": "head"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      -11.25,
+      -2.5,
+      54.25
+     ],
+     "qfac": 1,
+     "qform_code": 0,
+     "quaternion": [
+      8,
+      2,
+      10,
+      -12
+     ],
+     "sform": "other",
+     "sform_code": 3,
+     "shear": [
+      0.05,
+      0.1,
+      -0.025
+     ],
+     "spacing": [
+      1.0,
+      3.0,
+      4.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     16,
+     16,
+     17,
+     3
+    ],
+    "suffix": ".nii.gz",
+    "timing": {
+     "slice_code": 4,
+     "slice_duration": 0.1471,
+     "slice_end": 16,
+     "slice_start": 0,
+     "tr": 2.5,
+     "tunits": "sec"
+    },
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   },
+   "in2": {
+    "content": {
+     "direction": [
+      1,
+      2,
+      -1
+     ],
+     "seed": 764389259,
+     "type": "ramp"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      -8.25,
+      -24.0,
+      31.25
+     ],
+     "qfac": -1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      2.0,
+      2.0,
+      2.0
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     17,
+     5,
+     8
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 59,
+  "options": [
+   "3 image(s)",
+   "uniform_grid"
+  ],
+  "seed": "try1",
+  "tool": "sdcflows-estimation"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "sdcflows-estimation",
+ "tier": "smoke",
+ "tool": "sdcflows-estimation"
+}

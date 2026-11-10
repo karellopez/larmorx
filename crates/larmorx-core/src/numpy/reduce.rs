@@ -138,6 +138,66 @@ pub fn std_axis<T: NpFloat>(a: &[T], shape: [usize; 3], ddof: i64) -> Vec<T> {
         .collect()
 }
 
+/// The order numpy adds a whole contiguous array in (`np.add.reduce(a, axis=None)`, and so
+/// `a.sum()`, `a.mean()`, `a.var()`, `a.std()`), which changed with numpy 2.3's rewrite of the
+/// iterator's buffering (measured: `validation/investigations/sdcflows-fieldmap-b/`).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum SumOrder {
+    /// numpy 2.3 onwards: `0 + pairwise(a)` over the whole array.
+    #[default]
+    Pairwise,
+    /// numpy 2.2 and older: the buffered reduction's inner loop gets at most `NPY_BUFSIZE` (8192)
+    /// elements, so the result is `((0 + pairwise(c0)) + pairwise(c1)) + ...` over chunks of 8192
+    /// elements (fMRIPrep 25.2.6's image has numpy 2.2.6).
+    Buffered,
+}
+
+impl SumOrder {
+    /// The order of numpy release `version` (`"2.2.6"`, `"2.5.4"`, ...); numpy 1.x sums as 2.2.
+    pub fn from_version(version: &str) -> Option<SumOrder> {
+        let mut it = version.split('.');
+        let major: u32 = it.next()?.parse().ok()?;
+        let minor: u32 = it
+            .next()?
+            .trim_end_matches(|c: char| !c.is_ascii_digit())
+            .parse()
+            .ok()?;
+        Some(if major > 2 || (major == 2 && minor >= 3) {
+            SumOrder::Pairwise
+        } else {
+            SumOrder::Buffered
+        })
+    }
+}
+
+/// numpy's `NPY_BUFSIZE`.
+const NPY_BUFSIZE: usize = 8192;
+
+/// `numpy.add.reduce` of a whole contiguous array in the release's order ([`SumOrder`]).
+pub fn add_reduce_ordered<T: NpFloat>(a: &[T], order: SumOrder) -> T {
+    match order {
+        SumOrder::Pairwise => add_reduce(a),
+        SumOrder::Buffered => a
+            .chunks(NPY_BUFSIZE)
+            .fold(T::ZERO, |acc, c| acc.add(pairwise_sum(c, 0, c.len(), 1))),
+    }
+}
+
+/// `a.std(ddof=ddof)` of a whole contiguous array in the release's order (`_methods._var`: the
+/// mean, the squared deviations, their sum divided by `max(n - ddof, 0)`, the square root).
+pub fn std_ordered<T: NpFloat>(a: &[T], ddof: i64, order: SumOrder) -> T {
+    let n = a.len() as i64;
+    let mean = divide_by_count(add_reduce_ordered(a, order), n);
+    let sq: Vec<T> = a
+        .iter()
+        .map(|&x| {
+            let d = x.sub(mean);
+            d.mul(d)
+        })
+        .collect();
+    divide_by_count(add_reduce_ordered(&sq, order), (n - ddof).max(0)).sqrt()
+}
+
 /// `numpy.nansum(a, axis)`: NaNs replaced by `0`, then [`add_reduce_axis`].
 pub fn nansum_axis<T: NpFloat>(a: &[T], shape: [usize; 3]) -> Vec<T> {
     let replaced: Vec<T> = a
@@ -288,6 +348,25 @@ mod tests {
         let short = &a[..7];
         assert_eq!(add_reduce(short), short.iter().fold(-0.0f32, |s, &x| s + x));
         assert_eq!(add_reduce(&[-0.0f32]).to_bits(), 0); // +0, as numpy
+    }
+
+    #[test]
+    fn numpy_2_2_sums_in_buffered_chunks() {
+        let a: Vec<f32> = (0..20000)
+            .map(|i| ((i * 7919) % 1000) as f32 * 0.001)
+            .collect();
+        let want = 0.0f32 + pairwise_sum(&a, 0, 8192, 1);
+        let want = (want + pairwise_sum(&a, 8192, 8192, 1)) + pairwise_sum(&a, 16384, 3616, 1);
+        assert_eq!(
+            add_reduce_ordered(&a, SumOrder::Buffered).to_bits(),
+            want.to_bits()
+        );
+        assert_eq!(SumOrder::from_version("2.2.6"), Some(SumOrder::Buffered));
+        assert_eq!(SumOrder::from_version("2.3.5"), Some(SumOrder::Pairwise));
+        assert_eq!(
+            add_reduce_ordered(&a, SumOrder::Pairwise).to_bits(),
+            add_reduce(&a).to_bits()
+        );
     }
 
     #[test]

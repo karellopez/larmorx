@@ -1,0 +1,12 @@
+[package]
+name = "larmorx-ndimage"
+description = "SciPy's ndimage filters, morphology and labelling for larmorx, ported from SciPy 1.18.1 (minimum, maximum, rank and median filters, grey and binary morphology, label, sum_labels)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+larmorx-core.workspace = true
+rayon.workspace = true
+thiserror.workspace = true

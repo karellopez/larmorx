@@ -125,6 +125,15 @@ how = "port (sdcflows 2.17.1, with scikit-learn's, SciPy's, numpy's and nibabel'
 validation = "[{sdcflows-fieldmap.cases} cases](record:sdcflows-fieldmap): {sdcflows-fieldmap.pass} of {sdcflows-fieldmap.pass} bit-identical to sdcflows 2.17.1 (every array, file, header, warning and message), fMRIPrep's seven phase-difference estimators and their B-spline fits included (also fMRIPrep's own files); SDC-01, -02 and -04 to -11 corrected by default or refused, each with `reproduce`; the fit [6.5 to 7.8 times faster](repo:docs/benchmarks/sdcflows-fieldmap.md) than scikit-learn's at 14 threads, with 22 to 32 % of sdcflows' peak memory at one"
 
 [[tool]]
+id = "sdcflows-estimation"
+title = "sdcflows' PEPOLAR, direct and fieldmap-less estimation (the masks, the estimators of a BIDS dataset, the derivatives, the BIDS app; niworkflows' helpers; fMRIPrep's own field-map steps)"
+eco = "larmorx"
+page = "/tools/sdcflows-estimation/"
+use = ["larmorx sdcflows sdcflows", "lx.sdcflows.topup_workflow", "lx.sdcflows.fmap_workflow", "lx.sdcflows.syn_sdc_workflow", "lx.sdcflows.brain_masker", "lx.sdcflows.run_app", "lx.niworkflows", "lx.bids", "lx.ndimage", "lx.skimage"]
+how = "port (sdcflows 2.17.1 with 2.15.2's estimator search, niworkflows 1.15.4, nipype 1.12.0's command lines, pybids 0.22.0's index, fMRIPrep 25.2.7's field-map steps; SciPy's, scikit-image's and numpy's arithmetic in Rust)"
+validation = "[{sdcflows-estimation.cases}](record:sdcflows-estimation), [{sdcflows-estimation-full.cases}](record:sdcflows-estimation-full) and [{sdcflows-estimation-app-shared.cases}](record:sdcflows-estimation-app-shared) cases of the estimation, [{niworkflows-helpers.cases}](record:niworkflows-helpers) of niworkflows' helpers and [{ndimage-skimage.cases}](record:ndimage-skimage) and [{ndimage-skimage-full.cases}](record:ndimage-skimage-full) of SciPy's, scikit-image's and numpy's arithmetic, every one bit-identical to the originals (every array, file, header, warning, message and command line): sdcflows' BIDS app whole on its eight oracle datasets in both library environments, fMRIPrep's own field-map derivatives from LARMORX's stage run as fMRIPrep ran it, the fieldmap-less (SyN) registration ANTs' one-thread warp byte for byte; SDC-12 to SDC-46, PIPE-18 to PIPE-40, SCI-06 to SCI-32 and SKI-01 to SKI-04: 42 corrected by default and 15 refused, 61 with `reproduce`; the BIDS app [1.2 to 5.3 times faster](repo:docs/benchmarks/sdcflows-estimation.md) than sdcflows at one thread, with 16 to 72 % of the originals' peak memory"
+
+[[tool]]
 id = "tedana-t2smap"
 title = "tedana's t2smap (the T2* and S0 maps of multi-echo fMRI and the echoes' optimal combination)"
 eco = "larmorx"
@@ -351,6 +360,42 @@ reference = "sdcflows 2.17.1 with scikit-learn 1.9.1, SciPy 1.18.1, numpy 2.5.4 
 status = "`validated`"
 
 [[record]]
+id = "ndimage-skimage"
+larmorx = "`lx.ndimage` (`crates/larmorx-ndimage`), `lx.skimage`, SciPy's `inv` (`larmorx.transforms._linalg.scipy_inv`), `larmorx_core::numpy`"
+reference = "SciPy 1.18.1 and numpy 2.5.4 (OpenBLAS 0.3.34's Haswell kernels, one thread) and scikit-image 0.26.0 in-process (`oracles/python-newest`); the step from SciPy 1.15.3 and numpy 2.3.5 in every library case"
+status = "`validated`"
+
+[[record]]
+id = "ndimage-skimage-full"
+larmorx = "numpy's float32 `exp` (`larmorx_core::math::expf_numpy`), the full tier's own case"
+reference = "numpy 2.5.4 on every one of the 2^32 float32 inputs, with numpy's AVX-512 kernels and without; the step from numpy 2.3.5"
+status = "`validated`"
+
+[[record]]
+id = "niworkflows-helpers"
+larmorx = "`lx.niworkflows`, `larmorx._nipype`"
+reference = "niworkflows 1.15.3 (both environments' release, whose code on these paths is 1.15.4's, the port's source: of their Python files only `interfaces/confounds.py` and the version differ) and nipype 1.12.0 in-process (sdcflows 2.17.1's calls), and fMRIPrep 25.2.6's own files and command lines of the oracle runs; the step from SciPy 1.15.3 and numpy 2.3.5 in its library cases"
+status = "`validated`"
+
+[[record]]
+id = "sdcflows-estimation"
+larmorx = "`lx.sdcflows` (`crates/larmorx-sdcflows`), `lx.bids`, larmorprepx's field-map stages (`larmorx.pipelines.larmorprepx.estimators`, `.fieldmaps`), `larmorx sdcflows sdcflows`"
+reference = "sdcflows 2.17.1 (and 2.15's PEPOLAR wiring) in-process with nipype, fMRIPrep 25.2.6's own graphs, files and command lines of the oracle runs, sdcflows 2.17.1's own BIDS app; the programs underneath through larmorx's ports and the oracle cache"
+status = "`validated`"
+
+[[record]]
+id = "sdcflows-estimation-full"
+larmorx = "the same, the full tier's own cases: PEPOLAR's workflows, the SyN graphs, the estimators against fMRIPrep's image, `init_fmap_preproc_wf` whole, the BIDS app run whole on each of sdcflows 2.17.1's eight own runs"
+reference = "sdcflows 2.17.1's own graphs run by nipype, fMRIPrep 25.2.6's image (Apptainer) and sdcflows 2.17.1's own BIDS app (`oracles/sdcflows-2.17.1`'s datasets), in the newest Python environment"
+status = "`validated`"
+
+[[record]]
+id = "sdcflows-estimation-app-shared"
+larmorx = "`larmorx sdcflows sdcflows` run whole (`lx.sdcflows.run_app`, `LARMORX_SDCFLOWS_LIBRARIES=shared`)"
+reference = "sdcflows 2.17.1's own BIDS app on numpy 2.3.5 and SciPy 1.15.3 (the shared environment), on each of sdcflows 2.17.1's eight own runs' datasets"
+status = "`validated`"
+
+[[record]]
 id = "tedana-t2smap-replica"
 larmorx = "`larmorx-gpl tedana t2smap` (`crates-gpl/larmorx-gpl-tedana`); `lx.tedana.t2smap` and `larmorx tedana t2smap` (the replica, GNU GPL version 3)"
 reference = "tedana 26.0.3's t2smap as a program, in both kept library environments (numpy 2.5.4 with OpenBLAS 0.3.34 and SciPy 1.18.1; numpy 2.3.5 with OpenBLAS 0.3.30 and SciPy 1.15.3; OpenBLAS on its Haswell kernels, numpy's AVX-512 kernels off, one BLAS thread); fMRIPrep's calls also against fMRIPrep 25.2.6's own files (tedana 25.0.1)"
@@ -513,7 +558,7 @@ reference = "topup and applytopup (FSL 6.0.7.23, fsl-topup 2203.5), with FSL's o
 status = "`experimental` ({fsl-topup.pass} of {fsl-topup.compared} compared cases within thresholds, fMRIPrep's {fsl-topup.fmriprep} calls included; {fsl-topup.both} rejected by both, with the same messages and status; {fsl-topup.expected} expected divergences, each with its reason in the record: estimated movements that do not converge, where FSL-201's forward differences leave FSL's own path undetermined beyond its inputs' last bits (FSL's spread measured beside the original's), FSL-143, vb2D's transients, FSL-126, and inputs refused for FSL-124 and FSL-134)"
 [[record]]
 id = "fsl-topup-replica"
-larmorx = "`larmorx-nc fsl topup` and `fsl applytopup`; `lx.fsl.topup`, `lx.fsl.applytopup`, `larmorx fsl topup` and `larmorx fsl applytopup` (the replicas, FSL Licence)"
+larmorx = "`larmorx-nc fsl topup` and `fsl applytopup`; `lx.fsl.topup`, `lx.fsl.applytopup`, `larmorx fsl topup` and `larmorx fsl applytopup` (the replicas, FSL Licence); since 2026-11-09 FSL 6.0.7.23's six `topup` settings files carried byte for byte in `larmorx-nc`, found by `--config=<name>` without FSL"
 reference = "topup and applytopup (FSL 6.0.7.23, fsl-topup 2203.5); fMRIPrep's calls also against fMRIPrep's own outputs"
 status = "`experimental` ({fsl-topup-replica.pass} of {fsl-topup-replica.compared} compared cases bit-identical, fMRIPrep's {fsl-topup-replica.fmriprep} calls included; {fsl-topup-replica.both} rejected by both, with the same messages and status; {fsl-topup-replica.expected} expected divergences: refused in both modes, FSL-124 and FSL-134)"
 [[record]]

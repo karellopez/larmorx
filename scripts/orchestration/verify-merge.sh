@@ -20,7 +20,9 @@
 #                             (docs/validation/oracle-cache.md); LARMORX_ORACLE_CACHE names the cache
 # Writes <outdir>/main.log (one line per step, ALLDONE at the end) and a log per step.
 # Afterwards: compare_records.py <outdir>/records <suite>...; check the site's git status.
-R=$1; OUT=$2; shift 2
+# The checkout as an absolute path: PYTHONPATH is built from it, and tests that start larmorx in a
+# temporary folder cannot import it from a relative one (2026-11-10: "." made four memory tests fail).
+R=$(cd "$1" && pwd); OUT=$2; shift 2
 D=$(cd "$(dirname "$0")" && pwd); source "$D/env.sh"
 SUITES=(); EVID=(); SITE=""; GOLDEN=0; WORKERS=16; SMOKE=""; SUITES_SERIAL=""
 export LARMORX_ORACLE_CACHE_MODE=${LARMORX_ORACLE_CACHE_MODE:-use}

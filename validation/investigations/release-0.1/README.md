@@ -175,29 +175,36 @@ OCI archives, the Dockerfile's targets, labels and pins, the jobs' order and per
 | `rootless_docker.sh start\|stop\|env <state>` | a rootless Docker daemon with no administrator rights (Docker's rootless extras, the account's subordinate ids), its images in `<state>`, in a memory box of its own |
 | `container_rehearsal.sh <checkout> <wheels> <sdists> <out>` | the two container jobs' steps for linux/amd64, outside GitHub: `container.py stage`, `build` (buildx's docker-container builder, BuildKit pinned by digest), `check` (inside each image: labels, `smoke.py --image` as root and as an unprivileged user on a read-only file system, the default command, the packages, the companions' sources, the golden tests and `test_smoke.py`); each OCI archive turned into a SIF image by Apptainer, with `apptainer exec` of the versions, `smoke.py` and the golden tests; `container.py index` and `push --latest` into a local registry (distribution 3.0.0, run by Apptainer) with skopeo 1.13.3 (Ubuntu 24.04's, the runner's), each tag read back; `apptainer pull docker://...` of the four pushed tags and the programs in what came back. `FROM=push` repeats only the push part |
 
-**The rehearsal (2026-11-11, at `14f7cc2b`, with relay 3a's rehearsal files: the three wheels
+**The rehearsal (2026-11-11, at `5d1c328b`, with relay 3a's rehearsal files: the three wheels
 built on this host, tagged `manylinux_2_34_x86_64`, and the companions' sdists; rootless Docker
 28.3.0, buildx 0.25.0, BuildKit 0.34.1, Apptainer 1.4.5; log
-`oracles/logs/release-3b-container-rehearsal-2.log`): every step passed, about 5 minutes from a
-fresh daemon.** The build: 50 s for both images (pip resolves `larmorx[prep]` from PyPI: 48
+`oracles/logs/release-3b-container-rehearsal-3.log`): every step passed, about 5 minutes from a
+fresh daemon.** The build: about 50 s for both images (pip resolves `larmorx[prep]` from PyPI: 49
 packages, numpy 2.5.4, scipy 1.18.1, matplotlib 3.11.2, pandas 3.1.1, nilearn 0.14.1,
-templateflow 25.1.2; pip backtracks for about 20 s and settles on pybids 0.18.1); OCI archives
-226.4 MB (`larmorx`) and 237.5 MB (`larmorx-all`), 681 MB and 701 MB unpacked. The checks inside
-(27 of 27): the labels (licences `Apache-2.0`, and `Apache-2.0 AND GPL-3.0-only AND
-LicenseRef-FSL`), no entrypoint, `smoke.py --image` as root and as user 65534 on a read-only file
-system (the `larmorx` image without larmorx-nc, larmorx-gpl and FSL's data; the `-all` image
-with both programs at 0.1.0rc1 and the 9 FSL data files with their SHA-256s), `larmorx --help` as
-the default command, the `-all` image's packages exactly `larmorx`'s plus larmorx-nc and
-larmorx-gpl, its two sdists; the golden tests and `tests/python/test_smoke.py` inside each image
-317 passed (24 s). Apptainer: each OCI archive a SIF image (213 MB, 224 MB), `apptainer exec
---containall` of `larmorx --version`, `larmorx-nc --version` and `larmorx-gpl --version` (the -all
-image), `smoke.py --image`, and the golden tests (a venv over the image's packages for pytest):
-305 passed in each. The push: one OCI layout with both multi-architecture indexes (amd64 alone
-here), `skopeo copy --all --preserve-digests` of `0.1.0rc1`, `latest`, `0.1.0rc1-all` and
-`latest-all` into the local registry, each tag read back with the index's own digest (9 of 9
-checks; the per-architecture manifest pushed is the one built and checked), then `apptainer pull
+templateflow 25.1.2, pybids 0.22.0); OCI archives 226.7 MB (`larmorx`) and 237.9 MB
+(`larmorx-all`), about 680 and 700 MB unpacked. The checks inside (27 of 27): the labels
+(licences `Apache-2.0`, and `Apache-2.0 AND GPL-3.0-only AND LicenseRef-FSL`), no entrypoint,
+`smoke.py --image` as root and as user 65534 on a read-only file system (the `larmorx` image
+without larmorx-nc, larmorx-gpl and FSL's data; the `-all` image with both programs at 0.1.0rc1
+and the 9 FSL data files with their SHA-256s), `larmorx --help` as the default command, the
+`-all` image's packages exactly `larmorx`'s plus larmorx-nc and larmorx-gpl, its two sdists; the
+golden tests and `tests/python/test_smoke.py` inside each image 317 passed (24 s). Apptainer:
+each OCI archive a SIF image (213 MB, 224 MB), `apptainer exec --containall` of `larmorx
+--version`, `larmorx-nc --version` and `larmorx-gpl --version` (the -all image), `smoke.py
+--image`, and the golden tests (a venv over the image's packages for pytest): 305 passed in each.
+The push: one OCI layout with both multi-architecture indexes (amd64 alone here), `skopeo copy
+--all --preserve-digests` of `0.1.0rc1`, `latest`, `0.1.0rc1-all` and `latest-all` into the local
+registry, each tag read back with the index's own digest (9 of 9 checks; the per-architecture
+manifests pushed are the ones built and checked), then `apptainer pull
 docker://127.0.0.1:5055/karellopez/larmorx:<tag>` of the four tags: each runs `larmorx --version`,
-the -all image `larmorx-nc --version`, the plain image has no `larmorx-nc`.
+the -all image `larmorx-nc --version`, the plain image has no `larmorx-nc`. The earlier runs (logs
+`release-3b-container-rehearsal.log`, `-2.log`, `release-3b-push-try.log`): the first stopped at
+the push on this script's own image names (Apptainer takes a digest without a tag; fixed), the
+second passed every step at `14f7cc2b` with pybids 0.18.1: with `--only-binary :all:` pip cannot
+take docopt (an sdist only), which num2words 0.5.10 and newer need for pybids 0.19 and newer, and
+backtracked for about 20 s; a user's plain `pip install` builds docopt and gets pybids 0.22.0, so
+the images (and the workflow's `larmorx[all]` checks, now `--only-binary
+larmorx,larmorx-nc,larmorx-gpl`) install the dependencies as a user's pip does (`67d00142`).
 
 **What only GitHub shows:** the arm64 images (built on the arm64 runner; this machine has no
 arm64 emulation), the runners' Docker (the check takes an image's id as Docker's own store or
@@ -206,3 +213,17 @@ push with the workflow's token, the new package's visibility (private at first: 
 public once, D17), skopeo on `ubuntu-24.04` (installed by apt if missing), and the images'
 provenance attestations. Nothing of that runs on a dry run: `container-push` runs on a release
 only.
+
+**Dry run 1 (GitHub run 42927413161 at `d5421dac`, the workflow before the container jobs):**
+check, sdist, the six wheels and five of the six programs jobs passed; two failures, fixed in
+`79935496`. (1) `sdist-install`: the smoke's glibc 2.28 check on the packages pip built there
+from the sdists (they link the runner's glibc: `GLIBC_2.39`, `2.34`): `smoke.py --source-build`
+leaves the binaries' platform checks out for a build from source; the published files keep them
+(the test and verify-pypi jobs). Shown here on relay 3a's host-built venv: without the option
+3 failures of 21 (the same glibc checks), with it 17 of 17. (2) `programs (linux-aarch64)`:
+`cargo test` in the checkout read `rust-toolchain.toml`, and rustup added its rustfmt and clippy
+components to the 1.99.0 the setup step had installed: "detected conflict: 'bin/cargo-clippy'" on
+`ubuntu-24.04-arm`. The step now sets `RUSTUP_TOOLCHAIN` to the installed toolchain, which rustup
+puts before the toolchain file (`rustup show active-toolchain`: "overridden by environment
+variable RUSTUP_TOOLCHAIN"), so no component is added; the tests need neither. The next dry run
+is the first to show the test job on the six platforms, and the container jobs.

@@ -160,6 +160,25 @@ identical with `OPENBLAS_L2_SIZE=512` (the Haswell table's `GEMM_Q` 256 on the A
 and with the machine's own `GEMM_Q` 512 every defined case identical, the crashes of that library
 all in its undefined class.
 
+**Relays 2b-ii and 2b-iii** (`numpy_linalg::blocked`: the generation and application of `Q`, the
+bidiagonal reduction). Ported from the same two `lapack-netlib/SRC/` trees, each routine that
+differs between them in both forms (`LapackRelease`):
+
+| larmorx | Upstream files | Licence |
+|---|---|---|
+| `numpy_linalg::blocked::dorgqr`, `dorglq`, `org_lwork_opt` (the checks, the query, `NB` lowered by a short `LWORK`, the zeros above the blocked part, the unblocked trailing part first, then the 32-reflector blocks from the last back: `DLARFT` with `T` in the workspace at leading dimension `LDWORK`, `DLARFB` from the left (`DORGQR`) or the right with `Hᵀ` (`DORGLQ`, the block's reflectors copied out for it), the block's own columns or rows) | `dorgqr.f`, `dorglq.f` (identical in both trees), `ilaenv.f` (`NB` 32, `NBMIN` 2, `NX` 128) | BSD-3-Clause |
+| `numpy_linalg::blocked::dorg2r`, `dorgl2` (3.12.0: the reflector's 1 stored for `DLARF`; 3.12.1: `DLARF1F`; `DSCAL` by `-tau`, `1 - tau` on the diagonal) | `dorg2r.f`, `dorgl2.f` (both trees) | BSD-3-Clause |
+| `numpy_linalg::blocked::dormqr`, `dormlq`, `orm_lwork_opt`, `NBMAX_ORM`, `LDT_ORM`, `TSIZE_ORM` (every side and transpose; `T` at leading dimension 65; the optimal workspace and the short-workspace `NB` of each release: 3.12.0 `NW·NB + 65·64`, `(LWORK - 65·64)/NW`; 3.12.1 `NW·NB + 65·NB`, `LWORK/(NW + 65)`; `DORMLQ`'s block reflector transposed) | `dormqr.f`, `dormlq.f` (both trees) | BSD-3-Clause |
+| `numpy_linalg::blocked::dorm2r`, `dorml2` (every side and transpose; 3.12.0 stores each reflector's 1 in `A` for `DLARF` and restores the entry, 3.12.1 `DLARF1F`) | `dorm2r.f`, `dorml2.f` (both trees) | BSD-3-Clause |
+| `numpy_linalg::blocked::dgebrd`, `gebrd_lwork_opt` (the checks, the query, `NX = max(NB, 128)`, a short workspace's `NB = LWORK/(M + N)` or the unblocked reduction below `2·(M + N)`, the panels by `DLABRD` with `X` and `Y` at leading dimensions `M` and `N`, the two `DGEMM` updates of depth `NB` (the rows above the second one's output copied out for it), `d` and `e` written back, `DGEBD2` on the rest) | `dgebrd.f` (identical in both trees), `ilaenv.f` (`'BRD'`: `NB` 32, `NBMIN` 2, `NX` 128) | BSD-3-Clause |
+| `numpy_linalg::blocked::dlabrd` (both bidiagonal forms; every `DGEMV` with its own leading dimension and unit or non-unit increments, the vectors that share an array with the matrix passed through buffers) | `dlabrd.f` (identical in both trees) | BSD-3-Clause |
+| `numpy_linalg::blocked::dgebd2` (both bidiagonal forms; 3.12.0 `DLARF` with the stored 1 and `d`/`e` put back, 3.12.1 `DLARF1F`; the last `taup` or `tauq` 0) | `dgebd2.f` (both trees) | BSD-3-Clause |
+
+Validated bit for bit against numpy's own LAPACK through its exported Fortran entry points in both
+kept environments (`validation/investigations/confounds/check_lapack.py`, sections `org`, `orm`,
+`brd`, full tier, 2026-11-11): see `validation/investigations/confounds/README.md` for the counts
+and commits; `control_lapack_release.py` shows that the cases tell the two releases apart.
+
 ## SciPy's 4 × 4 inverse (`scipy_linalg`, field maps part B, relay 18)
 
 **Ported** from SciPy 1.18.1 (`scipy/linalg/_basic.py` `inv`, `src/_linalg_inv.hh`

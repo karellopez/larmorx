@@ -365,3 +365,99 @@ fn defaults_correct_and_name_the_defects() {
     assert_eq!(code, 2);
     assert!(err.contains("LARMORX_TEDANA_LIBRARIES"));
 }
+
+/// §3 step 2: `--exclude`'s four errors (§5.2) stop the run before any message, the output
+/// directory made (step 1) and left empty, in both modes. Checked on the directory itself: an
+/// oracle-output cache's replay records files, not empty directories.
+#[test]
+fn exclude_errors_leave_the_output_directory_empty() {
+    let dir = tempfile::tempdir().unwrap();
+    write_inputs(dir.path());
+    let cases = [
+        ("0:4:2", "Step sizes are not supported."),
+        ("2:", "Open-ended ranges are not supported."),
+        ("-1", "Negative indices are not supported."),
+        ("a", "invalid literal for int() with base 10: 'a'"),
+    ];
+    for mode in ["fix", "reproduce"] {
+        for (i, (text, message)) in cases.iter().enumerate() {
+            let out = format!("x-{mode}-{i}");
+            let mut args = base(&["--exclude"]);
+            args.push(text);
+            args.push("--out-dir");
+            args.push(Box::leak(out.clone().into_boxed_str()));
+            let (code, stdout, err) = run(dir.path(), &args, &[("LARMORX_UPSTREAM_DEFECTS", mode)]);
+            assert_eq!(code, 1, "{text}: {err}");
+            assert!(stdout.is_empty());
+            assert!(err.contains(message), "{text}: {err}");
+            assert!(!err.contains("Using output directory"), "{text}: {err}");
+            let made = dir.path().join(&out);
+            assert!(made.is_dir(), "{text}: no output directory");
+            assert_eq!(
+                std::fs::read_dir(&made).unwrap().count(),
+                0,
+                "{text}: the output directory is not empty"
+            );
+        }
+    }
+}
+
+/// TED-16 in `reproduce` without the dropout method (§15.1, §7.3): every volume excluded,
+/// `loglin` writes T2* = 500 ms and S0 = 1 with exit 0; `curvefit` stops after the log-linear
+/// fit's warning on the voxels with no sample; the default refuses both.
+#[test]
+fn every_volume_excluded_without_dropout() {
+    let dir = tempfile::tempdir().unwrap();
+    write_inputs(dir.path());
+    let reproduce = [("LARMORX_UPSTREAM_DEFECTS", "reproduce")];
+    let common = ["--masktype", "none", "--exclude", "0:5", "--out-dir"];
+    let mut args = base(&common);
+    args.push("loglin");
+    let (code, _, err) = run(dir.path(), &args, &reproduce);
+    assert_eq!(code, 0, "{err}");
+    assert!(err.contains("RuntimeWarning: divide by zero encountered in divide"));
+    assert!(err.contains("TED-16 (tedana) reproduced"));
+    let read = |name: &str| {
+        let img = nifti::read(dir.path().join("loglin").join(name), &Default::default()).unwrap();
+        let larmorx_core::array::DynArray::F32(a) = img.data else {
+            panic!("float32")
+        };
+        let mut v: Vec<f32> = a.iter().copied().filter(|&x| x != 0.0).collect();
+        v.dedup();
+        v
+    };
+    assert_eq!(read("T2starmap.nii.gz"), [0.5]);
+    assert_eq!(read("S0map.nii.gz"), [1.0]);
+    let mut args = base(&[
+        "--masktype",
+        "none",
+        "--exclude",
+        "0:5",
+        "--fittype",
+        "curvefit",
+        "--out-dir",
+    ]);
+    args.push("curvefit");
+    let (code, _, err) = run(dir.path(), &args, &reproduce);
+    assert_eq!(code, 1, "{err}");
+    let warning = err
+        .find("RuntimeWarning: divide by zero encountered in divide")
+        .unwrap();
+    let error = err
+        .find("ValueError: zero-size array to reduction operation minimum which has no identity")
+        .unwrap();
+    assert!(warning < error);
+    assert!(
+        !dir.path()
+            .join("curvefit/desc-decayFitFailures_mask.nii.gz")
+            .exists()
+    );
+    let mut args = base(&common);
+    args.push("default");
+    let (code, _, err) = run(dir.path(), &args, &[]);
+    assert_eq!(code, 1);
+    assert!(err.contains(
+        "ValueError: --exclude leaves no volume for the adaptive mask and the T2*/S0 fit (all 5 \
+         volumes excluded)"
+    ));
+}

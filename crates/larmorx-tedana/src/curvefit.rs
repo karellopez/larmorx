@@ -959,11 +959,22 @@ mod tests {
             Err(Failure::Residuals)
         );
         // a start of 0 (or −0) is moved to 1e-10 ms, where every derivative is 0: done at once
-        for z in [0.0, -0.0, 1e-300] {
+        for z in [0.0, -0.0, 1e-300, 5e-11, 1e-10] {
             let f = fit(&s, [1000.0, z], math::exp, w).expect("a fit");
             assert_eq!((f.s0, f.t2s, f.status), (1000.0, 1e-10, 1));
             assert_eq!(f.pcov, [0.0; 3]);
         }
+        // a very large finite T2* start is no failure: T2* stays and S0 moves, until xtol's
+        // test (relative to |x| ~ 1e300) ends the fit after one step: SciPy 1.15.3's curve_fit
+        // on these samples gives (740.77961, 1e300) in two evaluations, status 3 (§7.3)
+        let f = fit(&s, [1000.0, 1e300], math::exp, w).expect("a fit");
+        assert_eq!((f.t2s, f.nfev, f.status), (1e300, 2, 3));
+        assert!((f.s0 - 740.77961).abs() < 1e-4, "{}", f.s0);
+        // an S0 start on its bound (the smallest sample) is moved inside and fitted
+        assert!(fit(&s, [300.0, 30.0], math::exp, w).is_ok());
+        let mut neg = y.clone();
+        neg[2][0] = -50.0;
+        assert!(fit(&samples(&tes, &neg), [-50.0, 30.0], math::exp, w).is_ok());
         let mut bad = y.clone();
         bad[1][0] = f32::INFINITY;
         assert_eq!(

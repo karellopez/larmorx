@@ -92,8 +92,6 @@ fn run(
         None => std::env::current_dir().map_err(|e| PyError::new("OSError", e.to_string()))?,
     };
     let cwd = Some(cwd_owned.as_path());
-    // --exclude's text: its errors come before the output directory is made (observed)
-    let exclude = volumes::parse_exclude(o.exclude.as_deref())?;
     // 1. the output directory
     let out_dir = abspath(&cwd_owned, &o.out_dir);
     if !out_dir.is_dir() {
@@ -117,6 +115,9 @@ fn run(
             )
         })?;
     }
+    // 2. --exclude's text: its errors stop the run here, the output directory made and left
+    // empty (§3, observed with tedana's program run directly)
+    let exclude = volumes::parse_exclude(o.exclude.as_deref())?;
     // 3., 4.
     log.info(
         "t2smap:t2smap_workflow:365",
@@ -392,6 +393,14 @@ fn run(
     let mut maps = fit::loglin(&data, &count, &tes, used.volumes, ts, log, notices)?;
     let cols = maps.cols;
     if o.fittype == FitType::Curvefit {
+        // a voxel with no sample (every volume excluded or a dummy scan: TED-16, TED-13 in
+        // `reproduce`): the bound of its smallest sample stops the run before its fit (§7.3)
+        let t_used = used.volumes.map_or(n_t, <[usize]>::len);
+        if !ts && t_used == 0 && n_fit > 0 {
+            return Err(PyError::value(
+                "zero-size array to reduction operation minimum which has no identity",
+            ));
+        }
         let curve = curvefit::run(
             &data,
             &count,
@@ -629,15 +638,16 @@ fn curve_images(
         .map(|k| if one(k) && !fix { 0 } else { curve.failed[k] })
         .collect();
     let f32_of = |x: f64| x as f32;
+    // the count-1 fits that converged (§15.1: their variances are written by default)
     let k_var_one = if verbose {
-        (0..curve.pcov.len())
-            .filter(|&k| one(k) && curve.pcov[k].iter().any(|&x| f32_of(x) != 0.0))
+        (0..curve.failed.len())
+            .filter(|&k| one(k) && curve.failed[k] == 0)
             .count()
     } else {
         0
     };
-    // one notice per defect (the replica's form, observed): the failures where there are some,
-    // else the variances
+    // one notice per defect and run (§15, the replica's form, observed): the failures where
+    // there are some (summed over the volumes in `ts`), else the variances
     if k_failed_one > 0 {
         notices.add(
             &defects::TED_08,

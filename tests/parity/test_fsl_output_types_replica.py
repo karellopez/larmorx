@@ -50,9 +50,28 @@ TOPUP = ["--imain=pair.nii", "--datain=acq.txt", "--subsamp=1", "--miter=1", "--
 IMAGE_CALLS: list[tuple[str, list[str]]] = [
     ("fslmaths", ["fslmaths", "in.nii", "-add", "1", "m"]),
     ("fslroi", ["fslroi", "in.nii", "r", "0", "6", "0", "6", "0", "5"]),
-    ("flirt", ["flirt", "-in", "in.nii", "-ref", "in.nii", "-applyxfm", "-init", "eye.mat", "-out", "f"]),  # fmt: skip
+    (
+        "flirt",
+        ["flirt", "-in", "in.nii", "-ref", "in.nii", "-applyxfm", "-init", "eye.mat", "-out", "f"],
+    ),
     # the matrix is written before the image (FSL writes it, then stops)
-    ("flirt", ["flirt", "-in", "in.nii", "-ref", "in.nii", "-out", "f", "-omat", "f.mat", "-dof", "6", "-nosearch"]),  # fmt: skip
+    (
+        "flirt",
+        [
+            "flirt",
+            "-in",
+            "in.nii",
+            "-ref",
+            "in.nii",
+            "-out",
+            "f",
+            "-omat",
+            "f.mat",
+            "-dof",
+            "6",
+            "-nosearch",
+        ],
+    ),
     ("applyxfm4D", ["applyxfm4D", "series.nii", "in.nii", "a", "eye.mat", "-singlematrix"]),
     ("bet2", ["bet2", "in.nii", "b2", "-m"]),
     # the script's three bet2 runs: one line
@@ -62,9 +81,20 @@ IMAGE_CALLS: list[tuple[str, list[str]]] = [
     ("fast", ["fast", "-o", "seg", "in.nii"]),
     ("prelude", ["prelude", "-a", "in.nii", "-p", "phase.nii", "-o", "pu"]),
     ("topup", ["topup", *TOPUP, "--out=tu"]),
-    ("applytopup", ["applytopup", "--imain=in.nii", "--inindex=1", "--datain=acq.txt", "--topup=tu0", "--out=at", "--method=jac"]),  # fmt: skip
+    (
+        "applytopup",
+        [
+            "applytopup",
+            "--imain=in.nii",
+            "--inindex=1",
+            "--datain=acq.txt",
+            "--topup=tu0",
+            "--out=at",
+            "--method=jac",
+        ],
+    ),
     # the script goes on after its flirt stops, as FSL's does (exit 0, no output)
-    ("standard_space_roi", ["standard_space_roi", "in.nii", "ss", "-ssref", "in.nii", "-maskNONE"]),  # fmt: skip
+    ("standard_space_roi", ["standard_space_roi", "in.nii", "ss", "-ssref", "in.nii", "-maskNONE"]),
     # the matrices and the .par file before the series
     ("mcflirt", ["mcflirt", "-in", "series.nii", "-out", "mc", "-mats", "-plots"]),
     # the mean image first: nothing written
@@ -227,7 +257,9 @@ def test_calls_that_write_no_image_run_as_with_the_variable(args, inputs, tmp_pa
         mode = "reproduce" if reproduce else "fix"
         given = replica(fresh(inputs, tmp_path / f"given-{mode}"), inputs, args,
                         reproduce=reproduce, FSLOUTPUTTYPE="NIFTI_GZ")  # fmt: skip
-        unset = replica(fresh(inputs, tmp_path / f"unset-{mode}"), inputs, args, reproduce=reproduce)
+        unset = replica(
+            fresh(inputs, tmp_path / f"unset-{mode}"), inputs, args, reproduce=reproduce
+        )
         assert unset == given, (mode, unset[2].decode()[-800:])
         assert b"FSL-11" not in unset[2]
         assert sorted(unset[3]) == sorted(f[3]), mode

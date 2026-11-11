@@ -1357,7 +1357,13 @@ def timing(threads: int) -> int:
     from larmorx import _core
 
     rng = np.random.default_rng(5)
-    for t, tr, v in ((600, 0.8, 60_968), (280, 2.0, 60_968), (600, 2.7, 30_453)):
+    # The last: a design of 26 columns (DLALSD's divide-and-conquer path), longer than any run's.
+    for t, tr, v in (
+        (600, 0.8, 60_968),
+        (280, 2.0, 60_968),
+        (600, 2.7, 30_453),
+        (600, 2.8, 60_968),
+    ):
         a = cosine_design(t, tr)
         b = bold(rng, t, v).T.astype(np.float64)
         t0 = time.perf_counter()

@@ -253,6 +253,7 @@ dependencies = [
  "larmorx-fsl",
  "larmorx-io",
  "larmorx-mri",
+ "larmorx-tedana",
  "sha2",
  "tempfile",
 ]

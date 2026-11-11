@@ -222,6 +222,9 @@ def run_original(args: list[str], case: Path, env: dict) -> tuple[int, str, str]
     from larmorx import _core
 
     case.mkdir(parents=True, exist_ok=True)
+    # one thread unless the call or ``env`` says otherwise: without its own --n-threads the
+    # command line takes OMP_NUM_THREADS, else every logical CPU (2026-11-12)
+    env = {"OMP_NUM_THREADS": "1", **env}
     code, out, err = _core.tedana_t2smap_cleanroom(args, list(env.items()), str(case))
     return int(code), out, err
 

@@ -103,10 +103,14 @@ fn run_at(
     env: &[(&str, &str)],
     terminal_columns: Option<usize>,
 ) -> (u8, String, String) {
-    let mut vars: std::collections::HashMap<String, String> =
-        [("COLUMNS".to_owned(), "80".to_owned())]
-            .into_iter()
-            .collect();
+    // one thread unless a test says otherwise (without --n-threads the command line takes
+    // OMP_NUM_THREADS, else every logical CPU)
+    let mut vars: std::collections::HashMap<String, String> = [
+        ("COLUMNS".to_owned(), "80".to_owned()),
+        ("OMP_NUM_THREADS".to_owned(), "1".to_owned()),
+    ]
+    .into_iter()
+    .collect();
     for (k, v) in env {
         vars.insert((*k).to_owned(), (*v).to_owned());
     }
@@ -244,6 +248,30 @@ fn loglin_files_order_and_threads() {
 /// The curve fit's files (§7.3, §11.1: the failures and, with `--verbose`, the variances, in
 /// that order after the adaptive mask) are the same at one and at four threads, in both fit
 /// modes.
+/// Without its own `--n-threads` the run takes `OMP_NUM_THREADS` (larmorx's `--n-threads`
+/// before the family writes it there), as the replica's program does; given, its own wins.
+/// The files are the same (the sizes of the pools started tell which count ran).
+#[test]
+fn the_thread_count_without_its_own_option() {
+    let dir = tempfile::tempdir().unwrap();
+    write_inputs(dir.path());
+    let read = |out: &str| {
+        let d = dir.path().join(out);
+        ["T2starmap.nii.gz", "desc-optcom_bold.nii.gz"].map(|f| read_f32(&d.join(f)))
+    };
+    let mut args = base(&["--out-dir", "env"]);
+    let (code, _, err) = run(dir.path(), &args, &[("OMP_NUM_THREADS", "11")]);
+    assert_eq!(code, 0, "{err}");
+    assert!(larmorx_core::parallel::pool_sizes().contains(&11));
+    let call = std::fs::read_to_string(dir.path().join("env/t2smap_call.sh")).unwrap();
+    assert!(!call.contains("--n-threads"), "{call}");
+    args = base(&["--n-threads", "2", "--out-dir", "own"]);
+    let (code, _, err) = run(dir.path(), &args, &[("OMP_NUM_THREADS", "13")]);
+    assert_eq!(code, 0, "{err}");
+    assert!(!larmorx_core::parallel::pool_sizes().contains(&13));
+    assert_eq!(read("env"), read("own"));
+}
+
 #[test]
 fn curvefit_files_order_and_threads() {
     let dir = tempfile::tempdir().unwrap();

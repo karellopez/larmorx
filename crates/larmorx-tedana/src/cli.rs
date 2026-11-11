@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 //! `t2smap`'s command line (`specs/t2smap.md` §2, §14): tedana's argparse parser, its help and
-//! errors, the environment's settings, the run, the traceback and the notices.
+//! errors, the environment's settings, the run, the traceback and the notices; `larmorx tedana
+//! t2smap` ([`run_given`], with larmorx's own options before the family).
 
 use std::collections::HashMap;
 use std::io::Write;
 use std::path::PathBuf;
 
+use larmorx_core::cli::Overrides;
 use larmorx_core::defects::{self, Notices, UpstreamDefects};
 use larmorx_core::python::argparse::{
     Argument, Conversion, Namespace, Nargs, Parser, Type, Value, formatter_width,
@@ -17,6 +19,9 @@ use crate::options::{CombMode, Convention, FitMode, FitType, Libraries, MaskType
 
 /// tedana's version line (`-v`).
 pub const VERSION: &str = "t2smap v26.0.3";
+
+/// The tools of `larmorx tedana` ([`run_given`]).
+pub const TOOLS: &[&str] = &["t2smap"];
 
 /// The environment as the command line reads it (§9.1 of the porting guide): the variables,
 /// matched by name (whatever their case on Windows), and the working directory.
@@ -341,8 +346,8 @@ pub fn run(
         },
     };
     let width = formatter_width(settings.get("COLUMNS"), settings.terminal_columns);
-    let ns = match parser(settings.dir.clone()).parse(args, width) {
-        Ok(ns) => ns,
+    let (ns, given) = match parser(settings.dir.clone()).parse_given(args, width) {
+        Ok(parsed) => parsed,
         Err(exit) => {
             let _ = out.write_all(exit.stdout.as_bytes());
             let _ = err.write_all(exit.stderr.as_bytes());
@@ -350,6 +355,15 @@ pub fn run(
         }
     };
     let mut o = options(&ns, args, settings);
+    if !given.iter().any(|d| d == "n_threads") {
+        // without its own --n-threads, the run's thread count (larmorx's --n-threads, which
+        // `run_given` writes there, else OMP_NUM_THREADS, else every logical CPU), as for the
+        // replica's program; tedana's own default is one thread. The results never depend on it.
+        o.n_threads = i128::try_from(larmorx_core::cli::omp_num_threads(
+            settings.get("OMP_NUM_THREADS"),
+        ))
+        .unwrap_or(0);
+    }
     o.libraries = libraries;
     o.upstream_defects = mode;
     let mut notices = Notices::new(mode);
@@ -365,4 +379,82 @@ pub fn run(
     };
     notices.print(err);
     status
+}
+
+/// `larmorx tedana <tool> <args>` (`args` after the tool) in this process's environment and
+/// working directory, with larmorx's own options before the family (`given`: `--n-threads` and
+/// `--upstream-defects`, which win over `OMP_NUM_THREADS` and `LARMORX_UPSTREAM_DEFECTS` in the
+/// run's settings table; the process environment is never changed): the exit status, `None` for
+/// a tool `larmorx tedana` does not have.
+///
+/// The run's log reaches `err` while it runs (a thread of its own computes, this one writes what
+/// it sends), as the console script passes it on to Python's `sys.stderr`; standard output (only
+/// the help and the version) is written when it ends.
+pub fn run_given(
+    tool: &str,
+    args: &[String],
+    given: &Overrides,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> Option<u8> {
+    if tool != "t2smap" {
+        return None;
+    }
+    let mut settings = Settings::from_process();
+    for (name, value) in given.environment() {
+        match value {
+            Some(v) => settings.vars.insert(name.to_owned(), v),
+            None => settings.vars.remove(name),
+        };
+    }
+    Some(run_streaming(args, &settings, out, err))
+}
+
+/// [`run`], its standard error passed on to `err` piece by piece while it runs.
+fn run_streaming(
+    args: &[String],
+    settings: &Settings,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> u8 {
+    let (send, receive) = std::sync::mpsc::channel::<Vec<u8>>();
+    let (code, stdout) = std::thread::scope(|scope| {
+        let worker = scope.spawn(move || {
+            let mut stdout = Vec::new();
+            let mut pieces = Pieces(send);
+            let code = run(args, settings, &mut stdout, &mut pieces);
+            (code, stdout)
+        });
+        // ends when the worker drops its sender (it has returned or panicked)
+        let mut failed = false;
+        for piece in receive {
+            if !failed {
+                failed = err.write_all(&piece).and_then(|()| err.flush()).is_err();
+            }
+        }
+        match worker.join() {
+            Ok(done) => done,
+            Err(panic) => std::panic::resume_unwind(panic),
+        }
+    });
+    let _ = out.write_all(&stdout);
+    let _ = out.flush();
+    code
+}
+
+/// A writer that sends what it is given to the thread that writes it out.
+struct Pieces(std::sync::mpsc::Sender<Vec<u8>>);
+
+impl Write for Pieces {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        if !buf.is_empty() {
+            // the receiving thread outlives every send (it drains until this sender is dropped)
+            let _ = self.0.send(buf.to_vec());
+        }
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
 }

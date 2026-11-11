@@ -102,6 +102,7 @@ pub mod blas;
 pub mod blocked;
 pub mod gelsd;
 pub mod gesdd;
+pub mod lasda;
 pub mod lstsq;
 pub mod svd;
 pub use gesdd::{GesddError, Svd2, gesdd_s2};

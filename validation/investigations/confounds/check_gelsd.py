@@ -655,12 +655,215 @@ def lstsq_run(cid: int, case: tuple, threads: int, core) -> list[tuple[bool, str
     return [(ok, tag)]
 
 
+# --- sections lasd7, lasd8, lasd6: one merge of DLASDA's tree (relay 2d-ii) --------------------
+
+MERGE_KINDS = (
+    "normal",
+    "sorted",
+    "close",
+    "smallz",
+    "mixed",
+    "zero-d",
+    "tiny",
+    "huge",
+    "alpha0",
+    "beta0",
+)
+
+
+def ref_dlasd7(icompq, nl, nr, sqre, d, z, vf, vl, alpha, beta, dsigma, idxq, perm, givcol,
+               ldgcol, givnum, ldgnum, givptr, c, s):  # fmt: skip
+    """A dict of ``DLASD7``'s outputs (the names of ``lapack_dlasd7``'s)."""
+    n = nl + nr + 1
+    m = n + sqre
+    d, z, vf, vl, dsigma = d.copy(), z.copy(), vf.copy(), vl.copy(), dsigma.copy()
+    idxq, perm, givcol, givnum = idxq.copy(), perm.copy(), givcol.copy(), givnum.copy()
+    zw, vfw, vlw = nans(m), nans(m), nans(m)
+    idx, idxp = izeros(n), izeros(n)
+    k, gp, info = I64(-7), I64(givptr), I64(0)
+    cc, ss = ctypes.c_double(c), ctypes.c_double(s)
+    LIB.scipy_dlasd7_64_(
+        *_i(icompq, nl, nr, sqre), ctypes.byref(k), ptr(d), ptr(z), ptr(zw), ptr(vf), ptr(vfw),
+        ptr(vl), ptr(vlw), _d(alpha), _d(beta), ptr(dsigma), iptr(idx), iptr(idxp), iptr(idxq),
+        iptr(perm), ctypes.byref(gp), iptr(givcol), *_i(ldgcol), ptr(givnum), *_i(ldgnum),
+        ctypes.byref(cc), ctypes.byref(ss), ctypes.byref(info),
+    )  # fmt: skip
+    return {
+        "D": d, "Z": z, "VF": vf, "VL": vl, "DSIGMA": dsigma, "IDXQ": idxq, "PERM": perm,
+        "GIVCOL": givcol, "GIVNUM": givnum, "K": k.value, "GIVPTR": gp.value, "C": cc.value,
+        "S": ss.value, "INFO": info.value,
+    }  # fmt: skip
+
+
+def ref_dlasd8(icompq, k, d, z, vf, vl, difl, difr, lddifr, dsigma):
+    d, z, vf, vl, difl, difr = d.copy(), z.copy(), vf.copy(), vl.copy(), difl.copy(), difr.copy()
+    dsigma = dsigma.copy()
+    work, info = nans(3 * k), I64(0)
+    LIB.scipy_dlasd8_64_(
+        *_i(icompq, k), ptr(d), ptr(z), ptr(vf), ptr(vl), ptr(difl), ptr(difr), *_i(lddifr),
+        ptr(dsigma), ptr(work), ctypes.byref(info),
+    )  # fmt: skip
+    return d, z, vf, vl, difl, difr, info.value
+
+
+def ref_dlasd6(icompq, nl, nr, sqre, d, vf, vl, alpha, beta, idxq, perm, givcol, ldgcol, givnum,
+               ldgnum, poles, difl, difr, z, givptr, c, s):  # fmt: skip
+    n = nl + nr + 1
+    m = n + sqre
+    d, vf, vl, idxq, perm, givcol = d.copy(), vf.copy(), vl.copy(), idxq.copy(), perm.copy(), givcol.copy()  # fmt: skip
+    givnum, poles, difl, difr, z = givnum.copy(), poles.copy(), difl.copy(), difr.copy(), z.copy()
+    al, be, cc, ss = (ctypes.c_double(v) for v in (alpha, beta, c, s))
+    k, gp, info = I64(-7), I64(givptr), I64(0)
+    work, iwork = nans(4 * m), izeros(3 * n)
+    LIB.scipy_dlasd6_64_(
+        *_i(icompq, nl, nr, sqre), ptr(d), ptr(vf), ptr(vl), ctypes.byref(al), ctypes.byref(be),
+        iptr(idxq), iptr(perm), ctypes.byref(gp), iptr(givcol), *_i(ldgcol), ptr(givnum),
+        *_i(ldgnum), ptr(poles), ptr(difl), ptr(difr), ptr(z), ctypes.byref(k), ctypes.byref(cc),
+        ctypes.byref(ss), ptr(work), iptr(iwork), ctypes.byref(info),
+    )  # fmt: skip
+    return {
+        "D": d, "VF": vf, "VL": vl, "ALPHA": al.value, "BETA": be.value, "IDXQ": idxq,
+        "PERM": perm, "GIVPTR": gp.value, "GIVCOL": givcol, "GIVNUM": givnum, "POLES": poles,
+        "DIFL": difl, "DIFR": difr, "Z": z, "K": k.value, "C": cc.value, "S": ss.value,
+        "INFO": info.value,
+    }  # fmt: skip
+
+
+def merge_inputs(rng, nl: int, nr: int, sqre: int, kind: str):
+    """``(d, idxq, vf, vl, alpha, beta)`` of one merge: the halves' singular values (``d[nl]``
+    unused) with their sorting permutations, the halves' boundary rows of right vectors."""
+    n = nl + nr + 1
+    m = n + sqre
+    d = np.abs(rng.standard_normal(n)) + 0.1
+    if kind in ("close", "mixed"):
+        pool = np.abs(rng.standard_normal(max(2, n // 4))) + 0.1
+        d = rng.choice(pool, n) * (1 + 1e-17 * rng.standard_normal(n))
+    elif kind == "zero-d":
+        d[rng.random(n) < 0.25] = 0.0
+    elif kind == "tiny":
+        d *= 1e-300
+    elif kind == "huge":
+        d *= 1e300
+    if kind == "sorted":
+        d[:nl] = np.sort(d[:nl])
+        d[nl + 1 :] = np.sort(d[nl + 1 :])
+    idxq = np.zeros(n, dtype=np.int64)
+    idxq[:nl] = np.argsort(d[:nl], kind="stable") + 1
+    idxq[nl + 1 :] = np.argsort(d[nl + 1 :], kind="stable") + 1
+    vf, vl = rng.standard_normal(m), rng.standard_normal(m)
+    if kind in ("smallz", "mixed"):
+        mask = rng.random(m) < 0.35
+        vf[mask] *= 1e-18
+        vl[mask] *= 1e-18
+    alpha, beta = rng.standard_normal(2)
+    if kind == "alpha0":
+        alpha = 0.0
+    elif kind == "beta0":
+        beta = 0.0
+    if kind == "huge":
+        alpha, beta = alpha * 1e300, beta * 1e300
+    elif kind == "tiny":
+        alpha, beta = alpha * 1e-300, beta * 1e-300
+    return d, idxq, vf, vl, float(alpha), float(beta)
+
+
+def merge_cases(quick: bool) -> list[tuple]:
+    out: list[tuple] = []
+    sizes = [
+        (1, 1),
+        (1, 2),
+        (2, 1),
+        (3, 3),
+        (5, 8),
+        (12, 12),
+        (13, 12),
+        (25, 26),
+        (26, 25),
+        (40, 30),
+    ]
+    if not quick:
+        sizes += [(60, 61), (100, 100), (150, 120)]
+    for i, (nl, nr) in enumerate(sizes):
+        for sqre in (0, 1):
+            for icompq in (0, 1):
+                for j, kind in enumerate(MERGE_KINDS):
+                    if quick and (i + j + sqre) % 2:
+                        continue
+                    out += [(icompq, nl, nr, sqre, kind)] * (1 if quick else 2)
+    return out
+
+
+def merge_common(cid: int, case: tuple):
+    icompq, nl, nr, sqre, kind = case
+    rng = np.random.default_rng([89, cid])
+    n = nl + nr + 1
+    m = n + sqre
+    d, idxq, vf, vl, alpha, beta = merge_inputs(rng, nl, nr, sqre, kind)
+    ldgcol, ldgnum = n + cid % 2, n + (cid // 2) % 3
+    perm, givcol = np.zeros(n, dtype=np.int64), np.zeros(2 * ldgcol, dtype=np.int64)
+    givnum = nans(2 * ldgnum)
+    return icompq, nl, nr, sqre, n, m, d, idxq, vf, vl, alpha, beta, ldgcol, ldgnum, perm, givcol, givnum  # fmt: skip
+
+
+def dict_same(want: dict, got: dict) -> bool:
+    for key, w in want.items():
+        if key == "INFO" and key not in got:
+            continue
+        g = got[key]
+        if isinstance(w, np.ndarray):
+            if not same(w.astype(float), np.asarray(g).astype(float)):
+                return False
+        elif not same(np.atleast_1d(float(w)), np.atleast_1d(float(g))):
+            return False
+    return True
+
+
+def lasd7_run(cid: int, case: tuple, threads: int, core) -> list[tuple[bool, str]]:
+    icompq, nl, nr, sqre, n, m, d, idxq, vf, vl, alpha, beta, ldgcol, ldgnum, perm, givcol, givnum = merge_common(cid, case)  # fmt: skip
+    z, dsigma = nans(m), nans(n)
+    args = (icompq, nl, nr, sqre, d, z, vf, vl, alpha, beta, dsigma, idxq, perm, givcol, ldgcol, givnum, ldgnum, 5, 0.25, -0.5)  # fmt: skip
+    want = ref_dlasd7(*args)
+    got = core.lapack_dlasd7(*args, LAPACK)
+    return [(want["INFO"] == 0 and dict_same(want, got), f"dlasd7 icompq {icompq} sqre {sqre}")]
+
+
+def lasd8_run(cid: int, case: tuple, threads: int, core) -> list[tuple[bool, str]]:
+    icompq, nl, nr, sqre, n, m, d, idxq, vf, vl, alpha, beta, ldgcol, ldgnum, perm, givcol, givnum = merge_common(cid, case)  # fmt: skip
+    # DLASD8's inputs as DLASD6 makes them: the scaling, then the reference's DLASD7.
+    d = d.copy()
+    d[nl] = 0.0
+    orgnrm = max(abs(alpha), abs(beta), float(np.max(np.abs(d))))
+    if orgnrm == 0.0:
+        return [(True, "dlasd8 skipped (all zero)")]
+    d7 = ref_dlasd7(icompq, nl, nr, sqre, d / orgnrm, nans(m), vf, vl, alpha / orgnrm, beta / orgnrm, nans(n), idxq, perm, givcol, ldgcol, givnum, ldgnum, 0, 0.0, 0.0)  # fmt: skip
+    k = d7["K"]
+    lddifr = ldgnum
+    difl, difr = nans(max(n, 2)), nans(2 * lddifr)
+    args = (icompq, k, d7["D"], d7["Z"], d7["VF"], d7["VL"], difl, difr, lddifr, d7["DSIGMA"])
+    want = ref_dlasd8(*args)
+    got = core.lapack_dlasd8(*args)
+    ok = want[-1] == got[-1] and all(same(w, g) for w, g in zip(want[:-1], got[:-1], strict=True))
+    return [(ok, "dlasd8 K = 1" if k == 1 else f"dlasd8 icompq {icompq}")]
+
+
+def lasd6_run(cid: int, case: tuple, threads: int, core) -> list[tuple[bool, str]]:
+    icompq, nl, nr, sqre, n, m, d, idxq, vf, vl, alpha, beta, ldgcol, ldgnum, perm, givcol, givnum = merge_common(cid, case)  # fmt: skip
+    poles, difl, difr, z = nans(2 * ldgnum), nans(n), nans(2 * ldgnum), nans(m)
+    args = (icompq, nl, nr, sqre, d, vf, vl, alpha, beta, idxq, perm, givcol, ldgcol, givnum, ldgnum, poles, difl, difr, z, 3, 0.25, -0.5)  # fmt: skip
+    want = ref_dlasd6(*args)
+    got = core.lapack_dlasd6(*args, LAPACK)
+    return [(dict_same(want, got), f"dlasd6 icompq {icompq} sqre {sqre}")]
+
+
 SECTIONS = {
     "query": ("dgelsd query", query_cases, query_run),
     "lasrt": ("dlasrt", lasrt_cases, lasrt_run),
     "lalsd": ("dlalsd", lalsd_cases, lalsd_run),
     "gelsd": ("dgelsd", gelsd_cases, gelsd_run),
     "lstsq": ("np.linalg.lstsq", lstsq_cases, lstsq_run),
+    "lasd7": ("dlasd7", merge_cases, lasd7_run),
+    "lasd8": ("dlasd8", merge_cases, lasd8_run),
+    "lasd6": ("dlasd6", merge_cases, lasd6_run),
 }
 
 

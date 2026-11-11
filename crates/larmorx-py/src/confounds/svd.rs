@@ -36,7 +36,7 @@ pub(super) fn lp(lapack: &str, gemm_q: usize) -> PyResult<Lapack> {
     })
 }
 
-fn indices(x: &PyReadonlyArray1<'_, i64>) -> PyResult<Vec<usize>> {
+pub(super) fn indices(x: &PyReadonlyArray1<'_, i64>) -> PyResult<Vec<usize>> {
     x.as_slice()
         .map_err(value_err)?
         .iter()
@@ -44,7 +44,7 @@ fn indices(x: &PyReadonlyArray1<'_, i64>) -> PyResult<Vec<usize>> {
         .collect()
 }
 
-fn to_i64<'py>(py: Python<'py>, v: &[usize]) -> Bound<'py, PyArray1<i64>> {
+pub(super) fn to_i64<'py>(py: Python<'py>, v: &[usize]) -> Bound<'py, PyArray1<i64>> {
     PyArray1::from_vec(py, v.iter().map(|&x| x as i64).collect())
 }
 

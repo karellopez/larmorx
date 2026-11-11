@@ -1799,3 +1799,69 @@ def numpy_lstsq(
     gemm_q: int = 256,
 ) -> tuple[np.ndarray, np.ndarray, int, np.ndarray]:
     """``numpy.linalg.lstsq(a, b, rcond)`` of float64 arrays: ``(x, residuals, rank, s)``."""
+
+def lapack_dlasd7(
+    icompq: int,
+    nl: int,
+    nr: int,
+    sqre: int,
+    d: np.ndarray,
+    z: np.ndarray,
+    vf: np.ndarray,
+    vl: np.ndarray,
+    alpha: float,
+    beta: float,
+    dsigma: np.ndarray,
+    idxq: np.ndarray,
+    perm: np.ndarray,
+    givcol: np.ndarray,
+    ldgcol: int,
+    givnum: np.ndarray,
+    ldgnum: int,
+    givptr: int,
+    c: float,
+    s: float,
+    lapack: str = "3.12.1",
+) -> dict[str, object]:
+    """LAPACK's ``DLASD7`` (one merge's sorting and deflation): a dict of its outputs."""
+
+def lapack_dlasd8(
+    icompq: int,
+    k: int,
+    d: np.ndarray,
+    z: np.ndarray,
+    vf: np.ndarray,
+    vl: np.ndarray,
+    difl: np.ndarray,
+    difr: np.ndarray,
+    lddifr: int,
+    dsigma: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, int]:
+    """LAPACK's ``DLASD8`` (one merge's secular equation): ``(D, Z, VF, VL, DIFL, DIFR, INFO)``."""
+
+def lapack_dlasd6(
+    icompq: int,
+    nl: int,
+    nr: int,
+    sqre: int,
+    d: np.ndarray,
+    vf: np.ndarray,
+    vl: np.ndarray,
+    alpha: float,
+    beta: float,
+    idxq: np.ndarray,
+    perm: np.ndarray,
+    givcol: np.ndarray,
+    ldgcol: int,
+    givnum: np.ndarray,
+    ldgnum: int,
+    poles: np.ndarray,
+    difl: np.ndarray,
+    difr: np.ndarray,
+    z: np.ndarray,
+    givptr: int,
+    c: float,
+    s: float,
+    lapack: str = "3.12.1",
+) -> dict[str, object]:
+    """LAPACK's ``DLASD6`` (one merge of ``DLASDA``'s tree): a dict of its outputs."""

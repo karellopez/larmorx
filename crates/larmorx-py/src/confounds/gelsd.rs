@@ -6,15 +6,18 @@
 //! Matrices cross as flat column-major storage with their leading dimension (the `lapack_*`
 //! functions) or as arrays (`numpy_lstsq`). The GIL is released while computing.
 
-use super::svd::{F64s, c_view, linalg_error, lp, uplo};
+use super::lapack_release;
+use super::svd::{F64s, c_view, indices, linalg_error, lp, to_i64, uplo};
 use super::{contiguous, lapack_run, one_of};
 use larmorx_transform::numpy_linalg::LstsqError;
 use larmorx_transform::numpy_linalg::gelsd::{self, DgelsdError, Sort};
+use larmorx_transform::numpy_linalg::lasda::{self, GivensRecord, MergeFactors};
 use larmorx_transform::openblas::matmul::Array2 as View;
 use numpy::{PyArray1, PyArrayDyn, PyArrayMethods, PyReadonlyArray1, PyReadonlyArray2};
 use numpy::{PyReadonlyArrayDyn, PyUntypedArrayMethods};
 use pyo3::exceptions::{PyNotImplementedError, PyValueError};
 use pyo3::prelude::*;
+use pyo3::types::PyDict;
 
 fn gelsd_err(e: DgelsdError) -> PyErr {
     match e {
@@ -220,7 +223,243 @@ fn numpy_lstsq<'py>(
     ))
 }
 
+/// `DLASD7(ICOMPQ, NL, NR, SQRE, K, D, Z, ZW, VF, VFW, VL, VLW, ALPHA, BETA, DSIGMA, IDX, IDXP,
+/// IDXQ, PERM, GIVPTR, GIVCOL, LDGCOL, GIVNUM, LDGNUM, C, S, INFO)`: one merge's sorting and
+/// deflation (`larmorx_transform::numpy_linalg::lasda::dlasd7`). Index arrays as int64, 1-based;
+/// `givcol` and `givnum` flat column-major (`ldgcol × 2`, `ldgnum × 2`). Returns a dict of the
+/// outputs (`D`, `Z`, `VF`, `VL`, `DSIGMA`, `IDXQ`, `PERM`, `GIVCOL`, `GIVNUM`, `K`, `GIVPTR`, `C`,
+/// `S`).
+#[pyfunction]
+#[pyo3(signature = (icompq, nl, nr, sqre, d, z, vf, vl, alpha, beta, dsigma, idxq, perm, givcol, ldgcol, givnum, ldgnum, givptr, c, s, lapack = "3.12.1"))]
+#[allow(clippy::too_many_arguments)]
+fn lapack_dlasd7<'py>(
+    py: Python<'py>,
+    icompq: usize,
+    nl: usize,
+    nr: usize,
+    sqre: usize,
+    d: PyReadonlyArray1<'_, f64>,
+    z: PyReadonlyArray1<'_, f64>,
+    vf: PyReadonlyArray1<'_, f64>,
+    vl: PyReadonlyArray1<'_, f64>,
+    alpha: f64,
+    beta: f64,
+    dsigma: PyReadonlyArray1<'_, f64>,
+    idxq: PyReadonlyArray1<'_, i64>,
+    perm: PyReadonlyArray1<'_, i64>,
+    givcol: PyReadonlyArray1<'_, i64>,
+    ldgcol: usize,
+    givnum: PyReadonlyArray1<'_, f64>,
+    ldgnum: usize,
+    givptr: usize,
+    c: f64,
+    s: f64,
+    lapack: &str,
+) -> PyResult<Bound<'py, PyDict>> {
+    let release = lapack_release(lapack)?;
+    let (mut dv, mut zv) = (contiguous(&d)?.to_vec(), contiguous(&z)?.to_vec());
+    let (mut vfv, mut vlv) = (contiguous(&vf)?.to_vec(), contiguous(&vl)?.to_vec());
+    let mut dsv = contiguous(&dsigma)?.to_vec();
+    let (mut qv, mut pv, mut gcv) = (indices(&idxq)?, indices(&perm)?, indices(&givcol)?);
+    let mut gnv = contiguous(&givnum)?.to_vec();
+    let (n, m) = (nl + nr + 1, nl + nr + 1 + sqre);
+    if dv.len() < n
+        || zv.len() < m
+        || vfv.len() < m
+        || vlv.len() < m
+        || dsv.len() < n
+        || qv.len() < n
+    {
+        return Err(PyValueError::new_err("DLASD7: arrays too short"));
+    }
+    let out = lapack_run(py, "DLASD7", 1, || {
+        let mut rec = GivensRecord {
+            perm: &mut pv,
+            givcol: &mut gcv,
+            ldgcol,
+            givnum: &mut gnv,
+            ldgnum,
+        };
+        lasda::dlasd7(
+            release, icompq, nl, nr, sqre, &mut dv, &mut zv, &mut vfv, &mut vlv, alpha, beta,
+            &mut dsv, &mut qv, &mut rec, givptr, c, s,
+        )
+    })?
+    .map_err(|e| PyValueError::new_err(e.to_string()))?;
+    let dict = PyDict::new(py);
+    dict.set_item("D", PyArray1::from_vec(py, dv))?;
+    dict.set_item("Z", PyArray1::from_vec(py, zv))?;
+    dict.set_item("VF", PyArray1::from_vec(py, vfv))?;
+    dict.set_item("VL", PyArray1::from_vec(py, vlv))?;
+    dict.set_item("DSIGMA", PyArray1::from_vec(py, dsv))?;
+    dict.set_item("IDXQ", to_i64(py, &qv))?;
+    dict.set_item("PERM", to_i64(py, &pv))?;
+    dict.set_item("GIVCOL", to_i64(py, &gcv))?;
+    dict.set_item("GIVNUM", PyArray1::from_vec(py, gnv))?;
+    dict.set_item("K", out.k)?;
+    dict.set_item("GIVPTR", out.givptr)?;
+    dict.set_item("C", out.c)?;
+    dict.set_item("S", out.s)?;
+    Ok(dict)
+}
+
+/// `DLASD8(ICOMPQ, K, D, Z, VF, VL, DIFL, DIFR, LDDIFR, DSIGMA, WORK, INFO)`: the secular
+/// equation of one merge (`larmorx_transform::numpy_linalg::lasda::dlasd8`). Returns `(D, Z, VF,
+/// VL, DIFL, DIFR, INFO)`.
+#[pyfunction]
+#[allow(clippy::too_many_arguments)]
+fn lapack_dlasd8<'py>(
+    py: Python<'py>,
+    icompq: usize,
+    k: usize,
+    d: PyReadonlyArray1<'_, f64>,
+    z: PyReadonlyArray1<'_, f64>,
+    vf: PyReadonlyArray1<'_, f64>,
+    vl: PyReadonlyArray1<'_, f64>,
+    difl: PyReadonlyArray1<'_, f64>,
+    difr: PyReadonlyArray1<'_, f64>,
+    lddifr: usize,
+    dsigma: PyReadonlyArray1<'_, f64>,
+) -> PyResult<(
+    F64s<'py>,
+    F64s<'py>,
+    F64s<'py>,
+    F64s<'py>,
+    F64s<'py>,
+    F64s<'py>,
+    usize,
+)> {
+    let (mut dv, mut zv) = (contiguous(&d)?.to_vec(), contiguous(&z)?.to_vec());
+    let (mut vfv, mut vlv) = (contiguous(&vf)?.to_vec(), contiguous(&vl)?.to_vec());
+    let (mut dlv, mut drv) = (contiguous(&difl)?.to_vec(), contiguous(&difr)?.to_vec());
+    let dsv = contiguous(&dsigma)?.to_vec();
+    let need_difr = if icompq == 1 { lddifr + k } else { k };
+    if dv.len() < k
+        || zv.len() < k
+        || vfv.len() < k
+        || vlv.len() < k
+        || dsv.len() < k
+        || dlv.len() < k.max(2)
+        || drv.len() < need_difr
+    {
+        return Err(PyValueError::new_err("DLASD8: arrays too short"));
+    }
+    let info = lapack_run(py, "DLASD8", 1, || {
+        lasda::dlasd8(
+            icompq, k, &mut dv, &mut zv, &mut vfv, &mut vlv, &mut dlv, &mut drv, lddifr, &dsv,
+        )
+    })?
+    .map_err(|e| PyValueError::new_err(e.to_string()))?;
+    Ok((
+        PyArray1::from_vec(py, dv),
+        PyArray1::from_vec(py, zv),
+        PyArray1::from_vec(py, vfv),
+        PyArray1::from_vec(py, vlv),
+        PyArray1::from_vec(py, dlv),
+        PyArray1::from_vec(py, drv),
+        info,
+    ))
+}
+
+/// `DLASD6(ICOMPQ, NL, NR, SQRE, D, VF, VL, ALPHA, BETA, IDXQ, PERM, GIVPTR, GIVCOL, LDGCOL,
+/// GIVNUM, LDGNUM, POLES, DIFL, DIFR, Z, K, C, S, WORK, IWORK, INFO)`: one merge of `DLASDA`'s tree
+/// (`larmorx_transform::numpy_linalg::lasda::dlasd6`). Index arrays as int64, 1-based; `givcol`,
+/// `givnum`, `poles` and `difr` flat column-major. Returns a dict of the outputs (`D`, `VF`, `VL`,
+/// `ALPHA`, `BETA`, `IDXQ`, `PERM`, `GIVPTR`, `GIVCOL`, `GIVNUM`, `POLES`, `DIFL`, `DIFR`, `Z`, `K`,
+/// `C`, `S`, `INFO`).
+#[pyfunction]
+#[pyo3(signature = (icompq, nl, nr, sqre, d, vf, vl, alpha, beta, idxq, perm, givcol, ldgcol, givnum, ldgnum, poles, difl, difr, z, givptr, c, s, lapack = "3.12.1"))]
+#[allow(clippy::too_many_arguments)]
+fn lapack_dlasd6<'py>(
+    py: Python<'py>,
+    icompq: usize,
+    nl: usize,
+    nr: usize,
+    sqre: usize,
+    d: PyReadonlyArray1<'_, f64>,
+    vf: PyReadonlyArray1<'_, f64>,
+    vl: PyReadonlyArray1<'_, f64>,
+    alpha: f64,
+    beta: f64,
+    idxq: PyReadonlyArray1<'_, i64>,
+    perm: PyReadonlyArray1<'_, i64>,
+    givcol: PyReadonlyArray1<'_, i64>,
+    ldgcol: usize,
+    givnum: PyReadonlyArray1<'_, f64>,
+    ldgnum: usize,
+    poles: PyReadonlyArray1<'_, f64>,
+    difl: PyReadonlyArray1<'_, f64>,
+    difr: PyReadonlyArray1<'_, f64>,
+    z: PyReadonlyArray1<'_, f64>,
+    givptr: usize,
+    c: f64,
+    s: f64,
+    lapack: &str,
+) -> PyResult<Bound<'py, PyDict>> {
+    let release = lapack_release(lapack)?;
+    let mut dv = contiguous(&d)?.to_vec();
+    let (mut vfv, mut vlv) = (contiguous(&vf)?.to_vec(), contiguous(&vl)?.to_vec());
+    let (mut qv, mut pv, mut gcv) = (indices(&idxq)?, indices(&perm)?, indices(&givcol)?);
+    let mut gnv = contiguous(&givnum)?.to_vec();
+    let mut plv = contiguous(&poles)?.to_vec();
+    let (mut dlv, mut drv) = (contiguous(&difl)?.to_vec(), contiguous(&difr)?.to_vec());
+    let mut zv = contiguous(&z)?.to_vec();
+    let (n, m) = (nl + nr + 1, nl + nr + 1 + sqre);
+    if dv.len() < n
+        || vfv.len() < m
+        || vlv.len() < m
+        || qv.len() < n
+        || zv.len() < m
+        || dlv.len() < n
+    {
+        return Err(PyValueError::new_err("DLASD6: arrays too short"));
+    }
+    let out = lapack_run(py, "DLASD6", 1, || {
+        let mut rec = GivensRecord {
+            perm: &mut pv,
+            givcol: &mut gcv,
+            ldgcol,
+            givnum: &mut gnv,
+            ldgnum,
+        };
+        let mut fac = MergeFactors {
+            poles: &mut plv,
+            difl: &mut dlv,
+            difr: &mut drv,
+            z: &mut zv,
+        };
+        lasda::dlasd6(
+            release, icompq, nl, nr, sqre, &mut dv, &mut vfv, &mut vlv, alpha, beta, &mut qv,
+            &mut rec, &mut fac, givptr, c, s,
+        )
+    })?
+    .map_err(|e| PyValueError::new_err(e.to_string()))?;
+    let dict = PyDict::new(py);
+    dict.set_item("D", PyArray1::from_vec(py, dv))?;
+    dict.set_item("VF", PyArray1::from_vec(py, vfv))?;
+    dict.set_item("VL", PyArray1::from_vec(py, vlv))?;
+    dict.set_item("ALPHA", out.alpha)?;
+    dict.set_item("BETA", out.beta)?;
+    dict.set_item("IDXQ", to_i64(py, &qv))?;
+    dict.set_item("PERM", to_i64(py, &pv))?;
+    dict.set_item("GIVPTR", out.givptr)?;
+    dict.set_item("GIVCOL", to_i64(py, &gcv))?;
+    dict.set_item("GIVNUM", PyArray1::from_vec(py, gnv))?;
+    dict.set_item("POLES", PyArray1::from_vec(py, plv))?;
+    dict.set_item("DIFL", PyArray1::from_vec(py, dlv))?;
+    dict.set_item("DIFR", PyArray1::from_vec(py, drv))?;
+    dict.set_item("Z", PyArray1::from_vec(py, zv))?;
+    dict.set_item("K", out.k)?;
+    dict.set_item("C", out.c)?;
+    dict.set_item("S", out.s)?;
+    dict.set_item("INFO", out.info)?;
+    Ok(dict)
+}
+
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_function(wrap_pyfunction!(lapack_dlasd7, m)?)?;
+    m.add_function(wrap_pyfunction!(lapack_dlasd8, m)?)?;
+    m.add_function(wrap_pyfunction!(lapack_dlasd6, m)?)?;
     m.add_function(wrap_pyfunction!(lapack_dlasrt, m)?)?;
     m.add_function(wrap_pyfunction!(lapack_dlalsd, m)?)?;
     m.add_function(wrap_pyfunction!(lapack_dgelsd, m)?)?;

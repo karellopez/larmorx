@@ -243,22 +243,27 @@ fn nthr_given_on_the_command_line_or_in_the_configuration() {
         (&["--config=@plain.cnf"][..], false, 1),
         (&["--config=@nthr.cnf"][..], true, 3),
     ] {
-        let mut argv = vec!["topup".to_owned(), at("--imain=@b0"), at("--datain=@acq.txt")];
+        let mut argv = vec![
+            "topup".to_owned(),
+            at("--imain=@b0"),
+            at("--datain=@acq.txt"),
+        ];
         argv.extend(extra.iter().map(|a| at(a)));
         argv.push(at("--out=@o"));
         let (mut out, mut err) = (Vec::new(), Vec::new());
         let end = {
             let (mut cout, mut cerr) = (Vec::new(), Vec::new());
-            let con = larmorx_nc_topup::Console::with_mode(
-                &mut out,
-                &mut err,
-                UpstreamDefects::Fix,
-            );
+            let con =
+                larmorx_nc_topup::Console::with_mode(&mut out, &mut err, UpstreamDefects::Fix);
             parse(&argv, &settings(), &mut cout, &mut cerr, &con)
         };
         match end {
             ParseEnd::Run(clp) => {
-                assert_eq!((clp.nthr_given, clp.nthreads), (given, nthreads), "{extra:?}");
+                assert_eq!(
+                    (clp.nthr_given, clp.nthreads),
+                    (given, nthreads),
+                    "{extra:?}"
+                );
             }
             ParseEnd::Exit(code) => panic!("{extra:?}: exit {code}"),
         }
@@ -271,12 +276,7 @@ fn nthr_given_on_the_command_line_or_in_the_configuration() {
 #[test]
 fn the_same_bytes_at_any_thread_count() {
     let mut runs = Vec::new();
-    for (threads, extra) in [
-        (1usize, None),
-        (3, None),
-        (0, None),
-        (3, Some("--nthr=2")),
-    ] {
+    for (threads, extra) in [(1usize, None), (3, None), (0, None), (3, Some("--nthr=2"))] {
         let dir = tempfile::tempdir().unwrap();
         let d = dir.path();
         inputs(d);

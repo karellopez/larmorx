@@ -385,7 +385,6 @@ impl Implementation {
             Implementation::Original => "clean-room",
         }
     }
-
 }
 
 /// `larmorx --implementation NAME` ([`larmorx_core::cli::parse`]).

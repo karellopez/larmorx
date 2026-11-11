@@ -4355,29 +4355,30 @@ explanation = "The replica's known message gaps (one of two chained tracebacks, 
 tool = "tedana-t2smap-original"
 implementation = "original"
 signature = ["(A) messages", "(A) values (§N.N)", "(B) messages", "(B) values (§N.N)"]
-status = "open"
-explanation = "45 cases with numpy's 'divide by zero encountered in divide' in the original only: the closed-form log-linear fit gives an exact zero slope (integer data, equal observations at echo times symmetric about the middle one) where tedana's batched SVD leaves rounding noise, so T2* is infinite (then floored) in the original and huge in tedana, which moves the cap; within §16's latitude for the fit, outside §17.3's cap row. A question for a spec writer (how §17.3 judges such voxels) before any change; e.g. findings 11, 85, 93."
+status = "register"
+defect = "TED-46"
+explanation = "45 cases with numpy's 'divide by zero encountered in divide' in the original only: the closed-form log-linear fit gives an exact zero slope (integer data, equal observations at echo times symmetric about the middle one) where tedana's batched SVD leaves rounding noise, so T2* is infinite (then floored) in the original and huge in tedana, which moves the cap; within §16's latitude for the fit, outside §17.3's cap row. A question for a spec writer (how §17.3 judges such voxels) before any change; e.g. findings 11, 85, 93. Resolved (relay 3c, 2026-11-11): TED-46 under rule A (the orchestrator): the default takes the exact zero slope with its notice; reproduce writes the same until the exact port of numpy's lstsq serves it, an expected divergence (the suite's explain); permanent case tests/run.rs::equal_observations_take_the_slope_zero."
 
 [[difference]]
 tool = "tedana-t2smap-original"
 implementation = "original"
 signature = ["(A) messages"]
-status = "open"
-explanation = "The original's messages against tedana's: 17 with other RuntimeWarning lines (e.g. findings 24, 252, 289), 5 without numpy's 'invalid value encountered in scalar divide' before the adaptive mask's '(nan%)' warning (13, 207, 718), and the empty-mask cases below; for the next clean-room relay."
+status = "fixed"
+explanation = "The original's messages against tedana's: 17 with other RuntimeWarning lines (e.g. findings 24, 252, 289), 5 without numpy's 'invalid value encountered in scalar divide' before the adaptive mask's '(nan%)' warning (13, 207, 718), and the empty-mask cases below; for the next clean-room relay. Resolved (relay 3c, 2026-11-11): spec writer 2's §12.3 (the means of no volume warn alone with no voxel) and §6.5 (a scalar-divide warning at each of the two percentages); permanent case tests/run.rs::no_voxel_left_for_the_fit_is_ted31."
 
 [[difference]]
 tool = "tedana-t2smap-original"
 implementation = "original"
 signature = ["(A) messages", "(B) messages"]
-status = "open"
-explanation = "20 cases of an empty user mask or one of another grid: tedana's 'ValueError: Image/mask shape mismatch' (and its order against the dummy scans' and the dropout's errors) where the original raises the dropout's IndexError, and the replica nilearn's empty-mask refusal (e.g. findings 130, 141, 222); for the next clean-room relay."
+status = "fixed"
+explanation = "20 cases of an empty user mask or one of another grid: tedana's 'ValueError: Image/mask shape mismatch' (and its order against the dummy scans' and the dropout's errors) where the original raises the dropout's IndexError, and the replica nilearn's empty-mask refusal (e.g. findings 130, 141, 222); for the next clean-room relay. Resolved (relay 3c, 2026-11-11): §4.4's second reading in nilearn's order, the mask's values first, a 3D echo sending every echo through it too (validation/investigations/t2smap-original/mask_probe.py); permanent case tests/run.rs::nilearns_second_reading_checks_the_mask_first."
 
 [[difference]]
 tool = "tedana-t2smap-original"
 implementation = "original"
 signature = ["(B) notices"]
-status = "open"
-explanation = "18 cases whose D13 notices differ between the replica's default and the original's (TED-15's voxel count, TED-08's; e.g. findings 34, 162, 223); for the next clean-room relay."
+status = "fixed"
+explanation = "18 cases whose D13 notices differ between the replica's default and the original's (TED-15's voxel count, TED-08's; e.g. findings 34, 162, 223); for the next clean-room relay. Resolved (relay 3c, 2026-11-11): TED-09's and TED-15's notices count the first place that holds such voxels (TED-15: the first of the fit's groups, count 1 with count 2), as the replica does; permanent case tests/run.rs::ted15_counts_the_first_fit_group."
 
 [[difference]]
 tool = "tedana-t2smap-original"
@@ -4397,5 +4398,49 @@ explanation = "15 ANALYZE/MGH cases that fail before any image is read (a parser
 tool = "tedana-t2smap-original"
 implementation = "original"
 signature = ["(A) exit status", "(A) files", "(A) messages", "(A) values (§N.N)", "(B) exit status", "(B) files", "(B) messages", "(B) values (§N.N)"]
-status = "open"
-explanation = "2 cases where one program fails and the other completes (findings 224, 807); for the next clean-room relay."
+status = "register"
+defect = "TED-31"
+explanation = "2 cases where one program fails and the other completes (findings 224, 807); for the next clean-room relay. Resolved (relay 3c, 2026-11-11): TED-31 (new, rule B): no voxel left for the fit; tedana's IndexError in reproduce, a clear error by default; permanent case tests/run.rs::no_voxel_left_for_the_fit_is_ted31."
+
+[[difference]]
+tool = "tedana-t2smap-original"
+implementation = "original"
+signature = ["(A) values (§N.N)"]
+status = "harness"
+explanation = "Trial 2026-11-11-t2smap-original-2 (1,742 cases, 50 differ): 23 runs that both programs stop with the same error before the combination (e.g. PAID's zero weights in reproduce, findings 46, 175, 278), whose partial outputs were compared exactly; now file by file within 1e-5 relative, the confounds table number by number, a curve-fit run's maps reported (§17.3 judges them only with the model's full run). Every one agrees on replay (relay 3c, 2026-11-11)."
+
+[[difference]]
+tool = "tedana-t2smap-original"
+implementation = "original"
+signature = ["(B) messages", "(B) notices", "(B) values (§N.N)"]
+status = "explained"
+defect = "TED-46"
+explanation = "Trial 2026-11-11-t2smap-original-2: 13 cases with equal log-linear observations (uint8 saturated, e.g. findings 11, 348, 548, 999): TED-46's correction in the original's default moves the cap (TED-05's count), the curve fit's failures and messages, while the replica's default does not take TED-46 yet; explained by the suite (relay 3c, 2026-11-11: the same defects named, their counts aside), until the replica-side relay brings TED-46 to the replica."
+
+[[difference]]
+tool = "tedana-t2smap-original"
+implementation = "original"
+signature = ["(B) notices"]
+status = "fixed"
+explanation = "Trial 2026-11-11-t2smap-original-2: 4 cases whose TED-15 notice counted the first distinct echo count where the replica counts the first of the fit's groups, count 1 with count 2 (findings 341: 16 against 98 = 16 + 82; 812, 860, 919); fixed (relay 3c, 2026-11-11), permanent case tests/run.rs::ted15_counts_the_first_fit_group."
+
+[[difference]]
+tool = "tedana-t2smap-original"
+implementation = "original"
+signature = ["(B) messages", "(B) notices"]
+status = "fixed"
+explanation = "Trial 2026-11-11-t2smap-original-2: 3 cases with an infinite first-echo sample (findings 455, 588, 761): the default dropped every non-finite mean from the dropout percentile and named TED-01, where tedana (and the replica's default) sort and match an infinite mean; TED-01 now drops NaN means only (relay 3c, 2026-11-11), permanent case tests/run.rs::an_infinite_first_echo_mean_is_no_ted01."
+
+[[difference]]
+tool = "tedana-t2smap-original"
+implementation = "original"
+signature = ["(B) messages", "(B) values (§N.N)"]
+status = "harness"
+explanation = "Trial 2026-11-11-t2smap-original-2: 7 cases whose (B) failures combined the replica's known message gaps (its zero-padded thresholds, its single traceback) with a stopped run's values or the two causes above (e.g. findings 278, 701, 879, 1060); with those fixed, the gaps are explained as in every other case (relay 3c, 2026-11-11)."
+
+[[difference]]
+tool = "tedana-t2smap-original"
+implementation = "original"
+signature = ["(B) values (§N.N)"]
+status = "harness"
+explanation = "Trial 2026-11-11-t2smap-original-2: 1 case outside check.py's model (TED-01's NaN mean stops the model as it stops tedana; finding 1449) whose confounds table, compared as text, differed in its last digits; now number by number within 1e-5 (relay 3c, 2026-11-11)."

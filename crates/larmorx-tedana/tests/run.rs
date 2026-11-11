@@ -770,3 +770,64 @@ fn equal_observations_take_the_slope_zero() {
         assert_eq!(rmse[at(4, 2, 2, 0)].to_bits(), 0x7FC0_0000);
     }
 }
+
+/// Random testing's second trial (2026-11-11, findings 455, 588, 761): an infinite first-echo
+/// sample is no TED-01 (tedana sorts and matches an infinite mean): the default's dropout
+/// thresholds are reproduce's, with no notice.
+#[test]
+fn an_infinite_first_echo_mean_is_no_ted01() {
+    let dir = tempfile::tempdir().unwrap();
+    write_inputs(dir.path());
+    let p = dir.path().join("e1.nii.gz");
+    let mut v = read_f32(&p);
+    v[3 + NX * (2 + NY)] = f32::INFINITY; // voxel (3, 2, 1), volume 0
+    write_f32(dir.path(), "e1.nii.gz", &[NX, NY, NZ, NT], v);
+    let thresholds = |err: &str| {
+        err.lines()
+            .find(|l| l.contains("Echo-wise intensity thresholds"))
+            .expect(err)
+            .to_owned()
+    };
+    let mut out = Vec::new();
+    for mode in ["fix", "reproduce"] {
+        let mut args = base(&[]);
+        args.extend(["--out-dir", mode]);
+        let (code, _, err) = run(dir.path(), &args, &[("LARMORX_UPSTREAM_DEFECTS", mode)]);
+        assert_eq!(code, 0, "{err}");
+        assert!(!err.contains("TED-01"), "{err}");
+        out.push(thresholds(&err));
+    }
+    assert_eq!(out[0], out[1]);
+}
+
+/// TED-15's notice counts the first of the fit's echo-count groups (count 1 with count 2), as
+/// the replica's default does (random testing's second trial, findings 341, 812, 860, 919).
+#[test]
+fn ted15_counts_the_first_fit_group() {
+    let dir = tempfile::tempdir().unwrap();
+    write_inputs(dir.path());
+    let at = |x: usize, y: usize, z: usize, t: usize| x + NX * (y + NY * (z + NZ * t));
+    for e in 1..=3 {
+        let p = dir.path().join(format!("e{e}.nii.gz"));
+        let mut v = read_f32(&p);
+        for t in 0..NT {
+            // constant echoes 1 and 2 of two voxels: one of count 1 (its third echo bad), one of
+            // count 2 (its third echo bad, its second good); and one of count 3
+            v[at(1, 1, 1, t)] = if e == 2 { -1.0 } else { 900.0 };
+            v[at(2, 1, 1, t)] = if e == 3 { -1.0 } else { 900.0 - 100.0 * e as f32 };
+            v[at(3, 1, 1, t)] = 900.0 - 100.0 * e as f32;
+        }
+        write_f32(dir.path(), &format!("e{e}.nii.gz"), &[NX, NY, NZ, NT], v);
+    }
+    let mut args = base(&["--masktype", "none", "--combmode", "paid"]);
+    args.extend(["--out-dir", "paid"]);
+    let (code, _, err) = run(dir.path(), &args, &[]);
+    assert_eq!(code, 0, "{err}");
+    assert!(
+        err.contains(
+            "upstream defect TED-15 (tedana) corrected: 2 voxel(s) whose good echoes do not vary \
+             over time"
+        ),
+        "{err}"
+    );
+}

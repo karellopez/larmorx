@@ -466,8 +466,12 @@ def _trial(ctx: core.Context) -> tuple[list[dict], list[dict]]:
                        common.cell(f"{len(entries)} triage entries")]}]  # fmt: skip
     for e in entries:
         rows.append({"head": ", ".join(e["signature"]), "sub": common.clip(e["explanation"], 400),
-                     "verdict": {"fixed": "within-variability", "harness": "within-variability",
-                                 "register": "d13", "expected": "divergence"}.get(
+                     "verdict": {
+                    "fixed": "within-variability",
+                    "harness": "within-variability",
+                    "register": "d13",
+                    "explained": "divergence",
+                }.get(
                          e["status"], "open"),
                      "cells": [common.cell("–"), common.cell("–"), common.cell(e["status"])]})  # fmt: skip
     table = common.table(

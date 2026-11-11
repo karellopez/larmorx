@@ -227,3 +227,77 @@ components to the 1.99.0 the setup step had installed: "detected conflict: 'bin/
 puts before the toolchain file (`rustup show active-toolchain`: "overridden by environment
 variable RUSTUP_TOOLCHAIN"), so no component is added; the tests need neither. The next dry run
 is the first to show the test job on the six platforms, and the container jobs.
+
+## Relay 4: clean machines
+
+| Helper | What it shows |
+|---|---|
+| `clean_build.sh <checkout> <out> <manylinux_2_28.sif>` | the release's Linux x86_64 files built as `release.yml` builds them, inside the manylinux_2_28 image it pins (by digest), through Apptainer, with no administrator rights and nothing of this machine's on the paths (`--containall --cleanenv`, a fresh clone of the commit, Rust 1.99.0 by rustup, maturin 1.15.0 and twine 7.0.0 by pip, all in `<out>`): the sdist job, the wheel job (`--profile dist --locked --manylinux 2_28`), the programs job (the companions from their unpacked sdists, the standalone program wheel, the companions' golden tests on their installed programs, the archives), `twine check --strict`, `SHA256SUMS` |
+| `clean_env.sh <name> <image.sif> <python> <build out> <out>` | those files installed and tested in one clean environment (an image run by Apptainer as this unprivileged user, an empty home, every venv, cache and toolchain in `<out>`, the files and the tests read-only): `pip install larmorx`, `larmorx[prep]`, `larmorx[all]` from the wheels, each in a fresh venv with the venv's own pip; `smoke.py --installed --archives`; the test group and `pytest tests/python tests/golden` with the installed programs; with `SDIST_RUST` the three sdists built from source by pip as a user's `pip install --no-binary` (no `MATURIN_PEP517_ARGS`), the same checks with `--source-build`, and the companions' golden tests (cargo) on both installs' programs; `SDIST_RUST=none` (no compiler): the sdist's build must fail, and what pip says is kept. `RERUN=1` and `SRC=<checkout>` repeat the smoke checks and pytest with another checkout's tests |
+| `../../../scripts/release/check_install.py` (with `check_install_windows.ps1`) | the check after a release on a machine of one's own (below): a fresh venv, `pip install "larmorx[all]==<v>"` from PyPI (or `--find-links`), `pip check`, the tag's source tree from GitHub, `smoke.py --installed --archives` on the GitHub Release's archives of this platform, `pytest tests/python tests/golden`; the Windows wrapper keeps everything (uv's Python, every cache) in `%USERPROFILE%\larmorx-check-<v>` and removes it |
+| `win_check.sh <version> [--files <dir>] [-- <wrapper arguments>]` | the Windows wrapper run on the Windows helper over SSH (its alias, `docs/helper-machines.md`): the folder made (it must not exist), the two scripts (and `--files`) copied in, the check run, the folder's removal checked |
+| `win_gnu_build.sh <clean_build out> <manylinux_2_28.sif>` | Windows x86_64 files for a trial of the wrapper before the release, cross-built with Rust's `x86_64-pc-windows-gnu` target and zig's MinGW-w64 linker (ziglang 0.14.1 from PyPI, maturin's cargo-zigbuild wrappers): no MSVC and no Microsoft SDK, so no licence terms accepted for anyone. `maturin build --zig` of the extension fails (its `.def` names `PyInit_larmorx._core`, the dotted module name, which the link cannot find): built without `--zig`, with the zig wrapper as linker and pyo3's `generate-import-lib` |
+
+**The build (2026-11-11, at `5ef26ea9`, the commit of dry run 2; log
+`oracles/logs/release-4-clean-build.log`):** `quay.io/pypa/manylinux_2_28_x86_64:2026.10.26-1`
+(`sha256:e0adf185...`; AlmaLinux 8.10, glibc 2.28, CPython 3.12.16, GCC 14.2.1 of gcc-toolset-14),
+28 threads, every step passed: the three sdists 7 s (larmorx 3,224,497 bytes, larmorx-nc 3,274,952,
+larmorx-gpl 904,181; `twine check --strict` passed); larmorx's wheel 338 s (fat LTO;
+`larmorx-0.1.0rc1-cp312-abi3-manylinux_2_28_x86_64.whl`, 13,937,192 bytes); larmorx-nc's wheel
+from its sdist 47 s (`py3-none-manylinux_2_28_x86_64`, 6,212,535), larmorx-gpl's 19 s (1,060,330),
+the standalone program wheel 273 s (20,528,126); the companions' golden tests on the programs
+their wheels install: larmorx-nc 2 of 2 tests (every case, 21 s), larmorx-gpl 3 of 3; the archives
+(larmorx 9,997,705, larmorx-nc 5,817,953, larmorx-gpl 1,012,437 bytes). The sizes equal relay
+2b's and 3a's host builds; the tags are the ones `assemble.py` expects.
+
+**The clean environments** (logs `oracles/logs/release-4-env-<name>.log` and
+`-<name>-rerun.log`; every image pinned by digest; user 1000, no administrator rights):
+
+| Environment | System | Python, pip of its venvs | The wheels | From the sdists |
+|---|---|---|---|---|
+| `rhel8-py3.12`: `registry.access.redhat.com/ubi8/python-312@sha256:5a65be9c...` | RHEL 8.10, glibc 2.28 (the oldest supported), GCC 8.5.0, objdump | `/usr/bin/python3.12` 3.12.15, pip 23.2.1 | `larmorx` 4 s, `[prep]` 29 s, `[all]` 32 s; `pip check` clean; smoke 52 of 52 (53 with the `objdump` check of the first run), the glibc floor holds: every program and the extension need GLIBC_2.28 at most and run on 2.28; pytest 934 passed, 2 skipped (after the test fix below) | Rust 1.99.0: `[all]` 170 s, `larmorx` 105 s, `[prep]` 133 s (pip 23.2 builds again each time); smoke `--source-build` 17 of 17; pytest 934 passed, 2 skipped; the companions' golden tests (cargo) pass on both installs' programs |
+| `debian12-slim-py3.12`: `python:3.12.16-slim-bookworm@sha256:0f086103...` | Debian 12, glibc 2.36, no compiler, no binutils | 3.12.16, pip 25.0.1 | `larmorx` 7 s, `[prep]` 26 s, `[all]` 20 s; `pip check` clean; smoke 52 of 52 (the glibc floor read from the files themselves: no objdump, below); pytest 934 passed, 2 skipped | fails, as it must: maturin's build backend found no Rust, fetched Rust 1.99.1 itself (puccinialin, into the home's cache), then `error: linker 'cc' not found`: **a build from source needs a C compiler** (and Rust 1.99 or newer, which maturin fetches when none is installed) |
+| `debian13-py3.14`: `python:3.14-trixie@sha256:e683e47f...` | Debian 13, glibc 2.41, GCC 14.2.0, objdump | 3.14.10 (the abi3 wheel), pip 26.2.2 | `larmorx` 6 s, `[prep]` 28 s, `[all]` 20 s; smoke 52 of 52; pytest 934 passed, 2 skipped | Rust stable (1.99.1, newer than the pin): `[all]` 150 s, then `larmorx` 6 s and `[prep]` 19 s from pip 26's wheel cache; smoke 17 of 17; pytest 934 passed, 2 skipped, **the golden suite included: a newer compiler gives the same bits**; the companions' golden tests pass |
+
+In all three `larmorx[all]` resolves to the same 47 packages besides ours and pip (numpy 2.5.4,
+scipy 1.18.1, scikit-learn 1.9.1, pandas 3.1.1, matplotlib 3.11.2, nilearn 0.14.1, templateflow
+25.1.2, pybids 0.22.0), but for one: on Python 3.14 pip takes wrapt 2.6.0.dev1, a pre-release,
+because formulaic 1.2.2 (pybids') asks for `wrapt>=1.17.0rc1` on Python 3.13 and newer (a
+pre-release in a specifier lets pip take pre-releases; on 3.12 it takes wrapt 2.5.2);
+`larmorprepx` says it is not ready yet (exit status 1); `larmorx` alone installs neither companion.
+**Two findings, fixed:** (1) the first runs failed one test everywhere,
+`tests/python/test_sdcflows_app.py::test_exit_statuses` (`OSError: [Errno 30] Read-only file
+system: '/src/work'`): its calls without `-w` take the BIDS app's default work folder, `./work`,
+in the folder pytest runs from (in a checkout a git-ignored `work/`); the two tests now run in
+`tmp_path` (`ebf9dde6`), and the re-runs with the tests of `0d858b2e` pass. (2) In the slim image
+`smoke.py` failed its `objdump` check (binutils is not there): it now reads the files'
+version-needs tables itself when objdump is missing (`0d858b2e`; the same answer as `objdump -T`
+on the release's five Linux binaries and three system ones). `check_install.py` itself ran in the
+slim image on the same files (`--find-links`, `--source`, `--archives`; log
+`release-4-check-install-linux.log`): 8 of 8 steps (smoke 52 checks, pytest 934 passed).
+
+**The container rehearsal with these files** (`container_rehearsal.sh` with the
+manylinux_2_28 wheels and the clone of `5ef26ea9`; log `release-4-container-rehearsal.log`):
+every step passed: both images built (OCI archives 226,685,440 and 237,855,232 bytes), the 27
+checks inside (golden and `test_smoke.py` 317 passed in each), the SIF images with `apptainer exec`
+of the versions, `smoke.py --image` and the golden tests (305 passed in each), the push of the four
+tags into a local registry with their indexes' digests, `apptainer pull` of each and its programs.
+
+**Windows (the Windows helper: Windows 11 Education 25H2, build 26200, x64; uv 0.12.13; Visual
+C++'s runtime installed system-wide, so its absence cannot be shown there: the PE check of the
+release's files is the evidence, and it passed in dry run 2's two Windows test jobs).** The check
+for after rc1's upload is `win_check.sh 0.1.0rc1` (PyPI, the GitHub Release's `.exe` archives,
+the tag's tests). Proved now (logs `release-4-win-pypi-before.log`,
+`release-4-win-gnu-trial-2.log`):
+uv's Python 3.12.14 installed into the check's folder, the venv, pip upgraded; from PyPI the
+install fails as it must today ("No matching distribution found for larmorx==0.1.0rc1"); with
+the zig-built Windows files (`-FindLinks`, the source tree of `5ef26ea9` from GitHub's archive,
+`-NoArchives`): `larmorx[all]` from the files 98 s, `pip check` clean, the smoke checks pass but the
+3 C-runtime checks (these files import the Universal C Runtime's `api-ms-win-crt-*` DLLs, which
+the check refuses, as it must for the release's files), **pytest 934 passed, 2 skipped on
+Windows, the golden suite included**; the folder removed, nothing left. The first run left uv's
+`python3.12.exe` link in the profile's `.local\bin` and a registry entry
+(`HKCU\Software\Python\Astral\CPython3.12.14`) pointing into the removed folder: both removed
+(they were the check's own, made minutes before); the wrapper now sets `UV_PYTHON_INSTALL_BIN=0`,
+`UV_PYTHON_INSTALL_REGISTRY=0` and `UV_PYTHON_BIN_DIR` inside its folder and removes any registry
+entry that points into it; after the second run neither exists.

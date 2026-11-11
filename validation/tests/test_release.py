@@ -1095,3 +1095,59 @@ def test_smoke_reads_glibc_versions_without_objdump():
     printed = subprocess.run([objdump, "-T", str(program)], capture_output=True, text=True).stdout
     expected = {tuple(map(int, m)) for m in re.findall(r"GLIBC_(\d+)\.(\d+)", printed)}
     assert smoke.elf_glibc_versions(program.read_bytes()) == expected
+
+
+check_install = load("check_install")
+
+
+def test_check_install_names_and_source_archive(tmp_path, monkeypatch):
+    """The check after a release (scripts/release/check_install.py): this machine's archives by
+    the names archives.py gives them, GitHub's source archive unpacked without its top folder (and
+    nothing outside it), a work folder that is not empty refused."""
+    seen = set()
+    for system, machine, triple in (
+        ("Windows", "AMD64", "x86_64-pc-windows-msvc"),
+        ("Windows", "ARM64", "aarch64-pc-windows-msvc"),
+        ("Linux", "x86_64", "x86_64-unknown-linux-gnu"),
+        ("Linux", "aarch64", "aarch64-unknown-linux-gnu"),
+        ("Darwin", "arm64", "aarch64-apple-darwin"),
+        ("Darwin", "x86_64", "x86_64-apple-darwin"),
+    ):
+        monkeypatch.setattr(check_install.platform, "system", lambda s=system: s)
+        monkeypatch.setattr(check_install.platform, "machine", lambda m=machine: m)
+        assert check_install.target_triple() == triple
+        seen.add(triple)
+    assert seen == set(archives.TARGETS)  # the six release targets, as archives.py names them
+    monkeypatch.setattr(check_install.platform, "machine", lambda: "riscv64")
+    with pytest.raises(SystemExit, match="no release files"):
+        check_install.target_triple()
+    names = check_install.archive_names("0.1.0rc1", "x86_64-pc-windows-msvc")
+    assert names == [
+        f"{p}-0.1.0rc1-x86_64-pc-windows-msvc.zip" for p in ("larmorx", "larmorx-nc", "larmorx-gpl")
+    ]
+    assert check_install.archive_names("0.1.0", "aarch64-apple-darwin")[1] == (
+        "larmorx-nc-0.1.0-aarch64-apple-darwin.tar.gz"
+    )
+    data = io.BytesIO()
+    with zipfile.ZipFile(data, "w") as z:
+        z.writestr("larmorx-0.1.0rc1/pyproject.toml", "[project]\n")
+        z.writestr("larmorx-0.1.0rc1/tests/golden/test_golden.py", "")
+        z.writestr("larmorx-0.1.0rc1/crates-nc/larmorx-nc-cli/tests/golden.rs", "")
+    source = check_install.unpack_source(data.getvalue(), tmp_path / "source")
+    assert sorted(p.relative_to(source).as_posix() for p in source.rglob("*") if p.is_file()) == [
+        "crates-nc/larmorx-nc-cli/tests/golden.rs",
+        "pyproject.toml",
+        "tests/golden/test_golden.py",
+    ]
+    evil = io.BytesIO()
+    with zipfile.ZipFile(evil, "w") as z:
+        z.writestr("top/pyproject.toml", "")
+        z.writestr("top/../../outside.txt", "")
+    with pytest.raises(check_install.Failure, match="outside"):
+        check_install.unpack_source(evil.getvalue(), tmp_path / "evil")
+    assert not (tmp_path / "outside.txt").exists()
+    work = tmp_path / "work"
+    work.mkdir()
+    (work / "something").write_text("", encoding="utf-8")
+    with pytest.raises(SystemExit):
+        check_install.main(["--version", "0.1.0rc1", "--work", str(work)])

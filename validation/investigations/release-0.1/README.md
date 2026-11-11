@@ -301,3 +301,14 @@ Windows, the golden suite included**; the folder removed, nothing left. The firs
 (they were the check's own, made minutes before); the wrapper now sets `UV_PYTHON_INSTALL_BIN=0`,
 `UV_PYTHON_INSTALL_REGISTRY=0` and `UV_PYTHON_BIN_DIR` inside its folder and removes any registry
 entry that points into it; after the second run neither exists.
+
+**Dry run 2 (GitHub run 42934352316 at `5ef26ea9`, the first with the container jobs and the
+test job on six platforms):** check, sdist, the six wheels, the six programs jobs (linux-aarch64's
+fixed), sdist-install, both container jobs and the test jobs of linux-x64, linux-aarch64,
+windows-x64 and windows-arm64 passed (so the Windows `+crt-static` dist builds pass their golden
+tests and the PE check); one cause failed `test (macos-x64)` and `test (macos-arm64)`: "only the
+system's libraries: ['@rpath/larmorx._core.abi3.so']". That is the extension's own install name
+(its `LC_ID_DYLIB`, which `otool -L` prints first for a library), not a dependency: smoke.py now
+leaves out the name `otool -D` gives and still refuses every other library outside `/usr/lib` and
+`/System/Library` (`c02045bd`, with a test on `otool` outputs). Nothing was published (the
+release-only jobs and assemble were skipped).

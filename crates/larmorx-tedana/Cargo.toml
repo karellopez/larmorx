@@ -1,0 +1,20 @@
+[package]
+name = "larmorx-tedana"
+description = "Clean-room tedana-compatible t2smap for larmorx (T2* and S0 maps and the optimal combination of multi-echo fMRI), written from specs/t2smap.md"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+larmorx-core.workspace = true
+larmorx-io.workspace = true
+# nilearn's compute_epi_mask (the mask without --mask)
+larmorx-interp.workspace = true
+# LapackRelease: nibabel's qform arithmetic in the outputs' headers (numpy's LAPACK release)
+larmorx-transform.workspace = true
+ndarray.workspace = true
+rayon.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

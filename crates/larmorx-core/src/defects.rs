@@ -1027,18 +1027,32 @@ impl fmt::Display for Notice {
 }
 
 /// FSL-11's notice for a run of the FSL program `tool` with `FSLOUTPUTTYPE` unset whose images
-/// were written as `NIFTI_GZ` (the default; with `reproduce` the run stops as FSL's does). The
-/// words both implementations print: the clean-room originals' (`larmorx_mri::hmc::image::
-/// fsl11_notice`, the same text) and the `larmorx-nc` replicas'.
+/// were written as `NIFTI_GZ` (the default; with `reproduce` the run does what FSL's does). The
+/// one text both implementations print: the clean-room originals' (`larmorx_mri::hmc::image::
+/// fsl11_notice` re-exports it) and the `larmorx-nc` replicas'. It says what FSL's `tool` does
+/// with the variable unset ([`fsl11_what_fsl_does`]).
 pub fn fsl11_notice(tool: &str) -> Notice {
     Notice::new(
         &FSL_11,
         UpstreamDefects::Fix,
         format!(
-            "FSLOUTPUTTYPE is not set: the images are written as NIFTI_GZ (.nii.gz); FSL's {tool} \
-             stops with an error at its first image (exit 1)"
+            "FSLOUTPUTTYPE is not set: the images are written as NIFTI_GZ (.nii.gz); {}",
+            fsl11_what_fsl_does(tool)
         ),
     )
+}
+
+/// What FSL 6.0.7.23's `tool` does when `FSLOUTPUTTYPE` is not set (observed, black box:
+/// `validation/investigations/easy-cli/fsl11_probe.py`): its programs stop with an error at
+/// their first image (exit 1); `standard_space_roi`, a script, goes on after its steps stop
+/// there and exits 0 without writing an image.
+pub fn fsl11_what_fsl_does(tool: &str) -> String {
+    match tool {
+        "standard_space_roi" => "FSL's standard_space_roi writes no image (its steps stop with \
+                                 an error at their first image) and exits 0"
+            .to_owned(),
+        _ => format!("FSL's {tool} stops with an error at its first image (exit 1)"),
+    }
 }
 
 /// Adds `notice` to `notices` unless the same defect is already there (one notice per defect
@@ -1200,5 +1214,23 @@ mod tests {
             "{text}"
         );
         assert_eq!(text.lines().count(), 2);
+    }
+
+    #[test]
+    fn fsl11_says_what_fsl_does() {
+        // FSL's programs stop at their first image; standard_space_roi's script goes on
+        assert_eq!(
+            fsl11_notice("fslmaths").line(),
+            "upstream defect FSL-11 (FSL) corrected: FSLOUTPUTTYPE is not set: the images are \
+             written as NIFTI_GZ (.nii.gz); FSL's fslmaths stops with an error at its first image \
+             (exit 1) [LARMORX_UPSTREAM_DEFECTS=reproduce gives FSL's result]"
+        );
+        assert_eq!(
+            fsl11_notice("standard_space_roi").line(),
+            "upstream defect FSL-11 (FSL) corrected: FSLOUTPUTTYPE is not set: the images are \
+             written as NIFTI_GZ (.nii.gz); FSL's standard_space_roi writes no image (its steps \
+             stop with an error at their first image) and exits 0 \
+             [LARMORX_UPSTREAM_DEFECTS=reproduce gives FSL's result]"
+        );
     }
 }

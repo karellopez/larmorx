@@ -360,4 +360,7 @@ of `OMP_NUM_THREADS`.
 originals print (`larmorx_mri::hmc::image::fsl11_notice`, written by the clean role; a test in
 `crates/larmorx-cli` checks the two give the same notice), here so that the `larmorx-nc` replicas,
 which never depend on a clean-room crate, print the same line (`larmorx-nc: upstream defect FSL-11
-(FSL) corrected: ...`).
+(FSL) corrected: ...`). Since relay 3 (clean role, 2026-11-11) the one text: `larmorx_mri`
+re-exports it, and `defects::fsl11_what_fsl_does` says what FSL's program does with the variable
+unset, per tool (its first image stops it, exit 1; `standard_space_roi`'s script goes on after its
+steps stop there and exits 0 without an image: FSL 6.0.7.23 run black box).

@@ -265,7 +265,8 @@ page explains the rules. To get the original program's result, bit for bit, give
 is the same setting as an environment variable; `upstream_defects="reproduce"` in Python); the
 notice then says `reproduced`. FSL-11's notice (`FSLOUTPUTTYPE` not set, the images written as
 `.nii.gz`) is printed once per command that writes an image; with `--upstream-defects reproduce`
-an FSL tool stops at its first image with FSL's message, as FSL's does. The replica programs' notices start with `larmorx-nc:` or
+an FSL tool stops at its first image with FSL's message, as FSL's does (`standard_space_roi`'s
+script goes on and exits 0 without an image, as FSL's: its notice says so). The replica programs' notices start with `larmorx-nc:` or
 `larmorx-gpl:`, and AFNI's tools print theirs as AFNI's warnings (`*+ WARNING: upstream defect
 AFNI-99 (3dvolreg) corrected: ...`).
 

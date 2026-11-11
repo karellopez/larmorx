@@ -1,14 +1,24 @@
 // SPDX-License-Identifier: Apache-2.0
 //! The FSL tools' output types: FSL-09's notice names the program that ran (an integer output
-//! of flirt, applyxfm4D, applytopup); and FSL-11, `FSLOUTPUTTYPE` unset, for every FSL tool's
-//! clean-room original (the standalone
-//! `larmorx` binary, run as a separate process): FSL's programs stop with an error at their
-//! first image (exit 1). By default a tool that writes an image writes `NIFTI_GZ`, exactly the
-//! bytes it writes with `FSLOUTPUTTYPE=NIFTI_GZ`, and its run names FSL-11 on one line of its
-//! own (one also when its steps run other programs: `bet -R`); with `--upstream-defects
-//! reproduce`, FSL's message, no image, and FSL's exit status. A tool that writes no image
-//! (or a call of one that writes none: `flirt -omat`) runs as with the variable set, naming
-//! nothing, in both modes.
+//! of flirt, applyxfm4D, applytopup); and FSL-11, `FSLOUTPUTTYPE` unset, for the FSL tools'
+//! clean-room originals (the standalone `larmorx` binary, run as a separate process): FSL's
+//! programs stop with an error at their first image (exit 1; `standard_space_roi`'s script goes
+//! on and exits 0 without an image). By default a tool that writes an image writes `NIFTI_GZ`,
+//! exactly the bytes it writes with `FSLOUTPUTTYPE=NIFTI_GZ`, and its run names FSL-11 on one
+//! line of its own (one also when its steps run other programs: `standard_space_roi`); with
+//! `--upstream-defects reproduce`, FSL's message, no image, and FSL's exit status. A tool that
+//! writes no image (or a call of one that writes none: `flirt -omat`) runs as with the variable
+//! set, naming nothing, in both modes.
+//!
+//! On CI (every platform, the debug profile) one call per code path, a few seconds in all
+//! (rule 10's budget): one tool writing one image (`fslmaths`), FLIRT's engine (`flirt
+//! -applyxfm`), FAST's writer, the image names bet2's code resolves (`prelude`), a script whose
+//! steps are FSL programs (`standard_space_roi`, FSL-11's wording for it), mcflirt's own code
+//! (`fsl mcflirt`, `mri hmc`), the calls that write no image, mcflirt's files before it stops,
+//! FSL-09's three names. Every FSL tool's calls (bet2, bet, betsurf, fslroi, applyxfm4D, topup,
+//! applytopup, pairreg, ... besides these), each compared with FSL 6.0.7.23's own run, are in
+//! `tests/parity/test_fsl_output_types_original.py` (this machine; the parity smoke tier, at
+//! every merge), as `tests/parity/test_fsl_output_types_replica.py` for the replicas.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -36,13 +46,21 @@ const CLEARED: &[&str] = &[
 /// FSL's message (`specs/bet.md` §3.1).
 const UNSET: &str = "ERROR:: Environment variable FSLOUTPUTTYPE is not set!";
 
-/// The line a run of `tool` ends with when it wrote its images as `NIFTI_GZ` in place of the
-/// unset variable.
+/// The line a run of `tool` names FSL-11 with when it wrote its images as `NIFTI_GZ` in place
+/// of the unset variable: what FSL's program does instead (`standard_space_roi`'s script goes on and
+/// exits 0 without an image; FSL's other programs stop at their first image, exit 1).
 fn fsl11_line(tool: &str) -> String {
+    let fsl = if tool == "standard_space_roi" {
+        "FSL's standard_space_roi writes no image (its steps stop with an error at their first \
+         image) and exits 0"
+            .to_owned()
+    } else {
+        format!("FSL's {tool} stops with an error at its first image (exit 1)")
+    };
     format!(
         "larmorx: upstream defect FSL-11 (FSL) corrected: FSLOUTPUTTYPE is not set: the images \
-         are written as NIFTI_GZ (.nii.gz); FSL's {tool} stops with an error at its first image \
-         (exit 1) [LARMORX_UPSTREAM_DEFECTS=reproduce gives FSL's result]"
+         are written as NIFTI_GZ (.nii.gz); {fsl} [LARMORX_UPSTREAM_DEFECTS=reproduce gives \
+         FSL's result]"
     )
 }
 
@@ -144,9 +162,9 @@ fn run(
 }
 
 /// The inputs of every call: a 3D image, a 3-volume series, a 2-volume pair for topup with its
-/// acquisition parameters, a phase image, an identity matrix; topup's results (for applytopup)
-/// and bet2's mesh (for betsurf), made with `FSLOUTPUTTYPE=NIFTI_GZ`.
-fn inputs(d: &Path) {
+/// acquisition parameters, a phase image, an identity matrix; with `topup`, topup's results (for
+/// applytopup), made with `FSLOUTPUTTYPE=NIFTI_GZ`.
+fn inputs(d: &Path, topup: bool) {
     image(&d.join("in.nii"), &[12, 12, 10], |v| v);
     image(&d.join("series.nii"), &[12, 12, 10, 3], |v| v);
     image(&d.join("pair.nii"), &[12, 12, 10, 2], |v| v);
@@ -166,21 +184,10 @@ fn inputs(d: &Path) {
         let o = c.env("FSLOUTPUTTYPE", "NIFTI_GZ").output().unwrap();
         assert_eq!(o.status.code(), Some(0), "{args:?}: {o:?}");
     };
-    keep(&TOPUP_FOR_APPLYTOPUP);
-    keep(&["fsl", "bet2", "in.nii", "bm", "-e", "-n"]);
+    if topup {
+        keep(&TOPUP_FOR_APPLYTOPUP);
+    }
 }
-
-const TOPUP: [&str; 9] = [
-    "fsl",
-    "topup",
-    "--imain=pair.nii",
-    "--datain=acq.txt",
-    "--out=tu",
-    "--subsamp=1",
-    "--miter=1",
-    "--warpres=20",
-    "--fwhm=0",
-];
 
 const TOPUP_FOR_APPLYTOPUP: [&str; 9] = [
     "fsl",
@@ -194,8 +201,9 @@ const TOPUP_FOR_APPLYTOPUP: [&str; 9] = [
     "--fwhm=0",
 ];
 
-/// The calls that write an image, one or more per FSL tool, with the program FSL-11's line
-/// names and FSL's exit status when the variable is unset.
+/// The calls that write an image, one per code path (every FSL tool's:
+/// `tests/parity/test_fsl_output_types_original.py`), with the program FSL-11's line names and
+/// FSL's exit status when the variable is unset.
 fn image_calls() -> Vec<(&'static str, Vec<&'static str>, i32)> {
     vec![
         (
@@ -203,11 +211,7 @@ fn image_calls() -> Vec<(&'static str, Vec<&'static str>, i32)> {
             vec!["fsl", "fslmaths", "in.nii", "-add", "1", "m"],
             1,
         ),
-        (
-            "fslroi",
-            vec!["fsl", "fslroi", "in.nii", "r", "0", "6", "0", "6", "0", "5"],
-            1,
-        ),
+        // FLIRT's engine (applyxfm4D's too)
         (
             "flirt",
             vec![
@@ -225,37 +229,8 @@ fn image_calls() -> Vec<(&'static str, Vec<&'static str>, i32)> {
             ],
             1,
         ),
-        (
-            "applyxfm4D",
-            vec![
-                "fsl",
-                "applyxfm4D",
-                "series.nii",
-                "in.nii",
-                "a",
-                "eye.mat",
-                "-singlematrix",
-            ],
-            1,
-        ),
-        ("bet2", vec!["fsl", "bet2", "in.nii", "b2", "-m"], 1),
-        // the script runs bet2 three times: one line all the same
-        ("bet", vec!["fsl", "bet", "in.nii", "bR", "-R"], 1),
-        (
-            "betsurf",
-            vec![
-                "fsl",
-                "betsurf",
-                "--t1only",
-                "-m",
-                "in.nii",
-                "bm_mesh.vtk",
-                "eye.mat",
-                "bs",
-            ],
-            1,
-        ),
         ("fast", vec!["fsl", "fast", "-o", "seg", "in.nii"], 1),
+        // the image names bet2's code resolves (topup's, applytopup's and fast's inputs too)
         (
             "prelude",
             vec![
@@ -270,22 +245,8 @@ fn image_calls() -> Vec<(&'static str, Vec<&'static str>, i32)> {
             ],
             1,
         ),
-        ("topup", TOPUP.to_vec(), 1),
-        (
-            "applytopup",
-            vec![
-                "fsl",
-                "applytopup",
-                "--imain=in.nii",
-                "--inindex=1",
-                "--datain=acq.txt",
-                "--topup=tu0",
-                "--out=at",
-                "--method=jac",
-            ],
-            1,
-        ),
-        // the script goes on after its flirt fails, as FSL's does (exit 0)
+        // a script whose steps are FSL programs: one line; FSL's goes on after its steps stop
+        // (exit 0, no image), which FSL-11's line says
         (
             "standard_space_roi",
             vec![
@@ -332,10 +293,10 @@ fn image_calls() -> Vec<(&'static str, Vec<&'static str>, i32)> {
 }
 
 #[test]
-fn every_fsl_tool_writes_nifti_gz_when_fsloutputtype_is_unset() {
+fn fsl_tools_write_nifti_gz_when_fsloutputtype_is_unset() {
     let tmp = tempfile::tempdir().unwrap();
     let d = tmp.path();
-    inputs(d);
+    inputs(d, false);
     for (tool, args, fsl_status) in image_calls() {
         let line = fsl11_line(tool);
         let (given, given_files) = run(d, &[("FSLOUTPUTTYPE", "NIFTI_GZ")], false, &args);
@@ -393,7 +354,7 @@ fn mcflirt_reproduced_stops_where_mcflirt_does() {
     // observed with FSL 6.0.7.23, validation/investigations/easy-cli/fsl11_probe.py)
     let tmp = tempfile::tempdir().unwrap();
     let d = tmp.path();
-    inputs(d);
+    inputs(d, false);
     let (o, written) = run(
         d,
         &[],
@@ -446,7 +407,7 @@ fn mcflirt_reproduced_stops_where_mcflirt_does() {
 fn tools_that_write_no_image_run_as_with_the_variable() {
     let tmp = tempfile::tempdir().unwrap();
     let d = tmp.path();
-    inputs(d);
+    inputs(d, false);
     for args in [
         // flirt without an output image: nothing where FSL would stop
         vec![
@@ -462,18 +423,9 @@ fn tools_that_write_no_image_run_as_with_the_variable() {
             "6",
             "-nosearch",
         ],
+        // a tool that writes no image (convert_xfm, avscale, bet2 -e -n, pairreg: the parity
+        // test)
         vec!["fsl", "fslstats", "in.nii", "-M"],
-        vec![
-            "fsl",
-            "convert_xfm",
-            "-omat",
-            "inv.mat",
-            "-inverse",
-            "eye.mat",
-        ],
-        vec!["fsl", "avscale", "eye.mat"],
-        // bet2 with only the mesh
-        vec!["fsl", "bet2", "in.nii", "bn", "-e", "-n"],
     ] {
         for reproduce in [false, true] {
             let (given, given_files) = run(d, &[("FSLOUTPUTTYPE", "NIFTI_GZ")], reproduce, &args);
@@ -514,7 +466,7 @@ fn fsl09_names_the_program_that_ran() {
     // rounded by default, and the notice names the program that wrote them (not mcflirt)
     let tmp = tempfile::tempdir().unwrap();
     let d = tmp.path();
-    inputs(d);
+    inputs(d, true);
     image_i16(&d.join("s16.nii"), &[12, 12, 10, 2]);
     std::fs::write(
         d.join("shift.mat"),

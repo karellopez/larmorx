@@ -1025,8 +1025,9 @@ mod tests {
     }
 
     /// FSL-11's line has the same words in both implementations: the clean-room originals'
-    /// (`larmorx_mri::hmc::image::fsl11_notice`) and the `larmorx-nc` replicas'
-    /// (`larmorx_core::defects::fsl11_notice`; their lines start `larmorx-nc:` instead).
+    /// (`larmorx_mri::hmc::image::fsl11_notice`, a re-export of the core text) and the
+    /// `larmorx-nc` replicas' (`larmorx_core::defects::fsl11_notice`; their lines start
+    /// `larmorx-nc:` instead): a guard should either ever get its own text again.
     #[test]
     fn fsl11_has_the_same_words_in_both_implementations() {
         for tool in ["fslmaths", "bet", "standard_space_roi", "mcflirt"] {

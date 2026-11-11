@@ -49,8 +49,9 @@ The changes on `main` since 0.1.0rc1, for the next release.
 - **FSL's tools without `FSLOUTPUTTYPE`** (FSL-11): every FSL tool, its clean-room original and
   its `larmorx-nc` replica alike, writes its images as `.nii.gz` (`NIFTI_GZ`) when the variable is
   unset, as `flirt` and `mcflirt` already did, and names FSL-11 on one line per command, in the same
-  words; FSL's own programs stop at their first image (exit 1), which `--upstream-defects
-  reproduce` gives. Setting the variable is optional.
+  words; FSL's own programs stop at their first image (exit 1; `standard_space_roi`'s script goes
+  on and exits 0 without an image, which its notice says), which `--upstream-defects reproduce`
+  gives. Setting the variable is optional.
 
 ### Deprecated
 

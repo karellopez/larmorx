@@ -462,17 +462,9 @@ pub const OUTPUT_TYPES: [&str; 16] = [
 pub const FSLOUTPUTTYPE_UNSET: &str = "ERROR:: Environment variable FSLOUTPUTTYPE is not set!\nPlease make sure that the appropriate configuration file is sourced by your shell (e.g. by putting it in .profile).\ne.g. bash or sh users add the line \". ${FSLDIR}/etc/fslconf/fsl.sh\"\ne.g. tcsh or csh users add the line \"source ${FSLDIR}/etc/fslconf/fsl.csh\"\n";
 
 /// FSL-11's notice for a run of the FSL program `tool` with `FSLOUTPUTTYPE` unset whose images
-/// were written as `NIFTI_GZ` (the default; with `reproduce` the run stops as FSL's does).
-pub fn fsl11_notice(tool: &str) -> Notice {
-    Notice::new(
-        &defects::FSL_11,
-        UpstreamDefects::Fix,
-        format!(
-            "FSLOUTPUTTYPE is not set: the images are written as NIFTI_GZ (.nii.gz); FSL's {tool} \
-             stops with an error at its first image (exit 1)"
-        ),
-    )
-}
+/// were written as `NIFTI_GZ` (the default; with `reproduce` the run does what FSL's does): the
+/// one text in `larmorx_core::defects`, which the `larmorx-nc` replicas print too.
+pub use larmorx_core::defects::fsl11_notice;
 
 /// FSL 6.0.7.23's message for an `FSLOUTPUTTYPE` it does not know (§10.1, observed).
 pub fn unknown_output_type_message(value: &str) -> String {

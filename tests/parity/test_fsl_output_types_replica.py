@@ -113,11 +113,20 @@ NO_IMAGE_CALLS: list[list[str]] = [
 
 
 def line(tool: str, program: str = "larmorx-nc") -> bytes:
-    """FSL-11's line for a run of ``tool`` that wrote its images as ``NIFTI_GZ``."""
+    """FSL-11's line for a run of ``tool`` that wrote its images as ``NIFTI_GZ``: what FSL's
+    program does instead (``standard_space_roi``'s script goes on and exits 0 without an image;
+    FSL's other programs stop at their first image, exit 1)."""
+    if tool == "standard_space_roi":
+        fsl = (
+            "FSL's standard_space_roi writes no image (its steps stop with an error at their "
+            "first image) and exits 0"
+        )
+    else:
+        fsl = f"FSL's {tool} stops with an error at its first image (exit 1)"
     return (
         f"{program}: upstream defect FSL-11 (FSL) corrected: FSLOUTPUTTYPE is not set: the images "
-        f"are written as NIFTI_GZ (.nii.gz); FSL's {tool} stops with an error at its first image "
-        "(exit 1) [LARMORX_UPSTREAM_DEFECTS=reproduce gives FSL's result]"
+        f"are written as NIFTI_GZ (.nii.gz); {fsl} [LARMORX_UPSTREAM_DEFECTS=reproduce gives "
+        "FSL's result]"
     ).encode()
 
 

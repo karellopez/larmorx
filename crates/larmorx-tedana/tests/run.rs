@@ -484,3 +484,59 @@ fn every_volume_excluded_without_dropout() {
          volumes excluded)"
     ));
 }
+
+/// An empty user mask (random testing, 2026-11-11, black-box: tedana 26.0.3 and the replica):
+/// with the dropout method tedana's `IndexError` in both modes (not TED-01's error, which is for
+/// NaN means); without a method, nilearn's refusal of an empty mask at the adaptive mask's image,
+/// the first written, in both modes.
+#[test]
+fn an_empty_user_mask_fails_as_tedana_in_both_modes() {
+    let dir = tempfile::tempdir().unwrap();
+    write_inputs(dir.path());
+    let affine = Affine::from_rows([
+        [-3.0, 0.0, 0.0, 10.5],
+        [0.0, 3.0, 0.0, -7.5],
+        [0.0, 0.0, 3.5, -5.25],
+        [0.0, 0.0, 0.0, 1.0],
+    ]);
+    let shape = [NX, NY, NZ];
+    let hdr = nifti::header_for_image(
+        None,
+        None,
+        &shape,
+        larmorx_core::element::DataType::U8,
+        &affine,
+    )
+    .unwrap();
+    let arr = ArrayD::from_shape_vec(IxDyn(&shape).f(), vec![0u8; NX * NY * NZ]).unwrap();
+    nifti::write(
+        dir.path().join("empty.nii.gz"),
+        &hdr,
+        arr.view(),
+        &WriteOptions::default(),
+    )
+    .unwrap();
+    for mode in ["fix", "reproduce"] {
+        let env = [("LARMORX_UPSTREAM_DEFECTS", mode)];
+        let mut args = BASE.to_vec();
+        args.extend(["empty.nii.gz", "--out-dir", "dropout"]);
+        let (code, _, err) = run(dir.path(), &args, &env);
+        assert_eq!(code, 1, "{err}");
+        assert!(
+            err.ends_with("IndexError: index -1 is out of bounds for axis 0 with size 0\n"),
+            "{mode}: {err}"
+        );
+        assert!(!err.contains("TED-01"), "{err}");
+        let mut args = BASE.to_vec();
+        args.extend(["empty.nii.gz", "--masktype", "none", "--out-dir", "none"]);
+        let (code, _, err) = run(dir.path(), &args, &env);
+        assert_eq!(code, 1, "{err}");
+        assert!(
+            err.ends_with("ValueError: The mask is invalid as it is empty: it masks all data.\n"),
+            "{mode}: {err}"
+        );
+        assert!(!dir.path().join("none/desc-adaptiveGoodSignal_mask.nii.gz").exists());
+        std::fs::remove_dir_all(dir.path().join("dropout")).unwrap();
+        std::fs::remove_dir_all(dir.path().join("none")).unwrap();
+    }
+}

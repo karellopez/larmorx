@@ -125,7 +125,6 @@ fn positional<T: PrintFloat>(x: T) -> (String, String) {
 /// sign), the fraction digits and the exponent (signed, at least two digits).
 fn scientific<T: PrintFloat>(x: T) -> (String, String, String) {
     let v = x.to_f64();
-    let sign = if v.is_sign_negative() { "-" } else { "" };
     let mut s = x.sci();
     let digits = s
         .split_once('e')
@@ -137,10 +136,17 @@ fn scientific<T: PrintFloat>(x: T) -> (String, String, String) {
     if digits > PRECISION + 1 {
         s = x.sci_fixed(PRECISION);
     }
+    sci_parts(v, &s, true)
+}
+
+/// A scientific form `d.ddde±x` (Rust's) as numpy's integer part (with the sign of `v`),
+/// fraction digits (trailing zeros cut when `trim`) and exponent (`±XX`).
+fn sci_parts(v: f64, s: &str, trim: bool) -> (String, String, String) {
+    let sign = if v.is_sign_negative() { "-" } else { "" };
     let (mant, exp) = s.split_once('e').expect("e");
     let mant = mant.trim_start_matches('-');
     let (a, b) = mant.split_once('.').unwrap_or((mant, ""));
-    let b = b.trim_end_matches('0');
+    let b = if trim { b.trim_end_matches('0') } else { b };
     let exp: i64 = exp.parse().expect("exponent");
     let e = format!("{}{:02}", if exp < 0 { '-' } else { '+' }, exp.abs());
     (format!("{sign}{a}"), b.to_owned(), e)
@@ -216,7 +222,14 @@ impl Format {
             return format!("{r:>w$}");
         }
         if self.exp {
-            let (a, b, e) = scientific(x);
+            let (mut a, mut b, mut e) = scientific(x);
+            if b.len() < self.precision {
+                // `min_digits` (numpy's `FloatingFormat` sets it to the array's precision in
+                // scientific form): Dragon4 goes on with the element's own digits, the last
+                // rounded ties to even, instead of padding with zeros (numpy 2.5.4, observed:
+                // `[7.6950021e-02 7.0551876e-04]`, where 7.695002e-02 is the shortest)
+                (a, b, e) = sci_parts(x.to_f64(), &x.sci_fixed(self.precision), false);
+            }
             let b = format!("{b:0<w$}", w = self.precision);
             format!("{a:>l$}.{b}e{e}", l = self.pad_left)
         } else {
@@ -325,6 +338,16 @@ mod tests {
         assert_eq!(array_str(&a), "[180.95544  65.59678  18.5366 ]");
         assert_eq!(array_str(&[1.0f64, 2.5]), "[1.  2.5]");
         assert_eq!(array_str(&[1e-5f64, 2.5e-5]), "[1.0e-05 2.5e-05]");
+        // scientific form: a shorter element shows its own further digits (numpy's
+        // `min_digits`), not zeros (numpy 2.5.4's output)
+        let t = [7.6950021e-02f32, 7.0551876e-04, 1.2756876e-05];
+        assert_eq!(array_str(&t), "[7.6950021e-02 7.0551876e-04 1.2756876e-05]");
+        let t = [3.7185407e-01f32, 1.7238496e-03, 6.0828668e-05, 8.7365316e-07, 3.0783408e-08];
+        assert_eq!(
+            array_str(&t),
+            "[3.7185407e-01 1.7238496e-03 6.0828668e-05 8.7365316e-07 3.0783408e-08]"
+        );
+        assert_eq!(array_str(&[0.5f32, 1.25e-05]), "[5.00e-01 1.25e-05]");
         assert_eq!(array_str(&[0.0f64, -0.0]), "[ 0. -0.]");
         assert_eq!(array_str(&[f64::NAN, 1.0]), "[nan  1.]");
         assert_eq!(array_str(&[0.1f32]), "[0.1]");

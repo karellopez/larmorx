@@ -276,6 +276,13 @@ impl Outputs {
         four_d: bool,
     ) -> Result<(), PyError> {
         let path = self.claim(desc)?;
+        if spec.offsets.is_empty() {
+            // nilearn's unmask refuses a mask of no voxel (observed: the adaptive mask's image,
+            // the first written, with an empty computed mask or user mask and no dropout method)
+            return Err(PyError::value(
+                "The mask is invalid as it is empty: it masks all data.",
+            ));
+        }
         let [nx, ny, nz] = spec.grid;
         let nvox = nx * ny * nz;
         let mut buf = vec![T::default(); nvox * cols];

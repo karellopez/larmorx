@@ -59,7 +59,7 @@ def compare(a: Path, b: Path) -> list[str]:
                 with np.errstate(all="ignore"):
                     rel = np.nanmax(np.abs(x - y) / np.maximum(np.abs(x), np.abs(y)))
                 out.append(f"{name}: {n} of {da.size} values differ, largest relative {rel:.3g}")
-        elif name.endswith(".json") and name.startswith("dataset_description"):
+        elif name.endswith("dataset_description.json"):  # with or without a prefix
             continue  # the host, the libraries and larmorx's own description differ by design
         elif pa.read_bytes() != pb.read_bytes():
             out.append(f"{name}: the text differs")

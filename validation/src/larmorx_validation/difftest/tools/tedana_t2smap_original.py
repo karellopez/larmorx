@@ -370,14 +370,30 @@ _CHAIN = "During handling of the above exception, another exception occurred:"
 _WARNING_LINE = re.compile(r"^RuntimeWarning: ")
 
 
+_THRESHOLDS = re.compile(r"^(INFO +utils:make_adaptive_mask:\d+ Echo-wise intensity thresholds for adaptive mask: )\[(.*)\]$")  # fmt: skip
+
+
+def _by_value(line: str) -> str:
+    """The dropout thresholds' line with each number as the float32 it names: larmorx-gpl
+    0.1.0rc1 pads numpy's scientific form with zeros where numpy prints the element's own further
+    digits (larmorx_core::numpy::format, fixed 2026-11-11), the same values."""
+    import numpy as np
+
+    m = _THRESHOLDS.match(line)
+    if not m:
+        return line
+    values = [repr(float(np.float32(w))) for w in m.group(2).split()]
+    return f"{m.group(1)}{values}"
+
+
 def _without_gaps(lines: list[str]) -> list[str]:
     """The messages with what the replica's known gaps change taken out: every traceback but the
-    last of a chain, numpy's RuntimeWarning lines."""
+    last of a chain, numpy's RuntimeWarning lines, the thresholds' digits (by value)."""
     if _CHAIN in lines:
         first = lines.index("Traceback (most recent call last):")
         last = len(lines) - 1 - lines[::-1].index("Traceback (most recent call last):")
         lines = lines[:first] + lines[last:]
-    return [x for x in lines if not _WARNING_LINE.match(x)]
+    return [_by_value(x) for x in lines if not _WARNING_LINE.match(x)]
 
 
 def _run(case, checks) -> None:
@@ -433,7 +449,7 @@ def _run(case, checks) -> None:
             if _without_gaps(m_p) == _without_gaps(m_d):
                 reason = (
                     "the replica's known message gaps (one of two chained tracebacks, numpy's "
-                    "RuntimeWarning lines)"
+                    "RuntimeWarning lines, the thresholds' zero-padded digits)"
                 )
         met = so._settle(checks, b, reason)
         if met and all(c.passed for c in checks.checks):

@@ -8850,3 +8850,279 @@ def _(ctx: Context) -> dict[str, Any]:
             out[label] = Nifti(res.out_file)
             out[f"{label}.centre"] = np.asarray(res.centre, dtype=np.int64)
     return out
+
+
+# ------------------------------------------------------------------------------------------------
+# tedana's t2smap: the clean-room original (``crates/larmorx-tedana``, ``specs/t2smap.md`` §17.4)
+#
+# Through its own binding (``_core.tedana_t2smap_cleanroom``) until it is wired into
+# ``lx.tedana.t2smap`` (which runs the replica, ``larmorx-gpl``, today: ``REPLICA_ONLY_FUNCTIONS``),
+# so the cases cover no public name yet. Every file the run writes is an output (NIfTI images by
+# header and data), with its exit status and both streams; standard error with the case
+# directory's name replaced, ``dataset_description.json`` without the host's ``Node`` and with
+# larmorx's version replaced (the same checksum on every machine and at every release).
+
+T2SMAP_SHAPE = (12, 10, 8, 4)
+T2SMAP_TES_MS = (12, 28, 44)
+T2SMAP_TES = ("-e", "0.012", "0.028", "0.044")
+T2SMAP_ZOOMS = (3.0, 3.0, 3.5)
+
+
+@functools.cache
+def _t2smap_echoes() -> tuple[np.ndarray, ...]:
+    """Three echoes (12 × 10 × 8 × 4, float64): S0 times the decay as a product of
+    per-millisecond factors (1 − 1/T2*)^TE, with seeded multiplicative noise of ±2 %; a head and
+    a brain over a dim background, a dropout band (x ≤ 2: the last echo at a tenth), rising
+    voxels (y = 0: the last echo above the second, whose log-linear T2* is negative) and one
+    noiseless voxel decaying with a T2* of 2 s (above ten times the cap: TED-05)."""
+    shape = T2SMAP_SHAPE[:3]
+    head = ellipsoid(shape, 9, 10)
+    brain = ellipsoid(shape, 7, 10)
+    i, j, k = np.indices(shape, dtype=np.int64)
+    s0 = ints(301, shape, 10, 40) + 500 * head + 700 * brain + 9 * i * head
+    t2 = np.where(brain, 24 + 2 * j + k, np.where(head, 14 + j, 6))
+    t2[7, 6, 4] = 2000
+    factor = 1.0 - 1.0 / t2
+    decays = []
+    for te in T2SMAP_TES_MS:
+        decay = np.ones(shape)
+        for _ in range(te):
+            decay = decay * factor
+        decays.append(s0 * decay)
+    decays[2] = np.where(head & (i <= 2), decays[2] / 10, decays[2])
+    decays[2] = np.where(head & (j == 0), decays[1] * 1.2, decays[2])
+    noise = [ints(310 + e, T2SMAP_SHAPE, -100, 101) for e in range(len(decays))]
+    for n in noise:
+        n[7, 6, 4, :] = 0
+    return tuple(d[..., np.newaxis] * (1.0 + n / 5000) for d, n in zip(decays, noise, strict=True))
+
+
+def _t2smap_affine() -> np.ndarray:
+    return affine(T2SMAP_SHAPE[:3], T2SMAP_ZOOMS, (1.5, -4.0, 6.0), oblique=False)
+
+
+def _t2smap_header(data: np.ndarray, aff: np.ndarray, **fields: Any) -> NiftiHeader:
+    zooms = (1.0, *T2SMAP_ZOOMS, 2.0, 1.0, 1.0, 1.0)
+    return header_for(data, aff, pixdim=zooms, xyzt_units=10, **fields)
+
+
+def _t2smap_mask() -> np.ndarray:
+    return np.asfortranarray(ellipsoid(T2SMAP_SHAPE[:3], 8, 10).astype(np.uint8))
+
+
+def _t2smap_nifti(ctx: Context, *, ext: str = ".nii.gz", version: int | None = None) -> list[str]:
+    """The echoes as float32 NIfTI files ``e1<ext>``... and the mask ``mask<ext>`` in the case's
+    directory; ``-d`` with the echoes' names."""
+    aff = _t2smap_affine()
+    names = []
+    for e, echo in enumerate(_t2smap_echoes(), 1):
+        data = np.asfortranarray(echo.astype(np.float32))
+        lx.save(lx.Image(data, aff, _t2smap_header(data, aff)), ctx.out(f"e{e}{ext}"), version=version)  # fmt: skip
+        names.append(f"e{e}{ext}")
+    mask = _t2smap_mask()
+    lx.save(lx.Image(mask, aff, header_for(mask, aff)), ctx.out(f"mask{ext}"), version=version)
+    return ["-d", *names]
+
+
+def _t2smap_zcat(ctx: Context) -> list[str]:
+    """The three echoes stacked along z in one int16 file with ``scl_slope`` 0.5 and
+    ``scl_inter`` 3 (the deprecated z-concatenated form, 12 × 10 × 24 × 4)."""
+    stacked = np.concatenate(_t2smap_echoes(), axis=2)
+    raw = np.asfortranarray(np.round((stacked - 3.0) / 0.5).astype(np.int16))
+    aff = affine(raw.shape[:3], T2SMAP_ZOOMS, (1.5, -4.0, 6.0), oblique=False)
+    hdr = _t2smap_header(raw, aff, scl_slope=0.5, scl_inter=3.0)
+    _core.nifti_write(ctx.out("zcat.nii.gz"), raw, hdr.to_dict(), 2, 1)
+    return ["-d", "zcat.nii.gz"]
+
+
+def _analyze_header(shape: tuple[int, ...], datatype: int, bitpix: int) -> bytearray:
+    """A little-endian ANALYZE 7.5 header read as SPM2's (nibabel): voxel sizes 3, 3, 3.5 and a
+    2 s TR, the origin at voxel (6, 5, 4) (1-based, ``originator``), no scaling."""
+    import struct
+
+    h = bytearray(348)
+    struct.pack_into("<i", h, 0, 348)
+    struct.pack_into("<i", h, 32, 16384)
+    h[38] = ord("r")
+    dims = (*shape, *([1] * (7 - len(shape))))
+    struct.pack_into("<8h", h, 40, len(shape), *dims)
+    struct.pack_into("<2h", h, 70, datatype, bitpix)
+    struct.pack_into("<8f", h, 76, 0.0, *T2SMAP_ZOOMS, 2.0, 0.0, 0.0, 0.0)
+    struct.pack_into("<3h", h, 253, 6, 5, 4)
+    return h
+
+
+def _t2smap_analyze(ctx: Context) -> list[str]:
+    """The echoes as int16 ANALYZE 7.5 pairs with SPM2's scaling (``funused1`` 0.5 and
+    ``funused2`` 3: nibabel applies it in float64) and origin, and a uint8 ANALYZE mask."""
+    import struct
+
+    names = []
+    for e, echo in enumerate(_t2smap_echoes(), 1):
+        h = _analyze_header(T2SMAP_SHAPE, 4, 16)
+        struct.pack_into("<2f", h, 112, 0.5, 3.0)
+        (ctx.dir / f"a{e}.hdr").write_bytes(bytes(h))
+        raw = np.round((echo - 3.0) / 0.5).astype("<i2")
+        (ctx.dir / f"a{e}.img").write_bytes(raw.tobytes(order="F"))
+        names.append(f"a{e}.img")
+    (ctx.dir / "amask.hdr").write_bytes(bytes(_analyze_header(T2SMAP_SHAPE[:3], 2, 8)))
+    (ctx.dir / "amask.img").write_bytes(_t2smap_mask().tobytes(order="F"))
+    return ["-d", *names, "--mask", "amask.hdr"]
+
+
+def _mgh(path: Path, data: np.ndarray, kind: int, dtype: str, tr: float) -> None:
+    """An MGH image (big-endian; ``.mgz`` gzip-compressed): the grid of ``ROTATION`` times the
+    voxel sizes, its centre at (2, −3, 5) mm, and the footer's repetition time ``tr`` (ms)."""
+    import struct
+
+    shape = (*data.shape, *([1] * (4 - data.ndim)))
+    h = bytearray(284)
+    struct.pack_into(">i4iii", h, 0, 1, *shape, kind, 0)
+    struct.pack_into(">h", h, 28, 1)
+    columns = [[ROTATION[r][c] for r in range(3)] for c in range(3)]
+    struct.pack_into(">3f9f3f", h, 30, *T2SMAP_ZOOMS, *columns[0], *columns[1], *columns[2], 2.0, -3.0, 5.0)  # fmt: skip
+    body = bytes(h) + data.astype(dtype).tobytes(order="F") + struct.pack(">5f", tr, 0, 0, 0, 0)
+    path.write_bytes(gzip.compress(body, mtime=0) if path.suffix == ".mgz" else body)
+
+
+def _t2smap_mgh(ctx: Context) -> list[str]:
+    """The echoes as float32 ``.mgz`` files on an oblique grid (a 2000 ms TR in the footer) and
+    a uint8 ``.mgh`` mask of the same grid."""
+    names = []
+    for e, echo in enumerate(_t2smap_echoes(), 1):
+        _mgh(ctx.dir / f"m{e}.mgz", echo, 3, ">f4", 2000.0)
+        names.append(f"m{e}.mgz")
+    _mgh(ctx.dir / "mmask.mgh", _t2smap_mask(), 0, ">u1", 0.0)
+    return ["-d", *names, "--mask", "mmask.mgh"]
+
+
+def _t2smap_text(text: str, where: Path) -> str:
+    """``text`` with the case directory's name as ``<dir>`` and ``/`` for the separators of the
+    paths after it (standard error names the output directory as an absolute path)."""
+    lines = []
+    for line in text.replace(os.fspath(where), "<dir>").split("\n"):
+        lines.append(line.replace("\\", "/") if "<dir>" in line else line)
+    return "\n".join(lines)
+
+
+def _t2smap_run(
+    ctx: Context, name: str, *argv: str, mode: str = "fix", env: tuple = ()
+) -> dict[str, Any]:
+    """``t2smap <argv> --out-dir <name>`` by the clean-room original in the case's directory
+    (``COLUMNS=80``, ``LARMORX_UPSTREAM_DEFECTS=<mode>``): its exit status and streams, and every
+    file it wrote under ``<name>``."""
+    variables = [("COLUMNS", "80"), ("LARMORX_UPSTREAM_DEFECTS", mode), *env]
+    code, out, err = _core.tedana_t2smap_cleanroom(
+        [*argv, "--out-dir", name], variables, os.fspath(ctx.dir)
+    )
+    outputs: dict[str, Any] = _status_outputs(name, (code, out, _t2smap_text(err, ctx.dir)))
+    for p in sorted((ctx.dir / name).rglob("*")):
+        key = f"{name}/{p.relative_to(ctx.dir / name).as_posix()}"
+        if not p.is_file():
+            continue
+        if p.name.endswith("dataset_description.json"):
+            text = p.read_text(encoding="utf-8").replace(_core.__version__, "<version>")
+            outputs[key] = re.sub(r'"Node": \{[^}]*\}', '"Node": {}', text)
+        elif ".nii" in p.name:
+            outputs[key] = Nifti(os.fspath(p))
+        else:
+            outputs[key] = File(os.fspath(p))
+    return outputs
+
+
+@case("tedana.t2smap.cleanroom.loglin")
+def _(ctx: Context) -> dict[str, Any]:
+    """The defaults (``loglin``, ``all``, ``t2s``, ``bids``, the dropout method) on float32
+    echoes with a mask: the adaptive mask, the log-linear fit (the rising voxels' negative T2*),
+    the floors and the cap, the RMSE, the table, the combination, the JSON files; two threads."""
+    d = _t2smap_nifti(ctx)
+    return _t2smap_run(ctx, "out", *d, *T2SMAP_TES, "--mask", "mask.nii.gz", "--n-threads", "2")
+
+
+@case("tedana.t2smap.cleanroom.curvefit")
+def _(ctx: Context) -> dict[str, Any]:
+    """``--fittype curvefit --verbose --debug``: the trust-region fit of every voxel from the
+    log-linear start, its failures (uint8), the variance and covariance maps, the DEBUG lines."""
+    d = _t2smap_nifti(ctx)
+    return _t2smap_run(ctx, "out", *d, *T2SMAP_TES, "--mask", "mask.nii.gz", "--fittype", "curvefit", "--verbose", "--debug", "--n-threads", "3")  # fmt: skip
+
+
+@case("tedana.t2smap.cleanroom.ts")
+def _(ctx: Context) -> dict[str, Any]:
+    """``--fitmode ts --combmode paid``: a log-linear fit per voxel and volume (4D maps) and
+    PAID's weights from each volume's means."""
+    d = _t2smap_nifti(ctx)
+    return _t2smap_run(ctx, "out", *d, *T2SMAP_TES, "--mask", "mask.nii.gz", "--fitmode", "ts", "--combmode", "paid")  # fmt: skip
+
+
+@case("tedana.t2smap.cleanroom.curvefit-ts")
+def _(ctx: Context) -> dict[str, Any]:
+    """``--fittype curvefit --fitmode ts``: the curve fit per voxel and volume (its failures
+    image 4D)."""
+    d = _t2smap_nifti(ctx)
+    return _t2smap_run(ctx, "out", *d, *T2SMAP_TES, "--mask", "mask.nii.gz", "--fittype", "curvefit", "--fitmode", "ts", "--n-threads", "2")  # fmt: skip
+
+
+@case("tedana.t2smap.cleanroom.computed-mask")
+def _(ctx: Context) -> dict[str, Any]:
+    """No mask (nilearn's ``compute_epi_mask`` of the first echo), the decay method,
+    ``--convention orig`` with a prefix, echo times in milliseconds (the deprecation warning),
+    NIfTI-2 echoes (so NIfTI-2 outputs)."""
+    d = _t2smap_nifti(ctx, ext=".nii", version=2)
+    return _t2smap_run(ctx, "out", *d, "-e", "12", "28", "44", "--masktype", "decay", "--convention", "orig", "--prefix", "sub-01")  # fmt: skip
+
+
+@case("tedana.t2smap.cleanroom.volumes")
+def _(ctx: Context) -> dict[str, Any]:
+    """``--masktype none`` with a dummy scan and an excluded volume: the mask and the fit from
+    two of the three volumes left, the RMSE, the table and the combination of all three."""
+    d = _t2smap_nifti(ctx)
+    return _t2smap_run(ctx, "out", *d, *T2SMAP_TES, "--mask", "mask.nii.gz", "--masktype", "none", "--dummy-scans", "1", "--exclude", "3")  # fmt: skip
+
+
+@case("tedana.t2smap.cleanroom.zcat-int16")
+def _(ctx: Context) -> dict[str, Any]:
+    """A z-concatenated int16 file with a scale and an intercept, both mask methods, no mask
+    given (computed from the first echo's part), ``--n-independent-echos 2`` (its warnings)."""
+    d = _t2smap_zcat(ctx)
+    return _t2smap_run(ctx, "out", *d, *T2SMAP_TES, "--masktype", "dropout", "decay", "--n-independent-echos", "2")  # fmt: skip
+
+
+@case("tedana.t2smap.cleanroom.reproduce")
+def _(ctx: Context) -> dict[str, Any]:
+    """tedana's defects reproduced (D13: ``LARMORX_UPSTREAM_DEFECTS=reproduce``) with the
+    curve fit and numpy 2.3.5's results (``LARMORX_TEDANA_LIBRARIES=shared``): the cap of the
+    limited maps only, glibc's exponentials, the notices' ``reproduced`` texts."""
+    d = _t2smap_nifti(ctx)
+    env = (("LARMORX_TEDANA_LIBRARIES", "shared"),)
+    return _t2smap_run(ctx, "out", *d, *T2SMAP_TES, "--mask", "mask.nii.gz", "--fittype", "curvefit", mode=REPRODUCE, env=env)  # fmt: skip
+
+
+@case("tedana.t2smap.cleanroom.failures")
+def _(ctx: Context) -> dict[str, Any]:
+    """Refusals: a parser error (exit 2, the usage), echo times in mixed units (``ValueError``
+    after the call file), a mask of another grid (tedana's error chained to nilearn's) and an
+    open-ended ``--exclude`` range (the output directory left empty), each exit 1."""
+    d = _t2smap_nifti(ctx)
+    other = np.zeros((6, 5, 4), np.uint8)
+    other[1:5, 1:4, 1:3] = 1
+    lx.save(lx.Image(other, _t2smap_affine(), header_for(other, _t2smap_affine())), ctx.out("other.nii.gz"))  # fmt: skip
+    return {
+        **_t2smap_run(ctx, "parser", *d, "-e", "--fittype", "loglin"),
+        **_t2smap_run(ctx, "units", *d, "-e", "0.012", "28", "44"),
+        **_t2smap_run(ctx, "grid", *d, *T2SMAP_TES, "--mask", "other.nii.gz"),
+        **_t2smap_run(ctx, "exclude", *d, *T2SMAP_TES, "--exclude", "1:"),
+    }
+
+
+@case("tedana.t2smap.cleanroom.analyze")
+def _(ctx: Context) -> dict[str, Any]:
+    """ANALYZE 7.5 echoes and mask as nibabel loads them (SPM2's float64 scaling, its origin):
+    tedana's in-memory NIfTI-1 images, so NIfTI-1 outputs on the origin's grid."""
+    return _t2smap_run(ctx, "out", *_t2smap_analyze(ctx), *T2SMAP_TES)
+
+
+@case("tedana.t2smap.cleanroom.mgh")
+def _(ctx: Context) -> dict[str, Any]:
+    """MGH echoes (``.mgz``, float32, oblique, the TR from the footer) and an ``.mgh`` mask."""
+    return _t2smap_run(ctx, "out", *_t2smap_mgh(ctx), *T2SMAP_TES)

@@ -3,9 +3,9 @@
 
 Two images per release (D5), each for linux/amd64 and linux/arm64, built on each architecture's
 own runner from the release's own Linux wheels: `ghcr.io/karellopez/larmorx:<v>` (larmorx with
-its `[prep]` dependencies: Apache-2.0 and permissive licences only) and `:<v>-all` (also
-larmorx-gpl and larmorx-nc, labelled non-commercial). `latest` and `latest-all` follow final
-releases only. The release workflow runs the steps in this order:
+its `[prep]` dependencies, without the replica packages: commercial use allowed) and `:<v>-all`
+(also larmorx-gpl and larmorx-nc, labelled non-commercial). `latest` and `latest-all` follow
+final releases only. The release workflow runs the steps in this order:
 
 `stage`  the build context: this architecture's three wheels of the version, the companions'
          sdists, `docker/README.txt`; anything missing, of another version or there twice is an

@@ -5,7 +5,7 @@
 # the checks inside, the push after PyPI took the files); RELEASING.md has the maintainer's steps.
 #
 #   --target larmorx      -> ghcr.io/karellopez/larmorx:<version>
-#       larmorx with its [prep] dependencies: Apache-2.0 and permissive licences only.
+#       larmorx with its [prep] dependencies, without the replica packages: commercial use allowed.
 #   --target larmorx-all  -> ghcr.io/karellopez/larmorx:<version>-all
 #       also larmorx-gpl (the GNU GPL version 3) and larmorx-nc (the FSL Licence: NON-COMMERCIAL
 #       USE ONLY), with their source distributions in /opt/larmorx/source/. With larmorx-nc
@@ -52,7 +52,7 @@ RUN --mount=type=bind,source=wheels,target=/wheels \
     larmorx --version
 COPY README.txt /opt/larmorx/README.txt
 LABEL org.opencontainers.image.title="larmorx" \
-      org.opencontainers.image.description="larmorx: neuroimaging tools reimplemented in Rust, with Python bindings and the original programs' command lines (Apache-2.0 and permissive licences only)" \
+      org.opencontainers.image.description="larmorx: neuroimaging tools reimplemented in Rust, with Python bindings and the original programs' command lines (without the replica packages: commercial use allowed)" \
       org.opencontainers.image.version="${VERSION}" \
       org.opencontainers.image.revision="${REVISION}" \
       org.opencontainers.image.created="${CREATED}" \

@@ -120,9 +120,9 @@ that need no Python (the tools written in Python, `larmorx sdcflows` and `larmor
 Python package), with every file's SHA-256 in `SHA256SUMS`.
 
 **Container images** (linux/amd64 and linux/arm64, for Apptainer, Docker and Podman):
-`ghcr.io/karellopez/larmorx:<version>` holds larmorx with `[prep]` (Apache-2.0 and permissive
-licences only); `ghcr.io/karellopez/larmorx:<version>-all` adds larmorx-gpl and larmorx-nc (so
-non-commercial use only). `latest` and `latest-all` name the newest final release.
+`ghcr.io/karellopez/larmorx:<version>` holds larmorx with `[prep]`, without the replica packages
+(commercial use allowed); `ghcr.io/karellopez/larmorx:<version>-all` adds larmorx-gpl and
+larmorx-nc (so non-commercial use only). `latest` and `latest-all` name the newest final release.
 
 ```bash
 apptainer pull docker://ghcr.io/karellopez/larmorx:0.1.0rc1

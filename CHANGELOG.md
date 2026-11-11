@@ -41,9 +41,9 @@ tools below are complete and compared case by case with the original programs, t
   `larmorx-nc` and `larmorx-gpl` as archives that need no Python, each with its licences
   (`larmorx-nc`'s with FSL's original and amended source, as its licence requires).
 - **Two container images** for linux/amd64 and linux/arm64, usable by Apptainer, Docker and
-  Podman: `ghcr.io/karellopez/larmorx:0.1.0rc1` (larmorx with `[prep]`: Apache-2.0 and
-  permissive licences only) and `ghcr.io/karellopez/larmorx:0.1.0rc1-all` (also larmorx-gpl and
-  larmorx-nc: non-commercial use only).
+  Podman: `ghcr.io/karellopez/larmorx:0.1.0rc1` (larmorx with `[prep]`, without the replica
+  packages: commercial use allowed) and `ghcr.io/karellopez/larmorx:0.1.0rc1-all` (also
+  larmorx-gpl and larmorx-nc: non-commercial use only).
 - **Checks for every file:** its SHA-256 in the release's `SHA256SUMS`, and its build
   provenance (GitHub's attestations, PyPI's for its uploads).
 - `larmorx --version`, `larmorx-nc --version` and `larmorx-gpl --version` print the version as

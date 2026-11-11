@@ -3,8 +3,9 @@ larmorx container images (ghcr.io/karellopez/larmorx)
 
 Two images per release, for linux/amd64 and linux/arm64, built from the release's own wheels:
 
-  ghcr.io/karellopez/larmorx:<version>        larmorx with its [prep] dependencies.
-                                              Apache-2.0 and permissive licences only.
+  ghcr.io/karellopez/larmorx:<version>        larmorx with its [prep] dependencies,
+                                              without the replica packages: commercial use
+                                              allowed.
   ghcr.io/karellopez/larmorx:<version>-all    also larmorx-gpl (the GNU GPL version 3) and
                                               larmorx-nc (the FSL Licence: NON-COMMERCIAL USE
                                               ONLY). With larmorx-nc installed,

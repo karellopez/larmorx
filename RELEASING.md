@@ -24,7 +24,7 @@ upload is mended by the next version (for example `0.1.0rc2`), never by a second
   version's section of [CHANGELOG.md](CHANGELOG.md) as its text. A pre-release (`aN`, `bN`,
   `rcN`) is marked so and never becomes "latest".
 - **Two container images**, linux/amd64 and linux/arm64, at `ghcr.io/karellopez/larmorx`:
-  `<version>` (larmorx with `[prep]`: Apache-2.0 and permissive licences only) and
+  `<version>` (larmorx with `[prep]`, without the replica packages) and
   `<version>-all` (also larmorx-gpl and larmorx-nc). A final release also moves `latest` and
   `latest-all`.
 - **Build provenance** for every file and both images (GitHub's attestations), and PyPI's own

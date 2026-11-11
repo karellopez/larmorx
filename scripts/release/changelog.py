@@ -235,7 +235,7 @@ def footer(version: str) -> str:
         "(`larmorx`, `larmorx-nc`, `larmorx-gpl`) need no Python.\n\n"
         "**Container** (linux/amd64, linux/arm64): "
         f"`apptainer pull docker://{IMAGE}:{version}` or `docker run --rm {IMAGE}:{version} "
-        f"larmorx --version` (Apache-2.0 and permissive licences only); `{IMAGE}:{version}-all` "
+        f"larmorx --version` (without the replica packages: commercial use allowed); `{IMAGE}:{version}-all` "
         "adds larmorx-gpl and larmorx-nc (non-commercial use only).\n\n"
         "**Checks:** `SHA256SUMS` holds every file's SHA-256 (`sha256sum -c SHA256SUMS`); each "
         f"file's build provenance: `gh attestation verify <file> --repo {REPO}`."

@@ -340,12 +340,12 @@ mod tests {
         assert_eq!(array_str(&[1e-5f64, 2.5e-5]), "[1.0e-05 2.5e-05]");
         // scientific form: a shorter element shows its own further digits (numpy's
         // `min_digits`), not zeros (numpy 2.5.4's output)
-        let t = [7.6950021e-02f32, 7.0551876e-04, 1.2756876e-05];
+        let t = [7.695002e-02f32, 7.0551876e-04, 1.2756876e-05];
         assert_eq!(array_str(&t), "[7.6950021e-02 7.0551876e-04 1.2756876e-05]");
         let t = [
             3.7185407e-01f32,
             1.7238496e-03,
-            6.0828668e-05,
+            6.082867e-05,
             8.7365316e-07,
             3.0783408e-08,
         ];

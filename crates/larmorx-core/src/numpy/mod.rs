@@ -21,6 +21,8 @@
 //! - [`dot`]: `np.dot` and `np.linalg.norm` of float32 and float64 vectors (OpenBLAS's Haswell
 //!   `sdot` and `ddot`), under SciPy's conjugate gradients; `a.dot(x)` of a float64 matrix and a
 //!   vector (OpenBLAS's Haswell `dgemv_t`), under SciPy's Gaussian derivatives.
+//! - [`gemm`]: the arithmetic of OpenBLAS's Haswell `dgemm` micro-kernel on packed tiles (the
+//!   hot loop of `larmorx_transform::openblas::level3`: numpy's matrix products).
 //! - [`histograms`]: `numpy.linspace` and `numpy.histogram` with equal bins (scikit-image's Otsu
 //!   threshold).
 //!
@@ -48,6 +50,7 @@
 
 pub mod dot;
 pub mod format;
+pub mod gemm;
 pub mod histograms;
 pub mod quantile;
 pub mod reduce;

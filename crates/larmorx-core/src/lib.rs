@@ -19,7 +19,8 @@
 //!   in numpy's own order (and SciPy's `scoreatpercentile`), for replicas of Python programs.
 //! - [`python`]: CPython's `argparse` (parsing, usage, help, errors), `textwrap` and number
 //!   parsing and printing, for replicas of Python programs' command lines and messages.
-// No unsafe code, except the audited CPU-feature dispatch in `math` (CLAUDE.md rule 5).
+// No unsafe code, except the audited CPU-feature dispatch in `math` and `numpy` (`dot`, `gemm`)
+// (CLAUDE.md rule 5).
 #![deny(unsafe_code)]
 
 pub mod affine;

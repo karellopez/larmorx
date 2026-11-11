@@ -10,6 +10,7 @@ use pyo3::prelude::*;
 mod afni;
 mod ants;
 mod ants_filters;
+mod confounds;
 mod defects;
 mod fsl;
 mod hdf5;
@@ -73,6 +74,7 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     ants::register(m)?;
     ants_filters::register(m)?;
     afni::register(m)?;
+    confounds::register(m)?;
     defects::register(m)?;
     fsl::register(m)?;
     hdf5::register(m)?;

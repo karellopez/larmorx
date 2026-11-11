@@ -13,6 +13,10 @@ larmorx-gpl neither installed nor on the path, no FSL data), the `-all` image al
 their `/opt/larmorx/` files; the platform checks of the binaries are left out (the image brings
 its own glibc).
 
+`--source-build` (with `--installed`): the packages were built from their sdists on this
+machine, so their binaries link this machine's glibc (or macOS SDK): the platform checks of the
+binaries, which hold for the published files, are left out.
+
 `--archives DIR --target T`: the three archives of that platform (`scripts/release/archives.py`)
 unpacked into a temporary folder: their licence files, each program's `--version` (`lx` through
 its link or `lx.cmd`), `lx --help` naming itself (Unix), larmorx-nc's FSL data beside `bin/`.
@@ -28,6 +32,7 @@ failure is also an error annotation. Exit status 0 or 1.
 Usage:
     python -P scripts/release/smoke.py --version 0.1.0rc1 --installed
     python -P scripts/release/smoke.py --version 0.1.0rc1 --installed --image larmorx
+    python -P scripts/release/smoke.py --version 0.1.0rc1 --installed --source-build
     python -P scripts/release/smoke.py --version 0.1.0rc1 --archives archives --target <triple>
 """
 
@@ -274,13 +279,22 @@ def main(argv: list[str] | None = None) -> int:
         choices=["larmorx", "larmorx-all"],
         help="inside this release image (with --installed; no platform checks of the binaries)",
     )
+    parser.add_argument(
+        "--source-build",
+        action="store_true",
+        help="the installed packages were built here from their sdists (with --installed; no "
+        "platform checks of the binaries: the glibc 2.28 and macOS 11.0 floors are the "
+        "published files')",
+    )
     args = parser.parse_args(argv)
     if not args.installed and not args.archives:
         parser.error("nothing to check: --installed and/or --archives")
     if args.archives and not args.target:
         parser.error("--archives needs --target")
-    if args.image and not args.installed:
-        parser.error("--image needs --installed")
+    if (args.image or args.source_build) and not args.installed:
+        parser.error("--image and --source-build need --installed")
+    if args.source_build and args.archives:
+        parser.error("--source-build checks no archives (they are published files)")
     checks = Checks()
     found: list[Path] = []
     with tempfile.TemporaryDirectory(prefix="larmorx-smoke-") as tmp:
@@ -288,7 +302,7 @@ def main(argv: list[str] | None = None) -> int:
             found += installed(checks, args.version, args.image)
         if args.archives:
             found += archives(checks, args.version, args.archives, args.target, Path(tmp))
-        if not args.image:
+        if not (args.image or args.source_build):
             binaries(checks, found)
     if checks.failed:
         print(f"SMOKE FAILED: {len(checks.failed)} of {checks.n} checks")

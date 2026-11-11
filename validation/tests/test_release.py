@@ -987,3 +987,16 @@ def test_release_workflow_container_jobs():
     assert "container-push" in _needs(jobs["github-release"])
     for publish in ("publish-larmorx", "publish-nc", "publish-gpl"):
         assert "assemble" in _needs(jobs[publish])
+
+
+def test_release_workflow_smoke_scopes_and_toolchain():
+    """The glibc 2.28 and macOS 11.0 floors are checked on the published files only (a build from
+    the sdists links the runner's own glibc: dry run 1); the companions' golden tests run on the
+    installed toolchain without rustup adding rust-toolchain.toml's components (dry run 1's
+    clippy conflict on ubuntu-24.04-arm)."""
+    text = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
+    jobs = _workflow_jobs(text)
+    assert "--source-build" in jobs["sdist-install"]
+    for name in ("test", "verify-pypi", "container"):
+        assert "--source-build" not in jobs[name]
+    assert "RUSTUP_TOOLCHAIN: ${{ env.RUST_TOOLCHAIN }}" in jobs["programs"]

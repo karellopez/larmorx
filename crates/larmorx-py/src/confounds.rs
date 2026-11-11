@@ -2,10 +2,11 @@
 //! Bindings of the confounds' part (fMRIPrep's confound estimation and the numerics under it).
 //! Today: OpenBLAS's level-1, level-2 and level-3 kernels at the BLAS interface (`blas_*`),
 //! numpy's `matmul` of two 2-D float64 arrays (`numpy_matmul`), as `larmorx_transform::openblas`
-//! computes them, and LAPACK's QR and LQ routines at their Fortran interface (`lapack_*`, as
-//! `larmorx_transform::numpy_linalg::blocked` computes them); the validation compares them with
-//! numpy's own library. Matrices cross as flat column-major storage with their leading dimension, as BLAS
-//! takes them. The GIL is released while computing.
+//! computes them, and LAPACK's QR and LQ routines with their `Q` (`DORGQR`, `DORMQR`, ...) at
+//! their Fortran interface (`lapack_*`, as `larmorx_transform::numpy_linalg::blocked` computes
+//! them); the validation compares them with numpy's own library. Matrices cross as flat
+//! column-major storage with their leading dimension, as BLAS takes them. The GIL is released
+//! while computing.
 
 use larmorx_core::parallel;
 use larmorx_transform::numpy_linalg::blocked::{self, Direct, Lapack, Storev};
@@ -665,6 +666,298 @@ fn lapack_dlarfg<'py>(
     Ok((beta, PyArray1::from_vec(py, xv), tau))
 }
 
+type Generated<'py> = (Bound<'py, PyArray1<f64>>, usize);
+
+/// `DORGQR` (`lq = false`) or `DORGLQ` (`lq = true`) on flat column-major storage.
+#[allow(clippy::too_many_arguments)]
+fn generate<'py>(
+    py: Python<'py>,
+    lq: bool,
+    m: usize,
+    n: usize,
+    k: usize,
+    a: PyReadonlyArray1<'_, f64>,
+    lda: usize,
+    tau: PyReadonlyArray1<'_, f64>,
+    lwork: Option<usize>,
+    lapack: &str,
+    n_threads: usize,
+    gemm_q: usize,
+) -> PyResult<Generated<'py>> {
+    let lp = Lapack {
+        release: lapack_release(lapack)?,
+        gemm_q,
+    };
+    let mut av = contiguous(&a)?.to_vec();
+    let tau = contiguous(&tau)?;
+    let name = if lq { "DORGLQ" } else { "DORGQR" };
+    let work1 = lapack_run(py, name, n_threads, || {
+        if lq {
+            blocked::dorglq(lp, m, n, k, &mut av, 0, lda, tau, lwork)
+        } else {
+            blocked::dorgqr(lp, m, n, k, &mut av, 0, lda, tau, lwork)
+        }
+    })?
+    .map_err(value_err)?;
+    Ok((PyArray1::from_vec(py, av), work1))
+}
+
+/// `DORGQR(M, N, K, A, LDA, TAU, WORK, LWORK, INFO)` on flat column-major storage
+/// (`numpy_linalg::blocked::dorgqr`; `lwork=None` the optimal workspace); returns `(A,
+/// WORK(1))`.
+#[pyfunction]
+#[pyo3(signature = (m, n, k, a, lda, tau, lwork = None, lapack = "3.12.1", n_threads = 1, gemm_q = 256))]
+#[allow(clippy::too_many_arguments)]
+fn lapack_dorgqr<'py>(
+    py: Python<'py>,
+    m: usize,
+    n: usize,
+    k: usize,
+    a: PyReadonlyArray1<'_, f64>,
+    lda: usize,
+    tau: PyReadonlyArray1<'_, f64>,
+    lwork: Option<usize>,
+    lapack: &str,
+    n_threads: usize,
+    gemm_q: usize,
+) -> PyResult<Generated<'py>> {
+    generate(
+        py, false, m, n, k, a, lda, tau, lwork, lapack, n_threads, gemm_q,
+    )
+}
+
+/// `DORGLQ(M, N, K, A, LDA, TAU, WORK, LWORK, INFO)`, as `lapack_dorgqr`.
+#[pyfunction]
+#[pyo3(signature = (m, n, k, a, lda, tau, lwork = None, lapack = "3.12.1", n_threads = 1, gemm_q = 256))]
+#[allow(clippy::too_many_arguments)]
+fn lapack_dorglq<'py>(
+    py: Python<'py>,
+    m: usize,
+    n: usize,
+    k: usize,
+    a: PyReadonlyArray1<'_, f64>,
+    lda: usize,
+    tau: PyReadonlyArray1<'_, f64>,
+    lwork: Option<usize>,
+    lapack: &str,
+    n_threads: usize,
+    gemm_q: usize,
+) -> PyResult<Generated<'py>> {
+    generate(
+        py, true, m, n, k, a, lda, tau, lwork, lapack, n_threads, gemm_q,
+    )
+}
+
+/// `DORG2R(M, N, K, A, LDA, TAU, WORK, INFO)`; returns the new `A` storage.
+#[pyfunction]
+#[pyo3(signature = (m, n, k, a, lda, tau, lapack = "3.12.1"))]
+#[allow(clippy::too_many_arguments)]
+fn lapack_dorg2r<'py>(
+    py: Python<'py>,
+    m: usize,
+    n: usize,
+    k: usize,
+    a: PyReadonlyArray1<'_, f64>,
+    lda: usize,
+    tau: PyReadonlyArray1<'_, f64>,
+    lapack: &str,
+) -> PyResult<Bound<'py, PyArray1<f64>>> {
+    let release = lapack_release(lapack)?;
+    let mut av = contiguous(&a)?.to_vec();
+    let tau = contiguous(&tau)?;
+    lapack_run(py, "DORG2R", 1, || {
+        blocked::dorg2r(release, m, n, k, &mut av, 0, lda, tau)
+    })?
+    .map_err(value_err)?;
+    Ok(PyArray1::from_vec(py, av))
+}
+
+/// `DORGL2(M, N, K, A, LDA, TAU, WORK, INFO)`; returns the new `A` storage.
+#[pyfunction]
+#[pyo3(signature = (m, n, k, a, lda, tau, lapack = "3.12.1"))]
+#[allow(clippy::too_many_arguments)]
+fn lapack_dorgl2<'py>(
+    py: Python<'py>,
+    m: usize,
+    n: usize,
+    k: usize,
+    a: PyReadonlyArray1<'_, f64>,
+    lda: usize,
+    tau: PyReadonlyArray1<'_, f64>,
+    lapack: &str,
+) -> PyResult<Bound<'py, PyArray1<f64>>> {
+    let release = lapack_release(lapack)?;
+    let mut av = contiguous(&a)?.to_vec();
+    let tau = contiguous(&tau)?;
+    lapack_run(py, "DORGL2", 1, || {
+        blocked::dorgl2(release, m, n, k, &mut av, 0, lda, tau)
+    })?
+    .map_err(value_err)?;
+    Ok(PyArray1::from_vec(py, av))
+}
+
+type Applied<'py> = (Bound<'py, PyArray1<f64>>, Bound<'py, PyArray1<f64>>, usize);
+
+/// The four `ORM` routines: `(routine, blocked)` picks `DORMQR`/`DORMLQ` (`blocked = true`,
+/// `lwork`) or `DORM2R`/`DORML2`.
+#[allow(clippy::too_many_arguments)]
+fn apply_q<'py>(
+    py: Python<'py>,
+    lq: bool,
+    is_blocked: bool,
+    side: &str,
+    trans_: &str,
+    m: usize,
+    n: usize,
+    k: usize,
+    a: PyReadonlyArray1<'_, f64>,
+    lda: usize,
+    tau: PyReadonlyArray1<'_, f64>,
+    c: PyReadonlyArray1<'_, f64>,
+    ldc: usize,
+    lwork: Option<usize>,
+    lapack: &str,
+    n_threads: usize,
+    gemm_q: usize,
+) -> PyResult<Applied<'py>> {
+    let s = one_of("side", side, &[("L", Side::Left), ("R", Side::Right)])?;
+    let tr = trans(trans_)?;
+    let lp = Lapack {
+        release: lapack_release(lapack)?,
+        gemm_q,
+    };
+    let mut av = contiguous(&a)?.to_vec();
+    let tau = contiguous(&tau)?;
+    let mut cv = contiguous(&c)?.to_vec();
+    let name = match (lq, is_blocked) {
+        (false, true) => "DORMQR",
+        (true, true) => "DORMLQ",
+        (false, false) => "DORM2R",
+        (true, false) => "DORML2",
+    };
+    let work1 = lapack_run(py, name, n_threads, || {
+        let (a, c) = (&mut av, &mut cv);
+        match (lq, is_blocked) {
+            (false, true) => blocked::dormqr(lp, s, tr, m, n, k, a, 0, lda, tau, c, 0, ldc, lwork),
+            (true, true) => blocked::dormlq(lp, s, tr, m, n, k, a, 0, lda, tau, c, 0, ldc, lwork),
+            (false, false) => {
+                blocked::dorm2r(lp.release, s, tr, m, n, k, a, 0, lda, tau, c, 0, ldc).map(|()| 0)
+            }
+            (true, false) => {
+                blocked::dorml2(lp.release, s, tr, m, n, k, a, 0, lda, tau, c, 0, ldc).map(|()| 0)
+            }
+        }
+    })?
+    .map_err(value_err)?;
+    Ok((
+        PyArray1::from_vec(py, av),
+        PyArray1::from_vec(py, cv),
+        work1,
+    ))
+}
+
+/// `DORMQR(SIDE, TRANS, M, N, K, A, LDA, TAU, C, LDC, WORK, LWORK, INFO)` on flat column-major
+/// storage (`numpy_linalg::blocked::dormqr`; `lwork=None` the optimal workspace); returns `(A,
+/// C, WORK(1))` (`A` as it was: LAPACK restores it).
+#[pyfunction]
+#[pyo3(signature = (side, trans_, m, n, k, a, lda, tau, c, ldc, lwork = None, lapack = "3.12.1", n_threads = 1, gemm_q = 256))]
+#[allow(clippy::too_many_arguments)]
+fn lapack_dormqr<'py>(
+    py: Python<'py>,
+    side: &str,
+    trans_: &str,
+    m: usize,
+    n: usize,
+    k: usize,
+    a: PyReadonlyArray1<'_, f64>,
+    lda: usize,
+    tau: PyReadonlyArray1<'_, f64>,
+    c: PyReadonlyArray1<'_, f64>,
+    ldc: usize,
+    lwork: Option<usize>,
+    lapack: &str,
+    n_threads: usize,
+    gemm_q: usize,
+) -> PyResult<Applied<'py>> {
+    apply_q(
+        py, false, true, side, trans_, m, n, k, a, lda, tau, c, ldc, lwork, lapack, n_threads,
+        gemm_q,
+    )
+}
+
+/// `DORMLQ(SIDE, TRANS, M, N, K, A, LDA, TAU, C, LDC, WORK, LWORK, INFO)`, as `lapack_dormqr`.
+#[pyfunction]
+#[pyo3(signature = (side, trans_, m, n, k, a, lda, tau, c, ldc, lwork = None, lapack = "3.12.1", n_threads = 1, gemm_q = 256))]
+#[allow(clippy::too_many_arguments)]
+fn lapack_dormlq<'py>(
+    py: Python<'py>,
+    side: &str,
+    trans_: &str,
+    m: usize,
+    n: usize,
+    k: usize,
+    a: PyReadonlyArray1<'_, f64>,
+    lda: usize,
+    tau: PyReadonlyArray1<'_, f64>,
+    c: PyReadonlyArray1<'_, f64>,
+    ldc: usize,
+    lwork: Option<usize>,
+    lapack: &str,
+    n_threads: usize,
+    gemm_q: usize,
+) -> PyResult<Applied<'py>> {
+    apply_q(
+        py, true, true, side, trans_, m, n, k, a, lda, tau, c, ldc, lwork, lapack, n_threads,
+        gemm_q,
+    )
+}
+
+/// `DORM2R(SIDE, TRANS, M, N, K, A, LDA, TAU, C, LDC, WORK, INFO)`; returns `(A, C, 0)`.
+#[pyfunction]
+#[pyo3(signature = (side, trans_, m, n, k, a, lda, tau, c, ldc, lapack = "3.12.1"))]
+#[allow(clippy::too_many_arguments)]
+fn lapack_dorm2r<'py>(
+    py: Python<'py>,
+    side: &str,
+    trans_: &str,
+    m: usize,
+    n: usize,
+    k: usize,
+    a: PyReadonlyArray1<'_, f64>,
+    lda: usize,
+    tau: PyReadonlyArray1<'_, f64>,
+    c: PyReadonlyArray1<'_, f64>,
+    ldc: usize,
+    lapack: &str,
+) -> PyResult<Applied<'py>> {
+    apply_q(
+        py, false, false, side, trans_, m, n, k, a, lda, tau, c, ldc, None, lapack, 1, 256,
+    )
+}
+
+/// `DORML2(SIDE, TRANS, M, N, K, A, LDA, TAU, C, LDC, WORK, INFO)`; returns `(A, C, 0)`.
+#[pyfunction]
+#[pyo3(signature = (side, trans_, m, n, k, a, lda, tau, c, ldc, lapack = "3.12.1"))]
+#[allow(clippy::too_many_arguments)]
+fn lapack_dorml2<'py>(
+    py: Python<'py>,
+    side: &str,
+    trans_: &str,
+    m: usize,
+    n: usize,
+    k: usize,
+    a: PyReadonlyArray1<'_, f64>,
+    lda: usize,
+    tau: PyReadonlyArray1<'_, f64>,
+    c: PyReadonlyArray1<'_, f64>,
+    ldc: usize,
+    lapack: &str,
+) -> PyResult<Applied<'py>> {
+    apply_q(
+        py, true, false, side, trans_, m, n, k, a, lda, tau, c, ldc, None, lapack, 1, 256,
+    )
+}
+
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(blas_dgemm, m)?)?;
     m.add_function(wrap_pyfunction!(blas_dgemv, m)?)?;
@@ -686,5 +979,13 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(lapack_dlarfb, m)?)?;
     m.add_function(wrap_pyfunction!(lapack_dlarf, m)?)?;
     m.add_function(wrap_pyfunction!(lapack_dlarfg, m)?)?;
+    m.add_function(wrap_pyfunction!(lapack_dorgqr, m)?)?;
+    m.add_function(wrap_pyfunction!(lapack_dorglq, m)?)?;
+    m.add_function(wrap_pyfunction!(lapack_dorg2r, m)?)?;
+    m.add_function(wrap_pyfunction!(lapack_dorgl2, m)?)?;
+    m.add_function(wrap_pyfunction!(lapack_dormqr, m)?)?;
+    m.add_function(wrap_pyfunction!(lapack_dormlq, m)?)?;
+    m.add_function(wrap_pyfunction!(lapack_dorm2r, m)?)?;
+    m.add_function(wrap_pyfunction!(lapack_dorml2, m)?)?;
     Ok(())
 }

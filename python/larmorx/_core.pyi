@@ -1282,7 +1282,7 @@ def blas_idamax(n: int, x: np.ndarray, incx: int, aligned: bool) -> int:
 def blas_dnrm2(n: int, x: np.ndarray, incx: int) -> float:
     """``DNRM2`` (OpenBLAS's x87 kernel)."""
 
-# --- the confounds' part: LAPACK's QR and LQ routines (numpy_linalg::blocked) ------------------
+# --- the confounds' part: LAPACK's QR and LQ routines and their Q (numpy_linalg::blocked) -----
 
 def lapack_dgeqrf(
     m: int,
@@ -1376,3 +1376,110 @@ def lapack_dlarfg(
     n: int, alpha: float, x: np.ndarray, incx: int
 ) -> tuple[float, np.ndarray, float]:
     """LAPACK's ``DLARFG`` (positive ``incx``); returns ``(beta, X, tau)``."""
+
+def lapack_dorgqr(
+    m: int,
+    n: int,
+    k: int,
+    a: np.ndarray,
+    lda: int,
+    tau: np.ndarray,
+    lwork: int | None = None,
+    lapack: str = "3.12.1",
+    n_threads: int = 1,
+    gemm_q: int = 256,
+) -> tuple[np.ndarray, int]:
+    """LAPACK's blocked ``DORGQR`` (the first ``n`` columns of ``Q`` from ``k`` reflectors of
+    ``DGEQRF``), as ``lapack_dgeqrf``; returns ``(A, WORK(1))``."""
+
+def lapack_dorglq(
+    m: int,
+    n: int,
+    k: int,
+    a: np.ndarray,
+    lda: int,
+    tau: np.ndarray,
+    lwork: int | None = None,
+    lapack: str = "3.12.1",
+    n_threads: int = 1,
+    gemm_q: int = 256,
+) -> tuple[np.ndarray, int]:
+    """LAPACK's blocked ``DORGLQ``, as ``lapack_dorgqr``."""
+
+def lapack_dorg2r(
+    m: int, n: int, k: int, a: np.ndarray, lda: int, tau: np.ndarray, lapack: str = "3.12.1"
+) -> np.ndarray:
+    """LAPACK's ``DORG2R``; returns the new ``A`` storage."""
+
+def lapack_dorgl2(
+    m: int, n: int, k: int, a: np.ndarray, lda: int, tau: np.ndarray, lapack: str = "3.12.1"
+) -> np.ndarray:
+    """LAPACK's ``DORGL2``; returns the new ``A`` storage."""
+
+def lapack_dormqr(
+    side: str,
+    trans_: str,
+    m: int,
+    n: int,
+    k: int,
+    a: np.ndarray,
+    lda: int,
+    tau: np.ndarray,
+    c: np.ndarray,
+    ldc: int,
+    lwork: int | None = None,
+    lapack: str = "3.12.1",
+    n_threads: int = 1,
+    gemm_q: int = 256,
+) -> tuple[np.ndarray, np.ndarray, int]:
+    """LAPACK's blocked ``DORMQR`` (``Q`` of ``DGEQRF``'s reflectors applied to ``C`` from either
+    side, transposed or not; ``lwork=None``: the optimal workspace, a smaller one lowers the
+    block size as each release does); returns ``(A, C, WORK(1))``."""
+
+def lapack_dormlq(
+    side: str,
+    trans_: str,
+    m: int,
+    n: int,
+    k: int,
+    a: np.ndarray,
+    lda: int,
+    tau: np.ndarray,
+    c: np.ndarray,
+    ldc: int,
+    lwork: int | None = None,
+    lapack: str = "3.12.1",
+    n_threads: int = 1,
+    gemm_q: int = 256,
+) -> tuple[np.ndarray, np.ndarray, int]:
+    """LAPACK's blocked ``DORMLQ``, as ``lapack_dormqr``."""
+
+def lapack_dorm2r(
+    side: str,
+    trans_: str,
+    m: int,
+    n: int,
+    k: int,
+    a: np.ndarray,
+    lda: int,
+    tau: np.ndarray,
+    c: np.ndarray,
+    ldc: int,
+    lapack: str = "3.12.1",
+) -> tuple[np.ndarray, np.ndarray, int]:
+    """LAPACK's ``DORM2R``; returns ``(A, C, 0)``."""
+
+def lapack_dorml2(
+    side: str,
+    trans_: str,
+    m: int,
+    n: int,
+    k: int,
+    a: np.ndarray,
+    lda: int,
+    tau: np.ndarray,
+    c: np.ndarray,
+    ldc: int,
+    lapack: str = "3.12.1",
+) -> tuple[np.ndarray, np.ndarray, int]:
+    """LAPACK's ``DORML2``; returns ``(A, C, 0)``."""

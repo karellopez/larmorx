@@ -21,8 +21,16 @@ in two implementations ([licensing](../licensing.md)):
 - the bit-exact **replica** (2026-11-08), `larmorx-gpl tedana t2smap` (package `larmorx-gpl`,
   under the GNU GPL version 3 only: tedana's LGPL-2.1 converted under its section 3;
   [PROVENANCE](../../crates-gpl/larmorx-gpl-tedana/PROVENANCE.md)), run as a separate program;
-- the **clean-room original**, `crates/larmorx-tedana` in the main package (Apache-2.0, from
-  `specs/t2smap.md`): still to be written.
+- the **clean-room original**, `crates/larmorx-tedana` in the main package (Apache-2.0, written
+  from `specs/t2smap.md` by implementers who never read tedana's source or the replica's code,
+  2026-11-11; [PROVENANCE](../../crates/larmorx-tedana/PROVENANCE.md)), built for speed: the
+  log-linear fit per voxel in closed form, its own trust-region curve fit on the per-echo means,
+  deterministic threads (the same files at any `--n-threads`), every option, message, exit status
+  and defect of the spec. Until it is wired into `lx.tedana.t2smap` and `larmorx tedana t2smap`,
+  it runs through its own binding, `larmorx._core.tedana_t2smap_cleanroom(args, env, cwd)`
+  (tedana's arguments; `(exit status, standard output, standard error)`). Its `reproduce` gives
+  tedana's defects exactly and its fitted numbers within the spec's thresholds (§17.3), not bit
+  for bit: the replica is the exact one.
 
 Until the original exists, the replica is the only implementation: `implementation="auto"` and
 `"replica"` run it when `larmorx-gpl` is installed (`pip install larmorx-gpl`, or `pip install
@@ -98,7 +106,7 @@ larmorx's notice lines) and `implementation`. A run that fails raises `ReplicaEr
 | `-v`, `--version` | - | `t2smap v26.0.3` (exit 0) |
 | `LARMORX_UPSTREAM_DEFECTS` | `upstream_defects="fix"` | `"reproduce"` gives tedana's files bit for bit (its defects and its maths, below) |
 | `LARMORX_TEDANA_LIBRARIES` | `libraries="newest"` | the numpy and SciPy whose arithmetic is reproduced: `newest` (numpy 2.5.4, SciPy 1.18.1) or `shared` (numpy 2.3.5, SciPy 1.15.3); the curve fit's last bits differ between them |
-| - | `implementation="auto"` | `"auto"` or `"replica"` (the replica), `"original"` (none yet) |
+| - | `implementation="auto"` | `"auto"` or `"replica"` (the replica); the clean-room original through its own binding until it is wired in (above) |
 
 argparse's errors exit 2 with tedana's usage and message; any other failure exits 1 with Python's
 traceback lines (its first and last; the stack itself is not reproduced). The Python wrapper
@@ -227,4 +235,26 @@ and `reproduce` (which names them the same way) take about as long as tedana at 
   the curve-fit calls and 6 s on the log-linear one at one thread; the replica, whose both modes
   run the maths notices' passes (four in all on these calls), 31 to 45 s at one thread (0.8 to 1.1
   times tedana's speed) and 9 to 13 s at 14 threads (3 to 4 times), and 10 s / 8 s on the
-  log-linear call (tedana is faster there). The clean-room original is to be the fast one.
+  log-linear call (tedana is faster there). The clean-room original is the fast one (below).
+
+**The clean-room original** (2026-11-11):
+
+- **The record** [`tedana-t2smap-original`](../validation/tedana-t2smap-original.md) (from a clean
+  commit, the full tier): 119 cases, 114 pass, 5 expected divergences (the replica's single
+  tracebacks and two missing warnings; a chaotic curve-fit regime), 0 failures. (A) the original
+  in `reproduce` against tedana 26.0.3 (the oracle-output cache's runs) and (B) its default against
+  the replica's default: exit status, standard output, every message (Python warnings' location
+  lines aside), the files, the values by the spec's `check.py` (§17.3); the spec probe's 54 cases
+  and 82 more (every option, the readers: NIfTI pairs, ANALYZE 7.5, MGH/MGZ, which the replica
+  refuses), thread invariance at 1, 4 and 8 threads, and fMRIPrep's six multi-echo calls
+  (ds003592 with loglin, curvefit and `--verbose`; ds000210's two tasks and ds000258 from the
+  oracle runs made with OpenBLAS's Haswell kernels): all pass (A) and (B); the share of the curve
+  fit's voxels judged by §17.3's objective criteria rather than by value 0 to 0.305 %.
+- **Golden**: 11 cases (`tests/golden/registry.py`, `tedana.t2smap.cleanroom.*`, through its own
+  binding until the wiring): each fit type and mode, both combinations and conventions, the
+  variance maps, a computed mask, the mask methods, dummy scans and an excluded volume, float32,
+  NIfTI-2 and int16 z-concatenated inputs, ANALYZE and MGH, `reproduce` with numpy 2.3.5's
+  results, four refusals; every written file, the exit status and both streams, on every platform.
+- **Memory** (`tests/parity/test_memory_peak.py`, fMRIPrep's ds003592 curvefit call): 307 MiB at
+  one thread (both modes) and 546 MiB at eight, against tedana's 1,244 MiB.
+- **Findings**: [`tedana-t2smap-original`](../findings/tedana-t2smap-original.md).

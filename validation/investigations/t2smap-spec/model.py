@@ -15,9 +15,11 @@ kind of change §16 allows, to measure §17.3's margins: the log-linear fit solv
 closed form (a centred 2 × 2 least squares), the curve fit with an analytic Jacobian, and other
 orders of the sums in the RMSE, the table and the combination.
 
-Scope: NIfTI-1 single files (``.nii``, ``.nii.gz``), a user mask of the data's grid or the
-computed mask; the defects' corrections (larmorx's default) are not modelled: the model is
-tedana's behaviour. Messages are not written (``blackbox.py`` covers them); only the files.
+Scope: every image form the spec's §4.1 reads (NIfTI-1 and NIfTI-2 single files and pairs,
+ANALYZE 7.5, MGH/MGZ, as nibabel loads them), a user mask of any of them (a 4D one of one volume
+through nilearn's masking, §4.4) or the computed mask; the defects' corrections (larmorx's
+default) are not modelled: the model is tedana's behaviour. Messages are not written
+(``blackbox.py`` covers them); only the files.
 """
 
 from __future__ import annotations
@@ -143,42 +145,82 @@ def nanpercentile_linear(values: np.ndarray, q: float) -> F64:
 
 
 # ---------------------------------------------------------------- §4: the inputs
+def as_nifti1(img, dtype=None, max_dim: int | None = None):
+    """§4.1: a NIfTI-1 single-file image as it is (a NIfTI-2 one too: in nibabel a NIfTI-2
+    image is a kind of NIfTI-1 image); any other image nibabel reads (a NIfTI-1 or NIfTI-2
+    pair, ANALYZE 7.5, MGH/MGZ) becomes an in-memory NIfTI-1 image of nibabel's scaled array,
+    in nibabel's own type for it (``dtype`` given: that type), with the image's affine (§4.5)
+    and voxel sizes. ``max_dim`` (the user mask, §4.3): such an image with more dimensions is
+    first squeezed of its trailing axes of length 1, and refused if it still has more."""
+    if isinstance(img, nib.Nifti1Image):
+        return img
+    data = np.asanyarray(img.dataobj) if dtype is None else np.asarray(img.dataobj, dtype=dtype)
+    new = nib.Nifti1Image(data, img.affine)
+    new.header.set_zooms(img.header.get_zooms())
+    if max_dim and new.ndim > max_dim:
+        new = nib.funcs.squeeze_image(new)
+        if new.ndim > max_dim:
+            raise ValueError(f"{img.get_filename()} has more than {max_dim} dimensions")
+    return new
+
+
 def load_inputs(paths: list[str], n_echoes: int, mask_path: str | None):
-    """The reference image, the mask (grid booleans), its affine and the echoes' float32 data
-    on the mask's voxels, ``x[v, e, t]`` (§4)."""
+    """The reference image, the mask (grid booleans), its affine, the outputs' image class and
+    the echoes' float32 data on the mask's voxels, ``x[v, e, t]`` (§4): every image form of
+    §4.1, a user mask of any form (§4.3), and nilearn's masking (§4.4) where an echo's grid is
+    not the mask's shape (the shapes of the grid: a 4D mask of one volume) or an echo is not 4D;
+    nilearn's masking refuses a mask of another grid, as tedana's run does."""
     imgs = [nib.load(p) for p in paths]
-    for img in imgs:
-        if type(img) is not nib.Nifti1Image:
-            raise NotImplementedError("the model reads NIfTI-1 single files only")
     if len(paths) == 1:
-        img = imgs[0]
-        full = img.get_fdata(dtype=F32)
+        img = as_nifti1(imgs[0])
         nz = img.shape[2] // n_echoes
+        full = np.asarray(img.dataobj, dtype=F32)
+        if full.ndim != 4:
+            raise ValueError("Expected 4D z-concatenated image")
         slabs = [full[:, :, e * nz : (e + 1) * nz, :] for e in range(n_echoes)]
-        ref_data = img.get_fdata()[:, :, :nz, :]
-        ref = nib.Nifti1Image(ref_data, img.affine)
+        ref = nib.Nifti1Image(img.slicer[:, :, :nz, :].get_fdata(), img.affine)
         ref.header.set_zooms(img.header.get_zooms())
     else:
-        slabs = [img.get_fdata(dtype=F32) for img in imgs]
-        ref = imgs[0]
-    for s in slabs:
-        if s.ndim != 4:
-            raise ValueError("Expected 4D image")
+        slabs = None
+        ref = as_nifti1(imgs[0])
     if mask_path is not None:
-        mimg = nib.load(mask_path)
+        mimg = as_nifti1(nib.load(mask_path), max_dim=3)
         mask = mimg.get_fdata() > 0
-        if mask.shape != slabs[0].shape[:3]:
-            raise NotImplementedError("a mask of another grid (nilearn's path, §4.4)")
-        affine = mimg.affine
+        mask_img = nib.Nifti1Image(mask, mimg.affine, mimg.header)
+        affine, cls = mimg.affine, nib.Nifti1Image
     else:
         from nilearn.masking import compute_epi_mask
 
-        mimg = compute_epi_mask(ref)
-        mask = np.asanyarray(mimg.dataobj) > 0
-        affine = mimg.affine
+        mask_img = compute_epi_mask(ref)
+        mask = np.asanyarray(mask_img.dataobj) > 0
+        affine, cls = mask_img.affine, type(mask_img)
     idx = np.flatnonzero(mask.ravel(order="C"))
-    x = np.stack([s.reshape(-1, s.shape[3])[idx] for s in slabs], axis=1)
-    return ref, mask, affine, np.ascontiguousarray(x, dtype=F32)
+    if slabs is not None:
+        if slabs[0].shape[:3] != mask.shape:
+            raise ValueError("Z-cat echo slice/mask shape mismatch")
+        x = np.stack([s.reshape(-1, s.shape[3])[idx] for s in slabs], axis=1)
+        return ref, mask, affine, cls, np.ascontiguousarray(x, dtype=F32)
+    try:  # §4.4: each echo on the mask's grid, read as float32
+        cols = []
+        for img in imgs:
+            conv = as_nifti1(img)
+            if conv.shape[:3] != mask.shape:
+                raise ValueError("Image/mask shape mismatch")
+            arr = np.asarray(conv.dataobj, dtype=F32)
+            if arr.ndim != 4:
+                raise ValueError("Expected 4D image")
+            cols.append(arr.reshape(-1, arr.shape[3])[idx])
+    except ValueError:  # §4.4: nilearn's masking of every echo (non-finite values set to 0)
+        from nilearn import masking
+
+        cols = []
+        for img in imgs:
+            m = masking.apply_mask(as_nifti1(img, dtype=F32), mask_img)
+            if m.ndim != 2:
+                raise ValueError("Expected 4D image") from None
+            cols.append(m.T.astype(F32, copy=False))
+    x = np.stack(cols, axis=1)
+    return ref, mask, affine, cls, np.ascontiguousarray(x, dtype=F32)
 
 
 def parse_exclude(text: str | None) -> list[int]:
@@ -402,10 +444,12 @@ def rmse_series(x: np.ndarray, count: np.ndarray, t2s: np.ndarray, s0: np.ndarra
 
 
 def rmse_map(r: np.ndarray, variant: str) -> np.ndarray:
+    """§9 step 2; a voxel without a value is numpy's ``nan``, the positive quiet NaN (§13.1)."""
     nan = np.isnan(r)
     filled = np.where(nan, F32(0), r)
     total = sum_outer(filled) if variant == "fast" else sum_inner(filled)
-    return divide_count(total, (~nan).sum(axis=1))
+    cnt = (~nan).sum(axis=1)
+    return np.where(cnt == 0, F32(np.nan), divide_count(total, cnt))
 
 
 def table(r: np.ndarray, variant: str) -> list[list[float]]:
@@ -414,7 +458,8 @@ def table(r: np.ndarray, variant: str) -> list[list[float]]:
     cnt = (~nan).sum(axis=0)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        if variant == "fast":
+        # the voxels an outer axis: a plain sum, but pairwise with one volume (§13.2)
+        if variant == "fast" or r.shape[1] == 1:
             mean = divide_count(sum_inner(filled), cnt)
         else:
             mean = divide_count(sum_outer(filled), cnt)
@@ -478,13 +523,15 @@ def name(desc: str, convention: str, prefix: str) -> str:
     return f"{prefix}{base}{ext}"
 
 
-def save_image(vals, mask, affine, ref, dtype, path: Path) -> None:
+def save_image(vals, mask, affine, ref, dtype, path: Path, cls=nib.Nifti1Image) -> None:
+    """§11.3: a new image of the mask image's class (NIfTI-2 for a mask computed from a NIfTI-2
+    first echo) on the mask's three spatial axes."""
     vals = np.asarray(vals)
-    shape = mask.shape + vals.shape[1:]
+    shape = mask.shape[:3] + vals.shape[1:]
     data = np.zeros(shape, dtype=dtype)
     flat = data.reshape((-1, *vals.shape[1:]))
     flat[np.flatnonzero(mask.ravel(order="C"))] = vals.astype(dtype)
-    img = nib.Nifti1Image(data, affine)
+    img = cls(data, affine)
     if data.ndim == 4:
         img.header.set_zooms(ref.header.get_zooms()[:4])
     img.to_filename(str(path))
@@ -534,7 +581,7 @@ def prepare(a: argparse.Namespace) -> dict:
     if a.fitmode == "ts" and exclude:
         raise ValueError("Excluding volumes is not supported for fitmode='ts'.")
     tes = echo_times_ms(a.tes)
-    ref, mask, affine, x = load_inputs(a.data, len(tes), a.mask)
+    ref, mask, affine, cls, x = load_inputs(a.data, len(tes), a.mask)
     if a.dummy_scans > 0:
         x = np.ascontiguousarray(x[:, :, a.dummy_scans :])
     n_t = x.shape[2]
@@ -553,6 +600,7 @@ def prepare(a: argparse.Namespace) -> dict:
         ref=ref,
         mask=mask,
         affine=affine,
+        cls=cls,
         x=x,
         x_used=x_used,
         used=used,
@@ -587,7 +635,7 @@ def run(argv: list[str]) -> int:
 
     def img(desc, vals, dtype):
         fname = name(desc, a.convention, prefix)
-        save_image(vals, mask, affine, ref, dtype, out / fname)
+        save_image(vals, mask, affine, ref, dtype, out / fname, c["cls"])
         written[desc] = fname
 
     img("adaptive mask img", count, np.int32)

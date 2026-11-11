@@ -340,7 +340,10 @@ Each `-d` file is an image nibabel reads. larmorx reads NIfTI-1 and NIfTI-2 (sin
 does; other formats nibabel reads (AFNI BRIK/HEAD, MINC, PAR/REC, compressed `.bz2`/`.zst`) are
 refused with a clear message (decision D5, the replica's behaviour: a documented gap). tedana
 converts every image that is not a NIfTI-1 single-file image (pairs, ANALYZE, MGH) to an
-in-memory NIfTI-1 image with the same data, affine (§4.5) and voxel sizes; a NIfTI-2 image is
+in-memory NIfTI-1 image of nibabel's scaled array in nibabel's own type for it (the stored
+values when unscaled; SPM2's ANALYZE scale factor applied in float64; a pair's scaling as a
+single file's), with the image's affine (§4.5) and voxel sizes, which §4.4 then rounds to
+float32 (the model of §18 reproduces tedana's files on every form, 2026-11-11); a NIfTI-2 image is
 kept as it is (in Python a NIfTI-2 image is a kind of NIfTI-1 image), which matters for the
 outputs' format without a mask (§11.3).
 
@@ -398,11 +401,25 @@ user mask: the same rule in float64, then `> 0`). Masked to the S voxels, the da
 `x[v, e, t]`: S voxels × E echoes × T volumes, float32 (the int16 case of the probe prints other
 thresholds than its float32 source: observed). A 3D echo file is `ValueError: Expected 4D
 image` (observed; tedana prints two chained tracebacks, §12.4). An echo whose grid is not the
-mask's shape, or a 4D mask of one volume (§4.3), makes tedana read every echo through nilearn's
-masking instead, which applies the same scaling and **sets non-finite values to 0**, and refuses
-a mask whose shape or affine differs from the image's (nilearn's `ValueError` texts, through
-TED-04's check in the default). A z-concatenated file whose slab does not match the mask's shape
-is `ValueError: Z-cat echo slice/mask shape mismatch`.
+mask's shape (a 4D mask of one volume, §4.3, included), or an echo that is not 4D, makes tedana
+read every echo again through nilearn's masking; the first reading's error, `ValueError:
+Image/mask shape mismatch` (or `Expected 4D image`), is then the first of two chained tracebacks
+when the second reading fails too (§12.4, observed). The second reading masks each echo
+(converted as in §4.1, its values asked for as float32) with nilearn 0.14.1's `apply_mask` and
+the mask image of §4.3 (squeezed by nilearn to three dimensions when it has one volume): the
+values are nibabel's scaled array of the image in nibabel's own type for it (for the inputs of
+§17.2 the first reading's values), with **non-finite values set to 0**, rounded to float32, in
+the mask's voxel order. nilearn checks first, in this order, and its error is then the run's
+last line (observed): the mask's values (no voxel: `ValueError: The mask is invalid as it is
+empty: it masks all data.`), the affines (not numpy's `allclose`: `ValueError: Mask affine:`, a
+newline, the mask's affine as numpy prints it, a newline, ` is different from img affine:`, a
+newline, the echo's affine), the shapes (`ValueError: Mask shape: (15, 17, 2)`, a newline, ` is
+different from img shape:(16, 17, 2)`); a 3D echo passes them and fails with tedana's
+`ValueError: Expected 4D image`. So a mask of another grid is always refused, with the empty
+mask's text when it is also empty, at step 11, before §5's dummy scans (and before the default's
+TED-13 check, §15). TED-04's check in the default concerns masks of the data's shape only. A
+z-concatenated file whose slab does not match the mask's shape is `ValueError: Z-cat echo
+slice/mask shape mismatch` (no second reading).
 
 ### 4.5 The affine as nibabel reads it
 
@@ -503,17 +520,23 @@ Only warnings (EPTI acquisitions; the counts do not change): with N1 the voxels 
   `RuntimeWarning: invalid value encountered in scalar divide`); if p3 > 0: WARNING `<n3> voxels
   (<p3 rounded to 1 decimal>%) have fewer than <t3 rounded> good voxels. These voxels will be used
   in all analyses, but might not include 3 independent echo measurements.`;
-- if k > 3: td = ⌊(k − 1)E / k⌋, nd and pd likewise, and always WARNING `<nd> voxels (<pd>%) have
-  fewer than <td> good voxels. The degrees of freedom for fits across echoes will remain <k> even
-  if there might be fewer independent echo measurements.` (observed: `0 voxels (0.0%) have fewer
-  than 2.0 good voxels. The degrees of freedom for fits across echoes will remain 4 even if there
-  might be fewer independent echo measurements.`).
+- if k > 3: td = ⌊(k − 1)E / k⌋, nd and pd likewise (pd's division is another place of numpy's
+  warning, so N1 = 0 prints the warning a second time, before this line), and always WARNING
+  `<nd> voxels (<pd>%) have fewer than <td> good voxels. The degrees of freedom for fits across
+  echoes will remain <k> even if there might be fewer independent echo measurements.` (observed:
+  `0 voxels (0.0%) have fewer than 2.0 good voxels. The degrees of freedom for fits across echoes
+  will remain 4 even if there might be fewer independent echo measurements.`; with N1 = 0 the two
+  warnings, then `0 voxels (nan%) have fewer than 3.0 good voxels. ...`).
 The rounded numbers print as numpy float64 scalars (`2.0`, `12.3`, `nan`: §13.7).
 
 ### 6.6 The image
 
 The counts over the mask's S voxels are written at once as the adaptive mask image (int32: 0..E)
-(observed), before the fit.
+(observed), before the fit. The image is made through nilearn's unmasking with the mask of §4.3,
+which refuses a mask without voxels: with an empty user mask (no value > 0 on the echoes' grid)
+or an empty computed mask, a run whose methods do not stop it before (§6.2's dropout method does,
+with its `IndexError`) stops here with `ValueError: The mask is invalid as it is empty: it masks
+all data.` (observed: `--masktype none` and `--masktype decay`, after §6.5's warnings).
 
 ## 7. The fits
 
@@ -543,10 +566,34 @@ tedana solves all N voxels as one least-squares problem with N right-hand sides 
 treated as zero (m = n · T_u rows), so equal echo times give the minimum-norm solution of the rank-1
 problem; a voxel with β1 = 0 gives T2* = ±∞ (numpy's division: inf, with numpy's
 `RuntimeWarning: divide by zero encountered in divide`, §12.3).
-The solution of a voxel depends in its last bits on the other voxels of the batch and on the BLAS
+The solution of a voxel depends in its last bits on its place in the batch and on the BLAS
 threads (§13.4, black-box). One infinite sample makes y infinite and every voxel of its group NaN
 (TED-09); no row (T_u = 0, TED-16) gives β = 0. A non-finite design (an infinite TE: TED-10) is
 `numpy.linalg.LinAlgError: SVD did not converge in Linear Least Squares` (observed).
+
+**Observations without a slope** (observed, 2026-11-11). A voxel's exact least-squares slope is 0
+when its n · T_u observations are all equal (the same sample at every used echo and volume: in
+the random-testing trial of the original, uint8 voxels saturated at 255, so y = log 256, in 45
+of 1,761 cases), and in rarer arrangements of distinct observations (for instance one volume,
+echo times symmetric about the middle one, and equal first and last observations). tedana's β1
+there is **not 0** but the rounding noise of its batched solution: on the trial's 2,587 voxels of
+equal observations (log 256 each), |β1| between 5e-19 and 1e-16 ms⁻¹, never 0, negative at 1,881
+and positive at 706 of them in the reference setup (§17.1). Its sign and size are decided by the
+voxel's values, the group's design (n, T_u and the echo times), the voxel's place in the batch
+and the libraries, none of them a property of the signal (§13.4). So tedana writes there:
+- β1 < 0: T2* = 1/β1 < 0, floored to **1 ms** (§8) in the full and the limited map; in
+  `curvefit` that start lies outside the bounds, a failure that keeps it (§7.3, TED-06);
+- β1 > 0: a T2* of about 1e16 to 2e18 ms (the curve fit, started there, keeps a T2* of that
+  size and fits S0 near the samples' value), in the full map as it is, and in the limited map
+  capped to c when it lies above ten caps (§8); when such voxels are more than about 0.5 % of
+  the limited values the cap c is itself one of these values (observed: 1.9e14 s), and few or
+  none of them are capped;
+- never T2* = +∞ (β1 = +0, which §8 would floor to 500 ms), so these voxels give no `divide by
+  zero` warning (§12.3); S0 = exp(β0) is exp(y) of the equal observations to within its last
+  bits.
+fMRIPrep's four multi-echo calls hold no such voxel (none with equal observations; their smallest
+|β1| is about 8e9 times the rounding noise's scale). How the original treats these voxels: §19,
+open point 5.
 
 ### 7.3 The monoexponential curve fit (`curvefit`)
 
@@ -667,7 +714,9 @@ with the **limited** maps (ms):
    voxel, after TED-18's cap, divides by zero: numpy's warning, §12.3.)
 2. The RMSE map: per voxel, numpy's `nansum` over the volumes (the NaN values replaced by +0 in
    place, then the float32 sum along the volumes, the innermost axis: pairwise, §13.2) divided by
-   the number of non-NaN values (float64 division, rounded to float32); NaN when there is none.
+   the number of non-NaN values (float64 division, rounded to float32); NaN when there is none,
+   numpy's `nan` (the positive quiet NaN, `0x7FC00000` in the float32 image, observed; not the
+   default NaN of §13.1, which arithmetic makes).
 3. Per volume t over the S voxels: `rmse_mean` = numpy's `nansum` over the voxels (NaN as +0; a
    plain float32 sum in voxel order, the voxels an outer axis) divided by the number of non-NaN
    values (float64, rounded to float32), NaN when none; `rmse_std` = numpy's
@@ -878,9 +927,9 @@ marked):
 
 | Where | Category: message |
 |---|---|
-| the temporal means of no volume (§6.2, TED-13, TED-16) | `RuntimeWarning: Mean of empty slice` (numpy 2.5.4; `Mean of empty slice.` in 2.3.5), then `RuntimeWarning: invalid value encountered in divide` |
-| §6.5 with no fit voxel | `RuntimeWarning: invalid value encountered in scalar divide` (analysis) |
-| §7.2, β1 = 0; §9 with a limited T2* of 0 | `RuntimeWarning: divide by zero encountered in divide` (observed for §7.2: TED-16 with `--masktype none`; §9's from the analysis) |
+| the temporal means of no volume (§6.2, TED-13, TED-16) | `RuntimeWarning: Mean of empty slice` (numpy 2.5.4; `Mean of empty slice.` in 2.3.5), then `RuntimeWarning: invalid value encountered in divide` when the mask has at least one voxel (with no voxel there is nothing to divide: the first warning alone, observed) |
+| §6.5 with no fit voxel | `RuntimeWarning: invalid value encountered in scalar divide`, once for each of §6.5's two percentages computed (two places: p3, then pd when k > 3), each before its WARNING line (observed: twice before `0 voxels (nan%) have fewer than 3.0 good voxels. ...`, of which p3's prints no line, NaN not being > 0) |
+| §7.2, β1 = 0; §9 with a limited T2* of 0 | `RuntimeWarning: divide by zero encountered in divide` (observed for §7.2: TED-16 with `--masktype none`; §9's from the analysis); tedana's slope at observations without a slope is rounding noise, not 0, so they give none (§7.2) |
 | §7.3 covariance | `OptimizeWarning: Covariance of the parameters could not be estimated` (printed when the first fit that warns has finished: after its group's fits, observed with `--fitmode ts`) |
 | §9, a volume with no RMSE | `RuntimeWarning: Degrees of freedom <= 0 for slice.`, `RuntimeWarning: All-NaN slice encountered` (analysis) |
 | §10 PAID with infinite samples | `RuntimeWarning: invalid value encountered in reduce` / `... in subtract` (analysis) |
@@ -917,7 +966,8 @@ not a requirement) and the last line exactly. The errors and their texts are tho
 
 float32 operations round each result to float32 (no fused multiply-add, no extended precision);
 float64 likewise. Every NaN produced from numbers is x86-64's default NaN (the sign bit set:
-`0xFFF8...`/`0xFFC0...`) on every platform; NaN inputs propagate as they are.
+`0xFFF8...`/`0xFFC0...`) on every platform; NaN inputs propagate as they are; a NaN tedana writes
+as a fill value is numpy's `nan`, the sign bit clear (the RMSE map's voxels without a value, §9).
 
 ### 13.2 numpy's sums and means
 
@@ -969,6 +1019,22 @@ bit for bit at any thread count (§13.9); a direct per-voxel solution of the 2 �
 instance the closed form of the centred design) gives the same β within a few units in the last
 place, which §17.3 allows (measured: the model's per-voxel closed form wrote the same float32
 T2* and S0 as tedana on every voxel of §18's cases).
+
+Where the exact slope is 0 (§7.2's observations without a slope) the slope tedana writes is
+rounding noise only, so these dependences decide its **sign** (black-box, 2026-11-11, numpy's own
+`lstsq` called as tedana calls it, on the 2,587 such voxels of the trial's 45 cases and on
+columns of equal observations placed in batches of 1 to 8 columns): the column's place in the
+batch (another slope in 66 of 210 of tedana's designs, another sign in 19; the batch's last
+`N mod 4` columns take other kernels than the rest); the LAPACK release (numpy 2.3.5's LAPACK
+3.12.0: 48 of the 2,587 signs differ); OpenBLAS's kernels (SkylakeX's, picked by default on an
+AVX-512 CPU: 122 signs differ; the generic x86-64 kernels: 716; Zen's: none); the BLAS threads
+not at these sizes (4 threads: none). `larmorx_transform::numpy_linalg::lstsq` gives the
+reference setup's noise exactly (the 548 cases of its check, bit for bit, among them fMRIPrep's
+two largest groups). A closed form of the centred design gives an exact 0 for equal observations
+(their centred values are exactly 0), which is the divergence of §7.2's last paragraph. Its cost
+(black-box, a shared machine): on ds003592's main group (52,231 voxels × 600 observations) numpy's
+`lstsq` takes 0.33 s and `larmorx_transform::numpy_linalg::lstsq` 0.49 s at one thread and 0.21 s
+at eight, a closed form in numpy 0.04 s.
 
 ### 13.5 The curve fit (§7.3)
 
@@ -1057,7 +1123,12 @@ names the library gets tedana's bits there; one that replaces them stays within 
 Decided by the rules A to D (CLAUDE.md, D13), each with `reproduce` giving tedana's behaviour of
 §§2–13. The default names each one with a notice (§14) exactly where its correction changed the
 run: an output value, a message, the exit status. A defect is named **once per run**, by the
-first of its texts that applies (one notice per defect: the replica's form, observed). The texts
+first of its texts that applies (one notice per defect: the replica's form, observed), with the
+numbers of the place where it first applied: TED-09 and TED-15, met group by group, count the
+first echo-count group (in ascending order, and in `--fitmode ts` the first volume) that holds
+such voxels (observed: the replica's TED-15 notice counts 1 voxel where a later group holds 180
+more, its TED-09 notice 1 voxel in a `--fitmode ts` run whose voxel has an infinite sample in
+each of its 3 volumes); TED-08 sums its run (its row). The texts
 in quotes are the replica's default (observed by `blackbox.py` against `larmorx-gpl tedana
 t2smap`); the original prints the same, with `larmorx:` for the replica's `larmorx-gpl:`. Error
 texts are the last line of the traceback (§12.4), exit status 1.
@@ -1078,7 +1149,7 @@ texts are the last line of the traceback (§12.4), exit status 1.
 | TED-10 | `-e ... inf` passes as milliseconds and fails in the least squares: `numpy.linalg.LinAlgError: SVD did not converge in Linear Least Squares` (observed) | B | at the TE check: `ValueError: TE values must be finite (tedana fails later in numpy's least squares)`; notice `an infinite echo time` (observed) |
 | TED-11 | `--n-independent-echos 0`: `ZeroDivisionError: division by zero` (observed) | B | `ValueError: --n-independent-echos must be a positive number of echoes (tedana fails with ZeroDivisionError)`; notice `--n-independent-echos 0` (observed) |
 | TED-12 | one echo (one TE) is accepted, then `IndexError: invalid index to scalar variable.` (observed, dropout) or a numpy `column_stack` ValueError (log-linear fit) | B | at the TE check: `ValueError: t2smap needs two or more echoes (one echo time given; tedana fails later with an unrelated numpy error)`; notice `a single echo time` (observed) |
-| TED-13 | `--dummy-scans` ≥ T: numpy's "Mean of empty slice" warnings, then the argmax ValueError (observed); a negative count shifts `--exclude`'s indices up | B | `ValueError: --dummy-scans must be at least 0 and below the number of volumes (<T>); <N> given`; notice `--dummy-scans <N> of <T> volumes` (observed) |
+| TED-13 | `--dummy-scans` ≥ T: numpy's "Mean of empty slice" warnings, then the argmax ValueError (observed); a negative count shifts `--exclude`'s indices up | B | at step 12 (after the data are read, so a reading error of §4.4 comes first, observed through the replica): `ValueError: --dummy-scans must be at least 0 and below the number of volumes (<T>); <N> given`; notice `--dummy-scans <N> of <T> volumes` (observed) |
 | TED-14 | `--debug`'s floor message divides by E · V | A | the message's count and percentage of V voxels (a message only); notice `the floor's message counts <V> voxels; tedana prints <E·V>` |
 | TED-15 | PAID with a voxel whose good echoes do not vary over time (every voxel of a one-volume series): `ZeroDivisionError: Weights sum to zero, can't be normalized` | A (B for one volume) | those voxels combined with equal weights (notice `<k> voxel(s) whose good echoes do not vary over time combined with equal weights; tedana fails with ZeroDivisionError`); one volume: `ValueError: --combmode paid needs more than one volume: its weights are each echo's temporal signal-to-noise ratio (tedana fails with ZeroDivisionError)` |
 | TED-16 | `--exclude` removing every volume: the adaptive mask and the fit see no volume; the dropout method fails first with the argmax ValueError (observed); without it (`--masktype none`) `loglin` writes T2* = 500 ms and S0 = 1 in every voxel with exit 0 (observed), and `curvefit` stops after the log-linear fit with `ValueError: zero-size array to reduction operation minimum which has no identity` (§7.3, observed) | B | after the exclusion line: `ValueError: --exclude leaves no volume for the adaptive mask and the T2*/S0 fit (all <T> volumes excluded)`; notice `--exclude removes all <T> volumes from the adaptive mask and the fit` (observed) |
@@ -1232,7 +1303,7 @@ written values (T2* in seconds; ×1000 for the predictions and weights, in ms).
 | `curvefit` T2* and S0 | per voxel (and volume in `ts`): (a) \|r − r'\| ≤ 1e-6·\|r\| + 1e-9 s⁻¹ and \|S0 − S0'\| ≤ 1e-6·\|S0\|; or (b) the other run's fit is at least as good: F' ≤ F·(1 + 1e-6) + 1e-12·Σy², F = Σ (S0·exp(−TE/T2*) − y)² in float64 from the written full maps over the voxel's samples of the fit (echoes 1..n of its group, the used volumes); or (c) its log-linear start lies near the feasibility boundary (a start's rate within 1e-9 s⁻¹ of 0, or its S0 within 1e-6 relative of the voxel's smallest sample). **At a voxel at the cap** (the cap row) of a run read as larmorx's default, whose full map TED-05 caps, the written T2* is c whether the fit's T2* was c or above ten caps (then not written): that run's F in (b) is the least of F at its written (S0, c) and F over T2* ≥ 10c (+∞ included) with its written S0; in (a) its T2* agrees when the cap row accepts it, so (a) then rests on S0. Voxels passing by (b) or (c): at most **3 %** of the fit voxels [(a)'s use 0.997 / 0.995: the rest pass by (b); (b) or (c) for 0.28 % / 0.31 % of the fit voxels at most, all by (b), with F'/F − 1 between −1.9e-8 and 3.2e-8] |
 | the cap (limited T2*; in larmorx's default also the full T2*, which TED-05 caps alike) | the cap is an order statistic: \|c − c'\| ≤ max \|ℓ − ℓ'\| over the voxels at the cap in neither run (count ≥ 2) + tol·c (tol the T2* row's relative tolerance); a voxel at the cap in both runs is accepted on T2* so; a voxel at the cap in one run only is accepted when the other run's value is within 10·\|c − c'\| + 10·tol·c of ten caps, or passes by (b)/(c). **The voxels at the cap**, from each run's files: in tedana's (`reproduce`) the limited values that differ from the full map's (count ≥ 2), c being their value; in a run with no such value and no full value above ten caps (two float32 units of slack), read as larmorx's default, the values equal to its cap c, §8's percentile of its written limited values (a capped value is c, and capping leaves that percentile at c), count ≥ 2 in the limited map and ≥ 1 in the full map, with c ≤ 0 capping nothing (TED-18). A run with nothing to cap reads the same either way, and the order statistic's own voxel, at c, then counts as at the cap: tol·c and (b)/(c) cover its own difference [0.005 / 0.005; larmorx's default against the replica's default on fMRIPrep's curve-fit calls: 0.0027] |
 | the failures map | identical, except voxels passing by (b) or (c) (reported) [identical / identical] |
-| variance and covariance maps | where (a) holds (not at a voxel at the cap of a run read as larmorx's default, whose fit T2* is not written): relative 1e-4; +∞ identical; elsewhere reported [0.08 / 0.08: at most 8.1e-6 relative, on ds003592 with `--verbose`] |
+| variance and covariance maps | where (a) holds (not at a voxel at the cap of a run read as larmorx's default, whose fit T2* is not written): relative 1e-4, or a difference within the variance's **rounding floor** max(P00, P11) · m · (2⁻²⁴ · max\|y\|)² / (m − 2), P = (JᵀJ)⁻¹ at the reference's written fit (J the model's derivatives in S0 and T2* over the voxel's m samples of the fit, y those samples): the variance an exact fit to float32 samples can show, which decides the nearly noiseless fits of synthetic data (2026-11-11: the random-testing trial's 23 such cases, all differences within 2.5e-4 of it; on real data it is negligible); +∞ identical; elsewhere reported [0.08 / 0.08: at most 8.1e-6 relative, on ds003592 with `--verbose`] |
 | the RMSE map | per voxel \|Δ\| ≤ max_t rms_e(p_e − p'_e) + 2⁻²¹·max_e\|p_e\| + 2⁻²⁴·(T + E + 64)·RMSE, p and p' the predictions of §9 (float32) from the two runs' written limited maps; the last term is the error of a float32 sum of the volumes and the echoes in another order (the standard bound n·2⁻²⁴ of the terms' sum, with a slack for numpy's pairwise blocks); NaN where tedana has NaN [0.43 / 0.14] |
 | the confounds table | per volume t: `rmse_mean` and `rmse_std` \|Δ\| ≤ A_t + 2⁻²⁴·(N_t + 32)·max(\|value\|, \|rmse_mean\|); the percentile columns \|Δ\| ≤ A_t + 1e-6·\|value\| (order statistics move by at most the largest change of the values); A_t the largest over the voxels of rmse[v, t]'s allowance rms_e(p_e − p'_e) + 2⁻²¹·max_e\|p_e\| + 2⁻²⁴·(E + 32)·rmse[v, t], N_t the non-NaN values; `n/a` identical; the float32/float64 form of §9 identical [0.07 / 0.02] |
 | the combined series | per voxel and volume \|Δ\| ≤ Σ_e \|x_e\|·\|ŵ_e − ŵ'_e\| + 2⁻²⁰·(\|∂c/∂ln T2*\| + \|c\|) + 2⁻¹⁴⁹, ŵ the normalised weights of §10 from each run's written full T2* (ms), ∂c/∂ln T2* = Σ_e ŵ_e x_e (TE_e − Σ_k ŵ_k TE_k) / T2*: each run's own T2* lies within half a float32 unit of its written value, and eight units are allowed; PAID: identical weights expected, so the 2⁻²⁰ term [0.85 / 0.44: the first term is a first-order bound, sharp by design] |
@@ -1285,8 +1356,10 @@ the folder's README says how):
   `--exclude`, the adaptive mask, the groups, numpy's `lstsq` per group, SciPy's `curve_fit` per
   voxel with §7.3's options passed explicitly, the floors, the limited maps, the cap, the RMSE,
   the table (written with Python's `repr`), the combination, the images (nibabel's new image from
-  the mask's affine), the JSON files. Its scope: NIfTI-1 single files, a mask of the data's grid
-  or none; tedana's behaviour (`reproduce`); the files (the messages are `blackbox.py`'s). Its
+  the mask's affine), the JSON files. Its scope: every image form of §4.1 (since 2026-11-11:
+  NIfTI-1 and NIfTI-2 single files and pairs, ANALYZE 7.5, MGH/MGZ, converted as §4.1 says), a
+  user mask of any of them or none, nilearn's masking of §4.4 (a 4D mask of one volume);
+  tedana's behaviour (`reproduce`); the files (the messages are `blackbox.py`'s). Its
   `fast` variant makes the changes §16 allows: the log-linear fit per voxel in closed form (a
   centred 2 × 2 least squares), the curve fit with an analytic Jacobian (another path of the same
   trust-region method), the RMSE's sums in float64 with the echoes reversed and a plain sum over
@@ -1310,7 +1383,11 @@ the folder's README says how):
   compared, the identical ones, those passing by each rule, the failures, the largest use, and
   with `--details` the first failures. (2026-11-11) Each run's cap read from its files as the
   cap row states (tedana's, or larmorx's default whose full map TED-05 caps), with (b)'s F at
-  the cap and the variances' exception of §17.3.
+  the cap and the variances' exception of §17.3. (2026-11-11, spec writer 2) Every input form
+  through the model's readers; two caps further apart than the cap row's allowance fail its
+  rows (before, only the values at the cap were judged); the variances' rounding floor; the fit
+  values whose observations are all equal (§7.2) counted in the T2* rows' notes, not judged
+  apart (§19, open point 5).
 - `recheck.py` (2026-11-11): `check.py` again on output folders that `compare.py` and
   `fmriprep_calls.py` (`../t2smap-original/`) left, no program run, beside another `check.py`
   (`--baseline`): which verdicts a change of the checker changes. Its run of 2026-11-11 (the
@@ -1342,13 +1419,29 @@ the unreachable bounds error, the start moved off a bound, a voxel with no sampl
 single notice, TED-16 without the dropout method in both fit types, and §17.3's reading of
 TED-05's default cap (`check.py`, proved by `recheck.py` on the part's runs: §18).
 
+(spec writer 2, 2026-11-11, from the original's random-testing trial: 1,761 cases, its 362
+findings replayed with tedana's program run directly) Checked against tedana 26.0.3's source and
+those runs, and against numpy's own `lstsq` in six library setups: §7.2's observations without
+a slope and §13.4's sign of tedana's noise (open point 5), §4.4's second reading through nilearn
+and the order of its refusals, §6.5's two warnings, §6.6's empty mask, §12.3's warnings of no
+volume and no voxel, §9's NaN fill value, §15's TED-13 place and the notices' numbers, and
+§17.3's variance floor and caps; the model (§18) now reads every form of §4.1 and equals tedana
+bit for bit on the 202 replayed cases tedana completed.
+
 Open points:
 1. (Decided 2026-11-08, §15.2.) The original's maths notices: the one-pass rule (NP-03 never
    named; GLIBC-07 where a written log-linear S0 would differ).
 2. (Done, relay 8b.) The thresholds of §17.3, measured.
 3. fMRIPrep's image (tedana 25.0.1, numpy 2.2.6's blocked sums) is a reference of the final
    comparisons only; no "25" mode.
-4. What the model does not cover, for the original's own suite (§17.2): inputs other than NIfTI-1
-   single files and nilearn's masking path (§4.4); the defects' corrections (larmorx's default,
-   §15); the messages (`blackbox.py`'s report covers them); eight or more echoes (numpy's pairwise
-   sums along the echoes, §13.2); a 4D mask of one volume.
+4. What the model does not cover, for the original's own suite (§17.2): the defects' corrections
+   (larmorx's default, §15); the messages (`blackbox.py`'s report covers them); eight or more
+   echoes (numpy's pairwise sums along the echoes, §13.2). (Since 2026-11-11 it reads every image
+   form of §4.1 and takes nilearn's masking path of §4.4.)
+5. **Observations without a slope** (§7.2, §13.4; found by the original's random-testing trial,
+   2026-11-11): tedana's slope there is rounding noise whose sign the batch and the libraries
+   decide, against an exact 0 from a closed form; the two write 1 ms or about 1e16 to 2e18 ms
+   against 500 ms, can move the cap, and in `curvefit` turn a convergence into a failure. §17.3's
+   rows do not accept that divergence as they stand (its T2*, cap and (b)/(c) rows). The
+   original's treatment (tedana's arithmetic there, or a threshold, or a correction) is the
+   orchestrator's decision, written in the part's NOTES.md; this spec then says it.

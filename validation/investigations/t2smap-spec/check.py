@@ -233,6 +233,9 @@ def cap_rule(res: Result, va, vb, at_a, at_b, caps: Caps | None, sa, sb, tol, al
     use = abs(ca - cb) / allow if allow > 0 else (0.0 if ca == cb else np.inf)
     res.notes.append(f"cap {ca!r} / {cb!r} s, allowance {allow:.3g}, use {use:.3g}")
     res.use = max(res.use, float(use) if np.isfinite(use) else 0.0)
+    if not use <= 1:  # the caps themselves disagree (§17.3's cap row): the row fails
+        res.failed += 1
+        res.notes.append("the caps differ by more than their allowance")
     if use <= 1:
         ok |= at_a & at_b
         # at the cap on one side only: the other side's value near the cap's threshold, ten caps
@@ -241,6 +244,49 @@ def cap_rule(res: Result, va, vb, at_a, at_b, caps: Caps | None, sa, sb, tol, al
         near = np.abs(v - 10 * np.where(at_a, ca, cb)) <= 10 * abs(ca - cb) + 10 * tol * abs(ca)
         ok |= one & (near | alt)
     return ok
+
+
+def equal_observations(x_fit: np.ndarray, count: np.ndarray, ts: bool) -> np.ndarray:
+    """§7.2's observations without a slope, of the commonest kind: per fit voxel (and volume in
+    ``--fitmode ts``), its log-linear observations (log(|x| + 1), float32, echoes 1..n of its
+    group, the used volumes) all equal. Reported, not judged (§19, open point 5)."""
+    cols = x_fit.shape[2] if ts else 1
+    out = np.zeros((count.size, cols) if ts else count.size, dtype=bool)
+    with np.errstate(all="ignore"):
+        for n, members in model.groups_of(count):
+            for t in range(cols):
+                xg = x_fit[members, :n, t : t + 1] if ts else x_fit[members, :n, :]
+                y = np.log(np.abs(xg) + 1).reshape(len(members), -1)
+                same = np.all(y == y[:, :1], axis=1)
+                if ts:
+                    out[members, t] = same
+                else:
+                    out[members] = same
+    return out
+
+
+def variance_floor(x_fit, count, tes, t2s_ms, s0, ts: bool) -> np.ndarray:
+    """§17.3's variance row: the variance an exact fit to these float32 samples can show, per fit
+    value: max(P00, P11) * m * (2^-24 max|y|)^2 / (m - 2), P = (J^T J)^-1 at the written fit (J the
+    model's derivatives in S0 and T2* over the voxel's m samples of the fit); 0 where m <= 2."""
+    out = np.zeros(t2s_ms.shape)
+    cols = x_fit.shape[2] if ts else 1
+    with np.errstate(all="ignore"):
+        for n, members in model.groups_of(count):
+            for v in members:
+                for t in range(cols):
+                    k = (v, t) if ts else (v,)
+                    y = (x_fit[v, :n, t] if ts else x_fit[v, :n, :]).reshape(-1).astype(F64)
+                    m = y.size
+                    if m <= 2 or not (np.isfinite(t2s_ms[k]) and t2s_ms[k] > 0):
+                        continue
+                    te = np.repeat(tes[:n], 1 if ts else x_fit.shape[2])
+                    e = np.exp(-te / t2s_ms[k])
+                    jac = np.column_stack([e, s0[k] * e * te / (t2s_ms[k] * t2s_ms[k])])
+                    pinv = np.linalg.pinv(jac.T @ jac)
+                    unit = SUM_UNIT * float(np.max(np.abs(y)))
+                    out[k] = max(pinv[0, 0], pinv[1, 1]) * m * unit * unit / (m - 2)
+    return np.nan_to_num(out, nan=0.0, posinf=0.0)
 
 
 def objective(x_v: np.ndarray, te: np.ndarray, s0: float, t2s_ms: float) -> float:
@@ -381,6 +427,9 @@ def check(ref: Path, other: Path, cwd: Path) -> list[Result]:
         else no_alt
     )
 
+    flat = equal_observations(x if ts else x_used, count, ts)
+    n_flat = int(flat.sum())
+
     # ---- the curve fit's alternatives (b), (c) per fit voxel (and volume in ts)
     alt = np.zeros(t2a.shape, dtype=bool)
     if curve:
@@ -486,6 +535,11 @@ def check(ref: Path, other: Path, cwd: Path) -> list[Result]:
                 f"{int(at_full_a.sum())} / {int(at_full_b.sum())} values at the cap"
             )
             cap_ok = cap_rule(res, va, vb, at_full_a, at_full_b, caps, sa, sb, tol, alt)
+        if rate_dom and n_flat:
+            res.notes.append(
+                f"{n_flat} fit value(s) whose log-linear observations are all equal (no slope, "
+                f"§7.2: reported, §19 open point 5)"
+            )
         compare_maps(res, va, vb, tol, rate_dom, ok_extra=floored | alt | cap_ok)
         results.append(res)
 
@@ -507,13 +561,27 @@ def check(ref: Path, other: Path, cwd: Path) -> list[Result]:
                 )
             # at the cap of larmorx's default the fit's T2* is not written: (a) cannot be seen
             exact_ok &= ~at_full
+            floor_v = variance_floor(x if ts else x_used, count, tes, t2a, s0a, ts)
             for desc in ("t2star variance img", "s0 variance img", "t2star-s0 covariance img"):
                 res = Result(desc)
                 va = on(load(ref / fname(desc))[1])
                 vb = on(load(other / fname(desc))[1])
+                with np.errstate(invalid="ignore"):
+                    d_ab = np.abs(va.astype(F64) - vb.astype(F64))
+                    rel = d_ab <= TOL_VAR_REL * np.abs(va.astype(F64))
+                    by_floor = exact_ok & ~same_bits(va, vb) & ~rel & (d_ab <= floor_v)
+                n_floor = int(by_floor.sum())
                 passed = compare_maps(
-                    res, va, vb, TOL_VAR_REL, False, ok_extra=~exact_ok, use_where=exact_ok
+                    res,
+                    va,
+                    vb,
+                    TOL_VAR_REL,
+                    False,
+                    ok_extra=~exact_ok | by_floor,
+                    use_where=exact_ok,
                 )
+                if n_floor:
+                    res.notes.append(f"{n_floor} within the variance's rounding floor")
                 del passed
                 results.append(res)
 

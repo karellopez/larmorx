@@ -136,6 +136,30 @@ interfaces' threading, allocation and export lines):
 Validated bit for bit against numpy's own library through its Fortran entry points in both kept
 environments (`check_blas.py`'s `trmm`, `ger`, `trmv`, `level1` sections, 2026-11-11).
 
+**Relay 2b-i** (`numpy_linalg::blocked`: LAPACK's blocked QR and LQ; `numpy_linalg::dlarfg` made
+public). Ported from the two `lapack-netlib/SRC/` trees above (OpenBLAS 0.3.30: LAPACK 3.12.0;
+v0.3.34-106-g446c436e: LAPACK 3.12.1), whose `.f` files gfortran compiles into the wheels; the
+routines that differ between the trees are ported in both forms (`LapackRelease`):
+
+| larmorx | Upstream files | Licence |
+|---|---|---|
+| `numpy_linalg::blocked::dgeqrf`, `dgelqf`, `lwork_opt`, `NB`, `NX` (the argument checks, the workspace query, `NB` lowered by a short `LWORK`, the panels while more than `NX` columns or rows remain, the unblocked rest; `DGELQF`'s panel copied for `DLARFB`) | `dgeqrf.f`, `dgelqf.f` (identical in both trees), `ilaenv.f` (`NB` 32, `NBMIN` 2, `NX` 128), `xerbla.f` | BSD-3-Clause |
+| `numpy_linalg::blocked::dgeqr2`, `dgelq2` (3.12.0: the reflector's 1 stored for `DLARF`; 3.12.1: `DLARF1F`) | `dgeqr2.f`, `dgelq2.f` (both trees), `dlarfg.f` | BSD-3-Clause |
+| `numpy_linalg::blocked::dlarft`, `DLARFT_LVL2_BELOW`, `Direct`, `Storev` (the recursive algorithm in its four forms; 3.12.1's crossover at `ILAENV(3, 'DLARFT') = 64` to `DLARFT_LVL2`, forward and backward, columnwise and rowwise, its scans for the vectors' last nonzero entries) | `dlarft.f` (both trees), `dlarft_lvl2.f` (0.3.34), `dlacpy.f`, `ilaenv.f` (0.3.34's `'LA'`/`'RFT'` entry) | BSD-3-Clause |
+| `numpy_linalg::blocked::dlarfb` (every side, transpose, direction and storage) | `dlarfb.f` (identical in both trees) | BSD-3-Clause |
+| `numpy_linalg::blocked::dlarf`, `dlarf1f` (any length, positive increments: the scans `ILADLC`/`ILADLR`, then OpenBLAS's `dgemv`, `daxpy`, `dscal`, `dger` ports) | `dlarf.f` (both trees: the same arithmetic), `dlarf1f.f` (0.3.34), `iladlc.f`, `iladlr.f` | BSD-3-Clause |
+| `numpy_linalg::blocked::Lapack`, `IllegalValue` | (larmorx's: the release and the BLAS depth block a call follows; `XERBLA`'s message) | Apache-2.0 |
+
+Validated bit for bit against numpy's own LAPACK through its exported Fortran entry points in
+both kept environments (`validation/investigations/confounds/check_lapack.py`, full tier,
+2026-11-11, commit `6d88f10e`): numpy 2.3.5 (LAPACK 3.12.0) every case identical (`DLARFG`
+1,500, `DLARF` 3,000, `DGEQR2`/`DGELQ2` 132 each, `DLARFT` 2,006, `DLARFB` 2,506,
+`DGEQRF`/`DGELQF` 209 each, up to 600 × 60,968 and 60,968 × 600); numpy 2.5.4 (LAPACK 3.12.1,
+whose `DLARF1F` and `DLARFT_LVL2` are proved through `DGEQR2`/`DGELQ2`/`DLARFT`) the same counts
+identical with `OPENBLAS_L2_SIZE=512` (the Haswell table's `GEMM_Q` 256 on the AMD Zen 4 machine),
+and with the machine's own `GEMM_Q` 512 every defined case identical, the crashes of that library
+all in its undefined class.
+
 ## SciPy's 4 × 4 inverse (`scipy_linalg`, field maps part B, relay 18)
 
 **Ported** from SciPy 1.18.1 (`scipy/linalg/_basic.py` `inv`, `src/_linalg_inv.hh`

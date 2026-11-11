@@ -234,6 +234,21 @@ Validated bit for bit against numpy's own `scipy_dgelsd_64_`, `scipy_dlalsd_64_`
 (`validation/investigations/confounds/check_gelsd.py`, 2026-11-11): see
 `validation/investigations/confounds/README.md` for the counts and commits.
 
+**Relay 2d-ii-a** (`numpy_linalg::lasda`: one merge of `DLASDA`'s tree, for `DLALSD`'s
+divide-and-conquer path). `dlasd6.f` and `dlasd8.f` are identical in both `lapack-netlib/SRC/`
+trees; `dlasd7.f` differs as `dlasd2.f` does (the deflation test and the record of the deflated
+positions):
+
+| larmorx | Upstream files | Licence |
+|---|---|---|
+| `numpy_linalg::lasda::dlasd7`, `Lasd7`, `GivensRecord` (the checks; `Z` from `ALPHA·VL` and `BETA·VF`, the first half moved one position back and `IDXQ` shifted; `DSIGMA`/`ZW`/`VFW`/`VLW` as storage and the merge by `DLAMRG`; `TOL = 64·ε·max(|ALPHA|, |BETA|, |D(N)|)`; the deflation of small `Z` entries and of close values (3.12.0 `|D(j) - D(jprev)| <= TOL` and `IDXP(K2) = JPREV`; 3.12.1 the signed difference and the deflated positions recorded again in order) with `DLAPY2`, the Givens rotation on `VF` and `VL` by `DROT` and its record in `GIVCOL`/`GIVNUM` with `PERM` (`ICOMPQ = 1`); `DSIGMA(2)` raised to `TOL/2`; for `SQRE = 1` the extra row rotated into the first; `C` and `S` as LAPACK leaves them) | `dlasd7.f` (both trees), `dlamrg.f`, `dlapy2.f`, `INSTALL/dlamch.f`; OpenBLAS `interface/rot.c`, `kernel/x86_64/drot.c` | BSD-3-Clause |
+| `numpy_linalg::lasda::dlasd8` (the checks; `K = 1`; `Z` normalised by `DNRM2` and `DLASCL`, `RHO = ρ²`; `DLASD4` for each root with `DELTA` and its work in `WORK`, the product formula for the new `Z` in LAPACK's order of operations, `DIFL`, `DIFR(·, 1)` (its last entry as LAPACK leaves it), `DIFR(·, 2)` with `ICOMPQ = 1`; the new `VF`/`VL` through `DDOT` (the Haswell kernel) over `DNRM2`, `DLAMC3` as a stored sum) | `dlasd8.f` (identical in both trees), `dlasd4.f`, `dlascl.f`, `dlaset.f`; OpenBLAS `interface/dot.c`, `nrm2.c`, `kernel/x86_64/ddot.c`, `ddot_microk_haswell-2.c`, `nrm2.S` | BSD-3-Clause |
+| `numpy_linalg::lasda::dlasd6`, `Lasd6`, `MergeFactors` (the checks; `D(NL+1)` cleared, `ORGNRM` and the scaling of `D`, `ALPHA`, `BETA`; `DLASD7`, `DLASD8`; the poles with `ICOMPQ = 1`; the unscaling; `IDXQ` by `DLAMRG(K, N - K, D, 1, -1)`) | `dlasd6.f` (identical in both trees), `dlascl.f`, `dlamrg.f`, `dcopy` | BSD-3-Clause |
+
+Validated bit for bit against numpy's own `scipy_dlasd7_64_`, `scipy_dlasd8_64_` and
+`scipy_dlasd6_64_` in both kept environments (`validation/investigations/confounds/check_gelsd.py`
+sections `lasd7`, `lasd8`, `lasd6`, 2026-11-11): see `validation/investigations/confounds/README.md`.
+
 ## SciPy's 4 × 4 inverse (`scipy_linalg`, field maps part B, relay 18)
 
 **Ported** from SciPy 1.18.1 (`scipy/linalg/_basic.py` `inv`, `src/_linalg_inv.hh`

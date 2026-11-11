@@ -336,3 +336,14 @@ any other form is refused at build time. The build script includes `src/pep440.r
 constant; the crate's tests check the conversion. The command line's version tests
 (`crates/larmorx-cli/tests/binaries.rs`, `crates/larmorx-cli/tests/afni_replica_cli.rs`) compare
 `larmorx --version` with it.
+
+## larmorx's own command-line options (`src/cli.rs`, `src/parallel.rs`'s `pool_sizes`; 2026-11-11)
+
+larmorx's own code, ported from nothing. `cli::Overrides` carries what `larmorx --n-threads N
+--upstream-defects MODE <family> ...` gives one run of a tool's command line (the user's decision
+of 2026-11-11: the Python API's names, before the family, each option winning over the
+environment variable it replaces); `crates/larmorx-cli` parses the options. `parallel::pool_sizes`
+lists the sizes of the thread pools started in the process, for the test that checks that
+`--n-threads` reaches each family's tools (`crates/larmorx-cli/tests/options.rs`, which also runs
+the standalone program with each option and with the variable it replaces and compares the
+bytes).

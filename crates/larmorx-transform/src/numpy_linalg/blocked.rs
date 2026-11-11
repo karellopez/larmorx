@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0 AND BSD-3-Clause
 //! LAPACK's QR and LQ factorizations of general size (`DGEQRF`, `DGELQF`, blocked, with
 //! `DGEQR2`, `DGELQ2`), the generation and application of their `Q` (`DORGQR`, `DORGLQ`,
-//! `DORMQR`, `DORMLQ`, blocked, with `DORG2R`, `DORGL2`, `DORM2R`, `DORML2`), the block reflector
-//! routines under them (`DLARFT`, `DLARFB`) and the single reflectors (`DLARF`, `DLARF1F`), as
-//! numpy's x86-64 wheels run them at one BLAS thread on the Haswell kernels
-//! (`OPENBLAS_CORETYPE=Haswell`), both LAPACK releases, on every platform: the first steps of `numpy.linalg.svd` (`DGESDD`'s paths for tall and wide
-//! matrices), `pinv` and `lstsq` on the confounds' sizes (fMRIPrep's CompCor: up to 600 ×
-//! 60,968).
+//! `DORMQR`, `DORMLQ`, blocked, with `DORG2R`, `DORGL2`, `DORM2R`, `DORML2`), the reduction to
+//! bidiagonal form (`DGEBRD`, blocked with `DLABRD`, and `DGEBD2`), the block reflector routines
+//! under them (`DLARFT`, `DLARFB`) and the single reflectors (`DLARF`, `DLARF1F`), as numpy's
+//! x86-64 wheels run them at one BLAS thread on the Haswell kernels
+//! (`OPENBLAS_CORETYPE=Haswell`), both LAPACK releases, on every platform: the first steps of
+//! `numpy.linalg.svd` (`DGESDD`'s paths for tall and wide matrices), `pinv` and `lstsq` on the
+//! confounds' sizes (fMRIPrep's CompCor: up to 600 × 60,968).
 //!
 //! **The two releases** ([`LapackRelease`]; `lapack-netlib/SRC/` of OpenBLAS 0.3.30, numpy
 //! 2.3.5's wheels, and of OpenBLAS v0.3.34-106-g446c436e, numpy 2.5.4's):
@@ -15,8 +16,9 @@
 //!   stored in `A(i, i)` for the call, `w = Cᵀv`, `C -= tau·v·wᵀ`) or with `DLARF1F` (3.12.1:
 //!   the 1 implicit; `w = C(2:, :)ᵀv(2:)`, `w += C(1, :)`, `C(1, :) -= tau·w`, `C(2:, :) -=
 //!   tau·v(2:)·wᵀ`, a single row `C(1, :) *= 1 - tau`); `DLARF` itself is the same in both;
-//!   `DORG2R`, `DORGL2`, `DORM2R` and `DORML2` change the same way (3.12.0 stores the 1 for
-//!   `DLARF`, `DORM2R`/`DORML2` restore the entry afterwards);
+//!   `DORG2R`, `DORGL2`, `DORM2R`, `DORML2` and `DGEBD2` change the same way (3.12.0 stores the
+//!   1 for `DLARF`; `DORM2R`/`DORML2` restore the entry afterwards, `DGEBD2` puts `d` or `e`
+//!   back);
 //! - `DORMQR` and `DORMLQ` keep `T` after `NW·NB` entries of the workspace: 3.12.0 reserves a
 //!   fixed `TSIZE = 65·64` for it (optimal workspace `NW·NB + TSIZE`, a short one gives `NB =
 //!   (LWORK - TSIZE)/NW`), 3.12.1 `65·NB` (`NW·NB + 65·NB`, `NB = LWORK/(NW + 65)`); with `NB
@@ -28,9 +30,9 @@
 //!   `DTRMV` with the `T` built so far); 3.12.0's `ILAENV` has no such entry (0) and recurses
 //!   down to single reflectors. The blocked factorizations call it with `NB = 32` reflectors,
 //!   so 3.12.1 always takes `DLARFT_LVL2` there.
-//! - `DGEQRF`, `DGELQF`, `DORGQR`, `DORGLQ`, `DLARFB`, `DLARFG` and `ILAENV`'s `NB = 32`,
-//!   `NBMIN = 2`, `NX = 128` (`DORMQR`/`DORMLQ`: no crossover) for these routines are the same in
-//!   both.
+//! - `DGEQRF`, `DGELQF`, `DORGQR`, `DORGLQ`, `DGEBRD`, `DLABRD`, `DLARFB`, `DLARFG` and
+//!   `ILAENV`'s `NB = 32`, `NBMIN = 2`, `NX = 128` (`DORMQR`/`DORMLQ`: no crossover) for these
+//!   routines are the same in both.
 //!
 //! **The BLAS calls** go to [`crate::openblas`]'s ports of the Haswell kernels (`dgemm`,
 //! `dtrmm`, `dgemv`, `dger`, `dtrmv`, `daxpy`, `dscal`, `dnrm2`), with the depth block
@@ -52,10 +54,10 @@
 //! Upstream files (BSD-3-Clause; the notices are in the parent module and NOTICE): OpenBLAS
 //! 0.3.30 and v0.3.34-106-g446c436e `lapack-netlib/SRC/` (`dgeqrf.f`, `dgeqr2.f`, `dgelqf.f`,
 //! `dgelq2.f`, `dorgqr.f`, `dorg2r.f`, `dorglq.f`, `dorgl2.f`, `dormqr.f`, `dorm2r.f`,
-//! `dormlq.f`, `dorml2.f`, `dlarft.f` (both), `dlarft_lvl2.f` (0.3.34), `dlarfb.f`, `dlarf.f`,
-//! `dlarf1f.f` (0.3.34), `dlarfg.f`, `dlacpy.f`, `iladlc.f`, `iladlr.f`, `ilaenv.f`,
-//! `xerbla.f`); the BLAS
-//! files of [`crate::openblas`]. The logic is re-expressed in Rust; no code was copied.
+//! `dormlq.f`, `dorml2.f`, `dgebrd.f`, `dlabrd.f`, `dgebd2.f`, `dlarft.f` (both),
+//! `dlarft_lvl2.f` (0.3.34), `dlarfb.f`, `dlarf.f`, `dlarf1f.f` (0.3.34), `dlarfg.f`,
+//! `dlacpy.f`, `iladlc.f`, `iladlr.f`, `ilaenv.f`, `xerbla.f`); the BLAS files of
+//! [`crate::openblas`]. The logic is re-expressed in Rust; no code was copied.
 
 // The routines keep LAPACK's names, arguments and 1-based loops, so the port can be checked
 // line by line against the Fortran.
@@ -2550,6 +2552,795 @@ pub fn dormlq(
     )
 }
 
+// ------------------------------------------------------------------------------------------
+// Bidiagonal reduction (DGEBRD, DLABRD, DGEBD2)
+
+/// `DGEBD2(M, N, A, LDA, D, E, TAUQ, TAUP, WORK, INFO)`: `A = Q·B·Pᵀ` reflector by reflector,
+/// `B` upper bidiagonal for `m >= n` (`d`: `n` values, `e`: `n - 1`), lower otherwise (`d`:
+/// `m`, `e`: `m - 1`), the reflectors of `Q` and `P` stored below and right of `B` with their
+/// scalars `tauq` and `taup` (`min(m, n)` values each; the last one of `taup` (`m >= n`) or
+/// `tauq` (`m < n`) is 0). 3.12.0 applies each reflector with `DLARF` (the 1 stored and the
+/// entry put back), 3.12.1 with `DLARF1F`.
+///
+/// # Errors
+/// `LDA < max(1, M)` (parameter 4).
+pub fn dgebd2(
+    release: LapackRelease,
+    m: usize,
+    n: usize,
+    a: &mut [f64],
+    aoff: usize,
+    lda: usize,
+    d: &mut [f64],
+    e: &mut [f64],
+    tauq: &mut [f64],
+    taup: &mut [f64],
+) -> Result<(), IllegalValue> {
+    if lda < m.max(1) {
+        return Err(IllegalValue {
+            routine: "DGEBD2",
+            param: 4,
+        });
+    }
+    let p = |i: usize, j: usize| ix(aoff, lda, i, j);
+    if m >= n {
+        for i in 1..=n {
+            // H(i) annihilates A(i+1:m, i).
+            let mut alpha = a[p(i, i)];
+            tauq[i - 1] = dlarfg(m - i + 1, &mut alpha, a, p((i + 1).min(m), i), 1);
+            a[p(i, i)] = alpha;
+            d[i - 1] = alpha;
+            if i < n {
+                // A(i:m, i+1:n) ← H(i)·A(i:m, i+1:n)
+                apply_in_place(
+                    release,
+                    Side::Left,
+                    m - i + 1,
+                    n - i,
+                    a,
+                    p(i, i),
+                    1,
+                    tauq[i - 1],
+                    p(i, i + 1),
+                    lda,
+                );
+                // G(i) annihilates A(i, i+2:n).
+                let mut alpha = a[p(i, i + 1)];
+                taup[i - 1] = dlarfg(n - i, &mut alpha, a, p(i, (i + 2).min(n)), lda);
+                a[p(i, i + 1)] = alpha;
+                e[i - 1] = alpha;
+                // A(i+1:m, i+1:n) ← A(i+1:m, i+1:n)·G(i)
+                apply_in_place(
+                    release,
+                    Side::Right,
+                    m - i,
+                    n - i,
+                    a,
+                    p(i, i + 1),
+                    lda,
+                    taup[i - 1],
+                    p(i + 1, i + 1),
+                    lda,
+                );
+            } else {
+                taup[i - 1] = 0.0;
+            }
+        }
+    } else {
+        for i in 1..=m {
+            // G(i) annihilates A(i, i+1:n).
+            let mut alpha = a[p(i, i)];
+            taup[i - 1] = dlarfg(n - i + 1, &mut alpha, a, p(i, (i + 1).min(n)), lda);
+            a[p(i, i)] = alpha;
+            d[i - 1] = alpha;
+            if i < m {
+                // A(i+1:m, i:n) ← A(i+1:m, i:n)·G(i)
+                apply_in_place(
+                    release,
+                    Side::Right,
+                    m - i,
+                    n - i + 1,
+                    a,
+                    p(i, i),
+                    lda,
+                    taup[i - 1],
+                    p(i + 1, i),
+                    lda,
+                );
+                // H(i) annihilates A(i+2:m, i).
+                let mut alpha = a[p(i + 1, i)];
+                tauq[i - 1] = dlarfg(m - i, &mut alpha, a, p((i + 2).min(m), i), 1);
+                a[p(i + 1, i)] = alpha;
+                e[i - 1] = alpha;
+                // A(i+1:m, i+1:n) ← H(i)·A(i+1:m, i+1:n)
+                apply_in_place(
+                    release,
+                    Side::Left,
+                    m - i,
+                    n - i,
+                    a,
+                    p(i + 1, i),
+                    1,
+                    tauq[i - 1],
+                    p(i + 1, i + 1),
+                    lda,
+                );
+            } else {
+                tauq[i - 1] = 0.0;
+            }
+        }
+    }
+    Ok(())
+}
+
+/// `DLABRD`'s three arrays (`A`, the workspaces `X` and `Y`), each with its offset and leading
+/// dimension.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Brd {
+    A,
+    X,
+    Y,
+}
+
+struct Labrd<'s> {
+    a: &'s mut [f64],
+    x: &'s mut [f64],
+    y: &'s mut [f64],
+    off: [usize; 3],
+    ld: [usize; 3],
+}
+
+impl Labrd<'_> {
+    /// The storage index of element `(i, j)` (1-based) of an array.
+    fn at(&self, w: Brd, i: usize, j: usize) -> usize {
+        ix(self.off[w as usize], self.ld[w as usize], i, j)
+    }
+
+    fn get(&self, w: Brd) -> &[f64] {
+        match w {
+            Brd::A => self.a,
+            Brd::X => self.x,
+            Brd::Y => self.y,
+        }
+    }
+
+    fn get_mut(&mut self, w: Brd) -> &mut [f64] {
+        match w {
+            Brd::A => self.a,
+            Brd::X => self.x,
+            Brd::Y => self.y,
+        }
+    }
+
+    /// `DGEMV(TRANS, M, N, ALPHA, mat(i, j), LD, vec(xi, xj), INCX, BETA, vec(yi, yj), INCY)`
+    /// where the matrix and both vectors may lie in the same array (`DLABRD` passes a row or a
+    /// column of `A`, `X` or `Y` next to a block of the same array). `x` and `y` go through
+    /// buffers; `dgemv`'s arithmetic depends on the increments only as unit or not, which the
+    /// buffers keep (a stride of 2 stands for any other), and on the matrix's leading dimension,
+    /// which is the array's.
+    fn gemv(
+        &mut self,
+        trans: Trans,
+        m: usize,
+        n: usize,
+        alpha: f64,
+        mat: (Brd, usize, usize),
+        x: (Brd, usize, usize, usize),
+        beta: f64,
+        y: (Brd, usize, usize, usize),
+    ) {
+        if m == 0 || n == 0 {
+            return;
+        }
+        let (lenx, leny) = if trans == Trans::N { (n, m) } else { (m, n) };
+        let (xa, xi, xj, incx) = x;
+        let (ya, yi, yj, incy) = y;
+        let (sx, sy) = (if incx == 1 { 1 } else { 2 }, if incy == 1 { 1 } else { 2 });
+        let (xo, yo) = (self.at(xa, xi, xj), self.at(ya, yi, yj));
+        let mut xb = vec![0.0f64; (lenx - 1) * sx + 1];
+        let src = self.get(xa);
+        for t in 0..lenx {
+            xb[t * sx] = src[xo + t * incx];
+        }
+        let mut yb = vec![0.0f64; (leny - 1) * sy + 1];
+        let dst = self.get(ya);
+        for t in 0..leny {
+            yb[t * sy] = dst[yo + t * incy];
+        }
+        let ao = self.at(mat.0, mat.1, mat.2);
+        let lda = self.ld[mat.0 as usize];
+        dgemv(
+            trans,
+            m,
+            n,
+            alpha,
+            self.get(mat.0),
+            ao,
+            lda,
+            &xb,
+            0,
+            sx,
+            beta,
+            &mut yb,
+            0,
+            sy,
+        );
+        let dst = self.get_mut(ya);
+        for t in 0..leny {
+            dst[yo + t * incy] = yb[t * sy];
+        }
+    }
+
+    /// `DLARFG(N, A(ai, aj), A(xi, xj), INC, TAU)`: returns `(beta, tau)`, `beta` stored.
+    fn larfg(
+        &mut self,
+        n: usize,
+        (ai, aj): (usize, usize),
+        (xi, xj): (usize, usize),
+        inc: usize,
+    ) -> (f64, f64) {
+        let pa = self.at(Brd::A, ai, aj);
+        let px = self.at(Brd::A, xi, xj);
+        let mut alpha = self.a[pa];
+        let tau = dlarfg(n, &mut alpha, self.a, px, inc);
+        self.a[pa] = alpha;
+        (alpha, tau)
+    }
+
+    /// `DSCAL(N, ALPHA, w(i, j), 1)`.
+    fn scal(&mut self, n: usize, alpha: f64, w: Brd, i: usize, j: usize) {
+        let p = self.at(w, i, j);
+        dscal(n, alpha, self.get_mut(w), p, 1);
+    }
+}
+
+/// `DLABRD(M, N, NB, A, LDA, D, E, TAUQ, TAUP, X, LDX, Y, LDY)`: the first `nb` rows and columns
+/// of `A` (`m × n`) reduced to bidiagonal form as [`dgebd2`] would (upper for `m >= n`, lower
+/// otherwise), with `X` (`m × nb`) and `Y` (`n × nb`) such that the rest of `A` is updated by
+/// `A - V·Yᵀ - X·Uᵀ` (by the caller); `A`'s diagonal and off-diagonal entries of the reduced
+/// part are left as 1 where the reflectors' unit elements were (`DGEBRD` writes `d` and `e`
+/// back). Every product is OpenBLAS's `dgemv`; the same in both releases.
+///
+/// # Panics
+/// When an array is too small, `ldx < m` or `ldy < n`.
+pub fn dlabrd(
+    m: usize,
+    n: usize,
+    nb: usize,
+    a: &mut [f64],
+    aoff: usize,
+    lda: usize,
+    d: &mut [f64],
+    e: &mut [f64],
+    tauq: &mut [f64],
+    taup: &mut [f64],
+    x: &mut [f64],
+    xoff: usize,
+    ldx: usize,
+    y: &mut [f64],
+    yoff: usize,
+    ldy: usize,
+) {
+    use Brd::{A, X, Y};
+    use Trans::{N as No, T as Tr};
+    if m == 0 || n == 0 {
+        return;
+    }
+    let mut s = Labrd {
+        a,
+        x,
+        y,
+        off: [aoff, xoff, yoff],
+        ld: [lda, ldx, ldy],
+    };
+    if m >= n {
+        for i in 1..=nb {
+            // A(i:m, i) -= A(i:m, 1:i-1)·Y(i, 1:i-1)ᵀ + X(i:m, 1:i-1)·A(1:i-1, i)
+            s.gemv(
+                No,
+                m - i + 1,
+                i - 1,
+                -1.0,
+                (A, i, 1),
+                (Y, i, 1, ldy),
+                1.0,
+                (A, i, i, 1),
+            );
+            s.gemv(
+                No,
+                m - i + 1,
+                i - 1,
+                -1.0,
+                (X, i, 1),
+                (A, 1, i, 1),
+                1.0,
+                (A, i, i, 1),
+            );
+            // H(i) annihilates A(i+1:m, i).
+            let (beta, tq) = s.larfg(m - i + 1, (i, i), ((i + 1).min(m), i), 1);
+            tauq[i - 1] = tq;
+            d[i - 1] = beta;
+            if i < n {
+                let pii = s.at(A, i, i);
+                s.a[pii] = 1.0;
+                // Y(i+1:n, i)
+                s.gemv(
+                    Tr,
+                    m - i + 1,
+                    n - i,
+                    1.0,
+                    (A, i, i + 1),
+                    (A, i, i, 1),
+                    0.0,
+                    (Y, i + 1, i, 1),
+                );
+                s.gemv(
+                    Tr,
+                    m - i + 1,
+                    i - 1,
+                    1.0,
+                    (A, i, 1),
+                    (A, i, i, 1),
+                    0.0,
+                    (Y, 1, i, 1),
+                );
+                s.gemv(
+                    No,
+                    n - i,
+                    i - 1,
+                    -1.0,
+                    (Y, i + 1, 1),
+                    (Y, 1, i, 1),
+                    1.0,
+                    (Y, i + 1, i, 1),
+                );
+                s.gemv(
+                    Tr,
+                    m - i + 1,
+                    i - 1,
+                    1.0,
+                    (X, i, 1),
+                    (A, i, i, 1),
+                    0.0,
+                    (Y, 1, i, 1),
+                );
+                s.gemv(
+                    Tr,
+                    i - 1,
+                    n - i,
+                    -1.0,
+                    (A, 1, i + 1),
+                    (Y, 1, i, 1),
+                    1.0,
+                    (Y, i + 1, i, 1),
+                );
+                s.scal(n - i, tq, Y, i + 1, i);
+                // A(i, i+1:n) -= Y(i+1:n, 1:i)·A(i, 1:i)ᵀ + A(1:i-1, i+1:n)ᵀ·X(i, 1:i-1)ᵀ
+                s.gemv(
+                    No,
+                    n - i,
+                    i,
+                    -1.0,
+                    (Y, i + 1, 1),
+                    (A, i, 1, lda),
+                    1.0,
+                    (A, i, i + 1, lda),
+                );
+                s.gemv(
+                    Tr,
+                    i - 1,
+                    n - i,
+                    -1.0,
+                    (A, 1, i + 1),
+                    (X, i, 1, ldx),
+                    1.0,
+                    (A, i, i + 1, lda),
+                );
+                // G(i) annihilates A(i, i+2:n).
+                let (beta, tp) = s.larfg(n - i, (i, i + 1), (i, (i + 2).min(n)), lda);
+                taup[i - 1] = tp;
+                e[i - 1] = beta;
+                let pij = s.at(A, i, i + 1);
+                s.a[pij] = 1.0;
+                // X(i+1:m, i)
+                s.gemv(
+                    No,
+                    m - i,
+                    n - i,
+                    1.0,
+                    (A, i + 1, i + 1),
+                    (A, i, i + 1, lda),
+                    0.0,
+                    (X, i + 1, i, 1),
+                );
+                s.gemv(
+                    Tr,
+                    n - i,
+                    i,
+                    1.0,
+                    (Y, i + 1, 1),
+                    (A, i, i + 1, lda),
+                    0.0,
+                    (X, 1, i, 1),
+                );
+                s.gemv(
+                    No,
+                    m - i,
+                    i,
+                    -1.0,
+                    (A, i + 1, 1),
+                    (X, 1, i, 1),
+                    1.0,
+                    (X, i + 1, i, 1),
+                );
+                s.gemv(
+                    No,
+                    i - 1,
+                    n - i,
+                    1.0,
+                    (A, 1, i + 1),
+                    (A, i, i + 1, lda),
+                    0.0,
+                    (X, 1, i, 1),
+                );
+                s.gemv(
+                    No,
+                    m - i,
+                    i - 1,
+                    -1.0,
+                    (X, i + 1, 1),
+                    (X, 1, i, 1),
+                    1.0,
+                    (X, i + 1, i, 1),
+                );
+                s.scal(m - i, tp, X, i + 1, i);
+            }
+        }
+    } else {
+        for i in 1..=nb {
+            // A(i, i:n) -= Y(i:n, 1:i-1)·A(i, 1:i-1)ᵀ + A(1:i-1, i:n)ᵀ·X(i, 1:i-1)ᵀ
+            s.gemv(
+                No,
+                n - i + 1,
+                i - 1,
+                -1.0,
+                (Y, i, 1),
+                (A, i, 1, lda),
+                1.0,
+                (A, i, i, lda),
+            );
+            s.gemv(
+                Tr,
+                i - 1,
+                n - i + 1,
+                -1.0,
+                (A, 1, i),
+                (X, i, 1, ldx),
+                1.0,
+                (A, i, i, lda),
+            );
+            // G(i) annihilates A(i, i+1:n).
+            let (beta, tp) = s.larfg(n - i + 1, (i, i), (i, (i + 1).min(n)), lda);
+            taup[i - 1] = tp;
+            d[i - 1] = beta;
+            if i < m {
+                let pii = s.at(A, i, i);
+                s.a[pii] = 1.0;
+                // X(i+1:m, i)
+                s.gemv(
+                    No,
+                    m - i,
+                    n - i + 1,
+                    1.0,
+                    (A, i + 1, i),
+                    (A, i, i, lda),
+                    0.0,
+                    (X, i + 1, i, 1),
+                );
+                s.gemv(
+                    Tr,
+                    n - i + 1,
+                    i - 1,
+                    1.0,
+                    (Y, i, 1),
+                    (A, i, i, lda),
+                    0.0,
+                    (X, 1, i, 1),
+                );
+                s.gemv(
+                    No,
+                    m - i,
+                    i - 1,
+                    -1.0,
+                    (A, i + 1, 1),
+                    (X, 1, i, 1),
+                    1.0,
+                    (X, i + 1, i, 1),
+                );
+                s.gemv(
+                    No,
+                    i - 1,
+                    n - i + 1,
+                    1.0,
+                    (A, 1, i),
+                    (A, i, i, lda),
+                    0.0,
+                    (X, 1, i, 1),
+                );
+                s.gemv(
+                    No,
+                    m - i,
+                    i - 1,
+                    -1.0,
+                    (X, i + 1, 1),
+                    (X, 1, i, 1),
+                    1.0,
+                    (X, i + 1, i, 1),
+                );
+                s.scal(m - i, tp, X, i + 1, i);
+                // A(i+1:m, i) -= A(i+1:m, 1:i-1)·Y(i, 1:i-1)ᵀ + X(i+1:m, 1:i)·A(1:i, i)
+                s.gemv(
+                    No,
+                    m - i,
+                    i - 1,
+                    -1.0,
+                    (A, i + 1, 1),
+                    (Y, i, 1, ldy),
+                    1.0,
+                    (A, i + 1, i, 1),
+                );
+                s.gemv(
+                    No,
+                    m - i,
+                    i,
+                    -1.0,
+                    (X, i + 1, 1),
+                    (A, 1, i, 1),
+                    1.0,
+                    (A, i + 1, i, 1),
+                );
+                // H(i) annihilates A(i+2:m, i).
+                let (beta, tq) = s.larfg(m - i, (i + 1, i), ((i + 2).min(m), i), 1);
+                tauq[i - 1] = tq;
+                e[i - 1] = beta;
+                let pji = s.at(A, i + 1, i);
+                s.a[pji] = 1.0;
+                // Y(i+1:n, i)
+                s.gemv(
+                    Tr,
+                    m - i,
+                    n - i,
+                    1.0,
+                    (A, i + 1, i + 1),
+                    (A, i + 1, i, 1),
+                    0.0,
+                    (Y, i + 1, i, 1),
+                );
+                s.gemv(
+                    Tr,
+                    m - i,
+                    i - 1,
+                    1.0,
+                    (A, i + 1, 1),
+                    (A, i + 1, i, 1),
+                    0.0,
+                    (Y, 1, i, 1),
+                );
+                s.gemv(
+                    No,
+                    n - i,
+                    i - 1,
+                    -1.0,
+                    (Y, i + 1, 1),
+                    (Y, 1, i, 1),
+                    1.0,
+                    (Y, i + 1, i, 1),
+                );
+                s.gemv(
+                    Tr,
+                    m - i,
+                    i,
+                    1.0,
+                    (X, i + 1, 1),
+                    (A, i + 1, i, 1),
+                    0.0,
+                    (Y, 1, i, 1),
+                );
+                s.gemv(
+                    Tr,
+                    i,
+                    n - i,
+                    -1.0,
+                    (A, 1, i + 1),
+                    (Y, 1, i, 1),
+                    1.0,
+                    (Y, i + 1, i, 1),
+                );
+                s.scal(n - i, tq, Y, i + 1, i);
+            }
+        }
+    }
+}
+
+/// `DGEBRD`'s optimal workspace (the `LWORK = -1` query): `(m + n)·NB`, 1 for an empty matrix.
+pub fn gebrd_lwork_opt(m: usize, n: usize) -> usize {
+    if m.min(n) == 0 { 1 } else { (m + n) * NB }
+}
+
+/// `DGEBRD(M, N, A, LDA, D, E, TAUQ, TAUP, WORK, LWORK, INFO)`: [`dgebd2`]'s reduction, blocked
+/// by [`NB`] rows and columns ([`dlabrd`], then the rest of `A` updated by two `DGEMM` with
+/// depth `NB`, the panel's `d` and `e` written back) while more than [`NX`] remain; a workspace
+/// below the optimal ([`gebrd_lwork_opt`]; `lwork = None` gives it) lowers `NB` to `LWORK/(M +
+/// N)`, or unblocks everything below `2·(M + N)`. Returns `WORK(1)`; the same in both releases
+/// but for [`dgebd2`]'s reflectors.
+///
+/// # Errors
+/// `LDA < max(1, M)` (4), `LWORK < max(1, M, N)` (10).
+pub fn dgebrd(
+    lp: Lapack,
+    m: usize,
+    n: usize,
+    a: &mut [f64],
+    aoff: usize,
+    lda: usize,
+    d: &mut [f64],
+    e: &mut [f64],
+    tauq: &mut [f64],
+    taup: &mut [f64],
+    lwork: Option<usize>,
+) -> Result<usize, IllegalValue> {
+    let minmn = m.min(n);
+    let (lwkmin, lwkopt) = if minmn == 0 {
+        (1, 1)
+    } else {
+        (m.max(n), (m + n) * NB)
+    };
+    let lwork = lwork.unwrap_or(lwkopt);
+    let err = |param| {
+        Err(IllegalValue {
+            routine: "DGEBRD",
+            param,
+        })
+    };
+    if lda < m.max(1) {
+        return err(4);
+    }
+    if lwork < lwkmin {
+        return err(10);
+    }
+    if minmn == 0 {
+        return Ok(1);
+    }
+    let mut ws = m.max(n);
+    let (ldx, ldy) = (m, n);
+    let mut nb = NB;
+    let nx = if nb > 1 && nb < minmn {
+        let mut nx = NB.max(NX);
+        if nx < minmn {
+            ws = lwkopt;
+            if lwork < ws {
+                if lwork >= (m + n) * NBMIN {
+                    nb = lwork / (m + n);
+                } else {
+                    nb = 1;
+                    nx = minmn;
+                }
+            }
+        }
+        nx
+    } else {
+        minmn
+    };
+    let mut i = 1;
+    if minmn > nx {
+        // X and Y as LAPACK keeps them in WORK (leading dimensions M and N).
+        let mut x = vec![0.0f64; ldx * nb];
+        let mut y = vec![0.0f64; ldy * nb];
+        let mut panel = vec![0.0f64; nb * n];
+        while i <= minmn - nx {
+            dlabrd(
+                m - i + 1,
+                n - i + 1,
+                nb,
+                a,
+                ix(aoff, lda, i, i),
+                lda,
+                &mut d[i - 1..],
+                &mut e[i - 1..],
+                &mut tauq[i - 1..],
+                &mut taup[i - 1..],
+                &mut x,
+                0,
+                ldx,
+                &mut y,
+                0,
+                ldy,
+            );
+            let (mm, nn) = (m - i - nb + 1, n - i - nb + 1);
+            {
+                // A(i+nb:m, i+nb:n) -= A(i+nb:m, i:i+nb-1)·Y(nb+1:, 1:nb)ᵀ
+                let (left, right) = a.split_at_mut(ix(aoff, lda, 1, i + nb));
+                dgemm_with(
+                    mm,
+                    nn,
+                    nb,
+                    -1.0,
+                    Operand {
+                        data: left,
+                        off: ix(aoff, lda, i + nb, i),
+                        ld: lda,
+                        trans: Trans::N,
+                    },
+                    Operand {
+                        data: &y,
+                        off: nb,
+                        ld: ldy,
+                        trans: Trans::T,
+                    },
+                    1.0,
+                    right,
+                    i + nb - 1,
+                    lda,
+                    lp.gemm_q,
+                );
+            }
+            // A(i+nb:m, i+nb:n) -= X(nb+1:, 1:nb)·A(i:i+nb-1, i+nb:n); the rows above the
+            // updated block, in the same columns, are copied out (leading dimension nb).
+            for j in 0..nn {
+                for r in 0..nb {
+                    panel[r + j * nb] = a[ix(aoff, lda, i + r, i + nb + j)];
+                }
+            }
+            dgemm_with(
+                mm,
+                nn,
+                nb,
+                -1.0,
+                Operand {
+                    data: &x,
+                    off: nb,
+                    ld: ldx,
+                    trans: Trans::N,
+                },
+                Operand {
+                    data: &panel,
+                    off: 0,
+                    ld: nb,
+                    trans: Trans::N,
+                },
+                1.0,
+                a,
+                ix(aoff, lda, i + nb, i + nb),
+                lda,
+                lp.gemm_q,
+            );
+            // The bidiagonal entries back into A.
+            for j in i..i + nb {
+                a[ix(aoff, lda, j, j)] = d[j - 1];
+                if m >= n {
+                    a[ix(aoff, lda, j, j + 1)] = e[j - 1];
+                } else {
+                    a[ix(aoff, lda, j + 1, j)] = e[j - 1];
+                }
+            }
+            i += nb;
+        }
+    }
+    dgebd2(
+        lp.release,
+        m - i + 1,
+        n - i + 1,
+        a,
+        ix(aoff, lda, i, i),
+        lda,
+        &mut d[i - 1..],
+        &mut e[i - 1..],
+        &mut tauq[i - 1..],
+        &mut taup[i - 1..],
+    )?;
+    Ok(ws)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2943,5 +3734,76 @@ mod tests {
         );
         assert_eq!(e, Ok(1));
         assert_eq!(dorgqr(lp, 3, 0, 0, &mut a, 0, 3, &tau, None), Ok(1));
+    }
+
+    /// [`dgebrd`] (blocked, both shapes) against [`dgebd2`]: equal up to rounding, `B` keeps
+    /// `A`'s Frobenius norm, the same at 1 and 5 threads; checks and the query.
+    #[test]
+    fn bidiagonal_reduction() {
+        for release in [LapackRelease::V3_12_0, LapackRelease::V3_12_1] {
+            let lp = Lapack::new(release);
+            for &(m, n) in &[(300, 170), (170, 300), (200, 200)] {
+                let a0 = matrix(m, n, (m + 5 * n) as u64);
+                let k = m.min(n);
+                let run = |threads: usize, blocked: bool| {
+                    let pool = rayon::ThreadPoolBuilder::new()
+                        .num_threads(threads)
+                        .build()
+                        .unwrap();
+                    pool.install(|| {
+                        let mut a = a0.clone();
+                        let (mut d, mut e) = (vec![0.0f64; k], vec![0.0f64; k - 1]);
+                        let (mut tq, mut tp) = (vec![0.0f64; k], vec![0.0f64; k]);
+                        if blocked {
+                            dgebrd(
+                                lp, m, n, &mut a, 0, m, &mut d, &mut e, &mut tq, &mut tp, None,
+                            )
+                            .unwrap();
+                        } else {
+                            dgebd2(
+                                release, m, n, &mut a, 0, m, &mut d, &mut e, &mut tq, &mut tp,
+                            )
+                            .unwrap();
+                        }
+                        (a, d, e, tq, tp)
+                    })
+                };
+                let one = run(1, true);
+                assert_eq!(one, run(5, true));
+                let two = run(1, false);
+                let diff = one
+                    .0
+                    .iter()
+                    .zip(&two.0)
+                    .map(|(x, y)| (x - y).abs())
+                    .fold(0.0, f64::max);
+                assert!(diff < 1e-10, "{release:?} {m}x{n}: {diff}");
+                let fa: f64 = a0.iter().map(|v| v * v).sum();
+                let fb: f64 = one.1.iter().chain(&one.2).map(|v| v * v).sum();
+                assert!((fa - fb).abs() < 1e-9 * fa, "{fa} {fb}");
+            }
+        }
+        let lp = Lapack::default();
+        let (mut a, mut v) = (vec![0.0f64; 64], vec![0.0f64; 8]);
+        let (mut d, mut e, mut t) = (v.clone(), v.clone(), v.clone());
+        let r = dgebrd(lp, 4, 3, &mut a, 0, 3, &mut d, &mut e, &mut t, &mut v, None);
+        assert_eq!(r.unwrap_err().param, 4);
+        let r = dgebrd(
+            lp,
+            4,
+            3,
+            &mut a,
+            0,
+            4,
+            &mut d,
+            &mut e,
+            &mut t,
+            &mut v,
+            Some(3),
+        );
+        assert_eq!(r.unwrap_err().param, 10);
+        let r = dgebrd(lp, 0, 3, &mut a, 0, 1, &mut d, &mut e, &mut t, &mut v, None);
+        assert_eq!(r, Ok(1));
+        assert_eq!(gebrd_lwork_opt(600, 1_000), 1_600 * 32);
     }
 }

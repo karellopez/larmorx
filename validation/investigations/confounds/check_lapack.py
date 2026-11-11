@@ -1,7 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
-"""larmorx's LAPACK QR and LQ ports (``larmorx_transform::numpy_linalg::blocked``: ``DGEQRF``,
-``DGELQF``, ``DGEQR2``, ``DGELQ2``, ``DLARFT``, ``DLARFB``, ``DLARF``, and the shared
-``DLARFG``, through ``larmorx._core``) against numpy's own LAPACK, bit for bit.
+"""larmorx's LAPACK QR, LQ and bidiagonal ports (``larmorx_transform::numpy_linalg::blocked``:
+``DGEQRF``, ``DGELQF``, ``DGEQR2``, ``DGELQ2``, ``DORGQR``, ``DORGLQ``, ``DORG2R``, ``DORGL2``,
+``DORMQR``, ``DORMLQ``, ``DORM2R``, ``DORML2``, ``DGEBRD``, ``DLABRD``, ``DGEBD2``, ``DLARFT``,
+``DLARFB``, ``DLARF``, and the shared ``DLARFG``, through ``larmorx._core``) against numpy's own
+LAPACK, bit for bit.
 
 The reference is the library inside the running environment's numpy wheel
 (``numpy.libs/libscipy_openblas64_*``: its exported Fortran entry points
@@ -30,9 +32,20 @@ side/transpose/direction/storage forms, ``k`` up to 64, orders up to 2,000 (4,10
 up to 1,000 x 1,000 (and 600 x 60,968 / 60,968 x 600 without ``--quick``), the optimal workspace
 and smaller ones (``NB`` lowered to 10, 2 and 1).
 
+``DORG2R``/``DORGL2`` and ``DORGQR``/``DORGLQ`` (section ``org``) on reflectors from larmorx's
+own factorizations, from random vectors with orthogonal ``H`` and from random ``tau``, ``k <
+n``, on both sides of ``NX`` and of the 32-reflector blocks up to 60,968 x 600 and 600 x 60,968,
+short workspaces; ``DORM2R``/``DORML2`` and ``DORMQR``/``DORMLQ`` (``orm``) from both sides,
+transposed or not, ``k`` on both sides of 32, short workspaces (each release's ``NB`` rule),
+``lstsq``'s 600 x 60,968 right-hand sides; ``DGEBD2``, ``DGEBRD`` (both bidiagonal forms, on
+both sides of ``NX``, short workspaces) and ``DLABRD`` itself (``brd``); and the illegal
+arguments of each (``INFO`` against larmorx's ``ValueError``).
+
 Usage: ``OPENBLAS_CORETYPE=Haswell OPENBLAS_NUM_THREADS=1 PYTHONPATH=<repo>/python
-python -P check_lapack.py [--quick] [--threads N] [--sections larfg,larf,qr2,larft,larfb,qrf]
-[--gemm-q auto]``
+python -P check_lapack.py [--quick] [--threads N]
+[--sections larfg,larf,qr2,larft,larfb,qrf,org,orm,brd] [--gemm-q auto]``. On the AMD Zen 4
+machine, ``OPENBLAS_L2_SIZE=512`` keeps numpy 2.5.4's library on the Haswell table's GEMM_Q 256
+(``--gemm-q auto`` follows it): every case defined.
 """
 
 from __future__ import annotations
@@ -174,6 +187,39 @@ def ref_orm(lq, blocked, side, tr, m, n, k, a, lda, tau, c, ldc, lwork):
     work = np.zeros(max(lwork, 1))
     f(*head, ptr(work), *_i(lwork), ctypes.byref(info), *hidden(side, tr))
     return a, c, np.array([work[0]]), info.value
+
+
+def ref_brd(blocked, m, n, a, lda, lwork):
+    """``DGEBRD`` (``blocked``) or ``DGEBD2``; returns ``(A, D, E, TAUQ, TAUP, WORK(1),
+    INFO)`` (``E`` of ``min(m, n) - 1`` values, ``WORK(1)`` 0 for ``DGEBD2``)."""
+    a = a.copy()
+    k = min(m, n)
+    d, e, tq, tp = (np.zeros(max(k, 1)) for _ in range(4))
+    info = I64(0)
+    head = (*_i(m, n), ptr(a), *_i(lda), ptr(d), ptr(e), ptr(tq), ptr(tp))
+    if not blocked:
+        work = np.zeros(max(m, n, 1))
+        LIB.scipy_dgebd2_64_(*head, ptr(work), ctypes.byref(info))
+        w1 = 0.0
+    else:
+        if lwork is None:
+            q = np.zeros(1)
+            LIB.scipy_dgebrd_64_(*head, ptr(q), *_i(-1), ctypes.byref(info))
+            lwork = int(q[0])
+        work = np.zeros(max(lwork, 1))
+        LIB.scipy_dgebrd_64_(*head, ptr(work), *_i(lwork), ctypes.byref(info))
+        w1 = work[0]
+    return a, d[:k], e[: max(k - 1, 0)], tq[:k], tp[:k], np.array([w1]), info.value
+
+
+def ref_dlabrd(m, n, nb, a, lda, x, ldx, y, ldy):
+    a, x, y = a.copy(), x.copy(), y.copy()
+    d, e, tq, tp = (np.zeros(max(nb, 1)) for _ in range(4))
+    LIB.scipy_dlabrd_64_(
+        *_i(m, n, nb), ptr(a), *_i(lda), ptr(d), ptr(e), ptr(tq), ptr(tp), ptr(x), *_i(ldx),
+        ptr(y), *_i(ldy),
+    )  # fmt: skip
+    return a, d[:nb], e[:nb], tq[:nb], tp[:nb], x, y
 
 
 # --- the undefined class under GEMM_Q 512 (numpy 2.5.4 on an AMD Zen 4/5) ---------------------
@@ -794,6 +840,109 @@ def orm_run(cid: int, case: tuple, threads: int, core) -> list[tuple[bool, str]]
     return [(ok, name)]
 
 
+BRD_SHAPES = [
+    (100, 100),
+    (128, 128),
+    (129, 129),
+    (161, 161),
+    (200, 129),
+    (129, 200),
+    (300, 170),
+    (170, 300),
+    (330, 200),
+    (200, 330),
+    (240, 289),
+    (289, 240),
+    (588, 345),
+    (345, 588),
+    (590, 560),
+    (560, 590),
+    (600, 600),
+    (1000, 300),
+    (300, 1000),
+    (2049, 160),
+    (160, 2049),
+]
+BRD_BIG = [(600, 1_099), (1_099, 600), (1_000, 1_000)]
+LABRD_SHAPES = [
+    (1, 1, 1),
+    (2, 1, 1),
+    (1, 2, 1),
+    (10, 7, 3),
+    (7, 10, 3),
+    (9, 9, 9),
+    (33, 17, 17),
+    (17, 33, 17),
+    (100, 60, 32),
+    (60, 100, 32),
+    (300, 300, 32),
+    (2049, 160, 32),
+    (160, 2049, 32),
+]
+
+
+def brd_cases(quick: bool) -> list[tuple]:
+    """``(routine, m, n, extra, kind)``: ``DGEBD2`` on ``qr2``'s shapes (both bidiagonal forms),
+    ``DGEBRD`` on both sides of ``NX`` = 128 and of the 32-row panels (every kind at the
+    optimal workspace; workspaces that lower ``NB`` to 10 and 2 and unblock it), ``DLABRD``
+    itself (``extra``: ``nb``); then the illegal arguments."""
+    out = []
+    for m, n in QR2_SHAPES + ([] if quick else QR2_BIG):
+        out += [("gebd2", m, n, None, kind) for kind in QR_KINDS]
+    for m, n in BRD_SHAPES + ([] if quick else BRD_BIG):
+        big = m * n > 600_000
+        lworks = [None] if big else [None, (m + n) * 10, (m + n) * 2 + 1, (m + n) * 2 - 1]
+        for lw in lworks:
+            kinds = QR_KINDS if lw is None and not big else ("normal",)
+            out += [("gebrd", m, n, lw, kind) for kind in kinds]
+    for m, n, nb in LABRD_SHAPES:
+        out += [("labrd", m, n, nb, kind) for kind in QR_KINDS[:4]]
+    # Illegal arguments: (routine, m, n, lwork, "error", lda).
+    out += [
+        ("gebrd", 4, 3, None, "error", 3),
+        ("gebrd", 4, 3, 3, "error", 4),
+        ("gebrd", 3, 5, 4, "error", 3),
+        ("gebd2", 4, 3, None, "error", 3),
+    ]
+    return out
+
+
+def brd_run(cid: int, case: tuple, threads: int, core) -> list[tuple[bool, str]]:
+    routine, m, n, extra, kind, *rest = case
+    name = "d" + routine
+    rng = np.random.default_rng([19, cid])
+    if kind == "error":
+        (lda,) = rest
+        a = np.zeros(max(lda, 1) * max(n, 1))
+        want = ref_brd(routine == "gebrd", m, n, a, lda, 10_000 if extra is None else extra)[-1]
+        try:
+            if routine == "gebrd":
+                core.lapack_dgebrd(m, n, a, lda, extra, LAPACK, threads, cb.GEMM_Q)
+            else:
+                core.lapack_dgebd2(m, n, a, lda, LAPACK)
+            got = 0
+        except ValueError as e:
+            got = -param_of(e) if name.upper() in str(e) else 99
+        return [(want == got and want < 0, f"{name} illegal arguments")]
+    lda = m + cid % 3
+    a = matrix_entries(rng, lda, m, n, kind)
+    if routine == "labrd":
+        nb = extra
+        ldx, ldy = m + cid % 2, n + cid % 3
+        x, y = entries(rng, ldx * nb, "normal"), entries(rng, ldy * nb, "normal")
+        want = ref_dlabrd(m, n, nb, a, lda, x, ldx, y, ldy)
+        got = core.lapack_dlabrd(m, n, nb, a, lda, x, ldx, y, ldy)
+        return [(all(same(w, g) for w, g in zip(want, got, strict=True)), name)]
+    *want, info = ref_brd(routine == "gebrd", m, n, a, lda, extra)
+    if routine == "gebrd":
+        got = core.lapack_dgebrd(m, n, a, lda, extra, LAPACK, threads, cb.GEMM_Q)
+    else:
+        got = core.lapack_dgebd2(m, n, a, lda, LAPACK)
+    got = (*got[:5], np.array([float(got[5])]))
+    ok = info == 0 and all(same(w, g) for w, g in zip(want, got, strict=True))
+    return [(ok, name)]
+
+
 SECTIONS = {
     "larfg": ("dlarfg", larfg_cases, larfg_run),
     "larf": ("dlarf", larf_cases, larf_run),
@@ -803,6 +952,7 @@ SECTIONS = {
     "qrf": ("dgeqrf/dgelqf", qrf_cases, qrf_run),
     "org": ("dorgqr/dorglq/dorg2r/dorgl2", org_cases, org_run),
     "orm": ("dormqr/dormlq/dorm2r/dorml2", orm_cases, orm_run),
+    "brd": ("dgebrd/dgebd2/dlabrd", brd_cases, brd_run),
 }
 
 

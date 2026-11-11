@@ -1483,3 +1483,36 @@ def lapack_dorml2(
     lapack: str = "3.12.1",
 ) -> tuple[np.ndarray, np.ndarray, int]:
     """LAPACK's ``DORML2``; returns ``(A, C, 0)``."""
+
+def lapack_dgebrd(
+    m: int,
+    n: int,
+    a: np.ndarray,
+    lda: int,
+    lwork: int | None = None,
+    lapack: str = "3.12.1",
+    n_threads: int = 1,
+    gemm_q: int = 256,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, int]:
+    """LAPACK's blocked ``DGEBRD`` (``A = Q·B·Pᵀ``, ``B`` bidiagonal), as ``lapack_dgeqrf``;
+    returns ``(A, D, E, TAUQ, TAUP, WORK(1))``."""
+
+def lapack_dgebd2(
+    m: int, n: int, a: np.ndarray, lda: int, lapack: str = "3.12.1"
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, int]:
+    """LAPACK's ``DGEBD2``; returns ``(A, D, E, TAUQ, TAUP, 0)``."""
+
+def lapack_dlabrd(
+    m: int,
+    n: int,
+    nb: int,
+    a: np.ndarray,
+    lda: int,
+    x: np.ndarray,
+    ldx: int,
+    y: np.ndarray,
+    ldy: int,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """LAPACK's ``DLABRD`` (the first ``nb`` rows and columns reduced, with the update matrices
+    ``X`` and ``Y``; ``x``, ``y`` the initial workspaces); returns ``(A, D, E, TAUQ, TAUP, X,
+    Y)``."""

@@ -2,11 +2,11 @@
 //! Bindings of the confounds' part (fMRIPrep's confound estimation and the numerics under it).
 //! Today: OpenBLAS's level-1, level-2 and level-3 kernels at the BLAS interface (`blas_*`),
 //! numpy's `matmul` of two 2-D float64 arrays (`numpy_matmul`), as `larmorx_transform::openblas`
-//! computes them, and LAPACK's QR and LQ routines with their `Q` (`DORGQR`, `DORMQR`, ...) at
-//! their Fortran interface (`lapack_*`, as `larmorx_transform::numpy_linalg::blocked` computes
-//! them); the validation compares them with numpy's own library. Matrices cross as flat
-//! column-major storage with their leading dimension, as BLAS takes them. The GIL is released
-//! while computing.
+//! computes them, and LAPACK's QR and LQ routines with their `Q` (`DORGQR`, `DORMQR`, ...) and
+//! the bidiagonal reduction (`DGEBRD`) at their Fortran interface (`lapack_*`, as
+//! `larmorx_transform::numpy_linalg::blocked` computes them); the validation compares them with
+//! numpy's own library. Matrices cross as flat column-major storage with their leading
+//! dimension, as BLAS takes them. The GIL is released while computing.
 
 use larmorx_core::parallel;
 use larmorx_transform::numpy_linalg::blocked::{self, Direct, Lapack, Storev};
@@ -958,6 +958,147 @@ fn lapack_dorml2<'py>(
     )
 }
 
+type Bidiagonal<'py> = (
+    Bound<'py, PyArray1<f64>>,
+    Bound<'py, PyArray1<f64>>,
+    Bound<'py, PyArray1<f64>>,
+    Bound<'py, PyArray1<f64>>,
+    Bound<'py, PyArray1<f64>>,
+    usize,
+);
+
+/// `DGEBRD(M, N, A, LDA, D, E, TAUQ, TAUP, WORK, LWORK, INFO)` (`blocked = true`) or `DGEBD2`
+/// on flat column-major storage; returns `(A, D, E, TAUQ, TAUP, WORK(1))` (`E` of `min(m, n) -
+/// 1` values, `WORK(1)` 0 for `DGEBD2`).
+#[allow(clippy::too_many_arguments)]
+fn bidiagonalize<'py>(
+    py: Python<'py>,
+    is_blocked: bool,
+    m: usize,
+    n: usize,
+    a: PyReadonlyArray1<'_, f64>,
+    lda: usize,
+    lwork: Option<usize>,
+    lapack: &str,
+    n_threads: usize,
+    gemm_q: usize,
+) -> PyResult<Bidiagonal<'py>> {
+    let lp = Lapack {
+        release: lapack_release(lapack)?,
+        gemm_q,
+    };
+    let mut av = contiguous(&a)?.to_vec();
+    let k = m.min(n);
+    let (mut d, mut e) = (vec![0.0f64; k], vec![0.0f64; k]);
+    let (mut tq, mut tp) = (vec![0.0f64; k], vec![0.0f64; k]);
+    let name = if is_blocked { "DGEBRD" } else { "DGEBD2" };
+    let work1 = lapack_run(py, name, n_threads, || {
+        if is_blocked {
+            blocked::dgebrd(
+                lp, m, n, &mut av, 0, lda, &mut d, &mut e, &mut tq, &mut tp, lwork,
+            )
+        } else {
+            blocked::dgebd2(
+                lp.release, m, n, &mut av, 0, lda, &mut d, &mut e, &mut tq, &mut tp,
+            )
+            .map(|()| 0)
+        }
+    })?
+    .map_err(value_err)?;
+    e.truncate(k.saturating_sub(1));
+    Ok((
+        PyArray1::from_vec(py, av),
+        PyArray1::from_vec(py, d),
+        PyArray1::from_vec(py, e),
+        PyArray1::from_vec(py, tq),
+        PyArray1::from_vec(py, tp),
+        work1,
+    ))
+}
+
+/// `DGEBRD(M, N, A, LDA, D, E, TAUQ, TAUP, WORK, LWORK, INFO)` on flat column-major storage
+/// (`numpy_linalg::blocked::dgebrd`; `lwork=None` the optimal workspace); returns `(A, D, E,
+/// TAUQ, TAUP, WORK(1))`.
+#[pyfunction]
+#[pyo3(signature = (m, n, a, lda, lwork = None, lapack = "3.12.1", n_threads = 1, gemm_q = 256))]
+#[allow(clippy::too_many_arguments)]
+fn lapack_dgebrd<'py>(
+    py: Python<'py>,
+    m: usize,
+    n: usize,
+    a: PyReadonlyArray1<'_, f64>,
+    lda: usize,
+    lwork: Option<usize>,
+    lapack: &str,
+    n_threads: usize,
+    gemm_q: usize,
+) -> PyResult<Bidiagonal<'py>> {
+    bidiagonalize(py, true, m, n, a, lda, lwork, lapack, n_threads, gemm_q)
+}
+
+/// `DGEBD2(M, N, A, LDA, D, E, TAUQ, TAUP, WORK, INFO)`; returns `(A, D, E, TAUQ, TAUP, 0)`.
+#[pyfunction]
+#[pyo3(signature = (m, n, a, lda, lapack = "3.12.1"))]
+fn lapack_dgebd2<'py>(
+    py: Python<'py>,
+    m: usize,
+    n: usize,
+    a: PyReadonlyArray1<'_, f64>,
+    lda: usize,
+    lapack: &str,
+) -> PyResult<Bidiagonal<'py>> {
+    bidiagonalize(py, false, m, n, a, lda, None, lapack, 1, 256)
+}
+
+type Labrd<'py> = (
+    Bound<'py, PyArray1<f64>>,
+    Bound<'py, PyArray1<f64>>,
+    Bound<'py, PyArray1<f64>>,
+    Bound<'py, PyArray1<f64>>,
+    Bound<'py, PyArray1<f64>>,
+    Bound<'py, PyArray1<f64>>,
+    Bound<'py, PyArray1<f64>>,
+);
+
+/// `DLABRD(M, N, NB, A, LDA, D, E, TAUQ, TAUP, X, LDX, Y, LDY)` on flat column-major storage
+/// (`x`, `y`: the initial workspaces, whose entries LAPACK does not write are kept); returns
+/// `(A, D, E, TAUQ, TAUP, X, Y)` (`nb` values each for `D` to `TAUP`).
+#[pyfunction]
+#[allow(clippy::too_many_arguments)]
+fn lapack_dlabrd<'py>(
+    py: Python<'py>,
+    m: usize,
+    n: usize,
+    nb: usize,
+    a: PyReadonlyArray1<'_, f64>,
+    lda: usize,
+    x: PyReadonlyArray1<'_, f64>,
+    ldx: usize,
+    y: PyReadonlyArray1<'_, f64>,
+    ldy: usize,
+) -> PyResult<Labrd<'py>> {
+    let mut av = contiguous(&a)?.to_vec();
+    let mut xv = contiguous(&x)?.to_vec();
+    let mut yv = contiguous(&y)?.to_vec();
+    let (mut d, mut e) = (vec![0.0f64; nb], vec![0.0f64; nb]);
+    let (mut tq, mut tp) = (vec![0.0f64; nb], vec![0.0f64; nb]);
+    lapack_run(py, "DLABRD", 1, || {
+        blocked::dlabrd(
+            m, n, nb, &mut av, 0, lda, &mut d, &mut e, &mut tq, &mut tp, &mut xv, 0, ldx, &mut yv,
+            0, ldy,
+        )
+    })?;
+    Ok((
+        PyArray1::from_vec(py, av),
+        PyArray1::from_vec(py, d),
+        PyArray1::from_vec(py, e),
+        PyArray1::from_vec(py, tq),
+        PyArray1::from_vec(py, tp),
+        PyArray1::from_vec(py, xv),
+        PyArray1::from_vec(py, yv),
+    ))
+}
+
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(blas_dgemm, m)?)?;
     m.add_function(wrap_pyfunction!(blas_dgemv, m)?)?;
@@ -987,5 +1128,8 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(lapack_dormlq, m)?)?;
     m.add_function(wrap_pyfunction!(lapack_dorm2r, m)?)?;
     m.add_function(wrap_pyfunction!(lapack_dorml2, m)?)?;
+    m.add_function(wrap_pyfunction!(lapack_dgebrd, m)?)?;
+    m.add_function(wrap_pyfunction!(lapack_dgebd2, m)?)?;
+    m.add_function(wrap_pyfunction!(lapack_dlabrd, m)?)?;
     Ok(())
 }

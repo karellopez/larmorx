@@ -117,3 +117,27 @@ unchanged in both modes). The README's example without `export FSLOUTPUTTYPE=NIF
 lines each, 0 failed, every output byte-identical to relay 2's runs with the variable set;
 Windows PowerShell 5.1 on the Windows helper (`win_examples.sh`, a new folder removed and checked
 gone; the site's 0.1.0rc1 example in the same run, 22 lines) 16 lines, 0 failed.
+
+## FSL-11's words, the records and the tests' split (2026-11-11, relay 3)
+
+FSL 6.0.7.23's `standard_space_roi` with `FSLOUTPUTTYPE` unset (run black box on a generated
+12 x 12 x 10 image, `-ssref` itself and `-maskNONE`): FSL's message twice (its steps stop at their
+first image), then failures to read its temporary images, exit status 0, no image written. So the
+FSL-11 notice says what FSL's program does per tool (`larmorx_core::defects::fsl11_what_fsl_does`,
+the one text both implementations print): "FSL's standard_space_roi writes no image (its steps stop
+with an error at their first image) and exits 0", and for every other tool "FSL's <tool> stops with
+an error at its first image (exit 1)".
+
+The tests: `crates/larmorx-cli/tests/fsl_output_types.rs` keeps one call per code path on CI (3.7 s
+single-threaded in the debug profile, 29 s before); every FSL tool's calls are
+`tests/parity/test_fsl_output_types_original.py` (25 tests through the console script, `reproduce`
+against FSL's own runs: exit status, standard output, the files by name), beside
+`test_fsl_output_types_replica.py` for the replicas.
+
+The records `mri-hmc` and `fsl-prelude` were re-made from the clean commit `d300ef43` after the
+parity smoke tier passed there (3,020 tests, 6 workers), with `python -m larmorx_validation parity
+<suite> --tier standard [--jobs 1] --out <folder>` and `scripts/orchestration/compare_records.py
+<folder> fsl-prelude mri-hmc`: one case each changed, every other as before. The site's evidence of
+the two pages was exported again from them (`evidence mri-hmc|fsl-prelude --site <site>
+--no-compute`), and `site/shots_records.sh` photographs the two pages' agreement charts and case
+explorers before and after (1440 and 390 px, light and dark).

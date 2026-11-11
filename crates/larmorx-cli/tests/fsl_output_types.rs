@@ -41,6 +41,9 @@ const CLEARED: &[&str] = &[
     "OMP_NUM_THREADS",
     "FSLOUTPUTTYPE",
     "FSL_LOAD_NIFTI_EXTENSIONS",
+    // a machine with FSL installed sets it, CI's runners do not: cleared so that every machine runs
+    // the same calls (FAST's runs set their own, in the test below)
+    "FSLDIR",
 ];
 
 /// FSL's message (`specs/bet.md` §3.1).
@@ -297,10 +300,23 @@ fn fsl_tools_write_nifti_gz_when_fsloutputtype_is_unset() {
     let tmp = tempfile::tempdir().unwrap();
     let d = tmp.path();
     inputs(d, false);
+    let fsldir = d.to_str().unwrap();
     for (tool, args, fsl_status) in image_calls() {
         let line = fsl11_line(tool);
-        let (given, given_files) = run(d, &[("FSLOUTPUTTYPE", "NIFTI_GZ")], false, &args);
-        let (unset, unset_files) = run(d, &[], false, &args);
+        // FAST without FSLDIR stops before FSLOUTPUTTYPE matters under `reproduce` (FSL-100): its runs
+        // name an existing folder (FAST reads nothing from it without tissue priors)
+        let own: &[(&str, &str)] = if tool == "fast" {
+            &[("FSLDIR", fsldir)]
+        } else {
+            &[]
+        };
+        let with_type: Vec<(&str, &str)> = own
+            .iter()
+            .copied()
+            .chain([("FSLOUTPUTTYPE", "NIFTI_GZ")])
+            .collect();
+        let (given, given_files) = run(d, &with_type, false, &args);
+        let (unset, unset_files) = run(d, own, false, &args);
         assert_eq!(given.status.code(), Some(0), "{args:?}: {given:?}");
         assert_eq!(unset.status.code(), Some(0), "{args:?}: {unset:?}");
         assert_eq!(given.stdout, unset.stdout, "{args:?}");
@@ -331,7 +347,7 @@ fn fsl_tools_write_nifti_gz_when_fsloutputtype_is_unset() {
         assert!(given_files == unset_files, "{args:?}: the bytes differ");
 
         // reproduced: FSL's message, no image written, FSL's exit status
-        let (r, r_files) = run(d, &[], true, &args);
+        let (r, r_files) = run(d, own, true, &args);
         let r_err = String::from_utf8(r.stderr).unwrap();
         assert_eq!(r.status.code(), Some(fsl_status), "{args:?}: {r_err}");
         assert!(r_err.contains(UNSET), "{args:?}: {r_err}");

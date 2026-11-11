@@ -1516,3 +1516,166 @@ def lapack_dlabrd(
     """LAPACK's ``DLABRD`` (the first ``nb`` rows and columns reduced, with the update matrices
     ``X`` and ``Y``; ``x``, ``y`` the initial workspaces); returns ``(A, D, E, TAUQ, TAUP, X,
     Y)``."""
+
+# The divide-and-conquer bidiagonal SVD (the confounds' part, relay 2c-i): LAPACK's DBDSDC and
+# its routines at their Fortran interface, flat column-major storage, 1-based int64 indices.
+
+def lapack_dbdsdc(
+    uplo_: str,
+    compq: str,
+    n: int,
+    d: np.ndarray,
+    e: np.ndarray,
+    ldu: int,
+    ldvt: int,
+    lapack: str = "3.12.1",
+    n_threads: int = 1,
+    gemm_q: int = 256,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, int]:
+    """LAPACK's ``DBDSDC(UPLO, 'I', ...)`` (only ``compq="I"``): the singular values (descending)
+    and vectors of an ``n x n`` bidiagonal matrix; returns ``(D, E, U, VT, INFO)``."""
+
+def lapack_dlasd0(
+    n: int,
+    sqre: int,
+    d: np.ndarray,
+    e: np.ndarray,
+    u: np.ndarray,
+    ldu: int,
+    vt: np.ndarray,
+    ldvt: int,
+    smlsiz: int,
+    lapack: str = "3.12.1",
+    n_threads: int = 1,
+    gemm_q: int = 256,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, int]:
+    """LAPACK's ``DLASD0`` (divide and conquer on an ``n x (n + sqre)`` upper bidiagonal
+    matrix); returns ``(D, E, U, VT, INFO)``."""
+
+def lapack_dlasd1(
+    nl: int,
+    nr: int,
+    sqre: int,
+    d: np.ndarray,
+    alpha: float,
+    beta: float,
+    u: np.ndarray,
+    ldu: int,
+    vt: np.ndarray,
+    ldvt: int,
+    idxq: np.ndarray,
+    lapack: str = "3.12.1",
+    n_threads: int = 1,
+    gemm_q: int = 256,
+) -> tuple[np.ndarray, float, float, np.ndarray, np.ndarray, np.ndarray, int]:
+    """LAPACK's ``DLASD1`` (one merge); returns ``(D, ALPHA, BETA, U, VT, IDXQ, INFO)``."""
+
+def lapack_dlasd2(
+    nl: int,
+    nr: int,
+    sqre: int,
+    d: np.ndarray,
+    alpha: float,
+    beta: float,
+    u: np.ndarray,
+    ldu: int,
+    vt: np.ndarray,
+    ldvt: int,
+    ldu2: int,
+    ldvt2: int,
+    idxq: np.ndarray,
+    lapack: str = "3.12.1",
+) -> tuple[
+    int,
+    tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray],
+    tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray],
+]:
+    """LAPACK's ``DLASD2`` (the merge's deflation); returns ``(K, (D, Z, U, VT, DSIGMA, U2,
+    VT2), (IDXP, IDX, IDXC, IDXQ, COLTYP))``."""
+
+def lapack_dlasd3(
+    nl: int,
+    nr: int,
+    sqre: int,
+    k: int,
+    d: np.ndarray,
+    ldq: int,
+    dsigma: np.ndarray,
+    u: np.ndarray,
+    ldu: int,
+    u2: np.ndarray,
+    ldu2: int,
+    vt: np.ndarray,
+    ldvt: int,
+    vt2: np.ndarray,
+    ldvt2: int,
+    idxc: np.ndarray,
+    ctot: tuple[int, int, int, int] | list[int],
+    z: np.ndarray,
+    n_threads: int = 1,
+    gemm_q: int = 256,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, int]:
+    """LAPACK's ``DLASD3`` (the secular equation and the vectors' update); returns ``(D, Q, U,
+    VT, VT2, Z, INFO)``."""
+
+def lapack_dlasd4(
+    n: int, i: int, d: np.ndarray, z: np.ndarray, rho: float
+) -> tuple[np.ndarray, float, np.ndarray, int]:
+    """LAPACK's ``DLASD4`` (the ``i``-th root of the secular equation); returns ``(DELTA,
+    SIGMA, WORK, INFO)``."""
+
+def lapack_dlasd5(
+    i: int, d: np.ndarray, z: np.ndarray, rho: float
+) -> tuple[np.ndarray, float, np.ndarray]:
+    """LAPACK's ``DLASD5`` (the 2 x 2 secular equation); returns ``(DELTA, DSIGMA, WORK)``."""
+
+def lapack_dlaed6(
+    kniter: int,
+    orgati: bool,
+    rho: float,
+    d: list[float] | tuple[float, float, float],
+    z: list[float] | tuple[float, float, float],
+    finit: float,
+) -> tuple[float, int]:
+    """LAPACK's ``DLAED6`` (a root of the three-pole rational function); returns ``(TAU,
+    INFO)``."""
+
+def lapack_dlasdq(
+    uplo_: str,
+    sqre: int,
+    n: int,
+    ncvt: int,
+    nru: int,
+    ncc: int,
+    d: np.ndarray,
+    e: np.ndarray,
+    vt: np.ndarray,
+    ldvt: int,
+    u: np.ndarray,
+    ldu: int,
+    c: np.ndarray,
+    ldc: int,
+    lapack: str = "3.12.1",
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, int]:
+    """LAPACK's ``DLASDQ`` (a leaf: ``DBDSQR`` with the vectors, values ascending); returns
+    ``(D, E, VT, U, C, INFO)``."""
+
+def lapack_dlasdt(n: int, msub: int) -> tuple[int, int, np.ndarray, np.ndarray, np.ndarray]:
+    """LAPACK's ``DLASDT`` (the subproblem tree); returns ``(LVL, ND, INODE, NDIML, NDIMR)``."""
+
+def lapack_dlamrg(n1: int, n2: int, a: np.ndarray, dtrd1: int, dtrd2: int) -> np.ndarray:
+    """LAPACK's ``DLAMRG`` (the permutation merging two sorted lists); returns ``INDEX``."""
+
+def lapack_dlascl(
+    type_: str,
+    kl: int,
+    ku: int,
+    cfrom: float,
+    cto: float,
+    m: int,
+    n: int,
+    a: np.ndarray,
+    lda: int,
+) -> np.ndarray:
+    """LAPACK's ``DLASCL`` (only ``type_="G"``): ``A * cto/cfrom`` in safe steps; returns the new
+    ``A`` storage."""

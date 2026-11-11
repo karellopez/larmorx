@@ -179,6 +179,28 @@ kept environments (`validation/investigations/confounds/check_lapack.py`, sectio
 `brd`, full tier, 2026-11-11): see `validation/investigations/confounds/README.md` for the counts
 and commits; `control_lapack_release.py` shows that the cases tell the two releases apart.
 
+**Relay 2c-i** (`numpy_linalg::bdsdc`: LAPACK's divide-and-conquer bidiagonal SVD with the
+singular vectors). Ported from the same two `lapack-netlib/SRC/` trees (OpenBLAS 0.3.30, LAPACK
+3.12.0, numpy 2.3.5; OpenBLAS v0.3.34-106-g446c436e, LAPACK 3.12.1, numpy 2.5.4), each routine
+that differs between them in both forms (`LapackRelease`):
+
+| larmorx | Upstream files | Licence |
+|---|---|---|
+| `numpy_linalg::bdsdc::dbdsdc`, `SMLSIZ` (`COMPQ = 'I'`, both bidiagonal forms: the checks, a lower matrix rotated to upper with the rotations kept for `U`, `DLASDQ` up to 25 rows, else the scaling by `DLANST`, the tiny entries set to `±0.9ε`, the subproblems split at `|e(i)| < 0.9ε` (the 1 × 1 one at `d(n)`), `DLASD0` on each, the descending selection sort, the rotations applied to `U`) | `dbdsdc.f` (both trees: layout only), `ilaenv.f` (`ILAENV(9, 'DBDSDC')` = 25), `dlaset.f`, `dlanst.f`, `INSTALL/dlamch.f` | BSD-3-Clause |
+| `numpy_linalg::bdsdc::dlasd0`, `dlasdt`, `Tree` (the tree with `INT(LOG(n/(msub + 1))/LOG(2)) + 1` levels through glibc's `log`, `larmorx_core::math::log_glibc`; the leaves by `DLASDQ`, the merges bottom-up by `DLASD1`) | `dlasd0.f`, `dlasdt.f` (identical in both trees) | BSD-3-Clause |
+| `numpy_linalg::bdsdc::dlasd1`, `dlasd3`, `Deflation`, `MergeWork` (the scaling, `DLASD2`, `DLASD3`'s secular equation and its four `DGEMM` groups on the column types' blocks, the unscaling, `DLAMRG`'s permutation) | `dlasd1.f`, `dlasd3.f` (identical in both trees), `dlacpy.f` | BSD-3-Clause |
+| `numpy_linalg::bdsdc::dlasd2` (3.12.0: `TOL = 8ε·max(…)`, `|d(j) - d(jprev)| <= TOL`, `IDXP(K2) = JPREV`; 3.12.1: `64ε`, the signed difference, `IDXP(K2 + J - 1 - JP) = JP` for `JP = JPREV … J - 1`; `DROT`, `DLAPY2`, the column types, `COLTYP(1:4) = CTOT`) | `dlasd2.f` (both trees) | BSD-3-Clause |
+| `numpy_linalg::bdsdc::dlasd4`, `dlasd5`, `dlaed6` (the secular equation's roots: the last one and the inner ones, the two-pole and three-pole steps, `DLAED6`'s fallback, the geometric-mean bound; `DLAED6`'s scaling by `2^-340` and `2^-680`) | `dlasd4.f`, `dlasd5.f`, `dlaed6.f` (identical in both trees) | BSD-3-Clause |
+| `numpy_linalg::bdsdc::dlasdq` (both forms, `SQRE` 0 and 1, the rotations to upper form on `VT`, `U` and `C`, `DBDSQR` (the parent module's port, each release's `-0`), the ascending sort) | `dlasdq.f` (identical in both trees), `dbdsqr.f` (both trees) | BSD-3-Clause |
+| `numpy_linalg::bdsdc::dlamrg`, `dlascl_g` (`TYPE = 'G'`: the checks, the safe steps) | `dlamrg.f` (identical), `dlascl.f` (both trees; the same arithmetic for `'G'`) | BSD-3-Clause |
+
+The BLAS calls are the ported Haswell kernels (`openblas::level3::dgemm_with` for `DLASD3`,
+`level1::dnrm2` and `dcopy`, the parent module's `drot` and `dswap`). Validated bit for bit
+against numpy's own LAPACK through its exported Fortran entry points in both kept environments
+(`validation/investigations/confounds/check_svd.py`, every routine through its own entry point,
+2026-11-11): see `validation/investigations/confounds/README.md` for the counts and commits; its
+`--control` shows that the cases tell the two releases apart.
+
 ## SciPy's 4 × 4 inverse (`scipy_linalg`, field maps part B, relay 18)
 
 **Ported** from SciPy 1.18.1 (`scipy/linalg/_basic.py` `inv`, `src/_linalg_inv.hh`

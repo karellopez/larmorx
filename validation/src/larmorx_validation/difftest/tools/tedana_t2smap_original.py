@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """tedana's ``t2smap``: the clean-room original (``crates/larmorx-tedana``, written from
-``specs/t2smap.md``; through its own binding, ``larmorx._core.tedana_t2smap_cleanroom``, until
-it is wired into ``lx.tedana.t2smap``) against tedana 26.0.3's program, with the replica's default
+``specs/t2smap.md``; through its own binding, ``larmorx._core.tedana_t2smap_cleanroom``, which
+``lx.tedana.t2smap`` also runs since the wiring of 2026-11-12) against tedana 26.0.3's program, with the replica's default
 (``larmorx-gpl``, a black box) beside it: each case is one command line on multi-echo files the
 descriptor writes from the recipe, judged by the original's suite
 (``larmorx_validation.parity.tedana_t2smap_original``): (A) the original in ``reproduce`` against

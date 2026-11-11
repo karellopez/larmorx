@@ -26,21 +26,24 @@ in two implementations ([licensing](../licensing.md)):
   2026-11-11; [PROVENANCE](../../crates/larmorx-tedana/PROVENANCE.md)), built for speed: the
   log-linear fit per voxel in closed form, its own trust-region curve fit on the per-echo means,
   deterministic threads (the same files at any `--n-threads`), every option, message, exit status
-  and defect of the spec. Until it is wired into `lx.tedana.t2smap` and `larmorx tedana t2smap`,
-  it runs through its own binding, `larmorx._core.tedana_t2smap_cleanroom(args, env, cwd)`
-  (tedana's arguments; `(exit status, standard output, standard error)`). Its `reproduce` gives
-  tedana's defects exactly and its fitted numbers within the spec's thresholds (§17.3), not bit
-  for bit: the replica is the exact one.
+  and defect of the spec; run in this process by `lx.tedana.t2smap` and `larmorx tedana t2smap`
+  since 2026-11-12 (its own binding, `larmorx._core.tedana_t2smap_cleanroom(args, env, cwd)`:
+  tedana's arguments, an environment table, the directory; `(exit status, standard output,
+  standard error)`, serves the validation tools). Its `reproduce` gives tedana's defects exactly
+  and its fitted numbers within the spec's thresholds (§17.3), not bit for bit: the replica is
+  the exact one.
 
-Until the original exists, the replica is the only implementation: `implementation="auto"` and
-`"replica"` run it when `larmorx-gpl` is installed (`pip install larmorx-gpl`, or `pip install
-"larmorx[all]"`) and raise `ReplicaNotFoundError` with that command otherwise; `"clean-room"`
-(`"original"`, 0.1.0rc1's spelling, still works) raises `NotImplementedError`. The command line does the same (`--implementation`
-before the family, or `LARMORX_IMPLEMENTATION`; exit 127 with
-the command that installs it). The program is found through `LARMORX_GPL_BIN`, then the Python
-environment's scripts directory, then `PATH`.
+`implementation="auto"` (the default) runs the replica when `larmorx-gpl` is installed (`pip
+install larmorx-gpl`, or `pip install "larmorx[all]"`), else the clean-room original;
+`"replica"` runs the replica or raises `ReplicaNotFoundError` with that command; `"clean-room"`
+(`"original"`, 0.1.0rc1's spelling, still works, with a `DeprecationWarning`) runs the clean-room
+original. The command line does the same (`--implementation` before the family, or
+`LARMORX_IMPLEMENTATION`; `replica` without the program exits 127 with the command that installs
+it): `larmorx --implementation clean-room tedana t2smap -d ... -e ...`. The program is found
+through `LARMORX_GPL_BIN`, then the Python environment's scripts directory, then `PATH`.
 
-**Status: `experimental`** (the record `tedana-t2smap-replica`, random testing; below).
+**Status: `experimental`** (the records `tedana-t2smap-replica` and `tedana-t2smap-original`,
+random testing; below).
 
 ## Usage
 
@@ -67,6 +70,8 @@ res = lx.tedana.t2smap(echoes, tes, mask=mask, out_dir="derivatives/t2smap", con
 ```bash
 larmorx tedana t2smap -d echo-1.nii.gz echo-2.nii.gz echo-3.nii.gz -e 14.0 29.96 45.92 \
     --mask mask.nii.gz --fittype curvefit --out-dir t2smap
+larmorx --implementation clean-room --n-threads 8 tedana t2smap -d echo-1.nii.gz \
+    echo-2.nii.gz echo-3.nii.gz -e 14.0 29.96 45.92 --mask mask.nii.gz --out-dir t2smap-cr
 ```
 
 Inputs are paths or in-memory images (an `lx.Image`, a nibabel image, an `(array, affine)` pair),
@@ -78,8 +83,10 @@ tedana refuses to overwrite an existing one unless `overwrite=True`). The result
 NaN for tedana's `n/a`), `fit_failures`, `t2star_variance`, `s0_variance`,
 `t2star_s0_covariance` (or `None`), `dataset_description`, `files` (tedana's registry: each
 file's name by its description), `out_dir`, `log` (tedana's log, its standard error without
-larmorx's notice lines) and `implementation`. A run that fails raises `ReplicaError` (a
-`RuntimeError`) with tedana's messages and exit status.
+larmorx's notice lines) and `implementation` (the `larmorx-gpl` replica, or the clean-room
+original: `Implementation(kind="clean-room", package="larmorx", ...)`). A run of the replica
+that fails raises `ReplicaError` (a `RuntimeError`) with tedana's messages and exit status; one of
+the clean-room original a `RuntimeError` with the same messages.
 
 ## Options
 
@@ -100,12 +107,12 @@ larmorx's notice lines) and `implementation`. A run that fails raises `ReplicaEr
 | `--fitmode {all,ts}` | `fitmode="all"` | one fit per voxel over all volumes, or one per voxel and volume (4D maps) |
 | `--combmode {t2s,paid}` | `combmode="t2s"` | the combination's weights: TE · exp(-TE / T2*), or PAID's temporal SNR |
 | `--n-independent-echos INT` | `n_independent_echos=None` | the number of independent echoes (EPTI): only tedana's warnings change |
-| `--n-threads INT` | `n_threads=1` (0: all logical CPUs, passed as -1) | threads; tedana's limit for its BLAS and its curve-fit processes. On the command line, when it is not given, larmorx's own `--n-threads` before the family applies (`larmorx --n-threads 4 tedana t2smap ...`; else `OMP_NUM_THREADS`, else every logical CPU), not tedana's default of 1. The replica's results never depend on it (it gives tedana's one-thread results; tedana's own log-linear maps change with BLAS threads in a few voxels' last bits) |
+| `--n-threads INT` | `n_threads=1` (0: all logical CPUs, passed as -1) | threads; tedana's limit for its BLAS and its curve-fit processes. On the command line, when it is not given, larmorx's own `--n-threads` before the family applies (`larmorx --n-threads 4 tedana t2smap ...`; else `OMP_NUM_THREADS`, else every logical CPU), not tedana's default of 1. The replica's results never depend on it (it gives tedana's one-thread results; tedana's own log-linear maps change with BLAS threads in a few voxels' last bits), nor the clean-room original's (the same files at any count) |
 | `--debug` | `debug=False` | the log at DEBUG level (the help's TSV log file is never written: tedana's, kept) |
 | `--quiet` (hidden) | `quiet=False` | the log at WARNING level |
 | `-h`, `--help` | - | the usage (argparse's, exit 0) |
 | `-v`, `--version` | - | `t2smap v26.0.3` (exit 0) |
-| `LARMORX_UPSTREAM_DEFECTS` | `upstream_defects="fix"` | `"reproduce"` gives tedana's files bit for bit (its defects and its maths, below) |
+| `LARMORX_UPSTREAM_DEFECTS` | `upstream_defects="fix"` | `"reproduce"` gives tedana's files: bit for bit by the replica (its defects and its maths, below), and by the clean-room original with tedana's defects exactly and its fitted numbers within the spec's thresholds (§17.3) |
 | `LARMORX_TEDANA_LIBRARIES` | `libraries="newest"` | the numpy and SciPy whose arithmetic is reproduced: `newest` (numpy 2.5.4, SciPy 1.18.1) or `shared` (numpy 2.3.5, SciPy 1.15.3); the curve fit's last bits differ between them |
 | `--implementation` (before the family) | `implementation="auto"` | `"auto"` (the replica when larmorx-gpl is installed, else the clean-room original), `"replica"`, `"clean-room"` (`"original"`, the old spelling, warns) |
 
@@ -147,8 +154,9 @@ whose arithmetic it reproduces; every other key is tedana's (the host's `uname` 
 ## Upstream defects
 
 Corrected by default (D13; [the register](upstream-defects.md)), each with a notice
-(`larmorx-gpl: upstream defect TED-.. (tedana) corrected: ...` on standard error, an
-`UpstreamDefectWarning` in Python) where the correction changed the result, and reproduced with
+(`larmorx-gpl: upstream defect TED-.. (tedana) corrected: ...` on standard error from the
+replica, `larmorx: upstream defect ...` from the clean-room original, an `UpstreamDefectWarning`
+in Python) where the correction changed the result, and reproduced with
 `upstream_defects="reproduce"` (`LARMORX_UPSTREAM_DEFECTS=reproduce`):
 
 | ID | tedana 26.0.3 | larmorx by default |
@@ -251,11 +259,23 @@ and `reproduce` (which names them the same way) take about as long as tedana at 
   (ds003592 with loglin, curvefit and `--verbose`; ds000210's two tasks and ds000258 from the
   oracle runs made with OpenBLAS's Haswell kernels): all pass (A) and (B); the share of the curve
   fit's voxels judged by §17.3's objective criteria rather than by value 0 to 0.305 %.
-- **Golden**: 11 cases (`tests/golden/registry.py`, `tedana.t2smap.cleanroom.*`, through its own
-  binding until the wiring): each fit type and mode, both combinations and conventions, the
+- **Golden**: 13 cases (`tests/golden/registry.py`): 11 through its own binding
+  (`tedana.t2smap.cleanroom.*`: each fit type and mode, both combinations and conventions, the
   variance maps, a computed mask, the mask methods, dummy scans and an excluded volume, float32,
   NIfTI-2 and int16 z-concatenated inputs, ANALYZE and MGH, `reproduce` with numpy 2.3.5's
-  results, four refusals; every written file, the exit status and both streams, on every platform.
+  results, four refusals) and, since the wiring (2026-11-12), two through the public entry points:
+  `cli.tedana.t2smap` (`larmorx --n-threads 2 --upstream-defects reproduce --implementation
+  clean-room tedana t2smap ...`) and `py.tedana.t2smap` (`lx.tedana.t2smap(...,
+  implementation="clean-room")` with in-memory echoes, the curve fit with `verbose`: every image of
+  the result, the table, the registry, the log and the notices); every written file, the exit
+  status and both streams, on every platform.
+- **The wiring's tests** (2026-11-12): the standalone `larmorx` binary gives the crate's own files
+  (`crates/larmorx-cli/tests/tedana_t2smap.rs`), larmorx's options before the family give the
+  bytes of the variables they replace and win over them, `auto` without `larmorx-gpl` runs the
+  original and `replica` exits 127, the thread count reaches the run; `lx.tedana.t2smap` and the
+  console script give the binding's files (`tests/python/test_tedana_cleanroom.py`); without its
+  own `--n-threads` t2smap takes `OMP_NUM_THREADS` (larmorx's `--n-threads`), else every logical
+  CPU, as the replica's program does.
 - **Memory** (`tests/parity/test_memory_peak.py`, fMRIPrep's ds003592 curvefit call): 307 MiB at
   one thread (both modes) and 546 MiB at eight, against tedana's 1,244 MiB.
 - **Speed** ([benchmarks](../benchmarks/tedana-t2smap.md), "The clean-room original"; a shared

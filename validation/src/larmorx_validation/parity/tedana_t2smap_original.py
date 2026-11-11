@@ -5,8 +5,9 @@ from ``specs/t2smap.md``) with tedana 26.0.3's program and with the replica's de
 Written by the clean-room implementer: it reads no tedana source and no replica code, and runs the
 replica (``larmorx-gpl tedana t2smap``, from ``LARMORX_GPL_BIN`` or the ``PATH``) only as a black
 box. Its own name and module, beside the replica's suite ``tedana-t2smap-replica`` (never read).
-Before the original is wired into ``larmorx tedana t2smap`` it runs through its own binding,
-``larmorx._core.tedana_t2smap_cleanroom``, in this process.
+The original runs through its own binding, ``larmorx._core.tedana_t2smap_cleanroom``, in this
+process (``lx.tedana.t2smap`` and ``larmorx tedana t2smap`` run the same code since the wiring of
+2026-11-12).
 
 Every case runs each program in a folder of its own with ``--out-dir out`` and the spec's
 reference setup (``blackbox.environment()``: ``COLUMNS=80``, ``TQDM_DISABLE=1``, one OpenBLAS

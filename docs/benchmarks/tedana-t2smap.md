@@ -57,8 +57,8 @@ echo).
 ## The clean-room original (2026-11-11)
 
 The clean-room original (`crates/larmorx-tedana`, the main package; through its own binding,
-`larmorx._core.tedana_t2smap_cleanroom`, run as a program with `python -c` until it is wired into
-`larmorx tedana t2smap`) beside tedana and the replica, all three measured again together on the
+`larmorx._core.tedana_t2smap_cleanroom`, run as a program with `python -c`, as before its wiring
+into `larmorx tedana t2smap` of 2026-11-12: the same code) beside tedana and the replica, all three measured again together on the
 same calls and inputs.
 
 - **Generated:** 2026-11-11 on the main machine (Linux x86_64, AMD Ryzen 9 7945HX, 16 cores / 32

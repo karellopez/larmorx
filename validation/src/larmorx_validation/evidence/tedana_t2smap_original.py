@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """tedana's ``t2smap``: the clean-room original's evidence (crate larmorx-tedana, Apache-2.0,
-written from ``specs/t2smap.md``; through its own binding ``larmorx._core.tedana_t2smap_cleanroom``
-until it is wired into ``larmorx tedana t2smap``), for the t2smap page beside tedana's and the
+written from ``specs/t2smap.md``; through its own binding ``larmorx._core.tedana_t2smap_cleanroom``,
+as before its wiring into ``larmorx tedana t2smap`` of 2026-11-12), for the t2smap page beside tedana's and the
 replica's evidence.
 
 Written by the clean-room implementer: it reads no tedana source and none of the replica's files,
@@ -76,7 +76,7 @@ OUTPUTS = [
     ("rmse", "desc-rmse_statmap.nii.gz", "RMSE map", ""),
     ("am", "desc-adaptiveGoodSignal_mask.nii.gz", "adaptive mask (good echoes)", "echoes"),
 ]
-#: The original through its own binding, as a program (until the wiring).
+#: The original through its own binding, as a program (as its runs before the wiring were made).
 RUNNER = (
     "import os, sys\n"
     "from larmorx import _core\n"

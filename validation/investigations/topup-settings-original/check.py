@@ -255,7 +255,7 @@ def run(
     if fsldir is not None:
         env["FSLDIR"] = fsldir
     if Path(program[0]).name == "larmorx":
-        env["LARMORX_IMPLEMENTATION"] = "original"  # the clean-room original, never the replica
+        env["LARMORX_IMPLEMENTATION"] = "clean-room"  # the clean-room original, never the replica
     t0 = time.perf_counter()
     p = subprocess.run([*program, *_args(name, config)], cwd=d, env=env, capture_output=True)
     seconds = time.perf_counter() - t0

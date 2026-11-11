@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
-//! The clean-room `t2smap` (`larmorx_tedana`), bound on its own until it is wired into the
-//! shared implementation choice (`lx.tedana.t2smap(..., implementation="clean-room")`).
+//! The clean-room `t2smap` (`larmorx_tedana`), bound on its own: `lx.tedana.t2smap(...,
+//! implementation="clean-room")` runs it through this binding (since 2026-11-12), and so do the
+//! validation tools (its parity suite, random testing, evidence, benchmarks).
 
 use std::path::PathBuf;
 

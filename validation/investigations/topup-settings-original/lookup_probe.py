@@ -31,7 +31,7 @@ def main() -> int:
                 if fsldir:
                     env["FSLDIR"] = fsldir
                 if Path(program).name == "larmorx":
-                    env["LARMORX_IMPLEMENTATION"] = "original"
+                    env["LARMORX_IMPLEMENTATION"] = "clean-room"
                 p = subprocess.run(
                     [program, "fsl", "topup", "--imain=none", "--datain=none", f"--config={cfg}"],
                     env=env,

@@ -40,7 +40,7 @@ Added in relays 2b and 2c (2026-11-11), same rules:
 | File | What it is |
 |---|---|
 | `src/lib.rs` | the run in §3's order: every step, message and output, the notices |
-| `src/cli.rs` | tedana's command line (argparse's parser, help and errors from `larmorx_core::python::argparse`), the settings table, `run` |
+| `src/cli.rs` | tedana's command line (argparse's parser, help and errors from `larmorx_core::python::argparse`), the settings table, `run` (without its own `--n-threads`, the run's thread count: `OMP_NUM_THREADS`, else every logical CPU, as the replica's program); `run_given` and `TOOLS`, `larmorx tedana t2smap` with larmorx's options before the family (2026-11-12) |
 | `src/options.rs` | the typed options and the libraries' choice (`newest`, `shared`) |
 | `src/log.rs` | tedana's log lines, Python's warnings once per place, the errors' tracebacks (§12) |
 | `src/input.rs` | the echoes, the reference, the user's and nilearn's computed masks, nilearn's masking path (§4) |
@@ -53,5 +53,19 @@ Added in relays 2b and 2c (2026-11-11), same rules:
 | `src/rmse.rs` | the RMSE map and the confounds table (§9) |
 | `src/combine.rs` | the optimal combination: T2*'s and PAID's weights, TED-15 (§10) |
 | `src/output.rs` | the files: names, conventions, existence checks, headers, the table, the JSON files (§11) |
-| `examples/t2smap_cleanroom.rs` | the original as a program, for black-box runs before it is wired into `larmorx tedana t2smap` |
+| `examples/t2smap_cleanroom.rs` | the original as a program of its own (the black-box runs from before it was wired into `larmorx tedana t2smap`, 2026-11-12; kept for them) |
 | `tests/run.rs` | end-to-end tests of the command line and the files |
+| `../larmorx-cli/tests/tedana_t2smap.rs` | the wiring (2026-11-12): `larmorx tedana t2smap` through the shared implementation choice (`crates/larmorx-cli/src/replica.rs`'s `original: true`), the standalone binary against the crate's own files, larmorx's options before the family against their variables, `auto` and `replica` without `larmorx-gpl`, the thread count reaching the run |
+
+## The wiring (2026-11-12, the clean-room part's wiring relay, same rules)
+
+After the easy command line (main b13195fb) the original was wired into the shared implementation
+choice: `larmorx tedana t2smap` (`crates/larmorx-cli`: `REPLICAS`' `original: true`, the family
+dispatched to `cli::run_given`, whose log reaches the caller while it runs) and
+`lx.tedana.t2smap(..., implementation="clean-room")` (`python/larmorx/tedana/t2smap.py`, in this
+process through `larmorx._core.tedana_t2smap_cleanroom`; `"auto"` runs it when `larmorx-gpl` is
+not found). Inputs: the shared selection's code and documentation (`crates/larmorx-cli`,
+`python/larmorx/_replica.py`, `docs/architecture.md`), the API page `docs/api/tedana-t2smap.md`;
+no tedana or replica material. Its tests: `../larmorx-cli/tests/tedana_t2smap.rs`,
+`tests/python/test_tedana_cleanroom.py`, `tests/python/test_tedana.py` (auto without the
+replica), the golden cases `cli.tedana.t2smap` and `py.tedana.t2smap`.

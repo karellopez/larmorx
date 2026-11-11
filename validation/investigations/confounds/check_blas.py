@@ -28,8 +28,11 @@ allows it), ties and NaN for ``idamax`` at both 16-byte alignments of ``x(1)``.
 Each section runs in a child process: numpy 2.5.4's OpenBLAS (0.3.34) crashes with a
 segmentation fault on some products under the Haswell kernels on the AVX-512 main machine
 (``probe_haswell_crash.py``); a crashed case is counted apart ("the original crashes") and the
-child restarts after it. Prints one line per section (identical / compared, crashes) and the
-first differences; exit status 1 when any compared case differs.
+child restarts after it. A child that prints nothing for ``HANG_AFTER`` seconds (an undefined
+case may also spin forever inside the original) is stopped, its case counted as hung, and the
+next child starts after it (Linux: the pipe is watched with ``select``). Prints one line per section (identical / compared, crashes) and the
+first differences; exit status 1 when any compared case differs, or when the original crashes
+or hangs on a case outside its predicted undefined class.
 
 Usage: ``OPENBLAS_CORETYPE=Haswell OPENBLAS_NUM_THREADS=1 PYTHONPATH=<repo>/python
 python -P check_blas.py [--quick] [--threads N] [--sections gemm,matmul,syrk,gemv,trmm,ger,trmv,level1]``
@@ -41,8 +44,10 @@ import argparse
 import ctypes
 import glob
 import os
+import select
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 import numpy as np
@@ -644,6 +649,40 @@ def child(section: str, start: int, quick: bool, threads: int, sections=None) ->
     return 0
 
 
+# A case that prints nothing for this long is taken as hung in the original (seconds; the
+# slowest defined case takes about 20).
+HANG_AFTER = 300.0
+
+
+def run_child(args: list[str], hang_after: float = HANG_AFTER) -> tuple[list[str], int, bool, str]:
+    """Runs a child, reading its output unbuffered; returns ``(lines, returncode, hung,
+    stderr)``. A child silent for ``hang_after`` seconds is killed (``hung``)."""
+    with tempfile.TemporaryFile() as err:
+        proc = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=err)
+        assert proc.stdout is not None
+        fd = proc.stdout.fileno()
+        buf, lines, hung = b"", [], False
+        while True:
+            ready, _, _ = select.select([fd], [], [], hang_after)
+            if not ready:
+                proc.kill()
+                hung = True
+                break
+            chunk = os.read(fd, 1 << 16)
+            if not chunk:
+                break
+            buf += chunk
+            *done, buf = buf.split(b"\n")
+            lines += [line.decode(errors="replace") for line in done]
+        proc.wait()
+        proc.stdout.close()
+        if buf:
+            lines.append(buf.decode(errors="replace"))
+        err.seek(0)
+        stderr = err.read().decode(errors="replace")
+    return lines, proc.returncode, hung, stderr
+
+
 def parent(
     section: str, quick: bool, threads: int, sections=None, undefined_fn=None, script=None
 ) -> bool:
@@ -656,6 +695,7 @@ def parent(
     case_list = cases(quick)
     tallies: dict[str, list] = {}
     crashed: list[int] = []
+    hung: list[int] = []
     start = 0
     while True:
         args = [
@@ -672,10 +712,10 @@ def parent(
         args += ["--gemm-q", str(GEMM_Q)]
         if quick:
             args.append("--quick")
-        proc = subprocess.run(args, capture_output=True, text=True)
+        lines, returncode, silent, stderr = run_child(args)
         last = None
         done = False
-        for line in proc.stdout.splitlines():
+        for line in lines:
             if line.startswith("BEGIN "):
                 last = int(line.split()[1])
             elif line.startswith("RES "):
@@ -691,9 +731,13 @@ def parent(
                 done = True
         if done:
             break
-        if last is None or proc.returncode >= 0:
-            print(proc.stdout[-2000:], proc.stderr[-4000:], file=sys.stderr)
-            raise SystemExit(f"{section}: the child failed (status {proc.returncode})")
+        if last is not None and silent:
+            hung.append(last)
+            start = last + 1
+            continue
+        if last is None or returncode >= 0:
+            print("\n".join(lines)[-2000:], stderr[-4000:], file=sys.stderr)
+            raise SystemExit(f"{section}: the child failed (status {returncode})")
         crashed.append(last)
         start = last + 1
     ok = True
@@ -711,6 +755,17 @@ def parent(
     print(f"  crashes: {len(crashed)}, of which {undef_crash} in the undefined class", flush=True)
     for cid in crashed[:12]:
         print(f"  CRASH (numpy's OpenBLAS, SIGSEGV) case {cid}: {case_list[cid]}", flush=True)
+    if hung:
+        undef_hung = sum(undefined_fn(section, case_list[c]) for c in hung)
+        print(
+            f"  hangs (no output for {HANG_AFTER:.0f} s, stopped): {len(hung)}, of which "
+            f"{undef_hung} in the undefined class",
+            flush=True,
+        )
+        for cid in hung:
+            print(f"  HANG (numpy's OpenBLAS) case {cid}: {case_list[cid]}", flush=True)
+        ok &= undef_hung == len(hung)
+    ok &= undef_crash == len(crashed)
     return ok
 
 

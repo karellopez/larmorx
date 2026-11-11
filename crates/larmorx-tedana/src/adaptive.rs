@@ -223,14 +223,16 @@ fn dropout_thresholds(
     let argmax_empty = || PyError::value("attempt to get argmax of an empty sequence");
     let nan_present = nonzero.iter().any(|x| x.is_nan());
     let perc = if notices.fix() {
-        let finite: Vec<f32> = nonzero.iter().copied().filter(|x| x.is_finite()).collect();
+        // TED-01 is a NaN mean's (an infinite one sorts and matches as tedana's does: the
+        // replica's default, observed, random testing 2026-11-11)
+        let finite: Vec<f32> = nonzero.iter().copied().filter(|x| !x.is_nan()).collect();
         // an empty mask or first-echo means all 0 are not TED-01's: tedana's IndexError below,
         // in both modes (observed, random testing 2026-11-11)
         if finite.is_empty() && !nonzero.is_empty() {
             return Err(PyError::value(
-                "no voxel of the mask has a finite non-zero first-echo mean, so the dropout \
-                 thresholds cannot be set (tedana fails with: attempt to get argmax of an empty \
-                 sequence)",
+                "no voxel of the mask has a non-zero first-echo mean that is a number, so the \
+                 dropout thresholds cannot be set (tedana fails with: attempt to get argmax of an \
+                 empty sequence)",
             ));
         }
         if finite.len() != nonzero.len() {

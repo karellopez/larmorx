@@ -261,4 +261,11 @@ and `reproduce` (which names them the same way) take about as long as tedana at 
   machine, best of two runs): 2.7 to 3.7 s at one thread on fMRIPrep's four curve-fit calls (10 to
   15 times tedana's speed) and 1.3 to 2.0 s at eight threads (19 to 30 times); 3.0 s and 1.5 s on
   the log-linear call (tedana 6.2 s); the same files at 1 and 8 threads.
+- **Two defects of its own part** (2026-11-11, relay 3c): **TED-31** (rule B), a run whose adaptive mask
+  removes every voxel, where tedana fails with `IndexError: index 0 is out of bounds for axis 1 with size
+  0`: by default a clear `ValueError` (no voxel has good signal, nothing to fit); **TED-46** (rule A, the
+  orchestrator's decision), a voxel whose log-linear observations have no slope (all equal: no decay),
+  where tedana's batched least squares leaves its rounding noise (T2* 1 ms, or 1e16 ms and more): the
+  slope 0 (T2* 500 ms after the floor) with its notice; `reproduce` writes the same exact zero until the
+  main package's exact port of numpy's `lstsq` serves it (an expected divergence in its record).
 - **Findings**: [`tedana-t2smap-original`](../findings/tedana-t2smap-original.md).

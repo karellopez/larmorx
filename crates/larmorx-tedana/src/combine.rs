@@ -163,13 +163,12 @@ pub fn combine(
     let zero = flags.iter().filter(|f| f.0).count();
     if zero > 0 {
         if mode == CombMode::Paid {
-            // the notice counts the first echo-count group (ascending) that holds such voxels
-            // (§15: the replica's numbers, observed)
-            let first = (1..=data.n_echo)
-                .find_map(|c| {
-                    let k = (0..data.n_vox)
-                        .filter(|&v| usize::from(count[v]) == c && flags[v].0)
-                        .count();
+            // the notice counts the first echo-count group (ascending; the fit's groups, count
+            // 1 with count 2) that holds such voxels (§15: the replica's numbers, observed)
+            let first = crate::fit::groups(count)
+                .iter()
+                .find_map(|(_, members)| {
+                    let k = members.iter().filter(|&&v| flags[v].0).count();
                     (k > 0).then_some(k)
                 })
                 .unwrap_or(zero);

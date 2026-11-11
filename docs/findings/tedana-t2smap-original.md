@@ -100,6 +100,61 @@ failed at 11 voxels (ds003592) and 1 (ds000258) for that reason alone. The spec 
 S0 and by the least objective over T2* ≥ 10c); every earlier verdict stands and those three runs
 pass. The original's code was not the cause.
 
+## Relay 3c (2026-11-11): the spec's points of spec writer 2, two defects, the second trial
+
+- **nilearn's second reading (§4.4)**, probed again (`validation/investigations/t2smap-original/
+  mask_probe.py`, 22 cases, tedana 26.0.3 through the oracle-output cache): tedana's first reading
+  checks the echoes in order, each one's grid against the mask's shape and then its four axes, so
+  the first error is `Image/mask shape mismatch` (a 4D mask of one volume fails at the first echo;
+  an echo both 3D and of another grid too) or `Expected 4D image`; any of them sends every echo
+  through nilearn's masking, whose checks come per echo, in nilearn's order: the mask's values
+  (an empty mask's `The mask is invalid as it is empty: it masks all data.`), the affines, the
+  shapes, then tedana's own refusal of a 3D echo (a 3D first echo stops before a second echo of
+  another grid is looked at). A 4D mask of one volume holding other values than 0 and 1 (0/1/2,
+  1/2, 0/0.5, −1/1) is read as tedana reads it (its `> 0`), with no nilearn refusal: the values
+  check concerns only an empty mask. The original had read such masks on (the trial's findings
+  130, 141, 162, 222, 242); it now follows tedana in both modes, and with it the default's TED-13
+  check comes after these errors, at step 12.
+- **No voxel left for the fit (TED-31, new; rule B).** When the adaptive mask removes every voxel
+  (here every first echo ≤ 0: §6.1's base count 0), tedana writes the adaptive mask image, prints
+  `Computing T2* map`, checks the echo times' count, and fails with `IndexError: index 0 is out of
+  bounds for axis 1 with size 0`, with both fit types and both fit modes (observed, after §6.5's
+  warnings when `--n-independent-echos` is given). The input holds no estimate to make, and the
+  failure is an unrelated numpy error: by default a clear `ValueError: no voxel of the mask has
+  good signal (the adaptive mask removed all <S>), so there is nothing to fit (tedana fails with
+  IndexError)`, notice `no voxel is left for the fit (the adaptive mask removed all <S>)`;
+  `reproduce` gives tedana's error. Black-box facts of the replica (larmorx-gpl 0.1.0rc1) for the
+  replica-side relay: its default completes the log-linear fit's run (every map 0, the RMSE NaN,
+  exit 0) and stops a curve-fit run with nilearn's empty-mask text, no notice.
+- **Equal observations (TED-46, the orchestrator's decision under rule A, 2026-11-11).** Where a
+  voxel's log-linear observations are all equal (in a design of two distinct echo times or more)
+  the original takes the least squares' exact solution (y, 0) in both modes, so T2* = +∞, numpy's
+  `divide by zero` warning, then §8's floor: 500 ms (TED-05 then caps the full map in the default
+  where 500 ms lies above ten caps). Observations all 0 are not TED-46's: tedana's slope there is
+  an exact 0 too (a zero right-hand side). The default names the voxels counted at the first place
+  that holds one (the first group; in `ts` the first volume): `<k> voxel(s) whose log-linear
+  observations have no slope fitted with the slope 0 (no decay, T2* 500 ms); tedana's <n>-echo
+  least squares leaves rounding noise there (T2* 1 ms, or 1e16 ms and more)`. `reproduce` keeps
+  the exact zero (its notice says tedana's noise is not computed yet) until the main package's
+  exact port of numpy's `lstsq` serves it; the suite and the random-testing descriptor take those
+  cases as an expected divergence in (A), and in (B) until the replica's default takes TED-46.
+- **Warnings (§12.3, §6.5):** the temporal means of no volume warn `Mean of empty slice` alone when
+  the mask has no voxel; with no fit voxel `invalid value encountered in scalar divide` comes once
+  for each of §6.5's two percentages (two places: twice when k > 3) (both observed).
+- **The RMSE map's voxels without a value** are written as numpy's `nan` (`0x7FC00000`, §9, §13.1),
+  the one NaN the original does not write as x86-64's default NaN (golden `zcat-int16`'s RMSE
+  checksum changed with it).
+- **Notices' numbers (§15):** TED-09's and TED-15's count the first place that holds such voxels
+  (TED-09: in `ts` the first volume, then the first echo-count group; TED-15: the first of the
+  fit's echo-count groups, ascending, count 1 with count 2: observed against the replica, 829
+  voxels of count 1 where the run had 831, 1 voxel of count 3 where it had 181, 98 = 16 of count
+  1 and 82 of count 2 in a two-echo run).
+- **TED-01 is a NaN mean's** (the trial's findings 455, 588, 761): the default had dropped every
+  non-finite first-echo mean from the dropout percentile, so an infinite sample changed the
+  thresholds and named TED-01; tedana sorts and matches an infinite mean without failing, and the
+  replica's default keeps it (observed). The default now drops the NaN means only (the spec's
+  §15.1 row says "finite": for a spec writer).
+
 ## Speed and memory (fMRIPrep's calls)
 
 The original is I/O-bound: on ds003592's curve-fit call (64 × 64 × 43, 200 volumes, three echoes)

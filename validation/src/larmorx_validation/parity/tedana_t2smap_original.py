@@ -290,12 +290,46 @@ def files(out: Path) -> list[str]:
     return sorted(str(p.relative_to(out)) for p in out.rglob("*") if p.is_file())
 
 
-def _within(diffs: list[str], tolerance: float) -> list[str]:
-    """``outputs.compare``'s differences beyond ``tolerance`` (relative), headers and text kept."""
+def _table_within(a: Path, b: Path, tolerance: float) -> bool:
+    """Two confounds tables the same but for numbers within ``tolerance`` (relative)."""
+    ra = a.read_text(encoding="utf-8").splitlines()
+    rb = b.read_text(encoding="utf-8").splitlines()
+    if len(ra) != len(rb) or ra[:1] != rb[:1]:
+        return False
+    for la, lb in zip(ra[1:], rb[1:], strict=True):
+        wa, wb = la.split("\t"), lb.split("\t")
+        if len(wa) != len(wb):
+            return False
+        for x, y in zip(wa, wb, strict=True):
+            if x == y:
+                continue
+            try:
+                fx, fy = float(x), float(y)
+            except ValueError:
+                return False
+            if not abs(fx - fy) <= tolerance * max(abs(fx), abs(fy)):
+                return False
+    return True
+
+
+def _within(
+    diffs: list[str], tolerance: float, ref: Path | None = None, other: Path | None = None
+) -> list[str]:
+    """``outputs.compare``'s differences beyond ``tolerance`` (relative), headers and other text
+    kept; a confounds table compared number by number when the folders are given."""
     out = []
     for d in diffs:
         m = re.search(r"values differ, largest relative ([0-9.e+-]+|nan|inf)$", d)
         if m and m.group(1) not in ("nan", "inf") and float(m.group(1)) <= tolerance:
+            continue
+        name = d.split(": ", 1)[0]
+        if (
+            ref is not None
+            and other is not None
+            and name.endswith(".tsv")
+            and d.endswith("the text differs")
+            and _table_within(ref / name, other / name, tolerance)
+        ):
             continue
         out.append(d)
     return out
@@ -311,7 +345,24 @@ def judge_values(ref: Path, other: Path, file_by_file: bool) -> tuple[bool, str]
     )
     if file_by_file or not combined:
         diffs = outputs.compare(ref / "out", other / "out") if (ref / "out").exists() else []
-        return not diffs, "; ".join(diffs)[:600] or "identical"
+        if file_by_file or not diffs:
+            return not diffs, "; ".join(diffs)[:600] or "identical"
+        # a run that stopped before the combination (both programs, the same error): check.py's
+        # model stops there too; the files written before it, file by file within
+        # FILE_TOLERANCE, and in a curve-fit run the fit's maps reported (§17.3 judges them by
+        # (a)/(b)/(c) and the variances where (a) holds, which needs the model's full run)
+        call = (ref / "out" / "t2smap_call.sh").read_text(encoding="utf-8")
+        beyond = _within(diffs, FILE_TOLERANCE, ref / "out", other / "out")
+        if "curvefit" in call:
+            kept = [d for d in beyond if "adaptiveGoodSignal" in d or "adaptive_mask" in d]
+            reported = [d for d in beyond if d not in kept]
+            note = f"a stopped run, file by file within {FILE_TOLERANCE:g}"
+            if reported:
+                note += "; the curve fit's maps reported: " + "; ".join(reported)[:400]
+            return not kept, note + ("; " + "; ".join(kept)[:300] if kept else "")
+        return not beyond, f"a stopped run, file by file within {FILE_TOLERANCE:g}" + (
+            "; " + "; ".join(beyond)[:500] if beyond else ""
+        )
     proc = subprocess.run(
         [
             sys.executable,
@@ -333,15 +384,36 @@ def judge_values(ref: Path, other: Path, file_by_file: bool) -> tuple[bool, str]
         return False, "; ".join(failed)[:600]
     if proc.returncode != 0:
         if "model.py" in proc.stderr:
-            diffs = _within(outputs.compare(ref / "out", other / "out"), FILE_TOLERANCE)
+            diffs = _within(
+                outputs.compare(ref / "out", other / "out"),
+                FILE_TOLERANCE,
+                ref / "out",
+                other / "out",
+            )
             last = proc.stderr.strip().splitlines()[-1][:120]
             note = f"outside check.py's model ({last}): file by file within {FILE_TOLERANCE:g}"
             return not diffs, note + ("; " + "; ".join(diffs)[:500] if diffs else "")
         return False, proc.stderr.strip()[-300:]
     share = [x for x in lines if "(b)/(c) share" in x]
-    identical = sum(1 for x in lines if x.startswith("PASS") and " failed" in x)
-    m = re.search(r"share ([0-9.]+%) of the fit voxels", share[0]) if share else None
-    return True, f"{identical} rows pass" + (f"; (b)/(c) share {m.group(1)}" if m else "")
+    rows = sum(1 for x in lines if x.startswith("PASS") and " failed" in x)
+    counts = [tuple(map(int, m.group(2, 3))) for x in lines if (m := _ROW.match(x))]
+    n = sum(c[0] for c in counts)
+    k = sum(c[1] for c in counts)
+    m = _SHARE.search(share[0]) if share else None
+    return True, f"{rows} rows pass [{k}/{n} values identical]" + (
+        f"; (b)/(c) share {m.group(1)}%" if m else ""
+    )
+
+
+#: check.py's row line: ``PASS <output>: <n> values, <k> identical, ...``.
+_ROW = re.compile(r"^(PASS|FAIL) [^:]+: (\d+) values, (\d+) identical")
+_SHARE = re.compile(r"share ([0-9.]+)% of the fit voxels")
+
+
+def value_counts(detail: str) -> tuple[int, int] | None:
+    """(identical, compared) over check.py's rows, from ``judge_values``'s detail."""
+    m = re.search(r"\[(\d+)/(\d+) values identical\]", detail)
+    return (int(m.group(1)), int(m.group(2))) if m else None
 
 
 def compare_runs(
@@ -391,6 +463,25 @@ def compare_runs(
     if "t2smap_call.sh" in f_ref and "t2smap_call.sh" in f_other:
         ok, detail = judge_values(ref_case, other_case, file_by_file)
         checks(f"{label} values (§17.3)", ok, detail=detail)
+        # kept in the record as reported values (the site's verdicts read them)
+        counts = value_counts(detail)
+        if counts is not None:
+            checks(
+                f"{label} values identical",
+                True,
+                value=f"{counts[0]}/{counts[1]}",
+                threshold="reported",
+            )
+        m = re.search(r"\(b\)/\(c\) share ([0-9.]+)%", detail)
+        if m:
+            checks(
+                f"{label} curve fit (b)/(c) share (%)",
+                True,
+                value=float(m.group(1)),
+                threshold="reported",
+            )
+        if detail == "identical":
+            checks(f"{label} values identical", True, value="every file", threshold="reported")
 
 
 # --------------------------------------------------------------------------------------------
@@ -495,8 +586,18 @@ def explain(
         def strip46(lines: list[str]) -> list[str]:
             return [x for x in lines if not _TED46_LINES.match(x)]
 
-        n_ref = [x for x in notices(ref[2]) if "TED-46" not in x]
-        n_other = [x for x in notices(other[2]) if "TED-46" not in x]
+        # TED-46's values move the cap (TED-05's count) and the curve fit's failures (TED-07's,
+        # TED-08's, TED-15's counts): the same defects named, their numbers aside
+        def named(err: str) -> list[str]:
+            return sorted(
+                {
+                    re.sub(r"\d+", "<n>", x)
+                    for x in notices(err)
+                    if not re.search(r"defect TED-(46|05) ", x)
+                }
+            )
+
+        n_ref, n_other = named(ref[2]), named(other[2])
         ok = {"values (§17.3)"}
         if strip46(m_ref) == strip46(m_other) or (
             label.startswith("(B)")

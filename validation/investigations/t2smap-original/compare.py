@@ -60,13 +60,17 @@ def extra_inputs(d: Path) -> None:
     mask = np.asanyarray(nib.load(str(d / "mask.nii.gz")).dataobj)
     blackbox.save(mask[..., None], d / "mask-4d.nii.gz", dtype=np.uint8)
     blackbox.save(mask[:, :, :-1], d / "mask-grid.nii.gz", dtype=np.uint8)
-    # one slab of voxels with one good echo among the others: echo 2 rising (the decay test
-    # fails: count 1, the two-echo fit's start has T2* < 0) or dropped out (count 1 by the
-    # dropout test: the two-echo fit converges)
+    # voxels with one good echo among the others: half a slab with echo 2 rising (the decay
+    # test fails: count 1, the two-echo fit's start has T2* < 0) and six voxels whose echoes 2
+    # and 3 fall to a twentieth and a hundredth of echo 1 (count 1 by the dropout test, too few
+    # to move its thresholds: the two-echo fit converges)
     mixed = ech[1].copy()
-    mixed[0::2, :, 3, :] = ech[0][0::2, :, 3, :] * np.float32(1.2)
-    mixed[1::2, :, 3, :] = ech[0][1::2, :, 3, :] * np.float32(0.05)
-    blackbox.save(mixed, d / "mixed-e2.nii.gz")
+    mixed[0::2, :, 3, :] = ech[0][0::2, :, 3, :] * 1.2
+    mixed[6:9, 6:8, 4, :] = ech[0][6:9, 6:8, 4, :] * 0.05
+    blackbox.save(mixed, d / "mixed4-e2.nii.gz")
+    mixed3 = ech[2].copy()
+    mixed3[6:9, 6:8, 4, :] = ech[0][6:9, 6:8, 4, :] * 0.01
+    blackbox.save(mixed3, d / "mixed4-e3.nii.gz")
 
 
 def files(names: list[str]) -> list[str]:
@@ -141,15 +145,21 @@ EXTRA: list[tuple[str, list[str], int]] = [
     ("x-curvefit-no-mask", [*E3, *TES, "--fittype", "curvefit", "--debug"], 1),
     (
         "x-curvefit-one-echo-voxels",
-        [*files(["e1.nii.gz", "mixed-e2.nii.gz", "e3.nii.gz"]), *TES, *MASK]
+        [*files(["e1.nii.gz", "mixed4-e2.nii.gz", "mixed4-e3.nii.gz"]), *TES, *MASK]
         + ["--masktype", "dropout", "decay", "--fittype", "curvefit", "--verbose", "--debug"],
         1,
     ),
     (
         "x-ts-curvefit-one-echo-voxels",
-        [*files(["e1.nii.gz", "mixed-e2.nii.gz", "e3.nii.gz"]), *TES, *MASK]
+        [*files(["e1.nii.gz", "mixed4-e2.nii.gz", "mixed4-e3.nii.gz"]), *TES, *MASK]
         + ["--masktype", "dropout", "decay", "--fittype", "curvefit", "--fitmode", "ts"]
         + ["--verbose", "--debug"],
+        1,
+    ),
+    (
+        "x-cap-zero-curvefit",
+        [*files(["e1.nii.gz", "neg-e2.nii.gz", "e3.nii.gz"]), *TES, *MASK]
+        + ["--fittype", "curvefit", "--verbose", "--debug"],
         1,
     ),
     (
@@ -205,7 +215,7 @@ def main(argv: list[str]) -> int:
     # the inputs are shared by every report of the work folder (the same paths in every call
     # file); made once, seeded, so every program reads the same bytes
     inputs = a.work.resolve() / "inputs"
-    if not (inputs / "mixed-e2.nii.gz").exists():
+    if not (inputs / "mixed4-e3.nii.gz").exists():
         if inputs.exists():
             import shutil
 

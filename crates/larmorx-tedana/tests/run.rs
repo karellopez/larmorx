@@ -218,6 +218,94 @@ fn loglin_files_order_and_threads() {
     assert!(err.contains("desc-adaptiveGoodSignal_mask.nii.gz already exists."));
 }
 
+/// The curve fit's files (§7.3, §11.1: the failures and, with `--verbose`, the variances, in
+/// that order after the adaptive mask) are the same at one and at four threads, in both fit
+/// modes.
+#[test]
+fn curvefit_files_order_and_threads() {
+    let dir = tempfile::tempdir().unwrap();
+    write_inputs(dir.path());
+    for mode in ["all", "ts"] {
+        let mut outs = Vec::new();
+        for threads in ["1", "4"] {
+            let o = format!("cf-{mode}-{threads}");
+            let mut args = base(&[
+                "--fittype",
+                "curvefit",
+                "--verbose",
+                "--fitmode",
+                if mode == "all" { "all" } else { "ts" },
+                "--n-threads",
+                threads,
+                "--out-dir",
+            ]);
+            args.push(Box::leak(o.clone().into_boxed_str()));
+            let (code, _, err) = run(dir.path(), &args, &[]);
+            assert_eq!(code, 0, "{err}");
+            outs.push(dir.path().join(o));
+        }
+        let reg = std::fs::read_to_string(outs[0].join("desc-tedana_registry.json")).unwrap();
+        let keys: Vec<&str> = reg
+            .lines()
+            .filter_map(|l| l.trim().strip_prefix('"'))
+            .filter_map(|l| l.split('"').next())
+            .collect();
+        assert_eq!(
+            keys,
+            [
+                "adaptive mask img",
+                "combined img",
+                "confounds tsv",
+                "data description json",
+                "fit failures img",
+                "limited s0 img",
+                "limited t2star img",
+                "rmse img",
+                "s0 img",
+                "s0 variance img",
+                "t2star img",
+                "t2star variance img",
+                "t2star-s0 covariance img",
+            ]
+        );
+        for name in [
+            "desc-decayFitFailures_mask.nii.gz",
+            "stat-variance_desc-t2star_statmap.nii.gz",
+            "stat-variance_desc-s0_statmap.nii.gz",
+            "stat-covariance_desc-t2star+s0_statmap.nii.gz",
+            "S0map.nii.gz",
+            "T2starmap.nii.gz",
+            "desc-limited_T2starmap.nii.gz",
+            "desc-rmse_statmap.nii.gz",
+            "desc-optcom_bold.nii.gz",
+            "desc-confounds_timeseries.tsv",
+        ] {
+            let read = |d: &Path| {
+                if name.ends_with(".tsv") {
+                    std::fs::read(d.join(name)).unwrap()
+                } else {
+                    let img = nifti::read(d.join(name), &Default::default()).unwrap();
+                    format!("{:?}", img.data).into_bytes()
+                }
+            };
+            assert_eq!(
+                read(&outs[0]),
+                read(&outs[1]),
+                "{mode}: {name} depends on the threads"
+            );
+        }
+        let fail = nifti::read(
+            outs[0].join("desc-decayFitFailures_mask.nii.gz"),
+            &Default::default(),
+        )
+        .unwrap();
+        assert_eq!(
+            fail.header.data_type().unwrap(),
+            larmorx_core::element::DataType::U8
+        );
+    }
+}
+
 #[test]
 fn defaults_correct_and_name_the_defects() {
     let dir = tempfile::tempdir().unwrap();

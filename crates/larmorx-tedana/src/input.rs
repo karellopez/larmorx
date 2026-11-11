@@ -483,9 +483,23 @@ pub fn read_data(
         });
     let mut x: Vec<f32> = Vec::new();
     let mut n_t = 0;
+    // the files are decoded side by side, `n_threads` at a time (inflating one file is
+    // sequential), then checked and gathered in echo order: the first echo that fails is the
+    // one reported, as when they are read one after the other (tedana holds every echo at once,
+    // so the batch stays within its memory)
+    let batch = n_threads.clamp(1, n_echo.max(1));
+    let inner = (n_threads / batch).max(1);
+    let mut decoded: Vec<Result<nifti::NiftiImage, PyError>> = Vec::new();
     for (e, given) in files.iter().enumerate() {
-        let path = resolve(cwd, given);
-        let img = read_f32(&path, given, n_threads)?;
+        if e % batch == 0 {
+            let names = &files[e..(e + batch).min(n_echo)];
+            decoded = names
+                .par_iter()
+                .map(|g| read_f32(&resolve(cwd, g), g, inner))
+                .collect();
+            decoded.reverse();
+        }
+        let img = decoded.pop().expect("one decoded file per echo")?;
         let shape = img.data.shape().to_vec();
         if nilearn_path {
             let affine = img

@@ -628,15 +628,35 @@ fn curve_images(
     let failures: Vec<u8> = (0..curve.failed.len())
         .map(|k| if one(k) && !fix { 0 } else { curve.failed[k] })
         .collect();
-    let mut ted08 = Vec::new();
+    let f32_of = |x: f64| x as f32;
+    let k_var_one = if verbose {
+        (0..curve.pcov.len())
+            .filter(|&k| one(k) && curve.pcov[k].iter().any(|&x| f32_of(x) != 0.0))
+            .count()
+    } else {
+        0
+    };
+    // one notice per defect (the replica's form, observed): the failures where there are some,
+    // else the variances
     if k_failed_one > 0 {
-        ted08.push(format!(
-            "{k_failed_one} failed fit(s) of voxels with one good echo marked in the failures map"
-        ));
+        notices.add(
+            &defects::TED_08,
+            format!(
+                "{k_failed_one} failed fit(s) of voxels with one good echo marked in the \
+                 failures map"
+            ),
+        );
+    } else if k_var_one > 0 {
+        notices.add(
+            &defects::TED_08,
+            format!(
+                "the variances of {k_var_one} voxel(s) with one good echo kept in the variance \
+                 maps"
+            ),
+        );
     }
     outputs.image("fit failures img", spec, &failures, cols, ts)?;
     if verbose {
-        let f32_of = |x: f64| x as f32;
         let swaps = (0..curve.pcov.len()).any(|k| {
             !one(k) && f32_of(curve.pcov[k][0]).to_bits() != f32_of(curve.pcov[k][1]).to_bits()
         });
@@ -645,14 +665,6 @@ fn curve_images(
                 &defects::TED_07,
                 "the T2* and S0 variance maps hold their own variances",
             );
-        }
-        let k_var_one = (0..curve.pcov.len())
-            .filter(|&k| one(k) && curve.pcov[k].iter().any(|&x| f32_of(x) != 0.0))
-            .count();
-        if k_var_one > 0 {
-            ted08.push(format!(
-                "the variances of {k_var_one} voxel(s) with one good echo kept in the variance maps"
-            ));
         }
         // tedana writes P[0, 0] (S0's variance) as the T2* variance and P[1, 1] as S0's (TED-07)
         let (t2s_index, s0_index) = if fix { (1, 0) } else { (0, 1) };
@@ -667,16 +679,9 @@ fn curve_images(
                 })
                 .collect()
         };
-        if !ted08.is_empty() {
-            notices.add(&defects::TED_08, ted08.join("; "));
-            ted08.clear();
-        }
         outputs.image("t2star variance img", spec, &map(t2s_index), cols, ts)?;
         outputs.image("s0 variance img", spec, &map(s0_index), cols, ts)?;
         outputs.image("t2star-s0 covariance img", spec, &map(2), cols, ts)?;
-    }
-    if !ted08.is_empty() {
-        notices.add(&defects::TED_08, ted08.join("; "));
     }
     Ok(())
 }

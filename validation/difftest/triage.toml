@@ -4324,3 +4324,78 @@ signature = ["timeout"]
 status = "fixed"
 explanation = "brain_masker cases whose random walker does not converge (fmapb-try1 216, 492): SciPy's conjugate gradients run to their limit (2 x 162,120 iterations), 23 s in sdcflows and 209 s in larmorx at one thread (relay27/slow_masker_*.py): no result within the 240 s limit; the limit is 900 s and brain_masker drawn less often; in the trial 8 of 518 brain_masker cases still had no result within 900 s (the walkers that do not converge); one of them (fmapb-trial 4563) run to its end outside the limit agrees bit for bit, its fix pass too (726 s for sdcflows and larmorx's two modes). Fixed in relay 28 (same bits): the image's grey closing is 0 everywhere, so sdcflows divides 0 by 0 and the random walker's system is NaN; larmorx's conjugate gradients now stop once the solution is all NaN and the residual holds a NaN (no later iteration can change either), with SciPy's result and info = maxiter: 209 s became 0.02 s; the trial's 59 slow or timed-out brain_masker cases and 80 others replayed, all agree (the 8 timeouts now 73 to 199 s (14 replays at once), sdcflows' own time)"
 link = "validation/investigations/sdcflows-fieldmap-b/relay28/replay_masker_cases.py"
+
+# --- tedana-t2smap-original: the trial of 2026-11-11 (oracles/difftest/2026-11-11-t2smap-original,
+# seed t2smap-original-trial, 30 minutes, 4 jobs at one thread, 2 GiB a case: 1,761 cases, 1,399
+# agree, 362 differ), classified by validation/investigations/t2smap-original/classify.py; the
+# original's open causes go to the next clean-room relay with the finding files as reproducers.
+
+[[difference]]
+tool = "tedana-t2smap-original"
+implementation = "original"
+signature = ["(A) values (§N.N)", "(B) values (§N.N)"]
+status = "harness"
+explanation = "175 of the trial's 362: the descriptor's NIfTI-2, NIfTI-1 pair, ANALYZE, MGH and 4D-mask cases are judged file by file, exactly, or by the spec's check.py, whose model reads NIfTI-1 single files only (NotImplementedError); the original's fits are held to §17.3, not to bit-identity. To do: NIfTI-1 copies of those inputs for check.py's model. 9 more NIfTI-1 cases fail check.py's rows (e.g. findings 232, 511, 526): open, for the next clean-room relay."
+
+[[difference]]
+tool = "tedana-t2smap-original"
+implementation = "original"
+signature = ["(A) values (§N.N)"]
+status = "harness"
+explanation = "As the entry above, for (A) alone (59 cases: file by file, exact, where §17.3 applies)."
+
+[[difference]]
+tool = "tedana-t2smap-original"
+implementation = "original"
+signature = ["(B) messages"]
+status = "harness"
+explanation = "The replica's known message gaps (one of two chained tracebacks, numpy's RuntimeWarning lines, the dropout thresholds' zero-padded digits) are taken out before (B) compares, but the thresholds' line is compared by value only when numpy prints it on one line: a wrapped array (five or six echoes in scientific form) is not joined yet (34 cases)."
+
+[[difference]]
+tool = "tedana-t2smap-original"
+implementation = "original"
+signature = ["(A) messages", "(A) values (§N.N)", "(B) messages", "(B) values (§N.N)"]
+status = "open"
+explanation = "45 cases with numpy's 'divide by zero encountered in divide' in the original only: the closed-form log-linear fit gives an exact zero slope (integer data, equal observations at echo times symmetric about the middle one) where tedana's batched SVD leaves rounding noise, so T2* is infinite (then floored) in the original and huge in tedana, which moves the cap; within §16's latitude for the fit, outside §17.3's cap row. A question for a spec writer (how §17.3 judges such voxels) before any change; e.g. findings 11, 85, 93."
+
+[[difference]]
+tool = "tedana-t2smap-original"
+implementation = "original"
+signature = ["(A) messages"]
+status = "open"
+explanation = "The original's messages against tedana's: 17 with other RuntimeWarning lines (e.g. findings 24, 252, 289), 5 without numpy's 'invalid value encountered in scalar divide' before the adaptive mask's '(nan%)' warning (13, 207, 718), and the empty-mask cases below; for the next clean-room relay."
+
+[[difference]]
+tool = "tedana-t2smap-original"
+implementation = "original"
+signature = ["(A) messages", "(B) messages"]
+status = "open"
+explanation = "20 cases of an empty user mask or one of another grid: tedana's 'ValueError: Image/mask shape mismatch' (and its order against the dummy scans' and the dropout's errors) where the original raises the dropout's IndexError, and the replica nilearn's empty-mask refusal (e.g. findings 130, 141, 222); for the next clean-room relay."
+
+[[difference]]
+tool = "tedana-t2smap-original"
+implementation = "original"
+signature = ["(B) notices"]
+status = "open"
+explanation = "18 cases whose D13 notices differ between the replica's default and the original's (TED-15's voxel count, TED-08's; e.g. findings 34, 162, 223); for the next clean-room relay."
+
+[[difference]]
+tool = "tedana-t2smap-original"
+implementation = "original"
+signature = ["(B) the original's default reads them as reproduce"]
+status = "harness"
+explanation = "13 ANALYZE/MGH cases: the check assumed the original's default and reproduce exit alike, which a D13 correction changes (e.g. findings 50, 153); to be compared as the other cases' (A) and (B) are."
+
+[[difference]]
+tool = "tedana-t2smap-original"
+implementation = "original"
+signature = ["(B) the replica refuses ANALYZE and MGH (its documented gap)"]
+status = "harness"
+explanation = "15 ANALYZE/MGH cases that fail before any image is read (a parser or echo-time error), where the replica does not reach its refusal: the check must accept both programs failing alike there."
+
+[[difference]]
+tool = "tedana-t2smap-original"
+implementation = "original"
+signature = ["(A) exit status", "(A) files", "(A) messages", "(A) values (§N.N)", "(B) exit status", "(B) files", "(B) messages", "(B) values (§N.N)"]
+status = "open"
+explanation = "2 cases where one program fails and the other completes (findings 224, 807); for the next clean-room relay."

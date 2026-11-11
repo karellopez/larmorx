@@ -21,3 +21,11 @@ results are in the part's NOTES and, from relay 3 on, in the record.
 The curve fit's runs of 2026-11-11 (relay 2b): the probe's cases and the added ones in `<scratch>/cmp2`
 (and the one-echo-voxel cases alone in `cmp3`), fMRIPrep's four curve-fit calls at 1 and 8 threads;
 the results in the part's NOTES.
+
+## Relay 3a-ii (2026-11-11): benchmarks and random testing
+
+| Script | What it shows | How to run |
+|---|---|---|
+| `bench.py` | wall times of fMRIPrep's five multi-echo calls: tedana once (fresh, through the oracle cache with a reason never to store it), the replica's default and the original in both modes at each thread count (best of `--repeat`), the original's files at every thread count identical to one thread's (`docs/benchmarks/tedana-t2smap.md`, "The clean-room original"; `tedana-t2smap-original.json`) | `python -P bench.py <work> --replica <larmorx-gpl> --threads 1,8 --repeat 2 --json <file>` (boxed) |
+| `replay.py` | a random-testing finding of `tedana-t2smap-original` by hand: its inputs rebuilt from the recipe, tedana, the original in both modes and the replica, each one's exit status and standard error (tracebacks kept to their first and last lines, warnings without their location and source lines) | `python -P replay.py <finding.json> [--drawn] [--keep DIR] [--only tedana,reproduce,default,replica]` (boxed) |
+| `classify.py` | a trial's findings by cause (the first rule matching a failed check's detail), with their signatures and examples: the categories of `validation/difftest/triage.toml`'s entries for the tool | `python3 classify.py <oracles/difftest/<trial>>` |

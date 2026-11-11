@@ -375,6 +375,12 @@ defects! {
         "the index matches the entity patterns against each file's absolute path, so the folders above the dataset give its files entities: below a folder named func, sub-pilot or run-2 every file gets datatype func, subject pilot or run 2, and with the derivatives configuration (whose den-, res-, desc-, ... patterns have no separator before them) below golden-x or andres-lab every file gets den or res";
     PIPE_40 = "PIPE-40", "niworkflows IntraModalMerge", true,
         "with to_ras the series is reoriented to RAS but in_mask is not, so grand_mean_scaling indexes the RAS series with the mask on the input's grid: numpy's IndexError when the shapes differ, a mirrored or permuted mask when they agree";
+    PIPE_46 = "PIPE-46", "nipype compute_dvars", true,
+        "the voxel-wise standardisation, which runs whatever DVARS the caller asked for, turns numpy's floating-point warnings into errors: a voxel whose predicted difference SD is 0 (a robust SD of 0, kept by remove_zerovariance=False, or an AR(1) estimate of exactly 1) stops the whole computation with RuntimeWarning: divide by zero (or invalid value) encountered in divide, and every DVARS series is lost";
+    PIPE_47 = "PIPE-47", "nipype compute_dvars", true,
+        "an AR(1) estimate above 1, which the float32 FFT's rounding gives for a series whose lag-1 autocorrelation is just below 1, makes the predicted difference SD the square root of a negative number: NaN, so every standardised and voxel-wise DVARS value is NaN, without an error";
+    PIPE_50 = "PIPE-50", "nipype compute_dvars", true,
+        "a voxel whose demeaned series is all zeros (a constant voxel, kept by remove_zerovariance=False) has the AR(1) Yule-Walker equation 0 a = 0: with SciPy 1.15 nitime's solve returns NaN, which makes every standardised and voxel-wise DVARS value NaN without an error; with SciPy 1.18 it raises LinAlgError: A singular matrix detected.";
     SCI_02 = "SCI-02", "SciPy ndimage", true,
         "NaN and out-of-range values written to an integer output are converted as x86-64 converts them (C leaves the conversion undefined)";
     SCI_03 = "SCI-03", "SciPy ndimage", true,
@@ -413,6 +419,8 @@ defects! {
         "sum_labels (sum, center_of_mass) with a sequence index fails on a 0-d index array (TypeError: numpy.int64 does not support item assignment) and on an empty input (ValueError of labels.min(), or IndexError for uint64 labels)";
     SCI_31 = "SCI-31", "SciPy ndimage", true,
         "a binary erosion or dilation of more than one pass (the propagation strategy: the structure's centre true, no brute_force; binary_opening, binary_closing and binary_propagation too) with an int8 mask array uses the caller's mask as its scratch, as SciPy's cast to int8 does not copy it: the mask is left -1 where it was true and the first pass's output where it was false, and binary_closing's erosion then reads that overwritten mask, so its result differs";
+    SCI_41 = "SCI-41", "SciPy linalg.solve", true,
+        "SciPy 1.15 solves a diagonal system (every 1 x 1 system) by dividing, so a singular one gives inf or NaN with RuntimeWarnings only (its general path raises LinAlgError: Matrix is singular.), and checks only the matrix for infinities and NaNs, not the right-hand side; SciPy 1.18 raises LinAlgError: A singular matrix detected. and checks both";
     NP_03 = "NP-03", "numpy", true,
         "numpy's float32 log on x86-64 CPUs with AVX2 and FMA3 or AVX-512 is numpy's own kernel, which is not correctly rounded (10,947,841 of the 201,326,593 floats in [1, 2^24] get a result up to 3 units in the last place from the exact value; 78.4 million of all positive floats, up to 4), and the C library's logf on other CPUs: tedana's t2smap takes it for its log-linear T2* and S0 fit (the logarithm of float32 data plus 1), so its maps' last bits, and the curve fit started from them, depend on the CPU";
     SDC_01 = "SDC-01", "sdcflows", true,

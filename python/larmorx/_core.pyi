@@ -2088,3 +2088,37 @@ def scipy_fftpack(
     pocketfft (``scipy="1.15.3"``, ``"1.15.2"``); complex64. ``ValueError`` for a length below
     one, ``NotImplementedError`` for another length or, with ducc0, a complex array of 131072
     values or more."""
+
+def numpy_cmul64(a: np.ndarray, b: np.ndarray) -> np.ndarray:
+    """numpy's complex64 product ``a * b`` of two one-dimensional complex64 arrays, as numpy
+    computes it on x86-64 with AVX2 and FMA3 (``re = fma(a.re, b.re, -(a.im b.im))``)."""
+
+def nitime_crosscov(
+    x: np.ndarray, y: np.ndarray, all_lags: bool = False, scipy: str = "1.18.1"
+) -> np.ndarray:
+    """nitime's ``crosscov(x, y, debias=False, all_lags=all_lags)`` of two float32 series of one
+    length (``autocorr(x)``: ``y = x``) with SciPy ``scipy``'s FFTs; float32."""
+
+def scipy_solve_1x1(a: float, b: float, scipy: str = "1.18.1") -> float:
+    """SciPy ``scipy``'s ``linalg.solve([[a]], [b])`` of float32 values, or its error
+    (``ValueError``, ``numpy.linalg.LinAlgError``)."""
+
+def nitime_ar_est_yw(x: np.ndarray, scipy: str = "1.18.1") -> tuple[np.ndarray, float]:
+    """nitime's ``AR_est_YW(x, 1)`` of a float32 series: ``(ak, sigma_v)``, ``ak`` a float32
+    array of one value (empty for one value with SciPy 1.18), or SciPy's error."""
+
+def nipype_compute_dvars(
+    mfunc: np.ndarray,
+    remove_zerovariance: bool = False,
+    variance_tol: float = 0.0,
+    intensity_normalization: float = 1000.0,
+    numpy: str = "2.5.4",
+    scipy: str = "1.18.1",
+    upstream_defects: str = "fix",
+    n_threads: int = 1,
+) -> tuple[
+    np.ndarray, np.ndarray, np.ndarray, np.ndarray, int, list[tuple[str, str, str, str]]
+]:
+    """nipype's ``compute_dvars`` on the masked series ``mfunc`` (float32, one row per voxel in
+    the mask's C order): ``(dvars_stdz, dvars_nstd, dvars_vx_stdz, ar1, voxels, notices)``, or
+    nipype's error (``larmorx.confounds.compute_dvars`` is the public form)."""

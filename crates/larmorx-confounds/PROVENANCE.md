@@ -36,3 +36,28 @@ power of two up to 2^31 (`examples/twiddle_survey.rs`, which builds them with
 `larmorx_core::math::sincos_glibc` too). The arithmetic is SSE's single precision
 (`larmorx_core::numpy::NpFloat`); the extensions are built for the x86-64 baseline (no fused
 multiply-add, checked with `objdump`).
+
+## Relay 2e-ii: nitime's AR(1) and nipype's DVARS (`nitime`, `dvars`)
+
+nipype 1.12.0's `compute_dvars` (PyPI sdist `nipype-1.12.0.tar.gz`, SHA-256
+`784098a8a54839836fa0eba2fa1c2040a365a272d0b28692578b5b15b475aeeb`, `<workspace>/tags/nipype-1.12.0`;
+Copyright (c) 2009-2016, Nipype developers, Apache-2.0) with nitime 0.12.1's AR(1) estimate (PyPI
+sdist `nitime-0.12.1.tar.gz`, SHA-256
+`12cbf488b0655dc05aa18a0ca5982de970302604e461fc92e87ebd9b7539b6ff`, `<workspace>/tags/nitime-0.12.1`;
+Copyright (c) 2006-2011, NIPY Developers, BSD-3-Clause; nitime 0.11, fMRIPrep 25.2.6's, sdist
+SHA-256 `e087bc7ee93d08a767ffae13b027cdd8da36754d7a202a4145661eaeaa85d3fd`, `<workspace>/tags/nitime-0.11`:
+numerically the same on these functions), SciPy 1.18.1's and 1.15.3's `linalg.solve` (the 1 × 1
+paths; BSD-3-Clause, notice above) and numpy 2.5.4's complex64 product and `np.dot` dispatch
+(Copyright (c) 2005-2025, NumPy Developers, BSD-3-Clause).
+
+| larmorx | Upstream | Licence |
+|---|---|---|
+| `nitime::{cmul, cmul_plain, cmul_inplace}` | numpy 2.5.4 `numpy/_core/src/umath/loops_arithm_fp.dispatch.c.src` (`@TYPE@_multiply` for `CFLOAT`: the contiguous SIMD loop, `simd_cmul_f32`, `npyv_muladdsub_f32`; the scalar loop it takes for a zero output stride) | BSD-3-Clause |
+| `nitime::{CrosscovPlan, fft_size}` (`fftconvolve_reversed`, `crosscov`, `crosscov_all_lags`, `autocorr_01`) | nitime 0.12.1 `nitime/utils.py` (`fftconvolve` with `axis`, `crosscov`, `autocov`, `autocorr`) | BSD-3-Clause |
+| `nitime::{scipy_solve_1x1, SolveRelease, SolveError}` | SciPy 1.18.1 `scipy/linalg/_basic.py` (`solve`: `_asarray_validated(check_finite)`, `a_is_scalar`, `LinAlgError("A singular matrix detected.")`); SciPy 1.15.3 `scipy/linalg/_basic.py` (`solve`: the shape checks, `_find_matrix_structure`'s "diagonal", `_matrix_norm_diagonal`'s `asarray_chkfinite`, `x = (b.T / diag(a)).T`, `_solve_check`); `scipy/linalg/_special_matrices.py` (`toeplitz`) | BSD-3-Clause |
+| `nitime::{ar_est_yw1, ArYw1}` | nitime 0.12.1 `nitime/algorithms/autoregressive.py` (`AR_est_YW`); numpy 2.5.4 `arraytypes.c.src` (`FLOAT_dot`, OpenBLAS's `sdot` of one element) for `sigma_v` | BSD-3-Clause |
+| `dvars::{compute_dvars, DvarsOptions, Dvars, DvarsError}` | nipype 1.12.0 `nipype/algorithms/confounds.py` (`compute_dvars`, `_AR_est_YW`, `regress_poly`); numpy 2.5.4 `numpy/_core/src/common/cblasfuncs.c` (`cblas_matrixproduct`: the vector-matrix `gemv`, the dot product of one voxel, the scalar and outer products), `numpy/lib/_shape_base_impl.py` (`apply_along_axis`'s order and its empty-axis `ValueError`), `numpy/_core/_methods.py` (`_mean`), `numpy/_core/src/umath/ufunc_object.c` (the floating-point error order: divide, overflow, underflow, invalid) | Apache-2.0, BSD-3-Clause |
+
+The numerics underneath are the parent crates': numpy's `pinv` (`larmorx_transform::numpy_linalg::svd`),
+OpenBLAS's `dgemv_t` and `ddot` (`larmorx_transform::openblas::level2`), numpy's median,
+percentiles and reductions (`larmorx_core::numpy`), SciPy's FFTs (`scipy_fft`, above).

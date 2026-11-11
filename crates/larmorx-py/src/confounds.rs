@@ -6,10 +6,11 @@
 //! the bidiagonal reduction (`DGEBRD`) at their Fortran interface (`lapack_*`, as
 //! `larmorx_transform::numpy_linalg::blocked` computes them), and the divide-and-conquer
 //! bidiagonal SVD (`DBDSDC` and its routines, [`svd`]), numpy's reductions and order
-//! statistics at the confounds' call sites ([`reductions`]) and SciPy's single-precision FFTs
-//! ([`fft`]); the validation compares them with numpy's and SciPy's own libraries. Matrices
-//! cross as flat column-major storage with their leading dimension, as BLAS takes them. The GIL
-//! is released while computing.
+//! statistics at the confounds' call sites ([`reductions`]), SciPy's single-precision FFTs
+//! ([`fft`]) and nipype's DVARS with nitime's AR(1) under it ([`dvars`]); the validation
+//! compares them with numpy's, SciPy's, nitime's and nipype's own libraries. Matrices cross as
+//! flat column-major storage with their leading dimension, as BLAS takes them. The GIL is
+//! released while computing.
 
 use larmorx_core::parallel;
 use larmorx_transform::numpy_linalg::blocked::{self, Direct, DlarftForm, Lapack, Storev};
@@ -23,6 +24,7 @@ use numpy::{PyArray, PyArray1, PyArray2, PyReadonlyArray1, PyReadonlyArray2};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 
+mod dvars;
 mod fft;
 mod gelsd;
 mod gesvd;
@@ -1146,5 +1148,6 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     gesvd::register(m)?;
     reductions::register(m)?;
     fft::register(m)?;
+    dvars::register(m)?;
     Ok(())
 }

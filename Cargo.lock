@@ -262,6 +262,8 @@ name = "larmorx-confounds"
 version = "0.1.0-rc.1"
 dependencies = [
  "larmorx-core",
+ "larmorx-transform",
+ "rayon",
  "thiserror",
 ]
 

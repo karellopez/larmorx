@@ -45,11 +45,11 @@ CALLS = {
 
 def inputs(run: str, task: str) -> tuple[list[Path], Path]:
     work = RUNS / run / "work"
-    wf = [
+    wf = next(
         p
         for p in sorted(work.glob("fmriprep_25_2_wf/*/*/bold_native_wf/bold_t2smap_wf"))
         if f"task_{task}_" in p.parent.parent.name
-    ][0]
+    )
     native = wf.parent
     echoes = sorted(native.glob("_echoidx_*/boldref_bold/*_xformresampled.nii.gz"))
     return echoes, wf / "dilate_mask" / "dilated_mask.nii.gz"

@@ -36,13 +36,16 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_ROOT_USER_ACTION=ignore \
     MPLCONFIGDIR=/tmp/larmorx-matplotlib
 # The release's own wheel; its [prep] dependencies (numpy, matplotlib, nilearn, pandas, jinja2,
-# templateflow and theirs) from PyPI, wheels only; /opt/larmorx/pip-freeze.txt lists what is installed.
+# templateflow and theirs) from PyPI, as `pip install "larmorx[prep]"` gets them: wheels, and a
+# pure-Python sdist built where a package has no wheel (docopt, for pybids' num2words; with
+# --only-binary :all: pip would fall back to pybids 0.18.1). /opt/larmorx/pip-freeze.txt lists
+# what is installed.
 RUN --mount=type=bind,source=wheels,target=/wheels \
     set -eu; \
     test -n "$VERSION"; \
     wheel=$(echo /wheels/larmorx-"$VERSION"-*.whl); \
     test -f "$wheel"; \
-    python -m pip install --only-binary :all: "$wheel[prep]"; \
+    python -m pip install "$wheel[prep]"; \
     python -m pip check; \
     mkdir -p /opt/larmorx; \
     python -m pip list --format=freeze > /opt/larmorx/pip-freeze.txt; \

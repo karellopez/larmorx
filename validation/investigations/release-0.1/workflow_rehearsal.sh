@@ -96,7 +96,7 @@ echo "(the smoke's glibc failures are expected on this host: see the header)"
 all() {
   /usr/bin/python3.12 -m venv "$R/venv-all" &&
     "$R/venv-all/bin/python" -m pip install -q --upgrade pip &&
-    "$R/venv-all/bin/python" -m pip install -q --only-binary :all: --find-links programs "larmorx[all]==$VERSION" &&
+    "$R/venv-all/bin/python" -m pip install -q --only-binary larmorx,larmorx-nc,larmorx-gpl --find-links programs "larmorx[all]==$VERSION" &&
     "$R/venv-all/bin/python" -m pip check &&
     "$R/venv-all/bin/python" -c "import importlib.util as u; m = [n for n in ('matplotlib', 'nilearn', 'pandas', 'jinja2', 'templateflow') if u.find_spec(n) is None]; assert not m, m"
 }

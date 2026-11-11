@@ -84,6 +84,15 @@ RUNNER = (
     "os.getcwd())\n"
     "sys.stdout.write(out)\nsys.stderr.write(err)\nsys.exit(code)\n"
 )
+#: What each correction the example's defaults name changes (the register's entries).
+WHAT = {
+    "TED-05": "the full T2* map capped as the limited one",
+    "TED-07": "each variance in its own map",
+    "TED-08": "the failed fits of voxels with one good echo marked",
+    "TED-46": "observations without a slope fitted with the slope 0",
+    "NP-03": "the correctly rounded float32 logarithm",
+    "GLIBC-07": "the correctly rounded exponential",
+}
 _NOTICE = re.compile(r"^larmorx(?:-gpl)?: upstream defect (\S+) \((\w+)\) (corrected|reproduced)")
 
 
@@ -278,9 +287,8 @@ def _example(ctx: core.Context) -> dict:
             x["verdict"] = "bit-identical" if same[i] else "d13"
             x["reason"] = common.clip(
                 "The default's corrections, each named by its notice: "
-                + (", ".join(ids) if ids else "none named")
-                + " (TED-05 caps the full T2* map as the limited one; NP-03 and GLIBC-07 take "
-                "the correctly rounded logarithm and exponential).",
+                + ("; ".join(f"{d} ({WHAT.get(d, 'see the register')})" for d in ids) or "none")
+                + ".",
                 400,
             )
         elif i == "original-replica":
@@ -460,8 +468,11 @@ def _trial(ctx: core.Context) -> tuple[list[dict], list[dict]]:
         )
         if e.get("tool") == DIFFTEST_TOOL and TRIAL in e.get("explanation", "")
     ]
+    settled = all(e["status"] in ("fixed", "harness", "explained", "register") for e in entries)
     rows = [{"head": f"{n_cases:,} random cases (30 minutes, seed {summary['seed']})",
-             "verdict": "within-variability" if not n_diff else "open",
+             "sub": "every difference triaged and replayed through the part's fixes"
+             if settled and n_diff else "",
+             "verdict": "within-variability" if settled or not n_diff else "open",
              "cells": [common.cell(n_cases - n_diff, "count"), common.cell(n_diff, "count"),
                        common.cell(f"{len(entries)} triage entries")]}]  # fmt: skip
     for e in entries:
@@ -488,18 +499,18 @@ def _trial(ctx: core.Context) -> tuple[list[dict], list[dict]]:
     return [table], source
 
 
-def _memory(ctx: core.Context) -> list[tuple[str, float, float]]:
+def _memory(ctx: core.Context) -> list[tuple[str, float, float, float]]:
     path = common.oracles() / MEMORY_LOG
     if not path.is_file():
         return []
     rx = re.compile(r"t2smap ds003592 \((\w+), (\d+) thread\(s\)\): the original ([0-9.]+) MiB, "
-                    r"tedana ([0-9.]+) MiB")  # fmt: skip
+                    r"tedana ([0-9.]+) MiB, allowed ([0-9.]+) MiB")  # fmt: skip
     out = []
     for line in path.read_text(encoding="utf-8").splitlines():
         m = rx.search(line)
         if m:
             out.append((f"{m.group(1)}, {m.group(2)} thread(s)", float(m.group(3)),
-                        float(m.group(4))))  # fmt: skip
+                        float(m.group(4)), float(m.group(5))))  # fmt: skip
     return out
 
 
@@ -537,11 +548,12 @@ def _speed(ctx: core.Context) -> list[dict]:
             "Peak memory of fMRIPrep's ds003592 curve-fit call (MiB)",
             ["Run", {"label": "the original", "num": True}, {"label": "tedana", "num": True},
              {"label": "allowed", "num": True}],
-            [{"head": f"the original, {w}", "verdict": "within-variability" if o <= 1.1 * t + 8
+            [{"head": f"the original, {w}", "verdict": "within-variability" if o <= a
               else "open", "cells": [common.cell(o), common.cell(t),
-                                     common.cell(1.1 * t + 8)]} for w, o, t in mem],
-            note="tests/parity/test_memory_peak.py (the original's test): at most 10 % above "
-            "tedana's peak plus 8 MiB, tedana at one thread through the oracle-output cache.",
+                                     common.cell(a)]} for w, o, t, a in mem],
+            note="tests/parity/test_memory_peak.py (the original's test, its log): at most 10 % "
+            "above tedana's peak plus the interpreter's 8 MiB, tedana at one thread through the "
+            "oracle-output cache.",
         ))  # fmt: skip
     return out
 

@@ -1,6 +1,6 @@
 {
  "about": "SHA-256 of larmorx's outputs on Linux x86_64 for the golden cases in registry.py; every platform must reproduce them (docs/validation/golden.md). Written by scripts/record_golden.py; do not edit by hand.",
- "recorded": {"commit": "4e053fe27b7f0991a3e3665fe27fc33297d57c03", "date": "2026-11-11", "numpy": "2.3.5", "parity": "passed (pytest tests/parity, smoke tier)", "platform": "Linux x86_64", "python": "3.12.16"},
+ "recorded": {"commit": "6635146fbf051d7500bc92eb4bb3449d2a1a1279", "date": "2026-11-11", "numpy": "2.3.5", "parity": "passed (pytest tests/parity, smoke tier)", "platform": "Linux x86_64", "python": "3.12.16"},
  "cases": {
   "cli.afni.3dAutomask": {
    "depth:data": {"dtype": "<i2", "sample": "00000000020000000000020000000000", "sha256": "5eb371e03027e458585e506ca5feeb8a4a1673ee77a63e6a8442b5b23c1c3c85", "shape": [24, 20, 16], "sum": "2792.0"},
@@ -3541,7 +3541,7 @@
    "out/desc-limited_T2starmap.nii.gz:header": {"bytes": 352, "sha256": "6b5e2ba82daee82a8dad789f3be412c80fe0e92048be87e7692a939c768b512e"},
    "out/desc-optcom_bold.nii.gz:data": {"dtype": "<f4", "sample": "000000003d101a4400000000000000000000000000000000b6762b4400000000", "sha256": "d884c01ddc71bffff4ae9ac73e274aa8b3af434783cacbee86869daef3147e36", "shape": [12, 10, 8, 4], "sum": "290977.4954071045"},
    "out/desc-optcom_bold.nii.gz:header": {"bytes": 352, "sha256": "eece39a8a2cef76f1a2315a8303797825df71e69d1e5fb62adb6f5a497e8638a"},
-   "out/desc-rmse_statmap.nii.gz:data": {"dtype": "<f4", "sample": "0000000000000000000000006abeb14095d9c940000000000000000000000000", "sha256": "55d96d89acfb2a76e559aecb9fba457673d1c95f15a98f5eafb17b43ecf41475", "shape": [12, 10, 8], "sum": "1338.6635303497314"},
+   "out/desc-rmse_statmap.nii.gz:data": {"dtype": "<f4", "sample": "0000000000000000000000006abeb14095d9c940000000000000000000000000", "sha256": "2b73872536881a77e22eaa919242108316401207368fb43ae01a947fc28a293c", "shape": [12, 10, 8], "sum": "1338.6635303497314"},
    "out/desc-rmse_statmap.nii.gz:header": {"bytes": 352, "sha256": "6b5e2ba82daee82a8dad789f3be412c80fe0e92048be87e7692a939c768b512e"},
    "out/desc-tedana_registry.json": {"bytes": 446, "sha256": "663fa776b40a1dd3faeeaa5a10ddc48a9683909038ab12e2af489793be91b634"},
    "out/t2smap_call.sh": {"bytes": 105, "sha256": "e858948ab912f722ea3e24794ea1b292a8faf5bc00f321b80f5549641044a534"},

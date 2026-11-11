@@ -1,0 +1,537 @@
+// SPDX-License-Identifier: Apache-2.0
+//! Bindings of LAPACK's divide-and-conquer bidiagonal SVD (`DBDSDC` with `COMPQ = 'I'` and the
+//! routines under it: `DLASD0` to `DLASD5`, `DLASDQ`, `DLASDT`, `DLAMRG`, `DLAED6`, `DLASCL`) at
+//! their Fortran interface (`lapack_*`, as `larmorx_transform::numpy_linalg::bdsdc` computes
+//! them); the validation compares them with numpy's own library. Matrices cross as flat
+//! column-major storage with their leading dimension; index arrays as int64 (1-based, as LAPACK
+//! keeps them). The GIL is released while computing.
+
+use super::{contiguous, lapack_release, lapack_run, one_of, value_err};
+use larmorx_transform::numpy_linalg::bdsdc::{self, MergeWork};
+use larmorx_transform::numpy_linalg::blocked::Lapack;
+use larmorx_transform::openblas::trmm::Uplo;
+use numpy::{PyArray1, PyReadonlyArray1};
+use pyo3::exceptions::PyValueError;
+use pyo3::prelude::*;
+
+type F64s<'py> = Bound<'py, PyArray1<f64>>;
+type I64s<'py> = Bound<'py, PyArray1<i64>>;
+
+fn uplo(v: &str) -> PyResult<Uplo> {
+    one_of("uplo", v, &[("U", Uplo::Upper), ("L", Uplo::Lower)])
+}
+
+fn lp(lapack: &str, gemm_q: usize) -> PyResult<Lapack> {
+    Ok(Lapack {
+        release: lapack_release(lapack)?,
+        gemm_q,
+    })
+}
+
+fn indices(x: &PyReadonlyArray1<'_, i64>) -> PyResult<Vec<usize>> {
+    x.as_slice()
+        .map_err(value_err)?
+        .iter()
+        .map(|&v| usize::try_from(v).map_err(value_err))
+        .collect()
+}
+
+fn to_i64<'py>(py: Python<'py>, v: &[usize]) -> Bound<'py, PyArray1<i64>> {
+    PyArray1::from_vec(py, v.iter().map(|&x| x as i64).collect())
+}
+
+/// `DBDSDC(UPLO, 'I', N, D, E, U, LDU, VT, LDVT, ...)`: the singular values (descending) and
+/// vectors of an `n × n` bidiagonal matrix (`d`: `n` values, `e`: `n - 1`); `u` and `vt` start
+/// as zeros (`ldu × n`, `ldvt × n`). Only `compq = "I"` is ported. Returns `(D, E, U, VT,
+/// INFO)`.
+#[pyfunction]
+#[pyo3(signature = (uplo_, compq, n, d, e, ldu, ldvt, lapack = "3.12.1", n_threads = 1, gemm_q = 256))]
+#[allow(clippy::too_many_arguments)]
+fn lapack_dbdsdc<'py>(
+    py: Python<'py>,
+    uplo_: &str,
+    compq: &str,
+    n: usize,
+    d: PyReadonlyArray1<'_, f64>,
+    e: PyReadonlyArray1<'_, f64>,
+    ldu: usize,
+    ldvt: usize,
+    lapack: &str,
+    n_threads: usize,
+    gemm_q: usize,
+) -> PyResult<(F64s<'py>, F64s<'py>, F64s<'py>, F64s<'py>, usize)> {
+    let ul = uplo(uplo_)?;
+    if !compq.eq_ignore_ascii_case("I") {
+        return Err(PyValueError::new_err(format!(
+            "DBDSDC: only COMPQ = 'I' is ported, got {compq:?}"
+        )));
+    }
+    let lp = lp(lapack, gemm_q)?;
+    let mut dv = contiguous(&d)?.to_vec();
+    let mut ev = contiguous(&e)?.to_vec();
+    let mut u = vec![0.0f64; (ldu * n).max(1)];
+    let mut vt = vec![0.0f64; (ldvt * n).max(1)];
+    let info = lapack_run(py, "DBDSDC", n_threads, || {
+        bdsdc::dbdsdc(lp, ul, n, &mut dv, &mut ev, &mut u, ldu, &mut vt, ldvt)
+    })?
+    .map_err(value_err)?;
+    Ok((
+        PyArray1::from_vec(py, dv),
+        PyArray1::from_vec(py, ev),
+        PyArray1::from_vec(py, u),
+        PyArray1::from_vec(py, vt),
+        info,
+    ))
+}
+
+/// `DLASD0(N, SQRE, D, E, U, LDU, VT, LDVT, SMLSIZ, IWORK, WORK, INFO)` on flat column-major
+/// `u` (`ldu × n`) and `vt` (`ldvt × (n + sqre)`), whose entries outside the blocks LAPACK
+/// writes are kept. Returns `(D, E, U, VT, INFO)`.
+#[pyfunction]
+#[pyo3(signature = (n, sqre, d, e, u, ldu, vt, ldvt, smlsiz, lapack = "3.12.1", n_threads = 1, gemm_q = 256))]
+#[allow(clippy::too_many_arguments)]
+fn lapack_dlasd0<'py>(
+    py: Python<'py>,
+    n: usize,
+    sqre: usize,
+    d: PyReadonlyArray1<'_, f64>,
+    e: PyReadonlyArray1<'_, f64>,
+    u: PyReadonlyArray1<'_, f64>,
+    ldu: usize,
+    vt: PyReadonlyArray1<'_, f64>,
+    ldvt: usize,
+    smlsiz: usize,
+    lapack: &str,
+    n_threads: usize,
+    gemm_q: usize,
+) -> PyResult<(F64s<'py>, F64s<'py>, F64s<'py>, F64s<'py>, usize)> {
+    let lp = lp(lapack, gemm_q)?;
+    let mut dv = contiguous(&d)?.to_vec();
+    let mut ev = contiguous(&e)?.to_vec();
+    let mut uv = contiguous(&u)?.to_vec();
+    let mut vtv = contiguous(&vt)?.to_vec();
+    let info = lapack_run(py, "DLASD0", n_threads, || {
+        bdsdc::dlasd0(
+            lp, n, sqre, &mut dv, &mut ev, &mut uv, 0, ldu, &mut vtv, 0, ldvt, smlsiz,
+        )
+    })?
+    .map_err(value_err)?;
+    Ok((
+        PyArray1::from_vec(py, dv),
+        PyArray1::from_vec(py, ev),
+        PyArray1::from_vec(py, uv),
+        PyArray1::from_vec(py, vtv),
+        info,
+    ))
+}
+
+type Merged<'py> = (F64s<'py>, f64, f64, F64s<'py>, F64s<'py>, I64s<'py>, usize);
+
+/// `DLASD1(NL, NR, SQRE, D, ALPHA, BETA, U, LDU, VT, LDVT, IDXQ, IWORK, WORK, INFO)`; returns
+/// `(D, ALPHA, BETA, U, VT, IDXQ, INFO)`.
+#[pyfunction]
+#[pyo3(signature = (nl, nr, sqre, d, alpha, beta, u, ldu, vt, ldvt, idxq, lapack = "3.12.1", n_threads = 1, gemm_q = 256))]
+#[allow(clippy::too_many_arguments)]
+fn lapack_dlasd1<'py>(
+    py: Python<'py>,
+    nl: usize,
+    nr: usize,
+    sqre: usize,
+    d: PyReadonlyArray1<'_, f64>,
+    alpha: f64,
+    beta: f64,
+    u: PyReadonlyArray1<'_, f64>,
+    ldu: usize,
+    vt: PyReadonlyArray1<'_, f64>,
+    ldvt: usize,
+    idxq: PyReadonlyArray1<'_, i64>,
+    lapack: &str,
+    n_threads: usize,
+    gemm_q: usize,
+) -> PyResult<Merged<'py>> {
+    let lp = lp(lapack, gemm_q)?;
+    let mut dv = contiguous(&d)?.to_vec();
+    let mut uv = contiguous(&u)?.to_vec();
+    let mut vtv = contiguous(&vt)?.to_vec();
+    let mut iq = indices(&idxq)?;
+    let (mut a, mut b) = (alpha, beta);
+    let info = lapack_run(py, "DLASD1", n_threads, || {
+        bdsdc::dlasd1(
+            lp, nl, nr, sqre, &mut dv, &mut a, &mut b, &mut uv, 0, ldu, &mut vtv, 0, ldvt, &mut iq,
+        )
+    })?
+    .map_err(value_err)?;
+    Ok((
+        PyArray1::from_vec(py, dv),
+        a,
+        b,
+        PyArray1::from_vec(py, uv),
+        PyArray1::from_vec(py, vtv),
+        to_i64(py, &iq),
+        info,
+    ))
+}
+
+/// What `lapack_dlasd2` returns: `(K, (D, Z, U, VT, DSIGMA, U2, VT2), (IDXP, IDX, IDXC, IDXQ,
+/// COLTYP))`.
+type Deflated<'py> = (
+    usize,
+    (
+        F64s<'py>,
+        F64s<'py>,
+        F64s<'py>,
+        F64s<'py>,
+        F64s<'py>,
+        F64s<'py>,
+        F64s<'py>,
+    ),
+    (I64s<'py>, I64s<'py>, I64s<'py>, I64s<'py>, I64s<'py>),
+);
+
+/// `DLASD2(NL, NR, SQRE, K, D, Z, ALPHA, BETA, U, LDU, VT, LDVT, DSIGMA, U2, LDU2, VT2, LDVT2,
+/// IDXP, IDX, IDXC, IDXQ, COLTYP, INFO)`; the work arrays start as zeros (`Z`: `m`, `DSIGMA`,
+/// the index arrays: `n`, `COLTYP`: `max(n, 4)`, `U2`: `ldu2 × n`, `VT2`: `ldvt2 × m`).
+#[pyfunction]
+#[pyo3(signature = (nl, nr, sqre, d, alpha, beta, u, ldu, vt, ldvt, ldu2, ldvt2, idxq, lapack = "3.12.1"))]
+#[allow(clippy::too_many_arguments)]
+fn lapack_dlasd2<'py>(
+    py: Python<'py>,
+    nl: usize,
+    nr: usize,
+    sqre: usize,
+    d: PyReadonlyArray1<'_, f64>,
+    alpha: f64,
+    beta: f64,
+    u: PyReadonlyArray1<'_, f64>,
+    ldu: usize,
+    vt: PyReadonlyArray1<'_, f64>,
+    ldvt: usize,
+    ldu2: usize,
+    ldvt2: usize,
+    idxq: PyReadonlyArray1<'_, i64>,
+    lapack: &str,
+) -> PyResult<Deflated<'py>> {
+    let release = lapack_release(lapack)?;
+    let n = nl + nr + 1;
+    let m = n + sqre;
+    let mut dv = contiguous(&d)?.to_vec();
+    let mut uv = contiguous(&u)?.to_vec();
+    let mut vtv = contiguous(&vt)?.to_vec();
+    let mut iq = indices(&idxq)?;
+    let mut z = vec![0.0f64; m];
+    let mut dsigma = vec![0.0f64; n];
+    let mut u2 = vec![0.0f64; ldu2 * n];
+    let mut vt2 = vec![0.0f64; ldvt2 * m];
+    let (mut idxp, mut idx, mut idxc, mut coltyp) = (
+        vec![0usize; n],
+        vec![0usize; n],
+        vec![0usize; n],
+        vec![0usize; n.max(4)],
+    );
+    let defl = lapack_run(py, "DLASD2", 1, || {
+        bdsdc::dlasd2(
+            release,
+            nl,
+            nr,
+            sqre,
+            &mut dv,
+            alpha,
+            beta,
+            &mut uv,
+            0,
+            ldu,
+            &mut vtv,
+            0,
+            ldvt,
+            MergeWork {
+                z: &mut z,
+                dsigma: &mut dsigma,
+                u2: &mut u2,
+                ldu2,
+                vt2: &mut vt2,
+                ldvt2,
+                idxp: &mut idxp,
+                idx: &mut idx,
+                idxc: &mut idxc,
+                coltyp: &mut coltyp,
+            },
+            &mut iq,
+        )
+    })?
+    .map_err(value_err)?;
+    Ok((
+        defl.k,
+        (
+            PyArray1::from_vec(py, dv),
+            PyArray1::from_vec(py, z),
+            PyArray1::from_vec(py, uv),
+            PyArray1::from_vec(py, vtv),
+            PyArray1::from_vec(py, dsigma),
+            PyArray1::from_vec(py, u2),
+            PyArray1::from_vec(py, vt2),
+        ),
+        (
+            to_i64(py, &idxp),
+            to_i64(py, &idx),
+            to_i64(py, &idxc),
+            to_i64(py, &iq),
+            to_i64(py, &coltyp),
+        ),
+    ))
+}
+
+type Solved<'py> = (
+    F64s<'py>,
+    F64s<'py>,
+    F64s<'py>,
+    F64s<'py>,
+    F64s<'py>,
+    F64s<'py>,
+    usize,
+);
+
+/// `DLASD3(NL, NR, SQRE, K, D, Q, LDQ, DSIGMA, U, LDU, U2, LDU2, VT, LDVT, VT2, LDVT2, IDXC,
+/// CTOT, Z, INFO)` (`Q` starts as zeros, `ldq × k`); returns `(D, Q, U, VT, VT2, Z, INFO)`.
+#[pyfunction]
+#[pyo3(signature = (nl, nr, sqre, k, d, ldq, dsigma, u, ldu, u2, ldu2, vt, ldvt, vt2, ldvt2, idxc, ctot, z, n_threads = 1, gemm_q = 256))]
+#[allow(clippy::too_many_arguments)]
+fn lapack_dlasd3<'py>(
+    py: Python<'py>,
+    nl: usize,
+    nr: usize,
+    sqre: usize,
+    k: usize,
+    d: PyReadonlyArray1<'_, f64>,
+    ldq: usize,
+    dsigma: PyReadonlyArray1<'_, f64>,
+    u: PyReadonlyArray1<'_, f64>,
+    ldu: usize,
+    u2: PyReadonlyArray1<'_, f64>,
+    ldu2: usize,
+    vt: PyReadonlyArray1<'_, f64>,
+    ldvt: usize,
+    vt2: PyReadonlyArray1<'_, f64>,
+    ldvt2: usize,
+    idxc: PyReadonlyArray1<'_, i64>,
+    ctot: [usize; 4],
+    z: PyReadonlyArray1<'_, f64>,
+    n_threads: usize,
+    gemm_q: usize,
+) -> PyResult<Solved<'py>> {
+    let mut dv = contiguous(&d)?.to_vec();
+    let ds = contiguous(&dsigma)?.to_vec();
+    let mut uv = contiguous(&u)?.to_vec();
+    let u2v = contiguous(&u2)?.to_vec();
+    let mut vtv = contiguous(&vt)?.to_vec();
+    let mut vt2v = contiguous(&vt2)?.to_vec();
+    let ic = indices(&idxc)?;
+    let mut zv = contiguous(&z)?.to_vec();
+    let mut q = vec![0.0f64; ldq * k];
+    let info = lapack_run(py, "DLASD3", n_threads, || {
+        bdsdc::dlasd3(
+            gemm_q, nl, nr, sqre, k, &mut dv, &mut q, ldq, &ds, &mut uv, 0, ldu, &u2v, ldu2,
+            &mut vtv, 0, ldvt, &mut vt2v, ldvt2, &ic, &ctot, &mut zv,
+        )
+    })?
+    .map_err(value_err)?;
+    Ok((
+        PyArray1::from_vec(py, dv),
+        PyArray1::from_vec(py, q),
+        PyArray1::from_vec(py, uv),
+        PyArray1::from_vec(py, vtv),
+        PyArray1::from_vec(py, vt2v),
+        PyArray1::from_vec(py, zv),
+        info,
+    ))
+}
+
+/// `DLASD4(N, I, D, Z, DELTA, RHO, SIGMA, WORK, INFO)`; returns `(DELTA, SIGMA, WORK, INFO)`.
+#[pyfunction]
+fn lapack_dlasd4<'py>(
+    py: Python<'py>,
+    n: usize,
+    i: usize,
+    d: PyReadonlyArray1<'_, f64>,
+    z: PyReadonlyArray1<'_, f64>,
+    rho: f64,
+) -> PyResult<(F64s<'py>, f64, F64s<'py>, usize)> {
+    let dv = contiguous(&d)?.to_vec();
+    let zv = contiguous(&z)?.to_vec();
+    let (mut delta, mut work) = (vec![0.0f64; n], vec![0.0f64; n]);
+    let (sigma, info) = lapack_run(py, "DLASD4", 1, || {
+        bdsdc::dlasd4(n, i, &dv, &zv, &mut delta, rho, &mut work)
+    })?;
+    Ok((
+        PyArray1::from_vec(py, delta),
+        sigma,
+        PyArray1::from_vec(py, work),
+        info,
+    ))
+}
+
+/// `DLASD5(I, D, Z, DELTA, RHO, DSIGMA, WORK)`; returns `(DELTA, DSIGMA, WORK)`.
+#[pyfunction]
+fn lapack_dlasd5<'py>(
+    py: Python<'py>,
+    i: usize,
+    d: PyReadonlyArray1<'_, f64>,
+    z: PyReadonlyArray1<'_, f64>,
+    rho: f64,
+) -> PyResult<(F64s<'py>, f64, F64s<'py>)> {
+    let dv = contiguous(&d)?.to_vec();
+    let zv = contiguous(&z)?.to_vec();
+    let (mut delta, mut work) = (vec![0.0f64; 2], vec![0.0f64; 2]);
+    let s = lapack_run(py, "DLASD5", 1, || {
+        bdsdc::dlasd5(i, &dv, &zv, &mut delta, rho, &mut work)
+    })?;
+    Ok((
+        PyArray1::from_vec(py, delta),
+        s,
+        PyArray1::from_vec(py, work),
+    ))
+}
+
+/// `DLAED6(KNITER, ORGATI, RHO, D, Z, FINIT, TAU, INFO)`; returns `(TAU, INFO)`.
+#[pyfunction]
+fn lapack_dlaed6(
+    kniter: usize,
+    orgati: bool,
+    rho: f64,
+    d: [f64; 3],
+    z: [f64; 3],
+    finit: f64,
+) -> (f64, usize) {
+    bdsdc::dlaed6(kniter, orgati, rho, &d, &z, finit)
+}
+
+type Leaf<'py> = (F64s<'py>, F64s<'py>, F64s<'py>, F64s<'py>, F64s<'py>, usize);
+
+/// `DLASDQ(UPLO, SQRE, N, NCVT, NRU, NCC, D, E, VT, LDVT, U, LDU, C, LDC, WORK, INFO)`; returns
+/// `(D, E, VT, U, C, INFO)`.
+#[pyfunction]
+#[pyo3(signature = (uplo_, sqre, n, ncvt, nru, ncc, d, e, vt, ldvt, u, ldu, c, ldc, lapack = "3.12.1"))]
+#[allow(clippy::too_many_arguments)]
+fn lapack_dlasdq<'py>(
+    py: Python<'py>,
+    uplo_: &str,
+    sqre: usize,
+    n: usize,
+    ncvt: usize,
+    nru: usize,
+    ncc: usize,
+    d: PyReadonlyArray1<'_, f64>,
+    e: PyReadonlyArray1<'_, f64>,
+    vt: PyReadonlyArray1<'_, f64>,
+    ldvt: usize,
+    u: PyReadonlyArray1<'_, f64>,
+    ldu: usize,
+    c: PyReadonlyArray1<'_, f64>,
+    ldc: usize,
+    lapack: &str,
+) -> PyResult<Leaf<'py>> {
+    let ul = uplo(uplo_)?;
+    let release = lapack_release(lapack)?;
+    let mut dv = contiguous(&d)?.to_vec();
+    let mut ev = contiguous(&e)?.to_vec();
+    let mut vtv = contiguous(&vt)?.to_vec();
+    let mut uv = contiguous(&u)?.to_vec();
+    let mut cv = contiguous(&c)?.to_vec();
+    let info = lapack_run(py, "DLASDQ", 1, || {
+        bdsdc::dlasdq(
+            release, ul, sqre, n, ncvt, nru, ncc, &mut dv, &mut ev, &mut vtv, 0, ldvt, &mut uv, 0,
+            ldu, &mut cv, 0, ldc,
+        )
+    })?
+    .map_err(value_err)?;
+    Ok((
+        PyArray1::from_vec(py, dv),
+        PyArray1::from_vec(py, ev),
+        PyArray1::from_vec(py, vtv),
+        PyArray1::from_vec(py, uv),
+        PyArray1::from_vec(py, cv),
+        info,
+    ))
+}
+
+/// `DLASDT(N, LVL, ND, INODE, NDIML, NDIMR, MSUB)`; returns `(LVL, ND, INODE, NDIML, NDIMR)`
+/// (`max(n, 1)` entries each).
+#[pyfunction]
+fn lapack_dlasdt(
+    py: Python<'_>,
+    n: usize,
+    msub: usize,
+) -> (i64, usize, I64s<'_>, I64s<'_>, I64s<'_>) {
+    let t = bdsdc::dlasdt(n, msub);
+    (
+        t.lvl,
+        t.nd,
+        PyArray1::from_vec(py, t.inode),
+        PyArray1::from_vec(py, t.ndiml),
+        PyArray1::from_vec(py, t.ndimr),
+    )
+}
+
+/// `DLAMRG(N1, N2, A, DTRD1, DTRD2, INDEX)`; returns `INDEX` (1-based).
+#[pyfunction]
+fn lapack_dlamrg<'py>(
+    py: Python<'py>,
+    n1: usize,
+    n2: usize,
+    a: PyReadonlyArray1<'_, f64>,
+    dtrd1: i64,
+    dtrd2: i64,
+) -> PyResult<I64s<'py>> {
+    let av = contiguous(&a)?;
+    if av.len() < n1 + n2 || dtrd1.abs() != 1 || dtrd2.abs() != 1 {
+        return Err(PyValueError::new_err("DLAMRG: invalid arguments"));
+    }
+    let mut index = vec![0usize; n1 + n2];
+    bdsdc::dlamrg(n1, n2, av, dtrd1, dtrd2, &mut index);
+    Ok(to_i64(py, &index))
+}
+
+/// `DLASCL('G', 0, 0, CFROM, CTO, M, N, A, LDA, INFO)` (only `type_ = "G"` is ported); returns
+/// the new `A` storage.
+#[pyfunction]
+#[allow(clippy::too_many_arguments)]
+fn lapack_dlascl<'py>(
+    py: Python<'py>,
+    type_: &str,
+    kl: i64,
+    ku: i64,
+    cfrom: f64,
+    cto: f64,
+    m: usize,
+    n: usize,
+    a: PyReadonlyArray1<'_, f64>,
+    lda: usize,
+) -> PyResult<F64s<'py>> {
+    if !type_.eq_ignore_ascii_case("G") {
+        return Err(PyValueError::new_err(format!(
+            "DLASCL: only TYPE = 'G' is ported, got {type_:?}"
+        )));
+    }
+    let _ = (kl, ku);
+    let mut av = contiguous(&a)?.to_vec();
+    lapack_run(py, "DLASCL", 1, || {
+        bdsdc::dlascl_g(cfrom, cto, m, n, &mut av, 0, lda)
+    })?
+    .map_err(value_err)?;
+    Ok(PyArray1::from_vec(py, av))
+}
+
+pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_function(wrap_pyfunction!(lapack_dbdsdc, m)?)?;
+    m.add_function(wrap_pyfunction!(lapack_dlasd0, m)?)?;
+    m.add_function(wrap_pyfunction!(lapack_dlasd1, m)?)?;
+    m.add_function(wrap_pyfunction!(lapack_dlasd2, m)?)?;
+    m.add_function(wrap_pyfunction!(lapack_dlasd3, m)?)?;
+    m.add_function(wrap_pyfunction!(lapack_dlasd4, m)?)?;
+    m.add_function(wrap_pyfunction!(lapack_dlasd5, m)?)?;
+    m.add_function(wrap_pyfunction!(lapack_dlaed6, m)?)?;
+    m.add_function(wrap_pyfunction!(lapack_dlasdq, m)?)?;
+    m.add_function(wrap_pyfunction!(lapack_dlasdt, m)?)?;
+    m.add_function(wrap_pyfunction!(lapack_dlamrg, m)?)?;
+    m.add_function(wrap_pyfunction!(lapack_dlascl, m)?)?;
+    Ok(())
+}

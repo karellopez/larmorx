@@ -4,7 +4,8 @@
 //! numpy's `matmul` of two 2-D float64 arrays (`numpy_matmul`), as `larmorx_transform::openblas`
 //! computes them, and LAPACK's QR and LQ routines with their `Q` (`DORGQR`, `DORMQR`, ...) and
 //! the bidiagonal reduction (`DGEBRD`) at their Fortran interface (`lapack_*`, as
-//! `larmorx_transform::numpy_linalg::blocked` computes them); the validation compares them with
+//! `larmorx_transform::numpy_linalg::blocked` computes them), and the divide-and-conquer
+//! bidiagonal SVD (`DBDSDC` and its routines, [`svd`]); the validation compares them with
 //! numpy's own library. Matrices cross as flat column-major storage with their leading
 //! dimension, as BLAS takes them. The GIL is released while computing.
 
@@ -19,6 +20,8 @@ use numpy::ndarray::Array2;
 use numpy::{PyArray, PyArray1, PyArray2, PyReadonlyArray1, PyReadonlyArray2};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
+
+mod svd;
 
 fn value_err(e: impl std::fmt::Display) -> PyErr {
     PyValueError::new_err(e.to_string())
@@ -1131,5 +1134,6 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(lapack_dgebrd, m)?)?;
     m.add_function(wrap_pyfunction!(lapack_dgebd2, m)?)?;
     m.add_function(wrap_pyfunction!(lapack_dlabrd, m)?)?;
+    svd::register(m)?;
     Ok(())
 }

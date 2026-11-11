@@ -1,11 +1,11 @@
 # Parity: Head-motion correction (mcflirt-compatible)
 
-**All cases agree.** 170 cases on the `standard` tier: 145 pass, 20 rejected by both, 5 expected divergences, 0 failures.
+**All cases agree.** 170 cases on the `standard` tier: 145 pass, 21 rejected by both, 4 expected divergences, 0 failures.
 
 - **Validated:** `larmorx mri hmc` / `lx.mri.hmc` (crate larmorx-mri, clean-room from `specs/mcflirt.md`, Apache-2.0)
 - **Reference:** mcflirt from FSL 6.0.7.23 (fsl-mcflirt 2111.0), the recorded runs in `oracles/fsl-6.0.7.23/mcflirt-haswell/`
-- **Test data:** larmorx-testdata `52124bc98f9f`, tier `standard`
-- **Generated:** 2026-11-07 on Linux x86_64, with `python -m larmorx_validation parity mri-hmc --tier standard`
+- **Test data:** larmorx-testdata `52e371aab0ac`, tier `standard`
+- **Generated:** 2026-11-11 on Linux x86_64, with `python -m larmorx_validation parity mri-hmc --tier standard`
 - **Original programs:** 36 runs: 21 from the oracle cache, 15 run (6 never cached: the original varies); cache `<workspace>/oracles/cache`, mode `use`
 
 **fMRIPrep's command on real BOLD runs** (`-reffile <HMC reference> -mats`): larmorx's matrices against mcflirt's, next to mcflirt's own deviation when its input is perturbed slightly (the band: the worst of three noise realisations and the reverse order):
@@ -216,7 +216,7 @@ mcflirt is deterministic, so its variability is measured by perturbing its input
 | synthetic/content | 6 | 5 | 0 | 1 | 0 |
 | synthetic/dtypes | 10 | 10 | 0 | 0 | 0 |
 | synthetic/geometry | 10 | 10 | 0 | 0 | 0 |
-| synthetic/motion | 36 | 31 | 4 | 1 | 0 |
+| synthetic/motion | 36 | 31 | 5 | 0 | 0 |
 | synthetic/orientation | 6 | 5 | 0 | 1 | 0 |
 
 ## Expected divergences
@@ -224,7 +224,6 @@ mcflirt is deterministic, so its variability is measured by perturbing its input
 | Case | Reason |
 |---|---|
 | `syn/content/ramp/reffile` | A ramp along x, which only the x translation can align (the other parameters are not constrained by the data: mcflirt's own matrices move 11 to 17 mm at the 95th percentile when its inputs move in their last bits): the x translation ends 0.342 mm from mcflirt's (threshold 0.3), within mcflirt's own… |
-| `syn/motion/small/no-fsloutputtype` | Without FSLOUTPUTTYPE, mcflirt writes the .mat files and fails (exit 1); larmorx writes every output as .nii.gz (its default). |
 | `syn/orientation/ras-unflipped/reffile` | larmorx's evaluated matrices are mcflirt's for the first 41 evaluations (count_trace.py, mcflirt's -verbose 20), then part in a translation's 6th decimal and end 0.110 mm from mcflirt's at the 95th percentile, beyond the 0.1 mm made for real BOLD runs but within mcflirt's own spread on this run (hm… |
 | `difftest/normmi-aligns-worse` | -cost normmi, computed exactly as specs/mcflirt.md appendix B describes it since 2026-10-29: larmorx now aligns this phantom better than mcflirt 6.0.7.23 (temporal SD 0.93 of mcflirt's; 1.38 before), its estimates ending in other minima of a phantom moved by large rotations, beyond the record's thr… |
 | `difftest/phantom-several-minima` | A small phantom moved by up to 15 degrees: the normalised correlation has several minima, and larmorx's estimates end in other ones than mcflirt's beyond the record's thresholds, aligning the series as well (temporal SD 0.999 of mcflirt's here; over the 782 findings of the first long random-testing… |
@@ -240,6 +239,7 @@ mcflirt is deterministic, so its variability is measured by perturbing its input
 | `syn/cli/refvol-minus2` | -refvol -2 | mcflirt exit [-6]: Image Exception : #61 :: Invalid t index in [] operator terminate called after throwing an instance of 'std::runtime_error' what(): Invalid … |
 | `syn/cli/stages0` | -stages 0 with -reffile: the reference is never read | mcflirt exit [-6]: Image Exception : #8 :: Attempted to use affine transform with no voxels in vout terminate called after throwing an instance of 'std::runtim… |
 | `syn/cli/unknown-option-middle` | an unknown option followed by others | mcflirt exit [255]: Unrecognised option -edge; larmorx exit [255]: Unrecognised option -edge |
+| `syn/motion/small/no-fsloutputtype` | FSLOUTPUTTYPE unset | Without FSLOUTPUTTYPE, mcflirt writes the .mat files and stops at its first image with FSL's message (exit 1), and so does larmorx with reproduce (the same mat… |
 | `syn/motion/small/no-input` | no -in | mcflirt exit [2]: Input filename not found; larmorx exit [2]: Input filename not found |
 | `syn/motion/small/reffile-grid2` | reference on a different grid | mcflirt exit [-6]: Image Exception : #2 :: Attempted to copydata with non-matching sizes terminate called after throwing an instance of 'std::runtime_error' wh… |
 | `syn/motion/small/refvol-out-of-range` | -refvol 12 with 12 volumes | mcflirt exit [-6]: Image Exception : #61 :: Invalid t index in [] operator terminate called after throwing an instance of 'std::runtime_error' what(): Invalid … |
@@ -258,8 +258,8 @@ mcflirt is deterministic, so its variability is measured by perturbing its input
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (a3f1d343b8ec) |
-| larmorx-testdata | 52124bc98f9f |
+| larmorx | 0.1.0rc1 (d300ef431136) |
+| larmorx-testdata | 52e371aab0ac |
 | Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
 | CPU | AMD Ryzen 9 7945HX with Radeon Graphics, 32 logical CPUs |
@@ -382,7 +382,7 @@ Each recorded mcflirt run is replayed with the same arguments and FSLOUTPUTTYPE;
 | `syn/motion/small/meanvol` | pass | 18/18 | syn/motion/small/meanvol |
 | `syn/motion/small/nifti2` | pass | 17/17 | FSLOUTPUTTYPE=NIFTI2_GZ |
 | `syn/motion/small/nn_final` | pass | 17/17 | syn/motion/small/nn_final |
-| `syn/motion/small/no-fsloutputtype` | expected-divergence | 1/1 | FSLOUTPUTTYPE unset |
+| `syn/motion/small/no-fsloutputtype` | both-error | 13/13 | FSLOUTPUTTYPE unset |
 | `syn/motion/small/no-input` | both-error | – | no -in |
 | `syn/motion/small/no-out` | pass | 12/12 | no -out: the output name is <input>_mcf |
 | `syn/motion/small/out-no-ext` | pass | 17/17 | -out without an extension |

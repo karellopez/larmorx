@@ -46,11 +46,16 @@ gives FSL's behaviour within validated limits.
 - **Once larmorx-nc is installed, larmorx uses it by default** for these tools:
   `implementation="auto"` (the default of `lx.fsl.bet(...)`, `lx.mri.hmc(...)` and the others) and
   `larmorx fsl <program> ...` run the replica when its program is found, so the default results
-  then come from FSL-licensed code. `implementation="original"` (or
-  `LARMORX_IMPLEMENTATION=original` on the command line) runs the clean-room original instead;
-  `pip uninstall larmorx-nc` removes the replicas.
+  then come from FSL-licensed code. `implementation="clean-room"` (or
+  `larmorx --implementation clean-room fsl <program> ...`, `LARMORX_IMPLEMENTATION=clean-room`;
+  `original` is the old spelling) runs the clean-room original instead; `pip uninstall
+  larmorx-nc` removes the replicas.
 - The program can also be run directly, with the original program's arguments:
   `larmorx-nc fsl bet t1w.nii.gz brain.nii.gz -f 0.5` (`larmorx-nc --help` lists the programs).
+  larmorx's own options go before the family, as with `larmorx`: `--n-threads N` (in place of
+  `OMP_NUM_THREADS`; topup's own `--nthr` wins when it is given) and `--upstream-defects
+  fix|reproduce` (in place of `LARMORX_UPSTREAM_DEFECTS`), e.g. `larmorx-nc --n-threads 4 fsl bet
+  t1w.nii.gz brain.nii.gz`.
 
 ## Licence and source
 

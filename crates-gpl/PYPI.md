@@ -37,6 +37,10 @@ process and exchanges files with it only. With it installed, `lx.tedana.t2smap(.
 `LARMORX_GPL_BIN`). `t2smap` has no clean-room original in larmorx yet: without larmorx-gpl,
 `lx.tedana.t2smap` says how to install it. The program also runs directly, with t2smap's
 arguments: `larmorx-gpl tedana t2smap -d echo1.nii.gz echo2.nii.gz echo3.nii.gz -e 12.5 27.6 42.7`.
+larmorx's own options go before the family, as with `larmorx`: `--n-threads N` (in place of
+`OMP_NUM_THREADS`; t2smap's own `--n-threads`, after the tool, wins when it is given) and
+`--upstream-defects fix|reproduce` (in place of `LARMORX_UPSTREAM_DEFECTS`); `larmorx-gpl --help`
+lists them.
 
 - Source: [crates-gpl/](https://github.com/karellopez/larmorx/tree/main/crates-gpl) of the
   repository, [NOTICE](https://github.com/karellopez/larmorx/blob/main/crates-gpl/NOTICE),

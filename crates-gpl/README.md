@@ -30,7 +30,7 @@ The rest of larmorx is Apache-2.0. Why this directory is separate is in
 | Crate | What |
 |---|---|
 | `larmorx-gpl-tedana` | tedana 26.0.3's `t2smap` translated exactly (GPL-3.0-only): its command line (argparse), log, inputs (nibabel's and nilearn's reading), the adaptive mask, the log-linear and monoexponential fits (numpy's `lstsq`, SciPy's `curve_fit`), the maps, the RMSE, the optimal combination (t2s and PAID) and every output file as tedana writes it; the defects TED-01 to TED-15 corrected by default (D13). The numerics tedana calls are the main package's Apache crates' (`larmorx_core::numpy`, `larmorx_transform::numpy_linalg`, `larmorx_optim`, `larmorx_interp::nilearn`). Provenance: `larmorx-gpl-tedana/PROVENANCE.md` |
-| `larmorx-gpl-cli` | the `larmorx-gpl` command line: `larmorx-gpl tedana t2smap <t2smap's arguments>` (`larmorx-gpl --help`; `LARMORX_UPSTREAM_DEFECTS`, `LARMORX_TEDANA_LIBRARIES`) |
+| `larmorx-gpl-cli` | the `larmorx-gpl` command line: `larmorx-gpl [--n-threads N] [--upstream-defects fix\|reproduce] [--implementation replica] tedana t2smap <t2smap's arguments>` (`larmorx-gpl --help`; each option wins over the variable it replaces, `OMP_NUM_THREADS`, `LARMORX_UPSTREAM_DEFECTS`; t2smap's own `--n-threads` wins when it is given; `LARMORX_TEDANA_LIBRARIES`) |
 | `pyproject.toml`, `NOTICE`, `LICENSE`, `LICENSES/` | the `larmorx-gpl` wheel and the licences and notices it carries (below) |
 | `tools/` | verification tools, never distributed (below) |
 

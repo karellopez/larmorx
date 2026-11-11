@@ -4,7 +4,10 @@ and ``larmorx-gpl`` built in ``crates-nc/`` and ``crates-gpl/``, or named by ``L
 and ``LARMORX_GPL_BIN``): through the console script (``python -m larmorx``) and the standalone
 program (``target/release/larmorx``), ``--n-threads``, ``--upstream-defects`` and
 ``--implementation replica`` give the same exit status, messages and output bytes as the
-variables they replace, and win over them. The replica programs are run as black boxes."""
+variables they replace, and win over them. The replica programs take the same options
+themselves, before the family (``larmorx-nc --n-threads 3 fsl ...``; ``--implementation`` other
+than ``replica`` refused), and without a tool's own thread option (topup's ``--nthr``, t2smap's
+``--n-threads``) the run's thread count does the work, with the same bytes."""
 
 from __future__ import annotations
 
@@ -145,3 +148,104 @@ def test_larmorx_gpl_gets_the_options(cli, tmp_path):
     # --implementation clean-room: there is no clean-room original of t2smap yet (exit 127)
     (code, _, err), _ = run([*cli, "--implementation", "clean-room", *t2smap], tmp_path, base, [])
     assert code == 127 and b"no clean-room original of tedana t2smap" in err
+
+
+#: The companion programs' own options (the user's decision of 2026-11-11): ``larmorx-nc`` and
+#: ``larmorx-gpl`` take ``--n-threads``, ``--upstream-defects`` and ``--implementation replica``
+#: before the family, as ``larmorx`` does.
+DIRECT = {"larmorx-nc": NC, "larmorx-gpl": GPL}
+
+
+def direct(name: str, cwd: Path, options: list[str], args: list[str], env: dict[str, str]):
+    """The companion ``name`` run directly with ``options`` before ``args``: its exit status,
+    output and every file written under ``cwd`` (then removed), inputs aside."""
+    before = {p for p in cwd.rglob("*")}
+    full = {k: v for k, v in os.environ.items() if k not in VARIABLES}
+    full.update(env)
+    p = subprocess.run([str(DIRECT[name]), *options, *args], cwd=cwd, env=full,
+                       capture_output=True, check=False)  # fmt: skip
+    files = sorted(
+        (f.relative_to(cwd).as_posix(), f.read_bytes())
+        for f in cwd.rglob("*")
+        if f.is_file() and f not in before
+    )
+    for f in sorted(set(cwd.rglob("*")) - before, reverse=True):
+        f.rmdir() if f.is_dir() else f.unlink()
+    return (p.returncode, p.stdout, p.stderr), files
+
+
+@pytest.mark.skipif(NC is None or os.name == "nt", reason="the larmorx-nc program is not built")
+def test_larmorx_nc_takes_the_options_itself(tmp_path):
+    image(tmp_path / "in.nii.gz", (16, 16, 12))
+    base = {"FSLOUTPUTTYPE": "NIFTI_GZ"}
+    maths = ["fsl", "fslmaths", "in.nii.gz", "-s", "1", "out"]
+    plain = direct("larmorx-nc", tmp_path, [], maths, base)
+    assert plain[0][0] == 0 and plain[1], plain[0][2]
+    for option, variable in (
+        (["--n-threads", "3"], {"OMP_NUM_THREADS": "3"}),
+        (["--n-threads=0"], {}),
+        (["--upstream-defects", "reproduce"], {"LARMORX_UPSTREAM_DEFECTS": "reproduce"}),
+        (["--implementation", "replica"], {}),
+    ):
+        a = direct("larmorx-nc", tmp_path, option, maths, base)
+        b = direct("larmorx-nc", tmp_path, [], maths, {**base, **variable})
+        assert a == b, (option, a[0][2][-300:])
+        assert a[1] == plain[1] or "reproduce" in option, option
+    # the option wins over its variable, which is then not read
+    a = direct("larmorx-nc", tmp_path, ["--upstream-defects", "fix", "--n-threads", "2"], maths,
+               {**base, "LARMORX_UPSTREAM_DEFECTS": "bogus", "OMP_NUM_THREADS": "x"})  # fmt: skip
+    assert a == plain, a[0][2][-300:]
+    for refused in ("clean-room", "auto", "original"):
+        (code, out, err), files = direct(
+            "larmorx-nc", tmp_path, ["--implementation", refused], maths, base
+        )
+        assert (code, out, files) == (2, b"", []), refused
+        assert b"this program runs the bit-exact replicas only" in err, err
+    # topup without --nthr: the run's thread count does the work; the same bytes at one thread,
+    # at three, at every logical CPU and with --nthr=2
+    pair = image(tmp_path / "pair.nii.gz", (16, 16, 12, 2))
+    (tmp_path / "acq.txt").write_text("0 1 0 0.05\n0 -1 0 0.05\n", "utf-8")
+    topup = ["fsl", "topup", f"--imain={pair.name}", "--datain=acq.txt", "--out=tu",
+             "--fout=field", "--warpres=20", "--subsamp=2", "--fwhm=8", "--miter=2"]  # fmt: skip
+    one = direct("larmorx-nc", tmp_path, [], topup, {**base, "OMP_NUM_THREADS": "1"})
+    assert one[0][0] == 0, one[0][2][-500:]
+    for option, extra in ((["--n-threads", "3"], []), (["--n-threads", "0"], []), ([], ["--nthr=2"])):  # fmt: skip
+        a = direct("larmorx-nc", tmp_path, option, [*topup, *extra], base)
+        assert a[0] == one[0], (option, extra, a[0][2][-300:])
+        logs = [n for n, _ in a[1] if n.endswith("topup_log")]
+        same = [f for f in a[1] if f[0] not in logs] == [f for f in one[1] if f[0] not in logs]
+        assert same, (option, extra)
+
+
+@pytest.mark.skipif(GPL is None, reason="the larmorx-gpl program is not built")
+def test_larmorx_gpl_takes_the_options_itself(tmp_path):
+    for e, scale in ((1, 1.0), (2, 0.6), (3, 0.35)):
+        image(tmp_path / f"e{e}.nii.gz", (8, 8, 6, 3), scale)
+    mask = np.zeros((8, 8, 6), np.uint8)
+    mask[2:6, 2:6, 1:5] = 1
+    lx.save((mask, np.diag([2.0, 2.0, 2.0, 1.0])), tmp_path / "mask.nii.gz")
+    t2smap = ["tedana", "t2smap", "-d", "e1.nii.gz", "e2.nii.gz", "e3.nii.gz", "-e", "14", "30", "46", "--mask", "mask.nii.gz", "--out-dir", "o"]  # fmt: skip
+    plain = direct("larmorx-gpl", tmp_path, [], t2smap, {})
+    assert plain[0][0] == 0 and plain[1], plain[0][2][-500:]
+    for option, extra, variable in (
+        (["--n-threads", "3"], [], {"OMP_NUM_THREADS": "3"}),
+        (["--n-threads", "0"], [], {}),
+        (["--upstream-defects=reproduce"], [], {"LARMORX_UPSTREAM_DEFECTS": "reproduce"}),
+        (["--implementation", "replica"], [], {}),
+        # t2smap's own --n-threads after the tool wins, beside larmorx's before the family
+        (["--n-threads", "4"], ["--n-threads", "2"], {"OMP_NUM_THREADS": "4"}),
+    ):
+        a = direct("larmorx-gpl", tmp_path, option, [*t2smap, *extra], {})
+        b = direct("larmorx-gpl", tmp_path, [], [*t2smap, *extra], variable)
+        assert a == b, (option, extra, a[0][2][-300:])
+        if "reproduce" in option[0]:
+            continue
+        # the same images as without options: no thread count changes a byte (t2smap's call
+        # script and dataset_description.json record its own arguments)
+        recorded = ("t2smap_call.sh", "dataset_description.json")
+        images = [f for f in a[1] if not f[0].endswith(recorded) or not extra]
+        assert images == [f for f in plain[1] if not f[0].endswith(recorded) or not extra]
+    (code, out, err), files = direct(
+        "larmorx-gpl", tmp_path, ["--implementation", "auto"], t2smap, {}
+    )
+    assert (code, out, files) == (2, b"", []) and b"replicas only" in err, err

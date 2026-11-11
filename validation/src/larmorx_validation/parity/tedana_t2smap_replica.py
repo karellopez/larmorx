@@ -337,6 +337,11 @@ def run_replica(
     e["LARMORX_UPSTREAM_DEFECTS"] = mode
     e["LARMORX_TEDANA_LIBRARIES"] = env
     extra = [] if threads == 1 else ["--n-threads", str(threads)]
+    if threads == 1:
+        # tedana's default, one thread: without t2smap's own --n-threads, larmorx-gpl takes the
+        # run's thread count (OMP_NUM_THREADS, else every logical CPU; the user's decision of
+        # 2026-11-11), so the one thread is said there
+        e["OMP_NUM_THREADS"] = "1"
     p = subprocess.run(
         [str(exe), "tedana", "t2smap", *args, *extra, "--out-dir", "out"],
         cwd=cwd,

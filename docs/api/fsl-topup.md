@@ -107,7 +107,7 @@ larmorx fsl applytopup --imain=dwi_up,dwi_dn --inindex=1,2 --datain=acqparams.tx
 | `rigid_body_matrices` | `--rbmout` | `False` | each volume's rigid-body matrix |
 | `jacobians` | `--jacout` | `False` | each volume's Jacobian determinant |
 | `verbose` | `-v` | `False` | the cost of every evaluation (in `TopupResult.stdout`) |
-| `n_threads` | `--nthr` | 1 | threads; the results are FSL's one-thread results at any count (FSL-116) |
+| `n_threads` | `--nthr` | 1 | threads; the results are FSL's one-thread results at any count (FSL-116). On the command line without `--nthr` (nor in the configuration), the replica takes larmorx's own `--n-threads` (else `OMP_NUM_THREADS`, else every logical CPU) |
 | `implementation` | `LARMORX_IMPLEMENTATION` | `"auto"` | `"auto"`, `"replica"`, `"original"` |
 | `upstream_defects` | `LARMORX_UPSTREAM_DEFECTS` | `"fix"` | `"reproduce"`: FSL's defects as FSL has them (below) |
 

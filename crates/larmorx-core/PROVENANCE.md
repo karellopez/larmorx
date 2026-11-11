@@ -317,7 +317,10 @@ its default options: `wordsep_re`, `_wrap_chunks`, `_handle_long_word`), `Lib/sh
 (`get_terminal_size`'s `COLUMNS`), `Objects/floatobject.c` and `Python/pystrtod.c` (`float(str)`,
 `repr(float)`, `'%.Nf'`), `Objects/longobject.c` (`int(str)` in base 10, its underscores and its
 4,300-digit limit). Positional arguments, subparsers, mutually exclusive groups and `fromfile`
-prefixes are not ported (no ported program uses them). Unicode digits and Unicode's
+prefixes are not ported (no ported program uses them). `Parser::parse_given` (2026-11-11) is
+larmorx's own addition: `parse_args` with the destinations of the actions seen (argparse's
+`seen_actions`), so that a replica tells an option given apart from its default (t2smap's
+`--n-threads`). Unicode digits and Unicode's
 non-printable categories beyond the control characters are approximations (documented in the
 module). `json` (2026-11-08): `Lib/json/encoder.py` (`json.dump` with an indent: `_make_iterencode`,
 `py_encode_basestring_ascii`, `float.__repr__` and the special values), for tedana's JSON files.
@@ -346,4 +349,9 @@ environment variable it replaces); `crates/larmorx-cli` parses the options. `par
 lists the sizes of the thread pools started in the process, for the test that checks that
 `--n-threads` reaches each family's tools (`crates/larmorx-cli/tests/options.rs`, which also runs
 the standalone program with each option and with the variable it replaces and compares the
-bytes).
+bytes). `cli::parse` (2026-11-11, relay 1b) reads the options once for every program that takes
+them: `larmorx` (`larmorx_cli::parse_globals`) and the replica programs of the other licence
+families (`larmorx-nc`, `larmorx-gpl`, which depend on this crate and never on `larmorx_cli`);
+each says what its `--implementation` takes (`cli::ImplementationOption`; `cli::ReplicaOnly`:
+`replica`, a no-op, the others refused). `cli::omp_num_threads` is the replica programs' reading
+of `OMP_NUM_THREADS`.

@@ -31,6 +31,7 @@ larmorx-mri = { path = "crates/larmorx-mri", version = "0.1.0-rc.1" }
 larmorx-fsl = { path = "crates/larmorx-fsl", version = "0.1.0-rc.1" }
 larmorx-registration = { path = "crates/larmorx-registration", version = "0.1.0-rc.1" }
 larmorx-sdcflows = { path = "crates/larmorx-sdcflows", version = "0.1.0-rc.1" }
+larmorx-confounds = { path = "crates/larmorx-confounds", version = "0.1.0-rc.1" }
 larmorx-optim = { path = "crates/larmorx-optim", version = "0.1.0-rc.1" }
 larmorx-ndimage = { path = "crates/larmorx-ndimage", version = "0.1.0-rc.1" }
 pyo3 = { version = "0.29.3", features = ["abi3-py312"] }

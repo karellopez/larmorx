@@ -2065,3 +2065,12 @@ def numpy_legendre_basis(deg: int, x: np.ndarray, numpy_version: str = "2.5.4") 
 
 def numpy_linspace(start: float, stop: float, num: int) -> np.ndarray:
     """``numpy.linspace(start, stop, num)`` of float64 bounds."""
+
+def scipy_fftpack(
+    x: np.ndarray, n: int | None = None, forward: bool = True, scipy: str = "1.18.1"
+) -> np.ndarray:
+    """``scipy.fftpack.fft(x, n)`` (``forward``) or ``ifft(x, n)`` of a one-dimensional float32
+    or complex64 array of power-of-two length (after ``n``), with SciPy 1.18.1's ducc0 or 1.15's
+    pocketfft (``scipy="1.15.3"``, ``"1.15.2"``); complex64. ``ValueError`` for a length below
+    one, ``NotImplementedError`` for another length or, with ducc0, a complex array of 131072
+    values or more."""

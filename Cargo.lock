@@ -413,6 +413,7 @@ dependencies = [
 name = "larmorx-tedana"
 version = "0.1.0-rc.1"
 dependencies = [
+ "flate2",
  "larmorx-core",
  "larmorx-interp",
  "larmorx-io",

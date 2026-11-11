@@ -863,12 +863,12 @@ pub fn run(
     };
     let exp = model_exp(reproduce);
     (
-        maps.t2s.par_chunks_mut(cols),
-        maps.s0.par_chunks_mut(cols),
-        maps.s0_other.par_chunks_mut(cols),
-        curve.failed.par_chunks_mut(cols),
-        curve.pcov.par_chunks_mut(cols),
-        curve.warn.par_chunks_mut(cols),
+        maps.t2s.par_chunks_mut(cols.max(1)),
+        maps.s0.par_chunks_mut(cols.max(1)),
+        maps.s0_other.par_chunks_mut(cols.max(1)),
+        curve.failed.par_chunks_mut(cols.max(1)),
+        curve.pcov.par_chunks_mut(cols.max(1)),
+        curve.warn.par_chunks_mut(cols.max(1)),
     )
         .into_par_iter()
         .enumerate()

@@ -53,6 +53,13 @@ impl Used<'_> {
     }
 }
 
+/// The places of numpy's own warnings in its mean and standard deviation (Python's warnings
+/// registry knows them apart by place: §12.3).
+pub const MEAN_SUM: &str = "numpy.rs:mean_sum";
+pub const MEAN_DIVIDE: &str = "numpy.rs:mean_divide";
+pub const VAR_SUM: &str = "numpy.rs:var_sum";
+pub const VAR_SUBTRACT: &str = "numpy.rs:var_subtract";
+
 /// A float32 sum divided by an integer count (numpy's `true_divide` by an `intp`).
 pub fn divide_count(sum: f32, n: usize) -> f32 {
     f32::from_f64(sum.to_f64().div(n as f64))
@@ -110,7 +117,7 @@ pub fn adaptive_mask(
             };
             log.py_warning("adaptive.rs:60", "RuntimeWarning", text);
             log.py_warning(
-                "adaptive.rs:61",
+                MEAN_DIVIDE,
                 "RuntimeWarning",
                 "invalid value encountered in divide",
             );
@@ -120,6 +127,31 @@ pub fn adaptive_mask(
             .with_min_len(256)
             .flat_map_iter(|v| (0..n_echo).map(move |e| used.mean(v, e)))
             .collect();
+        // a series holding both infinities sums to NaN: numpy's `reduce` warning (observed);
+        // a NaN among them (which numpy's order may meet first) is taken to silence it
+        let both = (0..n_vox).into_par_iter().with_min_len(256).any(|v| {
+            (0..n_echo).any(|e| {
+                let s = used.data.series(v, e);
+                let mut seen = (false, false, false);
+                let mut look = |x: f32| {
+                    seen.0 |= x == f32::INFINITY;
+                    seen.1 |= x == f32::NEG_INFINITY;
+                    seen.2 |= x.is_nan();
+                };
+                match used.volumes {
+                    None => s.iter().for_each(|&x| look(x)),
+                    Some(vols) => vols.iter().for_each(|&t| look(s[t])),
+                }
+                seen.0 && seen.1 && !seen.2
+            })
+        });
+        if both {
+            log.py_warning(
+                MEAN_SUM,
+                "RuntimeWarning",
+                "invalid value encountered in reduce",
+            );
+        }
         let m = |v: usize, e: usize| means[v * n_echo + e];
         if methods.contains(&MaskType::Dropout) {
             let thr = dropout_thresholds(&means, n_vox, n_echo, libraries, notices)?;

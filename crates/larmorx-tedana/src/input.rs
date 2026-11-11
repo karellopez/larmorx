@@ -9,9 +9,10 @@ use std::path::{Path, PathBuf};
 use larmorx_core::affine::Affine;
 use larmorx_core::array::DynArray;
 use larmorx_interp::nilearn::{self, EpiData, Layout, Maths};
-use larmorx_io::nifti::{self, NiftiHeader, NiftiPaths, NiftiVersion, ReadOptions, Scaling};
+use larmorx_io::nifti::{NiftiVersion, Scaling};
 use rayon::prelude::*;
 
+use crate::formats;
 use crate::log::{Log, PyError};
 
 /// A path as given, against the run's working directory.
@@ -23,53 +24,9 @@ pub fn resolve(cwd: Option<&Path>, p: &str) -> PathBuf {
     }
 }
 
-/// An image file's kind, as nibabel would load it (§4.1).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Kind {
-    /// A NIfTI-1 or NIfTI-2 single file (`.nii`, `.nii.gz`).
-    Single(NiftiVersion),
-    /// A NIfTI `.hdr`/`.img` pair (converted to NIfTI-1 by tedana).
-    Pair,
-}
-
-fn kind(path: &Path, given: &str) -> Result<Kind, PyError> {
-    let Some(paths) = NiftiPaths::from_path(path) else {
-        return Err(unsupported(given));
-    };
-    let header = nifti::read_header(path).map_err(|e| read_error(given, &e))?;
-    Ok(if paths.is_single() {
-        Kind::Single(header.version)
-    } else {
-        Kind::Pair
-    })
-}
-
-/// Decision D5: formats nibabel reads that larmorx does not (and, in this relay of the
-/// clean-room original, ANALYZE 7.5 and MGH/MGZ), refused with a clear message.
-fn unsupported(given: &str) -> PyError {
-    PyError::value(format!(
-        "{given}: larmorx's clean-room t2smap reads NIfTI-1 and NIfTI-2 images (single files \
-         and .hdr/.img pairs); this file is not one of them"
-    ))
-}
-
-fn read_error(given: &str, e: &nifti::Error) -> PyError {
-    match e {
-        nifti::Error::Io { source, .. } if source.kind() == std::io::ErrorKind::NotFound => {
-            PyError::new(
-                "FileNotFoundError",
-                format!("No such file or no access: '{given}'"),
-            )
-        }
-        nifti::Error::Header { .. } | nifti::Error::InvalidArgument(_) => unsupported(given),
-        other => PyError::new("OSError", format!("{given}: {other}")),
-    }
-}
-
 /// The reference image (§4.2): the first echo's image, or a z-concatenated file's first slab.
 #[derive(Clone, Debug)]
 pub struct Reference {
-    pub header: NiftiHeader,
     pub shape: Vec<usize>,
     pub affine: Affine,
     /// The four voxel sizes the 4D outputs carry (§11.3).
@@ -85,40 +42,32 @@ pub fn reference(
     n_zcat: Option<usize>,
 ) -> Result<Reference, PyError> {
     let path = resolve(cwd, given);
-    let k = kind(&path, given)?;
-    let header = nifti::read_header(&path).map_err(|e| read_error(given, &e))?;
-    let mut h = header.clone();
-    h.apply_load_fixes().map_err(|_| unsupported(given))?;
-    let shape = h.shape().map_err(|_| unsupported(given))?;
-    let affine = h.best_affine_nibabel().map_err(|_| unsupported(given))?;
-    let z = h.zooms().map_err(|_| unsupported(given))?;
+    let head = formats::open(&path, given)?;
     let mut zooms = [1.0f64; 4];
     for (i, zz) in zooms.iter_mut().enumerate() {
-        if let Some(&v) = z.get(i) {
+        if let Some(&v) = head.zooms.get(i) {
             *zz = v;
         }
     }
-    let converted = n_zcat.is_some() || k == Kind::Pair;
-    if converted {
+    if n_zcat.is_some() || head.kind.converted() {
         // a new NIfTI-1 image holds its voxel sizes as float32
         for zz in &mut zooms {
             *zz = *zz as f32 as f64;
         }
     }
-    let version = match k {
-        Kind::Single(v) if n_zcat.is_none() => v,
+    let version = match head.kind {
+        formats::Kind::Single(v) if n_zcat.is_none() => v,
         _ => NiftiVersion::V1,
     };
-    let mut shape = shape;
+    let mut shape = head.shape;
     if let Some(e) = n_zcat
         && shape.len() >= 3
     {
         shape[2] /= e.max(1);
     }
     Ok(Reference {
-        header: h,
         shape,
-        affine,
+        affine: head.affine,
         zooms,
         version,
     })
@@ -166,21 +115,11 @@ impl Mask {
 /// The user mask (`--mask`): value > 0 in float64 with the header's scaling (§4.3).
 pub fn user_mask(cwd: Option<&Path>, given: &str) -> Result<Mask, PyError> {
     let path = resolve(cwd, given);
-    let k = kind(&path, given)?;
-    let img = nifti::read(
-        &path,
-        &ReadOptions {
-            scaling: Scaling::F64,
-            n_threads: 1,
-        },
-    )
-    .map_err(|e| read_error(given, &e))?;
-    let affine = img
-        .header
-        .best_affine_nibabel()
-        .map_err(|_| unsupported(given))?;
-    let mut shape = img.data.shape().to_vec();
-    if k == Kind::Pair {
+    let head = formats::open(&path, given)?;
+    let data = head.read(Scaling::F64, 1, given)?;
+    let affine = head.affine;
+    let mut shape = data.shape().to_vec();
+    if head.kind.converted() {
         while shape.len() > 3 && shape.last() == Some(&1) {
             shape.pop();
         }
@@ -190,7 +129,7 @@ pub fn user_mask(cwd: Option<&Path>, given: &str) -> Result<Mask, PyError> {
             )));
         }
     }
-    let DynArray::F64(a) = &img.data else {
+    let DynArray::F64(a) = &data else {
         unreachable!("Scaling::F64 reads float64");
     };
     let f = a.as_slice_memory_order().expect("contiguous");
@@ -230,16 +169,9 @@ pub fn computed_mask(
     let path = resolve(cwd, given);
     // the mean over time of the data as nibabel holds them: the stored values when unscaled,
     // float64 when scaled (and for a z-concatenated reference)
-    let img = nifti::read(
-        &path,
-        &ReadOptions {
-            scaling: Scaling::Auto,
-            n_threads,
-        },
-    )
-    .map_err(|e| read_error(given, &e))?;
-    let shape = img.data.shape().to_vec();
-    let result = match (n_zcat, img.data) {
+    let data = formats::open(&path, given)?.read(Scaling::Auto, n_threads, given)?;
+    let shape = data.shape().to_vec();
+    let result = match (n_zcat, data) {
         (Some(e), data) => {
             // the first slab's float64 values in C order (`get_fdata()[:, :, :nz, :]`)
             let f64data = to_f64(&data);
@@ -359,19 +291,19 @@ impl Data {
     }
 }
 
-fn read_f32(path: &Path, given: &str, n_threads: usize) -> Result<nifti::NiftiImage, PyError> {
-    nifti::read(
-        path,
-        &ReadOptions {
-            scaling: Scaling::F32,
-            n_threads,
-        },
-    )
-    .map_err(|e| read_error(given, &e))
+/// One echo file's header and float32 data (§4.4).
+fn read_f32(
+    path: &Path,
+    given: &str,
+    n_threads: usize,
+) -> Result<(formats::Head, DynArray), PyError> {
+    let head = formats::open(path, given)?;
+    let data = head.read(Scaling::F32, n_threads, given)?;
+    Ok((head, data))
 }
 
-fn f32_slice(img: &nifti::NiftiImage) -> &[f32] {
-    let DynArray::F32(a) = &img.data else {
+fn f32_slice(data: &DynArray) -> &[f32] {
+    let DynArray::F32(a) = data else {
         unreachable!("Scaling::F32 reads float32");
     };
     a.as_slice_memory_order().expect("contiguous")
@@ -443,8 +375,8 @@ pub fn read_data(
              https://github.com/ME-ICA/tedana/issues/1313.",
         );
         let path = resolve(cwd, &files[0]);
-        let img = read_f32(&path, &files[0], n_threads)?;
-        let shape = img.data.shape().to_vec();
+        let (_, img) = read_f32(&path, &files[0], n_threads)?;
+        let shape = img.shape().to_vec();
         if shape.len() != 4 {
             return Err(not_4d());
         }
@@ -476,10 +408,9 @@ pub fn read_data(
     let n_echo = files.len();
     let nilearn_path = mask.four_d()
         || files.iter().any(|f| {
-            nifti::read_header(resolve(cwd, f))
+            formats::open(&resolve(cwd, f), f)
                 .ok()
-                .and_then(|h| h.shape().ok())
-                .is_some_and(|s| s.len() >= 3 && s[..3] != mask.grid())
+                .is_some_and(|h| h.shape.len() >= 3 && h.shape[..3] != mask.grid())
         });
     let mut x: Vec<f32> = Vec::new();
     let mut n_t = 0;
@@ -489,8 +420,8 @@ pub fn read_data(
     // so the batch stays within its memory)
     let batch = n_threads.clamp(1, n_echo.max(1));
     let inner = (n_threads / batch).max(1);
-    let mut decoded: Vec<Result<nifti::NiftiImage, PyError>> = Vec::new();
-    for (e, given) in files.iter().enumerate() {
+    let mut decoded: Vec<Result<(formats::Head, DynArray), PyError>> = Vec::new();
+    for e in 0..files.len() {
         if e % batch == 0 {
             let names = &files[e..(e + batch).min(n_echo)];
             decoded = names
@@ -499,13 +430,10 @@ pub fn read_data(
                 .collect();
             decoded.reverse();
         }
-        let img = decoded.pop().expect("one decoded file per echo")?;
-        let shape = img.data.shape().to_vec();
+        let (head, img) = decoded.pop().expect("one decoded file per echo")?;
+        let shape = img.shape().to_vec();
         if nilearn_path {
-            let affine = img
-                .header
-                .best_affine_nibabel()
-                .map_err(|_| unsupported(given))?;
+            let affine = head.affine;
             let first = || PyError::value("Image/mask shape mismatch");
             if !mask.affine.allclose(&affine, 1e-5, 1e-8) {
                 return Err(after_direct(

@@ -40,6 +40,32 @@ fn paid_weight(s: &[f32], te: f64) -> f64 {
     (snr as f64).mul(te)
 }
 
+/// numpy's warnings while PAID's means and standard deviations are computed (§12.3), over the
+/// echoes each voxel's group combines: (`reduce`: a series holding both infinities, whose sum
+/// is NaN, in the mean and again in the standard deviation; `subtract`: a series whose mean is
+/// infinite, minus that mean). A series that also holds a NaN raises neither.
+pub fn paid_warnings(data: &Data, count: &[u8]) -> (bool, bool) {
+    (0..data.n_vox)
+        .into_par_iter()
+        .with_min_len(256)
+        .filter(|&v| count[v] >= 1)
+        .map(|v| {
+            let mut out = (false, false);
+            for e in 0..usize::from(count[v]).max(2) {
+                let s = data.series(v, e);
+                let pos = s.contains(&f32::INFINITY);
+                let neg = s.contains(&f32::NEG_INFINITY);
+                if s.iter().any(|x| x.is_nan()) {
+                    continue;
+                }
+                out.0 |= pos && neg;
+                out.1 |= pos != neg;
+            }
+            out
+        })
+        .reduce(|| (false, false), |a, b| (a.0 || b.0, a.1 || b.1))
+}
+
 /// The combined series `(S, T)` (float32 as written), §10.
 pub fn combine(
     data: &Data,

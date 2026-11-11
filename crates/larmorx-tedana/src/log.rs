@@ -87,6 +87,11 @@ impl<'a> Log<'a> {
         self.raw(&text);
     }
 
+    /// Python's warnings registry reset (its filters changed): every place shows again.
+    pub fn reset_registry(&mut self) {
+        self.warned.clear();
+    }
+
     /// Text written as it is (with a final newline).
     pub fn raw(&mut self, text: &str) {
         let _ = writeln!(self.err, "{text}");

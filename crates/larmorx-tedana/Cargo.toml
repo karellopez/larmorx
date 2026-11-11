@@ -13,6 +13,8 @@ larmorx-io.workspace = true
 larmorx-interp.workspace = true
 # LapackRelease: nibabel's qform arithmetic in the outputs' headers (numpy's LAPACK release)
 larmorx-transform.workspace = true
+# gzip (.mgz, .hdr.gz/.img.gz) and MATLAB 7's compressed elements (.mat)
+flate2.workspace = true
 ndarray.workspace = true
 rayon.workspace = true
 

@@ -17,6 +17,7 @@ pub mod cli;
 pub mod combine;
 pub mod curvefit;
 pub mod fit;
+pub mod formats;
 pub mod input;
 pub mod log;
 pub mod maps;
@@ -441,6 +442,13 @@ fn run(
         "t2smap:t2smap_workflow:505",
         "Calculating model fit quality metrics",
     );
+    if n_t == 0 {
+        // every volume a dummy scan (TED-13 in `reproduce`): tedana's table of no row stops the
+        // run before the RMSE image (observed, with two and three echoes)
+        return Err(PyError::value(
+            "Shape of passed values is (0, 3), indices imply (0, 9)",
+        ));
+    }
     if rmse::divides_by_zero(&count, &fin) {
         log.py_warning(
             "rmse.rs:40",
@@ -469,7 +477,9 @@ fn run(
         cols,
         ts,
     )?;
-    // 19. the combination
+    // 19. the combination; by then Python's warnings registry has been reset (a warning of the
+    // adaptive mask's means shows again in PAID's: observed)
+    log.reset_registry();
     log.info(
         "t2smap:t2smap_workflow:521",
         "Computing optimal combination",
@@ -486,6 +496,23 @@ fn run(
                 "Optimally combining data with parallel-acquired inhomogeneity desensitized \
                  (PAID) method",
             );
+            let (reduce, subtract) = combine::paid_warnings(&data, &count);
+            if reduce {
+                for place in [adaptive::MEAN_SUM, adaptive::VAR_SUM] {
+                    log.py_warning(
+                        place,
+                        "RuntimeWarning",
+                        "invalid value encountered in reduce",
+                    );
+                }
+            }
+            if subtract {
+                log.py_warning(
+                    adaptive::VAR_SUBTRACT,
+                    "RuntimeWarning",
+                    "invalid value encountered in subtract",
+                );
+            }
         }
         CombMode::T2s => log.info(
             "combine:make_optcom:202",

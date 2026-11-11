@@ -221,9 +221,9 @@ pub fn loglin(
     }
     let divide_by_zero = maps
         .t2s
-        .par_chunks_mut(cols)
-        .zip(maps.s0.par_chunks_mut(cols))
-        .zip(maps.s0_other.par_chunks_mut(cols))
+        .par_chunks_mut(cols.max(1))
+        .zip(maps.s0.par_chunks_mut(cols.max(1)))
+        .zip(maps.s0_other.par_chunks_mut(cols.max(1)))
         .enumerate()
         .with_min_len(64)
         .map(|(v, ((t2s, s0), s0_other))| {

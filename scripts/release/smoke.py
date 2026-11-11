@@ -21,8 +21,9 @@ binaries, which hold for the published files, are left out.
 unpacked into a temporary folder: their licence files, each program's `--version` (`lx` through
 its link or `lx.cmd`), `lx --help` naming itself (Unix), larmorx-nc's FSL data beside `bin/`.
 
-On every program and extension found: Linux, no glibc symbol newer than 2.28 (`objdump -T`: the
-oldest glibc the release supports); macOS, only the system's libraries (`otool -L`, the file's own
+On every program and extension found: Linux, no glibc symbol newer than 2.28 (`objdump -T`, or
+where binutils is missing the file's own version-needs table: the oldest glibc the release
+supports); macOS, only the system's libraries (`otool -L`, the file's own
 install name left out: `otool -D`) and a minimum macOS of at most 11.0 (`otool -l`); Windows, no C
 runtime DLL and the runner's machine type (`scripts/release/pe_imports.py`).
 
@@ -46,6 +47,7 @@ import os
 import platform
 import re
 import shutil
+import struct
 import subprocess
 import sys
 import sysconfig
@@ -245,16 +247,59 @@ def foreign_macos_libraries(otool_l: str, otool_d: str) -> list[str]:
     ]
 
 
+SHT_GNU_VERNEED = 0x6FFFFFFE
+
+
+def elf_glibc_versions(data: bytes) -> set[tuple[int, int]]:
+    """The glibc versions a 64-bit little-endian ELF file needs, from its version-needs table
+    (`.gnu.version_r`, the section `objdump -p` prints as "Version References"): where objdump is
+    missing (a slim image without binutils, relay 4), the same answer as `objdump -T`'s
+    `GLIBC_x.y` names for the release's programs and extension."""
+    if data[:4] != b"\x7fELF" or data[4] != 2 or data[5] != 1:
+        raise ValueError("not a 64-bit little-endian ELF file")
+    (shoff,) = struct.unpack_from("<Q", data, 0x28)
+    shentsize, shnum = struct.unpack_from("<HH", data, 0x3A)
+    if not shoff or not shnum:
+        raise ValueError("no section headers")
+    sections = [
+        struct.unpack_from("<IIQQQQIIQQ", data, shoff + i * shentsize) for i in range(shnum)
+    ]
+    versions = set()
+    for _, sh_type, _, _, offset, _, link, count, _, _ in sections:
+        if sh_type != SHT_GNU_VERNEED:
+            continue
+        strtab = sections[link][4]
+        entry = offset
+        for _ in range(count):
+            _, n_aux, _, aux, following = struct.unpack_from("<HHIII", data, entry)
+            a = entry + aux
+            for _ in range(n_aux):
+                _, _, _, name, after = struct.unpack_from("<IHHII", data, a)
+                end = data.index(b"\0", strtab + name)
+                m = re.fullmatch(rb"GLIBC_(\d+)\.(\d+)(?:\.\d+)?", data[strtab + name : end])
+                if m:
+                    versions.add((int(m.group(1)), int(m.group(2))))
+                a += after
+            entry += following
+    return versions
+
+
 def binaries(checks: Checks, paths: list[Path]) -> None:
     system = platform.system()
-    if system == "Linux" and not checks.check(shutil.which("objdump") is not None, "objdump"):
-        return
+    objdump = shutil.which("objdump")
     for path in paths:
         if system == "Linux":
-            versions = {
-                tuple(map(int, m.groups()))
-                for m in re.finditer(r"GLIBC_(\d+)\.(\d+)", _run(["objdump", "-T", str(path)]))
-            }
+            if objdump:
+                versions = {
+                    tuple(map(int, m.groups()))
+                    for m in re.finditer(r"GLIBC_(\d+)\.(\d+)", _run([objdump, "-T", str(path)]))
+                }
+            else:  # no binutils here: the file's own version-needs table
+                try:
+                    versions = elf_glibc_versions(path.read_bytes())
+                except ValueError as e:
+                    checks.check(False, f"{path.name}: its glibc versions", str(e))
+                    continue
             newest = max(versions, default=(0, 0))
             checks.check(
                 newest <= GLIBC_FLOOR,

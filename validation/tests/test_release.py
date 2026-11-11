@@ -16,6 +16,7 @@ import json
 import re
 import shutil
 import struct
+import subprocess
 import sys
 import tarfile
 import tomllib
@@ -1039,3 +1040,58 @@ def test_smoke_macos_libraries_leave_out_the_files_own_install_name():
         "\t/usr/lib/libSystem.B.dylib (compatibility version 1.0.0, current version 1345.0.0)\n"
     )
     assert smoke.foreign_macos_libraries(otool_l, f"{program} (architecture arm64):\n") == []
+
+
+def _elf_with_version_needs(needs: dict[str, list[str]]) -> bytes:
+    """A minimal 64-bit little-endian ELF file holding only a `.dynstr` and a `.gnu.version_r`."""
+    strtab = b"\0"
+    offsets = {}
+    for name in [*needs, *(v for vs in needs.values() for v in vs)]:
+        offsets[name] = len(strtab)
+        strtab += name.encode() + b"\0"
+    verneed = b""
+    for i, (lib, versions) in enumerate(needs.items()):
+        last = i == len(needs) - 1
+        size = 16 + 16 * len(versions)
+        verneed += struct.pack("<HHIII", 1, len(versions), offsets[lib], 16, 0 if last else size)
+        for j, v in enumerate(versions):
+            following = 0 if j == len(versions) - 1 else 16
+            verneed += struct.pack("<IHHII", 0, 0, 2 + j, offsets[v], following)
+    strtab_at, verneed_at = 64, 64 + len(strtab)
+    shoff = verneed_at + len(verneed)
+    header = struct.pack(
+        "<16sHHIQQQIHHHHHH", b"\x7fELF\x02\x01\x01" + bytes(9), 3, 62, 1, 0, 0, shoff, 0, 64, 0,
+        0, 64, 3, 0,
+    )  # fmt: skip
+    sections = bytes(64) + struct.pack(
+        "<IIQQQQIIQQ", 0, 3, 0, 0, strtab_at, len(strtab), 0, 0, 1, 0
+    ) + struct.pack(
+        "<IIQQQQIIQQ", 0, smoke.SHT_GNU_VERNEED, 0, 0, verneed_at, len(verneed), 1, len(needs), 8, 0
+    )  # fmt: skip
+    return header + strtab + verneed + sections
+
+
+def test_smoke_reads_glibc_versions_without_objdump():
+    """Where binutils is missing (a slim image: relay 4), the glibc floor's check reads the file's
+    version-needs table itself: the same answer as `objdump -T`'s `GLIBC_x.y` names."""
+    data = _elf_with_version_needs(
+        {"libc.so.6": ["GLIBC_2.2.5", "GLIBC_2.28"], "libm.so.6": ["GLIBC_2.27", "GLIBC_PRIVATE"]}
+    )
+    assert smoke.elf_glibc_versions(data) == {(2, 2), (2, 28), (2, 27)}
+    assert (
+        smoke.elf_glibc_versions(_elf_with_version_needs({"libgcc_s.so.1": ["GCC_3.0"]})) == set()
+    )
+    for bad, why in (
+        (b"MZ" + bytes(62), "not a 64-bit"),
+        (b"\x7fELF\x01\x01" + bytes(58), "not a 64-bit"),
+        (b"\x7fELF\x02\x01\x01" + bytes(57), "no section headers"),
+    ):
+        with pytest.raises(ValueError, match=why):
+            smoke.elf_glibc_versions(bad)
+    objdump = shutil.which("objdump")
+    program = Path(sys.executable).resolve()
+    if objdump is None or program.read_bytes()[:4] != b"\x7fELF":
+        pytest.skip("objdump or an ELF Python needed for the comparison")
+    printed = subprocess.run([objdump, "-T", str(program)], capture_output=True, text=True).stdout
+    expected = {tuple(map(int, m)) for m in re.findall(r"GLIBC_(\d+)\.(\d+)", printed)}
+    assert smoke.elf_glibc_versions(program.read_bytes()) == expected

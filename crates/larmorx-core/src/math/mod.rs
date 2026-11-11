@@ -6,8 +6,8 @@
 //! AFNI on Linux, except where glibc itself is not correctly rounded (about 0.1 % of
 //! calls). They are pure-Rust ports of CORE-MATH (MIT, commit `040ee482a8ca`, see
 //! `UPSTREAM.md`), verified against mpmath on CORE-MATH's worst-case inputs and millions of
-//! random inputs (`asin`, `acos`, `atan2`, `cbrt`, `pow`: against CORE-MATH's C on its worst
-//! cases and random inputs). Background: `docs/findings/platform-math.md`.
+//! random inputs (`asin`, `acos`, `atan2`, `cbrt`, `pow`, `hypot`: against CORE-MATH's C on its
+//! worst cases and random inputs). Background: `docs/findings/platform-math.md`.
 
 mod acos;
 mod asin;
@@ -24,6 +24,7 @@ mod exp_glibc;
 mod expf;
 mod expf_glibc;
 mod expf_numpy;
+mod hypot;
 mod log;
 mod log_glibc;
 mod logf;
@@ -284,6 +285,19 @@ pub fn atan2(y: f64, x: f64) -> f64 {
     atan2::atan2(y, x)
 }
 
+/// `sqrt(x^2 + y^2)`, correctly rounded (CORE-MATH's `cr_hypot`). SciPy's `Rotation.as_euler`
+/// (libc's `hypot`, glibc 2.35's own code, which is not correctly rounded on about 0.5 % of
+/// random pairs: `docs/findings/confounds-*.md`), as in fMRIPrep's motion parameters.
+#[inline]
+#[must_use]
+pub fn hypot(x: f64, y: f64) -> f64 {
+    #[cfg(target_arch = "x86_64")]
+    if std::arch::is_x86_feature_detected!("fma") {
+        return fma::hypot(x, y);
+    }
+    hypot::hypot(x, y)
+}
+
 /// `x^y`, correctly rounded (CORE-MATH's `cr_pow`). ITK's `std::pow` (glibc's `pow`, which is
 /// not correctly rounded), as in `JensenHavrdaCharvatTsallisPointSetToPointSetMetricv4`.
 #[inline]
@@ -376,6 +390,16 @@ mod fma {
     }
 
     #[inline]
+    pub(super) fn hypot(x: f64, y: f64) -> f64 {
+        #[target_feature(enable = "fma")]
+        fn kernel(x: f64, y: f64) -> f64 {
+            super::hypot::hypot(x, y)
+        }
+        // SAFETY: only called after `is_x86_feature_detected!("fma")` returned true.
+        unsafe { kernel(x, y) }
+    }
+
+    #[inline]
     pub(super) fn pow(x: f64, y: f64) -> f64 {
         #[target_feature(enable = "fma")]
         fn kernel(x: f64, y: f64) -> f64 {
@@ -436,6 +460,9 @@ mod tests {
                 (super::atan2(-0.25, x), super::atan2::atan2(-0.25, x)),
                 (super::pow(x.abs(), 0.75), super::pow::pow(x.abs(), 0.75)),
                 (super::pow(1.0625, x), super::pow::pow(1.0625, x)),
+                (super::hypot(x, 1.5), super::hypot::hypot(x, 1.5)),
+                (super::hypot(-0.25, x), super::hypot::hypot(-0.25, x)),
+                (super::hypot(x, x * 0.75), super::hypot::hypot(x, x * 0.75)),
             ] {
                 assert!(
                     a.to_bits() == b.to_bits() || (a.is_nan() && b.is_nan()),

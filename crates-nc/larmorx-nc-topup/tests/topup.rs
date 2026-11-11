@@ -220,3 +220,118 @@ fn applytopup_messages() {
     assert!(e.contains("applytopup (Version 1.0)"));
     assert!(out.is_empty());
 }
+
+/// Whether `--nthr` was given, on the command line or in the configuration file: when it was
+/// not, the run's thread count applies (larmorx's `--n-threads`, else `OMP_NUM_THREADS`; the
+/// user's decision of 2026-11-11).
+#[test]
+fn nthr_given_on_the_command_line_or_in_the_configuration() {
+    use larmorx_nc_topup::options::{ParseEnd, parse};
+    let dir = tempfile::tempdir().unwrap();
+    let d = dir.path();
+    inputs(d);
+    std::fs::write(d.join("nthr.cnf"), "--nthr=3\n--warpres=12\n").unwrap();
+    std::fs::write(d.join("plain.cnf"), "--warpres=12\n").unwrap();
+    let at = |a: &str| match a.split_once('@') {
+        Some((k, name)) => format!("{k}{}", d.join(name).to_string_lossy()),
+        None => a.to_owned(),
+    };
+    for (extra, given, nthreads) in [
+        (&[][..], false, 1u32),
+        (&["--nthr=1"][..], true, 1),
+        (&["--nthr=2"][..], true, 2),
+        (&["--config=@plain.cnf"][..], false, 1),
+        (&["--config=@nthr.cnf"][..], true, 3),
+    ] {
+        let mut argv = vec!["topup".to_owned(), at("--imain=@b0"), at("--datain=@acq.txt")];
+        argv.extend(extra.iter().map(|a| at(a)));
+        argv.push(at("--out=@o"));
+        let (mut out, mut err) = (Vec::new(), Vec::new());
+        let end = {
+            let (mut cout, mut cerr) = (Vec::new(), Vec::new());
+            let con = larmorx_nc_topup::Console::with_mode(
+                &mut out,
+                &mut err,
+                UpstreamDefects::Fix,
+            );
+            parse(&argv, &settings(), &mut cout, &mut cerr, &con)
+        };
+        match end {
+            ParseEnd::Run(clp) => {
+                assert_eq!((clp.nthr_given, clp.nthreads), (given, nthreads), "{extra:?}");
+            }
+            ParseEnd::Exit(code) => panic!("{extra:?}: exit {code}"),
+        }
+    }
+}
+
+/// Without `--nthr`, the run's thread count does the work (the transforms' slices): the same
+/// bytes at one, three and every logical CPU, and with `--nthr=2` given; the log keeps
+/// `--nthr`'s own value (1 when it is not given, as FSL writes it).
+#[test]
+fn the_same_bytes_at_any_thread_count() {
+    let mut runs = Vec::new();
+    for (threads, extra) in [
+        (1usize, None),
+        (3, None),
+        (0, None),
+        (3, Some("--nthr=2")),
+    ] {
+        let dir = tempfile::tempdir().unwrap();
+        let d = dir.path();
+        inputs(d);
+        let mut args: Vec<String> = [
+            "--imain=@b0",
+            "--datain=@acq.txt",
+            "--out=@res",
+            "--fout=@field",
+            "--iout=@corr",
+            "--warpres=12,9",
+            "--subsamp=2,1",
+            "--fwhm=4,0",
+            "--miter=2,2",
+            "--lambda=0.001,0.0001",
+            "--estmov=0",
+            "--minmet=0,1",
+            "-v",
+        ]
+        .iter()
+        .map(|a| match a.split_once('@') {
+            Some((k, name)) => format!("{k}{}", d.join(name).to_string_lossy()),
+            None => (*a).to_owned(),
+        })
+        .collect();
+        args.extend(extra.map(str::to_owned));
+        let threads = if threads == 0 {
+            std::thread::available_parallelism().map_or(1, usize::from)
+        } else {
+            threads
+        };
+        let (mut out, mut err) = (Vec::new(), Vec::new());
+        let code = larmorx_nc_topup::topup(
+            &args,
+            &settings(),
+            UpstreamDefects::Fix,
+            threads,
+            &mut out,
+            &mut err,
+        );
+        assert_eq!(code, 0, "{}", String::from_utf8_lossy(&err));
+        let files: Vec<Vec<u8>> = [
+            "res_fieldcoef.nii",
+            "res_movpar.txt",
+            "field.nii",
+            "corr.nii",
+        ]
+        .iter()
+        .map(|f| std::fs::read(d.join(f)).unwrap())
+        .collect();
+        let log = std::fs::read_to_string(d.join("b0.topup_log")).unwrap();
+        let nthr = if extra.is_some() { "2" } else { "1" };
+        assert!(log.ends_with(&format!("--nthr={nthr}\n")), "{log}");
+        runs.push((out, err, files));
+    }
+    for r in &runs[1..] {
+        assert!(r == &runs[0], "a thread count changed the output");
+    }
+}

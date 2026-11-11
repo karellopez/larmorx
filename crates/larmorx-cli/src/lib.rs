@@ -47,8 +47,8 @@ pub struct Globals {
     pub upstream_defects: Option<UpstreamDefects>,
 }
 
-/// larmorx's own options, in the order `--help` lists them.
-pub const GLOBAL_OPTIONS: [&str; 3] = ["--n-threads", "--implementation", "--upstream-defects"];
+/// larmorx's own options, in the order `--help` lists them ([`larmorx_core::cli::OPTIONS`]).
+pub const GLOBAL_OPTIONS: [&str; 3] = larmorx_core::cli::OPTIONS;
 
 impl Globals {
     /// What the tools' command lines receive: the thread count and D13's mode.
@@ -74,79 +74,18 @@ impl Globals {
 /// Reads larmorx's own options at the start of `args` (the arguments after the program's
 /// name): the options and how many arguments they took, or the message of a usage error (a
 /// wrong or missing value, an option given twice). Each takes its value as the next argument
-/// or after `=`.
+/// or after `=`. The parser is [`larmorx_core::cli::parse`], which the replica programs of the
+/// other licence families share.
 pub fn parse_globals(args: &[String]) -> Result<(Globals, usize), String> {
-    let mut g = Globals::default();
-    let mut i = 0;
-    while let Some(arg) = args.get(i) {
-        let Some((name, inline)) = global_option(arg) else {
-            break;
-        };
-        i += 1;
-        let value = match inline {
-            Some(v) => v,
-            None => {
-                let Some(v) = args.get(i) else {
-                    return Err(format!("{name} needs a value: {}", option_values(name)));
-                };
-                i += 1;
-                v.as_str()
-            }
-        };
-        let wrong = || format!("{name} must be {}, not '{value}'", option_values(name));
-        let twice = || format!("{name} is given twice");
-        match name {
-            "--n-threads" => {
-                if g.n_threads.is_some() {
-                    return Err(twice());
-                }
-                g.n_threads = Some(parse_n_threads(value).ok_or_else(wrong)?);
-            }
-            "--implementation" => {
-                if g.implementation.is_some() {
-                    return Err(twice());
-                }
-                g.implementation = Some(Implementation::parse(value).ok_or_else(wrong)?);
-            }
-            _ => {
-                if g.upstream_defects.is_some() {
-                    return Err(twice());
-                }
-                g.upstream_defects = Some(UpstreamDefects::parse(value).ok_or_else(wrong)?);
-            }
-        }
-    }
-    Ok((g, i))
-}
-
-/// `arg` as one of [`GLOBAL_OPTIONS`]: its name, and the value written after `=`.
-fn global_option(arg: &str) -> Option<(&'static str, Option<&str>)> {
-    GLOBAL_OPTIONS.iter().find_map(|&name| {
-        if arg == name {
-            Some((name, None))
-        } else {
-            arg.strip_prefix(name)
-                .and_then(|r| r.strip_prefix('='))
-                .map(|v| (name, Some(v)))
-        }
-    })
-}
-
-/// The values an option takes, as its messages name them.
-fn option_values(name: &str) -> &'static str {
-    match name {
-        "--n-threads" => "a whole number of threads, 0 for every logical CPU",
-        "--implementation" => "auto, replica or clean-room",
-        _ => "fix or reproduce",
-    }
-}
-
-/// `--n-threads`' value: a whole number written in decimal digits, 0 or more.
-fn parse_n_threads(value: &str) -> Option<usize> {
-    if value.is_empty() || !value.bytes().all(|b| b.is_ascii_digit()) {
-        return None;
-    }
-    value.parse().ok()
+    let (given, k) = larmorx_core::cli::parse::<Implementation>(args)?;
+    Ok((
+        Globals {
+            n_threads: given.n_threads,
+            implementation: given.implementation,
+            upstream_defects: given.upstream_defects,
+        },
+        k,
+    ))
 }
 
 /// The usage line of the command line with larmorx's own options.
@@ -349,7 +288,7 @@ where
             let tool = args.next();
             let rest: Vec<String> = args.collect();
             match tool.as_deref() {
-                Some(tool) if let Some((name, _)) = global_option(tool) => (
+                Some(tool) if let Some((name, _)) = larmorx_core::cli::option(tool) => (
                     EXIT_USAGE,
                     writeln!(
                         err,

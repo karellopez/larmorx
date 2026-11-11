@@ -7,16 +7,26 @@
 //!
 //! It mirrors `larmorx` (the Apache-2.0 command line): the same family and tool names, its own
 //! exit statuses 0 (success) and 2 (a usage error of this program), and the tool's own statuses
-//! otherwise. D13's choice comes from `LARMORX_UPSTREAM_DEFECTS` (`fix`, the default, or
-//! `reproduce`); the numpy and SciPy tedana's arithmetic follows from `LARMORX_TEDANA_LIBRARIES`
-//! (`newest`, the default: numpy 2.5.4 and SciPy 1.18.1; `shared`: numpy 2.3.5 and SciPy 1.15.3).
+//! otherwise. larmorx's own options stand before the family, as `larmorx`'s do (`larmorx-gpl
+//! [--n-threads N] [--upstream-defects fix|reproduce] [--implementation replica] tedana <tool>
+//! ...`, the user's decision of 2026-11-11, parsed by [`larmorx_core::cli::parse`]); each one
+//! given wins over the variable it replaces: D13's choice over `LARMORX_UPSTREAM_DEFECTS` (`fix`,
+//! the default, or `reproduce`), the thread count over `OMP_NUM_THREADS` (0, the default: every
+//! logical CPU; the results do not depend on it). A tool whose original has its own thread
+//! option (t2smap's `--n-threads`, after the tool) uses it when it is given, else the thread
+//! count. `--implementation` takes `replica` only, which changes nothing
+//! ([`larmorx_core::cli::ReplicaOnly`]). `larmorx` passes its options to this program through
+//! those variables, never as options. The numpy and SciPy tedana's arithmetic follows from
+//! `LARMORX_TEDANA_LIBRARIES` (`newest`, the default: numpy 2.5.4 and SciPy 1.18.1; `shared`:
+//! numpy 2.3.5 and SciPy 1.15.3).
 #![forbid(unsafe_code)]
 
 use std::io::{self, Write};
 use std::path::Path;
 use std::process::ExitCode;
 
-use larmorx_core::defects::{EXIT_BAD_MODE, UpstreamDefects};
+use larmorx_core::cli::{self, Overrides, ReplicaOnly};
+use larmorx_core::defects::EXIT_BAD_MODE;
 use larmorx_gpl_tedana::decay::Libraries;
 use larmorx_gpl_tedana::workflow::Env;
 
@@ -40,6 +50,16 @@ fn tool_names() -> String {
         .join(", ")
 }
 
+/// The tools whose originals have their own thread option, which wins when it is given (else
+/// the thread count applies), as `--help` lists them.
+const OWN_THREAD_OPTIONS: &str = "tedana t2smap --n-threads";
+
+/// The thread count: `--n-threads` before the family, else `OMP_NUM_THREADS` (0, every logical
+/// CPU, when unset or not a number).
+fn threads(given: &Overrides) -> usize {
+    given.n_threads_or(|| cli::omp_num_threads(std::env::var("OMP_NUM_THREADS").ok().as_deref()))
+}
+
 fn libraries() -> Result<Libraries, String> {
     match std::env::var("LARMORX_TEDANA_LIBRARIES").ok().as_deref() {
         None | Some("" | "newest") => Ok(Libraries::Newest),
@@ -55,26 +75,57 @@ where
     I: IntoIterator<Item = S>,
     S: AsRef<str>,
 {
+    run_tools(args, TEDANA_TOOLS, out, err)
+}
+
+/// [`run`] with the `tedana` family's `tools` (the tests' probes).
+fn run_tools<I, S>(
+    args: I,
+    tools: &[(&str, ToolFn)],
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> u8
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<str>,
+{
     let mut args = args.into_iter();
     let prog = args
         .next()
         .map_or_else(|| "larmorx-gpl".to_owned(), |a| program_name(a.as_ref()));
-    let (code, written) = match args.next().as_ref().map(AsRef::as_ref) {
+    let all: Vec<String> = args.map(|a| a.as_ref().to_owned()).collect();
+    let (given, k) = match cli::parse::<ReplicaOnly>(&all) {
+        Ok(parsed) => parsed,
+        Err(message) => return usage_error(&prog, &message, err),
+    };
+    let given = given.overrides();
+    let mut args = all.into_iter().skip(k);
+    let (code, written) = match args.next().as_deref() {
         Some("-V" | "--version") => (0, writeln!(out, "larmorx-gpl {VERSION}")),
         Some("-h" | "--help") => (0, out.write_all(usage(&prog).as_bytes())),
         None => (EXIT_USAGE, err.write_all(usage(&prog).as_bytes())),
         Some("tedana") => {
-            let tool = args.next().map(|a| a.as_ref().to_owned());
-            let rest: Vec<String> = args.map(|a| a.as_ref().to_owned()).collect();
+            let tool = args.next();
+            let rest: Vec<String> = args.collect();
             match tool.as_deref() {
-                Some(tool) => match TEDANA_TOOLS.iter().find(|(n, _)| *n == tool) {
-                    Some((_, f)) => match (UpstreamDefects::from_env(), libraries()) {
+                Some(tool) if let Some((name, _)) = cli::option(tool) => (
+                    EXIT_USAGE,
+                    writeln!(
+                        err,
+                        "error: {name} after the family: {prog}'s own options go before it \
+                         ({prog} {name} ... tedana <tool> ...); after the tool, an option is the \
+                         tool's\n\nRun '{prog} --help' for usage."
+                    ),
+                ),
+                Some(tool) => match tools.iter().find(|(n, _)| *n == tool) {
+                    Some((_, f)) => match (given.upstream_defects(), libraries()) {
                         (Ok(mode), Ok(libraries)) => {
                             let env = Env {
                                 columns: std::env::var("COLUMNS").ok(),
                                 terminal_columns: None,
                                 mode,
                                 libraries,
+                                threads: threads(&given),
                             };
                             (f(&rest, &env, out, err), Ok(()))
                         }
@@ -119,6 +170,29 @@ where
     if written.is_ok() { code } else { EXIT_IO_ERROR }
 }
 
+/// The usage line with larmorx's own options.
+fn usage_line(prog: &str) -> String {
+    format!(
+        "Usage: {prog} [--n-threads N] [--upstream-defects fix|reproduce] [--implementation \
+         replica] <family> <tool> [original arguments]"
+    )
+}
+
+/// A usage error of larmorx's own options: `error: <message>`, the usage line, a pointer to
+/// `--help`; exit [`EXIT_USAGE`] (as `larmorx`'s).
+fn usage_error(prog: &str, message: &str, err: &mut dyn Write) -> u8 {
+    let written = writeln!(
+        err,
+        "error: {message}\n\n{}\nRun '{prog} --help' for usage.",
+        usage_line(prog)
+    );
+    if written.is_ok() {
+        EXIT_USAGE
+    } else {
+        EXIT_IO_ERROR
+    }
+}
+
 fn program_name(argv0: &str) -> String {
     Path::new(argv0)
         .file_stem()
@@ -133,24 +207,32 @@ fn usage(prog: &str) -> String {
         "larmorx-gpl {version}: bit-exact replicas of GPL-family tools, with the original command
 lines (GNU General Public License version 3; see LICENSE and docs/licensing.md)
 
-Usage: {prog} <family> <tool> [original arguments]
+Usage: {prog} [options] <family> <tool> [original arguments]
        {prog} --version | --help
 
 Tools:
   tedana    {tedana}
 
-Options:
-  -h, --help     Print this help
-  -V, --version  Print the version
+Options (before the family; each one given wins over the environment variable it replaces):
+  --n-threads N            threads, 0 = every logical CPU (default); replaces OMP_NUM_THREADS
+  --upstream-defects MODE  fix (default) or reproduce; replaces LARMORX_UPSTREAM_DEFECTS
+  --implementation replica changes nothing: this program runs the replicas only (auto and
+                           clean-room are larmorx's choice: larmorx --implementation ...)
+  -h, --help               Print this help
+  -V, --version            Print the version
+  A tool whose original has its own thread option uses it when it is given, else --n-threads:
+  {own}. The results never depend on the thread count.
 
 Environment:
   LARMORX_UPSTREAM_DEFECTS  fix (default): the originals' defects corrected; reproduce: their
                             results bit for bit
+  OMP_NUM_THREADS           threads (default: all logical CPUs); results do not depend on it
   LARMORX_TEDANA_LIBRARIES  newest (default): numpy 2.5.4 and SciPy 1.18.1's arithmetic;
                             shared: numpy 2.3.5 and SciPy 1.15.3's
 ",
         version = VERSION,
         tedana = tool_names(),
+        own = OWN_THREAD_OPTIONS,
     )
 }
 
@@ -191,6 +273,135 @@ mod tests {
         assert!(e.contains("unknown tedana tool 'nope'"));
         let (c, o, _) = run_capture(&["larmorx-gpl", "tedana", "t2smap", "-v"]);
         assert_eq!((c, o.as_str()), (0, "t2smap v26.0.3\n"));
+    }
+
+    /// What the probe tool received: the thread count and D13's mode.
+    static PROBED: std::sync::Mutex<Vec<(usize, &'static str)>> = std::sync::Mutex::new(Vec::new());
+
+    fn probe(_: &[String], env: &Env, out: &mut dyn Write, _: &mut dyn Write) -> u8 {
+        PROBED.lock().unwrap().push((env.threads, env.mode.name()));
+        let _ = writeln!(out, "probe {} {}", env.threads, env.mode.name());
+        0
+    }
+
+    fn run_probe(args: &[&str]) -> (u8, String, String) {
+        let (mut out, mut err) = (Vec::new(), Vec::new());
+        let code = run_tools(args, &[("probe", probe)], &mut out, &mut err);
+        (
+            code,
+            String::from_utf8(out).unwrap(),
+            String::from_utf8(err).unwrap(),
+        )
+    }
+
+    /// larmorx's own options before the family reach the tool, over their variables; after
+    /// the tool, `--n-threads` is the tool's (t2smap's own).
+    #[test]
+    fn the_options_reach_the_tool() {
+        for (args, expected) in [
+            (
+                &[
+                    "larmorx-gpl",
+                    "--n-threads",
+                    "5",
+                    "--upstream-defects",
+                    "reproduce",
+                ][..],
+                "probe 5 reproduce\n",
+            ),
+            (
+                &["larmorx-gpl", "--upstream-defects=fix", "--n-threads=3"][..],
+                "probe 3 fix\n",
+            ),
+            (
+                &[
+                    "larmorx-gpl",
+                    "--implementation",
+                    "replica",
+                    "--n-threads",
+                    "0",
+                ][..],
+                "probe 0 ",
+            ),
+        ] {
+            let mut full = args.to_vec();
+            full.extend(["tedana", "probe", "--n-threads", "9"]);
+            let (code, out, err) = run_probe(&full);
+            assert_eq!((code, err.as_str()), (0, ""), "{full:?}");
+            assert!(out.starts_with(expected), "{full:?}: {out}");
+        }
+        let probed = PROBED.lock().unwrap().clone();
+        assert!(probed.contains(&(5, "reproduce")), "{probed:?}");
+        assert!(probed.contains(&(3, "fix")), "{probed:?}");
+    }
+
+    #[test]
+    fn wrong_options_are_usage_errors() {
+        let usage = "\n\nUsage: larmorx-gpl [--n-threads N] [--upstream-defects fix|reproduce] \
+                     [--implementation replica] <family> <tool> [original arguments]\nRun \
+                     'larmorx-gpl --help' for usage.\n";
+        for (args, message) in [
+            (
+                &["--n-threads", "1.5", "tedana", "probe"][..],
+                "--n-threads must be a whole number of threads, 0 for every logical CPU, not '1.5'",
+            ),
+            (
+                &["--upstream-defects"][..],
+                "--upstream-defects needs a value: fix or reproduce",
+            ),
+            (
+                &["--implementation=x", "tedana", "probe"][..],
+                "--implementation must be replica, not 'x'",
+            ),
+        ] {
+            let mut full = vec!["larmorx-gpl"];
+            full.extend(args);
+            let (code, out, err) = run_probe(&full);
+            assert_eq!((code, out.as_str()), (EXIT_USAGE, ""), "{full:?}");
+            assert_eq!(err, format!("error: {message}{usage}"), "{full:?}");
+        }
+        for refused in ["auto", "clean-room", "original"] {
+            let (code, _, err) = run_probe(&[
+                "larmorx-gpl",
+                "--implementation",
+                refused,
+                "tedana",
+                "probe",
+            ]);
+            assert_eq!(code, EXIT_USAGE, "{refused}");
+            assert!(
+                err.starts_with(&format!(
+                    "error: --implementation {refused}: this program runs the bit-exact replicas \
+                     only"
+                )),
+                "{err}"
+            );
+        }
+        let (code, _, err) = run_probe(&["larmorx-gpl", "tedana", "--upstream-defects", "fix"]);
+        assert_eq!(code, EXIT_USAGE);
+        assert!(
+            err.starts_with(
+                "error: --upstream-defects after the family: larmorx-gpl's own options go before \
+                 it (larmorx-gpl --upstream-defects ... tedana <tool> ...)"
+            ),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn help_lists_the_options() {
+        let (code, out, _) = run_capture(&["larmorx-gpl", "--help"]);
+        assert_eq!(code, 0);
+        for line in [
+            "Usage: larmorx-gpl [options] <family> <tool> [original arguments]\n",
+            "  --n-threads N            threads, 0 = every logical CPU (default); replaces OMP_NUM_THREADS\n",
+            "  --upstream-defects MODE  fix (default) or reproduce; replaces LARMORX_UPSTREAM_DEFECTS\n",
+            "  --implementation replica changes nothing: this program runs the replicas only (auto and\n",
+            "  tedana t2smap --n-threads. The results never depend on the thread count.\n",
+            "  OMP_NUM_THREADS           threads (default: all logical CPUs); results do not depend on it\n",
+        ] {
+            assert!(out.contains(line), "{line}\n{out}");
+        }
     }
 
     /// The version is Cargo's in PEP 440's form, the wheel's: the pre-release `-alpha.N`,

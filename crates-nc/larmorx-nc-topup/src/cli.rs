@@ -4,9 +4,9 @@
 //! exit statuses, as the `larmorx-nc` program (`larmorx-nc-cli`) runs it: the original
 //! arguments (without the program name), the settings it read from the environment once
 //! (`FSLOUTPUTTYPE`, `FSL_LOAD_NIFTI_EXTENSIONS`, `FSLDIR`), D13's mode
-//! (`LARMORX_UPSTREAM_DEFECTS`: `fix`, the default, or `reproduce`, FSL's result bit for bit)
-//! and the thread count (`OMP_NUM_THREADS`; 0: every logical CPU; the results do not depend on
-//! it).
+//! (`--upstream-defects`, else `LARMORX_UPSTREAM_DEFECTS`: `fix`, the default, or `reproduce`,
+//! FSL's result bit for bit) and the thread count (`--n-threads`, else `OMP_NUM_THREADS`; 0: every
+//! logical CPU; the results do not depend on it). topup's own `--nthr` wins when it is given.
 
 use std::io::Write;
 

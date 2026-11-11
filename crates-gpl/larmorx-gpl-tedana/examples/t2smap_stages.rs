@@ -61,6 +61,9 @@ fn main() {
         terminal_columns: None,
         mode,
         libraries,
+        threads: larmorx_core::cli::omp_num_threads(
+            std::env::var("OMP_NUM_THREADS").ok().as_deref(),
+        ),
     };
     let settings = match parser::parse(rest, 78) {
         Ok(s) => s,

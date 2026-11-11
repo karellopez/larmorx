@@ -386,6 +386,19 @@ impl Implementation {
         }
     }
 
+}
+
+/// `larmorx --implementation NAME` ([`larmorx_core::cli::parse`]).
+impl larmorx_core::cli::ImplementationOption for Implementation {
+    const VALUES: &'static str = "auto, replica or clean-room";
+
+    fn from_option(value: &str) -> Result<Self, String> {
+        Implementation::parse(value)
+            .ok_or_else(|| format!("--implementation must be {}, not '{value}'", Self::VALUES))
+    }
+}
+
+impl Implementation {
     /// [`IMPLEMENTATION_ENV`]: unset or empty is [`Implementation::Auto`].
     pub fn from_env() -> Result<Implementation, Error> {
         match std::env::var_os(IMPLEMENTATION_ENV) {

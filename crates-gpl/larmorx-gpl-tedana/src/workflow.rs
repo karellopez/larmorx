@@ -45,6 +45,11 @@ pub struct Env {
     pub mode: UpstreamDefects,
     /// `LARMORX_TEDANA_LIBRARIES` (`newest`, the default, or `shared`).
     pub libraries: Libraries,
+    /// The run's thread count (larmorx's `--n-threads`, else `OMP_NUM_THREADS`; 0: every logical
+    /// CPU), for the fits and the files when t2smap's own `--n-threads` is not given (the user's
+    /// decision of 2026-11-11: a tool's own thread option wins only when it is given). The
+    /// results do not depend on it.
+    pub threads: usize,
 }
 
 /// Python's `os.path.abspath`: joined to the working directory and normalised (`.`, `..` and
@@ -353,7 +358,7 @@ pub fn fit_stage(
     let reference = &setup.reference;
     let mut exclude = setup.exclude.clone();
     // load_mask
-    let threads = threads(settings);
+    let threads = threads(settings, env);
     let user_mask = settings.mask.is_some();
     let mask = if let Some(mask_path) = settings.mask.clone() {
         log.info(Site("utils", "load_mask", 916), "Using user-defined mask");
@@ -746,7 +751,7 @@ pub fn save_stage(
     let settings = &setup.settings;
     let tes = &setup.tes;
     let reproduce = notices.reproduce();
-    let threads = threads(settings);
+    let threads = threads(settings, env);
     let (e, n_vols) = (masked.n_echos, masked.n_vols);
     // fit_decay_ts fits every volume (it refuses --exclude): one column per volume.
     let cols = if settings.fit_ts { n_vols } else { 1 };
@@ -999,10 +1004,13 @@ fn affine_str(a: &larmorx_core::Affine) -> String {
     larmorx_core::numpy::format::array_str_2d(&v, 4)
 }
 
-/// The threads of the fits: `--n-threads` (tedana's joblib workers; 0 or less: all logical
-/// CPUs). The results do not depend on it.
-fn threads(s: &Settings) -> usize {
-    if s.n_threads <= 0 {
+/// The threads of the fits: `--n-threads` when it is given (tedana's joblib workers; 0 or less:
+/// all logical CPUs), else the run's thread count ([`Env::threads`]). The results do not depend
+/// on it.
+fn threads(s: &Settings, env: &Env) -> usize {
+    if !s.n_threads_given {
+        env.threads
+    } else if s.n_threads <= 0 {
         0
     } else {
         s.n_threads.min(1024) as usize

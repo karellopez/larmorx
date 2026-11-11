@@ -72,7 +72,7 @@ def test_python_matches_the_command_line(tmp_path, method):
     np.testing.assert_allclose(img.affine, expected.affine)
     assert img.header.toffset == expected.header["toffset"]
     assert img.implementation == lx.Implementation(
-        "original", "larmorx", lx.__version__, "Apache-2.0"
+        "clean-room", "larmorx", lx.__version__, "Apache-2.0"
     )
 
 
@@ -203,7 +203,7 @@ def test_cli_errors(tmp_path):
     assert "Unknown tpattern" in cli("-tpattern", "bogus", "-prefix", tmp_path / "z.nii", src)[1]
     # -verbose names the implementation first.
     code, err = cli("-verbose", "-tpattern", "alt+z", "-prefix", tmp_path / "v.nii", src)
-    assert code == 0 and err.startswith("++ implementation: original (larmorx "), err
+    assert code == 0 and err.startswith("++ implementation: clean-room (larmorx "), err
 
 
 def test_cli_copies_input_without_slice_timing(tmp_path):

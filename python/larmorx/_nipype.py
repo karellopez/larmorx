@@ -1775,7 +1775,7 @@ def run(
         warn_lines(process.stderr)
         return cmd
     if program in ("3dAutomask", "3dvolreg"):
-        if implementation == "original":
+        if _replica.implementation_name(implementation, warn=False) == "clean-room":
             raise NotImplementedError(
                 f"{program}'s command line runs through its built-in replica here "
                 "(implementation='auto' or 'replica'); its clean-room original has a typed API "

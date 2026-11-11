@@ -26,6 +26,7 @@ use std::io::Write;
 use std::path::Path;
 use std::sync::Arc;
 
+use larmorx_core::cli::Overrides;
 use larmorx_core::defects::{self, EXIT_BAD_MODE, Notices, UpstreamDefects};
 use larmorx_core::{IndexFloor, Precision};
 use larmorx_registration::initializer::{Feature, initialize};
@@ -202,12 +203,25 @@ pub fn main(
     out: &mut dyn Write,
     err: &mut dyn Write,
 ) -> u8 {
-    match UpstreamDefects::from_env() {
+    main_given(args, loader, &Overrides::default(), out, err)
+}
+
+/// [`main`] with larmorx's own options (`larmorx --n-threads N --upstream-defects MODE ants
+/// ...`): each one given wins over the variables it replaces (ITK's thread variables,
+/// `LARMORX_UPSTREAM_DEFECTS`).
+pub fn main_given(
+    args: &[String],
+    loader: &dyn TransformLoader,
+    given: &Overrides,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> u8 {
+    match given.upstream_defects() {
         Ok(mode) => run(
             args,
             &mut FileStore,
             loader,
-            super::itk_threads(),
+            given.n_threads_or(super::itk_threads),
             mode,
             std::env::var("ANTS_RANDOM_SEED").ok(),
             out,

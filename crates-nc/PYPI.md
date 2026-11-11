@@ -28,9 +28,11 @@ topup's settings files (`b02b0.cnf` and the others), at `<prefix>/share/larmorx-
 ## Installation
 
 ```bash
-pip install larmorx-nc              # by name, so that its licence is accepted knowingly
-pip install "larmorx[all]"          # or with everything: larmorx, larmorx-nc and larmorx-gpl
+pip install larmorx-nc
 ```
+
+installs it by name, so that its licence is accepted knowingly; `pip install "larmorx[all]"`
+installs everything: larmorx, larmorx-nc and larmorx-gpl.
 
 Python 3.12 or newer; wheels for Linux (x86-64, aarch64; glibc 2.28 or newer), macOS (11 or newer,
 Intel and Apple silicon; on Apple silicon `larmorx[all]` needs macOS 12, as SciPy's and
@@ -46,11 +48,16 @@ gives FSL's behaviour within validated limits.
 - **Once larmorx-nc is installed, larmorx uses it by default** for these tools:
   `implementation="auto"` (the default of `lx.fsl.bet(...)`, `lx.mri.hmc(...)` and the others) and
   `larmorx fsl <program> ...` run the replica when its program is found, so the default results
-  then come from FSL-licensed code. `implementation="original"` (or
-  `LARMORX_IMPLEMENTATION=original` on the command line) runs the clean-room original instead;
-  `pip uninstall larmorx-nc` removes the replicas.
+  then come from FSL-licensed code. `implementation="clean-room"` (or
+  `larmorx --implementation clean-room fsl <program> ...`, `LARMORX_IMPLEMENTATION=clean-room`;
+  `original` is the old spelling) runs the clean-room original instead; `pip uninstall
+  larmorx-nc` removes the replicas.
 - The program can also be run directly, with the original program's arguments:
   `larmorx-nc fsl bet t1w.nii.gz brain.nii.gz -f 0.5` (`larmorx-nc --help` lists the programs).
+  larmorx's own options go before the family, as with `larmorx`: `--n-threads N` (in place of
+  `OMP_NUM_THREADS`; topup's own `--nthr` wins when it is given) and `--upstream-defects
+  fix|reproduce` (in place of `LARMORX_UPSTREAM_DEFECTS`), e.g. `larmorx-nc --n-threads 4 fsl bet
+  t1w.nii.gz brain.nii.gz`.
 
 ## Licence and source
 

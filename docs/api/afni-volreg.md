@@ -14,8 +14,9 @@ the code of the Medical College of Wisconsin, which AFNI 26.3.05 releases under 
 (`crates/larmorx-afni/src/volreg/`, Apache-2.0), written from
 [`specs/3dvolreg.md`](../../specs/3dvolreg.md) by an agent that never read AFNI's source or the
 replica, built for speed (below). `implementation="auto"` (the default, and `larmorx afni
-3dvolreg`) and `"replica"` run the replica, in the same process; `"original"` (and
-`LARMORX_IMPLEMENTATION=original` on the command line) runs the original, also in the same process.
+3dvolreg`) and `"replica"` run the replica, in the same process; `"clean-room"` (`"original"`, 0.1.0rc1's spelling, still works)
+(and `--implementation clean-room` on the command line) runs the clean-room original, also in the
+same process.
 
 **Status: `validated`** (2026-11-06): the replica is bit-identical with AFNI 26.3.05 in every
 compared case of its record ([afni-volreg-replica](../validation/afni-volreg-replica.md), the

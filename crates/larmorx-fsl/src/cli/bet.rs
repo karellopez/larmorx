@@ -631,7 +631,7 @@ fn write_values(
     // FSL's programs (fslroi, fslmerge, fslmaths) print the image layer's messages (§3.1)
     let t = run
         .settings
-        .get("FSLOUTPUTTYPE")
+        .output_type()
         .ok_or_else(|| bet2::FSLOUTPUTTYPE_UNSET.to_owned())?;
     let (name, version) = image::output_file(&run.settings.name(stem), t)
         .ok_or_else(|| format!("{}\n", image::unknown_output_type_message(t)))?;

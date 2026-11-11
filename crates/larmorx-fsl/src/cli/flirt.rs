@@ -349,6 +349,7 @@ pub fn main_carrying(
     }
     let ctx = Ctx {
         settings,
+        fsl09: &engine::FSL_09_FLIRT,
         mode,
         n_threads: settings.threads(),
         // quiet: a registration names no GLIBC-07 (it cannot tell whether a last bit of its

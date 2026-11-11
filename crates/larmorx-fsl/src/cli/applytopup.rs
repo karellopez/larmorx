@@ -892,6 +892,9 @@ fn run(
     )
 }
 
+/// FSL-09 as applytopup meets it (`--datatype`'s integer types): the notices name applytopup.
+pub static FSL_09_APPLYTOPUP: defects::Defect = defects::FSL_09.of("applytopup");
+
 /// `--out`: the first image's header (4D with the images' volume count), display range 0 0,
 /// float32 or `--datatype`'s type (integers converted as FSL-09 says).
 #[allow(clippy::too_many_arguments)]
@@ -905,7 +908,7 @@ fn write_output(
     notices: &mut Vec<Notice>,
     err: &mut dyn Write,
 ) -> Result<(), u8> {
-    let ot = match settings.get("FSLOUTPUTTYPE") {
+    let ot = match settings.output_type() {
         None => {
             print_notices(err, notices);
             let _ = err.write_all(FSLOUTPUTTYPE_UNSET.as_bytes());
@@ -953,6 +956,7 @@ fn write_output(
                 defects::push_once(
                     notices,
                     larmorx_mri::hmc::image::fsl09_notice(
+                        &FSL_09_APPLYTOPUP,
                         std::path::Path::new(&name),
                         conv,
                         t,

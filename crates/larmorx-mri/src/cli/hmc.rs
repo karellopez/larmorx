@@ -3,7 +3,8 @@
 //! (`specs/mcflirt.md` §10–§12).
 //!
 //! Deliberate differences from mcflirt (documented in `docs/api/mri-hmc.md`): without
-//! `FSLOUTPUTTYPE` the output is `.nii.gz` (mcflirt fails); impossible inputs (a reference
+//! `FSLOUTPUTTYPE` the output is `.nii.gz` and FSL-11 is named (mcflirt fails at its first image;
+//! `reproduce` does so too); impossible inputs (a reference
 //! index out of range, a reference grid with another number of voxels, `-stages 0` with a
 //! reference file) are errors reported before any work, with exit code 1 (mcflirt aborts);
 //! `-gdt` is not supported.
@@ -22,6 +23,7 @@ use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
+use larmorx_core::cli::Overrides;
 use larmorx_core::defects::{self, EXIT_BAD_MODE, Notice, UpstreamDefects};
 use larmorx_core::element::DataType;
 
@@ -428,8 +430,20 @@ fn ignored_option(option: &str, mode: UpstreamDefects) -> Notice {
 /// Runs `larmorx mri hmc` with `args` (mcflirt-style options); returns the exit code. The D13
 /// mode comes from `LARMORX_UPSTREAM_DEFECTS`.
 pub fn main(args: &[String], out: &mut dyn Write, err: &mut dyn Write) -> u8 {
-    match UpstreamDefects::from_env() {
-        Ok(mode) => main_with(args, mode, out, err),
+    main_given(args, &Overrides::default(), out, err)
+}
+
+/// [`main`] with larmorx's own options (`larmorx --n-threads N --upstream-defects MODE mri hmc
+/// ...`): each one given wins over the variable it replaces (`OMP_NUM_THREADS`,
+/// `LARMORX_UPSTREAM_DEFECTS`).
+pub fn main_given(
+    args: &[String],
+    given: &Overrides,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> u8 {
+    match given.upstream_defects() {
+        Ok(mode) => main_with_threads(args, mode, given.n_threads, out, err),
         Err(e) => {
             let _ = writeln!(err, "Error: {e}");
             EXIT_BAD_MODE
@@ -442,10 +456,22 @@ fn print_notice(err: &mut dyn Write, notice: &Notice) {
     let _ = writeln!(err, "larmorx: {}", notice.line());
 }
 
-/// [`main`] with the D13 mode given.
+/// [`main`] with the D13 mode given; the thread count from `OMP_NUM_THREADS`.
 pub fn main_with(
     args: &[String],
     mode: UpstreamDefects,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> u8 {
+    main_with_threads(args, mode, None, out, err)
+}
+
+/// [`main_with`] on `n_threads` threads (0: every logical CPU; `None`: `OMP_NUM_THREADS`, else
+/// every logical CPU). The results never depend on it.
+pub fn main_with_threads(
+    args: &[String],
+    mode: UpstreamDefects,
+    n_threads: Option<usize>,
     out: &mut dyn Write,
     err: &mut dyn Write,
 ) -> u8 {
@@ -474,7 +500,7 @@ pub fn main_with(
         let _ = out.write_all(USAGE.as_bytes());
         return 2;
     }
-    match execute(&o, mode, out, err) {
+    match execute(&o, mode, n_threads.unwrap_or_else(threads), out, err) {
         Ok(()) => 0,
         Err(Failure::Error(message)) => {
             let _ = writeln!(err, "Error: {message}");
@@ -615,6 +641,7 @@ fn input_files(
 fn execute(
     o: &Options,
     mode: UpstreamDefects,
+    n_threads: usize,
     out: &mut dyn Write,
     err: &mut dyn Write,
 ) -> Result<(), Failure> {
@@ -627,13 +654,16 @@ fn execute(
         print_notice(err, &r.notice());
         return Err(Failure::Error(r.message));
     }
-    let n_threads = threads();
     let input = o.input.as_deref().unwrap_or_default();
     let out_name = o
         .out
         .clone()
         .unwrap_or_else(|| format!("{}_mcf", image::strip_image_extension(input)));
-    let output_type = std::env::var("FSLOUTPUTTYPE").unwrap_or_else(|_| "NIFTI_GZ".into());
+    // FSL-11: with FSLOUTPUTTYPE unset mcflirt stops at its first image (exit 1, what came before
+    // written); by default the images are written as NIFTI_GZ and the run names FSL-11.
+    let given_type = std::env::var("FSLOUTPUTTYPE").ok();
+    let type_unset = given_type.is_none();
+    let output_type = given_type.unwrap_or_else(|| "NIFTI_GZ".into());
     // An unknown FSLOUTPUTTYPE: FSL 6.0.7.23's message, before any work (mcflirt prints it after
     // the estimation and the .mat and .par files, and exits 1).
     let Some((image_path, version)) = output_name(&out_name, &output_type) else {
@@ -757,6 +787,7 @@ fn execute(
         &series,
         &result,
         options.init.as_ref(),
+        type_unset,
         n_threads,
         out,
         err,
@@ -896,7 +927,9 @@ fn unopened_failure(u: &Unopened, par: bool, notices: &mut Vec<Notice>) -> Failu
 /// directory ends it with mcflirt's message and exit status 0 (FSL-20), an unopenable `.rms` file
 /// is not written and an unopenable `.par` file ends it at volume 0 with status 0 (FSL-65). An
 /// image that cannot be written is an error in both modes (mcflirt aborts; with `reproduce` its two
-/// lines are printed first).
+/// lines are printed first). `type_unset`: `FSLOUTPUTTYPE` is not set (FSL-11): by default the
+/// images are written as `NIFTI_GZ` (`ext`) and FSL-11 named; with `reproduce` the first image
+/// stops the run with FSL's message and exit 1, as mcflirt does.
 #[allow(clippy::too_many_arguments)]
 fn write_outputs(
     o: &Options,
@@ -907,6 +940,7 @@ fn write_outputs(
     series: &Series,
     result: &HmcOutput,
     init: Option<&crate::hmc::rigid::Mat4>,
+    type_unset: bool,
     n_threads: usize,
     out: &mut dyn Write,
     err: &mut dyn Write,
@@ -1015,6 +1049,13 @@ fn write_outputs(
                  err: &mut dyn Write,
                  notices: &mut Vec<Notice>|
      -> Result<(), Failure> {
+        if type_unset {
+            if mode.reproduce() {
+                let _ = err.write_all(image::FSLOUTPUTTYPE_UNSET.as_bytes());
+                return Err(Failure::Exit(1));
+            }
+            defects::push_once(notices, image::fsl11_notice("mcflirt"));
+        }
         let files = ImageFiles::of(path).ok_or_else(|| format!("{path}: not an image"))?;
         let files = opened_files(path, files, mode, err);
         let written = image::write_like_files(
@@ -1234,7 +1275,13 @@ fn write_outputs(
         .map_err(|e| e.to_string())?;
         if c != image::Conversion::default() {
             let path = format!("{stem}{ext}");
-            notices.push(image::fsl09_notice(Path::new(&path), c, data_type, mode));
+            notices.push(image::fsl09_notice(
+                &defects::FSL_09,
+                Path::new(&path),
+                c,
+                data_type,
+                mode,
+            ));
         }
     }
     Ok(())

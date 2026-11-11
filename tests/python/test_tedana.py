@@ -145,7 +145,7 @@ def test_without_the_replica_there_is_no_implementation(scripts, tmp_path):
     with pytest.raises(lx.ReplicaNotFoundError, match="LARMORX_GPL_BIN"):
         lx.tedana.t2smap(files, TES, implementation="replica")
     with pytest.raises(NotImplementedError, match="no clean-room original of tedana t2smap"):
-        lx.tedana.t2smap(files, TES, implementation="original")
+        lx.tedana.t2smap(files, TES, implementation="clean-room")
 
 
 @pytest.mark.parametrize(

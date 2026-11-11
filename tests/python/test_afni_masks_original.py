@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 """The clean-room originals of 3dAutomask and 3dUnifize (``lx.afni.automask``,
-``lx.afni.unifize`` with ``implementation="original"``, and ``larmorx afni 3dAutomask`` /
+``lx.afni.unifize`` with ``implementation="clean-room"``, and ``larmorx afni 3dAutomask`` /
 ``3dUnifize``): the Python API gives the command line's outputs, the results do not depend on
 the thread count, and the D13 switches act. Their agreement with AFNI is the parity suites'
 (``validation/``), their bits on every platform the golden tests'."""
@@ -18,7 +18,7 @@ import pytest
 import larmorx as lx
 from larmorx.cli import run as cli_run
 
-ORIGINAL = "original"
+ORIGINAL = "clean-room"
 
 
 def head(shape=(26, 24, 20), seed=3, t2=False) -> np.ndarray:
@@ -89,7 +89,7 @@ def test_automask_outputs(t1, tmp_path):
     depth = np.asarray(r.depth.data)
     assert depth.dtype == np.int16 and depth.max() >= 2
     assert np.array_equal(depth > 0, mask > 0)
-    assert r.mask.implementation.kind == "original"
+    assert r.mask.implementation.kind == "clean-room"
     # The mask covers the head's centre, not the corners.
     assert mask[13, 12, 10] == 1 and mask[0, 0, 0] == 0
 
@@ -132,7 +132,7 @@ def test_unifize_python_gives_the_command_lines_outputs(t2, tmp_path):
     assert same(r.image, lx.load(out / "u.nii"))
     assert same(r.scale, lx.load(out / "s.nii"))
     assert same(r.automasked, lx.load(out / "a.nii"))
-    assert r.image.implementation.kind == "original"
+    assert r.image.implementation.kind == "clean-room"
 
 
 def test_results_do_not_depend_on_threads(t1, t2):

@@ -96,8 +96,8 @@ const SPECS: [Spec; 18] = [
 ];
 
 /// FSL's image layer's message when `FSLOUTPUTTYPE` is not set (§3.1), printed when the first
-/// output is written.
-pub const FSLOUTPUTTYPE_UNSET: &str = "ERROR:: Environment variable FSLOUTPUTTYPE is not set!\nPlease make sure that the appropriate configuration file is sourced by your shell (e.g. by putting it in .profile).\ne.g. bash or sh users add the line \". ${FSLDIR}/etc/fslconf/fsl.sh\"\ne.g. tcsh or csh users add the line \"source ${FSLDIR}/etc/fslconf/fsl.csh\"\n";
+/// output is written (with `reproduce`: FSL-11).
+pub use larmorx_mri::hmc::image::FSLOUTPUTTYPE_UNSET;
 
 /// bet2's options as given.
 #[derive(Clone, Debug, PartialEq)]
@@ -661,7 +661,6 @@ pub fn run(
     let shape = input_img.vol.shape;
     let voxel = input_img.vol.voxel;
     // the outputs
-    let output_type = settings.get("FSLOUTPUTTYPE").map(str::to_owned);
     let needs_images = o.brain || o.mask || o.outline || o.skull;
     let mask: Option<Vec<u8>>;
     // the mask is made whatever the outputs (observed: FSL crashes in its fill at a centroid
@@ -714,18 +713,18 @@ pub fn run(
         rewrite_quaternion: true,
     };
     if needs_images {
-        let ot = match &output_type {
+        let ot = match settings.output_type() {
             None => {
                 print_notices(err, &notices);
                 let _ = err.write_all(FSLOUTPUTTYPE_UNSET.as_bytes());
                 return 1;
             }
-            Some(t) if !image::OUTPUT_TYPES.contains(&t.as_str()) => {
+            Some(t) if !image::OUTPUT_TYPES.contains(&t) => {
                 print_notices(err, &notices);
                 let _ = writeln!(err, "{}", image::unknown_output_type_message(t));
                 return 1;
             }
-            Some(t) => t.clone(),
+            Some(t) => t.to_owned(),
         };
         let mut write = |stem: String, cal: Option<(f64, f64)>, values: Values| -> bool {
             let Some((name, version)) = image::output_file(&stem, &ot) else {

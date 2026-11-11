@@ -887,6 +887,18 @@ impl Parser {
     /// `parser.parse_args(args)` (without the program name), formatting with `width`
     /// ([`formatter_width`]).
     pub fn parse(&self, args: &[String], width: isize) -> Result<Namespace, Exit> {
+        self.parse_given(args, width).map(|(ns, _)| ns)
+    }
+
+    /// [`Parser::parse`], and the destinations of the arguments the command line gave (argparse's
+    /// `seen_actions`, which `parse_args` does not return; larmorx's addition): a value equal to
+    /// its default tells apart from one that was given (a replica's own thread option, which
+    /// wins over larmorx's `--n-threads` only when it is given).
+    pub fn parse_given(
+        &self,
+        args: &[String],
+        width: isize,
+    ) -> Result<(Namespace, Vec<String>), Exit> {
         self.parse_inner(args, width).map_err(|stop| match stop {
             Stop::Exit(e) => e,
             Stop::Error(action, m) => {
@@ -899,7 +911,7 @@ impl Parser {
         })
     }
 
-    fn parse_inner(&self, args: &[String], width: isize) -> Result<Namespace, Stop> {
+    fn parse_inner(&self, args: &[String], width: isize) -> Result<(Namespace, Vec<String>), Stop> {
         let mut ns = Namespace::default();
         for a in &self.actions {
             if let (Some(dest), Some(default)) = (&a.dest, &a.default)
@@ -993,7 +1005,14 @@ impl Parser {
                 format!("unrecognized arguments: {}", extras.join(" ")),
             ));
         }
-        Ok(ns)
+        let given = self
+            .actions
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| seen.contains(i))
+            .filter_map(|(_, a)| a.dest.clone())
+            .collect();
+        Ok((ns, given))
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -1204,6 +1223,27 @@ mod tests {
         assert_eq!(
             p.format_usage(78),
             "usage: prog [-h] -d FILE [FILE ...] [--fit {a,b}] [--overwrite] [--n N] [-v]\n"
+        );
+    }
+
+    /// The destinations given, apart from their defaults: an option written with `=`, as an
+    /// abbreviation or with its default's own value is given; one left out is not.
+    #[test]
+    fn tells_what_was_given() {
+        let p = demo();
+        let (ns, given) = p.parse_given(&args(&["-d", "x", "--fi=a"]), 78).unwrap();
+        assert_eq!(given, ["data", "fit"]);
+        assert_eq!(ns, p.parse(&args(&["-d", "x"]), 78).unwrap());
+        let (ns, given) = p.parse_given(&args(&["--n=1", "-d", "x"]), 78).unwrap();
+        assert_eq!(
+            (ns.get("n"), given.as_slice()),
+            (&Value::Int(1), &["data".to_owned(), "n".to_owned()][..])
+        );
+        let (_, given) = p.parse_given(&args(&["-d", "x", "-f"]), 78).unwrap();
+        assert_eq!(given, ["data", "overwrite"]);
+        assert_eq!(
+            p.parse_given(&args(&["--n", "2"]), 78).unwrap_err(),
+            p.parse(&args(&["--n", "2"]), 78).unwrap_err()
         );
     }
 }

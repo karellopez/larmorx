@@ -1309,6 +1309,7 @@ mod tests {
             vars: [("FSLDIR".to_owned(), "/opt/fsl".to_owned())].into(),
             dir: Some(p.to_path_buf()),
             stdin: None,
+            output_type_default: Default::default(),
         };
         let run = |w: &[&str]| {
             let (mut o, mut e) = (Vec::new(), Vec::new());
@@ -1372,6 +1373,7 @@ mod tests {
             vars: [("FSLOUTPUTTYPE".to_owned(), "NIFTI_PAIR".to_owned())].into(),
             dir: Some(p.to_path_buf()),
             stdin: None,
+            output_type_default: Default::default(),
         };
         copy_image(&settings, "a", "b").unwrap();
         let hdr = std::fs::read(p.join("b.hdr")).unwrap();

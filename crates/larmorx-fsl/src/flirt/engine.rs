@@ -51,6 +51,8 @@ pub struct Row {
 /// What a run reads besides its options.
 pub struct Ctx<'a> {
     pub settings: &'a Settings,
+    /// FSL-09 as the program that runs names it ([`FSL_09_FLIRT`], [`FSL_09_APPLYXFM4D`]).
+    pub fsl09: &'static defects::Defect,
     pub mode: UpstreamDefects,
     pub n_threads: usize,
     /// The run's C library functions (GLIBC-07: correctly rounded by default, glibc's with
@@ -2637,6 +2639,12 @@ pub(crate) fn qform_completed(input: &Input) -> bool {
     input.header.qform_code == 0 && input.header.sform_code > 0
 }
 
+/// FSL-09 as flirt meets it: the notices name flirt.
+pub static FSL_09_FLIRT: defects::Defect = defects::FSL_09.of("flirt");
+
+/// FSL-09 as applyxfm4D meets it.
+pub static FSL_09_APPLYXFM4D: defects::Defect = defects::FSL_09.of("applyxfm4D");
+
 /// Writes `values` like `look`'s reference in type `t` (FSL-09's conversion to integers, FSL-11's
 /// output type); a double output takes `doubles` when given (else the values in double).
 #[allow(clippy::too_many_arguments)]
@@ -2652,7 +2660,7 @@ pub(crate) fn write_values(
 ) -> Result<(), End> {
     let (reference, shape, volumes, tr) = (look.reference, look.shape, look.volumes, look.tr);
     let mode = ctx.mode;
-    let ot = match ctx.settings.get("FSLOUTPUTTYPE") {
+    let ot = match ctx.settings.output_type() {
         Some(v) => v.to_owned(),
         None => {
             if mode.reproduce() {
@@ -2715,6 +2723,7 @@ pub(crate) fn write_values(
                 defects::push_once(
                     notices,
                     larmorx_mri::hmc::image::fsl09_notice(
+                        ctx.fsl09,
                         std::path::Path::new(&name),
                         conv,
                         t,

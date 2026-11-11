@@ -23,7 +23,7 @@ from larmorx import _replica
 from larmorx.cli import run as cli_run
 
 REPLICA = lx.Implementation("replica", "larmorx", lx.__version__, "Apache-2.0 AND CC-BY-4.0")
-ORIGINAL = lx.Implementation("original", "larmorx", lx.__version__, "Apache-2.0")
+ORIGINAL = lx.Implementation("clean-room", "larmorx", lx.__version__, "Apache-2.0")
 
 VERSION_STUB = """\
 import sys
@@ -88,14 +88,14 @@ def test_the_registry_has_the_afni_replicas_built_in():
         selected = _replica.select("afni", tool, "auto")
         assert selected is not None and selected.program is None
         assert selected.implementation() == REPLICA
-        assert _replica.select("afni", tool, "original") is None
+        assert _replica.select("afni", tool, "clean-room") is None
     assert not _replica.registry()[("fsl", "mcflirt")].builtin
 
 
 @pytest.mark.parametrize("method", ["fourier", "linear", "wsinc9"])
 def test_auto_runs_the_built_in_replica(no_replica, tmp_path, method):
     """``"auto"`` runs the replica, in this process, and gives what the command line's replica
-    writes; ``"original"`` runs the clean-room original, as ``LARMORX_IMPLEMENTATION=original``
+    writes; ``"clean-room"`` runs the clean-room original, as ``LARMORX_IMPLEMENTATION=clean-room``
     does on the command line."""
     _, path = series(tmp_path)
     img = lx.afni.tshift(path, slice_times="alt+z", method=method, n_threads=2)
@@ -107,14 +107,14 @@ def test_auto_runs_the_built_in_replica(no_replica, tmp_path, method):
     code, _, err = cli("-verbose", flag, "-tpattern", "alt+z", "-prefix", str(out), str(path))
     assert code == 0 and "implementation: replica (larmorx " in err, err
     np.testing.assert_array_equal(lx.load(out).data, img.data)
-    original = lx.afni.tshift(path, slice_times="alt+z", method=method, implementation="original")
+    original = lx.afni.tshift(path, slice_times="alt+z", method=method, implementation="clean-room")
     assert original.implementation == ORIGINAL
     out = tmp_path / f"orig_{method}.nii"
     code, _, err = cli(
         "-verbose", flag, "-tpattern", "alt+z", "-prefix", str(out), str(path),
-        implementation="original",
+        implementation="clean-room",
     )  # fmt: skip
-    assert code == 0 and "implementation: original (larmorx " in err, err
+    assert code == 0 and "implementation: clean-room (larmorx " in err, err
     np.testing.assert_array_equal(lx.load(out).data, original.data)
 
 
@@ -143,7 +143,7 @@ def test_the_search_order_of_a_separate_replica(scripts, monkeypatch, tmp_path):
     assert _replica.find("fsl", "mcflirt") == str(in_scripts)
     monkeypatch.setattr(_replica, "search_dirs", list)
     assert _replica.find("fsl", "mcflirt") == str(on_path)
-    assert _replica.select("fsl", "mcflirt", "original") is None
+    assert _replica.select("fsl", "mcflirt", "clean-room") is None
     monkeypatch.setenv("LARMORX_NC_BIN", str(tmp_path / "missing"))
     with pytest.raises(ValueError, match="LARMORX_NC_BIN is set to"):
         _replica.select("fsl", "mcflirt", "auto")
@@ -282,7 +282,7 @@ def test_afni_settings_are_checked(no_replica, tmp_path):
             lx.afni.tshift(path, slice_times="alt+z", afni_settings=settings)
 
 
-@pytest.mark.parametrize("implementation", ["original", "replica"])
+@pytest.mark.parametrize("implementation", ["clean-room", "replica"])
 def test_both_implementations_apply_afni_settings(
     no_replica, monkeypatch, tmp_path, implementation
 ):
@@ -382,7 +382,7 @@ def test_the_real_replica_reports_afni_errors(no_replica, tmp_path):
         lx.afni.tshift(path, slice_times=[0.0, 1.0])
     assert e.value.returncode == 1
     with pytest.raises(ValueError, match="slice times for 3 slices"):
-        lx.afni.tshift(path, slice_times=[0.0, 1.0], implementation="original")
+        lx.afni.tshift(path, slice_times=[0.0, 1.0], implementation="clean-room")
 
 
 def test_the_command_line_runs_the_chosen_implementation(no_replica, monkeypatch, tmp_path):
@@ -393,8 +393,8 @@ def test_the_command_line_runs_the_chosen_implementation(no_replica, monkeypatch
     verbose = ("-verbose", "-prefix", str(tmp_path / "o.nii"), missing)
     code, _, err = cli(*verbose)
     assert code == 1 and err.startswith("++ implementation: replica (larmorx "), err
-    code, _, err = cli(*verbose, implementation="original")
-    assert code == 1 and err.startswith("++ implementation: original (larmorx "), err
-    monkeypatch.setenv("LARMORX_IMPLEMENTATION", "original")
+    code, _, err = cli(*verbose, implementation="clean-room")
+    assert code == 1 and err.startswith("++ implementation: clean-room (larmorx "), err
+    monkeypatch.setenv("LARMORX_IMPLEMENTATION", "clean-room")
     code, _, err = cli(*verbose)
-    assert err.startswith("++ implementation: original (larmorx "), err
+    assert err.startswith("++ implementation: clean-room (larmorx "), err

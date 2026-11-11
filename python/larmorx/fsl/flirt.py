@@ -196,7 +196,7 @@ def flirt(
     Raises ``ValueError`` for invalid arguments and ``RuntimeError`` when FLIRT ends without a
     matrix (FLIRT reports its errors with exit status 0; the message is in the error).
     ``implementation``: ``"auto"`` (the replica when ``larmorx-nc`` is installed, else the
-    clean-room original), ``"replica"`` or ``"original"``.
+    clean-room original), ``"replica"`` or ``"clean-room"``.
     """
     n_threads = _threads(n_threads)
     _choice("cost", cost, COSTS)

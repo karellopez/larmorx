@@ -113,9 +113,9 @@ def image(dtype=np.float32, shape=(5, 4, 3)) -> tuple[np.ndarray, np.ndarray]:
 
 
 def test_without_the_replica(scripts, tmp_path):
-    # fslmaths' clean-room original runs ("auto" without larmorx-nc, and "original")
+    # fslmaths' clean-room original runs ("auto" without larmorx-nc, and "clean-room")
     data, affine = image()
-    for impl in ("auto", "original"):
+    for impl in ("auto", "clean-room"):
         r = lx.fsl.fslmaths((data - 30, affine), "-abs", "-thr", 5, implementation=impl)
         want = np.abs(data - 30)
         assert np.array_equal(np.asarray(r.data), np.where(want >= 5, want, 0))
@@ -124,10 +124,10 @@ def test_without_the_replica(scripts, tmp_path):
     m = lx.fsl.fslmaths((data, affine), "-mul", mask, n_threads=3)
     assert np.array_equal(np.asarray(m.data), data * (data > 20))
     with pytest.raises(RuntimeError, match="unknown option"):
-        lx.fsl.fslmaths(image(), "-nosuchop", implementation="original")
+        lx.fsl.fslmaths(image(), "-nosuchop", implementation="clean-room")
     # fslstats' clean-room original: the typed wrappers and the generic call, -t and -K
     a = data.astype(np.float64)
-    for impl in ("auto", "original"):
+    for impl in ("auto", "clean-room"):
         assert lx.fsl.image_mean((data, affine), implementation=impl) == pytest.approx(
             a.mean(), abs=1e-6
         )
@@ -135,7 +135,7 @@ def test_without_the_replica(scripts, tmp_path):
     assert lx.fsl.image_std((data, affine), nonzero=True, n_threads=2) == pytest.approx(
         nz.std(ddof=1), rel=1e-6
     )
-    text = lx.fsl.fslstats((data, affine), "-R", "-p", 50, "-w", implementation="original")
+    text = lx.fsl.fslstats((data, affine), "-R", "-p", 50, "-w", implementation="clean-room")
     words = text.split()
     assert float(words[0]) == data.min() and float(words[1]) == data.max()
     assert words[3:] == ["0", "5", "0", "4", "0", "3", "0", "1"]
@@ -143,18 +143,18 @@ def test_without_the_replica(scripts, tmp_path):
     per = lx.fsl.fslstats((data, affine), "-M", index_mask=labels, json=True)
     assert '"-M"' in per and per.count('"-M"') == 2
     with pytest.raises(RuntimeError, match="Unrecognised option: -q"):
-        lx.fsl.fslstats(image(), "-q", implementation="original")
+        lx.fsl.fslstats(image(), "-q", implementation="clean-room")
     with (
         pytest.warns(lx.UpstreamDefectWarning, match="FSL-186"),
         pytest.raises(RuntimeError, match="FSL-186"),
     ):
-        lx.fsl.fslstats(image(), "-H", 5, 3, 3, implementation="original")
+        lx.fsl.fslstats(image(), "-H", 5, 3, 3, implementation="clean-room")
 
 
 def test_the_originals_filters(scripts):
     # sub-task 2's operations through the typed wrappers and fslmaths' clean-room original
     data, affine = image(shape=(6, 5, 4))
-    orig = {"implementation": "original"}
+    orig = {"implementation": "clean-room"}
     r = lx.fsl.spatial_filter((data, affine), "dilF", **orig)
     padded = np.pad(data, 1, constant_values=-np.inf)
     want = np.max(
@@ -199,7 +199,7 @@ def test_the_originals_reductions_and_statistics(scripts):
     rng = np.random.default_rng(3)
     series = rng.integers(0, 50, (4, 3, 2, 7)).astype(np.float32)
     affine = np.diag([2.0, 2.0, 2.0, 1.0])
-    orig = {"implementation": "original"}
+    orig = {"implementation": "clean-room"}
     m = np.asarray(lx.fsl.collapse((series, affine), "mean", **orig).data)
     assert m.shape == (4, 3, 2) and np.allclose(m, series.mean(axis=3), rtol=1e-6)
     mx = np.asarray(lx.fsl.collapse((series, affine), "max", axis="X", **orig).data)
@@ -231,7 +231,7 @@ def test_the_originals_roc(scripts):
     truth = np.zeros((6, 5, 4), np.float32)
     truth[:3] = 1.0
     affine = np.diag([2.0, 2.0, 2.0, 1.0])
-    orig = {"implementation": "original"}
+    orig = {"implementation": "clean-room"}
     r = lx.fsl.roc((ramp, affine), (truth, affine), 2.0, **orig)
     # FSL 6.0.7.23 prints 0.739618 0.610417 0.868819 (the area never reaches 2: the last
     # rectangle at the last true-positive rate)

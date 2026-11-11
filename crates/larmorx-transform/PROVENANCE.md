@@ -202,6 +202,21 @@ against numpy's own LAPACK through its exported Fortran entry points in both kep
 `DORMBR`/`DORGBR`: `check_lapack.py`'s section `orbr`, 2026-11-11): see `validation/investigations/confounds/README.md` for the counts and commits; its
 `--control` shows that the cases tell the two releases apart.
 
+**Relay 2c-ii** (`numpy_linalg::svd`: the thin SVD and the pseudo-inverse of a general matrix).
+`dgesdd.f` is identical in both `lapack-netlib/SRC/` trees; the routines it calls are the ports
+above, each in its release's form (`Lapack`):
+
+| larmorx | Upstream files | Licence |
+|---|---|---|
+| `numpy_linalg::svd::dgesdd_s`, `Gesdd`, `DgesddError` (`JOBZ = 'S'`: the checks of `LDA`, `LDU`, `LDVT`, `LWORK`; `DLANGE('M')`, `INFO = -4` on a NaN, the scaling by `DLASCL` to `[SMLNUM, BIGNUM]` and its undoing on `S`; `MNTHR = ⌊min(m, n)·11/6⌋`; path 3 (`DGEQRF`, `R` copied with zeros below, `DORGQR`, `DGEBRD` of `R`, `DBDSDC('U', 'I')`, `DORMBR('Q', 'L', 'N')`, `DORMBR('P', 'R', 'T')`, `U` copied out, `DGEMM`), path 5 (`DGEBRD`, `DLASET`, `DBDSDC('U', 'I')`, the two `DORMBR`), path 3t (`DGELQF`, `L` copied with zeros above, `DORGLQ`, `DGEBRD` of `L`, `DBDSDC('U', 'I')`, the two `DORMBR`, `VT` copied out, `DGEMM`), path 5t (`DGEBRD`, `DLASET`, `DBDSDC('L', 'I')`, the two `DORMBR`); every callee given `LWORK - NWORK + 1`; an infinite entry refused, where LAPACK would scale it to NaN and loop or return garbage) | `dgesdd.f` (identical in both trees), `dlange.f`, `dlascl.f`, `dlaset.f`, `dlacpy.f`, `la_xisnan.F90`, `droundup_lwork.f`, `xerbla.f`, `INSTALL/dlamch.f` | BSD-3-Clause |
+| `numpy_linalg::svd::dgesdd_s_lwork` (`DGESDD('S')`'s query: `MINWRK` and `MAXWRK` from the callees' queries `DGEQRF`, `DORGQR`, `DGELQF`, `DORGLQ`, `DGEBRD`, `DORMBR` and `BDSPAC = 3·k² + 4·k`, the same in both releases) | `dgesdd.f`, and the queries of the routines above | BSD-3-Clause |
+| `numpy_linalg::svd::numpy_svd`, `Svd`, `SvdDidNotConverge` (`svd(a, full_matrices=False)`: the copy into Fortran order with `LDA = LDU = max(m, 1)`, `LDVT = max(1, min(m, n))`, numpy 2.5.4's `all_finite` refusal (also for 2.3.5's NaN, which LAPACK refuses with `INFO = -4`, and its infinity, which LAPACK does not survive), the optimal workspace, `LinAlgError('SVD did not converge')` on `INFO != 0`, the copies back in C order) | numpy 2.5.4 and 2.3.5 `numpy/linalg/umath_linalg.cpp` (`svd_wrapper`, `init_gesdd`, `call_gesdd`, `compute_urows_vtcolumns`, `all_finite` (2.5.4 only), `linearize_matrix`, `delinearize_matrix`), `numpy/linalg/_linalg.py` (`svd`, `_raise_linalgerror_svd_nonconvergence`) | BSD-3-Clause |
+| `numpy_linalg::svd::numpy_pinv` (`pinv(a, rcond)`: an empty matrix's empty result, `cutoff = rcond·max(s)`, `1/s` where `s > cutoff` and 0 elsewhere, `s[:, None]·u.T` laid out in F order as numpy's multiply does, `matmul(vt.T, ·)` by `openblas::matmul::numpy_matmul_with`) | numpy 2.5.4 and 2.3.5 `numpy/linalg/_linalg.py` (`pinv`, identical in both) | BSD-3-Clause |
+
+Validated bit for bit against numpy's own `scipy_dgesdd_64_` and its `np.linalg.svd` and
+`np.linalg.pinv` in both kept environments (`validation/investigations/confounds/check_gesdd.py`,
+2026-11-11): see `validation/investigations/confounds/README.md` for the counts and commits.
+
 ## SciPy's 4 × 4 inverse (`scipy_linalg`, field maps part B, relay 18)
 
 **Ported** from SciPy 1.18.1 (`scipy/linalg/_basic.py` `inv`, `src/_linalg_inv.hh`

@@ -811,10 +811,14 @@ fn ted15_counts_the_first_fit_group() {
         let p = dir.path().join(format!("e{e}.nii.gz"));
         let mut v = read_f32(&p);
         for t in 0..NT {
-            // constant echoes 1 and 2 of two voxels: one of count 1 (its third echo bad), one of
-            // count 2 (its third echo bad, its second good); and one of count 3
+            // constant series: a voxel of count 1 (its second echo bad), one of count 2 (its
+            // third echo bad) and one of count 3
             v[at(1, 1, 1, t)] = if e == 2 { -1.0 } else { 900.0 };
-            v[at(2, 1, 1, t)] = if e == 3 { -1.0 } else { 900.0 - 100.0 * e as f32 };
+            v[at(2, 1, 1, t)] = if e == 3 {
+                -1.0
+            } else {
+                900.0 - 100.0 * e as f32
+            };
             v[at(3, 1, 1, t)] = 900.0 - 100.0 * e as f32;
         }
         write_f32(dir.path(), &format!("e{e}.nii.gz"), &[NX, NY, NZ, NT], v);

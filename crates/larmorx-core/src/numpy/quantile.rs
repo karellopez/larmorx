@@ -357,6 +357,138 @@ pub fn median_axis<T: NpFloat>(a: &[T], shape: [usize; 3]) -> Vec<T> {
     out
 }
 
+/// The rank methods of `numpy.percentile` that take an order statistic without interpolating.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum RankMethod {
+    /// `method="lower"`: the rank `floor((n - 1) * q)` (nipype's `compute_dvars`).
+    Lower,
+    /// `method="higher"`: the rank `ceil((n - 1) * q)`.
+    Higher,
+}
+
+/// `numpy.percentile(a, q, axis, method="lower" | "higher")` over the middle axis of a C-ordered
+/// `(outer, n, inner)` array (its memory order: numpy copies `a` and partitions along the axis,
+/// so only the values matter), `q` a Python `int` or `float`; the result is C-ordered `(outer,
+/// inner)`, in the array's type (`take` of the partitioned array).
+///
+/// The rank (`_QuantileMethods`' `get_virtual_index`, then `astype(np.intp)`) is computed in the
+/// release's type: numpy 2.2 and 2.3 divide `q` by `a.dtype.type(100)`, so for `float32` data
+/// `q` is rounded to `float32`, divided in `float32`, and `(n - 1) * q` (the count rounded to
+/// `float32`) and its `floor`/`ceil` are `float32`; numpy 2.5 divides by the Python `100`, in
+/// `float64` (and every release computes in `float64` for `float64` data). A column holding a
+/// NaN gives that NaN (numpy's `slices_having_nans`: the NaN its partition leaves last; the
+/// first in the column here). `Err(Range)` for `q / 100` outside `[0, 1]` (numpy's
+/// `ValueError`), `Err(Empty)` for `n == 0` (numpy's `IndexError` from `take`).
+pub fn percentile_rank_axis<T: NpFloat>(
+    a: &[T],
+    shape: [usize; 3],
+    q: f64,
+    method: RankMethod,
+    release: NumpyRelease,
+) -> Result<Vec<T>, PercentileError> {
+    let [outer, n, inner] = shape;
+    assert_eq!(
+        a.len(),
+        outer * n * inner,
+        "array length and shape disagree"
+    );
+    let single32 = std::mem::size_of::<T>() == 4 && release == NumpyRelease::V2_3;
+    let round = |x: f64| match method {
+        RankMethod::Lower => x.floor(),
+        RankMethod::Higher => x.ceil(),
+    };
+    let rank = if single32 {
+        let q32 = (q as f32) / 100.0f32;
+        if !(0.0..=1.0).contains(&q32) {
+            return Err(PercentileError::Range);
+        }
+        if n == 0 {
+            return Err(PercentileError::Empty);
+        }
+        // float32 product, float32 floor/ceil (exact: an integer-valued float32 stays one)
+        round(f64::from(((n - 1) as f32) * q32))
+    } else {
+        let q64 = q / 100.0;
+        if !(0.0..=1.0).contains(&q64) {
+            return Err(PercentileError::Range);
+        }
+        if n == 0 {
+            return Err(PercentileError::Empty);
+        }
+        round((n - 1) as f64 * q64)
+    };
+    // q in [0, 1] keeps the rank in [0, n - 1]; only a float32 count above 2^24 (numpy 2.2 and
+    // 2.3) can round past it, where numpy's `take` raises: not followed, the last rank taken.
+    let rank = (rank as usize).min(n - 1);
+    let mut out = Vec::with_capacity(outer * inner);
+    let mut col = Vec::with_capacity(n);
+    for o in 0..outer {
+        for i in 0..inner {
+            col.clear();
+            col.extend((0..n).map(|e| a[(o * n + e) * inner + i]));
+            if let Some(&nan) = col.iter().find(|x| x.is_nan()) {
+                out.push(nan);
+                continue;
+            }
+            out.push(kth(&mut col, rank));
+        }
+    }
+    Ok(out)
+}
+
+/// The side of [`searchsorted`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Side {
+    /// `side="left"` (the default): the first index whose value is not less than the key.
+    Left,
+    /// `side="right"`: the first index whose value is greater than the key.
+    Right,
+}
+
+/// `numpy.searchsorted(a, v, side)` of a one-dimensional float array and one key of its type,
+/// with numpy's NaN-aware order (`a < b || (b is NaN and a is not)`: NaNs sort last) and each
+/// release's bisection, so that the index is numpy's even where `a` is not sorted: numpy 2.2 and
+/// 2.3 narrow `[min, max)` around midpoints `min + (max - min) / 2`; numpy 2.5 halves an
+/// interval from the base `0` (`npysort/binsearch.cpp`). On a sorted `a` both give the same
+/// index. An empty `a` gives `0`.
+pub fn searchsorted<T: NpFloat>(a: &[T], v: T, side: Side, release: NumpyRelease) -> usize {
+    let less = |x: T, y: T| x < y || (y.is_nan() && !x.is_nan());
+    let cmp = |x: T, y: T| match side {
+        Side::Left => less(x, y),
+        Side::Right => !less(y, x),
+    };
+    let n = a.len();
+    if n == 0 {
+        return 0;
+    }
+    match release {
+        NumpyRelease::V2_3 => {
+            let (mut lo, mut hi) = (0usize, n);
+            while lo < hi {
+                let mid = lo + ((hi - lo) >> 1);
+                if cmp(a[mid], v) {
+                    lo = mid + 1;
+                } else {
+                    hi = mid;
+                }
+            }
+            lo
+        }
+        NumpyRelease::V2_5 => {
+            let mut len = n;
+            let mut base = 0usize;
+            while len > 1 {
+                let half = len >> 1;
+                len -= half;
+                if cmp(a[base + half], v) {
+                    base += half;
+                }
+            }
+            base + usize::from(cmp(a[base], v))
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -424,6 +556,45 @@ mod tests {
         assert_eq!(scoreatpercentile_lower(&b, 10.0).unwrap().to_bits(), 0); // -0 -> +0
         assert!(scoreatpercentile_lower(&[], 50.0).unwrap().is_nan());
         assert_eq!(scoreatpercentile_lower(&b, -1.0), None);
+    }
+
+    #[test]
+    fn rank_percentiles_along_an_axis() {
+        // (outer, n, inner) = (2, 5, 1): rows [5, 1, 4, 2, 3] and [0, NaN, 1, 2, 3]
+        let a = [5.0f32, 1.0, 4.0, 2.0, 3.0, 0.0, f32::NAN, 1.0, 2.0, 3.0];
+        for rel in [NumpyRelease::V2_3, NumpyRelease::V2_5] {
+            let lo = percentile_rank_axis(&a, [2, 5, 1], 75.0, RankMethod::Lower, rel).unwrap();
+            assert_eq!(lo[0], 4.0); // floor(4 * 0.75) = 3
+            assert!(lo[1].is_nan());
+            let hi = percentile_rank_axis(&a, [2, 5, 1], 30.0, RankMethod::Higher, rel).unwrap();
+            assert_eq!(hi[0], 3.0); // ceil(1.2) = 2
+            assert_eq!(
+                percentile_rank_axis(&a, [2, 5, 1], 101.0, RankMethod::Lower, rel),
+                Err(PercentileError::Range)
+            );
+            assert_eq!(
+                percentile_rank_axis::<f32>(&[], [1, 0, 1], 5.0, RankMethod::Lower, rel),
+                Err(PercentileError::Empty)
+            );
+        }
+        // along an outer axis: (1, 3, 2), columns [3, 1, 2] and [6, 5, 4]
+        let b = [3.0f64, 6.0, 1.0, 5.0, 2.0, 4.0];
+        let r = percentile_rank_axis(&b, [1, 3, 2], 50.0, RankMethod::Lower, NumpyRelease::V2_5);
+        assert_eq!(r.unwrap(), vec![2.0, 5.0]);
+    }
+
+    #[test]
+    fn searchsorted_both_bisections() {
+        let a = [0.1f64, 0.4, 0.4, 0.7, 1.0];
+        for rel in [NumpyRelease::V2_3, NumpyRelease::V2_5] {
+            assert_eq!(searchsorted(&a, 0.4, Side::Left, rel), 1);
+            assert_eq!(searchsorted(&a, 0.4, Side::Right, rel), 3);
+            assert_eq!(searchsorted(&a, 0.0, Side::Left, rel), 0);
+            assert_eq!(searchsorted(&a, 2.0, Side::Left, rel), 5);
+            assert_eq!(searchsorted(&a, f64::NAN, Side::Left, rel), 5);
+            assert_eq!(searchsorted(&[f64::NAN; 4], 0.5, Side::Left, rel), 0);
+            assert_eq!(searchsorted::<f64>(&[], 0.5, Side::Left, rel), 0);
+        }
     }
 
     #[test]

@@ -5,7 +5,8 @@
 //! computes them, and LAPACK's QR and LQ routines with their `Q` (`DORGQR`, `DORMQR`, ...) and
 //! the bidiagonal reduction (`DGEBRD`) at their Fortran interface (`lapack_*`, as
 //! `larmorx_transform::numpy_linalg::blocked` computes them), and the divide-and-conquer
-//! bidiagonal SVD (`DBDSDC` and its routines, [`svd`]); the validation compares them with
+//! bidiagonal SVD (`DBDSDC` and its routines, [`svd`]), numpy's reductions and order
+//! statistics at the confounds' call sites ([`reductions`]); the validation compares them with
 //! numpy's own library. Matrices cross as flat column-major storage with their leading
 //! dimension, as BLAS takes them. The GIL is released while computing.
 
@@ -23,6 +24,7 @@ use pyo3::prelude::*;
 
 mod gelsd;
 mod gesvd;
+mod reductions;
 mod svd;
 
 fn value_err(e: impl std::fmt::Display) -> PyErr {
@@ -1140,5 +1142,6 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     svd::register(m)?;
     gelsd::register(m)?;
     gesvd::register(m)?;
+    reductions::register(m)?;
     Ok(())
 }

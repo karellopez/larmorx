@@ -84,6 +84,7 @@ use super::{EPS, LapackRelease, SAFMIN, dbdsqr_upper_ncc, dlartg, dlasr};
 use crate::openblas::level3::{GEMM_Q, Operand, Trans, dgemm_with};
 use crate::openblas::matmul::{Array2, numpy_matmul_with};
 use crate::openblas::trmm::{Side, Uplo};
+use larmorx_core::numpy::reduce::{Extreme, extreme};
 
 /// The OpenBLAS a SciPy wheel bundles (module documentation).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -1126,9 +1127,11 @@ pub fn nipype_full_rank(
     if k == 0 {
         return Err(ScipySvdError::EmptyReduction);
     }
-    // numpy's max and min (s holds no NaN).
-    let smax = s.iter().copied().fold(f64::NEG_INFINITY, f64::max);
-    let smin = s.iter().copied().fold(f64::INFINITY, f64::min);
+    // numpy's max and min (`larmorx_core::numpy::reduce::extreme`: a -0.0 among the zero
+    // singular values makes the minimum -0.0, so c is -inf and the design is returned as it is;
+    // numpy's own sign there depends on the CPU's SIMD kernel).
+    let smax = extreme(&s, Extreme::Max).expect("k > 0");
+    let smin = extreme(&s, Extreme::Min).expect("k > 0");
     let c = smax / smin;
     if c < cmax {
         return Ok(FullRank {

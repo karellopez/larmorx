@@ -77,8 +77,89 @@ pub fn log_f64(x: f64) -> f64 {
     }
 }
 
+/// `numpy.nan_to_num(a)` of a float array (`copy=True`, `nan=0.0`, `posinf`/`neginf` the type's
+/// largest and smallest finite values): NaN becomes `+0.0`, `+inf` `T::MAX`, `-inf` `T::MIN`;
+/// every other value (a `-0.0` too) is kept.
+pub fn nan_to_num<T: super::NpFloat>(a: &mut [T]) {
+    let (max, min) = if std::mem::size_of::<T>() == 4 {
+        (
+            T::from_f64(f64::from(f32::MAX)),
+            T::from_f64(f64::from(f32::MIN)),
+        )
+    } else {
+        (T::from_f64(f64::MAX), T::from_f64(f64::MIN))
+    };
+    for x in a.iter_mut() {
+        let v = x.to_f64();
+        if v.is_nan() {
+            *x = T::ZERO;
+        } else if v == f64::INFINITY {
+            *x = max;
+        } else if v == f64::NEG_INFINITY {
+            *x = min;
+        }
+    }
+}
+
+/// `numpy.diff(a, n, axis)` over the middle axis of a C-ordered `(outer, len, inner)` array:
+/// `a[1:] - a[:-1]` along the axis, `n` times, in `T` (each difference one subtraction, so the
+/// memory order does not matter); the result is C-ordered `(outer, len - n, inner)` (empty when
+/// `n >= len`; `n == 0` returns `a` itself).
+pub fn diff_axis<T: super::NpFloat>(a: &[T], shape: [usize; 3], n: usize) -> Vec<T> {
+    let [outer, len, inner] = shape;
+    assert_eq!(
+        a.len(),
+        outer * len * inner,
+        "array length and shape disagree"
+    );
+    let mut cur = a.to_vec();
+    let mut l = len;
+    for _ in 0..n {
+        if l == 0 {
+            break;
+        }
+        let nl = l - 1;
+        let mut next = Vec::with_capacity(outer * nl * inner);
+        for o in 0..outer {
+            for e in 0..nl {
+                for j in 0..inner {
+                    let hi = cur[(o * l + e + 1) * inner + j];
+                    let lo = cur[(o * l + e) * inner + j];
+                    next.push(hi.sub(lo));
+                }
+            }
+        }
+        cur = next;
+        l = nl;
+    }
+    cur
+}
+
 #[cfg(test)]
 mod tests {
+    use super::{diff_axis, nan_to_num};
+
+    #[test]
+    fn nan_to_num_and_diff() {
+        let mut a = [f32::NAN, f32::INFINITY, f32::NEG_INFINITY, -0.0, 2.5];
+        nan_to_num(&mut a);
+        assert_eq!(a[0].to_bits(), 0);
+        assert_eq!((a[1], a[2]), (f32::MAX, f32::MIN));
+        assert_eq!(a[3].to_bits(), (-0.0f32).to_bits());
+        let mut b = [f64::INFINITY];
+        nan_to_num(&mut b);
+        assert_eq!(b[0], f64::MAX);
+        // (1, 4, 2): columns [1, 4, 9, 16] and [0, 1, 0, 1]
+        let x = [1.0f64, 0.0, 4.0, 1.0, 9.0, 0.0, 16.0, 1.0];
+        assert_eq!(
+            diff_axis(&x, [1, 4, 2], 1),
+            vec![3.0, 1.0, 5.0, -1.0, 7.0, 1.0]
+        );
+        assert_eq!(diff_axis(&x, [1, 4, 2], 2), vec![2.0, -2.0, 2.0, 2.0]);
+        assert!(diff_axis(&x, [1, 4, 2], 5).is_empty());
+        assert_eq!(diff_axis(&x, [1, 4, 2], 0), x.to_vec());
+    }
+
     #[test]
     fn negative_logarithms_are_cs_nan() {
         assert_eq!(super::log_f64(-1.0).to_bits(), 0x7ff8_0000_0000_0000);

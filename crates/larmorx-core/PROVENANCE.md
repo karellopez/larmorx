@@ -291,6 +291,26 @@ numpy 2.5.4 / SciPy 1.18.1 on the seeded cases of
 `validation/investigations/t2smap/numerics/check_numerics.py` (every shape and axis tedana
 reaches, lengths around the pairwise blocks, axes of length 1, NaN, signed zeros, infinities).
 
+- The confounds' part, relay 2d-iii-c (2026-11-11), numpy 2.5.4, 2.3.5 and 2.2.6 (BSD-3-Clause):
+  `numpy/reduce.rs`'s `add_reduce_axis_in`, `mean_axis_in`, `var_axis_in`, `std_axis_in` (numpy
+  2.2's buffered reduction cuts a row longer than 8192 along the innermost axis into chunks of
+  8192; established by measurement, `validation/investigations/confounds/probe_reduction_orders.py`),
+  `mean_ordered`, `var_ordered`, `cumsum` (`add.accumulate`), `extreme` (`minimum.reduce`,
+  `maximum.reduce`: `umath/loops_minmax.dispatch.c.src`'s NaN propagation; the sign of a zero tie
+  is IEEE 754-2019's, not the CPU-dependent one numpy's SIMD lanes give:
+  `probe_minmax_zero_sign.py`); `numpy/quantile.rs`'s `percentile_rank_axis` (`_QuantileMethods`'
+  `lower` and `higher`, `percentile`'s `q / a.dtype.type(100)` of numpy 2.2 and 2.3 and `q / 100` of
+  2.5, `_quantile`'s `supports_integers` path with `slices_having_nans`) and `searchsorted`
+  (`npysort/binsearch.cpp`: numpy 2.2 and 2.3's `[min, max)` bisection, numpy 2.5's halving from
+  base 0; `numpy_tag.h`'s NaN-aware `less`); `numpy/umath.rs`'s `nan_to_num`
+  (`numpy/lib/_type_check_impl.py`) and `diff_axis` (`numpy/lib/_function_base_impl.py`'s
+  `diff`); `numpy/polynomial.rs`: `Legendre.basis(deg)(x)` (`numpy/polynomial/_polybase.py`'s
+  `basis` and `__call__`, `polyutils.py`'s `mapdomain`/`mapparms`, `legendre.py`'s `legval`, whose
+  Clenshaw steps numpy 2.3 rewrote: both forms). Bit-identical to numpy 2.5.4, 2.3.5 and 2.2.6
+  (fMRIPrep 25.2.6's image) on every case of `validation/investigations/confounds/
+  check_numpy_reductions.py` (the operands of nipype's, niworkflows' and fMRIPrep's call sites
+  built as they build them, and the general rules), the zero-sign ties of `min`/`max` excepted.
+
 ## OpenBLAS's Haswell `dgemm` micro-kernel (`src/numpy/gemm.rs`; the confounds' part, 2026-11-11)
 
 **Ported** from `kernel/x86_64/dgemm_kernel_4x8_haswell.S` of OpenBLAS 0.3.30, of the 0.3.34

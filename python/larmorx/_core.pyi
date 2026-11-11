@@ -2023,3 +2023,45 @@ def nipype_full_rank(
     gemm_q: int = 256,
 ) -> tuple[np.ndarray, float, bool]:
     """nipype's ``_full_rank(X, cmax)``: ``(X, c, regularized)``."""
+
+# numpy's reductions and order statistics at the confounds' call sites (the confounds' part,
+# relay 2d-iii-c; larmorx_core::numpy's reduce, quantile, umath and polynomial).
+def numpy_reduce(
+    a: np.ndarray, op: str, axis: int | None = None, numpy_version: str = "2.5.4", ddof: int = 0
+) -> np.ndarray:
+    """``a.sum(axis)``/``mean``/``var``/``std`` (``op``) of a C- or Fortran-contiguous float32
+    or float64 array in numpy release ``numpy_version``'s summation order; numpy's shape (0-d
+    for ``axis=None``)."""
+
+def numpy_percentile_rank(
+    a: np.ndarray,
+    q: float,
+    axis: int | None = None,
+    method: str = "lower",
+    numpy_version: str = "2.5.4",
+) -> np.ndarray:
+    """``numpy.percentile(a, q, axis, method="lower" | "higher")`` with a Python-number ``q``;
+    numpy's ``ValueError``/``IndexError``."""
+
+def numpy_extreme(a: np.ndarray, which: str) -> float:
+    """``a.min()`` or ``a.max()`` (``which``: ``"min"``, ``"max"``); ``-0.0 < +0.0``."""
+
+def numpy_cumsum(a: np.ndarray) -> np.ndarray:
+    """``numpy.cumsum(a)`` of a one-dimensional float32 or float64 array."""
+
+def numpy_searchsorted(
+    a: np.ndarray, v: float, side: str = "left", numpy_version: str = "2.5.4"
+) -> int:
+    """``numpy.searchsorted(a, v, side)`` of a float64 vector, with the release's bisection."""
+
+def numpy_nan_to_num(a: np.ndarray) -> np.ndarray:
+    """``numpy.nan_to_num(a)`` of a C- or Fortran-contiguous float32 or float64 array."""
+
+def numpy_diff(a: np.ndarray, n: int = 1, axis: int = 0) -> np.ndarray:
+    """``numpy.diff(a, n, axis)`` of a C- or Fortran-contiguous float32 or float64 array."""
+
+def numpy_legendre_basis(deg: int, x: np.ndarray, numpy_version: str = "2.5.4") -> np.ndarray:
+    """``numpy.polynomial.Legendre.basis(deg)(x)`` (numpy 2.2's or 2.3's ``legval``)."""
+
+def numpy_linspace(start: float, stop: float, num: int) -> np.ndarray:
+    """``numpy.linspace(start, stop, num)`` of float64 bounds."""

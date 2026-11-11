@@ -158,7 +158,7 @@ pub fn dlascl_g(
 }
 
 /// `DLASET('A', M, N, 0, 1, A, LDA)`: the identity in the `m × n` block at `aoff`.
-fn identity(m: usize, n: usize, a: &mut [f64], aoff: usize, lda: usize) {
+pub(super) fn identity(m: usize, n: usize, a: &mut [f64], aoff: usize, lda: usize) {
     for j in 1..=n {
         for i in 1..=m {
             a[ix(aoff, lda, i, j)] = if i == j { 1.0 } else { 0.0 };
@@ -167,7 +167,7 @@ fn identity(m: usize, n: usize, a: &mut [f64], aoff: usize, lda: usize) {
 }
 
 /// `DLACPY(UPLO, M, N, A, LDA, B, LDB)` with any `UPLO` but `'U'` and `'L'`: the whole block.
-fn dlacpy(
+pub(super) fn dlacpy(
     m: usize,
     n: usize,
     a: &[f64],
@@ -1948,7 +1948,10 @@ pub fn dlasd1(
 /// `DLASDQ(UPLO, SQRE, N, NCVT, NRU, NCC, D, E, VT, LDVT, U, LDU, C, LDC, WORK, INFO)`: the SVD
 /// of an `n × (n + sqre)` bidiagonal matrix by `DBDSQR`, its rotations applied to `vt`
 /// (`ncvt` columns, the block at `vtoff`), `u` (`nru` rows) and `c` (`ncc` columns), the values
-/// sorted ascending. `d` has `n` values, `e` `n - 1 + sqre`. Returns `DBDSQR`'s `info`.
+/// sorted ascending. `d` has `n` values, `e` `n - 1 + sqre`. Returns `DBDSQR`'s `info`. With no
+/// vectors at all (`ncvt = nru = ncc = 0`, `n >= 2`) LAPACK's `DBDSQR` finds the values by
+/// `DLASQ1` (the dqds algorithm), which this port does not follow: no caller asks for it
+/// ([`super::lasda::dlasda`] refuses that case).
 pub fn dlasdq(
     release: LapackRelease,
     uplo: Uplo,

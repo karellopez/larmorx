@@ -33,9 +33,15 @@
 //! SMLSIZ = 25`** the identity `VT`, `DLASDQ('U', 0, N, N, 0, NRHS)` with `C = B`, `TOL = RCND ·
 //! |D(IDAMAX)|`, each row of `B` cleared (`D(i) <= TOL`) or scaled by `1/D(i)` (`DLASCL`) with the
 //! rank counted, `B = VTᵀ·B` by `DGEMM('T', 'N')`, `D` unscaled and sorted down by [`dlasrt`],
-//! `B` unscaled. The divide-and-conquer path for `N > 25` (`DLASDA`, `DLALSA`) is not ported yet
-//! ([`DgelsdError::LargePathNotPorted`]); fMRIPrep never reaches it (a cosine design of more than
-//! 25 columns needs a series of more than about 27 minutes at the 128 s cutoff).
+//! `B` unscaled. **For `N > SMLSIZ`** (divide and conquer; fMRIPrep never reaches it: a cosine
+//! design of more than 25 columns needs a series of more than about 27 minutes at the 128 s
+//! cutoff) each `|D(i)| < EPS` becomes `±EPS`, the bidiagonal splits at every `|E(i)| < EPS` and
+//! at its last row, and each piece is solved by its size: one row copied, at most `SMLSIZ` rows by
+//! `DLASDQ` (`C = B`, `VT` from the identity), more by [`super::lasda::dlasda`]'s compact SVD and
+//! [`super::lasda::dlalsa`]'s left factor; the rows of the result (`BX`) cleared (`|D(i)| <= TOL`)
+//! or scaled by `1/D(i)` with `D(i) = |D(i)|` after, then each piece back through its right factor
+//! (copied, `VTᵀ·BX` by `DGEMM('T', 'N')`, `DLALSA`'s right factor) into `B`; `D` unscaled and
+//! sorted down, `B` unscaled.
 //!
 //! **numpy's `lstsq`** ([`numpy_lstsq`]; `umath_linalg.cpp`'s `lstsq`, `init_gelsd`,
 //! `call_gelsd`, the same in numpy 2.5.4 and 2.3.5 but `all_finite`; `_linalg.py`'s `lstsq`, the
@@ -71,14 +77,15 @@
     clippy::needless_range_loop
 )]
 
-use super::bdsdc::{SMLSIZ, dlascl_g, dlasdq};
+use super::bdsdc::{SMLSIZ, dlacpy, dlascl_g, dlasdq, identity};
 use super::blocked::{
     IllegalValue, Lapack, NB, Vect, dgebrd, dgelqf, dgeqrf, dormbr, dormlq, dormqr,
 };
+use super::lasda::{LasdaError, SvdTree, dlalsa, dlasda};
 use super::lstsq::{Lstsq, LstsqError};
 use super::svd::{dlange_m, zero_block};
-use super::{EPS, SAFMIN, dlanst_max, dlartg, drot};
-use crate::openblas::level1::idamax;
+use super::{EPS, SAFMIN, dlanst_max, dlartg, drot, sign};
+use crate::openblas::level1::{dcopy, idamax};
 use crate::openblas::level3::{Operand, Trans, dgemm_with};
 use crate::openblas::matmul::Array2;
 use crate::openblas::trmm::{Side, Uplo};
@@ -95,15 +102,6 @@ pub enum DgelsdError {
     /// and returns what the NaN does to its arithmetic (module documentation).
     #[error("DGELSD: the matrix holds a value that is not finite")]
     NotFinite,
-    /// `DLALSD`'s divide-and-conquer path (a bidiagonal of more than [`SMLSIZ`] rows) is not
-    /// ported yet.
-    #[error(
-        "DLALSD: the divide-and-conquer path for a bidiagonal of {n} > 25 rows is not ported yet"
-    )]
-    LargePathNotPorted {
-        /// The bidiagonal's order.
-        n: usize,
-    },
 }
 
 /// The order [`dlasrt`] sorts into (`ID`).
@@ -316,10 +314,11 @@ fn for_columns(
 /// dimension `ldb`), overwritten; `d` returns the singular values, decreasing (module
 /// documentation). Returns `(RANK, INFO)` as LAPACK leaves them: `INFO = -4` for `NRHS = 0` and
 /// `-8` for `LDB < max(1, N)` (XERBLA's refusals, nothing done, `RANK` not set: 0 here), `> 0`
-/// when `DLASDQ` does not converge, `-4` from a refused `DLASCL` (a NaN in the bidiagonal).
+/// when a `DLASDQ` (a leaf's `DBDSQR`) or a merge's `DLASD4` does not converge (the rank then 0),
+/// `-4` from a refused `DLASCL` (a NaN in the bidiagonal), and for `n > smlsiz` with `smlsiz < 3`
+/// `DLASDA`'s refusal `-2`.
 ///
 /// # Errors
-/// [`DgelsdError::LargePathNotPorted`] for `n > smlsiz` (unless the bidiagonal is zero);
 /// `DLASDQ`'s argument checks (never refused here).
 pub fn dlalsd(
     lp: Lapack,
@@ -401,7 +400,7 @@ pub fn dlalsd(
     // If N is smaller than the minimum divide size SMLSIZ, then solve the problem with another
     // solver.
     if n > smlsiz {
-        return Err(DgelsdError::LargePathNotPorted { n });
+        return dlalsd_large(lp, smlsiz, n, nrhs, d, e, b, boff, ldb, rcnd, orgnrm);
     }
     // VT = I (DLASET('A', N, N, 0, 1, WORK, N)).
     let mut vt = vec![0.0f64; n * n];
@@ -470,6 +469,263 @@ pub fn dlalsd(
     Ok((rank, info))
 }
 
+/// `DLALSD`'s path for a bidiagonal of more than `smlsiz` rows (`d`, `e` already scaled by
+/// `orgnrm`; `rcnd` the tolerance's factor): each `|D(i)| < EPS` set to `±EPS`; the problem split
+/// at every `|E(i)| < EPS` and at the last row, each piece solved by its size (one row: copied;
+/// at most `smlsiz`: `DLASDQ` with `C = B` from the identity `VT`; more: [`dlasda`]'s compact SVD
+/// and [`dlalsa`]'s left factor), the results in `BX` (leading dimension `n`); the tolerance
+/// `RCND·max|D|` clearing or scaling each row of `BX` by its value, `D` then `|D|`; each piece
+/// back through its right factor (copied; `VTᵀ·BX` by `DGEMM('T', 'N')`; [`dlalsa`]'s right
+/// factor) into `B`; `D` unscaled and sorted down, `B` unscaled. The work arrays as `dlalsd.f`
+/// lays them out in `WORK` and `IWORK` (each piece's at its first row, leading dimension `n`), each
+/// allocated on its own.
+fn dlalsd_large(
+    lp: Lapack,
+    smlsiz: usize,
+    n: usize,
+    nrhs: usize,
+    d: &mut [f64],
+    e: &mut [f64],
+    b: &mut [f64],
+    boff: usize,
+    ldb: usize,
+    rcnd: f64,
+    orgnrm: f64,
+) -> Result<(usize, i64), DgelsdError> {
+    let eps = EPS;
+    let nm1 = n - 1;
+    let mut rank = 0usize;
+    // NLVL = INT(LOG(DBLE(N)/DBLE(SMLSIZ+1))/LOG(TWO)) + 1 (glibc's log).
+    let nlvl = (log_glibc(n as f64 / (smlsiz + 1) as f64) / log_glibc(2.0)) as i64 + 1;
+    let nlvl = nlvl.max(1) as usize;
+    let smlszp = smlsiz + 1;
+    let mut u = vec![0.0f64; n * smlsiz];
+    let mut vt = vec![0.0f64; n * smlszp];
+    let mut difl = vec![0.0f64; nlvl * n];
+    let mut difr = vec![0.0f64; 2 * nlvl * n];
+    let mut z = vec![0.0f64; nlvl * n];
+    let mut c = vec![0.0f64; n];
+    let mut s = vec![0.0f64; n];
+    let mut poles = vec![0.0f64; 2 * nlvl * n];
+    let mut givnum = vec![0.0f64; 2 * nlvl * n];
+    let mut bx = vec![0.0f64; n * nrhs];
+    let mut k = vec![0usize; n];
+    let mut givptr = vec![0usize; n];
+    let mut perm = vec![0usize; nlvl * n];
+    let mut givcol = vec![0usize; 2 * nlvl * n];
+    // A refused argument of DLASDA or DLALSA (XERBLA's message): DLALSD returns its INFO.
+    let refused = |e: IllegalValue| -i64::from(e.param);
+    // IWORK(1..NSUB): each piece's first row; IWORK(SIZEI..): its size.
+    let mut pieces: Vec<(usize, usize)> = Vec::new();
+    let (ldbi, ni) = (ldb as isize, n as isize);
+    for i in 0..n {
+        if d[i].abs() < eps {
+            d[i] = sign(eps, d[i]);
+        }
+    }
+    let mut st = 1usize;
+    for i in 1..=nm1 {
+        if e[i - 1].abs() < eps || i == nm1 {
+            // Subproblem found. First determine its size and then apply divide and conquer on it.
+            let nsize;
+            if i < nm1 {
+                // A subproblem with E(I) small for I < NM1.
+                nsize = i - st + 1;
+                pieces.push((st, nsize));
+            } else if e[i - 1].abs() >= eps {
+                // A subproblem with E(NM1) not too small but I = NM1.
+                nsize = n - st + 1;
+                pieces.push((st, nsize));
+            } else {
+                // A subproblem with E(NM1) small. This implies an 1-by-1 subproblem at D(N),
+                // which is not solved explicitly.
+                nsize = i - st + 1;
+                pieces.push((st, nsize));
+                pieces.push((n, 1));
+                dcopy(nrhs, b, boff + n - 1, ldbi, &mut bx, nm1, ni);
+            }
+            let st1 = st - 1;
+            if nsize == 1 {
+                // This is a 1-by-1 subproblem and is not solved explicitly.
+                dcopy(nrhs, b, boff + st1, ldbi, &mut bx, st1, ni);
+            } else if nsize <= smlsiz {
+                // This is a small subproblem and is solved by DLASDQ.
+                identity(nsize, nsize, &mut vt, st1, n);
+                let info = dlasdq(
+                    lp.release,
+                    Uplo::Upper,
+                    0,
+                    nsize,
+                    nsize,
+                    0,
+                    nrhs,
+                    &mut d[st1..],
+                    &mut e[st1..],
+                    &mut vt,
+                    st1,
+                    n,
+                    &mut [],
+                    0,
+                    n,
+                    b,
+                    boff + st1,
+                    ldb,
+                )?;
+                if info != 0 {
+                    return Ok((rank, info as i64));
+                }
+                dlacpy(nsize, nrhs, b, boff + st1, ldb, &mut bx, st1, n);
+            } else {
+                // A large problem. Solve it using divide and conquer.
+                let mut t = SvdTree {
+                    u: &mut u[st1..],
+                    vt: &mut vt[st1..],
+                    k: &mut k[st1..],
+                    difl: &mut difl[st1..],
+                    difr: &mut difr[st1..],
+                    z: &mut z[st1..],
+                    poles: &mut poles[st1..],
+                    givptr: &mut givptr[st1..],
+                    givcol: &mut givcol[st1..],
+                    perm: &mut perm[st1..],
+                    givnum: &mut givnum[st1..],
+                    c: &mut c[st1..],
+                    s: &mut s[st1..],
+                };
+                let info = dlasda(
+                    lp.release,
+                    1,
+                    smlsiz,
+                    nsize,
+                    0,
+                    &mut d[st1..],
+                    &mut e[st1..],
+                    n,
+                    &mut t,
+                    n,
+                )
+                .map_or_else(
+                    |e| match e {
+                        LasdaError::Illegal(e) => refused(e),
+                        // ICOMPQ = 1 here: never the values alone.
+                        LasdaError::ValuesOnlyNotPorted { .. } => unreachable!(),
+                    },
+                    |info| info as i64,
+                );
+                if info != 0 {
+                    return Ok((rank, info));
+                }
+                let info = dlalsa(
+                    lp.gemm_q,
+                    0,
+                    smlsiz,
+                    nsize,
+                    nrhs,
+                    &mut b[boff + st1..],
+                    ldb,
+                    &mut bx[st1..],
+                    n,
+                    n,
+                    &t,
+                    n,
+                )
+                .unwrap_or_else(refused);
+                if info != 0 {
+                    return Ok((rank, info));
+                }
+            }
+            st = i + 1;
+        }
+    }
+    // Apply the singular values and treat the tiny ones as zero.
+    let tol = rcnd * d[idamax(n, d, 0, 1, true) - 1].abs();
+    for i in 1..=n {
+        // Some of the elements in D can be negative because 1-by-1 subproblems were not solved
+        // explicitly.
+        if d[i - 1].abs() <= tol {
+            for j in 0..nrhs {
+                bx[(i - 1) + j * n] = 0.0;
+            }
+        } else {
+            rank += 1;
+            let _ = scl(d[i - 1], 1.0, 1, nrhs, &mut bx, i - 1, n);
+        }
+        d[i - 1] = d[i - 1].abs();
+    }
+    // Now apply back the right singular vectors.
+    for &(st, nsize) in &pieces {
+        let st1 = st - 1;
+        if nsize == 1 {
+            dcopy(nrhs, &bx, st1, ni, b, boff + st1, ldbi);
+        } else if nsize <= smlsiz {
+            let vto = Operand {
+                data: &vt,
+                off: st1,
+                ld: n,
+                trans: Trans::T,
+            };
+            let bxo = Operand {
+                data: &bx,
+                off: st1,
+                ld: n,
+                trans: Trans::N,
+            };
+            dgemm_with(
+                nsize,
+                nrhs,
+                nsize,
+                1.0,
+                vto,
+                bxo,
+                0.0,
+                b,
+                boff + st1,
+                ldb,
+                lp.gemm_q,
+            );
+        } else {
+            let t = SvdTree {
+                u: &mut u[st1..],
+                vt: &mut vt[st1..],
+                k: &mut k[st1..],
+                difl: &mut difl[st1..],
+                difr: &mut difr[st1..],
+                z: &mut z[st1..],
+                poles: &mut poles[st1..],
+                givptr: &mut givptr[st1..],
+                givcol: &mut givcol[st1..],
+                perm: &mut perm[st1..],
+                givnum: &mut givnum[st1..],
+                c: &mut c[st1..],
+                s: &mut s[st1..],
+            };
+            let info = dlalsa(
+                lp.gemm_q,
+                1,
+                smlsiz,
+                nsize,
+                nrhs,
+                &mut bx[st1..],
+                n,
+                &mut b[boff + st1..],
+                ldb,
+                n,
+                &t,
+                n,
+            )
+            .unwrap_or_else(refused);
+            if info != 0 {
+                return Ok((rank, info));
+            }
+        }
+    }
+    // Unscale and sort the singular values.
+    let _ = scl(1.0, orgnrm, n, 1, d, 0, n);
+    dlasrt(Sort::Decreasing, &mut d[..n]);
+    let info = scl(orgnrm, 1.0, n, nrhs, b, boff, ldb);
+    Ok((rank, info))
+}
+
 /// What [`dgelsd`] returns: the effective rank, LAPACK's `INFO` (0; `> 0` when `DLASDQ` did not
 /// converge, the results then as LAPACK leaves them; `-4` when `NRHS = 0`, `DLALSD`'s refusal, the
 /// rank then unset in LAPACK and 0 here), `WORK(1)` and `IWORK(1)`.
@@ -494,8 +750,7 @@ pub struct Gelsd {
 ///
 /// # Errors
 /// `LDA < max(1, M)` (5), `LDB < max(1, M, N)` (7), `LWORK < MINWRK` (12) as LAPACK
-/// ([`DgelsdError::Illegal`]); a NaN or infinite entry in `A` ([`DgelsdError::NotFinite`]);
-/// [`DgelsdError::LargePathNotPorted`] when `min(m, n) > 25`.
+/// ([`DgelsdError::Illegal`]); a NaN or infinite entry in `A` ([`DgelsdError::NotFinite`]).
 pub fn dgelsd(
     lp: Lapack,
     m: usize,
@@ -931,9 +1186,7 @@ fn unscale(
 ///
 /// # Errors
 /// [`LstsqError::IncompatibleDimensions`] when `b` has another number of rows; [`LstsqError::
-/// DidNotConverge`] when `DGELSD` returns `INFO != 0` or `a` is not finite;
-/// [`LstsqError::Unsupported`] where `DGELSD` needs `DLALSD`'s divide-and-conquer path
-/// (`min(m, n) > 25`, not ported yet).
+/// DidNotConverge`] when `DGELSD` returns `INFO != 0` or `a` is not finite.
 pub fn numpy_lstsq(
     lp: Lapack,
     a: Array2<'_>,
@@ -973,14 +1226,10 @@ pub fn numpy_lstsq(
     }
     let k = m.min(n);
     let mut s = vec![0.0f64; k];
-    let out = match dgelsd(
+    let Ok(out) = dgelsd(
         lp, m, n, nrhs, &mut fa, lda, &mut fb, ldb, &mut s, rcond, None,
-    ) {
-        Ok(out) => out,
-        Err(DgelsdError::LargePathNotPorted { .. }) => {
-            return Err(LstsqError::Unsupported { m, n });
-        }
-        Err(_) => return Err(LstsqError::DidNotConverge),
+    ) else {
+        return Err(LstsqError::DidNotConverge);
     };
     if out.info != 0 {
         return Err(LstsqError::DidNotConverge);
@@ -1109,6 +1358,12 @@ mod tests {
                 (20, 25, 3),
                 (5, 200, 2),
                 (9, 9, 1),
+                (40, 30, 3),
+                (30, 40, 2),
+                (26, 26, 1),
+                (90, 60, 4),
+                (60, 90, 3),
+                (300, 120, 2),
             ] {
                 let a = matrix(m, n, (m * 100 + n) as u64);
                 let b = matrix(m, nrhs, (m + n * 7) as u64);
@@ -1137,6 +1392,64 @@ mod tests {
                         }
                     } else {
                         assert!(r.iter().all(|v| v.abs() < 1e-10), "{release:?} {m}x{n}");
+                    }
+                }
+            }
+        }
+    }
+
+    /// `DLALSD`'s divide-and-conquer path: the solution of the bidiagonal system itself (`B·x =
+    /// b`), for bidiagonals that split into pieces of one row, of at most 25 rows and of more, the
+    /// upper and lower forms, both releases; the singular values sorted down.
+    #[test]
+    fn dlalsd_large_path_solves_the_bidiagonal() {
+        for release in [LapackRelease::V3_12_0, LapackRelease::V3_12_1] {
+            let lp = Lapack::new(release);
+            for &(n, splits) in &[
+                (26usize, &[][..]),
+                (60, &[]),
+                (61, &[30]),
+                (130, &[0, 1, 40, 41, 80, 128]),
+                (90, &[88]),
+            ] {
+                for uplo in [Uplo::Upper, Uplo::Lower] {
+                    let nrhs = 3;
+                    let mut d: Vec<f64> = matrix(n, 1, n as u64).iter().map(|v| v + 2.0).collect();
+                    let mut e = matrix(n - 1, 1, n as u64 + 1);
+                    for &i in splits {
+                        e[i] = 0.0;
+                    }
+                    let b = matrix(n, nrhs, 9);
+                    let (d0, e0) = (d.clone(), e.clone());
+                    let mut x = vec![0.0f64; n * nrhs];
+                    for j in 0..nrhs {
+                        for i in 0..n {
+                            x[i + j * n] = b[i * nrhs + j];
+                        }
+                    }
+                    let (rank, info) = dlalsd(
+                        lp, uplo, SMLSIZ, n, nrhs, &mut d, &mut e, &mut x, 0, n, -1.0,
+                    )
+                    .unwrap();
+                    assert_eq!((rank, info), (n, 0), "{release:?} {n} {uplo:?}");
+                    assert!(d.windows(2).all(|w| w[0] >= w[1]));
+                    for j in 0..nrhs {
+                        for i in 0..n {
+                            let xi = |t: usize| x[t + j * n];
+                            let r = match uplo {
+                                Uplo::Upper => {
+                                    d0[i] * xi(i) + if i + 1 < n { e0[i] * xi(i + 1) } else { 0.0 }
+                                }
+                                Uplo::Lower => {
+                                    d0[i] * xi(i) + if i > 0 { e0[i - 1] * xi(i - 1) } else { 0.0 }
+                                }
+                            };
+                            let want = b[i * nrhs + j];
+                            assert!(
+                                (r - want).abs() < 1e-11,
+                                "{release:?} {n} {uplo:?}: {r} {want}"
+                            );
+                        }
                     }
                 }
             }
@@ -1212,12 +1525,13 @@ mod tests {
             numpy_lstsq(lp, view(&a, m, n), view(&b, m - 1, 2), None),
             Err(LstsqError::IncompatibleDimensions)
         ));
-        let big = matrix(40, 30, 7);
+        let mut big = matrix(40, 30, 7);
+        for i in 0..40 {
+            big[i * 30 + 29] = big[i * 30 + 3];
+        }
         let bb = matrix(40, 1, 8);
-        assert!(matches!(
-            numpy_lstsq(lp, view(&big, 40, 30), view(&bb, 40, 1), None),
-            Err(LstsqError::Unsupported { m: 40, n: 30 })
-        ));
+        let out = numpy_lstsq(lp, view(&big, 40, 30), view(&bb, 40, 1), None).unwrap();
+        assert_eq!((out.rank, out.residuals.len()), (29, 0));
         let p = |r: Result<Gelsd, DgelsdError>| match r {
             Err(DgelsdError::Illegal(e)) => e.param,
             other => panic!("{other:?}"),

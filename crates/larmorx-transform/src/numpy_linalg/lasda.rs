@@ -16,12 +16,24 @@
 //! formula, `DIFL`/`DIFR` and the normalised `VF`/`VL` through `DDOT` and `DNRM2`); with `ICOMPQ =
 //! 1` the poles (`D` and `DSIGMA`) copied out; `D` unscaled and `IDXQ` rebuilt by `DLAMRG`.
 //!
+//! **The tree** ([`dlasda`], `dlasda.f`, identical in both trees; the release enters through
+//! `DLASDQ`'s `DBDSQR` and `DLASD7`): `DLASDT`'s subproblems, the leaves by `DLASDQ`, the merges
+//! bottom-up by [`dlasd6`], every node's factors kept in the compact form [`SvdTree`] (`ICOMPQ =
+//! 1`, as `DLALSD` asks for it). **The solves** ([`dlals0`], [`dlalsa`]; `dlals0.f`, `dlalsa.f`,
+//! identical in both trees, no callee that differs): one node's left factor (Givens rotations,
+//! `PERM`, the rows of the secular equation's vectors normalised by `DNRM2`, applied by
+//! `DGEMV('T')`, `DLASCL`) or right factor (the transposed vectors by `DGEMV('T')`, the extra row's
+//! rotation, `PERM`, the Givens rotations undone), and the tree's application: the leaves' `Uᵀ`
+//! then the nodes bottom-up, or the nodes top-down then the leaves' `VTᵀ` (`DGEMM('T', 'N')` of
+//! depth at most `SMLSIZ + 1`). `DLAMC3(A, B)` is the sum `A + B`, rounded once.
+//!
 //! Upstream files (BSD-3-Clause; the notices are in the parent module and NOTICE): OpenBLAS
 //! 0.3.30 and v0.3.34-106-g446c436e `lapack-netlib/SRC/` (`dlasd6.f` and `dlasd8.f`, identical in
 //! both; `dlasd7.f`, which differs in its deflation test and the record of the deflated positions;
-//! `dlasd4.f`, `dlamrg.f`, `dlapy2.f`, `dlascl.f`, `dlaset.f`, `dlamch.f`), `interface/rot.c`,
-//! `dot.c`, `nrm2.c`, `kernel/x86_64/drot.c`, `ddot.c`, `nrm2.S`. The logic is re-expressed in Rust;
-//! no code was copied.
+//! `dlasda.f`, `dlals0.f`, `dlalsa.f`, identical in both; `dlasd4.f`, `dlasdq.f`, `dlasdt.f`,
+//! `dlamrg.f`, `dlapy2.f`, `dlascl.f`, `dlaset.f`, `dlacpy.f`, `dlamch.f`), `interface/rot.c`,
+//! `dot.c`, `nrm2.c`, `gemv.c`, `scal.c`, `copy.c`, `gemm.c`, `kernel/x86_64/drot.c`, `ddot.c`,
+//! `nrm2.S`, `dgemv_t_4.c`, `dscal.c`. The logic is re-expressed in Rust; no code was copied.
 
 // The routines keep LAPACK's names, arguments and 1-based loops, so the port can be checked line
 // by line against the Fortran.
@@ -31,11 +43,14 @@
     clippy::needless_range_loop
 )]
 
-use super::bdsdc::{dlamrg, dlascl_g, dlasd4};
+use super::bdsdc::{dlacpy, dlamrg, dlascl_g, dlasd4, dlasdq, dlasdt, identity};
 use super::blas::ddot;
 use super::blocked::IllegalValue;
 use super::{EPS, LapackRelease, dlapy2, drot, sign};
-use crate::openblas::level1::dnrm2;
+use crate::openblas::level1::{dcopy, dnrm2, dscal};
+use crate::openblas::level2::dgemv;
+use crate::openblas::level3::{Operand, Trans, dgemm_with};
+use crate::openblas::trmm::Uplo;
 
 fn illegal(routine: &'static str, param: u32) -> Result<(), IllegalValue> {
     Err(IllegalValue { routine, param })
@@ -562,4 +577,803 @@ pub fn dlasd6(
     // Prepare the IDXQ sorting permutation.
     dlamrg(k, n - k, d, 1, -1, idxq);
     Ok(done(0))
+}
+
+/// The compact form of a bidiagonal's SVD that [`dlasda`] writes (`ICOMPQ = 1`) and [`dlalsa`]
+/// applies: every real array column-major with leading dimension `LDU`, every index array with
+/// `LDGCOL` (indices 1-based), as LAPACK lays them out (`NLVL` the depth of `DLASDT`'s tree).
+/// With `ICOMPQ = 0` only `k`, `difl`, `difr`, `z`, `givptr`, `c` and `s`'s first entries (and
+/// `difl`, `difr`, `z`'s first `n`) are referenced: the last merge's values.
+pub struct SvdTree<'a> {
+    /// `U` (`LDU × SMLSIZ`): the left singular vectors of the leaves.
+    pub u: &'a mut [f64],
+    /// `VT` (`LDU × (SMLSIZ + 1)`): the right singular vectors of the leaves, transposed.
+    pub vt: &'a mut [f64],
+    /// `K` (`N`): the size of each node's secular equation.
+    pub k: &'a mut [usize],
+    /// `DIFL` (`LDU × NLVL`).
+    pub difl: &'a mut [f64],
+    /// `DIFR` (`LDU × 2·NLVL`).
+    pub difr: &'a mut [f64],
+    /// `Z` (`LDU × NLVL`).
+    pub z: &'a mut [f64],
+    /// `POLES` (`LDU × 2·NLVL`).
+    pub poles: &'a mut [f64],
+    /// `GIVPTR` (`N`): the number of Givens rotations of each node.
+    pub givptr: &'a mut [usize],
+    /// `GIVCOL` (`LDGCOL × 2·NLVL`).
+    pub givcol: &'a mut [usize],
+    /// `PERM` (`LDGCOL × NLVL`).
+    pub perm: &'a mut [usize],
+    /// `GIVNUM` (`LDU × 2·NLVL`).
+    pub givnum: &'a mut [f64],
+    /// `C` (`N`): the rotation of each non-square node's extra row (other nodes: as given, or a
+    /// deflation's rotation, as `DLASD7` leaves it).
+    pub c: &'a mut [f64],
+    /// `S` (`N`).
+    pub s: &'a mut [f64],
+}
+
+/// Why [`dlasda`] did not run.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum LasdaError {
+    /// A parameter LAPACK's checks refuse (`XERBLA`'s message).
+    #[error(transparent)]
+    Illegal(#[from] IllegalValue),
+    /// `ICOMPQ = 0` with `2 <= N <= SMLSIZ`: LAPACK's `DLASDQ` then finds the values alone through
+    /// `DBDSQR`'s `DLASQ1` (the dqds algorithm), which is not ported (no caller of the confounds
+    /// asks for it: `DLALSD` always passes `ICOMPQ = 1`, numpy's SVDs always compute vectors).
+    #[error(
+        "DLASDA: the singular values alone of a bidiagonal of {n} <= SMLSIZ rows (DBDSQR's \
+         DLASQ1, the dqds algorithm) are not ported"
+    )]
+    ValuesOnlyNotPorted {
+        /// The bidiagonal's order.
+        n: usize,
+    },
+}
+
+/// `DLASDA(ICOMPQ, SMLSIZ, N, SQRE, D, E, U, LDU, VT, K, DIFL, DIFR, Z, POLES, GIVPTR, GIVCOL,
+/// LDGCOL, PERM, GIVNUM, C, S, WORK, IWORK, INFO)`: the singular values of the `n × (n + sqre)`
+/// upper bidiagonal (`d`: `n` values, `e`: `n - 1 + sqre`) by divide and conquer, and with `icompq
+/// = 1` the compact form of its vectors in `t` (module documentation of [`SvdTree`]): the tree by
+/// `DLASDT`, the leaves by `DLASDQ` (`ICOMPQ = 1`: their `U` and `VT` from the identity in place;
+/// `ICOMPQ = 0`: `VT` in a work array of leading dimension `SMLSIZ + 1`), the leaves' first and last
+/// right-vector components gathered into `VF` and `VL`, `IDXQ` the identity per leaf, then the
+/// merges level by level from the bottom by [`dlasd6`] with `ALPHA = D(IC)`, `BETA = E(IC)`
+/// (`ICOMPQ = 1`: each node's arrays at its rows and level's columns, its `K`, `GIVPTR`, `C`, `S`
+/// numbered from the last node down to the root's 1; `ICOMPQ = 0`: all at the arrays' starts).
+/// `n <= smlsiz`: one `DLASDQ` on `d`, `e` and (`ICOMPQ = 1`) `t.vt`, `t.u` as given. `d` returns
+/// the singular values as the merges leave them (each node's sorted by its `IDXQ`, not the whole).
+/// Returns LAPACK's `INFO` (0; a leaf's `DBDSQR` or a merge's `DLASD4` that did not converge: its
+/// positive `INFO`, the arrays as LAPACK leaves them).
+///
+/// # Errors
+/// `ICOMPQ` not 0 or 1 (1), `SMLSIZ < 3` (2), `SQRE` not 0 or 1 (4), `LDU < N + SQRE` (8),
+/// `LDGCOL < N` (17), as LAPACK ([`LasdaError::Illegal`]); `ICOMPQ = 0` with `2 <= N <= SMLSIZ`
+/// ([`LasdaError::ValuesOnlyNotPorted`]).
+pub fn dlasda(
+    release: LapackRelease,
+    icompq: usize,
+    smlsiz: usize,
+    n: usize,
+    sqre: usize,
+    d: &mut [f64],
+    e: &mut [f64],
+    ldu: usize,
+    t: &mut SvdTree<'_>,
+    ldgcol: usize,
+) -> Result<usize, LasdaError> {
+    if icompq > 1 {
+        illegal("DLASDA", 1)?;
+    } else if smlsiz < 3 {
+        illegal("DLASDA", 2)?;
+    } else if sqre > 1 {
+        illegal("DLASDA", 4)?;
+    } else if ldu < n + sqre {
+        illegal("DLASDA", 8)?;
+    } else if ldgcol < n {
+        illegal("DLASDA", 17)?;
+    }
+    let m = n + sqre;
+    let ix = |i: usize, j: usize| (i - 1) + (j - 1) * ldu;
+    // If the input matrix is too small, call DLASDQ to find the singular values and vectors.
+    if n <= smlsiz {
+        if icompq == 0 && n >= 2 {
+            return Err(LasdaError::ValuesOnlyNotPorted { n });
+        }
+        let info = if icompq == 0 {
+            dlasdq(
+                release,
+                Uplo::Upper,
+                sqre,
+                n,
+                0,
+                0,
+                0,
+                d,
+                e,
+                &mut [],
+                0,
+                ldu,
+                &mut [],
+                0,
+                ldu,
+                &mut [],
+                0,
+                ldu,
+            )
+        } else {
+            dlasdq(
+                release,
+                Uplo::Upper,
+                sqre,
+                n,
+                m,
+                n,
+                0,
+                d,
+                e,
+                t.vt,
+                0,
+                ldu,
+                t.u,
+                0,
+                ldu,
+                &mut [],
+                0,
+                ldu,
+            )
+        };
+        return Ok(info?);
+    }
+    // Book-keeping and set up the computation tree. WORK(VF), WORK(VL), IWORK(IDXQ); the leaves'
+    // VT with ICOMPQ = 0 at WORK(NWORK1) (leading dimension SMLSZP); the other work arrays are
+    // the callees' own.
+    let smlszp = smlsiz + 1;
+    let mut vf = vec![0.0f64; m];
+    let mut vl = vec![0.0f64; m];
+    let mut idxq = vec![0usize; n];
+    let tree = dlasdt(n, smlsiz);
+    let nlvl = tree.lvl as usize;
+    let nd = tree.nd;
+    let node = |i: usize| {
+        (
+            tree.inode[i - 1] as usize,
+            tree.ndiml[i - 1] as usize,
+            tree.ndimr[i - 1] as usize,
+        )
+    };
+    // For the nodes on the bottom level of the tree, solve their subproblems by DLASDQ.
+    let ndb1 = nd.div_ceil(2);
+    for i in ndb1..=nd {
+        let (ic, nl, nr) = node(i);
+        let nlp1 = nl + 1;
+        let nlf = ic - nl;
+        let nrf = ic + 1;
+        // 0-based positions of IWORK(IDXQI + 1), WORK(VFI), WORK(VLI).
+        let mut idxqi = nlf - 1;
+        let mut vfi = nlf - 1;
+        let mut vli = nlf - 1;
+        let sqrei = 1;
+        let info = if icompq == 0 {
+            let mut w = vec![0.0f64; smlszp * smlszp];
+            identity(nlp1, nlp1, &mut w, 0, smlszp);
+            let info = dlasdq(
+                release,
+                Uplo::Upper,
+                sqrei,
+                nl,
+                nlp1,
+                0,
+                0,
+                &mut d[nlf - 1..],
+                &mut e[nlf - 1..],
+                &mut w,
+                0,
+                smlszp,
+                &mut [],
+                0,
+                nl,
+                &mut [],
+                0,
+                nl,
+            )?;
+            let itemp = nl * smlszp;
+            vf[vfi..vfi + nlp1].copy_from_slice(&w[..nlp1]);
+            vl[vli..vli + nlp1].copy_from_slice(&w[itemp..itemp + nlp1]);
+            info
+        } else {
+            identity(nl, nl, t.u, ix(nlf, 1), ldu);
+            identity(nlp1, nlp1, t.vt, ix(nlf, 1), ldu);
+            let info = dlasdq(
+                release,
+                Uplo::Upper,
+                sqrei,
+                nl,
+                nlp1,
+                nl,
+                0,
+                &mut d[nlf - 1..],
+                &mut e[nlf - 1..],
+                t.vt,
+                ix(nlf, 1),
+                ldu,
+                t.u,
+                ix(nlf, 1),
+                ldu,
+                &mut [],
+                0,
+                ldu,
+            )?;
+            vf[vfi..vfi + nlp1].copy_from_slice(&t.vt[ix(nlf, 1)..ix(nlf, 1) + nlp1]);
+            vl[vli..vli + nlp1].copy_from_slice(&t.vt[ix(nlf, nlp1)..ix(nlf, nlp1) + nlp1]);
+            info
+        };
+        if info != 0 {
+            return Ok(info);
+        }
+        for j in 1..=nl {
+            idxq[idxqi + j - 1] = j;
+        }
+        let sqrei = if i == nd && sqre == 0 { 0 } else { 1 };
+        idxqi += nlp1;
+        vfi += nlp1;
+        vli += nlp1;
+        let nrp1 = nr + sqrei;
+        let info = if icompq == 0 {
+            let mut w = vec![0.0f64; smlszp * smlszp];
+            identity(nrp1, nrp1, &mut w, 0, smlszp);
+            let info = dlasdq(
+                release,
+                Uplo::Upper,
+                sqrei,
+                nr,
+                nrp1,
+                0,
+                0,
+                &mut d[nrf - 1..],
+                &mut e[nrf - 1..],
+                &mut w,
+                0,
+                smlszp,
+                &mut [],
+                0,
+                nr,
+                &mut [],
+                0,
+                nr,
+            )?;
+            let itemp = (nrp1 - 1) * smlszp;
+            vf[vfi..vfi + nrp1].copy_from_slice(&w[..nrp1]);
+            vl[vli..vli + nrp1].copy_from_slice(&w[itemp..itemp + nrp1]);
+            info
+        } else {
+            identity(nr, nr, t.u, ix(nrf, 1), ldu);
+            identity(nrp1, nrp1, t.vt, ix(nrf, 1), ldu);
+            let info = dlasdq(
+                release,
+                Uplo::Upper,
+                sqrei,
+                nr,
+                nrp1,
+                nr,
+                0,
+                &mut d[nrf - 1..],
+                &mut e[nrf - 1..],
+                t.vt,
+                ix(nrf, 1),
+                ldu,
+                t.u,
+                ix(nrf, 1),
+                ldu,
+                &mut [],
+                0,
+                ldu,
+            )?;
+            vf[vfi..vfi + nrp1].copy_from_slice(&t.vt[ix(nrf, 1)..ix(nrf, 1) + nrp1]);
+            vl[vli..vli + nrp1].copy_from_slice(&t.vt[ix(nrf, nrp1)..ix(nrf, nrp1) + nrp1]);
+            info
+        };
+        if info != 0 {
+            return Ok(info);
+        }
+        for j in 1..=nr {
+            idxq[idxqi + j - 1] = j;
+        }
+    }
+    // Now conquer each subproblem bottom-up.
+    let mut j = 1usize << nlvl;
+    for lvl in (1..=nlvl).rev() {
+        let lvl2 = lvl * 2 - 1;
+        // Find the first node LF and last node LL on the current level LVL.
+        let (lf, ll) = if lvl == 1 {
+            (1usize, 1usize)
+        } else {
+            let lf = 1usize << (lvl - 1);
+            (lf, 2 * lf - 1)
+        };
+        for i in lf..=ll {
+            let (ic, nl, nr) = node(i);
+            let nlf = ic - nl;
+            let sqrei = if i == ll { sqre } else { 1 };
+            let at = nlf - 1;
+            let alpha = d[ic - 1];
+            let beta = e[ic - 1];
+            // The node's slot: J (ICOMPQ = 1) or the first (ICOMPQ = 0); the columns of its level.
+            let (slot, c1, c2) = if icompq == 0 {
+                (1, 0, 0)
+            } else {
+                j -= 1;
+                (j, at + (lvl - 1) * ldu, at + (lvl2 - 1) * ldu)
+            };
+            let g1 = if icompq == 0 {
+                0
+            } else {
+                at + (lvl - 1) * ldgcol
+            };
+            let g2 = if icompq == 0 {
+                0
+            } else {
+                at + (lvl2 - 1) * ldgcol
+            };
+            let mut rec = GivensRecord {
+                perm: &mut t.perm[g1..],
+                givcol: &mut t.givcol[g2..],
+                ldgcol,
+                givnum: &mut t.givnum[c2..],
+                ldgnum: ldu,
+            };
+            let mut out = MergeFactors {
+                poles: &mut t.poles[c2..],
+                difl: &mut t.difl[c1..],
+                difr: &mut t.difr[c2..],
+                z: &mut t.z[c1..],
+            };
+            let merged = dlasd6(
+                release,
+                icompq,
+                nl,
+                nr,
+                sqrei,
+                &mut d[nlf - 1..],
+                &mut vf[at..],
+                &mut vl[at..],
+                alpha,
+                beta,
+                &mut idxq[at..],
+                &mut rec,
+                &mut out,
+                t.givptr[slot - 1],
+                t.c[slot - 1],
+                t.s[slot - 1],
+            )?;
+            t.k[slot - 1] = merged.k;
+            t.givptr[slot - 1] = merged.givptr;
+            t.c[slot - 1] = merged.c;
+            t.s[slot - 1] = merged.s;
+            if merged.info != 0 {
+                return Ok(merged.info);
+            }
+        }
+    }
+    Ok(0)
+}
+
+/// `DLALS0(ICOMPQ, NL, NR, SQRE, NRHS, B, LDB, BX, LDBX, PERM, GIVPTR, GIVCOL, LDGCOL, GIVNUM,
+/// LDGNUM, POLES, DIFL, DIFR, Z, K, C, S, WORK, INFO)`: one node's factor of the compact SVD
+/// applied to the `nrhs` columns of `b` (rows `n = nl + nr + 1`, and `m = n + sqre` for `icompq =
+/// 1`; leading dimension `ldb`), `bx` (leading dimension `ldbx`) a work array: `ICOMPQ = 0` the
+/// left factor (the Givens rotations, `PERM` into `BX`, then each of the `K` rows of `B` as
+/// `BXᵀ·w / ‖w‖` by `DGEMV('T')`, `DNRM2` and `DLASCL`, `w` from `POLES`, `DIFL`, `DIFR`, `Z`
+/// with `w(1) = -1`; the deflated rows copied), `ICOMPQ = 1` the right factor (the rows of `BX`
+/// as `Bᵀ·w` per root, the extra row's rotation by `C`, `S` for `SQRE = 1`, back into `B` through
+/// `PERM`, the Givens rotations undone in reverse). `perm` (`n`, 1-based), `givcol` (`ldgcol ×
+/// 2`), `givnum`, `poles`, `difr` (`ldgnum × 2`), `difl` and `z` (`k`) at the node's positions.
+/// Returns LAPACK's `INFO`: 0, or the last `DLASCL`'s (`-4` for a NaN norm) with `ICOMPQ = 0`.
+///
+/// # Errors
+/// `ICOMPQ` not 0 or 1 (1), `NL < 1` (2), `NR < 1` (3), `SQRE` not 0 or 1 (4), `NRHS < 1` (5),
+/// `LDB < N` (7), `LDBX < N` (9), `LDGCOL < N` (13), `LDGNUM < N` (15), `K < 1` (20), as LAPACK.
+pub fn dlals0(
+    icompq: usize,
+    nl: usize,
+    nr: usize,
+    sqre: usize,
+    nrhs: usize,
+    b: &mut [f64],
+    ldb: usize,
+    bx: &mut [f64],
+    ldbx: usize,
+    perm: &[usize],
+    givptr: usize,
+    givcol: &[usize],
+    ldgcol: usize,
+    givnum: &[f64],
+    ldgnum: usize,
+    poles: &[f64],
+    difl: &[f64],
+    difr: &[f64],
+    z: &[f64],
+    k: usize,
+    c: f64,
+    s: f64,
+) -> Result<i64, IllegalValue> {
+    let n = nl + nr + 1;
+    if icompq > 1 {
+        illegal("DLALS0", 1)?;
+    } else if nl < 1 {
+        illegal("DLALS0", 2)?;
+    } else if nr < 1 {
+        illegal("DLALS0", 3)?;
+    } else if sqre > 1 {
+        illegal("DLALS0", 4)?;
+    } else if nrhs < 1 {
+        illegal("DLALS0", 5)?;
+    } else if ldb < n {
+        illegal("DLALS0", 7)?;
+    } else if ldbx < n {
+        illegal("DLALS0", 9)?;
+    } else if ldgcol < n {
+        illegal("DLALS0", 13)?;
+    } else if ldgnum < n {
+        illegal("DLALS0", 15)?;
+    } else if k < 1 {
+        illegal("DLALS0", 20)?;
+    }
+    let m = n + sqre;
+    let nlp1 = nl + 1;
+    let (ldbi, ldbxi) = (ldb as isize, ldbx as isize);
+    // GIVCOL(I, 2), GIVCOL(I, 1), GIVNUM(I, 2), GIVNUM(I, 1), POLES(I, 1), POLES(I, 2), DIFR(I,
+    // 1), DIFR(I, 2), 1-based I; the rows of B and BX as offsets.
+    let gc = |i: usize, col: usize| givcol[(i - 1) + (col - 1) * ldgcol];
+    let gn = |i: usize, col: usize| givnum[(i - 1) + (col - 1) * ldgnum];
+    let pl = |i: usize, col: usize| poles[(i - 1) + (col - 1) * ldgnum];
+    let dr = |i: usize, col: usize| difr[(i - 1) + (col - 1) * ldgnum];
+    let mut work = vec![0.0f64; k];
+    let mut info = 0i64;
+    if icompq == 0 {
+        // Apply back orthogonal transformations from the left. Step (1L): apply back the Givens
+        // rotations performed.
+        for i in 1..=givptr {
+            drot(
+                nrhs,
+                b,
+                gc(i, 2) - 1,
+                ldb,
+                gc(i, 1) - 1,
+                ldb,
+                gn(i, 2),
+                gn(i, 1),
+            );
+        }
+        // Step (2L): permute rows of B.
+        dcopy(nrhs, b, nlp1 - 1, ldbi, bx, 0, ldbxi);
+        for i in 2..=n {
+            dcopy(nrhs, b, perm[i - 1] - 1, ldbi, bx, i - 1, ldbxi);
+        }
+        // Step (3L): apply the inverse of the left singular vector matrix to BX.
+        if k == 1 {
+            dcopy(nrhs, bx, 0, ldbxi, b, 0, ldbi);
+            if z[0] < 0.0 {
+                dscal(nrhs, -1.0, b, 0, ldbi);
+            }
+        } else {
+            let (mut difrj, mut dsigjp) = (0.0f64, 0.0f64);
+            for j in 1..=k {
+                let diflj = difl[j - 1];
+                let dj = pl(j, 1);
+                let dsigj = -pl(j, 2);
+                if j < k {
+                    difrj = -dr(j, 1);
+                    dsigjp = -pl(j + 1, 2);
+                }
+                work[j - 1] = if z[j - 1] == 0.0 || pl(j, 2) == 0.0 {
+                    0.0
+                } else {
+                    -(pl(j, 2) * z[j - 1] / diflj / (pl(j, 2) + dj))
+                };
+                for i in 1..j {
+                    work[i - 1] = if z[i - 1] == 0.0 || pl(i, 2) == 0.0 {
+                        0.0
+                    } else {
+                        // DLAMC3(POLES(I, 2), DSIGJ): the sum, stored.
+                        pl(i, 2) * z[i - 1] / ((pl(i, 2) + dsigj) - diflj) / (pl(i, 2) + dj)
+                    };
+                }
+                for i in j + 1..=k {
+                    work[i - 1] = if z[i - 1] == 0.0 || pl(i, 2) == 0.0 {
+                        0.0
+                    } else {
+                        pl(i, 2) * z[i - 1] / ((pl(i, 2) + dsigjp) + difrj) / (pl(i, 2) + dj)
+                    };
+                }
+                work[0] = -1.0;
+                let temp = dnrm2(k, &work, 0, 1);
+                dgemv(
+                    Trans::T,
+                    k,
+                    nrhs,
+                    1.0,
+                    bx,
+                    0,
+                    ldbx,
+                    &work,
+                    0,
+                    1,
+                    0.0,
+                    b,
+                    j - 1,
+                    ldb,
+                );
+                info = match dlascl_g(temp, 1.0, 1, nrhs, b, j - 1, ldb) {
+                    Ok(()) => 0,
+                    Err(e) => -i64::from(e.param),
+                };
+            }
+        }
+        // Move the deflated rows of BX to B also.
+        if k < m.max(n) {
+            dlacpy(n - k, nrhs, bx, k, ldbx, b, k, ldb);
+        }
+    } else {
+        // Apply back the right orthogonal transformations. Step (1R): apply back the new right
+        // singular vector matrix to B.
+        if k == 1 {
+            dcopy(nrhs, b, 0, ldbi, bx, 0, ldbxi);
+        } else {
+            for j in 1..=k {
+                let dsigj = pl(j, 2);
+                work[j - 1] = if z[j - 1] == 0.0 {
+                    0.0
+                } else {
+                    -(z[j - 1] / difl[j - 1] / (dsigj + pl(j, 1)) / dr(j, 2))
+                };
+                for i in 1..j {
+                    work[i - 1] = if z[j - 1] == 0.0 {
+                        0.0
+                    } else {
+                        // DLAMC3(DSIGJ, -POLES(I + 1, 2)): the sum, stored.
+                        z[j - 1]
+                            / ((dsigj + -pl(i + 1, 2)) - dr(i, 1))
+                            / (dsigj + pl(i, 1))
+                            / dr(i, 2)
+                    };
+                }
+                for i in j + 1..=k {
+                    work[i - 1] = if z[j - 1] == 0.0 {
+                        0.0
+                    } else {
+                        z[j - 1]
+                            / ((dsigj + -pl(i, 2)) - difl[i - 1])
+                            / (dsigj + pl(i, 1))
+                            / dr(i, 2)
+                    };
+                }
+                dgemv(
+                    Trans::T,
+                    k,
+                    nrhs,
+                    1.0,
+                    b,
+                    0,
+                    ldb,
+                    &work,
+                    0,
+                    1,
+                    0.0,
+                    bx,
+                    j - 1,
+                    ldbx,
+                );
+            }
+        }
+        // Step (2R): if SQRE = 1, apply back the rotation that is related to the right null
+        // space of the subproblem.
+        if sqre == 1 {
+            dcopy(nrhs, b, m - 1, ldbi, bx, m - 1, ldbxi);
+            drot(nrhs, bx, 0, ldbx, m - 1, ldbx, c, s);
+        }
+        if k < m.max(n) {
+            dlacpy(n - k, nrhs, b, k, ldb, bx, k, ldbx);
+        }
+        // Step (3R): permute rows of B.
+        dcopy(nrhs, bx, 0, ldbxi, b, nlp1 - 1, ldbi);
+        if sqre == 1 {
+            dcopy(nrhs, bx, m - 1, ldbxi, b, m - 1, ldbi);
+        }
+        for i in 2..=n {
+            dcopy(nrhs, bx, i - 1, ldbxi, b, perm[i - 1] - 1, ldbi);
+        }
+        // Step (4R): apply back the Givens rotations performed.
+        for i in (1..=givptr).rev() {
+            drot(
+                nrhs,
+                b,
+                gc(i, 2) - 1,
+                ldb,
+                gc(i, 1) - 1,
+                ldb,
+                gn(i, 2),
+                -gn(i, 1),
+            );
+        }
+    }
+    Ok(info)
+}
+
+/// `DLALSA(ICOMPQ, SMLSIZ, N, NRHS, B, LDB, BX, LDBX, U, LDU, VT, K, DIFL, DIFR, Z, POLES,
+/// GIVPTR, GIVCOL, LDGCOL, PERM, GIVNUM, C, S, WORK, IWORK, INFO)`: the compact SVD of
+/// [`dlasda`] (`t`, read only) applied to the `nrhs` columns of `b` (`n` rows, leading dimension
+/// `ldb`), the result in `bx` (leading dimension `ldbx`; `b` is a work array then): `ICOMPQ = 0`
+/// the transposed left singular vectors (each leaf's `Uᵀ·B` by `DGEMM('T', 'N')`, the nodes'
+/// centre rows copied, then [`dlals0`] bottom-up, each square), `ICOMPQ = 1` the right singular
+/// vectors (the nodes top-down by [`dlals0`], the last of each level square and the others with
+/// their extra row, then each leaf's `VTᵀ·B`). The depth of every product is at most `SMLSIZ +
+/// 1`. Returns LAPACK's `INFO` (the last [`dlals0`]'s).
+///
+/// # Errors
+/// `ICOMPQ` not 0 or 1 (1), `SMLSIZ < 3` (2), `N < SMLSIZ` (3), `NRHS < 1` (4), `LDB < N` (6),
+/// `LDBX < N` (8), `LDU < N` (10), `LDGCOL < N` (19), as LAPACK.
+pub fn dlalsa(
+    gemm_q: usize,
+    icompq: usize,
+    smlsiz: usize,
+    n: usize,
+    nrhs: usize,
+    b: &mut [f64],
+    ldb: usize,
+    bx: &mut [f64],
+    ldbx: usize,
+    ldu: usize,
+    t: &SvdTree<'_>,
+    ldgcol: usize,
+) -> Result<i64, IllegalValue> {
+    if icompq > 1 {
+        illegal("DLALSA", 1)?;
+    } else if smlsiz < 3 {
+        illegal("DLALSA", 2)?;
+    } else if n < smlsiz {
+        illegal("DLALSA", 3)?;
+    } else if nrhs < 1 {
+        illegal("DLALSA", 4)?;
+    } else if ldb < n {
+        illegal("DLALSA", 6)?;
+    } else if ldbx < n {
+        illegal("DLALSA", 8)?;
+    } else if ldu < n {
+        illegal("DLALSA", 10)?;
+    } else if ldgcol < n {
+        illegal("DLALSA", 19)?;
+    }
+    // Book-keeping and setting up the computation tree.
+    let tree = dlasdt(n, smlsiz);
+    let nlvl = tree.lvl as usize;
+    let nd = tree.nd;
+    let node = |i: usize| {
+        (
+            tree.inode[i - 1] as usize,
+            tree.ndiml[i - 1] as usize,
+            tree.ndimr[i - 1] as usize,
+        )
+    };
+    let (ldbi, ldbxi) = (ldb as isize, ldbx as isize);
+    // One node's DLALS0 between `top` (its B) and `low` (its BX), from the node's row `nlf` at
+    // level `lvl`, its slot `j`.
+    let node_solve = |icompq: usize,
+                      i: usize,
+                      lvl: usize,
+                      j: usize,
+                      sqre: usize,
+                      top: &mut [f64],
+                      ldtop: usize,
+                      low: &mut [f64],
+                      ldlow: usize|
+     -> Result<i64, IllegalValue> {
+        let (ic, nl, nr) = node(i);
+        let at = ic - nl - 1;
+        let lvl2 = 2 * lvl - 1;
+        let (c1, c2) = (at + (lvl - 1) * ldu, at + (lvl2 - 1) * ldu);
+        let (g1, g2) = (at + (lvl - 1) * ldgcol, at + (lvl2 - 1) * ldgcol);
+        dlals0(
+            icompq,
+            nl,
+            nr,
+            sqre,
+            nrhs,
+            &mut top[at..],
+            ldtop,
+            &mut low[at..],
+            ldlow,
+            &t.perm[g1..],
+            t.givptr[j - 1],
+            &t.givcol[g2..],
+            ldgcol,
+            &t.givnum[c2..],
+            ldu,
+            &t.poles[c2..],
+            &t.difl[c1..],
+            &t.difr[c2..],
+            &t.z[c1..],
+            t.k[j - 1],
+            t.c[j - 1],
+            t.s[j - 1],
+        )
+    };
+    let leaf_product = |rows: usize,
+                        from: &[f64],
+                        fld: usize,
+                        to: &mut [f64],
+                        tld: usize,
+                        v: &[f64],
+                        row: usize| {
+        let a = Operand {
+            data: v,
+            off: row - 1,
+            ld: ldu,
+            trans: Trans::T,
+        };
+        let bo = Operand {
+            data: from,
+            off: row - 1,
+            ld: fld,
+            trans: Trans::N,
+        };
+        dgemm_with(rows, nrhs, rows, 1.0, a, bo, 0.0, to, row - 1, tld, gemm_q);
+    };
+    let ndb1 = nd.div_ceil(2);
+    let mut info = 0i64;
+    if icompq == 0 {
+        // The nodes on the bottom level of the tree: apply Uᵀ to B.
+        for i in ndb1..=nd {
+            let (ic, nl, nr) = node(i);
+            leaf_product(nl, b, ldb, bx, ldbx, t.u, ic - nl);
+            leaf_product(nr, b, ldb, bx, ldbx, t.u, ic + 1);
+        }
+        // The rows of B corresponding to the centres of the subproblems.
+        for i in 1..=nd {
+            let ic = tree.inode[i - 1] as usize;
+            dcopy(nrhs, b, ic - 1, ldbi, bx, ic - 1, ldbxi);
+        }
+        // Finally go through the left singular vector matrices of all the other subproblems
+        // bottom-up on the tree.
+        let mut j = 1usize << nlvl;
+        for lvl in (1..=nlvl).rev() {
+            let (lf, ll) = if lvl == 1 {
+                (1usize, 1usize)
+            } else {
+                let lf = 1usize << (lvl - 1);
+                (lf, 2 * lf - 1)
+            };
+            for i in lf..=ll {
+                j -= 1;
+                info = node_solve(0, i, lvl, j, 0, bx, ldbx, b, ldb)?;
+            }
+        }
+    } else {
+        // ICOMPQ = 1: apply back the right singular vector factors, top-down.
+        let mut j = 0usize;
+        for lvl in 1..=nlvl {
+            let (lf, ll) = if lvl == 1 {
+                (1usize, 1usize)
+            } else {
+                let lf = 1usize << (lvl - 1);
+                (lf, 2 * lf - 1)
+            };
+            for i in (lf..=ll).rev() {
+                let sqre = if i == ll { 0 } else { 1 };
+                j += 1;
+                info = node_solve(1, i, lvl, j, sqre, b, ldb, bx, ldbx)?;
+            }
+        }
+        // The nodes on the bottom level of the tree: apply VTᵀ to B.
+        for i in ndb1..=nd {
+            let (ic, nl, nr) = node(i);
+            let nlp1 = nl + 1;
+            let nrp1 = if i == nd { nr } else { nr + 1 };
+            leaf_product(nlp1, b, ldb, bx, ldbx, t.vt, ic - nl);
+            leaf_product(nrp1, b, ldb, bx, ldbx, t.vt, ic + 1);
+        }
+    }
+    Ok(info)
 }

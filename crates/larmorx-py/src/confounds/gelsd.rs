@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
-//! Bindings of LAPACK's minimum-norm least squares (`DGELSD`, its bidiagonal solver `DLALSD` and
-//! `DLASRT`) at their Fortran interface (`lapack_*`, as
+//! Bindings of LAPACK's minimum-norm least squares (`DGELSD`, its bidiagonal solver `DLALSD` with
+//! its divide-and-conquer routines `DLASDA`, `DLASD6`/`7`/`8`, `DLALSA`, `DLALS0`, and `DLASRT`) at
+//! their Fortran interface (`lapack_*`, as
 //! `larmorx_transform::numpy_linalg::gelsd` computes them) and numpy's `lstsq(a, b, rcond)` on top
 //! of them (`numpy_lstsq`); the validation compares them with numpy's own library and function.
 //! Matrices cross as flat column-major storage with their leading dimension (the `lapack_*`
@@ -9,9 +10,10 @@
 use super::lapack_release;
 use super::svd::{F64s, c_view, indices, linalg_error, lp, to_i64, uplo};
 use super::{contiguous, lapack_run, one_of};
-use larmorx_transform::numpy_linalg::LstsqError;
 use larmorx_transform::numpy_linalg::gelsd::{self, DgelsdError, Sort};
-use larmorx_transform::numpy_linalg::lasda::{self, GivensRecord, MergeFactors};
+use larmorx_transform::numpy_linalg::lasda::{
+    self, GivensRecord, LasdaError, MergeFactors, SvdTree,
+};
 use larmorx_transform::openblas::matmul::Array2 as View;
 use numpy::{PyArray1, PyArrayDyn, PyArrayMethods, PyReadonlyArray1, PyReadonlyArray2};
 use numpy::{PyReadonlyArrayDyn, PyUntypedArrayMethods};
@@ -20,10 +22,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 fn gelsd_err(e: DgelsdError) -> PyErr {
-    match e {
-        DgelsdError::LargePathNotPorted { .. } => PyNotImplementedError::new_err(e.to_string()),
-        other => PyValueError::new_err(other.to_string()),
-    }
+    PyValueError::new_err(e.to_string())
 }
 
 /// `DLASRT(ID, N, D, INFO)`: `d` sorted increasing (`id = "I"`) or decreasing (`"D"`).
@@ -45,8 +44,8 @@ fn lapack_dlasrt<'py>(
 
 /// `DLALSD(UPLO, SMLSIZ, N, NRHS, D, E, B, LDB, RCOND, RANK, ...)`: the minimum-norm solution of an
 /// `n × n` bidiagonal system (`d`: `n` values, `e`: `n - 1`) for the `nrhs` columns of `b` (flat
-/// column-major, `ldb × nrhs`). Returns `(D, E, B, RANK, INFO)`. Only `N <= SMLSIZ` is ported
-/// (`NotImplementedError` otherwise).
+/// column-major, `ldb × nrhs`), both paths (`N <= SMLSIZ`; divide and conquer above). Returns
+/// `(D, E, B, RANK, INFO)`.
 #[pyfunction]
 #[pyo3(signature = (uplo_, smlsiz, n, nrhs, d, e, b, ldb, rcond, lapack = "3.12.1", n_threads = 1, gemm_q = 256))]
 #[allow(clippy::too_many_arguments)]
@@ -93,8 +92,7 @@ fn lapack_dlalsd<'py>(
 /// `DGELSD(M, N, NRHS, A, LDA, B, LDB, S, RCOND, RANK, WORK, LWORK, IWORK, INFO)` on flat
 /// column-major storage (`a`: `lda × n`, `b`: `ldb × nrhs`); `lwork=None` is the optimal workspace
 /// (numpy's query). Returns `(A, B, S, RANK, WORK(1), IWORK(1), INFO)`. A non-finite `A` is refused
-/// (`ValueError`: LAPACK scales an infinity to NaN and may loop forever); `min(m, n) > 25` raises
-/// `NotImplementedError` (`DLALSD`'s divide-and-conquer path, not ported yet).
+/// (`ValueError`: LAPACK scales an infinity to NaN and may loop forever).
 #[pyfunction]
 #[pyo3(signature = (m, n, nrhs, a, lda, b, ldb, rcond, lwork = None, lapack = "3.12.1", n_threads = 1, gemm_q = 256))]
 #[allow(clippy::too_many_arguments)]
@@ -159,8 +157,7 @@ fn dyn_vec<'py>(py: Python<'py>, shape: &[usize], v: Vec<f64>) -> PyResult<Dyn<'
 /// `(x, residuals, rank, s)` with numpy's shapes (`x` and the residuals 1-D for a 1-D `b`; the
 /// residuals empty unless the rank is `n` and `m > n`). `rcond=None` is numpy's default. Raises
 /// numpy's `LinAlgError` as numpy does (`Incompatible dimensions`; `SVD did not converge in Linear
-/// Least Squares`: `DGELSD`'s `INFO != 0` or a non-finite `a`); `NotImplementedError` where
-/// `min(m, n) > 25` (`DLALSD`'s divide-and-conquer path, not ported yet).
+/// Least Squares`: `DGELSD`'s `INFO != 0` or a non-finite `a`).
 #[pyfunction]
 #[pyo3(signature = (a, b, rcond = None, lapack = "3.12.1", n_threads = 1, gemm_q = 256))]
 fn numpy_lstsq<'py>(
@@ -204,15 +201,7 @@ fn numpy_lstsq<'py>(
         };
         gelsd::numpy_lstsq(lp, c_view(&adata, m, n), bview, rcond)
     })?;
-    let out = match res {
-        Ok(out) => out,
-        Err(e @ LstsqError::Unsupported { .. }) => {
-            return Err(PyNotImplementedError::new_err(format!(
-                "{e} (DLALSD's divide-and-conquer path)"
-            )));
-        }
-        Err(e) => return Err(linalg_error(py, &e.to_string())),
-    };
+    let out = res.map_err(|e| linalg_error(py, &e.to_string()))?;
     let shape: &[usize] = if is_1d { &[n] } else { &[n, nrhs] };
     let x = dyn_vec(py, shape, out.x)?;
     Ok((
@@ -456,7 +445,243 @@ fn lapack_dlasd6<'py>(
     Ok(dict)
 }
 
+fn short(name: &str) -> PyErr {
+    PyValueError::new_err(format!("{name}: arrays too short"))
+}
+
+/// `DLASDA(ICOMPQ, SMLSIZ, N, SQRE, D, E, U, LDU, VT, K, DIFL, DIFR, Z, POLES, GIVPTR, GIVCOL,
+/// LDGCOL, PERM, GIVNUM, C, S, WORK, IWORK, INFO)`: the divide-and-conquer SVD of an `n × (n +
+/// sqre)` upper bidiagonal (`d`, `e`) and, with `icompq = 1`, its compact form
+/// (`larmorx_transform::numpy_linalg::lasda::dlasda`). The real arrays flat column-major with
+/// leading dimension `ldu`, the integer ones (int64; indices 1-based) with `ldgcol`; every array
+/// starts as given (`u`, `vt` are read as given when `n <= smlsiz`); `icompq = 0` with `2 <= n <=
+/// smlsiz` raises `NotImplementedError` (LAPACK's `DLASQ1`, not ported). Returns a dict of the outputs
+/// (`D`, `E`, `U`, `VT`, `K`, `DIFL`, `DIFR`, `Z`, `POLES`, `GIVPTR`, `GIVCOL`, `PERM`, `GIVNUM`,
+/// `C`, `S`, `INFO`).
+#[pyfunction]
+#[pyo3(signature = (icompq, smlsiz, n, sqre, d, e, u, ldu, vt, k, difl, difr, z, poles, givptr, givcol, ldgcol, perm, givnum, c, s, lapack = "3.12.1"))]
+#[allow(clippy::too_many_arguments)]
+fn lapack_dlasda<'py>(
+    py: Python<'py>,
+    icompq: usize,
+    smlsiz: usize,
+    n: usize,
+    sqre: usize,
+    d: PyReadonlyArray1<'_, f64>,
+    e: PyReadonlyArray1<'_, f64>,
+    u: PyReadonlyArray1<'_, f64>,
+    ldu: usize,
+    vt: PyReadonlyArray1<'_, f64>,
+    k: PyReadonlyArray1<'_, i64>,
+    difl: PyReadonlyArray1<'_, f64>,
+    difr: PyReadonlyArray1<'_, f64>,
+    z: PyReadonlyArray1<'_, f64>,
+    poles: PyReadonlyArray1<'_, f64>,
+    givptr: PyReadonlyArray1<'_, i64>,
+    givcol: PyReadonlyArray1<'_, i64>,
+    ldgcol: usize,
+    perm: PyReadonlyArray1<'_, i64>,
+    givnum: PyReadonlyArray1<'_, f64>,
+    c: PyReadonlyArray1<'_, f64>,
+    s: PyReadonlyArray1<'_, f64>,
+    lapack: &str,
+) -> PyResult<Bound<'py, PyDict>> {
+    let release = lapack_release(lapack)?;
+    let (mut dv, mut ev) = (contiguous(&d)?.to_vec(), contiguous(&e)?.to_vec());
+    let (mut uv, mut vtv) = (contiguous(&u)?.to_vec(), contiguous(&vt)?.to_vec());
+    let (mut kv, mut gpv) = (indices(&k)?, indices(&givptr)?);
+    let (mut gcv, mut pv) = (indices(&givcol)?, indices(&perm)?);
+    let (mut dlv, mut drv) = (contiguous(&difl)?.to_vec(), contiguous(&difr)?.to_vec());
+    let (mut zv, mut plv) = (contiguous(&z)?.to_vec(), contiguous(&poles)?.to_vec());
+    let mut gnv = contiguous(&givnum)?.to_vec();
+    let (mut cv, mut sv) = (contiguous(&c)?.to_vec(), contiguous(&s)?.to_vec());
+    if dv.len() < n
+        || ev.len() + 1 < n + sqre.min(1)
+        || kv.is_empty()
+        || gpv.is_empty()
+        || cv.is_empty()
+        || sv.is_empty()
+    {
+        return Err(short("DLASDA"));
+    }
+    let info = lapack_run(py, "DLASDA", 1, || {
+        let mut t = SvdTree {
+            u: &mut uv,
+            vt: &mut vtv,
+            k: &mut kv,
+            difl: &mut dlv,
+            difr: &mut drv,
+            z: &mut zv,
+            poles: &mut plv,
+            givptr: &mut gpv,
+            givcol: &mut gcv,
+            perm: &mut pv,
+            givnum: &mut gnv,
+            c: &mut cv,
+            s: &mut sv,
+        };
+        lasda::dlasda(
+            release, icompq, smlsiz, n, sqre, &mut dv, &mut ev, ldu, &mut t, ldgcol,
+        )
+    })?
+    .map_err(|e| match e {
+        LasdaError::ValuesOnlyNotPorted { .. } => PyNotImplementedError::new_err(e.to_string()),
+        LasdaError::Illegal(e) => PyValueError::new_err(e.to_string()),
+    })?;
+    let dict = PyDict::new(py);
+    dict.set_item("D", PyArray1::from_vec(py, dv))?;
+    dict.set_item("E", PyArray1::from_vec(py, ev))?;
+    dict.set_item("U", PyArray1::from_vec(py, uv))?;
+    dict.set_item("VT", PyArray1::from_vec(py, vtv))?;
+    dict.set_item("K", to_i64(py, &kv))?;
+    dict.set_item("DIFL", PyArray1::from_vec(py, dlv))?;
+    dict.set_item("DIFR", PyArray1::from_vec(py, drv))?;
+    dict.set_item("Z", PyArray1::from_vec(py, zv))?;
+    dict.set_item("POLES", PyArray1::from_vec(py, plv))?;
+    dict.set_item("GIVPTR", to_i64(py, &gpv))?;
+    dict.set_item("GIVCOL", to_i64(py, &gcv))?;
+    dict.set_item("PERM", to_i64(py, &pv))?;
+    dict.set_item("GIVNUM", PyArray1::from_vec(py, gnv))?;
+    dict.set_item("C", PyArray1::from_vec(py, cv))?;
+    dict.set_item("S", PyArray1::from_vec(py, sv))?;
+    dict.set_item("INFO", info)?;
+    Ok(dict)
+}
+
+/// `DLALS0(ICOMPQ, NL, NR, SQRE, NRHS, B, LDB, BX, LDBX, PERM, GIVPTR, GIVCOL, LDGCOL, GIVNUM,
+/// LDGNUM, POLES, DIFL, DIFR, Z, K, C, S, WORK, INFO)`: one node's factor of the compact SVD
+/// applied to `b` (`ldb × nrhs`; `bx` `ldbx × nrhs` a work array)
+/// (`larmorx_transform::numpy_linalg::lasda::dlals0`). `perm`, `givcol` int64, 1-based; `givcol`,
+/// `givnum`, `poles`, `difr` flat column-major. Returns `(B, BX, INFO)`.
+#[pyfunction]
+#[allow(clippy::too_many_arguments)]
+fn lapack_dlals0<'py>(
+    py: Python<'py>,
+    icompq: usize,
+    nl: usize,
+    nr: usize,
+    sqre: usize,
+    nrhs: usize,
+    b: PyReadonlyArray1<'_, f64>,
+    ldb: usize,
+    bx: PyReadonlyArray1<'_, f64>,
+    ldbx: usize,
+    perm: PyReadonlyArray1<'_, i64>,
+    givptr: usize,
+    givcol: PyReadonlyArray1<'_, i64>,
+    ldgcol: usize,
+    givnum: PyReadonlyArray1<'_, f64>,
+    ldgnum: usize,
+    poles: PyReadonlyArray1<'_, f64>,
+    difl: PyReadonlyArray1<'_, f64>,
+    difr: PyReadonlyArray1<'_, f64>,
+    z: PyReadonlyArray1<'_, f64>,
+    k: usize,
+    c: f64,
+    s: f64,
+) -> PyResult<(F64s<'py>, F64s<'py>, i64)> {
+    let (mut bv, mut bxv) = (contiguous(&b)?.to_vec(), contiguous(&bx)?.to_vec());
+    let (pv, gcv) = (indices(&perm)?, indices(&givcol)?);
+    let gnv = contiguous(&givnum)?.to_vec();
+    let (plv, dlv) = (contiguous(&poles)?.to_vec(), contiguous(&difl)?.to_vec());
+    let (drv, zv) = (contiguous(&difr)?.to_vec(), contiguous(&z)?.to_vec());
+    let rows = nl + nr + 1 + sqre;
+    if nrhs > 0 && (bv.len() < ldb * (nrhs - 1) + rows || bxv.len() < ldbx * (nrhs - 1) + rows) {
+        return Err(short("DLALS0"));
+    }
+    let info = lapack_run(py, "DLALS0", 1, || {
+        lasda::dlals0(
+            icompq, nl, nr, sqre, nrhs, &mut bv, ldb, &mut bxv, ldbx, &pv, givptr, &gcv, ldgcol,
+            &gnv, ldgnum, &plv, &dlv, &drv, &zv, k, c, s,
+        )
+    })?
+    .map_err(|e| PyValueError::new_err(e.to_string()))?;
+    Ok((
+        PyArray1::from_vec(py, bv),
+        PyArray1::from_vec(py, bxv),
+        info,
+    ))
+}
+
+/// `DLALSA(ICOMPQ, SMLSIZ, N, NRHS, B, LDB, BX, LDBX, U, LDU, VT, K, DIFL, DIFR, Z, POLES, GIVPTR,
+/// GIVCOL, LDGCOL, PERM, GIVNUM, C, S, WORK, IWORK, INFO)`: [`lapack_dlasda`]'s compact SVD applied
+/// to `b` (`ldb × nrhs`), the result in `bx` (`ldbx × nrhs`)
+/// (`larmorx_transform::numpy_linalg::lasda::dlalsa`); the arrays as `lapack_dlasda` takes them.
+/// Returns `(B, BX, INFO)`.
+#[pyfunction]
+#[pyo3(signature = (icompq, smlsiz, n, nrhs, b, ldb, bx, ldbx, u, ldu, vt, k, difl, difr, z, poles, givptr, givcol, ldgcol, perm, givnum, c, s, n_threads = 1, gemm_q = 256))]
+#[allow(clippy::too_many_arguments)]
+fn lapack_dlalsa<'py>(
+    py: Python<'py>,
+    icompq: usize,
+    smlsiz: usize,
+    n: usize,
+    nrhs: usize,
+    b: PyReadonlyArray1<'_, f64>,
+    ldb: usize,
+    bx: PyReadonlyArray1<'_, f64>,
+    ldbx: usize,
+    u: PyReadonlyArray1<'_, f64>,
+    ldu: usize,
+    vt: PyReadonlyArray1<'_, f64>,
+    k: PyReadonlyArray1<'_, i64>,
+    difl: PyReadonlyArray1<'_, f64>,
+    difr: PyReadonlyArray1<'_, f64>,
+    z: PyReadonlyArray1<'_, f64>,
+    poles: PyReadonlyArray1<'_, f64>,
+    givptr: PyReadonlyArray1<'_, i64>,
+    givcol: PyReadonlyArray1<'_, i64>,
+    ldgcol: usize,
+    perm: PyReadonlyArray1<'_, i64>,
+    givnum: PyReadonlyArray1<'_, f64>,
+    c: PyReadonlyArray1<'_, f64>,
+    s: PyReadonlyArray1<'_, f64>,
+    n_threads: usize,
+    gemm_q: usize,
+) -> PyResult<(F64s<'py>, F64s<'py>, i64)> {
+    let (mut bv, mut bxv) = (contiguous(&b)?.to_vec(), contiguous(&bx)?.to_vec());
+    let (mut uv, mut vtv) = (contiguous(&u)?.to_vec(), contiguous(&vt)?.to_vec());
+    let (mut kv, mut gpv) = (indices(&k)?, indices(&givptr)?);
+    let (mut gcv, mut pv) = (indices(&givcol)?, indices(&perm)?);
+    let (mut dlv, mut drv) = (contiguous(&difl)?.to_vec(), contiguous(&difr)?.to_vec());
+    let (mut zv, mut plv) = (contiguous(&z)?.to_vec(), contiguous(&poles)?.to_vec());
+    let mut gnv = contiguous(&givnum)?.to_vec();
+    let (mut cv, mut sv) = (contiguous(&c)?.to_vec(), contiguous(&s)?.to_vec());
+    if nrhs > 0 && (bv.len() < ldb * (nrhs - 1) + n || bxv.len() < ldbx * (nrhs - 1) + n) {
+        return Err(short("DLALSA"));
+    }
+    let info = lapack_run(py, "DLALSA", n_threads, || {
+        let t = SvdTree {
+            u: &mut uv,
+            vt: &mut vtv,
+            k: &mut kv,
+            difl: &mut dlv,
+            difr: &mut drv,
+            z: &mut zv,
+            poles: &mut plv,
+            givptr: &mut gpv,
+            givcol: &mut gcv,
+            perm: &mut pv,
+            givnum: &mut gnv,
+            c: &mut cv,
+            s: &mut sv,
+        };
+        lasda::dlalsa(
+            gemm_q, icompq, smlsiz, n, nrhs, &mut bv, ldb, &mut bxv, ldbx, ldu, &t, ldgcol,
+        )
+    })?
+    .map_err(|e| PyValueError::new_err(e.to_string()))?;
+    Ok((
+        PyArray1::from_vec(py, bv),
+        PyArray1::from_vec(py, bxv),
+        info,
+    ))
+}
+
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_function(wrap_pyfunction!(lapack_dlasda, m)?)?;
+    m.add_function(wrap_pyfunction!(lapack_dlals0, m)?)?;
+    m.add_function(wrap_pyfunction!(lapack_dlalsa, m)?)?;
     m.add_function(wrap_pyfunction!(lapack_dlasd7, m)?)?;
     m.add_function(wrap_pyfunction!(lapack_dlasd8, m)?)?;
     m.add_function(wrap_pyfunction!(lapack_dlasd6, m)?)?;

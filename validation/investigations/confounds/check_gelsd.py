@@ -1,7 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
 """larmorx's minimum-norm least squares (``larmorx_transform::numpy_linalg::gelsd``: LAPACK's
-``DGELSD``, its bidiagonal solver ``DLALSD`` and ``DLASRT``, numpy's ``lstsq``, through
-``larmorx._core``) against numpy's own LAPACK and function, bit for bit.
+``DGELSD``, its bidiagonal solver ``DLALSD`` and ``DLASRT``, numpy's ``lstsq``;
+``larmorx_transform::numpy_linalg::lasda``: ``DLALSD``'s divide-and-conquer routines ``DLASD7``,
+``DLASD8``, ``DLASD6``, ``DLASDA``, ``DLALS0``, ``DLALSA``; through ``larmorx._core``) against
+numpy's own LAPACK and function, bit for bit.
 
 The references are the library inside the running environment's numpy wheel (its exported
 ``scipy_dgelsd_64_``, ``scipy_dlalsd_64_`` and ``scipy_dlasrt_64_``, called through ctypes as
@@ -11,12 +13,16 @@ LAPACK release follows from the OpenBLAS version (0.3.30: LAPACK 3.12.0, numpy 2
 later: 3.12.1, numpy 2.5.4), and larmorx is called with the same release.
 
 Run it like ``check_blas.py`` (whose runner, child processes, hang watchdog and helpers it
-reuses): under the Haswell kernels at one BLAS thread, in each kept environment. Only
-``DLALSD``'s path for a bidiagonal of at most 25 rows is ported (relay 2d-i), so every case has
-``min(m, n) <= 25``: then every routine ``DGELSD`` calls is unblocked (``DGEQRF``, ``DGELQF``,
-``DGEBRD``, ``DORMQR``, ``DORMLQ`` with fewer than 32 reflectors) and ``DLALSD``'s one product
-has a depth of at most 25, so numpy 2.5.4's undefined class at the AMD Zen 4 machine's ``GEMM_Q``
-512 (depth blocks above 298 steps) is never reached: every case is defined in both settings.
+reuses): under the Haswell kernels at one BLAS thread, in each kept environment. With
+``min(m, n) <= 32`` every routine ``DGELSD`` calls is unblocked (``DGEQRF``, ``DGELQF``,
+``DGEBRD``, ``DORMQR``, ``DORMLQ`` with at most 32 reflectors) and every product of ``DLALSD``
+(both paths) has a depth of at most 26, so numpy 2.5.4's undefined class at the AMD Zen 4
+machine's ``GEMM_Q`` 512 (depth blocks above 298 steps) is never reached. With ``min(m, n) > 32``
+and ``max(m, n) > 298`` (a superset of the cases whose blocked ``DORMQR``/``DORMLQ``, QR, LQ or
+bidiagonal reduction reach such a block) a case is counted in the "[undefined in the original]"
+tally at ``GEMM_Q`` 512; ``OPENBLAS_L2_SIZE=512`` keeps the library on the Haswell table's 256
+(every case defined). Cases with ``min(m, n) > 25`` (``DLALSD``'s divide-and-conquer path) carry
+"[DLALSD divide and conquer]" in their tallies.
 
 Sections and cases (seeded):
 
@@ -30,18 +36,36 @@ Sections and cases (seeded):
   ``LDB``) on random, graded, split, zero-diagonal, ``-0``, repeated, tiny, huge, identity and zero
   bidiagonals and the bidiagonals of random walks and low-rank matrices, with ``RCOND`` below 0,
   0, in ``(0, 1)``, 1, above 1 and NaN; ``NRHS = 0`` and a short ``LDB`` (``INFO = -4``, ``-8``);
+  the divide-and-conquer path (``N`` 26 to 416 with ``SMLSIZ`` 25, and 4 to 416 with ``SMLSIZ``
+  3, 4 and 10: deeper trees; the same kinds and the last row split off, pieces of 1, 2, 3, 12,
+  25, 26, 27, 30 and 40 rows, clustered, Toeplitz and Wilkinson bidiagonals), ``SMLSIZ < 3``
+  (``DLASDA``'s refusal, ``INFO = -2``);
 - ``gelsd``: ``DGELSD`` on every path (``M >= N`` with and without the QR step, ``M < N`` with and
   without the LQ step, the LQ step's ``L`` at leading dimension ``M`` or ``LDA``) at sizes on both
-  sides of ``MNTHR`` and of the leaf size 25, with padded ``LDA``/``LDB``, the workspaces that
+  sides of ``MNTHR``, of the leaf size 25, of the block size 32 and of the crossover 128 (up to
+  600 × 600 and 1,200 × 40), with padded ``LDA``/``LDB``, the workspaces that
   switch the paths (the optimal, the smallest, one between, one above the optimal, the LQ step's
   threshold and one below it, the ``LDA`` threshold), cosine designs, normal, low-rank,
   rank-deficient, graded, tiny, huge and subnormal (the scalings), zero, ``-0``, repeated-row and
   identity matrices, ``B`` normal, tiny, huge, zero, with a NaN or an infinity, every ``RCOND``
   form; ``NRHS = 0`` (``DLALSD``'s refusal), the empty shapes, the refused arguments; a NaN or an
   infinity in ``A`` refused by larmorx (the reference not run: LAPACK may loop forever);
+- ``lasda``: ``DLASDA`` (``ICOMPQ`` 0 and 1, ``SQRE`` 0 and 1, ``N`` 0 to 300, ``SMLSIZ`` 3, 4,
+  10 and 25, padded ``LDU`` and ``LDGCOL``, the bidiagonal kinds above; every array of the compact
+  form compared, the untouched entries included); ``N <= SMLSIZ`` (one ``DLASDQ`` on the ``U``
+  and ``VT`` given); ``ICOMPQ = 0`` with ``2 <= N <= SMLSIZ`` refused by larmorx
+  (``NotImplementedError``: ``DBDSQR``'s ``DLASQ1``, the dqds algorithm, is not ported); the
+  refused arguments;
+- ``lals0``: ``DLALS0`` (``ICOMPQ`` 0 and 1, ``SQRE`` 0 and 1, 1 to 33 right-hand sides) on the
+  factors the reference ``DLASD6`` makes of the merge kinds above and of merges with ``K = 1``;
+  the refused arguments;
+- ``lalsa``: ``DLALSA`` (``ICOMPQ`` 0 and 1, ``N`` 25 to 300, 1 to 257 right-hand sides) on the
+  trees the reference ``DLASDA`` makes; the refused arguments;
+- ``lasd7``, ``lasd8``, ``lasd6``: one merge (relay 2d-ii-a);
 - ``lstsq``: ``np.linalg.lstsq(a, b, rcond)``: nipype's ``cosine_filter`` calls (the discrete-cosine
   design of ``T`` volumes at ``TR`` with the 128 s cutoff, ``K`` 1 to 25, against fMRI-like float32
-  voxel series as ``data.T``: up to 600 × 11 with 60,968 voxels in the full tier), general shapes
+  voxel series as ``data.T``: up to 600 × 11 with 60,968 voxels in the full tier; designs of 26 to
+  52 columns, up to 600 × 26 with 60,968 voxels and 1,200 × 46), general shapes
   with C-, F-ordered and strided ``a`` and ``b``, a 1-D ``b``, no right-hand side, no rows, no
   columns, every ``rcond`` form, rank deficiency, a NaN or an infinity in ``b`` (no error), a NaN
   in ``a`` (``LinAlgError``), an infinity in ``a`` (``LinAlgError``; numpy 2.3.5 is not run on it:
@@ -49,7 +73,8 @@ Sections and cases (seeded):
   dimensions')``).
 
 Usage: ``OPENBLAS_CORETYPE=Haswell OPENBLAS_NUM_THREADS=1 PYTHONPATH=<repo>/python
-python -P check_gelsd.py [--quick] [--threads N] [--sections query,lasrt,lalsd,gelsd,lstsq]
+python -P check_gelsd.py [--quick] [--threads N] [--sections query,lasrt,lalsd,gelsd,lstsq,
+lasd7,lasd8,lasd6,lasda,lals0,lalsa]
 [--gemm-q auto] [--control] [--time]``. ``--control`` (quick tier, in-process) tells larmorx the
 other LAPACK release and counts the cases that then differ; ``--time`` times numpy and larmorx on
 the largest real call (600 × 11, 60,968 voxels).
@@ -119,15 +144,15 @@ def ref_dgelsd(m, n, nrhs, a, lda, b, ldb, rcond, lwork):
     return a, b, s[:k], rank.value, float(work[0]), int(iwork[0]), info.value
 
 
-def ref_dlalsd(uplo, n, nrhs, d, e, b, ldb, rcond):
+def ref_dlalsd(uplo, n, nrhs, d, e, b, ldb, rcond, smlsiz=SMLSIZ):
     """``(D, E, B, RANK, INFO)``."""
     d, e, b = d.copy(), e.copy(), b.copy()
-    lvl = nlvl(n)
-    work = nans(9 * n + 2 * n * SMLSIZ + 8 * n * lvl + n * max(nrhs, 1) + (SMLSIZ + 1) ** 2)
+    lvl = max(int(np.log(max(n, 1) / (smlsiz + 1)) / np.log(2.0)) + 1, 0) + 1
+    work = nans(9 * n + 2 * n * smlsiz + 8 * n * lvl + n * max(nrhs, 1) + (smlsiz + 1) ** 2)
     iwork = izeros(3 * n * lvl + 11 * n)
     rank, info = I64(-7), I64(0)
     LIB.scipy_dlalsd_64_(
-        *_c(uplo), *_i(SMLSIZ, n, nrhs), ptr(d), ptr(e), ptr(b), *_i(ldb), _d(rcond),
+        *_c(uplo), *_i(smlsiz, n, nrhs), ptr(d), ptr(e), ptr(b), *_i(ldb), _d(rcond),
         ctypes.byref(rank), ptr(work), iptr(iwork), ctypes.byref(info), *hidden(uplo),
     )  # fmt: skip
     return d, e, b, rank.value, info.value
@@ -256,8 +281,20 @@ def path(m: int, n: int, lwork: int, nrhs: int) -> str:
 
 
 def undefined(section: str, case: tuple) -> bool:
-    """No case reaches a depth block above the kernel's buffer (module documentation)."""
-    return False
+    """A superset of the cases whose blocked ``DORMQR``/``DORMLQ``, QR, LQ or bidiagonal reduction
+    reach a ``DGEMM`` depth block above the kernel's buffer, at ``GEMM_Q`` 512 only (module
+    documentation): ``min(m, n) > 32`` (more reflectors than one block) and ``max(m, n) > 298``."""
+    if cb.GEMM_Q <= cb.BUFFER_STEPS:
+        return False
+    if section == "gelsd":
+        m, n = case[0], case[1]
+    elif section == "lstsq" and case[0] == "general":
+        m, n = case[1], case[2]
+    elif section == "lstsq" and case[0] == "cosine":
+        m, n = case[1], cosine_design(case[1], case[2]).shape[1]
+    else:
+        return False
+    return min(m, n) > 32 and max(m, n) > cb.BUFFER_STEPS
 
 
 def rcond_value(spec: str, m: int, n: int) -> float:
@@ -382,28 +419,86 @@ def lalsd_cases(quick: bool) -> list[tuple]:
                     out.append((uplo, n, nrhs, kind, rc))
     out += [("U", 4, 0, "normal", "minus1"), ("L", 5, 0, "normal", "minus1")]
     out += [("U", 4, 2, "error-ldb", "minus1"), ("L", 6, 3, "error-ldb", "minus1")]
+    # The divide-and-conquer path (relay 2d-ii-b): N > SMLSIZ, DGELSD's 25 and smaller leaves.
+    large = LALSD_LARGE_N if not quick else [26, 30, 52, 53, 104, 105, 150]
+    for i, n in enumerate(large):
+        for uplo in "UL":
+            for j, kind in enumerate(LALSD_LARGE_KINDS):
+                if quick and (i + j) % 2:
+                    continue
+                nrhs = (1, 2, 3, 7, 33)[(i + j) % 5]
+                rc = RCONDS[(i + 2 * j) % len(RCONDS)]
+                smlsiz = SMLSIZES[(i + j + (uplo == "L")) % len(SMLSIZES)]
+                out.append((uplo, n, nrhs, kind, rc, smlsiz))
+    for i, n in enumerate((4, 5, 7, 8, 9, 12, 17, 20)):
+        for j, kind in enumerate(("normal", "split", "blocks", "lastsplit", "randomwalk")):
+            if quick and (i + j) % 3:
+                continue
+            out.append(("UL"[(i + j) % 2], n, (1, 3, 7)[j % 3], kind, RCONDS[(i + j) % len(RCONDS)], 3))  # fmt: skip
+    # SMLSIZ < 3: DLASDA's refusal (INFO = -2) once a piece has more rows than SMLSIZ.
+    out += [("U", 10, 2, "normal", "minus1", 2), ("L", 12, 1, "normal", "minus1", 1)]
     return out
 
 
+LALSD_LARGE_N = [26, 27, 30, 40, 51, 52, 53, 64, 100, 103, 104, 105, 150, 207, 208, 209, 300, 415, 416]  # fmt: skip
+LALSD_LARGE_KINDS = (
+    *LALSD_KINDS,
+    "lastsplit",
+    "blocks",
+    "periodic",
+    "clustered",
+    "toeplitz",
+    "wilkinson",
+)
+
+
+def lalsd_bidiagonal(rng, n: int, kind: str) -> tuple[np.ndarray, np.ndarray]:
+    """``cs.bidiagonal``'s kinds, ``blocks`` (zeros in ``E`` that split the bidiagonal into pieces
+    of 1, 30, 1, 2, 12, 27, 25, 26, 3 and 40 rows, in turn) and ``periodic`` (``D`` and ``E``
+    repeating every 13 entries: subproblems with equal singular values, deflated as close)."""
+    if kind == "periodic":
+        rd, re = rng.standard_normal(13), rng.standard_normal(13)
+        return rd[np.arange(n) % 13].copy(), re[np.arange(max(n - 1, 0)) % 13].copy()
+    if kind != "blocks":
+        return cs.bidiagonal(rng, n, kind)
+    d, e = rng.standard_normal(n), rng.standard_normal(max(n - 1, 0))
+    sizes = (1, 30, 1, 2, 12, 27, 25, 26, 3, 40)
+    pos, t = 0, 0
+    while True:
+        pos += sizes[t % len(sizes)]
+        t += 1
+        if pos >= n:
+            break
+        e[pos - 1] = (0.0, -0.0, 1e-17)[t % 3]
+    return d, e
+
+
 def lalsd_run(cid: int, case: tuple, threads: int, core) -> list[tuple[bool, str]]:
-    uplo, n, nrhs, kind, rc = case
+    uplo, n, nrhs, kind, rc, *rest = case
+    smlsiz = rest[0] if rest else SMLSIZ
     rng = np.random.default_rng([73, cid])
-    d, e = cs.bidiagonal(rng, n, "normal" if kind == "error-ldb" else kind)
+    d, e = lalsd_bidiagonal(rng, n, "normal" if kind == "error-ldb" else kind)
     e = np.concatenate([e, [0.0]])  # E has N - 1 entries; one more keeps the array non-empty
     ldb = max(n, 1) + cid % 3
     if kind == "error-ldb":
         ldb = n - 1
     b = rng.standard_normal((max(ldb, n) + 1) * max(nrhs, 1))
     rcond = rcond_value(rc, n, n)
-    want = ref_dlalsd(uplo, n, nrhs, d, e, b, ldb, rcond)
-    got = core.lapack_dlalsd(uplo, SMLSIZ, n, nrhs, d, e, b, ldb, rcond, LAPACK, threads, cb.GEMM_Q)
-    if want[-1] < 0:
+    want = ref_dlalsd(uplo, n, nrhs, d, e, b, ldb, rcond, smlsiz)
+    got = core.lapack_dlalsd(uplo, smlsiz, n, nrhs, d, e, b, ldb, rcond, LAPACK, threads, cb.GEMM_Q)
+    if want[-1] < 0 and smlsiz >= 3:
         # XERBLA's refusals: nothing done, RANK not set.
         return [(want[-1] == got[-1], "dlalsd refused arguments (INFO)")]
     ok = want[3] == got[3] and want[4] == got[4]
     ok &= same(want[0][:n], got[0][:n]) and same(want[2], got[2])
     ok &= same(want[1][: max(n - 1, 0)], got[1][: max(n - 1, 0)])
-    return [(ok, f"dlalsd {uplo}")]
+    if smlsiz < 3:
+        return [(ok and want[4] == -2, "dlalsd SMLSIZ < 3 (DLASDA's refusal, INFO = -2)")]
+    if n <= smlsiz:
+        return [(ok, f"dlalsd {uplo}")]
+    return [
+        (ok, f"dlalsd {uplo} divide and conquer" + ("" if smlsiz == SMLSIZ else " (SMLSIZ < 25)"))
+    ]
 
 
 # --- section gelsd ----------------------------------------------------------------------------
@@ -428,7 +523,23 @@ def gelsd_shapes(quick: bool) -> list[tuple[int, int]]:
     out += [(63, 1), (10, 1), (164, 5), (240, 7), (280, 4), (597, 7), (600, 11), (210, 9)]
     if not quick:
         out += [(600, 25), (25, 600), (300, 20)]
+    # DLALSD's divide-and-conquer path (relay 2d-ii-b): min(m, n) > 25, the blocked QR, LQ and
+    # DORMQR/DORMLQ above 32 reflectors, the blocked bidiagonal reduction above 128.
+    for k in (26, 33, 52) if quick else LARGE_K:
+        thr = mnthr(k, k)
+        longs = (
+            {k, thr, 2 * k + 5} if quick else {k, k + 1, thr - 1, thr, thr + 1, 2 * k + 5, 3 * k}
+        )
+        for big in sorted(longs):
+            out.append((big, k))
+            if big != k:
+                out.append((k, big))
+    if not quick:
+        out += [(600, 300), (300, 600), (600, 600), (1200, 40), (40, 1200), (600, 26)]
     return out
+
+
+LARGE_K = [26, 27, 32, 33, 40, 52, 53, 100, 129, 200]
 
 
 def gelsd_cases(quick: bool) -> list[tuple]:
@@ -523,7 +634,12 @@ def gelsd_run(cid: int, case: tuple, threads: int, core) -> list[tuple[bool, str
         tag = f"dgelsd path {path(m, n, eff, nrhs)}"
         if lw in ("lda-edge", "lda-edge-1") and tag.endswith("(LQ)"):
             tag += " L at LDA" if lw == "lda-edge" else " L at M"
+        if min(m, n) > SMLSIZ:
+            tag += DC
     return [(ok, tag)]
+
+
+DC = " [DLALSD divide and conquer]"
 
 
 # --- section lstsq ----------------------------------------------------------------------------
@@ -574,6 +690,14 @@ def lstsq_cases(quick: bool) -> list[tuple]:
         out += [("cosine", 600, 0.8, 60_968), ("cosine", 280, 2.0, 60_968), ("cosine", 588, 2.0, 30_453)]  # fmt: skip
         # Designs of 12 to 24 columns (longer or slower series than fMRIPrep's runs: TR 2.5 s).
         out += [("cosine", -(-128 * k // 5), 2.5, 300) for k in range(12, 25)]
+        # More than 25 columns: DLALSD's divide-and-conquer path (relay 2d-ii-b), up to
+        # CompCor-like voxel counts.
+        out += [
+            ("cosine", -(-128 * k // 5), 2.5, (300, 1_000)[k % 2]) for k in (26, 27, 30, 33, 40, 52)
+        ]
+        out += [("cosine", 600, 2.8, 60_968), ("cosine", 900, 2.0, 30_453), ("cosine", 1200, 2.5, 8_740)]  # fmt: skip
+    else:
+        out += [("cosine", -(-128 * k // 5), 2.5, 300) for k in (26, 33)]
     shapes = gelsd_shapes(quick)
     layouts = ("C", "F", "strided")
     for i, (m, n) in enumerate(shapes):
@@ -615,11 +739,13 @@ def lstsq_run(cid: int, case: tuple, threads: int, core) -> list[tuple[bool, str
         rc = None
         tag = f"lstsq cosine_filter K {a.shape[1]}"
         kind = "normal"
+        m, n = a.shape
     elif case[0] == "mismatch":
         _, m, n, nrhs = case
         a, b64, rc, kind = rng.standard_normal((m, n)), rng.standard_normal((m - 1, nrhs)), None, ""
         b = b64
         tag = "lstsq mismatched rows (LinAlgError)"
+        m = 0
     else:
         _, m, n, nrhs, kind, bk, layout, rcs = case
         a = laid_out(amatrix(rng, m, n, kind), layout)
@@ -638,6 +764,8 @@ def lstsq_run(cid: int, case: tuple, threads: int, core) -> list[tuple[bool, str
             tag = "lstsq no right-hand side"
         if kind in ("nan", "inf"):
             tag = f"lstsq {kind} in a (LinAlgError)"
+    if min(m, n) > SMLSIZ:
+        tag += DC
     got = outcome(lambda: core.numpy_lstsq(a, b64, rc, LAPACK, threads, cb.GEMM_Q))
     if kind == "inf" and not NUMPY_CHECKS_FINITE:
         return [(got[0] == "LinAlgError" and got[1] == "SVD did not converge in Linear Least Squares", tag + " (numpy 2.3.5 not run: it may hang)")]  # fmt: skip
@@ -855,6 +983,329 @@ def lasd6_run(cid: int, case: tuple, threads: int, core) -> list[tuple[bool, str
     return [(dict_same(want, got), f"dlasd6 icompq {icompq} sqre {sqre}")]
 
 
+# --- sections lasda, lals0, lalsa: DLASDA's tree and its solves (relay 2d-ii-b) ---------------
+
+TREE_KINDS = (
+    "normal",
+    "graded",
+    "split",
+    "lastsplit",
+    "zero-d",
+    "clustered",
+    "repeated",
+    "tiny",
+    "huge",
+    "toeplitz",
+    "wilkinson",
+    "randomwalk",
+    "lowrank",
+    "identity",
+    "neg-zero",
+    "positive",
+    "blocks",
+    "periodic",
+)
+
+
+def tree_cols(n: int, smlsiz: int) -> int:
+    """A safe number of tree levels for the arrays (one more than DLASDT's depth)."""
+    return max(int(np.log(max(n, 1) / (smlsiz + 1)) / np.log(2.0)) + 1, 0) + 1
+
+
+def tree_arrays(n: int, ldu: int, ldgcol: int, smlsiz: int) -> dict:
+    """DLASDA's output arrays, real ones NaN and integer ones zero (column-major)."""
+    lv = tree_cols(n, smlsiz)
+    return {
+        "U": nans(ldu * smlsiz), "VT": nans(ldu * (smlsiz + 1)), "K": izeros(n),
+        "DIFL": nans(ldu * lv), "DIFR": nans(ldu * 2 * lv), "Z": nans(ldu * lv),
+        "POLES": nans(ldu * 2 * lv), "GIVPTR": izeros(n), "GIVCOL": izeros(ldgcol * 2 * lv),
+        "PERM": izeros(ldgcol * lv), "GIVNUM": nans(ldu * 2 * lv), "C": nans(n), "S": nans(n),
+    }  # fmt: skip
+
+
+TREE_KEYS = ("U", "VT", "K", "DIFL", "DIFR", "Z", "POLES", "GIVPTR", "GIVCOL", "PERM", "GIVNUM", "C", "S")  # fmt: skip
+
+
+def ref_dlasda(icompq, smlsiz, n, sqre, d, e, ldu, ldgcol, arrays):
+    """A dict of ``DLASDA``'s outputs (``D``, ``E``, the tree's arrays, ``INFO``)."""
+    d, e = d.copy(), e.copy()
+    a = {key: v.copy() for key, v in arrays.items()}
+    m = n + sqre
+    work = nans(6 * (m + 1) + (smlsiz + 1) ** 2 + 16)
+    iwork = izeros(7 * n + 16)
+    info = I64(0)
+    LIB.scipy_dlasda_64_(
+        *_i(icompq, smlsiz, n, sqre), ptr(d), ptr(e), ptr(a["U"]), *_i(ldu), ptr(a["VT"]),
+        iptr(a["K"]), ptr(a["DIFL"]), ptr(a["DIFR"]), ptr(a["Z"]), ptr(a["POLES"]),
+        iptr(a["GIVPTR"]), iptr(a["GIVCOL"]), *_i(ldgcol), iptr(a["PERM"]), ptr(a["GIVNUM"]),
+        ptr(a["C"]), ptr(a["S"]), ptr(work), iptr(iwork), ctypes.byref(info),
+    )  # fmt: skip
+    return {"D": d, "E": e, **a, "INFO": info.value}
+
+
+def our_dlasda(core, icompq, smlsiz, n, sqre, d, e, ldu, ldgcol, a):
+    return core.lapack_dlasda(
+        icompq, smlsiz, n, sqre, d, e, a["U"], ldu, a["VT"], a["K"], a["DIFL"], a["DIFR"], a["Z"],
+        a["POLES"], a["GIVPTR"], a["GIVCOL"], ldgcol, a["PERM"], a["GIVNUM"], a["C"], a["S"],
+        LAPACK,
+    )  # fmt: skip
+
+
+def ref_dlals0(icompq, nl, nr, sqre, nrhs, b, ldb, bx, ldbx, perm, givptr, givcol, ldgcol, givnum,
+               ldgnum, poles, difl, difr, z, k, c, s):  # fmt: skip
+    b, bx = b.copy(), bx.copy()
+    work, info = nans(max(k, 1)), I64(0)
+    LIB.scipy_dlals0_64_(
+        *_i(icompq, nl, nr, sqre, nrhs), ptr(b), *_i(ldb), ptr(bx), *_i(ldbx), iptr(perm),
+        *_i(givptr), iptr(givcol), *_i(ldgcol), ptr(givnum), *_i(ldgnum), ptr(poles), ptr(difl),
+        ptr(difr), ptr(z), *_i(k), _d(c), _d(s), ptr(work), ctypes.byref(info),
+    )  # fmt: skip
+    return b, bx, info.value
+
+
+def ref_dlalsa(icompq, smlsiz, n, nrhs, b, ldb, bx, ldbx, ldu, ldgcol, a):
+    b, bx = b.copy(), bx.copy()
+    work, iwork, info = nans(n + 16), izeros(3 * n + 16), I64(0)
+    LIB.scipy_dlalsa_64_(
+        *_i(icompq, smlsiz, n, nrhs), ptr(b), *_i(ldb), ptr(bx), *_i(ldbx), ptr(a["U"]), *_i(ldu),
+        ptr(a["VT"]), iptr(a["K"]), ptr(a["DIFL"]), ptr(a["DIFR"]), ptr(a["Z"]), ptr(a["POLES"]),
+        iptr(a["GIVPTR"]), iptr(a["GIVCOL"]), *_i(ldgcol), iptr(a["PERM"]), ptr(a["GIVNUM"]),
+        ptr(a["C"]), ptr(a["S"]), ptr(work), iptr(iwork), ctypes.byref(info),
+    )  # fmt: skip
+    return b, bx, info.value
+
+
+def our_dlalsa(core, icompq, smlsiz, n, nrhs, b, ldb, bx, ldbx, ldu, ldgcol, a, threads):
+    return core.lapack_dlalsa(
+        icompq, smlsiz, n, nrhs, b, ldb, bx, ldbx, a["U"], ldu, a["VT"], a["K"], a["DIFL"],
+        a["DIFR"], a["Z"], a["POLES"], a["GIVPTR"], a["GIVCOL"], ldgcol, a["PERM"], a["GIVNUM"],
+        a["C"], a["S"], threads, cb.GEMM_Q,
+    )  # fmt: skip
+
+
+def tree_bidiagonal(rng, n: int, sqre: int, kind: str) -> tuple[np.ndarray, np.ndarray]:
+    """``(d, e)`` with ``n`` and ``n - 1 + sqre`` values (``e`` never empty)."""
+    d, e = lalsd_bidiagonal(rng, n, kind)
+    if sqre:
+        e = np.concatenate([e, rng.standard_normal(1)])
+    return d, np.concatenate([e, [0.0]])
+
+
+LASDA_N = [
+    0,
+    1,
+    2,
+    3,
+    5,
+    12,
+    25,
+    26,
+    27,
+    40,
+    51,
+    52,
+    53,
+    77,
+    103,
+    104,
+    105,
+    150,
+    207,
+    208,
+    209,
+    300,
+]
+SMLSIZES = (25, 25, 3, 4, 10, 25)
+
+
+def lasda_cases(quick: bool) -> list[tuple]:
+    out: list[tuple] = []
+    for i, n in enumerate(LASDA_N):
+        for sqre in (0, 1):
+            for icompq in (0, 1):
+                for j, kind in enumerate(TREE_KINDS):
+                    if quick and (i + j + sqre + icompq) % 4:
+                        continue
+                    smlsiz = SMLSIZES[(i + j) % len(SMLSIZES)]
+                    out.append((icompq, smlsiz, n, sqre, kind))
+    out += [("error", 2, 25, 30, 0), ("error", 1, 2, 30, 0), ("error", 1, 25, 30, 2)]
+    out += [("error", 1, 25, 30, "ldu"), ("error", 0, 25, 30, "ldgcol")]
+    return out
+
+
+def lasda_run(cid: int, case: tuple, threads: int, core) -> list[tuple[bool, str]]:
+    rng = np.random.default_rng([97, cid])
+    if case[0] == "error":
+        _, icompq, smlsiz, n, sqre = case
+        ldu, ldgcol = n + 1, n
+        if sqre == "ldu":
+            sqre, ldu = 0, n - 1
+        elif sqre == "ldgcol":
+            sqre, ldgcol = 0, n - 1
+        d, e = tree_bidiagonal(rng, n, 0, "normal")
+        a = tree_arrays(n, max(ldu, n + 1), max(ldgcol, n), max(smlsiz, 3))
+        want = ref_dlasda(icompq, smlsiz, n, sqre, d, e, ldu, ldgcol, a)
+        return illegal(want["INFO"], lambda: our_dlasda(core, icompq, smlsiz, n, sqre, d, e, ldu, ldgcol, a), "dlasda")  # fmt: skip
+    icompq, smlsiz, n, sqre, kind = case
+    m = n + sqre
+    ldu, ldgcol = max(m, 1) + cid % 3, max(n, 1) + (cid // 3) % 2
+    d, e = tree_bidiagonal(rng, n, sqre, kind)
+    a = tree_arrays(n, ldu, ldgcol, smlsiz)
+    if n <= smlsiz and icompq == 1:
+        # DLASDQ's rotations are applied to U and VT as given.
+        a["U"][: ldu * n] = rng.standard_normal(ldu * n)
+        a["VT"][: ldu * m] = rng.standard_normal(ldu * m)
+    if icompq == 0 and 2 <= n <= smlsiz:
+        # The values alone: LAPACK's DBDSQR goes through DLASQ1 (dqds), not ported.
+        try:
+            our_dlasda(core, icompq, smlsiz, n, sqre, d, e, ldu, ldgcol, a)
+            ok = False
+        except NotImplementedError as err:
+            ok = "DLASQ1" in str(err)
+        return [(ok, "dlasda icompq 0 leaf: values alone refused (DLASQ1 not ported)")]
+    want = ref_dlasda(icompq, smlsiz, n, sqre, d, e, ldu, ldgcol, a)
+    got = our_dlasda(core, icompq, smlsiz, n, sqre, d, e, ldu, ldgcol, a)
+    ok = want["INFO"] == got["INFO"] and same(want["D"][:n], got["D"][:n])
+    ok &= same(want["E"][: max(m - 1, 0)], got["E"][: max(m - 1, 0)])
+    for key in TREE_KEYS:
+        ok &= same(np.asarray(want[key], dtype=float), np.asarray(got[key], dtype=float))
+    path = "leaf (DLASDQ)" if n <= smlsiz else "tree"
+    return [(ok, f"dlasda icompq {icompq} sqre {sqre} {path}")]
+
+
+LALS0_SIZES = [(1, 1), (1, 2), (2, 1), (3, 3), (5, 8), (12, 12), (13, 12), (25, 26), (40, 30), (100, 100)]  # fmt: skip
+LALS0_KINDS = (*MERGE_KINDS, "k1")
+
+
+def lals0_cases(quick: bool) -> list[tuple]:
+    out: list[tuple] = []
+    for i, (nl, nr) in enumerate(LALS0_SIZES):
+        for sqre in (0, 1):
+            for icompq in (0, 1):
+                for j, kind in enumerate(LALS0_KINDS):
+                    if quick and (i + j + sqre) % 2:
+                        continue
+                    nrhs = (1, 2, 3, 7, 33)[(i + j + icompq) % 5]
+                    out.append((icompq, nl, nr, sqre, kind, nrhs))
+    for e in ("nrhs", "ldb", "ldbx", "ldgcol", "ldgnum", "k", "icompq"):
+        out.append(("error", e))
+    return out
+
+
+def merge_tree(cid: int, nl: int, nr: int, sqre: int, kind: str):
+    """One merge's factors as the reference ``DLASD6(ICOMPQ = 1)`` makes them."""
+    rng = np.random.default_rng([101, cid])
+    n = nl + nr + 1
+    m = n + sqre
+    d, idxq, vf, vl, alpha, beta = merge_inputs(rng, nl, nr, sqre, "normal" if kind == "k1" else kind)  # fmt: skip
+    if kind == "k1":
+        # Every Z entry but the first deflated: K = 1 (Z(1) of either sign).
+        vl[:nl] *= 1e-30
+        vf[nl + 1 :] *= 1e-30
+    ldgcol, ldgnum = n + cid % 2, n + (cid // 2) % 3
+    perm, givcol = np.zeros(n, dtype=np.int64), np.zeros(2 * ldgcol, dtype=np.int64)
+    givnum, poles, difl, difr, z = nans(2 * ldgnum), nans(2 * ldgnum), nans(n), nans(2 * ldgnum), nans(m)  # fmt: skip
+    out = ref_dlasd6(1, nl, nr, sqre, d, vf, vl, alpha, beta, idxq, perm, givcol, ldgcol, givnum, ldgnum, poles, difl, difr, z, 0, float(rng.standard_normal()), float(rng.standard_normal()))  # fmt: skip
+    return rng, n, m, ldgcol, ldgnum, out
+
+
+def lals0_run(cid: int, case: tuple, threads: int, core) -> list[tuple[bool, str]]:
+    if case[0] == "error":
+        icompq, nl, nr, sqre, nrhs, err = 0, 5, 4, 1, 2, case[1]
+    else:
+        icompq, nl, nr, sqre, kind, nrhs = case
+        err = None
+    rng, n, m, ldgcol, ldgnum, f = merge_tree(cid, nl, nr, sqre, "normal" if err else kind)
+    if f["INFO"] != 0:
+        return [(True, "dlals0 skipped (DLASD6 did not converge)")]
+    ldb, ldbx = m + cid % 3, m + (cid // 3) % 2
+    k, lgc, lgn = f["K"], ldgcol, ldgnum
+    if err == "nrhs":
+        nrhs = 0
+    elif err == "ldb":
+        ldb = n - 1
+    elif err == "ldbx":
+        ldbx = n - 1
+    elif err == "ldgcol":
+        lgc = n - 1
+    elif err == "ldgnum":
+        lgn = n - 1
+    elif err == "k":
+        k = 0
+    elif err == "icompq":
+        icompq = 2
+    b = rng.standard_normal(max(ldb, m) * max(nrhs, 1) + 3)
+    bx = nans(max(ldbx, m) * max(nrhs, 1) + 3)
+    args = (icompq, nl, nr, sqre, nrhs, b, ldb, bx, ldbx, f["PERM"], f["GIVPTR"], f["GIVCOL"], lgc, f["GIVNUM"], lgn, f["POLES"], f["DIFL"], f["DIFR"], f["Z"], k, f["C"], f["S"])  # fmt: skip
+    want = ref_dlals0(*args)
+    if err:
+        return illegal(want[-1], lambda: core.lapack_dlals0(*args), "dlals0")
+    got = core.lapack_dlals0(*args)
+    ok = want[2] == got[2] and same(want[0], got[0]) and same(want[1], got[1])
+    tag = f"dlals0 icompq {icompq} sqre {sqre}" + (" K = 1" if k == 1 else "")
+    return [(ok, tag)]
+
+
+LALSA_N = [25, 26, 27, 40, 51, 52, 53, 77, 103, 104, 105, 150, 207, 208, 209, 300]
+
+
+def lalsa_cases(quick: bool) -> list[tuple]:
+    out: list[tuple] = []
+    for i, n in enumerate(LALSA_N):
+        for icompq in (0, 1):
+            for j, kind in enumerate(TREE_KINDS):
+                if quick and (i + j + icompq) % 4:
+                    continue
+                smlsiz = SMLSIZES[(i + j) % len(SMLSIZES)]
+                if n <= smlsiz:
+                    smlsiz = 3 + (i + j) % 8
+                nrhs = (1, 2, 3, 7, 33, 257)[(i + j + icompq) % 6]
+                out.append((icompq, smlsiz, n, nrhs, kind))
+    for e in ("n", "nrhs", "ldb", "ldbx", "ldu", "ldgcol", "smlsiz"):
+        out.append(("error", e))
+    return out
+
+
+def lalsa_run(cid: int, case: tuple, threads: int, core) -> list[tuple[bool, str]]:
+    rng = np.random.default_rng([103, cid])
+    if case[0] == "error":
+        icompq, smlsiz, n, nrhs, kind, err = 1, 25, 40, 2, "normal", case[1]
+    else:
+        icompq, smlsiz, n, nrhs, kind = case
+        err = None
+    ldu, ldgcol = n + cid % 3, n + (cid // 3) % 2
+    d, e = tree_bidiagonal(rng, n, 0, kind)
+    a = tree_arrays(n, ldu, ldgcol, smlsiz)
+    tree = ref_dlasda(1, smlsiz, n, 0, d, e, ldu, ldgcol, a)
+    if tree["INFO"] != 0:
+        return [(True, "dlalsa skipped (DLASDA did not converge)")]
+    a = {key: tree[key] for key in TREE_KEYS}
+    ldb, ldbx = n + (cid // 2) % 3, n + cid % 2
+    nn, sm, lu, lg = n, smlsiz, ldu, ldgcol
+    if err == "n":
+        nn = smlsiz - 1
+    elif err == "nrhs":
+        nrhs = 0
+    elif err == "ldb":
+        ldb = n - 1
+    elif err == "ldbx":
+        ldbx = n - 1
+    elif err == "ldu":
+        lu = n - 1
+    elif err == "ldgcol":
+        lg = n - 1
+    elif err == "smlsiz":
+        sm = 2
+    b = rng.standard_normal(max(ldb, n) * max(nrhs, 1) + 3)
+    bx = nans(max(ldbx, n) * max(nrhs, 1) + 3)
+    want = ref_dlalsa(icompq, sm, nn, nrhs, b, ldb, bx, ldbx, lu, lg, a)
+    if err:
+        return illegal(want[-1], lambda: our_dlalsa(core, icompq, sm, nn, nrhs, b, ldb, bx, ldbx, lu, lg, a, threads), "dlalsa")  # fmt: skip
+    got = our_dlalsa(core, icompq, smlsiz, n, nrhs, b, ldb, bx, ldbx, ldu, ldgcol, a, threads)
+    ok = want[2] == got[2] and same(want[0], got[0]) and same(want[1], got[1])
+    return [(ok, f"dlalsa icompq {icompq}")]
+
+
 SECTIONS = {
     "query": ("dgelsd query", query_cases, query_run),
     "lasrt": ("dlasrt", lasrt_cases, lasrt_run),
@@ -864,6 +1315,9 @@ SECTIONS = {
     "lasd7": ("dlasd7", merge_cases, lasd7_run),
     "lasd8": ("dlasd8", merge_cases, lasd8_run),
     "lasd6": ("dlasd6", merge_cases, lasd6_run),
+    "lasda": ("dlasda", lasda_cases, lasda_run),
+    "lals0": ("dlals0", lals0_cases, lals0_run),
+    "lalsa": ("dlalsa", lalsa_cases, lalsa_run),
 }
 
 

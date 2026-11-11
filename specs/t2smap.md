@@ -288,8 +288,12 @@ Every observable step, in tedana's order (the messages' texts and prefixes are i
    directory: `.` and `..` resolved textually, symbolic links kept) and created if it does not
    exist (one level: a missing parent is `FileNotFoundError: [Errno 2] No such file or
    directory: '<abs>'`, exit 1, before any message).
-2. `--exclude` is parsed (§5.2); its errors stop the run here, before any message (the output
-   directory exists by then) (observed).
+2. `--exclude` is parsed (§5.2); its errors stop the run here, before any message. The output
+   directory **exists** by then: step 1 made it, and it stays, empty (observed: tedana's program
+   run directly, 2026-11-11, with each of §5.2's four errors). The oracle-output cache records
+   the files a run writes, not its directories, so a run it replays shows no empty directory: a
+   cached run cannot observe this step (a black-box report of "no output directory" here came
+   from such a run).
 3. The log starts (§12.1): INFO `Using output directory: <abs>`.
 4. `<out>/t2smap_call.sh` is written (§11.6).
 5. With `--fitmode ts` and a non-empty `--exclude`: `ValueError: Excluding volumes is not
@@ -560,16 +564,37 @@ float64, the same echo-major order; xdata the matching echo times), with
   `tr_solver="exact"` (a dense SVD of the scaled Jacobian); `ftol = xtol = gtol = 1e-8`; at most
   `max_nfev` = 200 evaluations (100 per parameter).
 
-A voxel's fit **fails**, keeping its log-linear S0 and T2*, when SciPy raises: samples not finite
-(numpy's `ValueError: array must not contain infs or NaNs`, checked first), bounds that are not strictly ordered (`Each lower bound must
-be strictly less than each upper bound.`: an infinite smallest sample), a start outside the bounds
-(a log-linear S0 below the voxel's smallest sample, a T2* < 0, or a NaN start: `Initial guess is
-outside of provided bounds`; most failures on real data are this: TED-06), residuals not finite at
-the start (`Residuals are not finite in the initial point.`), or no convergence within 200
-evaluations (`RuntimeError: Optimal parameters not found: The maximum number of function
-evaluations is exceeded.`); a start on a bound (T2* = 0) is first moved strictly inside. tedana
-catches each of these, marks the voxel in the failures map and goes on. Otherwise S0 and T2* are
-the fit's.
+A voxel's fit **fails**, keeping its log-linear S0 and T2*, when SciPy raises a `ValueError` or
+a `RuntimeError`; SciPy 1.18.1 checks, in this order (2 to 4 and the move below observed with
+SciPy 1.18.1 itself, a permissive library: `validation/investigations/t2smap-original/
+scipy_edges.py`, 2026-11-11):
+
+1. samples not finite: `ValueError: array must not contain infs or NaNs` (numpy's finiteness
+   check of the samples, first). The bounds are therefore always strictly ordered (the smallest
+   sample is finite, the upper bounds +∞): SciPy's `Each lower bound must be strictly less than
+   each upper bound.` is not reached on this path;
+2. a start outside the bounds: a log-linear S0 below the voxel's smallest sample, a T2* < 0 (−∞,
+   from β1 = −0, included) or a NaN start: `ValueError: Initial guess is outside of provided
+   bounds` (most failures on real data are this: TED-06);
+3. residuals not finite at the start (an S0 start of +∞): `ValueError: Residuals are not finite in
+   the initial point.`;
+4. a T2* start of **+∞** (β1 = +0, §7.2): inside the bounds, but the forward-difference Jacobian
+   is NaN there and the first iteration's SVD refuses it with the samples' text, `ValueError: array
+   must not contain infs or NaNs`;
+5. no convergence within 200 evaluations: `RuntimeError: Optimal parameters not found: The maximum
+   number of function evaluations is exceeded.`
+
+Before iterating, a start within 1e-10 · max(1, |lb|) of its lower bound lb (either parameter:
+a T2* start ≤ 1e-10 ms, 0 and −0 included, or an S0 start that close above the smallest sample)
+is moved to lb + 1e-10 · max(1, |lb|) (observed: a T2* start of 0 or 5e-11 converges at once at
+T2* = 1e-10 ms, which §8's underflow floor then replaces). tedana catches each failure, marks the
+voxel in the failures map (§7.5, TED-08) and goes on, printing nothing for it but §7.3's DEBUG
+count. Otherwise S0 and T2* are the fit's (a very large finite start, such as T2* = 1e300 ms,
+is no failure: the fit leaves that T2* as it is and fits S0 alone, observed). A voxel with **no sample** (no volume
+used: TED-16, or TED-13's dummy scans) is not a failure: the bound of its smallest sample stops
+the run before its fit, `ValueError: zero-size array to reduction operation minimum which has no
+identity` (observed: `--masktype none --exclude 0:6 --fittype curvefit`, after the log-linear
+fit's `divide by zero` warning).
 
 The **covariance** (for `--verbose`): from the final Jacobian J (m × 2) by SVD, singular values
 below eps · max(m, 2) · s_max dropped, P = V diag(1/s²) Vᵀ (the pseudo-inverse of JᵀJ), times
@@ -580,7 +605,10 @@ of T2* P[1, 1], the covariance P[0, 1]; tedana writes P[0, 0] as the T2* varianc
 the S0 variance (TED-07). Failed voxels have 0 in all three.
 
 Per group, with `--debug`: DEBUG `With <n> echoes, monoexponential fit failed on <f>/<N>
-(<100f/N with 2 decimals>%) voxel(s), used log linear estimate instead` when f > 0. tedana prints a
+(<100f/N with 2 decimals>%) voxel(s), used log linear estimate instead` when f > 0; N is the
+group's voxels and f their failures, group 2's voxels of count 1 included in both (observed:
+`54/74`, though the failures map leaves those voxels out: TED-08), per volume and group in
+`--fitmode ts` (observed). tedana prints a
 progress bar per group on standard error (`<n>-echo monoexponential`, tqdm's; none with
 `TQDM_DISABLE=1`, the reference setup: §12.3).
 
@@ -852,7 +880,7 @@ marked):
 |---|---|
 | the temporal means of no volume (§6.2, TED-13, TED-16) | `RuntimeWarning: Mean of empty slice` (numpy 2.5.4; `Mean of empty slice.` in 2.3.5), then `RuntimeWarning: invalid value encountered in divide` |
 | §6.5 with no fit voxel | `RuntimeWarning: invalid value encountered in scalar divide` (analysis) |
-| §7.2, β1 = 0; §9 with a limited T2* of 0 | `RuntimeWarning: divide by zero encountered in divide` (analysis) |
+| §7.2, β1 = 0; §9 with a limited T2* of 0 | `RuntimeWarning: divide by zero encountered in divide` (observed for §7.2: TED-16 with `--masktype none`; §9's from the analysis) |
 | §7.3 covariance | `OptimizeWarning: Covariance of the parameters could not be estimated` (printed when the first fit that warns has finished: after its group's fits, observed with `--fitmode ts`) |
 | §9, a volume with no RMSE | `RuntimeWarning: Degrees of freedom <= 0 for slice.`, `RuntimeWarning: All-NaN slice encountered` (analysis) |
 | §10 PAID with infinite samples | `RuntimeWarning: invalid value encountered in reduce` / `... in subtract` (analysis) |
@@ -1028,10 +1056,11 @@ names the library gets tedana's bits there; one that replaces them stays within 
 
 Decided by the rules A to D (CLAUDE.md, D13), each with `reproduce` giving tedana's behaviour of
 §§2–13. The default names each one with a notice (§14) exactly where its correction changed the
-run: an output value, a message, the exit status. The texts in quotes are the replica's default
-(observed by `blackbox.py` against `larmorx-gpl tedana t2smap`); the original prints the same,
-with `larmorx:` for the replica's `larmorx-gpl:`. Error texts are the last line of the traceback
-(§12.4), exit status 1.
+run: an output value, a message, the exit status. A defect is named **once per run**, by the
+first of its texts that applies (one notice per defect: the replica's form, observed). The texts
+in quotes are the replica's default (observed by `blackbox.py` against `larmorx-gpl tedana
+t2smap`); the original prints the same, with `larmorx:` for the replica's `larmorx-gpl:`. Error
+texts are the last line of the traceback (§12.4), exit status 1.
 
 ### 15.1 tedana's defects
 
@@ -1044,7 +1073,7 @@ with `larmorx:` for the replica's `larmorx-gpl:`. Error texts are the last line 
 | TED-05 | only the limited T2* is capped (§8); the full map (fMRIPrep's T2* map, the combination's weights) keeps values of up to 239,794 s on fMRIPrep's calls; tedana 25.0.1 capped the full map too | A | the full map gets the limited map's cap (values > 10c set to c) **before** the combination; notice `<k> value(s) of the full T2* map above <10c, 3 decimals> ms (ten times the cap) set to the cap, <c, 3 decimals> ms; tedana 26.0.3 caps only the limited map` |
 | TED-06 | a curve fit whose log-linear start lies outside its bounds is a silent failure keeping the start (1,919 of the 1,930 failures on fMRIPrep's four calls) | C | kept as tedana does it; no switch, no notice (refits from a clipped start beat the log-linear residuals in only 15 to 29 % of those voxels) |
 | TED-07 | `--verbose` writes S0's variance as the T2* variance map and T2*'s as the S0 map | A | each map its own variance; notice `the T2* and S0 variance maps hold their own variances` where the swap changes a written value outside count-1 voxels |
-| TED-08 | count-1 voxels are fitted (group 2) but their failures and variances are not written (0) | A | written; notices `<k> failed fit(s) of voxels with one good echo marked in the failures map` (when k > 0) and, with `--verbose`, `the variances of <k> voxel(s) with one good echo kept in the variance maps` |
+| TED-08 | count-1 voxels are fitted (group 2) but their failures and variances are not written (0) | A | written; **one** notice per run: `<k> failed fit(s) of voxels with one good echo marked in the failures map` when k > 0 of those voxels' fits failed (summed over the volumes in `--fitmode ts`), otherwise, with `--verbose` and k > 0 of them fitted, `the variances of <k> voxel(s) with one good echo kept in the variance maps`; never both (observed: the replica's default prints the failures text alone when both apply) |
 | TED-09 | one infinite sample makes every voxel of its group NaN in the log-linear fit (and so in the curve fit's starts) | A | the voxels whose observations are infinite get NaN T2* and S0 alone, the rest of the group is solved without them; notice `<k> voxel(s) with an infinite sample fitted alone (NaN); tedana's <n>-echo fit makes all <N> voxels of that count NaN` (observed) |
 | TED-10 | `-e ... inf` passes as milliseconds and fails in the least squares: `numpy.linalg.LinAlgError: SVD did not converge in Linear Least Squares` (observed) | B | at the TE check: `ValueError: TE values must be finite (tedana fails later in numpy's least squares)`; notice `an infinite echo time` (observed) |
 | TED-11 | `--n-independent-echos 0`: `ZeroDivisionError: division by zero` (observed) | B | `ValueError: --n-independent-echos must be a positive number of echoes (tedana fails with ZeroDivisionError)`; notice `--n-independent-echos 0` (observed) |
@@ -1052,7 +1081,7 @@ with `larmorx:` for the replica's `larmorx-gpl:`. Error texts are the last line 
 | TED-13 | `--dummy-scans` ≥ T: numpy's "Mean of empty slice" warnings, then the argmax ValueError (observed); a negative count shifts `--exclude`'s indices up | B | `ValueError: --dummy-scans must be at least 0 and below the number of volumes (<T>); <N> given`; notice `--dummy-scans <N> of <T> volumes` (observed) |
 | TED-14 | `--debug`'s floor message divides by E · V | A | the message's count and percentage of V voxels (a message only); notice `the floor's message counts <V> voxels; tedana prints <E·V>` |
 | TED-15 | PAID with a voxel whose good echoes do not vary over time (every voxel of a one-volume series): `ZeroDivisionError: Weights sum to zero, can't be normalized` | A (B for one volume) | those voxels combined with equal weights (notice `<k> voxel(s) whose good echoes do not vary over time combined with equal weights; tedana fails with ZeroDivisionError`); one volume: `ValueError: --combmode paid needs more than one volume: its weights are each echo's temporal signal-to-noise ratio (tedana fails with ZeroDivisionError)` |
-| TED-16 | `--exclude` removing every volume: the adaptive mask and the fit see no volume; tedana writes T2* = 500 ms and S0 = 1 in every voxel with exit 0 (the dropout method fails first with the argmax ValueError: observed) | B | after the exclusion line: `ValueError: --exclude leaves no volume for the adaptive mask and the T2*/S0 fit (all <T> volumes excluded)`; notice `--exclude removes all <T> volumes from the adaptive mask and the fit` (observed) |
+| TED-16 | `--exclude` removing every volume: the adaptive mask and the fit see no volume; the dropout method fails first with the argmax ValueError (observed); without it (`--masktype none`) `loglin` writes T2* = 500 ms and S0 = 1 in every voxel with exit 0 (observed), and `curvefit` stops after the log-linear fit with `ValueError: zero-size array to reduction operation minimum which has no identity` (§7.3, observed) | B | after the exclusion line: `ValueError: --exclude leaves no volume for the adaptive mask and the T2*/S0 fit (all <T> volumes excluded)`; notice `--exclude removes all <T> volumes from the adaptive mask and the fit` (observed) |
 | TED-17 | a single fit voxel: `IndexError: too many indices for array: array is 0-dimensional, but 1 were indexed` (both fit types and modes) | A | fitted as any other voxel; notice `a single voxel is left for the fit` |
 | TED-18 | a cap c ≤ 0 (more than 99.5 % of the limited values 0): every positive limited T2* set to c (then the RMSE divides by 0) | A | no cap of 0 or less, on either map (TED-05's not applied then); notice `the limited T2* map's cap is <c, 3 decimals> ms (its 99.5th percentile), so tedana sets its <k> value(s) above it to it` |
 
@@ -1200,10 +1229,10 @@ written values (T2* in seconds; ×1000 for the predictions and weights, in ms).
 | image headers, types, dimensions, affines | identical [0 / 0] |
 | the adaptive mask | identical (its means follow §13.2 exactly) [0 / 0] |
 | `loglin` full and limited T2* and S0 | per voxel identical, or: in the rate r = 1/T2* (s⁻¹), \|r − r'\| ≤ 2⁻²²·\|r\| + 1e-9 s⁻¹, and \|S0 − S0'\| ≤ 2⁻²²·\|S0\| (two float32 units in the last place); a value floored (§8: 1 ms, 500 ms or the underflow floor) in one run only is accepted when one run's rate is within 1e-9 s⁻¹ of 0 (β1's sign) or of the floor's rate [identical on every voxel: tedana's spread, and the fast variant's per-voxel closed-form solution, whose float64 differences vanish in the float32 values written] |
-| `curvefit` T2* and S0 | per voxel (and volume in `ts`): (a) \|r − r'\| ≤ 1e-6·\|r\| + 1e-9 s⁻¹ and \|S0 − S0'\| ≤ 1e-6·\|S0\|; or (b) the other run's fit is at least as good: F' ≤ F·(1 + 1e-6) + 1e-12·Σy², F = Σ (S0·exp(−TE/T2*) − y)² in float64 from the written full maps over the voxel's samples of the fit (echoes 1..n of its group, the used volumes); or (c) its log-linear start lies near the feasibility boundary (a start's rate within 1e-9 s⁻¹ of 0, or its S0 within 1e-6 relative of the voxel's smallest sample). Voxels passing by (b) or (c): at most **3 %** of the fit voxels [(a)'s use 0.997 / 0.995: the rest pass by (b); (b) or (c) for 0.28 % / 0.31 % of the fit voxels at most, all by (b), with F'/F − 1 between −1.9e-8 and 3.2e-8] |
-| the cap (limited T2*) | the cap is an order statistic: \|c − c'\| ≤ max \|ℓ − ℓ'\| over the voxels capped in neither run (count ≥ 2) + tol·c (tol the T2* row's relative tolerance); a voxel capped in one run only is accepted when the other run's value is within 10·\|c − c'\| + 10·tol·c of ten caps, or passes by (b)/(c) [0.005 / 0.005] |
+| `curvefit` T2* and S0 | per voxel (and volume in `ts`): (a) \|r − r'\| ≤ 1e-6·\|r\| + 1e-9 s⁻¹ and \|S0 − S0'\| ≤ 1e-6·\|S0\|; or (b) the other run's fit is at least as good: F' ≤ F·(1 + 1e-6) + 1e-12·Σy², F = Σ (S0·exp(−TE/T2*) − y)² in float64 from the written full maps over the voxel's samples of the fit (echoes 1..n of its group, the used volumes); or (c) its log-linear start lies near the feasibility boundary (a start's rate within 1e-9 s⁻¹ of 0, or its S0 within 1e-6 relative of the voxel's smallest sample). **At a voxel at the cap** (the cap row) of a run read as larmorx's default, whose full map TED-05 caps, the written T2* is c whether the fit's T2* was c or above ten caps (then not written): that run's F in (b) is the least of F at its written (S0, c) and F over T2* ≥ 10c (+∞ included) with its written S0; in (a) its T2* agrees when the cap row accepts it, so (a) then rests on S0. Voxels passing by (b) or (c): at most **3 %** of the fit voxels [(a)'s use 0.997 / 0.995: the rest pass by (b); (b) or (c) for 0.28 % / 0.31 % of the fit voxels at most, all by (b), with F'/F − 1 between −1.9e-8 and 3.2e-8] |
+| the cap (limited T2*; in larmorx's default also the full T2*, which TED-05 caps alike) | the cap is an order statistic: \|c − c'\| ≤ max \|ℓ − ℓ'\| over the voxels at the cap in neither run (count ≥ 2) + tol·c (tol the T2* row's relative tolerance); a voxel at the cap in both runs is accepted on T2* so; a voxel at the cap in one run only is accepted when the other run's value is within 10·\|c − c'\| + 10·tol·c of ten caps, or passes by (b)/(c). **The voxels at the cap**, from each run's files: in tedana's (`reproduce`) the limited values that differ from the full map's (count ≥ 2), c being their value; in a run with no such value and no full value above ten caps (two float32 units of slack), read as larmorx's default, the values equal to its cap c, §8's percentile of its written limited values (a capped value is c, and capping leaves that percentile at c), count ≥ 2 in the limited map and ≥ 1 in the full map, with c ≤ 0 capping nothing (TED-18). A run with nothing to cap reads the same either way, and the order statistic's own voxel, at c, then counts as at the cap: tol·c and (b)/(c) cover its own difference [0.005 / 0.005; larmorx's default against the replica's default on fMRIPrep's curve-fit calls: 0.0027] |
 | the failures map | identical, except voxels passing by (b) or (c) (reported) [identical / identical] |
-| variance and covariance maps | where (a) holds: relative 1e-4; +∞ identical; elsewhere reported [0.08 / 0.08: at most 8.1e-6 relative, on ds003592 with `--verbose`] |
+| variance and covariance maps | where (a) holds (not at a voxel at the cap of a run read as larmorx's default, whose fit T2* is not written): relative 1e-4; +∞ identical; elsewhere reported [0.08 / 0.08: at most 8.1e-6 relative, on ds003592 with `--verbose`] |
 | the RMSE map | per voxel \|Δ\| ≤ max_t rms_e(p_e − p'_e) + 2⁻²¹·max_e\|p_e\| + 2⁻²⁴·(T + E + 64)·RMSE, p and p' the predictions of §9 (float32) from the two runs' written limited maps; the last term is the error of a float32 sum of the volumes and the echoes in another order (the standard bound n·2⁻²⁴ of the terms' sum, with a slack for numpy's pairwise blocks); NaN where tedana has NaN [0.43 / 0.14] |
 | the confounds table | per volume t: `rmse_mean` and `rmse_std` \|Δ\| ≤ A_t + 2⁻²⁴·(N_t + 32)·max(\|value\|, \|rmse_mean\|); the percentile columns \|Δ\| ≤ A_t + 1e-6·\|value\| (order statistics move by at most the largest change of the values); A_t the largest over the voxels of rmse[v, t]'s allowance rms_e(p_e − p'_e) + 2⁻²¹·max_e\|p_e\| + 2⁻²⁴·(E + 32)·rmse[v, t], N_t the non-NaN values; `n/a` identical; the float32/float64 form of §9 identical [0.07 / 0.02] |
 | the combined series | per voxel and volume \|Δ\| ≤ Σ_e \|x_e\|·\|ŵ_e − ŵ'_e\| + 2⁻²⁰·(\|∂c/∂ln T2*\| + \|c\|) + 2⁻¹⁴⁹, ŵ the normalised weights of §10 from each run's written full T2* (ms), ∂c/∂ln T2* = Σ_e ŵ_e x_e (TE_e − Σ_k ŵ_k TE_k) / T2*: each run's own T2* lies within half a float32 unit of its written value, and eight units are allowed; PAID: identical weights expected, so the 2⁻²⁰ term [0.85 / 0.44: the first term is a first-order bound, sharp by design] |
@@ -1279,7 +1308,19 @@ the folder's README says how):
 - `check.py` (relay 8b): §17.3 between two output directories (the command read again from
   `t2smap_call.sh`, the inputs read again with the model's readers): per output the values
   compared, the identical ones, those passing by each rule, the failures, the largest use, and
-  with `--details` the first failures.
+  with `--details` the first failures. (2026-11-11) Each run's cap read from its files as the
+  cap row states (tedana's, or larmorx's default whose full map TED-05 caps), with (b)'s F at
+  the cap and the variances' exception of §17.3.
+- `recheck.py` (2026-11-11): `check.py` again on output folders that `compare.py` and
+  `fmriprep_calls.py` (`../t2smap-original/`) left, no program run, beside another `check.py`
+  (`--baseline`): which verdicts a change of the checker changes. Its run of 2026-11-11 (the
+  clean-room part's folders: the probe's cases and the added ones, both comparisons, and
+  fMRIPrep's five calls, (A) at 1 and 8 threads and (B)): 113 verdicts that passed still pass
+  with every count and use unchanged but two variance uses (lower: the cap's voxels in
+  `x-ts-curvefit-decay` are no longer judged), the three (B) runs that failed only at TED-05's
+  capped voxels pass (ds003592 with and without `--verbose`: 11 T2* values each; ds000258: 1 S0
+  value), and the three cases outside the model stay so (a mask of another grid, TED-01's NaN
+  sample).
 - `measure.py` (relay 8b): the runs behind §17.3: per case tedana in the reference setup, in the
   shared environment, with `--n-threads 4`, with numpy's AVX-512 kernels on, the model and its
   `fast` variant, each checked against the reference by `check.py`, and the table of the largest
@@ -1292,6 +1333,14 @@ findings, then checked against `blackbox.py`'s 54 runs of tedana's program (ever
 statement) and of the replica in both modes, and against the model of §18: §§3–11 as written give
 tedana's files bit for bit on every case of §18, and §17.3's thresholds hold, measured, for
 tedana's own spread and for the kind of implementation §16 allows.
+
+(spec writer, 2026-11-11, from the clean-room relays' black-box questions) Checked against
+tedana 26.0.3's source and its program run directly (the launcher, not the oracle-output cache)
+and against SciPy 1.18.1 itself: §3's output directory when `--exclude` fails (it exists: the
+cached runs could not show it), §7.3's failures (a T2* start of +∞, the order of SciPy's checks,
+the unreachable bounds error, the start moved off a bound, a voxel with no sample), TED-08's
+single notice, TED-16 without the dropout method in both fit types, and §17.3's reading of
+TED-05's default cap (`check.py`, proved by `recheck.py` on the part's runs: §18).
 
 Open points:
 1. (Decided 2026-11-08, §15.2.) The original's maths notices: the one-pass rule (NP-03 never

@@ -13,6 +13,13 @@ The report gives, per output, the values compared, how many are identical, how m
 rule, how many fail, and the largest difference as a fraction of its allowance ("use"): a check
 passes when every value is within its allowance; the margins of §17.3 are the largest uses
 measured on tedana's own spread. Exit status 0 when every check passes, 1 otherwise.
+
+Each run's files say how its T2* maps were capped (§17.3, "the cap"): tedana's (``reproduce``)
+cap only the limited map, so its capped values are the limited values that differ from the full
+map's; larmorx's default (TED-05) caps the full map the same way, so a run with no such value and
+no full value above ten caps is read as the default, its voxels at the cap being the values equal
+to its cap (§8's order statistic of its written limited map). The two readings agree on a run
+with nothing to cap.
 """
 
 from __future__ import annotations
@@ -45,6 +52,7 @@ SUM_SLACK = 32
 TOL_TABLE_REL = 1e-6  # the percentiles' interpolation
 TOL_COMB_REL = 2.0**-20  # eight float32 units (relay 8b: tedana's own spread used 0.99 of one)
 TINY = 2.0**-149
+TEN_CAPS_SLACK = 2.0**-22  # a value of at most ten caps, written: within two float32 units of 10 c
 
 
 @dataclass
@@ -148,35 +156,89 @@ def compare_maps(
     return passed
 
 
-def cap_rule(res: Result, la, lb, fa, fb, count, tol, alt) -> np.ndarray:
-    """§8's cap on the limited T2* map: c is an order statistic (the 99.5th percentile), so the
-    two runs' caps differ by at most the largest difference of the values below them; a value
-    capped on one side only lies near ten caps. Returns the mask of values accepted so."""
-    two = count >= 2
-    if la.ndim == 2:
-        two = np.repeat(two[:, None], la.shape[1], axis=1)
-    cap_a = two & ~same_bits(la, fa)
-    cap_b = two & ~same_bits(lb, fb)
-    ok = np.zeros(la.shape, dtype=bool)
-    if not (cap_a.any() or cap_b.any()):
-        return ok
-    ua, ub = np.unique(la[cap_a]), np.unique(lb[cap_b])
-    if ua.size != 1 or ub.size != 1:
-        res.notes.append(f"caps not single values: {ua[:3]} / {ub[:3]}")
-        return ok
-    ca, cb = float(ua[0]), float(ub[0])
-    rest = two & ~cap_a & ~cap_b
+def per_value(mask_v: np.ndarray, like: np.ndarray) -> np.ndarray:
+    """A per-voxel mask spread over the volumes of a ``--fitmode ts`` map."""
+    if like.ndim == 2:
+        return np.repeat(mask_v[:, None], like.shape[1], axis=1)
+    return mask_v
+
+
+@dataclass
+class CapState:
+    """§8's cap in one run's written T2* maps, as §17.3's cap row reads them."""
+
+    full_capped: bool  # larmorx's default (TED-05): the full map capped as the limited one
+    values: np.ndarray  # the distinct values at the cap (s): one, the cap, when it is single
+    at_limited: np.ndarray  # the values (count >= 2) at the cap in the limited map
+    at_full: np.ndarray  # the values (count >= 1) at the cap in the full map (default runs)
+
+
+def cap_state(lim: np.ndarray, full: np.ndarray, count: np.ndarray) -> CapState:
+    """tedana's files: the limited values that differ from the full map's (count >= 2) are the
+    capped ones. Otherwise, when no full value lies above ten caps, the run is read as larmorx's
+    default, whose full map TED-05 caps too: its voxels at the cap are the values equal to the cap
+    c, the 99.5th percentile (lower) of its written limited values over the fit voxels (§8; a
+    capped value equals c, and capping leaves that order statistic at c). A cap of 0 or less caps
+    nothing in the default (TED-18)."""
+    two = per_value(count >= 2, lim)
+    fit = per_value(count >= 1, lim)
+    none = np.zeros(lim.shape, dtype=bool)
+    differ = two & ~same_bits(lim, full)
+    if differ.any():
+        return CapState(False, np.unique(lim[differ]), differ, none)
+    values = lim[fit].reshape(-1)
+    if not values.size:
+        return CapState(False, values[:0], none, none)
+    c = model.percentile_lower(values, 99.5)
+    with np.errstate(invalid="ignore"):
+        above = full[fit].astype(F64) > 10 * F64(c) * (1 + TEN_CAPS_SLACK)
+    if not c > 0 or above.any():
+        return CapState(False, values[:0], none, none)
+    return CapState(True, np.array([c]), two & (lim == c), fit & (full == c))
+
+
+@dataclass
+class Caps:
+    ca: float  # each run's cap (s, as written)
+    cb: float
+    lip: float  # the largest |l - l'| of the limited values at the cap in neither run
+
+
+def cap_allowance(la, lb, sa: CapState, sb: CapState, count) -> Caps | None:
+    """c is an order statistic (the 99.5th percentile), so the two runs' caps differ by at most
+    the largest difference of the limited values at the cap in neither run (count >= 2), plus the
+    T2* row's relative tolerance of c (it covers the order statistic's own voxel, which the
+    default's files cannot tell from a capped one). None when a run's cap is not single."""
+    if sa.values.size != 1 or sb.values.size != 1:
+        return None
+    ca, cb = float(sa.values[0]), float(sb.values[0])
+    rest = per_value(count >= 2, la) & ~sa.at_limited & ~sb.at_limited
     lip = float(np.max(np.abs(la[rest].astype(F64) - lb[rest].astype(F64)), initial=0.0))
-    allow = lip + tol * abs(ca)
+    return Caps(ca, cb, lip)
+
+
+def cap_rule(res: Result, va, vb, at_a, at_b, caps: Caps | None, sa, sb, tol, alt) -> np.ndarray:
+    """§8's cap on a T2* map (the limited one; in larmorx's default also the full one): a value
+    at the cap in both runs is accepted when the caps agree (``cap_allowance``); a value at the cap
+    in one run only lies near ten caps in the other (it was capped in one run only), or passes by
+    (b)/(c). Returns the mask of values accepted so."""
+    ok = np.zeros(va.shape, dtype=bool)
+    if not (at_a.any() or at_b.any()):
+        return ok
+    if caps is None:
+        res.notes.append(f"caps not single values: {sa.values[:3]} / {sb.values[:3]}")
+        return ok
+    ca, cb = caps.ca, caps.cb
+    allow = caps.lip + tol * abs(ca)
     use = abs(ca - cb) / allow if allow > 0 else (0.0 if ca == cb else np.inf)
     res.notes.append(f"cap {ca!r} / {cb!r} s, allowance {allow:.3g}, use {use:.3g}")
     res.use = max(res.use, float(use) if np.isfinite(use) else 0.0)
     if use <= 1:
-        ok |= cap_a & cap_b
-        # capped on one side only: the other side's value near the cap's threshold, ten caps
-        one = cap_a ^ cap_b
-        v = np.where(cap_a, lb, la).astype(F64)
-        near = np.abs(v - 10 * np.where(cap_a, ca, cb)) <= 10 * abs(ca - cb) + 10 * tol * abs(ca)
+        ok |= at_a & at_b
+        # at the cap on one side only: the other side's value near the cap's threshold, ten caps
+        one = at_a ^ at_b
+        v = np.where(at_a, vb, va).astype(F64)
+        near = np.abs(v - 10 * np.where(at_a, ca, cb)) <= 10 * abs(ca - cb) + 10 * tol * abs(ca)
         ok |= one & (near | alt)
     return ok
 
@@ -185,6 +247,34 @@ def objective(x_v: np.ndarray, te: np.ndarray, s0: float, t2s_ms: float) -> floa
     with np.errstate(all="ignore"):
         r = s0 * np.exp(-te / t2s_ms) - x_v
     return float(np.sum(r * r))
+
+
+def objective_at_cap(x_v: np.ndarray, te: np.ndarray, s0: float, c_ms: float) -> float:
+    """(b)'s F of a run at a voxel at its cap in larmorx's default (TED-05 caps the full map):
+    the written T2* is c whether the fit's T2* was c or above ten caps, which is not written, so
+    F is the least of F at (S0, c) and F over T2* >= 10 c (T2* = +inf included), with the run's
+    written S0."""
+    from scipy.optimize import minimize_scalar
+
+    f_c = objective(x_v, te, s0, c_ms)
+    u_max = 1.0 / (10.0 * c_ms)  # the decay rates (1/ms) of T2* >= 10 c
+
+    def f_rate(u: float) -> float:
+        with np.errstate(all="ignore"):
+            r = s0 * np.exp(-te * u) - x_v
+        return float(np.sum(r * r))
+
+    grid = np.linspace(0.0, u_max, 33)
+    vals = np.array([f_rate(u) for u in grid])
+    j = int(np.nanargmin(vals)) if np.isfinite(vals).any() else 0
+    best = float(vals[j])
+    lo, hi = grid[max(j - 1, 0)], grid[min(j + 1, grid.size - 1)]
+    if hi > lo:
+        r = minimize_scalar(
+            f_rate, bounds=(lo, hi), method="bounded", options={"xatol": u_max * 1e-12}
+        )
+        best = min(best, float(r.fun))
+    return min(f_c, best)
 
 
 def check(ref: Path, other: Path, cwd: Path) -> list[Result]:
@@ -268,11 +358,28 @@ def check(ref: Path, other: Path, cwd: Path) -> list[Result]:
     curve = a.fittype == "curvefit"
     ts = a.fitmode == "ts"
 
-    t2a_s = on(load(ref / fname("t2star img"))[1]).astype(F64)  # written in seconds
-    t2b_s = on(load(other / fname("t2star img"))[1]).astype(F64)
+    full_a = on(load(ref / fname("t2star img"))[1])  # written in seconds, float32
+    full_b = on(load(other / fname("t2star img"))[1])
+    lim_a = on(load(ref / fname("limited t2star img"))[1])
+    lim_b = on(load(other / fname("limited t2star img"))[1])
+    t2a_s, t2b_s = full_a.astype(F64), full_b.astype(F64)
     t2a, t2b = t2a_s * 1000, t2b_s * 1000  # ms, as the echo times
     s0a = on(load(ref / fname("s0 img"))[1]).astype(F64)
     s0b = on(load(other / fname("s0 img"))[1]).astype(F64)
+
+    # ---- the cap of each run (§8, TED-05): which values are at it, and whether the caps agree
+    tol = TOL_CURVE_REL if curve else TOL_LOGLIN_REL
+    sa, sb = cap_state(lim_a, full_a, count), cap_state(lim_b, full_b, count)
+    caps = cap_allowance(lim_a, lim_b, sa, sb, count)
+    full_capped = sa.full_capped or sb.full_capped
+    at_full_a, at_full_b = sa.at_full, sb.at_full  # empty in tedana's files
+    at_full = at_full_a | at_full_b
+    no_alt = np.zeros(t2a.shape, dtype=bool)
+    cap_full_ok = (
+        cap_rule(Result("-"), full_a, full_b, at_full_a, at_full_b, caps, sa, sb, tol, no_alt)
+        if full_capped
+        else no_alt
+    )
 
     # ---- the curve fit's alternatives (b), (c) per fit voxel (and volume in ts)
     alt = np.zeros(t2a.shape, dtype=bool)
@@ -300,12 +407,24 @@ def check(ref: Path, other: Path, cwd: Path) -> list[Result]:
                         continue
                     da = abs(ra[k] - rb[k]) <= TOL_CURVE_REL * abs(ra[k]) + TOL_RATE_ABS
                     ds = abs(s0a[k] - s0b[k]) <= TOL_CURVE_REL * abs(s0a[k])
+                    if at_full[k]:
+                        # larmorx's default: the written T2* is the cap; it is judged by the cap
+                        # row, S0 by (a)
+                        da = bool(cap_full_ok[k])
                     if da and ds:
                         continue
                     xv = (x[v, :n, t] if ts else x_used[v, :n, :]).reshape(-1).astype(F64)
                     te = np.repeat(tes[:n], 1 if ts else x_used.shape[2])
-                    fa_ = objective(xv, te, s0a[k], t2a[k])
-                    fb_ = objective(xv, te, s0b[k], t2b[k])
+                    fa_ = (
+                        objective_at_cap(xv, te, s0a[k], t2a[k])
+                        if at_full_a[k]
+                        else objective(xv, te, s0a[k], t2a[k])
+                    )
+                    fb_ = (
+                        objective_at_cap(xv, te, s0b[k], t2b[k])
+                        if at_full_b[k]
+                        else objective(xv, te, s0b[k], t2b[k])
+                    )
                     detail_b.append((fb_ / fa_ - 1) if fa_ > 0 else np.inf)
                     if fb_ <= fa_ * (1 + TOL_OBJECTIVE) + TOL_OBJECTIVE_ABS * float(xv @ xv):
                         alt[k] = True
@@ -337,7 +456,6 @@ def check(ref: Path, other: Path, cwd: Path) -> list[Result]:
         results.append(res_bc)
 
     # ---- the maps
-    tol = TOL_CURVE_REL if curve else TOL_LOGLIN_REL
     for desc, rate_dom in (
         ("t2star img", True),
         ("limited t2star img", True),
@@ -359,16 +477,15 @@ def check(ref: Path, other: Path, cwd: Path) -> list[Result]:
             floored = (fa_ ^ fb_) & near
         cap_ok = np.zeros(va.shape, dtype=bool)
         if desc == "limited t2star img":
-            cap_ok = cap_rule(
-                res,
-                va,
-                vb,
-                on(load(ref / fname("t2star img"))[1]),
-                on(load(other / fname("t2star img"))[1]),
-                count,
-                tol,
-                alt,
+            cap_ok = cap_rule(res, va, vb, sa.at_limited, sb.at_limited, caps, sa, sb, tol, alt)
+        elif desc == "t2star img" and full_capped:
+            side = {(True, True): "both runs", (True, False): "the reference"}
+            res.notes.append(
+                f"full map read as capped (larmorx's default, TED-05; or nothing to cap) in "
+                f"{side.get((sa.full_capped, sb.full_capped), 'the other run')}: "
+                f"{int(at_full_a.sum())} / {int(at_full_b.sum())} values at the cap"
             )
+            cap_ok = cap_rule(res, va, vb, at_full_a, at_full_b, caps, sa, sb, tol, alt)
         compare_maps(res, va, vb, tol, rate_dom, ok_extra=floored | alt | cap_ok)
         results.append(res)
 
@@ -388,6 +505,8 @@ def check(ref: Path, other: Path, cwd: Path) -> list[Result]:
                 exact_ok = (np.abs(ra - rb) <= TOL_CURVE_REL * np.abs(ra) + TOL_RATE_ABS) & (
                     np.abs(s0a - s0b) <= TOL_CURVE_REL * np.abs(s0a)
                 )
+            # at the cap of larmorx's default the fit's T2* is not written: (a) cannot be seen
+            exact_ok &= ~at_full
             for desc in ("t2star variance img", "s0 variance img", "t2star-s0 covariance img"):
                 res = Result(desc)
                 va = on(load(ref / fname(desc))[1])

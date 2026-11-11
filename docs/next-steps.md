@@ -748,8 +748,9 @@ The items below keep their history.
    would like to solve this first before we continue with the rest fo things"; the release part,
    2026-11-10 and 11; decision log): the release workflow, the three packages, the standalone programs,
    two container images, the clean-machine checks and the documents (`RELEASING.md`, `CHANGELOG.md`,
-   `CITATION.cff`); its upload is the tag `v0.1.0rc1`'s run; then 0.1.0, once rc1 installs cleanly on
-   the six platforms (below).
+   `CITATION.cff`); **published 2026-11-11** (the tag `v0.1.0rc1`'s run 42962342043, every job green
+   after the user's approval: PyPI, the GitHub Release, both images); then 0.1.0, once rc1 installs
+   cleanly on the six platforms (below).
 
 ## Follow-ups, when they fit
 - **From the first release's part (2026-11-10 and 11; 10 relays; `RELEASING.md`,
@@ -2088,9 +2089,11 @@ results and `cbrtf_glibc`'s alike.
   images rehearsed with them; on the Windows helper, with Windows files cross-built by zig (no
   MSVC), 934 passed. The release workflow's `test` jobs install and test the three packages' built
   files on the six platforms (the replicas' own Python tests included; before, CI ran only their
-  `cargo test`), and `verify-pypi` installs them from PyPI after an upload. Left: after rc1's upload,
-  `scripts/release/check_install.py` in a clean Linux image and `win_check.sh 0.1.0rc1` on the
-  Windows helper (`RELEASING.md`, step 6). Windows Sandbox later (the user, 2026-11-10: "We do not do
+  `cargo test`), and `verify-pypi` installs them from PyPI after an upload. After rc1's upload
+  (2026-11-11, `RELEASING.md` step 6): `scripts/release/check_install.py` in a clean
+  `python:3.12-slim-bookworm` through Apptainer, `larmorx[all]==0.1.0rc1` from PyPI, 934 passed, 2
+  skipped, `CHECK-INSTALL ok`; `win_check.sh 0.1.0rc1` on the Windows helper, `CHECK-INSTALL ok`, its
+  folder removed. Windows Sandbox later (the user, 2026-11-10: "We do not do
   the windows sandbox now, maybe in the future"); until then the PE import-table check
   (`scripts/release/pe_imports.py`) is the Windows evidence. The requirements stated for users: the
   README's "Installation".
@@ -2132,12 +2135,19 @@ results and `cbrtf_glibc`'s alike.
   a name: the first upload does); `larmorx-freesurfer` and `larmorprepx` are not reserved. larmorx-nc
   on PyPI: the user's decision of 2026-11-10 (over asking FSL first). Version numbering: PEP 440, one
   version for the three packages, rc1 and then 0.1.0 (decision log 2026-11-10 and 11).
-- **0.1.0 after 0.1.0rc1** (the user, 2026-11-10): after rc1's upload, `verify-pypi` on the six
-  platforms, the clean checks above, the image package made public once by the user (D17) and its
-  images pulled here, and PyPI's author field ("Waiting for the user"); then 0.1.0 by `RELEASING.md`'s
-  step 7 (the version, CHANGELOG's section with its statuses table, the words that call the release
-  a candidate in the README and on the site, a dry run, the tag, the approval). A problem found in
-  rc1 is fixed in an rc2 first.
+- **0.1.0 after 0.1.0rc1** (the user, 2026-11-10). Done for rc1 (2026-11-11): `verify-pypi` on the
+  six platforms green; the clean checks above; the 39 files of the GitHub Release match its
+  `SHA256SUMS`, and PyPI's 21 files are byte for byte the release's; the image package is public
+  (anonymous pulls work), both images pulled here with Apptainer (`larmorx --version` 0.1.0rc1; `-all`
+  has the `larmorx-nc` and `larmorx-gpl` programs, the plain image neither); a plain `pip install
+  larmorx` takes 0.1.0rc1 while no final release exists (pip 26.3); the site's installation pages
+  published. Before 0.1.0: PyPI's author field ("Waiting for the user"), and
+  `scripts/release/check_install.py` should keep pip's temporary files and cache inside `--work`
+  (under Apptainer's `--containall` they otherwise fill its 64 MiB session space: `RELEASING.md`'s
+  example now binds a home and a temporary folder). Then 0.1.0 by `RELEASING.md`'s step 7 (the
+  version, CHANGELOG's section with its statuses table, the words that call the release a candidate
+  in the README and on the site, a dry run, the tag, the approval). A problem found in rc1 is fixed
+  in an rc2 first.
 
 ## Deferred (decide later)
 
@@ -2156,9 +2166,6 @@ Decided 2026-10-23 (decision log): the four rules for questionable behaviours (A
   name and the university e-mail. To match: `authors = [{ name = "Karel Mauricio López Vilaret",
   email = "..." }]` in the three files (the e-mail is then public on PyPI). Before 0.1.0 at the latest:
   a version's metadata cannot change after its upload.
-- **After 0.1.0rc1's upload, once, in the browser (D17):** the image package public
-  (github.com/users/karellopez/packages/container/larmorx -> Package settings -> Change visibility ->
-  Public); until then `apptainer pull` and `docker pull` without a login fail.
 - **For the user's information, FSL-22** (2026-10-26; decision log): `reproduce` now sorts NaN
   border values in libstdc++'s order, from an emulation written from the SGI STL (HP/SGI
   permissive notice) with no libstdc++ text; the orchestrator accepted that licensing reading

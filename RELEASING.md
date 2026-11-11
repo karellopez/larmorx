@@ -180,11 +180,16 @@ When `assemble` has passed, the run waits for the three deployments `pypi`, `pyp
      the tests (`tests/python`, `tests/golden`) of the tag's source. In a clean Linux, for example:
 
      ```bash
-     mkdir check && cd check
+     mkdir check && cd check && mkdir home tmp
      curl -sSfLO https://raw.githubusercontent.com/karellopez/larmorx/v<version>/scripts/release/check_install.py
-     apptainer exec --containall --bind "$PWD:/check" docker://python:3.12-slim-bookworm \
+     apptainer exec --containall --home "$PWD/home:/home/user" --bind "$PWD:/check" \
+         --env TMPDIR=/check/tmp docker://python:3.12-slim-bookworm \
          python -P /check/check_install.py --version <version> --work /check/work
      ```
+
+     The home and temporary folders are bound from `check/` because `--containall` otherwise keeps
+     both in Apptainer's session space, 64 MiB by default (`sessiondir max size`), which pip's
+     temporary files and cache outgrow ("No space left on device"; found at 0.1.0rc1's check).
 
    - Windows (10 or 11, no administrator rights needed): download
      [`scripts/release/check_install_windows.ps1`](scripts/release/check_install_windows.ps1) and

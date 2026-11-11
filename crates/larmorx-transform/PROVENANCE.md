@@ -267,6 +267,32 @@ environments (`validation/investigations/confounds/check_gelsd.py`, sections `la
 `lalsa` and the divide-and-conquer cases of `lalsd`, `gelsd`, `lstsq`, 2026-11-11): see
 `validation/investigations/confounds/README.md`.
 
+**Relay 2d-iii-a** (`numpy_linalg::gesvd`: SciPy's `linalg.svd(a, lapack_driver='gesvd')`, the
+SVD nipype's `fallback_svd` falls back to, with SciPy's own LAPACK). SciPy 1.18.1's wheel bundles
+scipy-openblas32 0.3.31.22.0 (OpenBLAS v0.3.31-22-g5ffbf38b, `MacPython/openblas-libs`'
+`openblas_commit.txt`; `tags/OpenBLAS-0.3.31-22-g5ffbf38b`, codeload tarball SHA-256
+`51257fb2f0aa7b4c23d9cf0302500b817dc82c0022ee681b24f9ab82dfd10312`), SciPy 1.15.3's
+scipy-openblas32 0.3.28.0.2 (the v0.3.28 release its build checks out; `tags/OpenBLAS-0.3.28`,
+release tarball SHA-256 `f1003466ad074e9b0c8d421a204121100b0751c96fc6fcf3d1456bd12f8a00a1`). Every
+`lapack-netlib/SRC/` file `DGESVD` reaches is identical in both to OpenBLAS 0.3.30's but
+`dlarft.f` of 0.3.28 (the column-by-column algorithm, before OpenBLAS 0.3.29's recursive one; the
+same Fortran as 0.3.34's `dlarft_lvl2.f`); the BLAS files on these paths differ from 0.3.30's only
+in threading heuristics and other architectures, and neither `kernel/setparam-ref.c` has 0.3.34's
+`GEMM_Q = 512` rule for AMD Zen 4 and 5:
+
+| larmorx | Upstream files | Licence |
+|---|---|---|
+| `numpy_linalg::blocked::DlarftForm`, the `dlarft` field of `Lapack`, `Lapack::with_gemm_q` (`ColumnByColumn`: every `DLARFT` call by the column-by-column algorithm, `dlarft_lvl2`) | OpenBLAS 0.3.28 `lapack-netlib/SRC/dlarft.f`; 0.3.34's `dlarft_lvl2.f` (identical but line breaks) | BSD-3-Clause |
+| `numpy_linalg::gesvd::dgesvd`, `dgesvd_lwork`, `Job`, `Gesvd`, `DgesvdError` (`JOBU = JOBVT = 'S'` or `'A'`: the checks, the workspace query from the callees' queries and `ILAENV(6)` = `INT(REAL(MIN(M, N))·1.6E0)`, `BDSPAC = 5·MIN(M, N)`; the scaling by `DLASCL` outside `[SMLNUM, BIGNUM]`; paths 6 and 9 (`DGEQRF`; with `N·N + MAX(4N, BDSPAC)` (path 9: `MAX(N + M, 4N, BDSPAC)`) or more `R` into `WORK(IU)` at leading dimension `LDA` when `LWORK >= WRKBL + LDA·N`, else `N`, `DGEBRD`, `DORGBR` `'Q'` and `'P'`, `DBDSQR('U')`, `DGEMM`, path 9 through `A` and `DLACPY`; else `DORGQR` in `U`, `R` reduced in `VT`, `DORMBR('Q', 'R', 'N')`, `DORGBR('P')`, `DBDSQR('U')` on `U`); path 10 (`DGEBRD`, `DORGBR('Q')` of `N` or `M` columns, `DORGBR('P')`, `DBDSQR('U')`); paths 6t, 9t (`DGELQF`, `L` into `WORK(IU)` or `U`, `DORGLQ` in `A` or `VT`, `DORMBR('P', 'L', 'T')` on the slow path) and 10t (`DBDSQR('L')`); each callee with `LWORK - IWORK + 1`; the unconverged superdiagonal and the unscaling; a non-finite matrix refused) | `dgesvd.f` (identical in the 0.3.28, 0.3.30 and 0.3.31-22 trees), `dlange.f`, `dlascl.f`, `dlacpy.f`, `dlaset.f`, `ilaenv.f`, `INSTALL/dlamch.f`, and the routines of `blocked`; OpenBLAS `interface/gemm.c` with the level-3 driver and the Haswell kernel (depth `GEMM_Q` 256) | BSD-3-Clause |
+| `numpy_linalg::gesvd::dbdsqr` (the checks; `N = 0`; without vectors refused: LAPACK's `DLASQ1`, the dqds algorithm, is not ported; a lower bidiagonal rotated to upper by `DLARTG`, the rotations applied to `U` by `DLASR('R', 'V', 'F')` and to `C` by `DLASR('L', 'V', 'F')`; then the parent module's `dbdsqr_upper_ncc`, 3.12.0's: a `-0` value kept) | `dbdsqr.f` (identical in the three trees), `dlartg.f90`, `dlasr.f` | BSD-3-Clause |
+| `numpy_linalg::gesvd::ScipyLibrary`, `scipy_svd`, `ScipySvd`, `ScipySvdError` (`check_finite`'s `ValueError`; an empty matrix: identities with `full_matrices`, empty factors without, no LAPACK; the 32-bit size checks with each version's message; the copy into Fortran order, `LDA = LDU = M`, `LDVT = N` or `MIN(M, N)`, the query's `WORK(1)` truncated as `LWORK`; `INFO > 0` as `LinAlgError` with each version's message) | SciPy 1.15.3 `scipy/linalg/_decomp_svd.py` (`svd`), `flapack_gen.pyf.src` (`dgesvd`, `dgesvd_lwork`), `lapack.py` (`_compute_lwork`, `_check_work_float`), `scipy/_lib/_util.py` (`_asarray_validated`); SciPy 1.18.1 `scipy/linalg/_decomp_svd.py` (`svd`, `_format_emit_errors_warnings`), `src/_linalg_svd.hh` (`u_vh_shapes`, `_svd_gesvd`), `src/_batched_linalg_module.cc` (`_linalg_svd`) | BSD-3-Clause |
+| `numpy_linalg::gesvd::nipype_fallback_svd`, `nipype_full_rank`, `FullRank` (`numpy.linalg.svd`, on `LinAlgError` SciPy's `gesvd`; the condition number `smax / smin`, at `cmax` or above `s + (smax - cmax·smin)/(cmax - 1)` and `np.dot(U, np.dot(np.diag(s), V))` through `openblas::matmul`) | nipype 1.12.0 `nipype/algorithms/confounds.py` (`fallback_svd`, `_full_rank`) | Apache-2.0 |
+
+Validated bit for bit against SciPy's own `scipy_dgesvd_`, `scipy_dbdsqr_`, `scipy_dlarft_`, its
+`scipy.linalg.svd(lapack_driver='gesvd')` and nipype's `fallback_svd` and `_full_rank` in both kept
+environments (SciPy 1.15.3 and 1.18.1; `validation/investigations/confounds/check_gesvd.py`,
+2026-11-11): see `validation/investigations/confounds/README.md`.
+
 ## SciPy's 4 × 4 inverse (`scipy_linalg`, field maps part B, relay 18)
 
 **Ported** from SciPy 1.18.1 (`scipy/linalg/_basic.py` `inv`, `src/_linalg_inv.hh`

@@ -42,9 +42,10 @@
 //! SciPy's `least_squares` gives it (for SciPy's `curve_fit`, `larmorx-optim`). The confounds'
 //! part adds the general routines at any size: [`blocked`] (the blocked QR, LQ and bidiagonal
 //! reductions with their `Q` and `P`), [`bdsdc`] (the divide-and-conquer bidiagonal SVD), [`svd`]
-//! (numpy's `svd(a, full_matrices=False)` and `pinv`), [`gelsd`] (numpy's `lstsq`) and [`lasda`]
-//! (the divide-and-conquer SVD in compact form and its solves, `lstsq` of more than 25 columns),
-//! each with its own upstream files.
+//! (numpy's `svd(a, full_matrices=False)` and `pinv`), [`gelsd`] (numpy's `lstsq`), [`lasda`]
+//! (the divide-and-conquer SVD in compact form and its solves, `lstsq` of more than 25 columns)
+//! and [`gesvd`] (SciPy's `svd` with the `gesvd` driver on SciPy's own LAPACK, nipype's
+//! `fallback_svd` and `_full_rank`), each with its own upstream files.
 //!
 //! Upstream files (BSD-3-Clause; notices below and in NOTICE): OpenBLAS 0.3.34 and 0.3.30
 //! release tarballs, `lapack-netlib/SRC/` (`dgesdd.f`, `dgebrd.f`, `dgebd2.f`, `dbdsdc.f`,

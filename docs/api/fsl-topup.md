@@ -64,8 +64,9 @@ r = lx.fsl.topup(
 field_hz = r.field                     # lx.Image on the input's grid
 up_corrected = r.corrected.data[..., 0]
 
-# FSL's own configuration by name, then the correction of a DWI pair by least squares
-r = lx.fsl.topup("b0_pair.nii.gz", acq, config="b02b0.cnf", fsldir="/opt/fsl")
+# FSL's configuration by name (larmorx carries the six FSL ships: no FSL needed), then the
+# correction of a DWI pair by least squares
+r = lx.fsl.topup("b0_pair.nii.gz", acq, config="b02b0")
 hifi = lx.fsl.applytopup(["dwi_up.nii.gz", "dwi_dn.nii.gz"], acq, [1, 2], r).corrected
 ```
 
@@ -84,8 +85,8 @@ larmorx fsl applytopup --imain=dwi_up,dwi_dn --inindex=1,2 --datain=acqparams.tx
 |---|---|---|---|
 | `images` | `--imain` | | the 4D image of the volumes (path or `lx.Image`) |
 | `acquisition` | `--datain` | | per volume the phase-encoding vector (3 numbers, voxel axes) and the read-out time (s): a file, or an array of shape `(n, 4)` |
-| `config` | `--config` | | a configuration file, or the name of one of FSL's (`"b02b0.cnf"`, `"b02b0_2.cnf"`, ...) with `fsldir` |
-| `fsldir` | `FSLDIR` | | the FSL installation whose `etc/flirtsch` holds FSL's configurations (only for a `config` given by name) |
+| `config` | `--config` | | a configuration file, or the name of one of FSL's: the six FSL ships (`"b02b0"`, `"b02b0_1"`, `"b02b0_2"`, `"b02b0_4"`, `"b02b0_7T"`, `"test_acqp"`, with or without `.cnf`) need nothing more; any other needs `fsldir` |
+| `fsldir` | `FSLDIR` | | the FSL installation whose `etc/flirtsch` holds FSL's configurations (only for a `config` given by name; its file wins over larmorx's own settings of the same name) |
 | `warpres` | `--warpres` | 10 | knot spacing (mm), one value or one per level |
 | `subsamp` | `--subsamp` | 1 | subsampling factor per level |
 | `fwhm` | `--fwhm` | 8 | Gaussian smoothing (mm) per level |

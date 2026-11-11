@@ -410,8 +410,9 @@ def test_error_map_in_fortran_order_for_numpys_max():
 
 def test_topup_configurations_fsldir_then_larmorx_ncs_copy(tmp_path, monkeypatch):
     """FSL's ``b02b0_{1,2,4}.cnf`` (D9 and the user's decision of 2026-11-09): from ``fsldir``,
-    else from larmorx-nc's copy beside its program, else a clear error naming both; sdcflows' own
-    files always from larmorx."""
+    else from larmorx-nc's copy beside its program, else the name, which larmorx's topup finds
+    among its own settings (clean-room, ``specs/topup.md`` §2.5); sdcflows' own files always
+    from larmorx."""
     import pathlib
 
     from larmorx.sdcflows import pepolar
@@ -436,9 +437,11 @@ def test_topup_configurations_fsldir_then_larmorx_ncs_copy(tmp_path, monkeypatch
     assert pepolar.topup_config_file("b02b0_1.cnf") == str((copy / "b02b0_1.cnf").resolve())
     own = pathlib.Path(pepolar.topup_config_file("b02b0.cnf")).parts[-4:]
     assert own == ("sdcflows", "data", "flirtsch", "b02b0.cnf")
+    # neither: the name itself, which larmorx's topup finds among its own settings
     monkeypatch.setattr(pepolar._replica, "find", lambda family, tool: None)
-    with pytest.raises(FileNotFoundError, match="clean-room settings come with t2smap") as e:
-        pepolar.topup_config_file("b02b0_1.cnf", fsldir)
-    assert str(fsldir / "etc" / "flirtsch" / "b02b0_1.cnf") in str(e.value)
+    assert pepolar.topup_config_file("b02b0_1.cnf", fsldir) == "b02b0_1.cnf"
+    fsls = fsldir / "etc" / "flirtsch" / "b02b0_2.cnf"
+    assert pepolar.topup_config_file("b02b0_2.cnf", fsldir) == str(fsls.resolve())
+    assert pepolar.topup_config_file("b02b0_4.cnf") == "b02b0_4.cnf"
     with pytest.raises(ValueError, match="not a topup configuration of sdcflows"):
         pepolar.topup_config_file("b02b0_7T.cnf")

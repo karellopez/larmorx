@@ -307,7 +307,9 @@ def test_arguments_are_checked_before_anything_runs(scripts, tmp_path):
         ({"splineorder": 4}, "splineorder"),
         ({"miter": 2.5}, "whole"),
         ({"warpres": float("nan")}, "finite"),
-        ({"config": "b02b0.cnf"}, "fsldir"),
+        # a name that is neither a file nor one of the six FSL ships needs fsldir (those six
+        # need nothing: larmorx carries their settings)
+        ({"config": "b02b0_9.cnf"}, "fsldir"),
     ):
         with pytest.raises(ValueError, match=match):
             lx.fsl.topup(path, ACQ, **kwargs)

@@ -5695,6 +5695,28 @@ def _(ctx: Context) -> dict[str, Any]:
     }
 
 
+@case("cli.fsl.topup.own-settings")
+def _(ctx: Context) -> dict[str, Any]:
+    """larmorx's own settings of FSL's six configurations (clean-room, ``specs/topup.md`` §2.5),
+    found by name with no FSL installation (``FSLDIR`` a folder without them): each one's log of
+    the settings in force (``--debug=9`` stops the run after the log is written), and the full
+    estimation of ``test_acqp``, with the field and corrected images its settings name."""
+    _topup_files(ctx)
+    saved = dict(os.environ)
+    os.environ["FSLDIR"] = os.fspath(ctx.dir)
+    out: dict[str, Any] = {}
+    try:
+        for name in ("b02b0", "b02b0_1", "b02b0_2", "b02b0_4", "b02b0_7T", "test_acqp"):
+            status = _in_dir(ctx, lambda n=name: _fsl_status(ctx, "topup", "--imain=blip_pair.nii", "--datain=acq.txt", f"--config={n}", f"--out={n}", f"--logout={n}.log", "--debug=9"))  # fmt: skip
+            out[f"{name}:status"] = status[0]
+            out[f"{name}.log"] = File(os.fspath(ctx.dir / f"{name}.log"))
+        _topup(ctx, "topup", "--imain=blip_pair.nii", "--datain=acq.txt", "--config=test_acqp.cnf", "--out=ta")  # fmt: skip
+    finally:
+        os.environ.clear()
+        os.environ.update(saved)
+    return {**out, **_written(ctx, "ta", "field_test", "iout_test")}
+
+
 def _topup_quick(ctx: Context) -> None:
     """A one-level topup of the pair (``tu_fieldcoef``, ``tu_movpar.txt``) for applytopup."""
     _topup_files(ctx)

@@ -217,6 +217,23 @@ Validated bit for bit against numpy's own `scipy_dgesdd_64_` and its `np.linalg.
 `np.linalg.pinv` in both kept environments (`validation/investigations/confounds/check_gesdd.py`,
 2026-11-11): see `validation/investigations/confounds/README.md` for the counts and commits.
 
+**Relay 2d-i** (`numpy_linalg::gelsd`: the minimum-norm least squares of a general matrix and
+numpy's `lstsq`). `dgelsd.f`, `dlalsd.f` and `dlasrt.f` are identical in both `lapack-netlib/SRC/`
+trees; the routines they call are the ports above, each in its release's form (`Lapack`):
+
+| larmorx | Upstream files | Licence |
+|---|---|---|
+| `numpy_linalg::gelsd::dgelsd`, `Gelsd`, `DgelsdError` (the checks of `LDA`, `LDB`, `LWORK`; the quick return; `DLANGE('M')` of `A` and `B` and their scalings by `DLASCL` to `[SMLNUM, BIGNUM]` (`SMLNUM = DLAMCH('S')/DLAMCH('P')`) and the undoing on `B` and `S`; an all-zero `A`; `B`'s rows past `M` cleared for `M < N`; path 1a (`DGEQRF`, `DORMQR('L', 'T')`, zeros below `R`), path 1 (`DGEBRD`, `DORMBR('Q', 'L', 'T')`, `DLALSD('U')`, `DORMBR('P', 'L', 'N')`), path 2a (`DGELQF`, `L` copied with zeros above at `LDWORK = M` or `LDA` by the workspace's rule, `DGEBRD` of `L`, the two `DORMBR`, `DLALSD('U')`, `B`'s rows past `M` cleared, `DORMLQ('L', 'T')`), path 2 (`DGEBRD` lower, `DORMBR('Q')`, `DLALSD('L')`, `DORMBR('P')`); every callee given `LWORK - NWORK + 1`; `INFO` from `DLALSD` returned as LAPACK does; a non-finite `A` refused, where LAPACK scales an infinity to NaN and may loop) | `dgelsd.f` (identical in both trees), `dlange.f`, `dlascl.f`, `dlaset.f`, `dlacpy.f`, `la_xisnan.F90`, `xerbla.f`, `INSTALL/dlamch.f` | BSD-3-Clause |
+| `numpy_linalg::gelsd::dgelsd_lwork`, `gelsd_mnthr`, `gelsd_nlvl` (`DGELSD`'s query: `MAXWRK`, `MINWRK`, `LIWORK`, `WLALSD` with `ILAENV(1, ...) = 32` for `DGEQRF`, `DORMQR`, `DGEBRD`, `DORMBR`, `DGELQF`, `DORMLQ`, `ILAENV(6, 'DGELSD') = INT(REAL(MIN(M, N))·1.6E0)` in single precision, `ILAENV(9) = 25`, `NLVL` through glibc's `log` as `larmorx_core::math::log_glibc`, the same in both releases) | `dgelsd.f`, `ilaenv.f` (ISPEC 1, 6 and 9: the same in both trees) | BSD-3-Clause |
+| `numpy_linalg::gelsd::dlalsd` (the checks of `NRHS` and `LDB` as `INFO` (XERBLA's refusals), `RCND`, `N = 0` and `N = 1`, the lower bidiagonal rotated to upper by `DLARTG` with `DROT` on `B`'s rows (both orders of the original: one column's operations the same), `DLANST`, a zero bidiagonal, the scaling by `ORGNRM`; `N <= SMLSIZ`: `VT = I`, `DLASDQ('U', 0, N, N, 0, NRHS)` with `C = B`, `TOL = RCND·|D(IDAMAX)|`, the rows cleared or scaled by `DLASCL`, the rank, `DGEMM('T', 'N')` and `DLACPY`, the unscalings, `DLASRT('D')`; the divide-and-conquer path for `N > SMLSIZ` not ported yet) | `dlalsd.f` (identical in both trees), `dlasdq.f`, `dlartg.f90`, `dlanst.f`, `dlascl.f`, `dlaset.f`, `dlacpy.f`; OpenBLAS `interface/rot.c`, `kernel/x86_64/drot.c`, `kernel/x86_64/iamax_sse2.S`, `interface/gemm.c` with the level-3 driver above | BSD-3-Clause |
+| `numpy_linalg::gelsd::dlasrt`, `Sort` (`DLASRT('I' \| 'D')`: insertion sort on stretches of at most 20 steps, quicksort with the median of three, the stack's order) | `dlasrt.f` (identical in both trees) | BSD-3-Clause |
+| `numpy_linalg::gelsd::numpy_lstsq` (`lstsq(a, b, rcond)`: `rcond = None` as `eps·max(m, n)`, the copies into Fortran order with `LDA = max(1, m)`, `LDB = max(1, m, n)`, no right-hand side as one zero column, numpy 2.5.4's `all_finite` refusal of `a` (for every release: NP-10), the optimal workspace, `LinAlgError` on `INFO != 0`, `x` from `B`'s first rows (0 for `m = 0`), the residuals by `abs2` at stride `m` kept only when the rank is `n` and `m > n`) | numpy 2.5.4 and 2.3.5 `numpy/linalg/umath_linalg.cpp` (`lstsq`, `init_gelsd`, `call_gelsd`, `release_gelsd`, `abs2`, `all_finite` (2.5.4 only), `linearize_matrix`, `delinearize_matrix`), `numpy/linalg/_linalg.py` (`lstsq`, `_raise_linalgerror_lstsq`, identical in both) | BSD-3-Clause |
+
+Validated bit for bit against numpy's own `scipy_dgelsd_64_`, `scipy_dlalsd_64_`,
+`scipy_dlasrt_64_` and its `np.linalg.lstsq` in both kept environments
+(`validation/investigations/confounds/check_gelsd.py`, 2026-11-11): see
+`validation/investigations/confounds/README.md` for the counts and commits.
+
 ## SciPy's 4 × 4 inverse (`scipy_linalg`, field maps part B, relay 18)
 
 **Ported** from SciPy 1.18.1 (`scipy/linalg/_basic.py` `inv`, `src/_linalg_inv.hh`

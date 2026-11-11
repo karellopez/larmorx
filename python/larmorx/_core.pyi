@@ -1749,3 +1749,53 @@ def numpy_pinv(
     gemm_q: int = 256,
 ) -> np.ndarray:
     """``numpy.linalg.pinv(a, rcond)`` of a float64 matrix."""
+
+def lapack_dlasrt(id: str, d: np.ndarray) -> np.ndarray:
+    """LAPACK's ``DLASRT``: ``d`` sorted increasing (``"I"``) or decreasing (``"D"``)."""
+
+def lapack_dlalsd(
+    uplo_: str,
+    smlsiz: int,
+    n: int,
+    nrhs: int,
+    d: np.ndarray,
+    e: np.ndarray,
+    b: np.ndarray,
+    ldb: int,
+    rcond: float,
+    lapack: str = "3.12.1",
+    n_threads: int = 1,
+    gemm_q: int = 256,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, int, int]:
+    """LAPACK's ``DLALSD`` (``N <= SMLSIZ``; ``NotImplementedError`` beyond); returns ``(D, E,
+    B, RANK, INFO)``."""
+
+def lapack_dgelsd(
+    m: int,
+    n: int,
+    nrhs: int,
+    a: np.ndarray,
+    lda: int,
+    b: np.ndarray,
+    ldb: int,
+    rcond: float,
+    lwork: int | None = None,
+    lapack: str = "3.12.1",
+    n_threads: int = 1,
+    gemm_q: int = 256,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, int, int, int, int]:
+    """LAPACK's ``DGELSD`` (``min(m, n) <= 25``; ``NotImplementedError`` beyond); returns ``(A,
+    B, S, RANK, WORK(1), IWORK(1), INFO)``."""
+
+def lapack_dgelsd_lwork(m: int, n: int, nrhs: int) -> tuple[int, int, int]:
+    """``DGELSD``'s ``(MINWRK, MAXWRK, LIWORK)``."""
+
+def numpy_lstsq(
+    a: np.ndarray,
+    b: np.ndarray,
+    rcond: float | None = None,
+    lapack: str = "3.12.1",
+    n_threads: int = 1,
+    gemm_q: int = 256,
+) -> tuple[np.ndarray, np.ndarray, int, np.ndarray]:
+    """``numpy.linalg.lstsq(a, b, rcond)`` of float64 arrays: ``(x, residuals, rank, s)``."""

@@ -185,7 +185,7 @@ fn kernel_block(
                 bp[kk * NR + cc] = b(kk, cg + cc);
             }
         }
-        let split_col = (nc & 1 == 1 && cg <= nc - 1 && nc - 1 < cg + width).then_some(nc - 1);
+        let split_col = (nc & 1 == 1 && cg < nc && nc - 1 < cg + width).then_some(nc - 1);
         if let Some(j) = split_col {
             for (kk, v) in col.iter_mut().enumerate() {
                 *v = bp[kk * NR + (j - cg)];
@@ -325,7 +325,7 @@ pub fn dgemm_with(
             let mut emit = |i: usize, j: usize, acc: f64| {
                 let slot = &mut ct[(i - r0) + (j - c0) * ldt];
                 let scaled = alpha * acc;
-                *slot = scaled + *slot;
+                *slot += scaled;
             };
             kernel_block(
                 m,
@@ -577,7 +577,7 @@ pub fn dsyrk_lower_with(
                         let s = scaled + 0.0;
                         *slot += s;
                     } else {
-                        *slot = scaled + *slot;
+                        *slot += scaled;
                     }
                 }
             }

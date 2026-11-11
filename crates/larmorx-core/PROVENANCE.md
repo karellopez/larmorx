@@ -290,6 +290,16 @@ numpy 2.5.4 / SciPy 1.18.1 on the seeded cases of
 `validation/investigations/t2smap/numerics/check_numerics.py` (every shape and axis tedana
 reaches, lengths around the pairwise blocks, axes of length 1, NaN, signed zeros, infinities).
 
+## OpenBLAS's Haswell `dgemm` micro-kernel (`src/numpy/gemm.rs`; the confounds' part, 2026-11-11)
+
+**Ported** from `kernel/x86_64/dgemm_kernel_4x8_haswell.S` of OpenBLAS 0.3.30, of the 0.3.34
+release and of v0.3.34-106-g446c436e (numpy 2.5.4's wheels; the same file in the three),
+BSD-3-Clause, notice in the file and in NOTICE: the arithmetic of one tile of the kernel (32
+fused multiply-add chains from +0; the 4-row, 1-column path's four accumulators by `k mod 4`
+and their sum `(a0 + a1) + (a2 + a3)`), with the audited AVX2/FMA dispatch (the same bits on
+every path). The driver around it is `larmorx_transform::openblas::level3`. The logic is
+re-expressed in Rust; no code was copied.
+
 ## numpy's printing of floats (`src/numpy/format.rs`)
 
 **Ported** from numpy 2.5.4 (BSD-3-Clause, unchanged from 2.3.5 on this path):

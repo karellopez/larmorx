@@ -98,6 +98,31 @@ and stage 4's field-map branch, `init_bold_native_wf`'s field-map nodes, `_selec
 `workflows/base.py` (the Jacobian rule, the missing-readout-time message), with niworkflows
 1.15.4's `utils/connections.listify` and nipype 1.12.0's `Merge` (Apache-2.0).
 
+## OpenBLAS's level 3 and `dgemv`, numpy's 2-D `matmul` (`openblas::{level3, level2, matmul}`; the confounds' part, relay 2a, 2026-11-11)
+
+**Ported** from OpenBLAS 0.3.30 (the release, numpy 2.3.5's scipy-openblas64 0.3.30) and from
+the commit numpy 2.5.4's wheels bundle, OpenBLAS **v0.3.34-106-g446c436e** (scipy-openblas64
+0.3.34.106.0, `MacPython/openblas-libs`' `openblas_commit.txt`; `<workspace>/tags/
+OpenBLAS-0.3.34-106-g446c436e`, codeload tarball SHA-256 `ddecf3872f66…`), the 0.3.34 release
+read beside it (`tags/OpenBLAS-0.3.34`): the files below are the same in the three but for
+cancellation hooks in `level3.c` and allocation checks in `gemm.c`/`syrk.c`/`gemv.c` (no
+arithmetic). BSD-3-Clause; the notice is in `openblas.rs` and NOTICE. Which routine numpy calls,
+and with which layout and transposition, was read in numpy 2.5.4 and 2.3.5 (BSD-3-Clause):
+`numpy/_core/src/umath/matmul.c.src`, `numpy/_core/src/multiarray/arraytypes.c.src`
+(`DOUBLE_dot`). The logic is re-expressed in Rust; no code was copied.
+
+| larmorx | Upstream files | Licence |
+|---|---|---|
+| `openblas::level3::dgemm`, `dgemm_with`, `depth_blocks`, `GEMM_Q`, `GEMM_Q_ZEN4` (the interface's returns, `beta`, the depth blocks, the kernel's paths and their classes, `c = alpha·acc + c`) | `interface/gemm.c`, `driver/level3/level3.c` (`level3_thread.c` read for its other depth rule), `kernel/x86_64/dgemm_kernel_4x8_haswell.S` (every path: `INIT*`, `KERNEL*_I/M1/M2/E/SUB`, `KERNEL4x1`, `SAVE*`), `dgemm_beta_skylakex.c`, `KERNEL.HASWELL`, `param.h` (`HASWELL`), `kernel/setparam-ref.c` (the Haswell table; the AMD Zen 4/5 block of 0.3.31 and later), `driver/others/parameter.c`, `common_param.h`, `common_x86_64.h` (`BUFFER_SIZE`) | BSD-3-Clause |
+| `openblas::level3::dsyrk_lower`, `dsyrk_lower_with`, `syrk_depth_blocks` (lower triangle, both `TRANS`) | `interface/syrk.c`, `driver/level3/syrk_k.c` (`syrk_beta`), `level3_syrk.c` (`LOWER`), `syrk_kernel.c` | BSD-3-Clause |
+| `openblas::level2::dgemv` (`N`, `T`; `alpha`, `beta`, positive increments), `ddot` (strided) | `interface/gemv.c`, `kernel/x86_64/dgemv_n_4.c`, `dgemv_n_microk_haswell-4.c`, `dgemv_t_4.c`, `dgemv_t_microk_haswell-4.c`, `dscal.c`, `ddot.c` | BSD-3-Clause |
+| `openblas::matmul::numpy_matmul`, `numpy_matmul_with`, `syrk_case`, `numpy_syrk`, `numpy_syrk_with` | numpy 2.5.4 and 2.3.5 `matmul.c.src` (`DOUBLE_matmul`, `is_blasable2d`, `DOUBLE_gemv`, `DOUBLE_matmul_matrixmatrix`, `DOUBLE_matmul_inner_noblas`, `DOUBLE_matrix_copy`), `arraytypes.c.src` (`DOUBLE_dot`); OpenBLAS's CBLAS paths of `interface/gemm.c`, `gemv.c`, `syrk.c` | BSD-3-Clause |
+
+Validated bit for bit against numpy's own library and `@`/`np.dot` in both kept environments
+(`validation/investigations/confounds/check_blas.py`, 2026-11-11: numpy 2.3.5 4,503 of 4,503;
+numpy 2.5.4 every defined case with `GEMM_Q` 512 on the AMD Zen 4 main machine, where that
+library sets it and crashes on the cases its Haswell kernel's stack buffer cannot hold).
+
 ## SciPy's 4 × 4 inverse (`scipy_linalg`, field maps part B, relay 18)
 
 **Ported** from SciPy 1.18.1 (`scipy/linalg/_basic.py` `inv`, `src/_linalg_inv.hh`

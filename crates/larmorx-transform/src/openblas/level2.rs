@@ -251,7 +251,7 @@ fn gemv_n(
 /// `dgemv_kernel_4x4` (Haswell) for one column of a row block.
 fn dot_fma4(a: &[f64], x: &[f64]) -> f64 {
     let mut l = [0.0f64; 4];
-    for (ra, rx) in a.chunks_exact(4).zip(x.chunks_exact(4)) {
+    for (ra, rx) in a.as_chunks::<4>().0.iter().zip(x.as_chunks::<4>().0) {
         for t in 0..4 {
             l[t] = ra[t].mul_add(rx[t], l[t]);
         }
@@ -262,7 +262,7 @@ fn dot_fma4(a: &[f64], x: &[f64]) -> f64 {
 /// `dgemv_kernel_4x2` (SSE2) for one column: two lanes, each product rounded, then `haddpd`.
 fn dot_pair(a: &[f64], x: &[f64]) -> f64 {
     let (mut l0, mut l1) = (0.0f64, 0.0f64);
-    for (ra, rx) in a.chunks_exact(2).zip(x.chunks_exact(2)) {
+    for (ra, rx) in a.as_chunks::<2>().0.iter().zip(x.as_chunks::<2>().0) {
         let (p0, p1) = (rx[0] * ra[0], rx[1] * ra[1]);
         l0 += p0;
         l1 += p1;
@@ -273,7 +273,7 @@ fn dot_pair(a: &[f64], x: &[f64]) -> f64 {
 /// `dgemv_kernel_4x1` (SSE2): four lanes, each product rounded, `(s0 + s2) + (s1 + s3)`.
 fn dot_single(a: &[f64], x: &[f64]) -> f64 {
     let mut s = [0.0f64; 4];
-    for (ra, rx) in a.chunks_exact(4).zip(x.chunks_exact(4)) {
+    for (ra, rx) in a.as_chunks::<4>().0.iter().zip(x.as_chunks::<4>().0) {
         for t in 0..4 {
             let p = ra[t] * rx[t];
             s[t] += p;

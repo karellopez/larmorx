@@ -1177,3 +1177,46 @@ def sdcflows_unwarp_volume(
     along ``pe_axis`` by ``fmap_hz * ro_time`` (float32 arithmetic, or float64 with
     ``ro_float64``), with SciPy's ``map_coordinates``, times the Jacobian of the shift with
     ``jacobian``. Returns the float32 volume (C order) and the interpolation's notices."""
+
+# --- the confounds' part: OpenBLAS's level-2/3 kernels and numpy's 2-D matmul -------------------
+
+def blas_dgemm(
+    transa: str,
+    transb: str,
+    m: int,
+    n: int,
+    k: int,
+    alpha: float,
+    a: np.ndarray,
+    lda: int,
+    b: np.ndarray,
+    ldb: int,
+    beta: float,
+    c: np.ndarray,
+    ldc: int,
+    n_threads: int = 1,
+    gemm_q: int = 256,
+) -> np.ndarray:
+    """``DGEMM`` on flat column-major float64 storage, as OpenBLAS computes it on the Haswell
+    kernels at one thread (``gemm_q`` 512 follows OpenBLAS >= 0.3.31 on an AMD Zen 4/5);
+    returns the new ``C`` storage."""
+
+def blas_dgemv(
+    trans_: str,
+    m: int,
+    n: int,
+    alpha: float,
+    a: np.ndarray,
+    lda: int,
+    x: np.ndarray,
+    incx: int,
+    beta: float,
+    y: np.ndarray,
+    incy: int,
+) -> np.ndarray:
+    """``DGEMV`` on flat float64 storage (positive increments), as OpenBLAS computes it on the
+    Haswell kernels; returns the new ``Y``."""
+
+def numpy_matmul(a: np.ndarray, b: np.ndarray, n_threads: int = 1, gemm_q: int = 256) -> np.ndarray:
+    """``a @ b`` of two C- or F-contiguous 2-D float64 arrays as numpy dispatches it onto
+    OpenBLAS's Haswell kernels (``dsyrk`` for ``x @ x.T`` and ``x.T @ x``); C-ordered."""

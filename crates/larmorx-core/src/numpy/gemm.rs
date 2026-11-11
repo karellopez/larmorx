@@ -56,8 +56,10 @@ pub type Tile = [[f64; MR]; NR];
 fn tile_4x8_body(ap: &[f64], bp: &[f64], l: usize) -> Tile {
     let mut acc = [[0.0f64; MR]; NR];
     for (a, b) in ap[..l * MR]
-        .chunks_exact(MR)
-        .zip(bp[..l * NR].chunks_exact(NR))
+        .as_chunks::<MR>()
+        .0
+        .iter()
+        .zip(bp[..l * NR].as_chunks::<NR>().0)
     {
         for (col, &bj) in acc.iter_mut().zip(b) {
             for (x, &ai) in col.iter_mut().zip(a) {

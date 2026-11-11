@@ -6,6 +6,63 @@ packages). Versions are written as PyPI writes them ([PEP 440](https://peps.pyth
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). How a release is made:
 [RELEASING.md](RELEASING.md).
 
+## [Unreleased]
+
+The changes on `main` since 0.1.0rc1, for the next release.
+
+### Added
+
+- **larmorx's own command-line options**, between `larmorx` (or `lx`) and the family, so that
+  they never clash with the original programs' options:
+  `larmorx [--n-threads N] [--implementation auto|replica|clean-room] [--upstream-defects fix|reproduce] <family> <tool> ...`
+  (`--opt value` or `--opt=value`). Each has the name and the values of the Python argument
+  (`n_threads`, `implementation`, `upstream_defects`) and replaces an environment variable
+  (`OMP_NUM_THREADS`, for ANTs' tools `ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS` and `NSLOTS`;
+  `LARMORX_IMPLEMENTATION`; `LARMORX_UPSTREAM_DEFECTS`), which keeps working: an option given
+  wins over its variable, with the same results. `--n-threads 0`, the command line's default, is
+  every logical CPU. A tool whose original has its own thread option (tedana's
+  `t2smap --n-threads`, sdcflows' `--nprocs` and `--omp-nthreads`, FSL's `topup --nthr`) uses it
+  when it is given, else `--n-threads`. A wrong or missing value, or an option given twice, is a
+  usage error (exit status 2); `larmorx --help` lists the options.
+- **The companion programs** `larmorx-nc` and `larmorx-gpl` take the same options before the
+  family: `--n-threads`, `--upstream-defects`, and `--implementation replica` (their one
+  implementation; `auto`, `clean-room` and `original` are refused with exit status 2).
+- **The tools' messages while they run**, in the console script pip installs (`larmorx`, `lx`) as
+  in the standalone program: until now they appeared when the tool ended, so a long
+  `antsRegistration -v` looked frozen.
+- **First steps** in the README: where pip puts the commands (`<venv>/bin`, `<venv>\Scripts`,
+  the `sysconfig` line, `python -m larmorx`), the three options with the variables they replace,
+  an example from start to end for Linux and macOS and one for Windows PowerShell, and what the
+  `upstream defect ... corrected` notices mean.
+
+### Changed
+
+- **The clean-room originals are called `clean-room`**, as "the original" means FSL's or AFNI's
+  own program: `implementation="clean-room"` in Python, `--implementation clean-room` and
+  `LARMORX_IMPLEMENTATION=clean-room` on the command line, `Implementation(kind='clean-room', ...)`
+  in a result, and `++ implementation: clean-room (larmorx ...)` in AFNI's `-verbose` line.
+- **topup's replica without `--nthr`, and `t2smap` without its own `--n-threads`**, run on the
+  thread count given (`--n-threads`, else `OMP_NUM_THREADS`, else every logical CPU) instead of
+  one thread; their results are the same bytes at every thread count.
+- **PyPI's author** of the three packages: Karel Mauricio López Vilaret, with the e-mail address
+  `CITATION.cff` gives.
+
+### Deprecated
+
+- `original` as an implementation's name, the spelling of 0.1.0rc1: it still works, with a
+  `DeprecationWarning` in Python and silently on the command line and in
+  `LARMORX_IMPLEMENTATION`.
+
+### Fixed
+
+- The copyable shell blocks of the README, the PyPI descriptions and the API pages hold no
+  comments: zsh, macOS's default shell, does not take a `#` typed at its prompt as a comment, so
+  `pip install larmorx  # the library ...` also asked pip for packages named `#`, `the`, ... A
+  test keeps comments out of them.
+- `scripts/release/check_install.py` keeps pip's temporary files and cache in its work folder:
+  inside Apptainer's `--containall`, `/tmp` and the home folder are a 64 MiB space that pip
+  filled ("No space left on device").
+
 ## [0.1.0rc1] - 2026-11-11
 
 The first release, as a **release candidate**: a pre-release, published to check that the
@@ -127,4 +184,5 @@ other records are the port's or the clean-room original's.
   line of the AFNI programs, and the `"Python"` field of the `dataset_description.json` that
   `t2smap` writes. From 0.1.0 on both forms are the same.
 
+[Unreleased]: https://github.com/karellopez/larmorx/compare/v0.1.0rc1...HEAD
 [0.1.0rc1]: https://github.com/karellopez/larmorx/releases/tag/v0.1.0rc1

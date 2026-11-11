@@ -57,6 +57,8 @@ On a branch, as any change:
 
 2. **CHANGELOG.md:** a section headed `## [0.1.0] - 2026-12-01` (the date of `CITATION.cff`),
    in plain words: what is new since the last release, what was fixed, the known limitations.
+   The changes gather meanwhile under `## [Unreleased]` at the top: rename that heading to the
+   version's, and start a new, empty `## [Unreleased]` above it after the release.
    Its tools' statuses come from `validation/tools.toml`: copy the two marker lines of the
    statuses table from the last section into the new one, then
 
@@ -68,7 +70,7 @@ On a branch, as any change:
    (the second prints the release's text).
 
    Add the link definition `[0.1.0]: https://github.com/karellopez/larmorx/releases/tag/v0.1.0`
-   at the end of the file. The README's status line names the newest release; update it too.
+   at the end of the file (and point `[Unreleased]`'s comparison at the new tag). The README's status line names the newest release; update it too.
 3. **The checks** the release's first job runs, here first:
 
    ```bash

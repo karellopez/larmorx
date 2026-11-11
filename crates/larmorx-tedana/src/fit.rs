@@ -136,7 +136,8 @@ fn obs(x: f32, reproduce: bool) -> f64 {
 }
 
 /// The log-linear fit of every group (§7.2), `volumes` the used ones (`None`: all), or with
-/// `ts` one fit per volume (§7.4).
+/// `ts` one fit per volume (§7.4). Every voxel is solved alone, in parallel, straight into the
+/// maps (no per-voxel intermediate array: the memory of §16).
 pub fn loglin(
     data: &Data,
     count: &[u8],
@@ -160,98 +161,109 @@ pub fn loglin(
     } else {
         volumes.map_or(data.n_t, <[usize]>::len)
     };
-    let mut divide_by_zero = false;
-    for (n, members) in groups(count) {
-        if tes[..n].iter().any(|t| !t.is_finite()) {
+    let groups = groups(count);
+    // the group of each echo count (count 1 is fitted in group 2)
+    let mut designs: Vec<Option<Design>> = (0..256).map(|_| None).collect();
+    for (n, _) in &groups {
+        if tes[..*n].iter().any(|t| !t.is_finite()) {
             // TED-10 in `reproduce` (the default refuses an infinite echo time earlier)
             return Err(PyError::new(
                 "numpy.linalg.LinAlgError",
                 "SVD did not converge in Linear Least Squares",
             ));
         }
-        let design = Design::new(tes, n, tu);
-        // per member and column: the per-echo sums, whether an observation is infinite
-        let fits: Vec<(f64, f64, bool)> = members
-            .par_iter()
-            .with_min_len(64)
-            .flat_map_iter(|&v| {
-                let design = &design;
-                (0..cols).map(move |t| {
-                    let mut s = [0.0f64; 256];
-                    let mut inf = false;
-                    for (e, se) in s.iter_mut().enumerate().take(n) {
-                        let series = data.series(v, e);
-                        let mut acc = 0.0f64;
-                        if ts {
-                            acc = obs(series[t], reproduce);
-                        } else {
-                            match volumes {
-                                None => {
-                                    for &x in series {
-                                        acc += obs(x, reproduce);
-                                    }
-                                }
-                                Some(vols) => {
-                                    for &tt in vols {
-                                        acc += obs(series[tt], reproduce);
-                                    }
-                                }
-                            }
-                        }
-                        inf |= acc.is_infinite();
-                        *se = acc;
-                    }
-                    let (b0, b1) = design.solve(&s[..n]);
-                    (b0, b1, inf)
-                })
-            })
-            .collect();
-        let n_inf = fits.iter().filter(|f| f.2).count();
-        // tedana's batch of a column (every volume's own in `ts`) is NaN when one of its
-        // voxels has an infinite observation (TED-09)
-        let mut poison = vec![false; cols];
-        if reproduce {
-            for (k, f) in fits.iter().enumerate() {
-                poison[k % cols] |= f.2;
-            }
-        }
-        if n_inf > 0 {
-            let detail = if reproduce {
-                format!(
-                    "an infinite sample makes all {} voxels of the {n}-echo fit NaN",
-                    members.len()
-                )
+        designs[*n] = Some(Design::new(tes, *n, tu));
+    }
+    let group_of = |c: u8| -> usize { (c as usize).max(2) };
+    // whether a fit's observations hold an infinite value (an infinite sample, TED-09)
+    let infinite = |v: usize, n: usize, t: usize| -> bool {
+        (0..n).any(|e| {
+            let s = data.series(v, e);
+            if ts {
+                s[t].is_infinite()
             } else {
-                format!(
-                    "{n_inf} voxel(s) with an infinite sample fitted alone (NaN); tedana's \
-                     {n}-echo fit makes all {} voxels of that count NaN",
-                    members.len()
-                )
-            };
-            notices.add(&defects::TED_09, detail);
+                match volumes {
+                    None => s.iter().any(|x| x.is_infinite()),
+                    Some(vols) => vols.iter().any(|&tt| s[tt].is_infinite()),
+                }
+            }
+        })
+    };
+    // tedana's batch of a group and column (every volume's own in `ts`) is NaN when one of its
+    // fits has an infinite observation
+    let mut poison = vec![false; 256 * cols];
+    for (n, members) in &groups {
+        let flags: Vec<bool> = members
+            .par_iter()
+            .with_min_len(256)
+            .flat_map_iter(|&v| (0..cols).map(move |t| infinite(v, *n, t)))
+            .collect();
+        let n_inf = flags.iter().filter(|&&f| f).count();
+        if n_inf == 0 {
+            continue;
         }
-        for (j, &v) in members.iter().enumerate() {
+        for (k, &f) in flags.iter().enumerate() {
+            poison[*n * cols + k % cols] |= f;
+        }
+        let detail = if reproduce {
+            format!(
+                "an infinite sample makes all {} voxels of the {n}-echo fit NaN",
+                members.len()
+            )
+        } else {
+            format!(
+                "{n_inf} voxel(s) with an infinite sample fitted alone (NaN); tedana's {n}-echo \
+                 fit makes all {} voxels of that count NaN",
+                members.len()
+            )
+        };
+        notices.add(&defects::TED_09, detail);
+    }
+    let divide_by_zero = maps
+        .t2s
+        .par_chunks_mut(cols)
+        .zip(maps.s0.par_chunks_mut(cols))
+        .zip(maps.s0_other.par_chunks_mut(cols))
+        .enumerate()
+        .with_min_len(64)
+        .map(|(v, ((t2s, s0), s0_other))| {
+            if count[v] == 0 {
+                return false;
+            }
+            let n = group_of(count[v]);
+            let design = designs[n].as_ref().expect("the voxel's group");
+            let mut zero = false;
             for t in 0..cols {
-                let (mut b0, mut b1, inf) = fits[j * cols + t];
-                if poison[t] || inf {
+                let mut s = [0.0f64; 256];
+                for (e, se) in s.iter_mut().enumerate().take(n) {
+                    let series = data.series(v, e);
+                    *se = if ts {
+                        obs(series[t], reproduce)
+                    } else {
+                        match volumes {
+                            None => series.iter().map(|&x| obs(x, reproduce)).sum(),
+                            Some(vols) => vols.iter().map(|&tt| obs(series[tt], reproduce)).sum(),
+                        }
+                    };
+                }
+                let (mut b0, mut b1) = design.solve(&s[..n]);
+                if (reproduce && poison[n * cols + t]) || s[..n].iter().any(|x| x.is_infinite()) {
                     b0 = f64::NAN;
                     b1 = f64::NAN;
                 }
-                if b1 == 0.0 {
-                    divide_by_zero = true;
-                }
-                let k = v * cols + t;
-                maps.t2s[k] = 1.0f64.div(b1);
+                zero |= b1 == 0.0;
+                t2s[t] = 1.0f64.div(b1);
                 let (ours, other) = if reproduce {
                     (math::exp_glibc(b0), math::exp(b0))
                 } else {
                     (math::exp(b0), math::exp_glibc(b0))
                 };
-                maps.s0[k] = ours;
-                maps.s0_other[k] = other;
+                s0[t] = ours;
+                s0_other[t] = other;
             }
-        }
-    }
+            zero
+        })
+        .reduce(|| false, |a, b| a || b);
     if divide_by_zero {
         log.py_warning(
             "fit.rs:200",

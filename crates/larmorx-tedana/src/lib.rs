@@ -91,6 +91,8 @@ fn run(
         None => std::env::current_dir().map_err(|e| PyError::new("OSError", e.to_string()))?,
     };
     let cwd = Some(cwd_owned.as_path());
+    // --exclude's text: its errors come before the output directory is made (observed)
+    let exclude = volumes::parse_exclude(o.exclude.as_deref())?;
     // 1. the output directory
     let out_dir = abspath(&cwd_owned, &o.out_dir);
     if !out_dir.is_dir() {
@@ -114,8 +116,6 @@ fn run(
             )
         })?;
     }
-    // 2. --exclude's text
-    let exclude = volumes::parse_exclude(o.exclude.as_deref())?;
     // 3., 4.
     log.info(
         "t2smap:t2smap_workflow:365",

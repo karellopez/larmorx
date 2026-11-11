@@ -519,6 +519,7 @@ mod tests {
             "  --upstream-defects MODE  fix (default) or reproduce; replaces LARMORX_UPSTREAM_DEFECTS\n",
             "  --implementation replica changes nothing: this program runs the replicas only (auto and\n",
             "  fsl topup --nthr. The results never depend on the thread count.\n",
+            "  FSLOUTPUTTYPE             the images' format, as in FSL (unset: NIFTI_GZ, .nii.gz, and a\n",
         ] {
             assert!(out.contains(line), "{line}\n{out}");
         }

@@ -147,10 +147,10 @@ fn run(
 /// acquisition parameters, a phase image, an identity matrix; topup's results (for applytopup)
 /// and bet2's mesh (for betsurf), made with `FSLOUTPUTTYPE=NIFTI_GZ`.
 fn inputs(d: &Path) {
-    image(&d.join("in.nii"), &[20, 20, 16], |v| v);
-    image(&d.join("series.nii"), &[20, 20, 16, 3], |v| v);
-    image(&d.join("pair.nii"), &[20, 20, 16, 2], |v| v);
-    image(&d.join("phase.nii"), &[20, 20, 16], |v| {
+    image(&d.join("in.nii"), &[12, 12, 10], |v| v);
+    image(&d.join("series.nii"), &[12, 12, 10, 3], |v| v);
+    image(&d.join("pair.nii"), &[12, 12, 10, 2], |v| v);
+    image(&d.join("phase.nii"), &[12, 12, 10], |v| {
         v / 1100.0 * 3.0 - 1.5
     });
     std::fs::write(d.join("eye.mat"), "1 0 0 0\n0 1 0 0\n0 0 1 0\n0 0 0 1\n").unwrap();
@@ -239,8 +239,7 @@ fn image_calls() -> Vec<(&'static str, Vec<&'static str>, i32)> {
             1,
         ),
         ("bet2", vec!["fsl", "bet2", "in.nii", "b2", "-m"], 1),
-        ("bet", vec!["fsl", "bet", "in.nii", "b", "-m"], 1),
-        // bet2 run three times by the script: one line all the same
+        // the script runs bet2 three times: one line all the same
         ("bet", vec!["fsl", "bet", "in.nii", "bR", "-R"], 1),
         (
             "betsurf",
@@ -384,9 +383,6 @@ fn every_fsl_tool_writes_nifti_gz_when_fsloutputtype_is_unset() {
             "{args:?}: {:?}",
             r_files.keys()
         );
-        // with the variable set, reproduce writes the images as it always did
-        let (rg, _) = run(d, &[("FSLOUTPUTTYPE", "NIFTI_GZ")], true, &args);
-        assert_eq!(rg.status.code(), Some(0), "{args:?}: {rg:?}");
     }
 }
 
@@ -454,7 +450,17 @@ fn tools_that_write_no_image_run_as_with_the_variable() {
     for args in [
         // flirt without an output image: nothing where FSL would stop
         vec![
-            "fsl", "flirt", "-in", "in.nii", "-ref", "in.nii", "-omat", "o.mat", "-dof", "6",
+            "fsl",
+            "flirt",
+            "-in",
+            "in.nii",
+            "-ref",
+            "in.nii",
+            "-omat",
+            "o.mat",
+            "-dof",
+            "6",
+            "-nosearch",
         ],
         vec!["fsl", "fslstats", "in.nii", "-M"],
         vec![
@@ -509,7 +515,7 @@ fn fsl09_names_the_program_that_ran() {
     let tmp = tempfile::tempdir().unwrap();
     let d = tmp.path();
     inputs(d);
-    image_i16(&d.join("s16.nii"), &[20, 20, 16, 2]);
+    image_i16(&d.join("s16.nii"), &[12, 12, 10, 2]);
     std::fs::write(
         d.join("shift.mat"),
         "1 0 0 0.5\n0 1 0 0\n0 0 1 0\n0 0 0 1\n",

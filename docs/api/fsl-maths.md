@@ -252,6 +252,10 @@ standard error (`larmorx-nc: upstream defect FSL-<n> (fslmaths) corrected: ...`)
 `UpstreamDefectWarning` ([all of them](upstream-defects.md)). Where FSL crashes, hangs or reads
 memory it never wrote, both modes refuse with a message (exit status 1).
 
+- **FSL-11**: with `FSLOUTPUTTYPE` unset FSL's fslmaths stops with FSL's message when it writes
+  its output (exit 1). The clean-room original writes the images as `NIFTI_GZ` (`.nii.gz`: the bytes
+  `FSLOUTPUTTYPE=NIFTI_GZ` gives) and names FSL-11 on one line per command; `reproduce` stops as FSL
+  does. Command line only: the Python functions set the type themselves.
 - **FSL-151**: conversions to an integer type beyond its range, or of NaN, wrap around: clamped
   (NaN as 0).
 - **FSL-152**: the thresholds, `-bin`, `-binv` and `-mas` bound their other side by the maximum

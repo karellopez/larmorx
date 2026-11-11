@@ -190,7 +190,8 @@ volumes, writing the corrected series too): 20 s on 3 threads and 36 s on one; m
 
 ## Deliberate differences
 
-- Without `FSLOUTPUTTYPE`, larmorx writes `.nii.gz` (mcflirt writes the matrices, then fails).
+- Without `FSLOUTPUTTYPE`, larmorx writes `.nii.gz` and names FSL-11 (mcflirt writes the
+  matrices, then fails; `reproduce` does so too).
   With an unknown value, larmorx prints mcflirt's message and exits 1 before any work (mcflirt
   prints it after the estimation and the `.mat` and `.par` files). Compressed outputs hold the
   same decompressed bytes as mcflirt's would, compressed by larmorx's own encoders (zstd in one
@@ -223,6 +224,7 @@ in both modes ([upstream-defects.md](upstream-defects.md); register entries in
 | FSL-07 | numbers read with C's `atoi`/`atof` (`-refvol abc` is 0, `-stages 1.5` is 1); `-help` alone exits 1 | anything but a number is an error (exit 255); `-help` alone exits 0 | command line |
 | FSL-08 | the `-stats` images leave the first and last slices at 0, and the `-stats` and `-meanvol` images are named after the `-out` string with its extension inside (`x.nii.gz_meanvol.nii.gz`) | every slice; `x_meanvol.nii.gz`, `x_mean_reg.nii.gz` (the names nipype expects) | `-stats`, `-meanvol` |
 | FSL-09 | int8 input is written as uint8; integer outputs are truncated toward zero, and values beyond the type's range wrap around (x86-64; observed) | int8 kept; rounded to the nearest (half to even) and clamped | integer outputs of the command line |
+| FSL-11 | `FSLOUTPUTTYPE` unset: mcflirt writes the matrices and the `.par` file, then stops at its first image with FSL's message (exit 1; with `-meanvol` its mean image comes first: nothing written) | the images as `NIFTI_GZ` (`.nii.gz`), FSL-11 named on one line; `reproduce` stops where mcflirt does | the command line without `FSLOUTPUTTYPE` |
 | FSL-10 | the output's units are always millimetres and seconds: a TR in milliseconds is labelled seconds | the input's units are kept (millimetres and seconds where it gives none) | inputs in other units (ds003345: milliseconds) |
 | FSL-13 | `-rmsrel` and `-rmsabs` create the `.mat` directory without `-mats` (holding only the reference's identity) | no `.mat` directory without `-mats` | command line |
 | FSL-04 | `-gdt` registers each volume's gradient image to the reference's plain image (the reference's gradient is computed and discarded) | refused (the clean-room original does not support `-gdt`); the replica reproduces it with `reproduce` | `-gdt` |

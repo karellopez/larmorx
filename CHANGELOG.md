@@ -46,6 +46,10 @@ The changes on `main` since 0.1.0rc1, for the next release.
   one thread; their results are the same bytes at every thread count.
 - **PyPI's author** of the three packages: Karel Mauricio López Vilaret, with the e-mail address
   `CITATION.cff` gives.
+- **FSL's tools without `FSLOUTPUTTYPE`** (FSL-11): every FSL tool's clean-room original writes
+  its images as `.nii.gz` (`NIFTI_GZ`) when the variable is unset, as `flirt` and `mcflirt`
+  already did, and names FSL-11 on one line per command; FSL's own programs stop at their first
+  image (exit 1), which `--upstream-defects reproduce` gives. Setting the variable is optional.
 
 ### Deprecated
 
@@ -59,6 +63,8 @@ The changes on `main` since 0.1.0rc1, for the next release.
   comments: zsh, macOS's default shell, does not take a `#` typed at its prompt as a comment, so
   `pip install larmorx  # the library ...` also asked pip for packages named `#`, `the`, ... A
   test keeps comments out of them.
+- The FSL-09 notice (an integer output rounded instead of truncated) of `flirt`, `applyxfm4D`
+  and `applytopup` names the program that wrote it; it named `mcflirt`.
 - `scripts/release/check_install.py` keeps pip's temporary files and cache in its work folder:
   inside Apptainer's `--containall`, `/tmp` and the home folder are a 64 MiB space that pip
   filled ("No space left on device").

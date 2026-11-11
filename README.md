@@ -195,11 +195,14 @@ is given, otherwise `--n-threads`: tedana's `t2smap --n-threads`, sdcflows' `--n
 [ds000005](https://openneuro.org/datasets/ds000005) (public domain, PDDL; 21 MB): a new virtual
 environment, the two images downloaded, then ANTs' bias-field correction on four threads, FSL's
 brain extraction, head-motion correction and registration, and AFNI's brain mask computed by the
-replica (the default) and by the clean-room original. FSL's tools need `FSLOUTPUTTYPE`, as FSL's
-own do (`NIFTI_GZ`: they write `.nii.gz` files). The last command gives the original N4's result
-instead of the corrected one. On Linux and macOS (bash or zsh), with Python 3.12 or newer as
-`python3` (macOS's own `python3` is older: install one from [python.org](https://www.python.org)
-or Homebrew):
+replica (the default) and by the clean-room original. FSL's tools write `.nii.gz` files and say so
+in one line each (`upstream defect FSL-11 ... corrected`, below): FSL's own programs need
+`FSLOUTPUTTYPE` and stop without it, larmorx's do not (new since 0.1.0rc1, whose FSL tools other
+than `flirt` and `mcflirt` need it as FSL's do). Set it to choose another type, as with FSL
+(`export FSLOUTPUTTYPE=NIFTI` writes `.nii` files; `$env:FSLOUTPUTTYPE = "NIFTI"` in PowerShell).
+The last command gives the original N4's result instead of the corrected one. On Linux and macOS
+(bash or zsh), with Python 3.12 or newer as `python3` (macOS's own `python3` is older: install one
+from [python.org](https://www.python.org) or Homebrew):
 
 ```bash
 python3 -m venv larmorx-env
@@ -209,7 +212,6 @@ mkdir larmorx-demo
 cd larmorx-demo
 curl -L -o t1w.nii.gz https://s3.amazonaws.com/openneuro.org/ds000005/sub-01/anat/sub-01_T1w.nii.gz
 curl -L -o bold.nii.gz https://s3.amazonaws.com/openneuro.org/ds000005/sub-01/func/sub-01_task-mixedgamblestask_run-01_bold.nii.gz
-export FSLOUTPUTTYPE=NIFTI_GZ
 larmorx --n-threads 4 ants N4BiasFieldCorrection -d 3 -i t1w.nii.gz -o t1w_n4.nii.gz
 larmorx fsl bet t1w_n4.nii.gz t1w_brain -R -m
 larmorx fsl mcflirt -in bold.nii.gz -out bold_mcf -plots
@@ -233,7 +235,6 @@ mkdir larmorx-demo
 cd larmorx-demo
 curl.exe -L -o t1w.nii.gz https://s3.amazonaws.com/openneuro.org/ds000005/sub-01/anat/sub-01_T1w.nii.gz
 curl.exe -L -o bold.nii.gz https://s3.amazonaws.com/openneuro.org/ds000005/sub-01/func/sub-01_task-mixedgamblestask_run-01_bold.nii.gz
-$env:FSLOUTPUTTYPE = "NIFTI_GZ"
 larmorx --n-threads 4 ants N4BiasFieldCorrection -d 3 -i t1w.nii.gz -o t1w_n4.nii.gz
 larmorx fsl bet t1w_n4.nii.gz t1w_brain -R -m
 larmorx fsl mcflirt -in bold.nii.gz -out bold_mcf -plots
@@ -262,7 +263,9 @@ the corrected result, as it does by default. The code (`ANTS-40`) is the defect'
 page explains the rules. To get the original program's result, bit for bit, give
 `--upstream-defects reproduce` before the family (the notice's `LARMORX_UPSTREAM_DEFECTS=reproduce`
 is the same setting as an environment variable; `upstream_defects="reproduce"` in Python); the
-notice then says `reproduced`. The replica programs' notices start with `larmorx-nc:` or
+notice then says `reproduced`. FSL-11's notice (`FSLOUTPUTTYPE` not set, the images written as
+`.nii.gz`) is printed once per command that writes an image; with `--upstream-defects reproduce`
+an FSL tool stops at its first image with FSL's message, as FSL's does. The replica programs' notices start with `larmorx-nc:` or
 `larmorx-gpl:`, and AFNI's tools print theirs as AFNI's warnings (`*+ WARNING: upstream defect
 AFNI-99 (3dvolreg) corrected: ...`).
 

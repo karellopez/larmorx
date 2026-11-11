@@ -376,8 +376,10 @@ fn fsl_and_mri_options_give_the_variables_bytes() {
         "mc",
         "-plots",
     ];
-    same(
+    // FSLOUTPUTTYPE set: reproduced, mcflirt stops without it (FSL-11)
+    same_in(
         d,
+        &[("FSLOUTPUTTYPE", "NIFTI_GZ")],
         &[
             "--implementation",
             "clean-room",

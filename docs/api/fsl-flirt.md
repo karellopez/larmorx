@@ -310,8 +310,13 @@ count's running total taking each point's weight as the point is visited).
 Corrected by default, FSL's behaviour with `upstream_defects="reproduce"`
 ([register](../findings/upstream-defects.md)):
 - **FSL-09**: integer outputs rounded to the nearest and clamped (FLIRT truncates; int8 kept as
-  int8, FLIRT writes uint8).
-- **FSL-11**: `FSLOUTPUTTYPE` unset writes `.nii.gz`.
+  int8, FLIRT writes uint8); the notice names the program that wrote the output (flirt,
+  applyxfm4D).
+- **FSL-11**: with `FSLOUTPUTTYPE` unset FSL's flirt and applyxfm4D stop with FSL's message at
+  their first image (exit 1; `-omat` alone writes no image, and runs). The clean-room original
+  writes the images as `NIFTI_GZ` (`.nii.gz`: the bytes `FSLOUTPUTTYPE=NIFTI_GZ` gives) and names
+  FSL-11 on one line per command; `reproduce` stops as FSL does. Command line only: the Python
+  functions set the type themselves.
 - **FSL-14**: non-finite voxels left out of the costs (one NaN makes FLIRT's cost NaN).
 - **FSL-56**: NIfTI extensions' offset.
 - **FSL-68**: an error after the command line (an image or matrix that cannot be read, an unknown

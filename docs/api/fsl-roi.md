@@ -106,6 +106,11 @@ the rest).
 
 ## Deliberate differences (D13; `LARMORX_UPSTREAM_DEFECTS=reproduce` gives FSL's)
 
+- **FSL-11** (`fslroi`, `standard_space_roi`): with `FSLOUTPUTTYPE` unset FSL's fslroi stops with
+  FSL's message at its output (exit 1), and standard_space_roi's script goes on after its FLIRT
+  stops there (exit 0, no output). The clean-room original writes the images as `NIFTI_GZ`
+  (`.nii.gz`: the bytes `FSLOUTPUTTYPE=NIFTI_GZ` gives) and names FSL-11 on one line per command;
+  `reproduce` stops as FSL does. Command line only: the Python functions set the type themselves.
 - **FSL-211** (`standard_space_roi`): the script expands its arguments unquoted; by default each
   name is one name, whatever its blanks; `reproduce` splits them as the shell does (with the
   shell's `[: too many arguments`). A name with `*`, `?` or `[` in `reproduce` is refused: the

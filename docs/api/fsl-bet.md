@@ -149,6 +149,11 @@ Corrected by default, reproduced with `upstream_defects="reproduce"`
 `lx.UpstreamDefectWarning` (on the command line `larmorx-nc: upstream defect <ID> ...`). Decided by
 the project's rules A to D ([register](../findings/upstream-defects.md)):
 
+- **FSL-11** (A): with `FSLOUTPUTTYPE` unset FSL's bet2 and betsurf stop with FSL's message at
+  their first image (exit 1; `bet`'s script fails with them). The clean-room original writes the
+  images as `NIFTI_GZ` (`.nii.gz`: the bytes `FSLOUTPUTTYPE=NIFTI_GZ` gives) and names FSL-11 on one
+  line per command; `reproduce` stops as FSL does. Command line only: the Python functions set the
+  type themselves.
 - **FSL-40** (A): bet2 removes the first `.hdr` of a name wherever it stands, and a name with
   `.img` but no `.hdr` aborts FSL; the default removes a trailing extension only.
 - **FSL-42** (B): a NaN `-f` or `-g`, a negative, NaN or infinite `-r`, `-w` of 0 or less, a

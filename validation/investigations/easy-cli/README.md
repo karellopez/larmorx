@@ -86,3 +86,34 @@ four pages whose shell blocks lost their comments, 1440 and 390 px, light and da
 inventory (`validation/investigations/afni-volreg-original/site_inventory.py`): no count of any
 page went down; the installation page 1,676 -> 2,629 words, the home page 5,076 -> 5,100, the
 FAST, FLIRT, mcflirt and validation pages +4 to +8 words (each comment's text now in the prose).
+
+## FSL-11: FSL's tools without `FSLOUTPUTTYPE` (2026-11-11, relay 2b)
+
+`fsl11_probe.py` runs FSL 6.0.7.23's programs (black box, FSL off the `PATH`) and this branch's
+standalone `larmorx` (`--upstream-defects fix` and `reproduce`) with `FSLOUTPUTTYPE` unset, on a
+generated 16 x 16 x 12 series, and prints each run's exit status, its first line about the
+variable and the files it wrote:
+
+```
+python -P validation/investigations/easy-cli/fsl11_probe.py --fsl ~/fsl-6.0.7.23 \
+    --larmorx target/release/larmorx --work <new folder>
+```
+
+| call | FSL 6.0.7.23 | larmorx (default) | larmorx `reproduce` |
+|---|---|---|---|
+| `mcflirt -mats -plots` | exit 1, FSL's message; `o.mat`, `o.par` written | exit 0; `o.mat`, `o.par`, `o.nii.gz`; FSL-11 named | exit 1, FSL's message; `o.mat`, `o.par` |
+| `mcflirt -meanvol -mats` | exit 1; nothing written (the mean image comes first) | exit 0; the series, its mean, `o.mat`; FSL-11 named | exit 1; nothing written |
+| `flirt -omat` (no image) | exit 0, `o.mat` | the same | the same |
+| `flirt -out -omat` | exit 1; `o.mat` written | exit 0; `o.mat`, `o.nii.gz`; FSL-11 named | exit 1; `o.mat` |
+| `fslmaths ... o` | exit 1; nothing written | exit 0; `o.nii.gz`; FSL-11 named | exit 1; nothing written |
+
+FSL's `standard_space_roi` (a script) goes on after its FLIRT stops: exit 0, no output, its
+standard output the same as larmorx's `reproduce` (compared by hand on the same inputs). Every FSL
+tool's case is a test: `crates/larmorx-cli/tests/fsl_output_types.rs` (the images byte-identical
+to `FSLOUTPUTTYPE=NIFTI_GZ`'s, one FSL-11 line per command, `bet -R`'s three bet2 runs included;
+`reproduce`: FSL's message, no image, FSL's exit status; the tools and calls that write no image
+unchanged in both modes). The README's example without `export FSLOUTPUTTYPE=NIFTI_GZ` (and
+`$env:FSLOUTPUTTYPE`), run as typed with this branch's wheels: an interactive bash and zsh 16
+lines each, 0 failed, every output byte-identical to relay 2's runs with the variable set;
+Windows PowerShell 5.1 on the Windows helper (`win_examples.sh`, a new folder removed and checked
+gone; the site's 0.1.0rc1 example in the same run, 22 lines) 16 lines, 0 failed.

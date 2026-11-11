@@ -5,8 +5,9 @@ Ubuntu 22.04) is the main machine. The old laptop (MSI GE75: Intel i7-8750H, 12 
 becomes a lean helper for speed measurements and extra tests when the main machine is busy
 (`docs/helper-machines.md`). The scripts are in `scripts/orchestration/move/`.
 
-**Same user, same paths:** user `karelo`, workspace `/home/karelo/VScode_projects/super_fmriprep`,
-so every absolute path in the scripts, records, the oracle cache and Claude Code's notes stays
+**Same user, same paths:** the same account name on both laptops, workspace
+`~/VScode_projects/super_fmriprep` (`/home/<user>/VScode_projects/super_fmriprep`; the account
+name is kept out of this public repository), so every absolute path in the scripts, records, the oracle cache and Claude Code's notes stays
 valid. Nothing is cloned again: the repositories move with their history and unpushed commits.
 
 ## The plan at a glance
@@ -68,7 +69,7 @@ valid. Nothing is cloned again: the repositories move with their history and unp
 ```bash
 bash /tmp/pull.sh old-laptop            # the copy (tmux session "move"); run again if it stops
 bash /tmp/pull.sh old-laptop --verify   # the final pass: compares every file's content
-python3 /home/karelo/VScode_projects/super_fmriprep/larmorx/scripts/orchestration/move/check.py
+python3 ~/VScode_projects/super_fmriprep/larmorx/scripts/orchestration/move/check.py
 ```
 
 `second-pass.sh` (tmux session `move2`) does the last two by itself when the copy ends, sets up the
@@ -81,8 +82,9 @@ maths depends on, the tools' versions, each copied tree's files and size.
 
 The new session starts here, in this order, whatever the user's first message says:
 
-1. **Where am I.** `hostname` must print `karelo-Alienware-m18-R1-AMD` (the old laptop is
-   `karelo-GE75-Raider-8SF`). The session-start checks of CLAUDE.md: `uname -m`, `nproc`, free
+1. **Where am I.** `hostname` must print the new laptop's host name (the workspace's
+   `ORCHESTRATOR-STATE.md` names both laptops' host names, outside this public repository). The
+   session-start checks of CLAUDE.md: `uname -m`, `nproc`, free
    memory, `apptainer --version`, `rustc --version`.
 2. **Usage.** `python3 tools/claude-usage/usage.py check` (as before every part). It must print
    GO, SLOW DOWN or PAUSE with the windows read "0 min ago"; "could not read the limits" means
@@ -147,7 +149,7 @@ choices below):
 | What | Size | Why it can go |
 |---|---|---|
 | The agents' worktrees and their build caches (`larmorx/.claude/worktrees`) | 43 GB | all clean and merged into main; the main checkout keeps its own build |
-| The sessions' scratch in `/tmp/claude-1000/-home-karelo-VScode-projects-super-fmriprep/` | 56 GB | temporary files; what mattered is committed or in the archive's documents |
+| The sessions' scratch in `/tmp/claude-<uid>/<workspace path with / and _ as ->/` (Claude Code's folder for this workspace) | 56 GB | temporary files; what mattered is committed or in the archive's documents |
 | `archive/` | 55 GB | its documents are on the new laptop; the rest is temporary data |
 | `oracles/compare` | 22 GB | superseded stage comparisons, redone at the end |
 | mcflirt's raw band runs | 18 GB | summarised in `band.json`; re-measured by the FSL update |

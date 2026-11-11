@@ -2,19 +2,23 @@
 # SPDX-License-Identifier: Apache-2.0
 # The move's phase 4 (docs/machine-move.md): the old laptop cleaned to a helper, only the list the
 # user approved on 2026-10-27. Runs on the old laptop (from the main machine:
-# `ssh old-laptop 'bash -s' < phase4-clean.sh` for the dry run, `... 'bash -s -- --delete' < ...`
-# to delete). The dry run prints every path, its size and the checks; nothing outside the list is
-# touched. Refuses to run on any other machine, and refuses to delete while a check fails.
+# `ssh old-laptop "OLD_LAPTOP_HOSTNAME=<its host name> bash -s" < phase4-clean.sh` for the dry
+# run, `... bash -s -- --delete" < ...` to delete; the host name is not kept in this public
+# repository). The dry run prints every path, its size and the checks; nothing outside the list
+# is touched. Refuses to run on any other machine, and refuses to delete while a check fails.
 set -euo pipefail
 export LC_ALL=C  # the old laptop's locale writes decimal commas, which printf then refuses
-[[ $(hostname) == karelo-GE75-Raider-8SF ]] || { echo "not the old laptop: $(hostname)" >&2; exit 1; }
+OLD=${OLD_LAPTOP_HOSTNAME:?set OLD_LAPTOP_HOSTNAME to the host name of the old laptop}
+[[ $(hostname) == "$OLD" ]] || { echo "not the old laptop: $(hostname)" >&2; exit 1; }
 WS=$HOME/VScode_projects/super_fmriprep
+# Claude Code's folder for the workspace: its path with every / and _ written as -
+PROJECT=$(printf '%s' "$WS" | tr '/_' '--')
 LOG=$WS/oracles/logs/phase4-clean.log
 DELETE=0
 [[ ${1:-} == --delete ]] && DELETE=1
 PATHS=(
   "$WS/larmorx/.claude/worktrees"
-  "/tmp/claude-1000/-home-karelo-VScode-projects-super-fmriprep"
+  "/tmp/claude-$(id -u)/$PROJECT"
   "$WS/archive"
   "$WS/oracles/compare"
   "$WS/oracles/fsl-6.0.7/mcflirt/band/real"

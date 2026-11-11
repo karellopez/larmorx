@@ -28,8 +28,8 @@ update, FLIRT, FreeSurfer, ...) are copied to it from the main machine.
 On the main machine, once (a git remote that points at the old laptop's repository):
 
 ```bash
-cd /home/karelo/VScode_projects/super_fmriprep/larmorx
-git remote add old-laptop old-laptop:/home/karelo/VScode_projects/super_fmriprep/larmorx
+cd ~/VScode_projects/super_fmriprep/larmorx
+git remote add old-laptop old-laptop:VScode_projects/super_fmriprep/larmorx   # a path from the home folder there
 ```
 
 For each measurement, push the commit to a branch there (pushing to a branch that is not checked

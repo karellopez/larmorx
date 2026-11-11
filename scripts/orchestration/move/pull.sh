@@ -13,12 +13,16 @@
 set -euo pipefail
 OLD=${1:?usage: pull.sh <old-host> [--verify] [--dry-run]}
 shift
-WS=/home/karelo/VScode_projects/super_fmriprep
-H=/home/karelo
+H=$HOME
+WS=$H/VScode_projects/super_fmriprep
+# Claude Code's folder for the workspace: its path with every / and _ written as -
+PROJECT=$(printf '%s' "$WS" | tr '/_' '--')
 LOG=$H/move-pull-$(date +%Y%m%d-%H%M%S).log
-[ "$HOME" = "$H" ] || { echo "run as karelo (HOME=$H), not $HOME"; exit 1; }
 command -v rsync >/dev/null || { echo "rsync missing: sudo apt install rsync"; exit 1; }
 ssh -o BatchMode=yes "$OLD" true || { echo "no key-based SSH to $OLD yet"; exit 1; }
+# The same user and paths on both machines: the old one's home must be this one's.
+OLD_HOME=$(ssh -o BatchMode=yes "$OLD" 'printf %s "$HOME"')
+[ "$OLD_HOME" = "$H" ] || { echo "$OLD's home is $OLD_HOME, not $H: run as the same user"; exit 1; }
 
 R=(rsync -aH --partial --info=progress2,stats1 --human-readable)
 for a in "$@"; do
@@ -86,8 +90,8 @@ copy "$WS/archive/" "$WS/archive/" --prune-empty-dirs --max-size=1024k --exclude
 # 4. The test data, Claude Code's notes for this project (memory and transcripts; the old
 #    settings.json beside the new one), the usage tool's records.
 copy "$H/.cache/larmorx-testdata/" "$H/.cache/larmorx-testdata/"
-copy "$H/.claude/projects/-home-karelo-VScode-projects-super-fmriprep/" \
-     "$H/.claude/projects/-home-karelo-VScode-projects-super-fmriprep/"
+copy "$H/.claude/projects/$PROJECT/" \
+     "$H/.claude/projects/$PROJECT/"
 copy "$H/.claude/settings.json" "$H/.claude/settings.json.from-old-laptop"
 copy "$H/.cache/claude-usage/" "$H/.cache/claude-usage/"
 if ssh -o BatchMode=yes "$OLD" test -e "$H/.config/claude-usage.json"; then

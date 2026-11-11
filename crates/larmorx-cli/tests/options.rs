@@ -469,7 +469,9 @@ fn replica_programs_get_the_options_in_their_environment() {
         );
         let out = text(&o.stdout);
         let want = if cfg!(windows) {
-            "threads=%OMP_NUM_THREADS% defects=fix"
+            // in a batch file an unset variable expands to nothing (the literal stays only at
+            // cmd's interactive prompt)
+            "threads= defects=fix"
         } else {
             "threads=unset defects=fix"
         };

@@ -38,7 +38,8 @@ Sections and cases (seeded):
   deflated vectors);
 - ``lasd0``: ``DLASD0`` from 1 to 300 rows, ``SQRE`` 0 and 1, leaf sizes 3 to 25, identity and
   general starting ``U``/``VT``;
-- ``bdsdc``: ``DBDSDC('U' and 'L', 'I')`` from 0 to 600 rows (832 without ``--quick``) on random,
+- ``bdsdc``: ``DBDSDC('U' and 'L', 'I')`` from 0 to 600 rows (832 without ``--quick``, which
+  also repeats the merges', ``DLASD0``'s and ``DBDSDC``'s cases with other seeds) on random,
   graded, clustered, repeated, split (zero and tiny ``e``, the last one included), tiny, huge,
   Toeplitz, Wilkinson, zero and rank-deficient bidiagonals and on ``DGEBRD``'s bidiagonals of
   random-walk and low-rank matrices (CompCor's kind), padded ``LDU``/``LDVT``; the refused
@@ -638,7 +639,8 @@ def merge_cases(quick: bool) -> list[tuple]:
     for nl, nr in sizes:
         for sqre in (0, 1):
             for kind in MERGE_KINDS:
-                out.append((nl, nr, sqre, kind))
+                # The full tier repeats each case with other seeds (the case's index).
+                out += [(nl, nr, sqre, kind)] * (1 if quick else 3)
     out += [(0, 3, 0, "error-nl"), (3, 0, 0, "error-nr"), (3, 3, 2, "error-sqre")]
     return out
 
@@ -700,7 +702,7 @@ def lasd0_cases(quick: bool) -> list[tuple]:
                     for kind in kinds[: 2 if quick and n > 100 else len(kinds)]:
                         if start == "general" and kind not in ("normal", "split"):
                             continue
-                        out.append((n, sqre, smlsiz, start, kind))
+                        out += [(n, sqre, smlsiz, start, kind)] * (1 if quick else 2)
     out += [
         (5, 2, 25, "error", "sqre"),
         (5, 0, 25, "error", "ldu"),
@@ -750,7 +752,7 @@ def bdsdc_cases(quick: bool) -> list[tuple]:
             if quick and n > 300 and kind not in ("normal", "randomwalk", "split", "clustered"):
                 continue
             for uplo in "UL":
-                out.append((uplo, n, kind))
+                out += [(uplo, n, kind)] * (1 if quick or n > 300 else 3)
     out += [("U", 4, "error-ldu"), ("L", 4, "error-ldvt")]
     return out
 

@@ -1679,3 +1679,38 @@ def lapack_dlascl(
 ) -> np.ndarray:
     """LAPACK's ``DLASCL`` (only ``type_="G"``): ``A * cto/cfrom`` in safe steps; returns the new
     ``A`` storage."""
+
+def lapack_dormbr(
+    vect_: str,
+    side: str,
+    trans_: str,
+    m: int,
+    n: int,
+    k: int,
+    a: np.ndarray,
+    lda: int,
+    tau: np.ndarray,
+    c: np.ndarray,
+    ldc: int,
+    lwork: int | None = None,
+    lapack: str = "3.12.1",
+    n_threads: int = 1,
+    gemm_q: int = 256,
+) -> tuple[np.ndarray, np.ndarray, int]:
+    """LAPACK's ``DORMBR`` (``DGEBRD``'s ``Q`` or ``P`` applied to ``C``; ``lwork=None``: its own
+    optimal workspace, handed to ``DORMQR``/``DORMLQ`` as it is); returns ``(A, C, WORK(1))``."""
+
+def lapack_dorgbr(
+    vect_: str,
+    m: int,
+    n: int,
+    k: int,
+    a: np.ndarray,
+    lda: int,
+    tau: np.ndarray,
+    lwork: int | None = None,
+    lapack: str = "3.12.1",
+    n_threads: int = 1,
+    gemm_q: int = 256,
+) -> tuple[np.ndarray, int]:
+    """LAPACK's ``DORGBR`` (``DGEBRD``'s ``Q`` or ``P^T`` generated); returns ``(A, WORK(1))``."""

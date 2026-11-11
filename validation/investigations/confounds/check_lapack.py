@@ -38,12 +38,15 @@ n``, on both sides of ``NX`` and of the 32-reflector blocks up to 60,968 x 600 a
 short workspaces; ``DORM2R``/``DORML2`` and ``DORMQR``/``DORMLQ`` (``orm``) from both sides,
 transposed or not, ``k`` on both sides of 32, short workspaces (each release's ``NB`` rule),
 ``lstsq``'s 600 x 60,968 right-hand sides; ``DGEBD2``, ``DGEBRD`` (both bidiagonal forms, on
-both sides of ``NX``, short workspaces) and ``DLABRD`` itself (``brd``); and the illegal
-arguments of each (``INFO`` against larmorx's ``ValueError``).
+both sides of ``NX``, short workspaces) and ``DLABRD`` itself (``brd``); ``DORMBR`` and
+``DORGBR`` (``orbr``, relay 2c-i: ``DGEBRD``'s ``Q`` and ``P`` from both sides, transposed or not,
+both bidiagonal forms and the shifted ones, ``DORMBR``'s own optimal workspace (short for
+``DORMQR``/``DORMLQ`` in both releases), larger and minimal ones); and the illegal arguments of
+each (``INFO`` against larmorx's ``ValueError``).
 
 Usage: ``OPENBLAS_CORETYPE=Haswell OPENBLAS_NUM_THREADS=1 PYTHONPATH=<repo>/python
 python -P check_lapack.py [--quick] [--threads N]
-[--sections larfg,larf,qr2,larft,larfb,qrf,org,orm,brd] [--gemm-q auto]``. On the AMD Zen 4
+[--sections larfg,larf,qr2,larft,larfb,qrf,org,orm,brd,orbr] [--gemm-q auto]``. On the AMD Zen 4
 machine, ``OPENBLAS_L2_SIZE=512`` keeps numpy 2.5.4's library on the Haswell table's GEMM_Q 256
 (``--gemm-q auto`` follows it): every case defined.
 """
@@ -326,6 +329,9 @@ def orm_blocks(lq: bool, side: str, tr: str, m: int, n: int, k: int, lwork):
 def undefined(section: str, case: tuple) -> bool:
     if cb.GEMM_Q <= cb.BUFFER_STEPS:
         return False
+    if section == "orbr":
+        inner = orbr_inner(case)
+        return inner is not None and undefined(*inner)
     if section == "larft":
         _, _, n, k, *_ = case
         return larft_risky(n, k)
@@ -943,6 +949,207 @@ def brd_run(cid: int, case: tuple, threads: int, core) -> list[tuple[bool, str]]
     return [(ok, name)]
 
 
+# --- section orbr: DORMBR and DORGBR (relay 2c-i) -------------------------------------------------
+
+
+def ref_dormbr(vect, side, tr, m, n, k, a, lda, tau, c, ldc, lwork):
+    """``DORMBR``; returns ``(A, C, WORK(1), INFO)``."""
+    a, c = a.copy(), c.copy()
+    info = I64(0)
+    head = (*_c(vect, side, tr), *_i(m, n, k), ptr(a), *_i(lda), ptr(tau), ptr(c), *_i(ldc))
+    if lwork is None:
+        q = np.zeros(1)
+        LIB.scipy_dormbr_64_(*head, ptr(q), *_i(-1), ctypes.byref(info), *hidden(vect, side, tr))
+        lwork = int(q[0])
+    work = np.full(max(lwork, 1), np.nan)
+    LIB.scipy_dormbr_64_(*head, ptr(work), *_i(lwork), ctypes.byref(info), *hidden(vect, side, tr))
+    return a, c, np.array([work[0]]), info.value
+
+
+def ref_dorgbr(vect, m, n, k, a, lda, tau, lwork):
+    """``DORGBR``; returns ``(A, WORK(1), INFO)``."""
+    a = a.copy()
+    info = I64(0)
+    head = (*_c(vect), *_i(m, n, k), ptr(a), *_i(lda), ptr(tau))
+    if lwork is None:
+        q = np.zeros(1)
+        LIB.scipy_dorgbr_64_(*head, ptr(q), *_i(-1), ctypes.byref(info), *hidden(vect))
+        lwork = int(q[0])
+    work = np.full(max(lwork, 1), np.nan)
+    LIB.scipy_dorgbr_64_(*head, ptr(work), *_i(lwork), ctypes.byref(info), *hidden(vect))
+    return a, np.array([work[0]]), info.value
+
+
+ORBR_SHAPES = [(1, 1), (2, 1), (1, 2), (5, 3), (3, 5), (33, 20), (20, 33), (100, 60), (60, 100)]
+ORBR_SHAPES += [(130, 129), (129, 130), (200, 200), (300, 129), (129, 300)]
+ORBR_BIG = [(600, 280), (280, 600), (1_000, 600), (600, 1_000)]
+
+
+def orbr_lwork(kind: str, nw: int):
+    """The workspaces of the cases: ``None`` (the routine's own optimum, which ``DORMBR`` hands
+    on as a short one), enough for ``NB`` 32 in both releases, ``NB`` lowered, the minimum."""
+    return {"opt": None, "big": nw * 32 + 65 * 64, "mid": nw * 10 + 65 * 64, "min": nw}[kind]
+
+
+def orbr_cases(quick: bool) -> list[tuple]:
+    """``("ormbr", vect, side, trans, mo, no, other, lwork, kind)``: ``DGEBRD``'s reflectors of an
+    ``mo x no`` matrix applied to a ``C`` with ``other`` columns (left) or rows (right);
+    ``("orgbr", vect, mo, no, out, lwork, kind)``: ``Q`` (``mo x out``) or ``P^T`` (``out x no``)
+    generated from them (``out`` between the bounds ``DORGBR`` allows); then the refused
+    arguments."""
+    out: list[tuple] = []
+    shapes = ORBR_SHAPES + ([] if quick else ORBR_BIG)
+    for mo, no in shapes:
+        big = mo * no > 100_000
+        for vect in "QP":
+            for side in "LR":
+                for tr in "NT":
+                    for other in (1, 7, 40) if not big else (40,):
+                        for lw in ("opt", "big", "mid", "min") if not big else ("opt", "big"):
+                            kinds = (
+                                ("normal", "zero-cols") if lw == "opt" and not big else ("normal",)
+                            )
+                            out += [
+                                ("ormbr", vect, side, tr, mo, no, other, lw, kd) for kd in kinds
+                            ]
+            k = no if vect == "Q" else mo
+            nq = mo if vect == "Q" else no
+            outs = sorted({nq, min(nq, k)})  # Q: min(m, k) <= n <= m; P: min(n, k) <= m <= n
+            for o in outs:
+                for lw in ("opt", "min") if not big else ("opt",):
+                    out += [("orgbr", vect, mo, no, o, lw, kd) for kd in ("normal", "zero-cols")]
+    out += [
+        ("ormbr-error", "lda"),
+        ("ormbr-error", "ldc"),
+        ("ormbr-error", "lwork"),
+        ("orgbr-error", "n"),
+        ("orgbr-error", "lda"),
+        ("orgbr-error", "lwork"),
+    ]
+    return out
+
+
+def orbr_inner(case: tuple):
+    """The ``DORMQR``/``DORMLQ`` (``orm``) or ``DORGQR``/``DORGLQ`` (``org``) call a case makes,
+    as ``check_lapack``'s undefined-class rule takes it (``None``: none)."""
+    if case[0] == "ormbr":
+        _, vect, side, tr, mo, no, other, lw, _ = case
+        nq = mo if vect == "Q" else no
+        k = no if vect == "Q" else mo
+        m, n = (nq, other) if side == "L" else (other, nq)
+        nw = max(1, n if side == "L" else m)
+        lwork = orbr_lwork(lw, nw)
+        lwork = nw * 32 if lwork is None else lwork
+        mi, ni = (m - 1, n) if side == "L" else (m, n - 1)
+        if vect == "Q":
+            call = (m, n, k) if nq >= k else ((mi, ni, nq - 1) if nq > 1 else None)
+            lq, t = False, tr
+        else:
+            call = (m, n, k) if nq > k else ((mi, ni, nq - 1) if nq > 1 else None)
+            lq, t = True, "T" if tr == "N" else "N"
+        if call is None:
+            return None
+        return "orm", (lq, True, side, t, *call, lwork, "normal")
+    if case[0] == "orgbr":
+        _, vect, mo, no, o, lw, _ = case
+        m, n, k = (mo, o, no) if vect == "Q" else (o, no, mo)
+        lwork = None if lw == "opt" else max(1, min(m, n))
+        if vect == "Q":
+            call = (False, m, n, k) if m >= k else ((False, m - 1, m - 1, m - 1) if m > 1 else None)
+        else:
+            call = (True, m, n, k) if k < n else ((True, n - 1, n - 1, n - 1) if n > 1 else None)
+        if call is None:
+            return None
+        lq, mm, nn, kk = call
+        if lwork is None:
+            lwork = max((mm if lq else nn), 1) * 32
+        return "org", (lq, True, mm, nn, kk, lwork, "normal")
+    return None
+
+
+def orbr_run(cid: int, case: tuple, threads: int, core) -> list[tuple[bool, str]]:
+    rng = np.random.default_rng([53, cid])
+    what = case[0]
+    if what == "ormbr-error":
+        m, n, k, lda, ldc, lwork = 6, 4, 4, 6, 6, 32 * 4
+        if case[1] == "lda":
+            lda = 5
+        elif case[1] == "ldc":
+            ldc = 5
+        else:
+            lwork = 3
+        a, tau, c = np.ones(lda * k), np.zeros(k), np.ones(ldc * n)
+        info = ref_dormbr("Q", "L", "N", m, n, k, a, lda, tau, c, ldc, lwork)[-1]
+        call = lambda: core.lapack_dormbr("Q", "L", "N", m, n, k, a, lda, tau, c, ldc, lwork, LAPACK, threads, cb.GEMM_Q)  # noqa: E731  # fmt: skip
+        try:
+            call()
+            got = 0
+        except ValueError as e:
+            got = -param_of(e) if "DORMBR" in str(e) else 99
+        return [(info < 0 and info == got, "dormbr illegal arguments")]
+    if what == "orgbr-error":
+        m, n, k, lda, lwork = 6, 4, 4, 6, 32 * 4
+        if case[1] == "n":
+            n = 7
+        elif case[1] == "lda":
+            lda = 5
+        else:
+            lwork = 3
+        a, tau = np.ones(max(lda * n, 1)), np.zeros(k)
+        info = ref_dorgbr("Q", m, n, k, a, lda, tau, lwork)[-1]
+        try:
+            core.lapack_dorgbr("Q", m, n, k, a, lda, tau, lwork, LAPACK, threads, cb.GEMM_Q)
+            got = 0
+        except ValueError as e:
+            got = -param_of(e) if "DORGBR" in str(e) else 99
+        return [(info < 0 and info == got, "dorgbr illegal arguments")]
+    if what == "ormbr":
+        _, vect, side, tr, mo, no, other, lw, kind = case
+    else:
+        _, vect, mo, no, o, lw, kind = case
+    # The reduction (numpy's own DGEBRD) of an mo x no matrix.
+    lda0 = mo + cid % 2
+    a0 = matrix_entries(rng, lda0, mo, no, kind)
+    a_red, _, _, tq, tp, _, info = ref_brd(True, mo, no, a0, lda0, None)
+    assert info == 0
+    tau = tq if vect == "Q" else tp
+    tau = np.ascontiguousarray(tau if tau.size else np.zeros(1))
+    if what == "ormbr":
+        nq = mo if vect == "Q" else no
+        k = no if vect == "Q" else mo
+        m, n = (nq, other) if side == "L" else (other, nq)
+        nw = max(1, n if side == "L" else m)
+        lwork = orbr_lwork(lw, nw)
+        # DORMBR('Q') reads A as nq x k (LDA >= nq); DORMBR('P') as k x nq: DGEBRD's storage.
+        ldc = m + cid % 3
+        c = entries(rng, max(ldc * n, 1), "normal")
+        want = ref_dormbr(vect, side, tr, m, n, k, a_red, lda0, tau, c, ldc, lwork)
+        got = core.lapack_dormbr(vect, side, tr, m, n, k, a_red, lda0, tau, c, ldc, lwork, LAPACK, threads, cb.GEMM_Q)  # fmt: skip
+        got = (got[0], got[1], np.array([float(got[2])]))
+        ok = want[-1] == 0 and all(same(w, g) for w, g in zip(want[:3], got, strict=True))
+        return [(ok, "dormbr")]
+    # DORGBR: Q (mo x o) from the first columns, or P^T (o x no) from the first rows.
+    if vect == "Q":
+        m, n, k = mo, o, no
+        lda = m + cid % 2
+        a = entries(rng, max(lda * n, 1), "normal")
+        for j in range(min(n, no)):
+            a[j * lda : j * lda + m] = a_red[j * lda0 : j * lda0 + m]
+    else:
+        m, n, k = o, no, mo
+        lda = m + cid % 2
+        a = entries(rng, max(lda * n, 1), "normal")
+        rows = min(m, mo)
+        for j in range(n):
+            a[j * lda : j * lda + rows] = a_red[j * lda0 : j * lda0 + rows]
+    lwork = None if lw == "opt" else max(1, min(m, n))
+    want = ref_dorgbr(vect, m, n, k, a, lda, tau, lwork)
+    got = core.lapack_dorgbr(vect, m, n, k, a, lda, tau, lwork, LAPACK, threads, cb.GEMM_Q)
+    got = (got[0], np.array([float(got[1])]))
+    ok = want[-1] == 0 and all(same(w, g) for w, g in zip(want[:2], got, strict=True))
+    return [(ok, "dorgbr")]
+
+
 SECTIONS = {
     "larfg": ("dlarfg", larfg_cases, larfg_run),
     "larf": ("dlarf", larf_cases, larf_run),
@@ -953,6 +1160,7 @@ SECTIONS = {
     "org": ("dorgqr/dorglq/dorg2r/dorgl2", org_cases, org_run),
     "orm": ("dormqr/dormlq/dorm2r/dorml2", orm_cases, orm_run),
     "brd": ("dgebrd/dgebd2/dlabrd", brd_cases, brd_run),
+    "orbr": ("dormbr/dorgbr", orbr_cases, orbr_run),
 }
 
 

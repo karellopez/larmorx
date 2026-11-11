@@ -2,7 +2,8 @@
 //! LAPACK's QR and LQ factorizations of general size (`DGEQRF`, `DGELQF`, blocked, with
 //! `DGEQR2`, `DGELQ2`), the generation and application of their `Q` (`DORGQR`, `DORGLQ`,
 //! `DORMQR`, `DORMLQ`, blocked, with `DORG2R`, `DORGL2`, `DORM2R`, `DORML2`), the reduction to
-//! bidiagonal form (`DGEBRD`, blocked with `DLABRD`, and `DGEBD2`), the block reflector routines
+//! bidiagonal form (`DGEBRD`, blocked with `DLABRD`, and `DGEBD2`) with its `Q` and `P`
+//! (`DORMBR`, `DORGBR`: identical in both releases, on the routines above), the block reflector routines
 //! under them (`DLARFT`, `DLARFB`) and the single reflectors (`DLARF`, `DLARF1F`), as numpy's
 //! x86-64 wheels run them at one BLAS thread on the Haswell kernels
 //! (`OPENBLAS_CORETYPE=Haswell`), both LAPACK releases, on every platform: the first steps of
@@ -3341,6 +3342,275 @@ pub fn dgebrd(
     Ok(ws)
 }
 
+// ------------------------------------------------------------------------------------------
+// The bidiagonal reduction's Q and P (DORMBR, DORGBR)
+
+/// Which factor of [`dgebrd`]'s reduction `A = Q·B·Pᵀ` a routine applies or generates
+/// (LAPACK's `VECT`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Vect {
+    /// `'Q'`: the reflectors `H(i)` stored below the diagonal (with `tauq`).
+    Q,
+    /// `'P'`: the reflectors `G(i)` stored right of the diagonal (with `taup`).
+    P,
+}
+
+/// `DORMBR`'s optimal workspace, the `LWORK = -1` query: `NW·NB` with `NW = max(1, N)` from the
+/// left and `max(1, M)` from the right, `NB = ILAENV(1, 'DORMQR' | 'DORMLQ', ...) = 32` (both
+/// releases; the workspace `DORMQR`/`DORMLQ` would ask for themselves is larger, so with this
+/// one they take their short-workspace block size).
+pub fn ormbr_lwork_opt(side: Side, m: usize, n: usize) -> usize {
+    (if side == Side::Left { n } else { m }).max(1) * NB
+}
+
+/// `DORMBR(VECT, SIDE, TRANS, M, N, K, A, LDA, TAU, C, LDC, WORK, LWORK, INFO)`: `C` (`m × n` at
+/// `coff`) overwritten by `Q·C`, `Qᵀ·C`, `C·Q`, `C·Qᵀ` (`vect = Q`) or the same with `P`
+/// (`vect = P`), from [`dgebrd`]'s reflectors of an `nq × k` (`Q`) or `k × nq` (`P`) matrix (`nq =
+/// m` from the left, `n` from the right): [`dormqr`] (or [`dormlq`] with the transpose flipped
+/// for `P`) on all `k` reflectors when `nq >= k` (`Q`) or `nq > k` (`P`), else on the `nq - 1`
+/// reflectors shifted by one row (`Q`) or column (`P`) with `C`'s first row (left) or column
+/// (right) untouched. `lwork` (`None`: [`ormbr_lwork_opt`]) is handed to `DORMQR`/`DORMLQ`
+/// as it is. Returns `WORK(1)`: [`ormbr_lwork_opt`], or 1 for an empty `C`.
+///
+/// # Errors
+/// `LDA < max(1, nq)` (`Q`) or `< max(1, min(nq, k))` (`P`) (8), `LDC < max(1, M)` (11), `LWORK
+/// < NW` (13).
+pub fn dormbr(
+    lp: Lapack,
+    vect: Vect,
+    side: Side,
+    trans: Trans,
+    m: usize,
+    n: usize,
+    k: usize,
+    a: &mut [f64],
+    aoff: usize,
+    lda: usize,
+    tau: &[f64],
+    c: &mut [f64],
+    coff: usize,
+    ldc: usize,
+    lwork: Option<usize>,
+) -> Result<usize, IllegalValue> {
+    let err = |param| {
+        Err(IllegalValue {
+            routine: "DORMBR",
+            param,
+        })
+    };
+    let applyq = vect == Vect::Q;
+    let left = side == Side::Left;
+    let nq = if left { m } else { n };
+    let nw = (if left { n } else { m }).max(1);
+    let lwkopt = ormbr_lwork_opt(side, m, n);
+    let lwork = lwork.unwrap_or(lwkopt);
+    if (applyq && lda < nq.max(1)) || (!applyq && lda < nq.min(k).max(1)) {
+        return err(8);
+    }
+    if ldc < m.max(1) {
+        return err(11);
+    }
+    if lwork < nw {
+        return err(13);
+    }
+    if m == 0 || n == 0 {
+        return Ok(1);
+    }
+    let (mi, ni, i1, i2) = if left {
+        (m.saturating_sub(1), n, 2, 1)
+    } else {
+        (m, n.saturating_sub(1), 1, 2)
+    };
+    let cshift = coff + (i1 - 1) + (i2 - 1) * ldc;
+    if applyq {
+        // Apply Q.
+        if nq >= k {
+            dormqr(
+                lp,
+                side,
+                trans,
+                m,
+                n,
+                k,
+                a,
+                aoff,
+                lda,
+                tau,
+                c,
+                coff,
+                ldc,
+                Some(lwork),
+            )?;
+        } else if nq > 1 {
+            dormqr(
+                lp,
+                side,
+                trans,
+                mi,
+                ni,
+                nq - 1,
+                a,
+                aoff + 1,
+                lda,
+                tau,
+                c,
+                cshift,
+                ldc,
+                Some(lwork),
+            )?;
+        }
+    } else {
+        // Apply P.
+        let transt = if trans == Trans::N {
+            Trans::T
+        } else {
+            Trans::N
+        };
+        if nq > k {
+            dormlq(
+                lp,
+                side,
+                transt,
+                m,
+                n,
+                k,
+                a,
+                aoff,
+                lda,
+                tau,
+                c,
+                coff,
+                ldc,
+                Some(lwork),
+            )?;
+        } else if nq > 1 {
+            dormlq(
+                lp,
+                side,
+                transt,
+                mi,
+                ni,
+                nq - 1,
+                a,
+                aoff + lda,
+                lda,
+                tau,
+                c,
+                cshift,
+                ldc,
+                Some(lwork),
+            )?;
+        }
+    }
+    Ok(lwkopt)
+}
+
+/// `DORGBR`'s optimal workspace, the `LWORK = -1` query: `DORGQR`'s (`Q`: of `m × n × k` when
+/// `m >= k`, else of the shifted `(m - 1)`-order one; 1 for `m = 1`) or `DORGLQ`'s (`P`: of `m ×
+/// n × k` when `k < n`, else of the shifted `(n - 1)`-order one; 1 for `n = 1`), at least
+/// `min(m, n)`.
+pub fn orgbr_lwork_opt(vect: Vect, m: usize, n: usize, k: usize) -> usize {
+    let inner = match vect {
+        Vect::Q if m >= k => org_lwork_opt(m, n, false),
+        Vect::Q if m > 1 => org_lwork_opt(m - 1, m - 1, false),
+        Vect::P if k < n => org_lwork_opt(m, n, true),
+        Vect::P if n > 1 => org_lwork_opt(n - 1, n - 1, true),
+        _ => 1,
+    };
+    inner.max(m.min(n))
+}
+
+/// `DORGBR(VECT, M, N, K, A, LDA, TAU, WORK, LWORK, INFO)`: [`dgebrd`]'s `Q` (`m × n`, from the
+/// reflectors of an `m × k` matrix: [`dorgqr`] when `m >= k`, else the reflectors shifted one
+/// column right and `Q`'s first row and column those of the identity, then `DORGQR` of order
+/// `m - 1`) or `Pᵀ` (`m × n`, from a `k × n` matrix: [`dorglq`] when `k < n`, else shifted one row
+/// down, `DORGLQ` of order `n - 1`), overwriting `A`. `lwork` (`None`: [`orgbr_lwork_opt`]) is
+/// handed on as it is. Returns `WORK(1)`: [`orgbr_lwork_opt`], or 1 for an empty `A`.
+///
+/// # Errors
+/// `Q`: `N > M` or `N < min(M, K)`; `P`: `M > N` or `M < min(N, K)` (3); `LDA < max(1, M)` (6);
+/// `LWORK < max(1, min(M, N))` (9).
+pub fn dorgbr(
+    lp: Lapack,
+    vect: Vect,
+    m: usize,
+    n: usize,
+    k: usize,
+    a: &mut [f64],
+    aoff: usize,
+    lda: usize,
+    tau: &[f64],
+    lwork: Option<usize>,
+) -> Result<usize, IllegalValue> {
+    let err = |param| {
+        Err(IllegalValue {
+            routine: "DORGBR",
+            param,
+        })
+    };
+    let wantq = vect == Vect::Q;
+    let mn = m.min(n);
+    if (wantq && (n > m || n < m.min(k))) || (!wantq && (m > n || m < n.min(k))) {
+        return err(3);
+    }
+    if lda < m.max(1) {
+        return err(6);
+    }
+    let lwkopt = orgbr_lwork_opt(vect, m, n, k);
+    let lwork = lwork.unwrap_or(lwkopt);
+    if lwork < mn.max(1) {
+        return err(9);
+    }
+    if m == 0 || n == 0 {
+        return Ok(1);
+    }
+    let at = |i: usize, j: usize| ix(aoff, lda, i, j);
+    if wantq {
+        // Form Q, determined by a call to DGEBRD to reduce an m-by-k matrix.
+        if m >= k {
+            dorgqr(lp, m, n, k, a, aoff, lda, tau, Some(lwork))?;
+        } else {
+            // Shift the vectors which define the elementary reflectors one column to the
+            // right, and set the first row and column of Q to those of the unit matrix.
+            for j in (2..=m).rev() {
+                a[at(1, j)] = 0.0;
+                for i in j + 1..=m {
+                    a[at(i, j)] = a[at(i, j - 1)];
+                }
+            }
+            a[at(1, 1)] = 1.0;
+            for i in 2..=m {
+                a[at(i, 1)] = 0.0;
+            }
+            if m > 1 {
+                dorgqr(lp, m - 1, m - 1, m - 1, a, at(2, 2), lda, tau, Some(lwork))?;
+            }
+        }
+    } else {
+        // Form P**T, determined by a call to DGEBRD to reduce a k-by-n matrix.
+        if k < n {
+            dorglq(lp, m, n, k, a, aoff, lda, tau, Some(lwork))?;
+        } else {
+            // Shift the vectors which define the elementary reflectors one row downward, and
+            // set the first row and column of P**T to those of the unit matrix.
+            a[at(1, 1)] = 1.0;
+            for i in 2..=n {
+                a[at(i, 1)] = 0.0;
+            }
+            for j in 2..=n {
+                for i in (2..j).rev() {
+                    a[at(i, j)] = a[at(i - 1, j)];
+                }
+                a[at(1, j)] = 0.0;
+            }
+            if n > 1 {
+                dorglq(lp, n - 1, n - 1, n - 1, a, at(2, 2), lda, tau, Some(lwork))?;
+            }
+        }
+    }
+    Ok(lwkopt)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -3805,5 +4075,118 @@ mod tests {
         let r = dgebrd(lp, 0, 3, &mut a, 0, 1, &mut d, &mut e, &mut t, &mut v, None);
         assert_eq!(r, Ok(1));
         assert_eq!(gebrd_lwork_opt(600, 1_000), 1_600 * 32);
+    }
+
+    #[test]
+    fn ormbr_and_orgbr_rebuild_the_reduction() {
+        // A = Q·B·Pᵀ: Qᵀ·A·P (DORMBR from both sides) is the bidiagonal B; DORGBR's Q and Pᵀ
+        // are orthonormal and give the same product.
+        for &(m, n) in &[(7usize, 5usize), (5, 7), (40, 40), (150, 140), (140, 150)] {
+            for release in [LapackRelease::V3_12_0, LapackRelease::V3_12_1] {
+                let lp = Lapack::new(release);
+                let mut s = 0x9E37_79B9u64 ^ ((m * 1000 + n) as u64);
+                let mut next = || {
+                    s ^= s << 13;
+                    s ^= s >> 7;
+                    s ^= s << 17;
+                    (s >> 11) as f64 / (1u64 << 53) as f64 - 0.5
+                };
+                let a0: Vec<f64> = (0..m * n).map(|_| next()).collect();
+                let mut a = a0.clone();
+                let k = m.min(n);
+                let (mut d, mut e) = (vec![0.0; k], vec![0.0; k]);
+                let (mut tq, mut tp) = (vec![0.0; k], vec![0.0; k]);
+                dgebrd(
+                    lp, m, n, &mut a, 0, m, &mut d, &mut e, &mut tq, &mut tp, None,
+                )
+                .unwrap();
+                // C = Qᵀ·A0·P.
+                let mut c = a0.clone();
+                dormbr(
+                    lp,
+                    Vect::Q,
+                    Side::Left,
+                    Trans::T,
+                    m,
+                    n,
+                    n,
+                    &mut a,
+                    0,
+                    m,
+                    &tq,
+                    &mut c,
+                    0,
+                    m,
+                    None,
+                )
+                .unwrap();
+                dormbr(
+                    lp,
+                    Vect::P,
+                    Side::Right,
+                    Trans::N,
+                    m,
+                    n,
+                    m,
+                    &mut a,
+                    0,
+                    m,
+                    &tp,
+                    &mut c,
+                    0,
+                    m,
+                    None,
+                )
+                .unwrap();
+                for j in 0..n {
+                    for i in 0..m {
+                        let want = if i == j {
+                            d[i]
+                        } else if m >= n && j == i + 1 {
+                            e[i]
+                        } else if m < n && i == j + 1 {
+                            e[j]
+                        } else {
+                            0.0
+                        };
+                        assert!((c[i + j * m] - want).abs() < 1e-12, "{m}x{n} ({i},{j})");
+                    }
+                }
+                // DORGBR: Q (m × k) and Pᵀ (k × n) rebuild A0 with B.
+                let mut q = a.clone();
+                q.truncate(m * n);
+                let qcols = if m >= n { n } else { m };
+                let mut qs = vec![0.0; m * qcols];
+                qs.copy_from_slice(&q[..m * qcols]);
+                dorgbr(lp, Vect::Q, m, qcols, n, &mut qs, 0, m, &tq, None).unwrap();
+                let prow = if m >= n { n } else { m };
+                let mut pt = vec![0.0; prow * n];
+                for j in 0..n {
+                    for i in 0..prow {
+                        pt[i + j * prow] = a[i + j * m];
+                    }
+                }
+                dorgbr(lp, Vect::P, prow, n, m, &mut pt, 0, prow, &tp, None).unwrap();
+                for j in 0..n {
+                    for i in 0..m {
+                        let mut r = 0.0;
+                        for t in 0..k {
+                            let mut b_t = d[t] * pt[t + j * prow];
+                            if m >= n && t + 1 < k {
+                                b_t += e[t] * pt[t + 1 + j * prow];
+                            }
+                            if m < n && t >= 1 {
+                                b_t += e[t - 1] * pt[t - 1 + j * prow];
+                            }
+                            r += qs[i + t * m] * b_t;
+                        }
+                        assert!(
+                            (r - a0[i + j * m]).abs() < 1e-12,
+                            "{m}x{n} rebuild ({i},{j})"
+                        );
+                    }
+                }
+            }
+        }
     }
 }

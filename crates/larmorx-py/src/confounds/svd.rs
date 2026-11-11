@@ -1,15 +1,17 @@
 // SPDX-License-Identifier: Apache-2.0
 //! Bindings of LAPACK's divide-and-conquer bidiagonal SVD (`DBDSDC` with `COMPQ = 'I'` and the
-//! routines under it: `DLASD0` to `DLASD5`, `DLASDQ`, `DLASDT`, `DLAMRG`, `DLAED6`, `DLASCL`) at
-//! their Fortran interface (`lapack_*`, as `larmorx_transform::numpy_linalg::bdsdc` computes
-//! them); the validation compares them with numpy's own library. Matrices cross as flat
+//! routines under it: `DLASD0` to `DLASD5`, `DLASDQ`, `DLASDT`, `DLAMRG`, `DLAED6`, `DLASCL`) and
+//! the bidiagonal reduction's `Q` and `P` (`DORMBR`, `DORGBR`) at their Fortran interface
+//! (`lapack_*`, as `larmorx_transform::numpy_linalg::{bdsdc, blocked}` compute them); the
+//! validation compares them with numpy's own library. Matrices cross as flat
 //! column-major storage with their leading dimension; index arrays as int64 (1-based, as LAPACK
 //! keeps them). The GIL is released while computing.
 
-use super::{contiguous, lapack_release, lapack_run, one_of, value_err};
+use super::{contiguous, lapack_release, lapack_run, one_of, trans, value_err};
 use larmorx_transform::numpy_linalg::bdsdc::{self, MergeWork};
-use larmorx_transform::numpy_linalg::blocked::Lapack;
-use larmorx_transform::openblas::trmm::Uplo;
+use larmorx_transform::numpy_linalg::blocked::{self, Lapack, Vect};
+use larmorx_transform::openblas::level3::Trans;
+use larmorx_transform::openblas::trmm::{Side, Uplo};
 use numpy::{PyArray1, PyReadonlyArray1};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -520,6 +522,84 @@ fn lapack_dlascl<'py>(
     Ok(PyArray1::from_vec(py, av))
 }
 
+fn vect(v: &str) -> PyResult<Vect> {
+    one_of("vect", v, &[("Q", Vect::Q), ("P", Vect::P)])
+}
+
+/// `DORMBR(VECT, SIDE, TRANS, M, N, K, A, LDA, TAU, C, LDC, WORK, LWORK, INFO)` on flat
+/// column-major storage (`lwork=None`: `DORMBR`'s own optimal workspace, handed to
+/// `DORMQR`/`DORMLQ` as it is); returns `(A, C, WORK(1))` (`A` as LAPACK restores it).
+#[pyfunction]
+#[pyo3(signature = (vect_, side, trans_, m, n, k, a, lda, tau, c, ldc, lwork = None, lapack = "3.12.1", n_threads = 1, gemm_q = 256))]
+#[allow(clippy::too_many_arguments)]
+fn lapack_dormbr<'py>(
+    py: Python<'py>,
+    vect_: &str,
+    side: &str,
+    trans_: &str,
+    m: usize,
+    n: usize,
+    k: usize,
+    a: PyReadonlyArray1<'_, f64>,
+    lda: usize,
+    tau: PyReadonlyArray1<'_, f64>,
+    c: PyReadonlyArray1<'_, f64>,
+    ldc: usize,
+    lwork: Option<usize>,
+    lapack: &str,
+    n_threads: usize,
+    gemm_q: usize,
+) -> PyResult<(F64s<'py>, F64s<'py>, usize)> {
+    let v = vect(vect_)?;
+    let sd = one_of("side", side, &[("L", Side::Left), ("R", Side::Right)])?;
+    let tr: Trans = trans(trans_)?;
+    let lp = lp(lapack, gemm_q)?;
+    let mut av = contiguous(&a)?.to_vec();
+    let tv = contiguous(&tau)?.to_vec();
+    let mut cv = contiguous(&c)?.to_vec();
+    let work1 = lapack_run(py, "DORMBR", n_threads, || {
+        blocked::dormbr(
+            lp, v, sd, tr, m, n, k, &mut av, 0, lda, &tv, &mut cv, 0, ldc, lwork,
+        )
+    })?
+    .map_err(value_err)?;
+    Ok((
+        PyArray1::from_vec(py, av),
+        PyArray1::from_vec(py, cv),
+        work1,
+    ))
+}
+
+/// `DORGBR(VECT, M, N, K, A, LDA, TAU, WORK, LWORK, INFO)` on flat column-major storage
+/// (`lwork=None`: `DORGBR`'s optimal workspace); returns `(A, WORK(1))`.
+#[pyfunction]
+#[pyo3(signature = (vect_, m, n, k, a, lda, tau, lwork = None, lapack = "3.12.1", n_threads = 1, gemm_q = 256))]
+#[allow(clippy::too_many_arguments)]
+fn lapack_dorgbr<'py>(
+    py: Python<'py>,
+    vect_: &str,
+    m: usize,
+    n: usize,
+    k: usize,
+    a: PyReadonlyArray1<'_, f64>,
+    lda: usize,
+    tau: PyReadonlyArray1<'_, f64>,
+    lwork: Option<usize>,
+    lapack: &str,
+    n_threads: usize,
+    gemm_q: usize,
+) -> PyResult<(F64s<'py>, usize)> {
+    let v = vect(vect_)?;
+    let lp = lp(lapack, gemm_q)?;
+    let mut av = contiguous(&a)?.to_vec();
+    let tv = contiguous(&tau)?.to_vec();
+    let work1 = lapack_run(py, "DORGBR", n_threads, || {
+        blocked::dorgbr(lp, v, m, n, k, &mut av, 0, lda, &tv, lwork)
+    })?
+    .map_err(value_err)?;
+    Ok((PyArray1::from_vec(py, av), work1))
+}
+
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(lapack_dbdsdc, m)?)?;
     m.add_function(wrap_pyfunction!(lapack_dlasd0, m)?)?;
@@ -533,5 +613,7 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(lapack_dlasdt, m)?)?;
     m.add_function(wrap_pyfunction!(lapack_dlamrg, m)?)?;
     m.add_function(wrap_pyfunction!(lapack_dlascl, m)?)?;
+    m.add_function(wrap_pyfunction!(lapack_dormbr, m)?)?;
+    m.add_function(wrap_pyfunction!(lapack_dorgbr, m)?)?;
     Ok(())
 }

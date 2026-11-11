@@ -193,12 +193,13 @@ that differs between them in both forms (`LapackRelease`):
 | `numpy_linalg::bdsdc::dlasd4`, `dlasd5`, `dlaed6` (the secular equation's roots: the last one and the inner ones, the two-pole and three-pole steps, `DLAED6`'s fallback, the geometric-mean bound; `DLAED6`'s scaling by `2^-340` and `2^-680`) | `dlasd4.f`, `dlasd5.f`, `dlaed6.f` (identical in both trees) | BSD-3-Clause |
 | `numpy_linalg::bdsdc::dlasdq` (both forms, `SQRE` 0 and 1, the rotations to upper form on `VT`, `U` and `C`, `DBDSQR` (the parent module's port, each release's `-0`), the ascending sort) | `dlasdq.f` (identical in both trees), `dbdsqr.f` (both trees) | BSD-3-Clause |
 | `numpy_linalg::bdsdc::dlamrg`, `dlascl_g` (`TYPE = 'G'`: the checks, the safe steps) | `dlamrg.f` (identical), `dlascl.f` (both trees; the same arithmetic for `'G'`) | BSD-3-Clause |
+| `numpy_linalg::blocked::dormbr`, `dorgbr`, `Vect`, `ormbr_lwork_opt`, `orgbr_lwork_opt` (`DGEBRD`'s `Q` and `P`: `DORMQR`/`DORMLQ` (the transpose flipped for `P`) on all the reflectors or on the `nq - 1` shifted ones, `DORMBR`'s own optimal workspace `NW·32` handed on as it is (short for `DORMQR`/`DORMLQ`: each release's `NB` rule then applies); `DORGQR`/`DORGLQ` or the shifted forms with the identity's first row and column; the checks, `WORK(1)`) | `dormbr.f`, `dorgbr.f` (identical in both trees) | BSD-3-Clause |
 
 The BLAS calls are the ported Haswell kernels (`openblas::level3::dgemm_with` for `DLASD3`,
 `level1::dnrm2` and `dcopy`, the parent module's `drot` and `dswap`). Validated bit for bit
 against numpy's own LAPACK through its exported Fortran entry points in both kept environments
-(`validation/investigations/confounds/check_svd.py`, every routine through its own entry point,
-2026-11-11): see `validation/investigations/confounds/README.md` for the counts and commits; its
+(`validation/investigations/confounds/check_svd.py`, every routine through its own entry point;
+`DORMBR`/`DORGBR`: `check_lapack.py`'s section `orbr`, 2026-11-11): see `validation/investigations/confounds/README.md` for the counts and commits; its
 `--control` shows that the cases tell the two releases apart.
 
 ## SciPy's 4 × 4 inverse (`scipy_linalg`, field maps part B, relay 18)

@@ -130,8 +130,13 @@ def trmm_gemm_depth(side: str, upper: bool, m: int, n: int) -> int:
 
 def zen4_rule(config: str) -> bool:
     """OpenBLAS >= 0.3.31's condition, approximately: an AMD CPU with AVX-512 (the library also
-    checks a 1 MiB L2 and an L3 a multiple of 32 MiB)."""
+    checks a 1 MiB L2, ``OPENBLAS_L2_SIZE`` when set, and an L3 a multiple of 32 MiB)."""
     version = tuple(int(x) for x in config.split()[1].split(".")[:3])
+    l2 = os.environ.get("OPENBLAS_L2_SIZE", "").strip()
+    if l2 and l2 != "1024":
+        # The library reads the L2 size from this variable first (`get_l2_size`): any other value
+        # than 1024 KiB skips the block, so the Haswell table's 256 stays.
+        return False
     try:
         info = Path("/proc/cpuinfo").read_text()
     except OSError:

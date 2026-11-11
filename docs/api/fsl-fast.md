@@ -123,8 +123,9 @@ FAST's defects are corrected by default and reproduced with `upstream_defects="r
 error and as an `UpstreamDefectWarning` ([all of them](upstream-defects.md)):
 
 - **FSL-11**: with `FSLOUTPUTTYPE` unset FSL's FAST stops with FSL's message at its first image
-  (exit 1). The clean-room original writes the images as `NIFTI_GZ` (`.nii.gz`: the bytes
-  `FSLOUTPUTTYPE=NIFTI_GZ` gives) and names FSL-11 on one line per command; `reproduce` stops as FSL
+  (exit 1). Both implementations, the clean-room original and the replica, write the images as
+  `NIFTI_GZ` (`.nii.gz`: the bytes `FSLOUTPUTTYPE=NIFTI_GZ` gives) and name FSL-11 on one line per
+  command, in the same words (the replica's line starts `larmorx-nc:`); `reproduce` stops as FSL
   does. Command line only: the Python functions set the type themselves.
 - **FSL-96**: `-p`'s probability maps outside the brain mask (and everywhere with `--nopve` and
   priors or no initialisation iteration) are memory FAST never writes: larmorx writes 0 (both

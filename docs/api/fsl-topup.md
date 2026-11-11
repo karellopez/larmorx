@@ -191,8 +191,9 @@ changes a result is named on standard error and as an `UpstreamDefectWarning`
 ([all of them](upstream-defects.md)):
 
 - **FSL-11**: with `FSLOUTPUTTYPE` unset FSL's topup and applytopup stop with FSL's message at
-  their first image (exit 1). The clean-room original writes the images as `NIFTI_GZ` (`.nii.gz`:
-  the bytes `FSLOUTPUTTYPE=NIFTI_GZ` gives) and names FSL-11 on one line per command; `reproduce`
+  their first image (exit 1). Both implementations, the clean-room original and the replica, write
+  the images as `NIFTI_GZ` (`.nii.gz`: the bytes `FSLOUTPUTTYPE=NIFTI_GZ` gives) and name FSL-11 on
+  one line per command, in the same words (the replica's line starts `larmorx-nc:`); `reproduce`
   stops as FSL does. Command line only: the Python functions set the type themselves. applytopup's
   integer `--datatype` outputs meet FSL-09 (rounded and clamped), its notice naming applytopup.
 - **FSL-116**: FSL's results depend on its thread count (`--nthr`, `FSL_NUM_THREADS`); larmorx

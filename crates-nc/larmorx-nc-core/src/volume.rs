@@ -1909,6 +1909,8 @@ impl<T: Elem> Volume<T> {
             self
         };
         let filetype = env_output_type(settings).map_err(SaveError::OutputType)?;
+        // FSL-11: under the default type, this is where FSL's program would have stopped
+        settings.note_output_type_read();
         // set_fsl_hdr
         let mut h = NiftiHeader::default();
         h.dim[0] = i64::from(v.dimensionality());

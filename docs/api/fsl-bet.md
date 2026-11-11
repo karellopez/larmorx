@@ -101,7 +101,7 @@ FSL program is looked for on the `PATH` (CLAUDE.md rule 6).
 | `-v`, `--verbose` | (command line only) | |
 | `--parameter_d1=`, `--parameter_d2=` | (command line only) | hidden search depths (7 and 3) |
 | `--tanh=correctly-rounded` (larmorx's own; also `--tanh correctly-rounded`, and passed on by `bet`) | `tanh="correctly-rounded"` | the surface's smoothness weight with the correctly rounded `tanh` (CORE-MATH's, `larmorx_core::math::tanh`) instead of glibc 2.35's bits, which FSL calls (`glibc`, the default). **GLIBC-06, the user's decision of 2026-10-31**: glibc's bits by default, the correctly rounded one on request (no notice: it is asked for). Where a surface self-intersects and is found again, the last bit can change the result (4 of the standard tier's 13 real images: findings). The clean-room original only (`implementation="replica"` refuses it; `"auto"` runs the original) |
-| `FSLOUTPUTTYPE` | (always NIfTI-1 in Python) | on the command line read from the environment, as FSL does |
+| `FSLOUTPUTTYPE` | (always NIfTI-1 in Python) | on the command line read from the environment, as FSL does (unset: `NIFTI_GZ`, FSL-11) |
 
 ### `bet`'s variations
 
@@ -140,7 +140,7 @@ which profiles cross the eyes); without `t2` the surfaces come from the T1 alone
 | `-v`, `--verbose` | (command line only) | `extracting profiles`, the profiles cast and the percentage set aside (the dropped ones and those of which only the scalp counts), then each phase |
 | `-h`, `--help` | (command line only) | the usage, exit 0 |
 | the mesh name `manual_input` | (command line only) | the name read from standard input (larmorx refuses at its end, where FSL waits forever); the name `c` cancels (an empty mesh: refused, FSL-52) |
-| `FSLOUTPUTTYPE` | (always NIfTI-1 in Python) | read when the first image is written, as FSL does |
+| `FSLOUTPUTTYPE` | (always NIfTI-1 in Python) | read when the first image is written, as FSL does (unset: `NIFTI_GZ`, FSL-11) |
 
 ## Upstream defects (D13)
 
@@ -150,10 +150,11 @@ Corrected by default, reproduced with `upstream_defects="reproduce"`
 the project's rules A to D ([register](../findings/upstream-defects.md)):
 
 - **FSL-11** (A): with `FSLOUTPUTTYPE` unset FSL's bet2 and betsurf stop with FSL's message at
-  their first image (exit 1; `bet`'s script fails with them). The clean-room original writes the
-  images as `NIFTI_GZ` (`.nii.gz`: the bytes `FSLOUTPUTTYPE=NIFTI_GZ` gives) and names FSL-11 on one
-  line per command; `reproduce` stops as FSL does. Command line only: the Python functions set the
-  type themselves.
+  their first image (exit 1; `bet`'s script fails with them; betsurf writes its inner skull's mesh
+  first). Both implementations, the clean-room original and the replica, write the images as
+  `NIFTI_GZ` (`.nii.gz`: the bytes `FSLOUTPUTTYPE=NIFTI_GZ` gives) and name FSL-11 on one line per
+  command (one for `bet`'s bet2 runs), in the same words (the replica's line starts `larmorx-nc:`);
+  `reproduce` stops as FSL does. Command line only: the Python functions set the type themselves.
 - **FSL-40** (A): bet2 removes the first `.hdr` of a name wherever it stands, and a name with
   `.img` but no `.hdr` aborts FSL; the default removes a trailing extension only.
 - **FSL-42** (B): a NaN `-f` or `-g`, a negative, NaN or infinite `-r`, `-w` of 0 or less, a

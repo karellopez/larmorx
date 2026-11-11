@@ -46,10 +46,11 @@ The changes on `main` since 0.1.0rc1, for the next release.
   one thread; their results are the same bytes at every thread count.
 - **PyPI's author** of the three packages: Karel Mauricio López Vilaret, with the e-mail address
   `CITATION.cff` gives.
-- **FSL's tools without `FSLOUTPUTTYPE`** (FSL-11): every FSL tool's clean-room original writes
-  its images as `.nii.gz` (`NIFTI_GZ`) when the variable is unset, as `flirt` and `mcflirt`
-  already did, and names FSL-11 on one line per command; FSL's own programs stop at their first
-  image (exit 1), which `--upstream-defects reproduce` gives. Setting the variable is optional.
+- **FSL's tools without `FSLOUTPUTTYPE`** (FSL-11): every FSL tool, its clean-room original and
+  its `larmorx-nc` replica alike, writes its images as `.nii.gz` (`NIFTI_GZ`) when the variable is
+  unset, as `flirt` and `mcflirt` already did, and names FSL-11 on one line per command, in the same
+  words; FSL's own programs stop at their first image (exit 1), which `--upstream-defects
+  reproduce` gives. Setting the variable is optional.
 
 ### Deprecated
 

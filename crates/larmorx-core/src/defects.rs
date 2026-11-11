@@ -1026,6 +1026,21 @@ impl fmt::Display for Notice {
     }
 }
 
+/// FSL-11's notice for a run of the FSL program `tool` with `FSLOUTPUTTYPE` unset whose images
+/// were written as `NIFTI_GZ` (the default; with `reproduce` the run stops as FSL's does). The
+/// words both implementations print: the clean-room originals' (`larmorx_mri::hmc::image::
+/// fsl11_notice`, the same text) and the `larmorx-nc` replicas'.
+pub fn fsl11_notice(tool: &str) -> Notice {
+    Notice::new(
+        &FSL_11,
+        UpstreamDefects::Fix,
+        format!(
+            "FSLOUTPUTTYPE is not set: the images are written as NIFTI_GZ (.nii.gz); FSL's {tool} \
+             stops with an error at its first image (exit 1)"
+        ),
+    )
+}
+
 /// Adds `notice` to `notices` unless the same defect is already there (one notice per defect
 /// and result).
 pub fn push_once(notices: &mut Vec<Notice>, notice: Notice) {

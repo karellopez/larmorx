@@ -104,7 +104,7 @@ correction changed the result, and reproduced with `upstream_defects="reproduce"
 
 | ID | FSL 6.0.7.23 | larmorx by default |
 |---|---|---|
-| FSL-11 | `FSLOUTPUTTYPE` unset: FSL's message at the first image, exit 1 | the images as `NIFTI_GZ` (`.nii.gz`), FSL-11 named on one line (the command line; the Python function sets the type itself); `reproduce` stops as FSL does |
+| FSL-11 | `FSLOUTPUTTYPE` unset: FSL's message at the first image, exit 1 | the images as `NIFTI_GZ` (`.nii.gz`), FSL-11 named on one line, in the same words by both implementations (the command line; the Python function sets the type itself); `reproduce` stops as FSL does |
 | FSL-261 | `--removeramps` leaves the image's last column, row and slice out of the ramps (one slice: no ramp removed) | every column, row and slice |
 | FSL-262 | `--savemask` and `-l` with several volumes keep only the last volume's | every processed volume's, as a series |
 | FSL-263 | `-c` with an image that is not complex reads its bytes as floats and its imaginary part from memory never written | refused (exit 1) |

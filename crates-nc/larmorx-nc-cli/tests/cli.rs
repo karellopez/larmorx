@@ -235,6 +235,11 @@ fn failures_corrected_and_reproduced() {
     );
     assert_eq!(o.code, 0, "{}", o.stderr);
     assert!(dir.join("unset.nii.gz").is_file());
+    assert!(
+        named(&o.stderr).contains(&"FSL-11".to_owned()),
+        "{}",
+        o.stderr
+    );
     let o = mcflirt(
         dir,
         &["-in", b, "-out", "unset2", "-mats", "-stages", "1"],

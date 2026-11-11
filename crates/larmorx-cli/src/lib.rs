@@ -1023,4 +1023,18 @@ mod tests {
             "{err}"
         );
     }
+
+    /// FSL-11's line has the same words in both implementations: the clean-room originals'
+    /// (`larmorx_mri::hmc::image::fsl11_notice`) and the `larmorx-nc` replicas'
+    /// (`larmorx_core::defects::fsl11_notice`; their lines start `larmorx-nc:` instead).
+    #[test]
+    fn fsl11_has_the_same_words_in_both_implementations() {
+        for tool in ["fslmaths", "bet", "standard_space_roi", "mcflirt"] {
+            assert_eq!(
+                larmorx_core::defects::fsl11_notice(tool),
+                larmorx_mri::hmc::image::fsl11_notice(tool),
+                "{tool}"
+            );
+        }
+    }
 }

@@ -355,3 +355,9 @@ families (`larmorx-nc`, `larmorx-gpl`, which depend on this crate and never on `
 each says what its `--implementation` takes (`cli::ImplementationOption`; `cli::ReplicaOnly`:
 `replica`, a no-op, the others refused). `cli::omp_num_threads` is the replica programs' reading
 of `OMP_NUM_THREADS`.
+
+`defects::fsl11_notice` (2026-11-11, relay 2c): FSL-11's notice, the words the clean-room
+originals print (`larmorx_mri::hmc::image::fsl11_notice`, written by the clean role; a test in
+`crates/larmorx-cli` checks the two give the same notice), here so that the `larmorx-nc` replicas,
+which never depend on a clean-room crate, print the same line (`larmorx-nc: upstream defect FSL-11
+(FSL) corrected: ...`).

@@ -9,7 +9,9 @@
 //! (`docs/licensing.md`).
 //!
 //! Each tool reads, as the original does, its environment variables (`FSLOUTPUTTYPE`, ...) once
-//! into a table of settings. larmorx's own options stand before the family, as `larmorx`'s do
+//! into a table of settings. With `FSLOUTPUTTYPE` unset, FSL's programs stop with an error at
+//! their first image (FSL-11): by default the table gives it `NIFTI_GZ` and the run ends with
+//! one line naming FSL-11 when it wrote an image; `reproduce` keeps FSL's error. larmorx's own options stand before the family, as `larmorx`'s do
 //! (`larmorx-nc [--n-threads N] [--upstream-defects fix|reproduce] [--implementation replica]
 //! fsl <tool> ...`, the user's decision of 2026-11-11, parsed by [`larmorx_core::cli::parse`]);
 //! each one given wins over the variable it replaces: the thread count over `OMP_NUM_THREADS`
@@ -124,6 +126,17 @@ fn renamed_notices(settings: &Settings, mode: UpstreamDefects, err: &mut dyn Wri
     }
 }
 
+/// FSL-11: the run wrote its images as `NIFTI_GZ` in place of the unset `FSLOUTPUTTYPE`
+/// (FSL's program stops with an error at its first image): one line per command, in the words
+/// of the clean-room originals' ([`larmorx_core::defects::fsl11_notice`]), whichever of the
+/// tool's steps wrote them (`bet`'s bet2 runs, `standard_space_roi`'s flirt).
+fn output_type_notice(settings: &Settings, tool: &str, err: &mut dyn Write) {
+    if settings.output_type_defaulted() {
+        let n = larmorx_core::defects::fsl11_notice(tool);
+        let _ = writeln!(err, "larmorx-nc: {}", n.line());
+    }
+}
+
 /// Runs the command line with `args` (program name first), writing to `out` and `err`.
 fn run<I, S>(args: I, out: &mut dyn Write, err: &mut dyn Write) -> u8
 where
@@ -176,7 +189,8 @@ where
                     Some((_, f)) => match given.upstream_defects() {
                         Ok(mode) => {
                             let settings = Settings::from_env(FSL_VARIABLES)
-                                .reproducing_renames(mode.reproduce());
+                                .reproducing_renames(mode.reproduce())
+                                .defaulting_output_type(mode.fix());
                             let threads = threads(&given);
                             // an exception nothing in the program catches: std::terminate
                             let code = match larmorx_nc_core::exception::catch(|| {
@@ -197,6 +211,7 @@ where
                                 }
                             };
                             renamed_notices(&settings, mode, err);
+                            output_type_notice(&settings, tool, err);
                             (code, Ok(()))
                         }
                         Err(e) => (EXIT_BAD_MODE, writeln!(err, "Error: {e}")),
@@ -291,6 +306,8 @@ Options (before the family; each one given wins over the environment variable it
 Environment:
   LARMORX_UPSTREAM_DEFECTS  fix (default): the originals' defects corrected; reproduce: their
                             results bit for bit
+  FSLOUTPUTTYPE             the images' format, as in FSL (unset: NIFTI_GZ, .nii.gz, and a
+                            notice, where FSL's programs stop with an error: FSL-11)
   OMP_NUM_THREADS           threads (default: all logical CPUs); results do not depend on it
 ",
         version = VERSION,

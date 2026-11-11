@@ -313,10 +313,11 @@ Corrected by default, FSL's behaviour with `upstream_defects="reproduce"`
   int8, FLIRT writes uint8); the notice names the program that wrote the output (flirt,
   applyxfm4D).
 - **FSL-11**: with `FSLOUTPUTTYPE` unset FSL's flirt and applyxfm4D stop with FSL's message at
-  their first image (exit 1; `-omat` alone writes no image, and runs). The clean-room original
-  writes the images as `NIFTI_GZ` (`.nii.gz`: the bytes `FSLOUTPUTTYPE=NIFTI_GZ` gives) and names
-  FSL-11 on one line per command; `reproduce` stops as FSL does. Command line only: the Python
-  functions set the type themselves.
+  their first image (exit 1; `-omat` alone writes no image, and runs; with `-out` the matrix is
+  written first). Both implementations, the clean-room original and the replica, write the images
+  as `NIFTI_GZ` (`.nii.gz`: the bytes `FSLOUTPUTTYPE=NIFTI_GZ` gives) and name FSL-11 on one line
+  per command, in the same words (the replica's line starts `larmorx-nc:`); `reproduce` stops as
+  FSL does. Command line only: the Python functions set the type themselves.
 - **FSL-14**: non-finite voxels left out of the costs (one NaN makes FLIRT's cost NaN).
 - **FSL-56**: NIfTI extensions' offset.
 - **FSL-68**: an error after the command line (an image or matrix that cannot be read, an unknown

@@ -1104,9 +1104,10 @@ def image_math_operations() -> list[str]:
 #: below). ``lx.fsl.prelude`` ran a tool with only its replica (FSL's prelude) from 2026-11-06
 #: until its clean-room original came the next day (its cases below); since 2026-11-06
 #: ``lx.afni.volreg`` ran a tool with only its replica (AFNI's 3dvolreg) from 2026-11-06 until its
-#: clean-room original came on 2026-11-08 (its cases below). ``lx.tedana.t2smap`` runs tedana's
-#: t2smap, whose replica (``larmorx-gpl``, since 2026-11-08) has its cases in ``crates-gpl``.
-REPLICA_ONLY_FUNCTIONS: dict[str, str] = {"lx.tedana.t2smap": "tedana t2smap"}
+#: clean-room original came on 2026-11-08 (its cases below). ``lx.tedana.t2smap`` ran tedana's
+#: t2smap with only its replica (``larmorx-gpl``, since 2026-11-08, its cases in ``crates-gpl``)
+#: until its clean-room original was wired in on 2026-11-12 (its cases below). None now.
+REPLICA_ONLY_FUNCTIONS: dict[str, str] = {}
 
 #: The replicas' golden cases: the AFNI replicas' (built into larmorx since 2026-10-29, cases
 #: in the larmorx command line's tests, run by ``cargo test`` in every platform's test job), the
@@ -8855,12 +8856,14 @@ def _(ctx: Context) -> dict[str, Any]:
 # ------------------------------------------------------------------------------------------------
 # tedana's t2smap: the clean-room original (``crates/larmorx-tedana``, ``specs/t2smap.md`` §17.4)
 #
-# Through its own binding (``_core.tedana_t2smap_cleanroom``) until it is wired into
-# ``lx.tedana.t2smap`` (which runs the replica, ``larmorx-gpl``, today: ``REPLICA_ONLY_FUNCTIONS``),
-# so the cases cover no public name yet. Every file the run writes is an output (NIfTI images by
-# header and data), with its exit status and both streams; standard error with the case
-# directory's name replaced, ``dataset_description.json`` without the host's ``Node`` and with
-# larmorx's version replaced (the same checksum on every machine and at every release).
+# Through its own binding (``_core.tedana_t2smap_cleanroom``: t2smap's arguments, an environment
+# table, the directory), and since 2026-11-12, when it was wired into the shared implementation
+# choice, through the public entry points too: the command line (``cli.tedana.t2smap``: larmorx's
+# options before the family) and ``lx.tedana.t2smap`` (``py.tedana.t2smap``). Every file the run
+# writes is an output (NIfTI images by header and data), with its exit status and both streams;
+# standard error with the case directory's name replaced, ``dataset_description.json`` without
+# the host's ``Node`` and with larmorx's version replaced (the same checksum on every machine and
+# at every release).
 
 T2SMAP_SHAPE = (12, 10, 8, 4)
 T2SMAP_TES_MS = (12, 28, 44)
@@ -9005,6 +9008,20 @@ def _t2smap_text(text: str, where: Path) -> str:
     return "\n".join(lines)
 
 
+def _t2smap_paths(text: str, where: Path) -> str:
+    """``text`` with the case directory's name as ``<dir>``, ``lx.tedana.t2smap``'s temporary
+    directory as ``<tmp>``, and ``/`` for the separators of the paths after them (in Python's
+    lists the backslashes doubled)."""
+    text = text.replace(os.fspath(where), "<dir>")
+    text = re.sub(r"[^\s'\"\[]*larmorx-t2smap-[A-Za-z0-9_]+", "<tmp>", text)
+    lines = []
+    for line in text.split("\n"):
+        if "<dir>" in line or "<tmp>" in line:
+            line = line.replace("\\\\", "/").replace("\\", "/")
+        lines.append(line)
+    return "\n".join(lines)
+
+
 def _t2smap_run(
     ctx: Context, name: str, *argv: str, mode: str = "fix", env: tuple = ()
 ) -> dict[str, Any]:
@@ -9015,6 +9032,13 @@ def _t2smap_run(
     code, out, err = _core.tedana_t2smap_cleanroom(
         [*argv, "--out-dir", name], variables, os.fspath(ctx.dir)
     )
+    return _t2smap_outputs(ctx, name, (code, out, err))
+
+
+def _t2smap_outputs(ctx: Context, name: str, status: tuple[int, str, str]) -> dict[str, Any]:
+    """A t2smap run's exit status and streams (the case directory's name replaced in standard
+    error), and every file it wrote under ``<name>``."""
+    code, out, err = status
     outputs: dict[str, Any] = _status_outputs(name, (code, out, _t2smap_text(err, ctx.dir)))
     for p in sorted((ctx.dir / name).rglob("*")):
         key = f"{name}/{p.relative_to(ctx.dir / name).as_posix()}"
@@ -9028,6 +9052,70 @@ def _t2smap_run(
         else:
             outputs[key] = File(os.fspath(p))
     return outputs
+
+
+@case("cli.tedana.t2smap", covers=("cli:tedana t2smap",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``larmorx --n-threads 2 --upstream-defects reproduce --implementation clean-room tedana
+    t2smap ...`` (the command line's dispatch to the clean-room original, in this process):
+    larmorx's options before the family reach it (D13's mode; the thread count, t2smap's own
+    ``--n-threads`` not given), relative names in the working directory; the log-linear fit with
+    both mask methods, tedana's names (``--convention orig``)."""
+    d = _t2smap_nifti(ctx)
+    argv = [*d, *T2SMAP_TES, "--mask", "mask.nii.gz", "--masktype", "dropout", "decay",
+            "--convention", "orig", "--out-dir", "out"]  # fmt: skip
+    globals_ = ["--n-threads", "2", "--upstream-defects", "reproduce", "--implementation", "clean-room"]  # fmt: skip
+    saved_dir, saved_env = os.getcwd(), dict(os.environ)
+    for name in ("COLUMNS", "OMP_NUM_THREADS", "LARMORX_TEDANA_LIBRARIES"):
+        os.environ.pop(name, None)
+    os.environ["COLUMNS"] = "80"
+    os.chdir(ctx.dir)
+    try:
+        seen = os.getcwd()  # the directory as the process names it (t2smap's log names it so)
+        code, out, err = _core.cli_main(["larmorx", *globals_, "tedana", "t2smap", *argv], [], None)  # fmt: skip
+    finally:
+        os.chdir(saved_dir)
+        os.environ.clear()
+        os.environ.update(saved_env)
+    return _t2smap_outputs(ctx, "out", (code, out, err.replace(seen, os.fspath(ctx.dir))))
+
+
+@case("py.tedana.t2smap", covers=("lx.tedana.t2smap",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``lx.tedana.t2smap(..., implementation="clean-room")`` in this process: in-memory float32
+    echoes (written as NIfTI-1 by the wrapper) and a mask file, the curve fit with ``verbose``
+    (every image of :class:`T2smapResult` read back, the failures and variance maps too), the
+    table's columns, the registry, the description (its host and larmorx's version replaced),
+    tedana's log (the temporary directory replaced) and the notices as warnings."""
+    _t2smap_nifti(ctx)
+    aff = _t2smap_affine()
+    echoes = [(np.asfortranarray(e.astype(np.float32)), aff) for e in _t2smap_echoes()]
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        r = lx.tedana.t2smap(echoes, [0.012, 0.028, 0.044], mask=ctx.out("mask.nii.gz"),
+                             fittype="curvefit", verbose=True, implementation="clean-room",
+                             n_threads=2)  # fmt: skip
+    out: dict[str, Any] = {}
+    for name in ("t2star", "s0", "t2star_limited", "s0_limited", "optcom", "adaptive_mask",
+                 "rmse", "fit_failures", "t2star_variance", "s0_variance",
+                 "t2star_s0_covariance"):  # fmt: skip
+        img = getattr(r, name)
+        out[name] = img.data
+        out[f"{name}.affine"] = img.affine
+    for column, values in r.confounds.items():
+        out[f"confounds.{column}"] = values
+    out["files"] = json.dumps(r.files, sort_keys=True)
+    generated = dict(r.dataset_description["GeneratedBy"][0])
+    generated["Node"] = {}
+    generated["Command"] = _t2smap_paths(generated["Command"], ctx.dir)
+    generated["Python"] = generated["Python"].replace(_core.__version__, "<version>")
+    description = {**r.dataset_description, "GeneratedBy": [generated]}
+    out["dataset_description"] = json.dumps(description, sort_keys=True)
+    out["log"] = _t2smap_paths(r.log, ctx.dir)
+    out["implementation"] = f"{r.implementation.kind} {r.implementation.package}"
+    notices = [w for w in caught if isinstance(w.message, lx.UpstreamDefectWarning)]
+    out["warnings"] = "\n".join(f"{type(w.message).__name__}: {w.message}" for w in notices)
+    return out
 
 
 @case("tedana.t2smap.cleanroom.loglin")

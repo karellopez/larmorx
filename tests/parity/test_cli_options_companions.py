@@ -145,9 +145,14 @@ def test_larmorx_gpl_gets_the_options(cli, tmp_path):
         assert a == b, (option, a[0][2][-500:])
         assert a[0][0] == 0, a[0][2][-500:]
         assert fa == fb and any(name in dict(fa) for name in outputs), sorted(dict(fa))
-    # --implementation clean-room: there is no clean-room original of t2smap yet (exit 127)
-    (code, _, err), _ = run([*cli, "--implementation", "clean-room", *t2smap], tmp_path, base, [])
-    assert code == 127 and b"no clean-room original of tedana t2smap" in err
+    # --implementation clean-room: t2smap's clean-room original (since 2026-11-12), with the
+    # replica's program found but not run
+    out = tmp_path / "clean-room"
+    args = [*cli, "--implementation", "clean-room", *t2smap, "--out-dir", str(out)]
+    (code, _, err), _ = run(args, tmp_path, base, [])
+    assert code == 0, err[-500:]
+    described = (out / "dataset_description.json").read_text(encoding="utf-8")
+    assert "a clean-room implementation of tedana" in described
 
 
 #: The companion programs' own options (the user's decision of 2026-11-11): ``larmorx-nc`` and

@@ -49,13 +49,13 @@ This is its own Cargo workspace; the root workspace does not build it.
 
 ```bash
 cd crates-nc
-cargo build --release          # target/release/larmorx-nc
+cargo build --release
 cargo test
 cargo clippy --all-targets -- -D warnings
 cargo fmt --check
 ```
 
-`cargo test` includes the golden tests (`larmorx-nc-cli/tests/golden.rs`, a few tenths of a
+The build writes the program `target/release/larmorx-nc`. `cargo test` includes the golden tests (`larmorx-nc-cli/tests/golden.rs`, a few tenths of a
 second): every platform must reproduce the checksums of the replica's Linux x86_64 output in
 `larmorx-nc-cli/tests/golden.tsv` (CLAUDE.md rule 10, `docs/validation/golden.md`), and
 `larmorx-nc-cli/tests/notices.rs` checks the notices' copies and `fsl-source/`. To record the

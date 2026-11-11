@@ -14,10 +14,10 @@ the main package (Apache-2.0, `crates/larmorx-fsl`), written from
 [`specs/bet.md`](../../specs/bet.md), the BET paper and black-box runs of FSL
 ([PROVENANCE](../../crates/larmorx-fsl/PROVENANCE.md); since 2026-10-30 `bet2` and the `bet`
 script, since 2026-10-31 `betsurf`). `implementation="auto"` runs the replica, as a separate
-program, when `larmorx-nc` is installed (`pip install larmorx-nc`), else the original;
-`"replica"` and `"original"` choose.
+program, when `larmorx-nc` is installed (`pip install larmorx-nc`), else the clean-room original;
+`"replica"` and `"clean-room"` (`"original"`, 0.1.0rc1's spelling, still works) choose.
 Each image's `implementation` names the one that ran. The command line chooses alike
-(`LARMORX_IMPLEMENTATION=auto|replica|original`).
+(`--implementation auto|replica|clean-room` before the family, or `LARMORX_IMPLEMENTATION`).
 
 **Status: `validated`** (the replica), against FSL 6.0.7.23 itself
 ([record](../validation/fsl-bet-replica.md), standard tier, re-made 2026-11-04 with `-S`, `-B`,

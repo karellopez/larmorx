@@ -28,9 +28,11 @@ topup's settings files (`b02b0.cnf` and the others), at `<prefix>/share/larmorx-
 ## Installation
 
 ```bash
-pip install larmorx-nc              # by name, so that its licence is accepted knowingly
-pip install "larmorx[all]"          # or with everything: larmorx, larmorx-nc and larmorx-gpl
+pip install larmorx-nc
 ```
+
+installs it by name, so that its licence is accepted knowingly; `pip install "larmorx[all]"`
+installs everything: larmorx, larmorx-nc and larmorx-gpl.
 
 Python 3.12 or newer; wheels for Linux (x86-64, aarch64; glibc 2.28 or newer), macOS (11 or newer,
 Intel and Apple silicon; on Apple silicon `larmorx[all]` needs macOS 12, as SciPy's and

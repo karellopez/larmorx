@@ -27,9 +27,9 @@ larmorx keeps its FSL tools in two implementations ([licensing](../licensing.md)
   [PROVENANCE](../../crates-nc/larmorx-nc-flirt/PROVENANCE.md)), which runs every program in the
   replica's own process.
 
-`implementation="auto"` runs the replica when its program is found, else the original;
-`"original"` and `"replica"` choose. The command line follows `LARMORX_IMPLEMENTATION` the same
-way.
+`implementation="auto"` runs the replica when its program is found, else the clean-room
+original; `"clean-room"` (`"original"`, 0.1.0rc1's spelling, still works) and `"replica"` choose. The command line follows
+`--implementation` (before the family) or `LARMORX_IMPLEMENTATION` the same way.
 
 **Built for speed** (the original): the registration to the reference is almost all of
 `standard_space_roi`'s time; besides it, without `-d` the temporary images are written

@@ -202,7 +202,7 @@ out_corrected, out_field)`.
 | `phdiff2fmap(in_file, delta_te=None, *, metadata=None, out_dir=None)` | `Phasediff2Fieldmap` (`phdiff2fmap`): `phase / (2π ΔTE)` in float32; `<in>_fmap` | `delta_te` or `metadata` needed |
 | `check_b0_units(in_file, units, *, out_dir=None)` | `CheckB0Units`: `Hz` passed through; `rad/s` divided by 2π (scaling applied) and stored in the input's type as nibabel scales it; `<in>_Hz` | `units` must be `Hz` or `rad/s` |
 | `check_register(mag_files, fmap_files, rot_thresh=0.02, trans_thresh=1.0, *, out_dir=None)` → `CheckRegisterResult(mag_files, fmap_files)` | `CheckRegister` (`_check_gross_geometry`, `_conform_img`) | "Images have shape mismatch: …", "Images have orientation mismatch: …" (logged as critical, raised as `ValueError`); images whose affine differs from the first magnitude's are rewritten with it ("Copying affine to …"). **Two magnitudes with different affines** need FreeSurfer's `mri_robust_register`: `NotImplementedError` until the FreeSurfer part (no oracle run reaches it) |
-| `phdiff_workflow(magnitude, phase, phase_meta, mask, *, out_dir=None, prelude_implementation="auto", n_threads=1, upstream_defects="fix")` → `PhdiffWorkflowResult(rads, phase_diff, unwrapped, fieldmap)` | `workflows/fit/fieldmap.py: init_phdiff_wf`: `PhaseMap2rads` per map, `SubtractPhases`, FSL's PRELUDE (nipype), `Phasediff2Fieldmap` | PRELUDE through `lx.fsl.prelude` (`prelude_implementation`: `"auto"`, `"original"`, `"replica"`); its output written as `<phase>_unwrapped` |
+| `phdiff_workflow(magnitude, phase, phase_meta, mask, *, out_dir=None, prelude_implementation="auto", n_threads=1, upstream_defects="fix")` → `PhdiffWorkflowResult(rads, phase_diff, unwrapped, fieldmap)` | `workflows/fit/fieldmap.py: init_phdiff_wf`: `PhaseMap2rads` per map, `SubtractPhases`, FSL's PRELUDE (nipype), `Phasediff2Fieldmap` | PRELUDE through `lx.fsl.prelude` (`prelude_implementation`: `"auto"`, `"clean-room"`, `"replica"`); its output written as `<phase>_unwrapped` |
 
 ## The brain-extraction, magnitude and field-map workflows (part B)
 
@@ -638,7 +638,7 @@ the program's name in them is `sdcflows`.
 | `--use-plugin FILE` | - | SDC-35, SDC-33 |
 | `--notrack` | - | recorded; larmorx never sends usage information |
 | `LARMORX_UPSTREAM_DEFECTS` | `upstream_defects=` | `fix` (default) or `reproduce` (D13) |
-| `LARMORX_IMPLEMENTATION` | `prelude_implementation=`, `topup_implementation=`, `volreg_implementation=` | `auto` (default), `replica`, `original`: FSL's `prelude` and `topup`, AFNI's `3dvolreg` |
+| `--implementation` (before the family) or `LARMORX_IMPLEMENTATION` | `prelude_implementation=`, `topup_implementation=`, `volreg_implementation=` | `auto` (default), `replica`, `clean-room` (`original`, 0.1.0rc1's spelling, still works): FSL's `prelude` and `topup`, AFNI's `3dvolreg` |
 | `LARMORX_SDCFLOWS_LIBRARIES` | `numpy_version=`, `scipy_version=`; nibabel's `set_qform` LAPACK (`larmorx.io.nibabel_header.use_lapack`, for the run) | `newest` (numpy 2.5.4, SciPy 1.18.1, LAPACK 3.12.1; default) or `shared` (numpy 2.3.5, SciPy 1.15.3, LAPACK 3.12.0) |
 | `FSLDIR` | `fsldir=` | FSL's topup configurations (decision D9: `topup_config_file`) |
 

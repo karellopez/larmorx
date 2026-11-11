@@ -17,7 +17,7 @@ and the clean-room **original** of `flirt` and `convert_xfm` in the main package
 `crates/larmorx-fsl`, written from [`specs/flirt.md`](../../specs/flirt.md) on the registration
 engine it shares with `lx.mri.hmc`; part 1, 2026-11-02: [PROVENANCE](../../crates/larmorx-fsl/PROVENANCE.md),
 section "FLIRT"). `implementation="auto"` runs the replica when `larmorx-nc` is installed, else
-the original; `"original"` runs the original in this process. Of FLIRT's other programs,
+the clean-room original; `"clean-room"` (`"original"`, 0.1.0rc1's spelling, still works) runs the clean-room original in this process. Of FLIRT's other programs,
 `avscale`, the coordinate programs, `rmsdiff` and `makerot` have their clean-room original too
 (part 2 of the original, 2026-11-02); `midtrans`, `pointflirt`, `applyxfm4D` and the scripts have
 their replica only for now (`"auto"` needs `larmorx-nc` for them). The command line chooses alike
@@ -140,8 +140,8 @@ weights and, with `-cost bbr`, BBR's `debug` volume).
 
 ## The clean-room original (part 1, 2026-11-02)
 
-`lx.fsl.flirt(..., implementation="original")`, `lx.fsl.convert_xfm(..., implementation="original")`,
-`LARMORX_IMPLEMENTATION=original larmorx fsl flirt|convert_xfm` (crate `larmorx-fsl`, module
+`lx.fsl.flirt(..., implementation="clean-room")`, `lx.fsl.convert_xfm(..., implementation="clean-room")`,
+`larmorx --implementation clean-room fsl flirt|convert_xfm` (crate `larmorx-fsl`, module
 `flirt`; Apache-2.0, written from [`specs/flirt.md`](../../specs/flirt.md) by an implementer who
 never read FSL's source or the replica). It runs on the main package's clean-room registration
 engine, shared with `lx.mri.hmc` (`larmorx_mri::hmc`: the parametrisation, the cost sampling and
@@ -163,8 +163,8 @@ search's grid points, the large evaluations' slices, the pyramid's filters, the 
 and the output's slices run in parallel, each result folded in a fixed order.
 
 **FLIRT's other programs (part 2, relay 1, 2026-11-02).** `avscale`, `img2imgcoord`,
-`std2imgcoord`, `img2stdcoord`, `rmsdiff` and `makerot` (`LARMORX_IMPLEMENTATION=original larmorx
-fsl <program>`, `lx.fsl.<program>(..., implementation="original")`; crate `larmorx-fsl`, modules
+`std2imgcoord`, `img2stdcoord`, `rmsdiff` and `makerot` (`larmorx --implementation clean-room
+fsl <program>`, `lx.fsl.<program>(..., implementation="clean-room")`; crate `larmorx-fsl`, modules
 `flirt::programs` and `cli::{avscale, coords, rmsdiff, makerot, common}`), complete: every option,
 usage, message, exit status and failure case of §15.1 to §15.4 (where FSL aborts, the same lines
 and exit status 1), standard input for the coordinate programs (their prompts, `std2imgcoord`'s

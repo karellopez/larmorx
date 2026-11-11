@@ -26,8 +26,9 @@ in two implementations ([licensing](../licensing.md)):
 
 Until the original exists, the replica is the only implementation: `implementation="auto"` and
 `"replica"` run it when `larmorx-gpl` is installed (`pip install larmorx-gpl`, or `pip install
-"larmorx[all]"`) and raise `ReplicaNotFoundError` with that command otherwise; `"original"` raises
-`NotImplementedError`. The command line does the same (`LARMORX_IMPLEMENTATION`; exit 127 with
+"larmorx[all]"`) and raise `ReplicaNotFoundError` with that command otherwise; `"clean-room"`
+(`"original"`, 0.1.0rc1's spelling, still works) raises `NotImplementedError`. The command line does the same (`--implementation`
+before the family, or `LARMORX_IMPLEMENTATION`; exit 127 with
 the command that installs it). The program is found through `LARMORX_GPL_BIN`, then the Python
 environment's scripts directory, then `PATH`.
 
@@ -98,7 +99,7 @@ larmorx's notice lines) and `implementation`. A run that fails raises `ReplicaEr
 | `-v`, `--version` | - | `t2smap v26.0.3` (exit 0) |
 | `LARMORX_UPSTREAM_DEFECTS` | `upstream_defects="fix"` | `"reproduce"` gives tedana's files bit for bit (its defects and its maths, below) |
 | `LARMORX_TEDANA_LIBRARIES` | `libraries="newest"` | the numpy and SciPy whose arithmetic is reproduced: `newest` (numpy 2.5.4, SciPy 1.18.1) or `shared` (numpy 2.3.5, SciPy 1.15.3); the curve fit's last bits differ between them |
-| - | `implementation="auto"` | `"auto"` or `"replica"` (the replica), `"original"` (none yet) |
+| `--implementation` (before the family) | `implementation="auto"` | `"auto"` or `"replica"` (the replica), `"clean-room"` (none yet) |
 
 argparse's errors exit 2 with tedana's usage and message; any other failure exits 1 with Python's
 traceback lines (its first and last; the stack itself is not reproduced). The Python wrapper

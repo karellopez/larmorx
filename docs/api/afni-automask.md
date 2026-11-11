@@ -11,7 +11,7 @@ package `larmorx-gpl`), and the clean-room **original** (`crates/larmorx-afni`, 
 built for speed and written from [`specs/3dAutomask.md`](../../specs/3dAutomask.md) and black-box
 runs of AFNI only ([PROVENANCE](../../crates/larmorx-afni/PROVENANCE.md)). `implementation="auto"`
 (the default, and `larmorx afni 3dAutomask`) runs the replica, in the same process;
-`implementation="replica"` or `"original"` (`LARMORX_IMPLEMENTATION`) forces one. Each image's `implementation` names the one
+`implementation="replica"` or `"clean-room"` (`"original"`, 0.1.0rc1's spelling, still works) (`--implementation` on the command line, or `LARMORX_IMPLEMENTATION`) forces one. Each image's `implementation` names the one
 that ran.
 
 **Status: `validated`**, both, against AFNI 26.3.05 itself (the original against AFNI 25.2.09 until 2026-10-29):
@@ -69,7 +69,7 @@ process environment is never read.
 | `-overwrite`, `-Dname=value`, `-ok_1D_text`, `-skip_afnirc` | `afni_settings` | AFNI's global options, anywhere on the command line |
 | `OMP_NUM_THREADS` | `n_threads` | the result does not depend on it (AFNI's 3dAutomask is single-threaded; the original runs its passes in parallel) |
 | `LARMORX_UPSTREAM_DEFECTS` | `upstream_defects` | `fix` (default) or `reproduce` |
-| `LARMORX_IMPLEMENTATION` | `implementation` | `auto`, `replica` or `original` |
+| `--implementation` or `LARMORX_IMPLEMENTATION` | `implementation` | `auto`, `replica` or `clean-room` |
 
 ## Upstream defects (D13)
 

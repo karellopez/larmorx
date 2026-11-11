@@ -40,13 +40,13 @@ This is its own Cargo workspace; the root workspace does not build it.
 
 ```bash
 cd crates-gpl
-cargo build --release -p larmorx-gpl-cli      # target/release/larmorx-gpl
+cargo build --release -p larmorx-gpl-cli
 cargo test -p larmorx-gpl-tedana -p larmorx-gpl-cli
 cargo clippy --workspace --all-targets -- -D warnings
 cargo fmt --check
 ```
 
-`cargo test` includes the golden tests (`larmorx-gpl-cli/tests/golden.rs`, a few tenths of a
+The build writes the program `target/release/larmorx-gpl`. `cargo test` includes the golden tests (`larmorx-gpl-cli/tests/golden.rs`, a few tenths of a
 second): every platform must reproduce the checksums of the replica's Linux x86_64 output in
 `larmorx-gpl-cli/tests/golden.tsv` (CLAUDE.md rule 10, `docs/validation/golden.md`); CI's `gpl`
 job runs them on the six platforms. `scripts/orchestration/gates-rust.sh <checkout> gpl` runs

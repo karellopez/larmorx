@@ -125,7 +125,7 @@ stage 4's field-map branch, for a run with a field map:
 | `sloppy`, `debug` | `--sloppy`, `--debug fieldmaps` | sdcflows' testing registration settings; the registration's warped images |
 | `ants_random_seed` | `ANTS_RANDOM_SEED` (fMRIPrep's `--random-seed`) | unseeded, ANTs seeds its sampling from the clock |
 | `sink` | `DerivativesDataSink` | called with each `DerivativeRequest(role, in_file, source_file, entities, sources)` (`role`: `boldref2fmap_xfm`, `coreg_boldref`, `bold_mask`; `entities`: fMRIPrep's `desc`, `suffix`, `from`, `to`, `mode`, `extension`, `compress`, `dismiss_entities`); it returns the file the later nodes read, as fMRIPrep's later nodes read the derivative files. Without it they read the node files (the same data; the skull-stripping files then take the node file's name) |
-| `fsl_implementation` | | BET's and fslmaths' implementation (`auto`, `replica`, `original`) |
+| `fsl_implementation` | | BET's and fslmaths' implementation (`auto`, `replica`, `clean-room`) |
 | `n_threads` | `omp_nthreads` | the results do not depend on it (ANTs' registration gives its one-thread result) |
 | `out_dir` | the BOLD fit's folder | required: `fmapreg_wf/`, `itk_mat2txt/`, `boldref_fmap/`, `unwarp_boldref/`, `skullstrip_bold_wf/` |
 

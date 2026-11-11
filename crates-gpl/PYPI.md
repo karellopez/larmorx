@@ -21,9 +21,11 @@ tag. larmorx-gpl does not present itself as tedana and is not endorsed by tedana
 ## Installation
 
 ```bash
-pip install larmorx-gpl             # by name
-pip install "larmorx[all]"          # or with everything: larmorx, larmorx-gpl and larmorx-nc
+pip install larmorx-gpl
 ```
+
+installs it by name; `pip install "larmorx[all]"` installs everything: larmorx, larmorx-gpl and
+larmorx-nc.
 
 Python 3.12 or newer; wheels for Linux (x86-64, aarch64; glibc 2.28 or newer), macOS (11 or newer,
 Intel and Apple silicon; on Apple silicon `larmorx[all]` needs macOS 12, as SciPy's and

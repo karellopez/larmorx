@@ -21,8 +21,8 @@ FSL-202 and FSL-203 in both modes (the last two since 2026-11-05; fMRIPrep's cal
 thresholds of `specs/fast.md` §11 on its oracle runs).
 `implementation="auto"` (the default) runs the replica when `larmorx-nc` is installed,
 else the original; `"replica"` needs `larmorx-nc` (`pip install larmorx-nc`; otherwise
-`ReplicaNotFoundError`); `"original"` runs the original. The command line chooses alike
-(`LARMORX_IMPLEMENTATION`).
+`ReplicaNotFoundError`); `"clean-room"` (`"original"`, 0.1.0rc1's spelling, still works) runs the clean-room original. The command
+line chooses alike (`--implementation` before the family, or `LARMORX_IMPLEMENTATION`).
 
 **Status: `experimental`**: the replica against FSL 6.0.7.23 itself
 ([record](../validation/fsl-fast-replica.md), standard tier): fMRIPrep's call bit-identical on
@@ -69,8 +69,10 @@ From the command line, FAST's own arguments:
 
 ```
 larmorx fsl fast -I 0 -N -p -g -S 1 T1w_brain.nii.gz
-larmorx fsl fast -S 2 -B -o out T2w_brain.nii.gz T1w_brain.nii.gz   # channel 1 is the last word
+larmorx fsl fast -S 2 -B -o out T2w_brain.nii.gz T1w_brain.nii.gz
 ```
+
+(in the second, channel 1 is the last word.)
 
 ## Options
 
@@ -99,7 +101,7 @@ larmorx fsl fast -S 2 -B -o out T2w_brain.nii.gz T1w_brain.nii.gz   # channel 1 
 | `fsldir` | `FSLDIR` | | the FSL installation whose `data/standard/tissuepriors` the standard priors come from (needed only for `priors_matrix` without `priors`) |
 | `verbose` | `-v` | `False` | FAST's diagnostic messages (in `FastResult.stdout`) |
 | `n_threads` | `OMP_NUM_THREADS` | 1 | threads (0: all); the results do not depend on it (the original's: the same bits on any count) |
-| `implementation` | `LARMORX_IMPLEMENTATION` | `"auto"` | `"auto"`, `"replica"`, `"original"` (the original: any number of channels) |
+| `implementation` | `--implementation` (before the family), `LARMORX_IMPLEMENTATION` | `"auto"` | `"auto"`, `"replica"`, `"clean-room"` (the clean-room original: any number of channels) |
 | `upstream_defects` | `LARMORX_UPSTREAM_DEFECTS` | `"fix"` | `"reproduce"`: FSL's defects as FSL has them (below) |
 
 `lx.fsl.fast` returns a `FastResult`: `segmentation` (`_seg`), `segments` (`_seg_<i>`),
@@ -161,7 +163,7 @@ mode names GLIBC-07: the default's correctly rounded functions can move a segmen
 
 ## The clean-room original
 
-`larmorx fsl fast` with `LARMORX_IMPLEMENTATION=original` (`implementation="original"`, and
+`larmorx --implementation clean-room fsl fast` (`implementation="clean-room"`, and
 `"auto"` without `larmorx-nc`): FAST's command line, usage, messages and exit statuses, the
 single-channel segmentation (§4: the mask, the log image, the initialisation, the MRF iterations
 with FSL's random numbers, the bias field, the class order and every output of §3.3 with the

@@ -62,18 +62,23 @@ On a branch, as any change:
 
    ```bash
    python -P scripts/release/changelog.py 0.1.0 --write-statuses
-   python -P scripts/release/changelog.py 0.1.0 --ref v0.1.0     # the release's text, printed
+   python -P scripts/release/changelog.py 0.1.0 --ref v0.1.0
    ```
+
+   (the second prints the release's text).
 
    Add the link definition `[0.1.0]: https://github.com/karellopez/larmorx/releases/tag/v0.1.0`
    at the end of the file. The README's status line names the newest release; update it too.
 3. **The checks** the release's first job runs, here first:
 
    ```bash
-   python -P scripts/release/licences.py --check       # the packages' licence expressions
-   python -P scripts/release/third_party.py --check    # LICENSES/third-party-rust.txt (cargo fetch first)
+   python -P scripts/release/licences.py --check
+   python -P scripts/release/third_party.py --check
    python -P scripts/release/pypi_readme.py --check --ref v0.1.0 README.md crates-nc/PYPI.md crates-gpl/PYPI.md
    ```
+
+   They check the packages' licence expressions, `LICENSES/third-party-rust.txt` (after `cargo
+   fetch`) and PyPI's descriptions.
 
    A changed `Cargo.lock` needs `third_party.py --write`. The golden tests do not depend on the
    version (the harnesses write it as `<version>`), so a version change re-records nothing:

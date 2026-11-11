@@ -17,8 +17,9 @@ the B-spline fields, sparse matrices, non-linear optimisers and warps of FSL's l
 `larmorx-fsl`, module `topup`), written from [`specs/topup.md`](../../specs/topup.md) without
 FSL's source (2026-11-03). `implementation="auto"` (the default) runs the replica when
 `larmorx-nc` is installed (`pip install larmorx-nc`) and the original otherwise; `"replica"`
-needs `larmorx-nc` (otherwise `ReplicaNotFoundError`); `"original"` always runs the original.
-The command line chooses alike (`LARMORX_IMPLEMENTATION`).
+needs `larmorx-nc` (otherwise `ReplicaNotFoundError`); `"clean-room"` (`"original"`, 0.1.0rc1's spelling, still works) always runs
+the clean-room original. The command line chooses alike (`--implementation` before the family, or
+`LARMORX_IMPLEMENTATION`).
 
 **Status: `experimental`**: the replica against FSL 6.0.7.23 itself (the parity suite
 `fsl-topup-replica`, record [fsl-topup-replica](../validation/fsl-topup-replica.md), 2026-11-03:
@@ -108,7 +109,7 @@ larmorx fsl applytopup --imain=dwi_up,dwi_dn --inindex=1,2 --datain=acqparams.tx
 | `jacobians` | `--jacout` | `False` | each volume's Jacobian determinant |
 | `verbose` | `-v` | `False` | the cost of every evaluation (in `TopupResult.stdout`) |
 | `n_threads` | `--nthr` | 1 | threads; the results are FSL's one-thread results at any count (FSL-116). On the command line without `--nthr` (nor in the configuration), the replica takes larmorx's own `--n-threads` (else `OMP_NUM_THREADS`, else every logical CPU) |
-| `implementation` | `LARMORX_IMPLEMENTATION` | `"auto"` | `"auto"`, `"replica"`, `"original"` |
+| `implementation` | `--implementation` (before the family), `LARMORX_IMPLEMENTATION` | `"auto"` | `"auto"`, `"replica"`, `"clean-room"` |
 | `upstream_defects` | `LARMORX_UPSTREAM_DEFECTS` | `"fix"` | `"reproduce"`: FSL's defects as FSL has them (below) |
 
 `None` (the default of every estimation setting) leaves the option out, so the configuration

@@ -9,8 +9,8 @@ follow mcflirt 6.0.7.23 and are validated against it; the clean-room original fo
 content and its names (FSL-60), and computes `-cost mutualinfo` and `normmi` exactly as the
 spec's appendix B describes them (2026-10-29).
 
-**Two implementations** (`implementation="auto" | "replica" | "original"`): the clean-room
-original described on most of this page (Apache-2.0, in `larmorx`), and the bit-exact
+**Two implementations** (`implementation="auto" | "replica" | "clean-room"`; `"original"`,
+0.1.0rc1's spelling, still works): the clean-room original described on most of this page (Apache-2.0, in `larmorx`), and the bit-exact
 **replica** in the separately licensed `larmorx-nc` package (FSL Licence: non-commercial use
 only), which gives mcflirt's output files byte for byte: 137 of the 137 recorded mcflirt runs,
 with the same messages and exit status where both fail (12 of them), fMRIPrep's own mcflirt
@@ -101,7 +101,7 @@ nibabel image, `(array, affine)`); `reference` likewise. Returns an `HmcResult`:
 | `in_plane` | whether the in-plane mode for thin slabs was used |
 | `image` | the corrected series (float32 `lx.Image`), or `None` with `resample=False` |
 | `mean` | the mean volume of `mean=True` |
-| `implementation` | which implementation computed it: `lx.Implementation("original", "larmorx", ...)` or the replica's (`"replica"`, `"larmorx-nc"`, its version, `"LicenseRef-FSL"`, its program) |
+| `implementation` | which implementation computed it: `lx.Implementation("clean-room", "larmorx", ...)` or the replica's (`"replica"`, `"larmorx-nc"`, its version, `"LicenseRef-FSL"`, its program) |
 
 `lx.mri.read_mats(directory)` reads an mcflirt-style `.mat` directory into an `(N, 4, 4)` array.
 
@@ -141,7 +141,7 @@ stages run the volumes in parallel. The result does not depend on the thread cou
 | `-help` | – | ✓ (usage, exit 0; without arguments: exit 1. `-help` alone exits 0; mcflirt's exit 1 with `reproduce`, FSL-07) | ✓ (the same) |
 | (`LARMORX_UPSTREAM_DEFECTS=fix\|reproduce`) | `upstream_defects="fix"` | mcflirt's defects corrected (default) or reproduced ([below](#upstream-defects-d13)) | the same corrections; `reproduce` gives mcflirt's bytes |
 | – | `normcorr_count="mcflirt"` | `"weights"`: the corrected correlation count (FSL-02), opt-in ([below](#the-correlation-count-fsl-02)) | ✗ (mcflirt's count; the original runs under `"auto"`) |
-| – | `implementation` | `"original"` | `"replica"`; `"auto"` (default) when `larmorx-nc` is installed |
+| `--implementation` (before the family) | `implementation` | `"clean-room"` | `"replica"`; `"auto"` (default) when `larmorx-nc` is installed |
 
 `FSLOUTPUTTYPE` chooses the output format as for mcflirt 6.0.7.23 (`NIFTI`, `NIFTI2`, the pair
 types `NIFTI_PAIR` and `NIFTI2_PAIR`, each also `_GZ`, `_ZST` and `_BZ2`: gzip, zstd and bzip2,
@@ -160,8 +160,10 @@ uses, FSL 6.0.7.23 since 2026-10-29; first FSL 6.0.7.17) in the `larmorx-nc` pac
 It is installed by name, so that its licence is accepted knowingly:
 
 ```bash
-pip install larmorx-nc        # on PyPI from 0.1.0rc1; or pip install "larmorx[all]"
+pip install larmorx-nc
 ```
+
+(on PyPI from 0.1.0rc1; or `pip install "larmorx[all]"`, with everything).
 
 larmorx never imports it: `lx.mri.hmc` and `larmorx fsl mcflirt` run its program
 (`larmorx-nc fsl mcflirt <mcflirt's arguments>`, found through `LARMORX_NC_BIN`, the Python

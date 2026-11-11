@@ -64,14 +64,21 @@ a download): the README's [Installation](../README.md#installation) and the site
 [installation page](https://karellopez.github.io/larmorx_documentation/installation/).
 
 ```bash
-pip install larmorx                  # library + `larmorx`/`lx` commands: the ports, the originals and the exact AFNI replicas (Apache-2.0)
-pip install "larmorx[prep]"          # + what the larmorprepx pipeline will need (not ready yet)
-pip install larmorx-nc               # FSL replicas; installed by name (FSL Licence: non-commercial use only)
-pip install larmorx-gpl              # tedana's t2smap replica; installed by name (GNU GPL version 3)
-pip install "larmorx[all]"           # everything: [prep] and every replica package, at one version (decided 2026-10-16)
-pip install "larmorx[prep,surfaces]" # planned: pipeline + larmorx-freesurfer (surfaces)
-larmorprepx /data/bids /data/derivatives participant --participant-label 01   # planned: not ready yet
+pip install larmorx
 ```
+
+installs the library and the `larmorx`/`lx` commands: the ports, the clean-room originals and the
+exact AFNI replicas (Apache-2.0). The others:
+
+- `pip install "larmorx[prep]"`: also what the larmorprepx pipeline will need (not ready yet);
+- `pip install larmorx-nc`: the FSL replicas, installed by name (FSL Licence: non-commercial use
+  only);
+- `pip install larmorx-gpl`: tedana's t2smap replica, installed by name (GNU GPL version 3);
+- `pip install "larmorx[all]"`: everything, `[prep]` and every replica package, at one version
+  (decided 2026-10-16);
+- planned: `pip install "larmorx[prep,surfaces]"` (the pipeline and larmorx-freesurfer, the
+  surfaces), and the pipeline itself,
+  `larmorprepx /data/bids /data/derivatives participant --participant-label 01` (not ready yet).
 
 - **One import for everything** (in place since 2026-10-11). `lx.afni.tshift(img, tr=2.0)`
   uses `implementation="auto"`: the replica when its package is installed, otherwise the

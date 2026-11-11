@@ -21,8 +21,8 @@ larmorx keeps its FSL tools in two implementations ([licensing](../licensing.md)
 
 `implementation="auto"` runs the replica when `larmorx-nc` is installed (`pip install
 larmorx-nc`), else the original; `"replica"` needs `larmorx-nc` (`ReplicaNotFoundError` without
-it); `"original"` runs the original. The command line follows `LARMORX_IMPLEMENTATION` the same
-way (exit 127 when the replica's program is asked for and not found). With `reproduce` both give
+it); `"clean-room"` (`"original"`, 0.1.0rc1's spelling, still works) runs the clean-room original. The command line follows
+`--implementation` (before the family) or `LARMORX_IMPLEMENTATION` the same way (exit 127 when the replica's program is asked for and not found). With `reproduce` both give
 FSL's result bit for bit; by default they agree bit for bit too, except the phase of a complex
 image (`-c`): the original's arctangent is correctly rounded, glibc's `atan2f` (FSL's, and the
 replica's) is not, so a few phases differ in their last bit (GLIBC-07, named), and the unwrapped
@@ -89,7 +89,7 @@ prelude's messages.
 | `-h,--help` | - | the usage (exit 1) |
 | `FSLOUTPUTTYPE` | - (NIfTI, read back) | the output files' type; the wrapper sets it and never reads the caller's FSL variables |
 | `LARMORX_UPSTREAM_DEFECTS` | `upstream_defects="fix"` | `"reproduce"` gives FSL's result bit for bit |
-| - | `implementation="auto"` | `"auto"`, `"replica"` or `"original"` |
+| `--implementation` (before the family) | `implementation="auto"` | `"auto"`, `"replica"` or `"clean-room"` |
 | - | `n_threads=1` | threads: the replica's for reading and writing the images; the original's also for the mask, the regions, the ramps and the slices of `-s` (the merging itself is sequential: its order is the result); the same bits at any count (`OMP_NUM_THREADS` on the command line) |
 
 A long option takes its value after `=` (`--start=1`), as in FSL. The Python wrapper checks its

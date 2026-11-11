@@ -1000,3 +1000,42 @@ def test_release_workflow_smoke_scopes_and_toolchain():
     for name in ("test", "verify-pypi", "container"):
         assert "--source-build" not in jobs[name]
     assert "RUSTUP_TOOLCHAIN: ${{ env.RUST_TOOLCHAIN }}" in jobs["programs"]
+
+
+smoke = load("smoke")
+
+
+def test_smoke_macos_libraries_leave_out_the_files_own_install_name():
+    """`otool -L` prints a library's own install name (its LC_ID_DYLIB) first: the extension's
+    `@rpath/larmorx._core.abi3.so` is not a dependency (dry run 2's two macOS failures); every
+    other library outside the system's is still refused."""
+    so = "/venv/lib/python3.12/site-packages/larmorx/_core.abi3.so"
+    otool_l = (
+        f"{so}:\n"
+        "\t@rpath/larmorx._core.abi3.so (compatibility version 0.0.0, current version 0.0.0)\n"
+        "\t/usr/lib/libiconv.2.dylib (compatibility version 7.0.0, current version 7.0.0)\n"
+        "\t/System/Library/Frameworks/Security.framework/Versions/A/Security (compatibility"
+        " version 1.0.0, current version 61040.1.3)\n"
+        "\t/usr/lib/libSystem.B.dylib (compatibility version 1.0.0, current version 1345.0.0)\n"
+    )
+    otool_d = f"{so}:\n@rpath/larmorx._core.abi3.so\n"
+    assert smoke.foreign_macos_libraries(otool_l, otool_d) == []
+    # without the id left out, it would count: the check before the fix
+    assert smoke.foreign_macos_libraries(otool_l, f"{so}:\n") == ["@rpath/larmorx._core.abi3.so"]
+    # another library of our own, or one from elsewhere, is refused as before
+    extra = otool_l + (
+        "\t@rpath/libother.dylib (compatibility version 1.0.0, current version 1.0.0)\n"
+        "\t/opt/homebrew/lib/libomp.dylib (compatibility version 5.0.0, current version 5.0.0)\n"
+    )
+    assert smoke.foreign_macos_libraries(extra, otool_d) == [
+        "@rpath/libother.dylib",
+        "/opt/homebrew/lib/libomp.dylib",
+    ]
+    # a program has no install name (`otool -D` prints the header only); a universal file's
+    # headers name the architecture
+    program = "/venv/bin/larmorx-nc"
+    otool_l = (
+        f"{program} (architecture arm64):\n"
+        "\t/usr/lib/libSystem.B.dylib (compatibility version 1.0.0, current version 1345.0.0)\n"
+    )
+    assert smoke.foreign_macos_libraries(otool_l, f"{program} (architecture arm64):\n") == []

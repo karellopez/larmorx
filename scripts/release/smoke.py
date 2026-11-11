@@ -22,9 +22,9 @@ unpacked into a temporary folder: their licence files, each program's `--version
 its link or `lx.cmd`), `lx --help` naming itself (Unix), larmorx-nc's FSL data beside `bin/`.
 
 On every program and extension found: Linux, no glibc symbol newer than 2.28 (`objdump -T`: the
-oldest glibc the release supports); macOS, only the system's libraries (`otool -L`) and a minimum
-macOS of at most 11.0 (`otool -l`); Windows, no C runtime DLL and the runner's machine type
-(`scripts/release/pe_imports.py`).
+oldest glibc the release supports); macOS, only the system's libraries (`otool -L`, the file's own
+install name left out: `otool -D`) and a minimum macOS of at most 11.0 (`otool -l`); Windows, no C
+runtime DLL and the runner's machine type (`scripts/release/pe_imports.py`).
 
 Last line `SMOKE ok: <n> checks` or `SMOKE FAILED: <n> of <m> checks`; in GitHub Actions each
 failure is also an error annotation. Exit status 0 or 1.
@@ -228,6 +228,23 @@ def _run(command: list[str]) -> str:
     return subprocess.run(command, capture_output=True, text=True, check=True).stdout
 
 
+def foreign_macos_libraries(otool_l: str, otool_d: str) -> list[str]:
+    """The libraries `otool -L` lists that are not the system's, the file's own install name left
+    out: for a library (the extension `_core.abi3.so`) `otool -L` prints its LC_ID_DYLIB first
+    (`@rpath/larmorx._core.abi3.so`, dry run 2), which `otool -D` prints alone; a program has none.
+    The listed entries are the indented lines (a header line names the file, or the file and an
+    architecture)."""
+    own = {
+        line.strip()
+        for line in otool_d.splitlines()[1:]
+        if line.strip() and not line.rstrip().endswith(":")
+    }
+    entries = [line.strip().split(" (")[0] for line in otool_l.splitlines() if line[:1].isspace()]
+    return [
+        x for x in entries if x not in own and not x.startswith(("/usr/lib/", "/System/Library/"))
+    ]
+
+
 def binaries(checks: Checks, paths: list[Path]) -> None:
     system = platform.system()
     if system == "Linux" and not checks.check(shutil.which("objdump") is not None, "objdump"):
@@ -245,9 +262,9 @@ def binaries(checks: Checks, paths: list[Path]) -> None:
                 f"needs GLIBC_{newest[0]}.{newest[1]}",
             )
         elif system == "Darwin":
-            deps = _run(["otool", "-L", str(path)]).splitlines()[1:]
-            libs = [d.strip().split(" (")[0] for d in deps if d.strip()]
-            foreign = [x for x in libs if not x.startswith(("/usr/lib/", "/System/Library/"))]
+            # `otool -D` of a program prints its header line only (no install name)
+            own = subprocess.run(["otool", "-D", str(path)], capture_output=True, text=True)
+            foreign = foreign_macos_libraries(_run(["otool", "-L", str(path)]), own.stdout)
             checks.check(not foreign, f"{path.name}: only the system's libraries", str(foreign))
             minos = re.findall(r"\bminos (\d+)\.(\d+)", _run(["otool", "-l", str(path)]))
             floor = max((tuple(map(int, m)) for m in minos), default=(99, 0))

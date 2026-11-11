@@ -155,3 +155,54 @@ checks all pass but the glibc ones, the `[prep]` modules present.
 `oracles/logs/release-3a-rehearsal-2.log`):** every step passed, the same times within seconds;
 `pytest tests/python tests/golden` on the installed wheels 885 passed, 51 skipped; the smoke 47 of
 53 (the 6 expected glibc checks); `larmorx[all]` from the built files 18 s, `pip check` clean.
+
+## Relay 3b: the container images
+
+`docker/Dockerfile` has two targets, built from the release's own Linux wheels on top of
+`python:3.12.16-slim-trixie` (pinned by its multi-architecture digest): `larmorx`
+(`ghcr.io/karellopez/larmorx:<v>`: larmorx with its `[prep]` dependencies, Apache-2.0 and
+permissive licences only) and `larmorx-all` (`:<v>-all`: also larmorx-gpl and larmorx-nc, labelled
+non-commercial, their sdists in `/opt/larmorx/source/`); `docker/README.txt` is copied into both.
+`scripts/release/container.py` does every step the workflow runs (`stage`, `build`, `check`,
+`compare`, `index`, `push`); the jobs are `container` (amd64 on `ubuntu-24.04`, arm64 on
+`ubuntu-24.04-arm`; every run; nothing pushed) and `container-push` (a release only, after the
+three PyPI uploads; the only job with `packages: write`). Tested by
+`validation/tests/test_release.py` (the build context, the multi-architecture index on synthetic
+OCI archives, the Dockerfile's targets, labels and pins, the jobs' order and permissions).
+
+| Helper | What it shows |
+|---|---|
+| `rootless_docker.sh start\|stop\|env <state>` | a rootless Docker daemon with no administrator rights (Docker's rootless extras, the account's subordinate ids), its images in `<state>`, in a memory box of its own |
+| `container_rehearsal.sh <checkout> <wheels> <sdists> <out>` | the two container jobs' steps for linux/amd64, outside GitHub: `container.py stage`, `build` (buildx's docker-container builder, BuildKit pinned by digest), `check` (inside each image: labels, `smoke.py --image` as root and as an unprivileged user on a read-only file system, the default command, the packages, the companions' sources, the golden tests and `test_smoke.py`); each OCI archive turned into a SIF image by Apptainer, with `apptainer exec` of the versions, `smoke.py` and the golden tests; `container.py index` and `push --latest` into a local registry (distribution 3.0.0, run by Apptainer) with skopeo 1.13.3 (Ubuntu 24.04's, the runner's), each tag read back; `apptainer pull docker://...` of the four pushed tags and the programs in what came back. `FROM=push` repeats only the push part |
+
+**The rehearsal (2026-11-11, at `14f7cc2b`, with relay 3a's rehearsal files: the three wheels
+built on this host, tagged `manylinux_2_34_x86_64`, and the companions' sdists; rootless Docker
+28.3.0, buildx 0.25.0, BuildKit 0.34.1, Apptainer 1.4.5; log
+`oracles/logs/release-3b-container-rehearsal-2.log`): every step passed, about 5 minutes from a
+fresh daemon.** The build: 50 s for both images (pip resolves `larmorx[prep]` from PyPI: 48
+packages, numpy 2.5.4, scipy 1.18.1, matplotlib 3.11.2, pandas 3.1.1, nilearn 0.14.1,
+templateflow 25.1.2; pip backtracks for about 20 s and settles on pybids 0.18.1); OCI archives
+226.4 MB (`larmorx`) and 237.5 MB (`larmorx-all`), 681 MB and 701 MB unpacked. The checks inside
+(27 of 27): the labels (licences `Apache-2.0`, and `Apache-2.0 AND GPL-3.0-only AND
+LicenseRef-FSL`), no entrypoint, `smoke.py --image` as root and as user 65534 on a read-only file
+system (the `larmorx` image without larmorx-nc, larmorx-gpl and FSL's data; the `-all` image
+with both programs at 0.1.0rc1 and the 9 FSL data files with their SHA-256s), `larmorx --help` as
+the default command, the `-all` image's packages exactly `larmorx`'s plus larmorx-nc and
+larmorx-gpl, its two sdists; the golden tests and `tests/python/test_smoke.py` inside each image
+317 passed (24 s). Apptainer: each OCI archive a SIF image (213 MB, 224 MB), `apptainer exec
+--containall` of `larmorx --version`, `larmorx-nc --version` and `larmorx-gpl --version` (the -all
+image), `smoke.py --image`, and the golden tests (a venv over the image's packages for pytest):
+305 passed in each. The push: one OCI layout with both multi-architecture indexes (amd64 alone
+here), `skopeo copy --all --preserve-digests` of `0.1.0rc1`, `latest`, `0.1.0rc1-all` and
+`latest-all` into the local registry, each tag read back with the index's own digest (9 of 9
+checks; the per-architecture manifest pushed is the one built and checked), then `apptainer pull
+docker://127.0.0.1:5055/karellopez/larmorx:<tag>` of the four tags: each runs `larmorx --version`,
+the -all image `larmorx-nc --version`, the plain image has no `larmorx-nc`.
+
+**What only GitHub shows:** the arm64 images (built on the arm64 runner; this machine has no
+arm64 emulation), the runners' Docker (the check takes an image's id as Docker's own store or
+the containerd store gives it), the manylinux_2_28 wheels in the images, GHCR's login and first
+push with the workflow's token, the new package's visibility (private at first: the user makes it
+public once, D17), skopeo on `ubuntu-24.04` (installed by apt if missing), and the images'
+provenance attestations. Nothing of that runs on a dry run: `container-push` runs on a release
+only.

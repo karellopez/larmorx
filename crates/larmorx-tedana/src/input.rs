@@ -406,12 +406,25 @@ pub fn read_data(
         });
     }
     let n_echo = files.len();
-    let nilearn_path = mask.four_d()
-        || files.iter().any(|f| {
-            formats::open(&resolve(cwd, f), f)
-                .ok()
-                .is_some_and(|h| h.shape.len() >= 3 && h.shape[..3] != mask.grid())
-        });
+    // tedana's first reading checks each echo in order, its grid against the mask's shape, then
+    // its four axes; the first that fails (a 4D mask fails at the first echo) sends every echo
+    // through nilearn's masking, its error chained before nilearn's (§4.4, observed)
+    let first_error: Option<PyError> = if mask.four_d() {
+        Some(PyError::value("Image/mask shape mismatch"))
+    } else {
+        files.iter().find_map(|f| {
+            let h = formats::open(&resolve(cwd, f), f).ok()?;
+            if h.shape.len() < 3 || h.shape[..3] != mask.grid() {
+                Some(PyError::value("Image/mask shape mismatch"))
+            } else if h.shape.len() != 4 {
+                Some(not_4d())
+            } else {
+                None
+            }
+        })
+    };
+    let nilearn_path = first_error.is_some();
+    let empty_mask = !mask.inside.iter().any(|&b| b);
     let mut x: Vec<f32> = Vec::new();
     let mut n_t = 0;
     // the files are decoded side by side, `n_threads` at a time (inflating one file is
@@ -432,13 +445,20 @@ pub fn read_data(
         }
         let (head, img) = decoded.pop().expect("one decoded file per echo")?;
         let shape = img.shape().to_vec();
-        if nilearn_path {
+        if let Some(first) = &first_error {
+            // nilearn's checks, in its order: the mask's values (an empty mask), the affines,
+            // the shapes; then tedana's own refusal of an echo that is not 4D (§4.4, observed)
+            if empty_mask {
+                return Err(after_direct(
+                    PyError::value("The mask is invalid as it is empty: it masks all data."),
+                    first.clone(),
+                ));
+            }
             let affine = head.affine;
-            let first = || PyError::value("Image/mask shape mismatch");
             if !mask.affine.allclose(&affine, 1e-5, 1e-8) {
                 return Err(after_direct(
                     nilearn_affine_error(&mask.affine, &affine),
-                    first(),
+                    first.clone(),
                 ));
             }
             if shape.len() < 3 || shape[..3] != mask.grid() {
@@ -448,12 +468,15 @@ pub fn read_data(
                         py_tuple(&mask.grid()),
                         py_tuple(&shape[..3.min(shape.len())])
                     )),
-                    first(),
+                    first.clone(),
                 ));
+            }
+            if shape.len() != 4 {
+                return Err(after_direct(not_4d(), first.clone()));
             }
         }
         if shape.len() != 4 {
-            // tedana's direct read, then nilearn's, each refuse a 3D file
+            // a file whose header did not open in the scan above (tedana's two refusals)
             return Err(after_direct(not_4d(), not_4d()));
         }
         let nt = shape[3];

@@ -381,6 +381,28 @@ fn run(
             tes.len()
         )));
     }
+    if n_fit == 0 {
+        // every voxel removed by the adaptive mask (an empty mask failed at its image, §6.6)
+        notices.add(
+            &defects::TED_31,
+            format!(
+                "no voxel is left for the fit (the adaptive mask removed all {})",
+                data.n_vox
+            ),
+        );
+        return Err(if notices.fix() {
+            PyError::value(format!(
+                "no voxel of the mask has good signal (the adaptive mask removed all {}), so \
+                 there is nothing to fit (tedana fails with IndexError)",
+                data.n_vox
+            ))
+        } else {
+            PyError::new(
+                "IndexError",
+                "index 0 is out of bounds for axis 1 with size 0",
+            )
+        });
+    }
     if n_fit == 1 {
         notices.add(&defects::TED_17, "a single voxel is left for the fit");
         if notices.reproduce() {
@@ -473,7 +495,8 @@ fn run(
     }
     let r = rmse::series(&data, &count, &fin, &tes, notices.reproduce());
     let rmap = rmse::map(&r, data.n_vox, n_t);
-    outputs.image("rmse img", &spec, &rmap, 1, false)?;
+    // its voxels without a value are numpy's `nan` (§9 step 2, observed)
+    outputs.image_nan("rmse img", &spec, &rmap, 1, false, output::NUMPY_NAN32)?;
     let table = rmse::table(&r, data.n_vox, n_t, log);
     drop(r);
     outputs.table(&rmse::COLUMNS, &table.rows, table.percentiles_f32)?;

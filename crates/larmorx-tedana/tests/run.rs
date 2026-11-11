@@ -544,3 +544,229 @@ fn an_empty_user_mask_fails_as_tedana_in_both_modes() {
         std::fs::remove_dir_all(dir.path().join("none")).unwrap();
     }
 }
+
+fn affine() -> Affine {
+    Affine::from_rows([
+        [-3.0, 0.0, 0.0, 10.5],
+        [0.0, 3.0, 0.0, -7.5],
+        [0.0, 0.0, 3.5, -5.25],
+        [0.0, 0.0, 0.0, 1.0],
+    ])
+}
+
+/// Writes `values` (Fortran order) as a float32 NIfTI-1 image of `shape` with the inputs' affine.
+fn write_f32(dir: &Path, name: &str, shape: &[usize], values: Vec<f32>) {
+    let hdr = nifti::header_for_image(
+        None,
+        None,
+        shape,
+        larmorx_core::element::DataType::F32,
+        &affine(),
+    )
+    .unwrap();
+    let arr = ArrayD::from_shape_vec(IxDyn(shape).f(), values).unwrap();
+    nifti::write(dir.join(name), &hdr, arr.view(), &WriteOptions::default()).unwrap();
+}
+
+fn read_f32(path: &Path) -> Vec<f32> {
+    let img = nifti::read(path, &Default::default()).unwrap();
+    let larmorx_core::array::DynArray::F32(a) = img.data else {
+        panic!("float32")
+    };
+    a.as_slice_memory_order().unwrap().to_vec()
+}
+
+/// tedana's second reading through nilearn (§4.4, black-box, 2026-11-11: mask_probe.py): a 4D
+/// mask of one volume or a 3D echo sends every echo through nilearn's masking, whose checks come
+/// in its order, the mask's values first: an empty mask's text after tedana's first error, in
+/// both modes.
+#[test]
+fn nilearns_second_reading_checks_the_mask_first() {
+    let dir = tempfile::tempdir().unwrap();
+    write_inputs(dir.path());
+    write_f32(
+        dir.path(),
+        "empty4d.nii.gz",
+        &[NX, NY, NZ, 1],
+        vec![0.0; NX * NY * NZ],
+    );
+    write_f32(
+        dir.path(),
+        "empty.nii.gz",
+        &[NX, NY, NZ],
+        vec![0.0; NX * NY * NZ],
+    );
+    write_f32(
+        dir.path(),
+        "e1-3d.nii.gz",
+        &[NX, NY, NZ],
+        vec![700.0; NX * NY * NZ],
+    );
+    let chained = |first: &str, last: &str, err: &str| {
+        let a = err.find(&format!("ValueError: {first}\n")).expect(err);
+        let b = err
+            .find("During handling of the above exception, another exception occurred:")
+            .expect(err);
+        let c = err.rfind(&format!("ValueError: {last}\n")).expect(err);
+        assert!(a < b && b < c, "{err}");
+    };
+    let empty = "The mask is invalid as it is empty: it masks all data.";
+    for mode in ["fix", "reproduce"] {
+        let env = [("LARMORX_UPSTREAM_DEFECTS", mode)];
+        let mut args = BASE.to_vec();
+        args.extend(["empty4d.nii.gz", "--out-dir", "a"]);
+        let (code, _, err) = run(dir.path(), &args, &env);
+        assert_eq!(code, 1);
+        chained("Image/mask shape mismatch", empty, &err);
+        let args = [
+            "-d",
+            "e1-3d.nii.gz",
+            "e2.nii.gz",
+            "e3.nii.gz",
+            "-e",
+            "0.012",
+            "0.028",
+            "0.044",
+            "--mask",
+            "empty.nii.gz",
+            "--out-dir",
+            "b",
+        ];
+        let (code, _, err) = run(dir.path(), &args, &env);
+        assert_eq!(code, 1);
+        chained("Expected 4D image", empty, &err);
+        let args = [
+            "-d",
+            "e1-3d.nii.gz",
+            "e2.nii.gz",
+            "e3.nii.gz",
+            "-e",
+            "0.012",
+            "0.028",
+            "0.044",
+            "--mask",
+            "mask.nii.gz",
+            "--out-dir",
+            "c",
+        ];
+        let (code, _, err) = run(dir.path(), &args, &env);
+        assert_eq!(code, 1);
+        chained("Expected 4D image", "Expected 4D image", &err);
+        for d in ["a", "b", "c"] {
+            std::fs::remove_dir_all(dir.path().join(d)).unwrap();
+        }
+    }
+}
+
+/// Every voxel removed by the adaptive mask (black-box, 2026-11-11): tedana's IndexError after
+/// `Computing T2* map` with both fit types and modes, TED-31's clear error by default; with
+/// `--n-independent-echos` above 3 numpy's scalar-divide warning at each of §6.5's two
+/// percentages.
+#[test]
+fn no_voxel_left_for_the_fit_is_ted31() {
+    let dir = tempfile::tempdir().unwrap();
+    write_inputs(dir.path());
+    // a negative first echo: §6.1's base count 0 everywhere
+    let p = dir.path().join("e1.nii.gz");
+    let neg: Vec<f32> = read_f32(&p).iter().map(|x| -x).collect();
+    write_f32(dir.path(), "e1.nii.gz", &[NX, NY, NZ, NT], neg);
+    for (mode, last) in [
+        (
+            "reproduce",
+            "IndexError: index 0 is out of bounds for axis 1 with size 0",
+        ),
+        (
+            "fix",
+            "ValueError: no voxel of the mask has good signal (the adaptive mask removed all \
+             144), so there is nothing to fit (tedana fails with IndexError)",
+        ),
+    ] {
+        let env = [("LARMORX_UPSTREAM_DEFECTS", mode)];
+        for (k, extra) in [
+            &[][..],
+            &["--fittype", "curvefit", "--fitmode", "ts"][..],
+            &["--n-independent-echos", "4"][..],
+        ]
+        .iter()
+        .enumerate()
+        {
+            let out = format!("{mode}{k}");
+            let mut args = base(extra);
+            args.extend(["--out-dir", &out]);
+            let (code, _, err) = run(dir.path(), &args, &env);
+            assert_eq!(code, 1, "{err}");
+            let fit = err.find("Computing T2* map").expect(&err);
+            assert!(err[fit..].contains(&format!("{last}\n")), "{err}");
+            assert!(err.contains("upstream defect TED-31 (tedana)"), "{err}");
+            assert!(
+                dir.path()
+                    .join(&out)
+                    .join("desc-adaptiveGoodSignal_mask.nii.gz")
+                    .exists()
+            );
+            let divides = err
+                .matches("RuntimeWarning: invalid value encountered in scalar divide")
+                .count();
+            assert_eq!(divides, if k == 2 { 2 } else { 0 }, "{err}");
+        }
+    }
+}
+
+/// TED-46 (§7.2's observations without a slope): a voxel whose samples are all equal takes the
+/// slope 0 (T2* 500 ms) with the notice; the RMSE map's voxels without a value are numpy's `nan`
+/// (0x7FC00000, §9); a voxel with observations all 0 is not TED-46's (tedana's slope is 0 too).
+#[test]
+fn equal_observations_take_the_slope_zero() {
+    let dir = tempfile::tempdir().unwrap();
+    write_inputs(dir.path());
+    let at = |x: usize, y: usize, z: usize, t: usize| x + NX * (y + NY * (z + NZ * t));
+    for e in 1..=3 {
+        let p = dir.path().join(format!("e{e}.nii.gz"));
+        let mut v = read_f32(&p);
+        for t in 0..NT {
+            v[at(2, 3, 1, t)] = 255.0; // equal observations
+            if e == 2 {
+                v[at(4, 2, 2, t)] = -1.0; // one good echo: no RMSE
+            }
+        }
+        write_f32(dir.path(), &format!("e{e}.nii.gz"), &[NX, NY, NZ, NT], v);
+    }
+    for mode in ["fix", "reproduce"] {
+        let env = [("LARMORX_UPSTREAM_DEFECTS", mode)];
+        let mut args = base(&["--masktype", "none"]);
+        args.extend(["--out-dir", mode]);
+        let (code, _, err) = run(dir.path(), &args, &env);
+        assert_eq!(code, 0, "{err}");
+        let verb = if mode == "fix" {
+            "corrected"
+        } else {
+            "reproduced"
+        };
+        assert!(
+            err.contains(&format!(
+                "upstream defect TED-46 (tedana) {verb}: 1 voxel(s) whose log-linear \
+                 observations have no slope"
+            )),
+            "{err}"
+        );
+        assert!(err.contains("RuntimeWarning: divide by zero encountered in divide"));
+        let out = dir.path().join(mode);
+        let t2s = read_f32(&out.join("T2starmap.nii.gz"));
+        if mode == "reproduce" {
+            assert_eq!(t2s[at(2, 3, 1, 0)], 0.5);
+        } else {
+            // 500 ms lies above ten caps: TED-05 caps the full map too
+            let limited = read_f32(&out.join("desc-limited_T2starmap.nii.gz"));
+            assert_eq!(t2s[at(2, 3, 1, 0)], limited[at(2, 3, 1, 0)]);
+            assert!(err.contains("TED-05"), "{err}");
+        }
+        let s0 = read_f32(&out.join("S0map.nii.gz"));
+        assert!(
+            (s0[at(2, 3, 1, 0)] - 256.0).abs() < 1e-3,
+            "{}",
+            s0[at(2, 3, 1, 0)]
+        );
+        let rmse = read_f32(&out.join("desc-rmse_statmap.nii.gz"));
+        assert_eq!(rmse[at(4, 2, 2, 0)].to_bits(), 0x7FC0_0000);
+    }
+}

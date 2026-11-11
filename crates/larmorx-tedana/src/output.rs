@@ -55,6 +55,8 @@ const NAMES: [(&str, &str, &str); 14] = [
 
 /// x86-64's default float32 NaN, which every NaN the original writes is (§13.1).
 const NAN32: u32 = 0xFFC0_0000;
+/// numpy's `nan` as float32: the positive quiet NaN.
+pub const NUMPY_NAN32: u32 = 0x7FC0_0000;
 
 /// The output directory, its file names and what has been written (the registry).
 pub struct Outputs {
@@ -243,17 +245,18 @@ impl ImageSpec {
     }
 }
 
-/// A value the images hold: float32 (NaNs written as x86-64's default NaN), int32, uint8.
+/// A value the images hold: float32 (NaNs written as one NaN: x86-64's default NaN, or numpy's
+/// `nan` where tedana fills a value in), int32, uint8.
 pub trait OutValue: Element + Copy {
-    fn canonical(self) -> Self {
+    fn canonical(self, _nan32: u32) -> Self {
         self
     }
 }
 
 impl OutValue for f32 {
-    fn canonical(self) -> Self {
+    fn canonical(self, nan32: u32) -> Self {
         if self.is_nan() {
-            f32::from_bits(NAN32)
+            f32::from_bits(nan32)
         } else {
             self
         }
@@ -266,7 +269,8 @@ impl OutValue for u8 {}
 
 impl Outputs {
     /// Writes an image of `values` (`[j * cols + t]` over the mask's voxels, 0 elsewhere): 3D
-    /// when `four_d` is false (one column), else `cols` volumes.
+    /// when `four_d` is false (one column), else `cols` volumes; every NaN written as x86-64's
+    /// default NaN (§13.1).
     pub fn image<T: OutValue + Default>(
         &mut self,
         desc: &str,
@@ -274,6 +278,20 @@ impl Outputs {
         values: &[T],
         cols: usize,
         four_d: bool,
+    ) -> Result<(), PyError> {
+        self.image_nan(desc, spec, values, cols, four_d, NAN32)
+    }
+
+    /// [`Outputs::image`] with every NaN written as `nan32`'s bits (the RMSE map's voxels
+    /// without a value hold numpy's `nan`, the sign bit clear: §9, §13.1).
+    pub fn image_nan<T: OutValue + Default>(
+        &mut self,
+        desc: &str,
+        spec: &ImageSpec,
+        values: &[T],
+        cols: usize,
+        four_d: bool,
+        nan32: u32,
     ) -> Result<(), PyError> {
         let path = self.claim(desc)?;
         if spec.offsets.is_empty() {
@@ -288,7 +306,7 @@ impl Outputs {
         let mut buf = vec![T::default(); nvox * cols];
         for (j, &f) in spec.offsets.iter().enumerate() {
             for t in 0..cols {
-                buf[f + t * nvox] = values[j * cols + t].canonical();
+                buf[f + t * nvox] = values[j * cols + t].canonical(nan32);
             }
         }
         let shape: Vec<usize> = if four_d {

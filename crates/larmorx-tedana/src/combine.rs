@@ -163,13 +163,28 @@ pub fn combine(
     let zero = flags.iter().filter(|f| f.0).count();
     if zero > 0 {
         if mode == CombMode::Paid {
-            notices.add(
-                &defects::TED_15,
+            // the notice counts the first echo-count group (ascending) that holds such voxels
+            // (§15: the replica's numbers, observed)
+            let first = (1..=data.n_echo)
+                .find_map(|c| {
+                    let k = (0..data.n_vox)
+                        .filter(|&v| usize::from(count[v]) == c && flags[v].0)
+                        .count();
+                    (k > 0).then_some(k)
+                })
+                .unwrap_or(zero);
+            let detail = if fix {
                 format!(
-                    "{zero} voxel(s) whose good echoes do not vary over time combined with equal \
-                     weights; tedana fails with ZeroDivisionError"
-                ),
-            );
+                    "{first} voxel(s) whose good echoes do not vary over time combined with \
+                     equal weights; tedana fails with ZeroDivisionError"
+                )
+            } else {
+                format!(
+                    "{first} voxel(s) whose good echoes do not vary over time: their weights sum \
+                     to zero, and tedana fails with ZeroDivisionError"
+                )
+            };
+            notices.add(&defects::TED_15, detail);
         }
         if !(fix && mode == CombMode::Paid) {
             return Err(zero_weights());

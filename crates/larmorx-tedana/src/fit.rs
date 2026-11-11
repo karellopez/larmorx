@@ -190,43 +190,45 @@ pub fn loglin(
         })
     };
     // tedana's batch of a group and column (every volume's own in `ts`) is NaN when one of its
-    // fits has an infinite observation
+    // fits has an infinite observation; TED-09's notice counts the first place that holds such
+    // a fit (the first volume in `ts`, then the first group: §15)
     let mut poison = vec![false; 256 * cols];
-    for (n, members) in &groups {
-        let flags: Vec<bool> = members
-            .par_iter()
-            .with_min_len(256)
-            .flat_map_iter(|&v| (0..cols).map(move |t| infinite(v, *n, t)))
-            .collect();
-        let n_inf = flags.iter().filter(|&&f| f).count();
-        if n_inf == 0 {
-            continue;
+    let mut first_place: Option<(usize, usize, usize)> = None;
+    for t in 0..cols {
+        for (n, members) in &groups {
+            let k = members
+                .par_iter()
+                .with_min_len(256)
+                .filter(|&&v| infinite(v, *n, t))
+                .count();
+            if k > 0 {
+                poison[*n * cols + t] = true;
+                first_place.get_or_insert((*n, k, members.len()));
+            }
         }
-        for (k, &f) in flags.iter().enumerate() {
-            poison[*n * cols + k % cols] |= f;
-        }
+    }
+    if let Some((n, n_inf, size)) = first_place {
         let detail = if reproduce {
-            format!(
-                "an infinite sample makes all {} voxels of the {n}-echo fit NaN",
-                members.len()
-            )
+            format!("an infinite sample makes all {size} voxels of the {n}-echo fit NaN")
         } else {
             format!(
                 "{n_inf} voxel(s) with an infinite sample fitted alone (NaN); tedana's {n}-echo \
-                 fit makes all {} voxels of that count NaN",
-                members.len()
+                 fit makes all {size} voxels of that count NaN"
             )
         };
         notices.add(&defects::TED_09, detail);
     }
+    // the fits whose observations have no slope (TED-46): taken as exactly 0 (no decay)
+    let mut flat = vec![false; n_vox * cols];
     let divide_by_zero = maps
         .t2s
         .par_chunks_mut(cols.max(1))
         .zip(maps.s0.par_chunks_mut(cols.max(1)))
         .zip(maps.s0_other.par_chunks_mut(cols.max(1)))
+        .zip(flat.par_chunks_mut(cols.max(1)))
         .enumerate()
         .with_min_len(64)
-        .map(|(v, ((t2s, s0), s0_other))| {
+        .map(|(v, (((t2s, s0), s0_other), flat))| {
             if count[v] == 0 {
                 return (false, false);
             }
@@ -236,21 +238,46 @@ pub fn loglin(
             let mut overflow = false;
             for t in 0..cols {
                 let mut s = [0.0f64; 256];
+                // the observations' first value and whether every one equals it
+                let mut first: Option<f64> = None;
+                let mut equal = true;
+                let mut seen = |y: f64| {
+                    match first {
+                        None => first = Some(y),
+                        Some(f) => equal &= y == f,
+                    }
+                    y
+                };
                 for (e, se) in s.iter_mut().enumerate().take(n) {
                     let series = data.series(v, e);
                     *se = if ts {
-                        obs(series[t], reproduce)
+                        seen(obs(series[t], reproduce))
                     } else {
                         match volumes {
-                            None => series.iter().map(|&x| obs(x, reproduce)).sum(),
-                            Some(vols) => vols.iter().map(|&tt| obs(series[tt], reproduce)).sum(),
+                            None => series.iter().map(|&x| seen(obs(x, reproduce))).sum(),
+                            Some(vols) => vols
+                                .iter()
+                                .map(|&tt| seen(obs(series[tt], reproduce)))
+                                .sum(),
                         }
                     };
                 }
-                let (mut b0, mut b1) = design.solve(&s[..n]);
+                let y0 = first.unwrap_or(0.0);
+                // equal observations: the least squares' exact solution, (y, 0) (§7.2's
+                // observations without a slope: tedana's batch leaves rounding noise there)
+                let (mut b0, mut b1) = if design.rank2 && tu > 0 && equal {
+                    (y0, 0.0)
+                } else {
+                    design.solve(&s[..n])
+                };
                 if (reproduce && poison[n * cols + t]) || s[..n].iter().any(|x| x.is_infinite()) {
                     b0 = f64::NAN;
                     b1 = f64::NAN;
+                }
+                if tu > 0 && b1 == 0.0 {
+                    b1 = 0.0; // a closed form's −0 is the same slope
+                    // observations all 0 give tedana's exact 0 too (a zero right-hand side)
+                    flat[t] = !(equal && y0 == 0.0);
                 }
                 zero |= b1 == 0.0;
                 t2s[t] = 1.0f64.div(b1);
@@ -266,6 +293,7 @@ pub fn loglin(
             (zero, overflow)
         })
         .reduce(|| (false, false), |a, b| (a.0 || b.0, a.1 || b.1));
+    no_slope_notice(&flat, &groups, cols, reproduce, notices);
     let (divide_by_zero, overflow) = divide_by_zero;
     if divide_by_zero {
         log.py_warning(
@@ -283,6 +311,40 @@ pub fn loglin(
         );
     }
     Ok(maps)
+}
+
+/// TED-46's notice (§15): the fits whose log-linear observations have no slope, counted at the
+/// first place that holds one (the first volume in `ts`, then the first group).
+fn no_slope_notice(
+    flat: &[bool],
+    groups: &[(usize, Vec<usize>)],
+    cols: usize,
+    reproduce: bool,
+    notices: &mut Notices,
+) {
+    let place = (0..cols).find_map(|t| {
+        groups.iter().find_map(|(n, members)| {
+            let k = members.iter().filter(|&&v| flat[v * cols + t]).count();
+            (k > 0).then_some((*n, k))
+        })
+    });
+    let Some((n, k)) = place else {
+        return;
+    };
+    let detail = if reproduce {
+        format!(
+            "{k} voxel(s) whose log-linear observations have no slope: tedana's {n}-echo least \
+             squares leaves rounding noise there (T2* 1 ms, or 1e16 ms and more), which this \
+             build does not compute yet; it writes the slope 0 (no decay, T2* 500 ms)"
+        )
+    } else {
+        format!(
+            "{k} voxel(s) whose log-linear observations have no slope fitted with the slope 0 \
+             (no decay, T2* 500 ms); tedana's {n}-echo least squares leaves rounding noise there \
+             (T2* 1 ms, or 1e16 ms and more)"
+        )
+    };
+    notices.add(&defects::TED_46, detail);
 }
 
 #[cfg(test)]

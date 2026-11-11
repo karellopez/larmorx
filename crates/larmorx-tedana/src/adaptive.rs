@@ -116,11 +116,15 @@ pub fn adaptive_mask(
                 Libraries::Shared => "Mean of empty slice.",
             };
             log.py_warning("adaptive.rs:60", "RuntimeWarning", text);
-            log.py_warning(
-                MEAN_DIVIDE,
-                "RuntimeWarning",
-                "invalid value encountered in divide",
-            );
+            // a mask of no voxel leaves nothing to divide: the first warning alone (§12.3,
+            // observed)
+            if n_vox > 0 {
+                log.py_warning(
+                    MEAN_DIVIDE,
+                    "RuntimeWarning",
+                    "invalid value encountered in divide",
+                );
+            }
         }
         let means: Vec<f32> = (0..n_vox)
             .into_par_iter()
@@ -331,11 +335,13 @@ pub fn independent_echo_warnings(
     let n1 = count.iter().filter(|&&c| c >= 1).count();
     let e = n_echo as f64;
     let kf = k as f64;
-    let share = |t: f64, log: &mut Log<'_>| -> (usize, f64) {
+    // each percentage is its own place of numpy's warning: with no fit voxel both warn (§6.5,
+    // observed)
+    let share = |t: f64, place: &'static str, log: &mut Log<'_>| -> (usize, f64) {
         let n = count.iter().filter(|&&c| c >= 1 && (c as f64) < t).count();
         if n1 == 0 {
             log.py_warning(
-                "adaptive.rs:250",
+                place,
                 "RuntimeWarning",
                 "invalid value encountered in scalar divide",
             );
@@ -344,7 +350,7 @@ pub fn independent_echo_warnings(
     };
     let round1 = |x: f64| (x * 10.0).round_ties_even() / 10.0;
     let t3 = (2.0 * e / kf).floor();
-    let (n3, p3) = share(t3, log);
+    let (n3, p3) = share(t3, "adaptive.rs:p3", log);
     if p3 > 0.0 {
         log.warning(
             "utils:make_adaptive_mask:215",
@@ -358,7 +364,7 @@ pub fn independent_echo_warnings(
     }
     if k > 3 {
         let td = ((kf - 1.0) * e / kf).floor();
-        let (nd, pd) = share(td, log);
+        let (nd, pd) = share(td, "adaptive.rs:pd", log);
         log.warning(
             "utils:make_adaptive_mask:231",
             &format!(

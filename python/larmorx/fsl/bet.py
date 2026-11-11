@@ -400,7 +400,7 @@ def bet(
         ``"auto"`` (default): the replica in ``larmorx-nc`` when it is installed, else the
         clean-room original (always the original with ``tanh="correctly-rounded"``);
         ``"replica"``: the replica (:class:`~larmorx.ReplicaNotFoundError` without it);
-        ``"original"``: the clean-room original (FSL's behaviour within the thresholds of its
+        ``"clean-room"``: the clean-room original (FSL's behaviour within the thresholds of its
         validation record, ``docs/validation/fsl-bet.md``).
     upstream_defects
         ``"fix"`` (default) or ``"reproduce"`` (FSL's output); a
@@ -488,9 +488,9 @@ def bet(
         if implementation == "replica":
             raise ValueError(
                 "tanh='correctly-rounded' is the clean-room original's option (the replica is "
-                "FSL's, glibc's tanh): use implementation='auto' or 'original'"
+                "FSL's, glibc's tanh): use implementation='auto' or 'clean-room'"
             )
-        implementation = "original"
+        implementation = "clean-room"
         options.append(f"--tanh={tanh}")
     selected = _replica.select("fsl", tool, implementation)
     impl = _replica.ORIGINAL if selected is None else selected.implementation()

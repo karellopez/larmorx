@@ -971,7 +971,7 @@ def cli(*argv: str, upstream_defects: str = "fix") -> str:
             del os.environ[name]
     os.environ["LARMORX_UPSTREAM_DEFECTS"] = upstream_defects
     try:
-        code, out, err = _core.cli_main(["larmorx", *argv], [], "original")
+        code, out, err = _core.cli_main(["larmorx", *argv], [], "clean-room")
     finally:
         os.environ.clear()
         os.environ.update(saved)
@@ -992,7 +992,7 @@ def cli_status(
     os.environ.update(env or {})
     os.environ["LARMORX_UPSTREAM_DEFECTS"] = upstream_defects
     try:
-        code, _, err = _core.cli_main(["larmorx", *argv], [], "original")
+        code, _, err = _core.cli_main(["larmorx", *argv], [], "clean-room")
     finally:
         os.environ.clear()
         os.environ.update(saved)
@@ -3092,7 +3092,7 @@ SLICE_TIMES = (0.0, 1.2, 0.4, 1.6, 0.8)
 
 #: ``lx.afni.tshift`` cases run the clean-room original (the replica's golden cases are in
 #: ``crates/larmorx-cli/tests/afni_replica_golden.rs``).
-ORIGINAL = "original"
+ORIGINAL = "clean-room"
 
 
 @case("py.afni.tshift", covers=("lx.afni.tshift",))
@@ -3659,7 +3659,7 @@ def _(ctx: Context) -> dict[str, Any]:
     os.environ["FSLOUTPUTTYPE"] = "NIFTI_GZ"
     os.environ["LARMORX_UPSTREAM_DEFECTS"] = "fix"
     try:
-        code, _, err = _core.cli_main(["larmorx", "mri", "hmc", "-in", os.fspath(series), "-out", out, "-mats", "-plots"], [], "original")  # fmt: skip
+        code, _, err = _core.cli_main(["larmorx", "mri", "hmc", "-in", os.fspath(series), "-out", out, "-mats", "-plots"], [], "clean-room")  # fmt: skip
     finally:
         os.environ.clear()
         os.environ.update(saved)
@@ -4757,10 +4757,10 @@ def _(ctx: Context) -> dict[str, Any]:
 def _(ctx: Context) -> dict[str, Any]:
     """``lx.fsl.betsurf`` with the clean-room original on in-memory images and bet's mesh: the
     surfaces, masks, skull mask and outlines."""
-    brain = lx.fsl.bet(anat(), mesh=True, brain=False, implementation="original")
+    brain = lx.fsl.bet(anat(), mesh=True, brain=False, implementation="clean-room")
     assert brain.mesh is not None
     m = np.array([[1.0, 0, 0, -8], [0, 1, 0, 4], [0, 0, 1, -12], [0, 0, 0, 1]])
-    s = lx.fsl.betsurf(anat(), brain.mesh, m, t2=anat2(), skull_mask=True, outlines=True, implementation="original")  # fmt: skip
+    s = lx.fsl.betsurf(anat(), brain.mesh, m, t2=anat2(), skull_mask=True, outlines=True, implementation="clean-room")  # fmt: skip
     out: dict[str, Any] = {}
     for name in ("inskull", "outskull", "outskin"):
         surface = getattr(s, name)
@@ -4830,7 +4830,7 @@ def _fsl_status(ctx: Context, *argv: str, upstream_defects: str = "fix") -> tupl
     os.environ["PATH"] = os.fspath(ctx.dir)
     os.environ["LARMORX_UPSTREAM_DEFECTS"] = upstream_defects
     try:
-        code, out, err = _core.cli_main(["larmorx", "fsl", *argv], [], "original")
+        code, out, err = _core.cli_main(["larmorx", "fsl", *argv], [], "clean-room")
     finally:
         os.environ.clear()
         os.environ.update(saved)
@@ -4984,8 +4984,8 @@ def _(ctx: Context) -> dict[str, Any]:
 def _(ctx: Context) -> dict[str, Any]:
     """``lx.fsl.flirt`` with the clean-room original on in-memory images: a 6-dof registration
     with its image, and ``apply_xfm``."""
-    r = lx.fsl.flirt(anat2(), anat(), dof=6, implementation="original")
-    a = lx.fsl.flirt(anat2(), anat(), init=r.matrix, apply_xfm=True, interp="sinc", implementation="original")  # fmt: skip
+    r = lx.fsl.flirt(anat2(), anat(), dof=6, implementation="clean-room")
+    a = lx.fsl.flirt(anat2(), anat(), init=r.matrix, apply_xfm=True, interp="sinc", implementation="clean-room")  # fmt: skip
     assert r.image is not None and a.image is not None
     return {"matrix": r.matrix, "image": r.image.data, "applied": a.image.data}
 
@@ -4995,7 +4995,7 @@ def _(ctx: Context) -> dict[str, Any]:
     """``lx.fsl.convert_xfm`` with the clean-room original: the inverse of a concatenation."""
     a = np.array([[1.05, 0.02, -0.03, 2], [-0.01, 0.97, 0.04, -3], [0.02, -0.05, 1.1, 1.5], [0, 0, 0, 1]])  # fmt: skip
     b = np.array([[0.99, 0.1, 0, 1], [-0.1, 0.99, 0.05, 2], [0, -0.05, 1.2, -3], [0, 0, 0, 1]])
-    return {"matrix": lx.fsl.convert_xfm(a, concat=b, inverse=True, implementation="original")}
+    return {"matrix": lx.fsl.convert_xfm(a, concat=b, inverse=True, implementation="clean-room")}
 
 
 _AFFINE = "1.05 0.02 -0.03 2\n-0.01 0.97 0.04 -3\n0.02 -0.05 1.1 1.5\n0 0 0 1\n"
@@ -5303,8 +5303,8 @@ def _(ctx: Context) -> dict[str, Any]:
     os.environ["LARMORX_DATA_DIR"] = os.fspath(ctx.dir / "cache")
     os.environ.pop("LARMORX_FSL_DATA_PACKAGE", None)
     try:
-        refused = _core.cli_main(["larmorx", "fetch", "fsl-standard", os.fspath(bad)], [], "original")  # fmt: skip
-        usage = _core.cli_main(["larmorx", "fetch"], [], "original")
+        refused = _core.cli_main(["larmorx", "fetch", "fsl-standard", os.fspath(bad)], [], "clean-room")  # fmt: skip
+        usage = _core.cli_main(["larmorx", "fetch"], [], "clean-room")
     finally:
         os.environ.clear()
         os.environ.update(saved)
@@ -5355,7 +5355,7 @@ def _(ctx: Context) -> dict[str, Any]:
 def _(ctx: Context) -> dict[str, Any]:
     """``lx.fsl.avscale`` with the clean-room original: every parameter about a volume's centre."""
     m = _mat(_AFFINE)
-    r = lx.fsl.avscale(m, anat(), all_params=True, implementation="original")
+    r = lx.fsl.avscale(m, anat(), all_params=True, implementation="clean-room")
     return {
         "rt": r.rotation_translation,
         "params": np.r_[r.rotations, r.translations, r.scales, r.skews],
@@ -5369,7 +5369,7 @@ def _(ctx: Context) -> dict[str, Any]:
     """``lx.fsl.img2imgcoord`` with the clean-room original, in voxels."""
     m = _mat(_AFFINE)
     pts = [[10, 20, 30], [0, 0, 0], [-5.5, 3.25, 7]]
-    return {"coords": lx.fsl.img2imgcoord(pts, anat(), anat2(), xfm=m, implementation="original")}
+    return {"coords": lx.fsl.img2imgcoord(pts, anat(), anat2(), xfm=m, implementation="clean-room")}
 
 
 @case("py.fsl.std2imgcoord", covers=("lx.fsl.std2imgcoord",))
@@ -5377,7 +5377,7 @@ def _(ctx: Context) -> dict[str, Any]:
     """``lx.fsl.std2imgcoord`` with the clean-room original, in millimetres."""
     m = _mat(_AFFINE)
     pts = [[10, 20, 30], [0, 0, 0], [-5.5, 3.25, 7]]
-    return {"coords": lx.fsl.std2imgcoord(pts, anat(), anat2(), xfm=m, implementation="original")}
+    return {"coords": lx.fsl.std2imgcoord(pts, anat(), anat2(), xfm=m, implementation="clean-room")}
 
 
 @case("py.fsl.img2stdcoord", covers=("lx.fsl.img2stdcoord",))
@@ -5387,7 +5387,7 @@ def _(ctx: Context) -> dict[str, Any]:
     pts = [[10, 20, 30], [0, 0, 0], [-5.5, 3.25, 7]]
     return {
         "coords": lx.fsl.img2stdcoord(
-            pts, anat(), anat2(), xfm=m, mm=True, implementation="original"
+            pts, anat(), anat2(), xfm=m, mm=True, implementation="clean-room"
         )
     }
 
@@ -5398,8 +5398,8 @@ def _(ctx: Context) -> dict[str, Any]:
     a = _mat(_AFFINE)
     b = _mat(_REFLECTION)
     return {
-        "rms": lx.fsl.rmsdiff(a, b, anat(), implementation="original"),
-        "mask": np.array(lx.fsl.rmsdiff(a, b, anat(), mask(), implementation="original")),
+        "rms": lx.fsl.rmsdiff(a, b, anat(), implementation="clean-room"),
+        "mask": np.array(lx.fsl.rmsdiff(a, b, anat(), mask(), implementation="clean-room")),
     }
 
 
@@ -5409,14 +5409,14 @@ def _(ctx: Context) -> dict[str, Any]:
     divided by its length, FSL-76's correction, named in a warning)."""
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        m = lx.fsl.makerot(30, axis=(1, 2, 3), centre=(4, 5, 6), implementation="original")
+        m = lx.fsl.makerot(30, axis=(1, 2, 3), centre=(4, 5, 6), implementation="clean-room")
     return {"matrix": m}
 
 
 @case("py.fsl.midtrans", covers=("lx.fsl.midtrans",))
 def _(ctx: Context) -> dict[str, Any]:
     """``lx.fsl.midtrans`` with the clean-room original: two transforms about the MNI origin."""
-    m = lx.fsl.midtrans([_mat(_AFFINE), _mat(_REFLECTION)], implementation="original")
+    m = lx.fsl.midtrans([_mat(_AFFINE), _mat(_REFLECTION)], implementation="clean-room")
     return {"matrix": m}
 
 
@@ -5424,7 +5424,7 @@ def _(ctx: Context) -> dict[str, Any]:
 def _(ctx: Context) -> dict[str, Any]:
     """``lx.fsl.pointflirt`` with the clean-room original: six point pairs in millimetres."""
     i, r = _points(ctx)
-    return {"matrix": lx.fsl.pointflirt(i, r, implementation="original")}
+    return {"matrix": lx.fsl.pointflirt(i, r, implementation="clean-room")}
 
 
 @case("py.fsl.applyxfm4d", covers=("lx.fsl.applyxfm4d",))
@@ -5432,7 +5432,7 @@ def _(ctx: Context) -> dict[str, Any]:
     """``lx.fsl.applyxfm4d`` with the clean-room original: a series through one matrix,
     trilinear."""
     a, _, _ = _flirt_files(ctx)
-    out = lx.fsl.applyxfm4d(ctx.file("bold.nii"), ctx.file("anat.nii"), ctx.out("o.nii.gz"), a, single_matrix=True, interp="trilinear", implementation="original")  # fmt: skip
+    out = lx.fsl.applyxfm4d(ctx.file("bold.nii"), ctx.file("anat.nii"), ctx.out("o.nii.gz"), a, single_matrix=True, interp="trilinear", implementation="clean-room")  # fmt: skip
     return {"series": Nifti(out)}
 
 
@@ -5440,7 +5440,7 @@ def _(ctx: Context) -> dict[str, Any]:
 def _(ctx: Context) -> dict[str, Any]:
     """``lx.fsl.pairreg`` with the clean-room original and FSL's schedules it carries."""
     b1, b2 = ctx.file("anat.nii"), ctx.file("anat2.nii")
-    m = lx.fsl.pairreg(b1, b2, b1, b2, flirt_args=["-dof", "6"], implementation="original")
+    m = lx.fsl.pairreg(b1, b2, b1, b2, flirt_args=["-dof", "6"], implementation="clean-room")
     return {"matrix": m}
 
 
@@ -5448,8 +5448,8 @@ def _(ctx: Context) -> dict[str, Any]:
 def _(ctx: Context) -> dict[str, Any]:
     """``lx.fsl.fslroi`` with the clean-room original: a box of an in-memory image (an axis not
     given whole) and two volumes of the BOLD series."""
-    box = lx.fsl.fslroi(anat(), x=(2, 10), z=(1, -1), implementation="original")
-    vols = lx.fsl.fslroi(ctx.file("bold.nii"), t=(1, 2), implementation="original")
+    box = lx.fsl.fslroi(anat(), x=(2, 10), z=(1, -1), implementation="clean-room")
+    vols = lx.fsl.fslroi(ctx.file("bold.nii"), t=(1, 2), implementation="clean-room")
     return {"box": box.data, "box_affine": box.affine, "volumes": vols.data}
 
 
@@ -5458,7 +5458,7 @@ def _(ctx: Context) -> dict[str, Any]:
     """``lx.fsl.standard_space_roi`` with the clean-room original: an image registered to
     another as its reference (FLIRT's ``-dof 6``), masked and cut by the field of view."""
     r = lx.fsl.standard_space_roi(
-        anat2(), reference=anat(), flirt_args=["-dof", "6"], implementation="original"
+        anat2(), reference=anat(), flirt_args=["-dof", "6"], implementation="clean-room"
     )
     return {"image": r.image.data, "to_standard": r.to_standard, "from_standard": r.from_standard}
 
@@ -5471,7 +5471,7 @@ def _(ctx: Context) -> dict[str, Any]:
     t.write_text(
         "".join(f"line {k} value {k * 3}\n" for k in range(1, 13)), encoding="utf-8", newline="\n"
     )
-    return {"lines": lx.fsl.extracttxt("e.4", t, 3, implementation="original")}
+    return {"lines": lx.fsl.extracttxt("e.4", t, 3, implementation="clean-room")}
 
 
 @case("py.fsl.aff2rigid", covers=("lx.fsl.aff2rigid",))
@@ -5480,7 +5480,7 @@ def _(ctx: Context) -> dict[str, Any]:
     warning)."""
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        m = lx.fsl.aff2rigid(_mat(_AFFINE), implementation="original")
+        m = lx.fsl.aff2rigid(_mat(_AFFINE), implementation="clean-room")
     return {"matrix": m}
 
 
@@ -5488,8 +5488,8 @@ def _(ctx: Context) -> dict[str, Any]:
 def _(ctx: Context) -> dict[str, Any]:
     """``lx.fsl.bet`` with the clean-room original on an in-memory image: every output, and the
     robust variation."""
-    r = lx.fsl.bet(anat(), mask=True, outline=True, skull=True, mesh=True, frac=0.4, implementation="original")  # fmt: skip
-    rob = lx.fsl.bet(anat(), variation="robust", mask=True, implementation="original")
+    r = lx.fsl.bet(anat(), mask=True, outline=True, skull=True, mesh=True, frac=0.4, implementation="clean-room")  # fmt: skip
+    rob = lx.fsl.bet(anat(), variation="robust", mask=True, implementation="clean-room")
     assert r.mesh is not None
     return {
         "brain": r.brain.data,
@@ -5598,8 +5598,8 @@ def _(ctx: Context) -> dict[str, Any]:
     channel; a single slice (the 2D neighbourhood and kernels)."""
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")  # FSL-96's correction (-p's maps outside the mask: 0)
-        r = lx.fsl.fast(tissue_brain(), segments=True, probabilities=True, restored=True, bias_field=True, implementation="original")  # fmt: skip
-    flat = lx.fsl.fast(plane(), n_classes=2, implementation="original")
+        r = lx.fsl.fast(tissue_brain(), segments=True, probabilities=True, restored=True, bias_field=True, implementation="clean-room")  # fmt: skip
+    flat = lx.fsl.fast(plane(), n_classes=2, implementation="clean-room")
     assert r.segments and r.probabilities and r.partial_volumes and r.restored and r.bias_fields
     assert flat.partial_volumes is not None
     return {
@@ -5739,7 +5739,7 @@ def _(ctx: Context) -> dict[str, Any]:
     """``lx.fsl.topup`` with the clean-room original on an in-memory pair: one quick level, the
     field, the corrected images and their mean, the Jacobians and the matrices."""
     acq = [[0, 1, 0, 0.05], [0, -1, 0, 0.05]]
-    r = lx.fsl.topup(blip_pair(), acq, warpres=20, subsamp=2, fwhm=8, miter=3, lambda_=0.005, corrected=True, jacobians=True, rigid_body_matrices=True, implementation="original")  # fmt: skip
+    r = lx.fsl.topup(blip_pair(), acq, warpres=20, subsamp=2, fwhm=8, miter=3, lambda_=0.005, corrected=True, jacobians=True, rigid_body_matrices=True, implementation="clean-room")  # fmt: skip
     assert r.field and r.corrected and r.corrected_mean and r.jacobians and r.rigid_body_matrices
     return {
         "coefficients": r.coefficients.data,
@@ -5758,11 +5758,11 @@ def _(ctx: Context) -> dict[str, Any]:
     """``lx.fsl.applytopup`` with the clean-room original: the pair restored by least squares
     with ``lx.fsl.topup``'s result, and one image by Jacobian modulation."""
     acq = [[0, 1, 0, 0.05], [0, -1, 0, 0.05]]
-    r = lx.fsl.topup(blip_pair(), acq, warpres=20, subsamp=2, fwhm=8, miter=3, lambda_=0.005, implementation="original")  # fmt: skip
+    r = lx.fsl.topup(blip_pair(), acq, warpres=20, subsamp=2, fwhm=8, miter=3, lambda_=0.005, implementation="clean-room")  # fmt: skip
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")  # FSL-132's correction (the first volume's splines)
-        lsr = lx.fsl.applytopup([blip("up"), blip("down")], acq, [1, 2], r, implementation="original")  # fmt: skip
-        jac = lx.fsl.applytopup(blip("up"), acq, [1], r, method="jac", implementation="original")
+        lsr = lx.fsl.applytopup([blip("up"), blip("down")], acq, [1, 2], r, implementation="clean-room")  # fmt: skip
+        jac = lx.fsl.applytopup(blip("up"), acq, [1], r, method="jac", implementation="clean-room")
     return {"lsr": lsr.corrected.data, "jac": jac.corrected.data}
 
 
@@ -6034,7 +6034,7 @@ def _orig(fn: Callable[..., Any], *args: Any, **kw: Any) -> Any:
     D13 notices it warns of silenced."""
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        return fn(*args, implementation="original", **kw)
+        return fn(*args, implementation="clean-room", **kw)
 
 
 @case("py.fsl.maths.voxelwise", covers=("lx.fsl.fslmaths", "lx.fsl.arithmetic", "lx.fsl.apply_mask", "lx.fsl.threshold", "lx.fsl.unary", "lx.fsl.binarise", "lx.fsl.add_noise", "lx.fsl.grid"))  # fmt: skip
@@ -6223,12 +6223,12 @@ def _(ctx: Context) -> dict[str, Any]:
     the same on every platform)."""
     f = _prelude_inputs(ctx)
     r = lx.fsl.prelude(f["ph"], f["mag"], save_mask=True, save_labels=True, save_raw_phase=True,
-                       verbose=True, implementation="original")  # fmt: skip
+                       verbose=True, implementation="clean-room")  # fmt: skip
     i, j, k = np.meshgrid(*(np.arange(n, dtype=np.float32) for n in SHAPE3), indexing="ij")
     head = (ellipsoid(SHAPE3, 9, 10) > 0).astype(np.float32)
     z = ((i - 11.5) * head + 0.25 + 1j * ((j - 9.5) * head - 0.5 * k)).astype(np.complex64)
     c = lx.fsl.prelude(complex_image=(np.asfortranarray(z), np.eye(4)), save_labels=True,
-                       implementation="original")  # fmt: skip
+                       implementation="clean-room")  # fmt: skip
     return {
         "unwrapped": r.unwrapped.data,
         "mask": r.mask.data,
@@ -6807,7 +6807,7 @@ def _(ctx: Context) -> dict[str, Any]:
     p = _sdc_phase_files(ctx)
     meta = [{"EchoTime": 0.00492}, {"EchoTime": 0.00738}]
     r = lx.sdcflows.phdiff_workflow(p["mag"], [p["phase1"], p["phase2"]], meta, p["mask"],
-                                    out_dir=ctx.out("w"), prelude_implementation="original")  # fmt: skip
+                                    out_dir=ctx.out("w"), prelude_implementation="clean-room")  # fmt: skip
     return {
         "phase_diff": Nifti(os.fspath(r.phase_diff.out_file)),
         "unwrapped": r.unwrapped.data,
@@ -7001,7 +7001,7 @@ def _(ctx: Context) -> dict[str, Any]:
         "magmrg": (mags, {"hmc": False, "to_ras": False}),
         "fmapmrg": (mags, {"hmc": False, "to_ras": False, "zero_based_avg": False}),
         "ras": (obl, {"hmc": False, "to_ras": True}),
-        "hmc": (mags, {"hmc": True, "to_ras": False, "hmc_implementation": "original"}),
+        "hmc": (mags, {"hmc": True, "to_ras": False, "hmc_implementation": "clean-room"}),
         "one": (mags[:1], {"hmc": False, "to_ras": False}),
     }
     for name, (files, kw) in runs.items():
@@ -7089,7 +7089,7 @@ def _(ctx: Context) -> dict[str, Any]:
             mags,
             [(pd, {"EchoTime1": 0.00492, "EchoTime2": 0.00738})],
             out_dir=ctx.out("fmap-phasediff"),
-            prelude_implementation="original",
+            prelude_implementation="clean-room",
         )
         mapped = lx.sdcflows.fmap_workflow(
             mags[:1], [(hz, {"Units": "rad/s"})], "mapped", out_dir=ctx.out("fmap-mapped")
@@ -7208,11 +7208,11 @@ def _(ctx: Context) -> dict[str, Any]:
         warnings.simplefilter("ignore")
         w15 = lx.sdcflows.topup_workflow(
             epis, metas, wiring="2.15", sloppy=True, out_dir=ctx.out("w15"),
-            topup_implementation="original",
+            topup_implementation="clean-room",
         )  # fmt: skip
         w17 = lx.sdcflows.topup_workflow(
             epis, metas, wiring="2.17", topup_config=cfg, debug=True, max_vols_per_pe=1,
-            out_dir=ctx.out("w17"), topup_implementation="original",
+            out_dir=ctx.out("w17"), topup_implementation="clean-room",
         )  # fmt: skip
     for name, w in (("w15", w15), ("w17", w17)):
         out[f"{name}.fmap"] = Nifti(w.fmap)
@@ -7284,8 +7284,8 @@ def _(ctx: Context) -> dict[str, Any]:
         ss = lx.niworkflows.skullstrip_bold_workflow(
             head,
             out_dir=ctx.out("ss"),
-            bet_implementation="original",
-            maths_implementation="original",
+            bet_implementation="clean-room",
+            maths_implementation="clean-room",
         )
     for name in ("bet_brain", "bet_mask", "automask_mask", "automask_brain", "mask_file"):
         out[f"ss.{name}"] = Nifti(getattr(ss, name))
@@ -7553,12 +7553,12 @@ def _(ctx: Context) -> dict[str, Any]:
         fit = fm.bold_fit_fieldmap(
             epis[1], meta, "auto_00000", estimates, refs[1], refs[1], masks[1],
             out_dir=ctx.out("fit"), sbref_files=[refs[1]], jacobian=True, sloppy=True,
-            ants_random_seed=42, sink=sink, fsl_implementation="original", n_threads=2,
+            ants_random_seed=42, sink=sink, fsl_implementation="clean-room", n_threads=2,
         )  # fmt: skip
         pre = fm.bold_fit_fieldmap(
             epis[1], meta, "auto_00000", estimates, refs[1], refs[1], masks[1],
             out_dir=ctx.out("pre"), boldref2fmap_xfm=fit.boldref2fmap_xfm,
-            fsl_implementation="original",
+            fsl_implementation="clean-room",
         )  # fmt: skip
         target = ctx.out("t1w_ref.nii.gz")
         lx.save(
@@ -7577,7 +7577,7 @@ def _(ctx: Context) -> dict[str, Any]:
         p20 = fm.bold_fit_fieldmap(
             epis[1], {"PhaseEncodingDirection": "i"}, "auto_00000", estimates, refs[1], refs[1],
             masks[1], out_dir=ctx.out("p20"), boldref2fmap_xfm=fit.boldref2fmap_xfm,
-            fsl_implementation="original", upstream_defects="reproduce",
+            fsl_implementation="clean-room", upstream_defects="reproduce",
         )  # fmt: skip
     out["fit.xfm"] = Path(fit.boldref2fmap_xfm).read_text(encoding="utf-8")
     for name in ("fieldmap", "unwarped_boldref", "coreg_boldref", "bold_mask"):

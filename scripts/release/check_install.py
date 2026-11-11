@@ -26,7 +26,11 @@ library only and nothing installed outside the work folder:
 
 Every step is reported with its time; the last line is `CHECK-INSTALL ok: <n> steps` or
 `CHECK-INSTALL FAILED: <steps>`, the exit status 0 or 1. The work folder must be new (or
-empty) and is left in place: the caller removes it (the Windows wrapper does).
+empty) and is left in place: the caller removes it (the Windows wrapper does). The temporary
+files of every step (`TMPDIR`, `TEMP`, `TMP`: pip's builds and downloads, the tests' folders)
+and pip's cache (`PIP_CACHE_DIR`) are kept in it too (`<work>/tmp`, `<work>/pip-cache`), so that
+a small temporary space (Apptainer's `--containall` keeps `/tmp` and the home folder in 64 MiB)
+is enough.
 
 Usage:
     python -P scripts/release/check_install.py --version 0.1.0rc1 --work <new folder>
@@ -72,6 +76,19 @@ def target_triple() -> str:
 def archive_names(version: str, triple: str) -> list[str]:
     ext = ".zip" if "windows" in triple else ".tar.gz"
     return [f"{p}-{version}-{triple}{ext}" for p in ("larmorx", "larmorx-nc", "larmorx-gpl")]
+
+
+def work_env(work: Path, environ: dict[str, str]) -> dict[str, str]:
+    """The environment of every step: ``environ`` without the variables that would change
+    what runs, with the temporary files and pip's cache in ``work`` (made here)."""
+    env = dict(environ, PIP_DISABLE_PIP_VERSION_CHECK="1", PYTHONUTF8="1")
+    for name in ("PYTHONPATH", "PYTHONHOME", "VIRTUAL_ENV", "LARMORX_NC_BIN", "LARMORX_GPL_BIN"):
+        env.pop(name, None)
+    tmp, cache = work / "tmp", work / "pip-cache"
+    tmp.mkdir(parents=True, exist_ok=True)
+    cache.mkdir(parents=True, exist_ok=True)
+    env.update(TMPDIR=str(tmp), TEMP=str(tmp), TMP=str(tmp), PIP_CACHE_DIR=str(cache))
+    return env
 
 
 def venv_python(venv: Path) -> Path:
@@ -183,9 +200,7 @@ def main(argv: list[str] | None = None) -> int:
     version, triple, steps = args.version, args.target or target_triple(), Steps()
     print(f"check-install of larmorx {version} in {work}")
     machine_report()
-    env = dict(os.environ, PIP_DISABLE_PIP_VERSION_CHECK="1", PYTHONUTF8="1")
-    for name in ("PYTHONPATH", "PYTHONHOME", "VIRTUAL_ENV", "LARMORX_NC_BIN", "LARMORX_GPL_BIN"):
-        env.pop(name, None)
+    env = work_env(work, dict(os.environ))
 
     venv = work / "venv"
     py = venv_python(venv)

@@ -26,7 +26,7 @@
 
 use std::ffi::OsString;
 use std::fmt;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitStatus, Stdio};
 
@@ -693,11 +693,16 @@ pub fn run_builtin_in(
 /// How the child process's output reaches the user.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Output {
-    /// Collected, then written to the `out` and `err` writers (the Python entry point).
+    /// Collected, then written to the `out` and `err` writers (`larmorx._core.cli_main`'s
+    /// strings).
     Capture,
     /// The child writes to this process's own standard output and error (the standalone
     /// binaries), so progress appears as it is made.
     Inherit,
+    /// Read as the child writes it and passed to the `out` and `err` writers piece by piece (the
+    /// Python console script, whose writers are `sys.stdout` and `sys.stderr`), so progress
+    /// appears as it is made there too.
+    Stream,
 }
 
 /// Runs `program <family> <tool> args...` and returns its exit code: the replica's own, so
@@ -746,6 +751,7 @@ pub fn run_env(
             (o.status, written.is_ok())
         }),
         Output::Inherit => command.status().map(|s| (s, true)),
+        Output::Stream => stream(&mut command, out, err),
     };
     match result {
         Ok((status, true)) => exit_code(status),
@@ -759,6 +765,55 @@ pub fn run_env(
                 program.display()
             );
             EXIT_CANNOT_RUN
+        }
+    }
+}
+
+/// Runs `command` with its output piped, passing each piece of its standard output and error
+/// to `out` and `err` as it arrives (one thread reads each pipe); waits for it. The second value
+/// is false when a piece could not be written (the pipes are still read to their end, so that
+/// the child never blocks).
+fn stream(
+    command: &mut Command,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> std::io::Result<(ExitStatus, bool)> {
+    let mut child = command
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()?;
+    let (Some(mut child_out), Some(mut child_err)) = (child.stdout.take(), child.stderr.take())
+    else {
+        return Err(std::io::Error::other("the child's pipes are missing"));
+    };
+    let (tx, rx) = std::sync::mpsc::channel::<(bool, Vec<u8>)>();
+    let mut written = true;
+    std::thread::scope(|s| {
+        let tx_out = tx.clone();
+        s.spawn(move || pipe(&mut child_out, false, &tx_out));
+        s.spawn(move || pipe(&mut child_err, true, &tx));
+        for (is_err, piece) in rx {
+            let w: &mut dyn Write = if is_err { &mut *err } else { &mut *out };
+            written &= w.write_all(&piece).is_ok();
+        }
+    });
+    written &= out.flush().is_ok() & err.flush().is_ok();
+    Ok((child.wait()?, written))
+}
+
+/// Sends what `reader` gives, piece by piece, until its end (or the receiver is gone).
+fn pipe(reader: &mut dyn Read, is_err: bool, tx: &std::sync::mpsc::Sender<(bool, Vec<u8>)>) {
+    let mut buf = vec![0u8; 64 * 1024];
+    loop {
+        match reader.read(&mut buf) {
+            Ok(0) => break,
+            Ok(n) => {
+                if tx.send((is_err, buf[..n].to_vec())).is_err() {
+                    break;
+                }
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::Interrupted => {}
+            Err(_) => break,
         }
     }
 }

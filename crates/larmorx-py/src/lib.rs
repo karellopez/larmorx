@@ -21,6 +21,7 @@ mod replica;
 mod resample;
 mod sdcflows;
 mod skimage;
+mod stream;
 
 /// Runs the `larmorx` command line with `argv` (program name first).
 ///
@@ -31,21 +32,35 @@ mod skimage;
 /// `PATH`.
 ///
 /// Returns `(exit_code, stdout, stderr)`; the Python caller writes the streams so that they go
-/// through `sys.stdout` and `sys.stderr`. The GIL is released while the command runs.
+/// through `sys.stdout` and `sys.stderr`. With `stream`, the command's output goes to
+/// `sys.stdout` and `sys.stderr` while it runs instead (a replica program's too: the console
+/// script), and both strings are empty; an exception a write raised is raised when the command
+/// has ended. The GIL is released while the command runs.
 #[pyfunction]
-#[pyo3(signature = (argv, replica_dirs = Vec::new(), implementation = None))]
+#[pyo3(signature = (argv, replica_dirs = Vec::new(), implementation = None, stream = false))]
 fn cli_main(
     py: Python<'_>,
     argv: Vec<String>,
     replica_dirs: Vec<std::path::PathBuf>,
     implementation: Option<&str>,
+    stream: bool,
 ) -> PyResult<(u8, String, String)> {
-    let options = larmorx_cli::Options {
+    let mut options = larmorx_cli::Options {
         loader: &larmorx_cli::FileLoader,
         implementation: implementation.map(replica::implementation).transpose()?,
         replica_dirs,
         replica_output: larmorx_cli::replica::Output::Capture,
     };
+    if stream {
+        options.replica_output = larmorx_cli::replica::Output::Stream;
+        let (mut out, mut err) = (stream::PyStream::stdout(), stream::PyStream::stderr());
+        let code = py.detach(|| larmorx_cli::run_with(&argv, &options, &mut out, &mut err));
+        let failed = (out.finish(), err.finish());
+        if let Some(e) = failed.0.or(failed.1) {
+            return Err(e);
+        }
+        return Ok((code, String::new(), String::new()));
+    }
     let (mut out, mut err) = (Vec::new(), Vec::new());
     let code = py.detach(|| larmorx_cli::run_with(&argv, &options, &mut out, &mut err));
     Ok((

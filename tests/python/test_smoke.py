@@ -44,7 +44,7 @@ def test_cli_prints_version(name):
 def test_lx_help_uses_its_own_name():
     result = run_process(script("lx"), "--help")
     assert result.returncode == 0, result.stderr
-    assert "Usage: lx <family> <tool>" in result.stdout
+    assert "Usage: lx [options] <family> <tool>" in result.stdout
 
 
 def test_cli_unknown_command_is_a_usage_error():

@@ -748,7 +748,9 @@ def parse_args(
             setattr(section, k, v)
     layout = _layout(execution, mode)  # execution.init(), inside sdcflows' from_dict
 
+    # "original": the old spelling of "clean-room", accepted silently as the command line does
     implementation = env.get(_IMPLEMENTATION_ENV, "") or "auto"
+    implementation = "clean-room" if implementation == "original" else implementation
     libraries = env.get(LIBRARIES_ENV, "") or "newest"
     if libraries not in _LIBRARIES:
         parser.error(f"{LIBRARIES_ENV} must be one of {sorted(_LIBRARIES)}, not {libraries!r}")

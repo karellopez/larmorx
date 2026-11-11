@@ -154,7 +154,7 @@ def test_without_the_replica(scripts, tmp_path):
     assert "--warpres=8" in r.log and r.stdout.startswith("SSD = ")
     costs = [float(ln.rsplit("=", 1)[1]) for ln in r.stdout.splitlines() if "Cost" in ln]
     assert len(costs) >= 2 and costs[-1] < costs[0]
-    o = lx.fsl.topup(path, ACQ, implementation="original", n_threads=3, **kw)
+    o = lx.fsl.topup(path, ACQ, implementation="clean-room", n_threads=3, **kw)
     assert np.array_equal(np.asarray(o.field.data), np.asarray(r.field.data))
     assert o.stdout == r.stdout
     with pytest.raises(lx.ReplicaNotFoundError, match="larmorx-nc"):
@@ -167,7 +167,7 @@ def test_without_the_replica(scripts, tmp_path):
     a = lx.fsl.applytopup(pair_imgs, ACQ, [1, 2], r)
     assert a.corrected.implementation == _replica.ORIGINAL
     assert np.asarray(a.corrected.data).shape == (12, 10, 6, 2)
-    j = lx.fsl.applytopup(path, ACQ, [1], r, method="jac", implementation="original")
+    j = lx.fsl.applytopup(path, ACQ, [1], r, method="jac", implementation="clean-room")
     assert np.asarray(j.corrected.data).shape == (12, 10, 6, 2)
     assert np.isfinite(np.asarray(j.corrected.data)).all()
     with pytest.raises(lx.ReplicaNotFoundError, match="larmorx-nc"):

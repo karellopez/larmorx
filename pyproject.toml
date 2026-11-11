@@ -7,7 +7,9 @@ name = "larmorx"
 description = "Neuroimaging tools reimplemented in Rust, with Python bindings and the original programs' command lines: ANTs/ITK, AFNI, sdcflows and clean-room FSL-compatible tools"
 readme = "README.md"
 requires-python = ">=3.12"
-authors = [{ name = "Karel Lopez Vilaret" }]
+authors = [
+    { name = "Karel Mauricio López Vilaret", email = "karel.mauricio.lopez.vilaret@uni-oldenburg.de" },
+]
 # larmorx's own licence is Apache-2.0 (LICENSE). The expression names every licence of the code
 # the wheel holds: the works NOTICE names (VXL, Eigen, CORE-MATH, SciPy, numpy, CPython, HDF5,
 # AFNI's MCW code under CC BY 4.0, fdlibm, ...; their texts and notices in NOTICE and LICENSES/)

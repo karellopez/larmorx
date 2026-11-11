@@ -14,7 +14,7 @@ separate program) and the clean-room original of this package (``larmorx_fsl::pr
 written from ``specs/prelude.md``, run in this process: the same files bit for bit, its
 default's ``-c`` phases from the correctly rounded arctangent). ``implementation="auto"`` runs
 the replica when ``larmorx-nc`` is installed, else the original; ``"replica"`` or
-``"original"`` choose. FSL's deterministic defects are corrected by default (D13,
+``"clean-room"`` choose. FSL's deterministic defects are corrected by default (D13,
 ``docs/api/upstream-defects.md``: FSL-261 to FSL-272); ``upstream_defects="reproduce"`` gives
 FSL's results bit for bit. FSL's environment variables are never read from the process
 environment (CLAUDE.md rule 6). A run that fails raises :class:`larmorx._replica.ReplicaError`

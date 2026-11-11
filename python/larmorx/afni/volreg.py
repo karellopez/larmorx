@@ -4,7 +4,7 @@ volume, as AFNI 26.3.05's program does.
 
 ``implementation="auto"`` (the default) and ``"replica"`` run the bit-exact replica (part of
 larmorx, in this process), which gives AFNI's registered series, parameters, matrices and
-displacements bit for bit (``docs/validation/afni-volreg-replica.md``); ``"original"`` runs the
+displacements bit for bit (``docs/validation/afni-volreg-replica.md``); ``"clean-room"`` runs the
 clean-room original (Apache-2.0, written from ``specs/3dvolreg.md``, built for speed), which
 gives AFNI's results within the thresholds of the spec (§14.3).
 
@@ -181,7 +181,7 @@ def volreg(
     n_threads
         Threads (0 = all); the result does not depend on it.
     implementation
-        ``"auto"`` (default) and ``"replica"``: the bit-exact replica; ``"original"``: the
+        ``"auto"`` (default) and ``"replica"``: the bit-exact replica; ``"clean-room"``: the
         clean-room original.
     upstream_defects
         ``"fix"`` (default) or ``"reproduce"`` (AFNI's output); a

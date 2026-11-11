@@ -157,16 +157,18 @@ def test_without_the_replica(scripts, tmp_path):
 
 
 def test_the_original_runs_in_process(scripts, tmp_path):
-    """``implementation="original"``: bet2 and bet's variations in this process, every output
+    """``implementation="clean-room"``: bet2 and bet's variations in this process, every output
     read back; the command line's outputs are the same."""
     path = head(tmp_path)
-    r = lx.fsl.bet(path, mask=True, outline=True, skull=True, mesh=True, implementation="original")
+    r = lx.fsl.bet(
+        path, mask=True, outline=True, skull=True, mesh=True, implementation="clean-room"
+    )
     assert r.brain.data.dtype == np.float32 and r.mask.data.dtype == np.int16
     inside = int(np.asarray(r.mask.data).sum())
     assert 1500 < inside < 6000, inside
     assert r.mesh.vertices.shape == (2562, 3) and r.mesh.triangles.shape == (5120, 3)
     assert r.outline.data.shape == r.brain.data.shape and r.skull.data.dtype == np.int16
-    rob = lx.fsl.bet(path, variation="robust", mask=True, implementation="original")
+    rob = lx.fsl.bet(path, variation="robust", mask=True, implementation="clean-room")
     assert rob.mask.implementation == _replica.ORIGINAL
     for k in ("FSLOUTPUTTYPE",):
         os.environ.pop(k, None)
@@ -183,9 +185,9 @@ def test_the_original_runs_in_process(scripts, tmp_path):
     # FSL's refusals: a fractional threshold out of range; FSL's standard images found nowhere
     # (a named directory is the only place looked: specs/bet.md §5.4)
     with pytest.raises(ValueError, match="frac"):
-        lx.fsl.bet(path, frac=2.0, implementation="original")
+        lx.fsl.bet(path, frac=2.0, implementation="clean-room")
     with pytest.raises(RuntimeError, match="MNI152_T1_2mm was not found"):
-        lx.fsl.bet(path, variation="eyes", implementation="original", fsl_data=tmp_path / "none")
+        lx.fsl.bet(path, variation="eyes", implementation="clean-room", fsl_data=tmp_path / "none")
 
 
 def standard_images(tmp_path: Path, t1: Path) -> Path:
@@ -212,7 +214,7 @@ def test_the_original_runs_the_variations_with_fsls_programs(scripts, tmp_path):
     fslstats, bet2, betsurf), FSL's standard images from ``fsl_data``."""
     t1 = head(tmp_path)
     data = standard_images(tmp_path, t1)
-    common = {"implementation": "original", "fsl_data": data}
+    common = {"implementation": "clean-room", "fsl_data": data}
     r = lx.fsl.bet(t1, variation="eyes", mask=True, skull=True, **common)
     assert r.brain.implementation == _replica.ORIGINAL
     assert 0 < int(np.count_nonzero(np.asarray(r.mask.data))) <= int(np.asarray(r.brain.data).size)
@@ -249,12 +251,12 @@ def test_arguments_are_checked_before_anything_runs(scripts, tmp_path):
     with pytest.raises(TypeError):
         lx.fsl.bet(path, radius="large")
     # without larmorx-nc the variations that read FSL's standard images run the original
-    # ("auto" and "original"), which refuses before running anything when an image is found
+    # ("auto" and "clean-room"), which refuses before running anything when an image is found
     # nowhere (a named directory: the only place looked)
     empty = tmp_path / "no fsl data"
     for variation in ("eyes", "bias", "surfaces", "surfaces_t2"):
         t2 = path if variation == "surfaces_t2" else None
-        for implementation in ("auto", "original"):
+        for implementation in ("auto", "clean-room"):
             with pytest.raises(RuntimeError, match="MNI152_T1_2mm was not found"):
                 lx.fsl.bet(
                     path, variation=variation, t2=t2, implementation=implementation, fsl_data=empty

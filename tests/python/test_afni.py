@@ -72,7 +72,7 @@ def test_python_matches_the_command_line(tmp_path, method):
     np.testing.assert_allclose(img.affine, expected.affine)
     assert img.header.toffset == expected.header["toffset"]
     assert img.implementation == lx.Implementation(
-        "original", "larmorx", lx.__version__, "Apache-2.0"
+        "clean-room", "larmorx", lx.__version__, "Apache-2.0"
     )
 
 

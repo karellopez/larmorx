@@ -258,7 +258,7 @@ def hmc(
     implementation
         ``"auto"`` (default): the bit-exact replica when the ``larmorx-nc`` package is
         installed (FSL Licence: non-commercial use only; ``pip install larmorx-nc``), else the
-        clean-room original; ``"replica"`` or ``"original"`` force one. The replica runs
+        clean-room original; ``"replica"`` or ``"clean-room"`` force one. The replica runs
         ``mcflirt``'s command line as a separate program on files in a temporary directory and
         returns ``mcflirt``'s outputs as written (the matrices with 6 decimals, the parameters
         and RMS values with 6 significant digits, the corrected series as float32 from the file

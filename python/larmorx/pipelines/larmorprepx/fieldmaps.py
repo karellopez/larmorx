@@ -326,7 +326,7 @@ def bold_fit_fieldmap(
         Writes a derivative and returns the file the later nodes read (see the module).
     fsl_implementation
         BET's and fslmaths' implementation in ``skullstrip_bold_wf`` (``"auto"``,
-        ``"replica"``, ``"original"``).
+        ``"replica"``, ``"clean-room"``).
     n_threads
         Worker threads (fMRIPrep's ``omp_nthreads``); the results do not depend on it.
     upstream_defects

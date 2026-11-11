@@ -94,6 +94,7 @@
 use crate::openblas;
 
 pub mod blas;
+pub mod blocked;
 pub mod gesdd;
 pub mod lstsq;
 pub use gesdd::{GesddError, Svd2, gesdd_s2};
@@ -524,8 +525,10 @@ fn dlapy2(x: f64, y: f64) -> f64 {
 }
 
 /// `DLARFG(N, ALPHA, X, INCX, TAU)`: the elementary reflector; `x` (N - 1 values at `xoff`,
-/// stride `inc` in `a`) is overwritten with `v(2:n)`, `alpha` with `beta`. Returns `tau`.
-fn dlarfg(n: usize, alpha: &mut f64, a: &mut [f64], xoff: usize, inc: usize) -> f64 {
+/// stride `inc` in `a`) is overwritten with `v(2:n)`, `alpha` with `beta`. Returns `tau`. Any
+/// length (the norm is OpenBLAS's x87 `dnrm2`, the scalings its `dscal`); the same in both
+/// releases.
+pub fn dlarfg(n: usize, alpha: &mut f64, a: &mut [f64], xoff: usize, inc: usize) -> f64 {
     if n <= 1 {
         return 0.0;
     }

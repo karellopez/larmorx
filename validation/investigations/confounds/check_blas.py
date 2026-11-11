@@ -623,10 +623,12 @@ SECTIONS = {
 }
 
 
-def child(section: str, start: int, quick: bool, threads: int) -> int:
+def child(section: str, start: int, quick: bool, threads: int, sections=None) -> int:
+    """Runs a section's cases from ``start`` on (``sections``: another script's table, as
+    ``check_lapack.py`` passes its own)."""
     from larmorx import _core
 
-    _, cases, run = SECTIONS[section]
+    _, cases, run = (sections or SECTIONS)[section]
     for cid, case in enumerate(cases(quick)):
         if cid < start:
             continue
@@ -637,8 +639,15 @@ def child(section: str, start: int, quick: bool, threads: int) -> int:
     return 0
 
 
-def parent(section: str, quick: bool, threads: int) -> bool:
-    title, cases, _ = SECTIONS[section]
+def parent(
+    section: str, quick: bool, threads: int, sections=None, undefined_fn=None, script=None
+) -> bool:
+    """Runs a section in child processes, restarting after a crash of the original, and prints
+    its tallies (``sections``, ``undefined_fn`` and ``script``: another script's table, rule for
+    the undefined class and path, as ``check_lapack.py`` passes them)."""
+    sections = sections or SECTIONS
+    undefined_fn = undefined_fn or undefined
+    title, cases, _ = sections[section]
     case_list = cases(quick)
     tallies: dict[str, list] = {}
     crashed: list[int] = []
@@ -647,7 +656,7 @@ def parent(section: str, quick: bool, threads: int) -> bool:
         args = [
             sys.executable,
             "-P",
-            __file__,
+            script or __file__,
             "--child",
             section,
             "--start",
@@ -667,7 +676,7 @@ def parent(section: str, quick: bool, threads: int) -> bool:
             elif line.startswith("RES "):
                 _, cid, ok, *tag = line.split()
                 key = " ".join(tag)
-                if undefined(section, case_list[int(cid)]):
+                if undefined_fn(section, case_list[int(cid)]):
                     key += " [undefined in the original]"
                 t = tallies.setdefault(key, [0, []])
                 t[0] += 1
@@ -693,7 +702,7 @@ def parent(section: str, quick: bool, threads: int) -> bool:
             print(f"  DIFF case {cid}: {case_list[cid]}", flush=True)
         if "np.dot" not in tag and "undefined" not in tag:  # informational ones
             ok &= not bad
-    undef_crash = sum(undefined(section, case_list[c]) for c in crashed)
+    undef_crash = sum(undefined_fn(section, case_list[c]) for c in crashed)
     print(f"  crashes: {len(crashed)}, of which {undef_crash} in the undefined class", flush=True)
     for cid in crashed[:12]:
         print(f"  CRASH (numpy's OpenBLAS, SIGSEGV) case {cid}: {case_list[cid]}", flush=True)

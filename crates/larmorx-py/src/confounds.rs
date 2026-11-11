@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 //! Bindings of the confounds' part (fMRIPrep's confound estimation and the numerics under it).
-//! Today: OpenBLAS's level-2 and level-3 kernels at the BLAS interface (`blas_dgemm`,
-//! `blas_dgemv`) and numpy's `matmul` of two 2-D float64 arrays (`numpy_matmul`), as
-//! `larmorx_transform::openblas` computes them; the validation compares them with numpy's own
-//! library. Matrices cross as flat column-major storage with their leading dimension, as BLAS
+//! Today: OpenBLAS's level-1, level-2 and level-3 kernels at the BLAS interface (`blas_*`),
+//! numpy's `matmul` of two 2-D float64 arrays (`numpy_matmul`), as `larmorx_transform::openblas`
+//! computes them, and LAPACK's QR and LQ routines at their Fortran interface (`lapack_*`, as
+//! `larmorx_transform::numpy_linalg::blocked` computes them); the validation compares them with
+//! numpy's own library. Matrices cross as flat column-major storage with their leading dimension, as BLAS
 //! takes them. The GIL is released while computing.
 
 use larmorx_core::parallel;
+use larmorx_transform::numpy_linalg::blocked::{self, Direct, Lapack, Storev};
+use larmorx_transform::numpy_linalg::{self, LapackRelease};
 use larmorx_transform::openblas::level3::{self, Operand, Trans};
 use larmorx_transform::openblas::matmul::{self, Array2 as View};
 use larmorx_transform::openblas::trmm::{self, Diag, Side, Uplo};
@@ -382,6 +385,286 @@ fn numpy_matmul<'py>(
     ))
 }
 
+/// The LAPACK release a `lapack_*` call follows ("3.12.1": numpy 2.5.4's OpenBLAS; "3.12.0":
+/// numpy 2.3.5's OpenBLAS 0.3.30).
+fn lapack_release(name: &str) -> PyResult<LapackRelease> {
+    match name {
+        "3.12.1" => Ok(LapackRelease::V3_12_1),
+        "3.12.0" => Ok(LapackRelease::V3_12_0),
+        other => Err(PyValueError::new_err(format!(
+            "lapack must be '3.12.1' or '3.12.0', not {other:?}"
+        ))),
+    }
+}
+
+fn direct_storev(direct: &str, storev: &str) -> PyResult<(Direct, Storev)> {
+    Ok((
+        one_of(
+            "direct",
+            direct,
+            &[("F", Direct::Forward), ("B", Direct::Backward)],
+        )?,
+        one_of(
+            "storev",
+            storev,
+            &[("C", Storev::Columnwise), ("R", Storev::Rowwise)],
+        )?,
+    ))
+}
+
+/// Runs a LAPACK routine with the GIL released in a pool of `n_threads`; a panic (an array too
+/// small for its arguments) becomes `ValueError(name: invalid arguments)`.
+fn lapack_run<R: Send>(
+    py: Python<'_>,
+    name: &str,
+    n_threads: usize,
+    f: impl FnOnce() -> R + Send,
+) -> PyResult<R> {
+    py.detach(|| {
+        parallel::with_threads(n_threads, || {
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(f))
+        })
+    })
+    .map_err(value_err)?
+    .map_err(|_| PyValueError::new_err(format!("{name}: invalid arguments")))
+}
+
+type Factored<'py> = (Bound<'py, PyArray1<f64>>, Bound<'py, PyArray1<f64>>, usize);
+
+/// `DGEQRF` (`lq = false`) or `DGELQF` (`lq = true`) on flat column-major storage.
+#[allow(clippy::too_many_arguments)]
+fn factor<'py>(
+    py: Python<'py>,
+    lq: bool,
+    m: usize,
+    n: usize,
+    a: PyReadonlyArray1<'_, f64>,
+    lda: usize,
+    lwork: Option<usize>,
+    lapack: &str,
+    n_threads: usize,
+    gemm_q: usize,
+) -> PyResult<Factored<'py>> {
+    let lp = Lapack {
+        release: lapack_release(lapack)?,
+        gemm_q,
+    };
+    let mut av = contiguous(&a)?.to_vec();
+    let mut tau = vec![0.0f64; m.min(n)];
+    let name = if lq { "DGELQF" } else { "DGEQRF" };
+    let work1 = lapack_run(py, name, n_threads, || {
+        if lq {
+            blocked::dgelqf(lp, m, n, &mut av, 0, lda, &mut tau, lwork)
+        } else {
+            blocked::dgeqrf(lp, m, n, &mut av, 0, lda, &mut tau, lwork)
+        }
+    })?
+    .map_err(value_err)?;
+    Ok((
+        PyArray1::from_vec(py, av),
+        PyArray1::from_vec(py, tau),
+        work1,
+    ))
+}
+
+/// `DGEQRF(M, N, A, LDA, TAU, WORK, LWORK, INFO)` on flat column-major storage
+/// (`numpy_linalg::blocked::dgeqrf`; `lwork=None` is the optimal workspace of the query, a
+/// smaller one lowers the block size as LAPACK does); returns `(A, TAU, WORK(1))`.
+#[pyfunction]
+#[pyo3(signature = (m, n, a, lda, lwork = None, lapack = "3.12.1", n_threads = 1, gemm_q = 256))]
+#[allow(clippy::too_many_arguments)]
+fn lapack_dgeqrf<'py>(
+    py: Python<'py>,
+    m: usize,
+    n: usize,
+    a: PyReadonlyArray1<'_, f64>,
+    lda: usize,
+    lwork: Option<usize>,
+    lapack: &str,
+    n_threads: usize,
+    gemm_q: usize,
+) -> PyResult<Factored<'py>> {
+    factor(py, false, m, n, a, lda, lwork, lapack, n_threads, gemm_q)
+}
+
+/// `DGELQF(M, N, A, LDA, TAU, WORK, LWORK, INFO)`, as `lapack_dgeqrf`.
+#[pyfunction]
+#[pyo3(signature = (m, n, a, lda, lwork = None, lapack = "3.12.1", n_threads = 1, gemm_q = 256))]
+#[allow(clippy::too_many_arguments)]
+fn lapack_dgelqf<'py>(
+    py: Python<'py>,
+    m: usize,
+    n: usize,
+    a: PyReadonlyArray1<'_, f64>,
+    lda: usize,
+    lwork: Option<usize>,
+    lapack: &str,
+    n_threads: usize,
+    gemm_q: usize,
+) -> PyResult<Factored<'py>> {
+    factor(py, true, m, n, a, lda, lwork, lapack, n_threads, gemm_q)
+}
+
+type Unblocked<'py> = (Bound<'py, PyArray1<f64>>, Bound<'py, PyArray1<f64>>);
+
+/// `DGEQR2(M, N, A, LDA, TAU, WORK, INFO)`; returns `(A, TAU)`.
+#[pyfunction]
+#[pyo3(signature = (m, n, a, lda, lapack = "3.12.1"))]
+fn lapack_dgeqr2<'py>(
+    py: Python<'py>,
+    m: usize,
+    n: usize,
+    a: PyReadonlyArray1<'_, f64>,
+    lda: usize,
+    lapack: &str,
+) -> PyResult<Unblocked<'py>> {
+    let release = lapack_release(lapack)?;
+    let mut av = contiguous(&a)?.to_vec();
+    let mut tau = vec![0.0f64; m.min(n)];
+    lapack_run(py, "DGEQR2", 1, || {
+        blocked::dgeqr2(release, m, n, &mut av, 0, lda, &mut tau)
+    })?
+    .map_err(value_err)?;
+    Ok((PyArray1::from_vec(py, av), PyArray1::from_vec(py, tau)))
+}
+
+/// `DGELQ2(M, N, A, LDA, TAU, WORK, INFO)`; returns `(A, TAU)`.
+#[pyfunction]
+#[pyo3(signature = (m, n, a, lda, lapack = "3.12.1"))]
+fn lapack_dgelq2<'py>(
+    py: Python<'py>,
+    m: usize,
+    n: usize,
+    a: PyReadonlyArray1<'_, f64>,
+    lda: usize,
+    lapack: &str,
+) -> PyResult<Unblocked<'py>> {
+    let release = lapack_release(lapack)?;
+    let mut av = contiguous(&a)?.to_vec();
+    let mut tau = vec![0.0f64; m.min(n)];
+    lapack_run(py, "DGELQ2", 1, || {
+        blocked::dgelq2(release, m, n, &mut av, 0, lda, &mut tau)
+    })?
+    .map_err(value_err)?;
+    Ok((PyArray1::from_vec(py, av), PyArray1::from_vec(py, tau)))
+}
+
+/// `DLARFT(DIRECT, STOREV, N, K, V, LDV, TAU, T, LDT)`; `t` is the initial `T` storage (the
+/// triangle LAPACK does not write keeps its values); returns the new `T` storage.
+#[pyfunction]
+#[pyo3(signature = (direct, storev, n, k, v, ldv, tau, t, ldt, lapack = "3.12.1", n_threads = 1, gemm_q = 256))]
+#[allow(clippy::too_many_arguments)]
+fn lapack_dlarft<'py>(
+    py: Python<'py>,
+    direct: &str,
+    storev: &str,
+    n: usize,
+    k: usize,
+    v: PyReadonlyArray1<'_, f64>,
+    ldv: usize,
+    tau: PyReadonlyArray1<'_, f64>,
+    t: PyReadonlyArray1<'_, f64>,
+    ldt: usize,
+    lapack: &str,
+    n_threads: usize,
+    gemm_q: usize,
+) -> PyResult<Bound<'py, PyArray1<f64>>> {
+    let (d, sv) = direct_storev(direct, storev)?;
+    let lp = Lapack {
+        release: lapack_release(lapack)?,
+        gemm_q,
+    };
+    let (v, tau) = (contiguous(&v)?, contiguous(&tau)?);
+    let mut tv = contiguous(&t)?.to_vec();
+    lapack_run(py, "DLARFT", n_threads, || {
+        blocked::dlarft(lp, d, sv, n, k, v, 0, ldv, tau, &mut tv, 0, ldt)
+    })?;
+    Ok(PyArray1::from_vec(py, tv))
+}
+
+/// `DLARFB(SIDE, TRANS, DIRECT, STOREV, M, N, K, V, LDV, T, LDT, C, LDC, WORK, LDWORK)`;
+/// returns the new `C` storage.
+#[pyfunction]
+#[pyo3(signature = (side, trans_, direct, storev, m, n, k, v, ldv, t, ldt, c, ldc, n_threads = 1, gemm_q = 256))]
+#[allow(clippy::too_many_arguments)]
+fn lapack_dlarfb<'py>(
+    py: Python<'py>,
+    side: &str,
+    trans_: &str,
+    direct: &str,
+    storev: &str,
+    m: usize,
+    n: usize,
+    k: usize,
+    v: PyReadonlyArray1<'_, f64>,
+    ldv: usize,
+    t: PyReadonlyArray1<'_, f64>,
+    ldt: usize,
+    c: PyReadonlyArray1<'_, f64>,
+    ldc: usize,
+    n_threads: usize,
+    gemm_q: usize,
+) -> PyResult<Bound<'py, PyArray1<f64>>> {
+    let s = one_of("side", side, &[("L", Side::Left), ("R", Side::Right)])?;
+    let tr = trans(trans_)?;
+    let (d, sv) = direct_storev(direct, storev)?;
+    let (v, t) = (contiguous(&v)?, contiguous(&t)?);
+    let mut cv = contiguous(&c)?.to_vec();
+    lapack_run(py, "DLARFB", n_threads, || {
+        blocked::dlarfb(
+            gemm_q, s, tr, d, sv, m, n, k, v, 0, ldv, t, 0, ldt, &mut cv, 0, ldc,
+        )
+    })?;
+    Ok(PyArray1::from_vec(py, cv))
+}
+
+/// `DLARF(SIDE, M, N, V, INCV, TAU, C, LDC, WORK)` (`implicit_one=False`) or LAPACK 3.12.1's
+/// `DLARF1F` (`implicit_one=True`), positive `incv`; returns the new `C` storage.
+#[pyfunction]
+#[pyo3(signature = (side, m, n, v, incv, tau, c, ldc, implicit_one = false))]
+#[allow(clippy::too_many_arguments)]
+fn lapack_dlarf<'py>(
+    py: Python<'py>,
+    side: &str,
+    m: usize,
+    n: usize,
+    v: PyReadonlyArray1<'_, f64>,
+    incv: usize,
+    tau: f64,
+    c: PyReadonlyArray1<'_, f64>,
+    ldc: usize,
+    implicit_one: bool,
+) -> PyResult<Bound<'py, PyArray1<f64>>> {
+    let s = one_of("side", side, &[("L", Side::Left), ("R", Side::Right)])?;
+    let v = contiguous(&v)?;
+    let mut cv = contiguous(&c)?.to_vec();
+    lapack_run(py, "DLARF", 1, || {
+        if implicit_one {
+            blocked::dlarf1f(s, m, n, v, 0, incv, tau, &mut cv, 0, ldc)
+        } else {
+            blocked::dlarf(s, m, n, v, 0, incv, tau, &mut cv, 0, ldc)
+        }
+    })?;
+    Ok(PyArray1::from_vec(py, cv))
+}
+
+/// `DLARFG(N, ALPHA, X, INCX, TAU)` (positive `incx`); returns `(beta, X, tau)`.
+#[pyfunction]
+fn lapack_dlarfg<'py>(
+    py: Python<'py>,
+    n: usize,
+    alpha: f64,
+    x: PyReadonlyArray1<'_, f64>,
+    incx: usize,
+) -> PyResult<(f64, Bound<'py, PyArray1<f64>>, f64)> {
+    let mut xv = contiguous(&x)?.to_vec();
+    let mut beta = alpha;
+    let tau = lapack_run(py, "DLARFG", 1, || {
+        numpy_linalg::dlarfg(n, &mut beta, &mut xv, 0, incx)
+    })?;
+    Ok((beta, PyArray1::from_vec(py, xv), tau))
+}
+
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(blas_dgemm, m)?)?;
     m.add_function(wrap_pyfunction!(blas_dgemv, m)?)?;
@@ -395,5 +678,13 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(blas_idamax, m)?)?;
     m.add_function(wrap_pyfunction!(blas_dnrm2, m)?)?;
     m.add_function(wrap_pyfunction!(numpy_matmul, m)?)?;
+    m.add_function(wrap_pyfunction!(lapack_dgeqrf, m)?)?;
+    m.add_function(wrap_pyfunction!(lapack_dgelqf, m)?)?;
+    m.add_function(wrap_pyfunction!(lapack_dgeqr2, m)?)?;
+    m.add_function(wrap_pyfunction!(lapack_dgelq2, m)?)?;
+    m.add_function(wrap_pyfunction!(lapack_dlarft, m)?)?;
+    m.add_function(wrap_pyfunction!(lapack_dlarfb, m)?)?;
+    m.add_function(wrap_pyfunction!(lapack_dlarf, m)?)?;
+    m.add_function(wrap_pyfunction!(lapack_dlarfg, m)?)?;
     Ok(())
 }

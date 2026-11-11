@@ -1281,3 +1281,98 @@ def blas_idamax(n: int, x: np.ndarray, incx: int, aligned: bool) -> int:
 
 def blas_dnrm2(n: int, x: np.ndarray, incx: int) -> float:
     """``DNRM2`` (OpenBLAS's x87 kernel)."""
+
+# --- the confounds' part: LAPACK's QR and LQ routines (numpy_linalg::blocked) ------------------
+
+def lapack_dgeqrf(
+    m: int,
+    n: int,
+    a: np.ndarray,
+    lda: int,
+    lwork: int | None = None,
+    lapack: str = "3.12.1",
+    n_threads: int = 1,
+    gemm_q: int = 256,
+) -> tuple[np.ndarray, np.ndarray, int]:
+    """LAPACK's blocked ``DGEQRF`` on flat column-major float64 storage, as numpy's OpenBLAS
+    computes it on the Haswell kernels at one thread (``lapack`` "3.12.1": numpy 2.5.4,
+    "3.12.0": numpy 2.3.5; ``lwork=None``: the optimal workspace); returns ``(A, TAU, WORK(1))``.
+    Raises ``ValueError`` with LAPACK's message on an illegal argument."""
+
+def lapack_dgelqf(
+    m: int,
+    n: int,
+    a: np.ndarray,
+    lda: int,
+    lwork: int | None = None,
+    lapack: str = "3.12.1",
+    n_threads: int = 1,
+    gemm_q: int = 256,
+) -> tuple[np.ndarray, np.ndarray, int]:
+    """LAPACK's blocked ``DGELQF``, as ``lapack_dgeqrf``."""
+
+def lapack_dgeqr2(
+    m: int, n: int, a: np.ndarray, lda: int, lapack: str = "3.12.1"
+) -> tuple[np.ndarray, np.ndarray]:
+    """LAPACK's ``DGEQR2``; returns ``(A, TAU)``."""
+
+def lapack_dgelq2(
+    m: int, n: int, a: np.ndarray, lda: int, lapack: str = "3.12.1"
+) -> tuple[np.ndarray, np.ndarray]:
+    """LAPACK's ``DGELQ2``; returns ``(A, TAU)``."""
+
+def lapack_dlarft(
+    direct: str,
+    storev: str,
+    n: int,
+    k: int,
+    v: np.ndarray,
+    ldv: int,
+    tau: np.ndarray,
+    t: np.ndarray,
+    ldt: int,
+    lapack: str = "3.12.1",
+    n_threads: int = 1,
+    gemm_q: int = 256,
+) -> np.ndarray:
+    """LAPACK's ``DLARFT`` (3.12.0: recursive; 3.12.1: ``DLARFT_LVL2`` below 64 reflectors);
+    ``t`` is the initial ``T`` storage; returns the new ``T`` storage."""
+
+def lapack_dlarfb(
+    side: str,
+    trans_: str,
+    direct: str,
+    storev: str,
+    m: int,
+    n: int,
+    k: int,
+    v: np.ndarray,
+    ldv: int,
+    t: np.ndarray,
+    ldt: int,
+    c: np.ndarray,
+    ldc: int,
+    n_threads: int = 1,
+    gemm_q: int = 256,
+) -> np.ndarray:
+    """LAPACK's ``DLARFB`` (every side, transpose, direction and storage); returns the new ``C``
+    storage."""
+
+def lapack_dlarf(
+    side: str,
+    m: int,
+    n: int,
+    v: np.ndarray,
+    incv: int,
+    tau: float,
+    c: np.ndarray,
+    ldc: int,
+    implicit_one: bool = False,
+) -> np.ndarray:
+    """LAPACK's ``DLARF`` (or 3.12.1's ``DLARF1F`` with ``implicit_one``), positive ``incv``;
+    returns the new ``C`` storage."""
+
+def lapack_dlarfg(
+    n: int, alpha: float, x: np.ndarray, incx: int
+) -> tuple[float, np.ndarray, float]:
+    """LAPACK's ``DLARFG`` (positive ``incx``); returns ``(beta, X, tau)``."""

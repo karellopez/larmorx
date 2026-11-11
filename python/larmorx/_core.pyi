@@ -1335,8 +1335,9 @@ def lapack_dlarft(
     n_threads: int = 1,
     gemm_q: int = 256,
 ) -> np.ndarray:
-    """LAPACK's ``DLARFT`` (3.12.0: recursive; 3.12.1: ``DLARFT_LVL2`` below 64 reflectors);
-    ``t`` is the initial ``T`` storage; returns the new ``T`` storage."""
+    """LAPACK's ``DLARFT`` (3.12.0: recursive; 3.12.1: ``DLARFT_LVL2`` below 64 reflectors;
+    ``lapack="3.12.0-openblas-0.3.28"``, SciPy 1.15.3's library: column by column); ``t`` is the
+    initial ``T`` storage; returns the new ``T`` storage."""
 
 def lapack_dlarfb(
     side: str,
@@ -1947,3 +1948,78 @@ def lapack_dlalsa(
     gemm_q: int = 256,
 ) -> tuple[np.ndarray, np.ndarray, int]:
     """LAPACK's ``DLALSA`` (the compact SVD applied to ``b``): ``(B, BX, INFO)``."""
+
+def lapack_dgesvd(
+    jobu: str,
+    jobvt: str,
+    m: int,
+    n: int,
+    a: np.ndarray,
+    lda: int,
+    u: np.ndarray,
+    ldu: int,
+    vt: np.ndarray,
+    ldvt: int,
+    lwork: int | None = None,
+    lapack: str = "3.12.0",
+    n_threads: int = 1,
+    gemm_q: int = 256,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, int, int, np.ndarray]:
+    """LAPACK's ``DGESVD`` with ``JOBU = JOBVT = 'S'`` or ``'A'`` (paths 6, 9, 10 and their
+    transposes; ``lapack="3.12.0"`` SciPy 1.18.1's library, ``"3.12.0-openblas-0.3.28"`` SciPy
+    1.15.3's); returns ``(A, S, U, VT, WORK(1), INFO, WORK(2:MIN(M, N)))``."""
+
+def lapack_dgesvd_lwork(job_: str, m: int, n: int) -> tuple[int, int]:
+    """``DGESVD(JOB, JOB)``'s ``(MINWRK, MAXWRK)``."""
+
+def lapack_dbdsqr(
+    uplo_: str,
+    n: int,
+    ncvt: int,
+    nru: int,
+    ncc: int,
+    d: np.ndarray,
+    e: np.ndarray,
+    vt: np.ndarray,
+    ldvt: int,
+    u: np.ndarray,
+    ldu: int,
+    c: np.ndarray,
+    ldc: int,
+    lapack: str = "3.12.0",
+    n_threads: int = 1,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, int]:
+    """LAPACK's ``DBDSQR`` with vectors (upper or lower): ``(D, E, VT, U, C, INFO)``; without
+    vectors raises ``NotImplementedError`` (``DLASQ1``)."""
+
+def scipy_svd(
+    a: np.ndarray,
+    full_matrices: bool = True,
+    compute_uv: bool = True,
+    lapack_driver: str = "gesvd",
+    scipy: str = "1.18.1",
+    n_threads: int = 1,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """``scipy.linalg.svd(a, full_matrices, lapack_driver='gesvd')`` with SciPy 1.18.1's or
+    1.15.3's own library: ``(u, s, vh)``; SciPy's ``ValueError`` and ``LinAlgError``."""
+
+def nipype_fallback_svd(
+    a: np.ndarray,
+    full_matrices: bool = False,
+    compute_uv: bool = True,
+    lapack: str = "3.12.1",
+    scipy: str = "1.18.1",
+    n_threads: int = 1,
+    gemm_q: int = 256,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, bool]:
+    """nipype's ``fallback_svd(a, full_matrices=False)``: ``(u, s, vt, fallback)``."""
+
+def nipype_full_rank(
+    x: np.ndarray,
+    cmax: float = 1e15,
+    lapack: str = "3.12.1",
+    scipy: str = "1.18.1",
+    n_threads: int = 1,
+    gemm_q: int = 256,
+) -> tuple[np.ndarray, float, bool]:
+    """nipype's ``_full_rank(X, cmax)``: ``(X, c, regularized)``."""

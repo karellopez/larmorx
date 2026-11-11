@@ -10,7 +10,7 @@
 //! ones); index arrays as int64 (1-based, as LAPACK keeps them). The GIL is released while
 //! computing.
 
-use super::{contiguous, lapack_release, lapack_run, one_of, trans, value_err};
+use super::{contiguous, lapack_release, lapack_run, lapack_settings, one_of, trans, value_err};
 use larmorx_transform::numpy_linalg::bdsdc::{self, MergeWork};
 use larmorx_transform::numpy_linalg::blocked::{self, Lapack, Vect};
 use larmorx_transform::numpy_linalg::svd::{self as tsvd, DgesddError};
@@ -30,10 +30,7 @@ pub(super) fn uplo(v: &str) -> PyResult<Uplo> {
 }
 
 pub(super) fn lp(lapack: &str, gemm_q: usize) -> PyResult<Lapack> {
-    Ok(Lapack {
-        release: lapack_release(lapack)?,
-        gemm_q,
-    })
+    lapack_settings(lapack, gemm_q)
 }
 
 pub(super) fn indices(x: &PyReadonlyArray1<'_, i64>) -> PyResult<Vec<usize>> {

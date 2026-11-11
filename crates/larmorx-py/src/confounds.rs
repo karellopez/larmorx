@@ -10,7 +10,7 @@
 //! dimension, as BLAS takes them. The GIL is released while computing.
 
 use larmorx_core::parallel;
-use larmorx_transform::numpy_linalg::blocked::{self, Direct, Lapack, Storev};
+use larmorx_transform::numpy_linalg::blocked::{self, Direct, DlarftForm, Lapack, Storev};
 use larmorx_transform::numpy_linalg::{self, LapackRelease};
 use larmorx_transform::openblas::level3::{self, Operand, Trans};
 use larmorx_transform::openblas::matmul::{self, Array2 as View};
@@ -22,6 +22,7 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 
 mod gelsd;
+mod gesvd;
 mod svd;
 
 fn value_err(e: impl std::fmt::Display) -> PyErr {
@@ -392,14 +393,30 @@ fn numpy_matmul<'py>(
 
 /// The LAPACK release a `lapack_*` call follows ("3.12.1": numpy 2.5.4's OpenBLAS; "3.12.0":
 /// numpy 2.3.5's OpenBLAS 0.3.30).
+/// The `lapack=` keyword's library: `"3.12.1"` (OpenBLAS 0.3.34's LAPACK: numpy 2.5.4),
+/// `"3.12.0"` (OpenBLAS 0.3.30's: numpy 2.3.5; also SciPy 1.18.1's 0.3.31 snapshot) or
+/// `"3.12.0-openblas-0.3.28"` (SciPy 1.15.3's OpenBLAS 0.3.28: LAPACK 3.12.0 with the
+/// column-by-column `DLARFT`).
+const OPENBLAS_0_3_28: &str = "3.12.0-openblas-0.3.28";
+
 fn lapack_release(name: &str) -> PyResult<LapackRelease> {
     match name {
         "3.12.1" => Ok(LapackRelease::V3_12_1),
-        "3.12.0" => Ok(LapackRelease::V3_12_0),
+        "3.12.0" | OPENBLAS_0_3_28 => Ok(LapackRelease::V3_12_0),
         other => Err(PyValueError::new_err(format!(
-            "lapack must be '3.12.1' or '3.12.0', not {other:?}"
+            "lapack must be '3.12.1', '3.12.0' or '{OPENBLAS_0_3_28}', not {other:?}"
         ))),
     }
+}
+
+/// The blocked routines' settings for the `lapack=` keyword ([`lapack_release`]) and the BLAS
+/// depth block `gemm_q`.
+fn lapack_settings(name: &str, gemm_q: usize) -> PyResult<Lapack> {
+    let mut lp = Lapack::with_gemm_q(lapack_release(name)?, gemm_q);
+    if name == OPENBLAS_0_3_28 {
+        lp.dlarft = DlarftForm::ColumnByColumn;
+    }
+    Ok(lp)
 }
 
 fn direct_storev(direct: &str, storev: &str) -> PyResult<(Direct, Storev)> {
@@ -450,10 +467,7 @@ fn factor<'py>(
     n_threads: usize,
     gemm_q: usize,
 ) -> PyResult<Factored<'py>> {
-    let lp = Lapack {
-        release: lapack_release(lapack)?,
-        gemm_q,
-    };
+    let lp = lapack_settings(lapack, gemm_q)?;
     let mut av = contiguous(&a)?.to_vec();
     let mut tau = vec![0.0f64; m.min(n)];
     let name = if lq { "DGELQF" } else { "DGEQRF" };
@@ -575,10 +589,7 @@ fn lapack_dlarft<'py>(
     gemm_q: usize,
 ) -> PyResult<Bound<'py, PyArray1<f64>>> {
     let (d, sv) = direct_storev(direct, storev)?;
-    let lp = Lapack {
-        release: lapack_release(lapack)?,
-        gemm_q,
-    };
+    let lp = lapack_settings(lapack, gemm_q)?;
     let (v, tau) = (contiguous(&v)?, contiguous(&tau)?);
     let mut tv = contiguous(&t)?.to_vec();
     lapack_run(py, "DLARFT", n_threads, || {
@@ -688,10 +699,7 @@ fn generate<'py>(
     n_threads: usize,
     gemm_q: usize,
 ) -> PyResult<Generated<'py>> {
-    let lp = Lapack {
-        release: lapack_release(lapack)?,
-        gemm_q,
-    };
+    let lp = lapack_settings(lapack, gemm_q)?;
     let mut av = contiguous(&a)?.to_vec();
     let tau = contiguous(&tau)?;
     let name = if lq { "DORGLQ" } else { "DORGQR" };
@@ -826,10 +834,7 @@ fn apply_q<'py>(
 ) -> PyResult<Applied<'py>> {
     let s = one_of("side", side, &[("L", Side::Left), ("R", Side::Right)])?;
     let tr = trans(trans_)?;
-    let lp = Lapack {
-        release: lapack_release(lapack)?,
-        gemm_q,
-    };
+    let lp = lapack_settings(lapack, gemm_q)?;
     let mut av = contiguous(&a)?.to_vec();
     let tau = contiguous(&tau)?;
     let mut cv = contiguous(&c)?.to_vec();
@@ -987,10 +992,7 @@ fn bidiagonalize<'py>(
     n_threads: usize,
     gemm_q: usize,
 ) -> PyResult<Bidiagonal<'py>> {
-    let lp = Lapack {
-        release: lapack_release(lapack)?,
-        gemm_q,
-    };
+    let lp = lapack_settings(lapack, gemm_q)?;
     let mut av = contiguous(&a)?.to_vec();
     let k = m.min(n);
     let (mut d, mut e) = (vec![0.0f64; k], vec![0.0f64; k]);
@@ -1137,5 +1139,6 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(lapack_dlabrd, m)?)?;
     svd::register(m)?;
     gelsd::register(m)?;
+    gesvd::register(m)?;
     Ok(())
 }

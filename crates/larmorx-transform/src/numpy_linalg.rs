@@ -103,6 +103,7 @@ pub mod blas;
 pub mod blocked;
 pub mod gelsd;
 pub mod gesdd;
+pub mod gesvd;
 pub mod lasda;
 pub mod lstsq;
 pub mod svd;

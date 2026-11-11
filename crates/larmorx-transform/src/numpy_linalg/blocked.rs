@@ -79,22 +79,48 @@ const NBMIN: usize = 2;
 /// `ILAENV(3, 'DLARFT', ...)` of LAPACK 3.12.1: fewer reflectors go to `DLARFT_LVL2`.
 pub const DLARFT_LVL2_BELOW: usize = 64;
 
+/// Which `DLARFT` the library's LAPACK holds.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum DlarftForm {
+    /// Reference-LAPACK's recursive `DLARFT` (LAPACK PR 1080, in OpenBLAS since 0.3.29: numpy
+    /// 2.3.5's and 2.5.4's wheels, SciPy 1.18.1's): 3.12.0 recurses down to single reflectors,
+    /// 3.12.1 hands fewer than [`DLARFT_LVL2_BELOW`] reflectors to `DLARFT_LVL2`.
+    #[default]
+    Recursive,
+    /// The column-by-column `DLARFT` of OpenBLAS 0.3.28 and earlier (SciPy 1.15.3's
+    /// scipy-openblas32 0.3.28; the same Fortran as 3.12.1's `DLARFT_LVL2`), for every call.
+    ColumnByColumn,
+}
+
 /// The LAPACK release and the BLAS depth block a blocked routine follows.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Lapack {
-    /// LAPACK 3.12.1 (numpy 2.5.4) or 3.12.0 (numpy 2.3.5, fMRIPrep 25.2.6's image).
+    /// LAPACK 3.12.1 (numpy 2.5.4) or 3.12.0 (numpy 2.3.5, fMRIPrep 25.2.6's image, SciPy's
+    /// wheels).
     pub release: LapackRelease,
     /// OpenBLAS's `GEMM_Q` ([`GEMM_Q`], or [`crate::openblas::level3::GEMM_Q_ZEN4`] to follow
     /// numpy 2.5.4 forced onto the Haswell kernels on an AMD Zen 4 or 5).
     pub gemm_q: usize,
+    /// The library's `DLARFT` ([`DlarftForm::Recursive`] but for OpenBLAS 0.3.28 and earlier).
+    pub dlarft: DlarftForm,
 }
 
 impl Lapack {
-    /// `release` with the default depth block ([`GEMM_Q`]).
+    /// `release` with the default depth block ([`GEMM_Q`]) and the recursive `DLARFT`.
     pub const fn new(release: LapackRelease) -> Self {
         Self {
             release,
             gemm_q: GEMM_Q,
+            dlarft: DlarftForm::Recursive,
+        }
+    }
+
+    /// `release` with the depth block `gemm_q` and the recursive `DLARFT`.
+    pub const fn with_gemm_q(release: LapackRelease, gemm_q: usize) -> Self {
+        Self {
+            release,
+            gemm_q,
+            dlarft: DlarftForm::Recursive,
         }
     }
 }
@@ -579,7 +605,7 @@ fn trmm_in_t(
 /// lower for [`Direct::Backward`]; the other triangle of `t` is not touched), `V` at `v[voff +
 /// i + j·ldv]`, `T` at `t[toff + i + j·ldt]`. LAPACK 3.12.0 recurses down to single
 /// reflectors; 3.12.1 takes `DLARFT_LVL2` below [`DLARFT_LVL2_BELOW`] reflectors (module
-/// documentation).
+/// documentation); [`DlarftForm::ColumnByColumn`] (OpenBLAS 0.3.28) takes it for every call.
 ///
 /// # Panics
 /// When an array is too small, and on the BLAS checks.
@@ -598,6 +624,10 @@ pub fn dlarft(
     ldt: usize,
 ) {
     if n == 0 || k == 0 {
+        return;
+    }
+    if lp.dlarft == DlarftForm::ColumnByColumn {
+        dlarft_lvl2(direct, storev, n, k, v, voff, ldv, tau, t, toff, ldt);
         return;
     }
     if n == 1 || k == 1 {
@@ -1024,7 +1054,7 @@ fn trmv_in_t(uplo: Uplo, len: usize, t: &mut [f64], aoff: usize, ldt: usize, xof
     t[xoff..xoff + len].copy_from_slice(&x);
 }
 
-/// `DLARFT_LVL2` (LAPACK 3.12.1): `T` column by column (forward) or backwards (backward), each
+/// `DLARFT_LVL2` (LAPACK 3.12.1; OpenBLAS 0.3.28's `DLARFT`): `T` column by column (forward) or backwards (backward), each
 /// from a `DGEMV` over the reflectors' overlapping parts and a `DTRMV` with the `T` built so
 /// far.
 fn dlarft_lvl2(

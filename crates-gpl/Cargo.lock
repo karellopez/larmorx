@@ -182,7 +182,7 @@ dependencies = [
 
 [[package]]
 name = "larmorx-afni-replica"
-version = "0.0.1"
+version = "0.1.0-rc.1"
 dependencies = [
  "larmorx-core",
  "larmorx-io",
@@ -193,7 +193,7 @@ dependencies = [
 
 [[package]]
 name = "larmorx-core"
-version = "0.0.1"
+version = "0.1.0-rc.1"
 dependencies = [
  "bytemuck",
  "ndarray",
@@ -204,7 +204,7 @@ dependencies = [
 
 [[package]]
 name = "larmorx-gpl-cli"
-version = "0.0.1"
+version = "0.1.0-rc.1"
 dependencies = [
  "flate2",
  "larmorx-core",
@@ -215,7 +215,7 @@ dependencies = [
 
 [[package]]
 name = "larmorx-gpl-tedana"
-version = "0.0.1"
+version = "0.1.0-rc.1"
 dependencies = [
  "larmorx-core",
  "larmorx-interp",
@@ -228,7 +228,7 @@ dependencies = [
 
 [[package]]
 name = "larmorx-hdf5"
-version = "0.0.1"
+version = "0.1.0-rc.1"
 dependencies = [
  "flate2",
  "larmorx-core",
@@ -238,7 +238,7 @@ dependencies = [
 
 [[package]]
 name = "larmorx-interp"
-version = "0.0.1"
+version = "0.1.0-rc.1"
 dependencies = [
  "larmorx-core",
  "rayon",
@@ -247,7 +247,7 @@ dependencies = [
 
 [[package]]
 name = "larmorx-io"
-version = "0.0.1"
+version = "0.1.0-rc.1"
 dependencies = [
  "bytemuck",
  "crc32fast",
@@ -261,7 +261,7 @@ dependencies = [
 
 [[package]]
 name = "larmorx-optim"
-version = "0.0.1"
+version = "0.1.0-rc.1"
 dependencies = [
  "larmorx-core",
  "larmorx-transform",
@@ -270,7 +270,7 @@ dependencies = [
 
 [[package]]
 name = "larmorx-transform"
-version = "0.0.1"
+version = "0.1.0-rc.1"
 dependencies = [
  "larmorx-core",
  "larmorx-interp",

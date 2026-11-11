@@ -22,6 +22,20 @@ Replicas and clean-room originals are covered alike. Written 2026-10-11.
 | Recorded by | `python scripts/record_golden.py` | `LARMORX_GOLDEN_RECORD=1 cargo test --locked -p larmorx-cli --test afni_replica_golden` | `LARMORX_GOLDEN_RECORD=1 cargo test --locked -p larmorx-nc-cli --test golden` (in `crates-nc`) | `LARMORX_GOLDEN_RECORD=1 cargo test --locked -p larmorx-gpl-cli --test golden` (in `crates-gpl`) |
 | CI artifact on failure | `golden-mismatches-<platform>` | `golden-mismatches-<platform>` (its `afni-replica/` folder) | `golden-mismatches-gpl-<platform>` | `golden-mismatches-gpl-<platform>` (the same artifact) |
 
+**The release's builds** (`.github/workflows/release.yml`, on every dry run and release, since
+2026-11-11; the `dist` profile: fat LTO, one codegen unit, stripped): the main package's suite runs
+on the installed wheels on the six platforms (`test`), on the wheels pip builds from its sdist
+(`sdist-install`, the `release` profile, as a user's source build), inside both container images (`container`) and, after an upload, on the wheels
+from PyPI (`verify-pypi`); the companions' suites on the programs their wheels install, on the six
+platforms (`programs`). **The installed programs** (since 2026-11-10): the larmorx-nc and
+larmorx-gpl harnesses take `LARMORX_GOLDEN_PROGRAM` (a path, or a name found on `PATH`; `.exe`
+added on Windows): the cases then run that program instead of cargo's build, e.g. the one a wheel
+installs (`LARMORX_GOLDEN_PROGRAM=<venv>/bin/larmorx-nc cargo test --locked -p larmorx-nc-cli
+--test golden` in `crates-nc`), after checking that its `--version` is the checkout's
+(`validation/investigations/release-0.1/installed_golden.sh`: every case passes on the `dist`
+wheels' programs). The `dist` builds give the same checksums as the `release` builds (the four
+suites; the parity smoke tier, 2,968 passed, on `dist` builds: relay 2b of the first release).
+
 No CI job or runner was added. Parity, benchmarks and real data still never run in CI.
 `larmorx-gpl`'s checksums (tedana's `t2smap` replica, 10 cases, 203 outputs) were recorded on
 2026-11-08 from 68f1126d and again from e86180ff (the maths notices: only the named-defects lines
@@ -30,6 +44,19 @@ and the notice texts of relay 10). The `gpl` jobs' added steps (rustfmt, clippy 
 `larmorx-gpl-tedana` and `larmorx-gpl-cli`, the workspace's tools left out) measured 2.4 s, 4.5 s
 and 8.3 s on the main machine from an empty target directory: about a minute per job cold on
 GitHub's runners, six job-minutes per CI run, less with the cache (rule 10's estimate, 2026-11-08).
+`larmorx-gpl`'s checksums were re-recorded on 2026-11-10 from 13013f21 (the first release's relay
+2c): the harness writes larmorx-gpl's own version, in Cargo's form or PEP 440's, as `<version>` in
+`dataset_description.json`'s `"Python"` field, so a release changes no checksum; exactly the 9
+`dataset_description.json` outputs changed (`validation/investigations/release-0.1/gpl_golden_version_only.py`:
+with `<version>` written back as 0.0.1 each equals the record before, 9 of 9), every other checksum
+unchanged.
+The main package's checksums were re-recorded on 2026-11-10 from 42d88287 (the first release's
+relay 2a; the parity smoke tier passing: 2,968 tests) for the same reason: `tests/golden/registry.py`'s
+`_h5_structure` writes the running version as `<version>` where larmorx's ITK HDF5 writer records it
+(`/OSVersion`); exactly the 4 cases holding such a file changed (`cli.ants.antsApplyTransforms.outputs`,
+`cli.ants.antsRegistration`, `.fields` and `.syn`: 6 outputs, each by that string only;
+`validation/investigations/release-0.1/golden_version_only.py`: with `<version>` written back as
+0.0.1 their fingerprints equal the record before, 4 of 4), every other checksum unchanged.
 The main package's checksums were recorded on 2026-11-09 from adf07a34 and a637d51f (the field maps'
 part B, relays 26 and 28; the parity smoke tier passing: 2,914 and 2,927 tests): 41 cases added,
 `cli.sdcflows.sdcflows` and forty `py.*` cases of `lx.ndimage`, `lx.sdcflows`, `lx.niworkflows`,
@@ -185,7 +212,7 @@ A coverage test fails when anything below has no case; its message says what to 
 | `larmorx afni 3dAutomask`, `3dUnifize`, `lx.afni.automask`, `lx.afni.unifize` (clean-room originals) | 8 | 3dAutomask: fMRIPrep's call (`-apply_prefix -dilate 1`) with `-depth` on the oblique float32 volume; a 4D series averaged with `-nograd -eclip -clfrac 0.3 -peels 2 -NN3 -dilate 2 -erode 1 -SI 20`, and the 2D method on a plane; `-peels 0 -nbhrs 12` on a series with a negative scale factor in both modes (AFNI-43, AFNI-01); the Python API in memory with `exterior_clip`, `erode`, `nn=1`, the masked input and the depth. 3dUnifize: the defaults with `-ssave` and `-amsave`; fMRIPrep's `-T2` call; `-T2 -T2 -GM`; `-EPI` on a series; `-T2 -T2up 100` in both modes (AFNI-45); the Python API in memory with `t2`, the scale and the automasked input. The half-size path (more than a million voxels) is covered by the parity suites and the Rust unit tests of `unifize::duplo` |
 | `larmorx-nc fsl mcflirt` | 24 | int16 (the default outputs, int16 written), float32 with a reference file, `-stages 4` and `-sinc_final`, `-meanvol` with `-spline_final` and `-dof 12`, every cost (`mutualinfo` with `-nn_final` and `-bins 64`, `normmi`, `corratio`, `woods`, `leastsquares` with `-smooth 0`), `-init` with `-fudge` and `-rotation 2`, the in-plane mode on a 3-slice slab (and `-2d`), `-stats`, `-gdt`, uint8 and int8 input, NaN and infinite voxels, big-endian float32 in the neurological order written as NIfTI-2, a TR in milliseconds; mcflirt's defects corrected (the default) and, in 7 `*.reproduce` cases, reproduced (FSL-03, -04, -08, -09, -10, -14); every file written fingerprinted (images by header and data, `.mat`, `.par`, `.rms`); each case checks the defects named on standard error; FSL-59 reproduced (`-nn_final` resampled trilinearly, as FSL 6.0.7.23) with zstd outputs (`FSLOUTPUTTYPE=NIFTI_ZST`) |
 | `larmorx-nc fsl bet`, `bet2`, `betsurf`, `standard_space_roi`, `fslroi` | 21 | bet2's outputs (brain, mask, outline, skull, VTK mesh; `-f 0.4`), its threshold, gradient, centre and smoothness options (NIFTI_GZ), `--ct` (NIFTI_PAIR; the self-intersection passes), FSL-40 reproduced; `bet -R`, `-F` (4D), `-Z` corrected and reproduced (FSL-45); `betsurf --t1only -o -m -s` and with the T2 and `-p 1`. The inputs: a head of 32 x 32 x 24 voxels of 2 mm (brain, CSF, skull, scalp) from SplitMix64 and integer arithmetic, its T2 contrast, 4 volumes of it, a slab of 10 slices, and bet2's own mesh of the head; every file written fingerprinted (images by header and data, meshes as text); each case checks the defects named on standard error. `PATH` is emptied for the runs (FSL-45's branch looks for `imglob` on it); `--binaryMask` (FSL 6.0.7.23) with bzip2 outputs (`NIFTI_BZ2`), and `bet` with zstd outputs (`NIFTI_ZST`); since 2026-11-04 `bet -S -m`, `-B -s` and `-A2` on generated standard images (`LARMORX_FSL_DATA`: a template head of other noise on the same grid, int16, its dilated brain mask and an eye block, uint8; neither FSL's data nor larmorx-nc's own copy), standard_space_roi with `-ssref` (the FOV mask and cut; `-maskMASK`, `-roiMASK`, `-d`), fslroi's box and spatial forms and an int8 image corrected and reproduced (FSL-217) |
-| `larmorx-gpl tedana t2smap` (the replica; `lx.tedana.t2smap` and `larmorx tedana t2smap` run it) | 10 | a generated 16 × 14 × 8 × 4 three-echo series of integer ratios (every 17th head voxel rising, every 23rd losing its last echo), relative paths: the log-linear fit (default and `reproduce`), the curve fit with `--verbose`, `--convention orig`, a prefix and two threads (both modes), the shared libraries' step (`reproduce`), `--fitmode ts` with PAID (`reproduce`), no mask with float32 data, echo times in ms, the dropout decay, `--dummy-scans 1`, `--exclude 0` and `--debug` (both modes), a z-concatenated file with `--masktype none`, TED-02's refusal (exit 1); every file written (images by header and data), `t2smap_call.sh`, `dataset_description.json` without its `Node` block, the exit status and the defects named |
+| `larmorx-gpl tedana t2smap` (the replica; `lx.tedana.t2smap` and `larmorx tedana t2smap` run it) | 10 | a generated 16 × 14 × 8 × 4 three-echo series of integer ratios (every 17th head voxel rising, every 23rd losing its last echo), relative paths: the log-linear fit (default and `reproduce`), the curve fit with `--verbose`, `--convention orig`, a prefix and two threads (both modes), the shared libraries' step (`reproduce`), `--fitmode ts` with PAID (`reproduce`), no mask with float32 data, echo times in ms, the dropout decay, `--dummy-scans 1`, `--exclude 0` and `--debug` (both modes), a z-concatenated file with `--masktype none`, TED-02's refusal (exit 1); every file written (images by header and data), `t2smap_call.sh`, `dataset_description.json` without its `Node` block and with larmorx-gpl's version written `<version>`, the exit status and the defects named |
 
 What the coverage test enumerates:
 
@@ -579,6 +606,8 @@ commit). `record_golden.py --check` compares without writing.
 Re-record when a change alters an output on purpose (a fix, a new default): the diff of
 `golden.json`, one line per output, shows exactly which outputs changed. Never re-record to make
 another platform pass.
+A new version re-records nothing: the harnesses write the running version as `<version>` (the
+HDF5 writer's `/OSVersion`, tedana's `dataset_description.json`; since 2026-11-10).
 
 ## Adding a golden case
 

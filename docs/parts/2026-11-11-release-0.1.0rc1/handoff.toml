@@ -1,0 +1,646 @@
+# The first release's handoff (relay 6, 2026-11-11): larmorx's shared documents, applied at the merge:
+#   cd <the merged checkout> && python -P scripts/orchestration/apply_handoff.py <scratch>/HANDOFF.toml [--check]
+# The reasons and what is not scriptable: HANDOFF.md beside this file. The CLAUDE.md operations at the end are the
+# orchestrator's file: apply them or not as one block.
+
+# docs/licensing.md: 'Nothing is on PyPI yet' becomes what the release publishes
+[[op]]
+do = "edit"
+file = "docs/licensing.md"
+old = '''
+- **Nothing is on PyPI yet.** Build the wheels locally:
+  ```bash
+  maturin build --release --locked --out dist                    # larmorx (repository root): the originals and the AFNI replicas
+  (cd crates-nc && maturin build --release --locked --out ../dist)    # larmorx-nc (FSL Licence)
+  pip install --find-links dist larmorx-nc                            # the FSL replicas, by name
+  pip install --find-links dist "larmorx[all]"                        # everything
+  ```
+'''
+new = '''
+- **On PyPI from 0.1.0rc1** (the first release; the user's decisions of 2026-11-10: PyPI only,
+  the three packages at one version, larmorx-nc included; decision log): `larmorx`, `larmorx-nc`
+  and `larmorx-gpl`, each as wheels for the six platforms and a source distribution, uploaded by
+  the release workflow (`.github/workflows/release.yml`; the maintainer's steps in
+  `RELEASING.md`) through PyPI's trusted publishing, one environment per package (`pypi`,
+  `pypi-nc`, `pypi-gpl`), each upload approved by the user. Each package's PyPI licence
+  expression names its own licence first and then the licences of the works its files include,
+  as `NOTICE` lists them (kept equal by `scripts/release/licences.py --check`; larmorx's:
+  `Apache-2.0 AND BSD-2-Clause AND BSD-3-Clause AND bzip2-1.0.6 AND CC-BY-4.0 AND HDF5 AND MIT
+  AND MPL-2.0 AND PSF-2.0 AND SunPro AND Zlib`); LARMORX's own licence stays Apache-2.0 (the
+  user, 2026-10-19). Every wheel and sdist carries its package's licence files and, beside
+  maturin's SBOM (`sboms/*.cyclonedx.json`, which names the Rust crates compiled in with their
+  licence identifiers), `LICENSES/third-party-rust.txt` (`crates-nc/LICENSES/` and
+  `crates-gpl/LICENSES/` for the companions): the full licence texts of every crates.io crate
+  compiled into the package's programs, as MIT's, Apache-2.0's and bzip2's binary-copy notices
+  require (`scripts/release/third_party.py --write` after every change of a `Cargo.lock`; its
+  test fails until then). larmorx-nc's wheel and sdist also carry FSL's original and amended
+  source; larmorx-gpl's sdist is its Corresponding Source.
+- **The GitHub Release** of each version adds the standalone programs for each platform
+  (`larmorx` with `lx`, `larmorx-nc`, `larmorx-gpl`; each archive with its package's licence
+  files, larmorx-nc's also with FSL's original and amended source, larmorx-gpl's naming its
+  sdist as the Corresponding Source) and `SHA256SUMS`, with GitHub's build provenance for every
+  file.
+- **Two container images** per version (`ghcr.io/karellopez/larmorx`, linux/amd64 and
+  linux/arm64; the user, 2026-11-10: "It is okay to just give the container only for linux"),
+  built from the release's own Linux wheels: `<version>` holds larmorx with `[prep]`, without the
+  replica packages (no FSL or GPL terms: commercial use allowed; the Debian base image keeps its
+  own packages' licences), and `<version>-all` adds larmorx-gpl and larmorx-nc, so the FSL
+  Licence's non-commercial terms apply to it (its OCI licence label `Apache-2.0 AND
+  GPL-3.0-only AND LicenseRef-FSL`; the two companions' sdists in `/opt/larmorx/source/`: the
+  GPL's Corresponding Source and FSL's source). Two images, not one, because with larmorx-nc
+  installed `implementation="auto"` runs the FSL replicas. `/opt/larmorx/README.txt` in each
+  says what it holds and where its licences are.
+- **Built locally**, for development:
+  ```bash
+  maturin build --release --locked --out dist                         # larmorx (repository root): the originals and the AFNI replicas
+  (cd crates-nc && maturin build --release --locked --out ../dist)    # larmorx-nc (FSL Licence)
+  (cd crates-gpl && maturin build --release --locked --out ../dist)   # larmorx-gpl (GPL-3.0)
+  pip install --find-links dist "larmorx[all]"                        # everything
+  ```
+  The release builds with the `dist` profile instead (fat LTO, one codegen unit, stripped: the
+  same results, smaller files) and the companions from their sdists
+  (`scripts/release/companion_sdist.py`).
+'''
+
+# docs/licensing.md: Publishing, the GPL's source once wheels ship
+[[op]]
+do = "edit"
+file = "docs/licensing.md"
+old = '''
+Once wheels ship,
+    the GPL requires the source to be public anyway.
+'''
+new = '''
+The wheels ship
+    from 0.1.0rc1, each version's larmorx-gpl sdist beside them on PyPI and in the GitHub
+    Release (its Corresponding Source); the source is public here anyway.
+'''
+
+# docs/overview.md: the installation section
+[[op]]
+do = "edit"
+file = "docs/overview.md"
+old = '''
+## Installing and running (planned)
+
+Nothing is on PyPI yet. All packages are precompiled wheels for the six platforms.
+
+```bash
+pip install larmorx                  # library + `larmorx`/`lx` commands; originals for restricted tools
+pip install "larmorx[prep]"          # + what the larmorprepx pipeline needs
+pip install larmorx                  # includes the exact AFNI replicas (since 2026-10-29)
+pip install larmorx-nc               # FSL replicas; installed by name (non-commercial licence)
+pip install larmorx-gpl              # tedana's t2smap replica; installed by name (GNU GPL version 3)
+pip install "larmorx[prep,surfaces]" # pipeline + larmorx-freesurfer (surfaces)
+pip install "larmorx[all]"           # everything: every replica package too (decided 2026-10-16)
+larmorprepx /data/bids /data/derivatives participant --participant-label 01
+```
+'''
+new = '''
+## Installing and running
+
+On PyPI from 0.1.0rc1, the first release (a release candidate; 0.1.0 follows once it installs
+cleanly on all six platforms): precompiled wheels for the six platforms, nothing else to
+install. The details (the requirements, the standalone programs, the container images, checking
+a download): the README's [Installation](../README.md#installation) and the site's
+[installation page](https://karellopez.github.io/larmorx_documentation/installation/).
+
+```bash
+pip install larmorx                  # library + `larmorx`/`lx` commands: the ports, the originals and the exact AFNI replicas (Apache-2.0)
+pip install "larmorx[prep]"          # + what the larmorprepx pipeline will need (not ready yet)
+pip install larmorx-nc               # FSL replicas; installed by name (FSL Licence: non-commercial use only)
+pip install larmorx-gpl              # tedana's t2smap replica; installed by name (GNU GPL version 3)
+pip install "larmorx[all]"           # everything: [prep] and every replica package, at one version (decided 2026-10-16)
+pip install "larmorx[prep,surfaces]" # planned: pipeline + larmorx-freesurfer (surfaces)
+larmorprepx /data/bids /data/derivatives participant --participant-label 01   # planned: not ready yet
+```
+'''
+
+# docs/overview.md: pre-releases and local builds instead of 'Until the packages are on PyPI'
+[[op]]
+do = "edit"
+file = "docs/overview.md"
+old = '''
+- **Until the packages are on PyPI,** both wheels can be built from the repository and
+  installed with `pip install --find-links dist larmorx` ([licensing.md](licensing.md),
+  "Packages").
+'''
+new = '''
+- **Pre-releases:** pip installs one such as 0.1.0rc1 by itself only while no final release
+  exists; `pip install "larmorx==0.1.0rc1"` (or `pip install --pre larmorx`) asks for it by
+  name. The wheels can also be built from the repository ([licensing.md](licensing.md),
+  "Packages").
+'''
+
+# docs/overview.md: the standalone programs exist
+[[op]]
+do = "edit"
+file = "docs/overview.md"
+old = '''
+- **A standalone `larmorx` binary** (no Python needed) is planned for GitHub Releases.
+'''
+new = '''
+- **Standalone programs** (no Python needed): each GitHub Release has `larmorx` (with `lx`),
+  `larmorx-nc` and `larmorx-gpl` for each platform; two Linux container images
+  (`ghcr.io/karellopez/larmorx:<version>` and `<version>-all`) serve Apptainer, Docker and
+  Podman.
+'''
+
+# docs/overview.md: What is published, the GPL's source
+[[op]]
+do = "edit"
+file = "docs/overview.md"
+old = '''
+Once wheels ship, the GPL requires this source to be public anyway;
+'''
+new = '''
+The wheels ship from 0.1.0rc1, larmorx-gpl's sdist (its Corresponding Source) beside them;
+'''
+
+# docs/overview.md: Never published, the e-mail (CITATION.cff has the university's, the user asked for it)
+[[op]]
+do = "edit"
+file = "docs/overview.md"
+old = '''
+- personal data: licence keys, the owner's email (commits use a GitHub no-reply address);
+'''
+new = '''
+- personal data: licence keys, the owner's personal e-mail (commits use a GitHub no-reply
+  address; `CITATION.cff` gives the university address, as the user asked on 2026-11-10);
+'''
+
+# docs/overview.md: Working on every platform, the release workflow
+[[op]]
+do = "edit"
+file = "docs/overview.md"
+old = '''
+- CI builds and tests the wheels on all six platforms for every push
+  (`.github/workflows/ci.yml`).
+'''
+new = '''
+- CI builds and tests the wheels on all six platforms for every push
+  (`.github/workflows/ci.yml`); the release workflow builds every published file (its programs
+  with the `dist` profile), installs and tests it on the six platforms before an upload, and installs the
+  release from PyPI on them after it (`.github/workflows/release.yml`, `RELEASING.md`).
+'''
+
+# docs/validation/golden.md: the golden tests on the release's builds and installed programs
+[[op]]
+do = "edit"
+file = "docs/validation/golden.md"
+old = '''
+No CI job or runner was added. Parity, benchmarks and real data still never run in CI.
+'''
+new = '''
+**The release's builds** (`.github/workflows/release.yml`, on every dry run and release, since
+2026-11-11; the `dist` profile: fat LTO, one codegen unit, stripped): the main package's suite runs
+on the installed wheels on the six platforms (`test`), on the wheels pip builds from its sdist
+(`sdist-install`, the `release` profile, as a user's source build), inside both container images (`container`) and, after an upload, on the wheels
+from PyPI (`verify-pypi`); the companions' suites on the programs their wheels install, on the six
+platforms (`programs`). **The installed programs** (since 2026-11-10): the larmorx-nc and
+larmorx-gpl harnesses take `LARMORX_GOLDEN_PROGRAM` (a path, or a name found on `PATH`; `.exe`
+added on Windows): the cases then run that program instead of cargo's build, e.g. the one a wheel
+installs (`LARMORX_GOLDEN_PROGRAM=<venv>/bin/larmorx-nc cargo test --locked -p larmorx-nc-cli
+--test golden` in `crates-nc`), after checking that its `--version` is the checkout's
+(`validation/investigations/release-0.1/installed_golden.sh`: every case passes on the `dist`
+wheels' programs). The `dist` builds give the same checksums as the `release` builds (the four
+suites; the parity smoke tier, 2,968 passed, on `dist` builds: relay 2b of the first release).
+
+No CI job or runner was added. Parity, benchmarks and real data still never run in CI.
+'''
+
+# docs/validation/golden.md: the re-recordings of 2026-11-10 (the version written <version>)
+[[op]]
+do = "insert"
+file = "docs/validation/golden.md"
+after = '''
+GitHub's runners, six job-minutes per CI run, less with the cache (rule 10's estimate, 2026-11-08).'''
+text = '''
+`larmorx-gpl`'s checksums were re-recorded on 2026-11-10 from 13013f21 (the first release's relay
+2c): the harness writes larmorx-gpl's own version, in Cargo's form or PEP 440's, as `<version>` in
+`dataset_description.json`'s `"Python"` field, so a release changes no checksum; exactly the 9
+`dataset_description.json` outputs changed (`validation/investigations/release-0.1/gpl_golden_version_only.py`:
+with `<version>` written back as 0.0.1 each equals the record before, 9 of 9), every other checksum
+unchanged.
+The main package's checksums were re-recorded on 2026-11-10 from 42d88287 (the first release's
+relay 2a; the parity smoke tier passing: 2,968 tests) for the same reason: `tests/golden/registry.py`'s
+`_h5_structure` writes the running version as `<version>` where larmorx's ITK HDF5 writer records it
+(`/OSVersion`); exactly the 4 cases holding such a file changed (`cli.ants.antsApplyTransforms.outputs`,
+`cli.ants.antsRegistration`, `.fields` and `.syn`: 6 outputs, each by that string only;
+`validation/investigations/release-0.1/golden_version_only.py`: with `<version>` written back as
+0.0.1 their fingerprints equal the record before, 4 of 4), every other checksum unchanged.'''
+
+# docs/validation/golden.md: the larmorx-gpl row, the version written <version>
+[[op]]
+do = "edit"
+file = "docs/validation/golden.md"
+old = "`dataset_description.json` without its `Node` block,"
+new = '''
+`dataset_description.json` without its `Node` block and with larmorx-gpl's version written `<version>`,'''
+
+# docs/validation/golden.md: Recording, a new version re-records nothing
+[[op]]
+do = "insert"
+file = "docs/validation/golden.md"
+after = "another platform pass."
+text = '''
+A new version re-records nothing: the harnesses write the running version as `<version>` (the
+HDF5 writer's `/OSVersion`, tedana's `dataset_description.json`; since 2026-11-10).'''
+
+# docs/next-steps.md: the order's item 10
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = '''
+10. **Releases on PyPI** (below).
+'''
+new = '''
+10. **Releases on PyPI:** the first, 0.1.0rc1, made ready ahead of this order (the user, 2026-11-10: "I
+   would like to solve this first before we continue with the rest fo things"; the release part,
+   2026-11-10 and 11; decision log): the release workflow, the three packages, the standalone programs,
+   two container images, the clean-machine checks and the documents (`RELEASING.md`, `CHANGELOG.md`,
+   `CITATION.cff`); its upload is the tag `v0.1.0rc1`'s run; then 0.1.0, once rc1 installs cleanly on
+   the six platforms (below).
+'''
+
+# docs/next-steps.md: the release items, done, and what remains for 0.1.0
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = '''
+- **A clean-machine check** (user, 2026-10-27): CI's runners have compilers and runtimes
+  installed, which can hide a missing piece. Install and test on truly clean machines: Windows
+  Sandbox on the Windows laptop (a throwaway clean Windows), a minimal Linux container here
+  (`apptainer` with a slim Python image); and test `larmorx-gpl` and `larmorx-nc` as installed
+  Python packages on the six platforms (today CI runs only their `cargo test`). Requirements
+  stated for users: Python 3.12 or newer; Linux with glibc 2.28 or newer; templates (and later
+  FreeSurfer's atlases) downloaded once on first use.
+- **Windows' C runtime:** nothing sets `+crt-static`, so the `.exe` programs (`larmorx-gpl`,
+  the standalone `larmorx`) need `vcruntime140.dll`. Python's own copy serves the extension,
+  but a separate program may not find one on a clean Windows. Link the C runtime statically
+  for the Windows MSVC targets (`.cargo/config.toml`, both workspaces). CI cannot show the
+  problem: GitHub's runners have the runtime installed.
+- **Size:** `strip`, LTO and `codegen-units = 1` in the release profile (stripping alone takes
+  the extension from 24 to 15 MB).
+- **Python dependencies:** h5py dropped (A4 part 1, 2026-10-16: numpy is the only one); check
+  that every `[prep]` dependency has wheels for all six platforms, Windows arm64 included. Linux
+  wheels are manylinux_2_28 (glibc 2.28 or newer); decide whether to add musllinux wheels
+  (Alpine).
+- **The `[all]` extra** (decided 2026-10-16): `larmorx-gpl`, `larmorx-nc` and `larmorx-freesurfer`,
+  added to `pyproject.toml` once those packages exist (an extra naming a missing package breaks
+  `pip install`).
+- **Publishing:** a release workflow (on a version tag: the six wheels and the sdist of each
+  package, the golden tests, upload by PyPI Trusted Publishing; standalone binaries to GitHub
+  Releases); reserve the names `larmorx`, `larmorx-gpl`, `larmorx-nc`, `larmorx-freesurfer`,
+  `larmorprepx` (all free on 2026-10-13; needs the user's PyPI account); the licence checks for
+  publishing `larmorx-nc` (FSL) and `larmorx-freesurfer` on PyPI; the first release's scope
+  (D10) and version numbering.
+'''
+new = '''
+- **A clean-machine check: done on Linux, prepared for Windows** (the first release's relay 4,
+  2026-11-11; `validation/investigations/release-0.1/README.md`, "Relay 4"): the Linux files built
+  as the release builds them (the pinned manylinux_2_28 image through Apptainer), installed and
+  tested from the wheels and from the sdists on RHEL 8 (glibc 2.28, the floor), Debian 12 slim (no
+  compiler, no binutils) and Debian 13 with Python 3.14: 934 tests passed in each; the container
+  images rehearsed with them; on the Windows helper, with Windows files cross-built by zig (no
+  MSVC), 934 passed. The release workflow's `test` jobs install and test the three packages' built
+  files on the six platforms (the replicas' own Python tests included; before, CI ran only their
+  `cargo test`), and `verify-pypi` installs them from PyPI after an upload. Left: after rc1's upload,
+  `scripts/release/check_install.py` in a clean Linux image and `win_check.sh 0.1.0rc1` on the
+  Windows helper (`RELEASING.md`, step 6). Windows Sandbox later (the user, 2026-11-10: "We do not do
+  the windows sandbox now, maybe in the future"); until then the PE import-table check
+  (`scripts/release/pe_imports.py`) is the Windows evidence. The requirements stated for users: the
+  README's "Installation".
+- **Windows' C runtime: done** (relay 2b, 2026-11-10): one `.cargo/config.toml` at the repository's
+  root links it statically for every MSVC target (Cargo reads the file from the working directory
+  upwards, so it serves the three workspaces, CI's Windows builds included); every Windows file of a
+  release is checked by `scripts/release/pe_imports.py` (no `vcruntime*`, `msvcp*`, `ucrtbase` or
+  `api-ms-win-crt-*` import), which passed in the dry runs' Windows `test` jobs, where the golden
+  tests also pass on these builds. Not in the sdists: a source build on Windows links the runtime
+  dynamically (accepted for 0.1.0rc1; below).
+- **Size: done** (relay 2b): a `dist` profile in the three workspaces (`inherits = "release"`, fat
+  LTO, one codegen unit, stripped), used by the release only; `release` stays the everyday profile
+  (CI, verify-merge and the agents' builds unchanged). Linux x86-64: larmorx's wheel 15.24 -> 13.95
+  MB (the extension 78.1 -> 41.2 MB), larmorx-nc's 6.39 -> 6.20, larmorx-gpl's 1.29 -> 1.06, the
+  standalone `larmorx` 48.4 -> 25.1 MB. The same bits (the four golden suites; the parity smoke
+  tier, 2,968 passed, on `dist` builds) and as fast or faster (0.88 to 1.03 of `release`'s time on
+  five benchmark calls at one and eight threads,
+  `validation/investigations/release-0.1/dist_speed.py`).
+- **Python dependencies: checked** (relay 1, 2026-11-10): every `[prep]` dependency has wheels for
+  the six platforms and CPython 3.12 and 3.14, Windows arm64 included; on Apple silicon `[prep]`
+  needs macOS 12 (SciPy's and scikit-learn's wheels). Linux wheels are manylinux_2_28; no musllinux
+  wheels in 0.1 (the container images serve other Linux systems). On Python 3.13 and newer pip takes
+  wrapt 2.6.0.dev1, a pre-release (formulaic 1.2.2's specifier; every test passes with it;
+  CHANGELOG's known limitations).
+- **The `[all]` extra: done** (relay 2a): `[prep]` with `larmorx-nc` and `larmorx-gpl`, pinned to
+  the same version by `scripts/release/set_version.py`; `larmorx-freesurfer` joins it once that
+  package exists.
+- **Publishing: done** (relays 3a and 3b, 2026-11-11): `.github/workflows/release.yml` (a `v*` tag
+  publishes; a push to `release/dry-run` or a dispatch is a dry run that builds and tests everything
+  and uploads nothing): each package's wheels for the six platforms and its sdist, the built files
+  installed and tested on each platform, the companions' golden tests on their installed programs,
+  the standalone archives, two container images (`ghcr.io/karellopez/larmorx:<v>` and `:<v>-all`,
+  amd64 and arm64), one publish job per package by PyPI's trusted publishing (the environments
+  `pypi`, `pypi-gpl`, `pypi-nc`, each upload approved by the user), the GitHub Release with
+  `SHA256SUMS` and build provenance, and the install from PyPI on the six platforms after the
+  upload; the maintainer's steps in `RELEASING.md`. Three dry runs (2026-11-10 and 11); the third
+  passed at 93154c93 (run 42942601741, 37 minutes). The names `larmorx`, `larmorx-gpl` and
+  `larmorx-nc` have the user's pending publishers (2026-11-10; a pending publisher does not reserve
+  a name: the first upload does); `larmorx-freesurfer` and `larmorprepx` are not reserved. larmorx-nc
+  on PyPI: the user's decision of 2026-11-10 (over asking FSL first). Version numbering: PEP 440, one
+  version for the three packages, rc1 and then 0.1.0 (decision log 2026-11-10 and 11).
+- **0.1.0 after 0.1.0rc1** (the user, 2026-11-10): after rc1's upload, `verify-pypi` on the six
+  platforms, the clean checks above, the image package made public once by the user (D17) and its
+  images pulled here, and PyPI's author field ("Waiting for the user"); then 0.1.0 by `RELEASING.md`'s
+  step 7 (the version, CHANGELOG's section with its statuses table, the words that call the release
+  a candidate in the README and on the site, a dry run, the tag, the approval). A problem found in
+  rc1 is fixed in an rc2 first.
+'''
+
+# docs/next-steps.md: the page 'Why Rust and Python', done
+[[op]]
+do = "edit"
+file = "docs/next-steps.md"
+old = '''
+- **The site: a page "Why Rust and Python"** (the user, 2026-10-31: "At some point we should clearly
+'''
+new = '''
+- **The site: a page "Why Rust and Python": done** (the first release's relay 5b, 2026-11-11: site
+  commit `b8edd27`, `/why-rust-and-python/`, published with the release and linked from the README;
+  every point below, from the projects' history, documentation and published papers, each DOI
+  checked against Crossref's record; CORE-MATH's ports are 18, `tan` included since 2026-11-03, where
+  the list below says 17) (the user, 2026-10-31: "At some point we should clearly
+'''
+
+# docs/next-steps.md: the release part's follow-ups
+[[op]]
+do = "insert"
+file = "docs/next-steps.md"
+after = "## Follow-ups, when they fit"
+text = '''
+- **From the first release's part (2026-11-10 and 11; 10 relays; `RELEASING.md`,
+  `validation/investigations/release-0.1/README.md`).** Left:
+  - *Two messages in Cargo's form of a pre-release version* (`0.1.0-rc.1`; the same in both forms
+    from 0.1.0 on): the AFNI clean-room programs' `++ implementation:` line (`crates/larmorx-afni`, a
+    clean-room agent) and tedana's `dataset_description.json` written by `larmorx-gpl` (the replica's
+    source, a replica-side agent); PEP 440's form, as everywhere else, before the next pre-release.
+  - *Windows source builds* link the C runtime dynamically (the sdists carry no `.cargo/config.toml`;
+    accepted for 0.1.0rc1, `RELEASING.md`, "Good to know"): an `include` of the file in
+    `[tool.maturin]` and in `scripts/release/companion_sdist.py` would make them the same as the
+    published wheels.
+  - *The release workflow's wall time* (the third dry run: 37 minutes): the standalone CLI's build in
+    its own job (`cli` x6, needing only `check`) would take about 10 minutes off it for about 30 more
+    job-minutes; decide from a release run's job times.
+  - *The contract audit misses integration tests:* `crates/*/tests/*.rs` must be named in a
+    PROVENANCE.md although its docstring leaves tests out (relay 2a named the two larmorx-cli tests
+    in larmorx-core's PROVENANCE instead); a one-line fix (`|/tests/` in its `GLUE`) for whoever owns
+    the field maps' part B's contract audit (`test_sdcflows_estimation_parity[contract-audit]`).
+  - *The 3dvolreg suite's workspace fallback:* without `LARMORX_WORKSPACE`,
+    `parity/afni_volreg_original.workspace()` takes `Path(__file__).parents[5]`, which in an agent's
+    worktree is `larmorx/.claude/worktrees`, and makes `oracles/inputs/` there; from then on every
+    suite takes that folder for the workspace (an empty cache, no AFNI oracles: 162 AFNI cases failed
+    in relay 2a's second smoke run). The fallback should be `oracle_cache.store.workspace()` (or
+    refuse). The stray folder is in `<workspace>/archive/2026-11-10-release-2a-stray-oracles/` (its
+    cache entries record wrong runs: never merge them into `oracles/cache`).
+  - *Upstream reports that could be drafted* (the user files them): maturin's `sdist` of a crate
+    whose path dependencies belong to another workspace ("File ... was already added from ...": why
+    the companions' sdists are staged by `scripts/release/companion_sdist.py`), and `maturin build
+    --zig` writing the dotted `PyInit_larmorx._core` into the extension's `.def` for
+    `x86_64-pc-windows-gnu` (`validation/investigations/release-0.1/win_gnu_build.sh` works around
+    it).
+  - *Not tried:* the site installation page's advice on the download marks of macOS (`xattr -d
+    com.apple.quarantine`) and of a browser on Windows (`Unblock-File`): no Mac here, and the Windows
+    helper's runs are over SSH; check it on rc1 when a Mac or a browser download is at hand.
+  - *The account name in records and history:* the current documents and scripts have placeholders
+    since relay 5a; `docs/validation/ants-registration-panel.json` (11 lines),
+    `validation/investigations/ants-40-n4-nonpositive/{analysis,results}.json` (25 each),
+    `validation/investigations/itk-06-nonfinite/results.json` (6), `docs/parts/` and git history
+    still hold the home path (the user, 2026-11-02: later).'''
+
+# docs/next-steps.md: waiting for the user, PyPI's author field and the images' visibility
+[[op]]
+do = "insert"
+file = "docs/next-steps.md"
+after = "  PIPE-03's real-data numbers, ready to file (from the user's GitHub account)."
+text = '''
+- **PyPI's author field** (asked 2026-11-10, the first release): the three `pyproject.toml` say
+  `authors = [{ name = "Karel Lopez Vilaret" }]` (NOTICE's form, no e-mail); CITATION.cff has the full
+  name and the university e-mail. To match: `authors = [{ name = "Karel Mauricio López Vilaret",
+  email = "..." }]` in the three files (the e-mail is then public on PyPI). Before 0.1.0 at the latest:
+  a version's metadata cannot change after its upload.
+- **After 0.1.0rc1's upload, once, in the browser (D17):** the image package public
+  (github.com/users/karellopez/packages/container/larmorx -> Package settings -> Change visibility ->
+  Public); until then `apptainer pull` and `docker pull` without a login fail.'''
+
+# docs/status.md: in place, the releases
+[[op]]
+do = "insert"
+file = "docs/status.md"
+after = "- **Python environments:**"
+text = '''
+- **Releases** (the first, 0.1.0rc1, 2026-11-11; [RELEASING.md](../RELEASING.md)): `.github/workflows/release.yml` builds and tests the three packages (wheels for the six platforms and the sdists), the standalone programs and two Linux container images on every dry run (a push to `release/dry-run`) and publishes them on a `v*` tag after the user's approval (PyPI's trusted publishing, the GitHub Release, `ghcr.io/karellopez/larmorx`); its helpers in `scripts/release/` (the version everywhere by `set_version.py`), the notes from `CHANGELOG.md`, the citation in `CITATION.cff`.'''
+
+# docs/api/afni-tshift.md: on PyPI
+[[op]]
+do = "edit"
+file = "docs/api/afni-tshift.md"
+old = '''
+(not on PyPI yet: build it from the
+  repository, `docs/licensing.md`, "Packages")'''
+new = '''
+(on PyPI from 0.1.0rc1, or built from the
+  repository, `docs/licensing.md`, "Packages")'''
+
+# docs/api/mri-hmc.md: on PyPI
+[[op]]
+do = "edit"
+file = "docs/api/mri-hmc.md"
+old = '''
+pip install larmorx-nc        # not on PyPI yet: build it from crates-nc/ (crates-nc/README.md)
+'''
+new = '''
+pip install larmorx-nc        # on PyPI from 0.1.0rc1; or pip install "larmorx[all]"
+'''
+
+# docs/orchestration.md: making a release
+[[op]]
+do = "insert"
+file = "docs/orchestration.md"
+after = "- **Launch worktree agents from inside this repository**"
+text = '''
+- **Making a release** (since the first, 0.1.0rc1, 2026-11-11; every step for any maintainer, with what to do when a job fails: [RELEASING.md](../RELEASING.md)): the orchestrator pushes and tags, the user approves the uploads; nothing needs a login or a token.
+  1. **The release commit** (the version by `scripts/release/set_version.py <v> --date <day>`, `CHANGELOG.md`'s section with its statuses table by `changelog.py <v> --write-statuses`, the README's status line) merged by the checklist above, and CI green on all six platforms. A later merge that changes `validation/tools.toml` before the tag needs `changelog.py <v> --write-statuses` again (the tag's `check` job stops otherwise). After the merge, step 2's `maturin develop --release` brings the shared venv's metadata to the new version (`tests/python/test_smoke.py`'s 7 version tests fail in agents' worktrees until then).
+  2. **The dry run, of the exact commit to be tagged:** `git push origin +<sha>:refs/heads/release/dry-run`, then `python3 scripts/orchestration/watch_ci.py <sha> release/dry-run` (each job's result, a failed job's annotations); about 40 to 55 minutes, about 400 job-minutes. It passes when every job but the release-only ones is green (check, sdist, wheel x6, programs x6, test x6, sdist-install, container x2, assemble); the normal notices: the version is not on PyPI yet and, for a commit not on main yet, `CI-GREEN NO`. The files and their sizes: assemble's notice at `https://api.github.com/repos/karellopez/larmorx/check-runs/<assemble's job id>/annotations`.
+  3. **Before the tag:** the three environments by the public API (`https://api.github.com/repos/karellopez/larmorx/environments` and each one's `deployment-branch-policies`: `pypi`, `pypi-gpl`, `pypi-nc`, each with the reviewer karellopez, administrators' bypass off, one tag rule `v*`); the date (`CITATION.cff`'s `date-released` and the CHANGELOG heading name the day of the tag; on another day `set_version.py <v> --date <day>` and the heading in one commit, which runs CI, and a dry run of it).
+  4. **The tag:** `git tag -a v<v> -m "larmorx <v>" <main's sha>`, `git push origin v<v>`, `watch_ci.py <sha> v<v>`. When `assemble` has passed, the run waits for the three deployments: tell the user then, with the run's link (they tick all three in "Review deployments" and approve). Then, by themselves: the three uploads (larmorx's waits for its companions), `container-push` (the two images to `ghcr.io/karellopez/larmorx`), the GitHub Release and `verify-pypi` on the six platforms. A job that fails after the approval: "Re-run failed jobs" (the user, in the browser; never "Re-run all jobs"; a partial upload finishes so: `skip-existing`), `RELEASING.md` step 5.
+  5. **After the upload:** the user makes the image package public once (D17: github.com/users/karellopez/packages/container/larmorx -> Package settings -> Change visibility -> Public); then here `apptainer pull docker://ghcr.io/karellopez/larmorx:<v>`, `check_install.py` from PyPI in a clean Linux image through Apptainer (`RELEASING.md` step 6) and `validation/investigations/release-0.1/win_check.sh <v>` on the Windows helper (it checks that nothing is left there); then the site's release pages, merged and pushed only now (their install lines, download addresses and image names exist only after the upload): the part's site handoff by `apply_handoff.py --site`, `tools/build.py` with 0 problems, and the Roadmap page.
+  6. **A final release** (0.1.0 after rc1) repeats steps 1 to 5 (`RELEASING.md` step 7).'''
+
+# docs/decision-log.md: the first release's decisions
+[[op]]
+do = "append"
+file = "docs/decision-log.md"
+text = '''
+## 2026-11-10 and 11: The first release, 0.1.0rc1 (the user's decisions and the orchestrator's)
+
+The user, 2026-11-10, before any further port: "I would like to solve this first before we continue with the rest
+fo things": the software installable from PyPI first, `t2smap`'s clean-room part after it. The part ran as ten relays
+in the release engineer's role (relay 1 the inventory and design, D1 to D20; relay 2c in the replica-side role), one
+agent at a time; its record: `validation/investigations/release-0.1/README.md`; the maintainer's steps: `RELEASING.md`.
+- **The user's decisions (2026-11-10):**
+  - **PyPI only, no TestPyPI** ("I prefer to run all in pypi and not test py"): the first upload is 0.1.0rc1, the
+    rehearsal, then 0.1.0 once rc1 installs cleanly on the six platforms; one version for the three packages. PyPI
+    never accepts a version twice, so nothing is uploaded before a dry run of the tagged commit has passed.
+  - **All three packages on PyPI from the first release:** `larmorx`, `larmorx-gpl`, and `larmorx-nc` now (the user
+    chose it over asking FSL first), its wheel and sdist with FSL's licence and FSL's original and amended source,
+    "non-commercial use only" first in its description; `pip install "larmorx[all]"` installs the three at the same
+    version. `larmorx-freesurfer` does not exist yet.
+  - **The user's personal account** `karellopez` owns the repository and the packages ("Maybe later I will create an
+    organization"; the 2026-10-19 note to reconsider an organisation before the first public release is answered).
+  - **A Linux container only** ("It is okay to just give the container only for linux"): images on GitHub's registry,
+    `ghcr.io/karellopez/larmorx`, linux/amd64 and linux/arm64, for Apptainer, Docker and Podman.
+  - **Trusted publishing:** the user added, for each project, a pending publisher (owner `karellopez`, repository
+    `larmorx`, workflow `release.yml`) with **one environment per package**, because PyPI refuses two pending
+    publishers with the same owner, repository, workflow and environment: `pypi` for `larmorx`, `pypi-gpl` for
+    `larmorx-gpl`, `pypi-nc` for `larmorx-nc`; and the three GitHub environments, each with the user as the required
+    reviewer, administrators' bypass off and one tag rule `v*` (checked by the public API on 2026-11-10). No token or
+    password exists anywhere: the orchestrator tags, the user approves the uploads.
+  - **No Windows Sandbox now** ("We do not do the windows sandbox now, maybe in the future"): the import-table check
+    of every Windows file is the evidence that Visual C++'s runtime is built in.
+  - **No Zenodo for now** (no DOI). **CITATION.cff** like the user's BIDS Manager fork's, with **one author** ("For
+    now, Jochem out, and yes add my email"): Karel Mauricio López Vilaret, the university e-mail, the lab's
+    affiliation and the ORCID.
+  - Open: PyPI's author field (`pyproject.toml`'s `authors`; next-steps, "Waiting for the user").
+- **The design (the orchestrator, 2026-11-10, on relay 1's recommendations, D1 to D20):**
+  - D1: a `dist` profile in the three workspaces (fat LTO, one codegen unit, stripped) for the release only; `release`
+    stays the everyday profile, so CI, verify-merge and the agents' builds are unchanged. The same bits (the four
+    golden suites; the parity smoke tier, 2,968 passed, on `dist` builds) and as fast or faster (0.88 to 1.03 of
+    `release`'s time on five benchmark calls); larmorx's wheel 15.24 -> 13.95 MB, the standalone `larmorx` 48.4 ->
+    25.1 MB (the user asked whether the smaller builds differ in completeness or speed: they do not).
+  - D2: Cargo's version `0.1.0-rc.1`; PEP 440's `0.1.0rc1` for PyPI, the tag (`v0.1.0rc1`), `larmorx_core::VERSION` and
+    the `--version` of the three programs (the companions' switched by relay 2c); `scripts/release/set_version.py`
+    sets and checks every place. The AFNI clean-room programs' `implementation:` line and tedana's
+    `dataset_description.json` keep Cargo's form for rc1 (the same from 0.1.0 on; next-steps).
+  - D3: the golden harnesses write the running version as `<version>` (the Python harness's HDF5 `/OSVersion`, relay 2a;
+    the gpl harness's `dataset_description.json`, relay 2c), their 4 and 9 cases re-recorded once, so a release
+    re-records nothing. D4: `compare_records.py` strips the versions.
+  - D5: two images per release, `:<v>` (larmorx with `[prep]`, without the replica packages: commercial use allowed)
+    and `:<v>-all` (also larmorx-gpl and larmorx-nc: non-commercial use only), because with larmorx-nc installed
+    `implementation="auto"` runs the FSL replicas; `latest` and `latest-all` only for a final release; the base
+    `python:3.12-slim-trixie` pinned by digest.
+  - D6: three publish jobs, one per environment, approved together in one dialog; larmorx's waits until PyPI lists
+    both companions with this run's files, so `larmorx[all]` never names a missing version. D7: the images and the
+    GitHub Release only after the uploads; a rejected approval leaves nothing public.
+  - D8: a dry run starts with a push to the branch `release/dry-run` (a dispatch would need a login). D18: the
+    orchestrator tags only a commit whose dry run passed and whose CI on main is green; the workflow's first job
+    checks CI, main, the version and that PyPI does not have it yet.
+  - D9: each package's PyPI licence expression is the compound one of the works its files include (NOTICE's), its own
+    licence first, kept equal to NOTICE by `scripts/release/licences.py --check`; LARMORX's own licence stays
+    Apache-2.0 (the user, 2026-10-19), as the README says.
+  - D10: PyPI's descriptions with absolute links pinned to the tag (`scripts/release/pypi_readme.py`); the companions'
+    own descriptions (`crates-nc/PYPI.md`, `crates-gpl/PYPI.md`).
+  - D11: standalone archives per platform and program, one binary each (`lx` a symbolic link, `lx.cmd` on Windows),
+    each with its package's licences; Linux for glibc 2.28, no musl.
+  - D12: the platforms as the wheels' tags give them (README, "Installation"). D13: Development Status 3 - Alpha, the
+    documentation site as Homepage and Documentation; CITATION.cff as the user gave it (above). D14: `larmorprepx`
+    stays and says plainly that it is not ready yet (exit status 1), with the roadmap's address.
+  - D15: Windows' C runtime linked statically by one `.cargo/config.toml` at the root (CI's Windows builds too),
+    checked in every release by `scripts/release/pe_imports.py`; not in the sdists (Windows source builds link it
+    dynamically: accepted for rc1).
+  - D16: PyPI's attestations and GitHub's build provenance for every file and both images. D17: the user makes the
+    image package public once, after the first push. D19: the companions' golden tests run on the programs their
+    wheels install (`LARMORX_GOLDEN_PROGRAM`, relay 2c). D20: `LICENSES/third-party-rust.txt` per package (the
+    licence texts of the crates.io crates compiled in), committed, checked against `Cargo.lock` by a test.
+- **During the part:** `--only-binary :all:` dropped from the checks of `[prep]`'s dependencies (it made pip fall back
+  to pybids 0.18.1, while a user's plain install gets 0.22.0: the checks now install what users get); the plain
+  image's licence in precise words, "without the replica packages: commercial use allowed" (not "Apache-2.0 and
+  permissive licences only": larmorx includes Eigen's MPL-2.0 routines, `[prep]` brings certifi's MPL-2.0, the Debian
+  base its own licences); `skip-existing` in the three publish steps (the orchestrator, 2026-11-11), so that "Re-run
+  failed jobs" finishes a partial upload with the same files; the README's installation text as relay 5a wrote it
+  (the orchestrator's review, 2026-11-11). Three dry runs: the first two found three platform problems (fixed: the
+  source builds' glibc check, rustup's components on ubuntu-24.04-arm, macOS's own install name); the third passed
+  at `93154c93` (run 42942601741, 37 minutes).'''
+
+# CLAUDE.md: Distribution, the releases
+[[op]]
+do = "edit"
+file = "CLAUDE.md"
+old = '''
+`implementation="auto" | "replica" | "original"` where a tool has both.
+'''
+new = '''
+`implementation="auto" | "replica" | "original"` where a tool has both. **Releases** (from 0.1.0rc1; the release part of 2026-11-10 and 11, the user's decisions in the decision log): the three packages on PyPI at one version (tags `v<version>`; wheels for the six platforms and the sdists), the standalone programs and `SHA256SUMS` in each GitHub Release, two Linux container images (`ghcr.io/karellopez/larmorx:<version>` without the replica packages, `<version>-all` with them); the maintainer's steps in `RELEASING.md`, the orchestrator's in `docs/orchestration.md`.
+'''
+
+# CLAUDE.md: Targets, images offered
+[[op]]
+do = "edit"
+file = "CLAUDE.md"
+old = '''
+No Docker, no external neuroimaging installs, no admin rights.
+'''
+new = '''
+No Docker needed (Linux container images are offered beside the wheels), no external neuroimaging installs, no admin rights.
+'''
+
+# CLAUDE.md: Next, the release part complete
+[[op]]
+do = "edit"
+file = "CLAUDE.md"
+old = "fMRIPrep's field-map steps, 2026-11-10) complete; next,"
+new = '''
+fMRIPrep's field-map steps, 2026-11-10) and the first release's part (0.1.0rc1's packaging, release workflow, container images, clean-machine checks and documents, 2026-11-11; the user put it before the next port; its upload is the tag's run, `RELEASING.md`) complete; next,'''
+
+# CLAUDE.md: the GitHub organisation, answered
+[[op]]
+do = "edit"
+file = "CLAUDE.md"
+old = '''
+**GitHub organisation:** not now (2026-10-19), to reconsider before the first public release.
+'''
+new = '''
+**GitHub organisation:** not now (2026-10-19); the first release is published from the user's personal account `karellopez` (the user, 2026-11-10: "Maybe later I will create an organization").
+'''
+
+# CLAUDE.md: rule 2, FreeSurfer's version decided
+[[op]]
+do = "edit"
+file = "CLAUDE.md"
+old = '''
+   - FreeSurfer v8.2.0 (pending D5)
+'''
+new = '''
+   - FreeSurfer v8.2.0 (D5, decided 2026-10-26)
+'''
+
+# CLAUDE.md: the gates, the release's licence files after a Cargo.lock change
+[[op]]
+do = "edit"
+file = "CLAUDE.md"
+old = '''
+(root, `crates-gpl`, `crates-nc`; refresh their `Cargo.lock` when dependencies change; `scripts/orchestration/gates-rust.sh <checkout> all`)'''
+new = '''
+(root, `crates-gpl`, `crates-nc`; refresh their `Cargo.lock` when dependencies change, then `python -P scripts/release/third_party.py --write` for the packages' third-party licence texts, and `scripts/release/licences.py --write` when a dependency brings a new licence: `validation/tests/test_release.py` fails until then; `scripts/orchestration/gates-rust.sh <checkout> all`)'''
+
+# CLAUDE.md: Docker on this machine
+[[op]]
+do = "edit"
+file = "CLAUDE.md"
+old = '''
+Docker is not installed; Apptainer replaces it.
+'''
+new = '''
+Docker (docker-ce) runs as a system service since 2026-10-27, but this account is not in the `docker` group, so agents have no daemon: Apptainer runs the containers (the oracles, the clean-environment checks), and OCI images are built with a rootless Docker daemon in a scratch folder (`validation/investigations/release-0.1/rootless_docker.sh`, no administrator rights).
+'''
+
+# CLAUDE.md: the repo map, the release's files
+[[op]]
+do = "edit"
+file = "CLAUDE.md"
+old = '''
+| `.github/workflows/ci.yml` | lint + wheel build and tests on the six targets |
+'''
+new = '''
+| `.github/workflows/ci.yml` | lint + wheel build and tests on the six targets |
+| `.github/workflows/release.yml`, `scripts/release/`, `docker/`, `RELEASING.md`, `CHANGELOG.md`, `CITATION.cff` | the release: the workflow (a `v*` tag publishes, a push to `release/dry-run` is a dry run), its helpers (the version, the licence expressions and texts, PyPI's descriptions, the companions' sdists, the archives, the smoke checks, the images), the images' Dockerfile, the maintainer's steps, the changelog, the citation |
+'''

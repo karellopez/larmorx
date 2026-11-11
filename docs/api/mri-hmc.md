@@ -160,7 +160,7 @@ uses, FSL 6.0.7.23 since 2026-10-29; first FSL 6.0.7.17) in the `larmorx-nc` pac
 It is installed by name, so that its licence is accepted knowingly:
 
 ```bash
-pip install larmorx-nc        # not on PyPI yet: build it from crates-nc/ (crates-nc/README.md)
+pip install larmorx-nc        # on PyPI from 0.1.0rc1; or pip install "larmorx[all]"
 ```
 
 larmorx never imports it: `lx.mri.hmc` and `larmorx fsl mcflirt` run its program

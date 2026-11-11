@@ -13,10 +13,12 @@ complex system dependencies. Where a licence requires it, algorithms are reimple
 clean-room development practices, so that restrictively licensed source code is not
 incorporated.
 
-**Status: early development.** The tools listed under [Supported tools](#supported-tools) are
-implemented and validated against the original programs; everything else is planned. LARMORX is
-not yet published on PyPI: build it from source ([Development](#development)). The package,
-module and commands are spelled `larmorx` (and `larmorprepx` for the planned pipeline).
+**Status: early development; the first release is 0.1.0rc1, a pre-release** (a release
+candidate, [CHANGELOG](CHANGELOG.md)). The tools listed under [Supported tools](#supported-tools)
+are implemented and compared case by case with the original programs; everything else is
+planned. The preprocessing pipeline `larmorprepx` is not ready yet: only its field-map stages
+exist. The package, module and commands are spelled `larmorx` (and `larmorprepx` for the
+pipeline).
 
 ## Core features
 
@@ -24,7 +26,9 @@ module and commands are spelled `larmorx` (and `larmorprepx` for the planned pip
   By design, results do not depend on the thread count, and transcendental functions come from
   correctly rounded [CORE-MATH](https://core-math.gitlabpages.inria.fr/) ports (or the
   deterministic pure-Rust `libm` where not yet ported), so a tool gives the same bits on every
-  platform.
+  platform. Why Rust, with Python on top, and why the original tools have no Windows version:
+  [Why Rust and Python](https://karellopez.github.io/larmorx_documentation/why-rust-and-python/)
+  on the documentation site.
 - **Command-line compatibility.** `larmorx <family> <program> <the original's arguments>`
   (short alias `lx`), e.g. `larmorx ants antsApplyTransforms ...` or `larmorx afni 3dTshift ...`,
   accepting the original's options; how far messages and exit statuses match is stated in each
@@ -63,26 +67,81 @@ and Reusable.
 The project follows the FAIR Principles for Research Software
 ([FAIR4RS](https://doi.org/10.15497/RDA00068)):
 
-- **Findable:** a public repository with versioned history; PyPI releases with citation
-  metadata are planned.
-- **Accessible:** open source under Apache-2.0; native builds with no external neuroimaging
-  installations, containers or administrator rights.
+- **Findable:** a public repository with versioned history, releases on PyPI and GitHub, and
+  citation metadata ([CITATION.cff](CITATION.cff)).
+- **Accessible:** open source under Apache-2.0; native wheels for six platforms that need no
+  external neuroimaging installations, containers or administrator rights (container images
+  are offered for those who prefer them).
 - **Interoperable:** standard formats (NIfTI-1/2, ITK transform files including HDF5), the
   original tools' command-line arguments, and a Python API for pipelines.
 - **Reusable:** a permissive licence, per-tool documentation, provenance records, case-by-case
   validation records and a register of the differences from the originals.
 
-## Installation and usage
-
-LARMORX is not on PyPI yet. To build it, see [Development](#development). The planned
-distribution ([overview](docs/overview.md)):
+## Installation
 
 ```bash
-pip install larmorx                  # the library and the larmorx / lx commands   (planned)
-pip install larmorx                  # the exact AFNI replicas included (CC BY 4.0's attribution)
-pip install "larmorx[all]"           # + the replica packages: larmorx-nc (FSL), larmorx-gpl (tedana) (planned)
-pip install "larmorx[prep]"          # + the larmorprepx pipeline                   (planned)
+pip install larmorx              # the library and the larmorx / lx commands (Apache-2.0)
+pip install "larmorx[prep]"      # + what the larmorprepx pipeline will need (not ready yet)
+pip install "larmorx[all]"       # + [prep] and the replica packages larmorx-nc and larmorx-gpl
 ```
+
+The first release, 0.1.0rc1, is a pre-release: pip installs a pre-release by itself only while
+no final release exists; `pip install "larmorx==0.1.0rc1"` (or `pip install --pre larmorx`) asks
+for it. `[all]` installs the three packages at the same version. Step by step, with a virtual
+environment, the standalone programs and how to check a download: the documentation site's
+[installation page](https://karellopez.github.io/larmorx_documentation/installation/).
+
+| Package | What it holds | Its licence, in plain words |
+|---|---|---|
+| `larmorx` | every tool below: the ports, the clean-room originals and the AFNI replicas | [Apache-2.0](LICENSE): any use, commercial use included; keep the licence and the notices. The works it includes and their licences, permissive ones and the Mozilla Public License 2.0 for routines translated from Eigen (whose source stays public), are listed in [NOTICE](NOTICE). |
+| `larmorx-nc` | the exact replicas of FSL's tools | the [FSL Licence](crates-nc/LICENSE): **non-commercial use only**. Once it is installed, the FSL tools' default (`implementation="auto"`) runs these replicas, so FSL's terms then cover your default results; `implementation="original"` (or `LARMORX_IMPLEMENTATION=original` on the command line) runs larmorx's own clean-room originals instead. |
+| `larmorx-gpl` | the exact replica of tedana's `t2smap` | the [GNU GPL version 3](crates-gpl/LICENSE): any use; whoever passes it on, changed or not, must pass on its source under the same licence. |
+
+The two replica packages are separate programs (`larmorx-nc`, `larmorx-gpl`) that larmorx runs as
+separate processes, so their licences stay with them; each is installed only when asked for by
+name or through `[all]`.
+
+**Requirements.** Nothing else is needed: no ANTs, AFNI, FSL or tedana installation, no
+compiler, no administrator rights. The wheels:
+
+- **Python** 3.12 or newer (CPython; one wheel serves every version from 3.12 on; tested on 3.12
+  on every platform, and on 3.13 and 3.14 on Linux); the free-threaded builds of Python are not
+  supported.
+- **Linux**, x86-64 and aarch64, with glibc 2.28 or newer (`manylinux_2_28`: for example RHEL 8,
+  Debian 10, Ubuntu 20.04 and later); no wheels for musl-based systems such as Alpine Linux (use
+  a container image).
+- **macOS 11** or newer, Intel and Apple silicon; on Apple silicon `[prep]` and `[all]` need
+  macOS 12, as SciPy's and scikit-learn's wheels do.
+- **Windows** 10 and 11, x64 and arm64; Visual C++'s runtime is built in, nothing to install.
+
+A build from the source distribution (where no wheel fits, or with `pip install --no-binary
+larmorx larmorx`) needs a C compiler (gcc or clang; Microsoft's C++ build tools on Windows) and
+Rust 1.99 or newer, which maturin downloads by itself when none is installed.
+
+**Standalone programs.** Each release on [GitHub](https://github.com/karellopez/larmorx/releases)
+also has `larmorx` (with `lx`), `larmorx-nc` and `larmorx-gpl` for each platform as archives
+that need no Python (the tools written in Python, `larmorx sdcflows` and `larmorprepx`, need the
+Python package), with every file's SHA-256 in `SHA256SUMS`.
+
+**Container images** (linux/amd64 and linux/arm64, for Apptainer, Docker and Podman):
+`ghcr.io/karellopez/larmorx:<version>` holds larmorx with `[prep]`, without the replica packages
+(commercial use allowed); `ghcr.io/karellopez/larmorx:<version>-all` adds larmorx-gpl and
+larmorx-nc (so non-commercial use only). `latest` and `latest-all` name the newest final release.
+
+```bash
+apptainer pull docker://ghcr.io/karellopez/larmorx:0.1.0rc1
+apptainer exec larmorx_0.1.0rc1.sif larmorx --version
+docker run --rm -v "$PWD:/data" -w /data ghcr.io/karellopez/larmorx:0.1.0rc1 \
+    larmorx ants N4BiasFieldCorrection -d 3 -i t1w.nii.gz -o t1w_n4.nii.gz
+```
+
+Under Apptainer the image runs as you, with your home directory, where TemplateFlow keeps the
+templates it downloads on first use (`$HOME/.cache/templateflow`); Docker runs it as root, so
+mount a volume at `/root/.cache/templateflow` (or set `TEMPLATEFLOW_HOME` to a mounted folder) to
+keep them. `/opt/larmorx/README.txt` in the image says what it holds and where its licences and
+sources are.
+
+## Usage
 
 Command line, with the original programs' arguments:
 
@@ -166,11 +225,15 @@ The ordered plan is in [docs/next-steps.md](docs/next-steps.md). In outline:
 4. **larmorprepx:** an independent, fMRIPrep-compatible preprocessing pipeline (BIDS in,
    fMRIPrep-compatible derivatives and reports out), written in plain Python on the library,
    then compared with fMRIPrep end to end.
-5. **Releases on PyPI** for all six platforms.
+5. **Releases:** the first, 0.1.0rc1, for all six platforms (PyPI, the GitHub Release, the
+   container images); 0.1.0 once it installs cleanly everywhere ([CHANGELOG](CHANGELOG.md),
+   [RELEASING.md](RELEASING.md)).
 
 | Document | Contents |
 |---|---|
 | [docs/overview.md](docs/overview.md) | the project in plain terms: replicas and clean-room originals, packages, installation, what is published |
+| [CHANGELOG.md](CHANGELOG.md) | what each release holds, each tool's status, known limitations |
+| [RELEASING.md](RELEASING.md) | how a release is made and checked |
 | [docs/licensing.md](docs/licensing.md) | how each upstream's licence is handled |
 | [docs/next-steps.md](docs/next-steps.md) | the plan of the next tasks |
 | [PLAN.md](PLAN.md) | the overall plan |
@@ -243,11 +306,15 @@ python -m larmorx_validation tables --check                     # the generated 
 
 ## Licence
 
-Apache-2.0 for LARMORX itself. Replicas of restrictively licensed tools are separate packages
-under their upstream's licence (`larmorx-nc`: the FSL Licence). The AFNI replicas carry CC BY
-4.0's attribution for the Medical College of Wisconsin's code ([NOTICE](NOTICE), `LICENSES/`); see
-[docs/licensing.md](docs/licensing.md). LARMORX is an independent project, not affiliated with
-or endorsed by the developers of ANTs, AFNI, FSL, FreeSurfer or fMRIPrep.
+Apache-2.0 for LARMORX itself ([LICENSE](LICENSE)). The licence expression PyPI shows for each
+package lists, beside its own licence, the licences of the works its files include (the ported
+code's and the Rust crates' it is built with; their texts and notices in [NOTICE](NOTICE) and
+`LICENSES/`). Replicas of restrictively licensed tools are separate packages under their
+upstream's licence (`larmorx-nc`: the FSL Licence, non-commercial use only; `larmorx-gpl`: the GNU
+GPL version 3). The AFNI replicas carry CC BY 4.0's attribution for the Medical College of
+Wisconsin's code; see [docs/licensing.md](docs/licensing.md). How to cite LARMORX:
+[CITATION.cff](CITATION.cff). LARMORX is an independent project, not affiliated with or endorsed
+by the developers of ANTs, AFNI, FSL, FreeSurfer, tedana or fMRIPrep.
 
 ## Contributing
 - Commit messages, PR descriptions and release notes must not contain AI co-author trailers (`Co-Authored-By: Claude …`) or "Generated with …" lines.

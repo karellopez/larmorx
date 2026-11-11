@@ -171,13 +171,49 @@ command-line binary. Code from different families is never linked into one binar
   by level, by the spec writer of 2026-11-09) by an agent that never opened FSL's files, come at
   the start of `t2smap`'s clean-room part. The values are necessarily FSL's (another number
   gives another field); the clean-room version's origin is what the audit proves.
-- **Nothing is on PyPI yet.** Build the wheels locally:
+- **On PyPI from 0.1.0rc1** (the first release; the user's decisions of 2026-11-10: PyPI only,
+  the three packages at one version, larmorx-nc included; decision log): `larmorx`, `larmorx-nc`
+  and `larmorx-gpl`, each as wheels for the six platforms and a source distribution, uploaded by
+  the release workflow (`.github/workflows/release.yml`; the maintainer's steps in
+  `RELEASING.md`) through PyPI's trusted publishing, one environment per package (`pypi`,
+  `pypi-nc`, `pypi-gpl`), each upload approved by the user. Each package's PyPI licence
+  expression names its own licence first and then the licences of the works its files include,
+  as `NOTICE` lists them (kept equal by `scripts/release/licences.py --check`; larmorx's:
+  `Apache-2.0 AND BSD-2-Clause AND BSD-3-Clause AND bzip2-1.0.6 AND CC-BY-4.0 AND HDF5 AND MIT
+  AND MPL-2.0 AND PSF-2.0 AND SunPro AND Zlib`); LARMORX's own licence stays Apache-2.0 (the
+  user, 2026-10-19). Every wheel and sdist carries its package's licence files and, beside
+  maturin's SBOM (`sboms/*.cyclonedx.json`, which names the Rust crates compiled in with their
+  licence identifiers), `LICENSES/third-party-rust.txt` (`crates-nc/LICENSES/` and
+  `crates-gpl/LICENSES/` for the companions): the full licence texts of every crates.io crate
+  compiled into the package's programs, as MIT's, Apache-2.0's and bzip2's binary-copy notices
+  require (`scripts/release/third_party.py --write` after every change of a `Cargo.lock`; its
+  test fails until then). larmorx-nc's wheel and sdist also carry FSL's original and amended
+  source; larmorx-gpl's sdist is its Corresponding Source.
+- **The GitHub Release** of each version adds the standalone programs for each platform
+  (`larmorx` with `lx`, `larmorx-nc`, `larmorx-gpl`; each archive with its package's licence
+  files, larmorx-nc's also with FSL's original and amended source, larmorx-gpl's naming its
+  sdist as the Corresponding Source) and `SHA256SUMS`, with GitHub's build provenance for every
+  file.
+- **Two container images** per version (`ghcr.io/karellopez/larmorx`, linux/amd64 and
+  linux/arm64; the user, 2026-11-10: "It is okay to just give the container only for linux"),
+  built from the release's own Linux wheels: `<version>` holds larmorx with `[prep]`, without the
+  replica packages (no FSL or GPL terms: commercial use allowed; the Debian base image keeps its
+  own packages' licences), and `<version>-all` adds larmorx-gpl and larmorx-nc, so the FSL
+  Licence's non-commercial terms apply to it (its OCI licence label `Apache-2.0 AND
+  GPL-3.0-only AND LicenseRef-FSL`; the two companions' sdists in `/opt/larmorx/source/`: the
+  GPL's Corresponding Source and FSL's source). Two images, not one, because with larmorx-nc
+  installed `implementation="auto"` runs the FSL replicas. `/opt/larmorx/README.txt` in each
+  says what it holds and where its licences are.
+- **Built locally**, for development:
   ```bash
-  maturin build --release --locked --out dist                    # larmorx (repository root): the originals and the AFNI replicas
+  maturin build --release --locked --out dist                         # larmorx (repository root): the originals and the AFNI replicas
   (cd crates-nc && maturin build --release --locked --out ../dist)    # larmorx-nc (FSL Licence)
-  pip install --find-links dist larmorx-nc                            # the FSL replicas, by name
+  (cd crates-gpl && maturin build --release --locked --out ../dist)   # larmorx-gpl (GPL-3.0)
   pip install --find-links dist "larmorx[all]"                        # everything
   ```
+  The release builds with the `dist` profile instead (fat LTO, one codegen unit, stripped: the
+  same results, smaller files) and the companions from their sdists
+  (`scripts/release/companion_sdist.py`).
 - **In the repository** (all in this one repository; for FSL decided 2026-10-10):
   - `crates/` holds the Apache crates;
   - `crates-gpl/`, `crates-nc/` and `crates-freesurfer/` hold the others, each directory
@@ -286,8 +322,9 @@ command-line binary. Code from different families is never linked into one binar
 - the replica directories (`crates-gpl/`, `crates-nc/`, `crates-freesurfer/`), each under
   its upstream's terms:
   - GPL: the GPL text, the upstream copyright notices, changes marked (tedana's `t2smap`,
-    since 2026-11-08: its LGPL-2.1 text and notice beside the GPL's). Once wheels ship,
-    the GPL requires the source to be public anyway.
+    since 2026-11-08: its LGPL-2.1 text and notice beside the GPL's). The wheels ship
+    from 0.1.0rc1, each version's larmorx-gpl sdist beside them on PyPI and in the GitHub
+    Release (its Corresponding Source); the source is public here anyway.
   - FSL: free of charge only, the FSL Licence passed on, FSL's original source included.
   - FreeSurfer: the licence with its required preface, notices kept, marked as modified, no
     MGH or FreeSurfer names used for promotion.

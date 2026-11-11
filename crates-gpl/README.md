@@ -60,8 +60,11 @@ program only (maturin's `bin` bindings), no Python module. Its licence files are
 the Apache-2.0 text and notices of the larmorx crates it includes (`LICENSES/Apache-2.0.txt`,
 `LICENSES/NOTICE-larmorx.txt`: copies of the repository's `LICENSE` and `NOTICE`, kept identical
 by `larmorx-gpl-cli/tests/notices.rs`) and the source of this workspace's two crates. Installed
-with `pip install larmorx-gpl` (or `pip install "larmorx[all]"`), it puts `larmorx-gpl` in the
-environment's scripts directory, where `larmorx` finds it (or `LARMORX_GPL_BIN`).
+with `pip install larmorx-gpl` (or `pip install "larmorx[all]"`; on PyPI from 0.1.0rc1, with the same
+version as larmorx, its description there `PYPI.md`), it puts `larmorx-gpl` in the environment's
+scripts directory, where `larmorx` finds it (or `LARMORX_GPL_BIN`). Its source distribution is made
+from the repository by `scripts/release/companion_sdist.py` (`maturin sdist` cannot make it here:
+this workspace uses the root workspace's crates by path).
 
 ## Verification tools (never distributed)
 

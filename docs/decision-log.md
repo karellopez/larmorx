@@ -2173,3 +2173,83 @@ The part's decisions, from its notes ("FROM THE ORCHESTRATOR", 2026-11-08 to 10;
 - **The fieldmap-less (SyN) viewer made in the part** (the site shows every estimator): LARMORX's warp ANTs 2.6.5's at
   one thread with correctly rounded maths byte for byte; ANTs at four threads does not repeat itself on this call
   (0.659 mm run to run), so `docs/findings/ants-syn.md`'s thread paragraph was scoped to its own cases.
+
+## 2026-11-10 and 11: The first release, 0.1.0rc1 (the user's decisions and the orchestrator's)
+
+The user, 2026-11-10, before any further port: "I would like to solve this first before we continue with the rest
+fo things": the software installable from PyPI first, `t2smap`'s clean-room part after it. The part ran as ten relays
+in the release engineer's role (relay 1 the inventory and design, D1 to D20; relay 2c in the replica-side role), one
+agent at a time; its record: `validation/investigations/release-0.1/README.md`; the maintainer's steps: `RELEASING.md`.
+- **The user's decisions (2026-11-10):**
+  - **PyPI only, no TestPyPI** ("I prefer to run all in pypi and not test py"): the first upload is 0.1.0rc1, the
+    rehearsal, then 0.1.0 once rc1 installs cleanly on the six platforms; one version for the three packages. PyPI
+    never accepts a version twice, so nothing is uploaded before a dry run of the tagged commit has passed.
+  - **All three packages on PyPI from the first release:** `larmorx`, `larmorx-gpl`, and `larmorx-nc` now (the user
+    chose it over asking FSL first), its wheel and sdist with FSL's licence and FSL's original and amended source,
+    "non-commercial use only" first in its description; `pip install "larmorx[all]"` installs the three at the same
+    version. `larmorx-freesurfer` does not exist yet.
+  - **The user's personal account** `karellopez` owns the repository and the packages ("Maybe later I will create an
+    organization"; the 2026-10-19 note to reconsider an organisation before the first public release is answered).
+  - **A Linux container only** ("It is okay to just give the container only for linux"): images on GitHub's registry,
+    `ghcr.io/karellopez/larmorx`, linux/amd64 and linux/arm64, for Apptainer, Docker and Podman.
+  - **Trusted publishing:** the user added, for each project, a pending publisher (owner `karellopez`, repository
+    `larmorx`, workflow `release.yml`) with **one environment per package**, because PyPI refuses two pending
+    publishers with the same owner, repository, workflow and environment: `pypi` for `larmorx`, `pypi-gpl` for
+    `larmorx-gpl`, `pypi-nc` for `larmorx-nc`; and the three GitHub environments, each with the user as the required
+    reviewer, administrators' bypass off and one tag rule `v*` (checked by the public API on 2026-11-10). No token or
+    password exists anywhere: the orchestrator tags, the user approves the uploads.
+  - **No Windows Sandbox now** ("We do not do the windows sandbox now, maybe in the future"): the import-table check
+    of every Windows file is the evidence that Visual C++'s runtime is built in.
+  - **No Zenodo for now** (no DOI). **CITATION.cff** like the user's BIDS Manager fork's, with **one author** ("For
+    now, Jochem out, and yes add my email"): Karel Mauricio López Vilaret, the university e-mail, the lab's
+    affiliation and the ORCID.
+  - Open: PyPI's author field (`pyproject.toml`'s `authors`; next-steps, "Waiting for the user").
+- **The design (the orchestrator, 2026-11-10, on relay 1's recommendations, D1 to D20):**
+  - D1: a `dist` profile in the three workspaces (fat LTO, one codegen unit, stripped) for the release only; `release`
+    stays the everyday profile, so CI, verify-merge and the agents' builds are unchanged. The same bits (the four
+    golden suites; the parity smoke tier, 2,968 passed, on `dist` builds) and as fast or faster (0.88 to 1.03 of
+    `release`'s time on five benchmark calls); larmorx's wheel 15.24 -> 13.95 MB, the standalone `larmorx` 48.4 ->
+    25.1 MB (the user asked whether the smaller builds differ in completeness or speed: they do not).
+  - D2: Cargo's version `0.1.0-rc.1`; PEP 440's `0.1.0rc1` for PyPI, the tag (`v0.1.0rc1`), `larmorx_core::VERSION` and
+    the `--version` of the three programs (the companions' switched by relay 2c); `scripts/release/set_version.py`
+    sets and checks every place. The AFNI clean-room programs' `implementation:` line and tedana's
+    `dataset_description.json` keep Cargo's form for rc1 (the same from 0.1.0 on; next-steps).
+  - D3: the golden harnesses write the running version as `<version>` (the Python harness's HDF5 `/OSVersion`, relay 2a;
+    the gpl harness's `dataset_description.json`, relay 2c), their 4 and 9 cases re-recorded once, so a release
+    re-records nothing. D4: `compare_records.py` strips the versions.
+  - D5: two images per release, `:<v>` (larmorx with `[prep]`, without the replica packages: commercial use allowed)
+    and `:<v>-all` (also larmorx-gpl and larmorx-nc: non-commercial use only), because with larmorx-nc installed
+    `implementation="auto"` runs the FSL replicas; `latest` and `latest-all` only for a final release; the base
+    `python:3.12-slim-trixie` pinned by digest.
+  - D6: three publish jobs, one per environment, approved together in one dialog; larmorx's waits until PyPI lists
+    both companions with this run's files, so `larmorx[all]` never names a missing version. D7: the images and the
+    GitHub Release only after the uploads; a rejected approval leaves nothing public.
+  - D8: a dry run starts with a push to the branch `release/dry-run` (a dispatch would need a login). D18: the
+    orchestrator tags only a commit whose dry run passed and whose CI on main is green; the workflow's first job
+    checks CI, main, the version and that PyPI does not have it yet.
+  - D9: each package's PyPI licence expression is the compound one of the works its files include (NOTICE's), its own
+    licence first, kept equal to NOTICE by `scripts/release/licences.py --check`; LARMORX's own licence stays
+    Apache-2.0 (the user, 2026-10-19), as the README says.
+  - D10: PyPI's descriptions with absolute links pinned to the tag (`scripts/release/pypi_readme.py`); the companions'
+    own descriptions (`crates-nc/PYPI.md`, `crates-gpl/PYPI.md`).
+  - D11: standalone archives per platform and program, one binary each (`lx` a symbolic link, `lx.cmd` on Windows),
+    each with its package's licences; Linux for glibc 2.28, no musl.
+  - D12: the platforms as the wheels' tags give them (README, "Installation"). D13: Development Status 3 - Alpha, the
+    documentation site as Homepage and Documentation; CITATION.cff as the user gave it (above). D14: `larmorprepx`
+    stays and says plainly that it is not ready yet (exit status 1), with the roadmap's address.
+  - D15: Windows' C runtime linked statically by one `.cargo/config.toml` at the root (CI's Windows builds too),
+    checked in every release by `scripts/release/pe_imports.py`; not in the sdists (Windows source builds link it
+    dynamically: accepted for rc1).
+  - D16: PyPI's attestations and GitHub's build provenance for every file and both images. D17: the user makes the
+    image package public once, after the first push. D19: the companions' golden tests run on the programs their
+    wheels install (`LARMORX_GOLDEN_PROGRAM`, relay 2c). D20: `LICENSES/third-party-rust.txt` per package (the
+    licence texts of the crates.io crates compiled in), committed, checked against `Cargo.lock` by a test.
+- **During the part:** `--only-binary :all:` dropped from the checks of `[prep]`'s dependencies (it made pip fall back
+  to pybids 0.18.1, while a user's plain install gets 0.22.0: the checks now install what users get); the plain
+  image's licence in precise words, "without the replica packages: commercial use allowed" (not "Apache-2.0 and
+  permissive licences only": larmorx includes Eigen's MPL-2.0 routines, `[prep]` brings certifi's MPL-2.0, the Debian
+  base its own licences); `skip-existing` in the three publish steps (the orchestrator, 2026-11-11), so that "Re-run
+  failed jobs" finishes a partial upload with the same files; the README's installation text as relay 5a wrote it
+  (the orchestrator's review, 2026-11-11). Three dry runs: the first two found three platform problems (fixed: the
+  source builds' glibc check, rustup's components on ubuntu-24.04-arm, macOS's own install name); the third passed
+  at `93154c93` (run 42942601741, 37 minutes).

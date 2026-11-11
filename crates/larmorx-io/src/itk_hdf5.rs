@@ -685,7 +685,7 @@ impl Default for WriteOptions {
             itk_version: "5.4.5".into(),
             hdf_version: "HDF5 library version: 1.12.1".into(),
             os_name: "larmorx".into(),
-            os_version: env!("CARGO_PKG_VERSION").into(),
+            os_version: larmorx_core::VERSION.into(),
         }
     }
 }

@@ -55,19 +55,22 @@ Licences decide what may be translated and where the translation may go
 - The GPL and the FSL Licence cannot be combined in one program, so their packages never
   link each other.
 
-## Installing and running (planned)
+## Installing and running
 
-Nothing is on PyPI yet. All packages are precompiled wheels for the six platforms.
+On PyPI from 0.1.0rc1, the first release (a release candidate; 0.1.0 follows once it installs
+cleanly on all six platforms): precompiled wheels for the six platforms, nothing else to
+install. The details (the requirements, the standalone programs, the container images, checking
+a download): the README's [Installation](../README.md#installation) and the site's
+[installation page](https://karellopez.github.io/larmorx_documentation/installation/).
 
 ```bash
-pip install larmorx                  # library + `larmorx`/`lx` commands; originals for restricted tools
-pip install "larmorx[prep]"          # + what the larmorprepx pipeline needs
-pip install larmorx                  # includes the exact AFNI replicas (since 2026-10-29)
-pip install larmorx-nc               # FSL replicas; installed by name (non-commercial licence)
+pip install larmorx                  # library + `larmorx`/`lx` commands: the ports, the originals and the exact AFNI replicas (Apache-2.0)
+pip install "larmorx[prep]"          # + what the larmorprepx pipeline will need (not ready yet)
+pip install larmorx-nc               # FSL replicas; installed by name (FSL Licence: non-commercial use only)
 pip install larmorx-gpl              # tedana's t2smap replica; installed by name (GNU GPL version 3)
-pip install "larmorx[prep,surfaces]" # pipeline + larmorx-freesurfer (surfaces)
-pip install "larmorx[all]"           # everything: every replica package too (decided 2026-10-16)
-larmorprepx /data/bids /data/derivatives participant --participant-label 01
+pip install "larmorx[all]"           # everything: [prep] and every replica package, at one version (decided 2026-10-16)
+pip install "larmorx[prep,surfaces]" # planned: pipeline + larmorx-freesurfer (surfaces)
+larmorprepx /data/bids /data/derivatives participant --participant-label 01   # planned: not ready yet
 ```
 
 - **One import for everything** (in place since 2026-10-11). `lx.afni.tshift(img, tr=2.0)`
@@ -80,15 +83,19 @@ larmorprepx /data/bids /data/derivatives participant --participant-label 01
   program in a separate process and exchanges files with it, so installing `larmorx-nc` does not
   put FSL-licensed code into your Python program; the AFNI replicas, permissive since AFNI
   26.3.05, are part of larmorx and run in its process ([licensing.md](licensing.md), "Choosing at run time").
-- **Until the packages are on PyPI,** both wheels can be built from the repository and
-  installed with `pip install --find-links dist larmorx` ([licensing.md](licensing.md),
+- **Pre-releases:** pip installs one such as 0.1.0rc1 by itself only while no final release
+  exists; `pip install "larmorx==0.1.0rc1"` (or `pip install --pre larmorx`) asks for it by
+  name. The wheels can also be built from the repository ([licensing.md](licensing.md),
   "Packages").
 - **The first pipeline run downloads data:** templates (e.g. MNI152) from TemplateFlow, and,
   with surfaces, FreeSurfer's atlas files from FreeSurfer's official site after the user
   accepts its licence (decision D6).
 - **Without `surfaces`,** the pipeline runs without surfaces, like fMRIPrep's
   `--fs-no-reconall`.
-- **A standalone `larmorx` binary** (no Python needed) is planned for GitHub Releases.
+- **Standalone programs** (no Python needed): each GitHub Release has `larmorx` (with `lx`),
+  `larmorx-nc` and `larmorx-gpl` for each platform; two Linux container images
+  (`ghcr.io/karellopez/larmorx:<version>` and `<version>-all`) serve Apptainer, Docker and
+  Podman.
 
 ## What is published on GitHub
 
@@ -98,7 +105,7 @@ larmorprepx /data/bids /data/derivatives participant --participant-label 01
 - replicas of permissive upstreams (ANTs/ITK, AFNI's NIH and, since 26.3.05, MCW files (CC BY 4.0), Arm's Optimized Routines, CORE-MATH, nibabel), with
   their copyright notices (`NOTICE`, each crate's `PROVENANCE.md`);
 - GPL replicas in `crates-gpl/` (tedana's `t2smap` since 2026-11-08; Workbench's to come), with the GPL text, the upstream
-  licence and copyright notices, and changes marked; and verification tools. Once wheels ship, the GPL requires this source to be public anyway;
+  licence and copyright notices, and changes marked; and verification tools. The wheels ship from 0.1.0rc1, larmorx-gpl's sdist (its Corresponding Source) beside them;
 - FSL replicas in `crates-nc/` (decided 2026-10-10: same repository). The FSL Licence
   allows this only free of charge, with its conditions passed on, and "all original and
   amended source code" included, so FSL's own source files for the replicated parts are
@@ -113,7 +120,8 @@ larmorprepx /data/bids /data/derivatives participant --participant-label 01
 - oracle builds and oracle outputs;
 - test images (they stay in the separate `larmorx-testdata` repository);
 - anything translated from MSM_HOCR;
-- personal data: licence keys, the owner's email (commits use a GitHub no-reply address);
+- personal data: licence keys, the owner's personal e-mail (commits use a GitHub no-reply
+  address; `CITATION.cff` gives the university address, as the user asked on 2026-11-10);
 - long verbatim excerpts of restricted code inside our docs. Behaviour descriptions and
   file:line references are fine.
 
@@ -279,7 +287,9 @@ Everything else fMRIPrep computes on this dataset, larmorx already does (above).
 ## Working on every platform
 
 - CI builds and tests the wheels on all six platforms for every push
-  (`.github/workflows/ci.yml`).
+  (`.github/workflows/ci.yml`); the release workflow builds every published file (its programs
+  with the `dist` profile), installs and tests it on the six platforms before an upload, and installs the
+  release from PyPI on them after it (`.github/workflows/release.yml`, `RELEASING.md`).
 - Pure-Rust dependencies only, so every platform compiles the same code.
 - Correctly rounded maths (`larmorx_core::math`), no fast-math, no CPU-specific builds, and
   results independent of the thread count. So deterministic tools are designed to give the

@@ -3,14 +3,14 @@
 # larmorx-gpl writes on Linux x86_64 (images by header and data, with sampled values),
 # its exit status and the upstream defects it names. Every platform must reproduce them
 # (docs/validation/golden.md). Do not edit by hand.
-# Recorded from e86180ff999929e3d21b3ba4bb8ed2d4f6159345 on 2026-11-08 (Linux x86_64)
+# Recorded from 13013f21489cb237d73901ec86ec4da38dcde777 on 2026-11-10 (Linux x86_64)
 # case	output	sha256	type	sample
 curvefit.shared.reproduce	named defects	b44a1e44ee663122b9b94de6c66d3ef27e26092caa9d67c028dda8fa8b73ee45	-	-
 curvefit.shared.reproduce	out/S0map.nii.gz.data	5f12a725b6141ccaa26a81ce3fa2bcf5e7fd51f0e6ec134ffba265d5fccd3faf	float32	0000000000000000000000000000000000000000000000000000000000000000
 curvefit.shared.reproduce	out/S0map.nii.gz.header	bf75711422af22efd949eb405010e2a151dbf19abe1d0e93499ccf446efd350f	-	-
 curvefit.shared.reproduce	out/T2starmap.nii.gz.data	340b6f5a7149d797002892969965b708347b688968626cadeee36d6c7534d586	float32	0000000000000000000000000000000000000000000000000000000000000000
 curvefit.shared.reproduce	out/T2starmap.nii.gz.header	bf75711422af22efd949eb405010e2a151dbf19abe1d0e93499ccf446efd350f	-	-
-curvefit.shared.reproduce	out/dataset_description.json	a045c007582bb2b1911b055e932bc5f46945d45411cee920d44c09ba7dbf6baf	-	-
+curvefit.shared.reproduce	out/dataset_description.json	57b307bfda0e7ae6769e72c40de3827ab0b16fa6bb4f251ef9a7632cf8a73801	-	-
 curvefit.shared.reproduce	out/desc-adaptiveGoodSignal_mask.nii.gz.data	2ef5300e2bcbe4fe110b0d044de9f50cb5f4aa6430140a421643d57069dbaf83	int32	0000000000000000000000000000000000000000000000000000000000000000
 curvefit.shared.reproduce	out/desc-adaptiveGoodSignal_mask.nii.gz.header	71e388dfb22c21d7df741e9e374ebe621234ca68afe74064322983093165e7af	-	-
 curvefit.shared.reproduce	out/desc-confounds_timeseries.tsv	7f99324bf58d30bb414723406715010d28245d03db13bda42b15b10104f219a8	-	-
@@ -32,7 +32,7 @@ curvefit.ts.paid.reproduce	out/S0map.nii.gz.data	e0261765b9d93bdfa359f36600e361c
 curvefit.ts.paid.reproduce	out/S0map.nii.gz.header	ff421c0ff0013e61b6041a45402fd6320381903ffdb6dde6be8142c3275e4a38	-	-
 curvefit.ts.paid.reproduce	out/T2starmap.nii.gz.data	70f96b305e0ccb9d0d091f662fa3bc5d7e7795c87822bc1ce500278ba1ce2a66	float32	0000000000000000000000000000000000000000000000000000000000000000
 curvefit.ts.paid.reproduce	out/T2starmap.nii.gz.header	ff421c0ff0013e61b6041a45402fd6320381903ffdb6dde6be8142c3275e4a38	-	-
-curvefit.ts.paid.reproduce	out/dataset_description.json	ef290da970eea9cf248d3b43a096a4aac89ea5eaf6d3751ace0c89e4e624a10c	-	-
+curvefit.ts.paid.reproduce	out/dataset_description.json	e04c0f936533cec2a00c7f4fd14f0a02192bb0b9d03b847431e5a29567998af9	-	-
 curvefit.ts.paid.reproduce	out/desc-adaptiveGoodSignal_mask.nii.gz.data	2ef5300e2bcbe4fe110b0d044de9f50cb5f4aa6430140a421643d57069dbaf83	int32	0000000000000000000000000000000000000000000000000000000000000000
 curvefit.ts.paid.reproduce	out/desc-adaptiveGoodSignal_mask.nii.gz.header	71e388dfb22c21d7df741e9e374ebe621234ca68afe74064322983093165e7af	-	-
 curvefit.ts.paid.reproduce	out/desc-confounds_timeseries.tsv	ffcb5b3910083dbec0ab927b3d8dab00a861ec6fd635615b03f8d203cfa4dad0	-	-
@@ -53,7 +53,7 @@ curvefit.verbose.orig	named defects	cc477cc817def99b4d8ab7fdd4c4b914183e765c48a3
 curvefit.verbose.orig	out/sub-01_adaptive_mask.nii.gz.data	2ef5300e2bcbe4fe110b0d044de9f50cb5f4aa6430140a421643d57069dbaf83	int32	0000000000000000000000000000000000000000000000000000000000000000
 curvefit.verbose.orig	out/sub-01_adaptive_mask.nii.gz.header	71e388dfb22c21d7df741e9e374ebe621234ca68afe74064322983093165e7af	-	-
 curvefit.verbose.orig	out/sub-01_confounds.tsv	7f99324bf58d30bb414723406715010d28245d03db13bda42b15b10104f219a8	-	-
-curvefit.verbose.orig	out/sub-01_dataset_description.json	29c1888022947a3ac2c6598e1cd7414ce86bffbfa60daa40d331c9a7ed53cb1a	-	-
+curvefit.verbose.orig	out/sub-01_dataset_description.json	b54a6d6c4faaff733deaefc8c2bbacaebdce3616cfb1275a0d273d5ddbbdef1a	-	-
 curvefit.verbose.orig	out/sub-01_fit_failures.nii.gz.data	f9be65629a72253f90587b8a3850ed9a4101e4c0c70bd754eaee589dd9acb2cf	uint8	0000000000000000
 curvefit.verbose.orig	out/sub-01_fit_failures.nii.gz.header	99c9b96b6c0d2394866aa7a6804941960d376dc73680c2858898d96b0bf86219	-	-
 curvefit.verbose.orig	out/sub-01_registry.json	901373a62a9cd4025f9c8df7b47f8df71aa1f8f5a02734d9aa3db5f7daa0b60b	-	-
@@ -81,7 +81,7 @@ curvefit.verbose.orig.reproduce	named defects	df757160e3b11f791186f73a56c602c19f
 curvefit.verbose.orig.reproduce	out/sub-01_adaptive_mask.nii.gz.data	2ef5300e2bcbe4fe110b0d044de9f50cb5f4aa6430140a421643d57069dbaf83	int32	0000000000000000000000000000000000000000000000000000000000000000
 curvefit.verbose.orig.reproduce	out/sub-01_adaptive_mask.nii.gz.header	71e388dfb22c21d7df741e9e374ebe621234ca68afe74064322983093165e7af	-	-
 curvefit.verbose.orig.reproduce	out/sub-01_confounds.tsv	7f99324bf58d30bb414723406715010d28245d03db13bda42b15b10104f219a8	-	-
-curvefit.verbose.orig.reproduce	out/sub-01_dataset_description.json	29c1888022947a3ac2c6598e1cd7414ce86bffbfa60daa40d331c9a7ed53cb1a	-	-
+curvefit.verbose.orig.reproduce	out/sub-01_dataset_description.json	b54a6d6c4faaff733deaefc8c2bbacaebdce3616cfb1275a0d273d5ddbbdef1a	-	-
 curvefit.verbose.orig.reproduce	out/sub-01_fit_failures.nii.gz.data	f9be65629a72253f90587b8a3850ed9a4101e4c0c70bd754eaee589dd9acb2cf	uint8	0000000000000000
 curvefit.verbose.orig.reproduce	out/sub-01_fit_failures.nii.gz.header	99c9b96b6c0d2394866aa7a6804941960d376dc73680c2858898d96b0bf86219	-	-
 curvefit.verbose.orig.reproduce	out/sub-01_registry.json	901373a62a9cd4025f9c8df7b47f8df71aa1f8f5a02734d9aa3db5f7daa0b60b	-	-
@@ -113,7 +113,7 @@ loglin	out/S0map.nii.gz.data	e5526dc0445edbece12d0c2b156b00732767a4e6d8a1e5a2ac4
 loglin	out/S0map.nii.gz.header	bf75711422af22efd949eb405010e2a151dbf19abe1d0e93499ccf446efd350f	-	-
 loglin	out/T2starmap.nii.gz.data	ff5885140982da25af91395a20e4fd76689c05f1ddc3e66bc1414fac77923149	float32	0000000000000000000000000000000000000000000000000000000000000000
 loglin	out/T2starmap.nii.gz.header	bf75711422af22efd949eb405010e2a151dbf19abe1d0e93499ccf446efd350f	-	-
-loglin	out/dataset_description.json	c576295eeae7c6b2fbfa4f638764289b3423e36d8b364471b6983395701ada82	-	-
+loglin	out/dataset_description.json	2b4526f1cd8222024c1cc0d49edc8106067020e500827400ac59269ec84b626a	-	-
 loglin	out/desc-adaptiveGoodSignal_mask.nii.gz.data	2ef5300e2bcbe4fe110b0d044de9f50cb5f4aa6430140a421643d57069dbaf83	int32	0000000000000000000000000000000000000000000000000000000000000000
 loglin	out/desc-adaptiveGoodSignal_mask.nii.gz.header	71e388dfb22c21d7df741e9e374ebe621234ca68afe74064322983093165e7af	-	-
 loglin	out/desc-confounds_timeseries.tsv	067ddd17984a677a365191f78a393d3f9e03f91b1cffe1448c3e0497b9fa5bf0	-	-
@@ -133,7 +133,7 @@ loglin.reproduce	out/S0map.nii.gz.data	60fa176bc00d9e4dbd82f455f511f79babcdddb77
 loglin.reproduce	out/S0map.nii.gz.header	bf75711422af22efd949eb405010e2a151dbf19abe1d0e93499ccf446efd350f	-	-
 loglin.reproduce	out/T2starmap.nii.gz.data	8a93a9de1d531a730a9df94f4ebc347ab12d7c01e67b75a9c735a0860e12cce3	float32	0000000000000000000000000000000000000000000000000000000000000000
 loglin.reproduce	out/T2starmap.nii.gz.header	bf75711422af22efd949eb405010e2a151dbf19abe1d0e93499ccf446efd350f	-	-
-loglin.reproduce	out/dataset_description.json	c576295eeae7c6b2fbfa4f638764289b3423e36d8b364471b6983395701ada82	-	-
+loglin.reproduce	out/dataset_description.json	2b4526f1cd8222024c1cc0d49edc8106067020e500827400ac59269ec84b626a	-	-
 loglin.reproduce	out/desc-adaptiveGoodSignal_mask.nii.gz.data	2ef5300e2bcbe4fe110b0d044de9f50cb5f4aa6430140a421643d57069dbaf83	int32	0000000000000000000000000000000000000000000000000000000000000000
 loglin.reproduce	out/desc-adaptiveGoodSignal_mask.nii.gz.header	71e388dfb22c21d7df741e9e374ebe621234ca68afe74064322983093165e7af	-	-
 loglin.reproduce	out/desc-confounds_timeseries.tsv	4137e47a36991e15468dcc400685645d0940f734fc5c39b8981cb35ad3248e1a	-	-
@@ -153,7 +153,7 @@ nomask.float32.ms	out/S0map.nii.gz.data	943132b26a3d09964675ed4bdb375e2887764172
 nomask.float32.ms	out/S0map.nii.gz.header	bf75711422af22efd949eb405010e2a151dbf19abe1d0e93499ccf446efd350f	-	-
 nomask.float32.ms	out/T2starmap.nii.gz.data	95a4be27b56ac5a0269232151fa804aa397da26016933fbcf1aef36dc5e36569	float32	0000000000000000000000000000000000000000000000000000000000000000
 nomask.float32.ms	out/T2starmap.nii.gz.header	bf75711422af22efd949eb405010e2a151dbf19abe1d0e93499ccf446efd350f	-	-
-nomask.float32.ms	out/dataset_description.json	157a872a74b83418a8ebe99ac3ce9182017998fba5544ec52af585d6c9abc2ae	-	-
+nomask.float32.ms	out/dataset_description.json	29e11ba00bdec6c765e6f5269c87957665bf42839f4babbb46a5b5a1f52c153d	-	-
 nomask.float32.ms	out/desc-adaptiveGoodSignal_mask.nii.gz.data	cb09ec653c5184fbf81999cd359ed9a8eaf5b997190df880eec2f84aaaaa1a09	int32	0000000000000000000000000000000000000000000000000000000000000000
 nomask.float32.ms	out/desc-adaptiveGoodSignal_mask.nii.gz.header	71e388dfb22c21d7df741e9e374ebe621234ca68afe74064322983093165e7af	-	-
 nomask.float32.ms	out/desc-confounds_timeseries.tsv	2bd4826d6d4e5067af404c1d9d4166046b8690c4c9bd8874551d372ef75648d0	-	-
@@ -173,7 +173,7 @@ nomask.float32.ms.reproduce	out/S0map.nii.gz.data	a4c88c26d377c957612304aac9d0ef
 nomask.float32.ms.reproduce	out/S0map.nii.gz.header	bf75711422af22efd949eb405010e2a151dbf19abe1d0e93499ccf446efd350f	-	-
 nomask.float32.ms.reproduce	out/T2starmap.nii.gz.data	f04b890a88ac677465931935b715c2b4d25cee9f8c62fc1f3c9314e475b1e1f0	float32	0000000000000000000000000000000000000000000000000000000000000000
 nomask.float32.ms.reproduce	out/T2starmap.nii.gz.header	bf75711422af22efd949eb405010e2a151dbf19abe1d0e93499ccf446efd350f	-	-
-nomask.float32.ms.reproduce	out/dataset_description.json	157a872a74b83418a8ebe99ac3ce9182017998fba5544ec52af585d6c9abc2ae	-	-
+nomask.float32.ms.reproduce	out/dataset_description.json	29e11ba00bdec6c765e6f5269c87957665bf42839f4babbb46a5b5a1f52c153d	-	-
 nomask.float32.ms.reproduce	out/desc-adaptiveGoodSignal_mask.nii.gz.data	cb09ec653c5184fbf81999cd359ed9a8eaf5b997190df880eec2f84aaaaa1a09	int32	0000000000000000000000000000000000000000000000000000000000000000
 nomask.float32.ms.reproduce	out/desc-adaptiveGoodSignal_mask.nii.gz.header	71e388dfb22c21d7df741e9e374ebe621234ca68afe74064322983093165e7af	-	-
 nomask.float32.ms.reproduce	out/desc-confounds_timeseries.tsv	17c0b38a4b5415888f88b31b55c7909d75c541ba92c3c75ec581470b1771214b	-	-
@@ -193,7 +193,7 @@ zcat.masktype-none	out/S0map.nii.gz.data	076efc2a8963df490410033de4432a399ab69cf
 zcat.masktype-none	out/S0map.nii.gz.header	bf75711422af22efd949eb405010e2a151dbf19abe1d0e93499ccf446efd350f	-	-
 zcat.masktype-none	out/T2starmap.nii.gz.data	7d4cfa4ec052eb215c81933ee296ebee846ecd411f3d3f9ba3503a048145c98c	float32	0000000000000000000000000000000000000000000000000000000000000000
 zcat.masktype-none	out/T2starmap.nii.gz.header	bf75711422af22efd949eb405010e2a151dbf19abe1d0e93499ccf446efd350f	-	-
-zcat.masktype-none	out/dataset_description.json	9e2da9d79b5f3ff273ebfdaeef254f223639a9f897c85d4ea6db20a15902a946	-	-
+zcat.masktype-none	out/dataset_description.json	b3d8469a15b8fadc18d07e4185caf89fc824f9ce371849abb397bf722beb065f	-	-
 zcat.masktype-none	out/desc-adaptiveGoodSignal_mask.nii.gz.data	f4f1dbce60e2f622197154c8882813c4c1c7face6ee26b1b086085bdba787f20	int32	0000000000000000000000000000000000000000000000000000000000000000
 zcat.masktype-none	out/desc-adaptiveGoodSignal_mask.nii.gz.header	71e388dfb22c21d7df741e9e374ebe621234ca68afe74064322983093165e7af	-	-
 zcat.masktype-none	out/desc-confounds_timeseries.tsv	fb3feb519d535afad7d1cf229c6a583d6bb88f3a3eb101ce5a7a4257cc9f4f4e	-	-

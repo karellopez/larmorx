@@ -326,3 +326,13 @@ value, the one with an even last digit, as `_Py_dg_dtoa` mode 0 and numpy's Drag
 (`numpy::format::shortest_ties_even`; Rust's own shortest form can pick the other: 920.45343017578125
 prints as `920.4534301757812`, found in tedana's confounds table). Verified against tedana 26.0.3's parser in-process: 109 cases, all identical
 (`validation/investigations/t2smap/replica/check_parser.py`), and the unit tests here.
+
+## The version in PEP 440's form (`larmorx-core/build.rs`, `src/pep440.rs`; 2026-11-10)
+
+larmorx's own code, ported from nothing. `VERSION` is the package's Cargo version in the form PEP
+440 normalises it to (`0.1.0-rc.1` is `0.1.0rc1`; `-alpha.N`, `-beta.N`, `-rc.N` become `aN`, `bN`,
+`rcN`), as maturin writes the wheels' version and as `scripts/release/set_version.py` converts it;
+any other form is refused at build time. The build script includes `src/pep440.rs` and sets the
+constant; the crate's tests check the conversion. The command line's version tests
+(`crates/larmorx-cli/tests/binaries.rs`, `crates/larmorx-cli/tests/afni_replica_cli.rs`) compare
+`larmorx --version` with it.

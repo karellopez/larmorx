@@ -1,0 +1,47 @@
+cff-version: 1.2.0
+message: >-
+  If LARMORX helped your research, please cite it as below, together with the
+  original tools whose methods you used through it (for example ANTs, AFNI,
+  FSL, sdcflows or tedana).
+type: software
+title: "LARMORX: Library of Algorithmic Reimplementations for MRI through Open Rust eXecution"
+abstract: >-
+  LARMORX is an open-source, cross-platform neuroimaging toolbox that
+  reimplements established neuroimaging algorithms and command-line tools in
+  Rust, without the original programs or their system dependencies: ports of
+  ANTs/ITK, sdcflows and fMRIPrep's resampler, the AFNI tools as exact replicas
+  and clean-room originals, and clean-room originals of FSL-compatible tools,
+  with exact replicas of FSL's and tedana's tools in separately licensed
+  companion packages. Each tool has a Python API (import larmorx), a command
+  line that accepts the original program's arguments (larmorx, lx), and a
+  validation record that compares it case by case with the original program.
+  Results do not depend on the thread count or the platform: the same bits on
+  Linux, macOS and Windows.
+authors:
+  - given-names: Karel Mauricio
+    family-names: López Vilaret
+    email: karel.mauricio.lopez.vilaret@uni-oldenburg.de
+    affiliation: Applied Neurocognitive Psychology Lab, University of Oldenburg
+    orcid: "https://orcid.org/0009-0007-0504-5258"
+version: "0.1.0rc1"
+date-released: "2026-11-11"
+license: Apache-2.0
+url: "https://karellopez.github.io/larmorx_documentation/"
+repository-code: "https://github.com/karellopez/larmorx"
+repository-artifact: "https://pypi.org/project/larmorx/"
+keywords:
+  - neuroimaging
+  - MRI
+  - fMRI
+  - image registration
+  - preprocessing
+  - reproducibility
+  - FAIR research software
+  - ANTs
+  - AFNI
+  - FSL
+  - sdcflows
+  - tedana
+  - fMRIPrep
+  - Rust
+  - Python

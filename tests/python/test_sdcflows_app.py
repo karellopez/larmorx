@@ -134,7 +134,12 @@ def test_session_label_sdc30(capsys: pytest.CaptureFixture[str], tmp_path: Path)
     assert code == 0 and "PEPOLAR" in text  # sdcflows ignores it
 
 
-def test_exit_statuses(capsys: pytest.CaptureFixture[str], tmp_path: Path) -> None:
+def test_exit_statuses(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # the calls without -w take the app's default work folder, ./work: here in tmp_path, not in
+    # the folder pytest runs from (a read-only source tree, e.g. a user's copy of a release's)
+    monkeypatch.chdir(tmp_path)
     bare = _bids(tmp_path / "bare", epi=False)
     base = [str(bare), str(tmp_path / "out"), "participant", "-w", str(tmp_path / "w")]
     # no estimator: os.EX_USAGE and sdcflows' message on standard error
@@ -179,7 +184,10 @@ def test_exit_statuses(capsys: pytest.CaptureFixture[str], tmp_path: Path) -> No
     )
 
 
-def test_bids_validation_error(capsys: pytest.CaptureFixture[str], tmp_path: Path) -> None:
+def test_bids_validation_error(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)  # the app's default work folder, ./work, in tmp_path
     root = _bids(tmp_path / "bids")
     (root / "dataset_description.json").unlink()
     code, _, err = _run([str(root), str(tmp_path / "out"), "participant"], capsys)

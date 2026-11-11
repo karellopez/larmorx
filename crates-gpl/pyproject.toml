@@ -2,7 +2,8 @@
 # The larmorx-gpl wheel: the `larmorx-gpl` program only (maturin's "bin" bindings), no Python
 # module. larmorx (Apache-2.0) runs it as a separate process; nothing imports it
 # (docs/licensing.md, "A replica package is a program"). Build: `maturin build --release --locked`
-# in this directory.
+# in this directory; the source distribution: `python -P scripts/release/companion_sdist.py gpl
+# --out <dir>` (from the repository).
 #
 # The program includes tedana's t2smap translated to Rust (crates larmorx-gpl-tedana, GPL-3.0-only:
 # tedana is LGPL-2.1-only, distributed under the GNU GPL version 3 as the LGPL's section 3 allows),
@@ -19,16 +20,23 @@ build-backend = "maturin"
 
 [project]
 name = "larmorx-gpl"
-description = "Bit-exact replicas of GPL-family neuroimaging tools (tedana's t2smap), run by larmorx as a separate program; GNU GPL version 3"
-readme = "README.md"
+description = "Bit-exact Rust replica of tedana's t2smap (multi-echo fMRI), run by larmorx as a separate program; GNU GPL version 3 only"
+# PyPI's description (PYPI.md); README.md is this directory's page for developers.
+readme = "PYPI.md"
 requires-python = ">=3.12"
-license = "GPL-3.0-only"
+authors = [{ name = "Karel Lopez Vilaret" }]
+# The GNU GPL version 3 only (LICENSE) first; then every licence of the code the wheel holds: the
+# Apache-2.0 larmorx crates with the works they translate (LICENSES/NOTICE-larmorx.txt) and the
+# Rust crates it is built with (the wheel's SBOM). tedana's LGPL-2.1-only code is distributed
+# under the GPL version 3 (NOTICE). scripts/release/licences.py derives it.
+license = "GPL-3.0-only AND Apache-2.0 AND BSD-3-Clause AND HDF5 AND MIT AND MPL-2.0 AND PSF-2.0 AND SunPro AND Zlib"
 license-files = [
     "LICENSE",
     "NOTICE",
     "LICENSES/LGPL-2.1-tedana.txt",
     "LICENSES/Apache-2.0.txt",
     "LICENSES/NOTICE-larmorx.txt",
+    "LICENSES/third-party-rust.txt",
     "Cargo.toml",
     "Cargo.lock",
     "larmorx-gpl-*/Cargo.toml",
@@ -38,20 +46,25 @@ license-files = [
 ]
 keywords = ["neuroimaging", "mri", "fmri", "multi-echo", "tedana", "t2star"]
 classifiers = [
-    "Development Status :: 2 - Pre-Alpha",
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
     "Intended Audience :: Science/Research",
     "Operating System :: MacOS",
     "Operating System :: Microsoft :: Windows",
     "Operating System :: POSIX :: Linux",
     "Programming Language :: Rust",
+    "Topic :: Scientific/Engineering :: Image Processing",
     "Topic :: Scientific/Engineering :: Medical Science Apps.",
 ]
 dynamic = ["version"]
 
 [project.urls]
+Homepage = "https://karellopez.github.io/larmorx_documentation/"
+Documentation = "https://karellopez.github.io/larmorx_documentation/"
 Repository = "https://github.com/karellopez/larmorx"
 Source = "https://github.com/karellopez/larmorx/tree/main/crates-gpl"
 Issues = "https://github.com/karellopez/larmorx/issues"
+Changelog = "https://github.com/karellopez/larmorx/blob/main/CHANGELOG.md"
 
 [tool.maturin]
 bindings = "bin"

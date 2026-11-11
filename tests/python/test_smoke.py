@@ -91,6 +91,16 @@ def test_larmorprepx_explains_missing_prep_extra(monkeypatch, capsys):
     assert 'pip install "larmorx[prep]"' in capsys.readouterr().err
 
 
+def test_larmorprepx_says_it_is_not_ready(capsys):
+    """A preview in 0.1 (only the field-map stages exist): it says so and exits with status 1."""
+    assert prep_cli.main([]) == 1
+    err = capsys.readouterr().err
+    assert err.startswith(f"larmorprepx is not ready yet in larmorx {VERSION}: "), err
+    assert prep_cli.ROADMAP in err
+    result = run_process(script("larmorprepx"), "--help")
+    assert result.returncode == 0 and "is not ready yet" in " ".join(result.stdout.split()), result
+
+
 def test_prep_extra_matches_the_checked_modules():
     requires = [Requirement(req) for req in importlib.metadata.requires("larmorx") or []]
     prep = {req.name for req in requires if req.marker and req.marker.evaluate({"extra": "prep"})}

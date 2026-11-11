@@ -4,7 +4,7 @@
 # first copy (pull.sh, tmux session "move") has ended, copies again with --verify (every file's
 # content compared; brings what changed meanwhile), sets up the shell, then runs check.py.
 # Results: ~/move-check.log (check.py's full output) and ~/MOVE-READY.txt (a summary).
-WS=/home/karelo/VScode_projects/super_fmriprep
+WS=$HOME/VScode_projects/super_fmriprep
 while pgrep -f '^bash /tmp/pull.sh' >/dev/null; do sleep 120; done
 
 ok=""

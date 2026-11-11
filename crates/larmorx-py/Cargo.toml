@@ -3,6 +3,7 @@ name = "larmorx-py"
 description = "Python bindings of larmorx: the larmorx._core extension module"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 publish = false

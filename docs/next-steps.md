@@ -744,9 +744,52 @@ The items below keep their history.
    (decision log 2026-10-19); Connectome Workbench- and MSM-compatible surface tools; the
    confounds (CompCor, DVARS, framewise displacement, ...).
 9. **larmorprepx**, then the end-to-end comparison with fMRIPrep.
-10. **Releases on PyPI** (below).
+10. **Releases on PyPI:** the first, 0.1.0rc1, made ready ahead of this order (the user, 2026-11-10: "I
+   would like to solve this first before we continue with the rest fo things"; the release part,
+   2026-11-10 and 11; decision log): the release workflow, the three packages, the standalone programs,
+   two container images, the clean-machine checks and the documents (`RELEASING.md`, `CHANGELOG.md`,
+   `CITATION.cff`); its upload is the tag `v0.1.0rc1`'s run; then 0.1.0, once rc1 installs cleanly on
+   the six platforms (below).
 
 ## Follow-ups, when they fit
+- **From the first release's part (2026-11-10 and 11; 10 relays; `RELEASING.md`,
+  `validation/investigations/release-0.1/README.md`).** Left:
+  - *Two messages in Cargo's form of a pre-release version* (`0.1.0-rc.1`; the same in both forms
+    from 0.1.0 on): the AFNI clean-room programs' `++ implementation:` line (`crates/larmorx-afni`, a
+    clean-room agent) and tedana's `dataset_description.json` written by `larmorx-gpl` (the replica's
+    source, a replica-side agent); PEP 440's form, as everywhere else, before the next pre-release.
+  - *Windows source builds* link the C runtime dynamically (the sdists carry no `.cargo/config.toml`;
+    accepted for 0.1.0rc1, `RELEASING.md`, "Good to know"): an `include` of the file in
+    `[tool.maturin]` and in `scripts/release/companion_sdist.py` would make them the same as the
+    published wheels.
+  - *The release workflow's wall time* (the third dry run: 37 minutes): the standalone CLI's build in
+    its own job (`cli` x6, needing only `check`) would take about 10 minutes off it for about 30 more
+    job-minutes; decide from a release run's job times.
+  - *The contract audit misses integration tests:* `crates/*/tests/*.rs` must be named in a
+    PROVENANCE.md although its docstring leaves tests out (relay 2a named the two larmorx-cli tests
+    in larmorx-core's PROVENANCE instead); a one-line fix (`|/tests/` in its `GLUE`) for whoever owns
+    the field maps' part B's contract audit (`test_sdcflows_estimation_parity[contract-audit]`).
+  - *The 3dvolreg suite's workspace fallback:* without `LARMORX_WORKSPACE`,
+    `parity/afni_volreg_original.workspace()` takes `Path(__file__).parents[5]`, which in an agent's
+    worktree is `larmorx/.claude/worktrees`, and makes `oracles/inputs/` there; from then on every
+    suite takes that folder for the workspace (an empty cache, no AFNI oracles: 162 AFNI cases failed
+    in relay 2a's second smoke run). The fallback should be `oracle_cache.store.workspace()` (or
+    refuse). The stray folder is in `<workspace>/archive/2026-11-10-release-2a-stray-oracles/` (its
+    cache entries record wrong runs: never merge them into `oracles/cache`).
+  - *Upstream reports that could be drafted* (the user files them): maturin's `sdist` of a crate
+    whose path dependencies belong to another workspace ("File ... was already added from ...": why
+    the companions' sdists are staged by `scripts/release/companion_sdist.py`), and `maturin build
+    --zig` writing the dotted `PyInit_larmorx._core` into the extension's `.def` for
+    `x86_64-pc-windows-gnu` (`validation/investigations/release-0.1/win_gnu_build.sh` works around
+    it).
+  - *Not tried:* the site installation page's advice on the download marks of macOS (`xattr -d
+    com.apple.quarantine`) and of a browser on Windows (`Unblock-File`): no Mac here, and the Windows
+    helper's runs are over SSH; check it on rc1 when a Mac or a browser download is at hand.
+  - *The account name in records and history:* the current documents and scripts have placeholders
+    since relay 5a; `docs/validation/ants-registration-panel.json` (11 lines),
+    `validation/investigations/ants-40-n4-nonpositive/{analysis,results}.json` (25 each),
+    `validation/investigations/itk-06-nonfinite/results.json` (6), `docs/parts/` and git history
+    still hold the home path (the user, 2026-11-02: later).
 - **From the field maps' part B (sdcflows' port continued, 2026-11-08 to 10; 32 relays;
   [findings](findings/sdcflows-estimation.md) and [SciPy's filters](findings/scipy-ndimage-filters.md), records
   [sdcflows-estimation](validation/sdcflows-estimation.md), [niworkflows-helpers](validation/niworkflows-helpers.md),
@@ -1294,7 +1337,11 @@ The items below keep their history.
     variability*; measuring FSL's band for every registration would keep such cases labelled by
     their band.
 
-- **The site: a page "Why Rust and Python"** (the user, 2026-10-31: "At some point we should clearly
+- **The site: a page "Why Rust and Python": done** (the first release's relay 5b, 2026-11-11: site
+  commit `b8edd27`, `/why-rust-and-python/`, published with the release and linked from the README;
+  every point below, from the projects' history, documentation and published papers, each DOI
+  checked against Crossref's record; CORE-MATH's ports are 18, `tan` included since 2026-11-03, where
+  the list below says 17) (the user, 2026-10-31: "At some point we should clearly
   explain [on] the website why we choose rust + python and explain all these points"). Before the
   first release at the latest; written for researchers, in plain words. The points, from the
   orchestrator's answers of 2026-10-31:
@@ -2033,33 +2080,64 @@ results and `cbrtf_glibc`'s alike.
 - **The version update, what changed in the numerics: done** (2026-10-29): every file read and
   classified (`docs/findings/scipy-ndimage.md`, `numpy-blas.md`); one change of results (SciPy's
   reflect initialisation, SCI-03), followed.
-- **A clean-machine check** (user, 2026-10-27): CI's runners have compilers and runtimes
-  installed, which can hide a missing piece. Install and test on truly clean machines: Windows
-  Sandbox on the Windows laptop (a throwaway clean Windows), a minimal Linux container here
-  (`apptainer` with a slim Python image); and test `larmorx-gpl` and `larmorx-nc` as installed
-  Python packages on the six platforms (today CI runs only their `cargo test`). Requirements
-  stated for users: Python 3.12 or newer; Linux with glibc 2.28 or newer; templates (and later
-  FreeSurfer's atlases) downloaded once on first use.
-- **Windows' C runtime:** nothing sets `+crt-static`, so the `.exe` programs (`larmorx-gpl`,
-  the standalone `larmorx`) need `vcruntime140.dll`. Python's own copy serves the extension,
-  but a separate program may not find one on a clean Windows. Link the C runtime statically
-  for the Windows MSVC targets (`.cargo/config.toml`, both workspaces). CI cannot show the
-  problem: GitHub's runners have the runtime installed.
-- **Size:** `strip`, LTO and `codegen-units = 1` in the release profile (stripping alone takes
-  the extension from 24 to 15 MB).
-- **Python dependencies:** h5py dropped (A4 part 1, 2026-10-16: numpy is the only one); check
-  that every `[prep]` dependency has wheels for all six platforms, Windows arm64 included. Linux
-  wheels are manylinux_2_28 (glibc 2.28 or newer); decide whether to add musllinux wheels
-  (Alpine).
-- **The `[all]` extra** (decided 2026-10-16): `larmorx-gpl`, `larmorx-nc` and `larmorx-freesurfer`,
-  added to `pyproject.toml` once those packages exist (an extra naming a missing package breaks
-  `pip install`).
-- **Publishing:** a release workflow (on a version tag: the six wheels and the sdist of each
-  package, the golden tests, upload by PyPI Trusted Publishing; standalone binaries to GitHub
-  Releases); reserve the names `larmorx`, `larmorx-gpl`, `larmorx-nc`, `larmorx-freesurfer`,
-  `larmorprepx` (all free on 2026-10-13; needs the user's PyPI account); the licence checks for
-  publishing `larmorx-nc` (FSL) and `larmorx-freesurfer` on PyPI; the first release's scope
-  (D10) and version numbering.
+- **A clean-machine check: done on Linux, prepared for Windows** (the first release's relay 4,
+  2026-11-11; `validation/investigations/release-0.1/README.md`, "Relay 4"): the Linux files built
+  as the release builds them (the pinned manylinux_2_28 image through Apptainer), installed and
+  tested from the wheels and from the sdists on RHEL 8 (glibc 2.28, the floor), Debian 12 slim (no
+  compiler, no binutils) and Debian 13 with Python 3.14: 934 tests passed in each; the container
+  images rehearsed with them; on the Windows helper, with Windows files cross-built by zig (no
+  MSVC), 934 passed. The release workflow's `test` jobs install and test the three packages' built
+  files on the six platforms (the replicas' own Python tests included; before, CI ran only their
+  `cargo test`), and `verify-pypi` installs them from PyPI after an upload. Left: after rc1's upload,
+  `scripts/release/check_install.py` in a clean Linux image and `win_check.sh 0.1.0rc1` on the
+  Windows helper (`RELEASING.md`, step 6). Windows Sandbox later (the user, 2026-11-10: "We do not do
+  the windows sandbox now, maybe in the future"); until then the PE import-table check
+  (`scripts/release/pe_imports.py`) is the Windows evidence. The requirements stated for users: the
+  README's "Installation".
+- **Windows' C runtime: done** (relay 2b, 2026-11-10): one `.cargo/config.toml` at the repository's
+  root links it statically for every MSVC target (Cargo reads the file from the working directory
+  upwards, so it serves the three workspaces, CI's Windows builds included); every Windows file of a
+  release is checked by `scripts/release/pe_imports.py` (no `vcruntime*`, `msvcp*`, `ucrtbase` or
+  `api-ms-win-crt-*` import), which passed in the dry runs' Windows `test` jobs, where the golden
+  tests also pass on these builds. Not in the sdists: a source build on Windows links the runtime
+  dynamically (accepted for 0.1.0rc1; below).
+- **Size: done** (relay 2b): a `dist` profile in the three workspaces (`inherits = "release"`, fat
+  LTO, one codegen unit, stripped), used by the release only; `release` stays the everyday profile
+  (CI, verify-merge and the agents' builds unchanged). Linux x86-64: larmorx's wheel 15.24 -> 13.95
+  MB (the extension 78.1 -> 41.2 MB), larmorx-nc's 6.39 -> 6.20, larmorx-gpl's 1.29 -> 1.06, the
+  standalone `larmorx` 48.4 -> 25.1 MB. The same bits (the four golden suites; the parity smoke
+  tier, 2,968 passed, on `dist` builds) and as fast or faster (0.88 to 1.03 of `release`'s time on
+  five benchmark calls at one and eight threads,
+  `validation/investigations/release-0.1/dist_speed.py`).
+- **Python dependencies: checked** (relay 1, 2026-11-10): every `[prep]` dependency has wheels for
+  the six platforms and CPython 3.12 and 3.14, Windows arm64 included; on Apple silicon `[prep]`
+  needs macOS 12 (SciPy's and scikit-learn's wheels). Linux wheels are manylinux_2_28; no musllinux
+  wheels in 0.1 (the container images serve other Linux systems). On Python 3.13 and newer pip takes
+  wrapt 2.6.0.dev1, a pre-release (formulaic 1.2.2's specifier; every test passes with it;
+  CHANGELOG's known limitations).
+- **The `[all]` extra: done** (relay 2a): `[prep]` with `larmorx-nc` and `larmorx-gpl`, pinned to
+  the same version by `scripts/release/set_version.py`; `larmorx-freesurfer` joins it once that
+  package exists.
+- **Publishing: done** (relays 3a and 3b, 2026-11-11): `.github/workflows/release.yml` (a `v*` tag
+  publishes; a push to `release/dry-run` or a dispatch is a dry run that builds and tests everything
+  and uploads nothing): each package's wheels for the six platforms and its sdist, the built files
+  installed and tested on each platform, the companions' golden tests on their installed programs,
+  the standalone archives, two container images (`ghcr.io/karellopez/larmorx:<v>` and `:<v>-all`,
+  amd64 and arm64), one publish job per package by PyPI's trusted publishing (the environments
+  `pypi`, `pypi-gpl`, `pypi-nc`, each upload approved by the user), the GitHub Release with
+  `SHA256SUMS` and build provenance, and the install from PyPI on the six platforms after the
+  upload; the maintainer's steps in `RELEASING.md`. Three dry runs (2026-11-10 and 11); the third
+  passed at 93154c93 (run 42942601741, 37 minutes). The names `larmorx`, `larmorx-gpl` and
+  `larmorx-nc` have the user's pending publishers (2026-11-10; a pending publisher does not reserve
+  a name: the first upload does); `larmorx-freesurfer` and `larmorprepx` are not reserved. larmorx-nc
+  on PyPI: the user's decision of 2026-11-10 (over asking FSL first). Version numbering: PEP 440, one
+  version for the three packages, rc1 and then 0.1.0 (decision log 2026-11-10 and 11).
+- **0.1.0 after 0.1.0rc1** (the user, 2026-11-10): after rc1's upload, `verify-pypi` on the six
+  platforms, the clean checks above, the image package made public once by the user (D17) and its
+  images pulled here, and PyPI's author field ("Waiting for the user"); then 0.1.0 by `RELEASING.md`'s
+  step 7 (the version, CHANGELOG's section with its statuses table, the words that call the release
+  a candidate in the README and on the site, a dry run, the tag, the approval). A problem found in
+  rc1 is fixed in an rc2 first.
 
 ## Deferred (decide later)
 
@@ -2073,6 +2151,14 @@ Decided 2026-10-23 (decision log): the four rules for questionable behaviours (A
 
 - **Upstream reports:** PIPE-02 and PIPE-03 are drafts in `docs/upstream-reports/`, now with
   PIPE-03's real-data numbers, ready to file (from the user's GitHub account).
+- **PyPI's author field** (asked 2026-11-10, the first release): the three `pyproject.toml` say
+  `authors = [{ name = "Karel Lopez Vilaret" }]` (NOTICE's form, no e-mail); CITATION.cff has the full
+  name and the university e-mail. To match: `authors = [{ name = "Karel Mauricio López Vilaret",
+  email = "..." }]` in the three files (the e-mail is then public on PyPI). Before 0.1.0 at the latest:
+  a version's metadata cannot change after its upload.
+- **After 0.1.0rc1's upload, once, in the browser (D17):** the image package public
+  (github.com/users/karellopez/packages/container/larmorx -> Package settings -> Change visibility ->
+  Public); until then `apptainer pull` and `docker pull` without a login fail.
 - **For the user's information, FSL-22** (2026-10-26; decision log): `reproduce` now sorts NaN
   border values in libstdc++'s order, from an emulation written from the SGI STL (HP/SGI
   permissive notice) with no libstdc++ text; the orchestrator accepted that licensing reading

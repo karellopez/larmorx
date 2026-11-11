@@ -1,0 +1,1018 @@
+# SPDX-License-Identifier: Apache-2.0
+# The release of larmorx's three packages, larmorx (Apache-2.0), larmorx-gpl (the GNU GPL
+# version 3) and larmorx-nc (the FSL Licence, non-commercial use only), at one version
+# (scripts/release/set_version.py). The maintainer's steps: RELEASING.md.
+#
+# A release is a pushed tag v<version>, the PEP 440 form the packages carry (v0.1.0rc1, v0.1.0),
+# on a commit of main that CI passed (or a dispatch of this workflow on such a tag with dry_run
+# off, should the tag's own run be lost). Everything else is a DRY RUN that builds and tests
+# every file and uploads nothing: a push to the branch release/dry-run (how the orchestrator
+# starts one) or a dispatch with dry_run on (the default).
+#
+# The jobs: check (the version, the tag, CI, PyPI, the release notes, the licence files), sdist
+# (the three sdists), wheel (larmorx's wheel, six platforms), programs (the companions' wheels
+# built from their sdists, their golden tests on the installed programs, the standalone archives;
+# six platforms), test (every built file installed and tested; six platforms), sdist-install (the
+# sdists built from source), container (the two container images built from the Linux files and
+# checked inside; amd64 and arm64), assemble (the whole set checked, SHA256SUMS). A release then
+# has three publish jobs, one per package, each in its own environment (pypi, pypi-gpl, pypi-nc:
+# PyPI's trusted publishers name them; the maintainer approves the three in one dialog); larmorx's
+# waits until PyPI has its two companions. Then the images pushed to ghcr.io/karellopez/larmorx,
+# the GitHub Release, and the install from PyPI on the six platforms. Nothing is public before
+# the approval.
+#
+# The build profile is `dist` (the workspaces' Cargo.toml: fat LTO, one codegen unit, stripped);
+# Windows' C runtime is linked statically (.cargo/config.toml). No caches (a release builds from
+# scratch), every action pinned by its commit, each job with the permissions it needs only. CI's
+# own workflow (ci.yml) is not changed by this one.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+    branches: ["release/dry-run"]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run: build and test, upload nothing (off only on a v* tag)"
+        type: boolean
+        default: true
+
+permissions: {}
+
+concurrency:
+  group: release-${{ github.ref }}
+  # A dry run gives way to a newer one; a release never stops half-way.
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+env:
+  CARGO_TERM_COLOR: always
+  # The Rust compiler of rust-toolchain.toml, and the tools every build uses.
+  RUST_TOOLCHAIN: "1.99.0"
+  MATURIN_VERSION: "1.15.0"
+  TWINE_VERSION: "7.0.0"
+  PYTHONUTF8: "1"
+
+jobs:
+  check:
+    name: check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: read # CI's runs of the tagged commit
+    outputs:
+      version: ${{ steps.mode.outputs.version }}
+      publish: ${{ steps.mode.outputs.publish }}
+      prerelease: ${{ steps.mode.outputs.prerelease }}
+      ref: ${{ steps.mode.outputs.ref }}
+      tag: ${{ steps.mode.outputs.tag }}
+      epoch: ${{ steps.mode.outputs.epoch }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master, 2026-10-16
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+      - name: A release or a dry run; the version
+        id: mode
+        env:
+          EVENT: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          REF_NAME: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          version=$(python -P scripts/release/set_version.py --print)
+          publish=false
+          if [[ "$REF" == refs/tags/v* ]] && { [ "$EVENT" = push ] || [ "$DRY_RUN" = false ]; }; then
+            publish=true
+          elif [ "$DRY_RUN" = false ]; then
+            echo "::error title=release::a release runs only on a v* tag (this run is on $REF)"
+            exit 1
+          fi
+          if [ "$publish" = true ]; then
+            # the tag names the version of every package, the [all] pins and CITATION.cff
+            python -P scripts/release/set_version.py --check "$REF_NAME"
+            ref=$REF_NAME
+          else
+            python -P scripts/release/set_version.py --check
+            ref=$SHA
+          fi
+          case $version in *a*|*b*|*rc*) prerelease=true ;; *) prerelease=false ;; esac
+          {
+            echo "version=$version"
+            echo "publish=$publish"
+            echo "prerelease=$prerelease"
+            echo "ref=$ref"
+            echo "tag=v$version"
+            echo "epoch=$(git log -1 --format=%ct "$SHA")"
+          } >> "$GITHUB_OUTPUT"
+          kind="dry run (nothing is uploaded)"
+          [ "$publish" = true ] && kind="release"
+          echo "::notice title=release::$kind of larmorx $version from ${SHA:0:12} (pre-release: $prerelease)"
+      - name: The commit is on main and CI passed for it
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PUBLISH: ${{ steps.mode.outputs.publish }}
+          SHA: ${{ github.sha }}
+        run: |
+          report=--report
+          [ "$PUBLISH" = true ] && report=
+          python -P scripts/release/ci_green.py --sha "$SHA" $report
+      - name: The version is not on PyPI yet
+        env:
+          PUBLISH: ${{ steps.mode.outputs.publish }}
+          VERSION: ${{ steps.mode.outputs.version }}
+        run: |
+          report=--report
+          [ "$PUBLISH" = true ] && report=
+          python -P scripts/release/pypi_state.py absent --version "$VERSION" $report \
+            larmorx larmorx-nc larmorx-gpl
+      - name: The release notes (the version's section of CHANGELOG.md)
+        env:
+          PUBLISH: ${{ steps.mode.outputs.publish }}
+          VERSION: ${{ steps.mode.outputs.version }}
+          REF: ${{ steps.mode.outputs.ref }}
+        run: |
+          if python -P scripts/release/changelog.py "$VERSION" --ref "$REF" --out release-notes.md; then
+            :
+          elif [ "$PUBLISH" = true ]; then
+            exit 1
+          else
+            echo "::warning title=CHANGELOG.md::the release notes of $VERSION failed (this step's log says why): a release would stop here"
+            echo "Dry run: CHANGELOG.md gives no release notes for $VERSION." > release-notes.md
+          fi
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-notes
+          path: release-notes.md
+          if-no-files-found: error
+          retention-days: 14
+      - name: The licence files and PyPI's descriptions are up to date
+        env:
+          REF: ${{ steps.mode.outputs.ref }}
+        run: |
+          # the registry's sources of every crate, for every target (third_party.py reads them)
+          for workspace in . crates-nc crates-gpl; do
+            cargo fetch --locked --manifest-path "$workspace/Cargo.toml"
+          done
+          python -P scripts/release/third_party.py --check
+          python -P scripts/release/licences.py --check
+          python -P scripts/release/pypi_readme.py --check --ref "$REF" \
+            README.md crates-nc/PYPI.md crates-gpl/PYPI.md
+
+  # The three source distributions; the companions' wheels are built from these very files.
+  sdist:
+    name: sdist
+    needs: check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      SOURCE_DATE_EPOCH: ${{ needs.check.outputs.epoch }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master, 2026-10-16
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+      - name: The sdists of larmorx, larmorx-nc and larmorx-gpl
+        env:
+          REF: ${{ needs.check.outputs.ref }}
+        run: |
+          python -m pip install "maturin==$MATURIN_VERSION" "twine==$TWINE_VERSION"
+          # PyPI's descriptions with their links absolute, at the tag (a dry run: the commit)
+          python -P scripts/release/pypi_readme.py --ref "$REF" \
+            README.md crates-nc/PYPI.md crates-gpl/PYPI.md
+          maturin sdist --out sdist
+          python -P scripts/release/companion_sdist.py nc --out sdist
+          python -P scripts/release/companion_sdist.py gpl --out sdist
+          twine check --strict sdist/*
+          ls -l sdist
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: sdist
+          path: sdist/*.tar.gz
+          if-no-files-found: error
+          retention-days: 14
+
+  # larmorx's wheel (the Python package with its Rust extension), on CI's six platforms.
+  wheel:
+    name: wheel (${{ matrix.platform }})
+    needs: check
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 120
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux-x64
+            runner: ubuntu-24.04
+            target: x86_64
+            manylinux: "2_28"
+            container: quay.io/pypa/manylinux_2_28_x86_64:2026.10.26-1@sha256:e0adf18521ad35192df733a6c62d35df7801957d24e0470238aacecfab2188a3
+          - platform: linux-aarch64
+            runner: ubuntu-24.04-arm
+            target: aarch64
+            manylinux: "2_28"
+            container: quay.io/pypa/manylinux_2_28_aarch64:2026.10.26-1@sha256:a3e02308c822fb6ce0d12248b0c941817ba5e1a1bc9e7bb5929f29c50eaa40a9
+          - { platform: macos-arm64, runner: macos-15, target: aarch64, macos: "11.0" }
+          - { platform: macos-x64, runner: macos-15-intel, target: x86_64, macos: "11.0" }
+          - { platform: windows-x64, runner: windows-2025, target: x64 }
+          - { platform: windows-arm64, runner: windows-11-arm, target: aarch64 }
+    env:
+      MACOSX_DEPLOYMENT_TARGET: ${{ matrix.macos }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master, 2026-10-16
+        if: runner.os != 'Linux' # on Linux the build runs in the manylinux_2_28 container
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+      - name: PyPI's description
+        env:
+          REF: ${{ needs.check.outputs.ref }}
+        run: python -P scripts/release/pypi_readme.py --ref "$REF" README.md
+      - name: Build the wheel
+        uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
+        with:
+          maturin-version: v${{ env.MATURIN_VERSION }}
+          rust-toolchain: ${{ env.RUST_TOOLCHAIN }}
+          target: ${{ matrix.target }}
+          manylinux: ${{ matrix.manylinux }}
+          container: ${{ matrix.container }}
+          args: --profile dist --locked --out dist
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: wheels-${{ matrix.platform }}
+          path: dist/*.whl
+          if-no-files-found: error
+          retention-days: 14
+
+  # The programs: larmorx-nc's and larmorx-gpl's wheels built from their sdists, their golden
+  # tests run on the programs those wheels install (LARMORX_GOLDEN_PROGRAM), and the standalone
+  # archives of larmorx, larmorx-nc and larmorx-gpl (scripts/release/archives.py).
+  programs:
+    name: programs (${{ matrix.platform }})
+    needs: [check, sdist]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 120
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux-x64
+            runner: ubuntu-24.04
+            target: x86_64
+            triple: x86_64-unknown-linux-gnu
+            manylinux: "2_28"
+            container: quay.io/pypa/manylinux_2_28_x86_64:2026.10.26-1@sha256:e0adf18521ad35192df733a6c62d35df7801957d24e0470238aacecfab2188a3
+          - platform: linux-aarch64
+            runner: ubuntu-24.04-arm
+            target: aarch64
+            triple: aarch64-unknown-linux-gnu
+            manylinux: "2_28"
+            container: quay.io/pypa/manylinux_2_28_aarch64:2026.10.26-1@sha256:a3e02308c822fb6ce0d12248b0c941817ba5e1a1bc9e7bb5929f29c50eaa40a9
+          - platform: macos-arm64
+            runner: macos-15
+            target: aarch64
+            triple: aarch64-apple-darwin
+            macos: "11.0"
+          - platform: macos-x64
+            runner: macos-15-intel
+            target: x86_64
+            triple: x86_64-apple-darwin
+            macos: "11.0"
+          - { platform: windows-x64, runner: windows-2025, target: x64, triple: x86_64-pc-windows-msvc }
+          - platform: windows-arm64
+            runner: windows-11-arm
+            target: aarch64
+            triple: aarch64-pc-windows-msvc
+    env:
+      MACOSX_DEPLOYMENT_TARGET: ${{ matrix.macos }}
+      VERSION: ${{ needs.check.outputs.version }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master, 2026-10-16
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: sdist
+          path: sdist
+      - name: Unpack the companions' sdists
+        # inside the checkout, so that a build there finds the repository's .cargo/config.toml
+        # (Windows' static C runtime) and rust-toolchain.toml, as every release build does
+        run: |
+          python -c "import sys, tarfile; [tarfile.open(p).extractall('_build', filter='data') for p in sys.argv[1:]]" \
+            "sdist/larmorx_nc-$VERSION.tar.gz" "sdist/larmorx_gpl-$VERSION.tar.gz"
+          ls _build
+      - name: Build larmorx-nc's wheel from its sdist
+        uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
+        with:
+          maturin-version: v${{ env.MATURIN_VERSION }}
+          rust-toolchain: ${{ env.RUST_TOOLCHAIN }}
+          target: ${{ matrix.target }}
+          manylinux: ${{ matrix.manylinux }}
+          container: ${{ matrix.container }}
+          working-directory: _build/larmorx_nc-${{ needs.check.outputs.version }}
+          args: --profile dist --locked --out ../../programs
+      - name: Build larmorx-gpl's wheel from its sdist
+        uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
+        with:
+          maturin-version: v${{ env.MATURIN_VERSION }}
+          rust-toolchain: ${{ env.RUST_TOOLCHAIN }}
+          target: ${{ matrix.target }}
+          manylinux: ${{ matrix.manylinux }}
+          container: ${{ matrix.container }}
+          working-directory: _build/larmorx_gpl-${{ needs.check.outputs.version }}
+          args: --profile dist --locked --out ../../programs
+      - name: Build the standalone larmorx and lx (a program wheel, not published)
+        uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
+        with:
+          maturin-version: v${{ env.MATURIN_VERSION }}
+          rust-toolchain: ${{ env.RUST_TOOLCHAIN }}
+          target: ${{ matrix.target }}
+          manylinux: ${{ matrix.manylinux }}
+          container: ${{ matrix.container }}
+          working-directory: crates/larmorx-cli
+          args: --profile dist --locked --bindings bin --out ../../programs
+      # Failures are also printed as annotations, which GitHub shows without a login.
+      - name: The companions' golden tests on the programs their wheels install
+        env:
+          LARMORX_GOLDEN_MISMATCHES: ${{ github.workspace }}/golden-mismatches
+          # the toolchain the setup step installed, as it is: without this, cargo reads
+          # rust-toolchain.toml and rustup adds its components (rustfmt, clippy) to that
+          # toolchain, which failed on ubuntu-24.04-arm ("detected conflict: 'bin/cargo-clippy'",
+          # dry run 1); a test needs neither
+          RUSTUP_TOOLCHAIN: ${{ env.RUST_TOOLCHAIN }}
+        run: |
+          python -m venv .venv-programs
+          vpy=.venv-programs/bin/python
+          [ "$RUNNER_OS" = Windows ] && vpy=.venv-programs/Scripts/python.exe
+          "$vpy" -m pip install --no-index --no-deps \
+            "programs/larmorx_nc-$VERSION"-*.whl "programs/larmorx_gpl-$VERSION"-*.whl
+          # a program of the environment, without a newline (Git Bash would keep print's "\r")
+          which() { "$vpy" -c "import pathlib, shutil, sys, sysconfig; p = shutil.which(sys.argv[1], path=sysconfig.get_path('scripts')); sys.exit(f'{sys.argv[1]} is not installed') if p is None else sys.stdout.write(pathlib.Path(p).as_posix())" "$1"; }
+          nc=$(which larmorx-nc)
+          gpl=$(which larmorx-gpl)
+          "$nc" --version
+          "$gpl" --version
+          cd crates-nc
+          LARMORX_GOLDEN_PROGRAM="$nc" cargo test --locked -p larmorx-nc-cli --test golden 2>&1 | tee cargo-test.log || {
+            python ../scripts/ci_cargo_failures.py cargo-test.log
+            exit 1
+          }
+          cd ../crates-gpl
+          LARMORX_GOLDEN_PROGRAM="$gpl" cargo test --locked -p larmorx-gpl-cli --test golden 2>&1 | tee cargo-test.log || {
+            python ../scripts/ci_cargo_failures.py cargo-test.log
+            exit 1
+          }
+      - name: Upload golden-test mismatches
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: golden-mismatches-programs-${{ matrix.platform }}
+          path: golden-mismatches/
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: The standalone archives
+        env:
+          SOURCE_DATE_EPOCH: ${{ needs.check.outputs.epoch }}
+          TRIPLE: ${{ matrix.triple }}
+        run: |
+          python -P scripts/release/archives.py --version "$VERSION" --target "$TRIPLE" \
+            --wheels programs --out archives
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: companions-${{ matrix.platform }}
+          path: |
+            programs/larmorx_nc-*.whl
+            programs/larmorx_gpl-*.whl
+          if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: archives-${{ matrix.platform }}
+          path: archives/*
+          if-no-files-found: error
+          retention-days: 14
+
+  # Every built file of a platform installed and tested there, as a user would get it: no Rust,
+  # the golden tests (each platform must reproduce larmorx's Linux x86_64 output, on the dist
+  # builds), the smoke checks (versions, the programs, larmorx-nc's FSL data, glibc 2.28, macOS
+  # 11.0, no C runtime DLL on Windows), `larmorx[all]` from the built files.
+  test:
+    name: test (${{ matrix.platform }})
+    needs: [check, wheel, programs]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { platform: linux-x64, runner: ubuntu-24.04, triple: x86_64-unknown-linux-gnu }
+          - { platform: linux-aarch64, runner: ubuntu-24.04-arm, triple: aarch64-unknown-linux-gnu }
+          - { platform: macos-arm64, runner: macos-15, triple: aarch64-apple-darwin }
+          - { platform: macos-x64, runner: macos-15-intel, triple: x86_64-apple-darwin }
+          - platform: windows-x64
+            runner: windows-2025
+            triple: x86_64-pc-windows-msvc
+            machine: x86_64
+          - platform: windows-arm64
+            runner: windows-11-arm
+            triple: aarch64-pc-windows-msvc
+            machine: aarch64
+    env:
+      VERSION: ${{ needs.check.outputs.version }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: wheels-${{ matrix.platform }}
+          path: dist
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: companions-${{ matrix.platform }}
+          path: dist
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: archives-${{ matrix.platform }}
+          path: archives
+      - name: Install the three wheels (Python 3.12)
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "dist/larmorx-$VERSION"-*.whl "dist/larmorx_nc-$VERSION"-*.whl \
+            "dist/larmorx_gpl-$VERSION"-*.whl
+          python -m pip install --group test
+      # The replicas' own tests run their installed programs (LARMORX_NC_BIN, LARMORX_GPL_BIN).
+      - name: Test the installed packages (the golden tests included)
+        env:
+          LARMORX_GOLDEN_MISMATCHES: ${{ github.workspace }}/golden-mismatches
+        run: |
+          # a program of the environment, without a newline (Git Bash would keep print's "\r")
+          which() { python -c "import pathlib, shutil, sys, sysconfig; p = shutil.which(sys.argv[1], path=sysconfig.get_path('scripts')); sys.exit(f'{sys.argv[1]} is not installed') if p is None else sys.stdout.write(pathlib.Path(p).as_posix())" "$1"; }
+          LARMORX_NC_BIN=$(which larmorx-nc)
+          LARMORX_GPL_BIN=$(which larmorx-gpl)
+          export LARMORX_NC_BIN LARMORX_GPL_BIN
+          python -m pytest
+      - name: Upload golden-test mismatches
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: golden-mismatches-test-${{ matrix.platform }}
+          path: golden-mismatches/
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Smoke checks of the installed packages and the standalone archives
+        env:
+          TRIPLE: ${{ matrix.triple }}
+        run: |
+          python -P scripts/release/smoke.py --version "$VERSION" --installed \
+            --archives archives --target "$TRIPLE"
+      - name: No C runtime DLL in the Windows files
+        if: runner.os == 'Windows'
+        env:
+          MACHINE: ${{ matrix.machine }}
+        run: python -P scripts/release/pe_imports.py --machine "$MACHINE" --quiet dist archives
+      - name: larmorx[all] from the built files, in a fresh environment
+        run: |
+          python -m venv .venv-all
+          vpy=.venv-all/bin/python
+          [ "$RUNNER_OS" = Windows ] && vpy=.venv-all/Scripts/python.exe
+          "$vpy" -m pip install --upgrade pip
+          # our three packages from the built wheels; their dependencies as a user gets them
+          "$vpy" -m pip install --only-binary larmorx,larmorx-nc,larmorx-gpl --find-links dist \
+            "larmorx[all]==$VERSION"
+          "$vpy" -m pip check
+          "$vpy" -P scripts/release/smoke.py --version "$VERSION" --installed
+          "$vpy" -c "import importlib.util as u; m = [n for n in ('matplotlib', 'nilearn', 'pandas', 'jinja2', 'templateflow') if u.find_spec(n) is None]; assert not m, m"
+      # The abi3 wheel on the newer CPythons; one platform is enough, without the golden tests
+      # (they ran above, on the same wheel), as CI does.
+      - name: Set up Python 3.13 and 3.14
+        if: matrix.platform == 'linux-x64'
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: |
+            3.13
+            3.14
+      - name: Test the installed packages on Python 3.13 and 3.14
+        if: matrix.platform == 'linux-x64'
+        run: |
+          for v in 3.13 3.14; do
+            "python$v" -m venv ".venv-$v"
+            vpy=".venv-$v/bin/python"
+            "$vpy" -m pip install --upgrade pip
+            "$vpy" -m pip install "dist/larmorx-$VERSION"-*.whl "dist/larmorx_nc-$VERSION"-*.whl \
+              "dist/larmorx_gpl-$VERSION"-*.whl
+            "$vpy" -m pip install --group test
+            LARMORX_NC_BIN="$PWD/.venv-$v/bin/larmorx-nc" LARMORX_GPL_BIN="$PWD/.venv-$v/bin/larmorx-gpl" \
+              "$vpy" -m pytest --ignore=tests/golden
+          done
+
+  # The sdists built from source, as pip does where no wheel fits (Rust 1.99 or newer needed),
+  # and the same tests on what they install.
+  sdist-install:
+    name: sdist-install
+    needs: [check, sdist]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    env:
+      VERSION: ${{ needs.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      # the default toolchain: pip builds the sdists outside the checkout
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master, 2026-10-16
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: sdist
+          path: sdist
+      - name: Build and install the three packages from their sdists
+        env:
+          MATURIN_PEP517_ARGS: --locked
+        run: |
+          python -m venv .venv-src
+          .venv-src/bin/python -m pip install --upgrade pip
+          .venv-src/bin/python -m pip install "sdist/larmorx-$VERSION.tar.gz" \
+            "sdist/larmorx_nc-$VERSION.tar.gz" "sdist/larmorx_gpl-$VERSION.tar.gz"
+          .venv-src/bin/python -m pip install --group test
+      - name: Test them (the golden tests included)
+        env:
+          LARMORX_GOLDEN_MISMATCHES: ${{ github.workspace }}/golden-mismatches
+        run: |
+          # built here: the binaries link the runner's glibc (the 2.28 floor is the published
+          # files', checked by the test and verify-pypi jobs)
+          .venv-src/bin/python -P scripts/release/smoke.py --version "$VERSION" --installed \
+            --source-build
+          LARMORX_NC_BIN="$PWD/.venv-src/bin/larmorx-nc" LARMORX_GPL_BIN="$PWD/.venv-src/bin/larmorx-gpl" \
+            .venv-src/bin/python -m pytest tests/python tests/golden
+      - name: Upload golden-test mismatches
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: golden-mismatches-sdist-install
+          path: golden-mismatches/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  # The container images (docker/Dockerfile, scripts/release/container.py), each architecture on
+  # its own runner, from the Linux files the jobs above built: larmorx (Apache-2.0 and permissive
+  # licences only) and larmorx-all (with larmorx-gpl and larmorx-nc: non-commercial use only).
+  # Built, checked inside (as root, and as an unprivileged user on a read-only file system as
+  # Apptainer runs them; the golden tests), kept as OCI archives. Nothing is pushed here: on a
+  # release, container-push does that after PyPI took the files.
+  container:
+    name: container (${{ matrix.arch }})
+    needs: [check, sdist, wheel, programs]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: amd64, runner: ubuntu-24.04, platform: linux-x64 }
+          - { arch: arm64, runner: ubuntu-24.04-arm, platform: linux-aarch64 }
+    env:
+      VERSION: ${{ needs.check.outputs.version }}
+      ARCH: ${{ matrix.arch }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: wheels-${{ matrix.platform }}
+          path: files/wheels
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: companions-${{ matrix.platform }}
+          path: files/wheels
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: sdist
+          path: files/sdist
+      - name: The build context
+        run: |
+          python3 -P scripts/release/container.py stage --version "$VERSION" --arch "$ARCH" \
+            --wheels files/wheels --sdists files/sdist --out image-context
+      - name: Build the two images (nothing is pushed)
+        env:
+          REVISION: ${{ github.sha }}
+          EPOCH: ${{ needs.check.outputs.epoch }}
+        run: |
+          docker version --format 'Docker {{.Server.Version}}'
+          docker buildx version
+          python3 -P scripts/release/container.py build --version "$VERSION" --arch "$ARCH" \
+            --context image-context --out images --revision "$REVISION" --epoch "$EPOCH"
+      - name: The checks inside the images (the golden tests included)
+        run: python3 -P scripts/release/container.py check --version "$VERSION" --out images
+      - name: Upload golden-test mismatches
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: golden-mismatches-container-${{ matrix.arch }}
+          path: images/golden-mismatches-*/
+          if-no-files-found: ignore
+          retention-days: 14
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: images-${{ matrix.arch }}
+          path: |
+            images/*.oci.tar
+            images/images.json
+            images/pip-freeze-*.txt
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0 # the layers are compressed already
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: image-meta-${{ matrix.arch }}
+          path: |
+            images/images.json
+            images/pip-freeze-*.txt
+          if-no-files-found: error
+          retention-days: 14
+
+  # The whole set checked (every file of the six platforms, PyPI's size limit) and laid out for
+  # the publish jobs and the GitHub Release, with SHA256SUMS.
+  assemble:
+    name: assemble
+    needs: [check, sdist, wheel, programs, test, sdist-install, container]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      VERSION: ${{ needs.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: wheels-*
+          path: built
+          merge-multiple: true
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: companions-*
+          path: built
+          merge-multiple: true
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: archives-*
+          path: built
+          merge-multiple: true
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: sdist
+          path: built
+      - name: Check the set; SHA256SUMS
+        run: |
+          python -P scripts/release/assemble.py --version "$VERSION" --in built --out release
+          python -m pip install "twine==$TWINE_VERSION"
+          twine check --strict release/pypi/*
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: image-meta-*
+          path: image-meta
+      - name: The images hold the same packages on both architectures
+        run: |
+          python -P scripts/release/container.py compare --version "$VERSION" \
+            --images image-meta/image-meta-amd64 image-meta/image-meta-arm64
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release
+          path: release/
+          if-no-files-found: error
+          retention-days: 30
+
+  # One publish job per package, each in its own environment (PyPI's trusted publishers name it;
+  # the environments allow only v* tags and need the maintainer's approval), each uploading only
+  # its package's 7 files (6 wheels, the sdist). PyPI's attestations are made on upload.
+  # skip-existing: a publish job that failed after uploading part of its files finishes with
+  # "Re-run failed jobs", which takes the same files (this run's artifact) and uploads only those
+  # PyPI does not have yet. Files built again cannot reach PyPI this way: "Re-run all jobs" runs
+  # check again, which finds the version on PyPI and stops the run.
+  publish-nc:
+    name: publish (larmorx-nc)
+    needs: [check, assemble]
+    if: needs.check.outputs.publish == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment:
+      name: pypi-nc
+      url: https://pypi.org/project/larmorx-nc/${{ needs.check.outputs.version }}/
+    permissions:
+      id-token: write # trusted publishing
+    env:
+      VERSION: ${{ needs.check.outputs.version }}
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release
+          path: release
+      - name: larmorx-nc's files
+        run: |
+          mkdir upload
+          mv "release/pypi/larmorx_nc-$VERSION.tar.gz" "release/pypi/larmorx_nc-$VERSION"-*.whl upload/
+          ls -l upload
+          test "$(find upload -type f | wc -l)" -eq 7
+      - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
+        with:
+          packages-dir: upload/
+          print-hash: true
+          attestations: true
+          skip-existing: true
+
+  publish-gpl:
+    name: publish (larmorx-gpl)
+    needs: [check, assemble]
+    if: needs.check.outputs.publish == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment:
+      name: pypi-gpl
+      url: https://pypi.org/project/larmorx-gpl/${{ needs.check.outputs.version }}/
+    permissions:
+      id-token: write # trusted publishing
+    env:
+      VERSION: ${{ needs.check.outputs.version }}
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release
+          path: release
+      - name: larmorx-gpl's files
+        run: |
+          mkdir upload
+          mv "release/pypi/larmorx_gpl-$VERSION.tar.gz" "release/pypi/larmorx_gpl-$VERSION"-*.whl upload/
+          ls -l upload
+          test "$(find upload -type f | wc -l)" -eq 7
+      - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
+        with:
+          packages-dir: upload/
+          print-hash: true
+          attestations: true
+          skip-existing: true
+
+  # larmorx last: it waits (at most 20 minutes) until PyPI lists both companions' files of this
+  # version with this release's SHA-256s, so that larmorx[all]==<version> never names a version
+  # PyPI does not have; a failed companion upload leaves larmorx unpublished.
+  publish-larmorx:
+    name: publish (larmorx)
+    needs: [check, assemble]
+    if: needs.check.outputs.publish == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    environment:
+      name: pypi
+      url: https://pypi.org/project/larmorx/${{ needs.check.outputs.version }}/
+    permissions:
+      contents: read # the checkout of the waiting script
+      id-token: write # trusted publishing
+    env:
+      VERSION: ${{ needs.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts/release
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release
+          path: release
+      - name: Wait until PyPI has larmorx-nc and larmorx-gpl
+        run: |
+          python3 -P scripts/release/pypi_state.py wait --version "$VERSION" --timeout 1200 \
+            release/pypi/larmorx_nc-"$VERSION"* release/pypi/larmorx_gpl-"$VERSION"*
+      - name: larmorx's files
+        run: |
+          mkdir upload
+          mv "release/pypi/larmorx-$VERSION.tar.gz" "release/pypi/larmorx-$VERSION"-*.whl upload/
+          ls -l upload
+          test "$(find upload -type f | wc -l)" -eq 7
+      - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
+        with:
+          packages-dir: upload/
+          print-hash: true
+          attestations: true
+          skip-existing: true
+
+  # A release only, after the three uploads: the two images pushed by digest, each as one
+  # multi-architecture index (amd64, arm64) tagged <version> and <version>-all (also latest and
+  # latest-all for a final release, never for an alpha, beta or release candidate); each tag read
+  # back and compared; GitHub's build provenance of both indexes. The only job that may write to
+  # the registry (packages: write).
+  container-push:
+    name: container push
+    needs: [check, container, publish-larmorx, publish-nc, publish-gpl]
+    if: needs.check.outputs.publish == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read # the checkout of the script
+      packages: write # ghcr.io/karellopez/larmorx
+      id-token: write # the provenance attestations (Sigstore)
+      attestations: write # the provenance attestations
+    outputs:
+      digest: ${{ steps.push.outputs.digest }}
+      digest-all: ${{ steps.push.outputs.digest-all }}
+    env:
+      VERSION: ${{ needs.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts/release
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: images-*
+          path: images
+      - name: One multi-architecture index per image
+        run: |
+          python3 -P scripts/release/container.py index --version "$VERSION" \
+            --images images/images-amd64 images/images-arm64 --out layout
+      - name: Push the images and tag them
+        id: push
+        env:
+          ACTOR: ${{ github.actor }}
+          TOKEN: ${{ github.token }}
+          PRERELEASE: ${{ needs.check.outputs.prerelease }}
+        run: |
+          command -v skopeo >/dev/null || { sudo apt-get update -q && sudo apt-get install -y -q skopeo; }
+          skopeo --version
+          printf '%s' "$TOKEN" | skopeo login --authfile "$RUNNER_TEMP/ghcr-auth.json" \
+            --username "$ACTOR" --password-stdin ghcr.io
+          latest=--latest
+          [ "$PRERELEASE" = true ] && latest=
+          python3 -P scripts/release/container.py push --layout layout \
+            --authfile "$RUNNER_TEMP/ghcr-auth.json" $latest
+      - name: Forget the registry's credentials
+        if: always()
+        run: rm -f "$RUNNER_TEMP/ghcr-auth.json"
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ghcr.io/karellopez/larmorx
+          subject-digest: ${{ steps.push.outputs.digest }}
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ghcr.io/karellopez/larmorx
+          subject-digest: ${{ steps.push.outputs.digest-all }}
+
+  # After the three uploads and the images: the GitHub Release of the tag, with every file (the 21
+  # PyPI files, the 18 standalone archives), SHA256SUMS, the notes from CHANGELOG.md (with the
+  # images' digests) and GitHub's build provenance of each file; a pre-release for an alpha, beta
+  # or release candidate.
+  github-release:
+    name: GitHub Release
+    needs: [check, publish-larmorx, publish-nc, publish-gpl, container-push]
+    if: needs.check.outputs.publish == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: write # the release
+      id-token: write # the provenance attestations (Sigstore)
+      attestations: write # the provenance attestations
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release
+          path: release
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-notes
+          path: notes
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            release/pypi/*
+            release/archives/*
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.check.outputs.tag }}
+          VERSION: ${{ needs.check.outputs.version }}
+          PRERELEASE: ${{ needs.check.outputs.prerelease }}
+          DIGEST: ${{ needs.container-push.outputs.digest }}
+          DIGEST_ALL: ${{ needs.container-push.outputs.digest-all }}
+        run: |
+          {
+            echo
+            echo "**Container images** (linux/amd64, linux/arm64): \`ghcr.io/karellopez/larmorx:$VERSION\`" \
+              "(\`$DIGEST\`) and \`ghcr.io/karellopez/larmorx:$VERSION-all\` (\`$DIGEST_ALL\`)."
+          } >> notes/release-notes.md
+          flags=(--verify-tag --title "larmorx $VERSION" --notes-file notes/release-notes.md)
+          if [ "$PRERELEASE" = true ]; then flags+=(--prerelease --latest=false); else flags+=(--latest); fi
+          gh release create "$TAG" "${flags[@]}" release/pypi/* release/archives/* release/SHA256SUMS
+
+  # The release as users get it: `pip install "larmorx[all]==<version>"` from PyPI itself on the
+  # six platforms (asking again while PyPI's index catches up), the golden and smoke tests.
+  verify-pypi:
+    name: from PyPI (${{ matrix.platform }})
+    needs: [check, publish-larmorx]
+    if: needs.check.outputs.publish == 'true'
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { platform: linux-x64, runner: ubuntu-24.04 }
+          - { platform: linux-aarch64, runner: ubuntu-24.04-arm }
+          - { platform: macos-arm64, runner: macos-15 }
+          - { platform: macos-x64, runner: macos-15-intel }
+          - { platform: windows-x64, runner: windows-2025 }
+          - { platform: windows-arm64, runner: windows-11-arm }
+    env:
+      VERSION: ${{ needs.check.outputs.version }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - name: pip install "larmorx[all]==<version>" from PyPI
+        run: |
+          python -m pip install --upgrade pip
+          for attempt in $(seq 1 20); do
+            if python -m pip install --no-cache-dir --only-binary larmorx,larmorx-nc,larmorx-gpl \
+              "larmorx[all]==$VERSION"; then
+              break
+            elif [ "$attempt" = 20 ]; then
+              echo "::error title=PyPI::larmorx[all]==$VERSION did not install from PyPI"
+              exit 1
+            fi
+            sleep 30
+          done
+          python -m pip install --group test
+      - name: The smoke checks and the golden tests
+        run: |
+          python -P scripts/release/smoke.py --version "$VERSION" --installed
+          # a program of the environment, without a newline (Git Bash would keep print's "\r")
+          which() { python -c "import pathlib, shutil, sys, sysconfig; p = shutil.which(sys.argv[1], path=sysconfig.get_path('scripts')); sys.exit(f'{sys.argv[1]} is not installed') if p is None else sys.stdout.write(pathlib.Path(p).as_posix())" "$1"; }
+          LARMORX_NC_BIN=$(which larmorx-nc)
+          LARMORX_GPL_BIN=$(which larmorx-gpl)
+          export LARMORX_NC_BIN LARMORX_GPL_BIN
+          python -m pytest tests/golden tests/python/test_smoke.py

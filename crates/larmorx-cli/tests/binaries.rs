@@ -10,7 +10,7 @@ fn run(exe: &str, args: &[&str]) -> Output {
 
 #[test]
 fn larmorx_and_lx_print_the_version() {
-    let expected = format!("larmorx {}\n", env!("CARGO_PKG_VERSION"));
+    let expected = format!("larmorx {}\n", larmorx_core::VERSION);
     for exe in [env!("CARGO_BIN_EXE_larmorx"), env!("CARGO_BIN_EXE_lx")] {
         let output = run(exe, &["--version"]);
         assert!(output.status.success(), "{exe}: {output:?}");

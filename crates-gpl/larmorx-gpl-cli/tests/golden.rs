@@ -10,8 +10,9 @@
 //! few lose their last echo), written as NIfTI-1 files by the test itself. Each case runs
 //! `larmorx-gpl tedana t2smap` with relative file names in its own directory and hashes (SHA-256)
 //! every file it writes: the images' header and data (decompressed), the table, the JSON files
-//! (`dataset_description.json` without its `Node` block, the host's name and system), the call
-//! script; and the exit status and the upstream defects named on standard error. One case per
+//! (`dataset_description.json` without its `Node` block, the host's name and system, and with
+//! larmorx-gpl's version written `<version>`: a release changes no checksum), the call script;
+//! and the exit status and the upstream defects named on standard error. One case per
 //! distinct code path: each fit type and mode, each combination, both naming conventions, the
 //! curve fit's variance maps, no mask (nilearn's mask), both adaptive-mask methods, dummy scans
 //! and excluded volumes, float32 and int16 inputs, a z-concatenated file, echo times in
@@ -22,12 +23,18 @@
 //! (`LARMORX_GOLDEN_ALLOW_DIRTY=1` to record from uncommitted changes). On a mismatch the
 //! outputs are saved in `$LARMORX_GOLDEN_MISMATCHES` (CI uploads it), else in
 //! `target/tmp/golden-mismatches`.
+//!
+//! The installed program: `LARMORX_GOLDEN_PROGRAM=<path or name> cargo test --locked -p
+//! larmorx-gpl-cli --test golden` runs that `larmorx-gpl` instead of cargo's build (e.g. the
+//! program a wheel installs, `<venv>/bin/larmorx-gpl`; `Scripts\larmorx-gpl.exe` on Windows),
+//! after checking that its `--version` is this checkout's.
 
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::io::Read as _;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::OnceLock;
 
 use sha2::{Digest, Sha256};
 
@@ -35,6 +42,65 @@ const EXE: &str = env!("CARGO_BIN_EXE_larmorx-gpl");
 const GOLDEN: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/golden.tsv");
 /// Values kept per image, at fixed positions, to tell how large a mismatch is.
 const N_SAMPLES: usize = 8;
+
+/// This crate's version in PEP 440's form, as `larmorx-gpl --version` prints it (build.rs).
+const VERSION: &str = env!("LARMORX_GPL_PEP440_VERSION");
+
+/// The program the cases run: cargo's build of `larmorx-gpl` (the test's own), or the one
+/// `LARMORX_GOLDEN_PROGRAM` names, e.g. the program the larmorx-gpl wheel installs: a path (a
+/// relative one from this crate's directory, where cargo runs the tests) or a name looked up on
+/// `PATH` (`.exe` added on Windows). Its `--version` must be this crate's.
+fn program() -> &'static Path {
+    static PROGRAM: OnceLock<PathBuf> = OnceLock::new();
+    PROGRAM.get_or_init(|| match std::env::var_os("LARMORX_GOLDEN_PROGRAM") {
+        Some(given) if !given.is_empty() => installed(Path::new(&given)),
+        _ => PathBuf::from(EXE),
+    })
+}
+
+/// `LARMORX_GOLDEN_PROGRAM`'s program as an absolute path, once its `--version` is checked.
+fn installed(given: &Path) -> PathBuf {
+    let with_exe = |p: PathBuf| {
+        let exe = p.with_extension(std::env::consts::EXE_EXTENSION);
+        [p, exe]
+    };
+    let bare = given.parent().is_some_and(|p| p.as_os_str().is_empty());
+    let found = if bare {
+        std::env::var_os("PATH").and_then(|path| {
+            std::env::split_paths(&path)
+                .flat_map(|dir| with_exe(dir.join(given)))
+                .find(|p| p.is_file())
+        })
+    } else {
+        with_exe(given.to_path_buf())
+            .into_iter()
+            .find(|p| p.is_file())
+    };
+    let found = found.unwrap_or_else(|| {
+        panic!(
+            "LARMORX_GOLDEN_PROGRAM={}: no such program",
+            given.display()
+        )
+    });
+    let path = std::path::absolute(&found).unwrap_or_else(|e| panic!("{}: {e}", found.display()));
+    let out = Command::new(&path)
+        .arg("--version")
+        .output()
+        .unwrap_or_else(|e| panic!("LARMORX_GOLDEN_PROGRAM={}: {e}", path.display()));
+    let reported = String::from_utf8_lossy(&out.stdout).trim_end().to_owned();
+    assert!(
+        out.status.success() && reported == format!("larmorx-gpl {VERSION}"),
+        "LARMORX_GOLDEN_PROGRAM={}: --version printed {reported:?} (exit status {:?}), not \
+         this checkout's larmorx-gpl {VERSION}",
+        path.display(),
+        out.status.code()
+    );
+    eprintln!(
+        "golden: running {} ({reported}), not cargo's build",
+        path.display()
+    );
+    path
+}
 
 /// The series: 16 x 14 x 8 voxels of 3 x 3 x 3.5 mm, 4 volumes, TR 2 s.
 const SHAPE: [usize; 3] = [16, 14, 8];
@@ -449,6 +515,21 @@ fn without_node(text: &str) -> String {
     out
 }
 
+/// `text` with this crate's version written `<version>` where tedana's description names the
+/// program (`"Python": "larmorx-gpl <version> (tedana 26.0.3's t2smap ...)"`), so that a release
+/// changes no checksum (as the Python golden tests' HDF5 `/OSVersion`). Only this version is
+/// replaced, in Cargo's form (`0.1.0-rc.1`) or PEP 440's (`0.1.0rc1`): any other still differs.
+fn without_version(text: &str) -> String {
+    [env!("CARGO_PKG_VERSION"), VERSION]
+        .iter()
+        .fold(text.to_owned(), |t, v| {
+            t.replace(
+                &format!("\"Python\": \"larmorx-gpl {v} "),
+                "\"Python\": \"larmorx-gpl <version> ",
+            )
+        })
+}
+
 /// Every file a run wrote below `dir`, by its path there: images by header and data, the
 /// others by their bytes.
 fn case_fingerprints(dir: &Path) -> Vec<(String, Fingerprint)> {
@@ -478,7 +559,10 @@ fn case_fingerprints(dir: &Path) -> Vec<(String, Fingerprint)> {
             }
         } else if name.ends_with("dataset_description.json") {
             let text = std::fs::read_to_string(&p).unwrap();
-            out.push((name, text_fingerprint(&without_node(&text))));
+            out.push((
+                name,
+                text_fingerprint(&without_version(&without_node(&text))),
+            ));
         } else {
             let bytes = std::fs::read(&p).unwrap();
             out.push((
@@ -680,7 +764,7 @@ fn golden() {
         let (family, tool) = case.tool.split_once(' ').unwrap();
         let mut args: Vec<String> = vec![family.into(), tool.into()];
         args.extend(case.args.split_whitespace().map(|a| fill(a, &inputs)));
-        let out = Command::new(EXE)
+        let out = Command::new(program())
             .args(&args)
             .current_dir(&run)
             .env_remove("COLUMNS")
@@ -763,12 +847,26 @@ fn golden() {
             }
         }
         panic!(
-            "{} golden mismatches (recorded from {source}); outputs saved in {}:\n{}",
+            "{} golden mismatches of {} (recorded from {source}); outputs saved in {}:\n{}",
             problems.len(),
+            program().display(),
             save.display(),
             problems.join("\n")
         );
     }
+}
+
+#[test]
+fn the_version_is_written_as_a_placeholder() {
+    let line = |v: &str| format!("    \"Python\": \"larmorx-gpl {v} (tedana 26.0.3's t2smap)\",\n");
+    let normalised = line("<version>");
+    assert_eq!(
+        without_version(&line(env!("CARGO_PKG_VERSION"))),
+        normalised
+    );
+    assert_eq!(without_version(&line(VERSION)), normalised);
+    // another version (an older program's) is kept, so its checksum differs
+    assert_eq!(without_version(&line("0.0.1")), line("0.0.1"));
 }
 
 #[test]

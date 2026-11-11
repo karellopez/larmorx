@@ -1,0 +1,96 @@
+# The first release's site handoff (relay 6, 2026-11-11, from relay 5b's handoff_site.py and handoff_roadmap.py):
+# the site's shared files, applied when the site's branch release-pages is merged and published, AFTER PyPI has
+# 0.1.0rc1 (the pages give its install lines, download addresses and image names):
+#   cd <larmorx checkout> && python -P scripts/orchestration/apply_handoff.py <scratch>/HANDOFF-site.toml --site <site checkout> [--check]
+# The roadmap's row and "Last updated" are dated 2026-11-12 (CHANGELOG's and CITATION.cff's date); on another day,
+# validation/investigations/release-0.1/site/handoff_roadmap.py <site> <day> instead of the four roadmap operations.
+
+# site.yml: the navigation's Install
+[[op]]
+do = "edit"
+file = "site:site.yml"
+old = '''
+  - { title: Status, url: "/#status" }
+  - { title: Validation, url: "/validation/" }
+'''
+new = '''
+  - { title: Status, url: "/#status" }
+  - { title: Install, url: "/installation/" }
+  - { title: Validation, url: "/validation/" }
+'''
+
+# site.yml: the documentation list's two pages
+[[op]]
+do = "edit"
+file = "site:site.yml"
+old = '''
+  - { title: Overview, url: "/" }
+  - { title: Validation, url: "/validation/" }
+'''
+new = '''
+  - { title: Overview, url: "/" }
+  - { title: Installation, url: "/installation/" }
+  - { title: Why Rust and Python, url: "/why-rust-and-python/" }
+  - { title: Validation, url: "/validation/" }
+'''
+
+# data/status.yml: the planned release item
+[[op]]
+do = "edit"
+file = "site:data/status.yml"
+old = '''
+  - eco: [larmorx]
+    title: Releases on PyPI
+    text: for all six platforms.
+'''
+new = '''
+  - eco: [larmorx]
+    title: Release 0.1.0
+    text: the final release, once the release candidate 0.1.0rc1 installs cleanly on all six platforms.
+'''
+
+# content/roadmap.md: the release section
+[[op]]
+do = "edit"
+file = "site:content/roadmap.md"
+old = '''
+## The first release {#release}
+
+- A check on clean machines, without compilers or runtimes installed (Windows, a minimal Linux).
+- The Windows runtime linked into the programs; smaller binaries.
+- A release workflow: the wheels for the six platforms, built, tested and uploaded on a version tag; the package names reserved on PyPI.
+- A page explaining why LARMORX is built in Rust with Python on top: why the original tools have no Windows version, what Rust gives and what the project's own rules add (its own maths functions, one fixed order for matrix arithmetic, the same digits on every platform), and the honest limits.
+'''
+new = '''
+## The first release {#release}
+
+The release candidate 0.1.0rc1 is out ([installation](/installation/)). Release 0.1.0 follows once it installs cleanly on all six platforms.
+'''
+
+# content/roadmap.md: the release's row at the top of the completed steps (dated 2026-11-12)
+[[op]]
+do = "edit"
+file = "site:content/roadmap.md"
+old = '''
+|---|---|
+| 2026-11-10 | **Field maps, part B'''
+new = '''
+|---|---|
+| 2026-11-12 | **The first release: 0.1.0rc1, a release candidate.** The three packages on PyPI at one version: `larmorx` (Apache-2.0), `larmorx-nc` (the FSL replicas; the FSL Licence, non-commercial use only) and `larmorx-gpl` (tedana's `t2smap`; the GNU GPL version 3), `pip install "larmorx[all]"` for all three; wheels for Linux, macOS and Windows on x86-64 and ARM, built and tested on every platform by a release workflow on the version's tag, with Windows' C runtime built into the programs and smaller binaries; the standalone programs for each platform and two container images for Apptainer, Docker and Podman; every file with its SHA-256 and GitHub's record of its build; the files rehearsed on clean Linux systems and on Windows before the upload. With it, the pages [Installation](/installation/) and [Why Rust and Python](/why-rust-and-python/) |
+| 2026-11-10 | **Field maps, part B'''
+
+# content/roadmap.md: last updated
+[[op]]
+do = "edit"
+file = "site:content/roadmap.md"
+old = "**Last updated: 2026-11-10.**"
+new = "**Last updated: 2026-11-12.**"
+
+# content/roadmap.md: the description
+[[op]]
+do = "edit"
+file = "site:content/roadmap.md"
+old = '''
+the final validation phase, the first release, and every step completed so far with its date.'''
+new = '''
+the final validation phase, the release after 0.1.0rc1, and every step completed so far with its date.'''

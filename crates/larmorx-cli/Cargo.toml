@@ -3,6 +3,7 @@ name = "larmorx-cli"
 description = "The larmorx multicall command line (alias lx), with original-compatible tool arguments"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 autobins = false

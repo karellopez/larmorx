@@ -1,0 +1,19 @@
+# The host names out of CLAUDE.md's "Machines" line (relay 6's HANDOFF.md; run in the checkout after HANDOFF.toml).
+import re
+import sys
+from pathlib import Path
+
+p = Path(sys.argv[1] if len(sys.argv) > 1 else "CLAUDE.md")
+t = p.read_text(encoding="utf-8")
+t, a = re.subn(r"the main machine is the new laptop \(`[^`]+`: AMD,", "the main machine is the new laptop (AMD,", t)
+t, b = re.subn(r"The old laptop \(`[^`]+`: Intel ", "The old laptop (Intel ", t)
+old = "RTX 4090, Ubuntu 22.04); every agent"
+c = t.count(old)
+assert (a, b, c) == (1, 1, 1), (a, b, c)
+t = t.replace(old, "RTX 4090, Ubuntu 22.04; the two laptops' host names are in the workspace's "
+              "`ORCHESTRATOR-STATE.md`, outside the repository); every agent")
+if "--check" in sys.argv:
+    print("claude_machines: applies (nothing written)")
+else:
+    p.write_text(t, encoding="utf-8")
+    print("claude_machines: written")

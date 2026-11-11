@@ -135,7 +135,7 @@ lx.afni.tshift("bold.nii.gz", slice_times="alt+z", implementation="original")
 ```
 
 - **`"auto"`** (the default) runs the bit-exact replica; **`"replica"`** and **`"original"`**
-  force one. Both are part of `pip install larmorx` (not on PyPI yet: build it from the
+  force one. Both are part of `pip install larmorx` (on PyPI from 0.1.0rc1, or built from the
   repository, `docs/licensing.md`, "Packages"); until 2026-10-29 the replica was the separate
   `larmorx-gpl` package, and `"auto"` ran the original without it.
 - **How it runs** (`docs/licensing.md`, "Choosing at run time"): in the same process (without

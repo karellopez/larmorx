@@ -633,6 +633,7 @@ mod tests {
                 .collect::<BTreeMap<_, _>>(),
             dir: None,
             stdin: None,
+            output_type_default: Default::default(),
         }
     }
 

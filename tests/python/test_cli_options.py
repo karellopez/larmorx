@@ -265,3 +265,40 @@ def test_a_replica_programs_output_is_passed_on_in_order(monkeypatch, tmp_path):
         ("out", "o2\n"),
         ("err", "e2"),
     ], order
+
+
+def test_fsl_tools_write_nifti_gz_when_fsloutputtype_is_unset(clean_env, tmp_path):
+    """FSL-11 through the console script: with ``FSLOUTPUTTYPE`` unset a clean-room FSL tool
+    writes ``NIFTI_GZ`` (the bytes it writes with the variable set) and names FSL-11 on one
+    line; ``--upstream-defects reproduce`` gives FSL's message and exit 1, no image. (Every FSL
+    tool: ``crates/larmorx-cli/tests/fsl_output_types.rs``.)"""
+    src = image(tmp_path / "in.nii", (12, 12, 10))
+    series = image(tmp_path / "series.nii", (12, 12, 10, 3))
+    calls = {
+        "fslmaths": ["fsl", "fslmaths", str(src), "-add", "1", str(tmp_path / "m")],
+        "mcflirt": ["mri", "hmc", "-in", str(series), "-out", str(tmp_path / "mc")],
+    }
+    first = {"fslmaths": tmp_path / "m.nii.gz", "mcflirt": tmp_path / "mc.nii.gz"}
+    for tool, argv in calls.items():
+        argv = ["--implementation", "clean-room", *argv]
+        clean_env.setenv("FSLOUTPUTTYPE", "NIFTI_GZ")
+        code, out, err = cli(argv)
+        assert code == 0, err
+        given = first[tool].read_bytes()
+        first[tool].unlink()
+        clean_env.delenv("FSLOUTPUTTYPE")
+        code_u, out_u, err_u = cli(argv)
+        assert (code_u, out_u) == (0, out), err_u
+        named = [line for line in err_u.splitlines() if "FSL-11" in line]
+        assert named == [
+            "larmorx: upstream defect FSL-11 (FSL) corrected: FSLOUTPUTTYPE is not set: the "
+            "images are written as NIFTI_GZ (.nii.gz); FSL's "
+            f"{tool} stops with an error at its first image (exit 1) "
+            "[LARMORX_UPSTREAM_DEFECTS=reproduce gives FSL's result]"
+        ], err_u
+        assert [line for line in err_u.splitlines() if "FSL-11" not in line] == err.splitlines()
+        assert first[tool].read_bytes() == given
+        first[tool].unlink()
+        code_r, _, err_r = cli(["--upstream-defects", "reproduce", *argv])
+        assert code_r == 1 and "ERROR:: Environment variable FSLOUTPUTTYPE is not set!" in err_r
+        assert "FSL-11" not in err_r and not first[tool].exists()

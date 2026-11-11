@@ -6,6 +6,11 @@
 //! for `bet -Z`) and larmorx's (`LARMORX_UPSTREAM_DEFECTS`, `OMP_NUM_THREADS` for the thread
 //! count) are read into a table of settings ([`Settings`]): the command line fills it from the
 //! process environment, the Python wrappers give it explicitly (porting guide §9.1).
+//!
+//! **FSL-11** (`FSLOUTPUTTYPE` unset): FSL's programs stop with an error at their first image
+//! (exit 1). By default every tool here writes `NIFTI_GZ` (`.nii.gz`) in its place and the run
+//! names FSL-11 once, at its end, when it wrote an image ([`run_with`]); with `reproduce`, FSL's
+//! message and exit 1 where FSL stops.
 
 pub mod aff2rigid;
 pub mod applytopup;
@@ -40,6 +45,8 @@ pub mod topup_debug;
 use std::collections::BTreeMap;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use larmorx_core::defects::{self, UpstreamDefects};
 
@@ -80,6 +87,21 @@ pub struct Settings {
     pub dir: Option<PathBuf>,
     /// Standard input's bytes for the coordinate programs (`None`: the process's own).
     pub stdin: Option<Vec<u8>>,
+    /// FSL-11: whether `FSLOUTPUTTYPE`, unset, was given `NIFTI_GZ` by [`run_with`], and whether an
+    /// image was written so (shared by the copies a run's steps make of its settings).
+    pub output_type_default: OutputTypeDefault,
+}
+
+/// FSL-11's default of one run ([`Settings::output_type_default`]): `None` when the run reads
+/// `FSLOUTPUTTYPE` as given; else whether an image was written in `NIFTI_GZ` in its place.
+#[derive(Clone, Debug, Default)]
+pub struct OutputTypeDefault(Option<Arc<AtomicBool>>);
+
+impl OutputTypeDefault {
+    /// Whether an image was written with `NIFTI_GZ` in place of the unset variable.
+    pub fn used(&self) -> bool {
+        self.0.as_ref().is_some_and(|w| w.load(Ordering::Relaxed))
+    }
 }
 
 impl Settings {
@@ -91,11 +113,34 @@ impl Settings {
                 .collect(),
             dir: None,
             stdin: None,
+            output_type_default: OutputTypeDefault::default(),
         }
     }
 
     pub fn get(&self, name: &str) -> Option<&str> {
         self.vars.get(name).map(String::as_str)
+    }
+
+    /// `FSLOUTPUTTYPE` for an image the run writes now: the variable (`None` when unset, which only
+    /// `reproduce` meets: FSL's message and exit 1 follow). Under FSL-11's default ([`run_with`])
+    /// it is `NIFTI_GZ`, and the run notes that an image was written so.
+    pub fn output_type(&self) -> Option<&str> {
+        if let Some(w) = &self.output_type_default.0 {
+            w.store(true, Ordering::Relaxed);
+        }
+        self.get("FSLOUTPUTTYPE")
+    }
+
+    /// These settings with FSL-11's default (`FSLOUTPUTTYPE=NIFTI_GZ`) when `FSLOUTPUTTYPE` is
+    /// unset and the mode is `fix`; `None` otherwise (a bad mode is the tool's own error).
+    fn with_output_type_default(&self) -> Option<Settings> {
+        if self.vars.contains_key("FSLOUTPUTTYPE") || self.defects() != Ok(UpstreamDefects::Fix) {
+            return None;
+        }
+        let mut s = self.clone();
+        s.vars.insert("FSLOUTPUTTYPE".into(), "NIFTI_GZ".into());
+        s.output_type_default = OutputTypeDefault(Some(Arc::new(AtomicBool::new(false))));
+        Some(s)
     }
 
     /// A file name as the run opens it: relative names start in [`Settings::dir`].
@@ -143,12 +188,34 @@ pub fn run_in(
         vars: env.into_iter().collect(),
         dir,
         stdin: None,
+        output_type_default: OutputTypeDefault::default(),
     };
     run_with(tool, args, &settings, out, err)
 }
 
-/// [`run`] with the settings given.
+/// [`run`] with the settings given. FSL-11: with `FSLOUTPUTTYPE` unset the tool runs with
+/// `NIFTI_GZ` by default and the run's last line names FSL-11 when it wrote an image (the tool's
+/// own steps, run through here with the variable set, name nothing); with `reproduce` the tool
+/// meets the unset variable as FSL does.
 pub fn run_with(
+    tool: &str,
+    args: &[String],
+    settings: &Settings,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> Option<u8> {
+    let Some(defaulted) = settings.with_output_type_default() else {
+        return dispatch(tool, args, settings, out, err);
+    };
+    let code = dispatch(tool, args, &defaulted, out, err);
+    if defaulted.output_type_default.used() {
+        common::print_notices(err, &[larmorx_mri::hmc::image::fsl11_notice(tool)]);
+    }
+    code
+}
+
+/// Runs `tool` with `settings` as they are.
+fn dispatch(
     tool: &str,
     args: &[String],
     settings: &Settings,

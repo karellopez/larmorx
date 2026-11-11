@@ -115,6 +115,19 @@ pub struct Defect {
     pub fixed_by_default: bool,
 }
 
+impl Defect {
+    /// This entry as the program `tool` meets it: a defect several programs share (FSL-09,
+    /// FSL-11), its notices naming the program that ran. Not in [`DEFECTS`]: the same ID.
+    pub const fn of(&self, tool: &'static str) -> Defect {
+        Defect {
+            id: self.id,
+            tool,
+            what: self.what,
+            fixed_by_default: self.fixed_by_default,
+        }
+    }
+}
+
 macro_rules! defects {
     ($($name:ident = $id:literal, $tool:literal, $default:literal, $what:literal;)*) => {
         $(
@@ -602,6 +615,8 @@ defects! {
         "int8 input is written as uint8, and integer outputs are truncated toward zero instead of rounded";
     FSL_10 = "FSL-10", "mcflirt", true,
         "output units are always millimetres and seconds, so a TR in milliseconds is labelled seconds";
+    FSL_11 = "FSL-11", "FSL", true,
+        "with FSLOUTPUTTYPE unset the programs stop with an error at their first image (exit 1), after the outputs written before it";
     FSL_13 = "FSL-13", "mcflirt", true,
         "-rmsrel and -rmsabs create the .mat directory without -mats (holding only the reference's identity)";
     FSL_14 = "FSL-14", "mcflirt", true,

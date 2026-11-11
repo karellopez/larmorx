@@ -175,6 +175,7 @@ pub fn main(args: &[String], settings: &Settings, out: &mut dyn Write, err: &mut
     }
     let ctx = Ctx {
         settings,
+        fsl09: &engine::FSL_09_APPLYXFM4D,
         mode,
         n_threads: settings.threads(),
         libm: std::sync::Arc::new(larmorx_core::math::Libm::quiet(mode)),

@@ -1019,6 +1019,7 @@ mod tests {
             .into(),
             dir: Some(p.to_path_buf()),
             stdin: None,
+            output_type_default: Default::default(),
         };
         let run = |w: &[&str]| {
             let args: Vec<String> = w.iter().map(|s| (*s).to_owned()).collect();

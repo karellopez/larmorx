@@ -968,6 +968,7 @@ mod tests {
             .into(),
             dir: None,
             stdin: None,
+            output_type_default: Default::default(),
         };
         let args = [
             "fsl-standard".to_owned(),

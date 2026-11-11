@@ -1220,3 +1220,64 @@ def blas_dgemv(
 def numpy_matmul(a: np.ndarray, b: np.ndarray, n_threads: int = 1, gemm_q: int = 256) -> np.ndarray:
     """``a @ b`` of two C- or F-contiguous 2-D float64 arrays as numpy dispatches it onto
     OpenBLAS's Haswell kernels (``dsyrk`` for ``x @ x.T`` and ``x.T @ x``); C-ordered."""
+
+def blas_dtrmm(
+    side: str,
+    uplo: str,
+    transa: str,
+    diag: str,
+    m: int,
+    n: int,
+    alpha: float,
+    a: np.ndarray,
+    lda: int,
+    b: np.ndarray,
+    ldb: int,
+    n_threads: int = 1,
+    gemm_q: int = 256,
+) -> np.ndarray:
+    """``DTRMM`` (every side, triangle, transpose and diagonal) on flat column-major float64
+    storage, as OpenBLAS computes it on the Haswell kernels at one thread; returns the new
+    ``B`` storage."""
+
+def blas_dger(
+    m: int,
+    n: int,
+    alpha: float,
+    x: np.ndarray,
+    incx: int,
+    y: np.ndarray,
+    incy: int,
+    a: np.ndarray,
+    lda: int,
+) -> np.ndarray:
+    """``DGER`` (any nonzero increments); returns the new ``A`` storage."""
+
+def blas_dtrmv(
+    uplo: str, trans_: str, diag: str, n: int, a: np.ndarray, lda: int, x: np.ndarray, incx: int
+) -> np.ndarray:
+    """``DTRMV`` (any nonzero increment); returns the new ``X`` storage."""
+
+def blas_daxpy(
+    n: int, alpha: float, x: np.ndarray, incx: int, y: np.ndarray, incy: int
+) -> np.ndarray:
+    """``DAXPY`` (any increments); returns the new ``Y`` storage."""
+
+def blas_dscal(n: int, alpha: float, x: np.ndarray, incx: int) -> np.ndarray:
+    """``DSCAL`` (nothing for ``incx <= 0``); returns the new ``X`` storage."""
+
+def blas_dcopy(n: int, x: np.ndarray, incx: int, y: np.ndarray, incy: int) -> np.ndarray:
+    """``DCOPY``; returns the new ``Y`` storage."""
+
+def blas_dswap(
+    n: int, x: np.ndarray, incx: int, y: np.ndarray, incy: int
+) -> tuple[np.ndarray, np.ndarray]:
+    """``DSWAP`` of two separate vectors; returns the new ``(X, Y)`` storage."""
+
+def blas_idamax(n: int, x: np.ndarray, incx: int, aligned: bool) -> int:
+    """``IDAMAX`` (1-based, 0 for ``n = 0`` or ``incx <= 0``) as OpenBLAS's ``iamax_sse2.S``
+    computes it; ``aligned``: whether ``x(1)`` lies on a 16-byte boundary in the original's
+    memory (only NaN input can tell)."""
+
+def blas_dnrm2(n: int, x: np.ndarray, incx: int) -> float:
+    """``DNRM2`` (OpenBLAS's x87 kernel)."""

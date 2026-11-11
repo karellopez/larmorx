@@ -7,10 +7,10 @@
 //! takes them. The GIL is released while computing.
 
 use larmorx_core::parallel;
-use larmorx_transform::openblas::level2;
 use larmorx_transform::openblas::level3::{self, Operand, Trans};
 use larmorx_transform::openblas::matmul::{self, Array2 as View};
 use larmorx_transform::openblas::trmm::{self, Diag, Side, Uplo};
+use larmorx_transform::openblas::{level1, level2};
 use numpy::ndarray::Array2;
 use numpy::{PyArray, PyArray1, PyArray2, PyReadonlyArray1, PyReadonlyArray2};
 use pyo3::exceptions::PyValueError;
@@ -122,7 +122,12 @@ fn one_of<T: Copy>(name: &str, v: &str, table: &[(&str, T)]) -> PyResult<T> {
         .iter()
         .find(|(k, _)| k.eq_ignore_ascii_case(v))
         .map(|&(_, t)| t)
-        .ok_or_else(|| PyValueError::new_err(format!("{name} must be one of {:?}, got {v:?}", table.iter().map(|x| x.0).collect::<Vec<_>>())))
+        .ok_or_else(|| {
+            PyValueError::new_err(format!(
+                "{name} must be one of {:?}, got {v:?}",
+                table.iter().map(|x| x.0).collect::<Vec<_>>()
+            ))
+        })
 }
 
 /// `DTRMM(SIDE, UPLO, TRANSA, DIAG, M, N, ALPHA, A, LDA, B, LDB)` on flat column-major storage
@@ -163,6 +168,157 @@ fn blas_dtrmm<'py>(
     .map_err(value_err)?
     .map_err(|_| PyValueError::new_err("DTRMM: invalid arguments"))?;
     Ok(PyArray1::from_vec(py, bv))
+}
+
+/// Runs `f`, turning its panic (a BLAS parameter error) into `ValueError(name: invalid
+/// arguments)`, with the GIL released.
+fn guarded<R: Send>(py: Python<'_>, name: &str, f: impl FnOnce() -> R + Send) -> PyResult<R> {
+    py.detach(|| std::panic::catch_unwind(std::panic::AssertUnwindSafe(f)))
+        .map_err(|_| PyValueError::new_err(format!("{name}: invalid arguments")))
+}
+
+/// `DGER(M, N, ALPHA, X, INCX, Y, INCY, A, LDA)`; returns the new `A` storage.
+#[pyfunction]
+#[allow(clippy::too_many_arguments)]
+fn blas_dger<'py>(
+    py: Python<'py>,
+    m: usize,
+    n: usize,
+    alpha: f64,
+    x: PyReadonlyArray1<'_, f64>,
+    incx: isize,
+    y: PyReadonlyArray1<'_, f64>,
+    incy: isize,
+    a: PyReadonlyArray1<'_, f64>,
+    lda: usize,
+) -> PyResult<Bound<'py, PyArray1<f64>>> {
+    let (x, y) = (contiguous(&x)?, contiguous(&y)?);
+    let mut av = contiguous(&a)?.to_vec();
+    guarded(py, "DGER", || {
+        level2::dger(m, n, alpha, x, 0, incx, y, 0, incy, &mut av, 0, lda)
+    })?;
+    Ok(PyArray1::from_vec(py, av))
+}
+
+/// `DTRMV(UPLO, TRANS, DIAG, N, A, LDA, X, INCX)`; returns the new `X` storage.
+#[pyfunction]
+#[allow(clippy::too_many_arguments)]
+fn blas_dtrmv<'py>(
+    py: Python<'py>,
+    uplo: &str,
+    trans_: &str,
+    diag: &str,
+    n: usize,
+    a: PyReadonlyArray1<'_, f64>,
+    lda: usize,
+    x: PyReadonlyArray1<'_, f64>,
+    incx: isize,
+) -> PyResult<Bound<'py, PyArray1<f64>>> {
+    let u = one_of("uplo", uplo, &[("U", Uplo::Upper), ("L", Uplo::Lower)])?;
+    let d = one_of("diag", diag, &[("U", Diag::Unit), ("N", Diag::NonUnit)])?;
+    let t = trans(trans_)?;
+    let a = contiguous(&a)?;
+    let mut xv = contiguous(&x)?.to_vec();
+    guarded(py, "DTRMV", || {
+        level2::dtrmv(u, t, d, n, a, 0, lda, &mut xv, 0, incx)
+    })?;
+    Ok(PyArray1::from_vec(py, xv))
+}
+
+/// `DAXPY(N, ALPHA, X, INCX, Y, INCY)`; returns the new `Y` storage.
+#[pyfunction]
+fn blas_daxpy<'py>(
+    py: Python<'py>,
+    n: usize,
+    alpha: f64,
+    x: PyReadonlyArray1<'_, f64>,
+    incx: isize,
+    y: PyReadonlyArray1<'_, f64>,
+    incy: isize,
+) -> PyResult<Bound<'py, PyArray1<f64>>> {
+    let x = contiguous(&x)?;
+    let mut yv = contiguous(&y)?.to_vec();
+    guarded(py, "DAXPY", || {
+        level1::daxpy(n, alpha, x, 0, incx, &mut yv, 0, incy)
+    })?;
+    Ok(PyArray1::from_vec(py, yv))
+}
+
+/// `DSCAL(N, ALPHA, X, INCX)`; returns the new `X` storage.
+#[pyfunction]
+fn blas_dscal<'py>(
+    py: Python<'py>,
+    n: usize,
+    alpha: f64,
+    x: PyReadonlyArray1<'_, f64>,
+    incx: isize,
+) -> PyResult<Bound<'py, PyArray1<f64>>> {
+    let mut xv = contiguous(&x)?.to_vec();
+    guarded(py, "DSCAL", || level1::dscal(n, alpha, &mut xv, 0, incx))?;
+    Ok(PyArray1::from_vec(py, xv))
+}
+
+/// `DCOPY(N, X, INCX, Y, INCY)`; returns the new `Y` storage.
+#[pyfunction]
+fn blas_dcopy<'py>(
+    py: Python<'py>,
+    n: usize,
+    x: PyReadonlyArray1<'_, f64>,
+    incx: isize,
+    y: PyReadonlyArray1<'_, f64>,
+    incy: isize,
+) -> PyResult<Bound<'py, PyArray1<f64>>> {
+    let x = contiguous(&x)?;
+    let mut yv = contiguous(&y)?.to_vec();
+    guarded(py, "DCOPY", || {
+        level1::dcopy(n, x, 0, incx, &mut yv, 0, incy)
+    })?;
+    Ok(PyArray1::from_vec(py, yv))
+}
+
+/// `DSWAP(N, X, INCX, Y, INCY)`; returns the new `(X, Y)` storage.
+#[pyfunction]
+#[allow(clippy::type_complexity)]
+fn blas_dswap<'py>(
+    py: Python<'py>,
+    n: usize,
+    x: PyReadonlyArray1<'_, f64>,
+    incx: isize,
+    y: PyReadonlyArray1<'_, f64>,
+    incy: isize,
+) -> PyResult<(Bound<'py, PyArray1<f64>>, Bound<'py, PyArray1<f64>>)> {
+    let mut xv = contiguous(&x)?.to_vec();
+    let mut yv = contiguous(&y)?.to_vec();
+    guarded(py, "DSWAP", || {
+        level1::dswap(n, &mut xv, 0, incx, &mut yv, 0, incy)
+    })?;
+    Ok((PyArray1::from_vec(py, xv), PyArray1::from_vec(py, yv)))
+}
+
+/// `IDAMAX(N, X, INCX)` (1-based; 0 for `n = 0` or `incx <= 0`); `aligned`: whether `x(1)` is
+/// on a 16-byte boundary in the original's memory (only NaN input can tell).
+#[pyfunction]
+fn blas_idamax(
+    py: Python<'_>,
+    n: usize,
+    x: PyReadonlyArray1<'_, f64>,
+    incx: isize,
+    aligned: bool,
+) -> PyResult<usize> {
+    let x = contiguous(&x)?;
+    guarded(py, "IDAMAX", || level1::idamax(n, x, 0, incx, aligned))
+}
+
+/// `DNRM2(N, X, INCX)`.
+#[pyfunction]
+fn blas_dnrm2(
+    py: Python<'_>,
+    n: usize,
+    x: PyReadonlyArray1<'_, f64>,
+    incx: isize,
+) -> PyResult<f64> {
+    let x = contiguous(&x)?;
+    guarded(py, "DNRM2", || level1::dnrm2(n, x, 0, incx))
 }
 
 /// A view of a C- or F-contiguous 2-D array as `matmul` takes it (strides in elements).
@@ -230,6 +386,14 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(blas_dgemm, m)?)?;
     m.add_function(wrap_pyfunction!(blas_dgemv, m)?)?;
     m.add_function(wrap_pyfunction!(blas_dtrmm, m)?)?;
+    m.add_function(wrap_pyfunction!(blas_dger, m)?)?;
+    m.add_function(wrap_pyfunction!(blas_dtrmv, m)?)?;
+    m.add_function(wrap_pyfunction!(blas_daxpy, m)?)?;
+    m.add_function(wrap_pyfunction!(blas_dscal, m)?)?;
+    m.add_function(wrap_pyfunction!(blas_dcopy, m)?)?;
+    m.add_function(wrap_pyfunction!(blas_dswap, m)?)?;
+    m.add_function(wrap_pyfunction!(blas_idamax, m)?)?;
+    m.add_function(wrap_pyfunction!(blas_dnrm2, m)?)?;
     m.add_function(wrap_pyfunction!(numpy_matmul, m)?)?;
     Ok(())
 }

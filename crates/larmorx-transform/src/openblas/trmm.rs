@@ -449,10 +449,7 @@ pub fn dtrmm_with(
         a.len() >= aoff + (nrowa - 1) * lda + nrowa,
         "DTRMM: A is too small"
     );
-    assert!(
-        b.len() >= boff + (n - 1) * ldb + m,
-        "DTRMM: B is too small"
-    );
+    assert!(b.len() >= boff + (n - 1) * ldb + m, "DTRMM: B is too small");
     assert!(
         side == Side::Left || n <= TRMM_RIGHT_MAX_N,
         "DTRMM: the right side above N = {TRMM_RIGHT_MAX_N} is not ported"
@@ -594,8 +591,12 @@ mod tests {
                             for j in 0..n {
                                 for i in 0..m {
                                     let want: f64 = match side {
-                                        Side::Left => (0..m).map(|k| t.tri(i, k) * b0[k + j * m]).sum(),
-                                        Side::Right => (0..n).map(|k| b0[i + k * m] * t.tri(k, j)).sum(),
+                                        Side::Left => {
+                                            (0..m).map(|k| t.tri(i, k) * b0[k + j * m]).sum()
+                                        }
+                                        Side::Right => {
+                                            (0..n).map(|k| b0[i + k * m] * t.tri(k, j)).sum()
+                                        }
                                     };
                                     let got = b[i + j * m];
                                     assert!(
@@ -615,12 +616,40 @@ mod tests {
     fn alpha_zero_clears_and_infinities_meet_the_stored_zeros() {
         let a = vec![1.0f64; 16];
         let mut b = vec![f64::NAN; 8];
-        dtrmm(Side::Left, Uplo::Upper, Trans::N, Diag::NonUnit, 4, 2, 0.0, &a, 0, 4, &mut b, 0, 4);
+        dtrmm(
+            Side::Left,
+            Uplo::Upper,
+            Trans::N,
+            Diag::NonUnit,
+            4,
+            2,
+            0.0,
+            &a,
+            0,
+            4,
+            &mut b,
+            0,
+            4,
+        );
         assert!(b.iter().all(|v| v.to_bits() == 0));
         // Rows 1..3 of a 4-row group multiply the stored zero of row 0's step by B(0, j).
         let mut b = vec![1.0f64; 4 * 8];
         b[0] = f64::INFINITY;
-        dtrmm(Side::Left, Uplo::Upper, Trans::N, Diag::NonUnit, 4, 8, 1.0, &a, 0, 4, &mut b, 0, 4);
+        dtrmm(
+            Side::Left,
+            Uplo::Upper,
+            Trans::N,
+            Diag::NonUnit,
+            4,
+            8,
+            1.0,
+            &a,
+            0,
+            4,
+            &mut b,
+            0,
+            4,
+        );
         assert!(b[0].is_infinite());
         assert!(b[1].is_nan() && b[2].is_nan() && b[3].is_nan());
     }

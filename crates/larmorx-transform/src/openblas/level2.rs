@@ -26,12 +26,28 @@
 //!   `-ffp-contract=fast` with `-mfma`: 47 fused multiply-adds in the Haswell build's
 //!   `dgemv_t`), these are their forms.
 //!
+//! - **`dger`** (`interface/ger.c`, `kernel/generic/ger.c`): nothing for `m = 0`, `n = 0` or
+//!   `alpha = 0`; `x` copied to a buffer when its increment is not 1; per column
+//!   `AXPYU_K(m, alpha·y(j), x, A(:, j))` ([`super::level1::axpy_k`]: the scalar rounded once,
+//!   then the fused head and the plain tail of `daxpy.c`).
+//! - **`dtrmv`** (`interface/trmv.c`, `driver/level2/trmv_U.c`, `trmv_L.c`: `NU` and `TL`
+//!   from `trmv_U.c`, `NL` and `TU` from `trmv_L.c`): `x` copied to a buffer when its
+//!   increment is not 1; the diagonal in blocks of `DTB_ENTRIES = 64` (forwards in `trmv_U.c`,
+//!   backwards in `trmv_L.c`); in a block, column by column, `AXPYU_K` of the earlier part
+//!   (`N`) or the diagonal's `x·a` then `+= DOTU_K` of the later part (`T`, the Haswell `ddot`
+//!   kernel: [`crate::numpy_linalg::blas::ddot`]); between blocks the `dgemv_n`/`dgemv_t`
+//!   kernels above with `alpha = 1`. One thread (`n ≥ 50` would thread with more).
+//!
 //! Upstream files (BSD-3-Clause; the notice is in the parent module and NOTICE): OpenBLAS
 //! 0.3.34 and 0.3.30 `interface/gemv.c`, `kernel/x86_64/dgemv_n_4.c`,
-//! `dgemv_n_microk_haswell-4.c`, `dgemv_t_4.c`, `dgemv_t_microk_haswell-4.c`, `dscal.c`. The
-//! logic is re-expressed in Rust; no code was copied.
+//! `dgemv_n_microk_haswell-4.c`, `dgemv_t_4.c`, `dgemv_t_microk_haswell-4.c`, `dscal.c`,
+//! `interface/ger.c`, `kernel/generic/ger.c`, `interface/trmv.c`, `driver/level2/trmv_U.c`,
+//! `trmv_L.c`, `driver/level2/Makefile`, `common.h` (`DTB_DEFAULT_ENTRIES`). The logic is
+//! re-expressed in Rust; no code was copied.
 
+use super::level1::{at, axpy_k};
 use super::level3::Trans;
+use super::trmm::{Diag, Uplo};
 
 /// `NBMAX` of `dgemv_n_4.c` and `dgemv_t_4.c`.
 const NBMAX: usize = 2048;
@@ -340,9 +356,240 @@ fn gemv_t(
     }
 }
 
+/// `DGER(M, N, ALPHA, X, INCX, Y, INCY, A, LDA)`: `A ← alpha·x·yᵀ + A` (module
+/// documentation), `A` of `m × n` at `a[aoff + i + j·lda]`, the vectors as in
+/// [`super::level1`].
+///
+/// # Panics
+/// On BLAS's parameter errors (`LDA < max(1, M)`, an increment 0).
+#[allow(clippy::too_many_arguments)]
+pub fn dger(
+    m: usize,
+    n: usize,
+    alpha: f64,
+    x: &[f64],
+    xoff: usize,
+    incx: isize,
+    y: &[f64],
+    yoff: usize,
+    incy: isize,
+    a: &mut [f64],
+    aoff: usize,
+    lda: usize,
+) {
+    assert!(lda >= m.max(1), "DGER: LDA ({lda}) < max(1, M)");
+    assert!(incx != 0 && incy != 0, "DGER: an increment is 0");
+    if m == 0 || n == 0 || alpha == 0.0 {
+        return;
+    }
+    let xb: Vec<f64> = (0..m).map(|t| x[at(m, xoff, incx, t)]).collect();
+    for j in 0..n {
+        let s = alpha * y[at(n, yoff, incy, j)];
+        axpy_k(m, s, &xb, 0, 1, a, aoff + j * lda, 1);
+    }
+}
+
+/// `DTB_ENTRIES` of every x86-64 core (`DTB_DEFAULT_ENTRIES`).
+const DTB_ENTRIES: usize = 64;
+
+/// `DTRMV(UPLO, TRANS, DIAG, N, A, LDA, X, INCX)`: `x ← op(A)·x` with `A` triangular (module
+/// documentation), `A` at `a[aoff + i + j·lda]`, `x` as in [`super::level1`].
+///
+/// # Panics
+/// On BLAS's parameter errors (`LDA < max(1, N)`, `INCX = 0`).
+#[allow(clippy::too_many_arguments)]
+pub fn dtrmv(
+    uplo: Uplo,
+    trans: Trans,
+    diag: Diag,
+    n: usize,
+    a: &[f64],
+    aoff: usize,
+    lda: usize,
+    x: &mut [f64],
+    xoff: usize,
+    incx: isize,
+) {
+    assert!(incx != 0, "DTRMV: INCX is 0");
+    assert!(lda >= n.max(1), "DTRMV: LDA ({lda}) < max(1, N)");
+    if n == 0 {
+        return;
+    }
+    let mut b: Vec<f64> = (0..n).map(|t| x[at(n, xoff, incx, t)]).collect();
+    let unit = diag == Diag::Unit;
+    let av = |i: usize, j: usize| a[aoff + i + j * lda];
+    // trmv_U.c for N·Upper and T·Lower; trmv_L.c for N·Lower and T·Upper.
+    let forwards = (uplo == Uplo::Upper) == (trans == Trans::N);
+    let transa = trans == Trans::T;
+    if forwards {
+        let mut is = 0;
+        while is < n {
+            let mi = (n - is).min(DTB_ENTRIES);
+            if !transa && is > 0 {
+                let xs = b[is..is + mi].to_vec();
+                gemv_n(
+                    is,
+                    mi,
+                    1.0,
+                    a,
+                    aoff + is * lda,
+                    lda,
+                    &xs,
+                    0,
+                    1,
+                    &mut b,
+                    0,
+                    1,
+                );
+            }
+            for i in 0..mi {
+                let col = aoff + is + (i + is) * lda;
+                if !transa && i > 0 {
+                    let s = b[is + i];
+                    axpy_k(i, s, a, col, 1, &mut b, is, 1);
+                }
+                if !unit {
+                    b[is + i] *= av(is + i, is + i);
+                }
+                if transa && i + 1 < mi {
+                    let len = mi - i - 1;
+                    let d = crate::numpy_linalg::blas::ddot(
+                        &a[col + i + 1..col + i + 1 + len],
+                        &b[is + i + 1..is + i + 1 + len],
+                    );
+                    b[is + i] += d;
+                }
+            }
+            if transa && n - is > mi {
+                let rows = n - is - mi;
+                let xs = b[is + mi..n].to_vec();
+                gemv_t(
+                    rows,
+                    mi,
+                    1.0,
+                    a,
+                    aoff + is + mi + is * lda,
+                    lda,
+                    &xs,
+                    0,
+                    1,
+                    &mut b,
+                    is,
+                    1,
+                );
+            }
+            is += mi;
+        }
+    } else {
+        let mut is = n;
+        while is > 0 {
+            let mi = is.min(DTB_ENTRIES);
+            let lo = is - mi;
+            if !transa && n > is {
+                let xs = b[lo..is].to_vec();
+                gemv_n(
+                    n - is,
+                    mi,
+                    1.0,
+                    a,
+                    aoff + is + lo * lda,
+                    lda,
+                    &xs,
+                    0,
+                    1,
+                    &mut b,
+                    is,
+                    1,
+                );
+            }
+            for i in 0..mi {
+                let p = is - i - 1;
+                if !transa && i > 0 {
+                    let s = b[p];
+                    axpy_k(i, s, a, aoff + p + 1 + p * lda, 1, &mut b, p + 1, 1);
+                }
+                if !unit {
+                    b[p] *= av(p, p);
+                }
+                if transa && i + 1 < mi {
+                    let len = p - lo;
+                    let d = crate::numpy_linalg::blas::ddot(
+                        &a[aoff + lo + p * lda..aoff + lo + p * lda + len],
+                        &b[lo..p],
+                    );
+                    b[p] += d;
+                }
+            }
+            if transa && lo > 0 {
+                let xs = b[..lo].to_vec();
+                gemv_t(
+                    lo,
+                    mi,
+                    1.0,
+                    a,
+                    aoff + lo * lda,
+                    lda,
+                    &xs,
+                    0,
+                    1,
+                    &mut b,
+                    lo,
+                    1,
+                );
+            }
+            is = lo;
+        }
+    }
+    for (t, v) in b.into_iter().enumerate() {
+        x[at(n, xoff, incx, t)] = v;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn trmv_is_the_triangular_product() {
+        for uplo in [Uplo::Upper, Uplo::Lower] {
+            for trans in [Trans::N, Trans::T] {
+                for diag in [Diag::Unit, Diag::NonUnit] {
+                    for n in [1usize, 2, 5, 63, 64, 65, 130, 200] {
+                        let a: Vec<f64> = (0..n * n)
+                            .map(|i| ((i * 7 % 13) as f64) * 0.1 - 0.6)
+                            .collect();
+                        let x0: Vec<f64> =
+                            (0..n).map(|i| ((i * 5 % 11) as f64) * 0.2 - 1.0).collect();
+                        let upper = (uplo == Uplo::Upper) != (trans == Trans::T);
+                        let op = |i: usize, k: usize| match trans {
+                            Trans::N => a[i + k * n],
+                            Trans::T => a[k + i * n],
+                        };
+                        let mut x = x0.clone();
+                        dtrmv(uplo, trans, diag, n, &a, 0, n, &mut x, 0, 1);
+                        for (i, &got) in x.iter().enumerate() {
+                            let want: f64 = (0..n)
+                                .map(|k| {
+                                    let t = if i == k {
+                                        if diag == Diag::Unit { 1.0 } else { op(i, i) }
+                                    } else if (upper && k > i) || (!upper && k < i) {
+                                        op(i, k)
+                                    } else {
+                                        0.0
+                                    };
+                                    t * x0[k]
+                                })
+                                .sum();
+                            assert!(
+                                (got - want).abs() < 1e-11,
+                                "{uplo:?} {trans:?} {diag:?} n = {n}"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     #[test]
     fn row_blocks_cover_the_body() {

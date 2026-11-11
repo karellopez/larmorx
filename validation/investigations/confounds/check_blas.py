@@ -1,10 +1,12 @@
 # SPDX-License-Identifier: Apache-2.0
-"""larmorx's OpenBLAS level-2 and level-3 ports (``larmorx_transform::openblas::{level2,
-level3, matmul}``, through ``larmorx._core``) against numpy's own OpenBLAS, bit for bit.
+"""larmorx's OpenBLAS level-1, level-2 and level-3 ports (``larmorx_transform::openblas::{level1,
+level2, level3, trmm, matmul}``, through ``larmorx._core``) against numpy's own OpenBLAS, bit
+for bit.
 
 The reference is the library inside the running environment's numpy wheel
 (``numpy.libs/libscipy_openblas64_*``, called directly through ctypes at its Fortran
-interface: ``dgemm``, ``dgemv``, the entry points LAPACK uses) and numpy's own ``@`` and
+interface: ``dgemm``, ``dgemv``, ``dtrmm``, ``dger``, ``dtrmv``, ``daxpy``, ``dscal``,
+``dcopy``, ``dswap``, ``idamax``, ``dnrm2``: the entry points LAPACK uses) and numpy's own ``@`` and
 ``np.dot`` (its dispatch to ``ddot``, ``dgemv``, ``dgemm`` and ``dsyrk``). Run it under the
 Haswell kernels at one BLAS thread (``OPENBLAS_CORETYPE=Haswell OPENBLAS_NUM_THREADS=1``; the
 script refuses otherwise) in each kept environment: the shared ``.venv`` (numpy 2.3.5, OpenBLAS
@@ -17,7 +19,11 @@ zeros of both signs (the kernel's first product), subnormal and huge entries, Na
 infinities (compared as NaN), products up to 600 × 2,000 × 400 (and 25 × 60,968 × 11 without
 ``--quick``); numpy's ``@`` and ``np.dot`` on C-ordered and F-ordered operands, vectors on
 either side, outer products, ``x @ x.T`` and ``x.T @ x`` (``dsyrk``); ``dgemv`` both ways with
-strides, row blocks around 2,048 and every column remainder.
+strides, row blocks around 2,048 and every column remainder; ``dtrmm`` on every side, triangle,
+transpose and diagonal (sizes around the kernel's groups, the 512-row blocks and the depth
+blocks, LAPACK's own shapes up to 60,968 x 32); ``dger`` and ``dtrmv`` (blocks of 64) with
+positive and negative increments; the level-1 calls with every increment sign (0 where BLAS
+allows it), ties and NaN for ``idamax`` at both 16-byte alignments of ``x(1)``.
 
 Each section runs in a child process: numpy 2.5.4's OpenBLAS (0.3.34) crashes with a
 segmentation fault on some products under the Haswell kernels on the AVX-512 main machine
@@ -26,7 +32,7 @@ child restarts after it. Prints one line per section (identical / compared, cras
 first differences; exit status 1 when any compared case differs.
 
 Usage: ``OPENBLAS_CORETYPE=Haswell OPENBLAS_NUM_THREADS=1 PYTHONPATH=<repo>/python
-python -P check_blas.py [--quick] [--threads N] [--sections gemm,matmul,syrk,gemv]``
+python -P check_blas.py [--quick] [--threads N] [--sections gemm,matmul,syrk,gemv,trmm,ger,trmv,level1]``
 """
 
 from __future__ import annotations
@@ -204,6 +210,54 @@ def ref_dtrmm(side, uplo, tr, diag, m, n, alpha, a, lda, b, ldb) -> np.ndarray:
         ctypes.byref(I64(ldb)),
     )
     return b
+
+
+def _c(*chars: str):
+    return [ctypes.c_char_p(c.encode()) for c in chars]
+
+
+def _i(*ints: int):
+    return [ctypes.byref(I64(v)) for v in ints]
+
+
+def _d(v: float):
+    return ctypes.byref(ctypes.c_double(v))
+
+
+def ref_dger(m, n, alpha, x, incx, y, incy, a, lda) -> np.ndarray:
+    a = a.copy()
+    LIB.scipy_dger_64_(*_i(m, n), _d(alpha), ptr(x), *_i(incx), ptr(y), *_i(incy), ptr(a), *_i(lda))
+    return a
+
+
+def ref_dtrmv(uplo, tr, diag, n, a, lda, x, incx) -> np.ndarray:
+    x = x.copy()
+    LIB.scipy_dtrmv_64_(*_c(uplo, tr, diag), *_i(n), ptr(a), *_i(lda), ptr(x), *_i(incx))
+    return x
+
+
+def ref_level1(op: str, n, alpha, x, incx, y, incy):
+    """One level-1 call on copies; returns what it changes or computes."""
+    x, y = x.copy(), y.copy()
+    if op == "axpy":
+        LIB.scipy_daxpy_64_(*_i(n), _d(alpha), ptr(x), *_i(incx), ptr(y), *_i(incy))
+        return (y,)
+    if op == "scal":
+        LIB.scipy_dscal_64_(*_i(n), _d(alpha), ptr(x), *_i(incx))
+        return (x,)
+    if op == "copy":
+        LIB.scipy_dcopy_64_(*_i(n), ptr(x), *_i(incx), ptr(y), *_i(incy))
+        return (y,)
+    if op == "swap":
+        LIB.scipy_dswap_64_(*_i(n), ptr(x), *_i(incx), ptr(y), *_i(incy))
+        return (x, y)
+    if op == "idamax":
+        LIB.scipy_idamax_64_.restype = ctypes.c_int64
+        return (np.array([LIB.scipy_idamax_64_(*_i(n), ptr(x), *_i(incx))], dtype=np.float64),)
+    if op == "nrm2":
+        LIB.scipy_dnrm2_64_.restype = ctypes.c_double
+        return (np.array([LIB.scipy_dnrm2_64_(*_i(n), ptr(x), *_i(incx))]),)
+    raise ValueError(op)
 
 
 def same(x: np.ndarray, y: np.ndarray) -> bool:
@@ -424,15 +478,24 @@ def trmm_cases(quick: bool) -> list[tuple]:
         alpha = float(rng.choice([1.0, -1.0, 0.5, 0.0, 2.0]))
         out.append((side, uplo, tr, diag, m, n, alpha, KINDS[t % len(KINDS)]))
     # DLARFB (right side, M x K, K the block size) and DLARFT's calls, at their sizes.
-    for side_args in [("R", "U", "N", "N"), ("R", "U", "T", "N"), ("R", "L", "N", "U"),
-                      ("R", "L", "T", "U"), ("R", "U", "N", "U"), ("R", "U", "T", "U"),
-                      ("L", "U", "N", "N")]:
+    for side_args in [
+        ("R", "U", "N", "N"),
+        ("R", "U", "T", "N"),
+        ("R", "L", "N", "U"),
+        ("R", "L", "T", "U"),
+        ("R", "U", "N", "U"),
+        ("R", "U", "T", "U"),
+        ("L", "U", "N", "N"),
+    ]:
         for m, n in [(60_968, 32), (4_100, 32), (600, 32), (16, 16), (31, 1), (1, 31)]:
             if side_args[0] == "L":
                 m, n = n, m
             out.append((*side_args, m, n, -1.0 if side_args[0] == "L" else 1.0, "normal"))
     if not quick:
-        out += [("L", "U", "N", "N", 1100, 40, 1.0, "normal"), ("R", "L", "T", "N", 300, 1100, 1.0, "normal")]
+        out += [
+            ("L", "U", "N", "N", 1100, 40, 1.0, "normal"),
+            ("R", "L", "T", "N", 300, 1100, 1.0, "normal"),
+        ]
     return out
 
 
@@ -448,12 +511,115 @@ def trmm_run(cid: int, case: tuple, threads: int, core) -> list[tuple[bool, str]
     return [(same(want, got), "")]
 
 
+def ger_cases(quick: bool) -> list[tuple]:
+    rng = np.random.default_rng(6)
+    dims_m = [1, 2, 3, 4, 5, 7, 8, 15, 16, 17, 31, 32, 33, 100, 2049]
+    dims_n = [1, 2, 3, 4, 5, 9, 40]
+    out = []
+    for t in range(300 if quick else 2000):
+        m, n = int(rng.choice(dims_m)), int(rng.choice(dims_n))
+        incx, incy = int(rng.choice([1, 1, 2, -1, -3])), int(rng.choice([1, 1, 2, -2]))
+        alpha = float(rng.choice([1.0, -1.0, 0.0, 0.37]))
+        out.append((m, n, alpha, incx, incy, KINDS[t % len(KINDS)]))
+    return out
+
+
+def vec(rng, n: int, inc: int, kind: str) -> np.ndarray:
+    return entries(rng, max((n - 1) * abs(inc) + 1, 1), kind)
+
+
+def ger_run(cid: int, case: tuple, threads: int, core) -> list[tuple[bool, str]]:
+    del threads
+    m, n, alpha, incx, incy, kind = case
+    rng = np.random.default_rng([6, cid])
+    lda = m + cid % 3
+    x, y, a = vec(rng, m, incx, kind), vec(rng, n, incy, kind), entries(rng, lda * n, "normal")
+    want = ref_dger(m, n, alpha, x, incx, y, incy, a, lda)
+    return [(same(want, core.blas_dger(m, n, alpha, x, incx, y, incy, a, lda)), "")]
+
+
+def trmv_cases(quick: bool) -> list[tuple]:
+    rng = np.random.default_rng(7)
+    dims = [1, 2, 3, 4, 5, 15, 16, 17, 31, 33, 63, 64, 65, 100, 127, 128, 129, 200, 300, 2049]
+    out = []
+    for t in range(400 if quick else 2500):
+        uplo, tr, diag = (str(rng.choice(v)) for v in (["U", "L"], ["N", "T"], ["U", "N"]))
+        n, incx = int(rng.choice(dims)), int(rng.choice([1, 1, 2, -1, -2]))
+        out.append((uplo, tr, diag, n, incx, KINDS[t % len(KINDS)]))
+    return out
+
+
+def trmv_run(cid: int, case: tuple, threads: int, core) -> list[tuple[bool, str]]:
+    del threads
+    uplo, tr, diag, n, incx, kind = case
+    rng = np.random.default_rng([7, cid])
+    lda = n + cid % 3
+    a, x = entries(rng, lda * n, kind), vec(rng, n, incx, kind)
+    want = ref_dtrmv(uplo, tr, diag, n, a, lda, x, incx)
+    return [(same(want, core.blas_dtrmv(uplo, tr, diag, n, a, lda, x, incx)), "")]
+
+
+LEVEL1_OPS = ("axpy", "scal", "copy", "swap", "idamax", "nrm2")
+
+
+def level1_cases(quick: bool) -> list[tuple]:
+    rng = np.random.default_rng(8)
+    dims = [0, 1, 2, 3, 4, 5, 7, 8, 9, 15, 16, 17, 23, 24, 25, 31, 32, 33, 40, 100, 1001]
+    out = []
+    for t in range(1200 if quick else 6000):
+        op = LEVEL1_OPS[t % len(LEVEL1_OPS)]
+        n = int(rng.choice(dims))
+        incs = (
+            [1, 1, 1, 2, 3, -1, -2, 0]
+            if op in ("axpy", "copy", "idamax", "nrm2", "scal")
+            else [1, 1, 2, -1, -3]
+        )
+        incx, incy = (
+            int(rng.choice(incs)),
+            int(rng.choice([1, 1, 2, -1] + ([0] if op == "axpy" else []))),
+        )
+        alpha = float(rng.choice([1.0, -1.0, 0.0, 0.5, 3.0]))
+        kinds = (*KINDS, "ties") if op == "idamax" else KINDS
+        out.append((op, n, alpha, incx, incy, kinds[(t // len(LEVEL1_OPS)) % len(kinds)], t % 2))
+    return out
+
+
+def level1_run(cid: int, case: tuple, threads: int, core) -> list[tuple[bool, str]]:
+    del threads
+    op, n, alpha, incx, incy, kind, shift = case
+    rng = np.random.default_rng([8, cid])
+    if kind == "ties":
+        buf = rng.integers(-2, 3, max((n - 1) * abs(incx) + 1, 1) + 1).astype(float)
+    else:
+        buf = entries(rng, max((n - 1) * abs(incx) + 1, 1) + 1, kind)
+    x = buf[shift:]  # both 16-byte alignments of x(1)
+    y = vec(rng, n, incy, "normal")
+    want = ref_level1(op, n, alpha, x, incx, y, incy)
+    if op == "axpy":
+        got = (core.blas_daxpy(n, alpha, x, incx, y, incy),)
+    elif op == "scal":
+        got = (core.blas_dscal(n, alpha, x, incx),)
+    elif op == "copy":
+        got = (core.blas_dcopy(n, x, incx, y, incy),)
+    elif op == "swap":
+        got = core.blas_dswap(n, x, incx, y, incy)
+    elif op == "idamax":
+        aligned = x.ctypes.data % 16 == 0
+        got = (np.array([core.blas_idamax(n, x, incx, aligned)], dtype=np.float64),)
+    else:
+        got = (np.array([core.blas_dnrm2(n, x, incx)]),)
+    return [(all(same(w, g) for w, g in zip(want, got, strict=True)), op)]
+
+
 SECTIONS = {
     "gemm": ("dgemm (Fortran interface)", gemm_cases, gemm_run),
     "matmul": ("numpy @ and np.dot (2-D)", matmul_cases, matmul_run),
     "syrk": ("numpy x @ x.T, x.T @ x (dsyrk)", syrk_cases, syrk_run),
     "gemv": ("dgemv (Fortran interface)", gemv_cases, gemv_run),
     "trmm": ("dtrmm (Fortran interface)", trmm_cases, trmm_run),
+    "ger": ("dger (Fortran interface)", ger_cases, ger_run),
+    "trmv": ("dtrmv (Fortran interface)", trmv_cases, trmv_run),
+    "level1": ("level 1 (Fortran interfaces)", level1_cases, level1_run),
 }
 
 

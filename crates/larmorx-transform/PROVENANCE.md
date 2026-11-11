@@ -123,6 +123,19 @@ Validated bit for bit against numpy's own library and `@`/`np.dot` in both kept 
 numpy 2.5.4 every defined case with `GEMM_Q` 512 on the AMD Zen 4 main machine, where that
 library sets it and crashes on the cases its Haswell kernel's stack buffer cannot hold).
 
+**Relay 2a-ii** (`openblas::{trmm, level1}`, `level2::{dger, dtrmv}`; the same three OpenBLAS
+trees, whose files below are identical but for `volatile` in three of the TRMM copies and the
+interfaces' threading, allocation and export lines):
+
+| larmorx | Upstream files | Licence |
+|---|---|---|
+| `openblas::trmm::dtrmm`, `dtrmm_with`, `Side`, `Uplo`, `Diag`, `TRMM_RIGHT_MAX_N` (the interface's checks and returns, `alpha` first, the drivers' block orders and kernel calls, the TRMM kernel's groups, step ranges and paths, the copies' stored zeros and unit diagonal) | `interface/trsm.c` (compiled as `TRMM`), `driver/level3/trmm_L.c`, `trmm_R.c`, `kernel/x86_64/dtrmm_kernel_4x8_haswell.c`, `kernel/generic/trmm_uncopy_4.c`, `trmm_lncopy_4.c`, `trmm_utcopy_4.c`, `trmm_ltcopy_4.c`, `trmm_uncopy_8.c`, `trmm_lncopy_8.c`, `trmm_utcopy_8.c`, `trmm_ltcopy_8.c`, `kernel/Makefile.L3`, `KERNEL.HASWELL` (the C paths' arithmetic checked in the disassembly of both wheels' `dtrmm_kernel_*_HASWELL`: no fused multiply-adds) | BSD-3-Clause |
+| `openblas::level2::dger`, `dtrmv` (`DTB_ENTRIES` 64; `NU`/`TL` from `trmv_U.c`, `NL`/`TU` from `trmv_L.c`) | `interface/ger.c`, `kernel/generic/ger.c`, `interface/trmv.c`, `driver/level2/trmv_U.c`, `trmv_L.c`, `driver/level2/Makefile`, `common.h` | BSD-3-Clause |
+| `openblas::level1::axpy_k`, `daxpy`, `dscal`, `dcopy`, `dswap`, `idamax` (`iamax_sse2.S`'s lanes, reductions and searches, both alignments), `dnrm2` (the interface around `numpy_linalg`'s x87 kernel), `at` | `interface/axpy.c`, `scal.c`, `copy.c`, `swap.c`, `imax.c`, `nrm2.c`, `kernel/x86_64/daxpy.c`, `daxpy_microk_haswell-2.c`, `dscal.c`, `dscal_microk_haswell-2.c`, `iamax_sse2.S`, `nrm2.S`, `KERNEL`, `KERNEL.HASWELL` | BSD-3-Clause |
+
+Validated bit for bit against numpy's own library through its Fortran entry points in both kept
+environments (`check_blas.py`'s `trmm`, `ger`, `trmv`, `level1` sections, 2026-11-11).
+
 ## SciPy's 4 × 4 inverse (`scipy_linalg`, field maps part B, relay 18)
 
 **Ported** from SciPy 1.18.1 (`scipy/linalg/_basic.py` `inv`, `src/_linalg_inv.hh`

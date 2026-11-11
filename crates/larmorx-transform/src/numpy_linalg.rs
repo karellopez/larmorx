@@ -279,7 +279,7 @@ fn round_to_f64(r: u128, exp: i32) -> f64 {
 /// `acc3 + ((acc2 + acc0) + acc1)`, the root in extended precision, stored as a double (for
 /// `n < 8` this is the plain sum in order). The extended exponent range holds every square and
 /// sum, so only the final store can underflow or overflow.
-fn dnrm2(n: usize, x: &[f64], off: usize, inc: usize) -> f64 {
+pub(crate) fn dnrm2(n: usize, x: &[f64], off: usize, inc: usize) -> f64 {
     if n == 0 {
         return 0.0;
     }

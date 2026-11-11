@@ -32,8 +32,9 @@ pip install larmorx-nc              # by name, so that its licence is accepted k
 pip install "larmorx[all]"          # or with everything: larmorx, larmorx-nc and larmorx-gpl
 ```
 
-Python 3.12 or newer; wheels for Linux (x86-64, aarch64; glibc 2.28 or newer), macOS (12 or newer,
-Intel and Apple silicon) and Windows (x64, arm64). Nothing else is needed: no FSL installation.
+Python 3.12 or newer; wheels for Linux (x86-64, aarch64; glibc 2.28 or newer), macOS (11 or newer,
+Intel and Apple silicon; on Apple silicon `larmorx[all]` needs macOS 12, as SciPy's and
+scikit-learn's wheels do) and Windows (x64, arm64). Nothing else is needed: no FSL installation.
 
 ## How larmorx uses it
 

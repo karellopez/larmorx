@@ -484,6 +484,157 @@ def test_changelog_command_line(tmp_path, capsys):
     assert "no section for 1.0.1" in err and "none.md does not exist" in err
 
 
+TOOLS_TOML = """\
+[[tool]]
+id = "a"
+title = "Tool A (one | two)"
+validation = "[{nifti-io.cases} cases](record:nifti-io); data panel: [x](record:nifti-io-panel); [b](record:afni-tshift-replica)"
+
+[[tool]]
+id = "b"
+title = "Tool B"
+validation = "[c](record:oracles)"
+
+[[record]]
+id = "nifti-io"
+status = "`validated` Data panel: [nifti-io-panel](record:nifti-io-panel), {nifti-io-panel.cases} cases."
+
+[[record]]
+id = "afni-tshift-replica"
+status = "`experimental` (2 of 3)"
+
+[[record]]
+id = "oracles"
+status = "reference"
+"""
+
+STATUS_TABLE = (
+    "| Tool | Validation records and their status |\n"
+    "|---|---|\n"
+    "| Tool A (one \\| two) | [nifti-io](docs/validation/nifti-io.md): `validated`; "
+    "[afni-tshift-replica](docs/validation/afni-tshift-replica.md): `experimental` |\n"
+    "| Tool B | [oracles](docs/validation/oracles.md): `reference` |"
+)
+
+
+def test_changelog_statuses_from_tools_toml():
+    """Each tool in its order with the records its text links (a data panel's record left out,
+    as part of its tool's main record) and each record's status word."""
+    assert changelog.statuses(TOOLS_TOML) == STATUS_TABLE
+    for text, message in (
+        (TOOLS_TOML.replace("(record:oracles)", "(record:c)"), "b links c, which has no record"),
+        (TOOLS_TOML.replace('"reference"', '"to be decided"'), "the record oracles has no status"),
+        (TOOLS_TOML.replace('"[c](record:oracles)"', '"no link"'), "b links no validation record"),
+    ):
+        with pytest.raises(changelog.ChangelogError, match=re.escape(message)):
+            changelog.statuses(text)
+    # the repository's own tools.toml gives a table: every tool, every linked record a status
+    table = changelog.statuses(changelog.TOOLS.read_text(encoding="utf-8"))
+    tools = tomllib.loads(changelog.TOOLS.read_text(encoding="utf-8"))["tool"]
+    assert len(table.splitlines()) == 2 + len(tools)
+    for record in re.findall(r"\]\(docs/validation/([^)]+)\.md\)", table):
+        assert (ROOT / "docs" / "validation" / f"{record}.md").is_file(), record
+
+
+def _with_statuses(table: str) -> str:
+    return (
+        "# Changelog\n\n## [1.1.0] - 2027-02-01\n\nNew.\n\n"
+        f"{changelog.BEGIN}\n{table}\n{changelog.END}\n\nAfter.\n\n"
+        "## [1.0.0] - 2027-01-01\n\nOld.\n\n"
+        f"{changelog.BEGIN}\n| old |\n{changelog.END}\n"
+    )
+
+
+def test_changelog_statuses_checked_and_written(tmp_path, monkeypatch):
+    """The notes refuse a statuses table that is not tools.toml's and leave the markers out;
+    --write-statuses makes the table of one version's section anew, and only that one."""
+    tools = tmp_path / "tools.toml"
+    tools.write_text(TOOLS_TOML, encoding="utf-8")
+    text = _with_statuses(STATUS_TABLE)
+    notes = changelog.notes(text, "1.1.0", "v1.1.0", ROOT / "CHANGELOG.md", tools)
+    assert (
+        "statuses" not in notes and "| Tool B | [oracles](https://github.com/karellopez/" in notes
+    )
+    assert notes.startswith("New.\n\n| Tool | Validation records") and "\n\nAfter.\n\n---" in notes
+    with pytest.raises(
+        changelog.ChangelogError, match=re.escape("the statuses table of 1.0.0 is not")
+    ):
+        changelog.notes(text, "1.0.0", "v1.0.0", ROOT / "CHANGELOG.md", tools)
+    stale = _with_statuses("| stale |")
+    with pytest.raises(changelog.ChangelogError, match="--write-statuses"):
+        changelog.checked(changelog.section(stale, "1.1.0"), "1.1.0", tools)
+    written = changelog.write_statuses(stale, "1.1.0", tools)
+    assert written == text and changelog.write_statuses(written, "1.1.0", tools) == written
+    assert "| old |" in written  # the other section's table is left alone
+    for broken, message in (
+        (text.replace(changelog.END + "\n\nAfter", "After"), "needs one"),
+        ("## [1.1.0] - 2027-02-01\n\nNo table.\n", "has no statuses table"),
+    ):
+        with pytest.raises(changelog.ChangelogError, match=message):
+            changelog.write_statuses(broken, "1.1.0", tools)
+    # the command line
+    path = tmp_path / "CHANGELOG.md"
+    path.write_text(stale, encoding="utf-8")
+    monkeypatch.setattr(changelog, "TOOLS", tools)
+    assert changelog.main(["1.1.0", "--write-statuses", "--file", str(path)]) == 0
+    assert path.read_text(encoding="utf-8") == text
+    assert changelog.main(["1.0.0", "--ref", "v1.0.0", "--file", str(path)]) == 1  # stale
+
+
+def test_changelog_notes_are_unwrapped():
+    """A release's text has one line per paragraph and list item (GitHub keeps line breaks in a
+    release's text); lists, tables, headings, fences and hard breaks stay as they are."""
+    text = (
+        "A paragraph\nwritten over\n  three lines.\n\n"
+        "- an item\n  continued\n  - a nested one\n    continued\n- the next\n\n"
+        "### A heading\nA line.\n\n"
+        "| a | b |\n|---|---|\n| 1 | 2 |\n\n"
+        "```\ncode\nlines\n```\nafter the fence\njoined\n\n"
+        "a hard  \nbreak and\\\nanother\n\n"
+        "1. first\n   more\n2. second\n\n> quoted\n> again\n"
+    )
+    assert changelog.unwrapped(text) == (
+        "A paragraph written over three lines.\n\n"
+        "- an item continued\n  - a nested one continued\n- the next\n\n"
+        "### A heading\nA line.\n\n"
+        "| a | b |\n|---|---|\n| 1 | 2 |\n\n"
+        "```\ncode\nlines\n```\nafter the fence joined\n\n"
+        "a hard  \nbreak and\\\nanother\n\n"
+        "1. first more\n2. second\n\n> quoted\n> again\n"
+    )
+
+
+def test_the_release_documents():
+    """CHANGELOG.md has the current version's section, dated as CITATION.cff, with its statuses
+    table; CITATION.cff names the author, the licence and the repository; README.md and the
+    changelog name RELEASING.md, which exists."""
+    version = set_version.version()
+    text = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    body = changelog.section(text, version)
+    assert changelog.BEGIN in body and changelog.END in body
+    heading = re.search(rf"(?m)^## \[{re.escape(version)}\] - (\d{{4}}-\d{{2}}-\d{{2}})$", text)
+    assert heading is not None, "the heading '## [<version>] - YYYY-MM-DD'"
+    assert f"[{version}]: https://github.com/karellopez/larmorx/releases/tag/v{version}" in text
+    citation = (ROOT / "CITATION.cff").read_text(encoding="utf-8")
+    assert re.search(r'(?m)^date-released: "(.*)"$', citation).group(1) == heading.group(1)
+    assert set_version.citation_version() == version
+    for line in (
+        "cff-version: 1.2.0",
+        "type: software",
+        "  - given-names: Karel Mauricio",
+        "    family-names: López Vilaret",
+        '    orcid: "https://orcid.org/0009-0007-0504-5258"',
+        "license: Apache-2.0",
+        'repository-code: "https://github.com/karellopez/larmorx"',
+        'repository-artifact: "https://pypi.org/project/larmorx/"',
+    ):
+        assert line in citation.splitlines(), line
+    assert citation.count("given-names:") == 1  # one author (the user, 2026-11-10)
+    assert (ROOT / "RELEASING.md").is_file()
+    for name in ("README.md", "CHANGELOG.md"):
+        assert "(RELEASING.md)" in (ROOT / name).read_text(encoding="utf-8"), name
+
+
 def _program_wheels(folder: Path, version: str, exe: str = "") -> None:
     """Small stand-ins of the three program wheels, laid out as maturin makes them."""
     folder.mkdir(parents=True, exist_ok=True)

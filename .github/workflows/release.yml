@@ -145,8 +145,8 @@ jobs:
           elif [ "$PUBLISH" = true ]; then
             exit 1
           else
-            echo "::warning title=CHANGELOG.md::no usable section for $VERSION: a release would stop here"
-            echo "Dry run: CHANGELOG.md has no section for $VERSION." > release-notes.md
+            echo "::warning title=CHANGELOG.md::the release notes of $VERSION failed (this step's log says why): a release would stop here"
+            echo "Dry run: CHANGELOG.md gives no release notes for $VERSION." > release-notes.md
           fi
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

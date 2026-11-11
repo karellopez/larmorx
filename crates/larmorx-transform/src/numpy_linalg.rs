@@ -96,6 +96,7 @@ use crate::openblas;
 pub mod bdsdc;
 pub mod blas;
 pub mod blocked;
+pub mod gelsd;
 pub mod gesdd;
 pub mod lstsq;
 pub mod svd;

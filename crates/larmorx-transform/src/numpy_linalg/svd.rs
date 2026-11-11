@@ -168,7 +168,7 @@ fn ix(ld: usize, i: usize, j: usize) -> usize {
 }
 
 /// `DLANGE('M', M, N, A, LDA, WORK)`: the largest magnitude, NaN when any entry is NaN.
-fn dlange_m(m: usize, n: usize, a: &[f64], lda: usize) -> f64 {
+pub(super) fn dlange_m(m: usize, n: usize, a: &[f64], lda: usize) -> f64 {
     let mut value = 0.0f64;
     for j in 1..=n {
         for i in 1..=m {
@@ -182,7 +182,7 @@ fn dlange_m(m: usize, n: usize, a: &[f64], lda: usize) -> f64 {
 }
 
 /// `DLASET('F', M, N, 0, 0, A, LDA)`: zeros in the `m × n` block.
-fn zero_block(m: usize, n: usize, a: &mut [f64], lda: usize) {
+pub(super) fn zero_block(m: usize, n: usize, a: &mut [f64], lda: usize) {
     for j in 1..=n {
         for i in 1..=m {
             a[ix(lda, i, j)] = 0.0;
@@ -191,7 +191,7 @@ fn zero_block(m: usize, n: usize, a: &mut [f64], lda: usize) {
 }
 
 /// `DLACPY('F', M, N, A, LDA, B, LDB)`.
-fn copy_block(m: usize, n: usize, a: &[f64], lda: usize, b: &mut [f64], ldb: usize) {
+pub(super) fn copy_block(m: usize, n: usize, a: &[f64], lda: usize, b: &mut [f64], ldb: usize) {
     for j in 1..=n {
         for i in 1..=m {
             b[ix(ldb, i, j)] = a[ix(lda, i, j)];

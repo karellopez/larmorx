@@ -22,14 +22,14 @@ use numpy::{PyArray, PyArray1, PyArray2, PyReadonlyArray1, PyReadonlyArray2};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 
-type F64s<'py> = Bound<'py, PyArray1<f64>>;
+pub(super) type F64s<'py> = Bound<'py, PyArray1<f64>>;
 type I64s<'py> = Bound<'py, PyArray1<i64>>;
 
-fn uplo(v: &str) -> PyResult<Uplo> {
+pub(super) fn uplo(v: &str) -> PyResult<Uplo> {
     one_of("uplo", v, &[("U", Uplo::Upper), ("L", Uplo::Lower)])
 }
 
-fn lp(lapack: &str, gemm_q: usize) -> PyResult<Lapack> {
+pub(super) fn lp(lapack: &str, gemm_q: usize) -> PyResult<Lapack> {
     Ok(Lapack {
         release: lapack_release(lapack)?,
         gemm_q,
@@ -665,7 +665,7 @@ fn lapack_dgesdd_lwork(m: usize, n: usize) -> (usize, usize) {
 }
 
 /// numpy's `LinAlgError(msg)`.
-fn linalg_error(py: Python<'_>, msg: &str) -> PyErr {
+pub(super) fn linalg_error(py: Python<'_>, msg: &str) -> PyErr {
     match py
         .import("numpy.linalg")
         .and_then(|m| m.getattr("LinAlgError"))
@@ -683,7 +683,7 @@ fn c_order(x: &PyReadonlyArray2<'_, f64>) -> (Vec<f64>, usize, usize) {
     (arr.iter().copied().collect(), rows, cols)
 }
 
-fn c_view(data: &[f64], rows: usize, cols: usize) -> View<'_> {
+pub(super) fn c_view(data: &[f64], rows: usize, cols: usize) -> View<'_> {
     View {
         data,
         off: 0,
@@ -694,9 +694,14 @@ fn c_view(data: &[f64], rows: usize, cols: usize) -> View<'_> {
     }
 }
 
-type Mat<'py> = Bound<'py, PyArray2<f64>>;
+pub(super) type Mat<'py> = Bound<'py, PyArray2<f64>>;
 
-fn mat<'py>(py: Python<'py>, rows: usize, cols: usize, v: Vec<f64>) -> PyResult<Mat<'py>> {
+pub(super) fn mat<'py>(
+    py: Python<'py>,
+    rows: usize,
+    cols: usize,
+    v: Vec<f64>,
+) -> PyResult<Mat<'py>> {
     Ok(PyArray::from_owned_array(
         py,
         Array2::from_shape_vec((rows, cols), v).map_err(value_err)?,

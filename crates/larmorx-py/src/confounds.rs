@@ -21,6 +21,7 @@ use numpy::{PyArray, PyArray1, PyArray2, PyReadonlyArray1, PyReadonlyArray2};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 
+mod gelsd;
 mod svd;
 
 fn value_err(e: impl std::fmt::Display) -> PyErr {
@@ -1135,5 +1136,6 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(lapack_dgebd2, m)?)?;
     m.add_function(wrap_pyfunction!(lapack_dlabrd, m)?)?;
     svd::register(m)?;
+    gelsd::register(m)?;
     Ok(())
 }

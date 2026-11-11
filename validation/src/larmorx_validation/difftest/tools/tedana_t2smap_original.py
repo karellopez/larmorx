@@ -23,15 +23,16 @@ not), ``--n-independent-echos``, both conventions, a prefix, ``--verbose``, ``--
 ``--quiet``). Inputs are written under ``TMPDIR`` (no random tedana run is stored in the
 oracle-output cache).
 
-Known differences of the replica's default (relays 2a and 2c, black-box facts, in its record's
-list for the replica-side relay) are taken as expected in (B): one of two chained tracebacks,
-numpy's ``RuntimeWarning`` lines it does not print, ANALYZE and MGH refused.
+Known differences (the suite's ``explain``, each with its reason) are taken as expected: in (B)
+the replica's default's black-box gaps (one of two chained tracebacks, numpy's ``RuntimeWarning``
+lines it does not print, the thresholds' zero-padded digits, ANALYZE and MGH refused) and the
+corrections it does not take yet (TED-31, TED-46); in (A) TED-46's equal observations, where
+``reproduce`` writes the exact zero slope until the exact port of numpy's lstsq serves it.
 """
 
 from __future__ import annotations
 
 import os
-import re
 import shutil
 import tempfile
 from pathlib import Path
@@ -364,38 +365,6 @@ def case(
     )
 
 
-#: The replica's default's known message gaps (black-box facts of relays 2a and 2c): a
-#: chained traceback printed as its last part only, numpy's warnings it does not print.
-_CHAIN = "During handling of the above exception, another exception occurred:"
-_WARNING_LINE = re.compile(r"^RuntimeWarning: ")
-
-
-_THRESHOLDS = re.compile(r"^(INFO +utils:make_adaptive_mask:\d+ Echo-wise intensity thresholds for adaptive mask: )\[(.*)\]$")  # fmt: skip
-
-
-def _by_value(line: str) -> str:
-    """The dropout thresholds' line with each number as the float32 it names: larmorx-gpl
-    0.1.0rc1 pads numpy's scientific form with zeros where numpy prints the element's own further
-    digits (larmorx_core::numpy::format, fixed 2026-11-11), the same values."""
-    import numpy as np
-
-    m = _THRESHOLDS.match(line)
-    if not m:
-        return line
-    values = [repr(float(np.float32(w))) for w in m.group(2).split()]
-    return f"{m.group(1)}{values}"
-
-
-def _without_gaps(lines: list[str]) -> list[str]:
-    """The messages with what the replica's known gaps change taken out: every traceback but the
-    last of a chain, numpy's RuntimeWarning lines, the thresholds' digits (by value)."""
-    if _CHAIN in lines:
-        first = lines.index("Traceback (most recent call last):")
-        last = len(lines) - 1 - lines[::-1].index("Traceback (most recent call last):")
-        lines = lines[:first] + lines[last:]
-    return [_by_value(x) for x in lines if not _WARNING_LINE.match(x)]
-
-
 def _run(case, checks) -> None:
     from larmorx_validation.parity import tedana_t2smap_original as so
     from larmorx_validation.parity.harness import EXPECTED, CheckList, Outcome
@@ -418,42 +387,39 @@ def _run(case, checks) -> None:
         dirs = {k: work / k / "case" for k in ("tedana", "reproduce", "replica", "default")}
         res_t = so.run_tedana(args, dirs["tedana"], env, "a random case's inputs")
         res_r = so.run_original(args, dirs["reproduce"], {**env, "LARMORX_UPSTREAM_DEFECTS": "reproduce"})  # fmt: skip
-        file_by_file = spec["form"] in ("pair", "analyze", "mgh") or spec["mask"] == "4d"
+        # since spec writer 2 (2026-11-11) check.py's model reads every image form and nilearn's
+        # masking path: every case is judged by §17.3's thresholds
+        a = CheckList()
         so.compare_runs(
-            checks, "(A)", res_t, res_r, dirs["tedana"], dirs["reproduce"], inputs,
-            file_by_file=file_by_file, with_notices=False,
+            a, "(A)", res_t, res_r, dirs["tedana"], dirs["reproduce"], inputs,
+            file_by_file=False, with_notices=False,
         )  # fmt: skip
+        reason_a = so.explain("(A)", a, res_t, res_r, dirs["tedana"], dirs["reproduce"], inputs)
+        met = [so._settle(checks, a, reason_a)]
         replica = so.replica_program()
         res_d = so.run_original(args, dirs["default"], {**env, "LARMORX_UPSTREAM_DEFECTS": "fix"})
         if replica is None:
             checks("(B) the replica", True, detail="larmorx-gpl not found: (B) not run")
-            return
-        res_p = so.run_replica(args, dirs["replica"], env)
-        if spec["form"] in ("analyze", "mgh"):
-            checks(
-                "(B) the replica refuses ANALYZE and MGH (its documented gap)",
-                res_p[0] == 1 and "UnsupportedFormat" in res_p[2],
-            )
-            checks("(B) the original's default reads them as reproduce", res_d[0] == res_r[0])
-            return
-        b = CheckList()
-        so.compare_runs(
-            b, "(B)", res_p, res_d, dirs["replica"], dirs["default"], inputs,
-            file_by_file=file_by_file, with_notices=True,
-        )  # fmt: skip
-        failed = [c for c in b.checks if not c.passed]
-        reason = None
-        if failed and all(c.name == "(B) messages" for c in failed):
-            m_p = so.messages(res_p[2], dirs["replica"].parent, inputs)
-            m_d = so.messages(res_d[2], dirs["default"].parent, inputs)
-            if _without_gaps(m_p) == _without_gaps(m_d):
-                reason = (
-                    "the replica's known message gaps (one of two chained tracebacks, numpy's "
-                    "RuntimeWarning lines, the thresholds' zero-padded digits)"
+        else:
+            res_p = so.run_replica(args, dirs["replica"], env)
+            if "UnsupportedFormat" in res_p[2]:
+                checks(
+                    "(B) the replica refuses ANALYZE and MGH (its documented gap)", res_p[0] == 1
                 )
-        met = so._settle(checks, b, reason)
-        if met and all(c.passed for c in checks.checks):
-            raise Outcome(EXPECTED, met)
+                so.default_reads(checks, res_d, res_r)
+            else:
+                b = CheckList()
+                so.compare_runs(
+                    b, "(B)", res_p, res_d, dirs["replica"], dirs["default"], inputs,
+                    file_by_file=False, with_notices=True,
+                )  # fmt: skip
+                reason_b = so.explain(
+                    "(B)", b, res_p, res_d, dirs["replica"], dirs["default"], inputs
+                )
+                met.append(so._settle(checks, b, reason_b))
+        reasons = [r for r in met if r]
+        if reasons and all(c.passed for c in checks.checks):
+            raise Outcome(EXPECTED, "; ".join(reasons))
     finally:
         shutil.rmtree(work, ignore_errors=True)
     if p.get("expect") == "divergence" and not all(c.passed for c in checks.checks):

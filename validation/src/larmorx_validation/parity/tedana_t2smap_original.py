@@ -92,9 +92,14 @@ EXPECTED_B = {
 }
 #: The replica's documented gap: it refuses ANALYZE and MGH images, which tedana reads.
 REPLICA_FORMATS_GAP = re.compile(r"^x-(analyze|mgh)")
-#: Cases outside ``check.py``'s model (it reads NIfTI-1 single files, and its TED-01 model
-#: reproduces tedana's failure): judged file by file.
-FILE_BY_FILE = re.compile(r"^(x-pair-|x-analyze|x-mgh|x-mask-4d$|nan-sample$)")
+#: Cases outside ``check.py``'s model, judged file by file: its model reproduces tedana's
+#: behaviour, which TED-01's NaN sample makes fail (since spec writer 2, 2026-11-11, the model
+#: reads every image form of §4.1 and nilearn's masking path, so the readers' cases are judged by
+#: §17.3's thresholds like every other).
+FILE_BY_FILE = re.compile(r"^nan-sample$")
+#: The relative difference allowed file by file where ``check.py``'s model cannot follow a run
+#: (a defect the default corrects stops tedana, and the model with it): a few float32 units.
+FILE_TOLERANCE = 1e-5
 
 SMOKE = (
     "loglin",
@@ -285,8 +290,21 @@ def files(out: Path) -> list[str]:
     return sorted(str(p.relative_to(out)) for p in out.rglob("*") if p.is_file())
 
 
+def _within(diffs: list[str], tolerance: float) -> list[str]:
+    """``outputs.compare``'s differences beyond ``tolerance`` (relative), headers and text kept."""
+    out = []
+    for d in diffs:
+        m = re.search(r"values differ, largest relative ([0-9.e+-]+|nan|inf)$", d)
+        if m and m.group(1) not in ("nan", "inf") and float(m.group(1)) <= tolerance:
+            continue
+        out.append(d)
+    return out
+
+
 def judge_values(ref: Path, other: Path, file_by_file: bool) -> tuple[bool, str]:
-    """``check.py`` (§17.3) on two case folders' outputs, or file by file."""
+    """``check.py`` (§17.3) on two case folders' outputs, or file by file; where ``check.py``'s
+    model cannot follow the run (it stops where tedana stops, and a defect the default corrects
+    let the run go on), file by file within ``FILE_TOLERANCE``."""
     _, _, outputs, _ = tools()
     combined = any((ref / "out").glob("*optcom_bold.nii.gz")) or any(
         (ref / "out").glob("*ts_OC.nii.gz")
@@ -314,6 +332,11 @@ def judge_values(ref: Path, other: Path, file_by_file: bool) -> tuple[bool, str]
     if failed:
         return False, "; ".join(failed)[:600]
     if proc.returncode != 0:
+        if "model.py" in proc.stderr:
+            diffs = _within(outputs.compare(ref / "out", other / "out"), FILE_TOLERANCE)
+            last = proc.stderr.strip().splitlines()[-1][:120]
+            note = f"outside check.py's model ({last}): file by file within {FILE_TOLERANCE:g}"
+            return not diffs, note + ("; " + "; ".join(diffs)[:500] if diffs else "")
         return False, proc.stderr.strip()[-300:]
     share = [x for x in lines if "(b)/(c) share" in x]
     identical = sum(1 for x in lines if x.startswith("PASS") and " failed" in x)
@@ -368,6 +391,129 @@ def compare_runs(
     if "t2smap_call.sh" in f_ref and "t2smap_call.sh" in f_other:
         ok, detail = judge_values(ref_case, other_case, file_by_file)
         checks(f"{label} values (§17.3)", ok, detail=detail)
+
+
+# --------------------------------------------------------------------------------------------
+# known divergences (black-box facts and decisions, each with its reason)
+
+#: The replica's default's known message gaps (relays 2a, 2c, 3a-ii: black-box facts, in the
+#: replica-side relay's list): a chained traceback printed as its last part only, numpy's
+#: RuntimeWarning lines it does not print, numpy's scientific thresholds padded with zeros.
+_CHAIN = "During handling of the above exception, another exception occurred:"
+_WARNING_LINE = re.compile(r"^RuntimeWarning: ")
+_THRESHOLDS = re.compile(r"^(INFO +utils:make_adaptive_mask:\d+ Echo-wise intensity thresholds for adaptive mask: )\[(.*)\]$")  # fmt: skip
+#: The lines TED-46's equal observations change (§7.2: tedana's slope there is rounding noise,
+#: not 0): numpy's divide warning, the curve fit's failure counts and SciPy's warning.
+_TED46_LINES = re.compile(
+    r"^(RuntimeWarning: divide by zero encountered in divide|OptimizeWarning: |DEBUG +decay:"
+    r"fit_monoexponential:\d+ With \d+ echoes, monoexponential fit failed)"
+)
+_TED46 = re.compile(r"upstream defect TED-46 ")
+_TED31 = re.compile(r"upstream defect TED-31 ")
+REASON_TED46_A = (
+    "TED-46 (§7.2's observations without a slope): reproduce writes the exact zero slope where "
+    "tedana's batched least squares leaves rounding noise (1 ms or 1e16 ms and more), until the "
+    "exact port of numpy's lstsq serves reproduce"
+)
+REASON_TED46_B = (
+    "TED-46: the replica's default does not take the slope 0 at observations without a slope "
+    "yet (its record's list for the replica-side relay)"
+)
+REASON_TED31_B = (
+    "TED-31: the replica's default does not refuse a run with no voxel left for the fit yet (it "
+    "completes the log-linear fit, and stops with nilearn's empty-mask text in the curve fit)"
+)
+REASON_REPLICA_GAPS = (
+    "the replica's known message gaps (one of two chained tracebacks, numpy's RuntimeWarning "
+    "lines, the thresholds' zero-padded digits)"
+)
+
+
+def join_wrapped(lines: list[str]) -> list[str]:
+    """numpy's printing of a long thresholds array goes on over several lines: one line again."""
+    out: list[str] = []
+    for line in lines:
+        prev = out[-1] if out else ""
+        if prev.startswith("INFO") and "intensity thresholds" in prev and "]" not in prev:
+            out[-1] = f"{prev} {line.strip()}"
+            continue
+        out.append(line)
+    return out
+
+
+def by_value(line: str) -> str:
+    """The dropout thresholds' line with each number as the float32 it names (larmorx-gpl
+    0.1.0rc1 pads numpy's scientific form with zeros where numpy prints the element's own further
+    digits: the same values)."""
+    import numpy as np
+
+    m = _THRESHOLDS.match(line)
+    if not m:
+        return line
+    values = [repr(float(np.float32(w))) for w in m.group(2).split()]
+    return f"{m.group(1)}{values}"
+
+
+def without_replica_gaps(lines: list[str]) -> list[str]:
+    """The messages with what the replica's known gaps change taken out."""
+    lines = join_wrapped(lines)
+    if _CHAIN in lines:
+        first = lines.index("Traceback (most recent call last):")
+        last = len(lines) - 1 - lines[::-1].index("Traceback (most recent call last):")
+        lines = lines[:first] + lines[last:]
+    return [by_value(x) for x in lines if not _WARNING_LINE.match(x)]
+
+
+def _failed(part: CheckList) -> list[str]:
+    """The failed checks' names without their label (``(A)``, ``(B) run 2``, ...)."""
+    return [re.sub(r"^\([AB]\)( run \d+)? ", "", c.name) for c in part.checks if not c.passed]
+
+
+def explain(
+    label: str,
+    part: CheckList,
+    ref: tuple[int, str, str],
+    other: tuple[int, str, str],
+    ref_case: Path,
+    other_case: Path,
+    inputs: Path,
+) -> str | None:
+    """The reason of ``part``'s failures when every one is a known divergence, else ``None``:
+    (A) tedana against the original's ``reproduce``, (B) the replica's default against the
+    original's default (``other`` is always the original's run)."""
+    failed = _failed(part)
+    if not failed:
+        return None
+    m_ref = messages(ref[2], ref_case.parent, inputs)
+    m_other = messages(other[2], other_case.parent, inputs)
+    m_ref = [x.replace(f"<W>/{ref_case.name}/", "<W>/<case>/") for x in m_ref]
+    m_other = [x.replace(f"<W>/{other_case.name}/", "<W>/<case>/") for x in m_other]
+    if label.startswith("(B)") and _TED31.search(other[2]):
+        return REASON_TED31_B
+    if _TED46.search(other[2]):
+
+        def strip46(lines: list[str]) -> list[str]:
+            return [x for x in lines if not _TED46_LINES.match(x)]
+
+        n_ref = [x for x in notices(ref[2]) if "TED-46" not in x]
+        n_other = [x for x in notices(other[2]) if "TED-46" not in x]
+        ok = {"values (§17.3)"}
+        if strip46(m_ref) == strip46(m_other) or (
+            label.startswith("(B)")
+            and without_replica_gaps(strip46(m_ref)) == without_replica_gaps(strip46(m_other))
+        ):
+            ok.add("messages")
+        if n_ref == n_other:
+            ok.add("notices")
+        if all(f in ok for f in failed):
+            return REASON_TED46_A if label.startswith("(A)") else REASON_TED46_B
+    if (
+        label.startswith("(B)")
+        and all(f == "messages" for f in failed)
+        and without_replica_gaps(m_ref) == without_replica_gaps(m_other)
+    ):
+        return REASON_REPLICA_GAPS
+    return None
 
 
 # --------------------------------------------------------------------------------------------
@@ -441,7 +587,12 @@ def run_probe(case: Case, checks: CheckList) -> None:
                 file_by_file=fbf,
                 with_notices=False,
             )
-        expected = [_settle(checks, a, EXPECTED_A.get(case.id))]
+        reason_a = EXPECTED_A.get(case.id)
+        for i in range(runs):
+            reason_a = reason_a or explain(
+                "(A)", a, res_t[i], res_r[i], dirs["tedana"], dirs["reproduce"], inputs
+            )
+        expected = [_settle(checks, a, reason_a)]
         replica = replica_program()
         if replica is None:
             checks("(B) the replica", True, detail="larmorx-gpl not found: (B) not run")
@@ -449,14 +600,14 @@ def run_probe(case: Case, checks: CheckList) -> None:
             return
         if REPLICA_FORMATS_GAP.match(case.id):
             code, _, err = run_replica(full, dirs["replica"], env)
-            checks(
-                "(B) the replica refuses ANALYZE and MGH (its documented gap)",
-                code == 1 and "UnsupportedFormat" in err,
-            )
-            res_d = run_original(full, dirs["default"], {**env, "LARMORX_UPSTREAM_DEFECTS": "fix"})
-            checks("(B) the original's default reads them", res_d[0] == res_r[0][0])
-            _expected(checks, expected)
-            return
+            if "UnsupportedFormat" in err:
+                checks("(B) the replica refuses ANALYZE and MGH (its documented gap)", code == 1)
+                res_d = run_original(
+                    full, dirs["default"], {**env, "LARMORX_UPSTREAM_DEFECTS": "fix"}
+                )
+                default_reads(checks, res_d, res_r[0])
+                _expected(checks, expected)
+                return
         res_p, res_d = [], []
         denv = {**env, "LARMORX_UPSTREAM_DEFECTS": "fix"}
         for _run in range(runs):
@@ -475,10 +626,30 @@ def run_probe(case: Case, checks: CheckList) -> None:
                 file_by_file=fbf,
                 with_notices=True,
             )
-        expected.append(_settle(checks, b, EXPECTED_B.get(case.id)))
+        reason_b = EXPECTED_B.get(case.id)
+        for i in range(runs):
+            reason_b = reason_b or explain(
+                "(B)", b, res_p[i], res_d[i], dirs["replica"], dirs["default"], inputs
+            )
+        expected.append(_settle(checks, b, reason_b))
         _expected(checks, expected)
     finally:
         shutil.rmtree(work, ignore_errors=True)
+
+
+def default_reads(
+    checks: CheckList, default: tuple[int, str, str], reproduce: tuple[int, str, str]
+):
+    """Where the replica refuses ANALYZE and MGH: the original's default reads them, and where its
+    exit status differs from ``reproduce``'s a corrected defect's notice says why."""
+    explained = default[0] == reproduce[0] or bool(
+        re.search(r"^larmorx: upstream defect \S+ \(\w+\) corrected: ", default[2], re.M)
+    )
+    checks(
+        "(B) the original's default reads them",
+        "UnsupportedFormat" not in default[2] and explained,
+        detail=f"exit {default[0]} (reproduce {reproduce[0]})",
+    )
 
 
 def _expected(checks: CheckList, reasons: list[str | None]) -> None:

@@ -104,10 +104,13 @@ CASES = [
     ("no-fit-loglin", [*DEAD, *TES, "--mask", "<I>/mask-ones.nii.gz"]),
     ("no-fit-none", [*DEAD, *TES, "--mask", "<I>/mask-ones.nii.gz", "--masktype", "none"]),
     ("no-fit-loglin-ts", [*DEAD, *TES, "--mask", "<I>/mask-ones.nii.gz", "--fitmode", "ts"]),
-    ("no-fit-curvefit", [*DEAD, *TES, "--mask", "<I>/mask-ones.nii.gz", "--fittype", "curvefit"]),  # fmt: skip
-    ("no-fit-curvefit-ts", [*DEAD, *TES, "--mask", "<I>/mask-ones.nii.gz", "--fittype", "curvefit", "--fitmode", "ts"]),  # fmt: skip
+    ("no-fit-curvefit", [*DEAD, *TES, "--mask", "<I>/mask-ones.nii.gz", "--fittype", "curvefit"]),
+    (
+        "no-fit-curvefit-ts",
+        [*DEAD, *TES, "--mask", "<I>/mask-ones.nii.gz", "--fittype", "curvefit", "--fitmode", "ts"],
+    ),
     ("no-fit-te-count", [*DEAD, "-e", "12", "28", "--mask", "<I>/mask-ones.nii.gz"]),
-    ("no-fit-indep", [*DEAD, *TES, "--mask", "<I>/mask-ones.nii.gz", "--n-independent-echos", "3"]),  # fmt: skip
+    ("no-fit-indep", [*DEAD, *TES, "--mask", "<I>/mask-ones.nii.gz", "--n-independent-echos", "3"]),
 ]
 
 
@@ -118,7 +121,7 @@ def main(argv: list[str]) -> int:
     p.add_argument("--runs", default="tedana,reproduce,default,replica")
     a = p.parse_args(argv)
     sys.path.insert(0, str(HERE))
-    import replay  # noqa: PLC0415  (this folder's helper)
+    import replay
     from larmorx_validation.parity import tedana_t2smap_original as so
 
     inputs = a.work / "inputs"
@@ -135,14 +138,16 @@ def main(argv: list[str]) -> int:
         shutil.rmtree(work, ignore_errors=True)
         print(f"########## {name}: {' '.join(words)}")
         runs = {
-            "tedana": lambda: so.run_tedana(args, work / "tedana", env, "a probe of relay 3c"),
-            "reproduce": lambda: so.run_original(
+            "tedana": lambda args=args, work=work: so.run_tedana(
+                args, work / "tedana", env, "a probe of relay 3c"
+            ),
+            "reproduce": lambda args=args, work=work: so.run_original(
                 args, work / "reproduce", {**env, "LARMORX_UPSTREAM_DEFECTS": "reproduce"}
             ),
-            "default": lambda: so.run_original(
+            "default": lambda args=args, work=work: so.run_original(
                 args, work / "default", {**env, "LARMORX_UPSTREAM_DEFECTS": "fix"}
             ),
-            "replica": lambda: so.run_replica(args, work / "replica", env),
+            "replica": lambda args=args, work=work: so.run_replica(args, work / "replica", env),
         }
         for run in a.runs.split(","):
             if run == "replica" and so.replica_program() is None:

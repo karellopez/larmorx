@@ -1767,7 +1767,7 @@ def lapack_dlalsd(
     n_threads: int = 1,
     gemm_q: int = 256,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, int, int]:
-    """LAPACK's ``DLALSD`` (``N <= SMLSIZ``; ``NotImplementedError`` beyond); returns ``(D, E,
+    """LAPACK's ``DLALSD`` (both paths: ``N <= SMLSIZ`` and divide and conquer); returns ``(D, E,
     B, RANK, INFO)``."""
 
 def lapack_dgelsd(
@@ -1784,8 +1784,8 @@ def lapack_dgelsd(
     n_threads: int = 1,
     gemm_q: int = 256,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, int, int, int, int]:
-    """LAPACK's ``DGELSD`` (``min(m, n) <= 25``; ``NotImplementedError`` beyond); returns ``(A,
-    B, S, RANK, WORK(1), IWORK(1), INFO)``."""
+    """LAPACK's ``DGELSD`` (every path, any size); returns ``(A, B, S, RANK, WORK(1), IWORK(1),
+    INFO)``."""
 
 def lapack_dgelsd_lwork(m: int, n: int, nrhs: int) -> tuple[int, int, int]:
     """``DGELSD``'s ``(MINWRK, MAXWRK, LIWORK)``."""
@@ -1865,3 +1865,85 @@ def lapack_dlasd6(
     lapack: str = "3.12.1",
 ) -> dict[str, object]:
     """LAPACK's ``DLASD6`` (one merge of ``DLASDA``'s tree): a dict of its outputs."""
+
+def lapack_dlasda(
+    icompq: int,
+    smlsiz: int,
+    n: int,
+    sqre: int,
+    d: np.ndarray,
+    e: np.ndarray,
+    u: np.ndarray,
+    ldu: int,
+    vt: np.ndarray,
+    k: np.ndarray,
+    difl: np.ndarray,
+    difr: np.ndarray,
+    z: np.ndarray,
+    poles: np.ndarray,
+    givptr: np.ndarray,
+    givcol: np.ndarray,
+    ldgcol: int,
+    perm: np.ndarray,
+    givnum: np.ndarray,
+    c: np.ndarray,
+    s: np.ndarray,
+    lapack: str = "3.12.1",
+) -> dict[str, object]:
+    """LAPACK's ``DLASDA`` (the divide-and-conquer SVD in compact form): a dict of its outputs;
+    ``icompq = 0`` with ``2 <= n <= smlsiz`` raises ``NotImplementedError`` (``DLASQ1``)."""
+
+def lapack_dlals0(
+    icompq: int,
+    nl: int,
+    nr: int,
+    sqre: int,
+    nrhs: int,
+    b: np.ndarray,
+    ldb: int,
+    bx: np.ndarray,
+    ldbx: int,
+    perm: np.ndarray,
+    givptr: int,
+    givcol: np.ndarray,
+    ldgcol: int,
+    givnum: np.ndarray,
+    ldgnum: int,
+    poles: np.ndarray,
+    difl: np.ndarray,
+    difr: np.ndarray,
+    z: np.ndarray,
+    k: int,
+    c: float,
+    s: float,
+) -> tuple[np.ndarray, np.ndarray, int]:
+    """LAPACK's ``DLALS0`` (one node's factor of the compact SVD): ``(B, BX, INFO)``."""
+
+def lapack_dlalsa(
+    icompq: int,
+    smlsiz: int,
+    n: int,
+    nrhs: int,
+    b: np.ndarray,
+    ldb: int,
+    bx: np.ndarray,
+    ldbx: int,
+    u: np.ndarray,
+    ldu: int,
+    vt: np.ndarray,
+    k: np.ndarray,
+    difl: np.ndarray,
+    difr: np.ndarray,
+    z: np.ndarray,
+    poles: np.ndarray,
+    givptr: np.ndarray,
+    givcol: np.ndarray,
+    ldgcol: int,
+    perm: np.ndarray,
+    givnum: np.ndarray,
+    c: np.ndarray,
+    s: np.ndarray,
+    n_threads: int = 1,
+    gemm_q: int = 256,
+) -> tuple[np.ndarray, np.ndarray, int]:
+    """LAPACK's ``DLALSA`` (the compact SVD applied to ``b``): ``(B, BX, INFO)``."""

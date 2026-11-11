@@ -86,7 +86,7 @@ AFNI's global options (anywhere on the command line):
 
 /// The first `-verbose` line.
 const IMPLEMENTATION: &str = concat!(
-    "implementation: original (larmorx ",
+    "implementation: clean-room (larmorx ",
     env!("CARGO_PKG_VERSION"),
     ", Apache-2.0), clean-room 3dvolreg"
 );

@@ -114,7 +114,7 @@ def test_auto_runs_the_built_in_replica(no_replica, tmp_path, method):
         "-verbose", flag, "-tpattern", "alt+z", "-prefix", str(out), str(path),
         implementation="clean-room",
     )  # fmt: skip
-    assert code == 0 and "implementation: original (larmorx " in err, err
+    assert code == 0 and "implementation: clean-room (larmorx " in err, err
     np.testing.assert_array_equal(lx.load(out).data, original.data)
 
 
@@ -394,7 +394,7 @@ def test_the_command_line_runs_the_chosen_implementation(no_replica, monkeypatch
     code, _, err = cli(*verbose)
     assert code == 1 and err.startswith("++ implementation: replica (larmorx "), err
     code, _, err = cli(*verbose, implementation="clean-room")
-    assert code == 1 and err.startswith("++ implementation: original (larmorx "), err
+    assert code == 1 and err.startswith("++ implementation: clean-room (larmorx "), err
     monkeypatch.setenv("LARMORX_IMPLEMENTATION", "clean-room")
     code, _, err = cli(*verbose)
-    assert err.startswith("++ implementation: original (larmorx "), err
+    assert err.startswith("++ implementation: clean-room (larmorx "), err

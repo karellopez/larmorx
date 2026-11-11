@@ -57,7 +57,7 @@ AFNI's global options may stand anywhere: -overwrite, -Dname=value, -ok_1D_text,
 /// larmorx's `-verbose`-like first line is not printed by 3dAutomask (it has no verbose
 /// option); the implementation is named in the Python results.
 pub const IMPLEMENTATION: &str = concat!(
-    "implementation: original (larmorx ",
+    "implementation: clean-room (larmorx ",
     env!("CARGO_PKG_VERSION"),
     ", Apache-2.0), clean-room 3dAutomask"
 );

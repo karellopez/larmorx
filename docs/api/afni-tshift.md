@@ -156,11 +156,13 @@ lx.afni.tshift("bold.nii.gz", slice_times="alt+z", implementation="original")
   way (`ValueError`). The checks that need the image (the number of slice times, their range,
   `slice`, `ignore`) come from the implementation that runs: a `ValueError` from the original,
   an `lx.ReplicaError` with AFNI's message from the replica.
-- **Command line:** `larmorx afni 3dTshift` follows the same rule; `LARMORX_IMPLEMENTATION`
-  overrides it. With `-verbose`, the first line names the implementation:
-  `++ implementation: original (larmorx 0.0.1, Apache-2.0), clean-room 3dTshift` or
-  `++ implementation: replica (larmorx 0.0.1, Apache-2.0 AND CC-BY-4.0), bit-exact translation
-  of AFNI 26.3.05's 3dTshift`.
+- **Command line:** `larmorx afni 3dTshift` follows the same rule; `--implementation` before
+  the family (`larmorx --implementation clean-room afni 3dTshift ...`) or
+  `LARMORX_IMPLEMENTATION` overrides it. With `-verbose`, the first line names the
+  implementation: `++ implementation: clean-room (larmorx <version>, Apache-2.0), clean-room
+  3dTshift` or `++ implementation: replica (larmorx <version>, Apache-2.0 AND CC-BY-4.0),
+  bit-exact translation of AFNI 26.3.05's 3dTshift` (0.1.0rc1 named the clean-room original
+  `original` in this line).
 
 ## How AFNI reads and writes NIfTI (reproduced)
 

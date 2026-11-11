@@ -65,7 +65,7 @@ environment variables for this run), -ok_1D_text, -skip_afnirc.
 /// The first `-verbose` line: which implementation runs (`larmorx afni 3dTshift` runs the
 /// bit-exact replica instead when the `larmorx-gpl` program is found; `docs/licensing.md`).
 const IMPLEMENTATION: &str = concat!(
-    "implementation: original (larmorx ",
+    "implementation: clean-room (larmorx ",
     env!("CARGO_PKG_VERSION"),
     ", Apache-2.0), clean-room 3dTshift"
 );

@@ -1,18 +1,24 @@
 // SPDX-License-Identifier: Apache-2.0
 //! Bindings of LAPACK's divide-and-conquer bidiagonal SVD (`DBDSDC` with `COMPQ = 'I'` and the
-//! routines under it: `DLASD0` to `DLASD5`, `DLASDQ`, `DLASDT`, `DLAMRG`, `DLAED6`, `DLASCL`) and
-//! the bidiagonal reduction's `Q` and `P` (`DORMBR`, `DORGBR`) at their Fortran interface
-//! (`lapack_*`, as `larmorx_transform::numpy_linalg::{bdsdc, blocked}` compute them); the
-//! validation compares them with numpy's own library. Matrices cross as flat
-//! column-major storage with their leading dimension; index arrays as int64 (1-based, as LAPACK
-//! keeps them). The GIL is released while computing.
+//! routines under it: `DLASD0` to `DLASD5`, `DLASDQ`, `DLASDT`, `DLAMRG`, `DLAED6`, `DLASCL`),
+//! the bidiagonal reduction's `Q` and `P` (`DORMBR`, `DORGBR`) and the thin SVD (`DGESDD` with
+//! `JOBZ = 'S'`) at their Fortran interface (`lapack_*`, as
+//! `larmorx_transform::numpy_linalg::{bdsdc, blocked, svd}` compute them), and numpy's `svd(a,
+//! full_matrices=False)` and `pinv(a)` on top of them (`numpy_svd`, `numpy_pinv`); the validation
+//! compares them with numpy's own library and functions. Matrices cross as flat column-major
+//! storage with their leading dimension (the `lapack_*` functions) or as 2-D arrays (the `numpy_*`
+//! ones); index arrays as int64 (1-based, as LAPACK keeps them). The GIL is released while
+//! computing.
 
 use super::{contiguous, lapack_release, lapack_run, one_of, trans, value_err};
 use larmorx_transform::numpy_linalg::bdsdc::{self, MergeWork};
 use larmorx_transform::numpy_linalg::blocked::{self, Lapack, Vect};
+use larmorx_transform::numpy_linalg::svd::{self as tsvd, DgesddError};
 use larmorx_transform::openblas::level3::Trans;
+use larmorx_transform::openblas::matmul::Array2 as View;
 use larmorx_transform::openblas::trmm::{Side, Uplo};
-use numpy::{PyArray1, PyReadonlyArray1};
+use numpy::ndarray::Array2;
+use numpy::{PyArray, PyArray1, PyArray2, PyReadonlyArray1, PyReadonlyArray2};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 
@@ -600,6 +606,152 @@ fn lapack_dorgbr<'py>(
     Ok((PyArray1::from_vec(py, av), work1))
 }
 
+/// `DGESDD('S', M, N, A, LDA, S, U, LDU, VT, LDVT, WORK, LWORK, IWORK, INFO)` on flat
+/// column-major storage: `u` (`ldu × min(m, n)`) and `vt` (`ldvt × n`) start as given and keep
+/// their entries outside the blocks LAPACK writes; `lwork=None` is the optimal workspace (numpy's
+/// query). Only `jobz = "S"` is ported. Returns `(A, S, U, VT, WORK(1), INFO)` (`INFO = -4`: a
+/// NaN in `A`, nothing computed). An infinite entry is refused (`ValueError`: LAPACK would loop
+/// forever or return garbage).
+#[pyfunction]
+#[pyo3(signature = (jobz, m, n, a, lda, u, ldu, vt, ldvt, lwork = None, lapack = "3.12.1", n_threads = 1, gemm_q = 256))]
+#[allow(clippy::too_many_arguments)]
+fn lapack_dgesdd<'py>(
+    py: Python<'py>,
+    jobz: &str,
+    m: usize,
+    n: usize,
+    a: PyReadonlyArray1<'_, f64>,
+    lda: usize,
+    u: PyReadonlyArray1<'_, f64>,
+    ldu: usize,
+    vt: PyReadonlyArray1<'_, f64>,
+    ldvt: usize,
+    lwork: Option<usize>,
+    lapack: &str,
+    n_threads: usize,
+    gemm_q: usize,
+) -> PyResult<(F64s<'py>, F64s<'py>, F64s<'py>, F64s<'py>, usize, i64)> {
+    if !jobz.eq_ignore_ascii_case("S") {
+        return Err(PyValueError::new_err(format!(
+            "DGESDD: only JOBZ = 'S' is ported, got {jobz:?}"
+        )));
+    }
+    let lp = lp(lapack, gemm_q)?;
+    let mut av = contiguous(&a)?.to_vec();
+    let mut uv = contiguous(&u)?.to_vec();
+    let mut vtv = contiguous(&vt)?.to_vec();
+    let mut s = vec![0.0f64; m.min(n)];
+    let out = lapack_run(py, "DGESDD", n_threads, || {
+        tsvd::dgesdd_s(
+            lp, m, n, &mut av, lda, &mut s, &mut uv, ldu, &mut vtv, ldvt, lwork,
+        )
+    })?
+    .map_err(|e: DgesddError| value_err(e))?;
+    Ok((
+        PyArray1::from_vec(py, av),
+        PyArray1::from_vec(py, s),
+        PyArray1::from_vec(py, uv),
+        PyArray1::from_vec(py, vtv),
+        out.work1,
+        out.info,
+    ))
+}
+
+/// `DGESDD('S', M, N, ...)`'s workspace: `(MINWRK, MAXWRK)`, the smallest `LWORK` it accepts and
+/// the optimal one (`WORK(1)` of the `LWORK = -1` query).
+#[pyfunction]
+fn lapack_dgesdd_lwork(m: usize, n: usize) -> (usize, usize) {
+    tsvd::dgesdd_s_lwork(m, n)
+}
+
+/// numpy's `LinAlgError(msg)`.
+fn linalg_error(py: Python<'_>, msg: &str) -> PyErr {
+    match py
+        .import("numpy.linalg")
+        .and_then(|m| m.getattr("LinAlgError"))
+        .and_then(|c| c.call1((msg,)))
+    {
+        Ok(v) => PyErr::from_value(v),
+        Err(e) => e,
+    }
+}
+
+/// The values of a 2-D float64 array (any strides) in C order, as a `matmul` view of them.
+fn c_order(x: &PyReadonlyArray2<'_, f64>) -> (Vec<f64>, usize, usize) {
+    let arr = x.as_array();
+    let (rows, cols) = arr.dim();
+    (arr.iter().copied().collect(), rows, cols)
+}
+
+fn c_view(data: &[f64], rows: usize, cols: usize) -> View<'_> {
+    View {
+        data,
+        off: 0,
+        rows,
+        cols,
+        s0: cols.max(1),
+        s1: 1,
+    }
+}
+
+type Mat<'py> = Bound<'py, PyArray2<f64>>;
+
+fn mat<'py>(py: Python<'py>, rows: usize, cols: usize, v: Vec<f64>) -> PyResult<Mat<'py>> {
+    Ok(PyArray::from_owned_array(
+        py,
+        Array2::from_shape_vec((rows, cols), v).map_err(value_err)?,
+    ))
+}
+
+/// `numpy.linalg.svd(a, full_matrices=False)` of a 2-D float64 array (any strides), with numpy
+/// 2.5.4's LAPACK (`lapack="3.12.1"`) or numpy 2.3.5's (`"3.12.0"`): `(u, s, vt)`, C-ordered.
+/// Raises numpy's `LinAlgError('SVD did not converge')` as numpy does (`DGESDD`'s `INFO != 0`, a
+/// non-finite entry).
+#[pyfunction]
+#[pyo3(signature = (a, lapack = "3.12.1", n_threads = 1, gemm_q = 256))]
+fn numpy_svd<'py>(
+    py: Python<'py>,
+    a: PyReadonlyArray2<'_, f64>,
+    lapack: &str,
+    n_threads: usize,
+    gemm_q: usize,
+) -> PyResult<(Mat<'py>, F64s<'py>, Mat<'py>)> {
+    let lp = lp(lapack, gemm_q)?;
+    let (data, m, n) = c_order(&a);
+    let res = lapack_run(py, "numpy.linalg.svd", n_threads, || {
+        tsvd::numpy_svd(lp, c_view(&data, m, n))
+    })?;
+    let svd = res.map_err(|e| linalg_error(py, &e.to_string()))?;
+    let k = svd.k;
+    Ok((
+        mat(py, m, k, svd.u)?,
+        PyArray1::from_vec(py, svd.s),
+        mat(py, k, n, svd.vt)?,
+    ))
+}
+
+/// `numpy.linalg.pinv(a, rcond)` of a 2-D float64 array (any strides; numpy's default `rcond` is
+/// `1e-15`, its `rtol=None` gives `max(m, n)·2^-52`), with numpy 2.5.4's or 2.3.5's LAPACK as
+/// [`numpy_svd`]: `n × m`, C-ordered. Raises numpy's `LinAlgError` as its `svd`.
+#[pyfunction]
+#[pyo3(signature = (a, rcond = 1e-15, lapack = "3.12.1", n_threads = 1, gemm_q = 256))]
+fn numpy_pinv<'py>(
+    py: Python<'py>,
+    a: PyReadonlyArray2<'_, f64>,
+    rcond: f64,
+    lapack: &str,
+    n_threads: usize,
+    gemm_q: usize,
+) -> PyResult<Mat<'py>> {
+    let lp = lp(lapack, gemm_q)?;
+    let (data, m, n) = c_order(&a);
+    let res = lapack_run(py, "numpy.linalg.pinv", n_threads, || {
+        tsvd::numpy_pinv(lp, c_view(&data, m, n), rcond)
+    })?;
+    let p = res.map_err(|e| linalg_error(py, &e.to_string()))?;
+    mat(py, n, m, p)
+}
+
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(lapack_dbdsdc, m)?)?;
     m.add_function(wrap_pyfunction!(lapack_dlasd0, m)?)?;
@@ -615,5 +767,9 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(lapack_dlascl, m)?)?;
     m.add_function(wrap_pyfunction!(lapack_dormbr, m)?)?;
     m.add_function(wrap_pyfunction!(lapack_dorgbr, m)?)?;
+    m.add_function(wrap_pyfunction!(lapack_dgesdd, m)?)?;
+    m.add_function(wrap_pyfunction!(lapack_dgesdd_lwork, m)?)?;
+    m.add_function(wrap_pyfunction!(numpy_svd, m)?)?;
+    m.add_function(wrap_pyfunction!(numpy_pinv, m)?)?;
     Ok(())
 }

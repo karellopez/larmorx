@@ -1714,3 +1714,37 @@ def lapack_dorgbr(
     gemm_q: int = 256,
 ) -> tuple[np.ndarray, int]:
     """LAPACK's ``DORGBR`` (``DGEBRD``'s ``Q`` or ``P^T`` generated); returns ``(A, WORK(1))``."""
+def lapack_dgesdd(
+    jobz: str,
+    m: int,
+    n: int,
+    a: np.ndarray,
+    lda: int,
+    u: np.ndarray,
+    ldu: int,
+    vt: np.ndarray,
+    ldvt: int,
+    lwork: int | None = None,
+    lapack: str = "3.12.1",
+    n_threads: int = 1,
+    gemm_q: int = 256,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, int, int]:
+    """LAPACK's ``DGESDD`` with ``JOBZ = 'S'`` (the thin SVD, all four paths); returns ``(A, S,
+    U, VT, WORK(1), INFO)``."""
+
+def lapack_dgesdd_lwork(m: int, n: int) -> tuple[int, int]:
+    """``DGESDD('S')``'s ``(MINWRK, MAXWRK)``."""
+
+def numpy_svd(
+    a: np.ndarray, lapack: str = "3.12.1", n_threads: int = 1, gemm_q: int = 256
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """``numpy.linalg.svd(a, full_matrices=False)`` of a float64 matrix: ``(u, s, vt)``."""
+
+def numpy_pinv(
+    a: np.ndarray,
+    rcond: float = 1e-15,
+    lapack: str = "3.12.1",
+    n_threads: int = 1,
+    gemm_q: int = 256,
+) -> np.ndarray:
+    """``numpy.linalg.pinv(a, rcond)`` of a float64 matrix."""

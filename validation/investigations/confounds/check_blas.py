@@ -80,7 +80,46 @@ def undefined(section: str, case: tuple) -> bool:
         (r, c), _, form = case
         order, depth = (r, c) if form == "x@x.T" else (c, r)
         return order > 512 and max(blocks(depth, GEMM_Q, False), default=0) > BUFFER_STEPS
+    if section == "trmm":
+        side, uplo, tr, _, m, n, *_ = case
+        return trmm_gemm_depth(side, (uplo == "U") != (tr == "T"), m, n) > BUFFER_STEPS
     return False
+
+
+def trmm_gemm_depth(side: str, upper: bool, m: int, n: int) -> int:
+    """The largest depth of a ``GEMM_KERNEL`` call of 24 or more columns that OpenBLAS's
+    ``trmm_L.c``/``trmm_R.c`` make (0 if none), for the undefined class above."""
+    q, deep = GEMM_Q, 0
+    if side == "L":
+        if n < 24:
+            return 0
+        if upper:
+            ls = min(m, q)
+            while ls < m:
+                deep = max(deep, min(m - ls, q))
+                ls += q
+        else:
+            ls = m - min(m, q)
+            while ls > 0:
+                deep = max(deep, min(ls, q))
+                ls -= q
+        return deep
+    if not upper:
+        ls = 0
+        while ls < n:
+            if ls >= 24:
+                deep = max(deep, min(n - ls, q))
+            ls += q
+        return deep
+    ls = 0
+    while ls + q < n:
+        ls += q
+    while ls >= 0:
+        lo = min(n - ls, q)
+        if n - ls - lo >= 24:
+            deep = max(deep, lo)
+        ls -= q
+    return deep
 
 
 def zen4_rule(config: str) -> bool:
@@ -150,6 +189,21 @@ def ref_dgemv(t, m, n, alpha, a, lda, x, incx, beta, y, incy) -> np.ndarray:
         ctypes.byref(I64(incy)),
     )
     return y
+
+
+def ref_dtrmm(side, uplo, tr, diag, m, n, alpha, a, lda, b, ldb) -> np.ndarray:
+    b = b.copy()
+    LIB.scipy_dtrmm_64_(
+        *(ctypes.c_char_p(c.encode()) for c in (side, uplo, tr, diag)),
+        ctypes.byref(I64(m)),
+        ctypes.byref(I64(n)),
+        ctypes.byref(ctypes.c_double(alpha)),
+        ptr(a),
+        ctypes.byref(I64(lda)),
+        ptr(b),
+        ctypes.byref(I64(ldb)),
+    )
+    return b
 
 
 def same(x: np.ndarray, y: np.ndarray) -> bool:
@@ -345,11 +399,61 @@ def gemv_run(cid: int, case: tuple, threads: int, core) -> list[tuple[bool, str]
     return [(same(want, got), "")]
 
 
+def trmm_cases(quick: bool) -> list[tuple]:
+    """Every side, triangle, transpose and diagonal; sizes on both sides of the kernel's groups
+    (4/8), the GEMM_P row blocks (512) and the GEMM_Q blocks (256/512); LAPACK's shapes (DLARFB's
+    M x K on the right, DLARFT's L x (K - L))."""
+    rng = np.random.default_rng(5)
+    dims = [1, 2, 3, 4, 5, 7, 8, 9, 12, 13, 16, 17, 23, 24, 25, 31, 32, 33, 64, 65, 129]
+    big = [255, 256, 257, 300, 513, 600]
+    out = []
+    for t in range(400 if quick else 3000):
+        side, uplo = str(rng.choice(["L", "R"])), str(rng.choice(["U", "L"]))
+        tr, diag = str(rng.choice(["N", "T"])), str(rng.choice(["U", "N"]))
+        m, n = int(rng.choice(dims)), int(rng.choice(dims))
+        if t % 10 == 0:
+            if side == "L":
+                m = int(rng.choice(big))
+            else:
+                n = int(rng.choice(big))
+        if t % 13 == 0:
+            if side == "L":
+                n = int(rng.choice([520, 1030, 2000]))
+            else:
+                m = int(rng.choice([520, 1030, 2000]))
+        alpha = float(rng.choice([1.0, -1.0, 0.5, 0.0, 2.0]))
+        out.append((side, uplo, tr, diag, m, n, alpha, KINDS[t % len(KINDS)]))
+    # DLARFB (right side, M x K, K the block size) and DLARFT's calls, at their sizes.
+    for side_args in [("R", "U", "N", "N"), ("R", "U", "T", "N"), ("R", "L", "N", "U"),
+                      ("R", "L", "T", "U"), ("R", "U", "N", "U"), ("R", "U", "T", "U"),
+                      ("L", "U", "N", "N")]:
+        for m, n in [(60_968, 32), (4_100, 32), (600, 32), (16, 16), (31, 1), (1, 31)]:
+            if side_args[0] == "L":
+                m, n = n, m
+            out.append((*side_args, m, n, -1.0 if side_args[0] == "L" else 1.0, "normal"))
+    if not quick:
+        out += [("L", "U", "N", "N", 1100, 40, 1.0, "normal"), ("R", "L", "T", "N", 300, 1100, 1.0, "normal")]
+    return out
+
+
+def trmm_run(cid: int, case: tuple, threads: int, core) -> list[tuple[bool, str]]:
+    side, uplo, tr, diag, m, n, alpha, kind = case
+    rng = np.random.default_rng([5, cid])
+    na = m if side == "L" else n
+    lda, ldb = na + cid % 3, m + cid % 2
+    a = entries(rng, lda * na, kind)
+    b = entries(rng, ldb * n, kind if cid % 2 else "normal")
+    want = ref_dtrmm(side, uplo, tr, diag, m, n, alpha, a, lda, b, ldb)
+    got = core.blas_dtrmm(side, uplo, tr, diag, m, n, alpha, a, lda, b, ldb, threads, GEMM_Q)
+    return [(same(want, got), "")]
+
+
 SECTIONS = {
     "gemm": ("dgemm (Fortran interface)", gemm_cases, gemm_run),
     "matmul": ("numpy @ and np.dot (2-D)", matmul_cases, matmul_run),
     "syrk": ("numpy x @ x.T, x.T @ x (dsyrk)", syrk_cases, syrk_run),
     "gemv": ("dgemv (Fortran interface)", gemv_cases, gemv_run),
+    "trmm": ("dtrmm (Fortran interface)", trmm_cases, trmm_run),
 }
 
 

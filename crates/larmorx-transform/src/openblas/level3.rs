@@ -149,7 +149,7 @@ fn path(i: usize, j: usize, mc: usize, nc: usize) -> Path {
 /// j, acc)` for each element, where `acc` sums `a(i, kk)·b(kk, j)` for `kk < l` along the
 /// element's path (before `alpha` and `C`). `ap` and `bp` are scratch.
 #[allow(clippy::too_many_arguments)]
-fn kernel_block(
+pub(super) fn kernel_block(
     mc: usize,
     nc: usize,
     l: usize,

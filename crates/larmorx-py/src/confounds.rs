@@ -10,6 +10,7 @@ use larmorx_core::parallel;
 use larmorx_transform::openblas::level2;
 use larmorx_transform::openblas::level3::{self, Operand, Trans};
 use larmorx_transform::openblas::matmul::{self, Array2 as View};
+use larmorx_transform::openblas::trmm::{self, Diag, Side, Uplo};
 use numpy::ndarray::Array2;
 use numpy::{PyArray, PyArray1, PyArray2, PyReadonlyArray1, PyReadonlyArray2};
 use pyo3::exceptions::PyValueError;
@@ -116,6 +117,54 @@ fn blas_dgemv<'py>(
     Ok(PyArray1::from_vec(py, yv))
 }
 
+fn one_of<T: Copy>(name: &str, v: &str, table: &[(&str, T)]) -> PyResult<T> {
+    table
+        .iter()
+        .find(|(k, _)| k.eq_ignore_ascii_case(v))
+        .map(|&(_, t)| t)
+        .ok_or_else(|| PyValueError::new_err(format!("{name} must be one of {:?}, got {v:?}", table.iter().map(|x| x.0).collect::<Vec<_>>())))
+}
+
+/// `DTRMM(SIDE, UPLO, TRANSA, DIAG, M, N, ALPHA, A, LDA, B, LDB)` on flat column-major storage
+/// (`larmorx_transform::openblas::trmm::dtrmm_with`; `gemm_q` as in `blas_dgemm`); returns the
+/// new `B` storage.
+#[pyfunction]
+#[pyo3(signature = (side, uplo, transa, diag, m, n, alpha, a, lda, b, ldb, n_threads = 1, gemm_q = 256))]
+#[allow(clippy::too_many_arguments)]
+fn blas_dtrmm<'py>(
+    py: Python<'py>,
+    side: &str,
+    uplo: &str,
+    transa: &str,
+    diag: &str,
+    m: usize,
+    n: usize,
+    alpha: f64,
+    a: PyReadonlyArray1<'_, f64>,
+    lda: usize,
+    b: PyReadonlyArray1<'_, f64>,
+    ldb: usize,
+    n_threads: usize,
+    gemm_q: usize,
+) -> PyResult<Bound<'py, PyArray1<f64>>> {
+    let s = one_of("side", side, &[("L", Side::Left), ("R", Side::Right)])?;
+    let u = one_of("uplo", uplo, &[("U", Uplo::Upper), ("L", Uplo::Lower)])?;
+    let d = one_of("diag", diag, &[("U", Diag::Unit), ("N", Diag::NonUnit)])?;
+    let t = trans(transa)?;
+    let a = contiguous(&a)?;
+    let mut bv = contiguous(&b)?.to_vec();
+    py.detach(|| {
+        parallel::with_threads(n_threads, || {
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                trmm::dtrmm_with(s, u, t, d, m, n, alpha, a, 0, lda, &mut bv, 0, ldb, gemm_q)
+            }))
+        })
+    })
+    .map_err(value_err)?
+    .map_err(|_| PyValueError::new_err("DTRMM: invalid arguments"))?;
+    Ok(PyArray1::from_vec(py, bv))
+}
+
 /// A view of a C- or F-contiguous 2-D array as `matmul` takes it (strides in elements).
 fn view<'a>(x: &'a PyReadonlyArray2<'_, f64>) -> PyResult<View<'a>> {
     let arr = x.as_array();
@@ -180,6 +229,7 @@ fn numpy_matmul<'py>(
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(blas_dgemm, m)?)?;
     m.add_function(wrap_pyfunction!(blas_dgemv, m)?)?;
+    m.add_function(wrap_pyfunction!(blas_dtrmm, m)?)?;
     m.add_function(wrap_pyfunction!(numpy_matmul, m)?)?;
     Ok(())
 }

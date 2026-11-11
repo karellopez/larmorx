@@ -258,6 +258,9 @@ mod tests {
         assert!(hypot(f64::NAN, 1.0).is_nan());
         assert_eq!(hypot(f64::MAX, f64::MAX), f64::INFINITY);
         assert_eq!(hypot(1.0, 1e-300), 1.0);
-        assert_eq!(hypot(f64::MIN_POSITIVE, f64::from_bits(1)), f64::MIN_POSITIVE);
+        assert_eq!(
+            hypot(f64::MIN_POSITIVE, f64::from_bits(1)),
+            f64::MIN_POSITIVE
+        );
     }
 }

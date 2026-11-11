@@ -1,0 +1,513 @@
+# The easy command line's changes to the shared documents (relay 3, 2026-11-11), applied in order by
+# scripts/orchestration/apply_handoff.py; the reasons are in HANDOFF.md (each op's `why` line too).
+
+[[op]]
+# decision 2: clean-room for original
+do = "edit"
+file = "CLAUDE.md"
+old = '''
+one `import larmorx` and one `larmorx` command either way, `implementation="auto" | "replica" | "original"` where a tool has both.'''
+new = '''
+one `import larmorx` and one `larmorx` command either way, `implementation="auto" | "replica" | "clean-room"` where a tool has both (`"original"`, 0.1.0rc1's spelling, still accepted; the user, 2026-11-11).'''
+
+[[op]]
+# decisions 1 and 3
+do = "edit"
+file = "CLAUDE.md"
+old = '''
+     - a CLI that accepts the original program's arguments (`larmorx ants antsRegistration ...`, short alias `lx`)'''
+new = '''
+     - a CLI that accepts the original program's arguments (`larmorx ants antsRegistration ...`, short alias `lx`), with larmorx's own options before the family (`larmorx [--n-threads N] [--implementation auto|replica|clean-room] [--upstream-defects fix|reproduce] <family> <tool> ...`, the Python arguments' names, each winning over the environment variable it replaces; the user, 2026-11-11), the same in every package's program (`larmorx-nc`, `larmorx-gpl`, later `larmorx-freesurfer`)'''
+
+[[op]]
+# the per-tool contract's CLI line
+do = "edit"
+file = "CLAUDE.md"
+old = '''
+   - Rust API, Python wrapper, compatible CLI
+'''
+new = '''
+   - Rust API, Python wrapper, compatible CLI (the original's arguments after the tool; larmorx's three options before the family reach it through the settings overlay, `docs/architecture.md`)
+'''
+
+[[op]]
+# the release deferred
+do = "edit"
+file = "CLAUDE.md"
+old = '''
+the maintainer's steps in `RELEASING.md`, the orchestrator's in `docs/orchestration.md`.'''
+new = '''
+the maintainer's steps in `RELEASING.md`, the orchestrator's in `docs/orchestration.md`. **The next release once the full pipeline exists** (the user, 2026-11-11: "I do not really want to release yet until we have the full pipeline"); what `main` adds meanwhile is in `CHANGELOG.md`'s "Unreleased".'''
+
+[[op]]
+# this part done
+do = "edit"
+file = "CLAUDE.md"
+old = '''
+checked from PyPI on clean Linux and Windows) complete; next'''
+new = '''
+checked from PyPI on clean Linux and Windows) and the easy command line (2026-11-11, from the user's hand tests of rc1 on macOS and Windows: larmorx's options before the family, `clean-room` for `original`, FSL-11 for every FSL tool, the README's First steps; no release) complete; next'''
+
+[[op]]
+# this part, and the release deferred
+do = "edit"
+file = "docs/next-steps.md"
+old = '''
+   after the user's approval: PyPI, the GitHub Release, both images); then 0.1.0, once rc1 installs
+   cleanly on the six platforms (below).'''
+new = '''
+   after the user's approval: PyPI, the GitHub Release, both images); **the next release once the full
+   pipeline exists** (the user, 2026-11-11: "I do not really want to release yet until we have the full
+   pipeline. Just fix all this and do the things before Freesurfer."; below). **The easy command line:
+   done** (2026-11-11, from the user's hand tests of rc1 on macOS's zsh and Windows' PowerShell, before
+   `t2smap`'s clean-room part; six relays, `validation/investigations/easy-cli/README.md`; decision
+   log): larmorx's own options before the family (`larmorx [--n-threads N] [--implementation
+   auto|replica|clean-room] [--upstream-defects fix|reproduce] <family> <tool> ...`, the Python
+   arguments' names, each winning over the variable it replaces; the same in `larmorx-nc` and
+   `larmorx-gpl`, where `--implementation` takes `replica` only); `clean-room` for `original` everywhere
+   (`original` still accepted, Python with a `DeprecationWarning`); the console script shows a tool's
+   messages while it runs (0.1.0rc1's showed them at the end: a long `antsRegistration -v` looked
+   frozen); FSL-11 for every FSL tool in both implementations, one notice text saying what FSL's program
+   does instead (`FSLOUTPUTTYPE` optional now) and FSL-09's notice naming the program that ran; the
+   README's First steps and the site's, tested as typed in bash, an interactive zsh and Windows
+   PowerShell 5.1; no comments in copyable shell blocks, with a test in both repositories; PyPI's
+   author; `check_install.py`'s temporary files. Golden checksums unchanged; every record unchanged but
+   mri-hmc's and fsl-prelude's, re-made for one case each (mri-hmc's `syn/motion/small/no-fsloutputtype` now rejected by both, with 13 checks, as mcflirt stops; fsl-prelude's `orig-types/unset` 14 of 14 checks; their site evidence exported again).'''
+
+[[op]]
+# decision 5
+do = "edit"
+file = "docs/next-steps.md"
+old = '''
+   (item 8); larmorprepx (item 9). **Later** (the user, 2026-11-06): a clean-room original of every program, the
+   permissive ports included, as the next-generation implementation; the completeness parts (proposed, after'''
+new = '''
+   (item 8); larmorprepx (item 9). **After FreeSurfer, in one block, before the final validation phase** (the user,
+   2026-11-06 and 11-11; decision log): a clean-room original of every program, the permissive ports included
+   (sdcflows' field maps, ANTs and ITK, fMRIPrep's resampler, nitransforms, the confounds, fMRIPrep's Python
+   steps), as the next-generation implementation (tedana's `t2smap` keeps its clean-room original before
+   FreeSurfer: LGPL, without it the main package has no `t2smap`); the completeness parts (proposed, after'''
+
+[[op]]
+# the release deferred
+do = "edit"
+file = "docs/next-steps.md"
+old = '''
+- **0.1.0 after 0.1.0rc1** (the user, 2026-11-10). Done for rc1 (2026-11-11):'''
+new = '''
+- **The next release once the full pipeline exists** (the user, 2026-11-10: rc1, then 0.1.0; 2026-11-11: "I do
+  not really want to release yet until we have the full pipeline"). Done for rc1 (2026-11-11):'''
+
+[[op]]
+# decision 4 and check_install.py done
+do = "edit"
+file = "docs/next-steps.md"
+old = '''
+  published. Before 0.1.0: PyPI's author field ("Waiting for the user"), and
+  `scripts/release/check_install.py` should keep pip's temporary files and cache inside `--work`
+  (under Apptainer's `--containall` they otherwise fill its 64 MiB session space: `RELEASING.md`'s
+  example now binds a home and a temporary folder). Then 0.1.0 by `RELEASING.md`'s step 7 (the
+  version, CHANGELOG's section with its statuses table, the words that call the release a candidate
+  in the README and on the site, a dry run, the tag, the approval). A problem found in rc1 is fixed
+  in an rc2 first.'''
+new = '''
+  published. Done since, in the easy command line's part (2026-11-11): PyPI's author, `Karel Mauricio
+  López Vilaret` with `CITATION.cff`'s e-mail, in the three `pyproject.toml` (the user's decision), and
+  `scripts/release/check_install.py` keeps pip's temporary files and cache inside `--work` (`RELEASING.md`'s
+  Apptainer example without the binds). Then, once the full pipeline exists, the next release by
+  `RELEASING.md`'s step 7 (the version, `CHANGELOG.md`'s "Unreleased" as the version's section with its
+  statuses table, the words that call the release a candidate in the README and on the site, a dry run,
+  the tag, the approval). What rc1's users meet meanwhile is fixed on `main` for that release.'''
+
+[[op]]
+# answered: decision 4
+do = "edit"
+file = "docs/next-steps.md"
+old = '''
+- **PyPI's author field** (asked 2026-11-10, the first release): the three `pyproject.toml` say
+  `authors = [{ name = "Karel Lopez Vilaret" }]` (NOTICE's form, no e-mail); CITATION.cff has the full
+  name and the university e-mail. To match: `authors = [{ name = "Karel Mauricio López Vilaret",
+  email = "..." }]` in the three files (the e-mail is then public on PyPI). Before 0.1.0 at the latest:
+  a version's metadata cannot change after its upload.
+'''
+new = '''
+'''
+
+[[op]]
+# this part's follow-ups
+do = "insert"
+file = "docs/next-steps.md"
+after = "## Follow-ups, when they fit"
+text = '''
+- **From the easy command line's part (2026-11-11; six relays, the clean and the replica-side roles;
+  `validation/investigations/easy-cli/README.md`).** Left:
+  - *A failed check under an outcome other than a pass goes unseen:* `parity.run_one` turns a `pass`
+    with a failed check into a failure, but a case ended as `both-error` or `expected-divergence` passes
+    its parity test whatever its checks (the tests assert the status only). So mri-hmc's
+    `syn/motion/small/no-fsloutputtype` failed its one check once FSL-11's `reproduce` stopped as mcflirt
+    does (relay 2b) while the smoke tier passed, and fsl-prelude's record of 2026-11-07 held
+    `orig-types/unset` as `both-error` with its D13 check failed (both re-made by relay 3, every check
+    passing). Proposal: a `both-error` case with a failed check is a failure, and an expected divergence
+    names the checks it may fail (as mri-hmc's `PATH_DIVERGENCES` does) and fails on any other; then
+    every suite's records run again to see what changes (a clean-role harness change).
+  - *The register's FSL-11 section* (inside "Restricted: FSL mcflirt", closed to the clean role) still
+    describes mcflirt and flirt: a replica-side agent widens it to every FSL tool as its summary row now
+    says (the evidence: `tests/parity/test_fsl_output_types_original.py` and
+    `test_fsl_output_types_replica.py`, every FSL tool against FSL 6.0.7.23's own runs).
+  - *Windows' execution policy:* the advice when PowerShell refuses `Activate.ps1`
+    (`Set-ExecutionPolicy -Scope Process RemoteSigned`, the README and the site) is untested: the Windows
+    helper's policy is the machine's (`MachinePolicy RemoteSigned`).
+  - *The AFNI built-in replicas' `++ upstream defects: fix (LARMORX_UPSTREAM_DEFECTS)` line* names the
+    variable however the mode was given (`--upstream-defects` sets that variable's setting: the same
+    bytes; kept, the orchestrator, 2026-11-11; `docs/api/upstream-defects.md` says so).
+  - *The parts begun beside this one* (`t2smap`'s clean-room original, the confounds) use
+    `implementation="original"`, which warns after this part's merge: rename them to `"clean-room"` at
+    their merges (golden cases especially: a recorded `DeprecationWarning` would change a checksum).'''
+
+[[op]]
+# decisions 1 to 6, the release deferred, the orchestrator's
+do = "append"
+file = "docs/decision-log.md"
+text = '''
+## 2026-11-11: The easy command line (the user's decisions, and the orchestrator's by the rules)
+
+After 0.1.0rc1's upload the user installed it by hand on macOS (zsh) and Windows (PowerShell) and asked for an easier
+command line before the next port, and for no release yet ("I do not really want to release yet until we have the full
+pipeline. Just fix all this and do the things before Freesurfer."): the version stays 0.1.0rc1, no tag, no dry run.
+The part ran as six relays in the clean role (relays 1b and 2c replica-side; a first attempt was stopped when the
+option names changed), one after the other, beside the `t2smap` clean-room and confounds parts; its record: `validation/investigations/easy-cli/README.md`.
+- **The user's decisions (2026-11-11):**
+  - **Command-line options with the Python API's names** ("an easy way for the majority of users, like specific
+    flags" instead of environment variables, keeping the variables; then, after a first proposal of shorter
+    switches, "I prefer mirrored names"): `larmorx [--n-threads N] [--implementation auto|replica|clean-room]
+    [--upstream-defects fix|reproduce] <family> <tool> <the original's arguments>` (and `lx`): each the Python
+    argument with dashes, taking the same values as Python and the variable; one spelling each, no shortcuts or
+    aliases; `--opt value` and `--opt=value`; between `larmorx` and the family, so they never clash with the
+    original programs' options (after the family an option is the tool's); the variables keep working and an
+    option given wins over its variable; `--n-threads` one option for every family, `0` every logical CPU, the
+    command line's default every logical CPU (Python's stays 1); a tool whose original has its own thread option
+    (tedana's `t2smap --n-threads`, sdcflows' BIDS app `--nprocs`/`--omp-nthreads`) uses it when it is on the
+    command line, `--n-threads` otherwise; a wrong value is a clear message with the usage and exit status 2;
+    `larmorx --help` shows the three, one line each, with the variables they replace.
+  - **`clean-room` for `original`** ("I prefer clean-room instead of original": on the command line and in the
+    docs "the original" means FSL's or AFNI's own program): `implementation="clean-room"` in Python (the
+    `ImplementationName` type, every wrapper), `--implementation clean-room`, `LARMORX_IMPLEMENTATION=clean-room`,
+    and what a result reports (`Implementation(kind='clean-room', ...)`); `original` stays accepted everywhere as
+    0.1.0rc1's spelling (Python with a `DeprecationWarning`, the command line and the variable silently).
+    Internal identifiers, records and golden checksums unchanged.
+  - **The companion programs** `larmorx-nc` and `larmorx-gpl` take the same options where they apply:
+    `--n-threads`, `--upstream-defects`; `--implementation replica` a no-op, `auto` and `clean-room` (and
+    `original`) refused with a message naming larmorx's own choice (relay 1b's choice). **Every future package**
+    (`larmorx-freesurfer`, reached as `larmorx freesurfer <program>`) takes them from its first tool
+    (`docs/architecture.md`, `docs/porting-guide.md` §9.1).
+  - **PyPI's author** for the next release: `Karel Mauricio López Vilaret` with `CITATION.cff`'s e-mail, in the
+    three packages' metadata (the question of 2026-11-10 answered).
+  - **The clean-room originals of the permissive ports** (sdcflows' field maps, ANTs and ITK, fMRIPrep's
+    resampler, nitransforms, the confounds, fMRIPrep's Python steps) come after FreeSurfer, in one block, before
+    the final validation phase (the place left open on 2026-11-06); tedana's `t2smap` clean room stays before
+    FreeSurfer (LGPL: without it the main package has no `t2smap`).
+  - **Python's API is otherwise unchanged** ("in python this is already intuitive right?": yes).
+  - **No release until the full pipeline exists:** the next release once larmorprepx exists; meanwhile
+    `CHANGELOG.md`'s "Unreleased" collects what `main` adds, and the site's installation page describes what
+    PyPI has (0.1.0rc1: the variables, `original`), naming the options and `clean-room` as coming.
+- **The orchestrator's decisions during the part (by the rules):**
+  - The options are parsed once, in Rust (`larmorx_core::cli::parse`), for the console script and the standalone
+    program, and reach every family as an explicit settings overlay (`larmorx_core::cli::Overrides`), never by
+    changing the process environment. larmorx passes them to the companions as the variables they replace
+    (`OMP_NUM_THREADS`, removed for `0`; `LARMORX_UPSTREAM_DEFECTS`; `LARMORX_IMPLEMENTATION`), so an older
+    companion keeps working.
+  - topup's replica without `--nthr` and `t2smap` without its own `--n-threads` run on the run's thread count
+    (before: one thread, the originals' default): decision 1's rule; their results are the same bytes at any
+    count (tested). Python's wrappers always pass the tool's own option: unchanged.
+  - The console script shows a tool's messages while it runs (measured on N4 `-v`, 1,211 lines: through
+    0.1.0rc1's console script the first line came at 12.5 s, at the end; now at 0.01 s, as with the standalone
+    program): a contained change with the same bytes and order.
+  - The AFNI clean-room programs' own `-verbose` line says `implementation: clean-room` (larmorx's line, not the
+    original's message; no golden output holds it); the AFNI built-in replicas' `++ upstream defects: ...
+    (LARMORX_UPSTREAM_DEFECTS)` line is kept (the option sets that variable's setting: the same bytes).
+  - **FSL-11 for every FSL tool** (the decision of 2026-10-23 for mcflirt and FLIRT, larmorx's behaviour kept as
+    the safer one, extended by the same rule): with `FSLOUTPUTTYPE` unset every FSL tool, clean-room original and
+    `larmorx-nc` replica alike, writes `.nii.gz` (the bytes `FSLOUTPUTTYPE=NIFTI_GZ` gives) and names FSL-11 on one
+    line per command, in one text for both implementations (`larmorx_core::defects::fsl11_notice`) that says what
+    FSL's program does instead (its first image stops it, exit 1; `standard_space_roi`'s script goes on and exits 0
+    without an image); `reproduce` stops where FSL does, checked against FSL 6.0.7.23's own runs for every tool.
+    Setting the variable is optional. FSL-09's notice names the program that wrote the output (flirt, applyxfm4D,
+    applytopup), not mcflirt.
+  - No comments inside copyable shell blocks (zsh's prompt does not take `#` as a comment): the README, the PyPI
+    descriptions, `docs/api`, the site's pages; a test in each repository.
+  - The parity smoke tier at 6 workers while three agents share the machine (at 8, a 27 GiB box stopped one
+    worker).'''
+
+[[op]]
+# decision 1: the command line's threads
+do = "edit"
+file = "docs/architecture.md"
+old = '''
+- **Threads:** every entry point takes `n_threads` (0 = all logical CPUs); there is no global or environment setting.'''
+new = '''
+- **Threads:** every entry point takes `n_threads` (0 = all logical CPUs); the library has no global or environment setting. The command line takes it from `--n-threads N` before the family, else the family's thread variable (`ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS` or `NSLOTS` for ANTs, `OMP_NUM_THREADS` for AFNI, FSL, `mri hmc` and the replica programs), else every logical CPU; a tool whose original takes its own thread option (tedana's `t2smap --n-threads`, topup's `--nthr`, sdcflows' `--nprocs` and `--omp-nthreads`) uses it when it is given.'''
+
+[[op]]
+# decision 1: D13's option
+do = "edit"
+file = "docs/architecture.md"
+old = '''
+`upstream_defects="reproduce"` (Python), `LARMORX_UPSTREAM_DEFECTS=reproduce` (command line) or `UpstreamDefects::Reproduce` (Rust options)'''
+new = '''
+`upstream_defects="reproduce"` (Python), `--upstream-defects reproduce` before the family or `LARMORX_UPSTREAM_DEFECTS=reproduce` (command line) or `UpstreamDefects::Reproduce` (Rust options)'''
+
+[[op]]
+# decisions 1 and 3: the rule for every package
+do = "insert"
+file = "docs/architecture.md"
+after = "- **Upstream defects (D13):**"
+text = '''
+
+- **larmorx's own command-line options** (the user, 2026-11-11): `larmorx [--n-threads N] [--implementation auto|replica|clean-room] [--upstream-defects fix|reproduce] <family> <tool> <the original's arguments>` (and `lx`), the Python arguments' names with dashes, one spelling each, `--opt value` or `--opt=value`. They stand before the family, so they never clash with an original program's options (after the family an option is the tool's), and each wins over the environment variable it replaces (the thread variables above, `LARMORX_IMPLEMENTATION`, `LARMORX_UPSTREAM_DEFECTS`), which keeps working. They are parsed once, in Rust (`larmorx_core::cli::parse`, `larmorx_cli::parse_globals`), for the console script and the standalone program alike, and reach the families as an explicit settings overlay (`larmorx_core::cli::Overrides`), never by changing the process environment; a wrong value is `error: ...`, the usage line and exit status 2. `implementation="original"` (Python), `--implementation original` and `LARMORX_IMPLEMENTATION=original` are 0.1.0rc1's spelling of `clean-room`, still accepted (Python warns). **Every package's program takes them** (decision of 2026-11-11): `larmorx-nc` and `larmorx-gpl` before the family through `larmorx_core::cli::parse` with `ReplicaOnly` (`--n-threads`, `--upstream-defects`; `--implementation replica` changes nothing, `auto`, `clean-room` and `original` are refused), with the same messages and exit status, and every future one (`larmorx-freesurfer`, reached as `larmorx freesurfer <program>`) from its first tool. `larmorx` passes its own options to them through the variables they replace only, so an older companion keeps working.'''
+
+[[op]]
+# relay 1b's text: the replica's program
+do = "edit"
+file = "docs/architecture.md"
+old = '''
+It takes its thread count from `OMP_NUM_THREADS`; with `-verbose`'''
+new = '''
+It takes larmorx's own options before the family, as `larmorx` does (`larmorx-nc [--n-threads N] [--upstream-defects fix|reproduce] [--implementation replica] <family> <tool> ...`: `larmorx_core::cli::parse` with `ReplicaOnly`), each winning over the variable it replaces (`OMP_NUM_THREADS`, 0 or unset every logical CPU; `LARMORX_UPSTREAM_DEFECTS`); its tests show that each option gives the bytes of its variable, that it wins over it, and the refusals; with `-verbose`'''
+
+[[op]]
+# relay 1b: the per-tool thread rule
+do = "edit"
+file = "docs/architecture.md"
+old = '''
+a tool whose original takes its own thread option, as tedana's `--n-threads`, keeps it instead of `OMP_NUM_THREADS`).'''
+new = '''
+a tool whose original takes its own thread option, as tedana's `--n-threads` or topup's `--nthr`, uses it when it is given, else the run's thread count, and `--help` lists it).'''
+
+[[op]]
+# decision 1
+do = "edit"
+file = "docs/architecture.md"
+old = '''
+(`LARMORX_IMPLEMENTATION` overrides)'''
+new = '''
+(`--implementation` before the family, or `LARMORX_IMPLEMENTATION`, overrides)'''
+
+[[op]]
+# decision 2 (the golden registry renamed by relay 1)
+do = "edit"
+file = "docs/architecture.md"
+old = '''
+Golden cases call the original explicitly (`implementation="original"`)'''
+new = '''
+Golden cases call the clean-room original explicitly (`implementation="clean-room"`)'''
+
+[[op]]
+# the per-tool contract's CLI row
+do = "edit"
+file = "docs/porting-guide.md"
+old = '''
+| 4 | Command line with the original's arguments, exit codes and thread variables | family crate's `cli` module | `larmorx ants N4BiasFieldCorrection` |'''
+new = '''
+| 4 | Command line with the original's arguments, exit codes and thread variables; larmorx's own options before the family (`--n-threads`, `--implementation`, `--upstream-defects`) reach it through the settings overlay, in every package's program (§9.1, [architecture.md](architecture.md)) | family crate's `cli` module | `larmorx ants N4BiasFieldCorrection` |'''
+
+[[op]]
+# decision 3's rule for every package
+do = "edit"
+file = "docs/porting-guide.md"
+old = '''
+- **The command line** (`larmorx <family> <tool>`, and a replica's program) reads the process
+  environment into the table, as the original reads its own: a user of the original's
+  command line gets the original's behaviour.'''
+new = '''
+- **The command line** (`larmorx <family> <tool>`, and a replica's program) reads the process
+  environment into the table, as the original reads its own: a user of the original's
+  command line gets the original's behaviour. larmorx's own options before the family
+  (`--n-threads`, `--implementation`, `--upstream-defects`; the user, 2026-11-11) are applied to
+  that table over the variables they replace (`larmorx_core::cli::Overrides`), never to the
+  process environment. **Every package's program takes them** (`larmorx-nc`, `larmorx-gpl`, and
+  `larmorx-freesurfer` from its first tool), before the family, through
+  `larmorx_core::cli::parse::<ReplicaOnly>` (the same messages and exit status 2 as `larmorx`;
+  `--implementation replica` a no-op, the others refused), with the per-tool rule for an
+  original's own thread option (used when given, else the run's count); its tests show that
+  each option gives the bytes of the variable it replaces, that it wins over it, and the
+  refusals.'''
+
+[[op]]
+# FSL-11's summary row: every FSL tool, both implementations
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = '''
+| FSL-11 † | mcflirt, flirt | `FSLOUTPUTTYPE` unset: fails after writing the matrices | e | none | writes `.nii.gz`; FLIRT's clean-room original writes `.nii.gz`; `reproduce` prints FSL's message and exits 1 (2026-11-02) | – (decided 2026-10-23: larmorx's behaviour kept) |'''
+new = '''
+| FSL-11 † | every FSL program that writes an image (mcflirt, flirt, applyxfm4D, bet2, bet, betsurf, fast, topup, applytopup, fslmaths, fslroi, standard_space_roi, prelude) | `FSLOUTPUTTYPE` unset: stops with an error at its first image (exit 1), after what it wrote before (mcflirt: the matrices and the `.par` file; flirt: its `-omat` matrix; betsurf: the inner skull's mesh); `standard_space_roi`'s script goes on after its steps stop there and exits 0 without an image | e | none | writes `.nii.gz` (the bytes `FSLOUTPUTTYPE=NIFTI_GZ` gives) and names FSL-11 on one line per command, saying what FSL's program does instead: every FSL tool's clean-room original and `larmorx-nc` replica since 2026-11-11, in one text (`larmorx_core::defects::fsl11_notice`; FLIRT's and mcflirt's wrote `.nii.gz` without a notice since 2026-11-02); `reproduce` prints FSL's message and stops where FSL does, checked against FSL 6.0.7.23's own runs for every tool (`tests/parity/test_fsl_output_types_original.py`, `test_fsl_output_types_replica.py`) | – (decided 2026-10-23: larmorx's behaviour kept; extended to every FSL tool 2026-11-11) |'''
+
+[[op]]
+# the gap list: FSL-11 has its switch
+do = "edit"
+file = "docs/findings/upstream-defects.md"
+old = '''
+expected divergence: ANTS-29, ITK-08, NIB-01, NIB-02, NIB-03, AFNI-11, AFNI-12, FSL-11. D13
+   asks for a switch for every class (c) and (e) defect; proposed: none for these.'''
+new = '''
+expected divergence: ANTS-29, ITK-08, NIB-01, NIB-02, NIB-03, AFNI-11, AFNI-12 (FSL-11 has its
+   switch: `reproduce` gives FSL's message and stops where FSL does, for every FSL tool since
+   2026-11-11). D13 asks for a switch for every class (c) and (e) defect; proposed: none for these.'''
+
+[[op]]
+# decision 1
+do = "edit"
+file = "docs/api/upstream-defects.md"
+old = '''
+| Command line | `LARMORX_UPSTREAM_DEFECTS` unset, empty or `fix` | `LARMORX_UPSTREAM_DEFECTS=reproduce` |'''
+new = '''
+| Command line | `--upstream-defects fix` before the family, or `LARMORX_UPSTREAM_DEFECTS` unset, empty or `fix` | `--upstream-defects reproduce` before the family (or `LARMORX_UPSTREAM_DEFECTS=reproduce`) |'''
+
+[[op]]
+# decision 1: the example
+do = "edit"
+file = "docs/api/upstream-defects.md"
+old = '''
+LARMORX_UPSTREAM_DEFECTS=reproduce larmorx mri hmc -in bold.nii.gz -reffile ref.nii.gz -mats'''
+new = '''
+larmorx --upstream-defects reproduce mri hmc -in bold.nii.gz -reffile ref.nii.gz -mats'''
+
+[[op]]
+# decision 1
+do = "edit"
+file = "docs/api/upstream-defects.md"
+old = '''
+- **The command line reads an environment variable**, as it reads `LARMORX_IMPLEMENTATION`,
+  so that no flag can clash with the original program's arguments. Any value other than `fix`,
+  `reproduce` or empty is an error (exit code 2). The Python API ignores the variable (no
+  global configuration, CLAUDE.md rule 6); `larmorx.cli.run`, which runs the command line in
+  process, reads it.
+'''
+new = '''
+- **The command line takes an option before the family** (`larmorx --upstream-defects reproduce
+  <family> <tool> ...`), where no option of the original program stands, or the environment
+  variable `LARMORX_UPSTREAM_DEFECTS`, as it takes `--implementation` or `LARMORX_IMPLEMENTATION`;
+  the option wins over the variable. Any other value is an error (exit code 2). The Python API
+  ignores the variable (no global configuration, CLAUDE.md rule 6); `larmorx.cli.run`, which runs
+  the command line in process, reads it.
+'''
+
+[[op]]
+# decision 1 and the orchestrator's point on the AFNI replicas' line
+do = "edit"
+file = "docs/api/upstream-defects.md"
+old = '''
+- **Replicas** receive the same variable: `lx.afni.tshift(..., implementation="replica")` sets
+  `LARMORX_UPSTREAM_DEFECTS` for the `larmorx-gpl` program, and `larmorx afni 3dTshift` passes
+  its environment on. Replicas share the corrected default, and with `reproduce` give exactly
+  the original's result (decision log, "D13's details"): the 3dTshift replica corrects the same
+  defects as the clean-room original by default (2026-10-12), and with `reproduce` writes
+  AFNI's output bytes.
+'''
+new = '''
+- **Replicas** receive the same choice: the replica programs (`larmorx-nc`, `larmorx-gpl`) take
+  `--upstream-defects` before the family as `larmorx` does, and `larmorx` and the Python wrappers
+  pass the choice to them as `LARMORX_UPSTREAM_DEFECTS`; the AFNI replicas, built in, get it in
+  their settings table (their `++ upstream defects: fix (LARMORX_UPSTREAM_DEFECTS)` line names the
+  variable however the choice was given: the option sets that variable's setting). Replicas share
+  the corrected default, and with `reproduce` give exactly the original's result (decision log,
+  "D13's details"): the 3dTshift replica corrects the same defects as the clean-room original by
+  default (2026-10-12), and with `reproduce` writes AFNI's output bytes.
+'''
+
+[[op]]
+# FSL-09: the programs, the notice's name (relay 2b)
+do = "edit"
+file = "docs/api/upstream-defects.md"
+old = '''
+| FSL-09 | mcflirt | `larmorx mri hmc` | int8 input is written as uint8; integer outputs are truncated toward zero, and values beyond the type's range wrap around (x86-64; C++ leaves it undefined) | int8 stays int8; values are rounded to the nearest (half to even) and clamped |'''
+new = '''
+| FSL-09 | mcflirt, flirt, applyxfm4D, applytopup | `larmorx mri hmc`, `larmorx fsl flirt`, `applyxfm4D`, `applytopup --datatype` | int8 input is written as uint8; integer outputs are truncated toward zero, and values beyond the type's range wrap around (x86-64; C++ leaves it undefined) | int8 stays int8; values are rounded to the nearest (half to even) and clamped; the notice names the program that wrote the output |'''
+
+[[op]]
+# FSL-11 for every FSL tool (relays 2b, 2c)
+do = "insert"
+file = "docs/api/upstream-defects.md"
+after = "| FSL-10 | mcflirt |"
+text = '''
+| FSL-11 | every FSL program that writes an image | the command line of every FSL tool (`larmorx fsl <tool>`, `larmorx mri hmc`; the Python functions set the type themselves) | `FSLOUTPUTTYPE` unset: the program stops with an error at its first image (exit 1; `standard_space_roi`'s script goes on and exits 0 without an image) | the images written as `NIFTI_GZ` (`.nii.gz`), FSL-11 named on one line per command, by both implementations in the same words (the replica's line starts `larmorx-nc:`), saying what FSL's program does instead; `reproduce` FSL's message where FSL stops |'''
+
+[[op]]
+# decision 2 (the old spelling named once)
+do = "edit"
+file = "docs/api/upstream-defects.md"
+old = '''
+`implementation="original"` or `LARMORX_IMPLEMENTATION=original`, and `"auto"` without'''
+new = '''
+`implementation="clean-room"` (0.1.0rc1's spelling `"original"` still works) or `--implementation clean-room`, and `"auto"` without'''
+
+[[op]]
+# decision 2
+do = "edit"
+file = "docs/api/upstream-defects.md"
+old = '''
+(`lx.fsl.fslmaths`, `implementation="original"`); the replica gives'''
+new = '''
+(`lx.fsl.fslmaths`, `implementation="clean-room"`); the replica gives'''
+
+[[op]]
+# decision 2
+do = "edit"
+file = "docs/api/upstream-defects.md"
+old = '''
+`lx.fsl.betsurf` with `implementation="original"`, or `"auto"` without `larmorx-nc`) shares these corrections'''
+new = '''
+`lx.fsl.betsurf` with `implementation="clean-room"`, or `"auto"` without `larmorx-nc`) shares these corrections'''
+
+[[op]]
+# decision 2
+do = "edit"
+file = "docs/api/upstream-defects.md"
+old = '''
+(`crates/larmorx-fsl`; `implementation="original"`, or `"auto"` without `larmorx-nc`; 2026-11-03)'''
+new = '''
+(`crates/larmorx-fsl`; `implementation="clean-room"`, or `"auto"` without `larmorx-nc`; 2026-11-03)'''
+
+[[op]]
+# no comments in copyable shell blocks (zsh)
+do = "edit"
+file = "docs/licensing.md"
+old = '''
+- **Built locally**, for development:
+  ```bash
+  maturin build --release --locked --out dist                         # larmorx (repository root): the originals and the AFNI replicas
+  (cd crates-nc && maturin build --release --locked --out ../dist)    # larmorx-nc (FSL Licence)
+  (cd crates-gpl && maturin build --release --locked --out ../dist)   # larmorx-gpl (GPL-3.0)
+  pip install --find-links dist "larmorx[all]"                        # everything
+  ```
+'''
+new = '''
+- **Built locally**, for development: larmorx from the repository's root (the originals and the
+  AFNI replicas), larmorx-nc from `crates-nc` (FSL Licence) and larmorx-gpl from `crates-gpl`
+  (GPL-3.0), then everything installed from those wheels:
+  ```bash
+  maturin build --release --locked --out dist
+  (cd crates-nc && maturin build --release --locked --out ../dist)
+  (cd crates-gpl && maturin build --release --locked --out ../dist)
+  pip install --find-links dist "larmorx[all]"
+  ```
+'''
+
+[[op]]
+# the test covers licensing.md from now on
+do = "edit"
+file = "validation/tests/test_docs_shell_blocks.py"
+old = '''
+        "docs/overview.md",
+'''
+new = '''
+        "docs/overview.md",
+        "docs/licensing.md",
+'''
+
+[[op]]
+# what is in place
+do = "insert"
+file = "docs/status.md"
+after = "- **Releases** (the first, 0.1.0rc1, published 2026-11-11"
+text = '''
+- **The command line** (the easy command line, 2026-11-11): `larmorx [--n-threads N] [--implementation auto|replica|clean-room] [--upstream-defects fix|reproduce] <family> <tool> ...` and the same options in `larmorx-nc` and `larmorx-gpl` (`docs/architecture.md`); the console script shows a tool's messages while it runs; every FSL tool writes `.nii.gz` without `FSLOUTPUTTYPE` (FSL-11); the README's First steps; in `CHANGELOG.md`'s "Unreleased" until the next release.'''

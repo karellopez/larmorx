@@ -28,6 +28,7 @@ DOCUMENTS = sorted(
         "crates-nc/README.md",
         "crates-gpl/README.md",
         "docs/overview.md",
+        "docs/licensing.md",
         *(p.relative_to(ROOT).as_posix() for p in (ROOT / "docs" / "api").glob("*.md")),
     ]
 )

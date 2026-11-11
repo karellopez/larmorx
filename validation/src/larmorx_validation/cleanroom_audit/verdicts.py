@@ -154,6 +154,11 @@ ROLE_BY_DESCRIPTION = {
     # Wrote the porting guide and the defect register from the findings (source-derived ones
     # included); its brief describes the clean-room implementer's rules, it is not one.
     "Porting guide + upstream defect register": "documentation",
+    # The easy command line's replica-side relays (their brief: "Relay 1b: the replica-side role";
+    # NOTES: "relay 2c (REPLICA-SIDE role)"): the companion programs' options and FSL-11 in
+    # crates-nc/ and crates-gpl/; they edited no clean-room code.
+    "Easy CLI relay 1b: companions": "replica author",
+    "Easy CLI relay 2c: larmorx-nc FSL default": "replica author",
 }
 
 

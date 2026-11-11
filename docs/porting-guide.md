@@ -531,7 +531,16 @@ sources, one per interface:
 
 - **The command line** (`larmorx <family> <tool>`, and a replica's program) reads the process
   environment into the table, as the original reads its own: a user of the original's
-  command line gets the original's behaviour.
+  command line gets the original's behaviour. larmorx's own options before the family
+  (`--n-threads`, `--implementation`, `--upstream-defects`; the user, 2026-11-11) are applied to
+  that table over the variables they replace (`larmorx_core::cli::Overrides`), never to the
+  process environment. **Every package's program takes them** (`larmorx-nc`, `larmorx-gpl`, and
+  `larmorx-freesurfer` from its first tool), before the family, through
+  `larmorx_core::cli::parse::<ReplicaOnly>` (the same messages and exit status 2 as `larmorx`;
+  `--implementation replica` a no-op, the others refused), with the per-tool rule for an
+  original's own thread option (used when given, else the run's count); its tests show that
+  each option gives the bytes of the variable it replaces, that it wins over it, and the
+  refusals.
 - **The Python wrapper** takes the variables as a typed keyword argument
   (`lx.afni.tshift(..., afni_settings={"AFNI_NIFTI_PRIORITY": "Q"})`, a
   `Mapping[str, str] | None`) and never reads `os.environ`, so a call gives the same result
@@ -640,7 +649,7 @@ Mandatory for every tool (PLAN.md §4, rule 7). Copy the models.
 | 1 | Spec (clean-room originals only) | `specs/<tool>.md` | [specs/3dTshift.md](../specs/3dTshift.md), [specs/mcflirt.md](../specs/mcflirt.md) |
 | 2 | Rust API on `Image`/`Affine`, explicit `n_threads` | family crate in `crates/` | `larmorx_ants::n4_bias_field_correction` |
 | 3 | Python wrapper, typed, dataclass results, `.pyi` stubs; `implementation=` when a replica exists | `python/larmorx/<family>/` | `lx.afni.tshift` |
-| 4 | Command line with the original's arguments, exit codes and thread variables | family crate's `cli` module | `larmorx ants N4BiasFieldCorrection` |
+| 4 | Command line with the original's arguments, exit codes and thread variables; larmorx's own options before the family (`--n-threads`, `--implementation`, `--upstream-defects`) reach it through the settings overlay, in every package's program (§9.1, [architecture.md](architecture.md)) | family crate's `cli` module | `larmorx ants N4BiasFieldCorrection` |
 | 5 | API page: option-mapping table, deliberate differences, known last-bit differences | `docs/api/<tool>.md` | [api/afni-tshift.md](api/afni-tshift.md) |
 | 6 | Findings, and register entries for every defect | `docs/findings/<tool>.md`, [findings/upstream-defects.md](findings/upstream-defects.md) | [findings/ants-n4.md](findings/ants-n4.md) |
 | 7 | Parity suite and validation record, with the band and the status | `validation/`, `docs/validation/<tool>.md`, the tool's entry in `validation/tools.toml` (the index in [validation/README.md](validation/README.md) is generated from it) | [validation/ants-n4.md](validation/ants-n4.md) |

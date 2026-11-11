@@ -125,6 +125,19 @@ def smooth_pair(tmp_path: Path) -> Path:
     return path
 
 
+def test_own_settings_by_name(scripts, tmp_path):
+    """One of the six configurations FSL ships, by name, with no FSL installation: the original
+    finds larmorx's own settings (clean-room, ``specs/topup.md`` §2.5); the log holds them."""
+    path = smooth_pair(tmp_path)
+    r = lx.fsl.topup(path, ACQ, config="test_acqp", miter=1, field=True)
+    assert r.coefficients.implementation == _replica.ORIGINAL
+    for line in ("--warpres=20,14", "--subsamp=2,2", "--fwhm=8,4", "--miter=1", "--lambda=0.005,0.0001"):  # fmt: skip
+        assert f"\n{line}\n" in r.log
+    assert r.field is not None and np.asarray(r.field.data).shape == (12, 10, 6)
+    s = lx.fsl.topup(path, ACQ, config="test_acqp.cnf", miter=1, field=True)
+    assert np.array_equal(np.asarray(s.field.data), np.asarray(r.field.data))
+
+
 def test_without_the_replica(scripts, tmp_path):
     """Without ``larmorx-nc``, ``auto`` runs topup's and applytopup's clean-room originals (in
     this process) and ``replica`` refuses."""

@@ -736,6 +736,9 @@ def test_t2smap_replica_needs_no_more_memory_than_tedana(tmp_path, name, fit):
             "LARMORX_GPL_BIN": str(tt.replica_binary()),
             "LARMORX_UPSTREAM_DEFECTS": mode,
             "PYTHONPATH": os.environ.get("PYTHONPATH", ""),
+            # one thread, as tedana's default: without t2smap's own --n-threads larmorx-gpl
+            # takes the run's thread count (2026-11-11)
+            "OMP_NUM_THREADS": "1",
         }
         entry = entry_peak(l_env, r_dir)
         code, mib = _peak(

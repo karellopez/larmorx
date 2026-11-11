@@ -7,7 +7,7 @@ Medical College of Wisconsin, which AFNI 26.3.05 releases under CC BY 4.0; part 
 since 2026-10-29, until then the separate GPL package ``larmorx-gpl``), and a clean-room
 original built for speed, written from behaviour specs, AFNI's documentation and black-box runs
 of AFNI, without AFNI's code. ``implementation="auto"`` (the default) runs the replica;
-``"replica"`` and ``"original"`` force one. The same programs run from the command line as
+``"replica"`` and ``"clean-room"`` force one. The same programs run from the command line as
 ``larmorx afni <program> ...`` with their original arguments (``LARMORX_IMPLEMENTATION``
 chooses). ``tshift``, ``automask`` and ``unifize`` have both; ``volreg`` has its replica only
 (its clean-room original is to be written from ``specs/3dvolreg.md``).

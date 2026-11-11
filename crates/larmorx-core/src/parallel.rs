@@ -39,8 +39,22 @@ where
     Ok(pool(resolve_threads(n_threads))?.install(f))
 }
 
+/// The pools started so far, by size.
+static POOLS: OnceLock<Mutex<HashMap<usize, Arc<rayon::ThreadPool>>>> = OnceLock::new();
+
+/// The sizes of the pools [`with_threads`] has started in this process, in increasing order:
+/// how the tests check that a thread count reached a tool (the command line's `--n-threads`).
+pub fn pool_sizes() -> Vec<usize> {
+    let pools = POOLS
+        .get_or_init(Default::default)
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+    let mut sizes: Vec<usize> = pools.keys().copied().collect();
+    sizes.sort_unstable();
+    sizes
+}
+
 fn pool(n: usize) -> Result<Arc<rayon::ThreadPool>, ThreadPoolError> {
-    static POOLS: OnceLock<Mutex<HashMap<usize, Arc<rayon::ThreadPool>>>> = OnceLock::new();
     let mut pools = POOLS
         .get_or_init(Default::default)
         .lock()
@@ -71,6 +85,7 @@ mod tests {
         assert_eq!(with_threads(3, rayon::current_num_threads).unwrap(), 3);
         assert_eq!(with_threads(1, rayon::current_num_threads).unwrap(), 1);
         assert_eq!(with_threads(3, rayon::current_num_threads).unwrap(), 3); // cached pool
+        assert!(pool_sizes().contains(&3));
         assert_eq!(resolve_threads(5), 5);
         assert!(resolve_threads(0) >= 1);
     }

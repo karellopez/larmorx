@@ -106,7 +106,7 @@ def test_without_the_replica(scripts, tmp_path):
     assert r.partial_volumes is not None and len(r.partial_volumes) == 3
     pve = np.sum([np.asarray(p.data) for p in r.partial_volumes], axis=0)
     assert np.allclose(pve[seg > 0], 1.0)
-    o = lx.fsl.fast(path, implementation="original", pve=False, verbose=True)
+    o = lx.fsl.fast(path, implementation="clean-room", pve=False, verbose=True)
     assert np.array_equal(np.asarray(o.segmentation.data), seg)
     assert o.partial_volumes is None and "Starting Single Image Segmentation" in o.stdout
     with pytest.raises(lx.ReplicaNotFoundError, match="larmorx-nc"):
@@ -122,7 +122,7 @@ def test_without_the_replica(scripts, tmp_path):
         ),
         other,
     )
-    m = lx.fsl.fast([path, other], implementation="original", bias_iterations=1)
+    m = lx.fsl.fast([path, other], implementation="clean-room", bias_iterations=1)
     assert np.asarray(m.segmentation.data).shape == (6, 5, 4)
     assert m.partial_volumes is not None and len(m.partial_volumes) == 3
     chans = []
@@ -131,11 +131,11 @@ def test_without_the_replica(scripts, tmp_path):
         v = rng.integers(1, 1000, size=(6, 5, 4)).astype(np.int16)
         lx.save((v, np.diag([2.0, 2.0, 2.0, 1.0])), f)
         chans.append(f)
-    n = lx.fsl.fast(chans, implementation="original", n_classes=2, no_bias=True, pve=False)
+    n = lx.fsl.fast(chans, implementation="clean-room", n_classes=2, no_bias=True, pve=False)
     assert set(np.unique(np.asarray(n.segmentation.data))) <= {0, 1, 2}
     # the same image twice: a singular covariance, where FAST aborts
     with pytest.raises(RuntimeError, match="matrix is singular"):
-        lx.fsl.fast([path, path], implementation="original")
+        lx.fsl.fast([path, path], implementation="clean-room")
 
 
 def test_fmripreps_call(scripts, monkeypatch, tmp_path):
@@ -229,7 +229,7 @@ def test_the_originals_variance_nan_voxels_and_first_voxel(scripts, tmp_path):
     path = tmp_path / "nan.nii"
     lx.save((data, grid), path)
     with pytest.warns(lx.UpstreamDefectWarning, match="FSL-202"):
-        r = lx.fsl.fast(path, implementation="original", restored=True, bias_iterations=1)
+        r = lx.fsl.fast(path, implementation="clean-room", restored=True, bias_iterations=1)
     assert r.restored is not None
     restored = np.asarray(r.restored[0].data)
     assert np.isnan(restored[5, 5, 2]) and np.isfinite(restored[2, 2, 1])
@@ -237,7 +237,7 @@ def test_the_originals_variance_nan_voxels_and_first_voxel(scripts, tmp_path):
     first = tmp_path / "first.nii"
     lx.save((data, grid), first)
     with pytest.warns(lx.UpstreamDefectWarning, match="FSL-203"):
-        f = lx.fsl.fast(first, implementation="original", bias_iterations=1, pve=False)
+        f = lx.fsl.fast(first, implementation="clean-room", bias_iterations=1, pve=False)
     seg = np.asarray(f.segmentation.data)
     # every brain voxel segmented but the NaN one (outside the mask); FAST's mask is empty
     inside = seg[2:8, 2:8, 1:5]
@@ -246,7 +246,7 @@ def test_the_originals_variance_nan_voxels_and_first_voxel(scripts, tmp_path):
         pytest.warns(lx.UpstreamDefectWarning, match="FSL-203"),
         pytest.raises(RuntimeError, match="Not enough classes"),
     ):
-        lx.fsl.fast(first, implementation="original", upstream_defects="reproduce")
+        lx.fsl.fast(first, implementation="clean-room", upstream_defects="reproduce")
 
 
 def test_arguments_are_checked_before_anything_runs(scripts, tmp_path):

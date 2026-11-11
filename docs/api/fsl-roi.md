@@ -27,9 +27,9 @@ larmorx keeps its FSL tools in two implementations ([licensing](../licensing.md)
   [PROVENANCE](../../crates-nc/larmorx-nc-flirt/PROVENANCE.md)), which runs every program in the
   replica's own process.
 
-`implementation="auto"` runs the replica when its program is found, else the original;
-`"original"` and `"replica"` choose. The command line follows `LARMORX_IMPLEMENTATION` the same
-way.
+`implementation="auto"` runs the replica when its program is found, else the clean-room
+original; `"clean-room"` (`"original"`, 0.1.0rc1's spelling, still works) and `"replica"` choose. The command line follows
+`--implementation` (before the family) or `LARMORX_IMPLEMENTATION` the same way.
 
 **Built for speed** (the original): the registration to the reference is almost all of
 `standard_space_roi`'s time; besides it, without `-d` the temporary images are written
@@ -106,6 +106,14 @@ the rest).
 
 ## Deliberate differences (D13; `LARMORX_UPSTREAM_DEFECTS=reproduce` gives FSL's)
 
+- **FSL-11** (`fslroi`, `standard_space_roi`): with `FSLOUTPUTTYPE` unset FSL's fslroi stops with
+  FSL's message at its output (exit 1), and standard_space_roi's script goes on after its FLIRT
+  stops there (exit 0, no output). Both implementations, the clean-room original and the replica,
+  write the images as `NIFTI_GZ` (`.nii.gz`: the bytes `FSLOUTPUTTYPE=NIFTI_GZ` gives) and name
+  FSL-11 on one line per command, in the same words (the replica's line starts `larmorx-nc:`),
+  which say what FSL's program does (for standard_space_roi: "FSL's standard_space_roi writes no
+  image (its steps stop with an error at their first image) and exits 0"); `reproduce` stops as
+  FSL does. Command line only: the Python functions set the type themselves.
 - **FSL-211** (`standard_space_roi`): the script expands its arguments unquoted; by default each
   name is one name, whatever its blanks; `reproduce` splits them as the shell does (with the
   shell's `[: too many arguments`). A name with `*`, `?` or `[` in `reproduce` is refused: the

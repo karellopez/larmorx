@@ -39,6 +39,13 @@ none of this crate's code.
 The line numbers the log prints (`%(module)s:%(funcName)s:%(lineno)d`) are those of tedana
 26.0.3's files.
 
+larmorx's own addition (2026-11-11, the user's decision that a tool's own thread option wins
+only when it is given): without t2smap's `--n-threads`, the fits and the files run on the run's
+thread count (`workflow::Env::threads`: larmorx's `--n-threads` before the family, else
+`OMP_NUM_THREADS`, else every logical CPU), not tedana's default of one; `parser::Settings::
+n_threads_given` tells the option given apart from its default (argparse's actions seen,
+`larmorx_core::python::argparse::Parser::parse_given`). The results do not depend on it.
+
 ## What other libraries contribute
 
 The numerics tedana calls are translated in the main package's Apache-2.0 crates, which this

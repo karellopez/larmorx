@@ -18,7 +18,7 @@ defined result or refuses with a message, whatever the switch says
 | Interface | Default | Reproduce the original |
 |---|---|---|
 | Python | `upstream_defects="fix"` | `upstream_defects="reproduce"` on the call |
-| Command line | `LARMORX_UPSTREAM_DEFECTS` unset, empty or `fix` | `LARMORX_UPSTREAM_DEFECTS=reproduce` |
+| Command line | `--upstream-defects fix` before the family, or `LARMORX_UPSTREAM_DEFECTS` unset, empty or `fix` | `--upstream-defects reproduce` before the family (or `LARMORX_UPSTREAM_DEFECTS=reproduce`) |
 | Rust | `UpstreamDefects::Fix` (`Default`) | `UpstreamDefects::Reproduce` in the tool's options |
 
 ```python
@@ -29,22 +29,25 @@ afni = lx.afni.tshift("bold.nii.gz", slice_times="alt+z", upstream_defects="repr
 ```
 
 ```bash
-LARMORX_UPSTREAM_DEFECTS=reproduce larmorx mri hmc -in bold.nii.gz -reffile ref.nii.gz -mats
+larmorx --upstream-defects reproduce mri hmc -in bold.nii.gz -reffile ref.nii.gz -mats
 ```
 
 - **One switch per call.** It restores all of a tool's reproduced defects at once: comparing
   with the original needs all of them together.
-- **The command line reads an environment variable**, as it reads `LARMORX_IMPLEMENTATION`,
-  so that no flag can clash with the original program's arguments. Any value other than `fix`,
-  `reproduce` or empty is an error (exit code 2). The Python API ignores the variable (no
-  global configuration, CLAUDE.md rule 6); `larmorx.cli.run`, which runs the command line in
-  process, reads it.
-- **Replicas** receive the same variable: `lx.afni.tshift(..., implementation="replica")` sets
-  `LARMORX_UPSTREAM_DEFECTS` for the `larmorx-gpl` program, and `larmorx afni 3dTshift` passes
-  its environment on. Replicas share the corrected default, and with `reproduce` give exactly
-  the original's result (decision log, "D13's details"): the 3dTshift replica corrects the same
-  defects as the clean-room original by default (2026-10-12), and with `reproduce` writes
-  AFNI's output bytes.
+- **The command line takes an option before the family** (`larmorx --upstream-defects reproduce
+  <family> <tool> ...`), where no option of the original program stands, or the environment
+  variable `LARMORX_UPSTREAM_DEFECTS`, as it takes `--implementation` or `LARMORX_IMPLEMENTATION`;
+  the option wins over the variable. Any other value is an error (exit code 2). The Python API
+  ignores the variable (no global configuration, CLAUDE.md rule 6); `larmorx.cli.run`, which runs
+  the command line in process, reads it.
+- **Replicas** receive the same choice: the replica programs (`larmorx-nc`, `larmorx-gpl`) take
+  `--upstream-defects` before the family as `larmorx` does, and `larmorx` and the Python wrappers
+  pass the choice to them as `LARMORX_UPSTREAM_DEFECTS`; the AFNI replicas, built in, get it in
+  their settings table (their `++ upstream defects: fix (LARMORX_UPSTREAM_DEFECTS)` line names the
+  variable however the choice was given: the option sets that variable's setting). Replicas share
+  the corrected default, and with `reproduce` give exactly the original's result (decision log,
+  "D13's details"): the 3dTshift replica corrects the same defects as the clean-room original by
+  default (2026-10-12), and with `reproduce` writes AFNI's output bytes.
 
 ## Warnings
 
@@ -211,8 +214,9 @@ changed it (`reproduce`); nothing is said when the two would agree.
 | FSL-06 | mcflirt | `larmorx mri hmc` | an unknown `-cost` silently uses normcorr | an error (exit 255) |
 | FSL-07 | mcflirt | `larmorx mri hmc` | numbers are read with C's `atoi`/`atof` (`abc` is 0, `1.5` is 1 for integers); `-help` alone exits 1 | anything but a number is an error (exit 255); `-help` alone exits 0 |
 | FSL-08 | mcflirt | `larmorx mri hmc -stats`, `-meanvol` | the `-stats` images leave the first and last slices at 0, and `-stats`/`-meanvol` images are named after `-out` with its extension inside (`x.nii.gz_meanvol.nii.gz`) | every slice computed; `x_meanvol.nii.gz` (the names nipype expects) |
-| FSL-09 | mcflirt | `larmorx mri hmc` | int8 input is written as uint8; integer outputs are truncated toward zero, and values beyond the type's range wrap around (x86-64; C++ leaves it undefined) | int8 stays int8; values are rounded to the nearest (half to even) and clamped |
+| FSL-09 | mcflirt, flirt, applyxfm4D, applytopup | `larmorx mri hmc`, `larmorx fsl flirt`, `applyxfm4D`, `applytopup --datatype` | int8 input is written as uint8; integer outputs are truncated toward zero, and values beyond the type's range wrap around (x86-64; C++ leaves it undefined) | int8 stays int8; values are rounded to the nearest (half to even) and clamped; the notice names the program that wrote the output |
 | FSL-10 | mcflirt | `larmorx mri hmc` | the output's units are always millimetres and seconds, so a TR in milliseconds is labelled seconds | the input's units are kept |
+| FSL-11 | every FSL program that writes an image | the command line of every FSL tool (`larmorx fsl <tool>`, `larmorx mri hmc`; the Python functions set the type themselves) | `FSLOUTPUTTYPE` unset: the program stops with an error at its first image (exit 1; `standard_space_roi`'s script goes on and exits 0 without an image) | the images written as `NIFTI_GZ` (`.nii.gz`), FSL-11 named on one line per command, by both implementations in the same words (the replica's line starts `larmorx-nc:`), saying what FSL's program does instead; `reproduce` FSL's message where FSL stops |
 | FSL-13 | mcflirt | `larmorx mri hmc` | `-rmsrel` and `-rmsabs` create the `.mat` directory without `-mats` | no `.mat` directory without `-mats` |
 | FSL-04 | mcflirt | `larmorx fsl mcflirt` (the replica; the original refuses `-gdt` in both modes) | `-gdt` registers each volume's gradient image to the reference's plain image | refused (exit 1); `reproduce` registers the gradient images as mcflirt does |
 | FSL-20 | mcflirt | `larmorx fsl mcflirt` (the replica), `larmorx mri hmc` | when the `.mat` directory cannot be created for another reason than its permissions, mcflirt prints "Error!: Unknown Log directory return value" and exits with status 0, writing nothing more | an error (exit 1), nothing written |
@@ -231,7 +235,7 @@ changed it (`reproduce`); nothing is said when the two would agree.
 | FSL-91 | flirt | the same | a `-refweight` or `-inweight` with no voxel of at least 0.01 (an empty mask): every cost constant, the matrix an artefact of the search | an error (exit status 1), named; `reproduce` FLIRT's registration |
 | FSL-92 | flirt | the same | an input or reference of one voxel (1 × 1 × 1) is registered: the matrix an artefact of the search | an error (exit status 1), named; `reproduce` FLIRT's registration |
 | FSL-93 | flirt | the same | a header voxel size of 0 makes the base scale 0: FLIRT never finishes (`-basescale 0` the same) | the size counted as 1 for the base scale, as reading the image counts it, named; `reproduce` and `-basescale 0`: an error (FLIRT never finishes) |
-| FSL-96 | fast | both: the replica `larmorx-nc fsl fast` and the clean-room original (`larmorx fsl fast`, `lx.fsl.fast`; `implementation="original"` or `LARMORX_IMPLEMENTATION=original`, and `"auto"` without `larmorx-nc`), each in its own way where noted | `-p`'s probability maps outside the brain mask (and everywhere with `--nopve` and priors or `-W 0 -O 0`) are memory FAST never writes | 0, named in both modes |
+| FSL-96 | fast | both: the replica `larmorx-nc fsl fast` and the clean-room original (`larmorx fsl fast`, `lx.fsl.fast`; `implementation="clean-room"` (0.1.0rc1's spelling `"original"` still works) or `--implementation clean-room`, and `"auto"` without `larmorx-nc`), each in its own way where noted | `-p`'s probability maps outside the brain mask (and everywhere with `--nopve` and priors or `-W 0 -O 0`) are memory FAST never writes | 0, named in both modes |
 | FSL-97 | fast | the same | several channels with `-N` and `-b` or `-B`: FAST saves a bias field it never computed | no bias field (1, and each channel's image), named in both modes |
 | FSL-98 | fast | the same | several channels: the class sort gives a class another class's covariance and posteriors when the classes move in a cycle | each class its own statistics, named; `reproduce` FAST's |
 | FSL-99 | fast | the same | a smoothness (`-H`, `-f`, `-R`) that is not a finite number, `-l` of 0 or less or not finite, `-n` below 1: used as given | an error (exit status 1), named; `reproduce` FAST's arithmetic |
@@ -292,7 +296,7 @@ changed it (`reproduce`); nothing is said when the two would agree.
 | FSL-187 | fslstats, fslmaths, bet2, flirt | the fslstats and fslmaths replicas, BET's and FLIRT's replicas; the clean-room originals of fslmaths, fslstats, BET and FLIRT | a value far above a histogram's range counts in its first bin (`-H`, `-e`, `-E`, the robust range) | the last bin, named; `reproduce` FSL's |
 | FSL-188 | fslstats | the same as FSL-181 | `-w` of a 4D image without nonzero voxels: a negative time range | the whole range, named; `reproduce` FSL's |
 | FSL-189 | fslstats | the same as FSL-181 | `-json` writes voxel counts in single precision | exact, named; `reproduce` FSL's |
-| FSL-191 | fslmaths | the clean-room original `larmorx fsl fslmaths` (`lx.fsl.fslmaths`, `implementation="original"`); the replica gives FSL's NaN volume in both modes | with a kernel large enough for FSL's FFT, one NaN or infinite voxel makes `-fmean`'s and `-fmeanu`'s whole volume NaN | NaN only within the kernel's reach, named; `reproduce` FSL's NaN volume |
+| FSL-191 | fslmaths | the clean-room original `larmorx fsl fslmaths` (`lx.fsl.fslmaths`, `implementation="clean-room"`); the replica gives FSL's NaN volume in both modes | with a kernel large enough for FSL's FFT, one NaN or infinite voxel makes `-fmean`'s and `-fmeanu`'s whole volume NaN | NaN only within the kernel's reach, named; `reproduce` FSL's NaN volume |
 | FSL-192 | fslmaths | the clean-room original; the replica mirrors in both modes | with a kernel large enough for FSL's FFT, `-fmean` and `-fmeanu` apply the kernel mirrored, where smaller kernels apply it as stored | the direct sum's orientation at every size, named; `reproduce` FSL's mirroring |
 | FSL-193 | fslmaths | the clean-room original; the replica skips silently (not run) | `-roc` with a curve file that cannot be written writes no curve and says nothing | an error naming the file; `reproduce` FSL's silent skip |
 | FSL-201 | topup | both: the replica `larmorx-nc fsl topup` and the clean-room original (`larmorx fsl topup`, `lx.fsl.topup`; the original's `reproduce` since 2026-11-04) | with `--estmov=1`, the rotation derivatives of the movements are not the cost's (forward differences of single-precision rotation matrices): the minimisers end elsewhere than the cost's minimum | the exact derivatives, named; `reproduce` FSL's |
@@ -345,7 +349,7 @@ changed it (`reproduce`); nothing is said when the two would agree.
 | FSL-64 | mcflirt, bet (FSL 6.0.7.23) | `larmorx-nc fsl mcflirt`, `larmorx-nc fsl bet`, `lx.mri.hmc(implementation="replica")`, `lx.fsl.bet` | the last bits of results computed from 4 × 4 inverses and solves depend on the CPU FSL runs on | the order of FSL's library on CPUs without AVX-512, on every platform |
 | SCI-02 | SciPy `ndimage` | `lx.ndimage.*` | NaN results written to a signed integer output, and a `cval` an integer input cannot hold, are converted as x86-64 converts them (C leaves it undefined) | NaN is 0, `cval` clamped |
 
-Rows naming `larmorx fsl mcflirt` are the replica's (`larmorx-nc`, `lx.mri.hmc(implementation="replica")`); it shares the clean-room original's corrections of FSL-01, -03, -05 to -10, -13 and -14. Rows FSL-40 to FSL-58 are BET's replica's (`larmorx-nc`: `larmorx fsl bet`, `bet2`, `betsurf`, `lx.fsl.bet`, `lx.fsl.betsurf`; there "both" means the command line and the Python function); BET's clean-room original (`crates/larmorx-fsl`; `larmorx fsl bet`, `bet2`, `betsurf`, and `lx.fsl.bet`, `lx.fsl.betsurf` with `implementation="original"`, or `"auto"` without `larmorx-nc`) shares these corrections and their `reproduce` switches: `bet2` and `bet` since 2026-10-30, `betsurf` (FSL-43, -47, -48, -50 to -55, -58) since 2026-10-31. FSL-49 and FSL-57 are kept as FSL's (rule C). Rows FSL-96 to FSL-104 are FAST's replica's (`larmorx-nc fsl fast`; `larmorx fsl fast` and `lx.fsl.fast` run it); inside `-a` FAST also meets FLIRT's FSL-09 and FSL-68 (FLIRT's replica, in the same process). Rows FSL-116 to FSL-143 are topup's and applytopup's replicas' (`larmorx-nc fsl topup` and `fsl applytopup`; `larmorx fsl topup|applytopup`, `lx.fsl.topup` and `lx.fsl.applytopup` run them when `larmorx-nc` is installed); topup's and applytopup's clean-room original (`crates/larmorx-fsl`; `implementation="original"`, or `"auto"` without `larmorx-nc`; 2026-11-03) shares these corrections and their `reproduce` switches where FSL's behaviour is defined and known from black-box runs (FSL-133's wrap of lines whose length does not divide 2^32 and FSL-134's field in another shape are not: it restores those lines circularly and refuses that field in both modes), and adds FSL-144 to FSL-146; applytopup with `--datatype` also meets FSL-09 (the integer output's rounding). FSL-127 to FSL-131 are defects of FSL's libraries no tool reaches (the register). Rows FSL-151 to FSL-189 are fslmaths' and fslstats' replicas' (`larmorx-nc fsl fslmaths` and `fsl fslstats`; `larmorx fsl fslmaths|fslstats`, `lx.fsl.fslmaths`, `lx.fsl.fslstats` and their typed wrappers run them until the clean-room originals); fslmaths' `-subsamp2` also meets FLIRT's FSL-75 (named in both modes, the result the same), FSL-187 is shared with BET's and FLIRT's replicas, and GLIBC-07 is fslmaths' `-dt double` functions and FFT convolution.
+Rows naming `larmorx fsl mcflirt` are the replica's (`larmorx-nc`, `lx.mri.hmc(implementation="replica")`); it shares the clean-room original's corrections of FSL-01, -03, -05 to -10, -13 and -14. Rows FSL-40 to FSL-58 are BET's replica's (`larmorx-nc`: `larmorx fsl bet`, `bet2`, `betsurf`, `lx.fsl.bet`, `lx.fsl.betsurf`; there "both" means the command line and the Python function); BET's clean-room original (`crates/larmorx-fsl`; `larmorx fsl bet`, `bet2`, `betsurf`, and `lx.fsl.bet`, `lx.fsl.betsurf` with `implementation="clean-room"`, or `"auto"` without `larmorx-nc`) shares these corrections and their `reproduce` switches: `bet2` and `bet` since 2026-10-30, `betsurf` (FSL-43, -47, -48, -50 to -55, -58) since 2026-10-31. FSL-49 and FSL-57 are kept as FSL's (rule C). Rows FSL-96 to FSL-104 are FAST's replica's (`larmorx-nc fsl fast`; `larmorx fsl fast` and `lx.fsl.fast` run it); inside `-a` FAST also meets FLIRT's FSL-09 and FSL-68 (FLIRT's replica, in the same process). Rows FSL-116 to FSL-143 are topup's and applytopup's replicas' (`larmorx-nc fsl topup` and `fsl applytopup`; `larmorx fsl topup|applytopup`, `lx.fsl.topup` and `lx.fsl.applytopup` run them when `larmorx-nc` is installed); topup's and applytopup's clean-room original (`crates/larmorx-fsl`; `implementation="clean-room"`, or `"auto"` without `larmorx-nc`; 2026-11-03) shares these corrections and their `reproduce` switches where FSL's behaviour is defined and known from black-box runs (FSL-133's wrap of lines whose length does not divide 2^32 and FSL-134's field in another shape are not: it restores those lines circularly and refuses that field in both modes), and adds FSL-144 to FSL-146; applytopup with `--datatype` also meets FSL-09 (the integer output's rounding). FSL-127 to FSL-131 are defects of FSL's libraries no tool reaches (the register). Rows FSL-151 to FSL-189 are fslmaths' and fslstats' replicas' (`larmorx-nc fsl fslmaths` and `fsl fslstats`; `larmorx fsl fslmaths|fslstats`, `lx.fsl.fslmaths`, `lx.fsl.fslstats` and their typed wrappers run them until the clean-room originals); fslmaths' `-subsamp2` also meets FLIRT's FSL-75 (named in both modes, the result the same), FSL-187 is shared with BET's and FLIRT's replicas, and GLIBC-07 is fslmaths' `-dt double` functions and FFT convolution.
 
 **ANTs and ITK** (2026-10-12; the tables of each tool's page say which apply to it:
 [ImageMath](ants-image-math.md#upstream-defects-d13),

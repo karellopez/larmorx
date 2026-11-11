@@ -166,7 +166,11 @@ fn afni_replicas_are_built_in() {
     for (implementation, line) in [
         (None, "++ implementation: replica (larmorx "),
         (Some("replica"), "++ implementation: replica (larmorx "),
-        (Some("original"), "++ implementation: original (larmorx "),
+        (Some("original"), "++ implementation: clean-room (larmorx "),
+        (
+            Some("clean-room"),
+            "++ implementation: clean-room (larmorx ",
+        ),
     ] {
         let mut env: Vec<(&str, &std::ffi::OsStr)> = vec![("PATH", empty.as_os_str())];
         if let Some(i) = implementation {

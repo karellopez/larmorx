@@ -18,7 +18,7 @@ environment's scripts directory, then ``PATH``. It is done once per call; nothin
 
 A tool's wrapper uses it in three steps, the same for both kinds (see ``larmorx.afni.tshift``)::
 
-    selected = _replica.select("afni", "3dTshift", implementation)  # None: run the original
+    selected = _replica.select("afni", "3dTshift", implementation)  # None: the clean-room original
     if selected is not None:
         process = _replica.run(selected, args, cwd=tmp, n_threads=n_threads)
         ...  # read the output files; the result records selected.implementation()
@@ -33,6 +33,7 @@ from __future__ import annotations
 import os
 import subprocess
 import sysconfig
+import warnings
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Literal
@@ -40,6 +41,7 @@ from typing import Literal
 from larmorx import _core, _defects
 
 __all__ = [
+    "CLEAN_ROOM",
     "IMPLEMENTATIONS",
     "ORIGINAL",
     "Implementation",
@@ -49,16 +51,42 @@ __all__ = [
     "ReplicaNotFoundError",
     "Selected",
     "find",
+    "implementation_name",
     "registry",
     "run",
     "search_dirs",
     "select",
 ]
 
-#: The values of a wrapper's ``implementation`` argument.
-IMPLEMENTATIONS = ("auto", "replica", "original")
+#: The values of a wrapper's ``implementation`` argument: ``"auto"``, ``"replica"`` and
+#: ``"clean-room"`` (larmorx's clean-room original). ``"original"``, the old spelling of
+#: ``"clean-room"`` (0.1.0rc1), is still accepted, with a ``DeprecationWarning``: on the command
+#: line and in the docs "the original" means FSL's or AFNI's own program (the user's decision of
+#: 2026-11-11).
+IMPLEMENTATIONS = ("auto", "replica", "clean-room")
 
-ImplementationName = Literal["auto", "replica", "original"]
+#: ``"original"``: the old spelling of ``"clean-room"`` (a ``DeprecationWarning``).
+ImplementationName = Literal["auto", "replica", "clean-room", "original"]
+
+#: larmorx's own package directory: a warning about a deprecated value names the caller's line
+#: outside it.
+_PACKAGE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
+def implementation_name(implementation: str, *, warn: bool = True) -> str:
+    """``implementation`` with the old spelling ``"original"`` replaced by ``"clean-room"`` (a
+    ``DeprecationWarning`` at the caller's line when ``warn``; the command line and
+    ``LARMORX_IMPLEMENTATION`` accept it silently). Other values are returned as they are."""
+    if implementation == "original":
+        if warn:
+            warnings.warn(
+                "implementation='original' is the old spelling of implementation='clean-room' "
+                "(larmorx's clean-room original); use 'clean-room'",
+                DeprecationWarning,
+                skip_file_prefixes=(_PACKAGE_DIR,),
+            )
+        return "clean-room"
+    return implementation
 
 
 @dataclass(frozen=True)
@@ -68,8 +96,8 @@ class Implementation:
     Attributes
     ----------
     kind
-        ``"original"``: larmorx's clean-room code; ``"replica"``: the bit-exact replica, built in
-        (in this process) or run as a separate program.
+        ``"clean-room"``: larmorx's clean-room original; ``"replica"``: the bit-exact replica,
+        built in (in this process) or run as a separate program.
     package
         The distribution that provides it: ``"larmorx"`` (the originals and the built-in
         replicas), or the replica's (``"larmorx-nc"``).
@@ -82,15 +110,18 @@ class Implementation:
         A separate replica's program, or ``None`` (the original, a built-in replica).
     """
 
-    kind: Literal["original", "replica"]
+    kind: Literal["clean-room", "replica"]
     package: str
     version: str
     licence: str
     program: str | None = None
 
 
-#: larmorx's own implementation.
-ORIGINAL = Implementation("original", "larmorx", _core.__version__, "Apache-2.0")
+#: larmorx's own implementation, the clean-room original.
+ORIGINAL = Implementation("clean-room", "larmorx", _core.__version__, "Apache-2.0")
+
+#: :data:`ORIGINAL`, by the name of its kind.
+CLEAN_ROOM = ORIGINAL
 
 
 class ReplicaNotFoundError(RuntimeError):
@@ -198,20 +229,22 @@ class Selected:
 
 
 def select(family: str, tool: str, implementation: str) -> Selected | None:
-    """The replica of ``family tool`` to run, or ``None`` to run the original.
+    """The replica of ``family tool`` to run, or ``None`` to run the clean-room original.
 
     ``"auto"``: the replica if it is built in or its program is found, else ``None``;
     ``"replica"``: the replica, or :class:`ReplicaNotFoundError` with the command that installs
-    it; ``"original"``: ``None``. A tool without a clean-room original
-    (:attr:`Replica.original` false) has only its replica: ``"auto"`` without its program raises
-    :class:`ReplicaNotFoundError`, and ``"original"`` raises ``NotImplementedError``.
+    it; ``"clean-room"``: ``None`` (``"original"``, its old spelling: the same, with a
+    ``DeprecationWarning``). A tool without a clean-room original (:attr:`Replica.original`
+    false) has only its replica: ``"auto"`` without its program raises
+    :class:`ReplicaNotFoundError`, and ``"clean-room"`` raises ``NotImplementedError``.
     """
+    implementation = implementation_name(implementation)
     if implementation not in IMPLEMENTATIONS:
         raise ValueError(
-            f"implementation must be 'auto', 'replica' or 'original', not {implementation!r}"
+            f"implementation must be 'auto', 'replica' or 'clean-room', not {implementation!r}"
         )
     replica = registry()[(family, tool)]
-    if implementation == "original":
+    if implementation == "clean-room":
         if not replica.original:
             where = (
                 "is built in"

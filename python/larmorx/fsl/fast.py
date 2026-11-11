@@ -222,7 +222,7 @@ def fast(
     if selected is not None and n_channels > MAX_CHANNELS:
         raise ValueError(
             f"the replica segments at most {MAX_CHANNELS} channels, not {n_channels} "
-            '(implementation="original" segments any number)'
+            '(implementation="clean-room" segments any number)'
         )
     with tempfile.TemporaryDirectory(prefix="larmorx-fast-") as tmp:
         args = ["-o", "out", "-n", _positive_int("n_classes", n_classes, 1)]

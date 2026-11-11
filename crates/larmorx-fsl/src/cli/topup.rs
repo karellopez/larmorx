@@ -1180,7 +1180,7 @@ fn write_outputs(
         .get("FSL_LOAD_NIFTI_EXTENSIONS")
         .is_some_and(|v| atof(v) != 0.0);
     // the output type, checked before the first image
-    let ot = match settings.get("FSLOUTPUTTYPE") {
+    let ot = match settings.output_type() {
         None => {
             print_notices(err, notices);
             let _ = err.write_all(FSLOUTPUTTYPE_UNSET.as_bytes());

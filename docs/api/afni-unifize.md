@@ -13,8 +13,8 @@ it; until 2026-10-29 the separate GPL package `larmorx-gpl`), and the clean-room
 (`crates/larmorx-afni`, Apache-2.0), built for speed and written from
 [`specs/3dUnifize.md`](../../specs/3dUnifize.md) and black-box runs of AFNI only
 ([PROVENANCE](../../crates/larmorx-afni/PROVENANCE.md)). `implementation="auto"` (the default, and
-`larmorx afni 3dUnifize`) runs the replica, in the same process; `"replica"` or `"original"`
-(`LARMORX_IMPLEMENTATION`) forces one.
+`larmorx afni 3dUnifize`) runs the replica, in the same process; `"replica"` or `"clean-room"` (`"original"`, 0.1.0rc1's spelling, still works)
+(`--implementation` before the family, or `LARMORX_IMPLEMENTATION`) forces one.
 
 **`-EPI`'s radius and the cube root's last bit** (2026-10-29). `-EPI` sets its radius from the
 voxel volume with the C library's `cbrtf`; AFNI's Linux builds take glibc's, whose code is

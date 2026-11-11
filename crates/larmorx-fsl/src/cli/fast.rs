@@ -1030,7 +1030,7 @@ fn write_outputs(
     libm: &Libm,
     err: &mut dyn Write,
 ) -> u8 {
-    let ot = match settings.get("FSLOUTPUTTYPE") {
+    let ot = match settings.output_type() {
         None => {
             print_notices(err, &notices);
             let _ = err.write_all(FSLOUTPUTTYPE_UNSET.as_bytes());

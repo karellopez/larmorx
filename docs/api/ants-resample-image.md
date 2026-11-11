@@ -37,9 +37,12 @@ labels = lx.ants.resample_image(seg, 1.0, interpolation="nearest", pixel_type="s
 ```bash
 larmorx ants ResampleImage 3 sub-01_T1w.nii.gz t1w_2mm.nii.gz 2
 larmorx ants ResampleImage 3 t1w.nii.gz on_grid.nii.gz 128x128x96 1 4
-larmorx ants ResampleImage 3 t1w.nii.gz sinc.nii.gz 1.5 0 3 w 3      # Welch window, unsigned short
-larmorx ants ResampleImage 3 t1w.nii.gz smooth.nii.gz 2 0 2 1.5x1.5x1.5 2 1   # Gaussian, uchar
+larmorx ants ResampleImage 3 t1w.nii.gz sinc.nii.gz 1.5 0 3 w 3
+larmorx ants ResampleImage 3 t1w.nii.gz smooth.nii.gz 2 0 2 1.5x1.5x1.5 2 1
 ```
+
+(the third with the windowed sinc's Welch window, as unsigned short; the fourth with a Gaussian,
+as unsigned char.)
 
 ## Option mapping
 

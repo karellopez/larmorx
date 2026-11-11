@@ -17,7 +17,7 @@ precision.
 ``implementation="auto"`` (the default) runs the bit-exact replica from ``larmorx-nc`` as a
 separate program when it is installed (``docs/licensing.md``), else the clean-room original
 (``larmorx fsl fslstats``, written from ``specs/fslstats.md``) in this process on ``n_threads``
-threads (its results the same at any count); ``"replica"`` and ``"original"`` choose one. FSL's
+threads (its results the same at any count); ``"replica"`` and ``"clean-room"`` choose one. FSL's
 deterministic defects are corrected by default (D13, ``docs/api/fsl-stats.md``);
 ``upstream_defects="reproduce"`` gives FSL's results. FSL's fslstats runs on one thread.
 """

@@ -10,6 +10,7 @@
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::nifti::{OpenOptions, Renames};
 
@@ -26,12 +27,18 @@ pub const FSL_VARIABLES: &[&str] = &[
 ];
 
 /// A table of environment settings, with how the image layer opens names (FSL-60: NewNifti
-/// 5.0.0's renaming of names holding ".img", reproduced or not, and the renames met).
+/// 5.0.0's renaming of names holding ".img", reproduced or not, and the renames met) and
+/// FSL-11's default output type (`FSLOUTPUTTYPE` unset: `NIFTI_GZ`, and whether an image was
+/// written so).
 #[derive(Clone, Debug, Default)]
 pub struct Settings {
     values: BTreeMap<String, String>,
     reproduce_renames: bool,
     renames: Arc<Renames>,
+    /// FSL-11: `Some` when `FSLOUTPUTTYPE` was unset and [`Settings::defaulting_output_type`]
+    /// gave it `NIFTI_GZ`; then whether an image was written with it (shared by every copy a
+    /// run's steps make of the table).
+    output_type_default: Option<Arc<AtomicBool>>,
 }
 
 impl PartialEq for Settings {
@@ -105,6 +112,37 @@ impl Settings {
     pub fn renames(&self) -> Vec<(String, String)> {
         self.renames.taken()
     }
+
+    /// FSL-11 corrected when `fix` is set: with `FSLOUTPUTTYPE` unset (absent, not empty) the
+    /// table gives it `NIFTI_GZ`, the type FSL's own configuration sets, and notes when an
+    /// image is written with it ([`Settings::output_type_defaulted`]). FSL's programs stop with
+    /// an error at their first image instead (exit 1), which the table keeps when `fix` is not
+    /// set (`reproduce`), as it keeps a variable that is set.
+    pub fn defaulting_output_type(mut self, fix: bool) -> Settings {
+        if fix && !self.values.contains_key("FSLOUTPUTTYPE") {
+            self.values
+                .insert("FSLOUTPUTTYPE".to_owned(), "NIFTI_GZ".to_owned());
+            self.output_type_default = Some(Arc::new(AtomicBool::new(false)));
+        }
+        self
+    }
+
+    /// Notes that an image is written with the type `FSLOUTPUTTYPE` gives, at the point where
+    /// FSL's image layer reads it (`FslGetEnvOutputType` in `save_volume`): under FSL-11's
+    /// default, the point where FSL's program would have stopped.
+    pub fn note_output_type_read(&self) {
+        if let Some(w) = &self.output_type_default {
+            w.store(true, Ordering::Relaxed);
+        }
+    }
+
+    /// FSL-11: whether an image was written as `NIFTI_GZ` in place of the unset
+    /// `FSLOUTPUTTYPE` ([`Settings::defaulting_output_type`]).
+    pub fn output_type_defaulted(&self) -> bool {
+        self.output_type_default
+            .as_ref()
+            .is_some_and(|w| w.load(Ordering::Relaxed))
+    }
 }
 
 /// C's `atoi` ([`crate::cnum::atoi`]): optional leading white space, an optional sign, then
@@ -134,6 +172,37 @@ mod tests {
         assert_eq!(atoi(""), 0);
         assert_eq!(atoi("99999999999"), (99_999_999_999_i64) as i32);
         assert_eq!(atoi("99999999999999999999999"), i64::MAX as i32);
+    }
+
+    /// FSL-11's default: only for an absent variable and only when fixing; noted by any copy.
+    #[test]
+    fn output_type_default() {
+        let unset = Settings::new().defaulting_output_type(true);
+        assert_eq!(unset.get("FSLOUTPUTTYPE"), Some("NIFTI_GZ"));
+        assert!(!unset.output_type_defaulted());
+        let step = unset.clone().with("FSLDIR", "/opt/fsl");
+        step.note_output_type_read();
+        assert!(unset.output_type_defaulted());
+        for kept in [
+            Settings::new().defaulting_output_type(false),
+            Settings::new()
+                .with("FSLOUTPUTTYPE", "")
+                .defaulting_output_type(true),
+            Settings::new()
+                .with("FSLOUTPUTTYPE", "NIFTI")
+                .defaulting_output_type(true),
+        ] {
+            let before = kept.get("FSLOUTPUTTYPE").map(str::to_owned);
+            kept.note_output_type_read();
+            assert!(!kept.output_type_defaulted());
+            assert_eq!(kept.get("FSLOUTPUTTYPE").map(str::to_owned), before);
+        }
+        assert_eq!(
+            Settings::new()
+                .defaulting_output_type(false)
+                .get("FSLOUTPUTTYPE"),
+            None
+        );
     }
 
     #[test]

@@ -35,11 +35,11 @@ def clean_room(monkeypatch, no_replica):
 
     def choose(family: str, tool: str, implementation: str) -> _replica.Selected | None:
         if implementation == "auto" and _replica.registry()[(family, tool)].builtin:
-            implementation = "original"
+            implementation = "clean-room"
         return select(family, tool, implementation)
 
     monkeypatch.setattr(_replica, "select", choose)
-    monkeypatch.setenv("LARMORX_IMPLEMENTATION", "original")
+    monkeypatch.setenv("LARMORX_IMPLEMENTATION", "clean-room")
 
 
 class BuiltinStub:

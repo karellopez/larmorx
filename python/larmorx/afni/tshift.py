@@ -262,7 +262,7 @@ def tshift(
     implementation
         ``"auto"`` (default) and ``"replica"``: the bit-exact replica (part of larmorx, run in
         this process on temporary NIfTI files, with the arguments AFNI's program takes);
-        ``"original"``: the clean-room original. The two differ only in the last bits of some
+        ``"clean-room"``: the clean-room original. The two differ only in the last bits of some
         values (``docs/validation/afni-tshift.md``).
     upstream_defects
         ``"fix"`` (default) corrects AFNI's defects (AFNI-01, -02, -07, -16, and with

@@ -406,7 +406,7 @@ def applytopup(
     type; float when ``None``); ``verbose`` ``-v``.
 
     ``implementation``: ``"auto"`` (the replica when ``larmorx-nc`` is installed, else the
-    clean-room original), ``"replica"`` or ``"original"``.
+    clean-room original), ``"replica"`` or ``"clean-room"``.
 
     Raises ``ValueError`` for invalid arguments, :class:`larmorx.ReplicaError` when the replica
     fails, ``RuntimeError`` (applytopup's message) when the original does, and

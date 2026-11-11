@@ -31,7 +31,7 @@ relate, is in [docs/licensing.md](../docs/licensing.md):
 | `larmorx-nc-mcflirt` | the `mcflirt` replica (head-motion correction): every option, message, exit status and output file of mcflirt 2111.0 (FSL 6.0.7.23; first made for 6.0.7.17). Provenance: `larmorx-nc-mcflirt/PROVENANCE.md` |
 | `larmorx-nc-bet` | the BET replicas (brain extraction): `bet` (its variations `-R`, `-F`, `-Z`), `bet2` and `betsurf` of fsl-bet2 2111.9 (FSL 6.0.7.23; first made for 2111.8, FSL 6.0.7.17), every option, message, exit status and output file; with `-S`, `-B`, `-A`, `-A2` (FLIRT, standard_space_roi, FAST, fslmaths, fslstats and betsurf in its process). Provenance: `larmorx-nc-bet/PROVENANCE.md` |
 | `larmorx-nc-fugue` | the PRELUDE replica (phase unwrapping): `prelude` of fsl-fugue 2603.0 (FSL 6.0.7.23), every option, message, exit status and output file, with newimage's complex reader in the core. Provenance: `larmorx-nc-fugue/PROVENANCE.md` |
-| `larmorx-nc-cli` | the `larmorx-nc` command line: `larmorx-nc fsl <program> <the original's arguments>` (`larmorx-nc --help` lists the programs) |
+| `larmorx-nc-cli` | the `larmorx-nc` command line: `larmorx-nc [--n-threads N] [--upstream-defects fix\|reproduce] [--implementation replica] fsl <program> <the original's arguments>` (`larmorx-nc --help` lists the programs; each option wins over the variable it replaces, `OMP_NUM_THREADS`, `LARMORX_UPSTREAM_DEFECTS`; topup's own `--nthr` wins when it is given) |
 | `larmorx-nc-core/tools/glibc-float-verify` | compares the glibc float functions (`sinf`, `cosf`, `sincosf`, `logf`, `atanf`; `atan2f` on seeded random pairs) with the platform's C library on all 2^32 inputs, and the C library with correctly rounded maths at mcflirt's arguments (Linux x86-64) |
 | `larmorx-nc-core/tools/libm-verify` | compares glibc's `pow`, `exp` and `tanh` and the x87 `long double` operations of FSL's NIfTI layer with this machine's C library and x87 unit, on BET's arguments and random operands (Linux x86-64) |
 | `larmorx-nc-core/tools/affine-trace-replay` | replays mcflirt's own `decompose_aff` calls, traced by `validation/probes/fsl-mcflirt-affine-trace`, through the replica, parameter by parameter |
@@ -49,13 +49,13 @@ This is its own Cargo workspace; the root workspace does not build it.
 
 ```bash
 cd crates-nc
-cargo build --release          # target/release/larmorx-nc
+cargo build --release
 cargo test
 cargo clippy --all-targets -- -D warnings
 cargo fmt --check
 ```
 
-`cargo test` includes the golden tests (`larmorx-nc-cli/tests/golden.rs`, a few tenths of a
+The build writes the program `target/release/larmorx-nc`. `cargo test` includes the golden tests (`larmorx-nc-cli/tests/golden.rs`, a few tenths of a
 second): every platform must reproduce the checksums of the replica's Linux x86_64 output in
 `larmorx-nc-cli/tests/golden.tsv` (CLAUDE.md rule 10, `docs/validation/golden.md`), and
 `larmorx-nc-cli/tests/notices.rs` checks the notices' copies and `fsl-source/`. To record the
@@ -82,8 +82,9 @@ The parity suites find the binary through `LARMORX_NC_BIN`, else `crates-nc/targ
 
 Installed, the replicas are used by `larmorx fsl <program> ...` and the Python wrappers
 (`lx.mri.hmc(...)`, `lx.fsl.bet(...)`, ...) with `implementation="auto"` (the default) or
-`"replica"`; `"original"` (or `LARMORX_IMPLEMENTATION=original` on the command line) runs the
-clean-room original, which every one of these tools has in larmorx itself. The
+`"replica"`; `"clean-room"` (or `larmorx --implementation clean-room ...`,
+`LARMORX_IMPLEMENTATION=clean-room`; `"original"` is the old spelling) runs the clean-room
+original, which every one of these tools has in larmorx itself. The
 program is found through `LARMORX_NC_BIN`, the Python environment's scripts directory, or the
 `PATH` (`larmorx_cli::replica`).
 

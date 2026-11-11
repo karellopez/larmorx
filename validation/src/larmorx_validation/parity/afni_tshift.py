@@ -2014,6 +2014,9 @@ def _check_python(
         from_file.header.replace(vox_offset=header.vox_offset).to_bytes() == header.to_bytes()
     )
     ran = from_file.implementation.kind if from_file.implementation else "unknown"
+    # the suite's (and its records') name of the clean-room original: "original" (the kind
+    # is "clean-room" since 2026-11-11)
+    ran = "original" if ran == "clean-room" else ran
     checks(
         PY_FILE,
         differing == 0 and same_header and ran == implementation,

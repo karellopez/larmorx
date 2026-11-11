@@ -18,7 +18,7 @@ version 3), which this wrapper runs as a separate process with t2smap's own opti
 directory of its own, and whose files it reads back (:class:`T2smapResult`). Its clean-room
 original is still to be written (``specs/t2smap.md``): ``implementation="auto"`` and
 ``"replica"`` run the replica, or raise :class:`larmorx.ReplicaNotFoundError` with the command
-that installs it; ``"original"`` raises ``NotImplementedError``. tedana's deterministic defects
+that installs it; ``"clean-room"`` raises ``NotImplementedError``. tedana's deterministic defects
 are corrected by default (D13, ``docs/api/upstream-defects.md``: TED-01 to TED-15), each named
 by an :class:`larmorx.UpstreamDefectWarning` where it changes a result;
 ``upstream_defects="reproduce"`` gives tedana's files bit for bit (its maths too: numpy's own

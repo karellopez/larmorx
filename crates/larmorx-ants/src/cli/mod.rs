@@ -29,6 +29,7 @@ use std::io::Write;
 use std::path::Path;
 
 use larmorx_core::Precision;
+use larmorx_core::cli::Overrides;
 use larmorx_core::defects::Notices;
 use larmorx_io::itk_transform::TransformFileError;
 use larmorx_transform::Transform;
@@ -94,10 +95,24 @@ pub fn run(
     out: &mut dyn Write,
     err: &mut dyn Write,
 ) -> Option<u8> {
+    run_given(tool, args, loader, &Overrides::default(), out, err)
+}
+
+/// [`run`] with larmorx's own options (`larmorx --n-threads N --upstream-defects MODE ants
+/// ...`): each one given wins over the variables it replaces (ITK's thread variables,
+/// `LARMORX_UPSTREAM_DEFECTS`).
+pub fn run_given(
+    tool: &str,
+    args: &[String],
+    loader: &dyn TransformLoader,
+    given: &Overrides,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> Option<u8> {
     // ITK's output window: the warnings its file IO prints while the program runs, written at
     // the program's end (`larmorx_io::itk_output`).
     let _ = larmorx_io::itk_output::take();
-    let code = run_tool(tool, args, loader, out, err);
+    let code = run_tool(tool, args, loader, given, out, err);
     for w in larmorx_io::itk_output::take() {
         let _ = err.write_all(w.as_bytes());
     }
@@ -108,23 +123,28 @@ fn run_tool(
     tool: &str,
     args: &[String],
     loader: &dyn TransformLoader,
+    given: &Overrides,
     out: &mut dyn Write,
     err: &mut dyn Write,
 ) -> Option<u8> {
     match tool {
-        "antsAffineInitializer" => Some(affine_initializer::main(args, out, err)),
-        "antsAI" => Some(ai::main(args, out, err)),
-        "antsApplyTransforms" => Some(apply_transforms::main(args, loader, out, err)),
-        "antsRegistration" => Some(registration::main(args, loader, out, err)),
-        "Atropos" => Some(atropos::main(args, out, err)),
-        "DenoiseImage" => Some(denoise_image::main(args, out, err)),
-        "ImageMath" => Some(image_math::main(args, out, err)),
-        "MultiplyImages" => Some(multiply_images::main(args, out, err)),
-        "N4BiasFieldCorrection" => Some(n4_bias_field_correction::main(args, out, err)),
-        "ResampleImage" => Some(resample_image::main(args, out, err)),
-        "ResampleImageBySpacing" => Some(resample_image_by_spacing::main(args, out, err)),
-        "SmoothImage" => Some(smooth_image::main(args, out, err)),
-        "ThresholdImage" => Some(threshold_image::main(args, out, err)),
+        "antsAffineInitializer" => Some(affine_initializer::main_given(args, given, out, err)),
+        "antsAI" => Some(ai::main_given(args, given, out, err)),
+        "antsApplyTransforms" => Some(apply_transforms::main_given(args, loader, given, out, err)),
+        "antsRegistration" => Some(registration::main_given(args, loader, given, out, err)),
+        "Atropos" => Some(atropos::main_given(args, given, out, err)),
+        "DenoiseImage" => Some(denoise_image::main_given(args, given, out, err)),
+        "ImageMath" => Some(image_math::main_given(args, given, out, err)),
+        "MultiplyImages" => Some(multiply_images::main_given(args, given, out, err)),
+        "N4BiasFieldCorrection" => {
+            Some(n4_bias_field_correction::main_given(args, given, out, err))
+        }
+        "ResampleImage" => Some(resample_image::main_given(args, given, out, err)),
+        "ResampleImageBySpacing" => {
+            Some(resample_image_by_spacing::main_given(args, given, out, err))
+        }
+        "SmoothImage" => Some(smooth_image::main_given(args, given, out, err)),
+        "ThresholdImage" => Some(threshold_image::main_given(args, given, out, err)),
         _ => None,
     }
 }

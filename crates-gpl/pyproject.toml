@@ -24,7 +24,9 @@ description = "Bit-exact Rust replica of tedana's t2smap (multi-echo fMRI), run 
 # PyPI's description (PYPI.md); README.md is this directory's page for developers.
 readme = "PYPI.md"
 requires-python = ">=3.12"
-authors = [{ name = "Karel Lopez Vilaret" }]
+authors = [
+    { name = "Karel Mauricio López Vilaret", email = "karel.mauricio.lopez.vilaret@uni-oldenburg.de" },
+]
 # The GNU GPL version 3 only (LICENSE) first; then every licence of the code the wheel holds: the
 # Apache-2.0 larmorx crates with the works they translate (LICENSES/NOTICE-larmorx.txt) and the
 # Rust crates it is built with (the wheel's SBOM). tedana's LGPL-2.1-only code is distributed

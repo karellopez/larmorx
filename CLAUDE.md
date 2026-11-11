@@ -11,13 +11,13 @@ One package, **`larmorx`** (repo `github.com/karellopez/larmorx`), with two laye
    - Every tool has three interfaces, plus documentation and a validation record (PLAN.md §4):
      - a Rust API (crates `larmorx-*`)
      - an idiomatic **Python wrapper** (`lx.ants.registration(...)`)
-     - a CLI that accepts the original program's arguments (`larmorx ants antsRegistration ...`, short alias `lx`)
+     - a CLI that accepts the original program's arguments (`larmorx ants antsRegistration ...`, short alias `lx`), with larmorx's own options before the family (`larmorx [--n-threads N] [--implementation auto|replica|clean-room] [--upstream-defects fix|reproduce] <family> <tool> ...`, the Python arguments' names, each winning over the environment variable it replaces; the user, 2026-11-11), the same in every package's program (`larmorx-nc`, `larmorx-gpl`, later `larmorx-freesurfer`)
 2. **`larmorprepx`**, the preprocessing pipeline, **inside the package**.
    - Module `larmorx.pipelines.larmorprepx`; command `larmorprepx`; installed via the `[prep]` extra.
    - An fMRIPrep-like pipeline in **plain Python functions** on top of the library. BIDS in, fMRIPrep-compatible derivatives and HTML reports out.
    - `larmorx.pipelines/` leaves room for future pipelines.
 
-The FreeSurfer port is a separate wheel, `larmorx-freesurfer` (exposed as `lx.freesurfer`), so its licence terms stay isolated. **Distribution** (user, 2026-10-16): companion wheels per licence family, `pip install larmorx` Apache-only, `pip install "larmorx[all]"` everything; one `import larmorx` and one `larmorx` command either way, `implementation="auto" | "replica" | "original"` where a tool has both. **Releases** (from 0.1.0rc1; the release part of 2026-11-10 and 11, the user's decisions in the decision log): the three packages on PyPI at one version (tags `v<version>`; wheels for the six platforms and the sdists), the standalone programs and `SHA256SUMS` in each GitHub Release, two Linux container images (`ghcr.io/karellopez/larmorx:<version>` without the replica packages, `<version>-all` with them); the maintainer's steps in `RELEASING.md`, the orchestrator's in `docs/orchestration.md`.
+The FreeSurfer port is a separate wheel, `larmorx-freesurfer` (exposed as `lx.freesurfer`), so its licence terms stay isolated. **Distribution** (user, 2026-10-16): companion wheels per licence family, `pip install larmorx` Apache-only, `pip install "larmorx[all]"` everything; one `import larmorx` and one `larmorx` command either way, `implementation="auto" | "replica" | "clean-room"` where a tool has both (`"original"`, 0.1.0rc1's spelling, still accepted; the user, 2026-11-11). **Releases** (from 0.1.0rc1; the release part of 2026-11-10 and 11, the user's decisions in the decision log): the three packages on PyPI at one version (tags `v<version>`; wheels for the six platforms and the sdists), the standalone programs and `SHA256SUMS` in each GitHub Release, two Linux container images (`ghcr.io/karellopez/larmorx:<version>` without the replica packages, `<version>-all` with them); the maintainer's steps in `RELEASING.md`, the orchestrator's in `docs/orchestration.md`. **The next release once the full pipeline exists** (the user, 2026-11-11: "I do not really want to release yet until we have the full pipeline"); what `main` adds meanwhile is in `CHANGELOG.md`'s "Unreleased".
 
 **Naming rules:**
 - Always lowercase `larmorx` / `larmorprepx` in code and commands.
@@ -42,7 +42,7 @@ replica (2026-11-02), FAST's clean-room original and topup's replica, topup's cl
 `fslmaths` and `fslstats`'s replica and the spec answers for topup, FAST and FLIRT (2026-11-03), `fslmaths`' and
 `fslstats`' clean-room originals, glibc's exact maths for `reproduce` (both halves) and BET's `-S`/`-B`/`-A`/`-A2` replica with `standard_space_roi` and `fslroi`
 (2026-11-04) and the clean-room catch-up (topup, FAST, FLIRT, BET with these options' original, `lx.mri.hmc`; 2026-11-05)
-complete, the clean-room audit (2026-11-06: [docs/validation/clean-room-audit.md](docs/validation/clean-room-audit.md); it runs at every merge), PRELUDE's replica and clean-room original (2026-11-06 and 07) and 3dvolreg's replica (2026-11-07), its clean-room original, the field maps' part A (sdcflows' port, 2026-11-08), tedana's `t2smap` replica (2026-11-08, in `larmorx-gpl`) and the field maps' part B (the rest of sdcflows with niworkflows' helpers, a BIDS index, SciPy's ndimage filters and fMRIPrep's field-map steps, 2026-11-10) and the first release's part (0.1.0rc1's packaging, release workflow, container images, clean-machine checks and documents, 2026-11-11; the user put it before the next port; published 2026-11-11: PyPI, the GitHub Release, the images, checked from PyPI on clean Linux and Windows) complete; next, before FreeSurfer (the user, 2026-11-06; decision log): `t2smap`'s clean-room original (first the main package's own `topup` settings), the confounds, the templates; then FreeSurfer, surfaces, larmorprepx; each a bounded part with a stop after it and its site page from its tests.
+complete, the clean-room audit (2026-11-06: [docs/validation/clean-room-audit.md](docs/validation/clean-room-audit.md); it runs at every merge), PRELUDE's replica and clean-room original (2026-11-06 and 07) and 3dvolreg's replica (2026-11-07), its clean-room original, the field maps' part A (sdcflows' port, 2026-11-08), tedana's `t2smap` replica (2026-11-08, in `larmorx-gpl`) and the field maps' part B (the rest of sdcflows with niworkflows' helpers, a BIDS index, SciPy's ndimage filters and fMRIPrep's field-map steps, 2026-11-10) and the first release's part (0.1.0rc1's packaging, release workflow, container images, clean-machine checks and documents, 2026-11-11; the user put it before the next port; published 2026-11-11: PyPI, the GitHub Release, the images, checked from PyPI on clean Linux and Windows) and the easy command line (2026-11-11, from the user's hand tests of rc1 on macOS and Windows: larmorx's options before the family, `clean-room` for `original`, FSL-11 for every FSL tool, the README's First steps; no release) complete; next, before FreeSurfer (the user, 2026-11-06; decision log): `t2smap`'s clean-room original (first the main package's own `topup` settings), the confounds, the templates; then FreeSurfer, surfaces, larmorprepx; each a bounded part with a stop after it and its site page from its tests.
 Then the final validation phase (the data panel's part b and every new tool, full tiers, heavy and
 nightly random testing, the extensive evidence, reviews, the scripts triage) and the comparisons
 with fMRIPrep. Machine-only runs meanwhile: 8 heavy random-testing cases wait for the lab's server.
@@ -70,8 +70,10 @@ with fMRIPrep. Machine-only runs meanwhile: 8 heavy random-testing cases wait fo
 
 - **Newest upstream versions, updated in steps** (user, 2026-10-27): each tool is ported from the newest release; a newer release is brought in by a planned part (source changes ported, records re-made), the old oracle kept. fMRIPrep's own versions are only a reference for the final comparisons (the user: "I would not like larmorx to be limited by fmriprep. The idea was that it reproduces fmriprep, but also to bring a solution in which user can simple use whatever they want to make software"). AFNI (25.2.09, newest 26.3.x) and FSL (6.0.7.17, newest 6.0.7.23) are updated after the move (decision log 2026-10-27).
 - **Port every tool first, compare with fMRIPrep at the end** (user, 2026-10-16). Each port is validated against its own original program; stage-by-stage and end-to-end comparisons with fMRIPrep wait until all tools are ported.
-- **Agents: in bounded parts with a stop after each; ONE AT A TIME since 2026-11-09, with relay
-  agents** (the user, 2026-11-09: "We will do one agent at a time now, until I tell you the opposite": relays one
+- **Agents: in bounded parts with a stop after each; UP TO THREE AT ONCE since 2026-11-11, with relay
+  agents** (the user, 2026-11-11: "We have a weekly reset that we can apply anytime, so please to speed up, feel
+  free to use 2 more agent slots": three parts side by side, each a chain of relays, never touching the same
+  files; decision log 2026-11-11). Before that, one at a time (the user, 2026-11-09: "We will do one agent at a time now, until I tell you the opposite": relays one
   after the other, nothing beside them; decision log 2026-11-09). Before that: two at once at most, by role
   (confirmed for the parts before FreeSurfer, user 2026-11-06) (the user, 2026-11-02: "can we try this new method after this flirt clean room? The idea
   is to go faster, spending less tokens and also maintaining quality"; before: one at a time, the
@@ -157,7 +159,7 @@ larmorx/scripts/bootstrap_workspace.sh --venv .venv --install-rust
    - Typed dataclass inputs and outputs; no global config; no pickles in caches.
    - UTF-8 I/O; no `shell=True`; `spawn` only.
 7. **The per-tool contract** (PLAN.md §4) is mandatory for every tool. Start every port from `docs/porting-guide.md`: the method, and the contract as a checklist with the models to copy (§11).
-   - Rust API, Python wrapper, compatible CLI
+   - Rust API, Python wrapper, compatible CLI (the original's arguments after the tool; larmorx's three options before the family reach it through the settings overlay, `docs/architecture.md`)
    - `.pyi` stubs + a docs page with the option-mapping table
    - a validation record and status (`experimental` / `validated` / `stable`)
    - `PROVENANCE.md`
@@ -226,9 +228,9 @@ Every agent reads this file first, then `docs/porting-guide.md`, its section of 
   `standard_space_roi` (about 1.5 MB, under `crates-nc/`, with FSL's Licence, MNI's notice and a checksum manifest).
 - The FreeSurfer licence file (`/usr/local/freesurfer/license.txt`) is only mounted read-only into containers; never copied or committed.
 - **Machines** (user, 2026-10-25; moved 2026-10-27 and 28): the main machine is the new laptop (AMD, 16 cores / 32 threads, 124 GiB, AVX-512, RTX 4090, Ubuntu 22.04; the two laptops' host names are in the workspace's `ORCHESTRATOR-STATE.md`, outside the repository); every agent and every record runs there. The old laptop (Intel i7-8750H, 12 threads, 31 GiB, AVX2) is the helper `old-laptop`: the quiet benchmark machine and a second Linux reference, reached by `ssh old-laptop` and the git remote `old-laptop` (`docs/helper-machines.md`); no development starts there. A Windows laptop serves Windows checks (`win-laptop`); the lab's server (1 TB RAM, shared, Ubuntu 24.04: originals in an Ubuntu 22.04 container) only giant jobs. Helpers are reached by key-based SSH from the main machine, never with passwords; macOS stays with CI.
-- **Agents at once:** one since 2026-11-09 ("The user's direction"): up to 28 threads and about 90 GiB of
-  memory boxes in total. When two run (by role, if the user says so again): 14 threads and at most 32 GiB of
-  memory boxes each; the orchestrator's verification beside them at most 32 GiB and 8 threads. Brief
+- **Agents at once:** up to three since 2026-11-11 ("The user's direction"): each at most 9 threads and 28 GiB
+  of memory boxes (the parity smoke tier at 6 workers; 8 ran out of memory in a 27 GiB box), the orchestrator's
+  verification beside them at most 28 GiB and 6 threads. One agent alone: up to 28 threads and about 90 GiB. Brief
   every agent to commit as soon as its work passes the gates; when pausing one, ask for a WIP
   checkpoint commit and a NOTES file first.
 - **The ANTs oracle is built with conda-forge GCC 14.3** (`oracles/toolchains/gcc-14.3`, user-level). Ubuntu 22.04's GCC 11.4 and 12.3 miscompile float roundings at `-O3` (GCC bug 110182); `scripts/build_ants_oracle.sh` probes for it and refuses such a compiler. The old GCC 11 build is kept as evidence in `oracles/ants-2.6.5-gcc11-O3`; validate registration (A4/A5) against the new build only.

@@ -17,8 +17,9 @@ the B-spline fields, sparse matrices, non-linear optimisers and warps of FSL's l
 `larmorx-fsl`, module `topup`), written from [`specs/topup.md`](../../specs/topup.md) without
 FSL's source (2026-11-03). `implementation="auto"` (the default) runs the replica when
 `larmorx-nc` is installed (`pip install larmorx-nc`) and the original otherwise; `"replica"`
-needs `larmorx-nc` (otherwise `ReplicaNotFoundError`); `"original"` always runs the original.
-The command line chooses alike (`LARMORX_IMPLEMENTATION`).
+needs `larmorx-nc` (otherwise `ReplicaNotFoundError`); `"clean-room"` (`"original"`, 0.1.0rc1's spelling, still works) always runs
+the clean-room original. The command line chooses alike (`--implementation` before the family, or
+`LARMORX_IMPLEMENTATION`).
 
 **Status: `experimental`**: the replica against FSL 6.0.7.23 itself (the parity suite
 `fsl-topup-replica`, record [fsl-topup-replica](../validation/fsl-topup-replica.md), 2026-11-03:
@@ -108,8 +109,8 @@ larmorx fsl applytopup --imain=dwi_up,dwi_dn --inindex=1,2 --datain=acqparams.tx
 | `rigid_body_matrices` | `--rbmout` | `False` | each volume's rigid-body matrix |
 | `jacobians` | `--jacout` | `False` | each volume's Jacobian determinant |
 | `verbose` | `-v` | `False` | the cost of every evaluation (in `TopupResult.stdout`) |
-| `n_threads` | `--nthr` | 1 | threads; the results are FSL's one-thread results at any count (FSL-116) |
-| `implementation` | `LARMORX_IMPLEMENTATION` | `"auto"` | `"auto"`, `"replica"`, `"original"` |
+| `n_threads` | `--nthr` | 1 | threads; the results are FSL's one-thread results at any count (FSL-116). On the command line without `--nthr` (nor in the configuration), the replica takes larmorx's own `--n-threads` (else `OMP_NUM_THREADS`, else every logical CPU) |
+| `implementation` | `--implementation` (before the family), `LARMORX_IMPLEMENTATION` | `"auto"` | `"auto"`, `"replica"`, `"clean-room"` |
 | `upstream_defects` | `LARMORX_UPSTREAM_DEFECTS` | `"fix"` | `"reproduce"`: FSL's defects as FSL has them (below) |
 
 `None` (the default of every estimation setting) leaves the option out, so the configuration
@@ -202,6 +203,12 @@ topup's and applytopup's defects are corrected by default and reproduced with
 changes a result is named on standard error and as an `UpstreamDefectWarning`
 ([all of them](upstream-defects.md)):
 
+- **FSL-11**: with `FSLOUTPUTTYPE` unset FSL's topup and applytopup stop with FSL's message at
+  their first image (exit 1). Both implementations, the clean-room original and the replica, write
+  the images as `NIFTI_GZ` (`.nii.gz`: the bytes `FSLOUTPUTTYPE=NIFTI_GZ` gives) and name FSL-11 on
+  one line per command, in the same words (the replica's line starts `larmorx-nc:`); `reproduce`
+  stops as FSL does. Command line only: the Python functions set the type themselves. applytopup's
+  integer `--datatype` outputs meet FSL-09 (rounded and clamped), its notice naming applytopup.
 - **FSL-116**: FSL's results depend on its thread count (`--nthr`, `FSL_NUM_THREADS`); larmorx
   gives FSL's one-thread result at any count.
 - **FSL-117**: with the membrane energy, Levenberg-Marquardt's Hessian of the regulariser is in

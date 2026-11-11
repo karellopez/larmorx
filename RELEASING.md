@@ -57,23 +57,30 @@ On a branch, as any change:
 
 2. **CHANGELOG.md:** a section headed `## [0.1.0] - 2026-12-01` (the date of `CITATION.cff`),
    in plain words: what is new since the last release, what was fixed, the known limitations.
+   The changes gather meanwhile under `## [Unreleased]` at the top: rename that heading to the
+   version's, and start a new, empty `## [Unreleased]` above it after the release.
    Its tools' statuses come from `validation/tools.toml`: copy the two marker lines of the
    statuses table from the last section into the new one, then
 
    ```bash
    python -P scripts/release/changelog.py 0.1.0 --write-statuses
-   python -P scripts/release/changelog.py 0.1.0 --ref v0.1.0     # the release's text, printed
+   python -P scripts/release/changelog.py 0.1.0 --ref v0.1.0
    ```
 
+   (the second prints the release's text).
+
    Add the link definition `[0.1.0]: https://github.com/karellopez/larmorx/releases/tag/v0.1.0`
-   at the end of the file. The README's status line names the newest release; update it too.
+   at the end of the file (and point `[Unreleased]`'s comparison at the new tag). The README's status line names the newest release; update it too.
 3. **The checks** the release's first job runs, here first:
 
    ```bash
-   python -P scripts/release/licences.py --check       # the packages' licence expressions
-   python -P scripts/release/third_party.py --check    # LICENSES/third-party-rust.txt (cargo fetch first)
+   python -P scripts/release/licences.py --check
+   python -P scripts/release/third_party.py --check
    python -P scripts/release/pypi_readme.py --check --ref v0.1.0 README.md crates-nc/PYPI.md crates-gpl/PYPI.md
    ```
+
+   They check the packages' licence expressions, `LICENSES/third-party-rust.txt` (after `cargo
+   fetch`) and PyPI's descriptions.
 
    A changed `Cargo.lock` needs `third_party.py --write`. The golden tests do not depend on the
    version (the harnesses write it as `<version>`), so a version change re-records nothing:
@@ -180,16 +187,18 @@ When `assemble` has passed, the run waits for the three deployments `pypi`, `pyp
      the tests (`tests/python`, `tests/golden`) of the tag's source. In a clean Linux, for example:
 
      ```bash
-     mkdir check && cd check && mkdir home tmp
+     mkdir check && cd check
      curl -sSfLO https://raw.githubusercontent.com/karellopez/larmorx/v<version>/scripts/release/check_install.py
-     apptainer exec --containall --home "$PWD/home:/home/user" --bind "$PWD:/check" \
-         --env TMPDIR=/check/tmp docker://python:3.12-slim-bookworm \
+     apptainer exec --containall --bind "$PWD:/check" docker://python:3.12-slim-bookworm \
          python -P /check/check_install.py --version <version> --work /check/work
      ```
 
-     The home and temporary folders are bound from `check/` because `--containall` otherwise keeps
-     both in Apptainer's session space, 64 MiB by default (`sessiondir max size`), which pip's
-     temporary files and cache outgrow ("No space left on device"; found at 0.1.0rc1's check).
+     `check_install.py` keeps every step's temporary files and pip's cache in its work folder
+     (`<work>/tmp`, `<work>/pip-cache`): `--containall` keeps `/tmp` and the home folder in
+     Apptainer's session space, 64 MiB by default (`sessiondir max size`), which pip's temporary
+     files and cache outgrew at 0.1.0rc1's check ("No space left on device"; until the next
+     release's script, rc1's needs `--env TMPDIR=/check/tmp` and a home folder bound from
+     `check/`).
 
    - Windows (10 or 11, no administrator rights needed): download
      [`scripts/release/check_install_windows.ps1`](scripts/release/check_install_windows.ps1) and

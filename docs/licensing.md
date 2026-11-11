@@ -204,12 +204,14 @@ command-line binary. Code from different families is never linked into one binar
   GPL's Corresponding Source and FSL's source). Two images, not one, because with larmorx-nc
   installed `implementation="auto"` runs the FSL replicas. `/opt/larmorx/README.txt` in each
   says what it holds and where its licences are.
-- **Built locally**, for development:
+- **Built locally**, for development: larmorx from the repository's root (the originals and the
+  AFNI replicas), larmorx-nc from `crates-nc` (FSL Licence) and larmorx-gpl from `crates-gpl`
+  (GPL-3.0), then everything installed from those wheels:
   ```bash
-  maturin build --release --locked --out dist                         # larmorx (repository root): the originals and the AFNI replicas
-  (cd crates-nc && maturin build --release --locked --out ../dist)    # larmorx-nc (FSL Licence)
-  (cd crates-gpl && maturin build --release --locked --out ../dist)   # larmorx-gpl (GPL-3.0)
-  pip install --find-links dist "larmorx[all]"                        # everything
+  maturin build --release --locked --out dist
+  (cd crates-nc && maturin build --release --locked --out ../dist)
+  (cd crates-gpl && maturin build --release --locked --out ../dist)
+  pip install --find-links dist "larmorx[all]"
   ```
   The release builds with the `dist` profile instead (fat LTO, one codegen unit, stripped: the
   same results, smaller files) and the companions from their sdists

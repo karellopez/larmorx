@@ -34,8 +34,9 @@ in two implementations ([licensing](../licensing.md)):
 
 Until the original exists, the replica is the only implementation: `implementation="auto"` and
 `"replica"` run it when `larmorx-gpl` is installed (`pip install larmorx-gpl`, or `pip install
-"larmorx[all]"`) and raise `ReplicaNotFoundError` with that command otherwise; `"original"` raises
-`NotImplementedError`. The command line does the same (`LARMORX_IMPLEMENTATION`; exit 127 with
+"larmorx[all]"`) and raise `ReplicaNotFoundError` with that command otherwise; `"clean-room"`
+(`"original"`, 0.1.0rc1's spelling, still works) raises `NotImplementedError`. The command line does the same (`--implementation`
+before the family, or `LARMORX_IMPLEMENTATION`; exit 127 with
 the command that installs it). The program is found through `LARMORX_GPL_BIN`, then the Python
 environment's scripts directory, then `PATH`.
 
@@ -99,14 +100,14 @@ larmorx's notice lines) and `implementation`. A run that fails raises `ReplicaEr
 | `--fitmode {all,ts}` | `fitmode="all"` | one fit per voxel over all volumes, or one per voxel and volume (4D maps) |
 | `--combmode {t2s,paid}` | `combmode="t2s"` | the combination's weights: TE · exp(-TE / T2*), or PAID's temporal SNR |
 | `--n-independent-echos INT` | `n_independent_echos=None` | the number of independent echoes (EPTI): only tedana's warnings change |
-| `--n-threads INT` | `n_threads=1` (0: all logical CPUs, passed as -1) | threads; tedana's limit for its BLAS and its curve-fit processes. The replica's results never depend on it (it gives tedana's one-thread results; tedana's own log-linear maps change with BLAS threads in a few voxels' last bits) |
+| `--n-threads INT` | `n_threads=1` (0: all logical CPUs, passed as -1) | threads; tedana's limit for its BLAS and its curve-fit processes. On the command line, when it is not given, larmorx's own `--n-threads` before the family applies (`larmorx --n-threads 4 tedana t2smap ...`; else `OMP_NUM_THREADS`, else every logical CPU), not tedana's default of 1. The replica's results never depend on it (it gives tedana's one-thread results; tedana's own log-linear maps change with BLAS threads in a few voxels' last bits) |
 | `--debug` | `debug=False` | the log at DEBUG level (the help's TSV log file is never written: tedana's, kept) |
 | `--quiet` (hidden) | `quiet=False` | the log at WARNING level |
 | `-h`, `--help` | - | the usage (argparse's, exit 0) |
 | `-v`, `--version` | - | `t2smap v26.0.3` (exit 0) |
 | `LARMORX_UPSTREAM_DEFECTS` | `upstream_defects="fix"` | `"reproduce"` gives tedana's files bit for bit (its defects and its maths, below) |
 | `LARMORX_TEDANA_LIBRARIES` | `libraries="newest"` | the numpy and SciPy whose arithmetic is reproduced: `newest` (numpy 2.5.4, SciPy 1.18.1) or `shared` (numpy 2.3.5, SciPy 1.15.3); the curve fit's last bits differ between them |
-| - | `implementation="auto"` | `"auto"` or `"replica"` (the replica); the clean-room original through its own binding until it is wired in (above) |
+| `--implementation` (before the family) | `implementation="auto"` | `"auto"` (the replica when larmorx-gpl is installed, else the clean-room original), `"replica"`, `"clean-room"` (`"original"`, the old spelling, warns) |
 
 argparse's errors exit 2 with tedana's usage and message; any other failure exits 1 with Python's
 traceback lines (its first and last; the stack itself is not reproduced). The Python wrapper

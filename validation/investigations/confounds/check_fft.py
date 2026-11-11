@@ -31,9 +31,9 @@ compiler puts first is not in the source). ``--control`` tells larmorx the other
 counts the cases whose bits change. Run it in each environment with the worktree's extension::
 
     OPENBLAS_CORETYPE=Haswell PYTHONPATH=<worktree>/python python -P check_fft.py \\
-        [--tier quick|full] [--sections synthetic,nitime,real] [--control]
+        [--tier quick|full] [--sections synthetic,nitime,real] [--control] [--time]
 
-Exit status 1 when any case differs (``--control``: never).
+``--time`` prints the per-call time of nitime's calls instead. Exit status 1 when any case differs (``--control``: never).
 """
 
 from __future__ import annotations
@@ -305,16 +305,44 @@ def real_section(tier: str) -> None:
             nitime_calls(f"real {run.split('-')[0]}", np.ascontiguousarray(row))
 
 
+def timing() -> None:
+    """Per-call time of nitime's forward and backward FFTs: SciPy (its plan cache warm) against
+    larmorx's binding (which builds the plan at every call; the confounds' own loop reuses it)."""
+    rng = np.random.default_rng(3)
+    print("timing: n, scipy fft, larmorx fft, scipy ifft, larmorx ifft (microseconds per call)")
+    for n in (32, 512, 1024, 2048, 16384):
+        x = rng.standard_normal(n // 2).astype(np.float32)
+        z = fftpack.fft(x, n)
+        reps = max(20, 200_000 // n)
+        row = []
+        for f in (
+            lambda x=x, n=n: fftpack.fft(x, n),
+            lambda x=x, n=n: _core.scipy_fftpack(x, n, True, LIB),
+            lambda z=z: fftpack.ifft(z),
+            lambda z=z: _core.scipy_fftpack(z, None, False, LIB),
+        ):
+            f()
+            t = time.perf_counter()
+            for _ in range(reps):
+                f()
+            row.append((time.perf_counter() - t) / reps * 1e6)
+        print(f"  {n:6d} " + " ".join(f"{v:9.1f}" for v in row))
+
+
 def main() -> int:
     global CONTROL, LIB
     ap = argparse.ArgumentParser()
     ap.add_argument("--tier", choices=("quick", "full"), default="quick")
     ap.add_argument("--sections", default="synthetic,nitime,real")
     ap.add_argument("--control", action="store_true")
+    ap.add_argument("--time", action="store_true", help="only the timing")
     args = ap.parse_args()
     CONTROL = args.control
     LIB = other(SCIPY) if CONTROL else SCIPY
     secs = args.sections.split(",")
+    if args.time:
+        timing()
+        return 0
     t0 = time.time()
     print(f"scipy {SCIPY} numpy {np.__version__} larmorx told {LIB} tier {args.tier}", flush=True)
     if "synthetic" in secs:

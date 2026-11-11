@@ -744,6 +744,10 @@ jobs:
   # One publish job per package, each in its own environment (PyPI's trusted publishers name it;
   # the environments allow only v* tags and need the maintainer's approval), each uploading only
   # its package's 7 files (6 wheels, the sdist). PyPI's attestations are made on upload.
+  # skip-existing: a publish job that failed after uploading part of its files finishes with
+  # "Re-run failed jobs", which takes the same files (this run's artifact) and uploads only those
+  # PyPI does not have yet. Files built again cannot reach PyPI this way: "Re-run all jobs" runs
+  # check again, which finds the version on PyPI and stops the run.
   publish-nc:
     name: publish (larmorx-nc)
     needs: [check, assemble]
@@ -773,6 +777,7 @@ jobs:
           packages-dir: upload/
           print-hash: true
           attestations: true
+          skip-existing: true
 
   publish-gpl:
     name: publish (larmorx-gpl)
@@ -803,6 +808,7 @@ jobs:
           packages-dir: upload/
           print-hash: true
           attestations: true
+          skip-existing: true
 
   # larmorx last: it waits (at most 20 minutes) until PyPI lists both companions' files of this
   # version with this release's SHA-256s, so that larmorx[all]==<version> never names a version
@@ -845,6 +851,7 @@ jobs:
           packages-dir: upload/
           print-hash: true
           attestations: true
+          skip-existing: true
 
   # A release only, after the three uploads: the two images pushed by digest, each as one
   # multi-architecture index (amd64, arm64) tagged <version> and <version>-all (also latest and

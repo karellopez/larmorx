@@ -312,3 +312,38 @@ system's libraries: ['@rpath/larmorx._core.abi3.so']". That is the extension's o
 leaves out the name `otool -D` gives and still refuses every other library outside `/usr/lib` and
 `/System/Library` (`c02045bd`, with a test on `otool` outputs). Nothing was published (the
 release-only jobs and assemble were skipped).
+
+## Relay 5b: the documentation site (`site/`)
+
+The site's pages for the first release are on the site's branch `release-pages` (from its main
+`d9f67d1`: `5650433` the installation page and the home page's install notes, `b8edd27` the page
+"Why Rust and Python", `af701b6` the installation page after its screenshots). Its shared files
+(`site.yml`, `data/status.yml`) and the roadmap change when the site is published, after PyPI
+has the version, through the release part's site handoff (`apply_handoff.py --site`). Relay 6
+put relay 5b's helpers here (SPDX headers, ruff's form, the screenshot scripts' folders as
+arguments); on the same inputs the three edit scripts write the same files as the ones relay 5b
+ran, byte for byte.
+
+| Helper | What it shows |
+|---|---|
+| `site/handoff_site.py <site checkout>` | the changes to the site's shared files: `site.yml`'s navigation (Install, after Status) and documentation list (Installation and Why Rust and Python, after Overview), `data/status.yml`'s planned item "Releases on PyPI" become "Release 0.1.0" |
+| `site/handoff_roadmap.py <site checkout> <date>` | the roadmap at the publication: the section "The first release" says the release candidate is out, the release's row at the top of the completed steps, "Last updated", the front matter's description; the release part's handoff has the same changes dated 2026-11-12, this script takes the actual day |
+| `site/edit_index.py <site checkout at d9f67d1>` | the home page's first edit (12 replacements: the "not yet on PyPI" lines and the cards that had gone stale); its result is site commit `5650433`'s `content/index.md`, byte for byte |
+| `site/shots.sh <site checkout> <work>`, `site/shots2.sh <site checkout> <work>` | the screenshots (1440 and 390 px wide, light and dark, the site's `tools/review/shoot.mjs`) of the two builds served from `<work>/serve-before/larmorx_documentation` and `serve-after/larmorx_documentation` (each a build's `_site`): both new pages whole, the home page's changed parts before and after, the roadmap's release paragraph |
+| `site/crop.py <png> <out> <y0> <y1>` | a close view of a full-page screenshot |
+| `site/sumtest.ps1`, `site/sumtest2.ps1` (with `winps.sh`) | the installation page's PowerShell check of a download against `SHA256SUMS`, on the Windows helper with Windows PowerShell 5.1: True for the file, False after changing it (`sumtest2.ps1` with the file's line second in `SHA256SUMS`), the temporary folder removed |
+
+**The checks (2026-11-11):** the site's `tools/build.py --main-repo <the part's worktree>`: 33
+pages, 0 problems, for the branch and for a copy with the handoff applied; against larmorx's main
+at `459a5a21` the branch has 2 problems, its links to `CHANGELOG.md` and `CITATION.cff`, which
+reach main with this part's merge: so the larmorx branch is merged first, and the site published
+only after PyPI has 0.1.0rc1 (its pages give the release's install lines, download addresses and
+image names). The inventory (`../afni-volreg-original/site_inventory.py <before>/_site
+<after>/_site`, every built page) against `d9f67d1`'s build: the home page 4,961 -> 5,060 words,
+mri-hmc 27,823 -> 27,829, two new pages, the other 28 pages byte-identical; with the handoff
+every page's words up (the footer's two new links), the roadmap one table row more, no count
+down (exit 0). The page's checks of a download for Linux and for macOS (`sha256sum -c
+--ignore-missing SHA256SUMS`, `shasum -a 256 -c --ignore-missing SHA256SUMS`) were run by hand,
+both on this Linux machine, on a test `SHA256SUMS`. **Not tried:** the advice on the download marks of macOS and of a browser on
+Windows (`xattr -d com.apple.quarantine`, `Unblock-File`): no Mac here, and the Windows helper's
+runs are over SSH, without a browser's mark; worded with "may" on the page.

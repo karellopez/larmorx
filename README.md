@@ -26,7 +26,9 @@ pipeline).
   By design, results do not depend on the thread count, and transcendental functions come from
   correctly rounded [CORE-MATH](https://core-math.gitlabpages.inria.fr/) ports (or the
   deterministic pure-Rust `libm` where not yet ported), so a tool gives the same bits on every
-  platform.
+  platform. Why Rust, with Python on top, and why the original tools have no Windows version:
+  [Why Rust and Python](https://karellopez.github.io/larmorx_documentation/why-rust-and-python/)
+  on the documentation site.
 - **Command-line compatibility.** `larmorx <family> <program> <the original's arguments>`
   (short alias `lx`), e.g. `larmorx ants antsApplyTransforms ...` or `larmorx afni 3dTshift ...`,
   accepting the original's options; how far messages and exit statuses match is stated in each
@@ -85,7 +87,9 @@ pip install "larmorx[all]"       # + [prep] and the replica packages larmorx-nc 
 
 The first release, 0.1.0rc1, is a pre-release: pip installs a pre-release by itself only while
 no final release exists; `pip install "larmorx==0.1.0rc1"` (or `pip install --pre larmorx`) asks
-for it. `[all]` installs the three packages at the same version.
+for it. `[all]` installs the three packages at the same version. Step by step, with a virtual
+environment, the standalone programs and how to check a download: the documentation site's
+[installation page](https://karellopez.github.io/larmorx_documentation/installation/).
 
 | Package | What it holds | Its licence, in plain words |
 |---|---|---|

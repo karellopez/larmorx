@@ -142,18 +142,22 @@ When `assemble` has passed, the run waits for the three deployments `pypi`, `pyp
   the files this run built (they are the run's artifacts, kept for 14 days, the assembled set for
   30). `check` is not run
   again, so its "not on PyPI yet" test does not stop the re-run. Never "Re-run all jobs" once an
-  upload has begun: that builds every file again, and PyPI keeps the first files.
-- **A publish job that failed after uploading part of its files**: its re-run stops at the first
-  file PyPI already has ("File already exists"). The version is then incomplete for that package:
-  yank it on PyPI (the project's page → Manage → the release → Options → Yank) and release the
-  next version.
+  upload has begun: it would build every file again while PyPI keeps the first ones, and its
+  `check` job, finding the version on PyPI, stops it anyway.
+- **A publish job that failed after uploading part of its files** (a network error, PyPI briefly
+  unavailable): "Re-run failed jobs" finishes it. The re-run takes the same files and uploads only
+  those PyPI does not have yet (the publish steps' `skip-existing`), so the version ends up
+  complete, with this run's files. Yanking a version and releasing the next one is for a broken
+  upload only (files that do not install or do not work, as `verify-pypi` would show), not for one
+  that stopped halfway.
 - **`container-push`** (after the PyPI uploads): "Re-run failed jobs"; the GitHub Release waits
   for it.
 - **`github-release`**: if the release was made but its files did not all arrive, delete that
   GitHub Release (keep the tag) and "Re-run failed jobs".
 - **`verify-pypi`**: it already asks PyPI 20 times, 30 seconds apart, while PyPI's index catches
   up. A real failure there means the published files are broken on that platform: yank the
-  version on PyPI, fix, and release the next one.
+  version on PyPI (each project's page → Manage → the release → Options → Yank), fix, and release
+  the next one.
 - **The tag's run is lost** (cancelled before the approval, or a runner failure early on): Actions
   → Release → Run workflow → "Use workflow from" the tag `v<version>`, with "Dry run" **not**
   ticked. Turning the dry run off is accepted only on a `v*` tag.
@@ -196,6 +200,15 @@ When `assemble` has passed, the run waits for the three deployments `pypi`, `pyp
    `gh attestation verify oci://ghcr.io/karellopez/larmorx:<version> --repo karellopez/larmorx`.
 4. **The files:** `sha256sum -c SHA256SUMS` in a folder with the release's files;
    `gh attestation verify <file> --repo karellopez/larmorx` for any one of them.
+5. **The documentation site** ([larmorx_documentation](https://github.com/karellopez/larmorx_documentation)),
+   only now: its pages give the version's `pip install` lines, download addresses and image
+   names, which exist only after the upload, and it links this repository's `CHANGELOG.md` and
+   `CITATION.cff` on `main`. The lines that name the release: the version at the top of
+   `content/installation.md` (`{%- set v = "<version>" %}`, the one place of it on that page),
+   the "Status" margin note of `content/index.md`, the release section (`{#release}`) and the
+   table of completed steps of `content/roadmap.md`, and the release item in `data/status.yml`'s
+   `planned` list. Build it with `python tools/build.py --main-repo <this checkout>` (0 problems)
+   before pushing it.
 
 ## 7. From a release candidate to the final release
 
@@ -205,6 +218,12 @@ Windows), the final release repeats steps 1 to 6 with the final version: `set_ve
 --date <day>`, a `## [0.1.0] - <day>` section (what changed since the release candidate, the
 statuses table made anew), the dry run, the tag `v0.1.0`, the approval. A final release marks its
 GitHub Release "latest" and moves the images' `latest` and `latest-all`.
+
+Besides the version, the final release changes the words that call the release a candidate: the
+README's status line and its sentence on how pip treats a pre-release (a final release installs
+with a plain `pip install larmorx`), and on the site (step 6.5) the installation page's first
+paragraph and its pre-release sentence, the home page's "Status" note, and the roadmap's release
+section; `data/status.yml`'s planned item "Release 0.1.0" is removed.
 
 A problem found in a release candidate is fixed, and the next candidate (`0.1.0rc2`) released
 the same way, before the final release.

@@ -825,12 +825,21 @@ def test_ci_green_verdict(tmp_path, monkeypatch):
 
 def test_release_workflow_names_and_pins():
     """The environments PyPI's trusted publishers name (the user's, 2026-11-10), every action
-    pinned by its commit, the publish jobs' permissions, and only a v* tag publishes."""
+    pinned by its commit, the publish jobs' permissions and settings (each upload with PyPI's
+    attestations, and skip-existing so that a re-run finishes a partial upload: the
+    orchestrator, 2026-11-11), and only a v* tag publishes."""
     text = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
     assert re.findall(r"^\s+name: (pypi[-a-z]*)$", text, re.M) == ["pypi-nc", "pypi-gpl", "pypi"]
     uses = re.findall(r"^\s+(?:- )?uses: (\S+)", text, re.M)
     assert uses and all(re.fullmatch(r"[\w.-]+/[\w.-]+@[0-9a-f]{40}", u) for u in uses), uses
     assert text.count("id-token: write # trusted publishing") == 3
+    publish = re.findall(
+        r"uses: pypa/gh-action-pypi-publish@\S+.*\n {8}with:\n((?: {10}\S.*\n)+)", text
+    )
+    assert len(publish) == 3
+    for settings in publish:
+        lines = {line.strip() for line in settings.splitlines()}
+        assert {"attestations: true", "skip-existing: true"} <= lines, settings
     assert re.search(r"^permissions: \{\}$", text, re.M)
     assert 'tags: ["v*"]' in text and 'branches: ["release/dry-run"]' in text
     assert text.count("if: needs.check.outputs.publish == 'true'") == 6

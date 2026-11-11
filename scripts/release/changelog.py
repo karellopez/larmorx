@@ -12,7 +12,8 @@ The version is written as the packages and the tag write it (PEP 440: `0.1.0rc1`
 section runs to the next level-2 heading. Its relative links and anchors are made absolute and
 pinned to the release's tag (`pypi_readme.rewrite`: on a release page they would lead nowhere),
 the link definitions of Keep a Changelog's footer at its end are left out, and a short footer says
-how to install the version and check its files.
+how to install the version (pip, the standalone programs, the container images) and check its
+files.
 
 A missing file, no section for the version, two sections for it, or a section without text is an
 error that names what is missing (exit status 1): a release stops in its first job, before
@@ -34,6 +35,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 CHANGELOG = ROOT / "CHANGELOG.md"
 REPO = "karellopez/larmorx"
+IMAGE = "ghcr.io/karellopez/larmorx"
 
 #: A level-2 heading that starts with a version (optionally in brackets, optionally after `v`).
 _HEADING = re.compile(r"^##(?!#)\s+\[?v?(\d+\.\d+\.\d+(?:(?:a|b|rc)\d+)?)\]?(?=[\s(:,-]|$)")
@@ -102,6 +104,10 @@ def footer(version: str) -> str:
         "only; `larmorx-gpl`: the GNU GPL version 3): "
         f'`pip install "larmorx[all]=={version}"`. The standalone programs below '
         "(`larmorx`, `larmorx-nc`, `larmorx-gpl`) need no Python.\n\n"
+        "**Container** (linux/amd64, linux/arm64): "
+        f"`apptainer pull docker://{IMAGE}:{version}` or `docker run --rm {IMAGE}:{version} "
+        f"larmorx --version` (Apache-2.0 and permissive licences only); `{IMAGE}:{version}-all` "
+        "adds larmorx-gpl and larmorx-nc (non-commercial use only).\n\n"
         "**Checks:** `SHA256SUMS` holds every file's SHA-256 (`sha256sum -c SHA256SUMS`); each "
         f"file's build provenance: `gh attestation verify <file> --repo {REPO}`."
     )

@@ -2,14 +2,17 @@
 """The release's helpers (scripts/release/): one version everywhere, the licence expressions,
 PyPI's descriptions, the companions' source distributions, the third-party crates' licence texts,
 the check of Windows files' imported DLLs, and the release workflow's own: the release notes, the
-standalone archives, the set of files with SHA256SUMS, PyPI's state, the tagged commit's CI, and
-the workflow's environments and pins."""
+standalone archives, the set of files with SHA256SUMS, PyPI's state, the tagged commit's CI, the
+container images (their build context, the multi-architecture indexes, the Dockerfile), and the
+workflow's environments, pins and jobs."""
 
 from __future__ import annotations
 
 import fnmatch
 import hashlib
 import importlib.util
+import io
+import json
 import re
 import shutil
 import struct
@@ -449,6 +452,8 @@ def test_changelog_notes_have_absolute_links_and_the_footer():
     assert f"[the licences]({blob}/docs/licensing.md)" in text
     assert f"[this page]({blob}/CHANGELOG.md#changelog)" in text
     assert 'pip install "larmorx[all]==0.2.0rc1"' in text and "SHA256SUMS" in text
+    assert "`apptainer pull docker://ghcr.io/karellopez/larmorx:0.2.0rc1`" in text
+    assert "`ghcr.io/karellopez/larmorx:0.2.0rc1-all`" in text
     assert pypi_readme.relative_links(text) == []
 
 
@@ -676,4 +681,309 @@ def test_release_workflow_names_and_pins():
     assert text.count("id-token: write # trusted publishing") == 3
     assert re.search(r"^permissions: \{\}$", text, re.M)
     assert 'tags: ["v*"]' in text and 'branches: ["release/dry-run"]' in text
-    assert text.count("if: needs.check.outputs.publish == 'true'") == 5
+    assert text.count("if: needs.check.outputs.publish == 'true'") == 6
+
+
+# ---------------------------------------------------------------------------------------------
+# The container images (scripts/release/container.py, docker/Dockerfile; relay 3b)
+
+container = load("container")
+CV = "0.2.0rc1"
+LAYER = "application/vnd.oci.image.layer.v1.tar+gzip"
+
+
+def _workflow_jobs(text: str) -> dict[str, str]:
+    """The release workflow's jobs: name -> its block of text."""
+    body = text.split("\njobs:\n", 1)[1]
+    parts = re.split(r"^  ([a-z][a-z0-9-]*):\n", body, flags=re.M)
+    return dict(zip(parts[1::2], parts[2::2], strict=True))
+
+
+def _needs(block: str) -> set[str]:
+    match = re.search(r"^    needs: \[([^\]]*)\]", block, re.M)
+    assert match, block[:200]
+    return {n.strip() for n in match.group(1).split(",")}
+
+
+def test_container_stage_takes_one_linux_wheel_per_package(tmp_path):
+    wheels, sdists = tmp_path / "wheels", tmp_path / "sdists"
+    wheels.mkdir()
+    sdists.mkdir()
+    for arch in ("x86_64", "aarch64"):
+        for dist, tags in (
+            ("larmorx", "cp312-abi3"),
+            ("larmorx_nc", "py3-none"),
+            ("larmorx_gpl", "py3-none"),
+        ):
+            (wheels / f"{dist}-{CV}-{tags}-manylinux_2_28_{arch}.whl").write_bytes(b"w")
+    # others of the release and of another version: left alone
+    (wheels / f"larmorx-{CV}-cp312-abi3-macosx_11_0_arm64.whl").write_bytes(b"m")
+    (wheels / "larmorx-0.1.0-cp312-abi3-manylinux_2_28_aarch64.whl").write_bytes(b"old")
+    (wheels / f"larmorx_cli-{CV}-py3-none-manylinux_2_28_aarch64.whl").write_bytes(b"cli")
+    for dist in ("larmorx_nc", "larmorx_gpl", "larmorx"):
+        (sdists / f"{dist}-{CV}.tar.gz").write_bytes(b"s")
+    out = tmp_path / "context"
+    files = container.stage(CV, "arm64", [wheels], sdists, out)
+    assert sorted(p.relative_to(out).as_posix() for p in files) == [
+        "README.txt",
+        f"source/larmorx_gpl-{CV}.tar.gz",
+        f"source/larmorx_nc-{CV}.tar.gz",
+        f"wheels/larmorx-{CV}-cp312-abi3-manylinux_2_28_aarch64.whl",
+        f"wheels/larmorx_gpl-{CV}-py3-none-manylinux_2_28_aarch64.whl",
+        f"wheels/larmorx_nc-{CV}-py3-none-manylinux_2_28_aarch64.whl",
+    ]
+    with pytest.raises(container.ContainerError, match="is not empty"):
+        container.stage(CV, "arm64", [wheels], sdists, out)
+    with pytest.raises(container.ContainerError, match="unknown architecture"):
+        container.stage(CV, "riscv64", [wheels], sdists, tmp_path / "c1")
+    (wheels / f"larmorx_nc-{CV}-py3-none-manylinux_2_34_aarch64.whl").write_bytes(b"2")
+    with pytest.raises(container.ContainerError, match=r"larmorx_nc 0\.2\.0rc1: .* found 2"):
+        container.stage(CV, "arm64", [wheels], sdists, tmp_path / "c2")
+    with pytest.raises(
+        container.ContainerError, match=re.escape("larmorx_nc-0.2.0rc1.tar.gz not found")
+    ):
+        container.stage(CV, "amd64", [wheels], tmp_path, tmp_path / "c3")
+
+
+def _oci_archive(path: Path, arch: str, image: str, version: str = CV) -> dict:
+    """A small OCI archive as `docker buildx --output type=oci` writes one: one image whose
+    first layer is shared by every image (the base), the second its own."""
+    blobs: dict[str, bytes] = {}
+
+    def put(data: bytes) -> dict:
+        digest = container.sha256(data)
+        blobs[digest] = data
+        return {"digest": digest, "size": len(data)}
+
+    layers = [put(b"the base image's layer"), put(f"{image} on {arch}".encode())]
+    labels = {"org.opencontainers.image.version": version, "org.opencontainers.image.title": image}
+    config = {"architecture": arch, "os": "linux", "config": {"Labels": labels}}
+    if arch == "arm64":
+        config["variant"] = "v8"
+    config_desc = put(json.dumps(config).encode())
+    manifest = {
+        "schemaVersion": 2,
+        "mediaType": container.MANIFEST,
+        "config": {"mediaType": "application/vnd.oci.image.config.v1+json", **config_desc},
+        "layers": [{"mediaType": LAYER, **layer} for layer in layers],
+    }
+    manifest_desc = put(json.dumps(manifest).encode())
+    index = {
+        "schemaVersion": 2,
+        "manifests": [{"mediaType": container.MANIFEST, **manifest_desc}],
+    }
+    with tarfile.open(path, "w") as tar:
+        members = {"oci-layout": b'{"imageLayoutVersion":"1.0.0"}', "index.json": b""}
+        members["index.json"] = json.dumps(index).encode()
+        members.update({f"blobs/sha256/{d.split(':')[1]}": b for d, b in blobs.items()})
+        for name, data in members.items():
+            info = tarfile.TarInfo(name)
+            info.size = len(data)
+            tar.addfile(info, io.BytesIO(data))
+    return {
+        "archive": path.name,
+        "manifest": manifest_desc["digest"],
+        "config": config_desc["digest"],
+        "bytes": path.stat().st_size,
+    }
+
+
+def _images_folder(folder: Path, arch: str, version: str = CV, freeze: str = "numpy==2.5.4\n"):
+    folder.mkdir(parents=True)
+    record = {"version": version, "arch": arch, "revision": "0" * 40, "created": "x", "images": {}}
+    for image in container.IMAGES:
+        archive = folder / f"{image}-{version}-{arch}.oci.tar"
+        record["images"][image] = _oci_archive(archive, arch, image, version)
+        (folder / f"pip-freeze-{image}.txt").write_text(freeze, encoding="utf-8")
+    (folder / "images.json").write_text(json.dumps(record), encoding="utf-8")
+    return record
+
+
+def test_container_index_layout(tmp_path):
+    amd = _images_folder(tmp_path / "amd64", "amd64")
+    arm = _images_folder(tmp_path / "arm64", "arm64")
+    out = tmp_path / "layout"
+    digests = container.index_layout(
+        CV, [tmp_path / "amd64", tmp_path / "arm64"], out, ["amd64", "arm64"]
+    )
+    assert list(digests) == [CV, f"{CV}-all"]
+    assert json.loads((out / "digests.json").read_text(encoding="utf-8")) == digests
+    assert json.loads((out / "oci-layout").read_bytes()) == {"imageLayoutVersion": "1.0.0"}
+    index = json.loads((out / "index.json").read_bytes())
+    refs = {m["annotations"]["org.opencontainers.image.ref.name"]: m for m in index["manifests"]}
+    assert set(refs) == set(digests)
+    blobs = out / "blobs" / "sha256"
+    for path in blobs.iterdir():  # every blob is what its name says
+        assert container.sha256(path.read_bytes()) == f"sha256:{path.name}"
+    # 1 shared base layer + per image and architecture (own layer, config, manifest) + 2 indexes
+    assert len(list(blobs.iterdir())) == 1 + 2 * 2 * 3 + 2
+    for name, image in ((CV, "larmorx"), (f"{CV}-all", "larmorx-all")):
+        desc = refs[name]
+        assert desc["digest"] == digests[name] and desc["mediaType"] == container.INDEX
+        body = (blobs / desc["digest"].split(":")[1]).read_bytes()
+        assert len(body) == desc["size"]
+        children = json.loads(body)["manifests"]
+        assert [c["platform"] for c in children] == [
+            {"architecture": "amd64", "os": "linux"},
+            {"architecture": "arm64", "os": "linux", "variant": "v8"},
+        ]
+        assert [c["digest"] for c in children] == [
+            amd["images"][image]["manifest"],
+            arm["images"][image]["manifest"],
+        ]
+    # the same inputs give the same index (its digest is what the registry will show)
+    again = container.index_layout(
+        CV, [tmp_path / "arm64", tmp_path / "amd64"], tmp_path / "l2", ["amd64", "arm64"]
+    )
+    assert again == digests
+
+
+def test_container_index_layout_refusals(tmp_path):
+    _images_folder(tmp_path / "amd64", "amd64")
+    _images_folder(tmp_path / "arm64", "arm64")
+    both = [tmp_path / "amd64", tmp_path / "arm64"]
+    with pytest.raises(container.ContainerError, match="architectures"):
+        container.index_layout(CV, both[:1], tmp_path / "l1", ["amd64", "arm64"])
+    with pytest.raises(container.ContainerError, match=re.escape("not 0.3.0")):
+        container.index_layout("0.3.0", both, tmp_path / "l2", ["amd64", "arm64"])
+    # an archive of the other architecture in a folder
+    record = json.loads((tmp_path / "arm64" / "images.json").read_text(encoding="utf-8"))
+    wrong = tmp_path / "wrong"
+    shutil.copytree(tmp_path / "amd64", wrong)
+    record_amd = json.loads((wrong / "images.json").read_text(encoding="utf-8"))
+    record_amd["arch"] = "arm64"
+    (wrong / "images.json").write_text(json.dumps(record_amd), encoding="utf-8")
+    with pytest.raises(container.ContainerError, match="an image for amd64 in the arm64 folder"):
+        container.index_layout(CV, [tmp_path / "amd64", wrong], tmp_path / "l3", ["amd64", "arm64"])
+    # images.json naming another manifest
+    record["images"]["larmorx"]["manifest"] = "sha256:" + "0" * 64
+    (tmp_path / "arm64" / "images.json").write_text(json.dumps(record), encoding="utf-8")
+    with pytest.raises(container.ContainerError, match=re.escape("not the one images.json names")):
+        container.index_layout(CV, both, tmp_path / "l4", ["amd64", "arm64"])
+    # a blob whose content is not its name
+    broken = tmp_path / "broken.oci.tar"
+    _oci_archive(broken, "amd64", "larmorx")
+    with tarfile.open(broken) as tar:
+        members = [(m, tar.extractfile(m).read()) for m in tar]
+    with tarfile.open(broken, "w") as tar:
+        for member, data in members:
+            if member.name.startswith("blobs/") and data.startswith(b"the base"):
+                data = b"the base image's layer, changed"
+                member.size = len(data)
+            tar.addfile(member, io.BytesIO(data))
+    with pytest.raises(container.ContainerError, match="has another content"):
+        container.read_archive(broken)
+
+
+def test_container_image_manifests_skips_attestations_and_follows_indexes(tmp_path):
+    record = _oci_archive(tmp_path / "a.oci.tar", "amd64", "larmorx")
+    index, blobs = container.read_archive(tmp_path / "a.oci.tar")
+    attestation = json.dumps({"schemaVersion": 2, "layers": []}).encode()
+    blobs[container.sha256(attestation)] = attestation
+    nested = {
+        "schemaVersion": 2,
+        "mediaType": container.INDEX,
+        "manifests": [
+            *index["manifests"],
+            {
+                "mediaType": container.MANIFEST,
+                "digest": container.sha256(attestation),
+                "size": len(attestation),
+                "annotations": {"vnd.docker.reference.type": "attestation-manifest"},
+            },
+        ],
+    }
+    body = json.dumps(nested).encode()
+    blobs[container.sha256(body)] = body
+    top = {"manifests": [{"mediaType": container.INDEX, "digest": container.sha256(body)}]}
+    (found,) = container.image_manifests(top, blobs, "a")
+    assert found["digest"] == record["manifest"] and found["config"] == record["config"]
+    with pytest.raises(container.ContainerError, match="is not in the archive"):
+        container.image_manifests(
+            {"manifests": [{"mediaType": container.MANIFEST, "digest": "sha256:1"}]}, blobs, "a"
+        )
+
+
+def test_container_compare_freezes(tmp_path):
+    _images_folder(tmp_path / "amd64", "amd64", freeze="numpy==2.5.4\nscipy==1.18.1\n")
+    _images_folder(tmp_path / "arm64", "arm64", freeze="numpy==2.5.4\nscipy==1.18.0\n")
+    both = [tmp_path / "amd64", tmp_path / "arm64"]
+    assert container.compare_freezes(CV, both) == [
+        "larmorx on amd64 lacks scipy==1.18.0",
+        "larmorx on arm64 lacks scipy==1.18.1",
+        "larmorx-all on amd64 lacks scipy==1.18.0",
+        "larmorx-all on arm64 lacks scipy==1.18.1",
+    ]
+    for image in container.IMAGES:
+        (tmp_path / "arm64" / f"pip-freeze-{image}.txt").write_text(
+            "scipy==1.18.1\nnumpy==2.5.4\n", encoding="utf-8"
+        )
+    assert container.compare_freezes(CV, both) == []
+    (tmp_path / "arm64" / "pip-freeze-larmorx-all.txt").unlink()
+    with pytest.raises(container.ContainerError, match="the check step writes it"):
+        container.compare_freezes(CV, both)
+    with pytest.raises(container.ContainerError, match=re.escape("not 0.3.0")):
+        container.compare_freezes("0.3.0", both)
+
+
+def test_container_names_and_labels():
+    assert container.push_names(CV, latest=False) == [CV]
+    assert container.push_names(CV, latest=True) == [CV, "latest"]
+    assert container.push_names(f"{CV}-all", latest=True) == [f"{CV}-all", "latest-all"]
+    assert container.tag(CV, "larmorx") == CV and container.tag(CV, "larmorx-all") == f"{CV}-all"
+    assert container.created_from_epoch(86400 + 61) == "1970-01-02T00:01:01Z"
+    plain = container.expected_labels(CV, "larmorx", "a" * 40, "t")
+    assert plain["org.opencontainers.image.licenses"] == "Apache-2.0"
+    assert plain["org.opencontainers.image.version"] == CV
+    every = container.expected_labels(CV, "larmorx-all", "a" * 40, "t")
+    assert every["org.opencontainers.image.licenses"] == (
+        "Apache-2.0 AND GPL-3.0-only AND LicenseRef-FSL"
+    )
+    assert re.fullmatch(r"docker\.io/moby/buildkit:v[\d.]+@sha256:[0-9a-f]{64}", container.BUILDKIT)
+
+
+def test_dockerfile_targets_labels_and_pins():
+    text = (ROOT / "docker" / "Dockerfile").read_text(encoding="utf-8")
+    base = re.search(r"^ARG BASE=(\S+)$", text, re.M)
+    assert base and re.fullmatch(
+        r"docker\.io/library/python:3\.12\.\d+-slim-trixie@sha256:[0-9a-f]{64}", base.group(1)
+    )
+    assert re.findall(r"^FROM (\S+) AS (\S+)$", text, re.M) == [
+        ("${BASE}", "larmorx"),
+        ("larmorx", "larmorx-all"),
+    ]
+    assert list(container.IMAGES) == ["larmorx", "larmorx-all"]
+    stages = re.split(r"^FROM .*$", text, flags=re.M)[1:]
+    for (image, (_, licence, companions)), stage in zip(
+        container.IMAGES.items(), stages, strict=True
+    ):
+        assert f'org.opencontainers.image.licenses="{licence}"' in stage
+        assert f'org.opencontainers.image.title="{image}"' in stage
+        assert ("larmorx_nc" in stage) == companions
+    assert "ENTRYPOINT" not in text.replace("No ENTRYPOINT", "")
+    assert 'CMD ["larmorx", "--help"]' in text
+    assert (ROOT / "docker" / "README.txt").is_file()
+
+
+def test_release_workflow_container_jobs():
+    """The images are built and checked on every run and pushed only on a release, after the
+    three PyPI uploads; the push job is the only one that may write to the registry; nothing is
+    published before the images passed; the GitHub Release comes after the push."""
+    text = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
+    jobs = _workflow_jobs(text)
+    build, push = jobs["container"], jobs["container-push"]
+    assert "if: needs.check.outputs.publish" not in build
+    assert re.findall(r"runner: ([\w.-]+)", build) == ["ubuntu-24.04", "ubuntu-24.04-arm"]
+    assert "container.py build" in build and "container.py check" in build
+    for word in ("skopeo", "container.py push", "docker push", "--push"):
+        assert word not in build
+    assert not re.search(r"^ +packages:", build, re.M)
+    assert "if: needs.check.outputs.publish == 'true'" in push
+    assert {"container", "publish-larmorx", "publish-nc", "publish-gpl"} <= _needs(push)
+    permission = re.compile(r"^ +packages: write\b", re.M)
+    assert permission.search(push) and len(permission.findall(text)) == 1
+    assert "container.py push" in push and text.count("container.py push") == 1
+    assert "container" in _needs(jobs["assemble"])
+    assert "container-push" in _needs(jobs["github-release"])
+    for publish in ("publish-larmorx", "publish-nc", "publish-gpl"):
+        assert "assemble" in _needs(jobs[publish])

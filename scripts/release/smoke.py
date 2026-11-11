@@ -7,6 +7,12 @@
 scripts directory), and larmorx-nc's FSL data where the wheel installs it
 (`<prefix>/share/larmorx-nc/fsl-data/`, every file of its MANIFEST.tsv with its SHA-256).
 
+`--image larmorx|larmorx-all` (with `--installed`, inside a release container image,
+`scripts/release/container.py`): the `larmorx` image must hold larmorx alone (larmorx-nc and
+larmorx-gpl neither installed nor on the path, no FSL data), the `-all` image all three; both
+their `/opt/larmorx/` files; the platform checks of the binaries are left out (the image brings
+its own glibc).
+
 `--archives DIR --target T`: the three archives of that platform (`scripts/release/archives.py`)
 unpacked into a temporary folder: their licence files, each program's `--version` (`lx` through
 its link or `lx.cmd`), `lx --help` naming itself (Unix), larmorx-nc's FSL data beside `bin/`.
@@ -21,6 +27,7 @@ failure is also an error annotation. Exit status 0 or 1.
 
 Usage:
     python -P scripts/release/smoke.py --version 0.1.0rc1 --installed
+    python -P scripts/release/smoke.py --version 0.1.0rc1 --installed --image larmorx
     python -P scripts/release/smoke.py --version 0.1.0rc1 --archives archives --target <triple>
 """
 
@@ -96,14 +103,19 @@ def _manifest(checks: Checks, data: Path, label: str) -> None:
     checks.check(bool(rows) and not bad, f"{label}: {len(rows)} FSL data files", "; ".join(bad))
 
 
-def installed(checks: Checks, version: str) -> list[Path]:
-    """The installed packages' checks; returns the binaries found."""
+def installed(checks: Checks, version: str, image: str | None = None) -> list[Path]:
+    """The installed packages' checks; returns the binaries found. ``image``: inside that
+    release image (`larmorx` holds larmorx alone)."""
+    alone = image == "larmorx"
     for dist in ("larmorx", "larmorx-nc", "larmorx-gpl"):
         try:
             got = importlib.metadata.version(dist)
         except importlib.metadata.PackageNotFoundError:
             got = "not installed"
-        checks.check(got == version, f"{dist} {version} installed", got)
+        if alone and dist != "larmorx":
+            checks.check(got == "not installed", f"{dist} not installed", got)
+        else:
+            checks.check(got == version, f"{dist} {version} installed", got)
     import larmorx
 
     checks.check(larmorx.__version__ == version, "larmorx.__version__", larmorx.__version__)
@@ -116,6 +128,10 @@ def installed(checks: Checks, version: str) -> list[Path]:
         ("larmorx-nc", "larmorx-nc"),
         ("larmorx-gpl", "larmorx-gpl"),
     ):
+        if alone and name.startswith("larmorx-"):
+            on_path = shutil.which(name)
+            checks.check(on_path is None, f"{name} not on the path", str(on_path))
+            continue
         found = shutil.which(name, path=str(scripts))
         if checks.check(found is not None, f"{name} in {scripts}"):
             checks.version_line([str(found), "--version"], f"{expected} {version}", name)
@@ -128,7 +144,17 @@ def installed(checks: Checks, version: str) -> list[Path]:
     if spec is not None and spec.origin:
         binaries.append(Path(spec.origin))
     data = Path(sysconfig.get_path("data")) / "share" / "larmorx-nc" / "fsl-data"
-    _manifest(checks, data, "installed larmorx-nc")
+    if alone:
+        checks.check(not data.exists(), f"no FSL data ({data})")
+    else:
+        _manifest(checks, data, "installed larmorx-nc")
+    if image:
+        for name in ("README.txt", "pip-freeze.txt"):
+            checks.check(Path("/opt/larmorx", name).is_file(), f"/opt/larmorx/{name}")
+        sources = Path("/opt/larmorx/source")
+        want = [] if alone else [f"{d}-{version}.tar.gz" for d in ("larmorx_gpl", "larmorx_nc")]
+        got = sorted(p.name for p in sources.iterdir()) if sources.is_dir() else []
+        checks.check(got == want, f"/opt/larmorx/source/ holds {want or 'nothing'}", str(got))
     return binaries
 
 
@@ -243,19 +269,27 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--installed", action="store_true", help="check this environment")
     parser.add_argument("--archives", type=Path, help="the folder of the standalone archives")
     parser.add_argument("--target", help="the archives' target triple (with --archives)")
+    parser.add_argument(
+        "--image",
+        choices=["larmorx", "larmorx-all"],
+        help="inside this release image (with --installed; no platform checks of the binaries)",
+    )
     args = parser.parse_args(argv)
     if not args.installed and not args.archives:
         parser.error("nothing to check: --installed and/or --archives")
     if args.archives and not args.target:
         parser.error("--archives needs --target")
+    if args.image and not args.installed:
+        parser.error("--image needs --installed")
     checks = Checks()
     found: list[Path] = []
     with tempfile.TemporaryDirectory(prefix="larmorx-smoke-") as tmp:
         if args.installed:
-            found += installed(checks, args.version)
+            found += installed(checks, args.version, args.image)
         if args.archives:
             found += archives(checks, args.version, args.archives, args.target, Path(tmp))
-        binaries(checks, found)
+        if not args.image:
+            binaries(checks, found)
     if checks.failed:
         print(f"SMOKE FAILED: {len(checks.failed)} of {checks.n} checks")
         return 1

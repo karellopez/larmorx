@@ -207,7 +207,8 @@ def run_tedana(args: list[str], case: Path, env: dict, never: str = "") -> tuple
             f"FileNotFoundError: [Errno 2] No such file or directory: '{target}"
         ):
             target.mkdir(exist_ok=True)
-            if "Generating figures directory" in err:
+            # step 9 made figures/: its log line says so, or (with --quiet) a file written after it
+            if "Generating figures directory" in err or any(target.glob("*.nii*")):
                 (target / "figures").mkdir(exist_ok=True)
     return code, out, err
 
@@ -271,7 +272,10 @@ def notices(err: str) -> list[str]:
     found = []
     for line in err.splitlines():
         if NOTICE.match(line) and not re.search(r"defect (NP-03|GLIBC-07) ", line):
-            found.append(re.sub(r"^larmorx-gpl:", "larmorx:", line))
+            line = re.sub(r"^larmorx-gpl:", "larmorx:", line)
+            # the decimals (TED-05's cap and ten caps, TED-18's) are each run's own order
+            # statistic, judged by §17.3's cap row with the maps; the counts are compared
+            found.append(re.sub(r"\d+\.\d+", "<x>", line))
     return sorted(found)
 
 
@@ -599,7 +603,11 @@ def suite() -> Suite:
                 "messages",
                 "identical but Python warnings' location lines (§12.3) and the cap's DEBUG digits",
             ),
-            ("notices (B)", "the same defects named in the same words (NP-03, GLIBC-07 aside)"),
+            (
+                "notices (B)",
+                "the same defects named in the same words and counts (NP-03, GLIBC-07 aside; "
+                "the cap's decimals by §17.3's cap row)",
+            ),
             (
                 "values",
                 "specs/t2smap.md §17.3 by its check.py; file by file where its model "

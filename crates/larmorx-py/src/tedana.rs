@@ -20,6 +20,7 @@ fn tedana_t2smap_cleanroom(
     let settings = larmorx_tedana::cli::Settings {
         vars: env.into_iter().collect(),
         dir: cwd,
+        terminal_columns: None,
     };
     let (code, out, err) = py.detach(|| {
         let (mut out, mut err) = (Vec::new(), Vec::new());

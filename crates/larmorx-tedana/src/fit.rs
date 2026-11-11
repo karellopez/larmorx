@@ -228,11 +228,12 @@ pub fn loglin(
         .with_min_len(64)
         .map(|(v, ((t2s, s0), s0_other))| {
             if count[v] == 0 {
-                return false;
+                return (false, false);
             }
             let n = group_of(count[v]);
             let design = designs[n].as_ref().expect("the voxel's group");
             let mut zero = false;
+            let mut overflow = false;
             for t in 0..cols {
                 let mut s = [0.0f64; 256];
                 for (e, se) in s.iter_mut().enumerate().take(n) {
@@ -260,15 +261,25 @@ pub fn loglin(
                 };
                 s0[t] = ours;
                 s0_other[t] = other;
+                overflow |= b0.is_finite() && ours.is_infinite();
             }
-            zero
+            (zero, overflow)
         })
-        .reduce(|| false, |a, b| a || b);
+        .reduce(|| (false, false), |a, b| (a.0 || b.0, a.1 || b.1));
+    let (divide_by_zero, overflow) = divide_by_zero;
     if divide_by_zero {
         log.py_warning(
             "fit.rs:200",
             "RuntimeWarning",
             "divide by zero encountered in divide",
+        );
+    }
+    // S0 = exp(β0) above float64's range (observed: echo times 0.05 ms apart)
+    if overflow {
+        log.py_warning(
+            "fit.rs:201",
+            "RuntimeWarning",
+            "overflow encountered in exp",
         );
     }
     Ok(maps)

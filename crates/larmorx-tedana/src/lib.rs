@@ -187,7 +187,7 @@ fn run(
                 Err(e) if e.message == "attempt to get argmax of an empty sequence" => {
                     notices.add(
                         &defects::TED_03,
-                        "the first echo has too few voxels for nilearn's compute_epi_mask",
+                        "nilearn's compute_epi_mask has too few voxels to find a threshold",
                     );
                     return Err(if notices.fix() {
                         PyError::value(
@@ -210,7 +210,7 @@ fn run(
                 );
                 notices.add(
                     &defects::TED_03,
-                    "nilearn's compute_epi_mask found no voxels in the first echo",
+                    "nilearn's compute_epi_mask found an empty mask",
                 );
                 if notices.fix() {
                     return Err(PyError::value(
@@ -421,10 +421,24 @@ fn run(
             &spec,
             &mut outputs,
             notices,
+            log,
         )?;
     }
     // 17. floors, limited maps, cap
     let fin = maps::finish(maps, &count, &tes, log, notices);
+    // numpy's cast of a float64 image to float32 (§11.3): finite values beyond its range
+    // overflow, with a warning per writing place
+    let cast = |log: &mut Log<'_>, v: &[f64], scale: f64| {
+        if v.iter().any(|&x| {
+            x.is_finite() && ((if scale == 1.0 { x } else { x / scale }) as f32).is_infinite()
+        }) {
+            log.py_warning(
+                "output.rs:cast",
+                "RuntimeWarning",
+                "overflow encountered in cast",
+            );
+        }
+    };
     let as32 = |v: &[f64], scale: f64| -> Vec<f32> {
         v.iter()
             .map(|&x| {
@@ -436,6 +450,7 @@ fn run(
             })
             .collect()
     };
+    cast(log, &fin.s0_full, 1.0);
     outputs.image("s0 img", &spec, &as32(&fin.s0_full, 1.0), cols, ts)?;
     // 18. the RMSE and the table
     log.info(
@@ -462,6 +477,10 @@ fn run(
     let table = rmse::table(&r, data.n_vox, n_t, log);
     drop(r);
     outputs.table(&rmse::COLUMNS, &table.rows, table.percentiles_f32)?;
+    // Python's warnings registry is reset by now: a warning shown before shows again (observed:
+    // the image cast's overflow of the S0 maps, the adaptive mask's means in PAID's)
+    log.reset_registry();
+    cast(log, &fin.s0_limited, 1.0);
     outputs.image(
         "limited s0 img",
         &spec,
@@ -470,6 +489,7 @@ fn run(
         ts,
     )?;
     glibc07_notice(&fin, &count, &outputs, notices);
+    cast(log, &fin.t2s_limited, 1000.0);
     outputs.image(
         "limited t2star img",
         &spec,
@@ -477,9 +497,7 @@ fn run(
         cols,
         ts,
     )?;
-    // 19. the combination; by then Python's warnings registry has been reset (a warning of the
-    // adaptive mask's means shows again in PAID's: observed)
-    log.reset_registry();
+    // 19. the combination
     log.info(
         "t2smap:t2smap_workflow:521",
         "Computing optimal combination",
@@ -524,6 +542,7 @@ fn run(
         ),
     }
     let combined = combine::combine(&data, &count, &fin, &tes, o.combmode, notices)?;
+    cast(log, &fin.t2s_full, 1000.0);
     outputs.image("t2star img", &spec, &as32(&fin.t2s_full, 1000.0), cols, ts)?;
     outputs.image("combined img", &spec, &combined, n_t, true)?;
     // 20. the JSON files
@@ -655,6 +674,7 @@ fn curve_images(
     spec: &ImageSpec,
     outputs: &mut Outputs,
     notices: &mut Notices,
+    log: &mut Log<'_>,
 ) -> Result<(), PyError> {
     let fix = notices.fix();
     let one = |k: usize| count[k / cols] == 1;
@@ -716,8 +736,24 @@ fn curve_images(
                 })
                 .collect()
         };
+        // numpy's cast to float32: finite variances beyond its range overflow (§11.3)
+        let mut cast = |i: usize| {
+            if (0..curve.pcov.len()).any(|k| {
+                let x = curve.pcov[k][i];
+                !(one(k) && !fix) && x.is_finite() && f32_of(x).is_infinite()
+            }) {
+                log.py_warning(
+                    "output.rs:cast",
+                    "RuntimeWarning",
+                    "overflow encountered in cast",
+                );
+            }
+        };
+        cast(t2s_index);
         outputs.image("t2star variance img", spec, &map(t2s_index), cols, ts)?;
+        cast(s0_index);
         outputs.image("s0 variance img", spec, &map(s0_index), cols, ts)?;
+        cast(2);
         outputs.image("t2star-s0 covariance img", spec, &map(2), cols, ts)?;
     }
     Ok(())

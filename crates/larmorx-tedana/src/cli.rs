@@ -24,6 +24,10 @@ pub const VERSION: &str = "t2smap v26.0.3";
 pub struct Settings {
     pub vars: HashMap<String, String>,
     pub dir: Option<PathBuf>,
+    /// The width of the terminal standard output writes to, when it is one: argparse's width
+    /// when `COLUMNS` is unset (§2.3; Python's `shutil.get_terminal_size`). The program that
+    /// owns the terminal fills it; without it the width is 80.
+    pub terminal_columns: Option<usize>,
 }
 
 impl Settings {
@@ -32,6 +36,7 @@ impl Settings {
         Settings {
             vars: std::env::vars().collect(),
             dir: None,
+            terminal_columns: None,
         }
     }
 
@@ -335,7 +340,7 @@ pub fn run(
             }
         },
     };
-    let width = formatter_width(settings.get("COLUMNS"), None);
+    let width = formatter_width(settings.get("COLUMNS"), settings.terminal_columns);
     let ns = match parser(settings.dir.clone()).parse(args, width) {
         Ok(ns) => ns,
         Err(exit) => {

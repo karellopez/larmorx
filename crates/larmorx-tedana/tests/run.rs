@@ -94,6 +94,15 @@ fn write_inputs(dir: &Path) {
 }
 
 fn run(dir: &Path, args: &[&str], env: &[(&str, &str)]) -> (u8, String, String) {
+    run_at(dir, args, env, None)
+}
+
+fn run_at(
+    dir: &Path,
+    args: &[&str],
+    env: &[(&str, &str)],
+    terminal_columns: Option<usize>,
+) -> (u8, String, String) {
     let mut vars: std::collections::HashMap<String, String> =
         [("COLUMNS".to_owned(), "80".to_owned())]
             .into_iter()
@@ -101,9 +110,11 @@ fn run(dir: &Path, args: &[&str], env: &[(&str, &str)]) -> (u8, String, String) 
     for (k, v) in env {
         vars.insert((*k).to_owned(), (*v).to_owned());
     }
+    vars.retain(|_, v| !v.is_empty());
     let settings = Settings {
         vars,
         dir: Some(dir.to_path_buf()),
+        terminal_columns,
     };
     let args: Vec<String> = args.iter().map(|s| (*s).to_owned()).collect();
     let (mut out, mut err) = (Vec::new(), Vec::new());
@@ -150,6 +161,18 @@ fn help_at_80_columns_is_the_specs() {
     assert_eq!(out, format!("{}\n", &spec[start..end]));
     let (code, out, _) = run(dir.path(), &["-v"], &[]);
     assert_eq!((code, out.as_str()), (0, "t2smap v26.0.3\n"));
+}
+
+/// argparse's width (§2.3): `COLUMNS`, else the terminal's, else 80.
+#[test]
+fn help_width_from_the_terminal_when_columns_is_unset() {
+    let dir = tempfile::tempdir().unwrap();
+    let at = |env: &[(&str, &str)], term| run_at(dir.path(), &["-h"], env, term).1;
+    let forty = at(&[("COLUMNS", "40")], None);
+    assert_ne!(forty, at(&[], None));
+    assert_eq!(at(&[("COLUMNS", "")], Some(40)), forty);
+    assert_eq!(at(&[("COLUMNS", "")], None), at(&[("COLUMNS", "80")], None));
+    assert_eq!(at(&[("COLUMNS", "80")], Some(40)), at(&[], None));
 }
 
 #[test]

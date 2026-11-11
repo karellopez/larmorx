@@ -185,6 +185,13 @@ def more_inputs(d: Path) -> None:
     both[7, 6, 3, 2] = np.inf
     both[7, 6, 3, 3] = -np.inf
     blackbox.save(both, d / "both-e2.nii.gz")
+    # a block whose later echoes fall to a thousandth of the first within 0.1 ms (with the echo
+    # times 12, 12.05 and 12.1 ms): T2* so short that exp(-TE / T2*) underflows (§8's floor)
+    fast = [e.copy() for e in ech]
+    fast[1][10:13, 4:9, 2:5, :] = ech[0][10:13, 4:9, 2:5, :] * 1e-3
+    fast[2][10:13, 4:9, 2:5, :] = ech[0][10:13, 4:9, 2:5, :] * 0.9e-3
+    for i in (2, 3):
+        blackbox.save(fast[i - 1], d / f"fast-e{i}.nii.gz")
     (d / "more.done").write_text("relay 2c\n", encoding="utf-8")
 
 
@@ -389,6 +396,36 @@ EXTRA += [
             *NONE,
             "--dummy-scans",
             "6",
+        ],
+        1,
+    ),
+    (
+        "x-underflow-debug",
+        [
+            *files(["e1.nii.gz", "fast-e2.nii.gz", "fast-e3.nii.gz"]),
+            "-e",
+            "0.012",
+            "0.01205",
+            "0.0121",
+            *MASK,
+            *NONE,
+            "--debug",
+        ],
+        1,
+    ),
+    (
+        "x-underflow-debug-curvefit",
+        [
+            *files(["e1.nii.gz", "fast-e2.nii.gz", "fast-e3.nii.gz"]),
+            "-e",
+            "0.012",
+            "0.01205",
+            "0.0121",
+            *MASK,
+            *NONE,
+            "--debug",
+            "--fittype",
+            "curvefit",
         ],
         1,
     ),

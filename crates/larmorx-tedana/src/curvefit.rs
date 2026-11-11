@@ -249,6 +249,18 @@ impl Bounds {
         (0..2).all(|i| x[i] >= self.lb[i] && x[i] <= f64::INFINITY)
     }
 
+    /// Whether the step `p` lands a parameter on its lower bound to within the rounding of
+    /// `x + p` (four units in the last place of x): the step cancels the parameter, and whether
+    /// it stays inside is decided by rounding alone. It is then taken as one that crosses the
+    /// bound, which in exact arithmetic it does or nearly does, so the reflected and the
+    /// anti-gradient steps are weighed against it (a robustness choice of this original, D11:
+    /// SciPy's own decision there rests on the last bits of its step; observed on noise
+    /// voxels with T2* ~ 0.2 ms and S0 ~ 1e28, `x-underflow-debug-curvefit`, where SciPy's step
+    /// left the bound and an inside decision collapsed S0 to one unit in the last place).
+    fn cancels(&self, x: [f64; 2], p: [f64; 2]) -> bool {
+        (0..2).any(|i| p[i] < 0.0 && (x[i] + p[i]) - self.lb[i] <= 4.0 * EPS * x[i].abs())
+    }
+
     /// Coleman-Li's scaling vector v and its derivative's sign dv (the upper bounds are
     /// infinite, so only g > 0 scales).
     fn cl_scaling(&self, x: [f64; 2], g: [f64; 2]) -> ([f64; 2], [f64; 2]) {
@@ -576,7 +588,7 @@ fn select_step(
     theta: f64,
 ) -> ([f64; 2], [f64; 2], f64) {
     let d = model.d;
-    if bounds.contains([x[0] + p[0], x[1] + p[1]]) {
+    if bounds.contains([x[0] + p[0], x[1] + p[1]]) && !bounds.cancels(x, p) {
         return (p, p_h, -model.evaluate_quadratic(p_h));
     }
     let (p_stride, hits) = bounds.step_to_bound(x, p);

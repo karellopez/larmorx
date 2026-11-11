@@ -120,6 +120,19 @@ pub fn table(r: &[f32], n_vox: usize, n_t: usize, log: &mut Log<'_>) -> Table {
         .collect();
     let std = nanstd_axis(r, [1, n_vox, n_t], 0);
     let pct = nanpercentile_linear_axis0(r, n_vox, n_t, &PERCENTILES).expect("valid percentiles");
+    // a volume holding an infinite RMSE (an S0 above float64's range): numpy's nanstd subtracts
+    // its infinite mean from it, and the 100th percentile's interpolation subtracts it from
+    // itself (observed)
+    let infinite = |t: usize| (0..n_vox).any(|v| r[v * n_t + t] == f32::INFINITY);
+    let first_inf = (0..n_t).find(|&t| infinite(t));
+    let first_all_nan = (0..n_t).find(|&t| numbers[t] == 0);
+    if first_inf.is_some() {
+        log.py_warning(
+            "rmse.rs:nanstd",
+            "RuntimeWarning",
+            "invalid value encountered in subtract",
+        );
+    }
     if std.bad_dof {
         log.py_warning(
             "rmse.rs:120",
@@ -127,8 +140,22 @@ pub fn table(r: &[f32], n_vox: usize, n_t: usize, log: &mut Log<'_>) -> Table {
             "Degrees of freedom <= 0 for slice.",
         );
     }
+    let lerp = |log: &mut Log<'_>| {
+        log.py_warning(
+            "rmse.rs:percentile",
+            "RuntimeWarning",
+            "invalid value encountered in subtract",
+        );
+    };
+    // the percentiles column by column (volume by volume): the first volume decides the order
+    if first_inf.is_some_and(|i| first_all_nan.is_none_or(|n| i < n)) {
+        lerp(log);
+    }
     if pct.all_nan_column {
         log.py_warning("rmse.rs:121", "RuntimeWarning", "All-NaN slice encountered");
+    }
+    if first_inf.is_some() {
+        lerp(log);
     }
     let rows = (0..n_t)
         .map(|t| {

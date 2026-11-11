@@ -57,7 +57,8 @@ Sections and cases (seeded):
 
 Usage: ``OPENBLAS_CORETYPE=Haswell OPENBLAS_NUM_THREADS=1 [OPENBLAS_L2_SIZE=512]
 PYTHONPATH=<repo>/python python -P check_gesvd.py [--quick] [--threads N]
-[--sections query,larft,bdsqr,gesvd,svd,fallback,fullrank] [--gemm-q auto] [--control]``.
+[--sections query,larft,bdsqr,gesvd,svd,fallback,fullrank] [--gemm-q auto] [--control]
+[--time]``.
 ``--control`` (quick tier, in-process; every case must be defined, so ``OPENBLAS_L2_SIZE=512`` on
 the Zen 4 machine) tells larmorx the other SciPy library's ``DLARFT`` and then LAPACK 3.12.1, and
 counts the cases that then differ.
@@ -718,6 +719,29 @@ def control(sections: list[str], threads: int) -> int:
     return 0
 
 
+def timing(threads: int) -> int:
+    """SciPy's ``svd(a, full_matrices=False, lapack_driver='gesvd')`` against larmorx's on
+    CompCor's largest matrices (one BLAS thread against larmorx at ``threads``)."""
+    import time
+
+    from larmorx import _core
+
+    for m, n in ((280, 60_968), (597, 30_453)):
+        a = matrix(np.random.default_rng([97, m]), m, n, "compcor")
+        t0 = time.perf_counter()
+        want = scipy.linalg.svd(a, full_matrices=False, lapack_driver="gesvd")
+        t1 = time.perf_counter()
+        got = _core.scipy_svd(a, False, True, "gesvd", SCIPY, threads)
+        t2 = time.perf_counter()
+        ok = all(same(w, g) for w, g in zip(want, got, strict=True))
+        print(
+            f"time {m} x {n}: SciPy {SCIPY} {t1 - t0:.3f} s, larmorx {t2 - t1:.3f} s "
+            f"({threads} threads); {'identical' if ok else 'DIFFERENT'}",
+            flush=True,
+        )
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--quick", action="store_true")
@@ -727,6 +751,7 @@ def main() -> int:
     ap.add_argument("--sections", default=",".join(SECTIONS))
     ap.add_argument("--gemm-q", default="auto", help="numpy's: 256, 512 or auto (as check_blas.py)")
     ap.add_argument("--control", action="store_true", help="the negative control (in-process)")
+    ap.add_argument("--time", action="store_true", help="the speed on CompCor's largest matrices")
     ap.add_argument("--child", help=argparse.SUPPRESS)
     ap.add_argument("--start", type=int, default=0, help=argparse.SUPPRESS)
     args = ap.parse_args()
@@ -758,6 +783,8 @@ def main() -> int:
             "refusing: run with OPENBLAS_CORETYPE=Haswell OPENBLAS_NUM_THREADS=1", file=sys.stderr
         )
         return 2
+    if args.time:
+        return timing(args.threads)
     if args.control:
         if cb.GEMM_Q > cb.BUFFER_STEPS:
             print("refusing: the control needs every case defined (GEMM_Q 256)", file=sys.stderr)

@@ -535,7 +535,11 @@ fn an_empty_user_mask_fails_as_tedana_in_both_modes() {
             err.ends_with("ValueError: The mask is invalid as it is empty: it masks all data.\n"),
             "{mode}: {err}"
         );
-        assert!(!dir.path().join("none/desc-adaptiveGoodSignal_mask.nii.gz").exists());
+        assert!(
+            !dir.path()
+                .join("none/desc-adaptiveGoodSignal_mask.nii.gz")
+                .exists()
+        );
         std::fs::remove_dir_all(dir.path().join("dropout")).unwrap();
         std::fs::remove_dir_all(dir.path().join("none")).unwrap();
     }

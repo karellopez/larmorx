@@ -1714,6 +1714,7 @@ def lapack_dorgbr(
     gemm_q: int = 256,
 ) -> tuple[np.ndarray, int]:
     """LAPACK's ``DORGBR`` (``DGEBRD``'s ``Q`` or ``P^T`` generated); returns ``(A, WORK(1))``."""
+
 def lapack_dgesdd(
     jobz: str,
     m: int,

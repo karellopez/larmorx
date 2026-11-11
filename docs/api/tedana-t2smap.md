@@ -257,4 +257,8 @@ and `reproduce` (which names them the same way) take about as long as tedana at 
   results, four refusals; every written file, the exit status and both streams, on every platform.
 - **Memory** (`tests/parity/test_memory_peak.py`, fMRIPrep's ds003592 curvefit call): 307 MiB at
   one thread (both modes) and 546 MiB at eight, against tedana's 1,244 MiB.
+- **Speed** ([benchmarks](../benchmarks/tedana-t2smap.md), "The clean-room original"; a shared
+  machine, best of two runs): 2.7 to 3.7 s at one thread on fMRIPrep's four curve-fit calls (10 to
+  15 times tedana's speed) and 1.3 to 2.0 s at eight threads (19 to 30 times); 3.0 s and 1.5 s on
+  the log-linear call (tedana 6.2 s); the same files at 1 and 8 threads.
 - **Findings**: [`tedana-t2smap-original`](../findings/tedana-t2smap-original.md).

@@ -48,6 +48,29 @@ scripts/orchestration/boxed.sh 24 python -P validation/investigations/topup-sett
 It prints one line per comparison and per unseen control, writes `results.json` here and exits 1
 when a comparison differs or a run fails.
 
-## Result (2026-11-11, relay 1)
+`lookup_probe.py <program> <work folder>` shows how a program finds a name (six `--config` words,
+FSLDIR unset or an empty folder, both D13 modes, the input missing so that each run stops after
+the lookup). 2026-11-11: larmorx-nc 0.1.0rc1 and the original give the same exit statuses and
+lines in all 24 runs (a setting found by name with FSLDIR unset or empty; `b02b0_9` FSL-121 with
+FSLDIR unset, `Cannot find config-file` with it set; `./b02b0` never looked for among the
+settings), but for the wording and order of the FSL-121 line (both larmorx's own messages).
 
-See the end of this file (filled in from `results.json`).
+## Result (2026-11-11, relay 1; `results.json`)
+
+larmorx-nc 0.1.0rc1 from PyPI, `larmorx` built from this branch's crates at ed1a5269 (the
+settings and their lookup as committed), one thread per run, 8 runs at a time:
+
+- **54 comparisons of 54 identical** (3 pairs × 6 names × 3 checks): in each, the exit status 0,
+  standard output and error, and all 12 outputs (`tu_fieldcoef`, `tu_movpar.txt`, the field, the
+  corrected images and their mean, both Jacobians, both displacement fields, both matrices, the
+  log; `test_acqp`'s `field_test`, `iout_test`, `iout_test_mean`) identical, the compressed bytes
+  too. So FSL's topup (its bit-exact replica) gives the same results with larmorx's settings as
+  with FSL's files, on real fMRIPrep inputs and on a pair whose movement the first levels
+  estimate, and the clean-room original gives the same results from its compiled-in settings, from
+  their files and from FSL's files (what changes when both exist: nothing).
+- **234 negative controls of 234 change the outputs** (6 names × 13 options × 3 pairs): 233 change
+  the images or matrices, one only the log (`test_acqp`'s last knot spacing 14 → 16 mm on the
+  synthetic pair's 2.5 mm voxels, where both round to the same knot spacing in voxels; the real
+  pairs' images change). Every value of every setting is thus seen by the comparisons.
+- Times (one thread): the replica 33 to 89 s per real-data run of the nine- and twelve-level
+  settings, the clean-room original 5 to 14 s.

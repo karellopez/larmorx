@@ -640,3 +640,36 @@ expected divergences, 0 failures; the replica suite's new `at/jac-coef-aniso` (a
 of other voxel sizes) passes, `at/jac-field-aniso`'s fix pass names FSL-273 now, and the time
 step's permanent case (`time-step-zero-series`, fMRIPrep's call on a series of time step 0, its
 `--iout` compared) passes; nothing else moved.
+
+## larmorx's own settings of FSL's six configurations (`t2smap`'s clean-room part, relay 1, 2026-11-11)
+
+The user's decision of 2026-11-09: the main package carries its own settings of the six
+configurations FSL ships by name (`b02b0`, `b02b0_1`, `b02b0_2`, `b02b0_4`, `b02b0_7T`,
+`test_acqp`), a clean-room original written from `specs/topup.md` §2.5's tables (the spec
+writer's of 2026-11-09) by an implementer who never opened FSL's files: `topup::settings`, the
+files `crates/larmorx-fsl/src/topup/settings/<name>.cnf` (their values the spec's, their comments
+written anew from the spec's meanings), compiled into `larmorx fsl topup`.
+
+- **The lookup** (`cli::topup::find_config`): as named, with `.cnf`, `$FSLDIR/etc/flirtsch/` (as
+  named, with `.cnf`), then, for a name without a directory part, the own settings (the name
+  itself without an extension, or `<name>.cnf`; matched exactly). FSLDIR unset and a name that is
+  none of the six: FSL-121 as before. *Verified* (black box: 6 names, FSLDIR unset or
+  an empty folder, both modes: 24 cases): the same statuses and lines as larmorx-nc 0.1.0rc1's own lookup of its copy of
+  FSL's files (which also finds a name with FSLDIR unset and never looks there for a name with a
+  directory part). The two programs' FSL-121 lines differ in wording and order (`... and FSLDIR is
+  unset (FSL-121)`, the notice first; the replica's `..., so FSL's configurations
+  ($FSLDIR/etc/flirtsch) cannot be searched (FSL-121)`, the error first): both larmorx's own lines.
+- **The values, by their effect** (*validated*,
+  [`validation/investigations/topup-settings-original/`](../../validation/investigations/topup-settings-original/README.md)):
+  54 of 54 comparisons bit for bit identical in every output, standard stream and exit status
+  (three pairs: fMRIPrep's topup inputs of ds005040 and ds006736 cropped to sizes divisible by 4,
+  and a synthetic pair with a known field and a movement; for each name, larmorx-nc's program with
+  FSL's file against the same program with larmorx's file, and the original with its own settings
+  against its file and against FSL's file found through FSLDIR); 234 of 234 runs with one value of
+  one setting changed give other outputs (233 other images or matrices, one only another log: a
+  knot spacing that rounds to the same number of voxels on the synthetic pair). The log records
+  every setting in force to six digits; the images every value's effect.
+- **Python**: `lx.fsl.topup(config=<one of the six>)` needs no `fsldir`;
+  `lx.sdcflows.topup_config_file` returns FSL's file where `fsldir` or larmorx-nc holds it, else the
+  name, which either implementation finds (before: `FileNotFoundError`). Golden case
+  `cli.fsl.topup.own-settings` (each name's log, `test_acqp`'s full run).

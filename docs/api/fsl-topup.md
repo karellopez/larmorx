@@ -146,9 +146,21 @@ files byte for byte (`b02b0.cnf`, `b02b0_1.cnf`, `b02b0_2.cnf`, `b02b0_4.cnf`, `
 in `<prefix>/share/larmorx-nc/fsl-data/etc/flirtsch/`: the replica program (`larmorx-nc fsl topup
 --config=b02b0`) looks for a name without a directory there after FSL's own places (as named,
 with `.cnf`, `$FSLDIR/etc/flirtsch/`), so the name works without an FSL installation; when
-neither has it, FSL's messages (and FSL-121's) are unchanged. The main package's own settings,
-a clean-room original written from `specs/topup.md` §2.5, come with `t2smap`'s clean-room part;
-until then `config` given by name needs `fsldir` here.
+neither has it, FSL's messages (and FSL-121's) are unchanged.
+
+**larmorx's own settings** (2026-11-11, the user's decision of 2026-11-09). The clean-room
+original carries its own settings of the same six names, written from `specs/topup.md` §2.5 by an
+implementer who never opened FSL's files (`crates/larmorx-fsl/src/topup/settings/`, Apache-2.0,
+compiled into `larmorx fsl topup`). It finds a name the same way, after FSL's own places (as
+named, with `.cnf`, `$FSLDIR/etc/flirtsch/`), FSLDIR unset included: so `config="b02b0"` (or
+`b02b0_1`, `_2`, `_4`, `b02b0_7T`, `test_acqp`, with or without `.cnf`) needs no FSL and no
+larmorx-nc, and `fsldir` is needed only for other names. Where an FSL installation holds the
+file, FSL's file is read, as FSL does; larmorx-nc's copy is read only by the replica. The values
+are FSL's: every output of topup is bit for bit the same with larmorx's settings as with FSL's
+files, for the replica program (FSL's own results) and for the original, on fMRIPrep's inputs of
+ds005040 and ds006736 and a synthetic pair with movements (54 of 54 comparisons; 234 runs with one
+value changed all differ:
+[`validation/investigations/topup-settings-original/`](../../validation/investigations/topup-settings-original/README.md)).
 
 **File names on Windows.** FSL finds a name's directory and extension at the last `/`. On Windows,
 where FSL does not run, `\` separates directories as well. So a configuration given without

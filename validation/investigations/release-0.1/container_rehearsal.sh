@@ -24,10 +24,11 @@
 #   <wheels>: the folder of the three packages' Linux x86_64 wheels of the checkout's version;
 #   <sdists>: the folder of larmorx-nc's and larmorx-gpl's sdists; <out>: a new folder.
 # Optional: PYTHON (a Python 3.12 or newer; default python3), PORT (the registry's, 5055),
-# KEEP_DOCKER=1 (leave the daemon running). Run it in a memory box:
+# KEEP_DOCKER=1 (leave the daemon running), FROM=push (only step 4, on an earlier run's <out>).
+# Run it in a memory box:
 # scripts/orchestration/boxed.sh 32 bash ... (the daemon has a box of its own).
 set -u
-[ $# -ge 4 ] || { sed -n '3,32p' "$0"; exit 2; }
+[ $# -ge 4 ] || { sed -n '3,29p' "$0"; exit 2; }
 W=$(cd "$1" && pwd)
 WHEELS=$(cd "$2" && pwd)
 SDISTS=$(cd "$3" && pwd)
@@ -35,8 +36,9 @@ mkdir -p "$4" && OUT=$(cd "$4" && pwd)
 HERE=$(cd "$(dirname "$0")" && pwd)
 PY=${PYTHON:-python3}
 PORT=${PORT:-5055}
-REGISTRY_IMAGE=docker://docker.io/library/registry:3.0.0@sha256:6c5666b861f3505b116bb9aa9b25175e71210414bd010d92035ff64018f9457e
-SKOPEO_IMAGE=docker://quay.io/skopeo/stable:v1.13.3@sha256:4853591bd1d2a13c6fd1ede57fa234503d08a6f7a0e0f455dcffd5c920fc8fba
+# by digest only (Apptainer refuses a tag with a digest): registry 3.0.0, skopeo v1.13.3
+REGISTRY_IMAGE=docker://docker.io/library/registry@sha256:6c5666b861f3505b116bb9aa9b25175e71210414bd010d92035ff64018f9457e
+SKOPEO_IMAGE=docker://quay.io/skopeo/stable@sha256:4853591bd1d2a13c6fd1ede57fa234503d08a6f7a0e0f455dcffd5c920fc8fba
 export APPTAINER_CACHEDIR=$OUT/apptainer-cache APPTAINER_TMPDIR=$OUT/apptainer-tmp
 mkdir -p "$APPTAINER_CACHEDIR" "$APPTAINER_TMPDIR"
 VERSION=$("$PY" -P "$W/scripts/release/set_version.py" --print)
@@ -58,6 +60,9 @@ expect() { # expect <text> <command...>: the command's standard output is exactl
 }
 echo "container rehearsal of larmorx $VERSION at $SHA"
 
+if [ "${FROM:-}" = push ]; then
+  echo "FROM=push: the build, check and Apptainer steps of the earlier run in $OUT are kept"
+else
 # 1. the daemon
 bash "$HERE/rootless_docker.sh" start "$OUT/docker" 32 || exit 1
 eval "$(bash "$HERE/rootless_docker.sh" env "$OUT/docker")"
@@ -99,7 +104,10 @@ for image in larmorx larmorx-all; do
       /venv/v/bin/python -m pytest -p no:cacheprovider -q tests/golden'
 done
 
+fi
+
 # 4. the workflow's container-push job, into a local registry
+rm -rf "$OUT/layout" "$OUT/registry"  # this run's own outputs (FROM=push makes them again)
 step index "${CONTAINER[@]}" index --version "$VERSION" --images "$OUT/images-amd64" \
   --out "$OUT/layout" --arches amd64
 mkdir -p "$OUT/registry" "$OUT/bin"
@@ -131,7 +139,7 @@ step "pulled $VERSION: no larmorx-nc" expect "absent" apptainer exec --containal
   "$OUT/sif/pulled-$VERSION.sif" sh -c 'command -v larmorx-nc || echo absent'
 kill "$REGISTRY_PID" 2>/dev/null
 wait "$REGISTRY_PID" 2>/dev/null
-[ "${KEEP_DOCKER:-0}" = 1 ] || bash "$HERE/rootless_docker.sh" stop "$OUT/docker"
+[ "${KEEP_DOCKER:-0}" = 1 ] || [ "${FROM:-}" = push ] || bash "$HERE/rootless_docker.sh" stop "$OUT/docker"
 du -sh "$OUT/images-amd64"/*.oci.tar "$OUT/sif"/larmorx*.sif
 if [ ${#FAILED[@]} -eq 0 ]; then
   echo "CONTAINER-REHEARSAL ok"

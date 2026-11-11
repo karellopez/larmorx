@@ -28,6 +28,22 @@ pub struct Run<'a> {
     pub threads: usize,
 }
 
+/// The threads of topup's work (the transforms' slices): `--nthr` when it is given, on the
+/// command line or in the configuration file (`NoOfThreads(n)`: 0 is the default, 1), else the
+/// run's thread count (larmorx's `--n-threads`, else `OMP_NUM_THREADS`, else every logical CPU:
+/// the user's decision of 2026-11-11, a tool's own thread option winning only when it is
+/// given). The results are FSL's one-thread results at any count (FSL-116), and the log keeps
+/// `--nthr`'s own value.
+fn work_threads(nthr_given: bool, nthr: u32, run_threads: usize) -> u32 {
+    if !nthr_given {
+        u32::try_from(run_threads.max(1)).unwrap_or(u32::MAX)
+    } else if nthr == 0 {
+        1
+    } else {
+        nthr
+    }
+}
+
 /// `f()`, with an exception thrown inside it (`exception::throw`) as its error.
 fn guarded<T>(f: impl FnOnce() -> Result<T, FslError>) -> Result<T, FslError> {
     exception::catch(f).and_then(|r| r)
@@ -125,8 +141,7 @@ fn body(argv: &[String], run: &Run, con: &Console) -> u8 {
     } else {
         vol::scale(&mut inv, (100.0 / gmean) as f32);
     }
-    // NoOfThreads(n): 0 is the default (1)
-    let nthr = if clp.nthreads == 0 { 1 } else { clp.nthreads };
+    let nthr = work_threads(clp.nthr_given, clp.nthreads, run.threads);
     let prepared = guarded(|| prepare(&clp, &inv, nthr, run, con));
     let (mut cf, mut nlpar) = match prepared {
         Ok(x) => x,
@@ -349,4 +364,19 @@ fn write_outputs(clp: &Clp, cf: &mut TopupCf, inv: &Volume, gmean: f64) -> Resul
         cf.write_jacobians(&clp.jacout)?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::work_threads;
+
+    /// `--nthr` given wins (0: FSL's default, one thread); else the run's thread count.
+    #[test]
+    fn the_run_threads_unless_nthr_is_given() {
+        assert_eq!(work_threads(false, 1, 6), 6);
+        assert_eq!(work_threads(false, 1, 0), 1);
+        assert_eq!(work_threads(true, 1, 6), 1);
+        assert_eq!(work_threads(true, 4, 6), 4);
+        assert_eq!(work_threads(true, 0, 6), 1);
+    }
 }

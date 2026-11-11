@@ -29,9 +29,10 @@ corrected its histograms without a histogram: with an empty mask `-h` and `-H` p
 without a histogram at all (a constant image's `-h`, FSL-186's `-H`) the text holds nothing and
 the JSON an empty list ([findings](../findings/fsl-maths-original.md) 28). `implementation="auto"` (the
 default) runs the replica when `larmorx-nc` is installed, the original otherwise; `"replica"`
-needs `larmorx-nc` (otherwise `ReplicaNotFoundError`), `"original"` runs the original in this
-process on `n_threads` threads (its results the same at any count; a failure raises
-`RuntimeError` with its messages). The command line chooses alike (`LARMORX_IMPLEMENTATION`).
+needs `larmorx-nc` (otherwise `ReplicaNotFoundError`), `"clean-room"` (`"original"`, 0.1.0rc1's spelling, still works) runs the
+clean-room original in this process on `n_threads` threads (its results the same at any count; a
+failure raises `RuntimeError` with its messages). The command line chooses alike
+(`--implementation` before the family, or `LARMORX_IMPLEMENTATION`).
 
 **Status: `experimental`**: the replica against FSL 6.0.7.23 itself (the parity suite
 `fsl-stats-replica`, record [fsl-stats-replica](../validation/fsl-stats-replica.md), standard

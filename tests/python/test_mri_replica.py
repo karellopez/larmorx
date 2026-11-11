@@ -105,7 +105,7 @@ def test_the_registry_has_mcflirt():
 
 def test_auto_without_the_replica_runs_the_original(scripts, tmp_path):
     res = lx.mri.hmc(series(tmp_path), resample=False)
-    assert res.implementation.kind == "original"
+    assert res.implementation.kind == "clean-room"
     with pytest.raises(lx.ReplicaNotFoundError, match="pip install larmorx-nc"):
         lx.mri.hmc(series(tmp_path), implementation="replica")
 
@@ -160,7 +160,7 @@ def test_reference_mean_and_options_only_the_original_has(scripts, tmp_path):
     n = len(calls(program))
     # Options mcflirt's command line does not have: the original under "auto", an error asked.
     res = lx.mri.hmc(path, in_plane="never", resample=False)
-    assert res.implementation.kind == "original" and len(calls(program)) == n
+    assert res.implementation.kind == "clean-room" and len(calls(program)) == n
     with pytest.raises(ValueError, match="no in_plane='never'"):
         lx.mri.hmc(path, in_plane="never", implementation="replica")
     with pytest.raises(ValueError, match="normcorr_count='weights'"):

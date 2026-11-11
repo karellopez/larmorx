@@ -656,7 +656,7 @@ impl Writer<'_> {
         notices: &mut Vec<Notice>,
         err: &mut dyn Write,
     ) -> Result<(), WriteFail> {
-        let ot = match self.settings.get("FSLOUTPUTTYPE") {
+        let ot = match self.settings.output_type() {
             None => {
                 let _ = err.write_all(FSLOUTPUTTYPE_UNSET.as_bytes());
                 return Err(WriteFail::OutputType);

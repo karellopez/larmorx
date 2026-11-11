@@ -11,12 +11,26 @@ __version__: str
 class NiftiError(ValueError): ...
 
 def cli_main(
-    argv: list[str], replica_dirs: list[str] = ..., implementation: str | None = None
+    argv: list[str],
+    replica_dirs: list[str] = ...,
+    implementation: str | None = None,
+    stream: bool = False,
 ) -> tuple[int, str, str]:
     """Run the ``larmorx`` command line; return ``(exit_code, stdout, stderr)``. Tools with a
     replica run its program when ``implementation`` (``"auto"``, ``"replica"``,
-    ``"original"``; ``None`` reads ``LARMORX_IMPLEMENTATION``) says so; the program is looked
-    for through its environment variable, then in ``replica_dirs``, then on ``PATH``."""
+    ``"clean-room"``, or ``"original"``, its old spelling; ``None`` reads
+    ``LARMORX_IMPLEMENTATION``; ``--implementation`` in ``argv`` wins) says so; the program is
+    looked for through its environment variable, then in ``replica_dirs``, then on ``PATH``.
+    With ``stream``, the output goes to ``sys.stdout`` and ``sys.stderr`` while the command runs
+    and both strings are empty."""
+
+def cli_python_program(
+    argv: list[str],
+) -> tuple[str, str, list[str], list[tuple[str, str | None]]] | None:
+    """``argv`` (program name first) when it names a Python program of the command line
+    (sdcflows' BIDS app) after larmorx's own options: ``(family, tool, arguments, environment
+    changes)``, a change ``(name, None)`` removing the variable; else ``None`` (also when the
+    options are wrong: :func:`cli_main` reports it)."""
 
 def cli_tools() -> list[tuple[str, list[str]]]:
     """The command line's tool families and their tools: ``[(family, [tool, ...]), ...]``."""

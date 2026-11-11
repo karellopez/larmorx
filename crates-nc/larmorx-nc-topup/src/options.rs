@@ -280,6 +280,10 @@ pub struct Clp {
     estmov: Vec<i32>,
     pub sporder: u32,
     pub nthreads: u32,
+    /// Whether `--nthr` was given (on the command line or in the configuration file): when it
+    /// was not, the run's thread count applies (larmorx's `--n-threads`, else
+    /// `OMP_NUM_THREADS`; `topup::main`).
+    pub nthr_given: bool,
     pub verbose: bool,
     pub trace: bool,
     pub debug: u32,
@@ -600,6 +604,7 @@ impl Clp {
             estmov,
             sporder,
             nthreads,
+            nthr_given: st("--nthr").set,
             verbose: st("-v,--verbose").bool(),
             trace: st("--trace").bool(),
             debug: st("--debug").int() as u32,

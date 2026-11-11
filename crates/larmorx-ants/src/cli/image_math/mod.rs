@@ -57,6 +57,7 @@ mod morphology;
 
 use std::io::Write;
 
+use larmorx_core::cli::Overrides;
 use larmorx_core::defects::{self, EXIT_BAD_MODE, Notices, UpstreamDefects};
 
 use crate::image::{AntsImage, ImageStore, OutputImage, Pixel, ReadError, read_with, write_with};
@@ -478,11 +479,23 @@ Operations ported to larmorx (ANTs v2.6.5); the other ANTs operations are not su
 /// Runs `ImageMath` with `args` (the arguments after the program name) on files, in the D13
 /// mode of `LARMORX_UPSTREAM_DEFECTS`.
 pub fn main(args: &[String], out: &mut dyn Write, err: &mut dyn Write) -> u8 {
-    match UpstreamDefects::from_env() {
+    main_given(args, &Overrides::default(), out, err)
+}
+
+/// [`main`] with larmorx's own options (`larmorx --n-threads N --upstream-defects MODE ants
+/// ...`): each one given wins over the variables it replaces (ITK's thread variables,
+/// `LARMORX_UPSTREAM_DEFECTS`).
+pub fn main_given(
+    args: &[String],
+    given: &Overrides,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> u8 {
+    match given.upstream_defects() {
         Ok(mode) => run(
             args,
             &mut crate::image::FileStore,
-            super::itk_threads(),
+            given.n_threads_or(super::itk_threads),
             mode,
             out,
             err,

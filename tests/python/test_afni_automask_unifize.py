@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 """``lx.afni.automask`` and ``lx.afni.unifize`` with the replica, built into larmorx since
-2026-10-29: ``"auto"`` and ``"replica"`` run it in this process, ``"original"`` the clean-room
+2026-10-29: ``"auto"`` and ``"replica"`` run it in this process, ``"clean-room"`` the clean-room
 original; with a stand-in for the built-in replica (``builtin_stub``) the wrappers pass AFNI's
 options, settings and D13's choice to it and read its outputs back. The replica itself is
 checked by its own golden tests and by the parity suites against AFNI; the originals by
@@ -39,7 +39,7 @@ def cli(tool: str, *args: str, implementation: str | None = None) -> tuple[int, 
 
 def test_auto_runs_the_built_in_replica(no_replica, tmp_path):
     """No program to install: the replica is part of larmorx, and gives what the command line's
-    replica writes; ``"original"`` runs the clean-room original."""
+    replica writes; ``"clean-room"`` runs the clean-room original."""
     path = volume(tmp_path)
     out = tmp_path / "out"
     out.mkdir()
@@ -50,11 +50,11 @@ def test_auto_runs_the_built_in_replica(no_replica, tmp_path):
             assert r.mask.implementation == REPLICA
             u = lx.afni.unifize(path, implementation=implementation)
             assert u.image.implementation == REPLICA
-        assert lx.afni.automask(path, implementation="original").mask.implementation.kind == (
-            "original"
+        assert lx.afni.automask(path, implementation="clean-room").mask.implementation.kind == (
+            "clean-room"
         )
-        assert lx.afni.unifize(path, implementation="original").image.implementation.kind == (
-            "original"
+        assert lx.afni.unifize(path, implementation="clean-room").image.implementation.kind == (
+            "clean-room"
         )
     code, _, err = cli("3dAutomask", "-q", "-prefix", str(out / "m.nii"), str(path))
     assert code == 0, err
@@ -62,7 +62,7 @@ def test_auto_runs_the_built_in_replica(no_replica, tmp_path):
     code, _, err = cli("3dUnifize", "-quiet", "-prefix", str(out / "u.nii"), str(path))
     assert code == 0, err
     np.testing.assert_array_equal(lx.load(out / "u.nii").data, u.image.data)
-    for implementation in ("original", "replica"):
+    for implementation in ("clean-room", "replica"):
         code, _, err = cli(
             "3dAutomask", "-q", "-prefix", str(out / f"m_{implementation}.nii"), str(path),
             implementation=implementation,
@@ -70,7 +70,7 @@ def test_auto_runs_the_built_in_replica(no_replica, tmp_path):
         assert code == 0, err
     # The help lists them, whichever implementation runs.
     for tool in ("3dTshift", "3dAutomask", "3dUnifize"):
-        for implementation in ("original", "replica"):
+        for implementation in ("clean-room", "replica"):
             code, _, _ = cli(tool, implementation=implementation)
             assert code == 0
 

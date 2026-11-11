@@ -53,6 +53,12 @@ what it translates.
   the half-resolution pair, `--nthr=4` moves FSL's field by up to 0.032 Hz and its corrected
   images by up to 88 (of about 20,000), `FSL_NUM_THREADS=4` at `--nthr=1` the field by up to
   3.8e-6 Hz; OpenBLAS's own threads (`FSL_SKIP_GLOBAL=1`) changed nothing on two cases.
+- Without `--nthr` (on the command line or in the configuration file), topup's work (the
+  transforms' slices) runs on the run's thread count, larmorx's own `--n-threads` (else
+  `OMP_NUM_THREADS`, else every logical CPU), not FSL's default of one (the user's decision of
+  2026-11-11: a tool's own thread option wins only when it is given; `topup::work_threads`,
+  `options::Clp::nthr_given`). The results do not change (the same bytes at any count:
+  `tests/topup.rs`), and the log keeps `--nthr`'s own value.
 - D13 (`LARMORX_UPSTREAM_DEFECTS`): FSL-117 (the membrane energy's Hessian in the cost's units:
   `costfn::field_energy_hess`), FSL-118 (the grid grown by the subsamplings' least common
   multiple: `topup::regridding`), FSL-119 (the field's intent parameters: `fileio::field_volume`),

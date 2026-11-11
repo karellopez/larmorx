@@ -1243,6 +1243,7 @@ mod tests {
                 .collect(),
             dir: None,
             stdin: None,
+            output_type_default: Default::default(),
         };
         let args: Vec<String> = args.iter().map(|s| (*s).to_owned()).collect();
         let (mut out, mut err) = (Vec::new(), Vec::new());

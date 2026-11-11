@@ -1,9 +1,17 @@
 // SPDX-License-Identifier: Apache-2.0
 //! The `larmorx` multicall command line (alias `lx`), PLAN.md §4 item 3.
 //!
-//! Usage is `larmorx <family> <tool> [original arguments]`, where each tool accepts the
-//! argument syntax of the program it replaces. Parsing lives here, once, and is shared by the
-//! standalone binaries and the Python console scripts (through `larmorx._core`).
+//! Usage is `larmorx [--n-threads N] [--implementation auto|replica|clean-room]
+//! [--upstream-defects fix|reproduce] <family> <tool> [original arguments]`, where each tool
+//! accepts the argument syntax of the program it replaces. larmorx's own options ([`Globals`],
+//! the Python API's `n_threads`, `implementation` and `upstream_defects`; the user's decision of
+//! 2026-11-11) stand between `larmorx` and the family, so they never clash with an original's
+//! options; each one given wins over the environment variable it replaces, which keeps working
+//! (`OMP_NUM_THREADS` and ITK's thread variables, `LARMORX_IMPLEMENTATION`,
+//! `LARMORX_UPSTREAM_DEFECTS`). They reach the tools explicitly
+//! ([`larmorx_core::cli::Overrides`], the families' settings tables, a replica program's child
+//! environment): the process environment is never changed. Parsing lives here, once, and is
+//! shared by the standalone binaries and the Python console scripts (through `larmorx._core`).
 //!
 //! Tools with a bit-exact replica run it by default: built in (AFNI's programs, in this
 //! process), or as the program of its own package when that is found (`larmorx-nc`,
@@ -18,8 +26,121 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 pub use larmorx_ants::cli::{FileLoader, TransformLoader};
+use larmorx_core::cli::Overrides;
+use larmorx_core::defects::UpstreamDefects;
 
 use replica::Implementation;
+
+/// larmorx's own options: `larmorx [--n-threads N] [--implementation NAME] [--upstream-defects
+/// MODE] <family> ...`, between the program's name and the family, with the Python API's names
+/// and values (the user's decision of 2026-11-11). `None` where an option was not given: the
+/// environment variable it replaces decides, as before.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Globals {
+    /// `--n-threads N`: every tool's thread count, 0 every logical CPU (the default); replaces
+    /// `OMP_NUM_THREADS` (the ANTs programs: `NSLOTS`, `ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS`).
+    pub n_threads: Option<usize>,
+    /// `--implementation auto|replica|clean-room` (`original`, the old spelling of
+    /// `clean-room`, accepted); replaces `LARMORX_IMPLEMENTATION`.
+    pub implementation: Option<Implementation>,
+    /// `--upstream-defects fix|reproduce` (D13); replaces `LARMORX_UPSTREAM_DEFECTS`.
+    pub upstream_defects: Option<UpstreamDefects>,
+}
+
+/// larmorx's own options, in the order `--help` lists them ([`larmorx_core::cli::OPTIONS`]).
+pub const GLOBAL_OPTIONS: [&str; 3] = larmorx_core::cli::OPTIONS;
+
+impl Globals {
+    /// What the tools' command lines receive: the thread count and D13's mode.
+    pub fn overrides(&self) -> Overrides {
+        Overrides {
+            n_threads: self.n_threads,
+            upstream_defects: self.upstream_defects,
+        }
+    }
+
+    /// The changes these options make to the environment of a program run as a child process
+    /// (a replica's program, sdcflows' BIDS app): a value to set, or `None` to remove the
+    /// variable. `--n-threads 0` removes `OMP_NUM_THREADS` (every logical CPU).
+    pub fn environment(&self) -> Vec<(&'static str, Option<String>)> {
+        let mut env = self.overrides().environment();
+        if let Some(i) = self.implementation {
+            env.push((replica::IMPLEMENTATION_ENV, Some(i.name().to_owned())));
+        }
+        env
+    }
+}
+
+/// Reads larmorx's own options at the start of `args` (the arguments after the program's
+/// name): the options and how many arguments they took, or the message of a usage error (a
+/// wrong or missing value, an option given twice). Each takes its value as the next argument
+/// or after `=`. The parser is [`larmorx_core::cli::parse`], which the replica programs of the
+/// other licence families share.
+pub fn parse_globals(args: &[String]) -> Result<(Globals, usize), String> {
+    let (given, k) = larmorx_core::cli::parse::<Implementation>(args)?;
+    Ok((
+        Globals {
+            n_threads: given.n_threads,
+            implementation: given.implementation,
+            upstream_defects: given.upstream_defects,
+        },
+        k,
+    ))
+}
+
+/// The usage line of the command line with larmorx's own options.
+fn usage_line(prog: &str) -> String {
+    format!(
+        "Usage: {prog} [--n-threads N] [--implementation auto|replica|clean-room] \
+         [--upstream-defects fix|reproduce] <family> <tool> [original arguments]"
+    )
+}
+
+/// A usage error of larmorx's own options: `error: <message>`, the usage line, a pointer to
+/// `--help`; exit [`EXIT_USAGE`].
+fn usage_error(prog: &str, message: &str, err: &mut dyn Write) -> u8 {
+    let written = writeln!(
+        err,
+        "error: {message}\n\n{}\nRun '{prog} --help' for usage.",
+        usage_line(prog)
+    );
+    if written.is_ok() {
+        EXIT_USAGE
+    } else {
+        EXIT_IO_ERROR
+    }
+}
+
+/// A Python program of the command line (sdcflows' BIDS app), as the Python package's console
+/// script runs it before this parser sees the command (`python/larmorx/cli/__init__.py`): its
+/// arguments, and the changes larmorx's own options make to its environment.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PythonProgram {
+    pub family: String,
+    pub tool: String,
+    /// The program's own arguments (after the tool's name).
+    pub args: Vec<String>,
+    /// [`Globals::environment`].
+    pub environment: Vec<(&'static str, Option<String>)>,
+}
+
+/// `args` (program name first) when they name a Python program ([`PYTHON_TOOLS`]) after
+/// larmorx's own options; `None` otherwise, and when the options are wrong (the command line
+/// then reports the error).
+pub fn python_program(args: &[String]) -> Option<PythonProgram> {
+    let rest = args.get(1..)?;
+    let (globals, k) = parse_globals(rest).ok()?;
+    let (family, tool) = (rest.get(k)?, rest.get(k + 1)?);
+    if family != "sdcflows" || !PYTHON_TOOLS.contains(&tool.as_str()) {
+        return None;
+    }
+    Some(PythonProgram {
+        family: family.clone(),
+        tool: tool.clone(),
+        args: rest[k + 2..].to_vec(),
+        environment: globals.environment(),
+    })
+}
 
 /// Exit code for invalid usage (unknown command or option).
 pub const EXIT_USAGE: u8 = 2;
@@ -94,7 +215,8 @@ pub struct Options<'a> {
     /// Reads transform files (the Python entry point adds `.h5`).
     pub loader: &'a dyn TransformLoader,
     /// The implementation of tools that have a replica; `None` reads
-    /// [`replica::IMPLEMENTATION_ENV`] (default `auto`).
+    /// [`replica::IMPLEMENTATION_ENV`] (default `auto`). `--implementation` on the command line
+    /// wins over it.
     pub implementation: Option<Implementation>,
     /// Where to look for replica programs after their environment variable and before `PATH`
     /// (the Python environment's scripts directory, or the directory of this binary).
@@ -144,7 +266,13 @@ where
     let prog = args
         .next()
         .map_or_else(|| "larmorx".to_owned(), |a| program_name(a.as_ref()));
-    let first = args.next().map(|a| a.as_ref().to_owned());
+    let all: Vec<String> = args.map(|a| a.as_ref().to_owned()).collect();
+    let (globals, k) = match parse_globals(&all) {
+        Ok(parsed) => parsed,
+        Err(message) => return usage_error(&prog, &message, err),
+    };
+    let mut args = all.into_iter().skip(k);
+    let first = args.next();
     let family = first
         .as_deref()
         .and_then(|f| FAMILIES.iter().find(|(name, _)| *name == f));
@@ -152,15 +280,24 @@ where
         (Some("-V" | "--version"), _) => (0, writeln!(out, "larmorx {}", larmorx_core::VERSION)),
         (Some("-h" | "--help"), _) => (0, out.write_all(usage(&prog).as_bytes())),
         (Some("fetch"), None) => {
-            let rest: Vec<String> = args.map(|a| a.as_ref().to_owned()).collect();
+            let rest: Vec<String> = args.collect();
             (fetch(&prog, &rest, out, err), Ok(()))
         }
         (None, _) => (EXIT_USAGE, err.write_all(usage(&prog).as_bytes())),
         (Some(_), Some((family, tools))) => {
-            let tool = args.next().map(|a| a.as_ref().to_owned());
-            let rest: Vec<String> = args.map(|a| a.as_ref().to_owned()).collect();
+            let tool = args.next();
+            let rest: Vec<String> = args.collect();
             match tool.as_deref() {
-                Some(tool) => match run_tool(family, tool, &rest, options, out, err) {
+                Some(tool) if let Some((name, _)) = larmorx_core::cli::option(tool) => (
+                    EXIT_USAGE,
+                    writeln!(
+                        err,
+                        "error: {name} after the family: larmorx's own options go before it \
+                         ({prog} {name} ... {family} <tool> ...); after the tool, an option is \
+                         the tool's\n\nRun '{prog} --help' for usage."
+                    ),
+                ),
+                Some(tool) => match run_tool(family, tool, &rest, options, &globals, out, err) {
                     Some(code) => (code, Ok(())),
                     None => (
                         EXIT_USAGE,
@@ -196,18 +333,22 @@ where
 }
 
 /// Runs `tool` of `family`: its replica (built in, or as a separate program) when
-/// [`replica::choose`] says so, else the original. `None` if there is no such tool.
+/// [`replica::choose`] says so, else the original. `None` if there is no such tool. larmorx's
+/// own options (`globals`) win over the variables they replace.
 fn run_tool(
     family: &str,
     tool: &str,
     args: &[String],
     options: &Options<'_>,
+    globals: &Globals,
     out: &mut dyn Write,
     err: &mut dyn Write,
 ) -> Option<u8> {
+    let given = globals.overrides();
     if let Some(replica) = replica::lookup(family, tool) {
-        let choice = options
+        let choice = globals
             .implementation
+            .or(options.implementation)
             .map_or_else(Implementation::from_env, Ok)
             .and_then(|implementation| {
                 replica::choose(implementation, replica, &options.replica_dirs)
@@ -215,13 +356,14 @@ fn run_tool(
         match choice {
             Ok(replica::Choice::Original) => {}
             Ok(replica::Choice::Builtin) => {
-                return replica::run_builtin(family, tool, args, out, err);
+                return replica::run_builtin_given(family, tool, args, &given, out, err);
             }
             Ok(replica::Choice::Replica(program)) => {
-                return Some(replica::run(
+                return Some(replica::run_env(
                     &program,
                     replica,
                     args,
+                    &globals.environment(),
                     options.replica_output,
                     out,
                     err,
@@ -238,15 +380,24 @@ fn run_tool(
         }
     }
     match family {
-        "afni" => larmorx_afni::cli::run(tool, args, out, err),
-        "ants" => larmorx_ants::cli::run(tool, args, options.loader, out, err),
+        "afni" => larmorx_afni::cli::run_given(tool, args, &given, out, err),
+        "ants" => larmorx_ants::cli::run_given(tool, args, options.loader, &given, out, err),
         "fsl" => match tool {
-            "mcflirt" => larmorx_mri::cli::run("hmc", args, out, err),
-            "standard_space_roi" | "bet" => {
+            "mcflirt" => larmorx_mri::cli::run_given("hmc", args, &given, out, err),
+            _ => {
+                // FSL's settings table holds the process environment, with larmorx's own
+                // options in place of the variables they replace
+                let mut settings = larmorx_fsl::cli::Settings::from_process();
+                for (name, value) in given.environment() {
+                    match value {
+                        Some(v) => settings.vars.insert(name.to_owned(), v),
+                        None => settings.vars.remove(name),
+                    };
+                }
                 // FSL's standard images may be read from larmorx-nc's installed copy, as data
                 // (`specs/bet.md` §5.4): its program found as the replica search finds it
-                let mut settings = larmorx_fsl::cli::Settings::from_process();
-                if !settings.vars.contains_key(larmorx_fsl::data::NC_ENV)
+                if matches!(tool, "standard_space_roi" | "bet")
+                    && !settings.vars.contains_key(larmorx_fsl::data::NC_ENV)
                     && let Ok(Some(p)) = replica::find(&replica::LARMORX_NC, &options.replica_dirs)
                 {
                     settings.vars.insert(
@@ -256,9 +407,8 @@ fn run_tool(
                 }
                 larmorx_fsl::cli::run_with(tool, args, &settings, out, err)
             }
-            _ => larmorx_fsl::cli::run(tool, args, out, err),
         },
-        "mri" => larmorx_mri::cli::run(tool, args, out, err),
+        "mri" => larmorx_mri::cli::run_given(tool, args, &given, out, err),
         "sdcflows" if PYTHON_TOOLS.contains(&tool) => {
             let written = writeln!(
                 err,
@@ -401,14 +551,20 @@ fn usage(prog: &str) -> String {
     format!(
         "larmorx {version}: neuroimaging tools in Rust with original-compatible command lines
 
-Usage: {prog} <family> <tool> [original arguments]
+Usage: {prog} [options] <family> <tool> [original arguments]
        {prog} --version | --help
 
 Tools:
 {tools}
-Options:
-  -h, --help     Print this help
-  -V, --version  Print the version
+Options (before the family; each one given wins over the environment variable it replaces):
+  --n-threads N            threads, 0 = every logical CPU (default); replaces OMP_NUM_THREADS, NSLOTS
+  --implementation NAME    auto (default), replica or clean-room; replaces LARMORX_IMPLEMENTATION
+  --upstream-defects MODE  fix (default) or reproduce; replaces LARMORX_UPSTREAM_DEFECTS
+  -h, --help               Print this help
+  -V, --version            Print the version
+  The ANTs programs' thread variables are NSLOTS and ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS. A tool
+  whose original has its own thread option uses it when it is given, else --n-threads: tedana
+  t2smap --n-threads, sdcflows sdcflows --nprocs and --omp-nthreads, fsl topup --nthr.
 
 Data:
   {prog} fetch fsl-standard [<package>]   FSL's standard images, fetched ahead into the data cache
@@ -417,8 +573,8 @@ Bit-exact replicas (docs/licensing.md):
 {replicas}
 Environment:
   {env:<23} auto (default): a tool's replica if it is built in or its program is
-  {pad:<23} found, else the original; replica: the replica or exit 127; original:
-  {pad:<23} the original
+  {pad:<23} found, else its clean-room original; replica: the replica or exit 127;
+  {pad:<23} clean-room (old spelling: original): the clean-room original
 {programs}",
         version = larmorx_core::VERSION,
         env = replica::IMPLEMENTATION_ENV,
@@ -463,7 +619,10 @@ mod tests {
     fn help_uses_the_invoked_program_name() {
         let (code, out, _) = run_capture(&["larmorx", "--help"]);
         assert_eq!(code, 0);
-        assert!(out.contains("Usage: larmorx <family> <tool>"), "{out}");
+        assert!(
+            out.contains("Usage: larmorx [options] <family> <tool>"),
+            "{out}"
+        );
         assert!(
             out.contains("afni 3dTshift: built in (Apache-2.0 AND CC-BY-4.0)"),
             "{out}"
@@ -474,7 +633,7 @@ mod tests {
 
         let (code, out, _) = run_capture(&["some/dir/lx.exe", "-h"]);
         assert_eq!(code, 0);
-        assert!(out.contains("Usage: lx <family> <tool>"), "{out}");
+        assert!(out.contains("Usage: lx [options] <family> <tool>"), "{out}");
     }
 
     #[test]
@@ -809,6 +968,7 @@ mod tests {
             .into(),
             dir: None,
             stdin: None,
+            output_type_default: Default::default(),
         };
         let args = [
             "fsl-standard".to_owned(),
@@ -862,5 +1022,20 @@ mod tests {
             err.starts_with("error: unknown option '--frobnicate'"),
             "{err}"
         );
+    }
+
+    /// FSL-11's line has the same words in both implementations: the clean-room originals'
+    /// (`larmorx_mri::hmc::image::fsl11_notice`, a re-export of the core text) and the
+    /// `larmorx-nc` replicas' (`larmorx_core::defects::fsl11_notice`; their lines start
+    /// `larmorx-nc:` instead): a guard should either ever get its own text again.
+    #[test]
+    fn fsl11_has_the_same_words_in_both_implementations() {
+        for tool in ["fslmaths", "bet", "standard_space_roi", "mcflirt"] {
+            assert_eq!(
+                larmorx_core::defects::fsl11_notice(tool),
+                larmorx_mri::hmc::image::fsl11_notice(tool),
+                "{tool}"
+            );
+        }
     }
 }

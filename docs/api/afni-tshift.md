@@ -119,7 +119,7 @@ and `tzero` fMRIPrep passes: `SliceTiming` reversed when the direction ends in `
 | `-verbose` | – | progress on stderr |
 | `-voxshift dset` | – | not supported |
 | (threads: `OMP_NUM_THREADS`) | `n_threads=1` (0 = all CPUs) | AFNI is single-threaded; the result does not depend on the thread count |
-| (`LARMORX_IMPLEMENTATION=auto\|replica\|original`) | `implementation="auto"` | larmorx's choice between the replica and the original (below) |
+| (`--implementation auto\|replica\|clean-room` before the family, or `LARMORX_IMPLEMENTATION`) | `implementation="auto"` | larmorx's choice between the replica and the clean-room original (below) |
 | (`LARMORX_UPSTREAM_DEFECTS=fix\|reproduce`) | `upstream_defects="fix"` | AFNI's defects corrected (default) or reproduced ([upstream defects](#upstream-defects-d13), [upstream-defects.md](upstream-defects.md)) |
 | AFNI's environment variables, `-Dname=value` | `afni_settings={"AFNI_NIFTI_PRIORITY": "Q"}` | the command line reads the process environment, as AFNI does; Python never does: [AFNI's settings in Python](#afnis-settings-in-python) |
 | `-overwrite`, `-ok_1D_text`, `-skip_afnirc` | – | the Python API writes no output file and its own slice-time file |
@@ -131,11 +131,11 @@ img = lx.afni.tshift("bold.nii.gz", slice_times="alt+z")   # implementation="aut
 img.implementation
 # Implementation(kind='replica', package='larmorx', version='0.0.1',
 #                licence='Apache-2.0 AND CC-BY-4.0', program=None)
-lx.afni.tshift("bold.nii.gz", slice_times="alt+z", implementation="original")
+lx.afni.tshift("bold.nii.gz", slice_times="alt+z", implementation="clean-room")
 ```
 
-- **`"auto"`** (the default) runs the bit-exact replica; **`"replica"`** and **`"original"`**
-  force one. Both are part of `pip install larmorx` (on PyPI from 0.1.0rc1, or built from the
+- **`"auto"`** (the default) runs the bit-exact replica; **`"replica"`** and **`"clean-room"`**
+  (`"original"`, 0.1.0rc1's spelling, still works) force one. Both are part of `pip install larmorx` (on PyPI from 0.1.0rc1, or built from the
   repository, `docs/licensing.md`, "Packages"); until 2026-10-29 the replica was the separate
   `larmorx-gpl` package, and `"auto"` ran the original without it.
 - **How it runs** (`docs/licensing.md`, "Choosing at run time"): in the same process (without
@@ -156,11 +156,13 @@ lx.afni.tshift("bold.nii.gz", slice_times="alt+z", implementation="original")
   way (`ValueError`). The checks that need the image (the number of slice times, their range,
   `slice`, `ignore`) come from the implementation that runs: a `ValueError` from the original,
   an `lx.ReplicaError` with AFNI's message from the replica.
-- **Command line:** `larmorx afni 3dTshift` follows the same rule; `LARMORX_IMPLEMENTATION`
-  overrides it. With `-verbose`, the first line names the implementation:
-  `++ implementation: original (larmorx 0.0.1, Apache-2.0), clean-room 3dTshift` or
-  `++ implementation: replica (larmorx 0.0.1, Apache-2.0 AND CC-BY-4.0), bit-exact translation
-  of AFNI 26.3.05's 3dTshift`.
+- **Command line:** `larmorx afni 3dTshift` follows the same rule; `--implementation` before
+  the family (`larmorx --implementation clean-room afni 3dTshift ...`) or
+  `LARMORX_IMPLEMENTATION` overrides it. With `-verbose`, the first line names the
+  implementation: `++ implementation: clean-room (larmorx <version>, Apache-2.0), clean-room
+  3dTshift` or `++ implementation: replica (larmorx <version>, Apache-2.0 AND CC-BY-4.0),
+  bit-exact translation of AFNI 26.3.05's 3dTshift` (0.1.0rc1 named the clean-room original
+  `original` in this line).
 
 ## How AFNI reads and writes NIfTI (reproduced)
 
@@ -267,8 +269,10 @@ Linux, macOS and Windows alike (decided 2026-10-12; behaviour in `specs/3dTshift
 ```
 larmorx afni 3dTshift -tpattern alt+z -prefix out.nii in.nii -overwrite
 larmorx afni 3dTshift -DAFNI_NIFTI_WRITE_TYPE=2 -tpattern alt+z -prefix out.nii in.nii
-AFNI_DECONFLICT=YES larmorx afni 3dTshift -tpattern alt+z -prefix out.nii in.nii   # out_AA1.nii
+AFNI_DECONFLICT=YES larmorx afni 3dTshift -tpattern alt+z -prefix out.nii in.nii
 ```
+
+(the last one, with `out.nii` present, writes `out_AA1.nii`.)
 
 - **`-overwrite`** replaces an existing output (as `AFNI_DECONFLICT=OVERWRITE`, quietly).
   **`-Dname=value`** sets a variable for the run; it wins over the environment, and a later

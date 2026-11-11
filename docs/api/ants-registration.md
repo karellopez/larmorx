@@ -241,8 +241,9 @@ warped = lx.ants.apply_transforms("moving.nii.gz", "fixed.nii.gz", res.transform
 larmorx ants antsRegistration -d 3 -o [out_,out_warped.nii.gz] ... \
     -t SyN[0.1,3,0] -m CC[fixed.nii.gz,moving.nii.gz,1,4] \
     -c [100x70x50x20,1e-6,10] -f 8x4x2x1 -s 3x2x1x0vox
-# out_0GenericAffine.mat, out_1Warp.nii.gz, out_1InverseWarp.nii.gz
 ```
+
+writes `out_0GenericAffine.mat`, `out_1Warp.nii.gz` and `out_1InverseWarp.nii.gz`.
 
 - **Metrics:** every image metric, `Demons` included, each with its derivative per voxel;
   several metrics combined as in a linear stage; masks resampled through the half-way
@@ -371,8 +372,9 @@ larmorx ants antsRegistration -d 3 -o out_ ... \
 larmorx ants antsRegistration -d 3 -o out_ -z 0 \
     -t TimeVaryingVelocityField[0.5,4,3,0,0,0] -m CC[fixed.nii.gz,moving.nii.gz,1,4] \
     -c [100x70x50x20,1e-6,10] -f 8x4x2x1 -s 3x2x1x0vox
-# out_0Warp.nii.gz, out_0InverseWarp.nii.gz, out_0VelocityField.nii.gz
 ```
+
+writes `out_0Warp.nii.gz`, `out_0InverseWarp.nii.gz` and `out_0VelocityField.nii.gz`.
 
 - **Every image metric and the point-set metrics** (a point-set metric cannot come first: ANTs
   allocates the field on its null image and crashes), masks, sampling, several metrics, 2D, 3D

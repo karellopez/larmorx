@@ -348,7 +348,10 @@ its default options: `wordsep_re`, `_wrap_chunks`, `_handle_long_word`), `Lib/sh
 (`get_terminal_size`'s `COLUMNS`), `Objects/floatobject.c` and `Python/pystrtod.c` (`float(str)`,
 `repr(float)`, `'%.Nf'`), `Objects/longobject.c` (`int(str)` in base 10, its underscores and its
 4,300-digit limit). Positional arguments, subparsers, mutually exclusive groups and `fromfile`
-prefixes are not ported (no ported program uses them). Unicode digits and Unicode's
+prefixes are not ported (no ported program uses them). `Parser::parse_given` (2026-11-11) is
+larmorx's own addition: `parse_args` with the destinations of the actions seen (argparse's
+`seen_actions`), so that a replica tells an option given apart from its default (t2smap's
+`--n-threads`). Unicode digits and Unicode's
 non-printable categories beyond the control characters are approximations (documented in the
 module). `json` (2026-11-08): `Lib/json/encoder.py` (`json.dump` with an indent: `_make_iterencode`,
 `py_encode_basestring_ascii`, `float.__repr__` and the special values), for tedana's JSON files.
@@ -367,3 +370,28 @@ any other form is refused at build time. The build script includes `src/pep440.r
 constant; the crate's tests check the conversion. The command line's version tests
 (`crates/larmorx-cli/tests/binaries.rs`, `crates/larmorx-cli/tests/afni_replica_cli.rs`) compare
 `larmorx --version` with it.
+
+## larmorx's own command-line options (`src/cli.rs`, `src/parallel.rs`'s `pool_sizes`; 2026-11-11)
+
+larmorx's own code, ported from nothing. `cli::Overrides` carries what `larmorx --n-threads N
+--upstream-defects MODE <family> ...` gives one run of a tool's command line (the user's decision
+of 2026-11-11: the Python API's names, before the family, each option winning over the
+environment variable it replaces); `crates/larmorx-cli` parses the options. `parallel::pool_sizes`
+lists the sizes of the thread pools started in the process, for the test that checks that
+`--n-threads` reaches each family's tools (`crates/larmorx-cli/tests/options.rs`, which also runs
+the standalone program with each option and with the variable it replaces and compares the
+bytes). `cli::parse` (2026-11-11, relay 1b) reads the options once for every program that takes
+them: `larmorx` (`larmorx_cli::parse_globals`) and the replica programs of the other licence
+families (`larmorx-nc`, `larmorx-gpl`, which depend on this crate and never on `larmorx_cli`);
+each says what its `--implementation` takes (`cli::ImplementationOption`; `cli::ReplicaOnly`:
+`replica`, a no-op, the others refused). `cli::omp_num_threads` is the replica programs' reading
+of `OMP_NUM_THREADS`.
+
+`defects::fsl11_notice` (2026-11-11, relay 2c): FSL-11's notice, the words the clean-room
+originals print (`larmorx_mri::hmc::image::fsl11_notice`, written by the clean role; a test in
+`crates/larmorx-cli` checks the two give the same notice), here so that the `larmorx-nc` replicas,
+which never depend on a clean-room crate, print the same line (`larmorx-nc: upstream defect FSL-11
+(FSL) corrected: ...`). Since relay 3 (clean role, 2026-11-11) the one text: `larmorx_mri`
+re-exports it, and `defects::fsl11_what_fsl_does` says what FSL's program does with the variable
+unset, per tool (its first image stops it, exit 1; `standard_space_roi`'s script goes on after its
+steps stop there and exits 0 without an image: FSL 6.0.7.23 run black box).

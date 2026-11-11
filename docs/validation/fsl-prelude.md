@@ -2,16 +2,16 @@
 
 **All cases agree.** 166 cases on the `standard` tier: 138 pass, 28 rejected by both, 0 expected divergences, 0 failures.
 
-- **Validated:** `larmorx fsl prelude` (larmorx 0.0.1, crate larmorx-fsl: the clean-room original written from specs/prelude.md, Apache-2.0), as a program (`python -m larmorx`, or `LARMORX_PRELUDE_BIN`)
+- **Validated:** `larmorx fsl prelude` (larmorx 0.1.0rc1, crate larmorx-fsl: the clean-room original written from specs/prelude.md, Apache-2.0), as a program (`python -m larmorx`, or `LARMORX_PRELUDE_BIN`)
 - **Reference:** prelude from FSL 6.0.7.23 (fsl-fugue 2603.0, fsl-newimage 2601.0), the conda installation in `~/fsl-6.0.7.23`; the replica (`larmorx-nc fsl prelude`) by default as a black box
-- **Test data:** larmorx-testdata `52124bc98f9f`, tier `standard`
-- **Generated:** 2026-11-07 on Linux x86_64, with `python -m larmorx_validation parity fsl-prelude --tier standard`
+- **Test data:** larmorx-testdata `52e371aab0ac`, tier `standard`
+- **Generated:** 2026-11-11 on Linux x86_64, with `python -m larmorx_validation parity fsl-prelude --tier standard`
 - **Original programs:** 166 runs: 152 from the oracle cache, 14 run (4 never cached: the original varies); cache `<workspace>/oracles/cache`, mode `use`
 
 - **The replica suite's cases and random testing's permanent cases (89), the original standing in for the replica's program:** 69 pass, 20 where both refuse, 0 expected, 0 failures (FSL's runs from the oracle cache under that suite's keys).
 - **The original's own 77 cases:** 69 pass, 8 where both refuse, 0 expected, 0 failures, 0 skipped.
   - with `reproduce` against FSL: 282 of 282 headers and data bit-identical;
-  - by default against the replica's default: 248 of 248 headers and data bit-identical, and 5 of 5 unwrapped phases where GLIBC-07 is named with the replica's integer offsets on at least 99.9 % of the mask's voxels.
+  - by default against the replica's default: 252 of 252 headers and data bit-identical, and 5 of 5 unwrapped phases where GLIBC-07 is named with the replica's integer offsets on at least 99.9 % of the mask's voxels.
 
 ## Thresholds
 
@@ -79,8 +79,8 @@
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (1ca117ed64eb) |
-| larmorx-testdata | 52124bc98f9f |
+| larmorx | 0.1.0rc1 (d300ef431136) |
+| larmorx-testdata | 52e371aab0ac |
 | Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
 | CPU | AMD Ryzen 9 7945HX with Radeon Graphics, 32 logical CPUs |
@@ -251,7 +251,7 @@ The replica suite's cases are run with its own checks, as a black box: larmorx's
 | `orig-types/nifti2-pair-bz2` | pass | 17/17 | `-p ph -a mag -o o -l lab` (FSLOUTPUTTYPE=NIFTI2_PAIR_BZ2) |
 | `orig-types/nifti2-gz` | pass | 17/17 | `-p ph -a mag -o o --savemask=m` (FSLOUTPUTTYPE=NIFTI2_GZ) |
 | `orig-types/nifti-zst` | pass | 17/17 | `-p ph -a mag -o o -r raw` (FSLOUTPUTTYPE=NIFTI_ZST) |
-| `orig-types/unset` | both-error | 9/10 | `-p ph -a mag -o o -v --savemask=m` (FSLOUTPUTTYPE=None) |
+| `orig-types/unset` | both-error | 14/14 | `-p ph -a mag -o o -v --savemask=m` (FSLOUTPUTTYPE=None) |
 | `orig-types/bogus` | both-error | 9/10 | `-p ph -a mag -o o -v --savemask=m` (FSLOUTPUTTYPE=bogus) |
 | `orig-fmriprep/ds001600-sub-1-noreconall/wf_auto_00000` | pass | 15/15 | fMRIPrep 25.2.6's call on ds001600-sub-1-noreconall/wf_auto_00000: clipped.nii.gz clipped_mask.nii.gz sub-1_acq-v1_phas… |
 | `orig-fmriprep/ds001600-sub-1-noreconall/wf_auto_00001` | pass | 15/15 | fMRIPrep 25.2.6's call on ds001600-sub-1-noreconall/wf_auto_00001: clipped.nii.gz clipped_mask.nii.gz sub-1_acq-v2_phas… |

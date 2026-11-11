@@ -126,11 +126,23 @@ _PATH_CHECKS = (
     "the identifiable translation",
 )
 
-#: Deliberate differences (docs/api/mri-hmc.md).
-EXPECTED_CASES = {
+#: Deliberate differences (docs/api/mri-hmc.md): larmorx succeeds where mcflirt fails, in
+#: ``reproduce`` too. None since 2026-11-11 (FSL-11's ``reproduce`` stops as mcflirt does:
+#: :data:`STOPPED_CASES`).
+EXPECTED_CASES: dict[str, str] = {}
+
+#: Runs where mcflirt stops with an error after writing some of its files and larmorx's
+#: ``reproduce`` stops where it does (the same exit status, mcflirt's message, the files it
+#: writes before it stops, the matrices compared as in every run), while larmorx's default goes
+#: on and names the defect (D13): ``(defect, reason)``. Both stop, so the case is rejected by
+#: both when every check passes.
+STOPPED_CASES = {
     "syn/motion/small/no-fsloutputtype": (
-        "Without FSLOUTPUTTYPE, mcflirt writes the .mat files and fails (exit 1); larmorx writes "
-        "every output as .nii.gz (its default)."
+        "FSL-11",
+        "Without FSLOUTPUTTYPE, mcflirt writes the .mat files and stops at its first image with "
+        "FSL's message (exit 1), and so does larmorx with reproduce (the same matrices within the "
+        "thresholds); larmorx's default writes every output, the images as .nii.gz, and names "
+        "FSL-11.",
     ),
 }
 
@@ -631,7 +643,9 @@ def run_case(case: Case, checks: CheckList) -> dict[str, Any]:
         except Exception as e:  # test data not available here
             raise Outcome("skipped", f"input not available: {e}") from e
 
-    def replay(tmp: Path, mode: str) -> tuple[list[int], list[tuple[str, str]]]:
+    def replay(
+        tmp: Path, mode: str, env: dict[str, str] | None = None
+    ) -> tuple[list[int], list[tuple[str, str]]]:
         codes, logs = [], []
         for step in run["steps"]:
             argv = step["argv"][1:]
@@ -639,7 +653,7 @@ def run_case(case: Case, checks: CheckList) -> dict[str, Any]:
                 local(arg, tmp, i > 0 and argv[i - 1] in ("-out", "-o"))
                 for i, arg in enumerate(argv)
             ]
-            code, out, err = _run_larmorx(args, run["env"], mode)
+            code, out, err = _run_larmorx(args, run["env"] if env is None else env, mode)
             codes.append(code)
             logs.append((out, err))
         return codes, logs
@@ -658,6 +672,30 @@ def run_case(case: Case, checks: CheckList) -> dict[str, Any]:
                 detail=f"mcflirt exit {oracle_codes}, larmorx {codes}",
             )
             raise Outcome(EXPECTED, EXPECTED_CASES[name])
+        if name in STOPPED_CASES:
+            defect, reason = STOPPED_CASES[name]
+            checks(
+                "reproduce: the exit status",
+                codes == oracle_codes and not oracle_ok,
+                detail=f"mcflirt {oracle_codes}, larmorx {codes}",
+            )
+            err_path = rdir / "stderr0.txt"
+            message = err_path.read_text(encoding="utf-8") if err_path.is_file() else ""
+            checks(
+                "reproduce: mcflirt's message",
+                bool(message.strip()) and message in logs[-1][1],
+                detail=last_err,
+            )
+            theirs = _outputs(rdir, copied)
+            ours = _outputs(tmp, copied)
+            ref_arg = run["inputs"].get("ref", run["inputs"]["in"])["path"]
+            reference = Path(local(ref_arg, tmp, False))
+            truth, _ = _truth(run)
+            metrics = _compare_run(checks, name, ours, theirs, reference, truth)
+            metrics.update(_stopped_default(checks, replay, run["env"], defect))
+            if all(c.passed for c in checks.checks):
+                raise Outcome(BOTH_ERROR, reason)
+            return metrics
         if not oracle_ok and not ours_ok:
             # mcflirt aborts (signal 6) where larmorx exits 1 with a message.
             same = all(
@@ -711,6 +749,46 @@ def run_case(case: Case, checks: CheckList) -> dict[str, Any]:
         if failed and all(any(k in c.name for k in _PATH_CHECKS) for c in failed):
             raise Outcome(EXPECTED, PATH_DIVERGENCES[name])
     return metrics
+
+
+def _stopped_default(
+    checks: CheckList, replay: Any, env: dict[str, str], defect: str
+) -> dict[str, Any]:
+    """D13 for a run that ``reproduce`` stops where mcflirt does (:data:`STOPPED_CASES`, FSL-11:
+    ``FSLOUTPUTTYPE`` unset): the default goes on (exit 0) and writes what its run with
+    ``FSLOUTPUTTYPE=NIFTI_GZ`` writes, byte for byte, an image among it, naming ``defect``
+    besides that run's notices (the other corrections, FSL-01's and FSL-09's here, are in
+    both)."""
+
+    def files(d: Path) -> dict[str, bytes]:
+        return {q.relative_to(d).as_posix(): q.read_bytes() for q in sorted(d.rglob("*")) if q.is_file()}  # fmt: skip
+
+    with (
+        tempfile.TemporaryDirectory(prefix="lx-hmc-fix-") as unset_name,
+        tempfile.TemporaryDirectory(prefix="lx-hmc-fix-set-") as set_name,
+    ):
+        codes, logs = replay(Path(unset_name), defects.FIX)
+        set_codes, set_logs = replay(Path(set_name), defects.FIX, {**env, "FSLOUTPUTTYPE": "NIFTI_GZ"})  # fmt: skip
+        unset, given = files(Path(unset_name)), files(Path(set_name))
+    entries = defects.notices_in(" ".join(e for _, e in logs))
+    set_entries = defects.notices_in(" ".join(e for _, e in set_logs))
+    checks(
+        "default: goes on, an image written as .nii.gz",
+        all(c == 0 for c in codes) and any(k.endswith(".nii.gz") for k in unset),
+        detail=f"exit {codes}; {len(unset)} files",
+    )
+    checks(
+        "default: the files of FSLOUTPUTTYPE=NIFTI_GZ, byte for byte",
+        all(c == 0 for c in set_codes) and unset == given,
+        detail=f"exit {set_codes}; {sorted(set(unset) ^ set(given)) or 'the same names'}",
+    )
+    checks(
+        f"default: {defect} named, the other notices as with the variable set",
+        defect in entries and defect not in set_entries
+        and [e for e in entries if e != defect] == set_entries,
+        detail=f"unset {entries}; set {set_entries}",
+    )  # fmt: skip
+    return {"fix_entries": entries}
 
 
 #: Notices about a condition whose effect the comparison may not see: FSL-01 names a

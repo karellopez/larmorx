@@ -32,7 +32,8 @@ pipeline).
 - **Command-line compatibility.** `larmorx <family> <program> <the original's arguments>`
   (short alias `lx`), e.g. `larmorx ants antsApplyTransforms ...` or `larmorx afni 3dTshift ...`,
   accepting the original's options; how far messages and exit statuses match is stated in each
-  tool's validation record.
+  tool's validation record. larmorx's own three options (threads, implementation, defect mode)
+  go before the family ([First steps](#first-steps)).
 - **Python bindings.** `import larmorx as lx`: the same tools with typed options, on in-memory
   images.
 - **Cross-platform.** Continuous integration builds the wheels and runs the test suites on
@@ -47,12 +48,12 @@ pipeline).
     never from its source; an exact replica, where one exists, is a separate package under the
     upstream's licence (`larmorx-nc` for FSL, `larmorx-gpl` for tedana's `t2smap`) that runs as a separate program. AFNI's tools have
     both inside larmorx since AFNI 26.3.05 released its MCW code under CC BY 4.0. Tools with both
-    take `implementation="auto" | "replica" | "original"`.
+    take `implementation="auto" | "replica" | "clean-room"`.
 - **Validated, with documented differences.** Every tool has a validation record comparing it
   case by case with the original program ([docs/validation](docs/validation/)). Defects found
   in the originals are recorded ([register](docs/findings/upstream-defects.md)) and corrected by
-  default with a warning; `upstream_defects="reproduce"` (`LARMORX_UPSTREAM_DEFECTS=reproduce`
-  on the command line) gives the original's behaviour, and the parity tests run in that mode
+  default with a warning; `upstream_defects="reproduce"` (`--upstream-defects reproduce` on the
+  command line) gives the original's behaviour, and the parity tests run in that mode
   ([upstream defects](docs/api/upstream-defects.md)).
 
 ## Philosophy
@@ -80,10 +81,16 @@ The project follows the FAIR Principles for Research Software
 ## Installation
 
 ```bash
-pip install larmorx              # the library and the larmorx / lx commands (Apache-2.0)
-pip install "larmorx[prep]"      # + what the larmorprepx pipeline will need (not ready yet)
-pip install "larmorx[all]"       # + [prep] and the replica packages larmorx-nc and larmorx-gpl
+pip install larmorx
 ```
+
+installs the library and the commands `larmorx` and `lx` (Apache-2.0). Two extras add more:
+
+- `pip install "larmorx[prep]"` adds what the `larmorprepx` pipeline will need (not ready yet);
+- `pip install "larmorx[all]"` adds `[prep]` and the replica packages `larmorx-nc` and
+  `larmorx-gpl`.
+
+The quotation marks keep the square brackets from being read by the shell.
 
 The first release, 0.1.0rc1, is a pre-release: pip installs a pre-release by itself only while
 no final release exists; `pip install "larmorx==0.1.0rc1"` (or `pip install --pre larmorx`) asks
@@ -94,7 +101,7 @@ environment, the standalone programs and how to check a download: the documentat
 | Package | What it holds | Its licence, in plain words |
 |---|---|---|
 | `larmorx` | every tool below: the ports, the clean-room originals and the AFNI replicas | [Apache-2.0](LICENSE): any use, commercial use included; keep the licence and the notices. The works it includes and their licences, permissive ones and the Mozilla Public License 2.0 for routines translated from Eigen (whose source stays public), are listed in [NOTICE](NOTICE). |
-| `larmorx-nc` | the exact replicas of FSL's tools | the [FSL Licence](crates-nc/LICENSE): **non-commercial use only**. Once it is installed, the FSL tools' default (`implementation="auto"`) runs these replicas, so FSL's terms then cover your default results; `implementation="original"` (or `LARMORX_IMPLEMENTATION=original` on the command line) runs larmorx's own clean-room originals instead. |
+| `larmorx-nc` | the exact replicas of FSL's tools | the [FSL Licence](crates-nc/LICENSE): **non-commercial use only**. Once it is installed, the FSL tools' default (`implementation="auto"`) runs these replicas, so FSL's terms then cover your default results; `implementation="clean-room"` (`--implementation clean-room` on the command line) runs larmorx's own clean-room originals instead. |
 | `larmorx-gpl` | the exact replica of tedana's `t2smap` | the [GNU GPL version 3](crates-gpl/LICENSE): any use; whoever passes it on, changed or not, must pass on its source under the same licence. |
 
 The two replica packages are separate programs (`larmorx-nc`, `larmorx-gpl`) that larmorx runs as
@@ -140,6 +147,128 @@ templates it downloads on first use (`$HOME/.cache/templateflow`); Docker runs i
 mount a volume at `/root/.cache/templateflow` (or set `TEMPLATEFLOW_HOME` to a mounted folder) to
 keep them. `/opt/larmorx/README.txt` in the image says what it holds and where its licences and
 sources are.
+
+## First steps
+
+**Where pip puts the commands.** pip installs `larmorx`, `lx` and `larmorprepx` into the
+Python environment's folder of programs: `bin` on Linux and macOS, `Scripts` on Windows. For a
+virtual environment named `larmorx-env` that is `larmorx-env/bin` or `larmorx-env\Scripts`, and
+activating the environment puts it on the `PATH`, so the commands work by their names. Without a
+virtual environment, pip names the folder in a warning when it is not on the `PATH`; this prints
+it (in PowerShell, with `python` for `python3`):
+
+```bash
+python3 -c "import sysconfig; print(sysconfig.get_path('scripts'))"
+```
+
+After `pip install --user`, the folder is `sysconfig.get_path('scripts',
+sysconfig.get_preferred_scheme('user'))` instead. `python3 -m larmorx` (`python -m larmorx` on
+Windows), followed by the same arguments, runs the same command without the folder on the `PATH`.
+
+**larmorx's own options** (new since 0.1.0rc1, so in the next release; in 0.1.0rc1 the
+environment variables of the table do the same, as the documentation site's
+[installation page](https://karellopez.github.io/larmorx_documentation/installation/) shows):
+
+```text
+larmorx [--n-threads N] [--implementation auto|replica|clean-room] [--upstream-defects fix|reproduce] <family> <tool> <the original's arguments>
+```
+
+They stand between `larmorx` (or `lx`) and the family, so they never clash with the original
+programs' options: everything after the family belongs to the tool. Each one takes the values of
+the Python argument of the same name and of the environment variable it replaces, and wins over
+that variable when both are set; `--n-threads 4` and `--n-threads=4` are the same.
+
+| Command line | Python argument | Environment variable it replaces | Values |
+|---|---|---|---|
+| `--n-threads N` | `n_threads` | `OMP_NUM_THREADS`; for ANTs' tools `ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS` and `NSLOTS` | the number of threads; `0`, the command line's default, is every logical CPU (Python's default is 1) |
+| `--implementation NAME` | `implementation` | `LARMORX_IMPLEMENTATION` | `auto` (the default): a tool's exact replica when it is built in or installed, otherwise its clean-room original; `replica`; `clean-room` |
+| `--upstream-defects MODE` | `upstream_defects` | `LARMORX_UPSTREAM_DEFECTS` | `fix` (the default): the original program's known defects corrected, each with a notice (below); `reproduce`: the original program's result |
+
+`clean-room` was spelled `original` in 0.1.0rc1: that spelling still works (Python adds a
+`DeprecationWarning`). A tool whose original program has its own thread option uses it when it
+is given, otherwise `--n-threads`: tedana's `t2smap --n-threads`, sdcflows' `--nprocs` and
+`--omp-nthreads`, FSL's `topup --nthr`. The replica programs `larmorx-nc` and `larmorx-gpl` take
+`--n-threads` and `--upstream-defects` in the same place; their `--implementation` takes only
+`replica`, the one implementation they hold. `larmorx --help` lists the options.
+
+**An example, start to end**, on one participant of the public OpenNeuro dataset
+[ds000005](https://openneuro.org/datasets/ds000005) (public domain, PDDL; 21 MB): a new virtual
+environment, the two images downloaded, then ANTs' bias-field correction on four threads, FSL's
+brain extraction, head-motion correction and registration, and AFNI's brain mask computed by the
+replica (the default) and by the clean-room original. FSL's tools write `.nii.gz` files and say so
+in one line each (`upstream defect FSL-11 ... corrected`, below): FSL's own programs need
+`FSLOUTPUTTYPE` and stop without it, larmorx's do not (new since 0.1.0rc1, whose FSL tools other
+than `flirt` and `mcflirt` need it as FSL's do). Set it to choose another type, as with FSL
+(`export FSLOUTPUTTYPE=NIFTI` writes `.nii` files; `$env:FSLOUTPUTTYPE = "NIFTI"` in PowerShell).
+The last command gives the original N4's result instead of the corrected one. On Linux and macOS
+(bash or zsh), with Python 3.12 or newer as `python3` (macOS's own `python3` is older: install one
+from [python.org](https://www.python.org) or Homebrew):
+
+```bash
+python3 -m venv larmorx-env
+source larmorx-env/bin/activate
+pip install larmorx
+mkdir larmorx-demo
+cd larmorx-demo
+curl -L -o t1w.nii.gz https://s3.amazonaws.com/openneuro.org/ds000005/sub-01/anat/sub-01_T1w.nii.gz
+curl -L -o bold.nii.gz https://s3.amazonaws.com/openneuro.org/ds000005/sub-01/func/sub-01_task-mixedgamblestask_run-01_bold.nii.gz
+larmorx --n-threads 4 ants N4BiasFieldCorrection -d 3 -i t1w.nii.gz -o t1w_n4.nii.gz
+larmorx fsl bet t1w_n4.nii.gz t1w_brain -R -m
+larmorx fsl mcflirt -in bold.nii.gz -out bold_mcf -plots
+larmorx fsl fslmaths bold_mcf -Tmean bold_mean
+larmorx afni 3dAutomask -prefix bold_mask.nii.gz bold_mean.nii.gz
+larmorx --implementation clean-room afni 3dAutomask -prefix bold_mask_clean_room.nii.gz bold_mean.nii.gz
+larmorx fsl fslmaths bold_mean -mas bold_mask bold_brain
+larmorx fsl flirt -in bold_brain -ref t1w_brain -dof 6 -omat bold2t1w.mat -out bold2t1w
+larmorx --upstream-defects reproduce ants N4BiasFieldCorrection -d 3 -i t1w.nii.gz -o t1w_n4_ants.nii.gz
+```
+
+On Windows, in PowerShell, with Python 3.12 or newer as `python` (python.org's installer puts it
+on the `PATH` when "Add python.exe to PATH" is ticked; otherwise write `py` for `python` in the
+first line):
+
+```powershell
+python -m venv larmorx-env
+larmorx-env\Scripts\Activate.ps1
+pip install larmorx
+mkdir larmorx-demo
+cd larmorx-demo
+curl.exe -L -o t1w.nii.gz https://s3.amazonaws.com/openneuro.org/ds000005/sub-01/anat/sub-01_T1w.nii.gz
+curl.exe -L -o bold.nii.gz https://s3.amazonaws.com/openneuro.org/ds000005/sub-01/func/sub-01_task-mixedgamblestask_run-01_bold.nii.gz
+larmorx --n-threads 4 ants N4BiasFieldCorrection -d 3 -i t1w.nii.gz -o t1w_n4.nii.gz
+larmorx fsl bet t1w_n4.nii.gz t1w_brain -R -m
+larmorx fsl mcflirt -in bold.nii.gz -out bold_mcf -plots
+larmorx fsl fslmaths bold_mcf -Tmean bold_mean
+larmorx afni 3dAutomask -prefix bold_mask.nii.gz bold_mean.nii.gz
+larmorx --implementation clean-room afni 3dAutomask -prefix bold_mask_clean_room.nii.gz bold_mean.nii.gz
+larmorx fsl fslmaths bold_mean -mas bold_mask bold_brain
+larmorx fsl flirt -in bold_brain -ref t1w_brain -dof 6 -omat bold2t1w.mat -out bold2t1w
+larmorx --upstream-defects reproduce ants N4BiasFieldCorrection -d 3 -i t1w.nii.gz -o t1w_n4_ants.nii.gz
+```
+
+If PowerShell refuses `Activate.ps1` because running scripts is disabled on the computer,
+`Set-ExecutionPolicy -Scope Process RemoteSigned` allows it in that window only. Each command
+writes its results into `larmorx-demo`; `deactivate` leaves the virtual environment.
+
+**What the `upstream defect ... corrected` lines mean.** Some commands print a notice such as
+
+```text
+larmorx: upstream defect ANTS-40 (N4BiasFieldCorrection) corrected: 6208 of the 92160 voxels N4 uses have no logarithm (6208 are 0, 0 negative or NaN): they are left out of the histogram and the fit; ITK keeps them in its log image as they are (0 is the log of 1) [LARMORX_UPSTREAM_DEFECTS=reproduce gives N4BiasFieldCorrection's result]
+```
+
+It is not an error (the command still ends with exit status 0). It says that a known defect of
+the original program (here ANTs' N4) would have changed this result, and that larmorx computed
+the corrected result, as it does by default. The code (`ANTS-40`) is the defect's entry in the
+[register](docs/findings/upstream-defects.md), and the [upstream defects](docs/api/upstream-defects.md)
+page explains the rules. To get the original program's result, bit for bit, give
+`--upstream-defects reproduce` before the family (the notice's `LARMORX_UPSTREAM_DEFECTS=reproduce`
+is the same setting as an environment variable; `upstream_defects="reproduce"` in Python); the
+notice then says `reproduced`. FSL-11's notice (`FSLOUTPUTTYPE` not set, the images written as
+`.nii.gz`) is printed once per command that writes an image; with `--upstream-defects reproduce`
+an FSL tool stops at its first image with FSL's message, as FSL's does (`standard_space_roi`'s
+script goes on and exits 0 without an image, as FSL's: its notice says so). The replica programs' notices start with `larmorx-nc:` or
+`larmorx-gpl:`, and AFNI's tools print theirs as AFNI's warnings (`*+ WARNING: upstream defect
+AFNI-99 (3dvolreg) corrected: ...`).
 
 ## Usage
 
@@ -249,7 +378,7 @@ The repo expects to live inside a workspace directory, next to read-only clones 
 ```bash
 mkdir -p ~/work/super_fmriprep && cd ~/work/super_fmriprep
 git clone https://github.com/karellopez/larmorx.git
-python3.12 -m venv .venv           # Python >= 3.12
+python3.12 -m venv .venv
 larmorx/scripts/bootstrap_workspace.sh --venv .venv --install-rust
 ```
 
@@ -263,13 +392,17 @@ You need Rust (stable, via rustup) and Python ≥ 3.12. From the repo, with the 
 
 ```bash
 source ../.venv/bin/activate
-pip install --group dev          # maturin, pytest, packaging, nibabel, ruff (pip >= 25.1)
-maturin develop --release        # build the larmorx._core extension into the venv
-cargo test --workspace           # Rust tests
-pytest tests/python tests/golden # Python tests and the cross-platform golden tests
+pip install --group dev
+maturin develop --release
+cargo test --workspace
+pytest tests/python tests/golden
 cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings
 ruff check && ruff format --check
 ```
+
+In order: the development tools (maturin, pytest, packaging, nibabel, ruff; pip 25.1 or newer
+reads `--group`), the `larmorx._core` extension built into the virtual environment, the Rust
+tests, the Python tests with the cross-platform golden tests, and the linters.
 
 The FSL replicas are a separate Cargo workspace: `cd crates-nc && cargo test --workspace`; `crates-gpl` holds tedana's `t2smap` replica (`cd crates-gpl && cargo test -p larmorx-gpl-tedana -p larmorx-gpl-cli`) and verification tools (`crates-gpl/README.md`)
 (build its wheel with `maturin build --release`).
@@ -278,12 +411,17 @@ Parity checks and benchmarks need the test data (`larmorx-testdata`, github.com/
 
 ```bash
 pip install -e ../larmorx-testdata -e "validation[oracles]"
-pytest tests/parity                                             # parity with the reference tools (smoke tier)
+pytest tests/parity
 python -m larmorx_validation parity nifti-io --tier standard --out docs/validation
 python -m larmorx_validation bench nifti-io --out docs/benchmarks
-python -m larmorx_validation difftest --tools all --budget 6 --jobs 4   # a night of random testing
-python -m larmorx_validation tables --check                     # the generated tables are current
+python -m larmorx_validation difftest --tools all --budget 6 --jobs 4
+python -m larmorx_validation tables --check
 ```
+
+In order: the test data and the validation package; the parity suites' smoke tier, which
+compares larmorx with the reference programs; one tool's parity suite (its standard tier) and
+benchmark, written into the repository's records; six hours of differential random testing on
+four processes; and the check that the generated tables are current.
 
 | Path | Contents |
 |---|---|

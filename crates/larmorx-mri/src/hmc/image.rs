@@ -457,6 +457,15 @@ pub const OUTPUT_TYPES: [&str; 16] = [
     "NIFTI2_PAIR_BZ2",
 ];
 
+/// FSL's image layer's message when `FSLOUTPUTTYPE` is not set (`specs/bet.md` §3.1), printed when
+/// the first image is written; the program then exits 1 (FSL-11).
+pub const FSLOUTPUTTYPE_UNSET: &str = "ERROR:: Environment variable FSLOUTPUTTYPE is not set!\nPlease make sure that the appropriate configuration file is sourced by your shell (e.g. by putting it in .profile).\ne.g. bash or sh users add the line \". ${FSLDIR}/etc/fslconf/fsl.sh\"\ne.g. tcsh or csh users add the line \"source ${FSLDIR}/etc/fslconf/fsl.csh\"\n";
+
+/// FSL-11's notice for a run of the FSL program `tool` with `FSLOUTPUTTYPE` unset whose images
+/// were written as `NIFTI_GZ` (the default; with `reproduce` the run does what FSL's does): the
+/// one text in `larmorx_core::defects`, which the `larmorx-nc` replicas print too.
+pub use larmorx_core::defects::fsl11_notice;
+
 /// FSL 6.0.7.23's message for an `FSLOUTPUTTYPE` it does not know (§10.1, observed).
 pub fn unknown_output_type_message(value: &str) -> String {
     format!(
@@ -600,13 +609,17 @@ pub fn integer_range(data_type: DataType) -> Option<(f64, f64)> {
 }
 
 /// The FSL-09 notice for the integer output `path` of `data_type`, whose conversion of the series
-/// mcflirt writes rounds and truncates differently as `conversion` says.
+/// the program `program` writes (mcflirt: [`defects::FSL_09`]; FSL's other programs:
+/// [`defects::Defect::of`] it, so that the notice names the program that ran) rounds and
+/// truncates differently as `conversion` says.
 pub fn fsl09_notice(
+    program: &'static defects::Defect,
     path: &Path,
     conversion: Conversion,
     data_type: DataType,
     defects: UpstreamDefects,
 ) -> Notice {
+    let tool = program.tool;
     let what = format!(
         "{} of its values convert differently when rounded than when truncated, {} lie outside \
          the {data_type} range",
@@ -614,17 +627,17 @@ pub fn fsl09_notice(
     );
     let detail = match defects {
         UpstreamDefects::Fix => format!(
-            "{}: integer output is rounded to the nearest and clamped; mcflirt truncates and \
+            "{}: integer output is rounded to the nearest and clamped; {tool} truncates and \
              wraps around ({what})",
             path.display()
         ),
         UpstreamDefects::Reproduce => format!(
-            "{}: integer output is truncated and wraps around beyond its range, as mcflirt does \
+            "{}: integer output is truncated and wraps around beyond its range, as {tool} does \
              on x86-64 ({what})",
             path.display()
         ),
     };
-    Notice::new(&defects::FSL_09, defects, detail)
+    Notice::new(program, defects, detail)
 }
 
 /// The `xyzt_units` of an output written like an input with `units`: mcflirt always writes
@@ -883,7 +896,7 @@ pub fn write_like_files(
     if conversion != Conversion::default() {
         defects::push_once(
             &mut notices,
-            fsl09_notice(path, conversion, data_type, defects),
+            fsl09_notice(&defects::FSL_09, path, conversion, data_type, defects),
         );
     }
     let compression = Compression::of_name(&path.to_string_lossy());

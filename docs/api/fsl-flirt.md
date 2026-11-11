@@ -17,7 +17,7 @@ and the clean-room **original** of `flirt` and `convert_xfm` in the main package
 `crates/larmorx-fsl`, written from [`specs/flirt.md`](../../specs/flirt.md) on the registration
 engine it shares with `lx.mri.hmc`; part 1, 2026-11-02: [PROVENANCE](../../crates/larmorx-fsl/PROVENANCE.md),
 section "FLIRT"). `implementation="auto"` runs the replica when `larmorx-nc` is installed, else
-the original; `"original"` runs the original in this process. Of FLIRT's other programs,
+the clean-room original; `"clean-room"` (`"original"`, 0.1.0rc1's spelling, still works) runs the clean-room original in this process. Of FLIRT's other programs,
 `avscale`, the coordinate programs, `rmsdiff` and `makerot` have their clean-room original too
 (part 2 of the original, 2026-11-02); `midtrans`, `pointflirt`, `applyxfm4D` and the scripts have
 their replica only for now (`"auto"` needs `larmorx-nc` for them). The command line chooses alike
@@ -140,8 +140,8 @@ weights and, with `-cost bbr`, BBR's `debug` volume).
 
 ## The clean-room original (part 1, 2026-11-02)
 
-`lx.fsl.flirt(..., implementation="original")`, `lx.fsl.convert_xfm(..., implementation="original")`,
-`LARMORX_IMPLEMENTATION=original larmorx fsl flirt|convert_xfm` (crate `larmorx-fsl`, module
+`lx.fsl.flirt(..., implementation="clean-room")`, `lx.fsl.convert_xfm(..., implementation="clean-room")`,
+`larmorx --implementation clean-room fsl flirt|convert_xfm` (crate `larmorx-fsl`, module
 `flirt`; Apache-2.0, written from [`specs/flirt.md`](../../specs/flirt.md) by an implementer who
 never read FSL's source or the replica). It runs on the main package's clean-room registration
 engine, shared with `lx.mri.hmc` (`larmorx_mri::hmc`: the parametrisation, the cost sampling and
@@ -163,8 +163,8 @@ search's grid points, the large evaluations' slices, the pyramid's filters, the 
 and the output's slices run in parallel, each result folded in a fixed order.
 
 **FLIRT's other programs (part 2, relay 1, 2026-11-02).** `avscale`, `img2imgcoord`,
-`std2imgcoord`, `img2stdcoord`, `rmsdiff` and `makerot` (`LARMORX_IMPLEMENTATION=original larmorx
-fsl <program>`, `lx.fsl.<program>(..., implementation="original")`; crate `larmorx-fsl`, modules
+`std2imgcoord`, `img2stdcoord`, `rmsdiff` and `makerot` (`larmorx --implementation clean-room
+fsl <program>`, `lx.fsl.<program>(..., implementation="clean-room")`; crate `larmorx-fsl`, modules
 `flirt::programs` and `cli::{avscale, coords, rmsdiff, makerot, common}`), complete: every option,
 usage, message, exit status and failure case of §15.1 to §15.4 (where FSL aborts, the same lines
 and exit status 1), standard input for the coordinate programs (their prompts, `std2imgcoord`'s
@@ -310,8 +310,14 @@ count's running total taking each point's weight as the point is visited).
 Corrected by default, FSL's behaviour with `upstream_defects="reproduce"`
 ([register](../findings/upstream-defects.md)):
 - **FSL-09**: integer outputs rounded to the nearest and clamped (FLIRT truncates; int8 kept as
-  int8, FLIRT writes uint8).
-- **FSL-11**: `FSLOUTPUTTYPE` unset writes `.nii.gz`.
+  int8, FLIRT writes uint8); the notice names the program that wrote the output (flirt,
+  applyxfm4D).
+- **FSL-11**: with `FSLOUTPUTTYPE` unset FSL's flirt and applyxfm4D stop with FSL's message at
+  their first image (exit 1; `-omat` alone writes no image, and runs; with `-out` the matrix is
+  written first). Both implementations, the clean-room original and the replica, write the images
+  as `NIFTI_GZ` (`.nii.gz`: the bytes `FSLOUTPUTTYPE=NIFTI_GZ` gives) and name FSL-11 on one line
+  per command, in the same words (the replica's line starts `larmorx-nc:`); `reproduce` stops as
+  FSL does. Command line only: the Python functions set the type themselves.
 - **FSL-14**: non-finite voxels left out of the costs (one NaN makes FLIRT's cost NaN).
 - **FSL-56**: NIfTI extensions' offset.
 - **FSL-68**: an error after the command line (an image or matrix that cannot be read, an unknown

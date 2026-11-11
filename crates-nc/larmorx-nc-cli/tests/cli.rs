@@ -3,7 +3,9 @@
 //! The `larmorx-nc fsl mcflirt` command line end to end, on a tiny generated series: mcflirt's
 //! messages and exit statuses for its usage errors and failure cases, each corrected by default
 //! and reproduced with `LARMORX_UPSTREAM_DEFECTS=reproduce` (D13). The texts are mcflirt's
-//! (FSL 6.0.7.17, checked against the oracle by the parity suite `fsl-mcflirt-replica`).
+//! (FSL 6.0.7.17, checked against the oracle by the parity suite `fsl-mcflirt-replica`). Also
+//! larmorx's own options before the family (`--n-threads`, `--upstream-defects`,
+//! `--implementation replica`): the bytes of the variables they replace, winning over them.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -233,6 +235,11 @@ fn failures_corrected_and_reproduced() {
     );
     assert_eq!(o.code, 0, "{}", o.stderr);
     assert!(dir.join("unset.nii.gz").is_file());
+    assert!(
+        named(&o.stderr).contains(&"FSL-11".to_owned()),
+        "{}",
+        o.stderr
+    );
     let o = mcflirt(
         dir,
         &["-in", b, "-out", "unset2", "-mats", "-stages", "1"],
@@ -504,4 +511,147 @@ fn negative_bins_fsl_66() {
         o.stderr
     );
     assert!(run.join("o.nii").is_file());
+}
+
+// -------------------------------------------------------------------------------------------
+// larmorx's own options before the family (the user's decision of 2026-11-11): `larmorx-nc
+// [--n-threads N] [--upstream-defects MODE] [--implementation replica] fsl <tool> ...`.
+
+/// The variables the options replace (and larmorx's choice of implementation), removed from
+/// every run below unless a case sets them.
+const VARIABLES: [&str; 3] = [
+    "OMP_NUM_THREADS",
+    "LARMORX_UPSTREAM_DEFECTS",
+    "LARMORX_IMPLEMENTATION",
+];
+
+/// A run of mcflirt with `options` before the family and the variables `env` in a fresh
+/// folder (relative names, so that nothing names the folder): its exit status, standard output
+/// and error, and every file it wrote with its bytes.
+fn with_options(
+    options: &[&str],
+    env: &[(&str, &str)],
+) -> (i32, String, String, Vec<(String, Vec<u8>)>) {
+    let d = tempfile::tempdir().unwrap();
+    let dir = d.path();
+    series(dir);
+    let mut c = Command::new(EXE);
+    c.args(options)
+        .args(["fsl", "mcflirt", "-in", "bold.nii", "-out", "t.nii"])
+        .args(["-meanvol", "-mats", "-plots"])
+        .current_dir(dir)
+        .env("FSLOUTPUTTYPE", "NIFTI");
+    for v in VARIABLES {
+        c.env_remove(v);
+    }
+    for (k, v) in env {
+        c.env(k, v);
+    }
+    let o = c.output().unwrap();
+    let files = files_under(dir, &["bold.nii"])
+        .into_iter()
+        .map(|f| {
+            let bytes = std::fs::read(dir.join(&f)).unwrap();
+            (f, bytes)
+        })
+        .collect();
+    (
+        o.status.code().unwrap_or(-1),
+        String::from_utf8_lossy(&o.stdout).into_owned(),
+        String::from_utf8_lossy(&o.stderr).into_owned(),
+        files,
+    )
+}
+
+/// Each option gives the bytes the variable it replaces gives (exit status, messages, files).
+#[test]
+fn the_options_give_the_variables_bytes() {
+    for (options, env) in [
+        (&["--n-threads", "3"][..], &[("OMP_NUM_THREADS", "3")][..]),
+        (&["--n-threads=1"][..], &[("OMP_NUM_THREADS", "1")][..]),
+        (&["--n-threads", "0"][..], &[][..]),
+        (
+            &["--upstream-defects", "reproduce"][..],
+            &[("LARMORX_UPSTREAM_DEFECTS", "reproduce")][..],
+        ),
+        (
+            &["--upstream-defects=fix"][..],
+            &[("LARMORX_UPSTREAM_DEFECTS", "fix")][..],
+        ),
+        (&["--implementation", "replica"][..], &[][..]),
+    ] {
+        let a = with_options(options, &[]);
+        let b = with_options(&[], env);
+        assert_eq!(a.0, 0, "{options:?}: {}", a.2);
+        assert!(a == b, "{options:?} and {env:?} differ:\n{}\n{}", a.2, b.2);
+        assert!(
+            a.3.iter().any(|(f, _)| f.ends_with("mean_reg.nii")),
+            "{:?}",
+            a.3
+        );
+    }
+    // fix and reproduce differ here (FSL-08: the -meanvol image's name), so the mode is seen
+    let fix = with_options(&["--upstream-defects", "fix"], &[]);
+    let reproduce = with_options(&["--upstream-defects", "reproduce"], &[]);
+    assert!(
+        fix.3.iter().any(|(f, _)| f == "t_mean_reg.nii"),
+        "{:?}",
+        fix.3
+    );
+    assert!(
+        reproduce.3.iter().any(|(f, _)| f == "t.nii_mean_reg.nii"),
+        "{:?}",
+        reproduce.3
+    );
+}
+
+/// An option given wins over its variable, which is then not read (a wrong value in it is no
+/// error); larmorx's choice of implementation in the environment changes nothing here.
+#[test]
+fn an_option_wins_over_its_variable() {
+    let fix = with_options(&[], &[]);
+    for env in [
+        &[("LARMORX_UPSTREAM_DEFECTS", "reproduce")][..],
+        &[("LARMORX_UPSTREAM_DEFECTS", "bogus")][..],
+    ] {
+        let a = with_options(&["--upstream-defects", "fix"], env);
+        assert!(a == fix, "{env:?}: {}", a.2);
+    }
+    let reproduce = with_options(&[], &[("LARMORX_UPSTREAM_DEFECTS", "reproduce")]);
+    let a = with_options(
+        &["--upstream-defects", "reproduce"],
+        &[("LARMORX_UPSTREAM_DEFECTS", "fix")],
+    );
+    assert!(a == reproduce, "{}", a.2);
+    let a = with_options(&["--n-threads", "2"], &[("OMP_NUM_THREADS", "x")]);
+    assert!(a == fix, "{}", a.2);
+    // the variable alone, wrong: D13's own error, as before
+    let (code, out, err, files) = with_options(&[], &[("LARMORX_UPSTREAM_DEFECTS", "bogus")]);
+    assert_eq!((code, out.as_str()), (2, ""));
+    assert!(err.starts_with("Error: "), "{err}");
+    assert!(files.is_empty(), "{files:?}");
+    for implementation in ["clean-room", "auto", "replica"] {
+        let a = with_options(&[], &[("LARMORX_IMPLEMENTATION", implementation)]);
+        assert!(a == fix, "LARMORX_IMPLEMENTATION={implementation}: {}", a.2);
+    }
+}
+
+/// `--implementation` other than `replica`: a usage error, nothing run.
+#[test]
+fn implementation_other_than_replica_is_refused() {
+    for refused in ["clean-room", "auto", "original"] {
+        let (code, out, err, files) = with_options(&["--implementation", refused], &[]);
+        assert_eq!((code, out.as_str()), (2, ""), "{refused}");
+        assert!(files.is_empty(), "{refused}: {files:?}");
+        assert!(
+            err.starts_with(&format!(
+                "error: --implementation {refused}: this program runs the bit-exact replicas only"
+            )),
+            "{err}"
+        );
+        assert!(
+            err.ends_with("\nRun 'larmorx-nc --help' for usage.\n"),
+            "{err}"
+        );
+    }
 }

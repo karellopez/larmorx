@@ -154,8 +154,11 @@ at a time:
    (9) the confounds (nipype's CompCor, DVARS, framewise displacement, the non-steady-state detector; fMRIPrep's
    confound steps: nothing from FreeSurfer); (10) the templates (item 8). Then FreeSurfer (its oracle runs first,
    then `mri_coreg`, `lta_convert`, `mri_robust_template`, which fMRIPrep runs without `recon-all`), surfaces
-   (item 8); larmorprepx (item 9). **Later** (the user, 2026-11-06): a clean-room original of every program, the
-   permissive ports included, as the next-generation implementation; the completeness parts (proposed, after
+   (item 8); larmorprepx (item 9). **After FreeSurfer, in one block, before the final validation phase** (the user,
+   2026-11-06 and 11-11; decision log): a clean-room original of every program, the permissive ports included
+   (sdcflows' field maps, ANTs and ITK, fMRIPrep's resampler, nitransforms, the confounds, fMRIPrep's Python
+   steps), as the next-generation implementation (tedana's `t2smap` keeps its clean-room original before
+   FreeSurfer: LGPL, without it the main package has no `t2smap`); the completeness parts (proposed, after
    FreeSurfer: ANTs' missing operations and image kinds, the clean-room `-gdt`, 3dTshift's `-voxshift` and AFNI's own
    format, the replicas' refused paths, FSL's scripts); **after FreeSurfer** (the user, 2026-11-06): FSL's FNIRT,
    `applywarp`, `convertwarp` and `fugue`, each a replica and a clean-room original, then the FLIRT pieces that wait
@@ -749,10 +752,61 @@ The items below keep their history.
    2026-11-10 and 11; decision log): the release workflow, the three packages, the standalone programs,
    two container images, the clean-machine checks and the documents (`RELEASING.md`, `CHANGELOG.md`,
    `CITATION.cff`); **published 2026-11-11** (the tag `v0.1.0rc1`'s run 42962342043, every job green
-   after the user's approval: PyPI, the GitHub Release, both images); then 0.1.0, once rc1 installs
-   cleanly on the six platforms (below).
+   after the user's approval: PyPI, the GitHub Release, both images); **the next release once the full
+   pipeline exists** (the user, 2026-11-11: "I do not really want to release yet until we have the full
+   pipeline. Just fix all this and do the things before Freesurfer."; below). **The easy command line:
+   done** (2026-11-11, from the user's hand tests of rc1 on macOS's zsh and Windows' PowerShell, before
+   `t2smap`'s clean-room part; six relays, `validation/investigations/easy-cli/README.md`; decision
+   log): larmorx's own options before the family (`larmorx [--n-threads N] [--implementation
+   auto|replica|clean-room] [--upstream-defects fix|reproduce] <family> <tool> ...`, the Python
+   arguments' names, each winning over the variable it replaces; the same in `larmorx-nc` and
+   `larmorx-gpl`, where `--implementation` takes `replica` only); `clean-room` for `original` everywhere
+   (`original` still accepted, Python with a `DeprecationWarning`); the console script shows a tool's
+   messages while it runs (0.1.0rc1's showed them at the end: a long `antsRegistration -v` looked
+   frozen); FSL-11 for every FSL tool in both implementations, one notice text saying what FSL's program
+   does instead (`FSLOUTPUTTYPE` optional now) and FSL-09's notice naming the program that ran; the
+   README's First steps and the site's, tested as typed in bash, an interactive zsh and Windows
+   PowerShell 5.1; no comments in copyable shell blocks, with a test in both repositories; PyPI's
+   author; `check_install.py`'s temporary files. Golden checksums unchanged; every record unchanged but
+   mri-hmc's and fsl-prelude's, re-made for one case each (mri-hmc's `syn/motion/small/no-fsloutputtype` now rejected by both, with 13 checks, as mcflirt stops; fsl-prelude's `orig-types/unset` 14 of 14 checks; their site evidence exported again).
 
 ## Follow-ups, when they fit
+- **From the orchestrator, 2026-11-11.**
+  - *OpenBLAS's block on AMD Zen 4/5:* OpenBLAS 0.3.31 and later sets `GEMM_Q` to 512 on this machine's CPU even with
+    `OPENBLAS_CORETYPE=Haswell`, so numpy 2.5.4 (the "newest" environment) blocks large products differently from a
+    real Haswell CPU and from fMRIPrep's image (256), and can crash or hang in that setting (NP-09); any
+    `OPENBLAS_L2_SIZE` other than 1024 keeps 256 (the confounds' part, `docs/findings/confounds-blas.md` once merged).
+    At a quiet boundary: set it in `scripts/orchestration/env.sh` for every agent, add it to the oracle-output cache's
+    key for numpy runs, and re-check every earlier record made in the newest environment on this machine whose calls
+    reach products deeper than 256 (t2smap's replica record, sdcflows' fit, `numpy_linalg`'s tall matrices).
+  - *The oracle-output cache does not record empty directories:* a replay cannot show a directory the original made
+    without files in it (tedana's output directory after a failed `--exclude`, 2026-11-11, first taken for a
+    difference). Record directories too, or state the limit in `docs/validation/oracle-cache.md` and have suites
+    that check directories run the original directly.
+- **From the easy command line's part (2026-11-11; six relays, the clean and the replica-side roles;
+  `validation/investigations/easy-cli/README.md`).** Left:
+  - *A failed check under an outcome other than a pass goes unseen:* `parity.run_one` turns a `pass`
+    with a failed check into a failure, but a case ended as `both-error` or `expected-divergence` passes
+    its parity test whatever its checks (the tests assert the status only). So mri-hmc's
+    `syn/motion/small/no-fsloutputtype` failed its one check once FSL-11's `reproduce` stopped as mcflirt
+    does (relay 2b) while the smoke tier passed, and fsl-prelude's record of 2026-11-07 held
+    `orig-types/unset` as `both-error` with its D13 check failed (both re-made by relay 3, every check
+    passing). Proposal: a `both-error` case with a failed check is a failure, and an expected divergence
+    names the checks it may fail (as mri-hmc's `PATH_DIVERGENCES` does) and fails on any other; then
+    every suite's records run again to see what changes (a clean-role harness change).
+  - *The register's FSL-11 section* (inside "Restricted: FSL mcflirt", closed to the clean role) still
+    describes mcflirt and flirt: a replica-side agent widens it to every FSL tool as its summary row now
+    says (the evidence: `tests/parity/test_fsl_output_types_original.py` and
+    `test_fsl_output_types_replica.py`, every FSL tool against FSL 6.0.7.23's own runs).
+  - *Windows' execution policy:* the advice when PowerShell refuses `Activate.ps1`
+    (`Set-ExecutionPolicy -Scope Process RemoteSigned`, the README and the site) is untested: the Windows
+    helper's policy is the machine's (`MachinePolicy RemoteSigned`).
+  - *The AFNI built-in replicas' `++ upstream defects: fix (LARMORX_UPSTREAM_DEFECTS)` line* names the
+    variable however the mode was given (`--upstream-defects` sets that variable's setting: the same
+    bytes; kept, the orchestrator, 2026-11-11; `docs/api/upstream-defects.md` says so).
+  - *The parts begun beside this one* (`t2smap`'s clean-room original, the confounds) use
+    `implementation="original"`, which warns after this part's merge: rename them to `"clean-room"` at
+    their merges (golden cases especially: a recorded `DeprecationWarning` would change a checksum).
 - **From the first release's part (2026-11-10 and 11; 10 relays; `RELEASING.md`,
   `validation/investigations/release-0.1/README.md`).** Left:
   - *Two messages in Cargo's form of a pre-release version* (`0.1.0-rc.1`; the same in both forms
@@ -2135,19 +2189,20 @@ results and `cbrtf_glibc`'s alike.
   a name: the first upload does); `larmorx-freesurfer` and `larmorprepx` are not reserved. larmorx-nc
   on PyPI: the user's decision of 2026-11-10 (over asking FSL first). Version numbering: PEP 440, one
   version for the three packages, rc1 and then 0.1.0 (decision log 2026-11-10 and 11).
-- **0.1.0 after 0.1.0rc1** (the user, 2026-11-10). Done for rc1 (2026-11-11): `verify-pypi` on the
+- **The next release once the full pipeline exists** (the user, 2026-11-10: rc1, then 0.1.0; 2026-11-11: "I do
+  not really want to release yet until we have the full pipeline"). Done for rc1 (2026-11-11): `verify-pypi` on the
   six platforms green; the clean checks above; the 39 files of the GitHub Release match its
   `SHA256SUMS`, and PyPI's 21 files are byte for byte the release's; the image package is public
   (anonymous pulls work), both images pulled here with Apptainer (`larmorx --version` 0.1.0rc1; `-all`
   has the `larmorx-nc` and `larmorx-gpl` programs, the plain image neither); a plain `pip install
   larmorx` takes 0.1.0rc1 while no final release exists (pip 26.3); the site's installation pages
-  published. Before 0.1.0: PyPI's author field ("Waiting for the user"), and
-  `scripts/release/check_install.py` should keep pip's temporary files and cache inside `--work`
-  (under Apptainer's `--containall` they otherwise fill its 64 MiB session space: `RELEASING.md`'s
-  example now binds a home and a temporary folder). Then 0.1.0 by `RELEASING.md`'s step 7 (the
-  version, CHANGELOG's section with its statuses table, the words that call the release a candidate
-  in the README and on the site, a dry run, the tag, the approval). A problem found in rc1 is fixed
-  in an rc2 first.
+  published. Done since, in the easy command line's part (2026-11-11): PyPI's author, `Karel Mauricio
+  López Vilaret` with `CITATION.cff`'s e-mail, in the three `pyproject.toml` (the user's decision), and
+  `scripts/release/check_install.py` keeps pip's temporary files and cache inside `--work` (`RELEASING.md`'s
+  Apptainer example without the binds). Then, once the full pipeline exists, the next release by
+  `RELEASING.md`'s step 7 (the version, `CHANGELOG.md`'s "Unreleased" as the version's section with its
+  statuses table, the words that call the release a candidate in the README and on the site, a dry run,
+  the tag, the approval). What rc1's users meet meanwhile is fixed on `main` for that release.
 
 ## Deferred (decide later)
 
@@ -2161,11 +2216,6 @@ Decided 2026-10-23 (decision log): the four rules for questionable behaviours (A
 
 - **Upstream reports:** PIPE-02 and PIPE-03 are drafts in `docs/upstream-reports/`, now with
   PIPE-03's real-data numbers, ready to file (from the user's GitHub account).
-- **PyPI's author field** (asked 2026-11-10, the first release): the three `pyproject.toml` say
-  `authors = [{ name = "Karel Lopez Vilaret" }]` (NOTICE's form, no e-mail); CITATION.cff has the full
-  name and the university e-mail. To match: `authors = [{ name = "Karel Mauricio López Vilaret",
-  email = "..." }]` in the three files (the e-mail is then public on PyPI). Before 0.1.0 at the latest:
-  a version's metadata cannot change after its upload.
 - **For the user's information, FSL-22** (2026-10-26; decision log): `reproduce` now sorts NaN
   border values in libstdc++'s order, from an emulation written from the SGI STL (HP/SGI
   permissive notice) with no libstdc++ text; the orchestrator accepted that licensing reading

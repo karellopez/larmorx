@@ -13,11 +13,11 @@ use pyo3::exceptions::{PyKeyError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-/// `"auto"`, `"replica"` or `"original"`.
+/// `"auto"`, `"replica"` or `"clean-room"` (`"original"`, its old spelling, accepted).
 pub fn implementation(name: &str) -> PyResult<Implementation> {
     Implementation::parse(name).ok_or_else(|| {
         PyValueError::new_err(format!(
-            "implementation must be 'auto', 'replica' or 'original', not {name:?}"
+            "implementation must be 'auto', 'replica' or 'clean-room', not {name:?}"
         ))
     })
 }

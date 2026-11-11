@@ -571,7 +571,6 @@ fn run_in(
     let ext = settings
         .get("FSL_LOAD_NIFTI_EXTENSIONS")
         .is_some_and(|v| options::atof(v) != 0.0);
-    let output_type = settings.get("FSLOUTPUTTYPE").map(str::to_owned);
     let root = settings.name(o.output.as_str());
     let output = Output {
         template: &t1.header,
@@ -588,16 +587,16 @@ fn run_in(
     };
     let mut written_notices: Vec<Notice> = Vec::new();
     let mut write_image = |suffix: &str, data: Vec<i16>, err: &mut dyn Write| -> Result<(), u8> {
-        let ot = match &output_type {
+        let ot = match settings.output_type() {
             None => {
                 let _ = err.write_all(FSLOUTPUTTYPE_UNSET.as_bytes());
                 return Err(1);
             }
-            Some(t) if !image::OUTPUT_TYPES.contains(&t.as_str()) => {
+            Some(t) if !image::OUTPUT_TYPES.contains(&t) => {
                 let _ = writeln!(err, "{}", image::unknown_output_type_message(t));
                 return Err(1);
             }
-            Some(t) => t.clone(),
+            Some(t) => t.to_owned(),
         };
         let stem = format!("{root}_{suffix}");
         let Some((name, version)) = image::output_file(&stem, &ot) else {

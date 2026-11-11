@@ -124,7 +124,7 @@ def test_the_arguments_are_checked_first(kwargs, message):
 @pytest.mark.usefixtures("no_replica")
 def test_the_original_runs_without_the_replica():
     phase, magnitude = _inputs()
-    for implementation in ("auto", "original"):
+    for implementation in ("auto", "clean-room"):
         r = lx.fsl.prelude(
             phase,
             magnitude,
@@ -152,14 +152,14 @@ def test_the_originals_failure_raises_with_preludes_message():
     _, magnitude = _inputs()
     wide = lx.Image(_phase() * 2.5, AFFINE)
     with pytest.raises(RuntimeError, match="exceeds allowable phase range"):
-        lx.fsl.prelude(wide, magnitude, implementation="original")
+        lx.fsl.prelude(wide, magnitude, implementation="clean-room")
     with pytest.warns(lx.UpstreamDefectWarning, match="FSL-262"):
         series = lx.Image(np.stack([_phase()] * 2, -1), AFFINE)
         lx.fsl.prelude(
             series,
             lx.Image(np.stack([_magnitude()] * 2, -1), AFFINE),
             save_mask=True,
-            implementation="original",
+            implementation="clean-room",
         )
 
 

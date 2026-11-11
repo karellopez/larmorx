@@ -558,7 +558,7 @@ pub fn write<T>(
     notices: &mut Notices,
     n_threads: usize,
 ) -> Result<(), WriteError> {
-    let ot = match settings.get("FSLOUTPUTTYPE") {
+    let ot = match settings.output_type() {
         None => {
             return Err(WriteError::OutputType(
                 crate::cli::bet2::FSLOUTPUTTYPE_UNSET.to_owned(),

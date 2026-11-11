@@ -4,7 +4,7 @@
 clean-room original.
 
 ``implementation="auto"`` (the default) runs the replica (part of larmorx, in this process);
-``"replica"`` and ``"original"`` force one. The original's squash uses a correctly rounded ``tanhf`` where AFNI
+``"replica"`` and ``"clean-room"`` force one. The original's squash uses a correctly rounded ``tanhf`` where AFNI
 calls glibc's, so squashed values (above 1300) can differ in their last bit
 (``docs/validation/afni-unifize.md``).
 

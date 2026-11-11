@@ -46,9 +46,10 @@ sphere 21 -fmean` of a BOLD mean, 1,313 kernel voxels; closer to the exact resul
 single-precision FFT: 7.9e-8 of its largest value against FSL's 1.5e-7 there, findings 31).
 `implementation="auto"`
 (the default) runs the replica when `larmorx-nc` is installed, the original otherwise;
-`"replica"` needs `larmorx-nc` (otherwise `ReplicaNotFoundError`), `"original"` runs the
-original in this process on `n_threads` threads (its results the same at any count). The
-command line chooses alike (`LARMORX_IMPLEMENTATION`).
+`"replica"` needs `larmorx-nc` (otherwise `ReplicaNotFoundError`), `"clean-room"` (`"original"`, 0.1.0rc1's spelling, still works)
+runs the clean-room original in this process on `n_threads` threads (its results the same at
+any count). The command line chooses alike (`--implementation` before the family, or
+`LARMORX_IMPLEMENTATION`).
 
 **Status: `experimental`**: the replica against FSL 6.0.7.23 itself (the parity suite
 `fsl-maths-replica`, record [fsl-maths-replica](../validation/fsl-maths-replica.md), standard
@@ -181,7 +182,7 @@ unless said:
 | `-tensor_decomp` | `tensor_decomp(image)` → `TensorDecomposition` (`image`, `l1`, `l2`, `l3`, `fa`, `md`, `mo`, `v1`, `v2`, `v3`) | eigenvalues, FA, MD, mode and eigenvectors of a 6-volume tensor image |
 | `-dt <type>`, `-odt <type>` | `dt=`, `odt=` (`DATATYPES`: `"char"`, `"short"`, `"int"`, `"float"`, `"double"`, `"input"`) | the type the chain computes in (float, or double for a double image) and the output's (float, or double) |
 | `-save`, `-restart`, `-pow`, `-invbin`, chains | `fslmaths(image, *operations)` | any command line |
-| | `implementation` | `"auto"`, `"replica"`, `"original"` (the original's operations so far: above) |
+| | `implementation` | `"auto"`, `"replica"`, `"clean-room"` (the clean-room original's operations so far: above) |
 | | `upstream_defects` | `"fix"` (default) or `"reproduce"`: FSL's defects as FSL has them (below) |
 
 The typed wrappers check their arguments (`ValueError`: an unknown name, a non-finite number, a
@@ -251,6 +252,11 @@ standard error (`larmorx-nc: upstream defect FSL-<n> (fslmaths) corrected: ...`)
 `UpstreamDefectWarning` ([all of them](upstream-defects.md)). Where FSL crashes, hangs or reads
 memory it never wrote, both modes refuse with a message (exit status 1).
 
+- **FSL-11**: with `FSLOUTPUTTYPE` unset FSL's fslmaths stops with FSL's message when it writes
+  its output (exit 1). Both implementations, the clean-room original and the replica, write the
+  images as `NIFTI_GZ` (`.nii.gz`: the bytes `FSLOUTPUTTYPE=NIFTI_GZ` gives) and name FSL-11 on one
+  line per command, in the same words (the replica's line starts `larmorx-nc:`); `reproduce` stops
+  as FSL does. Command line only: the Python functions set the type themselves.
 - **FSL-151**: conversions to an integer type beyond its range, or of NaN, wrap around: clamped
   (NaN as 0).
 - **FSL-152**: the thresholds, `-bin`, `-binv` and `-mas` bound their other side by the maximum

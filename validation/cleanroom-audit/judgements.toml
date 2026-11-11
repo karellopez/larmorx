@@ -212,6 +212,53 @@ shown = "the same permanent case, read again by a script and its last lines prin
 nature = "black-box data"
 judgement = "covered by the same agent's declaration (exposure 2)"
 
+# the easy command line (2026-11-11; its relays 1b and 2c were replica-side: verdicts.py ROLE_BY_DESCRIPTION)
+
+[[access]]
+agent = "a274715ea981aa7f6"
+line = 91
+time = "2026-11-11T12:04:56Z"
+declared = "no"
+shown = "4 dispatch lines of the AFNI replica's command line (crates/larmorx-afni-replica/src/cli/mod.rs: each program name mapped to its module's main), printed by a search for the families' command-line entry points over crates/ without --exclude-dir=larmorx-afni-replica"
+nature = "the replica's program list (names, no routine, no argument handling); the same names the clean-room command line dispatches"
+judgement = "no contamination of substance; an undeclared slip of a relay that was stopped and committed nothing (its unfinished edits, command-line plumbing only, were offered to the next relay as a patch)"
+
+[[access]]
+agent = "a486a83eec10e4513"
+line = 184
+time = "2026-11-11T12:43:15Z"
+declared = "no"
+shown = "6 dependency lines of three crates-gpl verification tools' Cargo.toml (larmorx-core and larmorx-afni-replica named as dependencies)"
+nature = "build manifests naming dependencies; no source"
+judgement = "no contamination; an undeclared slip"
+
+[[access]]
+agent = "ac58a62848b737f87"
+line = 171
+time = "2026-11-11T14:14:10Z"
+declared = "partly"
+shown = "the first three lines of the PyPI larmorx-nc program, an ELF executable: unreadable header bytes (the call checked whether the program was a script)"
+nature = "machine-code bytes of a compiled program's header; nothing readable, no source"
+judgement = "no contamination; the agent declared the program run as a black box, not this look at its first bytes"
+
+[[access]]
+agent = "a40d4fb32c242da7e"
+line = 402
+time = "2026-11-11T16:01:34Z"
+declared = "no"
+shown = "the copyable shell blocks of the replica packages' user documents (crates-gpl and crates-nc README.md and PYPI.md: install lines), printed by its script that moved comments out of every document's shell blocks"
+nature = "the packages' user documentation (installation lines), no source, no source-derived finding"
+judgement = "no contamination; documents a user reads on PyPI"
+
+[[access]]
+agent = "a171c64d81b932956"
+line = 64
+time = "2026-11-11T16:32:22Z"
+declared = "yes"
+shown = "the headings of the register's restricted sections (titles of FSL-01 to FSL-17 and of the restricted sections), printed while locating FSL-11; no section body"
+nature = "titles of defect entries, which the register's open summary table also describes"
+judgement = "titles only; declared in its report"
+
 # ------------------------------------------------- edits of clean-room code by other roles
 
 [[access]]

@@ -9,8 +9,8 @@ follow mcflirt 6.0.7.23 and are validated against it; the clean-room original fo
 content and its names (FSL-60), and computes `-cost mutualinfo` and `normmi` exactly as the
 spec's appendix B describes them (2026-10-29).
 
-**Two implementations** (`implementation="auto" | "replica" | "original"`): the clean-room
-original described on most of this page (Apache-2.0, in `larmorx`), and the bit-exact
+**Two implementations** (`implementation="auto" | "replica" | "clean-room"`; `"original"`,
+0.1.0rc1's spelling, still works): the clean-room original described on most of this page (Apache-2.0, in `larmorx`), and the bit-exact
 **replica** in the separately licensed `larmorx-nc` package (FSL Licence: non-commercial use
 only), which gives mcflirt's output files byte for byte: 137 of the 137 recorded mcflirt runs,
 with the same messages and exit status where both fail (12 of them), fMRIPrep's own mcflirt
@@ -101,7 +101,7 @@ nibabel image, `(array, affine)`); `reference` likewise. Returns an `HmcResult`:
 | `in_plane` | whether the in-plane mode for thin slabs was used |
 | `image` | the corrected series (float32 `lx.Image`), or `None` with `resample=False` |
 | `mean` | the mean volume of `mean=True` |
-| `implementation` | which implementation computed it: `lx.Implementation("original", "larmorx", ...)` or the replica's (`"replica"`, `"larmorx-nc"`, its version, `"LicenseRef-FSL"`, its program) |
+| `implementation` | which implementation computed it: `lx.Implementation("clean-room", "larmorx", ...)` or the replica's (`"replica"`, `"larmorx-nc"`, its version, `"LicenseRef-FSL"`, its program) |
 
 `lx.mri.read_mats(directory)` reads an mcflirt-style `.mat` directory into an `(N, 4, 4)` array.
 
@@ -141,7 +141,7 @@ stages run the volumes in parallel. The result does not depend on the thread cou
 | `-help` | – | ✓ (usage, exit 0; without arguments: exit 1. `-help` alone exits 0; mcflirt's exit 1 with `reproduce`, FSL-07) | ✓ (the same) |
 | (`LARMORX_UPSTREAM_DEFECTS=fix\|reproduce`) | `upstream_defects="fix"` | mcflirt's defects corrected (default) or reproduced ([below](#upstream-defects-d13)) | the same corrections; `reproduce` gives mcflirt's bytes |
 | – | `normcorr_count="mcflirt"` | `"weights"`: the corrected correlation count (FSL-02), opt-in ([below](#the-correlation-count-fsl-02)) | ✗ (mcflirt's count; the original runs under `"auto"`) |
-| – | `implementation` | `"original"` | `"replica"`; `"auto"` (default) when `larmorx-nc` is installed |
+| `--implementation` (before the family) | `implementation` | `"clean-room"` | `"replica"`; `"auto"` (default) when `larmorx-nc` is installed |
 
 `FSLOUTPUTTYPE` chooses the output format as for mcflirt 6.0.7.23 (`NIFTI`, `NIFTI2`, the pair
 types `NIFTI_PAIR` and `NIFTI2_PAIR`, each also `_GZ`, `_ZST` and `_BZ2`: gzip, zstd and bzip2,
@@ -160,8 +160,10 @@ uses, FSL 6.0.7.23 since 2026-10-29; first FSL 6.0.7.17) in the `larmorx-nc` pac
 It is installed by name, so that its licence is accepted knowingly:
 
 ```bash
-pip install larmorx-nc        # on PyPI from 0.1.0rc1; or pip install "larmorx[all]"
+pip install larmorx-nc
 ```
+
+(on PyPI from 0.1.0rc1; or `pip install "larmorx[all]"`, with everything).
 
 larmorx never imports it: `lx.mri.hmc` and `larmorx fsl mcflirt` run its program
 (`larmorx-nc fsl mcflirt <mcflirt's arguments>`, found through `LARMORX_NC_BIN`, the Python
@@ -188,7 +190,8 @@ volumes, writing the corrected series too): 20 s on 3 threads and 36 s on one; m
 
 ## Deliberate differences
 
-- Without `FSLOUTPUTTYPE`, larmorx writes `.nii.gz` (mcflirt writes the matrices, then fails).
+- Without `FSLOUTPUTTYPE`, larmorx writes `.nii.gz` and names FSL-11, the clean-room original and
+  the replica alike (mcflirt writes the matrices, then fails; `reproduce` does so too).
   With an unknown value, larmorx prints mcflirt's message and exits 1 before any work (mcflirt
   prints it after the estimation and the `.mat` and `.par` files). Compressed outputs hold the
   same decompressed bytes as mcflirt's would, compressed by larmorx's own encoders (zstd in one
@@ -221,6 +224,7 @@ in both modes ([upstream-defects.md](upstream-defects.md); register entries in
 | FSL-07 | numbers read with C's `atoi`/`atof` (`-refvol abc` is 0, `-stages 1.5` is 1); `-help` alone exits 1 | anything but a number is an error (exit 255); `-help` alone exits 0 | command line |
 | FSL-08 | the `-stats` images leave the first and last slices at 0, and the `-stats` and `-meanvol` images are named after the `-out` string with its extension inside (`x.nii.gz_meanvol.nii.gz`) | every slice; `x_meanvol.nii.gz`, `x_mean_reg.nii.gz` (the names nipype expects) | `-stats`, `-meanvol` |
 | FSL-09 | int8 input is written as uint8; integer outputs are truncated toward zero, and values beyond the type's range wrap around (x86-64; observed) | int8 kept; rounded to the nearest (half to even) and clamped | integer outputs of the command line |
+| FSL-11 | `FSLOUTPUTTYPE` unset: mcflirt writes the matrices and the `.par` file, then stops at its first image with FSL's message (exit 1; with `-meanvol` its mean image comes first: nothing written) | the images as `NIFTI_GZ` (`.nii.gz`), FSL-11 named on one line, in the same words by both implementations; `reproduce` stops where mcflirt does | the command line without `FSLOUTPUTTYPE` |
 | FSL-10 | the output's units are always millimetres and seconds: a TR in milliseconds is labelled seconds | the input's units are kept (millimetres and seconds where it gives none) | inputs in other units (ds003345: milliseconds) |
 | FSL-13 | `-rmsrel` and `-rmsabs` create the `.mat` directory without `-mats` (holding only the reference's identity) | no `.mat` directory without `-mats` | command line |
 | FSL-04 | `-gdt` registers each volume's gradient image to the reference's plain image (the reference's gradient is computed and discarded) | refused (the clean-room original does not support `-gdt`); the replica reproduces it with `reproduce` | `-gdt` |

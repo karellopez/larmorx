@@ -2253,3 +2253,80 @@ agent at a time; its record: `validation/investigations/release-0.1/README.md`; 
   (the orchestrator's review, 2026-11-11). Three dry runs: the first two found three platform problems (fixed: the
   source builds' glibc check, rustup's components on ubuntu-24.04-arm, macOS's own install name); the third passed
   at `93154c93` (run 42942601741, 37 minutes).
+
+## 2026-11-11: The easy command line (the user's decisions, and the orchestrator's by the rules)
+
+After 0.1.0rc1's upload the user installed it by hand on macOS (zsh) and Windows (PowerShell) and asked for an easier
+command line before the next port, and for no release yet ("I do not really want to release yet until we have the full
+pipeline. Just fix all this and do the things before Freesurfer."): the version stays 0.1.0rc1, no tag, no dry run.
+The part ran as six relays in the clean role (relays 1b and 2c replica-side; a first attempt was stopped when the
+option names changed), one after the other, beside the `t2smap` clean-room and confounds parts; its record: `validation/investigations/easy-cli/README.md`.
+- **The user's decisions (2026-11-11):**
+  - **Command-line options with the Python API's names** ("an easy way for the majority of users, like specific
+    flags" instead of environment variables, keeping the variables; then, after a first proposal of shorter
+    switches, "I prefer mirrored names"): `larmorx [--n-threads N] [--implementation auto|replica|clean-room]
+    [--upstream-defects fix|reproduce] <family> <tool> <the original's arguments>` (and `lx`): each the Python
+    argument with dashes, taking the same values as Python and the variable; one spelling each, no shortcuts or
+    aliases; `--opt value` and `--opt=value`; between `larmorx` and the family, so they never clash with the
+    original programs' options (after the family an option is the tool's); the variables keep working and an
+    option given wins over its variable; `--n-threads` one option for every family, `0` every logical CPU, the
+    command line's default every logical CPU (Python's stays 1); a tool whose original has its own thread option
+    (tedana's `t2smap --n-threads`, sdcflows' BIDS app `--nprocs`/`--omp-nthreads`) uses it when it is on the
+    command line, `--n-threads` otherwise; a wrong value is a clear message with the usage and exit status 2;
+    `larmorx --help` shows the three, one line each, with the variables they replace.
+  - **`clean-room` for `original`** ("I prefer clean-room instead of original": on the command line and in the
+    docs "the original" means FSL's or AFNI's own program): `implementation="clean-room"` in Python (the
+    `ImplementationName` type, every wrapper), `--implementation clean-room`, `LARMORX_IMPLEMENTATION=clean-room`,
+    and what a result reports (`Implementation(kind='clean-room', ...)`); `original` stays accepted everywhere as
+    0.1.0rc1's spelling (Python with a `DeprecationWarning`, the command line and the variable silently).
+    Internal identifiers, records and golden checksums unchanged.
+  - **The companion programs** `larmorx-nc` and `larmorx-gpl` take the same options where they apply:
+    `--n-threads`, `--upstream-defects`; `--implementation replica` a no-op, `auto` and `clean-room` (and
+    `original`) refused with a message naming larmorx's own choice (relay 1b's choice). **Every future package**
+    (`larmorx-freesurfer`, reached as `larmorx freesurfer <program>`) takes them from its first tool
+    (`docs/architecture.md`, `docs/porting-guide.md` §9.1).
+  - **PyPI's author** for the next release: `Karel Mauricio López Vilaret` with `CITATION.cff`'s e-mail, in the
+    three packages' metadata (the question of 2026-11-10 answered).
+  - **The clean-room originals of the permissive ports** (sdcflows' field maps, ANTs and ITK, fMRIPrep's
+    resampler, nitransforms, the confounds, fMRIPrep's Python steps) come after FreeSurfer, in one block, before
+    the final validation phase (the place left open on 2026-11-06); tedana's `t2smap` clean room stays before
+    FreeSurfer (LGPL: without it the main package has no `t2smap`).
+  - **Python's API is otherwise unchanged** ("in python this is already intuitive right?": yes).
+  - **No release until the full pipeline exists:** the next release once larmorprepx exists; meanwhile
+    `CHANGELOG.md`'s "Unreleased" collects what `main` adds, and the site's installation page describes what
+    PyPI has (0.1.0rc1: the variables, `original`), naming the options and `clean-room` as coming.
+  - **Up to three agents at once** ("We have a weekly reset that we can apply anytime, so please to speed up, feel
+    free to use 2 more agent slots"): from then on the easy command line, `t2smap`'s clean-room original and the
+    confounds' port ran side by side, each within 9 threads and 28 GiB of memory boxes, never touching the same
+    files; the usage check still applies before each new part.
+  - **A constant backup on the USB hard disk** ("you can make a constant backup in the HDD drive that I told you.
+    But, the main source will be the existing one"): the session transcripts, the archived transcript sets, the
+    clean-room audit's dossiers and the cost ledger, copied hourly and after each merge, never deleted there,
+    every copy verified by SHA-256 (the workspace's `tools/backup/`; `docs/orchestration.md`, step 5b).
+- **The orchestrator's decisions during the part (by the rules):**
+  - The options are parsed once, in Rust (`larmorx_core::cli::parse`), for the console script and the standalone
+    program, and reach every family as an explicit settings overlay (`larmorx_core::cli::Overrides`), never by
+    changing the process environment. larmorx passes them to the companions as the variables they replace
+    (`OMP_NUM_THREADS`, removed for `0`; `LARMORX_UPSTREAM_DEFECTS`; `LARMORX_IMPLEMENTATION`), so an older
+    companion keeps working.
+  - topup's replica without `--nthr` and `t2smap` without its own `--n-threads` run on the run's thread count
+    (before: one thread, the originals' default): decision 1's rule; their results are the same bytes at any
+    count (tested). Python's wrappers always pass the tool's own option: unchanged.
+  - The console script shows a tool's messages while it runs (measured on N4 `-v`, 1,211 lines: through
+    0.1.0rc1's console script the first line came at 12.5 s, at the end; now at 0.01 s, as with the standalone
+    program): a contained change with the same bytes and order.
+  - The AFNI clean-room programs' own `-verbose` line says `implementation: clean-room` (larmorx's line, not the
+    original's message; no golden output holds it); the AFNI built-in replicas' `++ upstream defects: ...
+    (LARMORX_UPSTREAM_DEFECTS)` line is kept (the option sets that variable's setting: the same bytes).
+  - **FSL-11 for every FSL tool** (the decision of 2026-10-23 for mcflirt and FLIRT, larmorx's behaviour kept as
+    the safer one, extended by the same rule): with `FSLOUTPUTTYPE` unset every FSL tool, clean-room original and
+    `larmorx-nc` replica alike, writes `.nii.gz` (the bytes `FSLOUTPUTTYPE=NIFTI_GZ` gives) and names FSL-11 on one
+    line per command, in one text for both implementations (`larmorx_core::defects::fsl11_notice`) that says what
+    FSL's program does instead (its first image stops it, exit 1; `standard_space_roi`'s script goes on and exits 0
+    without an image); `reproduce` stops where FSL does, checked against FSL 6.0.7.23's own runs for every tool.
+    Setting the variable is optional. FSL-09's notice names the program that wrote the output (flirt, applyxfm4D,
+    applytopup), not mcflirt.
+  - No comments inside copyable shell blocks (zsh's prompt does not take `#` as a comment): the README, the PyPI
+    descriptions, `docs/api`, the site's pages; a test in each repository.
+  - The parity smoke tier at 6 workers while three agents share the machine (at 8, a 27 GiB box stopped one
+    worker).

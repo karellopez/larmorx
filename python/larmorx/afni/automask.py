@@ -3,7 +3,7 @@
 bit-exact replica of AFNI 26.3.05's program, or its clean-room original).
 
 ``implementation="auto"`` (the default) runs the replica (part of larmorx, in this process);
-``"replica"`` and ``"original"`` force one. Both give AFNI's masks bit for bit on the parity cases
+``"replica"`` and ``"clean-room"`` force one. Both give AFNI's masks bit for bit on the parity cases
 (``docs/validation/afni-automask.md``).
 
 AFNI's deterministic defects are corrected by default (D13, ``docs/api/upstream-defects.md``):
@@ -112,7 +112,7 @@ def automask(
     n_threads
         Threads (0 = all); the result does not depend on it.
     implementation
-        ``"auto"`` (default) and ``"replica"``: the bit-exact replica; ``"original"``: the
+        ``"auto"`` (default) and ``"replica"``: the bit-exact replica; ``"clean-room"``: the
         clean-room original.
     upstream_defects
         ``"fix"`` (default) or ``"reproduce"`` (AFNI's output); a

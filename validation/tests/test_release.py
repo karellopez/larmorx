@@ -635,6 +635,18 @@ def test_the_release_documents():
         assert "(RELEASING.md)" in (ROOT / name).read_text(encoding="utf-8"), name
 
 
+def test_the_packages_author_is_the_citations():
+    """The three packages' metadata name the author as CITATION.cff does, with the e-mail (PyPI's
+    author field; the user's decision of 2026-11-11)."""
+    citation = (ROOT / "CITATION.cff").read_text(encoding="utf-8")
+    given = re.search(r"(?m)^  - given-names: (.+)$", citation).group(1)
+    family = re.search(r"(?m)^    family-names: (.+)$", citation).group(1)
+    email = re.search(r"(?m)^    email: (.+)$", citation).group(1)
+    for name in ("pyproject.toml", "crates-nc/pyproject.toml", "crates-gpl/pyproject.toml"):
+        project = tomllib.loads((ROOT / name).read_text(encoding="utf-8"))["project"]
+        assert project["authors"] == [{"name": f"{given} {family}", "email": email}], name
+
+
 def _program_wheels(folder: Path, version: str, exe: str = "") -> None:
     """Small stand-ins of the three program wheels, laid out as maturin makes them."""
     folder.mkdir(parents=True, exist_ok=True)
@@ -1258,6 +1270,20 @@ def test_smoke_reads_glibc_versions_without_objdump():
 
 
 check_install = load("check_install")
+
+
+def test_check_install_keeps_its_temporary_files_in_its_work_folder(tmp_path):
+    """Every step's temporary files and pip's cache go to the work folder (Apptainer's
+    --containall keeps /tmp and the home folder in 64 MiB, which pip outgrew at 0.1.0rc1's
+    check), and the variables that would change what runs are removed."""
+    environ = {"PATH": "/bin", "PYTHONPATH": "x", "LARMORX_NC_BIN": "y", "TMPDIR": "/tmp"}
+    env = check_install.work_env(tmp_path / "work", environ)
+    tmp, cache = tmp_path / "work" / "tmp", tmp_path / "work" / "pip-cache"
+    assert tmp.is_dir() and cache.is_dir()
+    assert (env["TMPDIR"], env["TEMP"], env["TMP"]) == (str(tmp),) * 3
+    assert env["PIP_CACHE_DIR"] == str(cache)
+    assert "PYTHONPATH" not in env and "LARMORX_NC_BIN" not in env and env["PATH"] == "/bin"
+    assert environ["TMPDIR"] == "/tmp"  # the caller's environment is not changed
 
 
 def test_check_install_names_and_source_archive(tmp_path, monkeypatch):

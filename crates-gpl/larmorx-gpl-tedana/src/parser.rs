@@ -235,6 +235,10 @@ pub struct Settings {
     pub n_independent_echos: Option<i128>,
     /// `--n-threads` (`-1` means no limit, `None` in `threadpool_limits`).
     pub n_threads: i128,
+    /// Whether `--n-threads` was given (larmorx's addition): when it was not, the run's thread
+    /// count applies (`workflow::Env::threads`, larmorx's own `--n-threads`), not tedana's
+    /// default of 1. The results do not depend on it.
+    pub n_threads_given: bool,
     pub debug: bool,
     pub quiet: bool,
 }
@@ -248,7 +252,7 @@ fn strings(v: &Value) -> Vec<String> {
 }
 
 impl Settings {
-    fn from_namespace(ns: &Namespace) -> Settings {
+    fn from_namespace(ns: &Namespace, given: &[String]) -> Settings {
         let s = |d: &str| ns.get(d).as_str().unwrap_or_default().to_owned();
         let opt = |d: &str| ns.get(d).as_str().map(str::to_owned);
         let int = |d: &str| match ns.get(d) {
@@ -285,6 +289,7 @@ impl Settings {
             paid: s("combmode") == "paid",
             n_independent_echos: int("n_independent_echos"),
             n_threads: int("n_threads").unwrap_or(1),
+            n_threads_given: given.iter().any(|d| d == "n_threads"),
             debug: ns.get("debug").as_bool(),
             quiet: ns.get("quiet").as_bool(),
         }
@@ -295,6 +300,6 @@ impl Settings {
 /// (`larmorx_core::python::argparse::formatter_width`).
 pub fn parse(args: &[String], width: isize) -> Result<Settings, Exit> {
     parser()
-        .parse(args, width)
-        .map(|ns| Settings::from_namespace(&ns))
+        .parse_given(args, width)
+        .map(|(ns, given)| Settings::from_namespace(&ns, &given))
 }

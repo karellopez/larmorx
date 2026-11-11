@@ -86,3 +86,32 @@ def test_exclude_index_equal_to_the_volumes(tmp_path: Path, mode: str) -> None:
     else:
         assert "IndexError: index 5 is out of bounds for axis 0 with size 5" in err
         assert "larmorx: upstream defect TED-02 (tedana) reproduced" in err
+
+
+@pytest.mark.parametrize("fitmode", ["all", "ts"])
+def test_curvefit_run(tmp_path: Path, fitmode: str) -> None:
+    """The curve fit (§7.3): the failures image (uint8) and, with ``--verbose``, the variance
+    maps, beside the maps the fit replaces; finite fits close to the log-linear ones."""
+    args = [*_phantom(tmp_path), "--fitmode", fitmode]
+    code, _, err = run([*args, "--out-dir", "ll"], ENV, str(tmp_path))
+    assert code == 0, err
+    code, _, err = run(
+        [*args, "--fittype", "curvefit", "--verbose", "--out-dir", "cf"], ENV, str(tmp_path)
+    )
+    assert code == 0, err
+    out = tmp_path / "cf"
+    fail = nib.load(out / "desc-decayFitFailures_mask.nii.gz")
+    assert fail.get_data_dtype() == np.uint8
+    assert np.asanyarray(fail.dataobj).max() <= 1
+    names = (
+        "stat-variance_desc-t2star_statmap.nii.gz",
+        "stat-variance_desc-s0_statmap.nii.gz",
+        "stat-covariance_desc-t2star+s0_statmap.nii.gz",
+    )
+    for name in names:
+        assert nib.load(out / name).shape[:3] == (8, 6, 4)
+    t2_ll = np.asanyarray(nib.load(tmp_path / "ll" / "T2starmap.nii.gz").dataobj)
+    t2_cf = np.asanyarray(nib.load(out / "T2starmap.nii.gz").dataobj)
+    inside = t2_ll > 0
+    assert np.all(np.isfinite(t2_cf[inside]))
+    assert np.median(np.abs(t2_cf[inside] / t2_ll[inside] - 1)) < 0.2

@@ -92,11 +92,25 @@ pub fn main_with(
     main_with_settings(args, defects, AfniSettings::from_env(), out, err)
 }
 
-/// [`main`] with the D13 mode and AFNI's settings given.
+/// [`main`] with the D13 mode and AFNI's settings given; the thread count from
+/// `OMP_NUM_THREADS`.
 pub fn main_with_settings(
     args: &[String],
     mode: UpstreamDefects,
+    settings: AfniSettings,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> u8 {
+    main_with_threads(args, mode, settings, threads(), out, err)
+}
+
+/// [`main_with_settings`] on `n_threads` threads (0: every logical CPU), as the other AFNI
+/// programs' `main_with_settings` take it. The results never depend on it.
+pub fn main_with_threads(
+    args: &[String],
+    mode: UpstreamDefects,
     mut settings: AfniSettings,
+    n_threads: usize,
     out: &mut dyn Write,
     err: &mut dyn Write,
 ) -> u8 {
@@ -121,7 +135,7 @@ pub fn main_with_settings(
     }
     let result = parse(&globals.rest, &mut log, &settings, mode).and_then(|o| {
         log.verbose = o.verbose;
-        execute(&o, mode, &settings, &mut log)
+        execute(&o, mode, &settings, n_threads, &mut log)
     });
     match result {
         Ok(code) => code,
@@ -458,6 +472,7 @@ fn execute(
     o: &Options,
     mode: UpstreamDefects,
     settings: &AfniSettings,
+    n_threads: usize,
     log: &mut Log<'_>,
 ) -> Result<u8, Failure> {
     let prefix = o.prefix.as_deref().ok_or_else(|| {
@@ -482,7 +497,7 @@ fn execute(
         prefix,
         deconflict,
         prefix_refused: o.prefix_refused,
-        n_threads: threads(),
+        n_threads,
     };
     log.larmorx_info(IMPLEMENTATION);
     log.larmorx_info(&format!(

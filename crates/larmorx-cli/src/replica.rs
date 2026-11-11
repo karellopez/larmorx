@@ -19,7 +19,8 @@
 //! - [`find`] looks for a separate replica's program: the package's environment variable
 //!   (`LARMORX_NC_BIN`, `LARMORX_GPL_BIN`), then the directories the caller gives (the Python environment's
 //!   scripts directory, or the directory of the `larmorx` binary), then `PATH`;
-//! - [`choose`] applies `auto`, `replica` or `original`;
+//! - [`choose`] applies `auto`, `replica` or `clean-room` (the old spelling `original`
+//!   accepted);
 //! - [`run`] runs a separate replica's program and passes its output and exit code on
 //!   unchanged; [`run_builtin`] and [`run_builtin_in`] run a built-in replica.
 
@@ -89,7 +90,7 @@ pub struct Replica {
     pub location: Location,
     /// Whether larmorx has a clean-room original of the tool. Without one (a tool whose
     /// original is still to be written from its spec), the replica is the only implementation:
-    /// `auto` runs it or fails like `replica`, and `original` is an error.
+    /// `auto` runs it or fails like `replica`, and `clean-room` is an error.
     pub original: bool,
 }
 
@@ -351,12 +352,12 @@ pub fn lookup(family: &str, tool: &str) -> Option<&'static Replica> {
 /// Which implementation runs a tool that has both.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Implementation {
-    /// The replica when it is built in or its program is found, the original otherwise (the
-    /// default).
+    /// The replica when it is built in or its program is found, the clean-room original
+    /// otherwise (the default).
     Auto,
     /// The replica; an error if it is a separate program that is not found.
     Replica,
-    /// The clean-room original, always.
+    /// The clean-room original, always: `clean-room` (`original`, the old spelling, accepted).
     Original,
 }
 
@@ -364,21 +365,24 @@ pub enum Implementation {
 pub const IMPLEMENTATION_ENV: &str = "LARMORX_IMPLEMENTATION";
 
 impl Implementation {
-    /// `auto`, `replica` or `original`.
+    /// `auto`, `replica` or `clean-room`; `original`, the old spelling of `clean-room` (the
+    /// user's decision of 2026-11-11: on the command line "the original" is FSL's or AFNI's own
+    /// program), is accepted as well.
     pub fn parse(name: &str) -> Option<Implementation> {
         match name {
             "auto" => Some(Implementation::Auto),
             "replica" => Some(Implementation::Replica),
-            "original" => Some(Implementation::Original),
+            "clean-room" | "original" => Some(Implementation::Original),
             _ => None,
         }
     }
 
+    /// The name [`Implementation::parse`] reads: `auto`, `replica` or `clean-room`.
     pub fn name(self) -> &'static str {
         match self {
             Implementation::Auto => "auto",
             Implementation::Replica => "replica",
-            Implementation::Original => "original",
+            Implementation::Original => "clean-room",
         }
     }
 
@@ -398,7 +402,8 @@ impl Implementation {
 /// Why a replica cannot be chosen.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Error {
-    /// [`IMPLEMENTATION_ENV`] holds something other than `auto`, `replica` or `original`.
+    /// [`IMPLEMENTATION_ENV`] holds something other than `auto`, `replica` or `clean-room`
+    /// (or `original`, its old spelling).
     BadImplementation(String),
     /// The package's environment variable names something that is not a file.
     BadPath { env: &'static str, value: String },
@@ -409,12 +414,12 @@ pub enum Error {
         package: &'static Package,
     },
     /// The tool has no clean-room original yet, and its replica's program was not found (or
-    /// `original` was asked for). `package` is `None` for a built-in replica.
+    /// `clean-room` was asked for). `package` is `None` for a built-in replica.
     NoOriginal {
         family: &'static str,
         tool: &'static str,
         package: Option<&'static Package>,
-        /// `original` was asked for explicitly.
+        /// `clean-room` was asked for explicitly.
         asked: bool,
     },
 }
@@ -435,7 +440,7 @@ impl fmt::Display for Error {
         match self {
             Error::BadImplementation(v) => write!(
                 f,
-                "{IMPLEMENTATION_ENV} must be 'auto', 'replica' or 'original', not '{v}'"
+                "{IMPLEMENTATION_ENV} must be 'auto', 'replica' or 'clean-room', not '{v}'"
             ),
             Error::BadPath { env, value } => {
                 write!(f, "{env} is set to '{value}', which is not a file")
@@ -460,15 +465,17 @@ impl fmt::Display for Error {
                 let Some(package) = package else {
                     return write!(
                         f,
-                        "{IMPLEMENTATION_ENV}=original was asked for, but larmorx has no \
-                         clean-room original of {family} {tool} yet; its bit-exact replica is \
-                         built in: use {IMPLEMENTATION_ENV}=auto or replica"
+                        "the clean-room original was asked for (--implementation clean-room, \
+                         {IMPLEMENTATION_ENV}=clean-room), but larmorx has none of {family} \
+                         {tool} yet; its bit-exact replica is built in: use --implementation \
+                         auto or replica"
                     );
                 };
                 let start = if *asked {
                     format!(
-                        "{IMPLEMENTATION_ENV}=original was asked for, but larmorx has no \
-                         clean-room original of {family} {tool} yet"
+                        "the clean-room original was asked for (--implementation clean-room, \
+                         {IMPLEMENTATION_ENV}=clean-room), but larmorx has no clean-room \
+                         original of {family} {tool} yet"
                     )
                 } else {
                     format!(
@@ -632,6 +639,38 @@ pub fn run_builtin(
     }
 }
 
+/// [`run_builtin`] with larmorx's own options (`--n-threads`, `--upstream-defects`): without
+/// any, [`run_builtin`]; else [`run_builtin_in`] with this process's environment, the options in
+/// place of the variables they replace (`OMP_NUM_THREADS`, `LARMORX_UPSTREAM_DEFECTS`), and its
+/// working directory.
+pub fn run_builtin_given(
+    family: &str,
+    tool: &str,
+    args: &[String],
+    given: &larmorx_core::cli::Overrides,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> Option<u8> {
+    if given.is_empty() {
+        return run_builtin(family, tool, args, out, err);
+    }
+    let mut env: Vec<(String, String)> = std::env::vars_os()
+        .map(|(k, v)| {
+            (
+                k.to_string_lossy().into_owned(),
+                v.to_string_lossy().into_owned(),
+            )
+        })
+        .collect();
+    for (name, value) in given.environment() {
+        env.retain(|(k, _)| k != name);
+        if let Some(v) = value {
+            env.push((name.to_owned(), v));
+        }
+    }
+    run_builtin_in(family, tool, args, env, None, out, err)
+}
+
 /// [`run_builtin`] inside a caller's process that must not depend on its own environment or
 /// directory (the Python wrappers): `env` stands for the process environment (D13's
 /// `LARMORX_UPSTREAM_DEFECTS`, the upstream's variables, `OMP_NUM_THREADS`), and relative file
@@ -673,12 +712,34 @@ pub fn run(
     out: &mut dyn Write,
     err: &mut dyn Write,
 ) -> u8 {
+    run_env(program, replica, args, &[], output, out, err)
+}
+
+/// [`run`] with changes to the program's environment (this process's otherwise): `(name,
+/// Some(value))` sets a variable, `(name, None)` removes it. larmorx's own options reach a
+/// replica's program this way (`OMP_NUM_THREADS`, `LARMORX_UPSTREAM_DEFECTS`,
+/// `LARMORX_IMPLEMENTATION`), as the variables they replace would.
+pub fn run_env(
+    program: &Path,
+    replica: &Replica,
+    args: &[String],
+    env: &[(&str, Option<String>)],
+    output: Output,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> u8 {
     let mut command = Command::new(program);
     command
         .arg(replica.family)
         .arg(replica.tool)
         .args(args)
         .stdin(Stdio::null());
+    for (name, value) in env {
+        match value {
+            Some(v) => command.env(name, v),
+            None => command.env_remove(name),
+        };
+    }
     let result = match output {
         Output::Capture => command.output().map(|o| {
             let written = out.write_all(&o.stdout).and(err.write_all(&o.stderr));
@@ -748,7 +809,10 @@ mod tests {
         );
         let e = choose_with(Implementation::Original, &ONLY, found).unwrap_err();
         assert!(
-            e.to_string().starts_with("LARMORX_IMPLEMENTATION=original"),
+            e.to_string().starts_with(
+                "the clean-room original was asked for (--implementation clean-room, \
+                 LARMORX_IMPLEMENTATION=clean-room)"
+            ),
             "{e}"
         );
         // A built-in replica without an original: `original` is an error that says so.
@@ -866,6 +930,12 @@ mod tests {
         }
         assert_eq!(Implementation::parse("Replica"), None);
         assert_eq!(Implementation::parse(""), None);
+        // the old spelling of clean-room (0.1.0rc1), accepted silently
+        assert_eq!(
+            Implementation::parse("original"),
+            Some(Implementation::Original)
+        );
+        assert_eq!(Implementation::Original.name(), "clean-room");
     }
 
     #[test]

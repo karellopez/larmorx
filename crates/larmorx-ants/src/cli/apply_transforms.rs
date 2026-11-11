@@ -31,6 +31,7 @@
 use std::io::Write;
 use std::path::Path;
 
+use larmorx_core::cli::Overrides;
 use larmorx_core::defects::{self, EXIT_BAD_MODE, Notices, UpstreamDefects};
 
 use larmorx_core::array::DynArray;
@@ -113,8 +114,21 @@ pub fn main(
     out: &mut dyn Write,
     err: &mut dyn Write,
 ) -> u8 {
-    match UpstreamDefects::from_env() {
-        Ok(mode) => main_with(args, loader, mode, out, err),
+    main_given(args, loader, &Overrides::default(), out, err)
+}
+
+/// [`main`] with larmorx's own options (`larmorx --n-threads N --upstream-defects MODE ants
+/// ...`): each one given wins over the variables it replaces (ITK's thread variables,
+/// `LARMORX_UPSTREAM_DEFECTS`).
+pub fn main_given(
+    args: &[String],
+    loader: &dyn TransformLoader,
+    given: &Overrides,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> u8 {
+    match given.upstream_defects() {
+        Ok(mode) => main_with_threads(args, loader, mode, given.n_threads, out, err),
         Err(e) => {
             let _ = writeln!(err, "larmorx: {e}");
             EXIT_BAD_MODE

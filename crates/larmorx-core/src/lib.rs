@@ -25,6 +25,7 @@
 pub mod affine;
 pub mod alloc;
 pub mod array;
+pub mod cli;
 pub mod defects;
 pub mod eigen_sym;
 pub mod element;

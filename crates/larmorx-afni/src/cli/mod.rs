@@ -9,6 +9,11 @@ pub mod volreg;
 
 use std::io::Write;
 
+use larmorx_core::cli::Overrides;
+use larmorx_core::defects::EXIT_BAD_MODE;
+
+use crate::settings::AfniSettings;
+
 /// The AFNI programs on the command line.
 pub const TOOLS: &[&str] = &["3dTshift", "3dAutomask", "3dUnifize", "3dvolreg"];
 
@@ -22,6 +27,37 @@ pub fn run(tool: &str, args: &[String], out: &mut dyn Write, err: &mut dyn Write
         "3dvolreg" => Some(volreg::main(args, out, err)),
         _ => None,
     }
+}
+
+/// [`run`] with larmorx's own options (`larmorx --n-threads N --upstream-defects MODE afni
+/// ...`): each one given wins over the variable it replaces (`OMP_NUM_THREADS`,
+/// `LARMORX_UPSTREAM_DEFECTS`); AFNI's settings from the process environment. Without options,
+/// [`run`].
+pub fn run_given(
+    tool: &str,
+    args: &[String],
+    given: &Overrides,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> Option<u8> {
+    if given.is_empty() || !TOOLS.contains(&tool) {
+        return run(tool, args, out, err);
+    }
+    let mode = match given.upstream_defects() {
+        Ok(mode) => mode,
+        Err(e) => {
+            let _ = writeln!(err, "** FATAL ERROR: {e}");
+            return Some(EXIT_BAD_MODE);
+        }
+    };
+    let settings = AfniSettings::from_env();
+    let n = given.n_threads_or(threads);
+    Some(match tool {
+        "3dTshift" => tshift::main_with_threads(args, mode, settings, n, out, err),
+        "3dAutomask" => automask::main_with_settings(args, mode, settings, n, out, err),
+        "3dUnifize" => unifize::main_with_settings(args, mode, settings, n, out, err),
+        _ => volreg::main_with_settings(args, mode, settings, n, out, err),
+    })
 }
 
 /// Threads for the command line: `OMP_NUM_THREADS` if set (AFNI's variable), else all logical

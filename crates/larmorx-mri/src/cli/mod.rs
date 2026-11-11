@@ -5,14 +5,29 @@ pub mod hmc;
 
 use std::io::Write;
 
+use larmorx_core::cli::Overrides;
+
 /// The tools on the command line.
 pub const TOOLS: &[&str] = &["hmc"];
 
 /// Runs tool `tool` with `args` (the arguments after the tool name). `None` if there is no
 /// such tool.
 pub fn run(tool: &str, args: &[String], out: &mut dyn Write, err: &mut dyn Write) -> Option<u8> {
+    run_given(tool, args, &Overrides::default(), out, err)
+}
+
+/// [`run`] with larmorx's own options (`larmorx --n-threads N --upstream-defects MODE mri ...`):
+/// each one given wins over the variable it replaces (`OMP_NUM_THREADS`,
+/// `LARMORX_UPSTREAM_DEFECTS`).
+pub fn run_given(
+    tool: &str,
+    args: &[String],
+    given: &Overrides,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> Option<u8> {
     match tool {
-        "hmc" => Some(hmc::main(args, out, err)),
+        "hmc" => Some(hmc::main_given(args, given, out, err)),
         _ => None,
     }
 }

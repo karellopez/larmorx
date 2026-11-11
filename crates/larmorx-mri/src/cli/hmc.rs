@@ -22,6 +22,7 @@ use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
+use larmorx_core::cli::Overrides;
 use larmorx_core::defects::{self, EXIT_BAD_MODE, Notice, UpstreamDefects};
 use larmorx_core::element::DataType;
 
@@ -428,8 +429,20 @@ fn ignored_option(option: &str, mode: UpstreamDefects) -> Notice {
 /// Runs `larmorx mri hmc` with `args` (mcflirt-style options); returns the exit code. The D13
 /// mode comes from `LARMORX_UPSTREAM_DEFECTS`.
 pub fn main(args: &[String], out: &mut dyn Write, err: &mut dyn Write) -> u8 {
-    match UpstreamDefects::from_env() {
-        Ok(mode) => main_with(args, mode, out, err),
+    main_given(args, &Overrides::default(), out, err)
+}
+
+/// [`main`] with larmorx's own options (`larmorx --n-threads N --upstream-defects MODE mri hmc
+/// ...`): each one given wins over the variable it replaces (`OMP_NUM_THREADS`,
+/// `LARMORX_UPSTREAM_DEFECTS`).
+pub fn main_given(
+    args: &[String],
+    given: &Overrides,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> u8 {
+    match given.upstream_defects() {
+        Ok(mode) => main_with_threads(args, mode, given.n_threads, out, err),
         Err(e) => {
             let _ = writeln!(err, "Error: {e}");
             EXIT_BAD_MODE
@@ -442,10 +455,22 @@ fn print_notice(err: &mut dyn Write, notice: &Notice) {
     let _ = writeln!(err, "larmorx: {}", notice.line());
 }
 
-/// [`main`] with the D13 mode given.
+/// [`main`] with the D13 mode given; the thread count from `OMP_NUM_THREADS`.
 pub fn main_with(
     args: &[String],
     mode: UpstreamDefects,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> u8 {
+    main_with_threads(args, mode, None, out, err)
+}
+
+/// [`main_with`] on `n_threads` threads (0: every logical CPU; `None`: `OMP_NUM_THREADS`, else
+/// every logical CPU). The results never depend on it.
+pub fn main_with_threads(
+    args: &[String],
+    mode: UpstreamDefects,
+    n_threads: Option<usize>,
     out: &mut dyn Write,
     err: &mut dyn Write,
 ) -> u8 {
@@ -474,7 +499,7 @@ pub fn main_with(
         let _ = out.write_all(USAGE.as_bytes());
         return 2;
     }
-    match execute(&o, mode, out, err) {
+    match execute(&o, mode, n_threads.unwrap_or_else(threads), out, err) {
         Ok(()) => 0,
         Err(Failure::Error(message)) => {
             let _ = writeln!(err, "Error: {message}");
@@ -615,6 +640,7 @@ fn input_files(
 fn execute(
     o: &Options,
     mode: UpstreamDefects,
+    n_threads: usize,
     out: &mut dyn Write,
     err: &mut dyn Write,
 ) -> Result<(), Failure> {
@@ -627,7 +653,6 @@ fn execute(
         print_notice(err, &r.notice());
         return Err(Failure::Error(r.message));
     }
-    let n_threads = threads();
     let input = o.input.as_deref().unwrap_or_default();
     let out_name = o
         .out

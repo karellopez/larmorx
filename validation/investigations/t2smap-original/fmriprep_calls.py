@@ -32,15 +32,24 @@ import blackbox  # noqa: E402
 WORKSPACE = next(p for p in HERE.parents if (p / "oracles" / "fmriprep-25.2.6").is_dir())
 RUNS = WORKSPACE / "oracles" / "fmriprep-25.2.6"
 LAUNCHER = WORKSPACE / "oracles/inputs/tedana-t2smap-replica/launcher-newest/t2smap"
-#: the oracle runs that reach t2smap, and their echo times (ms, as fMRIPrep passes them)
+#: the oracle runs that reach t2smap (fMRIPrep 25.2.6; ds000210 and ds000258 made again with
+#: OpenBLAS's Haswell kernels on 2026-11-09), the task's workflow folder and the echo times (ms,
+#: as fMRIPrep's command passes them: its node's command.txt)
 CALLS = {
-    "ds003592": ("ds003592-sub-280-noreconall", ["14.0", "29.96", "45.92"]),
+    "ds003592": ("ds003592-sub-280-noreconall", "rest", ["14.0", "29.96", "45.92"]),
+    "ds000210-cuedSGT": ("ds000210-sub-02-noreconall", "cuedSGT", ["13.0", "27.0", "43.0"]),
+    "ds000210-rest": ("ds000210-sub-02-noreconall", "rest", ["13.700000000000001", "30.0", "47.0"]),
+    "ds000258": ("ds000258-sub-21262-noreconall", "rest", ["12.0", "28.0", "44.0", "60.0"]),
 }
 
 
-def inputs(run: str) -> tuple[list[Path], Path]:
+def inputs(run: str, task: str) -> tuple[list[Path], Path]:
     work = RUNS / run / "work"
-    wf = sorted(work.glob("fmriprep_25_2_wf/*/*/bold_native_wf/bold_t2smap_wf"))[0]
+    wf = [
+        p
+        for p in sorted(work.glob("fmriprep_25_2_wf/*/*/bold_native_wf/bold_t2smap_wf"))
+        if f"task_{task}_" in p.parent.parent.name
+    ][0]
     native = wf.parent
     echoes = sorted(native.glob("_echoidx_*/boldref_bold/*_xformresampled.nii.gz"))
     return echoes, wf / "dilate_mask" / "dilated_mask.nii.gz"
@@ -105,8 +114,8 @@ def main(argv: list[str]) -> int:
     env = blackbox.environment()
     report: list[str] = []
     for name in a.runs.split(","):
-        run, tes = CALLS[name]
-        echoes, mask = inputs(run)
+        run, task, tes = CALLS[name]
+        echoes, mask = inputs(run, task)
         args = [
             "-d",
             *map(str, echoes),

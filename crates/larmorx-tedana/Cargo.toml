@@ -17,4 +17,6 @@ ndarray.workspace = true
 rayon.workspace = true
 
 [dev-dependencies]
+# SciPy's curve_fit (its port), the reference of the curve fit's unit test
+larmorx-optim.workspace = true
 tempfile.workspace = true

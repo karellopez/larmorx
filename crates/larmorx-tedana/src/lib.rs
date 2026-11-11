@@ -15,6 +15,7 @@
 pub mod adaptive;
 pub mod cli;
 pub mod combine;
+pub mod curvefit;
 pub mod fit;
 pub mod input;
 pub mod log;
@@ -388,15 +389,30 @@ fn run(
         }
     }
     let ts = o.fitmode == FitMode::Ts;
-    let maps = fit::loglin(&data, &count, &tes, used.volumes, ts, log, notices)?;
-    if o.fittype == FitType::Curvefit {
-        // 16. (relay 2b of the clean-room part: the curve fit, its failures and variances)
-        return Err(PyError::new(
-            "NotImplementedError",
-            "--fittype curvefit is not written yet in larmorx's clean-room t2smap",
-        ));
-    }
+    let mut maps = fit::loglin(&data, &count, &tes, used.volumes, ts, log, notices)?;
     let cols = maps.cols;
+    if o.fittype == FitType::Curvefit {
+        let curve = curvefit::run(
+            &data,
+            &count,
+            &tes,
+            used.volumes,
+            &mut maps,
+            notices.reproduce(),
+        );
+        curve_messages(&curve, &count, cols, log);
+        // 16. the failures; with --verbose the variances
+        curve_images(
+            &curve,
+            &count,
+            cols,
+            ts,
+            o.verbose,
+            &spec,
+            &mut outputs,
+            notices,
+        )?;
+    }
     // 17. floors, limited maps, cap
     let fin = maps::finish(maps, &count, &tes, log, notices);
     let as32 = |v: &[f64], scale: f64| -> Vec<f32> {
@@ -550,6 +566,119 @@ fn drop_first_volumes(data: &mut input::Data, n: usize) {
     data.x.truncate(rows * t_new);
     data.x.shrink_to_fit();
     data.n_t = t_new;
+}
+
+/// Step 15's curve-fit messages (§7.3, §12.3), per volume (in `ts`) and group in tedana's
+/// order: SciPy's `OptimizeWarning` when a fit of the group warned (Python prints it once), then
+/// with `--debug` the group's failure count.
+fn curve_messages(curve: &curvefit::Curve, count: &[u8], cols: usize, log: &mut Log<'_>) {
+    let groups = fit::groups(count);
+    for t in 0..cols {
+        for (n, members) in &groups {
+            if members.iter().any(|&v| curve.warn[v * cols + t]) {
+                log.py_warning(
+                    "curvefit.rs:run",
+                    "OptimizeWarning",
+                    "Covariance of the parameters could not be estimated",
+                );
+            }
+            if log.debugging() {
+                let f = members
+                    .iter()
+                    .filter(|&&v| curve.failed[v * cols + t] == 1)
+                    .count();
+                if f > 0 {
+                    let big_n = members.len();
+                    log.debug(
+                        "decay:fit_monoexponential:261",
+                        &format!(
+                            "With {n} echoes, monoexponential fit failed on {f}/{big_n} ({}%) \
+                             voxel(s), used log linear estimate instead",
+                            larmorx_core::python::number::format_fixed(
+                                100.0 * f as f64 / big_n as f64,
+                                2
+                            )
+                        ),
+                    );
+                }
+            }
+        }
+    }
+}
+
+/// Step 16: the failures image and, with `--verbose`, the variance and covariance images
+/// (§7.3, §11.1), with TED-07 (each variance in its own map by default) and TED-08 (the
+/// count-1 voxels' failures and variances written by default).
+#[allow(clippy::too_many_arguments)]
+fn curve_images(
+    curve: &curvefit::Curve,
+    count: &[u8],
+    cols: usize,
+    ts: bool,
+    verbose: bool,
+    spec: &ImageSpec,
+    outputs: &mut Outputs,
+    notices: &mut Notices,
+) -> Result<(), PyError> {
+    let fix = notices.fix();
+    let one = |k: usize| count[k / cols] == 1;
+    let k_failed_one = (0..curve.failed.len())
+        .filter(|&k| one(k) && curve.failed[k] == 1)
+        .count();
+    let failures: Vec<u8> = (0..curve.failed.len())
+        .map(|k| if one(k) && !fix { 0 } else { curve.failed[k] })
+        .collect();
+    let mut ted08 = Vec::new();
+    if k_failed_one > 0 {
+        ted08.push(format!(
+            "{k_failed_one} failed fit(s) of voxels with one good echo marked in the failures map"
+        ));
+    }
+    outputs.image("fit failures img", spec, &failures, cols, ts)?;
+    if verbose {
+        let f32_of = |x: f64| x as f32;
+        let swaps = (0..curve.pcov.len()).any(|k| {
+            !one(k) && f32_of(curve.pcov[k][0]).to_bits() != f32_of(curve.pcov[k][1]).to_bits()
+        });
+        if swaps {
+            notices.add(
+                &defects::TED_07,
+                "the T2* and S0 variance maps hold their own variances",
+            );
+        }
+        let k_var_one = (0..curve.pcov.len())
+            .filter(|&k| one(k) && curve.pcov[k].iter().any(|&x| f32_of(x) != 0.0))
+            .count();
+        if k_var_one > 0 {
+            ted08.push(format!(
+                "the variances of {k_var_one} voxel(s) with one good echo kept in the variance maps"
+            ));
+        }
+        // tedana writes P[0, 0] (S0's variance) as the T2* variance and P[1, 1] as S0's (TED-07)
+        let (t2s_index, s0_index) = if fix { (1, 0) } else { (0, 1) };
+        let map = |i: usize| -> Vec<f32> {
+            (0..curve.pcov.len())
+                .map(|k| {
+                    if one(k) && !fix {
+                        0.0
+                    } else {
+                        f32_of(curve.pcov[k][i])
+                    }
+                })
+                .collect()
+        };
+        if !ted08.is_empty() {
+            notices.add(&defects::TED_08, ted08.join("; "));
+            ted08.clear();
+        }
+        outputs.image("t2star variance img", spec, &map(t2s_index), cols, ts)?;
+        outputs.image("s0 variance img", spec, &map(s0_index), cols, ts)?;
+        outputs.image("t2star-s0 covariance img", spec, &map(2), cols, ts)?;
+    }
+    if !ted08.is_empty() {
+        notices.add(&defects::TED_08, ted08.join("; "));
+    }
+    Ok(())
 }
 
 /// GLIBC-07 by §15.2's one-pass rule: the written log-linear S0 values the other exponential

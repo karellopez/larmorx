@@ -416,6 +416,7 @@ dependencies = [
  "larmorx-core",
  "larmorx-interp",
  "larmorx-io",
+ "larmorx-optim",
  "larmorx-transform",
  "ndarray",
  "rayon",

@@ -60,6 +60,13 @@ def extra_inputs(d: Path) -> None:
     mask = np.asanyarray(nib.load(str(d / "mask.nii.gz")).dataobj)
     blackbox.save(mask[..., None], d / "mask-4d.nii.gz", dtype=np.uint8)
     blackbox.save(mask[:, :, :-1], d / "mask-grid.nii.gz", dtype=np.uint8)
+    # one slab of voxels with one good echo among the others: echo 2 rising (the decay test
+    # fails: count 1, the two-echo fit's start has T2* < 0) or dropped out (count 1 by the
+    # dropout test: the two-echo fit converges)
+    mixed = ech[1].copy()
+    mixed[0::2, :, 3, :] = ech[0][0::2, :, 3, :] * np.float32(1.2)
+    mixed[1::2, :, 3, :] = ech[0][1::2, :, 3, :] * np.float32(0.05)
+    blackbox.save(mixed, d / "mixed-e2.nii.gz")
 
 
 def files(names: list[str]) -> list[str]:
@@ -93,6 +100,63 @@ EXTRA: list[tuple[str, list[str], int]] = [
     ("x-te-single-inf", ["-d", "<I>/e1.nii.gz", "-e", "inf", *MASK], 1),
     ("x-debug-ts", [*E3, *TES, *MASK, "--fitmode", "ts", "--debug"], 1),
     ("x-help-40", ["-h"], 1),
+    # the curve fit (relay 2b): failures of voxels with one good echo (TED-08), the failure
+    # counts' messages, the variances, the per-volume fits, one volume, an infinite sample, two
+    # echoes per volume (m = 2: SciPy's warning), the used volumes, no mask, PAID per volume
+    (
+        "x-curvefit-decay",
+        [*E3, *TES, *MASK, "--masktype", "decay", "--fittype", "curvefit", "--debug", "--verbose"],
+        1,
+    ),
+    (
+        "x-ts-curvefit-decay",
+        [*E3, *TES, *MASK, "--masktype", "decay", "--fittype", "curvefit", "--fitmode", "ts"]
+        + ["--debug", "--verbose"],
+        1,
+    ),
+    (
+        "x-one-volume-curvefit",
+        [*files([f"one-e{i}.nii.gz" for i in (1, 2, 3)]), *TES, *MASK]
+        + ["--fittype", "curvefit", "--verbose", "--debug"],
+        1,
+    ),
+    (
+        "x-inf-sample-curvefit",
+        [*files(["e1.nii.gz", "inf-e2.nii.gz", "e3.nii.gz"]), *TES, *MASK]
+        + ["--fittype", "curvefit", "--debug", "--verbose"],
+        1,
+    ),
+    (
+        "x-two-echoes-ts-curvefit",
+        [*files(["e1.nii.gz", "e2.nii.gz"]), "-e", "0.012", "0.028", *MASK]
+        + ["--fittype", "curvefit", "--fitmode", "ts", "--verbose"],
+        1,
+    ),
+    (
+        "x-curvefit-used-volumes",
+        [*E3, *TES, *MASK, "--fittype", "curvefit", "--dummy-scans", "1", "--exclude", "2"]
+        + ["--debug"],
+        1,
+    ),
+    ("x-curvefit-no-mask", [*E3, *TES, "--fittype", "curvefit", "--debug"], 1),
+    (
+        "x-curvefit-one-echo-voxels",
+        [*files(["e1.nii.gz", "mixed-e2.nii.gz", "e3.nii.gz"]), *TES, *MASK]
+        + ["--masktype", "dropout", "decay", "--fittype", "curvefit", "--verbose", "--debug"],
+        1,
+    ),
+    (
+        "x-ts-curvefit-one-echo-voxels",
+        [*files(["e1.nii.gz", "mixed-e2.nii.gz", "e3.nii.gz"]), *TES, *MASK]
+        + ["--masktype", "dropout", "decay", "--fittype", "curvefit", "--fitmode", "ts"]
+        + ["--verbose", "--debug"],
+        1,
+    ),
+    (
+        "x-ts-curvefit-paid",
+        [*E3, *TES, *MASK, "--fittype", "curvefit", "--fitmode", "ts", "--combmode", "paid"],
+        1,
+    ),
 ]
 NO_OUT_DIR = blackbox.NO_OUT_DIR | {"x-help-40"}
 CASE_ENV = {"x-help-40": {"COLUMNS": "40"}}
@@ -141,7 +205,7 @@ def main(argv: list[str]) -> int:
     # the inputs are shared by every report of the work folder (the same paths in every call
     # file); made once, seeded, so every program reads the same bytes
     inputs = a.work.resolve() / "inputs"
-    if not (inputs / "mask-grid.nii.gz").exists():
+    if not (inputs / "mixed-e2.nii.gz").exists():
         if inputs.exists():
             import shutil
 

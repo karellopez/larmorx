@@ -1,0 +1,6157 @@
+# CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS: generated from FreeSurfer 8.2.0's source
+# (docs/freesurfer/README.md) by validation/investigations/freesurfer-inventory/licences.py;
+# what each field means: docs/freesurfer/third-party.md. Do not edit by hand: regenerate.
+
+schema = 1
+freesurfer = "8.2.0"
+files = 543
+lines = 736506
+
+[[finding]]
+id = "TP-01"
+title = "OpenRan1, setRandomSeed and randomNumber draw from VXL's vnl_random"
+where = ["utils/numerics.cpp:OpenRan1", "utils/utils.cpp:setRandomSeed", "utils/utils.cpp:randomNumber"]
+origin = "VXL's vnl_random (Marsaglia-Zaman subtract-with-borrow seeded by an LCG), as ITK 4.13.2 bundles it in the official build; not Numerical Recipes' ran1"
+terms = "BSD-3-Clause (VXL)"
+porting = "portable-with-notice"
+runs = "every program that sets a seed (-seed, FREESURFER_SEED) or draws numbers"
+programs_core = ["AntsDenoiseImageFs", "AntsN4BiasFieldCorrectionFs", "lta_convert", "mri_add_xform_to_header", "mri_binarize", "mri_brainvol_stats", "mri_ca_label", "mri_ca_normalize", "mri_ca_register", "mri_cc", "mri_concat", "mri_concatenate_lta", "mri_convert", "mri_cor2label", "mri_coreg", "mri_diff", "mri_edit_wm_with_aseg", "mri_em_register", "mri_fill", "mri_info", "mri_label2label", "mri_label2vol", "mri_make_uchar", "mri_mask", "mri_normalize", "mri_pretess", "mri_relabel_hypointensities", "mri_robust_register", "mri_robust_template", "mri_segment", "mri_segreg", "mri_segstats", "mri_surf2surf", "mri_surf2volseg", "mri_tessellate", "mri_vol2surf", "mri_vol2vol", "mri_warp_convert", "mri_watershed", "mris_anatomical_stats", "mris_autodet_gwstats", "mris_ca_label", "mris_calc", "mris_convert", "mris_curvature", "mris_curvature_stats", "mris_defects_pointset", "mris_euler_number", "mris_expand", "mris_extract_main_component", "mris_fix_topology", "mris_inflate", "mris_jacobian", "mris_label2annot", "mris_place_surface", "mris_register", "mris_remesh", "mris_remove_intersection", "mris_smooth", "mris_sphere", "mris_topo_fixer", "mris_volmask", "mrisp_paint", "talairach_afd", "tkregister2_cmdl"]
+programs_full_only = []
+
+[[finding]]
+id = "TP-02"
+title = "The Open* wrappers of numerics.cpp call VNL's linear algebra and optimisers"
+where = ["utils/numerics.cpp:OpenSvdcmp", "utils/numerics.cpp:OpenLUMatrixInverse", "utils/numerics.cpp:OpenMatrixDeterminant", "utils/numerics.cpp:OpenEigenSystem", "utils/numerics.cpp:OpenNonSymmetricEigenSystem", "utils/numerics.cpp:OpenQRdecomposition", "utils/numerics.cpp:OpenDFPMin", "utils/numerics.cpp:OpenPowell", "utils/numerics.cpp:OpenPowell2", "utils/numerics.cpp:sc_linalg_cholesky_decomp"]
+origin = "VXL's VNL (vnl_svd<float>, vnl_matrix_inverse, vnl_determinant, vnl_symmetric_eigensystem, vnl_real_eigensystem, vnl_qr, vnl_cholesky, fs_powell, fs_lbfgs) in ITK 4.13.2"
+terms = "BSD-3-Clause (VXL); the netlib parts through v3p"
+porting = "portable-with-notice"
+runs = "default paths (matrix inverses, determinants and SVDs in nearly every program)"
+programs_core = ["AntsDenoiseImageFs", "AntsN4BiasFieldCorrectionFs", "lta_convert", "mri_add_xform_to_header", "mri_binarize", "mri_brainvol_stats", "mri_ca_label", "mri_ca_normalize", "mri_ca_register", "mri_cc", "mri_concat", "mri_concatenate_lta", "mri_convert", "mri_cor2label", "mri_coreg", "mri_diff", "mri_edit_wm_with_aseg", "mri_em_register", "mri_fill", "mri_info", "mri_label2label", "mri_label2vol", "mri_make_uchar", "mri_mask", "mri_matrix_multiply", "mri_normalize", "mri_pretess", "mri_relabel_hypointensities", "mri_robust_register", "mri_robust_template", "mri_segment", "mri_segreg", "mri_segstats", "mri_surf2surf", "mri_surf2volseg", "mri_tessellate", "mri_vol2surf", "mri_vol2vol", "mri_warp_convert", "mri_watershed", "mris_anatomical_stats", "mris_autodet_gwstats", "mris_ca_label", "mris_calc", "mris_convert", "mris_curvature", "mris_curvature_stats", "mris_defects_pointset", "mris_euler_number", "mris_expand", "mris_extract_main_component", "mris_fix_topology", "mris_inflate", "mris_jacobian", "mris_label2annot", "mris_place_surface", "mris_register", "mris_remesh", "mris_remove_intersection", "mris_smooth", "mris_sphere", "mris_topo_fixer", "mris_volmask", "mrisp_paint", "talairach_afd", "tkregister2_cmdl"]
+programs_full_only = []
+
+[[finding]]
+id = "TP-03"
+title = "numerics.cpp's 'GSL library replacement': RANLUX389 and the random distributions"
+where = ["utils/numerics.cpp:sc_inc_status", "utils/numerics.cpp:sc_rng_get", "utils/numerics.cpp:sc_rng_set", "utils/numerics.cpp:sc_rng_alloc", "utils/numerics.cpp:sc_uni", "utils/numerics.cpp:sc_uni_pos", "utils/numerics.cpp:sc_ran_flat", "utils/numerics.cpp:sc_ran_gaussian", "utils/numerics.cpp:sc_ugauss", "utils/numerics.cpp:sc_gamma_int", "utils/numerics.cpp:sc_gamma_large", "utils/numerics.cpp:sc_gamma_frac", "utils/numerics.cpp:sc_ran_gamma", "utils/numerics.cpp:sc_ran_fdist", "utils/numerics.cpp:sc_ran_chisq", "utils/numerics.cpp:sc_ran_tdist", "utils/numerics.cpp:sc_ran_exponential"]
+origin = "a statement-by-statement transcription, renamed, of GSL 1.8's rng/ranlux.c and randist/{gamma,gauss,tdist,fdist,chisq,exponential,flat}.c (James Theiler, Brian Gough); the algorithms are Luescher's RANLUX with F. James's seeding and Knuth's and Marsaglia's methods"
+terms = "GSL is GPL-2.0-or-later (1.8; GPL-3.0-or-later since 1.12); the file carries FreeSurfer's notice only"
+porting = "question"
+runs = "mri_coreg by default (coordinate and intensity dithering on, seed 53: bbregister --init-coreg in fMRIPrep); mris_expand only with a random thickness map (-tmap_std)"
+programs_core = ["mri_coreg", "mris_expand"]
+programs_full_only = []
+
+[[finding]]
+id = "TP-04"
+title = "The cubic spline of mri_normalize is John Burkardt's spline library"
+where = ["utils/numerics.cpp:SplineCubicSet", "utils/numerics.cpp:SplineCubicValue", "utils/numerics.cpp:d3_np_fs", "utils/numerics.cpp:OpenSpline", "utils/numerics.cpp:OpenSplint"]
+origin = "John Burkardt's C++ spline library (Florida State University, the csit.fsu.edu address of about 2006); the function comments are his"
+terms = "his page says MIT today (checked 2026-11-12); the terms of the copy FreeSurfer took are not recorded"
+porting = "question"
+runs = "mri_normalize on every default path (MRInormalize calls MRIsplineNormalize unconditionally, utils/mrinorm.cpp 749)"
+programs_core = ["mri_normalize"]
+programs_full_only = []
+
+[[finding]]
+id = "TP-05"
+title = "The B-spline interpolation and pyramids of mriBSpline.cpp follow EPFL's code"
+where = ["utils/mriBSpline.cpp"]
+origin = "Martin Reuter's 3D version of P. Thevenaz's 2D code (bigwww.epfl.ch, coeff.c: no licence statement in the file) and M. Unser's 1992 NIH pyramid filters; Thevenaz, Blu, Unser, IEEE TMI 19 (2000) 739-758"
+terms = "the file carries FreeSurfer's notice; EPFL's code states no terms; Unser's 1992 filters were written at NIH"
+porting = "portable-with-notice"
+runs = "mri_robust_template's final resampling (cubic B-spline by default) with several T1w images; the robust tools' pyramid for large images; mri_convert and mri_vol2vol only with cubic interpolation"
+programs_core = ["AntsDenoiseImageFs", "AntsN4BiasFieldCorrectionFs", "lta_convert", "mri_add_xform_to_header", "mri_binarize", "mri_brainvol_stats", "mri_ca_label", "mri_ca_normalize", "mri_ca_register", "mri_cc", "mri_concat", "mri_concatenate_lta", "mri_convert", "mri_cor2label", "mri_coreg", "mri_diff", "mri_edit_wm_with_aseg", "mri_em_register", "mri_fill", "mri_info", "mri_label2label", "mri_label2vol", "mri_make_uchar", "mri_mask", "mri_normalize", "mri_pretess", "mri_relabel_hypointensities", "mri_robust_register", "mri_robust_template", "mri_segment", "mri_segreg", "mri_segstats", "mri_surf2surf", "mri_surf2volseg", "mri_tessellate", "mri_vol2surf", "mri_vol2vol", "mri_warp_convert", "mri_watershed", "mris_anatomical_stats", "mris_autodet_gwstats", "mris_ca_label", "mris_calc", "mris_convert", "mris_curvature", "mris_curvature_stats", "mris_defects_pointset", "mris_euler_number", "mris_expand", "mris_extract_main_component", "mris_fix_topology", "mris_inflate", "mris_jacobian", "mris_label2annot", "mris_place_surface", "mris_register", "mris_remesh", "mris_remove_intersection", "mris_smooth", "mris_sphere", "mris_topo_fixer", "mris_volmask", "mrisp_paint", "talairach_afd", "tkregister2_cmdl"]
+programs_full_only = []
+
+[[finding]]
+id = "TP-06"
+title = "Numerical Recipes' nrutil allocators"
+where = ["utils/numerics.cpp:vector", "utils/numerics.cpp:matrix", "utils/numerics.cpp:free_vector", "utils/numerics.cpp:free_matrix"]
+origin = "Numerical Recipes in C's nrutil.c allocation helpers, verbatim (names, NR_END, FREE_ARG, comments); the 'silly numerical recipes' comments of matrix.cpp and dmatrix.cpp are FreeSurfer's own code keeping NR's 1-based convention"
+terms = "Numerical Recipes' terms (not checked: nothing of it is ported)"
+porting = "nothing-to-port"
+runs = "memory layout only (1-based float arrays)"
+programs_core = ["AntsDenoiseImageFs", "AntsN4BiasFieldCorrectionFs", "lta_convert", "mri_add_xform_to_header", "mri_binarize", "mri_brainvol_stats", "mri_ca_label", "mri_ca_normalize", "mri_ca_register", "mri_cc", "mri_concat", "mri_concatenate_lta", "mri_convert", "mri_cor2label", "mri_coreg", "mri_diff", "mri_edit_wm_with_aseg", "mri_em_register", "mri_fill", "mri_info", "mri_label2label", "mri_label2vol", "mri_make_uchar", "mri_mask", "mri_matrix_multiply", "mri_normalize", "mri_pretess", "mri_relabel_hypointensities", "mri_robust_register", "mri_robust_template", "mri_segment", "mri_segreg", "mri_segstats", "mri_surf2surf", "mri_surf2volseg", "mri_tessellate", "mri_vol2surf", "mri_vol2vol", "mri_warp_convert", "mri_watershed", "mris_anatomical_stats", "mris_autodet_gwstats", "mris_ca_label", "mris_calc", "mris_convert", "mris_curvature", "mris_curvature_stats", "mris_defects_pointset", "mris_euler_number", "mris_expand", "mris_extract_main_component", "mris_fix_topology", "mris_inflate", "mris_jacobian", "mris_label2annot", "mris_place_surface", "mris_register", "mris_remesh", "mris_remove_intersection", "mris_smooth", "mris_sphere", "mris_topo_fixer", "mris_volmask", "mrisp_paint", "talairach_afd", "tkregister2_cmdl"]
+programs_full_only = []
+
+[[finding]]
+id = "TP-07"
+title = "Quickselect and medians"
+where = ["utils/utils.cpp:kth_smallest", "utils/utils.cpp:quick_select", "mri_robust_register/RobustGaussian.cpp"]
+origin = "N. Devillard's 1998 code (Wirth's algorithm and NR's description)"
+terms = "public domain (stated in the files)"
+porting = "portable"
+runs = "medians in many programs; mri_robust_template's robust statistics"
+programs_core = ["mri_concat", "mri_em_register", "mri_robust_template", "mri_segment", "mri_watershed", "mris_autodet_gwstats", "mris_curvature", "mris_curvature_stats", "mris_place_surface", "mris_register", "mris_smooth", "mrisp_paint"]
+programs_full_only = []
+
+[[finding]]
+id = "TP-08"
+title = "fs_powell and fs_lbfgs"
+where = ["utils/fs_powell.cpp", "include/fs_vnl/fs_powell.h", "utils/fs_lbfgs.cpp"]
+origin = "fs_powell is VXL's vnl_powell (with vnl_brent) changed by FreeSurfer; fs_lbfgs calls VNL's v3p_netlib_lbfgs_ (J. Nocedal's 1990 Fortran L-BFGS with the More-Thuente line search, f2c-translated)"
+terms = "BSD-3-Clause (VXL); netlib's code states no terms"
+porting = "portable-with-notice"
+runs = "mri_em_register, mri_ca_register, mri_ca_label, mri_coreg, mri_segreg"
+programs_core = ["mri_ca_label", "mri_ca_register", "mri_coreg", "mri_em_register", "mri_segreg"]
+programs_full_only = []
+
+[[finding]]
+id = "TP-09"
+title = "Washington University's 4dfp tools (classic Talairach)"
+where = ["talairach_avi"]
+origin = "Avi Snyder's 4dfp registration tools (C and Fortran); the Fortran files without a notice are the same collection (their RCS logs: avi); fftsol.f is R. C. Singleton's 1968 mixed-radix FFT, polfit.f is Bevington's POLFIT (1969, p. 141)"
+terms = "all rights reserved; no copying or distribution without Washington University's written permission"
+porting = "clean-room-only"
+runs = "the classic stream's talairach_avi (mpr2mni305); v8 uses rca-talairach"
+programs_core = ["analyzeto4dfp", "compute_vox2vox", "gauss_4dfp", "imgreg_4dfp"]
+programs_full_only = []
+
+[[finding]]
+id = "TP-10"
+title = "tkregister2_cmdl is under the FreeSurfer/CorTechs licence"
+where = ["tkregister2/tkregister2.cpp"]
+origin = "Martin Sereno and Anders Dale, 1996; Doug Greve, 2002; CorTechs Labs and MGH"
+terms = "non-commercial internal research and education by not-for-profit entities, no commercially sponsored research, modifications' source to be made available (distribution/docs/license.cortechs.txt, paragraphs 2(d)-(f))"
+porting = "question"
+runs = "fMRIPrep's bbregister: the header registration (--regheader) and the conversions --ltaout, --fslregout"
+programs_core = ["tkregister2_cmdl"]
+programs_full_only = []
+
+[[finding]]
+id = "TP-11"
+title = "The ITK in the official binaries is 4.13.2, not 5.4.5"
+where = ["AntsN4BiasFieldCorrectionFs/AntsN4BiasFieldCorrectionFs.cpp", "AntsDenoiseImageFs/AntsDenoiseImageFs.cpp", "AntsDenoiseImageFs/itkAdaptiveNonLocalMeansDenoisingImageFilter.hxx"]
+origin = "ITK 4.13.2 (CMakeLists.txt 690: Ubuntu22 with GCC 8 takes itk/4.13.2_ubuntu20; the binaries' build paths name itk/4.13.2), with its VNL; the adaptive non-local means filter is ITK's (Insight Software Consortium)"
+terms = "Apache-2.0 (ITK 4.x), BSD-3-Clause (VXL)"
+porting = "portable-with-notice"
+runs = "N4 and the denoising on both streams; every VNL call"
+programs_core = ["AntsDenoiseImageFs", "AntsN4BiasFieldCorrectionFs"]
+programs_full_only = []
+
+[[finding]]
+id = "TP-12"
+title = "The network programs carry upstream code under Apache-2.0"
+where = ["mri_synthseg/mri_synthseg", "mri_sclimbic_seg/mri_sclimbic_seg", "mri_synthstrip/mri_synthstrip", "mri_synthmorph/mri_synthmorph", "mri_synthmorph/synthmorph/registration.py", "mri_synthmorph/synthmorph/utils.py"]
+origin = "neurite's U-Net layers 'copied with permission' (github.com/adalca/neurite); SynthSeg (upstream BBillot/SynthSeg), SynthMorph (voxelmorph), SynthStrip are FreeSurfer's distributions; surfa is FreeSurfer's I/O package"
+terms = "neurite, voxelmorph, SynthSeg upstream: Apache-2.0; surfa: MIT (GitHub, 2026-11-12); the FreeSurfer files carry no notice (Part B)"
+porting = "portable-with-notice"
+runs = "v8 and classic: SynthSeg, SynthStrip, SynthMorph, ScLimbic (weights: data-files.md)"
+programs_core = ["mri_sclimbic_seg", "mri_synthmorph", "mri_synthseg", "mri_synthstrip"]
+programs_full_only = []
+
+[[finding]]
+id = "TP-13"
+title = "Small permissive pieces"
+where = ["include/json.h", "include/argparse.h", "utils/argparse.cpp", "include/utilsmath.h", "include/fnv_hash.h", "include/fnvhash.h"]
+origin = "nlohmann/json 3.x (MIT; Grisu2 by F. Loitsch, MIT; UTF-8 decoder by B. Hoehrmann, MIT); argparse derived from H. Bristow's (BSD-3-Clause); Geometric Tools' distance and box code (D. Eberly, Boost 1.0); the FNV hash (public domain)"
+terms = "MIT, BSD-3-Clause, BSL-1.0, public domain"
+porting = "portable-with-notice"
+runs = "JSON outputs (number formatting), command lines of the newer programs, mris_volmask's distances, hashing"
+programs_core = ["AntsDenoiseImageFs", "AntsN4BiasFieldCorrectionFs", "fs_temp_dir", "fs_temp_file", "lta_convert", "mri_add_xform_to_header", "mri_binarize", "mri_brainvol_stats", "mri_ca_label", "mri_ca_normalize", "mri_ca_register", "mri_cc", "mri_concat", "mri_concatenate_lta", "mri_convert", "mri_cor2label", "mri_coreg", "mri_diff", "mri_edit_wm_with_aseg", "mri_em_register", "mri_fill", "mri_info", "mri_label2label", "mri_label2vol", "mri_make_uchar", "mri_mask", "mri_normalize", "mri_pretess", "mri_relabel_hypointensities", "mri_robust_register", "mri_robust_template", "mri_segment", "mri_segreg", "mri_segstats", "mri_surf2surf", "mri_surf2volseg", "mri_tessellate", "mri_vol2surf", "mri_vol2vol", "mri_warp_convert", "mri_watershed", "mris_anatomical_stats", "mris_autodet_gwstats", "mris_ca_label", "mris_calc", "mris_convert", "mris_curvature", "mris_curvature_stats", "mris_defects_pointset", "mris_euler_number", "mris_expand", "mris_extract_main_component", "mris_fix_topology", "mris_inflate", "mris_jacobian", "mris_label2annot", "mris_place_surface", "mris_register", "mris_remesh", "mris_remove_intersection", "mris_smooth", "mris_sphere", "mris_topo_fixer", "mris_volmask", "mrisp_paint", "talairach_afd", "tkregister2_cmdl"]
+programs_full_only = []
+
+[[finding]]
+id = "TP-14"
+title = "MIT CSAIL's MARS distance transform"
+where = ["utils/MARS_DT_Boundary.cpp", "utils/min_heap.cpp"]
+origin = "the MARS project (Thomas Yeo, Mert Sabuncu), MIT CSAIL, 2006-2008"
+terms = "a copyright line, no licence terms"
+porting = "question"
+runs = "no default path at run time: only MRIScomputeAllDistances (MRISunfold with complete_dist_mat, which mris_sphere never sets) reaches it"
+programs_core = ["mris_sphere"]
+programs_full_only = []
+
+[[finding]]
+id = "TP-15"
+title = "The C library's generators (not FreeSurfer's code)"
+where = ["AntsN4BiasFieldCorrectionFs/AntsN4BiasFieldCorrectionFs.cpp:main", "mri_mask/mri_mask.cpp:main", "utils/pdf.cpp:PDFgaussian", "utils/mri.cpp:MRIfixTkReg", "utils/mri.cpp:MRIrandn", "mri_robust_register/mri_robust_template.cpp:getRandomNumber", "utils/utils.cpp:setRandomSeed"]
+origin = "drand48/srand48 (defined by POSIX), rand/srand and srandom (glibc 2.35's random_r on the official build's Ubuntu 22.04)"
+terms = "drand48: a published definition; glibc: LGPL-2.1-or-later, never copied (a behaviour spec, as specs/glibc-dbl.md)"
+porting = "published-description"
+runs = "N4's zero replacement option (srand48(53)), mri_mask's noise option, MRIrandn's noise options, mri_robust_template's random first time point (only without --inittp)"
+programs_core = ["AntsDenoiseImageFs", "AntsN4BiasFieldCorrectionFs", "lta_convert", "mri_add_xform_to_header", "mri_binarize", "mri_brainvol_stats", "mri_ca_label", "mri_ca_normalize", "mri_ca_register", "mri_cc", "mri_concat", "mri_concatenate_lta", "mri_convert", "mri_cor2label", "mri_coreg", "mri_diff", "mri_edit_wm_with_aseg", "mri_em_register", "mri_fill", "mri_info", "mri_label2label", "mri_label2vol", "mri_make_uchar", "mri_mask", "mri_normalize", "mri_pretess", "mri_relabel_hypointensities", "mri_robust_register", "mri_robust_template", "mri_segment", "mri_segreg", "mri_segstats", "mri_surf2surf", "mri_surf2volseg", "mri_tessellate", "mri_vol2surf", "mri_vol2vol", "mri_warp_convert", "mri_watershed", "mris_anatomical_stats", "mris_autodet_gwstats", "mris_ca_label", "mris_calc", "mris_convert", "mris_curvature", "mris_curvature_stats", "mris_defects_pointset", "mris_euler_number", "mris_expand", "mris_extract_main_component", "mris_fix_topology", "mris_inflate", "mris_jacobian", "mris_label2annot", "mris_place_surface", "mris_register", "mris_remesh", "mris_remove_intersection", "mris_smooth", "mris_sphere", "mris_topo_fixer", "mris_volmask", "mrisp_paint", "talairach_afd", "tkregister2_cmdl"]
+programs_full_only = []
+
+[[finding]]
+id = "TP-16"
+title = "Credits with no code copied, and code not compiled"
+where = ["utils/mrisutils.cpp:MRISvolumeTH3", "mris_curvature_stats/mris_curvature_stats.cpp:AlmostEqual2sComplement", "mris_remesh/remesher.cpp"]
+origin = "MRISvolumeTH3 follows A. M. Winkler's srf2vol method; AlmostEqual2sComplement B. Dawson's article; the remesher Botsch and Kobbelt (2004); DICOMRead.cpp's scandir/alphasort (J.-R. Hill, 2000) are inside #ifdef SunOS and not compiled on Linux; MRISOBBTree.h's Moller-Trumbore test is commented out"
+terms = "FreeSurfer's licence"
+porting = "portable"
+runs = "mris_anatomical_stats and mris_convert (volumes), mris_curvature_stats, mris_remesh (both streams)"
+programs_core = ["mris_anatomical_stats", "mris_convert", "mris_curvature_stats", "mris_remesh"]
+programs_full_only = []
+
+[[file]]
+path = "AntsDenoiseImageFs/AntsDenoiseImageFs.cpp"
+area = "program directories"
+lines = 98
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = ["TP-11"]
+core = true
+programs = 1
+
+[[file]]
+path = "AntsDenoiseImageFs/itkAdaptiveNonLocalMeansDenoisingImageFilter.hxx"
+area = "program directories"
+lines = 516
+notice = "Apache"
+family = "Apache-2.0 (ITK)"
+porting = "portable-with-notice"
+findings = ["TP-11"]
+core = true
+programs = 1
+
+[[file]]
+path = "AntsN4BiasFieldCorrectionFs/AntsN4BiasFieldCorrectionFs.cpp"
+area = "program directories"
+lines = 302
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = ["TP-11", "TP-15"]
+core = true
+programs = 1
+
+[[file]]
+path = "include/MRISOBBTree.h"
+area = "include"
+lines = 876
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "include/MRISdistancefield.h"
+area = "include"
+lines = 173
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "include/affine.h"
+area = "include"
+lines = 270
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "include/affine.hpp"
+area = "include"
+lines = 323
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "include/argparse.h"
+area = "include"
+lines = 262
+notice = "no notice"
+family = "derived from Hilton Bristow's argparse, BSD-3-Clause"
+porting = "portable-with-notice"
+findings = ["TP-13"]
+core = true
+programs = 7
+
+[[file]]
+path = "include/base.h"
+area = "include"
+lines = 178
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 7
+
+[[file]]
+path = "include/csv.h"
+area = "include"
+lines = 75
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "include/face_barycentric_coords.h"
+area = "include"
+lines = 52
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 6
+
+[[file]]
+path = "include/fio.h"
+area = "include"
+lines = 116
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "include/fnv_hash.h"
+area = "include"
+lines = 44
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = ["TP-13"]
+core = true
+programs = 39
+
+[[file]]
+path = "include/fnvhash.h"
+area = "include"
+lines = 47
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = ["TP-13"]
+core = true
+programs = 65
+
+[[file]]
+path = "include/fs_vnl/fs_powell.h"
+area = "include"
+lines = 69
+notice = "no notice"
+family = "taken from VXL's vnl_powell, BSD-3-Clause"
+porting = "portable-with-notice"
+findings = ["TP-08"]
+core = true
+programs = 5
+
+[[file]]
+path = "include/gcalinearnode.hpp"
+area = "include"
+lines = 819
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "include/gcalinearprior.hpp"
+area = "include"
+lines = 403
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "include/json.h"
+area = "include"
+lines = 18878
+notice = "other copyright"
+family = "nlohmann/json, MIT"
+porting = "portable-with-notice"
+findings = ["TP-13"]
+core = true
+programs = 13
+
+[[file]]
+path = "include/log.h"
+area = "include"
+lines = 99
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 13
+
+[[file]]
+path = "include/mri.h"
+area = "include"
+lines = 2177
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "include/mrishash.h"
+area = "include"
+lines = 181
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 18
+
+[[file]]
+path = "include/mrisurf.h"
+area = "include"
+lines = 2669
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 39
+
+[[file]]
+path = "include/mrisurf_SurfaceFromMRISPV_generated_AllM.h"
+area = "include"
+lines = 456
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 4
+
+[[file]]
+path = "include/mrisurf_SurfaceFromMRISPV_generated_Analysis.h"
+area = "include"
+lines = 431
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 4
+
+[[file]]
+path = "include/mrisurf_SurfaceFromMRISPV_generated_AnalysisM.h"
+area = "include"
+lines = 431
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 4
+
+[[file]]
+path = "include/mrisurf_SurfaceFromMRISPV_generated_Distort.h"
+area = "include"
+lines = 437
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 4
+
+[[file]]
+path = "include/mrisurf_SurfaceFromMRISPV_generated_DistortM.h"
+area = "include"
+lines = 432
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 11
+
+[[file]]
+path = "include/mrisurf_SurfaceFromMRISPV_generated_Existence.h"
+area = "include"
+lines = 110
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 4
+
+[[file]]
+path = "include/mrisurf_SurfaceFromMRISPV_generated_ExistenceM.h"
+area = "include"
+lines = 85
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 4
+
+[[file]]
+path = "include/mrisurf_SurfaceFromMRISPV_generated_Topology.h"
+area = "include"
+lines = 141
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 4
+
+[[file]]
+path = "include/mrisurf_SurfaceFromMRISPV_generated_TopologyM.h"
+area = "include"
+lines = 127
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 4
+
+[[file]]
+path = "include/mrisurf_SurfaceFromMRISPV_generated_XYZPosition.h"
+area = "include"
+lines = 171
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 4
+
+[[file]]
+path = "include/mrisurf_SurfaceFromMRISPV_generated_XYZPositionConsequences.h"
+area = "include"
+lines = 241
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 4
+
+[[file]]
+path = "include/mrisurf_SurfaceFromMRISPV_generated_XYZPositionConsequencesM.h"
+area = "include"
+lines = 239
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 4
+
+[[file]]
+path = "include/mrisurf_SurfaceFromMRISPV_generated_XYZPositionM.h"
+area = "include"
+lines = 158
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 11
+
+[[file]]
+path = "include/mrisurf_SurfaceFromMRISPV_generated_prefix.h"
+area = "include"
+lines = 150
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 39
+
+[[file]]
+path = "include/mrisurf_SurfaceFromMRISPV_generated_suffix.h"
+area = "include"
+lines = 8908
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "include/mrisurf_SurfaceFromMRIS_MP_generated_AllM.h"
+area = "include"
+lines = 165
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 4
+
+[[file]]
+path = "include/mrisurf_SurfaceFromMRIS_MP_generated_Analysis.h"
+area = "include"
+lines = 153
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 4
+
+[[file]]
+path = "include/mrisurf_SurfaceFromMRIS_MP_generated_AnalysisM.h"
+area = "include"
+lines = 153
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 4
+
+[[file]]
+path = "include/mrisurf_SurfaceFromMRIS_MP_generated_Distort.h"
+area = "include"
+lines = 161
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 4
+
+[[file]]
+path = "include/mrisurf_SurfaceFromMRIS_MP_generated_DistortM.h"
+area = "include"
+lines = 154
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 11
+
+[[file]]
+path = "include/mrisurf_SurfaceFromMRIS_MP_generated_Existence.h"
+area = "include"
+lines = 97
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 4
+
+[[file]]
+path = "include/mrisurf_SurfaceFromMRIS_MP_generated_ExistenceM.h"
+area = "include"
+lines = 61
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 4
+
+[[file]]
+path = "include/mrisurf_SurfaceFromMRIS_MP_generated_Topology.h"
+area = "include"
+lines = 96
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 4
+
+[[file]]
+path = "include/mrisurf_SurfaceFromMRIS_MP_generated_TopologyM.h"
+area = "include"
+lines = 65
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 4
+
+[[file]]
+path = "include/mrisurf_SurfaceFromMRIS_MP_generated_XYZPosition.h"
+area = "include"
+lines = 103
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 4
+
+[[file]]
+path = "include/mrisurf_SurfaceFromMRIS_MP_generated_XYZPositionConsequences.h"
+area = "include"
+lines = 135
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 4
+
+[[file]]
+path = "include/mrisurf_SurfaceFromMRIS_MP_generated_XYZPositionConsequencesM.h"
+area = "include"
+lines = 128
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 4
+
+[[file]]
+path = "include/mrisurf_SurfaceFromMRIS_MP_generated_XYZPositionM.h"
+area = "include"
+lines = 83
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 11
+
+[[file]]
+path = "include/mrisurf_SurfaceFromMRIS_MP_generated_prefix.h"
+area = "include"
+lines = 163
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 39
+
+[[file]]
+path = "include/mrisurf_SurfaceFromMRIS_MP_generated_suffix.h"
+area = "include"
+lines = 3244
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "include/mrisurf_SurfaceFromMRIS_generated_AllM.h"
+area = "include"
+lines = 462
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 4
+
+[[file]]
+path = "include/mrisurf_SurfaceFromMRIS_generated_Analysis.h"
+area = "include"
+lines = 437
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 4
+
+[[file]]
+path = "include/mrisurf_SurfaceFromMRIS_generated_AnalysisM.h"
+area = "include"
+lines = 437
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 4
+
+[[file]]
+path = "include/mrisurf_SurfaceFromMRIS_generated_Distort.h"
+area = "include"
+lines = 443
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 4
+
+[[file]]
+path = "include/mrisurf_SurfaceFromMRIS_generated_DistortM.h"
+area = "include"
+lines = 438
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 11
+
+[[file]]
+path = "include/mrisurf_SurfaceFromMRIS_generated_Existence.h"
+area = "include"
+lines = 110
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 4
+
+[[file]]
+path = "include/mrisurf_SurfaceFromMRIS_generated_ExistenceM.h"
+area = "include"
+lines = 85
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 4
+
+[[file]]
+path = "include/mrisurf_SurfaceFromMRIS_generated_Topology.h"
+area = "include"
+lines = 141
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 4
+
+[[file]]
+path = "include/mrisurf_SurfaceFromMRIS_generated_TopologyM.h"
+area = "include"
+lines = 127
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 4
+
+[[file]]
+path = "include/mrisurf_SurfaceFromMRIS_generated_XYZPosition.h"
+area = "include"
+lines = 171
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 4
+
+[[file]]
+path = "include/mrisurf_SurfaceFromMRIS_generated_XYZPositionConsequences.h"
+area = "include"
+lines = 247
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 4
+
+[[file]]
+path = "include/mrisurf_SurfaceFromMRIS_generated_XYZPositionConsequencesM.h"
+area = "include"
+lines = 245
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 4
+
+[[file]]
+path = "include/mrisurf_SurfaceFromMRIS_generated_XYZPositionM.h"
+area = "include"
+lines = 158
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 11
+
+[[file]]
+path = "include/mrisurf_SurfaceFromMRIS_generated_prefix.h"
+area = "include"
+lines = 150
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 39
+
+[[file]]
+path = "include/mrisurf_SurfaceFromMRIS_generated_suffix.h"
+area = "include"
+lines = 8791
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "include/mrisurf_aaa.h"
+area = "include"
+lines = 339
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 39
+
+[[file]]
+path = "include/mrisurf_base.h"
+area = "include"
+lines = 371
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "include/mrisurf_metricProperties.h"
+area = "include"
+lines = 173
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "include/mrisurf_sphere_interp.h"
+area = "include"
+lines = 83
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "include/mrisurf_topology.h"
+area = "include"
+lines = 96
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 2
+
+[[file]]
+path = "include/pointset.h"
+area = "include"
+lines = 124
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 5
+
+[[file]]
+path = "include/timer.h"
+area = "include"
+lines = 41
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "include/utilsmath.h"
+area = "include"
+lines = 729
+notice = "other copyright"
+family = "Geometric Tools, Boost Software License 1.0"
+porting = "portable-with-notice"
+findings = ["TP-13"]
+core = true
+programs = 1
+
+[[file]]
+path = "io/fs_temp_dir.cpp"
+area = "program directories"
+lines = 29
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "io/fs_temp_file.cpp"
+area = "program directories"
+lines = 31
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "lta_convert/lta_convert.cpp"
+area = "program directories"
+lines = 1441
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mri_add_xform_to_header/mri_add_xform_to_header.cpp"
+area = "program directories"
+lines = 225
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mri_aparc2aseg/mri_surf2volseg.cpp"
+area = "program directories"
+lines = 1029
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mri_binarize/mri_binarize.cpp"
+area = "program directories"
+lines = 1586
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mri_brainvol_stats/mri_brainvol_stats.cpp"
+area = "program directories"
+lines = 42
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mri_ca_label/mri_ca_label.cpp"
+area = "program directories"
+lines = 5529
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mri_ca_normalize/mri_ca_normalize.cpp"
+area = "program directories"
+lines = 2308
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mri_ca_register/mri_ca_register.cpp"
+area = "program directories"
+lines = 2563
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mri_cc/mri_cc.cpp"
+area = "program directories"
+lines = 2662
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mri_concat/mri_concat.cpp"
+area = "program directories"
+lines = 1498
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mri_concatenate_lta/mri_concatenate_lta.cpp"
+area = "program directories"
+lines = 747
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mri_convert/mri_convert.cpp"
+area = "program directories"
+lines = 4010
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mri_convert/mri_make_uchar.cpp"
+area = "program directories"
+lines = 289
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mri_cor2label/mri_cor2label.cpp"
+area = "program directories"
+lines = 673
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mri_coreg/mri_coreg.cpp"
+area = "program directories"
+lines = 2149
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mri_diff/mri_diff.cpp"
+area = "program directories"
+lines = 1325
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mri_edit_wm_with_aseg/mri_edit_wm_with_aseg.cpp"
+area = "program directories"
+lines = 3259
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mri_em_register/emregisterutils.cpp"
+area = "program directories"
+lines = 211
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mri_em_register/findtranslation.cpp"
+area = "program directories"
+lines = 247
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mri_em_register/mri_em_register.cpp"
+area = "program directories"
+lines = 2510
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mri_fill/mri_fill.cpp"
+area = "program directories"
+lines = 6729
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mri_info/mri_info.cpp"
+area = "program directories"
+lines = 1469
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mri_label2label/mri_label2label.cpp"
+area = "program directories"
+lines = 1601
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mri_label2vol/mri_label2vol.cpp"
+area = "program directories"
+lines = 1391
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mri_mask/mri_mask.cpp"
+area = "program directories"
+lines = 655
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = ["TP-15"]
+core = true
+programs = 1
+
+[[file]]
+path = "mri_matrix_multiply/mri_matrix_multiply.cpp"
+area = "program directories"
+lines = 366
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mri_mc/mri_pretess.cpp"
+area = "program directories"
+lines = 1413
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mri_mc/mris_extract_main_component.cpp"
+area = "program directories"
+lines = 69
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mri_normalize/mri_normalize.cpp"
+area = "program directories"
+lines = 2168
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mri_relabel_hypointensities/mri_relabel_hypointensities.cpp"
+area = "program directories"
+lines = 293
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mri_robust_register/CostFunctions.cpp"
+area = "program directories"
+lines = 1447
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 2
+
+[[file]]
+path = "mri_robust_register/CostFunctions.h"
+area = "program directories"
+lines = 382
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mri_robust_register/JointHisto.cpp"
+area = "program directories"
+lines = 978
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = false
+programs = 1
+
+[[file]]
+path = "mri_robust_register/MultiRegistration.cpp"
+area = "program directories"
+lines = 2269
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mri_robust_register/MultiRegistration.h"
+area = "program directories"
+lines = 347
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mri_robust_register/MyMRI.cpp"
+area = "program directories"
+lines = 1967
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 2
+
+[[file]]
+path = "mri_robust_register/MyMRI.h"
+area = "program directories"
+lines = 162
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 2
+
+[[file]]
+path = "mri_robust_register/MyMatrix.cpp"
+area = "program directories"
+lines = 2994
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 2
+
+[[file]]
+path = "mri_robust_register/Quaternion.cpp"
+area = "program directories"
+lines = 38
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = false
+programs = 2
+
+[[file]]
+path = "mri_robust_register/Quaternion.h"
+area = "program directories"
+lines = 688
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mri_robust_register/RegPowell.cpp"
+area = "program directories"
+lines = 646
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mri_robust_register/RegPowell.h"
+area = "program directories"
+lines = 88
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mri_robust_register/RegRobust.cpp"
+area = "program directories"
+lines = 638
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 2
+
+[[file]]
+path = "mri_robust_register/RegRobust.h"
+area = "program directories"
+lines = 377
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 2
+
+[[file]]
+path = "mri_robust_register/Registration.cpp"
+area = "program directories"
+lines = 4709
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 2
+
+[[file]]
+path = "mri_robust_register/Registration.h"
+area = "program directories"
+lines = 693
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 2
+
+[[file]]
+path = "mri_robust_register/RegistrationStep.h"
+area = "program directories"
+lines = 1423
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 2
+
+[[file]]
+path = "mri_robust_register/Regression.h"
+area = "program directories"
+lines = 126
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 2
+
+[[file]]
+path = "mri_robust_register/RobustGaussian.cpp"
+area = "program directories"
+lines = 411
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = ["TP-07"]
+core = true
+programs = 1
+
+[[file]]
+path = "mri_robust_register/Transformation.h"
+area = "program directories"
+lines = 1437
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 2
+
+[[file]]
+path = "mri_robust_register/mri_robust_register.cpp"
+area = "program directories"
+lines = 2370
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mri_robust_register/mri_robust_template.cpp"
+area = "program directories"
+lines = 954
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = ["TP-15"]
+core = true
+programs = 1
+
+[[file]]
+path = "mri_sclimbic_seg/mri_sclimbic_seg"
+area = "program directories"
+lines = 1077
+notice = "no notice"
+family = "FreeSurfer's licence; neurite's layers Apache-2.0"
+porting = "portable-with-notice"
+findings = ["TP-12"]
+core = false
+programs = 1
+
+[[file]]
+path = "mri_segment/mri_segment.cpp"
+area = "program directories"
+lines = 1906
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mri_segreg/mri_segreg.cpp"
+area = "program directories"
+lines = 2399
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mri_segstats/mri_segstats.cpp"
+area = "program directories"
+lines = 2716
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mri_surf2surf/mri_surf2surf.cpp"
+area = "program directories"
+lines = 3035
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mri_synthmorph/fs-synthmorph-reg"
+area = "program directories"
+lines = 1001
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = false
+programs = 1
+
+[[file]]
+path = "mri_synthmorph/mri_synthmorph"
+area = "program directories"
+lines = 419
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = ["TP-12"]
+core = false
+programs = 1
+
+[[file]]
+path = "mri_synthmorph/synthmorph/registration.py"
+area = "program directories"
+lines = 313
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = ["TP-12"]
+core = false
+programs = 1
+
+[[file]]
+path = "mri_synthmorph/synthmorph/utils.py"
+area = "program directories"
+lines = 93
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = ["TP-12"]
+core = false
+programs = 1
+
+[[file]]
+path = "mri_synthseg/mri_synthseg"
+area = "program directories"
+lines = 2715
+notice = "no notice"
+family = "FreeSurfer's licence; neurite's layers Apache-2.0"
+porting = "portable-with-notice"
+findings = ["TP-12"]
+core = false
+programs = 1
+
+[[file]]
+path = "mri_synthstrip/mri_synthstrip"
+area = "program directories"
+lines = 326
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = ["TP-12"]
+core = false
+programs = 1
+
+[[file]]
+path = "mri_tessellate/mri_tessellate.cpp"
+area = "program directories"
+lines = 720
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mri_vol2surf/mri_vol2surf.cpp"
+area = "program directories"
+lines = 2473
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mri_vol2vol/mri_vol2vol.cpp"
+area = "program directories"
+lines = 2862
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mri_warp_convert/mri_warp_convert.cpp"
+area = "program directories"
+lines = 968
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mri_watershed/mri_watershed.cpp"
+area = "program directories"
+lines = 11400
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mris_anatomical_stats/mris_anatomical_stats.cpp"
+area = "program directories"
+lines = 1742
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mris_ca_label/mris_ca_label.cpp"
+area = "program directories"
+lines = 615
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mris_calc/mris_calc.cpp"
+area = "program directories"
+lines = 2628
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mris_convert/mris_convert.cpp"
+area = "program directories"
+lines = 1411
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mris_curvature/mris_curvature.cpp"
+area = "program directories"
+lines = 726
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mris_curvature_stats/mris_curvature_stats.cpp"
+area = "program directories"
+lines = 3386
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = ["TP-16"]
+core = true
+programs = 1
+
+[[file]]
+path = "mris_defects_pointset/mris_defects_pointset.cpp"
+area = "program directories"
+lines = 166
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mris_euler_number/mris_euler_number.cpp"
+area = "program directories"
+lines = 222
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mris_expand/mris_expand.cpp"
+area = "program directories"
+lines = 486
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mris_fix_topology/mris_fix_topology.cpp"
+area = "program directories"
+lines = 891
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mris_fix_topology/mris_remove_intersection.cpp"
+area = "program directories"
+lines = 485
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mris_inflate/mris_inflate.cpp"
+area = "program directories"
+lines = 716
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mris_jacobian/mris_jacobian.cpp"
+area = "program directories"
+lines = 306
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mris_label2annot/mris_label2annot.cpp"
+area = "program directories"
+lines = 981
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mris_make_surfaces/mris_autodet_gwstats.cpp"
+area = "program directories"
+lines = 391
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mris_make_surfaces/mris_place_surface.cpp"
+area = "program directories"
+lines = 2174
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mris_register/mris_register.cpp"
+area = "program directories"
+lines = 1416
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mris_remesh/mris_remesh.cpp"
+area = "program directories"
+lines = 105
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mris_remesh/remesher.cpp"
+area = "program directories"
+lines = 2253
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = ["TP-16"]
+core = true
+programs = 1
+
+[[file]]
+path = "mris_remesh/remesher.h"
+area = "program directories"
+lines = 355
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mris_smooth/mris_smooth.cpp"
+area = "program directories"
+lines = 912
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mris_sphere/mris_sphere.cpp"
+area = "program directories"
+lines = 879
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mris_topo_fixer/face.cpp"
+area = "program directories"
+lines = 38
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mris_topo_fixer/fastloop.cpp"
+area = "program directories"
+lines = 1185
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mris_topo_fixer/fastloop.h"
+area = "program directories"
+lines = 148
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mris_topo_fixer/globals.cpp"
+area = "program directories"
+lines = 42
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mris_topo_fixer/globals.h"
+area = "program directories"
+lines = 99
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mris_topo_fixer/loop.cpp"
+area = "program directories"
+lines = 98
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mris_topo_fixer/mris_topo_fixer.cpp"
+area = "program directories"
+lines = 615
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mris_topo_fixer/mris_topology.cpp"
+area = "program directories"
+lines = 1173
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mris_topo_fixer/patchdisk.cpp"
+area = "program directories"
+lines = 452
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mris_topo_fixer/patchdisk.h"
+area = "program directories"
+lines = 49
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mris_topo_fixer/segment.cpp"
+area = "program directories"
+lines = 90
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mris_topo_fixer/surface.cpp"
+area = "program directories"
+lines = 1426
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mris_topo_fixer/vertex.cpp"
+area = "program directories"
+lines = 87
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mris_topo_fixer/vertex.h"
+area = "program directories"
+lines = 139
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mris_volmask/cmd_line_interface.cpp"
+area = "program directories"
+lines = 300
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mris_volmask/cmd_line_interface.h"
+area = "program directories"
+lines = 278
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mris_volmask/mris_volmask.cpp"
+area = "program directories"
+lines = 1017
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "mrisp_paint/mrisp_paint.cpp"
+area = "program directories"
+lines = 387
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "packages/cephes/const.c"
+area = "packages/cephes"
+lines = 252
+notice = "other copyright"
+family = "Cephes, BSD-3-Clause by the author's permission"
+porting = "portable-with-notice"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "packages/dcm2niix/dcm2niix_fswrapper.cpp"
+area = "packages/dcm2niix"
+lines = 503
+notice = "no notice"
+family = "dcm2niix's BSD terms (Chris Rorden); parts public domain, MIT"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/dcm2niix/jpg_0XC3.cpp"
+area = "packages/dcm2niix"
+lines = 518
+notice = "no notice"
+family = "dcm2niix's BSD terms (Chris Rorden); parts public domain, MIT"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/dcm2niix/miniz.c"
+area = "packages/dcm2niix"
+lines = 4925
+notice = "public domain"
+family = "dcm2niix's BSD terms (Chris Rorden); parts public domain, MIT"
+porting = "portable-with-notice"
+findings = []
+core = true
+programs = 66
+
+[[file]]
+path = "packages/dcm2niix/nifti1_io_core.cpp"
+area = "packages/dcm2niix"
+lines = 945
+notice = "public domain"
+family = "dcm2niix's BSD terms (Chris Rorden); parts public domain, MIT"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/dcm2niix/nii_dicom.cpp"
+area = "packages/dcm2niix"
+lines = 8550
+notice = "no notice"
+family = "dcm2niix's BSD terms (Chris Rorden); parts public domain, MIT"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/dcm2niix/nii_dicom_batch.cpp"
+area = "packages/dcm2niix"
+lines = 10629
+notice = "no notice"
+family = "dcm2niix's BSD terms (Chris Rorden); parts public domain, MIT"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/dcm2niix/nii_foreign.cpp"
+area = "packages/dcm2niix"
+lines = 457
+notice = "no notice"
+family = "dcm2niix's BSD terms (Chris Rorden); parts public domain, MIT"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/dcm2niix/nii_ortho.cpp"
+area = "packages/dcm2niix"
+lines = 411
+notice = "no notice"
+family = "dcm2niix's BSD terms (Chris Rorden); parts public domain, MIT"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/dcm2niix/tinydir.h"
+area = "packages/dcm2niix"
+lines = 403
+notice = "BSD-style"
+family = "dcm2niix's BSD terms (Chris Rorden); parts public domain, MIT"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/dcm2niix/ujpeg.cpp"
+area = "packages/dcm2niix"
+lines = 1006
+notice = "MIT-style"
+family = "dcm2niix's BSD terms (Chris Rorden); parts public domain, MIT"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/dicom/condition.c"
+area = "packages/dicom"
+lines = 546
+notice = "Washington University"
+family = "RSNA and Washington University's CTN notice (permissive)"
+porting = "portable-with-notice"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "packages/dicom/dcm.c"
+area = "packages/dicom"
+lines = 7555
+notice = "Washington University"
+family = "RSNA and Washington University's CTN notice (permissive)"
+porting = "portable-with-notice"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "packages/dicom/dcmcond.c"
+area = "packages/dicom"
+lines = 163
+notice = "Washington University"
+family = "RSNA and Washington University's CTN notice (permissive)"
+porting = "portable-with-notice"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "packages/dicom/dcmdict.c"
+area = "packages/dicom"
+lines = 2215
+notice = "Washington University"
+family = "RSNA and Washington University's CTN notice (permissive)"
+porting = "portable-with-notice"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "packages/dicom/lst.c"
+area = "packages/dicom"
+lines = 534
+notice = "Washington University"
+family = "RSNA and Washington University's CTN notice (permissive)"
+porting = "portable-with-notice"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "packages/expat/xmlparse.c"
+area = "packages/expat"
+lines = 6278
+notice = "other copyright"
+family = "expat's MIT terms"
+porting = "portable-with-notice"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "packages/expat/xmlrole.c"
+area = "packages/expat"
+lines = 1336
+notice = "other copyright"
+family = "expat's MIT terms"
+porting = "portable-with-notice"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "packages/expat/xmltok.c"
+area = "packages/expat"
+lines = 1651
+notice = "other copyright"
+family = "expat's MIT terms"
+porting = "portable-with-notice"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "packages/gifti/gifti_io.c"
+area = "packages/gifti"
+lines = 4546
+notice = "no notice"
+family = "public domain (gifticlib, NIH/NIMH)"
+porting = "portable"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "packages/gifti/gifti_xml.c"
+area = "packages/gifti"
+lines = 3209
+notice = "no notice"
+family = "public domain (gifticlib, NIH/NIMH)"
+porting = "portable"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "packages/jpeg/jcapimin.c"
+area = "packages/jpeg"
+lines = 280
+notice = "other copyright"
+family = "the Independent JPEG Group's licence (permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/jpeg/jcapistd.c"
+area = "packages/jpeg"
+lines = 161
+notice = "other copyright"
+family = "the Independent JPEG Group's licence (permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/jpeg/jccoefct.c"
+area = "packages/jpeg"
+lines = 449
+notice = "other copyright"
+family = "the Independent JPEG Group's licence (permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/jpeg/jccolor.c"
+area = "packages/jpeg"
+lines = 459
+notice = "other copyright"
+family = "the Independent JPEG Group's licence (permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/jpeg/jcdctmgr.c"
+area = "packages/jpeg"
+lines = 387
+notice = "other copyright"
+family = "the Independent JPEG Group's licence (permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/jpeg/jchuff.c"
+area = "packages/jpeg"
+lines = 909
+notice = "other copyright"
+family = "the Independent JPEG Group's licence (permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/jpeg/jcinit.c"
+area = "packages/jpeg"
+lines = 72
+notice = "other copyright"
+family = "the Independent JPEG Group's licence (permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/jpeg/jcmainct.c"
+area = "packages/jpeg"
+lines = 293
+notice = "other copyright"
+family = "the Independent JPEG Group's licence (permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/jpeg/jcmarker.c"
+area = "packages/jpeg"
+lines = 664
+notice = "other copyright"
+family = "the Independent JPEG Group's licence (permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/jpeg/jcmaster.c"
+area = "packages/jpeg"
+lines = 590
+notice = "other copyright"
+family = "the Independent JPEG Group's licence (permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/jpeg/jcomapi.c"
+area = "packages/jpeg"
+lines = 106
+notice = "other copyright"
+family = "the Independent JPEG Group's licence (permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/jpeg/jcparam.c"
+area = "packages/jpeg"
+lines = 610
+notice = "other copyright"
+family = "the Independent JPEG Group's licence (permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/jpeg/jcphuff.c"
+area = "packages/jpeg"
+lines = 833
+notice = "other copyright"
+family = "the Independent JPEG Group's licence (permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/jpeg/jcprepct.c"
+area = "packages/jpeg"
+lines = 354
+notice = "other copyright"
+family = "the Independent JPEG Group's licence (permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/jpeg/jcsample.c"
+area = "packages/jpeg"
+lines = 519
+notice = "other copyright"
+family = "the Independent JPEG Group's licence (permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/jpeg/jctrans.c"
+area = "packages/jpeg"
+lines = 388
+notice = "other copyright"
+family = "the Independent JPEG Group's licence (permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/jpeg/jdapimin.c"
+area = "packages/jpeg"
+lines = 395
+notice = "other copyright"
+family = "the Independent JPEG Group's licence (permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/jpeg/jdapistd.c"
+area = "packages/jpeg"
+lines = 275
+notice = "other copyright"
+family = "the Independent JPEG Group's licence (permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/jpeg/jdatadst.c"
+area = "packages/jpeg"
+lines = 151
+notice = "other copyright"
+family = "the Independent JPEG Group's licence (permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/jpeg/jdatasrc.c"
+area = "packages/jpeg"
+lines = 212
+notice = "other copyright"
+family = "the Independent JPEG Group's licence (permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/jpeg/jdcoefct.c"
+area = "packages/jpeg"
+lines = 736
+notice = "other copyright"
+family = "the Independent JPEG Group's licence (permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/jpeg/jdcolor.c"
+area = "packages/jpeg"
+lines = 396
+notice = "other copyright"
+family = "the Independent JPEG Group's licence (permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/jpeg/jddctmgr.c"
+area = "packages/jpeg"
+lines = 269
+notice = "other copyright"
+family = "the Independent JPEG Group's licence (permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/jpeg/jdhuff.c"
+area = "packages/jpeg"
+lines = 651
+notice = "other copyright"
+family = "the Independent JPEG Group's licence (permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/jpeg/jdinput.c"
+area = "packages/jpeg"
+lines = 381
+notice = "other copyright"
+family = "the Independent JPEG Group's licence (permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/jpeg/jdmainct.c"
+area = "packages/jpeg"
+lines = 512
+notice = "other copyright"
+family = "the Independent JPEG Group's licence (permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/jpeg/jdmarker.c"
+area = "packages/jpeg"
+lines = 1360
+notice = "other copyright"
+family = "the Independent JPEG Group's licence (permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/jpeg/jdmaster.c"
+area = "packages/jpeg"
+lines = 557
+notice = "other copyright"
+family = "the Independent JPEG Group's licence (permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/jpeg/jdmerge.c"
+area = "packages/jpeg"
+lines = 400
+notice = "other copyright"
+family = "the Independent JPEG Group's licence (permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/jpeg/jdphuff.c"
+area = "packages/jpeg"
+lines = 668
+notice = "other copyright"
+family = "the Independent JPEG Group's licence (permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/jpeg/jdpostct.c"
+area = "packages/jpeg"
+lines = 290
+notice = "other copyright"
+family = "the Independent JPEG Group's licence (permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/jpeg/jdsample.c"
+area = "packages/jpeg"
+lines = 478
+notice = "other copyright"
+family = "the Independent JPEG Group's licence (permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/jpeg/jerror.c"
+area = "packages/jpeg"
+lines = 253
+notice = "other copyright"
+family = "the Independent JPEG Group's licence (permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/jpeg/jfdctflt.c"
+area = "packages/jpeg"
+lines = 168
+notice = "other copyright"
+family = "the Independent JPEG Group's licence (permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/jpeg/jfdctfst.c"
+area = "packages/jpeg"
+lines = 224
+notice = "other copyright"
+family = "the Independent JPEG Group's licence (permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/jpeg/jfdctint.c"
+area = "packages/jpeg"
+lines = 283
+notice = "other copyright"
+family = "the Independent JPEG Group's licence (permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/jpeg/jidctflt.c"
+area = "packages/jpeg"
+lines = 242
+notice = "other copyright"
+family = "the Independent JPEG Group's licence (permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/jpeg/jidctfst.c"
+area = "packages/jpeg"
+lines = 368
+notice = "other copyright"
+family = "the Independent JPEG Group's licence (permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/jpeg/jidctint.c"
+area = "packages/jpeg"
+lines = 389
+notice = "other copyright"
+family = "the Independent JPEG Group's licence (permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/jpeg/jidctred.c"
+area = "packages/jpeg"
+lines = 398
+notice = "other copyright"
+family = "the Independent JPEG Group's licence (permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/jpeg/jmemmgr.c"
+area = "packages/jpeg"
+lines = 1118
+notice = "other copyright"
+family = "the Independent JPEG Group's licence (permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/jpeg/jmemnobs.c"
+area = "packages/jpeg"
+lines = 109
+notice = "other copyright"
+family = "the Independent JPEG Group's licence (permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/jpeg/jquant1.c"
+area = "packages/jpeg"
+lines = 856
+notice = "other copyright"
+family = "the Independent JPEG Group's licence (permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/jpeg/jquant2.c"
+area = "packages/jpeg"
+lines = 1310
+notice = "other copyright"
+family = "the Independent JPEG Group's licence (permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/jpeg/jutils.c"
+area = "packages/jpeg"
+lines = 179
+notice = "other copyright"
+family = "the Independent JPEG Group's licence (permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/minc/minc_basic.h"
+area = "packages/minc"
+lines = 181
+notice = "MNI (MINC)"
+family = "MNI's MINC notice (permissive); FreeSurfer's overhaul"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/minc/minc_convenience.c"
+area = "packages/minc"
+lines = 1529
+notice = "FreeSurfer (MGH)"
+family = "MNI's MINC notice (permissive); FreeSurfer's overhaul"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/minc/minc_files.c"
+area = "packages/minc"
+lines = 2636
+notice = "FreeSurfer (MGH)"
+family = "MNI's MINC notice (permissive); FreeSurfer's overhaul"
+porting = "portable-with-notice"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "packages/minc/minc_gaussian.c"
+area = "packages/minc"
+lines = 318
+notice = "FreeSurfer (MGH)"
+family = "MNI's MINC notice (permissive); FreeSurfer's overhaul"
+porting = "portable-with-notice"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "packages/minc/minc_image_conversion.c"
+area = "packages/minc"
+lines = 2748
+notice = "MNI (MINC)"
+family = "MNI's MINC notice (permissive); FreeSurfer's overhaul"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/minc/minc_input_free.c"
+area = "packages/minc"
+lines = 648
+notice = "FreeSurfer (MGH)"
+family = "MNI's MINC notice (permissive); FreeSurfer's overhaul"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/minc/minc_input_mnc.c"
+area = "packages/minc"
+lines = 1635
+notice = "FreeSurfer (MGH)"
+family = "MNI's MINC notice (permissive); FreeSurfer's overhaul"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/minc/minc_multidim_arrays.c"
+area = "packages/minc"
+lines = 758
+notice = "FreeSurfer (MGH)"
+family = "MNI's MINC notice (permissive); FreeSurfer's overhaul"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/minc/minc_netcdf_convenience.c"
+area = "packages/minc"
+lines = 1851
+notice = "FreeSurfer (MGH)"
+family = "MNI's MINC notice (permissive); FreeSurfer's overhaul"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/minc/minc_output_mnc.c"
+area = "packages/minc"
+lines = 1853
+notice = "FreeSurfer (MGH)"
+family = "MNI's MINC notice (permissive); FreeSurfer's overhaul"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/minc/minc_output_volume.c"
+area = "packages/minc"
+lines = 433
+notice = "FreeSurfer (MGH)"
+family = "MNI's MINC notice (permissive); FreeSurfer's overhaul"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/minc/minc_progress.c"
+area = "packages/minc"
+lines = 332
+notice = "FreeSurfer (MGH)"
+family = "MNI's MINC notice (permissive); FreeSurfer's overhaul"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/minc/minc_time.c"
+area = "packages/minc"
+lines = 320
+notice = "FreeSurfer (MGH)"
+family = "MNI's MINC notice (permissive); FreeSurfer's overhaul"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/minc/minc_value_conversion.c"
+area = "packages/minc"
+lines = 739
+notice = "MNI (MINC)"
+family = "MNI's MINC notice (permissive); FreeSurfer's overhaul"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/minc/minc_volume_io.c"
+area = "packages/minc"
+lines = 2938
+notice = "FreeSurfer (MGH)"
+family = "MNI's MINC notice (permissive); FreeSurfer's overhaul"
+porting = "portable-with-notice"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "packages/netcdf/attr.c"
+area = "packages/netcdf"
+lines = 2249
+notice = "UCAR/Unidata (netCDF)"
+family = "UCAR/Unidata's notice (permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/netcdf/dim.c"
+area = "packages/netcdf"
+lines = 525
+notice = "UCAR/Unidata (netCDF)"
+family = "UCAR/Unidata's notice (permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/netcdf/error.c"
+area = "packages/netcdf"
+lines = 158
+notice = "UCAR/Unidata (netCDF)"
+family = "UCAR/Unidata's notice (permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/netcdf/nc.c"
+area = "packages/netcdf"
+lines = 1519
+notice = "UCAR/Unidata (netCDF)"
+family = "UCAR/Unidata's notice (permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/netcdf/ncx.c"
+area = "packages/netcdf"
+lines = 4214
+notice = "UCAR/Unidata (netCDF)"
+family = "UCAR/Unidata's notice (permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/netcdf/posixio.c"
+area = "packages/netcdf"
+lines = 1626
+notice = "UCAR/Unidata (netCDF)"
+family = "UCAR/Unidata's notice (permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/netcdf/putget.c"
+area = "packages/netcdf"
+lines = 11782
+notice = "UCAR/Unidata (netCDF)"
+family = "UCAR/Unidata's notice (permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/netcdf/string.c"
+area = "packages/netcdf"
+lines = 123
+notice = "UCAR/Unidata (netCDF)"
+family = "UCAR/Unidata's notice (permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/netcdf/v1hpg.c"
+area = "packages/netcdf"
+lines = 1361
+notice = "UCAR/Unidata (netCDF)"
+family = "UCAR/Unidata's notice (permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/netcdf/v2i.c"
+area = "packages/netcdf"
+lines = 954
+notice = "UCAR/Unidata (netCDF)"
+family = "UCAR/Unidata's notice (permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/netcdf/var.c"
+area = "packages/netcdf"
+lines = 812
+notice = "UCAR/Unidata (netCDF)"
+family = "UCAR/Unidata's notice (permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/nifti/nifti1_io.c"
+area = "packages/nifti"
+lines = 7685
+notice = "public domain"
+family = "public domain (niftilib, znzlib)"
+porting = "portable"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "packages/nifti/znzlib.c"
+area = "packages/nifti"
+lines = 292
+notice = "public domain"
+family = "public domain (niftilib, znzlib)"
+porting = "portable"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "packages/nrrdio/754.c"
+area = "packages/nrrdio"
+lines = 658
+notice = "other copyright"
+family = "NrrdIO's zlib-style terms (Gordon Kindlmann, University of Utah)"
+porting = "portable-with-notice"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "packages/nrrdio/array.c"
+area = "packages/nrrdio"
+lines = 374
+notice = "other copyright"
+family = "NrrdIO's zlib-style terms (Gordon Kindlmann, University of Utah)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/nrrdio/arraysNrrd.c"
+area = "packages/nrrdio"
+lines = 345
+notice = "other copyright"
+family = "NrrdIO's zlib-style terms (Gordon Kindlmann, University of Utah)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/nrrdio/axis.c"
+area = "packages/nrrdio"
+lines = 1302
+notice = "other copyright"
+family = "NrrdIO's zlib-style terms (Gordon Kindlmann, University of Utah)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/nrrdio/biffbiff.c"
+area = "packages/nrrdio"
+lines = 641
+notice = "other copyright"
+family = "NrrdIO's zlib-style terms (Gordon Kindlmann, University of Utah)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/nrrdio/comment.c"
+area = "packages/nrrdio"
+lines = 144
+notice = "other copyright"
+family = "NrrdIO's zlib-style terms (Gordon Kindlmann, University of Utah)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/nrrdio/defaultsNrrd.c"
+area = "packages/nrrdio"
+lines = 72
+notice = "other copyright"
+family = "NrrdIO's zlib-style terms (Gordon Kindlmann, University of Utah)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/nrrdio/dio.c"
+area = "packages/nrrdio"
+lines = 387
+notice = "other copyright"
+family = "NrrdIO's zlib-style terms (Gordon Kindlmann, University of Utah)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/nrrdio/encoding.c"
+area = "packages/nrrdio"
+lines = 118
+notice = "other copyright"
+family = "NrrdIO's zlib-style terms (Gordon Kindlmann, University of Utah)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/nrrdio/encodingAscii.c"
+area = "packages/nrrdio"
+lines = 164
+notice = "other copyright"
+family = "NrrdIO's zlib-style terms (Gordon Kindlmann, University of Utah)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/nrrdio/encodingBzip2.c"
+area = "packages/nrrdio"
+lines = 82
+notice = "other copyright"
+family = "NrrdIO's zlib-style terms (Gordon Kindlmann, University of Utah)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/nrrdio/encodingGzip.c"
+area = "packages/nrrdio"
+lines = 285
+notice = "other copyright"
+family = "NrrdIO's zlib-style terms (Gordon Kindlmann, University of Utah)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/nrrdio/encodingHex.c"
+area = "packages/nrrdio"
+lines = 166
+notice = "other copyright"
+family = "NrrdIO's zlib-style terms (Gordon Kindlmann, University of Utah)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/nrrdio/encodingRaw.c"
+area = "packages/nrrdio"
+lines = 194
+notice = "other copyright"
+family = "NrrdIO's zlib-style terms (Gordon Kindlmann, University of Utah)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/nrrdio/endianAir.c"
+area = "packages/nrrdio"
+lines = 77
+notice = "other copyright"
+family = "NrrdIO's zlib-style terms (Gordon Kindlmann, University of Utah)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/nrrdio/endianNrrd.c"
+area = "packages/nrrdio"
+lines = 138
+notice = "other copyright"
+family = "NrrdIO's zlib-style terms (Gordon Kindlmann, University of Utah)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/nrrdio/enum.c"
+area = "packages/nrrdio"
+lines = 221
+notice = "other copyright"
+family = "NrrdIO's zlib-style terms (Gordon Kindlmann, University of Utah)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/nrrdio/enumsNrrd.c"
+area = "packages/nrrdio"
+lines = 768
+notice = "other copyright"
+family = "NrrdIO's zlib-style terms (Gordon Kindlmann, University of Utah)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/nrrdio/format.c"
+area = "packages/nrrdio"
+lines = 155
+notice = "other copyright"
+family = "NrrdIO's zlib-style terms (Gordon Kindlmann, University of Utah)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/nrrdio/formatEPS.c"
+area = "packages/nrrdio"
+lines = 111
+notice = "other copyright"
+family = "NrrdIO's zlib-style terms (Gordon Kindlmann, University of Utah)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/nrrdio/formatNRRD.c"
+area = "packages/nrrdio"
+lines = 939
+notice = "other copyright"
+family = "NrrdIO's zlib-style terms (Gordon Kindlmann, University of Utah)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/nrrdio/formatPNG.c"
+area = "packages/nrrdio"
+lines = 111
+notice = "other copyright"
+family = "NrrdIO's zlib-style terms (Gordon Kindlmann, University of Utah)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/nrrdio/formatPNM.c"
+area = "packages/nrrdio"
+lines = 112
+notice = "other copyright"
+family = "NrrdIO's zlib-style terms (Gordon Kindlmann, University of Utah)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/nrrdio/formatText.c"
+area = "packages/nrrdio"
+lines = 113
+notice = "other copyright"
+family = "NrrdIO's zlib-style terms (Gordon Kindlmann, University of Utah)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/nrrdio/formatVTK.c"
+area = "packages/nrrdio"
+lines = 112
+notice = "other copyright"
+family = "NrrdIO's zlib-style terms (Gordon Kindlmann, University of Utah)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/nrrdio/keyvalue.c"
+area = "packages/nrrdio"
+lines = 363
+notice = "other copyright"
+family = "NrrdIO's zlib-style terms (Gordon Kindlmann, University of Utah)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/nrrdio/methodsNrrd.c"
+area = "packages/nrrdio"
+lines = 1067
+notice = "other copyright"
+family = "NrrdIO's zlib-style terms (Gordon Kindlmann, University of Utah)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/nrrdio/miscAir.c"
+area = "packages/nrrdio"
+lines = 284
+notice = "other copyright"
+family = "NrrdIO's zlib-style terms (Gordon Kindlmann, University of Utah)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/nrrdio/mop.c"
+area = "packages/nrrdio"
+lines = 293
+notice = "other copyright"
+family = "NrrdIO's zlib-style terms (Gordon Kindlmann, University of Utah)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/nrrdio/parseAir.c"
+area = "packages/nrrdio"
+lines = 421
+notice = "other copyright"
+family = "NrrdIO's zlib-style terms (Gordon Kindlmann, University of Utah)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/nrrdio/parseNrrd.c"
+area = "packages/nrrdio"
+lines = 1663
+notice = "other copyright"
+family = "NrrdIO's zlib-style terms (Gordon Kindlmann, University of Utah)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/nrrdio/read.c"
+area = "packages/nrrdio"
+lines = 779
+notice = "other copyright"
+family = "NrrdIO's zlib-style terms (Gordon Kindlmann, University of Utah)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/nrrdio/reorder.c"
+area = "packages/nrrdio"
+lines = 504
+notice = "other copyright"
+family = "NrrdIO's zlib-style terms (Gordon Kindlmann, University of Utah)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/nrrdio/sane.c"
+area = "packages/nrrdio"
+lines = 190
+notice = "other copyright"
+family = "NrrdIO's zlib-style terms (Gordon Kindlmann, University of Utah)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/nrrdio/simple.c"
+area = "packages/nrrdio"
+lines = 1723
+notice = "other copyright"
+family = "NrrdIO's zlib-style terms (Gordon Kindlmann, University of Utah)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/nrrdio/string.c"
+area = "packages/nrrdio"
+lines = 439
+notice = "other copyright"
+family = "NrrdIO's zlib-style terms (Gordon Kindlmann, University of Utah)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/nrrdio/write.c"
+area = "packages/nrrdio"
+lines = 1212
+notice = "other copyright"
+family = "NrrdIO's zlib-style terms (Gordon Kindlmann, University of Utah)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/tiff/tif_aux.c"
+area = "packages/tiff"
+lines = 218
+notice = "permissive, own wording"
+family = "libtiff's notice (Sam Leffler, Silicon Graphics; permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/tiff/tif_close.c"
+area = "packages/tiff"
+lines = 80
+notice = "permissive, own wording"
+family = "libtiff's notice (Sam Leffler, Silicon Graphics; permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/tiff/tif_codec.c"
+area = "packages/tiff"
+lines = 150
+notice = "permissive, own wording"
+family = "libtiff's notice (Sam Leffler, Silicon Graphics; permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/tiff/tif_compress.c"
+area = "packages/tiff"
+lines = 233
+notice = "permissive, own wording"
+family = "libtiff's notice (Sam Leffler, Silicon Graphics; permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/tiff/tif_dir.c"
+area = "packages/tiff"
+lines = 1419
+notice = "permissive, own wording"
+family = "libtiff's notice (Sam Leffler, Silicon Graphics; permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/tiff/tif_dirinfo.c"
+area = "packages/tiff"
+lines = 480
+notice = "permissive, own wording"
+family = "libtiff's notice (Sam Leffler, Silicon Graphics; permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/tiff/tif_dirread.c"
+area = "packages/tiff"
+lines = 1485
+notice = "permissive, own wording"
+family = "libtiff's notice (Sam Leffler, Silicon Graphics; permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/tiff/tif_dirwrite.c"
+area = "packages/tiff"
+lines = 1233
+notice = "permissive, own wording"
+family = "libtiff's notice (Sam Leffler, Silicon Graphics; permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/tiff/tif_dumpmode.c"
+area = "packages/tiff"
+lines = 118
+notice = "permissive, own wording"
+family = "libtiff's notice (Sam Leffler, Silicon Graphics; permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/tiff/tif_error.c"
+area = "packages/tiff"
+lines = 49
+notice = "permissive, own wording"
+family = "libtiff's notice (Sam Leffler, Silicon Graphics; permissive)"
+porting = "portable-with-notice"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "packages/tiff/tif_fax3.c"
+area = "packages/tiff"
+lines = 1515
+notice = "permissive, own wording"
+family = "libtiff's notice (Sam Leffler, Silicon Graphics; permissive)"
+porting = "portable-with-notice"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "packages/tiff/tif_fax3sm.c"
+area = "packages/tiff"
+lines = 1046
+notice = "no notice"
+family = "libtiff's notice (Sam Leffler, Silicon Graphics; permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/tiff/tif_flush.c"
+area = "packages/tiff"
+lines = 67
+notice = "permissive, own wording"
+family = "libtiff's notice (Sam Leffler, Silicon Graphics; permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/tiff/tif_luv.c"
+area = "packages/tiff"
+lines = 1586
+notice = "permissive, own wording"
+family = "libtiff's notice (Sam Leffler, Silicon Graphics; permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/tiff/tif_lzw.c"
+area = "packages/tiff"
+lines = 745
+notice = "permissive, own wording"
+family = "libtiff's notice (Sam Leffler, Silicon Graphics; permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/tiff/tif_next.c"
+area = "packages/tiff"
+lines = 142
+notice = "permissive, own wording"
+family = "libtiff's notice (Sam Leffler, Silicon Graphics; permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/tiff/tif_open.c"
+area = "packages/tiff"
+lines = 495
+notice = "permissive, own wording"
+family = "libtiff's notice (Sam Leffler, Silicon Graphics; permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/tiff/tif_packbits.c"
+area = "packages/tiff"
+lines = 300
+notice = "permissive, own wording"
+family = "libtiff's notice (Sam Leffler, Silicon Graphics; permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/tiff/tif_predict.c"
+area = "packages/tiff"
+lines = 464
+notice = "permissive, own wording"
+family = "libtiff's notice (Sam Leffler, Silicon Graphics; permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/tiff/tif_read.c"
+area = "packages/tiff"
+lines = 637
+notice = "permissive, own wording"
+family = "libtiff's notice (Sam Leffler, Silicon Graphics; permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/tiff/tif_strip.c"
+area = "packages/tiff"
+lines = 217
+notice = "permissive, own wording"
+family = "libtiff's notice (Sam Leffler, Silicon Graphics; permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/tiff/tif_swab.c"
+area = "packages/tiff"
+lines = 217
+notice = "permissive, own wording"
+family = "libtiff's notice (Sam Leffler, Silicon Graphics; permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/tiff/tif_thunder.c"
+area = "packages/tiff"
+lines = 154
+notice = "permissive, own wording"
+family = "libtiff's notice (Sam Leffler, Silicon Graphics; permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/tiff/tif_tile.c"
+area = "packages/tiff"
+lines = 219
+notice = "permissive, own wording"
+family = "libtiff's notice (Sam Leffler, Silicon Graphics; permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/tiff/tif_unix.c"
+area = "packages/tiff"
+lines = 228
+notice = "permissive, own wording"
+family = "libtiff's notice (Sam Leffler, Silicon Graphics; permissive)"
+porting = "portable-with-notice"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "packages/tiff/tif_warning.c"
+area = "packages/tiff"
+lines = 49
+notice = "permissive, own wording"
+family = "libtiff's notice (Sam Leffler, Silicon Graphics; permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/tiff/tif_write.c"
+area = "packages/tiff"
+lines = 690
+notice = "permissive, own wording"
+family = "libtiff's notice (Sam Leffler, Silicon Graphics; permissive)"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "packages/xml2/dict.c"
+area = "packages/xml2"
+lines = 1100
+notice = "permissive, own wording"
+family = "libxml2's MIT terms"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 46
+
+[[file]]
+path = "packages/xml2/entities.c"
+area = "packages/xml2"
+lines = 1022
+notice = "other copyright"
+family = "libxml2's MIT terms"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 46
+
+[[file]]
+path = "packages/xml2/error.c"
+area = "packages/xml2"
+lines = 989
+notice = "other copyright"
+family = "libxml2's MIT terms"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 46
+
+[[file]]
+path = "packages/xml2/globals.c"
+area = "packages/xml2"
+lines = 1114
+notice = "other copyright"
+family = "libxml2's MIT terms"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 46
+
+[[file]]
+path = "packages/xml2/hash.c"
+area = "packages/xml2"
+lines = 1089
+notice = "permissive, own wording"
+family = "libxml2's MIT terms"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 46
+
+[[file]]
+path = "packages/xml2/list.c"
+area = "packages/xml2"
+lines = 779
+notice = "permissive, own wording"
+family = "libxml2's MIT terms"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 46
+
+[[file]]
+path = "packages/xml2/parserInternals.c"
+area = "packages/xml2"
+lines = 2162
+notice = "other copyright"
+family = "libxml2's MIT terms"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 46
+
+[[file]]
+path = "packages/xml2/threads.c"
+area = "packages/xml2"
+lines = 1032
+notice = "other copyright"
+family = "libxml2's MIT terms"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 46
+
+[[file]]
+path = "packages/xml2/tree.c"
+area = "packages/xml2"
+lines = 9903
+notice = "other copyright"
+family = "libxml2's MIT terms"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 46
+
+[[file]]
+path = "packages/xml2/valid.c"
+area = "packages/xml2"
+lines = 7041
+notice = "other copyright"
+family = "libxml2's MIT terms"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 46
+
+[[file]]
+path = "packages/xml2/xmlstring.c"
+area = "packages/xml2"
+lines = 984
+notice = "other copyright"
+family = "libxml2's MIT terms"
+porting = "portable-with-notice"
+findings = []
+core = false
+programs = 46
+
+[[file]]
+path = "scripts/UpdateNeeded"
+area = "scripts"
+lines = 41
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = false
+programs = 1
+
+[[file]]
+path = "scripts/avi2talxfm"
+area = "scripts"
+lines = 71
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = false
+programs = 1
+
+[[file]]
+path = "scripts/bbregister"
+area = "scripts"
+lines = 1224
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = false
+programs = 1
+
+[[file]]
+path = "scripts/constant-preproc.py"
+area = "scripts"
+lines = 174
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = false
+programs = 3
+
+[[file]]
+path = "scripts/csvprint"
+area = "scripts"
+lines = 223
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = false
+programs = 1
+
+[[file]]
+path = "scripts/defect2seg"
+area = "scripts"
+lines = 387
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = false
+programs = 1
+
+[[file]]
+path = "scripts/extract_talairach_avi_QA.awk"
+area = "scripts"
+lines = 16
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = false
+programs = 1
+
+[[file]]
+path = "scripts/fs-check-os"
+area = "scripts"
+lines = 210
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = false
+programs = 1
+
+[[file]]
+path = "scripts/fs-check-version"
+area = "scripts"
+lines = 569
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = false
+programs = 1
+
+[[file]]
+path = "scripts/fscalc"
+area = "scripts"
+lines = 342
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = false
+programs = 1
+
+[[file]]
+path = "scripts/fsr-getxopts"
+area = "scripts"
+lines = 80
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = false
+programs = 1
+
+[[file]]
+path = "scripts/getfullpath"
+area = "scripts"
+lines = 42
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = false
+programs = 1
+
+[[file]]
+path = "scripts/label-cortex"
+area = "scripts"
+lines = 515
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = false
+programs = 1
+
+[[file]]
+path = "scripts/mri_entowm_seg"
+area = "scripts"
+lines = 180
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = false
+programs = 1
+
+[[file]]
+path = "scripts/mri_mcadura_seg"
+area = "scripts"
+lines = 507
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = false
+programs = 1
+
+[[file]]
+path = "scripts/mri_mergelabels"
+area = "scripts"
+lines = 171
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = false
+programs = 1
+
+[[file]]
+path = "scripts/mri_nu_correct.mni"
+area = "scripts"
+lines = 546
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = false
+programs = 1
+
+[[file]]
+path = "scripts/mri_vsinus_seg"
+area = "scripts"
+lines = 673
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = false
+programs = 1
+
+[[file]]
+path = "scripts/pctsurfcon"
+area = "scripts"
+lines = 394
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = false
+programs = 1
+
+[[file]]
+path = "scripts/rca-config"
+area = "scripts"
+lines = 143
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = false
+programs = 1
+
+[[file]]
+path = "scripts/rca-config2csh"
+area = "scripts"
+lines = 48
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = false
+programs = 1
+
+[[file]]
+path = "scripts/rca-surfreg"
+area = "scripts"
+lines = 385
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = false
+programs = 1
+
+[[file]]
+path = "scripts/rca-talairach"
+area = "scripts"
+lines = 299
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = false
+programs = 1
+
+[[file]]
+path = "scripts/recon-all"
+area = "scripts"
+lines = 10128
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = false
+programs = 1
+
+[[file]]
+path = "scripts/seg2cc"
+area = "scripts"
+lines = 362
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = false
+programs = 1
+
+[[file]]
+path = "scripts/spherically_project.py"
+area = "scripts"
+lines = 269
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = false
+programs = 3
+
+[[file]]
+path = "scripts/vertexvol"
+area = "scripts"
+lines = 228
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = false
+programs = 1
+
+[[file]]
+path = "talairach_afd/talairach_afd.cpp"
+area = "program directories"
+lines = 677
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "talairach_avi/Getifh.c"
+area = "talairach_avi"
+lines = 256
+notice = "Washington University"
+family = "Washington University: all rights reserved, no copying or distribution without written permission"
+porting = "clean-room-only"
+findings = ["TP-09"]
+core = true
+programs = 4
+
+[[file]]
+path = "talairach_avi/analyzeto4dfp.c"
+area = "talairach_avi"
+lines = 278
+notice = "Washington University"
+family = "Washington University: all rights reserved, no copying or distribution without written permission"
+porting = "clean-room-only"
+findings = ["TP-09"]
+core = true
+programs = 1
+
+[[file]]
+path = "talairach_avi/cflip.c"
+area = "talairach_avi"
+lines = 84
+notice = "Washington University"
+family = "Washington University: all rights reserved, no copying or distribution without written permission"
+porting = "clean-room-only"
+findings = ["TP-09"]
+core = true
+programs = 3
+
+[[file]]
+path = "talairach_avi/cgauss3d.c"
+area = "talairach_avi"
+lines = 108
+notice = "Washington University"
+family = "Washington University: all rights reserved, no copying or distribution without written permission"
+porting = "clean-room-only"
+findings = ["TP-09"]
+core = true
+programs = 3
+
+[[file]]
+path = "talairach_avi/cgauss3dd.c"
+area = "talairach_avi"
+lines = 107
+notice = "Washington University"
+family = "Washington University: all rights reserved, no copying or distribution without written permission"
+porting = "clean-room-only"
+findings = ["TP-09"]
+core = true
+programs = 1
+
+[[file]]
+path = "talairach_avi/compute_vox2vox.c"
+area = "talairach_avi"
+lines = 153
+notice = "Washington University"
+family = "Washington University: all rights reserved, no copying or distribution without written permission"
+porting = "clean-room-only"
+findings = ["TP-09"]
+core = true
+programs = 1
+
+[[file]]
+path = "talairach_avi/conc.c"
+area = "talairach_avi"
+lines = 311
+notice = "Washington University"
+family = "Washington University: all rights reserved, no copying or distribution without written permission"
+porting = "clean-room-only"
+findings = ["TP-09"]
+core = true
+programs = 1
+
+[[file]]
+path = "talairach_avi/eigen.f"
+area = "talairach_avi"
+lines = 114
+notice = "Washington University"
+family = "Washington University: all rights reserved, no copying or distribution without written permission"
+porting = "clean-room-only"
+findings = ["TP-09"]
+core = false
+programs = 3
+
+[[file]]
+path = "talairach_avi/endianio.c"
+area = "talairach_avi"
+lines = 334
+notice = "Washington University"
+family = "Washington University: all rights reserved, no copying or distribution without written permission"
+porting = "clean-room-only"
+findings = ["TP-09"]
+core = true
+programs = 4
+
+[[file]]
+path = "talairach_avi/ffind.f"
+area = "talairach_avi"
+lines = 68
+notice = "no notice"
+family = "Washington University: all rights reserved, no copying or distribution without written permission"
+porting = "clean-room-only"
+findings = ["TP-09"]
+core = false
+programs = 2
+
+[[file]]
+path = "talairach_avi/fftsol.f"
+area = "talairach_avi"
+lines = 831
+notice = "no notice"
+family = "Washington University: all rights reserved, no copying or distribution without written permission"
+porting = "clean-room-only"
+findings = ["TP-09"]
+core = false
+programs = 3
+
+[[file]]
+path = "talairach_avi/fimgreg.f"
+area = "talairach_avi"
+lines = 521
+notice = "no notice"
+family = "Washington University: all rights reserved, no copying or distribution without written permission"
+porting = "clean-room-only"
+findings = ["TP-09"]
+core = false
+programs = 2
+
+[[file]]
+path = "talairach_avi/ft4imgo.f"
+area = "talairach_avi"
+lines = 69
+notice = "no notice"
+family = "Washington University: all rights reserved, no copying or distribution without written permission"
+porting = "clean-room-only"
+findings = ["TP-09"]
+core = false
+programs = 1
+
+[[file]]
+path = "talairach_avi/gauss_4dfp.c"
+area = "talairach_avi"
+lines = 220
+notice = "Washington University"
+family = "Washington University: all rights reserved, no copying or distribution without written permission"
+porting = "clean-room-only"
+findings = ["TP-09"]
+core = true
+programs = 1
+
+[[file]]
+path = "talairach_avi/imgpad.f"
+area = "talairach_avi"
+lines = 104
+notice = "Washington University"
+family = "Washington University: all rights reserved, no copying or distribution without written permission"
+porting = "clean-room-only"
+findings = ["TP-09"]
+core = false
+programs = 3
+
+[[file]]
+path = "talairach_avi/imgreg_4dfp.c"
+area = "talairach_avi"
+lines = 225
+notice = "Washington University"
+family = "Washington University: all rights reserved, no copying or distribution without written permission"
+porting = "clean-room-only"
+findings = ["TP-09"]
+core = true
+programs = 1
+
+[[file]]
+path = "talairach_avi/imgvalm.f"
+area = "talairach_avi"
+lines = 144
+notice = "no notice"
+family = "Washington University: all rights reserved, no copying or distribution without written permission"
+porting = "clean-room-only"
+findings = ["TP-09"]
+core = false
+programs = 2
+
+[[file]]
+path = "talairach_avi/imgvalx.f"
+area = "talairach_avi"
+lines = 307
+notice = "no notice"
+family = "Washington University: all rights reserved, no copying or distribution without written permission"
+porting = "clean-room-only"
+findings = ["TP-09"]
+core = false
+programs = 2
+
+[[file]]
+path = "talairach_avi/matopr.f"
+area = "talairach_avi"
+lines = 151
+notice = "Washington University"
+family = "Washington University: all rights reserved, no copying or distribution without written permission"
+porting = "clean-room-only"
+findings = ["TP-09"]
+core = false
+programs = 3
+
+[[file]]
+path = "talairach_avi/mpr2mni305"
+area = "talairach_avi"
+lines = 215
+notice = "Washington University"
+family = "Washington University: all rights reserved, no copying or distribution without written permission"
+porting = "clean-room-only"
+findings = ["TP-09"]
+core = false
+programs = 1
+
+[[file]]
+path = "talairach_avi/param6opr.f"
+area = "talairach_avi"
+lines = 189
+notice = "no notice"
+family = "Washington University: all rights reserved, no copying or distribution without written permission"
+porting = "clean-room-only"
+findings = ["TP-09"]
+core = false
+programs = 3
+
+[[file]]
+path = "talairach_avi/polfit.f"
+area = "talairach_avi"
+lines = 105
+notice = "no notice"
+family = "Washington University: all rights reserved, no copying or distribution without written permission"
+porting = "clean-room-only"
+findings = ["TP-09"]
+core = false
+programs = 3
+
+[[file]]
+path = "talairach_avi/rec.c"
+area = "talairach_avi"
+lines = 261
+notice = "Washington University"
+family = "Washington University: all rights reserved, no copying or distribution without written permission"
+porting = "clean-room-only"
+findings = ["TP-09"]
+core = true
+programs = 4
+
+[[file]]
+path = "talairach_avi/set_rnan.f"
+area = "talairach_avi"
+lines = 5
+notice = "no notice"
+family = "Washington University: all rights reserved, no copying or distribution without written permission"
+porting = "clean-room-only"
+findings = ["TP-09"]
+core = false
+programs = 1
+
+[[file]]
+path = "talairach_avi/t4_sub.f"
+area = "talairach_avi"
+lines = 437
+notice = "no notice"
+family = "Washington University: all rights reserved, no copying or distribution without written permission"
+porting = "clean-room-only"
+findings = ["TP-09"]
+core = false
+programs = 2
+
+[[file]]
+path = "talairach_avi/t4scale.c"
+area = "talairach_avi"
+lines = 38
+notice = "Washington University"
+family = "Washington University: all rights reserved, no copying or distribution without written permission"
+porting = "clean-room-only"
+findings = ["TP-09"]
+core = false
+programs = 2
+
+[[file]]
+path = "talairach_avi/talairach_avi"
+area = "talairach_avi"
+lines = 253
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = ["TP-09"]
+core = false
+programs = 1
+
+[[file]]
+path = "tkregister2/tkregister2.cpp"
+area = "program directories"
+lines = 5392
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer/CorTechs Software License (non-commercial)"
+porting = "question"
+findings = ["TP-10"]
+core = true
+programs = 1
+
+[[file]]
+path = "utils/Bruker.cpp"
+area = "utils"
+lines = 849
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "utils/DICOMRead.cpp"
+area = "utils"
+lines = 7717
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "utils/MARS_DT_Boundary.cpp"
+area = "utils"
+lines = 122
+notice = "other copyright"
+family = "MIT CSAIL's MARS project: a copyright line, no terms"
+porting = "question"
+findings = ["TP-14"]
+core = true
+programs = 1
+
+[[file]]
+path = "utils/MRISrigidBodyAlignGlobal.cpp"
+area = "utils"
+lines = 542
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "utils/MRISurfOverlay.cpp"
+area = "utils"
+lines = 319
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "utils/MRIio_old.cpp"
+area = "utils"
+lines = 88
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "utils/Progname.cpp"
+area = "utils"
+lines = 1
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 47
+
+[[file]]
+path = "utils/afni.cpp"
+area = "utils"
+lines = 1086
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "utils/annotation.cpp"
+area = "utils"
+lines = 1400
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "utils/argparse.cpp"
+area = "utils"
+lines = 409
+notice = "no notice"
+family = "derived from Hilton Bristow's argparse, BSD-3-Clause"
+porting = "portable-with-notice"
+findings = ["TP-13"]
+core = true
+programs = 7
+
+[[file]]
+path = "utils/autoencoder.cpp"
+area = "utils"
+lines = 2249
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "utils/bfileio.cpp"
+area = "utils"
+lines = 1124
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "utils/chklc.cpp"
+area = "utils"
+lines = 496
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "utils/cma.cpp"
+area = "utils"
+lines = 2391
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 7
+
+[[file]]
+path = "utils/cmdargs.cpp"
+area = "utils"
+lines = 103
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 16
+
+[[file]]
+path = "utils/colortab.cpp"
+area = "utils"
+lines = 2750
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "utils/connectcomp.cpp"
+area = "utils"
+lines = 1337
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 4
+
+[[file]]
+path = "utils/ctrpoints.cpp"
+area = "utils"
+lines = 558
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 6
+
+[[file]]
+path = "utils/diag.cpp"
+area = "utils"
+lines = 384
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 66
+
+[[file]]
+path = "utils/diffuse.cpp"
+area = "utils"
+lines = 794
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "utils/dmatrix.cpp"
+area = "utils"
+lines = 861
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 38
+
+[[file]]
+path = "utils/dti.cpp"
+area = "utils"
+lines = 1135
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "utils/dtk.fs.cpp"
+area = "utils"
+lines = 630
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "utils/field_code.cpp"
+area = "utils"
+lines = 164
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 2
+
+[[file]]
+path = "utils/filter.cpp"
+area = "utils"
+lines = 2185
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 2
+
+[[file]]
+path = "utils/fio.cpp"
+area = "utils"
+lines = 1141
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "utils/flash.cpp"
+area = "utils"
+lines = 328
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 4
+
+[[file]]
+path = "utils/fmriutils.cpp"
+area = "utils"
+lines = 3307
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 6
+
+[[file]]
+path = "utils/fsPrintHelp.cpp"
+area = "utils"
+lines = 297
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = false
+programs = 46
+
+[[file]]
+path = "utils/fs_cost_function.cpp"
+area = "utils"
+lines = 87
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 5
+
+[[file]]
+path = "utils/fs_lbfgs.cpp"
+area = "utils"
+lines = 204
+notice = "no notice"
+family = "FreeSurfer's wrapper of VNL's netlib L-BFGS"
+porting = "portable-with-notice"
+findings = ["TP-08"]
+core = true
+programs = 5
+
+[[file]]
+path = "utils/fs_lbfgs_observer.cpp"
+area = "utils"
+lines = 77
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 5
+
+[[file]]
+path = "utils/fs_lbfgs_subject.cpp"
+area = "utils"
+lines = 32
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 5
+
+[[file]]
+path = "utils/fs_powell.cpp"
+area = "utils"
+lines = 225
+notice = "FreeSurfer (MGH)"
+family = "taken from VXL's vnl_powell, BSD-3-Clause"
+porting = "portable-with-notice"
+findings = ["TP-08"]
+core = true
+programs = 5
+
+[[file]]
+path = "utils/fscnpy.cpp"
+area = "utils"
+lines = 629
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "utils/fsenv.cpp"
+area = "utils"
+lines = 146
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "utils/fsgdf.cpp"
+area = "utils"
+lines = 2033
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "utils/fsinit.cpp"
+area = "utils"
+lines = 32
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 55
+
+[[file]]
+path = "utils/fstagsio.cpp"
+area = "utils"
+lines = 1195
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "utils/gca.cpp"
+area = "utils"
+lines = 23591
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "utils/gcalinearnode.cpp"
+area = "utils"
+lines = 449
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "utils/gcalinearprior.cpp"
+area = "utils"
+lines = 252
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "utils/gcamcomputeLabelsLinearCPU.cpp"
+area = "utils"
+lines = 44
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "utils/gcamorph.cpp"
+area = "utils"
+lines = 17464
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "utils/gcsa.cpp"
+area = "utils"
+lines = 2609
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 2
+
+[[file]]
+path = "utils/gifti.cpp"
+area = "utils"
+lines = 3006
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "utils/gtm.cpp"
+area = "utils"
+lines = 3048
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "utils/hips.cpp"
+area = "utils"
+lines = 60
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "utils/histo.cpp"
+area = "utils"
+lines = 3037
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 26
+
+[[file]]
+path = "utils/icosahedron.cpp"
+area = "utils"
+lines = 2247
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 38
+
+[[file]]
+path = "utils/image.cpp"
+area = "utils"
+lines = 3822
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "utils/imageio.cpp"
+area = "utils"
+lines = 1873
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "utils/imautils.cpp"
+area = "utils"
+lines = 1449
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = false
+programs = 65
+
+[[file]]
+path = "utils/label.cpp"
+area = "utils"
+lines = 4287
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 26
+
+[[file]]
+path = "utils/log.cpp"
+area = "utils"
+lines = 146
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 68
+
+[[file]]
+path = "utils/machine.cpp"
+area = "utils"
+lines = 317
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 66
+
+[[file]]
+path = "utils/matfile.cpp"
+area = "utils"
+lines = 1169
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 66
+
+[[file]]
+path = "utils/matrix.cpp"
+area = "utils"
+lines = 4915
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 66
+
+[[file]]
+path = "utils/min_heap.cpp"
+area = "utils"
+lines = 367
+notice = "other copyright"
+family = "MIT CSAIL's MARS project: a copyright line, no terms"
+porting = "question"
+findings = ["TP-14"]
+core = true
+programs = 1
+
+[[file]]
+path = "utils/mosaic.cpp"
+area = "utils"
+lines = 274
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "utils/mri.cpp"
+area = "utils"
+lines = 17999
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = ["TP-15"]
+core = true
+programs = 65
+
+[[file]]
+path = "utils/mri2.cpp"
+area = "utils"
+lines = 8125
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "utils/mriBSpline.cpp"
+area = "utils"
+lines = 2976
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = ["TP-05"]
+core = true
+programs = 65
+
+[[file]]
+path = "utils/mriTransform.cpp"
+area = "utils"
+lines = 1416
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "utils/mri_conform.cpp"
+area = "utils"
+lines = 256
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 6
+
+[[file]]
+path = "utils/mri_fastmarching.cpp"
+area = "utils"
+lines = 116
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 7
+
+[[file]]
+path = "utils/mri_identify.cpp"
+area = "utils"
+lines = 1208
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "utils/mrifilter.cpp"
+area = "utils"
+lines = 7304
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 16
+
+[[file]]
+path = "utils/mriflood.cpp"
+area = "utils"
+lines = 1822
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 15
+
+[[file]]
+path = "utils/mrihisto.cpp"
+area = "utils"
+lines = 1360
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 9
+
+[[file]]
+path = "utils/mriio.cpp"
+area = "utils"
+lines = 12899
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "utils/mrimorph.cpp"
+area = "utils"
+lines = 7540
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 5
+
+[[file]]
+path = "utils/mrinorm.cpp"
+area = "utils"
+lines = 3662
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "utils/mripolv.cpp"
+area = "utils"
+lines = 4449
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "utils/mriprob.cpp"
+area = "utils"
+lines = 334
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "utils/mrisegment.cpp"
+area = "utils"
+lines = 1111
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 7
+
+[[file]]
+path = "utils/mriset.cpp"
+area = "utils"
+lines = 4021
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "utils/mrishash.cpp"
+area = "utils"
+lines = 2564
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 18
+
+[[file]]
+path = "utils/mrisp.cpp"
+area = "utils"
+lines = 3043
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 9
+
+[[file]]
+path = "utils/mrisurf.cpp"
+area = "utils"
+lines = 1007
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 39
+
+[[file]]
+path = "utils/mrisurf_base.cpp"
+area = "utils"
+lines = 1842
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 40
+
+[[file]]
+path = "utils/mrisurf_compute_dxyz.cpp"
+area = "utils"
+lines = 5087
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 5
+
+[[file]]
+path = "utils/mrisurf_defect.cpp"
+area = "utils"
+lines = 15532
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 11
+
+[[file]]
+path = "utils/mrisurf_deform.cpp"
+area = "utils"
+lines = 5699
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 15
+
+[[file]]
+path = "utils/mrisurf_deform.h"
+area = "utils"
+lines = 95
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 64
+
+[[file]]
+path = "utils/mrisurf_integrate.cpp"
+area = "utils"
+lines = 3107
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 5
+
+[[file]]
+path = "utils/mrisurf_io.cpp"
+area = "utils"
+lines = 6989
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 39
+
+[[file]]
+path = "utils/mrisurf_io_stl.cpp"
+area = "utils"
+lines = 370
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 39
+
+[[file]]
+path = "utils/mrisurf_metricProperties.cpp"
+area = "utils"
+lines = 13771
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 39
+
+[[file]]
+path = "utils/mrisurf_metricProperties_fast.h"
+area = "utils"
+lines = 1174
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 39
+
+[[file]]
+path = "utils/mrisurf_metricProperties_faster.cpp"
+area = "utils"
+lines = 867
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 39
+
+[[file]]
+path = "utils/mrisurf_metricProperties_slow.h"
+area = "utils"
+lines = 1008
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 39
+
+[[file]]
+path = "utils/mrisurf_mri.cpp"
+area = "utils"
+lines = 10515
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 38
+
+[[file]]
+path = "utils/mrisurf_project.cpp"
+area = "utils"
+lines = 466
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 9
+
+[[file]]
+path = "utils/mrisurf_sseTerms.cpp"
+area = "utils"
+lines = 3151
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 5
+
+[[file]]
+path = "utils/mrisurf_timeStep.cpp"
+area = "utils"
+lines = 2719
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 8
+
+[[file]]
+path = "utils/mrisurf_topology.cpp"
+area = "utils"
+lines = 3416
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 39
+
+[[file]]
+path = "utils/mrisurf_vals.cpp"
+area = "utils"
+lines = 4217
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 27
+
+[[file]]
+path = "utils/mrisutils.cpp"
+area = "utils"
+lines = 4204
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = ["TP-16"]
+core = true
+programs = 38
+
+[[file]]
+path = "utils/mrivoxel.cpp"
+area = "utils"
+lines = 514
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 5
+
+[[file]]
+path = "utils/numerics.cpp"
+area = "utils"
+lines = 2352
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = ["TP-01", "TP-02", "TP-03", "TP-04", "TP-06"]
+core = true
+programs = 66
+
+[[file]]
+path = "utils/path.cpp"
+area = "utils"
+lines = 450
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "utils/pdf.cpp"
+area = "utils"
+lines = 174
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = ["TP-15"]
+core = true
+programs = 6
+
+[[file]]
+path = "utils/pointset.cpp"
+area = "utils"
+lines = 154
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 5
+
+[[file]]
+path = "utils/prime.cpp"
+area = "utils"
+lines = 243
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 2
+
+[[file]]
+path = "utils/randomfields.cpp"
+area = "utils"
+lines = 704
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 3
+
+[[file]]
+path = "utils/realm.cpp"
+area = "utils"
+lines = 2593
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 39
+
+[[file]]
+path = "utils/region.cpp"
+area = "utils"
+lines = 499
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 12
+
+[[file]]
+path = "utils/registerio.cpp"
+area = "utils"
+lines = 544
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 55
+
+[[file]]
+path = "utils/resample.cpp"
+area = "utils"
+lines = 2983
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 55
+
+[[file]]
+path = "utils/rfa.cpp"
+area = "utils"
+lines = 697
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 2
+
+[[file]]
+path = "utils/rgb.cpp"
+area = "utils"
+lines = 930
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "utils/romp_support.cpp"
+area = "utils"
+lines = 667
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "utils/selxavgio.cpp"
+area = "utils"
+lines = 290
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 2
+
+[[file]]
+path = "utils/sig.cpp"
+area = "utils"
+lines = 147
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "utils/signa.cpp"
+area = "utils"
+lines = 324
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "utils/stats.cpp"
+area = "utils"
+lines = 1808
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 2
+
+[[file]]
+path = "utils/surfcluster.cpp"
+area = "utils"
+lines = 955
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 7
+
+[[file]]
+path = "utils/surfgrad.cpp"
+area = "utils"
+lines = 2715
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 4
+
+[[file]]
+path = "utils/tags.cpp"
+area = "utils"
+lines = 510
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "utils/talairachex.cpp"
+area = "utils"
+lines = 570
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "utils/targetpointset.cpp"
+area = "utils"
+lines = 464
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "utils/timer.cpp"
+area = "utils"
+lines = 53
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "utils/transform.cpp"
+area = "utils"
+lines = 5794
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "utils/tritri.cpp"
+area = "utils"
+lines = 552
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 7
+
+[[file]]
+path = "utils/utils.cpp"
+area = "utils"
+lines = 1998
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = ["TP-01", "TP-07", "TP-15"]
+core = true
+programs = 67
+
+[[file]]
+path = "utils/ventfix.cpp"
+area = "utils"
+lines = 600
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "utils/version.cpp"
+area = "utils"
+lines = 312
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 68
+
+[[file]]
+path = "utils/vertexRotator.cpp"
+area = "utils"
+lines = 224
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 1
+
+[[file]]
+path = "utils/volcluster.cpp"
+area = "utils"
+lines = 2588
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 9
+
+[[file]]
+path = "utils/voxlist.cpp"
+area = "utils"
+lines = 1221
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 5
+
+[[file]]
+path = "utils/warpfield.cpp"
+area = "utils"
+lines = 968
+notice = "no notice"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 65
+
+[[file]]
+path = "utils/xDebug.cpp"
+area = "utils"
+lines = 244
+notice = "FreeSurfer (MGH)"
+family = "FreeSurfer's licence (LICENSE.txt Part B)"
+porting = "portable"
+findings = []
+core = true
+programs = 3

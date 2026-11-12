@@ -251,9 +251,14 @@ def rerun(store: Store, entry: dict, *, timeout: float | None = 4 * 3600) -> Out
             return Outcome(key, "differs", "timed out", done.seconds)
         policy = Policy(
             entry.get("policy", {}).get("threads", 1),
-            volatile=tuple(entry.get("policy", {}).get("volatile", ())),
+            # a pattern with its replacement is stored as a list (JSON): a tuple again
+            volatile=tuple(
+                tuple(v) if isinstance(v, list) else v
+                for v in entry.get("policy", {}).get("volatile", ())
+            ),
             nifti_extensions=entry.get("policy", {}).get("nifti_extensions", ""),
             family=family,
+            formats=entry.get("policy", {}).get("formats", ""),
         )
         try:
             result, files = core._capture(store, prep, done, before, policy)
@@ -267,6 +272,7 @@ def rerun(store: Store, entry: dict, *, timeout: float | None = 4 * 3600) -> Out
             fresh_files,
             policy.volatile,
             nifti_extensions=not policy.nifti_extensions,
+            formats=policy.formats,
         )
         with store.lock(key):
             current = store.read(key) or entry

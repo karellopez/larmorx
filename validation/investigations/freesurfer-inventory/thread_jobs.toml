@@ -1,0 +1,37 @@
+# CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS: FreeSurfer 8.2.0's command lines (programs.md).
+# The jobs of thread_check.py (variation.md section 2): each program as a default path runs it, on
+# subjects of the reference runs, at several thread counts and twice at the same count.
+# {name} in args is an input of [job.inputs] (a folder under <runs>), {threads} the run's count.
+
+[[job]]
+name = "mri_robust_register-smriprep"
+# sMRIPrep's RobustRegister (surfaces.py 320-329): --satit --iscale, T1.mgz onto the T1w reference
+program = "mri_robust_register"
+args = ["--satit", "--iscale", "--mov", "{s}/mri/T1.mgz", "--dst", "{s}/mri/rawavg.mgz", "--lta", "out.lta"]
+inputs = { s = "ds000005-sub-01-v8/subjects/sub-01" }
+threads = [1, 4, 4, 2]
+outputs = ["out.lta"]
+
+[[job]]
+name = "mri_coreg-default"
+# mri_coreg with its defaults (dithering, seed 53, smoothing at sep 4 and 2), as fMRIPrep's MRICoreg
+# and bbregister --init-coreg run it; here rawavg.mgz (native T1w) onto T1.mgz
+program = "mri_coreg"
+args = ["--mov", "{s}/mri/rawavg.mgz", "--ref", "{s}/mri/T1.mgz", "--reg", "out.lta", "--threads", "{threads}"]
+inputs = { s = "ds000005-sub-01-v8/subjects/sub-01" }
+threads = [1, 4, 4, 2]
+outputs = ["out.lta"]
+
+[[job]]
+name = "mri_robust_template-motioncor-4"
+# recon-all's MotionCor with several inputs (recon-all 1424-1500), here four heads of four runs, so
+# that three registrations run side by side (initialXforms' centroid sum, MultiRegistration.cpp 1419);
+# the conformed orig.mgz (mri_robust_template refuses inputs of different voxel sizes)
+program = "mri_robust_template"
+args = ["--mov", "{a}/mri/orig.mgz", "{b}/mri/orig.mgz", "{c}/mri/orig.mgz", "{d}/mri/orig.mgz",
+        "--average", "1", "--template", "template.mgz", "--satit", "--inittp", "1", "--fixtp", "--noit",
+        "--iscale", "--iscaleout", "s1.txt", "s2.txt", "s3.txt", "s4.txt", "--subsample", "200",
+        "--lta", "t1.lta", "t2.lta", "t3.lta", "t4.lta"]
+inputs = { a = "ds000005-sub-01-v8/subjects/sub-01", b = "ds002422-sub-02-v8/subjects/sub-02", c = "ds004173-sub-603309-v8/subjects/sub-603309", d = "ds005003-sub-RS001-v8/subjects/sub-RS001" }
+threads = [1, 4, 4, 4]
+outputs = ["template.mgz", "t1.lta", "t2.lta", "t3.lta", "t4.lta"]

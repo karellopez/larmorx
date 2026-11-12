@@ -1,0 +1,346 @@
+# CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS: written from FreeSurfer 8.2.0's source and its third-party
+# pieces (docs/freesurfer/README.md). The placement table of sub-task 3b (the user's decision of 2026-11-12,
+# decision log "FreeSurfer's borrowed pieces and its two streams"): for every third-party piece of
+# third-party.md, its licence, the package its replica would live in, whether that licence and FreeSurfer's
+# may be combined in one program, the process boundary where there is one, what larmorx-freesurfer's replica
+# uses where they may not be combined, and the permission still needed. Written by hand by relay 5; the prose
+# and the reasons are in third-party.md section 9. Facts and options only: the user decides.
+#
+# Fields of [[piece]]:
+#   id, piece, findings (third-party.md's TP-xx), where (FreeSurfer's files), licence, terms (the relevant
+#   words of the piece's licence), runs (on a default path: which programs), link (begins with "in-process": compiled
+#   into the FreeSurfer program that uses it; "separate-program": run by a FreeSurfer script as its own
+#   program; or "dynamic": a shared library of the system; a note in brackets may follow), replica_package (the package of the piece's own licence family), combinable (with FreeSurfer's
+#   licence in one program: "yes", "yes-noncommercial" (the program as a whole then carries the piece's
+#   non-commercial terms), "no" (the cautious reading of both texts), "no-permission", "depends" (on which
+#   of the piece's terms is used: see basis)), basis (why),
+#   freesurfer_replica_uses (what larmorx-freesurfer's replica of the calling program uses for this part),
+#   clean_room ("larmorx" for every piece, the user's decision), permission (from whom, when one is needed),
+#   options (for the user, where the facts leave a choice), larmorx_today (what LARMORX already has),
+#   decided (where the user has decided the piece's placement: who, when, what; the other fields then follow it).
+
+schema = 1
+freesurfer = "8.2.0"
+written = "2026-11-12"
+
+[freesurfer_licence]
+name = "FreeSurfer Software License Agreement, version 1.0 (February 2011), LICENSE.txt"
+grant = "B.1: MGH grants 'with respect to MGH's rights in the software' a licence 'to use, reproduce, make derivative works of, display and distribute the Software', provided that (b) 'in connection with any copy of or sublicense of all or any portion of the Software, all of the terms and conditions in this Software License shall appear in and shall apply to such copy and such sublicense', with the required preface"
+not_reciprocal = "B.2: 'the right to (i) incorporate the Software into proprietary programs (subject to any restrictions applicable to such programs), (ii) add your own copyright statement to your modifications of the Software, and (iii) provide additional or different license terms and conditions in your sublicenses of modifications of the Software'"
+third_party = "B.3: 'This Software License does not grant any rights with respect to third party software, except those rights that MGH has been authorized by a third party to grant to you'"
+terms_beyond_notices = "B.4 research use acknowledged, compliance with export and import laws; B.5 'YOU FURTHER ASSUME ALL LIABILITY ... AND AGREE TO INDEMNIFY AND HOLD HARMLESS MGH AND ALL CONTRIBUTORS'; B.6 no use of names; B.7 automatic revocation; Part C Massachusetts law"
+contributions = "A.6: each contributor warrants that the contribution 'DOES NOT CONTAIN ANY CODE THAT REQURES OR PRESCRIBES AN \"OPEN SOURCE LICENSE\" FOR DERIVATIVE WORKS (by way of non-limiting example, the GNU General Public License ...)'"
+reading = "FreeSurfer's terms bind MGH's portions wherever they go and ask nothing of the code combined with them (B.2), so any licence that lets its code sit in a program under other terms combines with them; a licence that requires the whole program to be under it with no further restrictions (the GPL) does not, because B.1(b) makes B.4, B.5, B.7 and Part C apply to MGH's portions inside that program"
+
+[[piece]]
+id = "P-00"
+piece = "FreeSurfer's own code (MGH's rights, Part B), including contributions licensed to MGH under Part A"
+findings = []
+where = ["the 339 portable files of third-party.toml, and FreeSurfer's changes to the pieces below"]
+licence = "LicenseRef-FreeSurfer (Part B)"
+terms = "see [freesurfer_licence]"
+runs = "every program"
+link = "in-process"
+replica_package = "larmorx-freesurfer"
+combinable = "yes"
+basis = "its own licence"
+freesurfer_replica_uses = "the replica"
+clean_room = "larmorx"
+permission = ""
+larmorx_today = "nothing yet (crates-freesurfer/ is planned)"
+
+[[piece]]
+id = "P-01"
+piece = "VXL's VNL as ITK 4.13.2 bundles it: linear algebra, optimisers, vnl_random, vnl_fft"
+findings = ["TP-01", "TP-02", "TP-08", "TP-11"]
+where = ["utils/numerics.cpp (OpenSvdcmp, OpenRan1, the other Open* wrappers)", "mri_robust_register/*.cpp", "utils/fs_lbfgs.cpp", "N4's sharpening (vnl_fft_1d)"]
+licence = "BSD-3-Clause (VXL)"
+terms = "redistribution in source and binary forms 'with or without modification' if the copyright notice, the conditions and the disclaimer are retained; no endorsement with the authors' names"
+runs = "nearly every C++ program (SVD, inverses, determinants, eigensystems, QR, Powell, L-BFGS, the seeded generator)"
+link = "in-process"
+replica_package = "larmorx"
+combinable = "yes"
+basis = "BSD-3-Clause lets its code sit in a program under any terms if its notice is kept; FreeSurfer's official binaries are that combination"
+freesurfer_replica_uses = "the replica (larmorx's VNL ports, at ITK 4.13.2's version: section 10 finds no change of arithmetic in the VNL routines FreeSurfer calls)"
+clean_room = "larmorx"
+permission = ""
+larmorx_today = "larmorx-core ports vnl_svd, vnl_eigen, vnl_qr from ITK 5.4.5 under VXL's notice"
+
+[[piece]]
+id = "P-02"
+piece = "netlib through VXL's v3p: LINPACK, EISPACK, LAPACK, BLAS, libf2c, Nocedal's L-BFGS"
+findings = ["TP-02", "TP-08"]
+where = ["ITK's Modules/ThirdParty/VNL/src/vxl/v3p/netlib (statically linked)"]
+licence = "netlib's public code (no terms in the files; VXL and ITK distribute it under their licences); LAPACK modified BSD; libf2c AT&T and Bellcore's permission notice"
+terms = "LAPACK: redistribution with the notice and disclaimer; libf2c: 'Permission to use, copy, modify, and distribute this software and its documentation for any purpose and without fee is hereby granted' with the notice; LINPACK, EISPACK, BLAS and L-BFGS: no stated terms (freely available on netlib)"
+runs = "behind every VNL routine above"
+link = "in-process"
+replica_package = "larmorx"
+combinable = "yes"
+basis = "permissive or no-terms public code, distributed for decades inside VXL and ITK (LARMORX already treats EISPACK as 'freely available', docs/licensing.md)"
+freesurfer_replica_uses = "the replica"
+clean_room = "larmorx"
+permission = ""
+larmorx_today = "EISPACK's svd and pythag (AFNI's copies) in larmorx-afni-replica; LAPACK and BLAS as numpy and OpenBLAS ship them in larmorx_transform and the confounds' port"
+
+[[piece]]
+id = "P-03"
+piece = "ITK 4.13.2's filters (N4, the B-spline fit and evaluation, shrink, Gaussian, mean, statistics, exp, divide, extract) and the image classes"
+findings = ["TP-11"]
+where = ["AntsN4BiasFieldCorrectionFs/AntsN4BiasFieldCorrectionFs.cpp", "AntsDenoiseImageFs/", "include/mri.h (MRI::toITKImage)"]
+licence = "Apache-2.0 (ITK 4.x)"
+terms = "section 4: redistribution with a copy of the licence, the NOTICE text, and modified files marked; 'You may add Your own copyright statement to Your modifications and may provide additional or different license terms and conditions ... for any such Derivative Works as a whole, provided Your use, reproduction, and distribution of the Work otherwise complies with the conditions stated in this License'"
+runs = "AntsN4BiasFieldCorrectionFs (both streams' intensity correction), AntsDenoiseImageFs (both streams)"
+link = "in-process"
+replica_package = "larmorx"
+combinable = "yes"
+basis = "Apache-2.0 section 4 allows other terms for the whole program"
+freesurfer_replica_uses = "the replica, following ITK 4.13.2 where section 10 finds a difference from 5.4.5"
+clean_room = "larmorx"
+permission = ""
+options = ["port the 4.13.2 differences into larmorx's ITK crates behind a version switch", "or a separate 4.13.2 crate in larmorx for the few classes that differ"]
+larmorx_today = "larmorx ports ITK 5.4.5's N4, B-spline fit and evaluation, shrink and Gaussian filters (crates/larmorx-image, -ants)"
+
+[[piece]]
+id = "P-04"
+piece = "the adaptive non-local means denoiser (ITKAdaptiveDenoising, as FreeSurfer copied it)"
+findings = ["TP-11"]
+where = ["AntsDenoiseImageFs/itkAdaptiveNonLocalMeansDenoisingImageFilter.{h,hxx}", "AntsDenoiseImageFs/itkNonLocalPatchBasedImageFilter.{h,hxx}", "AntsDenoiseImageFs/itkVarianceImageFilter.{h,hxx}"]
+licence = "Apache-2.0 (Insight Software Consortium)"
+terms = "as P-03"
+runs = "AntsDenoiseImageFs -i brain.mgz -o antsdn.brain.mgz (both streams)"
+link = "in-process"
+replica_package = "larmorx"
+combinable = "yes"
+basis = "Apache-2.0 section 4"
+freesurfer_replica_uses = "the replica; FreeSurfer's copy is an older ITKAdaptiveDenoising than the commit LARMORX pins (24825c8, 2022): the denoiser's own file differs only in SetUseImageSpacingOn, the base class's NormalizeImagePatch and its Pearson branch differ (the denoiser calls neither)"
+clean_room = "larmorx"
+permission = ""
+larmorx_today = "ANTs 2.6.5's DenoiseImage with ITKAdaptiveDenoising 24825c8 (crates/larmorx-ants)"
+
+[[piece]]
+id = "P-05"
+piece = "the bundled permissive packages: MINC 1 volume_io (the .xfm reader), netCDF, the CTN DICOM library, libxml2, expat, IJG jpeg 6b, libtiff, NrrdIO, niftilib and znzlib, gifticlib, dcm2niix (with miniz and ujpeg), Cephes"
+findings = []
+where = ["packages/minc", "packages/netcdf", "packages/dicom", "packages/xml2", "packages/expat", "packages/jpeg", "packages/tiff", "packages/nrrdio", "packages/nifti", "packages/gifti", "packages/dcm2niix", "packages/cephes"]
+licence = "MNI's notice; UCAR/Unidata's notice; RSNA and Washington University's CTN notice; MIT (libxml2, expat, ujpeg); the IJG licence; libtiff's notice; NrrdIO's zlib-style terms; public domain (niftilib, znzlib, gifticlib); dcm2niix's BSD-style terms; the Unlicense (miniz); BSD-3-Clause by Moshier's permission (Cephes)"
+terms = "each: use, copy, modify and distribute with its notice (and, for IJG, a credit in the documentation of distributed binaries; for CTN, the three paragraphs with distributed source); the public-domain pieces ask nothing"
+runs = "the base layer of every program (MGZ and NIfTI I/O, the .xfm reader); the rest only for their input formats"
+link = "in-process"
+replica_package = "larmorx (the parts FreeSurfer did not change); larmorx-freesurfer for FreeSurfer's changes (twelve MINC files carry FreeSurfer's header over MNI's code)"
+combinable = "yes"
+basis = "permissive notices only; FreeSurfer's binaries are that combination"
+freesurfer_replica_uses = "the replica"
+clean_room = "larmorx"
+permission = ""
+larmorx_today = "NIfTI in larmorx-io; nibabel's MIT loaders for MGH and ANALYZE in larmorx_tedana::formats"
+
+[[piece]]
+id = "P-06"
+piece = "small permissive pieces: nlohmann/json (with Grisu2 and Hoehrmann's UTF-8 decoder), Bristow's argparse, Geometric Tools' distances, the FNV hash, Devillard's quickselect"
+findings = ["TP-07", "TP-13"]
+where = ["include/json.h", "include/argparse.h", "utils/argparse.cpp", "include/utilsmath.h", "include/fnv_hash.h", "include/fnvhash.h", "utils/utils.cpp (kth_smallest, quick_select)", "mri_robust_register/RobustGaussian.cpp"]
+licence = "MIT; BSD-3-Clause; BSL-1.0; public domain; public domain"
+terms = "MIT: 'Permission is hereby granted ... to deal in the Software without restriction', the notice in all copies or substantial portions; BSL-1.0: the notice in source copies only"
+runs = "JSON outputs, the newer programs' command lines and messages, mris_volmask, medians in many programs"
+link = "in-process"
+replica_package = "larmorx (argparse's FreeSurfer changes in larmorx-freesurfer)"
+combinable = "yes"
+basis = "permissive"
+freesurfer_replica_uses = "the replica"
+clean_room = "larmorx"
+permission = ""
+larmorx_today = ""
+
+[[piece]]
+id = "P-07"
+piece = "the network programs' upstream code and runtime: neurite's layers, SynthSeg's and voxelmorph's code, surfa; TensorFlow and Keras, PyTorch, numpy, SciPy, nibabel, h5py"
+findings = ["TP-12"]
+where = ["mri_synthseg/mri_synthseg", "mri_sclimbic_seg/mri_sclimbic_seg", "mri_synthstrip/mri_synthstrip", "mri_synthmorph/", "the package's python/"]
+licence = "Apache-2.0 (neurite, voxelmorph, SynthSeg, TensorFlow, Keras); MIT (surfa, nibabel); BSD-3-Clause (PyTorch, numpy, SciPy, h5py)"
+terms = "permissive (Apache-2.0 section 4; MIT; BSD-3-Clause); neurite's layers were 'Copied with permission'"
+runs = "SynthSeg, SynthStrip, SynthMorph, ScLimbic (the v8 stream, and SynthSeg in both)"
+link = "in-process (Python programs)"
+replica_package = "larmorx (Rust inference with the original weights, the settled choice of 2026-10-19); FreeSurfer's own program files in larmorx-freesurfer"
+combinable = "yes"
+basis = "permissive"
+freesurfer_replica_uses = "the replica"
+clean_room = "larmorx"
+permission = ""
+larmorx_today = ""
+
+[[piece]]
+id = "P-08"
+piece = "GSL 1.8's RANLUX389 and random distributions, as numerics.cpp transcribes them"
+findings = ["TP-03"]
+where = ["utils/numerics.cpp 1856-2230 (sc_rng_*, sc_ran_*, sc_gamma_*, sc_uni)"]
+licence = "GPL-2.0-or-later (GSL 1.8's headers: 'either version 2 of the License, or (at your option) any later version')"
+terms = "GPL-2.0 section 2(b): a work that contains the Program or is derived from it must be 'licensed as a whole at no charge to all third parties under the terms of this License'; section 6: 'You may not impose any further restrictions on the recipients' exercise of the rights granted herein'. GPL-3.0 section 5(c): 'You must license the entire work, as a whole, under this License'; section 7 lists the only additional terms allowed (warranty and liability disclaimers, notices and attributions, marking of modified versions, limits on the use of names, trademarks, indemnification only by those who convey with contractual assumptions of liability); section 10: 'You may not impose any further restrictions'"
+runs = "mri_coreg by default (dithering, seed 53): fMRIPrep's bbregister --init-coreg; mris_expand only with -tmap_std"
+link = "in-process (compiled into mri_coreg from libutils; FreeSurfer has no process boundary here)"
+replica_package = "larmorx-gpl (as GPL-3.0-or-later)"
+combinable = "no"
+basis = "the GPL requires the whole program under it with no further restrictions, and FreeSurfer's B.1(b) makes B.5 (indemnity by every user), B.7 and Part C (Massachusetts law) apply to MGH's portions in it, terms outside GPL-3.0 section 7's list; MGH's own A.6 keeps GPL code out of FreeSurfer. Process boundary: GPL-3.0 section 5 calls separate and independent works 'not combined with it such as to form a larger program' an aggregate the licence does not reach"
+freesurfer_replica_uses = "the clean-room piece (larmorx, Apache-2.0): RANLUX389 and the distributions written from Luescher (1994), James (1994), Knuth and Marsaglia and a spec of the exact expressions FreeSurfer evaluates, by an agent that has read neither GSL nor FreeSurfer's transcription; bit-exact, because the algorithms define every operation"
+clean_room = "larmorx"
+permission = ""
+options = ["larmorx-gpl's replica serves as the bit-exact reference that checks the clean room (as crates-gpl/tools keeps glibc's translations for the AFNI and FSL replicas)", "or larmorx-freesurfer's mri_coreg runs a larmorx-gpl program that writes the random stream to a pipe or file (a process boundary; the FSF's FAQ warns that communication 'intimate enough' can still make one program)"]
+larmorx_today = ""
+
+[[piece]]
+id = "P-09"
+piece = "John Burkardt's cubic spline (SplineCubicSet, SplineCubicValue, d3_np_fs)"
+findings = ["TP-04"]
+where = ["utils/numerics.cpp 1417-1680, behind OpenSpline and OpenSplint"]
+licence = "2006 (the csit.fsu.edu copy FreeSurfer names): no statement on the page or in spline.C; about 2010-2022: 'distributed under the GNU LGPL license'; since about 2024: 'distributed under the MIT license' (Wayback snapshots, section 9)"
+terms = "LGPL-2.1 section 6: a work that uses the library may be combined with it and distributed 'under terms of your choice, provided that the terms permit modification of the work for the customer's own use and reverse engineering for debugging such modifications', with the library's source and a way to relink; MIT: the notice in all copies or substantial portions"
+runs = "every mri_normalize (T1.mgz and the brain normalisation, both streams)"
+link = "in-process"
+replica_package = "larmorx if the MIT terms cover the 2006 code; larmorx-gpl (LGPL-2.1 to GPL-3.0 by its section 3) if it is ported under the LGPL"
+combinable = "depends"
+basis = "yes under MIT; under the LGPL only as a separate replaceable library (section 6), not as code inside a FreeSurfer-licensed file. Measured (burkardt_compare.py): FreeSurfer's d3_np_fs is identical to every release including today's MIT one; its SplineCubicSet is the 2006 form, the same as the 2012 (LGPL) release and rewritten in 2020 (five diagonals, another solver), so today's MIT release does not contain it; SplineCubicValue is Burkardt's arithmetic plus FreeSurfer's constant ends"
+freesurfer_replica_uses = "the MIT piece if Burkardt confirms the MIT terms for the 2006 version; otherwise the clean-room piece (the textbook cubic spline with first-derivative ends and a tridiagonal solve; bit-exactness to measure)"
+clean_room = "larmorx"
+permission = "John Burkardt (to confirm that his MIT terms cover the 2006 spline routines FreeSurfer copied)"
+options = ["ask Burkardt to confirm the MIT terms for the 2006 routines (one message)", "port under the LGPL from the 2010-2014 release (same code) into larmorx-gpl, unusable inside larmorx-freesurfer's mri_normalize", "clean room only"]
+larmorx_today = ""
+
+[[piece]]
+id = "P-10"
+piece = "EPFL's cubic B-spline coefficients and Unser's 1992 NIH pyramid filters, in Reuter's 3D code"
+findings = ["TP-05"]
+where = ["utils/mriBSpline.cpp"]
+licence = "LicenseRef-FreeSurfer: the file is Martin Reuter's (FreeSurfer's team), carries MGH's notice and FreeSurfer distributes it under its licence; it is 'based on' Thevenaz, Blu and Unser, Interpolation Revisited, IEEE TMI 19 (2000) 739-758, and EPFL's 2D example code (bigwww.epfl.ch/thevenaz/interpolation/, its coeff.c of January 5, 2009, and bigwww.epfl.ch/sage/pyramids/), which state no licence; the pyramid filters say 'Author: Michael Unser, NIH, BEIP, May 1992'"
+terms = "FreeSurfer's (see [freesurfer_licence]); EPFL's own code states none: Swiss law gives an employer the rights of use in software its employees write in their duties (Federal Act on Copyright, Art. 17), so EPFL's; a US federal employee's official work has no US copyright (17 U.S.C. 105), which may cover the 1992 NIH filters"
+runs = "mri_robust_template's final resampling (cubic B-spline by default, mri_robust_template.cpp 134) when several T1w images are averaged (sMRIPrep, recon-all's MotionCor); the robust tools' pyramid for large images (Registration.cpp 3016); mri_convert and mri_vol2vol only with cubic interpolation (no default command asks)"
+link = "in-process"
+replica_package = "larmorx-freesurfer, like FreeSurfer's other files, crediting EPFL (the paper, and the 2D example code whose routine names it keeps: ConvertToInterpolationCoefficients, InitialCausalCoefficient, InitialAntiCausalCoefficient) in the crate's PROVENANCE.md and NOTICE"
+combinable = "yes"
+basis = "the file the replica translates is FreeSurfer's (MGH's notice, distributed under FreeSurfer's licence); what it takes from EPFL is the published method and the 2D example code's routine names and structure, whose own page states no terms; ITK distributes its own EPFL-derived B-spline code under Apache-2.0 ('And code obtained from bigwww.epfl.ch by Philippe Thevenaz', itkBSplineDecompositionImageFilter.h, itkBSplineResampleImageFilterBase.h), which LARMORX already ports"
+freesurfer_replica_uses = "the replica (mriBSpline.cpp translated, its own queue item in wave 3.2 with mri_robust_template)"
+clean_room = "larmorx (the published recursive filtering and Unser's pyramid papers; LARMORX's ITK and SciPy ports implement the same recursion)"
+permission = "none needed for the replica (the user, 2026-11-12); a courtesy request to EPFL's Biomedical Imaging Group (Philippe Thevenaz, the contact the page names; Michael Unser, its head) afterwards (the user: 'We will ask the author afterwards'), drafted by the orchestrator"
+decided = "the user, 2026-11-12 (decision log 'FreeSurfer's borrowed pieces and its two streams', with its correction of the same day): a replica in larmorx-freesurfer crediting EPFL, no private branch, and a clean room in larmorx; the user: 'please make sure EPFL's B-splines is ported'"
+options = []
+larmorx_today = "the B-spline decomposition of ITK 5.4.5 and SciPy's spline_filter (larmorx-interp, larmorx-registration)"
+
+[[piece]]
+id = "P-11"
+piece = "tkregister2_cmdl (CorTechs Labs and MGH)"
+findings = ["TP-10"]
+where = ["tkregister2/tkregister2.cpp, built with -DNO_GUI and linked with libutils"]
+licence = "FreeSurfer/CorTechs Software License Agreement (distribution/docs/license.cortechs.txt)"
+terms = "2(d): use, reproduction, derivative works, display and distribution 'limited to non-commercial internal research and educational purposes by not-for-profit entities'; 2(e): 'you may not use FreeSurfer in research that is sponsored by a commercial entity'; 2(f): 'you make the source code to any modifications to the Software freely available under terms consistent with and no more restrictive than those in this Agreement'; 2(b): the notices and 'This product includes FreeSurfer developed by CorTechs Labs, Inc. and The General Hospital Corporation' on all copies and documentation"
+runs = "fMRIPrep's bbregister: --regheader, --ltaout, --fslregout (programs.md section 5)"
+link = "separate-program (bbregister, a tcsh script, runs tkregister2_cmdl as its own program)"
+replica_package = "a non-commercial package (the user's decision): the program links FreeSurfer-licensed libutils code as well"
+combinable = "yes-noncommercial"
+basis = "FreeSurfer's B.2(iii) allows additional terms on modifications and CorTechs 2(f) asks only that terms be no more restrictive than its own, so one program may hold both (FreeSurfer's official tkregister2_cmdl is that program); not with GPL code (2(d)-(e) are further restrictions), and not linked with FSL's code (the FSL Licence's conditions differ from CorTechs' and 2(f) forbids more restrictive ones)"
+freesurfer_replica_uses = "bbregister's replica (larmorx-freesurfer) runs the non-commercial package's tkregister2_cmdl when it is installed, and the clean room (larmorx) otherwise, as the larmorx program chooses implementations today"
+clean_room = "larmorx"
+permission = ""
+options = ["a new package and program of its own (for example larmorx-freesurfer-nc) that depends on crates-freesurfer", "a second program inside the larmorx-nc wheel, linking no FSL code (one wheel with two licence families, which docs/licensing.md's 'one family per package' rule would have to allow)", "inside larmorx-freesurfer as one program under the CorTechs terms (the wheel would then hold a non-commercial program)"]
+larmorx_today = ""
+
+[[piece]]
+id = "P-12"
+piece = "Washington University's 4dfp tools (the classic Talairach registration)"
+findings = ["TP-09"]
+where = ["talairach_avi/*.c and *.f (26 files)"]
+licence = "LicenseRef-WashU-all-rights-reserved"
+terms = "'All Rights Reserved. This software may not be reproduced, copied, or distributed without written permission of Washington University' (talairach_avi/Getifh.c 5-11, eigen.f 2-6); fftsol.f is Singleton's 1968 FFT, polfit.f Bevington's POLFIT (1969)"
+runs = "the classic stream's talairach_avi (mpr2mni305); v8 uses rca-talairach (SynthMorph)"
+link = "separate-program (FreeSurfer's talairach_avi and mpr2mni305 scripts run them)"
+replica_package = "none until Washington University's written permission"
+combinable = "no-permission"
+basis = "no right to copy; FreeSurfer distributes them under an arrangement it does not document (docs/licensing.md); a quick search (2026-11-12) found no public release under open terms"
+freesurfer_replica_uses = "the clean-room piece (the settled choice of 2026-10-19: written from the method's publications, the atlas fetched from FreeSurfer on first use), run in place of the programs (a process boundary already separates them)"
+clean_room = "larmorx"
+permission = "Washington University in St. Louis (the 4dfp suite's author, Avi Snyder's laboratory; the university's technology office for a licence)"
+options = ["clean room only (settled for the default)", "ask Washington University for written permission for a replica in a package of its own"]
+larmorx_today = ""
+
+[[piece]]
+id = "P-13"
+piece = "MIT CSAIL's MARS distance transform"
+findings = ["TP-14"]
+where = ["utils/MARS_DT_Boundary.cpp", "utils/min_heap.cpp"]
+licence = "a copyright line only: 'MARS Project (Thomas Yeo and Mert Sabuncu), MIT, CSAIL (c) 2006-2008'"
+terms = "none stated"
+runs = "no default path (mris_sphere never sets complete_dist_mat)"
+link = "in-process"
+replica_package = "none until permission, or until FreeSurfer (MGH) confirms the files were contributed under Part A (A.4 licenses contributions to MGH with the right to sublicense)"
+combinable = "no-permission"
+basis = "no grant in the files; whether Part A covers them is not recorded"
+freesurfer_replica_uses = "nothing now (later, the user's decision)"
+clean_room = "larmorx (later)"
+permission = "Thomas Yeo and Mert Sabuncu (MIT CSAIL), or MGH's confirmation of a Part A contribution"
+larmorx_today = ""
+
+[[piece]]
+id = "P-14"
+piece = "Numerical Recipes' nrutil allocators"
+findings = ["TP-06"]
+where = ["utils/numerics.cpp 1682-1729"]
+licence = "Numerical Recipes' terms (not checked)"
+terms = ""
+runs = "memory layout only"
+link = "in-process"
+replica_package = "none: nothing to port (Rust's own vectors)"
+combinable = "yes"
+basis = "no behaviour of its own is ported"
+freesurfer_replica_uses = "Rust allocation"
+clean_room = "not needed"
+permission = ""
+larmorx_today = ""
+
+[[piece]]
+id = "P-15"
+piece = "the C library's behaviours: drand48/srand48, rand/srand/srandom (random_r), qsort, the libm functions"
+findings = ["TP-15"]
+where = ["AntsN4BiasFieldCorrectionFs.cpp (srand48(53))", "utils/pdf.cpp", "utils/mri.cpp", "mri_robust_template.cpp", "utils/utils.cpp (setRandomSeed)", "82 qsort calls in 35 reached files", "every exp, log, pow, sin call (the host's libm.so.6)"]
+licence = "glibc 2.35: LGPL-2.1-or-later; drand48: POSIX's published definition"
+terms = "LGPL-2.1 section 6 (see P-09); LARMORX's rule 2: glibc is never copied or translated, behaviour specs only"
+runs = "N4's zero replacement option, noise options, mri_robust_template without --inittp; qsort's order of equal keys wherever FreeSurfer sorts; libm in every program"
+link = "dynamic (libc.so.6, libm.so.6)"
+replica_package = "larmorx, from definitions and behaviour specs (drand48 from POSIX; random_r, qsort and the libm functions not yet covered by larmorx_core::math from specs)"
+combinable = "yes"
+basis = "LGPL-2.1 section 6 with dynamic linking, as the official binaries do; a translation would have to stay a separate LGPL library, which rule 2 avoids"
+freesurfer_replica_uses = "the spec-written functions (larmorx_core::math's *_glibc and its specs)"
+clean_room = "larmorx"
+permission = ""
+larmorx_today = "larmorx_core::math (*_glibc from Arm's MIT routines and fdlibm; cbrtf and the double sin/cos from specs)"
+
+[[piece]]
+id = "P-16"
+piece = "the C++ runtime: libstdc++'s algorithms (std::sort's order of equal elements) and libgomp's schedules"
+findings = []
+where = ["5 std::sort calls in 5 reached files (mri_robust_register's CostFunctions, MyMRI, MyMatrix; nifti1_io; volcluster)", "every OpenMP loop"]
+licence = "GPL-3.0-or-later WITH the GCC Runtime Library Exception 3.1"
+terms = "the exception lets 'Target Code' compiled by an eligible compilation process combine with independent modules under any terms; it does not cover a translation of the library's source"
+runs = "where results depend on the order of equal keys or on a loop's partition"
+link = "dynamic (libstdc++.so.6, libgomp.so.1)"
+replica_package = "larmorx, from descriptions: std::sort from its SGI STL origin (HP and SGI's permissive notices) and the libstdc++ steps written from their description (FSL-22's precedent, decision log 2026-10-26); OpenMP schedules from the OpenMP specification"
+combinable = "yes"
+basis = "the GCC Runtime Library Exception covers compiled code; a translation is avoided by writing from descriptions"
+freesurfer_replica_uses = "the description-written versions"
+clean_room = "larmorx"
+permission = ""
+larmorx_today = "FSL-22's sort for the FSL replicas"
+
+[[piece]]
+id = "P-17"
+piece = "zlib (MGZ's gzip streams through znzlib)"
+findings = []
+where = ["packages/nifti/znzlib.c (gzopen, gzwrite)", "libz.so.1 at run time"]
+licence = "Zlib"
+terms = "use, alteration and redistribution for any purpose, with the notice kept in source distributions and altered versions marked"
+runs = "every .mgz and .nii.gz written"
+link = "dynamic"
+replica_package = "larmorx (a deflate that gives zlib's bytes at the level FreeSurfer uses, if byte-identical .mgz files are wanted; otherwise MGZ outputs are compared by content, as .h5 files are)"
+combinable = "yes"
+basis = "permissive"
+freesurfer_replica_uses = "the replica"
+clean_room = "larmorx"
+permission = ""
+larmorx_today = ""

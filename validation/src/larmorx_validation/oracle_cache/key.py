@@ -72,6 +72,8 @@ ENV_FAMILIES = {
     # A Python program (tedana's t2smap): its variables are all in FAMILY_ONLY_ENV, so a run
     # that names no family keeps its key.
     "python": (),
+    # FreeSurfer's programs (larmorx_validation.freesurfer, 2026-11-12): all in FAMILY_ONLY_ENV
+    "freesurfer": (),
 }
 #: Variables in the key of a program of one family only, not of a run that names no family:
 #: OpenBLAS's variables choose the kernels of FSL 6.0.7.23's matrix arithmetic
@@ -86,6 +88,25 @@ FAMILY_ONLY_ENV = {
     # usage text of a refused command line) and tqdm's defaults (``TQDM_DISABLE``: no progress
     # bars) choose a Python program's results and messages (since 2026-11-08).
     "python": ("NPY_", "OPENBLAS_", "OMP_", "MKL_", "PYTHON*", "COLUMNS", "TQDM_"),
+    # FreeSurfer's own variables (``FS_*``, ``FREESURFER_HOME``, ``SUBJECTS_DIR``: a place, by its
+    # role), the MNI tools' its scripts may call, OpenMP's and ITK's threads, and ``PATH``: its tcsh
+    # and Python scripts find the programs they run by it (since 2026-11-12, the replay tool).
+    "freesurfer": (
+        "FS*",
+        "FREESURFER*",
+        "SUBJECTS_DIR",
+        "MNI_",
+        "MINC_",
+        "PERL5LIB",
+        "FUNCTIONALS_DIR",
+        "LOCAL_DIR",
+        "FIX_VERTEX_AREA",
+        "OMP_",
+        "GOMP_",
+        "ITK_",
+        "PATH",
+        "PYTHON*",
+    ),
 }
 
 

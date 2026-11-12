@@ -101,13 +101,18 @@ class Policy:
     identifier, the date and the output's own path, which no suite reads); then they are left
     out when runs are compared, and may hold the run's paths. ``family``: which variables of
     the environment are in the key (``"itk"``, ``"afni"``, ``"fsl"``:
-    :data:`larmorx_validation.oracle_cache.key.ENV_FAMILIES`; ``None``: every family's)."""
+    :data:`larmorx_validation.oracle_cache.key.ENV_FAMILIES`; ``None``: every family's).
+    ``formats``: the comparison of the files a program writes when a fresh run is compared with
+    its entry (``"freesurfer"``: :func:`larmorx_validation.freesurfer.files.same_result`, which
+    leaves out the provenance FreeSurfer writes into its files, the command line, the time, the
+    user, the machine and the run's directories; ``""``: their bytes, as below)."""
 
     threads: int | None = 1
     never: str = ""
     volatile: tuple[str, ...] = field(default=())
     nifti_extensions: str = ""
     family: str | None = None
+    formats: str = ""
 
     def but_never(self, reason: str) -> Policy:
         """This policy, never cached for ``reason`` (the first reason given is kept)."""

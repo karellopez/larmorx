@@ -246,7 +246,13 @@ counts every old word, file by file (section 7).
    ("every option, message, exit status and failure case") is said once, on the Validation page,
    and linked.
 7. **Claim what the record shows, no more.** "Gives FSL's files byte for byte in 201 of its 263
-   cases", not "is identical to FSL". Where a port is not exact, the lede says so.
+   cases", not "is identical to FSL". Where a port is not exact, the lede says so. Where a port
+   matches the original as built in fewer cases than with correctly rounded maths, the lede
+   gives the two counts in two sentences, the cause last: "... once ANTs uses correctly rounded
+   maths (40 of 40 and 21 of 21). With ANTs as built, 7 of the 40 and none of the 21 match bit
+   for bit; the others differ only where glibc's `expf` is not correctly rounded." Not "and in
+   7 and 0 of them as ANTs is built, where glibc's `expf` is not correctly rounded", which reads
+   as if the clause named the cases that match.
 8. **British English** (behaviour, colour, licence as a noun and license as a verb), as the site's
    `en-GB`. Dates as 2026-11-12.
 9. **Names.** LARMORX in prose and `larmorx` in commands; software in plain text (FSL, AFNI);

@@ -136,7 +136,8 @@ def test_names_ports_and_order():
     }
     assert ex["order"]["groups"] == [
         ["The original against itself: the yardstick", ["ants8-ants1", "fp-ants"]],
-        ["The replica against the original and itself", ["lx-ants", "lx-cr", "fix-lx"]],
+        ["The replica against the original", ["lx-ants", "lx-cr"]],
+        ["The replica against itself: fix and reproduce", ["fix-lx"]],
     ]
     assert ex["shows"]["verdicts"] == [
         {"diff": "lx-ants", "port": "replica", "verdict": "identical-cr"}

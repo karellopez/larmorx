@@ -367,10 +367,25 @@ def example(
             if all(target[d["id"]] == "the known answer" for d in ds):
                 title_ = "The original against the known answer"
         else:
-            seen = list(dict.fromkeys(target[d["id"]] for d in ds))
-            title_ = f"The {words.PORT_NAME[port]} against " + (
-                seen[0] if len(seen) == 1 else ", ".join(seen[:-1]) + " and " + seen[-1]
-            )
+            # the port against the others, then against itself (its threads, fix and reproduce)
+            who = words.PORT_NAME[port]
+            others = [d for d in ds if target[d["id"]] != "itself"]
+            itself = [d for d in ds if target[d["id"]] == "itself"]
+            if others:
+                seen = list(dict.fromkeys(target[d["id"]] for d in others))
+                title_ = f"The {who} against " + (
+                    seen[0] if len(seen) == 1 else ", ".join(seen[:-1]) + " and " + seen[-1]
+                )
+                groups.append((title_, [d["id"] for d in others]))
+            if itself:
+                whats = [out[d["id"]][1].split("against itself: ", 1)[-1] for d in itself]
+                kinds = {
+                    "thread counts" if w.endswith(" threads") else w.split(" (")[0] for w in whats
+                }
+                order = ["thread counts", "fix and reproduce", *sorted(kinds)]
+                named = ", ".join(k for k in dict.fromkeys(order) if k in kinds)
+                groups.append((f"The {who} against itself: {named}", [d["id"] for d in itself]))
+            continue
         groups.append((title_, [d["id"] for d in ds]))
     words.example(
         ex,

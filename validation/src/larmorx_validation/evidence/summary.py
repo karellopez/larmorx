@@ -245,7 +245,10 @@ PAGES = [
         "/tools/tedana-t2smap/",
         "t2smap",
         "larmorx",
-        [("larmorx-gpl replica", "tedana-t2smap-replica", "experimental", None, None)],
+        [
+            ("clean-room original", "tedana-t2smap-original", "experimental", None, None),
+            ("larmorx-gpl replica", "tedana-t2smap-replica", "experimental", None, None),
+        ],
     ),
     (
         "/tools/sdcflows-estimation/",

@@ -25,7 +25,8 @@
 //!   is never copied);
 //! - [`VnlRandom::lrand32_range`] computes the range in 64 bits and refuses `lower > upper` (the
 //!   C++ computes `upper - lower + 1` in `int`, which overflows when the range exceeds `2^31 - 1`:
-//!   a range of `2^32` divides by zero, wider ones never return; with `lower > upper` it divides
+//!   a range of `2^32` divides by zero, one from `2^31` to `2^32 - 1` never returns; with
+//!   `lower > upper` it divides
 //!   by zero or never returns under `NDEBUG`).
 //!
 //! Ported from VXL as bundled with ITK 4.13.2, the version FreeSurfer 8.2.0's official binaries

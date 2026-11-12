@@ -454,7 +454,7 @@ reseeds. Left out: the time-seeded constructor and `reseed()`. Two VXL defects n
 reached by FreeSurfer, whose generator is never copied and never draws a range): a copy keeps the
 cached normal number (the C++ copy constructor and assignment leave it uninitialised), and
 `lrand32(lower, upper)` computes its range in 64 bits (the C++'s `int` overflows beyond `2^31 - 1`:
-a division by zero at `2^32`, no return wider); `lower > upper` panics.
+a division by zero at `2^32`, no return from `2^31` to `2^32 - 1`); `lower > upper` panics.
 
 **Bit-identical to ITK 4.13.2's own `vnl_random.cxx`** compiled by GCC 8.4.0 with FreeSurfer's C++
 flags and glibc 2.35's logarithm (`validation/probes/fs-random`, log

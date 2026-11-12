@@ -22,9 +22,9 @@ contents are never reproduced: D13).
 
 **F-VNLR-3. `lrand32(lower, upper)` overflows `int`** (*read*). The range is `upper - lower + 1`
 computed in `int` and converted to `unsigned long`: beyond `2^31 - 1` it overflows (undefined
-behaviour; in practice a range of `2^32` divides by zero and wider ones make the rejection loop
-never end), and `lower > upper` (the assertion is off under `NDEBUG`) divides by zero or never
-returns. Not reached by FreeSurfer (it draws only `drand64`). **larmorx**: the range in 64 bits, the
+behaviour; in practice a range of `2^32` divides by zero, and one from `2^31` to `2^32 - 1`
+becomes a huge `unsigned long`, a divisor of 0 and a rejection loop that never ends), and
+`lower > upper` (the assertion is off under `NDEBUG`) divides by zero or never returns. Not reached by FreeSurfer (it draws only `drand64`). **larmorx**: the range in 64 bits, the
 full range of `int` accepting every draw, `lower > upper` refused (a panic, as the assertion).
 
 **F-VNLR-4. Only a seed's low 32 bits matter, and FreeSurfer's first seed is 0** (*read*). The

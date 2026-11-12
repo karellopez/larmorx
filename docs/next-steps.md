@@ -793,6 +793,11 @@ The items below keep their history.
     without files in it (tedana's output directory after a failed `--exclude`, 2026-11-11, first taken for a
     difference). Record directories too, or state the limit in `docs/validation/oracle-cache.md` and have suites
     that check directories run the original directly.
+  - *The gates as CI runs them:* `verify-merge.sh` and the agents' gates run with this machine's `FSLDIR` set, CI
+    without it: `crates/larmorx-cli/tests/fsl_output_types.rs` passed here and failed on all six platforms
+    (2026-11-11, `52de0470`; fixed in `9abcd41a`). Run `cargo test` and the Python gates in `verify-merge.sh` with
+    `FSLDIR` unset as CI does (the orchestrator did by hand from 2026-11-12), with `LARMORX_GPL_BIN` at the merged
+    tree's `crates-gpl` build (`t2smap`'s follow-up below).
 - **From `t2smap`'s clean-room part (2026-11-11 and 12; 15 agents: nine clean relays, two replica-side spec
   writers, four replica-side relays; [findings](findings/tedana-t2smap-original.md), record
   [tedana-t2smap-original](validation/tedana-t2smap-original.md), [benchmarks](benchmarks/tedana-t2smap.md),

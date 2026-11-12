@@ -517,8 +517,11 @@ deterministic fill.
 
 **Bit-identical to ITK 4.13.2's VNL** as the FreeSurfer unit oracle built it (Ubuntu's `gcc-8`
 8.4.0-3ubuntu2, ITK's Release flags; `validation/probes/fs-vnl`, whose `build.sh` checks the
-oracle's VNL tree against the pinned tag and records the libraries' SHA-256), 2026-11-12, at scale 1
-(log `oracles/logs/fs-found-c-vnl-probe-200.log` for the scale-200 run): C's `printf` 777,393
+oracle's VNL tree against the pinned tag and records the libraries' SHA-256), 2026-11-12, at scale
+200 from af0c5620 (log `oracles/logs/fs-found-c-vnl-probe-200.log`): 7,655,619,214 values, 0
+differences. C's `printf` 155,485,224 conversions; the minimizers 1,420,803,455 values (1,200,000
+cases); L-BFGS 4,482,647,023 values (600,000 problems, 28,923,878 calls in lock step); the linear
+algebra 1,563,979,512 values (4,000,000 cases); the FFT 32,704,000 values. At scale 1: C's `printf` 777,393
 conversions; the minimizers 4,481,262 values (6,000 cases: brackets, the four Brent entry points,
 `fs_powell`'s `vnl_brent` step, `vnl_brent::minimize`, `vnl_powell` in 1 to 6 dimensions with its
 verbose lines; every evaluated point in order); L-BFGS 22,998,582 values (3,000 problems, 148,167

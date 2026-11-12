@@ -54,8 +54,9 @@ quadratic, Rosenbrock, pseudo-Huber, quartic and logarithmic shapes) at FreeSurf
 `OpenDFPMin` settings (memory 7, line-search accuracy 0.1, `xtol` 1e-16) and at VNL's defaults
 (memory 5, `gtol` 0.9): Nocedal's first stage changed **no** run (the same 6,770,896 and 6,181,988
 evaluations, the same final values and the same 117 and 133 line-search failures). In the probe's
-`lbfgs` family (3,000 problems at scale 1, some with deliberately wrong gradients) it changed 2
-runs, each by more evaluations to the same final value. The line search almost always ends at its
+`lbfgs` family (600,000 problems at scale 200, mixed settings, one in twelve with a deliberately
+wrong gradient) it changed 137 runs: more evaluations in 114 and fewer in none, a lower final value
+in 13 and a higher one in 11, the same 176,646 line-search failures. The line search almost always ends at its
 first or second trial, where `stx = sty = 0` makes the two the same. **Decided by rule D, then C**
 (a correction measured to bring no gain): VXL's behaviour stays in both modes, Nocedal's on request
 (`LbfgsGlobal::nocedal_first_stage`), named where it changes the search's state. VXL 5.4.5 is the

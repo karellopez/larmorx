@@ -217,6 +217,7 @@ class Function:
     summary: str
     doc: dict[str, list[tuple[list[str], str]]]  # numpydoc sections
     result: Result | None = None
+    module: str = ""  # the module that defines it: larmorx.fsl.bet
 
     @property
     def public(self) -> str:
@@ -257,6 +258,8 @@ def _module_file(repo: Path, module: str) -> Path:
 def _resolve(repo: Path, module: str, name: str, depth: int = 0) -> tuple[str, ast.AST, str]:
     """The definition of ``name`` as ``module`` binds it: (its module, its node, the source)."""
     path = _module_file(repo, module)
+    if module.split(".")[0] != "larmorx" or not path.is_file():
+        raise LookupError(f"{module} is not a module of the package")
     src = path.read_text(encoding="utf-8")
     tree = ast.parse(src)
     for node in tree.body:
@@ -342,6 +345,7 @@ def function(repo: Path, dotted: str) -> Function:
         returns,
         summary,
         sections,
+        module=where,
     )
     if returns and re.fullmatch(r"\w+", returns):
         try:

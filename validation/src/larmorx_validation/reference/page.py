@@ -183,7 +183,27 @@ def _status(record: dict | None) -> str:
 
 
 def _cell(s: str) -> str:
-    return s.replace("|", "\\|").replace("\n", " ")
+    """A table cell: each code span as HTML whose words never break inside (a browser would
+    break `-R` after its hyphen in a narrow column), every other ``|`` escaped."""
+    parts = re.split(r"(`[^`]+`)", s.replace("\n", " "))
+    out = []
+    for part in parts:
+        if part.startswith("`") and part.endswith("`") and len(part) > 1:
+            words = [w for w in part[1:-1].split(" ") if w]
+            out.append(
+                "<code>"
+                + " ".join(f'<span class="nw">{_entities(w)}</span>' for w in words)
+                + "</code>"
+            )
+        else:
+            out.append(part.replace("|", "\\|"))
+    return "".join(out)
+
+
+def _entities(word: str) -> str:
+    """Every character but letters and digits as an entity, so that neither Markdown nor its
+    typographer (``--`` to a dash, quotes to curly quotes) changes a word of code."""
+    return "".join(c if c.isascii() and c.isalnum() else f"&#{ord(c)};" for c in word)
 
 
 def build(repo: Path, p: apipage.Program) -> Reference:
@@ -300,6 +320,8 @@ def build(repo: Path, p: apipage.Program) -> Reference:
     # ---------------------------------------------------------------- the Markdown
     what = links(apipage.strip_comments(p.description), page, problems).strip()
     lede = _first_sentence(what) if what else fn.summary
+    if " ".join(what.split()) == lede:
+        lede = ""  # one sentence: the section says it, the header does not repeat it
     evidence = str(meta.get("evidence", ""))
     ev_page, _, ev_anchor = evidence.partition("#")
     ev_url = f"/evidence/{ev_page}/" + (f"#{ev_anchor}" if ev_anchor else "") if ev_page else ""
@@ -307,7 +329,8 @@ def build(repo: Path, p: apipage.Program) -> Reference:
     out.append("---")
     out.append(f"title: {_yaml('`' + p.name + '`')}")
     out.append(f"kicker: {_yaml('Programs · ' + GROUPS.get(p.group, p.group))}")
-    out.append(f"lede: {_yaml(lede)}")
+    if lede:
+        out.append(f"lede: {_yaml(lede)}")
     description = (
         f"LARMORX reference for {original} `{p.name}`: its command line, its Python call, every "
         "option, tested examples and its ports."
@@ -351,8 +374,8 @@ def build(repo: Path, p: apipage.Program) -> Reference:
         f"between `larmorx` and the family `{p.group}`, so they never meet the original's "
         f"([below](#larmorx-options)):\n"
     )
-    own_syn = " ".join(f"[{o.option} {o.values.replace(' | ', '|')}]" for o in own)
-    body.append("```text\n" + f"larmorx {own_syn} {command.split(' ', 1)[1]} ...\n```\n")
+    own_syn = "".join(f"        [{o.option} {o.values.replace(' | ', '|')}]\n" for o in own)
+    body.append("```text\nlarmorx\n" + own_syn + f"        {command.split(' ', 1)[1]} ...\n```\n")
     if cl.usage:
         usage = cl.usage.strip("\n")
         body.append(
@@ -368,6 +391,19 @@ def build(repo: Path, p: apipage.Program) -> Reference:
     body.append(
         "```python\n" + head + "(\n" + "".join(f"    {a},\n" for a in parts) + ")" + ret + "\n```\n"
     )
+    aliases = []
+    for name in dict.fromkeys(re.findall(r"\b[A-Z]\w+", " ".join(q.annotation for q in fn.params))):
+        values = code.literal_values(repo, fn.module, name)
+        if values:
+            words = [
+                f'`"{v}"` (0.1.0rc1\'s spelling of `"clean-room"`)'
+                if v == "original" and "clean-room" in values
+                else f'`"{v}"`'
+                for v in values
+            ]
+            aliases.append(f"`{name}` is one of " + ", ".join(words))
+    if aliases:
+        body.append("Where " + "; ".join(aliases) + ".\n")
     body.append(fn.summary + "\n")
     if py_text:
         body.append(links(py_text, page, problems) + "\n")
@@ -377,7 +413,7 @@ def build(repo: Path, p: apipage.Program) -> Reference:
         body.append(f"Its result, `{fn.result.name}`, holds {summary}\n")
         body.append("| Field | Type | What it holds |\n|---|---|---|")
         for n, ann, doc in fn.result.fields:
-            body.append(f"| `{n}` | `{_cell(ann)}` | {_cell(doc)} |")
+            body.append(f"| {_cell(f'`{n}`')} | {_cell(f'`{ann}`')} | {_cell(doc)} |")
         body.append("")
 
     body.append("## Options {#options}\n")
@@ -395,7 +431,7 @@ def build(repo: Path, p: apipage.Program) -> Reference:
             + (["Default"] if with_default else [])
             + (t.header[2:] or ["What it does"])
         )
-        body.append("| " + " | ".join(header) + " |")
+        body.append("| " + " | ".join(_cell(h) for h in header) + " |")
         body.append("|" + "---|" * len(header))
         for r in rows:
             cells = list(r.cells) + [""] * (3 - len(r.cells))
@@ -432,19 +468,17 @@ def build(repo: Path, p: apipage.Program) -> Reference:
         f"(`larmorx --n-threads 4 {command.split(' ', 1)[1]} ...`) and are arguments of "
         f"`{fn.public}`. Each one given wins over the environment variable it replaces.\n"
     )
-    body.append(
-        "| Command line | Python | Default | Replaces | What it does |\n|---|---|---|---|---|"
-    )
+    body.append("| Command line, then Python | What it does |\n|---|---|")
     for o in own:
         q = fn.param(o.python)
-        default = f"`{q.default}`" if q is not None and q.default is not None else ""
+        default = q.default if q is not None and q.default is not None else ""
         doc = q.doc if q is not None else ""
         if q is None:
             problems.append(f"{where}: {fn.public} has no `{o.python}` argument ({o.option})")
         values = o.values.replace(" | ", "|")
         body.append(
-            f"| {_cell(f'`{o.option} {values}`')} | `{o.python}` | {default} | "
-            f"`{o.variable}` | {_cell(links(doc, page, problems))} |"
+            f"| {_cell(f'`{o.option}` `{values}`')}<br>{_cell(f'`{o.python}={default}`')} | "
+            f"{_cell(f'Replaces `{o.variable}`. ' + links(doc, page, problems))} |"
         )
     body.append("")
 

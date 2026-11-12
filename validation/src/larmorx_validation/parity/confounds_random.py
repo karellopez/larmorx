@@ -1079,6 +1079,9 @@ def _fp_fd(e, files, tmp, nt):
             radius=e["radius"],
             **_kw(lc.fmriprep_framewise_displacement, upstream_defects=mode),
         ),
+        # PD-01's notice is the motion table's read; the displacement's sums of differences can
+        # round a value read one bit off to the same number
+        silent=("PD-01",),
     )
 
 
@@ -1345,7 +1348,9 @@ def _fp_expand(e, files, tmp, nt):
                 **_kw(lnw.expand_model, upstream_defects=mode),
             )
         ),
-        silent=("PIPE-43",),
+        # PIPE-43 is about the order (compared by name); PD-01's notice is the table's read (its
+        # values change), which the expansion shows only where the formula takes those columns
+        silent=("PIPE-43", "PD-01"),
     )
 
 

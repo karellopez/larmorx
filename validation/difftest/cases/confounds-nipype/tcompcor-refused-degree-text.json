@@ -1,0 +1,258 @@
+{
+ "defect": null,
+ "description": "TCompCor with regress_poly_degree=0: traits' TraitError text ('The 'regress_poly_degree' trait of a TCompCorInputSpec instance must be an integer >= 1, ...') where larmorx raised its own message. Fixed: every refused CompCor input raises traits' or nipype's text.",
+ "expect": "pass",
+ "found": {
+  "detail": "TCompCor with regress_poly_degree=0: traits' TraitError text ('The 'regress_poly_degree' trait of a TCompCorInputSpec instance must be an integer >= 1, ...') where larmorx raised its own message. Fixed: every refused CompCor input raises traits' or nipype's text.",
+  "n": 148,
+  "seed": "probe",
+  "shrink_moves": [],
+  "signature": [
+   "compcor: every output bit-identical"
+  ]
+ },
+ "id": "tcompcor-refused-degree-text",
+ "implementations": [
+  "port"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "call": "compcor",
+   "kind": "TCompCor",
+   "kw": {
+    "failure_mode": "error",
+    "ignore_initial_volumes": 2,
+    "percentile_threshold": 0.05,
+    "pre_filter": "polynomial",
+    "regress_poly_degree": 0,
+    "repetition_time": 3.0,
+    "save_pre_filter": true,
+    "variance_threshold": 0.99
+   },
+   "threads": 3
+  },
+  "features": {
+   "a refused input": false,
+   "axis0": 0.75,
+   "axis1": 0.9,
+   "axis2": 1.25,
+   "bias0": 0.0025,
+   "bias1": -0.0025,
+   "bias2": -0.0075,
+   "bias3": -0.0075,
+   "call": "compcor",
+   "centre0": -5.0,
+   "centre1": 0.0,
+   "centre2": -3.5,
+   "components_file": false,
+   "content": "head",
+   "criterion": "variance",
+   "dtype": "float32",
+   "extreme": false,
+   "failure_mode": "error",
+   "header_prefix": false,
+   "ignore_initial_volumes": true,
+   "ignore_initial_volumes value": 2,
+   "interface": "TCompCor",
+   "mask 4-D": false,
+   "mask binary": true,
+   "mask dtype": "float32",
+   "mask other grid": false,
+   "mask suffix": ".nii.gz",
+   "masks": 1,
+   "noise": 6.0,
+   "orientation": "plumb",
+   "origin0": -47.25,
+   "origin1": -15.75,
+   "origin2": -14.0,
+   "percentile_threshold": 0.05,
+   "pre_filter": "polynomial",
+   "qfac": 1,
+   "qform_code": 1,
+   "range": "plain",
+   "regress_poly_degree": 0,
+   "repetition_time": true,
+   "repetition_time value": 3.0,
+   "save_metadata": false,
+   "save_pre_filter": true,
+   "series dtype": "float32",
+   "series suffix": ".nii.gz",
+   "sform": "same",
+   "sform_code": 1,
+   "shape": "5x4x5x6",
+   "signal": true,
+   "signal amplitude": 0.2,
+   "signal period": 3,
+   "size": 22.5,
+   "slice_code": 1,
+   "spacing0": 1.0,
+   "spacing1": 4.0,
+   "spacing2": 1.5,
+   "threads": 3,
+   "tissues": "t1",
+   "tr": 3.0,
+   "tunits": "sec",
+   "units": "mm",
+   "variance_threshold": 0.99
+  },
+  "groups": [
+   {
+    "args": [
+     "compcor"
+    ],
+    "name": "compcor",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "mask0": {
+    "content": {
+     "axes": [
+      0.75,
+      0.9,
+      1.25
+     ],
+     "bias": [
+      0.0025,
+      -0.0025,
+      -0.0075,
+      -0.0075
+     ],
+     "centre": [
+      -5.0,
+      0.0,
+      -3.5
+     ],
+     "noise": 6.0,
+     "seed": 299599421,
+     "size": 22.5,
+     "tissues": "t1",
+     "type": "head"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      -47.25,
+      -15.75,
+      -14.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      4.0,
+      1.5
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     5,
+     4,
+     5
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "binarize": true
+    }
+   },
+   "series": {
+    "content": {
+     "axes": [
+      1.25,
+      1.2,
+      1.0
+     ],
+     "bias": [
+      0.0,
+      0.0,
+      -0.01,
+      0.005
+     ],
+     "centre": [
+      1.5,
+      5.0,
+      3.5
+     ],
+     "noise": 3.0,
+     "seed": 1179338407,
+     "size": 10.5,
+     "tissues": "t1",
+     "type": "head"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      -47.25,
+      -15.75,
+      -14.0
+     ],
+     "qfac": 1,
+     "qform_code": 1,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      1.0,
+      4.0,
+      1.5
+     ],
+     "units": "mm"
+    },
+    "scaling": null,
+    "shape": [
+     5,
+     4,
+     5,
+     6
+    ],
+    "signal": {
+     "amplitude": 0.2,
+     "period": 3
+    },
+    "suffix": ".nii.gz",
+    "timing": {
+     "slice_code": 1,
+     "slice_duration": 0.6,
+     "slice_end": 4,
+     "slice_start": 0,
+     "tr": 3.0,
+     "tunits": "sec"
+    },
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 148,
+  "options": [
+   "1 masks",
+   "TCompCor",
+   "compcor",
+   "pre_filter polynomial",
+   "variance"
+  ],
+  "seed": "probe",
+  "tool": "confounds-nipype"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "confounds-nipype",
+ "tier": "smoke",
+ "tool": "confounds-nipype"
+}

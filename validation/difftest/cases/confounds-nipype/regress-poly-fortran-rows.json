@@ -1,0 +1,74 @@
+{
+ "defect": null,
+ "description": "regress_poly of Fortran-ordered rows (387 x 69 float32, degree 0): numpy's pinv(X).dot(data.T) takes gemv on a C-ordered data.T, whose sums run in another order; larmorx summed as for C-ordered rows (16,284 of 26,703 residuals one or two ulps off). Fixed: regress_poly_layout follows the rows' memory order.",
+ "expect": "pass",
+ "found": {
+  "detail": "regress_poly of Fortran-ordered rows (387 x 69 float32, degree 0): numpy's pinv(X).dot(data.T) takes gemv on a C-ordered data.T, whose sums run in another order; larmorx summed as for C-ordered rows (16,284 of 26,703 residuals one or two ulps off). Fixed: regress_poly_layout follows the rows' memory order.",
+  "n": 485,
+  "seed": "probe3",
+  "shrink_moves": [],
+  "signature": [
+   "regress_poly: every output bit-identical"
+  ]
+ },
+ "id": "regress-poly-fortran-rows",
+ "implementations": [
+  "port"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "call": "regress_poly",
+   "data": {
+    "dtype": "float32",
+    "kind": "bold",
+    "layout": "F",
+    "seed": 1902846159,
+    "t": 69,
+    "voxels": 387
+   },
+   "degree": 0,
+   "failure_mode": "error",
+   "remove_mean": true,
+   "threads": 1
+  },
+  "features": {
+   "call": "regress_poly",
+   "degree": 0,
+   "dtype": "float32",
+   "extreme": false,
+   "failure_mode": "error",
+   "layout": "F",
+   "no voxel": false,
+   "remove_mean": true,
+   "threads": 1,
+   "values": "bold",
+   "volumes": 69,
+   "voxels": 387
+  },
+  "groups": [
+   {
+    "args": [
+     "regress_poly"
+    ],
+    "name": "regress_poly",
+    "optional": false
+   }
+  ],
+  "inputs": {},
+  "n": 485,
+  "options": [
+   "bold",
+   "degree 0",
+   "float32",
+   "regress_poly"
+  ],
+  "seed": "probe3",
+  "tool": "confounds-nipype"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "confounds-nipype",
+ "tier": "smoke",
+ "tool": "confounds-nipype"
+}

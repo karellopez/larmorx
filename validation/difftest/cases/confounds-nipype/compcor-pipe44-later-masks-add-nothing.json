@@ -1,0 +1,357 @@
+{
+ "defect": null,
+ "description": "ACompCor whose second mask gives no component and whose later masks give none either (the trial's notice verdicts): the default goes on with them (PIPE-44) to the same result, yet named PIPE-44. Fixed: named where a later mask adds components or changes the pre-filter's basis.",
+ "expect": "pass",
+ "found": {
+  "detail": "ACompCor whose second mask gives no component and whose later masks give none either (the trial's notice verdicts): the default goes on with them (PIPE-44) to the same result, yet named PIPE-44. Fixed: named where a later mask adds components or changes the pre-filter's basis.",
+  "n": 42559,
+  "seed": "confounds-trial",
+  "shrink_moves": [],
+  "signature": [
+   "D13 fix pass"
+  ]
+ },
+ "id": "compcor-pipe44-later-masks-add-nothing",
+ "implementations": [
+  "port"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "call": "compcor",
+   "kind": "ACompCor",
+   "kw": {
+    "failure_mode": "error",
+    "high_pass_cutoff": 128.0,
+    "ignore_initial_volumes": 3,
+    "mask_names": [
+     "m0",
+     "m1",
+     "m2"
+    ],
+    "merge_method": "none",
+    "num_components": "all",
+    "pre_filter": "cosine"
+   },
+   "threads": 1
+  },
+  "features": {
+   "a refused input": false,
+   "axis0": 0.85,
+   "axis1": 1.2,
+   "axis2": 1.1,
+   "bias0": -0.005,
+   "bias1": 0.0,
+   "bias2": 0.0025,
+   "bias3": 0.0,
+   "blobs": 5,
+   "call": "compcor",
+   "centre0": 1.5,
+   "centre1": -1.5,
+   "centre2": -4.0,
+   "components_file": false,
+   "content": "blobs",
+   "criterion": "all",
+   "dtype": "float64",
+   "extreme": false,
+   "failure_mode": "error",
+   "header_prefix": false,
+   "high_pass_cutoff": 128.0,
+   "ignore_initial_volumes": true,
+   "ignore_initial_volumes value": 3,
+   "inter": -5.0,
+   "interface": "ACompCor",
+   "mask 4-D": false,
+   "mask binary": true,
+   "mask dtype": "uint8",
+   "mask other grid": false,
+   "mask suffix": ".nii",
+   "mask_names": true,
+   "masks": 3,
+   "merging": "none",
+   "noise": 3.0,
+   "orientation": "axes",
+   "origin0": -23.25,
+   "origin1": 29.5,
+   "origin2": 45.0,
+   "pre_filter": "cosine",
+   "qfac": 1,
+   "qform_code": 2,
+   "range": "plain",
+   "repetition_time": false,
+   "save_metadata": false,
+   "save_pre_filter": false,
+   "series dtype": "uint16",
+   "series suffix": ".nii.gz",
+   "sform": "same",
+   "sform_code": 1,
+   "shape": "11x2x2x39",
+   "signal": true,
+   "signal amplitude": 0.05,
+   "signal period": 7,
+   "size": 13.5,
+   "slope": 0.5,
+   "spacing0": 4.0,
+   "spacing1": 2.5,
+   "spacing2": 2.0,
+   "sparse": 0.001,
+   "threads": 1,
+   "tissues": "epi",
+   "too few names": false,
+   "tr": 0.5,
+   "tunits": "sec",
+   "units": "unknown"
+  },
+  "groups": [
+   {
+    "args": [
+     "compcor"
+    ],
+    "name": "compcor",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "mask0": {
+    "content": {
+     "axes": [
+      1.25,
+      0.85,
+      1.05
+     ],
+     "bias": [
+      -0.005,
+      0.0,
+      0.0025,
+      0.0
+     ],
+     "centre": [
+      -6.0,
+      6.0,
+      1.0
+     ],
+     "noise": 3.0,
+     "seed": 435108362,
+     "size": 9.0,
+     "tissues": "epi",
+     "type": "head"
+    },
+    "dtype": "float64",
+    "geometry": {
+     "origin": [
+      -23.25,
+      29.5,
+      45.0
+     ],
+     "qfac": 1,
+     "qform_code": 2,
+     "quaternion": [
+      1,
+      0,
+      0,
+      1
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      4.0,
+      2.5,
+      2.0
+     ],
+     "units": "unknown"
+    },
+    "scaling": null,
+    "shape": [
+     11,
+     2,
+     2
+    ],
+    "suffix": ".nii",
+    "values": {
+     "binarize": true
+    }
+   },
+   "mask1": {
+    "content": {
+     "fraction": 0.001,
+     "seed": 1057656002,
+     "type": "sparse"
+    },
+    "dtype": "uint8",
+    "geometry": {
+     "origin": [
+      -23.25,
+      29.5,
+      45.0
+     ],
+     "qfac": 1,
+     "qform_code": 2,
+     "quaternion": [
+      1,
+      0,
+      0,
+      1
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      4.0,
+      2.5,
+      2.0
+     ],
+     "units": "unknown"
+    },
+    "scaling": null,
+    "shape": [
+     11,
+     2,
+     2
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "binarize": true
+    }
+   },
+   "mask2": {
+    "content": {
+     "axes": [
+      0.85,
+      1.2,
+      1.1
+     ],
+     "centre": [
+      1.5,
+      -1.5,
+      -4.0
+     ],
+     "n": 5,
+     "seed": 1437671695,
+     "size": 13.5,
+     "type": "blobs"
+    },
+    "dtype": "uint8",
+    "geometry": {
+     "origin": [
+      -23.25,
+      29.5,
+      45.0
+     ],
+     "qfac": 1,
+     "qform_code": 2,
+     "quaternion": [
+      1,
+      0,
+      0,
+      1
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      4.0,
+      2.5,
+      2.0
+     ],
+     "units": "unknown"
+    },
+    "scaling": null,
+    "shape": [
+     11,
+     2,
+     2
+    ],
+    "suffix": ".nii",
+    "values": {
+     "binarize": true
+    }
+   },
+   "series": {
+    "content": {
+     "axes": [
+      0.95,
+      0.85,
+      0.85
+     ],
+     "bias": [
+      -0.0075,
+      -0.01,
+      -0.0025,
+      0.0025
+     ],
+     "centre": [
+      0.0,
+      2.0,
+      2.0
+     ],
+     "noise": 1.0,
+     "seed": 459278577,
+     "size": 29.0,
+     "tissues": "t1",
+     "type": "head"
+    },
+    "dtype": "uint16",
+    "geometry": {
+     "origin": [
+      -23.25,
+      29.5,
+      45.0
+     ],
+     "qfac": 1,
+     "qform_code": 2,
+     "quaternion": [
+      1,
+      0,
+      0,
+      1
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      4.0,
+      2.5,
+      2.0
+     ],
+     "units": "unknown"
+    },
+    "scaling": {
+     "inter": -5.0,
+     "slope": 0.5
+    },
+    "shape": [
+     11,
+     2,
+     2,
+     39
+    ],
+    "signal": {
+     "amplitude": 0.05,
+     "period": 7
+    },
+    "suffix": ".nii.gz",
+    "timing": {
+     "slice_code": 0,
+     "tr": 0.5,
+     "tunits": "sec"
+    },
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 42559,
+  "options": [
+   "3 masks",
+   "ACompCor",
+   "all",
+   "compcor",
+   "pre_filter cosine"
+  ],
+  "seed": "confounds-trial",
+  "tool": "confounds-nipype"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "confounds-nipype",
+ "tier": "smoke",
+ "tool": "confounds-nipype"
+}

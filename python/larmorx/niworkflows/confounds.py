@@ -900,10 +900,28 @@ def _spikes(
     mask = reduce(operator.or_, mask_by.values())
 
     flagged = set(mask)
+    cumulative = set(mask)
     for lag in lags:
-        mask = {m + lag for m in mask} | mask
+        cumulative = {m + lag for m in cumulative} | cumulative
     corrected = flagged.union(*({m + lag for m in flagged} for lag in lags))
-    if mask.intersection(indices) != corrected.intersection(indices):
+    cumulative, corrected = cumulative.intersection(indices), corrected.intersection(indices)
+
+    def contiguous(m: set[int], post_final: int) -> set[int]:
+        """``minimum_contiguous``'s filling of short runs, the last run ending at
+        ``post_final`` (niworkflows': one volume past the end, PIPE-68)."""
+        if minimum_contiguous is None:
+            return m
+        m2 = set(m)
+        epoch_length = np.diff(sorted(m2 | {-1, post_final})) - 1
+        epoch_end = sorted(m2 | {post_final})
+        for end, length in zip(epoch_end, epoch_length, strict=False):
+            if length < minimum_contiguous:
+                m2 = m2 | set(range(end - length, end))
+        return m2.intersection(indices)
+
+    # Each correction is named where it changes the flagged volumes (after the filling).
+    post = data.n_rows if fix else data.n_rows + 1
+    if contiguous(cumulative, post) != contiguous(corrected, post):
         notices.append(
             (
                 "PIPE-67",
@@ -913,21 +931,9 @@ def _spikes(
                 + ("each lag is added to the flagged volumes only" if fix else "as niworkflows"),
             )
         )
-        if fix:
-            mask = corrected
-    mask = mask.intersection(indices)
-
+    mask = corrected if fix else cumulative
     if minimum_contiguous is not None:
-        results = {}
-        for post_final in (data.n_rows + 1, data.n_rows):
-            m2 = set(mask)
-            epoch_length = np.diff(sorted(m2 | {-1, post_final})) - 1
-            epoch_end = sorted(m2 | {post_final})
-            for end, length in zip(epoch_end, epoch_length, strict=False):
-                if length < minimum_contiguous:
-                    m2 = m2 | set(range(end - length, end))
-            results[post_final] = m2.intersection(indices)
-        original, ours = results[data.n_rows + 1], results[data.n_rows]
+        original, ours = contiguous(mask, data.n_rows + 1), contiguous(mask, data.n_rows)
         if original != ours:
             notices.append(
                 (

@@ -210,6 +210,14 @@ pub enum CompcorError {
     /// the loop reaches it.
     #[error("{0}")]
     ShapeMismatch(String),
+    /// numpy's `ValueError` of nipype's pre-filters reshaping a mask's rows of no volume to
+    /// `(-1, 0)` (an interface's `ignore_initial_volumes` at least the series' length); with the
+    /// mask PIPE-44's correction reached (`Some(i)`: mask `i` gave no component), named.
+    #[error(
+        "cannot reshape array of size 0 into shape (0){}",
+        .0.map(|i| format!(" (PIPE-44: mask {i} gives no component, where nipype stops before this mask)")).unwrap_or_default()
+    )]
+    NoVolume(Option<usize>),
     /// A path this port does not follow (`NotImplementedError`).
     #[error("{0}")]
     NotPorted(&'static str),
@@ -268,7 +276,12 @@ pub fn cosine_drift(
             (0..len_tim)
                 .map(|t| {
                     let a = NpFloat::mul(NpFloat::mul(w, NpFloat::add(t as f64, 0.5)), k as f64);
-                    NpFloat::mul(nfct, libm.cos(a))
+                    // the witness compares the basis values, not the cosines: a cosine one bit
+                    // off can round to the same product (GLIBC-07 named only where it shows)
+                    libm.choose64(
+                        || NpFloat::mul(nfct, larmorx_core::math::cos(a)),
+                        || NpFloat::mul(nfct, larmorx_core::math::cos_glibc(a)),
+                    )
                 })
                 .collect()
         })
@@ -699,6 +712,9 @@ fn noise<T: NpFloat>(
     let mut num_components: i64 = 0;
     let (mut zeroed_diff, mut inf_rows) = (0usize, 0usize);
     let mut skipped_after: Option<usize> = None;
+    // The basis where nipype stops (PIPE-44): the default names the correction only where the
+    // masks after it change the result (their components, or the last mask's basis).
+    let mut basis_at_skip: Option<Basis> = None;
     let mut basis_kept = false;
     let mut nan_fill_fixed = false;
     let mut filled = false;
@@ -760,6 +776,9 @@ fn noise<T: NpFloat>(
             })
         };
         basis_kept = false;
+        if t == 0 && !early && o.filter != FilterType::Other {
+            return Err(CompcorError::NoVolume(if fix { skipped_after } else { None }));
+        }
         let (data, m_f32) = if early {
             // nipype: the rows (float32 stays float32) and np.array([]). PIPE-55: the basis
             // (nipype's early return when computing it fails: T < 2 for the cosines).
@@ -842,8 +861,9 @@ fn noise<T: NpFloat>(
         num_components = num;
         if num == 0 {
             if fix {
-                if mi + 1 < nmasks {
-                    skipped_after = skipped_after.or(Some(mi));
+                if (mi + 1 < nmasks || mismatch.is_some()) && skipped_after.is_none() {
+                    skipped_after = Some(mi);
+                    basis_at_skip = Some(basis.clone());
                 }
                 continue;
             }
@@ -882,6 +902,13 @@ fn noise<T: NpFloat>(
     if let Some(msg) = mismatch
         && !broke
     {
+        // PIPE-44's correction reached the mask nipype never reaches: named in the error.
+        let msg = match skipped_after {
+            Some(i) if fix => format!(
+                "{msg} (PIPE-44: mask {i} gives no component, where nipype stops before this mask)"
+            ),
+            _ => msg,
+        };
         return Err(CompcorError::ShapeMismatch(msg));
     }
     if zeroed_diff > 0 {
@@ -894,7 +921,12 @@ fn noise<T: NpFloat>(
             ),
         );
     }
-    if let Some(i) = skipped_after {
+    let shows = |i: usize| {
+        !fix || metadata.iter().any(|m| m.mask > i) || basis_at_skip.as_ref() != Some(&basis)
+    };
+    if let Some(i) = skipped_after
+        && shows(i)
+    {
         notices.add(
             &defects::PIPE_44,
             format!(

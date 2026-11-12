@@ -1,0 +1,72 @@
+{
+ "defect": null,
+ "description": "RenameACompCor with a 'retained' column of text: pandas' KeyError prints the values' Index with line breaks at width 80, larmorx in one line. Fixed: _index_repr follows pandas' format_object_summary.",
+ "expect": "pass",
+ "found": {
+  "detail": "RenameACompCor with a 'retained' column of text: pandas' KeyError prints the values' Index with line breaks at width 80, larmorx in one line. Fixed: _index_repr follows pandas' format_object_summary.",
+  "n": 140,
+  "seed": "probe",
+  "shrink_moves": [],
+  "signature": [
+   "rename_acompcor: every output bit-identical"
+  ]
+ },
+ "id": "rename-acompcor-text-retained",
+ "implementations": [
+  "port"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "call": "rename_acompcor",
+   "components_t": 9,
+   "metadata": {
+    "masks": [
+     "CSF",
+     "WM",
+     "combined"
+    ],
+    "n": 5,
+    "names": "a_comp_cor",
+    "retained": "text",
+    "seed": 228233670
+   },
+   "mismatch": true,
+   "threads": 3
+  },
+  "features": {
+   "call": "rename_acompcor",
+   "component names": "a_comp_cor",
+   "components and metadata disagree": true,
+   "components per mask": 5,
+   "extreme": false,
+   "metadata masks": 0,
+   "retained": "text",
+   "threads": 3,
+   "volumes": 9
+  },
+  "groups": [
+   {
+    "args": [
+     "rename_acompcor"
+    ],
+    "name": "rename_acompcor",
+    "optional": false
+   }
+  ],
+  "inputs": {},
+  "n": 140,
+  "options": [
+   "3 masks",
+   "rename_acompcor",
+   "text"
+  ],
+  "seed": "probe",
+  "tool": "confounds-fmriprep"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "confounds-fmriprep",
+ "tier": "smoke",
+ "tool": "confounds-fmriprep"
+}

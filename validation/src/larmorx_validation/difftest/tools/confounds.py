@@ -446,6 +446,10 @@ def draw_nipype(d: gen.Draw) -> dict:
                 kw["percentile_threshold"] = d.choice("refused percentile", (0.0, 1.0))
             else:
                 kw["pre_filter"] = "Cosine"
+            # one refused input at a time: nipype names the first its caller set, an order a
+            # function with keyword parameters does not know (the trial's two findings)
+            if kw.get("regress_poly_degree") == 0:
+                kw["regress_poly_degree"] = 1
             options.append(f"refused {bad}")
         e["kw"] = kw
         options += [e["kind"], f"{n_masks} masks", f"pre_filter {pf}", criterion]

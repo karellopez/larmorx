@@ -18,7 +18,7 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import model  # noqa: E402
+import model
 
 H0 = 14695981039346656037
 P = 1099511628211
@@ -46,7 +46,10 @@ def splitmix(state: int):
 
 
 def report(name: str, cases: int, same: int, first: str | None) -> bool:
-    print(f"{name}: {cases} cases, {same} identical" + (f"; first difference: {first}" if first else ""))
+    print(
+        f"{name}: {cases} cases, {same} identical"
+        + (f"; first difference: {first}" if first else "")
+    )
     return same == cases
 
 
@@ -56,14 +59,48 @@ def quick(probe: str) -> bool:
     ref = run(probe, "default", 100000)
     st = model.Stream(1)
     mine = [st.next() for _ in range(100000)]
-    ok &= report("default stream, 100,000 values", 1, int(ref == mine), None if ref == mine else "default")
+    ok &= report(
+        "default stream, 100,000 values", 1, int(ref == mine), None if ref == mine else "default"
+    )
     # 2. seeds: boundaries of the 32-bit range and of the congruence, FreeSurfer's seeds, random ones,
     # and C's conversion of a long (negative, >= 2^32)
-    edge = [0, 1, 2, 3, 53, 1234, 2836, 16807, 127772, 127773, 127774, 2147483646, 2147483647,
-            2147483648, 2147483649, 2147483647 + 127773, 4294967294, 4294967295,
-            2 * 2147483647, 4294967295 - 127773, 16807 * 127773 % 2**32]
-    conv = [-1, -2, -53, -2147483647, -2147483648, -2147483649, 2**32, 2**32 + 5, 2**40 + 7,
-            -(2**40) - 7, 2**63 - 1, -(2**63)]
+    edge = [
+        0,
+        1,
+        2,
+        3,
+        53,
+        1234,
+        2836,
+        16807,
+        127772,
+        127773,
+        127774,
+        2147483646,
+        2147483647,
+        2147483648,
+        2147483649,
+        2147483647 + 127773,
+        4294967294,
+        4294967295,
+        2 * 2147483647,
+        4294967295 - 127773,
+        16807 * 127773 % 2**32,
+    ]
+    conv = [
+        -1,
+        -2,
+        -53,
+        -2147483647,
+        -2147483648,
+        -2147483649,
+        2**32,
+        2**32 + 5,
+        2**40 + 7,
+        -(2**40) - 7,
+        2**63 - 1,
+        -(2**63),
+    ]
     g = splitmix(0x6C696263)  # 'libc'
     rnd32 = [next(g) % 2**32 for _ in range(150)]
     rnd64 = [next(g) % 2**64 - 2**63 for _ in range(30)]
@@ -92,7 +129,7 @@ def quick(probe: str) -> bool:
     # 3. one state: rand and random alternate on one stream; srand then srandom (setRandomSeed's
     # two calls) and srandom alone give the stream of srand (§3)
     same, first = 0, None
-    sub = [1, 53, 1234, 0, 4294967295] + rnd32[:10]
+    sub = [1, 53, 1234, 0, 4294967295, *rnd32[:10]]
     for s in sub:
         ref = run(probe, "shared", s, 1000)
         st = model.Stream(s)
@@ -146,7 +183,10 @@ def exhaustive(probe: str, first: int, last: int) -> bool:
                 good = False
         proc.wait()
         same_blocks += good
-        print(f"block {b} ({b * block} to {(b + 1) * block - 1}): {'identical' if good else 'DIFFERS'}", flush=True)
+        print(
+            f"block {b} ({b * block} to {(b + 1) * block - 1}): {'identical' if good else 'DIFFERS'}",
+            flush=True,
+        )
     print(f"exhaustive: blocks {first} to {last - 1}: {same_blocks} of {last - first} identical")
     return same_blocks == last - first
 

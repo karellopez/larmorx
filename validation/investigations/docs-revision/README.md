@@ -62,6 +62,11 @@ nothing in it.
   export of the revision it lists only texts and the fields `port`, `order`, `shows` and the
   presentation's, so no number moved.
 
+- `page_old_words.py <site>/_site/evidence/<page>/index.html`: the old words left in a built
+  page's visible text, tooltips included, each distinct text once with its count, for a reader
+  to judge (a message's `larmorx:` prefix, the provenance's commits and the random-testing
+  panel's texts stay until their chunks).
+
 ```
 PYTHONPATH=python:validation/src python -P validation/investigations/docs-revision/present_dry_run.py \
     ants_n4 <site>/static/evidence/ants-n4.json /tmp/ants-n4.json

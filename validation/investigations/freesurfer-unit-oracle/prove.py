@@ -75,6 +75,10 @@ def _env(extra: dict[str, str] | None = None) -> dict[str, str]:
         "LANG": "C",
         "HOME": os.environ.get("HOME", "/tmp"),
     }
+    from larmorx_validation.freesurfer_unit import freesurfer_env
+
+    env.update(freesurfer_env())
+    env["FREESURFER_HOME"] = str(FS_HOME)
     env.update(extra or {})
     return env
 
@@ -188,8 +192,10 @@ def prove_volumes(work: Path) -> list[dict]:
             theirs = d / f"{src.stem}.official{suffix}"
             for p in (ours, theirs):
                 p.unlink(missing_ok=True)
-            header = fu.mri_read_write(src, ours)
             done = official("mri_convert", [str(src), str(theirs)])
+            # mri_convert adds its command line (getAllInfo: the time, the user, the machine) to
+            # the volume's provenance: MRIwrite gets the official output's, so every byte counts
+            header = fu.mri_read_write(src, ours, cmdlines_from=theirs)
             cmp = fsfiles.compare(theirs, ours) if theirs.exists() and ours.exists() else None
             row = {
                 "volume": rel,
@@ -263,7 +269,8 @@ def _read_lta_matrix(path: Path) -> list[list[float]] | None:
     lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
     for i, ln in enumerate(lines):
         if ln.strip() == "1 4 4":
-            return [[float(x) for x in lines[i + 1 + r].split()] for r in range(4)]
+            # %18.15le of a float widened to double: 16 digits, the float exactly once rounded back
+            return [[_f32(float(x)) for x in lines[i + 1 + r].split()] for r in range(4)]
     return None
 
 
@@ -327,7 +334,7 @@ def _gdb_returns(
         "end",
     ]
     script += ["while 1", "continue", "end"]
-    with tempfile.NamedTemporaryFile("w", suffix=".gdb", delete=False) as f:
+    with tempfile.NamedTemporaryFile("w", suffix=".gdb", dir=cwd, delete=False) as f:
         f.write("\n".join(script) + "\n")
         gdbfile = f.name
     try:
@@ -418,12 +425,12 @@ def prove_random(work: Path) -> list[dict]:
     return rows
 
 
-def prove_units(work: Path) -> dict:
-    return {
-        "volumes": prove_volumes(work),
-        "matrices": prove_matrices(work),
-        "random": prove_random(work),
-    }
+UNIT_PROOFS = ("volumes", "matrices", "random")
+
+
+def prove_units(work: Path, only: tuple[str, ...] = UNIT_PROOFS) -> dict:
+    proofs = {"volumes": prove_volumes, "matrices": prove_matrices, "random": prove_random}
+    return {name: proofs[name](work) for name in UNIT_PROOFS if name in only}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -431,13 +438,16 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("what", choices=("code", "replay", "units", "all"))
     ap.add_argument("--json", type=Path)
     ap.add_argument("--work", type=Path, default=Path(tempfile.gettempdir()) / "lx-fsunit-proof_")
+    ap.add_argument(
+        "--only", default=",".join(UNIT_PROOFS), help="the unit proofs to run (comma-separated)"
+    )
     a = ap.parse_args(argv)
     a.work.mkdir(parents=True, exist_ok=True)
     out: dict = {}
     if a.what in ("code", "all"):
         out["code"] = prove_code()
     if a.what in ("units", "all"):
-        out["units"] = prove_units(a.work)
+        out["units"] = prove_units(a.work, tuple(a.only.split(",")))
     if a.what in ("replay", "all"):
         out["replay"] = prove_replay(a.work)
     if a.json:

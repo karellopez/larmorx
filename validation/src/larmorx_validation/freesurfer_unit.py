@@ -45,28 +45,47 @@ class UnitError(RuntimeError):
     """The harness failed (its exit status and messages in the text)."""
 
 
-def workspace() -> Path:
-    env = os.environ.get("LARMORX_WORKSPACE")
+def harness() -> Path | None:
+    """The ``fsunit`` program (``LARMORX_FS_UNIT``, else the workspace's build; ``None``: no
+    workspace holds ``oracles/``, as on CI)."""
+    from larmorx_validation.oracle_cache.store import workspace
+
+    env = os.environ.get(ENV_PATH)
     if env:
         return Path(env)
-    # validation/src/larmorx_validation/ -> the checkout -> its main checkout's parent
-    here = Path(__file__).resolve()
-    checkout = here.parents[3]
-    common = checkout / ".git"
-    if common.is_file():  # a worktree: "gitdir: <main>/.git/worktrees/<name>"
-        text = common.read_text(encoding="utf-8").split(":", 1)[1].strip()
-        return Path(text).parents[2].parent
-    return checkout.parent
+    ws = workspace()
+    return ws / DEFAULT if ws is not None else None
 
 
-def harness() -> Path:
-    """The ``fsunit`` program (``LARMORX_FS_UNIT`` or the workspace's build)."""
-    env = os.environ.get(ENV_PATH)
-    return Path(env) if env else workspace() / DEFAULT
+#: FreeSurfer's installation the harness reads (its data; ``MRIread`` checks the licence there
+#: unless ``FS_LICENSE`` names the file), relative to the workspace.
+FS_HOME = Path("oracles") / "freesurfer-8.2.0" / "root" / "usr" / "local" / "freesurfer" / "8.2.0"
+#: The licence file read in place when neither ``LARMORX_FS_LICENSE`` nor ``FS_LICENSE`` names one
+#: (CLAUDE.md: never copied, never in results).
+LICENCE = Path("/usr/local/freesurfer/license.txt")
+
+
+def freesurfer_env() -> dict[str, str]:
+    """``FREESURFER_HOME`` and ``FS_LICENSE`` for FreeSurfer's code: ``MRIread`` and the other
+    readers call FreeSurfer's licence check (``chklc``), which stops a program without them."""
+    from larmorx_validation.oracle_cache.store import workspace
+
+    out = {}
+    ws = workspace()
+    home = os.environ.get("LARMORX_FS_HOME") or (str(ws / FS_HOME) if ws is not None else "")
+    if home:
+        out["FREESURFER_HOME"] = home
+    lic = os.environ.get("LARMORX_FS_LICENSE") or os.environ.get("FS_LICENSE")
+    if not lic and LICENCE.is_file():
+        lic = str(LICENCE)
+    if lic:
+        out["FS_LICENSE"] = lic
+    return out
 
 
 def available() -> bool:
-    return harness().is_file()
+    exe = harness()
+    return exe is not None and exe.is_file()
 
 
 def value(v: dict | int | str) -> float | int:
@@ -111,12 +130,13 @@ def call(
 ) -> Result:
     """``fsunit <command> <args>`` through the oracle-output cache. ``outputs``: directories (or
     files) it writes beyond those its arguments name; ``env``: variables added to its controlled
-    environment (``PATH`` of the system only, ``OMP_NUM_THREADS`` = ``threads``, the C locale);
+    environment (``PATH`` of the system only, ``OMP_NUM_THREADS`` = ``threads``, the C locale,
+    :func:`freesurfer_env`);
     ``never``: why this call must never be cached (the policy's rule)."""
     from larmorx_validation import oracle_cache
 
     exe = harness()
-    if not exe.is_file():
+    if exe is None or not exe.is_file():
         raise UnitError(f"the unit oracle is not built: {exe} (build.py all)")
     run_env = {
         "PATH": "/usr/bin:/bin",
@@ -124,6 +144,7 @@ def call(
         "LC_ALL": "C",
         "LANG": "C",
         "HOME": os.environ.get("HOME", "/tmp"),
+        **freesurfer_env(),
     }
     run_env.update(env or {})
     policy = oracle_cache.Policy(
@@ -221,9 +242,10 @@ def mri_header(path: Path) -> dict:
     return call("mri-header", Path(path)).data["header"]
 
 
-def mri_read_write(src: Path, dst: Path) -> dict:
+def mri_read_write(src: Path, dst: Path, cmdlines_from: Path | None = None) -> dict:
     """``MRIread(src)`` then ``MRIwrite(dst)`` (the writer chosen by ``dst``'s suffix, as
-    FreeSurfer chooses it); the header as read."""
-    dst = Path(dst)
-    res = call("mri-read-write", Path(src), dst)
+    FreeSurfer chooses it); the header as read. ``cmdlines_from``: a volume whose command-line
+    provenance (as ``MRIread`` reads it) replaces ``src``'s before the write."""
+    extra = [Path(cmdlines_from)] if cmdlines_from is not None else []
+    res = call("mri-read-write", Path(src), Path(dst), *extra)
     return res.data["header"]

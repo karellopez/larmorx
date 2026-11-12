@@ -176,13 +176,28 @@ int cmd_version(int, char **)
   return 0;
 }
 
-// MRIread then MRIwrite: FreeSurfer's readers and writers, chosen by the names' suffixes
+// MRIread then MRIwrite: FreeSurfer's readers and writers, chosen by the names' suffixes. With a
+// third volume, its command-line provenance (mri->cmdlines, as MRIread reads it) replaces the
+// input's before the write, as MRIcopyHeader copies it: a program's output can then be written
+// again by MRIwrite alone with the same provenance (mri_convert adds getAllInfo's line, with
+// the time, the user and the machine).
 int cmd_mri_read_write(int argc, char **argv)
 {
-  if (argc != 2) fail("usage: mri-read-write <in> <out>");
+  if (argc != 2 && argc != 3) fail("usage: mri-read-write <in> <out> [<cmdlines-from>]");
   MRI *mri = MRIread(argv[0]);
   if (!mri) fail(std::string("MRIread failed: ") + argv[0]);
   std::string header = header_json(mri);
+  if (argc == 3) {
+    MRI *from = MRIread(argv[2]);
+    if (!from) fail(std::string("MRIread failed: ") + argv[2]);
+    for (int i = 0; i < mri->ncmds; i++) free(mri->cmdlines[i]);
+    mri->ncmds = from->ncmds;
+    for (int i = 0; i < from->ncmds; i++) {
+      mri->cmdlines[i] = (char *)calloc(strlen(from->cmdlines[i]) + 1, sizeof(char));
+      strcpy(mri->cmdlines[i], from->cmdlines[i]);
+    }
+    MRIfree(&from);
+  }
   int status = MRIwrite(mri, argv[1]);
   printf("{\"function\": \"MRIread+MRIwrite\", \"write_status\": %d, \"header\": %s}\n", status,
          header.c_str());

@@ -11,7 +11,6 @@ from __future__ import annotations
 import struct
 
 import pytest
-
 from larmorx_validation import freesurfer_unit as fu
 
 

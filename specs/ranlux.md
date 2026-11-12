@@ -241,6 +241,10 @@ products, then the rounded quotient).
   3. The result is `Y₁ / sqrt((1 − (2/ν)) · (1 − Z))` (`2/ν`, the subtractions, the product, the root
      and the quotient rounded in that order).
 
+  Step 2's first test accepts only `|Y₁| ≤ sqrt(ν − 2)` or so, so just above ν = 2 the loop needs
+  about `1.25 / sqrt(ν − 2)` attempts per draw (for `ν = 2 + 2⁻⁵¹` about 6·10⁷, seconds per draw in
+  the original): slow, not wrong, and kept (the same draws must be made).
+
 ## 5. Constants
 
 | Name | Value | binary64 bits |
@@ -359,8 +363,10 @@ that never returns, is wrong). When the 24 seeded values are all 0, the default 
 recurrence with `c₂₃ = 1` (James's rule, applied only to this state: every other seed's stream is
 FreeSurfer's), with the notice "FS-101: seed <S> makes FreeSurfer's random generator give 0 for
 ever; larmorx starts it with a carry of 1 (James's 1994 initialisation) (--upstream-defects
-reproduce: FreeSurfer's constant stream)". The corrected stream's first values are 16777215 (ten
-times: `x₂₄` to `x₃₃`, each `0 − 0 − 1 + 2²⁴` with the carry kept), then 16777214, … as §2.3 gives.
+reproduce: FreeSurfer's constant stream)". The corrected stream's first twelve delivered values are
+16777215 (ten times: `x₂₄` to `x₃₃`, each `0 − 0 − 1 + 2²⁴` with the carry kept), 16777214
+(`x₃₄ = x₂₄ − x₁₀ − 1`, the carry now 0) and 16777215, then as §2.3 gives (the spec writer's model;
+FreeSurfer has no such stream to compare with).
 `reproduce`: the constant 0 stream; the uniform and flat draws (and gamma and chi-squared of shape
 0, which draw nothing) give FreeSurfer's values; every draw that would never return reports an
 error instead ("FS-101: with seed <S> FreeSurfer's <draw> never returns").
@@ -422,7 +428,7 @@ once per run). Expected: all identical.
   1000.25, 10⁶, 2³² − 0.5 and scales 1, 2, 0.5, −1; the helpers `gamma_int`, `gamma_large`,
   `gamma_frac` on their own (their draws as §4.5 says);
 - `chisq` with ν 0, 1, 3, 5, 24, 25, 30, 1000; `fdist` with (4, 9), (3, 25), (1, 1), (30, 50);
-  `tdist` with ν 0.5, 1, 1.5, 2, 2.0000000000000004, 3, 7, 30, 1000, NaN;
+  `tdist` with ν 0, 0.5, 1, 1.5, 2, 2.25, 3, 7, 30, 1000, NaN, and 2 + 2⁻⁵¹ for 3 draws only (§4.8);
 - `mixed <seed> 14000` (one stream through a fixed rotation of every draw, so each draw's
   consumption is checked: a draw that consumed one integer too many or too few shifts every later
   value).
@@ -464,7 +470,7 @@ CORE-MATH's `cr_tan`: 41,708 differ).
   mean 0 and σ 1 (`+ 0` after the draw), `t` the t draw with ν = `--dof`, `F` with (`--dof-num`,
   `--dof-den`), `chi2` with ν = `--dof`. **(observed**, 2026-11-12: `z` seed 53, `chi2` 30 and 3 seed
   7, `t` 9 seed 7, `t` 2 seed 13, `F` 3/25 seed 11, 5 × 4 × 3 × 2 voxels each: 120 of 120 equal in all
-  six; `compare.py` beside the probe**)**. Seeds below 0 are replaced by the time of day there: not
+  six; `volsynth_compare.py` beside the probe**)**. Seeds below 0 are replaced by the time of day there: not
   for tests.
 - `mri_coreg`'s default dithering (seed 53): through the replay of the recorded heads
   (`<workspace>/oracles/freesurfer-8.2.0/runs/`, the replay tool) once `larmorx-freesurfer`'s

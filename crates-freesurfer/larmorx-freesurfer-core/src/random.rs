@@ -11,9 +11,9 @@
 //! seed in `static` variables: it reseeds the generator whenever it is called with a seed other
 //! than the last one, and returns `drand64(0, 1)` rounded to `float`. `vnl_random` is ported into
 //! the main package (`larmorx_core::vnl_random`, queue item 3.1-04, the permissive track); the
-//! generator is reached here through [`Ran1Source`], which a program installs with
-//! [`Random::set_source`] (the wiring of `larmorx_core::vnl_random::VnlRandom` follows that
-//! port's merge). `setRandomSeed` also seeds the C library's `rand` and `random` (`srand`,
+//! generator is reached here through [`Ran1Source`]: [`Random::new`] installs
+//! `larmorx_core::vnl_random::VnlRandom` ([`vnl_source`]); tests may install another with
+//! [`Random::set_source`]. `setRandomSeed` also seeds the C library's `rand` and `random` (`srand`,
 //! `srandom`); their seed is kept in [`Random::c_seed`] for the generators of glibc's behaviour
 //! (queue item 3.1-04's clean room).
 //!
@@ -33,6 +33,7 @@ use std::io::Write;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use larmorx_core::defects::{FS_04, FS_05};
+use larmorx_core::vnl_random::VnlRandom;
 
 use crate::cstd;
 use crate::globals::Globals;
@@ -51,6 +52,26 @@ pub trait Ran1Source: std::fmt::Debug + Send {
 
 /// Makes the generator `vnl_random(seed)` (`OpenRan1`'s `static vnl_random mVnlRandom(mSeed)`).
 pub type Ran1Factory = fn(u64) -> Box<dyn Ran1Source>;
+
+impl Ran1Source for VnlRandom {
+    fn reseed(&mut self, seed: u64) {
+        VnlRandom::reseed(self, seed);
+    }
+
+    fn drand64_unit(&mut self) -> f64 {
+        self.drand64(0.0, 1.0)
+    }
+
+    fn box_clone(&self) -> Box<dyn Ran1Source> {
+        Box::new(self.clone())
+    }
+}
+
+/// `vnl_random(seed)`: the main package's port of ITK 4.13.2's VXL generator, the one the
+/// official programs link ([`Random::new`]'s generator).
+pub fn vnl_source(seed: u64) -> Box<dyn Ran1Source> {
+    Box::new(VnlRandom::new(seed))
+}
 
 /// `OpenRan1`'s `static` state: its last seed (`mSeed`, 0 at start) and its generator, made at
 /// the first call with seed 0.
@@ -117,7 +138,8 @@ impl Default for Random {
 }
 
 impl Random {
-    /// FreeSurfer's state at a program's start (no generator installed).
+    /// FreeSurfer's state at a program's start, `OpenRan1` drawing from VXL's `vnl_random`
+    /// ([`vnl_source`]).
     pub fn new() -> Self {
         Random {
             seed_has_been_set: false,
@@ -128,7 +150,7 @@ impl Random {
             ran1: OpenRan1 {
                 m_seed: 0,
                 source: None,
-                factory: None,
+                factory: Some(vnl_source),
             },
         }
     }
@@ -386,6 +408,45 @@ mod tests {
                     .collect()
             })
             .unwrap_or_default()
+    }
+
+    /// FreeSurfer 8.2.0's own sequences (the unit oracle, `fsunit fs-random <seed> <n> <low>
+    /// <high>`: `setRandomSeed(seed)`, then `randomNumber` n times, each call a fresh process;
+    /// 2026-11-12): the SHA-256 of 200 numbers in [0, 1] then 50 in [-3.5, 7.25], as
+    /// little-endian doubles, for the seeds the programs set, with the default generator
+    /// (`larmorx_core::vnl_random`).
+    #[test]
+    fn the_official_sequences() {
+        use sha2::{Digest, Sha256};
+        let want = [
+            (
+                -1i64,
+                "417f30724a318bfa4fdceaf8c5d7c5fd790f3cd2dccd994cec78209048a20598",
+            ),
+            (
+                1234,
+                "26d7d15e40cda364532d58b44d33d46963c3af567b63c6cbcbc2a3509a6282b4",
+            ),
+            (
+                53,
+                "0e82b68234fe567f8ff8c4ca45c771b58efdbeb95f413708aaaeb0d766ba340f",
+            ),
+        ];
+        let env = Environment::from_pairs(Vec::<(String, String)>::new());
+        for (seed, hash) in want {
+            let mut h = Sha256::new();
+            for (n, low, hi) in [(200, 0.0, 1.0), (50, -3.5, 7.25)] {
+                let mut g = Globals::new(UpstreamDefects::Reproduce);
+                set_random_seed(&mut g, seed);
+                let (mut o, mut e) = (Vec::new(), Vec::new());
+                for _ in 0..n {
+                    let x = random_number(&mut g, &env, &mut o, &mut e, low, hi).unwrap();
+                    h.update(x.to_le_bytes());
+                }
+            }
+            let hex: String = h.finalize().iter().map(|b| format!("{b:02x}")).collect();
+            assert_eq!(hex, hash, "seed {seed}");
+        }
     }
 
     #[test]

@@ -995,6 +995,30 @@ defects! {
         "the case-insensitive string comparison (stricmp) and the file-name extension helper copy their argument into a 1,024-byte buffer on the stack with no check: a longer string overflows it";
     FS_12 = "FS-12", "FreeSurfer", true,
         "nint and nint2 (FreeSurfer's rounding to an integer) convert values beyond the int range, and NaN, with no check, an undefined conversion that gives -2147483648 on x86-64";
+    FS_13 = "FS-13", "FreeSurfer", true,
+        "MatrixAlloc of a negative size, or of more numbers than an int holds, crashes or corrupts memory after printing that it uses an mmap'd file (the new allocator reads a file pointer it never set or clears memory with a wrapped size), or exits";
+    FS_14 = "FS-14", "FreeSurfer", true,
+        "MatrixCopy copies a complex matrix float by float through its real-element pointers: of each row it copies as many floats as the matrix has columns, starting at the float before the row's first pair, so half the values are lost and the rest are shifted";
+    FS_15 = "FS-15", "FreeSurfer", true,
+        "MatrixMultiplyD of complex matrices adds the product onto the output's earlier contents (it never clears the output): a given output, or one that is also an input, gives a wrong product";
+    FS_16 = "FS-16", "FreeSurfer", true,
+        "FreeSurfer's float matrices are addressed outside their arrays where types and sizes do not match (a complex product written into a real output writes past its end): memory the program does not own";
+    FS_17 = "FS-17", "FreeSurfer", true,
+        "FreeSurfer's matrices and histograms convert floats and doubles beyond the int range, and NaN, to int with no check (bins, counts compared as integers, floor of a vector), an undefined conversion that gives -2147483648 on x86-64";
+    FS_18 = "FS-18", "FreeSurfer", true,
+        "HISTOclearCounts clears only the first count of the histogram (and, making a new histogram, copies only the first bin's value): the counts it is meant to reset keep accumulating";
+    FS_19 = "FS-19", "FreeSurfer", true,
+        "HISTOaddSample decides where a sample outside the range goes by comparing its bin number with the range's lower intensity: below a negative lower intensity it is dropped, above the range with a lower intensity beyond the bin count it is counted in the first bin; a NaN sample is counted in the first bin";
+    FS_20 = "FS-20", "FreeSurfer", true,
+        "HISTOaddSample gives a sample exactly at a bin's value the weight 0 in both neighbouring bins, so it is not counted at all (with a bin size of 1 and integer intensities, no sample is counted)";
+    FS_21 = "FS-21", "FreeSurfer", true,
+        "HISTOcopy, HISTOadd, HISTOsubtract and HISTOcumsum write past the arrays of an output histogram that has fewer bins allocated than the result: memory the program does not own";
+    FS_22 = "FS-22", "FreeSurfer", true,
+        "FreeSurfer's histogram searches and helpers read and write bins outside the histogram's arrays when given a start bin outside it (a search's -1 passed on), when a peak window reaches past an end, and for histograms of 0 or 1 bins: memory the program does not own";
+    FS_23 = "FS-23", "FreeSurfer", true,
+        "HISTOmakePDF given an output histogram other than its source normalises the output's own counts instead of the source's";
+    FS_24 = "FS-24", "FreeSurfer", true,
+        "HISTOrobustGaussianFit of a histogram of one bin never returns: the loop that widens its window cannot widen it";
 }
 
 /// The register entry with ID `id`.

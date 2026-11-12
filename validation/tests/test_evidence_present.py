@@ -185,10 +185,21 @@ def test_chain_names_its_runs():
 
 
 def test_finish_names_categories_and_random_testing():
-    doc = {"cases": [{"category": "fmriprep", "description": "d", "results": {}}], "tables": []}
+    doc = {
+        "cases": [
+            {
+                "category": "fmriprep",
+                "description": "d",
+                "command": "N4 -i '<fMRIPrep oracle run>/x.nii.gz'",
+                "results": {},
+            }
+        ],
+        "tables": [],
+    }
     present.random_testing(PAGE, doc, {"port": "replica"})
     present.finish(PAGE, doc)
     assert doc["category_labels"] == {"fmriprep": "fMRIPrep's calls"}
+    assert doc["cases"][0]["command"] == "N4 -i '<fMRIPrep run>/x.nii.gz'"
     assert doc["random_testing"] == {
         "title": "Random testing, the replica against the original: "
         "ANTs `N4BiasFieldCorrection` 2.6.5",

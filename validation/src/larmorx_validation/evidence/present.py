@@ -409,6 +409,8 @@ def example(
     for d in ex["diffs"]:
         d["reason"] = text(page, d.get("reason"))
     ex["provenance"] = [oracle(x) for x in ex.get("provenance") or []]
+    if ex.get("poster", {}).get("caption"):
+        ex["poster"]["caption"] = text(page, ex["poster"]["caption"], code=False)
     if ex.get("chain"):
         chain(page, ex["chain"])
     return ex
@@ -442,8 +444,15 @@ def chain(page: Page, ch: dict) -> None:
     ch["note"] = text(page, ch.get("note"))
 
 
+#: A command's placeholder for the directory of fMRIPrep's runs, by what it is.
+_RUN_PLACEHOLDER = ("<fMRIPrep oracle run>", "<fMRIPrep run>")
+
+
 def cases(page: Page, cs: list[dict]) -> None:
+    """Every case's texts in the guide's words, its command's placeholders included."""
     for c in cs:
+        if c.get("command"):
+            c["command"] = c["command"].replace(*_RUN_PLACEHOLDER)
         c["description"] = text(page, c.get("description"), code=False)
         for r in c["results"].values():
             r["reason"] = text(page, r.get("reason"))

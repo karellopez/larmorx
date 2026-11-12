@@ -7,7 +7,7 @@
 
 use super::dvars::numpy_settings;
 use larmorx_confounds::signals::{self, Series};
-use numpy::{PyArray1, PyArrayMethods, PyReadonlyArray3, PyReadonlyArray4, PyUntypedArrayMethods};
+use numpy::{PyArray1, PyReadonlyArray3, PyReadonlyArray4, PyUntypedArrayMethods};
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 

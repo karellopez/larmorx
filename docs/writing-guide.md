@@ -6,8 +6,8 @@ and the lines its programs print. The documentation revision
 page written afterwards follows it. Draft of 2026-11-12, for the user's approval.
 
 Every fact in this guide comes from files a clean-room implementer may read (section 1, "Who
-changes what"): the site's pages and evidence, the validation records, the API pages, the
-benchmark reports, `CHANGELOG.md`, the main package's Python and command-line code, and the
+changes what"). They are the site's pages and evidence, the validation records, the API pages,
+the benchmark reports, `CHANGELOG.md`, the main package's Python and command-line code, and the
 clean-room audit's restriction table. Nothing comes from the restricted material.
 
 ## 1. Four words
@@ -493,7 +493,7 @@ and text.
 These are the colours the evidence's charts already use (`static/js/evidence.js`, `PAL`), so no
 image has to be drawn again. A point is filled at one thread and open at more, as the speed
 charts' dots and rings are now. Where one port appears in `fix` and in `reproduce` in one chart,
-`reproduce` takes a thinner line and a smaller point, and the legend names both (tedana's speed
+`reproduce` takes a thinner line and a smaller point. The legend names both (tedana's speed
 chart, the only such chart today). Where the three lines coincide, as they do when the ports are
 bit-identical, the dashes let the original's line show through.
 
@@ -626,9 +626,9 @@ The header's links: Getting started, Concepts, Programs, Validation, Roadmap, Ab
   (`/programs/ants/antsregistration/`) is not a page, and the build's link check sees only the
   site's own links. So the 404 page holds the list of the site's addresses, which the builder
   writes, and sends such a reader to the address that matches in lower case, anchor kept. No
-  page is written twice in two letter cases: on the usual file systems of macOS and Windows,
-  `antsRegistration/` and `antsregistration/` are one folder, so building the site there would
-  let one page overwrite the other.
+  page is written twice in two letter cases. On the usual file systems of macOS and Windows,
+  `antsRegistration/` and `antsregistration/` are one folder, so a site built there would let
+  one page overwrite the other.
 
 ### Where every part of today's site goes
 
@@ -651,7 +651,8 @@ The header's links: Getting started, Concepts, Programs, Validation, Roadmap, Ab
 | A tool's page: the verdicts, the worked examples, the variations, every case, random testing, speed, "Corrections by default", "Known limits" | the evidence page, each with its anchor |
 | A tool's page, every other section: "Memory", the original's own variability ("Against ANTs' own variability", "tedana's own variability"), "The originals' own step: two library releases", "On the data panel", "What is open", "Every file" and the rest | the evidence page, each with its anchor |
 | A tool's page: "The standard images the variations read" (`#data`) | the reference page of the program that reads them (`bet`'s), with its anchor |
-| Roadmap; 404 | as they are |
+| Roadmap | as it is |
+| 404 | as it is, with the list of addresses for another letter case (Addresses, above) |
 
 ### The home page, section by section
 
@@ -680,20 +681,23 @@ The header's links: Getting started, Concepts, Programs, Validation, Roadmap, Ab
 ## 7. The old words today
 
 From [the inventory](../validation/investigations/docs-revision/inventory.md) (this repository
-at `72f8dab3`, the site at `b768293a`; `old_words.py` makes it again):
+at `cb45ecb4`, the site at `b768293a`; `old_words.py` makes it again):
 
 | Who changes them | Files to change | *clean-room original* | *original* for a clean room | *exact replica* | *port* as a kind | slogan | tagline | jargon on user pages | other *original* to read |
 |---|---|---|---|---|---|---|---|---|---|
-| the writer, in the rollout | 393 | 2,080 | 206 | 246 | 6 | 14 | 7 | 1,526 | 5,378 |
-| generated: re-made or re-exported | 32 | 1,400 | 143 | 1 | 0 | 0 | 0 | 2,612 | 2,047 |
+| the writer, in the rollout | 361 | 1,998 | 193 | 228 | 6 | 14 | 7 | 1,526 | 4,733 |
+| generated: re-made or re-exported, never by hand | 64 | 1,482 | 156 | 19 | 0 | 0 | 0 | 2,612 | 2,692 |
 | a clean-room agent, a spec writer, the orchestrator | 42 | 109 | 14 | 18 | 0 | 0 | 2 | 0 | 373 |
 | kept as written (history, identifiers) | 377 | 1,944 | 3,769 | 149 | 5 | 6 | 2 | 8 | 11,987 |
 
-On the site, the pages (`content/`) hold 243 *clean-room original*, 60 *exact replica* and 271
-words of jargon. The exported evidence holds 1,376 *clean-room original* and 143 *original* for a
-clean room. 33 files are renamed, and 14 keep their names: 12 of random testing's cases and 2
-investigation scripts. The last column counts words to read one by one; most of them name the
-program compared with, which is right.
+The generated row holds the exported evidence (28 files to change), which the rollout exports
+again. It also holds the records' and reports' data (4) and the pages made by a measurement
+(section 1, "Where the old words stay"): 21 records' pages, 10 benchmark reports and the
+clean-room audit's page. These keep their words until each is made again. On the site, the pages (`content/`) hold 243 *clean-room original*, 60
+*exact replica* and 271 words of jargon. The exported evidence holds 1,376 *clean-room original*
+and 143 *original* for a clean room. 33 files are renamed, and 14 keep their names: 12 of random
+testing's cases and 2 investigation scripts. The last column counts words to read one by one;
+most of them name the program compared with, which is right.
 
 ## 8. Questions for the user
 

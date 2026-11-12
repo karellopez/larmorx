@@ -16,7 +16,11 @@ python -P validation/investigations/docs-revision/old_words.py --repo . \
 
 It reads tracked files only and takes about 15 seconds. Run again after each step of the rollout:
 the columns of words to change should fall to zero in the areas the writer changes, and stay in
-the areas kept as written (history, identifiers).
+the areas kept as written (history, identifiers). Pages made by a measurement are told apart by
+what wrote them (`MADE_PAGES`): a page of `docs/validation/` whose "Generated" line names a
+`python -m larmorx_validation` command is a record (the clean-room audit's page has its own
+area), and every benchmark report but the README is a report; these keep their words until each
+is made again (the writing guide, section 1, "Where the old words stay").
 
 `evidence_roles.py` counts what the site's evidence compares: every comparison label
 (`role_label`) with its count and two examples, the panels' roles and the chart series' marks per

@@ -470,3 +470,82 @@ float_precision="round_trip")` (the default); `to_csv`'s text byte for byte (flo
 magnitude with NaN, infinities and -0.0, integers, booleans, text with tabs, quotes and line breaks,
 names that need quotes, tables without rows or columns; `.gz` by content); ujson's text against
 `Series.to_json` (magnitudes, ties, the thresholds, carries).
+
+## larmorprepx: the confounds workflow of a BOLD run (`larmorx.pipelines.larmorprepx.confounds`)
+
+fMRIPrep 25.2.7's `init_bold_confs_wf` (`workflows/bold/confounds.py`; the same file in 25.2.6) and
+`base.py`'s `ds_confounds` as one plain Python function on the ports above: every node in
+fMRIPrep's order, each a call of its larmorx port, its files in a folder named as fMRIPrep's node
+under `out_dir` (a MapNode's items in `<node>/mapflow/_<node><i>`, as nipype's). No nipype, no graph.
+The reportlets (`rois_plot`, `compcor_plot`, `conf_corr_plot` and their sinks; `init_carpetplot_wf`)
+are drawn by larmorprepx's reports: their inputs are returned. nipype deletes the files of outputs
+nothing reads (the aCompCor and crown pre-filter tables); larmorx keeps them.
+
+### `bold_confounds(bold, bold_mask, hmc_boldref, motion_xfm, skip_vols, t1w_mask, t1w_tpms, boldref2anat_xfm, *, metadata, out_dir, regressors_all_comps=False, regressors_dvars_th=1.5, regressors_fd_th=0.5, freesurfer=False, fmriprep_dir=None, source_file=None, echo_idx=None, fmriprep_version="25.2.7", niworkflows_version="1.15.4", numpy_version="2.5.4", scipy_version="1.18.1", pandas_version="3.0.6", n_threads=1, upstream_defects="fix")` → `BoldConfoundsResult`
+
+| larmorx | fMRIPrep | Notes |
+|---|---|---|
+| `bold` | `inputnode.bold` (`bold_native_wf`'s `bold_native`) | the series after slice timing, head-motion and distortion correction, in its reference space (a multi-echo run's optimal combination) |
+| `bold_mask`, `hmc_boldref`, `motion_xfm`, `skip_vols`, `boldref2anat_xfm` | `bold_fit_wf`'s `bold_mask`, `hmc_boldref`, `motion_xfm`, `dummy_scans`, `boldref2anat_xfm` | the ITK text transforms of the head motion (one per volume) and of the coregistration |
+| `t1w_mask`, `t1w_tpms` | `inputnode.t1w_mask`, `t1w_tpms` | the T1w brain mask; the GM, WM and CSF probability maps, in that order |
+| `metadata` | `metadata` (`all_metadata[0]`) | its `RepetitionTime` goes to the three CompCor nodes; without it they read the header's (nipype's msec rule; its error without one) |
+| `out_dir` | the workflow's folder (`bold_confounds_wf`) | |
+| `regressors_all_comps` | `--return-all-components` | `num_components="all"` for aCompCor and tCompCor instead of `variance_threshold=0.5` (the crown keeps 24 components either way) |
+| `regressors_dvars_th`, `regressors_fd_th` | `--dvars-spike-threshold` (1.5), `--fd-spike-threshold` (0.5) | `SpikeRegressors`' thresholds; written in the description as Python writes them |
+| `freesurfer` | `run_reconall` | `aCompCorMasks`' `is_aseg` (PIPE-79) and the description's grey-matter sentence |
+| `fmriprep_dir`, `source_file`, `echo_idx` | `ds_confounds`: `base_directory`, `source_file` (the run's first echo), `--echo-idx` | `desc-confounds_timeseries.tsv` and its JSON (below); `source_file` is required with `fmriprep_dir` |
+| `fmriprep_version`, `niworkflows_version`, `numpy_version`, `scipy_version`, `pandas_version` | the releases fMRIPrep ran with | the steps' arithmetic and texts (`FSLMotionParams`' form, `FixHeaderApplyTransforms`' header message, numpy's and SciPy's linear algebra and reductions, nibabel's `set_qform` on the release's LAPACK, pandas' parser); fMRIPrep 25.2.6's image: `"25.2.6"`, `"1.15.2"`, `"2.2.6"`, `"1.15.2"`, `"2.2.3"` |
+| `n_threads` | `omp_nthreads` | the results do not depend on it |
+| → `confounds_file`, `confounds_metadata`, `acompcor_masks`, `tcompcor_mask`, `crown_mask` | `outputnode`'s fields | `spike_regressors`' table, `merge_confound_metadata2`'s dictionary, `acc_msk_bin`'s three files, `tcompcor`'s high-variance mask, `subtract_mask`'s crown |
+| → `nodes` | | every node's outputs by fMRIPrep's node name (paths, lists, dictionaries or the ports' results) |
+| → `report_inputs` (`ConfoundsReportInputs`) | `mrg_compcor`/`rois_plot`, `merge_compcor_metadata`/`compcor_plot`, `conf_corr_plot`, `carpetplot_wf`'s inputs | the ROIs (tCompCor mask, the last aCompCor mask, the crown) with colours `b`, `magenta`, `g`; the three CompCor metadata files (fMRIPrep's `Merge(2)` passes the first two: PIPE-42, with the reports), the thresholds (0.5, 0.7, 0.9) and sources; `concat`'s table, `select_cols` of it and `skip_vols`; the confounds file, the crown and the last aCompCor mask for the carpet plot |
+| → `description` | `workflow.__desc__` | `bold_confounds_description(regressors_fd_th, regressors_dvars_th, freesurfer)` |
+| → `derivatives` | `ds_confounds` | `ds_confounds`' result when `fmriprep_dir` is given, else `None` |
+
+The nodes and what runs them:
+
+| fMRIPrep's node | larmorx |
+|---|---|
+| `t1w_mask_tfm` (`FixHeaderApplyTransforms`, `MultiLabel`, the coregistration inverted) | nipype's `antsApplyTransforms` line (`--default-value 0 --float 0`) through larmorx's ANTs port, then `copy_xform` with `FixHeaderApplyTransforms (niworkflows v<niworkflows_version>)` |
+| `union_mask`, `dilated_mask` (radius 2), `subtract_mask` | `binary_union`, `larmorx.niworkflows.morphology.binary_dilation`, `binary_subtraction` |
+| `dvars` (`save_nstd`, `save_std`, `remove_zerovariance`) | `compute_dvars_node` |
+| `motion_params`, `fdisp`, `rmsd` | `fsl_motion_params`, `fmriprep_framewise_displacement`, `fsl_rms_deviation` |
+| `acc_masks` (`is_aseg=freesurfer`, the series' `_get_zooms`) | `acompcor_masks_node(t1w_tpms, get_zooms(bold), is_aseg=freesurfer)` |
+| `acc_msk_tfm` (`Gaussian`), `acc_msk_brain` (`ApplyMask`), `acc_msk_bin` (`Binarize`, `thresh_low=0.99`) | the same line with `Gaussian`; `lx.niworkflows.apply_mask`; `binarize(..., 0.99).out_file` (the values above 0.99 kept: what aCompCor and the signals read) |
+| `acompcor` (`a_comp_cor_`, masks `CSF`, `WM`, `combined`), `crowncompcor` (`edge_comp_`, mask `Edge`, 24 components), `tcompcor` (`t_comp_cor_`, `percentile_threshold=0.02`) | `acompcor` and `tcompcor` with fMRIPrep's settings (`pre_filter="cosine"`, both files saved, `merge_method="none"`, `failure_mode="NaN"`, `ignore_initial_volumes=skip_vols`); niworkflows' `Robust*` retry: PIPE-48 |
+| `rename_acompcor`, `merge_rois` (`ravel_inputs`), `signals` (`global_signal`, `csf`, `white_matter`, `csf_wm`, `tcompcor`) | `rename_acompcor`; the BOLD mask, the three aCompCor masks and the tCompCor mask; `larmorx.niworkflows.images.signal_extraction` |
+| `add_dvars_header`, `add_std_dvars_header`, `concat` | `add_tsv_header(..., ["dvars"])`, `(..., ["std_dvars"])`, `gather_confounds` |
+| `tcc_metadata_filter`, `acc_metadata_filter`, `tcc_metadata_fmt` (`mask` dropped), `acc_metadata_fmt`, `crowncc_metadata_fmt`, `merge_confound_metadata`, `merge_confound_metadata2` | `filter_dropped`; `tsv2json(..., "component", output=None, additional_metadata={"Method": ...}, enforce_case=True)` with `tCompCor`, `aCompCor`, `EdgeRegressor`; `dict_merge` of the dictionaries and the motion parameters' metadata (`MOTION_METADATA`) |
+| `model_expansion` (`(dd1(rps + wm + csf + gsr))^^2 + others`), `spike_regressors` | `expand_model`, `spike_regressors_node(fd_thresh=regressors_fd_th, dvars_thresh=regressors_dvars_th)` |
+
+### `ds_confounds(confounds_file, confounds_metadata, source_file, fmriprep_dir, *, echo_idx=None, upstream_defects="fix")` → `DerivativesDataSinkResult`
+
+`base.py`'s `ds_confounds`: niworkflows' `DerivativesDataSink` as fMRIPrep subclasses it
+(`out_path_base=''`), `desc='confounds'`, `suffix='timeseries'`, `dismiss_entities=dismiss_echo()`
+(`echo` unless `echo_idx` names one or two echoes), the metadata as `meta_dict`: the table copied as
+`<fmriprep_dir>/sub-<label>/[ses-<label>/]func/<source>_desc-confounds_timeseries.tsv` and its JSON
+(keys sorted, two-space indents) ([niworkflows-helpers.md](niworkflows-helpers.md)).
+
+### `select_cols(table)`, `bold_confounds_description(...)`, `SIGNALS_CLASS_LABELS`, `MODEL_FORMULA`, `MOTION_METADATA`
+
+fMRIPrep's `_select_cols` (the table's column names as pandas' `read_table(table, nrows=2)` gives
+them, but those starting with `a_comp_cor_`, `t_comp_cor_` or `std_dvars`), the workflow's
+description, and its constants.
+
+| ID | Rule | What fMRIPrep does | larmorx by default | `reproduce` |
+|---|---|---|---|---|
+| PIPE-41 | A | `merge_confound_metadata`'s third input is set to the tissue signals' metadata (`{"Method": "Mean"}` for `global_signal`, `csf`, `white_matter`, `csf_wm`, `tcompcor`) and then connected to the crown's metadata, which replaces it: the confounds' JSON never describes those five columns (all 36 oracle files) | both kept (an `UpstreamDefectWarning` with every run) | fMRIPrep's JSON, without them |
+
+Kept as fMRIPrep does it (documented, no switch):
+
+- **PIPE-49 (rule C)**: the crown's metadata are not filtered (`FilterDropped` runs on the tCompCor
+  and aCompCor metadata only), so the JSON lists the crown's components not retained as
+  `dropped_<k>`; fMRIPrep's documentation describes it ("Entries that are not saved in the data file
+  for denoising are still stored in metadata with the `dropped` prefix", `docs/outputs.rst`), so
+  users may read them.
+- **PIPE-79 (rule D, open)**: `acc_masks` takes `is_aseg=freesurfer`, but the tissue maps are always
+  FAST's partial-volume maps, so with FreeSurfer the segmentation path smooths them again and keeps as
+  grey matter only the voxels of fraction exactly 1 (measured on the oracle runs' own maps: ds005454's
+  CSF mask 243,706 voxels without FreeSurfer, 33,031 with; its WM 156,468 and 182,036). Whether
+  correcting it helps is measured on fMRIPrep runs with FreeSurfer (none of the oracle runs has it);
+  until then larmorx keeps fMRIPrep's wiring in both modes.

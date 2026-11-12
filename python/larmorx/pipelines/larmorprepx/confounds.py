@@ -537,9 +537,15 @@ def _bold_confounds(
     nodes["acc_masks"] = acc
     acc_tfm = [
         _apply_transforms(
-            mapnode("acc_msk_tfm", i), m, bold_mask, boldref2anat_xfm, "Gaussian",
-            niworkflows_version, mode, n_threads,
-        )  # fmt: skip
+            mapnode("acc_msk_tfm", i),
+            m,
+            bold_mask,
+            boldref2anat_xfm,
+            "Gaussian",
+            niworkflows_version,
+            mode,
+            n_threads,
+        )
         for i, m in enumerate(acc.out_masks)
     ]
     nodes["acc_msk_tfm"] = acc_tfm

@@ -109,14 +109,19 @@ def table(p: Any) -> tuple[list[str], dict[str, list[str]]]:
     return head, cols
 
 
-def cells_differ(a: Any, b: Any) -> tuple[int, list[str]]:
-    """The cells of two tables that differ, matched by column name, and the columns."""
+def cells_differ(a: Any, b: Any, strict: bool = True) -> tuple[int, list[str]]:
+    """The cells of two tables that differ, matched by column name, and the columns; ``-1``
+    and the names in one table only when the names differ (``strict``), else the cells of the
+    common columns and those names marked ``+`` (only in ``a``) or ``-`` (only in ``b``)."""
     ha, ca = table(a)
     hb, cb = table(b)
-    if sorted(ha) != sorted(hb):
+    only = [f"+{h}" for h in ha if h not in cb] + [f"-{h}" for h in hb if h not in ca]
+    if strict and only:
         return -1, sorted(set(ha) ^ set(hb))
-    n, cols = 0, []
+    n, cols = 0, list(only)
     for h in hb:
+        if h not in ca:
+            continue
         d = sum(x != y for x, y in zip(ca[h], cb[h], strict=False)) + abs(len(ca[h]) - len(cb[h]))
         if d:
             n += d
@@ -401,7 +406,7 @@ def synthetic_run(root: Path) -> dict[str, Any]:
     r2 = c[0] ** 2 + c[1] ** 2 + c[2] ** 2
     brain = r2 < 0.85
     base = 300 + 500 * brain + 200 * (r2 < 0.1)
-    noise = rng.normal(0, 20, shape + (t,)) * brain[..., None]
+    noise = rng.normal(0, 20, (*shape, t)) * brain[..., None]
     data = (base[..., None] + noise).astype(np.float32)
     data += (np.arange(t, dtype=np.float32) * 0.5)[None, None, None, :]
     bold = nb.Nifti1Image(data, aff)
@@ -492,7 +497,11 @@ def graph_section(tier: str, tmp: Path) -> None:
                     regressors_dvars_th=opts["dv"], regressors_fd_th=opts["fd"],
                     freesurfer=opts["freesurfer"], n_threads=2, upstream_defects=mode,
                 )  # fmt: skip
-            count("graph: PIPE-41 notice", notes[f"PIPE-41 {mode}"] == 1, f"{tag} {mode} {dict(notes)}")
+            count(
+                "graph: PIPE-41 notice",
+                notes[f"PIPE-41 {mode}"] == 1,
+                f"{tag} {mode} {dict(notes)}",
+            )
             l_edges, l_args = larmorx_flow(rec, {**inputs})
             merged = [c for c in rec.calls if c[0] == "merge_confound_metadata2"]
             count("graph: one DictMerge", len(merged) == 1, tag)
@@ -526,7 +535,11 @@ def graph_section(tier: str, tmp: Path) -> None:
             l_edges.add(("merge_confound_metadata", "out", "merge_confound_metadata2", "in_dicts"))
             missing = sorted(n_edges - l_edges)
             extra = sorted(l_edges - n_edges)
-            count("graph: data flow = fMRIPrep's", not missing and not extra, f"{tag} missing {missing[:6]} extra {extra[:6]}")
+            count(
+                "graph: data flow = fMRIPrep's",
+                not missing and not extra,
+                f"{tag} missing {missing[:6]} extra {extra[:6]}",
+            )
             # every node fMRIPrep runs, called (the merges are larmorx's lists).
             ran = {c[0] for c in rec.calls} | {"merge_confound_metadata"}
             nodes = {n for n in n_explicit if n not in ("get_zooms",)}
@@ -541,7 +554,11 @@ def graph_section(tier: str, tmp: Path) -> None:
                 if name.startswith("merge_") or name in ("union_mask",):
                     continue
                 got = l_args.get(name, {})
-                bad = {k: (v, got.get(k, "<absent>")) for k, v in want.items() if got.get(k, "<absent>") != v and k not in ("num_threads",)}
+                bad = {
+                    k: (v, got.get(k, "<absent>"))
+                    for k, v in want.items()
+                    if got.get(k, "<absent>") != v and k not in ("num_threads",)
+                }
                 # parameters fMRIPrep leaves at their defaults: larmorx's must equal them
                 for k, v in got.items():
                     if k in n_every.get(name, {}) and n_every[name][k] != v and k not in bad:
@@ -550,7 +567,7 @@ def graph_section(tier: str, tmp: Path) -> None:
             # the workflow's outputs (outputnode's connections)
             outs = {(u, s_) for (u, s_, v, t) in _out_edges(wf)}
             last = {}
-            for node, index, fn, values, result in rec.calls:
+            for node, _index, _fn, _values, result in rec.calls:
                 last.setdefault(node, []).append(result)
             ok = outs == {
                 ("spike_regressors", "confounds_file"),
@@ -586,7 +603,11 @@ def graph_section(tier: str, tmp: Path) -> None:
                 ("concat", "confounds_file|_select_cols", "conf_corr_plot", "columns"),
                 ("conf_corr_plot", "out_file", "ds_report_conf_corr", "in_file"),
             }
-            count("graph: reportlets' connections (as listed)", n_report == expect_report, f"{tag} {sorted(n_report ^ expect_report)[:4]}")
+            count(
+                "graph: reportlets' connections (as listed)",
+                n_report == expect_report,
+                f"{tag} {sorted(n_report ^ expect_report)[:4]}",
+            )
             calls = {c[0]: c for c in rec.calls if c[1] in (None, 2)}
             from larmorx.confounds import _tables  # noqa: F401  (select_cols' reader)
 
@@ -625,12 +646,19 @@ def graph_section(tier: str, tmp: Path) -> None:
                 tag,
             )
     # ds_confounds: fMRIPrep's sink settings (base.py), from its source.
-    base = (WORKSPACE / "tags" / "fmriprep-25.2.7" / "fmriprep" / "workflows" / "bold" / "base.py").read_text()
-    m = re.search(r"ds_confounds = pe\.Node\(\s*DerivativesDataSink\((.*?)\),\s*name='ds_confounds'", base, re.S)
+    base = (
+        WORKSPACE / "tags" / "fmriprep-25.2.7" / "fmriprep" / "workflows" / "bold" / "base.py"
+    ).read_text()
+    m = re.search(
+        r"ds_confounds = pe\.Node\(\s*DerivativesDataSink\((.*?)\),\s*name='ds_confounds'",
+        base,
+        re.S,
+    )
     text = re.sub(r"\s+", " ", m.group(1)).strip() if m else ""
     count(
         "graph: ds_confounds' settings (base.py)",
-        text == "base_directory=fmriprep_dir, desc='confounds', suffix='timeseries', dismiss_entities=dismiss_echo(),",
+        text
+        == "base_directory=fmriprep_dir, desc='confounds', suffix='timeseries', dismiss_entities=dismiss_echo(),",
         text,
     )
 
@@ -680,7 +708,14 @@ def workflow_inputs(wf: Path) -> tuple[dict[str, Any], dict[str, Any]]:
 
     dv, mp, tm, am, ac, sr = (
         inp(n)
-        for n in ("dvars", "motion_params", "t1w_mask_tfm", "acc_masks", "acompcor", "spike_regressors")
+        for n in (
+            "dvars",
+            "motion_params",
+            "t1w_mask_tfm",
+            "acc_masks",
+            "acompcor",
+            "spike_regressors",
+        )
     )
     ds = loadpkl(wf.parent / "ds_confounds" / "_inputs.pklz")
     meta = {}
@@ -734,16 +769,30 @@ def compare_nodes(ours: Path, theirs: Path, tag: str) -> None:
             continue
         a, b = content(p), content(q)
         if a == b:
-            count(f"real: node files = fMRIPrep's ({'motion chain' if node in motion_chain else 'others'})", True, "")
+            count(
+                f"real: node files = fMRIPrep's ({'motion chain' if node in motion_chain else 'others'})",
+                True,
+                "",
+            )
             continue
         if node in gaussian:
             x = np.asanyarray(nb.load(str(p)).dataobj)
             y = np.asanyarray(nb.load(str(q)).dataobj)
             ok = a[:352] == b[:352] and x.shape == y.shape
             ok = ok and int(((x > 0.99) != (y > 0.99)).sum()) == 0
-            ok = ok and int(((x >= 0.5) != (y >= 0.5)).sum()) == 0 and int(((x > 0) != (y > 0)).sum()) == 0
-            count("real: aCompCor mask values (Gaussian, glibc exp/log): header and thresholds equal", ok, f"{tag} {rel}")
-            INFO["real: aCompCor mask voxels with other values (glibc exp/log)"][node] += int((x != y).sum())
+            ok = (
+                ok
+                and int(((x >= 0.5) != (y >= 0.5)).sum()) == 0
+                and int(((x > 0) != (y > 0)).sum()) == 0
+            )
+            count(
+                "real: aCompCor mask values (Gaussian, glibc exp/log): header and thresholds equal",
+                ok,
+                f"{tag} {rel}",
+            )
+            INFO["real: aCompCor mask voxels with other values (glibc exp/log)"][node] += int(
+                (x != y).sum()
+            )
             continue
         if node in motion_chain:
             n, cols = cells_differ(p, q)
@@ -763,7 +812,11 @@ def compare_dicts(ours: dict, wf: Path, node: str, key: str, tag: str) -> None:
 
     res = loadpkl(next((wf / node).glob("result_*.pklz")))
     want = getattr(res.outputs, key)
-    count(f"real: {node} = fMRIPrep's", json.dumps(ours, sort_keys=True) == json.dumps(want, sort_keys=True), f"{tag}")
+    count(
+        f"real: {node} = fMRIPrep's",
+        json.dumps(ours, sort_keys=True) == json.dumps(want, sort_keys=True),
+        f"{tag}",
+    )
 
 
 def run_lx(args: dict[str, Any], opts: dict[str, Any], out: Path, **kw: Any) -> tuple[Any, Counter]:
@@ -777,7 +830,9 @@ def run_lx(args: dict[str, Any], opts: dict[str, Any], out: Path, **kw: Any) -> 
         **opts,
         **kw,
     )
-    SECONDS["larmorx bold_confounds " + kw.get("upstream_defects", "fix")] += time.perf_counter() - t0
+    SECONDS["larmorx bold_confounds " + kw.get("upstream_defects", "fix")] += (
+        time.perf_counter() - t0
+    )
     return r
 
 
@@ -824,8 +879,14 @@ def real_section(tier: str, tmp: Path) -> None:
         n, cols = cells_differ(tsv, theirs)
         ha, _ = table(tsv)
         hb, _ = table(theirs)
-        INFO["real: column order (PIPE-43)"]["the same as fMRIPrep's" if ha == hb else "another"] += 1
-        count("real: JSON byte for byte", js.read_bytes() == theirs.with_suffix(".json").read_bytes(), tag)
+        INFO["real: column order (PIPE-43)"][
+            "the same as fMRIPrep's" if ha == hb else "another"
+        ] += 1
+        count(
+            "real: JSON byte for byte",
+            js.read_bytes() == theirs.with_suffix(".json").read_bytes(),
+            tag,
+        )
         compare_nodes(d / "e3" / "bold_confounds_wf", wf, tag)
         for node, key in (
             ("tcc_metadata_fmt", "output"),
@@ -837,34 +898,58 @@ def real_section(tier: str, tmp: Path) -> None:
         if n == 0:
             count("real: TSV every column = fMRIPrep's (by name)", True, tag)
         else:
-            motion_cols = all(re.match(r"(rot_|framewise_displacement|motion_outlier)", c) for c in cols)
-            count("real: TSV differs only in motion-derived columns (D4)", n > 0 and motion_cols, f"{tag} {n} {cols[:8]}")
+            motion_cols = all(
+                re.match(r"(rot_|framewise_displacement|motion_outlier)", c) for c in cols
+            )
+            count(
+                "real: TSV differs only in motion-derived columns (D4)",
+                n > 0 and motion_cols,
+                f"{tag} {n} {cols[:8]}",
+            )
             INFO["real: TSV cells changed by D4 (atan2), files"][tag] = n
             with spliced(wf / "motion_params"):
                 res2, _ = run_lx(args, opts, d / "sp", upstream_defects="reproduce", **E3)
             n2, cols2 = cells_differ(res2.derivatives.out_file[0], theirs)
-            count("real: TSV with fMRIPrep's motion table = fMRIPrep's (by name)", n2 == 0, f"{tag} {n2} {cols2[:6]}")
+            count(
+                "real: TSV with fMRIPrep's motion table = fMRIPrep's (by name)",
+                n2 == 0,
+                f"{tag} {n2} {cols2[:6]}",
+            )
         INFO["real: notices under reproduce (E3 libraries)"].update(notes)
         # the step to the newest libraries, and the default
         new, _ = run_lx(args, opts, d / "new", upstream_defects="reproduce")
         dft, dnotes = run_lx(args, opts, d / "fix")
-        n_step, c_step = cells_differ(new.derivatives.out_file[0], tsv)
-        n_fix, c_fix = cells_differ(dft.derivatives.out_file[0], new.derivatives.out_file[0])
-        INFO["real: cells, newest libraries vs fMRIPrep 25.2.6's (reproduce)"]["cells"] += max(n_step, 0)
-        INFO["real: cells, newest libraries vs fMRIPrep 25.2.6's (reproduce)"]["files"] += n_step != 0
+        n_step, c_step = cells_differ(new.derivatives.out_file[0], tsv, strict=False)
+        n_fix, c_fix = cells_differ(
+            dft.derivatives.out_file[0], new.derivatives.out_file[0], strict=False
+        )
+        INFO["real: cells, newest libraries vs fMRIPrep 25.2.6's (reproduce)"]["cells"] += max(
+            n_step, 0
+        )
+        INFO["real: cells, newest libraries vs fMRIPrep 25.2.6's (reproduce)"]["files"] += bool(
+            c_step
+        )
         INFO["real: cells, the default vs reproduce (newest)"]["cells"] += max(n_fix, 0)
-        INFO["real: cells, the default vs reproduce (newest)"]["files"] += n_fix != 0
-        for c in c_fix:
-            INFO["real: columns the default changes (by prefix)"][re.sub(r"_?\d+$", "", c)] += 1
-        for c in c_step:
-            INFO["real: columns the step changes (by prefix)"][re.sub(r"_?\d+$", "", c)] += 1
+        INFO["real: cells, the default vs reproduce (newest)"]["files"] += bool(c_fix)
+        for label, c_ in (("the default", c_fix), ("the step", c_step)):
+            for c in c_:
+                key = "columns added or removed" if c[0] in "+-" else "columns changed"
+                INFO[f"real: {key} by {label} (by prefix)"][re.sub(r"_?\d+$", "", c)] += 1
         mj_new = json.loads(Path(new.derivatives.out_meta).read_text())
         mj_fix = json.loads(Path(dft.derivatives.out_meta).read_text())
         mj_e3 = json.loads(js.read_text())
-        INFO["real: JSON entries, step"]["changed"] += sum(mj_new.get(k) != v for k, v in mj_e3.items())
+        INFO["real: JSON entries, step"]["changed"] += sum(
+            mj_new.get(k) != v for k, v in mj_e3.items()
+        )
         added = sorted(set(mj_fix) - set(mj_new))
-        count("real: the default adds the five signals' metadata (PIPE-41)", added == sorted(pc.SIGNALS_CLASS_LABELS), f"{tag} {added}")
-        INFO["real: JSON entries, default"]["changed"] += sum(mj_fix.get(k) != v for k, v in mj_new.items())
+        count(
+            "real: the default adds the five signals' metadata (PIPE-41)",
+            added == sorted(pc.SIGNALS_CLASS_LABELS),
+            f"{tag} {added}",
+        )
+        INFO["real: JSON entries, default"]["changed"] += sum(
+            mj_fix.get(k) != v for k, v in mj_new.items()
+        )
         INFO["real: notices of the default (newest)"].update(dnotes)
         count("real: the default's PIPE-41 notice", dnotes["PIPE-41 fix"] == 1, tag)
         shutil.rmtree(d)

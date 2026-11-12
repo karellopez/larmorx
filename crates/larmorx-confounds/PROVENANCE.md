@@ -182,3 +182,17 @@ and writing through `larmorx.io`, the empty array of an image without voxels), S
 | `python/larmorx/confounds/masks.py` (`binary_union`, `get_zooms`, `mask2vf`, `acompcor_masks`, `acompcor_masks_node`, `AcompcorMasksResult`) | fMRIPrep 25.2.7 `fmriprep/workflows/bold/confounds.py` (`_binary_union`, `_get_zooms`), `fmriprep/utils/confounds.py` (`mask2vf`, `acompcor_masks`), `fmriprep/interfaces/confounds.py` (`aCompCorMasks` and its input spec); nibabel's `ArrayProxy.__array__(dtype)` (`_get_scaled`: the scaled values cast to `promote_types(dtype, int64)` or `uint8`, then numpy's cast: PIPE-74, PIPE-76) and `get_zooms`; numpy's `percentile`, `clip` and casts; PIPE-74, PIPE-75 (rule B), PIPE-76 | Apache-2.0 |
 | `python/larmorx/niworkflows/morphology.py` (`binary_dilation`, `binary_subtraction`, `image_binary_dilation`) | niworkflows 1.15.4 `niworkflows/interfaces/morphology.py` (`BinaryDilation`, `BinarySubtraction`, `image_binary_dilation`; `traits.Int`'s radius; PIPE-77, rule B) | Apache-2.0 |
 | `python/larmorx/niworkflows/images.py` (`signal_extraction`) | niworkflows 1.15.4 `niworkflows/interfaces/images.py` (`SignalExtraction` and its input spec: `prob_thres`'s range, `class_labels`, `out_file`; nibabel's `four_to_three`); numpy's `unique`, comparisons, `astype(str)` (the shortest `repr`), `vstack` and `savetxt(fmt="%s", delimiter="\t")` (a text file in the locale's encoding: UTF-8, `"\n"`); PIPE-78 (rule B) | Apache-2.0 |
+
+## Relay 2h: fMRIPrep's confound estimation workflow (Python layer)
+
+fMRIPrep 25.2.7 (Apache-2.0, the NiPreps developers; `<workspace>/tags/fmriprep-25.2.7/`; the same
+`workflows/bold/confounds.py` and the same `ds_confounds` in 25.2.6) and niworkflows 1.15.4
+(Apache-2.0, the NiPreps developers: `FixHeaderApplyTransforms`' header message, through
+`larmorx.niworkflows.header.copy_xform`). No code of a crate: the workflow is composed in Python
+from the ports above and the existing `lx.ants`/`larmorx._nipype` (antsApplyTransforms' nipype
+line), `lx.niworkflows` (`apply_mask`, `binarize`, `derivatives_data_sink`) and `larmorx.io`
+(nibabel's `set_qform` on the release's LAPACK: `use_lapack`).
+
+| larmorx | Upstream | Licence |
+|---|---|---|
+| `python/larmorx/pipelines/larmorprepx/confounds.py` (`bold_confounds`, `BoldConfoundsResult`, `ConfoundsReportInputs`, `ds_confounds`, `select_cols`, `bold_confounds_description`, `SIGNALS_CLASS_LABELS`, `MODEL_FORMULA`, `MOTION_METADATA`) | fMRIPrep 25.2.7 `fmriprep/workflows/bold/confounds.py` (`init_bold_confs_wf`: its nodes, their parameters and connections, the reportlets' inputs (`mrg_compcor`, `merge_compcor_metadata`, `_last`, `_select_cols`), `workflow.__desc__`; PIPE-41, rule A; PIPE-49, rule C; PIPE-79, rule D, open), `fmriprep/workflows/bold/base.py` (`bold_confounds_wf`'s inputs, `ds_confounds`), `fmriprep/utils/bids.py` (`dismiss_echo`); nipype 1.12.0 `interfaces/utility/base.py` (`Merge`, `ravel_inputs`); niworkflows 1.15.4 `niworkflows/interfaces/fixes.py` (`FixHeaderApplyTransforms`), `niworkflows/utils/misc.py` (`listify`) | Apache-2.0 |

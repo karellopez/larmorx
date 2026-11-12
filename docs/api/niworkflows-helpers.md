@@ -212,6 +212,16 @@ scaled and big-endian data, extensions, NIfTI-2, the `ni1` and an unknown magic,
 several files and sources, `dismiss_entities`, the errors): all identical, the defects' cases with
 `upstream_defects="reproduce"`.
 
+## `robust_acompcor`, `robust_tcompcor`: `RobustACompCor`, `RobustTCompCor`
+
+nipype's `ACompCor` and `TCompCor` as fMRIPrep runs them (`docs/api/confounds.md`):
+`lx.niworkflows.robust_acompcor(realigned_file, mask_files=None, **kwargs)` is
+`lx.confounds.acompcor(realigned_file, mask_files, **kwargs)`, `robust_tcompcor` is
+`lx.confounds.tcompcor`, their files bit for bit (`check_nipype_misc.py`'s `robust` section).
+PIPE-48 (kept, no switch): niworkflows reruns the interface after a `numpy.linalg.LinAlgError`, up
+to ten more times after random sleeps (about 8 to 9 minutes in all), then raises the last error;
+larmorx's computation is deterministic, so it raises that error at once.
+
 ## Upstream defects of these steps (D13)
 
 | ID | Defect | larmorx by default (`upstream_defects="reproduce"`: the original) | Functions |

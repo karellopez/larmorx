@@ -82,3 +82,18 @@ The Python layer (`python/larmorx/confounds/compcor.py`) follows nipype 1.12.0's
 and the functions' argument handling, and nibabel 5.4.2's `squeeze_image`, `get_zooms`,
 `get_xyzt_units` (MIT, Copyright the NiBabel developers) on larmorx's nibabel-compatible reader and
 writer.
+
+## Relay 2f-ii: nipype's TSNR, NonSteadyStateDetector and FramewiseDisplacement (Python layer)
+
+No Rust in this crate: the three interfaces are Python over the numerics already ported
+(`larmorx_core::numpy::reduce` through `_core.numpy_reduce`, `compcor::regress_poly`) and over
+larmorx's nibabel-compatible reader and writer (`larmorx_io::nifti::read_first_volumes`, new, and
+`save_nibabel`).
+
+| larmorx | Upstream | Licence |
+|---|---|---|
+| `python/larmorx/confounds/tsnr.py` (`tsnr`, `TsnrResult`) | nipype 1.12.0 `TSNR` (`_run_interface`, `_list_outputs`); numpy 2.5.4 `numpy/_core/_methods.py` (`_mean`, `_var`, `_std`: the summation order of the series' memory), `numpy/lib/_type_check_impl.py` (`nan_to_num`); nibabel 5.4.2 `get_fdata`, `Nifti1Image(data, affine, header)` and `save` | Apache-2.0, BSD-3-Clause, MIT |
+| `python/larmorx/confounds/nonsteady.py` (`nonsteady_state_detector`, `NonSteadyStateResult`) | nipype 1.12.0 `NonSteadyStateDetector`, `is_outlier` (`larmorx.niworkflows.bold.is_outlier`); numpy 2.5.4 `mean(axis=0)` of a Fortran-ordered array (float32 in float32, integers in float64); nibabel 5.4.2 `dataobj[:, :, :, :50]` | Apache-2.0, BSD-3-Clause, MIT |
+| `python/larmorx/confounds/framewise.py` (`framewise_displacement`, `normalize_mc_params`, `FramewiseDisplacementResult`, `SOURCES`) | nipype 1.12.0 `FramewiseDisplacement` (`_run_interface`), `nipype/utils/misc.py` (`normalize_mc_params`, but its `NIPY` branch: not ported yet); numpy 2.5.4 `sum(axis=1)`, `mean()` (`_core.numpy_reduce`), and numpy's own `loadtxt`, `apply_along_axis`, `savetxt` | Apache-2.0, BSD-3-Clause |
+| `python/larmorx/niworkflows/patches.py` (`robust_acompcor`, `robust_tcompcor`) | niworkflows 1.15.4 `interfaces/patches.py` (`RobustACompCor`, `RobustTCompCor`; their retries left out: PIPE-48) | Apache-2.0 |
+

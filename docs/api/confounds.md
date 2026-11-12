@@ -5,10 +5,12 @@ the same in every environment), niworkflows 1.15.4's and fMRIPrep 25.2.7's confo
 with the arithmetic of the libraries they call (numpy, SciPy, nitime), bit for bit
 (`crates/larmorx-confounds`). A port in the main package; a clean-room original comes later (the
 user, 2026-11-06 and 2026-11-11). The confounds' part fills this page step by step: today nipype's
-DVARS and CompCor.
+DVARS, CompCor, TSNR, NonSteadyStateDetector and FramewiseDisplacement (the whole of nipype's
+`algorithms/confounds.py` but `FramewiseDisplacement`'s `NIPY` source and the plots).
 
 **Status: `experimental`** (checked bit for bit against nipype, nitime, SciPy and numpy in the
-three environments and against fMRIPrep's own DVARS and CompCor files; the record comes with the
+three environments, against fMRIPrep's own DVARS and CompCor files and on the oracle runs' raw
+series and real motion parameters; the record comes with the
 part's records; `lx.confounds` is not yet in the golden registry: its cases come with the part's
 golden relay).
 
@@ -134,3 +136,73 @@ value would give `c = -inf` and leave a singular design unregularized; numpy's `
 probe_compcor_defects.py`: 2,000 + 6,000 rank-deficient designs), so no input reaches it. And
 nipype's DVARS with a masked median of 0 raises (SciPy's `ValueError: array must not contain
 infs or NaNs`, or `Cannot apply_along_axis ...`), as larmorx does in both modes.
+
+## `tsnr`: nipype's `TSNR`
+
+| larmorx | nipype | Notes |
+|---|---|---|
+| `tsnr(in_file, regress_poly=None, *, tsnr_file="tsnr.nii.gz", mean_file="mean.nii.gz", stddev_file="stdev.nii.gz", detrended_file="detrend.nii.gz", out_dir=".", numpy_version="2.5.4", upstream_defects="fix", n_threads=1)` → `TsnrResult(tsnr_file, mean_file, stddev_file, detrended_file)` | `TSNR(in_file, regress_poly, tsnr_file, mean_file, stddev_file, detrended_file)` | the files in `out_dir` (nipype: the node's directory); `detrended_file` only with `regress_poly` |
+| `in_file` | the same | one path or a list: each read with nibabel's `get_fdata(dtype=np.float32)`, reshaped to four axes (a 3-D file is one volume) and concatenated along the fourth (numpy's `concatenate`: its errors for other shapes; the axis order it chooses decides the summation order, and larmorx follows it), NaN to 0 and infinities to float32's largest values (`np.nan_to_num`) |
+| `regress_poly` | the same | an integer of at least 1 (traits' `Range(low=1)`: `True` counts as 1); the Legendre polynomials of degree 1 to `regress_poly` removed with the mean kept (`regress_poly(..., remove_mean=False)`: numpy's `pinv` and `dot`), the series float64 from then on |
+| `tsnr_file`, `mean_file`, `stddev_file`, `detrended_file` | the same | written as `nb.Nifti1Image(data, affine, header)` with the first file's affine and header (nibabel's scaling into its data type; PIPE-51) |
+| `numpy_version` | the environment's numpy | the mean and standard deviation over time (`np.mean`/`np.std(axis=3)`: in index order along the series' outermost axis, pairwise along a contiguous one), the Legendre basis (numpy 2.2's `legval` from degree 3) and the LAPACK of `pinv` |
+
+The tSNR is `mean / std` where the standard deviation is above `1e-3` (compared in the data's
+type: float32 without `regress_poly`), 0 elsewhere. fMRIPrep's BOLD report workflow
+(`init_bold_preproc_report_wf`) runs `TSNR()` on the preprocessed series; no oracle run reaches it.
+
+| ID | nipype does | larmorx by default |
+|---|---|---|
+| PIPE-51 | writes the maps of a series stored as integers in that integer type, quantized by nibabel's scaling (256 levels for `uint8`, 65,536 for `int16`): its check that switches the header to float32 for integer data never fires, as the data are float32 by then | writes them as float32 (what the check meant); `upstream_defects="reproduce"`: the input's type |
+
+## `nonsteady_state_detector`: nipype's `NonSteadyStateDetector`
+
+| larmorx | nipype | Notes |
+|---|---|---|
+| `nonsteady_state_detector(in_file, *, numpy_version="2.5.4", upstream_defects="fix", n_threads=1)` → `NonSteadyStateResult(n_volumes_to_discard, global_signal)` | `NonSteadyStateDetector(in_file)` → `n_volumes_to_discard` | `global_signal`: the mean of each of the first 50 volumes, in nipype's type |
+| `in_file` | the same | a NIfTI file with four or more axes; its first 50 volumes read alone, as nibabel's `dataobj[:, :, :, :50]` reads them (the file's type, float64 when the header scales the data; `larmorx_io::nifti::read_first_volumes`), so a long series is never held whole; fewer than four axes: nibabel's `IndexError: tuple index out of range` |
+| `numpy_version` | the environment's numpy | `mean(axis=0)` three times (float32 data in float32, the integer types in float64; pairwise along the first axis, numpy 2.2 in chunks of 8192) |
+| `upstream_defects` | | PIPE-23 (below); the leading volumes whose modified z-score (`0.6745 abs(x - median) / MAD`, nipype's `is_outlier`) is above 3.5 |
+
+niworkflows' `NonsteadyStatesDetector`, which fMRIPrep runs, clips the series first and averages
+other volumes: `lx.niworkflows.nonsteady_states_detector` (`docs/api/niworkflows-helpers.md`).
+PIPE-23 (nipype's `is_outlier`, in the register): a median absolute deviation of 0 (more than half
+of the means equal) counts every leading volume as non-steady; larmorx gives the volumes at the
+median a z-score of 0.
+
+## `framewise_displacement`, `normalize_mc_params`: nipype's `FramewiseDisplacement`
+
+| larmorx | nipype | Notes |
+|---|---|---|
+| `framewise_displacement(in_file, parameter_source, radius=50.0, *, out_file="fd_power_2012.txt", out_figure="fd_power_2012.pdf", series_tr=None, save_plot=False, normalize=False, figdpi=100, figsize=(11.7, 2.3), out_dir=".", numpy_version="2.5.4")` → `FramewiseDisplacementResult(out_file, out_figure, fd_average, fd)` | `FramewiseDisplacement(...)` → `out_file`, `out_figure`, `fd_average` | the file in `out_dir` |
+| `in_file` | the same | a text table, one row of motion parameters per volume, read with numpy's `loadtxt`; one row or one column: numpy's `AxisError`, as nipype |
+| `parameter_source` | the same | `"FSL"`, `"AFNI"`, `"SPM"`, `"FSFAST"` (traits' `Enum`: the exact spelling); each row through `normalize_mc_params`: SPM's order (translations in mm, rotations in radians); too few columns: numpy's `IndexError`, as nipype. `"NIPY"` (nipy's rotation vectors through nipy's `to_matrix44` and `aff2euler`; nipype raises `ModuleNotFoundError` where nipy is not installed, as in every environment here): not ported yet (`NotImplementedError`) |
+| `radius` | the same | the rotations' differences times `radius` (mm) |
+| `out_file` | the same | numpy's `savetxt` (`%.18e`, one value per line, the header `FramewiseDisplacement`) |
+| `numpy_version` | the environment's numpy | `np.abs(diff).sum(axis=1)` and `mean()` (numpy 2.2 sums more than 8,192 values in chunks) |
+| `series_tr`, `normalize`, `figdpi`, `figsize`, `out_figure`, `save_plot` | the same | only nipype's plot uses them; `save_plot=True` comes with larmorprepx's reports (`NotImplementedError`) |
+| `normalize_mc_params(params, source)` | `nipype.utils.misc.normalize_mc_params` | one row: FSL's rotations first (reordered), AFNI's and FS-FAST's degrees to radians (a seventh column means a leading index column, as in `3dvolreg -dfile`), any other source unchanged; `source` in any case |
+
+fMRIPrep computes its framewise displacement with its own interface (pandas over gzipped tables)
+from its own motion parameters; nipype's `FramewiseDisplacement` is this one.
+
+## niworkflows' `RobustACompCor` and `RobustTCompCor`
+
+`lx.niworkflows.robust_acompcor(realigned_file, mask_files=None, **kwargs)` and
+`robust_tcompcor(...)` take `acompcor`'s and `tcompcor`'s inputs and write their files
+(`docs/api/niworkflows-helpers.md`). PIPE-48 (in the register; kept, no switch: results are never
+affected): niworkflows reruns the interface after a `numpy.linalg.LinAlgError`, up to ten more
+times, sleeping `randint(10 k - 6, 10 k)` seconds before the `k`-th retry (measured: 11 attempts,
+about 520 s of sleeps, then the last error); larmorx's computation is deterministic, so a rerun
+would give the same error, which larmorx raises at once.
+
+**Validation** (`validation/investigations/confounds/check_nipype_misc.py`, sections `tsnr`,
+`nssd`, `fd`, `robust`, `real`; numpy 2.5.4 / nipype 1.12.0 / niworkflows 1.15.4, numpy 2.3.5 /
+niworkflows 1.15.3 and numpy 2.2.6 / niworkflows 1.15.2 inside fMRIPrep 25.2.6's image): every file
+and value bit for bit or the same error, with `upstream_defects="reproduce"`; the default equal to
+`reproduce` wherever no notice is raised, and PIPE-51's files equal to nipype's code with its
+float32 switch made effective; the oracle runs' raw BOLD series (int16, big-endian int16, uint16,
+float32; up to 600 volumes) through `TSNR` and `NonSteadyStateDetector`, and real motion
+parameters (fMRIPrep's own as SPM and FSL tables, `mcflirt`'s and `3dvolreg`'s files) through
+`FramewiseDisplacement`.
+

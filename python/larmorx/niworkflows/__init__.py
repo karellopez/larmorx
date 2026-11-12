@@ -77,7 +77,10 @@ from larmorx.niworkflows.nibabel import (
 )
 from larmorx.niworkflows.nitransforms import ConcatenateXfmsResult, concatenate_xfms
 from larmorx.niworkflows.participants import BIDSError, BIDSWarning, collect_participants
-from larmorx.niworkflows.patches import robust_acompcor, robust_tcompcor
+
+# robust_acompcor and robust_tcompcor join __all__ (the golden registry's namespace) with their
+# golden cases, in the confounds' golden relay; until then they are importable here.
+from larmorx.niworkflows.patches import robust_acompcor, robust_tcompcor  # noqa: F401
 from larmorx.niworkflows.refmap import EpiReferenceResult, epi_reference_workflow
 from larmorx.niworkflows.regrid import RegridToZoomsResult, regrid_to_zooms, resample_by_spacing
 from larmorx.niworkflows.sampling import (
@@ -132,9 +135,7 @@ __all__ = [
     "reorient_image",
     "resample_by_spacing",
     "resample_img_nearest",
-    "robust_acompcor",
     "robust_average",
-    "robust_tcompcor",
     "skullstrip_bold_workflow",
     "squeeze_image",
     "validate_image",

@@ -34,6 +34,7 @@ mod motion;
 mod nipy;
 mod pandas;
 mod reductions;
+mod signals;
 mod svd;
 
 fn value_err(e: impl std::fmt::Display) -> PyErr {
@@ -1159,5 +1160,6 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     pandas::register(m)?;
     expansion::register(m)?;
     motion::register(m)?;
+    signals::register(m)?;
     Ok(())
 }

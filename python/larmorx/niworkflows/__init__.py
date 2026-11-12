@@ -33,6 +33,10 @@ and scikit-image arithmetic under them.
   (PIPE-48).
 - :func:`add_tsv_header`, :func:`dict_merge`, :func:`tsv2json`: ``AddTSVHeader``,
   ``DictMerge`` and ``TSV2JSON`` (PIPE-61, PIPE-62; PD-01, PD-02).
+- :mod:`larmorx.niworkflows.morphology` (``BinaryDilation``, ``BinarySubtraction``,
+  ``image_binary_dilation``; PIPE-77) and :func:`larmorx.niworkflows.images.signal_extraction`
+  (``SignalExtraction``; PIPE-78): the confounds' crown mask and tissue signals, importable from
+  those modules until their golden cases (the confounds' golden relay).
 - :mod:`larmorx.niworkflows.confounds`: ``ExpandModel`` (``parse_formula``), ``SpikeRegressors``
   and ``NormalizeMotionParams`` (PIPE-43, PIPE-64 to PIPE-70), importable from that module until
   their golden cases (the confounds' golden relay).

@@ -2270,3 +2270,13 @@ def fmriprep_motion_params(
 def fmriprep_rms_deviation(fsl: np.ndarray, center: list[float]) -> np.ndarray:
     """fMRIPrep's ``FSLRMSDeviation`` values (``n``, NaN first) of ``n × 16`` FSL matrices about
     ``center`` (``larmorx.confounds.fsl_rms_deviation`` is the public form)."""
+
+# niworkflows' SignalExtraction means (the confounds' part, relay 2g-iv;
+# larmorx_confounds::signals).
+def niworkflows_signal_means(
+    data: np.ndarray, mask: np.ndarray, numpy_version: str = "2.5.4", n_threads: int = 1
+) -> np.ndarray:
+    """``data[mask, :].mean(axis=0)`` of a C- or Fortran-contiguous 4-D float32 or float64
+    series over the voxels of a 3-D boolean mask (in its C order), as numpy ``numpy_version``
+    sums them: the ``T`` float64 means (NaN for an empty mask)
+    (``larmorx.niworkflows.images.signal_extraction`` is the public form)."""

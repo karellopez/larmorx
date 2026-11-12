@@ -31,6 +31,8 @@
 //! - [`pandas`]: pandas' default float parser of `read_csv` (`precise_xstrtod`, pandas 3.0.6
 //!   and 2.2.3; BSD-3-Clause: the notice in the module) with the correctly rounded reading of
 //!   the same texts (PD-01), for the tables fMRIPrep's confound steps read.
+//! - [`signals`]: niworkflows' `SignalExtraction` means (`data[mask, :].mean(axis=0)` in numpy's
+//!   summation order), read where the voxels are, without numpy's masked copy.
 //!
 //! This crate is the **port** (a replica of permissive upstreams, in the main package). The
 //! clean-room original of the same steps, planned later (the user, 2026-11-06 and 2026-11-11),
@@ -45,3 +47,4 @@ pub mod nipy;
 pub mod nitime;
 pub mod pandas;
 pub mod scipy_fft;
+pub mod signals;

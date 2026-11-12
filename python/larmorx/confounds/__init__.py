@@ -25,6 +25,12 @@ bit for bit (the confounds' part fills it step by step).
   and 25.2.6's forms) and ``FSLRMSDeviation``: the motion parameters and the root mean square
   deviation of the head-motion transforms (nitransforms' ITK reading and FSL conversion, SciPy's
   ``Rotation``).
+- :func:`binary_union`, :func:`acompcor_masks`, :func:`acompcor_masks_node`, :func:`mask2vf`,
+  :func:`get_zooms`: fMRIPrep's masks: the brain masks' union (``_binary_union``) and the
+  aCompCor tissue masks (``acompcor_masks``, ``aCompCorMasks``, ``mask2vf``; PIPE-74 to
+  PIPE-76). niworkflows' ``BinaryDilation``, ``BinarySubtraction`` and ``SignalExtraction``,
+  which make the crown mask and the tissue signals, are :mod:`larmorx.niworkflows.morphology`
+  and :func:`larmorx.niworkflows.images.signal_extraction` (PIPE-77, PIPE-78).
 """
 
 from larmorx.confounds.compcor import (
@@ -60,6 +66,14 @@ from larmorx.confounds.framewise import (
     framewise_displacement,
     normalize_mc_params,
 )
+from larmorx.confounds.masks import (
+    AcompcorMasksResult,
+    acompcor_masks,
+    acompcor_masks_node,
+    binary_union,
+    get_zooms,
+    mask2vf,
+)
 from larmorx.confounds.motion import (
     MotionParamsResult,
     RmsDeviationResult,
@@ -70,6 +84,7 @@ from larmorx.confounds.nonsteady import NonSteadyStateResult, nonsteady_state_de
 from larmorx.confounds.tsnr import TsnrResult, tsnr
 
 __all__ = [
+    "AcompcorMasksResult",
     "CompCorResult",
     "ComputeDvarsResult",
     "DvarsResult",
@@ -81,6 +96,9 @@ __all__ = [
     "RmsDeviationResult",
     "TsnrResult",
     "acompcor",
+    "acompcor_masks",
+    "acompcor_masks_node",
+    "binary_union",
     "combine_mask_files",
     "compcor",
     "compute_dvars",
@@ -97,6 +115,8 @@ __all__ = [
     "fsl_rms_deviation",
     "full_rank",
     "gather_confounds",
+    "get_zooms",
+    "mask2vf",
     "nonsteady_state_detector",
     "normalize_mc_params",
     "regress_poly",

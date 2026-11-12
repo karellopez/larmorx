@@ -24,6 +24,17 @@ checksums recorded with the part's records). The text files numpy's `savetxt` wr
 (CompCor's, DVARS', `FramewiseDisplacement`'s) are written as numpy writes them on Linux, on every
 platform (UTF-8, `\n` line ends; numpy's text mode writes `\r\n` on Windows), as the tables.
 
+**Findings** (what the port measured and decided, with the scripts behind each number):
+[confounds-workflow.md](../findings/confounds-workflow.md) (the workflow, its defects, fMRIPrep's own
+files column by column, the follow-ups), [confounds-dvars.md](../findings/confounds-dvars.md),
+[confounds-compcor.md](../findings/confounds-compcor.md) (with TSNR, the non-steady-state detector and
+framewise displacement), [confounds-pandas.md](../findings/confounds-pandas.md),
+[confounds-model.md](../findings/confounds-model.md), [confounds-motion.md](../findings/confounds-motion.md),
+[confounds-masks.md](../findings/confounds-masks.md), and the arithmetic under them:
+[confounds-blas.md](../findings/confounds-blas.md) (OpenBLAS and LAPACK under numpy and SciPy),
+[confounds-numpy.md](../findings/confounds-numpy.md), [confounds-fft.md](../findings/confounds-fft.md).
+Speed: [docs/benchmarks/confounds.md](../benchmarks/confounds.md).
+
 ## `compute_dvars`: nipype's `compute_dvars`
 
 | larmorx | nipype | Notes |
@@ -521,6 +532,14 @@ The nodes and what runs them:
 | `add_dvars_header`, `add_std_dvars_header`, `concat` | `add_tsv_header(..., ["dvars"])`, `(..., ["std_dvars"])`, `gather_confounds` |
 | `tcc_metadata_filter`, `acc_metadata_filter`, `tcc_metadata_fmt` (`mask` dropped), `acc_metadata_fmt`, `crowncc_metadata_fmt`, `merge_confound_metadata`, `merge_confound_metadata2` | `filter_dropped`; `tsv2json(..., "component", output=None, additional_metadata={"Method": ...}, enforce_case=True)` with `tCompCor`, `aCompCor`, `EdgeRegressor`; `dict_merge` of the dictionaries and the motion parameters' metadata (`MOTION_METADATA`) |
 | `model_expansion` (`(dd1(rps + wm + csf + gsr))^^2 + others`), `spike_regressors` | `expand_model`, `spike_regressors_node(fd_thresh=regressors_fd_th, dvars_thresh=regressors_dvars_th)` |
+
+The two `antsApplyTransforms` nodes run nipype's command line. nipype writes some file names into its
+lines unquoted (those inside ANTs' bracketed arguments, `--transform` and `--output`), so a path with a
+blank or a quote breaks them, in fMRIPrep and in larmorx's emulation of nipype alike: **PIPE-80**,
+corrected by default (the names quoted, so a dataset, working directory or output folder with a blank
+works), `upstream_defects="reproduce"` keeps nipype's line and its failure, with the `PIPE-80` notice
+whenever the two lines differ ([niworkflows-helpers.md](niworkflows-helpers.md)'s nipype section,
+[confounds-workflow.md](../findings/confounds-workflow.md)).
 
 ### `ds_confounds(confounds_file, confounds_metadata, source_file, fmriprep_dir, *, echo_idx=None, upstream_defects="fix")` → `DerivativesDataSinkResult`
 

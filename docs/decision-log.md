@@ -2374,3 +2374,51 @@ replica's gaps, the site, the handoff); the clean relays never read the replica 
   and windows taken from the voxels with a value, the viewer leaving such a voxel undrawn; arrays without NaN keep
   their earlier bits. Texts the site renders as Markdown escape what its typographer would turn into signs
   (`\(c)`, code spans), checked by `typographer_hazards.py` (relay C5).
+
+## 2026-11-12: the plan to the end (the user)
+- **Usage:** "we have a weekly reset that I can apply any time, so for now usage is not a problem and we can ignore
+  the limits we put ourselves, until I tell you the opposite." The pace line stops gating launches; `usage.py` keeps
+  recording usage and cost. A **burst** (a fresh weekly window the user opens) runs about six agents at once on
+  separate files; a **normal week** goes back to one agent at a time, the cheaper way (the user: "when we go to a
+  normal new week, we can use again the single agent cheap approach").
+- **Machines:** "Do not run anything that depends on development in the pc linux machine. This machine is very
+  slow": everything development depends on runs on the main machine, using its cores. **The lab's server** (set up
+  2026-11-12 with a key the user installed; its details only in the workspace's private notes, never in a
+  repository): "always use 64 thread", and "the server for now should serve us for complementary information. I do
+  not want to slow down our development in case we really depend on outputs from the server": extras only (more
+  heads, repeated and one-thread runs, fMRIPrep with recon-all for the final comparisons, heavy batches); nothing on
+  the development path waits for it; what a record uses is copied to the main machine. FreeSurfer there reads the
+  user's licence file ("FreeSurfer in the server can use this laptop's license"), kept in the private work folder,
+  never in results or repositories.
+- **The words:** "original" is only the program LARMORX is compared with (the oracle); every reimplementation is a
+  **port** ("a port can be a replica in another language, or a clean room, right?": yes), each a **replica** or a
+  **clean room** ("we should call clean room, not clean room original"). ANTs' and ITK's ports are replicas in the
+  main package. The home page explains original, replica and clean room in an early section; the deeper concepts
+  go on a Concepts page. The repository follows (prose, API pages, messages, file names such as `*-original.md`);
+  history stays as written.
+- **The documentation revision** ([documentation-plan.md](documentation-plan.md)): the website "needs a deep
+  revision", with programs grouped by their software ("mother softwares ... toggles that show the programs that
+  are already ported"), a reference page per program ("CLI and python interface with nice examples of usage"),
+  evidence that says "what is that image, what is that comparison, what vs what", writing that feels "written by
+  humans" (no "AI slop slogan like 'Many toolkits, one framework'"). The figures stay and are not recomputed ("If
+  something is missing, of course you can compute that, but not all"). Two agents: a writer and a critical reviewer
+  that guarantees its quality (the user's proposal); the user reviews the writing guide and four pilots first.
+- **FreeSurfer** ([freesurfer-plan.md](freesurfer-plan.md)): planned to use the burst ("plan this in a way that let
+  us port all this amount of freesurfer programs in order to have recon-all replica and clean room fast"),
+  starting the oracle runs at once ("if we have to run the oracles, they will take time, so we must start as soon as
+  possible"): FreeSurfer 8.2.0 from its official Ubuntu 22.04 package unpacked without administrator rights; every
+  step of recon-all recorded by a stand-in for `fs_time`; six heads on the main machine (the critical path), the
+  rest of the panel and the variability runs on the server; an inventory with the third-party and data-file audits;
+  one replay tool for every program; replica authors writing the specs; the clean rooms one wave behind; the
+  replicas in a workspace `crates-freesurfer/` of several crates (CLAUDE.md rule 3 updated). Found while setting
+  it up: recon-all 8.2.0's default is the **v8 stream** (`FS_V8_XOPTS=1`: SynthStrip, SynthSeg and SynthMorph,
+  neural networks, and new fixes), the classic stream (`-no-v8`) being what fMRIPrep 25.x's FreeSurfer 7.3.2 runs;
+  both are recorded, the order between them asked of the user.
+- **"The templates" part** is folded into the documentation revision (page template, generated option tables),
+  FreeSurfer's preparation (the replay harness) and larmorprepx (the MNI-template steps), the orchestrator's
+  proposal, accepted.
+- **Data files:** the four rules and one list of every data file (freesurfer-plan.md, "Data files"), the
+  orchestrator's proposal, accepted: the main package ships only small freely usable data; restricted data in its
+  family's companion or fetched from its owner on first use; big files always fetched; one checked list shown on
+  the site. LARMORX's code stays Apache-2.0; data keeps its own licence.
+- **Examples on program pages are run by the tests**, so they never go stale (accepted).

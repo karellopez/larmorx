@@ -7,9 +7,9 @@ parts, as they were planned, are in [status-log.md](status-log.md).
 **Ground rules.** Port every tool first, then compare with fMRIPrep at the end (user,
 2026-10-16): each port is validated against its own original program (parity, golden). **Full
 completeness** for every tool: every option, message and failure case, with D13 switches (user,
-2026-10-12); brief each agent for it from the start, so a tool takes one pass. **One agent at a
-time, in bounded parts with a stop after each**, for the user's usage check (user, 2026-10-10 and
-2026-10-17). Every tool's contract includes its figures (CLAUDE.md rule 7). **Testing depth**
+2026-10-12); brief each agent for it from the start, so a tool takes one pass. **Agents in bounded
+parts with a stop after each**: up to three at once since 2026-11-11, about six during a burst of usage and
+one at a time in a normal week (the user, 2026-11-12; "The order from here"). Every tool's contract includes its figures (CLAUDE.md rule 7). **Testing depth**
 (user, 2026-10-28; decision log): each part tests smartly (every code path once, fMRIPrep's real
 calls on about three oracle runs, the defects' edge cases, the standard and smoke tiers) and
 publishes its tool's page with figures and metrics from those tests; the very extensive testing
@@ -37,6 +37,41 @@ starts no other agent.
 | BET | `worktree-agent-a38ebb82788afa285` (10-26) | the BET replica (`larmorx-nc fsl bet`, `bet2`, `betsurf`; `lx.fsl.bet`, `lx.fsl.betsurf`), bit-identical to FSL 6.0.7.17 in every compared case (129 of 129, 364 files); its FSL libraries joined to mcflirt's in `larmorx-nc-core`; FSL-40 to FSL-58; `specs/bet.md`; its random-testing descriptor, memory cases and evidence page; FSL-22's `reproduce` exact | BET's clean-room original; `bet -S`, `-B`, `-A`, `-A2` (FLIRT, FAST); "BET, further" (follow-ups) |
 
 ## The order from here
+
+**From 2026-11-12 (the user; decision log, "2026-11-12: the plan to the end").** The roadmap to the end:
+
+| # | Step | State |
+|---|---|---|
+| 1 | **Confounds**: CompCor, DVARS, framewise displacement, fMRIPrep's confound steps and table, `larmorx nipype run` (item 4 (9)) | in progress: the first half merged 2026-11-12; relays 2g, 2h, 3a/3b, 2i, 4, 5 left |
+| 2 | **The documentation revision**, website and repository: [documentation-plan.md](documentation-plan.md) | starting |
+| 3 | **FreeSurfer 8.2.0**, a replica and a clean room of every program of `recon-all`'s two streams and of fMRIPrep's FreeSurfer programs: [freesurfer-plan.md](freesurfer-plan.md) (3.0 preparation, 3.1 foundations, waves 3.2 to 3.5, 3.6 `recon-all`) | starting: 3.0 |
+| 4 | **Surfaces**: Workbench-compatible tools (a replica in `larmorx-gpl`, a clean room in `larmorx`), MSM (a clean room only, after a patent check) | planned |
+| 5 | **larmorprepx**, the pipeline, with the MNI-template steps (TemplateFlow; niworkflows' `init_enhance_and_skullstrip_bold_wf`, the data sink's `template_metadata`) | planned |
+| 6 | **The clean rooms of the permissive ports**, one block (ANTs and ITK, sdcflows, fMRIPrep's resampler, nitransforms, the confounds, fMRIPrep's Python steps) | after FreeSurfer |
+| 7 | **The completeness parts**: FSL's FNIRT, `applywarp`, `convertwarp`, `fugue` (each a replica and a clean room), then the FLIRT pieces that wait for them; ANTs' missing operations; FreeSurfer's optional streams | after FreeSurfer |
+| 8 | **The final validation phase** (item 5), then the stage-by-stage and end-to-end comparisons with fMRIPrep | planned |
+| 9 | **Release 0.1.0**, once the full pipeline exists (the user, 2026-11-11) | planned |
+
+**"The templates" part is folded into others** (the user, 2026-11-12): its page template and generated
+option tables into the documentation revision, its replay harness into FreeSurfer's preparation (3.0), the
+MNI-template steps into larmorprepx.
+
+**Side by side.** During a **burst** (a fresh weekly usage window the user opens): about six agents on
+separate files: FreeSurfer two to three (the inventory, then the foundations' modules, then wave 3.2's
+replicas with their specs), the confounds one (its slot then moves to FreeSurfer), the documentation two
+(the writer and the critical reviewer); the orchestrator merges in batches about twice a day and runs the
+reference runs. In a **normal week**: one agent at a time on the queue (`docs/freesurfer/queue.md`, from
+the inventory): the next wave's replicas and the previous wave's clean rooms. Usage limits: the user
+lifted the self-imposed ones on 2026-11-12 until they say otherwise (they reset the weekly window
+themselves).
+
+**Machines** (the user, 2026-11-12): everything that development depends on runs on the main machine;
+the old laptop runs nothing development-dependent (too slow); the lab's server only adds information
+(more heads, FreeSurfer's own variation, fMRIPrep with recon-all for the final comparisons, heavy batches),
+up to 64 threads, and nothing on the development path waits for it.
+
+**Data files** (the user, 2026-11-12): the four rules and the list of every data file, in
+[freesurfer-plan.md](freesurfer-plan.md), "Data files".
 
 **From 2026-11-02 (the user; decision log):** two agents at once by role, each part run by relay agents
 (CLAUDE.md, "Relay agents and fewer, fuller steps"): FLIRT's clean-room part 2 beside FAST's replica, then

@@ -94,6 +94,23 @@ WHAT = {
     "GLIBC-07": "the correctly rounded exponential",
 }
 _NOTICE = re.compile(r"^larmorx(?:-gpl)?: upstream defect (\S+) \((\w+)\) (corrected|reproduced)")
+#: The site renders the reasons, row heads, notes and titles through markdown-it's typographer,
+#: which turns ``(c)`` into the copyright sign: those texts write ``\(c)`` (the escape keeps the
+#: parenthesis; the page's prose does the same). Column labels are not Markdown: they keep ``(c)``.
+BC = "(b)/\\(c)"
+#: The random-testing harness writes a difference's signature with its digits as ``N``
+#: (``difftest.core._norm``): the suite's check ``values (§17.3)`` (its check.py by §17.3's
+#: thresholds) is ``values (§N.N)`` there. The trial table's row heads give the section again.
+SECTIONS = {"values (§N.N)": "values (§17.3)"}
+
+
+def _signature(text: str) -> str:
+    """A triage entry's signature with its sections' numbers (:data:`SECTIONS`)."""
+    for norm, real in SECTIONS.items():
+        text = text.replace(norm, real)
+    if "§N" in text:
+        raise ValueError(f"a signature with a section the table does not know: {text!r}")
+    return text
 
 
 def _suite():
@@ -306,7 +323,7 @@ def _example(ctx: core.Context) -> dict:
             )
             x["reason"] = common.clip(
                 f"specs/t2smap.md §17.3 by its check.py: {counted(cnt_a)}; the curve fit's "
-                f"(b)/(c) share {_share(det_a)} of the fit voxels (the original's own trust-region "
+                f"{BC} share {_share(det_a)} of the fit voxels (the original's own trust-region "
                 "solver, its log-linear fit in closed form: the fitted numbers within the "
                 "thresholds, not bit for bit, decided 2026-11-11)",
                 420,
@@ -327,7 +344,7 @@ def _example(ctx: core.Context) -> dict:
             )
             x["reason"] = common.clip(
                 f"The two implementations' defaults by §17.3 (check.py): {counted(cnt_b)}; the "
-                f"(b)/(c) share {_share(det_b)}.",
+                f"{BC} share {_share(det_b)}.",
                 400,
             )
         else:
@@ -419,7 +436,7 @@ def case_verdict(r: dict) -> tuple[str, str]:
     words = ", ".join(str(x) for x in same)
     return "within-variability", common.clip(
         f"specs/t2smap.md §17.3 by its check.py: {words} values identical"
-        + (f"; the curve fit's (b)/(c) share {share[0]} %" if share else "")
+        + (f"; the curve fit's {BC} share {share[0]} %" if share else "")
         + "; exit status, files and messages tedana's",
         400,
     )
@@ -475,9 +492,9 @@ def _fmriprep_table(rec: records.Record) -> dict:
         ["Call", "(A) values identical", {"label": "(A) (b)/(c) share (%)", "num": True},
          "(B) values identical", {"label": "(B) (b)/(c) share (%)", "num": True}, "checks"],
         rows,
-        note="specs/t2smap.md §17.3's thresholds by its check.py; (b)/(c): the curve-fit voxels "
+        note=f"specs/t2smap.md §17.3's thresholds by its check.py; {BC}: the curve-fit voxels "
         "whose fit the other run's is no better than (b), or whose start lies on the feasibility "
-        "boundary (c), at most 3 % allowed. The log-linear call's values are tedana's bit for bit "
+        "boundary \\(c), at most 3 % allowed. The log-linear call's values are tedana's bit for bit "
         "but for one float32 unit in the combined series.",
     )  # fmt: skip
 
@@ -506,7 +523,8 @@ def _trial(ctx: core.Context) -> tuple[list[dict], list[dict]]:
              "cells": [common.cell(n_cases - n_diff, "count"), common.cell(n_diff, "count"),
                        common.cell(f"{len(entries)} triage entries")]}]  # fmt: skip
     for e in entries:
-        rows.append({"head": ", ".join(e["signature"]), "sub": common.clip(e["explanation"], 400),
+        rows.append({"head": ", ".join(map(_signature, e["signature"])),
+                     "sub": common.clip(e["explanation"], 400),
                      "verdict": {
                     "fixed": "within-variability",
                     "harness": "within-variability",

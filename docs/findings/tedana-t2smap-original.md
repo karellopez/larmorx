@@ -48,8 +48,9 @@ the record `docs/validation/tedana-t2smap-original.md`).
 - **tedana chains two tracebacks** for a 3D echo file (`Expected 4D image` twice) and for a mask of
   another grid (`ValueError: Image/mask shape mismatch`, then "During handling of the above
   exception, another exception occurred:" and nilearn's `Mask shape: ...` error); the original
-  prints the chain in both modes. **The replica prints only the last traceback** (a replica gap,
-  for the replica-side relay).
+  prints the chain in both modes. The replica of 0.1.0rc1 printed only the last traceback; the
+  replica built from this branch prints tedana's chain (2026-11-12: `three-d` and `x-mask-grid`
+  pass (B) in the record).
 - **The output directory is made before `--exclude` is parsed and left empty when it fails** (§3
   step 2; the spec writer checked by running tedana directly). The oracle-output cache stores files,
   not directories, so a replayed run shows no empty directory; the suite makes it again from the
@@ -80,7 +81,8 @@ the record `docs/validation/tedana-t2smap-original.md`).
   in cast` (float64 maps written as float32). **Python's warnings registry is reset** between the
   S0 image and the limited S0 image and before the combination (a warning of one place shows
   again there); the original resets after the confounds table (where exactly is not observable).
-  The replica does not print two of these (`x-underflow-debug`, `x-inf-both-paid`: a replica gap).
+  The replica of 0.1.0rc1 did not print two of these; the replica built from this branch prints
+  both (2026-11-12: `x-underflow-debug` and `x-inf-both-paid` pass (B) in the record).
 - **SciPy's internal floating-point warnings** in degenerate fits (`overflow encountered in scalar
   multiply`, `in dot`; `invalid value encountered in subtract`, `in multiply`) are not reproduced:
   the solver is the original's own, and §12.3 lists only the OptimizeWarning for the curve fit.
@@ -88,8 +90,10 @@ the record `docs/validation/tedana-t2smap-original.md`).
   as SPM2's ANALYZE (byte order by nibabel's guess, its header fixes, SPM2's scaling in float64:
   `funused1` and `funused2` when the slope is finite and not 0, else the gl/cal ranges' ratio; the
   origin affine; a `.mat` sidecar); a NIfTI pair's scaling is float32 arithmetic (observed: 664 of
-  10,752 values would differ in float64, and none differ). **The replica refuses both formats**
-  (`larmorx.UnsupportedFormat`), a replica gap; the original reads them as tedana.
+  10,752 values would differ in float64, and none differ). The original and the replica built
+  from this branch both read them as tedana does (2026-11-12: the record's 12 ANALYZE and MGH
+  cases pass (A) and (B), every value identical); only the replica of 0.1.0rc1 (PyPI) refused
+  both formats (`larmorx.UnsupportedFormat`).
 - **TED-03's two computed-mask cases** (an image whose one-voxel planes the erosions remove; a
   1 × 1 × 1 series) and TED-18 with one positive limited value: observed and equal to tedana's
   (`reproduce`) and the replica's (default).

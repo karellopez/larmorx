@@ -8,14 +8,14 @@
 | Source | `talairach_avi/talairach_avi` |
 | Streams | classic (classic-only) |
 | Wave | 3.6 |
-| Replica's crate | `larmorx-freesurfer-classic` |
+| Replica's crate | none: a clean room only (P-12, the user) |
 | Clean room's crate | `larmorx-fs-classic` |
 | Queue items | 3.6-18 |
 | Called by | recon-all |
 | Runs | `avi2talxfm`, `lta_convert`, `mpr2mni305`, `mri_convert` |
 | How it runs in the reference runs | timed |
 | Stages (programs.md §3) | 11 |
-| Why this wave | classic only; its 4dfp tools a clean room only (the plan: 3.2) |
+| Why this wave | classic only; a clean room only, with mpr2mni305 and the 4dfp tools (the user, 2026-11-12: Washington University's Talairach tools; the script itself carries MGH's notice; the plan: 3.2) |
 
 ## The calls recon-all and fMRIPrep make
 

@@ -573,9 +573,11 @@ EXTRA: list[dict] = [
         "kind": "oracle",
         "crate": "validation/investigations/freesurfer-unit-oracle/",
         "what": "a unit oracle: FreeSurfer 8.2.0's libutils and the packages it links, built from"
-        " the tag with GCC 8.4.0 (oracles/toolchains/gcc-8.4) and the official flags (code.toml)"
-        " against ITK 4.13.2's VNL, with a harness that calls single functions (the foundations'"
-        " checks below; a proposal: the replay checks whole programs only)",
+        " the tag with GCC 8.4.0 and the official flags (code.toml) against ITK 4.13.2's VNL,"
+        " with a harness that calls single functions (the foundations' checks below; W4: a"
+        " queue item); done 2026-11-12 with Ubuntu's own gcc-8 8.4.0"
+        " (oracles/toolchains/gcc-8.4-ubuntu), the build in oracles/freesurfer-8.2.0-unit/,"
+        " larmorx_validation.freesurfer_unit",
         "lines": 0,
         "inputs": "code.md section 1 (the build as the official one ran), relay 5's gcc84/",
         "checks": "three programs built from it give the official binaries' outputs on recorded"
@@ -655,7 +657,7 @@ EXTRA: list[dict] = [
         " vnl_fft where larmorx-image's differs), at ITK 4.13.2 (the same arithmetic as 5.4.5,"
         " third-party.md section 10)",
         "lines": 0,
-        "inputs": "ITK 4.13.2's tarball (<scratch>/r5/itk-4.13.2/), itk-diff.toml",
+        "inputs": "ITK 4.13.2's source (<workspace>/tags/ITK-v4.13.2), itk-diff.toml",
         "checks": "against the unit oracle; the existing vnl_svd_f32, vnl_qr, vnl_eigen ports"
         " re-checked at FreeSurfer's call sites",
     },

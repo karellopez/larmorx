@@ -70,7 +70,7 @@ Single-letter options of its `switch (toupper(*option))`: `H`, `U`
 
 ## Checks
 
-- replay: 31 recorded steps in 11 runs
+- replay: 36 recorded steps in 12 runs
 
 ## Notes
 

@@ -48,7 +48,9 @@ Their results are in `docs/freesurfer/` (closed too).
   from elsewhere) with the programs reaching each in the core and full views. `--toml-out` writes
   `docs/freesurfer/third-party.toml`; `--rng` lists the reached functions whose bodies call a
   random-number source (the seeds' findings). The families, classes and findings are the audit's
-  reading, each with its evidence in `docs/freesurfer/third-party.md`; the tool applies them.
+  reading, each with its evidence in `docs/freesurfer/third-party.md`; the tool applies them
+  (since relay 8 the user's decisions of 2026-11-12 too: the classes `gpl-alone`,
+  `noncommercial-program` and `later` in place of the former questions).
 
       python -P validation/investigations/freesurfer-inventory/licences.py \
           <workspace>/tags/freesurfer-8.2.0 docs/freesurfer/programs.toml <scratch>/cmake.json \
@@ -154,14 +156,22 @@ Their results are in `docs/freesurfer/` (closed too).
   and that no script comes before a program it runs, gives each reached function to the one queue
   item that brings it (the program alone, else its module's item; earlier programs' option paths
   into a later module wait for it) and cuts items to a budget of lines; counts each program's
-  recorded steps in the reference runs. Writes `docs/freesurfer/waves.toml` and the generated
-  tables of `waves.md` and `queue.md` (between their `<!-- waves.py: ... -->` markers):
+  recorded steps in the reference runs (`--run-pattern`: the folders ending in `-classic` or `-v8`,
+  not the variability runs beside them). Since relay 8 it also follows the user's placements of
+  2026-11-12 (`FUNCTION_MODULES` and `OWN_ITEM`: GSL's generators and Burkardt's spline as modules
+  of their own; `W3`: the parser modules' items by role; `CLEAN_ONLY`, `OTHER_REPLICA`; the
+  permissive pieces' clean rooms, `PERMISSIVE_CLEAN`) and keeps the items' numbers stable in
+  `docs/freesurfer/queue-ids.toml` (`--ids`: a new item takes the next free number of its wave; one
+  no longer generated must be marked retired by hand, with why; `[[key]]` in a text is replaced
+  by that item's number). Writes `docs/freesurfer/waves.toml` and the generated tables of
+  `waves.md` and `queue.md` (between their `<!-- waves.py: ... -->` markers):
 
       python -P validation/investigations/freesurfer-inventory/waves.py \
           docs/freesurfer/programs.toml docs/freesurfer/code.toml <core.json> \
           --data docs/freesurfer/data-files.toml --tag <workspace>/tags/freesurfer-8.2.0 \
           --runs <workspace>/oracles/freesurfer-8.2.0/runs --toml docs/freesurfer/waves.toml \
-          --markdown docs/freesurfer/waves.md --queue docs/freesurfer/queue.md
+          --markdown docs/freesurfer/waves.md --queue docs/freesurfer/queue.md \
+          --ids docs/freesurfer/queue-ids.toml
 
   `<core.json>` is `callgraph.py --core --json` (about 11 MB, regenerated as code.md §6 says). It
   exits 1 with `PROBLEM:` lines when a file has no module or a placement breaks a rule.

@@ -64,4 +64,4 @@ Single-letter options of its `switch (toupper(*option))`: `H`, `N`, `U`, `V`
 
 ## Checks
 
-- replay: 20 recorded steps in 10 runs
+- replay: 24 recorded steps in 12 runs

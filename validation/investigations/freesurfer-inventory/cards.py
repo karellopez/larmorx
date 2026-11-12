@@ -166,6 +166,12 @@ def main() -> int:
     ap.add_argument("--docs", type=Path, required=True)
     ap.add_argument("--trace", type=Path)
     ap.add_argument("--runs", type=Path)
+    ap.add_argument(
+        "--run-pattern",
+        default=r"-(classic|v8)$",
+        help="the runs read (a regular expression on the run's folder name; by default the"
+        " reference runs, as waves.py counts them)",
+    )
     ap.add_argument("--out", type=Path, required=True)
     args = ap.parse_args()
 
@@ -188,6 +194,8 @@ def main() -> int:
                 writes[p] |= {subj(x) for x in v.get("subject:write", [])}
     if args.runs and args.runs.is_dir():
         for st in args.runs.glob("*/record/steps/*.json"):
+            if not re.search(args.run_pattern, st.parents[2].name):
+                continue
             try:
                 d = json.loads(st.read_text(encoding="utf-8"))
             except (OSError, ValueError):

@@ -70,7 +70,7 @@ Single-letter options of its `switch (toupper(*option))`: `H`, `T`, `U`
 
 ## Checks
 
-- through mri_nu_correct.mni, vertexvol's recorded steps (37)
+- through mri_nu_correct.mni, vertexvol's recorded steps (42)
 
 ## Notes
 

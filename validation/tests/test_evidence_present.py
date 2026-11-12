@@ -215,3 +215,16 @@ def test_a_shape_it_does_not_know_is_refused():
     ex["panels"][2]["label"] = "FSL 6.0.7.23, bet"
     with pytest.raises(ValueError, match="another shape"):
         _present(ex)
+
+
+def test_a_panel_command_names_each_file():
+    """The data panel's Command fact names each file, a relative path's first folder included."""
+    from larmorx_validation.evidence.ants_panel import _cmd
+
+    args = ["-i", "{in:openneuro/ds005454/sub-16/anat/sub-16_T1w.nii.gz}", "-o",
+            "[", "{out:denoised.nii.gz},", "{out:noise.nii.gz}", "]", "-w",
+            "<fMRIPrep oracle run>/work/n4/weight.nii.gz"]  # fmt: skip
+    assert _cmd("DenoiseImage", args) == (
+        "DenoiseImage -i sub-16_T1w.nii.gz -o [ denoised.nii.gz, noise.nii.gz ] -w "
+        "<fMRIPrep oracle run>weight.nii.gz"
+    )

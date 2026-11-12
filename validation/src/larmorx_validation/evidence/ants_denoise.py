@@ -19,6 +19,7 @@ from pathlib import Path
 import numpy as np
 
 from larmorx_validation.evidence import common, core
+from larmorx_validation.evidence import present as present_
 from larmorx_validation.figures import cache as fcache
 from larmorx_validation.figures import records
 
@@ -819,7 +820,7 @@ def export(ctx: core.Context) -> dict:
         "logical CPUs).",
     )
     e = entry(ctx)
-    return {
+    doc = {
         "schema": 1,
         "tool": TOOL,
         "title": "DenoiseImage",
@@ -851,6 +852,70 @@ def export(ctx: core.Context) -> dict:
         ],
         **({"tables": [inventory]} if inventory else {}),
     }
+    return present(doc)
+
+
+#: The page in the writing guide's words (evidence/present.py). The guide's order puts the row
+#: against correctly rounded maths after the one against ANTs as built, so the reasons name it.
+PAGE = present_.Page(
+    software="ANTs",
+    program="DenoiseImage",
+    version="2.6.5",
+    texts=[(r"\(the row above\)", "(the row against correctly rounded maths)")],
+)
+
+#: Each worked example's "What this shows" line and the verdict beside it, from the example's
+#: own metrics; the data panel's lines are written from their own verdicts (present.panel_shows).
+SHOWS = {
+    "fmriprep-denoise": (
+        "In `reproduce`, on 1 and 12 threads, the replica gives ANTs' output at one thread with "
+        "correctly rounded maths, bit for bit; ANTs as built differs from it only where glibc's "
+        "`expf` is not correctly rounded (5,522 of 5,898,240 voxels, by at most 0.0002). ANTs' "
+        "own result moves with its thread count, by up to 271 at 8 threads, and fMRIPrep's "
+        "output, made by its ANTs 2.6.2 at 8 threads, is one more of those results. The "
+        "default, `fix`, corrects ANTS-43 in this call: 437,915 voxels change, by up to 2.81.",
+        ["lx-ants1"],
+    ),
+    "ants-44": (
+        "The replica's default, `fix`, gives the voxels just outside the mask that the patches "
+        "reach the smoothed and corrected bias (ANTS-44) and corrects ANTS-43 inside the mask: "
+        "611,567 of the denoised image's 5,898,240 values change, by up to 177. In `reproduce` "
+        "it gives ANTs' output bit for bit with correctly rounded maths.",
+        ["fix-ants"],
+    ),
+}
+TITLES = {"fmriprep-denoise": "fMRIPrep's denoising of a real T1w"}
+
+
+def present(doc: dict) -> dict:
+    """DenoiseImage's page in the writing guide's words and order: texts, ports and order
+    only."""
+    for ex in doc["examples"]:
+        if ex["id"] in SHOWS:
+            shows, verdicts = SHOWS[ex["id"]]
+        else:
+            shows, verdicts = present_.panel_shows(PAGE, ex)
+        present_.example(PAGE, ex, shows=shows, verdicts=verdicts, title=TITLES.get(ex["id"]))
+    for im in doc["implementations"]:
+        present_.implementation(PAGE, im, "standard comparison and data panel")
+    present_.speed(
+        PAGE,
+        doc.get("speed"),
+        "Seconds for the whole command (reading, denoising, writing), the median of repeated "
+        "runs, on a log scale. The factor is how many times faster the replica is than ANTs, "
+        "both on one thread.",
+    )
+    b = doc.get("band")
+    if b:
+        b["title"] = (
+            "Variability, the replica against the original divided by the original against "
+            f"itself between thread counts: {present_.original_name(PAGE)}, the "
+            f"{len({r['case'] for r in b['rows']})} cases that differ from it as built (log scale)"
+        )
+        b["note"] = present_.text(PAGE, b.get("note"))
+        b["port"] = PAGE.port
+    present_.random_testing(PAGE, doc, {"port": "replica"})
+    return present_.finish(PAGE, doc)
 
 
 if __name__ == "__main__":  # compute the cache entry only

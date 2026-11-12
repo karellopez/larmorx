@@ -76,8 +76,7 @@ statistics, ...).
   `HISTOaddFractionalSample`, `HISTOclearBG`, `HISTOvalToBinDirect`, `HISTOvalToCount`,
   `HISTOwriteInto`, `HISTOreadFrom`, `HISTOgaussian*`, `HISTOscalarMul`, `HISTOscalarAdd`,
   `HISTOfindMaxDerivative`, the other `HISTO2D*`, `HISTOrmsDifference`, `HISTOearthMoversDistance`,
-  `HISTOksDistance`, `HISTOerase*`, `HISTOisPeak`, `HISTOwrite`; `DMatrixTest`,
-  `GetFloorAffineVector`'s users aside). Still to come in item 3.1-23: `MatrixInverse` and
+  `HISTOksDistance`, `HISTOerase*`, `HISTOisPeak`, `HISTOwrite`; `DMatrixTest`). Still to come in item 3.1-23: `MatrixInverse` and
   `MatrixQRdecomposition` (with `utils/numerics.cpp`'s VNL wrappers and the main package's `float`
   VNL routines), `DMatrixMultiply`, `DVectorDot`, `DVectorLen`, `DVectorCrossProduct` (x87 `long
   double`: `larmorx_core`'s 80-bit arithmetic), `DMatrixDRand48`, `fs_powell`, `fs_lbfgs`,

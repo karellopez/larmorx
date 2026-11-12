@@ -72,6 +72,12 @@ find_package(OpenSSL REQUIRED)
 # 494-497: the official build found OpenGL (BUILD_GUIS); only its definition reaches these targets
 add_definitions(-DHAVE_OPENGL)
 
+# 565 (cmake/FindQT.cmake 91) and 672: the run path the official programs carry, Qt's folder then
+# VTK's prepended to an empty list, so it ends in an empty entry (the working directory: FS-61).
+# Kept: the .dynamic section, and so the GOT and every address after it, as the official ones.
+set(CMAKE_INSTALL_RPATH "$ORIGIN/../lib/vtk:$ORIGIN/../lib/qt/lib:")
+set(CMAKE_BUILD_WITH_INSTALL_RPATH ON)
+
 # 677-713: ITK 4.13.2, as packages/source/build_itk.sh builds it (build.py)
 find_package(ITK HINTS ${ITK_DIR} REQUIRED)
 message(STATUS "ITK_DIR=${ITK_DIR} ITK_VERSION=${ITK_VERSION}")

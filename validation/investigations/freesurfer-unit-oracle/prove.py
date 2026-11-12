@@ -61,6 +61,8 @@ REPLAY_RUNS = (
 )
 #: Recorded volumes for the reader and writer: conformed uchar, the raw average (its own type and
 #: geometry), float intensities, labels.
+#: The draws read from a program under gdb at most (the rest of its run goes on without stops).
+GDB_HITS = 2000
 VOLUMES = ("mri/rawavg.mgz", "mri/orig.mgz", "mri/nu.mgz", "mri/T1.mgz", "mri/aseg.presurf.mgz")
 
 
@@ -116,7 +118,9 @@ def prove_code() -> dict:
             f"order (ours {n_ours}); {len(own)} differing stretches outside GCC's start files"
         )
         for d in own:
-            print(f"  {d['tag']} in {', '.join(d['functions'][:3])}: {d['ours_text'][:2]} / {d['official_text'][:2]}")
+            print(
+                f"  {d['tag']} in {', '.join(d['functions'][:3])}: {d['ours_text'][:2]} / {d['official_text'][:2]}"
+            )
     return out
 
 
@@ -137,13 +141,21 @@ def prove_replay(work: Path) -> dict:
                 continue
             dest = work / "replay" / run / step.label
             report, _rb = replay.replay(
-                rec, step, threads=threads, dest=dest, command=[str(UNIT_BIN / "{program}")], timeout=1800
+                rec,
+                step,
+                threads=threads,
+                dest=dest,
+                command=[str(UNIT_BIN / "{program}")],
+                timeout=1800,
             )
             d = report.to_dict()
             results.append(d)
             print(f"replay {run} {step.label}: {d['verdict']} {d['counts']}")
             shutil.rmtree(dest, ignore_errors=True)  # a rebuilt copy of the recording
-    return {"steps": results, "reproduced": sum(r["verdict"].startswith("reproduced") for r in results)}
+    return {
+        "steps": results,
+        "reproduced": sum(r["verdict"].startswith("reproduced") for r in results),
+    }
 
 
 # ---------------------------------------------------------------- 3. units
@@ -190,7 +202,9 @@ def prove_volumes(work: Path) -> list[dict]:
                 "dims": [header["width"], header["height"], header["depth"], header["nframes"]],
             }
             rows.append(row)
-            print(f"units volume {rel} -> {suffix}: {row['verdict']} (bytes identical: {row['bytes_identical']})")
+            print(
+                f"units volume {rel} -> {suffix}: {row['verdict']} (bytes identical: {row['bytes_identical']})"
+            )
     return rows
 
 
@@ -233,11 +247,15 @@ def _matrices(n: int, seed: int = 20261112) -> list[list[list[float]]]:
     out = [[[1.0, 0, 0, 0], [0, 1.0, 0, 0], [0, 0, 1.0, 0], [0, 0, 0, 1.0]]]
     out.append([[0.9375, 0, 0, -127.5], [0, 1.0, 0, 128.25], [0, 0, 1.125, -96.0], [0, 0, 0, 1.0]])
     for k in range(n - 3):
-        m = [[rng.uniform(-1.5, 1.5) for _ in range(3)] + [rng.uniform(-150, 150)] for _ in range(3)]
+        m = [
+            [rng.uniform(-1.5, 1.5) for _ in range(3)] + [rng.uniform(-150, 150)] for _ in range(3)
+        ]
         if k % 5 == 4:  # nearly singular: one row close to a combination of the others
             m[2][:3] = [m[0][j] + m[1][j] + rng.uniform(-1e-4, 1e-4) for j in range(3)]
         out.append([*m, [0.0, 0.0, 0.0, 1.0]])
-    out.append([[1.0, 2.0, 3.0, 0], [2.0, 4.0, 6.0, 0], [1.0, 1.0, 1.0, 0], [0, 0, 0, 1.0]])  # singular
+    out.append(
+        [[1.0, 2.0, 3.0, 0], [2.0, 4.0, 6.0, 0], [1.0, 1.0, 1.0, 0], [0, 0, 0, 1.0]]
+    )  # singular
     return [[[_f32(v) for v in row] for row in m] for m in out]
 
 
@@ -260,13 +278,16 @@ def prove_matrices(work: Path, n: int = 40) -> list[dict]:
         dst = d / f"m{k:03d}.inv.lta"
         dst.unlink(missing_ok=True)
         src.write_text(
-            LTA.format(rows="\n".join(" ".join(f"{v:.9g}" for v in row) for row in m)), encoding="utf-8"
+            LTA.format(rows="\n".join(" ".join(f"{v:.9g}" for v in row) for row in m)),
+            encoding="utf-8",
         )
         done = official("lta_convert", ["--inlta", str(src), "--outlta", str(dst), "--invert"])
         theirs = _read_lta_matrix(dst) if dst.exists() else None
         ours = fu.matrix_inverse(m)
-        same = theirs is not None and ours is not None and all(
-            ours[r][c] == theirs[r][c] for r in range(4) for c in range(4)
+        same = (
+            theirs is not None
+            and ours is not None
+            and all(ours[r][c] == theirs[r][c] for r in range(4) for c in range(4))
         )
         rows.append(
             {
@@ -282,19 +303,26 @@ def prove_matrices(work: Path, n: int = 40) -> list[dict]:
     return rows
 
 
-def _gdb_returns(program: Path, args: list[str], cwd: Path, env: dict, addresses: list[int]) -> list[str]:
+def _gdb_returns(
+    program: Path, args: list[str], cwd: Path, env: dict, addresses: list[int]
+) -> list[str]:
     """Run ``program`` under gdb; at each address (OpenRan1's returns, relative to the program's
     load address) print xmm0's low float's bits; the values in the order they were returned."""
     script = ["set pagination off", "set confirm off", "starti", "python", "import gdb, re"]
     script += [
         "maps = gdb.execute('info proc mappings', to_string=True)",
         f"base = min(int(m, 16) for m in re.findall(r'^\\s*(0x[0-9a-f]+)\\s.*{re.escape(program.name)}\\s*$', maps, re.M))",
-        f"for a in {addresses!r}:",
-        "    gdb.Breakpoint('*' + hex(base + a))",
+        f"bps = [gdb.Breakpoint('*' + hex(base + a)) for a in {addresses!r}]",
+        "hits = [0]",
         "def on_stop(event):",
         "    if isinstance(event, gdb.BreakpointEvent):",
         "        v = int(gdb.parse_and_eval('$xmm0.v4_int32[0]')) & 0xffffffff",
         "        print('OPENRAN1 %08x' % v)",
+        "        hits[0] += 1",
+        f"        if hits[0] >= {GDB_HITS}:",
+        "            print('OPENRAN1-LIMIT')",
+        "            for b in bps:",
+        "                b.enabled = False",
         "gdb.events.stop.connect(on_stop)",
         "end",
     ]
@@ -303,8 +331,9 @@ def _gdb_returns(program: Path, args: list[str], cwd: Path, env: dict, addresses
         f.write("\n".join(script) + "\n")
         gdbfile = f.name
     try:
+        gdb = shutil.which("gdb") or "gdb"
         p = subprocess.run(
-            ["gdb", "-nx", "-batch", "-x", gdbfile, "--args", str(program), *args],
+            [gdb, "-nx", "-batch", "-x", gdbfile, "--args", str(program), *args],
             cwd=cwd,
             env=env,
             capture_output=True,
@@ -317,17 +346,19 @@ def _gdb_returns(program: Path, args: list[str], cwd: Path, env: dict, addresses
     return re.findall(r"OPENRAN1 ([0-9a-f]{8})", p.stdout)
 
 
-def _function_returns(binary: Path, name: str) -> list[int]:
-    """The addresses of ``ret`` in the function ``name`` of a binary with symbols."""
+def _function_returns(binary: Path, *names: str) -> list[int]:
+    """The addresses of ``ret`` in the function (any of ``names``) of a binary with symbols."""
     rows = code_identity.disassemble(binary)
-    return [addr for fn, addr, ins in rows if fn == name and ins.split()[0].startswith("ret")]
+    return [addr for fn, addr, ins in rows if fn in names and ins.split()[0].startswith("ret")]
 
 
 def _official_addresses(prog: str, ours_addrs: list[int]) -> list[int]:
     """Our addresses mapped onto the stripped official program through the code alignment."""
     a = code_identity.disassemble(UNIT_BIN / prog)
     b = code_identity.disassemble(FS_HOME / "bin" / prog)
-    ops = code_identity.align([code_identity.norm(x[2]) for x in a], [code_identity.norm(x[2]) for x in b])
+    ops = code_identity.align(
+        [code_identity.norm(x[2]) for x in a], [code_identity.norm(x[2]) for x in b]
+    )
     index = {addr: i for i, (_f, addr, _t) in enumerate(a)}
     out = []
     for addr in ours_addrs:
@@ -353,14 +384,16 @@ def prove_random(work: Path) -> list[dict]:
         rec = Recording(RUNS / run)
         step = next(s for s in rec.steps if s.program == prog)
         seed = int(step.argv[step.argv.index("-seed") + 1])
-        sym = "_Z8OpenRan1Pl"
-        ours = _function_returns(UNIT_BIN / prog, sym)
+        ours = _function_returns(UNIT_BIN / prog, "OpenRan1", "_Z8OpenRan1Pl")
         theirs = _official_addresses(prog, ours)
         # relative to the load address: both are PIE (the first mapping is the file's start)
         dest = work / "random" / run / step.label
         rb = replay.rebuild(rec, step, dest, threads=1)
         values = {}
-        for label, binary, addrs in (("official", FS_HOME / "bin" / prog, theirs), ("unit", UNIT_BIN / prog, ours)):
+        for label, binary, addrs in (
+            ("official", FS_HOME / "bin" / prog, theirs),
+            ("unit", UNIT_BIN / prog, ours),
+        ):
             values[label] = _gdb_returns(binary, list(rb.argv[1:]), rb.cwd, dict(rb.env), addrs)
             replay.rebuild(rec, step, dest, threads=1)  # the run wrote into it: start again
         shutil.rmtree(dest, ignore_errors=True)

@@ -1,16 +1,23 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Is the unit oracle's build the official build? Its programs' machine code against the official
-8.2.0 binaries, instruction by instruction.
+"""Is the unit oracle's build the official build? Its programs against the official 8.2.0
+binaries: the whole files, every section, every instruction.
 
 CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS: about FreeSurfer's binaries built from its source.
 
-Both programs are disassembled (``objdump -d``); every instruction is written without its
-addresses (absolute and RIP-relative addresses, call and jump targets and the symbol names
-objdump prints beside them are masked, as in ``freesurfer-inventory/gcc84/fit_in_binary.py``),
-and the two sequences are aligned (:func:`align`). The official programs are stripped; the unit
-oracle's keep their symbols, so each difference is named by the function of ours it falls in.
-Prints, per program: the sections' sizes, the instructions in each, how many are identical in
-order, and every differing stretch with its function.
+Four views, strictest first:
+
+1. **The files**: the unit oracle's program stripped of its symbols (``strip --strip-all``, as
+   the official programs are) against the official one, byte by byte; the build ID (a hash the
+   linker writes, 20 bytes) is the only part that must differ.
+2. **The sections**: every section's bytes (the symbol tables, which only ours has, aside).
+3. **The instructions**: both programs disassembled (``objdump -d``), every instruction written
+   without its addresses (RIP-relative displacements and branch targets masked; immediates and
+   offsets kept), the two sequences aligned (:func:`align`); the official programs are stripped,
+   ours keep their symbols, so each difference is named by the function of ours it falls in. The
+   same with the addresses kept, where both lay out their code at the same addresses.
+4. **The data and the constructors**: each data section word by word (a word that holds an
+   address differs by its section's shift; a constant would not), and the static constructors in
+   the order they run.
 
     python -P code_identity.py [--unit <out>/bin] [--official <8.2.0>/bin] [--json out.json]
         [program ...]
@@ -24,6 +31,7 @@ import re
 import struct
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -219,9 +227,78 @@ def constructors(ours: Path, official: Path, a, b, ops) -> dict:
         "ours": len(ours_names),
         "official": len(off_names),
         "same_order": [n for n in ours_names if n != "frame_dummy"]
-        == [n for n in off_names if not n.startswith("official")],
+        == [n for n in off_names if n != "frame_dummy" and not n.startswith("official")],
         "official_unmapped": [n for n in off_names if n.startswith("official")],
     }
+
+
+def section_list(path: Path) -> list[tuple[str, str]]:
+    out = subprocess.run(["readelf", "-S", "-W", str(path)], capture_output=True, text=True).stdout
+    res = []
+    for ln in out.splitlines():
+        m = re.match(r"\s*\[\s*\d+\]\s+(\S+)\s+(\S+)", ln)
+        if m and m.group(1) != "NULL":
+            res.append((m.group(1), m.group(2)))
+    return res
+
+
+def build_id_range(path: Path) -> tuple[int, int] | None:
+    out = subprocess.run(["readelf", "-S", "-W", str(path)], capture_output=True, text=True).stdout
+    for ln in out.splitlines():
+        parts = ln.replace("[ ", "[").split()
+        if len(parts) > 5 and parts[1] == ".note.gnu.build-id":
+            off, size = int(parts[4], 16), int(parts[5], 16)
+            return off + size - 20, off + size  # the 20-byte SHA-1 ends the note
+    return None
+
+
+def whole_files(ours: Path, official: Path) -> dict:
+    """Our program stripped as the official one is, against it, byte by byte."""
+    with tempfile.TemporaryDirectory(prefix="lx-fsunit-strip_") as d:
+        stripped = Path(d) / ours.name
+        subprocess.run(["strip", "--strip-all", "-o", str(stripped), str(ours)], check=True)
+        a, b = stripped.read_bytes(), official.read_bytes()
+    differ = [k for k, (x, y) in enumerate(zip(a, b, strict=False)) if x != y]
+    bid = build_id_range(official)
+    outside = [k for k in differ if not (bid and bid[0] <= k < bid[1])]
+    return {
+        "size": [len(a), len(b)],
+        "differing_bytes": len(differ) + abs(len(a) - len(b)),
+        "outside_build_id": len(outside) + abs(len(a) - len(b)),
+    }
+
+
+def section_bytes_compare(ours: Path, official: Path) -> dict:
+    """Every section with content: identical, or how many of its bytes differ."""
+    sa, sb = dict(section_list(ours)), dict(section_list(official))
+    out = {}
+    for name in sorted(set(sa) | set(sb)):
+        if name in (".symtab", ".strtab"):
+            continue
+        if name not in sa or name not in sb:
+            out[name] = "only ours" if name in sa else "only official"
+            continue
+        if sa[name] == "NOBITS":
+            continue
+        x, y = section_bytes(ours, name), section_bytes(official, name)
+        if x != y:
+            out[name] = {
+                "size": [len(x), len(y)],
+                "differing_bytes": sum(c != d for c, d in zip(x, y, strict=False)),
+            }
+    return out
+
+
+def raw_differences(a, b) -> int | None:
+    """With both programs' instructions at the same addresses: those whose text differs with
+    every address kept (``None``: the layouts differ)."""
+    if [x[1] for x in a] != [y[1] for y in b]:
+        return None
+
+    def raw(t: str) -> str:
+        return " ".join(re.sub(r"<[^>]*>", "", t.split("#")[0]).split())
+
+    return sum(raw(x[2]) != raw(y[2]) for x, y in zip(a, b, strict=True))
 
 
 def compare(ours: Path, official: Path) -> dict:
@@ -264,8 +341,11 @@ def compare(ours: Path, official: Path) -> dict:
         "instructions": [len(na), len(nb)],
         "identical_in_order": same,
         "differences": diffs,
+        "raw_differences": raw_differences(a, b),
         "data": data_words(ours, official),
         "constructors": constructors(ours, official, a, b, ops),
+        "sections_differing": section_bytes_compare(ours, official),
+        "files": whole_files(ours, official),
     }
 
 
@@ -293,6 +373,9 @@ def main(argv: list[str] | None = None) -> int:
         for k, (x, y) in r["sections"].items():
             if x != y:
                 print(f"  {k}: {x} bytes (official {y})")
+        print(f"  files (ours stripped): {r['files']}")
+        print(f"  sections differing: {r['sections_differing']}")
+        print(f"  instructions differing with their addresses: {r['raw_differences']}")
         for name, dw in r["data"].items():
             print(f"  {name}: {dw}")
         print(f"  constructors: {r['constructors']}")

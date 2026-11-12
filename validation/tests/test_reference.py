@@ -102,3 +102,42 @@ def test_examples_run(program, tmp_path, monkeypatch):
                 assert p.returncode == 0, f"{where}: larmorx {shlex.join(args)}\n{p.stderr[-2000:]}"
         else:
             pytest.fail(f"{where}: an example in {c.lang!r}: python or a shell")
+
+
+#: Drifts the checks must catch, on bet's API page: (what changes, the text, its replacement,
+#: a part of the problem expected).
+DRIFTS = [
+    ("a missing row", "| `-d` | (command line only) | keeps the temporary files |\n", "", "`-d`"),
+    (
+        "an option the program does not take",
+        "| `-m` | `mask=True` | |",
+        "| `-m`, `--mask` | `mask=True` | |",
+        "`--mask`",
+    ),
+    (
+        "an argument the function does not take",
+        "| `-t` | `threshold=True` |",
+        "| `-t` | `thresh=True` |",
+        "`thresh`",
+    ),
+    (
+        "a stale signature",
+        'upstream_defects="fix")`\n\nReturns a `BetResult`',
+        'upstream_defects="reproduce")`\n\nReturns a `BetResult`',
+        "signature",
+    ),
+]
+
+
+@pytest.mark.parametrize("drift", DRIFTS, ids=[d[0] for d in DRIFTS])
+def test_checks_catch_drift(drift, tmp_path):
+    from larmorx_validation.reference.page import build
+
+    _, old, new, expected = drift
+    text = (REPO / "docs/api/fsl-bet.md").read_text(encoding="utf-8")
+    assert old in text, "the drift's text is no longer on bet's API page: update DRIFTS"
+    (tmp_path / "docs/api").mkdir(parents=True)
+    (tmp_path / "docs/api/fsl-bet.md").write_text(text.replace(old, new, 1), encoding="utf-8")
+    api = apipage.read(tmp_path, "docs/api/fsl-bet.md")
+    problems = [x for p in api.programs for x in build(REPO, p).problems]
+    assert any(expected in x for x in problems), problems

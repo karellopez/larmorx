@@ -24,6 +24,7 @@ use numpy::{PyArray, PyArray1, PyArray2, PyReadonlyArray1, PyReadonlyArray2};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 
+mod compcor;
 mod dvars;
 mod fft;
 mod gelsd;
@@ -1149,5 +1150,6 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     reductions::register(m)?;
     fft::register(m)?;
     dvars::register(m)?;
+    compcor::register(m)?;
     Ok(())
 }

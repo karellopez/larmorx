@@ -16,12 +16,16 @@
 //!   and `AR_est_YW(x, 1)` with each SciPy release's 1 × 1 `linalg.solve`.
 //! - [`dvars`]: nipype's `compute_dvars` on the masked series (the three DVARS series, the
 //!   corrections PIPE-46, PIPE-47, PIPE-50 and SCI-41).
+//! - [`compcor`]: nipype's CompCor numerics (`_cosine_drift`, `regress_poly`, `cosine_filter`,
+//!   `_compute_tSTD`, `TCompCor`'s high-variance mask, `compute_noise_components`; the corrections
+//!   PIPE-44, PIPE-45, PIPE-52, PIPE-54, PIPE-55, PIPE-57 and PIPE-59, GLIBC-07's cosine).
 //!
 //! This crate is the **port** (a replica of permissive upstreams, in the main package). The
 //! clean-room original of the same steps, planned later (the user, 2026-11-06 and 2026-11-11),
 //! lives in another crate.
 #![forbid(unsafe_code)]
 
+pub mod compcor;
 pub mod dvars;
 pub mod nitime;
 pub mod scipy_fft;

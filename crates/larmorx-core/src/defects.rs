@@ -375,12 +375,32 @@ defects! {
         "the index matches the entity patterns against each file's absolute path, so the folders above the dataset give its files entities: below a folder named func, sub-pilot or run-2 every file gets datatype func, subject pilot or run 2, and with the derivatives configuration (whose den-, res-, desc-, ... patterns have no separator before them) below golden-x or andres-lab every file gets den or res";
     PIPE_40 = "PIPE-40", "niworkflows IntraModalMerge", true,
         "with to_ras the series is reoriented to RAS but in_mask is not, so grand_mean_scaling indexes the RAS series with the mask on the input's grid: numpy's IndexError when the shapes differ, a mirrored or permuted mask when they agree";
+    PIPE_44 = "PIPE-44", "nipype compute_noise_components", true,
+        "a mask that gives no component (an empty mask with components_criterion 'all') ends the loop over the masks (break): the masks after it are skipped, their components and metadata lost, and when no component was found failure_mode='NaN' stops with ValueError: need at least one array to concatenate instead of returning";
+    PIPE_45 = "PIPE-45", "nipype compute_noise_components", true,
+        "only the voxels whose float sum over time is NaN are zeroed: a voxel holding an infinity (and no NaN) reaches the pre-filter and the SVD, which then fails, so every component of the mask is NaN with failure_mode='NaN' (or ValueError: array must not contain infs or NaNs), while a finite voxel whose float32 sum overflows both ways is zeroed";
     PIPE_46 = "PIPE-46", "nipype compute_dvars", true,
         "the voxel-wise standardisation, which runs whatever DVARS the caller asked for, turns numpy's floating-point warnings into errors: a voxel whose predicted difference SD is 0 (a robust SD of 0, kept by remove_zerovariance=False, or an AR(1) estimate of exactly 1) stops the whole computation with RuntimeWarning: divide by zero (or invalid value) encountered in divide, and every DVARS series is lost";
     PIPE_47 = "PIPE-47", "nipype compute_dvars", true,
         "an AR(1) estimate above 1, which the float32 FFT's rounding gives for a series whose lag-1 autocorrelation is just below 1, makes the predicted difference SD the square root of a negative number: NaN, so every standardised and voxel-wise DVARS value is NaN, without an error";
     PIPE_50 = "PIPE-50", "nipype compute_dvars", true,
         "a voxel whose demeaned series is all zeros (a constant voxel, kept by remove_zerovariance=False) has the AR(1) Yule-Walker equation 0 a = 0: with SciPy 1.15 nitime's solve returns NaN, which makes every standardised and voxel-wise DVARS value NaN without an error; with SciPy 1.18 it stops with LinAlgError (\"A singular matrix detected.\")";
+    PIPE_52 = "PIPE-52", "nipype regress_poly", true,
+        "the non-constant regressors it returns (CompCor's Legendre pre-filter file) are X[:, :-1], the constant and every polynomial but the highest, not the polynomials of degree 1 to d";
+    PIPE_53 = "PIPE-53", "nipype regress_poly, cosine_filter", true,
+        "an axis other than the last takes that axis' length as the series' length but reshapes the data in memory order to rows of that length, so the series regressed are runs of consecutive values across voxels and volumes, without an error";
+    PIPE_54 = "PIPE-54", "nipype compute_noise_components", true,
+        "a components_criterion of 0 ends the loop over the masks at the first one, and a negative one other than -1 ('all') slices columns off the end of each mask's components (u[:, :-2]) while marking none retained in the metadata; a count given as a float (6.0) stops with TypeError when an SVD fails with failure_mode='NaN'";
+    PIPE_55 = "PIPE-55", "nipype compute_noise_components", true,
+        "an empty mask with a failure_mode other than 'error' returns an empty pre-filter basis, so when it is the last mask the cosine or polynomial basis is lost (CompCor's pre-filter file then holds no basis column)";
+    PIPE_56 = "PIPE-56", "nipype CompCor", true,
+        "the repetition time read from the header is converted from milliseconds but not from microseconds (xyzt_units usec): it is taken as that many seconds, which gives a cosine basis of millions of columns";
+    PIPE_57 = "PIPE-57", "nipype compute_noise_components", true,
+        "a filter_type other than 'cosine', 'polynomial' and False silently filters nothing, not even the mean, and a float32 series is then decomposed in single precision";
+    PIPE_58 = "PIPE-58", "nipype compute_noise_components", true,
+        "mask_names shorter than the masks silently drops the masks without a name (zip): their components and metadata are not computed";
+    PIPE_59 = "PIPE-59", "nipype compute_noise_components", true,
+        "an SVD that fails with failure_mode='NaN' is replaced by T NaN singular values whatever the decomposition's size min(T, N), and with components_criterion 'all' by one NaN component while all T values are marked retained (CompCor's metadata then names every one after the first component)";
     SCI_02 = "SCI-02", "SciPy ndimage", true,
         "NaN and out-of-range values written to an integer output are converted as x86-64 converts them (C leaves the conversion undefined)";
     SCI_03 = "SCI-03", "SciPy ndimage", true,

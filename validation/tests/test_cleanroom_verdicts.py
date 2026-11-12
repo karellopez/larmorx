@@ -75,6 +75,9 @@ def test_every_clean_room_crate_is_audited():
         ),
         ("3dTshift globals: -overwrite, -D (replica+spec)", "", "replica author"),
         ("glibc maths part 1, relay 2 (spec)", "", "spec writer"),
+        ("Docs revision writer relay 11 (restart)", "clean-room implementers ...", "documentation"),
+        ("Docs revision critical reviewer round 1", "", "documentation"),
+        ("Cross-part coherence review (reviewer)", "", "documentation"),
         ('implementation="auto": run the GPL replica', "", "integration"),
         (
             "glibc maths part 2, relay 1",

@@ -523,7 +523,7 @@ EXTRA: list[dict] = [
     {
         "wave": "3.1",
         "kind": "oracle",
-        "crate": "validation/investigations/freesurfer-oracle/",
+        "crate": "validation/investigations/freesurfer-unit-oracle/",
         "what": "a unit oracle: FreeSurfer 8.2.0's libutils and the packages it links, built from"
         " the tag with GCC 8.4.0 (oracles/toolchains/gcc-8.4) and the official flags (code.toml)"
         " against ITK 4.13.2's VNL, with a harness that calls single functions (the foundations'"

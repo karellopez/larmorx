@@ -125,6 +125,9 @@ def tool_of(rel: str) -> tuple[str, str] | None:
 ROLE_BY_WORDS = (
     ("orchestrator", r"^ORCHESTRATOR$"),
     ("audit", r"[Cc]lean-room audit"),
+    # the documentation revision's writer and critical reviewer, and the cross-part coherence reviewer (2026-11-12):
+    # they may read every document, replica material included, and never edit clean-room code
+    ("documentation", r"^Docs revision (writer|critical reviewer)|^Cross-part coherence review"),
     ("spec writer", r"\(spec\)|spec answers|behaviour spec|[Ss]pec writer"),
     ("replica author", r"[Rr]eplica|^Port (AFNI|FSL)"),
     ("clean-room implementer", r"[Cc]lean-room|[Cc]lean room"),

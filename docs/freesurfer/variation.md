@@ -74,6 +74,13 @@ lists what the next relay checks. Lines are FreeSurfer 8.2.0's (`<workspace>/tag
   a random source has 97 rows (`drand48`, `srand48`, `rand`, `setRandomSeed`, `randomNumber`, ...;
   third-party.md, TP-15 for glibc's generators); which of them run with a clock seed on a default
   path is the next relay's check.
+- **Time-of-day seeds in fMRIPrep's programs.** `mri_segreg` (387-388, bbregister's optimiser),
+  `mri_vol2vol` (663-664) and `mri_surf2surf` (844-848, only when synthesizing data) seed
+  `drand48` with `PDFtodSeed()` unless a seed is given: `tv_sec + tv_usec` of the time of day
+  (`utils/pdf.cpp` 32-38); `mri_vol2surf` seeds it only when synthesizing its source (357-360;
+  its `seed`, from the time of day when not given, 1873). Whether a default
+  call draws from it (for `mri_segreg`: the random rotations at 1314-1316) is the next relay's
+  check.
 
 ## 4. Next (relay 5)
 

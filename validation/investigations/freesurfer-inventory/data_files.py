@@ -374,7 +374,7 @@ def main(argv: list[str]) -> int:
             tag_path = in_git[(size, digest)]
             url = GITHUB_RAW + tag_path
             served = "FreeSurfer's git repository at v8.2.0 (GitHub)"
-        streams = sorted(e["streams"]) or ["(conditional only)"]
+        streams = sorted(e["streams"])
         if kind == "configuration":
             home = "the recon-all port's own configuration (not shipped as data)"
         elif licence.startswith("Washington"):
@@ -395,7 +395,7 @@ def main(argv: list[str]) -> int:
                 "sha256": digest,
                 "programs": sorted(e["programs"]),
                 "streams": streams,
-                "conditional_streams": sorted(e["cond"]),
+                "conditional_streams": sorted(e["cond"] - e["streams"]),
                 "evidence": sorted(e["jobs"]),
                 "tag_path": tag_path,
                 "served": served,

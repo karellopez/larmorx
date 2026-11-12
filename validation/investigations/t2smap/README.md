@@ -223,6 +223,14 @@ OPENBLAS_CORETYPE=Haswell scripts/orchestration/boxed.sh 32 <env>/bin/python -P 
 - `rs2_descriptor_formats.py --cases N` (relay RS2): the replica's random-testing descriptor on
   its ANALYZE and MGH draws only, each through the descriptor's own comparison: 30 of 30 agree
   (log `oracles/logs/t2smap-cr-rs2-descriptor-formats.log`).
+- `rs2_fmriprep_t25.py` (relay RS2): fMRIPrep's own `T2starmap` and `desc-optcom_bold` of its
+  three multi-echo calls on the oracle runs made again with OpenBLAS's Haswell kernels (ds000210's
+  two tasks, ds000258) against tedana 25.0.1 run here in fMRIPrep 25.2.6's image (oracle cache),
+  with numpy's AVX-512 kernels off and on: **on, every value identical** on all three calls; off,
+  4,015, 7,609 and 25,542 values differ (T2* by up to 9.8e-6 relative, the series by one float32
+  unit: NP-04's SVML `exp`/`log`). So fMRIPrep's runs had numpy's AVX-512 kernels on (their
+  RUN_INFO sets only `OPENBLAS_CORETYPE`) and are reproduced exactly (log
+  `oracles/logs/t2smap-cr-rs2-fmriprep-t25.log`).
 - `check_outputs.py --replica <target>/release/larmorx-gpl --work <empty dir> --libraries
   newest|shared` (relay 5b; build with `cargo build --release --manifest-path crates-gpl/Cargo.toml
   -p larmorx-gpl-cli`): tedana's whole `t2smap` program (`t2smap._main(args)` in the environment's

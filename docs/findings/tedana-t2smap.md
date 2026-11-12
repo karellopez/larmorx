@@ -499,3 +499,68 @@ passing from this branch, in both environments):
   element's own further digits, not zeros) reaches the replica when it is rebuilt: case 22 prints
   `8.8745688e+04` as tedana, where 0.1.0rc1 printed its zero-padded form.
 
+## ANALYZE 7.5, MGH/MGZ and TED-46 under the curve fit (relay RS2, 2026-11-12)
+
+- **ANALYZE 7.5 and MGH/MGZ are read** (*read*: nibabel 5.4.2's `load`, `Spm2AnalyzeHeader`,
+  `Spm99AnalyzeImage.from_file_map`, `MGHHeader`, `MGHImage.from_file_map`, `affines.from_matvec`,
+  `volumeutils.array_from_file`; tedana's `_convert_to_nifti1`). nibabel tries its classes in order:
+  a `.hdr`/`.img` pair whose header is not NIfTI's (348 in `sizeof_hdr` in either byte order, no
+  `ni1`/`n+1` magic) is an `Spm2AnalyzeImage` (SPM2's scale factor `funused1` with its intercept
+  `funused2`, else the gl/cal ranges; SPM's origin; a MATLAB `.mat` beside it overrides the
+  affine); `.mgh`/`.mgz` (no other compressed suffix: `x.mgh.gz` is no image nibabel knows) is an
+  `MGHImage`. tedana converts both to an in-memory `Nifti1Image` of nibabel's scaled array.
+  The replica reads their bytes through the main package's reader of that loading,
+  `larmorx_tedana::formats` (Apache-2.0: the clean-room original's, called as a library; a shared
+  crate would be its better home, below), and adds what tedana's path decides:
+  - **when the data are read**: `_convert_to_nifti1` reads a converted image's data at once, so a
+    reading error (a short `.img`) comes where the image is loaded: at `load_ref_img` for the
+    first echo (one traceback), in the fast path before its shape check for a later echo (then
+    again in nilearn's fallback, which converts every echo before masking: two chained
+    tracebacks), and before the squeeze of a user mask. The replica read the data after those
+    checks; it now reads converted images where tedana does (`Header::converted`);
+  - **the file a short read names**: nibabel's `array_from_file` names the file object it read
+    (`Expected <n> bytes, got <m> bytes from <file>`, then ` - could the file be damaged?`): an
+    ANALYZE pair's `.img`, not the `.hdr` the user gave;
+  - **MGH's affine is float32** (*read*: `from_matvec(MdcD, Pxyz_c - centre)` makes a 4 × 4 of
+    `MdcD`'s type, float32): the translation, computed in float64, is stored rounded to float32.
+    It shows only where the affine is printed (nilearn's `Mask affine: ...` refusal); the outputs'
+    headers keep float32 fields either way. The main package's reader returns the float64
+    translation (an observation for its clean-room owner, in behaviour words: the MGH translation
+    is the float32 rounding of `Pxyz_c - centre`);
+  - complex64 and RGB ANALYZE data, and headers the reader refuses (negative dimensions, an
+    unknown ANALYZE `dim[0]`, an MGH type nibabel does not know), are refused with the replica's
+    message (`larmorx.UnsupportedFormat`; D5).
+  Measured: the parity suite's 20 `formats/` cases (`check_formats.py`: both byte orders, every
+  stored type a fit reads, both scalings, the origin set and unset, `.mat` files of `mat`, `M` and
+  neither, compressed pairs, voxel sizes of 0 and below 0, `.img` names, z-concatenated files,
+  masks of each format, MGH's oblique affine, its footer or none, `goodRASFlag` 0, three formats at
+  once, and nibabel's six failures) agree bit for bit in both environments; the 104 replayed
+  random-testing cases of the clean-room part with ANALYZE or MGH inputs
+  (`rs2_replayed_formats.py`): every file tedana wrote identical, the 30 it failed failing too; the
+  descriptor's ANALYZE and MGH draws: 30 of 30 agree.
+- **TED-46 under `--fittype curvefit`** (spec writer 4: rule D, measured first;
+  `validation/investigations/t2smap-spec/ted46_curvefit.py`, `specs/t2smap.md` §7.3): with TED-46's
+  exact slope 0 the curve fit starts at T2* = +inf, which SciPy refuses (a failure keeping the
+  log-linear S0 = x + 1, the +1 of log(|x| + 1)). On the 23 cases that hold such voxels (20
+  replayed trial cases, three synthetic series of 0.2 %, 1 % and 5 % saturated voxels), against
+  the curve fit's exact solution (S0 = x, T2* = +inf: a residual of 0): that start already gave
+  the truth's T2* (500 ms), cap and every other voxel's values, but S0 = x + 1 and a failure at
+  each such voxel; a finite start (500 ms) converges at T2* 1.2e9 to 2.1e10 ms and moves the cap
+  in 20 of the 23 cases (not adopted); tedana writes 1 ms (negative noise, 12 trial cases and the
+  synthetic ones) or about 1e16 to 3e17 ms with S0 = x + 0.5 (positive noise, 7 cases; the cap one
+  of them). The default (rule A) now takes the exact solution where the samples are all equal: S0
+  = x, T2* +inf (500 ms), not a failure, variances 0 (+inf with two samples, SciPy's warning)
+  (`decay::fit_monoexponential`; the unit test `equal_samples_take_the_curve_fits_exact_solution_
+  by_default`); `reproduce` is tedana's fit from its noise.
+- **fMRIPrep's own files, reproduced exactly** (*measured*: `rs2_fmriprep_t25.py`): on the oracle
+  runs made again with OpenBLAS's Haswell kernels (2026-11-09), tedana 25.0.1 run here in
+  fMRIPrep 25.2.6's image gives fMRIPrep's `T2starmap` and `desc-optcom_bold` of ds000210's two
+  tasks and ds000258 **bit for bit** with numpy's AVX-512 kernels on (as fMRIPrep's run had them:
+  only `OPENBLAS_CORETYPE` was set), and differs in 4,015, 7,609 and 25,542 values with them off
+  (NP-04). The earlier runs' remaining differences were OpenBLAS's AVX-512 kernels. The replica
+  record's comparison of fMRIPrep's files with tedana 26.0.3's counts the version step from 25.0.1
+  (6,364, 13,164 and 38,876 values; ds003592, an earlier run on another machine, 41,897).
+- **The reader's home** (for the orchestrator): `larmorx_tedana::formats` (ANALYZE, MGH, MATLAB
+  files) reads what nibabel reads for any tool, not only t2smap; moved to `larmorx-io` (a clean
+  relay's or the orchestrator's move: the replica-side relays never edit the clean-room crate),
+  both implementations and later tools would call it from there.

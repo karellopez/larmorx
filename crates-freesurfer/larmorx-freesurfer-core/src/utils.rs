@@ -416,9 +416,15 @@ pub fn nint2(g: &mut Globals, f: f64) -> i32 {
 /// `sum2stddev(xsum, xsum2, nx)`: `sqrt((xsum2 - 2*mean*xsum + nx*mean*mean) / (nx - 1))`, mean
 /// `xsum / nx`, in that order.
 pub fn sum2stddev(xsum: f64, xsum2: f64, nx: i32) -> f64 {
-    let xmean = xsum / f64::from(nx);
-    ((xsum2 - 2.0 * xmean * xsum + f64::from(nx) * xmean * xmean) / f64::from(nx.wrapping_sub(1)))
-        .sqrt()
+    use crate::sse::{add64, div64, mul64, sqrt64, sub64};
+    let n = f64::from(nx);
+    let xmean = div64(xsum, n);
+    let t = add64(
+        sub64(xsum2, mul64(mul64(2.0, xmean), xsum)),
+        mul64(mul64(n, xmean), xmean),
+    );
+    // SSE2's NaN rules (crate::sse): nx of 0 or 1 makes 0 / 0
+    sqrt64(div64(t, f64::from(nx.wrapping_sub(1))))
 }
 
 /// `compare_ints`: -1, 1 or 0.

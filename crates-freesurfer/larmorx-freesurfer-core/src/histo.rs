@@ -19,7 +19,8 @@
 //! `HISTOcomputeFWHM`, `HISTOwriteTxt`, `HISTOsumNorm`, `HISTOcumsum`.
 //!
 //! Every expression keeps C's types: `float` sums stay `float` (each step rounded), `double`
-//! ones `double`; a `float` compared with an `int` converts the `int`; the C library's `exp`,
+//! ones `double`; the divisions that can make a NaN from numbers (`0 / 0` of an empty histogram, a
+//! histogram of one bin, a zero count) follow SSE2's NaN rules on every platform (`crate::sse`); a `float` compared with an `int` converts the `int`; the C library's `exp`,
 //! `log` and `pow` are larmorx's correctly rounded ones by default and glibc 2.35's with
 //! `reproduce` (`larmorx_core::math::Libm`).
 //!
@@ -80,6 +81,7 @@ use crate::diag::{DIAG_WRITE, verbose_on};
 use crate::globals::Globals;
 use crate::log::{self, ERROR_BADPARM, ERROR_NO_MEMORY, ERROR_NOFILE, ERROR_UNSUPPORTED, Fatal};
 use crate::ret::Ret;
+use crate::sse;
 use crate::utils::{nint, resolve};
 
 /// `MAX_BINS`.
@@ -501,7 +503,7 @@ fn smooth_kernel(g: &mut Globals, sigma: f32) -> Vec<f32> {
         norm += k;
     }
     for k in kernel.iter_mut() {
-        *k /= norm;
+        *k = sse::div(*k, norm);
     }
     kernel
 }
@@ -545,7 +547,7 @@ pub fn histo_smooth(
             norm += k;
             total += k * src.counts[b1 as usize];
         }
-        d.counts[b as usize] = total / norm;
+        d.counts[b as usize] = sse::div(total, norm);
         d.bins[b as usize] = src.bins[b as usize];
     }
     match fresh {
@@ -570,7 +572,7 @@ pub fn histo_smooth_in_place(g: &mut Globals, h: &mut Histogram, sigma: f32) {
             norm += k;
             total += k * h.counts[b1 as usize];
         }
-        h.counts[b as usize] = total / norm;
+        h.counts[b as usize] = sse::div(total, norm);
     }
 }
 
@@ -810,10 +812,10 @@ pub fn histo_add_sample(
     let (bmin, bin_size) = if bmin >= bmax {
         (histo.min, histo.bin_size)
     } else {
-        (bmin, (bmax - bmin) / (histo.nbins as f32 - 1.0))
+        (bmin, sse::div(bmax - bmin, histo.nbins as f32 - 1.0))
     };
     let reproduce = g.notices.reproduce();
-    let x = (val - bmin) / bin_size;
+    let x = sse::div(val - bmin, bin_size);
     let bin_no = nint(g, f64::from(x));
     if !reproduce && x.is_nan() {
         g.notices.add(
@@ -1116,7 +1118,10 @@ pub fn histo_fill_holes(g: &mut Globals, h: &mut Histogram) -> i32 {
                 let change = if h.counts[u] == 0.0 {
                     1.0
                 } else {
-                    (new_val - f64::from(h.counts[u])).abs() / f64::from(h.counts[u]).abs()
+                    sse::div64(
+                        (new_val - f64::from(h.counts[u])).abs(),
+                        f64::from(h.counts[u]).abs(),
+                    )
                 };
                 h.counts[u] = new_val as f32;
                 if change > max_change {
@@ -1277,7 +1282,7 @@ pub fn histo_compute_linear_fit_correlation(
         corr += f64::from(h1.counts[b1 as usize]) * c2;
     }
     for b2 in 0..h2.nbins {
-        let b1 = nint(g, (f64::from(b2) - b) / a);
+        let b1 = nint(g, sse::div64(f64::from(b2) - b, a));
         let c1 = if b1 < 0 || b1 > h1.nbins - 1 {
             0.0
         } else {
@@ -1423,7 +1428,7 @@ pub fn histo_make_pdf_in_place(h: &mut Histogram) {
     }
     if total > 0.0 {
         for c in &mut h.counts[..n] {
-            *c /= total;
+            *c = sse::div(*c, total);
             if f64::from(*c).abs() < 1e-15 {
                 *c = (1.0f64 / f64::from(10.0f32 * total)) as f32;
             }
@@ -1441,7 +1446,7 @@ pub fn histo_bins(
     max: f64,
 ) -> Result<Histogram, Fatal> {
     let mut h = histo_alloc(g, err, nbins)?;
-    h.bin_size = ((max - min) / f64::from(nbins - 1)) as f32;
+    h.bin_size = sse::div64(max - min, f64::from(nbins - 1)) as f32;
     for n in 0..h.n() {
         h.bins[n] = (min + f64::from(h.bin_size * n as f32)) as f32;
     }
@@ -1516,7 +1521,7 @@ pub fn histo_init(
     }
     h.min = mn as f32;
     h.max = mx as f32;
-    h.bin_size = ((mx - mn) / f64::from(nbins - 1)) as f32;
+    h.bin_size = sse::div64(mx - mn, f64::from(nbins - 1)) as f32;
     if h.bin_size <= 0.0 {
         h.bin_size = 1.0;
     }
@@ -1603,7 +1608,7 @@ fn make_cdf(
         }
     }
     for b in 0..d.n() {
-        d.counts[b] = (f64::from(d.counts[b]) / total) as f32;
+        d.counts[b] = sse::div64(f64::from(d.counts[b]), total) as f32;
     }
     Ok(match fresh {
         Some(d) => Ret::New(d),
@@ -1732,7 +1737,7 @@ pub fn histo_robust_gaussian_fit(
                 n += 1;
             }
         }
-        scale /= f64::from(n);
+        scale = sse::div64(scale, f64::from(n));
         let mut sse = 0.0f64;
         for b in min_bin..=max_bin {
             let val = f64::from(bin_value(g, &hz, b, "HISTOrobustGaussianFit"));
@@ -1760,7 +1765,7 @@ pub fn histo_robust_gaussian_fit(
                 n += 1;
             }
         }
-        scale /= f64::from(n);
+        scale = sse::div64(scale, f64::from(n));
         for b in 0..hp.n() {
             let val = f64::from(hp.bins[b]) - mean;
             let predicted = scale / (best_sigma * sqrt_2pi)
@@ -1988,7 +1993,7 @@ pub fn histo_sum_norm(h: &mut Histogram) -> i32 {
     }
     if sum != 0.0 {
         for c in &mut h.counts[..n] {
-            *c = (f64::from(*c) / sum) as f32;
+            *c = sse::div64(f64::from(*c), sum) as f32;
         }
     }
     0

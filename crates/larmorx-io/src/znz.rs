@@ -172,7 +172,11 @@ impl ZnzFile {
             if trunc {
                 o.truncate(true);
             }
-            let file = o.open(to_path(path)).ok()?;
+            let mut file = o.open(to_path(path)).ok()?;
+            if a {
+                // glibc's append stream starts at the end (its ftell says so before any write).
+                let _ = file.seek(SeekFrom::End(0));
+            }
             Some(ZnzFile {
                 inner: Inner::Plain(StdioFile {
                     file,
@@ -366,12 +370,7 @@ impl ZnzFile {
             Inner::Plain(p) => {
                 if p.fwrite(&b, 1, 1) == 1 { c & 0xff } else { -1 }
             }
-            Inner::Gz(g) => {
-                if g.mode != GzMode::Write || g.err != Z_OK {
-                    return -1;
-                }
-                if g.gzwrite(&b) == 1 { c & 0xff } else { -1 }
-            }
+            Inner::Gz(g) => g.gzputc(c),
         }
     }
 
@@ -984,10 +983,21 @@ impl GzFile {
         self.mode == GzMode::Read && self.past
     }
 
-    /// `gzputc`.
+    /// `gzputc`: a pending gap is written first (before the buffers exist: FS-78), then the byte.
     pub fn gzputc(&mut self, c: i32) -> i32 {
         if self.mode != GzMode::Write || self.err != Z_OK {
             return -1;
+        }
+        if self.seek {
+            self.seek = false;
+            if self.zero(self.skip).is_err() {
+                return -1;
+            }
+        }
+        if self.size > 0 && self.wbuf.len() < self.size {
+            self.wbuf.push(c as u8);
+            self.x_pos += 1;
+            return c & 0xff;
         }
         if self.gzwrite(&[c as u8]) == 1 { c & 0xff } else { -1 }
     }
@@ -1196,4 +1206,152 @@ enum Target {
 enum Dest {
     Out,
     User,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use larmorx_core::cfmt::{Captured, Stream};
+
+    fn gz(data: &[u8]) -> Vec<u8> {
+        let mut e = flate2::write::GzEncoder::new(Vec::new(), Compression::new(6));
+        e.write_all(data).unwrap();
+        e.finish().unwrap()
+    }
+
+    fn data(n: usize) -> Vec<u8> {
+        (0..n).map(|i| (i * 7 % 251) as u8).collect()
+    }
+
+    #[test]
+    fn writes_and_reads_back_both_kinds() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut c = Captured::default();
+        for comp in [false, true] {
+            let p = dir.path().join(if comp { "a.gz" } else { "a.bin" });
+            let pb = p.as_os_str().as_encoded_bytes();
+            let d = data(70_000);
+            let mut f = ZnzFile::open(pb, b"wb", comp).unwrap();
+            assert_eq!(f.write(&d, 1, d.len(), &mut c), d.len() as i64);
+            assert_eq!(f.tell(), d.len() as i64);
+            assert_eq!(f.close(), 0);
+            let mut f = ZnzFile::open(pb, b"rb", comp).unwrap();
+            let mut back = vec![0u8; d.len() + 10];
+            assert_eq!(f.read(&mut back, 1, d.len() + 10, &mut c), d.len() as i64);
+            assert_eq!(&back[..d.len()], &d[..]);
+            assert!(f.eof());
+            f.close();
+        }
+        assert_eq!(c.text(Stream::Err), "");
+    }
+
+    #[test]
+    fn gzip_seeks() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("s.gz");
+        let d = data(50_000);
+        std::fs::write(&p, gz(&d)).unwrap();
+        let mut f = ZnzFile::open(p.as_os_str().as_encoded_bytes(), b"rb", true).unwrap();
+        let mut c = Captured::default();
+        assert_eq!(f.seek(30_000, Whence::Set), 30_000);
+        assert_eq!(f.tell(), 30_000);
+        assert_eq!(f.getc(), d[30_000] as i32);
+        assert_eq!(f.seek(-20_000, Whence::Cur), 10_001);
+        let mut b = [0u8; 4];
+        assert_eq!(f.read(&mut b, 1, 4, &mut c), 4);
+        assert_eq!(&b, &d[10_001..10_005]);
+        assert_eq!(f.seek(0, Whence::End), -1);
+        assert_eq!(f.seek(-1, Whence::Set), -1);
+        // a seek past the end is accepted; the next read finds the end
+        assert_eq!(f.seek(60_000, Whence::Set), 60_000);
+        assert_eq!(f.read(&mut b, 1, 4, &mut c), 0);
+        assert!(f.eof());
+    }
+
+    #[test]
+    fn transparent_trailing_truncated_and_two_members() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("t.gz");
+        let pb = p.as_os_str().as_encoded_bytes().to_vec();
+        let d = data(30_000);
+        let mut c = Captured::default();
+        let read_all = |c: &mut Captured| {
+            let mut f = ZnzFile::open(&pb, b"rb", true).unwrap();
+            let mut back = vec![0u8; 100_000];
+            let len = back.len();
+            let n = f.read(&mut back, 1, len, c);
+            (n, f.close(), back)
+        };
+        std::fs::write(&p, &d).unwrap();
+        assert_eq!(read_all(&mut c).0, 30_000);
+        let mut t = gz(&d);
+        t.extend_from_slice(b"garbage");
+        std::fs::write(&p, &t).unwrap();
+        assert_eq!(read_all(&mut c).0, 30_000);
+        let mut two = gz(&d[..10_000]);
+        two.extend(gz(&d[10_000..]));
+        std::fs::write(&p, &two).unwrap();
+        let (n, _, back) = read_all(&mut c);
+        assert_eq!(n, 30_000);
+        assert_eq!(&back[..30_000], &d[..]);
+        let mut cut = gz(&d);
+        cut.truncate(cut.len() / 2);
+        std::fs::write(&p, &cut).unwrap();
+        let (n, close, _) = read_all(&mut c);
+        assert!(n > 0 && n < 30_000);
+        assert_eq!(close, Z_BUF_ERROR);
+    }
+
+    #[test]
+    fn defects_76_77_78() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("d.gz");
+        let pb = p.as_os_str().as_encoded_bytes().to_vec();
+        std::fs::write(&p, gz(&data(7))).unwrap();
+        let mut c = Captured::default();
+        let mut buf = [0u8; 8];
+        // 7 bytes read as 4 members of 2: nifticlib says 4 (FS-77), larmorx 3.
+        let mut f = ZnzFile::open(&pb, b"rb", true).unwrap();
+        assert_eq!(f.read(&mut buf, 2, 4, &mut c), 3);
+        assert!(f.notices().contains(&d::FS_77));
+        assert_eq!(c.text(Stream::Err), "** znzread: read short by 1 bytes\n");
+        let mut f = ZnzFile::open(&pb, b"rb", true).unwrap().with_upstream_defects(UpstreamDefects::Reproduce);
+        assert_eq!(f.read(&mut buf, 2, 4, &mut c), 4);
+        let mut f = ZnzFile::open(&pb, b"rb", true).unwrap();
+        assert_eq!(f.read(&mut buf, 0, 4, &mut c), 0);
+        assert!(f.notices().contains(&d::FS_76));
+        // a gap before the first write: zeros, and FS-78's notice
+        let q = dir.path().join("w.gz");
+        let mut f = ZnzFile::open(q.as_os_str().as_encoded_bytes(), b"wb", true).unwrap();
+        assert_eq!(f.seek(100, Whence::Set), 100);
+        assert_eq!(f.putc(7), 7);
+        let (r, n) = f.close_with_notices();
+        assert_eq!(r, 0);
+        assert!(n.contains(&d::FS_78));
+        let mut out = Vec::new();
+        flate2::read::GzDecoder::new(&std::fs::read(&q).unwrap()[..]).read_to_end(&mut out).unwrap();
+        assert_eq!(out.len(), 101);
+        assert!(out[..100].iter().all(|&b| b == 0));
+        assert_eq!(out[100], 7);
+    }
+
+    #[test]
+    fn plain_streams() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("p.bin");
+        std::fs::write(&p, data(10)).unwrap();
+        let mut c = Captured::default();
+        let mut f = ZnzFile::open(p.as_os_str().as_encoded_bytes(), b"rb", false).unwrap();
+        assert_eq!(f.seek(3, Whence::Set), 0);
+        assert_eq!(f.tell(), 3);
+        let mut b = [0u8; 20];
+        assert_eq!(f.read(&mut b, 4, 5, &mut c), 1);
+        assert!(f.eof());
+        assert_eq!(f.seek(-2, Whence::End), 0);
+        assert!(!f.eof());
+        assert_eq!(f.getc(), data(10)[8] as i32);
+        assert!(ZnzFile::open(b"/nonexistent/x", b"rb", false).is_none());
+        assert!(ZnzFile::open(p.as_os_str().as_encoded_bytes(), b"q", false).is_none());
+        assert!(ZnzFile::open(p.as_os_str().as_encoded_bytes(), b"r+", true).is_none());
+    }
 }

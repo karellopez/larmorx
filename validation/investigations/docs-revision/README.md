@@ -44,3 +44,26 @@ pairs and tritanopia are information only. It prints one line per check and PASS
 ```
 python -P validation/investigations/docs-revision/pastels.py <checkout of larmorx_documentation>
 ```
+
+## Moving an evidence page into the guide's words
+
+Three helpers for the rollout's evidence pages (the part's notes say how a page moves). Each
+reads a page's evidence JSON (`static/evidence/<page>.json` of a site checkout) and changes
+nothing in it.
+
+- `present_dry_run.py <module> <published json> <out json>`: applies the evidence module's
+  `present` (its words, ports and order) to the published JSON, prints every worked example's
+  What this shows line, panels, metrics groups, comparisons, facts and reasons, the charts'
+  titles and the tables', and writes the result: a page's words read before it is exported.
+- `evidence_texts.py <json>`: every text of the JSON with its pointer, for a search of the old
+  words.
+- `export_diff.py <before json> <after json>`: what an export changed: texts (counted), fields
+  added, and every other difference (a number, a list's length, a key removed) listed. After an
+  export of the revision it lists only texts and the fields `port`, `order`, `shows` and the
+  presentation's, so no number moved.
+
+```
+PYTHONPATH=python:validation/src python -P validation/investigations/docs-revision/present_dry_run.py \
+    ants_n4 <site>/static/evidence/ants-n4.json /tmp/ants-n4.json
+python -P validation/investigations/docs-revision/export_diff.py old.json new.json
+```

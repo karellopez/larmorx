@@ -48,9 +48,21 @@ def port_binary(jobs: int) -> Path:
     manifest = REPO / "crates-freesurfer" / "Cargo.toml"
     env = {k: v for k, v in os.environ.items() if k != "FSLDIR"}
     subprocess.run(
-        ["cargo", "build", "--release", "--example", "fs_maths_probe", "-p",
-         "larmorx-freesurfer-core", "--manifest-path", str(manifest), "-j", str(jobs)],
-        check=True, env=env,
+        [
+            "cargo",
+            "build",
+            "--release",
+            "--example",
+            "fs_maths_probe",
+            "-p",
+            "larmorx-freesurfer-core",
+            "--manifest-path",
+            str(manifest),
+            "-j",
+            str(jobs),
+        ],
+        check=True,
+        env=env,
     )
     return REPO / "crates-freesurfer" / "target" / "release" / "examples" / "fs_maths_probe"
 

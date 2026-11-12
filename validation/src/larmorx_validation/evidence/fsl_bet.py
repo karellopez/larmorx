@@ -1547,7 +1547,7 @@ CATCHUP_TRIAGE = "validation/investigations/cleanroom-bet/trial_catchup_triage.j
 #: category -> (what the page says, the verdict of the row; None: fixed after the trial).
 CATCHUP_TEXT: dict[str, tuple[str, str | None]] = {
     "fixed: FLIRT's search, starting points of equal cost (std::sort)": (
-        "Fixed after the trial (relay 10), with permanent cases: standard_space_roi's FLIRT (and "
+        "Fixed after this run, with permanent cases: standard_space_roi's FLIRT (and "
         "bet -B's, inside its standard_space_roi) ended 37 to 303 mm (RMS) from FSL's matrix on "
         "small heads whose costs tie at the coarse scales (every cost 1, FSL's own measure of "
         "both matrices): FLIRT's search kept its starting points of equal cost in the order "
@@ -1556,7 +1556,7 @@ CATCHUP_TEXT: dict[str, tuple[str, str | None]] = {
         None,
     ),
     "fixed: the output's box, from FLIRT's matrix (the search's equal costs)": (
-        "Fixed after the trial by the same change: standard_space_roi's output box, which follows "
+        "Fixed after this run by the same change: standard_space_roi's output box, which follows "
         "the region brought back by FLIRT's matrix, a few voxels from FSL's on small heads; each "
         "agrees on replay with the final build",
         None,
@@ -1565,13 +1565,13 @@ CATCHUP_TEXT: dict[str, tuple[str, str | None]] = {
         "betsurf's surfaces on small synthetic heads (betsurf, bet -A, -A2): the profiles are "
         "decided as FSL decides them (162 of 164 images' shares of profiles set aside FSL's), "
         "the skulls follow; the scalp's deformation settles a little elsewhere (0.24 to 3.4 mm on "
-        "a clean testbed), relay 7's open class, for BET's next clean-room part",
+        "a clean testbed), a class already open before this run, for BET's next clean-room part",
         "open",
     ),
     "standard_space_roi: FSL's FLIRT crashes (FSL-75)": (
         "standard_space_roi runs whose FLIRT crashes in FSL (Segmentation fault, free(): invalid "
         "pointer or size: FSL-75's corrupted heap, undefined behaviour never reproduced), so "
-        "FSL's later steps run on missing files (fslroi's usage), where the original registers "
+        "FSL's later steps run on missing files (fslroi's usage), where the clean room registers "
         "and goes on",
         "divergence",
     ),
@@ -1593,7 +1593,7 @@ CATCHUP_TEXT: dict[str, tuple[str, str | None]] = {
         "-maskNONE -roiNONE (or -b -maskNONE) on an input in another format than "
         "FSLOUTPUTTYPE's: fslpy's imcp converts it with nibabel, whose header has pixdim[4..7] 1 "
         "where the input's are 0 and scl_slope 1 where it is 0, and NIfTI-2 for a NIFTI2 type; "
-        "the original converts the layout and keeps the header (specs/standard_space_roi.md "
+        "the clean room converts the layout and keeps the header (specs/standard_space_roi.md "
         "§2.5: pending until its bytes are checked)",
         "open",
     ),
@@ -1606,8 +1606,8 @@ CATCHUP_TEXT: dict[str, tuple[str, str | None]] = {
     ),
     "standard_space_roi: a NIfTI-2 output's matrices": (
         "standard_space_roi's NIfTI-2 output of a NIfTI-1 input, FSL's matrix given: FSL's "
-        "matrices in single precision (-44.40308380 against the original's -44.40308296), and a "
-        "sform of code 0 moved by the cut too (its translation -1.2412 where the original keeps "
+        "matrices in single precision (-44.40308380 against the clean room's -44.40308296), and a "
+        "sform of code 0 moved by the cut too (its translation -1.2412 where the clean room keeps "
         "the input's 51.25): a question for the specification (specs/standard_space_roi.md §3.2)",
         "open",
     ),
@@ -1620,7 +1620,7 @@ CATCHUP_TEXT: dict[str, tuple[str, str | None]] = {
     ),
     "bet -B, -A2: FSL fails or crashes midway": (
         "bet -B and -A2 on small heads where FSL's script fails or crashes midway (Error: input "
-        "image ... not found; a program crashing) and the original's messages or exit status "
+        "image ... not found; a program crashing) and the clean room's messages or exit status "
         "differ: not yet looked at, for BET's next clean-room part",
         "open",
     ),
@@ -1648,7 +1648,7 @@ def trial_catchup(ctx: core.Context) -> tuple[list[dict], dict]:
         "FSLOUTPUTTYPE=NIFTI_GZ", 0
     )
     rows = [
-        ("Random cases, each run by FSL 6.0.7.23 and both implementations", t["cases"]),
+        ("Random cases, each run by FSL 6.0.7.23 and both ports", t["cases"]),
         ("the original: within the record's thresholds, every exact check passed",
          orig.get("agree", 0)),
         ("the original: differing (each one in a category below)", orig.get("differ", 0)),
@@ -1679,13 +1679,15 @@ def trial_catchup(ctx: core.Context) -> tuple[list[dict], dict]:
     commit = s["larmorx_commit"].removesuffix("-dirty")
     summary = common.table(
         "trial-catchup",
-        f"Random testing after the clean-room catch-up: the trial of {s['date']}",
+        f"Random testing, both ports against the original: FSL `bet` {fsl_step.NEW} "
+        f"({t['cases']:,} random calls, {s['date']})",
         ["", {"label": "Cases", "num": True}],
         out_rows,
-        note=f"Differential random testing's trial of both implementations after the clean-room "
-        f"original gained bet's variations, standard_space_roi and fslroi (seed `{s['seed']}`: "
-        "the BET part's trial of 2026-11-04 drawn again and further, FSL's runs served by the "
-        "oracle cache where they had run), each case compared as the records compare (the "
+        note=f"A random-testing run of both ports, {round(s['elapsed_s'] / 60)} minutes long, "
+        "after the clean room gained bet's variations, standard_space_roi and fslroi (seed "
+        f"`{s['seed']}`, the seed of the random-testing run of 2026-11-04, drawn again and "
+        "further; FSL's runs served by the oracle cache where they had run), each case compared "
+        "as the records compare (the "
         "replica: FSL's bytes; the original: specs/bet.md §11 and §11.1, "
         "specs/standard_space_roi.md §8). The build: larmorx "
         f"`{commit}`; two classes were fixed after it, from its findings. Every case in a memory "
@@ -1715,16 +1717,16 @@ def trial_catchup(ctx: core.Context) -> tuple[list[dict], dict]:
         trows.append(row)
     triage = common.table(
         "trial-catchup-triage",
-        "The original's differing cases, each in one category",
+        "The clean room's differences from the original, by category",
         ["Category", {"label": "Cases", "num": True}, "Verdict", "Reproducer"],
         trows,
-        note="Every differing case of the clean-room original in one category by its program, "
+        note="Every differing case of the clean room in one category by its program, "
         "its failed checks and their details, and by its replay with the final build "
         "(`validation/investigations/cleanroom-bet/trial_catchup_categories.py`, its output "
         f"`{CATCHUP_TRIAGE}`; the replays: `replay_trial.py`), each category's cause established "
         "by replaying findings and by probes (`trial_ssroi_matrices.py`, `finding_dirs.py`, "
         "`betsurf_shares.py`; `docs/findings/fsl-bet-original.md`); the triage's entries: "
-        "`validation/difftest/triage.toml`. The reproducer is a finding of the trial "
+        "`validation/difftest/triage.toml`. The reproducer is a finding of this run "
         "(`difftest --replay`).",
     )
     prov = {
@@ -1917,8 +1919,8 @@ def present(doc: dict) -> dict:
     for ex in doc["examples"]:
         _present_example(ex)
     titles = {
-        "replica": ("replica", "6.0.7.17", "full comparison", "replica, FSL 6.0.7.17"),
-        "replica-23": ("replica", fsl_step.NEW, "standard comparison", "replica, FSL 6.0.7.23"),
+        "replica": ("replica", "6.0.7.17", "full comparison", "replica 6.0.7.17"),
+        "replica-23": ("replica", fsl_step.NEW, "standard comparison", f"replica {fsl_step.NEW}"),
         "original": ("clean room", fsl_step.NEW, "standard comparison", "clean room"),
     }
     for im in doc["implementations"]:
@@ -1952,8 +1954,69 @@ def present(doc: dict) -> dict:
                 r["head"] = re.sub(r"\bthe original\b", "the clean room", r["head"])
         words.table(t)
     words.cases(doc["cases"])
+    # each record's list of what fix changed, linked: a case's by its port's record, an
+    # example's by the replica's standard record, which its notes name
+    records = {im["id"]: im["record"] for im in doc["implementations"]}
+    for c in doc["cases"]:
+        for impl, r in c["results"].items():
+            r["reason"] = words.fix_list_link(r.get("reason"), records[impl])
+    for ex in doc["examples"]:
+        texts = [ex.get("metrics_note") or ""] + [f["text"] for f in ex.get("facts", [])]
+        for t in texts:
+            if words.FIX_LIST in t and "replica's" not in t:
+                raise ValueError(f"{ex['id']}: a list of what fix changed, of which record?")
+        ex["metrics_note"] = words.fix_list_link(ex.get("metrics_note"), REPLICA_RECORD)
+        for f in ex.get("facts", []):
+            f["text"] = words.fix_list_link(f["text"], REPLICA_RECORD)
+    doc["category_labels"] = {k: v for k, v in CATEGORY_LABELS.items() if any(
+        c["category"] == k for c in doc["cases"])}  # fmt: skip
+    missing = {c["category"] for c in doc["cases"]} - set(CATEGORY_LABELS)
+    if missing:
+        raise ValueError(f"categories without a label: {sorted(missing)}")
     doc["presentation"] = words.PRESENTATION
     return doc
+
+
+#: The record the variations' examples cite for what fix changed (the replica's standard one).
+REPLICA_RECORD = f"docs/validation/{RECORD_NEW}.md"
+#: A category of the records' cases as the page names it (the id stays the case explorer's).
+CATEGORY_LABELS = {
+    "fmriprep": "fMRIPrep's calls",
+    "bet2": "bet2",
+    "bet": "bet",
+    "betsurf": "betsurf",
+    "defects": "defects of FSL",
+    "formats": "file formats",
+    "real": "real heads",
+    "difftest": "random testing",
+    "fslroi": "fslroi",
+    "ssroi": "standard_space_roi",
+}
+
+
+def _default_newest(ex: dict) -> None:
+    """The default view shows FSL's newest version and the replica's run against it, the ones
+    the verdicts beside "What this shows" use. A still of 6.0.7.17's run stands for 6.0.7.23's
+    only where the two versions, and the replica's two runs, agree in every output, voxel for
+    voxel; 6.0.7.17's panels stay in the panel chooser."""
+    swap = {"fsl": "fsl23", "replica": "replica23"}
+    diffs = {d["id"]: d for d in ex["diffs"]}
+    need = ("fsl23-fsl", "replica-fsl", "replica23-fsl23")
+    if not all(d in diffs for d in need) or not set(swap) & set(ex["default"]["panels"]):
+        return
+    if not all(all(m["identical"] for m in diffs[d]["metrics"].values()) for d in need):
+        raise ValueError(f"{ex['id']}: 6.0.7.17's runs and 6.0.7.23's differ: no shared still")
+    dflt, poster = ex["default"], ex["poster"]
+    for old, new in swap.items():
+        if old in dflt["panels"]:
+            dflt["panels"][dflt["panels"].index(old)] = new
+            if old in poster["panels"]:
+                poster["panels"][new] = poster["panels"][old]
+    if "replica-fsl" in dflt["diffs"]:
+        dflt["diffs"][dflt["diffs"].index("replica-fsl")] = "replica23-fsl23"
+    dflt["compare"] = {k: swap.get(v, v) for k, v in dflt["compare"].items()}
+    dflt["panels"].sort(key=ex["order"]["panels"].index)
+    dflt["diffs"].sort(key=ex["order"]["diffs"].index)
 
 
 def _present_example(ex: dict) -> None:
@@ -2090,10 +2153,11 @@ def _present_example(ex: dict) -> None:
         panels=new,
         diffs=out,
         groups=groups,
-        shows=SHOWS[ex["id"]],
+        shows=words.link_ids(SHOWS[ex["id"]]),
         verdicts=[m for m in main if m],
         rank=rank,
     )
+    _default_newest(ex)
 
 
 if __name__ == "__main__":  # compute the cache entries only; refresh-original <why>

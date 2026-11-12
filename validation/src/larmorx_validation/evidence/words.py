@@ -95,12 +95,25 @@ _REWORD: list[tuple[str, str, str]] = [
         "the standard comparison's record",
     ),
     (r"\bthe parity suite's\b", "the comparison's", "the comparison's"),
-    # D13, a decision's number: its section of a record by the record's own name for it
+    # D13, a decision's number: its section of a record, by what it lists (a page that knows the
+    # record links it: FIX_LIST)
     (
         r"\(the record's D13 section\)",
-        "(the record's list of corrections, “D13 fix pass”)",
-        "(the record's list of corrections, “D13 fix pass”)",
+        "(the record's list of what `fix` changed)",
+        "(the record's list of what fix changed)",
     ),
+    # "the user" reads as the reader on a public page: the project's decision, by its date
+    (
+        r"\bnamed nowhere by the user's decision of (\d{4}-\d\d-\d\d)",
+        r"named nowhere, as decided on \1",
+        r"named nowhere, as decided on \1",
+    ),
+    (
+        r"\bnot named: the user's decision of (\d{4}-\d\d-\d\d) for the iterative programs\b",
+        r"not named in the iterative programs, as decided on \1",
+        r"not named in the iterative programs, as decided on \1",
+    ),
+    (r"\(the user's decision of (\d{4}-\d\d-\d\d)\)", r"(as decided on \1)", r"(as decided on \1)"),
     (
         r"\bD13's rule for failure cases\b",
         "the rule of the corrections by default for failure cases",
@@ -120,6 +133,34 @@ _REWORD: list[tuple[str, str, str]] = [
     ),
 ]
 _REWORD_RX = [(re.compile(p), code, plain) for p, code, plain in _REWORD]
+
+#: The list a record keeps of what ``fix`` changed, as :func:`reword` names it.
+FIX_LIST = "(the record's list of what `fix` changed)"
+
+
+#: The register of the originals' defects, where an id is linked (its summary table).
+REGISTER = "docs/findings/upstream-defects.md#summary"
+_REGISTER_ID = re.compile(
+    r"(?<![\[\w/#-])((?:ANTS|ITK|AFNI|FSL|GLIBC|NP|SCI|TED|PIPE|PD)-\d+)(?![\w\]-])"
+)
+
+
+def link_ids(text: str) -> str:
+    """``text`` with every register id (FSL-09, GLIBC-07) linked to the register's summary
+    table, outside code spans and existing links."""
+    parts = re.split(r"(`[^`]*`|\[[^\]]*\]\([^)]*\))", text)
+    return "".join(
+        part if i % 2 else _REGISTER_ID.sub(rf"[\1](repo:{REGISTER})", part)
+        for i, part in enumerate(parts)
+    )
+
+
+def fix_list_link(text: str | None, record: str) -> str | None:
+    """``text`` with the record's list of what ``fix`` changed linked to ``record`` (a path in
+    the repository, ``docs/validation/fsl-bet-replica.md``)."""
+    if not text:
+        return text
+    return text.replace(FIX_LIST, f"([the record's](repo:{record}) list of what `fix` changed)")
 
 
 def reword(text: str | None, code: bool = True) -> str | None:

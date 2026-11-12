@@ -37,8 +37,9 @@ impl SplitMix64 {
     }
 }
 
-/// FNV-1a over 64-bit words: the hash the unit tests compare with the hardware's.
-pub fn fnv(words: impl IntoIterator<Item = u64>) -> u64 {
+/// FNV-1a over 128-bit words (16 little-endian bytes each): the hash the unit tests compare
+/// with the hardware's.
+pub fn fnv(words: impl IntoIterator<Item = u128>) -> u64 {
     let mut h = 0xcbf2_9ce4_8422_2325u64;
     for w in words {
         for b in w.to_le_bytes() {
@@ -346,36 +347,37 @@ impl Op {
         Op::RoundToI64,
     ];
 
-    /// This operation in software, as one word (an extended result's 80 bits folded into 64:
-    /// the significand XOR the sign and exponent shifted to the top).
-    pub fn apply(self, a: F80, b: F80) -> u64 {
-        let fold = |x: F80| {
-            let bits = x.to_bits();
-            (bits as u64) ^ (((bits >> 64) as u64) << 48)
-        };
+    /// This operation in software, as one word: an extended result's 80 bits ([`F80::to_bits`]),
+    /// a narrower result's bits zero-extended.
+    pub fn apply(self, a: F80, b: F80) -> u128 {
         match self {
-            Op::Add => fold(a + b),
-            Op::Sub => fold(a - b),
-            Op::Mul => fold(a * b),
-            Op::Div => fold(a / b),
-            Op::Sqrt => fold(a.sqrt()),
-            Op::Cmp => {
-                u64::from(a < b)
-                    | u64::from(a <= b) << 1
-                    | u64::from(a == b) << 2
-                    | u64::from(a != b) << 3
-                    | u64::from(a > b) << 4
-                    | u64::from(a >= b) << 5
-            }
-            Op::ToF64 => a.to_f64().to_bits(),
-            Op::ToF32 => u64::from(a.to_f32().to_bits()),
-            Op::ToI64 => a.to_i64_trunc() as u64,
-            Op::ToI32 => a.to_i32_trunc() as u32 as u64,
-            Op::ToI16 => a.to_i16_trunc() as u16 as u64,
-            Op::ToU64 => a.to_u64_trunc(),
-            Op::ToU32 => u64::from(a.to_u32_trunc()),
-            Op::RoundToI64 => a.round_ties_even_to_i64() as u64,
+            Op::Add => (a + b).to_bits(),
+            Op::Sub => (a - b).to_bits(),
+            Op::Mul => (a * b).to_bits(),
+            Op::Div => (a / b).to_bits(),
+            Op::Sqrt => a.sqrt().to_bits(),
+            Op::Cmp => u128::from(
+                u8::from(a < b)
+                    | u8::from(a <= b) << 1
+                    | u8::from(a == b) << 2
+                    | u8::from(a != b) << 3
+                    | u8::from(a > b) << 4
+                    | u8::from(a >= b) << 5,
+            ),
+            Op::ToF64 => a.to_f64().to_bits().into(),
+            Op::ToF32 => a.to_f32().to_bits().into(),
+            Op::ToI64 => (a.to_i64_trunc() as u64).into(),
+            Op::ToI32 => (a.to_i32_trunc() as u32).into(),
+            Op::ToI16 => (a.to_i16_trunc() as u16).into(),
+            Op::ToU64 => a.to_u64_trunc().into(),
+            Op::ToU32 => a.to_u32_trunc().into(),
+            Op::RoundToI64 => (a.round_ties_even_to_i64() as u64).into(),
         }
+    }
+
+    /// Whether the operation reads its second operand.
+    pub fn binary(self) -> bool {
+        matches!(self, Op::Add | Op::Sub | Op::Mul | Op::Div | Op::Cmp)
     }
 }
 
@@ -415,8 +417,8 @@ impl Conv {
         }
     }
 
-    /// The conversion in software, folded as [`Op::apply`] folds.
-    pub fn apply(self, x: u64) -> u64 {
+    /// The conversion in software, as [`F80::to_bits`].
+    pub fn apply(self, x: u64) -> u128 {
         let v = match self {
             Conv::F64 => F80::from_f64(f64::from_bits(x)),
             Conv::F32 => F80::from_f32(f32::from_bits(x as u32)),
@@ -425,8 +427,7 @@ impl Conv {
             Conv::U64 => F80::from_u64(x),
             Conv::U32 => F80::from(x as u32),
         };
-        let bits = v.to_bits();
-        (bits as u64) ^ (((bits >> 64) as u64) << 48)
+        v.to_bits()
     }
 }
 
@@ -516,11 +517,18 @@ impl Pattern {
                 floats: vec![],
             },
             Pattern::Smooth => {
+                // Kernel weights: positive floats from 2^-40 to 1, full significands, so that
+                // their sums need more than double's 53 bits.
                 let n = rng.range(1, 48) as usize;
                 PatternInput {
                     n,
                     doubles: vec![],
-                    floats: (0..n).map(|_| f(rng)).collect(),
+                    floats: (0..n)
+                        .map(|_| {
+                            let e = (127 - rng.range(1, 40)) as u32;
+                            f32::from_bits((e << 23) | (rng.next_u64() as u32 >> 9))
+                        })
+                        .collect(),
                 }
             }
             Pattern::EdgeCost => {

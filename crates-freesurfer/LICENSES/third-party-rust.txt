@@ -45,11 +45,47 @@ test_release.py checks it against Cargo.lock. Do not edit by hand.
 - unicode-ident 1.0.26: (MIT OR Apache-2.0) AND Unicode-3.0 [T15 LICENSE-APACHE, T16 LICENSE-MIT,
   T18 LICENSE-UNICODE]
 
-3. In Cargo.lock's graph of the programs, not built into them (3 crates)
+3. In Cargo.lock's graph of the programs, not built into them (22 crates)
 
 - autocfg 1.5.1: only at build time (a build script's dependency)
+- bitflags 2.13.2: not built into the programs (the tests' dependencies, or features they do not
+  enable)
+- block-buffer 0.12.1: not built into the programs (the tests' dependencies, or features they do not
+  enable)
+- cpufeatures 0.3.1: not built into the programs (the tests' dependencies, or features they do not
+  enable)
+- crypto-common 0.2.2: not built into the programs (the tests' dependencies, or features they do not
+  enable)
+- digest 0.11.3: not built into the programs (the tests' dependencies, or features they do not
+  enable)
+- errno 0.3.14: not built into the programs (the tests' dependencies, or features they do not
+  enable)
+- fastrand 2.5.0: not built into the programs (the tests' dependencies, or features they do not
+  enable)
+- getrandom 0.4.3: not built into the programs (the tests' dependencies, or features they do not
+  enable)
+- hybrid-array 0.4.15: not built into the programs (the tests' dependencies, or features they do not
+  enable)
+- libc 0.2.191: not built into the programs (the tests' dependencies, or features they do not
+  enable)
+- linux-raw-sys 0.12.1: not built into the programs (the tests' dependencies, or features they do
+  not enable)
+- once_cell 1.21.4: not built into the programs (the tests' dependencies, or features they do not
+  enable)
 - portable-atomic 1.15.0: only on platforms other than the six release targets
 - portable-atomic-util 0.2.8: only on platforms other than the six release targets
+- r-efi 6.0.0: not built into the programs (the tests' dependencies, or features they do not enable)
+- rustix 1.1.6: not built into the programs (the tests' dependencies, or features they do not
+  enable)
+- sha2 0.11.1: not built into the programs (the tests' dependencies, or features they do not enable)
+- tempfile 3.27.0: not built into the programs (the tests' dependencies, or features they do not
+  enable)
+- typenum 1.20.1: not built into the programs (the tests' dependencies, or features they do not
+  enable)
+- windows-link 0.2.1: not built into the programs (the tests' dependencies, or features they do not
+  enable)
+- windows-sys 0.61.2: not built into the programs (the tests' dependencies, or features they do not
+  enable)
 
 4. The licence texts (19 different texts)
 

@@ -23,7 +23,7 @@ from pathlib import Path
 
 import numpy as np
 
-from larmorx_validation.evidence import afni_step, common, core
+from larmorx_validation.evidence import afni_pages, afni_step, common, core
 from larmorx_validation.figures import cache as fcache
 from larmorx_validation.figures import records
 
@@ -1348,7 +1348,7 @@ def export(ctx: core.Context) -> dict:
     pe = panel_entry(ctx)
     step = afni_step.ensure(e, ["afni", "bold-afni", "peels0-afni"], ctx.compute)
     pstep = afni_step.ensure(pe, ["afni"], ctx.compute)
-    return {
+    doc = {
         "schema": 1,
         "tool": TOOL,
         "title": "3dAutomask",
@@ -1372,6 +1372,49 @@ def export(ctx: core.Context) -> dict:
             _example_panel(ctx, pe, pstep),
         ],
     }
+    return present(doc)
+
+
+PAGE = afni_pages.page("3dAutomask")
+
+#: Each worked example's "What this shows" line and the verdicts beside it, one per port; the
+#: data panel's is written from its own verdicts (present.panel_shows).
+SHOWS: afni_pages.Shows = {
+    "fmriprep-automask": lambda ex: (
+        "On fMRIPrep's call the replica and the clean room both give AFNI's mask, every voxel, "
+        "in both releases and in fMRIPrep's build; the clean room on 1 and 6 threads. No "
+        "correction by default changes this call.",
+        ["replica-afni26", "original-afni26"],
+    ),
+    "bold-automask": lambda ex: (
+        "On the raw BOLD series, with no options, the replica and the clean room both give "
+        "AFNI's mask, every voxel, in both releases; the clean room on 1 and 6 threads. No "
+        "correction by default changes this call.",
+        ["replica-afni26", "original-afni26"],
+    ),
+    "afni-43": lambda ex: (
+        "AFNI peels once at -peels 0, as at -peels 1, in both releases (AFNI-43). In `fix`, "
+        "their default, the replica and the clean room do not peel, as AFNI's help says, and "
+        "warn; in `reproduce` both give AFNI's mask, every voxel.",
+        ["replica-afni", "original-afni"],
+    ),
+}
+
+
+def present(doc: dict) -> dict:
+    """3dAutomask's page in the writing guide's words and order: texts, ports and order only."""
+    return afni_pages.present(
+        doc,
+        PAGE,
+        SHOWS,
+        "Seconds for the whole program, informal timings of 2026-10-24.",
+        {
+            "AFNI 25.2.09, 1 thread": "AFNI 3dAutomask 25.2.09, 1 thread",
+            "clean-room original, 1 thread": "clean room, 1 thread",
+            "clean-room original, 6 threads": "clean room, 6 threads",
+        },
+        "25.2.09",
+    )
 
 
 if __name__ == "__main__":  # compute the cache entry only

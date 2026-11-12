@@ -667,7 +667,7 @@ def nipy_row_case(key: str, row, what: str) -> None:
             NOTICES[f"PIPE-60 ({mode})"] += 1
     if rust and not wraps:
         v = same(refs["plain"], got["reproduce"])
-        if v != "identical":
+        if v != "identical" and not CONTROL:
             why = causes(refs)
             APART[f"nipy rows: nipype as run here differs from reproduce: {why}"] += 1
             if why == "unexplained":
@@ -843,7 +843,7 @@ def fd_nipy_case(key: str, f: str, what: str, **kw) -> None:
             verdict(refs[m], got[m]),
             f"{what} {m}: {refs[m] if isinstance(refs[m], str) else 'ok'} | {got[m] if isinstance(got[m], str) else 'ok'}",
         )
-    if verdict(refs["plain"], got["reproduce"]) != "identical":
+    if verdict(refs["plain"], got["reproduce"]) != "identical" and not CONTROL:
         why = []
         if verdict(refs["reproduce-npexp"], refs["reproduce"]) != "identical":
             why.append("exp (NP-04)")

@@ -18,15 +18,33 @@
 //! - `fs.core` (queue item 3.1-22; the behaviour: `specs/freesurfer-core.md`): [`globals`]
 //!   (FreeSurfer's process-wide state, one value per run), [`log`] (messages, fatal errors, the
 //!   error codes; FS-01), [`diag`] (the diagnostic bits and `DiagInit`; FS-02, FS-03),
-//!   [`machine`] (byte swaps), [`cmdargs`], [`base`]; [`cstd`], the C library's conversions they
-//!   need (larmorx's own code).
+//!   [`machine`] (byte swaps), [`cmdargs`], [`base`]; [`random`] (the seeded random numbers;
+//!   FS-04, FS-05), [`utils`] (lines, strings, file names, rounding, lists, order statistics, the
+//!   fast arctangent, memory reports, logic-problem reports, temporary files; FS-06, FS-09 to
+//!   FS-12), [`version`] (`--version`, `--all-info`, the stamps; FS-07), [`fsenv`] (FS-08),
+//!   [`timer`], [`romp`], [`chklc`] (no licence check), [`xdebug`], [`fio`]'s table.
+//! - The C library's behaviour they need, larmorx's own code: [`cstd`] (conversions), [`cglob`]
+//!   (`glob`, `fnmatch`), [`ctime`] (`gmtime`, `localtime` with the time-zone files,
+//!   `strftime("%c")`), [`system`] (the user's and the machine's names).
 #![forbid(unsafe_code)]
 
 pub mod base;
+pub mod cglob;
+pub mod chklc;
 pub mod cmdargs;
 pub mod cstd;
+pub mod ctime;
 pub mod diag;
+pub mod fio;
+pub mod fsenv;
 pub mod globals;
 pub mod log;
 pub mod machine;
+pub mod random;
+pub mod romp;
 pub mod run;
+pub mod system;
+pub mod timer;
+pub mod utils;
+pub mod version;
+pub mod xdebug;

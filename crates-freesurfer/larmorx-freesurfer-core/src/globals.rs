@@ -7,7 +7,9 @@
 //! `Gx` ... `Gvz`, `IMAGE_SIZE` and `Gprofile` (`utils/diag.cpp` 47-68), `Gerror` and the error
 //! log's settings (`utils/log.cpp` 55-58), `hips_cplxtor` and `hips_rtocplx`
 //! (`utils/hips.cpp` 4-5), the C library's `errno`, and the static variables of the functions
-//! that remember earlier calls (`DiagHeartbeat`, `DiagShowPctDone`). The replica keeps them in
+//! that remember earlier calls (`DiagHeartbeat`, `DiagShowPctDone`, the random numbers of
+//! `utils.cpp` and `OpenRan1`, `fastApproxAtan2f`, `GetVmPeak`, the logic-problem reports, the
+//! debugging stack of `xDebug.cpp`, `ROMP_main_started`). The replica keeps them in
 //! [`Globals`], which every translated function that reads or writes them takes, so that
 //! programs run one after the other in one process (`recon-all`'s replica) or side by side in
 //! tests each start from FreeSurfer's initial values.
@@ -15,6 +17,10 @@
 use std::path::PathBuf;
 
 use larmorx_core::defects::{Notices, UpstreamDefects};
+
+use crate::random::Random;
+use crate::utils::LogicReports;
+use crate::xdebug::XDebug;
 
 /// FreeSurfer's process-wide state at a program's start, with D13's choice and its notices.
 #[derive(Clone, Debug)]
@@ -62,6 +68,22 @@ pub struct Globals {
     pub(crate) heartbeat_old_pct: f32,
     /// `DiagShowPctDone`'s `static float old_pct` (-10).
     pub(crate) pct_done_old_pct: f32,
+    /// The name the kernel gives the process (`/proc/self/comm`: the program file's first 15
+    /// bytes, [`crate::random::comm_of`]), which `randomNumber` prints; empty until the program
+    /// sets it (as on a system without `/proc`).
+    pub comm: String,
+    /// The random numbers' state (`utils.cpp`'s `idum`, `nrgcalls`, ...; `OpenRan1`'s).
+    pub random: Random,
+    /// `fastApproxAtan2f`'s `static` choice of `atan2f`, read at its first call.
+    pub(crate) atan2f_choice: Option<bool>,
+    /// `GetVmPeak`'s `static int u[5]`.
+    pub(crate) vm_peak_usage: [i32; 5],
+    /// The logic-problem reports' table (`reportEntry`, `copeWithLogicProblem2`).
+    pub(crate) logic_reports: LogicReports,
+    /// The debugging stack (`xDebug.cpp`).
+    pub xdebug: XDebug,
+    /// `ROMP_main_started`'s file and line.
+    pub romp_main: Option<(String, i32)>,
     /// D13's choice and the notices of the defects that changed this run's results.
     pub notices: Notices,
 }
@@ -96,6 +118,13 @@ impl Globals {
             hips_rtocplx: 0,
             heartbeat_old_pct: -10.0,
             pct_done_old_pct: -10.0,
+            comm: String::new(),
+            random: Random::new(),
+            atan2f_choice: None,
+            vm_peak_usage: [0; 5],
+            logic_reports: LogicReports::default(),
+            xdebug: XDebug::default(),
+            romp_main: None,
             notices: Notices::new(mode),
         }
     }

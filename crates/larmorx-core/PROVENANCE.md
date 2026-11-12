@@ -535,3 +535,13 @@ ITK-113, counted). The existing ports `vnl_svd_f32`, `vnl_svd::vnl_inverse`,
 `vnl_eigen::symmetric_eigensystem` and `vnl_qr::VnlQr` were re-checked at FreeSurfer's call sites
 in the same run. `vnl_digests.rs` checks digests of the ports' outputs on seeded inputs, recorded on
 Linux x86-64, on every platform (debug and release alike; a NaN hashed as one value).
+
+## C's `sscanf` conversions and `strtod` (`src/cscan.rs`; FreeSurfer's foundations, item 3.1-14, 2026-11-12)
+
+**Original implementation**, written from the C standard's description (ISO C 7.21.6.2, 7.22.1.3,
+7.22.1.4); where the standard leaves room, glibc 2.35's choices measured as a black box (no glibc
+code read or translated): the run `%lf` reads, `0x` alone failing, `nan(...)` read as `nan`, `%d`'s
+low 32 bits of `strtol`. Decimal strings through Rust's correctly rounded parser; hexadecimal ones
+rounded here, ties to even, subnormals included. `validation/probes/fs-minc-nifti` (family `scan`)
+compares it with glibc's `sscanf("%lf")`, `sscanf("%d")` and `strtod`: 400,000 generated strings of
+each, 0 differences at scale 1 (the scale-5 numbers in `docs/findings/minc-xfm.md`).

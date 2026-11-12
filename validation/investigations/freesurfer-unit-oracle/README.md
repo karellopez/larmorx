@@ -39,7 +39,7 @@ What made it identical (each read from the official package, never guessed):
   `libgcc_s` at run time).
   The preparation's conda-forge GCC 8.4.0 (`--compiler conda`, behind wrappers that give it the
   machine's headers and libraries and Ubuntu's default hardening flags) gives the same instructions
-  too, but its own start files (`crtbeginS.o`, `crtendS.o`: 62 instructions of GCC's
+  too, but its own start files (`crtbeginS.o`, `crtendS.o`: about 60 instructions of GCC's
   `frame_dummy`, `register_tm_clones`, ... in each program) differ and it is configured without
   `.init_array` support: constructors go to `.ctors`, and the linker runs `romp_support.cpp`'s two
   (its `before_main` and its static initialisation) in the other order. Ubuntu's package has
@@ -115,7 +115,17 @@ A change of the harness changes its SHA-256, so the cache keys its new runs apar
 `prove.py code|replay|units|all` (in a memory box, `boxed.sh 14`; the official programs through the
 oracle-output cache at one thread; `--json` writes everything):
 
-RESULTS
+Measured 2026-11-12 (track B relay 1), on the main machine:
+
+| Proof | What is compared | Result |
+|---|---|---|
+| `code` | the three programs against the official ones (the table above) | 2 files identical apart from the build ID; `mris_smooth` apart from one unwind entry; 1,799,495 of 1,799,495 instructions identical with their addresses |
+| `replay` | the three programs in place of FreeSurfer's on every recorded step of them in three reference runs (`ds000005-sub-01-classic-1thread` at 1 thread; `ds000005-sub-01-v8` and `ds000228-sub-pixar008-v8` at their recorded 4 threads), their files against the recorded ones | **19 of 19 steps reproduced** (`mri_add_xform_to_header` 6, `mri_normalize` 5, `mris_smooth` 8); every output differs from the recording only in its provenance (the subjects folder's path, the command-line records) |
+| `units`, volumes | `fsunit mri-read-write <in> <out> <official out>` (MRIread, the official output's command-line provenance, MRIwrite) against `mri_convert <in> <out>`, on five recorded volumes of `ds000005-sub-01-v8` (`rawavg`: the raw average; `orig`, `T1`: conformed uchar; `nu`; `aseg.presurf`: labels) written as MGZ and as NIfTI | **10 of 10 outputs byte-identical**, compressed bytes included |
+| `units`, matrices | `MatrixInverse` on 40 float 4 x 4 matrices (the identity, a scaling with a shift, 36 seeded affine ones of registration size, one in five nearly singular, one singular) against `lta_convert --invert` (its LTA prints the float matrix with `%18.15le`: exact once rounded back to float) | **40 of 40 identical**, the singular one refused by both |
+| `units`, random numbers | `OpenRan1`'s return values read under `gdb` at its returns (the official programs are stripped: the addresses come from the code alignment) in the official `mri_normalize -g 1 -seed 1234 -mprage nu.mgz T1.mgz` and `mris_smooth -nw -seed 1234 ...` of `ds000005-sub-01-v8`, against the same programs of the unit oracle and against `fsunit open-ran1 1234 <n>` | **identical**: `mri_normalize`'s first 2,000 draws (the limit the proof reads; it draws more), `mris_smooth`'s one draw (`setRandomSeed`'s own); `open-ran1` equals `vnl-random 1234 <n> drand64` rounded to float |
+
+Logs: `<workspace>/oracles/logs/freesurfer-unit-proof-*.log`.
 
 ## Files
 

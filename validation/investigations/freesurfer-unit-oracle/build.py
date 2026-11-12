@@ -494,6 +494,7 @@ def write_info(p: Paths) -> None:
         else "",
         "itk_tarball_sha256": ITK_SHA256,
         "compiler": _version(p.cxx),
+        "binutils": _version(Path(shutil.which("ld", path=build_env(p)["PATH"]) or "ld")),
         "compiler_package": "Ubuntu gcc-8 8.4.0-3ubuntu2" if p.compiler == "ubuntu" else str(p.gcc),
         "fs_version": FS_VERSION,
         "build_stamp": BUILD_STAMP,

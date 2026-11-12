@@ -425,9 +425,7 @@ def _la_fallback(e, files, tmp, nt):
         lambda: _plain(lambda: tuple(fallback_svd(_matrix(e["a"]), full_matrices=False))),
         lambda mode: _plain(
             lambda: tuple(
-                lc.fallback_svd(
-                    _matrix(e["a"]), False, **_kw(lc.fallback_svd, n_threads=nt)
-                )
+                lc.fallback_svd(_matrix(e["a"]), False, **_kw(lc.fallback_svd, n_threads=nt))
             )
         ),
         switch=False,
@@ -480,7 +478,9 @@ def _la_reduce(e, files, tmp, nt):
     op, axis = e["op"], e["axis"]
     extra = {"ddof": e["ddof"]} if op in ("var", "std") else {}
     return _Call(
-        lambda: _plain(lambda: np.asarray(getattr(np, op)(_ndarray(e["array"]), axis=axis, **extra))),
+        lambda: _plain(
+            lambda: np.asarray(getattr(np, op)(_ndarray(e["array"]), axis=axis, **extra))
+        ),
         lambda mode: _plain(
             lambda: np.asarray(
                 _core.numpy_reduce(_ndarray(e["array"]), op, axis, np.__version__, e["ddof"])
@@ -669,6 +669,7 @@ def _np_compcor(e, files, tmp, nt):
     masks = _masks(files)
     kw = dict(e["kw"])
     mask_kw = {"mask_files": masks} if masks else {}
+
     def normalize(want, got):
         # the result's pre-filter basis (PIPE-52, PIPE-55) has no interface output to compare
         # with: compared in the fix pass only
@@ -925,7 +926,9 @@ def _table_text(s: dict) -> str:
     """The table's text as the chain writes it: pandas' ``to_csv`` with its float formats."""
     df = _table_frame(s)
     fmt = s["formats"][0]
-    return df.to_csv(sep="\t", index=False, na_rep="n/a", float_format=None if fmt == "repr" else fmt)
+    return df.to_csv(
+        sep="\t", index=False, na_rep="n/a", float_format=None if fmt == "repr" else fmt
+    )
 
 
 def _frame_form(df) -> Any:
@@ -1004,9 +1007,10 @@ def _ujson_values(e: dict) -> np.ndarray:
     n = e["n"]
     kind = e["kind"]
     if kind == "ties":
-        return rng.integers(-(2**30), 2**30, n) / np.array([2.0**k for k in range(1, 45)])[
-            rng.integers(0, 44, n)
-        ]
+        return (
+            rng.integers(-(2**30), 2**30, n)
+            / np.array([2.0**k for k in range(1, 45)])[rng.integers(0, 44, n)]
+        )
     if kind == "rounded":
         return np.round(_ih(rng, n) * 40.0, 10) + rng.choice([-1.0, 1.0], n) * 5e-11
     if kind == "special":
@@ -1029,7 +1033,11 @@ def _fp_ujson(e, files, tmp, nt):
 
     def mine(mode):
         vals = _ujson_values(e).tolist()
-        return "[" + ",".join("null" if not math.isfinite(v) else tb.ujson_double(v) for v in vals) + "]"
+        return (
+            "["
+            + ",".join("null" if not math.isfinite(v) else tb.ujson_double(v) for v in vals)
+            + "]"
+        )
 
     return _Call(lambda: _plain(orig), lambda mode: _plain(lambda: mine(mode)), switch=False)
 
@@ -1058,7 +1066,9 @@ def _fp_fd(e, files, tmp, nt):
     import larmorx.confounds as lc
 
     fc = _fmriprep("25.2.7")
-    f = _write_frame(tmp, "motion.tsv", _motion_frame(e["motion"], e["missing"]), e["motion"]["format"])
+    f = _write_frame(
+        tmp, "motion.tsv", _motion_frame(e["motion"], e["missing"]), e["motion"]["format"]
+    )
     return _Call(
         lambda: _iface(fc.FramewiseDisplacement, tmp, ("out_file",), in_file=f, radius=e["radius"]),
         lambda mode: _lx(
@@ -1112,7 +1122,11 @@ def _fp_filter(e, files, tmp, nt):
     return _Call(
         lambda: _iface(fc.FilterDropped, tmp, ("out_file",), in_file=f),
         lambda mode: _lx(
-            lc.filter_dropped, tmp, ("out_file",), f, **_kw(lc.filter_dropped, upstream_defects=mode)
+            lc.filter_dropped,
+            tmp,
+            ("out_file",),
+            f,
+            **_kw(lc.filter_dropped, upstream_defects=mode),
         ),
     )
 
@@ -1176,7 +1190,11 @@ def _fp_gather(e, files, tmp, nt):
     return _Call(
         lambda: _iface(fc.GatherConfounds, tmp, out, **paths),
         lambda mode: _lx(
-            lc.gather_confounds, tmp, out, **paths, **_kw(lc.gather_confounds, upstream_defects=mode)
+            lc.gather_confounds,
+            tmp,
+            out,
+            **paths,
+            **_kw(lc.gather_confounds, upstream_defects=mode),
         ),
     )
 
@@ -1195,7 +1213,12 @@ def _fp_add_header(e, files, tmp, nt):
     return _Call(
         lambda: _iface(AddTSVHeader, tmp, ("out_file",), in_file=f, columns=cols),
         lambda mode: _lx(
-            lnw.add_tsv_header, tmp, ("out_file",), f, cols, **_kw(lnw.add_tsv_header, upstream_defects=mode)
+            lnw.add_tsv_header,
+            tmp,
+            ("out_file",),
+            f,
+            cols,
+            **_kw(lnw.add_tsv_header, upstream_defects=mode),
         ),
     )
 
@@ -1255,13 +1278,19 @@ def _confounds_frame(c: dict):
         cols[f"cosine{k:02d}"] = 0.1 * _ih(rng, t)
     for k in range(c["nss"]):
         cols[f"non_steady_state_outlier{k:02d}"] = (np.arange(t) == k).astype(np.float64)
-    for name, scale in (("dvars", 20.0), ("std_dvars", 1.0), ("framewise_displacement", c["fd_scale"])):
+    for name, scale in (
+        ("dvars", 20.0),
+        ("std_dvars", 1.0),
+        ("framewise_displacement", c["fd_scale"]),
+    ):
         v = np.abs(scale + scale * _ih(rng, t))
         if t:
             v[0] = np.nan
         cols[name] = v
     cols["rmsd"] = np.abs(0.1 * _ih(rng, t))
-    rows = _motion_rows({"seed": c["seed"] + 3, "t": t, "rot": 0.01, "trans": 0.5, "special": None}, 6)
+    rows = _motion_rows(
+        {"seed": c["seed"] + 3, "t": t, "rot": 0.01, "trans": 0.5, "special": None}, 6
+    )
     for j, name in enumerate(("rot_x", "rot_y", "rot_z", "trans_x", "trans_y", "trans_z")):
         cols[name] = rows[:, j]
     if c["extra"] == "integers":
@@ -1297,7 +1326,9 @@ def _fp_expand(e, files, tmp, nt):
             "a power above 2: numpy's float64 pow is not the C library's here (AVX-512's SVML); "
             "compared with NPY_DISABLE_CPU_FEATURES set, as check_model.py",
         )
-    f = _write_frame(tmp, "confounds.tsv", _confounds_frame(e["confounds"]), e["confounds"]["format"])
+    f = _write_frame(
+        tmp, "confounds.tsv", _confounds_frame(e["confounds"]), e["confounds"]["format"]
+    )
     formula = e["formula"]
     return _Call(
         lambda: _by_name(
@@ -1323,7 +1354,9 @@ def _fp_spikes(e, files, tmp, nt):
 
     import larmorx.niworkflows as lnw
 
-    f = _write_frame(tmp, "confounds.tsv", _confounds_frame(e["confounds"]), e["confounds"]["format"])
+    f = _write_frame(
+        tmp, "confounds.tsv", _confounds_frame(e["confounds"]), e["confounds"]["format"]
+    )
     kw = dict(e["kw"])
     return _Call(
         lambda: _iface(SpikeRegressors, tmp, ("confounds_file",), confounds_file=f, **kw),
@@ -1388,7 +1421,11 @@ def _xfm(e: dict, tmp: Path) -> str:
 
 
 def _cells(text: Any) -> Any:
-    return [line.split("\t") for line in text.decode().splitlines()] if isinstance(text, bytes) else text
+    return (
+        [line.split("\t") for line in text.decode().splitlines()]
+        if isinstance(text, bytes)
+        else text
+    )
 
 
 def _fp_motion(e, files, tmp, nt):
@@ -1423,9 +1460,7 @@ def _fp_motion(e, files, tmp, nt):
                     **_kw(lc.fsl_motion_params, upstream_defects=mode, n_threads=nt),
                 )
             ),
-            "rmsd": _lx(
-                lc.fsl_rms_deviation, tmp, (), xfm, ref, upstream_defects=mode
-            ),
+            "rmsd": _lx(lc.fsl_rms_deviation, tmp, (), xfm, ref, upstream_defects=mode),
         }
 
     def normalize(want, got):
@@ -1487,7 +1522,9 @@ def _fp_masks(e, files, tmp, nt):
                 res = cm.IFACES.aCompCorMasks(
                     in_vfs=vfs, is_aseg=e["is_aseg"], bold_zooms=zooms
                 ).run()
-                return contents({"files": _files(d), "outputs": {"out_masks": res.outputs.out_masks}})
+                return contents(
+                    {"files": _files(d), "outputs": {"out_masks": res.outputs.out_masks}}
+                )
 
             return _guard(run)
 
@@ -1517,7 +1554,9 @@ def _fp_union(e, files, tmp, nt):
 
     def orig():
         with _work(tmp) as d:
-            return _guard(lambda: {"out": _rel(cm.UNION["_binary_union"](a, b), d), "files": _files(d)})
+            return _guard(
+                lambda: {"out": _rel(cm.UNION["_binary_union"](a, b), d), "files": _files(d)}
+            )
 
     def mine(mode):
         with _work(tmp) as d:
@@ -1725,7 +1764,9 @@ def _run_case(case: Case, checks: CheckList) -> None:
             if isinstance(want, _Err):
                 detail = f"both refuse: {want!r}"
             if not exact:
-                detail = (detail + "; " if detail else "") + "NaN payloads differ (x86-64's default NaN)"
+                detail = (
+                    detail + "; " if detail else ""
+                ) + "NaN payloads differ (x86-64's default NaN)"
             if note:
                 detail = (detail + "; " if detail else "") + note
         checks(f"{call}: every output bit-identical", ok, value=0 if ok else 1, detail=detail[:400])
@@ -1735,7 +1776,14 @@ def _run_case(case: Case, checks: CheckList) -> None:
             warnings.simplefilter("always")
             fixed = CALLS[call](e, files, tmp, nt).larmorx("fix")
         entries = _entries(w3)
-        entries = list(dict.fromkeys([*entries, *(i for x in _errors(fixed) for i in _IDS.findall(getattr(x, "full", x.text)))]))
+        entries = list(
+            dict.fromkeys(
+                [
+                    *entries,
+                    *(i for x in _errors(fixed) for i in _IDS.findall(getattr(x, "full", x.text))),
+                ]
+            )
+        )
         fixed, got = _canon(fixed), _canon(got)
         change = defects.Change(0, 0, 0.0)
         other = ""
@@ -1752,9 +1800,9 @@ def _run_case(case: Case, checks: CheckList) -> None:
                 else:
                     other = f"{len(fa)} arrays in fix, {len(ra)} in reproduce"
                 if _key(_strip(fixed)) != _key(_strip(got)):
-                    other = (other + "; " if other else "") + _describe(
-                        _strip(fixed), _strip(got)
-                    )[:200]
+                    other = (other + "; " if other else "") + _describe(_strip(fixed), _strip(got))[
+                        :200
+                    ]
         defects.add_fix_check(checks, entries, change, other_changes=other, silent_ok=c.silent)
 
 

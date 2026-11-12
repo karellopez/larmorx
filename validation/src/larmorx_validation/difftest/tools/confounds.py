@@ -368,14 +368,20 @@ def draw_nipype(d: gen.Draw) -> dict:
         if n_masks >= 2:
             how = d.choice("merging", ("union", "intersect", "none", "index", "default"))
             if how == "index":
-                kw["mask_index"] = d.integer("mask_index", 0, n_masks - 1 + (1 if d.chance("index past the end", 0.1) else 0))
+                kw["mask_index"] = d.integer(
+                    "mask_index", 0, n_masks - 1 + (1 if d.chance("index past the end", 0.1) else 0)
+                )
             elif how != "default":
                 kw["merge_method"] = how
             if how == "none" and d.chance("mask_names", 0.6):
-                kw["mask_names"] = [f"m{j}" for j in range(n_masks - (1 if d.chance("too few names", 0.1) else 0))]
+                kw["mask_names"] = [
+                    f"m{j}" for j in range(n_masks - (1 if d.chance("too few names", 0.1) else 0))
+                ]
         criterion = d.choice("criterion", ("count", "all", "variance", "neither"), (4, 1, 3, 0.5))
         if criterion == "count":
-            kw["num_components"] = d.choice("num_components", (1, 2, 3, 5, 6, 12), (2, 2, 2, 1, 1, 0.5))
+            kw["num_components"] = d.choice(
+                "num_components", (1, 2, 3, 5, 6, 12), (2, 2, 2, 1, 1, 0.5)
+            )
         elif criterion == "all":
             kw["num_components"] = "all"
         elif criterion == "variance":
@@ -383,9 +389,13 @@ def draw_nipype(d: gen.Draw) -> dict:
         pf = d.choice("pre_filter", ("polynomial", "cosine", False), (3, 3, 1))
         kw["pre_filter"] = pf
         if pf == "polynomial":
-            kw["regress_poly_degree"] = d.choice("regress_poly_degree", (1, 2, 3, 0), (3, 2, 1, 0.3))
+            kw["regress_poly_degree"] = d.choice(
+                "regress_poly_degree", (1, 2, 3, 0), (3, 2, 1, 0.3)
+            )
         if pf == "cosine":
-            kw["high_pass_cutoff"] = d.choice("high_pass_cutoff", (128.0, 30.0, 1000.0, 5.0), (3, 1, 1, 0.5))
+            kw["high_pass_cutoff"] = d.choice(
+                "high_pass_cutoff", (128.0, 30.0, 1000.0, 5.0), (3, 1, 1, 0.5)
+            )
         if d.chance("repetition_time", 0.4):
             kw["repetition_time"] = d.choice("repetition_time value", (2.0, 0.8, 3.0, 1.0))
         save_pf = d.choice("save_pre_filter", (False, True, "pf.tsv"), (2, 2, 1))
@@ -402,7 +412,9 @@ def draw_nipype(d: gen.Draw) -> dict:
         if d.chance("components_file", 0.2):
             kw["components_file"] = "c.tsv"
         if e["kind"] == "TCompCor":
-            kw["percentile_threshold"] = d.choice("percentile_threshold", (0.02, 0.05, 0.1, 0.5), (3, 2, 1, 0.5))
+            kw["percentile_threshold"] = d.choice(
+                "percentile_threshold", (0.02, 0.05, 0.1, 0.5), (3, 2, 1, 0.5)
+            )
         if d.chance("a refused input", 0.08):
             bad = d.choice(
                 "refused input",
@@ -538,7 +550,26 @@ FP_CALLS = (
     "dilate",
     "subtract",
 )
-FP_WEIGHTS = (2.5, 1.5, 1.0, 1.0, 1.0, 1.5, 2.0, 1.0, 1.5, 3.0, 2.0, 1.0, 2.5, 2.0, 1.0, 2.0, 1.0, 1.0)
+FP_WEIGHTS = (
+    2.5,
+    1.5,
+    1.0,
+    1.0,
+    1.0,
+    1.5,
+    2.0,
+    1.0,
+    1.5,
+    3.0,
+    2.0,
+    1.0,
+    2.5,
+    2.0,
+    1.0,
+    2.0,
+    1.0,
+    1.0,
+)
 NUMBER_FORMATS = ("repr", "%.10f", "%.18e", "%0.6f", "%g", "%.17g", "%.25g", "%.3e")
 #: fMRIPrep-like confound column groups (ExpandModel's and SpikeRegressors' inputs).
 FORMULAS = (
@@ -579,7 +610,9 @@ def _confounds(d: gen.Draw) -> dict:
         "tcc": d.integer("t_comp_cor columns", 0, 3),
         "cos": d.integer("cosine columns", 0, 4),
         "nss": d.integer("non_steady_state columns", 0, 2),
-        "extra": d.choice("extra columns", ("none", "integers", "booleans", "text"), (5, 1, 0.5, 0.5)),
+        "extra": d.choice(
+            "extra columns", ("none", "integers", "booleans", "text"), (5, 1, 0.5, 0.5)
+        ),
         "fd_scale": d.choice("fd scale", (0.2, 0.5, 1.0, 3.0)),
         "format": d.choice("table format", ("repr", "%.10f", "%.18e", "%g")),
     }
@@ -607,19 +640,33 @@ def draw_fmriprep(d: gen.Draw) -> dict:
     elif call in ("filter_dropped", "rename_acompcor", "tsv2json"):
         e["metadata"] = {
             "seed": d.seed(),
-            "masks": d.choice("metadata masks", (("CSF", "WM", "combined"), ("CSF",), ("WM", "combined"), ("edge",)), (4, 1, 1, 1)),
+            "masks": d.choice(
+                "metadata masks",
+                (("CSF", "WM", "combined"), ("CSF",), ("WM", "combined"), ("edge",)),
+                (4, 1, 1, 1),
+            ),
             "n": d.integer("components per mask", 1, 8),
             "retained": d.choice("retained", ("some", "all", "none", "text"), (5, 1, 1, 0.3)),
-            "names": d.choice("component names", ("a_comp_cor", "comp_cor", "t_comp_cor", "dropped"), (4, 2, 1, 0.5)),
+            "names": d.choice(
+                "component names",
+                ("a_comp_cor", "comp_cor", "t_comp_cor", "dropped"),
+                (4, 2, 1, 0.5),
+            ),
         }
         if call == "rename_acompcor":
             e["components_t"] = d.integer("volumes", 1, 60)
             e["mismatch"] = d.chance("components and metadata disagree", 0.1)
         if call == "tsv2json":
-            e["index_column"] = d.choice("index_column", ("component", "mask", "missing"), (6, 1, 0.3))
-            e["drop_columns"] = d.choice("drop_columns", (None, ["mask"], ["retained", "mask"]), (2, 1, 1))
+            e["index_column"] = d.choice(
+                "index_column", ("component", "mask", "missing"), (6, 1, 0.3)
+            )
+            e["drop_columns"] = d.choice(
+                "drop_columns", (None, ["mask"], ["retained", "mask"]), (2, 1, 1)
+            )
             e["additional_metadata"] = d.choice(
-                "additional_metadata", (None, {"Method": "aCompCor"}, {"Method": "tCompCor", "Note": 1.5}), (2, 1, 1)
+                "additional_metadata",
+                (None, {"Method": "aCompCor"}, {"Method": "tCompCor", "Note": 1.5}),
+                (2, 1, 1),
             )
             e["enforce_case"] = d.chance("enforce_case", 0.8)
             e["output"] = d.choice("output", ("file", None), (3, 1))
@@ -629,7 +676,18 @@ def draw_fmriprep(d: gen.Draw) -> dict:
         e["seed"] = d.seed()
         e["parts"] = [
             p
-            for p in ("signals", "dvars", "std_dvars", "fd", "rmsd", "tcompcor", "acompcor", "crowncompcor", "cos_basis", "motion")
+            for p in (
+                "signals",
+                "dvars",
+                "std_dvars",
+                "fd",
+                "rmsd",
+                "tcompcor",
+                "acompcor",
+                "crowncompcor",
+                "cos_basis",
+                "motion",
+            )
             if d.chance(f"gather {p}", 0.6)
         ]
         e["mismatch"] = d.chance("a table of other length", 0.05)
@@ -644,7 +702,9 @@ def draw_fmriprep(d: gen.Draw) -> dict:
         options += [e["names"]]
     elif call == "expand":
         e["confounds"] = _confounds(d)
-        e["formula"] = d.choice("formula", FORMULAS, (6, 2, 1, 1, 1, 1, 1, 1, 1, 1, 0.5, 0.5, 0.5, 0.5, 1))
+        e["formula"] = d.choice(
+            "formula", FORMULAS, (6, 2, 1, 1, 1, 1, 1, 1, 1, 1, 0.5, 0.5, 0.5, 0.5, 1)
+        )
         options += [e["formula"][:40]]
     elif call == "spikes":
         e["confounds"] = _confounds(d)
@@ -695,7 +755,10 @@ def draw_fmriprep(d: gen.Draw) -> dict:
                 dtypes=("float32", "uint8", "int16") if k == 0 else ("float32",),
                 scaling=0.4 if k == 0 else 0.0,
             )
-            spec["values"] = {"scale": d.choice(f"{name} scale", (0.01, 0.012, 0.005)), "offset": 0.0}
+            spec["values"] = {
+                "scale": d.choice(f"{name} scale", (0.01, 0.012, 0.005)),
+                "offset": 0.0,
+            }
             inputs[name] = spec
         e["is_aseg"] = d.chance("is_aseg", 0.1)
         e["zooms"] = d.choice("bold_zooms", ("same", "coarse", "anisotropic"), (2, 3, 1))
@@ -708,7 +771,9 @@ def draw_fmriprep(d: gen.Draw) -> dict:
             content_weights=(4, 3, 1, 0.2),
             dtypes=("uint8", "int16", "float32", "float64", "int32"),
         )
-        first["values"] = {"binarize": True} if d.chance("binary", 0.8) else {"scale": 0.02, "offset": -0.5}
+        first["values"] = (
+            {"binarize": True} if d.chance("binary", 0.8) else {"scale": 0.02, "offset": -0.5}
+        )
         inputs["m0"] = first
         if call != "dilate":
             second = _image(
@@ -761,7 +826,9 @@ def draw_fmriprep(d: gen.Draw) -> dict:
                 spec["values"] = {"scale": 0.01, "offset": 0.0}
                 inputs[f"map{k}"] = spec
         e["classes"] = n
-        e["class_labels"] = d.choice("class names", ("tissues", "short", "too many", "unicode"), (5, 1, 0.3, 0.2))
+        e["class_labels"] = d.choice(
+            "class names", ("tissues", "short", "too many", "unicode"), (5, 1, 0.3, 0.2)
+        )
         e["prob_thres"] = d.choice("prob_thres", (0.5, 0.0, 0.9, 0.25), (4, 1, 1, 1))
         options += [e["labels_kind"], f"{n} classes"]
     return _body(d, call, inputs, options, e)

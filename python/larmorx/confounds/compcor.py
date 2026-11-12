@@ -650,7 +650,10 @@ def _compcor(
     if variance_threshold is not None:
         if not (isinstance(variance_threshold, int | float) and 0.0 < variance_threshold < 1.0):
             raise _trait(
-                spec, "variance_threshold", "0.0 < a floating point number < 1.0", variance_threshold
+                spec,
+                "variance_threshold",
+                "0.0 < a floating point number < 1.0",
+                variance_threshold,
             )
         if num_components is not None:
             raise _xor("variance_threshold", "num_components")
@@ -666,7 +669,10 @@ def _compcor(
         isinstance(percentile_threshold, int | float) and 0.0 < percentile_threshold < 1.0
     ):
         raise _trait(
-            spec, "percentile_threshold", "0.0 < a floating point number < 1.0", percentile_threshold
+            spec,
+            "percentile_threshold",
+            "0.0 < a floating point number < 1.0",
+            percentile_threshold,
         )
     for name, value in (("merge_method", merge_method), ("mask_index", mask_index)):
         if value is not None and not mask_files:

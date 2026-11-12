@@ -768,15 +768,18 @@ def suite() -> Suite:
             (
                 "values",
                 "specs/t2smap.md §17.3 by its check.py; file by file where its model "
-                "cannot read the inputs",
+                "cannot follow the run",
             ),
             ("threads", "every output identical at 1, 4 and 8 threads"),
         ],
         cases=cases,
         run_case=run_case,
         notes="(A) is the original's reproduce against tedana, (B) its default against the "
-        "replica's default (a black box). The fitted numbers of reproduce are the original's own "
-        "solvers' within §17.3, not bit for bit (decision of 2026-11-11).",
+        "replica's default (a black box: a larmorx-gpl program built from the same branch). The "
+        "fitted numbers of reproduce are the original's own solvers' within §17.3, not bit for "
+        "bit (decision of 2026-11-11), but at TED-46's voxels of equal observations, where "
+        "reproduce computes tedana's values with the main package's exact ports of numpy's lstsq "
+        "and SciPy's curve_fit (2026-11-12).",
         packages=("tedana", "numpy", "scipy", "nibabel", "nilearn"),
         highlights=highlights,
     )

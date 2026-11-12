@@ -380,7 +380,7 @@ defects! {
     PIPE_47 = "PIPE-47", "nipype compute_dvars", true,
         "an AR(1) estimate above 1, which the float32 FFT's rounding gives for a series whose lag-1 autocorrelation is just below 1, makes the predicted difference SD the square root of a negative number: NaN, so every standardised and voxel-wise DVARS value is NaN, without an error";
     PIPE_50 = "PIPE-50", "nipype compute_dvars", true,
-        "a voxel whose demeaned series is all zeros (a constant voxel, kept by remove_zerovariance=False) has the AR(1) Yule-Walker equation 0 a = 0: with SciPy 1.15 nitime's solve returns NaN, which makes every standardised and voxel-wise DVARS value NaN without an error; with SciPy 1.18 it raises LinAlgError: A singular matrix detected.";
+        "a voxel whose demeaned series is all zeros (a constant voxel, kept by remove_zerovariance=False) has the AR(1) Yule-Walker equation 0 a = 0: with SciPy 1.15 nitime's solve returns NaN, which makes every standardised and voxel-wise DVARS value NaN without an error; with SciPy 1.18 it stops with LinAlgError (\"A singular matrix detected.\")";
     SCI_02 = "SCI-02", "SciPy ndimage", true,
         "NaN and out-of-range values written to an integer output are converted as x86-64 converts them (C leaves the conversion undefined)";
     SCI_03 = "SCI-03", "SciPy ndimage", true,

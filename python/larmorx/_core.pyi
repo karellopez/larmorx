@@ -2116,9 +2116,7 @@ def nipype_compute_dvars(
     scipy: str = "1.18.1",
     upstream_defects: str = "fix",
     n_threads: int = 1,
-) -> tuple[
-    np.ndarray, np.ndarray, np.ndarray, np.ndarray, int, list[tuple[str, str, str, str]]
-]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, int, list[tuple[str, str, str, str]]]:
     """nipype's ``compute_dvars`` on the masked series ``mfunc`` (float32, one row per voxel in
     the mask's C order): ``(dvars_stdz, dvars_nstd, dvars_vx_stdz, ar1, voxels, notices)``, or
     nipype's error (``larmorx.confounds.compute_dvars`` is the public form)."""

@@ -445,6 +445,8 @@ defects! {
         "a negative radius (traits.Int takes it) dilates with scikit-image's ball of that radius, an arbitrary footprint: -1 is one false element, so the dilated mask is empty; -2 the cross of radius 1";
     PIPE_78 = "PIPE-78", "niworkflows SignalExtraction", true,
         "a class label holding a tab or a line break is written as it is, which breaks the table's columns or rows";
+    PIPE_80 = "PIPE-80", "nipype command lines", true,
+        "some file names are written into the command line unquoted (the files inside ANTs' bracketed arguments: ApplyTransforms' --transform [ f, 1 ] and --output, Registration's --metric, --masks, --initial-moving-transform and --output, N4BiasFieldCorrection's and DenoiseImage's [ out, extra ]; ApplyTransforms' --transform f, MultiImageMaths' operands, TOPUP's --datain file), and the line runs through the shell, so a file name with a blank is split into several words (one with a quote breaks the line); BET's input name is made relative after it is quoted, so a name that needs quotes is taken relative to the process's folder: the program gets other file names and fails";
     PD_01 = "PD-01", "pandas read_csv", true,
         "the default float parser (precise_xstrtod) keeps at most 17 digit characters, the leading zeros of 0.00... included, accumulates them in a double and divides by one power of ten, so most values to_csv writes (their shortest repr, up to 17 significant digits) are read back as another double, one or more units in the last place off";
     PD_02 = "PD-02", "pandas to_json", true,

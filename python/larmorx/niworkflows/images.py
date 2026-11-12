@@ -503,11 +503,11 @@ def _volreg_nipype(
     threads = 1 if num_threads is None else max(int(num_threads), 1)
     if selected is None:
         # in this process: the output names in the node's folder
-        _run_original(cmd.run_argv(), threads, upstream_defects, {})
+        _run_original(_nipype.words(cmd, upstream_defects, run=True), threads, upstream_defects, {})
     else:
         _common.run_replica(
             selected,
-            cmd.argv(),
+            _nipype.words(cmd, upstream_defects),
             cwd,
             n_threads=threads,
             upstream_defects=upstream_defects,

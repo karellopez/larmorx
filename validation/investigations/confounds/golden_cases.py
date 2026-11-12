@@ -10,10 +10,13 @@ the case's folder or a temporary path. Prints each case's time and output count,
 ``python -P golden_cases.py py.confounds py.niworkflows.confounds py.niworkflows.utility
 py.niworkflows.morphology py.larmorprepx.confounds py.skimage.ball.negative --threads 1,4
 --paths`` (``PYTHONPATH=<repo>/python``, ``OPENBLAS_CORETYPE=Haswell``). Relay 2h-ii
-(2026-11-12): 15 cases, 533 outputs, 0.38 s, 0 problems. ``--subdir "a b"`` (a blank in the path)
-fails for ``py.larmorprepx.confounds`` and the field maps' ``py.larmorprepx.fieldmaps``: nipype's
-ANTs interfaces write the paths inside ``[ ... ]`` unquoted, so the shell splits them, in nipype
-and in larmorx's ``_nipype`` alike (the candidate PIPE-80 of the confounds' notes).
+(2026-11-12): 15 cases, 533 outputs, 0.38 s, 0 problems. ``--subdir "a b"`` (a blank in the path):
+nipype's ANTs interfaces write the paths inside ``[ ... ]`` unquoted (and BET's input relative
+after quoting it), so the shell splits them; since relay 3a (PIPE-80, rule A) larmorx's
+``_nipype`` quotes them by default, so ``py.larmorprepx.confounds`` runs there too (its notices
+then name PIPE-80, the only output that changes), while ``py.larmorprepx.confounds.reproduce``
+and the ``reproduce`` part of the field maps' ``py.larmorprepx.fieldmaps`` fail there as nipype
+does.
 """
 
 import argparse

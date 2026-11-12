@@ -336,9 +336,11 @@ def test_programs_what_it_does_has_one_source(monkeypatch):
     monkeypatch.setattr(
         programs,
         "_api_does",
-        lambda repo, api: {"antsRegistration": "It registers."}
-        if api == "docs/api/ants-registration.md"
-        else real(repo, api),
+        lambda repo, api: (
+            {"antsRegistration": "It registers."}
+            if api == "docs/api/ants-registration.md"
+            else real(repo, api)
+        ),
     )
     _, _, problems = programs.build(reference.REPO, None)
     assert any("antsRegistration: `does` given" in p for p in problems), problems

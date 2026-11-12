@@ -393,11 +393,13 @@ pub fn regress_poly_layout<T: NpFloat>(
     // t × n copy of them.
     let transposed: Vec<f64> = if fortran {
         let mut v = vec![0.0f64; t * n];
-        v.par_chunks_mut(n.max(1)).enumerate().for_each(|(kk, row)| {
-            for (i, x) in row.iter_mut().enumerate() {
-                *x = data[i * t + kk];
-            }
-        });
+        v.par_chunks_mut(n.max(1))
+            .enumerate()
+            .for_each(|(kk, row)| {
+                for (i, x) in row.iter_mut().enumerate() {
+                    *x = data[i * t + kk];
+                }
+            });
         v
     } else {
         Vec::new()
@@ -777,7 +779,11 @@ fn noise<T: NpFloat>(
         };
         basis_kept = false;
         if t == 0 && !early && o.filter != FilterType::Other {
-            return Err(CompcorError::NoVolume(if fix { skipped_after } else { None }));
+            return Err(CompcorError::NoVolume(if fix {
+                skipped_after
+            } else {
+                None
+            }));
         }
         let (data, m_f32) = if early {
             // nipype: the rows (float32 stays float32) and np.array([]). PIPE-55: the basis

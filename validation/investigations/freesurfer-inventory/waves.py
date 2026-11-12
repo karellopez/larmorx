@@ -1311,6 +1311,10 @@ def run_main() -> int:
         for n, p in by_name.items():
             wave, note = PLACE[n]
             crate = CRATE[wave] if n != "mri_ca_label" else CRATE["3.3"]
+            if n in ("analyzeto4dfp", "gauss_4dfp", "imgreg_4dfp", "compute_vox2vox"):
+                crate = "none: a clean room only (P-12)"
+            elif n == "tkregister2_cmdl":
+                crate = "a non-commercial package (P-11, the user's P1)"
             ccrate = CLEAN[wave] if n != "mri_ca_label" else CLEAN["3.3"]
             ids = [q["id"] for q in queue if q.get("program") == n]
             out += [

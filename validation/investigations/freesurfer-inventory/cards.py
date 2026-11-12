@@ -226,8 +226,8 @@ def main() -> int:
             f"| Streams | {', '.join(p['streams']) or 'none (conditional)'} ({w['group']}) |",
             f"| Wave | {w['wave']} |",
             f"| Replica's crate | `{w['crate']}` |"
-            if w["crate"]
-            else "| Replica's crate | (later) |",
+            if w["crate"].startswith("larmorx")
+            else f"| Replica's crate | {w['crate'] or '(later)'} |",
             f"| Clean room's crate | `{w['clean_room_crate']}` |"
             if w["clean_room_crate"]
             else "| Clean room's crate | (later) |",

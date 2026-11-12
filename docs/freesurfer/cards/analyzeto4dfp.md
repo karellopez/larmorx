@@ -8,7 +8,7 @@
 | Source | `talairach_avi/analyzeto4dfp.c` |
 | Streams | classic (classic-only) |
 | Wave | 3.6 |
-| Replica's crate | `larmorx-freesurfer-classic` |
+| Replica's crate | none: a clean room only (P-12) |
 | Clean room's crate | `larmorx-fs-classic` |
 | Queue items | 3.6-14 |
 | Called by | mpr2mni305 |

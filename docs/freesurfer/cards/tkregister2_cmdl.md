@@ -8,7 +8,7 @@
 | Source | `tkregister2/tkregister2.cpp` |
 | Streams | fmriprep (fmriprep) |
 | Wave | 3.5 |
-| Replica's crate | `larmorx-freesurfer-cortex` |
+| Replica's crate | a non-commercial package (P-11, the user's P1) |
 | Clean room's crate | `larmorx-fs-cortex` |
 | Queue items | 3.5-26, 3.5-27 |
 | Called by | bbregister |

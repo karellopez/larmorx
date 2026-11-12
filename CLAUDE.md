@@ -253,7 +253,7 @@ Every agent reads this file first, then `docs/porting-guide.md`, its section of 
   `docs/validation/clean-room-audit.md` is generated from it (never edited by hand). The
   transcripts and the dossiers stay private in `<workspace>/archive/`.
 - **Detached jobs (`nohup ... &`) send no notice when they end.** Watch their log for a final line in a tracked background command.
-- **Oracle builds:** `scripts/build_ants_oracle.sh` (GCC 14.3; `oracles/ants-2.6.5`, with `antsAI`, `antsAffineInitializer`, `Atropos`, ...), `scripts/build_afni_oracle.sh` (`oracles/afni-25.2.09`, `oracles/afni-26.3.05`), `scripts/build_crmath_preload.sh` (`oracles/core-math-preload`, correctly rounded `exp`, `log`, `sin`, `cos`, `pow`, `asin`, `acos`, `atan2`, `cbrt` and their float versions; older preloads archived).
+- **Oracle builds:** `scripts/build_ants_oracle.sh` (GCC 14.3; `oracles/ants-2.6.5`, with `antsAI`, `antsAffineInitializer`, `Atropos`, ...), `scripts/build_afni_oracle.sh` (`oracles/afni-25.2.09`, `oracles/afni-26.3.05`), `scripts/build_crmath_preload.sh` (`oracles/core-math-preload`, correctly rounded `exp`, `log`, `sin`, `cos`, `pow`, `asin`, `acos`, `atan2`, `cbrt` and their float versions; older preloads archived), `validation/investigations/freesurfer-unit-oracle/build.py` (`oracles/freesurfer-8.2.0-unit`: FreeSurfer 8.2.0's `utils` and packages, ITK 4.13.2, the `fsunit` harness and three programs that are the official files byte for byte apart from the build ID; Ubuntu's own `gcc-8` 8.4.0-3ubuntu2 in `oracles/toolchains/gcc-8.4-ubuntu`).
 
 ## Repo map
 | Path | Contents |

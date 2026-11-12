@@ -735,6 +735,21 @@ def test_glibc_source_dates_and_the_rules_table():
             "restricted",
             "R11",
         ),
+        (
+            f"{WT}/validation/src/larmorx_validation/freesurfer/replay.py",
+            "read",
+            "restricted",
+            "R11",
+        ),
+        (f"{WT}/validation/src/larmorx_validation/freesurfer_unit.py", "read", "restricted", "R11"),
+        (
+            f"{WT}/validation/investigations/freesurfer-unit-oracle/build.sh",
+            "read",
+            "restricted",
+            "R11",
+        ),
+        (f"{WS}/oracles/freesurfer-8.2.0-unit/src/utils/mri.cpp", "read", "restricted", "R03"),
+        (f"{WS}/oracles/freesurfer-8.2.0-unit/bin/fsunit", "exec", "run", None),
     ],
 )
 def test_classification(path, op, category, rule):

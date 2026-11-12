@@ -832,6 +832,9 @@ The items below keep their history.
     unless given `-no-v8`; fMRIPrep 25.x runs the classic stream through 7.3.2): to decide with larmorprepx; and ITK 4.13.2
     (what FreeSurfer 8.2.0's programs link) where it differs from 5.4.5, recommended, to confirm with the inventory's ITK
     comparison (no arithmetic difference found on FreeSurfer's paths).
+  - *A flaky test under load:* `validation/tests/test_difftest.py::test_a_case_over_the_memory_limit_is_recorded_and_the_night_goes_on`
+    fails inside a small memory box with several pytest workers (seen by several relays, 2026-11-11 and 12) and passes alone:
+    make it independent of the box it runs in (its own memory limit measured against the box's, or run serially).
   - *glibc's double `atan2` for `reproduce`* (2026-11-12, the confounds part): SciPy's `as_euler` in fMRIPrep's
     motion parameters goes through glibc's `atan2`; LARMORX's correctly rounded one changes 15 of 22,293 rotation
     cells in 12 of the 36 real files, so `reproduce` is not yet exact there (a D13 gap, GLIBC-07's row). A micro-part

@@ -1,0 +1,17 @@
+[package]
+name = "fs-random"
+description = "larmorx_core::vnl_random against ITK 4.13.2's vnl_random (GCC 8.4.0, FreeSurfer 8.2.0's flags) and larmorx_core::drand48 against the C library's"
+version = "0.0.1"
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+
+# Its own workspace: a measurement tool, never part of larmorx's build (it calls the C library's
+# generators and a library compiled from ITK's vnl_random.cxx through the dynamic loader).
+[workspace]
+
+[dependencies]
+larmorx-core = { path = "../../../crates/larmorx-core" }
+
+[profile.release]
+debug = false

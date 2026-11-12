@@ -533,7 +533,17 @@ def _classify_repo(rel: str, op: str) -> Class:
         return Class("register", "R12", None)
     # FreeSurfer's preparation (2026-11-12): the inventory, cards, queue and findings come from its source
     if (
-        rel.startswith(("docs/freesurfer/", "validation/investigations/freesurfer-inventory/"))
+        rel.startswith(
+            (
+                "docs/freesurfer/",
+                "validation/investigations/freesurfer-inventory/",
+                "validation/investigations/freesurfer-unit-oracle/",
+                # the replay tool and the unit oracle's harness, written from FreeSurfer's source: a FreeSurfer
+                # clean-room implementer runs them (black box) but never reads them (2026-11-12)
+                "validation/src/larmorx_validation/freesurfer/",
+                "validation/src/larmorx_validation/freesurfer_unit.py",
+            )
+        )
         or re.match(r"^docs/findings/freesurfer-[^/]+\.md$", rel)
     ) and not rel.endswith("-clean-room.md"):
         return restricted("R11", "FreeSurfer", op, rel)
@@ -603,6 +613,11 @@ def _classify_workspace(rel: str, op: str) -> Class:
         ):
             return restricted("R03", "FreeSurfer", op, rel)
         return Class("freesurfer-install")
+    # the unit oracle's build tree (track B, 2026-11-12): FreeSurfer's library built from its source
+    if re.match(r"^oracles/freesurfer-[^/]+-unit/", rel):
+        if op in RUN_OPS:
+            return Class("run", None, "FreeSurfer")
+        return restricted("R03", "FreeSurfer", op, rel)
     # a recorded run: recon-all copies itself and its configuration into the subject's scripts/
     if re.match(
         r"^oracles/freesurfer-[^/]+/runs/.*/scripts/(recon-all\.local-copy|recon-config\.yaml)$",

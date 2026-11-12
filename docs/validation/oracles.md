@@ -94,6 +94,23 @@ built: 2026-10-18T13:06:55Z
 |---|---|
 | `libcrmath.so` | `faaade81e63d742b80ea3252b78c31cdf265ab88a7f17c907f196cb153497e29` |
 
+## FreeSurfer 8.2.0's unit oracle (one library function per call)
+
+`validation/investigations/freesurfer-unit-oracle/build.py all` (about 15 minutes at 10 jobs, in a 16 GiB box)
+builds FreeSurfer 8.2.0's `utils` library and its packages from the tag, with FreeSurfer's own CMake files and
+the official build's settings, against ITK 4.13.2 built as FreeSurfer's `build_itk.sh` builds it, with the
+official compiler: Ubuntu 20.04's `gcc-8` 8.4.0-3ubuntu2, downloaded from Ubuntu's archive and checked through
+its signed index (key, `InRelease`, `Packages.gz`, each package), unpacked without administrator rights. The
+`fsunit` harness calls one function on given inputs (`larmorx_validation.freesurfer_unit`, through the
+oracle-output cache). Proof that it is the official build: `mri_add_xform_to_header` and `mri_normalize` built
+from it are the official files byte for byte apart from the 20-byte build ID, `mris_smooth` too apart from one
+unwind-table entry of ITK's (no instruction differs); the three reproduce 19 of 19 recorded steps of the
+reference runs (`prove.py replay`); `MRIread`/`MRIwrite` give `mri_convert`'s bytes on 10 of 10 recorded
+volumes (MGZ and NIfTI), `MatrixInverse` gives `lta_convert --invert`'s floats on 40 of 40 matrices, `OpenRan1`
+gives the first 2,000 draws the official `mri_normalize -seed 1234` makes (read under gdb). Record of the
+build: `oracles/freesurfer-8.2.0-unit/bin/BUILD_INFO.txt`; the details:
+`validation/investigations/freesurfer-unit-oracle/README.md` (closed to FreeSurfer clean-room implementers).
+
 ## ANTs 2.6.5, GCC 11.4 -O3 (kept as evidence only; miscompiles float roundings)
 
 `oracles/{d}/BUILD_INFO.txt`:

@@ -273,7 +273,9 @@ impl PosixTz {
         let Some((dst_off, sd, st, ed, et)) = self.dst else {
             return self.std_off;
         };
-        let year = gmtime(t + self.std_off).year + 1900;
+        // The rules apply to the UTC year; before 1970 the C library (glibc 2.35, measured:
+        // validation/investigations/freesurfer-core/ctime_probe.py) uses 1970's change times.
+        let year = (gmtime(t).year + 1900).max(1970);
         let jan1 = days_from_civil(year, 1, 1) * 86_400;
         let start = jan1 + Self::yday(year, sd) * 86_400 + st - self.std_off;
         let end = jan1 + Self::yday(year, ed) * 86_400 + et - dst_off;

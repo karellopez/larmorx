@@ -20,9 +20,11 @@
 //! ones `double`; elements are addressed as the C macros address them (`rptr[r][c]`), so where a
 //! caller's sizes do not match, the floats FreeSurfer reads and writes inside the array are the
 //! ones read and written here, and outside it FS-16 applies (a read gives 0, a write is dropped,
-//! in both modes). The C library's `exp`, `sin` and `cos` are larmorx's correctly rounded ones by
-//! default and glibc 2.35's with `reproduce` (`larmorx_core::math::Libm`); `acos` is the correctly
-//! rounded one in both modes (glibc's `acos` is not ported yet: queue item 3.1-08).
+//! in both modes). A C library function of a `float` argument is C++'s `float` overload (`expf`,
+//! `sinf`, `cosf`, `sqrtf`), as `<cmath>` declares them; of a `double`, the `double` one. `expf`,
+//! `sinf` and `cosf` are larmorx's correctly rounded ones by default and glibc 2.35's with
+//! `reproduce` (`larmorx_core::math::Libm`); `acos` is the correctly rounded one in both modes
+//! (glibc's `acos` is not ported yet: queue item 3.1-08).
 //!
 //! Defects (`larmorx_core::defects`; the findings in `docs/findings/freesurfer-maths.md`):
 //! - **FS-25** (an error by default; `MatrixClear` corrected): the operations written for real
@@ -929,7 +931,7 @@ pub fn matrix_is_symmetric(g: &mut Globals, err: &mut dyn Write, m: &Matrix) -> 
 
 /// `MatrixReallocRotation(n, angle, which, m)`: the rotation by `angle` (radians) about the x
 /// ([`X_ROTATION`]), y or z axis written into `m` (a new `n` x `n` identity when there is none):
-/// `c = cos(angle)`, `s = sin(angle)` (of the `float` widened, rounded to `float`); another
+/// `c = cos(angle)`, `s = sin(angle)` (C++'s `float` overloads: `cosf`, `sinf`); another
 /// `which` leaves it unchanged. Only the four elements of the rotation are written (a given `m`
 /// keeps its other elements). FS-25.
 pub fn matrix_realloc_rotation(
@@ -954,9 +956,10 @@ pub fn matrix_realloc_rotation(
             m
         }
     };
+    // C++'s float overloads: cosf and sinf
     let libm = Libm::quiet(g.mode());
-    let c = libm.cos(f64::from(angle)) as f32;
-    let s = libm.sin(f64::from(angle)) as f32;
+    let c = libm.cosf(angle);
+    let s = libm.sinf(angle);
     let cells: [(i32, i32, f32); 4] = match which {
         X_ROTATION => [(2, 2, c), (2, 3, s), (3, 2, -s), (3, 3, c)],
         Y_ROTATION => [(1, 1, c), (1, 3, -s), (3, 1, s), (3, 3, c)],
@@ -992,7 +995,7 @@ pub fn vector_len(g: &mut Globals, err: &mut dyn Write, v: &Matrix) -> f32 {
         let vi = read_relt(g, v, i, 1);
         len += vi * vi;
     }
-    f64::from(len).sqrt() as f32
+    len.sqrt()
 }
 
 /// `VectorDot(v1, v2)`: the `float` sum of the products of the first columns, over `v1`'s rows.
@@ -1536,8 +1539,8 @@ pub fn matrix_similarity_transform(
 }
 
 /// `GaussianMatrix(len, std, norm, G)`: the `len` x `len` matrix whose row `r` is the Gaussian
-/// `exp(-d² / (2 std²)) / (sqrt(2 pi) std)` of `d = c - r` (`float` arithmetic, `exp` in
-/// `double`); `norm` 1 scales it so that the centre row (`d = c - len / 2`) sums to 1 (FreeSurfer
+/// `exp(-d² / (2 std²)) / (sqrt(2 pi) std)` of `d = c - r` (`float` arithmetic; C++'s `float`
+/// overload of `exp`, `expf`); `norm` 1 scales it so that the centre row (`d = c - len / 2`) sums to 1 (FreeSurfer
 /// says of its own code that it meant every row), `norm` 2 makes every row sum to 1 (in `float`).
 /// A given `G` of another size: `ERROR: GaussianMatrix: dimension mismatch` on standard output and
 /// `Null`.
@@ -1570,8 +1573,8 @@ pub fn gaussian_matrix(
     let libm = Libm::quiet(g.mode());
     let var = std * std;
     let mut f = ((2.0 * std::f64::consts::PI).sqrt() * f64::from(std)) as f32;
-    let gauss =
-        |d: f32, f: f32| -> f32 { (libm.exp(f64::from(-(d * d) / (2.0 * var))) / f64::from(f)) as f32 };
+    // C++'s float overload of exp: expf of the float argument, then a float division
+    let gauss = |d: f32, f: f32| -> f32 { libm.expf(-(d * d) / (2.0 * var)) / f };
     if norm == 1 {
         let mut sum = 0.0f32;
         for c in 0..len {

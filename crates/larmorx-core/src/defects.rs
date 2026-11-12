@@ -1031,6 +1031,8 @@ defects! {
         "PDFtodSeed seeds from the clock (seconds plus microseconds): the programs and random fields that take it when no seed is given never repeat a run";
     FS_30 = "FS-30", "FreeSurfer", true,
         "PDFgaussian divides zero by zero when both of its uniform draws give exactly 0 (drand48 returned 0.5 twice): it returns NaN";
+    FS_32 = "FS-32", "FreeSurfer", true,
+        "GetClosestPrimeFactor and GetClosestPrimeFactorLess of 1, which has no prime factor, read the first element of the empty factor list (0 from glibc's calloc): mri_surf2surf and mri_vol2surf reshape a one-vertex surface by a factor of 0";
     FS_31 = "FS-31", "FreeSurfer", true,
         "FreeSurfer's vector functions do not check their vectors' lengths (VectorCrossProduct's and VectorTripleProduct's test lets column vectors of one or two elements through and never tests the other vectors; VectorDot and VectorDistance read the second vector to the first's length): elements read outside the vectors";
 }

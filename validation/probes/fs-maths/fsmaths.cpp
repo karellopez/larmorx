@@ -26,7 +26,12 @@
 #include "error.h"
 #include "histo.h"
 #include "matrix.h"
+#include "pdf.h"
+#include "prime.h"
 #include "utils.h"
+
+// declared in utils/matrix.cpp only (external linkage)
+int MatrixIsSymmetric(MATRIX *matrix);
 
 const char *Progname = "fsmaths";
 
@@ -134,6 +139,23 @@ void putm_raw(const MATRIX *m)
   puti(m->rows);
   puti(m->cols);
   for (int i = -2; i < n; i++) putf(m->data[i]);
+}
+
+// a matrix a function returned, or NULL
+void putm_n(const MATRIX *m)
+{
+  if (!m) {
+    line_out += "NULL ";
+    return;
+  }
+  putm_raw(m);
+}
+
+// a matrix of a type given first
+MATRIX *getmt()
+{
+  int t = geti();
+  return getm(t);
 }
 
 DMATRIX *getdm()
@@ -486,6 +508,162 @@ void run_case(const char *tmpfile)
     for (int i = 0; i < n; i++) v[i] = getd();
     double *st = DListStats(v.data(), n, NULL);
     for (int i = 0; i < 5; i++) putd(st[i]);
+  }
+  else if (cmd == "mmf") {
+    int t1 = geti(), t2 = geti();
+    MATRIX *a = getm(t1), *b = getm(t2);
+    MATRIX *c = MatrixMultiply(a, b, NULL);
+    putm_n(c);
+    MATRIX *a2 = MatrixCopy(a, NULL);
+    MatrixMultiply(a2, b, c);
+    putm_n(c);
+  }
+  else if (cmd == "melt") {
+    MATRIX *a = getm(MATRIX_REAL), *b = getm(MATRIX_REAL);
+    float s = getf();
+    int k = geti(), k1 = geti(), k2 = geti();
+    int r = a->rows, c = a->cols;
+    putm_n(MatrixTranspose(a, NULL));
+    putm_n(MatrixAdd(a, b, NULL));
+    putm_n(MatrixSubtract(a, b, NULL));
+    putm_n(MatrixScalarMul(a, s, NULL));
+    putm_n(MatrixSquareElts(a, NULL));
+    MATRIX *cl = MatrixCopy(a, NULL);
+    MatrixClear(cl);
+    putm_n(cl);
+    putm_n(MatrixIdentity(r, NULL));
+    MATRIX *t = MatrixCopy(a, NULL);
+    putm_n(MatrixIdentity(k, t));
+    putm_n(MatrixDiag(a, NULL));
+    puti(MatrixIsSymmetric(a));
+    if (r == c) {
+      MATRIX *at = MatrixTranspose(a, NULL);
+      puti(MatrixIsSymmetric(MatrixAdd(a, at, NULL)));
+    }
+    putf(MatrixTrace(a));
+    putd(MatrixSumElts(a));
+    puti(MatrixIsZero(a));
+    puti(MatrixCheck(a));
+    putm_n(MatrixConstVal(s, r, c, NULL));
+    putm_n(MatrixNormalizeColScale(a, NULL));
+    putm_n(MatrixNormalizeCol(a, NULL, NULL));
+    putm_n(MatrixReshape(a, NULL, c, r));
+    MATRIX *d = MatrixAlloc(k1, k2, MATRIX_REAL);
+    MatrixReshape(a, d, 0, 0);
+    putm_n(d);
+  }
+  else if (cmd == "mcplx") {
+    MATRIX *a = getm(MATRIX_COMPLEX);
+    float s = getf();
+    putm_n(MatrixTranspose(a, NULL));
+    putm_n(MatrixAdd(a, a, NULL));
+    putm_n(MatrixScalarMul(a, s, NULL));
+    putm_n(MatrixSquareElts(a, NULL));
+    MATRIX *cl = MatrixAlloc(a->rows, a->cols, MATRIX_COMPLEX);
+    memcpy(cl->data, a->data, sizeof(float) * 2 * a->rows * a->cols);
+    MatrixClear(cl);
+    putm_n(cl);
+    putf(MatrixTrace(a));
+    putd(MatrixSumElts(a));
+    puti(MatrixIsZero(a));
+    putm_n(MatrixDiag(a, NULL));
+    putm_n(MatrixConstVal(s, 0, 0, MatrixCopy(a, NULL)));
+  }
+  else if (cmd == "mregion") {
+    int which = geti();
+    MATRIX *src = getmt();
+    int given = geti();
+    MATRIX *dst = NULL;
+    if (given) dst = getmt();
+    int sr = geti(), sc = geti(), rows = geti(), cols = geti(), dr = geti(), dc = geti();
+    MATRIX *res;
+    if (which == 0)
+      res = MatrixCopyRegion(src, dst, sr, sc, rows, cols, dr, dc);
+    else if (which == 1)
+      res = MatrixCopyRealRegion(src, dst, sr, sc, rows, cols, dr, dc);
+    else
+      res = MatrixCopyImagRegion(src, dst, sr, sc, rows, cols, dr, dc);
+    putm_n(res);
+    if (dst) putm_raw(dst);
+  }
+  else if (cmd == "mr2c") {
+    MATRIX *a = getm(MATRIX_REAL), *b = getm(MATRIX_REAL), *o = getm(MATRIX_COMPLEX);
+    putm_n(MatrixRealToComplex(a, b, NULL));
+    putm_n(MatrixRealToComplex(a, b, o));
+  }
+  else if (cmd == "mrot") {
+    int n = geti();
+    float angle = getf();
+    int which = geti();
+    putm_n(MatrixAllocRotation(n, angle, which));
+    MATRIX *m = getm(MATRIX_REAL);
+    putm_n(MatrixReallocRotation(n, angle, which, m));
+  }
+  else if (cmd == "mvec") {
+    MATRIX *v1 = getm(MATRIX_REAL), *v2 = getm(MATRIX_REAL), *v3 = getm(MATRIX_REAL);
+    float norm = getf();
+    putf(VectorLen(v1));
+    putf(VectorDot(v1, v2));
+    putf(VectorDistance(v1, v2));
+    putm_n(VectorCrossProduct(v1, v2, NULL));
+    putf(VectorTripleProduct(v1, v2, v3));
+    XYZ xyz;
+    float len;
+    XYZ_NORMALIZED_LOAD(&xyz, &len, v1->rptr[1][1], v1->rptr[2][1], v1->rptr[3][1]);
+    putf(xyz.x);
+    putf(xyz.y);
+    putf(xyz.z);
+    putf(len);
+    putf(XYZApproxAngle_knownLength(&xyz, v2->rptr[1][1], v2->rptr[2][1], v2->rptr[3][1], norm));
+  }
+  else if (cmd == "v3angle") {
+    MATRIX *v1 = getm(MATRIX_REAL), *v2 = getm(MATRIX_REAL);
+    putd(Vector3Angle(v1, v2));
+  }
+  else if (cmd == "mgauss") {
+    int len = geti();
+    float std1 = getf(), std2 = getf(), w1 = getf();
+    int norm = geti();
+    putm_n(GaussianMatrix(len, std1, norm, NULL));
+    putm_n(GaussianMatrix2(len, std1, std2, w1, norm, NULL));
+  }
+  else if (cmd == "msim") {
+    MATRIX *src = getm(MATRIX_REAL), *mul = getm(MATRIX_REAL);
+    putm_n(MatrixSimilarityTransform(src, mul, NULL));
+  }
+  else if (cmd == "mprint") {
+    MATRIX *a = getmt();
+    int prec = geti();
+    FILE *fp = fopen(tmpfile, "w");
+    puti(MatrixPrint(fp, a, prec));
+    puti(MatrixPrintFmt(fp, "%10f", a));
+    fclose(fp);
+    putfile(tmpfile);
+    remove(tmpfile);
+  }
+  else if (cmd == "primes") {
+    int nmax = geti(), n = geti(), p = geti();
+    int np = 0;
+    int *pr = GetPrimes(nmax, &np);
+    puti(np);
+    long long sum = 0;
+    for (int i = 0; i < np; i++) sum += pr[i];
+    char b[32];
+    snprintf(b, sizeof b, "%lld ", sum);
+    line_out += b;
+    if (np) puti(pr[np - 1]);
+    int nf = 0;
+    int *f = GetPrimeFactors(n, &nf);
+    puti(nf);
+    for (int i = 0; i < nf; i++) puti(f[i]);
+    puti(GetClosestPrimeFactor(n, p));
+    puti(GetClosestPrimeFactorLess(n, p));
+  }
+  else if (cmd == "pdfg") {
+    long seed = geti();
+    int k = geti();
+    srand48(seed);
+    for (int i = 0; i < k; i++) putd(PDFgaussian());
   }
   else
     fail("unknown case");

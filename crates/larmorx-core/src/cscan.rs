@@ -33,7 +33,11 @@ fn lower(c: u8) -> u8 {
 
 /// Whether `s[i..]` begins with `word` (ASCII, any case).
 fn starts_ci(s: &[u8], i: usize, word: &[u8]) -> bool {
-    s.len() >= i + word.len() && s[i..i + word.len()].iter().zip(word).all(|(a, b)| lower(*a) == *b)
+    s.len() >= i + word.len()
+        && s[i..i + word.len()]
+            .iter()
+            .zip(word)
+            .all(|(a, b)| lower(*a) == *b)
 }
 
 /// `strtod(s, &end)`: the value and the number of bytes used (0: no conversion, value 0).
@@ -52,7 +56,11 @@ pub fn strtod(s: &[u8]) -> (f64, usize) {
     let sign = |v: f64| if neg { -v } else { v };
     // INF / INFINITY
     if starts_ci(s, i, b"inf") {
-        let end = if starts_ci(s, i, b"infinity") { i + 8 } else { i + 3 };
+        let end = if starts_ci(s, i, b"infinity") {
+            i + 8
+        } else {
+            i + 3
+        };
         return (sign(f64::INFINITY), end);
     }
     // NAN / NAN(n-char-sequence)
@@ -297,7 +305,11 @@ fn float_run(s: &[u8], mut i: usize) -> usize {
     }
     if i < s.len() && lower(s[i]) == b'n' {
         // "nan" (what follows, a parenthesis included, is not read).
-        return if starts_ci(s, i, b"nan") { i + 3 } else { usize::MAX };
+        return if starts_ci(s, i, b"nan") {
+            i + 3
+        } else {
+            usize::MAX
+        };
     }
     if i < s.len() && lower(s[i]) == b'i' {
         if !starts_ci(s, i, b"inf") {
@@ -326,7 +338,11 @@ fn float_run(s: &[u8], mut i: usize) -> usize {
     let mut got_e = false;
     while i < s.len() {
         let c = s[i];
-        let is_digit = if hex { c.is_ascii_hexdigit() } else { c.is_ascii_digit() };
+        let is_digit = if hex {
+            c.is_ascii_hexdigit()
+        } else {
+            c.is_ascii_digit()
+        };
         if is_digit && !(got_e && hex && !c.is_ascii_digit()) {
             got_digit = true;
             i += 1;
@@ -436,7 +452,10 @@ mod tests {
         assert_eq!(bits("0x1p-1074"), Some(1));
         assert_eq!(bits("0x1p-1075"), Some(0));
         assert_eq!(bits("0x1.0000000000001p-1075"), Some(1));
-        assert_eq!(bits("0x1.fffffffffffff8p1023"), Some(f64::INFINITY.to_bits()));
+        assert_eq!(
+            bits("0x1.fffffffffffff8p1023"),
+            Some(f64::INFINITY.to_bits())
+        );
     }
 
     #[test]

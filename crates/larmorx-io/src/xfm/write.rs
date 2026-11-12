@@ -114,7 +114,11 @@ fn output_one_transform(
             let mut volume_filename = prefix;
             volume_filename.extend_from_slice(format!("_grid_{volume_count}.mnc").as_bytes());
             *volume_count += 1;
-            let base = Ctx { dialect, notices: &mut *notices }.remove_directories(&volume_filename);
+            let base = Ctx {
+                dialect,
+                notices: &mut *notices,
+            }
+            .remove_directories(&volume_filename);
             out.extend_from_slice(b"Displacement_Volume = ");
             out.extend_from_slice(&base);
             out.extend_from_slice(b";\n");
@@ -126,11 +130,29 @@ fn output_one_transform(
             }
             if invert {
                 for sub in v.iter().rev() {
-                    output_one_transform(out, filename, volume_count, invert, sub, dialect, streams, notices)?;
+                    output_one_transform(
+                        out,
+                        filename,
+                        volume_count,
+                        invert,
+                        sub,
+                        dialect,
+                        streams,
+                        notices,
+                    )?;
                 }
             } else {
                 for sub in v {
-                    output_one_transform(out, filename, volume_count, invert, sub, dialect, streams, notices)?;
+                    output_one_transform(
+                        out,
+                        filename,
+                        volume_count,
+                        invert,
+                        sub,
+                        dialect,
+                        streams,
+                        notices,
+                    )?;
                 }
             }
             Ok(())
@@ -178,7 +200,9 @@ pub fn output_transform(
     out.push(b'\n');
     let mut own = 0;
     let count = volume_count.unwrap_or(&mut own);
-    output_one_transform(&mut out, filename, count, false, t, dialect, streams, notices)?;
+    output_one_transform(
+        &mut out, filename, count, false, t, dialect, streams, notices,
+    )?;
     Ok(out)
 }
 
@@ -215,6 +239,14 @@ pub fn output_transform_file(
         unreachable!("opened for writing")
     };
     let mut count = 0;
-    let text = output_transform(Some(filename), Some(&mut count), comments, t, dialect, streams, notices)?;
+    let text = output_transform(
+        Some(filename),
+        Some(&mut count),
+        comments,
+        t,
+        dialect,
+        streams,
+        notices,
+    )?;
     file.write_all(&text).map_err(|_| ())
 }

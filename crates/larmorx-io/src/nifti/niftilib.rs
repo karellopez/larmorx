@@ -54,19 +54,30 @@ fn is_uppercase(s: &[u8]) -> bool {
 }
 
 /// `nifti_find_file_extension`: the offset of the name's NIfTI extension, or `None`.
-pub fn find_file_extension(name: &[u8], opts: &NiftiOptions, streams: &mut dyn Streams) -> Option<usize> {
+pub fn find_file_extension(
+    name: &[u8],
+    opts: &NiftiOptions,
+    streams: &mut dyn Streams,
+) -> Option<usize> {
     let name = cstr(name);
     let len = name.len();
     if len < 4 {
         return None;
     }
     let lower = |s: &[u8]| -> Vec<u8> {
-        if opts.allow_upper_fext { s.to_ascii_lowercase() } else { s.to_vec() }
+        if opts.allow_upper_fext {
+            s.to_ascii_lowercase()
+        } else {
+            s.to_vec()
+        }
     };
     let ext = &name[len - 4..];
     if [&b".nii"[..], b".hdr", b".img", b".nia"].contains(&lower(ext).as_slice()) {
         if is_mixedcase(ext) {
-            streams.err(&format!("** mixed case extension '{}' is not valid\n", lossy(ext)));
+            streams.err(&format!(
+                "** mixed case extension '{}' is not valid\n",
+                lossy(ext)
+            ));
             return None;
         }
         return Some(len - 4);
@@ -82,13 +93,19 @@ pub fn find_file_extension(name: &[u8], opts: &NiftiOptions, streams: &mut dyn S
     };
     if gz_list.contains(&lower(ext).as_slice()) {
         if is_mixedcase(ext) {
-            streams.err(&format!("** mixed case extension '{}' is not valid\n", lossy(ext)));
+            streams.err(&format!(
+                "** mixed case extension '{}' is not valid\n",
+                lossy(ext)
+            ));
             return None;
         }
         return Some(len - 7);
     }
     if opts.debug > 1 {
-        streams.err(&format!("** find_file_ext: failed for name '{}'\n", lossy(name)));
+        streams.err(&format!(
+            "** find_file_ext: failed for name '{}'\n",
+            lossy(name)
+        ));
     }
     None
 }
@@ -110,7 +127,11 @@ pub fn is_gzfile_with(name: &[u8], opts: &NiftiOptions) -> bool {
         return false;
     }
     let tail = &name[name.len() - 3..];
-    if opts.upper_case_gz { ext_equal(tail, b".gz") } else { tail == b".gz" }
+    if opts.upper_case_gz {
+        ext_equal(tail, b".gz")
+    } else {
+        tail == b".gz"
+    }
 }
 
 /// `nifti_makebasename`: the name without its NIfTI extension.
@@ -273,7 +294,10 @@ mod tests {
         assert_eq!(find_file_extension(b"a.NII.GZ", &o, &mut c), Some(1));
         assert_eq!(find_file_extension(b"a.nia.gz", &o, &mut c), None);
         assert_eq!(find_file_extension(b"a.Nii", &o, &mut c), None);
-        assert_eq!(c.text(Stream::Err), "** mixed case extension '.Nii' is not valid\n");
+        assert_eq!(
+            c.text(Stream::Err),
+            "** mixed case extension '.Nii' is not valid\n"
+        );
         assert!(is_gzfile(b"x.GZ"));
         assert!(!is_gzfile(b"x.Gz"));
         let mut c = Captured::default();

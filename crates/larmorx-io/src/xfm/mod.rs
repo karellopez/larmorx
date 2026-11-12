@@ -397,11 +397,9 @@ impl GeneralTransform {
     /// inverse flag is set); not linear: the internal-error report and `None`.
     pub fn linear_transform(&self, streams: &mut dyn Streams) -> Option<&Transform> {
         match &self.data {
-            TransformData::Linear { forward, inverse } => Some(if self.inverse_flag {
-                inverse
-            } else {
-                forward
-            }),
+            TransformData::Linear { forward, inverse } => {
+                Some(if self.inverse_flag { inverse } else { forward })
+            }
             _ => {
                 handle_internal_error("get_linear_transform_ptr", streams);
                 None
@@ -412,11 +410,9 @@ impl GeneralTransform {
     /// `get_inverse_linear_transform_ptr`.
     pub fn inverse_linear_transform(&self, streams: &mut dyn Streams) -> Option<&Transform> {
         match &self.data {
-            TransformData::Linear { forward, inverse } => Some(if self.inverse_flag {
-                forward
-            } else {
-                inverse
-            }),
+            TransformData::Linear { forward, inverse } => {
+                Some(if self.inverse_flag { forward } else { inverse })
+            }
             _ => {
                 handle_internal_error("get_inverse_linear_transform_ptr", streams);
                 None
@@ -444,7 +440,9 @@ impl GeneralTransform {
                 }
             }
             TransformData::Concatenated(v) => GeneralTransform {
-                data: TransformData::Concatenated(v.iter().map(|t| t.copy_and_invert(false)).collect()),
+                data: TransformData::Concatenated(
+                    v.iter().map(|t| t.copy_and_invert(false)).collect(),
+                ),
                 inverse_flag: self.inverse_flag != invert_it,
             },
             other => GeneralTransform {
@@ -475,7 +473,11 @@ impl GeneralTransform {
             second.transform_type() == TransformType::Concatenated && second.inverse_flag;
         let range = |t: &GeneralTransform| -> (i64, i64, i64) {
             let n = t.n_concated() as i64;
-            if t.inverse_flag { (n - 1, 0, -1) } else { (0, n - 1, 1) }
+            if t.inverse_flag {
+                (n - 1, 0, -1)
+            } else {
+                (0, n - 1, 1)
+            }
         };
         let (first_start, mut first_end, first_step) = range(first);
         let (mut second_start, second_end, second_step) = range(second);

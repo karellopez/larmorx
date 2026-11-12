@@ -84,9 +84,16 @@ pub fn expand_filename(filename: &[u8]) -> Vec<u8> {
 
 /// [`expand_filename`] with a dialect's home directories; volume_io crashes on an expansion to
 /// nothing at the start of the name (FS-75), which larmorx expands to nothing.
-pub fn expand_filename_in(filename: &[u8], dialect: &dyn Dialect, notices: &mut Notices) -> Vec<u8> {
+pub fn expand_filename_in(
+    filename: &[u8],
+    dialect: &dyn Dialect,
+    notices: &mut Notices,
+) -> Vec<u8> {
     // C's string ends at its first NUL.
-    let filename = &filename[..filename.iter().position(|&b| b == 0).unwrap_or(filename.len())];
+    let filename = &filename[..filename
+        .iter()
+        .position(|&b| b == 0)
+        .unwrap_or(filename.len())];
     let len = filename.len();
     let at = |i: usize| if i < len { filename[i] } else { 0 };
     let mut out = Vec::with_capacity(len);
@@ -200,25 +207,36 @@ impl Ctx<'_> {
 /// `file_exists`: `fopen(expanded, "r")` succeeds.
 pub fn file_exists(filename: &[u8]) -> bool {
     let mut n = Notices::default();
-    Ctx { dialect: &super::Mni, notices: &mut n }.file_exists(filename)
+    Ctx {
+        dialect: &super::Mni,
+        notices: &mut n,
+    }
+    .file_exists(filename)
 }
 
 /// `remove_directories_from_filename`: what follows the expanded name's last `/`.
 pub fn remove_directories_from_filename(filename: &[u8]) -> Vec<u8> {
     let mut n = Notices::default();
-    Ctx { dialect: &super::Mni, notices: &mut n }.remove_directories(filename)
+    Ctx {
+        dialect: &super::Mni,
+        notices: &mut n,
+    }
+    .remove_directories(filename)
 }
 
 /// `extract_directory`: the expanded name up to and including its last `/`, or `.`.
 pub fn extract_directory(filename: &[u8]) -> Vec<u8> {
     let mut n = Notices::default();
-    Ctx { dialect: &super::Mni, notices: &mut n }.extract_directory(filename)
+    Ctx {
+        dialect: &super::Mni,
+        notices: &mut n,
+    }
+    .extract_directory(filename)
 }
 
 fn ends_in(s: &[u8], ending: &[u8]) -> bool {
     s.len() >= ending.len() && &s[s.len() - ending.len()..] == ending
 }
-
 
 /// glibc's `strerror` text for an error number (the messages file operations give).
 pub(crate) fn strerror(errno: i32) -> String {
@@ -275,8 +293,15 @@ pub(crate) fn errno_of(e: &std::io::Error) -> i32 {
 }
 
 /// `print_system_error`.
-pub(crate) fn print_system_error(e: &std::io::Error, dialect: &dyn Dialect, streams: &mut dyn Streams) {
-    dialect.print_error(&format!("\nSystem message: {}\n", strerror(errno_of(e))), streams);
+pub(crate) fn print_system_error(
+    e: &std::io::Error,
+    dialect: &dyn Dialect,
+    streams: &mut dyn Streams,
+) {
+    dialect.print_error(
+        &format!("\nSystem message: {}\n", strerror(errno_of(e))),
+        streams,
+    );
 }
 
 /// The characters a POSIX shell splits a word at or interprets (in `gunzip -c <name> > <tmp>`).

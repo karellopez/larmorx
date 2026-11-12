@@ -468,7 +468,11 @@ fn input_one_transform(
             let mut volume_filename = volume_filename.expect("a token");
             if volume_filename.first() != Some(&b'/') {
                 if let Some(f) = filename {
-                    let directory = Ctx { dialect, notices: &mut *notices }.extract_directory(f);
+                    let directory = Ctx {
+                        dialect,
+                        notices: &mut *notices,
+                    }
+                    .extract_directory(f);
                     if !directory.is_empty() {
                         let mut t = directory;
                         t.push(b'/');
@@ -520,7 +524,10 @@ pub(crate) fn input_transform(
 ) -> Result<GeneralTransform, ()> {
     let (st, line) = input_string(s, 0, 0, dialect);
     if st != Status::Ok {
-        dialect.print_error("input_transform(): could not read header in file.\n", streams);
+        dialect.print_error(
+            "input_transform(): could not read header in file.\n",
+            streams,
+        );
         return Err(());
     }
     if line.as_deref() != Some(TRANSFORM_FILE_HEADER) {

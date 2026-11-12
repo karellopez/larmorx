@@ -225,7 +225,14 @@ impl ZnzFile {
     /// nifticlib's count of the members read or written by a compressed file: `nmemb -
     /// remain / size` counts a member it only partly read as read (FS-77); corrected, the
     /// complete members only.
-    fn members(&mut self, nmemb: usize, total: usize, remain: usize, size: usize, what: &str) -> i64 {
+    fn members(
+        &mut self,
+        nmemb: usize,
+        total: usize,
+        remain: usize,
+        size: usize,
+        what: &str,
+    ) -> i64 {
         let original = nmemb - remain / size;
         let complete = (total - remain) / size;
         if original != complete {
@@ -249,13 +256,22 @@ impl ZnzFile {
     /// `-1` on an error (as C's `size_t` would carry it, here a negative number), and the warning
     /// `** znzread: read short by N bytes` when a member is cut. A member size of 0 on a compressed
     /// file divides by zero in nifticlib (FS-76); larmorx returns 0.
-    pub fn read(&mut self, buf: &mut [u8], size: usize, nmemb: usize, streams: &mut dyn Streams) -> i64 {
+    pub fn read(
+        &mut self,
+        buf: &mut [u8],
+        size: usize,
+        nmemb: usize,
+        streams: &mut dyn Streams,
+    ) -> i64 {
         let total = size.saturating_mul(nmemb).min(buf.len());
         match &mut self.inner {
             Inner::Plain(p) => p.fread(&mut buf[..total], size, nmemb) as i64,
             Inner::Gz(g) => {
                 if size == 0 {
-                    self.defects.add(&d::FS_76, "a read with a member size of 0 (nifticlib divides by zero)");
+                    self.defects.add(
+                        &d::FS_76,
+                        "a read with a member size of 0 (nifticlib divides by zero)",
+                    );
                     return 0;
                 }
                 let mut remain = total;
@@ -274,7 +290,10 @@ impl ZnzFile {
                     }
                 }
                 if remain > 0 && remain < size {
-                    streams.err(&format!("** znzread: read short by {} bytes\n", remain as u32));
+                    streams.err(&format!(
+                        "** znzread: read short by {} bytes\n",
+                        remain as u32
+                    ));
                 }
                 self.members(nmemb, total, remain, size, "read")
             }
@@ -283,13 +302,22 @@ impl ZnzFile {
 
     /// `znzwrite(buf, size, nmemb)`: the number of members written (and, compressed, the warning
     /// `** znzwrite: write short by N bytes` when a member is cut).
-    pub fn write(&mut self, buf: &[u8], size: usize, nmemb: usize, streams: &mut dyn Streams) -> i64 {
+    pub fn write(
+        &mut self,
+        buf: &[u8],
+        size: usize,
+        nmemb: usize,
+        streams: &mut dyn Streams,
+    ) -> i64 {
         let total = size.saturating_mul(nmemb).min(buf.len());
         match &mut self.inner {
             Inner::Plain(p) => p.fwrite(&buf[..total], size, nmemb) as i64,
             Inner::Gz(g) => {
                 if size == 0 {
-                    self.defects.add(&d::FS_76, "a write with a member size of 0 (nifticlib divides by zero)");
+                    self.defects.add(
+                        &d::FS_76,
+                        "a write with a member size of 0 (nifticlib divides by zero)",
+                    );
                     return 0;
                 }
                 let mut remain = total;
@@ -308,7 +336,10 @@ impl ZnzFile {
                     }
                 }
                 if remain > 0 && remain < size {
-                    streams.err(&format!("** znzwrite: write short by {} bytes\n", remain as u32));
+                    streams.err(&format!(
+                        "** znzwrite: write short by {} bytes\n",
+                        remain as u32
+                    ));
                 }
                 self.members(nmemb, total, remain, size, "write")
             }
@@ -357,7 +388,11 @@ impl ZnzFile {
         match &mut self.inner {
             Inner::Plain(p) => {
                 let mut b = [0u8];
-                if p.fread(&mut b, 1, 1) == 1 { b[0] as i32 } else { -1 }
+                if p.fread(&mut b, 1, 1) == 1 {
+                    b[0] as i32
+                } else {
+                    -1
+                }
             }
             Inner::Gz(g) => g.gzgetc(),
         }
@@ -368,7 +403,11 @@ impl ZnzFile {
         let b = [c as u8];
         match &mut self.inner {
             Inner::Plain(p) => {
-                if p.fwrite(&b, 1, 1) == 1 { c & 0xff } else { -1 }
+                if p.fwrite(&b, 1, 1) == 1 {
+                    c & 0xff
+                } else {
+                    -1
+                }
             }
             Inner::Gz(g) => g.gzputc(c),
         }
@@ -379,11 +418,19 @@ impl ZnzFile {
     pub fn puts(&mut self, s: &[u8]) -> i32 {
         match &mut self.inner {
             Inner::Plain(p) => {
-                if p.fwrite(s, 1, s.len()) == s.len() { 1 } else { -1 }
+                if p.fwrite(s, 1, s.len()) == s.len() {
+                    1
+                } else {
+                    -1
+                }
             }
             Inner::Gz(g) => {
                 let n = g.gzwrite(s);
-                if n < 0 || (n as usize) < s.len() && !s.is_empty() { -1 } else { n }
+                if n < 0 || (n as usize) < s.len() && !s.is_empty() {
+                    -1
+                } else {
+                    n
+                }
             }
         }
     }
@@ -404,14 +451,22 @@ impl ZnzFile {
                 break;
             }
         }
-        if out.is_empty() && size > 1 { None } else { Some(out) }
+        if out.is_empty() && size > 1 {
+            None
+        } else {
+            Some(out)
+        }
     }
 
     /// `znzflush`: `fflush`, or `gzflush(Z_SYNC_FLUSH)`.
     pub fn flush(&mut self) -> i32 {
         match &mut self.inner {
             Inner::Plain(p) => {
-                if p.file.flush().is_ok() { 0 } else { -1 }
+                if p.file.flush().is_ok() {
+                    0
+                } else {
+                    -1
+                }
             }
             Inner::Gz(g) => g.gzflush(),
         }
@@ -658,7 +713,8 @@ impl GzFile {
         }
         if !self.eof {
             if self.avail_in > 0 {
-                self.input.copy_within(self.next_in..self.next_in + self.avail_in, 0);
+                self.input
+                    .copy_within(self.next_in..self.next_in + self.avail_in, 0);
             }
             let got = self.load(Target::In(self.avail_in), self.size - self.avail_in)?;
             self.avail_in += got;
@@ -681,7 +737,10 @@ impl GzFile {
                 return Ok(());
             }
         }
-        if self.avail_in > 1 && self.input[self.next_in] == 31 && self.input[self.next_in + 1] == 139 {
+        if self.avail_in > 1
+            && self.input[self.next_in] == 31
+            && self.input[self.next_in + 1] == 139
+        {
             // inflateReset
             self.inflate = Some(Decompress::new_gzip(15));
             self.how = How::Gzip;
@@ -723,7 +782,11 @@ impl GzFile {
             let (ti, to) = (inf.total_in(), inf.total_out());
             let input = &self.input[self.next_in..self.next_in + self.avail_in];
             let r = match dest {
-                Dest::Out => inf.decompress(input, &mut self.out[produced..avail_out], FlushDecompress::None),
+                Dest::Out => inf.decompress(
+                    input,
+                    &mut self.out[produced..avail_out],
+                    FlushDecompress::None,
+                ),
                 Dest::User => {
                     // zlib writes nothing past what it produces; zlib-rs may use the whole
                     // output slice, so a caller's buffer gets the produced bytes only (through
@@ -911,7 +974,11 @@ impl GzFile {
             return c as i32;
         }
         let mut b = [0u8];
-        if self.read_into(&mut b) < 1 { -1 } else { b[0] as i32 }
+        if self.read_into(&mut b) < 1 {
+            -1
+        } else {
+            b[0] as i32
+        }
     }
 
     /// `gzrewind`.
@@ -920,7 +987,9 @@ impl GzFile {
         if self.mode != GzMode::Read || (self.err != Z_OK && self.err != Z_BUF_ERROR) {
             return Err(());
         }
-        self.file.seek(SeekFrom::Start(self.start)).map_err(|_| ())?;
+        self.file
+            .seek(SeekFrom::Start(self.start))
+            .map_err(|_| ())?;
         self.reset();
         Ok(())
     }
@@ -940,7 +1009,11 @@ impl GzFile {
         }
         self.seek = false;
         if self.mode == GzMode::Read && self.how == How::Copy && self.x_pos + offset >= 0 {
-            if self.file.seek(SeekFrom::Current(offset - self.x_have as i64)).is_err() {
+            if self
+                .file
+                .seek(SeekFrom::Current(offset - self.x_have as i64))
+                .is_err()
+            {
                 return -1;
             }
             self.x_have = 0;
@@ -999,7 +1072,11 @@ impl GzFile {
             self.x_pos += 1;
             return c & 0xff;
         }
-        if self.gzwrite(&[c as u8]) == 1 { c & 0xff } else { -1 }
+        if self.gzwrite(&[c as u8]) == 1 {
+            c & 0xff
+        } else {
+            -1
+        }
     }
 
     /// FS-78's notice, when it changed the file.
@@ -1079,7 +1156,9 @@ impl GzFile {
         if self.size == 0 && len > 0 {
             self.notices.add(
                 &d::FS_78,
-                format!("{len} zeros before the first write (zlib 1.2.11 writes memory it never set)"),
+                format!(
+                    "{len} zeros before the first write (zlib 1.2.11 writes memory it never set)"
+                ),
             );
         }
         if !self.wbuf.is_empty() {
@@ -1315,7 +1394,9 @@ mod tests {
         assert_eq!(f.read(&mut buf, 2, 4, &mut c), 3);
         assert!(f.notices().contains(&d::FS_77));
         assert_eq!(c.text(Stream::Err), "** znzread: read short by 1 bytes\n");
-        let mut f = ZnzFile::open(&pb, b"rb", true).unwrap().with_upstream_defects(UpstreamDefects::Reproduce);
+        let mut f = ZnzFile::open(&pb, b"rb", true)
+            .unwrap()
+            .with_upstream_defects(UpstreamDefects::Reproduce);
         assert_eq!(f.read(&mut buf, 2, 4, &mut c), 4);
         let mut f = ZnzFile::open(&pb, b"rb", true).unwrap();
         assert_eq!(f.read(&mut buf, 0, 4, &mut c), 0);
@@ -1329,7 +1410,9 @@ mod tests {
         assert_eq!(r, 0);
         assert!(n.contains(&d::FS_78));
         let mut out = Vec::new();
-        flate2::read::GzDecoder::new(&std::fs::read(&q).unwrap()[..]).read_to_end(&mut out).unwrap();
+        flate2::read::GzDecoder::new(&std::fs::read(&q).unwrap()[..])
+            .read_to_end(&mut out)
+            .unwrap();
         assert_eq!(out.len(), 101);
         assert!(out[..100].iter().all(|&b| b == 0));
         assert_eq!(out[100], 7);

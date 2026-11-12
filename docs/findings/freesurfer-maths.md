@@ -3,7 +3,7 @@
 **Closed to FreeSurfer clean-room implementers** (source-derived: it names FreeSurfer's files and
 lines; the behaviour is in `specs/freesurfer-maths.md`). Written by the replica author of queue
 items 3.1-23 and 3.1-24 (FreeSurfer's foundations, track A). Defect IDs FS-13 to FS-24 (this
-part 1) and FS-25 to FS-32 (part 2, item 3.1-24), decided by rules A to D (CLAUDE.md, D13); the
+part 1) and FS-25 to FS-33 (part 2, items 3.1-24 and 3.1-23's inverse), decided by rules A to D (CLAUDE.md, D13); the
 register's entries are in the orchestrator's handoff. Every claim below is from the source of the 8.2.0 tag and, where a number is given, from
 the probe `validation/probes/fs-maths/` (FreeSurfer's own functions from the unit oracle's build).
 
@@ -169,6 +169,16 @@ rotations (`sinf`/`cosf`), 3 Gaussian draws and 6 entropies (`log`), where the c
 function moved a last bit. Seed 1, 620 cases: 607 identical, 13 not comparable; SHA-256
 `ed7e3de2...` in `tests/fs_maths_official.rs`.
 
+After main's VNL merge (2026-11-13), with `MatrixInverse`, `MatrixDeterminant` and
+`MatrixQRdecomposition` (two more commands, `minv` and `mqr`: real matrices of 1 to 7 rows, a sixth
+of them singular, so the closed forms and `vnl_qr<float>`'s inverse are both reached; invertible
+complex ones of 1 to 3 rows, whose real form of up to 6 rows goes through `vnl_qr<float>`):
+`check.py --seed 7 --n 64000`: **63,173 of 63,173 comparable lines identical** with `reproduce`
+(827 not comparable: 817 FS-22, 10 FS-16); the default differs on 4,271 lines, all with notices
+but 19 rotations, 4 Gaussian draws and 10 entropies (the correctly rounded `sinf`, `cosf`, `log`).
+Seed 1, 640 cases: 627 identical, 13 not comparable, SHA-256 `bb0da3da...`. A singular complex
+matrix crashes FreeSurfer's probe (FS-33), so the generator keeps them out.
+
 ## C++'s `float` overloads (a porting trap, not a defect)
 
 `utils/matrix.cpp` is C++: `<cmath>` overloads `exp`, `sin`, `cos`, `sqrt` for `float`, so
@@ -261,6 +271,20 @@ test, as FreeSurfer refuses it: kept.)
 whole minimal chunk, so FreeSurfer gets 0 (measured in the 16 probe cases with N = 1). Reached by
 `mri_surf2surf` (1179) and `mri_vol2surf` (815-818) for a surface of one vertex, which then reshape
 by a factor of 0. 1, no reshaping, is the sensible answer: rule A.
+
+## FS-33: 0 x 0 matrices and singular complex inverses (memory errors and a crash: never reproduced)
+
+`numerics.cpp` 1091-1153 (`OpenLUMatrixInverse`): `if (r <= 4 && r == cols)` with `r == 0` falls to
+the `else` branch, `vnl_matrix_fixed<float, 4, 4> m(vnlMatrix)`, which copies 16 floats from the
+empty matrix's data (VNL's assertion compiled out), and `copy_out(oInverse->data)` writes 16 floats
+into an output with none. 1198-1219 (`OpenMatrixDeterminant`): 0 rows is not 1 to 4, so
+`vnl_determinant` runs `vnl_qr` on the empty matrix and reads its factor's `(0, 0)`. `matrix.cpp`
+240-242 (`MatrixInverse`, complex): `mInv = MatrixInverse(mTmp, NULL)` is NULL for a singular
+matrix and is copied from at once (`MatrixCopyRegion(mInv, ...)` reads `mInv->rows`): a crash. The
+memory errors depend on the heap: both modes give the empty inverse (what FreeSurfer returns unless
+that memory makes a zero determinant) and the determinant 1 (the empty product) by default, 0 with
+`reproduce`; the crash is never reproduced (nothing returned). No program is known to invert or take
+the determinant of an empty matrix.
 
 ## Kept as FreeSurfer has them (rule C), part 2
 

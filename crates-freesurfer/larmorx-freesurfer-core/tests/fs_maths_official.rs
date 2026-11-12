@@ -4,7 +4,7 @@
 //! fs.maths against FreeSurfer 8.2.0's official code on every platform: the SHA-256 of the
 //! official build's output lines for the probe's cases of seed 1 (640 cases, ten of each of the
 //! 64 commands), recorded by `validation/probes/fs-maths/check.py --seed 1 --n 640` on Linux x64
-//! from the unit oracle's build (2026-11-13: 633 lines identical, 7 where FreeSurfer reads outside
+//! from the unit oracle's build (2026-11-13: 627 lines identical, 13 where FreeSurfer reads outside
 //! its arrays, FS-22 or FS-16, hashed as `SKIP`), against the port's output with `reproduce`.
 
 #[path = "fs_maths/cases.rs"]
@@ -13,7 +13,7 @@ mod cases;
 use larmorx_core::defects::UpstreamDefects;
 use sha2::{Digest, Sha256};
 
-const OFFICIAL_SHA256: &str = "780f401303aebfe789e833d6a42b5db4a991815979f4c3117105b821aedda91a";
+const OFFICIAL_SHA256: &str = "bb0da3dafb4cc3d5a3810a49f2e624a30912bf5302523e52a0b814c4af82ef04";
 
 #[test]
 fn reproduce_gives_the_official_outputs() {
@@ -31,7 +31,7 @@ fn reproduce_gives_the_official_outputs() {
             h.update(b"\n");
         }
     }
-    assert_eq!(skipped, 7);
+    assert_eq!(skipped, 13);
     let hex: String = h.finalize().iter().map(|b| format!("{b:02x}")).collect();
     assert_eq!(hex, OFFICIAL_SHA256);
 }

@@ -753,8 +753,21 @@ fn case(g: &mut Gen, cmd: &str) -> String {
             let n = if t == 2 { g.int(1, 3) } else { g.int(1, 7) };
             let mut m = vec![cmd.to_owned(), t.to_string()];
             put_mat(&mut m, g, n, n, t == 2);
-            // sometimes a singular matrix: the first row repeated
-            if g.below(6) == 0 && n > 1 {
+            // a complex matrix must be invertible: FreeSurfer crashes on a singular one (FS-33),
+            // so no zero element and no repeated row; a real one is sometimes singular (the first
+            // row repeated)
+            if t == 2 {
+                for v in m.iter_mut().skip(4) {
+                    if v == "00000000" {
+                        *v = fx(1.0);
+                    }
+                }
+                // a diagonally dominant real part keeps [A -C; C A] well conditioned
+                for i in 0..n as usize {
+                    m[4 + 2 * (i * n as usize + i)] = fx(4096.0 + i as f32);
+                }
+            }
+            if t == 1 && g.below(6) == 0 && n > 1 {
                 let w = (if t == 2 { 2 } else { 1 } * n) as usize;
                 for j in 0..w {
                     m[4 + w + j] = m[4 + j].clone();

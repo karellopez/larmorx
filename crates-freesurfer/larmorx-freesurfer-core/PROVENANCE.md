@@ -34,6 +34,8 @@ built for the official binaries with GCC 8.4.0 (`docs/freesurfer/variation.md`).
 | `histo` | `include/histo.h`; `utils/histo.cpp` | `HISTOGRAM`, `HISTOGRAM2D`, `MAX_BINS`; the 55 reached functions: `HISTOfree`, `HISTOrealloc`, `HISTOalloc`, `HISTOcopy`, `HISTOclear`, `HISTOclearCounts`, `HISTOadd`, `HISTOsubtract`, `HISTOclearBins`, `HISTOsmooth`, `HISTOfindLastPeak`, `HISTOfindFirstPeak`, `HISTOfindValley`, `HISTOfindLastPeakInRegion`, `HISTOfindHighestPeakInRegion`, `HISTOplot`, `HISTOaddSample`, `HISTOfindPreviousValley`, `HISTOfindNextValley`, `HISTOfindNextPeak`, `HISTOfindPreviousPeak`, `HISTOfindStartOfPeak`, `HISTOfindEndOfPeak`, `HISTOfindCurrentPeak`, `HISTOfillHoles`, `HISTOtotalInRegion`, `HISTOtotal`, `HISTOclearZeroBin`, `HISTOfindBinWithCount`, `HISTOfindBin`, `HISTOgetCount`, `HISTOcorrelate`, `histoComputeLinearFitCorrelation`, `HISTOfindLinearFit`, `HISTOlinearScale`, `HISTOthreshSum`, `HISTOmakePDF`, `HISTObins`, `HISTOcount`, `HISTOvalToBin`, `HISTOinit`, `HISTOfindMedian`, `HISTOmakeReverseCDF`, `HISTOmakeCDF`, `HISTOrobustGaussianFit`, `HISTOabs`, `HISTOgetEntropy`, `HISTOsoapBubbleZeros`, `HISTO2DfindBin1`, `HISTO2DfindBin2`, `HISTO2DgetCount`, `HISTOcomputeFWHM`, `HISTOwriteTxt`, `HISTOsumNorm`, `HISTOcumsum`; `include/macros.h`'s `MIN`, `MAX`, `EVEN`, `FZERO`, `DZERO` as they evaluate; FS-17 to FS-24 |
 | `matrix` (3.1-24) | `utils/matrix.cpp` 717-842 | `MatrixMultiply_wkr` (`MatrixMultiply`; the product's body shared with `MatrixMultiplyD`) |
 | `matrix_ops` | `include/matrix.h` 193-297; `utils/matrix.cpp` 844-880, 892-926, 1072-1195, 1232-1272, 1359-1543, 1586-1602, 1673-1690, 1931-1963, 2289-2313, 2342-2356, 2444-2462, 2530-2551, 2582-2602, 2638-2774, 2848-2911, 3039-3065, 3162-3172, 3428-3501, 3543-3612 | `MatrixPrint`, `MatrixPrintFmt`, `MatrixIdentity`, `MatrixTranspose`, `MatrixAdd`, `MatrixSubtract`, `MatrixScalarMul`, `MatrixClear`, `MatrixSquareElts`, `MatrixDiag`, `MatrixCopyRegion`, `MatrixCopyRealRegion`, `MatrixCopyImagRegion`, `MatrixRealToComplex`, `MatrixIsSymmetric`, `MatrixReallocRotation`, `MatrixAllocRotation`, `VectorLen`, `VectorDot`, `VectorDistance`, `MatrixIsZero`, `VectorCrossProduct`, `VectorTripleProduct`, `Vector3Angle`, `XYZ_NORMALIZED_LOAD`, `XYZApproxAngle_knownLength`, `MatrixCheck`, `MatrixReshape`, `MatrixTrace`, `MatrixConstVal`, `MatrixZero`, `MatrixSumElts`, `MatrixNormalizeColScale`, `MatrixNormalizeCol`, `MatrixSimilarityTransform`, `GaussianMatrix2`, `GaussianMatrix`; the macros `VECTOR_ELT`, `RVECTOR_ELT`, `V3_X`/`Y`/`Z`, `V3_DOT`, `MatrixClone`, `VectorClone`, `X_ROTATION`/`Y`/`Z`, `XYZ`; FS-25 to FS-28, FS-31 |
+| `matrix_ops` (3.1-23) | `utils/matrix.cpp` 183-296, 1604 | `MatrixQRdecomposition`, `MatrixInverse` (real and complex), `MatrixDeterminant`; FS-33 |
+| `numerics` | `utils/numerics.cpp` 1091-1219 | `OpenLUMatrixInverse`, `OpenQRdecomposition`, `OpenMatrixDeterminant` (on the main package's `float` VNL: `larmorx_core::vnl_fixed`, `larmorx_core::vnl_qr::Qr<f32>`, item 3.1-07); FS-33 |
 | `prime` | `utils/prime.cpp` 20-235 | `GetPrimes`, `GetPrimeFactors`, `CompareFactors` (as a sort of integers), `GetClosestPrimeFactor`, `GetClosestPrimeFactorLess`; FS-32 |
 | `pdf` | `utils/pdf.cpp` 26-61 | `PDFtodSeed`, `PDFgaussian`; FS-29, FS-30 |
 | `sse` | none (larmorx's own) | SSE2's NaN rules for the official build's arithmetic (the porting guide's "NaN bits are part of the output") |
@@ -82,7 +84,7 @@ statistics, ...).
 - (`fs.maths`, 3.1-24) The float matrices' arithmetic follows SSE2's NaN rules on every platform
   (`sse`); `PDFgaussian` draws from the C library's 48-bit generator through
   `larmorx_core::drand48` (POSIX's definition, `Globals::drand48`). Item 3.1-24 is in progress: still
-  to come are `matrix.cpp`'s decompositions and the functions over them (`MatrixDeterminant`, the
+  to come are `matrix.cpp`'s decompositions and the functions over them (the
   eigensystems, `MatrixSVD*`, `MatrixConditionNumber`, `MatrixNSConditionNumber`,
   `MatrixPseudoInverse`, `MatrixSVDPseudoInverse`), its text and binary files (`MatrixReadTxt`,
   `MatrixAsciiWriteInto`, `MatrixAsciiReadFrom`, `MatrixReadFrom`, `MatrixWriteTxt`),
@@ -94,9 +96,7 @@ statistics, ...).
   `HISTOaddFractionalSample`, `HISTOclearBG`, `HISTOvalToBinDirect`, `HISTOvalToCount`,
   `HISTOwriteInto`, `HISTOreadFrom`, `HISTOgaussian*`, `HISTOscalarMul`, `HISTOscalarAdd`,
   `HISTOfindMaxDerivative`, the other `HISTO2D*`, `HISTOrmsDifference`, `HISTOearthMoversDistance`,
-  `HISTOksDistance`, `HISTOerase*`, `HISTOisPeak`, `HISTOwrite`; `DMatrixTest`). Still to come in item 3.1-23: `MatrixInverse` and
-  `MatrixQRdecomposition` (with `utils/numerics.cpp`'s VNL wrappers and the main package's `float`
-  VNL routines), `fs_powell`, `fs_lbfgs`,
+  `HISTOksDistance`, `HISTOerase*`, `HISTOisPeak`, `HISTOwrite`; `DMatrixTest`). Still to come in item 3.1-23: `fs_powell`, `fs_lbfgs`,
   `fs_cost_function` (VNL's Powell, Brent and L-BFGS, item 3.1-07).
 - The defects FS-01 (a NUL byte after the C-style error messages), FS-02 (`PROFILE`'s undefined
   conversion) and FS-03 (`assertFailed`'s deliberate segmentation fault) are corrected by default

@@ -9,11 +9,11 @@ standards only.
 
 Status: **part 1** (§1-6): the float matrices' storage, allocation, copy and double-accumulated
 product; the 4 x 4 affine helpers; the double matrices with their long-double products; the
-histograms. **Part 2** (§7-11, queue item 3.1-24, first piece): the NaN conventions; the float
-product; the element-wise operations, regions, vectors, printing, rotations and Gaussian matrices;
-prime factors; the Gaussian draws and the time-of-day seed. To come: the matrices' decompositions
-(inverse, determinant, eigensystems, SVD and what uses them), their text and binary files, the
-numerics wrappers, the random fields.
+histograms. **Part 2** (§7-11, queue items 3.1-24, first piece, and 3.1-23's inverse): the NaN conventions; the
+float product; the element-wise operations, regions, vectors, printing, rotations and Gaussian
+matrices; the inverse, determinant and QR factors; prime factors; the Gaussian draws and the
+time-of-day seed. To come: the eigensystems, the SVD and what uses them, the matrices' text and
+binary files, the other numerics wrappers (Powell, L-BFGS, DFP), the random fields.
 
 ## 1. Conventions
 
@@ -614,6 +614,40 @@ Vectors are matrices whose first column is read (element i is (i, 1)).
 - **Mixture** (n, s1, s2, w1, norm, G): `w1 G1 + (1 - w1) G2` (1 - w1 in float), the two matrices
   scaled (§8.2) then added (§8.2, into `G`).
 
+### 8.8 Inverse, determinant, QR factors
+
+The decompositions are ITK 4.13.2's VNL in **float** (the main package's ports, queue item 3.1-07:
+`vnl_det` and `vnl_inverse` of 2 to 4 rows, `vnl_determinant`, `vnl_qr<float>`), on the matrix's
+numbers row by row.
+
+- **Determinant** (m): 0 when not square; one element: itself; 2 to 4 rows: VNL's closed-form
+  determinant in float; more: VNL's QR determinant in float. **FS-33:** a 0 x 0 matrix: FreeSurfer
+  reads the empty factor's first element; **default:** 1 (the empty product); **reproduce:** 0.
+- **QR factors** (m, Q, R): each missing matrix or mismatch prints its line on standard output and
+  returns 1, in this order: `QRdecomposition(): input matrix is NULL`, `... output Q matrix is
+  NULL`, `... output R matrix is NULL`, `... Q rows != input Matrix rows`, `... Q cols != Q rows`,
+  `... R rows != input Matrix rows`, `... R cols != input Matrix cols` (each + `\n`). Else Q (rows x
+  rows) and R (rows x cols) of `vnl_qr<float>` (LINPACK's Householder QR without pivoting; Q by
+  backward accumulation of the reflections) into the given matrices; returns 0. No columns: Q the
+  identity.
+- **Inverse** (m, out): absent `m`: the program ends, code -4, `MatrixInverse: NULL input matrix!`
+  + `\n`. Not square: an error, code -4, `MatrixInverse: matrix (<r> x <c>) is not square` + `\n`,
+  nothing returned. Absent `out`: a new matrix of `m`'s size and type (FS-28: a given one of another
+  size or type).
+  - Real: of one element `(float)(1.0 / a)` (double division), nothing returned when a = 0; of 2 to 4
+    rows VNL's closed-form inverse, nothing returned when the closed-form determinant is 0; of more,
+    `vnl_qr<float>`'s inverse (each column solved with the identity's column; a column that meets a
+    zero diagonal prints `Modules/ThirdParty/VNL/src/vxl/core/vnl/algo/vnl_qr.hxx: vnl_qr<T>::solve()
+    : matrix is rank-deficient by <k>` + `\n` on standard error), nothing returned when the QR
+    determinant is 0.
+  - Complex `A + iC` (n x n): the real 2n x 2n matrix `[[A, -C], [C, A]]`, its inverse as above, and
+    the result's real part its upper-left n x n block, its imaginary part the lower-left block.
+    **FS-33:** a singular complex matrix: FreeSurfer crashes; both modes: nothing returned.
+  - Then nothing is returned when an element of the result (both parts of a complex one) is not
+    finite; a given `out` keeps what was written.
+  - **FS-33:** a 0 x 0 matrix: FreeSurfer takes the 4 x 4 path on memory it never allocated and writes
+    16 floats past `out`; both modes: the empty inverse.
+
 ## 9. Prime numbers
 
 - **Primes** (nmax): nmax < 1: `ERROR: GetPrimes: cannot compute primes for <nmax>` + `\n` on
@@ -642,7 +676,9 @@ Vectors are matrices whose first column is read (element i is (i, 1)).
   float product, the element-wise operations on real matrices with zeros, tiny values, infinities
   and NaNs, the same operations on complex matrices, the regions of all types and destinations, real
   to complex, rotations, vectors and angles, Gaussian matrices, similarity transforms, printing,
-  primes and factors, the Gaussian draws). A case whose official run reads outside its arrays
+  primes and factors, the Gaussian draws; inverses of real matrices of 1 to 7 rows and of complex ones
+  of 1 to 3, singular ones included, determinants and QR factors). A case whose official run reads
+  outside its arrays
   (FS-22, FS-16) is counted, not compared. The angles go through `acos`: a difference there is
   allowed only as one unit in the last place, counted apart. Measured: see the findings
   (`docs/findings/freesurfer-maths.md`, "Part 2").

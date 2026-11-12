@@ -745,12 +745,16 @@ def export(ctx: core.Context) -> dict:
 
 
 #: The page in the writing guide's words (evidence/present.py); the B-spline example's history
-#: goes to the page's History.
+#: goes to the page's History; a case's "larmorx: Error: ..." names who printed ANTs' message
+#: (the replica), not a prefix the replica prints.
 PAGE = present_.Page(
     software="ANTs",
     program="antsApplyTransforms",
     version="2.6.5",
-    texts=[(r" Before A5 part 3 larmorx refused B-spline transform files\.", "")],
+    texts=[
+        (r" Before A5 part 3 larmorx refused B-spline transform files\.", ""),
+        (r"; larmorx: (?=Error: )", "; the replica: "),
+    ],
 )
 
 #: Each worked example's "What this shows" line and the verdict beside it, from the example's

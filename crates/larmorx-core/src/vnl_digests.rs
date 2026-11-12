@@ -32,12 +32,20 @@ impl Digest {
     /// from GCC's), which the source leaves open.
     fn f64s(&mut self, v: &[f64]) {
         for x in v {
-            self.word(if x.is_nan() { 0x7ff8_0000_0000_0000 } else { x.to_bits() });
+            self.word(if x.is_nan() {
+                0x7ff8_0000_0000_0000
+            } else {
+                x.to_bits()
+            });
         }
     }
     fn f32s(&mut self, v: &[f32]) {
         for x in v {
-            self.word(if x.is_nan() { 0x7fc0_0000 } else { u64::from(x.to_bits()) });
+            self.word(if x.is_nan() {
+                0x7fc0_0000
+            } else {
+                u64::from(x.to_bits())
+            });
         }
     }
     fn text(&mut self, s: &str) {
@@ -52,7 +60,11 @@ fn unit(rng: &mut SplitMix64) -> f64 {
 }
 
 fn ten_to(k: i64) -> f64 {
-    if k >= 0 { math::powi(10.0, k as u32) } else { 1.0 / math::powi(10.0, (-k) as u32) }
+    if k >= 0 {
+        math::powi(10.0, k as u32)
+    } else {
+        1.0 / math::powi(10.0, (-k) as u32)
+    }
 }
 
 /// A 1-D or n-D test function (smooth, kinked, stepped, oscillating), recording its points.
@@ -66,8 +78,12 @@ struct Problem {
 impl Problem {
     fn new(rng: &mut SplitMix64, n: usize) -> Problem {
         Problem {
-            c: (0..n).map(|_| (unit(rng) - 0.5) * ten_to(rng.range(-2, 2))).collect(),
-            s: (0..n).map(|_| ten_to(rng.range(-2, 2)) * (0.5 + unit(rng))).collect(),
+            c: (0..n)
+                .map(|_| (unit(rng) - 0.5) * ten_to(rng.range(-2, 2)))
+                .collect(),
+            s: (0..n)
+                .map(|_| ten_to(rng.range(-2, 2)) * (0.5 + unit(rng)))
+                .collect(),
             kind: (0..n).map(|_| rng.below(5) as u8).collect(),
             trace: Vec::new(),
         }
@@ -110,11 +126,30 @@ fn digest_minimizers() -> u64 {
         let ((ax, xx, bx), _) = brent.bracket_minimum(&mut f, 0.0, 1.0, 0.0);
         let (fret, xmin) = brent.minimize_given_bounds(&mut f, bx, xx, ax, xtol);
         let x3 = Brent::new().minimize(&mut f, a);
-        h.f64s(&[br.a, br.b, br.c, br.fa, br.fb, br.fc, x0, x1, x2, ax, xx, bx, fret, xmin, x3, bm.f_at_last_minimum]);
+        h.f64s(&[
+            br.a,
+            br.b,
+            br.c,
+            br.fa,
+            br.fb,
+            br.fc,
+            x0,
+            x1,
+            x2,
+            ax,
+            xx,
+            bx,
+            fret,
+            xmin,
+            x3,
+            bm.f_at_last_minimum,
+        ]);
         h.f64s(&p.trace);
         let n = 1 + rng.below(4) as usize;
         let mut p = Problem::new(&mut SplitMix64::new(seed ^ 1), n);
-        let mut pt: Vec<f64> = (0..n).map(|_| rng.range(-2000, 2000) as f64 / 1000.0).collect();
+        let mut pt: Vec<f64> = (0..n)
+            .map(|_| rng.range(-2000, 2000) as f64 / 1000.0)
+            .collect();
         let mut pw = Powell::new();
         pw.base.verbose = true;
         let mut out = Captured::default();
@@ -166,7 +201,9 @@ fn digest_lbfgs() -> u64 {
         };
         let m = [7i64, 3, 5][rng.below(3) as usize];
         let gtol = [0.1, 0.9][rng.below(2) as usize];
-        let x0: Vec<f64> = (0..n).map(|_| rng.range(-3000, 3000) as f64 / 997.0).collect();
+        let x0: Vec<f64> = (0..n)
+            .map(|_| rng.range(-3000, 3000) as f64 / 997.0)
+            .collect();
         for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
             let mut x = x0.clone();
             let mut g = vec![0.0; n];
@@ -179,7 +216,10 @@ fn digest_lbfgs() -> u64 {
             let mut out = Captured::default();
             for _ in 0..200 {
                 let f = fg(&x, &mut g);
-                lbfgs(n as i64, m, &mut x, f, &g, false, &mut diag, iprint, 1e-5, 1e-16, &mut w, &mut iflag, &mut gl, mode, &mut out);
+                lbfgs(
+                    n as i64, m, &mut x, f, &g, false, &mut diag, iprint, 1e-5, 1e-16, &mut w,
+                    &mut iflag, &mut gl, mode, &mut out,
+                );
                 if iflag <= 0 {
                     break;
                 }
@@ -286,7 +326,10 @@ fn digest_linalg() -> u64 {
         let mut spd = vec![0.0; n * n];
         for i in 0..n {
             for j in 0..n {
-                spd[i * n + j] = (0..n).map(|k| m[i * n + k] * m[j * n + k]).fold(0.0, |a, v| a + v) + if i == j { 1e-3 } else { 0.0 };
+                spd[i * n + j] = (0..n)
+                    .map(|k| m[i * n + k] * m[j * n + k])
+                    .fold(0.0, |a, v| a + v)
+                    + if i == j { 1e-3 } else { 0.0 };
             }
         }
         for (mat, mode) in [(&spd, Mode::EstimateCondition), (&m, Mode::Verbose)] {
@@ -294,7 +337,16 @@ fn digest_linalg() -> u64 {
             let mut ch = VnlCholesky::new(mat, n, mode, &mut out);
             h.word(ch.rank_deficiency() as u64);
             h.f64s(&ch.upper_triangle());
-            h.f64s(&ch.solve(&b[..n.min(b.len())].iter().copied().chain(std::iter::repeat(1.0)).take(n).collect::<Vec<_>>()));
+            h.f64s(
+                &ch.solve(
+                    &b[..n.min(b.len())]
+                        .iter()
+                        .copied()
+                        .chain(std::iter::repeat(1.0))
+                        .take(n)
+                        .collect::<Vec<_>>(),
+                ),
+            );
             h.f64s(&[ch.determinant(), ch.rcond().unwrap_or(-1.0)]);
             if let Some(inv) = ch.inverse(&mut Silent) {
                 h.f64s(&inv);
@@ -315,7 +367,10 @@ const LINALG: u64 = 0xce29_4ebf_05c7_3ab3;
 fn the_ports_give_linux_x86_64s_bits() {
     let got = [digest_minimizers(), digest_lbfgs(), digest_linalg()];
     if std::env::var_os("LARMORX_PRINT_DIGESTS").is_some() {
-        println!("MINIMIZERS = {:#018x}\nLBFGS = {:#018x}\nLINALG = {:#018x}", got[0], got[1], got[2]);
+        println!(
+            "MINIMIZERS = {:#018x}\nLBFGS = {:#018x}\nLINALG = {:#018x}",
+            got[0], got[1], got[2]
+        );
     }
     assert_eq!(got, [MINIMIZERS, LBFGS, LINALG]);
 }

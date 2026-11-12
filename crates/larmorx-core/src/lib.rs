@@ -46,6 +46,8 @@ pub mod parallel;
 pub mod python;
 pub mod rotation;
 pub mod vnl_cholesky;
+#[cfg(test)]
+mod vnl_digests;
 pub mod vnl_eigen;
 pub mod vnl_fixed;
 pub mod vnl_lbfgs;
@@ -54,8 +56,6 @@ pub mod vnl_qr;
 pub mod vnl_random;
 pub mod vnl_svd;
 pub mod vnl_svd_f32;
-#[cfg(test)]
-mod vnl_digests;
 pub mod x87;
 
 pub use affine::{Affine, SingularAffine};

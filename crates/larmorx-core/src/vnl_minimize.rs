@@ -59,6 +59,20 @@
 //   ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
 //   OF THE POSSIBILITY OF SUCH DAMAGE.
 
+// The expressions are kept as the C writes them (`-1.0 * x` is not `-x` for a NaN; the
+// constants are VXL's spellings; the negated comparisons are the f2c loops' NaN behaviour).
+#![allow(
+    clippy::neg_multiply,
+    clippy::manual_range_contains,
+    clippy::excessive_precision,
+    clippy::approx_constant,
+    clippy::neg_cmp_op_on_partial_ord,
+    clippy::assign_op_pattern,
+    clippy::collapsible_if,
+    clippy::needless_late_init,
+    clippy::too_many_arguments
+)]
+
 use crate::cfmt::{self, Streams};
 
 /// `vnl_cost_function::f`: the function a minimizer evaluates, at a point of its dimension.
@@ -228,7 +242,14 @@ pub fn bracket_minimum(f: &mut dyn CostFunction, a: f64, b: f64) -> Bracket {
         fb = fc;
         fc = fu;
     }
-    finish(Bracket { a, b, c, fa, fb, fc })
+    finish(Bracket {
+        a,
+        b,
+        c,
+        fa,
+        fb,
+        fc,
+    })
 }
 
 /// `std::max(a, b)`: `(a < b) ? b : a`.
@@ -272,7 +293,13 @@ impl BrentMinimizer {
     /// `minimize_given_bounds(ax, bx, cx)`: evaluates `f(bx)`, then
     /// [`BrentMinimizer::minimize_given_bounds_and_one_f`]. The bracket's order is not checked
     /// (VNL's assertions are compiled out by `NDEBUG`).
-    pub fn minimize_given_bounds(&mut self, f: &mut dyn CostFunction, ax: f64, bx: f64, cx: f64) -> f64 {
+    pub fn minimize_given_bounds(
+        &mut self,
+        f: &mut dyn CostFunction,
+        ax: f64,
+        bx: f64,
+        cx: f64,
+    ) -> f64 {
         let fb = f.f(&[bx]);
         self.minimize_given_bounds_and_one_f(f, ax, bx, cx, fb)
     }
@@ -476,7 +503,9 @@ impl Brent {
         tol: f64,
     ) -> (f64, f64) {
         self.inner.xtol = tol;
-        let xmin = self.inner.minimize_given_bounds_and_one_f(f, ax, bx, cx, fb);
+        let xmin = self
+            .inner
+            .minimize_given_bounds_and_one_f(f, ax, bx, cx, fb);
         (self.inner.f_at_last_minimum, xmin)
     }
 
@@ -615,7 +644,12 @@ impl Powell {
 
     /// `vnl_powell::minimize(p)`: minimizes from `p` (updated in place) and returns the
     /// [`ReturnCode`]. The counters continue from earlier calls (VNL does not reset them).
-    pub fn minimize(&mut self, functor: &mut dyn CostFunction, p: &mut [f64], out: &mut dyn Streams) -> ReturnCode {
+    pub fn minimize(
+        &mut self,
+        functor: &mut dyn CostFunction,
+        p: &mut [f64],
+        out: &mut dyn Streams,
+    ) -> ReturnCode {
         let n = p.len();
         // xi: the identity, row-major (xi[j][i] is row j, column i).
         let mut xi = vec![0.0f64; n * n];
@@ -662,7 +696,8 @@ impl Powell {
             let fptt = functor.f(&ptt);
             self.base.report_eval(fret);
             if fptt < fp {
-                let t = 2.0 * (fp - 2.0 * fret + fptt) * sqr(fp - fret - del) - del * sqr(fp - fptt);
+                let t =
+                    2.0 * (fp - 2.0 * fret + fptt) * sqr(fp - fret - del) - del * sqr(fp - fptt);
                 if t < 0.0 {
                     let (xx, fr) = self.line_minimize(functor, p, &xit, 1.0);
                     fret = fr;
@@ -685,7 +720,13 @@ impl Powell {
     /// One line minimization along `dx` from `x0` (`vnl_powell_1dfun` with
     /// `vnl_bracket_minimum(f1d, 0, xx, bx)` and `vnl_brent_minimizer` at `linmin_xtol`); each
     /// evaluation is reported. Returns `(xx, fret)`.
-    fn line_minimize(&mut self, functor: &mut dyn CostFunction, x0: &[f64], dx: &[f64], step: f64) -> (f64, f64) {
+    fn line_minimize(
+        &mut self,
+        functor: &mut dyn CostFunction,
+        x0: &[f64],
+        dx: &[f64],
+        step: f64,
+    ) -> (f64, f64) {
         let n = x0.len();
         let mut tmpx = vec![0.0f64; n];
         let linmin_xtol = self.linmin_xtol;
@@ -738,6 +779,9 @@ mod tests {
         let mut powell = Powell::new();
         let code = powell.minimize(&mut f, &mut p, &mut Silent);
         assert_eq!(code, ReturnCode::ConvergedFtol);
-        assert!((p[0] - 1.0).abs() < 1e-3 && (p[1] + 2.0).abs() < 1e-3, "{p:?}");
+        assert!(
+            (p[0] - 1.0).abs() < 1e-3 && (p[1] + 2.0).abs() < 1e-3,
+            "{p:?}"
+        );
     }
 }

@@ -272,7 +272,12 @@ fn dot_t<T: ItkReal>(x: &[T], y: &[T]) -> T {
     }
     let mut i = m;
     while i + 5 <= n {
-        t = t + x[i] * y[i] + x[i + 1] * y[i + 1] + x[i + 2] * y[i + 2] + x[i + 3] * y[i + 3] + x[i + 4] * y[i + 4];
+        t = t
+            + x[i] * y[i]
+            + x[i + 1] * y[i + 1]
+            + x[i + 2] * y[i + 2]
+            + x[i + 3] * y[i + 3]
+            + x[i + 4] * y[i + 4];
         i += 5;
     }
     t
@@ -314,7 +319,10 @@ pub type Solved<T> = (Vec<T>, usize);
 impl<T: ItkReal> Qr<T> {
     /// `vnl_qr<T>(M)` of the `rows × cols` matrix `m` (row-major).
     pub fn new(m: &[T], rows: usize, cols: usize) -> Qr<T> {
-        assert!(rows > 0 && cols > 0 && m.len() == rows * cols, "not a rows × cols matrix");
+        assert!(
+            rows > 0 && cols > 0 && m.len() == rows * cols,
+            "not a rows × cols matrix"
+        );
         let (n, p) = (rows, cols);
         let mut x = vec![T::ZERO; n * p];
         for i in 0..n {
@@ -462,7 +470,10 @@ impl<T: ItkReal> Qr<T> {
             x[jj] = temp;
         }
         if solve {
-            assert!(k <= n, "vnl_qr::solve of a matrix with more columns than rows is refused (VNL reads past Qᵀb)");
+            assert!(
+                k <= n,
+                "vnl_qr::solve of a matrix with more columns than rows is refused (VNL reads past Qᵀb)"
+            );
             b.copy_from_slice(&qty[..k]);
             for jj in 1..=k {
                 let j = k - jj + 1;
@@ -532,7 +543,11 @@ impl<T: ItkReal> Qr<T> {
     /// `solve(rhs)` for a `rows × cols` right-hand side matrix (row-major): each column solved;
     /// the result `p × cols`, and each column's `info`.
     pub fn solve_matrix(&self, rhs: &[T], cols: usize) -> (Vec<T>, Vec<usize>) {
-        assert_eq!(rhs.len(), self.n * cols, "right-hand side of the wrong size");
+        assert_eq!(
+            rhs.len(),
+            self.n * cols,
+            "right-hand side of the wrong size"
+        );
         let mut out = vec![T::ZERO; self.p * cols];
         let mut infos = Vec::with_capacity(cols);
         for c in 0..cols {
@@ -589,8 +604,12 @@ mod tests {
         for _ in 0..200 {
             let (r, c) = (1 + rng.below(7) as usize, 1 + rng.below(7) as usize);
             let (r, c) = (r.max(c), c.min(r));
-            let a: Vec<f64> = (0..r * c).map(|_| rng.range(-1000, 1000) as f64 / 37.0).collect();
-            let b: Vec<f64> = (0..r).map(|_| rng.range(-1000, 1000) as f64 / 13.0).collect();
+            let a: Vec<f64> = (0..r * c)
+                .map(|_| rng.range(-1000, 1000) as f64 / 37.0)
+                .collect();
+            let b: Vec<f64> = (0..r)
+                .map(|_| rng.range(-1000, 1000) as f64 / 13.0)
+                .collect();
             let old = VnlQr::new(&a, r, c).solve(&b);
             let new = Qr::new(&a, r, c).solve(&b);
             assert_eq!(old, new);

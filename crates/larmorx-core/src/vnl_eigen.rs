@@ -1263,7 +1263,9 @@ fn hqr2_full(
     let mut t = 0.0f64;
     let mut itn = (n * 30) as isize;
     // Values that persist across the loops, as the C locals do.
-    let (mut p, mut q, mut r, mut s, mut w, mut x, mut y, mut zz) = (0.0f64, 0.0f64, 0.0f64, 0.0f64, 0.0f64, 0.0f64, 0.0f64, 0.0f64);
+    let (mut p, mut q, mut r, mut s, mut w, mut x, mut y, mut zz) = (
+        0.0f64, 0.0f64, 0.0f64, 0.0f64, 0.0f64, 0.0f64, 0.0f64, 0.0f64,
+    );
     let mut m: usize;
     let mut l: usize;
     // L60.
@@ -1393,7 +1395,8 @@ fn hqr2_full(
                 if m == l {
                     break;
                 }
-                let tst1 = abs_m(p) * (abs_m(h.at(m - 1, m - 1)) + abs_m(zz) + abs_m(h.at(m + 1, m + 1)));
+                let tst1 =
+                    abs_m(p) * (abs_m(h.at(m - 1, m - 1)) + abs_m(zz) + abs_m(h.at(m + 1, m + 1)));
                 let tst2 = tst1 + abs_m(h.at(m, m - 1)) * (abs_m(q) + abs_m(r));
                 if tst2 == tst1 {
                     break;
@@ -1772,7 +1775,9 @@ mod tests {
         let mut rng = crate::x87::cases::SplitMix64::new(11);
         for _ in 0..300 {
             let n = 1 + rng.below(7) as usize;
-            let m: Vec<f64> = (0..n * n).map(|_| rng.range(-1000, 1000) as f64 / 97.0).collect();
+            let m: Vec<f64> = (0..n * n)
+                .map(|_| rng.range(-1000, 1000) as f64 / 97.0)
+                .collect();
             let es = real_eigensystem(&m, n).unwrap();
             let (wr, wi, ierr) = real_eigenvalues(&m, n);
             assert_eq!(ierr, es.ierr);
@@ -1785,15 +1790,26 @@ mod tests {
                     continue;
                 }
                 assert!(es.vreal_written[c]);
-                let norm: f64 = (0..n).map(|r| es.vreal[r * n + c].abs()).fold(0.0, f64::max);
+                let norm: f64 = (0..n)
+                    .map(|r| es.vreal[r * n + c].abs())
+                    .fold(0.0, f64::max);
                 for r in 0..n {
                     let av: f64 = (0..n).map(|k| m[r * n + k] * es.vreal[k * n + c]).sum();
-                    assert!((av - wr[c] * es.vreal[r * n + c]).abs() <= 1e-9 * (1.0 + norm) * (1.0 + wr[c].abs()));
+                    assert!(
+                        (av - wr[c] * es.vreal[r * n + c]).abs()
+                            <= 1e-9 * (1.0 + norm) * (1.0 + wr[c].abs())
+                    );
                 }
                 c += 1;
             }
         }
-        assert_eq!(real_eigensystem(&[0.0, f64::NAN, 1.0, 0.0], 2), Err(BalancNeverReturns));
-        assert_eq!(real_eigensystem(&[0.0, f64::INFINITY, 1.0, 0.0], 2), Err(BalancNeverReturns));
+        assert_eq!(
+            real_eigensystem(&[0.0, f64::NAN, 1.0, 0.0], 2),
+            Err(BalancNeverReturns)
+        );
+        assert_eq!(
+            real_eigensystem(&[0.0, f64::INFINITY, 1.0, 0.0], 2),
+            Err(BalancNeverReturns)
+        );
     }
 }

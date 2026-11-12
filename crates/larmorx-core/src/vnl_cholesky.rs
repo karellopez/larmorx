@@ -67,6 +67,20 @@
 
 #![allow(clippy::needless_range_loop)]
 
+// The expressions are kept as the C writes them (`-1.0 * x` is not `-x` for a NaN; the
+// constants are VXL's spellings; the negated comparisons are the f2c loops' NaN behaviour).
+#![allow(
+    clippy::neg_multiply,
+    clippy::manual_range_contains,
+    clippy::excessive_precision,
+    clippy::approx_constant,
+    clippy::neg_cmp_op_on_partial_ord,
+    clippy::assign_op_pattern,
+    clippy::collapsible_if,
+    clippy::needless_late_init,
+    clippy::too_many_arguments
+)]
+
 use crate::cfmt::{self, Streams};
 use crate::defects::{ITK_108, ITK_109, Notice, UpstreamDefects};
 use crate::math;
@@ -94,7 +108,13 @@ fn dasum(x: &[f64]) -> f64 {
     }
     let mut i = m;
     while i + 6 <= n {
-        t = t + abs_m(x[i]) + abs_m(x[i + 1]) + abs_m(x[i + 2]) + abs_m(x[i + 3]) + abs_m(x[i + 4]) + abs_m(x[i + 5]);
+        t = t
+            + abs_m(x[i])
+            + abs_m(x[i + 1])
+            + abs_m(x[i + 2])
+            + abs_m(x[i + 3])
+            + abs_m(x[i + 4])
+            + abs_m(x[i + 5]);
         i += 6;
     }
     t
@@ -164,12 +184,18 @@ impl VnlCholesky {
             notices: Vec::new(),
         };
         if (m[n - 1] - m[(n - 1) * n]).abs() > 1e-8 {
-            out.err(&format!("vnl_cholesky: WARNING: non-symmetric: {}\n", matrix_text(m, n, n)));
+            out.err(&format!(
+                "vnl_cholesky: WARNING: non-symmetric: {}\n",
+                matrix_text(m, n, n)
+            ));
         }
         if mode != Mode::EstimateCondition {
             ch.rank_def = dpofa(&mut ch.a, n);
             if mode == Mode::Verbose && ch.rank_def != 0 {
-                out.err(&format!("vnl_cholesky: {} dimensions of non-posdeffness\n", ch.rank_def));
+                out.err(&format!(
+                    "vnl_cholesky: {} dimensions of non-posdeffness\n",
+                    ch.rank_def
+                ));
             }
         } else {
             let (rcond, info) = dpoco(&mut ch.a, n);
@@ -518,7 +544,10 @@ mod tests {
         assert!((ch.determinant() - det).abs() < 1e-12);
         let bad = VnlCholesky::new(&[1.0, 2.0, 2.0, 1.0], 2, Mode::Verbose, &mut out);
         assert_eq!(bad.rank_deficiency(), 2);
-        assert_eq!(out.text(Stream::Err), "vnl_cholesky: 2 dimensions of non-posdeffness\n");
+        assert_eq!(
+            out.text(Stream::Err),
+            "vnl_cholesky: 2 dimensions of non-posdeffness\n"
+        );
     }
 
     #[test]

@@ -158,7 +158,7 @@ mod tests {
         assert_eq!(e(-2.5, 0), "-2e+00");
         assert_eq!(f(0.125, 2), "0.12");
         assert_eq!(f(f64::NEG_INFINITY, 3), "-inf");
-        assert_eq!(pad(&f(3.14159, 3), 10), "     3.142");
+        assert_eq!(pad(&f(1.2346, 3), 10), "     1.235");
         assert_eq!(ostream_setw(0.5, 4), " 0.5");
     }
 }

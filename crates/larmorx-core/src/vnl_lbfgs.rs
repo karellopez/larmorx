@@ -78,7 +78,21 @@
 
 // Fortran's 1-based indices are kept (`w[k]` is `W(k)`), so the port reads line by line
 // against lbfgs.c.
-#![allow(clippy::needless_range_loop, clippy::too_many_arguments)]
+#![allow(clippy::needless_range_loop)]
+
+// The expressions are kept as the C writes them (`-1.0 * x` is not `-x` for a NaN; the
+// constants are VXL's spellings; the negated comparisons are the f2c loops' NaN behaviour).
+#![allow(
+    clippy::neg_multiply,
+    clippy::manual_range_contains,
+    clippy::excessive_precision,
+    clippy::approx_constant,
+    clippy::neg_cmp_op_on_partial_ord,
+    clippy::assign_op_pattern,
+    clippy::collapsible_if,
+    clippy::needless_late_init,
+    clippy::too_many_arguments
+)]
 
 use crate::cfmt::{self, Streams};
 use crate::defects::{ITK_103, ITK_104, ITK_105, ITK_106, Notice, UpstreamDefects};
@@ -225,7 +239,10 @@ pub fn lbfgs(
     }
     let dot = |w: &[f64], a: i64, b: i64| -> f64 {
         // ddot_(n, &w[a], 1, &w[b], 1), a and b 1-based.
-        ddot(&w[a as usize - 1..a as usize - 1 + nu], &w[b as usize - 1..b as usize - 1 + nu])
+        ddot(
+            &w[a as usize - 1..a as usize - 1 + nu],
+            &w[b as usize - 1..b as usize - 1 + nu],
+        )
     };
 
     enum Go {
@@ -325,7 +342,10 @@ pub fn lbfgs(
                             "ys reset to 0 on the caller's diagonal: 1/ys is infinite"
                         }
                     };
-                    crate::defects::push_once(&mut call.notices, Notice::new(&ITK_104, mode, detail));
+                    crate::defects::push_once(
+                        &mut call.notices,
+                        Notice::new(&ITK_104, mode, detail),
+                    );
                 }
                 entered_for_diag = false;
                 if diagco {
@@ -379,7 +399,19 @@ pub fn lbfgs(
             }
             Go::L172 => {
                 let s0 = (gl.ispt + gl.point * n) as usize; // s = &w[ispt + point*n + 1]
-                mcsrch(n, x, f, g, &w[s0..s0 + nu], xtol, diag, gl, mode, out, &mut call);
+                mcsrch(
+                    n,
+                    x,
+                    f,
+                    g,
+                    &w[s0..s0 + nu],
+                    xtol,
+                    diag,
+                    gl,
+                    mode,
+                    out,
+                    &mut call,
+                );
                 if gl.info == -1 {
                     *iflag = 1;
                     gl.ys = ys;
@@ -455,7 +487,13 @@ fn l165(n: i64, g: &[f64], w: &mut [f64], gl: &mut LbfgsGlobal) {
 }
 
 /// L195: a non-positive diagonal element.
-fn l195(iflag: &mut i64, gl: &mut LbfgsGlobal, i: i64, out: &mut dyn Streams, call: LbfgsCall) -> LbfgsCall {
+fn l195(
+    iflag: &mut i64,
+    gl: &mut LbfgsGlobal,
+    i: i64,
+    out: &mut dyn Streams,
+    call: LbfgsCall,
+) -> LbfgsCall {
     *iflag = -2;
     if gl.lp > 0 {
         out.out(&format!(
@@ -481,7 +519,9 @@ fn write50(v: &[f64], mode: UpstreamDefects, out: &mut dyn Streams, call: &mut L
     };
     let vxl = scale_of(vmax);
     let fixed = {
-        let vabs = v.iter().fold(0.0f64, |a, &b| if b.abs() > a { b.abs() } else { a });
+        let vabs = v
+            .iter()
+            .fold(0.0f64, |a, &b| if b.abs() > a { b.abs() } else { a });
         if vabs == 0.0 { 1.0 } else { scale_of(vabs) }
     };
     let vmaxscale = match mode {
@@ -516,8 +556,12 @@ fn write50(v: &[f64], mode: UpstreamDefects, out: &mut dyn Streams, call: &mut L
 /// `write50` as `lb1_` calls it (ITK-106): VXL passes the array's pointer decremented by one.
 fn write50_lb1(v: &[f64], mode: UpstreamDefects, out: &mut dyn Streams, call: &mut LbfgsCall) {
     let detail = match mode {
-        UpstreamDefects::Fix => "the printed vector (VXL's lb1 prints from the value before the array and drops the last)",
-        UpstreamDefects::Reproduce => "the printed vector starts with the value before the array (memory VXL does not own, printed as 0) and drops the last",
+        UpstreamDefects::Fix => {
+            "the printed vector (VXL's lb1 prints from the value before the array and drops the last)"
+        }
+        UpstreamDefects::Reproduce => {
+            "the printed vector starts with the value before the array (memory VXL does not own, printed as 0) and drops the last"
+        }
     };
     if !v.is_empty() {
         crate::defects::push_once(&mut call.notices, Notice::new(&ITK_106, mode, detail));
@@ -562,8 +606,14 @@ fn lb1(
     const HEAD: &str = "   I   NFN    FUNC        GNORM       STEPLENGTH\n";
     if gl.iter == 0 {
         out.out("*************************************************\n");
-        out.out(&format!("  N={n}   NUMBER OF CORRECTIONS={m}       INITIAL VALUES"));
-        out.out(&format!(" F= {}   GNORM= {}\n", cfmt::g(f, 6), cfmt::g(gl.gnorm, 6)));
+        out.out(&format!(
+            "  N={n}   NUMBER OF CORRECTIONS={m}       INITIAL VALUES"
+        ));
+        out.out(&format!(
+            " F= {}   GNORM= {}\n",
+            cfmt::g(f, 6),
+            cfmt::g(gl.gnorm, 6)
+        ));
         if iprint[1] >= 1 {
             out.out(" VECTOR X= ");
             write50_lb1(&x[..nu], mode, out, call);
@@ -711,12 +761,16 @@ fn mcsrch(
                 let (fm, dgm, stmin, stmax) = (gl.fm, gl.dgm, gl.stmin, gl.stmax);
                 if vxl {
                     let (mut fx, mut fy) = (gl.fx, gl.fy);
-                    mcstep(gl, &mut fx, &mut dx, &mut fy, &mut dy, fm, dgm, stmin, stmax);
+                    mcstep(
+                        gl, &mut fx, &mut dx, &mut fy, &mut dy, fm, dgm, stmin, stmax,
+                    );
                     gl.fx = fx;
                     gl.fy = fy;
                 } else {
                     let (mut fxm, mut fym) = (gl.fxm, gl.fym);
-                    mcstep(gl, &mut fxm, &mut dx, &mut fym, &mut dy, fm, dgm, stmin, stmax);
+                    mcstep(
+                        gl, &mut fxm, &mut dx, &mut fym, &mut dy, fm, dgm, stmin, stmax,
+                    );
                     gl.fxm = fxm;
                     gl.fym = fym;
                 }

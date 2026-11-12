@@ -35,6 +35,15 @@ from pathlib import Path
 GITHUB_RAW = "https://raw.githubusercontent.com/freesurfer/freesurfer/v8.2.0/"
 SMALL = 2_000_000  # bytes: below this a FreeSurfer-licensed file could ship in larmorx-freesurfer
 
+# Package folders the build unpacks from one annexed tarball each (distribution/average/CMakeLists.txt,
+# install_tarball): their files are served only as part of that tarball.
+TARBALLS = {
+    "subjects/fsaverage/": "distribution/average/fsaverage.tar.gz",
+    "subjects/fsaverage5/": "distribution/average/fsaverage5.tar.gz",
+    "subjects/fsaverage6/": "distribution/average/fsaverage6.tar.gz",
+    "average/mni_icbm152_nlin_asym_09c/": "distribution/average/mni_icbm152_nlin_asym_09c.tar.gz",
+}
+
 # (pattern on the package path, kind, licence, origin). The first match wins.
 SLA = "FreeSurfer licence (Part B; docs/freesurfer/third-party.md section 2)"
 RULES: list[tuple[str, str, str, str]] = [
@@ -287,6 +296,17 @@ def main(argv: list[str]) -> int:
                 if status == "200"
                 else f"annexed (key {key}); remote answered {status or 'not checked'}"
             )
+        elif any(rel.startswith(prefix) for prefix in TARBALLS):
+            tarball = next(t for prefix, t in TARBALLS.items() if rel.startswith(prefix))
+            tag_path = tarball
+            key = os.path.basename(os.readlink(args.tag / tarball))
+            u = urls.get(tarball)
+            if u:
+                url, status = u["url"], u["http_status"]
+            served = (
+                f"inside the annexed tarball {tarball} (key {key}; remote answered "
+                f"{status or 'not checked'})"
+            )
         elif (size, digest) in in_git:
             tag_path = in_git[(size, digest)]
             url = GITHUB_RAW + tag_path
@@ -346,15 +366,14 @@ def main(argv: list[str]) -> int:
     )
     print("|---|---|---:|---|---|---|---|---|")
     for e in sorted(entries, key=lambda x: (x["kind"], x["path"])):
-        served = (
-            "annex 200"
-            if e["url_status"] == "200"
-            else (
-                "GitHub (git)"
-                if "GitHub" in e["served"]
-                else ("annex " + (e["url_status"] or "?") if "annex" in e["served"] else "no")
-            )
-        )
+        if "tarball" in e["served"]:
+            served = "in its tarball, annex " + (e["url_status"] or "?")
+        elif "GitHub" in e["served"]:
+            served = "GitHub (git)"
+        elif "annex" in e["served"]:
+            served = "annex " + (e["url_status"] or "?")
+        else:
+            served = "no"
         streams = ", ".join(e["streams"] + [f"{s} (conditional)" for s in e["conditional_streams"]])
         print(
             f"| `{e['path']}` | {e['kind']} | {e['bytes']:,} | `{e['sha256'][:12]}` | "

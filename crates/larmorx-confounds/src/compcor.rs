@@ -505,14 +505,15 @@ pub fn compute_tstd(rows: &[f64], n: usize, t: usize, x: f64, order: SumOrder) -
 }
 
 /// `TCompCor._process_masks` for one mask: the high-variance voxels of the `n × t` rows (C order,
-/// the mask's voxels in its C order, the series' values as float64), `true` for a voxel whose SD
-/// after `regress_poly(2, ...)` is at or above the `round(100 (1 - percentile_threshold))`th
-/// percentile.
+/// the mask's voxels in its C order, the series' values: float32 as nipype passes a float32
+/// series to `regress_poly`, which casts them to float64 as numpy's product does; float64
+/// otherwise), `true` for a voxel whose SD after `regress_poly(2, ...)` is at or above the
+/// `round(100 (1 - percentile_threshold))`th percentile.
 ///
 /// # Errors
 /// numpy `percentile`'s `IndexError` for an empty mask ([`CompcorError::Percentile`]).
-pub fn tcompcor_mask(
-    rows: &[f64],
+pub fn tcompcor_mask<T: NpFloat>(
+    rows: &[T],
     n: usize,
     t: usize,
     percentile_threshold: f64,

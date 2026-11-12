@@ -253,25 +253,27 @@ fn nipype_cosine_filter<'py>(
 }
 
 /// `TCompCor._process_masks` for one mask: the high-variance voxels (`True` at or above the
-/// percentile) of `rows` (2-D float64, the mask's voxels in its C order, the series' values).
+/// percentile) of `rows` (2-D float32 or float64, the mask's voxels in its C order, the series'
+/// values: a float32 series' rows as they are, so no float64 copy is held beside the series).
 #[pyfunction]
 #[pyo3(signature = (rows, percentile_threshold = 0.02, numpy = "2.5.4", n_threads = 1))]
 fn nipype_tcompcor_mask<'py>(
     py: Python<'py>,
-    rows: PyReadonlyArray2<'py, f64>,
+    rows: &Bound<'py, PyAny>,
     percentile_threshold: f64,
     numpy: &str,
     n_threads: usize,
 ) -> PyResult<Bound<'py, PyArray1<bool>>> {
     let libs = libraries(numpy, "1.18.1")?;
-    let (n, t) = (rows.shape()[0], rows.shape()[1]);
-    let v: Vec<f64> = match rows.as_slice() {
-        Ok(s) => s.to_vec(),
-        Err(_) => rows.as_array().iter().copied().collect(),
-    };
-    let m = py
-        .detach(|| compcor::tcompcor_mask(&v, n, t, percentile_threshold, &libs, n_threads))
-        .map_err(|e| err(py, e))?;
+    let m = match rows_of(rows)? {
+        Rows::F32(v, n, t) => {
+            py.detach(|| compcor::tcompcor_mask(&v, n, t, percentile_threshold, &libs, n_threads))
+        }
+        Rows::F64(v, n, t) => {
+            py.detach(|| compcor::tcompcor_mask(&v, n, t, percentile_threshold, &libs, n_threads))
+        }
+    }
+    .map_err(|e| err(py, e))?;
     Ok(PyArray1::from_vec(py, m))
 }
 

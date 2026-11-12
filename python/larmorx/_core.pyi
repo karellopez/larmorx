@@ -2169,7 +2169,8 @@ def nipype_cosine_filter(
 def nipype_tcompcor_mask(
     rows: np.ndarray, percentile_threshold: float = 0.02, numpy: str = "2.5.4", n_threads: int = 1
 ) -> np.ndarray:
-    """``TCompCor._process_masks`` for one mask's rows (float64): the high-variance voxels."""
+    """``TCompCor._process_masks`` for one mask's rows (float32 or float64): the high-variance
+    voxels."""
 
 def nipype_compute_noise_components(
     masks: list[np.ndarray],

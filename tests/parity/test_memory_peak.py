@@ -1775,3 +1775,81 @@ def test_t2smap_original_needs_no_more_memory_than_tedana(tmp_path, call, extra)
         assert mib <= limit, f"{call} ({mode}, {threads}): {mib:.0f} MiB > {limit:.0f} MiB"
         if written:
             assert _t2smap_files(d / "out") == written, (mode, threads)
+
+
+# --- fMRIPrep's confound estimation ----------------------------------------------------------------
+
+#: The confounds' part (2026-11-12): fMRIPrep's ``acompcor``, ``tcompcor``, ``dvars`` and
+#: ``signals`` nodes with the inputs fMRIPrep gave them (their ``_report/report.rst``) on two
+#: oracle runs (ds000005: 64 x 64 x 34 x 240 float32, the first run's 32,069 brain voxels;
+#: ds000228: a child's 64 x 64 x 32 x 168), nipype's ``ACompCor``, ``TCompCor`` and
+#: ``ComputeDVARS`` and niworkflows' ``SignalExtraction`` in the newest Python environment
+#: against ``lx.confounds`` and ``signal_extraction``, each in a process of its own
+#: (``validation/investigations/confounds/memory_call.py``), numpy's OpenBLAS at one thread with
+#: the part's ``OPENBLAS_L2_SIZE=512``; larmorx in both D13 modes at one thread and by default at
+#: eight, its files the originals' byte for byte in ``reproduce`` (decompressed). The originals'
+#: runs go through the oracle cache, the releases an argument of the call. The allowance is the
+#: memory rule's.
+CONFOUNDS_CASES = [
+    ("acompcor-ds000005", "acompcor", "ds000005-sub-01-noreconall"),
+    ("tcompcor-ds000005", "tcompcor", "ds000005-sub-01-noreconall"),
+    ("dvars-ds000005", "dvars", "ds000005-sub-01-noreconall"),
+    ("signals-ds000005", "signals", "ds000005-sub-01-noreconall"),
+    ("acompcor-ds000228", "acompcor", "ds000228-sub-pixar008-noreconall"),
+    ("tcompcor-ds000228", "tcompcor", "ds000228-sub-pixar008-noreconall"),
+]
+
+
+@pytest.mark.parametrize(("name", "call", "run"), CONFOUNDS_CASES)
+def test_confounds_need_no_more_memory_than_the_originals(tmp_path, name, call, run):
+    pv = pytest.importorskip("larmorx_validation.parity.python_versions")
+    newest = pv.prefix(pv.NEWEST)
+    if newest is None:
+        pytest.skip("the newest Python environment (oracles/python-newest) was not found")
+    if not Path("/usr/bin/time").is_file():
+        pytest.skip("/usr/bin/time was not found")
+    ws = pv.workspace()
+    if ws is None or not (ws / "oracles" / SDCFLOWS_RUNS / run / "work").is_dir():
+        pytest.skip(f"the oracle run {run} was not found")
+    script = (
+        Path(__file__).resolve().parents[2]
+        / "validation" / "investigations" / "confounds" / "memory_call.py"
+    )  # fmt: skip
+    py = str(newest / "bin" / "python")
+    env = {
+        **{k: v for k, v in os.environ.items() if k not in ("PYTHONPATH", "OPENBLAS_L2_SIZE")},
+        "OMP_NUM_THREADS": "1",
+        "OPENBLAS_NUM_THREADS": "1",
+        "MKL_NUM_THREADS": "1",
+        "OPENBLAS_CORETYPE": os.environ.get("OPENBLAS_CORETYPE", "Haswell"),
+        "OPENBLAS_L2_SIZE": "512",
+        "LARMORX_WORKSPACE": str(ws),
+    }
+    done = subprocess.run(
+        [py, "-P", "-c", f"import runpy; print(runpy.run_path({str(script)!r})['releases']())"],
+        capture_output=True, text=True, env=env, check=True,
+    )  # fmt: skip
+    releases = done.stdout.strip()
+    o_dir = tmp_path / "original"
+    o_dir.mkdir()
+    code, orig_mib = _original_peak(
+        [py, "-P", str(script), "original", call, run, "--env", releases],
+        env,
+        None,
+        _emptier(o_dir),
+        o_dir,
+    )
+    assert code == 0
+    for mode, threads in (("reproduce", 1), ("fix", 1), ("fix", 8)):
+        r_dir = tmp_path / f"larmorx-{mode}-{threads}"
+        r_dir.mkdir()
+        l_env = {**env, "PYTHONPATH": os.environ.get("PYTHONPATH", "")}
+        cmd = [py, "-P", str(script), "larmorx", call, run, "--defects", mode]
+        code, mib = _peak([*cmd, "--threads", str(threads)], l_env, r_dir)
+        assert code == 0
+        print(f"{name} ({mode}, {threads}): larmorx {mib:.1f} MiB, the original {orig_mib:.1f} MiB")
+        assert mib <= allowance(orig_mib), (
+            f"{name} ({mode}, {threads}): larmorx {mib:.0f} MiB, the original {orig_mib:.0f} MiB"
+        )
+        if mode == "reproduce":
+            assert _stored(o_dir) == _stored(r_dir), name

@@ -664,8 +664,12 @@ def _compcor(
             imgseries = dataobj[mask, :]
             if imgseries.dtype.kind == "c":
                 raise NotImplementedError("complex series are not ported")
+            # float32 rows as they are (regress_poly casts them as numpy's product does); other
+            # types as float64 (exact), so no float64 copy is held beside a float32 series
+            if imgseries.dtype not in (np.float32, np.float64):
+                imgseries = imgseries.astype(np.float64)
             hv = _core.nipype_tcompcor_mask(
-                np.ascontiguousarray(imgseries, dtype=np.float64),
+                np.ascontiguousarray(imgseries),
                 float(percentile_threshold),
                 str(numpy_version),
                 n_threads,
@@ -698,9 +702,11 @@ def _compcor(
             "`variance_threshold`, as this feature may be deprecated in the future."
         )
 
-    # imgseries.get_fdata(dtype=np.float32) (of the sliced dataobj when volumes are skipped).
+    # imgseries.get_fdata(dtype=np.float32) (of the sliced dataobj when volumes are skipped):
+    # a float32 series is used where it is (nibabel's get_fdata returns it uncopied), so the
+    # peak holds one series, as nipype's.
     if skip_vols:
-        series = dataobj.astype(np.float32)
+        series = dataobj.astype(np.float32, copy=False)
     elif dataobj.dtype == np.float32:
         series = dataobj
     else:

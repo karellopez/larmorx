@@ -320,7 +320,7 @@ def _run_original(
     if code != 0:
         tail = "\n".join(err.strip().splitlines()[-20:])
         raise RuntimeError(
-            f"larmorx fsl {tool} (the clean-room original) failed with exit code {code}:\n{tail}"
+            f"larmorx fsl {tool} (the clean room) failed with exit code {code}:\n{tail}"
         )
 
 
@@ -404,7 +404,7 @@ def bet(
         room (FSL's behaviour within the thresholds of its validation record,
         ``docs/validation/fsl-bet.md``).
     upstream_defects
-        ``"fix"`` (default) or ``"reproduce"`` (FSL's output); a
+        ``"fix"`` (default) or ``"reproduce"`` (FSL's output); an
         :class:`~larmorx.UpstreamDefectWarning` names each defect that changed the result.
 
     Returns
@@ -488,7 +488,7 @@ def bet(
     if tanh != "glibc":
         if implementation == "replica":
             raise ValueError(
-                "tanh='correctly-rounded' is the clean-room original's option (the replica is "
+                "tanh='correctly-rounded' is the clean room's option (the replica is "
                 "FSL's, glibc's tanh): use implementation='auto' or 'clean-room'"
             )
         implementation = "clean-room"

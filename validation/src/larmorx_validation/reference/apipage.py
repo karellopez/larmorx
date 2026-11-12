@@ -18,7 +18,9 @@ GitHub does not show::
     usage-only: ["-h"]
     -->
 
-Its text before the first level-3 heading says what the program does. Its level-3 sections are
+Its text before the first level-3 heading says what the program does: its first sentence is the
+reference page's lede, and the page's "What it does" holds the rest (all of it when it is one
+sentence, which the page then shows once, without a lede). Its level-3 sections are
 read by the first word of their title: ``Python ...`` (the Python call: a line holding the call's
 signature, then its description), ``Options ...`` (the options tables: a first column of the
 original's options, a column headed ``Python``, a column of notes), ``Examples ...`` (code blocks

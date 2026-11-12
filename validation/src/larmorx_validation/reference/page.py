@@ -177,6 +177,18 @@ def _first_sentence(text: str) -> str:
     return m.group(1) if m else plain
 
 
+def _lede(text: str) -> tuple[str, str]:
+    """The page's lede and its "What it does": the lede is the text's first sentence, which the
+    section then leaves out, so that the page does not print it twice; a text of one sentence
+    gives no lede and the whole text to the section. The rest keeps its lines and paragraphs."""
+    text = text.strip()
+    first = _first_sentence(text)
+    pattern = r"\s+".join(re.escape(word) for word in first.split())
+    m = re.match(pattern, text)
+    rest = text[m.end() :].strip() if m else ""
+    return (first, rest) if rest else ("", text)
+
+
 def _records(repo: Path) -> dict[str, dict]:
     doc = tomllib.loads((repo / "validation/tools.toml").read_text(encoding="utf-8"))
     return {r["id"]: r for r in doc.get("record", [])}
@@ -382,9 +394,7 @@ def build(repo: Path, p: apipage.Program) -> Reference:
 
     # ---------------------------------------------------------------- the Markdown
     what = links(apipage.strip_comments(p.description), page, problems).strip()
-    lede = _first_sentence(what) if what else fn.summary
-    if " ".join(what.split()) == lede:
-        lede = ""  # one sentence: the section says it, the header does not repeat it
+    lede, what = _lede(what or fn.summary)
     evidence = str(meta.get("evidence", ""))
     ev_page, _, ev_anchor = evidence.partition("#")
     ev_url = f"/evidence/{ev_page}/" + (f"#{ev_anchor}" if ev_anchor else "") if ev_page else ""
@@ -425,7 +435,7 @@ def build(repo: Path, p: apipage.Program) -> Reference:
     out.append("")
     body = []
     body.append("## What it does {#what-it-does}\n")
-    body.append((what or fn.summary) + "\n")
+    body.append(what + "\n")
 
     body.append("## Command line {#command-line}\n")
     syn = [f"larmorx {p.group} {s}" for s in cl.synopsis] or [f"{command} ..."]

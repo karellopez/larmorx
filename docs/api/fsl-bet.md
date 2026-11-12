@@ -118,7 +118,8 @@ import larmorx as lx
 # As fMRIPrep calls BET on its BOLD reference.
 r = lx.fsl.bet("boldref.nii.gz", frac=0.2, mask=True)
 r.brain, r.mask
-# The port that ran: the clean room of larmorx, or the replica once larmorx-nc is installed.
+# The port that ran: the clean room of larmorx,
+# or the replica once larmorx-nc is installed.
 r.mask.implementation
 
 # The same call, the clean room chosen.
@@ -133,10 +134,13 @@ larmorx fsl bet boldref.nii.gz boldref_brain.nii.gz -f 0.20 -m
 ### Ports of `bet`
 
 The replica gives FSL 6.0.7.23's exit status, messages and files byte for byte in 201 of the 263
-cases of its record, which holds `bet`, `bet2` and `betsurf`; 47 more are rejected by both. The
-clean room is within the thresholds in 198 of its 200 compared cases. One of the two others is
-`bet`'s: a 3.5-year-old's `bet -B`, whose mask has a Dice coefficient of 0.9983 and a boundary
-distance of 1.0 voxel at the 95th percentile but 2.24 voxels at most, where the threshold is 2.
+cases of its record, which holds `bet`, `bet2`, `betsurf`, `standard_space_roi` and `fslroi`; 47
+more are rejected by both. The clean room is within the thresholds in 198 of the 200 compared
+cases of its record, which holds the same programs. One of the two others is `bet`'s: a
+3.5-year-old's `bet -B`. The boundaries of its brain and mask lie up to 2.24 voxels from FSL's,
+where the threshold is 2, and the mask's boundary distance at the 95th percentile is 1.0 voxel,
+where the threshold is 0.5. Their Dice coefficients, 0.9989 and 0.9983, are within the threshold
+of 0.995.
 
 ## `bet2`
 
@@ -201,9 +205,10 @@ larmorx fsl bet2 T1w.nii.gz T1w_brain -e
 ### Ports of `bet2`
 
 The replica gives FSL 6.0.7.23's exit status, messages and files byte for byte in 201 of the 263
-cases of its record, which holds `bet`, `bet2` and `betsurf`; 47 more are rejected by both. In the
-clean room's record, 378 of its 380 brains, masks and outlines are FSL's bit for bit, and 11 of
-11 meshes have FSL's vertices to the file's 6 decimals.
+cases of its record, which holds `bet`, `bet2`, `betsurf`, `standard_space_roi` and `fslroi`; 47
+more are rejected by both. The clean room's record holds the same programs. Of its 380 brains,
+masks and outlines (`betsurf`'s counted apart), 378 are FSL's bit for bit; the two others are
+`bet -B`'s. 11 of 11 meshes have FSL's vertices to the file's 6 decimals.
 
 ## `betsurf`
 
@@ -265,8 +270,8 @@ larmorx fsl betsurf --t1only -o -m -s T1w.nii.gz T1w_brain_mesh.vtk T1w_to_MNI15
 ### Ports of `betsurf`
 
 The replica gives FSL 6.0.7.23's exit status, messages and files byte for byte in 201 of the 263
-cases of its record, which holds `bet`, `bet2` and `betsurf`; 47 more are rejected by both. The
-clean room's masks and outlines are within its thresholds (a Dice coefficient of at least 0.99, a
+cases of its record, which holds `bet`, `bet2`, `betsurf`, `standard_space_roi` and `fslroi`; 47
+more are rejected by both. The clean room's masks and outlines are within its thresholds (a Dice coefficient of at least 0.99, a
 boundary distance of at most 1 voxel at the 95th percentile) in 114 of 116, 34 of them bit for bit.
 One of the record's two misses is `betsurf`'s: the scalp of ds002603 with its T2, whose boundary
 distance is 2 voxels at the 95th percentile.
@@ -293,7 +298,8 @@ FSL in any measured call (`tests/parity/test_memory_peak.py`).
 
 **The clean room: `experimental`.** Its [record](../validation/fsl-bet.md) is the standard
 comparison with FSL 6.0.7.23: 252 cases. **198 of its 200 compared cases are within the
-thresholds**; the other two miss one ([below](#the-clean-room-crateslarmorx-fsl)). 46 more are
+thresholds**; the other two miss thresholds of the boundary distance
+([below](#the-clean-room-crateslarmorx-fsl)). 46 more are
 rejected by both alike, and in 6 `reproduce` fills in what FSL leaves undefined; none is pending.
 The 252 cases are the 164 kept from the second record (168 cases), unchanged in status and
 details, and 88 new ones:
@@ -411,7 +417,7 @@ FSL's bet2 takes its initial radius and the fractional threshold's power from gl
 and betsurf its blurring's weights from glibc's `exp` (`specs/bet.md` §8), which are not correctly
 rounded. The clean room computes them correctly rounded by default and takes glibc's with
 `upstream_defects="reproduce"` (`larmorx_core::math`'s `*_glibc` functions, proved bit for bit
-against glibc 2.35; the user's decision of 2026-11-04: glibc's bits for `reproduce` only). The
+against glibc 2.35; decided on 2026-11-04: glibc's bits for `reproduce` only). The
 surface is an iterative fit: one power's last bit can move it, and bet2 cannot tell without fitting
 twice, so neither mode names GLIBC-07: the default's correctly rounded functions can move a
 surface's last bits. bet2's `tanh` is a separate choice (GLIBC-06, `tanh=`, above).
@@ -507,11 +513,13 @@ and 51 more within these thresholds; on the five real heads the masks' Dice coef
 2 voxels): one of the record's two failures. The other (since 2026-11-05): `real/child-3y-B`, a
 3.5-year-old's `bet -B`, every `-d` file FSL's (both `standard_space_roi` runs, FAST's bias field
 and the unbiased images) but the robust run's second bet2 pass, whose `-c` (FSL's centre, given in
-voxels) falls on a neurologically stored image: the mask's Dice 0.9983, its boundary distance's
-95th percentile 1.0 and its maximum 2.24 voxels (bet2's threshold 2), the open question of random
+voxels) falls on a neurologically stored image. The mask's Dice coefficient, 0.9983, is within
+its threshold (at least 0.995), but its boundary distance misses both of its thresholds: 1.0 voxel
+at the 95th percentile, where the threshold is 0.5, and 2.24 voxels at its largest, where the
+threshold is 2; the brain's largest is 2.24 voxels too. It is the open question of random
 testing's cases 622 and 677. The questions for the spec writer are in the findings.
 
-**`tanh`** (GLIBC-06, the user's decision of 2026-10-31): the smoothness weight's `tanh` is glibc
+**`tanh`** (GLIBC-06, decided on 2026-10-31): the smoothness weight's `tanh` is glibc
 2.35's by default (`larmorx_core::math::tanh_glibc`, fdlibm's, proved equal to the system's on
 12.9 billion inputs), so the surfaces are FSL's; `--tanh correctly-rounded` (`tanh=
 "correctly-rounded"`) takes the correctly rounded `larmorx_core::math::tanh` (CORE-MATH's),
@@ -586,8 +594,8 @@ lines `larmorx_fsl::cli::run` / `run_in` (an environment table and a directory g
   changed, `bet2 --binaryMask` among it, is in [findings/fsl-bet.md](../findings/fsl-bet.md),
   "FSL 6.0.7.23".
 - **2026-10-30:** the clean room's `bet2` and the `bet` script.
-- **2026-10-31:** the clean room's `betsurf`, and its second record (168 cases); the user's
-  decision GLIBC-06 (glibc's `tanh` by default, the correctly rounded one on request).
+- **2026-10-31:** the clean room's `betsurf`, and its second record (168 cases); decision
+  GLIBC-06 (glibc's `tanh` by default, the correctly rounded one on request).
 - **2026-11-04:** the replica's `-S`, `-B`, `-A` and `-A2`, which run the replicas of the programs
   they need; the replica's record made again with them, standard_space_roi and fslroi.
 - **2026-11-05:** the clean room's `-S`, `-B`, `-A` and `-A2`, which run the clean room's own

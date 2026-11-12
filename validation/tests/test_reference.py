@@ -369,3 +369,39 @@ def test_first_sentence(text, first):
     from larmorx_validation.reference import programs
 
     assert programs.first_sentence(text) == first
+
+
+@pytest.mark.parametrize(
+    ("text", "lede", "section"),
+    [
+        (
+            "`bet` finds the brain\nin a head.  It writes it.\n\nMore.",
+            "`bet` finds the brain in a head.",
+            "It writes it.\n\nMore.",
+        ),
+        ("`bet` finds the brain.\n\nIt writes it.", "`bet` finds the brain.", "It writes it."),
+        ("`betsurf` finds the skull.", "", "`betsurf` finds the skull."),
+    ],
+)
+def test_lede_is_not_repeated(text, lede, section):
+    """A reference page's lede is its first sentence, which "What it does" then leaves out; one
+    sentence gives no lede."""
+    from larmorx_validation.reference.page import _lede
+
+    assert _lede(text) == (lede, section)
+
+
+def test_bet_pages_say_their_first_sentence_once():
+    """bet's and bet2's pages show their first sentence as the lede only; betsurf's, one
+    sentence, has no lede."""
+    ledes = {}
+    for ref in reference.references(API, REPO):
+        front, _, body = ref.markdown.partition("\n---\n")
+        what = body.split("## What it does {#what-it-does}\n", 1)[1].split("\n## ", 1)[0]
+        m = re.search(r'^lede: "(.*)"$', front, re.M)
+        ledes[ref.program.name] = m.group(1) if m else ""
+        if m:
+            assert m.group(1) not in " ".join(what.split())
+    assert ledes["bet"] == "`bet` finds the brain in a head image."
+    assert ledes["bet2"].startswith("`bet2` is FSL's brain extraction")
+    assert ledes["betsurf"] == ""

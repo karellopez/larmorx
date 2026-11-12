@@ -714,23 +714,27 @@ The header's links: Getting started, Concepts, Programs, Validation, Roadmap, Ab
 ## 7. The old words today
 
 From [the inventory](../validation/investigations/docs-revision/inventory.md) (this repository
-at `cb45ecb4`, the site at `b768293a`; `old_words.py` makes it again):
+at `6eb5f150`, the site at `d9cf5fa9`, with `bet`'s first reference and evidence pages;
+`old_words.py` makes it again):
 
 | Who changes them | Files to change | *clean-room original* | *original* for a clean room | *exact replica* | *port* as a kind | slogan | tagline | jargon on user pages | other *original* to read |
 |---|---|---|---|---|---|---|---|---|---|
-| the writer, in the rollout | 361 | 1,998 | 193 | 228 | 6 | 14 | 7 | 1,526 | 4,733 |
+| the writer, in the rollout | 365 | 2,015 | 197 | 228 | 6 | 14 | 7 | 1,550 | 4,793 |
 | generated: re-made or re-exported, never by hand | 64 | 1,482 | 156 | 19 | 0 | 0 | 0 | 2,612 | 2,692 |
 | a clean-room agent, a spec writer, the orchestrator | 42 | 109 | 14 | 18 | 0 | 0 | 2 | 0 | 373 |
 | kept as written (history, identifiers) | 377 | 1,944 | 3,769 | 149 | 5 | 6 | 2 | 8 | 11,987 |
 
 The generated row holds the exported evidence (28 files to change), which the rollout exports
 again. It also holds the records' and reports' data (4) and the pages made by a measurement
-(section 1, "Where the old words stay"): 21 records' pages, 10 benchmark reports and the
-clean-room audit's page. These keep their words until each is made again. On the site, the pages (`content/`) hold 243 *clean-room original*, 60
-*exact replica* and 271 words of jargon. The exported evidence holds 1,376 *clean-room original*
-and 143 *original* for a clean room. 33 files are renamed, and 14 keep their names: 12 of random
-testing's cases and 2 investigation scripts. The last column counts words to read one by one;
-most of them name the program compared with, which is right.
+(section 1, "Where the old words stay"), those that hold old words: 21 records' pages, 10 of the
+21 benchmark reports and the clean-room audit's page. These keep their words until each is made
+again. On the site, the pages (`content/`) hold 259 *clean-room original*, 60 *exact replica*
+and 294 words of jargon. The exported evidence holds 1,376 *clean-room original* and 143
+*original* for a clean room. Of the 47 files named with *original*, 28 are renamed in the
+rollout and 5 later, when the reports that link to them are made again (section 1, "Renamed
+files"). 14 keep their names: 12 of random testing's cases and 2 investigation scripts. The last
+column counts words to read one by one; most of them name the program compared with, which is
+right.
 
 ## 8. Questions for the user
 

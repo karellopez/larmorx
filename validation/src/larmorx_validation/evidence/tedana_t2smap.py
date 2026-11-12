@@ -265,6 +265,10 @@ def _go(e: fcache.Entry, label: str, program: str, kw: dict, args: list[str]):
         r = tt.run_replica("newest", args, cwd, kw["mode"], threads=kw["threads"])
         settings = {**SETTINGS, "LARMORX_UPSTREAM_DEFECTS": kw["mode"],
                     "LARMORX_TEDANA_LIBRARIES": "newest"}  # fmt: skip
+        if kw["threads"] == 1:
+            # the parity suite's run_replica says the one thread there (without t2smap's own
+            # --n-threads the program takes OMP_NUM_THREADS, else every logical CPU)
+            settings["OMP_NUM_THREADS"] = "1"
         extra = [] if kw["threads"] == 1 else ["--n-threads", str(kw["threads"])]
         argv = ["larmorx-gpl", "tedana", "t2smap", *args, *extra, "--out-dir", "out"]
     _record(e, label, argv, settings, r, time.perf_counter() - t0)
@@ -345,9 +349,11 @@ def _compute_memory(e: fcache.Entry) -> None:
         for who, argv, extra in (
             ("tedana", [str(tt.launcher("newest")), *args], {}),
             ("larmorx-reproduce", [str(exe), "tedana", "t2smap", *args],
-             {"LARMORX_UPSTREAM_DEFECTS": "reproduce", "LARMORX_TEDANA_LIBRARIES": "newest"}),
+             {"LARMORX_UPSTREAM_DEFECTS": "reproduce", "LARMORX_TEDANA_LIBRARIES": "newest",
+              "OMP_NUM_THREADS": "1"}),
             ("larmorx-fix", [str(exe), "tedana", "t2smap", *args],
-             {"LARMORX_UPSTREAM_DEFECTS": "fix", "LARMORX_TEDANA_LIBRARIES": "newest"}),
+             {"LARMORX_UPSTREAM_DEFECTS": "fix", "LARMORX_TEDANA_LIBRARIES": "newest",
+              "OMP_NUM_THREADS": "1"}),
         ):  # fmt: skip
             label = f"{name}-{who}"
             cwd = e.dir / label
@@ -369,9 +375,10 @@ def _compute_memory(e: fcache.Entry) -> None:
     e.finish(
         versions=_versions(),
         peaks_mib=peaks,
-        settings="each call in a process of its own, one thread, its peak resident memory from "
-        "/usr/bin/time -v; tedana's launcher run directly (not through the oracle-output cache), "
-        "the replica as the larmorx-gpl program",
+        settings="each call in a process of its own, one thread (the replica: OMP_NUM_THREADS=1, "
+        "since without t2smap's own --n-threads it takes every logical CPU, 2026-11-11), its peak "
+        "resident memory from /usr/bin/time -v; tedana's launcher run directly (not through the "
+        "oracle-output cache), the replica as the larmorx-gpl program",
     )
 
 
@@ -436,9 +443,9 @@ def refresh(ctx: core.Context) -> None:
             "labels": sorted(new),
             "added": added,
             "previous_larmorx_commit": previous,
-            "why": "the replica's runs made again with the replica of this commit (the "
-            "clean-room part's corrections); tedana 25.0.1 with numpy's AVX-512 kernels on "
-            "added (fMRIPrep's own runs had them on)",
+            "why": "the replica's runs made again with the replica of this commit (its one-thread "
+            "run with OMP_NUM_THREADS=1, as the parity suite gives it)"
+            + (f"; added: {', '.join(added)} (new runs of RUNS)" if added else ""),
         })  # fmt: skip
         e.info_path.write_text(json.dumps(info, indent=1) + "\n", encoding="utf-8")
     fcache.recompute(
@@ -447,10 +454,16 @@ def refresh(ctx: core.Context) -> None:
         "memory",
         MEMORY_DESCRIPTION,
         _compute_memory,
-        why="the replica of this commit (the entry measured larmorx-gpl 0.0.1)",
+        why="the replica of this commit, at one thread (OMP_NUM_THREADS=1)",
     )
 
 
+#: fMRIPrep's oracle runs made on another machine, which has no AVX-512 (their RUN_INFO.txt names
+#: its 12 logical CPUs): there numpy computes float64 exp and log with glibc's functions.
+NO_AVX512_RUNS = {
+    "ds003592-sub-280-noreconall": "the project's earlier main machine, an Intel Core i7-8750H "
+    "(AVX2, no AVX-512)",
+}
 #: fMRIPrep's curve-fit calls whose own files tedana 25.0.1 is run against here (every one).
 T25_CALLS = (
     "ds000210-sub-02-cuedSGT-curvefit",
@@ -1129,40 +1142,51 @@ def _spread_table(rec) -> dict:
 
 
 def _t25_table(ctx: core.Context) -> dict:
-    """fMRIPrep's own files against tedana 25.0.1 run here, numpy's AVX-512 kernels off and on."""
+    """fMRIPrep's own files against tedana 25.0.1 run here, numpy's AVX-512 kernels off and on;
+    the verdict from the setting fMRIPrep's own run had (its machine's numpy kernels)."""
     info = t25_entry(ctx).info()
     tt = _suite()
     rows = []
     for name in T25_CALLS:
         c = info["counts"][name]
         ds, task = name.split("-")[0], _task(name)
+        run = node_dir(name).relative_to(common.oracles() / "fmriprep-25.2.6").parts[0]
+        other = NO_AVX512_RUNS.get(run)
+        if other is None and "this machine" not in c["host"]:
+            raise ValueError(f"{name}: fMRIPrep's run was made elsewhere ({c['host']})")
+        same = "off" if other else "avx512"
+        where = (
+            f"made on {other}: numpy's kernels off there"
+            if other
+            else "made on this machine, numpy's AVX-512 kernels on"
+        )
         for f in tt.FMRIPREP_FILES:
             off, on = c["off"].get(f), c["avx512"].get(f)
             if off is None or on is None:
                 continue
+            match = c[same][f][0]
             rows.append({
                 "head": f"{ds} {task}: `{f}`",
-                "sub": f"{on[1]:,} values; fMRIPrep's run {c['host'].removeprefix('made ')}",
+                "sub": f"{on[1]:,} values; fMRIPrep's run {where}",
                 "cells": [common.cell(int(off[0]), "count"), common.cell(int(on[0]), "count")],
-                "verdict": "bit-identical" if on[0] == 0 else None,
+                "verdict": "bit-identical" if match == 0 else "open",
             })  # fmt: skip
     return common.table(
         "fmriprep-tedana-25",
         "fMRIPrep's own files against tedana 25.0.1 run here: values that differ",
         ["fMRIPrep's call and file",
          {"label": "numpy's AVX-512 kernels off", "num": True},
-         {"label": "on (as in fMRIPrep's run)", "num": True}],
+         {"label": "on", "num": True}],
         rows,
         note="tedana 25.0.1 in fMRIPrep 25.2.6's image (Apptainer, through the oracle-output "
         "cache) on fMRIPrep's own call of each oracle run, against the T2* map and the combined "
         "series fMRIPrep kept, every value. The oracle runs of ds000210 and ds000258 were made "
         "again on 2026-11-09 on this machine with OpenBLAS's Haswell kernels; their settings name "
-        "only those, so numpy used its AVX-512 kernels for float64 exp and log (NP-04): run "
-        "the same way here, tedana 25.0.1 gives fMRIPrep's files bit for bit; with those "
-        "kernels off (larmorx's reference setting, decision D2) its exp and log are glibc "
-        "2.35's and the curve fit ends elsewhere in some voxels. ds003592's run was made on "
-        "another machine. A verdict is given where the files are the same; the other rows "
-        "measure the original against itself.",
+        "only those, so numpy used its AVX-512 kernels for float64 exp and log (NP-04). "
+        "ds003592's run was made on a machine without AVX-512, where numpy uses glibc 2.35's "
+        "functions, as it does here with those kernels off (larmorx's reference setting, "
+        "decision D2). The verdict compares the run made as fMRIPrep's was: bit-identical in "
+        "every call; the other column shows how far numpy's other kernels move the curve fit.",
     )  # fmt: skip
 
 

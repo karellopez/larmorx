@@ -90,7 +90,7 @@ JARGON = {
 
 # ---------------------------------------------------------------------------------------- files
 SKIP = re.compile(
-    r"^validation/investigations/docs-revision/|(^|/)(fsl-source|LICENSES|fonts|blobs)/|Cargo\.lock$|\.lock$|requirements-lock\.txt$|"
+    r"^validation/investigations/docs-revision/|^docs/writing-guide\.md$|(^|/)(fsl-source|LICENSES|fonts|blobs)/|Cargo\.lock$|\.lock$|requirements-lock\.txt$|"
     r"(^|/)LICENSE[^/]*$|\.(png|jpe?g|webp|gif|ico|svg|woff2?|ttf|otf|bin|gz|h5|nii|mat|pdf)$",
 )
 TEXT_LIMIT = 40 * 1024 * 1024

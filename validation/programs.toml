@@ -1,0 +1,637 @@
+# One entry per program and per module LARMORX ports, grouped by the software it comes from: the
+# documentation site's Programs page (data/programs.yml) is generated from it, with the code and
+# the records (docs/writing-guide.md §6):
+#
+#     python -m larmorx_validation reference programs --site <site>          write data/programs.yml
+#     python -m larmorx_validation reference programs --site <site> --check  fail when it differs
+#
+# What the code and the records already say is not written here: the ports of a command come from
+# the replica registry (crates/larmorx-cli/src/replica.rs), every port's status from its records
+# (validation/tools.toml's `status`), the reference page from the site's checkout. A check fails
+# when a command of `larmorx` (crates/larmorx-cli/src/lib.rs, FAMILIES) has no entry, when an
+# entry names a record, an API page, an evidence page or a Python name that does not exist, or
+# when its `records` name other ports than the registry lists.
+#
+# Fields of a group: `id` (the site's address, /programs/<id>/; a software colour of
+# data/ecosystems.yml of the same name), `name`, `original` (what its ports are compared with),
+# `planned` (a text, for software with no port yet).
+# Fields of a program: `group`, `name` (the command's own spelling; a module's name), `command`
+# (absent for a module), `also` (another command that runs the same port), `python`, `does` (one
+# sentence, in the words of its API page), `api`, `evidence` (its evidence page on the site),
+# `records` (per port: the records whose status it has; a module with no record takes the status
+# its API page states), `ports` (for a program the replica registry does not list), `original`
+# (where it is not the group's), `next_release` (ports that 0.1.0rc1 does not have: CHANGELOG.md's
+# "Unreleased" and the roadmap's dates).
+
+[[group]]
+id = "ants"
+name = "ANTs and ITK"
+original = "ANTs 2.6.5 on ITK 5.4.5"
+
+[[group]]
+id = "afni"
+name = "AFNI"
+original = "AFNI 26.3.05"
+
+[[group]]
+id = "fsl"
+name = "FSL"
+original = "FSL 6.0.7.23"
+
+[[group]]
+id = "tedana"
+name = "tedana"
+original = "tedana 26.0.3"
+
+[[group]]
+id = "sdcflows"
+name = "sdcflows"
+original = "sdcflows 2.17.1, with niworkflows 1.15.4 and pybids 0.22.0"
+
+[[group]]
+id = "fmriprep"
+name = "fMRIPrep"
+original = "fMRIPrep's own steps, and the libraries they call"
+
+[[group]]
+id = "larmorx"
+name = "LARMORX's own"
+original = ""
+
+[[group]]
+id = "freesurfer"
+name = "FreeSurfer"
+original = "FreeSurfer 8.2.0"
+planned = "Every program complete, a replica in its own package, `larmorx-freesurfer`, and a clean room built for speed."
+
+[[group]]
+id = "workbench"
+name = "Workbench"
+original = "Connectome Workbench and MSM"
+planned = "Surface tools compatible with Connectome Workbench and MSM."
+
+# ------------------------------------------------------------------------------------------- ANTs
+
+[[program]]
+group = "ants"
+name = "antsRegistration"
+command = "larmorx ants antsRegistration"
+python = "lx.ants.registration"
+does = "Registers one image to another, stage by stage: linear, SyN, B-spline SyN, B-spline, displacement-field, exponential and time-varying velocity-field, with image and point-set metrics."
+api = "docs/api/ants-registration.md"
+evidence = "/tools/ants-registration/"
+records = { replica = ["ants-registration"] }
+
+[[program]]
+group = "ants"
+name = "N4BiasFieldCorrection"
+command = "larmorx ants N4BiasFieldCorrection"
+python = "lx.ants.n4_bias_field_correction"
+does = "Bias-field correction (N4), as fMRIPrep, sMRIPrep and sdcflows call it."
+api = "docs/api/ants-n4.md"
+evidence = "/tools/ants-n4/"
+records = { replica = ["ants-n4"] }
+
+[[program]]
+group = "ants"
+name = "DenoiseImage"
+command = "larmorx ants DenoiseImage"
+python = "lx.ants.denoise_image"
+does = "Adaptive non-local means denoising; ANTs' single-thread result at any thread count."
+api = "docs/api/ants-denoise.md"
+evidence = "/tools/ants-denoise/"
+records = { replica = ["ants-denoise"] }
+
+[[program]]
+group = "ants"
+name = "antsApplyTransforms"
+command = "larmorx ants antsApplyTransforms"
+python = "lx.ants.apply_transforms"
+does = "Resampling through ITK transforms, in double and with `--float 1`; transform outputs."
+api = "docs/api/ants-apply-transforms.md"
+evidence = "/tools/ants-apply-transforms/"
+records = { replica = ["ants-apply-transforms"] }
+
+[[program]]
+group = "ants"
+name = "ImageMath"
+command = "larmorx ants ImageMath"
+python = "lx.ants.image_math"
+does = "Image arithmetic, morphology, filters and the other operations of `ImageMath` that fMRIPrep, sMRIPrep and sdcflows call."
+api = "docs/api/ants-image-math.md"
+evidence = "/tools/ants-programs/"
+records = { replica = ["ants-image-math"] }
+
+[[program]]
+group = "ants"
+name = "ThresholdImage"
+command = "larmorx ants ThresholdImage"
+python = "lx.ants.threshold_image"
+does = "Thresholds an image; `lx.ants.otsu_threshold` finds Otsu's thresholds."
+api = "docs/api/ants-threshold-image.md"
+evidence = "/tools/ants-programs/"
+records = { replica = ["ants-threshold-image"] }
+
+[[program]]
+group = "ants"
+name = "MultiplyImages"
+command = "larmorx ants MultiplyImages"
+python = "lx.ants.multiply_images"
+does = "Multiplies an image by another image or by a number, as sMRIPrep's brain extraction calls it."
+api = "docs/api/ants-multiply-images.md"
+evidence = "/tools/ants-programs/"
+records = { replica = ["ants-multiply-images"] }
+
+[[program]]
+group = "ants"
+name = "SmoothImage"
+command = "larmorx ants SmoothImage"
+python = "lx.ants.smooth_image"
+does = "Gaussian smoothing (ITK's recursive Gaussian), or median filtering."
+api = "docs/api/ants-smooth-image.md"
+evidence = "/tools/ants-programs/"
+records = { replica = ["ants-smooth-image"] }
+
+[[program]]
+group = "ants"
+name = "ResampleImage"
+command = "larmorx ants ResampleImage"
+python = "lx.ants.resample_image"
+does = "Resamples an image onto a grid with a new spacing or size, in any of ANTs' eight pixel types, without smoothing."
+api = "docs/api/ants-resample-image.md"
+evidence = "/tools/ants-programs/"
+records = { replica = ["ants-resample-image"] }
+
+[[program]]
+group = "ants"
+name = "ResampleImageBySpacing"
+command = "larmorx ants ResampleImageBySpacing"
+python = "lx.ants.resample_image_by_spacing"
+does = "Resamples an image onto a grid with a new spacing, after an optional Gaussian smoothing."
+api = "docs/api/ants-resample-image-by-spacing.md"
+evidence = "/tools/ants-programs/"
+records = { replica = ["ants-resample-image-by-spacing"] }
+
+[[program]]
+group = "ants"
+name = "antsAI"
+command = "larmorx ants antsAI"
+python = "lx.ants.ai"
+does = "The linear transform that best aligns two images: an initial alignment, then a multi-start search over rotations and translations."
+api = "docs/api/ants-ai.md"
+evidence = "/tools/ants-ai/"
+records = { replica = ["ants-ai"] }
+
+[[program]]
+group = "ants"
+name = "antsAffineInitializer"
+command = "larmorx ants antsAffineInitializer"
+python = "lx.ants.affine_initializer"
+does = "An affine transform that aligns two images' centres of mass (and principal axes), refined by a multi-start search over rotations."
+api = "docs/api/ants-affine-initializer.md"
+evidence = "/tools/ants-ai/"
+records = { replica = ["ants-affine-initializer"] }
+
+[[program]]
+group = "ants"
+name = "Atropos"
+command = "larmorx ants Atropos"
+python = "lx.ants.atropos"
+does = "Finite-mixture segmentation with a Markov random field prior: every initialization, likelihood model, outlier and partial-volume option."
+api = "docs/api/ants-atropos.md"
+evidence = "/tools/ants-atropos/"
+records = { replica = ["ants-atropos"] }
+
+[[program]]
+group = "ants"
+name = "transforms-hdf5"
+python = "lx.transforms.read"
+does = "ITK's transform files, text, MATLAB and HDF5 (`.h5`), read and written in pure Rust."
+api = "docs/api/transforms-hdf5.md"
+evidence = "/tools/itk-hdf5/"
+records = { replica = ["itk-hdf5"] }
+original = "ITK 5.4.5 on HDF5 1.12.1"
+
+# ------------------------------------------------------------------------------------------- AFNI
+
+[[program]]
+group = "afni"
+name = "3dTshift"
+command = "larmorx afni 3dTshift"
+python = "lx.afni.tshift"
+does = "Slice-timing correction of a series."
+api = "docs/api/afni-tshift.md"
+evidence = "/tools/afni-tshift/"
+records = { replica = ["afni-tshift-replica"], clean-room = ["afni-tshift"] }
+
+[[program]]
+group = "afni"
+name = "3dAutomask"
+command = "larmorx afni 3dAutomask"
+python = "lx.afni.automask"
+does = "A brain mask from an EPI series or a skull-stripped anatomical image."
+api = "docs/api/afni-automask.md"
+evidence = "/tools/afni-automask/"
+records = { replica = ["afni-automask-replica"], clean-room = ["afni-automask"] }
+
+[[program]]
+group = "afni"
+name = "3dUnifize"
+command = "larmorx afni 3dUnifize"
+python = "lx.afni.unifize"
+does = "Makes the white-matter intensity of a T1-weighted volume uniform across space, scaled to about 1000 (with `-T2` and `-EPI`, of T2-weighted and EPI images)."
+api = "docs/api/afni-unifize.md"
+evidence = "/tools/afni-unifize/"
+records = { replica = ["afni-unifize-replica"], clean-room = ["afni-unifize"] }
+
+[[program]]
+group = "afni"
+name = "3dvolreg"
+command = "larmorx afni 3dvolreg"
+python = "lx.afni.volreg"
+does = "Rigid-body registration of every volume of a series to a base volume."
+api = "docs/api/afni-volreg.md"
+evidence = "/tools/afni-volreg/"
+records = { replica = ["afni-volreg-replica"], clean-room = ["afni-volreg-original"] }
+
+# -------------------------------------------------------------------------------------------- FSL
+
+[[program]]
+group = "fsl"
+name = "mcflirt"
+command = "larmorx fsl mcflirt"
+also = "larmorx mri hmc"
+python = "lx.mri.hmc"
+does = "Head-motion correction of a 4D series, with mcflirt's algorithm, options and output files."
+api = "docs/api/mri-hmc.md"
+evidence = "/tools/mri-hmc/"
+records = { replica = ["fsl-mcflirt-replica", "fsl-mcflirt-replica-full"], clean-room = ["mri-hmc"] }
+
+[[program]]
+group = "fsl"
+name = "bet"
+command = "larmorx fsl bet"
+python = "lx.fsl.bet"
+does = "FSL's `bet` script: `bet2` itself, or one of its variations (`-R`, `-F`, `-Z`, `-S`, `-B`, `-A`, `-A2`)."
+api = "docs/api/fsl-bet.md"
+evidence = "/evidence/fsl-bet/"
+records = { replica = ["fsl-bet-replica", "fsl-bet-replica-full"], clean-room = ["fsl-bet"] }
+
+[[program]]
+group = "fsl"
+name = "bet2"
+command = "larmorx fsl bet2"
+python = "lx.fsl.bet2"
+does = "FSL's brain extraction itself, which the `bet` script runs."
+api = "docs/api/fsl-bet.md"
+evidence = "/evidence/fsl-bet/"
+records = { replica = ["fsl-bet-replica", "fsl-bet-replica-full"], clean-room = ["fsl-bet"] }
+
+[[program]]
+group = "fsl"
+name = "betsurf"
+command = "larmorx fsl betsurf"
+python = "lx.fsl.betsurf"
+does = "The inner skull, outer skull and scalp surfaces, as FSL's `betsurf` finds them."
+api = "docs/api/fsl-bet.md"
+evidence = "/evidence/fsl-bet/"
+records = { replica = ["fsl-bet-replica", "fsl-bet-replica-full"], clean-room = ["fsl-bet"] }
+
+[[program]]
+group = "fsl"
+name = "flirt"
+command = "larmorx fsl flirt"
+python = "lx.fsl.flirt"
+does = "Linear (affine) registration, with every cost function and boundary-based registration (BBR)."
+api = "docs/api/fsl-flirt.md"
+evidence = "/tools/fsl-flirt/"
+records = { replica = ["fsl-flirt-replica"], clean-room = ["fsl-flirt"] }
+
+[[program]]
+group = "fsl"
+name = "convert_xfm"
+command = "larmorx fsl convert_xfm"
+python = "lx.fsl.convert_xfm"
+does = "FLIRT's matrix tool: inverts a 4 × 4 matrix (`-inverse`), composes two (`-concat`), and the rest of its options."
+api = "docs/api/fsl-flirt.md"
+evidence = "/tools/fsl-flirt/"
+records = { replica = ["fsl-flirt-replica"], clean-room = ["fsl-flirt"] }
+
+[[program]]
+group = "fsl"
+name = "avscale"
+command = "larmorx fsl avscale"
+python = "lx.fsl.avscale"
+does = "A matrix taken apart: its rotation and translation, angles, scales, skews, determinant and half transforms."
+api = "docs/api/fsl-flirt.md"
+evidence = "/tools/fsl-flirt/"
+records = { replica = ["fsl-flirt-replica"], clean-room = ["fsl-flirt"] }
+
+[[program]]
+group = "fsl"
+name = "img2imgcoord"
+command = "larmorx fsl img2imgcoord"
+python = "lx.fsl.img2imgcoord"
+does = "Coordinates carried from one image to another through a matrix (voxels by default)."
+api = "docs/api/fsl-flirt.md"
+evidence = "/tools/fsl-flirt/"
+records = { replica = ["fsl-flirt-replica"], clean-room = ["fsl-flirt"] }
+
+[[program]]
+group = "fsl"
+name = "std2imgcoord"
+command = "larmorx fsl std2imgcoord"
+python = "lx.fsl.std2imgcoord"
+does = "Coordinates carried from a standard image to an image (millimetres by default), the matrix inverted."
+api = "docs/api/fsl-flirt.md"
+evidence = "/tools/fsl-flirt/"
+records = { replica = ["fsl-flirt-replica"], clean-room = ["fsl-flirt"] }
+
+[[program]]
+group = "fsl"
+name = "img2stdcoord"
+command = "larmorx fsl img2stdcoord"
+python = "lx.fsl.img2stdcoord"
+does = "Coordinates carried from an image to a standard image's millimetres (input voxels by default)."
+api = "docs/api/fsl-flirt.md"
+evidence = "/tools/fsl-flirt/"
+records = { replica = ["fsl-flirt-replica"], clean-room = ["fsl-flirt"] }
+
+[[program]]
+group = "fsl"
+name = "rmsdiff"
+command = "larmorx fsl rmsdiff"
+python = "lx.fsl.rmsdiff"
+does = "The RMS deviation between two matrices over 80 mm about the reference's centre of gravity, or over a mask."
+api = "docs/api/fsl-flirt.md"
+evidence = "/tools/fsl-flirt/"
+records = { replica = ["fsl-flirt-replica"], clean-room = ["fsl-flirt"] }
+
+[[program]]
+group = "fsl"
+name = "makerot"
+command = "larmorx fsl makerot"
+python = "lx.fsl.makerot"
+does = "A rotation matrix: an angle in degrees about an axis through a centre."
+api = "docs/api/fsl-flirt.md"
+evidence = "/tools/fsl-flirt/"
+records = { replica = ["fsl-flirt-replica"], clean-room = ["fsl-flirt"] }
+
+[[program]]
+group = "fsl"
+name = "midtrans"
+command = "larmorx fsl midtrans"
+python = "lx.fsl.midtrans"
+does = "The transform from a template space to the middle of several transforms."
+api = "docs/api/fsl-flirt.md"
+evidence = "/tools/fsl-flirt/"
+records = { replica = ["fsl-flirt-replica"], clean-room = ["fsl-flirt"] }
+
+[[program]]
+group = "fsl"
+name = "pointflirt"
+command = "larmorx fsl pointflirt"
+python = "lx.fsl.pointflirt"
+does = "The least-squares affine matrix that maps one set of points onto another."
+api = "docs/api/fsl-flirt.md"
+evidence = "/tools/fsl-flirt/"
+records = { replica = ["fsl-flirt-replica"], clean-room = ["fsl-flirt"] }
+
+[[program]]
+group = "fsl"
+name = "applyxfm4D"
+command = "larmorx fsl applyxfm4D"
+python = "lx.fsl.applyxfm4d"
+does = "Each volume of a series resampled onto a reference's grid, through one matrix or one per volume."
+api = "docs/api/fsl-flirt.md"
+evidence = "/tools/fsl-flirt/"
+records = { replica = ["fsl-flirt-replica"], clean-room = ["fsl-flirt"] }
+
+[[program]]
+group = "fsl"
+name = "pairreg"
+command = "larmorx fsl pairreg"
+python = "lx.fsl.pairreg"
+does = "A script: brain-to-brain registration refined with the skulls, in three FLIRT runs."
+api = "docs/api/fsl-flirt.md"
+evidence = "/tools/fsl-flirt/"
+records = { replica = ["fsl-flirt-replica"], clean-room = ["fsl-flirt"] }
+
+[[program]]
+group = "fsl"
+name = "extracttxt"
+command = "larmorx fsl extracttxt"
+python = "lx.fsl.extracttxt"
+does = "A script: the lines of a text file from the first match of a word."
+api = "docs/api/fsl-flirt.md"
+evidence = "/tools/fsl-flirt/"
+records = { replica = ["fsl-flirt-replica"], clean-room = ["fsl-flirt"] }
+
+[[program]]
+group = "fsl"
+name = "aff2rigid"
+command = "larmorx fsl aff2rigid"
+python = "lx.fsl.aff2rigid"
+does = "A script: the 6-parameter matrix that keeps the anterior commissure, the AC-PC line and the mid-sagittal plane of an input-to-standard matrix."
+api = "docs/api/fsl-flirt.md"
+evidence = "/tools/fsl-flirt/"
+records = { replica = ["fsl-flirt-replica"], clean-room = ["fsl-flirt"] }
+
+[[program]]
+group = "fsl"
+name = "fast"
+command = "larmorx fsl fast"
+python = "lx.fsl.fast"
+does = "Segments a skull-stripped brain into tissue classes (by default CSF, grey matter and white matter), with a bias field and each class's partial volume."
+api = "docs/api/fsl-fast.md"
+evidence = "/tools/fsl-fast/"
+records = { replica = ["fsl-fast-replica"], clean-room = ["fsl-fast"] }
+
+[[program]]
+group = "fsl"
+name = "topup"
+command = "larmorx fsl topup"
+python = "lx.fsl.topup"
+does = "Estimates the off-resonance field that displaces echo-planar images along their phase encoding, from images with different phase encodings."
+api = "docs/api/fsl-topup.md"
+evidence = "/tools/fsl-topup/"
+records = { replica = ["fsl-topup-replica"], clean-room = ["fsl-topup"] }
+
+[[program]]
+group = "fsl"
+name = "applytopup"
+command = "larmorx fsl applytopup"
+python = "lx.fsl.applytopup"
+does = "Corrects images with `topup`'s result."
+api = "docs/api/fsl-topup.md"
+evidence = "/tools/fsl-topup/"
+records = { replica = ["fsl-topup-replica"], clean-room = ["fsl-topup"] }
+
+[[program]]
+group = "fsl"
+name = "fslmaths"
+command = "larmorx fsl fslmaths"
+python = "lx.fsl.fslmaths"
+does = "An image calculator: a chain of operations applied from left to right (maths, thresholds, masks, filters, reductions, statistics, TFCE)."
+api = "docs/api/fsl-maths.md"
+evidence = "/tools/fsl-maths/"
+records = { replica = ["fsl-maths-replica"], clean-room = ["fsl-maths"] }
+
+[[program]]
+group = "fsl"
+name = "fslstats"
+command = "larmorx fsl fslstats"
+python = "lx.fsl.fslstats"
+does = "Prints statistics of an image, per volume, per label and as JSON."
+api = "docs/api/fsl-stats.md"
+evidence = "/tools/fsl-stats/"
+records = { replica = ["fsl-stats-replica"], clean-room = ["fsl-stats"] }
+
+[[program]]
+group = "fsl"
+name = "fslroi"
+command = "larmorx fsl fslroi"
+python = "lx.fsl.fslroi"
+does = "A box of an image, a range of its volumes, or both."
+api = "docs/api/fsl-roi.md"
+evidence = "/evidence/fsl-bet/"
+records = { replica = ["fsl-bet-replica"], clean-room = ["fsl-bet"] }
+
+[[program]]
+group = "fsl"
+name = "standard_space_roi"
+command = "larmorx fsl standard_space_roi"
+python = "lx.fsl.standard_space_roi"
+does = "A script: a head cut with a region of the standard space (MNI152), through FLIRT."
+api = "docs/api/fsl-roi.md"
+evidence = "/evidence/fsl-bet/"
+records = { replica = ["fsl-bet-replica"], clean-room = ["fsl-bet"] }
+
+[[program]]
+group = "fsl"
+name = "prelude"
+command = "larmorx fsl prelude"
+python = "lx.fsl.prelude"
+does = "Unwraps a phase image inside a mask (PRELUDE)."
+api = "docs/api/fsl-prelude.md"
+evidence = "/tools/fsl-prelude/"
+records = { replica = ["fsl-prelude-replica"], clean-room = ["fsl-prelude"] }
+
+# ----------------------------------------------------------------------------------------- tedana
+
+[[program]]
+group = "tedana"
+name = "t2smap"
+command = "larmorx tedana t2smap"
+python = "lx.tedana.t2smap"
+does = "T2* and S0 maps of multi-echo fMRI, voxel by voxel, and the echoes' optimal combination."
+api = "docs/api/tedana-t2smap.md"
+evidence = "/tools/tedana-t2smap/"
+records = { replica = ["tedana-t2smap-replica"], clean-room = ["tedana-t2smap-original"] }
+next_release = ["clean-room"]
+
+# --------------------------------------------------------------------------------------- sdcflows
+
+[[program]]
+group = "sdcflows"
+name = "sdcflows"
+command = "larmorx sdcflows sdcflows"
+python = "lx.sdcflows.run_app"
+does = "sdcflows' BIDS app: the field maps of a BIDS dataset, PEPOLAR, direct and fieldmap-less (SyN), with their derivatives."
+api = "docs/api/sdcflows-fieldmap.md"
+evidence = "/tools/sdcflows-estimation/"
+records = { replica = ["sdcflows-estimation", "sdcflows-estimation-full", "sdcflows-estimation-app-shared"] }
+ports = ["replica"]
+
+[[program]]
+group = "sdcflows"
+name = "fieldmap"
+python = "lx.sdcflows"
+does = "sdcflows' B-spline field fit, the field evaluated and applied, and the phase-difference preparation."
+api = "docs/api/sdcflows-fieldmap.md"
+evidence = "/tools/sdcflows-fieldmap/"
+records = { replica = ["sdcflows-fieldmap"] }
+
+[[program]]
+group = "sdcflows"
+name = "niworkflows-helpers"
+python = "lx.niworkflows"
+does = "The interfaces of niworkflows that sdcflows' and fMRIPrep's field-map steps run."
+api = "docs/api/niworkflows-helpers.md"
+evidence = "/tools/sdcflows-estimation/"
+records = { replica = ["niworkflows-helpers"] }
+original = "niworkflows 1.15.4"
+
+[[program]]
+group = "sdcflows"
+name = "bids"
+python = "lx.bids"
+does = "A BIDS dataset's index, as pybids' `BIDSLayout` gives it, in memory, without its database."
+api = "docs/api/bids.md"
+evidence = "/tools/sdcflows-estimation/"
+records = { replica = ["sdcflows-estimation"] }
+original = "pybids 0.22.0"
+
+# --------------------------------------------------------------------------------------- fMRIPrep
+
+[[program]]
+group = "fmriprep"
+name = "resample-series"
+python = "lx.transforms.resample_series"
+does = "fMRIPrep's one-shot resampler: head motion, susceptibility distortion and the transforms to a target space applied to a BOLD series in one cubic interpolation."
+api = "docs/api/resample-series.md"
+evidence = "/tools/resample-series/"
+records = { replica = ["resample-series"] }
+original = "fMRIPrep's `ResampleSeries`, nitransforms 25.1.0, SciPy 1.18.1"
+
+[[program]]
+group = "fmriprep"
+name = "fieldmap-steps"
+python = "lx.transforms.reconstruct_fieldmap"
+does = "fMRIPrep's steps between sdcflows' field-map estimators and the one-shot resampler: the field map evaluated on a reference's grid, and the distortion parameters."
+api = "docs/api/fmriprep-fieldmap-steps.md"
+evidence = "/tools/sdcflows-estimation/"
+records = { replica = [] }
+original = "fMRIPrep 25.2.7"
+
+[[program]]
+group = "fmriprep"
+name = "confounds"
+python = "lx.confounds"
+does = "fMRIPrep's confound estimation, ported step by step: today nipype's DVARS."
+api = "docs/api/confounds.md"
+records = { replica = [] }
+original = "nipype 1.12.0, niworkflows 1.15.4 and fMRIPrep 25.2.7"
+next_release = ["replica"]
+
+[[program]]
+group = "fmriprep"
+name = "ndimage-filters"
+python = "lx.ndimage"
+does = "SciPy's ndimage filters, morphology, labelling and watershed, under sdcflows' and fMRIPrep's steps."
+api = "docs/api/ndimage-filters.md"
+evidence = "/tools/sdcflows-estimation/"
+records = { replica = ["ndimage-skimage", "ndimage-skimage-full"] }
+original = "SciPy 1.18.1"
+
+[[program]]
+group = "fmriprep"
+name = "skimage"
+python = "lx.skimage"
+does = "scikit-image's ball, Otsu threshold, random walker and histogram matching, under sdcflows' brain mask."
+api = "docs/api/skimage.md"
+evidence = "/tools/sdcflows-estimation/"
+records = { replica = ["ndimage-skimage"] }
+original = "scikit-image 0.26.0"
+
+# ---------------------------------------------------------------------------------- LARMORX's own
+
+[[program]]
+group = "larmorx"
+name = "io"
+python = "lx.load"
+does = "NIfTI-1 and NIfTI-2 images read and written (`lx.load`, `lx.save`, `lx.Image`), compared with nibabel."
+api = "docs/api/io.md"
+evidence = "/tools/nifti-io/"
+records = { own = ["nifti-io"] }
+ports = ["own"]

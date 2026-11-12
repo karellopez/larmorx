@@ -14,6 +14,10 @@ out by its ``reference`` template. Nobody edits those pages by hand.
     python -m larmorx_validation reference all --check              only the checks
     python -m larmorx_validation reference all --site <site> --check
                                                                    also fail on a stale page
+    python -m larmorx_validation reference programs --site <site>   only the Programs page's data
+
+``all`` also writes the Programs page's data, ``data/programs.yml``
+(:mod:`larmorx_validation.reference.programs`, from ``validation/programs.toml``).
 
 The checks (:func:`.page.build`) fail on any drift between an API page and the code; the
 tests run them for every API page, and run every example of every reference page in a new
@@ -27,7 +31,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from larmorx_validation.reference import apipage
+from larmorx_validation.reference import apipage, programs
 from larmorx_validation.reference.page import Reference, build
 
 REPO = Path(__file__).resolve().parents[4]
@@ -52,12 +56,14 @@ def references(page: str, repo: Path = REPO) -> list[Reference]:
 
 def main(args) -> int:
     repo = REPO
+    site = Path(args.site) if args.site else None
+    if args.page == "programs":
+        return programs.main(repo, site, args.check)
     pages = api_pages(repo) if args.page == "all" else [args.page]
     refs = [r for page in pages for r in references(page, repo)]
     problems = [x for r in refs for x in r.problems]
     for x in problems:
         print(f"PROBLEM: {x}", file=sys.stderr)
-    site = Path(args.site) if args.site else None
     stale = []
     if site is not None:
         for r in refs:
@@ -76,11 +82,16 @@ def main(args) -> int:
         f"{len(refs)} reference pages from {len(pages)} API pages; {len(problems)} problems"
         + (f"; {len(stale)} stale" if args.check and site else "")
     )
-    return 1 if problems or stale else 0
+    status = 1 if problems or stale else 0
+    if args.page == "all":
+        status |= programs.main(repo, site, args.check)
+    return status
 
 
 def add_arguments(p) -> None:
-    p.add_argument("page", help="an API page (fsl-bet, docs/api/fsl-bet.md) or 'all'")
+    p.add_argument(
+        "page", help="an API page (fsl-bet, docs/api/fsl-bet.md), 'programs' or 'all'"
+    )
     p.add_argument("--site", help="the documentation site's checkout: write its reference pages")
     p.add_argument(
         "--check",

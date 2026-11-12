@@ -48,9 +48,17 @@ state in a struct and passes only `dx`, `dy`, `fp`, `dp`: `mcstep_` reads the st
 `fx = fxm + stx·dgtest` from the stale `fxm`. The step therefore mixes the modified `fm` with the
 unmodified `fx`. Where `stx` and `sty` are 0 (a line search's first trials) `fxm = fx` exactly,
 so the first new step is the same; the stale `fx`, `fy` change later steps of the same search.
-Measured (the probe's `lbfgs` family, 3,000 problems at scale 1, see PROVENANCE for the full
-run): the internal state differs after about 2.7 % of the calls, the run's result in about 0.07 %
-of the problems, and then only by more evaluations to the same final value. VXL 5.4.5 is the
+Measured on the port (it reproduces VXL's arithmetic bit for bit, and Nocedal's on request):
+`fs-vnl --only itk103` ran 200,000 smooth problems with correct gradients (1 to 30 variables,
+quadratic, Rosenbrock, pseudo-Huber, quartic and logarithmic shapes) at FreeSurfer's
+`OpenDFPMin` settings (memory 7, line-search accuracy 0.1, `xtol` 1e-16) and at VNL's defaults
+(memory 5, `gtol` 0.9): Nocedal's first stage changed **no** run (the same 6,770,896 and 6,181,988
+evaluations, the same final values and the same 117 and 133 line-search failures). In the probe's
+`lbfgs` family (3,000 problems at scale 1, some with deliberately wrong gradients) it changed 2
+runs, each by more evaluations to the same final value. The line search almost always ends at its
+first or second trial, where `stx = sty = 0` makes the two the same. **Decided by rule D, then C**
+(a correction measured to bring no gain): VXL's behaviour stays in both modes, Nocedal's on request
+(`LbfgsGlobal::nocedal_first_stage`), named where it changes the search's state. VXL 5.4.5 is the
 same.
 
 ## F-VNLN-3. `ys` is reset on every call (ITK-104, *read*)

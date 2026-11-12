@@ -61,3 +61,24 @@ paths; BSD-3-Clause, notice above) and numpy 2.5.4's complex64 product and `np.d
 The numerics underneath are the parent crates': numpy's `pinv` (`larmorx_transform::numpy_linalg::svd`),
 OpenBLAS's `dgemv_t` and `ddot` (`larmorx_transform::openblas::level2`), numpy's median,
 percentiles and reductions (`larmorx_core::numpy`), SciPy's FFTs (`scipy_fft`, above).
+
+## Relay 2f-i: nipype's CompCor (`compcor`)
+
+nipype 1.12.0's CompCor numerics (`nipype/algorithms/confounds.py`; sdist and notice above;
+`_cosine_drift` and `_full_rank` are nipype's copies of nipy 0.4.1's `nipy/modalities/fmri/
+design_matrix.py`, Copyright (c) 2006-2024, NIPY Developers, BSD-3-Clause), with numpy 2.5.4's,
+2.3.5's and 2.2.6's arithmetic (BSD-3-Clause, notice above).
+
+| larmorx | Upstream | Licence |
+|---|---|---|
+| `compcor::cosine_drift` | nipype 1.12.0 `_cosine_drift` (from nipy 0.4.1); the cosine through `larmorx_core::math::Libm` (CORE-MATH's correctly rounded `cos`, or glibc 2.35's bits for `reproduce`: `cos_glibc`) | Apache-2.0, BSD-3-Clause |
+| `compcor::{regress_poly, Filtered, Basis}` | nipype 1.12.0 `regress_poly`; numpy 2.5.4 `numpy/polynomial/legendre.py` (`Legendre.basis`, `legval`, via `larmorx_core::numpy::polynomial`), `numpy/_core/function_base.py` (`linspace`), `numpy/linalg/_linalg.py` (`pinv`), `numpy/_core/src/common/cblasfuncs.c` (`np.dot`'s dispatch) | Apache-2.0, BSD-3-Clause |
+| `compcor::cosine_filter` | nipype 1.12.0 `cosine_filter`, `_full_rank` (from nipy 0.4.1, `larmorx_transform::numpy_linalg::gesvd::nipype_full_rank`); numpy 2.5.4 `lstsq` (`larmorx_transform::numpy_linalg::gelsd::numpy_lstsq`) | Apache-2.0, BSD-3-Clause |
+| `compcor::{compute_tstd, tcompcor_mask}` | nipype 1.12.0 `_compute_tSTD`, `TCompCor._process_masks`; numpy 2.5.4 `numpy/_core/_methods.py` (`_var`, `_std`), `numpy/lib/_function_base_impl.py` (`percentile`'s linear method with an integer `q`), `numpy/_core/fromnumeric.py` (`round`) | Apache-2.0, BSD-3-Clause |
+| `compcor::{compute_noise_components, NoiseOptions, NoiseComponents, MaskRows, MaskMetadata, Libraries, Criterion, FilterType, FailureMode, CompcorError}` | nipype 1.12.0 `compute_noise_components`, `fallback_svd` (`larmorx_transform::numpy_linalg::gesvd::nipype_fallback_svd`); numpy 2.5.4 `numpy/_core/fromnumeric.py` (`sum`, `cumsum`, `searchsorted`) | Apache-2.0, BSD-3-Clause |
+
+The Python layer (`python/larmorx/confounds/compcor.py`) follows nipype 1.12.0's `CompCor`,
+`ACompCor`, `TCompCor` (`_run_interface`, `_process_masks`, `_make_headers`), `combine_mask_files`
+and the functions' argument handling, and nibabel 5.4.2's `squeeze_image`, `get_zooms`,
+`get_xyzt_units` (MIT, Copyright the NiBabel developers) on larmorx's nibabel-compatible reader and
+writer.

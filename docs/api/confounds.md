@@ -5,11 +5,12 @@ the same in every environment), niworkflows 1.15.4's and fMRIPrep 25.2.7's confo
 with the arithmetic of the libraries they call (numpy, SciPy, nitime), bit for bit
 (`crates/larmorx-confounds`). A port in the main package; a clean-room original comes later (the
 user, 2026-11-06 and 2026-11-11). The confounds' part fills this page step by step: today nipype's
-DVARS.
+DVARS and CompCor.
 
 **Status: `experimental`** (checked bit for bit against nipype, nitime, SciPy and numpy in the
-three environments and against fMRIPrep's own DVARS files; the record comes with the part's
-records).
+three environments and against fMRIPrep's own DVARS and CompCor files; the record comes with the
+part's records; `lx.confounds` is not yet in the golden registry: its cases come with the part's
+golden relay).
 
 ## `compute_dvars`: nipype's `compute_dvars`
 
@@ -66,3 +67,70 @@ fMRIPrep runs `ComputeDVARS(save_nstd=True, save_std=True, remove_zerovariance=T
 variance_tol=1e-7, intensity_normalization=1000.0)` on the series in its reference space and the
 BOLD mask (`init_bold_confs_wf`'s `dvars` node); `compute_dvars_node(...,
 numpy_version="2.2.6", scipy_version="1.15.2")` writes fMRIPrep 25.2.6's two files byte for byte.
+
+## `compcor`, `acompcor`, `tcompcor`: nipype's `CompCor`, `ACompCor`, `TCompCor`
+
+| larmorx | nipype | Notes |
+|---|---|---|
+| `compcor(realigned_file, mask_files=None, *, ..., out_dir=".", numpy_version="2.5.4", scipy_version="1.18.1", upstream_defects="fix", n_threads=1)` → `CompCorResult(components_file, pre_filter_file, metadata_file, high_variance_masks, components, basis, metadata)` | `CompCor(...)` (header `CompCor`) | the files in `out_dir` (nipype: the node's directory) |
+| `acompcor(...)`, `tcompcor(..., percentile_threshold=0.02)` | `ACompCor`, `TCompCor` | headers `aCompCor`, `tCompCor`; niworkflows' `RobustACompCor`/`RobustTCompCor` (fMRIPrep's) differ only by retrying a `LinAlgError` after random sleeps (PIPE-48, in the register: larmorx's result is deterministic) |
+| `realigned_file` | the same | a 4-D NIfTI file, read with nibabel's `get_fdata(dtype=np.float32)` (of the sliced `dataobj` when initial volumes are ignored); `ValueError` for another number of dimensions, nipype's message |
+| `mask_files`, `merge_method` (`"union"`, `"intersect"`, `"none"`), `mask_index` | the same | `combine_mask_files`: `astype("int32") > 0` of each mask for the union and the intersection, with the last file's affine and header; none: the whole volume |
+| `mask_names` | the same | the metadata's `mask` column; PIPE-58 |
+| `components_file` (`"components_file.txt"`), `header_prefix` | the same | `np.savetxt(fmt="%.10f", delimiter="\t")` with the header `<prefix>NN`; zeros for the ignored initial volumes |
+| `num_components` (a count or `"all"`), `variance_threshold` | the same | mutually exclusive; neither: 6 components and nipype's warning (logged) |
+| `pre_filter` (`"polynomial"` (the default), `"cosine"`, `False`), `regress_poly_degree` (1), `high_pass_cutoff` (128 s), `repetition_time` | the same | the header's repetition time when not given (`get_zooms()[3]`, float32, divided by 1000 for milliseconds; PIPE-56); nipype's `ValueError` when it is 0 |
+| `use_regress_poly` | the same | deprecated: refused with nipype's traits' message |
+| `save_pre_filter`, `save_metadata` (`True` or a file name) | the same | `pre_filter.tsv` (`LegendreNN` or `CosineNN` columns, then `NonSteadyStateOutlierNN` columns with a 1 at each ignored volume), `component_metadata.tsv` (`component`, `mask`, `singular_value`, `variance_explained`, `cumulative_variance_explained` as `.10f`, `retained`; the components not retained named `droppedN`) |
+| `ignore_initial_volumes`, `failure_mode` (`"error"`, `"NaN"`) | the same | |
+| `percentile_threshold` (TCompCor) | the same | each mask's voxels (the series' values, nibabel's `dataobj`) detrended by `regress_poly(2, ...)`; those whose SD is at or above the `round(100 (1 - percentile_threshold))`th percentile, written as `mask_NNN.nii.gz` with the mask's header (`high_variance_masks`) |
+
+fMRIPrep runs `RobustACompCor(components_file="acompcor.tsv", header_prefix="a_comp_cor_",
+pre_filter="cosine", save_pre_filter=True, save_metadata=True, mask_names=["CSF", "WM",
+"combined"], merge_method="none", failure_mode="NaN", variance_threshold=0.5)`, the crown's
+(`edge_comp_`, `num_components=24`) and `RobustTCompCor(components_file="tcompcor.tsv",
+header_prefix="t_comp_cor_", pre_filter="cosine", save_pre_filter=True, save_metadata=True,
+percentile_threshold=0.02, failure_mode="NaN", variance_threshold=0.5)`, each with
+`repetition_time` and `ignore_initial_volumes` from the BOLD series; `acompcor(...,
+numpy_version="2.2.6", scipy_version="1.15.2")` and `tcompcor(...)` write fMRIPrep 25.2.6's files
+(byte for byte, the masks by their content).
+
+## `compute_noise_components` and the functions under it
+
+| larmorx | nipype | Notes |
+|---|---|---|
+| `compute_noise_components(imgseries, mask_images, components_criterion=0.5, filter_type=False, degree=0, period_cut=128, repetition_time=None, failure_mode="error", mask_names=None, *, numpy_version, scipy_version, upstream_defects, n_threads)` → `(components, basis, metadata)` | the same | `imgseries` a 4-D array (float32 or float64; other real types are cast exactly), the masks images or paths (`nb.squeeze_image(img).dataobj` `astype(bool)`); nipype's dtypes (float32 NaN fills) and errors (a mask of another shape when the loop reaches it, "No components found", ...) |
+| `regress_poly(degree, data, remove_mean=True, axis=-1, failure_mode="error", *, numpy_version, upstream_defects, n_threads)` | the same | the design `[1, P1(x), ..., Pd(x)]` (numpy's `Legendre.basis` on `linspace(-1, 1, T)`, numpy 2.2's or 2.3's `legval`), `pinv(X).dot(data.T)` (numpy's `pinv`, OpenBLAS's `dgemm`/`dgemv`), the residuals in float64; PIPE-52, PIPE-53 |
+| `cosine_filter(data, timestep, period_cut, remove_mean=True, axis=-1, failure_mode="error", *, numpy_version, scipy_version, upstream_defects, n_threads)` | the same | `_full_rank(_cosine_drift(...))`, `lstsq(X, data.T)` (numpy's `DGELSD`), the residuals in float64; PIPE-53 |
+| `cosine_drift(period_cut, frametimes, *, upstream_defects)` | `_cosine_drift` | `sqrt(2/T) cos((pi/T)(t + 0.5) k)` in nipype's order of products, the constant last; the cosine correctly rounded by default, glibc 2.35's (numpy's `np.cos` on x86-64) with `reproduce` (GLIBC-07: about 0.15 % of the values differ in their last bit) |
+| `full_rank(X, cmax=1e15, *, numpy_version, scipy_version, n_threads)` | `_full_rank` | the condition number from `fallback_svd`'s singular values; regularized (and nipype's warning logged) at `cmax` or above |
+| `compute_tstd(M, x, axis=0, *, numpy_version)` | `_compute_tSTD` | numpy's `std` in the release's order, 0 and NaN replaced by `x` |
+| `fallback_svd(a, full_matrices=True, compute_uv=True, *, ...)` | the same | numpy's `svd`, else SciPy's `gesvd`; only `full_matrices=False` with `compute_uv=True` (nipype's own calls) is ported (`NotImplementedError`) |
+| `combine_mask_files(mask_files, mask_method=None, mask_index=None)` | the same | images (`lx.Image`); nipype's `ValueError`s |
+
+Not ported: an unknown `filter_type` on a float32 series under `reproduce` (nipype decomposes it in
+single precision, numpy's `sgesdd`: `NotImplementedError`; the default refuses an unknown filter,
+PIPE-57).
+
+Corrected by default (`upstream_defects="reproduce"` gives nipype's result with the release's
+libraries; GLIBC-07 above):
+
+| ID | nipype does | larmorx by default |
+|---|---|---|
+| PIPE-44 | a mask that gives no component (an empty mask with `'all'`) ends the loop over the masks: the later masks are skipped, and when no component was found `failure_mode='NaN'` stops with `ValueError: need at least one array to concatenate` | goes on with the next mask; returns no component and empty metadata |
+| PIPE-45 | zeroes only the voxels whose float sum over time is NaN: a voxel with an infinity makes the mask's SVD fail (every component NaN with `failure_mode='NaN'`, or `ValueError`), a finite voxel whose float32 sum overflows both ways is zeroed | zeroes exactly the voxels that hold a non-finite value |
+| PIPE-52 | `regress_poly`'s non-constant regressors (the Legendre pre-filter file) are `X[:, :-1]`: the constant and every polynomial but the highest | the polynomials of degree 1 to `degree` |
+| PIPE-53 | `regress_poly` and `cosine_filter` with an `axis` other than the last reshape the data in memory order to rows of that axis' length | refused (`ValueError`) |
+| PIPE-54 | a `components_criterion` of 0 ends the loop at the first mask, a negative one other than -1 slices columns off the end with none marked retained; a float count raises `TypeError` when an SVD fails with `failure_mode='NaN'` | 0 and negative criteria refused (`ValueError`); a float count by its integer part |
+| PIPE-55 | an empty last mask with `failure_mode='NaN'` returns an empty pre-filter basis | the basis |
+| PIPE-56 | a header repetition time in microseconds is taken as seconds | converted to seconds |
+| PIPE-57 | an unknown `filter_type` filters nothing, not even the mean | refused (`ValueError`) |
+| PIPE-58 | `mask_names` shorter than the masks drops the masks without a name | refused (`ValueError`) |
+| PIPE-59 | a failed SVD with `failure_mode='NaN'` gets `T` NaN singular values, and one NaN component for `'all'` while all `T` are marked retained | the decomposition's size `min(T, N)` |
+
+Measured, no ID: nipype's `_full_rank` computes `c = smax / smin`, so a `-0.0` smallest singular
+value would give `c = -inf` and leave a singular design unregularized; numpy's `svd` and SciPy's
+`gesvd` return `+0.0` for every exact zero singular value (`validation/investigations/confounds/
+probe_compcor_defects.py`: 2,000 + 6,000 rank-deficient designs), so no input reaches it. And
+nipype's DVARS with a masked median of 0 raises (SciPy's `ValueError: array must not contain
+infs or NaNs`, or `Cannot apply_along_axis ...`), as larmorx does in both modes.

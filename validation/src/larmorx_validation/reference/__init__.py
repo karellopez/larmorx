@@ -23,7 +23,10 @@ The checks (:func:`.page.build`) fail on any drift between an API page and the c
 tests run them for every API page, and run every example of every reference page in a new
 folder on synthetic inputs (``validation/tests/test_reference.py``). A page is byte-for-byte
 the same when nothing it is made from changed: its front matter names each source with the
-start of its SHA-256, never a commit.
+start of its SHA-256, never a commit. Two checks keep the site's copies current: the site's
+build compares those hashes with the main repository it is given (``tools/build.py
+--main-repo``), and the merge's verification runs ``reference all --site <site> --check``
+(``scripts/orchestration/verify-merge.sh --site``).
 """
 
 from __future__ import annotations

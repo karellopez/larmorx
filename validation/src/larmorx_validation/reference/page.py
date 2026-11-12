@@ -10,8 +10,14 @@ test_reference.py``):
 - every argument of the Python function has a row (LARMORX's own three, ``n_threads``,
   ``implementation`` and ``upstream_defects``, are written from the code), and every argument a
   row names is one the function has;
+- every option the usage text lists is one the parser accepts (its table of specs or its match
+  arms), unless the reference block names it ``usage-only`` (handled by the parser's fallback,
+  as ``bet``'s ``-h``);
 - the call written in the API page's Python section is the function's signature;
-- the records named exist, and the ports named are the ones the replica registry lists.
+- the records named exist, and the ports named are the ones the replica registry lists;
+- the page links no restricted file (a replica crate, a source-derived finding, ``docs/parts/``,
+  the probes, the files the clean-room briefs forbid): a reference page is readable material
+  (the writing guide, section 1).
 """
 
 from __future__ import annotations
@@ -23,6 +29,7 @@ import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from larmorx_validation.cleanroom_audit import restrictions, verdicts
 from larmorx_validation.reference import apipage, code, inputs
 
 #: The site's groups of programs, in the order of its Programs page (docs/writing-guide.md §6).
@@ -46,6 +53,8 @@ SOFTWARE = {
 }
 PORT_NAMES = {"replica": "replica", "clean-room": "clean room"}
 OWN = ("n_threads", "implementation", "upstream_defects")
+#: The level-3 sections of a program's section that the exporter places itself.
+PLACED = ("python", "options", "examples", "ports")
 CONSTANTS = {"True", "False", "None"}
 TEST = "validation/tests/test_reference.py"
 
@@ -119,7 +128,7 @@ def _link_map(page: apipage.ApiPage) -> dict[str, str]:
             out[c.anchor] = (
                 url_of(p)
                 + "#"
-                + (c.keyword if c.keyword in ("python", "options", "examples") else c.anchor)
+                + (c.keyword if c.keyword in PLACED else c.anchor)
             )
     ports = page.section("ports")
     if ports is not None:
@@ -206,6 +215,47 @@ def _entities(word: str) -> str:
     return "".join(c if c.isascii() and c.isalnum() else f"&#{ord(c)};" for c in word)
 
 
+def restricted(path: str) -> str | None:
+    """Why a file of the repository is restricted for a clean-room implementer, or ``None``: the
+    clean-room audit's restriction table (``cleanroom_audit.restrictions``: the replica crates,
+    the source-derived findings, ``docs/parts/``, the probes) and the files the clean-room briefs
+    forbid (``cleanroom_audit.verdicts``: the replicas' suites and evidence modules, their
+    investigations, the random-testing triage and cases)."""
+    rel = path.lstrip("/").partition("#")[0]
+    for rx, rule, _family in restrictions.ANCHORS:
+        if rx.search("/" + rel):
+            return rule
+    name = rel.rsplit("/", 1)[-1]
+    if rel.startswith("docs/findings/") and name in restrictions.SOURCE_FINDINGS:
+        return "R11"
+    if (
+        verdicts.BRIEF_RESTRICTED.search(rel)
+        or verdicts.BRIEF_FILES.search(rel)
+        or rel.startswith("validation/difftest/cases/")
+    ):
+        return "a clean-room brief"
+    return None
+
+
+CHANGELOG = "CHANGELOG.md"
+
+
+def next_release(repo: Path, options: list[str]) -> str | None:
+    """The published release that lacks LARMORX's own command-line options (``0.1.0rc1``), or
+    ``None`` once a release has them: their synopsis (``larmorx [--n-threads N] ...``) is in
+    ``CHANGELOG.md``'s Unreleased section and in no released one."""
+    text = (repo / CHANGELOG).read_text(encoding="utf-8")
+    parts = re.split(r"(?m)^## \[([^\]]+)\][^\n]*\n", text)
+    sections = dict(zip(parts[1::2], parts[2::2], strict=True))
+    released = [v for v in sections if v.lower() != "unreleased"]
+    synopsis = f"larmorx [{options[0]}" if options else None
+    if not released or not synopsis or synopsis not in sections.get("Unreleased", ""):
+        return None
+    if any(synopsis in sections[v] for v in released):
+        return None
+    return released[0]
+
+
 def build(repo: Path, p: apipage.Program) -> Reference:
     page = p.page
     ref = Reference(p, url_of(p), f"content/programs/{p.group}/{p.name}.md")
@@ -228,12 +278,15 @@ def build(repo: Path, p: apipage.Program) -> Reference:
             fn.path,
             cl.path,
             "crates/larmorx-core/src/cli.rs",
+            "crates/larmorx-core/src/defects.rs",
             "crates/larmorx-cli/src/replica.rs",
             "validation/tools.toml",
+            CHANGELOG,
         }
     )
     params = {q.name for q in fn.params}
     own = code.own_options(repo)
+    released = next_release(repo, [o.option for o in own])
 
     # The Python section: the call written there is the signature.
     py = p.child("python")
@@ -280,6 +333,20 @@ def build(repo: Path, p: apipage.Program) -> Reference:
         if not set(o.spellings) & claimed:
             problems.append(
                 f"{where}: `{'`, `'.join(o.spellings)}` ({cl.path}) has no row in the options table"
+            )
+    usage_only = [str(x) for x in meta.get("usage-only") or []]
+    for o in cl.options:
+        for s in o.spellings:
+            if s not in cl.parsed and s not in usage_only:
+                problems.append(
+                    f"{where}: `{s}` is in the usage text of {cl.path}, but its parser does not "
+                    "accept it (if its fallback handles it, name it under usage-only)"
+                )
+    for s in usage_only:
+        if s in cl.parsed or s not in accepted:
+            problems.append(
+                f"{where}: usage-only names `{s}`, which "
+                + ("the parser accepts" if s in cl.parsed else f"the usage text of {cl.path} lacks")
             )
     for q in fn.params:
         if q.name not in named and q.name not in OWN:
@@ -340,6 +407,7 @@ def build(repo: Path, p: apipage.Program) -> Reference:
     out.append("reference:")
     out.append(f"  group: {p.group}")
     out.append(f"  original: {_yaml(original)}")
+    out.append(f"  software: {_yaml(software)}")
     out.append(f"  command: {_yaml(command)}")
     out.append(f"  python: {_yaml(fn.public)}")
     out.append(f"  api: {_yaml(page.path.as_posix())}")
@@ -367,7 +435,7 @@ def build(repo: Path, p: apipage.Program) -> Reference:
     syn = [f"larmorx {p.group} {s}" for s in cl.synopsis] or [f"{command} ..."]
     if command != f"larmorx {p.group} {p.name}":
         syn = [command + s[len(f"larmorx {p.group} {p.name}") :] for s in syn]
-    body.append("```text\n" + "\n".join(syn) + "\n```\n")
+    body.append("```text synopsis\n" + "\n".join(syn) + "\n```\n")
     body.append(
         f"Everything after `{command}` is the original's command line: the arguments of "
         f"{original}'s `{p.name}`, as {software} takes them. LARMORX's own options stand "
@@ -375,7 +443,11 @@ def build(repo: Path, p: apipage.Program) -> Reference:
         f"([below](#larmorx-options)):\n"
     )
     own_syn = "".join(f"        [{o.option} {o.values.replace(' | ', '|')}]\n" for o in own)
-    body.append("```text\nlarmorx\n" + own_syn + f"        {command.split(' ', 1)[1]} ...\n```\n")
+    body.append(
+        "```text synopsis\nlarmorx\n" + own_syn + f"        {command.split(' ', 1)[1]} ...\n```\n"
+    )
+    if released:
+        body.append(_not_yet(own, released) + "\n")
     if cl.usage:
         usage = cl.usage.strip("\n")
         body.append(
@@ -463,10 +535,13 @@ def build(repo: Path, p: apipage.Program) -> Reference:
             body.append("| " + " | ".join(_cell(c) for c in row) + " |")
         body.append("")
     body.append("### LARMORX's own options {#larmorx-options}\n")
+    if released:
+        body.append(_not_yet(own, released) + "\n")
     body.append(
         f"They stand between `larmorx` and `{p.group}` on the command line "
         f"(`larmorx --n-threads 4 {command.split(' ', 1)[1]} ...`) and are arguments of "
-        f"`{fn.public}`. Each one given wins over the environment variable it replaces.\n"
+        f"`{fn.public}`. Each one given wins over its environment variable, which keeps "
+        "working.\n"
     )
     body.append("| Command line, then Python | What it does |\n|---|---|")
     for o in own:
@@ -476,9 +551,18 @@ def build(repo: Path, p: apipage.Program) -> Reference:
         if q is None:
             problems.append(f"{where}: {fn.public} has no `{o.python}` argument ({o.option})")
         values = o.values.replace(" | ", "|")
+        text = links(doc, page, problems)
+        if o.option == "--n-threads":
+            # larmorx_core::cli: unset, the command line runs on every logical CPU (CHANGELOG.md)
+            text += f" Default: every logical CPU on the command line (`0`), `{default}` in Python."
+        text += (
+            f" The variable `{o.variable}` in {released}."
+            if released
+            else f" Replaces `{o.variable}`, which keeps working."
+        )
         body.append(
             f"| {_cell(f'`{o.option}` `{values}`')}<br>{_cell(f'`{o.python}={default}`')} | "
-            f"{_cell(f'Replaces `{o.variable}`. ' + links(doc, page, problems))} |"
+            f"{_cell(text.strip())} |"
         )
     body.append("")
 
@@ -496,7 +580,7 @@ def build(repo: Path, p: apipage.Program) -> Reference:
         body.append(f"```{c.lang}\n{c.text}\n```\n")
 
     for c in p.section.children:
-        if c.keyword in ("python", "options", "examples"):
+        if c.keyword in PLACED:
             continue
         body.append(f"## {c.title}\n")
         body.append(links(apipage.strip_comments(c.text()), page, problems).strip() + "\n")
@@ -517,6 +601,9 @@ def build(repo: Path, p: apipage.Program) -> Reference:
             f"{_status(records.get(rid))} | {recs} |"
         )
     body.append("")
+    own_ports = p.child("ports")
+    if own_ports is not None:
+        body.append(links(apipage.strip_comments(own_ports.text()), page, problems).strip() + "\n")
     shared = page.section("ports")
     if shared is not None:
         body.append(links(apipage.strip_comments(shared.text()), page, problems).strip() + "\n")
@@ -524,7 +611,7 @@ def build(repo: Path, p: apipage.Program) -> Reference:
     body.append("## Evidence {#evidence}\n")
     if ev_url:
         body.append(
-            f"How `{p.name}`'s ports compare with {original}, case by case: "
+            f"How each of `{p.name}`'s ports was measured against {software}, case by case: "
             f"[its evidence]({ev_url}).\n"
         )
         # sections of the evidence page that hold what the reference page leaves out: facts a
@@ -547,8 +634,27 @@ def build(repo: Path, p: apipage.Program) -> Reference:
         body.append(f"- [{_plain(s.title)}](repo:{page.path.as_posix()}#{s.anchor})")
     body.append("")
     text = "\n".join(body)
+    for target in dict.fromkeys(re.findall(r"\]\(repo:([^)\s]+)\)", text)):
+        why = restricted(target)
+        if why:
+            problems.append(
+                f"{where}: the page links {target}, restricted for clean-room implementers ({why}); "
+                "name it instead, or link docs/licensing.md"
+            )
     ref.markdown = "\n".join(out) + "\n" + _jinja_safe(text)
     return ref
+
+
+def _not_yet(own: list[code.OwnOption], released: str) -> str:
+    """The note under LARMORX's own options while the published release lacks them."""
+    names = []
+    for o in own:
+        n = f"`{o.variable}`"
+        if o.option == "--implementation":
+            n += " (`original` for the clean room)"
+        names.append(n)
+    variables = ", ".join(names[:-1]) + " and " + names[-1] if len(names) > 1 else names[0]
+    return f"**From the next release.** In {released}, set the variables instead: {variables}."
 
 
 def _plain(title: str) -> str:

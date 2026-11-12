@@ -71,6 +71,11 @@ class CommandLine:
     usage: str | None
     synopsis: list[str]
     options: list[Option]
+    #: The spellings the parser itself accepts (its table of specs and its match arms): an option
+    #: the usage text lists and the parser does not is a drift, unless the API page names it as
+    #: handled elsewhere (``usage-only``, as ``bet``'s ``-h``, which its fallback prints the
+    #: usage for).
+    parsed: set[str] = field(default_factory=set)
 
 
 def usage_options(usage: str) -> list[Option]:
@@ -175,7 +180,8 @@ def command_line(repo: Path, rel: str, program: str) -> CommandLine:
     its table of specs and of its parser's arms, merged where they share a spelling."""
     text = (repo / rel).read_text(encoding="utf-8")
     usage = rust_string(text, "USAGE")
-    found = (usage_options(usage) if usage else []) + specs_options(text) + match_options(text)
+    parser = specs_options(text) + match_options(text)
+    found = (usage_options(usage) if usage else []) + parser
     merged: list[Option] = []
     for o in found:
         same = [m for m in merged if set(m.spellings) & set(o.spellings)]
@@ -191,7 +197,8 @@ def command_line(repo: Path, rel: str, program: str) -> CommandLine:
     for m in merged:  # the short spelling first
         m.spellings.sort(key=lambda s: (s.startswith("--"), s))
     synopsis = usage_synopsis(usage, program) if usage else []
-    return CommandLine(rel, usage, synopsis, merged)
+    parsed = {s for o in parser for s in o.spellings}
+    return CommandLine(rel, usage, synopsis, merged, parsed)
 
 
 # ------------------------------------------------------------------------------------------------

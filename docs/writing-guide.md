@@ -5,10 +5,10 @@ and the lines its programs print. The documentation revision
 ([documentation-plan.md](documentation-plan.md)) rewrites both repositories with it, and every
 page written afterwards follows it. Draft of 2026-11-12, for the user's approval.
 
-Every fact in this guide comes from documents a clean-room implementer may read: the site's pages
-and evidence, the validation records, the API pages, the benchmark reports, `CHANGELOG.md`, and the
-main package's Python and command-line code. Nothing comes from the restricted findings or the
-replica crates.
+Every fact in this guide comes from files a clean-room implementer may read (section 1, "Who
+changes what"): the site's pages and evidence, the validation records, the API pages, the
+benchmark reports, `CHANGELOG.md`, the main package's Python and command-line code, and the
+clean-room audit's restriction table. Nothing comes from the restricted material.
 
 ## 1. Four words
 
@@ -16,7 +16,7 @@ replica crates.
 |---|---|---|
 | **original** | The program or function that a port reimplements, as its own developers release it. Every port is compared with its original. | `bet` from FSL 6.0.7.23; `antsRegistration` from ANTs 2.6.5; fMRIPrep 25.2.6's resampler |
 | **port** | One reimplementation of an original in LARMORX: in Rust, or in Python where the original is Python code that LARMORX keeps in Python (pybids' BIDS index, sdcflows' workflows). Each port is one kind, a replica or a clean room, so a program can have two ports. | `bet` has two ports, a replica and a clean room; `antsRegistration` has one, a replica. |
-| **replica** | A port translated from the original's source, step by step, to give the original's results bit for bit. Where a record shows a difference, it says why (most often the C library's rounding of `exp` or `pow`). A replica comes under its original's licence terms, so it goes in the package for those terms: tedana's LGPL-2.1 code goes under GPL-3.0, which the LGPL allows. | `antsRegistration`'s replica in `larmorx`; `bet`'s in `larmorx-nc` |
+| **replica** | A port translated from the original's source, step by step, to give the original's results bit for bit. Where a record shows a difference, it says why (most often the C library's rounding of `exp` or `pow`). A replica comes under its original's licence terms, so it lives in the package for those terms: tedana's LGPL-2.1 code is under GPL-3.0, which the LGPL allows. | `antsRegistration`'s replica in `larmorx`; `bet`'s in `larmorx-nc` |
 | **clean room** | A port written again without the original's source or its replica: from a description of what the original does, its documentation, papers and runs of the original. It is built for speed and carries LARMORX's licence, Apache-2.0. | `bet`'s and `3dvolreg`'s clean rooms in `larmorx` |
 
 Where each port lives on `main` (section 2, rule 14):
@@ -41,9 +41,12 @@ How to use them:
 - **port** is the word for both kinds. Never make it a third kind beside them: ANTs' programs have
   replicas, not ports "from the source".
 - In code the names are `implementation="auto" | "replica" | "clean-room"` and
-  `--implementation clean-room`. The published release, 0.1.0rc1, spells the clean room
-  `"original"`, and `main` still accepts that spelling. A page that shows the value gives
-  `"clean-room"`, with `"original"` (0.1.0rc1) in brackets.
+  `--implementation clean-room`. On the command line LARMORX's options stand between `larmorx`
+  and the family: `larmorx --implementation clean-room fsl bet ...`. Everything after the
+  program is the original's own arguments.
+- The published release, 0.1.0rc1, spells the clean room `"original"`, and `main` still accepts
+  that spelling. A page that shows the value gives `"clean-room"`, with `"original"` (0.1.0rc1)
+  in brackets.
 - What LARMORX has that is not a port is **LARMORX's own**: its NIfTI reader and writer, the
   `larmorx` command itself. The program LARMORX's own work is compared with is called by its name
   (nibabel), never *the original*.
@@ -60,7 +63,7 @@ How to use them:
 | the original's own variability | the original's spread; the original's own spread | Also the figure's name (section 4). |
 | the cross-platform checks | the golden tests | On user pages. |
 | a random-testing run of half an hour | a trial night; a night | Give the duration. |
-| a defect of the original, corrected by default | D13 | The register's ids (FSL-11, AFNI-41) stay, linked to the register. |
+| a defect of the original, corrected by default | D13 | The register's ids (ANTS-40, ITK-50) stay, linked to the register's summary table. |
 | `fix` (the default) and `reproduce` | default mode; reproduce mode | The values of `upstream_defects` and `--upstream-defects`. |
 | the software (ANTs, FSL) in general; *a project* when counted ("the six projects LARMORX ports from") | the ecosystem; the toolkit; "each software" | In prose. Not *package* for a project: LARMORX's packages are `larmorx`, `larmorx-nc` and `larmorx-gpl`. |
 | the family (`fsl` in `larmorx fsl bet`) | | Only for the command line's first word after the options. On user pages never for a group of licences: say "FSL's licence". |
@@ -78,51 +81,91 @@ How to use them:
 - **Identifiers**: random testing's case names and descriptor `NAME`s, and the record, suite and
   cache names written inside records until a record is made again (Mechanics, below). Code keeps
   accepting `"original"`.
+- **Pages made by a measurement**: the records (the pages of `docs/validation/` that a comparison
+  writes, with their `.json`), the benchmark reports (`docs/benchmarks/`, its README aside) and the
+  clean-room audit's page (`docs/validation/clean-room-audit.md`). A comparison suite, a
+  benchmark or the audit writes each, except 10 of the 21 benchmark reports, written by hand from
+  their script's measurements. The evidence cites the records and the reports by path and SHA-256
+  (`provenance.records`, `provenance.benchmarks` in `static/evidence/*.json`). So nobody changes
+  them afterwards, not even their words:
+  - each keeps its words until it is made again in its normal course, as the final validation
+    phase does; none is made again only for its words;
+  - the new words go into what writes them (the suites' and the benchmarks' report code, the
+    evidence module, `tables.py`, the audit's summary), so the next ones use them;
+  - where the site shows a record's text, the evidence module may reword it there;
+  - a renamed record or report keeps its contents byte for byte, and the evidence exported again
+    names its new path with the same SHA-256.
 
 ### Who changes what
 
-- **The writer** changes the site, the documents, the API pages, the Python package's messages
-  and docstrings, LARMORX's own lines in `larmorx-cli` and the replica crates (never the
-  original's messages, which a replica prints bit for bit) and the evidence module's texts.
+- **The writer** changes the site, the documents, the API pages and the evidence module's texts.
+  In code, the writer changes the Python package's messages and docstrings, and LARMORX's own
+  lines in `larmorx-cli` and the replica crates; never the original's messages, which a replica
+  prints bit for bit.
 - **A clean-room agent** changes the clean rooms' code and the lines they print
   (`crates/larmorx-afni`, `-mri`, `-fsl`, `-tedana` and larmorx-core's clean-room files), from
   the writer's list. **A spec writer** changes `specs/`. **The orchestrator** changes
   `CLAUDE.md`.
-- **Documents a clean-room implementer may read**: the API pages of programs with a clean room,
-  `docs/porting-guide.md`, `docs/architecture.md`, the clean rooms' records, findings and
-  evidence modules, the register's unrestricted sections, this guide, and anything not marked
-  restricted. The writer reads replica material, so in these files the writer changes the wording
-  only. No fact, number, name or behaviour goes in that is not already in the same file or in a
-  public source the file cites. New facts go only in documents marked restricted or in
-  replica-side material. Each such file is listed for the orchestrator, and the reviewer checks
-  its diff for added facts.
+- **Files a clean-room implementer may read.** `docs/porting-guide.md` §1 says what an
+  implementer may read, and the clean-room audit's restriction table
+  (`validation/src/larmorx_validation/cleanroom_audit/restrictions.py`) applies it. For this
+  rule, treat every file as readable except the restricted material, which the table lists:
+  - the originals' source that it restricts (today FSL's, AFNI's, tedana's, FreeSurfer's,
+    Workbench's, MSM_HOCR's, glibc's and libstdc++'s);
+  - the replica crates (`crates/larmorx-afni-replica`, `crates-gpl/`, `crates-nc/`);
+  - the findings written from the source: the thirteen files §1 lists, by name, since two of them
+    (`afni-tshift.md`, `fsl-mcflirt.md`) say so in other words than "Restricted";
+  - the register's restricted sections, headed `## Restricted: ...` (their entries carry † in the
+    summary table, which anyone may read);
+  - `docs/parts/`, the probes in `validation/probes/`, the replica authors' random-testing cases,
+    the replicas' suite and evidence modules that a part's brief names, the session transcripts
+    and other agents' scratch notes.
+
+  This widens what the writer guards, never what an implementer may read. The writer has read
+  restricted material, so in a readable file:
+  - a changed sentence keeps its facts, and only its wording changes;
+  - a new sentence, table row or page holds only facts already in a readable file (a record, the
+    evidence's JSON, an API page, a spec, the original's own documentation), and names or links
+    that file;
+  - nothing comes from the restricted material, even reworded or summarised.
+
+  New facts from restricted material go only into restricted material. Each changed readable
+  file is listed for the orchestrator, and the reviewer checks every new sentence against the
+  readable file it comes from.
 
 ### Mechanics of the rollout
 
-- **Shared documents** (CLAUDE.md's list): those whose words this revision rewrites (`README.md`,
-  `docs/licensing.md`, `docs/validation/README.md`, `docs/validation/golden.md`, the register and
-  `docs/api/upstream-defects.md`; on the site `site.yml` and `content/validation.md`) the writer
-  edits directly and lists for the orchestrator. `docs/next-steps.md`, the decision log and
-  `CLAUDE.md` change through the handoff. Generated tables and files (the README's tool table,
+- **Shared documents** (CLAUDE.md's list). The writer edits directly those whose words this
+  revision rewrites: `README.md`, `docs/licensing.md`, `docs/validation/README.md`,
+  `docs/validation/golden.md`, the register and `docs/api/upstream-defects.md`, and on the site
+  `site.yml` and `content/validation.md`. Each is listed in the part's notes, and the
+  orchestrator checks it again at the merge. This is the documentation revision's exception to
+  CLAUDE.md's handoff rule (the orchestrator, 2026-11-12). `docs/next-steps.md`, the decision log
+  and `CLAUDE.md` change through the handoff.
+- **Generated tables and files** (the README's tool table, the validation index's records table,
   the site's `data/status.yml`, `static/evidence/summary.json`) change through their source
-  (`validation/tools.toml`, the evidence module) and the generator, never by hand.
+  (`validation/tools.toml`, the evidence module) and the generator, never by hand. The pages made
+  by a measurement keep their words until they are made again (above).
 - **A printed line changed** (a message, a usage text, a `--help`): the golden cases that hash
   the output (`tests/golden/registry.py`: 3dTshift's and 3dvolreg's, among others) are recorded
   again with `scripts/record_golden.py` from a clean commit, after the quick check. Whoever
   changes the line records them.
 - **Renamed files**: records, findings, benchmark reports, tests and validation modules named
   `*-original*` become `*-clean-room*` (`*_clean_room*` for Python modules), with their links,
-  their record ids in `validation/tools.toml` and the generated tables. Random testing's cases and
-  the investigations keep their names.
+  their record ids in `validation/tools.toml` and the generated tables. A renamed record or
+  report keeps its contents byte for byte. Random testing's cases and the investigations keep
+  their names.
 - **Renamed identifiers**: a renamed comparison suite (`afni-volreg-original` becomes
   `afni-volreg-clean-room`) keeps its old name as an accepted alias, so the "Generated: with
   `python -m larmorx_validation parity afni-volreg-original`" lines of today's records still run
   until each record is made again. Random testing's descriptor `NAME`s
   (`NAME = "afni-volreg-original"`, used in `validation/difftest/triage.toml` and the cases) stay
   as they are, even where the module's file is renamed.
-- **The evidence exported again** changes texts and marks only: every blob stays byte for byte
-  (`static/evidence/blobs.sha256` unchanged, checked before the push). The JSON files change, and
-  the merge's site inventory shows each change for the merge to judge.
+- **The evidence exported again** changes only texts, marks, the provenance's paths and the
+  exporter's commit, which the provenance records. Every blob stays byte for byte
+  (`static/evidence/blobs.sha256` unchanged, checked before the push), and every SHA-256 the
+  provenance cites stays the same. The JSON files change, and the merge's site inventory shows
+  each change for the merge to judge.
 
 [validation/investigations/docs-revision/inventory.md](../validation/investigations/docs-revision/inventory.md)
 counts every old word, file by file (section 7).
@@ -134,8 +177,8 @@ counts every old word, file by file (section 7).
 2. **One idea per sentence.** Most sentences under 25 words. A semicolon or a bracket only where
    it helps, never one bracket inside another.
 3. **What the reader gets comes first; history comes last.** A lede says what the program does in
-   one sentence, then how good each port is today, one sentence per port. The status goes to the
-   facts line under the lede, the dates of changes to the page's History section.
+   one sentence, then how good each port is today, in a sentence or two per port. The status goes
+   to the facts line under the lede, the dates of changes to the page's History section.
 4. **Say what a thing is.** "The standard comparison: every option and fMRIPrep's own calls",
    not "the standard tier".
 5. **Numbers with their unit and their whole.** "198 of 200 compared cases", "3.0 s", "307 MiB",
@@ -183,9 +226,9 @@ same records as the sentences they replace.
    functionality and behaviour of tools from ANTs, AFNI, FreeSurfer and others, without requiring
    you to install the original binaries or manage complex system dependencies."
    After: "LARMORX puts programs from ANTs, AFNI, FSL, tedana, sdcflows and fMRIPrep in one Python
-   package. `pip install larmorx` is all it takes on Linux, macOS and Windows (tedana's `t2smap`
-   from the next release; 0.1.0rc1 has it in `larmorx-gpl`): no other installation, and the same
-   results on every computer (the tests check it on six platforms)."
+   package. `pip install larmorx` is all it takes on Linux, macOS and Windows: no other
+   installation, and the same results on every computer, which the tests check on six platforms.
+   tedana's `t2smap` comes with the next release; in 0.1.0rc1 it is in `larmorx-gpl`."
    Why: what the reader gets, in their words; no *established* or *aims to*; FreeSurfer is not
    ported yet, so it is not named; what 0.1.0rc1 lacks is marked (rule 14).
 3. Before: "Each tool is reimplemented in one of three ways, chosen by the licence of the
@@ -198,11 +241,11 @@ same records as the sentences they replace.
 4. Before: "Ported from the source. Tools with permissive licences, ANTs and ITK (Apache-2.0),
    are ported from their source, with each Rust function's origin recorded in the crate's
    `PROVENANCE.md`."
-   After: "Replica. The original's source translated step by step, into Rust (or, for some Python
-   originals, kept in Python), to give its results bit for bit. A replica comes under its
-   original's licence terms: the replicas of ANTs, ITK, AFNI, sdcflows and fMRIPrep are in
-   `larmorx`, FSL's in `larmorx-nc`, and tedana's `t2smap` in `larmorx-gpl`, under GPL-3.0.
-   Each Rust function's origin is recorded in its crate's `PROVENANCE.md`."
+   After: "Replica. The original's source translated step by step into Rust, or, for some Python
+   originals, rewritten step by step in Python, to give its results bit for bit. A replica comes
+   under its original's licence terms: the replicas of ANTs, ITK, AFNI, sdcflows and fMRIPrep
+   are in `larmorx`, FSL's in `larmorx-nc`, and tedana's `t2smap` in `larmorx-gpl`, under
+   GPL-3.0. Each Rust function's origin is recorded in its crate's `PROVENANCE.md`."
    Why: ANTs' ports are replicas; every replica's package is named; the provenance fact stays.
 5. Before: "A clean-room original. Where the licence is restrictive (FSL, tedana, Workbench), an
    original is written from a behavioural specification, documentation and runs of the original
@@ -261,10 +304,10 @@ same records as the sentences they replace.
     and sdcflows' own command lines on real data, every option, generated edge cases, the invalid
     inputs), *full* where a tool has more."
     After: "**Three sizes of comparison.** A quick check, a few cases of every program, run with
-    the test suite each time a change is added to the code (*smoke*). The standard comparison,
-    which this site shows: fMRIPrep's, sMRIPrep's and sdcflows' own command lines on real data,
-    every option, generated edge cases and invalid inputs (*standard*). And, for some programs,
-    more and larger cases (*full*)."
+    the test suite before every change goes into the published code (*smoke*). The standard
+    comparison, which this site shows: fMRIPrep's, sMRIPrep's and sdcflows' own command lines on
+    real data, every option, generated edge cases and invalid inputs (*standard*). And, for some
+    programs, more and larger cases (*full*)."
     Why: what each size holds, every fact kept; "at every merge" (the same page's table) in plain
     words.
 13. Before (`content/tools/fsl-bet.md`, the lede, 137 words): "FSL's brain extraction (bet, bet2)
@@ -274,12 +317,18 @@ same records as the sentences they replace.
     since 2026-11-05 so does the clean-room original, every program its own clean-room program."
     After: "`bet` finds the brain in a head image; `betsurf` adds the skull and the scalp. The
     replica (`larmorx-nc`) matches FSL 6.0.7.23's exit status, messages and files, byte for byte,
-    in 201 of its 263 cases, and 47 more are rejected by both. The clean room (`larmorx`) gives
-    FSL's brains, masks and outlines bit for bit in 378 of 380 images, and `betsurf`'s masks and
-    outlines within the thresholds in 114 of 116, 34 of them bit for bit."
-    Why: what it does, then one sentence per port, with where the clean room is not exact
-    (`betsurf`). "Experimental" goes to the facts line (example 14), how each port was written to
-    "Its ports" and the dates to the page's History.
+    in 201 of its 263 cases, and 47 more are rejected by both. Of the other 15, FSL crashes in 13
+    and reads memory beyond the image in one; the last needs an FSL program that LARMORX does not
+    replicate yet. The clean room (`larmorx`) is within the thresholds in 198 of its 200 compared
+    cases. Its brains, masks and outlines are FSL's bit for bit in 378 of 380 images, and
+    `betsurf`'s masks and outlines are within the thresholds in 114 of 116, 34 of them bit for
+    bit."
+    Why: what it does, then a sentence or two per port, with where each is not complete or not
+    exact (the replica's last case, the clean room's two cases and `betsurf`). The records count
+    cases and images apart, so the lede names both units. "Experimental" goes to the facts line
+    (example 14), how each port was written to "Its ports" and the dates to the page's History.
+    The numbers: [fsl-bet-replica.md](validation/fsl-bet-replica.md) (its summary and its
+    expected divergences) and [fsl-bet.md](validation/fsl-bet.md).
 14. Before (`content/tools/fsl-bet.md`, the facts): "Status: experimental (original) · validated
     (replica)".
     After: "Status: replica validated; clean room experimental."
@@ -372,7 +421,9 @@ same records as the sentences they replace.
 
 - *A* and *B* are: the original; the replica; the clean room; both ports; **fMRIPrep's output**
   (the file fMRIPrep wrote, in its own run); **the known answer** (what a synthetic input was
-  made to give: the true transform, the exact field).
+  made to give: the true transform, the exact field); **a reference computed another way** (the
+  Jacobian factor on the BOLD's own grid, where both methods agree); **the input**; **the
+  original's starting point** (a registration's initial alignment).
 - A comparison of something with itself says what changes, after a colon: "the original against
   itself: two versions", "the replica against itself: `fix` and `reproduce`", "the clean room
   against itself: 1 and 8 threads".
@@ -407,7 +458,7 @@ label says "larmorx", the evidence module names the port.
 | larmorx's correction (9); larmorx's corrections (3) | the replica (or the clean room) against itself: `fix` and `reproduce` (the defect's id, ITK-50) |
 | larmorx against the original (both implementations' reference) (5) | both ports against the original |
 | against the truth (5); the original against the truth (1) | the original, the replica or the clean room against the known answer |
-| against the reference (4) | the original (or the port) against the known answer: the exact field, the exact factor |
+| against the reference (4) | `resample-series` (2): the replica in `fix`, and in `reproduce` (fMRIPrep's factor), against a reference computed another way: the factor on the BOLD's own grid; `sdcflows-fieldmap` (2): the original (or the replica) against the known answer: the exact field |
 | what the registration changed (3) | the original against its starting point: what the registration changed |
 | the original against itself: the machine (3); … the machine and numpy's kernels (3); … fMRIPrep's AFNI 25.2.09 in its image (1); … the same volumes stored another way (1) | as they are (they already follow the pattern) |
 | the defect, in AFNI (2) | the original against itself: the defect (`-peels 0` and `-peels 1`) |
@@ -441,7 +492,9 @@ and text.
 
 These are the colours the evidence's charts already use (`static/js/evidence.js`, `PAL`), so no
 image has to be drawn again. A point is filled at one thread and open at more, as the speed
-charts' dots and rings are now. Where the three lines coincide, as they do when the ports are
+charts' dots and rings are now. Where one port appears in `fix` and in `reproduce` in one chart,
+`reproduce` takes a thinner line and a smaller point, and the legend names both (tedana's speed
+chart, the only such chart today). Where the three lines coincide, as they do when the ports are
 bit-identical, the dashes let the original's line show through.
 
 - **One token set** for the three, read by both the CSS and the page's script
@@ -456,8 +509,12 @@ bit-identical, the dashes let the original's line show through.
   - LARMORX's own work (the NIfTI reader): the clean room's colour and line, labelled "LARMORX's
     own". Apricot then means code LARMORX writes itself; LARMORX's own never shares a chart with a
     clean room;
-  - inputs and known answers: the grey of `PAL.input` (`#8a847a`, dark `#7d776d`), dotted, with no
-    point.
+  - inputs, known answers and references computed another way: the grey of `PAL.input`
+    (`#8a847a`, dark `#7d776d`), dotted, with no point;
+  - the panel role `reference` (54 panels today) holds both kinds: runs of the original (with
+    correctly rounded maths; FSL on the same map without its NaN) take the original's colour,
+    and the computed reference (`resample-series`) and the known answer (`sdcflows-fieldmap`'s
+    exact field) the grey. The evidence module names which each panel is.
 - **A port's colour always comes with its name** (a legend, a caption) and its mark, never alone.
 - **Ports are lines, marks and labels; verdicts are filled areas.** A verdict's colour always comes
   with its pattern and its name (`data/verdicts.yml`). Three verdicts share a hue with a port:
@@ -536,7 +593,8 @@ The header's links: Getting started, Concepts, Programs, Validation, Roadmap, Ab
   records (`fsl-bet`, `fsl-bet-replica`, `fsl-bet-replica-full`); each reference page links to its
   own section.
 - **mcflirt's page** is `/programs/fsl/mcflirt/`. It shows `larmorx mri hmc` and `lx.mri.hmc` as
-  its clean room, and `larmorx fsl mcflirt --implementation clean-room`, which runs it.
+  its clean room, and `larmorx --implementation clean-room fsl mcflirt`, which runs it (from the
+  next release; in 0.1.0rc1, the environment variable `LARMORX_IMPLEMENTATION=original`).
 - **The API pages, by group**:
   - `ants`: the thirteen `ants-*` pages and `transforms-hdf5`;
   - `afni`: the four `afni-*` pages;
@@ -552,11 +610,25 @@ The header's links: Getting started, Concepts, Programs, Validation, Roadmap, Ab
   this repository, beside the evidence module (step 2 of the plan), writes the site's reference
   pages from it, the command-line definitions and the `.pyi` stubs. Nobody edits a reference page
   on the site by hand.
+- **An API page with several programs** holds one section per program, and the exporter writes
+  one reference page from each section: `fsl-flirt.md` gives 14, `fsl-bet.md` 3, `fsl-roi.md`
+  and `fsl-topup.md` 2 each. `sdcflows-fieldmap.md` gives the `sdcflows` command's page and the
+  `fieldmap` module's.
 - **Old addresses keep working.** The builder gets a redirect page type (step 2): a page at the
-  old address that names the new one, sends the reader there and carries the anchor
-  (`/tools/fsl-bet/#speed` to `/evidence/fsl-bet/#speed`). Every anchor of today's pages keeps
-  working: the heading that takes a section's place gets its old `id` (Home's `#status`, Getting
-  started's `#first-steps` and `#containers`).
+  old address that names the new one. It holds a table of the old page's anchors and the page
+  that now holds each: `/tools/fsl-bet/#speed` goes to `/evidence/fsl-bet/#speed`, and
+  `/tools/fsl-bet/#data` (the standard images) to `/programs/fsl/bet/#data`. A line of script
+  sends the reader there with the anchor, which a plain meta refresh would drop, and a link to the
+  new address serves readers without scripts. Every anchor of today's pages keeps working: the
+  heading that takes a section's place gets its old `id` (Home's `#status`, Getting started's
+  `#first-steps` and `#containers`).
+- **Another letter case.** An address typed in another letter case
+  (`/programs/ants/antsregistration/`) is not a page, and the build's link check sees only the
+  site's own links. So the 404 page holds the list of the site's addresses, which the builder
+  writes, and sends such a reader to the address that matches in lower case, anchor kept. No
+  page is written twice in two letter cases: on the usual file systems of macOS and Windows,
+  `antsRegistration/` and `antsregistration/` are one folder, so building the site there would
+  let one page overwrite the other.
 
 ### Where every part of today's site goes
 
@@ -574,9 +646,11 @@ The header's links: Getting started, Concepts, Programs, Validation, Roadmap, Ab
 | Validation: The method, Levels of testing, Now and before the first release, How to read the evidence, The verdicts, Where every tool stands, Random testing, The records | Validation, each with its anchor; "Three ways of reimplementing" becomes "Two kinds of port" (example 11), with a link to Concepts |
 | Data panel | its own page under Validation |
 | Tools: the introduction; "How to read the figures" (`/tools/#reading`) | Programs (example 9); Validation's "How to read the evidence" |
-| A tool's page: "What it is" | the reference page's "what it does" and the evidence page's lede (what is compared) |
+| A tool's page: "What it is", "What they are" (`ants-programs`, `ants-ai`) | the reference pages' "what it does" and the evidence page's lede (what is compared) |
+| A tool's page: "FLIRT's other programs" (`fsl-flirt`) | the reference pages of those programs (`avscale`, `img2imgcoord`, `rmsdiff`, `makerot`, `midtrans`, `pointflirt`, `applyxfm4D`, `aff2rigid` and the rest), each with its own section of `fsl-flirt.md` |
 | A tool's page: the verdicts, the worked examples, the variations, every case, random testing, speed, "Corrections by default", "Known limits" | the evidence page, each with its anchor |
-| A tool's page: "The standard images the variations read" | the reference page of the program that reads them (`bet`'s) |
+| A tool's page, every other section: "Memory", the original's own variability ("Against ANTs' own variability", "tedana's own variability"), "The originals' own step: two library releases", "On the data panel", "What is open", "Every file" and the rest | the evidence page, each with its anchor |
+| A tool's page: "The standard images the variations read" (`#data`) | the reference page of the program that reads them (`bet`'s), with its anchor |
 | Roadmap; 404 | as they are |
 
 ### The home page, section by section

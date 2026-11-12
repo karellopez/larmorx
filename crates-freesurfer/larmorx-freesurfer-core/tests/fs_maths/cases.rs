@@ -326,6 +326,8 @@ const COMMANDS: &[&str] = &[
     "mprint",
     "primes",
     "pdfg",
+    "minv",
+    "mqr",
 ];
 
 /// One case line of command `cmd`.
@@ -745,6 +747,24 @@ fn case(g: &mut Gen, cmd: &str) -> String {
         "pdfg" => {
             s.push(g.int(-2_000_000_000, 2_000_000_000).to_string());
             s.push(g.int(1, 12).to_string());
+        }
+        "minv" => {
+            let t = if g.below(4) == 0 { 2 } else { 1 };
+            let n = if t == 2 { g.int(1, 3) } else { g.int(1, 7) };
+            let mut m = vec![cmd.to_owned(), t.to_string()];
+            put_mat(&mut m, g, n, n, t == 2);
+            // sometimes a singular matrix: the first row repeated
+            if g.below(6) == 0 && n > 1 {
+                let w = (if t == 2 { 2 } else { 1 } * n) as usize;
+                for j in 0..w {
+                    m[4 + w + j] = m[4 + j].clone();
+                }
+            }
+            return m.join(" ");
+        }
+        "mqr" => {
+            let (r, c) = (g.int(1, 6), g.int(1, 6));
+            put_mat(&mut s, g, r, c, false);
         }
         _ => unreachable!("{cmd}"),
     }
@@ -1503,6 +1523,33 @@ pub fn run_line(line: &str, mode: UpstreamDefects, tmp: &Path) -> (String, Vec<&
             for _ in 0..k {
                 o.d(pdf::pdf_gaussian(g));
             }
+        }
+        "minv" => {
+            let a = o.mt(g, &mut t);
+            let x = mo::matrix_inverse(g, &mut so, &mut se, Some(&a), None).unwrap();
+            o.mn(&x, None);
+            let mut out = m::matrix_alloc(g, &mut so, &mut se, a.rows, a.cols, a.mtype)
+                .unwrap()
+                .unwrap();
+            let r = mo::matrix_inverse(g, &mut so, &mut se, Some(&a), Some(&mut out)).unwrap();
+            o.0.push(if r.is_null() { "NULL" } else { "OK" }.to_owned());
+            o.mraw(&out);
+            o.f(mo::matrix_determinant(g, &mut se, &a));
+        }
+        "mqr" => {
+            let a = t.m(g, MATRIX_REAL);
+            let mut q = Matrix::real(a.rows, a.rows);
+            let mut r = Matrix::real(a.rows, a.cols);
+            o.i(mo::matrix_qr_decomposition(
+                g,
+                &mut so,
+                &mut se,
+                Some(&a),
+                Some(&mut q),
+                Some(&mut r),
+            ));
+            o.mraw(&q);
+            o.mraw(&r);
         }
         _ => panic!("unknown case {cmd}"),
     }

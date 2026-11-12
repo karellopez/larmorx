@@ -45,7 +45,7 @@
 
 use std::io::Write;
 
-use larmorx_core::defects::{FS_25, FS_26, FS_27, FS_28, FS_31};
+use larmorx_core::defects::{FS_25, FS_26, FS_27, FS_28, FS_31, FS_33};
 use larmorx_core::math::Libm;
 
 use crate::cstd;
@@ -55,6 +55,7 @@ use crate::matrix::{
     self, MATRIX_COMPLEX, MATRIX_REAL, Matrix, celt_read, matrix_alloc, read_relt, rptr, write_at,
     write_relt,
 };
+use crate::numerics;
 use crate::ret::Ret;
 use crate::sse;
 
@@ -1654,6 +1655,224 @@ pub fn gaussian_matrix2(
     };
     matrix_scalar_mul_in_place(g, out, err, &mut g2, sse::sub(1.0, w1))?;
     matrix_add(g, out, err, &g1, &g2, gm)
+}
+
+/// `MatrixDeterminant(mIn)`: [`numerics::open_matrix_determinant`] (0 for a matrix that is not
+/// square). FS-25, FS-33.
+pub fn matrix_determinant(g: &mut Globals, err: &mut dyn Write, m: &Matrix) -> f32 {
+    if real_only(g, err, "MatrixDeterminant", &[m]) {
+        return 0.0;
+    }
+    numerics::open_matrix_determinant(g, m)
+}
+
+/// `MatrixQRdecomposition(iMatrix, oQ, oR)`: [`numerics::open_qr_decomposition`] (0, or 1 after
+/// its line on standard output). FS-25.
+pub fn matrix_qr_decomposition(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    i_matrix: Option<&Matrix>,
+    o_q: Option<&mut Matrix>,
+    o_r: Option<&mut Matrix>,
+) -> i32 {
+    let mut all: Vec<&Matrix> = Vec::new();
+    all.extend(i_matrix);
+    all.extend(o_q.as_deref());
+    all.extend(o_r.as_deref());
+    if real_only(g, err, "MatrixQRdecomposition", &all) {
+        return 1;
+    }
+    numerics::open_qr_decomposition(out, i_matrix, o_q, o_r)
+}
+
+/// `MatrixInverse(mIn, mOut)`: the inverse of the square `mIn` into `mOut` (a new matrix of its
+/// size and type when there is none). `mIn` absent ends the program (`MatrixInverse: NULL input
+/// matrix!`, code -4); a matrix that is not square gives `MatrixInverse: matrix (r x c) is not
+/// square` and `Null`. A real matrix: [`numerics::open_lu_matrix_inverse`] of a copy; its error
+/// gives `Null`. A complex `A + iC`: the inverse of the real `2n` x `2n` matrix `[A -C; C A]`
+/// (built with the region copies, FS-26 and FS-27 not reached), whose left blocks are the real and
+/// imaginary parts. Then `Null` when an element of the result is not finite (a given `mOut` keeps
+/// what was written). FS-28 (a given `mOut` of another size or type), FS-33.
+pub fn matrix_inverse(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    m_in: Option<&Matrix>,
+    m_out: Option<&mut Matrix>,
+) -> Result<Ret<Matrix>, Fatal> {
+    let Some(m_in) = m_in else {
+        log::error_exit(g, err, ERROR_BADPARM, "MatrixInverse: NULL input matrix!\n")?;
+        return Ok(Ret::Null);
+    };
+    if m_in.rows != m_in.cols {
+        log::error_printf(
+            g,
+            err,
+            ERROR_BADPARM,
+            &format!(
+                "MatrixInverse: matrix ({} x {}) is not square\n",
+                m_in.rows, m_in.cols
+            ),
+        );
+        return Ok(Ret::Null);
+    }
+    let (rows, cols) = (m_in.rows, m_in.cols);
+    let given = m_out.is_some();
+    let mut fresh = None;
+    let Some(m) = output(g, out, err, m_out, &mut fresh, rows, cols, m_in.mtype)? else {
+        return Ok(Ret::Null);
+    };
+    if given
+        && (m.rows != rows || m.cols != cols || m.mtype != m_in.mtype)
+        && unfit(
+            g,
+            err,
+            "MatrixInverse",
+            &format!(
+                "a {} x {} output of type {} for the inverse of a {rows} x {cols} matrix of type {}",
+                m.rows, m.cols, m.mtype, m_in.mtype
+            ),
+        )
+    {
+        return Ok(Ret::Null);
+    }
+    if m_in.mtype == MATRIX_COMPLEX {
+        let (r, c) = (rows, cols);
+        let mut tmp = Matrix::real(2 * r, 2 * c);
+        matrix_copy_region(
+            g,
+            out,
+            err,
+            Region::Real,
+            m_in,
+            Some(&mut tmp),
+            1,
+            1,
+            r,
+            c,
+            1,
+            1,
+        )?;
+        matrix_copy_region(
+            g,
+            out,
+            err,
+            Region::Real,
+            m_in,
+            Some(&mut tmp),
+            1,
+            1,
+            r,
+            c,
+            r + 1,
+            c + 1,
+        )?;
+        let mut quad = Matrix::real(r, c);
+        matrix_copy_region(
+            g,
+            out,
+            err,
+            Region::Imag,
+            m_in,
+            Some(&mut quad),
+            1,
+            1,
+            r,
+            c,
+            1,
+            1,
+        )?;
+        matrix_scalar_mul_in_place(g, out, err, &mut quad, -1.0)?;
+        matrix_copy_region(
+            g,
+            out,
+            err,
+            Region::All,
+            &quad,
+            Some(&mut tmp),
+            1,
+            1,
+            r,
+            c,
+            1,
+            c + 1,
+        )?;
+        matrix_copy_region(
+            g,
+            out,
+            err,
+            Region::Imag,
+            m_in,
+            Some(&mut tmp),
+            1,
+            1,
+            r,
+            c,
+            c + 1,
+            1,
+        )?;
+        let mut re = Matrix::real(r, c);
+        let mut im = Matrix::real(r, c);
+        let Some(inv) = matrix_inverse(g, out, err, Some(&tmp), None)?.into_new() else {
+            // FreeSurfer copies from the NULL inverse and crashes (never reproduced)
+            g.notices.add(
+                &FS_33,
+                "MatrixInverse of a singular complex matrix: NULL (FreeSurfer crashes)",
+            );
+            return Ok(Ret::Null);
+        };
+        matrix_copy_region(
+            g,
+            out,
+            err,
+            Region::All,
+            &inv,
+            Some(&mut re),
+            1,
+            1,
+            r,
+            c,
+            1,
+            1,
+        )?;
+        matrix_copy_region(
+            g,
+            out,
+            err,
+            Region::All,
+            &inv,
+            Some(&mut im),
+            r + 1,
+            1,
+            r,
+            c,
+            1,
+            1,
+        )?;
+        matrix_real_to_complex(g, out, err, &re, &im, Some(&mut *m))?;
+    } else {
+        let tmp = m_in.clone();
+        if numerics::open_lu_matrix_inverse(g, err, &tmp, m) < 0 {
+            return Ok(Ret::Null);
+        }
+    }
+    for j in 1..=rows {
+        for i in 1..=rows {
+            let finite = match m.mtype {
+                MATRIX_REAL => read_relt(g, m, i, j).is_finite(),
+                MATRIX_COMPLEX => {
+                    let (re, im) = celt(g, m, i, j);
+                    re.is_finite() && im.is_finite()
+                }
+                _ => true,
+            };
+            if !finite {
+                return Ok(Ret::Null);
+            }
+        }
+    }
+    Ok(done(fresh))
 }
 
 #[cfg(test)]

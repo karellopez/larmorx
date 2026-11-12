@@ -665,6 +665,23 @@ void run_case(const char *tmpfile)
     srand48(seed);
     for (int i = 0; i < k; i++) putd(PDFgaussian());
   }
+  else if (cmd == "minv") {
+    MATRIX *a = getmt();
+    putm_n(MatrixInverse(a, NULL));
+    MATRIX *o = MatrixAlloc(a->rows, a->cols, a->type);
+    MATRIX *r = MatrixInverse(a, o);
+    line_out += r ? "OK " : "NULL ";
+    putm_raw(o);
+    putf(MatrixDeterminant(a));
+  }
+  else if (cmd == "mqr") {
+    MATRIX *a = getm(MATRIX_REAL);
+    MATRIX *q = MatrixAlloc(a->rows, a->rows, MATRIX_REAL);
+    MATRIX *r = MatrixAlloc(a->rows, a->cols, MATRIX_REAL);
+    puti(MatrixQRdecomposition(a, q, r));
+    putm_raw(q);
+    putm_raw(r);
+  }
   else
     fail("unknown case");
 }

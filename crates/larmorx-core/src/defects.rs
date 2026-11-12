@@ -1055,6 +1055,8 @@ defects! {
         "PDFgaussian divides zero by zero when both of its uniform draws give exactly 0 (drand48 returned 0.5 twice): it returns NaN";
     FS_32 = "FS-32", "FreeSurfer", true,
         "GetClosestPrimeFactor and GetClosestPrimeFactorLess of 1, which has no prime factor, read the first element of the empty factor list (0 from glibc's calloc): mri_surf2surf and mri_vol2surf reshape a one-vertex surface by a factor of 0";
+    FS_33 = "FS-33", "FreeSurfer", true,
+        "MatrixInverse and MatrixDeterminant of a 0 x 0 matrix read memory VNL never allocated (the inverse goes through the 4 x 4 closed form and copies 16 floats past its output; the determinant reads the empty QR factor's first element), and MatrixInverse of a singular complex matrix crashes (it copies from the NULL inverse of its real form)";
     FS_31 = "FS-31", "FreeSurfer", true,
         "FreeSurfer's vector functions do not check their vectors' lengths (VectorCrossProduct's and VectorTripleProduct's test lets column vectors of one or two elements through and never tests the other vectors; VectorDot and VectorDistance read the second vector to the first's length): elements read outside the vectors";
 }

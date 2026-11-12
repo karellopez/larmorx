@@ -45,6 +45,7 @@ pub mod log;
 pub mod machine;
 pub mod matrix;
 pub mod matrix_ops;
+pub mod numerics;
 pub mod pdf;
 pub mod prime;
 pub mod random;

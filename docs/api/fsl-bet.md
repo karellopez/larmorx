@@ -5,6 +5,12 @@
 6.0.7.17's until 2026-10-29: what changed, `bet2 --binaryMask` among it, in
 [findings/fsl-bet.md](../findings/fsl-bet.md), "FSL 6.0.7.23").
 
+One section per program follows (`bet`, `bet2`, `betsurf`); each is the source of the program's
+reference page on the documentation site (`python -m larmorx_validation reference`), with its
+options table checked against the code. What the three share comes after them.
+
+## Ports
+
 **Two implementations.** FSL is distributed under the FSL Licence (non-commercial use only), so
 larmorx keeps its FSL tools in two implementations ([licensing](../licensing.md)): the bit-exact
 **replica**, `larmorx-nc fsl bet|bet2|betsurf` (package `larmorx-nc`, `crates-nc/`, under the FSL
@@ -33,29 +39,45 @@ conversion (standard_space_roi, below). The records include random testing's per
 random testing: [docs/validation/difftest.md](../validation/difftest.md)), and the replica needs no
 more memory than FSL in any measured call (`tests/parity/test_memory_peak.py`).
 
-## Quick start
+**Status: `experimental`** ([record](../validation/fsl-bet.md), standard tier against FSL
+6.0.7.23, re-made 2026-11-05 in the clean-room catch-up: **198 of the 200 compared cases within the
+thresholds**, the other two missing one (below); of its 252 cases 46 more are rejected by both
+alike, 6 are where `reproduce` fills what FSL leaves undefined, none pending; the 164 cases kept
+from part 2b's record (2026-10-31, 168 cases) unchanged in status and details, the 88 new ones
+`standard_space_roi`'s and `fslroi`'s 57 (45 within the thresholds, every one FSL's bit for bit, 12
+rejected by both: [fsl-roi.md](fsl-roi.md)) and the options' 31: `-S` and `-B` FSL's bit for bit on
+every case (every output and every `-d` file; an adult, a tumour, an 82-year-old with the neck,
+`-S -n`, a NaN head, a pair output) but a 3.5-year-old's `-B`, `-A` and `-A2` with bet2's outputs and
+FLIRT's matrices FSL's and betsurf's masks within its thresholds, `-F` and `-Z` of int8 heads FSL's;
+part 2b's numbers follow): exit statuses and messages FSL's byte
+for byte; 217 of 217
+brains, masks and outlines of `bet2` and `bet` bit-identical to FSL's (part 2a's record
+counted 12 reported Dice values with phantoms' known brains among them, as "within the
+thresholds"), 13 of 13 skull images bit-identical, the meshes FSL's to the file's 6 decimals, the
+surfaces that rerun after a self-intersecting first pass (a 75-year-old's T1w, 7 T, a tumour)
+bit for bit, fMRIPrep's 29 BET calls on its oracle runs all bit-identical (and with fMRIPrep's
+own outputs' values); headers FSL's byte for byte but for `descrip` (`larmorx fsl bet2`), the
+qform's quaternion included. The 142 cases of part 2a's record are unchanged; the 26 new ones
+are betsurf's (its options, messages and failure cases, FSL-48, -52, -53, -54 among them, and
+five real heads with bet2's meshes and FLIRT's matrices made by FSL).
 
-```python
-import larmorx as lx
+## `bet`
 
-# As fMRIPrep calls BET on its BOLD reference.
-r = lx.fsl.bet("boldref.nii.gz", frac=0.2, mask=True)
-r.brain, r.mask
-r.mask.implementation   # Implementation(kind='replica', package='larmorx-nc', ...)
+<!-- reference
+program: bet
+group: fsl
+original: FSL 6.0.7.23
+python: larmorx.fsl.bet
+command-line: crates/larmorx-fsl/src/cli/bet.rs
+records: {replica: [fsl-bet-replica, fsl-bet-replica-full], clean-room: [fsl-bet]}
+evidence: fsl-bet
+-->
 
-# The skull and scalp: bet2's mesh, then betsurf with the T1's registration to MNI152
-b = lx.fsl.bet("T1w.nii.gz", mesh=True)
-s = lx.fsl.betsurf("T1w.nii.gz", b.mesh, "T1w_to_MNI152.mat", skull_mask=True)
-s.inskull_mask, s.outskull_mask, s.outskin_mask, s.skull_mask
-```
+FSL's `bet` script: `bet2` itself, or one of its variations (below).
 
-```bash
-larmorx fsl bet boldref.nii.gz boldref_brain.nii.gz -f 0.20 -m
-larmorx fsl bet2 T1w.nii.gz T1w_brain -e
-larmorx fsl betsurf --t1only -o -m -s T1w.nii.gz T1w_brain_mesh.vtk T1w_to_MNI152.mat T1w
-```
+### Python (`bet`)
 
-## `lx.fsl.bet(image, *, frac=0.5, gradient=0.0, radius=None, centre=None, smoothness=1.0, threshold=False, head_ct=False, variation=None, t2=None, brain=True, mask=False, outline=False, skull=False, mesh=False, tanh="glibc", fsl_data=None, n_threads=1, implementation="auto", upstream_defects="fix")`
+`lx.fsl.bet(image, *, frac=0.5, gradient=0.0, radius=None, centre=None, smoothness=1.0, threshold=False, head_ct=False, variation=None, t2=None, brain=True, mask=False, outline=False, skull=False, mesh=False, tanh="glibc", fsl_data=None, n_threads=1, implementation="auto", upstream_defects="fix")`
 
 Returns a `BetResult`: `brain` (float32: the input times the mask; 4D with `"fmri"`), `mask`
 (int16, 1 inside), `outline` (float32), `skull` (int16) and `mesh` (a `Surface`: `vertices`
@@ -81,7 +103,78 @@ settings are the call's: the outputs are written as NIfTI-1 and read back, `FSLO
 `FSL_LOAD_NIFTI_EXTENSIONS` and every other `FSL*` variable of the process are never passed, and no
 FSL program is looked for on the `PATH` (CLAUDE.md rule 6).
 
-### Option mapping (`bet2`, and `bet` without a variation)
+### Options of `bet`
+
+| FSL option | Python | Notes |
+|---|---|---|
+| `<input> <output>` | `image`; the result | outputs `<output>`, `_mask`, `_overlay`, `_skull`, `_mesh.vtk` |
+| `-f <f>` | `frac` | 0 to 1; smaller gives a larger brain |
+| `-g <g>` | `gradient` | -1 to 1; positive gives a larger brain at the bottom |
+| `-r <r>` | `radius` | mm; the initial sphere is half of it |
+| `-c <x y z>` | `centre` | voxels of the file as stored; `0 0 0` is "not given" (the centre of gravity), as in FSL (observed) |
+| `-t` | `threshold=True` | also thresholds the brain and mask |
+| `-m` | `mask=True` | |
+| `-o` | `outline=True` | |
+| `-s` | `skull=True` | |
+| `-n` | `brain=False` | |
+| `-e` | `mesh=True` | VTK; also switches the self-intersection test to the exact one |
+| `-v` | (command line only) | |
+| `-h` | (command line only) | |
+| `--tanh=correctly-rounded` (larmorx's own; also `--tanh correctly-rounded`, and passed on by `bet`) | `tanh="correctly-rounded"` | the surface's smoothness weight with the correctly rounded `tanh` (CORE-MATH's, `larmorx_core::math::tanh`) instead of glibc 2.35's bits, which FSL calls (`glibc`, the default). **GLIBC-06, the user's decision of 2026-10-31**: glibc's bits by default, the correctly rounded one on request (no notice: it is asked for). Where a surface self-intersects and is found again, the last bit can change the result (4 of the standard tier's 13 real images: findings). The clean-room original only (`implementation="replica"` refuses it; `"auto"` runs the original) |
+| (`bet2`'s `-w`) | `smoothness` | bet2 only (`bet` does not pass it) |
+| (`bet2`'s `--ct`) | `head_ct=True` | bet2 only: the input in Hounsfield units |
+| `LARMORX_FSL_DATA` | `fsl_data` | where `-S`, `-B`, `-A` and `-A2` read FSL's standard images ([`bet`'s Python call](#python-bet)) |
+| `FSLOUTPUTTYPE` | (always NIfTI-1 in Python) | on the command line read from the environment, as FSL does (unset: `NIFTI_GZ`, FSL-11) |
+
+| `bet` option | Python `variation` | What it does |
+|---|---|---|
+| (none) | `None` | bet2 |
+| `-R` | `"robust"` | bet2 again from the brain's centre until it moves less than a voxel (at most 11 runs); `-n` ignored |
+| `-Z` | `"small_fov"` | pads the image to 100 mm in z with copies of its end slices, crops back (FSL-45) |
+| `-F` | `"fmri"` | the first volume's mask (`-f 0.3`, then the user's `-f`), dilated, applied to every volume |
+| `-S` | `"eyes"` | SIENA's eye and optic nerve cleanup: `bet2 -s`; `standard_space_roi -b -d` and `bet2 -n -m -f 0.4` on its result; MNI152's eye mask taken into the input (FLIRT `-applyxfm` through standard_space_roi's inverse matrix), dilated (`-dilF`, 7 more in 2D) and removed from the brain mask, the premask's brain added; what is brighter than 3.5 standard deviations above the brain's mean (`fslstats -M`, `-S`, GNU `dc`: FSL-216) removed with a little morphology; the mask (`_mask`) and the skull without the eyes (`_skull`) always written; no outline or mesh (`-o`, `-e` only in its temporary run); with `-n` it fails (`brain=False` refused) |
+| `-B` | `"bias"` | SIENA's bias field and neck cleanup: `standard_space_roi -b -d`, FAST's bias field (`fast -b`, its messages discarded), the input divided by it; with `-s` the skull from `standard_space_roi -maskFOV -roiNONE -d` and `bet2`, moved by fslpy's `immv` (and `-s` removed from the options through `echo`: FSL-63); `standard_space_roi -b -d` again and `bet -m -R -d` on its result (the brain and mask always written: `-R` removes `-n`) |
+| `-A` | `"surfaces"` | FLIRT to `MNI152_T1_2mm` (the matrix), `bet2 -e`, `betsurf --t1only -o -m -s`: the brain, its mesh, the three surfaces, their masks and outlines, the skull's mask |
+| `-A2 <T2>` | `"surfaces_t2"`, `t2` | the T2 registered to the input by FLIRT (`-interp sinc`), then as `-A` with `betsurf -o -m -s` on the registered T2 |
+| (the last of `-R`, `-S`, `-Z`, `-F`, `-A`, `-A2`, `-B` given) | | the variation run |
+| `-d` | (command line only) | keeps the temporary files |
+
+### Examples of `bet`
+
+<!-- inputs: boldref.nii.gz=head -->
+
+```python example
+import larmorx as lx
+
+# As fMRIPrep calls BET on its BOLD reference.
+r = lx.fsl.bet("boldref.nii.gz", frac=0.2, mask=True)
+r.brain, r.mask
+r.mask.implementation   # Implementation(kind='replica', package='larmorx-nc', ...)
+```
+
+```bash example
+larmorx fsl bet boldref.nii.gz boldref_brain.nii.gz -f 0.20 -m
+```
+
+## `bet2`
+
+<!-- reference
+program: bet2
+group: fsl
+original: FSL 6.0.7.23
+python: larmorx.fsl.bet
+command-line: crates/larmorx-fsl/src/cli/bet2.rs
+records: {replica: [fsl-bet-replica, fsl-bet-replica-full], clean-room: [fsl-bet]}
+evidence: fsl-bet
+-->
+
+FSL's brain extraction itself, which the `bet` script runs.
+
+### Python (`bet2`)
+
+`lx.fsl.bet` without `variation` runs `bet2` (the function's description: [`bet`](#bet)).
+
+### Options of `bet2`
 
 | FSL option | Python | Notes |
 |---|---|---|
@@ -99,26 +192,43 @@ FSL program is looked for on the `PATH` (CLAUDE.md rule 6).
 | `-n`, `--nooutput` | `brain=False` | |
 | `-e`, `--mesh` | `mesh=True` | VTK; also switches the self-intersection test to the exact one |
 | `-v`, `--verbose` | (command line only) | |
+| `--binaryMask <image>` | (command line only) | |
+| `-h`, `--help` | (command line only) | |
 | `--parameter_d1=`, `--parameter_d2=` | (command line only) | hidden search depths (7 and 3) |
 | `--tanh=correctly-rounded` (larmorx's own; also `--tanh correctly-rounded`, and passed on by `bet`) | `tanh="correctly-rounded"` | the surface's smoothness weight with the correctly rounded `tanh` (CORE-MATH's, `larmorx_core::math::tanh`) instead of glibc 2.35's bits, which FSL calls (`glibc`, the default). **GLIBC-06, the user's decision of 2026-10-31**: glibc's bits by default, the correctly rounded one on request (no notice: it is asked for). Where a surface self-intersects and is found again, the last bit can change the result (4 of the standard tier's 13 real images: findings). The clean-room original only (`implementation="replica"` refuses it; `"auto"` runs the original) |
 | `FSLOUTPUTTYPE` | (always NIfTI-1 in Python) | on the command line read from the environment, as FSL does (unset: `NIFTI_GZ`, FSL-11) |
+| (`bet`'s variations) | `variation`, `t2`, `fsl_data` | `bet` only ([its options](#options-of-bet)) |
 
-### `bet`'s variations
+### Examples of `bet2`
 
-| `bet` option | Python `variation` | What it does |
-|---|---|---|
-| (none) | `None` | bet2 |
-| `-R` | `"robust"` | bet2 again from the brain's centre until it moves less than a voxel (at most 11 runs); `-n` ignored |
-| `-Z` | `"small_fov"` | pads the image to 100 mm in z with copies of its end slices, crops back (FSL-45) |
-| `-F` | `"fmri"` | the first volume's mask (`-f 0.3`, then the user's `-f`), dilated, applied to every volume |
-| `-S` | `"eyes"` | SIENA's eye and optic nerve cleanup: `bet2 -s`; `standard_space_roi -b -d` and `bet2 -n -m -f 0.4` on its result; MNI152's eye mask taken into the input (FLIRT `-applyxfm` through standard_space_roi's inverse matrix), dilated (`-dilF`, 7 more in 2D) and removed from the brain mask, the premask's brain added; what is brighter than 3.5 standard deviations above the brain's mean (`fslstats -M`, `-S`, GNU `dc`: FSL-216) removed with a little morphology; the mask (`_mask`) and the skull without the eyes (`_skull`) always written; no outline or mesh (`-o`, `-e` only in its temporary run); with `-n` it fails (`brain=False` refused) |
-| `-B` | `"bias"` | SIENA's bias field and neck cleanup: `standard_space_roi -b -d`, FAST's bias field (`fast -b`, its messages discarded), the input divided by it; with `-s` the skull from `standard_space_roi -maskFOV -roiNONE -d` and `bet2`, moved by fslpy's `immv` (and `-s` removed from the options through `echo`: FSL-63); `standard_space_roi -b -d` again and `bet -m -R -d` on its result (the brain and mask always written: `-R` removes `-n`) |
-| `-A` | `"surfaces"` | FLIRT to `MNI152_T1_2mm` (the matrix), `bet2 -e`, `betsurf --t1only -o -m -s`: the brain, its mesh, the three surfaces, their masks and outlines, the skull's mask |
-| `-A2 <T2>` | `"surfaces_t2"`, `t2` | the T2 registered to the input by FLIRT (`-interp sinc`), then as `-A` with `betsurf -o -m -s` on the registered T2 |
-| (the last of `-R`, `-S`, `-Z`, `-F`, `-A`, `-A2`, `-B` given) | | the variation run |
-| `-d` | (command line only) | keeps the temporary files |
+<!-- inputs: T1w.nii.gz=head -->
 
-## `lx.fsl.betsurf(t1, brain_surface, t1_to_standard, *, t2=None, masks=True, skull_mask=False, outlines=False, precision=0, n_threads=1, implementation="auto", upstream_defects="fix")`
+```python example
+import larmorx as lx
+
+b = lx.fsl.bet("T1w.nii.gz", mesh=True)
+b.brain, b.mesh
+```
+
+```bash example
+larmorx fsl bet2 T1w.nii.gz T1w_brain -e
+```
+
+## `betsurf`
+
+<!-- reference
+program: betsurf
+group: fsl
+original: FSL 6.0.7.23
+python: larmorx.fsl.betsurf
+command-line: crates/larmorx-fsl/src/cli/betsurf.rs
+records: {replica: [fsl-bet-replica, fsl-bet-replica-full], clean-room: [fsl-bet]}
+evidence: fsl-bet#betsurf
+-->
+
+### Python (`betsurf`)
+
+`lx.fsl.betsurf(t1, brain_surface, t1_to_standard, *, t2=None, masks=True, skull_mask=False, outlines=False, precision=0, n_threads=1, implementation="auto", upstream_defects="fix")`
 
 Returns a `BetsurfResult`: the `inskull`, `outskull` and `outskin` surfaces, their masks
 (`masks=True`, `-m`), the skull's mask (`skull_mask=True`, `-s`) and the surfaces drawn as images
@@ -127,7 +237,7 @@ or a VTK file; `t1_to_standard` FLIRT's 4 x 4 matrix to MNI152 (a path or an arr
 which profiles cross the eyes); without `t2` the surfaces come from the T1 alone (`--t1only`).
 `precision` is `-p`. `lx.fsl.read_vtk(path)` reads a VTK mesh as FSL writes it.
 
-### Option mapping (`betsurf`)
+### Options of `betsurf`
 
 | FSL option | Python | Notes |
 |---|---|---|
@@ -141,6 +251,24 @@ which profiles cross the eyes); without `t2` the surfaces come from the T1 alone
 | `-h`, `--help` | (command line only) | the usage, exit 0 |
 | the mesh name `manual_input` | (command line only) | the name read from standard input (larmorx refuses at its end, where FSL waits forever); the name `c` cancels (an empty mesh: refused, FSL-52) |
 | `FSLOUTPUTTYPE` | (always NIfTI-1 in Python) | read when the first image is written, as FSL does (unset: `NIFTI_GZ`, FSL-11) |
+
+### Examples of `betsurf`
+
+<!-- inputs: T1w.nii.gz=head T1w_to_MNI152.mat=matrix -->
+
+```python example
+import larmorx as lx
+
+# The skull and scalp: bet2's mesh, then betsurf with the T1's registration to MNI152
+b = lx.fsl.bet("T1w.nii.gz", mesh=True)
+s = lx.fsl.betsurf("T1w.nii.gz", b.mesh, "T1w_to_MNI152.mat", skull_mask=True)
+s.inskull_mask, s.outskull_mask, s.outskin_mask, s.skull_mask
+```
+
+```bash example
+larmorx fsl bet2 T1w.nii.gz T1w_brain -e
+larmorx fsl betsurf --t1only -o -m -s T1w.nii.gz T1w_brain_mesh.vtk T1w_to_MNI152.mat T1w
+```
 
 ## Upstream defects (D13)
 
@@ -311,28 +439,6 @@ temporary images uint8 with the same bytes in `reproduce`). Since 2026-10-31: **
 `-p`'s retessellation, the VTK, OFF and FreeSurfer meshes, `manual_input`, every message; the
 D13 switches of FSL-43, -47, -48, -50 to -55 and -58, FSL-49 and FSL-57 kept as FSL's), so
 `implementation="auto"` without `larmorx-nc` runs the original for every BET program.
-
-**Status: `experimental`** ([record](../validation/fsl-bet.md), standard tier against FSL
-6.0.7.23, re-made 2026-11-05 in the clean-room catch-up: **198 of the 200 compared cases within the
-thresholds**, the other two missing one (below); of its 252 cases 46 more are rejected by both
-alike, 6 are where `reproduce` fills what FSL leaves undefined, none pending; the 164 cases kept
-from part 2b's record (2026-10-31, 168 cases) unchanged in status and details, the 88 new ones
-`standard_space_roi`'s and `fslroi`'s 57 (45 within the thresholds, every one FSL's bit for bit, 12
-rejected by both: [fsl-roi.md](fsl-roi.md)) and the options' 31: `-S` and `-B` FSL's bit for bit on
-every case (every output and every `-d` file; an adult, a tumour, an 82-year-old with the neck,
-`-S -n`, a NaN head, a pair output) but a 3.5-year-old's `-B`, `-A` and `-A2` with bet2's outputs and
-FLIRT's matrices FSL's and betsurf's masks within its thresholds, `-F` and `-Z` of int8 heads FSL's;
-part 2b's numbers follow): exit statuses and messages FSL's byte
-for byte; 217 of 217
-brains, masks and outlines of `bet2` and `bet` bit-identical to FSL's (part 2a's record
-counted 12 reported Dice values with phantoms' known brains among them, as "within the
-thresholds"), 13 of 13 skull images bit-identical, the meshes FSL's to the file's 6 decimals, the
-surfaces that rerun after a self-intersecting first pass (a 75-year-old's T1w, 7 T, a tumour)
-bit for bit, fMRIPrep's 29 BET calls on its oracle runs all bit-identical (and with fMRIPrep's
-own outputs' values); headers FSL's byte for byte but for `descrip` (`larmorx fsl bet2`), the
-qform's quaternion included. The 142 cases of part 2a's record are unchanged; the 26 new ones
-are betsurf's (its options, messages and failure cases, FSL-48, -52, -53, -54 among them, and
-five real heads with bet2's meshes and FLIRT's matrices made by FSL).
 
 **betsurf, what agrees and what does not.** The profiles' decisions (§6.4) are FSL's: on 330 of
 330 single profiles probed one at a time (a tiny triangle that casts exactly one profile; FSL's

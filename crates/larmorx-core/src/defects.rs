@@ -1059,6 +1059,18 @@ defects! {
         "MatrixInverse and MatrixDeterminant of a 0 x 0 matrix read memory VNL never allocated (the inverse goes through the 4 x 4 closed form and copies 16 floats past its output; the determinant reads the empty QR factor's first element), and MatrixInverse of a singular complex matrix crashes (it copies from the NULL inverse of its real form)";
     FS_31 = "FS-31", "FreeSurfer", true,
         "FreeSurfer's vector functions do not check their vectors' lengths (VectorCrossProduct's and VectorTripleProduct's test lets column vectors of one or two elements through and never tests the other vectors; VectorDot and VectorDistance read the second vector to the first's length): elements read outside the vectors";
+    FS_34 = "FS-34", "FreeSurfer", true,
+        "OpenPowell and OpenPowell2 accept no initial directions (a NULL matrix) but then write the final directions through it: a crash";
+    FS_35 = "FS-35", "FreeSurfer", false,
+        "fs_powell returns FAILED_USER_REQUEST where VNL's Powell, which it copies, returns FAILED_TOO_MANY_ITERATIONS (its iteration limit), so OpenPowell's exit and OpenPowell2's message and return value 1 for too many iterations never happen (kept: FreeSurfer's change keeps programs from exiting at the limit)";
+    FS_36 = "FS-36", "FreeSurfer", false,
+        "OpenPowell's tolerance argument sets VNL's x tolerance, which Powell's method never reads: every call stops at VNL's default relative tolerance on the cost, 1e-10 (kept: the programs' results depend on it)";
+    FS_37 = "FS-37", "FreeSurfer", true,
+        "fs_lbfgs records its best point only from the second evaluation on and reports the last value evaluated: without an improvement on the starting point a successful run empties the parameters (OpenDFPMin then crashes) and a failed one leaves them at the line search's last trial point with the previous run's end value; otherwise the end value can be a worse point's";
+    FS_38 = "FS-38", "FreeSurfer", false,
+        "OpenDFPMin repeats the minimization while the cost improved by more than the tolerance relative to the caller's first value, never to the previous pass's, so it repeats until a pass fails (to be measured on mri_em_register before deciding: rule D)";
+    FS_39 = "FS-39", "FreeSurfer", true,
+        "OpenDFPMin returns FAILED_USER_REQUEST without writing the parameters, the iteration count or the final value when an L-BFGS pass reaches its evaluation limit: the progress made is dropped and the caller reads its own unset count";
 }
 
 /// The register entry with ID `id`.

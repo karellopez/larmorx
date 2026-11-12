@@ -38,6 +38,7 @@ pub mod ctime;
 pub mod diag;
 pub mod dmatrix;
 pub mod fio;
+pub mod fs_vnl;
 pub mod fsenv;
 pub mod globals;
 pub mod histo;

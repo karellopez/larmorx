@@ -18,7 +18,7 @@ from html.parser import HTMLParser
 
 PAT = re.compile(
     r"\boracle\b|\bparity\b|\(port\)|default mode|reproduce mode|clean-room original|\bFSL\b"
-    r"|the replica \(the|\blarmorx\b|\bD13\b|golden test|\btool\b|implementation",
+    r"|the replica \(the|(?-i:\blarmorx\b)|\bD13\b|golden test|\btool\b|implementation",
     re.I,
 )
 

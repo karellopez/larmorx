@@ -27,6 +27,8 @@ DOCUMENTS = sorted(
         "crates-gpl/PYPI.md",
         "crates-nc/README.md",
         "crates-gpl/README.md",
+        "crates-freesurfer/PYPI.md",
+        "crates-freesurfer/README.md",
         "docs/overview.md",
         "docs/licensing.md",
         *(p.relative_to(ROOT).as_posix() for p in (ROOT / "docs" / "api").glob("*.md")),

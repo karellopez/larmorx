@@ -33,7 +33,7 @@ than two echoes are good, and the evidence's comparisons and windows were not Na
 `evidence/core.py` and `evidence/example.py`, the viewer's `evidence.js` leaves a NaN voxel
 undrawn). The inventory (`../afni-volreg-original/site_inventory.py`, per page): the t2smap page
 numbers 617 -> 856, examples 3 -> 4, panels 12 -> 16, differences 9 -> 11, charts 9 -> 15, tables
-11 -> 18, table rows 245 -> 463, case rows 69 -> 227, images 18 -> 24, words 14,473 -> 26,816; the
+11 -> 18, table rows 245 -> 463, case rows 69 -> 227, images 18 -> 24, words 14,473 -> 26,876; the
 31 other pages' HTML byte-identical; `../cleanroom-bet/site_inventory.py compare`: after >= before
 (every panel, comparison, case and speed row kept). Of the JSON's 5,408 values before, 344 are
 not found after, every one re-measured, not lost: 32 provenance; 223 of ds000258's example

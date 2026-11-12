@@ -10,9 +10,11 @@ DVARS, CompCor, TSNR, NonSteadyStateDetector and FramewiseDisplacement with its 
 the plots; fMRIPrep's own table steps (`FramewiseDisplacement`, `FilterDropped`,
 `RenameACompCor`, `GatherConfounds`) on pandas' reading and writing of tables, without pandas;
 fMRIPrep's motion parameters and root mean square deviation (`FSLMotionParams`, `FSLRMSDeviation`);
-and fMRIPrep's masks (`_binary_union`, `acompcor_masks` with `mask2vf`, `aCompCorMasks`,
+fMRIPrep's masks (`_binary_union`, `acompcor_masks` with `mask2vf`, `aCompCorMasks`,
 `_get_zooms`), with niworkflows' morphology and signals beside them
-(`docs/api/niworkflows-helpers.md`: `BinaryDilation`, `BinarySubtraction`, `SignalExtraction`).
+(`docs/api/niworkflows-helpers.md`: `BinaryDilation`, `BinarySubtraction`, `SignalExtraction`);
+and the workflow that composes them, fMRIPrep's `init_bold_confs_wf` with its `ds_confounds`
+(`larmorx.pipelines.larmorprepx.confounds.bold_confounds`, the last section).
 
 **Status: `experimental`** (checked bit for bit against nipype, nitime, SciPy and numpy in the
 three environments, against fMRIPrep's own DVARS and CompCor files and on the oracle runs' raw
@@ -549,3 +551,32 @@ Kept as fMRIPrep does it (documented, no switch):
   CSF mask 243,706 voxels without FreeSurfer, 33,031 with; its WM 156,468 and 182,036). Whether
   correcting it helps is measured on fMRIPrep runs with FreeSurfer (none of the oracle runs has it);
   until then larmorx keeps fMRIPrep's wiring in both modes.
+
+**Validation** (`validation/investigations/confounds/check_workflow.py`, in numpy 2.5.4 / pandas
+3.0.6 and numpy 2.3.5 / pandas 3.0.6 with nipype 1.12.0 and fMRIPrep 25.2.7's tag): **`graph`**,
+fMRIPrep's `init_bold_confs_wf` built by nipype for eight option sets (`--return-all-components`,
+FreeSurfer, a `RepetitionTime` or the header's, other spike thresholds) against larmorx's run of the
+same options on a synthetic BOLD run with every step recorded: every node fMRIPrep runs called (a
+MapNode's items in order), every parameter fMRIPrep sets (208 node parameter sets) and every other
+parameter both name equal, every connection (source node and output, destination node and input,
+the inputnode's fields and `_get_zooms` included) the same, the workflow's outputs, the reportlets'
+inputs (`_last`, `_select_cols`, `merge_compcor_metadata`'s two inputs), PIPE-41 under both modes
+and the description identical. **`real`, the 36 confounds workflows of the 21 oracle runs** (fMRIPrep
+25.2.6 in its image), each run end to end from its own inputs with fMRIPrep 25.2.6's libraries
+(`fmriprep_version="25.2.6"`, `niworkflows_version="1.15.2"`, `numpy_version="2.2.6"`,
+`scipy_version="1.15.2"`, `pandas_version="2.2.3"`) and `reproduce`: **all 36
+`desc-confounds_timeseries.tsv` identical to fMRIPrep's column by column** (by name: the columns'
+order is niworkflows' set order, PIPE-43; 25 directly, 11 once the motion parameters' cells that
+glibc's `atan2` rounds otherwise are taken from the run, D4: 15 of 22,293 rotation cells in 12
+files, reaching FD, the expansion and the spikes) and **all 36 JSON files byte for byte**; every node
+file of the workflow byte for byte (decompressed) with the node folder's (970, and 124 of the motion
+chain), the metadata dictionaries identical; the aCompCor masks after `-n Gaussian` hold other
+values in 5,298 voxels (vnl's `erf` through glibc's `exp`/`log` in fMRIPrep's ANTs, correctly rounded
+in larmorx's ANTs port: [why](../findings/platform-math.md)) but the same voxels above 0.5 and 0.99,
+so aCompCor and the signals read the same masks. The step to the newest libraries changes 263,181
+cells of the 36 tables (fMRIPrep 25.2.7's motion parameters, numpy's SVD, the FD spikes: 2 more and
+4 fewer `motion_outlier` columns) and 6 JSON values; the default (`fix`) changes 218,474 cells
+(PD-01: pandas' parser, GLIBC-07: the cosine basis's sign of some components) and 4 JSON values, and
+adds PIPE-41's five entries to every JSON. Speed: larmorx's whole stage of the 36 runs takes 297 s in
+all at 8 threads (the default, the newest libraries; fMRIPrep's own times come with the part's
+records).

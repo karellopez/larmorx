@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import posixpath
 import re
 import subprocess
 from collections import Counter, defaultdict
@@ -280,6 +281,9 @@ def area_of(
     raise AssertionError(rel)
 
 
+#: A Markdown link's target inside this repository (no scheme, no anchor, no title).
+LINK = re.compile(r"\]\((?![a-z][a-z0-9+.-]*:)([^)\s#]+)")
+
 #: A token with a slash is a path, a URL or a link's target: its words are file names (counted in
 #: the table of files named with *original*), not prose.
 PATHLIKE = re.compile(r"\S*/\S*")
@@ -362,6 +366,7 @@ def main() -> None:
     rows = []  # (area, how, path, Counter)
     names = []  # tracked paths of this repository with "original" in their name
     texts = {}  # (label, rel) -> (group, raw text)
+    made = {}  # rel -> raw text, for this repository's pages made by a measurement
     heads = {}
     for label, root, areas in (("repo", a.repo, REPO_AREAS), ("site", a.site, SITE_AREAS)):
         heads[label] = subprocess.run(
@@ -381,6 +386,8 @@ def main() -> None:
                 continue
             area, how = area_of(rel, areas, text if label == "repo" else None)
             texts[(label, rel)] = (group_of(how), text)
+            if label == "repo" and any(area == name for _, _, name, _ in MADE_PAGES):
+                made[rel] = text
             if label == "repo" and re.search(r"original", Path(rel).name, FLAGS):
                 names.append((rel, group_of(how)))
             c = count(prose(rel, text), bool(USER_FACING.match(area)))
@@ -399,6 +406,15 @@ def main() -> None:
             by_full += full in text
             by_stem += stem in text
         refs[rel] = (by_full, by_stem)
+
+    # a renamed file that a page made by a measurement links to keeps its name until that page is
+    # made again (the writing guide, section 1, "Renamed files"): those pages are never edited
+    linked_by: dict[str, list[str]] = defaultdict(list)
+    for page, text in sorted(made.items()):
+        for target in LINK.findall(text):
+            path = posixpath.normpath(posixpath.join(posixpath.dirname(page), target))
+            if page not in linked_by[path]:
+                linked_by[path].append(page)
 
     by_area: dict[str, Counter] = defaultdict(Counter)
     how_of: dict[str, str] = {}
@@ -510,14 +526,30 @@ def main() -> None:
         "reports, tests and validation modules are renamed (*original* becomes *clean-room* or "
         "*clean_room*), a renamed record or benchmark report keeping its contents byte for byte; "
         "random testing's permanent cases (identifiers in the records and the triage) and the "
-        "investigations (history) keep their names."
+        "investigations (history) keep their names. A file that a page made by a measurement "
+        "links to (a record's or a benchmark report's page, which nobody edits) keeps its name "
+        "until that page is made again: *renamed later*, with the pages that link to it."
     )
     L.append("")
     L.append("| File | Renamed? | Files naming it (whole name) | (without extension) |")
     L.append("|---|---|---|---|")
+    tally: Counter = Counter()
     for rel, g in names:
-        rename = "kept" if g == kept else "renamed"
+        if g == kept:
+            rename = "kept"
+        elif linked_by.get(rel):
+            rename = "renamed later (linked by " + ", ".join(
+                f"`{x}`" for x in linked_by[rel]
+            ) + ")"
+        else:
+            rename = "renamed"
+        tally[rename.split(" (")[0]] += 1
         L.append(f"| `{rel}` | {rename} | {refs[rel][0]} | {refs[rel][1]} |")
+    L.append("")
+    L.append(
+        f"{tally['renamed']} renamed now, {tally['renamed later']} renamed later, "
+        f"{tally['kept']} kept."
+    )
     L.append("")
 
     L.append("## File by file")

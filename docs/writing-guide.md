@@ -6,9 +6,12 @@ and the lines its programs print. The documentation revision
 page written afterwards follows it. Draft of 2026-11-12, for the user's approval.
 
 Every fact in this guide comes from files a clean-room implementer may read (section 1, "Who
-changes what"). They are the site's pages and evidence, the validation records, the API pages,
-the benchmark reports, `CHANGELOG.md`, the main package's Python and command-line code, and the
-clean-room audit's restriction table. Nothing comes from the restricted material.
+changes what"). They are the site's pages and evidence, the validation records (all but
+`tedana-t2smap-replica`), the API pages, the benchmark reports, `CHANGELOG.md`, the main
+package's Python and command-line code, and the clean-room audit's restriction table and lists.
+Nothing comes from the restricted material. Section 4 quotes four comparison labels from
+3dvolreg's and t2smap's evidence, which restricted modules export (section 1): they name the
+runs compared, with no fact of the original's source.
 
 ## 1. Four words
 
@@ -117,9 +120,22 @@ How to use them:
     (`afni-tshift.md`, `fsl-mcflirt.md`) say so in other words than "Restricted";
   - the register's restricted sections, headed `## Restricted: ...` (their entries carry † in the
     summary table, which anyone may read);
-  - `docs/parts/`, the probes in `validation/probes/`, the replica authors' random-testing cases,
-    the replicas' suite and evidence modules that a part's brief names, the session transcripts
-    and other agents' scratch notes.
+  - `docs/parts/`, the probes in `validation/probes/`, the session transcripts and other agents'
+    scratch notes;
+  - what the clean-room briefs forbid, as the audit applies it (`cleanroom_audit/verdicts.py`,
+    `BRIEF_RESTRICTED` and `BRIEF_FILES`, rules R15 and R16):
+    - the replica authors' random-testing cases and their entries in
+      `validation/difftest/triage.toml`;
+    - the replicas' comparison suites, random-testing descriptors and evidence modules (files of
+      `parity/`, `evidence/` and `difftest/tools/` named `*replica*`, `fsl_mcflirt*` or
+      `afni_volreg.py`, and `evidence/` and `difftest/tools/` `tedana_t2smap.py`);
+    - the investigations of replica parts and spec writers that `BRIEF_FILES` lists;
+    - `t2smap`'s replica record (`docs/validation/tedana-t2smap-replica.md` and `.json`) and its
+      cases (`validation/difftest/cases/tedana-t2smap/`);
+  - the site's pages, or sections of them, that those evidence modules export (today 3dvolreg's
+    and t2smap's): restricted for the clean-room implementers of that software, through their
+    briefs (the orchestrator, 2026-11-12). Clean-room implementers work from the specs and runs
+    of the original, never from their software's site pages.
 
   This widens what the writer guards, never what an implementer may read. The writer has read
   restricted material, so in a readable file:
@@ -129,9 +145,17 @@ How to use them:
     that file;
   - nothing comes from the restricted material, even reworded or summarised.
 
-  New facts from restricted material go only into restricted material. Each changed readable
-  file is listed for the orchestrator, and the reviewer checks every new sentence against the
-  readable file it comes from.
+  New facts from restricted material go only into restricted material. Text that a restricted
+  file exports or prints where anyone reads it (`evidence/afni_volreg.py` and
+  `evidence/tedana_t2smap.py` write the site's JSON) is readable once exported. In such text the
+  writer changes the wording only, as in any readable file. Each changed readable file is listed
+  for the orchestrator, and the reviewer checks every new sentence against the readable file it
+  comes from.
+- **A program's reference page is readable material.** The exporter writes it only from readable
+  files (section 6, "One source"), so clean-room implementers may read it. A section of today's
+  pages whose facts come from restricted material stays on the evidence page, and the reference
+  page links to it. Today that is `bet`'s "The standard images the variations read" (`#data`),
+  which cites `docs/findings/fsl-bet.md`.
 
 ### Mechanics of the rollout
 
@@ -154,7 +178,12 @@ How to use them:
   `*-original*` become `*-clean-room*` (`*_clean_room*` for Python modules), with their links,
   their record ids in `validation/tools.toml` and the generated tables. A renamed record or
   report keeps its contents byte for byte. Random testing's cases and the investigations keep
-  their names.
+  their names. A file that a page made by a measurement links to keeps its name until that page
+  is made again. Today these are five: `docs/validation/afni-volreg-original.md` (the record),
+  `docs/findings/fsl-maths-original.md`, `docs/findings/fsl-prelude-original.md`,
+  `docs/validation/tedana-t2smap-original.md` and `docs/benchmarks/tedana-t2smap-original.json`,
+  which the benchmark reports of 3dvolreg, fslmaths, prelude and t2smap link. They are renamed
+  when those reports are made again. The inventory marks them "renamed later".
 - **Renamed identifiers**: a renamed comparison suite (`afni-volreg-original` becomes
   `afni-volreg-clean-room`) keeps its old name as an accepted alias, so the "Generated: with
   `python -m larmorx_validation parity afni-volreg-original`" lines of today's records still run
@@ -609,7 +638,11 @@ The header's links: Getting started, Concepts, Programs, Validation, Roadmap, Ab
 - **One source.** `docs/api/<page>.md` stays the one source of a reference page. An exporter in
   this repository, beside the evidence module (step 2 of the plan), writes the site's reference
   pages from it, the command-line definitions and the `.pyi` stubs. Nobody edits a reference page
-  on the site by hand.
+  on the site by hand. The exporter reads only files a clean-room implementer may read: the API
+  page, the main package's Python (`python/larmorx`), the command-line code of the clean rooms
+  and of `larmorx-cli`, larmorx-core's `cli.rs` and `defects.rs`, and `validation/tools.toml`;
+  never the replica crates. So a reference page holds no fact from the restricted material
+  (section 1).
 - **An API page with several programs** holds one section per program, and the exporter writes
   one reference page from each section: `fsl-flirt.md` gives 14, `fsl-bet.md` 3, `fsl-roi.md`
   and `fsl-topup.md` 2 each. `sdcflows-fieldmap.md` gives the `sdcflows` command's page and the
@@ -617,7 +650,7 @@ The header's links: Getting started, Concepts, Programs, Validation, Roadmap, Ab
 - **Old addresses keep working.** The builder gets a redirect page type (step 2): a page at the
   old address that names the new one. It holds a table of the old page's anchors and the page
   that now holds each: `/tools/fsl-bet/#speed` goes to `/evidence/fsl-bet/#speed`, and
-  `/tools/fsl-bet/#data` (the standard images) to `/programs/fsl/bet/#data`. A line of script
+  `/tools/#reading` (how to read the figures) to `/validation/#reading`. A line of script
   sends the reader there with the anchor, which a plain meta refresh would drop, and a link to the
   new address serves readers without scripts. Every anchor of today's pages keeps working: the
   heading that takes a section's place gets its old `id` (Home's `#status`, Getting started's
@@ -646,11 +679,11 @@ The header's links: Getting started, Concepts, Programs, Validation, Roadmap, Ab
 | Validation: The method, Levels of testing, Now and before the first release, How to read the evidence, The verdicts, Where every tool stands, Random testing, The records | Validation, each with its anchor; "Three ways of reimplementing" becomes "Two kinds of port" (example 11), with a link to Concepts |
 | Data panel | its own page under Validation |
 | Tools: the introduction; "How to read the figures" (`/tools/#reading`) | Programs (example 9); Validation's "How to read the evidence" |
-| A tool's page: "What it is", "What they are" (`ants-programs`, `ants-ai`) | the reference pages' "what it does" and the evidence page's lede (what is compared) |
+| A tool's page: "What it is", "What they are" (`ants-programs`, `ants-ai`) | the evidence page's first section, "What is compared", with its old anchor; the reference page's "what it does" is the API page's own text (One source, above) |
 | A tool's page: "FLIRT's other programs" (`fsl-flirt`) | the reference pages of those programs (`avscale`, `img2imgcoord`, `rmsdiff`, `makerot`, `midtrans`, `pointflirt`, `applyxfm4D`, `aff2rigid` and the rest), each with its own section of `fsl-flirt.md` |
 | A tool's page: the verdicts, the worked examples, the variations, every case, random testing, speed, "Corrections by default", "Known limits" | the evidence page, each with its anchor |
 | A tool's page, every other section: "Memory", the original's own variability ("Against ANTs' own variability", "tedana's own variability"), "The originals' own step: two library releases", "On the data panel", "What is open", "Every file" and the rest | the evidence page, each with its anchor |
-| A tool's page: "The standard images the variations read" (`#data`) | the reference page of the program that reads them (`bet`'s), with its anchor |
+| A tool's page: "The standard images the variations read" (`#data`) | the evidence page, with its anchor; `bet`'s reference page links to it (its facts come from restricted material: section 1) |
 | Roadmap | as it is |
 | 404 | as it is, with the list of addresses for another letter case (Addresses, above) |
 

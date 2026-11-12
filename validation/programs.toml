@@ -216,7 +216,7 @@ name = "transforms-hdf5"
 python = "lx.transforms.read"
 does = "ITK's transform files, text, MATLAB and HDF5 (`.h5`), read and written in pure Rust."
 api = "docs/api/transforms-hdf5.md"
-evidence = "/tools/itk-hdf5/"
+evidence = "/evidence/itk-hdf5/"
 records = { replica = ["itk-hdf5"] }
 original = "ITK 5.4.5 on HDF5 1.12.1"
 

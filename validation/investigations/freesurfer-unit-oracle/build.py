@@ -60,6 +60,11 @@ ITK_NAME = "InsightToolkit-4.13.2"
 #: ``freesurfer_ubuntu22-8.2.0_amd64.deb``): configured into ``utils/version_info.h``.
 FS_VERSION = "8.2.0"
 BUILD_STAMP = "freesurfer-linux-ubuntu22_x86_64-8.2.0-20260314-d932c45"
+#: When the official build compiled ``utils/version.cpp``: its ``__DATE__ " " __TIME__`` (``Mar 14
+#: 2026 12:21:06``, the rodata and an immediate of ``getAllInfo``), given to GCC as
+#: ``SOURCE_DATE_EPOCH`` (UTC): every ``__DATE__`` (MRIwrite's NIfTI ``descrip``, "FreeSurfer Mar 14
+#: 2026") and that ``__TIME__`` as the official programs hold them.
+BUILD_EPOCH = 1773490866
 
 #: The tag's folders the build reads (linked into the shadow tree).
 FS_DIRS = ("cmake", "include", "packages", "utils")
@@ -145,6 +150,7 @@ def run(cmd: list[str], log: Path, *, cwd: Path | None = None, env: dict | None 
 
 def build_env(p: Paths) -> dict:
     env = dict(os.environ)
+    env["SOURCE_DATE_EPOCH"] = str(BUILD_EPOCH)
     # FSL's own make is on some PATHs (env.sh drops it); the wrappers come first
     path = [d for d in env.get("PATH", "").split(":") if "/fsl" not in d]
     env["PATH"] = ":".join([str(p.toolchain / "bin"), *path])
@@ -200,7 +206,7 @@ def fetch_itk(p: Paths) -> None:
     if not p.tarball.exists():
         p.tarball.parent.mkdir(parents=True, exist_ok=True)
         tmp = p.tarball.with_suffix(".part")
-        with urllib.request.urlopen(ITK_URL) as r, tmp.open("wb") as f:  # noqa: S310 (a fixed https URL)
+        with urllib.request.urlopen(ITK_URL) as r, tmp.open("wb") as f:
             shutil.copyfileobj(r, f)
         tmp.rename(p.tarball)
     got = sha256(p.tarball)
@@ -212,42 +218,60 @@ def fetch_itk(p: Paths) -> None:
             t.extractall(p.src, filter="data")
 
 
+def official_itk_source_dir(official: Path) -> str:
+    """The folder the official build compiled ITK 4.13.2 in, from the ``__FILE__`` strings of
+    VNL's messages in one of its programs (read from the binary, never written into the
+    repository): ``-fmacro-prefix-map`` gives ITK's messages and their lengths (immediates in the
+    code) the official text."""
+    data = (official / "bin" / "mri_add_xform_to_header").read_bytes()
+    m = re.search(
+        rb"\x00(/[\x21-\x7e]+?)/Modules/ThirdParty/VNL/src/vxl/core/vnl/algo/vnl_svd\.hxx", data
+    )
+    if not m:
+        sys.exit(f"no ITK __FILE__ path in {official}/bin/mri_add_xform_to_header")
+    return m.group(1).decode()
+
+
 def step_itk(p: Paths, jobs: int) -> None:
     fetch_itk(p)
+    # build_itk.sh's flags; the prefix map changes only the text of __FILE__
+    flags = (
+        f"-msse2 -mfpmath=sse -fmacro-prefix-map={p.itk_src}={official_itk_source_dir(p.official)}"
+    )
     log = p.logs / "freesurfer-unit-itk.log"
     env = build_env(p)
     p.itk_build.mkdir(parents=True, exist_ok=True)
-    if not (p.itk_build / "CMakeCache.txt").exists():
-        # packages/source/build_itk.sh, with Ninja instead of Make (the generator sets no flag)
-        run(
-            [
-                "cmake",
-                str(p.itk_src),
-                "-G",
-                "Ninja",
-                f"-DCMAKE_C_COMPILER={p.cc}",
-                f"-DCMAKE_CXX_COMPILER={p.cxx}",
-                f"-DCMAKE_INSTALL_PREFIX:PATH={p.itk}",
-                "-DCMAKE_BUILD_TYPE:STRING=Release",
-                "-DCMAKE_CXX_FLAGS:STRING=-msse2 -mfpmath=sse",
-                "-DCMAKE_C_FLAGS:STRING=-msse2 -mfpmath=sse",
-                "-DCMAKE_CXX_STANDARD:STRING=11",
-                "-DCMAKE_C_STANDARD:STRING=11",
-                "-DITK_BUILD_DEFAULT_MODULES:BOOL=OFF",
-                "-DITKGroup_Core:BOOL=ON",
-                "-DITKGroup_Filtering:BOOL=ON",
-                "-DITKGroup_Numerics:BOOL=ON",
-                "-DITKGroup_Registration:BOOL=ON",
-                "-DITKGroup_Segmentation:BOOL=ON",
-                "-DITKGroup_IO:BOOL=ON",
-                "-DModule_AnisotropicDiffusionLBR:BOOL=ON",
-                "-DBUILD_TESTING:BOOL=OFF",
-                "-DCMAKE_EXPORT_COMPILE_COMMANDS:BOOL=ON",
-            ],
-            log,
-            cwd=p.itk_build,
-            env=env,
-        )
+    # configured every time, so a changed setting reaches the cache
+    # packages/source/build_itk.sh, with Ninja instead of Make (the generator sets no flag)
+    run(
+        [
+            "cmake",
+            str(p.itk_src),
+            "-G",
+            "Ninja",
+            f"-DCMAKE_C_COMPILER={p.cc}",
+            f"-DCMAKE_CXX_COMPILER={p.cxx}",
+            f"-DCMAKE_INSTALL_PREFIX:PATH={p.itk}",
+            "-DCMAKE_BUILD_TYPE:STRING=Release",
+            f"-DCMAKE_CXX_FLAGS:STRING={flags}",
+            f"-DCMAKE_C_FLAGS:STRING={flags}",
+            "-DCMAKE_CXX_STANDARD:STRING=11",
+            "-DCMAKE_C_STANDARD:STRING=11",
+            "-DITK_BUILD_DEFAULT_MODULES:BOOL=OFF",
+            "-DITKGroup_Core:BOOL=ON",
+            "-DITKGroup_Filtering:BOOL=ON",
+            "-DITKGroup_Numerics:BOOL=ON",
+            "-DITKGroup_Registration:BOOL=ON",
+            "-DITKGroup_Segmentation:BOOL=ON",
+            "-DITKGroup_IO:BOOL=ON",
+            "-DModule_AnisotropicDiffusionLBR:BOOL=ON",
+            "-DBUILD_TESTING:BOOL=OFF",
+            "-DCMAKE_EXPORT_COMPILE_COMMANDS:BOOL=ON",
+        ],
+        log,
+        cwd=p.itk_build,
+        env=env,
+    )
     run(["cmake", "--build", ".", "--", f"-j{jobs}"], log, cwd=p.itk_build, env=env)
     run(["cmake", "--build", ".", "--target", "install"], log, cwd=p.itk_build, env=env)
     print(f"ITK 4.13.2 installed: {p.itk}")
@@ -340,7 +364,7 @@ def write_info(p: Paths) -> None:
         else "",
         "itk_tarball_sha256": ITK_SHA256,
         "compiler": _version(p.gcc / "bin" / "x86_64-conda-linux-gnu-g++"),
-        "ubuntu_defaults": list(UBUNTU_DEFAULTS) + ["-D_FORTIFY_SOURCE=2 (with -O)"],
+        "ubuntu_defaults": [*UBUNTU_DEFAULTS, "-D_FORTIFY_SOURCE=2 (with -O)"],
         "fs_version": FS_VERSION,
         "build_stamp": BUILD_STAMP,
         "scripts_commit": head + ("-dirty" if dirty else ""),
@@ -365,7 +389,14 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument(
         "--official",
         type=Path,
-        default=ws / "oracles" / "freesurfer-8.2.0" / "root" / "usr" / "local" / "freesurfer" / "8.2.0",
+        default=ws
+        / "oracles"
+        / "freesurfer-8.2.0"
+        / "root"
+        / "usr"
+        / "local"
+        / "freesurfer"
+        / "8.2.0",
         help="the official 8.2.0 installation (its programs' __FILE__ strings)",
     )
     ap.add_argument("--jobs", type=int, default=10)

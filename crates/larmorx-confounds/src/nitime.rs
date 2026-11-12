@@ -129,7 +129,7 @@ impl CrosscovPlan {
     ///
     /// # Errors
     /// [`FftError::InvalidLength`] for `n = 0`; [`FftError::TooLong`] when ducc0 would compute
-    /// the inverse transform by Bailey's algorithm (`n > 65536`).
+    /// the inverse transform by Bailey's algorithm (`n > 32768`: an FFT length of 131072).
     pub fn new(library: FftLibrary, n: usize) -> Result<CrosscovPlan, FftError> {
         if n == 0 {
             return Err(FftError::InvalidLength(0));

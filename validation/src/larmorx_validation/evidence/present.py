@@ -53,7 +53,8 @@ _ORACLE_TEXTS = [
 
 #: The port's name in texts, after :func:`words.reword` (``{port}`` = "replica"). A bare
 #: "larmorx" names the port, not a module path (``larmorx.ants``), a code span or the prefix of
-#: a message the program prints ("larmorx: N4BiasFieldCorrection: cannot read ...").
+#: a message the program prints ("larmorx: N4BiasFieldCorrection: cannot read ...", the notice
+#: "larmorx: upstream defect ANTS-62 (antsRegistration) reproduced: ...").
 _PORT_TEXTS = [
     (r"\blarmorx's reproduce-mode output\b", "the {port}'s output in `reproduce`"),
     (r"\blarmorx's `reproduce`", "the {port}'s `reproduce`"),
@@ -61,7 +62,7 @@ _PORT_TEXTS = [
     (r"\blarmorx's default\b", "the {port}'s default, `fix`,"),
     (r"\blarmorx's\b", "the {port}'s"),
     (r"\blarmorx \(port\)", "the {port}"),
-    (r"(?<![\w./`-])larmorx(?![\w/`-]|\.\w|: \w+:)", "the {port}"),
+    (r"(?<![\w./`-])larmorx(?![\w/`-]|\.\w|: \w+:|: upstream defect )", "the {port}"),
     (r"^`reproduce` gives\b", "In `reproduce`, the {port} gives"),
     (r"\bReproduce mode gives\b", "In `reproduce`, the {port} gives"),
 ]
@@ -286,6 +287,9 @@ def _role(page: Page, d: dict, pa: str, pb: str, panels: dict) -> tuple[str, str
             role += ": correctly rounded maths"
         elif b is not None and "fMRIPrep's image" in b.get("label", ""):
             role += ": fMRIPrep's build"
+        elif re.search(r"\bseed\b.* − .*\bthe clock's seed\b", old):
+            # "larmorx, seed 121212 − ANTs, the clock's seed (run 1)": two seeds, not one call
+            role += ": a fixed seed and the clock's"
         return role, "the original"
     if who and pb == "input":
         return f"the {who} against the known answer", "the known answer"
@@ -363,6 +367,8 @@ def example(
                 continue
             if d["kind"] == "variability":
                 hidden[pid] = "original"
+            elif pid.startswith("larmorx"):  # the port's run ("larmorx-seed", "larmorx-1")
+                hidden[pid] = page.port
             elif d[other] in by_id:
                 hidden[pid] = port_of(d[other])
             else:
@@ -444,7 +450,33 @@ def example(
         ex["poster"]["caption"] = text(page, ex["poster"]["caption"], code=False)
     if ex.get("chain"):
         chain(page, ex["chain"])
+    for t in ex.get("tables") or []:
+        example_table(page, t)
     return ex
+
+
+def example_table(page: Page, t: dict) -> None:
+    """A worked example's own table (a registration's parameters, its fields' differences):
+    its title and note in the guide's words, LARMORX's run named by its port in the columns
+    and rows ("larmorx − ANTs as built" -> "replica − ANTs as built")."""
+    name = words.PORT_NAME[page.port]
+
+    def run(s: str | None) -> str | None:
+        if not s:
+            return s
+        return _mode(re.sub(r"(?<![\w./`-])larmorx(?: \(port\))?(?![\w/`-])", name, s))
+
+    t["title"] = text(page, t.get("title"))
+    t["note"] = text(page, t.get("note"))
+    for c in t.get("columns", []):
+        c["label"] = run(c["label"])
+    for r in t["rows"]:
+        r["head"] = run(r.get("head"))
+        if r.get("sub"):
+            r["sub"] = text(page, r["sub"])
+        for c in r["cells"]:
+            if "text" in c:
+                c["text"] = text(page, c["text"])
 
 
 def chain(page: Page, ch: dict) -> None:
@@ -489,16 +521,66 @@ def cases(page: Page, cs: list[dict]) -> None:
             r["reason"] = text(page, r.get("reason"))
 
 
-def table(page: Page, t: dict) -> None:
+def table(page: Page, t: dict, runs: bool = False) -> None:
+    """A table's texts in the guide's words; ``runs``: its rows are a worked example's runs,
+    named as its panels name them (:func:`run_rows`)."""
     t["title"] = text(page, t.get("title"))
     t["note"] = text(page, t.get("note"))
+    if runs:
+        run_rows(page, t)
     for r in t["rows"]:
-        r["head"] = text(page, r.get("head"))
-        if r.get("sub"):
-            r["sub"] = text(page, r["sub"])
+        if not runs:
+            r["head"] = text(page, r.get("head"))
+            if r.get("sub"):
+                r["sub"] = text(page, r["sub"])
         for c in r["cells"]:
             if "text" in c:
                 c["text"] = text(page, c["text"])
+
+
+def _last_bracket(s: str) -> tuple[str, str]:
+    """A run's name split at its last bracket of the top level: "ANTs 2.6.5, 1 thread (as built
+    (GCC 14.3), glibc's maths)" gives ("ANTs 2.6.5, 1 thread", "as built (GCC 14.3), glibc's
+    maths")."""
+    if not s.endswith(")"):
+        raise ValueError(f"a run's name without its bracket: {s!r}")
+    depth = 0
+    for i in range(len(s) - 1, -1, -1):
+        depth += {")": 1, "(": -1}.get(s[i], 0)
+        if depth == 0:
+            return s[:i].rstrip(), s[i + 1 : -1]
+    raise ValueError(f"unbalanced brackets: {s!r}")
+
+
+def run_rows(page: Page, t: dict) -> None:
+    """A table whose rows are the runs of a worked example ("every run's transform": each
+    head "<panel's label> (<its second line>)"): each run named as the panels name it, its
+    second line under it, so that no bracket stands inside another."""
+    for r in t["rows"]:
+        label, sub = _last_bracket(r["head"])
+        if re.match(r"^(?:\w+: )?larmorx\b", label):
+            r["head"], r["sub"] = _port_panel(page, {"label": label, "sub": sub}, None)
+        else:
+            role = "reference" if "correctly rounded" in label else "original"
+            name, second, _ = _original_panel(page, {"label": label, "sub": sub, "role": role})
+            r["head"], r["sub"] = name, second
+
+
+def dots(page: Page, s: dict | None, title: str, labels: dict[str, str]) -> None:
+    """A dots chart (a thread band beside the port's distance from the original, one row per
+    case): its title by the guide's pattern, each series by ``labels`` (series id -> name),
+    the port's points in its mark."""
+    if not s:
+        return
+    s["title"] = title
+    for ser in s["series"]:
+        ser["label"] = labels[ser["id"]]
+        mark = ser["mark"]
+        if mark.startswith("larmorx"):
+            ser["mark"] = page.port + mark.removeprefix("larmorx")
+        ser["port"] = ser["mark"].removesuffix("-open")
+    s["note"] = text(page, s.get("note"))
+    s["port"] = page.port
 
 
 def original_name(page: Page, code: bool = True) -> str:
@@ -562,10 +644,13 @@ def random_testing(page: Page, doc: dict, names: dict[str, str]) -> None:
     }
 
 
-def finish(page: Page, doc: dict, labels: dict[str, str] | None = None) -> dict:
-    """The page's tables, cases, its categories' names and the mark that it is presented."""
+def finish(
+    page: Page, doc: dict, labels: dict[str, str] | None = None, runs: tuple[str, ...] = ()
+) -> dict:
+    """The page's tables (``runs``: the ids of those whose rows are a worked example's runs),
+    cases, its categories' names and the mark that it is presented."""
     for t in doc.get("tables", []):
-        table(page, t)
+        table(page, t, runs=t["id"] in runs)
     cases(page, doc.get("cases", []))
     known = {**CATEGORY_LABELS, **(labels or {})}
     used = list(dict.fromkeys(c["category"] for c in doc.get("cases", [])))

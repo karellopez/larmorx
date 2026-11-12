@@ -257,3 +257,85 @@ def test_a_correction_that_only_warns_is_not_said_to_correct():
         "mask (ANTS-36)."
     )
     assert verdicts == ["lx-ants"]
+
+
+def test_a_seed_comparison_and_a_hidden_port_run():
+    """Atropos' fixed seed against ANTs' clock-seeded run: the port's run is not a panel (its
+    id names it), and the role says what differs besides the program."""
+    ex = _example()
+    ex["panels"].append(
+        {"id": "seed1", "role": "original", "label": "ANTs 2.6.5, --use-random-seed 1",
+         "sub": "the clock's seed (one of three runs)", "arrays": {}}
+    )  # fmt: skip
+    ex["diffs"].append(
+        {"id": "lxseed-seed1", "a": "larmorx-seed", "b": "seed1", "kind": "main",
+         "label": "larmorx, seed 121212 − ANTs, the clock's seed (run 1)", "role_label": "x",
+         "metrics": {}, "verdict": "within-variability", "reason": ""}
+    )  # fmt: skip
+    out = _present(ex)
+    d = next(x for x in out["diffs"] if x["id"] == "lxseed-seed1")
+    assert d["role_label"] == "the replica against the original: a fixed seed and the clock's"
+    assert d["label"] == (
+        "replica, seed 121212 − ANTs N4BiasFieldCorrection, the clock's seed (run 1)"
+    )
+    assert d["port"] == "replica"
+
+
+def test_a_notice_the_program_prints_keeps_its_prefix():
+    s = "larmorx: upstream defect ANTS-62 (antsRegistration) reproduced: an extra point"
+    assert present.text(PAGE, s) == s
+    assert present.text(PAGE, "larmorx gives it") == "The replica gives it"
+
+
+def test_a_table_of_runs_and_an_example_table():
+    """A table whose rows are an example's runs names them as the panels do, the second line
+    under the name (no bracket inside another); an example's own table names the port."""
+    t = {
+        "id": "x-transforms", "title": "every run's transform", "note": "",
+        "rows": [
+            {"head": "ANTs 2.6.5, 1 thread (as built (GCC 14.3), glibc's maths)", "cells": []},
+            {"head": "ANTs 2.6.5, correctly rounded maths (1 thread, CORE-MATH preloaded)",
+             "cells": []},
+            {"head": "larmorx (port) (reproduce mode, 8 threads)", "cells": []},
+            {"head": "larmorx (port) (default mode, 8 threads)", "cells": []},
+        ],
+    }  # fmt: skip
+    present.table(PAGE, t, runs=True)
+    assert [(r["head"], r["sub"]) for r in t["rows"]] == [
+        ("ANTs N4BiasFieldCorrection 2.6.5", "1 thread · as built (GCC 14.3), glibc's maths"),
+        ("ANTs N4BiasFieldCorrection 2.6.5, correctly rounded maths",
+         "1 thread, CORE-MATH preloaded"),
+        ("replica", "larmorx, Apache-2.0 · reproduce, 8 threads"),
+        ("replica", "larmorx, Apache-2.0 · fix (the default), 8 threads"),
+    ]  # fmt: skip
+    e = {
+        "title": "The fields", "note": "larmorx's difference from ANTs as built",
+        "columns": [{"label": "Parameter"}, {"label": "larmorx"},
+                    {"label": "larmorx − ANTs as built"}],
+        "rows": [{"head": "larmorx − ANTs with CORE-MATH, 1 thread", "cells": [{"text": "a"}]}],
+    }  # fmt: skip
+    present.example_table(PAGE, e)
+    assert [c["label"] for c in e["columns"]] == ["Parameter", "replica", "replica − ANTs as built"]
+    assert e["rows"][0]["head"] == "replica − ANTs with CORE-MATH, 1 thread"
+    assert e["note"] == "The replica's difference from ANTs as built"
+
+
+def test_a_dots_chart_names_its_series():
+    s = {
+        "title": "old", "note": "Where larmorx differs from ANTs as built, ...",
+        "series": [{"id": "band", "label": "ANTs' own band", "mark": "original"},
+                   {"id": "larmorx", "label": "larmorx vs ANTs", "mark": "larmorx"}],
+        "rows": [],
+    }  # fmt: skip
+    present.dots(
+        PAGE,
+        s,
+        "Variability, ...",
+        {"band": "the original against itself", "larmorx": "the replica against the original"},
+    )
+    assert [(x["label"], x["mark"], x["port"]) for x in s["series"]] == [
+        ("the original against itself", "original", "original"),
+        ("the replica against the original", "replica", "replica"),
+    ]
+    assert s["note"] == "Where the replica differs from ANTs as built, ..."
+    assert (s["title"], s["port"]) == ("Variability, ...", "replica")

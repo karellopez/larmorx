@@ -222,6 +222,18 @@ PIPE-48 (kept, no switch): niworkflows reruns the interface after a `numpy.linal
 to ten more times after random sleeps (about 8 to 9 minutes in all), then raises the last error;
 larmorx's computation is deterministic, so it raises that error at once.
 
+## `add_tsv_header`, `dict_merge`, `tsv2json`: `AddTSVHeader`, `DictMerge`, `TSV2JSON`
+
+niworkflows 1.15.4's `interfaces/utility.py` (the same in 1.15.2), under fMRIPrep's confounds
+(`docs/api/confounds.md`). They are importable from `lx.niworkflows` and join its `__all__` with
+their golden cases (the confounds' golden relay).
+
+| larmorx | niworkflows | Notes |
+|---|---|---|
+| `add_tsv_header(in_file, columns, *, out_dir=".", upstream_defects="fix")` → the path | `AddTSVHeader(in_file, columns)` → `out_file` | numpy's `loadtxt` (whitespace-separated, `#` comments) and `savetxt` (`%.18e`, tabs, the header `"\t".join(columns)`), `<stem>_motion.tsv` in `out_dir`; an empty table: numpy's warning and the header alone; PIPE-61, PIPE-62 (below) |
+| `dict_merge(in_dicts)` → a dictionary | `DictMerge(in_dicts)` → `out_dict` | the keys in order, a later dictionary's value winning; an element that is not a dictionary: traits' message as a `ValueError` |
+| `tsv2json(in_file, index_column, *, output=UNDEFINED, additional_metadata=None, drop_columns=None, enforce_case=True, out_dir=".", pandas_version="3.0.6", upstream_defects="fix")` → a dictionary or the path | `TSV2JSON` (`_tsv2json`) → `output` | the table read as pandas reads it (PD-01), `additional_metadata` set as columns (before `drop_columns`, which raises pandas' `KeyError` for a missing one) and again on every entry, keyed by `index_column` (a table without it keeps its row numbers, which `enforce_case` cannot turn to snake case: Python's `AttributeError`, as niworkflows), with `enforce_case` the keys in snake case and the fields title-cased then camel-cased (`Csf` → `CSF`); pandas' `ValueError` for keys or fields that are not unique; the numbers as pandas' `to_json` writes them and Python's `json` reads them back (10 decimals: PD-02), NaN and infinities `None`; `output=None`: the ordered dictionary, else written as JSON (indent 4, `\n` line ends), left undefined `<stem>.json` in `out_dir` |
+
 ## Upstream defects of these steps (D13)
 
 | ID | Defect | larmorx by default (`upstream_defects="reproduce"`: the original) | Functions |
@@ -234,3 +246,6 @@ larmorx's computation is deterministic, so it raises that error at once.
 | PIPE-29 | the data type coercion casts values out of the integer type's range and NaN with numpy's cast (undefined in C; on x86-64 a wrapped or arbitrary value) | clamped to the range, NaN to 0, with a warning (the rule for undefined conversions) | `derivatives_data_sink`, `fmap_derivatives_workflow` |
 | PIPE-30 | a `RepetitionTime` input for an image that is not 4-D makes the header fix set four voxel sizes on it, and nibabel's `HeaderDataError` stops the sink (rule A: a 3-D reference of a BOLD series is a sensible input) | the fourth voxel size set only on an image with a fourth axis (its other sizes kept), the sidecar with the value | `derivatives_data_sink` |
 | PIPE-35 | `resample_by_spacing(smooth=True)` sets the Gaussian's sigma to `max(0, (old / new - 1) / 2)` voxels, positive only when the new grid is finer: a coarser grid (the anti-aliasing case) is never smoothed, so fMRIPrep's brain extraction regrids its 1 mm images to 4 mm without smoothing (scikit-image's `rescale` takes `(new / old - 1) / 2`) | rule D: niworkflows' sigma in both modes until the anatomical brain extraction's port measures whether smoothing changes its initialisation | `regrid_to_zooms`, `resample_by_spacing` |
+| PIPE-61 | `AddTSVHeader` reads with numpy's `loadtxt`, which squeezes a table of one row to a vector, written by `savetxt` as one column (the row's values one under the other), and a table of one value to a scalar, which `savetxt` refuses (`ValueError: Expected 1D or 2D array, got 0D array instead`) (rule A) | the table's shape kept: one row stays a row, one value is written | `add_tsv_header` |
+| PIPE-62 | `AddTSVHeader` writes a header with another number of names than the table's columns as given: the file's header and rows disagree (rule B) | a `ValueError` | `add_tsv_header` |
+| PD-01, PD-02 | pandas' `read_csv` and `to_json` (`docs/api/confounds.md`, "pandas' tables") | correctly rounded readings and 10-decimal values | `tsv2json` |

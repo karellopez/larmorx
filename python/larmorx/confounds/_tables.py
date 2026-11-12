@@ -76,8 +76,6 @@ NA_VALUES = frozenset(
 _TRUE = frozenset({"True", "TRUE", "true"})
 _FALSE = frozenset({"False", "FALSE", "false"})
 _SPACE = " \t\n\v\f\r"
-_INT = re.compile(r"[ \t\n\v\f\r]*[+-]?[0-9]+[ \t\n\v\f\r]*")
-_UINT = re.compile(r"[ \t\n\v\f\r]*\+?[0-9]+[ \t\n\v\f\r]*")
 _INT64_MIN = -(2**63)
 _INT64_MAX = 2**63 - 1
 _UINT64_MAX = 2**64 - 1
@@ -288,34 +286,44 @@ def _header(fields: list[str]) -> list[str]:
     return header
 
 
-def _int_or_none(tokens: list[str]) -> tuple[str, Any]:
-    """``_try_int64``: ``("ok", ints, na_count)``, ``("invalid", None, 0)`` (a token with
-    other characters: "Number is not int"), ``("nodigits", None, 0)`` or ``("overflow", ...)``,
-    stopping at the first token that is not an int64 (as pandas)."""
-    ints = []
+_DIGITS = re.compile(r"[ \t\n\v\f\r]*([+-]?)([0-9]*)(.*)", re.S)
+
+
+def _int_or_none(tokens: list[str], series: str) -> tuple[str, Any, int]:
+    """``_try_int64``: ``("ok", ints, na_count)``, ``("invalid", None, 0)``, ``("nodigits",
+    None, 0)`` or ``("overflow", None, 0)``, at the first token that is not an int64 (as
+    pandas). pandas 3.0 reads with C's ``strtoll`` (a token too large but followed by other
+    characters is invalid), pandas 2.2 digit by digit (it overflows as soon as its digits
+    leave int64's range, whatever follows)."""
+    ints: list[Any] = []
     na = 0
     for t in tokens:
         if t in NA_VALUES:
             na += 1
             ints.append(None)
             continue
-        if not _INT.fullmatch(t):
-            stripped = t.lstrip(_SPACE)
-            digit_start = stripped[1:] if stripped[:1] in "+-" else stripped
-            if not digit_start[:1].isascii() or not digit_start[:1].isdigit():
-                return "nodigits", None, 0
-            return "invalid", None, 0
-        v = int(t.strip(_SPACE))
+        m = _DIGITS.fullmatch(t)
+        sign, digits, rest = m.group(1), m.group(2), m.group(3)
+        if not digits:
+            return "nodigits", None, 0
+        v = int(sign + digits)
+        clean = rest.strip(_SPACE) == ""
         if v < _INT64_MIN or v > _INT64_MAX:
-            return "overflow", None, 0
+            # strtoll's ERANGE: invalid when a character follows the digits (a space too).
+            if series == "2.2" or rest == "":
+                return "overflow", None, 0
+            return "invalid", None, 0
+        if not clean:
+            return "invalid", None, 0
         ints.append(v)
     return "ok", ints, na
 
 
-def _uint_path(tokens: list[str]) -> tuple[str, Any]:
-    """``_try_uint64`` after an int64 overflow: ``("uint64", values)``, ``("pylong",)``,
-    ``("object",)`` (the strings, missing values kept as text), ``("invalid",)`` or
-    ``("nodigits",)``."""
+def _uint_path(tokens: list[str], series: str) -> tuple[Any, ...]:
+    """``_try_uint64`` after an int64 overflow: ``("uint64", values)``, ``("overflow",)`` (a
+    value beyond uint64's range, or a negative value: pandas' ``OverflowError``),
+    ``("object",)`` (unsigned values beyond int64 beside negative or missing ones: pandas'
+    ``ValueError``), ``("invalid",)`` or ``("nodigits",)``."""
     seen_sint = seen_null = seen_uint = False
     vals = []
     for t in tokens:
@@ -328,21 +336,25 @@ def _uint_path(tokens: list[str]) -> tuple[str, Any]:
             seen_sint = True
             vals.append(0)
             continue
-        body = s[1:] if s.startswith("+") else s
-        if not body[:1].isascii() or not body[:1].isdigit():
+        m = re.fullmatch(r"(\+?)([0-9]*)(.*)", s, re.S)
+        digits, rest = m.group(2), m.group(3)
+        if not digits:
             return ("nodigits",)
-        if not _UINT.fullmatch(t):
-            return ("invalid",)
-        v = int(t.strip(_SPACE))
+        v = int(digits)
+        clean = rest.strip(_SPACE) == ""
         if v > _UINT64_MAX:
-            return ("pylong",)
+            if series == "2.2" or rest == "":
+                return ("overflow",)
+            return ("invalid",)
+        if not clean:
+            return ("invalid",)
         if v > _INT64_MAX:
             seen_uint = True
         vals.append(v)
     if seen_uint and (seen_sint or seen_null):
         return ("object",)
     if seen_sint:
-        return ("pylong",)
+        return ("overflow",)
     return ("uint64", vals)
 
 
@@ -401,7 +413,7 @@ def _convert(tokens: list[str], series: str, mode: str, stats: _ReadStats) -> Co
     """pandas' ``_convert_tokens`` without a requested type (int64, float64, bool, object)."""
     if not tokens:
         return Column("object", [])
-    status, ints, na = _int_or_none(tokens)
+    status, ints, na = _int_or_none(tokens, series)
     if status == "ok":
         if na:
             fix = mode == "fix"
@@ -419,12 +431,15 @@ def _convert(tokens: list[str], series: str, mode: str, stats: _ReadStats) -> Co
             )
         return Column("int64", np.array(ints, dtype=np.int64))
     if status == "overflow":
-        u = _uint_path(tokens)
+        u = _uint_path(tokens, series)
         if u[0] == "uint64":
             return Column("uint64", np.array(u[1], dtype=np.uint64))
-        if u[0] == "pylong":
-            col = _pylong(tokens)
-            return col if col is not None else Column("object", list(tokens))
+        if u[0] == "overflow":
+            if series == "3.0":
+                # pandas 3.0's _try_pylong (Python integers), else the text as it is.
+                col = _pylong(tokens)
+                return col if col is not None else Column("object", list(tokens))
+            return Column("object", [math.nan if t in NA_VALUES else t for t in tokens])
         if u[0] == "object":
             return Column("object", list(tokens))
     col = _floats(tokens, series, mode, stats)

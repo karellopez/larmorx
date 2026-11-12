@@ -7,7 +7,8 @@ with the arithmetic of the libraries they call (numpy, SciPy, nitime), bit for b
 user, 2026-11-06 and 2026-11-11). The confounds' part fills this page step by step: today nipype's
 DVARS, CompCor, TSNR, NonSteadyStateDetector and FramewiseDisplacement with its `NIPY` source
 (nipy 0.6.1's `to_matrix44` and `aff2euler`): the whole of nipype's `algorithms/confounds.py` but
-the plots.
+the plots; and fMRIPrep's own table steps (`FramewiseDisplacement`, `FilterDropped`,
+`RenameACompCor`, `GatherConfounds`) on pandas' reading and writing of tables, without pandas.
 
 **Status: `experimental`** (checked bit for bit against nipype, nitime, SciPy and numpy in the
 three environments, against fMRIPrep's own DVARS and CompCor files and on the oracle runs' raw
@@ -259,3 +260,92 @@ and a correctly rounded `atan2` (`reproduce`) and with every function correctly 
 build: the default); nipype as this machine runs it is counted apart, each difference with its
 cause (`exp`: NP-04; `atan2`: D4), and with numpy's AVX-512 dispatch off only `atan2`'s remain.
 
+
+## fMRIPrep's table steps: `fmriprep_framewise_displacement`, `filter_dropped`, `rename_acompcor`, `gather_confounds`
+
+fMRIPrep 25.2.7's `interfaces/confounds.py` (Apache-2.0, the NiPreps developers; the same in
+25.2.6 on these interfaces), each table read and written as pandas reads and writes it (below:
+pandas 3.0.6 by default, `pandas_version="2.2.3"` for fMRIPrep 25.2.6's image). The functions write
+their files in `out_dir` (fMRIPrep's node directory) under the interface's names; a missing input
+file raises nipype's `File(exists=True)` message as a `ValueError`.
+
+| larmorx | fMRIPrep | Notes |
+|---|---|---|
+| `fmriprep_framewise_displacement(in_file, *, radius=50.0, out_dir=".", pandas_version="3.0.6", upstream_defects="fix")` → the path | `FramewiseDisplacement(in_file, radius)` → `out_file` | not nipype's (that is `framewise_displacement`, above) |
+| `in_file` | the same | a table with `trans_x`, `trans_y`, `trans_z` (mm) and `rot_x`, `rot_y`, `rot_z` (radians), other columns ignored; a missing one: pandas' `KeyError: "['rot_z'] not in index"`; text or boolean columns: `TypeError` (larmorx does not follow pandas' arithmetic on them) |
+| `radius` | the same | the rotations' differences (pandas' `diff`; integer columns subtracted in int64, wrapping, then float) times `radius` |
+| output | `<stem>_fd.tsv<ext>` | `FramewiseDisplacement`: the absolute differences summed per row from the first column on (pandas' `sum(axis=1, skipna=False)`: its transposed, Fortran-ordered block, which numpy sums column after column), `n/a` in the first row; a gzipped table when `in_file` ends in `.gz` (fMRIPrep's `*_motion.tsv.nii.gz` gives `*_motion.tsv_fd.tsv.nii.gz`) |
+| `filter_dropped(in_file, *, out_dir=".", pandas_version="3.0.6", upstream_defects="fix")` → the path | `FilterDropped` → `out_file` | the CompCor metadata's rows whose boolean `retained` is true, `<stem>_filtered<ext>`; a `retained` with missing values: pandas' `ValueError: Cannot mask with non-boolean array containing NA / NaN values`; of text: pandas' `KeyError` (pandas takes the values for column names); an empty table (a header alone): pandas' empty selection, a file of one empty line |
+| `rename_acompcor(components_file, metadata_file, *, out_dir=".", pandas_version="3.0.6", upstream_defects="fix")` → `RenameACompCorResult(components_file, metadata_file)` | `RenameACompCor` | the retained components of the masks `CSF`, `WM` and `combined` (the metadata's `mask`) renamed `c_comp_cor_XX`, `w_comp_cor_XX` and `a_comp_cor_XX` (from 00, in the metadata's order: three renamings one after the other, as pandas' `rename`) in the components' header and the metadata's `component`, `<stem>_renamed<ext>`; a table without columns (pandas' `EmptyDataError`) returns both inputs unchanged |
+| `gather_confounds(signals=None, dvars=None, std_dvars=None, fd=None, rmsd=None, tcompcor=None, acompcor=None, crowncompcor=None, cos_basis=None, motion=None, *, out_dir=".", pandas_version="3.0.6", upstream_defects="fix")` → `GatherConfoundsResult(confounds_file, confounds_list)` | `GatherConfounds` | `None`: not given. The tables read in the order `signals`, `std_dvars`, `dvars`, `fd`, `rmsd`, `tcompcor`, `acompcor`, `crowncompcor`, `cos_basis`, `motion` (empty files and tables without columns skipped; `confounds_list` names every group given), each name without white space and `#`, in snake case (`GlobalSignal` → `global_signal`), placed side by side with pandas' `concat(axis=1)`: a shorter table's rows aligned with the last rows (fMRIPrep's `_adjust_indices`: its missing rows first, `n/a`), the rows in the order of pandas' index union without sorting (the earlier tables' rows, then the new ones: a longer table after a shorter one puts its first rows last, as pandas does); an integer column with missing rows becomes float, a boolean one booleans and `n/a`; `confounds.tsv` |
+
+**Validation** (`validation/investigations/confounds/check_tables.py`, section `iface`; pandas 3.0.6
+with fMRIPrep 25.2.7 and niworkflows 1.15.4, pandas 3.0.6 with niworkflows 1.15.3, and pandas 2.2.3
+with fMRIPrep 25.2.6 and niworkflows 1.15.2 inside fMRIPrep 25.2.6's image): every file (gzipped
+tables by their content) and output with `upstream_defects="reproduce"`, errors by type and last
+line; the default against the same interfaces run with pandas' correctly rounded parser
+(`float_precision="round_trip"`); section `real`: fMRIPrep's own nodes (`fdisp`, `rename_acompcor`,
+`acc_metadata_filter`, `tcc_metadata_filter`, `concat`) in every oracle run's working directory,
+with their own inputs, byte for byte with `pandas_version="2.2.3"` and `upstream_defects="reproduce"`.
+
+## pandas' tables (`larmorx.confounds._tables`)
+
+fMRIPrep's and niworkflows' steps read their inputs with `pandas.read_csv(path, sep="\t")`, write
+with `to_csv(path, sep="\t", index=False, na_rep="n/a")` and turn metadata into dictionaries with
+`to_json(orient="index")`. larmorx follows pandas 3.0.6 and 2.2.3 (BSD-3-Clause) on those calls
+without pandas (a dependency of `larmorx[prep]` only):
+
+- **Reading** (pandas' C engine with its defaults): UTF-8 (a byte-order mark dropped); gzip, bzip2
+  and xz files by their extension, as `compression="infer"` (zip, zstd and tar archives refused);
+  `\n`, `\r\n` and `\r` line ends; blank lines and lines of spaces skipped; tab-separated fields,
+  a field starting with `"` quoted (tabs, line breaks and doubled quotes inside); the header's
+  empty names `Unnamed: <i>`, repeated ones `<name>.<k>` as pandas' C engine renames them (the named
+  columns first, the first `k` not already in the header); short rows padded with missing values; a
+  row longer than the header pandas' `ParserError` (a first row longer than the header, pandas'
+  implicit index, is refused); a file without columns pandas' `EmptyDataError`. Each column's type as
+  pandas infers it: 64-bit integers (beyond int64: unsigned 64-bit, else Python integers, as
+  pandas' overflow path), else floats, else booleans (`True`/`TRUE`/`true`, `False`/... and any
+  ASCII case), else text; pandas' missing-value words (`n/a`, `NaN`, `nan`, `NA`, `null`, `None`,
+  `#N/A`, the empty field, ...) NaN, an integer column with one of them float, a boolean one booleans
+  and NaN. Floats through larmorx's Rust port of pandas' `precise_xstrtod`
+  (`larmorx_confounds::pandas`; the infinity words `inf`, `Infinity` in any case).
+- **Writing**: the header and rows through Python's `csv` writer as pandas sets it up (`"`,
+  minimal quoting), floats as numpy's `astype(str)` (the shortest repr), `n/a` for missing values,
+  booleans `True`/`False`; the line end `\n` on every platform (pandas writes `os.linesep`, `\r\n`
+  on Windows; larmorx's files are Linux's everywhere); a `.gz` name with Python's `gzip.GzipFile`, as
+  pandas (the same content; the header's time stamp is the time of writing).
+- **JSON**: numbers with ujson's 10 decimals (pandas' vendored ujson, the same in both releases:
+  fixed notation, trailing zeros dropped, C's `%.10g` above `1e16 - 1` and below `1e-15`), NaN and
+  infinities `null`; then Python's `json`.
+
+The two releases differ in the exponent only: pandas 3.0.6 reads it with C's `strtol` (white space
+after the `e`, any number of digits) and turns an exponent above 308 into ±inf (or 0); pandas 2.2.3
+reads at most 17 digits right after the `e` and its sign, and an exponent above 308 or a result of
+±inf makes the token text (the column is then not a float column). Their integer parsers differ
+too: pandas 3.0.6 reads with C's `strtoll`, so a token whose digits leave int64's range but are
+followed by other characters (`99999999999999999999.5`, `1e300` written as `%.10f`) is no integer
+and goes on to the float parser, and integers beyond uint64 become Python integers; pandas 2.2.3
+reads digit by digit and overflows as soon as the digits leave the range, whatever follows, and
+keeps such a column as text (a column of `%.10f` values from 1e20 on is text in pandas 2.2.3).
+
+Corrected by default (`upstream_defects="reproduce"` gives pandas' values; a notice names each one
+when it changes a value):
+
+| ID | pandas does | larmorx by default |
+|---|---|---|
+| PD-01 | `precise_xstrtod` keeps at most 17 digit characters, the leading zeros of `0.00...` included, accumulates them in a double (rounding from the 16th digit on) and divides by one power of ten: most values `to_csv` writes (their shortest repr) come back as another double, one or more units in the last place off (186,107 of 200,000 motion-like values; every table of fMRIPrep's chain is read 4 to 5 times) | the correctly rounded value of the same text (the texts pandas accepts as floats, and only those, are floats) |
+| PD-02 | `to_json`'s ujson multiplies the fraction by 1e10 in floating point, truncates it and rounds the remainder (a tie with an even last digit down, with a last digit 0 up): some values get another 10th decimal than the correctly rounded one | the correctly rounded 10-decimal value (`TSV2JSON`, `docs/api/niworkflows-helpers.md`) |
+| PD-03 | an integer column with missing values marks them with int64's minimum before turning them into NaN, so a value -9223372036854775808 in it becomes NaN too | the value kept (as a float) |
+
+**Validation** (`check_tables.py`, sections `parse`, `read`, `write`, `ujson`, in the three
+environments): `precise_xstrtod`'s values bit for bit against `read_csv` on columns of numbers in
+Python's repr, `%.10f`, `%.18e`, `%0.6f`, `%.17g`, `%.25g`, `%.3E`, with white space and signs, from
+subnormals to 1e308, and the correctly rounded values against Python's `float`; odd tokens (exponent
+forms, overflow and underflow, missing-value words in other cases, infinity words, integers of every
+size, booleans, text) by type and value; whole files (the header's renaming, line ends, blank lines,
+quotes, short and long rows, empty files, int64's limits, unsigned and larger integers, booleans with
+missing values, compressed files) against `read_csv` (`reproduce`) and `read_csv(...,
+float_precision="round_trip")` (the default); `to_csv`'s text byte for byte (floats of every
+magnitude with NaN, infinities and -0.0, integers, booleans, text with tabs, quotes and line breaks,
+names that need quotes, tables without rows or columns; `.gz` by content); ujson's text against
+`Series.to_json` (magnitudes, ties, the thresholds, carries).

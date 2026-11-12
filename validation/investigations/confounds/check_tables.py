@@ -158,7 +158,8 @@ ODD_TOKENS = [
     "inf", "INF", "Inf", "+inf", "-inf", "infinity", "-Infinity", "+INFINITY", "infinit",
     "nan", "NaN", "NAN", "-NaN", "n/a", "N/A", "NA", "null", "NULL", "None", "#N/A", "<NA>",
     " n/a", "n/a ", "1.5x", "0x10", "1_000", "1,5", "1.5.6", "\v1.5", "1.5\f", "1e5 ", " 1e5",
-    "e5", "E5", "12", "-12", "+12", " 12 ", "9223372036854775807", "-9223372036854775808",
+    "e5", "E5", "12", "-12", "+12", " 12 ", "99999999999999999999 ", "99999999999999999999x",
+    "9223372036854775807", "-9223372036854775808",
     "9223372036854775808", "-9223372036854775809", "18446744073709551615",
     "18446744073709551616", "True", "false", "TRUE", "tRuE", "yes", "abc", "é", "1e5x",
 ]  # fmt: skip
@@ -216,8 +217,20 @@ def parse_section(tier: str, tmp: Path) -> None:
             if col.dtype == np.int64 and all(re.fullmatch(r"[ +-]*[0-9]+ *", x) for x in tokens):
                 APART[f"parse: integer texts, an int64 column ({vname}, {fname})"] += 1
                 continue
-            if col.dtype != np.float64 or got is None:
-                count(key, False, f"{vname}: pandas {col.dtype}, larmorx {got is not None}")
+            if col.dtype != np.float64:
+                # pandas did not reach its float parser (pandas 2.2: integer digits beyond
+                # uint64 overflow its integer parser and leave the column as text): the reader.
+                f = tmp / f"{vname}-{len(COUNTS)}.tsv"
+                f.write_text(text, encoding="utf-8")
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    t_ = tb.read_tsv(f, pandas_version=PANDAS, upstream_defects="reproduce")
+                ok = column_equal(col, t_.columns[0])
+                count(f"{key} (not floats: the reader)", ok, f"{vname}: pandas {col.dtype}")
+                APART[f"parse: pandas reads {vname} {fname} as {col.dtype}"] += 1
+                continue
+            if got is None:
+                count(key, False, f"{vname}: pandas float64, larmorx not floats")
                 continue
             count(key, bits_equal(col.to_numpy(), got[0]), f"{vname}: pandas' values")
             exact = np.array([float(t) for t in tokens])
@@ -259,6 +272,10 @@ def read_files(tmp: Path, rng: np.random.Generator) -> list[tuple[str, Path]]:
         "floats": b"x\ty\n0.1\tinf\n1e5\t-Infinity\nn/a\tINF\n",
         "ints-then-text": b"x\n1\n99999999999999999999\nabc\n",
         "text-then-big": b"x\nabc\n99999999999999999999\n",
+        "big-then-float": b"x\n99999999999999999999\n1.5\n",
+        "big-space": b"x\n99999999999999999999 \n1\n",
+        "neg-big": b"x\n-1\n18446744073709551615\n",
+        "uint-na-text": b"x\n18446744073709551615\nn/a\nabc\n",
     }
     motion = pd.DataFrame(rng.normal(0, 1e-3, (40, 6)), columns=list("abcdef"))
     raw = motion.to_csv(sep="\t", index=False, na_rep="n/a").encode()

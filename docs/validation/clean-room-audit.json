@@ -579,6 +579,14 @@
    "named": "2026-10-23",
    "since": "2026-10-23",
    "title": "other agents' scratch notes and archived scratch"
+  },
+  {
+   "basis": "decision log 2026-11-12 (FreeSurfer's borrowed pieces: each gets a clean room); docs/freesurfer/third-party.md",
+   "family": "FreeSurfer",
+   "id": "R19",
+   "named": "2026-11-12",
+   "since": "2026-11-12",
+   "title": "code FreeSurfer borrows from others, at its sources (GSL, Burkardt's spline, EPFL's B-spline code, Washington University's 4dfp tools)"
   }
  ],
  "schema": 1,

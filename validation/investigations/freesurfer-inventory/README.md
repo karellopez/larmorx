@@ -40,11 +40,17 @@ Their results are in `docs/freesurfer/` (closed too).
 - `report_code.py`: code.md's tables (Markdown on standard output) and `docs/freesurfer/code.toml`
   from the build graph and the three call-graph views (full, core, core calls-only); the commands
   in code.md §6.
-- `licences.py`: the third-party audit's first pass. For every file the programs on a default path
-  are built from (the call graph's full view, the targets' sources, the scripts and Python
-  programs), the notice in its first 80 lines and every other line that names another origin
-  (FreeSurfer's own copyright lines excluded). Used for `docs/freesurfer/third-party.md`.
+- `licences.py`: the third-party audit. For every file the programs on a default path are built
+  from (the call graph's full view, the targets' sources, the scripts and Python programs), the
+  notice in its first 80 lines, every other line that names a copyright, a licence or another
+  origin (two pattern sets; FreeSurfer's own copyright lines excluded), its licence family and
+  porting class; and the audit's findings (`FINDINGS`: code inside FreeSurfer's files that comes
+  from elsewhere) with the programs reaching each in the core and full views. `--toml-out` writes
+  `docs/freesurfer/third-party.toml`; `--rng` lists the reached functions whose bodies call a
+  random-number source (the seeds' findings). The families, classes and findings are the audit's
+  reading, each with its evidence in `docs/freesurfer/third-party.md`; the tool applies them.
 
       python -P validation/investigations/freesurfer-inventory/licences.py \
           <workspace>/tags/freesurfer-8.2.0 docs/freesurfer/programs.toml <scratch>/cmake.json \
-          <scratch>/full.json <scratch>/core.json --json <scratch>/licences.json
+          <scratch>/full.json <scratch>/core.json --json <scratch>/licences.json \
+          --toml-out docs/freesurfer/third-party.toml --rng <scratch>/rng.txt

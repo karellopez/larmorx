@@ -1,0 +1,82 @@
+{
+ "about": "Wall times (s) of fMRIPrep's multi-echo t2smap calls: tedana 26.0.3 once (fresh), the replica's default (larmorx-gpl 0.1.0rc1 from PyPI) and the clean-room original in both modes, best of two runs at each thread count; validation/investigations/t2smap-original/bench.py.",
+ "generated": "2026-11-11",
+ "commit": "3d934964",
+ "machine": {
+  "system": "Linux",
+  "machine": "x86_64",
+  "cpus": 32
+ },
+ "threads": [
+  1,
+  8
+ ],
+ "repeat": 2,
+ "calls": {
+  "ds000210-sub-02-cuedSGT-curvefit": {
+   "tedana": 27.53,
+   "replica default (1)": 30.24,
+   "original reproduce (1)": 2.73,
+   "original reproduce (1) identical to (1)": true,
+   "original fix (1)": 2.72,
+   "original fix (1) identical to (1)": true,
+   "replica default (8)": 10.48,
+   "original reproduce (8)": 1.44,
+   "original reproduce (8) identical to (1)": true,
+   "original fix (8)": 1.43,
+   "original fix (8) identical to (1)": true
+  },
+  "ds000210-sub-02-rest-curvefit": {
+   "tedana": 49.04,
+   "replica default (1)": 44.71,
+   "original reproduce (1)": 3.66,
+   "original reproduce (1) identical to (1)": true,
+   "original fix (1)": 3.67,
+   "original fix (1) identical to (1)": true,
+   "replica default (8)": 14.83,
+   "original reproduce (8)": 1.98,
+   "original reproduce (8) identical to (1)": true,
+   "original fix (8)": 1.95,
+   "original fix (8) identical to (1)": true
+  },
+  "ds000258-sub-21262-rest-curvefit": {
+   "tedana": 34.04,
+   "replica default (1)": 44.32,
+   "original reproduce (1)": 3.01,
+   "original reproduce (1) identical to (1)": true,
+   "original fix (1)": 2.92,
+   "original fix (1) identical to (1)": true,
+   "replica default (8)": 12.98,
+   "original reproduce (8)": 1.35,
+   "original reproduce (8) identical to (1)": true,
+   "original fix (8)": 1.33,
+   "original fix (8) identical to (1)": true
+  },
+  "ds003592-sub-280-rest-curvefit": {
+   "tedana": 47.1,
+   "replica default (1)": 43.35,
+   "original reproduce (1)": 3.16,
+   "original reproduce (1) identical to (1)": true,
+   "original fix (1)": 3.05,
+   "original fix (1) identical to (1)": true,
+   "replica default (8)": 12.61,
+   "original reproduce (8)": 1.56,
+   "original reproduce (8) identical to (1)": true,
+   "original fix (8)": 1.56,
+   "original fix (8) identical to (1)": true
+  },
+  "ds003592-sub-280-rest-loglin": {
+   "tedana": 6.24,
+   "replica default (1)": 10.1,
+   "original reproduce (1)": 3.05,
+   "original reproduce (1) identical to (1)": true,
+   "original fix (1)": 3.04,
+   "original fix (1) identical to (1)": true,
+   "replica default (8)": 8.4,
+   "original reproduce (8)": 1.53,
+   "original reproduce (8) identical to (1)": true,
+   "original fix (8)": 1.52,
+   "original fix (8) identical to (1)": true
+  }
+ }
+}

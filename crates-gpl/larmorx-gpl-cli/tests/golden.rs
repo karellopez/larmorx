@@ -16,7 +16,10 @@
 //! distinct code path: each fit type and mode, each combination, both naming conventions, the
 //! curve fit's variance maps, no mask (nilearn's mask), both adaptive-mask methods, dummy scans
 //! and excluded volumes, float32 and int16 inputs, a z-concatenated file, echo times in
-//! milliseconds, both library environments, D13's default and `reproduce`, and a failure.
+//! milliseconds, both library environments, D13's default and `reproduce`, and a failure; and
+//! since relay RS2 of the clean-room part (2026-11-12) TED-46's saturated voxels (the
+//! log-linear fit, the curve fit in both modes), TED-31's refusal, an ANALYZE 7.5 pair (SPM2's
+//! big-endian scaled int16, its origin) and an MGH image (its affine; nilearn's mask).
 //!
 //! Recording, on Linux x86_64 only, from a committed tree whose replica parity passes:
 //! `LARMORX_GOLDEN_RECORD=1 cargo test --locked -p larmorx-gpl-cli --test golden`
@@ -114,7 +117,10 @@ struct Case {
     tool: &'static str,
     /// t2smap's arguments, separated by blanks; `{name}` is the generated input `name` (`e1`,
     /// `e2`, `e3`: int16 echoes; `f1`, `f2`, `f3`: float32 echoes; `zcat`: the three int16
-    /// echoes along z; `mask`: uint8), relative to the case's directory.
+    /// echoes along z; `mask`: uint8; `s1` to `s3`: uint8 echoes with a block saturated at 255;
+    /// `d1`: the first echo negated; `a1` to `a3`: the int16 echoes as big-endian ANALYZE 7.5
+    /// pairs scaled by SPM2's factor and intercept; `g1` to `g3`: the int16 echoes as MGH
+    /// images), relative to the case's directory.
     args: &'static str,
     /// `LARMORX_UPSTREAM_DEFECTS`: `fix` (the default) or `reproduce`.
     mode: &'static str,
@@ -212,6 +218,60 @@ const CASES: &[Case] = &[
         mode: "fix",
         libraries: "newest",
         status: 1,
+    },
+    // TED-46 (relay RS2): voxels saturated at 255 in every echo and volume take the exact
+    // slope 0 in the log-linear fit, and the curve fit's exact solution (S0 255, no decay)
+    Case {
+        id: "ted46.loglin",
+        tool: "tedana t2smap",
+        args: "-d {s1} {s2} {s3} -e 0.012 0.028 0.044 --mask {mask} --out-dir out",
+        mode: "fix",
+        libraries: "newest",
+        status: 0,
+    },
+    Case {
+        id: "ted46.curvefit",
+        tool: "tedana t2smap",
+        args: "-d {s1} {s2} {s3} -e 0.012 0.028 0.044 --mask {mask} --fittype curvefit --verbose --out-dir out",
+        mode: "fix",
+        libraries: "newest",
+        status: 0,
+    },
+    // tedana's rounding noise there (numpy's batched least squares, exactly)
+    Case {
+        id: "ted46.curvefit.reproduce",
+        tool: "tedana t2smap",
+        args: "-d {s1} {s2} {s3} -e 0.012 0.028 0.044 --mask {mask} --fittype curvefit --verbose --out-dir out",
+        mode: "reproduce",
+        libraries: "newest",
+        status: 0,
+    },
+    // TED-31: the adaptive mask leaves no voxel for the fit (a negative first echo)
+    Case {
+        id: "ted31",
+        tool: "tedana t2smap",
+        args: "-d {d1} {e2} {e3} -e 0.012 0.028 0.044 --mask {mask} --masktype none --out-dir out",
+        mode: "fix",
+        libraries: "newest",
+        status: 1,
+    },
+    // ANALYZE 7.5 (SPM2's big-endian int16 with a scale factor, an intercept and an origin)
+    Case {
+        id: "analyze.scaled",
+        tool: "tedana t2smap",
+        args: "-d {a1} {a2} {a3} -e 0.012 0.028 0.044 --mask {mask} --out-dir out",
+        mode: "fix",
+        libraries: "newest",
+        status: 0,
+    },
+    // MGH (an affine of direction cosines and a centre; nilearn's mask of the first echo)
+    Case {
+        id: "mgh.nomask",
+        tool: "tedana t2smap",
+        args: "-d {g1} {g2} {g3} -e 12 28 44 --out-dir out",
+        mode: "fix",
+        libraries: "newest",
+        status: 0,
     },
 ];
 
@@ -333,6 +393,70 @@ fn int16_bytes(values: impl Iterator<Item = i64>) -> Vec<u8> {
         .collect()
 }
 
+/// An ANALYZE 7.5 pair of big-endian int16 data (`.hdr` 348 bytes, `.img`) with SPM2's scale
+/// factor (`funused1`) and intercept (`funused2`) and SPM's origin (1-based voxel (9, 8, 5), so
+/// that its affine is the mask's).
+fn analyze_pair(hdr: &Path, dims: &[usize], values: impl Iterator<Item = i64>) {
+    let mut h = vec![0u8; 348];
+    let put_i32 = |h: &mut Vec<u8>, o: usize, v: i32| h[o..o + 4].copy_from_slice(&v.to_be_bytes());
+    let put_i16 = |h: &mut Vec<u8>, o: usize, v: i16| h[o..o + 2].copy_from_slice(&v.to_be_bytes());
+    let put_f32 = |h: &mut Vec<u8>, o: usize, v: f32| h[o..o + 4].copy_from_slice(&v.to_be_bytes());
+    put_i32(&mut h, 0, 348);
+    h[38] = b'r';
+    put_i16(&mut h, 40, dims.len() as i16);
+    for (k, d) in dims.iter().enumerate() {
+        put_i16(&mut h, 42 + 2 * k, *d as i16);
+    }
+    for k in dims.len()..7 {
+        put_i16(&mut h, 42 + 2 * k, 1);
+    }
+    put_i16(&mut h, 70, 4);
+    put_i16(&mut h, 72, 16);
+    for (k, d) in PIXDIM.iter().enumerate() {
+        put_f32(&mut h, 80 + 4 * k, *d);
+    }
+    put_f32(&mut h, 92, 2.0);
+    put_f32(&mut h, 112, 2.0);
+    put_f32(&mut h, 116, 0.5);
+    for (k, o) in [9i16, 8, 5].iter().enumerate() {
+        put_i16(&mut h, 253 + 2 * k, *o);
+    }
+    std::fs::write(hdr, h).unwrap();
+    let data: Vec<u8> = values
+        .flat_map(|x| i16::try_from(x).unwrap().to_be_bytes())
+        .collect();
+    std::fs::write(hdr.with_extension("img"), data).unwrap();
+}
+
+/// An MGH image (`.mgh`) of int16 data: big-endian, voxel sizes 3 x 3 x 3.5 mm, direction
+/// cosines of an LIA orientation, a centre off the grid's, the TR (2000 ms) in its footer.
+fn mgh_file(path: &Path, dims: &[usize], values: impl Iterator<Item = i64>) {
+    let mut h = vec![0u8; 284];
+    let put_i32 = |h: &mut Vec<u8>, o: usize, v: i32| h[o..o + 4].copy_from_slice(&v.to_be_bytes());
+    let put_f32 = |h: &mut Vec<u8>, o: usize, v: f32| h[o..o + 4].copy_from_slice(&v.to_be_bytes());
+    put_i32(&mut h, 0, 1);
+    for (k, d) in dims.iter().enumerate() {
+        put_i32(&mut h, 4 + 4 * k, *d as i32);
+    }
+    put_i32(&mut h, 20, 4);
+    h[28..30].copy_from_slice(&1i16.to_be_bytes());
+    for (k, d) in PIXDIM.iter().enumerate() {
+        put_f32(&mut h, 30 + 4 * k, *d);
+    }
+    let mdc = [-1.0f32, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0, 1.0, 0.0];
+    for (k, v) in mdc.iter().enumerate() {
+        put_f32(&mut h, 42 + 4 * k, *v);
+    }
+    for (k, c) in [1.25f32, -2.5, 3.375].iter().enumerate() {
+        put_f32(&mut h, 78 + 4 * k, *c);
+    }
+    let mut bytes = h;
+    bytes.extend(values.flat_map(|x| i16::try_from(x).unwrap().to_be_bytes()));
+    bytes.extend_from_slice(&2000.0f32.to_be_bytes());
+    bytes.extend_from_slice(&[0u8; 16]);
+    std::fs::write(path, bytes).unwrap();
+}
+
 /// The generated inputs in `dir/inputs`, by name.
 fn write_inputs(dir: &Path) -> BTreeMap<&'static str, PathBuf> {
     let dir = dir.join("inputs");
@@ -390,6 +514,58 @@ fn write_inputs(dir: &Path) -> BTreeMap<&'static str, PathBuf> {
     let path = dir.join("zcat.nii");
     nifti_file(&path, &[nx, ny, nz * ECHOES, VOLUMES], 4, 16, &ordered);
     paths.insert("zcat", path);
+    // relay RS2: uint8 echoes (a fifth of the int16 ones) with a block saturated at 255 in
+    // every echo and volume (TED-46); the first echo negated (TED-31); the int16 echoes as
+    // ANALYZE pairs (stored (x - 0.5) / 2 floored, scaled back by 2 and 0.5) and MGH images
+    for (e, name) in ["s1", "s2", "s3"].into_iter().enumerate() {
+        let mut bytes = Vec::with_capacity(nvox * VOLUMES);
+        for vol in &echoes[e] {
+            for k in 0..nz {
+                for j in 0..ny {
+                    for i in 0..nx {
+                        let x = vol[i + nx * (j + ny * k)];
+                        let block =
+                            (6..=8).contains(&i) && (6..=8).contains(&j) && (3..=4).contains(&k);
+                        bytes.push(if block {
+                            255
+                        } else {
+                            (x / 5).clamp(0, 254) as u8
+                        });
+                    }
+                }
+            }
+        }
+        let path = dir.join(format!("{name}.nii"));
+        nifti_file(&path, &dims, 2, 8, &bytes);
+        paths.insert(name, path);
+    }
+    let path = dir.join("d1.nii");
+    nifti_file(
+        &path,
+        &dims,
+        4,
+        16,
+        &int16_bytes(echoes[0].iter().flatten().map(|&x| -x)),
+    );
+    paths.insert("d1", path);
+    for (e, (a, g)) in [("a1", "g1"), ("a2", "g2"), ("a3", "g3")]
+        .into_iter()
+        .enumerate()
+    {
+        let path = dir.join(format!("{a}.hdr"));
+        analyze_pair(
+            &path,
+            &dims,
+            echoes[e]
+                .iter()
+                .flatten()
+                .map(|&x| (2 * x - 1).div_euclid(4)),
+        );
+        paths.insert(a, path);
+        let path = dir.join(format!("{g}.mgh"));
+        mgh_file(&path, &dims, echoes[e].iter().flatten().copied());
+        paths.insert(g, path);
+    }
     // the mask: the head shrunk by one voxel, uint8
     let mut mask = Vec::with_capacity(nvox);
     for k in 0..nz {

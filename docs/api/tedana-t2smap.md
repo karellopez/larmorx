@@ -21,18 +21,31 @@ in two implementations ([licensing](../licensing.md)):
 - the bit-exact **replica** (2026-11-08), `larmorx-gpl tedana t2smap` (package `larmorx-gpl`,
   under the GNU GPL version 3 only: tedana's LGPL-2.1 converted under its section 3;
   [PROVENANCE](../../crates-gpl/larmorx-gpl-tedana/PROVENANCE.md)), run as a separate program;
-- the **clean-room original**, `crates/larmorx-tedana` in the main package (Apache-2.0, from
-  `specs/t2smap.md`): still to be written.
+- the **clean-room original**, `crates/larmorx-tedana` in the main package (Apache-2.0, written
+  from `specs/t2smap.md` by implementers who never read tedana's source or the replica's code,
+  2026-11-11; [PROVENANCE](../../crates/larmorx-tedana/PROVENANCE.md)), built for speed: the
+  log-linear fit per voxel in closed form, its own trust-region curve fit on the per-echo means,
+  deterministic threads (the same files at any `--n-threads`), every option, message, exit status
+  and defect of the spec; run in this process by `lx.tedana.t2smap` and `larmorx tedana t2smap`
+  since 2026-11-12 (its own binding, `larmorx._core.tedana_t2smap_cleanroom(args, env, cwd)`:
+  tedana's arguments, an environment table, the directory; `(exit status, standard output,
+  standard error)`, serves the validation tools). Its `reproduce` gives tedana's defects exactly
+  and its fitted numbers within the spec's thresholds (§17.3), not bit for bit: the replica is
+  the exact one (but at TED-46's voxels of equal observations, whose values are tedana's
+  rounding noise: there `reproduce` computes them with the main package's exact ports of numpy's
+  `lstsq` and SciPy's `curve_fit`, since 2026-11-12).
 
-Until the original exists, the replica is the only implementation: `implementation="auto"` and
-`"replica"` run it when `larmorx-gpl` is installed (`pip install larmorx-gpl`, or `pip install
-"larmorx[all]"`) and raise `ReplicaNotFoundError` with that command otherwise; `"clean-room"`
-(`"original"`, 0.1.0rc1's spelling, still works) raises `NotImplementedError`. The command line does the same (`--implementation`
-before the family, or `LARMORX_IMPLEMENTATION`; exit 127 with
-the command that installs it). The program is found through `LARMORX_GPL_BIN`, then the Python
-environment's scripts directory, then `PATH`.
+`implementation="auto"` (the default) runs the replica when `larmorx-gpl` is installed (`pip
+install larmorx-gpl`, or `pip install "larmorx[all]"`), else the clean-room original;
+`"replica"` runs the replica or raises `ReplicaNotFoundError` with that command; `"clean-room"`
+(`"original"`, 0.1.0rc1's spelling, still works, with a `DeprecationWarning`) runs the clean-room
+original. The command line does the same (`--implementation` before the family, or
+`LARMORX_IMPLEMENTATION`; `replica` without the program exits 127 with the command that installs
+it): `larmorx --implementation clean-room tedana t2smap -d ... -e ...`. The program is found
+through `LARMORX_GPL_BIN`, then the Python environment's scripts directory, then `PATH`.
 
-**Status: `experimental`** (the record `tedana-t2smap-replica`, random testing; below).
+**Status: `experimental`** (the records `tedana-t2smap-replica` and `tedana-t2smap-original`,
+random testing; below).
 
 ## Usage
 
@@ -59,6 +72,8 @@ res = lx.tedana.t2smap(echoes, tes, mask=mask, out_dir="derivatives/t2smap", con
 ```bash
 larmorx tedana t2smap -d echo-1.nii.gz echo-2.nii.gz echo-3.nii.gz -e 14.0 29.96 45.92 \
     --mask mask.nii.gz --fittype curvefit --out-dir t2smap
+larmorx --implementation clean-room --n-threads 8 tedana t2smap -d echo-1.nii.gz \
+    echo-2.nii.gz echo-3.nii.gz -e 14.0 29.96 45.92 --mask mask.nii.gz --out-dir t2smap-cr
 ```
 
 Inputs are paths or in-memory images (an `lx.Image`, a nibabel image, an `(array, affine)` pair),
@@ -70,8 +85,10 @@ tedana refuses to overwrite an existing one unless `overwrite=True`). The result
 NaN for tedana's `n/a`), `fit_failures`, `t2star_variance`, `s0_variance`,
 `t2star_s0_covariance` (or `None`), `dataset_description`, `files` (tedana's registry: each
 file's name by its description), `out_dir`, `log` (tedana's log, its standard error without
-larmorx's notice lines) and `implementation`. A run that fails raises `ReplicaError` (a
-`RuntimeError`) with tedana's messages and exit status.
+larmorx's notice lines) and `implementation` (the `larmorx-gpl` replica, or the clean-room
+original: `Implementation(kind="clean-room", package="larmorx", ...)`). A run of the replica
+that fails raises `ReplicaError` (a `RuntimeError`) with tedana's messages and exit status; one of
+the clean-room original a `RuntimeError` with the same messages.
 
 ## Options
 
@@ -92,14 +109,14 @@ larmorx's notice lines) and `implementation`. A run that fails raises `ReplicaEr
 | `--fitmode {all,ts}` | `fitmode="all"` | one fit per voxel over all volumes, or one per voxel and volume (4D maps) |
 | `--combmode {t2s,paid}` | `combmode="t2s"` | the combination's weights: TE · exp(-TE / T2*), or PAID's temporal SNR |
 | `--n-independent-echos INT` | `n_independent_echos=None` | the number of independent echoes (EPTI): only tedana's warnings change |
-| `--n-threads INT` | `n_threads=1` (0: all logical CPUs, passed as -1) | threads; tedana's limit for its BLAS and its curve-fit processes. On the command line, when it is not given, larmorx's own `--n-threads` before the family applies (`larmorx --n-threads 4 tedana t2smap ...`; else `OMP_NUM_THREADS`, else every logical CPU), not tedana's default of 1. The replica's results never depend on it (it gives tedana's one-thread results; tedana's own log-linear maps change with BLAS threads in a few voxels' last bits) |
+| `--n-threads INT` | `n_threads=1` (0: all logical CPUs, passed as -1) | threads; tedana's limit for its BLAS and its curve-fit processes. On the command line, when it is not given, larmorx's own `--n-threads` before the family applies (`larmorx --n-threads 4 tedana t2smap ...`; else `OMP_NUM_THREADS`, else every logical CPU), not tedana's default of 1. The replica's results never depend on it (it gives tedana's one-thread results; tedana's own log-linear maps change with BLAS threads in a few voxels' last bits), nor the clean-room original's (the same files at any count) |
 | `--debug` | `debug=False` | the log at DEBUG level (the help's TSV log file is never written: tedana's, kept) |
 | `--quiet` (hidden) | `quiet=False` | the log at WARNING level |
 | `-h`, `--help` | - | the usage (argparse's, exit 0) |
 | `-v`, `--version` | - | `t2smap v26.0.3` (exit 0) |
-| `LARMORX_UPSTREAM_DEFECTS` | `upstream_defects="fix"` | `"reproduce"` gives tedana's files bit for bit (its defects and its maths, below) |
+| `LARMORX_UPSTREAM_DEFECTS` | `upstream_defects="fix"` | `"reproduce"` gives tedana's files: bit for bit by the replica (its defects and its maths, below), and by the clean-room original with tedana's defects exactly and its fitted numbers within the spec's thresholds (§17.3; exactly at TED-46's voxels) |
 | `LARMORX_TEDANA_LIBRARIES` | `libraries="newest"` | the numpy and SciPy whose arithmetic is reproduced: `newest` (numpy 2.5.4, SciPy 1.18.1) or `shared` (numpy 2.3.5, SciPy 1.15.3); the curve fit's last bits differ between them |
-| `--implementation` (before the family) | `implementation="auto"` | `"auto"` or `"replica"` (the replica), `"clean-room"` (none yet) |
+| `--implementation` (before the family) | `implementation="auto"` | `"auto"` (the replica when larmorx-gpl is installed, else the clean-room original), `"replica"`, `"clean-room"` (`"original"`, the old spelling, warns) |
 
 argparse's errors exit 2 with tedana's usage and message; any other failure exits 1 with Python's
 traceback lines (its first and last; the stack itself is not reproduced). The Python wrapper
@@ -139,13 +156,14 @@ whose arithmetic it reproduces; every other key is tedana's (the host's `uname` 
 ## Upstream defects
 
 Corrected by default (D13; [the register](upstream-defects.md)), each with a notice
-(`larmorx-gpl: upstream defect TED-.. (tedana) corrected: ...` on standard error, an
-`UpstreamDefectWarning` in Python) where the correction changed the result, and reproduced with
+(`larmorx-gpl: upstream defect TED-.. (tedana) corrected: ...` on standard error from the
+replica, `larmorx: upstream defect ...` from the clean-room original, an `UpstreamDefectWarning`
+in Python) where the correction changed the result, and reproduced with
 `upstream_defects="reproduce"` (`LARMORX_UPSTREAM_DEFECTS=reproduce`):
 
 | ID | tedana 26.0.3 | larmorx by default |
 |---|---|---|
-| TED-01 | a NaN among the first echo's temporal means (a NaN sample, or no volume left) makes the dropout mask's 33rd percentile NaN: `ValueError: attempt to get argmax of an empty sequence` | the percentile and the reference voxels from the finite means; a clear error when none is finite |
+| TED-01 | a NaN among the first echo's temporal means (a NaN sample, or no volume left) makes the dropout mask's 33rd percentile NaN: `ValueError: attempt to get argmax of an empty sequence` | the percentile and the reference voxels from the means that are not NaN; a clear error when none is a number |
 | TED-02 | `--exclude` accepts an index equal to the number of volumes, then fails with numpy's IndexError | refused with the check's own message, as a larger index is |
 | TED-03 | without `--mask`, an empty mask from nilearn (or too few voxels for its threshold) fails later with IndexError or ValueError | refused with a clear error |
 | TED-04 | a user mask's affine is never compared with the data's | refused with nilearn's message when they differ |
@@ -162,6 +180,8 @@ Corrected by default (D13; [the register](upstream-defects.md)), each with a not
 | TED-16 | `--exclude` that removes every volume: nothing is fitted, and every voxel's T2* (500 ms) and S0 (1) are written with exit status 0 | refused with a clear error |
 | TED-17 | a single voxel left for the fit fails with `IndexError: too many indices for array` | fitted |
 | TED-18 | when more than 99.5 % of the limited T2* map's values are 0 (voxels of one good echo), its cap is 0 and every limited T2* is set to 0 | no cap of 0 or less, on either map |
+| TED-31 | an adaptive mask that removes every voxel fails with `IndexError: index 0 is out of bounds for axis 1 with size 0` | refused with a clear `ValueError` (no voxel has good signal, nothing to fit) |
+| TED-46 | a voxel whose log-linear observations are all equal (no decay: saturated samples) gets the batched least squares' rounding noise as its slope: T2* 1 ms, or 1e16 ms and more (the cap with it); in `curvefit` the fit then fails or keeps that size | the exact slope 0 (T2* 500 ms after the floor), the other voxels unchanged; in `curvefit`, where the samples themselves are all equal, the curve fit's exact solution (S0 the samples' value, no decay, not a failure; both implementations since 2026-11-12, `specs/t2smap.md` §7.3) |
 
 TED-06 (a curve fit whose log-linear start lies outside its bounds, T2* <= 0 or S0 below the
 voxel's lowest signal, is a silent failure keeping the log-linear estimate: 1,919 of the 1,930
@@ -195,15 +215,19 @@ and `reproduce` (which names them the same way) take about as long as tedana at 
 - **The record** [`tedana-t2smap-replica`](../validation/tedana-t2smap-replica.md) (the parity
   suite, tedana 26.0.3 as a program through the oracle-output cache, in both library
   environments: numpy 2.5.4 / SciPy 1.18.1 and numpy 2.3.5 / SciPy 1.15.3, OpenBLAS on its
-  Haswell kernels, numpy's AVX-512 kernels off, one BLAS thread): 69 cases, 44 bit-identical
-  (every output file, header, log line and Python warning, the exit status and the last error
-  line), 25 rejected by both alike, 0 failures: fMRIPrep's four multi-echo calls (ds003592,
-  ds000210's two tasks and ds000258 with curvefit, ds003592's with loglin), 32 synthetic cases
-  (every option and path: no mask, scaled int16, z-concatenated, PAID, `--fitmode ts`,
-  `--verbose`, nine echoes, one volume, existing outputs) and the failure cases of every defect;
-  each case's D13 fix pass (a defect named exactly where the default changes an output); tedana's
-  own step between the releases and its spread (numpy's AVX-512 kernels, threads, tedana 25.0.1
-  in fMRIPrep's image) reported; fMRIPrep's own files compared with tedana 26.0.3's and with the
+  Haswell kernels, numpy's AVX-512 kernels off, one BLAS thread; made again 2026-11-12): 102
+  cases, 62 bit-identical (every output file, header, log line and Python warning, the chain of
+  tracebacks, the exit status and the last error line), 40 rejected by both alike, 0 failures:
+  fMRIPrep's four multi-echo calls (ds003592, ds000210's two tasks and ds000258 with curvefit,
+  ds003592's with loglin; ds000210's and ds000258's inputs from the oracle runs made again with
+  OpenBLAS's Haswell kernels, 2026-11-09), 32 synthetic cases (every option and path: no mask,
+  scaled int16, z-concatenated, PAID, `--fitmode ts`, `--verbose`, nine echoes, one volume,
+  existing outputs), 20 ANALYZE and MGH cases (below) and the failure cases of every defect (24:
+  since 2026-11-12 also TED-31, TED-46, the chained tracebacks, the temporal means' and the
+  cast's warnings, numpy's scientific thresholds, `--fitmode ts` with no volume); each case's D13
+  fix pass (a defect named exactly where the default changes an output); tedana's own step
+  between the releases and its spread (numpy's AVX-512 kernels, threads, tedana 25.0.1 in
+  fMRIPrep's image) reported; fMRIPrep's own files compared with tedana 26.0.3's and with the
   default's; and random testing's 18 permanent cases (below).
 - **Random testing** (`difftest --tools tedana-t2smap`, [the descriptor](../validation/difftest.md)):
   the trial (30 minutes, 3,886 random cases: two to six echoes, every option, data type, file form,
@@ -213,14 +237,23 @@ and `reproduce` (which names them the same way) take about as long as tedana at 
   rank, the maths notices) or registered (TED-16, TED-17, TED-18); every one agrees with the final
   build, 17 kept as permanent cases (`validation/difftest/cases/tedana-t2smap/`); a 10-minute check of
   the final build: 1,268 cases, no difference (one notice, made exact: an 18th permanent case).
+  Since 2026-11-12 the descriptor also draws ANALYZE 7.5 pairs (with or without a `.mat`) and MGH
+  images (30 such draws agree).
 - **Beneath**: the command line on 109 cases (help at 19 widths, every error), the numerics bit
   for bit (numpy's reductions, percentiles and float32 log, `lstsq` on tedana's own calls, SciPy's
   `curve_fit` on tedana's own 169,344 calls), nibabel's qform on 4,000 headers.
-- **Golden**: larmorx-gpl's 10 cases (`crates-gpl/larmorx-gpl-cli/tests/golden.rs`: each fit type
+- **Golden**: larmorx-gpl's 16 cases (`crates-gpl/larmorx-gpl-cli/tests/golden.rs`: each fit type
   and mode, both combinations and naming conventions, the variance maps, no mask, both mask
   methods, dummy scans and an excluded volume, float32 and int16, a z-concatenated file, echo
-  times in ms, both library environments, both modes, a failure) on every platform (CI's `gpl`
-  job).
+  times in ms, both library environments, both modes, a failure; since 2026-11-12 TED-46 in the
+  log-linear fit and the curve fit in both modes, TED-31, an ANALYZE 7.5 pair and an MGH image)
+  on every platform (CI's `gpl` job).
+- **ANALYZE 7.5 and MGH/MGZ** (2026-11-12): read as nibabel 5.4.2 loads them, through the main
+  package's reader (`larmorx_tedana::formats`) with the conversion tedana makes (`data.rs`): the
+  suite's 20 `formats/` cases (both byte orders, every stored type, SPM2's scalings, the origin,
+  `.mat` files, compressed pairs, masks, z-concatenated files, MGH's affine and footer, nibabel's
+  failures) bit for bit in both environments, and the clean-room part's 104 replayed random cases
+  with those inputs, every file identical; complex and RGB ANALYZE stay refused (D5).
 - **Memory** (`tests/parity/test_memory_peak.py`, fMRIPrep's ds003592 call): 545 MiB (curvefit)
   and 543 MiB (loglin) at the peak, against tedana's 1,243 and 1,224 MiB.
 - **Speed** ([benchmarks](../benchmarks/tedana-t2smap.md); fMRIPrep's four curvefit calls and
@@ -228,4 +261,58 @@ and `reproduce` (which names them the same way) take about as long as tedana at 
   the curve-fit calls and 6 s on the log-linear one at one thread; the replica, whose both modes
   run the maths notices' passes (four in all on these calls), 31 to 45 s at one thread (0.8 to 1.1
   times tedana's speed) and 9 to 13 s at 14 threads (3 to 4 times), and 10 s / 8 s on the
-  log-linear call (tedana is faster there). The clean-room original is to be the fast one.
+  log-linear call (tedana is faster there). The clean-room original is the fast one (below).
+
+**The clean-room original** (2026-11-11):
+
+- **The record** [`tedana-t2smap-original`](../validation/tedana-t2smap-original.md) (from a clean
+  commit, the full tier; made again 2026-11-12 against a replica built from the same branch):
+  125 cases, 124 pass, 1 expected divergence (a chaotic curve-fit regime: SciPy's own
+  floating-point warnings inside its steps), 0 failures. (A) the original
+  in `reproduce` against tedana 26.0.3 (the oracle-output cache's runs) and (B) its default against
+  the replica's default: exit status, standard output, every message (Python warnings' location
+  lines aside), the files, the values by the spec's `check.py` (§17.3); the spec probe's 54 cases
+  and 88 more (every option, the readers: NIfTI pairs, ANALYZE 7.5, MGH/MGZ; TED-46's saturated
+  voxels in both fits and modes, every value at those voxels tedana's in `reproduce` and the
+  replica's in the default), thread invariance at 1, 4 and 8 threads, and fMRIPrep's six multi-echo calls
+  (ds003592 with loglin, curvefit and `--verbose`; ds000210's two tasks and ds000258 from the
+  oracle runs made with OpenBLAS's Haswell kernels): all pass (A) and (B); the share of the curve
+  fit's voxels judged by §17.3's objective criteria rather than by value 0 to 0.305 %.
+- **Golden**: 14 cases (`tests/golden/registry.py`): 12 through its own binding
+  (`tedana.t2smap.cleanroom.*`: each fit type and mode, both combinations and conventions, the
+  variance maps, a computed mask, the mask methods, dummy scans and an excluded volume, float32,
+  NIfTI-2 and int16 z-concatenated inputs, ANALYZE and MGH, `reproduce` with numpy 2.3.5's
+  results, four refusals; since 2026-11-12 `ted46`: saturated voxels, tedana's noise in
+  `reproduce` and the curve fit's exact solution, +∞ with two samples) and, since the wiring
+  (2026-11-12), two through the public entry points:
+  `cli.tedana.t2smap` (`larmorx --n-threads 2 --upstream-defects reproduce --implementation
+  clean-room tedana t2smap ...`) and `py.tedana.t2smap` (`lx.tedana.t2smap(...,
+  implementation="clean-room")` with in-memory echoes, the curve fit with `verbose`: every image of
+  the result, the table, the registry, the log and the notices); every written file, the exit
+  status and both streams, on every platform.
+- **The wiring's tests** (2026-11-12): the standalone `larmorx` binary gives the crate's own files
+  (`crates/larmorx-cli/tests/tedana_t2smap.rs`), larmorx's options before the family give the
+  bytes of the variables they replace and win over them, `auto` without `larmorx-gpl` runs the
+  original and `replica` exits 127, the thread count reaches the run; `lx.tedana.t2smap` and the
+  console script give the binding's files (`tests/python/test_tedana_cleanroom.py`); without its
+  own `--n-threads` t2smap takes `OMP_NUM_THREADS` (larmorx's `--n-threads`), else every logical
+  CPU, as the replica's program does.
+- **Memory** (`tests/parity/test_memory_peak.py`, fMRIPrep's ds003592 curvefit call): 307 MiB at
+  one thread (both modes) and 546 MiB at eight, against tedana's 1,244 MiB.
+- **Speed** ([benchmarks](../benchmarks/tedana-t2smap.md), "The clean-room original"; a shared
+  machine, best of two runs): 2.7 to 3.7 s at one thread on fMRIPrep's four curve-fit calls (10 to
+  15 times tedana's speed) and 1.3 to 2.0 s at eight threads (19 to 30 times); 3.0 s and 1.5 s on
+  the log-linear call (tedana 6.2 s); the same files at 1 and 8 threads.
+- **Two defects of its own part** (2026-11-11, relay 3c): **TED-31** (rule B), a run whose adaptive mask
+  removes every voxel, where tedana fails with `IndexError: index 0 is out of bounds for axis 1 with size
+  0`: by default a clear `ValueError` (no voxel has good signal, nothing to fit); **TED-46** (rule A, the
+  orchestrator's decision), a voxel whose log-linear observations have no slope (all equal: no decay),
+  where tedana's batched least squares leaves its rounding noise (T2* 1 ms, or 1e16 ms and more): the
+  slope 0 (T2* 500 ms after the floor) with its notice, and in the curve fit, where the samples are
+  all equal, the exact solution (S0 the samples' value, T2* +∞, not a failure, variances 0, or +∞
+  with SciPy's warning for two samples: spec writer 4's measurement, 2026-11-12); since 2026-11-12
+  `reproduce` computes tedana's noise there (the group's batch through the main package's exact
+  port of numpy's `lstsq`) and fits those voxels with its exact port of SciPy's `curve_fit` (from
+  a start of 1e13 s SciPy's forward differences move S0 only, where the original's own solver
+  moved T2* as well): every value at those voxels tedana's.
+- **Findings**: [`tedana-t2smap-original`](../findings/tedana-t2smap-original.md).

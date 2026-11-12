@@ -8,6 +8,9 @@
 #                                           at the browser's default 300 x 150 (a viewer whose drawing throws,
 #                                           e.g. a default view naming a comparison without images, passes the
 #                                           viewer check but draws nothing)
+#   site_checks.sh <site> <port> <out> views      every view of every viewer drawn (2026-11-12): each output in
+#                                           each plane selected in turn; no error thrown, no status message
+#                                           left, no canvas at the browser's default size, every window a number
 #   site_checks.sh <site> <port> <out> shots <name>=<css selector>...
 #                                           element screenshots at 1440 and 390, light and dark, each element
 #                                           scrolled into view and given 5 s to draw first
@@ -31,6 +34,9 @@ case $WHAT in
   drawn)
     shoot --out "$OUT" --name drawn \
       --eval "(async () => { const out = []; for (const e of document.querySelectorAll('.ev-example')) { e.scrollIntoView(); await new Promise(r => setTimeout(r, 8000)); const st = e.querySelector('.ev-status'); const cs = [...e.querySelectorAll('.ev-live canvas')]; out.push([e.id, st && !st.hidden ? st.textContent.slice(0, 120) : 'drawn', cs.length, cs.filter(c => c.width === 300 && c.height === 150).length]); } return out; })()" ;;
+  views)
+    shoot --out "$OUT" --name views \
+      --eval "(async () => { const errs = []; window.addEventListener('error', e => errs.push(String(e.message))); const out = []; for (const e of document.querySelectorAll('.ev-example')) { e.scrollIntoView(); await new Promise(r => setTimeout(r, 6000)); const outs = [...e.querySelectorAll('.ev-seg[aria-label=Output] button')]; const planes = [...e.querySelectorAll('.ev-seg[aria-label=Plane] button')]; let n = 0, bad = []; for (const o of (outs.length ? outs : [null])) { if (o) o.click(); for (const p of planes) { p.click(); await new Promise(r => setTimeout(r, 1200)); n++; const st = e.querySelector('.ev-status'); const cs = [...e.querySelectorAll('.ev-live canvas')]; const wins = [...e.querySelectorAll('input')].filter(i => i.type !== 'range' && i.type !== 'checkbox' && !i.disabled).map(i => i.value); if ((st && !st.hidden) || !cs.length || cs.some(c => c.width === 300 && c.height === 150) || wins.some(v => v === '' || v === 'NaN')) bad.push([o ? o.textContent : '-', p.textContent]); } } out.push([e.id, n, bad]); } return [out, errs]; })()" ;;
   shots)
     for spec in "$@"; do
       name=${spec%%=*}; sel=${spec#*=}

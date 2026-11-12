@@ -323,13 +323,13 @@ pub const REPLICAS: &[Replica] = &[
         location: Location::Program(&LARMORX_NC),
         original: true,
     },
-    // tedana 26.0.3's t2smap (2026-11-08): the replica only, in larmorx-gpl; its clean-room
-    // original (crates/larmorx-tedana, from specs/t2smap.md) is still to be written.
+    // tedana 26.0.3's t2smap: the replica (2026-11-08, in larmorx-gpl), and its clean-room
+    // original (`larmorx_tedana::cli`, written from specs/t2smap.md, 2026-11-11).
     Replica {
         family: "tedana",
         tool: "t2smap",
         location: Location::Program(&LARMORX_GPL),
-        original: false,
+        original: true,
     },
 ];
 
@@ -920,25 +920,29 @@ mod tests {
         assert_eq!(replica_only("ants").count(), 0);
         // every FSL tool has its clean-room original (prelude's since 2026-11-06)
         assert_eq!(replica_only("fsl").count(), 0);
-        // tedana's t2smap has only its replica (larmorx-gpl) until its clean-room original
+        // tedana's t2smap: its replica (larmorx-gpl) and, since 2026-11-11, its clean-room
+        // original; no tool has only its replica now (the stand-ins above keep that path)
         let t2smap = lookup("tedana", "t2smap").unwrap();
-        assert_eq!(replica_only("tedana").collect::<Vec<_>>(), ["t2smap"]);
+        assert!(t2smap.original);
+        assert_eq!(replica_only("tedana").count(), 0);
         assert_eq!(t2smap.package(), Some(&LARMORX_GPL));
         assert_eq!(t2smap.licence(), "GPL-3.0-only");
         assert!(matches!(
             choose_with(Implementation::Auto, t2smap, found),
             Ok(Choice::Replica(_))
         ));
-        let e = choose_with(Implementation::Auto, t2smap, missing).unwrap_err();
+        assert_eq!(
+            choose_with(Implementation::Auto, t2smap, missing),
+            Ok(Choice::Original)
+        );
+        assert_eq!(
+            choose_with(Implementation::Original, t2smap, found),
+            Ok(Choice::Original)
+        );
+        let e = choose_with(Implementation::Replica, t2smap, missing).unwrap_err();
         assert_eq!(e.exit_code(), EXIT_NOT_FOUND);
         assert!(e.to_string().contains("pip install larmorx-gpl"), "{e}");
         assert!(e.to_string().contains("LARMORX_GPL_BIN"), "{e}");
-        let e = choose_with(Implementation::Original, t2smap, found).unwrap_err();
-        assert!(
-            e.to_string()
-                .contains("no clean-room original of tedana t2smap"),
-            "{e}"
-        );
         let prelude = lookup("fsl", "prelude").unwrap();
         assert!(matches!(
             choose_with(Implementation::Auto, prelude, found),

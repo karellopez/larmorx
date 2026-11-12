@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
-"""``lx.tedana.t2smap`` and ``larmorx tedana t2smap`` with the replica of ``larmorx-gpl`` (the
-tool's only implementation until its clean-room original exists): a stand-in program written by
-the test (a small Python script that records its arguments and environment and writes t2smap's
-files), and, where it is built, the replica itself."""
+"""``lx.tedana.t2smap`` and ``larmorx tedana t2smap`` with the replica of ``larmorx-gpl``: a
+stand-in program written by the test (a small Python script that records its arguments and
+environment and writes t2smap's files), and, where it is built, the replica itself; without the
+replica, ``implementation="auto"`` runs the clean-room original (since 2026-11-12; its own tests
+are in ``test_tedana_cleanroom.py``)."""
 
 from __future__ import annotations
 
@@ -135,17 +136,24 @@ def test_the_registry_has_t2smap():
         "LARMORX_GPL_BIN",
         "GPL-3.0-only",
     )
-    assert not r.original and not r.builtin and "larmorx-gpl" in r.install
+    # its clean-room original since 2026-11-12 (crates/larmorx-tedana)
+    assert r.original and not r.builtin and "larmorx-gpl" in r.install
 
 
-def test_without_the_replica_there_is_no_implementation(scripts, tmp_path):
+def test_without_the_replica_auto_runs_the_clean_room_original(scripts, tmp_path):
     files = echoes(tmp_path)
     with pytest.raises(lx.ReplicaNotFoundError, match="pip install larmorx-gpl"):
-        lx.tedana.t2smap(files, TES)
+        lx.tedana.t2smap(files, TES, implementation="replica")
     with pytest.raises(lx.ReplicaNotFoundError, match="LARMORX_GPL_BIN"):
         lx.tedana.t2smap(files, TES, implementation="replica")
-    with pytest.raises(NotImplementedError, match="no clean-room original of tedana t2smap"):
-        lx.tedana.t2smap(files, TES, implementation="clean-room")
+    auto = lx.tedana.t2smap(files, TES, mask=mask(tmp_path))
+    assert (
+        auto.implementation
+        == _replica.ORIGINAL
+        == lx.Implementation("clean-room", "larmorx", lx.__version__, "Apache-2.0")
+    )
+    clean = lx.tedana.t2smap(files, TES, mask=mask(tmp_path), implementation="clean-room")
+    assert np.array_equal(auto.t2star.data, clean.t2star.data)
 
 
 @pytest.mark.parametrize(

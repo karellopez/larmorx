@@ -17,7 +17,10 @@ defects are corrected by default (D13,
 ``docs/api/upstream-defects.md``); ``upstream_defects="reproduce"`` gives FSL's results. FSL's
 environment variables are settings of the call, never read from the process environment
 (CLAUDE.md rule 6): ``fsldir`` names the FSL installation whose shipped configurations
-(``$FSLDIR/etc/flirtsch/b02b0.cnf``, ...) a ``config`` name refers to."""
+(``$FSLDIR/etc/flirtsch/b02b0.cnf``, ...) a ``config`` name refers to. The six FSL ships by name
+(``b02b0``, ``b02b0_1``, ``b02b0_2``, ``b02b0_4``, ``b02b0_7T``, ``test_acqp``) need no FSL:
+the original carries their settings (clean-room, ``specs/topup.md`` §2.5) and the replica a copy
+of FSL's files."""
 
 from __future__ import annotations
 
@@ -145,16 +148,24 @@ def _levels(name: str, value: Any, kind: type) -> str:
     return ",".join(out)
 
 
+#: The configurations FSL ships by name, whose settings larmorx carries itself (the clean-room
+#: original's, ``specs/topup.md`` §2.5; larmorx-nc's copy of FSL's files for the replica), so a
+#: ``config`` of one of these names needs no FSL installation.
+OWN_SETTINGS = ("b02b0", "b02b0_1", "b02b0_2", "b02b0_4", "b02b0_7T", "test_acqp")
+
+
 def _config(config: Any, fsldir: Any) -> str:
     """``--config``: an existing file by its absolute path, else the name of one of FSL's shipped
-    configurations (looked up in ``fsldir``'s ``etc/flirtsch``, as topup does)."""
+    configurations: looked up in ``fsldir``'s ``etc/flirtsch``, as topup does, then among the
+    settings larmorx carries (:data:`OWN_SETTINGS`, with or without ``.cnf``)."""
     path = os.fspath(config)
     if os.path.exists(path):
         return os.path.abspath(path)
-    if fsldir is None:
+    if fsldir is None and path.removesuffix(".cnf") not in OWN_SETTINGS:
         raise ValueError(
-            f"config {path!r} is not a file: give fsldir, the FSL installation whose "
-            "etc/flirtsch holds FSL's configurations (b02b0.cnf, ...)"
+            f"config {path!r} is not a file nor one of the configurations larmorx carries "
+            f"({', '.join(OWN_SETTINGS)}): give its path, or fsldir, the FSL installation "
+            "whose etc/flirtsch holds it"
         )
     return path
 
@@ -221,7 +232,8 @@ def topup(
     read-out time (``--datain``: a file, or an array of shape ``(n, 4)``). The keyword arguments
     map one to one onto topup's options (``docs/api/fsl-topup.md``); ``None`` leaves an option
     out, so that ``config``'s file (or topup's default) sets it: ``config`` ``--config`` (a file,
-    or the name of one of FSL's configurations with ``fsldir``); ``warpres``, ``subsamp``,
+    or the name of one of FSL's configurations: the six FSL ships, :data:`OWN_SETTINGS`, with or
+    without ``fsldir``, any other with it); ``warpres``, ``subsamp``,
     ``fwhm``, ``miter``, ``lambda_``, ``estmov`` and ``minmet`` (``"LM"`` or ``"SCG"``) one value
     or one per resolution level; ``ssqlambda``, ``regmod``, ``splineorder``, ``numprec``,
     ``interp``, ``scale``, ``regrid`` as topup's; ``verbose`` ``-v``; the outputs ``field``

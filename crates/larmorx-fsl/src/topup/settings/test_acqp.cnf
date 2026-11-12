@@ -1,0 +1,40 @@
+# SPDX-License-Identifier: Apache-2.0
+# larmorx's own topup settings "test_acqp": a clean-room original written from specs/topup.md
+# section 2.5 (by an implementer who never opened FSL's files); its values are those of
+# FSL 6.0.7.23's configuration of the same name (fsl-topup 2203.5).
+# A rough, quick estimation to check an acquisition-parameter file (--datain): two levels,
+# no movements; it names two outputs of its own, in the working directory (a command line's
+# --fout or --iout wins over them).
+# Per-level options hold one value per level, separated by commas; a single value applies to
+# every level.
+#
+# Knot spacing of the field's B-splines, in mm
+--warpres=20,14
+# Subsampling factor: a factor s turns each s x s x s block of voxels into one voxel
+--subsamp=2,2
+# Full width at half maximum of the Gaussian smoothing of the images, in mm
+--fwhm=8,4
+# Largest number of iterations of the minimiser
+--miter=5,5
+# Relative weight of the regularisation
+--lambda=0.005,0.0001
+# 1: the weight is multiplied by the current mean squared difference of the images
+--ssqlambda=1
+# Model of the regularisation: bending_energy or membrane_energy
+--regmod=bending_energy
+# 0: no movements are estimated
+--estmov=0
+# Minimiser: 0 Levenberg-Marquardt
+--minmet=0
+# Order of the B-splines: 2 quadratic, 3 cubic
+--splineorder=3
+# Precision in which the Hessian is computed and kept: double or float
+--numprec=double
+# Interpolation of the images: spline or linear
+--interp=spline
+# 1: each image is scaled by itself to a common mean intensity
+--scale=1
+# The estimated field (Hz)
+--fout=field_test
+# The corrected images
+--iout=iout_test

@@ -286,9 +286,12 @@ def run_tedana(
     return Run(code, p.stdout, p.stderr, cwd)
 
 
-def run_fmriprep_tedana(args: list[str], cwd: Path, binds: list[Path]) -> Run:
+def run_fmriprep_tedana(
+    args: list[str], cwd: Path, binds: list[Path], *, avx512: bool = False
+) -> Run:
     """fMRIPrep 25.2.6's tedana 25.0.1 (``t2smap`` in its image), with the Haswell kernels and
-    numpy's AVX-512 kernels off, through the oracle-output cache."""
+    numpy's AVX-512 kernels off (``avx512``: on, the CPU's default, as fMRIPrep's own oracle runs
+    had them), through the oracle-output cache."""
     from larmorx_validation import oracle_cache
 
     ws = workspace()
@@ -302,6 +305,8 @@ def run_fmriprep_tedana(args: list[str], cwd: Path, binds: list[Path]) -> Run:
         "COLUMNS": "80",
         "TQDM_DISABLE": "1",
     }
+    if avx512:
+        inner.pop("NPY_DISABLE_CPU_FEATURES")
     cmd = ["apptainer", "exec", "--cleanenv", "--no-home", "--pwd", str(cwd)]
     for b in sorted({str(cwd), *(str(b) for b in binds)}):
         cmd += ["--bind", f"{b}:{b}"]
@@ -389,6 +394,30 @@ def messages(r: Run) -> list[str]:
     return out
 
 
+_CHAINS = (
+    "During handling of the above exception, another exception occurred:",
+    "The above exception was the direct cause of the following exception:",
+)
+
+
+def exceptions(r: Run) -> list[str]:
+    """The traceback's exceptions in order: each ``Traceback`` line and its exception's first
+    line (the stack left out, the run directory masked), and the lines that chain them."""
+    out: list[str] = []
+    in_trace = False
+    for line in r.stderr.replace(str(r.cwd), "<run>").splitlines():
+        if line.startswith("Traceback (most recent call last):"):
+            out.append(line)
+            in_trace = True
+        elif in_trace:
+            if not line.startswith(" "):
+                out.append(line)
+                in_trace = False
+        elif line in _CHAINS:
+            out.append(line)
+    return out
+
+
 def last_error(r: Run) -> str:
     lines = [
         ln
@@ -422,6 +451,12 @@ def compare_runs(checks: CheckList, label: str, t: Run, r: Run) -> bool:
         te, re_ = last_error(t), last_error(r)
         ok &= checks(
             f"{label}: last error line", te == re_, detail=f"{te!r} / {re_!r}"[:400]
+        ).passed
+        tx, rx = exceptions(t), exceptions(r)
+        ok &= checks(
+            f"{label}: traceback chain",
+            tx == rx,
+            detail=f"{(len(tx) + 1) // 3} exception(s)" if tx == rx else f"{tx} / {rx}"[:400],
         ).passed
     tm, rm = messages(t), messages(r)
     first = next(
@@ -619,6 +654,11 @@ def _all_cases() -> list[tuple[str, str, str, Any]]:
                 ("fail", defect, _absolute(args, fdir)),
             )
         )
+    # ANALYZE 7.5 and MGH/MGZ inputs (relay RS2): their inputs are written with the others
+    formats = _investigation("check_formats")
+    for name, tier, args in formats.CASES:
+        full = formats.arguments(args, base / "formats")
+        out.append((f"formats/{name}", tier, _describe(full), ("syn", name, full)))
     # tedana's own spread: fMRIPrep's ds003592 call and two synthetic cases in its form
     syn = base / "synthetic"
     te_ms = ["-e", "12", "28", "44"]
@@ -657,6 +697,7 @@ def _generate(base: Path) -> list[tuple[str, list[str]]]:
     fdir = base / "failures"
     fdir.mkdir(parents=True, exist_ok=True)
     failures.make(fdir)
+    _investigation("check_formats").make(base / "formats")
     return cases
 
 
@@ -669,6 +710,7 @@ def _generator_digest() -> str:
         INVESTIGATION / "check_stages.py",
         INVESTIGATION / "check_outputs.py",
         INVESTIGATION / "check_failures.py",
+        INVESTIGATION / "check_formats.py",
     ):
         h.update(path.read_bytes())
     return h.hexdigest()[:16]
@@ -717,6 +759,10 @@ def _with_masks(base: Path, extra: list[tuple[str, list[str]]]) -> list[tuple[st
     return out
 
 
+#: The ANALYZE and MGH file names of the ``formats`` cases (named by their file names).
+_FORMATS = (".hdr", ".img", ".hdr.gz", ".img.gz", ".mgh", ".mgz", ".mgh.gz")
+
+
 def _describe(args: list[str]) -> str:
     """The arguments with every file named by its name (``@twice``: run twice)."""
     words = []
@@ -725,6 +771,8 @@ def _describe(args: list[str]) -> str:
             words.append("(run twice)")
         elif a.endswith(".nii.gz"):
             words.append(Path(a).name.removesuffix(".nii.gz"))
+        elif a.lower().endswith(_FORMATS):
+            words.append(Path(a).name)
         else:
             words.append(a)
     return "t2smap " + " ".join(words)
@@ -916,6 +964,11 @@ def suite() -> Suite:
         f"own files (tedana {FMRIPREP_TEDANA}) reported",
         thresholds=[
             ("Exit status, last error line", "the same"),
+            (
+                "Traceback chain",
+                "the same exceptions in the same order (chained ones: a fallback's error after "
+                "the error it handled), the stacks left out",
+            ),
             (
                 "Messages",
                 "tedana's log lines and Python's warnings identical (the run directory masked; "

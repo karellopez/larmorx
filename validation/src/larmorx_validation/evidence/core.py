@@ -297,6 +297,8 @@ def compare(a: np.ndarray, b: np.ndarray, *, scale: float = 1.0, inter: float = 
     identical = a.dtype == b.dtype and a.shape == b.shape and a.tobytes() == b.tobytes()
     x = np.asarray(a, dtype=np.float64)
     y = np.asarray(b, dtype=np.float64)
+    if np.isnan(x).any() or np.isnan(y).any():
+        return _compare_nan(x, y, identical, scale, inter)
     d = x - y
     n = int(d.size)
     nd = int(np.count_nonzero(d)) if not identical else 0
@@ -321,6 +323,54 @@ def compare(a: np.ndarray, b: np.ndarray, *, scale: float = 1.0, inter: float = 
     }
     if scale != 1.0:
         out["max_abs_stored"] = float(ad.flat[k])
+    return out
+
+
+def _compare_nan(x: np.ndarray, y: np.ndarray, identical: bool, scale: float, inter: float) -> dict:
+    """:func:`compare` of images that hold NaN (a voxel without a value, e.g. tedana's RMSE map
+    where fewer than two echoes are good; 2026-11-12): NaN against NaN counts as equal (as the
+    parity suites compare), NaN against a number as a difference without a size
+    (``differ_nan``); the sizes (largest |Δ|, RMS, the range, 1 − NCC) are those of the voxels
+    where both hold a number. Images without NaN never come here, so their metrics keep their
+    bits."""
+    nx, ny = np.isnan(x), np.isnan(y)
+    both = ~nx & ~ny
+    one = nx ^ ny
+    n = int(x.size)
+    xs, ys = x[both], y[both]
+    d = xs - ys
+    nd_num = int(np.count_nonzero(d)) if not identical else 0
+    nd_nan = int(np.count_nonzero(one)) if not identical else 0
+    nd = nd_num + nd_nan
+    ad = np.abs(d)
+    where = np.flatnonzero(both)
+    if nd_num:
+        k = int(where[int(np.argmax(ad))])
+        big = float(ad.max())
+    else:
+        k = int(np.flatnonzero(one)[0]) if nd_nan else (int(where[0]) if where.size else 0)
+        big = 0.0
+    at = [int(v) for v in np.unravel_index(k, x.shape)]
+    s = abs(scale)
+    rng = float(ys.max() - ys.min()) * s if ys.size else 0.0
+    out = {
+        "identical": bool(identical),
+        "voxels": n,
+        "differ": nd,
+        "share": nd / n if n else 0.0,
+        "max_abs": big * s,
+        "at": at,
+        "a_at": float(x[tuple(at)]) * scale + inter,
+        "b_at": float(y[tuple(at)]) * scale + inter,
+        "rms": math.sqrt(float(np.mean(d * d))) * s if d.size else 0.0,
+        "range": rng,
+        "max_rel_range": (big * s / rng) if rng else 0.0,
+        "one_minus_ncc": 0.0 if identical or not d.size else one_minus_ncc(xs, ys),
+        "nan": int(np.count_nonzero(nx & ny)),
+        "differ_nan": nd_nan,
+    }
+    if scale != 1.0:
+        out["max_abs_stored"] = big
     return out
 
 

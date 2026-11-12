@@ -253,6 +253,7 @@ dependencies = [
  "larmorx-fsl",
  "larmorx-io",
  "larmorx-mri",
+ "larmorx-tedana",
  "sha2",
  "tempfile",
 ]
@@ -390,6 +391,7 @@ dependencies = [
  "larmorx-mri",
  "larmorx-ndimage",
  "larmorx-sdcflows",
+ "larmorx-tedana",
  "larmorx-transform",
  "numpy",
  "pyo3",
@@ -417,6 +419,21 @@ dependencies = [
  "larmorx-transform",
  "rayon",
  "thiserror",
+]
+
+[[package]]
+name = "larmorx-tedana"
+version = "0.1.0-rc.1"
+dependencies = [
+ "flate2",
+ "larmorx-core",
+ "larmorx-interp",
+ "larmorx-io",
+ "larmorx-optim",
+ "larmorx-transform",
+ "ndarray",
+ "rayon",
+ "tempfile",
 ]
 
 [[package]]

@@ -42,7 +42,9 @@ pub struct Site(pub &'static str, pub &'static str, pub u32);
 
 /// An exception tedana raises and nothing catches: Python prints the traceback and exits with
 /// status 1. The replica prints the traceback's first and last lines (the exception's class and
-/// message exactly) and, between them, where tedana raised it.
+/// message exactly) and, between them, where tedana raised it. An exception raised while another
+/// was being handled (`load_data_nilearn`'s fallback after its fast path failed) carries that
+/// one as its `context`, printed first, as Python chains them.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PyError {
     /// The class as Python prints it (`ValueError`, `nibabel.filebasedimages.ImageFileError`).
@@ -50,6 +52,8 @@ pub struct PyError {
     pub message: String,
     /// tedana's (or the library's) function that raised it, for the traceback's middle line.
     pub place: String,
+    /// The exception being handled when this one was raised (Python's `__context__`).
+    pub context: Option<Box<PyError>>,
 }
 
 impl PyError {
@@ -58,23 +62,40 @@ impl PyError {
             class: class.to_owned(),
             message: message.into(),
             place: place.to_owned(),
+            context: None,
         }
+    }
+
+    /// This error, raised while `handled` was being handled (`except Exception:` and a fallback
+    /// that fails too): Python prints `handled`'s traceback, then `During handling of the above
+    /// exception, another exception occurred:`, then this one's.
+    pub fn during_handling_of(mut self, handled: PyError) -> PyError {
+        self.context = Some(Box::new(handled));
+        self
     }
 
     pub fn value_error(message: impl Into<String>, place: &str) -> PyError {
         PyError::new("ValueError", message, place)
     }
 
-    /// The text Python prints (the call stack in between is not reproduced).
+    /// The text Python prints (the call stack in between is not reproduced), the chain of
+    /// handled exceptions first.
     pub fn traceback(&self) -> String {
         let last = if self.message.is_empty() {
             self.class.clone()
         } else {
             format!("{}: {}", self.class, self.message)
         };
+        let before = match &self.context {
+            Some(c) => format!(
+                "{}\nDuring handling of the above exception, another exception occurred:\n\n",
+                c.traceback()
+            ),
+            None => String::new(),
+        };
         format!(
-            "Traceback (most recent call last):\n  File \"{}\" (tedana 26.0.3's call stack is not \
-             reproduced)\n{last}\n",
+            "{before}Traceback (most recent call last):\n  File \"{}\" (tedana 26.0.3's call stack \
+             is not reproduced)\n{last}\n",
             self.place
         )
     }
@@ -131,6 +152,15 @@ impl<'a> Log<'a> {
             at_capture: (None, HashSet::new()),
             bars,
         }
+    }
+
+    /// Python's warnings registry reset: a library changed the warnings filters (`warnings.
+    /// catch_warnings`, `simplefilter`), so each warning shows again at its next place. During
+    /// t2smap's run it happens when the libraries' versions are gathered and when pandas writes
+    /// the confounds table (traced: `validation/investigations/t2smap/replica/rs1_probe.py
+    /// --registry`).
+    pub fn reset_registry(&mut self) {
+        self.warned.clear();
     }
 
     /// Keeps the lines printed from here on ([`Log::take_capture`]).
@@ -302,6 +332,61 @@ mod tests {
             ("TQDM_DISABLED", "1"),
             ("tqdm_disable", "1")
         ])));
+    }
+
+    #[test]
+    fn a_fallbacks_error_follows_the_one_it_handled() {
+        let first = PyError::value_error("Image/mask shape mismatch", "_mask_4d");
+        let e = PyError::value_error(
+            "The mask is invalid as it is empty: it masks all data.",
+            "nilearn/masking.py, in load_mask_img",
+        )
+        .during_handling_of(first);
+        let text = e.traceback();
+        let lines: Vec<&str> = text.lines().filter(|l| !l.starts_with(' ')).collect();
+        assert_eq!(
+            lines,
+            [
+                "Traceback (most recent call last):",
+                "ValueError: Image/mask shape mismatch",
+                "",
+                "During handling of the above exception, another exception occurred:",
+                "",
+                "Traceback (most recent call last):",
+                "ValueError: The mask is invalid as it is empty: it masks all data.",
+            ]
+        );
+        assert!(text.ends_with("it masks all data.\n"));
+    }
+
+    #[test]
+    fn a_reset_registry_shows_a_warning_again() {
+        let mut shown = Vec::new();
+        let mut log = Log::with_bars(&mut shown, false);
+        for _ in 0..2 {
+            log.warn(
+                "tedana/io.py",
+                352,
+                "RuntimeWarning",
+                "overflow encountered in cast",
+                "x",
+            );
+        }
+        log.reset_registry();
+        log.warn(
+            "tedana/io.py",
+            352,
+            "RuntimeWarning",
+            "overflow encountered in cast",
+            "x",
+        );
+        drop(log);
+        let text = String::from_utf8(shown).unwrap();
+        assert_eq!(
+            text.matches("overflow encountered in cast").count(),
+            2,
+            "{text}"
+        );
     }
 
     #[test]

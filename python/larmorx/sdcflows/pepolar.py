@@ -25,9 +25,10 @@ sdcflows' own ``b02b0.cnf``).
 no FSL file. sdcflows' own configurations (``b02b0.cnf``, ``b02b0_quick.cnf``,
 ``b02b0_{1,2,4}_quick.cnf``, Apache-2.0) are in ``larmorx/sdcflows/data/flirtsch/``; FSL's
 ``b02b0_1/2/4.cnf`` are read from ``fsldir``'s ``etc/flirtsch``, else from the copy ``larmorx-nc``
-carries (FSL 6.0.7.23's files, byte for byte), else refused (:func:`topup_config_file`). The main
-package's own settings, a clean-room original from ``specs/topup.md``, come with ``t2smap``'s
-clean-room part; this lookup is the one place that changes then.
+carries (FSL 6.0.7.23's files, byte for byte), else given to ``topup`` by name: larmorx's
+``topup`` carries their settings itself (a clean-room original written from ``specs/topup.md``
+§2.5, ``t2smap``'s clean-room part, 2026-11-11) and finds them by name, as FSL's topup finds its
+own (:func:`topup_config_file`).
 
 Corrected by default (``upstream_defects="reproduce"`` gives sdcflows' behaviour):
 
@@ -88,7 +89,8 @@ SDCFLOWS_CONFIGS = (
     "b02b0_2_quick.cnf",
     "b02b0_4_quick.cnf",
 )
-#: FSL's configurations sdcflows 2.17.1 picks by the grid (FSL Licence: never shipped here).
+#: FSL's configurations sdcflows 2.17.1 picks by the grid (FSL's files, FSL Licence, are never
+#: shipped here; larmorx's topup carries their settings, clean-room).
 FSL_CONFIGS = ("b02b0_1.cnf", "b02b0_2.cnf", "b02b0_4.cnf")
 _DATA = Path(__file__).resolve().parent / "data" / "flirtsch"
 _LAS = "LAS"
@@ -487,34 +489,27 @@ def reorient_image_and_metadata(
 
 
 def topup_config_file(name: str, fsldir: str | os.PathLike[str] | None = None) -> str:
-    """The path of the ``topup`` configuration ``name`` (D9, in one place): sdcflows' own
-    configurations from larmorx's copy (:data:`SDCFLOWS_CONFIGS`); FSL's (:data:`FSL_CONFIGS`)
-    from ``fsldir``'s ``etc/flirtsch``, else from ``larmorx-nc``'s copy of FSL's files
-    (``share/larmorx-nc/fsl-data/etc/flirtsch``) when it is installed; otherwise
-    ``FileNotFoundError`` naming both places. The main package's own settings (a clean-room
-    original, the user's decision of 2026-11-09) come with ``t2smap``'s clean-room part."""
+    """The ``topup`` configuration ``name`` as ``--config`` takes it (D9, in one place):
+    sdcflows' own configurations, the path of larmorx's copy (:data:`SDCFLOWS_CONFIGS`); FSL's
+    (:data:`FSL_CONFIGS`), the path of FSL's file in ``fsldir``'s ``etc/flirtsch``, else in
+    ``larmorx-nc``'s copy of FSL's files (``share/larmorx-nc/fsl-data/etc/flirtsch``) when it is
+    installed, else ``name`` itself: larmorx's ``topup`` carries these settings (a clean-room
+    original written from ``specs/topup.md`` §2.5, the user's decision of 2026-11-09) and finds
+    them by name, as FSL's topup finds its own in ``$FSLDIR/etc/flirtsch``. The values are
+    FSL's in every case, so the result does not depend on which is found."""
     if name in SDCFLOWS_CONFIGS:
         return str(_DATA / name)
     if name not in FSL_CONFIGS:
         raise ValueError(f"not a topup configuration of sdcflows: {name!r}")
-    tried = []
     if fsldir is not None:
         p = Path(os.path.expanduser(os.fspath(fsldir))) / "etc" / "flirtsch" / name
         if p.is_file():
             return str(p.resolve())
-        tried.append(str(p))
     for root in _nc_data_roots():
         p = root / "etc" / "flirtsch" / name
         if p.is_file():
             return str(p.resolve())
-        tried.append(str(p))
-    raise FileNotFoundError(
-        f"FSL's topup configuration {name} (FSL Licence; larmorx's main package does not ship "
-        "it, and its own clean-room settings come with t2smap's clean-room part, "
-        "docs/next-steps.md) was not found: give fsldir, an FSL installation whose etc/flirtsch "
-        "holds it, or install larmorx-nc, which carries FSL's files (looked in: "
-        f"{', '.join(tried) or 'nowhere'})"
-    )
+    return name
 
 
 def _nc_data_roots() -> list[Path]:
@@ -763,7 +758,8 @@ def topup_workflow(
     ``fallback_total_readout_time``, ``omp_nthreads`` (3dvolreg's threads), ``sloppy`` (the
     ``_quick`` configurations) and ``debug`` (the corrected volumes and the field from
     ``ApplyCoeffsField`` instead of TOPUP's) are ``init_topup_wf``'s. ``fsldir`` gives FSL's
-    configurations (:func:`topup_config_file`). The library releases that change results
+    configurations (:func:`topup_config_file`; without it, larmorx's own settings of
+    ``b02b0_1/2/4``). The library releases that change results
     (``numpy_version``, ``scipy_version``: the averages' percentiles and summation, the brain
     mask) default to the newest. Every node's files are in ``out_dir`` as in nipype's working
     directory (a temporary directory without it: the paths are then ``None``)."""

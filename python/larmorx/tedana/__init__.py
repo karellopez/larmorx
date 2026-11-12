@@ -8,9 +8,9 @@
 
 tedana is LGPL-2.1: its bit-exact replica is in the ``larmorx-gpl`` package (the GNU GPL version
 3, as the LGPL's section 3 allows), a separate program larmorx runs and exchanges files with
-(``docs/licensing.md``). Its clean-room original, in this package, is still to be written
-(``specs/t2smap.md``): until then ``implementation="auto"`` runs the replica when
-``larmorx-gpl`` is installed and raises :class:`larmorx.ReplicaNotFoundError` otherwise.
+(``docs/licensing.md``); its clean-room original, written from ``specs/t2smap.md``, is in this
+package (``crates/larmorx-tedana``). ``implementation="auto"`` runs the replica when
+``larmorx-gpl`` is installed and the clean-room original otherwise.
 """
 
 from larmorx.tedana.t2smap import T2smapResult, t2smap

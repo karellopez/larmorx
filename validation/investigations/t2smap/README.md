@@ -188,7 +188,49 @@ OPENBLAS_CORETYPE=Haswell scripts/orchestration/boxed.sh 32 <env>/bin/python -P 
 - `check_failures.py --t2smap <env>/bin/t2smap --replica <target>/release/larmorx-gpl --work
   <dir>`: tedana's failure cases on tiny seeded echoes (TED-01, 02, 04, 10, 11, 12, 13 and three
   clear errors of tedana's own): with `reproduce` the replica ends as tedana does (status, last
-  line of standard error), by default it names the defect. 11 cases, all as expected.
+  line of standard error), by default it names the defect. 11 cases, all as expected; 24 since
+  the clean-room part's relay RS1 (2026-11-12: TED-31, TED-46, the chained tracebacks, the
+  temporal means' and the cast's warnings, the thresholds' printing, `--fitmode ts` with no
+  volume), which the parity suite's `fail/` cases run against tedana in full.
+- `rs1_probe.py <work dir> --t2smap <launcher-newest>/t2smap --replica <larmorx-gpl>
+  [--only <case>,...] [--show]` (relay RS1, 2026-11-12; run with the newest environment's Python,
+  boxed): tedana's program run **directly** (not through the oracle-output cache) and the replica
+  in both modes on a small seeded phantom: every line of standard error (warnings with their
+  source lines, chained tracebacks), the exit status and every file's bytes, tedana against the
+  replica's `reproduce`, and the default's notices. Result: 21 of 21 identical (log
+  `oracles/logs/t2smap-cr-rs1-probe2.log`; before the fixes 13 differed, `...-probe1.log`).
+  `--registry` runs tedana in process with `warnings`' filter changes traced (`##FILTERS`
+  lines): Python's warnings registry is reset when the libraries' versions are gathered and when
+  the confounds table is written (log `oracles/logs/t2smap-cr-rs1-registry.log`).
+- `check_formats.py` (relay RS2, 2026-11-12): the inputs and cases of the parity suite's
+  `formats/` category (ANALYZE 7.5 pairs of SPM2 in both byte orders and every stored type a fit
+  reads, the scale factor and intercept, the gl/cal ranges, the origin, a `.mat` beside the pair
+  (`mat`, `M`, neither), compressed pairs, voxel sizes of 0 and below 0, `.img` names, a
+  z-concatenated file and masks of the format; MGH/MGZ of uint8, int16, uint16, int32, float32,
+  an oblique affine, the footer's repetition time or none, `goodRASFlag` 0, a z-concatenated
+  file, three formats at once; and nibabel's failures: a short data file first and later, an
+  unknown ANALYZE type, MGH dimensions of 0, an MGH version other than 1, a `.mgh.gz` name; a
+  head-shaped series for nilearn's computed mask of an ANALYZE and an MGZ reference):
+  `make(<folder>)` writes them, `CASES` names them (20; the suite runs them in both environments,
+  `reproduce` bit for bit, the default pass). Result: 20 of 20 agree, 12 complete and 8 refused
+  alike (log `oracles/logs/t2smap-cr-rs2-formats4.log`).
+- `rs2_replayed_formats.py <work> <larmorx-gpl> <scratch>` (relay RS2): the replica
+  (`reproduce`) against tedana's files on the replayed random-testing cases of the clean-room
+  part whose inputs are ANALYZE or MGH (`<work>/f<n>/{inputs,tedana/out}` as
+  `../t2smap-original/replay.py --keep` leaves them): 104 cases, every file tedana wrote
+  identical (the host's `dataset_description.json` apart), the 30 tedana failed failing too (log
+  `oracles/logs/t2smap-cr-rs2-replayed-formats.log`).
+- `rs2_descriptor_formats.py --cases N` (relay RS2): the replica's random-testing descriptor on
+  its ANALYZE and MGH draws only, each through the descriptor's own comparison: 30 of 30 agree
+  (log `oracles/logs/t2smap-cr-rs2-descriptor-formats.log`).
+- `rs2_fmriprep_t25.py` (relay RS2): fMRIPrep's own `T2starmap` and `desc-optcom_bold` of its
+  three multi-echo calls on the oracle runs made again with OpenBLAS's Haswell kernels (ds000210's
+  two tasks, ds000258) against tedana 25.0.1 run here in fMRIPrep 25.2.6's image (oracle cache),
+  with numpy's AVX-512 kernels off and on: **on, every value identical** on all three calls; off,
+  4,015, 7,609 and 25,542 values differ (T2* by up to 9.8e-6 relative, the series by one float32
+  unit: NP-04's SVML `exp`/`log`). So fMRIPrep's runs had numpy's AVX-512 kernels on (their
+  RUN_INFO sets only `OPENBLAS_CORETYPE`) and are reproduced exactly (log
+  `oracles/logs/t2smap-cr-rs2-fmriprep-t25.log`).
 - `check_outputs.py --replica <target>/release/larmorx-gpl --work <empty dir> --libraries
   newest|shared` (relay 5b; build with `cargo build --release --manifest-path crates-gpl/Cargo.toml
   -p larmorx-gpl-cli`): tedana's whole `t2smap` program (`t2smap._main(args)` in the environment's

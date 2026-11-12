@@ -44,12 +44,12 @@ tedana 26.0.3 (TE-Dependent ANAlysis of multi-echo fMRI), Copyright 2023, The ME
 Included works
 ==============
 
-The program includes crates of larmorx (larmorx-core, larmorx-io, larmorx-interp,
-larmorx-transform, larmorx-optim), Copyright 2026 Karel Lopez Vilaret, licensed under the Apache
-License, Version 2.0 (LICENSES/Apache-2.0.txt), with the notices of the works they were
-translated from (numpy, SciPy, OpenBLAS and the reference LAPACK, CPython, nibabel, nilearn and
-others) in LICENSES/NOTICE-larmorx.txt, a copy of the repository's NOTICE. Apache-2.0 code may be
-included in a work licensed under the GNU GPL version 3.
+The program includes crates of larmorx (larmorx-core, larmorx-io, larmorx-hdf5, larmorx-interp,
+larmorx-transform, larmorx-optim, larmorx-tedana), Copyright 2026 Karel Lopez Vilaret, licensed
+under the Apache License, Version 2.0 (LICENSES/Apache-2.0.txt), with the notices of the works they
+were translated from (numpy, SciPy, OpenBLAS and the reference LAPACK, CPython, nibabel, nilearn
+and others) in LICENSES/NOTICE-larmorx.txt, a copy of the repository's NOTICE. Apache-2.0 code may
+be included in a work licensed under the GNU GPL version 3.
 
 
 Verification tools (tools/, never distributed)

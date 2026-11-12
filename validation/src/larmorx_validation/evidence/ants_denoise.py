@@ -861,7 +861,11 @@ PAGE = present_.Page(
     software="ANTs",
     program="DenoiseImage",
     version="2.6.5",
-    texts=[(r"\(the row above\)", "(the row against correctly rounded maths)")],
+    texts=[
+        (r"\(the row above\)", "(the row against correctly rounded maths)"),
+        # the example's own Repeats fact and chain: six runs at 8 threads, three at 12
+        (r"\(twice at 8\)", "(six times at 8 and three at 12; two of the runs at 8 shown)"),
+    ],
 )
 
 #: Each worked example's "What this shows" line and the verdict beside it, from the example's
@@ -873,15 +877,17 @@ SHOWS = {
         "`expf` is not correctly rounded (5,522 of 5,898,240 voxels, by at most 0.0002). ANTs' "
         "own result moves with its thread count, by up to 271 at 8 threads against one; "
         "fMRIPrep's output, made by its ANTs 2.6.2 at 8 threads, differs from ANTs 2.6.5's at 8 "
-        "threads by up to 73, although the two builds agree bit for bit at one thread. The "
-        "default, `fix`, corrects ANTS-43 in this call: 437,915 voxels change, by up to 2.81.",
+        "threads by up to 73, although the two builds agree bit for bit at one thread; so the "
+        "replica differs from fMRIPrep's output by up to 271, within ANTs' own variability "
+        "between thread counts. The default, `fix`, corrects ANTS-43 in this call: 437,915 "
+        "voxels change, by up to 2.81.",
         ["lx-ants1"],
     ),
     "ants-44": (
-        "The replica's default, `fix`, gives the voxels just outside the mask that the patches "
-        "reach the smoothed and corrected bias (ANTS-44) and corrects ANTS-43 inside the mask: "
-        "611,567 of the denoised image's 5,898,240 values change, by up to 177. In `reproduce` "
-        "it gives ANTs' output bit for bit with correctly rounded maths.",
+        "The replica's default, `fix`, gives the smoothed and corrected bias to the voxels just "
+        "outside the mask that the patches reach (ANTS-44), and corrects ANTS-43 inside the "
+        "mask: 611,567 of the denoised image's 5,898,240 values change, by up to 177. In "
+        "`reproduce` it gives ANTs' output bit for bit with correctly rounded maths.",
         ["fix-ants"],
     ),
 }
@@ -908,10 +914,16 @@ def present(doc: dict) -> dict:
     )
     b = doc.get("band")
     if b:
+        # the cases drawn, of those that differ from ANTs as built: a case whose band is 0 is
+        # named in the note instead ("Not drawn: `options/patch-0` (denoised), ...")
+        drawn = {r["case"] for r in b["rows"]}
+        named = {c for c in re.findall(r"`([^`]+)` \(", b.get("note") or "") if c not in drawn}
+        n = len(drawn)
+        whole = f"{n} of the {n + len(named)}" if named else f"the {n}"
         b["title"] = (
             "Variability, the replica against the original divided by the original against "
-            f"itself between thread counts: {present_.original_name(PAGE)}, the "
-            f"{len({r['case'] for r in b['rows']})} cases that differ from it as built (log scale)"
+            f"itself between thread counts: {present_.original_name(PAGE)}, {whole} cases that "
+            "differ from it as built (log scale)"
         )
         b["note"] = present_.text(PAGE, b.get("note"))
         b["port"] = PAGE.port

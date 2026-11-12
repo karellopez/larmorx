@@ -351,6 +351,12 @@ def cmd_tables(args: argparse.Namespace) -> int:
     return tables.main(args)
 
 
+def cmd_reference(args: argparse.Namespace) -> int:
+    from larmorx_validation import reference
+
+    return reference.main(args)
+
+
 def cmd_cleanroom_audit(args: argparse.Namespace) -> int:
     from larmorx_validation.cleanroom_audit import cli
 
@@ -467,6 +473,15 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     tables_arguments(tb)
     tb.set_defaults(func=cmd_tables)
+    rf = sub.add_parser(
+        "reference",
+        help="write the programs' reference pages of the documentation site from docs/api/ and "
+        "the code, checking each API page against the code (larmorx_validation.reference)",
+    )
+    from larmorx_validation.reference import add_arguments as reference_arguments
+
+    reference_arguments(rf)
+    rf.set_defaults(func=cmd_reference)
     ca = sub.add_parser(
         "cleanroom-audit",
         help="the clean-room audit: every agent's access log from the session transcripts "

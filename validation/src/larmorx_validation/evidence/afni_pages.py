@@ -136,4 +136,4 @@ def present(
             else f"Speed, both ports against the original: AFNI `{pg.program}`"
         )
     present_.random_testing(pg, doc, dict(PORTS))
-    return present_.finish(pg, doc, CATEGORIES)
+    return present_.finish(pg, doc, CATEGORIES, ports=PORTS)

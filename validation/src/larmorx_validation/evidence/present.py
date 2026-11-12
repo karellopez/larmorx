@@ -841,14 +841,16 @@ def chain(page: Page, ch: dict) -> None:
 _RUN_PLACEHOLDER = ("<fMRIPrep oracle run>", "<fMRIPrep run>")
 
 
-def cases(page: Page, cs: list[dict]) -> None:
-    """Every case's texts in the guide's words, its command's placeholders included."""
+def cases(page: Page, cs: list[dict], ports: dict[str, str] | None = None) -> None:
+    """Every case's texts in the guide's words, its command's placeholders included; each
+    result's reason names its own port (``ports``: a record's implementation id -> its port, on
+    a page of two)."""
     for c in cs:
         if c.get("command"):
             c["command"] = c["command"].replace(*_RUN_PLACEHOLDER)
         c["description"] = text(page, c.get("description"), code=False)
-        for r in c["results"].values():
-            r["reason"] = text(page, r.get("reason"))
+        for impl, r in c["results"].items():
+            r["reason"] = text(page, r.get("reason"), port=(ports or {}).get(impl, ""))
 
 
 def table(page: Page, t: dict, runs: bool = False) -> None:
@@ -1011,13 +1013,14 @@ def finish(
     labels: dict[str, str] | None = None,
     runs: tuple[str, ...] = (),
     pages: dict[str, Page] | None = None,
+    ports: dict[str, str] | None = None,
 ) -> dict:
     """The page's tables (``runs``: the ids of those whose rows are a worked example's runs;
     ``pages``: a table's own page, where its runs are of another program of the page), cases,
     its categories' names and the mark that it is presented."""
     for t in doc.get("tables", []):
         table((pages or {}).get(t["id"], page), t, runs=t["id"] in runs)
-    cases(page, doc.get("cases", []))
+    cases(page, doc.get("cases", []), ports)
     known = {**CATEGORY_LABELS, **(labels or {})}
     used = list(dict.fromkeys(c["category"] for c in doc.get("cases", [])))
     missing = [c for c in used if c not in known]

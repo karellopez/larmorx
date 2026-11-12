@@ -13,6 +13,8 @@ the site never computes a number of its own. The guide: ``docs/figures.md``.
 
 from __future__ import annotations
 
+from larmorx_validation import renamed
+
 #: Evidence pages: tool -> module in this package (each has ``export(ctx) -> dict``).
 TOOLS: dict[str, str] = {
     "ants-registration": "ants_registration",
@@ -55,6 +57,7 @@ _RENAMED = {
     f"{m}_original": f"{m}_clean_room"
     for m in ("afni_volreg", "fsl_bet_options", "fsl_maths", "fsl_prelude", "tedana_t2smap")
 }
+renamed.alias(__name__, _RENAMED)
 
 
 def __getattr__(name: str):

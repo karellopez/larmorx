@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import importlib
 
+from larmorx_validation import renamed
 from larmorx_validation.difftest.core import Tool
 
 #: tool name -> (module in this package, attribute).
@@ -91,6 +92,7 @@ _RENAMED = {
         "tedana_t2smap",
     )
 }
+renamed.alias(__name__, _RENAMED)
 
 
 def __getattr__(name: str):

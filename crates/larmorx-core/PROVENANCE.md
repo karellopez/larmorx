@@ -477,3 +477,58 @@ was measured on glibc 2.35 as a black box: the state before any seeding is `X = 
 functions, then `seed48` (its returned previous state compared) and `lcong48` with random
 parameters, each followed by 1,000 more). The unit tests check the C library's hashes of a fixed
 sequence for five seeds on every platform.
+
+## vnl's and netlib's routines for FreeSurfer (FreeSurfer's foundations, item 3.1-07, 2026-11-12)
+
+**Ported** from VXL as bundled with ITK 4.13.2, the version FreeSurfer 8.2.0's official binaries
+link (`<workspace>/tags/ITK-v4.13.2`; BSD-3-Clause; LINPACK, EISPACK, the reference BLAS and
+Nocedal's L-BFGS from netlib as VXL distributes them, f2c-translated; every file's SPDX header is
+`Apache-2.0 AND BSD-3-Clause`), the same code as 5.4.5's but for `nullptr` and export macros
+(`docs/freesurfer/third-party.md` §10). SHA-256 prefixes of the files read, under
+`Modules/ThirdParty/VNL/src/vxl/`:
+- `src/vnl_minimize.rs`: `core/vnl/algo/vnl_bracket_minimum.cxx` (`4edba4c5d1f1…`),
+  `vnl_fit_parabola.h` (`9519af2d7eb2…`), `vnl_brent_minimizer.cxx` (`1f36978fdea3…`),
+  `vnl_brent.cxx` (`e37c4a57cfc9…`), `vnl_powell.cxx` (`63ce301c12e8…`) and `.h`,
+  `core/vnl/vnl_nonlinear_minimizer.cxx` (`77ce15efc129…`) and `.h`;
+- `src/vnl_lbfgs.rs`: `v3p/netlib/opt/lbfgs.c` (`63fe947289a1…`; `lbfgs_`, `lb1_`, `write50`,
+  `mcsrch_`, `mcstep_`, `v3p_netlib_lbfgs_init`) and `lbfgs.h`, with `lbfgs.f` (Nocedal's Fortran)
+  the reference for ITK-103 and ITK-104;
+- `src/vnl_cholesky.rs`: `core/vnl/algo/vnl_cholesky.cxx` (`8ac4541af962…`) and `.h`,
+  `v3p/netlib/linpack/{dpofa (9327f080d6a4…), dposl (a8bf870376c4…), dpodi (23988b1a90ec…),
+  dpoco (b53b3853e6ef…)}.c`, `v3p/netlib/blas/dasum.c` (`139d999917e4…`);
+- `src/vnl_qr.rs` (`Qr<T>`): `core/vnl/algo/vnl_qr.hxx` (`cfae1afd8e51…`),
+  `v3p/netlib/linpack/{sqrdc (7dbbd9cae762…), sqrsl (dc6289dc71df…)}.c` and their double versions,
+  the single-precision BLAS (`snrm2`, `sdot`, `saxpy`, `sscal`);
+- `src/vnl_fixed.rs` (for `float`, and `determinant_balanced`): `core/vnl/vnl_det.hxx`
+  (`833ae550ccfb…`), `core/vnl/vnl_inverse.h` (`bd0d7dc0ab2f…`), `core/vnl/algo/vnl_determinant.hxx`
+  (`1140fe95da6f…`), `core/vnl/vnl_c_vector.hxx` (`rms_norm`);
+- `src/vnl_eigen.rs` (`real_eigensystem`, `symmetric_eigensystem_f32`):
+  `core/vnl/algo/vnl_real_eigensystem.cxx` (`4551bad87f2e…`),
+  `vnl_symmetric_eigensystem.hxx` (`58cb2655d44f…`), `v3p/netlib/eispack/{rg (aae4796dc48e…),
+  balanc (b5d53c13c3aa…), elmhes (460159c440a2…), eltran (4174a06adc21…), hqr2 (70b52aceece7…),
+  balbak (6ebb4b0be540…), cdiv (86a0bd5ce479…)}.c`;
+- `src/cfmt.rs` (not ported: written from the C standard's description of `printf`'s conversions);
+- `src/vnl_digests.rs` (tests only).
+
+FreeSurfer's call sites (`utils/numerics.cpp`, `mri_robust_register/`, `AntsN4BiasFieldCorrectionFs`)
+were read for which routines, types and modes it calls; no FreeSurfer code is in these files.
+Eleven VNL defects (ITK-103 to ITK-113, `docs/findings/vnl-netlib.md`) have their switch or their
+deterministic fill.
+
+**Bit-identical to ITK 4.13.2's VNL** as the FreeSurfer unit oracle built it (Ubuntu's `gcc-8`
+8.4.0-3ubuntu2, ITK's Release flags; `validation/probes/fs-vnl`, whose `build.sh` checks the
+oracle's VNL tree against the pinned tag and records the libraries' SHA-256), 2026-11-12, at scale 1
+(log `oracles/logs/fs-found-c-vnl-probe-200.log` for the scale-200 run): C's `printf` 777,393
+conversions; the minimizers 4,481,262 values (6,000 cases: brackets, the four Brent entry points,
+`fs_powell`'s `vnl_brent` step, `vnl_brent::minimize`, `vnl_powell` in 1 to 6 dimensions with its
+verbose lines; every evaluated point in order); L-BFGS 22,998,582 values (3,000 problems, 148,167
+calls in lock step: `x`, `diag`, `w`, `iflag`, the whole state and the printed text, `reproduce`);
+the linear algebra 7,764,649 values (20,000 cases: fixed determinants and inverses in float and
+double, `vnl_determinant` to 10 × 10 plain and balanced, `vnl_qr<float/double>`, `vnl_svd<float>`,
+`vnl_matrix_inverse<double>`, the symmetric eigensystems, `vnl_real_eigensystem`, `vnl_cholesky`
+in its three modes; messages included; a NaN compared as a NaN); `vnl_fft_1d<double>` 163,520
+values (2 to 512 points); 0 differences. Not compared: memory VNL never writes (ITK-107, ITK-110,
+ITK-113, counted). The existing ports `vnl_svd_f32`, `vnl_svd::vnl_inverse`,
+`vnl_eigen::symmetric_eigensystem` and `vnl_qr::VnlQr` were re-checked at FreeSurfer's call sites
+in the same run. `vnl_digests.rs` checks digests of the ports' outputs on seeded inputs, recorded on
+Linux x86-64, on every platform (debug and release alike; a NaN hashed as one value).

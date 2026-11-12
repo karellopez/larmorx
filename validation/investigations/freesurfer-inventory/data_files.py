@@ -253,6 +253,8 @@ def main(argv: list[str]) -> int:
         cond = "-cond-" in rec["name"]
         for prog, kinds in rec["programs"].items():
             for rel in kinds.get("data:read", []):
+                if "/bin/" in rel:  # scripts under fsfast/bin, mni/bin: code, not data
+                    continue
                 e = reads.setdefault(
                     rel, {"programs": set(), "streams": set(), "jobs": set(), "cond": set()}
                 )

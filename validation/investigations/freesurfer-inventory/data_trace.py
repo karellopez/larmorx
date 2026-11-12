@@ -215,7 +215,7 @@ def classify(path: str, fs_home: str, subjects: str, license_file: str) -> tuple
     if real.startswith(fs_home + "/") or path.startswith(fs_home + "/"):
         rel = (real if real.startswith(fs_home + "/") else path)[len(fs_home) + 1 :]
         top = rel.split("/", 1)[0]
-        if top in ("bin", "lib"):
+        if top in ("bin", "lib") or "/bin/" in rel or rel.startswith("tktools/"):
             return "code", rel
         if top == "python":
             if rel.endswith(CODE_SUFFIXES) or any(

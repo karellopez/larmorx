@@ -36,7 +36,6 @@ sys.path.insert(0, str(REPO / "validation" / "src"))
 from larmorx_validation import oracle_cache  # noqa: E402
 from larmorx_validation.oracle_cache.store import workspace  # noqa: E402
 
-
 #: Commands whose results go through the C library's ``acos``: the port uses the correctly
 #: rounded one in both modes (glibc's is not ported yet, queue item 3.1-08), so a line may differ
 #: from FreeSurfer's in a last bit there; such lines are counted apart, every differing number
@@ -62,10 +61,7 @@ def last_bit_only(official: str, port: str) -> bool:
     a, b = official.split(), port.split()
     if len(a) != len(b):
         return False
-    for x, y in zip(a, b, strict=True):
-        if x != y and _ulps(x, y) != 1:
-            return False
-    return True
+    return all(x == y or _ulps(x, y) == 1 for x, y in zip(a, b, strict=True))
 
 
 def probe_binary(ws: Path) -> Path:

@@ -351,10 +351,15 @@ resampling and the CIFTI steps use Workbench (`wb_command`), the surfaces track.
 ## 6. The programs, counted
 
 `programs.toml` lists every program above once (kind, source, streams, the steps and options, how it
-is run, what it calls). Counts: 63 FreeSurfer programs compiled from C/C++ (with
-`AntsN4BiasFieldCorrectionFs` and `AntsDenoiseImageFs`, FreeSurfer's ITK wrappers), 6 compiled
-4dfp tools of Washington University, 4 Python networks, 20 tcsh/csh scripts with image outputs,
-and the helpers of §4. The list grows by what the recordings show.
+is run, what it calls): 110 entries, 102 of them on a default path (`recon-all -all` in either
+stream, or fMRIPrep's calls) and 8 only on other paths (`mri_robust_template` with several inputs,
+`mris_topo_fixer`, `mri_seg_diff`, `mri_compute_seg_overlap`, `mergeseg`, `fsr-checkxopts`,
+`nu_correct`, MINC's `talairach`). The 102: 66 compiled C++ programs of FreeSurfer (with
+`AntsN4BiasFieldCorrectionFs` and `AntsDenoiseImageFs`, its ITK wrappers, and the helpers
+`fs_temp_file`, `fs_temp_dir`), 4 compiled 4dfp tools of Washington University (C, two with
+Fortran), 4 Python network programs, 24 tcsh/csh scripts (recon-all and its helpers among them),
+3 Python helpers and one awk script. By stream: v8 84 programs, classic 80, fMRIPrep's calls 14;
+16 run only in v8, 13 only in classic. The list grows by what the recordings show.
 
 **Named by the plan or the version list, but not run by 8.2.0's `recon-all -all`:**
 `mri_segment_hypointensities` (no call at all), `mris_make_surfaces` (replaced by

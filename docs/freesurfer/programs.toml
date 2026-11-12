@@ -1,0 +1,1365 @@
+# CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS: written from FreeSurfer's source (docs/freesurfer/README.md).
+#
+# Every program recon-all 8.2.0 runs in its two streams (v8, the default; classic, -no-v8) and every
+# FreeSurfer program fMRIPrep 25.2.6 / sMRIPrep 0.19.2 / niworkflows 1.15.2 run outside it; the prose,
+# the reasons and the line numbers are in programs.md. Relay 1 of FreeSurfer's preparation,
+# 2026-11-12, from the script; to be checked against the recordings.
+#
+# Fields of each [[program]]:
+#   name       the program as called
+#   kind       c++ | c | c+fortran | tcsh | csh | python | python-network | system | minc
+#   source     its main file under <workspace>/tags/freesurfer-8.2.0 ("" when not in the tree)
+#   streams    v8, classic, fmriprep (the stages of programs.md run it in that stream; "fmriprep" =
+#              called by fMRIPrep/sMRIPrep outside recon-all, or by a script they call)
+#   called_by  recon-all, a script's name, or the fMRIPrep component
+#   run        timed (a recorded step), bare (seen only as a change between steps), nested (timed
+#              inside a script's step), mixed (more than one of these), conditional (not on the
+#              default path of the reference runs)
+#   stages     the stage numbers of programs.md §3 (recon-all -all), or "fmriprep"
+#   uses       the argument forms used (paths shortened as in programs.md)
+#   plan_wave  the wave docs/freesurfer-plan.md gives it ("" when the plan does not name it;
+#              sub-task 6 assigns every program)
+#   notes      anything the porting card needs from this reading
+
+schema = 1
+freesurfer = "8.2.0"
+fmriprep = "25.2.6"
+smriprep = "0.19.2"
+niworkflows = "1.15.2"
+nipype = "1.12.0"
+
+# ---------------------------------------------------------------- the driver
+
+[[program]]
+name = "recon-all"
+kind = "tcsh"
+source = "scripts/recon-all"
+streams = ["v8", "classic", "fmriprep"]
+called_by = ["user", "sMRIPrep ReconAll"]
+run = "driver"
+stages = []
+uses = ["-all -s <subj> -i <T1w> -openmp 4 -itkthreads 4 [-no-v8]", "sMRIPrep: -autorecon1 -noskullstrip -noT2pial -noFLAIRpial [-cw256] [-hires] [-T2|-FLAIR] -i <T1w ref> -openmp N", "-gcareg", "-autorecon2-volonly", "-autorecon-hemi lh|rh -noparcstats -noparcstats2 -noparcstats3 -nohyporelabel -nobalabels", "-cortribbon -parallel [-T2pial|-FLAIRpial]", "-autorecon-hemi lh|rh -nohyporelabel", "-autorecon3"]
+plan_wave = "3.6"
+notes = "10,128 lines; reads etc/recon-config.yaml (rca-config) and, in v8, etc/global-expert-options.v8.txt; copies itself to scripts/recon-all.local-copy"
+
+# ---------------------------------------------------------------- volumes (C++)
+
+[[program]]
+name = "mri_convert"
+kind = "c++"
+source = "mri_convert/mri_convert.cpp"
+streams = ["v8", "classic", "fmriprep"]
+called_by = ["recon-all", "mri_nu_correct.mni", "talairach_avi", "fs-synthmorph-reg", "mri_mcadura_seg", "mri_vsinus_seg", "seg2cc", "fscalc", "bbregister", "niworkflows check_valid_fs_license"]
+run = "mixed"
+stages = ["1", "3", "10", "11", "16", "17", "20", "21", "fmriprep"]
+uses = ["<T1w> mri/orig/001.mgz", "rawavg.mgz orig.mgz --conform", "nu0.mgz <out> --like <in>", "<in> talsrcimg.img", "-rt nearest <in> -at <warp> test.nii.gz", "<crop> --left-right-reverse-pix <out>", "<seg> <out> --left-right-swap-label-table <lh> <rh> --left-right-reverse-pix", "<sentinel.nii.gz> out.mgz"]
+plan_wave = "3.2"
+notes = "classic: --conform in a fresh orig; non-N4 path would also write MINC (mnc)"
+
+[[program]]
+name = "mri_info"
+kind = "c++"
+source = "mri_info/mri_info.cpp"
+streams = ["v8", "classic"]
+called_by = ["recon-all", "seg2cc", "avi2talxfm"]
+run = "bare"
+stages = ["1", "2", "5", "31", "11"]
+uses = ["--nrows|--ncols|--nslices <vol>", "--nframes <vol>", "<vol> (the FOV check reads 'fov:')", "--o <file> --conformed-to-min <seg>", "--vox2ras --o <file> <vol>"]
+plan_wave = ""
+notes = "its printed header is parsed by the scripts (fov, nframes, conformed-to-min); also -all-info in the version loop"
+
+[[program]]
+name = "mri_add_xform_to_header"
+kind = "c++"
+source = "mri_add_xform_to_header/mri_add_xform_to_header.cpp"
+streams = ["v8", "classic"]
+called_by = ["recon-all"]
+run = "timed"
+stages = ["4", "18"]
+uses = ["-c transforms/talairach.xfm orig.mgz orig.mgz (the transform does not exist yet)", "-c <sd>/mri/transforms/talairach.xfm nu.mgz nu.mgz"]
+plan_wave = "3.2"
+notes = ""
+
+[[program]]
+name = "lta_convert"
+kind = "c++"
+source = "lta_convert/lta_convert.cpp"
+streams = ["v8", "classic", "fmriprep"]
+called_by = ["recon-all", "talairach_avi", "rca-talairach", "fs-synthmorph-reg", "bbregister", "sMRIPrep", "niworkflows"]
+run = "mixed"
+stages = ["6", "13", "11", "15", "16", "fmriprep"]
+uses = ["--inlta identity.nofile --src rawavg.mgz --trg orig.mgz --outlta mri/rawavg2orig.lta --subject <subj>", "--src orig.mgz --trg <FS>/average/mni305.cor.mgz --inxfm transforms/talairach.xfm --outlta transforms/talairach.xfm.lta --subject fsaverage --ltavox2vox", "--ltavox2vox --inlta aff.lta --outlta transforms/talairach.xfm.lta", "--inlta talairach.xfm.lta --outmni transforms/talairach.xfm", "--invert --inlta <a> --outlta <b>", "--inlta <lta> --outmni <xfm>", "--inlta identity.nofile --src <crop> --trg <in> --outlta <lta>", "--inlta <InitReg> --outreg <reg>", "fMRIPrep: --inlta identity.nofile --src --trg --outlta; --outfsl; --infsl --outlta"]
+plan_wave = "3.2"
+notes = ""
+
+[[program]]
+name = "mri_robust_template"
+kind = "c++"
+source = "mri_robust_register/mri_robust_template.cpp"
+streams = ["v8", "classic", "fmriprep"]
+called_by = ["recon-all", "sMRIPrep StructuralReference"]
+run = "conditional"
+stages = ["2", "fmriprep"]
+uses = ["--mov <runs> --average 1 --template rawavg.mgz --satit --inittp 1 --fixtp --noit --iscale --iscaleout <txt> --subsample 200 --lta <ltas>", "fMRIPrep: --satit --mov <images> --inittp 1 --iscale --subsample 200 --fixtp --noit --lta <ltas> --template <out>"]
+plan_wave = "3.2"
+notes = "only with several input images (recon-all -i twice; fMRIPrep several T1w); a single image is copied"
+
+[[program]]
+name = "mri_normalize"
+kind = "c++"
+source = "mri_normalize/mri_normalize.cpp"
+streams = ["v8", "classic"]
+called_by = ["recon-all"]
+run = "timed"
+stages = ["19", "33"]
+uses = ["-g 1 -seed 1234 -mprage nu.mgz T1.mgz", "-seed 1234 -mprage -aseg aseg.presurf.mgz -mask brainmask.mgz norm.mgz brain.mgz"]
+plan_wave = "3.2"
+notes = "seeded; T2/FLAIR pial would add a third call (-sigma 0.5 -nonmax_suppress 0 -min_dist 1 -aseg ... -surface ...)"
+
+[[program]]
+name = "mri_mask"
+kind = "c++"
+source = "mri_mask/mri_mask.cpp"
+streams = ["v8", "classic"]
+called_by = ["recon-all", "fs-synthmorph-reg", "mri_mcadura_seg", "mri_vsinus_seg"]
+run = "mixed"
+stages = ["22", "34", "35", "16", "20", "21"]
+uses = ["T1.mgz synthstrip.mgz brainmask.mgz (bare, v8)", "-T 5 brain.mgz brainmask.mgz brain.finalsurfs.mgz", "-oval 1 -invert brain.finalsurfs.mgz mca-dura.mgz|vsinus.mgz brain.finalsurfs.mgz", "-bb 3 <in> <in> <crop>", "-T .001 -crop-to-fov-mm <fov> <fov> <fov> <in> <prior> <crop>", "-T .001 -crop 0 <prior> <prior> <out>", "<seg> <mask> <seg>"]
+plan_wave = "3.2"
+notes = ""
+
+[[program]]
+name = "mri_em_register"
+kind = "c++"
+source = "mri_em_register/mri_em_register.cpp"
+streams = ["v8", "classic"]
+called_by = ["recon-all"]
+run = "timed"
+stages = ["23", "26"]
+uses = ["-skull nu.mgz <FS>/average/RB_all_withskull_2020_01_02.gca transforms/talairach_with_skull.lta (classic)", "-uns 3 -mask brainmask.mgz nu.mgz <FS>/average/RB_all_2020-01-02.gca transforms/talairach.lta (both)"]
+plan_wave = "3.3"
+notes = "the plan calls it classic-only: v8 keeps it (check_params 8362)"
+
+[[program]]
+name = "mri_watershed"
+kind = "c++"
+source = "mri_watershed/mri_watershed.cpp"
+streams = ["classic"]
+called_by = ["recon-all"]
+run = "timed"
+stages = ["24"]
+uses = ["-T1 -brain_atlas <FS>/average/RB_all_withskull_2020_01_02.gca transforms/talairach_with_skull.lta T1.mgz brainmask.auto.mgz"]
+plan_wave = "3.2"
+notes = ""
+
+[[program]]
+name = "mri_ca_normalize"
+kind = "c++"
+source = "mri_ca_normalize/mri_ca_normalize.cpp"
+streams = ["v8", "classic"]
+called_by = ["recon-all"]
+run = "timed"
+stages = ["27"]
+uses = ["-c ctrl_pts.mgz -mask brainmask.mgz nu.mgz <GCA> transforms/talairach.lta norm.mgz"]
+plan_wave = "3.3"
+notes = "runs in v8 too: norm.mgz comes from it"
+
+[[program]]
+name = "mri_ca_register"
+kind = "c++"
+source = "mri_ca_register/mri_ca_register.cpp"
+streams = ["v8", "classic"]
+called_by = ["recon-all", "fs-synthmorph-reg"]
+run = "mixed"
+stages = ["28", "16"]
+uses = ["-nobigventricles -T transforms/talairach.lta -align-after -mask brainmask.mgz norm.mgz <GCA> transforms/talairach.m3z (classic)", "-invert-and-save <warp.nii.gz> <warp.inv.nii.gz> (v8, nested in fs-synthmorph-reg)"]
+plan_wave = "3.3"
+notes = "v8 needs only its -invert-and-save path"
+
+[[program]]
+name = "mri_ca_label"
+kind = "c++"
+source = "mri_ca_label/mri_ca_label.cpp"
+streams = ["classic"]
+called_by = ["recon-all"]
+run = "timed"
+stages = ["30"]
+uses = ["-relabel_unlikely 9 .3 -prior 0.5 -align norm.mgz transforms/talairach.m3z <GCA> aseg.auto_noCCseg.mgz"]
+plan_wave = "3.3"
+notes = "the v8 file's mri_ca_label options (-vent-fix -1 7000 1 -insert-wm-bet-putctx 1) apply in no stream"
+
+[[program]]
+name = "mri_cc"
+kind = "c++"
+source = "mri_cc/mri_cc.cpp"
+streams = ["v8", "classic"]
+called_by = ["seg2cc"]
+run = "nested"
+stages = ["31"]
+uses = ["-aseg aseg.auto_noCCseg.mgz -o aseg.auto.mgz -lta transforms/cc_up.lta <subj>"]
+plan_wave = "3.2"
+notes = "v8: the input is the SynthSeg segmentation (a link)"
+
+[[program]]
+name = "mri_edit_wm_with_aseg"
+kind = "c++"
+source = "mri_edit_wm_with_aseg/mri_edit_wm_with_aseg.cpp"
+streams = ["v8", "classic"]
+called_by = ["recon-all"]
+run = "timed"
+stages = ["36", "40", "42"]
+uses = ["-keep-in wm.seg.mgz brain.mgz aseg.presurf.mgz wm.asegedit.mgz (classic)", "-keep-in -fix-ento-wm entowm.mgz 3 255 255 -fix-acj aseg.presurf.mgz 255 255 -fill-seg-wm -fix-scm-ha 1 wm.seg.mgz brain.mgz aseg.presurf.mgz wm.asegedit.mgz (v8)", "-sa-fix-ento-wm entowm.mgz 2 255 255 brain.finalsurfs.mgz brain.finalsurfs.mgz", "-sa-fix-acj aseg.presurf.mgz 255 255 brain.finalsurfs.mgz brain.finalsurfs.mgz", "-sa-fix-ento-wm entowm.mgz 3 255 255 wm.mgz wm.mgz", "-sa-fix-acj aseg.presurf.mgz 255 255 wm.mgz wm.mgz"]
+plan_wave = "3.2"
+notes = "v8 adds five option paths"
+
+[[program]]
+name = "AntsDenoiseImageFs"
+kind = "c++"
+source = "AntsDenoiseImageFs/AntsDenoiseImageFs.cpp"
+streams = ["v8", "classic"]
+called_by = ["recon-all"]
+run = "timed"
+stages = ["38"]
+uses = ["-i brain.mgz -o antsdn.brain.mgz"]
+plan_wave = ""
+notes = "FreeSurfer's wrapper of ITK's/ANTs' DenoiseImage (non-local means); on by default (recon-config.yaml DoAntsDenoising)"
+
+[[program]]
+name = "AntsN4BiasFieldCorrectionFs"
+kind = "c++"
+source = "AntsN4BiasFieldCorrectionFs/AntsN4BiasFieldCorrectionFs.cpp"
+streams = ["v8", "classic"]
+called_by = ["mri_nu_correct.mni"]
+run = "bare"
+stages = ["10", "17"]
+uses = ["-i orig.mgz -o <tmp>/nu0.mgz --dtype uchar"]
+plan_wave = ""
+notes = "the default intensity correction of 8.2.0 (DoAntsN4 true); no mask, no thread option; FS_ANTS_N4_REPLACE_ZEROS adds --replace-zeros 0 1 1"
+
+[[program]]
+name = "mri_segment"
+kind = "c++"
+source = "mri_segment/mri_segment.cpp"
+streams = ["v8", "classic"]
+called_by = ["recon-all"]
+run = "timed"
+stages = ["39"]
+uses = ["-wsizemm 13 -mprage antsdn.brain.mgz wm.seg.mgz"]
+plan_wave = "3.2"
+notes = "input is the denoised brain"
+
+[[program]]
+name = "mri_pretess"
+kind = "c++"
+source = "mri_mc/mri_pretess.cpp"
+streams = ["v8", "classic"]
+called_by = ["recon-all"]
+run = "timed"
+stages = ["41", "44"]
+uses = ["wm.asegedit.mgz wm norm.mgz wm.mgz", "../mri/filled.mgz 255|127 ../mri/norm.mgz ../mri/filled-pretess255|127.mgz"]
+plan_wave = "3.2"
+notes = ""
+
+[[program]]
+name = "mri_fill"
+kind = "c++"
+source = "mri_fill/mri_fill.cpp"
+streams = ["v8", "classic"]
+called_by = ["recon-all"]
+run = "timed"
+stages = ["43"]
+uses = ["-a ../scripts/ponscc.cut.log -xform transforms/talairach.lta -segmentation aseg.presurf.mgz -ctab <FS>/SubCorticalMassLUT.txt wm.mgz filled.mgz"]
+plan_wave = "3.2"
+notes = ""
+
+[[program]]
+name = "mri_binarize"
+kind = "c++"
+source = "mri_binarize/mri_binarize.cpp"
+streams = ["v8", "classic"]
+called_by = ["mri_nu_correct.mni", "mri_mcadura_seg", "mri_vsinus_seg", "label-cortex", "seg2cc"]
+run = "bare"
+stages = ["17", "20", "21", "57"]
+uses = ["--i nu0.mgz --min -1 --o ones.mgz", "--match 3 42 --i <aseg> --o <ctx>", "--i <ctxseg> --match 3 42 --inv --o <mask>", "--crop-around-ras <out> <in> nolta cras <prior> 0 <fov> <fov> <fov>", "--match 3201|4201 --i entowm.mgz --o <ga>", "--frame 0|2 --i <nxyz> --mask <ga> --o <mask> --min|--max ..."]
+plan_wave = ""
+notes = "recon-all itself runs it only with existing wm edits (-autorecon2 again)"
+
+[[program]]
+name = "mri_segstats"
+kind = "c++"
+source = "mri_segstats/mri_segstats.cpp"
+streams = ["v8", "classic"]
+called_by = ["recon-all", "mri_nu_correct.mni", "mri_mcadura_seg", "mri_vsinus_seg", "pctsurfcon"]
+run = "mixed"
+stages = ["17", "20", "21", "75", "80", "82"]
+uses = ["--id 1 --seg ones.mgz --i <vol> --sum <junk> --avgwf <mean.dat>", "--seed 1234 --seg mri/wmparc.mgz --sum stats/wmparc.stats --pv mri/norm.mgz --excludeid 0 --brainmask mri/brainmask.mgz --in mri/norm.mgz --in-intensity-name norm --in-intensity-units MR --subject <subj> --surf-wm-vol --ctab <FS>/WMParcStatsLUT.txt --etiv [--stiv stats/synthseg.tiv.dat]", "--seed 1234 --seg mri/aseg.mgz --sum stats/aseg.stats --pv mri/norm.mgz --empty --brainmask mri/brainmask.mgz --brain-vol-from-seg --excludeid 0 --excl-ctxgmwm --supratent --subcortgray --in mri/norm.mgz --in-intensity-name norm --in-intensity-units MR --etiv [--stiv ...] --surf-wm-vol --surf-ctx-vol --totalgray --euler --ctab <FS>/ASegStatsLUT.txt --subject <subj>", "--seg <seg> --i <ctx> --accumulate --sum <stats>", "--i <invol> --seg <seg> --sum <stats> --subject <subj> --etiv", "--in <pct> --annot <subj> lh aparc --sum <stats> --snr"]
+plan_wave = "3.5"
+notes = "--seed is passed (random sampling somewhere: sub-task 5)"
+
+[[program]]
+name = "mris_calc"
+kind = "c++"
+source = "mris_calc/mris_calc.cpp"
+streams = ["v8", "classic"]
+called_by = ["mri_nu_correct.mni", "vertexvol", "fscalc"]
+run = "bare"
+stages = ["17", "71", "57"]
+uses = ["-o nu0.mgz nu0.mgz mul <ratio>", "-o lh.area.mid lh.area add lh.area.pial", "-o lh.area.mid lh.area.mid div 2", "-o <tmp> <tmp> <op> [<i2>] (fscalc)"]
+plan_wave = ""
+notes = "the ratio comes from bc on mri_segstats' means (text)"
+
+[[program]]
+name = "mri_make_uchar"
+kind = "c++"
+source = "mri_convert/mri_make_uchar.cpp"
+streams = ["v8", "classic"]
+called_by = ["mri_nu_correct.mni"]
+run = "bare"
+stages = ["17"]
+uses = ["nu.mgz transforms/talairach.xfm nu.mgz"]
+plan_wave = ""
+notes = "uses the Talairach transform to find a ball of brain voxels; in v8 that transform is SynthMorph's"
+
+[[program]]
+name = "mri_concatenate_lta"
+kind = "c++"
+source = "mri_concatenate_lta/mri_concatenate_lta.cpp"
+streams = ["v8"]
+called_by = ["fs-synthmorph-reg"]
+run = "nested"
+stages = ["16"]
+uses = ["-invert1 -invertout <aff.lta> <crop-to-invol.lta> <out>", "-invert2 <reg.1.0mm.to.1.0mm.cropped.lta> <invol-to-croptarg.lta> <out>"]
+plan_wave = "3.2"
+notes = "the plan lists it for fMRIPrep; fMRIPrep 25.2.6 does not instantiate PatchedConcatenateLTA in its workflows"
+
+[[program]]
+name = "mri_warp_convert"
+kind = "c++"
+source = "mri_warp_convert/mri_warp_convert.cpp"
+streams = ["v8"]
+called_by = ["fs-synthmorph-reg"]
+run = "nested"
+stages = ["16"]
+uses = ["--inras deform.mgz --insrcgeom <in-crop> --outfswarp warp.to.mni152.1.0mm.1.0mm.nii.gz --vg-thresh 1e-4 --lta1-inv <crop-to-invol.lta> --lta2 <reg.cropped.to.1.0mm.lta>"]
+plan_wave = ""
+notes = ""
+
+[[program]]
+name = "mri_vol2vol"
+kind = "c++"
+source = "mri_vol2vol/mri_vol2vol.cpp"
+streams = ["v8", "fmriprep"]
+called_by = ["fs-synthmorph-reg", "mri_mcadura_seg", "mri_vsinus_seg", "sMRIPrep ApplyVolTransform", "bbregister"]
+run = "mixed"
+stages = ["16", "20", "21", "fmriprep"]
+uses = ["--regheader --mov <synthmorph.out> --targ <targ> --o <out> (--test)", "--reg <mnireg> --mov <FS>/average/mca-dura.prior.warp.mni152.1.0mm.lh.nii.gz --o <prior>", "--regheader --mov <in> --targ <crop> --o <out>", "--regheader --interp nearest --mov <seg> --targ <in> --o <out>", "--mov <FS>/average/vsinus.no-sp.prior.mni152.1.0mm.mgz --lta <lta> --targ <in> --o <prior>", "fMRIPrep: --mov <aseg> --targ <T1w> --lta <lta> --interp nearest --o seg.nii.gz"]
+plan_wave = "3.5"
+notes = ""
+
+[[program]]
+name = "mri_diff"
+kind = "c++"
+source = "mri_diff/mri_diff.cpp"
+streams = ["v8"]
+called_by = ["fs-synthmorph-reg"]
+run = "bare"
+stages = ["16"]
+uses = ["--po <test.nii.gz> <synthmorph.out>"]
+plan_wave = ""
+notes = "only a test print (--test), output into a log"
+
+[[program]]
+name = "mri_concat"
+kind = "c++"
+source = "mri_concat/mri_concat.cpp"
+streams = ["v8", "classic"]
+called_by = ["mri_mcadura_seg", "pctsurfcon"]
+run = "bare"
+stages = ["20", "75"]
+uses = ["<lh> <rh> --sum --ctab <ctab> --o mca-dura.mgz", "<wm> <gm> --paired-diff-norm --mul 100 --o lh.w-g.pct.mgh"]
+plan_wave = ""
+notes = ""
+
+[[program]]
+name = "mri_label2vol"
+kind = "c++"
+source = "mri_label2vol/mri_label2vol.cpp"
+streams = ["v8", "classic"]
+called_by = ["defect2seg", "seg2cc"]
+run = "bare"
+stages = ["52", "31"]
+uses = ["--defects <surf> <defects> <template> <offset> 0|<merge> <outseg> <label>", "--seg <seg> --temp <vol> --regheader --o <out> (seg2cc's unconformed branch)"]
+plan_wave = ""
+notes = ""
+
+[[program]]
+name = "mri_relabel_hypointensities"
+kind = "c++"
+source = "mri_relabel_hypointensities/mri_relabel_hypointensities.cpp"
+streams = ["v8", "classic"]
+called_by = ["recon-all"]
+run = "timed"
+stages = ["76"]
+uses = ["aseg.presurf.mgz ../surf aseg.presurf.hypos.mgz"]
+plan_wave = "3.3"
+notes = ""
+
+[[program]]
+name = "mri_surf2volseg"
+kind = "c++"
+source = "mri_aparc2aseg/mri_surf2volseg.cpp"
+streams = ["v8", "classic"]
+called_by = ["recon-all"]
+run = "timed"
+stages = ["77", "79", "80"]
+uses = ["--o aseg.mgz --i aseg.presurf.hypos.mgz --fix-presurf-with-ribbon <sd>/mri/ribbon.mgz --threads N --lh-cortex-mask ... --lh-white ... --lh-pial ... --rh-...", "--o aparc+aseg.mgz --label-cortex --i aseg.mgz --threads N --lh-annot lh.aparc.annot 1000 ... --rh-annot ... 2000 (a2009s 11100/12100, DKTatlas 1000/2000)", "--o wmparc.mgz --label-wm --i aparc+aseg.mgz --threads N --lh-annot ... 3000 ... --rh-annot ... 4000"]
+plan_wave = "3.5"
+notes = "replaces mri_aparc2aseg"
+
+[[program]]
+name = "mri_brainvol_stats"
+kind = "c++"
+source = "mri_brainvol_stats/mri_brainvol_stats.cpp"
+streams = ["v8", "classic"]
+called_by = ["recon-all"]
+run = "timed"
+stages = ["78"]
+uses = ["--subject <subj>"]
+plan_wave = "3.5"
+notes = ""
+
+[[program]]
+name = "mri_label2label"
+kind = "c++"
+source = "mri_label2label/mri_label2label.cpp"
+streams = ["v8", "classic"]
+called_by = ["recon-all", "label-cortex", "defect2seg"]
+run = "mixed"
+stages = ["57", "58", "52", "83"]
+uses = ["--label-cortex ../surf/lh.white.preaparc aseg.presurf.mgz 1 ../label/lh.cortex+hipamyg.label", "--label-cortex <white.preaparc> aseg.presurf.mgz 0 <cortex.label>", "--srcsubject fsaverage --srclabel <SD>/fsaverage/label/lh.<L>.label --trgsubject <subj> --trglabel ./lh.<L>.label --hemi lh --regmethod surface (36 labels per hemisphere)"]
+plan_wave = "3.5"
+notes = ""
+
+[[program]]
+name = "mri_vol2surf"
+kind = "c++"
+source = "mri_vol2surf/mri_vol2surf.cpp"
+streams = ["v8", "classic", "fmriprep"]
+called_by = ["pctsurfcon", "label-cortex", "fMRIPrep SampleToSurface"]
+run = "mixed"
+stages = ["75", "57", "fmriprep"]
+uses = ["--mov <sd>/mri/rawavg.mgz --hemi lh --noreshape --interp trilinear [--projdist -1] --o <out> --regheader <subj> --cortex", "--regheader <subj> --hemi lh --surf white.preaparc --mov <ga> --projdist-max -1 0 .1 --o <out> (v8 --fix-ga)", "fMRIPrep: --mov <bold_t1w> --reg <lta> --hemi lh --interp trilinear --projfrac-avg 0 1 0.2 --trgsubject <fsnative|fsaverageN> --srcsubject <subj> --out_type gii --o <out>"]
+plan_wave = "3.5"
+notes = "fMRIPrep's fsaverage sampling happens inside it (--trgsubject)"
+
+[[program]]
+name = "mri_cor2label"
+kind = "c++"
+source = "mri_cor2label/mri_cor2label.cpp"
+streams = ["v8"]
+called_by = ["label-cortex"]
+run = "bare"
+stages = ["57"]
+uses = ["--i <gamask> --l <galabel> --surf-path <white.preaparc> --id 1 --thresh 0.5"]
+plan_wave = ""
+notes = "only with --fix-ga"
+
+[[program]]
+name = "talairach_afd"
+kind = "c++"
+source = "talairach_afd/talairach_afd.cpp"
+streams = ["classic"]
+called_by = ["recon-all"]
+run = "timed"
+stages = ["14"]
+uses = ["-T 0.005 -xfm transforms/talairach.xfm"]
+plan_wave = "3.2"
+notes = ""
+
+[[program]]
+name = "mri_matrix_multiply"
+kind = "c++"
+source = "mri_matrix_multiply/mri_matrix_multiply.cpp"
+streams = ["classic"]
+called_by = ["avi2talxfm"]
+run = "bare"
+stages = ["11"]
+uses = ["-fsl -im <St> -iim <V> -iim <Si> -om <X>"]
+plan_wave = ""
+notes = ""
+
+# ---------------------------------------------------------------- surfaces (C++)
+
+[[program]]
+name = "mri_tessellate"
+kind = "c++"
+source = "mri_tessellate/mri_tessellate.cpp"
+streams = ["v8", "classic"]
+called_by = ["recon-all"]
+run = "timed"
+stages = ["45"]
+uses = ["../mri/filled-pretess255.mgz 255 ../surf/lh.orig.nofix"]
+plan_wave = "3.4"
+notes = ""
+
+[[program]]
+name = "mris_extract_main_component"
+kind = "c++"
+source = "mri_mc/mris_extract_main_component.cpp"
+streams = ["v8", "classic"]
+called_by = ["recon-all"]
+run = "timed"
+stages = ["46"]
+uses = ["../surf/lh.orig.nofix ../surf/lh.orig.nofix"]
+plan_wave = "3.4"
+notes = ""
+
+[[program]]
+name = "mris_smooth"
+kind = "c++"
+source = "mris_smooth/mris_smooth.cpp"
+streams = ["v8", "classic"]
+called_by = ["recon-all"]
+run = "timed"
+stages = ["47", "59"]
+uses = ["-nw -seed 1234 ../surf/lh.orig.nofix ../surf/lh.smoothwm.nofix", "-n 3 -nw -seed 1234 ../surf/lh.white.preaparc ../surf/lh.smoothwm"]
+plan_wave = "3.4"
+notes = "seeded"
+
+[[program]]
+name = "mris_inflate"
+kind = "c++"
+source = "mris_inflate/mris_inflate.cpp"
+streams = ["v8", "classic"]
+called_by = ["recon-all"]
+run = "timed"
+stages = ["48", "60"]
+uses = ["-no-save-sulc ../surf/lh.smoothwm.nofix ../surf/lh.inflated.nofix", "../surf/lh.smoothwm ../surf/lh.inflated (writes lh.sulc)"]
+plan_wave = "3.4"
+notes = "sMRIPrep's -hires adds the expert option -n 50"
+
+[[program]]
+name = "mris_sphere"
+kind = "c++"
+source = "mris_sphere/mris_sphere.cpp"
+streams = ["v8", "classic"]
+called_by = ["recon-all"]
+run = "timed"
+stages = ["49", "62"]
+uses = ["-q -p 6 -a 128 -seed 1234 ../surf/lh.inflated.nofix ../surf/lh.qsphere.nofix", "-threads N -seed 1234 ../surf/lh.inflated ../surf/lh.sphere"]
+plan_wave = "3.4"
+notes = "seeded; threaded in the second call"
+
+[[program]]
+name = "mris_fix_topology"
+kind = "c++"
+source = "mris_fix_topology/mris_fix_topology.cpp"
+streams = ["v8", "classic"]
+called_by = ["recon-all"]
+run = "timed"
+stages = ["50"]
+uses = ["-threads 1 -mgz -sphere qsphere.nofix -inflated inflated.nofix -orig orig.nofix -out orig.premesh -ga -seed 1234 [v8: -threads 1] <subj> lh"]
+plan_wave = "3.4"
+notes = "always one thread (nondeterministic with more, recon-all 3728-3731); seeded"
+
+[[program]]
+name = "mris_euler_number"
+kind = "c++"
+source = "mris_euler_number/mris_euler_number.cpp"
+streams = ["v8", "classic"]
+called_by = ["recon-all"]
+run = "bare"
+stages = ["51"]
+uses = ["../surf/lh.orig.premesh (into scripts/mris_euler_number.lh.log; 'total defect index' parsed)"]
+plan_wave = "3.4"
+notes = ""
+
+[[program]]
+name = "mris_topo_fixer"
+kind = "c++"
+source = "mris_topo_fixer/mris_topo_fixer.cpp"
+streams = ["v8", "classic"]
+called_by = ["recon-all"]
+run = "conditional"
+stages = ["51"]
+uses = ["-orig_name orig.nofix -out_name orig.premesh -mgz -warnings -seed 1234 <subj> lh"]
+plan_wave = ""
+notes = "only when mris_fix_topology leaves a defect (euler number not 2)"
+
+[[program]]
+name = "mris_remesh"
+kind = "c++"
+source = "mris_remesh/mris_remesh.cpp"
+streams = ["v8", "classic"]
+called_by = ["recon-all"]
+run = "timed"
+stages = ["53"]
+uses = ["--remesh --iters 3 --input <sd>/surf/lh.orig.premesh --output <sd>/surf/lh.orig"]
+plan_wave = ""
+notes = "on by default (recon-config.yaml DoRemesh)"
+
+[[program]]
+name = "mris_remove_intersection"
+kind = "c++"
+source = "mris_fix_topology/mris_remove_intersection.cpp"
+streams = ["v8", "classic"]
+called_by = ["recon-all"]
+run = "timed"
+stages = ["54"]
+uses = ["../surf/lh.orig ../surf/lh.orig"]
+plan_wave = "3.4"
+notes = ""
+
+[[program]]
+name = "mris_defects_pointset"
+kind = "c++"
+source = "mris_defects_pointset/mris_defects_pointset.cpp"
+streams = ["v8", "classic"]
+called_by = ["defect2seg"]
+run = "bare"
+stages = ["52"]
+uses = ["-s <surf> -d <defects> -o <pointset>"]
+plan_wave = ""
+notes = ""
+
+[[program]]
+name = "mris_autodet_gwstats"
+kind = "c++"
+source = "mris_make_surfaces/mris_autodet_gwstats.cpp"
+streams = ["v8", "classic"]
+called_by = ["recon-all"]
+run = "timed"
+stages = ["55"]
+uses = ["--o ../surf/autodet.gw.stats.lh.dat --i brain.finalsurfs.mgz --wm wm.mgz --surf ../surf/lh.orig.premesh"]
+plan_wave = "3.5"
+notes = ""
+
+[[program]]
+name = "mris_place_surface"
+kind = "c++"
+source = "mris_make_surfaces/mris_place_surface.cpp"
+streams = ["v8", "classic"]
+called_by = ["recon-all"]
+run = "timed"
+stages = ["56", "67", "68", "69", "70"]
+uses = ["--adgws-in <ads> --wm wm.mgz --threads N --invol brain.finalsurfs.mgz --lh --i ../surf/lh.orig --o ../surf/lh.white.preaparc --white --seg aseg.presurf.mgz [v8: --restore-255] --nsmooth 5 [v8: --rip-bg-no-annot --rip-bg --rip-bg-lof --restore-255 --outvol mrisps.wpa.mgz]", "--adgws-in <ads> --seg aseg.presurf.mgz --threads N --wm wm.mgz --invol brain.finalsurfs.mgz --lh --i ../surf/lh.white.preaparc --o ../surf/lh.white --white --nsmooth 0 --rip-label ../label/lh.cortex.label --rip-bg --rip-surf ../surf/lh.white.preaparc --aparc ../label/lh.aparc.annot [v8: --restore-255 --restore-255 --outvol mrisps.white.mgz --rip-bg-lof]", "--adgws-in <ads> --seg aseg.presurf.mgz --threads N --wm wm.mgz --invol brain.finalsurfs.mgz --lh --i ../surf/lh.white --o ../surf/lh.pial.T1 --pial --nsmooth 0 --rip-label ../label/lh.cortex+hipamyg.label --pin-medial-wall ../label/lh.cortex.label --aparc ../label/lh.aparc.annot --repulse-surf ../surf/lh.white --white-surf ../surf/lh.white [v8: --restore-255]", "--curv-map ../surf/lh.white|pial 2 10 ../surf/lh.curv|curv.pial", "--area-map ../surf/lh.white|pial ../surf/lh.area|area.pial", "--thickness ../surf/lh.white ../surf/lh.pial 20 5 ../surf/lh.thickness"]
+plan_wave = "3.5"
+notes = "five modes in one program; the v8 pial options (key T1PialSurf) never apply"
+
+[[program]]
+name = "mris_curvature"
+kind = "c++"
+source = "mris_curvature/mris_curvature.cpp"
+streams = ["v8", "classic"]
+called_by = ["recon-all"]
+run = "timed"
+stages = ["61"]
+uses = ["-w -seed 1234 lh.white.preaparc", "-seed 1234 -thresh .999 -n -a 5 -w -distances 10 10 lh.inflated"]
+plan_wave = "3.5"
+notes = "seeded"
+
+[[program]]
+name = "mris_register"
+kind = "c++"
+source = "mris_register/mris_register.cpp"
+streams = ["v8", "classic"]
+called_by = ["rca-surfreg"]
+run = "nested"
+stages = ["63"]
+uses = ["-curv -threads N <sd>/surf/lh.sphere <FS>/average/lh.folding.atlas.acfb40.noaparc.i12.2016-08-02.tif <sd>/surf/lh.sphere.reg"]
+plan_wave = "3.5"
+notes = "threaded"
+
+[[program]]
+name = "mris_jacobian"
+kind = "c++"
+source = "mris_jacobian/mris_jacobian.cpp"
+streams = ["v8", "classic"]
+called_by = ["recon-all"]
+run = "timed"
+stages = ["64"]
+uses = ["../surf/lh.white.preaparc ../surf/lh.sphere.reg ../surf/lh.jacobian_white"]
+plan_wave = "3.5"
+notes = ""
+
+[[program]]
+name = "mrisp_paint"
+kind = "c++"
+source = "mrisp_paint/mrisp_paint.cpp"
+streams = ["v8", "classic"]
+called_by = ["recon-all"]
+run = "timed"
+stages = ["65"]
+uses = ["-a 5 <FS>/average/lh.folding.atlas.acfb40.noaparc.i12.2016-08-02.tif#6 ../surf/lh.sphere.reg ../surf/lh.avg_curv"]
+plan_wave = "3.5"
+notes = ""
+
+[[program]]
+name = "mris_ca_label"
+kind = "c++"
+source = "mris_ca_label/mris_ca_label.cpp"
+streams = ["v8", "classic"]
+called_by = ["recon-all"]
+run = "timed"
+stages = ["66", "74"]
+uses = ["-l ../label/lh.cortex.label -aseg ../mri/aseg.presurf.mgz -seed 1234 <subj> lh ../surf/lh.sphere.reg <FS>/average/lh.{DKaparc,CDaparc,DKTaparc}.atlas.acfb40.noaparc.i12.2016-08-02.gcs ../label/lh.aparc{,.a2009s,.DKTatlas}.annot"]
+plan_wave = "3.5"
+notes = "seeded; three atlases"
+
+[[program]]
+name = "mris_curvature_stats"
+kind = "c++"
+source = "mris_curvature_stats/mris_curvature_stats.cpp"
+streams = ["v8", "classic"]
+called_by = ["recon-all"]
+run = "timed"
+stages = ["72"]
+uses = ["-m --writeCurvatureFiles -G -o ../stats/lh.curv.stats -F smoothwm <subj> lh curv sulc"]
+plan_wave = ""
+notes = ""
+
+[[program]]
+name = "mris_volmask"
+kind = "c++"
+source = "mris_volmask/mris_volmask.cpp"
+streams = ["v8", "classic"]
+called_by = ["recon-all"]
+run = "timed"
+stages = ["73"]
+uses = ["--aseg_name aseg.presurf --label_left_white 2 --label_left_ribbon 3 --label_right_white 41 --label_right_ribbon 42 --save_ribbon --parallel <subj>"]
+plan_wave = "3.5"
+notes = "--parallel: its two hemispheres at once (a race fixed upstream, recon-all 4860-4861: sub-task 5)"
+
+[[program]]
+name = "mris_anatomical_stats"
+kind = "c++"
+source = "mris_anatomical_stats/mris_anatomical_stats.cpp"
+streams = ["v8", "classic"]
+called_by = ["recon-all"]
+run = "timed"
+stages = ["81", "83"]
+uses = ["-no-th3 -mgz -cortex ../label/lh.cortex.label -f ../stats/lh.aparc{,.pial,.a2009s,.DKTatlas}.stats -b -a ../label/lh.aparc{...}.annot -c ../label/aparc.annot{...}.ctab <subj> lh white|pial", "-no-th3 -mgz -f ../stats/lh.BA_exvivo{,.thresh}.stats -b -a ./lh.BA_exvivo{,.thresh}.annot -c ./BA_exvivo{,.thresh}.ctab <subj> lh white"]
+plan_wave = "3.5"
+notes = "-no-th3: recon-all's TH3Flag is 0 (line 180)"
+
+[[program]]
+name = "mris_label2annot"
+kind = "c++"
+source = "mris_label2annot/mris_label2annot.cpp"
+streams = ["v8", "classic"]
+called_by = ["recon-all"]
+run = "timed"
+stages = ["83"]
+uses = ["--s <subj> --ctab <FS>/average/colortable_vpnl.txt --hemi lh --a mpm.vpnl --maxstatwinner --noverbose --l <8 labels>", "--s <subj> --hemi lh --ctab <FS>/average/colortable_BA{,_thresh}.txt --l <14 labels> --a BA_exvivo{,.thresh} --maxstatwinner --noverbose"]
+plan_wave = ""
+notes = ""
+
+[[program]]
+name = "mris_convert"
+kind = "c++"
+source = "mris_convert/mris_convert.cpp"
+streams = ["v8", "classic", "fmriprep"]
+called_by = ["vertexvol", "label-cortex", "sMRIPrep MRIsConvert", "sMRIPrep MRIsConvertData"]
+run = "mixed"
+stages = ["71", "57", "fmriprep"]
+uses = ["--volume <subj> lh <sd>/surf/lh.volume (vertexvol --th3)", "--to-scanner -n <white.preaparc> <nxyz.mgz> (v8 --fix-ga)", "fMRIPrep: --to-scanner <surf> <out>.gii (spheres without); -c <sd>/surf/lh.{thickness,sulc,curv} <sd>/surf/lh.white <out>.gii"]
+plan_wave = "3.5"
+notes = ""
+
+[[program]]
+name = "mri_surf2surf"
+kind = "c++"
+source = "mri_surf2surf/mri_surf2surf.cpp"
+streams = ["fmriprep"]
+called_by = ["bbregister"]
+run = "bare"
+stages = ["fmriprep"]
+uses = ["--reg <InitReg> --reg-diff <outreg> --sval-xyz white --rms <rms> --s <subj> --hemi lh|rh"]
+plan_wave = "3.5"
+notes = "fMRIPrep reaches it only through bbregister's RMS check; recon-all only with -qcache (off)"
+
+[[program]]
+name = "mris_expand"
+kind = "c++"
+source = "mris_expand/mris_expand.cpp"
+streams = ["fmriprep"]
+called_by = ["sMRIPrep MakeMidthickness"]
+run = "bare"
+stages = ["fmriprep"]
+uses = ["-thickness <sd>/surf/lh.white 0.5 lh.midthickness (OMP_NUM_THREADS = floor(1.5 x threads))"]
+plan_wave = "3.5"
+notes = "replaced by cp when a graymid/midthickness exists"
+
+[[program]]
+name = "mri_robust_register"
+kind = "c++"
+source = "mri_robust_register/mri_robust_register.cpp"
+streams = ["fmriprep"]
+called_by = ["sMRIPrep RobustRegister"]
+run = "bare"
+stages = ["fmriprep"]
+uses = ["--satit --iscale --mov <sd>/mri/T1.mgz --dst <T1w ref> --lta <out>"]
+plan_wave = "3.2"
+notes = "bbregister would call it only with --init-rr"
+
+[[program]]
+name = "mri_coreg"
+kind = "c++"
+source = "mri_coreg/mri_coreg.cpp"
+streams = ["fmriprep"]
+called_by = ["fMRIPrep MRICoreg", "bbregister"]
+run = "bare"
+stages = ["fmriprep"]
+uses = ["fMRIPrep: --s <subj> --sd <SD> --mov <boldref> --lta <out> --dof 6 --sep 4 --ftol 1.000000e-04 --linmintol 1.000000e-02 [reference mask off with a T2w]", "bbregister --init-coreg: --s <subj> --mov <vol> --regdat <InitReg> --reg <tmp>/mri_coreg.lta --nthreads N --dof <dof> --sep 4 --ftol .0001 --linmintol ..."]
+plan_wave = "3.2"
+notes = ""
+
+[[program]]
+name = "mri_segreg"
+kind = "c++"
+source = "mri_segreg/mri_segreg.cpp"
+streams = ["fmriprep"]
+called_by = ["bbregister"]
+run = "bare"
+stages = ["fmriprep"]
+uses = ["--mov <template> --init-reg <InitReg> --out-reg <Pass1Reg> --subsamp-brute <n> --subsamp <n> --tol 1e-4 --tol1d 1e-3 --brute -<max> ... (pass 1)", "--mov <template> --init-reg <Pass1Reg> --out-reg <outreg> --interp <interp> --wm-proj-abs <wm> --tol ... --tol1d ... --c0 ... (pass 2)"]
+plan_wave = ""
+notes = "the boundary-based registration itself; the exact lines from a run"
+
+[[program]]
+name = "tkregister2_cmdl"
+kind = "c++"
+source = "tkregister2/tkregister2.cpp"
+streams = ["fmriprep"]
+called_by = ["bbregister"]
+run = "bare"
+stages = ["fmriprep"]
+uses = ["--s <subj> --mov <vol> --regheader --reg <InitReg> --noedit", "--s <subj> --mov <template> --int <intvol> <InitReg> --noedit --reg <InitReg0>", "--mov <vol> --reg <outreg> --noedit --ltaout <lta>", "--mov <vol> --reg <outreg> --noedit --fslregout <fsl>"]
+plan_wave = ""
+notes = "tkregister2 built with NO_GUI (tkregister2/CMakeLists.txt 5-7)"
+
+[[program]]
+name = "mri_compute_seg_overlap"
+kind = "c++"
+source = "mri_compute_seg_overlap/mri_compute_seg_overlap.cpp"
+streams = []
+called_by = ["mri_vsinus_seg"]
+run = "conditional"
+stages = []
+uses = ["-dice <diceseg> <seg> embedded 1 0 <dat> <tbl>"]
+plan_wave = ""
+notes = "only with a reference segmentation (--dice), not in recon-all"
+
+[[program]]
+name = "mri_seg_diff"
+kind = "c++"
+source = "mri_seg_diff/mri_seg_diff.cpp"
+streams = []
+called_by = ["recon-all"]
+run = "conditional"
+stages = ["30", "32"]
+uses = ["--seg1 aseg.auto.mgz --seg2 aseg.presurf.mgz --diff aseg.manedit.mgz", "--seg aseg.auto.mgz --diff-in aseg.manedit.mgz --merged aseg.presurf.mgz"]
+plan_wave = ""
+notes = "only on a second run with edits; the replay of a resumed recon-all needs it"
+
+[[program]]
+name = "fs_temp_file"
+kind = "c++"
+source = "io/fs_temp_file.cpp"
+streams = ["v8", "classic"]
+called_by = ["recon-all"]
+run = "bare"
+stages = []
+uses = ["(no arguments: prints a temporary file name)"]
+plan_wave = ""
+notes = "helper"
+
+[[program]]
+name = "fs_temp_dir"
+kind = "c++"
+source = "io/fs_temp_dir.cpp"
+streams = ["classic"]
+called_by = ["avi2talxfm"]
+run = "bare"
+stages = ["11"]
+uses = ["(no arguments: prints a temporary directory)"]
+plan_wave = ""
+notes = "helper"
+
+# ---------------------------------------------------------------- Washington University's 4dfp tools
+
+[[program]]
+name = "analyzeto4dfp"
+kind = "c"
+source = "talairach_avi/analyzeto4dfp.c"
+streams = ["classic"]
+called_by = ["mpr2mni305"]
+run = "bare"
+stages = ["11"]
+uses = ["talsrcimg -O0 -y"]
+plan_wave = "3.2"
+notes = "talairach_avi: a clean room only, its atlas fetched (docs/licensing.md)"
+
+[[program]]
+name = "gauss_4dfp"
+kind = "c"
+source = "talairach_avi/gauss_4dfp.c"
+streams = ["classic"]
+called_by = ["mpr2mni305"]
+run = "bare"
+stages = ["11"]
+uses = ["talsrcimg 1.1"]
+plan_wave = "3.2"
+notes = ""
+
+[[program]]
+name = "imgreg_4dfp"
+kind = "c+fortran"
+source = "talairach_avi/imgreg_4dfp.c"
+streams = ["classic"]
+called_by = ["mpr2mni305"]
+run = "bare"
+stages = ["11"]
+uses = ["<FS>/average/711-2C_as_mni_average_305 none|<FS>/average/711-2B_as_mni_average_305_mask talsrcimg_g11 none <t4file> <mode> (modes 4355 4355 1283 3335 2311 2311)"]
+plan_wave = "3.2"
+notes = ""
+
+[[program]]
+name = "compute_vox2vox"
+kind = "c+fortran"
+source = "talairach_avi/compute_vox2vox.c"
+streams = ["classic"]
+called_by = ["mpr2mni305"]
+run = "bare"
+stages = ["11"]
+uses = ["talsrcimg <t4file> <FS>/average/711-2C_as_mni_average_305"]
+plan_wave = "3.2"
+notes = ""
+
+# ---------------------------------------------------------------- the networks (Python)
+
+[[program]]
+name = "mri_synthstrip"
+kind = "python-network"
+source = "mri_synthstrip/mri_synthstrip"
+streams = ["v8"]
+called_by = ["recon-all"]
+run = "timed"
+stages = ["7"]
+uses = ["--threads N -i orig.mgz -o synthstrip.mgz"]
+plan_wave = "3.3"
+notes = "PyTorch; model <FS>/models/synthstrip.1.pt"
+
+[[program]]
+name = "mri_synthseg"
+kind = "python-network"
+source = "mri_synthseg/mri_synthseg"
+streams = ["v8"]
+called_by = ["recon-all"]
+run = "timed"
+stages = ["8"]
+uses = ["--i orig.mgz --o synthseg.rca.mgz --threads N --vol stats/synthseg.vol.csv --keepgeom --addctab --cpu"]
+plan_wave = "3.3"
+notes = "TensorFlow/Keras; model synthseg_2.0.h5 (no --robust, --parc, --qc)"
+
+[[program]]
+name = "mri_synthmorph"
+kind = "python-network"
+source = "mri_synthmorph/mri_synthmorph"
+streams = ["v8"]
+called_by = ["fs-synthmorph-reg"]
+run = "nested"
+stages = ["15", "16"]
+uses = ["-m affine -t aff.lta <in> <target> -j <threads>", "-m deform -t deform.mgz -i aff.lta <in-crop> <target-crop> -j <threads> -o synthmorph.out.mgz"]
+plan_wave = "3.3"
+notes = "TensorFlow with voxelmorph and neurite; models mri_synthmorph/synthmorph.{rigid.1,affine.2,deform.3}.h5"
+
+[[program]]
+name = "mri_sclimbic_seg"
+kind = "python-network"
+source = "mri_sclimbic_seg/mri_sclimbic_seg"
+streams = ["v8"]
+called_by = ["mri_mcadura_seg", "mri_vsinus_seg", "mri_entowm_seg"]
+run = "bare"
+stages = ["20", "21", "29", "57"]
+uses = ["--model <FS>/models/mca-dura.both-lh.nstd21.fhs.h5 --ctab ... --keep_ac --percentile 99.9 --vmp --output-base mcadura --conform --logfile mri_mcadura_seg.log --no-cite-sclimbic --threads N --fov 72 --i <crop> --o <seg>", "--model .../vsinus.no-sp.m.all.nstd10-070.h5 --ctab ... --keep_ac --conform --percentile 99.9 --vmp --output-base <base> --logfile mri_vsinus_seg.log --fov <fov> --threads N --no-cite-sclimbic --i <crop> --o <seg>", "--no-cite-sclimbic --model <FS>/models/entowm.fsm31.t1.nstd00-30.nstd21-108.h5 --keep_ac --ctab .../entowm.ctab --percentile 99.9 --vmp --output-base <base> ..."]
+plan_wave = ""
+notes = "a fourth network program, not in the plan; TensorFlow/Keras"
+
+# ---------------------------------------------------------------- scripts with image outputs
+
+[[program]]
+name = "mri_nu_correct.mni"
+kind = "tcsh"
+source = "scripts/mri_nu_correct.mni"
+streams = ["v8", "classic"]
+called_by = ["recon-all"]
+run = "timed"
+stages = ["10", "17"]
+uses = ["--no-rescale --i orig.mgz --o orig_nu.mgz --ants-n4 --n 1 --proto-iters 1000 --distance 50 (classic)", "--i orig.mgz --o nu.mgz --uchar transforms/talairach.xfm --n 2 --ants-n4 (both)"]
+plan_wave = "3.2"
+notes = "N4 by default: AntsN4BiasFieldCorrectionFs, then the mean rescale (mri_binarize, mri_segstats x2, bc, mris_calc), mri_convert --like, mri_make_uchar"
+
+[[program]]
+name = "talairach_avi"
+kind = "tcsh"
+source = "talairach_avi/talairach_avi"
+streams = ["classic"]
+called_by = ["recon-all"]
+run = "timed"
+stages = ["11"]
+uses = ["--i orig_nu.mgz --xfm transforms/talairach.auto.xfm [--atlas 3T18yoSchwartzReactN32_as_orig on a retry]"]
+plan_wave = "3.2"
+notes = "mri_convert to ANALYZE, mpr2mni305, avi2talxfm, lta_convert; target 711-2C_as_mni_average_305"
+
+[[program]]
+name = "mpr2mni305"
+kind = "csh"
+source = "talairach_avi/mpr2mni305"
+streams = ["classic"]
+called_by = ["talairach_avi"]
+run = "bare"
+stages = ["11"]
+uses = ["talsrcimg (REFDIR=<FS>/average, MPR2MNI305_TARGET=711-2C_as_mni_average_305)"]
+plan_wave = "3.2"
+notes = "analyzeto4dfp, gauss_4dfp, imgreg_4dfp x6, compute_vox2vox"
+
+[[program]]
+name = "avi2talxfm"
+kind = "csh"
+source = "scripts/avi2talxfm"
+streams = ["classic"]
+called_by = ["talairach_avi"]
+run = "bare"
+stages = ["11"]
+uses = ["<in> <FS>/average/mni305.cor.mgz talsrcimg_to_711-2C_as_mni_average_305_t4_vox2vox.txt <xfm>"]
+plan_wave = "3.2"
+notes = "fs_temp_dir, mri_info --vox2ras x2, mri_matrix_multiply -fsl, awk"
+
+[[program]]
+name = "rca-talairach"
+kind = "tcsh"
+source = "scripts/rca-talairach"
+streams = ["v8"]
+called_by = ["recon-all"]
+run = "timed"
+stages = ["15"]
+uses = ["--s <subj> --threads N"]
+plan_wave = "3.3"
+notes = "fs-synthmorph-reg --affine-only to mni305.cor.stripped.mgz at one thread (OMP_NUM_THREADS set to 1 before --threads is read); lta_convert x2 (bare)"
+
+[[program]]
+name = "fs-synthmorph-reg"
+kind = "tcsh"
+source = "mri_synthmorph/fs-synthmorph-reg"
+streams = ["v8"]
+called_by = ["recon-all", "rca-talairach", "mri_mcadura_seg", "mri_vsinus_seg"]
+run = "mixed"
+stages = ["15", "16"]
+uses = ["--s <subj> --threads N --i <sd>/mri/orig.mgz --test", "--i <sd>/mri/synthstrip.mgz --t $FREESURFER/average/mni305.cor.stripped.mgz --affine-only --o <sd>/mri/transforms/synthmorph.mni305 --threads 1"]
+plan_wave = "3.3"
+notes = "mri_mask -bb 3, lta_convert, mri_synthmorph affine and deform, mri_concatenate_lta x2, mri_warp_convert, mri_ca_register -invert-and-save, mri_vol2vol, mri_convert -at, mri_diff"
+
+[[program]]
+name = "mri_mcadura_seg"
+kind = "tcsh"
+source = "scripts/mri_mcadura_seg"
+streams = ["v8"]
+called_by = ["recon-all"]
+run = "bare"
+stages = ["20"]
+uses = ["--i <sd>/mri/nu.mgz --o <sd>/mri/mca-dura.mgz --threads N --synthmorphdir <sd>/mri/transforms/synthmorph.1.0mm.1.0mm"]
+plan_wave = ""
+notes = "mri_vol2vol, mri_mask, mri_convert, mri_sclimbic_seg (mca-dura model), mri_concat, mri_binarize, mri_segstats; priors <FS>/average/mca-dura.prior.warp.mni152.1.0mm.{lh,rh}.nii.gz"
+
+[[program]]
+name = "mri_vsinus_seg"
+kind = "tcsh"
+source = "scripts/mri_vsinus_seg"
+streams = ["v8"]
+called_by = ["recon-all"]
+run = "bare"
+stages = ["21"]
+uses = ["--s <subj> --rca-synthseg --threads N --synthmorphdir <sd>/mri/transforms/synthmorph.1.0mm.1.0mm"]
+plan_wave = ""
+notes = "mri_vol2vol, mri_mask, mri_binarize, mri_sclimbic_seg (vsinus model), mri_segstats; prior <FS>/average/vsinus.no-sp.prior.mni152.1.0mm.mgz; receives the previous step's $xopts (recon-all 2241)"
+
+[[program]]
+name = "mri_entowm_seg"
+kind = "tcsh"
+source = "scripts/mri_entowm_seg"
+streams = ["v8"]
+called_by = ["recon-all"]
+run = "bare"
+stages = ["29"]
+uses = ["--s <subj> --conform --threads N"]
+plan_wave = ""
+notes = "mri_sclimbic_seg (entowm model); writes mri/entowm.mgz and stats/entowm.stats (read by recon-all to keep or drop -fix-ga)"
+
+[[program]]
+name = "seg2cc"
+kind = "tcsh"
+source = "scripts/seg2cc"
+streams = ["v8", "classic"]
+called_by = ["recon-all"]
+run = "timed"
+stages = ["31"]
+uses = ["--s <subj>"]
+plan_wave = "3.2"
+notes = "mri_info --conformed-to-min, then mri_cc (conformed) or mri_convert/mri_label2vol/mri_cc/mri_binarize/mergeseg"
+
+[[program]]
+name = "mergeseg"
+kind = "tcsh"
+source = "scripts/mergeseg"
+streams = []
+called_by = ["seg2cc"]
+run = "conditional"
+stages = ["31"]
+uses = ["--src <seg> --merge <ccbin.mgh> --o aseg.auto.mgz --segid <id> --tmpdir <tmp> --ctab <ctab>"]
+plan_wave = ""
+notes = "only for an input not conformed to its minimum voxel size"
+
+[[program]]
+name = "defect2seg"
+kind = "tcsh"
+source = "scripts/defect2seg"
+streams = ["v8", "classic"]
+called_by = ["recon-all"]
+run = "timed"
+stages = ["52"]
+uses = ["--s <subj> --cortex"]
+plan_wave = "3.4"
+notes = "mri_label2label --label-cortex, mri_label2vol --defects, mris_defects_pointset (per hemisphere, bare)"
+
+[[program]]
+name = "label-cortex"
+kind = "tcsh"
+source = "scripts/label-cortex"
+streams = ["v8", "classic"]
+called_by = ["recon-all"]
+run = "timed"
+stages = ["57"]
+uses = ["--s <subj> --lh [v8: --fix-ga]"]
+plan_wave = ""
+notes = "mri_label2label --label-cortex; with --fix-ga also mri_binarize, mri_vol2surf, mris_convert -n, fscalc, mri_cor2label, mri_mergelabels"
+
+[[program]]
+name = "fscalc"
+kind = "tcsh"
+source = "scripts/fscalc"
+streams = ["v8"]
+called_by = ["label-cortex"]
+run = "bare"
+stages = ["57"]
+uses = ["<nxmask> and <nzmask> -o <gamask>"]
+plan_wave = ""
+notes = "mri_convert and mris_calc"
+
+[[program]]
+name = "mri_mergelabels"
+kind = "tcsh"
+source = "scripts/mri_mergelabels"
+streams = ["v8"]
+called_by = ["label-cortex"]
+run = "bare"
+stages = ["57"]
+uses = ["-i <ctx-no-ga.label> -i <ga.label> -o <cortex.label>"]
+plan_wave = ""
+notes = "label text files"
+
+[[program]]
+name = "rca-surfreg"
+kind = "tcsh"
+source = "scripts/rca-surfreg"
+streams = ["v8", "classic"]
+called_by = ["recon-all"]
+run = "timed"
+stages = ["63"]
+uses = ["--s <subj> --threads N --tif-path <FS>/average --tif-name folding.atlas.acfb40.noaparc.i12.2016-08-02.tif"]
+plan_wave = "3.5"
+notes = "mris_register per hemisphere (fs_time, nested) and ln -sf lh.sphere.reg lh.fsaverage.sphere.reg"
+
+[[program]]
+name = "vertexvol"
+kind = "tcsh"
+source = "scripts/vertexvol"
+streams = ["v8", "classic"]
+called_by = ["recon-all"]
+run = "timed"
+stages = ["71"]
+uses = ["--s <subj> --lh --th3"]
+plan_wave = ""
+notes = "mris_calc x2 (area.mid) and mris_convert --volume (TH3)"
+
+[[program]]
+name = "pctsurfcon"
+kind = "tcsh"
+source = "scripts/pctsurfcon"
+streams = ["v8", "classic"]
+called_by = ["recon-all"]
+run = "timed"
+stages = ["75"]
+uses = ["--s <subj> --lh-only|--rh-only"]
+plan_wave = "3.5"
+notes = "mri_vol2surf x2 on rawavg.mgz, mri_concat --paired-diff-norm --mul 100, mri_segstats --annot ... aparc --snr"
+
+[[program]]
+name = "bbregister"
+kind = "tcsh"
+source = "scripts/bbregister"
+streams = ["fmriprep"]
+called_by = ["sMRIPrep BBRegister (T2w)", "fMRIPrep BBRegister (BOLD)"]
+run = "bare"
+stages = ["fmriprep"]
+uses = ["--s <subj> --mov <t2w> --t2 --init-coreg --6 --reg ... --lta ... --gm-proj-abs 2 --wm-proj-abs 1", "--s <subj> --mov <boldref> --t2 --6|--9|--12 --reg ... --lta ... --initcost bbregister.initcost --init-reg <lta>|--init-header"]
+plan_wave = "3.5"
+notes = "mri_convert, mri_coreg (--init-coreg), tkregister2_cmdl, lta_convert --outreg, mri_segreg x2, mri_surf2surf --reg-diff x2, tkregister2_cmdl --ltaout"
+
+# ---------------------------------------------------------------- helpers (no image output)
+
+[[program]]
+name = "rca-config"
+kind = "python"
+source = "scripts/rca-config"
+streams = ["v8", "classic"]
+called_by = ["recon-all"]
+run = "bare"
+stages = []
+uses = ["<FS>/etc/recon-config.yaml <tmp_config> <tmp_unknown_args> <args>"]
+plan_wave = "3.6"
+notes = "argparse over the YAML; the defaults of DoAntsN4, DoAntsDenoising, DoRemesh live here"
+
+[[program]]
+name = "rca-config2csh"
+kind = "python"
+source = "scripts/rca-config2csh"
+streams = ["v8", "classic"]
+called_by = ["recon-all"]
+run = "bare"
+stages = []
+uses = ["<tmp_config>"]
+plan_wave = "3.6"
+notes = ""
+
+[[program]]
+name = "fsr-getxopts"
+kind = "tcsh"
+source = "scripts/fsr-getxopts"
+streams = ["v8", "classic"]
+called_by = ["recon-all", "label-cortex", "rca-surfreg"]
+run = "bare"
+stages = []
+uses = ["<key> <xopts files ...>"]
+plan_wave = "3.6"
+notes = "exact match on a line's first word; options from all files, in order"
+
+[[program]]
+name = "fsr-checkxopts"
+kind = "tcsh"
+source = "scripts/fsr-checkxopts"
+streams = []
+called_by = ["recon-all"]
+run = "conditional"
+stages = []
+uses = ["<SUBJECTS_DIR>/global-expert-options.txt"]
+plan_wave = "3.6"
+notes = "only with a global expert options file"
+
+[[program]]
+name = "UpdateNeeded"
+kind = "csh"
+source = "scripts/UpdateNeeded"
+streams = ["v8", "classic"]
+called_by = ["recon-all", "most scripts"]
+run = "bare"
+stages = []
+uses = ["<target> <dependencies ...> (prints 1 when the target is missing or older)"]
+plan_wave = "3.6"
+notes = "the resume logic: file times"
+
+[[program]]
+name = "fs-check-version"
+kind = "tcsh"
+source = "scripts/fs-check-version"
+streams = ["v8", "classic"]
+called_by = ["recon-all"]
+run = "bare"
+stages = []
+uses = ["--s <subj> --o <checkfile>"]
+plan_wave = "3.6"
+notes = ""
+
+[[program]]
+name = "fs-check-os"
+kind = "tcsh"
+source = "scripts/fs-check-os"
+streams = ["v8", "classic"]
+called_by = ["recon-all"]
+run = "bare"
+stages = []
+uses = ["--check"]
+plan_wave = "3.6"
+notes = ""
+
+[[program]]
+name = "csvprint"
+kind = "python"
+source = "scripts/csvprint"
+streams = ["v8"]
+called_by = ["recon-all"]
+run = "bare"
+stages = ["9"]
+uses = ["--csv stats/synthseg.vol.csv --f \"total intracranial\""]
+plan_wave = ""
+notes = "its output is stats/synthseg.tiv.dat (mri_segstats --stiv)"
+
+[[program]]
+name = "extract_talairach_avi_QA.awk"
+kind = "system"
+source = "scripts/extract_talairach_avi_QA.awk"
+streams = ["classic"]
+called_by = ["recon-all"]
+run = "bare"
+stages = ["14"]
+uses = ["awk -f <FS>/bin/extract_talairach_avi_QA.awk transforms/talairach_avi.log"]
+plan_wave = "3.2"
+notes = "TalAviQA z-score below -9 retries the registration"
+
+[[program]]
+name = "getfullpath"
+kind = "tcsh"
+source = "scripts/getfullpath"
+streams = ["v8", "classic"]
+called_by = ["fs-synthmorph-reg", "seg2cc", "rca-talairach"]
+run = "bare"
+stages = []
+uses = ["<path>"]
+plan_wave = ""
+notes = "helper (also fname2stem, fname2ext in fs-synthmorph-reg)"
+
+# ---------------------------------------------------------------- off the default path
+
+[[program]]
+name = "nu_correct"
+kind = "minc"
+source = ""
+streams = []
+called_by = ["mri_nu_correct.mni"]
+run = "conditional"
+stages = ["10", "17"]
+uses = ["-clobber <in.mnc> <out.mnc> -tmpdir <dir> [-iterations 1000 -distance 50]"]
+plan_wave = "3.2"
+notes = "MNI's N3 (Perl and MINC tools, shipped only in the package); only with -no-ants-n4"
+
+[[program]]
+name = "talairach"
+kind = "tcsh"
+source = "scripts/talairach"
+streams = []
+called_by = ["recon-all"]
+run = "conditional"
+stages = ["14"]
+uses = ["--i orig_nu.mgz --xfm transforms/talairach.auto.xfm"]
+plan_wave = ""
+notes = "MINC's mritotal; only after the Talairach check fails twice"

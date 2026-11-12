@@ -37,6 +37,7 @@ curvatures, annotations: values and labels) or line by line (text).
 from __future__ import annotations
 
 import gzip
+import io
 import os
 import re
 from dataclasses import dataclass
@@ -51,10 +52,17 @@ LOG = "log"  # a log whose text differs beyond the masks (messages, not results)
 DIFFERS = "differs"
 MISSING = "missing"  # in the reference only
 EXTRA = "extra"  # in the replay only
+VARIES = "varies"  # differs where the original itself varies from run to run (measured)
 
 _CMDLINE = rb"ProgramName: [\x20-\x7e]*?CompilerVersion: [0-9][0-9.]*"
 _STAMP = rb"created by [^\n\x00]*"
 _ANY_DIR = rb"/(?:[A-Za-z0-9._+~-]+/)+"
+#: A temporary file's name as mktemp makes it (``/tmp/tmp.JBTcX9.ctab``: a statistics file names
+#: the colour table its script wrote there).
+_TEMP = rb"(?<![\w.])tmp\.[A-Za-z0-9]{6,12}(?![A-Za-z0-9])"
+#: A script's temporary directory named by its process number (``tmpdir.label-cortex.719800``,
+#: ``tmp.mri_nu_correct.mni.12345``).
+_TEMP_PID = rb"(?<![\w.])(tmp(?:dir)?\.[A-Za-z0-9_.-]*?\.)\d+(?![\w])"
 
 #: Dates and times as FreeSurfer and its scripts print them (UTC records, ``date``'s output in
 #: the run's locale, ISO forms).
@@ -78,16 +86,18 @@ LOG_MASKS: tuple[str | tuple[str, str], ...] = (
     # fs_time's report lines (@#@FSTIME, @#@FSLOADPRE, @#@FSLOADPOST: times, memory, the load)
     (r"(?m)^(@#@FS[A-Z]+) .*$", r"\1 …"),
     (r"(?m)^#@#%# .*$", "#@#%# …"),
-    (r"(?i)\b([0-9]+(?:\.[0-9]*)?)(\s*(?:min(?:ute)?s?|sec(?:ond)?s?|hours?|h|m|s)\b)", r"…\2"),
+    # a program's peak memory, as FreeSurfer's scripts print it (#VMPC# <program> <kB>)
+    (r"(?m)^(#VMPC# \S+) \d+", r"\1 …"),
+    (r"(?i)\b([0-9]+(?:[.,][0-9]*)?)(\s*(?:min(?:ute)?s?|sec(?:ond)?s?|hours?)\b)", r"…\2"),
     (
-        r"(?i)((?:took|elapsed|time|runtime|duration|seconds|minutes|hours)[^0-9\n]{0,24})[0-9.:]+",
+        r"(?i)((?:took|elapsed|time|runtime|duration|seconds|minutes|hours|run-time-min)"
+        r"[^0-9\n]{0,24})[0-9.,:]+",
         r"\1…",
     ),
     (
         r"(?i)((?:vmpeak|vmsize|vmrss|vmhwm|maxrss|memory|mem|ram|KB|MB|GB)[^0-9\n]{0,12})[0-9.]+",
         r"\1…",
     ),
-    (r"\b(tmp\.[A-Za-z0-9_.-]*?\.)\d+\b", r"\1…"),
     (r"\bpid\s*[=:]?\s*\d+\b", "pid …"),
 )
 
@@ -157,10 +167,15 @@ def kind_of(name: str, data: bytes) -> str:
 # Binary files: provenance runs cut out, the bytes between them compared
 
 
-def _binary_pattern(side: int, ctx: Context) -> re.Pattern[bytes]:
-    alts = [(b"cmd", _CMDLINE), (b"stamp", _STAMP)]
-    pairs = sorted(enumerate(ctx.pairs), key=lambda ip: -len(ip[1][side]))
-    alts += [(f"p{i}".encode(), re.escape(p[side].encode())) for i, p in pairs if p[side]]
+def _binary_pattern(ctx: Context) -> re.Pattern[bytes]:
+    """The provenance runs of a binary file. Both texts of a pair are masked on both sides: a
+    file the replay wrote may keep the recorded path where it copies it from its input (a
+    surface's volume, a record the volume inherits)."""
+    alts = [(b"cmd", _CMDLINE), (b"stamp", _STAMP), (b"tmpp", _TEMP_PID), (b"tmp", _TEMP)]
+    texts = sorted(
+        {(t, i) for i, pair in enumerate(ctx.pairs) for t in pair if t}, key=lambda x: -len(x[0])
+    )
+    alts += [(f"p{i}x{j}".encode(), re.escape(t.encode())) for j, (t, i) in enumerate(texts)]
     names = sorted({n for n in ctx.names if len(n) >= 3}, key=len, reverse=True)
     alts += [(f"n{i}".encode(), re.escape(n.encode())) for i, n in enumerate(names)]
     if ctx.any_directory:
@@ -173,7 +188,11 @@ def _split(data: bytes, pattern: re.Pattern[bytes]) -> tuple[list[bytes], list[t
     for m in pattern.finditer(data):
         literals.append(data[pos : m.start()])
         kind = m.lastgroup or ""
-        runs.append(("name" if kind.startswith("n") else kind, m.group()))
+        if kind.startswith("n"):
+            kind = "name"
+        elif kind.startswith("p"):
+            kind = kind.split("x", 1)[0]
+        runs.append((kind, m.group()))
         pos = m.end()
     literals.append(data[pos:])
     return literals, runs
@@ -182,6 +201,8 @@ def _split(data: bytes, pattern: re.Pattern[bytes]) -> tuple[list[bytes], list[t
 _RUN_WORDS = {
     "cmd": "the command-line records",
     "stamp": "the creation stamp",
+    "tmp": "a temporary file's name",
+    "tmpp": "a temporary directory's process number",
     "name": "the user's or machine's name",
     "dir": "a directory's path",
 }
@@ -189,8 +210,9 @@ _RUN_WORDS = {
 
 def masked_binary(a: bytes, b: bytes, ctx: Context) -> tuple[bool, str]:
     """Whether ``a`` and ``b`` are the same apart from provenance; the reason either way."""
-    la, ra = _split(a, _binary_pattern(0, ctx))
-    lb, rb = _split(b, _binary_pattern(1, ctx))
+    pattern = _binary_pattern(ctx)
+    la, ra = _split(a, pattern)
+    lb, rb = _split(b, pattern)
     if [k for k, _ in ra] != [k for k, _ in rb]:
         return False, (
             f"the provenance records differ in number or order ({len(ra)} in the reference, "
@@ -208,10 +230,112 @@ def masked_binary(a: bytes, b: bytes, ctx: Context) -> tuple[bool, str]:
                     break
         if not ok:
             where = sum(len(s) for s in la[:i]) + sum(len(r) for _, r in ra[:i])
-            return False, f"bytes outside the provenance records differ (near offset {where})"
+            first = next(
+                (k for k in range(min(len(x), len(y))) if x[k] != y[k]), min(len(x), len(y))
+            )
+            near = (
+                re.sub(rb"[^\x20-\x7e]+", b" ", x[max(0, first - 40) : first + 40]).decode().strip()
+            )
+            return False, (
+                f"bytes outside the provenance records differ (near offset {where + first}: "
+                f"{near[:80]!r})"
+            )
+    return True, _words(ra, rb)
+
+
+def _words(ra, rb) -> str:
     kinds = sorted({ka for (ka, x), (_, y) in zip(ra, rb, strict=True) if x != y})
     words = [_RUN_WORDS.get(k, "the subjects directory's path") for k in kinds]
-    return True, "only provenance differs: " + ", ".join(dict.fromkeys(words))
+    return (
+        "only provenance differs: " + ", ".join(dict.fromkeys(words))
+        if words
+        else ("only provenance differs")
+    )
+
+
+#: The record that holds a command line (observed in 8.2.0's volumes and surfaces: both
+#: ``ProgramName: ...`` records and plain command lines carry the number 3).
+CMDLINE_RECORD = 3
+
+
+def _records(data: bytes, start: int) -> list[tuple[int, bytes]] | None:
+    """The records from ``start`` to the end (``[4-byte number][8-byte length][bytes]``, big
+    endian, as observed), or ``None`` when the first is not one. A record whose length field
+    does not fit (an embedded colour table, number 1, has none: observed) ends the list with the
+    rest of the file as one record of number ``-1 - number``."""
+    out, pos = [], start
+    while pos < len(data):
+        tag = int.from_bytes(data[pos : pos + 4], "big") if pos + 4 <= len(data) else -1
+        n = int.from_bytes(data[pos + 4 : pos + 12], "big") if pos + 12 <= len(data) else -1
+        if not 0 <= tag <= 65535 or not 0 <= n <= len(data) - pos - 12:
+            if not out:
+                return None
+            out.append((-1 - max(tag, 0), data[pos:]))
+            break
+        out.append((tag, data[pos + 12 : pos + 12 + n]))
+        pos += 12 + n
+    return out
+
+
+def _record_start(kind: str, data: bytes) -> list[int]:
+    """Where a volume's or a surface's records may start (candidates, the first that parses
+    wins): a volume after its data and its scan parameters (20 bytes; nibabel's footer offset
+    gives the data's end), a surface after its volume information's last line (``cras = ...``)."""
+    if kind == "mgh":
+        try:
+            from nibabel.freesurfer.mghformat import MGHHeader
+
+            end = MGHHeader.from_fileobj(io.BytesIO(data)).get_footer_offset()
+        except Exception:
+            return []
+        return [end + 20, end]
+    if kind == "surface":
+        i = data.find(b"\ncras")
+        j = data.find(b"\n", i + 1) if i >= 0 else -1
+        return [j + 1] if j >= 0 else []
+    return []
+
+
+def structured(kind: str, a: bytes, b: bytes, ctx: Context) -> tuple[bool, str] | None:
+    """A volume or a surface compared record by record: the part before the records with the
+    provenance runs masked, then the records in order (a command-line record is provenance as a
+    whole; another is compared with the paths and names masked). ``None``: the files are not
+    laid out so (the byte-run comparison decides)."""
+    for start_a in _record_start(kind, a):
+        start_b = start_a if kind == "mgh" else (_record_start(kind, b) or [-1])[0]
+        if start_b < 0:
+            return None
+        ra, rb = _records(a, start_a), _records(b, start_b)
+        if ra is None or rb is None:
+            continue
+        same, why = masked_binary(a[:start_a], b[:start_b], ctx)
+        if not same:
+            return False, f"before the records: {why}"
+        if [t for t, _ in ra] != [t for t, _ in rb]:
+            return False, (
+                f"the records differ in number or kind ({[t for t, _ in ra]} in the reference, "
+                f"{[t for t, _ in rb]} in the replay)"
+            )
+        words = [why] if why != "only provenance differs" else []
+        for k, ((tag, x), (_, y)) in enumerate(zip(ra, rb, strict=True)):
+            if x == y:
+                continue
+            if tag == CMDLINE_RECORD:
+                words.append("only provenance differs: the command-line records")
+                continue
+            ok, w = masked_binary(x, y, ctx)
+            if not ok:
+                printable = re.sub(rb"[^\x20-\x7e]+", b" ", x[:200]).decode()[:80].strip()
+                what = f"number {tag}" if tag >= 0 else f"number {-1 - tag} and what follows"
+                return False, f"record {k + 1} ({what}, {len(x)} bytes: {printable!r}) differs: {w}"
+            words.append(w)
+        parts = []
+        for w in words:
+            for piece in w.removeprefix("only provenance differs").lstrip(": ").split(", "):
+                if piece and piece not in parts:
+                    parts.append(piece)
+        return True, "only provenance differs" + (": " + ", ".join(parts) if parts else "")
+    return None
 
 
 # ------------------------------------------------------------------------------------------------
@@ -227,6 +351,8 @@ def mask_text(text: str, ctx: Context, side: int, *, log: bool = False) -> str:
         text = re.sub(r"(?<![\w.])/(?:[A-Za-z0-9._+~-]+/)+", "{DIR}/", text)
     for n in sorted({n for n in ctx.names if len(n) >= 3}, key=len, reverse=True):
         text = text.replace(n, "{NAME}")
+    text = re.sub(_TEMP_PID.decode(), r"\1…", text)
+    text = re.sub(_TEMP.decode(), "tmp.…", text)
     text = _PROVENANCE_KEYS.sub(r"\1 …", text)
     text = _CREATED.sub("created by … on …", text)
     for d in DATES:
@@ -344,7 +470,8 @@ def compare(
         if ma == mb:
             return Comparison(PROVENANCE, kind, "only provenance differs")
         return Comparison(LOG if kind == "log" else DIFFERS, kind, _text_detail(ma, mb))
-    same, why = masked_binary(da, db, ctx)
+    found = structured(kind, da, db, ctx) if kind in ("mgh", "surface") else None
+    same, why = found if found is not None else masked_binary(da, db, ctx)
     if same:
         return Comparison(PROVENANCE, kind, why)
     try:
@@ -371,6 +498,7 @@ __all__ = [
     "LOG_MASKS",
     "MISSING",
     "PROVENANCE",
+    "VARIES",
     "Comparison",
     "Context",
     "compare",

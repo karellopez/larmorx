@@ -6,8 +6,8 @@ program_identity``): an ELF program's SHA-256 and its shared libraries', a scrip
 every file of its directory. A FreeSurfer program also reads its installation's data (atlases,
 colour tables, ``fsaverage``, the networks' weights) and, for its scripts, the other programs
 of ``bin/``; none of that would be in the key. So every FreeSurfer program runs through a
-launcher, ``<base>/<tree>/<program>/<program>`` (a two-line shell script that runs the
-installation's program), beside a ``PACKAGE.json`` that names the whole installation: its build
+launcher, ``<base>/<tree>/<program>/<program>`` (a short bash script that runs the
+installation's program under its bare name, as recon-all's ``fs_time`` does), beside a ``PACKAGE.json`` that names the whole installation: its build
 stamp, the downloaded package's SHA-256 (when ``download/SHA256SUMS`` is found beside the
 unpacked tree, as the reference runs keep it) and the SHA-256 of a manifest of every file of the
 tree (each file's path and SHA-256; a link by its text). The launcher's directory is the
@@ -128,10 +128,12 @@ def launcher(program: str, fs_home: str | Path, *, root: Path | None = None) -> 
     ident = identity(str(home))
     d = (root or base() / "launchers") / ident["tree_sha256"][:16] / program
     script = d / program
+    # argv[0] as recon-all's fs_time gives it (the bare name, found on PATH): programs print it
+    # (mris_anatomical_stats' "# generating_program", the command-line records of volumes)
     text = (
-        "#!/bin/sh\n"
+        "#!/bin/bash\n"
         "# larmorx_validation.freesurfer: FreeSurfer's program, the installation in PACKAGE.json\n"
-        f"exec '{target}' \"$@\"\n"
+        f"exec -a '{program}' '{target}' \"$@\"\n"
     )
     package = json.dumps(ident, indent=1, sort_keys=True) + "\n"
 

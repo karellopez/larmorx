@@ -54,8 +54,24 @@ THREAD_ENV = ("OMP_NUM_THREADS", "FS_OMP_NUM_THREADS", "ITK_GLOBAL_DEFAULT_NUMBE
 #: The thread options of the programs recon-all 8.2.0 runs, as the recordings show them
 #: (mris_place_surface, mri_surf2volseg, rca-* --threads; mris_sphere -threads; ...).
 THREAD_OPTIONS = ("--threads", "-threads", "--nthreads", "-nthreads", "-openmp", "--openmp", "-j")
+#: Where FreeSurfer's own result varies from run to run (measured by replaying the step twice
+#: with the cache off: the two replays differ as each differs from the recording): program ->
+#: (the file, a regular expression of its path, why). Such a step is never cached, and the file's
+#: difference is reported as ``varies``.
+VARIES: dict[str, tuple[str, str]] = {
+    "defect2seg": (
+        r"(^|/)surface\.defects\.mgz$",
+        "the colour table embedded in surface.defects.mgz gives each defect cluster a colour that "
+        "changes from run to run (two replays differ from each other as from the recording; the "
+        "voxels are identical)",
+    ),
+}
 #: A replay's root holds this file (a root without it is never emptied).
 MARKER = ".larmorx-fs-replay"
+#: Touched when the rebuild is done: a file whose status changed after it (its ``ctime``, which
+#: no program can set back) may have been written by the run; the others hold what the rebuild
+#: copied (so only those are hashed after the run).
+REBUILT = ".larmorx-fs-replay-rebuilt"
 
 
 def _keep(name: str) -> bool:
@@ -180,6 +196,7 @@ def rebuild(rec: Recording, step: Step, dest: Path, *, threads: int | None = 1) 
     cwd.mkdir(parents=True, exist_ok=True)
     env, nthreads = step_env(rec, step, subjects, cwd, threads)
     argv = step_argv(rec, step, subjects, threads)
+    (dest / REBUILT).write_text(f"{n} files\n", encoding="utf-8")
     return Rebuilt(rec, step, dest, subjects, subject, cwd, argv, env, nthreads, n, size, links)
 
 
@@ -196,8 +213,10 @@ def run_freesurfer(rb: Rebuilt, *, timeout: float | None = None):
     if not fs_home:
         raise RuntimeError("the recording names no FREESURFER_HOME")
     prog = launcher(rb.argv[0], fs_home)
+    varies = VARIES.get(rb.argv[0])
     policy = oracle_cache.Policy(
         threads=rb.threads,
+        never=f"{rb.argv[0]}: {varies[1]}" if varies else "",
         family="freesurfer",
         formats="freesurfer",
         volatile=STREAM_VOLATILE,
@@ -257,8 +276,12 @@ def _sha(path: Path) -> str:
     return h.hexdigest()
 
 
-def scan(subject: Path) -> dict[str, str]:
-    """The subject directory as the recorder sees it: path -> SHA-256 (links as their files)."""
+def scan(
+    subject: Path, known: dict[str, str] | None = None, since_ns: int | None = None
+) -> dict[str, str]:
+    """The subject directory as the recorder sees it: path -> SHA-256 (links as their files). A
+    file in ``known`` whose status has not changed since ``since_ns`` (its ``ctime``) keeps its
+    known SHA-256 without being read."""
     out = {}
     for d, dirs, names in os.walk(subject):
         rel_d = os.path.relpath(d, subject)
@@ -269,6 +292,13 @@ def scan(subject: Path) -> dict[str, str]:
             p = Path(d) / name
             if skipped(rel) or not p.is_file():
                 continue
+            if known is not None and since_ns is not None and rel in known:
+                st = p.stat()
+                if st.st_ctime_ns < since_ns and (
+                    not p.is_symlink() or p.lstat().st_ctime_ns < since_ns
+                ):
+                    out[rel] = known[rel]
+                    continue
             out[rel] = _sha(p)
     return out
 
@@ -304,6 +334,8 @@ class StepReport:
             return "reproduced"
         if verdicts <= {fsfiles.IDENTICAL, fsfiles.PROVENANCE, fsfiles.LOG}:
             return "reproduced; a log differs"
+        if verdicts <= {fsfiles.IDENTICAL, fsfiles.PROVENANCE, fsfiles.LOG, fsfiles.VARIES}:
+            return "reproduced where the original is deterministic"
         return "differs"
 
     def counts(self) -> dict[str, int]:
@@ -351,8 +383,10 @@ def compare_step(rb: Rebuilt, done) -> StepReport:
     """The rebuilt directory after the run against the recorded state after the step."""
     rec, step = rb.recording, rb.step
     expected = step.after()
-    actual = scan(rb.subject_dir)
     before = step.before
+    sentinel = rb.root / REBUILT
+    since = sentinel.stat().st_ctime_ns if sentinel.is_file() else None
+    actual = scan(rb.subject_dir, before, since)
     changed_ref = {rel for rel, sha in expected.items() if before.get(rel) != sha} | set(
         step.deleted
     )
@@ -366,8 +400,19 @@ def compare_step(rb: Rebuilt, done) -> StepReport:
         pairs.append((ref_dated.get(key), rep_dated.get(key)))
     plain = (changed_ref | changed_rep) - set(ref_dated.values()) - set(rep_dated.values())
     pairs += [(r, r) for r in sorted(plain)]
+    places = [(rec.subjects_dir, str(rb.subjects_dir))]
+    home = rec.environment.get("HOME", "")
+    if (
+        home
+        and rec.subjects_dir.startswith(home + "/")
+        and str(rb.subjects_dir).startswith(home + "/")
+    ):
+        # tcsh prints paths under the home directory with a "~" (the scripts' logs)
+        places.append(
+            ("~" + rec.subjects_dir[len(home) :], "~" + str(rb.subjects_dir)[len(home) :])
+        )
     ctx = fsfiles.Context(
-        pairs=((rec.subjects_dir, str(rb.subjects_dir)),),
+        pairs=tuple(places),
         names=tuple(sorted(set(_names(rec.environment)) | set(_names(rb.env)))),
     )
     results = []
@@ -375,6 +420,9 @@ def compare_step(rb: Rebuilt, done) -> StepReport:
         a = rec.blob(expected[ref]) if ref is not None and ref in expected else None
         b = rb.subject_dir / rep if rep is not None and rep in actual else None
         c = fsfiles.compare(a, b, ctx, name=os.path.basename(rep or ref or ""))
+        varies = VARIES.get(rb.argv[0])
+        if c.verdict == fsfiles.DIFFERS and varies and re.search(varies[0], rep or ref or ""):
+            c = fsfiles.Comparison(fsfiles.VARIES, c.kind, f"{varies[1]}; {c.detail}")
         results.append(FileResult(ref or "", rep or "", c))
     return StepReport(
         run=rec.name,
@@ -482,6 +530,7 @@ __all__ = [
     "STREAM_VOLATILE",
     "THREAD_ENV",
     "THREAD_OPTIONS",
+    "VARIES",
     "FileResult",
     "Ran",
     "Rebuilt",

@@ -52,7 +52,7 @@ import numpy as np
 
 from larmorx import _core, _defects
 from larmorx._defects import UpstreamDefectsName
-from larmorx.confounds.fmriprep import _existing, _out_dir
+from larmorx.confounds.fmriprep import _out_dir
 
 __all__ = [
     "AcompcorMasksResult",
@@ -74,6 +74,27 @@ class AcompcorMasksResult:
     """``aCompCorMasks``' output: ``out_masks``, the CSF, WM and combined maps' paths."""
 
     out_masks: list[str]
+
+
+def _trait_file(spec: str, name: str, value: Any, element: bool = False) -> str:
+    """nipype's ``File(exists=True)`` as its input spec checks it when the input is set: the
+    path, or traits' ``TraitError`` text (as ``ValueError``; ``element`` for an item of an
+    ``InputMultiPath``)."""
+    p = os.fspath(value) if isinstance(value, (str, os.PathLike)) else str(value)
+    if not os.path.isfile(p):
+        raise ValueError(
+            f"{'Each element of the' if element else 'The'} '{name}' trait of a {spec} instance "
+            "must be a pathlike object or string representing an existing file, but a value of "
+            f"'{p}' <class 'str'> was specified."
+        )
+    return p
+
+
+def _nibabel_data(img: Any) -> np.ndarray:
+    """``np.asanyarray(img.dataobj)``: nibabel reads an image without voxels (an axis of length
+    0) as a one-dimensional empty array (``array_from_file``)."""
+    a = np.asanyarray(img.data)
+    return a.reshape(0) if a.size == 0 else a
 
 
 def _load(path: Any, dtype: Any = None, n_threads: int = 1):
@@ -151,9 +172,9 @@ def binary_union(
     ``ValueError``). Its path."""
     mode = _defects.check(upstream_defects)
     img = _load(mask1, n_threads=n_threads)
-    one, _ = _positive_int64(np.asanyarray(img.data), mode, os.fspath(mask1))
+    one, _ = _positive_int64(_nibabel_data(img), mode, os.fspath(mask1))
     two, _ = _positive_int64(
-        np.asanyarray(_load(mask2, n_threads=n_threads).data), mode, os.fspath(mask2)
+        _nibabel_data(_load(mask2, n_threads=n_threads)), mode, os.fspath(mask2)
     )
     if one.shape != two.shape:
         if mode == "fix":
@@ -351,7 +372,7 @@ def acompcor_masks_node(
     ``is_aseg``, as nipype's traits check them (``ValueError`` with traits' text)."""
     spec = "_aCompCorMasksInputSpec"
     files = [in_vfs] if isinstance(in_vfs, (str, os.PathLike)) else list(in_vfs)
-    files = [_existing(spec, "in_vfs", f) for f in files]
+    files = [_trait_file(spec, "in_vfs", f, element=True) for f in files]
     zooms = tuple(bold_zooms)
     if len(zooms) != 3 or not all(
         isinstance(z, (int, float, np.floating, np.integer)) and not isinstance(z, bool)

@@ -8,8 +8,11 @@ user, 2026-11-06 and 2026-11-11). The confounds' part fills this page step by st
 DVARS, CompCor, TSNR, NonSteadyStateDetector and FramewiseDisplacement with its `NIPY` source
 (nipy 0.6.1's `to_matrix44` and `aff2euler`): the whole of nipype's `algorithms/confounds.py` but
 the plots; fMRIPrep's own table steps (`FramewiseDisplacement`, `FilterDropped`,
-`RenameACompCor`, `GatherConfounds`) on pandas' reading and writing of tables, without pandas; and
-fMRIPrep's motion parameters and root mean square deviation (`FSLMotionParams`, `FSLRMSDeviation`).
+`RenameACompCor`, `GatherConfounds`) on pandas' reading and writing of tables, without pandas;
+fMRIPrep's motion parameters and root mean square deviation (`FSLMotionParams`, `FSLRMSDeviation`);
+and fMRIPrep's masks (`_binary_union`, `acompcor_masks` with `mask2vf`, `aCompCorMasks`,
+`_get_zooms`), with niworkflows' morphology and signals beside them
+(`docs/api/niworkflows-helpers.md`: `BinaryDilation`, `BinarySubtraction`, `SignalExtraction`).
 
 **Status: `experimental`** (checked bit for bit against nipype, nitime, SciPy and numpy in the
 three environments, against fMRIPrep's own DVARS and CompCor files and on the oracle runs' raw
@@ -346,6 +349,49 @@ and `reproduce`: the 36 `rmsd` files byte for byte, the 36 motion files with eve
 identical and 15 of the 22,293 `rot_*` cells (12 files) changed by glibc's `atan2` (D4; glibc's
 `hypot` changes none); the default equals `reproduce` on every real node.
 
+
+## fMRIPrep's masks: `binary_union`, `acompcor_masks`, `acompcor_masks_node`, `mask2vf`, `get_zooms`
+
+fMRIPrep 25.2.7's masks for the confounds (`workflows/bold/confounds.py`: `_binary_union`,
+`_get_zooms`; `utils/confounds.py`: `mask2vf`, `acompcor_masks`; `interfaces/confounds.py`:
+`aCompCorMasks`; Apache-2.0, the NiPreps developers; the same in 25.2.6) with nibabel's reading and
+writing (`larmorx.io`), SciPy's `binary_dilation` and `gaussian_filter` (`lx.ndimage`),
+scikit-image's `ball` (`lx.skimage`) and numpy's `percentile` and casts, bit for bit
+(`python/larmorx/confounds/masks.py`). In fMRIPrep's workflow the union of the BOLD mask and the
+T1w mask (resampled with `MultiLabel`) is the brain mask whose crown (`ball(2)`'s dilation minus the
+mask: niworkflows' `BinaryDilation` and `BinarySubtraction`, `docs/api/niworkflows-helpers.md`)
+feeds the crown CompCor, and the tissue maps feed aCompCor and the tissue signals.
+
+| larmorx | fMRIPrep | Notes |
+|---|---|---|
+| `binary_union(mask1, mask2, *, out_dir=".", n_threads=1, upstream_defects="fix")` → path | `_binary_union(mask1, mask2)` → path | `np.asanyarray(dataobj, dtype=int) > 0` of each mask (nibabel's scaled values cast to `int64`: fractions truncated, so a value in `(0, 1)` is outside; `uint64` and floats through `float64`), their union written as `uint8` with `mask1`'s header and affine (`mask1`'s class: NIfTI-1 or NIfTI-2) to `mask_union.nii.gz`; `mask2`'s affine is not compared (kept: rule C) |
+| `get_zooms(in_file)` → tuple | `_get_zooms(in_file)` | the header's first three voxel sizes after nibabel's load-time fixes, as Python floats of their `float32` values (`(1.0,)` for an image without dimensions; fewer than three for fewer axes); only the header is read |
+| `mask2vf(in_file, zooms=None, out_file=None, *, numpy_version="2.5.4", n_threads=1)` → array or path | `mask2vf(in_file, zooms, out_file)` | `get_fdata(dtype=float32)` smoothed by `gaussian_filter` with `sigma = 0.5 · zooms / voxel sizes` (0.5 without `zooms`), divided by the 99th percentile of its positive values (numpy `numpy_version`'s `percentile`: a weak `q` is handled in `float64` from numpy 2.5; the quotient in `float32`; no positive value: numpy's `IndexError: index -1 is out of bounds for axis 0 with size 0`), clipped to `[0, 1]`; with `out_file`, written as `float32` NIfTI-1 with the input's header and affine |
+| `acompcor_masks(in_files, is_aseg=False, zooms=None, *, out_dir=".", numpy_version="2.5.4", n_threads=1, upstream_defects="fix")` → `[csf, wm, combined]` | `acompcor_masks(in_files, is_aseg, zooms)` | `in_files`: the GM, WM and CSF maps in that order (later ones ignored; fewer: `IndexError`). Partial-volume maps (`is_aseg=False`, fMRIPrep without FreeSurfer): the CSF map is `in_files[2]` itself, WM `get_fdata()`, the grey matter `GM > 0.05`; segmentations (`is_aseg=True`): CSF and WM through `mask2vf` with the BOLD `zooms` (CSF written as `acompcor_csf.nii.gz`), the grey matter the GM map's `uint8` values `> 0` (PIPE-76). The grey matter is dilated by `ball(3)`; WM and CSF + WM are set to 0 there and written as `nb.Nifti1Image(data, gm.affine, gm.header)` (the GM map's stored type with nibabel's scaling; a NIfTI-2 GM header converted) to `acompcor_wm.nii.gz` and `acompcor_wmcsf.nii.gz`. Maps of other shapes stop with numpy's `IndexError` or broadcasting `ValueError` |
+| `acompcor_masks_node(in_vfs, bold_zooms, *, is_aseg=False, out_dir=".", numpy_version="2.5.4", n_threads=1, upstream_defects="fix")` → `AcompcorMasksResult(out_masks)` | `aCompCorMasks(in_vfs, is_aseg, bold_zooms)` → `out_masks` | `acompcor_masks` with nipype's traits' checks (`in_vfs` existing files, `bold_zooms` three numbers: their `TraitError` texts as `ValueError`) |
+
+Corrected by default (`upstream_defects="reproduce"` gives fMRIPrep's files; a notice names the ID
+when the correction changes a result):
+
+| ID | fMRIPrep does | larmorx by default |
+|---|---|---|
+| PIPE-74 | `_binary_union` casts the masks to `int64` with numpy's cast, undefined in C for NaN, infinities and values beyond `int64`'s range: on x86-64 they become the most negative `int64`, so a voxel of `+inf` or `1e19` (or a `uint64` value from `2**63`) is outside the union | the undefined conversions clamped (the rule for undefined conversions): those voxels are inside (NaN and `-inf` stay outside in both modes) |
+| PIPE-75 | `_binary_union` broadcasts masks of different shapes without a word (a `(X, Y, 1)` mask is taken for every slice of an `(X, Y, Z)` one) (rule B) | `ValueError` (`reproduce`: numpy's broadcasting, or its `ValueError` for shapes it cannot broadcast) |
+| PIPE-76 | `acompcor_masks(is_aseg=True)` casts the GM map to `uint8` before `> 0`: integers wrap (-1 is 255, inside; 256 is 0, outside) and floats out of `int32`'s range or NaN are undefined in C (on x86-64 0, outside; a float in range keeps its truncated `int32`'s low byte: 300.0 is 44, 256.0 is 0) | the values clamped to `[0, 255]` first, so the grey matter is the voxels `>= 1` |
+
+Kept and documented (rule C): `_binary_union`'s truncation (a fraction below 1 is outside the union,
+while niworkflows' morphology takes every non-zero value as inside); the second mask's affine and the
+WM and CSF maps' affines are never compared with the first's (all fMRIPrep's inputs share a grid).
+
+**A finding for the workflow (the confounds' workflow relay, PIPE-79 proposed):** fMRIPrep passes
+`is_aseg=freesurfer` (`run_reconall`, true by default), but its `t1w_tpms` are FAST's partial-volume
+maps in every case (smriprep's `fast2bids`), so with FreeSurfer the segmentation path smooths partial
+volumes again (`mask2vf`) and takes as grey matter only the voxels whose GM fraction is exactly 1
+(`uint8` truncation), dilated by `ball(3)`: WM and CSF voxels partly in grey matter stay in the aCompCor
+masks. No oracle run reaches it (all are `--fs-no-reconall`); the check runs the path on FAST-like maps.
+
+**Validation** (`validation/investigations/confounds/check_masks.py`; see the section's record in
+NOTES until the part's record): VALIDATION_MASKS
 
 ## pandas' tables (`larmorx.confounds._tables`)
 

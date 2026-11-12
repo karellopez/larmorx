@@ -714,7 +714,7 @@ def signal_extraction(
 ) -> str:
     """niworkflows' ``SignalExtraction`` interface: the mean of the series ``in_file`` over each
     region of ``label_files`` per volume, as a table (``class_labels`` as the header, numpy's
-    ``repr`` of each mean, tabs between, ``\\n`` line ends, latin-1) at ``out_file`` (relative
+    ``repr`` of each mean, tabs between, ``\\n`` line ends, UTF-8) at ``out_file`` (relative
     to ``out_dir``). Several files (or one 4-D file of several volumes) are probability maps
     (the voxels ``>= prob_thres`` in each map's stored type); one 3-D file is a label image
     (one region per non-zero value, in ascending order). The means are numpy's
@@ -726,20 +726,17 @@ def signal_extraction(
     mode = _defects.check(upstream_defects)
     spec = "_SignalExtractionInputSpec"
 
-    def existing(name: str, value: Any) -> str:
-        from larmorx.confounds.fmriprep import _existing
+    from larmorx.confounds.masks import _nibabel_data, _trait_file
 
-        return _existing(spec, name, value)
-
-    in_path = existing("in_file", in_file)
+    in_path = _trait_file(spec, "in_file", in_file)
     files = [label_files] if isinstance(label_files, (str, os.PathLike)) else list(label_files)
     if not files:
         raise ValueError(
             "SignalExtraction requires a value for input 'label_files'. For a list of required "
             "inputs, see SignalExtraction.help()"
         )
-    files = [existing("label_files", f) for f in files]
-    if isinstance(prob_thres, bool) or not isinstance(prob_thres, (int, float, np.number)):
+    files = [_trait_file(spec, "label_files", f, element=True) for f in files]
+    if not isinstance(prob_thres, (int, float, np.integer, np.floating)):
         raise ValueError(
             f"The 'prob_thres' trait of a {spec} instance must be 0.0 <= a floating point "
             f"number <= 1.0, but a value of {prob_thres!r} {type(prob_thres)!r} was specified."
@@ -753,7 +750,7 @@ def signal_extraction(
     from larmorx.io.nifti import read_header
 
     shape = tuple(int(s) for s in read_header(in_path).shape)
-    mask_arrays = [np.asanyarray(load_nibabel(f, n_threads=n_threads).data) for f in files]
+    mask_arrays = [_nibabel_data(load_nibabel(f, n_threads=n_threads)) for f in files]
     if len(mask_arrays) == 1 and mask_arrays[0].ndim == 4:
         four = mask_arrays[0]
         mask_arrays = [four[..., i] for i in range(four.shape[3])]
@@ -777,7 +774,7 @@ def signal_extraction(
     if len(shape) < 4:
         raise IndexError("tuple index out of range")
     series = np.zeros((shape[3], len(masks)))
-    data = np.asanyarray(load_nibabel(in_path, n_threads=n_threads).data)
+    data = _nibabel_data(load_nibabel(in_path, n_threads=n_threads))
     for j, mask in enumerate(masks):
         series[:, j] = _region_means(data, mask, numpy_version, n_threads)
     del data
@@ -803,7 +800,7 @@ def signal_extraction(
         )
     os.makedirs(out_dir, exist_ok=True)
     path = os.path.join(os.path.abspath(os.fspath(out_dir)), os.fspath(out_file))
-    with open(path, "wb") as fh:
+    with open(path, "wb") as fh:  # numpy's savetxt: a text file in UTF-8 (Linux's), "\n"
         for row in output:
-            fh.write(("\t".join(str(v) for v in row) + "\n").encode("latin-1"))
+            fh.write(("\t".join(str(v) for v in row) + "\n").encode("utf-8"))
     return path

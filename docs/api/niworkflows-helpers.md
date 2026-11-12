@@ -299,6 +299,35 @@ for 1.15.2 and 1.15.3 (niworkflows 1.15.4 made fMRIPrep 25.2.7's change in its c
 `fmriprep_framewise_displacement` (the same in every release). The options, the arithmetic and the
 defects (PIPE-71, PIPE-72, PIPE-73): `docs/api/confounds.md`, "fMRIPrep's motion parameters".
 
+## `binary_dilation`, `binary_subtraction`, `image_binary_dilation`, `signal_extraction`: `BinaryDilation`, `BinarySubtraction`, `SignalExtraction`
+
+`larmorx.niworkflows.morphology` and `larmorx.niworkflows.images.signal_extraction` (not yet in
+`lx.niworkflows`' namespace: their golden cases come with the confounds' golden relay).
+niworkflows 1.15.4's `interfaces/morphology.py` and `interfaces/images.py` (Apache-2.0, the NiPreps
+developers; the same in 1.15.2 and 1.15.3), with SciPy's `binary_dilation`, scikit-image's `ball`,
+nibabel and numpy, bit for bit. fMRIPrep's confounds make the crown mask with the first two (the brain
+mask dilated by `ball(2)` minus the mask) and the global, CSF, white-matter, CSF + WM and tCompCor
+signals with the third.
+
+| larmorx | niworkflows | Notes |
+|---|---|---|
+| `binary_dilation(in_mask, *, radius=2, out_dir=".", n_threads=1, upstream_defects="fix")` → path | `BinaryDilation(in_mask, radius=2)` → `out_mask` | `np.bool_(dataobj)` (every non-zero value inside, NaN too) dilated by `image_binary_dilation`, written as `uint8` with the mask's header and affine to `dilated_mask.nii.gz`; `radius` a `traits.Int` (`True` is 1; a float: traits' `TraitError` as `ValueError`); a mask that is not 3-D: SciPy's `RuntimeError: structure and input must have same dimensionality` |
+| `image_binary_dilation(in_mask, radius=2, *, n_threads=1, upstream_defects="fix")` → array | `image_binary_dilation(in_mask, radius)` | `ndi.binary_dilation(in_mask.astype(bool), ball(radius)).astype(int)` (`int64`); any real radius (`ball(2.5)` is 6 × 6 × 6) |
+| `binary_subtraction(in_base, in_subtract, *, out_dir=".", n_threads=1)` → path | `BinarySubtraction(in_base, in_subtract)` → `out_mask` | `np.bool_` of the base set to false where `np.bool_` of the other is true (numpy's boolean indexing: other shapes stop with its `IndexError`), `uint8` with the base's header to `subtracted_mask.nii.gz` |
+| `signal_extraction(in_file, label_files, class_labels, *, prob_thres=0.5, out_file="signals.tsv", out_dir=".", numpy_version="2.5.4", n_threads=1, upstream_defects="fix")` → path | `SignalExtraction(in_file, label_files, class_labels, prob_thres, out_file)` → `out_file` | several label files (or one 4-D file of several volumes: nibabel's `four_to_three`): probability maps, each region the voxels `>= prob_thres` in the map's stored type (a Python float against it: numpy's weak scalar; `prob_thres` in `[0, 1]`, else traits' text); one 3-D file: a label image, one region per non-zero value in ascending order (`np.unique`). Each column is `data[mask, :].mean(axis=0)` of `get_fdata()` (a `float32` series widened exactly): the voxels in the mask's C order summed per volume from `+0.0` in that order (pairwise for a series of one volume, in chunks of 8,192 before numpy 2.3: `numpy_version`), divided by the count; an empty region gives NaN (`nan` in the table). larmorx reads the voxels where they are (no `(N, T)` copy) on `n_threads` threads (the result does not depend on them). The table: the labels, then numpy's `astype(str)` of each mean (Python's shortest `repr`), tabs between, `\n` line ends, UTF-8 (numpy's `savetxt` in a text file: the locale's encoding, UTF-8 on Linux; larmorx writes Linux's bytes on every platform). niworkflows' errors are kept: the first map's shape against the series' (`NotImplementedError`), the number of regions against the labels (`ValueError`), a 3-D series (`IndexError: tuple index out of range`), a later map of another shape or more axes (numpy's `IndexError`), a series without volumes (nibabel's empty array: numpy's `IndexError`) |
+
+Corrected by default (`upstream_defects="reproduce"` gives niworkflows' result, with a notice):
+
+| ID | niworkflows does | larmorx by default |
+|---|---|---|
+| PIPE-77 | a negative `radius` (`traits.Int` takes it) dilates with scikit-image's `ball` of that radius, an arbitrary footprint: -1 is one false element, so the dilated mask is empty; -2 the cross of radius 1; -3 the ball of radius 2 (rule B) | `ValueError` |
+| PIPE-78 | a class label holding a tab or a line break is written as it is, which breaks the table's columns or rows (rule B) | `ValueError` |
+
+Kept and documented (rule C): the regions' and masks' affines are not compared with the series'
+(niworkflows works on voxel indices); `np.bool_` takes NaN as inside.
+
+**Validation**: `docs/api/confounds.md`, "fMRIPrep's masks".
+
 ## Upstream defects of these steps (D13)
 
 | ID | Defect | larmorx by default (`upstream_defects="reproduce"`: the original) | Functions |
@@ -321,5 +350,7 @@ defects (PIPE-71, PIPE-72, PIPE-73): `docs/api/confounds.md`, "fMRIPrep's motion
 | PIPE-68 | `minimum_contiguous` takes the table's end one volume too far, so the last run of unflagged volumes counts one volume more and a final run one shorter than the minimum is kept (rule A) | the last run counted as it is | `spike_regressors`, `spike_regressors_node` |
 | PIPE-69 | a criterion other than `'<'` and `'>'` is skipped without an error (all of them: `TypeError: reduce() of empty iterable with no initial value`) (rule B) | a `ValueError` | `spike_regressors` |
 | PIPE-70 | `NormalizeMotionParams` reads with numpy's `loadtxt`, which squeezes a table of one row to a vector, which `apply_along_axis` refuses (`AxisError: axis 1 is out of bounds for array of dimension 1`) (rule A) | the row converted | `normalize_motion_params` |
+| PIPE-77 | `BinaryDilation` and `image_binary_dilation` with a negative radius dilate with scikit-image's `ball` of it, an arbitrary footprint (-1: one false element, the dilated mask empty) (rule B) | a `ValueError` | `binary_dilation`, `image_binary_dilation` |
+| PIPE-78 | `SignalExtraction` writes a class label holding a tab or a line break as it is, which breaks the table (rule B) | a `ValueError` | `signal_extraction` |
 | GLIBC-07 | glibc's `pow` (numpy's float64 `x ** o` for exponents other than 0, 1 and 2) is not correctly rounded | the correctly rounded `pow` | `exponential_terms`, `parse_formula`, `expand_model` |
 | PD-01, PD-02 | pandas' `read_csv` and `to_json` (`docs/api/confounds.md`, "pandas' tables") | correctly rounded readings and 10-decimal values | `tsv2json`, `expand_model`, `spike_regressors_node` |

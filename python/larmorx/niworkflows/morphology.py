@@ -13,8 +13,8 @@ Corrected by default (``upstream_defects="reproduce"`` gives niworkflows' result
 
 - PIPE-77: a negative ``radius`` (``traits.Int`` takes it) gives scikit-image's ``ball`` of a
   negative radius, an arbitrary footprint (``-1``: one false element, so the "dilation" empties
-  the mask; ``-2``: the cross of radius 1; ``-3``: a 5 × 5 × 5 ball of radius 3 on a coarser
-  grid); larmorx raises ``ValueError``.
+  the mask; ``-2``: the cross of radius 1; ``-3``: the ball of radius 2; a radius in ``(-1, 0)``:
+  an empty footprint, which SciPy refuses); larmorx raises ``ValueError``.
 """
 
 from __future__ import annotations
@@ -42,15 +42,15 @@ def _load(path: Any, n_threads: int):
 
 def _existing(spec: str, name: str, value: Any) -> str:
     """nipype's ``File(exists=True)``: the path, or its ``TraitError`` (as ``ValueError``)."""
-    from larmorx.confounds.fmriprep import _existing as existing
+    from larmorx.confounds.masks import _trait_file
 
-    return existing(spec, name, value)
+    return _trait_file(spec, name, value)
 
 
 def _int_trait(spec: str, name: str, value: Any) -> int:
-    """``traits.Int``: a Python or numpy integer (not a ``bool``), else traits' ``TraitError``
-    (as ``ValueError``)."""
-    if isinstance(value, bool) or not isinstance(value, (int, np.integer)):
+    """``traits.Int``: a Python or numpy integer (a ``bool`` too: ``True`` is 1), else traits'
+    ``TraitError`` (as ``ValueError``)."""
+    if not isinstance(value, (int, np.integer)):
         raise ValueError(
             f"The '{name}' trait of a {spec} instance must be an integer, but a value of "
             f"{value!r} {type(value)!r} was specified."
@@ -114,8 +114,10 @@ def binary_dilation(
     path = _existing(spec, "in_mask", in_mask)
     r = _int_trait(spec, "radius", radius)
     img = _load(path, n_threads)
+    from larmorx.confounds.masks import _nibabel_data
+
     dilated = image_binary_dilation(
-        np.asanyarray(img.data).astype(bool),
+        _nibabel_data(img).astype(bool),
         radius=r,
         n_threads=n_threads,
         upstream_defects=upstream_defects,
@@ -143,10 +145,11 @@ def binary_subtraction(
     spec = "_BinarySubtractInputSpec"
     base_path = _existing(spec, "in_base", in_base)
     sub_path = _existing(spec, "in_subtract", in_subtract)
+    from larmorx.confounds.masks import _nibabel_data, _save
+
     base_img = _load(base_path, n_threads)
-    data = np.asanyarray(base_img.data).astype(bool)
-    data[np.asanyarray(_load(sub_path, n_threads).data).astype(bool)] = False
-    from larmorx.confounds.masks import _save
+    data = _nibabel_data(base_img).astype(bool)
+    data[_nibabel_data(_load(sub_path, n_threads)).astype(bool)] = False
 
     d = os.path.abspath(os.fspath(out_dir))
     os.makedirs(d, exist_ok=True)

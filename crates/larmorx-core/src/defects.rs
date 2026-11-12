@@ -433,6 +433,16 @@ defects! {
         "a reference image whose centre of gravity is undefined (a constant image under 25.2.7, whose weights value - min are all zero; a sum of zero under 25.2.6; a NaN or infinite voxel) gives NaN or infinite translations in every row without an error, which FramewiseDisplacement turns into n/a everywhere";
     PIPE_73 = "PIPE-73", "nitransforms ITKLinearTransform", true,
         "every ITK text transform is read in single precision (numpy's genfromtxt with dtype f4), the double-precision ones (AffineTransform_double_3_3) too, so their parameters are rounded to float32";
+    PIPE_74 = "PIPE-74", "fMRIPrep _binary_union", true,
+        "the masks are cast to int64 with numpy's cast, undefined in C for NaN, infinities and values beyond int64's range: on x86-64 they become the most negative int64, so a voxel of +inf or 1e19 (or a uint64 value from 2**63) is outside the union";
+    PIPE_75 = "PIPE-75", "fMRIPrep _binary_union", true,
+        "masks of different shapes are broadcast without an error (a mask of shape (X, Y, 1) is taken for every slice of an (X, Y, Z) one)";
+    PIPE_76 = "PIPE-76", "fMRIPrep acompcor_masks", true,
+        "with is_aseg the grey-matter map is cast to uint8 with numpy's cast before the test > 0: integers wrap (-1 is 255, inside; 256 is 0, outside) and floats out of int32's range or NaN are undefined in C (on x86-64 0, outside; a float in range keeps its truncated int32's low byte: 300.0 is 44)";
+    PIPE_77 = "PIPE-77", "niworkflows BinaryDilation", true,
+        "a negative radius (traits.Int takes it) dilates with scikit-image's ball of that radius, an arbitrary footprint: -1 is one false element, so the dilated mask is empty; -2 the cross of radius 1";
+    PIPE_78 = "PIPE-78", "niworkflows SignalExtraction", true,
+        "a class label holding a tab or a line break is written as it is, which breaks the table's columns or rows";
     PD_01 = "PD-01", "pandas read_csv", true,
         "the default float parser (precise_xstrtod) keeps at most 17 digit characters, the leading zeros of 0.00... included, accumulates them in a double and divides by one power of ten, so most values to_csv writes (their shortest repr, up to 17 significant digits) are read back as another double, one or more units in the last place off";
     PD_02 = "PD-02", "pandas to_json", true,

@@ -163,3 +163,22 @@ them. The notices are in `src/motion.rs`.
 | `crates/larmorx-py/src/confounds/motion.rs` (`_core.nitransforms_itk_to_ras`, `numpy_first_singular4`, `numpy_det4_is_positive`, `nitransforms_fsl_from_ras`, `scipy_rotation_from_matrix`, `scipy_rotation_as_euler`, `fmriprep_motion_params`, `fmriprep_rms_deviation`) | the bindings of the above | Apache-2.0 |
 | `python/larmorx/confounds/motion.py` (`fsl_motion_params`, `fsl_rms_deviation`, `MotionParamsResult`, `RmsDeviationResult`, `TransformFileError`, `FMRIPREP_NEWEST`) | fMRIPrep 25.2.7 and 25.2.6 `FSLMotionParams`, `FSLRMSDeviation` (`fname_presuffix`, the table written by pandas' `to_csv`: `larmorx.confounds._tables`); nitransforms 25.1.0 `nitransforms/io/itk.py` (`ITKLinearTransformArray.from_string`, `ITKLinearTransform.from_string`, with numpy's own `genfromtxt`), `nitransforms/linear.py` (`load`: one transform as one `Affine`, PIPE-71; `Affine`'s last-row check and message); SciPy 1.18.1 `scipy/ndimage/_measurements.py` (`center_of_mass`, `sum_labels`, `_stats` without labels) with numpy's sums in each release's order (`larmorx_core::numpy::reduce`: a byte-swapped float array in chunks of 8,192 in every release, measured); SciPy's `ValueError` message of a non-positive determinant and its gimbal-lock warning; PIPE-72 (rule B) and PIPE-73 (rule A) | Apache-2.0 AND MIT |
 | `python/larmorx/niworkflows/confounds.py` (`fsl_motion_params`, `fsl_rms_deviation`, `framewise_displacement`, `NIWORKFLOWS_NEWEST`) | niworkflows 1.15.4 `niworkflows/interfaces/confounds.py` (`FSLMotionParams`: 25.2.7's form, 25.2.6's in 1.15.2 and 1.15.3; `FSLRMSDeviation`; `FramewiseDisplacement`) | Apache-2.0 |
+
+## Relay 2g-iv: fMRIPrep's and niworkflows' masks and signals (`signals`, Python layer)
+
+fMRIPrep 25.2.7 (Apache-2.0, the NiPreps developers; `<workspace>/tags/fmriprep-25.2.7/`; the same
+functions in 25.2.6), niworkflows 1.15.4 (Apache-2.0, the NiPreps developers;
+`<workspace>/tags/niworkflows-1.15.4/`; the same in 1.15.2 and 1.15.3), nibabel 5.4.2 (MIT; reading
+and writing through `larmorx.io`, the empty array of an image without voxels), SciPy 1.18.1
+(`binary_dilation`, `gaussian_filter` through `larmorx.ndimage`), scikit-image 0.26.0 (`ball` through
+`larmorx.skimage`; 0.25.2 in fMRIPrep's image gives the same footprints) and numpy 2.5.4, 2.3.5 and
+2.2.6 (BSD-3-Clause, Copyright (c) 2005-2026, NumPy Developers: the masked mean's summation order,
+`percentile`'s weak `q` through `larmorx_core::numpy`, the casts the ports reproduce).
+
+| larmorx | Upstream | Licence |
+|---|---|---|
+| `signals::{Series, voxel_offsets, signal_means}` | niworkflows 1.15.4 `niworkflows/interfaces/images.py` (`SignalExtraction._run_interface`: `data[mask, :].mean(axis=0)` of `get_fdata()`); numpy's boolean indexing (a C-ordered `(N, T)` copy in the mask's C order) and `mean` (`_methods._mean`: `umr_sum` along the outer axis in index order from `+0.0`, pairwise along a contiguous one: `larmorx_core::numpy::reduce::add_reduce_ordered`; the division by the count) | Apache-2.0 AND BSD-3-Clause |
+| `crates/larmorx-py/src/confounds/signals.rs` (`_core.niworkflows_signal_means`) | the binding of the above | Apache-2.0 |
+| `python/larmorx/confounds/masks.py` (`binary_union`, `get_zooms`, `mask2vf`, `acompcor_masks`, `acompcor_masks_node`, `AcompcorMasksResult`) | fMRIPrep 25.2.7 `fmriprep/workflows/bold/confounds.py` (`_binary_union`, `_get_zooms`), `fmriprep/utils/confounds.py` (`mask2vf`, `acompcor_masks`), `fmriprep/interfaces/confounds.py` (`aCompCorMasks` and its input spec); nibabel's `ArrayProxy.__array__(dtype)` (`_get_scaled`: the scaled values cast to `promote_types(dtype, int64)` or `uint8`, then numpy's cast: PIPE-74, PIPE-76) and `get_zooms`; numpy's `percentile`, `clip` and casts; PIPE-74, PIPE-75 (rule B), PIPE-76 | Apache-2.0 |
+| `python/larmorx/niworkflows/morphology.py` (`binary_dilation`, `binary_subtraction`, `image_binary_dilation`) | niworkflows 1.15.4 `niworkflows/interfaces/morphology.py` (`BinaryDilation`, `BinarySubtraction`, `image_binary_dilation`; `traits.Int`'s radius; PIPE-77, rule B) | Apache-2.0 |
+| `python/larmorx/niworkflows/images.py` (`signal_extraction`) | niworkflows 1.15.4 `niworkflows/interfaces/images.py` (`SignalExtraction` and its input spec: `prob_thres`'s range, `class_labels`, `out_file`; nibabel's `four_to_three`); numpy's `unique`, comparisons, `astype(str)` (the shortest `repr`), `vstack` and `savetxt(fmt="%s", delimiter="\t")` (a text file in the locale's encoding: UTF-8, `"\n"`); PIPE-78 (rule B) | Apache-2.0 |

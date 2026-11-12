@@ -2450,3 +2450,12 @@ replica's gaps, the site, the handoff); the clean relays never read the replica 
   no licence; the method is the published recursion LARMORX already ports from ITK and SciPy. So its replica goes into
   `larmorx-freesurfer` like FreeSurfer's other files, crediting EPFL; no private branch is needed; the request to the
   authors is a courtesy (the user: "We will ask the author afterwards").
+- **No waiting for permissions** (the user, 2026-11-12, on the placement table's P1-P5): "We do not really have to write
+  an email to anyone, we first implement the replica, put that in the specific licensed package, then we port a better
+  and nice optimized clean room version. We publish when we want. Emails go after." So every borrowed piece's replica is
+  built now and goes into its licence family's package (CorTechs' `tkregister2_cmdl` into `larmorx-nc` as its own
+  program; GSL's generators alone into `larmorx-gpl`, `mri_coreg`'s replica using the clean-room generator since GPL and
+  FreeSurfer's licence cannot share one program; Burkardt's spline, EPFL's B-splines and Washington University's 4dfp
+  tools with FreeSurfer's code in `larmorx-freesurfer`), and an improved, optimised clean room of every piece goes into
+  `larmorx`. Publishing is the user's decision; at that time the orchestrator lists the pieces that carry no licence
+  (Washington University's 4dfp tools, Burkardt's 2006 routines) so the user decides knowingly. No emails before.

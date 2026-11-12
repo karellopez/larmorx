@@ -42,23 +42,24 @@ key = "extra:libc"
 
 [[id]]
 id = "3.1-09"
-key = "mod:perm.gifti:1"
+key = "w3:perm.gifti:xml"
 
 [[id]]
 id = "3.1-10"
-key = "mod:perm.gifti:2"
+key = "w3:perm.gifti:read-xml"
 
 [[id]]
 id = "3.1-11"
-key = "mod:perm.gifti:3"
+key = "w3:perm.gifti:read-io"
 
 [[id]]
 id = "3.1-12"
-key = "mod:perm.gifti:4"
+key = "w3:perm.gifti:write"
 
 [[id]]
 id = "3.1-13"
 key = "mod:perm.gifti:5"
+retired = "W3 (relay 8, the orchestrator's decision after relay 6): GIFTI's items regrouped by role into 3.1-09 to 3.1-12"
 
 [[id]]
 id = "3.1-14"
@@ -70,11 +71,12 @@ key = "mod:perm.nifti:1"
 
 [[id]]
 id = "3.1-16"
-key = "mod:perm.dicom:1"
+key = "w3:perm.dicom:probe"
 
 [[id]]
 id = "3.1-17"
 key = "mod:perm.dicom:2"
+retired = "W3 (relay 8): the DICOM probe is one item, 3.1-16 (no port of CTN's library)"
 
 [[id]]
 id = "3.1-18"
@@ -82,11 +84,11 @@ key = "mod:perm.misc:1"
 
 [[id]]
 id = "3.1-19"
-key = "mod:perm.json:1"
+key = "w3:perm.json:parse"
 
 [[id]]
 id = "3.1-20"
-key = "mod:perm.json:2"
+key = "w3:perm.json:write"
 
 [[id]]
 id = "3.1-21"
@@ -215,6 +217,14 @@ key = "mod:fs.surfio:7"
 [[id]]
 id = "3.1-52"
 key = "mod:fs.surfio:8"
+
+[[id]]
+id = "3.1-53"
+key = "mod:gpl.gsl:1"
+
+[[id]]
+id = "3.1-54"
+key = "mod:fs.spline:1"
 
 [[id]]
 id = "3.2-01"
@@ -375,6 +385,10 @@ key = "prog:mri_concat"
 [[id]]
 id = "3.2-40"
 key = "prog:mri_label2vol"
+
+[[id]]
+id = "3.2-41"
+key = "extra:main-plumbing"
 
 [[id]]
 id = "3.3-01"
@@ -921,6 +935,10 @@ id = "3.7-13"
 key = "prog:fs-check-os"
 
 [[id]]
+id = "C3.1-00"
+key = "clean:extra:crates"
+
+[[id]]
 id = "C3.1-01"
 key = "clean:mod:fs.core"
 
@@ -1343,10 +1361,12 @@ key = "clean:prog:fs_temp_dir"
 [[id]]
 id = "C3.6-06"
 key = "clean:prog:talairach_avi"
+retired = "the user, 2026-11-12: Washington University's Talairach tools a clean room only; talairach_avi's own item (3.6) is its clean room"
 
 [[id]]
 id = "C3.6-07"
 key = "clean:prog:mpr2mni305"
+retired = "the user, 2026-11-12: a clean room only (Washington University's notice); mpr2mni305's own item (3.6) is its clean room"
 
 [[id]]
 id = "C3.6-08"
@@ -1387,3 +1407,55 @@ key = "clean:prog:fs-check-version"
 [[id]]
 id = "C3.7-08"
 key = "clean:prog:fs-check-os"
+
+[[id]]
+id = "CP-01"
+key = "cp:mod:perm.gifti"
+
+[[id]]
+id = "CP-02"
+key = "cp:mod:perm.minc"
+
+[[id]]
+id = "CP-03"
+key = "cp:mod:perm.nifti"
+
+[[id]]
+id = "CP-04"
+key = "cp:mod:perm.dicom"
+
+[[id]]
+id = "CP-05"
+key = "cp:mod:perm.misc"
+
+[[id]]
+id = "CP-06"
+key = "cp:mod:perm.json"
+
+[[id]]
+id = "CP-07"
+key = "cp:mod:perm.geomtools"
+
+[[id]]
+id = "CP-08"
+key = "cp:mod:perm.argparse"
+
+[[id]]
+id = "CP-09"
+key = "cp:extra:x87"
+
+[[id]]
+id = "CP-10"
+key = "cp:extra:random"
+
+[[id]]
+id = "CP-11"
+key = "cp:extra:vnl"
+
+[[id]]
+id = "CP-12"
+key = "cp:itk"
+
+[[id]]
+id = "CP-13"
+key = "cp:extra:nn"

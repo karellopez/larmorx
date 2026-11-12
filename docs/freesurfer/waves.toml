@@ -11,7 +11,7 @@ id = "perm.gifti"
 crate = "larmorx-io"
 kind = "permissive"
 wave = "3.1"
-title = "GIFTI: gifticlib and expat (P-05); the writer's long-double line formatting"
+title = "GIFTI: gifticlib, read over a pure-Rust XML parser in expat 2.0.1's place (W3); the writer exact, with its long-double line formatting (P-05)"
 lines = 10365
 programs = ["AntsDenoiseImageFs", "AntsN4BiasFieldCorrectionFs", "lta_convert", "mri_add_xform_to_header", "mri_binarize", "mri_brainvol_stats", "mri_ca_label", "mri_ca_normalize", "mri_ca_register", "mri_cc", "mri_compute_seg_overlap", "mri_concat", "mri_concatenate_lta", "mri_convert", "mri_cor2label", "mri_coreg", "mri_diff", "mri_edit_wm_with_aseg", "mri_em_register", "mri_fill", "mri_info", "mri_label2label", "mri_label2vol", "mri_make_uchar", "mri_mask", "mri_normalize", "mri_pretess", "mri_relabel_hypointensities", "mri_robust_register", "mri_robust_template", "mri_seg_diff", "mri_segment", "mri_segreg", "mri_segstats", "mri_surf2surf", "mri_surf2volseg", "mri_tessellate", "mri_vol2surf", "mri_vol2vol", "mri_warp_convert", "mri_watershed", "mris_anatomical_stats", "mris_autodet_gwstats", "mris_ca_label", "mris_calc", "mris_convert", "mris_curvature", "mris_curvature_stats", "mris_defects_pointset", "mris_euler_number", "mris_expand", "mris_extract_main_component", "mris_fix_topology", "mris_inflate", "mris_jacobian", "mris_label2annot", "mris_place_surface", "mris_register", "mris_remesh", "mris_remove_intersection", "mris_smooth", "mris_sphere", "mris_topo_fixer", "mris_volmask", "mrisp_paint", "talairach_afd", "tkregister2_cmdl"]
 files = ["packages/expat/xmlparse.c", "packages/expat/xmlrole.c", "packages/expat/xmltok.c", "packages/gifti/gifti_io.c", "packages/gifti/gifti_xml.c"]
@@ -21,7 +21,7 @@ id = "perm.minc"
 crate = "larmorx-io"
 kind = "permissive"
 wave = "3.1"
-title = "MINC's volume_io: the .xfm reader and writer (P-05; FreeSurfer's changes to the MINC files in larmorx-freesurfer-io)"
+title = "MINC's volume_io: the .xfm reader (W3: a pure-Rust parser, the same values and messages) and writer (exact) (P-05; FreeSurfer's changes to the MINC files in larmorx-freesurfer-io)"
 lines = 1676
 programs = ["AntsDenoiseImageFs", "AntsN4BiasFieldCorrectionFs", "lta_convert", "mri_add_xform_to_header", "mri_binarize", "mri_brainvol_stats", "mri_ca_label", "mri_ca_normalize", "mri_ca_register", "mri_cc", "mri_compute_seg_overlap", "mri_concat", "mri_concatenate_lta", "mri_convert", "mri_cor2label", "mri_coreg", "mri_diff", "mri_edit_wm_with_aseg", "mri_em_register", "mri_fill", "mri_info", "mri_label2label", "mri_label2vol", "mri_make_uchar", "mri_mask", "mri_normalize", "mri_pretess", "mri_relabel_hypointensities", "mri_robust_register", "mri_robust_template", "mri_seg_diff", "mri_segment", "mri_segreg", "mri_segstats", "mri_surf2surf", "mri_surf2volseg", "mri_tessellate", "mri_vol2surf", "mri_vol2vol", "mri_warp_convert", "mri_watershed", "mris_anatomical_stats", "mris_autodet_gwstats", "mris_ca_label", "mris_calc", "mris_convert", "mris_curvature", "mris_curvature_stats", "mris_defects_pointset", "mris_euler_number", "mris_expand", "mris_extract_main_component", "mris_fix_topology", "mris_inflate", "mris_jacobian", "mris_label2annot", "mris_place_surface", "mris_register", "mris_remesh", "mris_remove_intersection", "mris_smooth", "mris_sphere", "mris_topo_fixer", "mris_volmask", "mrisp_paint", "talairach_afd", "tkregister2_cmdl"]
 files = ["packages/minc/minc_files.c", "packages/minc/minc_gaussian.c", "packages/minc/minc_volume_io.c"]
@@ -41,7 +41,7 @@ id = "perm.dicom"
 crate = "larmorx-io"
 kind = "permissive"
 wave = "3.1"
-title = "CTN's DICOM library (P-05): the format probe of every volume reader; DICOM input later"
+title = "CTN's DICOM library (P-05): the format probe of every volume reader (W3: a pure-Rust probe, no port of CTN); DICOM input later"
 lines = 4371
 programs = ["AntsDenoiseImageFs", "AntsN4BiasFieldCorrectionFs", "lta_convert", "mri_add_xform_to_header", "mri_binarize", "mri_brainvol_stats", "mri_ca_label", "mri_ca_normalize", "mri_ca_register", "mri_cc", "mri_compute_seg_overlap", "mri_concat", "mri_concatenate_lta", "mri_convert", "mri_cor2label", "mri_coreg", "mri_diff", "mri_edit_wm_with_aseg", "mri_em_register", "mri_fill", "mri_info", "mri_label2label", "mri_label2vol", "mri_make_uchar", "mri_mask", "mri_normalize", "mri_pretess", "mri_relabel_hypointensities", "mri_robust_register", "mri_robust_template", "mri_seg_diff", "mri_segment", "mri_segreg", "mri_segstats", "mri_surf2surf", "mri_surf2volseg", "mri_tessellate", "mri_vol2surf", "mri_vol2vol", "mri_warp_convert", "mri_watershed", "mris_anatomical_stats", "mris_autodet_gwstats", "mris_ca_label", "mris_calc", "mris_convert", "mris_curvature", "mris_curvature_stats", "mris_defects_pointset", "mris_euler_number", "mris_expand", "mris_extract_main_component", "mris_fix_topology", "mris_inflate", "mris_jacobian", "mris_label2annot", "mris_place_surface", "mris_register", "mris_remesh", "mris_remove_intersection", "mris_smooth", "mris_sphere", "mris_topo_fixer", "mris_volmask", "mrisp_paint", "talairach_afd", "tkregister2_cmdl"]
 files = ["packages/dicom/condition.c", "packages/dicom/dcm.c", "packages/dicom/dcmcond.c", "packages/dicom/dcmdict.c", "packages/dicom/lst.c"]
@@ -61,7 +61,7 @@ id = "perm.json"
 crate = "larmorx-core"
 kind = "permissive"
 wave = "3.1"
-title = "nlohmann/json (P-06): its number formatting decides JSON outputs' bytes"
+title = "nlohmann/json 3.2.0 (P-06): a pure-Rust parser in its parser's place (W3); its writer exact (its number formatting decides JSON outputs' bytes)"
 lines = 3508
 programs = ["AntsN4BiasFieldCorrectionFs", "mri_brainvol_stats", "mri_ca_label", "mri_coreg", "mris_defects_pointset", "mris_expand", "mris_inflate", "mris_place_surface", "mris_register", "mris_remesh", "mris_remove_intersection", "mris_sphere", "mris_volmask"]
 files = ["include/json.h"]
@@ -102,7 +102,7 @@ crate = "larmorx-freesurfer-core"
 kind = "replica"
 wave = "3.1"
 title = "matrices (float and long double), the numerics wrappers over VNL and Cephes, fs_powell, fs_lbfgs, histograms, statistics, PDFs, random fields"
-lines = 6074
+lines = 5601
 programs = ["AntsDenoiseImageFs", "AntsN4BiasFieldCorrectionFs", "lta_convert", "mri_add_xform_to_header", "mri_binarize", "mri_brainvol_stats", "mri_ca_label", "mri_ca_normalize", "mri_ca_register", "mri_cc", "mri_compute_seg_overlap", "mri_concat", "mri_concatenate_lta", "mri_convert", "mri_cor2label", "mri_coreg", "mri_diff", "mri_edit_wm_with_aseg", "mri_em_register", "mri_fill", "mri_info", "mri_label2label", "mri_label2vol", "mri_make_uchar", "mri_mask", "mri_matrix_multiply", "mri_normalize", "mri_pretess", "mri_relabel_hypointensities", "mri_robust_register", "mri_robust_template", "mri_seg_diff", "mri_segment", "mri_segreg", "mri_segstats", "mri_surf2surf", "mri_surf2volseg", "mri_tessellate", "mri_vol2surf", "mri_vol2vol", "mri_warp_convert", "mri_watershed", "mris_anatomical_stats", "mris_autodet_gwstats", "mris_ca_label", "mris_calc", "mris_convert", "mris_curvature", "mris_curvature_stats", "mris_defects_pointset", "mris_euler_number", "mris_expand", "mris_extract_main_component", "mris_fix_topology", "mris_inflate", "mris_jacobian", "mris_label2annot", "mris_place_surface", "mris_register", "mris_remesh", "mris_remove_intersection", "mris_smooth", "mris_sphere", "mris_topo_fixer", "mris_volmask", "mrisp_paint", "talairach_afd", "tkregister2_cmdl"]
 files = ["include/affine.h", "include/affine.hpp", "include/fs_vnl/fs_powell.h", "utils/dmatrix.cpp", "utils/fs_cost_function.cpp", "utils/fs_lbfgs.cpp", "utils/fs_lbfgs_observer.cpp", "utils/fs_lbfgs_subject.cpp", "utils/fs_powell.cpp", "utils/histo.cpp", "utils/matrix.cpp", "utils/numerics.cpp", "utils/pdf.cpp", "utils/prime.cpp", "utils/randomfields.cpp", "utils/stats.cpp"]
 
@@ -151,7 +151,7 @@ id = "fs.filter"
 crate = "larmorx-freesurfer-filter"
 kind = "replica"
 wave = "3.1"
-title = "volume filters and morphology, intensity normalisation (with Burkardt's spline, P-09), segmentation helpers, flood fill, connected components, fast marching, clusters"
+title = "volume filters and morphology, intensity normalisation (its cubic spline: fs.spline), segmentation helpers, flood fill, connected components, fast marching, clusters"
 lines = 11201
 programs = ["AntsDenoiseImageFs", "AntsN4BiasFieldCorrectionFs", "lta_convert", "mri_add_xform_to_header", "mri_binarize", "mri_brainvol_stats", "mri_ca_label", "mri_ca_normalize", "mri_ca_register", "mri_cc", "mri_compute_seg_overlap", "mri_concat", "mri_concatenate_lta", "mri_convert", "mri_cor2label", "mri_coreg", "mri_diff", "mri_edit_wm_with_aseg", "mri_em_register", "mri_fill", "mri_info", "mri_label2label", "mri_label2vol", "mri_make_uchar", "mri_mask", "mri_normalize", "mri_pretess", "mri_relabel_hypointensities", "mri_robust_register", "mri_robust_template", "mri_seg_diff", "mri_segment", "mri_segreg", "mri_segstats", "mri_surf2surf", "mri_surf2volseg", "mri_tessellate", "mri_vol2surf", "mri_vol2vol", "mri_warp_convert", "mri_watershed", "mris_anatomical_stats", "mris_autodet_gwstats", "mris_ca_label", "mris_calc", "mris_convert", "mris_curvature", "mris_curvature_stats", "mris_defects_pointset", "mris_euler_number", "mris_expand", "mris_extract_main_component", "mris_fix_topology", "mris_inflate", "mris_jacobian", "mris_label2annot", "mris_place_surface", "mris_register", "mris_remesh", "mris_remove_intersection", "mris_smooth", "mris_sphere", "mris_topo_fixer", "mris_volmask", "mrisp_paint", "talairach_afd", "tkregister2_cmdl"]
 files = ["utils/connectcomp.cpp", "utils/diffuse.cpp", "utils/filter.cpp", "utils/fmriutils.cpp", "utils/gtm.cpp", "utils/mri_fastmarching.cpp", "utils/mrifilter.cpp", "utils/mriflood.cpp", "utils/mrinorm.cpp", "utils/mripolv.cpp", "utils/mrisegment.cpp", "utils/rfa.cpp", "utils/ventfix.cpp", "utils/volcluster.cpp"]
@@ -191,7 +191,7 @@ id = "fs.mars"
 crate = "larmorx-freesurfer-surf"
 kind = "replica"
 wave = "later"
-title = "MIT CSAIL's MARS distance transform (P-13: on no default path; later, with permission)"
+title = "MIT CSAIL's MARS distance transform (P-13: on no default path; later, the user)"
 lines = 328
 programs = ["mris_sphere"]
 files = ["utils/MARS_DT_Boundary.cpp", "utils/min_heap.cpp"]
@@ -231,10 +231,30 @@ id = "cr.4dfp"
 crate = "larmorx-fs-classic"
 kind = "clean-room-only"
 wave = "3.6"
-title = "Washington University's 4dfp tools (P-12): a clean room only, at the process boundary talairach_avi already has"
+title = "Washington University's 4dfp tools (P-12): a clean room only (the user, 2026-11-12), at the process boundary talairach_avi already has"
 lines = 1577
 programs = ["analyzeto4dfp", "compute_vox2vox", "gauss_4dfp", "imgreg_4dfp"]
 files = ["talairach_avi/Getifh.c", "talairach_avi/analyzeto4dfp.c", "talairach_avi/cflip.c", "talairach_avi/cgauss3d.c", "talairach_avi/cgauss3dd.c", "talairach_avi/compute_vox2vox.c", "talairach_avi/conc.c", "talairach_avi/endianio.c", "talairach_avi/gauss_4dfp.c", "talairach_avi/imgreg_4dfp.c", "talairach_avi/rec.c"]
+
+[[module]]
+id = "gpl.gsl"
+crate = "larmorx-gpl-gsl"
+kind = "gpl"
+wave = "3.1"
+title = "GSL 1.8's RANLUX389 and distributions as numerics.cpp transcribes them (P-08): the replica alone in larmorx-gpl (crates-gpl/, GPL-3.0-or-later), the clean room's bit-exact reference; FreeSurfer's replicas (mri_coreg, mris_expand) use the clean room"
+lines = 281
+programs = ["mri_coreg", "mris_expand"]
+files = ["utils/numerics.cpp"]
+
+[[module]]
+id = "fs.spline"
+crate = "larmorx-freesurfer-core"
+kind = "replica"
+wave = "3.1"
+title = "John Burkardt's 2006 cubic spline in numerics.cpp (SplineCubicSet, SplineCubicValue, d3_np_fs; P-09): the replica crediting Burkardt, published normally (the user, 2026-11-12)"
+lines = 192
+programs = ["mri_normalize"]
+files = ["utils/numerics.cpp"]
 
 [[program]]
 name = "recon-all"
@@ -466,10 +486,10 @@ group = "shared"
 crate = "larmorx-freesurfer-volumes"
 clean_room_crate = "larmorx-fs-volumes"
 items = ["3.2-24", "3.2-25"]
-note = "uses Burkardt's spline (P-09: the clean-room piece meanwhile)"
+note = "uses Burkardt's spline, its replica 3.1-54 (P-09)"
 runs = []
-item_lines = 4404
-inputs = "modules bspline, core, filter, io, labels, maths, surfio, volume, dicom, gifti, minc, misc, nifti; waits for deform (13), gca (6,089), surf (1,982)"
+item_lines = 4212
+inputs = "modules bspline, core, filter, io, labels, maths, spline, surfio, volume, dicom, gifti, minc, misc, nifti; waits for deform (13), gca (6,089), surf (1,982)"
 checks = "replay: 24 recorded steps in 12 runs"
 [program.reach]
 "fs.bspline" = 785
@@ -479,7 +499,8 @@ checks = "replay: 24 recorded steps in 12 runs"
 "fs.gca" = 6089
 "fs.io" = 15020
 "fs.labels" = 1575
-"fs.maths" = 2684
+"fs.maths" = 2492
+"fs.spline" = 192
 "fs.surf" = 1982
 "fs.surfio" = 7507
 "fs.volume" = 9655
@@ -2763,10 +2784,10 @@ group = "fmriprep"
 crate = "larmorx-freesurfer-cortex"
 clean_room_crate = "larmorx-fs-cortex"
 items = ["3.5-24"]
-note = ""
+note = "-tmap_std's random map uses the clean-room RANLUX (3.1-05)"
 runs = []
 item_lines = 445
-inputs = "modules bspline, core, defect, deform, filter, gca, io, labels, maths, surf, surfio, volume, dicom, gifti, json, minc, misc, nifti"
+inputs = "modules bspline, core, defect, deform, filter, gca, io, labels, maths, surf, surfio, volume, RANLUX's clean room (3.1-05), dicom, gifti, json, minc, misc, nifti"
 checks = "fMRIPrep's calls on the recorded subjects (sMRIPrep's MakeMidthickness)"
 [program.reach]
 "fs.bspline" = 785
@@ -2777,10 +2798,11 @@ checks = "fMRIPrep's calls on the recorded subjects (sMRIPrep's MakeMidthickness
 "fs.gca" = 6014
 "fs.io" = 16468
 "fs.labels" = 1294
-"fs.maths" = 2569
+"fs.maths" = 2288
 "fs.surf" = 4372
 "fs.surfio" = 15116
 "fs.volume" = 7111
+"gpl.gsl" = 281
 "own" = 424
 "perm.dicom" = 4371
 "perm.gifti" = 10365
@@ -2833,10 +2855,10 @@ group = "fmriprep"
 crate = "larmorx-freesurfer-volumes"
 clean_room_crate = "larmorx-fs-volumes"
 items = ["3.2-17"]
-note = "uses the clean-room RANLUX389 and distributions (P-08)"
+note = "uses the clean-room RANLUX389 and distributions (3.1-05, P-08): GSL's replica stays alone in larmorx-gpl"
 runs = []
 item_lines = 2153
-inputs = "modules bspline, core, filter, io, labels, maths, surfio, volume, dicom, gifti, json, minc, misc, nifti; data: 1 files, 0.1 MB (FreeSurferColorLUT.txt); waits for deform (13), gca (6,014)"
+inputs = "modules bspline, core, filter, io, labels, maths, surfio, volume, RANLUX's clean room (3.1-05), dicom, gifti, json, minc, misc, nifti; data: 1 files, 0.1 MB (FreeSurferColorLUT.txt); waits for deform (13), gca (6,014)"
 checks = "fMRIPrep's calls on the recorded subjects (fMRIPrep's MRICoreg, bbregister --init-coreg)"
 [program.reach]
 "fs.bspline" = 785
@@ -2846,9 +2868,10 @@ checks = "fMRIPrep's calls on the recorded subjects (fMRIPrep's MRICoreg, bbregi
 "fs.gca" = 6014
 "fs.io" = 13971
 "fs.labels" = 1230
-"fs.maths" = 2733
+"fs.maths" = 2452
 "fs.surfio" = 78
 "fs.volume" = 7862
+"gpl.gsl" = 281
 "own" = 1805
 "perm.dicom" = 4371
 "perm.gifti" = 10365
@@ -2898,10 +2921,10 @@ checks = "fMRIPrep's calls on the recorded subjects (bbregister's)"
 name = "tkregister2_cmdl"
 wave = "3.5"
 group = "fmriprep"
-crate = "a non-commercial package (P-11, the user's P1)"
+crate = "larmorx-nc-tkregister2"
 clean_room_crate = "larmorx-fs-cortex"
 items = ["3.5-26", "3.5-27"]
-note = "CorTechs' terms (P-11): the clean room here; the replica in a non-commercial package (the user's P1)"
+note = "CorTechs' terms (P-11): the replica in larmorx-nc as its own program, the clean room here (the user, 2026-11-12)"
 runs = []
 item_lines = 4048
 inputs = "modules bspline, core, filter, gca, io, labels, maths, surf, surfio, volume, dicom, gifti, minc, misc, nifti"
@@ -3033,10 +3056,10 @@ checks = "synthetic cases and a recorded call of its own (no default step runs i
 name = "analyzeto4dfp"
 wave = "3.6"
 group = "classic-only"
-crate = "none: a clean room only (P-12)"
+crate = "none: a clean room only (P-12, the user)"
 clean_room_crate = "larmorx-fs-classic"
 items = ["3.6-14"]
-note = "Washington University's: a clean room only (P-12)"
+note = "Washington University's: a clean room only (P-12, the user)"
 runs = []
 item_lines = 338
 inputs = "modules 4dfp"
@@ -3050,10 +3073,10 @@ checks = "synthetic cases and a recorded call of its own (no default step runs i
 name = "gauss_4dfp"
 wave = "3.6"
 group = "classic-only"
-crate = "none: a clean room only (P-12)"
+crate = "none: a clean room only (P-12, the user)"
 clean_room_crate = "larmorx-fs-classic"
 items = ["3.6-15"]
-note = "Washington University's: a clean room only (P-12)"
+note = "Washington University's: a clean room only (P-12, the user)"
 runs = []
 item_lines = 604
 inputs = "modules 4dfp"
@@ -3067,10 +3090,10 @@ checks = "synthetic cases and a recorded call of its own (no default step runs i
 name = "imgreg_4dfp"
 wave = "3.6"
 group = "classic-only"
-crate = "none: a clean room only (P-12)"
+crate = "none: a clean room only (P-12, the user)"
 clean_room_crate = "larmorx-fs-classic"
 items = ["3.6-16"]
-note = "Washington University's: a clean room only (P-12)"
+note = "Washington University's: a clean room only (P-12, the user)"
 runs = []
 item_lines = 206
 inputs = "modules 4dfp; data: 6 files, 201.3 MB (3T18yoSchwartzReactN32_as_orig.4dfp.ifh, 3T18yoSchwartzReactN32_as_orig.4dfp.img, 711-2B_as_mni_average_305_mask.4dfp.ifh ...)"
@@ -3084,10 +3107,10 @@ checks = "synthetic cases and a recorded call of its own (no default step runs i
 name = "compute_vox2vox"
 wave = "3.6"
 group = "classic-only"
-crate = "none: a clean room only (P-12)"
+crate = "none: a clean room only (P-12, the user)"
 clean_room_crate = "larmorx-fs-classic"
 items = ["3.6-17"]
-note = "Washington University's: a clean room only (P-12)"
+note = "Washington University's: a clean room only (P-12, the user)"
 runs = []
 item_lines = 109
 inputs = "modules 4dfp; data: 2 files, 0.0 MB (3T18yoSchwartzReactN32_as_orig.4dfp.ifh, 711-2C_as_mni_average_305.4dfp.ifh)"
@@ -3205,10 +3228,10 @@ checks = "replay: 18 recorded steps in 12 runs"
 name = "talairach_avi"
 wave = "3.6"
 group = "classic-only"
-crate = "larmorx-freesurfer-classic"
+crate = "none: a clean room only (P-12, the user)"
 clean_room_crate = "larmorx-fs-classic"
 items = ["3.6-18"]
-note = "classic only; its 4dfp tools a clean room only (the plan: 3.2)"
+note = "classic only; a clean room only, with mpr2mni305 and the 4dfp tools (the user, 2026-11-12: Washington University's Talairach tools; the script itself carries MGH's notice; the plan: 3.2)"
 runs = ["avi2talxfm", "lta_convert", "mpr2mni305", "mri_convert"]
 item_lines = 0
 inputs = "runs avi2talxfm, lta_convert, mpr2mni305, mri_convert; data: 1 files, 0.0 MB (sources.csh)"
@@ -3227,10 +3250,10 @@ checks = "replay: 6 recorded steps in 6 runs"
 name = "mpr2mni305"
 wave = "3.6"
 group = "classic-only"
-crate = "larmorx-freesurfer-classic"
+crate = "none: a clean room only (P-12, the user)"
 clean_room_crate = "larmorx-fs-classic"
 items = ["3.6-19"]
-note = "talairach_avi's"
+note = "talairach_avi's; Washington University's notice: a clean room only (P-12)"
 runs = ["analyzeto4dfp", "compute_vox2vox", "gauss_4dfp", "imgreg_4dfp"]
 item_lines = 0
 inputs = "runs analyzeto4dfp, compute_vox2vox, gauss_4dfp, imgreg_4dfp; data: 1 files, 0.0 MB (sources.csh)"
@@ -3775,7 +3798,7 @@ checks = "synthetic cases and a recorded call of its own (no default step runs i
 id = "3.1-01"
 wave = "3.1"
 kind = "plumbing"
-what = "the workspace crates-freesurfer/ (the crates of this layout, empty), the program and wheel larmorx-freesurfer (larmorx-freesurfer-cli: FreeSurfer's licence text and preface, NOTICE, PROVENANCE.md, the settings overlay of larmorx's three options), its CI check and test steps (minutes estimated first), lx.freesurfer's dispatch between replica and clean room; the clean-room crates crates/larmorx-fs-* (empty), each added to the clean-room audit's lists by the orchestrator"
+what = "the workspace crates-freesurfer/ (the crates of this layout, empty), the program and wheel larmorx-freesurfer (larmorx-freesurfer-cli: FreeSurfer's licence text and preface, NOTICE, PROVENANCE.md, the settings overlay of larmorx's three options), its CI check and test steps (minutes estimated first); the replica side only (split by the coherence review's finding 7): the main package's side is 3.2-41, the clean-room crates C3.1-00"
 crate = "crates-freesurfer/"
 lines = 0
 files = []
@@ -3807,8 +3830,8 @@ checks = "random operands and the 12 reached functions' patterns against the mac
 [[item]]
 id = "3.1-04"
 wave = "3.1"
-kind = "permissive"
-what = "random numbers: VXL's vnl_random (Marsaglia-Zaman, drand64's measured left-to-right order, TP-01), POSIX drand48/srand48/erand48 (TP-15); glibc 2.35's rand, srand, random and srandom from a behaviour spec only (a spec writer, then a clean-room implementer: the GNU family's precedent, specs/glibc-dbl.md); FreeSurfer's setRandomSeed and randomNumber come with fs.core"
+kind = "permissive; spec + clean room (glibc's part)"
+what = "random numbers: VXL's vnl_random (Marsaglia-Zaman, drand64's measured left-to-right order, TP-01) and POSIX drand48/srand48/erand48 (TP-15), ported from their own sources; glibc 2.35's rand, srand, random and srandom from a behaviour spec only (specs/glibc-random.md by a spec writer, then a clean-room implementer: the GNU family's precedent, specs/glibc-dbl.md; not the permissive track's part); FreeSurfer's setRandomSeed and randomNumber come with fs.core"
 crate = "larmorx-core"
 lines = 0
 files = []
@@ -3819,7 +3842,7 @@ checks = "sequences against the unit oracle and the machine's glibc; mri_normali
 id = "3.1-05"
 wave = "3.1"
 kind = "spec + clean room"
-what = "RANLUX389 and GSL 1.8's distributions (P-08, TP-03): specs/ranlux.md by a spec writer (from L\u00fcscher 1994, James 1994, Knuth, Marsaglia, with the exact expressions FreeSurfer evaluates), then the clean room by an implementer who has read neither GSL nor numerics.cpp (GSL's source joins the audit's restriction table); mri_coreg's replica uses it; the GSL replica as its bit-exact reference in larmorx-gpl (the user's P5)"
+what = "RANLUX389 and GSL 1.8's distributions (P-08, TP-03): specs/ranlux.md by a spec writer (from L\u00fcscher 1994, James 1994, Knuth, Marsaglia, with the exact expressions FreeSurfer evaluates), then the clean room by an implementer who has read neither GSL nor numerics.cpp (GSL's source joins the audit's restriction table); mri_coreg's and mris_expand's replicas use it (GPL code never joins a FreeSurfer program: the user, 'No waiting for permissions'); GSL's replica 3.1-53, alone in larmorx-gpl, is its bit-exact reference"
 crate = "larmorx-core (clean-room files, GSL family)"
 lines = 375
 files = []
@@ -3830,11 +3853,11 @@ checks = "streams against the unit oracle's sc_rng_* for many seeds; mri_coreg's
 id = "3.1-06"
 wave = "3.1"
 kind = "spec + clean room"
-what = "the cubic spline mri_normalize uses (P-09, TP-04: Burkardt's 2006 routines, the clean-room piece until Burkardt confirms his MIT terms cover them, the user's P2)"
+what = "the cubic spline mri_normalize uses (P-09, TP-04: Burkardt's 2006 routines): specs/burkardt-spline.md by a spec writer, then the clean room by an implementer who has read neither Burkardt's code nor numerics.cpp; the replica is 3.1-54 (larmorx-freesurfer, crediting Burkardt, published normally: the user, 2026-11-12), which mri_normalize's replica uses"
 crate = "larmorx-core (clean-room files)"
 lines = 0
 files = []
-inputs = "the placement table P-09"
+inputs = "the placement table P-09; numerics.cpp 1417-1680 (the spec writer only)"
 checks = "SplineCubicSet/SplineCubicValue against the unit oracle; mri_normalize's replays"
 
 [[item]]
@@ -3852,7 +3875,7 @@ checks = "against the unit oracle; the existing vnl_svd_f32, vnl_qr, vnl_eigen p
 id = "3.1-08"
 wave = "3.1"
 kind = "inventory + spec"
-what = "the C library behind the results: every libm function the reached code calls (exp, log, pow, sqrt, sin, cos, atan2, floor, ...) checked against larmorx_core::math (glibc 2.35's bits for reproduce where it lacks them: specs and clean rooms, the GNU family's precedent), glibc's qsort (a behaviour spec) and libstdc++'s std::sort (FSL-22's precedent)"
+what = "the C library behind the results: every libm function the reached code calls (exp, log, pow, sqrt, sin, cos, atan2, floor, ...) checked against larmorx_core::math (where it lacks glibc 2.35's bits for reproduce: a spec by a spec writer, then a clean room by an implementer, the GNU family's precedent), glibc's qsort (a behaviour spec) and libstdc++'s std::sort (FSL-22's precedent)"
 crate = "larmorx-core"
 lines = 0
 files = []
@@ -3862,63 +3885,52 @@ checks = "the unit oracle; the first replays"
 [[item]]
 id = "3.1-09"
 wave = "3.1"
-kind = "permissive"
-what = "perm.gifti (1 of 5) (GIFTI: gifticlib and expat (P-05); the writer's long-double line formatting): xmlparse.c (lines 648-3618)"
+kind = "W3 parser"
+what = "perm.gifti (1 of 4) (GIFTI: gifticlib, read over a pure-Rust XML parser in expat 2.0.1's place (W3); the writer exact, with its long-double line formatting (P-05)): the XML parser under GIFTI: a pure-Rust parser in expat 2.0.1's place (xmlparse.c, xmlrole.c, xmltok.c are the behaviour, not ported) that gives gifticlib the same elements, attributes and character data, and the same failure messages (expat's error text with its line and column, as gifticlib prints them) on every path the programs reach: UTF-8 and the encodings expat accepts, entities, CDATA, comments, the DOCTYPE, malformed and truncated files"
 crate = "larmorx-io"
-lines = 2010
-files = ["packages/expat/xmlparse.c"]
+lines = 5809
+files = ["packages/expat/xmlparse.c", "packages/expat/xmlrole.c", "packages/expat/xmltok.c"]
 inputs = "the 3.1 items before it"
-checks = "unit checks against the unit oracle; then the replays of the first programs that use it (67 programs reach the module)"
+checks = "differential tests against the original parser in the unit oracle (generated, malformed and truncated inputs: the same values, the same messages); then the replays of the first programs that read the format (67 programs reach the module)"
 
 [[item]]
 id = "3.1-10"
 wave = "3.1"
 kind = "permissive"
-what = "perm.gifti (2 of 5): xmlrole.c (lines 33-216), xmlparse.c (lines 3630-6255)"
+what = "perm.gifti (2 of 4): gifticlib's XML reading, ported (public domain) on the parser's events: gifti_xml.c's element callbacks and checks with their messages, the ASCII, Base64Binary and GZipBase64Binary decoding, the external-file data"
 crate = "larmorx-io"
-lines = 2493
-files = ["packages/expat/xmlparse.c", "packages/expat/xmlrole.c"]
+lines = 2173
+files = ["packages/gifti/gifti_xml.c"]
 inputs = "the 3.1 items before it"
-checks = "unit checks against the unit oracle; then the replays of the first programs that use it (67 programs reach the module)"
+checks = "unit checks against the unit oracle (every encoding and data type, malformed files and their messages); then the replays of the first programs that read the format (67 programs reach the module)"
 
 [[item]]
 id = "3.1-11"
 wave = "3.1"
 kind = "permissive"
-what = "perm.gifti (3 of 5): gifti_io.c (lines 137-1781), xmlrole.c (lines 234-1315), xmltok.c"
+what = "perm.gifti (3 of 4): gifticlib's structures and checks, ported: gifti_io.c's validity checks with their messages, the attribute tables, copies, meta-data, the external data reader"
 crate = "larmorx-io"
-lines = 2488
-files = ["packages/expat/xmlrole.c", "packages/expat/xmltok.c", "packages/gifti/gifti_io.c"]
+lines = 1430
+files = ["packages/gifti/gifti_io.c"]
 inputs = "the 3.1 items before it"
-checks = "unit checks against the unit oracle; then the replays of the first programs that use it (67 programs reach the module)"
+checks = "unit checks against the unit oracle (every encoding and data type, malformed files and their messages); then the replays of the first programs that read the format (67 programs reach the module)"
 
 [[item]]
 id = "3.1-12"
 wave = "3.1"
-kind = "permissive"
-what = "perm.gifti (4 of 5): gifti_xml.c (lines 121-2053), gifti_io.c (lines 1811-4216)"
+kind = "permissive (exact writer)"
+what = "perm.gifti (4 of 4): gifticlib's writer, exact: gifti_xml.c's ewrite_* with the long-double line formatting (3.1-03's x87 arithmetic), the Base64 and zlib output; gifti_io.c's write and display functions (their printed text)"
 crate = "larmorx-io"
-lines = 2320
+lines = 953
 files = ["packages/gifti/gifti_io.c", "packages/gifti/gifti_xml.c"]
 inputs = "the 3.1 items before it"
-checks = "unit checks against the unit oracle; then the replays of the first programs that use it (67 programs reach the module)"
-
-[[item]]
-id = "3.1-13"
-wave = "3.1"
-kind = "permissive"
-what = "perm.gifti (5 of 5): gifti_xml.c (lines 2109-3148)"
-crate = "larmorx-io"
-lines = 1054
-files = ["packages/gifti/gifti_xml.c"]
-inputs = "the 3.1 items before it"
-checks = "unit checks against the unit oracle; then the replays of the first programs that use it (67 programs reach the module)"
+checks = "the bytes of every output against the unit oracle's writer (generated values: every type, extreme numbers); then the replays of the programs that write the format (67 programs reach the module)"
 
 [[item]]
 id = "3.1-14"
 wave = "3.1"
 kind = "permissive"
-what = "perm.minc (MINC's volume_io: the .xfm reader and writer (P-05; FreeSurfer's changes to the MINC files in larmorx-freesurfer-io)): minc_gaussian.c, minc_files.c, minc_volume_io.c"
+what = "perm.minc (MINC's volume_io: the .xfm reader (W3: a pure-Rust parser, the same values and messages) and writer (exact) (P-05; FreeSurfer's changes to the MINC files in larmorx-freesurfer-io)): minc_gaussian.c, minc_files.c, minc_volume_io.c"
 crate = "larmorx-io"
 lines = 1676
 files = ["packages/minc/minc_files.c", "packages/minc/minc_gaussian.c", "packages/minc/minc_volume_io.c"]
@@ -3939,24 +3951,13 @@ checks = "unit checks against the unit oracle; then the replays of the first pro
 [[item]]
 id = "3.1-16"
 wave = "3.1"
-kind = "permissive"
-what = "perm.dicom (1 of 2) (CTN's DICOM library (P-05): the format probe of every volume reader; DICOM input later): dcmcond.c, dcmdict.c (lines 90-140), condition.c, dcm.c"
+kind = "W3 parser"
+what = "perm.dicom (1 of 1) (CTN's DICOM library (P-05): the format probe of every volume reader (W3: a pure-Rust probe, no port of CTN); DICOM input later): the DICOM probe: a pure-Rust check in CTN's place that answers as DCM_OpenFile does for IsDICOM, the format probe of every volume reader (the part-10 preamble and 'DICM', the elements it reads, implicit and explicit VR, little and big endian, the condition messages a failed open prints); CTN's dcm.c, dictionaries, lst.c and condition stack are the behaviour, not ported; DICOM input itself later (no default path reads DICOM)"
 crate = "larmorx-io"
-lines = 2473
-files = ["packages/dicom/condition.c", "packages/dicom/dcm.c", "packages/dicom/dcmcond.c", "packages/dicom/dcmdict.c"]
+lines = 4371
+files = ["packages/dicom/condition.c", "packages/dicom/dcm.c", "packages/dicom/dcmcond.c", "packages/dicom/dcmdict.c", "packages/dicom/lst.c"]
 inputs = "the 3.1 items before it"
-checks = "unit checks against the unit oracle; then the replays of the first programs that use it (67 programs reach the module)"
-
-[[item]]
-id = "3.1-17"
-wave = "3.1"
-kind = "permissive"
-what = "perm.dicom (2 of 2): lst.c, dcmdict.c (lines 165-2012)"
-crate = "larmorx-io"
-lines = 1898
-files = ["packages/dicom/dcmdict.c", "packages/dicom/lst.c"]
-inputs = "the 3.1 items before it"
-checks = "unit checks against the unit oracle; then the replays of the first programs that use it (67 programs reach the module)"
+checks = "differential tests against the original parser in the unit oracle (generated, malformed and truncated inputs: the same values, the same messages); then the replays of the first programs that read the format (67 programs reach the module)"
 
 [[item]]
 id = "3.1-18"
@@ -3972,24 +3973,24 @@ checks = "unit checks against the unit oracle; then the replays of the first pro
 [[item]]
 id = "3.1-19"
 wave = "3.1"
-kind = "permissive"
-what = "perm.json (1 of 2) (nlohmann/json (P-06): its number formatting decides JSON outputs' bytes): json.h (lines 655-10516)"
+kind = "W3 parser"
+what = "perm.json (1 of 2) (nlohmann/json 3.2.0 (P-06): a pure-Rust parser in its parser's place (W3); its writer exact (its number formatting decides JSON outputs' bytes)): nlohmann/json 3.2.0's parser replaced: a pure-Rust JSON reader giving its values (integers, unsigned and floating-point numbers as its lexer converts them, strings with their escapes and UTF-8 checks) and its parse_error messages (the byte position, the last token read) on every path the programs reach"
 crate = "larmorx-core"
-lines = 2483
+lines = 1913
 files = ["include/json.h"]
 inputs = "the 3.1 items before it"
-checks = "unit checks against the unit oracle; then the replays of the first programs that use it (13 programs reach the module)"
+checks = "differential tests against the original parser in the unit oracle (generated, malformed and truncated inputs: the same values, the same messages); then the replays of the first programs that read the format (13 programs reach the module)"
 
 [[item]]
 id = "3.1-20"
 wave = "3.1"
-kind = "permissive"
-what = "perm.json (2 of 2): json.h (lines 10692-18254)"
+kind = "permissive (exact writer)"
+what = "perm.json (2 of 2): nlohmann/json's writer and the values it orders, exact: dump with its indentation, dump_escaped's escapes and UTF-8 handling, dump_float's Grisu2 shortest digits and exponent format, the integer output; basic_json's object order (sorted keys), json_pointer and patch as the programs use them"
 crate = "larmorx-core"
-lines = 1021
+lines = 1591
 files = ["include/json.h"]
 inputs = "the 3.1 items before it"
-checks = "unit checks against the unit oracle; then the replays of the first programs that use it (13 programs reach the module)"
+checks = "the bytes of every output against the unit oracle's writer (generated values: every type, extreme numbers); then the replays of the programs that write the format (13 programs reach the module)"
 
 [[item]]
 id = "3.1-21"
@@ -4030,7 +4031,7 @@ wave = "3.1"
 kind = "replica"
 what = "fs.maths (2 of 2): prime.cpp, pdf.cpp, numerics.cpp, randomfields.cpp, matrix.cpp (lines 717-3613)"
 crate = "larmorx-freesurfer-core"
-lines = 2273
+lines = 1992
 files = ["utils/matrix.cpp", "utils/numerics.cpp", "utils/pdf.cpp", "utils/prime.cpp", "utils/randomfields.cpp"]
 inputs = "the 3.1 items before it"
 checks = "unit checks against the unit oracle; then the replays of the first programs that use it (68 programs reach the module)"
@@ -4226,7 +4227,7 @@ checks = "unit checks against the unit oracle; then the replays of the first pro
 id = "3.1-42"
 wave = "3.1"
 kind = "replica"
-what = "fs.filter (1 of 3) (volume filters and morphology, intensity normalisation (with Burkardt's spline, P-09), segmentation helpers, flood fill, connected components, fast marching, clusters): mri_fastmarching.cpp, diffuse.cpp, connectcomp.cpp, fmriutils.cpp, filter.cpp, mrifilter.cpp (lines 923-5395)"
+what = "fs.filter (1 of 3) (volume filters and morphology, intensity normalisation (its cubic spline: fs.spline), segmentation helpers, flood fill, connected components, fast marching, clusters): mri_fastmarching.cpp, diffuse.cpp, connectcomp.cpp, fmriutils.cpp, filter.cpp, mrifilter.cpp (lines 923-5395)"
 crate = "larmorx-freesurfer-filter"
 lines = 2269
 files = ["utils/connectcomp.cpp", "utils/diffuse.cpp", "utils/filter.cpp", "utils/fmriutils.cpp", "utils/mri_fastmarching.cpp", "utils/mrifilter.cpp"]
@@ -4342,6 +4343,39 @@ lines = 1925
 files = ["utils/mrisurf_metricProperties_fast.h", "utils/mrisurf_metricProperties_faster.cpp", "utils/mrisurf_metricProperties_slow.h"]
 inputs = "the 3.1 items before it"
 checks = "unit checks against the unit oracle; then the replays of the first programs that use it (67 programs reach the module)"
+
+[[item]]
+id = "3.1-53"
+wave = "3.1"
+kind = "gpl"
+what = "gpl.gsl (GSL 1.8's RANLUX389 and distributions as numerics.cpp transcribes them (P-08): the replica alone in larmorx-gpl (crates-gpl/, GPL-3.0-or-later), the clean room's bit-exact reference; FreeSurfer's replicas (mri_coreg, mris_expand) use the clean room): numerics.cpp"
+crate = "larmorx-gpl-gsl"
+lines = 281
+files = ["utils/numerics.cpp"]
+inputs = "the 3.1 items before it"
+checks = "streams against the unit oracle's sc_rng_* and sc_ran_* for many seeds; then the bit-exact reference of the clean room (3.1-05)"
+
+[[item]]
+id = "3.1-54"
+wave = "3.1"
+kind = "replica"
+what = "fs.spline (John Burkardt's 2006 cubic spline in numerics.cpp (SplineCubicSet, SplineCubicValue, d3_np_fs; P-09): the replica crediting Burkardt, published normally (the user, 2026-11-12)): numerics.cpp"
+crate = "larmorx-freesurfer-core"
+lines = 192
+files = ["utils/numerics.cpp"]
+inputs = "the 3.1 items before it"
+checks = "SplineCubicSet and SplineCubicValue against the unit oracle; mri_normalize's replays"
+
+[[item]]
+id = "3.2-41"
+wave = "3.2"
+kind = "plumbing (main package)"
+what = "the main package's side of larmorx-freesurfer, split from 3.1-01 (the coherence review's finding 7): the package entry LARMORX_FREESURFER in crates/larmorx-cli/src/replica.rs (the program larmorx-freesurfer, LARMORX_FREESURFER_BIN, LicenseRef-FreeSurfer) with its REPLICAS lines, the family freesurfer in larmorx's command line, lx.freesurfer (python/larmorx/freesurfer/: the dispatch between the replica program and the clean room); best by an agent that never read FreeSurfer's material, because these files carry the clean rooms' side too"
+crate = "larmorx (crates/larmorx-cli, python/larmorx/freesurfer/)"
+lines = 0
+files = []
+inputs = "3.1-01; the first program item (3.2-04)"
+checks = "the larmorx and larmorx-freesurfer programs' tests, test_release.py, the golden registry"
 
 [[item]]
 id = "3.2-01"
@@ -4527,7 +4561,7 @@ what = "mri_coreg"
 crate = "larmorx-freesurfer-volumes"
 lines = 2153
 files = ["include/pointset.h", "mri_coreg/mri_coreg.cpp", "utils/matrix.cpp", "utils/mriset.cpp", "utils/pointset.cpp", "utils/randomfields.cpp", "utils/transform.cpp"]
-inputs = "modules bspline, core, filter, io, labels, maths, surfio, volume, dicom, gifti, json, minc, misc, nifti; data: 1 files, 0.1 MB (FreeSurferColorLUT.txt); waits for deform (13), gca (6,014)"
+inputs = "modules bspline, core, filter, io, labels, maths, surfio, volume, RANLUX's clean room (3.1-05), dicom, gifti, json, minc, misc, nifti; data: 1 files, 0.1 MB (FreeSurferColorLUT.txt); waits for deform (13), gca (6,014)"
 checks = "fMRIPrep's calls on the recorded subjects (fMRIPrep's MRICoreg, bbregister --init-coreg)"
 
 [[item]]
@@ -4604,7 +4638,7 @@ what = "mri_normalize (1 of 2): mri_normalize.cpp, mrinorm.cpp (lines 80-81), mr
 crate = "larmorx-freesurfer-volumes"
 lines = 2447
 files = ["mri_normalize/mri_normalize.cpp", "utils/histo.cpp", "utils/label.cpp", "utils/mri.cpp", "utils/mrifilter.cpp", "utils/mrihisto.cpp", "utils/mrinorm.cpp"]
-inputs = "modules bspline, core, filter, io, labels, maths, surfio, volume, dicom, gifti, minc, misc, nifti; waits for deform (13), gca (6,089), surf (1,982)"
+inputs = "modules bspline, core, filter, io, labels, maths, spline, surfio, volume, dicom, gifti, minc, misc, nifti; waits for deform (13), gca (6,089), surf (1,982)"
 checks = "unit checks of its functions against the unit oracle"
 
 [[item]]
@@ -4613,7 +4647,7 @@ wave = "3.2"
 kind = "c++"
 what = "mri_normalize (2 of 2): mrinorm.cpp (lines 98-3635), numerics.cpp; the program assembled"
 crate = "larmorx-freesurfer-volumes"
-lines = 1957
+lines = 1765
 files = ["utils/mrinorm.cpp", "utils/numerics.cpp"]
 inputs = "the parts before it"
 checks = "replay: 24 recorded steps in 12 runs"
@@ -5084,7 +5118,7 @@ checks = "synthetic cases for each option path; the programs' records re-made"
 id = "3.4-11"
 wave = "3.4"
 kind = "completeness"
-what = "the option paths of 30 earlier programs into fs.deform (static reach, lines; most never run by default: each checked when its program's record is re-made): mri_binarize (732), mri_cc (13), mri_coreg (13), mri_normalize (13), mri_segment (13), mri_fill (13) ..."
+what = "the option paths of 30 earlier programs into fs.deform (static reach, lines; most never run by default: each checked when its program's record is re-made): mri_binarize (732), AntsDenoiseImageFs (13), AntsN4BiasFieldCorrectionFs (13), lta_convert (13), mri_add_xform_to_header (13), mri_ca_normalize (13) ..."
 crate = "the programs' crates"
 lines = 0
 files = []
@@ -5594,7 +5628,7 @@ what = "mris_expand"
 crate = "larmorx-freesurfer-cortex"
 lines = 445
 files = ["mris_expand/mris_expand.cpp", "utils/label.cpp"]
-inputs = "modules bspline, core, defect, deform, filter, gca, io, labels, maths, surf, surfio, volume, dicom, gifti, json, minc, misc, nifti"
+inputs = "modules bspline, core, defect, deform, filter, gca, io, labels, maths, surf, surfio, volume, RANLUX's clean room (3.1-05), dicom, gifti, json, minc, misc, nifti"
 checks = "fMRIPrep's calls on the recorded subjects (sMRIPrep's MakeMidthickness)"
 
 [[item]]
@@ -5613,7 +5647,7 @@ id = "3.5-26"
 wave = "3.5"
 kind = "c++"
 what = "tkregister2_cmdl (1 of 2): tkregister2.cpp (lines 204-2906)"
-crate = "a non-commercial package (P1); its clean room in larmorx-fs-cortex"
+crate = "`larmorx-nc-tkregister2` (crates-nc/: its own program in the larmorx-nc wheel, P-11); its clean room in larmorx-fs-cortex"
 lines = 2493
 files = ["tkregister2/tkregister2.cpp"]
 inputs = "modules bspline, core, filter, gca, io, labels, maths, surf, surfio, volume, dicom, gifti, minc, misc, nifti"
@@ -5624,7 +5658,7 @@ id = "3.5-27"
 wave = "3.5"
 kind = "c++"
 what = "tkregister2_cmdl (2 of 2): registerio.cpp, fio.cpp, mri.cpp, tkregister2.cpp (lines 2946-5388), mri2.cpp; the program assembled"
-crate = "a non-commercial package (P1); its clean room in larmorx-fs-cortex"
+crate = "`larmorx-nc-tkregister2` (crates-nc/: its own program in the larmorx-nc wheel, P-11); its clean room in larmorx-fs-cortex"
 lines = 1555
 files = ["tkregister2/tkregister2.cpp", "utils/fio.cpp", "utils/mri.cpp", "utils/mri2.cpp", "utils/registerio.cpp"]
 inputs = "the parts before it"
@@ -5744,7 +5778,7 @@ checks = "through mri_nu_correct.mni, vertexvol's recorded steps (42)"
 id = "3.6-01"
 wave = "3.6"
 kind = "clean-room-only"
-what = "cr.4dfp (Washington University's 4dfp tools (P-12): a clean room only, at the process boundary talairach_avi already has): cflip.c, Getifh.c, rec.c, endianio.c"
+what = "cr.4dfp (Washington University's 4dfp tools (P-12): a clean room only (the user, 2026-11-12), at the process boundary talairach_avi already has): cflip.c, Getifh.c, rec.c, endianio.c"
 crate = "larmorx-fs-classic"
 lines = 320
 files = ["talairach_avi/Getifh.c", "talairach_avi/cflip.c", "talairach_avi/endianio.c", "talairach_avi/rec.c"]
@@ -5930,9 +5964,9 @@ checks = "synthetic cases and a recorded call of its own (no default step runs i
 [[item]]
 id = "3.6-18"
 wave = "3.6"
-kind = "tcsh"
+kind = "clean room only"
 what = "talairach_avi (253 lines of tcsh)"
-crate = "larmorx-freesurfer-classic"
+crate = "larmorx-fs-classic"
 lines = 0
 files = []
 inputs = "runs avi2talxfm, lta_convert, mpr2mni305, mri_convert; data: 1 files, 0.0 MB (sources.csh)"
@@ -5941,9 +5975,9 @@ checks = "replay: 6 recorded steps in 6 runs"
 [[item]]
 id = "3.6-19"
 wave = "3.6"
-kind = "csh"
+kind = "clean room only"
 what = "mpr2mni305 (215 lines of csh)"
-crate = "larmorx-freesurfer-classic"
+crate = "larmorx-fs-classic"
 lines = 0
 files = []
 inputs = "runs analyzeto4dfp, compute_vox2vox, gauss_4dfp, imgreg_4dfp; data: 1 files, 0.0 MB (sources.csh)"
@@ -6280,6 +6314,13 @@ inputs = "data: 1 files, 0.0 MB (sources.csh)"
 checks = "synthetic cases and a recorded call of its own (no default step runs it)"
 
 [[clean_room]]
+id = "C3.1-00"
+after_wave = "3.1"
+what = "the clean-room crates, empty (crates/larmorx-fs-core, -gca, -surf and the program crates -volumes, -atlas, -topology, -cortex, -classic, -networks, -recon), created by the first FreeSurfer clean-room relay from a clean brief (split from 3.1-01: no agent that read FreeSurfer's material creates them, the coherence review's finding 7); the orchestrator adds them to the clean-room audit's lists (CLEANROOM_CRATES, CLEANROOM_PATHS, a FreeSurfer entry like FSL_TOOLS) in that part"
+crate = "crates/larmorx-fs-*"
+lines = 0
+
+[[clean_room]]
 id = "C3.1-01"
 after_wave = "3.1"
 what = "fs.core's clean room (messages, diagnostics, program name, environment, version stamps, the ROMP switch, timers, paths, signals, the licence check's messages)"
@@ -6291,7 +6332,7 @@ id = "C3.1-02"
 after_wave = "3.1"
 what = "fs.maths's clean room (matrices (float and long double), the numerics wrappers over VNL and Cephes, fs_powell, fs_lbfgs, histograms, statistics, PDFs, random fields)"
 crate = "larmorx-fs-core"
-lines = 6074
+lines = 5601
 
 [[clean_room]]
 id = "C3.1-03"
@@ -6317,7 +6358,7 @@ lines = 26345
 [[clean_room]]
 id = "C3.1-06"
 after_wave = "3.1"
-what = "fs.filter's clean room (volume filters and morphology, intensity normalisation (with Burkardt's spline, P-09), segmentation helpers, flood fill, connected components, fast marching, clusters)"
+what = "fs.filter's clean room (volume filters and morphology, intensity normalisation (its cubic spline: fs.spline), segmentation helpers, flood fill, connected components, fast marching, clusters)"
 crate = "larmorx-fs-core"
 lines = 11201
 
@@ -6452,7 +6493,7 @@ id = "C3.2-18"
 after_wave = "3.2"
 what = "mri_normalize's clean room"
 crate = "larmorx-fs-volumes"
-lines = 4404
+lines = 4212
 
 [[clean_room]]
 id = "C3.2-19"
@@ -6917,20 +6958,6 @@ crate = "larmorx-fs-classic"
 lines = 25
 
 [[clean_room]]
-id = "C3.6-06"
-after_wave = "3.6"
-what = "talairach_avi's clean room"
-crate = "larmorx-fs-classic"
-lines = 253
-
-[[clean_room]]
-id = "C3.6-07"
-after_wave = "3.6"
-what = "mpr2mni305's clean room"
-crate = "larmorx-fs-classic"
-lines = 215
-
-[[clean_room]]
 id = "C3.6-08"
 after_wave = "3.6"
 what = "avi2talxfm's clean room"
@@ -7097,3 +7124,94 @@ after_wave = "3.7"
 what = "fs-check-os's clean room"
 crate = "larmorx-fs-recon"
 lines = 210
+
+[[clean_room]]
+id = "CP-01"
+after_wave = "step 6"
+what = "perm.gifti's clean room (GIFTI: gifticlib, read over a pure-Rust XML parser in expat 2.0.1's place (W3); the writer exact, with its long-double line formatting (P-05))"
+crate = "with step 6"
+lines = 10365
+
+[[clean_room]]
+id = "CP-02"
+after_wave = "step 6"
+what = "perm.minc's clean room (MINC's volume_io: the .xfm reader (W3: a pure-Rust parser, the same values and messages) and writer (exact) (P-05; FreeSurfer's changes to the MINC files in larmorx-freesurfer-io))"
+crate = "with step 6"
+lines = 1676
+
+[[clean_room]]
+id = "CP-03"
+after_wave = "step 6"
+what = "perm.nifti's clean room (niftilib and znzlib (P-05))"
+crate = "with step 6"
+lines = 335
+
+[[clean_room]]
+id = "CP-04"
+after_wave = "step 6"
+what = "perm.dicom's clean room (CTN's DICOM library (P-05): the format probe of every volume reader (W3: a pure-Rust probe, no port of CTN); DICOM input later)"
+crate = "with step 6"
+lines = 4371
+
+[[clean_room]]
+id = "CP-05"
+after_wave = "step 6"
+what = "perm.misc's clean room (miniz, libtiff, NrrdIO, Cephes, the FNV hash (P-05, P-06))"
+crate = "with step 6"
+lines = 1467
+
+[[clean_room]]
+id = "CP-06"
+after_wave = "step 6"
+what = "perm.json's clean room (nlohmann/json 3.2.0 (P-06): a pure-Rust parser in its parser's place (W3); its writer exact (its number formatting decides JSON outputs' bytes))"
+crate = "with step 6"
+lines = 3508
+
+[[clean_room]]
+id = "CP-07"
+after_wave = "step 6"
+what = "perm.geomtools's clean room (Geometric Tools' distances and bounding boxes (P-06, mris_volmask))"
+crate = "with step 6"
+lines = 424
+
+[[clean_room]]
+id = "CP-08"
+after_wave = "step 6"
+what = "perm.argparse's clean room (the argparse derived from Hilton Bristow's ArgumentParser (P-06): the newer programs' command lines and messages)"
+crate = "with step 6"
+lines = 396
+
+[[clean_room]]
+id = "CP-09"
+after_wave = "step 6"
+what = "the x87 80-bit arithmetic's improved form (3.1-03 is written from Intel's manual, no upstream code: a faster implementation where it pays)"
+crate = "with step 6"
+lines = 0
+
+[[clean_room]]
+id = "CP-10"
+after_wave = "step 6"
+what = "vnl_random's and drand48's clean rooms (3.1-04's permissive part)"
+crate = "with step 6"
+lines = 0
+
+[[clean_room]]
+id = "CP-11"
+after_wave = "step 6"
+what = "the VNL and netlib routines' clean rooms (3.1-07; with ANTs' and ITK's VNL ports)"
+crate = "with step 6"
+lines = 0
+
+[[clean_room]]
+id = "CP-12"
+after_wave = "step 6"
+what = "ITK 4.13.2's N4, B-spline, shrink and Gaussian filters and the non-local means denoiser (P-03, P-04; AntsN4BiasFieldCorrectionFs and AntsDenoiseImageFs): with ANTs' and ITK's clean rooms"
+crate = "with step 6"
+lines = 0
+
+[[clean_room]]
+id = "CP-13"
+after_wave = "step 6"
+what = "the networks' inference core's clean room (N-01, larmorx-nn)"
+crate = "with step 6"
+lines = 0

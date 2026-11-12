@@ -22,6 +22,7 @@ from pathlib import Path
 import numpy as np
 
 from larmorx_validation.evidence import common, core
+from larmorx_validation.evidence import present as present_
 from larmorx_validation.figures import cache as fcache
 from larmorx_validation.figures import records
 
@@ -1073,7 +1074,7 @@ def export(ctx: core.Context) -> dict:
     a40 = _a40_spec(ctx)
     a40_example = corrections.example(ctx, a40, reg)
     tables, table_sources = _a40_tables(ctx)
-    return {
+    doc = {
         "schema": 1,
         "tool": TOOL,
         "title": "N4BiasFieldCorrection",
@@ -1107,6 +1108,72 @@ def export(ctx: core.Context) -> dict:
         "tables": tables + ([inventory] if inventory else []),
         "examples": [_example(ctx, e), a40_example, *ants_panel.examples(ctx, TOOL)],
     }
+    return present(doc)
+
+
+#: The page in the writing guide's words (evidence/present.py). The guide's order puts the row
+#: against correctly rounded maths after the one against ANTs as built, so the reasons name it.
+PAGE = present_.Page(
+    software="ANTs",
+    program="N4BiasFieldCorrection",
+    version="2.6.5",
+    texts=[
+        (r"\((?:the row above|next row)\)", "(the row against correctly rounded maths)"),
+        (r"\(the row larmorx default − reproduce mode\)", "(the row replica, fix − reproduce)"),
+    ],
+)
+
+#: Each worked example's "What this shows" line and the verdict beside it; the data panel's
+#: lines are written from their own verdicts (present.panel_shows).
+SHOWS = {
+    "final-n4": (
+        "In `reproduce` the replica gives ANTs' output at one thread with correctly rounded "
+        "maths, bit for bit, at 1 and at 12 threads; ANTs as built differs from it only where "
+        "glibc's maths is not correctly rounded (largest difference 0.031). fMRIPrep's own "
+        "output, ANTs at 8 threads, differs from both as ANTs differs from itself between "
+        "thread counts. The default, `fix`, leaves out the few zero voxels this call's weight "
+        "image includes (ANTS-40).",
+        ["lx-ants1"],
+    ),
+    "ants-40": (
+        "ANTs' bias field on this 7 T template is flat, 1.0000 to 1.0002: the 43 negative "
+        "voxels N4 uses stretch its histogram, and nothing is corrected. The replica's "
+        "default, `fix`, leaves them out (ANTS-40), and its field spans 0.485 to 1.157; in "
+        "`reproduce` it gives ANTs' output bit for bit with correctly rounded maths.",
+        ["fix-ants"],
+    ),
+}
+TITLES = {"final-n4": "fMRIPrep's final N4 of a real T1w"}
+
+
+def present(doc: dict) -> dict:
+    """N4's page in the writing guide's words and order: texts, ports and order only."""
+    for ex in doc["examples"]:
+        if ex["id"] in SHOWS:
+            shows, verdicts = SHOWS[ex["id"]]
+        else:
+            shows, verdicts = present_.panel_shows(PAGE, ex)
+        present_.example(PAGE, ex, shows=shows, verdicts=verdicts, title=TITLES.get(ex["id"]))
+    for im in doc["implementations"]:
+        present_.implementation(PAGE, im, "standard comparison and data panel")
+    present_.speed(
+        PAGE,
+        doc.get("speed"),
+        "Seconds for the whole command (reading, N4, writing), the median of repeated runs, on "
+        "a log scale. The factor is how many times faster the replica is than ANTs, both on "
+        "one thread.",
+    )
+    b = doc.get("band")
+    if b:
+        b["title"] = (
+            "Variability, the replica against the original divided by the original against "
+            f"itself between thread counts: {present_.original_name(PAGE)}, the "
+            f"{len({r['case'] for r in b['rows']})} cases that differ from it as built (log scale)"
+        )
+        b["note"] = present_.text(PAGE, b.get("note"))
+        b["port"] = PAGE.port
+    present_.random_testing(PAGE, doc, {"port": "replica"})
+    return present_.finish(PAGE, doc)
 
 
 def cases_for(cases: list[dict], impl: str) -> list[dict]:

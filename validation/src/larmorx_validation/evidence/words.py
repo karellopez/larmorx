@@ -57,6 +57,7 @@ _REWORD: list[tuple[str, str, str]] = [
     (r"\bThe default mode\b", "The default, `fix`,", "The default, fix,"),
     (r"\bthe default mode\b", "the default, `fix`,", "the default, fix,"),
     (r"\bits default mode\b", "its default, `fix`,", "its default, fix,"),
+    (r"\bIts default mode\b", "Its default, `fix`,", "Its default, fix,"),
     (r"'s default mode\b", "'s default, `fix`,", "'s default, fix,"),
     (r"\bdefault mode\b", "`fix`, the default", "fix, the default"),
     (r"\bfMRIPrep oracle run's\b", "fMRIPrep run's", "fMRIPrep run's"),
@@ -210,6 +211,7 @@ def example(
     shows: str,
     verdicts: list[str],
     rank: dict[str, float] | None = None,
+    runs: dict[str, str] | None = None,
 ) -> dict:
     """One worked example in the guide's words and order.
 
@@ -220,7 +222,8 @@ def example(
     its comparisons, in the order shown; every comparison in exactly one. ``shows``: the "What
     this shows" sentence; ``verdicts``: the comparisons whose verdicts stand beside it, one per
     port. ``rank``: a panel's place within its port where the list's order is not the guide's
-    (an original's other builds after its versions)."""
+    (an original's other builds after its versions). ``runs``: the port of a run a comparison
+    names that the example does not show as a panel (ANTs at 2 threads in a thread band)."""
     pid = [p["id"] for p in ex["panels"]]
     did = [d["id"] for d in ex["diffs"]]
     if set(panels) != set(pid):
@@ -243,7 +246,15 @@ def example(
         p["label"] = label
         if sub is not None:
             p["sub"] = sub
+    for run, port in (runs or {}).items():
+        if run in port_of:
+            raise ValueError(f"{ex['id']}: {run} is a panel, not a run without one")
+        if port not in PORT_ORDER:
+            raise ValueError(f"{ex['id']}: run {run} has no port")
+        port_of[run] = port
     for d in ex["diffs"]:
+        if d["a"] not in port_of or d["b"] not in port_of:
+            raise ValueError(f"{ex['id']}: comparison {d['id']} names a run without a port")
         d["label"], d["role_label"] = diffs[d["id"]]
         d["port"] = port_of[d["a"]]
         d["reason"] = reword(d.get("reason"))

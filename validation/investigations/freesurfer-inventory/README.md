@@ -40,3 +40,11 @@ Their results are in `docs/freesurfer/` (closed too).
 - `report_code.py`: code.md's tables (Markdown on standard output) and `docs/freesurfer/code.toml`
   from the build graph and the three call-graph views (full, core, core calls-only); the commands
   in code.md §6.
+- `licences.py`: the third-party audit's first pass. For every file the programs on a default path
+  are built from (the call graph's full view, the targets' sources, the scripts and Python
+  programs), the notice in its first 80 lines and every other line that names another origin
+  (FreeSurfer's own copyright lines excluded). Used for `docs/freesurfer/third-party.md`.
+
+      python -P validation/investigations/freesurfer-inventory/licences.py \
+          <workspace>/tags/freesurfer-8.2.0 docs/freesurfer/programs.toml <scratch>/cmake.json \
+          <scratch>/full.json <scratch>/core.json --json <scratch>/licences.json

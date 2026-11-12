@@ -50,12 +50,21 @@ CORE_FILES = {
     "crates/larmorx-core/src/math/sincos_glibc_tables.rs": ("GNU", "sincos_glibc"),
     "crates/larmorx-core/src/math/tanh_glibc.rs": ("GNU", "tanh_glibc"),
 }
+#: Clean-room module folders of crates that are not clean-room crates (2026-11-13: FreeSurfer's borrowed pieces and
+#: glibc's random numbers, each a module folder with its own mod.rs, from specs/ranlux.md, specs/burkardt-spline.md and
+#: specs/glibc-random.md). GSL's and Burkardt's sources are FreeSurfer's family (R19), as FreeSurfer's copy of them is.
+CORE_DIRS = {
+    "crates/larmorx-core/src/ranlux/": ("FreeSurfer", "ranlux"),
+    "crates/larmorx-core/src/cubic_spline/": ("FreeSurfer", "cubic_spline"),
+    "crates/larmorx-core/src/glibc_random/": ("GNU", "glibc_random"),
+}
 CLEANROOM_PATHS = (
     "crates/larmorx-afni",
     "crates/larmorx-mri",
     "crates/larmorx-fsl",
     "crates/larmorx-tedana",
     *CORE_FILES,
+    *(d.rstrip("/") for d in CORE_DIRS),
 )
 #: larmorx-fsl's modules and programs by tool (the first match wins; the rest is shared code).
 FSL_TOOLS = (
@@ -93,6 +102,18 @@ TOOL_NAMES = {
     ("GNU", "cbrtf_glibc"): "cbrtf with glibc 2.35's bits (larmorx-core)",
     ("GNU", "sincos_glibc"): "sin, cos, sincos with glibc 2.35's bits (larmorx-core)",
     ("GNU", "tanh_glibc"): "tanh with glibc 2.35's bits (larmorx-core, from fdlibm)",
+    (
+        "FreeSurfer",
+        "ranlux",
+    ): "RANLUX389 and the random distributions FreeSurfer uses (larmorx-core)",
+    (
+        "FreeSurfer",
+        "cubic_spline",
+    ): "the cubic spline FreeSurfer's mri_normalize uses (larmorx-core)",
+    (
+        "GNU",
+        "glibc_random",
+    ): "rand, srand, random and srandom with glibc 2.35's streams (larmorx-core)",
 }
 
 
@@ -100,6 +121,9 @@ def tool_of(rel: str) -> tuple[str, str] | None:
     """The (family, tool) a repository path's clean-room code belongs to, or None."""
     if rel in CORE_FILES:
         return CORE_FILES[rel]
+    for d, tool in CORE_DIRS.items():
+        if rel.startswith(d):
+            return tool
     m = re.match(r"^crates/larmorx-(afni|mri|fsl|tedana)(?:/(.*))?$", rel)
     if not m:
         return None

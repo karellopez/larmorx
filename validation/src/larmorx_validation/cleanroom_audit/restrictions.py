@@ -567,6 +567,12 @@ def _classify_repo(rel: str, op: str) -> Class:
                 # the recorder of the reference runs (written after reading the inventory; its README documents
                 # recon-all's steps): run, never read (FreeSurfer's preparation, 2026-11-12)
                 "validation/investigations/freesurfer-oracle/",
+                # the spec writer's own models and inventories of FreeSurfer's borrowed pieces (track D, 2026-11-12):
+                # closed to the clean-room implementers of specs/ranlux.md and specs/burkardt-spline.md; the probe
+                # folder freesurfer-ranlux-probe/ holds calls only and stays open
+                "validation/investigations/freesurfer-ranlux-spec-check/",
+                "validation/investigations/freesurfer-spline-spec-check/",
+                "validation/investigations/freesurfer-libm-inventory/",
                 # the replay tool and the unit oracle's harness, written from FreeSurfer's source: a FreeSurfer
                 # clean-room implementer runs them (black box) but never reads them (2026-11-12)
                 "validation/src/larmorx_validation/freesurfer/",
@@ -576,6 +582,9 @@ def _classify_repo(rel: str, op: str) -> Class:
         or re.match(r"^docs/findings/freesurfer-[^/]+\.md$", rel)
     ) and not rel.endswith("-clean-room.md"):
         return restricted("R11", "FreeSurfer", op, rel)
+    # the spec writer's model of specs/glibc-random.md (track D, 2026-11-12; it read glibc's random.c): closed
+    if rel.startswith("validation/investigations/glibc-random-spec-check/"):
+        return restricted("R11", "GNU", op, rel)
     m = re.match(r"^docs/findings/((?:fsl|afni)-[^/]+\.md)$", rel)
     # a clean room's own findings: "-original.md", renamed "-clean-room.md" by the documentation revision (2026-11-12)
     if m and not m[1].endswith(("-original.md", "-clean-room.md")):

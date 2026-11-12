@@ -9541,8 +9541,8 @@ def _conf_compcor(prefix: str, r: Any) -> dict[str, Any]:
 )
 def _(ctx: Context) -> dict[str, Any]:
     """nipype's CompCor interfaces on the 4-volume series: ``ACompCor`` over the union of two
-    masks with the Legendre pre-filter of degree 2, two components, the first volume ignored,
-    every file saved; ``TCompCor`` with the cosine pre-filter (the repetition time given), its
+    masks with the Legendre pre-filter of degree 1, two components, the first volume ignored
+    (three left: a degree 2 would fit them exactly), every file saved; ``TCompCor`` with the cosine pre-filter (the repetition time given), its
     high-variance mask at the 10 % threshold and 70 % of the variance; ``CompCor`` without a
     pre-filter over the intersection, every component, the repetition time from the header;
     each mask apart (``"none"``) with an empty third (PIPE-44 and PIPE-55 with
@@ -9556,7 +9556,7 @@ def _(ctx: Context) -> dict[str, Any]:
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         a = lx.confounds.acompcor(
-            series, rois, merge_method="union", num_components=2, regress_poly_degree=2,
+            series, rois, merge_method="union", num_components=2, regress_poly_degree=1,
             ignore_initial_volumes=1, save_pre_filter=True, save_metadata="meta.tsv",
             components_file="a.tsv", out_dir=_conf_dir(ctx, "acompcor"), n_threads=t,
         )  # fmt: skip

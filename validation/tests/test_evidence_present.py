@@ -433,3 +433,30 @@ def test_a_port_run_in_a_variability_comparison_is_refused():
     ex["diffs"][3]["a"] = "larmorx-8"
     with pytest.raises(ValueError, match="variability comparison"):
         _present(ex)
+
+
+def test_a_page_of_a_part_of_its_software():
+    """A page whose original is a part of its software, not a program (ITK's transform files):
+    its titles name the part after the version; the columns and texts name the port."""
+    page = present.Page("ITK", "", "5.4.5", part="transform files")
+    assert present.original_name(page) == "ITK 5.4.5's transform files"
+    im = {"id": "port", "label": "larmorx (port)", "short": "port"}
+    present.implementation(page, im, "standard comparison")
+    assert im["title"] == "Agreement, replica against the original: ITK 5.4.5's transform files"
+    doc = {
+        "cases": [
+            {
+                "category": "errors",
+                "description": "written by h5py, read by ITK, refused by larmorx: virtual",
+                "command": "",
+                "results": {"port": {"reason": "ITK's HDF5 follows it; larmorx refuses the file"}},
+            }
+        ],
+        "tables": [],
+    }
+    present.finish(page, doc, {"errors": "files refused"})
+    assert doc["cases"][0]["description"].endswith("refused by the replica: virtual")
+    assert doc["cases"][0]["results"]["port"]["reason"].endswith("the replica refuses the file")
+    assert doc["category_labels"] == {"errors": "files refused"}
+    with pytest.raises(ValueError, match="without its program"):
+        present.original_name(present.Page("ITK", "", "5.4.5"))

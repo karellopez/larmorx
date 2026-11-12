@@ -35,6 +35,9 @@ class Page:
     #: a page of several programs (ImageMath and the filters): their names, for the titles
     #: of what covers them all; ``program`` is then empty on the page and named per example
     programs: tuple[str, ...] = ()
+    #: a page whose original is a part of its software, not a program (ITK's "transform
+    #: files"): the titles name it after the version, "ITK 5.4.5's transform files"
+    part: str = ""
 
 
 #: The oracle's words in texts (the guide's section 1): fMRIPrep's runs and the builds of the
@@ -611,7 +614,10 @@ def dots(page: Page, s: dict | None, title: str, labels: dict[str, str]) -> None
 
 
 def original_name(page: Page, code: bool = True) -> str:
-    """The original in a title: "ANTs `N4BiasFieldCorrection` 2.6.5"."""
+    """The original in a title: "ANTs `N4BiasFieldCorrection` 2.6.5"; a part of the software
+    (:attr:`Page.part`): "ITK 5.4.5's transform files"."""
+    if page.part and not page.program and not page.programs:
+        return f"{page.software} {page.version}'s {page.part}"
     names = [page.program] if page.program else list(page.programs)
     if not names:
         raise ValueError("a page without its program")

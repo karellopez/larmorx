@@ -17,6 +17,8 @@
 //!   closed-form determinants and inverses of small matrices.
 //! - [`numpy`]: numpy's sums, means, variances, percentiles and weighted averages over one axis
 //!   in numpy's own order (and SciPy's `scoreatpercentile`), for replicas of Python programs.
+//! - [`x87`]: the x87's 80-bit extended arithmetic (`long double` on x86-64 Linux) in software,
+//!   bit-exact with the hardware, for replicas of programs that compute in `long double`.
 //! - [`python`]: CPython's `argparse` (parsing, usage, help, errors), `textwrap` and number
 //!   parsing and printing, for replicas of Python programs' command lines and messages.
 // No unsafe code, except the audited CPU-feature dispatch in `math` and `numpy` (`dot`, `gemm`)
@@ -44,6 +46,7 @@ pub mod vnl_fixed;
 pub mod vnl_qr;
 pub mod vnl_svd;
 pub mod vnl_svd_f32;
+pub mod x87;
 
 pub use affine::{Affine, SingularAffine};
 pub use array::DynArray;

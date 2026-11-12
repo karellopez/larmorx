@@ -1,15 +1,17 @@
-# FreeSurfer 8.2.0's RANLUX389 and its distributions, as a black box
+# FreeSurfer 8.2.0's RANLUX389, its distributions and its cubic spline, as a black box
 
 The probes behind the **(observed)** marks of `specs/ranlux.md` (FreeSurfer's random generator and
 the distributions `mri_coreg`'s dithering, `mri_volsynth`, `mri_glmfit` and `mris_expand` draw
-from). **Open to the clean-room implementer of that spec**: the files here hold only calls of
+from) and `specs/burkardt-spline.md` (the spline of `mri_normalize`). **Open to the clean-room
+implementers of those specs**: the files here hold only calls of
 FreeSurfer's functions by name and a comparison loop, no FreeSurfer or GSL code; the implementer may
 read, build and run them (black-box runs of the original, `docs/porting-guide.md` §1).
 
 | File | What it is |
 |---|---|
 | `fs_rng_probe.cpp` | calls FreeSurfer's generator (`sc_rng_alloc`, `sc_rng_set`, `sc_rng_get`), its uniform deviates, every distribution and the random-field layer (`RFspecInit`, `RFdrawVal`, as `mri_coreg` calls them), linked against the unit oracle's `libutils.a`; prints integers in decimal and doubles as the 16 hex digits of their bits. Commands: `raw <seed> <count>`, `dist <name> <seed> <count> [p1 [p2]]`, `rf <name> <seed> <count> [p1 [p2]]`, `mixed <seed> <count>` (one stream, a fixed rotation of every distribution), `zero-seeds <first> <last>` (the 32-bit seeds whose seeded state is all zero, §2.4 of the spec) |
-| `build.sh` | builds the probe with the unit oracle's compiler (Ubuntu's GCC 8.4.0) and FreeSurfer's flags against `<workspace>/oracles/freesurfer-8.2.0-unit` (queue item 3.1-02): `build.sh <workspace> <output>` |
+| `fs_spline_probe.cpp` | the same for FreeSurfer's cubic spline (`specs/burkardt-spline.md`): `SplineCubicSet`, `SplineCubicValue`, `d3_np_fs`, `OpenSpline`, `OpenSplint`; commands `cases` (cases from standard input, floats as bits; derivative outputs start as the sentinel `7fc00bad` so unwritten ones show), `d3` (systems from standard input), `set1 <n> <ibcbeg> <ibcend> t... y...` (one call, for the error messages and exit status) |
+| `build.sh` | builds a probe with the unit oracle's compiler (Ubuntu's GCC 8.4.0) and FreeSurfer's flags against `<workspace>/oracles/freesurfer-8.2.0-unit` (queue item 3.1-02): `build.sh <workspace> <output> [fs_spline_probe.cpp]` (default `fs_rng_probe.cpp`) |
 | `refs.sh` | prints the reference numbers the spec quotes (§2.5's streams, §10.2's hashes and first draws): `refs.sh <fs_rng_probe>` |
 | `volsynth_compare.py` | runs the official `mri_volsynth` (six random fields) and compares its float32 voxels with the probe's draws in FreeSurfer's field order (the spec's §10.4): `python -P volsynth_compare.py <FREESURFER_HOME> <FS_LICENSE> <fs_rng_probe> <scratch folder>` |
 | `run_zero.sh` | the official `mri_volsynth` with the all-zero seed 2147483563 (FS-101) and a negative chi-squared degree of freedom (FS-100), each stopped after 20 s: `run_zero.sh <FREESURFER_HOME> <FS_LICENSE> <output folder>` |

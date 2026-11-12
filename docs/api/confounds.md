@@ -5,8 +5,9 @@ the same in every environment), niworkflows 1.15.4's and fMRIPrep 25.2.7's confo
 with the arithmetic of the libraries they call (numpy, SciPy, nitime), bit for bit
 (`crates/larmorx-confounds`). A port in the main package; a clean-room original comes later (the
 user, 2026-11-06 and 2026-11-11). The confounds' part fills this page step by step: today nipype's
-DVARS, CompCor, TSNR, NonSteadyStateDetector and FramewiseDisplacement (the whole of nipype's
-`algorithms/confounds.py` but `FramewiseDisplacement`'s `NIPY` source and the plots).
+DVARS, CompCor, TSNR, NonSteadyStateDetector and FramewiseDisplacement with its `NIPY` source
+(nipy 0.6.1's `to_matrix44` and `aff2euler`): the whole of nipype's `algorithms/confounds.py` but
+the plots.
 
 **Status: `experimental`** (checked bit for bit against nipype, nitime, SciPy and numpy in the
 three environments, against fMRIPrep's own DVARS and CompCor files and on the oracle runs' raw
@@ -174,17 +175,65 @@ median a z-score of 0.
 
 | larmorx | nipype | Notes |
 |---|---|---|
-| `framewise_displacement(in_file, parameter_source, radius=50.0, *, out_file="fd_power_2012.txt", out_figure="fd_power_2012.pdf", series_tr=None, save_plot=False, normalize=False, figdpi=100, figsize=(11.7, 2.3), out_dir=".", numpy_version="2.5.4")` → `FramewiseDisplacementResult(out_file, out_figure, fd_average, fd)` | `FramewiseDisplacement(...)` → `out_file`, `out_figure`, `fd_average` | the file in `out_dir` |
+| `framewise_displacement(in_file, parameter_source, radius=50.0, *, out_file="fd_power_2012.txt", out_figure="fd_power_2012.pdf", series_tr=None, save_plot=False, normalize=False, figdpi=100, figsize=(11.7, 2.3), out_dir=".", numpy_version="2.5.4", upstream_defects="fix")` → `FramewiseDisplacementResult(out_file, out_figure, fd_average, fd)` | `FramewiseDisplacement(...)` → `out_file`, `out_figure`, `fd_average` | the file in `out_dir` |
 | `in_file` | the same | a text table, one row of motion parameters per volume, read with numpy's `loadtxt`; one row or one column: numpy's `AxisError`, as nipype |
-| `parameter_source` | the same | `"FSL"`, `"AFNI"`, `"SPM"`, `"FSFAST"` (traits' `Enum`: the exact spelling); each row through `normalize_mc_params`: SPM's order (translations in mm, rotations in radians); too few columns: numpy's `IndexError`, as nipype. `"NIPY"` (nipy's rotation vectors through nipy's `to_matrix44` and `aff2euler`; nipype raises `ModuleNotFoundError` where nipy is not installed, as in every environment here): not ported yet (`NotImplementedError`) |
+| `parameter_source` | the same | `"FSL"`, `"AFNI"`, `"SPM"`, `"FSFAST"`, `"NIPY"` (traits' `Enum`: the exact spelling); each row through `normalize_mc_params`: SPM's order (translations in mm, rotations in radians); too few columns: numpy's `IndexError`, as nipype. `"NIPY"`: nipy's affine parameters (below); nipype imports nipy's functions from nipy, which it does not install (its `nipy` extra: `ModuleNotFoundError` without it, as in every environment here); larmorx needs no nipy |
 | `radius` | the same | the rotations' differences times `radius` (mm) |
 | `out_file` | the same | numpy's `savetxt` (`%.18e`, one value per line, the header `FramewiseDisplacement`) |
-| `numpy_version` | the environment's numpy | `np.abs(diff).sum(axis=1)` and `mean()` (numpy 2.2 sums more than 8,192 values in chunks) |
+| `numpy_version` | the environment's numpy | `np.abs(diff).sum(axis=1)` and `mean()` (numpy 2.2 sums more than 8,192 values in chunks); for `"NIPY"` also the LAPACK of its 3 × 3 SVDs (3.12.1 for numpy 2.5, 3.12.0 before) |
+| `upstream_defects` | – | `"NIPY"` only: the C library's functions and PIPE-60 (below) |
 | `series_tr`, `normalize`, `figdpi`, `figsize`, `out_figure`, `save_plot` | the same | only nipype's plot uses them; `save_plot=True` comes with larmorprepx's reports (`NotImplementedError`) |
-| `normalize_mc_params(params, source)` | `nipype.utils.misc.normalize_mc_params` | one row: FSL's rotations first (reordered), AFNI's and FS-FAST's degrees to radians (a seventh column means a leading index column, as in `3dvolreg -dfile`), any other source unchanged; `source` in any case |
+| `normalize_mc_params(params, source, *, numpy_version="2.5.4", upstream_defects="fix")` | `nipype.utils.misc.normalize_mc_params` | one row: FSL's rotations first (reordered), AFNI's and FS-FAST's degrees to radians (a seventh column means a leading index column, as in `3dvolreg -dfile`), `"NIPY"` nipy's affine parameters (below), any other source unchanged; `source` in any case |
 
 fMRIPrep computes its framewise displacement with its own interface (pandas over gzipped tables)
 from its own motion parameters; nipype's `FramewiseDisplacement` is this one.
+
+**The `NIPY` source** (nipy 0.6.1, BSD-3-Clause, with nibabel's `mat2euler`, MIT;
+`crates/larmorx-confounds/src/nipy.rs`): a row of nipy's affine parameters (translations in mm, a
+rotation vector in radians, then an isotropic scale, or three log-scales and a second rotation
+vector) becomes `[tx, ty, tz, x, y, z]`: `to_matrix44(params)`'s translations
+(`threshold(t[0:3], 1e10)`) and nibabel's Euler angles of the polar factor of its normalized
+rotation-and-scale part (`aff2euler`), bit for bit as nipy computes them with numpy: the rotation
+by Rodrigues' formula (its Taylor form at or below `1e-30` radians, the identity above `1e10 · 2π`),
+6 values a rigid transform, 7 that times the scale `t[6]`, 12 or more `R · diag(exp(threshold(t[6:9],
+log 1e10))) · Q`; numpy's pairwise sums, OpenBLAS's Haswell `dgemm`, `dgetrf`'s determinant sign
+(the first column negated where it is negative) and `dgesdd`'s polar factor `P · Qs` of the 3 × 3
+matrices; nibabel's `cy` threshold `4 · eps` (gimbal lock: `x = 0`). As nipy:
+
+- 3 to 5 values, or 8 to 11: numpy's `IndexError: index 2 is out of bounds for axis 0 with size k`
+  where nipy indexes a rotation vector past its end; but a vector of one or two values whose norm is
+  above `1e10 · 2π` is the identity before any index, so 10 or 11 values with such a second vector
+  are a valid row (and 4 or 5 such values stop at the second, empty, vector: size 0);
+- a NaN in a rotation vector, a scale (7 values) that is zero, infinite or NaN, a NaN log-scale:
+  numpy's `LinAlgError: SVD did not converge` (numpy's `RuntimeWarning`s on the way, `invalid value
+  encountered in divide` and `in det`, are not repeated); an infinite rotation vector is the
+  identity; a NaN translation stays in its column; huge translations and log-scales are clamped;
+- `FramewiseDisplacement` stops at the first such row, with the same error.
+
+**The C library's functions.** numpy's float64 `sin` and `cos` are glibc's; its `exp` (of the
+log-scales) glibc's on x86-64 CPUs without AVX-512 and Intel's SVML kernel with it (NP-04);
+CPython's `math.atan2` glibc's. By default larmorx takes the correctly rounded `sin`, `cos` and `exp`
+(CORE-MATH's); `upstream_defects="reproduce"` takes glibc 2.35's (GLIBC-07; numpy's path without
+AVX-512, as for tedana's `t2smap`). `atan2` is correctly rounded in both modes (glibc's is not on
+about 0.1 % of uniform pairs: under `reproduce` such a row's angle can differ from nipype's in its
+last bit, an expected difference the check counts with its cause). GLIBC-07 is named exactly: when
+the other mode's functions change a row's parameters (`normalize_mc_params`) or the displacement
+(`framewise_displacement`).
+
+**Rows of another type.** A float64 row (what `FramewiseDisplacement` passes: `np.loadtxt`'s
+type) takes larmorx's own arithmetic, the same bits on every platform. An integer row whose squared
+values are at most 2^25 (exact in float64) is taken the same way, with the same bits as nipy's
+integer arithmetic. Any other input (float32, float16, boolean, larger integers, an array that is
+not one row) follows nipy's own numpy code in its type (`larmorx.confounds._nipy`), with this
+platform's numpy and C library, as nipype does, in both modes (nipy computes a float32 rotation in
+float32; a boolean row without rotation stops with numpy's `TypeError`, as nipy's Taylor form
+negates it).
+
+Corrected by default (`upstream_defects="reproduce"` gives nipy's result):
+
+| ID | nipy does | larmorx by default |
+|---|---|---|
+| PIPE-60 | squares an integer rotation vector in its own type, which wraps around silently (an int8 component from 12, int16 from 182, int32 from 46,341; int64 when the sum passes 2^63): another rotation, or numpy's `LinAlgError` | the angle from the exact sum of squares (a notice names it in both modes) |
 
 ## niworkflows' `RobustACompCor` and `RobustTCompCor`
 
@@ -197,12 +246,16 @@ about 520 s of sleeps, then the last error); larmorx's computation is determinis
 would give the same error, which larmorx raises at once.
 
 **Validation** (`validation/investigations/confounds/check_nipype_misc.py`, sections `tsnr`,
-`nssd`, `fd`, `robust`, `real`; numpy 2.5.4 / nipype 1.12.0 / niworkflows 1.15.4, numpy 2.3.5 /
+`nssd`, `fd`, `nipy`, `robust`, `real`; numpy 2.5.4 / nipype 1.12.0 / niworkflows 1.15.4, numpy 2.3.5 /
 niworkflows 1.15.3 and numpy 2.2.6 / niworkflows 1.15.2 inside fMRIPrep 25.2.6's image): every file
 and value bit for bit or the same error, with `upstream_defects="reproduce"`; the default equal to
 `reproduce` wherever no notice is raised, and PIPE-51's files equal to nipype's code with its
 float32 switch made effective; the oracle runs' raw BOLD series (int16, big-endian int16, uint16,
 float32; up to 600 volumes) through `TSNR` and `NonSteadyStateDetector`, and real motion
 parameters (fMRIPrep's own as SPM and FSL tables, `mcflirt`'s and `3dvolreg`'s files) through
-`FramewiseDisplacement`.
+`FramewiseDisplacement`. The `NIPY` source against nipype running nipy 0.6.1's own functions
+(compiled from the tag by `nipy_inject.py`; nipy itself is installed nowhere) with glibc's `exp`
+and a correctly rounded `atan2` (`reproduce`) and with every function correctly rounded (CORE-MATH's
+build: the default); nipype as this machine runs it is counted apart, each difference with its
+cause (`exp`: NP-04; `atan2`: D4), and with numpy's AVX-512 dispatch off only `atan2`'s remain.
 

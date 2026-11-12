@@ -302,7 +302,12 @@ pub fn normalize_rows(
     release: LapackRelease,
     mode: UpstreamDefects,
 ) -> Result<NipyRows, RowError> {
-    assert_eq!(rows.len(), n * k, "normalize_rows: {} values for {n} × {k}", rows.len());
+    assert_eq!(
+        rows.len(),
+        n * k,
+        "normalize_rows: {} values for {n} × {k}",
+        rows.len()
+    );
     let other_mode = if mode.reproduce() {
         UpstreamDefects::Fix
     } else {
@@ -356,16 +361,33 @@ mod tests {
         }
         // The identity: zeros (x and z are -0: atan2(-0, 1), as nipype gives them).
         let p = normalize(&[0.0; 6], LapackRelease::default(), &libm()).unwrap();
-        assert_eq!(p.map(f64::to_bits), [0.0, 0.0, 0.0, -0.0, 0.0, -0.0].map(f64::to_bits));
+        assert_eq!(
+            p.map(f64::to_bits),
+            [0.0, 0.0, 0.0, -0.0, 0.0, -0.0].map(f64::to_bits)
+        );
     }
 
     #[test]
     fn lengths_nipy_cannot_index_stop_with_numpys_index_error() {
         let l = libm();
         let rel = LapackRelease::default();
-        for (k, size) in [(0, 0), (2, 0), (3, 0), (4, 1), (5, 2), (8, 0), (9, 0), (10, 1), (11, 2)] {
+        for (k, size) in [
+            (0, 0),
+            (2, 0),
+            (3, 0),
+            (4, 1),
+            (5, 2),
+            (8, 0),
+            (9, 0),
+            (10, 1),
+            (11, 2),
+        ] {
             let row = vec![0.1; k];
-            assert_eq!(normalize(&row, rel, &l), Err(NipyError::Index(size)), "{k} values");
+            assert_eq!(
+                normalize(&row, rel, &l),
+                Err(NipyError::Index(size)),
+                "{k} values"
+            );
         }
         // A rotation vector of one value above MAX_ANGLE is the identity before any index: the
         // row of four values then stops at the second, empty, rotation vector.
@@ -408,7 +430,9 @@ mod tests {
         // Translations and log-scales are bounded.
         let p = normalize(&[1e300, -1e300, 0.0, 0.0, 0.0, 0.0], rel, &l).unwrap();
         assert_eq!(&p[..2], &[MAX_DIST, -MAX_DIST]);
-        let row = [0.0, 0.0, 0.0, 0.1, 0.0, 0.0, 400.0, -400.0, 0.0, 0.0, 0.0, 0.2];
+        let row = [
+            0.0, 0.0, 0.0, 0.1, 0.0, 0.0, 400.0, -400.0, 0.0, 0.0, 0.0, 0.2,
+        ];
         assert!(normalize(&row, rel, &l).is_ok());
     }
 
@@ -426,7 +450,20 @@ mod tests {
 
     #[test]
     fn rows_report_the_first_row_that_stops_and_the_other_mode() {
-        let rows = [0.0, 0.0, 0.0, 0.5, 0.25, 0.125, 0.0, 0.0, 0.0, f64::NAN, 0.0, 0.0];
+        let rows = [
+            0.0,
+            0.0,
+            0.0,
+            0.5,
+            0.25,
+            0.125,
+            0.0,
+            0.0,
+            0.0,
+            f64::NAN,
+            0.0,
+            0.0,
+        ];
         assert_eq!(
             normalize_rows(&rows, 2, 6, LapackRelease::default(), UpstreamDefects::Fix),
             Err(RowError {
@@ -451,8 +488,10 @@ mod tests {
                 .unwrap()
                 .params;
             match out.other {
-                Some(o) => assert_eq!(o.iter().map(|v| v.to_bits()).collect::<Vec<_>>(),
-                                      full.iter().map(|v| v.to_bits()).collect::<Vec<_>>()),
+                Some(o) => assert_eq!(
+                    o.iter().map(|v| v.to_bits()).collect::<Vec<_>>(),
+                    full.iter().map(|v| v.to_bits()).collect::<Vec<_>>()
+                ),
                 None => assert_eq!(out.params, full),
             }
         }

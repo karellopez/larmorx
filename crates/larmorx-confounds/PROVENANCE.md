@@ -94,6 +94,21 @@ larmorx's nibabel-compatible reader and writer (`larmorx_io::nifti::read_first_v
 |---|---|---|
 | `python/larmorx/confounds/tsnr.py` (`tsnr`, `TsnrResult`) | nipype 1.12.0 `TSNR` (`_run_interface`, `_list_outputs`); numpy 2.5.4 `numpy/_core/_methods.py` (`_mean`, `_var`, `_std`: the summation order of the series' memory), `numpy/lib/_type_check_impl.py` (`nan_to_num`); nibabel 5.4.2 `get_fdata`, `Nifti1Image(data, affine, header)` and `save` | Apache-2.0, BSD-3-Clause, MIT |
 | `python/larmorx/confounds/nonsteady.py` (`nonsteady_state_detector`, `NonSteadyStateResult`) | nipype 1.12.0 `NonSteadyStateDetector`, `is_outlier` (`larmorx.niworkflows.bold.is_outlier`); numpy 2.5.4 `mean(axis=0)` of a Fortran-ordered array (float32 in float32, integers in float64); nibabel 5.4.2 `dataobj[:, :, :, :50]` | Apache-2.0, BSD-3-Clause, MIT |
-| `python/larmorx/confounds/framewise.py` (`framewise_displacement`, `normalize_mc_params`, `FramewiseDisplacementResult`, `SOURCES`) | nipype 1.12.0 `FramewiseDisplacement` (`_run_interface`), `nipype/utils/misc.py` (`normalize_mc_params`, but its `NIPY` branch: not ported yet); numpy 2.5.4 `sum(axis=1)`, `mean()` (`_core.numpy_reduce`), and numpy's own `loadtxt`, `apply_along_axis`, `savetxt` | Apache-2.0, BSD-3-Clause |
+| `python/larmorx/confounds/framewise.py` (`framewise_displacement`, `normalize_mc_params`, `FramewiseDisplacementResult`, `SOURCES`) | nipype 1.12.0 `FramewiseDisplacement` (`_run_interface`), `nipype/utils/misc.py` (`normalize_mc_params`; its `NIPY` branch since relay 2f-ii-b, below); numpy 2.5.4 `sum(axis=1)`, `mean()` (`_core.numpy_reduce`), and numpy's own `loadtxt`, `apply_along_axis`, `savetxt` | Apache-2.0, BSD-3-Clause |
 | `python/larmorx/niworkflows/patches.py` (`robust_acompcor`, `robust_tcompcor`) | niworkflows 1.15.4 `interfaces/patches.py` (`RobustACompCor`, `RobustTCompCor`; their retries left out: PIPE-48) | Apache-2.0 |
 
+## Relay 2f-ii-b: `FramewiseDisplacement`'s `NIPY` source (`nipy`)
+
+nipype's `normalize_mc_params(params, "NIPY")` imports nipy's `to_matrix44` and `aff2euler`; nipy
+0.6.1 (the newest release, BSD-3-Clause, Copyright (c) 2006-2024, NIPY Developers) from its GitHub
+tag's tarball (`<workspace>/tags/nipy-0.6.1/`, SHA-256 `79babfd76618a3573a4d5920d1fe46829a19df92ff3b98efa16bd9a51f7a7610`:
+PyPI holds wheels only), and nibabel 5.4.2's `mat2euler` (MIT; the same function in 5.3.2, fMRIPrep
+25.2.6's). The notices are in `src/nipy.rs` and `python/larmorx/confounds/_nipy.py`.
+
+| larmorx | Upstream | Licence |
+|---|---|---|
+| `nipy::{threshold, rotation_vec2mat, to_matrix44, MAX_ANGLE, SMALL_ANGLE, MAX_DIST, LOG_MAX_DIST}` | nipy 0.6.1 `nipy/algorithms/registration/affine.py` (`threshold`, `rotation_vec2mat`, `to_matrix44` and the module's constants); numpy 2.5.4's pairwise sum (`larmorx_core::numpy::reduce::add_reduce`) and `np.dot` of 3 × 3 matrices (`larmorx_transform::numpy_linalg::matmul3`: OpenBLAS's Haswell `dgemm`); `sin`, `cos`, `exp` through `larmorx_core::math::Libm` (CORE-MATH's, or glibc 2.35's bits for `reproduce`: numpy's path without AVX-512) | BSD-3-Clause |
+| `nipy::aff2rot_zooms` | nipy 0.6.1 `nipy/algorithms/registration/scripting.py` (`aff2rot_zooms`); numpy 2.5.4 `sum(axis=0)` (`add_reduce_axis`), `linalg.det` (`numpy_linalg::det3_is_negative`), `linalg.svd` (`numpy_linalg::svd3`) | BSD-3-Clause |
+| `nipy::{mat2euler, py_atan2}` | nibabel 5.4.2 `nibabel/eulerangles.py` (`mat2euler`, from Ken Shoemake's `EulerAngles.c`); the special values CPython 3.12's `math.atan2` returns (a NaN, infinities, zeros: C99's Annex F values, checked against it), `atan2` correctly rounded (`larmorx_core::math::atan2`, CORE-MATH's) | MIT |
+| `nipy::{normalize, normalize_rows, NipyRows, NipyError, RowError}` | nipype 1.12.0 `nipype/utils/misc.py` (`normalize_mc_params`'s `NIPY` branch), numpy's `apply_along_axis` row by row (the first row that stops) | Apache-2.0 |
+| `python/larmorx/confounds/_nipy.py` | nipy 0.6.1's five functions and nibabel 5.4.2's `mat2euler`, copied (the rows larmorx's own arithmetic does not take: another type or shape; with larmorx's `exact_squares` switch, PIPE-60) | BSD-3-Clause, MIT |

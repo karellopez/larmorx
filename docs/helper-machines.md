@@ -1,4 +1,4 @@
-# Helper machines: the old laptop and the Windows laptop
+# Helper machines: the old laptop, the Windows laptop and the lab's server
 
 From 2026-10-27 the main machine is the new laptop (Alienware m18 R1, AMD, 32 threads, 124 GiB,
 Ubuntu 22.04; `docs/machine-move.md`). Every agent and every record runs there. The helpers
@@ -9,9 +9,11 @@ name in the main machine's `~/.ssh/config`:
 |---|---|---|
 | `old-laptop` | MSI GE75 Raider 8SF: Intel i7-8750H, 6 cores / 12 threads, 31 GiB, Ubuntu 22.04 | speed measurements on a quiet machine; a second Linux reference (Intel, where the main machine is AMD) |
 | `win-laptop` | the Windows laptop | Windows checks: the wheel, the golden suite, the command line |
-| (later) | the lab's server, 1 TB of memory, shared | only the jobs too large for the main machine (the 25 queued heavy random-testing cases) |
+| `<lab-server>` | the lab's server (since 2026-11-12): 64 cores / 128 threads, about 1 TB of memory, shared, Ubuntu 24.04, Apptainer | **extras only** (the user, 2026-11-12: "the server for now should serve us for complementary information"): more heads, repeated and one-thread runs, fMRIPrep with recon-all, heavy batches; our jobs together use up to 64 threads; nothing on the development path waits for it, and what a record uses is copied to the main machine first. Reached by key only; its name, address, account and folder are kept in the workspace's private notes, never in a repository |
 
 ## The old laptop
+
+**Nothing development depends on runs here** (the user, 2026-11-12: "This machine is very slow"): oracle runs, records and checks run on the main machine; the old laptop at most for quiet speed measurements when asked.
 
 ### What it holds
 

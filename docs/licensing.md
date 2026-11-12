@@ -42,13 +42,16 @@ and lives in the main package.
 ## Packages
 
 Each licence family is a separate set of crates, a separate Python wheel and a separate
-command-line binary. Code from different families is never linked into one binary.
+command-line binary. Code from different families is never linked into one binary; one wheel may hold separate
+programs of compatible families side by side (since 2026-11-12: `larmorx-nc` also holds CorTechs' non-commercial
+`tkregister2_cmdl` as its own program, with no FSL code; `larmorx-gpl` holds GSL's generators alone; the user,
+decision log "No waiting for permissions").
 
 | Package | Licence | Contents | Depends on |
 |---|---|---|---|
 | `larmorx` | Apache-2.0 | everything permissive, plus every original | – |
 | `larmorx-gpl` | GPL-3.0 (the program; its tedana-derived crate GPL-3.0-only, the rest GPL-3.0-or-later) | tedana's `t2smap` replica (since 2026-11-08: the `larmorx-gpl` program and its binary-only wheel); replicas of Workbench (none yet; until 2026-10-29 also AFNI's MCW files); development tools that keep or read glibc's LGPL code (never in the wheel) | `larmorx` (Apache-2.0 code may be included in GPL-3 works) |
-| `larmorx-nc` | the FSL Licence's terms (non-commercial, source included) | replicas of FSL | `larmorx` |
+| `larmorx-nc` | the FSL Licence's terms (non-commercial, source included); CorTechs' non-commercial terms for `tkregister2_cmdl` | replicas of FSL; `tkregister2_cmdl`'s replica as its own program (from FreeSurfer's part) | `larmorx` |
 | `larmorx-freesurfer` | FreeSurfer Software License | replicas of FreeSurfer | `larmorx` |
 
 - **`larmorx-gpl` and `larmorx-nc` are separate,** and neither may link the other. The FSL
@@ -273,7 +276,10 @@ command-line binary. Code from different families is never linked into one binar
   sources; FreeSurfer's licence text is not under the image's `/opt/freesurfer` either). A Rust
   translation of WashU's code is a derivative work that arrangement would not cover. Simplest
   way to settle it: ask Washington University (A. Z. Snyder's group) for written permission to
-  port the code and ship the atlases. To decide when the FreeSurfer track starts. `mni305.cor.mgz` is
+  port the code and ship the atlases. **Decided 2026-11-12 (the user, "No waiting for permissions"):** a replica of
+  the Talairach step in `larmorx-freesurfer` and a clean room in `larmorx`, both built now, with no request first;
+  publishing is the user's call (until then the replica stays on a local branch, never pushed); the atlases are
+  fetched at first use. `mni305.cor.mgz` is
   derived from MNI's MINC average (MNI's terms are permissive).
 - **Eigen (MPL-2.0), one file in `larmorx-core`** (decided by the user, 2026-10-23: kept).
   `crates/larmorx-core/src/eigen_sym.rs` translates Eigen 3.4.90's self-adjoint eigensolver (as

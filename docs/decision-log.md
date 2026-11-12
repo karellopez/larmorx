@@ -2459,3 +2459,13 @@ replica's gaps, the site, the handoff); the clean relays never read the replica 
   tools with FreeSurfer's code in `larmorx-freesurfer`), and an improved, optimised clean room of every piece goes into
   `larmorx`. Publishing is the user's decision; at that time the orchestrator lists the pieces that carry no licence
   (Washington University's 4dfp tools, Burkardt's 2006 routines) so the user decides knowingly. No emails before.
+
+## 2026-11-12: what `validated` means (the orchestrator, from the documentation revision's review)
+- Since the user's testing-depth decision (2026-10-28: each part tests "decent but not heavily extensive", the extensive
+  evidence in the final validation phase), a status means: **`experimental`**, its part's tests pass but the extensive
+  evidence is still to come (or a case still fails); **`validated`**, every case of its record passes **and** the extensive
+  evidence exists (for the ports marked validated before 2026-11-12 their own parts made it: their full tiers, panels,
+  random testing; for later ports the final validation phase makes it); **`stable`**, validated with a frozen API. The
+  37 records marked validated on 2026-11-12 keep their status (a frozen list, shown on the site); a new `validated`
+  needs its extensive evidence named (the site's export refuses it otherwise). The porting guide's status paragraph and
+  PLAN.md §4 follow at the documentation revision's merge.

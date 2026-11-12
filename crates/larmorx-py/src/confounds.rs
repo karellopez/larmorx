@@ -26,6 +26,7 @@ use pyo3::prelude::*;
 
 mod compcor;
 mod dvars;
+mod expansion;
 mod fft;
 mod gelsd;
 mod gesvd;
@@ -1155,5 +1156,6 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     compcor::register(m)?;
     nipy::register(m)?;
     pandas::register(m)?;
+    expansion::register(m)?;
     Ok(())
 }

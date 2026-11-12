@@ -2214,3 +2214,12 @@ def pandas_try_double(
     pandas 3.0.x or 2.2.x; the default missing values, the infinity words): ``(pandas' values,
     the correctly rounded values)``, or ``None`` when a token is not a float
     (``larmorx.confounds._tables`` is its caller)."""
+
+def numpy_power_f64(
+    a: np.ndarray, exponent: float, upstream_defects: str = "fix"
+) -> tuple[np.ndarray, int]:
+    """numpy's float64 ``a ** exponent`` for a non-negative integral exponent (niworkflows'
+    ``exponential_terms``): ``(values, differ)``, ``1`` for 0, ``x * x`` for 2, otherwise the
+    correctly rounded ``pow`` (``"fix"``) or glibc 2.35's (``"reproduce"``: numpy's on CPUs
+    without AVX-512), and how many values differ between the two (GLIBC-07)
+    (``larmorx.niworkflows.confounds`` is its caller)."""

@@ -22,6 +22,9 @@
 //! - [`nipy`]: nipype's `normalize_mc_params(params, "NIPY")`, nipy 0.6.1's `to_matrix44` and
 //!   `aff2euler` with nibabel's `mat2euler` (BSD-3-Clause and MIT: the notices in the module),
 //!   for `FramewiseDisplacement(parameter_source="NIPY")`.
+//! - [`expansion`]: numpy's float64 `a ** o` for the integer exponents of niworkflows'
+//!   `ExpandModel` (`exponential_terms`): `x * x` for 2, glibc's `pow` (`reproduce`) or the
+//!   correctly rounded one (the default, GLIBC-07) for the others.
 //! - [`pandas`]: pandas' default float parser of `read_csv` (`precise_xstrtod`, pandas 3.0.6
 //!   and 2.2.3; BSD-3-Clause: the notice in the module) with the correctly rounded reading of
 //!   the same texts (PD-01), for the tables fMRIPrep's confound steps read.
@@ -33,6 +36,7 @@
 
 pub mod compcor;
 pub mod dvars;
+pub mod expansion;
 pub mod nipy;
 pub mod nitime;
 pub mod pandas;

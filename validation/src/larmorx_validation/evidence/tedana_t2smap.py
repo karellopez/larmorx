@@ -1169,18 +1169,23 @@ def _t25_table(ctx: core.Context) -> dict:
             if off is None or on is None:
                 continue
             match = c[same][f][0]
+            verdict = "bit-identical" if match == 0 else "open"
             rows.append({
                 "head": f"{ds} {task}: `{f}`",
                 "sub": f"{on[1]:,} values; fMRIPrep's run {where}",
-                "cells": [common.cell(int(off[0]), "count"), common.cell(int(on[0]), "count")],
-                "verdict": "bit-identical" if match == 0 else "open",
+                "cells": [common.cell(int(off[0]), "count"), common.cell(int(on[0]), "count"),
+                          {"verdict": verdict,
+                           "text": f"kernels {'off' if same == 'off' else 'on'}, as in "
+                           "fMRIPrep's run" + ("" if match == 0 else f": {match:,} differ")}],
+                "verdict": verdict,
             })  # fmt: skip
     return common.table(
         "fmriprep-tedana-25",
         "fMRIPrep's own files against tedana 25.0.1 run here: values that differ",
         ["fMRIPrep's call and file",
          {"label": "numpy's AVX-512 kernels off", "num": True},
-         {"label": "on", "num": True}],
+         {"label": "on", "num": True},
+         "Run as fMRIPrep's was"],
         rows,
         note="tedana 25.0.1 in fMRIPrep 25.2.6's image (Apptainer, through the oracle-output "
         "cache) on fMRIPrep's own call of each oracle run, against the T2* map and the combined "

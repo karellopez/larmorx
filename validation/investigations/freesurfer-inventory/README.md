@@ -165,3 +165,17 @@ Their results are in `docs/freesurfer/` (closed too).
 
   `<core.json>` is `callgraph.py --core --json` (about 11 MB, regenerated as code.md §6 says). It
   exits 1 with `PROBLEM:` lines when a file has no module or a placement breaks a rule.
+- `cards.py`: sub-task 6 (relay 6), the porting cards `docs/freesurfer/cards/<program>.md` and
+  their index. Joins programs.toml, waves.toml, code.toml, third-party.toml, placement.toml,
+  data-files.toml, a table of variation.md's facts per program (in the tool), relay 4's strace
+  jobs (the subject files each program read and wrote) and the recordings' step outputs; extracts
+  the option names each program's parser compares from its own source files (C/C++ string
+  comparisons and `addArgument`, tcsh `case` labels, Python `add_argument`; older parsers compare
+  without the leading dash: candidates, which each replica item confirms). Run waves.py first:
+
+      python -P validation/investigations/freesurfer-inventory/cards.py \
+          --tag <workspace>/tags/freesurfer-8.2.0 --docs docs/freesurfer \
+          --trace <scratch>/r4/trace --runs <workspace>/oracles/freesurfer-8.2.0/runs \
+          --out docs/freesurfer/cards
+
+  (`<scratch>/r4/trace`: data_trace.py's job folder, relay 4.)

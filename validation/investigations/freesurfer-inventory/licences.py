@@ -254,7 +254,7 @@ FINDINGS = [
         "where": ["utils/mriBSpline.cpp"],
         "origin": "Martin Reuter's 3D version of P. Thevenaz's 2D code (bigwww.epfl.ch, coeff.c: no licence statement in the file) and M. Unser's 1992 NIH pyramid filters; Thevenaz, Blu, Unser, IEEE TMI 19 (2000) 739-758",
         "terms": "the file carries FreeSurfer's notice; EPFL's code states no terms; Unser's 1992 filters were written at NIH",
-        "porting": "question",
+        "porting": "portable-with-notice",
         "runs": "mri_robust_template's final resampling (cubic B-spline by default) with several T1w images; the robust tools' pyramid for large images; mri_convert and mri_vol2vol only with cubic interpolation",
     },
     {

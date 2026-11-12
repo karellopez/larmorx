@@ -40,9 +40,10 @@ Porting classes (what a file or a finding means for LARMORX):
 | `nothing-to-port` | no behaviour of its own (findings only: TP-06) | - | - |
 
 The three `question` files are `tkregister2/tkregister2.cpp` (CorTechs, TP-10) and the two MARS
-files (TP-14). Three more questions concern code inside files that are otherwise `portable`
-(TP-03, TP-04, TP-05): a file's class is its notice's; its findings (the `findings` field in
-`third-party.toml`) override it for the functions they name.
+files (TP-14). Three more questions concerned code inside files that are otherwise `portable`
+(TP-03, TP-04, TP-05; TP-05 is decided since, `portable-with-notice` crediting EPFL, §9 P-10): a
+file's class is its notice's; its findings (the `findings` field in `third-party.toml`) override it
+for the functions they name.
 
 ## 2. FreeSurfer's own licence and its scope
 

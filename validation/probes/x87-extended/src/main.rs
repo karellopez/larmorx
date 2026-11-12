@@ -181,7 +181,10 @@ impl Hw {
 
     fn run_from(&self, conv: Conv, x: &[u64]) -> Vec<u128> {
         let &(_, f, size) = self.from.iter().find(|t| t.0 == conv).unwrap();
-        let input: Vec<u8> = x.iter().flat_map(|w| w.to_le_bytes()[..size].to_vec()).collect();
+        let input: Vec<u8> = x
+            .iter()
+            .flat_map(|w| w.to_le_bytes()[..size].to_vec())
+            .collect();
         let mut r = vec![[0u8; 16]; x.len()];
         // SAFETY: n values of `size` bytes in, n slots out.
         unsafe { f(input.as_ptr(), r.as_mut_ptr() as *mut u8, x.len() as i64) };
@@ -330,7 +333,10 @@ impl Tally {
             self.differ += 1;
             if self.shown < 5 {
                 self.shown += 1;
-                println!("  DIFF {what}: {} software {sw:#x} hardware {hw:#x}", inputs());
+                println!(
+                    "  DIFF {what}: {} software {sw:#x} hardware {hw:#x}",
+                    inputs()
+                );
             }
         }
     }
@@ -411,7 +417,9 @@ fn in_double(p: Pattern, x: &cases::PatternInput) -> Vec<u64> {
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
-    let lib_path = args.get(1).expect("usage: x87-probe <libx87probe.so> [log2n] [--record <file>]");
+    let lib_path = args
+        .get(1)
+        .expect("usage: x87-probe <libx87probe.so> [log2n] [--record <file>]");
     let mut log2n = 20u32;
     let mut record: Option<String> = None;
     let mut i = 2;
@@ -431,14 +439,30 @@ fn main() {
     let control_word = sym!(lib, "x87_control_word", Cw);
     // SAFETY: x87_control_word() takes nothing and returns the control word.
     let cw = unsafe { control_word() };
-    println!("x87 control word {cw:#06x} (Linux's default 0x037f: 64-bit precision, nearest, masked)");
+    println!(
+        "x87 control word {cw:#06x} (Linux's default 0x037f: 64-bit precision, nearest, masked)"
+    );
     assert_eq!(cw, 0x037f, "the probe needs Linux's default control word");
 
     let mut total = Tally::default();
     let mut rec = String::new();
-    writeln!(rec, "// Recorded by validation/probes/x87-extended (x87-probe --record) from the machine's x87.").unwrap();
-    writeln!(rec, "// The hardware's results of the first {TEST_N} cases of each (operation, family).").unwrap();
-    writeln!(rec, "pub(super) const OP_FAMILY_HASHES: [[u64; {}]; {}] = [", Family::ALL.len(), Op::ALL.len()).unwrap();
+    writeln!(
+        rec,
+        "// Recorded by validation/probes/x87-extended (x87-probe --record) from the machine's x87."
+    )
+    .unwrap();
+    writeln!(
+        rec,
+        "// The hardware's results of the first {TEST_N} cases of each (operation, family)."
+    )
+    .unwrap();
+    writeln!(
+        rec,
+        "pub(super) const OP_FAMILY_HASHES: [[u64; {}]; {}] = [",
+        Family::ALL.len(),
+        Op::ALL.len()
+    )
+    .unwrap();
 
     for (o, &op) in Op::ALL.iter().enumerate() {
         let mut row = Vec::new();
@@ -470,20 +494,45 @@ fn main() {
                 }
                 done += m;
             }
-            println!("{op:?} {fam:?}: {} cases, {} differ{}", t.cases, t.differ, classes.summary());
+            println!(
+                "{op:?} {fam:?}: {} cases, {} differ{}",
+                t.cases,
+                t.differ,
+                classes.summary()
+            );
             total.cases += t.cases;
             total.differ += t.differ;
             row.push(cases::fnv(first));
         }
-        writeln!(rec, "    [{}], // {op:?}", row.iter().map(|h| format!("{h:#018x}")).collect::<Vec<_>>().join(", ")).unwrap();
+        writeln!(
+            rec,
+            "    [{}], // {op:?}",
+            row.iter()
+                .map(|h| format!("{h:#018x}"))
+                .collect::<Vec<_>>()
+                .join(", ")
+        )
+        .unwrap();
     }
     writeln!(rec, "];").unwrap();
 
     // Every pair of special values.
     let s = cases::specials();
-    let (a, b): (Vec<F80>, Vec<F80>) = s.iter().flat_map(|&x| s.iter().map(move |&y| (x, y))).unzip();
-    writeln!(rec, "// Every pair of cases::specials(), in order, per operation.").unwrap();
-    writeln!(rec, "pub(super) const SPECIAL_HASHES: [u64; {}] = [", Op::ALL.len()).unwrap();
+    let (a, b): (Vec<F80>, Vec<F80>) = s
+        .iter()
+        .flat_map(|&x| s.iter().map(move |&y| (x, y)))
+        .unzip();
+    writeln!(
+        rec,
+        "// Every pair of cases::specials(), in order, per operation."
+    )
+    .unwrap();
+    writeln!(
+        rec,
+        "pub(super) const SPECIAL_HASHES: [u64; {}] = [",
+        Op::ALL.len()
+    )
+    .unwrap();
     for &op in &Op::ALL {
         let sw: Vec<u128> = a.iter().zip(&b).map(|(&x, &y)| op.apply(x, y)).collect();
         let mut t = Tally::default();
@@ -505,8 +554,17 @@ fn main() {
     writeln!(rec, "];").unwrap();
 
     // Conversions into the extended format.
-    writeln!(rec, "// The first {TEST_N} inputs of each conversion into the extended format.").unwrap();
-    writeln!(rec, "pub(super) const CONV_HASHES: [u64; {}] = [", Conv::ALL.len()).unwrap();
+    writeln!(
+        rec,
+        "// The first {TEST_N} inputs of each conversion into the extended format."
+    )
+    .unwrap();
+    writeln!(
+        rec,
+        "pub(super) const CONV_HASHES: [u64; {}] = [",
+        Conv::ALL.len()
+    )
+    .unwrap();
     for (c, &conv) in Conv::ALL.iter().enumerate() {
         let mut rng = SplitMix64::new(cases::from_seed(c));
         let x: Vec<u64> = (0..n_cases).map(|_| conv.input(&mut rng)).collect();
@@ -519,14 +577,28 @@ fn main() {
         println!("from {conv:?}: {} cases, {} differ", t.cases, t.differ);
         total.cases += t.cases;
         total.differ += t.differ;
-        writeln!(rec, "    {:#018x}, // {conv:?}", cases::fnv(h[..TEST_N].iter().copied())).unwrap();
+        writeln!(
+            rec,
+            "    {:#018x}, // {conv:?}",
+            cases::fnv(h[..TEST_N].iter().copied())
+        )
+        .unwrap();
     }
     writeln!(rec, "];").unwrap();
 
     // The patterns.
     let n_patterns = (n_cases >> 4).max(TEST_PATTERNS);
-    writeln!(rec, "// The outputs of the first {TEST_PATTERNS} cases of each pattern.").unwrap();
-    writeln!(rec, "pub(super) const PATTERN_HASHES: [u64; {}] = [", Pattern::ALL.len()).unwrap();
+    writeln!(
+        rec,
+        "// The outputs of the first {TEST_PATTERNS} cases of each pattern."
+    )
+    .unwrap();
+    writeln!(
+        rec,
+        "pub(super) const PATTERN_HASHES: [u64; {}] = [",
+        Pattern::ALL.len()
+    )
+    .unwrap();
     for (p, &pat) in Pattern::ALL.iter().enumerate() {
         let mut rng = SplitMix64::new(cases::pattern_seed(p));
         let mut t = Tally::default();
@@ -537,7 +609,11 @@ fn main() {
             let sw = pat.apply(&x);
             let h = pats.run(pat, &x);
             assert_eq!(sw.len(), h.len());
-            control += in_double(pat, &x).iter().zip(&h).filter(|(c, w)| c != w).count();
+            control += in_double(pat, &x)
+                .iter()
+                .zip(&h)
+                .filter(|(c, w)| c != w)
+                .count();
             for (j, (&s, &w)) in sw.iter().zip(&h).enumerate() {
                 let inputs = || format!("case {k} output {j} {x:?}");
                 t.check(&format!("{pat:?}"), &inputs, u128::from(s), u128::from(w));
@@ -560,7 +636,10 @@ fn main() {
         std::fs::write(&path, rec).expect("write the record");
         println!("hashes written to {path}");
     }
-    println!("total: {} comparisons, {} differ", total.cases, total.differ);
+    println!(
+        "total: {} comparisons, {} differ",
+        total.cases, total.differ
+    );
     if total.differ == 0 {
         println!("VERIFY-PASS");
     } else {

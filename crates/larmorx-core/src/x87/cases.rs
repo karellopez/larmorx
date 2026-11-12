@@ -51,7 +51,9 @@ pub fn fnv(words: impl IntoIterator<Item = u128>) -> u64 {
 
 /// An extended number from its sign, exponent field and significand.
 pub fn f80(negative: bool, exp_field: u16, m: u64) -> F80 {
-    F80::from_bits(((u128::from(exp_field) | if negative { 0x8000 } else { 0 }) << 64) | u128::from(m))
+    F80::from_bits(
+        ((u128::from(exp_field) | if negative { 0x8000 } else { 0 }) << 64) | u128::from(m),
+    )
 }
 
 /// Special values: zeros, the extremes of every range, infinities, NaNs of both kinds with
@@ -62,27 +64,27 @@ pub fn specials() -> Vec<F80> {
     let mut v = Vec::new();
     for neg in [false, true] {
         v.extend([
-            f80(neg, 0, 0),                     // zero
-            f80(neg, 0, 1),                     // smallest denormal
-            f80(neg, 0, I - 1),                 // largest denormal
-            f80(neg, 0, I),                     // pseudo-denormal (= smallest normal)
-            f80(neg, 0, I | 12345),             // pseudo-denormal
-            f80(neg, 1, I),                     // smallest normal
-            f80(neg, 0x3fff, I),                // 1
-            f80(neg, 0x3fff, I | 1),            // 1 + 2^-63
-            f80(neg, 0x4000, I | (1 << 62)),    // 3
-            f80(neg, 0x3ffe, u64::MAX),         // 1 - 2^-64
-            f80(neg, 0x7ffe, u64::MAX),         // largest finite
-            f80(neg, 0x403e, I),                // 2^63
-            f80(neg, 0x7fff, I),                // infinity
-            f80(neg, 0x7fff, I | Q),            // quiet NaN (indefinite when negative)
-            f80(neg, 0x7fff, I | Q | 0x1234),   // quiet NaN with a payload
-            f80(neg, 0x7fff, I | 1),            // signalling NaN
-            f80(neg, 0x7fff, I | 0x00ff_0000),  // signalling NaN with another payload
-            f80(neg, 0x7fff, 0),                // pseudo-infinity
-            f80(neg, 0x7fff, Q | 5),            // pseudo-NaN
-            f80(neg, 0x3fff, Q),                // unnormal
-            f80(neg, 0x1234, 1),                // unnormal
+            f80(neg, 0, 0),                    // zero
+            f80(neg, 0, 1),                    // smallest denormal
+            f80(neg, 0, I - 1),                // largest denormal
+            f80(neg, 0, I),                    // pseudo-denormal (= smallest normal)
+            f80(neg, 0, I | 12345),            // pseudo-denormal
+            f80(neg, 1, I),                    // smallest normal
+            f80(neg, 0x3fff, I),               // 1
+            f80(neg, 0x3fff, I | 1),           // 1 + 2^-63
+            f80(neg, 0x4000, I | (1 << 62)),   // 3
+            f80(neg, 0x3ffe, u64::MAX),        // 1 - 2^-64
+            f80(neg, 0x7ffe, u64::MAX),        // largest finite
+            f80(neg, 0x403e, I),               // 2^63
+            f80(neg, 0x7fff, I),               // infinity
+            f80(neg, 0x7fff, I | Q),           // quiet NaN (indefinite when negative)
+            f80(neg, 0x7fff, I | Q | 0x1234),  // quiet NaN with a payload
+            f80(neg, 0x7fff, I | 1),           // signalling NaN
+            f80(neg, 0x7fff, I | 0x00ff_0000), // signalling NaN with another payload
+            f80(neg, 0x7fff, 0),               // pseudo-infinity
+            f80(neg, 0x7fff, Q | 5),           // pseudo-NaN
+            f80(neg, 0x3fff, Q),               // unnormal
+            f80(neg, 0x1234, 1),               // unnormal
         ]);
     }
     v
@@ -160,8 +162,12 @@ impl Family {
         };
         match self {
             Family::RawBits => (
-                F80::from_bits(u128::from(rng.next_u64()) | (u128::from(rng.next_u64() as u16) << 64)),
-                F80::from_bits(u128::from(rng.next_u64()) | (u128::from(rng.next_u64() as u16) << 64)),
+                F80::from_bits(
+                    u128::from(rng.next_u64()) | (u128::from(rng.next_u64() as u16) << 64),
+                ),
+                F80::from_bits(
+                    u128::from(rng.next_u64()) | (u128::from(rng.next_u64() as u16) << 64),
+                ),
             ),
             Family::Normal => {
                 let ea = rng.range(-16382, 16383);
@@ -192,7 +198,11 @@ impl Family {
                 let a = normal(rng, ea);
                 let bits = a.to_bits();
                 let width = rng.range(0, 64) as u32;
-                let delta = if width == 0 { 0 } else { rng.next_u64() >> (64 - width) };
+                let delta = if width == 0 {
+                    0
+                } else {
+                    rng.next_u64() >> (64 - width)
+                };
                 let m = (bits as u64).wrapping_add(delta) | I;
                 let se = ((bits >> 64) as u16) ^ if sign(rng) { 0x8000 } else { 0 };
                 let se = match rng.below(4) {
@@ -242,7 +252,8 @@ impl Family {
             Family::Floats => {
                 let f = |rng: &mut SplitMix64| {
                     let e = rng.range(1, 254) as u32;
-                    let bits = ((rng.below(2) as u32) << 31) | (e << 23) | (rng.next_u64() as u32 >> 9);
+                    let bits =
+                        ((rng.below(2) as u32) << 31) | (e << 23) | (rng.next_u64() as u32 >> 9);
                     F80::from_f32(f32::from_bits(bits))
                 };
                 (f(rng), f(rng))
@@ -250,7 +261,11 @@ impl Family {
             Family::Integers => {
                 let i = |rng: &mut SplitMix64| {
                     let bits = rng.range(0, 40) as u32;
-                    let v = if bits == 0 { 0 } else { (rng.next_u64() >> (64 - bits)) as i64 };
+                    let v = if bits == 0 {
+                        0
+                    } else {
+                        (rng.next_u64() >> (64 - bits)) as i64
+                    };
                     F80::from_i64(if sign(rng) { -v } else { v })
                 };
                 (i(rng), i(rng))
@@ -270,7 +285,9 @@ impl Family {
                     // just off it, or an integer.
                     let frac_bits = (63 - e).clamp(0, 63) as u32;
                     let m = match rng.below(4) {
-                        0 if frac_bits > 0 => (m >> frac_bits << frac_bits) | (1 << (frac_bits - 1)),
+                        0 if frac_bits > 0 => {
+                            (m >> frac_bits << frac_bits) | (1 << (frac_bits - 1))
+                        }
                         1 if frac_bits > 0 => m >> frac_bits << frac_bits,
                         _ => m,
                     };
@@ -287,9 +304,9 @@ impl Family {
 fn edge(rng: &mut SplitMix64, p: u32, bias: i64) -> F80 {
     const I: u64 = 1 << 63;
     let e = match rng.below(4) {
-        0 => bias + rng.range(-3, 1),                 // near overflow
+        0 => bias + rng.range(-3, 1),                  // near overflow
         1 => 1 - bias + rng.range(-(p as i64) - 3, 3), // subnormal and smallest normal
-        2 => 1 - bias - p as i64 + rng.range(-3, 1),  // below the smallest subnormal
+        2 => 1 - bias - p as i64 + rng.range(-3, 1),   // below the smallest subnormal
         _ => rng.range(1 - bias, bias),
     };
     let drop = 64 - p;
@@ -400,15 +417,26 @@ pub enum Conv {
 }
 
 impl Conv {
-    pub const ALL: [Conv; 6] = [Conv::F64, Conv::F32, Conv::I64, Conv::I32, Conv::U64, Conv::U32];
+    pub const ALL: [Conv; 6] = [
+        Conv::F64,
+        Conv::F32,
+        Conv::I64,
+        Conv::I32,
+        Conv::U64,
+        Conv::U32,
+    ];
 
     /// A random input word of this conversion (the low bits for the narrower types).
     pub fn input(self, rng: &mut SplitMix64) -> u64 {
         let x = rng.next_u64();
         // A quarter of the inputs small or special: exponent fields 0 and all ones, small integers.
         match (self, rng.below(4)) {
-            (Conv::F64, 0) => x & 0x800f_ffff_ffff_ffff | if rng.below(2) == 1 { 0x7ff0 << 48 } else { 0 },
-            (Conv::F32, 0) => (x as u32 & 0x807f_ffff | if rng.below(2) == 1 { 0x7f80_0000 } else { 0 }) as u64,
+            (Conv::F64, 0) => {
+                x & 0x800f_ffff_ffff_ffff | if rng.below(2) == 1 { 0x7ff0 << 48 } else { 0 }
+            }
+            (Conv::F32, 0) => {
+                (x as u32 & 0x807f_ffff | if rng.below(2) == 1 { 0x7f80_0000 } else { 0 }) as u64
+            }
             (Conv::F32, _) => x as u32 as u64,
             (Conv::I32 | Conv::U32, 0) => (x >> rng.range(32, 63)) as u32 as u64,
             (Conv::I32 | Conv::U32, _) => x as u32 as u64,
@@ -568,17 +596,32 @@ impl Pattern {
                 let mean = sum / nn;
                 let var = (sum2 - nn * mean * mean) / F80::from(n as i32 - 1);
                 let std = var.sqrt();
-                vec![mean.to_f64().to_bits(), var.to_f64().to_bits(), std.to_f64().to_bits()]
+                vec![
+                    mean.to_f64().to_bits(),
+                    var.to_f64().to_bits(),
+                    std.to_f64().to_bits(),
+                ]
             }
             Pattern::Cross => {
                 let v = &x.floats;
-                let a = [lf(v[3]) - lf(v[0]), lf(v[4]) - lf(v[1]), lf(v[5]) - lf(v[2])];
-                let b = [lf(v[6]) - lf(v[3]), lf(v[7]) - lf(v[4]), lf(v[8]) - lf(v[5])];
+                let a = [
+                    lf(v[3]) - lf(v[0]),
+                    lf(v[4]) - lf(v[1]),
+                    lf(v[5]) - lf(v[2]),
+                ];
+                let b = [
+                    lf(v[6]) - lf(v[3]),
+                    lf(v[7]) - lf(v[4]),
+                    lf(v[8]) - lf(v[5]),
+                ];
                 let cx = a[1] * b[2] - a[2] * b[1];
                 let cy = a[2] * b[0] - a[0] * b[2];
                 let cz = a[0] * b[1] - a[1] * b[0];
                 let cl = (cx * cx + cy * cy + cz * cz).sqrt();
-                [cx, cy, cz, cl].iter().map(|c| c.to_f64().to_bits()).collect()
+                [cx, cy, cz, cl]
+                    .iter()
+                    .map(|c| c.to_f64().to_bits())
+                    .collect()
             }
             Pattern::Unit => {
                 let v = &x.doubles;

@@ -149,7 +149,10 @@ fn vnl_run(vr: &Vr, seed: u64, rng: &mut SplitMix64, t: &mut Tally, log_changes:
                 0 | 1 => (u64::from(ours.lrand32()), (vr.lrand32)(theirs)),
                 2 => {
                     let (a, b) = range(rng);
-                    (ours.lrand32_range(a, b) as u64, (vr.range)(theirs, a, b) as u64)
+                    (
+                        ours.lrand32_range(a, b) as u64,
+                        (vr.range)(theirs, a, b) as u64,
+                    )
                 }
                 3 => {
                     let (a, b) = range(rng);
@@ -161,11 +164,17 @@ fn vnl_run(vr: &Vr, seed: u64, rng: &mut SplitMix64, t: &mut Tally, log_changes:
                 4 => {
                     let a = rng.range(-1000, 1000) as f64 / 7.0;
                     let b = a + rng.below(1000) as f64 / 3.0;
-                    (ours.drand32(a, b).to_bits(), (vr.drand32)(theirs, a, b).to_bits())
+                    (
+                        ours.drand32(a, b).to_bits(),
+                        (vr.drand32)(theirs, a, b).to_bits(),
+                    )
                 }
                 5 | 6 => {
                     let (a, b) = if what == 5 { (0.0, 1.0) } else { (-2.5, 7.25) };
-                    (ours.drand64(a, b).to_bits(), (vr.drand64)(theirs, a, b).to_bits())
+                    (
+                        ours.drand64(a, b).to_bits(),
+                        (vr.drand64)(theirs, a, b).to_bits(),
+                    )
                 }
                 7 => {
                     let mut probe = ours.clone();
@@ -185,7 +194,10 @@ fn vnl_run(vr: &Vr, seed: u64, rng: &mut SplitMix64, t: &mut Tally, log_changes:
                 }
                 9 => {
                     let v = (ours.drand64(0.0, 1.0) as f32).to_bits();
-                    (u64::from(v), u64::from((vr.drand64_float)(theirs).to_bits()))
+                    (
+                        u64::from(v),
+                        u64::from((vr.drand64_float)(theirs).to_bits()),
+                    )
                 }
                 10 => {
                     if rng.below(8) == 0 {
@@ -196,7 +208,8 @@ fn vnl_run(vr: &Vr, seed: u64, rng: &mut SplitMix64, t: &mut Tally, log_changes:
                         ours.reseed(s);
                         (vr.reseed)(theirs, s);
                     } else if rng.below(16) == 0 {
-                        let mut words: [u64; ARRAY_SIZE] = std::array::from_fn(|_| rng.next_u64() >> 32);
+                        let mut words: [u64; ARRAY_SIZE] =
+                            std::array::from_fn(|_| rng.next_u64() >> 32);
                         ours.reseed_array(&words);
                         (vr.reseed_array)(theirs, words.as_mut_ptr());
                     }
@@ -205,7 +218,11 @@ fn vnl_run(vr: &Vr, seed: u64, rng: &mut SplitMix64, t: &mut Tally, log_changes:
                 _ => (u64::from(ours.lrand32()), (vr.lrand32)(theirs)),
             }
         };
-        t.check(&|| format!("vnl_random seed {seed:#x} call {call} kind {what}"), o, c);
+        t.check(
+            &|| format!("vnl_random seed {seed:#x} call {call} kind {what}"),
+            o,
+            c,
+        );
         fnv(&mut h, c);
     }
     // SAFETY: frees the shim's object.
@@ -215,7 +232,11 @@ fn vnl_run(vr: &Vr, seed: u64, rng: &mut SplitMix64, t: &mut Tally, log_changes:
 
 /// The nine functions of the drand48 family after one seeding, on both.
 fn drand48_run(ours: &mut Drand48, rng: &mut SplitMix64, t: &mut Tally, label: &str) -> u64 {
-    let mut arr = [rng.next_u64() as u16, rng.next_u64() as u16, rng.next_u64() as u16];
+    let mut arr = [
+        rng.next_u64() as u16,
+        rng.next_u64() as u16,
+        rng.next_u64() as u16,
+    ];
     let mut theirs_arr = arr;
     let mut h = FNV0;
     for call in 0..1000 {
@@ -226,14 +247,27 @@ fn drand48_run(ours: &mut Drand48, rng: &mut SplitMix64, t: &mut Tally, label: &
                 0 => (ours.drand48().to_bits(), drand48().to_bits()),
                 1 => (ours.lrand48() as u64, lrand48() as u64),
                 2 => (ours.mrand48() as u64, mrand48() as u64),
-                3 => (ours.erand48(&mut arr).to_bits(), erand48(theirs_arr.as_mut_ptr()).to_bits()),
-                4 => (ours.nrand48(&mut arr) as u64, nrand48(theirs_arr.as_mut_ptr()) as u64),
-                _ => (ours.jrand48(&mut arr) as u64, jrand48(theirs_arr.as_mut_ptr()) as u64),
+                3 => (
+                    ours.erand48(&mut arr).to_bits(),
+                    erand48(theirs_arr.as_mut_ptr()).to_bits(),
+                ),
+                4 => (
+                    ours.nrand48(&mut arr) as u64,
+                    nrand48(theirs_arr.as_mut_ptr()) as u64,
+                ),
+                _ => (
+                    ours.jrand48(&mut arr) as u64,
+                    jrand48(theirs_arr.as_mut_ptr()) as u64,
+                ),
             }
         };
         t.check(&|| format!("drand48 {label} call {call} kind {what}"), o, c);
         let words = |a: [u16; 3]| u64::from(a[0]) | u64::from(a[1]) << 16 | u64::from(a[2]) << 32;
-        t.check(&|| format!("drand48 {label} call {call} array"), words(arr), words(theirs_arr));
+        t.check(
+            &|| format!("drand48 {label} call {call} array"),
+            words(arr),
+            words(theirs_arr),
+        );
         fnv(&mut h, c);
     }
     h
@@ -271,7 +305,10 @@ fn drand48_sequence(seed: i64) -> u64 {
         fnv(&mut h, s.jrand48(&mut a) as u64);
     }
     let old = s.seed48([0x1234, 0x5678, 0x9abc]);
-    fnv(&mut h, u64::from(old[0]) | u64::from(old[1]) << 16 | u64::from(old[2]) << 32);
+    fnv(
+        &mut h,
+        u64::from(old[0]) | u64::from(old[1]) << 16 | u64::from(old[2]) << 32,
+    );
     for _ in 0..100 {
         fnv(&mut h, s.drand48().to_bits());
     }
@@ -311,7 +348,10 @@ unsafe fn glibc_sequence(seed: i64) -> u64 {
         }
         let mut w = [0x1234u16, 0x5678, 0x9abc];
         let old = std::slice::from_raw_parts(seed48(w.as_mut_ptr()), 3);
-        fnv(&mut h, u64::from(old[0]) | u64::from(old[1]) << 16 | u64::from(old[2]) << 32);
+        fnv(
+            &mut h,
+            u64::from(old[0]) | u64::from(old[1]) << 16 | u64::from(old[2]) << 32,
+        );
         for _ in 0..100 {
             fnv(&mut h, drand48().to_bits());
         }
@@ -391,7 +431,9 @@ fn vnl_original_sequence(vr: &Vr, seed: u64) -> u64 {
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
-    let lib = args.get(1).expect("usage: fs-random <libvnlrandom.so> [n_seeds] [--record <file>]");
+    let lib = args
+        .get(1)
+        .expect("usage: fs-random <libvnlrandom.so> [n_seeds] [--record <file>]");
     let mut n_seeds = 2000usize;
     let mut record: Option<String> = None;
     let mut i = 2;
@@ -405,7 +447,11 @@ fn main() {
         }
     }
     let mut rec = String::new();
-    writeln!(rec, "// Recorded by validation/probes/fs-random (fs-random --record).").unwrap();
+    writeln!(
+        rec,
+        "// Recorded by validation/probes/fs-random (fs-random --record)."
+    )
+    .unwrap();
 
     // drand48 first: the state before any seeding (this process has not called the family yet).
     let mut t48 = Tally::default();
@@ -413,7 +459,11 @@ fn main() {
     for k in 0..16 {
         // SAFETY: glibc's drand48.
         let c = unsafe { drand48() };
-        t48.check(&|| format!("drand48 unseeded call {k}"), ours.drand48().to_bits(), c.to_bits());
+        t48.check(
+            &|| format!("drand48 unseeded call {k}"),
+            ours.drand48().to_bits(),
+            c.to_bits(),
+        );
     }
     let mut rng = SplitMix64::new(0x0048);
     for k in 0..n_seeds {
@@ -427,16 +477,34 @@ fn main() {
         // SAFETY: glibc's srand48.
         unsafe { srand48(seed) };
         ours.srand48(seed);
-        let h = drand48_run(&mut ours, &mut SplitMix64::new(seed as u64), &mut t48, &format!("srand48({seed})"));
+        let h = drand48_run(
+            &mut ours,
+            &mut SplitMix64::new(seed as u64),
+            &mut t48,
+            &format!("srand48({seed})"),
+        );
         let _ = h;
         // seed48 and lcong48 between seedings.
-        let mut words = [rng.next_u64() as u16, rng.next_u64() as u16, rng.next_u64() as u16];
+        let mut words = [
+            rng.next_u64() as u16,
+            rng.next_u64() as u16,
+            rng.next_u64() as u16,
+        ];
         // SAFETY: glibc's seed48 returns a pointer to its three-word buffer.
         let old = unsafe { std::slice::from_raw_parts(seed48(words.as_mut_ptr()), 3).to_vec() };
         let ours_old = ours.seed48(words);
         let pack = |a: &[u16]| u64::from(a[0]) | u64::from(a[1]) << 16 | u64::from(a[2]) << 32;
-        t48.check(&|| format!("seed48 previous after srand48({seed})"), pack(&ours_old), pack(&old));
-        drand48_run(&mut ours, &mut SplitMix64::new(seed as u64 ^ 1), &mut t48, "seed48");
+        t48.check(
+            &|| format!("seed48 previous after srand48({seed})"),
+            pack(&ours_old),
+            pack(&old),
+        );
+        drand48_run(
+            &mut ours,
+            &mut SplitMix64::new(seed as u64 ^ 1),
+            &mut t48,
+            "seed48",
+        );
         let mut param: [u16; 7] = std::array::from_fn(|_| rng.next_u64() as u16);
         if k % 2 == 0 {
             param[3..6].copy_from_slice(&[0xe66d, 0xdeec, 0x5]);
@@ -444,16 +512,29 @@ fn main() {
         // SAFETY: glibc's lcong48 reads seven words.
         unsafe { lcong48(param.as_mut_ptr()) };
         ours.lcong48(param);
-        drand48_run(&mut ours, &mut SplitMix64::new(seed as u64 ^ 2), &mut t48, "lcong48");
+        drand48_run(
+            &mut ours,
+            &mut SplitMix64::new(seed as u64 ^ 2),
+            &mut t48,
+            "lcong48",
+        );
     }
     println!("drand48 family: {} calls, {} differ", t48.calls, t48.differ);
-    writeln!(rec, "// drand48: the C library's outputs of drand48_sequence(seed) (tests.rs).").unwrap();
+    writeln!(
+        rec,
+        "// drand48: the C library's outputs of drand48_sequence(seed) (tests.rs)."
+    )
+    .unwrap();
     writeln!(rec, "pub(super) const DRAND48_HASHES: [(i64, u64); 5] = [").unwrap();
     for seed in DRAND48_SEEDS {
         // SAFETY: glibc's functions; the arrays hold three and seven 16-bit words.
         let h = unsafe { glibc_sequence(seed) };
         let mine = drand48_sequence(seed);
-        t48.check(&|| format!("drand48 fixed sequence of seed {seed}"), mine, h);
+        t48.check(
+            &|| format!("drand48 fixed sequence of seed {seed}"),
+            mine,
+            h,
+        );
         writeln!(rec, "    ({seed}, {h:#018x}),").unwrap();
     }
     writeln!(rec, "];").unwrap();
@@ -472,14 +553,28 @@ fn main() {
             4 => u64::MAX,
             _ => rng.next_u64(),
         };
-        let h = vnl_run(&vr, seed, &mut SplitMix64::new(seed ^ 0x72), &mut tv, &mut log_changes);
+        let h = vnl_run(
+            &vr,
+            seed,
+            &mut SplitMix64::new(seed ^ 0x72),
+            &mut tv,
+            &mut log_changes,
+        );
         let _ = h;
     }
-    writeln!(rec, "// vnl_random: the original's outputs of vnl_sequence(seed) (vnl_random.rs's tests).").unwrap();
+    writeln!(
+        rec,
+        "// vnl_random: the original's outputs of vnl_sequence(seed) (vnl_random.rs's tests)."
+    )
+    .unwrap();
     writeln!(rec, "pub(super) const VNL_HASHES: [(u64, u64); 5] = [").unwrap();
     for seed in VNL_SEEDS {
         let h = vnl_original_sequence(&vr, seed);
-        tv.check(&|| format!("vnl_random fixed sequence of seed {seed:#x}"), vnl_sequence(seed), h);
+        tv.check(
+            &|| format!("vnl_random fixed sequence of seed {seed:#x}"),
+            vnl_sequence(seed),
+            h,
+        );
         writeln!(rec, "    ({seed:#x}, {h:#018x}),").unwrap();
     }
     writeln!(rec, "];").unwrap();

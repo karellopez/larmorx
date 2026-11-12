@@ -399,14 +399,14 @@ impl F80 {
                     return F80::INDEFINITE;
                 }
                 // N = sig · 2^s with exp - s even and N in [2^126, 2^128): sqrt(N) in [2^63, 2^64).
-                let s = if exp & 1 != 0 { 63 } else { 64 };
+                let s: i32 = if exp & 1 != 0 { 63 } else { 64 };
                 let n = (sig as u128) << s;
                 let q = n.isqrt();
                 let r = n - q * q;
                 // sqrt(N) > q + 1/2 exactly when r > q; a tie is impossible (a midpoint's square
                 // has more bits than N).
                 let m = q + u128::from(r > q);
-                round_pack(false, m, (exp - s as i32) / 2, false)
+                round_pack(false, m, (exp - s) / 2, false)
             }
         }
     }
@@ -503,13 +503,14 @@ impl F80 {
                 sign | (0x7ff << 52) | (1 << 51) | ((self.m >> 11) & ((1 << 52) - 1)),
             ),
             Kind::Unsupported => f64::from_bits(0xfff8_0000_0000_0000),
-            Kind::Finite { sig, exp } => match round_format(sig as u128, exp, false, 53, 1023, 2047)
-            {
-                None => f64::from_bits(sign | (0x7ff << 52)),
-                Some((be, q)) => {
-                    f64::from_bits(sign | ((be as u64) << 52) | (q as u64 & ((1 << 52) - 1)))
+            Kind::Finite { sig, exp } => {
+                match round_format(sig as u128, exp, false, 53, 1023, 2047) {
+                    None => f64::from_bits(sign | (0x7ff << 52)),
+                    Some((be, q)) => {
+                        f64::from_bits(sign | ((be as u64) << 52) | (q as u64 & ((1 << 52) - 1)))
+                    }
                 }
-            },
+            }
         }
     }
 
@@ -524,12 +525,14 @@ impl F80 {
                 sign | (0xff << 23) | (1 << 22) | ((self.m >> 40) as u32 & ((1 << 23) - 1)),
             ),
             Kind::Unsupported => f32::from_bits(0xffc0_0000),
-            Kind::Finite { sig, exp } => match round_format(sig as u128, exp, false, 24, 127, 255) {
-                None => f32::from_bits(sign | (0xff << 23)),
-                Some((be, q)) => {
-                    f32::from_bits(sign | ((be as u32) << 23) | (q as u32 & ((1 << 23) - 1)))
+            Kind::Finite { sig, exp } => {
+                match round_format(sig as u128, exp, false, 24, 127, 255) {
+                    None => f32::from_bits(sign | (0xff << 23)),
+                    Some((be, q)) => {
+                        f32::from_bits(sign | ((be as u32) << 23) | (q as u32 & ((1 << 23) - 1)))
+                    }
                 }
-            },
+            }
         }
     }
 
@@ -547,11 +550,7 @@ impl F80 {
                     Some(0)
                 } else {
                     let mag = sig >> (-exp) as u32;
-                    Some(if negative {
-                        -(mag as i64)
-                    } else {
-                        mag as i64
-                    })
+                    Some(if negative { -(mag as i64) } else { mag as i64 })
                 }
             }
             _ => None,
@@ -664,7 +663,14 @@ fn rne_shift(sig: u128, sticky: bool, n: u32) -> u128 {
 /// significand bits (the leading bit included), exponent bias `bias` and exponent field `emax`
 /// for infinities: `Some((exponent field, significand))`, the significand with its leading bit
 /// (`p` bits for normal numbers; fewer, exponent field 0, for subnormals), or `None` on overflow.
-fn round_format(sig: u128, e: i32, sticky: bool, p: u32, bias: i32, emax: i32) -> Option<(i32, u128)> {
+fn round_format(
+    sig: u128,
+    e: i32,
+    sticky: bool,
+    p: u32,
+    bias: i32,
+    emax: i32,
+) -> Option<(i32, u128)> {
     let lz = sig.leading_zeros();
     let sig = sig << lz;
     // value = sig · 2^(e - lz), the leading bit at 127.
@@ -852,5 +858,7 @@ impl fmt::Debug for F80 {
     }
 }
 
+#[cfg(test)]
+mod hardware;
 #[cfg(test)]
 mod tests;

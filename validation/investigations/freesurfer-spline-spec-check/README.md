@@ -11,4 +11,13 @@ spec's writer, who read Burkardt's spline routines and FreeSurfer's single-preci
 | `check.py` | runs the model and FreeSurfer's functions (the probe, a black box) on seeded random cases and prints one line per group: `python -P check.py <fs_spline_probe> [--cases N]` |
 
 Result (2026-11-12, the reference machine; log `<workspace>/oracles/logs/freesurfer-spline-spec-check.log`):
-RESULT_LINES
+
+- `cases`: 20,001 seeded cases (`n` from 2 to 80; integer row knots, random knots, neighbours one unit in
+  the last place apart, widely spread magnitudes; every pair of end conditions; 400 cases with two NaN values
+  of different payloads and a NaN beginning value, some with an infinite value), the second derivatives,
+  every evaluation point's value and two derivative outputs, and the two wrappers: all identical;
+- `d3`: 1,000 systems (one in ten with a +0 or −0 diagonal entry: refused): all identical;
+- the messages E1 to E5 (and a NaN knot, accepted as the original does): standard output and exit status
+  identical in all nine.
+
+So the spec alone gives FreeSurfer's numbers and messages on everything tested.

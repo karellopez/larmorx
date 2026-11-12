@@ -195,7 +195,7 @@ programs; suites run them through the oracle-output cache.
    random end values (and 0, 0 for the wrappers' case); evaluation points below, at and above every
    knot, between knots, ±0, ±∞, NaN; `n = 2` with conditions (0, 0); one case in 50 with two NaN
    values of different payloads and a NaN beginning value, one in 77 with an infinite value (§6).
-   **(observed**, 2026-11-12: the spec writer's model of this spec equals the probe on RESULT_CASES**)**.
+   **(observed**, 2026-11-12: the spec writer's model of this spec equals the probe on 20,001 seeded cases (400 of them with NaN values), every evaluation point of each, 1,000 systems of item 2 and the nine messages of item 3, bit for bit and byte for byte**)**.
 2. **`d3`**: systems with a zero (+0, −0) diagonal entry (refused), with a diagonal that becomes 0
    during the elimination, and random diagonally dominant and non-dominant systems.
 3. **Messages** (`set1`): E1 to E5 (E5 through two knots one subnormal step apart, `2⁻¹⁴⁹`, whose

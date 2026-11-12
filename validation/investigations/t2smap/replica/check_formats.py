@@ -46,6 +46,22 @@ def _echoes() -> list[np.ndarray]:
     return out
 
 
+def _head_echoes() -> list[np.ndarray]:
+    """A head-shaped series nilearn finds a mask in (16 x 14 x 8 voxels, 5 volumes): an
+    ellipsoid of S0 900-1200 decaying in each echo, a background of about 20."""
+    rng = np.random.default_rng(20261113)
+    shape = (16, 14, 8, 5)
+    i, j, k = np.indices(shape[:3])
+    head = ((i - 7.5) / 7) ** 2 + ((j - 6.5) / 6) ** 2 + ((k - 3.5) / 3.5) ** 2 <= 1
+    s0 = np.where(head, 900 + 300 * rng.random(shape[:3]), 20.0)
+    t2 = 0.02 + 0.04 * rng.random(shape[:3])
+    out = []
+    for te in TES:
+        decay = np.where(head, np.exp(-te / t2), 1.0)
+        out.append((s0 * decay)[..., None] * (1 + 0.02 * rng.standard_normal(shape)))
+    return out
+
+
 def write_analyze(
     path: Path,
     data: np.ndarray,
@@ -174,6 +190,24 @@ def make(d: Path) -> None:
         )
         write_mgh(d / f"m32-e{i}.mgh", x.astype(np.float32), obl)
         write_mgh(d / f"m16-e{i}.mgz", np.round(x).astype(np.int16), aff)
+    # computed masks (nilearn's compute_epi_mask of the first echo) need a head: int16 MGZ, and
+    # big-endian int16 ANALYZE with SPM2's scale factor and a MATLAB 5 `mat`
+    for i, x in enumerate(_head_echoes(), 1):
+        write_mgh(d / f"mhead-e{i}.mgz", np.round(x).astype(np.int16), aff)
+        write_analyze(
+            d / f"ahead-e{i}.hdr",
+            np.round((x - 0.5) / 2),
+            dtype="i2",
+            endian=">",
+            slope=2.0,
+            inter=0.5,
+        )
+        write_mat(
+            d / f"ahead-e{i}.mat",
+            "mat",
+            np.array([[-3.0, 0, 0, 9], [0, 3, 0, -12], [0, 0, 3.5, -7], [0, 0, 0, 1]]),
+            "5",
+        )
         write_mgh(d / f"mu16-e{i}.mgz", np.round(np.abs(x)).astype(np.uint16), aff, good_ras=False)
         write_mgh(d / f"m8-e{i}.mgz", np.clip(np.round(x / 6), 0, 255).astype(np.uint8), aff)
     # a mask of each format
@@ -218,8 +252,17 @@ CASES: list[tuple[str, str, list[str]]] = [
     (
         "analyze-i16-be-scaled-mat",
         "standard",
-        [*_d("a16be", ".hdr"), *TE, "--fittype", "curvefit", "--verbose"],
+        [
+            *_d("a16be", ".hdr"),
+            *TE,
+            "--mask",
+            "<F>/amask.hdr",
+            "--fittype",
+            "curvefit",
+            "--verbose",
+        ],
     ),
+    ("analyze-head-nomask", "standard", [*_d("ahead", ".hdr"), *TE]),
     ("analyze-u8-glcal-M", "standard", [*_d("a8", ".img"), *TE, *M, "--combmode", "paid"]),
     (
         "analyze-gz-f64-pixdim",
@@ -231,7 +274,7 @@ CASES: list[tuple[str, str, list[str]]] = [
     (
         "mgz-i16-nomask-curvefit",
         "standard",
-        [*_d("m16", ".mgz"), *TE, "--fittype", "curvefit", "--masktype", "dropout", "decay"],
+        [*_d("mhead", ".mgz"), *TE, "--fittype", "curvefit", "--masktype", "dropout", "decay"],
     ),
     ("mgz-u16-noras", "standard", [*_d("mu16", ".mgz"), *TE, *M]),
     ("mgz-u8", "standard", [*_d("m8", ".mgz"), *TE, *M, "--dummy-scans", "1"]),

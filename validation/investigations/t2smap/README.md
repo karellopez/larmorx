@@ -209,10 +209,11 @@ OPENBLAS_CORETYPE=Haswell scripts/orchestration/boxed.sh 32 <env>/bin/python -P 
   z-concatenated file and masks of the format; MGH/MGZ of uint8, int16, uint16, int32, float32,
   an oblique affine, the footer's repetition time or none, `goodRASFlag` 0, a z-concatenated
   file, three formats at once; and nibabel's failures: a short data file first and later, an
-  unknown ANALYZE type, MGH dimensions of 0, an MGH version other than 1, a `.mgh.gz` name):
-  `make(<folder>)` writes them, `CASES` names them (19; the suite runs them in both environments,
-  `reproduce` bit for bit, the default pass). Result: 19 of 19 pass (log
-  `oracles/logs/t2smap-cr-rs2-formats2.log`).
+  unknown ANALYZE type, MGH dimensions of 0, an MGH version other than 1, a `.mgh.gz` name; a
+  head-shaped series for nilearn's computed mask of an ANALYZE and an MGZ reference):
+  `make(<folder>)` writes them, `CASES` names them (20; the suite runs them in both environments,
+  `reproduce` bit for bit, the default pass). Result: 20 of 20 agree, 11 complete and 9 refused
+  alike (log `oracles/logs/t2smap-cr-rs2-formats3.log`).
 - `rs2_replayed_formats.py <work> <larmorx-gpl> <scratch>` (relay RS2): the replica
   (`reproduce`) against tedana's files on the replayed random-testing cases of the clean-room
   part whose inputs are ANALYZE or MGH (`<work>/f<n>/{inputs,tedana/out}` as

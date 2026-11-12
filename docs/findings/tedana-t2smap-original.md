@@ -34,7 +34,10 @@ the record `docs/validation/tedana-t2smap-original.md`).
   SciPy's (2 evaluations, xtol). Results stay within §17.3 (the orchestrator, 2026-11-11).
 - **`reproduce` is held to §17.3's thresholds for the fitted numbers** (the orchestrator,
   2026-11-11, as for 3dvolreg's original): the TED defects' behaviours (what is computed, refused
-  or written) are exact; the fits are the original's solvers'. The replica is the exact one.
+  or written) are exact; the fits are the original's solvers'. The replica is the exact one. The
+  one exception (relay C4, 2026-11-12, below): TED-46's voxels, where tedana's values are its
+  rounding noise, are computed with the main package's exact ports of numpy's `lstsq` and SciPy's
+  `curve_fit`.
 - **Every NaN written is x86-64's default NaN** (the orchestrator, 2026-11-11): the same bits on
   every platform; `check.py` compares NaN with NaN.
 
@@ -134,10 +137,10 @@ pass. The original's code was not the cause.
   an exact 0 too (a zero right-hand side). The default names the voxels counted at the first place
   that holds one (the first group; in `ts` the first volume): `<k> voxel(s) whose log-linear
   observations have no slope fitted with the slope 0 (no decay, T2* 500 ms); tedana's <n>-echo
-  least squares leaves rounding noise there (T2* 1 ms, or 1e16 ms and more)`. `reproduce` keeps
-  the exact zero (its notice says tedana's noise is not computed yet) until the main package's
-  exact port of numpy's `lstsq` serves it; the suite and the random-testing descriptor take those
-  cases as an expected divergence in (A), and in (B) until the replica's default takes TED-46.
+  least squares leaves rounding noise there (T2* 1 ms, or 1e16 ms and more)`. `reproduce` kept
+  the exact zero (its notice said tedana's noise was not computed yet) until relay C4
+  (2026-11-12, below), which computes it with the main package's exact port of numpy's
+  `lstsq`.
 - **Warnings (§12.3, §6.5):** the temporal means of no volume warn `Mean of empty slice` alone when
   the mask has no voxel; with no fit voxel `invalid value encountered in scalar divide` comes once
   for each of §6.5's two percentages (two places: twice when k > 3) (both observed).
@@ -153,7 +156,68 @@ pass. The original's code was not the cause.
   non-finite first-echo mean from the dropout percentile, so an infinite sample changed the
   thresholds and named TED-01; tedana sorts and matches an infinite mean without failing, and the
   replica's default keeps it (observed). The default now drops the NaN means only (the spec's
-  §15.1 row says "finite": for a spec writer).
+  §15.1 row said "finite"; spec writer 3 made it "not NaN", 2026-11-12).
+
+## Relay C4 (2026-11-12): TED-46 in `reproduce` and in the curve fit, the spec writers' answers
+
+- **TED-46 in `reproduce`: tedana's rounding noise, computed.** A voxel whose log-linear
+  observations are all equal has the exact slope 0, but tedana's batched least squares leaves
+  noise there whose sign depends on the voxel's place in its group's batch (§13.4). `reproduce`
+  now solves each group (and volume, in `ts`) that holds such voxels as tedana does: the m × 2
+  design (rows (1, −TE), echo by echo) and one right-hand side per voxel of the group in voxel
+  order, through the main package's exact port of numpy's `lstsq`
+  (`larmorx_transform::numpy_linalg::lstsq`, LAPACK 3.12.1 or 3.12.0 as `LARMORX_TEDANA_LIBRARIES`
+  names numpy's release), and takes its solution at those voxels only (every other voxel keeps
+  the closed form). The whole batch is solved because a column's last bits depend on where it
+  stands in it (the kernel class of the batch's last columns, §13.4). Memory: the batch, m × N
+  float64, only in such a group in `reproduce` (none of fMRIPrep's calls holds one). The notice
+  no longer says the noise is not computed.
+- **TED-46 in the curve fit, `reproduce`: SciPy's own fit, through its exact port.** From
+  tedana's start at those voxels (T2* about 1e13 s, a positive noise slope, in the suite's cases),
+  SciPy's forward difference along T2* (a step of √eps · T2*) changes the model S0 · exp(−TE /
+  T2*) by less than half a unit in the last place of float64, so its Jacobian's T2* column is
+  exactly 0 and only S0 moves (to about x + 0.5, the spec's measurement). The original's own
+  derivatives are not 0 there, so its trust-region fit went on along T2* to an objective of
+  about 0 (T2* 8.4e8 s instead of tedana's 2.7e13 s): the suite's `x-ted46-curvefit-ts` failed
+  (A) on §17.3's (b)/(c) share (108 of 3,216 fits, 3.36 %) and on the run's cap (one of those
+  values; the caps 2.7e13 s and 8.4e8 s apart). `reproduce` therefore fits TED-46's voxels with
+  `larmorx_optim::curve_fit2` (SciPy 1.18.1, or 1.15.3 with `shared`), the model with glibc's
+  exponential, from tedana's start; every other voxel keeps the original's solver.
+- **TED-46 in the curve fit, the default** (spec writer 4's measurement, §7.3's last paragraph):
+  where the samples themselves are all equal (x), the exact solution S0 = x, T2* = +∞ (500 ms
+  after §8's floor), not a failure (0 in the failures map, left out of the DEBUG count), its
+  variances and covariance 0 when m = n · T_u > 2, +∞ with SciPy's `OptimizeWarning` when m ≤ 2
+  (two echoes in `--fitmode ts`). Observations equal with samples that are not (x = ±c) keep the
+  start +∞ and its failure.
+- **The result**, value by value at the 18 voxels the suite's TED-46 inputs saturate at 255 in
+  every echo and volume (`validation/investigations/t2smap-original/ted46_values.py`; cases
+  `x-ted46-loglin`, `-loglin-ts`, `-curvefit`, `-curvefit-ts`, `-curvefit-ts-2e`): every map
+  (T2*, S0, the limited maps, the failures, both variances, the RMSE) identical to tedana's in
+  `reproduce`, and the default's identical to the replica's default (larmorx-gpl built from the
+  same branch). tedana's T2* there: 7.3e13 s (all mode), 2.7e13 s per volume (ts), 1.6e14 s with
+  two echoes; the default's 500 ms.
+- **TED-46's notice counts equal observations only** (spec writer 3): an exact zero slope from
+  distinct observations (rare arrangements, §7.2) is the closed form's own value (judged by
+  §17.3), no longer counted.
+- **TED-01's texts** (spec writer 3): the notice reads "not NaN"; with no first-echo mean that is a
+  number the default's error comes with the notice `no voxel of the mask has a first-echo mean
+  that is a number` (a correction that changes the message is named).
+- **`--fitmode ts` with no volume** (every volume a dummy scan, TED-13 in `reproduce`): tedana
+  checks the echo times in each volume's fit, so with no volume a count that does not match is
+  never met (nor TED-31): it writes the adaptive mask and the S0 map and fails at the confounds
+  table (spec writer 3); the original now does the same (`x-dummy-all-none-ts-te2`).
+- **MGH's translation is float32** (nibabel 5.4.2's `MGHHeader.get_affine` and
+  `affines.from_matvec`, MIT): the translation Pxyz_c − (MdcD · dims) / 2 is computed in float64
+  and stored in an array of MdcD's type, float32; the image's affine is that array widened. The
+  original kept the float64 value. It shows where nilearn prints an affine in a refusal; the
+  outputs' headers store float32 values anyway (golden `mgh` unchanged).
+- **The suite against a replica of this branch.** The replica built from the same branch
+  (`crates-gpl`, `cargo build --release -p larmorx-gpl-cli`, run as a program) reads ANALYZE and
+  MGH, prints tedana's chained tracebacks and both missing warnings, and has TED-31's and TED-46's
+  corrections: the suite's expected divergences `three-d`, `x-mask-grid`, `x-underflow-debug`,
+  `x-inf-both-paid`, TED-46's (A) and (B) and TED-31's (B), and the handling of the replica's
+  refusal of ANALYZE and MGH are gone; every one of those cases passes. (B) is run only against
+  such a replica (`LARMORX_GPL_BIN`).
 
 ## Speed and memory (fMRIPrep's calls)
 

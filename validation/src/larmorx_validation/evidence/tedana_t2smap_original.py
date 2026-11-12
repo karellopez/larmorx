@@ -126,15 +126,19 @@ def _args() -> tuple[list[str], list[Path], Path]:
     return args, echoes, mask
 
 
-def _compute(e: fcache.Entry) -> None:
+def _compute(e: fcache.Entry, only: tuple[str, ...] = ()) -> None:
+    """The example's runs (``only``: just those programs, a re-run)."""
     suite = _suite()
     args, echoes, mask = _args()
-    for i, p in enumerate(echoes, 1):
-        e.input(f"echo {i} (fMRIPrep's boldref-space series)", p)
-    e.input("fMRIPrep's dilated brain mask (t2smap's --mask)", mask)
+    if not only:
+        for i, p in enumerate(echoes, 1):
+            e.input(f"echo {i} (fMRIPrep's boldref-space series)", p)
+        e.input("fMRIPrep's dilated brain mask (t2smap's --mask)", mask)
     unset = [k for k in os.environ if k.startswith(("NPY_", "OPENBLAS_", "OMP_"))]
     notices: dict[str, list[str]] = {}
     for label, program, mode, n, _sub in RUNS:
+        if only and program not in only:
+            continue
         d = e.dir / label
         if d.is_dir():
             shutil.rmtree(d)
@@ -165,18 +169,44 @@ def _compute(e: fcache.Entry) -> None:
         del r
         log = (e.dir / f"{label}.log").read_text(encoding="utf-8")
         notices[label] = sorted({m.group(1) for x in log.splitlines() if (m := _NOTICE.match(x))})
+    versions = {
+        "tedana": "tedana 26.0.3 (oracles/python-newest, the launcher of the spec's probe; "
+        "through the oracle-output cache)",
+        "replica": REPLICA,
+        "larmorx": "the clean-room original (crate larmorx-tedana) through "
+        "larmorx._core.tedana_t2smap_cleanroom",
+    }
+    if only:
+        e.extra.update(notices=notices, versions={"replica": REPLICA})
+        return
     e.extra.update(
         call=CALL,
         command="t2smap " + " ".join(core.short_path(w) for w in args),
         notices=notices,
-        versions={
-            "tedana": "tedana 26.0.3 (oracles/python-newest, the launcher of the spec's probe; "
-            "through the oracle-output cache)",
-            "replica": "larmorx-gpl 0.1.0rc1 (PyPI), its program as a black box",
-            "larmorx": "the clean-room original (crate larmorx-tedana) through "
-            "larmorx._core.tedana_t2smap_cleanroom",
-        },
+        versions=versions,
         threads={"tedana": ["1"], "original": [str(THREADS), "1"]},
+    )
+
+
+#: The replica's program the example runs (``LARMORX_GPL_BIN``): since relay C4 (2026-11-12) the
+#: one built from the clean-room part's branch (larmorx-gpl 0.1.0rc1 from PyPI before).
+REPLICA = "larmorx-gpl built from the clean-room part's branch, its program as a black box"
+
+
+def rerun_larmorx(ctx: core.Context) -> dict:
+    """The example's runs of the original and of the replica again (relay C4, 2026-11-12: the
+    original's TED-46 work and the replica built from the same branch), tedana's kept; written
+    into the complete cache entry with ``fcache.merge_rerun``."""
+    e = entry(ctx)
+    info = e.info()
+    e.runs = []
+    e.extra = {}
+    _compute(e, only=("original", "replica"))
+    return fcache.merge_rerun(
+        e,
+        info,
+        "relay C4 (2026-11-12): the original's TED-46 work (no TED-46 voxel in this call) and "
+        "the replica's program built from the same branch",
     )
 
 
@@ -337,8 +367,8 @@ def _example(ctx: core.Context) -> dict:
             {
                 "label": "Programs",
                 "text": "tedana 26.0.3's t2smap (through the oracle-output "
-                "cache); larmorx-gpl 0.1.0rc1's replica (a black box); LARMORX's clean-room original "
-                f"(crate larmorx-tedana, experimental) from larmorx at commit "
+                f"cache); the replica: {info['versions']['replica']}; LARMORX's clean-room "
+                f"original (crate larmorx-tedana, experimental) from larmorx at commit "
                 f"`{info['larmorx_commit'][:12]}`",
             },
             {"label": "Grid", "text": common.describe_grid(img, tuple(grid.shape))},
@@ -597,8 +627,10 @@ def export(ctx: core.Context) -> dict:
                         "tables": [], "provenance": {}})  # fmt: skip
 
 
-if __name__ == "__main__":  # the example's cache entry only
+if __name__ == "__main__":  # the example's cache entry only: python -m ... [--rerun]
     from larmorx_validation.figures.core import REPO, default_cache
 
     c = core.Context(repo=REPO, site=Path("."), cache=default_cache())
+    if "--rerun" in sys.argv:
+        rerun_larmorx(c)
     print("done", entry(c).dir)

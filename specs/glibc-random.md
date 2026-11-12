@@ -178,7 +178,8 @@ passes when it gives the same values:
 5. **Long streams:** §6's `long` hashes (10⁶ values).
 6. **Every seed:** all 2³² seeds, the first 4 values each (`raw <seed0> <count> 4` writes them as
    binary; or the `hash` command over blocks of seeds, compared with the clean room's hash of the same
-   block). The spec writer's check ran this in two processes in about an hour.
+   block). The spec writer's check ran this in two processes in about an hour (all identical,
+   §10's last paragraph).
 7. **The official program:** `robust_template_tp.sh` (the probe folder) runs FreeSurfer's
    `mri_robust_template` for `N` inputs and a seed and compares its "Will use TP k" line with
    `(o₀ mod N) + 1` (28 cases); a replica of `mri_robust_template` passes the same cases.
@@ -186,7 +187,10 @@ passes when it gives the same values:
    0, 1, 2³¹ and 2³² − 1, the first 4 values of each and the 1,000th.
 
 The spec writer's check (`validation/investigations/glibc-random-spec-check/`, closed) ran groups 1 to
-6 against a model written from this text: all identical (its README).
+6 against a model written from this text **(observed**, 2026-11-12**)**: the default stream, 213 seeds ×
+10,000 values (`srand` and `rand`), 47 seeds × 3,000 (`srandom` and `random`), the shared state on 15
+seeds, the four long streams and the two block hashes, and **every one of the 2³² seeds**, the first 4
+values of each: all identical.
 
 ## 11. References
 

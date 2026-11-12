@@ -16,4 +16,6 @@ Results (2026-11-12, the reference machine, glibc 2.35; logs
   conversions of a `long`, 150 random 32-bit and 30 random 64-bit seeds) x 10,000 values: all
   identical; `srandom` + `random` on 47 seeds x 3,000 values: identical; the shared state on 15 seeds:
   identical; four long streams (10⁶ values): identical; the spec's two block hashes: identical;
-- every 32-bit seed, the first 4 values: see the exhaustive logs (filled in below when they end).
+- **every 32-bit seed** (all 4,294,967,296), the first 4 values of each: **identical** (256 of 256
+  blocks of 2²⁴ seeds; two processes, blocks 0 to 127 in 59 minutes and 128 to 255 in about 70
+  minutes beside other work).

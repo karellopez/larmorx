@@ -305,8 +305,10 @@ def gather_confounds(
     ``acompcor``, ``crowncompcor``, ``cos_basis``, ``motion`` (empty files and tables without
     columns skipped), their columns renamed to snake case without white space or ``#``
     (``GlobalSignal`` → ``global_signal``), placed side by side, a shorter table's rows aligned
-    with the last rows (fMRIPrep's ``_adjust_indices``); ``confounds.tsv`` in ``out_dir``, and
-    the names of the groups given."""
+    with the last rows (fMRIPrep's ``_adjust_indices``: their missing rows first, in volume
+    order; PIPE-63: pandas' ``concat`` writes the first volume's row last when an earlier table is
+    the shorter one, ``"reproduce"``); ``confounds.tsv`` in ``out_dir``, and the names of the groups
+    given."""
     _defects.check(upstream_defects)
     groups = (
         (signals, "signals", "Global signals"),
@@ -330,6 +332,7 @@ def gather_confounds(
         if os.path.exists(path) and os.stat(path).st_size > 0:
             all_files.append(path)
     data = Table([], [], [])
+    unsorted = False
     for path in all_files:
         try:
             new = tb.read_tsv(
@@ -348,6 +351,31 @@ def gather_confounds(
         elif diff < 0:
             data = Table(data.names, data.columns, list(range(-diff, data.n_rows - diff)))
         data = _concat(data, new)
+        order = sorted(range(data.n_rows), key=data.index.__getitem__)
+        if order != list(range(data.n_rows)):
+            unsorted = True
+            if upstream_defects == "fix":
+                # Kept in volume order after every concat: a later shorter frame's relabelling
+                # (``_adjust_indices``) then shifts the volumes, not pandas' order.
+                data = data.take_rows(order)
+    if unsorted:
+        _defects.warn(
+            [
+                (
+                    "PIPE-63",
+                    "fMRIPrep GatherConfounds",
+                    upstream_defects,
+                    "pandas' concat puts the rows of a table longer than the earlier ones after "
+                    "theirs, so the first volumes' rows would be written last: "
+                    + (
+                        "the rows are written in volume order"
+                        if upstream_defects == "fix"
+                        else "written as pandas orders them"
+                    ),
+                )
+            ],
+            stacklevel=2,
+        )
     out = os.path.join(_out_dir(out_dir), "confounds.tsv")
     tb.write_tsv(out, data)
     return GatherConfoundsResult(out, confounds_list)

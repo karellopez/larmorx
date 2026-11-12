@@ -471,13 +471,22 @@ def model_default():
             }
         )
 
+    concat = pd.concat
+
+    def sorted_concat(objs, *a, **kw):
+        # PIPE-63's correction: the rows in volume order (the labels sorted).
+        out = concat(objs, *a, **kw)
+        return out.sort_index() if kw.get("axis") == 1 else out
+
     pd.read_csv = functools.partial(read_csv, float_precision="round_trip")
     pd.DataFrame.to_json = rounded
+    pd.concat = sorted_concat
     try:
         yield
     finally:
         pd.read_csv = read_csv
         pd.DataFrame.to_json = to_json
+        pd.concat = concat
 
 
 def run_orig(klass, d: Path, model: bool = False, **inputs):
@@ -776,6 +785,7 @@ def iface_section(tier: str, tmp: Path) -> None:
             "fd": str(inputs / "head.tsv"),
             "motion": files["motion"],
         },
+        {"std_dvars": files["std_dvars"], "fd": files["fd"], "rmsd": str(inputs / "long.tsv")},
         {"signals": files["signals"], "dvars": files["signals"]},
         {},
     ]

@@ -221,7 +221,7 @@ fn xstrtod(s: &[u8], release: PandasRelease) -> (Xstrtod, Denoted) {
         number = -number;
     }
     let mut written: i64 = 0;
-    if at(s, p).to_ascii_uppercase() == b'E' {
+    if at(s, p).eq_ignore_ascii_case(&b'E') {
         p += 1;
         match release {
             PandasRelease::V3_0 => {

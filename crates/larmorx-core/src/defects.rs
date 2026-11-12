@@ -409,6 +409,8 @@ defects! {
         "numpy's loadtxt squeezes a table of one row to a vector, which savetxt writes as one column (the row's values one under the other), and a table of one value to a scalar, which savetxt refuses (ValueError: Expected 1D or 2D array, got 0D array instead)";
     PIPE_62 = "PIPE-62", "niworkflows AddTSVHeader", true,
         "a header with another number of names than the table's columns is written as given, so the file's header and rows disagree";
+    PIPE_63 = "PIPE-63", "fMRIPrep GatherConfounds", true,
+        "a shorter table is aligned with the last rows (its missing rows first), but pandas' concat joins the row labels without sorting them: when an earlier table is the shorter one (no signals table, a DVARS table first), the first volume's row is written last and every other row one volume early";
     PD_01 = "PD-01", "pandas read_csv", true,
         "the default float parser (precise_xstrtod) keeps at most 17 digit characters, the leading zeros of 0.00... included, accumulates them in a double and divides by one power of ten, so most values to_csv writes (their shortest repr, up to 17 significant digits) are read back as another double, one or more units in the last place off";
     PD_02 = "PD-02", "pandas to_json", true,

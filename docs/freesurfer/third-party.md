@@ -177,7 +177,8 @@ disclaimer page no longer answers. FreeSurfer's file carries MGH's notice. **Run
 images (`Registration.cpp` 3016); `mri_convert` and `mri_vol2vol` only with cubic interpolation
 (no default-path command asks for it, programs.md). The method is the published recursive
 filtering that ITK's `BSplineDecompositionImageFilter` and SciPy's `spline_filter` also implement
-(LARMORX ports both). Porting: a question (§7, Q4).
+(LARMORX ports both). Porting: decided by the user (2026-11-12): a replica in `larmorx-freesurfer`
+crediting EPFL, and a clean room in `larmorx` (§9, P-10).
 
 **TP-06. Numerical Recipes' `nrutil` allocators.** `vector`, `matrix`, `free_vector`,
 `free_matrix` (`utils/numerics.cpp` 1682-1729) are NR in C's `nrutil.c` helpers verbatim (names,
@@ -332,7 +333,8 @@ the facts for each and §10 the ITK comparison; Q5 is answered (later).
   write the spline from its published description?
 - **Q4 (TP-05).** The cubic B-spline code derived from EPFL's (no licence statement): port it as
   part of FreeSurfer's file, or write it from the published method (LARMORX already ports the same
-  recursion from ITK and SciPy)?
+  recursion from ITK and SciPy)? *Answered (the user, 2026-11-12):* both, as for every piece; the
+  replica in `larmorx-freesurfer` with FreeSurfer's other files, crediting EPFL (§9, P-10).
 - **Q5 (TP-14).** MARS's distance transform runs on no default path: leave it out of the replicas
   until a program needs it?
 - **Q6 (TP-11).** The official 8.2.0 binaries link ITK 4.13.2 (chosen by `CMakeLists.txt` for
@@ -417,7 +419,7 @@ in `larmorx-gpl`, non-commercial code in a non-commercial package.
 | P-07 the networks' upstream code and runtime (neurite, SynthSeg, voxelmorph, surfa; TensorFlow, PyTorch, numpy, SciPy, nibabel, h5py; TP-12) | Apache-2.0, MIT, BSD-3-Clause | `larmorx` (Rust inference with the original weights) | yes | in-process (Python) | the replica |
 | **P-08 GSL 1.8's RANLUX389 and distributions (TP-03)** | **GPL-2.0-or-later** | **`larmorx-gpl`** | **no** | in-process (`mri_coreg`; no boundary) | **the clean-room piece** |
 | **P-09 Burkardt's cubic spline (TP-04)** | **2006: none stated; ~2010-2022: LGPL; since ~2024: MIT** | `larmorx` under MIT; `larmorx-gpl` under the LGPL | **depends on the terms** | in-process (`mri_normalize`) | the MIT piece if Burkardt confirms MIT for the 2006 code, else the clean-room piece |
-| **P-10 EPFL's B-splines and Unser's NIH pyramids (TP-05)** | **none stated** | **none until EPFL's permission** | no permission | in-process (`mri_robust_template`) | **the clean-room piece** (or ITK's Apache-2.0 version if it gives the same bits) |
+| P-10 EPFL's B-splines and Unser's NIH pyramids, in Reuter's `mriBSpline.cpp` (TP-05) | FreeSurfer's (MGH's notice); EPFL's own example code states none | `larmorx-freesurfer`, crediting EPFL (the user, 2026-11-12) | yes (FreeSurfer's file) | in-process (`mri_robust_template`) | the replica |
 | **P-11 `tkregister2_cmdl` (TP-10)** | **FreeSurfer/CorTechs, non-commercial** | **a non-commercial package** | yes, the program then non-commercial; not with GPL or FSL code | **separate program** (run by `bbregister`) | the non-commercial package's program when installed, the clean room otherwise |
 | **P-12 Washington University's 4dfp tools (TP-09)** | **all rights reserved** | **none until Washington University's written permission** | no permission | **separate programs** (run by `talairach_avi`) | **the clean-room piece** (settled 2026-10-19) |
 | P-13 MARS (TP-14) | a copyright line, no terms | none until permission | no permission | in-process; no default path | nothing now (later) |
@@ -426,7 +428,7 @@ in `larmorx-gpl`, non-commercial code in a non-commercial package.
 | P-16 libstdc++'s `std::sort`, libgomp's schedules | GPL-3.0 with the GCC Runtime Library Exception | `larmorx`, from descriptions (FSL-22's precedent) | yes (compiled code) | dynamic | the description-written versions |
 | P-17 zlib (MGZ's gzip) | Zlib | `larmorx` | yes | dynamic | the replica |
 
-The five that need a decision or a permission, with the facts behind each:
+The five that needed a decision or a permission, with the facts behind each (P-10 decided since):
 
 - **P-08, GSL (TP-03).** GPL-2.0 §2(b): a work containing the Program must be "licensed as a whole
   at no charge to all third parties under the terms of this License", §6: "You may not impose any
@@ -464,17 +466,26 @@ The five that need a decision or a permission, with the facts behind each:
   the 2006 routines (then the replica goes to `larmorx` and runs in `mri_normalize`'s replica);
   port under the LGPL into `larmorx-gpl` (then `mri_normalize`'s replica cannot use it); clean room
   only.
-- **P-10, EPFL (TP-05).** Nothing grants a right to copy the EPFL-derived parts of `mriBSpline.cpp`
-  (EPFL's `coeff.c` and its page state no terms). Swiss law gives the employer the rights of use in
-  software its employees write in their duties (Federal Act on Copyright, Art. 17), so the
-  permission is EPFL's: its Biomedical Imaging Group (Philippe Thévenaz, whom the page names as
-  contact; Michael Unser, its head). Unser's 1992 pyramid filters say "NIH, BEIP": if written in a
-  federal employee's duties they have no US copyright (17 U.S.C. §105). ITK distributes its own
-  EPFL-derived B-spline classes under Apache-2.0 ("And code obtained from bigwww.epfl.ch by Philippe
-  Thevenaz", `itkBSplineDecompositionImageFilter.h`, `itkBSplineResampleImageFilterBase.h`), which
-  LARMORX already ports. *Until a permission:* `mri_robust_template`'s replica uses the clean-room
-  piece (the published recursive filtering), or ITK's Apache-2.0 code where it gives FreeSurfer's
-  bits (to measure).
+- **P-10, EPFL (TP-05). Decided (the user, 2026-11-12; decision log "FreeSurfer's borrowed pieces
+  and its two streams", with its correction of the same day):** `utils/mriBSpline.cpp` is Martin
+  Reuter's file, carries MGH's notice and is distributed by FreeSurfer under its licence, so its
+  replica goes into `larmorx-freesurfer` like FreeSurfer's other files, crediting EPFL in the
+  crate's `PROVENANCE.md` and `NOTICE` (no private branch); its clean room goes into `larmorx`. The
+  user: "please make sure EPFL's B-splines is ported": it is its own item of the queue, in wave 3.2
+  with `mri_robust_template` (`queue.md`). A request to the authors follows as a courtesy ("We will
+  ask the author afterwards"; the orchestrator drafts it). The facts behind it: the file is "based
+  on" Thévenaz, Blu and Unser's paper (IEEE TMI 19 (2000) 739-758) and EPFL's 2D example code
+  (`bigwww.epfl.ch/thevenaz/interpolation/`, its `coeff.c` of January 5, 2009, and
+  `bigwww.epfl.ch/sage/pyramids/`), whose routine names it keeps (`ConvertToInterpolationCoefficients`,
+  `InitialCausalCoefficient`, `InitialAntiCausalCoefficient`); EPFL's page and `coeff.c` state no
+  terms. Swiss law gives the employer the rights of use in software its employees write in their
+  duties (Federal Act on Copyright, Art. 17), so EPFL's Biomedical Imaging Group is whom to ask
+  (Philippe Thévenaz, whom the page names as contact; Michael Unser, its head). Unser's 1992
+  pyramid filters say "NIH, BEIP": if written in a federal employee's duties they have no US
+  copyright (17 U.S.C. §105). ITK distributes its own EPFL-derived B-spline classes under
+  Apache-2.0 ("And code obtained from bigwww.epfl.ch by Philippe Thevenaz",
+  `itkBSplineDecompositionImageFilter.h`, `itkBSplineResampleImageFilterBase.h`), which LARMORX
+  already ports: the clean room can build on the same published recursion.
 - **P-11, CorTechs (TP-10).** The CorTechs terms limit use, reproduction, derivative works and
   distribution "to non-commercial internal research and educational purposes by not-for-profit
   entities" (2(d)), forbid research "sponsored by a commercial entity" (2(e)), and ask that

@@ -16,7 +16,8 @@
 #   of the piece's terms is used: see basis)), basis (why),
 #   freesurfer_replica_uses (what larmorx-freesurfer's replica of the calling program uses for this part),
 #   clean_room ("larmorx" for every piece, the user's decision), permission (from whom, when one is needed),
-#   options (for the user, where the facts leave a choice), larmorx_today (what LARMORX already has).
+#   options (for the user, where the facts leave a choice), larmorx_today (what LARMORX already has),
+#   decided (where the user has decided the piece's placement: who, when, what; the other fields then follow it).
 
 schema = 1
 freesurfer = "8.2.0"
@@ -209,17 +210,18 @@ id = "P-10"
 piece = "EPFL's cubic B-spline coefficients and Unser's 1992 NIH pyramid filters, in Reuter's 3D code"
 findings = ["TP-05"]
 where = ["utils/mriBSpline.cpp"]
-licence = "none stated (EPFL's coeff.c of 2009 and its page); Unser's filters 'NIH, BEIP, May 1992'"
-terms = "no permission is stated, so copyright law alone applies: Swiss law gives an employer the rights of use in software its employees write in their duties (Federal Act on Copyright, Art. 17), so EPFL's; a US federal employee's official work has no US copyright (17 U.S.C. 105), which may cover the 1992 NIH filters"
-runs = "mri_robust_template's final resampling (cubic B-spline by default) when several T1w images are averaged (sMRIPrep, recon-all); the robust tools' pyramid for large images; mri_convert and mri_vol2vol only with cubic interpolation (no default command asks)"
+licence = "LicenseRef-FreeSurfer: the file is Martin Reuter's (FreeSurfer's team), carries MGH's notice and FreeSurfer distributes it under its licence; it is 'based on' Thevenaz, Blu and Unser, Interpolation Revisited, IEEE TMI 19 (2000) 739-758, and EPFL's 2D example code (bigwww.epfl.ch/thevenaz/interpolation/, its coeff.c of January 5, 2009, and bigwww.epfl.ch/sage/pyramids/), which state no licence; the pyramid filters say 'Author: Michael Unser, NIH, BEIP, May 1992'"
+terms = "FreeSurfer's (see [freesurfer_licence]); EPFL's own code states none: Swiss law gives an employer the rights of use in software its employees write in their duties (Federal Act on Copyright, Art. 17), so EPFL's; a US federal employee's official work has no US copyright (17 U.S.C. 105), which may cover the 1992 NIH filters"
+runs = "mri_robust_template's final resampling (cubic B-spline by default, mri_robust_template.cpp 134) when several T1w images are averaged (sMRIPrep, recon-all's MotionCor); the robust tools' pyramid for large images (Registration.cpp 3016); mri_convert and mri_vol2vol only with cubic interpolation (no default command asks)"
 link = "in-process"
-replica_package = "none until EPFL's permission; then larmorx-freesurfer (Reuter's file is MGH's) with EPFL's terms"
-combinable = "no-permission"
-basis = "nothing grants a right to copy the EPFL-derived parts; ITK distributes its own EPFL-derived B-spline code under Apache-2.0 ('And code obtained from bigwww.epfl.ch by Philippe Thevenaz', itkBSplineDecompositionImageFilter.h, itkBSplineResampleImageFilterBase.h), which LARMORX already ports"
-freesurfer_replica_uses = "the clean-room piece (the published recursive filtering, Thevenaz, Blu, Unser, IEEE TMI 19 (2000) 739-758, and Unser's papers), or ITK's Apache-2.0 version where its arithmetic equals FreeSurfer's (to measure)"
-clean_room = "larmorx"
-permission = "EPFL's Biomedical Imaging Group (Philippe Thevenaz, the contact the page names; Michael Unser, its head), for EPFL as the holder; the orchestrator drafts the request for the user"
-options = ["ask EPFL", "clean room only", "build on ITK's Apache-2.0 B-spline classes if they give FreeSurfer's bits"]
+replica_package = "larmorx-freesurfer, like FreeSurfer's other files, crediting EPFL (the paper, and the 2D example code whose routine names it keeps: ConvertToInterpolationCoefficients, InitialCausalCoefficient, InitialAntiCausalCoefficient) in the crate's PROVENANCE.md and NOTICE"
+combinable = "yes"
+basis = "the file the replica translates is FreeSurfer's (MGH's notice, distributed under FreeSurfer's licence); what it takes from EPFL is the published method and the 2D example code's routine names and structure, whose own page states no terms; ITK distributes its own EPFL-derived B-spline code under Apache-2.0 ('And code obtained from bigwww.epfl.ch by Philippe Thevenaz', itkBSplineDecompositionImageFilter.h, itkBSplineResampleImageFilterBase.h), which LARMORX already ports"
+freesurfer_replica_uses = "the replica (mriBSpline.cpp translated, its own queue item in wave 3.2 with mri_robust_template)"
+clean_room = "larmorx (the published recursive filtering and Unser's pyramid papers; LARMORX's ITK and SciPy ports implement the same recursion)"
+permission = "none needed for the replica (the user, 2026-11-12); a courtesy request to EPFL's Biomedical Imaging Group (Philippe Thevenaz, the contact the page names; Michael Unser, its head) afterwards (the user: 'We will ask the author afterwards'), drafted by the orchestrator"
+decided = "the user, 2026-11-12 (decision log 'FreeSurfer's borrowed pieces and its two streams', with its correction of the same day): a replica in larmorx-freesurfer crediting EPFL, no private branch, and a clean room in larmorx; the user: 'please make sure EPFL's B-splines is ported'"
+options = []
 larmorx_today = "the B-spline decomposition of ITK 5.4.5 and SciPy's spline_filter (larmorx-interp, larmorx-registration)"
 
 [[piece]]

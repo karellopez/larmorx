@@ -14,3 +14,13 @@ Their results are in `docs/freesurfer/` (closed too).
 
   It is a reading aid: conditions around a command (`if(...)`) are not printed, so every line it
   shows was checked by hand in the script before it went into the inventory.
+- `cmake_targets.py`: the build graph. For every compiled program of
+  `docs/freesurfer/programs.toml`: its CMake target, its source files and their lines, the
+  internal libraries it reaches (transitively) and the external ones; then every internal library
+  reached, with its files and lines. Used for `docs/freesurfer/code.md` §1.
+
+      python -P validation/investigations/freesurfer-inventory/cmake_targets.py \
+          <workspace>/tags/freesurfer-8.2.0 docs/freesurfer/programs.toml [--json out.json]
+
+  Known gaps (relay 2 fixes them): `if()` blocks are not evaluated (conditional libraries are
+  listed), and a target named through a variable (`${DCM2NIIXFSLIB}`) is not resolved.

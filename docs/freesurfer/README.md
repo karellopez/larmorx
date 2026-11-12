@@ -14,7 +14,7 @@ porting cards. It grows relay by relay; the state of each part is below.
 |---|---|---|
 | [programs.md](programs.md) | every program `recon-all` 8.2.0 runs in its two streams (v8, the default, and `-no-v8`), and the FreeSurfer programs fMRIPrep 25.2.6 and sMRIPrep 0.19.2 run outside it, each with the options used and the step that runs it; the corrections this brings to the plan | relay 1, from the script; to be checked against the recordings when they exist |
 | [programs.toml](programs.toml) | the same, one entry per program, machine-readable (the base the cards and the queue are built from) | relay 1 |
-| `code.md` | per program: its source files, the shared library functions it reaches, their size; the foundations | next relay |
+| [code.md](code.md) | per program: its source files, the shared library functions it reaches, their size; the foundations | started by relay 1 (the build graph's first pass); relay 2 continues |
 | `third-party.md` | the licence and origin of every file in those call graphs | later |
 | `data-files.md` | every data file each program reads, its licence, source, size and checksum | later |
 | `variation.md` | thread counts, seeds, floating-point settings | later |

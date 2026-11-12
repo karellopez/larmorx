@@ -29,6 +29,11 @@
 //! - **ITK-105** (printing only): `write50` takes the largest value with its sign (a negative
 //!   one stops the scale's search) and divides by 0 for a vector of zeros. `Fix` scales by the
 //!   largest magnitude and prints a zero vector unscaled; `Reproduce` prints as VXL.
+//! - **ITK-106** (printing only): `lb1_` decrements its `x` and `g` pointers for Fortran's
+//!   indexing and passes the decremented pointers to `write50`, which indexes from 0: the vectors
+//!   are printed from the double *before* each array (memory the routine does not own) and their
+//!   last element is dropped. `Fix` prints the vectors; `Reproduce` prints VXL's window with the
+//!   value before the array as 0 (memory contents are never reproduced, D13).
 //!
 //! Ported from VXL as bundled with ITK v4.13.2 (BSD licence; netlib's Fortran by J. Nocedal,
 //! `lbfgs.f`, translated by f2c 20050501 and edited by VXL): `v3p/netlib/opt/lbfgs.{c,h}`,
@@ -76,7 +81,7 @@
 #![allow(clippy::needless_range_loop, clippy::too_many_arguments)]
 
 use crate::cfmt::{self, Streams};
-use crate::defects::{ITK_103, ITK_104, ITK_105, Notice, UpstreamDefects};
+use crate::defects::{ITK_103, ITK_104, ITK_105, ITK_106, Notice, UpstreamDefects};
 use crate::math;
 use crate::vnl_svd::{daxpy, ddot};
 
@@ -508,6 +513,28 @@ fn write50(v: &[f64], mode: UpstreamDefects, out: &mut dyn Streams, call: &mut L
     out.out(&line);
 }
 
+/// `write50` as `lb1_` calls it (ITK-106): VXL passes the array's pointer decremented by one.
+fn write50_lb1(v: &[f64], mode: UpstreamDefects, out: &mut dyn Streams, call: &mut LbfgsCall) {
+    let detail = match mode {
+        UpstreamDefects::Fix => "the printed vector (VXL's lb1 prints from the value before the array and drops the last)",
+        UpstreamDefects::Reproduce => "the printed vector starts with the value before the array (memory VXL does not own, printed as 0) and drops the last",
+    };
+    if !v.is_empty() {
+        crate::defects::push_once(&mut call.notices, Notice::new(&ITK_106, mode, detail));
+    }
+    match mode {
+        UpstreamDefects::Fix => write50(v, mode, out, call),
+        UpstreamDefects::Reproduce => {
+            let mut window = Vec::with_capacity(v.len());
+            if !v.is_empty() {
+                window.push(0.0);
+                window.extend_from_slice(&v[..v.len() - 1]);
+            }
+            write50(&window, mode, out, call);
+        }
+    }
+}
+
 /// `lb1_`: the table of iterations (`IPRINT(1)` iterations apart, `IPRINT(2)` its detail).
 fn lb1(
     iprint: [i64; 2],
@@ -539,9 +566,9 @@ fn lb1(
         out.out(&format!(" F= {}   GNORM= {}\n", cfmt::g(f, 6), cfmt::g(gl.gnorm, 6)));
         if iprint[1] >= 1 {
             out.out(" VECTOR X= ");
-            write50(&x[..nu], mode, out, call);
+            write50_lb1(&x[..nu], mode, out, call);
             out.out(" GRADIENT VECTOR G= ");
-            write50(&g[..nu], mode, out, call);
+            write50_lb1(&g[..nu], mode, out, call);
         }
         out.out("*************************************************\n");
         out.out(HEAD);
@@ -570,10 +597,10 @@ fn lb1(
             } else {
                 out.out(" VECTOR X= ");
             }
-            write50(&x[..nu], mode, out, call);
+            write50_lb1(&x[..nu], mode, out, call);
             if iprint[1] == 3 {
                 out.out(" GRADIENT VECTOR G= ");
-                write50(&g[..nu], mode, out, call);
+                write50_lb1(&g[..nu], mode, out, call);
             }
         }
         if gl.finish {

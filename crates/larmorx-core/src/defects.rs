@@ -963,6 +963,14 @@ defects! {
         "VXL's L-BFGS resets ys to 0 on every call (a local of the C function, saved in the Fortran), so a caller that supplies the diagonal (DIAGCO) gets an infinite 1/ys";
     ITK_105 = "ITK-105", "VXL", true,
         "VXL's L-BFGS prints its vectors (IPRINT(2) of 1 and above) scaled from the signed value that last exceeded the running maximum in magnitude rather than from the largest magnitude, and divides a vector of zeros by 0";
+    ITK_106 = "ITK-106", "VXL", true,
+        "VXL's L-BFGS prints its vectors X and G (IPRINT(2) of 1 and above) from the double before each array, memory it does not own, and drops their last element (lb1 passes write50 the pointers it decremented for Fortran's indexing)";
+    ITK_107 = "ITK-107", "VXL", true,
+        "vnl_inverse of a 2 x 2, 3 x 3 or 4 x 4 matrix whose determinant is 0 returns an uninitialised vnl_matrix_fixed (its assertion is compiled out): memory contents";
+    ITK_108 = "ITK-108", "VXL", true,
+        "vnl_cholesky never initialises rcond_ and LINPACK's dpoco leaves it unset for a matrix that is not positive definite: rcond(), and the estimate_condition mode's message, give memory contents";
+    ITK_109 = "ITK-109", "VXL", true,
+        "vnl_cholesky::determinant (LINPACK's dpodi) keeps its mantissa in [1, 10) with loops that never end when it is not finite: a factor with an infinite or NaN diagonal entry, or one whose square overflows the mantissa";
     ANTS_110 = "ANTS-110", "antsAI", true,
         "the blob alignment keeps the blob pairs whose displacements have about the same length as the others' (the squared distance between a pair's fixed and moving blob over another pair's), not those whose distances to the other blobs are preserved between the images, as its comment and ImageMath's MatchBlobs say";
     ANTS_111 = "ANTS-111", "antsAI", true,

@@ -45,6 +45,7 @@ pub mod numpy;
 pub mod parallel;
 pub mod python;
 pub mod rotation;
+pub mod vnl_cholesky;
 pub mod vnl_eigen;
 pub mod vnl_fixed;
 pub mod vnl_lbfgs;

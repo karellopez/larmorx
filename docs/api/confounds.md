@@ -3,8 +3,8 @@
 `lx.confounds`: nipype 1.12.0's `algorithms/confounds.py` (Apache-2.0, the nipype developers;
 the same in every environment), niworkflows 1.15.4's and fMRIPrep 25.2.7's confound steps, ported
 with the arithmetic of the libraries they call (numpy, SciPy, nitime), bit for bit
-(`crates/larmorx-confounds`). A port in the main package; a clean room comes later (the
-user, 2026-11-06 and 2026-11-11). The confounds' part fills this page step by step: today nipype's
+(`crates/larmorx-confounds`). A replica of fMRIPrep's Python (bit for bit), in the main package; a
+clean room comes later, after FreeSurfer (the user, 2026-11-06 and 2026-11-11). The confounds' part fills this page step by step: today nipype's
 DVARS, CompCor, TSNR, NonSteadyStateDetector and FramewiseDisplacement with its `NIPY` source
 (nipy 0.6.1's `to_matrix44` and `aff2euler`): the whole of nipype's `algorithms/confounds.py` but
 the plots; fMRIPrep's own table steps (`FramewiseDisplacement`, `FilterDropped`,
@@ -17,7 +17,7 @@ and the workflow that composes them, fMRIPrep's `init_bold_confs_wf` with its `d
 (`larmorx.pipelines.larmorprepx.confounds.bold_confounds`, the last section).
 
 **Status: `experimental`** (checked bit for bit against nipype, nitime, SciPy and numpy in the
-three environments, against fMRIPrep's own DVARS and CompCor files and on the oracle runs' raw
+three environments, against fMRIPrep's own DVARS and CompCor files and on fMRIPrep's reference runs' raw
 series and real motion parameters; the record comes with the
 part's records; `lx.confounds` and the workflow in the golden registry since 2026-11-12, their
 checksums recorded with the part's records). The text files numpy's `savetxt` writes in nipype
@@ -170,7 +170,7 @@ infs or NaNs`, or `Cannot apply_along_axis ...`), as larmorx does in both modes.
 
 The tSNR is `mean / std` where the standard deviation is above `1e-3` (compared in the data's
 type: float32 without `regress_poly`), 0 elsewhere. fMRIPrep's BOLD report workflow
-(`init_bold_preproc_report_wf`) runs `TSNR()` on the preprocessed series; no oracle run reaches it.
+(`init_bold_preproc_report_wf`) runs `TSNR()` on the preprocessed series; no reference run reaches it.
 
 | ID | nipype does | larmorx by default |
 |---|---|---|
@@ -270,7 +270,7 @@ would give the same error, which larmorx raises at once.
 niworkflows 1.15.3 and numpy 2.2.6 / niworkflows 1.15.2 inside fMRIPrep 25.2.6's image): every file
 and value bit for bit or the same error, with `upstream_defects="reproduce"`; the default equal to
 `reproduce` wherever no notice is raised, and PIPE-51's files equal to nipype's code with its
-float32 switch made effective; the oracle runs' raw BOLD series (int16, big-endian int16, uint16,
+float32 switch made effective; fMRIPrep's reference runs' raw BOLD series (int16, big-endian int16, uint16,
 float32; up to 600 volumes) through `TSNR` and `NonSteadyStateDetector`, and real motion
 parameters (fMRIPrep's own as SPM and FSL tables, `mcflirt`'s and `3dvolreg`'s files) through
 `FramewiseDisplacement`. The `NIPY` source against nipype running nipy 0.6.1's own functions
@@ -311,7 +311,7 @@ with fMRIPrep 25.2.6 and niworkflows 1.15.2 inside fMRIPrep 25.2.6's image): eve
 tables by their content) and output with `upstream_defects="reproduce"`, errors by type and last
 line; the default against the same interfaces run with pandas' correctly rounded parser
 (`float_precision="round_trip"`) and, for PIPE-63, the rows sorted after each `concat`; section `real`: fMRIPrep's own nodes (`fdisp`, `rename_acompcor`,
-`acc_metadata_filter`, `tcc_metadata_filter`, `concat`) in every oracle run's working directory,
+`acc_metadata_filter`, `tcc_metadata_filter`, `concat`) in every reference run's working directory,
 with their own inputs, byte for byte with `pandas_version="2.2.3"` and `upstream_defects="reproduce"`.
 
 ## fMRIPrep's motion parameters: `fsl_motion_params`, `fsl_rms_deviation`
@@ -359,7 +359,7 @@ bit (5,138, both layouts, eight kinds of matrices, the errors) and its `as_euler
 the correctly rounded ones; nitransforms' `linear.load` and `from_ras` bit for bit (19 kinds of ITK
 files, 204 affines); both interfaces and niworkflows' copies on 21 synthetic cases per release, the
 tables byte for byte but the angles D4 names; **fMRIPrep's own `motion_params` and `rmsd` nodes of the
-36 confounds workflows of the oracle runs** with `fmriprep_version="25.2.6"`, `numpy_version="2.2.6"`
+36 confounds workflows of fMRIPrep's reference runs** with `fmriprep_version="25.2.6"`, `numpy_version="2.2.6"`
 and `reproduce`: the 36 `rmsd` files byte for byte, the 36 motion files with every `trans_*` cell
 identical and 15 of the 22,293 `rot_*` cells (12 files) changed by glibc's `atan2` (D4; glibc's
 `hypot` changes none); the default equals `reproduce` on every real node.
@@ -403,7 +403,7 @@ WM and CSF maps' affines are never compared with the first's (all fMRIPrep's inp
 maps in every case (smriprep's `fast2bids`), so with FreeSurfer the segmentation path smooths partial
 volumes again (`mask2vf`) and takes as grey matter only the voxels whose GM fraction is exactly 1
 (`uint8` truncation), dilated by `ball(3)`: WM and CSF voxels partly in grey matter stay in the aCompCor
-masks. No oracle run reaches it (all are `--fs-no-reconall`); the check runs the path on FAST-like maps.
+masks. No reference run reaches it (all are `--fs-no-reconall`); the check runs the path on FAST-like maps.
 
 **Validation** (`validation/investigations/confounds/check_masks.py`, in numpy 2.5.4 with SciPy 1.18.1,
 scikit-image 0.26.0 and niworkflows 1.15.4, numpy 2.3.5 with SciPy 1.15.3 and niworkflows 1.15.3, and
@@ -417,7 +417,7 @@ storages, FAST-like maps on the segmentation path, PIPE-76's casts, the errors),
 their undefined values clamped (PIPE-74, PIPE-76) and against PIPE-75's `ValueError`; niworkflows'
 morphology and `SignalExtraction` (`docs/api/niworkflows-helpers.md`) on 135 and 106 cases. **fMRIPrep's
 own `union_mask`, `dilated_mask`, `subtract_mask`, `acc_masks` and `signals` nodes of the 36 confounds
-workflows of the oracle runs**: larmorx's files byte for byte (decompressed) with the nodes' (the CSF
+workflows of fMRIPrep's reference runs**: larmorx's files byte for byte (decompressed) with the nodes' (the CSF
 map is the node's input, as there), the default equal to `reproduce` on every node, `get_zooms` of the
 series equal to the nodes' `bold_zooms`, and the originals run again in every environment equal to
 larmorx. Speed (the 36 nodes, one environment): `aCompCorMasks` 15 s in all against fMRIPrep's 62 s,
@@ -557,7 +557,7 @@ description, and its constants.
 
 | ID | Rule | What fMRIPrep does | larmorx by default | `reproduce` |
 |---|---|---|---|---|
-| PIPE-41 | A | `merge_confound_metadata`'s third input is set to the tissue signals' metadata (`{"Method": "Mean"}` for `global_signal`, `csf`, `white_matter`, `csf_wm`, `tcompcor`) and then connected to the crown's metadata, which replaces it: the confounds' JSON never describes those five columns (all 36 oracle files) | both kept (an `UpstreamDefectWarning` with every run) | fMRIPrep's JSON, without them |
+| PIPE-41 | A | `merge_confound_metadata`'s third input is set to the tissue signals' metadata (`{"Method": "Mean"}` for `global_signal`, `csf`, `white_matter`, `csf_wm`, `tcompcor`) and then connected to the crown's metadata, which replaces it: the confounds' JSON never describes those five columns (all 36 files of fMRIPrep's reference runs) | both kept (an `UpstreamDefectWarning` with every run) | fMRIPrep's JSON, without them |
 
 Kept as fMRIPrep does it (documented, no switch):
 
@@ -568,9 +568,9 @@ Kept as fMRIPrep does it (documented, no switch):
   users may read them.
 - **PIPE-79 (rule D, open)**: `acc_masks` takes `is_aseg=freesurfer`, but the tissue maps are always
   FAST's partial-volume maps, so with FreeSurfer the segmentation path smooths them again and keeps as
-  grey matter only the voxels of fraction exactly 1 (measured on the oracle runs' own maps: ds005454's
+  grey matter only the voxels of fraction exactly 1 (measured on fMRIPrep's reference runs' own maps: ds005454's
   CSF mask 243,706 voxels without FreeSurfer, 33,031 with; its WM 156,468 and 182,036). Whether
-  correcting it helps is measured on fMRIPrep runs with FreeSurfer (none of the oracle runs has it);
+  correcting it helps is measured on fMRIPrep runs with FreeSurfer (none of fMRIPrep's reference runs has it);
   until then larmorx keeps fMRIPrep's wiring in both modes.
 
 **Validation** (`validation/investigations/confounds/check_workflow.py`, in numpy 2.5.4 / pandas
@@ -582,7 +582,7 @@ MapNode's items in order), every parameter fMRIPrep sets (208 node parameter set
 parameter both name equal, every connection (source node and output, destination node and input,
 the inputnode's fields and `_get_zooms` included) the same, the workflow's outputs, the reportlets'
 inputs (`_last`, `_select_cols`, `merge_compcor_metadata`'s two inputs), PIPE-41 under both modes
-and the description identical. **`real`, the 36 confounds workflows of the 21 oracle runs** (fMRIPrep
+and the description identical. **`real`, the 36 confounds workflows of fMRIPrep's 21 reference runs** (fMRIPrep
 25.2.6 in its image), each run end to end from its own inputs with fMRIPrep 25.2.6's libraries
 (`fmriprep_version="25.2.6"`, `niworkflows_version="1.15.2"`, `numpy_version="2.2.6"`,
 `scipy_version="1.15.2"`, `pandas_version="2.2.3"`) and `reproduce`: **all 36

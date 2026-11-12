@@ -4,8 +4,8 @@
 the same on these paths in 1.15.2, fMRIPrep 25.2.6's) that sdcflows' and fMRIPrep's field-map
 steps run, ported in plain Python with numpy's, SciPy's, scikit-image's and nibabel's arithmetic
 as niworkflows calls it (`lx.ndimage`, `lx.skimage`, `larmorx_core::numpy`,
-`larmorx.io.save_nibabel`). A port in the main package; a clean-room original comes later (the
-user, 2026-11-06).
+`larmorx.io.save_nibabel`). A replica of niworkflows' Python (bit for bit), in the main package; a
+clean room comes later, after FreeSurfer (the user, 2026-11-06 and 2026-11-11).
 
 **Status: `experimental`** (checked file for file against niworkflows in both kept environments
 and against fMRIPrep's own files; the record comes with the part's records).
@@ -22,7 +22,7 @@ and against fMRIPrep's own files; the record comes with the part's records).
 |---|---|---|
 | `in_files` (a path or a list) | `in_files` | the outputs are named after the first file |
 | `in_mask=None` | `in_mask` | the mask of `grand_mean_scaling` (`> 0.5`) |
-| `hmc=True` | `hmc` | with more than one file: `mcflirt -in <merged> -cost normcorr -out <merged>_mcf.nii.gz -refvol 0 -mats -plots` (nipype's `MCFLIRT`) through `larmorx fsl mcflirt`: the replica with `larmorx-nc` installed, else the clean-room original (`hmc_implementation`: `"auto"`, `"replica"`, `"clean-room"`); `out_mats` (`<out>.mat/MAT_NNNN`) and `out_movpar` (`<out>.par`) as nipype lists them |
+| `hmc=True` | `hmc` | with more than one file: `mcflirt -in <merged> -cost normcorr -out <merged>_mcf.nii.gz -refvol 0 -mats -plots` (nipype's `MCFLIRT`) through `larmorx fsl mcflirt`: the replica with `larmorx-nc` installed, else the clean room (`hmc_implementation`: `"auto"`, `"replica"`, `"clean-room"`); `out_mats` (`<out>.mat/MAT_NNNN`) and `out_movpar` (`<out>.par`) as nipype lists them |
 | `zero_based_avg=True` | `zero_based_avg` | the average minus its minimum |
 | `to_ras=True` | `to_ras` | each file reoriented to the closest RAS orientation first (`reorient`: nibabel's `as_closest_canonical`, `dim_info` moved with the axes), `<name>_ras` |
 | `grand_mean_scaling=False` | `grand_mean_scaling` | PIPE-18 (below) |
@@ -76,7 +76,7 @@ is clipped once more and its median over the volumes written as `<in>_average`. 
 | `reorient_file(in_file, *, target_file=None, target_ornt=None, newpath=None, n_threads=1)` → the path | `nibabel.ReorientImage` (`reorient_file`) | to `target_file`'s axis codes or `target_ornt`'s (`TypeError('No target orientation or file is specified.')`), `reoriented.nii.gz` |
 | `reorient_image(img, target_ornt)`, `as_reoriented(img, ornt)`, `axcodes2ornt(axcodes)`, `aff2axcodes(affine)`, `ornt_transform(start, end)`, `squeeze_image`, `four_to_three` | `nibabel.reorient_image`; nibabel 5.4.2's functions (MIT) | in memory; nibabel's errors (`Not all axis codes … in label set …`) |
 
-Checked file for file against niworkflows and sdcflows on the oracle runs' PEPOLAR estimators
+Checked file for file against niworkflows and sdcflows on fMRIPrep's reference runs' PEPOLAR estimators
 (every option of `RobustAverage`, its one-volume, 3D and error paths) and against fMRIPrep's own
 node files: `validation/investigations/sdcflows-fieldmap-b/check_pepolar.py`.
 
@@ -103,7 +103,7 @@ node files: `validation/investigations/sdcflows-fieldmap-b/check_pepolar.py`.
 fMRIPrep's `itk_mat2txt` (`bold_fit_wf`) writes the registration's `transform0GenericAffine.mat`
 this way; its `out_fwd.tfm` becomes the `desc-fmap_xfm.txt` derivative that every later
 `ReconstructFieldmap` reads. The six digits move the BOLD grid's corners by at most 7.9e-05 mm on
-the oracle runs (PIPE-22, rule C: kept, a correction that brings no measurable gain). A file holding several transforms
+fMRIPrep's reference runs (PIPE-22, rule C: kept, a correction that brings no measurable gain). A file holding several transforms
 (a series) is not combined (`NotImplementedError`: fMRIPrep passes single affines). Checked: the 7
 `itk_mat2txt` nodes of the earlier runs byte for byte (and their derivatives), niworkflows' own
 interface on them with `inverse`, and every input format combined
@@ -115,7 +115,7 @@ interface on them with `inverse`, and every input format combined
 |---|---|---|
 | `in_file` | `inputnode.in_file` | linked into the first node's folder, as nipype links it (a copy where links cannot be made) |
 | `out_dir=None` | the workflow's directory | the nodes' folders `skullstrip_first_pass`, `skullstrip_second_pass`, `combine_masks`, `apply_mask`; a temporary folder otherwise (the paths are then `None`) |
-| `bet_implementation="auto"`, `maths_implementation="auto"` | | FSL's `bet` and `fslmaths`: the replica when `larmorx-nc` is installed, else the clean-room original; AFNI's `3dAutomask`: its replica (built in) |
+| `bet_implementation="auto"`, `maths_implementation="auto"` | | FSL's `bet` and `fslmaths`: the replica when `larmorx-nc` is installed, else the clean room; AFNI's `3dAutomask`: its replica (built in) |
 | `upstream_defects="fix"`, `n_threads=1` | | |
 | → `SkullstripBoldResult(mask_file, skull_stripped_file, bet_brain, bet_mask, automask_mask, automask_brain, commands)` | `outputnode.mask_file`, `skull_stripped_file` | `commands`: nipype's lines, `bet <in> <in>_brain -f 0.20 -m`, `3dAutomask -apply_prefix <in>_brain_masked.nii.gz -dilate 1 -prefix <in>_brain_mask.nii.gz <in>_brain.nii.gz`, `fslmaths <bet mask> -mul <automask> <bet mask>_maths.nii.gz`; the mask report (`SimpleShowMaskRPT`) belongs with the reports and is not made |
 
@@ -130,11 +130,11 @@ files: `lx.sdcflows.registration_settings`), `ants.ApplyTransforms` (`FixHeaderA
 `afni.Volreg` in nipype's order (positions first, then by name, negative positions last), with
 nipype's file names (`name_source`, `genfile`, the output types' extensions), its shell quoting
 and its `_list_outputs`, and runs them in the node's folder through larmorx's ports (ANTs in this
-process, FSL's replicas or clean-room originals, AFNI's replicas). Settings files are read as
+process, FSL's replicas or clean rooms, AFNI's replicas). Settings files are read as
 nipype's `from_file` reads them, their values converted as nipype's input traits convert them
 (a JSON `6` for a float stage setting is written `6.0`). `antsRegistration` takes fMRIPrep's
 `ANTS_RANDOM_SEED` as `ants_random_seed` (ANTs seeds from the clock without one). Checked against
-every `command.txt` of the oracle runs for these interfaces (1,583 nodes, the encoding files of
+every `command.txt` of fMRIPrep's reference runs for these interfaces (1,583 nodes, the encoding files of
 TOPUP against nipype's own) and against nipype's own `cmdline` and outputs on 14 option sets the
 runs do not use: `validation/investigations/sdcflows-fieldmap-b/check_nipype.py`. Not ported:
 nipype's version checks (the singular `fixed_image_mask`/`moving_image_mask` of ANTs <= 2.1.0
@@ -167,7 +167,7 @@ folder) are quoted in both modes, so a node folder with a blank works as in nipy
 | `is_outlier(points, thresh=3.5, *, upstream_defects="fix")` → `int` | nipype 1.12.0 `algorithms/confounds.is_outlier` | the leading observations whose modified z-score `0.6745 * abs(x - median) / MAD` exceeds `thresh`, in the points' type (numpy's medians: `larmorx_core::numpy`); PIPE-23 |
 | `binarize(in_file, thresh_low, *, out_dir=".", n_threads=1)` → `BinarizeResult(out_file, out_mask)` | `interfaces/nibabel.Binarize` | `get_fdata()` above `thresh_low` (the rest 0) in the input's header and type, `<in>_masked`; the mask as `uint8`, `<in>_mask` |
 | `generate_sampling_reference(fixed_image, moving_image, *, xform_code=None, fov_mask=None, keep_native=True, target_resolution=None, out_dir=".", niworkflows_version="1.15.4", nilearn_version="0.14.1", scipy_version="1.18.1", n_threads=1, upstream_defects="fix")` → path | `interfaces/nibabel.GenerateSamplingReference` (`_gen_reference`) | the fixed image's field of view on a RAS grid of the moving image's voxel sizes after nibabel's `as_closest_canonical` (or `target_resolution`), rounded to 0.001 mm; the fixed image resampled onto it (nearest); `fov_mask` crops the grid to the mask's bounding box plus two voxels ("Fixed image and mask do not have the same dimensions.", "... different affines"); qform and sform of the grid with the sform's code (2 for 1; `xform_code` 2 or 4 forces it); `descrip` names niworkflows' version; `<fixed>_reference`. `nilearn_version`: 0.13 onwards copies the fixed image's header (written unscaled, `scl_slope = scl_inter = 0`), 0.11.1 (fMRIPrep 25.2.6's image) makes a new one and copies by whole voxels where the grids differ by whole voxels |
-| `resample_img_nearest(img, target_affine, target_shape=None, *, copy=False, nilearn_version, scipy_version, n_threads=1, upstream_defects="fix")` → `Image` | nilearn 0.14.1 / 0.11.1 `image.resample_img(interpolation="nearest")` | the grid's bounds as OpenBLAS's `dgemm` adds them (one fused multiply-add per term), `BoundingBoxError`, the "no sform" warning, non-finite values (NaN where the voxel taken was not finite, with nilearn's warning), the input itself when nothing needs resampling. nilearn's two inverses of the image's affine: numpy's (`np.linalg.inv`, OpenBLAS's `dgesv`) for the bounds and SciPy's (`scipy.linalg.inv`, `larmorx.transforms._linalg.scipy_inv`) for the sampling points: SciPy 1.18.1's structure detection (a plumb affine is upper triangular: OpenBLAS's `trti2`; an oblique one `getrf`/`getri`; a symmetric one, an axis swap with a zero origin, Cholesky or Bunch-Kaufman) with its `LinAlgWarning` from LAPACK's condition estimates (`gecon`, `trcon`, `pocon`, `sycon`, the `rcond` it prints), or 1.15's `getrf`/`getri` with `scipy_version`, through SciPy's own OpenBLAS (0.3.31.dev, 0.3.28) on the Haswell kernels: identical to SciPy on 27 families of 20,000 matrices and 513 image affines of the oracle runs per environment, every `rcond` identical to SciPy's LAPACK calls (`check_scipy_inv.py`; SCI-18, SCI-19, SCI-20) |
+| `resample_img_nearest(img, target_affine, target_shape=None, *, copy=False, nilearn_version, scipy_version, n_threads=1, upstream_defects="fix")` → `Image` | nilearn 0.14.1 / 0.11.1 `image.resample_img(interpolation="nearest")` | the grid's bounds as OpenBLAS's `dgemm` adds them (one fused multiply-add per term), `BoundingBoxError`, the "no sform" warning, non-finite values (NaN where the voxel taken was not finite, with nilearn's warning), the input itself when nothing needs resampling. nilearn's two inverses of the image's affine: numpy's (`np.linalg.inv`, OpenBLAS's `dgesv`) for the bounds and SciPy's (`scipy.linalg.inv`, `larmorx.transforms._linalg.scipy_inv`) for the sampling points: SciPy 1.18.1's structure detection (a plumb affine is upper triangular: OpenBLAS's `trti2`; an oblique one `getrf`/`getri`; a symmetric one, an axis swap with a zero origin, Cholesky or Bunch-Kaufman) with its `LinAlgWarning` from LAPACK's condition estimates (`gecon`, `trcon`, `pocon`, `sycon`, the `rcond` it prints), or 1.15's `getrf`/`getri` with `scipy_version`, through SciPy's own OpenBLAS (0.3.31.dev, 0.3.28) on the Haswell kernels: identical to SciPy on 27 families of 20,000 matrices and 513 image affines of fMRIPrep's reference runs per environment, every `rcond` identical to SciPy's LAPACK calls (`check_scipy_inv.py`; SCI-18, SCI-19, SCI-20) |
 | `regrid_to_zooms(in_file, zooms, *, order=3, clip=True, smooth=False, out_dir=None, numpy_version, n_threads=1)` → `RegridToZoomsResult(out_file)`; `resample_by_spacing(in_file, zooms, order=3, clip=True, smooth=False, *, numpy_version, n_threads=1)` → `Image` | `interfaces/images.RegridToZooms` (= `interfaces/nibabel.RegridToZooms`), `utils/images.resample_by_spacing` | the field of view on a grid of voxel sizes `zooms` (`ceil(extent / zooms)` voxels, centred): the `float32` cardinal matrix of the header's `pixdim`, its inverse numpy's (computed in `float64` and cast, as numpy does for single-precision input), the sampling points as numpy's `dgemm` adds them, SciPy's `map_coordinates` (`order`, `mode='constant'`, prefiltered) of the file's `dataobj` or, with `smooth`, of `gaussian_filter(get_fdata(), sigma)` (`True`: `max(0, (old / new - 1) / 2)` voxels, PIPE-35; a number: that sigma), `clip` to the input's range; the header's zooms set, the qform and sform carried by `new_affine · inv(affine) · xform` with their codes (both `new_affine`, code 1, when neither is set), written in the header's stored type (scaled); `<in_file>_regrid`. Voxel sizes that are not normal `float32` numbers: nibabel's `HeaderDataError` ("Could not decompose affine:", its matrix not niworkflows'); a 4-D input: SciPy's "invalid shape for coordinate array". Identical to niworkflows on 576 seeded files and on fMRIPrep's 51 own nodes (`res_tmpl`, `res_target` of every run's brain extraction, `zooms_epi` of the SyN runs) in both environments (`check_regrid.py`) |
 | `epi_reference_workflow(in_files, t_masks=None, auto_bold_nss=False, *, out_dir, omp_nthreads=1, numpy_version, volreg_implementation="auto", upstream_defects="fix", n_threads=1)` → `EpiReferenceResult` | `workflows/epi/refmap.init_epi_reference_wf` | the nodes `validate_nii`, `select_volumes` (with `auto_bold_nss`), `per_run_avgs` (`RobustAverage`), `clip_avgs`, `n4_avgs` (N4 with nipype's `copy_header`), `clip_bg_noise` (`IntensityClip(2, 100)`), `epi_merge` and `post_merge`, in nipype's map-node folders; one input: `StructuralReference`'s shortcut (its identity LTA, written by FreeSurfer's `lta_convert` and read by nothing on these paths, is not produced: `xfm_files` is `None`); several inputs need FreeSurfer's `mri_robust_template` (`NotImplementedError` until the FreeSurfer part) |
 
@@ -216,7 +216,7 @@ padding and data the same, and the gzip stream Python's (the compressed bytes ar
 zlib's; the contents are the same everywhere).
 
 Checked (`validation/investigations/sdcflows-fieldmap-b/check_derivatives.py`): every
-field-map sink of the fMRIPrep oracle runs (95 files of 19 estimators, fMRIPrep 25.2.6's image)
+field-map sink of fMRIPrep's reference runs (95 files of 19 estimators, fMRIPrep 25.2.6's image)
 and of sdcflows 2.17.1's own BIDS-app runs (75 files of 15 estimators), given each node's own
 inputs: every name, uncompressed and gzip byte and sidecar identical (every one of them fixed the
 header: the estimators' files carry `sec` units or other codes); and 38 edge cases against
@@ -296,7 +296,7 @@ type first (an integer column beside a float one becomes float).
 **The column order (PIPE-43).** niworkflows orders a group's variables, and the `others`, as a
 Python set of strings, whose order changes from one process to the next (Python's per-process hash
 seed): in fMRIPrep's files a variable's square comes before or after the square of its derivative
-from run to run (169 and 155 times in the 36 oracle files). larmorx keeps the formula's order in
+from run to run (169 and 155 times in the 36 confounds files of fMRIPrep's reference runs). larmorx keeps the formula's order in
 both modes: each variable, its derivatives, then their powers in the same order (`x`,
 `x_derivative1`, `x_power2`, `x_derivative1_power2`), one order niworkflows can produce; its
 notice says so (never reproduced: nondeterminism). The values do not depend on it; compare such

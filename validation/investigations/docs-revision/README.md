@@ -71,7 +71,15 @@ nothing in it.
   to judge (a message's `larmorx:` prefix, the provenance's commits and the random-testing
   panel's texts stay until their chunks). Inside code it lists the placeholders and paths that
   name the oracle, the workspace or the figures cache (`code` lines), which a command should
-  not show.
+  not show, and every paragraph, list item or cell that offers `--upstream-defects`,
+  `--n-threads` or `--implementation` without "next release" (`option` lines: 0.1.0rc1 has
+  only the environment variables).
+- `panel_runs_check.py <site>`: every fMRIPrep run an evidence page names in its data panel's
+  cases and worked examples is one of the panel's fourteen (`fmriprep_nodes.PANEL_RUNS`); run it
+  after every export, beside `summary_check.py`. Since relay 15 `fmriprep_nodes` reads only
+  those fourteen runs, so an export no longer needs `LARMORX_FMRIPREP_RUNS` to leave out the
+  runs of 2026-11-08 (an export of relay 12 had named three of their nodes on DenoiseImage's
+  page).
 
 ```
 PYTHONPATH=python:validation/src python -P validation/investigations/docs-revision/present_dry_run.py \

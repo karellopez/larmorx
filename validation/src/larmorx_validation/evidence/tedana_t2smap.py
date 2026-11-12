@@ -14,6 +14,11 @@ program, translated from tedana 26.0.3), against tedana itself and fMRIPrep 25.2
 - The record's cases, tedana's own spread (the record's ``spread/`` cases), the defects TED-01
   to TED-18 with the maths entries, the memory peaks (a call in a process of its own), random
   testing's trial and its check, and the benchmark.
+- fMRIPrep's own files against tedana 25.0.1 run here in fMRIPrep's image with numpy's AVX-512
+  kernels off and on (fMRIPrep's runs had them on), on its four curve-fit calls (2026-11-12).
+- The clean-room original's part (``tedana_t2smap_original.extend``, its implementer's module:
+  its worked example, its record's cases as ``original/<case>``, its tables), and its series on
+  the speed chart from its benchmark.
 
 tedana runs as its program through the oracle-output cache (the parity suite's launchers,
 ``parity.tedana_t2smap_replica``), the replica as the ``larmorx-gpl`` program (``LARMORX_GPL_BIN``
@@ -22,6 +27,7 @@ dilated by two voxels, the region t2smap computes over), dilated by one more vox
 show.
 
     python -m larmorx_validation.evidence.tedana_t2smap   (computes the cache entries)
+    python -m larmorx_validation.evidence.tedana_t2smap --refresh   (brings them to this commit)
 """
 
 from __future__ import annotations
@@ -73,6 +79,7 @@ RUNS = [
     ("tedana-shared", "tedana", {"env": "shared"}),
     ("tedana-threads4", "tedana", {"env": "newest", "threads": 4}),
     ("tedana-25", "fmriprep-tedana", {}),
+    ("tedana-25-avx512", "fmriprep-tedana", {"avx512": True}),
 ]
 #: The maps an example shows: output id, file (tedana's BIDS names), label, unit.
 MAPS = [
@@ -106,6 +113,7 @@ FILE_PAIRS = [
     ("tedana: shared − newest", "tedana-shared", "tedana"),
     ("tedana: 4 threads − 1", "tedana-threads4", "tedana"),
     ("tedana 25.0.1 − 26.0.3", "tedana-25", "tedana"),
+    ("tedana 25.0.1: AVX-512 on − off", "tedana-25-avx512", "tedana-25"),
 ]
 OPTCOM = "desc-optcom_bold.nii.gz"
 #: Why tedana 26.0.3's outputs differ from tedana 25.0.1's (fMRIPrep 25.2.6's) on its calls.
@@ -247,8 +255,10 @@ def _go(e: fcache.Entry, label: str, program: str, kw: dict, args: list[str]):
         argv = [str(tt.launcher(env)), *full, "--out-dir", "out"]
     elif program == "fmriprep-tedana":
         binds = sorted({p.parent for p in parse(args)["echoes"]} | {parse(args)["mask"].parent})
-        r = tt.run_fmriprep_tedana(args, cwd, binds)
+        r = tt.run_fmriprep_tedana(args, cwd, binds, avx512=kw.get("avx512", False))
         settings = dict(SETTINGS)
+        if kw.get("avx512"):
+            settings.pop("NPY_DISABLE_CPU_FEATURES")
         argv = ["apptainer", "exec", "--cleanenv", str(tt.workspace() / tt.FMRIPREP_IMAGE),
                 "t2smap", *args, "--out-dir", "out"]  # fmt: skip
     else:
@@ -302,14 +312,20 @@ def _compute_call(name: str):
     return compute
 
 
+def _call_description(name: str) -> str:
+    return (
+        f"fMRIPrep's t2smap call {name}: tedana 26.0.3 (reference setup, AVX-512 on, shared "
+        "releases, 4 threads), tedana 25.0.1 in fMRIPrep's image (numpy's AVX-512 kernels off "
+        "and on), the replica (1 and 14 threads, both modes)"
+    )
+
+
 def call_entry(ctx: core.Context, name: str) -> fcache.Entry:
     return fcache.entry(
         ctx.figures_context(),
         TOOL,
         f"call-{name}",
-        f"fMRIPrep's t2smap call {name}: tedana 26.0.3 (reference setup, AVX-512 on, shared "
-        "releases, 4 threads), tedana 25.0.1 in fMRIPrep's image, the replica (1 and 14 threads, "
-        "both modes)",
+        _call_description(name),
         _compute_call(name),
     )
 
@@ -359,14 +375,130 @@ def _compute_memory(e: fcache.Entry) -> None:
     )
 
 
+MEMORY_DESCRIPTION = (
+    "the memory rule's calls (fMRIPrep's ds003592 call, curvefit and loglin): tedana 26.0.3 "
+    "and the replica in both modes, one thread, peak resident memory"
+)
+
+
 def memory_entry(ctx: core.Context) -> fcache.Entry:
+    return fcache.entry(ctx.figures_context(), TOOL, "memory", MEMORY_DESCRIPTION, _compute_memory)
+
+
+def _inputs_current(info: dict) -> bool:
+    """Every input of an entry still the file it was (its SHA-256)."""
+    from larmorx_validation.figures.core import sha256
+
+    for v in info.get("inputs", {}).values():
+        m = re.fullmatch(r"(.*) \(sha256 ([0-9a-f]{64})\)", v)
+        if m is None or not Path(m[1]).is_file() or sha256(Path(m[1])) != m[2]:
+            return False
+    return True
+
+
+def refresh(ctx: core.Context) -> None:
+    """Bring the shown calls' entries and the memory entry up to this commit (relay RS3,
+    2026-11-12): an entry whose inputs changed (ds000258's oracle run made again on 2026-11-09
+    with OpenBLAS's Haswell kernels: its mask and fMRIPrep's own files) is computed again; in the
+    others the replica's runs are made again with this commit's replica and the runs added to
+    ``RUNS`` since are made, tedana's runs kept (the oracle-output cache serves them anyway);
+    the memory entry is computed again (the replica measured there was larmorx-gpl 0.0.1)."""
+    from larmorx_validation.figures.core import git_commit
+    from larmorx_validation.parity import defects
+
+    fctx = ctx.figures_context()
+    for name in SHOWN:
+        e = fcache.Entry(fctx, TOOL, f"call-{name}", _call_description(name))
+        if not e.done or not _inputs_current(e.info()):
+            fcache.recompute(fctx, TOOL, e.case, _call_description(name), _compute_call(name),
+                             why="its inputs changed: the oracle run made again on 2026-11-09 "
+                             "with OpenBLAS's Haswell kernels")  # fmt: skip
+            continue
+        info = e.info()
+        have = {r["label"] for r in info["runs"]}
+        args = call_args(name)
+        named = {}
+        for label, program, kw in RUNS:
+            if program == "replica" or label not in have:
+                r = _go(e, label, program, kw, args)
+                if program == "replica":
+                    named[label] = defects.notices_in(r.stderr)
+        new = {r.label: r.__dict__ for r in e.runs}
+        added = [x for x in new if x not in have]
+        info["runs"] = [new.get(r["label"], r) for r in info["runs"]] + [new[x] for x in added]
+        info["named"] = {**info.get("named", {}), **named}
+        info["versions"] = _versions()
+        info["description"] = _call_description(name)
+        previous = info.get("larmorx_commit")
+        info["larmorx_commit"] = git_commit(ctx.repo)
+        info.setdefault("rerun", []).append({
+            "computed": time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime()),
+            "labels": sorted(new),
+            "added": added,
+            "previous_larmorx_commit": previous,
+            "why": "the replica's runs made again with the replica of this commit (the "
+            "clean-room part's corrections); tedana 25.0.1 with numpy's AVX-512 kernels on "
+            "added (fMRIPrep's own runs had them on)",
+        })  # fmt: skip
+        e.info_path.write_text(json.dumps(info, indent=1) + "\n", encoding="utf-8")
+    fcache.recompute(
+        fctx,
+        TOOL,
+        "memory",
+        MEMORY_DESCRIPTION,
+        _compute_memory,
+        why="the replica of this commit (the entry measured larmorx-gpl 0.0.1)",
+    )
+
+
+#: fMRIPrep's curve-fit calls whose own files tedana 25.0.1 is run against here (every one).
+T25_CALLS = (
+    "ds000210-sub-02-cuedSGT-curvefit",
+    "ds000210-sub-02-rest-curvefit",
+    "ds000258-sub-21262-rest-curvefit",
+    "ds003592-sub-280-rest-curvefit",
+)
+
+
+def _compute_t25(e: fcache.Entry) -> None:
+    tt = _suite()
+    counts: dict[str, dict] = {}
+    for name in T25_CALLS:
+        args = call_args(name)
+        p = parse(args)
+        node = node_dir(name)
+        for i, f in enumerate(p["echoes"]):
+            e.input(f"{name}: echo {i + 1} (fMRIPrep's)", f)
+        e.input(f"{name}: mask", p["mask"])
+        for f in tt.FMRIPREP_FILES:
+            e.input(f"{name}: fMRIPrep's own {f}", node / f)
+        counts[name] = {"host": _fmriprep_host(name)}
+        for avx in (False, True):
+            label = f"{name}-{'avx512' if avx else 'off'}"
+            r = _go(e, label, "fmriprep-tedana", {"avx512": avx}, args)
+            counts[name][label.rsplit("-", 1)[1]] = {
+                f: list(v) for f, v in tt.value_differences(node, r.out, tt.FMRIPREP_FILES).items()
+            }
+            shutil.rmtree(r.out, ignore_errors=True)  # the counts are kept; the cache has them
+    e.finish(
+        versions={"fmriprep": f"tedana {tt.FMRIPREP_TEDANA} in fMRIPrep 25.2.6's image"},
+        counts=counts,
+        settings="tedana 25.0.1 in fMRIPrep 25.2.6's image (Apptainer, --cleanenv) through the "
+        "oracle-output cache, on fMRIPrep's own call of each oracle run (its node's command.txt), "
+        "OPENBLAS_CORETYPE=Haswell, one BLAS thread, numpy's AVX-512 kernels off and on; the "
+        "values of fMRIPrep's T2* map and combined series that differ (the parity suite's "
+        "value_differences); the outputs removed once counted",
+    )
+
+
+def t25_entry(ctx: core.Context) -> fcache.Entry:
     return fcache.entry(
         ctx.figures_context(),
         TOOL,
-        "memory",
-        "the memory rule's calls (fMRIPrep's ds003592 call, curvefit and loglin): tedana 26.0.3 "
-        "and the replica in both modes, one thread, peak resident memory",
-        _compute_memory,
+        "fmriprep-tedana-25",
+        "fMRIPrep's own T2* maps and combined series against tedana 25.0.1 run here in "
+        "fMRIPrep's image, numpy's AVX-512 kernels off and on, on fMRIPrep's four curve-fit calls",
+        _compute_t25,
     )
 
 
@@ -455,9 +587,12 @@ def _diffs() -> list[dict]:
         d("t25-ted", "tedana-25", "tedana", "variability",
           "tedana 25.0.1 (fMRIPrep's image, here) − tedana 26.0.3", "the original against itself: "
           "the version step"),
-        d("t25-fmriprep", "tedana-25", "fmriprep", "variability",
-          "tedana 25.0.1 here − fMRIPrep's own file (tedana 25.0.1 in its run)",
-          "the original against itself: the machine"),
+        d("t25-fmriprep", "tedana-25-avx512", "fmriprep", "variability",
+          "tedana 25.0.1 here, numpy's AVX-512 kernels on (as in fMRIPrep's run) − fMRIPrep's "
+          "own file", "the original against itself: the machine"),
+        d("t25off-fmriprep", "tedana-25", "fmriprep", "variability",
+          "tedana 25.0.1 here, numpy's AVX-512 kernels off − fMRIPrep's own file (tedana 25.0.1 "
+          "in its run)", "the original against itself: the machine and numpy's kernels"),
     ]  # fmt: skip
     return out
 
@@ -493,14 +628,19 @@ def _verdicts(diffs: list[dict], named: list[str], links: dict, capped: int | No
                 "t25-ted": "tedana's own step from 25.0.1 (fMRIPrep 25.2.6's) to 26.0.3: "
                 + VERSION_STEP,
                 "t25-fmriprep": "tedana 25.0.1 in fMRIPrep's image, here with numpy's AVX-512 "
-                "kernels off, against fMRIPrep's own run of it, " + host,
+                "kernels on as fMRIPrep's own run had them (its settings name only OpenBLAS's "
+                "Haswell kernels), against fMRIPrep's own run of it, " + host,
+                "t25off-fmriprep": "tedana 25.0.1 in fMRIPrep's image, here with numpy's "
+                "AVX-512 kernels off (larmorx's reference setting), against fMRIPrep's own run "
+                "of it, " + host + ": numpy's float64 exp and log differ between the two paths "
+                "(NP-04)",
             }[i]
             x["reason"] = lead + (
                 f"{body}: every one of the {total:,} values is the same."
                 if same[i]
                 else f"{body}: {n:,} of {total:,} values differ."
             )
-            if i == "avx-ted":
+            if i in ("avx-ted", "t25off-fmriprep"):
                 x["links"] += _link(links, ["NP-04"])
             continue
         if i == "rep-ted":
@@ -693,6 +833,7 @@ def _example_maps(ctx: core.Context, name: str, links: dict) -> dict:
     full = {
         "tedana-threads4": runs["tedana-threads4"],
         "tedana-25": runs["tedana-25"],
+        "tedana-25-avx512": runs["tedana-25-avx512"],
         "fmriprep": {"t2s": _stored(node / FMRIPREP_FILES["t2s"])},
     }
     diffs = _diffs()
@@ -987,6 +1128,44 @@ def _spread_table(rec) -> dict:
     )
 
 
+def _t25_table(ctx: core.Context) -> dict:
+    """fMRIPrep's own files against tedana 25.0.1 run here, numpy's AVX-512 kernels off and on."""
+    info = t25_entry(ctx).info()
+    tt = _suite()
+    rows = []
+    for name in T25_CALLS:
+        c = info["counts"][name]
+        ds, task = name.split("-")[0], _task(name)
+        for f in tt.FMRIPREP_FILES:
+            off, on = c["off"].get(f), c["avx512"].get(f)
+            if off is None or on is None:
+                continue
+            rows.append({
+                "head": f"{ds} {task}: `{f}`",
+                "sub": f"{on[1]:,} values; fMRIPrep's run {c['host'].removeprefix('made ')}",
+                "cells": [common.cell(int(off[0]), "count"), common.cell(int(on[0]), "count")],
+                "verdict": "bit-identical" if on[0] == 0 else None,
+            })  # fmt: skip
+    return common.table(
+        "fmriprep-tedana-25",
+        "fMRIPrep's own files against tedana 25.0.1 run here: values that differ",
+        ["fMRIPrep's call and file",
+         {"label": "numpy's AVX-512 kernels off", "num": True},
+         {"label": "on (as in fMRIPrep's run)", "num": True}],
+        rows,
+        note="tedana 25.0.1 in fMRIPrep 25.2.6's image (Apptainer, through the oracle-output "
+        "cache) on fMRIPrep's own call of each oracle run, against the T2* map and the combined "
+        "series fMRIPrep kept, every value. The oracle runs of ds000210 and ds000258 were made "
+        "again on 2026-11-09 on this machine with OpenBLAS's Haswell kernels; their settings name "
+        "only those, so numpy used its AVX-512 kernels for float64 exp and log (NP-04): run "
+        "the same way here, tedana 25.0.1 gives fMRIPrep's files bit for bit; with those "
+        "kernels off (larmorx's reference setting, decision D2) its exp and log are glibc "
+        "2.35's and the curve fit ends elsewhere in some voxels. ds003592's run was made on "
+        "another machine. A verdict is given where the files are the same; the other rows "
+        "measure the original against itself.",
+    )  # fmt: skip
+
+
 def _defect_rows(ctx: core.Context) -> list[tuple[str, str, str, str]]:
     """The findings' table of TED-xx: (id, what tedana does, rule, larmorx's default)."""
     text = (ctx.repo / FINDINGS).read_text(encoding="utf-8")
@@ -1232,17 +1411,31 @@ def trial(ctx: core.Context) -> tuple[list[dict], dict]:
     return [table, triage], prov
 
 
-def _speed(bench) -> dict | None:
+#: The clean-room original's benchmark (its relay's report, 2026-11-11): its series on the chart.
+ORIGINAL_BENCH = "docs/benchmarks/tedana-t2smap-original.json"
+
+
+def _speed(bench, ctx: core.Context | None = None) -> dict | None:
     if bench is None:
         return None
     series = [
         {"id": "tedana|1", "label": "tedana 26.0.3, 1 thread", "mark": "original"},
-        {"id": "reproduce|1", "label": "larmorx (replica), reproduce, 1 thread", "mark": "larmorx"},
+        {"id": "reproduce|1", "label": "larmorx (replica), reproduce, 1 thread", "mark": "replica"},
         {"id": "reproduce|14", "label": "larmorx (replica), reproduce, 14 threads",
-         "mark": "larmorx-open"},
-        {"id": "fix|1", "label": "larmorx (replica), default, 1 thread", "mark": "larmorx"},
-        {"id": "fix|14", "label": "larmorx (replica), default, 14 threads", "mark": "larmorx-open"},
+         "mark": "replica-open"},
+        {"id": "fix|1", "label": "larmorx (replica), default, 1 thread", "mark": "replica"},
+        {"id": "fix|14", "label": "larmorx (replica), default, 14 threads", "mark": "replica-open"},
     ]  # fmt: skip
+    orig = {}
+    if ctx is not None and (ctx.repo / ORIGINAL_BENCH).is_file():
+        ob = json.loads((ctx.repo / ORIGINAL_BENCH).read_text(encoding="utf-8"))
+        orig = ob["calls"]
+        series += [
+            {"id": "original|1", "label": "larmorx (clean-room original), default, 1 thread",
+             "mark": "larmorx"},
+            {"id": "original|8", "label": "larmorx (clean-room original), default, 8 threads",
+             "mark": "larmorx-open"},
+        ]  # fmt: skip
     rows = []
     for r in bench.data["rows"]:
         sec = {
@@ -1253,6 +1446,10 @@ def _speed(bench) -> dict | None:
             "fix|14": r["fix_14_s"],
         }
         name = r["call"]
+        o = orig.get(name, {})
+        for sid, key in (("original|1", "original fix (1)"), ("original|8", "original fix (8)")):
+            if o.get(key) is not None:
+                sec[sid] = o[key]
         rows.append({
             "label": f"{name.split('-')[0]} {_task(name)}, {name.rsplit('-', 1)[-1]}",
             "input": name,
@@ -1274,8 +1471,17 @@ def _speed(bench) -> dict | None:
         "replica's modes run the stages from the mask to the combination again with the other "
         "mode's maths functions, writing nothing, to name NP-03 and GLIBC-07 exactly where they "
         "change a value (up to four passes on these calls): one pass of a curve-fit call takes "
-        "about a quarter of these times. The clean-room original, still to be written, is the "
-        "fast implementation.",
+        "about a quarter of these times."
+        + (
+            " The clean-room original, the fast implementation, from its own benchmark "
+            f"(`{ORIGINAL_BENCH}`, 2026-11-11: the best of two runs at 1 and 8 threads, 8 the "
+            "budget of its relay, on a machine shared with two other agents' work; tedana, timed "
+            "again there, took "
+            f"{min(v['tedana'] for v in orig.values()):g} to "
+            f"{max(v['tedana'] for v in orig.values()):g} s on these calls)."
+            if orig
+            else " The clean-room original is the fast implementation."
+        ),
     }
 
 
@@ -1357,7 +1563,7 @@ def _cases(ctx: core.Context, rec) -> list[dict]:
 
 
 def entries(ctx: core.Context) -> list[fcache.Entry]:
-    return [*(call_entry(ctx, n) for n in SHOWN), memory_entry(ctx)]
+    return [*(call_entry(ctx, n) for n in SHOWN), memory_entry(ctx), t25_entry(ctx)]
 
 
 def _check_default(ex: dict) -> None:
@@ -1405,13 +1611,14 @@ def export(ctx: core.Context) -> dict:
     trial_tables, tprov = trial(ctx)
     tables = [
         _calls_table(rec, bench),
+        _t25_table(ctx),
         _spread_table(rec),
         _corrections_table(ctx, links, rec),
         _files_table(ctx),
         _memory_table(ctx),
         *trial_tables,
     ]
-    return {
+    doc = {
         "schema": 1,
         "tool": TOOL,
         "title": "t2smap",
@@ -1420,7 +1627,7 @@ def export(ctx: core.Context) -> dict:
             "records": rec.source(),
             "benchmarks": _bench_source(ctx, bench),
             "cache": [fcache.provenance(x) for x in ents],
-            "difftest": tprov,
+            "difftest": [{"night": k, **v} for k, v in tprov.items()],
             "command": f"python -m larmorx_validation evidence {TOOL} --site <site>",
         },
         "implementations": [
@@ -1435,15 +1642,24 @@ def export(ctx: core.Context) -> dict:
         ],
         "cases": cases,
         "cases_total": len(cases),
-        "speed": _speed(bench),
+        "speed": _speed(bench, ctx),
         "tables": tables,
         "examples": examples,
     }
+    # The clean-room original's part (its own module, written by its implementer: its example,
+    # its record's cases as original/<case>, its implementation, its tables, its provenance).
+    from larmorx_validation.evidence import tedana_t2smap_original
+
+    return tedana_t2smap_original.extend(ctx, doc)
 
 
-if __name__ == "__main__":  # compute the cache entries only
+if __name__ == "__main__":  # compute the cache entries only: python -m ... [--refresh]
+    import sys
+
     from larmorx_validation.figures.core import REPO, default_cache
 
     c = core.Context(repo=REPO, site=Path("."), cache=default_cache())
+    if "--refresh" in sys.argv:
+        refresh(c)
     for x in entries(c):
         print("done", x.dir, flush=True)

@@ -286,9 +286,12 @@ def run_tedana(
     return Run(code, p.stdout, p.stderr, cwd)
 
 
-def run_fmriprep_tedana(args: list[str], cwd: Path, binds: list[Path]) -> Run:
+def run_fmriprep_tedana(
+    args: list[str], cwd: Path, binds: list[Path], *, avx512: bool = False
+) -> Run:
     """fMRIPrep 25.2.6's tedana 25.0.1 (``t2smap`` in its image), with the Haswell kernels and
-    numpy's AVX-512 kernels off, through the oracle-output cache."""
+    numpy's AVX-512 kernels off (``avx512``: on, the CPU's default, as fMRIPrep's own oracle runs
+    had them), through the oracle-output cache."""
     from larmorx_validation import oracle_cache
 
     ws = workspace()
@@ -302,6 +305,8 @@ def run_fmriprep_tedana(args: list[str], cwd: Path, binds: list[Path]) -> Run:
         "COLUMNS": "80",
         "TQDM_DISABLE": "1",
     }
+    if avx512:
+        inner.pop("NPY_DISABLE_CPU_FEATURES")
     cmd = ["apptainer", "exec", "--cleanenv", "--no-home", "--pwd", str(cwd)]
     for b in sorted({str(cwd), *(str(b) for b in binds)}):
         cmd += ["--bind", f"{b}:{b}"]

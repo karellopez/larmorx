@@ -23,6 +23,7 @@
 #include "error.h"
 #include "matrix.h"
 #include "mri.h"
+#include "numerics.h"
 #include "utils.h"
 #include "version.h"
 
@@ -280,6 +281,19 @@ int cmd_fs_random(int argc, char **argv)
   return 0;
 }
 
+// FreeSurfer's OpenRan1 (utils/numerics.cpp: a static vnl_random reseeded when the seed changes,
+// drand64(0, 1) cast to float), called <count> times with the same seed, from a fresh process
+int cmd_open_ran1(int argc, char **argv)
+{
+  if (argc != 2) fail("usage: open-ran1 <seed> <count>");
+  long seed = to_long(argv[0]);
+  long count = to_long(argv[1]);
+  std::string s = "[";
+  for (long i = 0; i < count; i++) s += (i ? ", " : "") + num((double)OpenRan1(&seed));
+  printf("{\"function\": \"OpenRan1\", \"seed\": %ld, \"values\": %s]}\n", seed, s.c_str());
+  return 0;
+}
+
 struct Command {
   const char *name;
   int (*run)(int, char **);
@@ -295,6 +309,7 @@ const Command COMMANDS[] = {
     {"matrix-determinant", cmd_matrix_determinant, "<in>: MatrixDeterminant"},
     {"vnl-random", cmd_vnl_random, "<seed> <count> <method>: vnl_random(seed), count draws"},
     {"fs-random", cmd_fs_random, "<seed> <count> <low> <high>: setRandomSeed, randomNumber"},
+    {"open-ran1", cmd_open_ran1, "<seed> <count>: OpenRan1(&seed), count times"},
 };
 
 }  // namespace

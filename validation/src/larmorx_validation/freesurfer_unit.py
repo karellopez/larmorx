@@ -169,6 +169,13 @@ def fs_random(seed: int, count: int, low: float = 0.0, high: float = 1.0) -> lis
     return values(res.data["values"])
 
 
+def open_ran1(seed: int, count: int) -> list[float]:
+    """FreeSurfer's ``OpenRan1(&seed)`` (``utils/numerics.cpp``) ``count`` times from a fresh
+    process: ``vnl_random(seed)``'s ``drand64(0, 1)`` rounded to float, the values
+    ``setRandomSeed`` and ``randomNumber`` draw from."""
+    return values(call("open-ran1", str(seed), str(count)).data["values"])
+
+
 def _write_matrix(path: Path, m: Sequence[Sequence[float]]) -> None:
     rows, cols = len(m), len(m[0])
     lines = [f"{rows} {cols}"] + [" ".join(f32(float(x)).hex() for x in row) for row in m]

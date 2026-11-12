@@ -94,7 +94,7 @@ _REWORD: list[tuple[str, str, str]] = [
         "the standard comparison's record",
         "the standard comparison's record",
     ),
-    (r"\bthe parity suite's\b", "the comparison's", "the comparison's"),
+    (r"\bthe parity suite's\b", "the comparison suite's", "the comparison suite's"),
     # D13, a decision's number: its section of a record, by what it lists (a page that knows the
     # record links it: FIX_LIST)
     (
@@ -170,6 +170,28 @@ def reword(text: str | None, code: bool = True) -> str | None:
     for rx, with_code, plain in _REWORD_RX:
         text = rx.sub(with_code if code else plain, text)
     return text
+
+
+#: A version as a figures cache entry records it, in the old words ("larmorx 0.0.1 (crate
+#: larmorx-fsl: the clean-room original)"): a provenance item quotes it, unchanged.
+_RECORDED_VERSION = re.compile(
+    r"(\blarmorx [0-9][\w.+-]* \([^()]*\bclean-room originals?\b[^()]*\))"
+)
+
+
+def provenance(items: list[str]) -> list[str]:
+    """An example's provenance in the guide's words (shown with Markdown). A version string
+    the cache entry recorded in the old words is quoted as it is, marked as the record's."""
+    out = []
+    for item in items:
+        parts = _RECORDED_VERSION.split(item)
+        out.append(
+            "".join(
+                f"“{part}”, as the cache entry records it" if i % 2 else reword(part) or ""
+                for i, part in enumerate(parts)
+            )
+        )
+    return out
 
 
 def program_label(software: str, program: str, version: str) -> str:
@@ -255,6 +277,8 @@ def example(
         f["label"] = reword(f["label"], code=False)
         f["text"] = reword(f["text"])
     ex["metrics_note"] = reword(ex.get("metrics_note"))
+    if ex.get("provenance"):
+        ex["provenance"] = provenance(ex["provenance"])
     ex.pop("groups", None)  # replaced by order.groups
     return ex
 

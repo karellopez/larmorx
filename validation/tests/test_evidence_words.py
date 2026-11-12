@@ -111,3 +111,21 @@ def test_reword_plain_text():
     assert words.reword("its reproduce mode", code=False) == "reproduce"
     assert words.reword("the full tier") == "the full comparison"
     assert words.reword(None) is None
+
+
+def test_provenance_reworded_and_recorded_versions_quoted():
+    items = [
+        "Data: the parity suite's synthetic head (larmorx_validation.parity.fsl_bet: shells)",
+        "Runs of the clean-room original: figures cache entry `fsl-bet/x-original`, computed "
+        "2026-11-05 with larmorx `73c3baf9c975`; larmorx 0.0.1 (crate larmorx-fsl: the "
+        "clean-room original); every command in its `RUN_INFO.json`",
+    ]
+    assert words.provenance(items) == [
+        "Data: the comparison suite's synthetic head (larmorx_validation.parity.fsl_bet: shells)",
+        "Runs of the clean room: figures cache entry `fsl-bet/x-original`, computed 2026-11-05 "
+        "with larmorx `73c3baf9c975`; “larmorx 0.0.1 (crate larmorx-fsl: the clean-room "
+        "original)”, as the cache entry records it; every command in its `RUN_INFO.json`",
+    ]
+    ex = _example()
+    ex["provenance"] = items
+    assert _present(ex)["provenance"] == words.provenance(items)

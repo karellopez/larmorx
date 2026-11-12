@@ -84,9 +84,11 @@ def upstream_defects() -> list[tuple[str, str, str, bool]]:
     fixed_by_default)``."""
 
 def nifti_read(
-    path: str, scaling: str = "auto", n_threads: int = 1
+    path: str, scaling: str = "auto", n_threads: int = 1, volumes: int | None = None
 ) -> tuple[np.ndarray, np.ndarray, dict[str, Any], list[str], bool]:
-    """Read a NIfTI file: ``(data, affine, header fields, fixes applied, scaled)``."""
+    """Read a NIfTI file: ``(data, affine, header fields, fixes applied, scaled)``; ``volumes``
+    keeps the first volumes along the fourth axis only (nibabel's ``dataobj[:, :, :, :volumes]``,
+    the header's shape set to the data's)."""
 
 def nifti_read_header(path: str, fix: bool = False) -> Any:
     """Read a NIfTI header: the fields as stored, or ``(fields, fixes)`` with nibabel's

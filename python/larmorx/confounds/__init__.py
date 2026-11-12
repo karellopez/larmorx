@@ -10,6 +10,13 @@ bit for bit (the confounds' part fills it step by step).
   ``TCompCor`` interfaces' files; :func:`compute_noise_components` and the functions under it
   (:func:`regress_poly`, :func:`cosine_filter`, :func:`cosine_drift`, :func:`full_rank`,
   :func:`compute_tstd`, :func:`fallback_svd`, :func:`combine_mask_files`).
+- :func:`tsnr`: nipype's ``TSNR`` (the tSNR, mean and standard deviation maps, the detrended
+  series).
+- :func:`nonsteady_state_detector`: nipype's ``NonSteadyStateDetector`` (``is_outlier`` of the
+  first 50 volumes' mean signal; niworkflows' version, fMRIPrep's, is
+  :func:`larmorx.niworkflows.nonsteady_states_detector`).
+- :func:`framewise_displacement`, :func:`normalize_mc_params`: nipype's
+  ``FramewiseDisplacement`` and the motion parameters' conversion to SPM's order and units.
 """
 
 from larmorx.confounds.compcor import (
@@ -32,11 +39,21 @@ from larmorx.confounds.dvars import (
     compute_dvars,
     compute_dvars_node,
 )
+from larmorx.confounds.framewise import (
+    FramewiseDisplacementResult,
+    framewise_displacement,
+    normalize_mc_params,
+)
+from larmorx.confounds.nonsteady import NonSteadyStateResult, nonsteady_state_detector
+from larmorx.confounds.tsnr import TsnrResult, tsnr
 
 __all__ = [
     "CompCorResult",
     "ComputeDvarsResult",
     "DvarsResult",
+    "FramewiseDisplacementResult",
+    "NonSteadyStateResult",
+    "TsnrResult",
     "acompcor",
     "combine_mask_files",
     "compcor",
@@ -47,7 +64,11 @@ __all__ = [
     "cosine_drift",
     "cosine_filter",
     "fallback_svd",
+    "framewise_displacement",
     "full_rank",
+    "nonsteady_state_detector",
+    "normalize_mc_params",
     "regress_poly",
     "tcompcor",
+    "tsnr",
 ]

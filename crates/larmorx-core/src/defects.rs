@@ -385,6 +385,8 @@ defects! {
         "an AR(1) estimate above 1, which the float32 FFT's rounding gives for a series whose lag-1 autocorrelation is just below 1, makes the predicted difference SD the square root of a negative number: NaN, so every standardised and voxel-wise DVARS value is NaN, without an error";
     PIPE_50 = "PIPE-50", "nipype compute_dvars", true,
         "a voxel whose demeaned series is all zeros (a constant voxel, kept by remove_zerovariance=False) has the AR(1) Yule-Walker equation 0 a = 0: with SciPy 1.15 nitime's solve returns NaN, which makes every standardised and voxel-wise DVARS value NaN without an error; with SciPy 1.18 it stops with LinAlgError (\"A singular matrix detected.\")";
+    PIPE_51 = "PIPE-51", "nipype TSNR", true,
+        "the maps of a series stored as integers (tSNR, mean, standard deviation, the detrended series) are written in that integer type, quantized by nibabel's scaling (256 levels for uint8, 65,536 for int16): the check meant to switch the header to float32 for integer data never fires, as the data are float32 by then";
     PIPE_52 = "PIPE-52", "nipype regress_poly", true,
         "the non-constant regressors it returns (CompCor's Legendre pre-filter file) are X[:, :-1], the constant and every polynomial but the highest, not the polynomials of degree 1 to d";
     PIPE_53 = "PIPE-53", "nipype regress_poly, cosine_filter", true,

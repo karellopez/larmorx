@@ -267,7 +267,20 @@ pub fn read_header(path: impl AsRef<Path>) -> Result<NiftiHeader> {
 
 /// Reads a NIfTI image.
 pub fn read(path: impl AsRef<Path>, options: &ReadOptions) -> Result<NiftiImage> {
-    read_from(path.as_ref(), None, options)
+    read_from(path.as_ref(), None, options, None)
+}
+
+/// [`read`] of the first `volumes` volumes along the fourth axis only: nibabel's
+/// `img.dataobj[:, :, :, :volumes]` (the same values, scaled the same way), with only those
+/// volumes' bytes kept (the others are skipped in the stream, as nibabel's `fileslice` skips
+/// them) and the header's shape set to the data's. An image with fewer than four axes, or with
+/// no more than `volumes` volumes, is read whole.
+pub fn read_first_volumes(
+    path: impl AsRef<Path>,
+    options: &ReadOptions,
+    volumes: usize,
+) -> Result<NiftiImage> {
+    read_from(path.as_ref(), None, options, Some(volumes))
 }
 
 /// [`read`] with the header from `path` and the voxels from `data`, at the header's
@@ -278,10 +291,15 @@ pub fn read_with_data_from(
     data: &Path,
     options: &ReadOptions,
 ) -> Result<NiftiImage> {
-    read_from(path.as_ref(), Some(data), options)
+    read_from(path.as_ref(), Some(data), options, None)
 }
 
-fn read_from(path: &Path, data: Option<&Path>, options: &ReadOptions) -> Result<NiftiImage> {
+fn read_from(
+    path: &Path,
+    data: Option<&Path>,
+    options: &ReadOptions,
+    volumes: Option<usize>,
+) -> Result<NiftiImage> {
     let paths = checked_paths(path)?;
     let hpath = paths.header_path();
     let mut reader = open_stream(hpath)?;
@@ -321,26 +339,54 @@ fn read_from(path: &Path, data: Option<&Path>, options: &ReadOptions) -> Result<
         .iter()
         .try_fold(1usize, |acc, &d| acc.checked_mul(d))
         .ok_or_else(|| format_err(hpath, format!("shape {shape:?} is too large")))?;
+    // The first `k` volumes of every index after the fourth axis: `outer` blocks of `block`
+    // values, `skip` values apart in the file (Fortran order).
+    let (shape, blocks) = match volumes.filter(|&k| shape.len() >= 4 && k < shape[3]) {
+        Some(k) => {
+            let volume: usize = shape[..3].iter().product();
+            let outer = shape[4..].iter().product();
+            let mut kept = shape.clone();
+            kept[3] = k;
+            hdr.set_shape(&kept).map_err(header_err(hpath))?;
+            (
+                kept,
+                Blocks {
+                    block: volume * k,
+                    skip: volume * (shape[3] - k),
+                    outer,
+                },
+            )
+        }
+        None => (
+            shape,
+            Blocks {
+                block: n_elements,
+                skip: 0,
+                outer: 1,
+            },
+        ),
+    };
+    let n_elements = blocks.block * blocks.outer;
     let order = hdr.byte_order;
     let n_threads = options.n_threads;
     let raw = parallel::with_threads(n_threads, || -> Result<DynArray> {
         let r = &mut *data_reader;
         Ok(match data_type {
-            DataType::U8 => read_array::<u8>(r, &shape, n_elements, order, ipath)?.into(),
-            DataType::I8 => read_array::<i8>(r, &shape, n_elements, order, ipath)?.into(),
-            DataType::U16 => read_array::<u16>(r, &shape, n_elements, order, ipath)?.into(),
-            DataType::I16 => read_array::<i16>(r, &shape, n_elements, order, ipath)?.into(),
-            DataType::U32 => read_array::<u32>(r, &shape, n_elements, order, ipath)?.into(),
-            DataType::I32 => read_array::<i32>(r, &shape, n_elements, order, ipath)?.into(),
-            DataType::U64 => read_array::<u64>(r, &shape, n_elements, order, ipath)?.into(),
-            DataType::I64 => read_array::<i64>(r, &shape, n_elements, order, ipath)?.into(),
-            DataType::F32 => read_array::<f32>(r, &shape, n_elements, order, ipath)?.into(),
-            DataType::F64 => read_array::<f64>(r, &shape, n_elements, order, ipath)?.into(),
+            DataType::U8 => read_array::<u8>(r, &shape, n_elements, blocks, order, ipath)?.into(),
+            DataType::I8 => read_array::<i8>(r, &shape, n_elements, blocks, order, ipath)?.into(),
+            DataType::U16 => read_array::<u16>(r, &shape, n_elements, blocks, order, ipath)?.into(),
+            DataType::I16 => read_array::<i16>(r, &shape, n_elements, blocks, order, ipath)?.into(),
+            DataType::U32 => read_array::<u32>(r, &shape, n_elements, blocks, order, ipath)?.into(),
+            DataType::I32 => read_array::<i32>(r, &shape, n_elements, blocks, order, ipath)?.into(),
+            DataType::U64 => read_array::<u64>(r, &shape, n_elements, blocks, order, ipath)?.into(),
+            DataType::I64 => read_array::<i64>(r, &shape, n_elements, blocks, order, ipath)?.into(),
+            DataType::F32 => read_array::<f32>(r, &shape, n_elements, blocks, order, ipath)?.into(),
+            DataType::F64 => read_array::<f64>(r, &shape, n_elements, blocks, order, ipath)?.into(),
             DataType::C64 => {
-                read_array::<Complex<f32>>(r, &shape, n_elements, order, ipath)?.into()
+                read_array::<Complex<f32>>(r, &shape, n_elements, blocks, order, ipath)?.into()
             }
             DataType::C128 => {
-                read_array::<Complex<f64>>(r, &shape, n_elements, order, ipath)?.into()
+                read_array::<Complex<f64>>(r, &shape, n_elements, blocks, order, ipath)?.into()
             }
         })
     })??;
@@ -358,24 +404,54 @@ fn read_from(path: &Path, data: Option<&Path>, options: &ReadOptions) -> Result<
     })
 }
 
-/// Reads `n` elements in `order` into an array of `shape` in Fortran order.
+/// The parts of the voxel data kept: `outer` blocks of `block` values, each followed (but the
+/// last) by `skip` values not read.
+#[derive(Clone, Copy)]
+struct Blocks {
+    block: usize,
+    skip: usize,
+    outer: usize,
+}
+
+/// Reads `n` elements in `order`, `blocks` of them (the values between two blocks skipped),
+/// into an array of `shape` in Fortran order.
 fn read_array<T: Element>(
     reader: &mut dyn Read,
     shape: &[usize],
     n: usize,
+    blocks: Blocks,
     order: ByteOrder,
     path: &Path,
 ) -> Result<ArrayD<T>> {
-    n.checked_mul(std::mem::size_of::<T>())
+    let size = std::mem::size_of::<T>();
+    n.checked_mul(size)
         .ok_or_else(|| format_err(path, "image too large"))?;
     let mut values = vec![T::zeroed(); n];
-    let bytes: &mut [u8] = bytemuck::cast_slice_mut(&mut values);
-    let got = extension::read_up_to(reader, bytes).map_err(io_err(path))?;
-    if got < bytes.len() {
-        return Err(format_err(
-            path,
-            format!("expected {} bytes of voxel data, found {got}", bytes.len()),
-        ));
+    for (i, part) in values.chunks_mut(blocks.block.max(1)).enumerate() {
+        if i > 0 && blocks.skip > 0 {
+            let skip = (blocks.skip * size) as u64;
+            let skipped =
+                io::copy(&mut (&mut *reader).take(skip), &mut io::sink()).map_err(io_err(path))?;
+            if skipped < skip {
+                return Err(format_err(
+                    path,
+                    "the voxel data end before the volumes kept",
+                ));
+            }
+        }
+        let bytes: &mut [u8] = bytemuck::cast_slice_mut(part);
+        let got = extension::read_up_to(reader, bytes).map_err(io_err(path))?;
+        if got < bytes.len() {
+            let want = if blocks.outer == 1 {
+                n * size
+            } else {
+                bytes.len()
+            };
+            return Err(format_err(
+                path,
+                format!("expected {want} bytes of voxel data, found {got}"),
+            ));
+        }
     }
     if !order.is_native() {
         values

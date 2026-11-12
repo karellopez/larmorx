@@ -28,6 +28,9 @@ and scikit-image arithmetic under them.
   ``_copy_any``.
 - :func:`collect_participants`: the participants of a BIDS dataset to process (with
   :class:`BIDSError` and :class:`BIDSWarning`).
+- :func:`robust_acompcor`, :func:`robust_tcompcor`: ``RobustACompCor`` and ``RobustTCompCor``,
+  nipype's ``ACompCor`` and ``TCompCor`` (:mod:`larmorx.confounds`) without niworkflows' retries
+  (PIPE-48).
 """
 
 from larmorx.niworkflows.bids import (
@@ -74,6 +77,7 @@ from larmorx.niworkflows.nibabel import (
 )
 from larmorx.niworkflows.nitransforms import ConcatenateXfmsResult, concatenate_xfms
 from larmorx.niworkflows.participants import BIDSError, BIDSWarning, collect_participants
+from larmorx.niworkflows.patches import robust_acompcor, robust_tcompcor
 from larmorx.niworkflows.refmap import EpiReferenceResult, epi_reference_workflow
 from larmorx.niworkflows.regrid import RegridToZoomsResult, regrid_to_zooms, resample_by_spacing
 from larmorx.niworkflows.sampling import (
@@ -128,7 +132,9 @@ __all__ = [
     "reorient_image",
     "resample_by_spacing",
     "resample_img_nearest",
+    "robust_acompcor",
     "robust_average",
+    "robust_tcompcor",
     "skullstrip_bold_workflow",
     "squeeze_image",
     "validate_image",

@@ -267,8 +267,8 @@ def _counts(x: dict, ex, outputs: list[dict]) -> str:
 MISSES = {
     "real/child-3y-B": "the record's failure: -B's last step, bet -R with -c from the robust "
     "centre, starts bet2 a few bits from FSL's on this neurologically stored image (the "
-    "specification's open question of the trial's cases 622 and 677: the conversion of a centre "
-    "in voxels into FSL's radiological frame)",
+    "specification's open question of random testing's cases 622 and 677: the conversion of a "
+    "centre in voxels into FSL's radiological frame)",
 }
 
 
@@ -360,7 +360,7 @@ def _verdicts(diffs: list[dict], ex, outputs: list[dict], info: dict, rec_orig) 
                 f"Not FSL 6.0.7.23's values: {counts}. "
                 + (
                     "bet2's brain and every step before betsurf are FSL's; betsurf decides its "
-                    "profiles as FSL does (relay 7's rules) and its surfaces settle a little "
+                    "profiles as FSL does and its surfaces settle a little "
                     "elsewhere, the scalp most (docs/findings/fsl-bet-original.md, betsurf), "
                     "held to its masks' thresholds (Dice >= 0.99, boundary p95 <= 1 voxel)."
                     if surf

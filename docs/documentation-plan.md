@@ -10,7 +10,11 @@ project is in [next-steps.md](next-steps.md), "The order from here".
 - **Four words, used one way everywhere:**
   - **original**: the program LARMORX is compared with (FSL's `bet`, ANTs' `antsRegistration`): the
     oracle.
-  - **port**: any program LARMORX reimplements in Rust. Every port is a replica, a clean room, or both.
+  - **port**: one reimplementation of an original program in LARMORX, in Rust (or in Python where the
+    original is Python code that LARMORX keeps in Python, such as pybids' BIDS index). Every port is
+    either a replica or a clean room, and a program can have both: FSL's `bet` has two ports, a replica
+    in `larmorx-nc` and a clean room in `larmorx` (the user: "a port can be a replica in another
+    language, or a clean room").
   - **replica**: a port translated from the original's source, giving its results bit for bit (ANTs'
     and ITK's ports are replicas in the main package; FSL's are in `larmorx-nc`, tedana's in
     `larmorx-gpl`).

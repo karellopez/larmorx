@@ -68,3 +68,42 @@ Their results are in `docs/freesurfer/` (closed too).
       python -P validation/investigations/freesurfer-inventory/data_refs.py package \
           <workspace>/oracles/freesurfer-8.2.0/root/usr/local/freesurfer/8.2.0 \
           --tsv <scratch>/package-files.tsv --workers 4
+- `data_trace.py` with `data_trace_jobs.toml`: sub-task 4's measurement (relay 4). For each job it
+  rebuilds the subject directory a recorded step started from (the step's `before` map, copied
+  from the recording's blobs; `fsaverage` linked as recon-all links it), runs the step's command
+  (or the job's own: the bare steps recon-all runs without `fs_time`, the conditional Talairach
+  retries, fMRIPrep's and sMRIPrep's calls) under `strace -f` with FreeSurfer's environment,
+  inside a memory box, stopped at the job's time limit, and lists the files each program opened
+  (by the program at the top of its process chain): the package's data, its code, the licence
+  file, the subject's files, and the package paths searched but missing. One job at a time, 4
+  threads; the rebuilt directory is removed after each job, the strace log kept gzip-compressed.
+
+      python -P validation/investigations/freesurfer-inventory/data_trace.py run \
+          --jobs validation/investigations/freesurfer-inventory/data_trace_jobs.toml \
+          --runs <workspace>/oracles/freesurfer-8.2.0/runs \
+          --fs-home <workspace>/oracles/freesurfer-8.2.0/root/usr/local/freesurfer/8.2.0 \
+          --license <licence file> --box scripts/orchestration/boxed.sh --box-gib 12 \
+          --out <scratch>/trace
+      python -P validation/investigations/freesurfer-inventory/data_trace.py report \
+          --out <scratch>/trace --json <scratch>/trace/summary.json
+- `annex_check.py`: whether FreeSurfer serves an annexed file on its own (HEAD requests to its
+  git-annex remote, one every 20 seconds: the server refuses clients that ask faster).
+
+      python -P validation/investigations/freesurfer-inventory/annex_check.py \
+          <workspace>/tags/freesurfer-8.2.0 --toml docs/freesurfer/data-files.toml \
+          --tsv <scratch>/annex-urls.tsv
+- `data_files.py`: `docs/freesurfer/data-files.toml` and the tables of `data-files.md`, from the
+  trace's job results, the package's sizes and SHA-256 (`data_refs.py package`), the tag's annex
+  links (relay 3's `annex-keys.tsv`), the annex checks and the recordings' command lines; licence
+  and origin per file from its `RULES` (each with its source).
+
+      python -P validation/investigations/freesurfer-inventory/data_files.py \
+          --trace <scratch>/trace --package-tsv <scratch>/package-files.tsv \
+          --annex-tsv <scratch>/annex-keys.tsv --annex-urls <scratch>/annex-urls.tsv \
+          --tag <workspace>/tags/freesurfer-8.2.0 --runs <workspace>/oracles/freesurfer-8.2.0/runs \
+          --fs-home <package root> --toml docs/freesurfer/data-files.toml > <scratch>/tables.md
+- `drand64_order.sh` with `find_consts.py`: sub-task 5 (relay 4). The order in which the official
+  binaries evaluate `vnl_random::drand64`'s two `lrand32()` calls: the code that divides by
+  4294967295.0² and the two calls before it, per binary (`objdump`, `readelf`).
+
+      validation/investigations/freesurfer-inventory/drand64_order.sh <package root>/bin/mri_ca_register

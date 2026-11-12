@@ -143,6 +143,21 @@ files through larmorx's port of the program (`_core.ants_file_program`, an expli
 its result never depends on it), then `FixHeaderApplyTransforms` copies the reference's x-forms
 onto the output (`copy_xform`).
 
+**File names with a blank (PIPE-80, corrected by default).** nipype writes some file names
+unquoted: the files inside ANTs' bracketed arguments (`--transform [ f, 1 ]`, `--metric MI[ fixed,
+moving, ... ]`, `--masks [ f, m ]`, `--initial-moving-transform [ f, 0 ]`, the `--output [ ... ]`
+forms of `antsRegistration`, `antsApplyTransforms`, `N4BiasFieldCorrection` and `DenoiseImage`),
+`antsApplyTransforms`' `--transform f`, `MultiImageMaths`' operands and TOPUP's `--datain` file;
+and BET makes its input's name relative after quoting it. The line runs through the shell, so a
+dataset, working directory or output folder whose path holds a blank (or a quote) gives the
+program other file names, and the node fails. Each `Command` keeps nipype's line (`cmdline`, as
+`command.txt` holds it) and the line with every file name quoted (`quoted_cmdline`; the same text
+when no name needs quoting); `larmorx._nipype.words(cmd, upstream_defects)` gives the program the
+quoted line's words by default and nipype's with `upstream_defects="reproduce"` (nipype's
+failure), with the `PIPE-80` notice whenever the two differ. The output names larmorx makes
+absolute for a program that runs in this process (nipype writes them relative to the node's
+folder) are quoted in both modes, so a node folder with a blank works as in nipype.
+
 ## The EPI reference and the steps under it (SyN preprocessing)
 
 | larmorx | niworkflows / nipype / nilearn | Notes |

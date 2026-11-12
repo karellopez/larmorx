@@ -120,16 +120,17 @@ class Run:
     timeout: int = 3600
 
 
-#: The scripts: short name -> (script, linear-algebra form, environments, box GiB, the
-#: environments that put fMRIPrep 25.2.7's tag on PYTHONPATH, numpy's AVX-512 off, what it
-#: compares, the control's arguments (``None``: no control), the control's environments, the
-#: full tier's time limit in seconds).
+#: The linear algebra's environments (its scripts call numpy's own exported routines; the
+#: image's numpy is reached through the real calls of the other scripts).
 LINALG_ENVS = ("e2", "e1")
+#: The other scripts' environments.
 LIBRARY_ENVS = ("e1", "e2", "e3")
 
 
 @dataclass(frozen=True)
 class Script:
+    """One check script and the runs it was validated with."""
+
     name: str
     script: str
     what: str
@@ -327,11 +328,7 @@ def _runs(s: Script) -> dict[str, Run]:
     if s.control is not None:
         for env in s.control_envs:
             for full in (False, True):
-                args = (*s.control, *(_tier_args(s, full) if not s.linalg or full else ()))
-                if s.linalg and not full:
-                    args = (*s.control, "--quick", "--threads", "4")
-                elif s.linalg:
-                    args = (*s.control, "--threads", "4")
+                args = (*s.control, *_tier_args(s, full))
                 out[f"{s.name}-control-{'full' if full else 'quick'}-{env}"] = Run(
                     s.script,
                     args,
@@ -415,7 +412,10 @@ _TOTAL_TABLE = re.compile(
     r"^TOTAL identical (?P<k>\d+) nan-bits (?P<b>\d+) differ (?P<d>\d+)\b.*?(?P<control> CONTROL)?$"
 )
 _TOTAL_OF = re.compile(r"^TOTAL (?P<k>\d+) of (?P<n>\d+) identical\b.*?(?P<control>\[control:.*)?$")
-_INFO = ("INFO ", "apart:", "note:", "seconds:", "larmorx's seconds", "numpy ", "time ")
+_INFO = ("INFO ", "apart:", "note:", "numpy ")
+#: The scripts' timing lines: not part of a record (they change from run to run; the speed is
+#: the benchmarks').
+_TIMING = ("seconds:", "larmorx's seconds", "time ", "TIME ")
 
 
 class _Parsed:
@@ -554,8 +554,13 @@ def parse(stdout: str, control: bool = False) -> _Parsed:
                 ok = k == n if m["word"] == "identical" else k == 0
                 out.add(m["name"], passed=ok, value=f"{k}/{n}", metric=m["word"], compared=True)
             continue
+        if s.startswith(_TIMING):
+            continue
         if s.startswith(_INFO):
-            name, _, value = s.partition(": ")
+            body = s.removeprefix("INFO ")
+            name, _, value = body.rpartition(": ")
+            if not value:
+                name, value = body[:80], body
             out.add(
                 f"INFO {name[:120]}", passed=True, threshold="reported", value=_reported(value or s)
             )

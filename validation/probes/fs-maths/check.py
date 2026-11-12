@@ -115,7 +115,7 @@ def main(argv: list[str] | None = None) -> int:
     fix_differ, fix_unexplained, fix_ids = Counter(), Counter(), Counter()
     hashed = hashlib.sha256()
     first_differ = []
-    for case, c, (r, ids), (f, fids) in zip(cases, official, rep, fix):
+    for case, c, (r, ids), (f, fids) in zip(cases, official, rep, fix, strict=True):
         cmd = case.split()[0]
         if "FS-22" in ids:
             skipped[cmd] += 1

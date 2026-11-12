@@ -54,6 +54,8 @@ pub mod vnl_qr;
 pub mod vnl_random;
 pub mod vnl_svd;
 pub mod vnl_svd_f32;
+#[cfg(test)]
+mod vnl_digests;
 pub mod x87;
 
 pub use affine::{Affine, SingularAffine};

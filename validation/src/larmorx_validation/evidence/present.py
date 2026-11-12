@@ -231,9 +231,13 @@ def _original_panel(page: Page, p: dict) -> tuple[str, str, float]:
     second line (how it ran) and its place among the original's panels. A panel of the
     original's kind that names no run of it ("Initial alignment (-init)", the starting point of
     a registration) keeps its label as its name, after the original's runs."""
-    if not p["label"].startswith(page.software) and re.match(r"^[A-Z][a-z]", p["label"]):
-        if not re.search(r"\d+\.\d+", p["label"]):
-            return p["label"], text(page, p.get("sub"), code=False) or "", 3.0
+    label = p["label"]
+    if (
+        not label.startswith(page.software)
+        and re.match(r"^[A-Z][a-z]", label)
+        and not re.search(r"\d+\.\d+", label)
+    ):
+        return label, text(page, p.get("sub"), code=False) or "", 3.0
     program, ver, rest, tail, rank = _original_parts(page, p)
     # a page of several programs names a call's program in the example, not on each panel
     name = " ".join(x for x in (page.software, program, ver) if x) + "".join(f", {t}" for t in tail)
@@ -470,7 +474,7 @@ _ROLE_LABELS = {
 
 
 def _defect(page: Page, old: str) -> str:
-    """"AFNI: -peels 0 − -peels 1", "AFNI on the negative scale factor − AFNI on the usual
+    """ "AFNI: -peels 0 − -peels 1", "AFNI on the negative scale factor − AFNI on the usual
     encoding": the two runs that show an original's defect, by what differs."""
     sw = re.escape(page.software)
     sides = []
@@ -514,7 +518,6 @@ def _role(
             raise ValueError(f"{d['id']}: what changes in {old!r}?")
         return f"the {who} against itself: {what}", "itself"
     if pa == "clean-room" and pb == "replica":
-        left, _, right = old.partition(" − ")
         both = ""
         if re.search(r"\bdefault\b|\bfix\b", old) and "reproduce" not in old:
             both = ": both fix"
@@ -525,7 +528,9 @@ def _role(
         return f"the {who} against fMRIPrep's output", "fMRIPrep's output"
     if who and pb == "original":
         role = f"the {who} against the original"
-        if b is not None and b.get("role") == "reference" or b is None and "correctly rounded" in old:
+        if (b is not None and b.get("role") == "reference") or (
+            b is None and "correctly rounded" in old
+        ):
             role += ": correctly rounded maths"
         elif b is not None and "fMRIPrep's image" in b.get("label", ""):
             role += ": fMRIPrep's build"
@@ -609,9 +614,8 @@ def example(
             name, sub, r = attempt(_original_panel, page, p, fallback=fallback)
             new[pid], originals[pid], rank[pid] = (name, sub), name, r
             info[pid] = {"name": name, "role": p["role"]}
-            if r == 0.0 and name != p["label"]:  # a run of a version, as built
-                info[pid]["version"] = attempt(_original_parts, page, p, fallback=("",) * 5)[1]
-            elif r == 1.0:  # fMRIPrep's build: its version, which may be another
+            # a run of a version as built, or fMRIPrep's build (its version may be another)
+            if (r == 0.0 and name != p["label"]) or r == 1.0:
                 info[pid]["version"] = attempt(_original_parts, page, p, fallback=("",) * 5)[1]
         elif p["role"] == "input":
             new[pid] = (p["label"], text(page, p.get("sub"), code=False))
@@ -800,7 +804,6 @@ def chain(page: Page, ch: dict) -> None:
     """A worked example's chain of causes (what separates fMRIPrep's output from the port's):
     each run named as the panels name it, LARMORX's by its port (``port`` on every node). The
     site shows its title and nodes as plain text."""
-    who = words.PORT_NAME[page.port]
     ch["title"] = text(page, ch["title"], code=False)
     for step in ch["steps"]:
         for n in step["nodes"]:
@@ -1003,46 +1006,144 @@ def _sig(v: float, digits: int = 2) -> str:
     return f"{v:.{digits}g}" if v else "0"
 
 
-def panel_shows(page: Page, ex: dict) -> tuple[str, list[str]]:
-    """The "What this shows" line of a data-panel example (``ants_panel``'s shapes: the port
-    against the original as built ``lx-ants`` and with correctly rounded maths ``lx-cr``, its
-    threads ``lx1-lx``, ``fix`` against ``reproduce`` ``fix-lx``), from its own verdicts,
-    metrics and reasons; and the verdict that stands beside it."""
-    d = {x["id"]: x for x in ex["diffs"]}
-    who = words.PORT_NAME[page.port]
-    sw = _owner(page.software)
-    main = d["lx-ants"]
-    head = "In `reproduce`"
-    if "lx1-lx" in d and d["lx1-lx"]["verdict"] == "bit-identical":
-        n = sorted({int(x) for x in re.findall(r"(\d+) threads?", d["lx1-lx"]["label"])})
-        if len(n) == 2:
-            head += f", on {n[0]} and {n[1]} threads"
-    parts = []
-    if main["verdict"] == "bit-identical":
-        parts.append(
-            f"{head}, the {who} gives {sw} bytes, as built and with correctly rounded maths."
+def _panel_facts(page: Page, ex: dict, port: str, ports: dict[str, str]) -> dict | None:
+    """What a data-panel example shows of one port, by what each comparison is: the port
+    against the original's run of the page's version as built (its main comparison), against
+    correctly rounded maths, against itself by threads, and ``fix`` against ``reproduce``."""
+    by_id = {p["id"]: p for p in ex["panels"]}
+    mine = {pid for pid, x in ports.items() if x == port}
+    if not mine:
+        return None
+
+    def built(pid: str) -> bool:  # the original's run of the page's version, as built
+        p = by_id.get(pid)
+        if not p or p["role"] != "original":
+            return False
+        try:
+            _, ver, _, _, rank = _original_parts(page, p)
+        except ValueError:
+            return False
+        return rank == 0.0 and ver == page.version
+
+    def same(d: dict) -> bool:  # two runs of this port (one may have no panel)
+        return (d["a"] in mine or d["a"] not in by_id) and (d["b"] in mine or d["b"] not in by_id)
+
+    main = next(
+        (d for d in ex["diffs"] if d["kind"] == "main" and d["a"] in mine and built(d["b"])), None
+    )
+    if main is None:
+        raise ValueError(
+            f"{ex['id']}: no comparison of the {words.PORT_NAME[port]} with the original as built"
         )
-    elif main["verdict"] == "identical-cr":
-        big = max(m["max_abs"] for m in main["metrics"].values())
-        parts.append(
-            f"{head}, the {who} gives {sw} bytes with correctly rounded maths; {page.software} as "
-            f"built differs only where glibc's maths is not correctly rounded (largest difference "
-            f"{_sig(big)})."
-        )
-    else:
-        raise ValueError(f"{ex['id']}: lx-ants is {main['verdict']}")
-    fix = d.get("fix-lx")
-    if fix and fix["verdict"] == "bit-identical":
-        parts.append("No correction by default changes this call.")
-    elif fix and fix["verdict"] == "d13":
+    cr = next(
+        (d for d in ex["diffs"] if d["a"] == main["a"] and d is not main and (
+            by_id.get(d["b"], {}).get("role") == "reference"
+            or (d["b"] not in by_id and "correctly rounded" in d["label"]))), None,
+    )  # fmt: skip
+    threads = [
+        d for d in ex["diffs"] if same(d) and main["a"] in (d["a"], d["b"])
+        and "thread" in d["label"]
+        and not re.search(r"default|reproduce|fix", d["label"].split("−")[0])
+    ]  # fmt: skip
+    fix = next(
+        (d for d in ex["diffs"] if same(d) and d["a"] in mine and d["b"] in mine and re.search(
+            r"\b(default|fix)\b.*− .*reproduce", d["label"])), None,
+    )  # fmt: skip
+    n = []
+    if threads and threads[0]["verdict"] == "bit-identical":
+        n = sorted({int(x) for x in re.findall(r"(\d+) threads?", threads[0]["label"])})
+    mode = "reproduce" if "reproduce" in (by_id[main["a"]].get("sub") or "") else "fix"
+    return {"main": main, "cr": cr, "threads": n if len(n) == 2 else [], "fix": fix, "mode": mode}
+
+
+def _fix_clause(ex: dict, fix: dict | None, whose: str, port: str = "") -> str:
+    """What ``fix`` changes on the call, from the comparison of ``fix`` with ``reproduce``
+    (``port``: the port it is said of, on a page of two)."""
+    if fix is None:
+        return ""
+    if fix["verdict"] == "bit-identical":
+        if port:
+            return f"No correction by default changes the {port}'s result on this call."
+        return "No correction by default changes this call."
+    if fix["verdict"] == "d13":
         # "corrects" only for the corrections that change values on this call (WARNS)
-        ids = list(dict.fromkeys(re.findall(r"\b(?:ANTS|ITK)-\d+\b", fix.get("reason") or "")))
+        ids = list(dict.fromkeys(re.findall(r"\b[A-Z]+-\d+\b", fix.get("reason") or "")))
         fixed = [i for i in ids if i not in WARNS]
         if not fixed:
-            raise ValueError(f"{ex['id']}: fix-lx changes values, but names only {ids}")
-        line = f"Its default, `fix`, corrects {' and '.join(fixed)} here"
+            raise ValueError(f"{ex['id']}: {fix['id']} changes values, but names only {ids}")
+        line = f"{whose} default, `fix`, corrects {' and '.join(fixed)} here"
         warned = [f"{WARNS[i]} ({i})" for i in ids if i in WARNS]
-        parts.append(line + "".join(f" and {w}" for w in warned) + ".")
-    elif fix:
-        raise ValueError(f"{ex['id']}: fix-lx is {fix['verdict']}")
-    return " ".join(parts), ["lx-ants"]
+        return line + "".join(f" and {w}" for w in warned) + "."
+    raise ValueError(f"{ex['id']}: {fix['id']} is {fix['verdict']}")
+
+
+def panel_shows(page: Page, ex: dict) -> tuple[str, list[str]]:
+    """The "What this shows" line of a data-panel example, from its own verdicts, metrics and
+    reasons, each comparison found by what it is (:func:`_panel_facts`), not by its id; on a
+    page of two ports one line for both; and the verdicts that stand beside it, one per port.
+    It serves the data panel's calls of fMRIPrep, where a port's run is compared with the
+    original's run as built and, where the page has one, with correctly rounded maths."""
+    ports = {
+        p["id"]: port_of_label(page, p["label"]) for p in ex["panels"] if p["role"] == "larmorx"
+    }
+    facts = {
+        port: f for port in ("replica", "clean-room")
+        if (f := _panel_facts(page, ex, port, ports)) is not None
+    }  # fmt: skip
+    if not facts:
+        raise ValueError(f"{ex['id']}: no port's panel")
+    sw = _owner(page.software)
+
+    def gives(port: str, f: dict, alone: bool) -> str:
+        who = words.PORT_NAME[port]
+        main = f["main"]
+        head = "In `reproduce`" if f["mode"] == "reproduce" else "In `fix`, the default"
+        if alone and f["threads"]:
+            head += f", on {f['threads'][0]} and {f['threads'][1]} threads"
+        if main["verdict"] == "bit-identical":
+            if f["cr"] is not None and f["cr"]["verdict"] != "bit-identical":
+                raise ValueError(f"{ex['id']}: {main['id']} bit-identical, {f['cr']['id']} not")
+            how = ", as built and with correctly rounded maths" if f["cr"] is not None else ""
+            return f"{head}, the {who} gives {sw} bytes{how}."
+        if main["verdict"] == "identical-cr":
+            big = max(m["max_abs"] for m in main["metrics"].values())
+            return (
+                f"{head}, the {who} gives {sw} bytes with correctly rounded maths; "
+                f"{page.software} as built differs only where glibc's maths is not correctly "
+                f"rounded (largest difference {_sig(big)})."
+            )
+        raise ValueError(f"{ex['id']}: {main['id']} is {main['verdict']}")
+
+    if len(facts) == 1:
+        port, f = next(iter(facts.items()))
+        parts = [gives(port, f, True), _fix_clause(ex, f["fix"], "Its")]
+        return " ".join(x for x in parts if x), [f["main"]["id"]]
+    fr, fc = facts["replica"], facts["clean-room"]
+    verdicts = [fr["main"]["id"], fc["main"]["id"]]
+    alike = (
+        fr["main"]["verdict"] == fc["main"]["verdict"] == "bit-identical"
+        and fr["mode"] == fc["mode"] and (fr["cr"] is None) == (fc["cr"] is None)
+    )  # fmt: skip
+    if not alike:
+        line = " ".join([gives("replica", fr, True), gives("clean-room", fc, True)])
+    else:
+        head = "In `reproduce`" if fr["mode"] == "reproduce" else "In `fix`, the default"
+        how = ", as built and with correctly rounded maths" if fr["cr"] is not None else ""
+        threads = {p: f["threads"] for p, f in facts.items() if f["threads"]}
+        note = ""
+        if len(threads) == 2 and threads["replica"] == threads["clean-room"]:
+            head += f", on {threads['replica'][0]} and {threads['replica'][1]} threads"
+        elif threads:
+            note = " (" + "; ".join(
+                f"the {words.PORT_NAME[p]} on {n[0]} and {n[1]} threads" for p, n in threads.items()
+            ) + ")"  # fmt: skip
+        line = f"{head}, the replica and the clean room both give {sw} bytes{how}{note}."
+    fixes = [fr["fix"], fc["fix"]]
+    if all(x is not None and x["verdict"] == "bit-identical" for x in fixes):
+        clause = "No correction by default changes this call, in either port."
+    else:
+        clause = " ".join(
+            c for c in (_fix_clause(ex, fr["fix"], "The replica's", "replica"),
+                        _fix_clause(ex, fc["fix"], "The clean room's", "clean room")) if c
+        )  # fmt: skip
+    return " ".join(x for x in (line, clause) if x), verdicts

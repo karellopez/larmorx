@@ -243,14 +243,9 @@ def test_a_correction_that_only_warns_is_not_said_to_correct():
     )
     assert present.warnings("corrects ANTS-40 here") == "corrects ANTS-40 here"
     page = present.Page(software="ANTs", program="N4BiasFieldCorrection", version="2.6.5")
-    ex = {
-        "id": "panel-x",
-        "diffs": [
-            {"id": "lx-ants", "verdict": "bit-identical", "label": "", "metrics": {}},
-            {"id": "fix-lx", "verdict": "d13", "label": "",
-             "reason": "larmorx's default corrects ANTS-36, ANTS-40 ([register](repo:x.md))"},
-        ],
-    }  # fmt: skip
+    ex = _example()
+    ex["diffs"][0]["verdict"] = "bit-identical"
+    ex["diffs"][2]["reason"] = "larmorx's default corrects ANTS-36, ANTS-40 ([register](repo:x.md))"
     shows, verdicts = present.panel_shows(page, ex)
     assert shows.endswith(
         "Its default, `fix`, corrects ANTS-40 here and warns that `-r` does nothing without a "
@@ -260,8 +255,9 @@ def test_a_correction_that_only_warns_is_not_said_to_correct():
 
 
 def test_a_seed_comparison_and_a_hidden_port_run():
-    """Atropos' fixed seed against ANTs' clock-seeded run: the port's run is not a panel (its
-    id names it), and the role says what differs besides the program."""
+    """Atropos' fixed seed against ANTs' clock-seeded run: the port's run is not a panel (the
+    page names its port, ``runs``: never its id), and the role says what differs besides the
+    program."""
     ex = _example()
     ex["panels"].append(
         {"id": "seed1", "role": "original", "label": "ANTs 2.6.5, --use-random-seed 1",
@@ -272,7 +268,11 @@ def test_a_seed_comparison_and_a_hidden_port_run():
          "label": "larmorx, seed 121212 − ANTs, the clock's seed (run 1)", "role_label": "x",
          "metrics": {}, "verdict": "within-variability", "reason": ""}
     )  # fmt: skip
-    out = _present(ex)
+    with pytest.raises(ValueError, match="larmorx-seed of lxseed-seed1 has no port"):
+        _present(copy.deepcopy(ex))
+    out = present.example(
+        PAGE, ex, shows="x", verdicts=["lx-ants"], runs={"larmorx-seed": "replica"}
+    )
     d = next(x for x in out["diffs"] if x["id"] == "lxseed-seed1")
     assert d["role_label"] == "the replica against the original: a fixed seed and the clock's"
     assert d["label"] == (
@@ -426,9 +426,8 @@ def test_a_page_of_two_programs_and_what_a_panel_shows():
 
 
 def test_a_port_run_in_a_variability_comparison_is_refused():
-    """Until each run's port comes from its own side (chunk X1): a hidden run whose id names
-    LARMORX in a comparison of the original's own variability is refused, never taken for the
-    original."""
+    """A hidden run whose id names one of LARMORX's ports in a comparison of the original's own
+    variability is refused unless the page names its port: never taken for the original."""
     ex = _example()
     ex["diffs"][3]["a"] = "larmorx-8"
     with pytest.raises(ValueError, match="variability comparison"):
@@ -466,17 +465,225 @@ def test_a_dry_run_lists_every_shape_it_cannot_name():
     """``errors``: every panel, run and comparison of another shape is listed, not only the
     first, and the example comes back with its panels, comparisons and verdicts as they were."""
     ex = _example()
-    ex["panels"][1]["label"] = "larmorx replica"  # a port named in another shape
+    ex["panels"][1]["label"] = "larmorx replica's"  # a port named in another shape
     ex["panels"][2]["label"] = "AFNI in fMRIPrep's image"  # an original of another software
-    ex["diffs"][0]["label"] = "original − replica (both default mode)"
+    ex["diffs"][3]["a"] = "replica-8"  # a port's run in the original's own variability
     before = copy.deepcopy(ex)
     errors: list[str] = []
     out = present.example(PAGE, ex, shows="x", verdicts=[], errors=errors)
-    assert any("a port's panel of another shape: 'larmorx replica'" in e for e in errors)
+    assert any("a port's panel of another shape: \"larmorx replica's\"" in e for e in errors)
     assert any("an original's panel of another shape" in e for e in errors)
-    assert len(errors) >= 2
+    assert any("the port's run replica-8 in a variability comparison" in e for e in errors)
     assert [p["label"] for p in out["panels"]] == [p["label"] for p in before["panels"]]
     assert [d["verdict"] for d in out["diffs"]] == [d["verdict"] for d in before["diffs"]]
     # without ``errors`` the first refusal stops it, as before
     with pytest.raises(ValueError):
         present.example(PAGE, copy.deepcopy(before), shows="x", verdicts=[])
+
+
+AFNI = present.Page(
+    software="AFNI",
+    program="3dAutomask",
+    version="26.3.05",
+    packages={"replica": "larmorx, Apache-2.0 with CC BY 4.0's attribution"},
+    versions_in_labels=True,
+)
+
+
+def _two_ports() -> dict:
+    """An example of a page with both ports, in AFNI's shapes: the clean room called "original"
+    in the old ids and labels, two versions of the original and fMRIPrep's build."""
+
+    def panel(i, role, label, sub=""):
+        return {"id": i, "role": role, "label": label, "sub": sub, "arrays": {}}
+
+    def diff(i, a, b, kind, verdict, label, rl="x"):
+        return {"id": i, "a": a, "b": b, "kind": kind, "label": label, "role_label": rl,
+                "metrics": {"m": {"identical": True, "max_abs": 0.0}}, "verdict": verdict,
+                "reason": ""}  # fmt: skip
+
+    return {
+        "id": "two", "title": "t", "summary": "", "facts": [], "metrics_note": "",
+        "panels": [
+            panel("in", "input", "BOLD reference"),
+            panel("afni", "original", "AFNI 25.2.09, 3dAutomask", "the repository's oracle build"),
+            panel("image", "original", "AFNI 25.2.09 in fMRIPrep's image", "fMRIPrep 25.2.6's build"),
+            panel("replica", "larmorx", "larmorx replica", "default mode"),
+            panel("replica-r", "larmorx", "larmorx replica", "reproduce mode"),
+            panel("original", "larmorx", "LARMORX clean-room original", "default mode, 1 thread"),
+            panel("afni26", "original", "AFNI 26.3.05, 3dAutomask",
+                  "the repository's oracle build; both implementations' reference"),
+        ],
+        "diffs": [
+            diff("original-afni26", "original", "afni26", "main", "bit-identical",
+                 "original − AFNI 26.3.05"),
+            diff("replica-afni26", "replica", "afni26", "main", "bit-identical",
+                 "replica − AFNI 26.3.05"),
+            diff("replica-afni", "replica", "afni", "main", "bit-identical",
+                 "replica (default) − AFNI, -peels 0"),
+            diff("image-afni", "image", "afni", "variability", None,
+                 "fMRIPrep's AFNI − the repository's AFNI build"),
+            diff("replica-image", "replica", "image", "fmriprep", "bit-identical",
+                 "replica − fMRIPrep's AFNI"),
+            diff("original-replica", "original", "replica", "check", "bit-identical",
+                 "original − replica (both default mode)"),
+            diff("original-threads", "original-6", "original", "check", "bit-identical",
+                 "original, 6 threads − 1 thread"),
+            diff("replica-repro", "replica", "replica-r", "check", "bit-identical",
+                 "replica, default − reproduce mode"),
+            diff("afni26-afni", "afni26", "afni", "variability", None,
+                 "AFNI 26.3.05 − AFNI 25.2.09", "the original against itself: the version step"),
+        ],
+        "default": {"panels": ["replica", "afni26"], "diffs": ["replica-afni26"]},
+    }  # fmt: skip
+
+
+def test_each_panel_names_its_own_port_on_a_page_of_two_ports():
+    """X1: the port of each panel from its label, the clean room against the replica, a run
+    without a panel with the port of the run it is checked against, each port's package."""
+    out = present.example(
+        AFNI, _two_ports(), shows="x", verdicts=["replica-afni26", "original-afni26"]
+    )
+    p = {x["id"]: x for x in out["panels"]}
+    assert p["replica"]["port"] == "replica" and p["original"]["port"] == "clean-room"
+    assert p["original"]["label"] == "clean room"
+    assert p["replica"]["sub"] == (
+        "larmorx, Apache-2.0 with CC BY 4.0's attribution · fix (the default) · against AFNI "
+        "3dAutomask 26.3.05, which it follows"
+    )
+    assert p["original"]["sub"].startswith("larmorx, Apache-2.0 · fix (the default), 1 thread")
+    assert p["afni26"]["label"] == "AFNI 3dAutomask 26.3.05"
+    assert p["afni26"]["sub"] == "the repository's build; the version both ports follow"
+    assert p["image"]["label"] == "AFNI 3dAutomask 25.2.09, fMRIPrep's build"
+    d = {x["id"]: (x["label"], x["role_label"], x["port"]) for x in out["diffs"]}
+    assert d["original-afni26"] == (
+        "clean room − AFNI 3dAutomask 26.3.05",
+        "the clean room against the original",
+        "clean-room",
+    )
+    assert d["replica-afni"][0] == "replica (fix) − AFNI 3dAutomask 25.2.09, -peels 0"
+    assert d["original-replica"][:2] == (
+        "clean room − replica (both fix)",
+        "the clean room against the replica: both fix",
+    )
+    assert d["original-threads"][1] == "the clean room against itself: 1 and 6 threads"
+    assert d["image-afni"][:2] == (
+        "AFNI 3dAutomask 25.2.09, fMRIPrep's build − the repository's build",
+        "the original against itself: fMRIPrep's build and the repository's",
+    )
+    assert d["replica-image"][:2] == (
+        "replica − AFNI 3dAutomask 25.2.09, fMRIPrep's build",
+        "the replica against the original: fMRIPrep's build",
+    )
+    assert d["afni26-afni"][:2] == (
+        "AFNI 3dAutomask 26.3.05 − 25.2.09",
+        "the original against itself: versions 25.2.09 and 26.3.05",
+    )
+    groups = [g[0] for g in out["order"]["groups"]]
+    assert groups == [
+        "The original against itself: the yardstick",
+        "The replica against the original",
+        "The replica against itself: fix and reproduce",
+        "The clean room against the original and the replica",
+        "The clean room against itself: thread counts",
+    ]
+    assert [v["port"] for v in out["shows"]["verdicts"]] == ["replica", "clean-room"]
+
+
+def test_the_original_in_the_other_software_shapes():
+    """X1-X2: an original named after its program, without a version but in its second line,
+    with its arguments, and a panel of the original's kind that names no run of it."""
+    fsl = present.Page(software="FSL", program="mcflirt", version="6.0.7.23")
+    assert present._original_panel(
+        fsl, {"label": "mcflirt, FSL 6.0.7.17", "sub": "fMRIPrep's command", "role": "original"}
+    ) == ("FSL mcflirt 6.0.7.17", "fMRIPrep's command", 0.0)
+    topup = present.Page(software="FSL", program="topup", version="6.0.7.23",
+                         programs=("topup", "applytopup"))  # fmt: skip
+    assert present._original_panel(
+        topup, {"label": "FSL 6.0.7.23, topup --nthr=4", "sub": "four threads", "role": "original"}
+    ) == ("FSL topup 6.0.7.23", "--nthr=4 · four threads", 0.0)
+    assert (
+        present._original_panel(
+            topup, {"label": "FSL 6.0.7.23, applytopup", "sub": "", "role": "original"}
+        )[0]
+        == "FSL applytopup 6.0.7.23"
+    )
+    afni = present.Page(software="AFNI", program="3dvolreg", version="26.3.05")
+    name, _, rank = present._original_panel(
+        afni, {"label": "AFNI in fMRIPrep's image", "role": "original",
+               "sub": "fMRIPrep 25.2.6's build (AFNI_25.2.09 (Aug 24 2025) [64-bit])"}
+    )  # fmt: skip
+    assert (name, rank) == ("AFNI 3dvolreg 25.2.09, fMRIPrep's build", 1.0)
+    assert present._original_panel(
+        fsl, {"label": "Initial alignment (-init)", "sub": "the starting point", "role": "original"}
+    ) == ("Initial alignment (-init)", "the starting point", 3.0)
+    with pytest.raises(ValueError, match="another shape"):
+        present._original_panel(fsl, {"label": "ANTs 2.6.5", "sub": "", "role": "original"})
+
+
+@pytest.mark.parametrize(
+    ("label", "rl", "what"),
+    [
+        ("FSL 6.0.7.23 − FSL 6.0.7.17", "the original against itself: the version step",
+         "versions 6.0.7.17 and 6.0.7.23"),
+        ("AFNI 26.3.05: stored LPS − LAS", "x", "the same volumes stored another way"),
+        ("FSL with the NaN − FSL without it", "x", "with and without the NaN"),
+        ("clean-room original, 1 thread − all CPUs", "x", "1 thread and all CPUs"),
+        ("FSL, --nthr=4 − --nthr=1", "x", "1 and 4 threads"),
+        ("sdcflows: numpy 2.5.4 / SciPy 1.18.1 − numpy 2.3.5 / SciPy 1.15.3",
+         "the original against itself: the version step", "two releases of numpy and SciPy"),
+        ("tedana: x − y", "the original against itself: the machine", "the machine"),
+        ("clean-room original (default) − itself on the usual encoding", "x", "two encodings"),
+        ("mcflirt: second run − first run", "x", "two runs of the same command"),
+    ],
+)  # fmt: skip
+def test_what_changes_in_the_other_software_shapes(label, rl, what):
+    """X2: what changes between two runs of one program, beyond ANTs' shapes."""
+    assert present._what(label, None, None, rl) == what
+
+
+def test_the_role_labels_the_guide_maps_and_the_defect_in_the_original():
+    """X2: the old role labels whose shape does not say what they compare (the guide's section
+    4), and the defect shown by two of the original's runs, in a group of its own."""
+    ex = _two_ports()
+    ex["diffs"].append(
+        {"id": "afni-peels", "a": "afni", "b": "image", "kind": "variability",
+         "label": "AFNI: -peels 0 − -peels 1", "role_label": "the defect, in AFNI",
+         "metrics": {}, "verdict": None, "reason": ""}
+    )  # fmt: skip
+    out = present.example(AFNI, ex, shows="x", verdicts=["replica-afni26"])
+    d = {x["id"]: (x["label"], x["role_label"]) for x in out["diffs"]}
+    assert d["afni-peels"] == (
+        "AFNI 3dAutomask 25.2.09: -peels 0 − -peels 1",
+        "the original against itself: the defect (-peels 0 and -peels 1)",
+    )
+    assert out["order"]["groups"][0] == ["The original against itself: the defect", ["afni-peels"]]
+    for rl, role in (
+        ("what the registration changed",
+         "the original against its starting point: what the registration changed"),
+        ("the two implementations of the corrections",
+         "the clean room against the replica: both fix"),
+        ("the same data, two encodings", "the input against itself: two encodings"),
+    ):  # fmt: skip
+        assert present._ROLE_LABELS[rl][0] == role
+
+
+def test_a_data_panel_line_by_role_for_two_ports():
+    """X3: the "What this shows" line of a data-panel example found by what each comparison is,
+    one line and one verdict per port on a page of two ports."""
+    shows, verdicts = present.panel_shows(AFNI, _two_ports())
+    assert verdicts == ["replica-afni26", "original-afni26"]
+    assert shows == (
+        "In `fix`, the default, the replica and the clean room both give AFNI's bytes (the clean "
+        "room on 1 and 6 threads). No correction by default changes the replica's result on this "
+        "call."
+    )
+    ex = _two_ports()
+    ex["panels"] = [p for p in ex["panels"] if p["id"] != "original"]
+    ex["diffs"] = [d for d in ex["diffs"] if not d["id"].startswith("original")]
+    shows, verdicts = present.panel_shows(AFNI, ex)
+    assert verdicts == ["replica-afni26"]
+    assert shows == (
+        "In `fix`, the default, the replica gives AFNI's bytes. No correction by default changes "
+        "this call."
+    )

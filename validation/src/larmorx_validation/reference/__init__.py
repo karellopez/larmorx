@@ -89,9 +89,7 @@ def main(args) -> int:
 
 
 def add_arguments(p) -> None:
-    p.add_argument(
-        "page", help="an API page (fsl-bet, docs/api/fsl-bet.md), 'programs' or 'all'"
-    )
+    p.add_argument("page", help="an API page (fsl-bet, docs/api/fsl-bet.md), 'programs' or 'all'")
     p.add_argument("--site", help="the documentation site's checkout: write its reference pages")
     p.add_argument(
         "--check",

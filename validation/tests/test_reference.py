@@ -141,3 +141,26 @@ def test_checks_catch_drift(drift, tmp_path):
     api = apipage.read(tmp_path, "docs/api/fsl-bet.md")
     problems = [x for p in api.programs for x in build(REPO, p).problems]
     assert any(expected in x for x in problems), problems
+
+
+def test_programs_page_data_matches_the_code():
+    """validation/programs.toml names every command of larmorx once, ports the replica registry
+    lists, records, API pages and Python names that exist (the Programs page's data)."""
+    from larmorx_validation.reference import programs
+
+    groups, progs, problems = programs.build(reference.REPO, None)
+    assert problems == []
+    assert {p.group for p in progs} <= set(groups)
+    text = programs.render(groups, progs)
+    assert text == programs.render(*programs.build(reference.REPO, None)[:2])
+    assert all(x.status for p in progs for x in p.ports)
+
+
+def test_programs_check_catches_a_missing_command(tmp_path, monkeypatch):
+    """A command of larmorx without an entry is a problem."""
+    from larmorx_validation.reference import programs
+
+    real = programs.commands
+    monkeypatch.setattr(programs, "commands", lambda repo: [*real(repo), ("fsl", "fnirt")])
+    _, _, problems = programs.build(reference.REPO, None)
+    assert any("larmorx fsl fnirt" in p for p in problems)

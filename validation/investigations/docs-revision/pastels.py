@@ -32,24 +32,52 @@ It prints one line per check and the word PASS or FAIL at the end.
 
 from __future__ import annotations
 
+import itertools
 import math
 import sys
 from pathlib import Path
 
 import yaml
 
-ORDER = ["ants", "afni", "fsl", "tedana", "sdcflows", "fmriprep", "larmorx", "freesurfer", "workbench"]
+ORDER = [
+    "ants",
+    "afni",
+    "fsl",
+    "tedana",
+    "sdcflows",
+    "fmriprep",
+    "larmorx",
+    "freesurfer",
+    "workbench",
+]
 NEW = ["tedana", "sdcflows", "fmriprep"]
-PORTS = {"replica": "#467dea", "clean room": "#c76717", "replica, dark": "#5890fa", "clean room, dark": "#d97530"}
+PORTS = {
+    "replica": "#467dea",
+    "clean room": "#c76717",
+    "replica, dark": "#5890fa",
+    "clean room, dark": "#d97530",
+}
 ORIGINAL = ["#4a453e", "#b6b0a3"]
 ON_PASTEL = "#16130f"
 PAPER_LIGHT = "#e8e1d2"
 CARD_LIGHT = "#f0ebe0"
 
 MACHADO = {
-    "protanopia": [[0.152286, 1.052583, -0.204868], [0.114503, 0.786281, 0.099216], [-0.003882, -0.048116, 1.051998]],
-    "deuteranopia": [[0.367322, 0.860646, -0.227968], [0.280085, 0.672501, 0.047413], [-0.011820, 0.042940, 0.968881]],
-    "tritanopia": [[1.255528, -0.076749, -0.178779], [-0.078411, 0.930809, 0.147602], [0.004733, 0.691367, 0.303900]],
+    "protanopia": [
+        [0.152286, 1.052583, -0.204868],
+        [0.114503, 0.786281, 0.099216],
+        [-0.003882, -0.048116, 1.051998],
+    ],
+    "deuteranopia": [
+        [0.367322, 0.860646, -0.227968],
+        [0.280085, 0.672501, 0.047413],
+        [-0.011820, 0.042940, 0.968881],
+    ],
+    "tritanopia": [
+        [1.255528, -0.076749, -0.178779],
+        [-0.078411, 0.930809, 0.147602],
+        [0.004733, 0.691367, 0.303900],
+    ],
 }
 
 
@@ -101,7 +129,10 @@ def hue_chroma(hex_: str) -> tuple[float, float]:
 
 def main(argv: list[str]) -> int:
     site = Path(argv[1])
-    ecos = {e["id"]: e for e in yaml.safe_load((site / "data/ecosystems.yml").read_text(encoding="utf-8"))}
+    ecos = {
+        e["id"]: e
+        for e in yaml.safe_load((site / "data/ecosystems.yml").read_text(encoding="utf-8"))
+    }
     missing = [k for k in ORDER if k not in ecos]
     if missing:
         print(f"FAIL: no pastel for {missing}")
@@ -117,7 +148,7 @@ def main(argv: list[str]) -> int:
         a, b = rgb(ecos[x]["pastel"]), rgb(ecos[y]["pastel"])
         return delta_e(simulate(a, kind), simulate(b, kind)) if kind else delta_e(a, b)
 
-    for x, y in zip(ORDER, ORDER[1:]):
+    for x, y in itertools.pairwise(ORDER):
         new = x in NEW or y in NEW
         line = f"{x} / {y}: normal {de(x, y):.1f}, " + ", ".join(
             f"{k} {de(x, y, k):.1f}" for k in MACHADO

@@ -108,7 +108,9 @@ def _python_exists(repo: Path, dotted: str) -> bool:
     if (pkg / f"{name}.py").is_file():
         return True
     init = pkg / "__init__.py"
-    return init.is_file() and re.search(rf"\b{re.escape(name)}\b", init.read_text("utf-8")) is not None
+    return (
+        init.is_file() and re.search(rf"\b{re.escape(name)}\b", init.read_text("utf-8")) is not None
+    )
 
 
 def _api_status(repo: Path, api: str) -> str:
@@ -123,7 +125,9 @@ def _status(record: dict | None) -> str:
 
 def _page_exists(site: Path, url: str) -> bool:
     rel = url.strip("/")
-    return (site / "content" / f"{rel}.md").is_file() or (site / "content" / rel / "index.md").is_file()
+    return (site / "content" / f"{rel}.md").is_file() or (
+        site / "content" / rel / "index.md"
+    ).is_file()
 
 
 def build(repo: Path, site: Path | None) -> tuple[dict, list[Program], list[str]]:
@@ -164,7 +168,9 @@ def build(repo: Path, site: Path | None) -> tuple[dict, list[Program], list[str]
         if reg and e.get("ports"):
             problems.append(f"{where}: `ports` given, but the replica registry lists this command")
         if sorted(kinds) != sorted(rec_ports):
-            problems.append(f"{where}: the records name the ports {sorted(rec_ports)}, the code {sorted(kinds)}")
+            problems.append(
+                f"{where}: the records name the ports {sorted(rec_ports)}, the code {sorted(kinds)}"
+            )
         for path in [e["api"]]:
             if not (repo / path).is_file():
                 problems.append(f"{where}: no {path}")
@@ -189,7 +195,9 @@ def build(repo: Path, site: Path | None) -> tuple[dict, list[Program], list[str]
             else:
                 package, licence = "larmorx", "Apache-2.0"
             out_ports.append(
-                Port(kind, package, LICENCE_WORDS.get(licence, licence), status, kind in next_release)
+                Port(
+                    kind, package, LICENCE_WORDS.get(licence, licence), status, kind in next_release
+                )
             )
         progs.append(
             Program(
@@ -241,21 +249,27 @@ def render(groups: dict, progs: list[Program]) -> str:
         kinds: dict[tuple, int] = {}
         for p in mine:
             for x in p.ports:
-                kinds[(x.kind, x.package, x.licence)] = kinds.get((x.kind, x.package, x.licence), 0) + 1
+                kinds[(x.kind, x.package, x.licence)] = (
+                    kinds.get((x.kind, x.package, x.licence), 0) + 1
+                )
         lines += [
             f"  - id: {gid}",
             f"    name: {_y(g['name'])}",
             f"    original: {_y(g.get('original', ''))}",
             f"    count: {_y(' and '.join(parts))}",
         ]
+        if g.get("summary"):
+            lines.append(f"    summary: {_y(' '.join(g['summary'].split()))}")
         if g.get("planned"):
             lines.append(f"    planned: {_y(' '.join(g['planned'].split()))}")
         lines.append("    ports:" + ("" if kinds else " []"))
         order = ["replica", "clean-room", "own"]
-        for (kind, package, licence), n in sorted(kinds.items(), key=lambda kv: order.index(kv[0][0])):
+        for (kind, package, licence), n in sorted(
+            kinds.items(), key=lambda kv: order.index(kv[0][0])
+        ):
             lines.append(
                 f"      - {{kind: {kind}, name: {_y(PORT_NAMES[kind])}, package: {package}, "
-                f"licence: {_y(licence)}, programs: {n}}}"
+                f"licence: {_y(licence)}, count: {n}}}"
             )
         lines.append("    programs:" + ("" if mine else " []"))
         for p in mine:

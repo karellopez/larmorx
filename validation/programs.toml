@@ -14,7 +14,7 @@
 #
 # Fields of a group: `id` (the site's address, /programs/<id>/; a software colour of
 # data/ecosystems.yml of the same name), `name`, `original` (what its ports are compared with),
-# `planned` (a text, for software with no port yet).
+# `summary` (what it holds, for the home page), `planned` (a text, for software with no port yet).
 # Fields of a program: `group`, `name` (the command's own spelling; a module's name), `command`
 # (absent for a module), `also` (another command that runs the same port), `python`, `does` (one
 # sentence, in the words of its API page), `api`, `evidence` (its evidence page on the site),
@@ -27,36 +27,43 @@
 id = "ants"
 name = "ANTs and ITK"
 original = "ANTs 2.6.5 on ITK 5.4.5"
+summary = "Transforms and their files, N4, denoising, `ImageMath` and its filters, registration (linear and deformable stages), `antsAI`, `Atropos`."
 
 [[group]]
 id = "afni"
 name = "AFNI"
 original = "AFNI 26.3.05"
+summary = "`3dTshift`, `3dAutomask`, `3dUnifize` and `3dvolreg`. AFNI 26.3.05 released the Medical College of Wisconsin's code under CC BY 4.0, so the replicas are in `larmorx` beside the clean rooms."
 
 [[group]]
 id = "fsl"
 name = "FSL"
 original = "FSL 6.0.7.23"
+summary = "`mcflirt`, BET, FLIRT and its programs, FAST, `topup`, `fslmaths`, `fslstats`, `fslroi`, `standard_space_roi` and `prelude`."
 
 [[group]]
 id = "tedana"
 name = "tedana"
 original = "tedana 26.0.3"
+summary = "`t2smap`: the T2* and S0 maps of multi-echo fMRI and the echoes' optimal combination."
 
 [[group]]
 id = "sdcflows"
 name = "sdcflows"
 original = "sdcflows 2.17.1, with niworkflows 1.15.4 and pybids 0.22.0"
+summary = "Field-map estimation: the B-spline fit, PEPOLAR, direct and fieldmap-less (SyN), sdcflows' BIDS app, with niworkflows' helpers and pybids' BIDS index."
 
 [[group]]
 id = "fmriprep"
 name = "fMRIPrep"
 original = "fMRIPrep's own steps, and the libraries they call"
+summary = "fMRIPrep's one-shot BOLD resampler and its field-map steps, SciPy's and scikit-image's routines under them, and the confounds, being ported."
 
 [[group]]
 id = "larmorx"
 name = "LARMORX's own"
 original = ""
+summary = "Its NIfTI reader and writer. The larmorprepx pipeline is planned."
 
 [[group]]
 id = "freesurfer"

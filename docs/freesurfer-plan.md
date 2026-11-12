@@ -25,9 +25,11 @@ from here".
   **classic stream** (`-no-v8`, what fMRIPrep 25.x's FreeSurfer 7.3.2 runs): `mri_watershed`,
   `talairach_avi`, `mri_em_register`, `mri_ca_normalize`, `mri_ca_register`, `mri_ca_label`. Most
   programs, the surface steps among them, are shared by both. Both streams are recorded; which is
-  ported first is the user's choice (decision log). The intensity correction, `mri_nu_correct.mni`,
-  runs MNI's N3 (the MINC `nu_correct` tools) in both; its `--ants-n4` option, off by default, uses
-  ITK's N4.
+  ported first is the user's choice (decision log). Both streams correct the intensity with ITK's N4:
+  recon-all runs `mri_nu_correct.mni --ants-n4`, which calls `AntsN4BiasFieldCorrectionFs` (LARMORX's
+  N4 replica may serve), and both run `AntsDenoiseImageFs` and `mris_remesh`; v8 keeps
+  `mri_em_register` and `mri_ca_normalize` and runs `mri_ca_register -invert-and-save`, and a fourth
+  network, `mri_sclimbic_seg` (inventory, relay 1, checked against the first recordings).
 - **The licence key** is a check inside FreeSurfer's own programs: the oracle runs read the user's
   licence file in place (the user, 2026-11-12: also on the lab's server), never copied into results
   or repositories; LARMORX's ports need none (decision log 2026-10-19).
@@ -93,8 +95,8 @@ from here".
 | Wave | Programs (from the inventory, which may regroup them) |
 |---|---|
 | 3.1 Foundations | the file formats (MGZ, surfaces, curvature, labels, annotations, colour tables, LTA and `.xfm` transforms, `.m3z`, GCA, `.gcs`, `.tif` atlases), the image and surface structures, FreeSurfer's maths, random numbers and messages |
-| 3.2 Volumes | `mri_convert`, `mri_add_xform_to_header`, `mri_nu_correct.mni` (MNI's N3, `nu_correct`), `talairach_avi` (a clean room only, its atlas fetched: `docs/licensing.md`), `talairach_afd`, `mri_normalize`, `mri_watershed`, `mri_mask`, `mri_segment`, `mri_edit_wm_with_aseg`, `mri_pretess`, `mri_fill`, `mri_cc`, `lta_convert`, `mri_concatenate_lta`; fMRIPrep's `mri_coreg`, `mri_robust_template`, `mri_robust_register` (fMRIPrep runs them without recon-all: early value) |
-| 3.3 Atlas | the classic stream's `mri_em_register`, `mri_ca_normalize`, `mri_ca_register`, `mri_ca_label`, `mri_relabel_hypointensities`, `mri_segment_hypointensities`; the v8 stream's networks `mri_synthstrip`, `mri_synthseg`, `fs-synthmorph-reg` (a small inference core in Rust, the original weights fetched) — two tracks that can run side by side |
+| 3.2 Volumes | `mri_convert`, `mri_add_xform_to_header`, `mri_nu_correct.mni` with `AntsN4BiasFieldCorrectionFs` (ITK's N4), `AntsDenoiseImageFs`, `talairach_avi` (a clean room only, its atlas fetched: `docs/licensing.md`), `talairach_afd`, `mri_normalize`, `mri_watershed`, `mri_mask`, `mri_segment`, `mri_edit_wm_with_aseg`, `mri_pretess`, `mri_fill`, `mri_cc`, `lta_convert`, `mri_concatenate_lta`; fMRIPrep's `mri_coreg`, `mri_robust_template`, `mri_robust_register` (fMRIPrep runs them without recon-all: early value) |
+| 3.3 Atlas | the classic stream's `mri_em_register`, `mri_ca_normalize`, `mri_ca_register`, `mri_ca_label`, `mri_relabel_hypointensities`, `mri_segment_hypointensities`; the v8 stream's networks `mri_synthstrip`, `mri_synthseg`, `fs-synthmorph-reg`, `mri_sclimbic_seg` (a small inference core in Rust, the original weights fetched) — two tracks that can run side by side |
 | 3.4 First surfaces | `mri_tessellate`, `mris_extract_main_component`, `mris_smooth`, `mris_inflate`, `mris_sphere`, `mris_fix_topology`, `mris_euler_number`, `mris_remove_intersection`, `defect2seg` |
 | 3.5 Final surfaces and statistics | `mris_autodet_gwstats`, `mris_place_surface`, `mris_curvature`, `mris_register`, `mris_jacobian`, `mrisp_paint`, `mris_ca_label`, `mris_volmask`, `mris_anatomical_stats`, `mri_surf2volseg`, `mri_segstats`, `mri_brainvol_stats`, `mri_label2label`, `pctsurfcon`; fMRIPrep's `bbregister`, `mri_vol2surf`, `mris_expand`, `mri_vol2vol`, `mri_surf2surf`, `mris_convert` |
 | 3.6 `recon-all` | the script's behaviour (its steps, flags, checks, logs, the resume logic sMRIPrep uses) |

@@ -395,3 +395,85 @@ which never depend on a clean-room crate, print the same line (`larmorx-nc: upst
 re-exports it, and `defects::fsl11_what_fsl_does` says what FSL's program does with the variable
 unset, per tool (its first image stops it, exit 1; `standard_space_roi`'s script goes on after its
 steps stop there and exits 0 without an image: FSL 6.0.7.23 run black box).
+
+## The x87's 80-bit extended arithmetic (`src/x87/`; FreeSurfer's foundations, item 3.1-03, 2026-11-12)
+
+**Not ported:** written for LARMORX (Apache-2.0) from Intel's description of the x87 (*Intel 64 and
+IA-32 Architectures Software Developer's Manual*, volume 1, chapters 4 and 8: the extended format,
+its special and unsupported encodings, the NaN rules, the masked responses to invalid operations,
+division by zero, overflow and underflow) and IEEE 754's definition of correctly rounded
+operations; no upstream code. `F80` is `long double` on x86-64 Linux as GCC computes it, under the
+control word Linux gives every process (`0x037f`: 64-bit precision, round to nearest even, every
+exception masked): the four operations and the square root correctly rounded with the 15-bit
+exponent range (denormal results rounded once, overflow to infinity), the real indefinite for
+invalid operations and for every unsupported encoding (pseudo-NaN, pseudo-infinity, unnormal), the
+x87's NaN propagation (a quiet NaN before a signalling one, then the larger significand, then the
+positive sign), canonical results (pseudo-denormals read as exponent 1, never written); the
+conversions GCC emits (`fld`, `fild`, `fst`, `fistp` under truncation with the integer indefinite,
+GCC 8.4.0's sequences for `unsigned long` and `unsigned int`), `llrintl`'s rounding, and IEEE 754's
+comparisons. FreeSurfer 8.2.0 computes in `long double` in 12 reached functions
+(`docs/freesurfer/variation.md` §1).
+
+**Bit-identical to the machine's x87** (AMD Ryzen 9 7945HX, Zen 4; glibc 2.35;
+`validation/probes/x87-extended`, log `oracles/logs/fs-found-c-x87-probe-24.log`, 2026-11-12):
+4,748,983,348 comparisons, 0 differences: 2^24 seeded cases of each of 14 operations (add, subtract,
+multiply, divide, square root (`fsqrt`, glibc's `sqrtl` and GCC's `__builtin_sqrtl`, all three),
+the six comparisons, the conversions to `double`, `float`, `long`, `int`, `short`, `unsigned long`,
+`unsigned int`, `llrintl`) in each of 17 operand families (random bit patterns, normals of every
+exponent, nearby exponents, sparse significands with exact results and exact ties, cancellations,
+products and quotients in the denormal range and near overflow, denormals and pseudo-denormals,
+exact `double`s, `float`s and integers, special values, the boundaries of `double`, `float` and the
+integer types), every pair of 42 special values (unsupported encodings and NaN payloads included),
+2^24 inputs of each conversion from `double`, `float`, `long`, `int`, `unsigned long`, `unsigned
+int` (every bit pattern), and 2^20 cases of six arithmetic patterns of FreeSurfer's `long double`
+functions (sums of `double` products, a mean, variance and standard deviation, cross products of
+`float` edge vectors and their length, a unit vector and its gradient, `float` kernel weights over
+their sum, squared length differences) written as plain C++ loops and compiled by GCC 8.4.0 with
+FreeSurfer's C++ flags; computed in `double` instead, 1.8 % to 71 % of each pattern's outputs
+differ (55 % of the dot products, 71 % of the statistics, 5.3 % of the cross products, 60 % of the
+unit vectors and gradients, 3.0 % of the normalised weights, 1.8 % of the edge costs: the control
+that the patterns depend on the extended precision). Among the results: 7.8 million denormal
+products and 8.0 million denormal quotients, 6.4 million overflows, 250,342 exact ties among
+16.8 million sparse products. The unit tests (`src/x87/tests.rs`) check the hardware's
+recorded hashes (`src/x87/hardware.rs`) on the first 1,024 cases of every operation and family,
+every pair of special values, 1,024 inputs of each conversion and 256 cases of each pattern, on
+every platform.
+
+## vnl's random numbers (`src/vnl_random.rs`; FreeSurfer's foundations, item 3.1-04, 2026-11-12)
+
+**Ported** from VXL as bundled with ITK 4.13.2, the version FreeSurfer 8.2.0's official binaries
+link (BSD-3-Clause; the file's SPDX header is `Apache-2.0 AND BSD-3-Clause`):
+`core/vnl/vnl_random.h` (SHA-256 `373697ca2304…`) and `vnl_random.cxx` (`75550ff547df…`), identical in
+ITK 5.4.5 apart from the default constructor's initialisers (`docs/freesurfer/third-party.md` §8):
+the linear congruential seeding (`x · 1664525 + 1 mod 2^32`, 1,000 warm-up draws), Marsaglia and
+Zaman's subtract-with-borrow on 37 words, `lrand32` and its two ranged forms, `drand32`, `drand64`
+(the first of its two draws divided by `0xffffffff`, as GCC 8.4.0 compiles it and as every official
+binary does: `docs/freesurfer/variation.md` §3), `normal` and `normal64` (Marsaglia's polar method;
+the caller passes the logarithm: `math::log_glibc` for the original's bits), `restart` and both
+reseeds. Left out: the time-seeded constructor and `reseed()`. Two VXL defects not reproduced (not
+reached by FreeSurfer, whose generator is never copied and never draws a range): a copy keeps the
+cached normal number (the C++ copy constructor and assignment leave it uninitialised), and
+`lrand32(lower, upper)` computes its range in 64 bits (the C++'s `int` overflows beyond `2^31 - 1`:
+a division by zero at `2^32`, no return from `2^31` to `2^32 - 1`); `lower > upper` panics.
+
+**Bit-identical to ITK 4.13.2's own `vnl_random.cxx`** compiled by GCC 8.4.0 with FreeSurfer's C++
+flags and glibc 2.35's logarithm (`validation/probes/fs-random`, log
+`oracles/logs/fs-found-c-random-probe.log`, 2026-11-12): 4,000,005 calls, 0 differences (2,000
+seeds, FreeSurfer's 1234 and 53 among them, 2,000 randomly chosen calls each, FreeSurfer's
+`(float) drand64(0.0, 1.0)` included). With the correctly rounded `math::log`, 125 of about 667,000
+normal numbers change. The unit tests check the original's hashes of a fixed sequence for five
+seeds on every platform.
+
+## POSIX's 48-bit random numbers (`src/drand48.rs`; FreeSurfer's foundations, item 3.1-04, 2026-11-12)
+
+**Not ported:** written from POSIX's definition (IEEE Std 1003.1, *drand48*), which fixes every
+bit (the generator, its defaults, `srand48`'s `0x330E`, the 16-bit words' order, which bits each
+function returns); glibc's code is never used (LGPL-2.1, CLAUDE.md rule 2). What POSIX leaves open
+was measured on glibc 2.35 as a black box: the state before any seeding is `X = 0`.
+
+**Identical to the machine's C library** (glibc 2.35; `validation/probes/fs-random`, 2026-11-12):
+12,002,016 calls, 0 differences (16 calls before any seeding; 2,000 seeds of `srand48`, 53 first,
+`AntsN4BiasFieldCorrectionFs`'s, each followed by 1,000 randomly chosen calls of the nine
+functions, then `seed48` (its returned previous state compared) and `lcong48` with random
+parameters, each followed by 1,000 more). The unit tests check the C library's hashes of a fixed
+sequence for five seeds on every platform.

@@ -1,9 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Set or check the one version of larmorx's three packages (larmorx, larmorx-gpl, larmorx-nc).
+"""Set or check the one version of larmorx's packages (larmorx, larmorx-gpl, larmorx-nc, and
+larmorx-freesurfer, not published yet).
 
-The version lives in the three Cargo workspaces (`Cargo.toml`, `crates-gpl/Cargo.toml`,
-`crates-nc/Cargo.toml`: `[workspace.package] version` and the `version` of every path
-dependency in `[workspace.dependencies]`), in their three `Cargo.lock` files (the entries of the
+The version lives in the Cargo workspaces (`Cargo.toml`, `crates-gpl/Cargo.toml`,
+`crates-nc/Cargo.toml`, `crates-freesurfer/Cargo.toml`: `[workspace.package] version` and the
+`version` of every path dependency in `[workspace.dependencies]`), in their `Cargo.lock` files (the entries of the
 crates that take the workspace's version) and in the main package's `[all]` extra, which pins the
 two companions to the same release; and, once it exists, in `CITATION.cff` (`version`, with
 `date-released` set when the version is). Cargo writes it in its own form (`0.1.0-rc.1`); PyPI, the
@@ -32,8 +33,14 @@ import tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-#: The three Cargo workspaces, by package.
-WORKSPACES = {"larmorx": ROOT, "larmorx-gpl": ROOT / "crates-gpl", "larmorx-nc": ROOT / "crates-nc"}
+#: The Cargo workspaces, by package.
+WORKSPACES = {
+    "larmorx": ROOT,
+    "larmorx-gpl": ROOT / "crates-gpl",
+    "larmorx-nc": ROOT / "crates-nc",
+    # not published yet (FreeSurfer's foundations, item 3.1-01), so not in the `[all]` extra
+    "larmorx-freesurfer": ROOT / "crates-freesurfer",
+}
 #: The companions the `[all]` extra pins.
 COMPANIONS = ("larmorx-nc", "larmorx-gpl")
 #: The citation file (relay 5a writes it); its `version` is the release's, PEP 440 form.
@@ -80,7 +87,7 @@ def _write(path: Path, text: str) -> None:
 
 def workspace_crates() -> set[str]:
     """The crates that take their workspace's version (``version.workspace = true``), in the
-    three workspaces; their entries in every lock file carry the version."""
+    workspaces; their entries in every lock file carry the version."""
     names = set()
     for ws in WORKSPACES.values():
         for manifest in sorted(ws.glob("*/Cargo.toml")) + sorted(ws.glob("crates/*/Cargo.toml")):

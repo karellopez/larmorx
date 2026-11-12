@@ -47,6 +47,7 @@ log "commit $(git -C "$R" rev-parse --short HEAD) dirty=[$(git -C "$R" status --
 bash "$D/gates-rust.sh" "$R" all > "$OUT/rust.log" 2>&1; log "STEP1 rust gates exit $?"
 bash "$D/build-gpl.sh" "$R" > "$OUT/gpl-build.log" 2>&1; log "GPL build exit $?"
 bash "$D/build-nc.sh" "$R" > "$OUT/nc-build.log" 2>&1; log "NC build exit $?"
+bash "$D/build-freesurfer.sh" "$R" > "$OUT/freesurfer-build.log" 2>&1; log "FREESURFER build exit $?"
 bash "$D/gates-python.sh" "$R" > "$OUT/python.log" 2>&1; log "STEP2+3 python gates exit $?"
 if [ $GOLDEN = 0 ]; then
   (export PYTHONPATH=$R/python:$R/validation/src; cd "$R" && python -P scripts/orchestration/parity_smoke.py --workers "$WORKERS" $SMOKE) > "$OUT/parity-tests.log" 2>&1; log "STEP4 parity smoke exit $?"

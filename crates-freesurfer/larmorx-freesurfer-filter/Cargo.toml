@@ -1,0 +1,11 @@
+[package]
+name = "larmorx-freesurfer-filter"
+description = "FreeSurfer 8.2.0's replica for larmorx: volume filters and morphology, intensity normalisation (with Burkardt's spline), segmentation helpers, flood fill, connected components, fast marching and clusters (FreeSurfer's licence)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+larmorx-freesurfer-volume.workspace = true

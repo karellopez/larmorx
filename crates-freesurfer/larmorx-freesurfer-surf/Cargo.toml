@@ -1,0 +1,11 @@
+[package]
+name = "larmorx-freesurfer-surf"
+description = "FreeSurfer 8.2.0's replica for larmorx: the surface structure and its I/O, with the metric properties every read computes (fs.surfio); the rest of the surface library: topology, values, volume-surface sampling, projections, the surface hash, realms, icosahedra, spherical maps, surface clusters, gcsa and the surface-gradient code (fs.surf) (FreeSurfer's licence)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+larmorx-freesurfer-volume.workspace = true

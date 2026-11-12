@@ -971,6 +971,30 @@ defects! {
         "Gaussian interpolation given fewer sigmas than dimensions reads the missing sigmas past the end of their list: the result depends on memory the program never wrote";
     ANTS_162 = "ANTS-162", "ANTs", true,
         "N4BiasFieldCorrection's B-spline lattice and padding, and ResampleImage's and ResampleImageBySpacing's output grids, are sized from the image's physical extent with no check: a header in metres or micrometres, or a 4D image's time axis, can make a tiny input need more memory than any machine has, which fills the machine until the process is stopped";
+    FS_01 = "FS-01", "FreeSurfer", true,
+        "the C-style error messages (ErrorPrintf, ErrorExit, ErrorReturn and what calls them) end with a NUL byte before their newline, on standard error and in the error log, so recon-all.log and other logs that capture them read as binary files to grep and text tools";
+    FS_02 = "FS-02", "FreeSurfer", true,
+        "DiagInit converts the PROFILE variable to an integer with no range check: a value beyond the int range (or NaN) is an undefined conversion, which gives -2147483648 on x86-64";
+    FS_03 = "FS-03", "FreeSurfer", true,
+        "a failed internal assertion (assertFailed) ends the program by writing to address -1 on purpose, a segmentation fault, after its message; with FREESURFER_HANG_ON_ASSERT set it first loops for ever";
+    FS_04 = "FS-04", "FreeSurfer", true,
+        "a program that draws random numbers before setting a seed (or after setting seed 0), with FREESURFER_SEED unset, seeds the generator from the clock: no two runs agree";
+    FS_05 = "FS-05", "FreeSurfer", true,
+        "a FREESURFER_SEED that is not an integer, or is beyond a 64-bit integer, ends the program with an uncaught C++ exception (abort, exit status 134) at its first random number";
+    FS_06 = "FS-06", "FreeSurfer", true,
+        "the fast arctangent's table lookup (fastApproxAtan2f) reads outside its table when an argument is NaN, both are infinite, or the larger magnitude is so large that 100000 times the smaller overflows a float";
+    FS_07 = "FS-07", "FreeSurfer", true,
+        "the --version and --all-info handling skips the argument that follows each option it removes and examines the last arguments again: a second version option can be missed, another handled twice";
+    FS_08 = "FS-08", "FreeSurfer", true,
+        "FSENVgetenv reads memory it never wrote: the b-vector space when FS_DESIRED_BVEC_SPACE holds no number, the working directory when it cannot be read";
+    FS_09 = "FS-09", "FreeSurfer", true,
+        "the median (and quick_select) of an empty list reads the value before the list";
+    FS_10 = "FS-10", "FreeSurfer", true,
+        "the unique-integer helpers (count, list and most frequent value of a list) given an empty list read the integer past its end and report one item";
+    FS_11 = "FS-11", "FreeSurfer", true,
+        "the case-insensitive string comparison (stricmp) and the file-name extension helper copy their argument into a 1,024-byte buffer on the stack with no check: a longer string overflows it";
+    FS_12 = "FS-12", "FreeSurfer", true,
+        "nint and nint2 (FreeSurfer's rounding to an integer) convert values beyond the int range, and NaN, with no check, an undefined conversion that gives -2147483648 on x86-64";
 }
 
 /// The register entry with ID `id`.

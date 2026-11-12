@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
-"""The licence expression of each of the three packages (PEP 639's ``License-Expression``).
+"""The licence expression of each of the packages (PEP 639's ``License-Expression``).
 
 The expression names every licence under which code or data in the package's files is
 distributed: the package's own licence first (larmorx Apache-2.0, larmorx-nc the FSL Licence,
-larmorx-gpl the GNU GPL version 3 only), then, in alphabetical order, the licences of
+larmorx-gpl the GNU GPL version 3 only, larmorx-freesurfer FreeSurfer's), then, in alphabetical order, the licences of
 
 - the works its NOTICE names (the translated and included works; sections "never distributed"
   left out), read from the licence phrases of ``PHRASES``;
@@ -57,6 +57,7 @@ PHRASES = {
     "creative commons attribution license (cc by 4.0)": "CC-BY-4.0",
     "fdlibm": "SunPro",
     "the fsl licence": "LicenseRef-FSL",
+    "the freesurfer software license": "LicenseRef-FreeSurfer",
     "gnu general public license, version 3": "GPL-3.0-only",
     # The SGI STL's notice (HP and SGI): SPDX's HPND-sell-variant without its optional clauses.
     "permission to use, copy, modify, distribute and sell this software": "HPND-sell-variant",
@@ -106,6 +107,13 @@ PACKAGES = (
         # tedana's LGPL-2.1-only code is distributed under the GPL version 3 only (the LGPL's
         # section 3; crates-gpl/NOTICE).
         converted=("LGPL-2.1-only",),
+    ),
+    Package(
+        "larmorx-freesurfer",
+        ROOT / "crates-freesurfer" / "pyproject.toml",
+        "LicenseRef-FreeSurfer",
+        ROOT / "crates-freesurfer" / "NOTICE",
+        ROOT / "crates-freesurfer" / "larmorx-freesurfer-cli" / "Cargo.toml",
     ),
 )
 

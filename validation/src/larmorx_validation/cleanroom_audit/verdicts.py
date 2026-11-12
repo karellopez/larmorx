@@ -125,6 +125,9 @@ def tool_of(rel: str) -> tuple[str, str] | None:
 ROLE_BY_WORDS = (
     ("orchestrator", r"^ORCHESTRATOR$"),
     ("audit", r"[Cc]lean-room audit"),
+    # the documentation revision's writer and critical reviewer, and the cross-part coherence reviewer (2026-11-12):
+    # they may read every document, replica material included, and never edit clean-room code
+    ("documentation", r"^Docs revision (writer|critical reviewer)|^Cross-part coherence review"),
     ("spec writer", r"\(spec\)|spec answers|behaviour spec|[Ss]pec writer"),
     ("replica author", r"[Rr]eplica|^Port (AFNI|FSL)"),
     ("clean-room implementer", r"[Cc]lean-room|[Cc]lean room"),
@@ -838,8 +841,8 @@ def run(scan: Path, repo: Path) -> dict:
                 if w == key or wrole == "clean-room implementer":
                     continue  # a clean-room part's own case
                 if w is None and (
-                    rel.rsplit("/", 1)[-1].startswith("original-")
-                    or re.match(r"^validation/difftest/cases/[^/]+-original(/|$)", rel)
+                    rel.rsplit("/", 1)[-1].startswith(("original-", "clean-room-"))
+                    or re.match(r"^validation/difftest/cases/[^/]+-(original|clean-room)(/|$)", rel)
                 ):
                     continue  # named for the clean-room original that differed: its own case
                 kind = f"R15: a permanent case added by a {wrole}"

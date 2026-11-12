@@ -11,10 +11,11 @@ repository), `LARMORX_VENV` (default: `<workspace>/.venv`), cargo first on the p
 
 | Script | What it does |
 |---|---|
-| `gates-rust.sh <checkout> [root\|gpl\|nc\|both\|all]` | fmt, clippy `-D warnings`, tests, in the root workspace, `crates-gpl` and `crates-nc` (`both`: root and gpl; `all`: the three) |
+| `gates-rust.sh <checkout> [root\|gpl\|nc\|freesurfer\|both\|all]` | fmt, clippy `-D warnings`, tests, in the root workspace, `crates-gpl`, `crates-nc` and `crates-freesurfer` (`both`: root and gpl; `all`: the four) |
 | `gates-python.sh <checkout> [--no-build]` | `maturin develop --release` (main checkout only), `pytest tests/python tests/golden`, ruff, SPDX |
 | `build-gpl.sh <checkout>` | the GPL workspace's verification tools (release; the AFNI replicas are in the main package since 2026-10-29) |
 | `build-nc.sh <checkout>` | the `larmorx-nc` replica program (release) |
+| `build-freesurfer.sh <checkout>` | the `larmorx-freesurfer` replica program (release) |
 | `boxed.sh <GiB> <command>` | runs a heavy job in its own memory box (a systemd user scope, no swap): a runaway process is killed inside it and nothing else is touched; use it for every parity, random-testing, oracle, benchmark or merge-verification run |
 | `lxv.sh <checkout> <args>` | `python -m larmorx_validation <args>` from that checkout |
 | `verify-merge.sh <checkout> <out> [--suite "..."]... [--site <dir> --evidence <tool>...] [--golden] [--threads N] [--oracle-cache use\|refresh\|off] [--serial-parity] [--serial-suites]` | the checklist's steps 1-5 on a committed merge, one line per step in `<out>/main.log`, then `VERDICT PASSED` or `VERDICT FAILED: <the failed steps>` before `ALLDONE` (exit status 1 when any step failed: read the verdict, never only the log's tail); step 4 the smoke tier in parallel (`parity_smoke.py`, `--threads` its workers, 16 without), the `--suite`s side by side (`run-suites.sh`: their `--jobs` add up), STEP5 lines in the order given; the parity runs use the oracle-output cache (below) |

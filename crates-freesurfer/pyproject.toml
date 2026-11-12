@@ -1,0 +1,69 @@
+# SPDX-License-Identifier: LicenseRef-FreeSurfer
+# The larmorx-freesurfer wheel: the `larmorx-freesurfer` program only (maturin's "bin" bindings), no
+# Python module. larmorx (Apache-2.0) runs it as a separate process; nothing imports it
+# (docs/licensing.md, "A replica package is a program"). Build: `maturin build --release --locked`
+# in this directory.
+#
+# The program holds FreeSurfer 8.2.0's programs translated to Rust (crates larmorx-freesurfer-*),
+# distributed under the FreeSurfer Software License (LICENSE: its Part B with the preface its
+# paragraph 1(b) requires). The wheel carries the licences and notices (LICENSE, NOTICE, LICENSES/:
+# the complete FreeSurfer agreement, the Apache-2.0 text and notices of the larmorx crates it
+# includes, the Rust crates' licence texts) and this workspace's source. Not published yet: the
+# release workflow builds larmorx and its two published companions only (NOTES of FreeSurfer's
+# foundations, item 3.1-01: what publishing it needs).
+[build-system]
+requires = ["maturin>=1.15,<2"]
+build-backend = "maturin"
+
+[project]
+name = "larmorx-freesurfer"
+description = "Bit-exact Rust replicas of FreeSurfer 8.2.0's programs, run by larmorx as a separate program; FreeSurfer Software License (research use only)"
+# PyPI's description (PYPI.md); README.md is this directory's page for developers.
+readme = "PYPI.md"
+requires-python = ">=3.12"
+authors = [
+    { name = "Karel Mauricio López Vilaret", email = "karel.mauricio.lopez.vilaret@uni-oldenburg.de" },
+]
+# FreeSurfer's licence (LICENSE) first; then every licence of the code the wheel holds: the
+# Apache-2.0 larmorx crates with the works they translate (LICENSES/NOTICE-larmorx.txt) and the Rust
+# crates it is built with (LICENSES/third-party-rust.txt). scripts/release/licences.py derives it.
+license = "LicenseRef-FreeSurfer AND Apache-2.0 AND BSD-3-Clause AND HDF5 AND MIT AND MPL-2.0 AND PSF-2.0 AND SunPro AND Zlib"
+license-files = [
+    "LICENSE",
+    "NOTICE",
+    "LICENSES/FreeSurfer-LICENSE.txt",
+    "LICENSES/Apache-2.0.txt",
+    "LICENSES/NOTICE-larmorx.txt",
+    "LICENSES/third-party-rust.txt",
+    "Cargo.toml",
+    "Cargo.lock",
+    "larmorx-freesurfer-*/Cargo.toml",
+    "larmorx-freesurfer-*/PROVENANCE.md",
+    "larmorx-freesurfer-*/src/*.rs",
+    "larmorx-freesurfer-*/src/**/*.rs",
+]
+keywords = ["neuroimaging", "mri", "freesurfer", "cortical-surface", "segmentation", "recon-all"]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Science/Research",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Rust",
+    "Topic :: Scientific/Engineering :: Image Processing",
+    "Topic :: Scientific/Engineering :: Medical Science Apps.",
+]
+dynamic = ["version"]
+
+[project.urls]
+Homepage = "https://karellopez.github.io/larmorx_documentation/"
+Documentation = "https://karellopez.github.io/larmorx_documentation/"
+Repository = "https://github.com/karellopez/larmorx"
+Source = "https://github.com/karellopez/larmorx/tree/main/crates-freesurfer"
+Issues = "https://github.com/karellopez/larmorx/issues"
+Changelog = "https://github.com/karellopez/larmorx/blob/main/CHANGELOG.md"
+
+[tool.maturin]
+bindings = "bin"
+manifest-path = "larmorx-freesurfer-cli/Cargo.toml"

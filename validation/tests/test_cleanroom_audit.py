@@ -673,6 +673,8 @@ def test_glibc_source_dates_and_the_rules_table():
         (f"{WT}/docs/findings/fsl-newtool.md", "read", "findings-unlisted", None),
         (f"{WT}/docs/findings/fsl-prelude.md", "read", "restricted", "R11"),
         (f"{WT}/docs/findings/fsl-bet-original.md", "read", "repo", None),
+        (f"{WT}/docs/findings/fsl-bet-clean-room.md", "read", "repo", None),
+        (f"{WT}/docs/findings/afni-volreg-clean-room.md", "read", "repo", None),
         (f"{SCRATCH}/x/larmorx_documentation/content/a.md", "read", "repo-site", None),
         (f"{SCRATCH}/x/clone/crates-nc/fsl-source/a.cc", "read", "restricted", "R01"),
         (f"{HOME}/.claude/projects/-home-u-ws/s1/tool-results/b1.txt", "read", "tool-output", None),
@@ -735,6 +737,21 @@ def test_glibc_source_dates_and_the_rules_table():
             "restricted",
             "R11",
         ),
+        (
+            f"{WT}/validation/src/larmorx_validation/freesurfer/replay.py",
+            "read",
+            "restricted",
+            "R11",
+        ),
+        (f"{WT}/validation/src/larmorx_validation/freesurfer_unit.py", "read", "restricted", "R11"),
+        (
+            f"{WT}/validation/investigations/freesurfer-unit-oracle/build.sh",
+            "read",
+            "restricted",
+            "R11",
+        ),
+        (f"{WS}/oracles/freesurfer-8.2.0-unit/src/utils/mri.cpp", "read", "restricted", "R03"),
+        (f"{WS}/oracles/freesurfer-8.2.0-unit/bin/fsunit", "exec", "run", None),
     ],
 )
 def test_classification(path, op, category, rule):

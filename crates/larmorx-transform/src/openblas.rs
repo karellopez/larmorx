@@ -70,6 +70,12 @@
 //! NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
 //! OF THE POSSIBILITY OF SUCH DAMAGE.
 
+pub mod level1;
+pub mod level2;
+pub mod level3;
+pub mod matmul;
+pub mod trmm;
+
 use larmorx_core::linalg::Mat4;
 
 /// One output of `dgemm`: `Σ a[k]·b[k]` as a fused multiply-add chain in index order, then

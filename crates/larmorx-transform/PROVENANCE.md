@@ -98,6 +98,201 @@ and stage 4's field-map branch, `init_bold_native_wf`'s field-map nodes, `_selec
 `workflows/base.py` (the Jacobian rule, the missing-readout-time message), with niworkflows
 1.15.4's `utils/connections.listify` and nipype 1.12.0's `Merge` (Apache-2.0).
 
+## OpenBLAS's level 3 and `dgemv`, numpy's 2-D `matmul` (`openblas::{level3, level2, matmul}`; the confounds' part, relay 2a, 2026-11-11)
+
+**Ported** from OpenBLAS 0.3.30 (the release, numpy 2.3.5's scipy-openblas64 0.3.30) and from
+the commit numpy 2.5.4's wheels bundle, OpenBLAS **v0.3.34-106-g446c436e** (scipy-openblas64
+0.3.34.106.0, `MacPython/openblas-libs`' `openblas_commit.txt`; `<workspace>/tags/
+OpenBLAS-0.3.34-106-g446c436e`, codeload tarball SHA-256 `ddecf3872f66…`), the 0.3.34 release
+read beside it (`tags/OpenBLAS-0.3.34`): the files below are the same in the three but for
+cancellation hooks in `level3.c` and allocation checks in `gemm.c`/`syrk.c`/`gemv.c` (no
+arithmetic). BSD-3-Clause; the notice is in `openblas.rs` and NOTICE. Which routine numpy calls,
+and with which layout and transposition, was read in numpy 2.5.4 and 2.3.5 (BSD-3-Clause):
+`numpy/_core/src/umath/matmul.c.src`, `numpy/_core/src/multiarray/arraytypes.c.src`
+(`DOUBLE_dot`). The logic is re-expressed in Rust; no code was copied.
+
+| larmorx | Upstream files | Licence |
+|---|---|---|
+| `openblas::level3::dgemm`, `dgemm_with`, `depth_blocks`, `GEMM_Q`, `GEMM_Q_ZEN4` (the interface's returns, `beta`, the depth blocks, the kernel's paths and their classes, `c = alpha·acc + c`) | `interface/gemm.c`, `driver/level3/level3.c` (`level3_thread.c` read for its other depth rule), `kernel/x86_64/dgemm_kernel_4x8_haswell.S` (every path: `INIT*`, `KERNEL*_I/M1/M2/E/SUB`, `KERNEL4x1`, `SAVE*`), `dgemm_beta_skylakex.c`, `KERNEL.HASWELL`, `param.h` (`HASWELL`), `kernel/setparam-ref.c` (the Haswell table; the AMD Zen 4/5 block of 0.3.31 and later), `driver/others/parameter.c`, `common_param.h`, `common_x86_64.h` (`BUFFER_SIZE`) | BSD-3-Clause |
+| `openblas::level3::dsyrk_lower`, `dsyrk_lower_with`, `syrk_depth_blocks` (lower triangle, both `TRANS`) | `interface/syrk.c`, `driver/level3/syrk_k.c` (`syrk_beta`), `level3_syrk.c` (`LOWER`), `syrk_kernel.c` | BSD-3-Clause |
+| `openblas::level2::dgemv` (`N`, `T`; `alpha`, `beta`, positive increments), `ddot` (strided) | `interface/gemv.c`, `kernel/x86_64/dgemv_n_4.c`, `dgemv_n_microk_haswell-4.c`, `dgemv_t_4.c`, `dgemv_t_microk_haswell-4.c`, `dscal.c`, `ddot.c` | BSD-3-Clause |
+| `openblas::matmul::numpy_matmul`, `numpy_matmul_with`, `syrk_case`, `numpy_syrk`, `numpy_syrk_with` | numpy 2.5.4 and 2.3.5 `matmul.c.src` (`DOUBLE_matmul`, `is_blasable2d`, `DOUBLE_gemv`, `DOUBLE_matmul_matrixmatrix`, `DOUBLE_matmul_inner_noblas`, `DOUBLE_matrix_copy`), `arraytypes.c.src` (`DOUBLE_dot`); OpenBLAS's CBLAS paths of `interface/gemm.c`, `gemv.c`, `syrk.c` | BSD-3-Clause |
+
+Validated bit for bit against numpy's own library and `@`/`np.dot` in both kept environments
+(`validation/investigations/confounds/check_blas.py`, 2026-11-11: numpy 2.3.5 4,503 of 4,503;
+numpy 2.5.4 every defined case with `GEMM_Q` 512 on the AMD Zen 4 main machine, where that
+library sets it and crashes on the cases its Haswell kernel's stack buffer cannot hold).
+
+**Relay 2a-ii** (`openblas::{trmm, level1}`, `level2::{dger, dtrmv}`; the same three OpenBLAS
+trees, whose files below are identical but for `volatile` in three of the TRMM copies and the
+interfaces' threading, allocation and export lines):
+
+| larmorx | Upstream files | Licence |
+|---|---|---|
+| `openblas::trmm::dtrmm`, `dtrmm_with`, `Side`, `Uplo`, `Diag`, `TRMM_RIGHT_MAX_N` (the interface's checks and returns, `alpha` first, the drivers' block orders and kernel calls, the TRMM kernel's groups, step ranges and paths, the copies' stored zeros and unit diagonal) | `interface/trsm.c` (compiled as `TRMM`), `driver/level3/trmm_L.c`, `trmm_R.c`, `kernel/x86_64/dtrmm_kernel_4x8_haswell.c`, `kernel/generic/trmm_uncopy_4.c`, `trmm_lncopy_4.c`, `trmm_utcopy_4.c`, `trmm_ltcopy_4.c`, `trmm_uncopy_8.c`, `trmm_lncopy_8.c`, `trmm_utcopy_8.c`, `trmm_ltcopy_8.c`, `kernel/Makefile.L3`, `KERNEL.HASWELL` (the C paths' arithmetic checked in the disassembly of both wheels' `dtrmm_kernel_*_HASWELL`: no fused multiply-adds) | BSD-3-Clause |
+| `openblas::level2::dger`, `dtrmv` (`DTB_ENTRIES` 64; `NU`/`TL` from `trmv_U.c`, `NL`/`TU` from `trmv_L.c`) | `interface/ger.c`, `kernel/generic/ger.c`, `interface/trmv.c`, `driver/level2/trmv_U.c`, `trmv_L.c`, `driver/level2/Makefile`, `common.h` | BSD-3-Clause |
+| `openblas::level1::axpy_k`, `daxpy`, `dscal`, `dcopy`, `dswap`, `idamax` (`iamax_sse2.S`'s lanes, reductions and searches, both alignments), `dnrm2` (the interface around `numpy_linalg`'s x87 kernel), `at` | `interface/axpy.c`, `scal.c`, `copy.c`, `swap.c`, `imax.c`, `nrm2.c`, `kernel/x86_64/daxpy.c`, `daxpy_microk_haswell-2.c`, `dscal.c`, `dscal_microk_haswell-2.c`, `iamax_sse2.S`, `nrm2.S`, `KERNEL`, `KERNEL.HASWELL` | BSD-3-Clause |
+
+Validated bit for bit against numpy's own library through its Fortran entry points in both kept
+environments (`check_blas.py`'s `trmm`, `ger`, `trmv`, `level1` sections, 2026-11-11).
+
+**Relay 2b-i** (`numpy_linalg::blocked`: LAPACK's blocked QR and LQ; `numpy_linalg::dlarfg` made
+public). Ported from the two `lapack-netlib/SRC/` trees above (OpenBLAS 0.3.30: LAPACK 3.12.0;
+v0.3.34-106-g446c436e: LAPACK 3.12.1), whose `.f` files gfortran compiles into the wheels; the
+routines that differ between the trees are ported in both forms (`LapackRelease`):
+
+| larmorx | Upstream files | Licence |
+|---|---|---|
+| `numpy_linalg::blocked::dgeqrf`, `dgelqf`, `lwork_opt`, `NB`, `NX` (the argument checks, the workspace query, `NB` lowered by a short `LWORK`, the panels while more than `NX` columns or rows remain, the unblocked rest; `DGELQF`'s panel copied for `DLARFB`) | `dgeqrf.f`, `dgelqf.f` (identical in both trees), `ilaenv.f` (`NB` 32, `NBMIN` 2, `NX` 128), `xerbla.f` | BSD-3-Clause |
+| `numpy_linalg::blocked::dgeqr2`, `dgelq2` (3.12.0: the reflector's 1 stored for `DLARF`; 3.12.1: `DLARF1F`) | `dgeqr2.f`, `dgelq2.f` (both trees), `dlarfg.f` | BSD-3-Clause |
+| `numpy_linalg::blocked::dlarft`, `DLARFT_LVL2_BELOW`, `Direct`, `Storev` (the recursive algorithm in its four forms; 3.12.1's crossover at `ILAENV(3, 'DLARFT') = 64` to `DLARFT_LVL2`, forward and backward, columnwise and rowwise, its scans for the vectors' last nonzero entries) | `dlarft.f` (both trees), `dlarft_lvl2.f` (0.3.34), `dlacpy.f`, `ilaenv.f` (0.3.34's `'LA'`/`'RFT'` entry) | BSD-3-Clause |
+| `numpy_linalg::blocked::dlarfb` (every side, transpose, direction and storage) | `dlarfb.f` (identical in both trees) | BSD-3-Clause |
+| `numpy_linalg::blocked::dlarf`, `dlarf1f` (any length, positive increments: the scans `ILADLC`/`ILADLR`, then OpenBLAS's `dgemv`, `daxpy`, `dscal`, `dger` ports) | `dlarf.f` (both trees: the same arithmetic), `dlarf1f.f` (0.3.34), `iladlc.f`, `iladlr.f` | BSD-3-Clause |
+| `numpy_linalg::blocked::Lapack`, `IllegalValue` | (larmorx's: the release and the BLAS depth block a call follows; `XERBLA`'s message) | Apache-2.0 |
+
+Validated bit for bit against numpy's own LAPACK through its exported Fortran entry points in
+both kept environments (`validation/investigations/confounds/check_lapack.py`, full tier,
+2026-11-11, commit `6d88f10e`): numpy 2.3.5 (LAPACK 3.12.0) every case identical (`DLARFG`
+1,500, `DLARF` 3,000, `DGEQR2`/`DGELQ2` 132 each, `DLARFT` 2,006, `DLARFB` 2,506,
+`DGEQRF`/`DGELQF` 209 each, up to 600 × 60,968 and 60,968 × 600); numpy 2.5.4 (LAPACK 3.12.1,
+whose `DLARF1F` and `DLARFT_LVL2` are proved through `DGEQR2`/`DGELQ2`/`DLARFT`) the same counts
+identical with `OPENBLAS_L2_SIZE=512` (the Haswell table's `GEMM_Q` 256 on the AMD Zen 4 machine),
+and with the machine's own `GEMM_Q` 512 every defined case identical, the crashes of that library
+all in its undefined class.
+
+**Relays 2b-ii and 2b-iii** (`numpy_linalg::blocked`: the generation and application of `Q`, the
+bidiagonal reduction). Ported from the same two `lapack-netlib/SRC/` trees, each routine that
+differs between them in both forms (`LapackRelease`):
+
+| larmorx | Upstream files | Licence |
+|---|---|---|
+| `numpy_linalg::blocked::dorgqr`, `dorglq`, `org_lwork_opt` (the checks, the query, `NB` lowered by a short `LWORK`, the zeros above the blocked part, the unblocked trailing part first, then the 32-reflector blocks from the last back: `DLARFT` with `T` in the workspace at leading dimension `LDWORK`, `DLARFB` from the left (`DORGQR`) or the right with `Hᵀ` (`DORGLQ`, the block's reflectors copied out for it), the block's own columns or rows) | `dorgqr.f`, `dorglq.f` (identical in both trees), `ilaenv.f` (`NB` 32, `NBMIN` 2, `NX` 128) | BSD-3-Clause |
+| `numpy_linalg::blocked::dorg2r`, `dorgl2` (3.12.0: the reflector's 1 stored for `DLARF`; 3.12.1: `DLARF1F`; `DSCAL` by `-tau`, `1 - tau` on the diagonal) | `dorg2r.f`, `dorgl2.f` (both trees) | BSD-3-Clause |
+| `numpy_linalg::blocked::dormqr`, `dormlq`, `orm_lwork_opt`, `NBMAX_ORM`, `LDT_ORM`, `TSIZE_ORM` (every side and transpose; `T` at leading dimension 65; the optimal workspace and the short-workspace `NB` of each release: 3.12.0 `NW·NB + 65·64`, `(LWORK - 65·64)/NW`; 3.12.1 `NW·NB + 65·NB`, `LWORK/(NW + 65)`; `DORMLQ`'s block reflector transposed) | `dormqr.f`, `dormlq.f` (both trees) | BSD-3-Clause |
+| `numpy_linalg::blocked::dorm2r`, `dorml2` (every side and transpose; 3.12.0 stores each reflector's 1 in `A` for `DLARF` and restores the entry, 3.12.1 `DLARF1F`) | `dorm2r.f`, `dorml2.f` (both trees) | BSD-3-Clause |
+| `numpy_linalg::blocked::dgebrd`, `gebrd_lwork_opt` (the checks, the query, `NX = max(NB, 128)`, a short workspace's `NB = LWORK/(M + N)` or the unblocked reduction below `2·(M + N)`, the panels by `DLABRD` with `X` and `Y` at leading dimensions `M` and `N`, the two `DGEMM` updates of depth `NB` (the rows above the second one's output copied out for it), `d` and `e` written back, `DGEBD2` on the rest) | `dgebrd.f` (identical in both trees), `ilaenv.f` (`'BRD'`: `NB` 32, `NBMIN` 2, `NX` 128) | BSD-3-Clause |
+| `numpy_linalg::blocked::dlabrd` (both bidiagonal forms; every `DGEMV` with its own leading dimension and unit or non-unit increments, the vectors that share an array with the matrix passed through buffers) | `dlabrd.f` (identical in both trees) | BSD-3-Clause |
+| `numpy_linalg::blocked::dgebd2` (both bidiagonal forms; 3.12.0 `DLARF` with the stored 1 and `d`/`e` put back, 3.12.1 `DLARF1F`; the last `taup` or `tauq` 0) | `dgebd2.f` (both trees) | BSD-3-Clause |
+
+Validated bit for bit against numpy's own LAPACK through its exported Fortran entry points in both
+kept environments (`validation/investigations/confounds/check_lapack.py`, sections `org`, `orm`,
+`brd`, full tier, 2026-11-11): see `validation/investigations/confounds/README.md` for the counts
+and commits; `control_lapack_release.py` shows that the cases tell the two releases apart.
+
+**Relay 2c-i** (`numpy_linalg::bdsdc`: LAPACK's divide-and-conquer bidiagonal SVD with the
+singular vectors). Ported from the same two `lapack-netlib/SRC/` trees (OpenBLAS 0.3.30, LAPACK
+3.12.0, numpy 2.3.5; OpenBLAS v0.3.34-106-g446c436e, LAPACK 3.12.1, numpy 2.5.4), each routine
+that differs between them in both forms (`LapackRelease`):
+
+| larmorx | Upstream files | Licence |
+|---|---|---|
+| `numpy_linalg::bdsdc::dbdsdc`, `SMLSIZ` (`COMPQ = 'I'`, both bidiagonal forms: the checks, a lower matrix rotated to upper with the rotations kept for `U`, `DLASDQ` up to 25 rows, else the scaling by `DLANST`, the tiny entries set to `±0.9ε`, the subproblems split at `|e(i)| < 0.9ε` (the 1 × 1 one at `d(n)`), `DLASD0` on each, the descending selection sort, the rotations applied to `U`) | `dbdsdc.f` (both trees: layout only), `ilaenv.f` (`ILAENV(9, 'DBDSDC')` = 25), `dlaset.f`, `dlanst.f`, `INSTALL/dlamch.f` | BSD-3-Clause |
+| `numpy_linalg::bdsdc::dlasd0`, `dlasdt`, `Tree` (the tree with `INT(LOG(n/(msub + 1))/LOG(2)) + 1` levels through glibc's `log`, `larmorx_core::math::log_glibc`; the leaves by `DLASDQ`, the merges bottom-up by `DLASD1`) | `dlasd0.f`, `dlasdt.f` (identical in both trees) | BSD-3-Clause |
+| `numpy_linalg::bdsdc::dlasd1`, `dlasd3`, `Deflation`, `MergeWork` (the scaling, `DLASD2`, `DLASD3`'s secular equation and its four `DGEMM` groups on the column types' blocks, the unscaling, `DLAMRG`'s permutation) | `dlasd1.f`, `dlasd3.f` (identical in both trees), `dlacpy.f` | BSD-3-Clause |
+| `numpy_linalg::bdsdc::dlasd2` (3.12.0: `TOL = 8ε·max(…)`, `|d(j) - d(jprev)| <= TOL`, `IDXP(K2) = JPREV`; 3.12.1: `64ε`, the signed difference, `IDXP(K2 + J - 1 - JP) = JP` for `JP = JPREV … J - 1`; `DROT`, `DLAPY2`, the column types, `COLTYP(1:4) = CTOT`) | `dlasd2.f` (both trees) | BSD-3-Clause |
+| `numpy_linalg::bdsdc::dlasd4`, `dlasd5`, `dlaed6` (the secular equation's roots: the last one and the inner ones, the two-pole and three-pole steps, `DLAED6`'s fallback, the geometric-mean bound; `DLAED6`'s scaling by `2^-340` and `2^-680`) | `dlasd4.f`, `dlasd5.f`, `dlaed6.f` (identical in both trees) | BSD-3-Clause |
+| `numpy_linalg::bdsdc::dlasdq` (both forms, `SQRE` 0 and 1, the rotations to upper form on `VT`, `U` and `C`, `DBDSQR` (the parent module's port, each release's `-0`), the ascending sort) | `dlasdq.f` (identical in both trees), `dbdsqr.f` (both trees) | BSD-3-Clause |
+| `numpy_linalg::bdsdc::dlamrg`, `dlascl_g` (`TYPE = 'G'`: the checks, the safe steps) | `dlamrg.f` (identical), `dlascl.f` (both trees; the same arithmetic for `'G'`) | BSD-3-Clause |
+| `numpy_linalg::blocked::dormbr`, `dorgbr`, `Vect`, `ormbr_lwork_opt`, `orgbr_lwork_opt` (`DGEBRD`'s `Q` and `P`: `DORMQR`/`DORMLQ` (the transpose flipped for `P`) on all the reflectors or on the `nq - 1` shifted ones, `DORMBR`'s own optimal workspace `NW·32` handed on as it is (short for `DORMQR`/`DORMLQ`: each release's `NB` rule then applies); `DORGQR`/`DORGLQ` or the shifted forms with the identity's first row and column; the checks, `WORK(1)`) | `dormbr.f`, `dorgbr.f` (identical in both trees) | BSD-3-Clause |
+
+The BLAS calls are the ported Haswell kernels (`openblas::level3::dgemm_with` for `DLASD3`,
+`level1::dnrm2` and `dcopy`, the parent module's `drot` and `dswap`). Validated bit for bit
+against numpy's own LAPACK through its exported Fortran entry points in both kept environments
+(`validation/investigations/confounds/check_svd.py`, every routine through its own entry point;
+`DORMBR`/`DORGBR`: `check_lapack.py`'s section `orbr`, 2026-11-11): see `validation/investigations/confounds/README.md` for the counts and commits; its
+`--control` shows that the cases tell the two releases apart.
+
+**Relay 2c-ii** (`numpy_linalg::svd`: the thin SVD and the pseudo-inverse of a general matrix).
+`dgesdd.f` is identical in both `lapack-netlib/SRC/` trees; the routines it calls are the ports
+above, each in its release's form (`Lapack`):
+
+| larmorx | Upstream files | Licence |
+|---|---|---|
+| `numpy_linalg::svd::dgesdd_s`, `Gesdd`, `DgesddError` (`JOBZ = 'S'`: the checks of `LDA`, `LDU`, `LDVT`, `LWORK`; `DLANGE('M')`, `INFO = -4` on a NaN, the scaling by `DLASCL` to `[SMLNUM, BIGNUM]` and its undoing on `S`; `MNTHR = ⌊min(m, n)·11/6⌋`; path 3 (`DGEQRF`, `R` copied with zeros below, `DORGQR`, `DGEBRD` of `R`, `DBDSDC('U', 'I')`, `DORMBR('Q', 'L', 'N')`, `DORMBR('P', 'R', 'T')`, `U` copied out, `DGEMM`), path 5 (`DGEBRD`, `DLASET`, `DBDSDC('U', 'I')`, the two `DORMBR`), path 3t (`DGELQF`, `L` copied with zeros above, `DORGLQ`, `DGEBRD` of `L`, `DBDSDC('U', 'I')`, the two `DORMBR`, `VT` copied out, `DGEMM`), path 5t (`DGEBRD`, `DLASET`, `DBDSDC('L', 'I')`, the two `DORMBR`); every callee given `LWORK - NWORK + 1`; an infinite entry refused, where LAPACK would scale it to NaN and loop or return garbage) | `dgesdd.f` (identical in both trees), `dlange.f`, `dlascl.f`, `dlaset.f`, `dlacpy.f`, `la_xisnan.F90`, `droundup_lwork.f`, `xerbla.f`, `INSTALL/dlamch.f` | BSD-3-Clause |
+| `numpy_linalg::svd::dgesdd_s_lwork` (`DGESDD('S')`'s query: `MINWRK` and `MAXWRK` from the callees' queries `DGEQRF`, `DORGQR`, `DGELQF`, `DORGLQ`, `DGEBRD`, `DORMBR` and `BDSPAC = 3·k² + 4·k`, the same in both releases) | `dgesdd.f`, and the queries of the routines above | BSD-3-Clause |
+| `numpy_linalg::svd::numpy_svd`, `Svd`, `SvdDidNotConverge` (`svd(a, full_matrices=False)`: the copy into Fortran order with `LDA = LDU = max(m, 1)`, `LDVT = max(1, min(m, n))`, numpy 2.5.4's `all_finite` refusal (also for 2.3.5's NaN, which LAPACK refuses with `INFO = -4`, and its infinity, which LAPACK does not survive), the optimal workspace, `LinAlgError('SVD did not converge')` on `INFO != 0`, the copies back in C order) | numpy 2.5.4 and 2.3.5 `numpy/linalg/umath_linalg.cpp` (`svd_wrapper`, `init_gesdd`, `call_gesdd`, `compute_urows_vtcolumns`, `all_finite` (2.5.4 only), `linearize_matrix`, `delinearize_matrix`), `numpy/linalg/_linalg.py` (`svd`, `_raise_linalgerror_svd_nonconvergence`) | BSD-3-Clause |
+| `numpy_linalg::svd::numpy_pinv` (`pinv(a, rcond)`: an empty matrix's empty result, `cutoff = rcond·max(s)`, `1/s` where `s > cutoff` and 0 elsewhere, `s[:, None]·u.T` laid out in F order as numpy's multiply does, `matmul(vt.T, ·)` by `openblas::matmul::numpy_matmul_with`) | numpy 2.5.4 and 2.3.5 `numpy/linalg/_linalg.py` (`pinv`, identical in both) | BSD-3-Clause |
+
+Validated bit for bit against numpy's own `scipy_dgesdd_64_` and its `np.linalg.svd` and
+`np.linalg.pinv` in both kept environments (`validation/investigations/confounds/check_gesdd.py`,
+2026-11-11): see `validation/investigations/confounds/README.md` for the counts and commits.
+
+**Relay 2d-i** (`numpy_linalg::gelsd`: the minimum-norm least squares of a general matrix and
+numpy's `lstsq`). `dgelsd.f`, `dlalsd.f` and `dlasrt.f` are identical in both `lapack-netlib/SRC/`
+trees; the routines they call are the ports above, each in its release's form (`Lapack`):
+
+| larmorx | Upstream files | Licence |
+|---|---|---|
+| `numpy_linalg::gelsd::dgelsd`, `Gelsd`, `DgelsdError` (the checks of `LDA`, `LDB`, `LWORK`; the quick return; `DLANGE('M')` of `A` and `B` and their scalings by `DLASCL` to `[SMLNUM, BIGNUM]` (`SMLNUM = DLAMCH('S')/DLAMCH('P')`) and the undoing on `B` and `S`; an all-zero `A`; `B`'s rows past `M` cleared for `M < N`; path 1a (`DGEQRF`, `DORMQR('L', 'T')`, zeros below `R`), path 1 (`DGEBRD`, `DORMBR('Q', 'L', 'T')`, `DLALSD('U')`, `DORMBR('P', 'L', 'N')`), path 2a (`DGELQF`, `L` copied with zeros above at `LDWORK = M` or `LDA` by the workspace's rule, `DGEBRD` of `L`, the two `DORMBR`, `DLALSD('U')`, `B`'s rows past `M` cleared, `DORMLQ('L', 'T')`), path 2 (`DGEBRD` lower, `DORMBR('Q')`, `DLALSD('L')`, `DORMBR('P')`); every callee given `LWORK - NWORK + 1`; `INFO` from `DLALSD` returned as LAPACK does; a non-finite `A` refused, where LAPACK scales an infinity to NaN and may loop) | `dgelsd.f` (identical in both trees), `dlange.f`, `dlascl.f`, `dlaset.f`, `dlacpy.f`, `la_xisnan.F90`, `xerbla.f`, `INSTALL/dlamch.f` | BSD-3-Clause |
+| `numpy_linalg::gelsd::dgelsd_lwork`, `gelsd_mnthr`, `gelsd_nlvl` (`DGELSD`'s query: `MAXWRK`, `MINWRK`, `LIWORK`, `WLALSD` with `ILAENV(1, ...) = 32` for `DGEQRF`, `DORMQR`, `DGEBRD`, `DORMBR`, `DGELQF`, `DORMLQ`, `ILAENV(6, 'DGELSD') = INT(REAL(MIN(M, N))·1.6E0)` in single precision, `ILAENV(9) = 25`, `NLVL` through glibc's `log` as `larmorx_core::math::log_glibc`, the same in both releases) | `dgelsd.f`, `ilaenv.f` (ISPEC 1, 6 and 9: the same in both trees) | BSD-3-Clause |
+| `numpy_linalg::gelsd::dlalsd` (the checks of `NRHS` and `LDB` as `INFO` (XERBLA's refusals), `RCND`, `N = 0` and `N = 1`, the lower bidiagonal rotated to upper by `DLARTG` with `DROT` on `B`'s rows (both orders of the original: one column's operations the same), `DLANST`, a zero bidiagonal, the scaling by `ORGNRM`; `N <= SMLSIZ`: `VT = I`, `DLASDQ('U', 0, N, N, 0, NRHS)` with `C = B`, `TOL = RCND·|D(IDAMAX)|`, the rows cleared or scaled by `DLASCL`, the rank, `DGEMM('T', 'N')` and `DLACPY`, the unscalings, `DLASRT('D')`; the divide-and-conquer path for `N > SMLSIZ`: relay 2d-ii-b below) | `dlalsd.f` (identical in both trees), `dlasdq.f`, `dlartg.f90`, `dlanst.f`, `dlascl.f`, `dlaset.f`, `dlacpy.f`; OpenBLAS `interface/rot.c`, `kernel/x86_64/drot.c`, `kernel/x86_64/iamax_sse2.S`, `interface/gemm.c` with the level-3 driver above | BSD-3-Clause |
+| `numpy_linalg::gelsd::dlasrt`, `Sort` (`DLASRT('I' \| 'D')`: insertion sort on stretches of at most 20 steps, quicksort with the median of three, the stack's order) | `dlasrt.f` (identical in both trees) | BSD-3-Clause |
+| `numpy_linalg::gelsd::numpy_lstsq` (`lstsq(a, b, rcond)`: `rcond = None` as `eps·max(m, n)`, the copies into Fortran order with `LDA = max(1, m)`, `LDB = max(1, m, n)`, no right-hand side as one zero column, numpy 2.5.4's `all_finite` refusal of `a` (for every release: NP-10), the optimal workspace, `LinAlgError` on `INFO != 0`, `x` from `B`'s first rows (0 for `m = 0`), the residuals by `abs2` at stride `m` kept only when the rank is `n` and `m > n`) | numpy 2.5.4 and 2.3.5 `numpy/linalg/umath_linalg.cpp` (`lstsq`, `init_gelsd`, `call_gelsd`, `release_gelsd`, `abs2`, `all_finite` (2.5.4 only), `linearize_matrix`, `delinearize_matrix`), `numpy/linalg/_linalg.py` (`lstsq`, `_raise_linalgerror_lstsq`, identical in both) | BSD-3-Clause |
+
+Validated bit for bit against numpy's own `scipy_dgelsd_64_`, `scipy_dlalsd_64_`,
+`scipy_dlasrt_64_` and its `np.linalg.lstsq` in both kept environments
+(`validation/investigations/confounds/check_gelsd.py`, 2026-11-11): see
+`validation/investigations/confounds/README.md` for the counts and commits.
+
+**Relay 2d-ii-a** (`numpy_linalg::lasda`: one merge of `DLASDA`'s tree, for `DLALSD`'s
+divide-and-conquer path). `dlasd6.f` and `dlasd8.f` are identical in both `lapack-netlib/SRC/`
+trees; `dlasd7.f` differs as `dlasd2.f` does (the deflation test and the record of the deflated
+positions):
+
+| larmorx | Upstream files | Licence |
+|---|---|---|
+| `numpy_linalg::lasda::dlasd7`, `Lasd7`, `GivensRecord` (the checks; `Z` from `ALPHA·VL` and `BETA·VF`, the first half moved one position back and `IDXQ` shifted; `DSIGMA`/`ZW`/`VFW`/`VLW` as storage and the merge by `DLAMRG`; `TOL = 64·ε·max(|ALPHA|, |BETA|, |D(N)|)`; the deflation of small `Z` entries and of close values (3.12.0 `|D(j) - D(jprev)| <= TOL` and `IDXP(K2) = JPREV`; 3.12.1 the signed difference and the deflated positions recorded again in order) with `DLAPY2`, the Givens rotation on `VF` and `VL` by `DROT` and its record in `GIVCOL`/`GIVNUM` with `PERM` (`ICOMPQ = 1`); `DSIGMA(2)` raised to `TOL/2`; for `SQRE = 1` the extra row rotated into the first; `C` and `S` as LAPACK leaves them) | `dlasd7.f` (both trees), `dlamrg.f`, `dlapy2.f`, `INSTALL/dlamch.f`; OpenBLAS `interface/rot.c`, `kernel/x86_64/drot.c` | BSD-3-Clause |
+| `numpy_linalg::lasda::dlasd8` (the checks; `K = 1`; `Z` normalised by `DNRM2` and `DLASCL`, `RHO = ρ²`; `DLASD4` for each root with `DELTA` and its work in `WORK`, the product formula for the new `Z` in LAPACK's order of operations, `DIFL`, `DIFR(·, 1)` (its last entry as LAPACK leaves it), `DIFR(·, 2)` with `ICOMPQ = 1`; the new `VF`/`VL` through `DDOT` (the Haswell kernel) over `DNRM2`, `DLAMC3` as a stored sum) | `dlasd8.f` (identical in both trees), `dlasd4.f`, `dlascl.f`, `dlaset.f`; OpenBLAS `interface/dot.c`, `nrm2.c`, `kernel/x86_64/ddot.c`, `ddot_microk_haswell-2.c`, `nrm2.S` | BSD-3-Clause |
+| `numpy_linalg::lasda::dlasd6`, `Lasd6`, `MergeFactors` (the checks; `D(NL+1)` cleared, `ORGNRM` and the scaling of `D`, `ALPHA`, `BETA`; `DLASD7`, `DLASD8`; the poles with `ICOMPQ = 1`; the unscaling; `IDXQ` by `DLAMRG(K, N - K, D, 1, -1)`) | `dlasd6.f` (identical in both trees), `dlascl.f`, `dlamrg.f`, `dcopy` | BSD-3-Clause |
+
+Validated bit for bit against numpy's own `scipy_dlasd7_64_`, `scipy_dlasd8_64_` and
+`scipy_dlasd6_64_` in both kept environments (`validation/investigations/confounds/check_gelsd.py`
+sections `lasd7`, `lasd8`, `lasd6`, 2026-11-11): see `validation/investigations/confounds/README.md`.
+
+**Relay 2d-ii-b** (`numpy_linalg::lasda` and `gelsd`: the rest of `DLALSD`'s divide-and-conquer
+path, so `DGELSD` and numpy's `lstsq` of any size). `dlasda.f`, `dlals0.f`, `dlalsa.f` and
+`dlalsd.f` are identical in both `lapack-netlib/SRC/` trees; the release enters through `DLASDQ`'s
+`DBDSQR` and `DLASD7`:
+
+| larmorx | Upstream files | Licence |
+|---|---|---|
+| `numpy_linalg::lasda::dlasda`, `SvdTree`, `LasdaError` (the checks; `N <= SMLSIZ`: one `DLASDQ` on `D`, `E` and, with `ICOMPQ = 1`, `VT` and `U` as given; `DLASDT`'s tree; the leaves by `DLASDQ` from the identity (`ICOMPQ = 1`: `U` and `VT` in place at the leaf's rows; `ICOMPQ = 0`: `VT` in a work array of leading dimension `SMLSIZ + 1`), their first and last right-vector components into `VF` and `VL`, `IDXQ` per leaf; the merges level by level from the bottom by `DLASD6` with `ALPHA = D(IC)`, `BETA = E(IC)`, each node's arrays at its rows and its level's columns and its `K`, `GIVPTR`, `C`, `S` at the slot counted down from `2^NLVL - 1` (`ICOMPQ = 1`), all at the arrays' starts (`ICOMPQ = 0`); `INFO` from a leaf or a merge; `ICOMPQ = 0` with `2 <= N <= SMLSIZ` refused: LAPACK's `DLASDQ` without vectors goes through `DBDSQR`'s `DLASQ1`, the dqds algorithm, which is not ported) | `dlasda.f` (identical in both trees), `dlasdq.f`, `dlasdt.f`, `dlaset.f`, `dlasd6.f`; OpenBLAS `interface/copy.c` | BSD-3-Clause |
+| `numpy_linalg::lasda::dlals0` (the checks; `ICOMPQ = 0`: the Givens rotations by `DROT`, `PERM` into `BX` by `DCOPY`, `K = 1` (copied, `DSCAL` by -1 for a negative `Z(1)`), each of the `K` rows from the secular equation's vector (`POLES`, `DIFL`, `DIFR`, `Z` with `DLAMC3` as a stored sum, `WORK(1) = -1`) by `DNRM2`, `DGEMV('T')` and `DLASCL`, the deflated rows by `DLACPY`, `INFO` the last `DLASCL`'s; `ICOMPQ = 1`: the transposed vectors by `DGEMV('T')`, the extra row's rotation by `C`, `S` for `SQRE = 1`, the deflated rows, back through `PERM`, the Givens rotations undone in reverse) | `dlals0.f` (identical in both trees), `dlascl.f`, `dlacpy.f`, `dlamc3` in `INSTALL/dlamch.f`; OpenBLAS `interface/rot.c`, `copy.c`, `scal.c`, `gemv.c`, `nrm2.c`, `kernel/x86_64/drot.c`, `dscal.c`, `dgemv_t_4.c`, `dgemv_t_microk_haswell-4.c`, `nrm2.S` | BSD-3-Clause |
+| `numpy_linalg::lasda::dlalsa` (the checks; `DLASDT`'s tree; `ICOMPQ = 0`: each leaf's `Uᵀ·B` by `DGEMM('T', 'N')`, the centre rows copied, `DLALS0` bottom-up with `SQRE = 0`, the slots counted down; `ICOMPQ = 1`: `DLALS0` top-down (the last node of each level square, the others with their extra row), the slots counted up, then each leaf's `VTᵀ·B` (the last leaf's right child without its extra row)) | `dlalsa.f` (identical in both trees), `dlasdt.f`, `dlals0.f`; OpenBLAS `interface/gemm.c` with the level-3 driver and the Haswell kernel above (depth at most 26), `interface/copy.c` | BSD-3-Clause |
+| `numpy_linalg::gelsd::dlalsd`'s path for `N > SMLSIZ` (`NLVL` through glibc's `log`; the workspace of `dlalsd.f` (`U`, `VT`, `DIFL`, `DIFR`, `Z`, `C`, `S`, `POLES`, `GIVNUM`, `BX`; `IWORK`'s `K`, `GIVPTR`, `PERM`, `GIVCOL`), each piece's at its first row with leading dimension `N`; `|D(i)| < EPS` set to `SIGN(EPS, D(i))`; the pieces at every `|E(i)| < EPS` and at the last row (its three cases, the last row a piece of its own when `|E(N-1)| < EPS`); one row copied, at most `SMLSIZ` rows by `DLASET` + `DLASDQ` with `C = B` + `DLACPY`, more by `DLASDA(ICOMPQ = 1)` and `DLALSA(ICOMPQ = 0)`; `TOL = RCND·|D(IDAMAX)|`, each row of `BX` cleared (`|D(i)| <= TOL`) or scaled by `DLASCL` by the signed `D(i)`, the rank, `D(i) = |D(i)|`; the pieces back by `DCOPY`, `DGEMM('T', 'N')` or `DLALSA(ICOMPQ = 1)`; the returns on a nonzero `INFO` (a refusal of `DLASDA` for `SMLSIZ < 3` as its negative `INFO`); the unscalings and `DLASRT('D')`) | `dlalsd.f` (identical in both trees), `dlasda.f`, `dlalsa.f`, `dlasdq.f`, `dlaset.f`, `dlacpy.f`, `dlascl.f`, `dlasrt.f`; OpenBLAS `interface/copy.c`, `imax.c` with `kernel/x86_64/iamax_sse2.S`, `interface/gemm.c` | BSD-3-Clause |
+
+Validated bit for bit against numpy's own `scipy_dlasda_64_`, `scipy_dlals0_64_`,
+`scipy_dlalsa_64_`, `scipy_dlalsd_64_`, `scipy_dgelsd_64_` and its `np.linalg.lstsq` in both kept
+environments (`validation/investigations/confounds/check_gelsd.py`, sections `lasda`, `lals0`,
+`lalsa` and the divide-and-conquer cases of `lalsd`, `gelsd`, `lstsq`, 2026-11-11): see
+`validation/investigations/confounds/README.md`.
+
+**Relay 2d-iii-a** (`numpy_linalg::gesvd`: SciPy's `linalg.svd(a, lapack_driver='gesvd')`, the
+SVD nipype's `fallback_svd` falls back to, with SciPy's own LAPACK). SciPy 1.18.1's wheel bundles
+scipy-openblas32 0.3.31.22.0 (OpenBLAS v0.3.31-22-g5ffbf38b, `MacPython/openblas-libs`'
+`openblas_commit.txt`; `tags/OpenBLAS-0.3.31-22-g5ffbf38b`, codeload tarball SHA-256
+`51257fb2f0aa7b4c23d9cf0302500b817dc82c0022ee681b24f9ab82dfd10312`), SciPy 1.15.3's
+scipy-openblas32 0.3.28.0.2 (the v0.3.28 release its build checks out; `tags/OpenBLAS-0.3.28`,
+release tarball SHA-256 `f1003466ad074e9b0c8d421a204121100b0751c96fc6fcf3d1456bd12f8a00a1`). Every
+`lapack-netlib/SRC/` file `DGESVD` reaches is identical in both to OpenBLAS 0.3.30's but
+`dlarft.f` of 0.3.28 (the column-by-column algorithm, before OpenBLAS 0.3.29's recursive one; the
+same Fortran as 0.3.34's `dlarft_lvl2.f`); the BLAS files on these paths differ from 0.3.30's only
+in threading heuristics and other architectures, and neither `kernel/setparam-ref.c` has 0.3.34's
+`GEMM_Q = 512` rule for AMD Zen 4 and 5:
+
+| larmorx | Upstream files | Licence |
+|---|---|---|
+| `numpy_linalg::blocked::DlarftForm`, the `dlarft` field of `Lapack`, `Lapack::with_gemm_q` (`ColumnByColumn`: every `DLARFT` call by the column-by-column algorithm, `dlarft_lvl2`) | OpenBLAS 0.3.28 `lapack-netlib/SRC/dlarft.f`; 0.3.34's `dlarft_lvl2.f` (identical but line breaks) | BSD-3-Clause |
+| `numpy_linalg::gesvd::dgesvd`, `dgesvd_lwork`, `Job`, `Gesvd`, `DgesvdError` (`JOBU = JOBVT = 'S'` or `'A'`: the checks, the workspace query from the callees' queries and `ILAENV(6)` = `INT(REAL(MIN(M, N))·1.6E0)`, `BDSPAC = 5·MIN(M, N)`; the scaling by `DLASCL` outside `[SMLNUM, BIGNUM]`; paths 6 and 9 (`DGEQRF`; with `N·N + MAX(4N, BDSPAC)` (path 9: `MAX(N + M, 4N, BDSPAC)`) or more `R` into `WORK(IU)` at leading dimension `LDA` when `LWORK >= WRKBL + LDA·N`, else `N`, `DGEBRD`, `DORGBR` `'Q'` and `'P'`, `DBDSQR('U')`, `DGEMM`, path 9 through `A` and `DLACPY`; else `DORGQR` in `U`, `R` reduced in `VT`, `DORMBR('Q', 'R', 'N')`, `DORGBR('P')`, `DBDSQR('U')` on `U`); path 10 (`DGEBRD`, `DORGBR('Q')` of `N` or `M` columns, `DORGBR('P')`, `DBDSQR('U')`); paths 6t, 9t (`DGELQF`, `L` into `WORK(IU)` or `U`, `DORGLQ` in `A` or `VT`, `DORMBR('P', 'L', 'T')` on the slow path) and 10t (`DBDSQR('L')`); each callee with `LWORK - IWORK + 1`; the unconverged superdiagonal and the unscaling; a non-finite matrix refused) | `dgesvd.f` (identical in the 0.3.28, 0.3.30 and 0.3.31-22 trees), `dlange.f`, `dlascl.f`, `dlacpy.f`, `dlaset.f`, `ilaenv.f`, `INSTALL/dlamch.f`, and the routines of `blocked`; OpenBLAS `interface/gemm.c` with the level-3 driver and the Haswell kernel (depth `GEMM_Q` 256) | BSD-3-Clause |
+| `numpy_linalg::gesvd::dbdsqr` (the checks; `N = 0`; without vectors refused: LAPACK's `DLASQ1`, the dqds algorithm, is not ported; a lower bidiagonal rotated to upper by `DLARTG`, the rotations applied to `U` by `DLASR('R', 'V', 'F')` and to `C` by `DLASR('L', 'V', 'F')`; then the parent module's `dbdsqr_upper_ncc`, 3.12.0's: a `-0` value kept) | `dbdsqr.f` (identical in the three trees), `dlartg.f90`, `dlasr.f` | BSD-3-Clause |
+| `numpy_linalg::gesvd::ScipyLibrary`, `scipy_svd`, `ScipySvd`, `ScipySvdError` (`check_finite`'s `ValueError`; an empty matrix: identities with `full_matrices`, empty factors without, no LAPACK; the 32-bit size checks with each version's message; the copy into Fortran order, `LDA = LDU = M`, `LDVT = N` or `MIN(M, N)`, the query's `WORK(1)` truncated as `LWORK`; `INFO > 0` as `LinAlgError` with each version's message) | SciPy 1.15.3 `scipy/linalg/_decomp_svd.py` (`svd`), `flapack_gen.pyf.src` (`dgesvd`, `dgesvd_lwork`), `lapack.py` (`_compute_lwork`, `_check_work_float`), `scipy/_lib/_util.py` (`_asarray_validated`); SciPy 1.18.1 `scipy/linalg/_decomp_svd.py` (`svd`, `_format_emit_errors_warnings`), `src/_linalg_svd.hh` (`u_vh_shapes`, `_svd_gesvd`), `src/_batched_linalg_module.cc` (`_linalg_svd`) | BSD-3-Clause |
+| `numpy_linalg::gesvd::nipype_fallback_svd`, `nipype_full_rank`, `FullRank` (`numpy.linalg.svd`, on `LinAlgError` SciPy's `gesvd`; the condition number `smax / smin`, at `cmax` or above `s + (smax - cmax·smin)/(cmax - 1)` and `np.dot(U, np.dot(np.diag(s), V))` through `openblas::matmul`) | nipype 1.12.0 `nipype/algorithms/confounds.py` (`fallback_svd`, `_full_rank`) | Apache-2.0 |
+
+Validated bit for bit against SciPy's own `scipy_dgesvd_`, `scipy_dbdsqr_`, `scipy_dlarft_`, its
+`scipy.linalg.svd(lapack_driver='gesvd')` and nipype's `fallback_svd` and `_full_rank` in both kept
+environments (SciPy 1.15.3 and 1.18.1; `validation/investigations/confounds/check_gesvd.py`,
+2026-11-11): see `validation/investigations/confounds/README.md`.
+
 ## SciPy's 4 × 4 inverse (`scipy_linalg`, field maps part B, relay 18)
 
 **Ported** from SciPy 1.18.1 (`scipy/linalg/_basic.py` `inv`, `src/_linalg_inv.hh`

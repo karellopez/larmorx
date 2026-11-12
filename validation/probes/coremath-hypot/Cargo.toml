@@ -1,0 +1,17 @@
+[package]
+name = "coremath-hypot"
+description = "larmorx_core::math::hypot against CORE-MATH's C cr_hypot; how often glibc 2.35's hypot is not correctly rounded on SciPy's Rotation.as_euler-like arguments"
+version = "0.0.1"
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+
+# Its own workspace: a measurement tool, never part of larmorx's build (it calls the C
+# library's hypot and CORE-MATH's C as black boxes).
+[workspace]
+
+[dependencies]
+larmorx-core = { path = "../../../crates/larmorx-core" }
+
+[profile.release]
+debug = false

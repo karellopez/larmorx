@@ -1,0 +1,1210 @@
+# SPDX-License-Identifier: Apache-2.0
+"""larmorx's LAPACK QR, LQ and bidiagonal ports (``larmorx_transform::numpy_linalg::blocked``:
+``DGEQRF``, ``DGELQF``, ``DGEQR2``, ``DGELQ2``, ``DORGQR``, ``DORGLQ``, ``DORG2R``, ``DORGL2``,
+``DORMQR``, ``DORMLQ``, ``DORM2R``, ``DORML2``, ``DGEBRD``, ``DLABRD``, ``DGEBD2``, ``DLARFT``,
+``DLARFB``, ``DLARF``, and the shared ``DLARFG``, through ``larmorx._core``) against numpy's own
+LAPACK, bit for bit.
+
+The reference is the library inside the running environment's numpy wheel
+(``numpy.libs/libscipy_openblas64_*``: its exported Fortran entry points
+``scipy_<routine>_64_``, called through ctypes with gfortran's hidden string lengths). Its LAPACK
+release follows from the OpenBLAS version (0.3.30: LAPACK 3.12.0, numpy 2.3.5; 0.3.34 and later:
+3.12.1, numpy 2.5.4), and larmorx is called with the same release. 3.12.1's ``DLARF1F`` and
+``DLARFT_LVL2`` are not exported (static symbols): they are proved through ``DGEQR2``/``DGELQ2``
+(every reflector) and ``DLARFT`` (fewer than 64 reflectors) and the blocked factorizations.
+
+Run it like ``check_blas.py`` (whose runner, helpers and undefined-class rule it reuses): under
+the Haswell kernels at one BLAS thread, in each kept environment. On the AMD Zen 4 main machine
+numpy 2.5.4's library blocks the depth of ``dgemm`` by 512, where its Haswell kernel is undefined
+(and may crash) on 12-column paths with depth blocks above 298 steps: a case whose ``DLARFB`` or
+recursive ``DLARFT`` makes such a product is reported in the "[undefined in the original]" tally,
+and a crash is counted apart.
+
+Cases (seeded): ``DLARFG`` at every length class with strides, tiny norms (the rescaling loop),
+zero tails and signed zeros; ``DLARF`` from both sides with zero tails in ``v`` and zero columns
+or rows in ``C`` (the scans), ``tau`` 0, 1 and others, strides; ``DGEQR2``/``DGELQ2`` on tall,
+wide and square matrices up to 2,049 x 160 (60,968 x 3 and 3 x 60,968 without ``--quick``),
+padded leading dimensions, rank-deficient and zero columns, subnormal and huge entries;
+``DLARFT`` in all four directions and storages, 1 to 129 reflectors (both sides of 64), zero
+``tau``, ``v`` with zero ends, the untouched triangle of ``T`` kept; ``DLARFB`` in all 16
+side/transpose/direction/storage forms, ``k`` up to 64, orders up to 2,000 (4,100 without
+``--quick``); ``DGEQRF``/``DGELQF`` on both sides of ``NX`` = 128 and of the 32-column panels,
+up to 1,000 x 1,000 (and 600 x 60,968 / 60,968 x 600 without ``--quick``), the optimal workspace
+and smaller ones (``NB`` lowered to 10, 2 and 1).
+
+``DORG2R``/``DORGL2`` and ``DORGQR``/``DORGLQ`` (section ``org``) on reflectors from larmorx's
+own factorizations, from random vectors with orthogonal ``H`` and from random ``tau``, ``k <
+n``, on both sides of ``NX`` and of the 32-reflector blocks up to 60,968 x 600 and 600 x 60,968,
+short workspaces; ``DORM2R``/``DORML2`` and ``DORMQR``/``DORMLQ`` (``orm``) from both sides,
+transposed or not, ``k`` on both sides of 32, short workspaces (each release's ``NB`` rule),
+``lstsq``'s 600 x 60,968 right-hand sides; ``DGEBD2``, ``DGEBRD`` (both bidiagonal forms, on
+both sides of ``NX``, short workspaces) and ``DLABRD`` itself (``brd``); ``DORMBR`` and
+``DORGBR`` (``orbr``, relay 2c-i: ``DGEBRD``'s ``Q`` and ``P`` from both sides, transposed or not,
+both bidiagonal forms and the shifted ones, ``DORMBR``'s own optimal workspace (short for
+``DORMQR``/``DORMLQ`` in both releases), larger and minimal ones); and the illegal arguments of
+each (``INFO`` against larmorx's ``ValueError``).
+
+Usage: ``OPENBLAS_CORETYPE=Haswell OPENBLAS_NUM_THREADS=1 PYTHONPATH=<repo>/python
+python -P check_lapack.py [--quick] [--threads N]
+[--sections larfg,larf,qr2,larft,larfb,qrf,org,orm,brd,orbr] [--gemm-q auto]``. On the AMD Zen 4
+machine, ``OPENBLAS_L2_SIZE=512`` keeps numpy 2.5.4's library on the Haswell table's GEMM_Q 256
+(``--gemm-q auto`` follows it): every case defined.
+"""
+
+from __future__ import annotations
+
+import argparse
+import ctypes
+import sys
+from pathlib import Path
+
+import numpy as np
+
+sys.path.append(str(Path(__file__).resolve().parent))
+import check_blas as cb
+
+LIB, I64 = cb.LIB, cb.I64
+ptr, same, entries, KINDS = cb.ptr, cb.same, cb.entries, cb.KINDS
+_c, _i, _d = cb._c, cb._i, cb._d
+
+
+def lapack_of(config: str) -> str:
+    version = tuple(int(x) for x in config.split()[1].split(".")[:3])
+    return "3.12.1" if version >= (0, 3, 34) else "3.12.0"
+
+
+LAPACK = lapack_of(LIB.scipy_openblas_get_config64_().decode())
+
+
+def hidden(*chars: str):
+    """gfortran's hidden string lengths (size_t, after the other arguments)."""
+    return [I64(len(c)) for c in chars]
+
+
+# --- the references (numpy's own LAPACK through ctypes) ---------------------------------------
+
+
+def ref_dlarfg(n, alpha, x, incx):
+    x = x.copy()
+    a, tau = ctypes.c_double(alpha), ctypes.c_double(0.0)
+    LIB.scipy_dlarfg_64_(*_i(n), ctypes.byref(a), ptr(x), *_i(incx), ctypes.byref(tau))
+    return np.array([a.value]), x, np.array([tau.value])
+
+
+def ref_dlarf(side, m, n, v, incv, tau, c, ldc):
+    c = c.copy()
+    work = np.zeros(max(m, n, 1))
+    LIB.scipy_dlarf_64_(
+        *_c(side), *_i(m, n), ptr(v), *_i(incv), _d(tau), ptr(c), *_i(ldc), ptr(work),
+        *hidden(side),
+    )  # fmt: skip
+    return c
+
+
+def ref_unblocked(lq, m, n, a, lda):
+    a = a.copy()
+    tau = np.zeros(max(min(m, n), 1))
+    work = np.zeros(max(m, n, 1))
+    info = I64(0)
+    f = LIB.scipy_dgelq2_64_ if lq else LIB.scipy_dgeqr2_64_
+    f(*_i(m, n), ptr(a), *_i(lda), ptr(tau), ptr(work), ctypes.byref(info))
+    assert info.value == 0, info.value
+    return a, tau[: min(m, n)]
+
+
+def ref_blocked(lq, m, n, a, lda, lwork):
+    a = a.copy()
+    tau = np.zeros(max(min(m, n), 1))
+    f = LIB.scipy_dgelqf_64_ if lq else LIB.scipy_dgeqrf_64_
+    info = I64(0)
+    if lwork is None:
+        q = np.zeros(1)
+        f(*_i(m, n), ptr(a), *_i(lda), ptr(tau), ptr(q), *_i(-1), ctypes.byref(info))
+        lwork = int(q[0])
+    work = np.zeros(max(lwork, 1))
+    f(*_i(m, n), ptr(a), *_i(lda), ptr(tau), ptr(work), *_i(lwork), ctypes.byref(info))
+    assert info.value == 0, info.value
+    return a, tau[: min(m, n)], np.array([work[0]])
+
+
+def ref_dlarft(direct, storev, n, k, v, ldv, tau, t, ldt):
+    t = t.copy()
+    LIB.scipy_dlarft_64_(
+        *_c(direct, storev), *_i(n, k), ptr(v), *_i(ldv), ptr(tau), ptr(t), *_i(ldt),
+        *hidden(direct, storev),
+    )  # fmt: skip
+    return t
+
+
+def ref_dlarfb(side, tr, direct, storev, m, n, k, v, ldv, t, ldt, c, ldc):
+    c = c.copy()
+    ldw = max(n if side == "L" else m, 1)
+    work = np.zeros(ldw * max(k, 1))
+    LIB.scipy_dlarfb_64_(
+        *_c(side, tr, direct, storev), *_i(m, n, k), ptr(v), *_i(ldv), ptr(t), *_i(ldt),
+        ptr(c), *_i(ldc), ptr(work), *_i(ldw), *hidden(side, tr, direct, storev),
+    )  # fmt: skip
+    return c
+
+
+def ref_org(lq, m, n, k, a, lda, tau, lwork):
+    """``DORGQR``/``DORGLQ``; returns ``(A, WORK(1), INFO)``."""
+    a = a.copy()
+    f = LIB.scipy_dorglq_64_ if lq else LIB.scipy_dorgqr_64_
+    info = I64(0)
+    if lwork is None:
+        q = np.zeros(1)
+        f(*_i(m, n, k), ptr(a), *_i(lda), ptr(tau), ptr(q), *_i(-1), ctypes.byref(info))
+        lwork = int(q[0])
+    work = np.zeros(max(lwork, 1))
+    f(*_i(m, n, k), ptr(a), *_i(lda), ptr(tau), ptr(work), *_i(lwork), ctypes.byref(info))
+    return a, np.array([work[0]]), info.value
+
+
+def ref_org2(lq, m, n, k, a, lda, tau):
+    """``DORG2R``/``DORGL2``; returns ``(A, INFO)``."""
+    a = a.copy()
+    f = LIB.scipy_dorgl2_64_ if lq else LIB.scipy_dorg2r_64_
+    work = np.zeros(max(m, n, 1))
+    info = I64(0)
+    f(*_i(m, n, k), ptr(a), *_i(lda), ptr(tau), ptr(work), ctypes.byref(info))
+    return a, info.value
+
+
+def ref_orm(lq, blocked, side, tr, m, n, k, a, lda, tau, c, ldc, lwork):
+    """``DORMQR``/``DORMLQ`` (``blocked``) or ``DORM2R``/``DORML2``; returns ``(A, C,
+    WORK(1), INFO)`` (``WORK(1)`` 0 for the unblocked routines)."""
+    a, c = a.copy(), c.copy()
+    info = I64(0)
+    head = (*_c(side, tr), *_i(m, n, k), ptr(a), *_i(lda), ptr(tau), ptr(c), *_i(ldc))
+    if not blocked:
+        f = LIB.scipy_dorml2_64_ if lq else LIB.scipy_dorm2r_64_
+        work = np.zeros(max(m, n, 1))
+        f(*head, ptr(work), ctypes.byref(info), *hidden(side, tr))
+        return a, c, np.array([0.0]), info.value
+    f = LIB.scipy_dormlq_64_ if lq else LIB.scipy_dormqr_64_
+    if lwork is None:
+        q = np.zeros(1)
+        f(*head, ptr(q), *_i(-1), ctypes.byref(info), *hidden(side, tr))
+        lwork = int(q[0])
+    work = np.zeros(max(lwork, 1))
+    f(*head, ptr(work), *_i(lwork), ctypes.byref(info), *hidden(side, tr))
+    return a, c, np.array([work[0]]), info.value
+
+
+def ref_brd(blocked, m, n, a, lda, lwork):
+    """``DGEBRD`` (``blocked``) or ``DGEBD2``; returns ``(A, D, E, TAUQ, TAUP, WORK(1),
+    INFO)`` (``E`` of ``min(m, n) - 1`` values, ``WORK(1)`` 0 for ``DGEBD2``)."""
+    a = a.copy()
+    k = min(m, n)
+    d, e, tq, tp = (np.zeros(max(k, 1)) for _ in range(4))
+    info = I64(0)
+    head = (*_i(m, n), ptr(a), *_i(lda), ptr(d), ptr(e), ptr(tq), ptr(tp))
+    if not blocked:
+        work = np.zeros(max(m, n, 1))
+        LIB.scipy_dgebd2_64_(*head, ptr(work), ctypes.byref(info))
+        w1 = 0.0
+    else:
+        if lwork is None:
+            q = np.zeros(1)
+            LIB.scipy_dgebrd_64_(*head, ptr(q), *_i(-1), ctypes.byref(info))
+            lwork = int(q[0])
+        work = np.zeros(max(lwork, 1))
+        LIB.scipy_dgebrd_64_(*head, ptr(work), *_i(lwork), ctypes.byref(info))
+        w1 = work[0]
+    return a, d[:k], e[: max(k - 1, 0)], tq[:k], tp[:k], np.array([w1]), info.value
+
+
+def ref_dlabrd(m, n, nb, a, lda, x, ldx, y, ldy):
+    a, x, y = a.copy(), x.copy(), y.copy()
+    d, e, tq, tp = (np.zeros(max(nb, 1)) for _ in range(4))
+    LIB.scipy_dlabrd_64_(
+        *_i(m, n, nb), ptr(a), *_i(lda), ptr(d), ptr(e), ptr(tq), ptr(tp), ptr(x), *_i(ldx),
+        ptr(y), *_i(ldy),
+    )  # fmt: skip
+    return a, d[:nb], e[:nb], tq[:nb], tp[:nb], x, y
+
+
+# --- the undefined class under GEMM_Q 512 (numpy 2.5.4 on an AMD Zen 4/5) ---------------------
+
+
+def risky(cols: int, depth: int) -> bool:
+    """A ``dgemm`` of ``cols`` output columns whose depth blocks overflow the kernel's buffer."""
+    return cols >= 24 and max(cb.blocks(depth, cb.GEMM_Q, True), default=0) > cb.BUFFER_STEPS
+
+
+def larfb_risky(side: str, m: int, n: int, k: int) -> bool:
+    if side == "L":
+        rest, other = m - k, n
+    else:
+        rest, other = n - k, m
+    if rest > 0 and (risky(k, rest) or risky(other if side == "L" else rest, k)):
+        return True
+    return any(cb.trmm_gemm_depth("R", up, other, k) > cb.BUFFER_STEPS for up in (True, False))
+
+
+def larft_risky(n: int, k: int) -> bool:
+    """The recursive DLARFT's products (3.12.0 always; 3.12.1 from 64 reflectors)."""
+    if n <= 1 or k <= 1 or (LAPACK == "3.12.1" and k < 64):
+        return False
+    lo = k // 2
+    return risky(k - lo, n - k) or larft_risky(n, lo) or larft_risky(n - lo, k - lo)
+
+
+def factor_risky(lq: bool, m: int, n: int, lwork) -> bool:
+    k = min(m, n)
+    ldwork = m if lq else n
+    nb, nx = 32, 0
+    if 1 < nb < k:
+        nx = 128
+        if nx < k and lwork is not None and lwork < ldwork * nb:
+            nb = lwork // ldwork
+    if not (nb >= 2 and nb < k and nx < k):
+        return False
+    i = 1
+    while i <= k - nx:
+        ib = min(k - i + 1, nb)
+        if (
+            lq
+            and i + ib <= m
+            and (larft_risky(n - i + 1, ib) or larfb_risky("R", m - i - ib + 1, n - i + 1, ib))
+        ):
+            return True
+        if (
+            not lq
+            and i + ib <= n
+            and (larft_risky(m - i + 1, ib) or larfb_risky("L", m - i + 1, n - i - ib + 1, ib))
+        ):
+            return True
+        i += nb
+    return False
+
+
+def org_blocks(lq: bool, m: int, n: int, k: int, lwork) -> list[tuple[int, int, int]]:
+    """The ``DLARFB`` calls ``(m, n, k)`` of ``DORGQR``/``DORGLQ`` (as LAPACK blocks them)."""
+    ldwork = m if lq else n
+    nb, nx = 32, 0
+    if 1 < nb < k:
+        nx = 128
+        if nx < k and lwork is not None and lwork < ldwork * nb:
+            nb = lwork // ldwork
+    if not (nb >= 2 and nb < k and nx < k):
+        return []
+    out = []
+    for i in range(((k - nx - 1) // nb) * nb + 1, 0, -nb):
+        ib = min(nb, k - i + 1)
+        if lq and i + ib <= m:
+            out.append((m - i - ib + 1, n - i + 1, ib))
+        if not lq and i + ib <= n:
+            out.append((m - i + 1, n - i - ib + 1, ib))
+    return out
+
+
+def orm_lwork_opt(side: str, m: int, n: int) -> int:
+    nw = max(1, n if side == "L" else m)
+    return nw * 32 + (65 * 64 if LAPACK == "3.12.0" else 65 * 32)
+
+
+def orm_blocks(lq: bool, side: str, tr: str, m: int, n: int, k: int, lwork):
+    """The ``(nq - i + 1, mi, ni, ib)`` of ``DORMQR``'s/``DORMLQ``'s ``DLARFT`` and ``DLARFB``
+    calls ([] when everything goes to ``DORM2R``/``DORML2``)."""
+    left = side == "L"
+    nw = max(1, n if left else m)
+    lwkopt = orm_lwork_opt(side, m, n)
+    lwork = lwkopt if lwork is None else lwork
+    nb = 32
+    if 1 < nb < k and lwork < lwkopt:
+        nb = int((lwork - 65 * 64) / nw) if LAPACK == "3.12.0" else lwork // (nw + 65)
+    if nb < 2 or nb >= k:
+        return []
+    nq = m if left else n
+    out = []
+    for i in range(1, k + 1, nb):  # the order does not matter for the rule
+        ib = min(nb, k - i + 1)
+        mi, ni = (m - i + 1, n) if left else (m, n - i + 1)
+        out.append((nq - i + 1, mi, ni, ib))
+    return out
+
+
+def undefined(section: str, case: tuple) -> bool:
+    if cb.GEMM_Q <= cb.BUFFER_STEPS:
+        return False
+    if section == "orbr":
+        inner = orbr_inner(case)
+        return inner is not None and undefined(*inner)
+    if section == "larft":
+        _, _, n, k, *_ = case
+        return larft_risky(n, k)
+    if section == "larfb":
+        side, _, _, _, m, n, k, *_ = case
+        return larfb_risky(side, m, n, k)
+    if section == "qrf":
+        lq, m, n, lwork, *_ = case
+        return factor_risky(lq, m, n, lwork)
+    if section == "org":
+        lq, blocked, m, n, k, lwork, *_ = case
+        side = "R" if lq else "L"
+        return blocked and any(larfb_risky(side, *call) for call in org_blocks(lq, m, n, k, lwork))
+    if section == "orm":
+        lq, blocked, side, tr, m, n, k, lwork, *_ = case
+        return blocked and any(
+            larft_risky(nqi, ib) or larfb_risky(side, mi, ni, ib)
+            for nqi, mi, ni, ib in orm_blocks(lq, side, tr, m, n, k, lwork)
+        )
+    return False
+
+
+# --- the sections -------------------------------------------------------------------------------
+
+
+def larfg_cases(quick: bool) -> list[tuple]:
+    rng = np.random.default_rng(11)
+    dims = [0, 1, 2, 3, 4, 7, 8, 15, 16, 17, 31, 33, 100, 1001, 2049]
+    if not quick:
+        dims += [60_968]
+    kinds = (*KINDS, "tiny", "zero-tail", "zeros")
+    out = []
+    for t in range(300 if quick else 1500):
+        n, incx = int(rng.choice(dims)), int(rng.choice([1, 1, 2, 5]))
+        alpha = float(rng.choice([1.3, -2.0, 0.0, -0.0, 1e-310, 7e305]))
+        out.append((n, alpha, incx, kinds[t % len(kinds)]))
+    return out
+
+
+def vector_entries(rng, size: int, kind: str) -> np.ndarray:
+    if kind == "tiny":
+        return rng.standard_normal(size) * 2.0**-1070
+    if kind == "zero-tail":
+        v = rng.standard_normal(size)
+        v[size // 2 :] = 0.0
+        return v
+    if kind == "zeros":
+        return np.where(rng.random(size) < 0.5, 0.0, -0.0)
+    return entries(rng, size, kind)
+
+
+def larfg_run(cid: int, case: tuple, threads: int, core) -> list[tuple[bool, str]]:
+    del threads
+    n, alpha, incx, kind = case
+    rng = np.random.default_rng([11, cid])
+    x = vector_entries(rng, max((n - 2) * incx + 1, 1), kind)
+    want = ref_dlarfg(n, alpha, x, incx)
+    beta, xg, tau = core.lapack_dlarfg(n, alpha, x, incx)
+    got = (np.array([beta]), xg, np.array([tau]))
+    return [(all(same(w, g) for w, g in zip(want, got, strict=True)), "")]
+
+
+def larf_cases(quick: bool) -> list[tuple]:
+    rng = np.random.default_rng(12)
+    dims = [1, 2, 3, 4, 5, 7, 15, 16, 17, 31, 33, 64, 100, 2049]
+    out = []
+    for _ in range(500 if quick else 3000):
+        side = str(rng.choice(["L", "R"]))
+        m, n = int(rng.choice(dims)), int(rng.choice(dims))
+        if m * n > 400_000:
+            n = 3
+        incv = int(rng.choice([1, 1, 2, 7]))
+        tau = float(rng.choice([0.0, 1.0, 1.7, 0.4, -0.3]))
+        vkind = str(rng.choice(["normal", "zero-tail", "signed-zeros", "small-ints"]))
+        ckind = str(rng.choice(["normal", "zero-cols", "signed-zeros", "exponents"]))
+        out.append((side, m, n, incv, tau, vkind, ckind))
+    return out
+
+
+def matrix_entries(rng, ld: int, rows: int, cols: int, kind: str) -> np.ndarray:
+    """``ld x cols`` column-major storage of a ``rows x cols`` matrix (padding random)."""
+    if kind == "zero-cols":
+        a = rng.standard_normal(ld * cols).reshape(cols, ld)
+        a[cols // 2 :, :rows] = 0.0
+        a[:, rows // 2 : rows][::3] = 0.0
+        return a.ravel()
+    if kind == "rank-deficient":
+        a = rng.standard_normal(ld * cols).reshape(cols, ld)
+        for j in range(1, cols, 3):
+            a[j, :rows] = a[j - 1, :rows] * 2.0
+        return a.ravel()
+    return entries(rng, max(ld * cols, 1), kind)
+
+
+def larf_run(cid: int, case: tuple, threads: int, core) -> list[tuple[bool, str]]:
+    del threads
+    side, m, n, incv, tau, vkind, ckind = case
+    rng = np.random.default_rng([12, cid])
+    lenv = m if side == "L" else n
+    v = vector_entries(rng, (lenv - 1) * incv + 1, vkind)
+    ldc = m + cid % 3
+    c = matrix_entries(rng, ldc, m, n, ckind)
+    want = ref_dlarf(side, m, n, v, incv, tau, c, ldc)
+    got = core.lapack_dlarf(side, m, n, v, incv, tau, c, ldc)
+    return [(same(want, got), "")]
+
+
+QR2_SHAPES = [
+    (1, 1),
+    (1, 5),
+    (5, 1),
+    (2, 2),
+    (3, 7),
+    (7, 3),
+    (4, 4),
+    (16, 17),
+    (17, 16),
+    (33, 33),
+    (64, 9),
+    (9, 64),
+    (129, 40),
+    (40, 129),
+    (300, 31),
+    (2049, 7),
+    (7, 2049),
+    (2049, 160),
+    (160, 2049),
+]
+QR2_BIG = [(60_968, 3), (3, 60_968), (4_100, 33)]
+QR_KINDS = ("normal", "signed-zeros", "exponents", "subnormal", "small-ints", "zero-cols")
+
+
+def qr2_cases(quick: bool) -> list[tuple]:
+    shapes = QR2_SHAPES + ([] if quick else QR2_BIG)
+    return [(lq, m, n, kind) for (m, n) in shapes for lq in (False, True) for kind in QR_KINDS]
+
+
+def qr2_run(cid: int, case: tuple, threads: int, core) -> list[tuple[bool, str]]:
+    del threads
+    lq, m, n, kind = case
+    rng = np.random.default_rng([13, cid])
+    lda = m + cid % 3
+    a = matrix_entries(rng, lda, m, n, kind)
+    wa, wt = ref_unblocked(lq, m, n, a, lda)
+    f = core.lapack_dgelq2 if lq else core.lapack_dgeqr2
+    ga, gt = f(m, n, a, lda, LAPACK)
+    return [(same(wa, ga) and same(wt, gt), "dgelq2" if lq else "dgeqr2")]
+
+
+def larft_cases(quick: bool) -> list[tuple]:
+    rng = np.random.default_rng(14)
+    ks = [1, 2, 3, 4, 5, 8, 16, 31, 32, 33, 63, 64, 65, 100, 129]
+    extra = [0, 1, 2, 5, 100, 700]
+    out = []
+    for _ in range(400 if quick else 2000):
+        direct, storev = str(rng.choice(["F", "B"])), str(rng.choice(["C", "R"]))
+        k = int(rng.choice(ks))
+        n = k + int(rng.choice(extra))
+        if quick and n * k > 60_000:
+            n = k + 2
+        vkind = str(rng.choice(["normal", "zero-ends", "signed-zeros", "exponents"]))
+        tkind = str(rng.choice(["normal", "some-zero", "normal"]))
+        out.append((direct, storev, n, k, vkind, tkind))
+    # DGEQRF's and DGELQF's own calls: 32 reflectors of long vectors.
+    for n in (600, 4_100) if quick else (600, 4_100, 60_968):
+        for storev in "CR":
+            out.append(("F", storev, n, 32, "normal", "normal"))
+    return out
+
+
+def larft_run(cid: int, case: tuple, threads: int, core) -> list[tuple[bool, str]]:
+    direct, storev, n, k, vkind, tkind = case
+    rng = np.random.default_rng([14, cid])
+    rows, cols = (n, k) if storev == "C" else (k, n)
+    ldv = rows + cid % 3
+    v = entries(rng, ldv * cols, "normal" if vkind == "zero-ends" else vkind)
+    if vkind == "zero-ends":  # the vectors' far ends zero (DLARFT_LVL2's scans)
+        vv = v.reshape(cols, ldv)
+        for j in range(k):
+            cut = int(rng.integers(0, n))
+            if storev == "C":
+                if direct == "F":
+                    vv[j, cut:rows] = 0.0
+                else:
+                    vv[j, :cut] = 0.0
+            elif direct == "F":
+                vv[cut:, j] = 0.0
+            else:
+                vv[:cut, j] = 0.0
+    tau = rng.uniform(1.0, 2.0, k)
+    if tkind == "some-zero":
+        tau[rng.random(k) < 0.3] = 0.0
+    ldt = k + cid % 2
+    t = np.full(ldt * k, 7.25)
+    want = ref_dlarft(direct, storev, n, k, v, ldv, tau, t, ldt)
+    got = core.lapack_dlarft(direct, storev, n, k, v, ldv, tau, t, ldt, LAPACK, threads, cb.GEMM_Q)
+    return [(same(want, got), "")]
+
+
+def larfb_cases(quick: bool) -> list[tuple]:
+    rng = np.random.default_rng(15)
+    ks = [1, 2, 5, 8, 24, 31, 32, 33, 64]
+    rests = [0, 1, 7, 100, 300, 700, 2000]
+    others = [1, 3, 8, 24, 25, 100, 600]
+    out = []
+    for _ in range(400 if quick else 2500):
+        side, tr = str(rng.choice(["L", "R"])), str(rng.choice(["N", "T"]))
+        direct, storev = str(rng.choice(["F", "B"])), str(rng.choice(["C", "R"]))
+        k = int(rng.choice(ks))
+        order, other = k + int(rng.choice(rests)), int(rng.choice(others))
+        if order * other > 400_000:
+            other = 8
+        m, n = (order, other) if side == "L" else (other, order)
+        out.append((side, tr, direct, storev, m, n, k, str(rng.choice(KINDS[:4]))))
+    # DGEQRF's and DGELQF's calls.
+    out += [
+        ("L", "T", "F", "C", 600, 568, 32, "normal"),
+        ("R", "N", "F", "R", 568, 600, 32, "normal"),
+    ]
+    out += [
+        ("L", "T", "F", "C", 330, 200, 32, "normal"),
+        ("R", "N", "F", "R", 200, 330, 32, "normal"),
+    ]
+    if not quick:
+        out += [
+            ("L", "T", "F", "C", 4_100, 300, 32, "normal"),
+            ("R", "N", "F", "R", 300, 4_100, 32, "normal"),
+        ]
+    return out
+
+
+def larfb_run(cid: int, case: tuple, threads: int, core) -> list[tuple[bool, str]]:
+    side, tr, direct, storev, m, n, k, kind = case
+    rng = np.random.default_rng([15, cid])
+    order = m if side == "L" else n
+    rows, cols = (order, k) if storev == "C" else (k, order)
+    ldv, ldt, ldc = rows + cid % 3, k + cid % 2, m + cid % 4
+    v = entries(rng, ldv * cols, kind)
+    t = entries(rng, ldt * k, kind)
+    c = entries(rng, ldc * n, "normal")
+    want = ref_dlarfb(side, tr, direct, storev, m, n, k, v, ldv, t, ldt, c, ldc)
+    got = core.lapack_dlarfb(
+        side, tr, direct, storev, m, n, k, v, ldv, t, ldt, c, ldc, threads, cb.GEMM_Q
+    )
+    return [(same(want, got), "")]
+
+
+QRF_SHAPES = [
+    (100, 100),
+    (128, 300),
+    (300, 128),
+    (129, 129),
+    (300, 129),
+    (129, 300),
+    (161, 161),
+    (192, 400),
+    (400, 192),
+    (330, 200),
+    (200, 330),
+    (600, 200),
+    (200, 600),
+    (600, 600),
+    (590, 560),
+    (560, 590),
+    (1000, 300),
+    (300, 1000),
+    (2049, 160),
+    (160, 2049),
+]
+QRF_BIG = [(1000, 1000), (600, 4_000), (4_000, 600), (600, 60_968), (60_968, 600)]
+
+
+def qrf_cases(quick: bool) -> list[tuple]:
+    """Each shape with the optimal workspace (every kind of entries) and with workspaces that
+    lower NB to 10, 2 and 1 (unblocked)."""
+    out = []
+    for m, n in QRF_SHAPES + ([] if quick else QRF_BIG):
+        big = m * n > 3_000_000
+        for lq in (False, True):
+            ldwork = m if lq else n
+            lworks = [None] if big else [None, ldwork * 10, ldwork * 2 + 1, ldwork]
+            for lw in lworks:
+                kinds = QR_KINDS if lw is None and not big else ("normal",)
+                out += [(lq, m, n, lw, kind) for kind in kinds]
+    return out
+
+
+def qrf_run(cid: int, case: tuple, threads: int, core) -> list[tuple[bool, str]]:
+    lq, m, n, lwork, kind = case
+    rng = np.random.default_rng([16, cid])
+    lda = m + cid % 3
+    a = matrix_entries(rng, lda, m, n, kind)
+    want = ref_blocked(lq, m, n, a, lda, lwork)
+    f = core.lapack_dgelqf if lq else core.lapack_dgeqrf
+    ga, gt, w1 = f(m, n, a, lda, lwork, LAPACK, threads, cb.GEMM_Q)
+    ok = same(want[0], ga) and same(want[1], gt) and same(want[2], np.array([float(w1)]))
+    return [(ok, "dgelqf" if lq else "dgeqrf")]
+
+
+# DORGQR's (m, n, k), n <= m, k <= n, on both sides of NX = 128 and of the 32-reflector blocks
+# (k - 128 a multiple of 32 or not), k < n; DORGLQ takes the transposes.
+ORG_SHAPES = [
+    (1, 1, 1),
+    (1, 1, 0),
+    (5, 1, 1),
+    (5, 3, 0),
+    (5, 3, 2),
+    (7, 7, 7),
+    (17, 16, 16),
+    (33, 33, 20),
+    (64, 9, 9),
+    (129, 40, 40),
+    (300, 128, 128),
+    (300, 129, 129),
+    (300, 129, 100),
+    (300, 160, 129),
+    (300, 161, 161),
+    (300, 200, 150),
+    (330, 200, 200),
+    (400, 192, 192),
+    (600, 200, 200),
+    (600, 600, 450),
+    (600, 600, 600),
+    (590, 560, 560),
+    (1000, 300, 300),
+    (2049, 160, 160),
+    (2049, 7, 7),
+]
+ORG_BIG = [(4_000, 600, 600), (60_968, 600, 600), (60_968, 300, 161)]
+ORG_KINDS = ("qr", "reflectors", "signed-zeros", "small-ints", "raw")
+
+
+def org_cases(quick: bool) -> list[tuple]:
+    """``(lq, blocked, m, n, k, lwork, kind)``: each shape with the unblocked routine and the
+    blocked one (every kind at the optimal workspace; workspaces that lower NB to 10, 2 and 1),
+    then the illegal arguments."""
+    out = []
+    for mq, nq, k in ORG_SHAPES + ([] if quick else ORG_BIG):
+        big = mq * nq > 3_000_000
+        for lq in (False, True):
+            m, n = (nq, mq) if lq else (mq, nq)
+            ldwork = max(m if lq else n, 1)
+            if not big:
+                out += [(lq, False, m, n, k, None, kind) for kind in ORG_KINDS[:3]]
+            lworks = [None] if big else [None, ldwork * 10, ldwork * 2 + 1, ldwork]
+            for lw in lworks:
+                kinds = ORG_KINDS if lw is None and not big else ("reflectors",)
+                out += [(lq, True, m, n, k, lw, kind) for kind in kinds]
+    # Illegal arguments: (lq, blocked, m, n, k, lwork, "error", lda).
+    for blocked in (False, True):
+        out += [
+            (False, blocked, 3, 4, 2, None, "error", 3),
+            (False, blocked, 4, 3, 4, None, "error", 4),
+            (False, blocked, 4, 3, 2, None, "error", 3),
+            (True, blocked, 4, 3, 2, None, "error", 4),
+            (True, blocked, 3, 4, 4, None, "error", 3),
+            (True, blocked, 3, 4, 2, None, "error", 2),
+        ]
+    out += [(False, True, 4, 3, 2, 2, "error", 4), (True, True, 3, 4, 2, 2, "error", 3)]
+    return out
+
+
+def reflector_storage(rng, lq: bool, rows: int, cols: int, ld: int, k: int, kind: str, core):
+    """``ld x cols`` storage holding ``k`` reflectors (below the diagonal of the first ``k``
+    columns for QR, right of it in the first ``k`` rows for LQ) and their ``tau``: from
+    larmorx's own factorization of a random matrix (``qr``), or random vectors with ``tau`` =
+    ``2/(1 + |v|^2)`` (each ``H`` orthogonal; one in ten ``tau`` 0), or random ``tau`` in [0, 2)
+    (``raw``)."""
+    if kind == "qr":
+        a = entries(rng, max(ld * cols, 1), "normal")
+        f = core.lapack_dgelqf if lq else core.lapack_dgeqrf
+        a, tau, _ = f(rows, cols, a, ld, None, LAPACK, 4, 256)
+        tau = np.concatenate([tau, np.zeros(1)])[: max(k, 1)]
+        return a, tau
+    a = entries(rng, max(ld * cols, 1), "normal" if kind in ("reflectors", "raw") else kind)
+    tau = np.zeros(max(k, 1))
+    v = a.reshape(cols, ld)  # v[j, i] = A(i, j)
+    for j in range(k):
+        tail = v[j, j + 1 : rows] if not lq else v[j + 1 : cols, j]
+        tau[j] = 2.0 / (1.0 + float(np.dot(tail, tail)))
+    if kind == "raw":
+        tau[:k] = rng.uniform(0.0, 2.0, k)
+    tau[:k][rng.random(k) < 0.1] = 0.0
+    return a, tau
+
+
+def param_of(err: Exception) -> int:
+    text = str(err)
+    return int(text.split("parameter number")[1].split()[0]) if "parameter number" in text else 0
+
+
+def org_run(cid: int, case: tuple, threads: int, core) -> list[tuple[bool, str]]:
+    lq, blocked, m, n, k, lwork, kind, *rest = case
+    name = ("dorglq" if lq else "dorgqr") if blocked else ("dorgl2" if lq else "dorg2r")
+    rng = np.random.default_rng([17, cid])
+    if kind == "error":
+        (lda,) = rest
+        a, tau = np.zeros(max(lda, 1) * max(n, 1)), np.full(max(k, 1), 0.5)
+        if blocked:
+            want = ref_org(lq, m, n, k, a, lda, tau, 10_000 if lwork is None else lwork)[2]
+            f = core.lapack_dorglq if lq else core.lapack_dorgqr
+            call = lambda: f(m, n, k, a, lda, tau, lwork, LAPACK, threads, cb.GEMM_Q)  # noqa: E731
+        else:
+            want = ref_org2(lq, m, n, k, a, lda, tau)[1]
+            f = core.lapack_dorgl2 if lq else core.lapack_dorg2r
+            call = lambda: f(m, n, k, a, lda, tau, LAPACK)  # noqa: E731
+        try:
+            call()
+            got = 0
+        except ValueError as e:
+            got = -param_of(e) if name.upper() in str(e) else 99
+        return [(want == got and want < 0, f"{name} illegal arguments")]
+    lda = m + cid % 3
+    a, tau = reflector_storage(rng, lq, m, n, lda, k, kind, core)
+    if blocked:
+        wa, w1, info = ref_org(lq, m, n, k, a, lda, tau, lwork)
+        f = core.lapack_dorglq if lq else core.lapack_dorgqr
+        ga, g1 = f(m, n, k, a, lda, tau, lwork, LAPACK, threads, cb.GEMM_Q)
+        ok = info == 0 and same(wa, ga) and same(w1, np.array([float(g1)]))
+    else:
+        wa, info = ref_org2(lq, m, n, k, a, lda, tau)
+        f = core.lapack_dorgl2 if lq else core.lapack_dorg2r
+        ok = info == 0 and same(wa, f(m, n, k, a, lda, tau, LAPACK))
+    return [(ok, name)]
+
+
+def orm_cases(quick: bool) -> list[tuple]:
+    """``(lq, blocked, side, trans, m, n, k, lwork, kind)``: every side and transpose, ``k`` on
+    both sides of 32 (``NB``: blocked only above it), orders and other dimensions across the
+    kernels' paths, short workspaces (each release's own ``NB`` rule), the 600 x 60,968 shapes
+    of ``lstsq``'s right-hand sides; then the illegal arguments."""
+    rng = np.random.default_rng(18)
+    ks = [1, 2, 11, 25, 32, 33, 40, 64, 65, 100, 150]
+    extra = [0, 1, 7, 100, 450]
+    others = [1, 3, 8, 24, 25, 100, 600]
+    out = []
+    for _ in range(500 if quick else 2500):
+        lq, blocked = bool(rng.random() < 0.5), bool(rng.random() < 0.75)
+        side, tr = str(rng.choice(["L", "R"])), str(rng.choice(["N", "T"]))
+        k = int(rng.choice(ks))
+        nq, other = k + int(rng.choice(extra)), int(rng.choice(others))
+        if nq * other > 400_000:
+            other = 8
+        m, n = (nq, other) if side == "L" else (other, nq)
+        lwork = None
+        if blocked and rng.random() < 0.3:
+            nw = max(1, n if side == "L" else m)
+            lwork = int(rng.choice([nw, nw + 1, nw * 5 + 70, nw * 10 + 4160, nw * 20 + 4160]))
+            lwork = min(lwork, orm_lwork_opt(side, m, n))
+        kind = str(rng.choice(["qr", "reflectors", "reflectors", "signed-zeros", "small-ints"]))
+        out.append((lq, blocked, side, tr, m, n, k, lwork, kind))
+    # numpy's calls: lstsq's Qᵀ·B (DORMQR('L', 'T') of K reflectors on 600 × N voxels), dgesdd's
+    # DORMBR products on square and wide blocks.
+    out += [
+        (False, True, "L", "T", 600, 2_000, 11, None, "qr"),
+        (False, True, "L", "N", 600, 600, 600, None, "qr"),
+        (True, True, "R", "T", 600, 600, 599, None, "qr"),
+        (True, True, "R", "T", 560, 1_000, 560, None, "qr"),
+        (False, True, "L", "N", 1_000, 560, 560, None, "qr"),
+    ]
+    if not quick:
+        out += [
+            (False, True, "L", "T", 600, 60_968, 11, None, "qr"),
+            (False, True, "L", "T", 600, 60_968, 200, None, "reflectors"),
+            (True, True, "R", "T", 60_968, 600, 200, None, "reflectors"),
+            (False, False, "L", "T", 600, 60_968, 25, None, "reflectors"),
+        ]
+    # Illegal arguments: (lq, blocked, side, trans, m, n, k, lwork, "error", lda, ldc).
+    for blocked in (False, True):
+        for lq in (False, True):
+            out += [
+                (lq, blocked, "L", "N", 4, 3, 5, 10_000, "error", 5, 4),
+                (lq, blocked, "R", "T", 3, 4, 2, 10_000, "error", 1, 3),
+                (lq, blocked, "L", "T", 4, 3, 2, 10_000, "error", 4, 3),
+            ]
+        out.append((False, blocked, "L", "N", 4, 3, 2, 10_000, "error", 3, 4))
+    out += [(lq, True, "R", "N", 4, 3, 2, 3, "error", 4, 4) for lq in (False, True)]
+    return out
+
+
+def orm_run(cid: int, case: tuple, threads: int, core) -> list[tuple[bool, str]]:
+    lq, blocked, side, tr, m, n, k, lwork, kind, *rest = case
+    name = ("dormlq" if lq else "dormqr") if blocked else ("dorml2" if lq else "dorm2r")
+    rng = np.random.default_rng([18, cid])
+    nq = m if side == "L" else n
+    rows, cols = (k, nq) if lq else (nq, k)
+    if kind == "error":
+        lda, ldc = rest
+        a, tau = np.zeros(max(lda, 1) * max(cols, 1)), np.full(max(k, 1), 0.5)
+        c = np.zeros(max(ldc, 1) * max(n, 1))
+        want = ref_orm(lq, blocked, side, tr, m, n, k, a, lda, tau, c, ldc, lwork)[3]
+        f = getattr(core, f"lapack_{name}")
+        try:
+            if blocked:
+                f(side, tr, m, n, k, a, lda, tau, c, ldc, lwork, LAPACK, threads, cb.GEMM_Q)
+            else:
+                f(side, tr, m, n, k, a, lda, tau, c, ldc, LAPACK)
+            got = 0
+        except ValueError as e:
+            got = -param_of(e) if name.upper() in str(e) else 99
+        return [(want == got and want < 0, f"{name} illegal arguments")]
+    lda, ldc = rows + cid % 3, m + cid % 4
+    a, tau = reflector_storage(rng, lq, rows, cols, lda, k, kind, core)
+    c = entries(rng, ldc * n, str(rng.choice(KINDS[:5])))
+    wa, wc, w1, info = ref_orm(lq, blocked, side, tr, m, n, k, a, lda, tau, c, ldc, lwork)
+    f = getattr(core, f"lapack_{name}")
+    if blocked:
+        ga, gc, g1 = f(side, tr, m, n, k, a, lda, tau, c, ldc, lwork, LAPACK, threads, cb.GEMM_Q)
+    else:
+        ga, gc, g1 = f(side, tr, m, n, k, a, lda, tau, c, ldc, LAPACK)
+    ok = info == 0 and same(wa, ga) and same(wc, gc) and same(w1, np.array([float(g1)]))
+    return [(ok, name)]
+
+
+BRD_SHAPES = [
+    (100, 100),
+    (128, 128),
+    (129, 129),
+    (161, 161),
+    (200, 129),
+    (129, 200),
+    (300, 170),
+    (170, 300),
+    (330, 200),
+    (200, 330),
+    (240, 289),
+    (289, 240),
+    (588, 345),
+    (345, 588),
+    (590, 560),
+    (560, 590),
+    (600, 600),
+    (1000, 300),
+    (300, 1000),
+    (2049, 160),
+    (160, 2049),
+]
+BRD_BIG = [(600, 1_099), (1_099, 600), (1_000, 1_000)]
+LABRD_SHAPES = [
+    (1, 1, 1),
+    (2, 1, 1),
+    (1, 2, 1),
+    (10, 7, 3),
+    (7, 10, 3),
+    (9, 9, 9),
+    (33, 17, 17),
+    (17, 33, 17),
+    (100, 60, 32),
+    (60, 100, 32),
+    (300, 300, 32),
+    (2049, 160, 32),
+    (160, 2049, 32),
+]
+
+
+def brd_cases(quick: bool) -> list[tuple]:
+    """``(routine, m, n, extra, kind)``: ``DGEBD2`` on ``qr2``'s shapes (both bidiagonal forms),
+    ``DGEBRD`` on both sides of ``NX`` = 128 and of the 32-row panels (every kind at the
+    optimal workspace; workspaces that lower ``NB`` to 10 and 2 and unblock it), ``DLABRD``
+    itself (``extra``: ``nb``); then the illegal arguments."""
+    out = []
+    for m, n in QR2_SHAPES + ([] if quick else QR2_BIG):
+        out += [("gebd2", m, n, None, kind) for kind in QR_KINDS]
+    for m, n in BRD_SHAPES + ([] if quick else BRD_BIG):
+        big = m * n > 600_000
+        lworks = [None] if big else [None, (m + n) * 10, (m + n) * 2 + 1, (m + n) * 2 - 1]
+        for lw in lworks:
+            kinds = QR_KINDS if lw is None and not big else ("normal",)
+            out += [("gebrd", m, n, lw, kind) for kind in kinds]
+    for m, n, nb in LABRD_SHAPES:
+        out += [("labrd", m, n, nb, kind) for kind in QR_KINDS[:4]]
+    # Illegal arguments: (routine, m, n, lwork, "error", lda).
+    out += [
+        ("gebrd", 4, 3, None, "error", 3),
+        ("gebrd", 4, 3, 3, "error", 4),
+        ("gebrd", 3, 5, 4, "error", 3),
+        ("gebd2", 4, 3, None, "error", 3),
+    ]
+    return out
+
+
+def brd_run(cid: int, case: tuple, threads: int, core) -> list[tuple[bool, str]]:
+    routine, m, n, extra, kind, *rest = case
+    name = "d" + routine
+    rng = np.random.default_rng([19, cid])
+    if kind == "error":
+        (lda,) = rest
+        a = np.zeros(max(lda, 1) * max(n, 1))
+        want = ref_brd(routine == "gebrd", m, n, a, lda, 10_000 if extra is None else extra)[-1]
+        try:
+            if routine == "gebrd":
+                core.lapack_dgebrd(m, n, a, lda, extra, LAPACK, threads, cb.GEMM_Q)
+            else:
+                core.lapack_dgebd2(m, n, a, lda, LAPACK)
+            got = 0
+        except ValueError as e:
+            got = -param_of(e) if name.upper() in str(e) else 99
+        return [(want == got and want < 0, f"{name} illegal arguments")]
+    lda = m + cid % 3
+    a = matrix_entries(rng, lda, m, n, kind)
+    if routine == "labrd":
+        nb = extra
+        ldx, ldy = m + cid % 2, n + cid % 3
+        x, y = entries(rng, ldx * nb, "normal"), entries(rng, ldy * nb, "normal")
+        want = ref_dlabrd(m, n, nb, a, lda, x, ldx, y, ldy)
+        got = core.lapack_dlabrd(m, n, nb, a, lda, x, ldx, y, ldy)
+        return [(all(same(w, g) for w, g in zip(want, got, strict=True)), name)]
+    *want, info = ref_brd(routine == "gebrd", m, n, a, lda, extra)
+    if routine == "gebrd":
+        got = core.lapack_dgebrd(m, n, a, lda, extra, LAPACK, threads, cb.GEMM_Q)
+    else:
+        got = core.lapack_dgebd2(m, n, a, lda, LAPACK)
+    got = (*got[:5], np.array([float(got[5])]))
+    ok = info == 0 and all(same(w, g) for w, g in zip(want, got, strict=True))
+    return [(ok, name)]
+
+
+# --- section orbr: DORMBR and DORGBR (relay 2c-i) -------------------------------------------------
+
+
+def ref_dormbr(vect, side, tr, m, n, k, a, lda, tau, c, ldc, lwork):
+    """``DORMBR``; returns ``(A, C, WORK(1), INFO)``."""
+    a, c = a.copy(), c.copy()
+    info = I64(0)
+    head = (*_c(vect, side, tr), *_i(m, n, k), ptr(a), *_i(lda), ptr(tau), ptr(c), *_i(ldc))
+    if lwork is None:
+        q = np.zeros(1)
+        LIB.scipy_dormbr_64_(*head, ptr(q), *_i(-1), ctypes.byref(info), *hidden(vect, side, tr))
+        lwork = int(q[0])
+    work = np.full(max(lwork, 1), np.nan)
+    LIB.scipy_dormbr_64_(*head, ptr(work), *_i(lwork), ctypes.byref(info), *hidden(vect, side, tr))
+    return a, c, np.array([work[0]]), info.value
+
+
+def ref_dorgbr(vect, m, n, k, a, lda, tau, lwork):
+    """``DORGBR``; returns ``(A, WORK(1), INFO)``."""
+    a = a.copy()
+    info = I64(0)
+    head = (*_c(vect), *_i(m, n, k), ptr(a), *_i(lda), ptr(tau))
+    if lwork is None:
+        q = np.zeros(1)
+        LIB.scipy_dorgbr_64_(*head, ptr(q), *_i(-1), ctypes.byref(info), *hidden(vect))
+        lwork = int(q[0])
+    work = np.full(max(lwork, 1), np.nan)
+    LIB.scipy_dorgbr_64_(*head, ptr(work), *_i(lwork), ctypes.byref(info), *hidden(vect))
+    return a, np.array([work[0]]), info.value
+
+
+ORBR_SHAPES = [(1, 1), (2, 1), (1, 2), (5, 3), (3, 5), (33, 20), (20, 33), (100, 60), (60, 100)]
+ORBR_SHAPES += [(130, 129), (129, 130), (200, 200), (300, 129), (129, 300)]
+ORBR_BIG = [(600, 280), (280, 600), (1_000, 600), (600, 1_000)]
+
+
+def orbr_lwork(kind: str, nw: int):
+    """The workspaces of the cases: ``None`` (the routine's own optimum, which ``DORMBR`` hands
+    on as a short one), enough for ``NB`` 32 in both releases, ``NB`` lowered, the minimum."""
+    return {"opt": None, "big": nw * 32 + 65 * 64, "mid": nw * 10 + 65 * 64, "min": nw}[kind]
+
+
+def orbr_cases(quick: bool) -> list[tuple]:
+    """``("ormbr", vect, side, trans, mo, no, other, lwork, kind)``: ``DGEBRD``'s reflectors of an
+    ``mo x no`` matrix applied to a ``C`` with ``other`` columns (left) or rows (right);
+    ``("orgbr", vect, mo, no, out, lwork, kind)``: ``Q`` (``mo x out``) or ``P^T`` (``out x no``)
+    generated from them (``out`` between the bounds ``DORGBR`` allows); then the refused
+    arguments."""
+    out: list[tuple] = []
+    shapes = ORBR_SHAPES + ([] if quick else ORBR_BIG)
+    for mo, no in shapes:
+        big = mo * no > 100_000
+        for vect in "QP":
+            for side in "LR":
+                for tr in "NT":
+                    for other in (1, 7, 40) if not big else (40,):
+                        for lw in ("opt", "big", "mid", "min") if not big else ("opt", "big"):
+                            kinds = (
+                                ("normal", "zero-cols") if lw == "opt" and not big else ("normal",)
+                            )
+                            out += [
+                                ("ormbr", vect, side, tr, mo, no, other, lw, kd) for kd in kinds
+                            ]
+            k = no if vect == "Q" else mo
+            nq = mo if vect == "Q" else no
+            outs = sorted({nq, min(nq, k)})  # Q: min(m, k) <= n <= m; P: min(n, k) <= m <= n
+            for o in outs:
+                for lw in ("opt", "min") if not big else ("opt",):
+                    out += [("orgbr", vect, mo, no, o, lw, kd) for kd in ("normal", "zero-cols")]
+    out += [
+        ("ormbr-error", "lda"),
+        ("ormbr-error", "ldc"),
+        ("ormbr-error", "lwork"),
+        ("orgbr-error", "n"),
+        ("orgbr-error", "lda"),
+        ("orgbr-error", "lwork"),
+    ]
+    return out
+
+
+def orbr_inner(case: tuple):
+    """The ``DORMQR``/``DORMLQ`` (``orm``) or ``DORGQR``/``DORGLQ`` (``org``) call a case makes,
+    as ``check_lapack``'s undefined-class rule takes it (``None``: none)."""
+    if case[0] == "ormbr":
+        _, vect, side, tr, mo, no, other, lw, _ = case
+        nq = mo if vect == "Q" else no
+        k = no if vect == "Q" else mo
+        m, n = (nq, other) if side == "L" else (other, nq)
+        nw = max(1, n if side == "L" else m)
+        lwork = orbr_lwork(lw, nw)
+        lwork = nw * 32 if lwork is None else lwork
+        mi, ni = (m - 1, n) if side == "L" else (m, n - 1)
+        if vect == "Q":
+            call = (m, n, k) if nq >= k else ((mi, ni, nq - 1) if nq > 1 else None)
+            lq, t = False, tr
+        else:
+            call = (m, n, k) if nq > k else ((mi, ni, nq - 1) if nq > 1 else None)
+            lq, t = True, "T" if tr == "N" else "N"
+        if call is None:
+            return None
+        return "orm", (lq, True, side, t, *call, lwork, "normal")
+    if case[0] == "orgbr":
+        _, vect, mo, no, o, lw, _ = case
+        m, n, k = (mo, o, no) if vect == "Q" else (o, no, mo)
+        lwork = None if lw == "opt" else max(1, min(m, n))
+        if vect == "Q":
+            call = (False, m, n, k) if m >= k else ((False, m - 1, m - 1, m - 1) if m > 1 else None)
+        else:
+            call = (True, m, n, k) if k < n else ((True, n - 1, n - 1, n - 1) if n > 1 else None)
+        if call is None:
+            return None
+        lq, mm, nn, kk = call
+        if lwork is None:
+            lwork = max((mm if lq else nn), 1) * 32
+        return "org", (lq, True, mm, nn, kk, lwork, "normal")
+    return None
+
+
+def orbr_run(cid: int, case: tuple, threads: int, core) -> list[tuple[bool, str]]:
+    rng = np.random.default_rng([53, cid])
+    what = case[0]
+    if what == "ormbr-error":
+        m, n, k, lda, ldc, lwork = 6, 4, 4, 6, 6, 32 * 4
+        if case[1] == "lda":
+            lda = 5
+        elif case[1] == "ldc":
+            ldc = 5
+        else:
+            lwork = 3
+        a, tau, c = np.ones(lda * k), np.zeros(k), np.ones(ldc * n)
+        info = ref_dormbr("Q", "L", "N", m, n, k, a, lda, tau, c, ldc, lwork)[-1]
+        call = lambda: core.lapack_dormbr("Q", "L", "N", m, n, k, a, lda, tau, c, ldc, lwork, LAPACK, threads, cb.GEMM_Q)  # noqa: E731  # fmt: skip
+        try:
+            call()
+            got = 0
+        except ValueError as e:
+            got = -param_of(e) if "DORMBR" in str(e) else 99
+        return [(info < 0 and info == got, "dormbr illegal arguments")]
+    if what == "orgbr-error":
+        m, n, k, lda, lwork = 6, 4, 4, 6, 32 * 4
+        if case[1] == "n":
+            n = 7
+        elif case[1] == "lda":
+            lda = 5
+        else:
+            lwork = 3
+        a, tau = np.ones(max(lda * n, 1)), np.zeros(k)
+        info = ref_dorgbr("Q", m, n, k, a, lda, tau, lwork)[-1]
+        try:
+            core.lapack_dorgbr("Q", m, n, k, a, lda, tau, lwork, LAPACK, threads, cb.GEMM_Q)
+            got = 0
+        except ValueError as e:
+            got = -param_of(e) if "DORGBR" in str(e) else 99
+        return [(info < 0 and info == got, "dorgbr illegal arguments")]
+    if what == "ormbr":
+        _, vect, side, tr, mo, no, other, lw, kind = case
+    else:
+        _, vect, mo, no, o, lw, kind = case
+    # The reduction (numpy's own DGEBRD) of an mo x no matrix.
+    lda0 = mo + cid % 2
+    a0 = matrix_entries(rng, lda0, mo, no, kind)
+    a_red, _, _, tq, tp, _, info = ref_brd(True, mo, no, a0, lda0, None)
+    assert info == 0
+    tau = tq if vect == "Q" else tp
+    tau = np.ascontiguousarray(tau if tau.size else np.zeros(1))
+    if what == "ormbr":
+        nq = mo if vect == "Q" else no
+        k = no if vect == "Q" else mo
+        m, n = (nq, other) if side == "L" else (other, nq)
+        nw = max(1, n if side == "L" else m)
+        lwork = orbr_lwork(lw, nw)
+        # DORMBR('Q') reads A as nq x k (LDA >= nq); DORMBR('P') as k x nq: DGEBRD's storage.
+        ldc = m + cid % 3
+        c = entries(rng, max(ldc * n, 1), "normal")
+        want = ref_dormbr(vect, side, tr, m, n, k, a_red, lda0, tau, c, ldc, lwork)
+        got = core.lapack_dormbr(vect, side, tr, m, n, k, a_red, lda0, tau, c, ldc, lwork, LAPACK, threads, cb.GEMM_Q)  # fmt: skip
+        got = (got[0], got[1], np.array([float(got[2])]))
+        ok = want[-1] == 0 and all(same(w, g) for w, g in zip(want[:3], got, strict=True))
+        return [(ok, "dormbr")]
+    # DORGBR: Q (mo x o) from the first columns, or P^T (o x no) from the first rows.
+    if vect == "Q":
+        m, n, k = mo, o, no
+        lda = m + cid % 2
+        a = entries(rng, max(lda * n, 1), "normal")
+        for j in range(min(n, no)):
+            a[j * lda : j * lda + m] = a_red[j * lda0 : j * lda0 + m]
+    else:
+        m, n, k = o, no, mo
+        lda = m + cid % 2
+        a = entries(rng, max(lda * n, 1), "normal")
+        rows = min(m, mo)
+        for j in range(n):
+            a[j * lda : j * lda + rows] = a_red[j * lda0 : j * lda0 + rows]
+    lwork = None if lw == "opt" else max(1, min(m, n))
+    want = ref_dorgbr(vect, m, n, k, a, lda, tau, lwork)
+    got = core.lapack_dorgbr(vect, m, n, k, a, lda, tau, lwork, LAPACK, threads, cb.GEMM_Q)
+    got = (got[0], np.array([float(got[1])]))
+    ok = want[-1] == 0 and all(same(w, g) for w, g in zip(want[:2], got, strict=True))
+    return [(ok, "dorgbr")]
+
+
+SECTIONS = {
+    "larfg": ("dlarfg", larfg_cases, larfg_run),
+    "larf": ("dlarf", larf_cases, larf_run),
+    "qr2": ("dgeqr2/dgelq2", qr2_cases, qr2_run),
+    "larft": ("dlarft", larft_cases, larft_run),
+    "larfb": ("dlarfb", larfb_cases, larfb_run),
+    "qrf": ("dgeqrf/dgelqf", qrf_cases, qrf_run),
+    "org": ("dorgqr/dorglq/dorg2r/dorgl2", org_cases, org_run),
+    "orm": ("dormqr/dormlq/dorm2r/dorml2", orm_cases, orm_run),
+    "brd": ("dgebrd/dgebd2/dlabrd", brd_cases, brd_run),
+    "orbr": ("dormbr/dorgbr", orbr_cases, orbr_run),
+}
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument("--quick", action="store_true")
+    ap.add_argument(
+        "--threads", type=int, default=4, help="larmorx's threads (the bits do not depend on it)"
+    )
+    ap.add_argument("--sections", default=",".join(SECTIONS))
+    ap.add_argument("--gemm-q", default="auto", help="256, 512 or auto (as check_blas.py)")
+    ap.add_argument("--child", help=argparse.SUPPRESS)
+    ap.add_argument("--start", type=int, default=0, help=argparse.SUPPRESS)
+    args = ap.parse_args()
+    config = LIB.scipy_openblas_get_config64_().decode()
+    cb.GEMM_Q = (
+        (512 if cb.zen4_rule(config) else 256) if args.gemm_q == "auto" else int(args.gemm_q)
+    )
+    if args.child:
+        return cb.child(args.child, args.start, args.quick, args.threads, sections=SECTIONS)
+    core = LIB.scipy_openblas_get_corename64_().decode()
+    nthreads = LIB.scipy_openblas_get_num_threads64_()
+    print(
+        f"numpy {np.__version__}; {config}; core {core}; threads {nthreads}; "
+        f"GEMM_Q {cb.GEMM_Q}; LAPACK {LAPACK}"
+    )
+    if core != "Haswell" or nthreads != 1:
+        print(
+            "refusing: run with OPENBLAS_CORETYPE=Haswell OPENBLAS_NUM_THREADS=1", file=sys.stderr
+        )
+        return 2
+    ok = True
+    for name in args.sections.split(","):
+        ok &= cb.parent(
+            name,
+            args.quick,
+            args.threads,
+            sections=SECTIONS,
+            undefined_fn=undefined,
+            script=__file__,
+        )
+    print("ALL IDENTICAL" if ok else "DIFFERENCES FOUND", flush=True)
+    return 0 if ok else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

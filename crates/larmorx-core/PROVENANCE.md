@@ -21,6 +21,7 @@ reproduces the original copyright and MIT notice.
 | `math/acos.rs` | `src/binary64/acos/acos.c` (`ecd617383721…`) | as for `asin`, with `acos.wc` (264,123 cases) |
 | `math/atan2.rs` | `src/binary64/atan2/atan2.c` (`404b0db90e53…`), `src/binary64/atan2/tint.h` (`41264d54812a…`) | bit-identical to the C on all of `atan2.wc` (signalling NaNs aside, which C's `strtod` cannot read) and 300,000 random pairs (random bits, comparable magnitudes, exponent differences of 40 to 70, rotation angles) |
 | `math/cbrt.rs` | `src/binary64/cbrt/cbrt.c` (`0a86b7a8f433…`) | bit-identical to the C on all of `cbrt.wc` and 300,000 random inputs; round to nearest only (the directed-rounding branches dropped) |
+| `math/hypot.rs` | `src/binary64/hypot/hypot.c` (`71d47330651a…`) | bit-identical to the C (gcc 11.4, `-O2 -ffp-contract=off`, as a shared library) on every pair of 16 special values and 536,870,912 random pairs (2^26 in each of eight families: random bit patterns, uniform on (-1, 1), unit-quaternion components, exponent differences 20 to 34, subnormal, near overflow, scaled Pythagorean triples moved by up to 3 ulp, small integers), the FMA copy (the portable one equals it: `fma_copies_are_bit_identical`); log `oracles/logs/confounds-r2diiib-hypot.log`, 2026-11-11 (the confounds' part, for SciPy's `Rotation.as_euler`; `validation/probes/coremath-hypot`); round to nearest only (the directed-rounding branches, the flags and `errno` dropped); the C's wrapping unsigned arithmetic written with wrapping operations |
 | `math/pow.rs`, `math/pow/{dint,qint,tables}.rs` | `src/binary64/pow/pow.c` (`b14c65a1d136…`), `pow.h` (`8e28930b514f…`), `dint.h` (`c62a9788d872…`), `qint.h` (`32de9c103880…`) | bit-identical to the C (gcc 11.4, `-O2`) on 5,656,161 inputs: all of `pow.wc` (1,003,179 pairs, and again with -x for its 882,438 integer exponents), random bit patterns, moderate and huge exponents, x near 1, integer and dyadic exponents (exact and midpoint cases), powers of two, results near underflow, the subnormal range and overflow, subnormal x, the JHCT metric's probabilities and exponents, every pair of 38 special values and signalling NaNs; 950,312 of them need the second phase and 78,436 the third (2026-10-18). Also bit-identical in a debug build (no shift overflows). The tables are transcribed mechanically from the C initializers |
 | `math/sinf.rs` (`sinf`, `cosf`) | `src/binary32/sin/sinf.c` (`f27c4baa849b…`), `src/binary32/cos/cosf.c` (`3ea4c6d03d32…`) | bit-identical to the C (gcc 11.4, `-O2`) on all 2^32 inputs of each; unit tests check checksums of every 4099th input, an ignored one of all inputs |
 | `math/tanhf.rs` | `src/binary32/tanh/tanhf.c` (`a60f385ebc85…`) | bit-identical to the C (gcc 11.4, `-O2 -ffp-contract=off`) on all 2^32 inputs; checksums as for `expf` (2026-10-23, for 3dUnifize's squash) |
@@ -289,6 +290,36 @@ Each file carries numpy's (and SciPy's) notice. Bit-identical to numpy 2.3.5 / S
 numpy 2.5.4 / SciPy 1.18.1 on the seeded cases of
 `validation/investigations/t2smap/numerics/check_numerics.py` (every shape and axis tedana
 reaches, lengths around the pairwise blocks, axes of length 1, NaN, signed zeros, infinities).
+
+- The confounds' part, relay 2d-iii-c (2026-11-11), numpy 2.5.4, 2.3.5 and 2.2.6 (BSD-3-Clause):
+  `numpy/reduce.rs`'s `add_reduce_axis_in`, `mean_axis_in`, `var_axis_in`, `std_axis_in` (numpy
+  2.2's buffered reduction cuts a row longer than 8192 along the innermost axis into chunks of
+  8192; established by measurement, `validation/investigations/confounds/probe_reduction_orders.py`),
+  `mean_ordered`, `var_ordered`, `cumsum` (`add.accumulate`), `extreme` (`minimum.reduce`,
+  `maximum.reduce`: `umath/loops_minmax.dispatch.c.src`'s NaN propagation; the sign of a zero tie
+  is IEEE 754-2019's, not the CPU-dependent one numpy's SIMD lanes give:
+  `probe_minmax_zero_sign.py`); `numpy/quantile.rs`'s `percentile_rank_axis` (`_QuantileMethods`'
+  `lower` and `higher`, `percentile`'s `q / a.dtype.type(100)` of numpy 2.2 and 2.3 and `q / 100` of
+  2.5, `_quantile`'s `supports_integers` path with `slices_having_nans`) and `searchsorted`
+  (`npysort/binsearch.cpp`: numpy 2.2 and 2.3's `[min, max)` bisection, numpy 2.5's halving from
+  base 0; `numpy_tag.h`'s NaN-aware `less`); `numpy/umath.rs`'s `nan_to_num`
+  (`numpy/lib/_type_check_impl.py`) and `diff_axis` (`numpy/lib/_function_base_impl.py`'s
+  `diff`); `numpy/polynomial.rs`: `Legendre.basis(deg)(x)` (`numpy/polynomial/_polybase.py`'s
+  `basis` and `__call__`, `polyutils.py`'s `mapdomain`/`mapparms`, `legendre.py`'s `legval`, whose
+  Clenshaw steps numpy 2.3 rewrote: both forms). Bit-identical to numpy 2.5.4, 2.3.5 and 2.2.6
+  (fMRIPrep 25.2.6's image) on every case of `validation/investigations/confounds/
+  check_numpy_reductions.py` (the operands of nipype's, niworkflows' and fMRIPrep's call sites
+  built as they build them, and the general rules), the zero-sign ties of `min`/`max` excepted.
+
+## OpenBLAS's Haswell `dgemm` micro-kernel (`src/numpy/gemm.rs`; the confounds' part, 2026-11-11)
+
+**Ported** from `kernel/x86_64/dgemm_kernel_4x8_haswell.S` of OpenBLAS 0.3.30, of the 0.3.34
+release and of v0.3.34-106-g446c436e (numpy 2.5.4's wheels; the same file in the three),
+BSD-3-Clause, notice in the file and in NOTICE: the arithmetic of one tile of the kernel (32
+fused multiply-add chains from +0; the 4-row, 1-column path's four accumulators by `k mod 4`
+and their sum `(a0 + a1) + (a2 + a3)`), with the audited AVX2/FMA dispatch (the same bits on
+every path). The driver around it is `larmorx_transform::openblas::level3`. The logic is
+re-expressed in Rust; no code was copied.
 
 ## numpy's printing of floats (`src/numpy/format.rs`)
 

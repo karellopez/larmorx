@@ -66,8 +66,21 @@ pub fn add_reduce<T: NpFloat>(a: &[T]) -> T {
 
 /// `numpy.add.reduce(a, axis)` over the middle axis of a C-ordered `(outer, n, inner)` array;
 /// the result is C-ordered `(outer, inner)` (module documentation: pairwise when `inner == 1`,
-/// in order otherwise).
+/// in order otherwise). numpy 2.3 and later; [`add_reduce_axis_in`] for numpy 2.2's order.
 pub fn add_reduce_axis<T: NpFloat>(a: &[T], shape: [usize; 3]) -> Vec<T> {
+    add_reduce_axis_in(a, shape, SumOrder::Pairwise)
+}
+
+/// [`add_reduce_axis`] in a release's order ([`SumOrder`]): where the summed axis is the
+/// innermost in memory (`inner == 1`), numpy 2.2's buffered reduction hands the inner loop at
+/// most `NPY_BUFSIZE` (8192) elements of a row, so each result is `((0 + pairwise(c0)) +
+/// pairwise(c1)) + ...` over the row's chunks of 8192 (measured in numpy 2.2.6:
+/// `validation/investigations/confounds/probe_reduction_orders.py`; a row of 8192 elements or
+/// fewer is never cut, whatever the rows before it); numpy 2.3 and later sum the whole row
+/// pairwise. Along an outer axis every release adds in index order. A cast to a wider type
+/// (`int16` or `float32` data summed in `float64`) is buffered in every release, but those sums
+/// are exact, so no order shows.
+pub fn add_reduce_axis_in<T: NpFloat>(a: &[T], shape: [usize; 3], order: SumOrder) -> Vec<T> {
     let [outer, n, inner] = shape;
     assert_eq!(
         a.len(),
@@ -76,7 +89,7 @@ pub fn add_reduce_axis<T: NpFloat>(a: &[T], shape: [usize; 3]) -> Vec<T> {
     );
     if inner == 1 {
         return (0..outer)
-            .map(|o| T::ZERO.add(pairwise_sum(a, o * n, n, 1)))
+            .map(|o| add_reduce_ordered(&a[o * n..(o + 1) * n], order))
             .collect();
     }
     let mut out = vec![T::ZERO; outer * inner];
@@ -101,8 +114,13 @@ fn divide_by_count<T: NpFloat>(x: T, count: i64) -> T {
 /// `numpy.mean(a, axis)` over the middle axis of `(outer, n, inner)` (`_methods._mean`: the sum,
 /// then the division by the count; `n == 0` gives NaN, as numpy's "Mean of empty slice").
 pub fn mean_axis<T: NpFloat>(a: &[T], shape: [usize; 3]) -> Vec<T> {
+    mean_axis_in(a, shape, SumOrder::Pairwise)
+}
+
+/// [`mean_axis`] in a release's order ([`add_reduce_axis_in`]).
+pub fn mean_axis_in<T: NpFloat>(a: &[T], shape: [usize; 3], order: SumOrder) -> Vec<T> {
     let n = shape[1] as i64;
-    add_reduce_axis(a, shape)
+    add_reduce_axis_in(a, shape, order)
         .into_iter()
         .map(|s| divide_by_count(s, n))
         .collect()
@@ -112,8 +130,13 @@ pub fn mean_axis<T: NpFloat>(a: &[T], shape: [usize; 3]) -> Vec<T> {
 /// reduced axis kept, the deviations `a - mean` in `T`, their squares, their sum by the same
 /// order as the first, divided by `max(n - ddof, 0)`).
 pub fn var_axis<T: NpFloat>(a: &[T], shape: [usize; 3], ddof: i64) -> Vec<T> {
+    var_axis_in(a, shape, ddof, SumOrder::Pairwise)
+}
+
+/// [`var_axis`] in a release's order ([`add_reduce_axis_in`]).
+pub fn var_axis_in<T: NpFloat>(a: &[T], shape: [usize; 3], ddof: i64, order: SumOrder) -> Vec<T> {
     let [outer, n, inner] = shape;
-    let mean = mean_axis(a, shape);
+    let mean = mean_axis_in(a, shape, order);
     let mut sq = Vec::with_capacity(a.len());
     for o in 0..outer {
         for e in 0..n {
@@ -124,7 +147,7 @@ pub fn var_axis<T: NpFloat>(a: &[T], shape: [usize; 3], ddof: i64) -> Vec<T> {
         }
     }
     let dof = (n as i64 - ddof).max(0);
-    add_reduce_axis(&sq, shape)
+    add_reduce_axis_in(&sq, shape, order)
         .into_iter()
         .map(|s| divide_by_count(s, dof))
         .collect()
@@ -132,7 +155,12 @@ pub fn var_axis<T: NpFloat>(a: &[T], shape: [usize; 3], ddof: i64) -> Vec<T> {
 
 /// `numpy.std(a, axis, ddof=ddof)`: the square root of [`var_axis`].
 pub fn std_axis<T: NpFloat>(a: &[T], shape: [usize; 3], ddof: i64) -> Vec<T> {
-    var_axis(a, shape, ddof)
+    std_axis_in(a, shape, ddof, SumOrder::Pairwise)
+}
+
+/// [`std_axis`] in a release's order ([`add_reduce_axis_in`]).
+pub fn std_axis_in<T: NpFloat>(a: &[T], shape: [usize; 3], ddof: i64, order: SumOrder) -> Vec<T> {
+    var_axis_in(a, shape, ddof, order)
         .into_iter()
         .map(NpFloat::sqrt)
         .collect()
@@ -183,11 +211,17 @@ pub fn add_reduce_ordered<T: NpFloat>(a: &[T], order: SumOrder) -> T {
     }
 }
 
-/// `a.std(ddof=ddof)` of a whole contiguous array in the release's order (`_methods._var`: the
-/// mean, the squared deviations, their sum divided by `max(n - ddof, 0)`, the square root).
-pub fn std_ordered<T: NpFloat>(a: &[T], ddof: i64, order: SumOrder) -> T {
+/// `a.mean()` of a whole contiguous array in the release's order (`_methods._mean`: the sum,
+/// divided by the count in `float64` and rounded to `T`; an empty array gives NaN).
+pub fn mean_ordered<T: NpFloat>(a: &[T], order: SumOrder) -> T {
+    divide_by_count(add_reduce_ordered(a, order), a.len() as i64)
+}
+
+/// `a.var(ddof=ddof)` of a whole contiguous array in the release's order (`_methods._var`: the
+/// mean, the squared deviations, their sum divided by `max(n - ddof, 0)`).
+pub fn var_ordered<T: NpFloat>(a: &[T], ddof: i64, order: SumOrder) -> T {
     let n = a.len() as i64;
-    let mean = divide_by_count(add_reduce_ordered(a, order), n);
+    let mean = mean_ordered(a, order);
     let sq: Vec<T> = a
         .iter()
         .map(|&x| {
@@ -195,7 +229,61 @@ pub fn std_ordered<T: NpFloat>(a: &[T], ddof: i64, order: SumOrder) -> T {
             d.mul(d)
         })
         .collect();
-    divide_by_count(add_reduce_ordered(&sq, order), (n - ddof).max(0)).sqrt()
+    divide_by_count(add_reduce_ordered(&sq, order), (n - ddof).max(0))
+}
+
+/// `a.std(ddof=ddof)` of a whole contiguous array in the release's order (`_methods._var`: the
+/// mean, the squared deviations, their sum divided by `max(n - ddof, 0)`, the square root).
+pub fn std_ordered<T: NpFloat>(a: &[T], ddof: i64, order: SumOrder) -> T {
+    var_ordered(a, ddof, order).sqrt()
+}
+
+/// `numpy.cumsum(a)` of a one-dimensional array (`add.accumulate`): the first value as it is
+/// (a `-0.0` stays `-0.0`), then `out[i] = out[i - 1] + a[i]` in index order, in `T`.
+pub fn cumsum<T: NpFloat>(a: &[T]) -> Vec<T> {
+    let mut out = Vec::with_capacity(a.len());
+    let mut acc = T::ZERO;
+    for (i, &x) in a.iter().enumerate() {
+        acc = if i == 0 { x } else { acc.add(x) };
+        out.push(acc);
+    }
+    out
+}
+
+/// Which extreme [`extreme`] takes.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Extreme {
+    /// `a.min()` (`numpy.minimum.reduce`).
+    Min,
+    /// `a.max()` (`numpy.maximum.reduce`).
+    Max,
+}
+
+/// `a.min()` or `a.max()` of a float array (`numpy.minimum.reduce`, `numpy.maximum.reduce`): a
+/// NaN anywhere gives a NaN (the first in index order; numpy keeps one of them), else the
+/// smallest or largest value. Between `-0.0` and `+0.0` numpy's answer depends on the CPU's
+/// SIMD kernel (the lanes' order of x86's `min`/`max` instructions, which return their second
+/// operand on equal values: AVX-512, AVX2 and SSE give different signs on the same array,
+/// `validation/investigations/confounds/probe_minmax_zero_sign.py`); larmorx returns IEEE
+/// 754-2019's `minimum`/`maximum` instead (`-0.0 < +0.0`), the same on every machine. `None` for
+/// an empty array (numpy's `ValueError: zero-size array to reduction operation minimum which has
+/// no identity`).
+pub fn extreme<T: NpFloat>(a: &[T], which: Extreme) -> Option<T> {
+    let (&first, rest) = a.split_first()?;
+    if let Some(&nan) = a.iter().find(|x| x.is_nan()) {
+        return Some(nan);
+    }
+    let mut r = first;
+    for &x in rest {
+        let take = match which {
+            Extreme::Min => x < r || (x == r && x.to_f64().is_sign_negative()),
+            Extreme::Max => x > r || (x == r && x.to_f64().is_sign_positive()),
+        };
+        if take {
+            r = x;
+        }
+    }
+    Some(r)
 }
 
 /// `numpy.nansum(a, axis)`: NaNs replaced by `0`, then [`add_reduce_axis`].
@@ -389,6 +477,52 @@ mod tests {
         for (o, v) in out.iter().enumerate() {
             assert_eq!(v.to_bits(), add_reduce(&a[o * 20..o * 20 + 20]).to_bits());
         }
+    }
+
+    #[test]
+    fn numpy_2_2_cuts_long_rows_only() {
+        // rows of 8193 (cut into 8192 + 1) and rows of 300 (never cut)
+        let a: Vec<f32> = (0..2 * 8193)
+            .map(|i| ((i * 7919) % 1000) as f32 * 0.37 - 100.0)
+            .collect();
+        let got = add_reduce_axis_in(&a, [2, 8193, 1], SumOrder::Buffered);
+        for (o, g) in got.iter().enumerate() {
+            let row = &a[o * 8193..(o + 1) * 8193];
+            let want = (0.0f32 + pairwise_sum(row, 0, 8192, 1)) + row[8192];
+            assert_eq!(g.to_bits(), want.to_bits());
+        }
+        let short = add_reduce_axis_in(&a[..3000], [10, 300, 1], SumOrder::Buffered);
+        assert_eq!(short, add_reduce_axis(&a[..3000], [10, 300, 1]));
+        let m = mean_axis_in(&a, [2, 8193, 1], SumOrder::Buffered);
+        assert_eq!(m[0], (f64::from(got[0]) / 8193.0) as f32);
+        assert_eq!(
+            mean_ordered(&a, SumOrder::Pairwise),
+            (f64::from(add_reduce(&a)) / a.len() as f64) as f32
+        );
+        assert!(mean_ordered::<f64>(&[], SumOrder::Pairwise).is_nan());
+        assert_eq!(var_ordered(&[1.0f64, 3.0], 1, SumOrder::Pairwise), 2.0);
+    }
+
+    #[test]
+    fn cumsum_and_extremes() {
+        let c = cumsum(&[-0.0f64, 1.0, 2.5]);
+        assert_eq!(c[0].to_bits(), (-0.0f64).to_bits()); // a copy, not 0 + -0
+        assert_eq!(&c[1..], &[1.0, 3.5]);
+        assert!(cumsum::<f32>(&[]).is_empty());
+        let z = [0.0f64, 2.0, -0.0, 0.0];
+        assert_eq!(
+            extreme(&z, Extreme::Min).unwrap().to_bits(),
+            (-0.0f64).to_bits()
+        );
+        let nz = [-0.0f32, -2.0, 0.0, -0.0];
+        assert_eq!(extreme(&nz, Extreme::Max).unwrap().to_bits(), 0);
+        assert!(
+            extreme(&[1.0f32, f32::NAN, -3.0], Extreme::Min)
+                .unwrap()
+                .is_nan()
+        );
+        assert_eq!(extreme(&[1.0f32, 7.0, -3.0], Extreme::Max), Some(7.0));
+        assert_eq!(extreme::<f64>(&[], Extreme::Max), None);
     }
 
     #[test]

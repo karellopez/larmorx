@@ -1191,3 +1191,932 @@ def sdcflows_unwarp_volume(
     along ``pe_axis`` by ``fmap_hz * ro_time`` (float32 arithmetic, or float64 with
     ``ro_float64``), with SciPy's ``map_coordinates``, times the Jacobian of the shift with
     ``jacobian``. Returns the float32 volume (C order) and the interpolation's notices."""
+
+# --- the confounds' part: OpenBLAS's level-2/3 kernels and numpy's 2-D matmul -------------------
+
+def blas_dgemm(
+    transa: str,
+    transb: str,
+    m: int,
+    n: int,
+    k: int,
+    alpha: float,
+    a: np.ndarray,
+    lda: int,
+    b: np.ndarray,
+    ldb: int,
+    beta: float,
+    c: np.ndarray,
+    ldc: int,
+    n_threads: int = 1,
+    gemm_q: int = 256,
+) -> np.ndarray:
+    """``DGEMM`` on flat column-major float64 storage, as OpenBLAS computes it on the Haswell
+    kernels at one thread (``gemm_q`` 512 follows OpenBLAS >= 0.3.31 on an AMD Zen 4/5);
+    returns the new ``C`` storage."""
+
+def blas_dgemv(
+    trans_: str,
+    m: int,
+    n: int,
+    alpha: float,
+    a: np.ndarray,
+    lda: int,
+    x: np.ndarray,
+    incx: int,
+    beta: float,
+    y: np.ndarray,
+    incy: int,
+) -> np.ndarray:
+    """``DGEMV`` on flat float64 storage (positive increments), as OpenBLAS computes it on the
+    Haswell kernels; returns the new ``Y``."""
+
+def numpy_matmul(a: np.ndarray, b: np.ndarray, n_threads: int = 1, gemm_q: int = 256) -> np.ndarray:
+    """``a @ b`` of two C- or F-contiguous 2-D float64 arrays as numpy dispatches it onto
+    OpenBLAS's Haswell kernels (``dsyrk`` for ``x @ x.T`` and ``x.T @ x``); C-ordered."""
+
+def blas_dtrmm(
+    side: str,
+    uplo: str,
+    transa: str,
+    diag: str,
+    m: int,
+    n: int,
+    alpha: float,
+    a: np.ndarray,
+    lda: int,
+    b: np.ndarray,
+    ldb: int,
+    n_threads: int = 1,
+    gemm_q: int = 256,
+) -> np.ndarray:
+    """``DTRMM`` (every side, triangle, transpose and diagonal) on flat column-major float64
+    storage, as OpenBLAS computes it on the Haswell kernels at one thread; returns the new
+    ``B`` storage."""
+
+def blas_dger(
+    m: int,
+    n: int,
+    alpha: float,
+    x: np.ndarray,
+    incx: int,
+    y: np.ndarray,
+    incy: int,
+    a: np.ndarray,
+    lda: int,
+) -> np.ndarray:
+    """``DGER`` (any nonzero increments); returns the new ``A`` storage."""
+
+def blas_dtrmv(
+    uplo: str, trans_: str, diag: str, n: int, a: np.ndarray, lda: int, x: np.ndarray, incx: int
+) -> np.ndarray:
+    """``DTRMV`` (any nonzero increment); returns the new ``X`` storage."""
+
+def blas_daxpy(
+    n: int, alpha: float, x: np.ndarray, incx: int, y: np.ndarray, incy: int
+) -> np.ndarray:
+    """``DAXPY`` (any increments); returns the new ``Y`` storage."""
+
+def blas_dscal(n: int, alpha: float, x: np.ndarray, incx: int) -> np.ndarray:
+    """``DSCAL`` (nothing for ``incx <= 0``); returns the new ``X`` storage."""
+
+def blas_dcopy(n: int, x: np.ndarray, incx: int, y: np.ndarray, incy: int) -> np.ndarray:
+    """``DCOPY``; returns the new ``Y`` storage."""
+
+def blas_dswap(
+    n: int, x: np.ndarray, incx: int, y: np.ndarray, incy: int
+) -> tuple[np.ndarray, np.ndarray]:
+    """``DSWAP`` of two separate vectors; returns the new ``(X, Y)`` storage."""
+
+def blas_idamax(n: int, x: np.ndarray, incx: int, aligned: bool) -> int:
+    """``IDAMAX`` (1-based, 0 for ``n = 0`` or ``incx <= 0``) as OpenBLAS's ``iamax_sse2.S``
+    computes it; ``aligned``: whether ``x(1)`` lies on a 16-byte boundary in the original's
+    memory (only NaN input can tell)."""
+
+def blas_dnrm2(n: int, x: np.ndarray, incx: int) -> float:
+    """``DNRM2`` (OpenBLAS's x87 kernel)."""
+
+# --- the confounds' part: LAPACK's QR and LQ routines and their Q (numpy_linalg::blocked) -----
+
+def lapack_dgeqrf(
+    m: int,
+    n: int,
+    a: np.ndarray,
+    lda: int,
+    lwork: int | None = None,
+    lapack: str = "3.12.1",
+    n_threads: int = 1,
+    gemm_q: int = 256,
+) -> tuple[np.ndarray, np.ndarray, int]:
+    """LAPACK's blocked ``DGEQRF`` on flat column-major float64 storage, as numpy's OpenBLAS
+    computes it on the Haswell kernels at one thread (``lapack`` "3.12.1": numpy 2.5.4,
+    "3.12.0": numpy 2.3.5; ``lwork=None``: the optimal workspace); returns ``(A, TAU, WORK(1))``.
+    Raises ``ValueError`` with LAPACK's message on an illegal argument."""
+
+def lapack_dgelqf(
+    m: int,
+    n: int,
+    a: np.ndarray,
+    lda: int,
+    lwork: int | None = None,
+    lapack: str = "3.12.1",
+    n_threads: int = 1,
+    gemm_q: int = 256,
+) -> tuple[np.ndarray, np.ndarray, int]:
+    """LAPACK's blocked ``DGELQF``, as ``lapack_dgeqrf``."""
+
+def lapack_dgeqr2(
+    m: int, n: int, a: np.ndarray, lda: int, lapack: str = "3.12.1"
+) -> tuple[np.ndarray, np.ndarray]:
+    """LAPACK's ``DGEQR2``; returns ``(A, TAU)``."""
+
+def lapack_dgelq2(
+    m: int, n: int, a: np.ndarray, lda: int, lapack: str = "3.12.1"
+) -> tuple[np.ndarray, np.ndarray]:
+    """LAPACK's ``DGELQ2``; returns ``(A, TAU)``."""
+
+def lapack_dlarft(
+    direct: str,
+    storev: str,
+    n: int,
+    k: int,
+    v: np.ndarray,
+    ldv: int,
+    tau: np.ndarray,
+    t: np.ndarray,
+    ldt: int,
+    lapack: str = "3.12.1",
+    n_threads: int = 1,
+    gemm_q: int = 256,
+) -> np.ndarray:
+    """LAPACK's ``DLARFT`` (3.12.0: recursive; 3.12.1: ``DLARFT_LVL2`` below 64 reflectors;
+    ``lapack="3.12.0-openblas-0.3.28"``, SciPy 1.15.3's library: column by column); ``t`` is the
+    initial ``T`` storage; returns the new ``T`` storage."""
+
+def lapack_dlarfb(
+    side: str,
+    trans_: str,
+    direct: str,
+    storev: str,
+    m: int,
+    n: int,
+    k: int,
+    v: np.ndarray,
+    ldv: int,
+    t: np.ndarray,
+    ldt: int,
+    c: np.ndarray,
+    ldc: int,
+    n_threads: int = 1,
+    gemm_q: int = 256,
+) -> np.ndarray:
+    """LAPACK's ``DLARFB`` (every side, transpose, direction and storage); returns the new ``C``
+    storage."""
+
+def lapack_dlarf(
+    side: str,
+    m: int,
+    n: int,
+    v: np.ndarray,
+    incv: int,
+    tau: float,
+    c: np.ndarray,
+    ldc: int,
+    implicit_one: bool = False,
+) -> np.ndarray:
+    """LAPACK's ``DLARF`` (or 3.12.1's ``DLARF1F`` with ``implicit_one``), positive ``incv``;
+    returns the new ``C`` storage."""
+
+def lapack_dlarfg(
+    n: int, alpha: float, x: np.ndarray, incx: int
+) -> tuple[float, np.ndarray, float]:
+    """LAPACK's ``DLARFG`` (positive ``incx``); returns ``(beta, X, tau)``."""
+
+def lapack_dorgqr(
+    m: int,
+    n: int,
+    k: int,
+    a: np.ndarray,
+    lda: int,
+    tau: np.ndarray,
+    lwork: int | None = None,
+    lapack: str = "3.12.1",
+    n_threads: int = 1,
+    gemm_q: int = 256,
+) -> tuple[np.ndarray, int]:
+    """LAPACK's blocked ``DORGQR`` (the first ``n`` columns of ``Q`` from ``k`` reflectors of
+    ``DGEQRF``), as ``lapack_dgeqrf``; returns ``(A, WORK(1))``."""
+
+def lapack_dorglq(
+    m: int,
+    n: int,
+    k: int,
+    a: np.ndarray,
+    lda: int,
+    tau: np.ndarray,
+    lwork: int | None = None,
+    lapack: str = "3.12.1",
+    n_threads: int = 1,
+    gemm_q: int = 256,
+) -> tuple[np.ndarray, int]:
+    """LAPACK's blocked ``DORGLQ``, as ``lapack_dorgqr``."""
+
+def lapack_dorg2r(
+    m: int, n: int, k: int, a: np.ndarray, lda: int, tau: np.ndarray, lapack: str = "3.12.1"
+) -> np.ndarray:
+    """LAPACK's ``DORG2R``; returns the new ``A`` storage."""
+
+def lapack_dorgl2(
+    m: int, n: int, k: int, a: np.ndarray, lda: int, tau: np.ndarray, lapack: str = "3.12.1"
+) -> np.ndarray:
+    """LAPACK's ``DORGL2``; returns the new ``A`` storage."""
+
+def lapack_dormqr(
+    side: str,
+    trans_: str,
+    m: int,
+    n: int,
+    k: int,
+    a: np.ndarray,
+    lda: int,
+    tau: np.ndarray,
+    c: np.ndarray,
+    ldc: int,
+    lwork: int | None = None,
+    lapack: str = "3.12.1",
+    n_threads: int = 1,
+    gemm_q: int = 256,
+) -> tuple[np.ndarray, np.ndarray, int]:
+    """LAPACK's blocked ``DORMQR`` (``Q`` of ``DGEQRF``'s reflectors applied to ``C`` from either
+    side, transposed or not; ``lwork=None``: the optimal workspace, a smaller one lowers the
+    block size as each release does); returns ``(A, C, WORK(1))``."""
+
+def lapack_dormlq(
+    side: str,
+    trans_: str,
+    m: int,
+    n: int,
+    k: int,
+    a: np.ndarray,
+    lda: int,
+    tau: np.ndarray,
+    c: np.ndarray,
+    ldc: int,
+    lwork: int | None = None,
+    lapack: str = "3.12.1",
+    n_threads: int = 1,
+    gemm_q: int = 256,
+) -> tuple[np.ndarray, np.ndarray, int]:
+    """LAPACK's blocked ``DORMLQ``, as ``lapack_dormqr``."""
+
+def lapack_dorm2r(
+    side: str,
+    trans_: str,
+    m: int,
+    n: int,
+    k: int,
+    a: np.ndarray,
+    lda: int,
+    tau: np.ndarray,
+    c: np.ndarray,
+    ldc: int,
+    lapack: str = "3.12.1",
+) -> tuple[np.ndarray, np.ndarray, int]:
+    """LAPACK's ``DORM2R``; returns ``(A, C, 0)``."""
+
+def lapack_dorml2(
+    side: str,
+    trans_: str,
+    m: int,
+    n: int,
+    k: int,
+    a: np.ndarray,
+    lda: int,
+    tau: np.ndarray,
+    c: np.ndarray,
+    ldc: int,
+    lapack: str = "3.12.1",
+) -> tuple[np.ndarray, np.ndarray, int]:
+    """LAPACK's ``DORML2``; returns ``(A, C, 0)``."""
+
+def lapack_dgebrd(
+    m: int,
+    n: int,
+    a: np.ndarray,
+    lda: int,
+    lwork: int | None = None,
+    lapack: str = "3.12.1",
+    n_threads: int = 1,
+    gemm_q: int = 256,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, int]:
+    """LAPACK's blocked ``DGEBRD`` (``A = Q·B·Pᵀ``, ``B`` bidiagonal), as ``lapack_dgeqrf``;
+    returns ``(A, D, E, TAUQ, TAUP, WORK(1))``."""
+
+def lapack_dgebd2(
+    m: int, n: int, a: np.ndarray, lda: int, lapack: str = "3.12.1"
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, int]:
+    """LAPACK's ``DGEBD2``; returns ``(A, D, E, TAUQ, TAUP, 0)``."""
+
+def lapack_dlabrd(
+    m: int,
+    n: int,
+    nb: int,
+    a: np.ndarray,
+    lda: int,
+    x: np.ndarray,
+    ldx: int,
+    y: np.ndarray,
+    ldy: int,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """LAPACK's ``DLABRD`` (the first ``nb`` rows and columns reduced, with the update matrices
+    ``X`` and ``Y``; ``x``, ``y`` the initial workspaces); returns ``(A, D, E, TAUQ, TAUP, X,
+    Y)``."""
+
+# The divide-and-conquer bidiagonal SVD (the confounds' part, relay 2c-i): LAPACK's DBDSDC and
+# its routines at their Fortran interface, flat column-major storage, 1-based int64 indices.
+
+def lapack_dbdsdc(
+    uplo_: str,
+    compq: str,
+    n: int,
+    d: np.ndarray,
+    e: np.ndarray,
+    ldu: int,
+    ldvt: int,
+    lapack: str = "3.12.1",
+    n_threads: int = 1,
+    gemm_q: int = 256,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, int]:
+    """LAPACK's ``DBDSDC(UPLO, 'I', ...)`` (only ``compq="I"``): the singular values (descending)
+    and vectors of an ``n x n`` bidiagonal matrix; returns ``(D, E, U, VT, INFO)``."""
+
+def lapack_dlasd0(
+    n: int,
+    sqre: int,
+    d: np.ndarray,
+    e: np.ndarray,
+    u: np.ndarray,
+    ldu: int,
+    vt: np.ndarray,
+    ldvt: int,
+    smlsiz: int,
+    lapack: str = "3.12.1",
+    n_threads: int = 1,
+    gemm_q: int = 256,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, int]:
+    """LAPACK's ``DLASD0`` (divide and conquer on an ``n x (n + sqre)`` upper bidiagonal
+    matrix); returns ``(D, E, U, VT, INFO)``."""
+
+def lapack_dlasd1(
+    nl: int,
+    nr: int,
+    sqre: int,
+    d: np.ndarray,
+    alpha: float,
+    beta: float,
+    u: np.ndarray,
+    ldu: int,
+    vt: np.ndarray,
+    ldvt: int,
+    idxq: np.ndarray,
+    lapack: str = "3.12.1",
+    n_threads: int = 1,
+    gemm_q: int = 256,
+) -> tuple[np.ndarray, float, float, np.ndarray, np.ndarray, np.ndarray, int]:
+    """LAPACK's ``DLASD1`` (one merge); returns ``(D, ALPHA, BETA, U, VT, IDXQ, INFO)``."""
+
+def lapack_dlasd2(
+    nl: int,
+    nr: int,
+    sqre: int,
+    d: np.ndarray,
+    alpha: float,
+    beta: float,
+    u: np.ndarray,
+    ldu: int,
+    vt: np.ndarray,
+    ldvt: int,
+    ldu2: int,
+    ldvt2: int,
+    idxq: np.ndarray,
+    lapack: str = "3.12.1",
+) -> tuple[
+    int,
+    tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray],
+    tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray],
+]:
+    """LAPACK's ``DLASD2`` (the merge's deflation); returns ``(K, (D, Z, U, VT, DSIGMA, U2,
+    VT2), (IDXP, IDX, IDXC, IDXQ, COLTYP))``."""
+
+def lapack_dlasd3(
+    nl: int,
+    nr: int,
+    sqre: int,
+    k: int,
+    d: np.ndarray,
+    ldq: int,
+    dsigma: np.ndarray,
+    u: np.ndarray,
+    ldu: int,
+    u2: np.ndarray,
+    ldu2: int,
+    vt: np.ndarray,
+    ldvt: int,
+    vt2: np.ndarray,
+    ldvt2: int,
+    idxc: np.ndarray,
+    ctot: tuple[int, int, int, int] | list[int],
+    z: np.ndarray,
+    n_threads: int = 1,
+    gemm_q: int = 256,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, int]:
+    """LAPACK's ``DLASD3`` (the secular equation and the vectors' update); returns ``(D, Q, U,
+    VT, VT2, Z, INFO)``."""
+
+def lapack_dlasd4(
+    n: int, i: int, d: np.ndarray, z: np.ndarray, rho: float
+) -> tuple[np.ndarray, float, np.ndarray, int]:
+    """LAPACK's ``DLASD4`` (the ``i``-th root of the secular equation); returns ``(DELTA,
+    SIGMA, WORK, INFO)``."""
+
+def lapack_dlasd5(
+    i: int, d: np.ndarray, z: np.ndarray, rho: float
+) -> tuple[np.ndarray, float, np.ndarray]:
+    """LAPACK's ``DLASD5`` (the 2 x 2 secular equation); returns ``(DELTA, DSIGMA, WORK)``."""
+
+def lapack_dlaed6(
+    kniter: int,
+    orgati: bool,
+    rho: float,
+    d: list[float] | tuple[float, float, float],
+    z: list[float] | tuple[float, float, float],
+    finit: float,
+) -> tuple[float, int]:
+    """LAPACK's ``DLAED6`` (a root of the three-pole rational function); returns ``(TAU,
+    INFO)``."""
+
+def lapack_dlasdq(
+    uplo_: str,
+    sqre: int,
+    n: int,
+    ncvt: int,
+    nru: int,
+    ncc: int,
+    d: np.ndarray,
+    e: np.ndarray,
+    vt: np.ndarray,
+    ldvt: int,
+    u: np.ndarray,
+    ldu: int,
+    c: np.ndarray,
+    ldc: int,
+    lapack: str = "3.12.1",
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, int]:
+    """LAPACK's ``DLASDQ`` (a leaf: ``DBDSQR`` with the vectors, values ascending); returns
+    ``(D, E, VT, U, C, INFO)``."""
+
+def lapack_dlasdt(n: int, msub: int) -> tuple[int, int, np.ndarray, np.ndarray, np.ndarray]:
+    """LAPACK's ``DLASDT`` (the subproblem tree); returns ``(LVL, ND, INODE, NDIML, NDIMR)``."""
+
+def lapack_dlamrg(n1: int, n2: int, a: np.ndarray, dtrd1: int, dtrd2: int) -> np.ndarray:
+    """LAPACK's ``DLAMRG`` (the permutation merging two sorted lists); returns ``INDEX``."""
+
+def lapack_dlascl(
+    type_: str,
+    kl: int,
+    ku: int,
+    cfrom: float,
+    cto: float,
+    m: int,
+    n: int,
+    a: np.ndarray,
+    lda: int,
+) -> np.ndarray:
+    """LAPACK's ``DLASCL`` (only ``type_="G"``): ``A * cto/cfrom`` in safe steps; returns the new
+    ``A`` storage."""
+
+def lapack_dormbr(
+    vect_: str,
+    side: str,
+    trans_: str,
+    m: int,
+    n: int,
+    k: int,
+    a: np.ndarray,
+    lda: int,
+    tau: np.ndarray,
+    c: np.ndarray,
+    ldc: int,
+    lwork: int | None = None,
+    lapack: str = "3.12.1",
+    n_threads: int = 1,
+    gemm_q: int = 256,
+) -> tuple[np.ndarray, np.ndarray, int]:
+    """LAPACK's ``DORMBR`` (``DGEBRD``'s ``Q`` or ``P`` applied to ``C``; ``lwork=None``: its own
+    optimal workspace, handed to ``DORMQR``/``DORMLQ`` as it is); returns ``(A, C, WORK(1))``."""
+
+def lapack_dorgbr(
+    vect_: str,
+    m: int,
+    n: int,
+    k: int,
+    a: np.ndarray,
+    lda: int,
+    tau: np.ndarray,
+    lwork: int | None = None,
+    lapack: str = "3.12.1",
+    n_threads: int = 1,
+    gemm_q: int = 256,
+) -> tuple[np.ndarray, int]:
+    """LAPACK's ``DORGBR`` (``DGEBRD``'s ``Q`` or ``P^T`` generated); returns ``(A, WORK(1))``."""
+
+def lapack_dgesdd(
+    jobz: str,
+    m: int,
+    n: int,
+    a: np.ndarray,
+    lda: int,
+    u: np.ndarray,
+    ldu: int,
+    vt: np.ndarray,
+    ldvt: int,
+    lwork: int | None = None,
+    lapack: str = "3.12.1",
+    n_threads: int = 1,
+    gemm_q: int = 256,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, int, int]:
+    """LAPACK's ``DGESDD`` with ``JOBZ = 'S'`` (the thin SVD, all four paths); returns ``(A, S,
+    U, VT, WORK(1), INFO)``."""
+
+def lapack_dgesdd_lwork(m: int, n: int) -> tuple[int, int]:
+    """``DGESDD('S')``'s ``(MINWRK, MAXWRK)``."""
+
+def numpy_svd(
+    a: np.ndarray, lapack: str = "3.12.1", n_threads: int = 1, gemm_q: int = 256
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """``numpy.linalg.svd(a, full_matrices=False)`` of a float64 matrix: ``(u, s, vt)``."""
+
+def numpy_pinv(
+    a: np.ndarray,
+    rcond: float = 1e-15,
+    lapack: str = "3.12.1",
+    n_threads: int = 1,
+    gemm_q: int = 256,
+) -> np.ndarray:
+    """``numpy.linalg.pinv(a, rcond)`` of a float64 matrix."""
+
+def lapack_dlasrt(id: str, d: np.ndarray) -> np.ndarray:
+    """LAPACK's ``DLASRT``: ``d`` sorted increasing (``"I"``) or decreasing (``"D"``)."""
+
+def lapack_dlalsd(
+    uplo_: str,
+    smlsiz: int,
+    n: int,
+    nrhs: int,
+    d: np.ndarray,
+    e: np.ndarray,
+    b: np.ndarray,
+    ldb: int,
+    rcond: float,
+    lapack: str = "3.12.1",
+    n_threads: int = 1,
+    gemm_q: int = 256,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, int, int]:
+    """LAPACK's ``DLALSD`` (both paths: ``N <= SMLSIZ`` and divide and conquer); returns ``(D, E,
+    B, RANK, INFO)``."""
+
+def lapack_dgelsd(
+    m: int,
+    n: int,
+    nrhs: int,
+    a: np.ndarray,
+    lda: int,
+    b: np.ndarray,
+    ldb: int,
+    rcond: float,
+    lwork: int | None = None,
+    lapack: str = "3.12.1",
+    n_threads: int = 1,
+    gemm_q: int = 256,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, int, int, int, int]:
+    """LAPACK's ``DGELSD`` (every path, any size); returns ``(A, B, S, RANK, WORK(1), IWORK(1),
+    INFO)``."""
+
+def lapack_dgelsd_lwork(m: int, n: int, nrhs: int) -> tuple[int, int, int]:
+    """``DGELSD``'s ``(MINWRK, MAXWRK, LIWORK)``."""
+
+def numpy_lstsq(
+    a: np.ndarray,
+    b: np.ndarray,
+    rcond: float | None = None,
+    lapack: str = "3.12.1",
+    n_threads: int = 1,
+    gemm_q: int = 256,
+) -> tuple[np.ndarray, np.ndarray, int, np.ndarray]:
+    """``numpy.linalg.lstsq(a, b, rcond)`` of float64 arrays: ``(x, residuals, rank, s)``."""
+
+def lapack_dlasd7(
+    icompq: int,
+    nl: int,
+    nr: int,
+    sqre: int,
+    d: np.ndarray,
+    z: np.ndarray,
+    vf: np.ndarray,
+    vl: np.ndarray,
+    alpha: float,
+    beta: float,
+    dsigma: np.ndarray,
+    idxq: np.ndarray,
+    perm: np.ndarray,
+    givcol: np.ndarray,
+    ldgcol: int,
+    givnum: np.ndarray,
+    ldgnum: int,
+    givptr: int,
+    c: float,
+    s: float,
+    lapack: str = "3.12.1",
+) -> dict[str, object]:
+    """LAPACK's ``DLASD7`` (one merge's sorting and deflation): a dict of its outputs."""
+
+def lapack_dlasd8(
+    icompq: int,
+    k: int,
+    d: np.ndarray,
+    z: np.ndarray,
+    vf: np.ndarray,
+    vl: np.ndarray,
+    difl: np.ndarray,
+    difr: np.ndarray,
+    lddifr: int,
+    dsigma: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, int]:
+    """LAPACK's ``DLASD8`` (one merge's secular equation): ``(D, Z, VF, VL, DIFL, DIFR, INFO)``."""
+
+def lapack_dlasd6(
+    icompq: int,
+    nl: int,
+    nr: int,
+    sqre: int,
+    d: np.ndarray,
+    vf: np.ndarray,
+    vl: np.ndarray,
+    alpha: float,
+    beta: float,
+    idxq: np.ndarray,
+    perm: np.ndarray,
+    givcol: np.ndarray,
+    ldgcol: int,
+    givnum: np.ndarray,
+    ldgnum: int,
+    poles: np.ndarray,
+    difl: np.ndarray,
+    difr: np.ndarray,
+    z: np.ndarray,
+    givptr: int,
+    c: float,
+    s: float,
+    lapack: str = "3.12.1",
+) -> dict[str, object]:
+    """LAPACK's ``DLASD6`` (one merge of ``DLASDA``'s tree): a dict of its outputs."""
+
+def lapack_dlasda(
+    icompq: int,
+    smlsiz: int,
+    n: int,
+    sqre: int,
+    d: np.ndarray,
+    e: np.ndarray,
+    u: np.ndarray,
+    ldu: int,
+    vt: np.ndarray,
+    k: np.ndarray,
+    difl: np.ndarray,
+    difr: np.ndarray,
+    z: np.ndarray,
+    poles: np.ndarray,
+    givptr: np.ndarray,
+    givcol: np.ndarray,
+    ldgcol: int,
+    perm: np.ndarray,
+    givnum: np.ndarray,
+    c: np.ndarray,
+    s: np.ndarray,
+    lapack: str = "3.12.1",
+) -> dict[str, object]:
+    """LAPACK's ``DLASDA`` (the divide-and-conquer SVD in compact form): a dict of its outputs;
+    ``icompq = 0`` with ``2 <= n <= smlsiz`` raises ``NotImplementedError`` (``DLASQ1``)."""
+
+def lapack_dlals0(
+    icompq: int,
+    nl: int,
+    nr: int,
+    sqre: int,
+    nrhs: int,
+    b: np.ndarray,
+    ldb: int,
+    bx: np.ndarray,
+    ldbx: int,
+    perm: np.ndarray,
+    givptr: int,
+    givcol: np.ndarray,
+    ldgcol: int,
+    givnum: np.ndarray,
+    ldgnum: int,
+    poles: np.ndarray,
+    difl: np.ndarray,
+    difr: np.ndarray,
+    z: np.ndarray,
+    k: int,
+    c: float,
+    s: float,
+) -> tuple[np.ndarray, np.ndarray, int]:
+    """LAPACK's ``DLALS0`` (one node's factor of the compact SVD): ``(B, BX, INFO)``."""
+
+def lapack_dlalsa(
+    icompq: int,
+    smlsiz: int,
+    n: int,
+    nrhs: int,
+    b: np.ndarray,
+    ldb: int,
+    bx: np.ndarray,
+    ldbx: int,
+    u: np.ndarray,
+    ldu: int,
+    vt: np.ndarray,
+    k: np.ndarray,
+    difl: np.ndarray,
+    difr: np.ndarray,
+    z: np.ndarray,
+    poles: np.ndarray,
+    givptr: np.ndarray,
+    givcol: np.ndarray,
+    ldgcol: int,
+    perm: np.ndarray,
+    givnum: np.ndarray,
+    c: np.ndarray,
+    s: np.ndarray,
+    n_threads: int = 1,
+    gemm_q: int = 256,
+) -> tuple[np.ndarray, np.ndarray, int]:
+    """LAPACK's ``DLALSA`` (the compact SVD applied to ``b``): ``(B, BX, INFO)``."""
+
+def lapack_dgesvd(
+    jobu: str,
+    jobvt: str,
+    m: int,
+    n: int,
+    a: np.ndarray,
+    lda: int,
+    u: np.ndarray,
+    ldu: int,
+    vt: np.ndarray,
+    ldvt: int,
+    lwork: int | None = None,
+    lapack: str = "3.12.0",
+    n_threads: int = 1,
+    gemm_q: int = 256,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, int, int, np.ndarray]:
+    """LAPACK's ``DGESVD`` with ``JOBU = JOBVT = 'S'`` or ``'A'`` (paths 6, 9, 10 and their
+    transposes; ``lapack="3.12.0"`` SciPy 1.18.1's library, ``"3.12.0-openblas-0.3.28"`` SciPy
+    1.15.3's); returns ``(A, S, U, VT, WORK(1), INFO, WORK(2:MIN(M, N)))``."""
+
+def lapack_dgesvd_lwork(job_: str, m: int, n: int) -> tuple[int, int]:
+    """``DGESVD(JOB, JOB)``'s ``(MINWRK, MAXWRK)``."""
+
+def lapack_dbdsqr(
+    uplo_: str,
+    n: int,
+    ncvt: int,
+    nru: int,
+    ncc: int,
+    d: np.ndarray,
+    e: np.ndarray,
+    vt: np.ndarray,
+    ldvt: int,
+    u: np.ndarray,
+    ldu: int,
+    c: np.ndarray,
+    ldc: int,
+    lapack: str = "3.12.0",
+    n_threads: int = 1,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, int]:
+    """LAPACK's ``DBDSQR`` with vectors (upper or lower): ``(D, E, VT, U, C, INFO)``; without
+    vectors raises ``NotImplementedError`` (``DLASQ1``)."""
+
+def scipy_svd(
+    a: np.ndarray,
+    full_matrices: bool = True,
+    compute_uv: bool = True,
+    lapack_driver: str = "gesvd",
+    scipy: str = "1.18.1",
+    n_threads: int = 1,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """``scipy.linalg.svd(a, full_matrices, lapack_driver='gesvd')`` with SciPy 1.18.1's or
+    1.15.3's own library: ``(u, s, vh)``; SciPy's ``ValueError`` and ``LinAlgError``."""
+
+def nipype_fallback_svd(
+    a: np.ndarray,
+    full_matrices: bool = False,
+    compute_uv: bool = True,
+    lapack: str = "3.12.1",
+    scipy: str = "1.18.1",
+    n_threads: int = 1,
+    gemm_q: int = 256,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, bool]:
+    """nipype's ``fallback_svd(a, full_matrices=False)``: ``(u, s, vt, fallback)``."""
+
+def nipype_full_rank(
+    x: np.ndarray,
+    cmax: float = 1e15,
+    lapack: str = "3.12.1",
+    scipy: str = "1.18.1",
+    n_threads: int = 1,
+    gemm_q: int = 256,
+) -> tuple[np.ndarray, float, bool]:
+    """nipype's ``_full_rank(X, cmax)``: ``(X, c, regularized)``."""
+
+# numpy's reductions and order statistics at the confounds' call sites (the confounds' part,
+# relay 2d-iii-c; larmorx_core::numpy's reduce, quantile, umath and polynomial).
+def numpy_reduce(
+    a: np.ndarray, op: str, axis: int | None = None, numpy_version: str = "2.5.4", ddof: int = 0
+) -> np.ndarray:
+    """``a.sum(axis)``/``mean``/``var``/``std`` (``op``) of a C- or Fortran-contiguous float32
+    or float64 array in numpy release ``numpy_version``'s summation order; numpy's shape (0-d
+    for ``axis=None``)."""
+
+def numpy_percentile_rank(
+    a: np.ndarray,
+    q: float,
+    axis: int | None = None,
+    method: str = "lower",
+    numpy_version: str = "2.5.4",
+) -> np.ndarray:
+    """``numpy.percentile(a, q, axis, method="lower" | "higher")`` with a Python-number ``q``;
+    numpy's ``ValueError``/``IndexError``."""
+
+def numpy_extreme(a: np.ndarray, which: str) -> float:
+    """``a.min()`` or ``a.max()`` (``which``: ``"min"``, ``"max"``); ``-0.0 < +0.0``."""
+
+def numpy_cumsum(a: np.ndarray) -> np.ndarray:
+    """``numpy.cumsum(a)`` of a one-dimensional float32 or float64 array."""
+
+def numpy_searchsorted(
+    a: np.ndarray, v: float, side: str = "left", numpy_version: str = "2.5.4"
+) -> int:
+    """``numpy.searchsorted(a, v, side)`` of a float64 vector, with the release's bisection."""
+
+def numpy_nan_to_num(a: np.ndarray) -> np.ndarray:
+    """``numpy.nan_to_num(a)`` of a C- or Fortran-contiguous float32 or float64 array."""
+
+def numpy_diff(a: np.ndarray, n: int = 1, axis: int = 0) -> np.ndarray:
+    """``numpy.diff(a, n, axis)`` of a C- or Fortran-contiguous float32 or float64 array."""
+
+def numpy_legendre_basis(deg: int, x: np.ndarray, numpy_version: str = "2.5.4") -> np.ndarray:
+    """``numpy.polynomial.Legendre.basis(deg)(x)`` (numpy 2.2's or 2.3's ``legval``)."""
+
+def numpy_linspace(start: float, stop: float, num: int) -> np.ndarray:
+    """``numpy.linspace(start, stop, num)`` of float64 bounds."""
+
+def scipy_fftpack(
+    x: np.ndarray, n: int | None = None, forward: bool = True, scipy: str = "1.18.1"
+) -> np.ndarray:
+    """``scipy.fftpack.fft(x, n)`` (``forward``) or ``ifft(x, n)`` of a one-dimensional float32
+    or complex64 array of power-of-two length (after ``n``), with SciPy 1.18.1's ducc0 or 1.15's
+    pocketfft (``scipy="1.15.3"``, ``"1.15.2"``); complex64. ``ValueError`` for a length below
+    one, ``NotImplementedError`` for another length or, with ducc0, a complex array of 131072
+    values or more."""
+
+def numpy_cmul64(a: np.ndarray, b: np.ndarray) -> np.ndarray:
+    """numpy's complex64 product ``a * b`` of two one-dimensional complex64 arrays, as numpy
+    computes it on x86-64 with AVX2 and FMA3 (``re = fma(a.re, b.re, -(a.im b.im))``)."""
+
+def nitime_crosscov(
+    x: np.ndarray, y: np.ndarray, all_lags: bool = False, scipy: str = "1.18.1"
+) -> np.ndarray:
+    """nitime's ``crosscov(x, y, debias=False, all_lags=all_lags)`` of two float32 series of one
+    length (``autocorr(x)``: ``y = x``) with SciPy ``scipy``'s FFTs; float32."""
+
+def scipy_solve_1x1(a: float, b: float, scipy: str = "1.18.1") -> float:
+    """SciPy ``scipy``'s ``linalg.solve([[a]], [b])`` of float32 values, or its error
+    (``ValueError``, ``numpy.linalg.LinAlgError``)."""
+
+def nitime_ar_est_yw(x: np.ndarray, scipy: str = "1.18.1") -> tuple[np.ndarray, float]:
+    """nitime's ``AR_est_YW(x, 1)`` of a float32 series: ``(ak, sigma_v)``, ``ak`` a float32
+    array of one value (empty for one value with SciPy 1.18), or SciPy's error."""
+
+def nipype_compute_dvars(
+    mfunc: np.ndarray,
+    remove_zerovariance: bool = False,
+    variance_tol: float = 0.0,
+    intensity_normalization: float = 1000.0,
+    numpy: str = "2.5.4",
+    scipy: str = "1.18.1",
+    upstream_defects: str = "fix",
+    n_threads: int = 1,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, int, list[tuple[str, str, str, str]]]:
+    """nipype's ``compute_dvars`` on the masked series ``mfunc`` (float32, one row per voxel in
+    the mask's C order): ``(dvars_stdz, dvars_nstd, dvars_vx_stdz, ar1, voxels, notices)``, or
+    nipype's error (``larmorx.confounds.compute_dvars`` is the public form)."""

@@ -20,6 +20,7 @@ doctest = false
 larmorx-afni.workspace = true
 larmorx-ants.workspace = true
 larmorx-cli.workspace = true
+larmorx-confounds.workspace = true
 larmorx-core.workspace = true
 larmorx-fsl.workspace = true
 larmorx-hdf5.workspace = true

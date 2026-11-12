@@ -258,6 +258,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "larmorx-confounds"
+version = "0.1.0-rc.1"
+dependencies = [
+ "larmorx-core",
+ "larmorx-transform",
+ "rayon",
+ "thiserror",
+]
+
+[[package]]
 name = "larmorx-core"
 version = "0.1.0-rc.1"
 dependencies = [
@@ -371,6 +381,7 @@ dependencies = [
  "larmorx-afni",
  "larmorx-ants",
  "larmorx-cli",
+ "larmorx-confounds",
  "larmorx-core",
  "larmorx-fsl",
  "larmorx-hdf5",

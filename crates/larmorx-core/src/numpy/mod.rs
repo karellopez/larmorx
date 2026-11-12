@@ -6,21 +6,27 @@
 //! `scipy.stats.scoreatpercentile`).
 //!
 //! - [`reduce`]: `numpy.add.reduce` (pairwise summation along a contiguous axis, accumulation in
-//!   order along an outer one), `mean`, `var`, `std`, `nansum`, `nanvar`, `nanstd` and the
-//!   weighted `average`, over one axis of a C-ordered array.
+//!   order along an outer one; numpy 2.2's buffered chunks), `mean`, `var`, `std`, `nansum`,
+//!   `nanvar`, `nanstd` and the weighted `average`, over one axis of a C-ordered array or a whole
+//!   array; `cumsum`; `min`/`max` (the confounds' call sites: nipype's DVARS, CompCor, TSNR,
+//!   framewise displacement, niworkflows' signal extraction).
 //! - [`quantile`]: `numpy.percentile(..., method="higher")`, `numpy.nanpercentile` (the default
 //!   `"linear"` method) along the first axis, SciPy's `scoreatpercentile(...,
 //!   interpolation_method="lower")`; `numpy.percentile` with the default method of a whole array
 //!   (a Python-number `q`, as numpy 2.3 or 2.5 computes it, [`NumpyRelease`], or a list of
 //!   them), `numpy.median` of a whole array and along an axis (sdcflows' `brain_masker`,
-//!   niworkflows' `IntensityClip` and `RobustAverage`).
+//!   niworkflows' `IntensityClip` and `RobustAverage`); `percentile(..., axis, method="lower" |
+//!   "higher")` and `searchsorted` (nipype's DVARS and CompCor).
+//! - [`polynomial`]: `Legendre.basis(deg)(x)` (nipype's `regress_poly`).
 //!
 //! - [`format`]: numpy's `str()` of a float array (the messages' numbers).
 //! - [`umath`]: numpy's elementwise `exp` and `log` as its x86-64 Linux wheels compute them
-//!   (for `reproduce`), and `clip` with scalar bounds.
+//!   (for `reproduce`), `clip` with scalar bounds, `nan_to_num` and `diff`.
 //! - [`dot`]: `np.dot` and `np.linalg.norm` of float32 and float64 vectors (OpenBLAS's Haswell
 //!   `sdot` and `ddot`), under SciPy's conjugate gradients; `a.dot(x)` of a float64 matrix and a
 //!   vector (OpenBLAS's Haswell `dgemv_t`), under SciPy's Gaussian derivatives.
+//! - [`gemm`]: the arithmetic of OpenBLAS's Haswell `dgemm` micro-kernel on packed tiles (the
+//!   hot loop of `larmorx_transform::openblas::level3`: numpy's matrix products).
 //! - [`histograms`]: `numpy.linspace` and `numpy.histogram` with equal bins (scikit-image's Otsu
 //!   threshold).
 //!
@@ -48,7 +54,9 @@
 
 pub mod dot;
 pub mod format;
+pub mod gemm;
 pub mod histograms;
+pub mod polynomial;
 pub mod quantile;
 pub mod reduce;
 pub mod umath;

@@ -1,0 +1,13 @@
+[package]
+name = "larmorx-confounds"
+description = "fMRIPrep's confound estimation for larmorx, ported from nipype 1.12.0, niworkflows 1.15.4, fMRIPrep 25.2.7 and the numerics they call (SciPy's FFTs, nitime's AR(1), nipype's DVARS, ...)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+larmorx-core.workspace = true
+larmorx-transform.workspace = true
+rayon.workspace = true
+thiserror.workspace = true

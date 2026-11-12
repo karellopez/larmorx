@@ -39,7 +39,13 @@
 //! right-hand sides (LAPACK's `dgelsd`, and these kernels' main loops on long vectors);
 //! [`gesdd`] the thin SVD of an `m × 2` matrix (`scipy.linalg.svd(a, full_matrices=False)`:
 //! `dgesdd` with `JOBZ='S'`), and [`blas`] numpy's `dot` of vectors and matrices on the shapes
-//! SciPy's `least_squares` gives it (for SciPy's `curve_fit`, `larmorx-optim`).
+//! SciPy's `least_squares` gives it (for SciPy's `curve_fit`, `larmorx-optim`). The confounds'
+//! part adds the general routines at any size: [`blocked`] (the blocked QR, LQ and bidiagonal
+//! reductions with their `Q` and `P`), [`bdsdc`] (the divide-and-conquer bidiagonal SVD), [`svd`]
+//! (numpy's `svd(a, full_matrices=False)` and `pinv`), [`gelsd`] (numpy's `lstsq`), [`lasda`]
+//! (the divide-and-conquer SVD in compact form and its solves, `lstsq` of more than 25 columns)
+//! and [`gesvd`] (SciPy's `svd` with the `gesvd` driver on SciPy's own LAPACK, nipype's
+//! `fallback_svd` and `_full_rank`), each with its own upstream files.
 //!
 //! Upstream files (BSD-3-Clause; notices below and in NOTICE): OpenBLAS 0.3.34 and 0.3.30
 //! release tarballs, `lapack-netlib/SRC/` (`dgesdd.f`, `dgebrd.f`, `dgebd2.f`, `dbdsdc.f`,
@@ -93,9 +99,15 @@
 
 use crate::openblas;
 
+pub mod bdsdc;
 pub mod blas;
+pub mod blocked;
+pub mod gelsd;
 pub mod gesdd;
+pub mod gesvd;
+pub mod lasda;
 pub mod lstsq;
+pub mod svd;
 pub use gesdd::{GesddError, Svd2, gesdd_s2};
 pub use lstsq::{Lstsq, LstsqError, lstsq};
 
@@ -279,7 +291,7 @@ fn round_to_f64(r: u128, exp: i32) -> f64 {
 /// `acc3 + ((acc2 + acc0) + acc1)`, the root in extended precision, stored as a double (for
 /// `n < 8` this is the plain sum in order). The extended exponent range holds every square and
 /// sum, so only the final store can underflow or overflow.
-fn dnrm2(n: usize, x: &[f64], off: usize, inc: usize) -> f64 {
+pub(crate) fn dnrm2(n: usize, x: &[f64], off: usize, inc: usize) -> f64 {
     if n == 0 {
         return 0.0;
     }
@@ -524,8 +536,10 @@ fn dlapy2(x: f64, y: f64) -> f64 {
 }
 
 /// `DLARFG(N, ALPHA, X, INCX, TAU)`: the elementary reflector; `x` (N - 1 values at `xoff`,
-/// stride `inc` in `a`) is overwritten with `v(2:n)`, `alpha` with `beta`. Returns `tau`.
-fn dlarfg(n: usize, alpha: &mut f64, a: &mut [f64], xoff: usize, inc: usize) -> f64 {
+/// stride `inc` in `a`) is overwritten with `v(2:n)`, `alpha` with `beta`. Returns `tau`. Any
+/// length (the norm is OpenBLAS's x87 `dnrm2`, the scalings its `dscal`); the same in both
+/// releases.
+pub fn dlarfg(n: usize, alpha: &mut f64, a: &mut [f64], xoff: usize, inc: usize) -> f64 {
     if n <= 1 {
         return 0.0;
     }

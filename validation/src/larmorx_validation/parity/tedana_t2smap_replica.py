@@ -649,6 +649,11 @@ def _all_cases() -> list[tuple[str, str, str, Any]]:
                 ("fail", defect, _absolute(args, fdir)),
             )
         )
+    # ANALYZE 7.5 and MGH/MGZ inputs (relay RS2): their inputs are written with the others
+    formats = _investigation("check_formats")
+    for name, tier, args in formats.CASES:
+        full = formats.arguments(args, base / "formats")
+        out.append((f"formats/{name}", tier, _describe(full), ("syn", name, full)))
     # tedana's own spread: fMRIPrep's ds003592 call and two synthetic cases in its form
     syn = base / "synthetic"
     te_ms = ["-e", "12", "28", "44"]
@@ -687,6 +692,7 @@ def _generate(base: Path) -> list[tuple[str, list[str]]]:
     fdir = base / "failures"
     fdir.mkdir(parents=True, exist_ok=True)
     failures.make(fdir)
+    _investigation("check_formats").make(base / "formats")
     return cases
 
 
@@ -699,6 +705,7 @@ def _generator_digest() -> str:
         INVESTIGATION / "check_stages.py",
         INVESTIGATION / "check_outputs.py",
         INVESTIGATION / "check_failures.py",
+        INVESTIGATION / "check_formats.py",
     ):
         h.update(path.read_bytes())
     return h.hexdigest()[:16]
@@ -747,6 +754,10 @@ def _with_masks(base: Path, extra: list[tuple[str, list[str]]]) -> list[tuple[st
     return out
 
 
+#: The ANALYZE and MGH file names of the ``formats`` cases (named by their file names).
+_FORMATS = (".hdr", ".img", ".hdr.gz", ".img.gz", ".mgh", ".mgz", ".mgh.gz")
+
+
 def _describe(args: list[str]) -> str:
     """The arguments with every file named by its name (``@twice``: run twice)."""
     words = []
@@ -755,6 +766,8 @@ def _describe(args: list[str]) -> str:
             words.append("(run twice)")
         elif a.endswith(".nii.gz"):
             words.append(Path(a).name.removesuffix(".nii.gz"))
+        elif a.lower().endswith(_FORMATS):
+            words.append(Path(a).name)
         else:
             words.append(a)
     return "t2smap " + " ".join(words)

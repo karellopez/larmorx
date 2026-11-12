@@ -202,6 +202,26 @@ OPENBLAS_CORETYPE=Haswell scripts/orchestration/boxed.sh 32 <env>/bin/python -P 
   `--registry` runs tedana in process with `warnings`' filter changes traced (`##FILTERS`
   lines): Python's warnings registry is reset when the libraries' versions are gathered and when
   the confounds table is written (log `oracles/logs/t2smap-cr-rs1-registry.log`).
+- `check_formats.py` (relay RS2, 2026-11-12): the inputs and cases of the parity suite's
+  `formats/` category (ANALYZE 7.5 pairs of SPM2 in both byte orders and every stored type a fit
+  reads, the scale factor and intercept, the gl/cal ranges, the origin, a `.mat` beside the pair
+  (`mat`, `M`, neither), compressed pairs, voxel sizes of 0 and below 0, `.img` names, a
+  z-concatenated file and masks of the format; MGH/MGZ of uint8, int16, uint16, int32, float32,
+  an oblique affine, the footer's repetition time or none, `goodRASFlag` 0, a z-concatenated
+  file, three formats at once; and nibabel's failures: a short data file first and later, an
+  unknown ANALYZE type, MGH dimensions of 0, an MGH version other than 1, a `.mgh.gz` name):
+  `make(<folder>)` writes them, `CASES` names them (19; the suite runs them in both environments,
+  `reproduce` bit for bit, the default pass). Result: 19 of 19 pass (log
+  `oracles/logs/t2smap-cr-rs2-formats2.log`).
+- `rs2_replayed_formats.py <work> <larmorx-gpl> <scratch>` (relay RS2): the replica
+  (`reproduce`) against tedana's files on the replayed random-testing cases of the clean-room
+  part whose inputs are ANALYZE or MGH (`<work>/f<n>/{inputs,tedana/out}` as
+  `../t2smap-original/replay.py --keep` leaves them): 104 cases, every file tedana wrote
+  identical (the host's `dataset_description.json` apart), the 30 tedana failed failing too (log
+  `oracles/logs/t2smap-cr-rs2-replayed-formats.log`).
+- `rs2_descriptor_formats.py --cases N` (relay RS2): the replica's random-testing descriptor on
+  its ANALYZE and MGH draws only, each through the descriptor's own comparison: 30 of 30 agree
+  (log `oracles/logs/t2smap-cr-rs2-descriptor-formats.log`).
 - `check_outputs.py --replica <target>/release/larmorx-gpl --work <empty dir> --libraries
   newest|shared` (relay 5b; build with `cargo build --release --manifest-path crates-gpl/Cargo.toml
   -p larmorx-gpl-cli`): tedana's whole `t2smap` program (`t2smap._main(args)` in the environment's

@@ -236,7 +236,7 @@ pub fn prepare_and_fit(
 pub fn prepare(
     settings: Settings,
     argv: &[String],
-    _env: &Env,
+    env: &Env,
     log: &mut Log<'_>,
     notices: &mut Notices,
 ) -> Result<Setup, PyError> {
@@ -308,7 +308,7 @@ pub fn prepare(
         }
     }
 
-    let reference = data::load_ref(&settings.data, n_echos)?;
+    let reference = data::load_ref(&settings.data, n_echos, threads(&settings, env))?;
     // OutputGenerator(ref_img, convention, out_dir, prefix, ...)
     let prefix = infer_prefix(&settings.prefix);
     let figures = format!("{out_dir}/figures");

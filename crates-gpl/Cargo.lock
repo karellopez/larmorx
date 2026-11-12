@@ -217,10 +217,12 @@ dependencies = [
 name = "larmorx-gpl-tedana"
 version = "0.1.0-rc.1"
 dependencies = [
+ "flate2",
  "larmorx-core",
  "larmorx-interp",
  "larmorx-io",
  "larmorx-optim",
+ "larmorx-tedana",
  "larmorx-transform",
  "rayon",
  "tempfile",
@@ -266,6 +268,19 @@ dependencies = [
  "larmorx-core",
  "larmorx-transform",
  "thiserror",
+]
+
+[[package]]
+name = "larmorx-tedana"
+version = "0.1.0-rc.1"
+dependencies = [
+ "flate2",
+ "larmorx-core",
+ "larmorx-interp",
+ "larmorx-io",
+ "larmorx-transform",
+ "ndarray",
+ "rayon",
 ]
 
 [[package]]

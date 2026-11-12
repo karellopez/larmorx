@@ -7,12 +7,17 @@
 //! classes and scaling.
 //!
 //! nibabel reads NIfTI-1 single files as `Nifti1Image` and NIfTI-2 single files as
-//! `Nifti2Image` (a subclass of `Nifti1Image`), which tedana uses as they are; pairs it converts
+//! `Nifti2Image` (a subclass of `Nifti1Image`), which tedana uses as they are; pairs, ANALYZE 7.5
+//! pairs (nibabel's `Spm2AnalyzeImage`) and MGH/MGZ images (`MGHImage`) it converts
 //! (`_convert_to_nifti1`: the data, the affine and the zooms into a new `Nifti1Image`, squeezed
 //! to three dimensions for a mask). The values are the
 //! same either way: float32 from the stored type, through float64 where the header scales them.
-//! Other formats nibabel reads (ANALYZE, MGH, AFNI, MINC, PAR/REC, compressed with bzip2 or
-//! zstd) are refused with a clear message (a documented gap, decision D5).
+//! ANALYZE and MGH are read by the main package's reader of nibabel 5.4.2's loading
+//! (`larmorx_tedana::formats`, Apache-2.0: SPM2's header, scaling, origin and `.mat` affine;
+//! MGH's big-endian header, affine and footer), with nibabel's float32 translation of an MGH
+//! affine (`from_matvec` keeps the float32 type of `Mdc.T * delta`). Other formats nibabel reads
+//! (AFNI, MINC, PAR/REC, compressed with bzip2 or zstd), complex and RGB ANALYZE data, and
+//! headers that reader refuses, are refused with a clear message (a documented gap, D5).
 //!
 //! Masked voxels are taken in numpy's order of a boolean index on the first three axes: the
 //! first axis slowest. `Masked::data` is the `(voxels, echoes, volumes)` C-ordered float32
@@ -23,6 +28,7 @@ use std::path::{Path, PathBuf};
 use larmorx_core::numpy::format::array_str_2d;
 use larmorx_core::{Affine, DynArray};
 use larmorx_io::nifti::{self, NiftiHeader, NiftiPaths, ReadOptions, Scaling};
+use larmorx_tedana::formats;
 use rayon::prelude::*;
 
 use crate::log::PyError;
@@ -34,17 +40,50 @@ pub enum ImageClass {
     Nifti1Pair,
     Nifti2Image,
     Nifti2Pair,
+    /// An ANALYZE 7.5 pair (nibabel's first ANALYZE class, SPM2's).
+    Spm2AnalyzeImage,
+    MghImage,
+}
+
+/// Where an image's values are read from.
+#[derive(Clone, Debug)]
+enum Source {
+    Nifti(Box<NiftiHeader>),
+    /// ANALYZE or MGH: the main package's reader of nibabel's loading.
+    Formats(Box<formats::Head>),
 }
 
 /// An image header as nibabel loads it, before the data.
 #[derive(Clone, Debug)]
 pub struct Header {
     pub path: PathBuf,
+    /// The name as the user gave it (for messages).
+    pub given: String,
     pub class: ImageClass,
-    pub header: NiftiHeader,
     pub shape: Vec<usize>,
     /// nibabel's `img.affine`.
     pub affine: Affine,
+    source: Source,
+}
+
+impl Header {
+    /// Whether tedana converts the image to an in-memory `Nifti1Image` (`_convert_to_nifti1`:
+    /// every image but a NIfTI single file), which reads its data at once: a reading error
+    /// then comes before any check of the image's shape.
+    pub fn converted(&self) -> bool {
+        !matches!(
+            self.class,
+            ImageClass::Nifti1Image | ImageClass::Nifti2Image
+        )
+    }
+
+    /// `img.header.get_zooms()`.
+    pub fn zooms(&self) -> Result<Vec<f64>, PyError> {
+        match &self.source {
+            Source::Nifti(h) => h.zooms().map_err(io_error),
+            Source::Formats(h) => Ok(h.zooms.clone()),
+        }
+    }
 }
 
 fn image_file_error(path: &str) -> PyError {
@@ -59,30 +98,109 @@ fn io_error(e: impl std::fmt::Display) -> PyError {
     PyError::new("OSError", e.to_string(), "nibabel/loadsave.py, in load")
 }
 
+fn unsupported(path: &str, what: &str) -> PyError {
+    PyError::new(
+        "larmorx.UnsupportedFormat",
+        format!(
+            "{path}: larmorx-gpl reads NIfTI-1 and NIfTI-2 images, ANALYZE 7.5 and MGH/MGZ \
+             images; tedana reads {what} through nibabel (a documented gap)"
+        ),
+        "tedana/io.py, in load_ref_img",
+    )
+}
+
+/// An error of the main package's ANALYZE and MGH reader as nibabel raises it (its own refusals,
+/// a form it does not read, become the replica's).
+fn formats_error(path: &str, e: larmorx_tedana::log::PyError) -> PyError {
+    if e.message.contains("larmorx's clean-room") {
+        return unsupported(path, "this file");
+    }
+    let place = if e.class.contains("mghformat") || e.message.contains("MGH") {
+        "nibabel/freesurfer/mghformat.py"
+    } else {
+        "nibabel/loadsave.py, in load"
+    };
+    PyError::new(&e.class, e.message, place)
+}
+
+/// SPM2's test of a pair's header (nibabel's `Spm2AnalyzeHeader.may_contain_header`): 348 in
+/// `sizeof_hdr` in either byte order, and not NIfTI-1's magic.
+fn is_analyze(path: &Path) -> bool {
+    let Some(paths) = NiftiPaths::from_path(path) else {
+        return false;
+    };
+    let Ok(raw) = std::fs::read(paths.header_path()) else {
+        return false;
+    };
+    let bytes = if raw.len() >= 2 && raw[0] == 0x1f && raw[1] == 0x8b {
+        let mut out = Vec::new();
+        use std::io::Read as _;
+        if flate2::read::MultiGzDecoder::new(&raw[..])
+            .take(348)
+            .read_to_end(&mut out)
+            .is_err()
+        {
+            return false;
+        }
+        out
+    } else {
+        raw
+    };
+    if bytes.len() < 348 || matches!(&bytes[344..348], b"ni1\0" | b"n+1\0") {
+        return false;
+    }
+    let le = i32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
+    let be = i32::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
+    le == 348 || be == 348
+}
+
+/// ANALYZE or MGH through the main package's reader (`given` the user's name of the file).
+fn load_formats(p: &Path, path: &str, class: ImageClass) -> Result<Header, PyError> {
+    let head = formats::open(p, path).map_err(|e| formats_error(path, e))?;
+    if !head.kind.converted() {
+        return Err(unsupported(path, "this file"));
+    }
+    let mut affine = head.affine;
+    if class == ImageClass::MghImage {
+        // nibabel's MGH affine is float32 (`from_matvec(MdcD, ...)` keeps MdcD's type): its
+        // translation, Pxyz_c - centre in float64, is stored rounded to float32.
+        let mut rows = *affine.rows();
+        for row in rows.iter_mut().take(3) {
+            row[3] = f64::from(row[3] as f32);
+        }
+        affine = Affine::from_rows(rows);
+    }
+    Ok(Header {
+        path: p.to_path_buf(),
+        given: path.to_owned(),
+        class,
+        shape: head.shape.clone(),
+        affine,
+        source: Source::Formats(Box::new(head)),
+    })
+}
+
 /// `nibabel.load(path)`'s class and header.
 pub fn load_header(path: &str) -> Result<Header, PyError> {
     let lower = path.to_ascii_lowercase();
     let stem = lower.strip_suffix(".gz").unwrap_or(&lower).to_owned();
+    let p = Path::new(path);
+    // MGHImage: `.mgh` and `.mgz` only (no compressed suffix: `.mgh.gz` is no image nibabel
+    // knows).
+    if lower.ends_with(".mgh") || lower.ends_with(".mgz") {
+        return load_formats(p, path, ImageClass::MghImage);
+    }
     for (ext, what) in [
-        (".bz2", "bzip2-compressed"),
-        (".zst", "zstd-compressed"),
-        (".mgh", "MGH"),
-        (".mgz", "MGH"),
-        (".head", "AFNI"),
-        (".brik", "AFNI"),
-        (".mnc", "MINC"),
-        (".par", "PAR/REC"),
-        (".rec", "PAR/REC"),
+        (".bz2", "bzip2-compressed images"),
+        (".zst", "zstd-compressed images"),
+        (".head", "AFNI images"),
+        (".brik", "AFNI images"),
+        (".mnc", "MINC images"),
+        (".par", "PAR/REC images"),
+        (".rec", "PAR/REC images"),
     ] {
         if lower.ends_with(ext) || stem.ends_with(ext) {
-            return Err(PyError::new(
-                "larmorx.UnsupportedFormat",
-                format!(
-                    "{path}: larmorx-gpl reads NIfTI-1 and NIfTI-2 images only; tedana reads \
-                     {what} images through nibabel (a documented gap)"
-                ),
-                "tedana/io.py, in load_ref_img",
-            ));
+            return Err(unsupported(path, what));
         }
     }
     let single = stem.ends_with(".nii");
@@ -90,7 +208,9 @@ pub fn load_header(path: &str) -> Result<Header, PyError> {
     if !single && !pair {
         return Err(image_file_error(path));
     }
-    let p = Path::new(path);
+    if pair && is_analyze(p) {
+        return load_formats(p, path, ImageClass::Spm2AnalyzeImage);
+    }
     let header = nifti::read_header(p).map_err(|e| match e {
         nifti::Error::Header { .. } => image_file_error(path),
         other => io_error(other),
@@ -101,17 +221,7 @@ pub fn load_header(path: &str) -> Result<Header, PyError> {
         (b"n+2" | b"ni2", true) => ImageClass::Nifti2Image,
         (b"ni1" | b"n+1", false) => ImageClass::Nifti1Pair,
         (b"ni2" | b"n+2", false) => ImageClass::Nifti2Pair,
-        (_, true) => return Err(image_file_error(path)),
-        (_, false) => {
-            return Err(PyError::new(
-                "larmorx.UnsupportedFormat",
-                format!(
-                    "{path}: larmorx-gpl reads NIfTI-1 and NIfTI-2 images only; tedana reads \
-                     ANALYZE images through nibabel (a documented gap)"
-                ),
-                "tedana/io.py, in load_ref_img",
-            ));
-        }
+        _ => return Err(image_file_error(path)),
     };
     // nibabel's load-time fixes are applied when the data are read; the shape and affine are
     // those of the fixed header.
@@ -122,18 +232,38 @@ pub fn load_header(path: &str) -> Result<Header, PyError> {
     let affine = fixed.best_affine_nibabel().map_err(io_error)?;
     Ok(Header {
         path: p.to_path_buf(),
+        given: path.to_owned(),
         class,
-        header: fixed,
         shape,
         affine,
+        source: Source::Nifti(Box::new(fixed)),
     })
 }
 
 /// Reads the voxels of `h` with `scaling` (nibabel's `np.asarray(img.dataobj, dtype)`).
 fn read_data(h: &Header, scaling: Scaling, n_threads: usize) -> Result<DynArray, PyError> {
-    nifti::read(&h.path, &ReadOptions { scaling, n_threads })
-        .map(|img| img.data)
-        .map_err(io_error)
+    match &h.source {
+        Source::Nifti(_) => nifti::read(&h.path, &ReadOptions { scaling, n_threads })
+            .map(|img| img.data)
+            .map_err(io_error),
+        Source::Formats(head) => head
+            .read(scaling, n_threads, &h.given)
+            .map_err(|e| short_file(h, formats_error(&h.given, e))),
+    }
+}
+
+/// nibabel's `array_from_file` names the file it read the data from (`infile.name`): an
+/// ANALYZE pair's image file, not the header the user may have named.
+fn short_file(h: &Header, mut e: PyError) -> PyError {
+    let from = format!(" bytes from {}\n", h.given);
+    if e.class == "OSError" && e.message.contains(&from) {
+        if let Some(paths) = NiftiPaths::from_path(Path::new(&h.given)) {
+            let image = format!(" bytes from {}\n", paths.image_path().display());
+            e.message = e.message.replace(&from, &image);
+        }
+        e.place = "nibabel/volumeutils.py, in array_from_file".to_owned();
+    }
+    e
 }
 
 fn as_f32(a: DynArray) -> Vec<f32> {
@@ -162,9 +292,13 @@ pub struct RefImage {
 }
 
 /// `load_ref_img(data, n_echos)`.
-pub fn load_ref(data: &[String], n_echos: usize) -> Result<RefImage, PyError> {
+pub fn load_ref(data: &[String], n_echos: usize, n_threads: usize) -> Result<RefImage, PyError> {
     let h = load_header(&data[0])?;
-    let zooms = h.header.zooms().map_err(io_error)?;
+    if h.converted() {
+        // `_convert_to_nifti1(img)` reads the data (`np.asanyarray(img.dataobj)`).
+        read_data(&h, Scaling::Auto, n_threads)?;
+    }
+    let zooms = h.zooms()?;
     let mut shape = h.shape.clone();
     if data.len() == 1 {
         // `data_img.shape[2] // n_echos`, then `slicer[:, :, :n_z, :]`.
@@ -207,8 +341,13 @@ pub fn load_user_mask(path: &str, n_threads: usize) -> Result<UserMask, PyError>
     let h = load_header(path)?;
     let mut shape = h.shape.clone();
     // `_convert_to_nifti1` returns any `Nifti1Image` as it is, a `Nifti2Image` (a subclass)
-    // included: only pairs are converted and squeezed.
-    let converted = !matches!(h.class, ImageClass::Nifti1Image | ImageClass::Nifti2Image);
+    // included: pairs, ANALYZE and MGH images are converted (their data read) and squeezed.
+    let converted = h.converted();
+    let values = if converted {
+        Some(as_f64(read_data(&h, Scaling::F64, n_threads)?))
+    } else {
+        None
+    };
     if converted && shape.len() > 3 {
         // `nb.funcs.squeeze_image`: trailing axes of length 1 beyond the third.
         while shape.len() > 3 && *shape.last().expect("non-empty") == 1 {
@@ -224,7 +363,10 @@ pub fn load_user_mask(path: &str, n_threads: usize) -> Result<UserMask, PyError>
             ));
         }
     }
-    let values = as_f64(read_data(&h, Scaling::F64, n_threads)?);
+    let values = match values {
+        Some(v) => v,
+        None => as_f64(read_data(&h, Scaling::F64, n_threads)?),
+    };
     let inside = values.par_iter().map(|&v| v > 0.0).collect();
     Ok(UserMask {
         header: h,
@@ -364,11 +506,21 @@ fn load_fast(data: &[String], mask: &UserMask, n_threads: usize) -> Result<Maske
     let mut spatial = [0; 3];
     for f in data {
         let h = load_header(f)?;
+        // `_mask_4d(_convert_to_nifti1(nb.load(f)))`: a converted image's data are read first,
+        // then the shape is checked, the values asked for as float32, the dimensions checked.
+        let mut arr = if h.converted() {
+            Some(as_f32(read_data(&h, Scaling::F32, n_threads)?))
+        } else {
+            None
+        };
         if h.shape.len() < 3 || h.shape[..3] != mask.shape[..] {
             return Err(PyError::value_error(
                 "Image/mask shape mismatch",
                 "_mask_4d",
             ));
+        }
+        if arr.is_none() {
+            arr = Some(as_f32(read_data(&h, Scaling::F32, n_threads)?));
         }
         if h.shape.len() != 4 {
             return Err(PyError::value_error("Expected 4D image", "_mask_4d"));
@@ -385,7 +537,7 @@ fn load_fast(data: &[String], mask: &UserMask, n_threads: usize) -> Result<Maske
             ));
         }
         n_vols = Some(t);
-        let arr = as_f32(read_data(&h, Scaling::F32, n_threads)?);
+        let arr = arr.expect("read above");
         per_echo.push(gather(&arr, spatial.iter().product(), &voxels, t));
     }
     let n_vols = n_vols.unwrap_or(0);
@@ -401,11 +553,18 @@ fn load_fast(data: &[String], mask: &UserMask, n_threads: usize) -> Result<Maske
 
 /// nilearn's `masking.apply_mask(img, mask_img)` per echo (the fallback).
 fn load_nilearn(data: &[String], mask: &UserMask, n_threads: usize) -> Result<Masked, PyError> {
-    // Every echo is loaded before the first is masked.
-    let headers = data
-        .iter()
-        .map(|f| load_header(f))
-        .collect::<Result<Vec<_>, _>>()?;
+    // Every echo is loaded (`_convert_to_nifti1(nb.load(f), dtype=dtype)`: a converted image's
+    // data read as float32 then) before the first is masked.
+    let mut loaded = Vec::with_capacity(data.len());
+    for f in data {
+        let h = load_header(f)?;
+        let arr = if h.converted() {
+            Some(as_f32(read_data(&h, Scaling::F32, n_threads)?))
+        } else {
+            None
+        };
+        loaded.push((h, arr));
+    }
     // check_niimg_3d: a 4D mask of one volume is squeezed; other shapes are refused.
     let mut mshape = mask.shape.clone();
     if mshape.len() == 4 && mshape[3] == 1 {
@@ -434,7 +593,7 @@ fn load_nilearn(data: &[String], mask: &UserMask, n_threads: usize) -> Result<Ma
     let voxels = masked_voxels(&mask.inside, spatial);
     let mut per_echo = Vec::with_capacity(data.len());
     let mut n_vols = None;
-    for h in headers {
+    for (h, arr) in loaded {
         if !allclose(&mask.header.affine, &h.affine) {
             return Err(PyError::value_error(
                 format!(
@@ -471,7 +630,10 @@ fn load_nilearn(data: &[String], mask: &UserMask, n_threads: usize) -> Result<Ma
         }
         n_vols = Some(t);
         // smooth_array(..., ensure_finite=True): non-finite values become 0.
-        let mut arr = as_f32(read_data(&h, Scaling::F32, n_threads)?);
+        let mut arr = match arr {
+            Some(a) => a,
+            None => as_f32(read_data(&h, Scaling::F32, n_threads)?),
+        };
         arr.par_iter_mut().for_each(|v| {
             if !v.is_finite() {
                 *v = 0.0;
@@ -498,6 +660,8 @@ fn load_zcat(
     n_threads: usize,
 ) -> Result<Masked, PyError> {
     let h = load_header(path)?;
+    // `np.asarray(data_img.dataobj, dtype=dtype)` before `arr.ndim != 4`.
+    let arr = as_f32(read_data(&h, Scaling::F32, n_threads)?);
     if h.shape.len() != 4 {
         return Err(PyError::value_error(
             "Expected 4D z-concatenated image",
@@ -514,7 +678,6 @@ fn load_zcat(
     }
     let spatial = [nx, ny, n_z];
     let voxels = masked_voxels(&mask.inside, spatial);
-    let arr = as_f32(read_data(&h, Scaling::F32, n_threads)?);
     let full = nx * ny * nzt;
     let per_echo: Vec<Vec<f32>> = (0..n_echos)
         .map(|e| {

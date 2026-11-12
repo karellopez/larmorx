@@ -605,8 +605,8 @@ fMRIPrep's four multi-echo calls hold no such voxel (none with equal observation
 decision of 2026-11-11, §15.1): by default a voxel whose n · T_u observations are all equal and not
 all 0, in a group whose design keeps both singular values (lstsq's rank 2: two distinct echo
 times among its n, §13.4), takes the exact least-squares solution β = (y, 0): T2* = 1/(+0) = +∞
-(floored to 500 ms, §8; in `curvefit` that start is §7.3's failure that keeps it, marked in the
-failures map), S0 = exp(y), with numpy's `divide by zero` warning (§12.3) and TED-46's notice; every other voxel of the group keeps tedana's batched solution (an implementation that
+(floored to 500 ms, §8; in `curvefit` §7.3's last paragraph says what the curve fit then does),
+S0 = exp(y), with numpy's `divide by zero` warning (§12.3) and TED-46's notice; every other voxel of the group keeps tedana's batched solution (an implementation that
 solves the batch, as the replica does, overwrites only those voxels' β, so the rest keep
 tedana's bits). Observations all 0 are not TED-46's (a zero right-hand side: tedana's slope is an
 exact 0 there too), nor is an exact slope of 0 from distinct observations (the solver's own value,
@@ -679,6 +679,41 @@ progress bar per group on standard error (`<n>-echo monoexponential`, tqdm's; no
 The failures and variances of count-1 voxels (fitted in group 2) are **not** reported: the
 failures map and the variance maps hold 0 there, while the full maps hold their group-2 fit
 (TED-08).
+
+**TED-46 in the curve fit** (spec writer 4, 2026-11-12: rule D, measured first,
+`validation/investigations/t2smap-spec/ted46_curvefit.py`). A voxel of §7.2's TED-46 whose n ·
+T_u **samples** are all equal (x, finite; their observation y not 0) has an exact solution of the
+curve fit too: S0 = x, T2* = +∞ (S0 · exp(−TE/∞) = x at every echo: a residual of 0, the
+infimum of the cost, inside the bounds since S0 ≥ x). Started from TED-46's exact log-linear
+solution (T2* = +∞), SciPy refuses the fit (item 4 above): a failure that keeps the log-linear
+S0 = exp(y) = x + 1 (the +1 of log(|x| + 1)) and marks the voxel in the failures map. Measured on
+the 23 cases that hold such voxels (the 20 replayed trial cases with `--fittype curvefit`, the
+model's `tedana` variant equal to tedana's S0 and limited T2* files in each, and three synthetic
+series of decaying voxels with 0.2 %, 1 % and 5 % of the mask clipped at 255), against the exact
+solution as the truth:
+- tedana: T2* 1 ms (a negative noise slope: TED-06's failure keeping S0 = x + 1) in 12 trial
+  cases and the three synthetic ones, about 1e16 to 3e17 ms with S0 = x + 0.5 in 7 (the fit
+  started there leaves T2* and moves S0 halfway), mixed in one (`ts`); in those 8 the cap is
+  itself one of those values (2.0e16 to 2.8e17 ms), so nothing is capped; the RMSE map holds
+  about x at the 1 ms voxels;
+- the start +∞ (TED-46's log-linear result kept): T2* = 500 ms in both maps, the cap and every
+  other voxel's limited T2* and RMSE **equal to the truth's** in all 23 cases; but S0 = x + 1
+  (to 4e-6: exp of the float32 log(x + 1); 1/255 of the saturated 255) and every such voxel a
+  failure;
+- the fit started at a finite T2* (500 ms, the value §8 gives +∞; the correction first proposed):
+  it converges (S0 within 4e-6 of x) at T2* = 1.2e9 to 2.1e10 ms, finite, which §8 keeps: the
+  cap becomes one of those values in 20 of the 23 cases (it stays where those voxels are few, the
+  0.2 % series, whose limited map then caps them to 80 ms with an RMSE of 0.31 x, or all of
+  count 1, which the limited map leaves out: two trial cases): worse than the start +∞, not
+  adopted.
+So by default (rule A) such a voxel takes the exact solution: S0 = x, T2* = +∞ (500 ms after §8),
+**not a failure**, its variance and covariance values SciPy's for a residual of 0 (0 when m = n ·
+T_u > 2; +∞ when m ≤ 2, with SciPy's `OptimizeWarning: Covariance of the parameters could not be
+estimated`, §12.3), and §7.3's DEBUG count leaves it out; TED-46's notice is unchanged. Its T2*,
+the cap and every other voxel are those of the start +∞ (the measurement above); its S0 and the
+failures map are the truth's. Observations equal with samples that are not (x = ±c, or values so
+large that log(|x| + 1) rounds them together) keep the start +∞ and its failure. `reproduce`
+gives tedana's fit from its noise.
 
 ### 7.4 `--fitmode ts`
 
@@ -1189,7 +1224,7 @@ texts are the last line of the traceback (§12.4), exit status 1.
 | TED-17 | a single fit voxel: `IndexError: too many indices for array: array is 0-dimensional, but 1 were indexed` (both fit types and modes) | A | fitted as any other voxel; notice `a single voxel is left for the fit` |
 | TED-18 | a cap c ≤ 0 (more than 99.5 % of the limited values 0): every positive limited T2* set to c (then the RMSE divides by 0) | A | no cap of 0 or less, on either map (TED-05's not applied then); notice `the limited T2* map's cap is <c, 3 decimals> ms (its 99.5th percentile), so tedana sets its <k> value(s) above it to it` |
 | TED-31 | no voxel left for the fit (the adaptive mask removed every voxel of a mask of S ≥ 1 voxels): after the adaptive mask image, `Computing T2* map` and the echo times' check (§3 step 15), `IndexError: index 0 is out of bounds for axis 1 with size 0` (both fit types and both fit modes; observed) | B | at the same place: `ValueError: no voxel of the mask has good signal (the adaptive mask removed all <S>), so there is nothing to fit (tedana fails with IndexError)`; notice `no voxel is left for the fit (the adaptive mask removed all <S>)` (the same notice, `reproduced`, in `reproduce`) |
-| TED-46 | a voxel whose log-linear observations are all equal and not all 0 (no decay: saturated samples) gets the batch's rounding noise as its slope (§7.2, §13.4): T2* 1 ms where it is negative, 1e16 ms and more where it is positive, never the 500 ms of an exact 0; the cap and, in `curvefit`, the fits' outcomes can move with it (observed) | A | the exact solution β = (y, 0) in a group of rank 2 (§7.2): T2* +∞, floored to 500 ms, S0 = exp(y), numpy's `divide by zero` warning; the group's other voxels unchanged; notice `<k> voxel(s) whose log-linear observations have no slope fitted with the slope 0 (no decay, T2* 500 ms); tedana's <n>-echo least squares leaves rounding noise there (T2* 1 ms, or 1e16 ms and more)` (k and n at the first place: this section's rule); `reproduce` computes tedana's noise (§13.4's exact `lstsq`), notice `<k> voxel(s) whose log-linear observations have no slope: tedana's <n>-echo least squares leaves rounding noise there (T2* 1 ms, or 1e16 ms and more)` (an original that does not compute that noise yet ends it `..., which this build does not compute yet; it writes the slope 0 (no decay, T2* 500 ms)` and writes the default's values) |
+| TED-46 | a voxel whose log-linear observations are all equal and not all 0 (no decay: saturated samples) gets the batch's rounding noise as its slope (§7.2, §13.4): T2* 1 ms where it is negative, 1e16 ms and more where it is positive, never the 500 ms of an exact 0; the cap and, in `curvefit`, the fits' outcomes can move with it (observed) | A | the exact solution β = (y, 0) in a group of rank 2 (§7.2): T2* +∞, floored to 500 ms, S0 = exp(y), numpy's `divide by zero` warning; the group's other voxels unchanged; in `curvefit`, where the samples themselves are all equal (x), the curve fit's exact solution S0 = x, T2* +∞, no failure, variances 0 (+∞ with two samples, SciPy's warning) (§7.3's last paragraph: measured, spec writer 4); notice `<k> voxel(s) whose log-linear observations have no slope fitted with the slope 0 (no decay, T2* 500 ms); tedana's <n>-echo least squares leaves rounding noise there (T2* 1 ms, or 1e16 ms and more)` (k and n at the first place: this section's rule); `reproduce` computes tedana's noise (§13.4's exact `lstsq`), notice `<k> voxel(s) whose log-linear observations have no slope: tedana's <n>-echo least squares leaves rounding noise there (T2* 1 ms, or 1e16 ms and more)` (an original that does not compute that noise yet ends it `..., which this build does not compute yet; it writes the slope 0 (no decay, T2* 500 ms)` and writes the default's values) |
 
 ### 15.2 The maths (NP-03, NP-04, GLIBC-07)
 
@@ -1473,6 +1508,12 @@ decision of open point 5, its texts), §15.1's TED-01 (a NaN mean, not an infini
 group-2 counting, §12.3's warnings registry (reset when the confounds table is written), the
 temporal means' `invalid value encountered in reduce` and the images' cast overflow, and §14's
 interfaces after the easy command line and the wiring (`implementation="clean-room"`).
+
+(spec writer 4, 2026-11-12, the replica-side relay RS2: one question of the orchestrator, rule
+D) TED-46 under `--fittype curvefit`, measured first: the default's start +∞ against the curve
+fit's exact solution and tedana's own results on the 23 cases that hold such voxels, and the
+correction first proposed (a finite start) measured too (§7.3's last paragraph); the replica's
+default implements the answer, its `reproduce` is unchanged (tedana's files).
 
 Open points:
 1. (Decided 2026-11-08, §15.2.) The original's maths notices: the one-pass rule (NP-03 never

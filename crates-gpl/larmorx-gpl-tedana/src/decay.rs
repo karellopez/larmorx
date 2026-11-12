@@ -21,7 +21,10 @@
 //! least-squares problem for all of them); by default that voxel alone is NaN. TED-46, a voxel
 //! whose observations are all equal (no decay: saturated samples) gets the batch's rounding noise
 //! as its slope (T2* 1 ms, or 1e16 ms and more); by default it takes the exact solution, slope 0
-//! (T2* 500 ms after the floors), the rest of the batch unchanged (`specs/t2smap.md` §7.2).
+//! (T2* 500 ms after the floors), the rest of the batch unchanged (`specs/t2smap.md` §7.2), and
+//! in the curve fit, where its samples are all equal, the curve fit's exact solution (S0 the
+//! samples' value, T2* +inf: 500 ms; no failure), not SciPy's refusal of an infinite start
+//! (§7.3; measured: `validation/investigations/t2smap-spec/ted46_curvefit.py`).
 
 use larmorx_core::defects::{Notices, TED_09, TED_17, TED_46};
 use larmorx_core::parallel;
@@ -464,6 +467,29 @@ pub fn fit_monoexponential(
         let idx = group(am, echo_num, false);
         let x: Vec<f64> = (0..n * n_vols).map(|r| tes[r / n_vols.max(1)]).collect();
         let bar = log.progress(&format!("{echo_num}-echo monoexponential"), idx.len());
+        // TED-46 (`specs/t2smap.md` §7.3): with two distinct echo times among the group's, a
+        // voxel whose samples are all equal (x, finite, its log-linear observation not 0) has
+        // the curve fit's exact solution S0 = x, T2* = +inf (no decay); tedana starts the fit
+        // from its log-linear noise, and an exact slope 0 would start it at +inf, which SciPy
+        // refuses (a failure keeping S0 = x + 1).
+        let rank2 = tes[..n].iter().any(|&t| t != tes[0]);
+        let exact_flat = |v: usize| -> Option<f32> {
+            if reproduce || !rank2 || n_vols == 0 {
+                return None;
+            }
+            let x0 = data[v * n_echos * n_vols];
+            // log(|x| + 1) is 0 exactly when |x| + 1 rounds to 1 in float32
+            if !x0.is_finite() || x0.abs() + 1.0 == 1.0 {
+                return None;
+            }
+            (0..n)
+                .all(|e| {
+                    data[(v * n_echos + e) * n_vols..(v * n_echos + e + 1) * n_vols]
+                        .iter()
+                        .all(|&s| s == x0)
+                })
+                .then_some(x0)
+        };
         if n_vols == 0 && !idx.is_empty() {
             // No volume to fit (all of them excluded): the first voxel's bound,
             // np.min(data_2d[:, voxel]) of an empty column, raises outside curve_fit's try.
@@ -473,6 +499,13 @@ pub fn fit_monoexponential(
             ));
         }
         let fit_one = |v: usize| -> VoxelFit {
+            if let Some(x0) = exact_flat(v) {
+                // SciPy's covariance of a zero residual: 0 with more samples than parameters,
+                // +inf (and its warning) otherwise.
+                let m = n * n_vols;
+                let c = if m > 2 { 0.0 } else { f64::INFINITY };
+                return Some(([f64::from(x0), f64::INFINITY], [[c, c], [c, c]], m <= 2));
+            }
             let y: Vec<f64> = (0..n)
                 .flat_map(|e| {
                     data[(v * n_echos + e) * n_vols..(v * n_echos + e + 1) * n_vols]
@@ -734,5 +767,56 @@ mod tests {
         zeros[..6].fill(0.0);
         let (_, _, nz, _) = fit(&zeros, UpstreamDefects::Fix);
         assert!(nz.is_empty());
+    }
+
+    fn curve(data: &[f32], vols: usize, am: &[i64], mode: UpstreamDefects) -> Fit {
+        let maths = Maths::of_mode(UpstreamDefects::Fix);
+        let ctx = Context {
+            libraries: Libraries::Newest,
+            n_threads: 1,
+            maths: &maths,
+        };
+        let mut err = Vec::new();
+        let mut log = Log::with_bars(&mut err, false);
+        log.setup(false, false);
+        let mut notices = Notices::new(mode);
+        let tes = [12.0, 28.0, 44.0];
+        fit_monoexponential(data, 3, vols, &tes, am, &ctx, &mut log, &mut notices).unwrap()
+    }
+
+    #[test]
+    fn equal_samples_take_the_curve_fits_exact_solution_by_default() {
+        // saturated (255 everywhere), decaying, and samples equal in |x| only (log-linear
+        // observations equal, samples not: the start +inf is SciPy's failure, as in tedana)
+        let mut data = vec![0.0f32; 3 * 3 * 2];
+        data[..6].fill(255.0);
+        for e in 0..3 {
+            for t in 0..2 {
+                data[6 + e * 2 + t] = 900.0 * (0.97f32).powi(16 * e as i32) + t as f32;
+                data[12 + e * 2 + t] = if (e + t) % 2 == 0 { 40.0 } else { -40.0 };
+            }
+        }
+        let f = curve(&data, 2, &[3, 3, 3], UpstreamDefects::Fix);
+        assert_eq!((f.s0[0], f.t2s[0]), (255.0, f64::INFINITY));
+        let fails = f.failures.as_ref().unwrap();
+        assert!(!fails[0] && !fails[1]);
+        // six samples: SciPy's covariance of a zero residual is 0
+        assert_eq!(f.s0_var.as_ref().unwrap()[0], 0.0);
+        assert_eq!(f.t2s_var.as_ref().unwrap()[0], 0.0);
+        // tedana: the start from the log-linear noise (reproduce), the decaying voxel unchanged
+        let r = curve(&data, 2, &[3, 3, 3], UpstreamDefects::Reproduce);
+        assert_ne!(r.s0[0], 255.0);
+        assert_eq!(f.s0[1].to_bits(), r.s0[1].to_bits());
+        assert_eq!(f.t2s[1].to_bits(), r.t2s[1].to_bits());
+        // equal observations of unequal samples: TED-46's start +inf, SciPy's failure
+        assert!(fails[2]);
+        assert_eq!(f.t2s[2], f64::INFINITY);
+        // one volume: three echoes are three samples (variances 0); the two-echo group's two
+        // samples have +inf variances (SciPy's rule)
+        let one = curve(&[255.0; 9], 1, &[3, 3, 3], UpstreamDefects::Fix);
+        assert_eq!(one.s0_var.as_ref().unwrap()[0], 0.0);
+        let two = curve(&[255.0; 9], 1, &[2, 2, 2], UpstreamDefects::Fix);
+        assert_eq!((two.s0[0], two.t2s[0]), (255.0, f64::INFINITY));
+        assert_eq!(two.s0_var.as_ref().unwrap()[0], f64::INFINITY);
     }
 }

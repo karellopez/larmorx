@@ -555,27 +555,32 @@ def panel_shows(page: Page, ex: dict) -> tuple[str, list[str]]:
     who = words.PORT_NAME[page.port]
     sw = _owner(page.software)
     main = d["lx-ants"]
+    head = "In `reproduce`"
+    if "lx1-lx" in d and d["lx1-lx"]["verdict"] == "bit-identical":
+        n = sorted({int(x) for x in re.findall(r"(\d+) threads?", d["lx1-lx"]["label"])})
+        if len(n) == 2:
+            head += f", on {n[0]} and {n[1]} threads"
     parts = []
     if main["verdict"] == "bit-identical":
-        parts.append(f"The {who} gives {sw} bytes as built, and with correctly rounded maths")
+        parts.append(
+            f"{head}, the {who} gives {sw} bytes, as built and with correctly rounded maths."
+        )
     elif main["verdict"] == "identical-cr":
         big = max(m["max_abs"] for m in main["metrics"].values())
         parts.append(
-            f"The {who} gives {sw} bytes with correctly rounded maths; {page.software} as built differs "
-            f"only where glibc's maths is not correctly rounded (largest difference {_sig(big)})"
+            f"{head}, the {who} gives {sw} bytes with correctly rounded maths; {page.software} as "
+            f"built differs only where glibc's maths is not correctly rounded (largest difference "
+            f"{_sig(big)})."
         )
     else:
         raise ValueError(f"{ex['id']}: lx-ants is {main['verdict']}")
-    if "lx1-lx" in d and d["lx1-lx"]["verdict"] == "bit-identical":
-        parts[-1] += ", at one thread and at eight"
-    parts[-1] += "."
     fix = d.get("fix-lx")
     if fix and fix["verdict"] == "bit-identical":
         parts.append("No correction by default changes this call.")
     elif fix and fix["verdict"] == "d13":
         ids = re.findall(r"\b(?:ANTS|ITK)-\d+\b", fix.get("reason") or "")
         named = " and ".join(dict.fromkeys(ids))
-        parts.append(f"Its default, `fix`, corrects {named} here; `reproduce` gives {sw} result.")
+        parts.append(f"Its default, `fix`, corrects {named} here.")
     elif fix:
         raise ValueError(f"{ex['id']}: fix-lx is {fix['verdict']}")
     return " ".join(parts), ["lx-ants"]

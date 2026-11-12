@@ -1127,12 +1127,12 @@ PAGE = present_.Page(
 #: lines are written from their own verdicts (present.panel_shows).
 SHOWS = {
     "final-n4": (
-        "In `reproduce` the replica gives ANTs' output at one thread with correctly rounded "
-        "maths, bit for bit, at 1 and at 12 threads; ANTs as built differs from it only where "
-        "glibc's maths is not correctly rounded (largest difference 0.031). fMRIPrep's own "
-        "output, ANTs at 8 threads, differs from both as ANTs differs from itself between "
-        "thread counts. The default, `fix`, leaves out the few zero voxels this call's weight "
-        "image includes (ANTS-40).",
+        "In `reproduce`, on 1 and 12 threads, the replica gives ANTs' output at one thread with "
+        "correctly rounded maths, bit for bit; ANTs as built differs from it only where glibc's "
+        "maths is not correctly rounded (largest difference 0.031). fMRIPrep's output, made by "
+        "ANTs at 8 threads, differs from both as ANTs differs from itself between thread "
+        "counts. The default, `fix`, leaves out the few zero voxels this call's weight image "
+        "includes (ANTS-40).",
         ["lx-ants1"],
     ),
     "ants-40": (

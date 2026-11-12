@@ -314,3 +314,43 @@ def test_a_step_is_rebuilt_and_compared(tmp_path):
     (tmp_path / "keep" / "x").write_text("x")
     with pytest.raises(FileExistsError):
         rp.rebuild(rec, step, tmp_path / "keep")
+
+
+def test_volume_records_are_compared_one_by_one(tmp_path):
+    """A command-line record (number 3) is provenance as a whole, a plain one too; an embedded
+    colour table (number 1, observed without a length field) ends the records, and a change in
+    it is reported by its record."""
+    data = np.zeros((2, 2, 2), dtype=np.uint8)
+    ctab = (1).to_bytes(4, "big") + b"\xff\xff\xff\xfe\x00\x00\x00\x05none\x00cluster1\x00"
+    plain_a, plain_b = b"mri_segment -wsizemm 13 a.mgz b.mgz", b"mri_segment -wsizemm 13 x.mgz"
+    a = mgz(tmp_path / "a.mgz", data, record(3, plain_a) + ctab + b"\x10\x20\x30")
+    b = mgz(tmp_path / "b.mgz", data, record(3, plain_b) + ctab + b"\x10\x20\x30")
+    c = ff.compare(a, b, ctx())
+    assert c.verdict == ff.PROVENANCE and "command-line" in c.detail, c
+    d = mgz(tmp_path / "d.mgz", data, record(3, plain_b) + ctab + b"\x10\x20\x31")
+    c = ff.compare(a, d, ctx())
+    assert c.verdict == ff.DIFFERS and "number 1 and what follows" in c.detail, c
+    assert "voxels: the same values" in c.detail
+
+
+def test_the_launcher_names_the_installation_and_keeps_the_bare_name(tmp_path, monkeypatch):
+    from larmorx_validation.freesurfer import package
+
+    home = tmp_path / "fs"
+    (home / "bin").mkdir(parents=True)
+    (home / "bin" / "mri_x").write_text('#!/bin/sh\necho "$0"\n')
+    (home / "bin" / "mri_x").chmod(0o755)
+    (home / "build-stamp.txt").write_text("fs-test\n")
+    (home / "average").mkdir()
+    (home / "average" / "atlas.gca").write_bytes(b"atlas")
+    monkeypatch.setenv("LARMORX_FS_REPLAY_BASE", str(tmp_path / "base"))
+    package.identity.cache_clear()
+    script = package.launcher("mri_x", home)
+    ident = json.loads((script.parent / "PACKAGE.json").read_text())
+    assert ident["build_stamp"] == "fs-test" and ident["files"] == 3
+    assert "exec -a 'mri_x'" in script.read_text()
+    # a data file changed: another installation, another launcher directory
+    (home / "average" / "atlas.gca").write_bytes(b"atlas 2")
+    package.identity.cache_clear()
+    assert package.launcher("mri_x", home).parent != script.parent
+    package.identity.cache_clear()

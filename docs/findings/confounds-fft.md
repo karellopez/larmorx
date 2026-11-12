@@ -80,7 +80,8 @@ differ; SciPy 1.15.3 (numpy 2.3.5) and **1.15.2 inside fMRIPrep 25.2.6's image**
 505 `nan-bits`, 0 differ: every length 1 to 2^20 real and complex to 2^16 (ducc0) and 2^20
 (pocketfft), both directions, padded, cut, strided and reversed inputs of 15 kinds, the refusals;
 nitime's calls on synthetic series of 2 to 9,000 volumes and on 2,000 voxels of fMRIPrep's own DVARS
-inputs in ds005752, ds000256, ds005040, ds005454 and ds004958 (30,000 calls). Speed of one call
+inputs in ds005752, ds000256, ds005040, ds005454 and ds004958 (30,000 calls). The suite
+`confounds-linalg` runs `check_fft.py` as its cases. Speed of one call
 through the binding (which builds the plan each time; SciPy caches its plans): length 32 larmorx 0.9
 µs against SciPy 1.7-2.9 µs; 512 4.6-7.8 against 2.8-4.5; 2,048 18-31 against 5.6-9.7; 16,384 158-286
 against 36-168. DVARS builds one plan per `fsize` and reuses it; the passes still allocate per call

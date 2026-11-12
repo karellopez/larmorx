@@ -126,5 +126,5 @@ BSD-3-Clause; this file is not restricted. The scripts: `check_numpy_reductions.
 `check_numpy_reductions.py`'s full tier: 9,403 of 9,403 cases identical in numpy 2.5.4
 (`OPENBLAS_L2_SIZE=512`), 2.3.5 and **2.2.6 inside fMRIPrep 25.2.6's image** (the worktree's abi3
 extension loads there: Python 3.12.11, glibc 2.35), the 46 `min`/`max` cases with a ±0 tie counted
-apart. The element-wise findings by their probes in the same three environments. The suites
-`confounds-linalg` and `confounds-nipype` run these scripts as cases.
+apart. The element-wise findings by their probes in the same three environments. The suite
+`confounds-linalg` runs `check_numpy_reductions.py` as its cases.

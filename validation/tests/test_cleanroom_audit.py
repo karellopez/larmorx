@@ -683,6 +683,58 @@ def test_glibc_source_dates_and_the_rules_table():
         (f"{WS}/oracles/ants-2.6.5-src/Examples/a.cxx", "mention", "permissive-source", None),
         (f"{WT}/crates-nc/target/release/larmorx-nc", "copy", "replica-build-output", "R10"),
         (f"{SCRATCH}/t/nc-target/release/larmorx-nc", "exec", "replica-build-output", "R10"),
+        # FreeSurfer (2026-11-12)
+        (
+            f"{WS}/oracles/freesurfer-8.2.0/root/usr/local/freesurfer/8.2.0/bin/recon-all",
+            "read",
+            "restricted",
+            "R03",
+        ),
+        (
+            f"{WS}/oracles/freesurfer-8.2.0/root/usr/local/freesurfer/8.2.0/bin/mri_convert",
+            "exec",
+            "run",
+            None,
+        ),
+        (
+            f"{WS}/oracles/freesurfer-8.2.0/root/usr/local/freesurfer/8.2.0/python/packages/fsbindings/a.py",
+            "read",
+            "restricted",
+            "R03",
+        ),
+        (
+            f"{WS}/oracles/freesurfer-8.2.0/root/usr/local/freesurfer/8.2.0/SetUpFreeSurfer.sh",
+            "read",
+            "restricted",
+            "R03",
+        ),
+        (
+            f"{WS}/oracles/freesurfer-8.2.0/root/usr/local/freesurfer/8.2.0/average/RB_all_2019_10_25.talxfm.mni305.gca",
+            "read",
+            "freesurfer-install",
+            None,
+        ),
+        (
+            f"{WS}/oracles/freesurfer-8.2.0/runs/a-v8/subjects/s/scripts/recon-all.local-copy",
+            "read",
+            "restricted",
+            "R03",
+        ),
+        (
+            f"{WS}/oracles/freesurfer-8.2.0/runs/a-v8/subjects/s/mri/orig.mgz",
+            "read",
+            "oracle",
+            None,
+        ),
+        (f"{WT}/crates-freesurfer/larmorx-freesurfer-core/src/mgh.rs", "read", "restricted", "R10"),
+        (f"{WT}/docs/freesurfer/cards/mri_coreg.md", "read", "restricted", "R11"),
+        (f"{WT}/docs/findings/freesurfer-mri_coreg.md", "read", "restricted", "R11"),
+        (
+            f"{WT}/validation/investigations/freesurfer-inventory/waves.py",
+            "read",
+            "restricted",
+            "R11",
+        ),
     ],
 )
 def test_classification(path, op, category, rule):

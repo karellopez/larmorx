@@ -112,12 +112,22 @@ def without_extensions(data: bytes) -> bytes | None:
     return None
 
 
-def same_file(stored: Path, fresh: Path, *, nifti_extensions: bool = True) -> tuple[bool, str]:
+def same_file(
+    stored: Path, fresh: Path, *, nifti_extensions: bool = True, formats: str = ""
+) -> tuple[bool, str]:
     """Whether two output files hold the same result (see the module's documentation);
-    ``nifti_extensions=False`` leaves NIfTI extensions out (``Policy.nifti_extensions``)."""
+    ``nifti_extensions=False`` leaves NIfTI extensions out (``Policy.nifti_extensions``);
+    ``formats="freesurfer"`` compares FreeSurfer's files without the provenance FreeSurfer
+    writes into them (``Policy.formats``, :mod:`larmorx_validation.freesurfer.files`)."""
     a, b = stored.read_bytes(), fresh.read_bytes()
     if a == b:
         return True, ""
+    if formats == "freesurfer":
+        from larmorx_validation.freesurfer.files import same_result
+
+        return same_result(stored, fresh)
+    if formats:
+        raise ValueError(f"unknown formats {formats!r}")
     name = fresh.name
     if name.endswith(".gz"):
         try:

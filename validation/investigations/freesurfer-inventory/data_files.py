@@ -1,0 +1,534 @@
+# SPDX-License-Identifier: Apache-2.0
+"""Sub-task 4's list: every file of FreeSurfer 8.2.0's package a default-path program reads, with
+its size, SHA-256, git-annex key, where FreeSurfer serves it, its licence and origin.
+
+CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS (built from FreeSurfer's source and package).
+
+    python -P validation/investigations/freesurfer-inventory/data_files.py \\
+        --trace <scratch>/trace --package-tsv <scratch>/package-files.tsv \\
+        --annex-tsv <scratch>/annex-keys.tsv --annex-urls <scratch>/annex-urls-retry.tsv \\
+        --tag <workspace>/tags/freesurfer-8.2.0 --runs <workspace>/oracles/freesurfer-8.2.0/runs \\
+        --fs-home <package root> --toml docs/freesurfer/data-files.toml \\
+        --markdown docs/freesurfer/data-files.md > <scratch>/data-files-tables.md
+
+Inputs: ``data_trace.py``'s job results (which program opened which file, per job), the package's
+files with sizes and SHA-256 (``data_refs.py package``), the tag's git-annex symlinks
+(``annex-keys.tsv``) and the HEAD checks of their objects on FreeSurfer's annex remote, and the
+recordings' command lines (files named on a command line count as read by that program even when
+a job stopped it before it opened them). The tag's regular files are matched by SHA-256, so a file
+that is in FreeSurfer's git repository without git-annex gets its GitHub address at the tag.
+The licence and origin of each file come from ``RULES`` (each rule says where its claim comes
+from); the proposed home applies the plan's data rules 1 to 3 (docs/freesurfer-plan.md).
+"""
+
+from __future__ import annotations
+
+import argparse
+import csv
+import glob
+import hashlib
+import io
+import json
+import os
+import re
+import sys
+from pathlib import Path
+
+GITHUB_RAW = "https://raw.githubusercontent.com/freesurfer/freesurfer/v8.2.0/"
+SMALL = 2_000_000  # bytes: below this a FreeSurfer-licensed file could ship in larmorx-freesurfer
+
+# Package folders the build unpacks from one annexed tarball each (distribution/average/CMakeLists.txt,
+# install_tarball): their files are served only as part of that tarball.
+TARBALLS = {
+    "subjects/fsaverage/": "distribution/average/fsaverage.tar.gz",
+    "subjects/fsaverage5/": "distribution/average/fsaverage5.tar.gz",
+    "subjects/fsaverage6/": "distribution/average/fsaverage6.tar.gz",
+    "average/mni_icbm152_nlin_asym_09c/": "distribution/average/mni_icbm152_nlin_asym_09c.tar.gz",
+}
+
+# (pattern on the package path, kind, licence, origin). The first match wins.
+SLA = "FreeSurfer licence (Part B; docs/freesurfer/third-party.md section 2)"
+RULES: list[tuple[str, str, str, str]] = [
+    (
+        r"^average/RB_all_.*\.gca$",
+        "atlas (GCA)",
+        SLA,
+        "MGH: the subcortical atlas trained on manually labelled heads (Fischl et al. 2002, 2004); "
+        "release 2020-01-02 (the with-skull one 2020_01_02)",
+    ),
+    (
+        r"^average/[lr]h\.DKaparc\.atlas.*\.gcs$",
+        "atlas (GCS)",
+        SLA,
+        "MGH: Desikan-Killiany cortical atlas (Desikan et al. 2006) trained on 40 heads (acfb40)",
+    ),
+    (
+        r"^average/[lr]h\.CDaparc\.atlas.*\.gcs$",
+        "atlas (GCS)",
+        SLA,
+        "MGH: Destrieux cortical atlas (Destrieux et al. 2010) trained on 40 heads (acfb40)",
+    ),
+    (
+        r"^average/[lr]h\.DKTaparc\.atlas.*\.gcs$",
+        "atlas (GCS)",
+        SLA,
+        "MGH: Desikan-Killiany-Tourville atlas (Klein and Tourville 2012) trained on 40 heads",
+    ),
+    (
+        r"^average/[lr]h\.folding\.atlas.*\.tif$",
+        "atlas (folding, .tif)",
+        SLA,
+        "MGH: the spherical folding atlas (Fischl et al. 1999), 40 heads (acfb40)",
+    ),
+    (
+        r"^average/mni305\.cor(\.stripped)?\.mgz$",
+        "template",
+        "MNI's notice (the MINC package, license.minc.txt) for the data; " + SLA + " for MGH's "
+        "conversion",
+        "MNI305 average (Evans et al. 1993), converted by FreeSurfer from MINC's "
+        "mni_autoreg average_305.mnc (average/mni305.cor.readme); the stripped one FreeSurfer's",
+    ),
+    (
+        r"^average/mni_icbm152_nlin_asym_09c/",
+        "template",
+        "MNI's notice (average/mni_icbm152_nlin_asym_09c/COPYING) for the data; "
+        + SLA
+        + " for MGH's derivation",
+        "ICBM 2009c nonlinear asymmetric (Fonov et al. 2011), made into registration targets by "
+        "FreeSurfer's log/mkatlas (masked, symmetrised, cropped; LTAs between the views)",
+    ),
+    (
+        r"^average/.*\.4dfp\.(img|ifh|hdr|mat|img\.rec)$|^average/.*\.lst$",
+        "atlas (4dfp)",
+        "Washington University's atlas: no licence statement with the files (the 4dfp code's "
+        "notice forbids copying without permission, TP-09)",
+        "Washington University (A. Snyder): 711-2B/711-2C atlases registered to MNI305 (2007); "
+        "3T18yoSchwartzReactN32 a 3 T young-adult atlas (2009)",
+    ),
+    (
+        r"^average/(mca-dura|vsinus).*",
+        "prior (MNI152 space)",
+        SLA,
+        "MGH: priors for the v8 dura and venous-sinus segmentations, in MNI152 1 mm space",
+    ),
+    (
+        r"^average/rigidly_aligned_brain_template\.tif$",
+        "template (.tif)",
+        SLA,
+        "MGH: the brain template mri_watershed reads by default (classic stream; opened at start)",
+    ),
+    (
+        r"^mni/etc/mni_autoreg/",
+        "MINC configuration",
+        "MNI's notice (license.minc.txt)",
+        "MNI: mritotal's settings (Collins et al. 1994)",
+    ),
+    (r"^average/colortable_.*\.txt$", "colour table", SLA, "MGH (FreeSurfer)"),
+    (r"^[A-Za-z]+LUT\.txt$", "colour table", SLA, "MGH (FreeSurfer)"),
+    (
+        r"^models/synthseg_.*\.npy$",
+        "label list (.npy)",
+        SLA,
+        "UCL/MGH: SynthSeg 2.0's label numbers, names and topological classes",
+    ),
+    (r"^models/.*\.ctab$", "colour table", SLA, "MGH: the v8 segmentations' colour tables"),
+    (r"^models/.*\.csv$", "table", SLA, "MGH: sclimbic's volume statistics table"),
+    (
+        r"^models/synthstrip\..*\.pt$",
+        "network weights (PyTorch)",
+        SLA + "; no separate terms stated with the weights",
+        "MGH: SynthStrip (Hoopes et al. 2022)",
+    ),
+    (
+        r"^models/synthseg_.*\.h5$",
+        "network weights (Keras HDF5)",
+        SLA + "; no separate terms stated with the weights (SynthSeg's code is Apache-2.0)",
+        "UCL/MGH: SynthSeg 2.0 (Billot et al. 2023)",
+    ),
+    (
+        r"^models/synthmorph\..*\.h5$",
+        "network weights (Keras HDF5)",
+        SLA + "; no separate terms stated with the weights (voxelmorph's code is Apache-2.0)",
+        "MGH: SynthMorph (Hoffmann et al. 2022, 2024)",
+    ),
+    (
+        r"^models/(sclimbic|entowm|mca-dura|vsinus).*\.h5$",
+        "network weights (Keras HDF5)",
+        SLA + "; no separate terms stated with the weights",
+        "MGH: the sclimbic network family (Greve et al. 2021), models for v8's entorhinal white "
+        "matter, MCA/dura and venous sinus segmentations",
+    ),
+    (
+        r"^subjects/fsaverage[0-9]?/label/.*_exvivo.*\.label$",
+        "label (fsaverage)",
+        SLA,
+        "MGH: Brodmann areas mapped from ex vivo histology (Fischl et al. 2008; Amunts, Zilles)",
+    ),
+    (
+        r"^subjects/fsaverage[0-9]?/label/.*\.mpm\.vpnl\.label$",
+        "label (fsaverage)",
+        SLA,
+        "Ventral visual stream cytoarchitectonic areas (Rosenke et al. 2018), on fsaverage",
+    ),
+    (
+        r"^subjects/fsaverage[0-9]?/",
+        "average subject",
+        SLA,
+        "MGH: fsaverage, the 40-head spherical average (Fischl et al. 1999); fsaverage5/6 its "
+        "icosahedron 5 and 6 versions",
+    ),
+    (
+        r"^mni/share/mni_autoreg/",
+        "MINC model",
+        "MNI's notice (license.minc.txt)",
+        "MNI: mritotal's models (Collins et al. 1994)",
+    ),
+    (r"^fsafd/", "statistics table", SLA, "MGH: Talairach failure detection (talairach_afd)"),
+    (
+        r"^(etc/|build-stamp\.txt|sources\.(c)?sh|FreeSurferEnv\.(c)?sh|SetUpFreeSurfer)",
+        "configuration",
+        SLA,
+        "FreeSurfer's run-time configuration (not data: the recon-all port reproduces it)",
+    ),
+]
+
+
+def rule_for(path: str) -> tuple[str, str, str]:
+    for pattern, kind, licence, origin in RULES:
+        if re.search(pattern, path):
+            return kind, licence, origin
+    return "unclassified", "to be checked", "to be checked"
+
+
+def sha256(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as f:
+        for block in iter(lambda: f.read(1 << 20), b""):
+            h.update(block)
+    return h.hexdigest()
+
+
+def load_tsv(path: Path) -> list[dict[str, str]]:
+    with path.open(encoding="utf-8") as f:
+        return list(csv.DictReader(f, delimiter="\t"))
+
+
+def tag_regular_files(tag: Path, sizes: set[int]) -> dict[tuple[int, str], str]:
+    """(size, sha256) -> tag path, for regular files whose size is one we look for."""
+    found: dict[tuple[int, str], str] = {}
+    for d, _, files in os.walk(tag):
+        for name in files:
+            p = Path(d) / name
+            if p.is_symlink() or not p.is_file():
+                continue
+            size = p.stat().st_size
+            if size in sizes:
+                found.setdefault((size, sha256(p)), str(p.relative_to(tag)))
+    return found
+
+
+def annex_links(tag: Path) -> dict[str, dict[str, str]]:
+    """sha256 -> {path} for every git-annex link in the tag, both key backends: SHA256E
+    (``SHA256E-s<size>--<sha256><ext>``) and the older SHA256 (``SHA256-s<size>--<sha256>``)."""
+    key = re.compile(r"^SHA256E?-s(\d+)--([0-9a-f]{64})")
+    found: dict[str, dict[str, str]] = {}
+    for d, _, files in os.walk(tag):
+        for name in files:
+            p = Path(d) / name
+            if p.is_symlink():
+                m = key.match(os.path.basename(os.readlink(p)))
+                if m:
+                    rel = str(p.relative_to(tag))
+                    prev = found.get(m.group(2))
+                    if prev is None or (
+                        prev["path"].startswith("attic/") and not rel.startswith("attic/")
+                    ):
+                        found[m.group(2)] = {"path": rel, "bytes": m.group(1), "sha256": m.group(2)}
+    return found
+
+
+def recorded_reads(runs: Path, fs_home: str) -> dict[str, tuple[set[str], set[str]]]:
+    """Package files named on recorded command lines: their programs and streams."""
+    named: dict[str, tuple[set[str], set[str]]] = {}
+    for f in glob.glob(str(runs / "*" / "record" / "steps" / "*.json")):
+        step = json.loads(Path(f).read_text(encoding="utf-8"))
+        home = step["env"].get("FREESURFER_HOME", fs_home)
+        subjects = step["env"].get("SUBJECTS_DIR", "")
+        prog = os.path.basename(step["argv"][0])
+        stream = "v8" if Path(f).parents[2].name.endswith("-v8") else "classic"
+        for arg in step["argv"]:
+            for tok in re.split(r"[,=]", arg):
+                m = re.match(re.escape(subjects) + r"/(fsaverage[0-9a-z_]*/.*)$", tok)
+                if subjects and m:  # recon-all's link to the package's fsaverage
+                    tok = f"{home}/subjects/{m.group(1)}"
+                if tok.startswith(home + "/"):
+                    rel = tok[len(home) + 1 :].split("#")[0]
+                    if os.path.isfile(os.path.join(home, rel)):
+                        progs, streams = named.setdefault(rel, (set(), set()))
+                        progs.add(prog)
+                        streams.add(stream)
+    return named
+
+
+def stream_of(job: str) -> str:
+    return {"v8": "v8", "cl": "classic", "fp": "fmriprep"}[job.split("-", 1)[0]]
+
+
+def splice(md: Path, text: str) -> None:
+    """Replace the generated regions of data-files.md (between its data_files.py markers)."""
+    blocks = text.strip().split("\n\n")
+    files_table, totals, per_prog, homes, served = blocks[:5]
+    m = re.match(r"(\d+) files, ([\d,]+) bytes", totals)
+    regions = {
+        "programs": per_prog,
+        "files": f"{m.group(1)} files, {m.group(2)} bytes in all.\n\n{files_table}\n\n{homes}"
+        f"\n\n{served}",
+    }
+    doc = md.read_text(encoding="utf-8")
+    for name, body in regions.items():
+        begin, end = f"<!-- data_files.py: {name} -->", f"<!-- data_files.py: end {name} -->"
+        a, b = doc.index(begin) + len(begin), doc.index(end)
+        doc = doc[:a] + "\n" + body + "\n" + doc[b:]
+    md.write_text(doc, encoding="utf-8")
+
+
+def main(argv: list[str]) -> int:
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument("--trace", required=True, type=Path)
+    ap.add_argument("--package-tsv", required=True, type=Path)
+    ap.add_argument("--annex-tsv", required=True, type=Path)
+    ap.add_argument("--annex-urls", required=True, type=Path)
+    ap.add_argument("--tag", required=True, type=Path)
+    ap.add_argument("--runs", required=True, type=Path)
+    ap.add_argument("--fs-home", required=True)
+    ap.add_argument("--toml", required=True, type=Path)
+    ap.add_argument(
+        "--markdown", type=Path, help="data-files.md: its generated regions are replaced"
+    )
+    args = ap.parse_args(argv)
+
+    package = {r["path"]: r for r in load_tsv(args.package_tsv)}
+    annex_by_sha = annex_links(args.tag)
+    for r in load_tsv(args.annex_tsv):  # relay 3's table: the same links, kept as a cross-check
+        annex_by_sha.setdefault(r["sha256"], r)
+    urls = {r["path"]: r for r in load_tsv(args.annex_urls)}
+
+    # file -> {programs, streams, jobs, conditional}
+    reads: dict[str, dict] = {}
+    for f in sorted(args.trace.glob("*.json")):
+        if f.name == "summary.json":
+            continue
+        rec = json.loads(f.read_text(encoding="utf-8"))
+        stream = stream_of(rec["name"])
+        cond = "-cond-" in rec["name"]
+        for prog, kinds in rec["programs"].items():
+            for rel in kinds.get("data:read", []):
+                if "/bin/" in rel:  # scripts under fsfast/bin, mni/bin: code, not data
+                    continue
+                e = reads.setdefault(
+                    rel, {"programs": set(), "streams": set(), "jobs": set(), "cond": set()}
+                )
+                e["programs"].add(prog)
+                e["jobs"].add(rec["name"])
+                (e["cond"] if cond else e["streams"]).add(stream)
+    for rel, (progs, streams) in recorded_reads(args.runs, args.fs_home).items():
+        e = reads.setdefault(
+            rel, {"programs": set(), "streams": set(), "jobs": set(), "cond": set()}
+        )
+        e["programs"] |= progs
+        e["streams"] |= streams
+        e["jobs"].add("recorded command lines")
+
+    # The jobs ran the left hemisphere of each per-hemisphere stage; recon-all runs the right one
+    # the same way (programs.md section 3), so each lh file has its rh twin read by the same programs.
+    for rel in list(reads):
+        twin = re.sub(r"(^|/)lh\.", r"\1rh.", rel)
+        if twin != rel and (Path(args.fs_home) / twin).is_file():
+            e = reads[rel]
+            t = reads.setdefault(
+                twin, {"programs": set(), "streams": set(), "jobs": set(), "cond": set()}
+            )
+            t["programs"] |= e["programs"]
+            t["streams"] |= e["streams"]
+            t["cond"] |= e["cond"]
+            t["jobs"].add("right-hemisphere twin of " + rel)
+    missing = sorted(r for r in reads if r not in package)
+    for rel in missing:  # outside data_refs.py's folders (etc/, fsafd/, ...): measured here
+        p = Path(args.fs_home) / rel
+        if p.is_file():
+            package[rel] = {"path": rel, "bytes": str(p.stat().st_size), "sha256": sha256(p)}
+    missing = sorted(r for r in reads if r not in package)
+    sizes = {int(package[r]["bytes"]) for r in reads if r in package}
+    in_git = tag_regular_files(args.tag, sizes)
+
+    entries = []
+    for rel in sorted(reads):
+        e = reads[rel]
+        kind, licence, origin = rule_for(rel)
+        row = package.get(rel)
+        size = int(row["bytes"]) if row else 0
+        digest = row["sha256"] if row else ""
+        annex = annex_by_sha.get(digest)
+        served, url, status = "only inside the package", "", ""
+        tag_path = ""
+        if annex:
+            tag_path = annex["path"]
+            u = urls.get(annex["path"])
+            key = os.path.basename(os.readlink(args.tag / annex["path"]))
+            if u:
+                url, status = u["url"], u["http_status"]
+            served = (
+                "FreeSurfer's git-annex remote (key " + key + ")"
+                if status == "200"
+                else f"annexed (key {key}); remote answered {status or 'not checked'}"
+            )
+        elif any(rel.startswith(prefix) for prefix in TARBALLS):
+            tarball = next(t for prefix, t in TARBALLS.items() if rel.startswith(prefix))
+            tag_path = tarball
+            key = os.path.basename(os.readlink(args.tag / tarball))
+            u = urls.get(tarball)
+            if u:
+                url, status = u["url"], u["http_status"]
+            served = (
+                f"inside the annexed tarball {tarball} (key {key}; remote answered "
+                f"{status or 'not checked'})"
+            )
+        elif (size, digest) in in_git:
+            tag_path = in_git[(size, digest)]
+            url = GITHUB_RAW + tag_path
+            served = "FreeSurfer's git repository at v8.2.0 (GitHub)"
+        streams = sorted(e["streams"])
+        if kind == "configuration":
+            home = "the recon-all port's own configuration (not shipped as data)"
+        elif licence.startswith("Washington"):
+            home = "fetched on first use (rule 2: terms unknown)"
+        elif size > SMALL:
+            home = "fetched on first use (rule 3: large)"
+        elif licence.startswith("MNI") and "MGH" in licence:
+            home = "fetched, or the main package if MGH's conversion is judged free (rule 1)"
+        elif licence.startswith("MNI"):
+            home = "the main package (rule 1: MNI's notice), or fetched from MNI's own release"
+        else:
+            home = "larmorx-freesurfer, or fetched (rule 2: FreeSurfer's terms allow it)"
+        entries.append(
+            {
+                "path": rel,
+                "kind": kind,
+                "bytes": size,
+                "sha256": digest,
+                "programs": sorted(e["programs"]),
+                "streams": streams,
+                "conditional_streams": sorted(e["cond"] - e["streams"]),
+                "evidence": sorted(e["jobs"]),
+                "tag_path": tag_path,
+                "served": served,
+                "url": url,
+                "url_status": status,
+                "licence": licence,
+                "origin": origin,
+                "proposed_home": home,
+            }
+        )
+
+    lines = [
+        "# SPDX-License-Identifier: Apache-2.0",
+        "# Every file of FreeSurfer 8.2.0's package a default-path program reads (the plan's data rule 4).",
+        "# Generated by validation/investigations/freesurfer-inventory/data_files.py; do not edit by hand.",
+        "# CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS.",
+        'package = "freesurfer_ubuntu22-8.2.0_amd64.deb (build freesurfer-linux-ubuntu22_x86_64-8.2.0-20260314-d932c45)"',
+        'package_sha256 = "0c17edb0e738a41faad76ed1435aced157a2bbf6151472d4bd9891b6a9fa1013"',
+        'paths_relative_to = "FREESURFER_HOME"',
+        "",
+    ]
+    for e in entries:
+        lines.append("[[file]]")
+        for k, v in e.items():
+            lines.append(f"{k} = {json.dumps(v, ensure_ascii=False)}")
+        lines.append("")
+    args.toml.write_text("\n".join(lines), encoding="utf-8")
+
+    # Markdown (printed, and spliced into --markdown between its markers): one row per file
+    out, real = io.StringIO(), sys.stdout
+    sys.stdout = out
+    print(
+        "| File (under `FREESURFER_HOME`) | Kind | Size (bytes) | SHA-256 (first 12) | Programs | "
+        "Streams | Served on its own | Proposed home |"
+    )
+    print("|---|---|---:|---|---|---|---|---|")
+    labels = [e for e in entries if e["kind"] == "label (fsaverage)"]
+    for e in sorted(entries, key=lambda x: (x["kind"], x["path"])):
+        if e["kind"] == "label (fsaverage)":
+            if e is not min(labels, key=lambda x: x["path"]):
+                continue
+            # one row for fsaverage's labels (the TOML lists each)
+            print(
+                f"| `subjects/fsaverage/label/{{lh,rh}}.*` ({len(labels)} files: 14 `*_exvivo`, "
+                f"14 `*_exvivo.thresh`, 8 `*.mpm.vpnl` per hemisphere) | {e['kind']} | "
+                f"{sum(x['bytes'] for x in labels):,} | (each in the TOML) | "
+                f"{', '.join(e['programs'])} | {', '.join(e['streams'])} | in its tarball, annex "
+                f"{e['url_status'] or '?'} | {e['proposed_home']} |"
+            )
+            continue
+        if "tarball" in e["served"]:
+            served = "in its tarball, annex " + (e["url_status"] or "?")
+        elif "GitHub" in e["served"]:
+            served = "GitHub (git)"
+        elif "annex" in e["served"]:
+            served = "annex " + (e["url_status"] or "?")
+        else:
+            served = "no"
+        streams = ", ".join(e["streams"] + [f"{s} (conditional)" for s in e["conditional_streams"]])
+        print(
+            f"| `{e['path']}` | {e['kind']} | {e['bytes']:,} | `{e['sha256'][:12]}` | "
+            f"{', '.join(e['programs'])} | {streams} | {served} | {e['proposed_home']} |"
+        )
+    total = sum(e["bytes"] for e in entries)
+    print(f"\n{len(entries)} files, {total:,} bytes; not in the package's file list: {missing}")
+
+    # Per program: its data files (configuration left out), grouped by folder
+    print("\n| Program | Data files it reads (count, bytes) |\n|---|---|")
+    by_prog: dict[str, list[dict]] = {}
+    for e in entries:
+        if e["kind"] == "configuration":
+            continue
+        for prog in e["programs"]:
+            by_prog.setdefault(prog, []).append(e)
+    for prog, es in sorted(by_prog.items()):
+        names = ", ".join(f"`{x['path']}`" for x in sorted(es, key=lambda x: x["path"])[:8])
+        more = f" and {len(es) - 8} more" if len(es) > 8 else ""
+        print(f"| `{prog}` | {len(es)}, {sum(x['bytes'] for x in es):,}: {names}{more} |")
+
+    # Totals by proposed home and by where FreeSurfer serves the file
+    print("\n| Proposed home | Files | Bytes |\n|---|---:|---:|")
+    homes: dict[str, list[int]] = {}
+    for e in entries:
+        h = homes.setdefault(e["proposed_home"], [0, 0])
+        h[0] += 1
+        h[1] += e["bytes"]
+    for home, (n, b) in sorted(homes.items(), key=lambda x: -x[1][1]):
+        print(f"| {home} | {n} | {b:,} |")
+    print("\n| Served on its own | Files | Bytes |\n|---|---:|---:|")
+    served: dict[str, list[int]] = {}
+    for e in entries:
+        if "tarball" in e["served"]:
+            k = "inside an annexed tarball (" + e["tag_path"].rsplit("/", 1)[-1] + ")"
+        elif "GitHub" in e["served"]:
+            k = "GitHub, FreeSurfer's repository at v8.2.0"
+        elif "annex" in e["served"]:
+            k = "git-annex object, remote answered " + (e["url_status"] or "not checked")
+        else:
+            k = "only inside the package"
+        v = served.setdefault(k, [0, 0])
+        v[0] += 1
+        v[1] += e["bytes"]
+    for k, (n, b) in sorted(served.items()):
+        print(f"| {k} | {n} | {b:,} |")
+    sys.stdout = real
+    print(out.getvalue(), end="")
+    if args.markdown:
+        splice(args.markdown, out.getvalue())
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

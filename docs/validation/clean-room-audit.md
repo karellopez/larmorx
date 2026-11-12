@@ -82,6 +82,7 @@ The restriction table, from the project's rules (CLAUDE.md rule 1 and its agent 
 | R16 | replicas' suite and evidence modules a brief names | per tool | 2026-10-09 | 2026-10-09 | the clean-room parts' briefs |
 | R17 | session transcripts (they hold every source an agent read) | all | 2026-10-09 | 2026-11-06 | by content; the audit's brief |
 | R18 | other agents' scratch notes and archived scratch | all | 2026-10-23 | 2026-10-23 | as R13 (other parts' notes and handoffs) |
+| R19 | code FreeSurfer borrows from others, at its sources (GSL, Burkardt's spline, EPFL's B-spline code, Washington University's 4dfp tools) | FreeSurfer | 2026-11-12 | 2026-11-12 | decision log 2026-11-12 (FreeSurfer's borrowed pieces: each gets a clean room); docs/freesurfer/third-party.md |
 
 **Allowed, and logged by kind:** black-box runs of the original programs (FSL's, AFNI's, ANTs', FreeSurfer's, fMRIPrep's), their `-help` and documentation, permissive upstream source (ANTs, ITK, nibabel, SciPy, numpy, OpenBLAS, CORE-MATH, Arm's routines, nitransforms, fMRIPrep and its libraries), `specs/`, the clean-room code, oracle outputs and data.
 

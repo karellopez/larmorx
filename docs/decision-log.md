@@ -2422,3 +2422,60 @@ replica's gaps, the site, the handoff); the clean relays never read the replica 
   family's companion or fetched from its owner on first use; big files always fetched; one checked list shown on
   the site. LARMORX's code stays Apache-2.0; data keeps its own licence.
 - **Examples on program pages are run by the tests**, so they never go stale (accepted).
+
+## 2026-11-12: FreeSurfer's borrowed pieces and its two streams (the user)
+- **Every third-party piece inside FreeSurfer gets a replica and an improved clean room** (the user: "we should make
+  replicas of all them and also improved clean rooms from all of them. People that will use larmorx-freesurfer will
+  need to install the other licence packages if they want to use that ... larmorx package will have full freedom and
+  users will only install the licensed version if they really want to use the replicas that are restrictive with their
+  license"). Each piece's replica lives in the package of its own licence family (GSL's GPL code in `larmorx-gpl`,
+  CorTechs' non-commercial `tkregister2_cmdl` in a non-commercial package, Burkardt's MIT spline wherever MIT allows);
+  code with no licence at all (EPFL's B-splines) only with its authors' permission (the orchestrator drafts the request
+  for the user); the clean room of every piece in `larmorx`. Before building: a placement table per piece (package,
+  whether its licence and FreeSurfer's combine in one program; where they do not, the replica uses the clean-room piece
+  for that part), from FreeSurfer's preparation, for the user. MARS later (on no default path). ITK 4.13.2, what
+  FreeSurfer 8.2.0's programs link, where it differs from 5.4.5 (recommended; to be confirmed with the table).
+- **One FreeSurfer version, two streams:** FreeSurfer 8.2.0 only; its v8 and classic (`-no-v8`) streams share most
+  programs, each ported once. Order: the shared programs, then the classic-only ones (fMRIPrep's), with the v8-only
+  networks as a parallel track. FreeSurfer 7.3.2 (fMRIPrep 25's) is not ported; its runs are a reference for the final
+  comparisons; a later version step would port only the differences if ever needed.
+- **EPFL's B-splines** (no licence stated; `mriBSpline.cpp`, in `mri_robust_template`'s final resampling): a replica
+  and a clean room both (the user: "do both replica and clean room as well. We will ask the author afterwards"). The
+  replica is built but kept off the public repositories (a local branch, never pushed, outside every wheel) until the
+  authors' permission arrives (the orchestrator's caution: publishing a translation of unlicensed code would
+  redistribute it without permission); the clean room is published as usual.
+- **Correction, EPFL's B-splines (the same day):** the file the replica translates, `utils/mriBSpline.cpp`, is Martin
+  Reuter's (FreeSurfer's team) and carries MGH's notice: FreeSurfer distributes it under FreeSurfer's licence; it is
+  "based on" EPFL's paper (Thévenaz, Blu, Unser 2000) and their 2D example code (routine names), whose own page states
+  no licence; the method is the published recursion LARMORX already ports from ITK and SciPy. So its replica goes into
+  `larmorx-freesurfer` like FreeSurfer's other files, crediting EPFL; no private branch is needed; the request to the
+  authors is a courtesy (the user: "We will ask the author afterwards").
+- **No waiting for permissions** (the user, 2026-11-12, on the placement table's P1-P5): "We do not really have to write
+  an email to anyone, we first implement the replica, put that in the specific licensed package, then we port a better
+  and nice optimized clean room version. We publish when we want. Emails go after." So every borrowed piece's replica is
+  built now and goes into its licence family's package (CorTechs' `tkregister2_cmdl` into `larmorx-nc` as its own
+  program; GSL's generators alone into `larmorx-gpl`, `mri_coreg`'s replica using the clean-room generator since GPL and
+  FreeSurfer's licence cannot share one program; Burkardt's spline, EPFL's B-splines and Washington University's 4dfp
+  tools with FreeSurfer's code in `larmorx-freesurfer`), and an improved, optimised clean room of every piece goes into
+  `larmorx`. Publishing is the user's decision; at that time the orchestrator lists the pieces that carry no licence
+  (Washington University's 4dfp tools, Burkardt's 2006 routines) so the user decides knowingly. No emails before.
+
+## 2026-11-12: what `validated` means (the orchestrator, from the documentation revision's review)
+- Since the user's testing-depth decision (2026-10-28: each part tests "decent but not heavily extensive", the extensive
+  evidence in the final validation phase), a status means: **`experimental`**, its part's tests pass but the extensive
+  evidence is still to come (or a case still fails); **`validated`**, every case of its record passes **and** the extensive
+  evidence exists (for the ports marked validated before 2026-11-12 their own parts made it: their full tiers, panels,
+  random testing; for later ports the final validation phase makes it); **`stable`**, validated with a frozen API. The
+  37 records marked validated on 2026-11-12 keep their status (a frozen list, shown on the site); a new `validated`
+  needs its extensive evidence named (the site's export refuses it otherwise). The porting guide's status paragraph and
+  PLAN.md §4 follow at the documentation revision's merge.
+- **Washington University's Talairach tools: a clean room only** (the user, 2026-11-12: "Can we make a clean room of the
+  first one to avoid the problems?", after learning that the 4dfp source forbids reproduction without Washington
+  University's written permission). `talairach_avi` and its 4dfp tools get a clean room in `larmorx` (from behaviour and
+  black-box runs, checked against the recorded heads), its atlases fetched at first use; no replica, unless Washington
+  University gives written permission later. This replaces the 4dfp replica of "No waiting for permissions" above. Burkardt's
+  2006 spline routines: the orchestrator recommends publishing their replica normally with his credit (his code is MIT
+  today); the user to confirm.
+- **Burkardt's 2006 spline routines: a replica and a clean room, published normally** (the user, 2026-11-12: "the
+  second the replica and clean room"): the replica in `larmorx-freesurfer` with his credit, pushed like the rest; no
+  local-only branch remains for any borrowed piece.

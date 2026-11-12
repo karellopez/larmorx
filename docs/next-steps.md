@@ -44,7 +44,7 @@ starts no other agent.
 |---|---|---|
 | 1 | **Confounds**: CompCor, DVARS, framewise displacement, fMRIPrep's confound steps and table, `larmorx nipype run` (item 4 (9)) | in progress: the first half merged 2026-11-12; relays 2g, 2h, 3a/3b, 2i, 4, 5 left |
 | 2 | **The documentation revision**, website and repository: [documentation-plan.md](documentation-plan.md) | starting |
-| 3 | **FreeSurfer 8.2.0**, a replica and a clean room of every program of `recon-all`'s two streams and of fMRIPrep's FreeSurfer programs: [freesurfer-plan.md](freesurfer-plan.md) (3.0 preparation, 3.1 foundations, waves 3.2 to 3.5, 3.6 `recon-all`) | starting: 3.0 |
+| 3 | **FreeSurfer 8.2.0**, a replica and a clean room of every program of `recon-all`'s two streams and of fMRIPrep's FreeSurfer programs: [freesurfer-plan.md](freesurfer-plan.md) (3.0 preparation, 3.1 foundations, waves 3.2 to 3.6, the networks' track N, 3.7 `recon-all`) | starting: 3.0 |
 | 4 | **Surfaces**: Workbench-compatible tools (a replica in `larmorx-gpl`, a clean room in `larmorx`), MSM (a clean room only, after a patent check) | planned |
 | 5 | **larmorprepx**, the pipeline, with the MNI-template steps (TemplateFlow; niworkflows' `init_enhance_and_skullstrip_bold_wf`, the data sink's `template_metadata`) | planned |
 | 6 | **The clean rooms of the permissive ports**, one block (ANTs and ITK, sdcflows, fMRIPrep's resampler, nitransforms, the confounds, fMRIPrep's Python steps) | after FreeSurfer |
@@ -828,6 +828,15 @@ The items below keep their history.
     without files in it (tedana's output directory after a failed `--exclude`, 2026-11-11, first taken for a
     difference). Record directories too, or state the limit in `docs/validation/oracle-cache.md` and have suites
     that check directories run the original directly.
+  - *Open, FreeSurfer (2026-11-12):* which stream larmorprepx runs by default (FreeSurfer 8.2.0's `recon-all` runs v8
+    unless given `-no-v8`; fMRIPrep 25.x runs the classic stream through 7.3.2): to decide with larmorprepx; and ITK 4.13.2
+    (what FreeSurfer 8.2.0's programs link) where it differs from 5.4.5, recommended, to confirm with the inventory's ITK
+    comparison (no arithmetic difference found on FreeSurfer's paths).
+  - *glibc's double `atan2` for `reproduce`* (2026-11-12, the confounds part): SciPy's `as_euler` in fMRIPrep's
+    motion parameters goes through glibc's `atan2`; LARMORX's correctly rounded one changes 15 of 22,293 rotation
+    cells in 12 of the 36 real files, so `reproduce` is not yet exact there (a D13 gap, GLIBC-07's row). A micro-part
+    as for `sincos_glibc`: a spec writer describes glibc 2.35's `atan2` (`specs/`), a clean-room agent writes
+    `atan2_glibc` in `larmorx_core::math` (glibc is LGPL: never translated); the audit's `CORE_FILES` gains it.
   - *The gates as CI runs them:* `verify-merge.sh` and the agents' gates run with this machine's `FSLDIR` set, CI
     without it: `crates/larmorx-cli/tests/fsl_output_types.rs` passed here and failed on all six platforms
     (2026-11-11, `52de0470`; fixed in `9abcd41a`). Run `cargo test` and the Python gates in `verify-merge.sh` with

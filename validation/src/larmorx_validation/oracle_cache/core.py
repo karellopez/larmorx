@@ -499,6 +499,7 @@ def differences(
     fresh_files: dict[tuple[str, str], Path],
     volatile: Sequence[str] = (),
     nifti_extensions: bool = True,
+    formats: str = "",
 ) -> list[str]:
     """How a fresh run's result (its files at ``fresh_files``) differs from a stored one."""
     out = []
@@ -519,7 +520,10 @@ def differences(
         if sa[k]["sha256"] == sb[k]["sha256"]:
             continue
         same, why = compare.same_file(
-            store.blob_path(sa[k]["sha256"]), fresh_files[k], nifti_extensions=nifti_extensions
+            store.blob_path(sa[k]["sha256"]),
+            fresh_files[k],
+            nifti_extensions=nifti_extensions,
+            formats=formats,
         )
         if not same:
             out.append(f"{k[1] or k[0]}: {why}")
@@ -569,6 +573,7 @@ def _new_entry(
             "threads": policy.threads,
             "volatile": list(policy.volatile),
             "nifti_extensions": policy.nifti_extensions,
+            **({"formats": policy.formats} if policy.formats else {}),
         },
         "required": required,
         "confirmations": 1,
@@ -650,6 +655,7 @@ def _settle(
             fresh_files,
             policy.volatile,
             nifti_extensions=not policy.nifti_extensions,
+            formats=policy.formats,
         )
         event = {"date": now(), "seconds": round(done.seconds, 3), "case": _case.name}
         if diff:

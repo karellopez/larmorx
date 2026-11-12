@@ -16,20 +16,15 @@ from here".
   `freesurfer_ubuntu22-8.2.0_amd64.deb` (9.6 GB; FreeSurfer 8.2.0 ships no tarball) unpacked with
   `dpkg-deb -x`, no administrator rights, under `<workspace>/oracles/freesurfer-8.2.0/`; the same
   file on every machine that runs it, its SHA-256 in each run's `RUN_INFO.txt`.
-- **Two streams.** `recon-all` 8.2.0 sets `FS_V8_XOPTS=1` unless told otherwise, so its default is the
-  **v8 stream**: `etc/global-expert-options.v8.txt` adds `-fix-ento-wm -transfer-base-bfs -fix-vsinus
-  -fix-mca-dura -fix-ga -fix-acj -synthstrip -synthseg -synthmorph` and options of `mris_place_surface`,
-  `mri_ca_label`, `mri_edit_wm_with_aseg` and `mris_fix_topology`: skull stripping by SynthStrip, the
-  labels by SynthSeg, the registration by SynthMorph (`fs-synthmorph-reg`), all three neural networks
-  (pretrained models: Rust inference with the original weights, decision log 2026-10-19). The
-  **classic stream** (`-no-v8`, what fMRIPrep 25.x's FreeSurfer 7.3.2 runs): `mri_watershed`,
-  `talairach_avi`, `mri_em_register`, `mri_ca_normalize`, `mri_ca_register`, `mri_ca_label`. Most
-  programs, the surface steps among them, are shared by both. Both streams are recorded; which is
-  ported first is the user's choice (decision log). Both streams correct the intensity with ITK's N4:
-  recon-all runs `mri_nu_correct.mni --ants-n4`, which calls `AntsN4BiasFieldCorrectionFs` (LARMORX's
-  N4 replica may serve), and both run `AntsDenoiseImageFs` and `mris_remesh`; v8 keeps
-  `mri_em_register` and `mri_ca_normalize` and runs `mri_ca_register -invert-and-save`, and a fourth
-  network, `mri_sclimbic_seg` (inventory, relay 1, checked against the first recordings).
+- **Two streams.** `recon-all` 8.2.0 runs, by default, the **v8 stream**: skull stripping by SynthStrip, the
+  labels by SynthSeg and the registration by SynthMorph, neural networks (pretrained models: Rust inference with
+  the original weights, decision log 2026-10-19), with several new correction steps. Its `-no-v8` flag gives the
+  **classic stream**, what fMRIPrep 25.x's FreeSurfer 7.3.2 runs (`mri_watershed`, the Talairach chain,
+  `mri_ca_label`, ...). Most programs, the surface steps among them, are shared by both; both correct the intensity
+  with ITK's N4 (`AntsN4BiasFieldCorrectionFs`, which LARMORX's N4 replica may serve). The programs of each stream,
+  measured on the recordings: `docs/freesurfer/programs.md` (replica side). **The order (the user, 2026-11-12):** the
+  programs both streams share first, then the classic-only ones (fMRIPrep's), with the v8-only networks as a
+  parallel track; FreeSurfer 7.3.2 is not ported (a reference for the final comparisons only).
 - **The licence key** is a check inside FreeSurfer's own programs: the oracle runs read the user's
   licence file in place (the user, 2026-11-12: also on the lab's server), never copied into results
   or repositories; LARMORX's ports need none (decision log 2026-10-19).
@@ -92,14 +87,16 @@ from here".
 
 ## The waves
 
-| Wave | Programs (from the inventory, which may regroup them) |
+| Wave | What (the programs per wave: `docs/freesurfer/waves.md` and the queue, replica side) |
 |---|---|
-| 3.1 Foundations | the file formats (MGZ, surfaces, curvature, labels, annotations, colour tables, LTA and `.xfm` transforms, `.m3z`, GCA, `.gcs`, `.tif` atlases), the image and surface structures, FreeSurfer's maths, random numbers and messages |
-| 3.2 Volumes | `mri_convert`, `mri_add_xform_to_header`, `mri_nu_correct.mni` with `AntsN4BiasFieldCorrectionFs` (ITK's N4), `AntsDenoiseImageFs`, `talairach_avi` (a clean room only, its atlas fetched: `docs/licensing.md`), `talairach_afd`, `mri_normalize`, `mri_watershed`, `mri_mask`, `mri_segment`, `mri_edit_wm_with_aseg`, `mri_pretess`, `mri_fill`, `mri_cc`, `lta_convert`, `mri_concatenate_lta`; fMRIPrep's `mri_coreg`, `mri_robust_template`, `mri_robust_register` (fMRIPrep runs them without recon-all: early value) |
-| 3.3 Atlas | the classic stream's `mri_em_register`, `mri_ca_normalize`, `mri_ca_register`, `mri_ca_label`, `mri_relabel_hypointensities`, `mri_segment_hypointensities`; the v8 stream's networks `mri_synthstrip`, `mri_synthseg`, `fs-synthmorph-reg`, `mri_sclimbic_seg` (a small inference core in Rust, the original weights fetched) — two tracks that can run side by side |
-| 3.4 First surfaces | `mri_tessellate`, `mris_extract_main_component`, `mris_smooth`, `mris_inflate`, `mris_sphere`, `mris_fix_topology`, `mris_euler_number`, `mris_remove_intersection`, `defect2seg` |
-| 3.5 Final surfaces and statistics | `mris_autodet_gwstats`, `mris_place_surface`, `mris_curvature`, `mris_register`, `mris_jacobian`, `mrisp_paint`, `mris_ca_label`, `mris_volmask`, `mris_anatomical_stats`, `mri_surf2volseg`, `mri_segstats`, `mri_brainvol_stats`, `mri_label2label`, `pctsurfcon`; fMRIPrep's `bbregister`, `mri_vol2surf`, `mris_expand`, `mri_vol2vol`, `mri_surf2surf`, `mris_convert` |
-| 3.6 `recon-all` | the script's behaviour (its steps, flags, checks, logs, the resume logic sMRIPrep uses) |
+| 3.1 Foundations | the file formats, the image and surface structures, FreeSurfer's maths, random numbers and messages; x87 80-bit arithmetic; the third-party pieces (the placement table) |
+| 3.2 Volumes | the volume programs both streams run (`mri_convert`, `mri_nu_correct.mni` with ITK's N4, `AntsDenoiseImageFs`, `mri_normalize`, `mri_segment`, `mri_fill`, ...), and fMRIPrep's `mri_coreg`, `mri_robust_template` (with EPFL's B-splines) and `mri_robust_register`, early |
+| 3.3 Atlas | the atlas programs both streams run (`mri_em_register`, `mri_ca_normalize`, `mri_ca_register`) |
+| 3.4 First surfaces | tessellation to the fixed, remeshed surface |
+| 3.5 Final surfaces and statistics | placement, registration, parcellation, statistics; fMRIPrep's surface programs and `bbregister` (with `tkregister2_cmdl`) |
+| 3.6 The classic-only programs | `mri_watershed`, the Talairach chain (`talairach_avi`: a clean room only, its atlases fetched), `talairach_afd`, `mri_ca_label` |
+| N The v8 networks (a parallel track) | the inference core, the four network programs, their scripts |
+| 3.7 `recon-all` | the script's behaviour (its steps, flags, checks, logs, the resume logic sMRIPrep uses) |
 
 **Roles.** Each wave's replica authors also write its specs (`specs/<program>.md`; one reading of the
 source, two products; their briefs name them spec writers). The clean rooms follow one wave behind,
@@ -120,10 +117,23 @@ record, memory near the original's, its reference page and evidence page from th
 - **A normal week:** one agent at a time, the cheaper way, on the queue `docs/freesurfer/queue.md`
   (written by the inventory, kept by the orchestrator): the next wave's replicas and the previous
   wave's clean rooms, in priority order.
-- Honest timing: the whole of `recon-all`, replica and clean room, is several weeks; the first burst
-  should bring the preparation, the foundations and most of wave 3.2.
+- Honest timing: the whole of `recon-all`, replica and clean room, is several weeks (the inventory measured
+  about 309,000 lines reached, an upper bound); the first burst should bring the preparation and a good part of the
+  foundations (wave 3.1 alone is about 50 queue items).
 
 ## Data files
+
+**Borrowed code inside FreeSurfer** (the user, 2026-11-12; decision log): every third-party piece gets a
+replica, in the package of its own licence family (GSL's GPL code in `larmorx-gpl`, CorTechs' non-commercial
+`tkregister2_cmdl` in `larmorx-nc` as its own program, Burkardt's spline in `larmorx-freesurfer`, EPFL's B-splines
+(`mriBSpline.cpp`, carrying MGH's notice) in `larmorx-freesurfer` crediting EPFL), and an improved clean room in
+`larmorx`; `larmorx` keeps full freedom, and users install a restricted replica only if they want it. Where a
+piece's licence and FreeSurfer's cannot be combined in one program, the replica uses the clean-room piece there
+(the placement table, `docs/freesurfer/third-party.md`). MARS later; ITK 4.13.2 where it differs from 5.4.5.
+No waiting for permissions (the user, 2026-11-12): the replicas are built now and published like the rest
+(Burkardt's 2006 routines included, with his credit).
+**Washington University's Talairach tools get a clean room only** (the user, 2026-11-12): their source forbids
+reproduction without written permission, so no replica unless that permission comes.
 
 The four rules (the user, 2026-11-12; decision log):
 

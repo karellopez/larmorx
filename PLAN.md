@@ -389,6 +389,8 @@ recon-all writes every step's output to the subject directory, which gives a nat
 - With FreeSurfer installed (Linux/macOS), `lx freesurfer recon --until <step>` hands over to FreeSurfer, and the reverse.
 - This keeps the stream usable during the port and lets every step be validated in isolation.
 
+**Superseded on 2026-11-12** (decision log; `docs/freesurfer-plan.md` is the current plan: FreeSurfer 8.2.0 only, its two streams, a replica of every borrowed piece in its licence family's package and a clean room of each in larmorx; 8.2.0 corrects the intensity with ITK's N4). The original text:
+
 **Third-party code inside FreeSurfer is not covered by MGH's licence:** `talairach_avi` (4dfp tools) and `mri_nu_correct.mni` (MNI N3, Perl/MINC). Plan:
 - Replace them with larmorx-ants affine registration to MNI305 and with N4.
 - Validate that downstream differences stay within the variability band.
@@ -663,8 +665,8 @@ Five tracks; they can run in parallel once L0 exists. Sizes are person-months fo
 | D2 | Licence of our code | **Decided 2026-10-09:** Apache-2.0 |
 | D3 | Distributions | **Decided with D1:** wheel `larmorx` (library + larmorprepx pipeline via the `[prep]` extra) and wheel `larmorx-freesurfer` (licence isolation); plus standalone CLI binaries |
 | D4 | Names for clean-room tools | **Neutral names** (`mri.hmc`, `mri.brain_mask`, `mri.pepolar`, …) with documented compatibility ("accepts mcflirt-style options"), not the FSL/Workbench program names |
-| D5 | FreeSurfer version to port | **v8.2.0**, also validated against 7.4.x |
-| D6 | FreeSurfer atlas data | **Download at first use after licence acceptance**, until MGH confirms whether bundling is allowed |
+| D5 | FreeSurfer version to port | **v8.2.0** (since 2026-11-12: 7.3.2's runs, fMRIPrep's, are a reference for the final comparisons only) |
+| D6 | FreeSurfer atlas data | **Download at first use** from FreeSurfer's public annex remote; files up to 2 MB may ship in `larmorx-freesurfer` (2026-11-12: the four data-file rules, `docs/freesurfer-plan.md`) |
 | D7 | Is the project (or its main users) commercial? | **Decided 2026-10-09: not commercial.** FSL and MSM binaries may be run as validation oracles. larmorx itself stays Apache-2.0, so others may use it commercially |
 | D8 | Output compatibility | **fMRIPrep-compatible derivative names and confound columns** |
 | D9 | Minimum Python | **3.12** |

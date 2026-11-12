@@ -178,6 +178,16 @@ RULES: dict[str, Rule] = {
             "2026-10-23T19:28:03+02:00",
             "as R13 (other parts' notes and handoffs)",
         ),
+        Rule(
+            "R19",
+            "code FreeSurfer borrows from others, at its sources (GSL, Burkardt's spline, EPFL's B-spline "
+            "code, Washington University's 4dfp tools)",
+            "FreeSurfer",
+            "2026-11-12T00:00:00+01:00",
+            "2026-11-12T00:00:00+01:00",
+            "decision log 2026-11-12 (FreeSurfer's borrowed pieces: each gets a clean room); "
+            "docs/freesurfer/third-party.md",
+        ),
     )
 }
 
@@ -257,6 +267,16 @@ URL_RULES = (
     (re.compile(r"^https?://(ftp\.gnu\.org/gnu/glibc|gcc\.gnu\.org/git)"), "R06"),
     (re.compile(r"^https?://(www\.)?github\.com/ME-ICA/tedana/(blob|tree|raw)/"), "R07"),
     (re.compile(r"^https?://raw\.githubusercontent\.com/ME-ICA/tedana/"), "R07"),
+    # the sources of the code FreeSurfer borrows (2026-11-12), also through the Wayback Machine
+    (
+        re.compile(
+            r"(savannah\.gnu\.org/(cgit|git)/gsl|ftp\.gnu\.org/gnu/gsl|github\.com/ampl/gsl)"
+        ),
+        "R19",
+    ),
+    (re.compile(r"people\.sc\.fsu\.edu/~?jburkardt|people\.math\.sc\.edu/Burkardt"), "R19"),
+    (re.compile(r"bigwww\.epfl\.ch/(thevenaz|sage)"), "R19"),
+    (re.compile(r"(github\.com/[^/]+/4dfp_tools|nil\.wustl\.edu/.*4dfp)"), "R19"),
 )
 DOC_HOSTS = re.compile(
     r"^https?://(fsl\.fmrib\.ox\.ac\.uk|afni\.nimh\.nih\.gov|surfer\.nmr\.mgh\.harvard\.edu|"
@@ -303,6 +323,9 @@ ANCHORS = (
     # tedana's source wherever a copy lives: the tags, every installed package (D9, 2026-11-08)
     (re.compile(r"/tags/tedana-[^/]+(/|$)"), "R07", "tedana"),
     (re.compile(r"/site-packages/tedana(/|$)"), "R07", "tedana"),
+    # FreeSurfer's replicas (2026-11-12: a workspace of several crates, the wheel larmorx-freesurfer)
+    (re.compile(r"/crates-freesurfer(/|$)"), "R10", "FreeSurfer"),
+    (re.compile(r"/larmorx[-_]freesurfer([-_][a-z0-9]+)*(/|$)"), "R10", "FreeSurfer"),
     (re.compile(r"/docs/parts(/|$)"), "R13", "all"),
     (re.compile(r"/validation/probes(/|$)"), "R14", None),
 )
@@ -508,6 +531,12 @@ def restricted(rule: str, family: str | None, op: str, rel: str) -> Class:
 def _classify_repo(rel: str, op: str) -> Class:
     if rel == "docs/findings/upstream-defects.md":
         return Class("register", "R12", None)
+    # FreeSurfer's preparation (2026-11-12): the inventory, cards, queue and findings come from its source
+    if (
+        rel.startswith(("docs/freesurfer/", "validation/investigations/freesurfer-inventory/"))
+        or re.match(r"^docs/findings/freesurfer-[^/]+\.md$", rel)
+    ) and not rel.endswith("-clean-room.md"):
+        return restricted("R11", "FreeSurfer", op, rel)
     m = re.match(r"^docs/findings/((?:fsl|afni)-[^/]+\.md)$", rel)
     if m and not m[1].endswith("-original.md"):
         return Class("findings-unlisted", None, m[1].split("-", 1)[0].upper())
@@ -560,6 +589,25 @@ def _classify_workspace(rel: str, op: str) -> Class:
     if m and m[1] == "afni" and op in CONTENT_OPS:
         return restricted("R02", "AFNI", op, rel)
     if top == "freesurfer" or rel.startswith("tags/freesurfer"):
+        return restricted("R03", "FreeSurfer", op, rel)
+    # an unpacked FreeSurfer package (oracles/freesurfer-8.2.0/root/usr/local/freesurfer/8.2.0/): running its programs
+    # is a black-box run; its scripts, Python and libraries are FreeSurfer's source; its data is data
+    m = re.match(r"^oracles/freesurfer-[^/]+/root/usr/local/freesurfer/[^/]+/(?P<sub>.*)$", rel)
+    if m:
+        sub = m["sub"]
+        if op in RUN_OPS and sub.startswith("bin/"):
+            return Class("run", None, "FreeSurfer")
+        if op in CONTENT_OPS and (
+            re.match(r"^(bin|python|lib|etc|fsfast|matlab|tktools|fsafd)/", sub)
+            or re.match(r"^[^/]+\.(c?sh|py)$", sub)
+        ):
+            return restricted("R03", "FreeSurfer", op, rel)
+        return Class("freesurfer-install")
+    # a recorded run: recon-all copies itself and its configuration into the subject's scripts/
+    if re.match(
+        r"^oracles/freesurfer-[^/]+/runs/.*/scripts/(recon-all\.local-copy|recon-config\.yaml)$",
+        rel,
+    ):
         return restricted("R03", "FreeSurfer", op, rel)
     if rel.startswith("reference_src/workbench"):
         return restricted("R04", "Workbench", op, rel)

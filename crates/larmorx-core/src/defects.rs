@@ -405,6 +405,16 @@ defects! {
         "an SVD that fails with failure_mode='NaN' is replaced by T NaN singular values whatever the decomposition's size min(T, N), and with components_criterion 'all' by one NaN component while all T values are marked retained (CompCor's metadata then names every one after the first component)";
     PIPE_60 = "PIPE-60", "nipy rotation_vec2mat", true,
         "the angle of a rotation vector given as integers is the square root of its sum of squares computed in the vector's own type, which wraps around silently (a component of an int8 vector from 12, int16 from 182, int32 from 46,341; an int64 vector when the sum passes 2^63, from about 1.75e9 per component), so nipype's normalize_mc_params(params, 'NIPY') of such a row is another rotation or numpy's LinAlgError";
+    PIPE_61 = "PIPE-61", "niworkflows AddTSVHeader", true,
+        "numpy's loadtxt squeezes a table of one row to a vector, which savetxt writes as one column (the row's values one under the other), and a table of one value to a scalar, which savetxt refuses (ValueError: Expected 1D or 2D array, got 0D array instead)";
+    PIPE_62 = "PIPE-62", "niworkflows AddTSVHeader", true,
+        "a header with another number of names than the table's columns is written as given, so the file's header and rows disagree";
+    PD_01 = "PD-01", "pandas read_csv", true,
+        "the default float parser (precise_xstrtod) keeps at most 17 digit characters, the leading zeros of 0.00... included, accumulates them in a double and divides by one power of ten, so most values to_csv writes (their shortest repr, up to 17 significant digits) are read back as another double, one or more units in the last place off";
+    PD_02 = "PD-02", "pandas to_json", true,
+        "the 10-decimal formatting of doubles (ujson) multiplies the fraction by 1e10 in floating point, truncates it and rounds the remainder, ties of an even last digit down and of a last digit 0 up, so some values are written with another 10th decimal than the correctly rounded one";
+    PD_03 = "PD-03", "pandas read_csv", true,
+        "an integer column with missing values marks them with int64's minimum before turning them into NaN, so a value equal to -9223372036854775808 in it is read as NaN";
     SCI_02 = "SCI-02", "SciPy ndimage", true,
         "NaN and out-of-range values written to an integer output are converted as x86-64 converts them (C leaves the conversion undefined)";
     SCI_03 = "SCI-03", "SciPy ndimage", true,

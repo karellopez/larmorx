@@ -17,6 +17,10 @@ bit for bit (the confounds' part fills it step by step).
   :func:`larmorx.niworkflows.nonsteady_states_detector`).
 - :func:`framewise_displacement`, :func:`normalize_mc_params`: nipype's
   ``FramewiseDisplacement`` and the motion parameters' conversion to SPM's order and units.
+- :func:`fmriprep_framewise_displacement`, :func:`filter_dropped`, :func:`rename_acompcor`,
+  :func:`gather_confounds`: fMRIPrep's own ``FramewiseDisplacement``, ``FilterDropped``,
+  ``RenameACompCor`` and ``GatherConfounds`` (the tables read and written as pandas reads and
+  writes them: PD-01).
 """
 
 from larmorx.confounds.compcor import (
@@ -39,6 +43,14 @@ from larmorx.confounds.dvars import (
     compute_dvars,
     compute_dvars_node,
 )
+from larmorx.confounds.fmriprep import (
+    GatherConfoundsResult,
+    RenameACompCorResult,
+    filter_dropped,
+    fmriprep_framewise_displacement,
+    gather_confounds,
+    rename_acompcor,
+)
 from larmorx.confounds.framewise import (
     FramewiseDisplacementResult,
     framewise_displacement,
@@ -52,7 +64,9 @@ __all__ = [
     "ComputeDvarsResult",
     "DvarsResult",
     "FramewiseDisplacementResult",
+    "GatherConfoundsResult",
     "NonSteadyStateResult",
+    "RenameACompCorResult",
     "TsnrResult",
     "acompcor",
     "combine_mask_files",
@@ -64,11 +78,15 @@ __all__ = [
     "cosine_drift",
     "cosine_filter",
     "fallback_svd",
+    "filter_dropped",
+    "fmriprep_framewise_displacement",
     "framewise_displacement",
     "full_rank",
+    "gather_confounds",
     "nonsteady_state_detector",
     "normalize_mc_params",
     "regress_poly",
+    "rename_acompcor",
     "tcompcor",
     "tsnr",
 ]

@@ -2206,3 +2206,11 @@ def nipy_motion_params(
     ``IndexError`` or ``LinAlgError`` for the first row nipy cannot compute
     (``larmorx.confounds.normalize_mc_params`` and ``framewise_displacement`` are the public
     forms)."""
+
+def pandas_try_double(
+    tokens: list[str], pandas_version: str = "3.0.6"
+) -> tuple[np.ndarray, np.ndarray] | None:
+    """pandas' ``read_csv`` float conversion of one column's tokens (``precise_xstrtod``,
+    pandas 3.0.x or 2.2.x; the default missing values, the infinity words): ``(pandas' values,
+    the correctly rounded values)``, or ``None`` when a token is not a float
+    (``larmorx.confounds._tables`` is its caller)."""

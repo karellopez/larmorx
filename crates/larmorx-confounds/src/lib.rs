@@ -22,6 +22,9 @@
 //! - [`nipy`]: nipype's `normalize_mc_params(params, "NIPY")`, nipy 0.6.1's `to_matrix44` and
 //!   `aff2euler` with nibabel's `mat2euler` (BSD-3-Clause and MIT: the notices in the module),
 //!   for `FramewiseDisplacement(parameter_source="NIPY")`.
+//! - [`pandas`]: pandas' default float parser of `read_csv` (`precise_xstrtod`, pandas 3.0.6
+//!   and 2.2.3; BSD-3-Clause: the notice in the module) with the correctly rounded reading of
+//!   the same texts (PD-01), for the tables fMRIPrep's confound steps read.
 //!
 //! This crate is the **port** (a replica of permissive upstreams, in the main package). The
 //! clean-room original of the same steps, planned later (the user, 2026-11-06 and 2026-11-11),
@@ -32,4 +35,5 @@ pub mod compcor;
 pub mod dvars;
 pub mod nipy;
 pub mod nitime;
+pub mod pandas;
 pub mod scipy_fft;

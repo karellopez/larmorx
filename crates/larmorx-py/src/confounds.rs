@@ -30,6 +30,7 @@ mod fft;
 mod gelsd;
 mod gesvd;
 mod nipy;
+mod pandas;
 mod reductions;
 mod svd;
 
@@ -1153,5 +1154,6 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     dvars::register(m)?;
     compcor::register(m)?;
     nipy::register(m)?;
+    pandas::register(m)?;
     Ok(())
 }

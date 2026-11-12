@@ -31,6 +31,8 @@ and scikit-image arithmetic under them.
 - :func:`robust_acompcor`, :func:`robust_tcompcor`: ``RobustACompCor`` and ``RobustTCompCor``,
   nipype's ``ACompCor`` and ``TCompCor`` (:mod:`larmorx.confounds`) without niworkflows' retries
   (PIPE-48).
+- :func:`add_tsv_header`, :func:`dict_merge`, :func:`tsv2json`: ``AddTSVHeader``,
+  ``DictMerge`` and ``TSV2JSON`` (PIPE-61, PIPE-62; PD-01, PD-02).
 """
 
 from larmorx.niworkflows.bids import (
@@ -88,6 +90,10 @@ from larmorx.niworkflows.sampling import (
     generate_sampling_reference,
     resample_img_nearest,
 )
+
+# add_tsv_header, dict_merge and tsv2json join __all__ with their golden cases (the confounds'
+# golden relay), as robust_acompcor and robust_tcompcor.
+from larmorx.niworkflows.utility import add_tsv_header, dict_merge, tsv2json  # noqa: F401
 
 __all__ = [
     "DEFAULT_DTYPES",

@@ -1,5 +1,5 @@
 {
- "dossier": "2026-11-12-freesurfer-foundations-ac2",
+ "dossier": "2026-11-12-freesurfer-preparation",
  "edits": [
   {
    "added": null,
@@ -121,11 +121,11 @@
   }
  ],
  "evidence": {
-  "accesses": 354932,
+  "accesses": 355192,
   "agents": 361,
   "archive_checksums_differ": 0,
-  "archive_checksums_matched": 471,
-  "archived_files": 471,
+  "archive_checksums_matched": 478,
+  "archived_files": 478,
   "archives": {
    "2026-11-05-session-transcripts": {
     "files": 244,
@@ -191,18 +191,22 @@
     "files": 108,
     "sha256": "288dfd5c5be533f9f1e81af035b0da00ad1d25ab562f25c99057a293cd5de079"
    },
+   "2026-11-12-session-transcripts-freesurfer-preparation": {
+    "files": 8,
+    "sha256": "9f829e9c3abd74e10e29c36458ba0bcfbd5d41700f763894f3b262211b8612db"
+   },
    "2026-11-12-session-transcripts-t2smap-clean-room": {
     "files": 24,
     "sha256": "270fabe579ae46ec980c98fa1944da5c901164127803af20dc15e52efe4767ba"
    }
   },
-  "commits_printed": 3380,
+  "commits_printed": 3383,
   "distinct_transcripts": 365,
   "first_record": "2026-10-09 11:38 UTC",
   "gaps": {
    "agents_without_worktree": 260,
    "bad_lines": 0,
-   "calls_without_result": 34,
+   "calls_without_result": 37,
    "compaction_parent_missing": 2,
    "compactions": 77,
    "refused_calls": 1643,
@@ -211,11 +215,11 @@
    "results_without_call": 0,
    "unresolved_paths": 8222
   },
-  "last_record": "2026-11-12 23:01 UTC",
+  "last_record": "2026-11-12 23:09 UTC",
   "live_files": 365,
-  "live_files_also_archived": 361,
+  "live_files_also_archived": 362,
   "sessions": 4,
-  "tool_calls": 102477,
+  "tool_calls": 102540,
   "tool_calls_by_tool": [
    [
     "Agent",
@@ -231,7 +235,7 @@
    ],
    [
     "Bash",
-    87359
+    87415
    ],
    [
     "CronCreate",
@@ -255,7 +259,7 @@
    ],
    [
     "Read",
-    2646
+    2648
    ],
    [
     "ReadNotifications",
@@ -275,7 +279,7 @@
    ],
    [
     "SubagentHandback",
-    376
+    377
    ],
    [
     "TaskOutput",
@@ -283,11 +287,11 @@
    ],
    [
     "TaskStop",
-    268
+    271
    ],
    [
     "ToolSearch",
-    220
+    221
    ],
    [
     "WebFetch",
@@ -302,9 +306,9 @@
     6358
    ]
   ],
-  "transcript_bytes": 9099510094,
-  "transcript_files": 836,
-  "unique_paths": 74161
+  "transcript_bytes": 9284012357,
+  "transcript_files": 843,
+  "unique_paths": 74219
  },
  "levels": [
   [
@@ -385,7 +389,7 @@
  "made_from": {
   "scan": "scan",
   "similarity_commit": "6e18b57d-dirty",
-  "verdicts_repository": "9542d421"
+  "verdicts_repository": "d3a690b9"
  },
  "overview": {
   "agents_by_role": [

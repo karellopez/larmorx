@@ -400,9 +400,13 @@ def example(
             continue
         ds.sort(key=lambda d: (targets.index(target[d["id"]]), place(d["a"]), place(d["b"])))
         if port == "original":
-            title_ = "The original against itself: the yardstick"
-            if all(target[d["id"]] == "the known answer" for d in ds):
-                title_ = "The original against the known answer"
+            # the original against the known answer (a phantom's truth), then against itself
+            known = [d["id"] for d in ds if target[d["id"]] == "the known answer"]
+            if known:
+                groups.append(("The original against the known answer", known))
+            rest = [d["id"] for d in ds if d["id"] not in known]
+            if rest:
+                groups.append(("The original against itself: the yardstick", rest))
         else:
             # the port against the others, then against itself (its threads, fix and reproduce)
             who = words.PORT_NAME[port]
@@ -422,8 +426,6 @@ def example(
                 order = ["thread counts", "fix and reproduce", *sorted(kinds)]
                 named = ", ".join(k for k in dict.fromkeys(order) if k in kinds)
                 groups.append((f"The {who} against itself: {named}", [d["id"] for d in itself]))
-            continue
-        groups.append((title_, [d["id"] for d in ds]))
     words.example(
         ex,
         ports=ports,

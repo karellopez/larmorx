@@ -339,3 +339,17 @@ def test_a_dots_chart_names_its_series():
     ]
     assert s["note"] == "Where the replica differs from ANTs as built, ..."
     assert (s["title"], s["port"]) == ("Variability, ...", "replica")
+
+
+def test_the_original_against_a_known_answer_has_its_own_group():
+    """A phantom's truth: the original against it is not the original against itself."""
+    ex = _example()
+    ex["panels"].append({"id": "truth", "role": "input", "label": "the truth", "arrays": {}})
+    ex["diffs"].append(
+        {"id": "ants-truth", "a": "ants", "b": "truth", "kind": "reference",
+         "label": "ANTs − the truth", "role_label": "x", "metrics": {}, "verdict": None,
+         "reason": ""}
+    )  # fmt: skip
+    groups = dict((t, ids) for t, ids in _present(ex)["order"]["groups"])
+    assert groups["The original against the known answer"] == ["ants-truth"]
+    assert groups["The original against itself: the yardstick"] == ["ants8-ants1", "fp-ants"]

@@ -23,6 +23,7 @@ larmorx-ants.workspace = true
 larmorx-core.workspace = true
 larmorx-fsl.workspace = true
 larmorx-mri.workspace = true
+larmorx-tedana.workspace = true
 
 [dev-dependencies]
 larmorx-io.workspace = true

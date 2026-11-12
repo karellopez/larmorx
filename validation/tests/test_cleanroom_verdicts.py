@@ -6,6 +6,8 @@ judged against a tool's family, a tool's verdict, git's exclusion pathspecs."""
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 from larmorx_validation.cleanroom_audit import accesses as acc
 from larmorx_validation.cleanroom_audit import restrictions as rs
@@ -32,6 +34,8 @@ WT = f"{WS}/larmorx/.claude/worktrees/agent-a1"
         ("crates/larmorx-fsl/src/cli/ssroi.rs", ("FSL", "standard_space_roi")),
         ("crates/larmorx-fsl/src/cli/fslroi.rs", ("FSL", "fslroi")),
         ("crates/larmorx-fsl/src/data.rs", ("FSL", "fsl-shared")),
+        ("crates/larmorx-tedana/src/curvefit.rs", ("tedana", "t2smap")),
+        ("crates-gpl/larmorx-gpl-tedana/src/decay.rs", None),
         ("crates/larmorx-core/src/math/sincos_glibc_tables.rs", ("GNU", "sincos_glibc")),
         ("crates/larmorx-core/src/math/sincosf_glibc.rs", None),  # Arm's MIT code, a replica
         ("crates/larmorx-afni-replica/src/tshift.rs", None),
@@ -40,6 +44,23 @@ WT = f"{WS}/larmorx/.claude/worktrees/agent-a1"
 )
 def test_tool_of(rel, expected):
     assert vd.tool_of(rel) == expected
+
+
+def test_every_clean_room_crate_is_audited():
+    """A crate whose PROVENANCE.md calls it a clean-room implementation is in the audit's lists
+    (crates/larmorx-tedana was not until its merge, 2026-11-12), and every listed crate is one."""
+    repo = Path(__file__).resolve().parents[2]
+    declared = {
+        f"crates/{d.name}"
+        for d in (repo / "crates").iterdir()
+        if (d / "PROVENANCE.md").is_file()
+        and "Clean-room implementation"
+        in "".join((d / "PROVENANCE.md").read_text(encoding="utf-8").splitlines(True)[:12])
+    }
+    assert declared == {c.rstrip("/") for c in rs.CLEANROOM_CRATES}
+    assert declared <= set(vd.CLEANROOM_PATHS)
+    for c in declared:
+        assert vd.tool_of(f"{c}/src/lib.rs") in vd.TOOL_NAMES, c
 
 
 @pytest.mark.parametrize(
@@ -207,6 +228,18 @@ def test_register_lines_and_what_an_output_shows():
     assert {s for s, _ in hits} == {"Restricted: AFNI 3dTshift (source-derived)"}
 
 
+@pytest.mark.parametrize(
+    ("section", "family"),
+    [
+        ("Restricted: AFNI 3dvolreg (source-derived)", "AFNI"),
+        ("Restricted: FSL mcflirt (source-derived)", "FSL"),
+        ("Restricted: tedana t2smap (source-derived)", "tedana"),
+    ],
+)
+def test_section_family(section, family):
+    assert vd.section_family(section) == family
+
+
 def _access(**kw):
     base = {
         "rule": "R10",
@@ -233,6 +266,8 @@ def _access(**kw):
         (_access(in_force=False), "FSL", "content", False),
         (_access(rule="R11", family="AFNI/FSL"), "FSL", "content", True),
         (_access(rule="R17", family="all"), "GNU", "content", True),
+        (_access(family="AFNI/tedana"), "tedana", "content", True),  # crates-gpl
+        (_access(rule="R07", family="tedana"), "FSL", "content", False),
     ],
 )
 def test_judge_levels_and_families(access, family, level, relevant):

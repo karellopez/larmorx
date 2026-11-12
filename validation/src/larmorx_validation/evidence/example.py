@@ -279,6 +279,14 @@ class Example:
         if self.planes is not None:
             va, vb = self.slices(va), self.slices(vb)
         d = np.abs(va - vb)
+        if np.isnan(d).any():
+            # NaN against NaN is no difference; NaN against a number is one without a size:
+            # the largest difference shown is sought among the voxels where both hold a number
+            same_nan = np.isnan(va) & np.isnan(vb)
+            differ = int(np.count_nonzero(~same_nan & ~(va == vb)))
+            d = np.where(np.isnan(d), 0.0, d)
+        else:
+            differ = None
         k = int(np.argmax(d))
         if self.planes is not None:
             plane, at = self.unslice(k, ndim)
@@ -289,7 +297,7 @@ class Example:
             "at": at,
             "a": float(va.flat[k]),
             "b": float(vb.flat[k]),
-            "differ": int(np.count_nonzero(d)),
+            "differ": int(np.count_nonzero(d)) if differ is None else differ,
         }
         if plane:
             out["plane"] = plane
@@ -335,7 +343,10 @@ def own_windows(ex: Example, panels: list[dict], outputs: list[dict]) -> None:
             key = ex.key(p["id"], o["id"])
             v = ex.values(key)
             m = ex.m if v.ndim == 3 else np.broadcast_to(ex.m[..., None], v.shape)
-            lo, hi = np.percentile(v[m], [0.5, 99.5])
+            vm = v[m]
+            if np.isnan(vm).any():  # a voxel without a value (NaN) has no place in a window
+                vm = vm[~np.isnan(vm)] if (~np.isnan(vm)).any() else np.zeros(1)
+            lo, hi = np.percentile(vm, [0.5, 99.5])
             own[o["id"]] = [float(lo), float(hi)]
         p["own"] = own
     for o in outputs:
@@ -345,6 +356,8 @@ def own_windows(ex: Example, panels: list[dict], outputs: list[dict]) -> None:
 def windows(values: np.ndarray, label: str = "brain") -> list[dict]:
     """An output's intensity windows: 0.5 to 99.5 % of the shown brain, and its full range."""
     v = values.astype(np.float64)
+    if np.isnan(v).any():  # a voxel without a value (NaN) has no place in a window
+        v = v[~np.isnan(v)] if (~np.isnan(v)).any() else np.zeros(1)
     lo, hi = np.percentile(v, [0.5, 99.5])
     return [
         {"id": "brain", "label": f"{label}, 0.5–99.5 %", "lo": float(lo), "hi": float(hi)},

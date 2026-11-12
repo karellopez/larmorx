@@ -13,7 +13,8 @@
 //! - [`model`]: one level's predictions, cost, gradient and Gauss-Newton Hessian (§4.3, §4.6);
 //! - [`stencil`]: the Hessian's storage and its conjugate-gradient solve (§4.7, §11);
 //! - [`minimise`]: Levenberg-Marquardt and scaled conjugate gradients (§4.7);
-//! - [`apply`]: applytopup's corrections (§7).
+//! - [`apply`]: applytopup's corrections (§7);
+//! - [`settings`]: larmorx's own settings of FSL's six configurations, by name (§2.5).
 //!
 //! The command line is [`crate::cli::topup`].
 
@@ -23,6 +24,7 @@ pub mod minimise;
 pub mod model;
 pub mod movement;
 pub mod pool;
+pub mod settings;
 pub mod spline;
 pub mod stencil;
 pub mod vb;

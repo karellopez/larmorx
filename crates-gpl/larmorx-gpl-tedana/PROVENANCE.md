@@ -72,7 +72,27 @@ and `_var` (reduce, subtract), `_nanfunctions_impl.py`'s `nanvar` (subtract) and
 `_function_base_impl.py`'s `_lerp` (subtract, multiply, add) on infinite values, with their
 lines in numpy 2.5.4 and 2.3.5 (`decay::Libraries`); numpy 2.3.5's `percentile` dividing `q` by
 `a.dtype.type(100)` (a float32 rank for float32 data); pandas' `DataFrame` shape error of an
-empty table (BSD-3-Clause).
+empty table (BSD-3-Clause). Since relay RS2 of the clean-room part (2026-11-12): nibabel
+5.4.2's loading of ANALYZE 7.5 pairs (`Spm2AnalyzeHeader`, `Spm99AnalyzeImage`'s `.mat` affine)
+and MGH/MGZ images (`MGHHeader`, `MGHImage`) through the main package's Apache-2.0 reader of that
+loading, `larmorx_tedana::formats` (the clean-room original's module, called as a library; this
+crate edits none of it), with nibabel's own choices this crate adds (`data.rs`: the classes'
+order, the reading where `_convert_to_nifti1` reads, `from_matvec`'s float32 MGH translation,
+`array_from_file`'s file name; MIT).
+
+## Verification (relay RS2 of the clean-room part, 2026-11-12)
+
+- The parity suite's `formats/` cases (`validation/investigations/t2smap/replica/check_formats.py`,
+  20: ANALYZE and MGH inputs, masks and z-concatenated files, nibabel's failures): bit for bit
+  with tedana in both environments; `rs2_replayed_formats.py`: the clean-room part's 104 replayed
+  random cases with ANALYZE or MGH inputs, every file identical; `rs2_descriptor_formats.py`: the
+  descriptor's ANALYZE and MGH draws, 30 of 30 agree.
+- TED-46 under the curve fit (`specs/t2smap.md` §7.3, measured by
+  `validation/investigations/t2smap-spec/ted46_curvefit.py`): the default's exact solution, unit
+  test `decay::tests::equal_samples_take_the_curve_fits_exact_solution_by_default`.
+- Golden (`crates-gpl/larmorx-gpl-cli/tests/golden.rs`): 16 cases (6 added: TED-46 in the
+  log-linear fit and the curve fit in both modes, TED-31, an ANALYZE 7.5 pair, an MGH image).
+- The record (`docs/validation/tedana-t2smap-replica.md`): 102 cases from d5288693 (standard tier): 62 bit-identical in both environments, 40 rejected by both alike, 0 failures; fMRIPrep's calls from the oracle runs made again with OpenBLAS's Haswell kernels; the 20 `formats/` cases.
 
 ## Verification (relay 7b, 2026-11-08)
 
@@ -99,8 +119,10 @@ that did not agree agrees with the final build (70 of 70,
 - `check_parser.py`: the command line against tedana's parser in-process: 109 cases (help at 19
   widths, every error argparse and `is_valid_file` give, abbreviations, `=` forms, clusters,
   negative numbers, `--`), all identical (exit status, standard output and error, values).
-- `check_failures.py`: 11 failure cases (the TED defects' and tedana's own clear errors): with
-  `reproduce` tedana's exit status and last line, by default the defect named.
+- `check_failures.py`: 24 failure cases (the TED defects' and tedana's own clear errors; 13 added
+  by the clean-room part's relay RS1, 2026-11-12: TED-31, TED-46, the chained tracebacks, the
+  temporal means' and the cast's warnings, the thresholds' printing, `--fitmode ts` with no
+  volume): with `reproduce` tedana's exit status and last line, by default the defect named.
 
 ## Verification (relay 5b, 2026-11-08)
 

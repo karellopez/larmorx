@@ -399,6 +399,7 @@ judgement = "plumbing in larmorx's own words, nothing AFNI-derived; the only edi
 "GNU/cbrtf_glibc" = "clean"
 "GNU/sincos_glibc" = "clean"
 "GNU/tanh_glibc" = "clean (a declared port of fdlibm's permissive code; glibc's source never opened)"
+"tedana/t2smap" = "clean: seven clean relays wrote it from specs/t2smap.md and black-box runs of tedana; no content of tedana's source or of the replica seen before or during the work (names, builds, black-box runs of the replica program and licence files only; one declared slip of another family: the header bytes of the PyPI larmorx-nc program); its shared runs with the replica (23.5 % of tokens, read at the merge of 2026-11-12) are tedana's observable texts (messages, log locations, the help, dataset_description.json) written through the same main-package APIs (argparse, the defect notices, PyError)"
 
 # ------------------------------------------------- what the evidence cannot see
 
@@ -447,3 +448,10 @@ text = "Exclude folders with `--exclude-dir` rather than by filtering a search's
 
 [[recommendation]]
 text = "Run the audit at every merge (scripts/orchestration/cleanroom-audit-merge.sh): it archives the part's transcripts and stops the merge on any unjudged edit of clean-room code after restricted material of the tool's family."
+
+# the confounds part's intermediate merge (2026-11-12): a merge on the t2smap clean-room branch
+[[edit]]
+agent = "orchestrator"
+commit = "e8b4474b9"
+what = "the t2smap wiring relay's own merge of main (b13195fb) into its branch (made by that clean-room implementer, not the orchestrator): its resolution adds `mod tedana;` beside main's `mod stream;` in larmorx-py's module list and rewrites one row of docs/api/tedana-t2smap.md's option table (`--implementation`'s values); no clean-room crate file (the dossier's list is empty)"
+judgement = "no algorithmic content; nothing tedana-derived"

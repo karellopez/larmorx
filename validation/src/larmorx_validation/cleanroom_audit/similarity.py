@@ -835,6 +835,7 @@ FSL_SOURCE = "crates-nc/fsl-source"
 AFNI_TAG = "tags/AFNI-26.3.05"
 GLIBC_TAG = "tags/glibc-2.35"
 CORE_MATH_TAG = "tags/core-math"
+TEDANA_TAG = "tags/tedana-26.0.3"
 
 #: FSL's source files (``crates-nc/fsl-source/``) by the clean-room tool they belong to (the first
 #: match wins; the rest, newimage with its cost functions, miscmaths, utils, NewNifti, znzlib and
@@ -917,6 +918,16 @@ GNU_TOOLS = {
         ["crates-nc/larmorx-nc-core/src/fdlibm.rs"],
     ),
 }
+#: tedana's files the t2smap replica was ported from (its PROVENANCE.md): Python, the upstream of
+#: larmorx-tedana; the replica is crates-gpl/larmorx-gpl-tedana.
+TEDANA_UPSTREAM = (
+    "tedana/combine.py",
+    "tedana/decay.py",
+    "tedana/io.py",
+    "tedana/utils.py",
+    "tedana/workflows/t2smap.py",
+    "tedana/workflows/parser_utils.py",
+)
 #: Fixed calibration pairs: (name, kind, measured files, reference files).
 CALIBRATION = (
     (
@@ -1108,6 +1119,11 @@ def make_plan(repo: Path, workspace: Path, fsl_src: Path | None, wide: bool) -> 
             plan.add("GNU", tool, "upstream", _source(workspace, u))
         for r in reps:
             plan.add("GNU", tool, "replica", _source(repo, r))
+    for f in TEDANA_UPSTREAM:
+        plan.add("tedana", "t2smap", "upstream", _source(workspace, f"{TEDANA_TAG}/{f}"))
+    for rel in _git_files(repo, "crates-gpl/larmorx-gpl-tedana"):
+        if rel.endswith(".rs") and not _is_test_path(rel):
+            plan.add("tedana", "t2smap", "replica", Source(str(repo / rel), rel))
     for name, kind, ours, theirs in CALIBRATION:
         plan.calibration.append(
             (
@@ -1516,6 +1532,25 @@ EXPLAINED = (
         "crates/larmorx-core/src/math/sincos_glibc.rs",
         "`specs/glibc-dbl.md`'s operations in the spec's order (the reduction of §8 as a sum of"
         " its six parts); the spec writer's model carries out the same text",
+    ),
+    (
+        "crates/larmorx-afni/src/volreg/rotate.rs",
+        "the 3 × 3 matrix product as `specs/3dvolreg.md` §4.3 states it (`A_i0·B_0j + A_i1·B_1j +"
+        " A_i2·B_2j` summed left to right); AFNI's `AFF44_MULT` writes the same definition for"
+        " 4 × 4",
+    ),
+    (
+        "crates/larmorx-afni/src/volreg/grid.rs",
+        "the 3 × 3 determinant by the rule of Sarrus in the six terms' order `specs/3dvolreg.md`"
+        " §4.5 gives (left to right); the replica translates AFNI's `DMAT_DET`, the same formula"
+        " in the same order",
+    ),
+    (
+        "crates/larmorx-tedana/src/cli.rs",
+        "tedana's options declared through the main package's port of CPython's argparse"
+        " (`larmorx_core::python::argparse`), with the help texts `t2smap -h` prints, which"
+        " `specs/t2smap.md` §2 quotes; the builder calls in another order (`.default` before"
+        " `.help`), and no access to the replica recorded (the verdicts)",
     ),
 )
 #: Runs at least this long (names stream, in tokens) are listed in the public section.

@@ -1104,9 +1104,10 @@ def image_math_operations() -> list[str]:
 #: below). ``lx.fsl.prelude`` ran a tool with only its replica (FSL's prelude) from 2026-11-06
 #: until its clean-room original came the next day (its cases below); since 2026-11-06
 #: ``lx.afni.volreg`` ran a tool with only its replica (AFNI's 3dvolreg) from 2026-11-06 until its
-#: clean-room original came on 2026-11-08 (its cases below). ``lx.tedana.t2smap`` runs tedana's
-#: t2smap, whose replica (``larmorx-gpl``, since 2026-11-08) has its cases in ``crates-gpl``.
-REPLICA_ONLY_FUNCTIONS: dict[str, str] = {"lx.tedana.t2smap": "tedana t2smap"}
+#: clean-room original came on 2026-11-08 (its cases below). ``lx.tedana.t2smap`` ran tedana's
+#: t2smap with only its replica (``larmorx-gpl``, since 2026-11-08, its cases in ``crates-gpl``)
+#: until its clean-room original was wired in on 2026-11-12 (its cases below). None now.
+REPLICA_ONLY_FUNCTIONS: dict[str, str] = {}
 
 #: The replicas' golden cases: the AFNI replicas' (built into larmorx since 2026-10-29, cases
 #: in the larmorx command line's tests, run by ``cargo test`` in every platform's test job), the
@@ -5695,6 +5696,28 @@ def _(ctx: Context) -> dict[str, Any]:
     }
 
 
+@case("cli.fsl.topup.own-settings")
+def _(ctx: Context) -> dict[str, Any]:
+    """larmorx's own settings of FSL's six configurations (clean-room, ``specs/topup.md`` §2.5),
+    found by name with no FSL installation (``FSLDIR`` a folder without them): each one's log of
+    the settings in force (``--debug=9`` stops the run after the log is written), and the full
+    estimation of ``test_acqp``, with the field and corrected images its settings name."""
+    _topup_files(ctx)
+    saved = dict(os.environ)
+    os.environ["FSLDIR"] = os.fspath(ctx.dir)
+    out: dict[str, Any] = {}
+    try:
+        for name in ("b02b0", "b02b0_1", "b02b0_2", "b02b0_4", "b02b0_7T", "test_acqp"):
+            status = _in_dir(ctx, lambda n=name: _fsl_status(ctx, "topup", "--imain=blip_pair.nii", "--datain=acq.txt", f"--config={n}", f"--out={n}", f"--logout={n}.log", "--debug=9"))  # fmt: skip
+            out[f"{name}:status"] = status[0]
+            out[f"{name}.log"] = File(os.fspath(ctx.dir / f"{name}.log"))
+        _topup(ctx, "topup", "--imain=blip_pair.nii", "--datain=acq.txt", "--config=test_acqp.cnf", "--out=ta")  # fmt: skip
+    finally:
+        os.environ.clear()
+        os.environ.update(saved)
+    return {**out, **_written(ctx, "ta", "field_test", "iout_test")}
+
+
 def _topup_quick(ctx: Context) -> None:
     """A one-level topup of the pair (``tu_fieldcoef``, ``tu_movpar.txt``) for applytopup."""
     _topup_files(ctx)
@@ -8828,3 +8851,393 @@ def _(ctx: Context) -> dict[str, Any]:
             out[label] = Nifti(res.out_file)
             out[f"{label}.centre"] = np.asarray(res.centre, dtype=np.int64)
     return out
+
+
+# ------------------------------------------------------------------------------------------------
+# tedana's t2smap: the clean-room original (``crates/larmorx-tedana``, ``specs/t2smap.md`` §17.4)
+#
+# Through its own binding (``_core.tedana_t2smap_cleanroom``: t2smap's arguments, an environment
+# table, the directory), and since 2026-11-12, when it was wired into the shared implementation
+# choice, through the public entry points too: the command line (``cli.tedana.t2smap``: larmorx's
+# options before the family) and ``lx.tedana.t2smap`` (``py.tedana.t2smap``). Every file the run
+# writes is an output (NIfTI images by header and data), with its exit status and both streams;
+# standard error with the case directory's name replaced, ``dataset_description.json`` without
+# the host's ``Node`` and with larmorx's version replaced (the same checksum on every machine and
+# at every release).
+
+T2SMAP_SHAPE = (12, 10, 8, 4)
+T2SMAP_TES_MS = (12, 28, 44)
+T2SMAP_TES = ("-e", "0.012", "0.028", "0.044")
+T2SMAP_ZOOMS = (3.0, 3.0, 3.5)
+
+
+@functools.cache
+def _t2smap_echoes() -> tuple[np.ndarray, ...]:
+    """Three echoes (12 × 10 × 8 × 4, float64): S0 times the decay as a product of
+    per-millisecond factors (1 − 1/T2*)^TE, with seeded multiplicative noise of ±2 %; a head and
+    a brain over a dim background, a dropout band (x ≤ 2: the last echo at a tenth), rising
+    voxels (y = 0: the last echo above the second, whose log-linear T2* is negative) and one
+    noiseless voxel decaying with a T2* of 2 s (above ten times the cap: TED-05)."""
+    shape = T2SMAP_SHAPE[:3]
+    head = ellipsoid(shape, 9, 10)
+    brain = ellipsoid(shape, 7, 10)
+    i, j, k = np.indices(shape, dtype=np.int64)
+    s0 = ints(301, shape, 10, 40) + 500 * head + 700 * brain + 9 * i * head
+    t2 = np.where(brain, 24 + 2 * j + k, np.where(head, 14 + j, 6))
+    t2[7, 6, 4] = 2000
+    factor = 1.0 - 1.0 / t2
+    decays = []
+    for te in T2SMAP_TES_MS:
+        decay = np.ones(shape)
+        for _ in range(te):
+            decay = decay * factor
+        decays.append(s0 * decay)
+    decays[2] = np.where(head & (i <= 2), decays[2] / 10, decays[2])
+    decays[2] = np.where(head & (j == 0), decays[1] * 1.2, decays[2])
+    noise = [ints(310 + e, T2SMAP_SHAPE, -100, 101) for e in range(len(decays))]
+    for n in noise:
+        n[7, 6, 4, :] = 0
+    return tuple(d[..., np.newaxis] * (1.0 + n / 5000) for d, n in zip(decays, noise, strict=True))
+
+
+def _t2smap_affine() -> np.ndarray:
+    return affine(T2SMAP_SHAPE[:3], T2SMAP_ZOOMS, (1.5, -4.0, 6.0), oblique=False)
+
+
+def _t2smap_header(data: np.ndarray, aff: np.ndarray, **fields: Any) -> NiftiHeader:
+    zooms = (1.0, *T2SMAP_ZOOMS, 2.0, 1.0, 1.0, 1.0)
+    return header_for(data, aff, pixdim=zooms, xyzt_units=10, **fields)
+
+
+def _t2smap_mask() -> np.ndarray:
+    return np.asfortranarray(ellipsoid(T2SMAP_SHAPE[:3], 8, 10).astype(np.uint8))
+
+
+def _t2smap_nifti(ctx: Context, *, ext: str = ".nii.gz", version: int | None = None) -> list[str]:
+    """The echoes as float32 NIfTI files ``e1<ext>``... and the mask ``mask<ext>`` in the case's
+    directory; ``-d`` with the echoes' names."""
+    aff = _t2smap_affine()
+    names = []
+    for e, echo in enumerate(_t2smap_echoes(), 1):
+        data = np.asfortranarray(echo.astype(np.float32))
+        lx.save(lx.Image(data, aff, _t2smap_header(data, aff)), ctx.out(f"e{e}{ext}"), version=version)  # fmt: skip
+        names.append(f"e{e}{ext}")
+    mask = _t2smap_mask()
+    lx.save(lx.Image(mask, aff, header_for(mask, aff)), ctx.out(f"mask{ext}"), version=version)
+    return ["-d", *names]
+
+
+def _t2smap_zcat(ctx: Context) -> list[str]:
+    """The three echoes stacked along z in one int16 file with ``scl_slope`` 0.5 and
+    ``scl_inter`` 3 (the deprecated z-concatenated form, 12 × 10 × 24 × 4)."""
+    stacked = np.concatenate(_t2smap_echoes(), axis=2)
+    raw = np.asfortranarray(np.round((stacked - 3.0) / 0.5).astype(np.int16))
+    aff = affine(raw.shape[:3], T2SMAP_ZOOMS, (1.5, -4.0, 6.0), oblique=False)
+    hdr = _t2smap_header(raw, aff, scl_slope=0.5, scl_inter=3.0)
+    _core.nifti_write(ctx.out("zcat.nii.gz"), raw, hdr.to_dict(), 2, 1)
+    return ["-d", "zcat.nii.gz"]
+
+
+def _analyze_header(shape: tuple[int, ...], datatype: int, bitpix: int) -> bytearray:
+    """A little-endian ANALYZE 7.5 header read as SPM2's (nibabel): voxel sizes 3, 3, 3.5 and a
+    2 s TR, the origin at voxel (6, 5, 4) (1-based, ``originator``), no scaling."""
+    import struct
+
+    h = bytearray(348)
+    struct.pack_into("<i", h, 0, 348)
+    struct.pack_into("<i", h, 32, 16384)
+    h[38] = ord("r")
+    dims = (*shape, *([1] * (7 - len(shape))))
+    struct.pack_into("<8h", h, 40, len(shape), *dims)
+    struct.pack_into("<2h", h, 70, datatype, bitpix)
+    struct.pack_into("<8f", h, 76, 0.0, *T2SMAP_ZOOMS, 2.0, 0.0, 0.0, 0.0)
+    struct.pack_into("<3h", h, 253, 6, 5, 4)
+    return h
+
+
+def _t2smap_analyze(ctx: Context) -> list[str]:
+    """The echoes as int16 ANALYZE 7.5 pairs with SPM2's scaling (``funused1`` 0.5 and
+    ``funused2`` 3: nibabel applies it in float64) and origin, and a uint8 ANALYZE mask."""
+    import struct
+
+    names = []
+    for e, echo in enumerate(_t2smap_echoes(), 1):
+        h = _analyze_header(T2SMAP_SHAPE, 4, 16)
+        struct.pack_into("<2f", h, 112, 0.5, 3.0)
+        (ctx.dir / f"a{e}.hdr").write_bytes(bytes(h))
+        raw = np.round((echo - 3.0) / 0.5).astype("<i2")
+        (ctx.dir / f"a{e}.img").write_bytes(raw.tobytes(order="F"))
+        names.append(f"a{e}.img")
+    (ctx.dir / "amask.hdr").write_bytes(bytes(_analyze_header(T2SMAP_SHAPE[:3], 2, 8)))
+    (ctx.dir / "amask.img").write_bytes(_t2smap_mask().tobytes(order="F"))
+    return ["-d", *names, "--mask", "amask.hdr"]
+
+
+def _mgh(path: Path, data: np.ndarray, kind: int, dtype: str, tr: float) -> None:
+    """An MGH image (big-endian; ``.mgz`` gzip-compressed): the grid of ``ROTATION`` times the
+    voxel sizes, its centre at (2, −3, 5) mm, and the footer's repetition time ``tr`` (ms)."""
+    import struct
+
+    shape = (*data.shape, *([1] * (4 - data.ndim)))
+    h = bytearray(284)
+    struct.pack_into(">i4iii", h, 0, 1, *shape, kind, 0)
+    struct.pack_into(">h", h, 28, 1)
+    columns = [[ROTATION[r][c] for r in range(3)] for c in range(3)]
+    struct.pack_into(">3f9f3f", h, 30, *T2SMAP_ZOOMS, *columns[0], *columns[1], *columns[2], 2.0, -3.0, 5.0)  # fmt: skip
+    body = bytes(h) + data.astype(dtype).tobytes(order="F") + struct.pack(">5f", tr, 0, 0, 0, 0)
+    path.write_bytes(gzip.compress(body, mtime=0) if path.suffix == ".mgz" else body)
+
+
+def _t2smap_mgh(ctx: Context) -> list[str]:
+    """The echoes as float32 ``.mgz`` files on an oblique grid (a 2000 ms TR in the footer) and
+    a uint8 ``.mgh`` mask of the same grid."""
+    names = []
+    for e, echo in enumerate(_t2smap_echoes(), 1):
+        _mgh(ctx.dir / f"m{e}.mgz", echo, 3, ">f4", 2000.0)
+        names.append(f"m{e}.mgz")
+    _mgh(ctx.dir / "mmask.mgh", _t2smap_mask(), 0, ">u1", 0.0)
+    return ["-d", *names, "--mask", "mmask.mgh"]
+
+
+def _t2smap_text(text: str, where: Path) -> str:
+    """``text`` with the case directory's name as ``<dir>`` and ``/`` for the separators of the
+    paths after it (standard error names the output directory as an absolute path)."""
+    lines = []
+    for line in text.replace(os.fspath(where), "<dir>").split("\n"):
+        lines.append(line.replace("\\", "/") if "<dir>" in line else line)
+    return "\n".join(lines)
+
+
+def _t2smap_paths(text: str, where: Path) -> str:
+    """``text`` with the case directory's name as ``<dir>``, ``lx.tedana.t2smap``'s temporary
+    directory as ``<tmp>``, and ``/`` for the separators of the paths after them (in Python's
+    lists the backslashes doubled)."""
+    text = text.replace(os.fspath(where), "<dir>")
+    text = re.sub(r"[^\s'\"\[]*larmorx-t2smap-[A-Za-z0-9_]+", "<tmp>", text)
+    lines = []
+    for line in text.split("\n"):
+        if "<dir>" in line or "<tmp>" in line:
+            line = line.replace("\\\\", "/").replace("\\", "/")
+        lines.append(line)
+    return "\n".join(lines)
+
+
+def _t2smap_run(
+    ctx: Context, name: str, *argv: str, mode: str = "fix", env: tuple = ()
+) -> dict[str, Any]:
+    """``t2smap <argv> --out-dir <name>`` by the clean-room original in the case's directory
+    (``COLUMNS=80``, ``LARMORX_UPSTREAM_DEFECTS=<mode>``): its exit status and streams, and every
+    file it wrote under ``<name>``."""
+    variables = [("COLUMNS", "80"), ("LARMORX_UPSTREAM_DEFECTS", mode), *env]
+    code, out, err = _core.tedana_t2smap_cleanroom(
+        [*argv, "--out-dir", name], variables, os.fspath(ctx.dir)
+    )
+    return _t2smap_outputs(ctx, name, (code, out, err))
+
+
+def _t2smap_outputs(ctx: Context, name: str, status: tuple[int, str, str]) -> dict[str, Any]:
+    """A t2smap run's exit status and streams (the case directory's name replaced in standard
+    error), and every file it wrote under ``<name>``."""
+    code, out, err = status
+    outputs: dict[str, Any] = _status_outputs(name, (code, out, _t2smap_text(err, ctx.dir)))
+    for p in sorted((ctx.dir / name).rglob("*")):
+        key = f"{name}/{p.relative_to(ctx.dir / name).as_posix()}"
+        if not p.is_file():
+            continue
+        if p.name.endswith("dataset_description.json"):
+            text = p.read_text(encoding="utf-8").replace(_core.__version__, "<version>")
+            outputs[key] = re.sub(r'"Node": \{[^}]*\}', '"Node": {}', text)
+        elif ".nii" in p.name:
+            outputs[key] = Nifti(os.fspath(p))
+        else:
+            outputs[key] = File(os.fspath(p))
+    return outputs
+
+
+@case("cli.tedana.t2smap", covers=("cli:tedana t2smap",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``larmorx --n-threads 2 --upstream-defects reproduce --implementation clean-room tedana
+    t2smap ...`` (the command line's dispatch to the clean-room original, in this process):
+    larmorx's options before the family reach it (D13's mode; the thread count, t2smap's own
+    ``--n-threads`` not given), relative names in the working directory; the log-linear fit with
+    both mask methods, tedana's names (``--convention orig``)."""
+    d = _t2smap_nifti(ctx)
+    argv = [*d, *T2SMAP_TES, "--mask", "mask.nii.gz", "--masktype", "dropout", "decay",
+            "--convention", "orig", "--out-dir", "out"]  # fmt: skip
+    globals_ = ["--n-threads", "2", "--upstream-defects", "reproduce", "--implementation", "clean-room"]  # fmt: skip
+    saved_dir, saved_env = os.getcwd(), dict(os.environ)
+    for name in ("COLUMNS", "OMP_NUM_THREADS", "LARMORX_TEDANA_LIBRARIES"):
+        os.environ.pop(name, None)
+    os.environ["COLUMNS"] = "80"
+    os.chdir(ctx.dir)
+    try:
+        seen = os.getcwd()  # the directory as the process names it (t2smap's log names it so)
+        code, out, err = _core.cli_main(["larmorx", *globals_, "tedana", "t2smap", *argv], [], None)  # fmt: skip
+    finally:
+        os.chdir(saved_dir)
+        os.environ.clear()
+        os.environ.update(saved_env)
+    return _t2smap_outputs(ctx, "out", (code, out, err.replace(seen, os.fspath(ctx.dir))))
+
+
+@case("py.tedana.t2smap", covers=("lx.tedana.t2smap",))
+def _(ctx: Context) -> dict[str, Any]:
+    """``lx.tedana.t2smap(..., implementation="clean-room")`` in this process: in-memory float32
+    echoes (written as NIfTI-1 by the wrapper) and a mask file, the curve fit with ``verbose``
+    (every image of :class:`T2smapResult` read back, the failures and variance maps too), the
+    table's columns, the registry, the description (its host and larmorx's version replaced),
+    tedana's log (the temporary directory replaced) and the notices as warnings."""
+    _t2smap_nifti(ctx)
+    aff = _t2smap_affine()
+    echoes = [(np.asfortranarray(e.astype(np.float32)), aff) for e in _t2smap_echoes()]
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        r = lx.tedana.t2smap(echoes, [0.012, 0.028, 0.044], mask=ctx.out("mask.nii.gz"),
+                             fittype="curvefit", verbose=True, implementation="clean-room",
+                             n_threads=2)  # fmt: skip
+    out: dict[str, Any] = {}
+    for name in ("t2star", "s0", "t2star_limited", "s0_limited", "optcom", "adaptive_mask",
+                 "rmse", "fit_failures", "t2star_variance", "s0_variance",
+                 "t2star_s0_covariance"):  # fmt: skip
+        img = getattr(r, name)
+        out[name] = img.data
+        out[f"{name}.affine"] = img.affine
+    for column, values in r.confounds.items():
+        out[f"confounds.{column}"] = values
+    out["files"] = json.dumps(r.files, sort_keys=True)
+    generated = dict(r.dataset_description["GeneratedBy"][0])
+    generated["Node"] = {}
+    generated["Command"] = _t2smap_paths(generated["Command"], ctx.dir)
+    generated["Python"] = generated["Python"].replace(_core.__version__, "<version>")
+    description = {**r.dataset_description, "GeneratedBy": [generated]}
+    out["dataset_description"] = json.dumps(description, sort_keys=True)
+    out["log"] = _t2smap_paths(r.log, ctx.dir)
+    out["implementation"] = f"{r.implementation.kind} {r.implementation.package}"
+    notices = [w for w in caught if isinstance(w.message, lx.UpstreamDefectWarning)]
+    out["warnings"] = "\n".join(f"{type(w.message).__name__}: {w.message}" for w in notices)
+    return out
+
+
+@case("tedana.t2smap.cleanroom.loglin")
+def _(ctx: Context) -> dict[str, Any]:
+    """The defaults (``loglin``, ``all``, ``t2s``, ``bids``, the dropout method) on float32
+    echoes with a mask: the adaptive mask, the log-linear fit (the rising voxels' negative T2*),
+    the floors and the cap, the RMSE, the table, the combination, the JSON files; two threads."""
+    d = _t2smap_nifti(ctx)
+    return _t2smap_run(ctx, "out", *d, *T2SMAP_TES, "--mask", "mask.nii.gz", "--n-threads", "2")
+
+
+@case("tedana.t2smap.cleanroom.curvefit")
+def _(ctx: Context) -> dict[str, Any]:
+    """``--fittype curvefit --verbose --debug``: the trust-region fit of every voxel from the
+    log-linear start, its failures (uint8), the variance and covariance maps, the DEBUG lines."""
+    d = _t2smap_nifti(ctx)
+    return _t2smap_run(ctx, "out", *d, *T2SMAP_TES, "--mask", "mask.nii.gz", "--fittype", "curvefit", "--verbose", "--debug", "--n-threads", "3")  # fmt: skip
+
+
+@case("tedana.t2smap.cleanroom.ts")
+def _(ctx: Context) -> dict[str, Any]:
+    """``--fitmode ts --combmode paid``: a log-linear fit per voxel and volume (4D maps) and
+    PAID's weights from each volume's means."""
+    d = _t2smap_nifti(ctx)
+    return _t2smap_run(ctx, "out", *d, *T2SMAP_TES, "--mask", "mask.nii.gz", "--fitmode", "ts", "--combmode", "paid")  # fmt: skip
+
+
+@case("tedana.t2smap.cleanroom.curvefit-ts")
+def _(ctx: Context) -> dict[str, Any]:
+    """``--fittype curvefit --fitmode ts``: the curve fit per voxel and volume (its failures
+    image 4D)."""
+    d = _t2smap_nifti(ctx)
+    return _t2smap_run(ctx, "out", *d, *T2SMAP_TES, "--mask", "mask.nii.gz", "--fittype", "curvefit", "--fitmode", "ts", "--n-threads", "2")  # fmt: skip
+
+
+@case("tedana.t2smap.cleanroom.computed-mask")
+def _(ctx: Context) -> dict[str, Any]:
+    """No mask (nilearn's ``compute_epi_mask`` of the first echo), the decay method,
+    ``--convention orig`` with a prefix, echo times in milliseconds (the deprecation warning),
+    NIfTI-2 echoes (so NIfTI-2 outputs)."""
+    d = _t2smap_nifti(ctx, ext=".nii", version=2)
+    return _t2smap_run(ctx, "out", *d, "-e", "12", "28", "44", "--masktype", "decay", "--convention", "orig", "--prefix", "sub-01")  # fmt: skip
+
+
+@case("tedana.t2smap.cleanroom.volumes")
+def _(ctx: Context) -> dict[str, Any]:
+    """``--masktype none`` with a dummy scan and an excluded volume: the mask and the fit from
+    two of the three volumes left, the RMSE, the table and the combination of all three."""
+    d = _t2smap_nifti(ctx)
+    return _t2smap_run(ctx, "out", *d, *T2SMAP_TES, "--mask", "mask.nii.gz", "--masktype", "none", "--dummy-scans", "1", "--exclude", "3")  # fmt: skip
+
+
+@case("tedana.t2smap.cleanroom.zcat-int16")
+def _(ctx: Context) -> dict[str, Any]:
+    """A z-concatenated int16 file with a scale and an intercept, both mask methods, no mask
+    given (computed from the first echo's part), ``--n-independent-echos 2`` (its warnings)."""
+    d = _t2smap_zcat(ctx)
+    return _t2smap_run(ctx, "out", *d, *T2SMAP_TES, "--masktype", "dropout", "decay", "--n-independent-echos", "2")  # fmt: skip
+
+
+@case("tedana.t2smap.cleanroom.reproduce")
+def _(ctx: Context) -> dict[str, Any]:
+    """tedana's defects reproduced (D13: ``LARMORX_UPSTREAM_DEFECTS=reproduce``) with the
+    curve fit and numpy 2.3.5's results (``LARMORX_TEDANA_LIBRARIES=shared``): the cap of the
+    limited maps only, glibc's exponentials, the notices' ``reproduced`` texts."""
+    d = _t2smap_nifti(ctx)
+    env = (("LARMORX_TEDANA_LIBRARIES", "shared"),)
+    return _t2smap_run(ctx, "out", *d, *T2SMAP_TES, "--mask", "mask.nii.gz", "--fittype", "curvefit", mode=REPRODUCE, env=env)  # fmt: skip
+
+
+@case("tedana.t2smap.cleanroom.failures")
+def _(ctx: Context) -> dict[str, Any]:
+    """Refusals: a parser error (exit 2, the usage), echo times in mixed units (``ValueError``
+    after the call file), a mask of another grid (tedana's error chained to nilearn's) and an
+    open-ended ``--exclude`` range (the output directory left empty), each exit 1."""
+    d = _t2smap_nifti(ctx)
+    other = np.zeros((6, 5, 4), np.uint8)
+    other[1:5, 1:4, 1:3] = 1
+    lx.save(lx.Image(other, _t2smap_affine(), header_for(other, _t2smap_affine())), ctx.out("other.nii.gz"))  # fmt: skip
+    return {
+        **_t2smap_run(ctx, "parser", *d, "-e", "--fittype", "loglin"),
+        **_t2smap_run(ctx, "units", *d, "-e", "0.012", "28", "44"),
+        **_t2smap_run(ctx, "grid", *d, *T2SMAP_TES, "--mask", "other.nii.gz"),
+        **_t2smap_run(ctx, "exclude", *d, *T2SMAP_TES, "--exclude", "1:"),
+    }
+
+
+@case("tedana.t2smap.cleanroom.analyze")
+def _(ctx: Context) -> dict[str, Any]:
+    """ANALYZE 7.5 echoes and mask as nibabel loads them (SPM2's float64 scaling, its origin):
+    tedana's in-memory NIfTI-1 images, so NIfTI-1 outputs on the origin's grid."""
+    return _t2smap_run(ctx, "out", *_t2smap_analyze(ctx), *T2SMAP_TES)
+
+
+@case("tedana.t2smap.cleanroom.mgh")
+def _(ctx: Context) -> dict[str, Any]:
+    """MGH echoes (``.mgz``, float32, oblique, the TR from the footer) and an ``.mgh`` mask."""
+    return _t2smap_run(ctx, "out", *_t2smap_mgh(ctx), *T2SMAP_TES)
+
+
+@case("tedana.t2smap.cleanroom.ted46")
+def _(ctx: Context) -> dict[str, Any]:
+    """TED-46 (relay C4, 2026-11-12): a block of 18 head voxels saturated at 255 in every echo
+    and volume. ``reproduce`` solves their group as tedana's batch with the exact port of
+    numpy's ``lstsq`` (their slope tedana's rounding noise); the default's curve fit takes the
+    exact solution there (S0 255, T2* +inf, variances 0), and with two echoes per volume
+    (``--fitmode ts``) their covariance +inf with SciPy's warning."""
+    aff = _t2smap_affine()
+    names = []
+    for e, echo in enumerate(_t2smap_echoes(), 1):
+        sat = echo.copy()
+        sat[4:7, 3:6, 3:5, :] = 255.0
+        data = np.asfortranarray(sat.astype(np.float32))
+        lx.save(lx.Image(data, aff, _t2smap_header(data, aff)), ctx.out(f"s{e}.nii.gz"))
+        names.append(f"s{e}.nii.gz")
+    mask = _t2smap_mask()
+    lx.save(lx.Image(mask, aff, header_for(mask, aff)), ctx.out("mask.nii.gz"))
+    m = ("--mask", "mask.nii.gz")
+    curve = ("--fittype", "curvefit", "--verbose")
+    two = ("-d", *names[:2], "-e", "0.012", "0.028", *m, *curve, "--fitmode", "ts")
+    return {
+        **_t2smap_run(ctx, "noise", "-d", *names, *T2SMAP_TES, *m, mode=REPRODUCE),
+        **_t2smap_run(ctx, "exact", "-d", *names, *T2SMAP_TES, *m, *curve, "--debug"),
+        **_t2smap_run(ctx, "two", *two),
+    }

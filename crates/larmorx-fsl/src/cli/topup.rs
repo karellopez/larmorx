@@ -279,37 +279,53 @@ fn refuse(err: &mut dyn Write, notices: &[Notice], why: &str) -> u8 {
     1
 }
 
-/// Finds a configuration file (§2.5): as named, with `.cnf`, or in `$FSLDIR/etc/flirtsch/`.
-fn find_config(settings: &Settings, name: &str) -> Result<Option<std::path::PathBuf>, ()> {
+/// Where a `--config` name was found (§2.5).
+#[derive(Debug, PartialEq, Eq)]
+enum Config {
+    /// A file or directory (a directory gives no option).
+    Path(std::path::PathBuf),
+    /// One of larmorx's own settings ([`topup::settings`]).
+    Own(&'static topup::settings::Setting),
+}
+
+/// Finds a configuration (§2.5): as named, with `.cnf`, in `$FSLDIR/etc/flirtsch/` (as named,
+/// with `.cnf`); a name without a directory part that none of those holds, among larmorx's own
+/// settings ([`topup::settings`]: FSL's six configurations by name). `Err` when the name is in
+/// none of those places and FSLDIR is unset (FSL-121).
+fn find_config(settings: &Settings, name: &str) -> Result<Option<Config>, ()> {
     let p = settings.path(name);
     if p.exists() {
-        return Ok(Some(p));
+        return Ok(Some(Config::Path(p)));
     }
     let has_ext = std::path::Path::new(name).extension().is_some();
     if !has_ext {
         let q = settings.path(&format!("{name}.cnf"));
         if q.exists() {
-            return Ok(Some(q));
+            return Ok(Some(Config::Path(q)));
         }
     }
     let has_dir = name_start(name) > 0;
-    if !has_dir {
-        let Some(fsldir) = settings.get("FSLDIR") else {
-            return Err(());
-        };
+    if has_dir {
+        return Ok(None);
+    }
+    if let Some(fsldir) = settings.get("FSLDIR") {
         let base = std::path::Path::new(fsldir).join("etc").join("flirtsch");
         let r = base.join(name);
         if r.exists() {
-            return Ok(Some(r));
+            return Ok(Some(Config::Path(r)));
         }
         if !has_ext {
             let s = base.join(format!("{name}.cnf"));
             if s.exists() {
-                return Ok(Some(s));
+                return Ok(Some(Config::Path(s)));
             }
         }
     }
-    Ok(None)
+    match topup::settings::find(name, has_ext) {
+        Some(own) => Ok(Some(Config::Own(own))),
+        None if settings.get("FSLDIR").is_none() => Err(()),
+        None => Ok(None),
+    }
 }
 
 /// The `topup` command line.
@@ -369,9 +385,14 @@ pub fn main(args: &[String], settings: &Settings, out: &mut dyn Write, err: &mut
                 };
             }
         };
-        if path.is_file() {
-            let text = std::fs::read(&path).unwrap_or_default();
-            let text = String::from_utf8_lossy(&text);
+        let text = match &path {
+            Config::Path(p) if p.is_file() => {
+                Some(String::from_utf8_lossy(&std::fs::read(p).unwrap_or_default()).into_owned())
+            }
+            Config::Path(_) => None,
+            Config::Own(own) => Some(own.text.to_owned()),
+        };
+        if let Some(text) = text {
             let mut from_file = Given::default();
             // FSL-122: a line whose text after its first word exceeds 1023 characters ends FSL's
             // reading (observed: the settings after it are ignored)
@@ -1566,7 +1587,7 @@ mod tests {
         let settings = Settings::default();
         let named = dir.join("b02b0");
         let found = find_config(&settings, named.to_str().unwrap());
-        assert_eq!(found, Ok(Some(cnf.clone())));
+        assert_eq!(found, Ok(Some(Config::Path(cnf.clone()))));
         // a name with a directory is never looked for in $FSLDIR
         assert_eq!(
             find_config(&settings, dir.join("none").to_str().unwrap()),
@@ -1575,5 +1596,185 @@ mod tests {
         std::fs::remove_dir_all(&dir).unwrap();
         let backslash = default_stem("a.b\\half.nii.gz");
         assert_eq!(backslash, if cfg!(windows) { "a.b\\half" } else { "a" });
+    }
+
+    /// larmorx's own settings (§2.5): found by a name without a directory part after FSL's
+    /// places, FSLDIR unset included (no FSL-121); an FSL installation's file wins; a file in
+    /// the working directory wins over both; a name with a directory part is never one of them.
+    #[test]
+    fn own_settings_after_fsls_places() {
+        let own = |n: &str| Ok(Some(Config::Own(topup::settings::find(n, false).unwrap())));
+        let unset = Settings::default();
+        for name in [
+            "b02b0",
+            "b02b0_1",
+            "b02b0_2",
+            "b02b0_4",
+            "b02b0_7T",
+            "test_acqp",
+        ] {
+            assert_eq!(find_config(&unset, name), own(name));
+            assert_eq!(find_config(&unset, &format!("{name}.cnf")), own(name));
+        }
+        assert_eq!(find_config(&unset, "b02b0_9"), Err(()));
+        let dir = tempfile::tempdir().unwrap();
+        let fsl = dir.path().join("fsl");
+        std::fs::create_dir_all(fsl.join("etc").join("flirtsch")).unwrap();
+        let fsls = fsl.join("etc").join("flirtsch").join("b02b0.cnf");
+        std::fs::write(&fsls, "--miter=1\n").unwrap();
+        let work = dir.path().join("work");
+        std::fs::create_dir_all(&work).unwrap();
+        let mut set = Settings {
+            dir: Some(work.clone()),
+            ..Settings::default()
+        };
+        set.vars
+            .insert("FSLDIR".to_owned(), fsl.to_str().unwrap().to_owned());
+        assert_eq!(
+            find_config(&set, "b02b0"),
+            Ok(Some(Config::Path(fsls.clone())))
+        );
+        assert_eq!(find_config(&set, "b02b0_4"), own("b02b0_4"));
+        assert_eq!(find_config(&set, "b02b0_9"), Ok(None));
+        assert_eq!(find_config(&set, "./b02b0_4"), Ok(None));
+        let here = work.join("b02b0_4.cnf");
+        std::fs::write(&here, "--miter=2\n").unwrap();
+        assert_eq!(find_config(&set, "b02b0_4"), Ok(Some(Config::Path(here))));
+    }
+
+    /// Every option of larmorx's own settings, read as topup reads a configuration file,
+    /// against `specs/topup.md` §2.5's tables (the six single values; the per-level lists).
+    #[test]
+    fn own_settings_hold_the_specs_values() {
+        struct Want {
+            name: &'static str,
+            warpres: Vec<f64>,
+            subsamp: Vec<i64>,
+            fwhm: Vec<f64>,
+            miter: Vec<i64>,
+            lambda: Vec<f64>,
+            estmov: Vec<i64>,
+            minmet: Vec<i64>,
+            outputs: &'static [(&'static str, &'static str)],
+        }
+        let nine = |name, subsamp: [i64; 9], lambda: [f64; 9]| Want {
+            name,
+            warpres: vec![20.0, 16.0, 14.0, 12.0, 10.0, 6.0, 4.0, 4.0, 4.0],
+            subsamp: subsamp.to_vec(),
+            fwhm: vec![8.0, 6.0, 4.0, 3.0, 3.0, 2.0, 1.0, 0.0, 0.0],
+            miter: vec![5, 5, 5, 5, 5, 10, 10, 20, 20],
+            lambda: lambda.to_vec(),
+            estmov: vec![1, 1, 1, 1, 1, 0, 0, 0, 0],
+            minmet: vec![0, 0, 0, 0, 0, 1, 1, 1, 1],
+            outputs: &[],
+        };
+        let lam_2 = [
+            0.005, 0.001, 0.0001, 1.5e-05, 5e-06, 5e-07, 5e-08, 5e-10, 1e-11,
+        ];
+        let lam_1 = [
+            0.0005, 0.0001, 1e-05, 1.5e-06, 5e-07, 5e-07, 5e-08, 5e-10, 1e-11,
+        ];
+        let lam_4 = [
+            0.035, 0.006, 0.0001, 1.5e-05, 5e-06, 5e-07, 5e-08, 5e-10, 1e-11,
+        ];
+        let wants = [
+            nine("b02b0", [2, 2, 2, 2, 2, 1, 1, 1, 1], lam_2),
+            nine("b02b0_1", [1; 9], lam_1),
+            nine("b02b0_2", [2, 2, 2, 2, 2, 1, 1, 1, 1], lam_2),
+            nine("b02b0_4", [4, 4, 2, 2, 2, 1, 1, 1, 1], lam_4),
+            Want {
+                name: "b02b0_7T",
+                warpres: vec![
+                    30.0, 25.0, 20.0, 18.0, 16.0, 14.0, 12.0, 10.0, 6.0, 4.0, 4.0, 4.0,
+                ],
+                subsamp: vec![2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1],
+                fwhm: vec![
+                    14.0, 12.0, 10.0, 8.0, 6.0, 4.0, 3.0, 3.0, 2.0, 1.0, 0.0, 0.0,
+                ],
+                miter: vec![5, 5, 5, 5, 5, 5, 5, 5, 10, 10, 20, 20],
+                lambda: vec![
+                    0.0003, 0.0002, 0.0001, 5e-05, 2.5e-05, 1e-05, 2.5e-06, 5e-07, 5e-08, 5e-09,
+                    5e-11, 1e-12,
+                ],
+                estmov: vec![1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0],
+                minmet: vec![0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1],
+                outputs: &[],
+            },
+            Want {
+                name: "test_acqp",
+                warpres: vec![20.0, 14.0],
+                subsamp: vec![2, 2],
+                fwhm: vec![8.0, 4.0],
+                miter: vec![5, 5],
+                lambda: vec![0.005, 0.0001],
+                estmov: vec![0],
+                minmet: vec![0],
+                outputs: &[("fout", "field_test"), ("iout", "iout_test")],
+            },
+        ];
+        assert_eq!(wants.len(), topup::settings::SETTINGS.len());
+        for (w, own) in wants.iter().zip(topup::settings::SETTINGS) {
+            assert_eq!(w.name, own.name);
+            let mut given = Given::default();
+            for line in own.text.lines() {
+                assert!(line.len() < 1024, "{}: a line FSL would cut", own.name);
+                let word = line.split_whitespace().next().unwrap_or("#");
+                if !word.starts_with('#') {
+                    assert_eq!(word, line, "{}: one word per line", own.name);
+                    parse_word(word, &mut given).unwrap();
+                }
+            }
+            let v = |k: &str| given.get(k).unwrap_or_else(|| panic!("{}: {k}", own.name));
+            // the numbers as written (exact doubles), and as topup keeps them (floats)
+            let floats = |k: &str, want: &[f64]| {
+                let exact: Vec<f64> = v(k)
+                    .split(',')
+                    .map(|p| super::super::options::strtod(p).0)
+                    .collect();
+                assert_eq!(exact, want, "{}: {k}", own.name);
+                let kept: Vec<f64> = want.iter().map(|&x| f64::from(x as f32)).collect();
+                assert_eq!(float_list(v(k)), kept, "{}: {k}", own.name);
+            };
+            floats("warpres", &w.warpres);
+            assert_eq!(int_list(v("subsamp")), w.subsamp, "{}", own.name);
+            floats("fwhm", &w.fwhm);
+            assert_eq!(int_list(v("miter")), w.miter, "{}", own.name);
+            floats("lambda", &w.lambda);
+            assert_eq!(int_list(v("estmov")), w.estmov, "{}", own.name);
+            assert_eq!(int_list(v("minmet")), w.minmet, "{}", own.name);
+            for (k, want) in [
+                ("ssqlambda", "1"),
+                ("regmod", "bending_energy"),
+                ("splineorder", "3"),
+                ("numprec", "double"),
+                ("interp", "spline"),
+                ("scale", "1"),
+            ] {
+                assert_eq!(v(k), want, "{}: {k}", own.name);
+            }
+            for (k, want) in w.outputs {
+                assert_eq!(v(k), *want, "{}: {k}", own.name);
+            }
+            let mut names: Vec<&str> = given.values.keys().copied().collect();
+            names.sort_unstable();
+            let mut expected = vec![
+                "estmov",
+                "fwhm",
+                "interp",
+                "lambda",
+                "minmet",
+                "miter",
+                "numprec",
+                "regmod",
+                "scale",
+                "splineorder",
+                "ssqlambda",
+                "subsamp",
+                "warpres",
+            ];
+            expected.extend(w.outputs.iter().map(|o| o.0));
+            expected.sort_unstable();
+            assert_eq!(names, expected, "{}: the options it sets", own.name);
+        }
     }
 }

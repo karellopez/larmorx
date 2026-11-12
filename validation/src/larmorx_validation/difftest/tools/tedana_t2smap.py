@@ -19,7 +19,10 @@ time (infeasible starts of the curve fit, TED-06) or whose last echo drops out, 
 (none: PAID's zero deviations, TED-15), a background of zeros or of noise around zero (the
 adaptive mask's non-positive samples), now and then a NaN, an infinity, a zero, a negative or a
 signed-zero sample (TED-01, TED-09); stored as float32, float64, int16 (scaled or not), uint16 or
-uint8, little- or big-endian, ``.nii.gz``, ``.nii``, a NIfTI pair or NIfTI-2; a mask (ones, a
+uint8, little- or big-endian, ``.nii.gz``, ``.nii``, a NIfTI pair or NIfTI-2, now and then an
+ANALYZE 7.5 pair (SPM2's: the scale factor and intercept, the origin, sometimes a MATLAB ``.mat``
+of the drawn affine; uint16 stored as int16) or an MGH/MGZ image (unscaled: float64 stored as
+float32; the repetition time in its footer), the mask then in the same form or not; a mask (ones, a
 thresholded head of several stored types and values, a box, 4D of one volume; rarely an empty
 one, another grid's (TED-04) or another shape) or none (nilearn's ``compute_epi_mask``, TED-03);
 every option: ``--fittype``, ``--fitmode``, ``--combmode``, ``--masktype`` (lists),
@@ -32,7 +35,7 @@ rarely unsorted echo times, mixed units or one echo time too few.
 Not drawn: ``--n-threads`` above one (tedana's BLAS threads move its log-linear fit's last bits:
 the record's spread case; the replica's own threads are the golden and spread cases'), option
 errors and help texts (``validation/investigations/t2smap/replica/check_parser.py``), formats
-other than NIfTI-1/2 (decision D5).
+other than NIfTI-1/2, ANALYZE and MGH (decision D5).
 
 The inputs are not ``gen`` specs: the echoes share one S0 and T2* map, so the recipe's ``extra``
 holds the series' parameters and :func:`materialize` writes the files (plain arithmetic of
@@ -52,8 +55,8 @@ from larmorx_validation.difftest import gen
 from larmorx_validation.difftest.core import Tool, arguments, deep, group, required
 from larmorx_validation.difftest.tools import _ants
 
-SUFFIXES = (".nii.gz", ".nii", ".hdr", "nifti2")
-SUFFIX_WEIGHTS = (6, 2, 0.5, 0.5)
+SUFFIXES = (".nii.gz", ".nii", ".hdr", "nifti2", "analyze", "mgh")
+SUFFIX_WEIGHTS = (6, 2, 0.5, 0.5, 0.4, 0.4)
 DTYPES = ("float32", "int16", "float64", "uint16", "uint8")
 DTYPE_WEIGHTS = (5, 2.5, 1, 0.7, 0.3)
 MASKS = ("ones", "head", "box", "4d", "empty", "other grid", "other shape")
@@ -152,15 +155,18 @@ def _storage(d: gen.Draw) -> dict:
         if scaling["slope"] < 0 and dtype == "uint16":
             scaling["slope"] = 2.0
     suffix = d.choice("suffix", SUFFIXES, SUFFIX_WEIGHTS)
-    return {
+    out = {
         "dtype": dtype,
         "scaling": scaling,
         "suffix": suffix,
         "big_endian": d.chance("big-endian", 0.1),
     }
+    if suffix == "analyze":
+        out["mat"] = d.chance("ANALYZE .mat", 0.5)
+    return out
 
 
-def _mask(d: gen.Draw) -> dict:
+def _mask(d: gen.Draw, echo_suffix: str = ".nii.gz") -> dict:
     kind = d.choice("mask", MASKS, MASK_WEIGHTS)
     m = {"kind": kind, "dtype": "uint8", "value": 1.0, "suffix": ".nii.gz"}
     if kind in ("head", "4d"):
@@ -172,6 +178,8 @@ def _mask(d: gen.Draw) -> dict:
     if kind == "other grid":
         m["shift"] = [d.step(f"mask shift{k}", -6.0, 6.0, 1.5) for k in range(3)]
     m["suffix"] = d.choice("mask suffix", (".nii.gz", ".nii"), (4, 1))
+    if echo_suffix in ("analyze", "mgh") and d.chance("mask in the echoes' form", 0.6):
+        m["suffix"] = echo_suffix
     return m
 
 
@@ -250,7 +258,7 @@ def draw(d: gen.Draw) -> dict:
     if extra["specials"]:
         options.append("special samples: " + ", ".join(s["kind"] for s in extra["specials"]))
     if d.chance("mask given", 0.85):
-        extra["mask"] = _mask(d)
+        extra["mask"] = _mask(d, extra["storage"]["suffix"])
         groups.append(group("mask", *_spell(d, "--mask", "@mask")))
         options.append(f"mask {extra['mask']['kind']}")
     else:
@@ -366,9 +374,64 @@ def echo_data(extra: dict) -> np.ndarray:
     return out
 
 
+def _write_other(spec: dict, data: np.ndarray, target: Path) -> Path:
+    """``data`` (stored values) as an ANALYZE 7.5 pair (SPM2's header: voxel sizes, the origin
+    of the drawn affine, the scale factor and intercept; a MATLAB ``.mat`` of the affine when
+    drawn) or an MGZ image (unscaled, the drawn affine, the repetition time in ms)."""
+    import nibabel as nb
+    from nibabel.spm2analyze import Spm2AnalyzeHeader
+
+    geometry = spec["geometry"]
+    affine = gen.sform_of(geometry)
+    tr = float(spec.get("timing", {}).get("tr", 0.0))
+    if spec.get("timing", {}).get("tunits") == "sec":
+        tr *= 1000.0
+    if spec["suffix"] == "mgh":
+        arr = np.asarray(data)
+        if arr.dtype not in (np.uint8, np.int16, np.uint16, np.int32, np.float32):
+            arr = arr.astype(np.float32)
+        if arr.ndim == 4 and arr.shape[3] == 1:
+            arr = arr[..., 0]  # nibabel writes one frame as a 3D image
+        img = nb.MGHImage(arr, affine)
+        if arr.ndim == 4 and arr.shape[3] > 1:
+            img.header["tr"] = tr
+        path = target.with_name(target.name + ".mgz")
+        img.to_filename(str(path))
+        return path
+    endian = ">" if spec.get("big_endian") else "<"
+    arr = np.asarray(data)
+    if arr.dtype == np.uint16:  # ANALYZE 7.5 has no uint16
+        arr = np.clip(arr, 0, 32767).astype(np.int16)
+    elif arr.dtype not in (np.uint8, np.int16, np.int32, np.float32, np.float64):
+        arr = arr.astype(np.float32)
+    hdr = Spm2AnalyzeHeader(endianness=endian)
+    hdr.set_data_dtype(arr.dtype)
+    hdr.set_data_shape(arr.shape)
+    zooms = [abs(float(z)) for z in geometry["spacing"][:3]][: arr.ndim]
+    if arr.ndim == 4:
+        zooms.append(tr / 1000.0)
+    hdr.set_zooms(zooms)
+    hdr.set_origin_from_affine(affine)
+    sc = spec.get("scaling")
+    if sc:
+        hdr["scl_slope"], hdr["scl_inter"] = sc["slope"], sc["inter"]
+    path = target.with_name(target.name + ".hdr")
+    path.write_bytes(hdr.binaryblock)
+    raw = arr.astype(arr.dtype.newbyteorder(endian)).tobytes(order="F")
+    path.with_suffix(".img").write_bytes(raw)
+    if spec.get("mat"):
+        import scipy.io as sio
+
+        sio.savemat(str(path.with_suffix(".mat")), {"mat": affine})
+    return path
+
+
 def _write(spec: dict, data: np.ndarray, target: Path) -> Path:
     """``data`` (stored values) in the file form of ``spec`` (``gen``'s header writer)."""
     import gzip
+
+    if spec["suffix"] in ("analyze", "mgh"):
+        return _write_other(spec, data, target)
 
     nifti2 = spec["suffix"] == "nifti2"
     suffix = ".nii.gz" if nifti2 else spec["suffix"]

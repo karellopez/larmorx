@@ -342,7 +342,10 @@ nibabel 5.4.2 (orientation helpers, from_matvec, apply_affine; since 2026-11-08 
 array writer of arraywriters.py and volumeutils.py, nifti1.py's set_qform and get_qform,
 quaternions.py and orientations.io_orientation, in python/larmorx/io/nibabel_writer.py,
 nibabel_header.py and crates/larmorx-io; since 2026-11-08 also get_qform in x86-64's extended
-precision, in crates/larmorx-io/src/nifti/nibabel_affine.rs, for tedana's t2smap) - MIT License
+precision, in crates/larmorx-io/src/nifti/nibabel_affine.rs, for tedana's t2smap; since 2026-11-11
+also the loading of ANALYZE 7.5 (SPM2) and MGH/MGZ images and MATLAB .mat sidecars of analyze.py,
+spm99analyze.py, spm2analyze.py, freesurfer/mghformat.py and the scaling of arrayproxy.py and
+volumeutils.py, in crates/larmorx-tedana/src/formats.rs) - MIT License
   Copyright (c) 2009-2019 Matthew Brett <matthew.brett@gmail.com>
   Copyright (c) 2010-2013 Stephan Gerhard <git@unidesign.ch>
   Copyright (c) 2006-2014 Michael Hanke <michael.hanke@gmail.com>

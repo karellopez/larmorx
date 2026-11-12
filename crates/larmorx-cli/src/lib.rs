@@ -16,7 +16,7 @@
 //! Tools with a bit-exact replica run it by default: built in (AFNI's programs, in this
 //! process), or as the program of its own package when that is found (`larmorx-nc`,
 //! `larmorx-gpl`), else the clean-room original ([`replica`], `docs/licensing.md`); a tool with a
-//! replica only (tedana's t2smap) says how to install it.
+//! replica only (none since tedana's t2smap got its clean-room original) says how to install it.
 #![forbid(unsafe_code)]
 
 pub mod replica;
@@ -156,13 +156,9 @@ pub const FAMILIES: &[(&str, &[&str])] = &[
     ("ants", larmorx_ants::cli::TOOLS),
     ("fsl", FSL_TOOLS),
     ("mri", larmorx_mri::cli::TOOLS),
-    ("tedana", TEDANA_TOOLS),
+    ("tedana", larmorx_tedana::cli::TOOLS),
     ("sdcflows", PYTHON_TOOLS),
 ];
-
-/// The tedana tools: those with a replica only (`larmorx-gpl`, a separate program), until their
-/// clean-room originals exist (`specs/t2smap.md`).
-const TEDANA_TOOLS: &[&str] = &["t2smap"];
 
 /// The tools that are Python programs (sdcflows' BIDS app, `larmorx.sdcflows.run_app`): the
 /// `larmorx` command of the Python package runs them before this parser sees them; here they
@@ -409,6 +405,8 @@ fn run_tool(
             }
         },
         "mri" => larmorx_mri::cli::run_given(tool, args, &given, out, err),
+        // tedana's t2smap: the clean-room original (the replica is larmorx-gpl's program)
+        "tedana" => larmorx_tedana::cli::run_given(tool, args, &given, out, err),
         "sdcflows" if PYTHON_TOOLS.contains(&tool) => {
             let written = writeln!(
                 err,
@@ -843,7 +841,7 @@ mod tests {
     }
 
     #[test]
-    fn tedana_t2smap_has_only_its_replica() {
+    fn tedana_t2smap_has_both_implementations() {
         let (code, out, _) = run_capture(&["lx", "--help"]);
         assert_eq!(code, 0);
         assert!(out.contains("  tedana t2smap\n"), "{out}");
@@ -852,12 +850,23 @@ mod tests {
             "{out}"
         );
         assert!(out.contains("LARMORX_GPL_BIN"), "{out}");
-        // `original`: there is none yet
-        let (code, _, err) = run_capture(&["lx", "tedana", "t2smap", "-h"]);
-        assert_eq!(code, replica::EXIT_NOT_FOUND);
+        // its clean-room original since 2026-11-11 (`larmorx_tedana::cli`, specs/t2smap.md)
+        assert!(replica::lookup("tedana", "t2smap").is_some_and(|r| r.original));
+        assert_eq!(replica::replica_only("tedana").count(), 0);
         assert!(
-            err.contains("no clean-room original of tedana t2smap yet")
-                && err.contains("pip install larmorx-gpl"),
+            FAMILIES
+                .iter()
+                .any(|(f, tools)| *f == "tedana" && *tools == larmorx_tedana::cli::TOOLS)
+        );
+        let (code, out, err) = run_capture(&["lx", "tedana", "t2smap", "-v"]);
+        assert_eq!(
+            (code, out.as_str(), err.as_str()),
+            (0, "t2smap v26.0.3\n", "")
+        );
+        let (code, out, err) = run_capture(&["lx", "tedana", "t2smap"]);
+        assert_eq!((code, out.as_str()), (2, ""));
+        assert!(
+            err.ends_with("t2smap: error: the following arguments are required: -d, -e\n"),
             "{err}"
         );
         let (code, _, err) = run_capture(&["lx", "tedana", "tedana"]);
@@ -866,6 +875,26 @@ mod tests {
             err.starts_with("error: unknown tedana tool 'tedana' (available: t2smap)"),
             "{err}"
         );
+        // `replica` without larmorx-gpl's program: exit 127, how to install it
+        let nowhere = tempfile::tempdir().unwrap();
+        if replica::find(&replica::LARMORX_GPL, &[]).is_ok_and(|p| p.is_none()) {
+            let options = Options {
+                implementation: Some(Implementation::Replica),
+                replica_dirs: vec![nowhere.path().to_path_buf()],
+                ..Options::default()
+            };
+            let (code, _, err) = run_options(&["lx", "tedana", "t2smap", "-v"], &options);
+            assert_eq!(code, replica::EXIT_NOT_FOUND);
+            assert!(err.contains("pip install larmorx-gpl"), "{err}");
+            // `auto` without it: the clean-room original
+            let options = Options {
+                implementation: Some(Implementation::Auto),
+                replica_dirs: vec![nowhere.path().to_path_buf()],
+                ..Options::default()
+            };
+            let (code, out, _) = run_options(&["lx", "tedana", "t2smap", "-v"], &options);
+            assert_eq!((code, out.as_str()), (0, "t2smap v26.0.3\n"));
+        }
     }
 
     /// `larmorx tedana t2smap ...` runs `larmorx-gpl tedana t2smap ...` when the program is

@@ -215,7 +215,7 @@ over every volume (excluded ones included); the full T2* (seconds) and the combi
   2026-11-08 (relay 8b: `log::tqdm_disabled`, the same rule; the parity suite had normalised the
   bars away, so its record did not see it).
 
-## Defects (D13; the register's TED-01 to TED-18)
+## Defects (D13; the register's TED-01 to TED-18, TED-31 and TED-46)
 
 Every one verified black-box (`validation/investigations/t2smap/replica/check_failures.py` and the
 parity suite's `fail/` cases): with `LARMORX_UPSTREAM_DEFECTS=reproduce` the replica ends as tedana
@@ -225,10 +225,10 @@ result changes.
 
 | ID | What tedana does (*read*, *measured*) | Rule | larmorx's default |
 |---|---|---|---|
-| TED-01 | a NaN first-echo temporal mean (a NaN sample, or no volume left) makes the dropout method's 33rd percentile NaN: `ValueError: attempt to get argmax of an empty sequence` | A | the percentile and the exemplars over the finite means; no finite mean at all: a clear error |
+| TED-01 | a NaN first-echo temporal mean (a NaN sample, or no volume left) makes the dropout method's 33rd percentile NaN: `ValueError: attempt to get argmax of an empty sequence` | A | the percentile and the exemplars over the means that are not NaN (an infinite mean sorts and matches as in tedana: since 2026-11-12, it was dropped with the NaN before); none left: a clear error |
 | TED-02 | `--exclude` accepts an index equal to the number of volumes (`>` for `>=`), then numpy's IndexError | B | a clear error, as for larger indices |
 | TED-03 | without `--mask`, nilearn's `compute_epi_mask` may find nothing (MaskWarning, then `IndexError: index -1 ...` in the adaptive mask) or too few voxels (the argmax ValueError) | B | a clear error |
-| TED-04 | a user mask is applied by voxel index, its affine never compared with the data's (tedana's TODO); measured: the four real calls' masks have the data's affine | B | nilearn's own "Mask affine ... is different from img affine" error, mask against the first echo |
+| TED-04 | a user mask is applied by voxel index, its affine never compared with the data's (tedana's TODO); measured: the four real calls' masks have the data's affine | B | nilearn's own `Mask affine ... is different from img affine` error, mask against the first echo |
 | TED-05 | only the limited T2* map is capped (below) | A | the full map gets the limited map's cap |
 | TED-06 | a curve fit whose log-linear start is outside the bounds is a silent "failure" keeping the log-linear estimate; measured (relay 4, `defects/ted06_feasible_start.py`): of 1,930 failures on fMRIPrep's four calls 1,919 are such starts (every one a T2* <= 0, a signal rising with the echo time), 11 the evaluation budget; refits from the clipped start beat the log-linear residuals in only 15 to 29 % | C | kept, documented (no switch) |
 | TED-07 | `--verbose` writes the variance of S0 as the T2* variance map and the T2* variance as the S0 map (the covariance diagonal unpacked in the wrong order) | A | the true names; `reproduce` swaps them on output; the notice with `--verbose` |
@@ -243,6 +243,8 @@ result changes.
 | TED-16 | `--exclude` removing every volume: the adaptive mask from no volume, the log-linear fit of no rows, T2* = 1/0 (then 500 ms) and S0 = 1 in every voxel, written with exit status 0 (random testing) | B | a clear error |
 | TED-17 | a single voxel left for the fit: `fit_loglinear`'s squeezed mask column is 0-dimensional, `IndexError: too many indices for array` (both fit types and modes; random testing) | A | fitted |
 | TED-18 | the limited T2* map's cap is its 99.5th percentile, 0 when more than 99.5 % of its values are 0 (voxels of one good echo): every positive limited T2* set to 0, the RMSE computed with T2* = 0 (random testing) | A | no cap of 0 or less, on either map (TED-05's full-map cap included) |
+| TED-31 | no voxel left for the fit (the adaptive mask removed every voxel of the mask): `fit_loglinear`'s count-1 step indexes column 0 of an array of no column, `IndexError: index 0 is out of bounds for axis 1 with size 0`, after the adaptive mask image and the echo-time check (both fit types and modes; found by the clean-room original's black-box probe, 2026-11-11) | B | a clear error (the text both implementations share); the replica completed a log-linear run of no fit voxel and stopped a curve fit with nilearn's empty-mask text until 2026-11-12, in both modes |
+| TED-46 | a voxel whose log-linear observations are all equal (saturated samples: no decay) gets the batched `lstsq`'s rounding noise as its slope: T2* 1 ms, or 1e15-1e18 ms, never 500 ms (found by the clean-room original's random testing, 2026-11-11; spec §7.2, §13.4) | A | the exact solution (y, 0) in a rank-2 group, the batch's other columns kept (tedana's bits); `reproduce` keeps `lstsq`'s noise (since 2026-11-12) |
 
 Not defects: `--debug`'s help promising a TSV log file (C, documented); the dropout mask appended
 twice; RepLGR lines that go nowhere; warnings and bars naming paths and timings.
@@ -444,3 +446,121 @@ What runs show without tedana's source; the spec writer may copy from here.
   differ between numpy 2.3.5 and 2.5.4 in a noise voxel (none of fMRIPrep's calls).
 - **Speed and memory** (fMRIPrep's ds003592 call; `docs/benchmarks/tedana-t2smap.md`): tedana
   26.0.3 takes about 55 s (curvefit) and 1.24 GB at its peak.
+
+## The clean-room part's replica gaps (relay RS1, 2026-11-12)
+
+The clean-room original's record, probe and random testing (2026-11-11) found where larmorx-gpl
+0.1.0rc1 departed from tedana; each was checked against tedana 26.0.3's source and its program
+run **directly** (not through the oracle-output cache, which keeps files but not directories:
+`validation/investigations/t2smap/replica/rs1_probe.py`, 21 cases, every line of standard error
+with the warnings' source lines, every file's bytes), fixed, and kept as a permanent case of the
+parity suite (`check_failures.py`'s cases 11 to 23, each failing on the PyPI 0.1.0rc1 replica and
+passing from this branch, in both environments):
+
+- **Chained tracebacks** (*read*: `io.load_data_nilearn`'s `try: <fast path> except Exception:
+  <nilearn's apply_mask>`): when the fallback fails too, Python prints the fast path's error,
+  `During handling of the above exception, another exception occurred:`, then the fallback's. The
+  replica printed only the last. Now `log::PyError` carries the handled error (`during_handling_of`)
+  and `data::load_data` chains them: a 3D echo (`Expected 4D image` twice), a mask of another grid
+  (`Image/mask shape mismatch`, then nilearn's `Mask shape: ...`), an empty mask of another grid
+  (the mismatch, then nilearn's empty-mask text: the "message" gap the original's suite saw was
+  this chain). The suite now compares the chain (`exceptions`).
+- **Python's warnings registry is reset during a run** (*measured*: `rs1_probe.py --registry`
+  traces `warnings._filters_mutated`): when `get_system_version_info` asks the libraries' versions
+  (before any warning) and when `save_tsv` writes the confounds table (pandas' `pandas_dtype` in
+  `infer_objects` under `catch_warnings`), so a warning shown before the table shows again after
+  it. `Log::reset_registry` at both places.
+- **Two warnings the replica never printed**: numpy's `RuntimeWarning: overflow encountered in
+  cast` at `tedana/io.py:352` (`data = np.float32(data)` in `save_img`, a finite float64 value
+  beyond float32's range: the full S0 map, then again the limited one after the table; also the
+  variance maps, the T2* maps and the combined series), and `RuntimeWarning: invalid value
+  encountered in reduce` at `numpy/_core/_methods.py:132` (134 in numpy 2.3.5) from the adaptive
+  mask's temporal means (`data.mean(axis=-1)`) of a series whose sum adds +inf and -inf, which
+  PAID's means then print again after the reset. The condition is numpy's summation order
+  (`adaptive::sum_adds_opposite_infinities`: pairwise with eight accumulators along a contiguous
+  axis, in order along an outer one; a NaN met first makes the sum NaN quietly); PAID's warnings
+  use it too (they skipped every series with a NaN before).
+- **TED-31 and TED-46** (above): the defaults the clean-room original takes, with the same notices
+  (`specs/t2smap.md` §15.1); `reproduce` tedana's IndexError and `lstsq`'s noise. Measured: the
+  replica's default and the original's default write the same files on the three TED-46 cases of
+  `rs1_probe.py` (T2* 0.5 s and S0 256 at the 18 saturated voxels, where tedana writes 7.9e12 s,
+  or 2.7e13 s per volume), with the same notice (18 voxels, 3 echoes). In `curvefit` the exact
+  slope's start (T2* = +inf) is SciPy's refused start, a failure that keeps the log-linear S0
+  (256, from log(255 + 1)), where tedana's positive noise let the fit converge to S0 255.5.
+- **TED-01** (spec writer 3, 2026-11-12): the default drops NaN first-echo means only (an infinite
+  one sorts and matches as in tedana, the original's rule since its second trial); the notice and
+  the error say "not NaN" / "a number".
+- **`--fitmode ts` with no volume** (TED-13 in `reproduce`, *read* and observed): `fit_decay_ts`
+  calls `fit_decay`, which checks the echo times, once per volume, so with no volume it checks
+  nothing; tedana then writes the S0 map and fails at the confounds table. The replica checked the
+  echo times first; now it skips that check (and TED-31's) when it fits nothing.
+- **numpy's scientific printing of the thresholds**: the shared fix in
+  `larmorx_core::numpy::format` (the clean-room part's relay 3a-ii: numpy prints a shorter
+  element's own further digits, not zeros) reaches the replica when it is rebuilt: case 22 prints
+  `8.8745688e+04` as tedana, where 0.1.0rc1 printed its zero-padded form.
+
+## ANALYZE 7.5, MGH/MGZ and TED-46 under the curve fit (relay RS2, 2026-11-12)
+
+- **ANALYZE 7.5 and MGH/MGZ are read** (*read*: nibabel 5.4.2's `load`, `Spm2AnalyzeHeader`,
+  `Spm99AnalyzeImage.from_file_map`, `MGHHeader`, `MGHImage.from_file_map`, `affines.from_matvec`,
+  `volumeutils.array_from_file`; tedana's `_convert_to_nifti1`). nibabel tries its classes in order:
+  a `.hdr`/`.img` pair whose header is not NIfTI's (348 in `sizeof_hdr` in either byte order, no
+  `ni1`/`n+1` magic) is an `Spm2AnalyzeImage` (SPM2's scale factor `funused1` with its intercept
+  `funused2`, else the gl/cal ranges; SPM's origin; a MATLAB `.mat` beside it overrides the
+  affine); `.mgh`/`.mgz` (no other compressed suffix: `x.mgh.gz` is no image nibabel knows) is an
+  `MGHImage`. tedana converts both to an in-memory `Nifti1Image` of nibabel's scaled array.
+  The replica reads their bytes through the main package's reader of that loading,
+  `larmorx_tedana::formats` (Apache-2.0: the clean-room original's, called as a library; a shared
+  crate would be its better home, below), and adds what tedana's path decides:
+  - **when the data are read**: `_convert_to_nifti1` reads a converted image's data at once, so a
+    reading error (a short `.img`) comes where the image is loaded: at `load_ref_img` for the
+    first echo (one traceback), in the fast path before its shape check for a later echo (then
+    again in nilearn's fallback, which converts every echo before masking: two chained
+    tracebacks), and before the squeeze of a user mask. The replica read the data after those
+    checks; it now reads converted images where tedana does (`Header::converted`);
+  - **the file a short read names**: nibabel's `array_from_file` names the file object it read
+    (`Expected <n> bytes, got <m> bytes from <file>`, then ` - could the file be damaged?`): an
+    ANALYZE pair's `.img`, not the `.hdr` the user gave;
+  - **MGH's affine is float32** (*read*: `from_matvec(MdcD, Pxyz_c - centre)` makes a 4 × 4 of
+    `MdcD`'s type, float32): the translation, computed in float64, is stored rounded to float32.
+    It shows only where the affine is printed (nilearn's `Mask affine: ...` refusal); the outputs'
+    headers keep float32 fields either way. The main package's reader returns the float64
+    translation (an observation for its clean-room owner, in behaviour words: the MGH translation
+    is the float32 rounding of `Pxyz_c - centre`);
+  - complex64 and RGB ANALYZE data, and headers the reader refuses (negative dimensions, an
+    unknown ANALYZE `dim[0]`, an MGH type nibabel does not know), are refused with the replica's
+    message (`larmorx.UnsupportedFormat`; D5).
+  Measured: the parity suite's 20 `formats/` cases (`check_formats.py`: both byte orders, every
+  stored type a fit reads, both scalings, the origin set and unset, `.mat` files of `mat`, `M` and
+  neither, compressed pairs, voxel sizes of 0 and below 0, `.img` names, z-concatenated files,
+  masks of each format, MGH's oblique affine, its footer or none, `goodRASFlag` 0, three formats at
+  once, and nibabel's six failures) agree bit for bit in both environments; the 104 replayed
+  random-testing cases of the clean-room part with ANALYZE or MGH inputs
+  (`rs2_replayed_formats.py`): every file tedana wrote identical, the 30 it failed failing too; the
+  descriptor's ANALYZE and MGH draws: 30 of 30 agree.
+- **TED-46 under `--fittype curvefit`** (spec writer 4: rule D, measured first;
+  `validation/investigations/t2smap-spec/ted46_curvefit.py`, `specs/t2smap.md` §7.3): with TED-46's
+  exact slope 0 the curve fit starts at T2* = +inf, which SciPy refuses (a failure keeping the
+  log-linear S0 = x + 1, the +1 of log(|x| + 1)). On the 23 cases that hold such voxels (20
+  replayed trial cases, three synthetic series of 0.2 %, 1 % and 5 % saturated voxels), against
+  the curve fit's exact solution (S0 = x, T2* = +inf: a residual of 0): that start already gave
+  the truth's T2* (500 ms), cap and every other voxel's values, but S0 = x + 1 and a failure at
+  each such voxel; a finite start (500 ms) converges at T2* 1.2e9 to 2.1e10 ms and moves the cap
+  in 20 of the 23 cases (not adopted); tedana writes 1 ms (negative noise, 12 trial cases and the
+  synthetic ones) or about 1e16 to 3e17 ms with S0 = x + 0.5 (positive noise, 7 cases; the cap one
+  of them). The default (rule A) now takes the exact solution where the samples are all equal: S0
+  = x, T2* +inf (500 ms), not a failure, variances 0 (+inf with two samples, SciPy's warning)
+  (`decay::fit_monoexponential`; the unit test `equal_samples_take_the_curve_fits_exact_solution_
+  by_default`); `reproduce` is tedana's fit from its noise.
+- **fMRIPrep's own files, reproduced exactly** (*measured*: `rs2_fmriprep_t25.py`): on the oracle
+  runs made again with OpenBLAS's Haswell kernels (2026-11-09), tedana 25.0.1 run here in
+  fMRIPrep 25.2.6's image gives fMRIPrep's `T2starmap` and `desc-optcom_bold` of ds000210's two
+  tasks and ds000258 **bit for bit** with numpy's AVX-512 kernels on (as fMRIPrep's run had them:
+  only `OPENBLAS_CORETYPE` was set), and differs in 4,015, 7,609 and 25,542 values with them off
+  (NP-04). The earlier runs' remaining differences were OpenBLAS's AVX-512 kernels. The replica
+  record's comparison of fMRIPrep's files with tedana 26.0.3's counts the version step from 25.0.1
+  (6,364, 13,164 and 38,876 values; ds003592, an earlier run on another machine, 41,897).
+- **The reader's home** (for the orchestrator): `larmorx_tedana::formats` (ANALYZE, MGH, MATLAB
+  files) reads what nibabel reads for any tool, not only t2smap; moved to `larmorx-io` (a clean
+  relay's or the orchestrator's move: the replica-side relays never edit the clean-room crate),
+  both implementations and later tools would call it from there.

@@ -11,7 +11,8 @@ topup's and applytopup's, fslmaths' and fslstats' (``FLIRT_CASES``, ``FAST_CASES
 ``TOPUP_CASES``, ``AVW_CASES``), and their clean-room originals (``ORIGINAL_*_CASES``:
 fslmaths' and fslstats' since 2026-11-03); prelude's replica (``PRELUDE_CASES``, 2026-11-06) and clean-room original
 (``ORIGINAL_PRELUDE_CASES``, 2026-11-06); tedana's t2smap against the ``larmorx-gpl`` replica
-(``T2SMAP_CASES``, 2026-11-08).
+(``T2SMAP_CASES``, 2026-11-08) and its clean-room original (``T2SMAP_ORIGINAL_CALLS``,
+2026-11-11).
 
 The allowance is the user's rule of 2026-10-27, "similar" memory: at most ``RATIO`` times the
 original's peak plus a fixed cost (a 16-voxel call needs 20 MiB in larmorx, 18 in ANTs;
@@ -1699,3 +1700,78 @@ def test_fieldmap_steps_need_no_more_memory_than_the_originals(tmp_path, name, c
         )
         if mode == "reproduce":
             assert _stored(o_dir) == _stored(r_dir), name
+
+
+# --- tedana's t2smap: the clean-room original -----------------------------------------------------
+
+#: fMRIPrep's multi-echo call the clean-room ``t2smap`` (``crates/larmorx-tedana``) is measured on
+#: against tedana 26.0.3 at one thread (2026-11-11): ds003592's with the curve fit (64 × 64 × 43,
+#: 200 volumes, three echoes, the inputs fMRIPrep gave tedana; ``specs/t2smap.md`` §16: tedana
+#: about 1,243 MiB). The original runs through its own binding until it is wired into
+#: ``lx.tedana.t2smap``: ``python -c`` with ``larmorx._core.tedana_t2smap_cleanroom``, so its
+#: allowance has the Python entry point's fixed cost.
+T2SMAP_ORIGINAL_CALLS = [("ds003592", ["--fittype", "curvefit"])]
+
+#: The clean-room t2smap as a program: tedana's arguments, this environment, this directory.
+_T2SMAP_ORIGINAL = (
+    "import os, sys\n"
+    "from larmorx import _core\n"
+    "code, out, err = _core.tedana_t2smap_cleanroom(sys.argv[1:], list(os.environ.items()), os.getcwd())\n"
+    "sys.stdout.write(out)\n"
+    "sys.stderr.write(err)\n"
+    "sys.exit(code)\n"
+)
+
+
+def _t2smap_files(d: Path) -> list[str]:
+    return sorted(p.name for p in d.glob("*") if p.is_file()) if d.is_dir() else []
+
+
+@pytest.mark.parametrize(("call", "extra"), T2SMAP_ORIGINAL_CALLS)
+def test_t2smap_original_needs_no_more_memory_than_tedana(tmp_path, call, extra):
+    """The clean-room t2smap's peak on fMRIPrep's call, at one thread in both D13 modes and at
+    eight threads by default, against tedana's at one thread (through the oracle-output cache):
+    each at most ``RATIO`` times tedana's plus the entry point's cost; the same files written."""
+    from larmorx import _core
+
+    if not hasattr(_core, "tedana_t2smap_cleanroom"):
+        pytest.skip("this build of larmorx has no clean-room t2smap")
+    if not Path("/usr/bin/time").is_file():
+        pytest.skip("/usr/bin/time was not found")
+    try:
+        from larmorx_validation.parity import tedana_t2smap_original as suite
+
+        blackbox, _, _, fmriprep = suite.tools()
+    except (ImportError, StopIteration):
+        pytest.skip("the t2smap original's suite or the oracle runs are not on this machine")
+    if not suite.LAUNCHER.exists():
+        pytest.skip("tedana 26.0.3's launcher was not found")
+    run, task, tes = fmriprep.CALLS[call]
+    if not (fmriprep.RUNS / run).is_dir():
+        pytest.skip(f"the oracle run {run} was not found")
+    echoes, mask = fmriprep.inputs(run, task)
+    args = ["-d", *map(str, echoes), "-e", *tes, "--mask", str(mask), *extra]
+    env = blackbox.environment()
+    t_dir = tmp_path / "tedana"
+    t_dir.mkdir()
+    code, tedana_mib = _original_peak(
+        [str(suite.LAUNCHER), *args, "--out-dir", "out"], env, "python", _emptier(t_dir), t_dir
+    )
+    assert code == 0
+    l_env = {**env, "PYTHONPATH": os.environ.get("PYTHONPATH", "")}
+    limit = allowance(tedana_mib, entry_peak(l_env))
+    written = _t2smap_files(t_dir / "out")
+    for mode, threads in (("reproduce", 1), ("fix", 1), ("fix", 8)):
+        d = tmp_path / f"original-{mode}-{threads}"
+        d.mkdir()
+        cmd = [sys.executable, "-P", "-c", _T2SMAP_ORIGINAL, *args]
+        cmd += ["--n-threads", str(threads), "--out-dir", "out"]
+        code, mib = _peak(cmd, {**l_env, "LARMORX_UPSTREAM_DEFECTS": mode}, d)
+        assert code == 0
+        print(
+            f"t2smap {call} ({mode}, {threads} thread(s)): the original {mib:.1f} MiB, tedana "
+            f"{tedana_mib:.1f} MiB, allowed {limit:.1f} MiB"
+        )
+        assert mib <= limit, f"{call} ({mode}, {threads}): {mib:.0f} MiB > {limit:.0f} MiB"
+        if written:
+            assert _t2smap_files(d / "out") == written, (mode, threads)

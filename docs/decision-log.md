@@ -2330,3 +2330,95 @@ option names changed), one after the other, beside the `t2smap` clean-room and c
     descriptions, `docs/api`, the site's pages; a test in each repository.
   - The parity smoke tier at 6 workers while three agents share the machine (at 8, a 27 GiB box stopped one
     worker).
+
+## 2026-11-11 and 12: `t2smap`'s clean-room original and the main package's own `topup` settings (the orchestrator, by the rules and on the spec writers' measurements)
+
+Three agents at once (the user, 2026-11-11), this part beside the easy command line and the confounds' port; nine
+clean relays (the implementer), two replica-side spec writers and four replica-side relays (the spec's answers, the
+replica's gaps, the site, the handoff); the clean relays never read the replica side's notes.
+- **The `topup` settings** (relay 1; the user's decision of 2026-11-09): the six configurations compiled into
+  `larmorx-fsl` from `crates/larmorx-fsl/src/topup/settings/` and found by name after FSL's own places (an FSL
+  installation's file of the same name wins, as in FSL); `lx.sdcflows.topup_config_file` gives the bare name when
+  neither FSL nor larmorx-nc has the file (it raised `FileNotFoundError`), so `pip install larmorx` alone runs
+  sdcflows 2.17's wiring. The values are FSL's in every case, so no result depends on which file is found.
+- **NaN bits:** every NaN the clean-room original makes from numbers is x86-64's default NaN on every platform; the
+  spec's `check.py` takes NaN = NaN. The RMSE map's voxels without a value are numpy's `nan` (sign bit clear), as
+  tedana writes them (spec writer 2).
+- **`reproduce` within the thresholds for the fitted numbers** (as for 3dvolreg's original): the log-linear fit in
+  closed form and the curve fit by the original's own trust-region solver (analytic derivatives on the echoes'
+  means), in both modes; what the TED defects compute, refuse or write is exact where the spec states it. One
+  exception (relay C4): at TED-46's voxels `reproduce` runs the main package's exact ports of numpy's `lstsq` and
+  SciPy's `curve_fit`, so tedana's rounding noise there is reproduced bit for bit.
+- **The curve fit's robustness (D11):** a trust-region step that cancels a parameter onto its lower bound to within
+  4 ulps is taken as crossing it (SciPy's in/out decision rests on its last bits there), stated in the record and
+  the findings.
+- **TED-31** (rule B, relay 3c): no voxel left for the fit, a clear error; tedana's `IndexError` in `reproduce`.
+  **TED-46** (rule A, after spec writer 2's measurement: tedana's slope at equal observations is the batched least
+  squares' rounding noise, its sign set by the voxel's place in the batch and the LAPACK and BLAS builds): the slope
+  0 by default. **TED-46 in the curve fit** (rule D measured by spec writer 4, then A): the curve fit's exact
+  solution (S0 the samples' value, T2* 500 ms after the floor, not a failure); a finite start of 500 ms was measured
+  and not taken (it converges at 1e9 to 2e10 ms and moves the cap in 20 of 23 cases). **TED-01:** only NaN means are
+  left out (tedana fails on a NaN mean, sorts an infinite one). Both implementations take these corrections, with
+  the same notices (`larmorx_core::defects`).
+- **The output directory before `--exclude`'s errors:** tedana makes it and leaves it empty (spec writer 1, by
+  running tedana directly); a cached replay cannot show it (the oracle-output cache records files only: a
+  follow-up), so the planned replica "fix" was dropped and the original makes the directory too.
+- **Threads:** without `t2smap`'s own `--n-threads` the clean-room original takes the run's thread count
+  (`--n-threads`, else `OMP_NUM_THREADS`, else every logical CPU), as the replica does since the easy command line;
+  its files are the same at every count.
+- **ANALYZE 7.5 and MGH/MGZ** (D5): read as nibabel 5.4.2 loads them, by `larmorx_tedana::formats` (written from
+  nibabel's MIT source, a permitted upstream), which the replica now calls too; its move to `larmorx-io` waits for
+  the FreeSurfer part (which needs MGH).
+- **FSL-121's wording** differs between the two `topup` implementations: a follow-up.
+- **The evidence** (relay RS3): images holding NaN (the RMSE map) are compared NaN against NaN as equal, their sizes
+  and windows taken from the voxels with a value, the viewer leaving such a voxel undrawn; arrays without NaN keep
+  their earlier bits. Texts the site renders as Markdown escape what its typographer would turn into signs
+  (`\(c)`, code spans), checked by `typographer_hazards.py` (relay C5).
+
+## 2026-11-12: the plan to the end (the user)
+- **Usage:** "we have a weekly reset that I can apply any time, so for now usage is not a problem and we can ignore
+  the limits we put ourselves, until I tell you the opposite." The pace line stops gating launches; `usage.py` keeps
+  recording usage and cost. A **burst** (a fresh weekly window the user opens) runs about six agents at once on
+  separate files; a **normal week** goes back to one agent at a time, the cheaper way (the user: "when we go to a
+  normal new week, we can use again the single agent cheap approach").
+- **Machines:** "Do not run anything that depends on development in the pc linux machine. This machine is very
+  slow": everything development depends on runs on the main machine, using its cores. **The lab's server** (set up
+  2026-11-12 with a key the user installed; its details only in the workspace's private notes, never in a
+  repository): "always use 64 thread", and "the server for now should serve us for complementary information. I do
+  not want to slow down our development in case we really depend on outputs from the server": extras only (more
+  heads, repeated and one-thread runs, fMRIPrep with recon-all for the final comparisons, heavy batches); nothing on
+  the development path waits for it; what a record uses is copied to the main machine. FreeSurfer there reads the
+  user's licence file ("FreeSurfer in the server can use this laptop's license"), kept in the private work folder,
+  never in results or repositories.
+- **The words:** "original" is only the program LARMORX is compared with (the oracle); every reimplementation is a
+  **port** ("a port can be a replica in another language, or a clean room, right?": yes), each a **replica** or a
+  **clean room** ("we should call clean room, not clean room original"). ANTs' and ITK's ports are replicas in the
+  main package. The home page explains original, replica and clean room in an early section; the deeper concepts
+  go on a Concepts page. The repository follows (prose, API pages, messages, file names such as `*-original.md`);
+  history stays as written.
+- **The documentation revision** ([documentation-plan.md](documentation-plan.md)): the website "needs a deep
+  revision", with programs grouped by their software ("mother softwares ... toggles that show the programs that
+  are already ported"), a reference page per program ("CLI and python interface with nice examples of usage"),
+  evidence that says "what is that image, what is that comparison, what vs what", writing that feels "written by
+  humans" (no "AI slop slogan like 'Many toolkits, one framework'"). The figures stay and are not recomputed ("If
+  something is missing, of course you can compute that, but not all"). Two agents: a writer and a critical reviewer
+  that guarantees its quality (the user's proposal); the user reviews the writing guide and four pilots first.
+- **FreeSurfer** ([freesurfer-plan.md](freesurfer-plan.md)): planned to use the burst ("plan this in a way that let
+  us port all this amount of freesurfer programs in order to have recon-all replica and clean room fast"),
+  starting the oracle runs at once ("if we have to run the oracles, they will take time, so we must start as soon as
+  possible"): FreeSurfer 8.2.0 from its official Ubuntu 22.04 package unpacked without administrator rights; every
+  step of recon-all recorded by a stand-in for `fs_time`; six heads on the main machine (the critical path), the
+  rest of the panel and the variability runs on the server; an inventory with the third-party and data-file audits;
+  one replay tool for every program; replica authors writing the specs; the clean rooms one wave behind; the
+  replicas in a workspace `crates-freesurfer/` of several crates (CLAUDE.md rule 3 updated). Found while setting
+  it up: recon-all 8.2.0's default is the **v8 stream** (`FS_V8_XOPTS=1`: SynthStrip, SynthSeg and SynthMorph,
+  neural networks, and new fixes), the classic stream (`-no-v8`) being what fMRIPrep 25.x's FreeSurfer 7.3.2 runs;
+  both are recorded, the order between them asked of the user.
+- **"The templates" part** is folded into the documentation revision (page template, generated option tables),
+  FreeSurfer's preparation (the replay harness) and larmorprepx (the MNI-template steps), the orchestrator's
+  proposal, accepted.
+- **Data files:** the four rules and one list of every data file (freesurfer-plan.md, "Data files"), the
+  orchestrator's proposal, accepted: the main package ships only small freely usable data; restricted data in its
+  family's companion or fetched from its owner on first use; big files always fetched; one checked list shown on
+  the site. LARMORX's code stays Apache-2.0; data keeps its own licence.
+- **Examples on program pages are run by the tests**, so they never go stale (accepted).

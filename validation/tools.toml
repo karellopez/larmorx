@@ -139,8 +139,8 @@ title = "tedana's t2smap (the T2* and S0 maps of multi-echo fMRI and the echoes'
 eco = "larmorx"
 page = "/tools/tedana-t2smap/"
 use = ["larmorx tedana t2smap", "larmorx-gpl tedana t2smap", "lx.tedana.t2smap"]
-how = "exact replica in `larmorx-gpl` (GNU GPL version 3, converted from tedana's LGPL-2.1 under its section 3), `experimental` (2026-11-08: every option, message, output and failure case of tedana 26.0.3, with numpy's, SciPy's, nibabel's and nilearn's arithmetic; TED-01 to TED-18 corrected by default or refused, each with `reproduce`, but TED-06, kept); the clean-room original later, in the main package"
-validation = "replica: [{tedana-t2smap-replica.pass} of {tedana-t2smap-replica.compared}](record:tedana-t2smap-replica) compared cases bit-identical to tedana 26.0.3 in both kept library environments (every file, message and exit status): fMRIPrep's {tedana-t2smap-replica.fmriprep} multi-echo calls on three oracle runs (also against fMRIPrep's own files), every option, data type and failure; {tedana-t2smap-replica.both} more rejected by both alike; 44 % of tedana's peak memory on fMRIPrep's calls, [3.0 to 4.2 times its speed](repo:docs/benchmarks/tedana-t2smap.md) at 14 threads on fMRIPrep's curve-fit calls"
+how = "clean-room original, `experimental` (2026-11-12: every option, message, exit status and failure case of `specs/t2smap.md`, TED-01 to TED-18, TED-31 and TED-46 corrected by default or refused, each with `reproduce` (the fitted numbers its own solvers', within §17.3's thresholds), but TED-06, kept; the log-linear fit in closed form, the curve fit a trust-region solver on the echoes' means, deterministic threads: fMRIPrep's curve-fit calls 10 to 15 times tedana's speed at one thread and 19 to 30 at eight, with a quarter of its memory); exact replica in `larmorx-gpl` (GNU GPL version 3, converted from tedana's LGPL-2.1 under its section 3), `experimental` (2026-11-08: every option, message, output and failure case of tedana 26.0.3, with numpy's, SciPy's, nibabel's and nilearn's arithmetic; TED-01 to TED-18, TED-31 and TED-46 corrected by default or refused, each with `reproduce`, but TED-06, kept; ANALYZE and MGH inputs since 2026-11-12)"
+validation = "original: [{tedana-t2smap-original.pass} of {tedana-t2smap-original.compared}](record:tedana-t2smap-original) compared cases within `specs/t2smap.md` §17.3's thresholds against tedana 26.0.3 (`reproduce`: exit status, messages and files tedana's) and the replica's default (by default): fMRIPrep's {tedana-t2smap-original.fmriprep} multi-echo calls on three oracle runs, every option, data type, image format and failure, threads; {tedana-t2smap-original.expected} expected divergence (a chaotic curve fit of noise voxels); 25 % of tedana's peak memory; replica: [{tedana-t2smap-replica.pass} of {tedana-t2smap-replica.compared}](record:tedana-t2smap-replica) compared cases bit-identical to tedana 26.0.3 in both kept library environments (every file, message and exit status): fMRIPrep's {tedana-t2smap-replica.fmriprep} multi-echo calls on three oracle runs (also against fMRIPrep's own files), every option, data type and failure; {tedana-t2smap-replica.both} more rejected by both alike; 44 % of tedana's peak memory on fMRIPrep's calls, [3.0 to 4.2 times its speed](repo:docs/benchmarks/tedana-t2smap.md) at 14 threads on fMRIPrep's curve-fit calls"
 
 [[tool]]
 id = "afni-tshift"
@@ -394,6 +394,12 @@ id = "sdcflows-estimation-app-shared"
 larmorx = "`larmorx sdcflows sdcflows` run whole (`lx.sdcflows.run_app`, `LARMORX_SDCFLOWS_LIBRARIES=shared`)"
 reference = "sdcflows 2.17.1's own BIDS app on numpy 2.3.5 and SciPy 1.15.3 (the shared environment), on each of sdcflows 2.17.1's eight own runs' datasets"
 status = "`validated`"
+
+[[record]]
+id = "tedana-t2smap-original"
+larmorx = "`lx.tedana.t2smap(implementation=\"clean-room\")`, `larmorx --implementation clean-room tedana t2smap` (clean-room, `crates/larmorx-tedana`)"
+reference = "tedana 26.0.3's t2smap as a program (numpy 2.5.4, SciPy 1.18.1; one thread; through the oracle cache); the replica's default (`larmorx-gpl` built from the same tree, a black box); `specs/t2smap.md` §17.3's thresholds by its `check.py`"
+status = "`experimental` ({tedana-t2smap-original.pass} of {tedana-t2smap-original.compared} compared cases within §17.3's thresholds, with `reproduce` against tedana and by default against the replica's default, fMRIPrep's {tedana-t2smap-original.fmriprep} calls included; {tedana-t2smap-original.expected} expected divergence: noise voxels of a chaotic curve-fit regime, where tedana and the replica's default differ far more)"
 
 [[record]]
 id = "tedana-t2smap-replica"

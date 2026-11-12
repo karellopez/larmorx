@@ -25,7 +25,7 @@ and lives in the main package.
 | FSL | FSL Licence: non-commercial. Modification and transmission allowed "without financial return", if the licence conditions are imposed on the receiver and all original and amended source is included (`~/fsl/LICENCE.FSL`) | ✓ `larmorx-nc`, under the FSL Licence's terms | ✓ main package |
 | FreeSurfer | FreeSurfer Software License v1.0: derived works and redistribution allowed, also commercially, if the licence text with its required preface ships with them, notices are kept and modifications marked. Every user inherits "research use only" and an indemnity in MGH's favour | ✓ `larmorx-freesurfer` (planned, D3) | not planned (not required; revisit for single parts if needed) |
 | MSM_HOCR | non-commercial. Its ELC library: "derivatives must not be publicly distributed without a prior consent". Its FastPD optimiser: "protected by … patent applications" | ✗ cannot be published | ✓ main package, in the surfaces track, **without** the FastPD/ELC optimisation methods (patents cover methods, however they are coded). First step: a patent check of FastPD and HOCR |
-| tedana | LGPL-2.1 (only: its `LICENSE` is the LGPL-2.1 text, its documentation names "version 2.1", no "any later version" and no file headers) | ✓ `larmorx-gpl` since 2026-11-08 (`crates-gpl/larmorx-gpl-tedana`: an exact replica of tedana 26.0.3's `t2smap`, GPL-3.0-only under LGPL-2.1's section 3, which lets a copy of the library carry the ordinary GPL instead; the user, 2026-11-08) | ✓ main package (planned: `crates/larmorx-tedana`, from `specs/t2smap.md`, the published equations and black-box runs) |
+| tedana | LGPL-2.1 (only: its `LICENSE` is the LGPL-2.1 text, its documentation names "version 2.1", no "any later version" and no file headers) | ✓ `larmorx-gpl` since 2026-11-08 (`crates-gpl/larmorx-gpl-tedana`: an exact replica of tedana 26.0.3's `t2smap`, GPL-3.0-only under LGPL-2.1's section 3, which lets a copy of the library carry the ordinary GPL instead; the user, 2026-11-08) | ✓ main package since 2026-11-12 (`crates/larmorx-tedana`, Apache-2.0: written from `specs/t2smap.md`, tedana's documentation, the published equations and black-box runs of tedana's program by agents that never opened its source, the clean-room audit's proof; nibabel's MIT loaders for its ANALYZE and MGH inputs) |
 | nilearn (`compute_epi_mask`, as tedana calls it) | BSD-3-Clause | ✓ main package since 2026-11-08 (`larmorx_interp::nilearn`; the notice in `NOTICE`) | not needed; since 2026-11-09 also `resample_img` (nearest neighbour) for niworkflows' sampling reference (`larmorx.niworkflows.sampling`) |
 | pybids (the dataset index), toml (`dumps`), the running median of SciPy's `_rank_filter_1d.cpp` (ashelly, Gideon Genadi Kogan) | MIT | ✓ main package since 2026-11-09 (`larmorx.bids`, `larmorx.sdcflows.app`, `larmorx_ndimage::filters`; the notices in `NOTICE`) | not needed |
 | scikit-image (`ball`, `threshold_otsu`, `random_walker`, `match_histograms`) | BSD-3-Clause; `filters/thresholding.py` BSD-2-Clause (its `LICENSE.txt`) | ✓ main package since 2026-11-09 (`larmorx_ndimage::skimage`, `larmorx.skimage`; the notices in each file and `NOTICE`) | not needed |
@@ -165,12 +165,17 @@ command-line binary. Code from different families is never linked into one binar
   `MANIFEST.tsv`, its `NOTICE` and `crates-nc/NOTICE`), under FSL's Licence: the replica's
   `topup --config=<name>` looks there after FSL's own places, and the main package's port of
   sdcflows (`lx.sdcflows.topup_config_file`) reads `b02b0_1`, `_2` and `_4` from an FSL
-  installation it is given, else from that copy where `larmorx-nc` is installed, else refuses,
-  naming both. The main package carries none of FSL's files; its own settings, a clean-room
-  original written from `specs/topup.md` §2.5 (the settings' values, option by option and level
-  by level, by the spec writer of 2026-11-09) by an agent that never opened FSL's files, come at
-  the start of `t2smap`'s clean-room part. The values are necessarily FSL's (another number
-  gives another field); the clean-room version's origin is what the audit proves.
+  installation it is given, else from that copy where `larmorx-nc` is installed, else gives topup
+  the name, which finds the main package's own settings. The main package carries none of FSL's files;
+  its own settings of the six, a clean-room original written from `specs/topup.md` §2.5 (the
+  settings' values, option by option and level by level, by the spec writer of 2026-11-09) by an agent
+  that never opened FSL's files (`t2smap`'s clean-room part, 2026-11-11:
+  `crates/larmorx-fsl/src/topup/settings/`, Apache-2.0), are compiled into `larmorx fsl topup`, which
+  finds them by name after FSL's own places; checked by their effect, every output bit for bit,
+  against FSL's files read by larmorx-nc's program and by the clean-room original (54 of 54
+  comparisons; `validation/investigations/topup-settings-original/`). The values are necessarily
+  FSL's (another number gives another field); the clean-room version's origin is what the audit
+  proves.
 - **On PyPI from 0.1.0rc1** (the first release; the user's decisions of 2026-11-10: PyPI only,
   the three packages at one version, larmorx-nc included; decision log): `larmorx`, `larmorx-nc`
   and `larmorx-gpl`, each as wheels for the six platforms and a source distribution, uploaded by

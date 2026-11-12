@@ -7,9 +7,9 @@ parts, as they were planned, are in [status-log.md](status-log.md).
 **Ground rules.** Port every tool first, then compare with fMRIPrep at the end (user,
 2026-10-16): each port is validated against its own original program (parity, golden). **Full
 completeness** for every tool: every option, message and failure case, with D13 switches (user,
-2026-10-12); brief each agent for it from the start, so a tool takes one pass. **One agent at a
-time, in bounded parts with a stop after each**, for the user's usage check (user, 2026-10-10 and
-2026-10-17). Every tool's contract includes its figures (CLAUDE.md rule 7). **Testing depth**
+2026-10-12); brief each agent for it from the start, so a tool takes one pass. **Agents in bounded
+parts with a stop after each**: up to three at once since 2026-11-11, about six during a burst of usage and
+one at a time in a normal week (the user, 2026-11-12; "The order from here"). Every tool's contract includes its figures (CLAUDE.md rule 7). **Testing depth**
 (user, 2026-10-28; decision log): each part tests smartly (every code path once, fMRIPrep's real
 calls on about three oracle runs, the defects' edge cases, the standard and smoke tiers) and
 publishes its tool's page with figures and metrics from those tests; the very extensive testing
@@ -37,6 +37,41 @@ starts no other agent.
 | BET | `worktree-agent-a38ebb82788afa285` (10-26) | the BET replica (`larmorx-nc fsl bet`, `bet2`, `betsurf`; `lx.fsl.bet`, `lx.fsl.betsurf`), bit-identical to FSL 6.0.7.17 in every compared case (129 of 129, 364 files); its FSL libraries joined to mcflirt's in `larmorx-nc-core`; FSL-40 to FSL-58; `specs/bet.md`; its random-testing descriptor, memory cases and evidence page; FSL-22's `reproduce` exact | BET's clean-room original; `bet -S`, `-B`, `-A`, `-A2` (FLIRT, FAST); "BET, further" (follow-ups) |
 
 ## The order from here
+
+**From 2026-11-12 (the user; decision log, "2026-11-12: the plan to the end").** The roadmap to the end:
+
+| # | Step | State |
+|---|---|---|
+| 1 | **Confounds**: CompCor, DVARS, framewise displacement, fMRIPrep's confound steps and table, `larmorx nipype run` (item 4 (9)) | in progress: the first half merged 2026-11-12; relays 2g, 2h, 3a/3b, 2i, 4, 5 left |
+| 2 | **The documentation revision**, website and repository: [documentation-plan.md](documentation-plan.md) | starting |
+| 3 | **FreeSurfer 8.2.0**, a replica and a clean room of every program of `recon-all`'s two streams and of fMRIPrep's FreeSurfer programs: [freesurfer-plan.md](freesurfer-plan.md) (3.0 preparation, 3.1 foundations, waves 3.2 to 3.5, 3.6 `recon-all`) | starting: 3.0 |
+| 4 | **Surfaces**: Workbench-compatible tools (a replica in `larmorx-gpl`, a clean room in `larmorx`), MSM (a clean room only, after a patent check) | planned |
+| 5 | **larmorprepx**, the pipeline, with the MNI-template steps (TemplateFlow; niworkflows' `init_enhance_and_skullstrip_bold_wf`, the data sink's `template_metadata`) | planned |
+| 6 | **The clean rooms of the permissive ports**, one block (ANTs and ITK, sdcflows, fMRIPrep's resampler, nitransforms, the confounds, fMRIPrep's Python steps) | after FreeSurfer |
+| 7 | **The completeness parts**: FSL's FNIRT, `applywarp`, `convertwarp`, `fugue` (each a replica and a clean room), then the FLIRT pieces that wait for them; ANTs' missing operations; FreeSurfer's optional streams | after FreeSurfer |
+| 8 | **The final validation phase** (item 5), then the stage-by-stage and end-to-end comparisons with fMRIPrep | planned |
+| 9 | **Release 0.1.0**, once the full pipeline exists (the user, 2026-11-11) | planned |
+
+**"The templates" part is folded into others** (the user, 2026-11-12): its page template and generated
+option tables into the documentation revision, its replay harness into FreeSurfer's preparation (3.0), the
+MNI-template steps into larmorprepx.
+
+**Side by side.** During a **burst** (a fresh weekly usage window the user opens): about six agents on
+separate files: FreeSurfer two to three (the inventory, then the foundations' modules, then wave 3.2's
+replicas with their specs), the confounds one (its slot then moves to FreeSurfer), the documentation two
+(the writer and the critical reviewer); the orchestrator merges in batches about twice a day and runs the
+reference runs. In a **normal week**: one agent at a time on the queue (`docs/freesurfer/queue.md`, from
+the inventory): the next wave's replicas and the previous wave's clean rooms. Usage limits: the user
+lifted the self-imposed ones on 2026-11-12 until they say otherwise (they reset the weekly window
+themselves).
+
+**Machines** (the user, 2026-11-12): everything that development depends on runs on the main machine;
+the old laptop runs nothing development-dependent (too slow); the lab's server only adds information
+(more heads, FreeSurfer's own variation, fMRIPrep with recon-all for the final comparisons, heavy batches),
+up to 64 threads, and nothing on the development path waits for it.
+
+**Data files** (the user, 2026-11-12): the four rules and the list of every data file, in
+[freesurfer-plan.md](freesurfer-plan.md), "Data files".
 
 **From 2026-11-02 (the user; decision log):** two agents at once by role, each part run by relay agents
 (CLAUDE.md, "Relay agents and fewer, fuller steps"): FLIRT's clean-room part 2 beside FAST's replica, then
@@ -149,10 +184,20 @@ at a time:
    library environments (69: 44 pass, 25 refused by both alike), fMRIPrep's five calls on three oracle runs
    included, also against fMRIPrep's own files; TED-01 to TED-18, NP-03, NP-04; 44 % of tedana's peak memory, 3.0
    to 4.2 times its speed at 14 threads on fMRIPrep's curve-fit calls; `specs/t2smap.md` with its model for the
-   clean-room original, next;
-   follow-ups below);
+   clean-room original; the clean-room original **done** 2026-11-12: `crates/larmorx-tedana` in the main package
+   (`implementation="clean-room"`, and `auto` without `larmorx-gpl`), from `specs/t2smap.md` and black-box runs
+   alone, every compared case of its record within §17.3's thresholds of tedana (`reproduce`) and of the
+   replica's default (125: 124 pass, 1 expected divergence, a chaotic curve-fit regime; none failing),
+   fMRIPrep's six calls on three oracle runs included; fMRIPrep's curve-fit calls 10 to 15 times tedana's speed
+   at one thread and 19 to 30 at eight, 25 % of its memory, the same bytes at any thread count; first in the
+   part, the main package's own `topup` settings (54 of 54 comparisons bit for bit with FSL's files); TED-31 and
+   TED-46, both implementations; the replica's gaps closed (ANALYZE and MGH inputs, chained tracebacks, two
+   warnings) and its record re-made (102: 62 bit-identical, 40 refused by both alike); follow-ups below);
    (9) the confounds (nipype's CompCor, DVARS, framewise displacement, the non-steady-state detector; fMRIPrep's
-   confound steps: nothing from FreeSurfer); (10) the templates (item 8). Then FreeSurfer (its oracle runs first,
+   confound steps: nothing from FreeSurfer; **in progress**: its first half merged 2026-11-12, numpy's and SciPy's
+   linear algebra (OpenBLAS's level 1 to 3 and LAPACK's SVD and least-squares paths), SciPy's FFTs and DVARS, every
+   real call bit-identical in numpy 2.5.4, 2.3.5 and fMRIPrep's 2.2.6; CompCor, TSNR, the non-steady-state
+   detector and framewise displacement since done in its branch); (10) the templates (item 8). Then FreeSurfer (its oracle runs first,
    then `mri_coreg`, `lta_convert`, `mri_robust_template`, which fMRIPrep runs without `recon-all`), surfaces
    (item 8); larmorprepx (item 9). **After FreeSurfer, in one block, before the final validation phase** (the user,
    2026-11-06 and 11-11; decision log): a clean-room original of every program, the permissive ports included
@@ -783,6 +828,43 @@ The items below keep their history.
     without files in it (tedana's output directory after a failed `--exclude`, 2026-11-11, first taken for a
     difference). Record directories too, or state the limit in `docs/validation/oracle-cache.md` and have suites
     that check directories run the original directly.
+  - *The gates as CI runs them:* `verify-merge.sh` and the agents' gates run with this machine's `FSLDIR` set, CI
+    without it: `crates/larmorx-cli/tests/fsl_output_types.rs` passed here and failed on all six platforms
+    (2026-11-11, `52de0470`; fixed in `9abcd41a`). Run `cargo test` and the Python gates in `verify-merge.sh` with
+    `FSLDIR` unset as CI does (the orchestrator did by hand from 2026-11-12), with `LARMORX_GPL_BIN` at the merged
+    tree's `crates-gpl` build (`t2smap`'s follow-up below).
+- **From `t2smap`'s clean-room part (2026-11-11 and 12; 15 agents: nine clean relays, two replica-side spec
+  writers, four replica-side relays; [findings](findings/tedana-t2smap-original.md), record
+  [tedana-t2smap-original](validation/tedana-t2smap-original.md), [benchmarks](benchmarks/tedana-t2smap.md),
+  [API](api/tedana-t2smap.md), [spec](../specs/t2smap.md)).** Left:
+  - *verify-merge and the original's (B):* the original's suite compares its default with the replica's only when
+    `LARMORX_GPL_BIN` names a replica program (or `larmorx-gpl` is on `PATH`); verify-merge and the parity smoke
+    tier set neither, so (B) is not run there (noted per case). Point `LARMORX_GPL_BIN` at the merged tree's
+    `crates-gpl` build (PyPI's 0.1.0rc1 lacks the corrections and the ANALYZE/MGH reading, and prints the same
+    version).
+  - *`crates/larmorx-cli/tests/binaries.rs`' PATH case* fails whenever a `larmorx-nc` binary sits in the same
+    target directory as `larmorx` (one `CARGO_TARGET_DIR` for the three workspaces: `replica::find` searches the
+    program's own directory before `PATH`): make it independent of the target directory.
+  - *FSL-121's message:* the clean-room `topup` (`--config=X: no such file here, and FSLDIR is unset (FSL-121)`,
+    the notice first) and the replica (`..., so FSL's configurations ($FSLDIR/etc/flirtsch) cannot be searched
+    (FSL-121)`, the error first) word and order it differently: harmonise.
+  - *`t2smap -h` at a terminal:* the help wraps at 80 columns when `COLUMNS` is unset, tedana's at the terminal's
+    width (Rust's standard library has no terminal-size query; a crate would be a new dependency).
+  - *FLIRT's `extracttxt` memory case* (`test_flirt_original_needs_no_more_memory_than_fsl[extracttxt-...]`)
+    fails when the entry point is measured low (larmorx 15.8 to 16.5 MiB against 14.5 to 15.2 MiB: a margin under
+    1 MiB that the entry point's own spread eats): measure both several times, or a floor for tiny programs.
+  - *`larmorx_tedana::formats` into `larmorx-io`* (ANALYZE 7.5, MGH/MGZ and MATLAB `.mat` as nibabel 5.4.2 loads
+    them; the replica calls it too): with the FreeSurfer part, which needs MGH there.
+  - *The clean-room `t2smap`'s speed:* without a mask the first echo is read twice (reusing the computed mask's
+    read needs nibabel's float32 scaling from the stored values), and the RMSE table is reduced volume by volume
+    in one thread; reading the echoes (inflating) is most of the run.
+  - *The site's typographer on other pages:* markdown-it's replacements turn an evidence text's `(c)` into ©, a
+    leading `--` into an en dash and `...` into an ellipsis; `validation/investigations/t2smap-original/typographer_hazards.py
+    <page.json>` finds 92 such texts on eight other pages (afni-unifize 4, fsl-bet 2, fsl-fast 10, fsl-flirt 22,
+    fsl-maths 3, fsl-prelude 25, fsl-topup 13, sdcflows-estimation 13; 28 of them `(c)`), 0 on t2smap's: escape
+    them (`\(c)`, code spans) in each tool's evidence module, by the role that owns it; or make the site's
+    builder escape them.
+  - *Not observed yet* (`specs/t2smap.md` §19, open point 6): a 5D echo; a mask with NaN values in nilearn's path.
 - **From the easy command line's part (2026-11-11; six relays, the clean and the replica-side roles;
   `validation/investigations/easy-cli/README.md`).** Left:
   - *A failed check under an outcome other than a pass goes unseen:* `parity.run_one` turns a `pass`
@@ -806,7 +888,8 @@ The items below keep their history.
     bytes; kept, the orchestrator, 2026-11-11; `docs/api/upstream-defects.md` says so).
   - *The parts begun beside this one* (`t2smap`'s clean-room original, the confounds) use
     `implementation="original"`, which warns after this part's merge: rename them to `"clean-room"` at
-    their merges (golden cases especially: a recorded `DeprecationWarning` would change a checksum).
+    their merges (golden cases especially: a recorded `DeprecationWarning` would change a checksum). `t2smap`'s: done at its wiring relay
+    (2026-11-12).
 - **From the first release's part (2026-11-10 and 11; 10 relays; `RELEASING.md`,
   `validation/investigations/release-0.1/README.md`).** Left:
   - *Two messages in Cargo's form of a pre-release version* (`0.1.0-rc.1`; the same in both forms
@@ -938,22 +1021,13 @@ The items below keep their history.
   `argparse`, `textwrap`, `json` and number formats (`larmorx_core::python`) and nibabel's `get_qform` in
   extended precision (`larmorx_io::nifti::nibabel_affine`), all in the main package for the next Python
   programs' ports. Left:
-  - *The clean-room original* (next): `crates/larmorx-tedana`, from `specs/t2smap.md` and its model
-    (`validation/investigations/t2smap-spec/`: `model.py`, `check.py` with §17.3's thresholds, `measure.py`),
-    built for speed; the one-pass notice rule (§15.2); its implementer opens nothing the spec's header names
-    (tedana's source and every installed copy, `crates-gpl/`, `docs/findings/tedana-t2smap.md`,
-    `validation/investigations/t2smap/`, the replica's suite module, difftest descriptor and permanent cases);
-    the audit's tedana family (R07) is in place. Its brief also forbids the replica's record, evidence module and
-    site page (their descriptions name a few things of tedana's source: decision log, the replica's entry).
-  - *First in the clean-room part* (the user, 2026-11-09; decision log): the main package's own `topup` settings
-    (`b02b0`, `b02b0_1`, `_2`, `_4`, `b02b0_7T`, `test_acqp`) from `specs/topup.md`'s tables, which the field maps'
-    part B adds with FSL's files in larmorx-nc; checked by `topup`'s result with each against larmorx-nc's file, bit
-    for bit; the implementer never opens FSL's files (the audit's FSL family).
-  - *In the clean-room part:* fMRIPrep's runs `ds000210-sub-02-noreconall` and `ds000258-sub-21262-noreconall`
-    were made with OpenBLAS's AVX-512 kernels at first (the main machine's own; the earlier runs had Haswell's, an
-    AVX2 laptop) and made again with Haswell's on 2026-11-09 (the first ones archived; `docs/validation/oracle-runs.md`):
-    re-make the replica record's real calls and the page's fMRIPrep panels from the new runs in the clean-room part
-    (ds000258's 581 values that numpy's AVX-512 kernels explain should then agree).
+  - *The clean-room original*: **done** 2026-11-12 (`t2smap`'s clean-room part, below).
+  - *First in the clean-room part*, the main package's own `topup` settings: **done** 2026-11-11 (54 of 54
+    comparisons bit for bit; `validation/investigations/topup-settings-original/`).
+  - *In the clean-room part*, the replica record's real calls from the Haswell runs of ds000210 and ds000258:
+    **done** 2026-11-12 (relay RS2); ds000258's values: tedana 25.0.1 gives fMRIPrep's own T2* map and combined
+    series bit for bit in all four curve-fit calls with numpy's kernels of each run's machine (the page's table
+    `fmriprep-tedana-25`; with numpy's AVX-512 kernels off, 629 values of ds000258's T2* map differ).
   - *Duplicates to merge:* `larmorx_sdcflows`' own numpy mean and pairwise sum (`npy.rs`, `approx.rs`) could use
     `larmorx_core::numpy`; `larmorx_sdcflows::npy::py_repr` duplicates `larmorx_core::python::number::float_repr`.
   - *Formats* (D5): inputs nibabel reads but `larmorx-io` does not (AFNI's BRIK, MINC, PAR/REC) are refused with

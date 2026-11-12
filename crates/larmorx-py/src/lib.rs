@@ -23,6 +23,7 @@ mod resample;
 mod sdcflows;
 mod skimage;
 mod stream;
+mod tedana;
 
 /// Runs the `larmorx` command line with `argv` (program name first).
 ///
@@ -120,5 +121,6 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     replica::register(m)?;
     resample::register(m)?;
     sdcflows::register(m)?;
+    tedana::register(m)?;
     Ok(())
 }

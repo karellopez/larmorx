@@ -12,6 +12,10 @@ larmorx-io.workspace = true
 larmorx-interp.workspace = true
 larmorx-transform.workspace = true
 larmorx-optim.workspace = true
+# the main package's reader of nibabel's ANALYZE and MGH loading (Apache-2.0)
+larmorx-tedana.workspace = true
+# a gzip-compressed ANALYZE header's first bytes (nibabel's sniff)
+flate2.workspace = true
 rayon.workspace = true
 
 [dev-dependencies]

@@ -44,7 +44,7 @@ Licences decide what may be translated and where the translation may go
 | AFNI, public-domain (NIH) files | public domain | main package | not needed |
 | AFNI, files copyrighted by the Medical College of Wisconsin (e.g. 3dTshift) | CC BY 4.0 from AFNI 26.3.05 (GPL-2.0-or-later before) | main package (since 2026-10-29) | main package |
 | Connectome Workbench | GPL-2.0-or-later | `larmorx-gpl` | main package |
-| tedana (its `t2smap`) | LGPL-2.1 | `larmorx-gpl` (GPL-3.0 under LGPL-2.1's section 3, since 2026-11-08) | main package (planned) |
+| tedana (its `t2smap`) | LGPL-2.1 | `larmorx-gpl` (GPL-3.0 under LGPL-2.1's section 3, since 2026-11-08) | main package (since 2026-11-12) |
 | FSL | FSL Licence (non-commercial) | `larmorx-nc` | main package |
 | FreeSurfer | FreeSurfer Software License 1.0 | `larmorx-freesurfer` | not planned (see below) |
 | MSM_HOCR | non-commercial; parts may not be redistributed; parts patented | **not allowed** | main package (planned) |

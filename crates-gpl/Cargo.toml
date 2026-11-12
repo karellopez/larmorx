@@ -37,6 +37,8 @@ larmorx-io = { path = "../crates/larmorx-io", version = "0.1.0-rc.1" }
 larmorx-interp = { path = "../crates/larmorx-interp", version = "0.1.0-rc.1" }
 larmorx-transform = { path = "../crates/larmorx-transform", version = "0.1.0-rc.1" }
 larmorx-optim = { path = "../crates/larmorx-optim", version = "0.1.0-rc.1" }
+# ANALYZE 7.5 and MGH/MGZ as nibabel loads them (larmorx_tedana::formats), for the t2smap replica
+larmorx-tedana = { path = "../crates/larmorx-tedana", version = "0.1.0-rc.1" }
 larmorx-gpl-tedana = { path = "larmorx-gpl-tedana", version = "0.1.0-rc.1" }
 larmorx-afni-replica = { path = "../crates/larmorx-afni-replica", version = "0.1.0-rc.1" }
 glibc-reference = { path = "tools/glibc-reference" }

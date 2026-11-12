@@ -54,6 +54,7 @@ TOOLS: dict[str, tuple[str, str]] = {
     "resample-series": ("resample_series", "TOOL"),
     "sdcflows-fieldmap": ("sdcflows_fieldmap", "TOOL"),
     "tedana-t2smap": ("tedana_t2smap", "TOOL"),
+    "tedana-t2smap-original": ("tedana_t2smap_original", "TOOL"),
     "ndimage-skimage": ("fieldmaps_b", "NDIMAGE"),
     "niworkflows-helpers": ("fieldmaps_b", "NIWORKFLOWS"),
     "sdcflows-estimation": ("fieldmaps_b", "ESTIMATION"),

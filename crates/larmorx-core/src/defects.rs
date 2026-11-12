@@ -501,6 +501,10 @@ defects! {
         "t2smap fails with IndexError: too many indices for array: array is 0-dimensional, but 1 were indexed when a single voxel is left for the fit (a one-voxel mask, or one voxel with good signal), with both fit types and both fit modes";
     TED_18 = "TED-18", "tedana", true,
         "t2smap caps the limited T2* map at its 99.5th percentile, which is 0 when more than 99.5 % of its values are 0 (the voxels with one good echo, which the limited map sets to 0): every positive limited T2* is then set to 0, so the limited map holds no estimate and the RMSE is computed with T2* = 0 (numpy's divide-by-zero warning)";
+    TED_31 = "TED-31", "tedana", true,
+        "t2smap fails with IndexError: index 0 is out of bounds for axis 1 with size 0 when the adaptive mask removes every voxel of the mask (no voxel left for the fit), with both fit types and both fit modes, after writing the adaptive mask image";
+    TED_46 = "TED-46", "tedana", true,
+        "t2smap's log-linear fit (also the start of curvefit) solves each echo-count group as one batched least-squares problem, so a voxel whose observations have no slope (all equal: no decay, e.g. saturated samples) gets the batch's rounding noise as its slope instead of 0: T2* 1 ms where the noise is negative, 1e16 ms and more where it is positive (the cap can move with them), decided by the voxel's place in the batch and the LAPACK and BLAS builds, never the 500 ms an exact zero slope gives";
     SDC_12 = "SDC-12", "sdcflows", true,
         "ReorientImageAndMetadata checks the upper-cased orientation code but reorients to the code as given, so a lower-case one fails in nibabel";
     SDC_14 = "SDC-14", "sdcflows", true,

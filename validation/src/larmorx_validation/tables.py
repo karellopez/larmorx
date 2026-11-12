@@ -236,6 +236,8 @@ METRICS: dict[str, Callable[[dict], dict[str, int]]] = {
     "fsl-prelude": _bet,
     # tedana's t2smap replica (2026-11-08): fMRIPrep's calls counted as BET's
     "tedana-t2smap-replica": _bet,
+    # its clean-room original (2026-11-12): fMRIPrep's calls counted as BET's
+    "tedana-t2smap-original": _bet,
     # The data panel's records of the ANTs tools (2026-10-26): the same metrics as their
     # standard records.
     "ants-apply-transforms-panel": _bit_identical(),

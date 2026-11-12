@@ -1,0 +1,18 @@
+[package]
+name = "fs-vnl"
+description = "larmorx-core's VNL and netlib ports against ITK 4.13.2's own VNL (the FreeSurfer unit oracle's build: GCC 8.4.0, FreeSurfer 8.2.0's flags)"
+version = "0.0.1"
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+
+# Its own workspace: a measurement tool, never part of larmorx's build (it calls a library compiled
+# from ITK's VNL through the dynamic loader).
+[workspace]
+
+[dependencies]
+larmorx-core = { path = "../../../crates/larmorx-core" }
+larmorx-image = { path = "../../../crates/larmorx-image" }
+
+[profile.release]
+debug = false

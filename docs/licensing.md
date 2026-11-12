@@ -44,8 +44,9 @@ and lives in the main package.
 Each licence family is a separate set of crates, a separate Python wheel and a separate
 command-line binary. Code from different families is never linked into one binary; one wheel may hold separate
 programs of compatible families side by side (since 2026-11-12: `larmorx-nc` also holds CorTechs' non-commercial
-`tkregister2_cmdl` as its own program, with no FSL code; `larmorx-gpl` holds GSL's generators alone; the user,
-decision log "No waiting for permissions").
+`tkregister2_cmdl` as its own program, with no FSL code, `crates-nc/larmorx-nc-tkregister2`; `larmorx-gpl` holds
+GSL's generators alone, `crates-gpl/larmorx-gpl-gsl`, which no FreeSurfer program links: `mri_coreg`'s replica uses
+the clean-room generator; the user, decision log "No waiting for permissions").
 
 | Package | Licence | Contents | Depends on |
 |---|---|---|---|
@@ -278,7 +279,10 @@ decision log "No waiting for permissions").
   way to settle it: ask Washington University (A. Z. Snyder's group) for written permission to
   port the code and ship the atlases. **Decided 2026-11-12 (the user, "No waiting for permissions"):** first a replica and a
   clean room; then, the same day, **a clean room only** (the user: "make a clean room of the first one to avoid the
-  problems"): no replica unless Washington University gives written permission; the atlases are fetched at first use. `mni305.cor.mgz` is
+  problems"): no replica unless Washington University gives written permission; the atlases are fetched at first use.
+  The clean room covers the chain's Washington University programs, `talairach_avi`, `mpr2mni305` (which carries its
+  notice too) and the four 4dfp programs; FreeSurfer's own `avi2talxfm`, `mri_matrix_multiply`, `fs_temp_dir` and the
+  QA check get a replica and a clean room (the orchestrator, 2026-11-12). `mni305.cor.mgz` is
   derived from MNI's MINC average (MNI's terms are permissive).
 - **Eigen (MPL-2.0), one file in `larmorx-core`** (decided by the user, 2026-10-23: kept).
   `crates/larmorx-core/src/eigen_sym.rs` translates Eigen 3.4.90's self-adjoint eigensolver (as

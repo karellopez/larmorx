@@ -73,7 +73,7 @@ Every option its parser compares, as written in its own source (older parsers co
 
 ## Checks
 
-- replay: 160 recorded steps in 10 runs
+- replay: 192 recorded steps in 12 runs
 
 ## Notes
 

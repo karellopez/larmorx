@@ -1,0 +1,210 @@
+# FreeSurfer's preparation (relay 9, 2026-11-12): the restricted paths for the clean-room audit, as exact
+# proposals for the orchestrator (restrictions.py is the audit's code: not edited in the branch).
+# python -P scripts/orchestration/apply_handoff.py <scratch>/freesurfer-0/HANDOFF-audit.toml [--check]
+# then: pytest validation/tests/test_cleanroom_audit.py; the audit page regenerated at the merge.
+# Checked: --check passes on main 0f310788 merged with the branch; applied in that trial, the audit's
+# tests pass (HANDOFF.md, "The restricted paths").
+
+[[op]]
+# item 4: tkregister2_cmdl's replica crate (larmorx-nc, its own program): FreeSurfer's family, before crates-nc's FSL
+do = "edit"
+file = "validation/src/larmorx_validation/cleanroom_audit/restrictions.py"
+old = '''    (re.compile(r"/crates-nc(/|$)"), "R10", "FSL"),
+'''
+new = '''    # tkregister2_cmdl's replica (2026-11-12: CorTechs' terms, its own program in larmorx-nc, queue 3.5-26/27): FreeSurfer's
+    # code, so FreeSurfer's family (before crates-nc's FSL anchors)
+    (re.compile(r"/crates-nc/larmorx-nc-tkregister2(/|$)"), "R10", "FreeSurfer"),
+    (re.compile(r"/larmorx[-_]nc[-_]tkregister2(/|$)"), "R10", "FreeSurfer"),
+    (re.compile(r"/crates-nc(/|$)"), "R10", "FSL"),
+'''
+
+[[op]]
+# item 3: GSL's generators' replica crate (alone in larmorx-gpl): FreeSurfer's family, before crates-gpl's AFNI/tedana
+do = "edit"
+file = "validation/src/larmorx_validation/cleanroom_audit/restrictions.py"
+old = '''    (re.compile(r"/crates-gpl(/|$)"), "R10", "AFNI/tedana"),
+'''
+new = '''    # GSL's generators as FreeSurfer's numerics.cpp transcribes them (2026-11-12: alone in larmorx-gpl, queue 3.1-53): closed
+    # to the RANLUX clean room's implementer (3.1-05) as to every FreeSurfer clean room (before crates-gpl's anchors)
+    (re.compile(r"/crates-gpl/larmorx-gpl-gsl(/|$)"), "R10", "FreeSurfer"),
+    (re.compile(r"/larmorx[-_]gpl[-_]gsl(/|$)"), "R10", "FreeSurfer"),
+    (re.compile(r"/crates-gpl(/|$)"), "R10", "AFNI/tedana"),
+'''
+
+[[op]]
+# item 2: recon-all's own copy and its configuration wherever a subject directory lives (the replays' work folders,
+# a replay's --dest, a stopped run's folder), not only in the reference runs
+do = "edit"
+file = "validation/src/larmorx_validation/cleanroom_audit/restrictions.py"
+old = '''    (re.compile(r"/larmorx[-_]freesurfer([-_][a-z0-9]+)*(/|$)"), "R10", "FreeSurfer"),
+'''
+new = '''    (re.compile(r"/larmorx[-_]freesurfer([-_][a-z0-9]+)*(/|$)"), "R10", "FreeSurfer"),
+    # recon-all copies itself and its configuration into a subject's scripts/: every copy (a recording's subject, the
+    # replay tool's rebuilt directories, a stopped run) is FreeSurfer's text (2026-11-12, FreeSurfer's preparation)
+    (re.compile(r"/scripts/(recon-config\.yaml|recon-all\.local-copy)$"), "R03", "FreeSurfer"),
+'''
+
+[[op]]
+# item 1: the two blobs that hold recon-all's configuration (the recordings keep files by SHA-256 only)
+do = "edit"
+file = "validation/src/larmorx_validation/cleanroom_audit/restrictions.py"
+old = '''PERMISSIVE_TAGS += ("OpenBLAS-", "nitransforms-")
+'''
+new = '''PERMISSIVE_TAGS += ("OpenBLAS-", "nitransforms-")
+
+#: The recordings' blobs (record/blobs/<2 hex>/<sha256>) that hold FreeSurfer's own text: recon-all's configuration
+#: (scripts/recon-config.yaml; recon-all.local-copy is never recorded), classic and v8. Listed by
+#: validation/investigations/freesurfer-inventory/recording_source.py (19 recordings, 2026-11-12: no other blob is a
+#: file of the package's source folders); re-run it when new recordings arrive (the lab server's).
+FREESURFER_CONFIG_BLOBS = frozenset(
+    {
+        "6930b94343b8c1767ce6fdfa301cdb4fe381ee885ce4b20a99097e2184ca0ba6",
+        "7d560ebd1430a9050bec9c3f71ed4e350f472304f418bb07aa7435fccc1a9ef7",
+    }
+)
+'''
+
+[[op]]
+# items 1 and 2: a stopped run's folder too (failed/), and the configuration's blobs
+do = "edit"
+file = "validation/src/larmorx_validation/cleanroom_audit/restrictions.py"
+old = '''    # a recorded run: recon-all copies itself and its configuration into the subject's scripts/
+    if re.match(
+        r"^oracles/freesurfer-[^/]+/runs/.*/scripts/(recon-all\.local-copy|recon-config\.yaml)$",
+        rel,
+    ):
+        return restricted("R03", "FreeSurfer", op, rel)
+'''
+new = '''    # a recorded run: recon-all copies itself and its configuration into the subject's scripts/
+    if re.match(
+        r"^oracles/freesurfer-[^/]+/(?:runs|failed)/.*/scripts/(recon-all\.local-copy|recon-config\.yaml)$",
+        rel,
+    ):
+        return restricted("R03", "FreeSurfer", op, rel)
+    # ... and the recording keeps that configuration among its blobs, named by SHA-256 only
+    m = re.match(
+        r"^oracles/freesurfer-[^/]+/(?:runs|failed)/[^/]+/record/blobs/[0-9a-f]{2}/(?P<sha>[0-9a-f]{64})$",
+        rel,
+    )
+    if m and m["sha"] in FREESURFER_CONFIG_BLOBS:
+        return restricted("R03", "FreeSurfer", op, rel)
+'''
+
+[[op]]
+# item 5: the recorder (the orchestrator's tools, its README documents recon-all's steps): run, never read, as the replay tool
+do = "edit"
+file = "validation/src/larmorx_validation/cleanroom_audit/restrictions.py"
+old = '''                "validation/investigations/freesurfer-unit-oracle/",
+'''
+new = '''                "validation/investigations/freesurfer-unit-oracle/",
+                # the recorder of the reference runs (written after reading the inventory; its README documents
+                # recon-all's steps): run, never read (FreeSurfer's preparation, 2026-11-12)
+                "validation/investigations/freesurfer-oracle/",
+'''
+
+[[op]]
+# the two crates' build outputs and metadata carry FreeSurfer's family too (no effect before the crates exist)
+do = "edit"
+file = "validation/src/larmorx_validation/cleanroom_audit/restrictions.py"
+old = '''        if BUILD_OUTPUT.search(s):
+            return Class("replica-build-output", "R10", "FSL" if "nc" in s else "AFNI/tedana")
+        if REPLICA_METADATA.search(s) and op not in ("build", "exec"):
+            return Class("replica-metadata", "R10", "FSL" if "crates-nc" in s else "AFNI/tedana")
+'''
+new = '''        if BUILD_OUTPUT.search(s):
+            # crates-nc's and crates-gpl's builds hold FreeSurfer's replicas too (tkregister2_cmdl, GSL's generators)
+            fam = "FSL/FreeSurfer" if "nc" in s else "AFNI/tedana/FreeSurfer"
+            return Class("replica-build-output", "R10", fam)
+        if REPLICA_METADATA.search(s) and op not in ("build", "exec"):
+            if re.search(r"/larmorx-(gpl-gsl|nc-tkregister2)/", s):
+                return Class("replica-metadata", "R10", "FreeSurfer")
+            return Class("replica-metadata", "R10", "FSL" if "crates-nc" in s else "AFNI/tedana")
+'''
+
+[[op]]
+# the classification cases, one per proposal (and the neighbours that must not change)
+do = "insert"
+file = "validation/tests/test_cleanroom_audit.py"
+after = '''        (f"{WS}/oracles/freesurfer-8.2.0-unit/bin/fsunit", "exec", "run", None),'''
+text = '''        # FreeSurfer's preparation, the restricted paths (2026-11-12, relay 9)
+        (
+            f"{WS}/oracles/freesurfer-8.2.0/runs/a-v8/record/blobs/7d/"
+            "7d560ebd1430a9050bec9c3f71ed4e350f472304f418bb07aa7435fccc1a9ef7",
+            "read",
+            "restricted",
+            "R03",
+        ),
+        (
+            f"{WS}/oracles/freesurfer-8.2.0/runs/a-classic/record/blobs/69/"
+            "6930b94343b8c1767ce6fdfa301cdb4fe381ee885ce4b20a99097e2184ca0ba6",
+            "list",
+            "restricted-names",
+            "R03",
+        ),
+        (
+            f"{WS}/oracles/freesurfer-8.2.0/runs/a-v8/record/blobs/00/"
+            "002d0ee74c1a7f151c6a766d0e101f035357cae587bf56439be7fdacf89c4ac9",
+            "read",
+            "oracle",
+            None,
+        ),
+        (
+            f"{WS}/oracles/freesurfer-8.2.0/failed/a-v8-x/subjects/s/scripts/recon-config.yaml",
+            "read",
+            "restricted",
+            "R03",
+        ),
+        (
+            f"{WS}/oracles/inputs/freesurfer-replay/work/a-v8/0019-x-recorded/subjects/s/scripts/recon-config.yaml",
+            "read",
+            "restricted",
+            "R03",
+        ),
+        (
+            f"{WS}/oracles/inputs/freesurfer-replay/work/a-v8/0019-x-recorded/subjects/s/mri/wm.mgz",
+            "read",
+            "oracle",
+            None,
+        ),
+        (
+            f"{SCRATCH}/t/replay/subjects/s/scripts/recon-all.local-copy",
+            "read",
+            "restricted",
+            "R03",
+        ),
+        (f"{WT}/crates-gpl/larmorx-gpl-gsl/src/ranlux.rs", "read", "restricted", "R10"),
+        (f"{WT}/crates-nc/larmorx-nc-tkregister2/src/main.rs", "read", "restricted", "R10"),
+        (
+            f"{WT}/validation/investigations/freesurfer-oracle/README.md",
+            "read",
+            "restricted",
+            "R11",
+        ),
+        (f"{WT}/docs/validation/freesurfer-replay.md", "read", "repo", None),'''
+
+[[op]]
+# the families: the two crates in other companions are FreeSurfer's; their neighbours keep theirs
+do = "append"
+file = "validation/tests/test_cleanroom_audit.py"
+text = '''
+
+@pytest.mark.parametrize(
+    ("path", "family"),
+    [
+        (f"{WT}/crates-gpl/larmorx-gpl-gsl/src/ranlux.rs", "FreeSurfer"),
+        (f"{SCRATCH}/t/clone/crates-gpl/larmorx-gpl-gsl/Cargo.toml", "FreeSurfer"),
+        (f"{WT}/crates-gpl/larmorx-gpl-tedana/src/decay.rs", "tedana"),
+        (f"{WT}/crates-gpl/larmorx-gpl-cli/src/main.rs", "AFNI/tedana"),
+        (f"{WT}/crates-nc/larmorx-nc-tkregister2/src/main.rs", "FreeSurfer"),
+        (f"{WT}/crates-nc/larmorx-nc-bet/src/lib.rs", "FSL"),
+        (f"{WT}/crates-nc/target/release/larmorx-nc", "FSL/FreeSurfer"),
+        (
+            f"{WS}/oracles/inputs/freesurfer-replay/work/a/0001-x/subjects/s/scripts/recon-config.yaml",
+            "FreeSurfer",
+        ),
+    ],
+)
+def test_freesurfer_pieces_in_other_companions_are_freesurfer_family(path, family):
+    """FreeSurfer's preparation (2026-11-12): GSL's and tkregister2_cmdl's replicas, and recon-all's copies."""
+    cls = rs.classify(rs.locate(path, CTX), "read")
+    assert cls.family == family'''

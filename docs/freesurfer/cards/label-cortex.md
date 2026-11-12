@@ -24,7 +24,7 @@
 ## Inputs and outputs (measured)
 
 - Subject files read (strace of the recorded steps run again, relay 4): `<subj>/scripts/log/label-cortex.lh.Y2026.M11.D12.H14.M16.log`
-- Files written (the recordings' outputs and the strace jobs): `<subj>/scripts/log/label-cortex.lh.Y2026.M11.D12.H14.M16.log`, `label/lh.cortex.label`, `label/rh.cortex.label`, `scripts/log/label-cortex.lh.Y2026.M11.D12.H12.M54.log`, `scripts/log/label-cortex.lh.Y2026.M11.D12.H12.M58.log`, `scripts/log/label-cortex.lh.Y2026.M11.D12.H14.M00.log`, `scripts/log/label-cortex.lh.Y2026.M11.D12.H14.M10.log`, `scripts/log/label-cortex.lh.Y2026.M11.D12.H14.M22.log`, `scripts/log/label-cortex.lh.Y2026.M11.D12.H14.M42.log`, `scripts/log/label-cortex.lh.Y2026.M11.D12.H15.M24.log`, `scripts/log/label-cortex.lh.Y2026.M11.D12.H15.M50.log`, `scripts/log/label-cortex.lh.Y2026.M11.D12.H15.M55.log`, `scripts/log/label-cortex.rh.Y2026.M11.D12.H12.M55.log`, `scripts/log/label-cortex.rh.Y2026.M11.D12.H12.M58.log`, `scripts/log/label-cortex.rh.Y2026.M11.D12.H14.M01.log`, `scripts/log/label-cortex.rh.Y2026.M11.D12.H14.M10.log`, `scripts/log/label-cortex.rh.Y2026.M11.D12.H14.M23.log`, `scripts/log/label-cortex.rh.Y2026.M11.D12.H14.M42.log`, `scripts/log/label-cortex.rh.Y2026.M11.D12.H15.M25.log`, `scripts/log/label-cortex.rh.Y2026.M11.D12.H15.M50.log`, `scripts/log/label-cortex.rh.Y2026.M11.D12.H15.M55.log`
+- Files written (the recordings' outputs and the strace jobs): `<subj>/scripts/log/label-cortex.lh.Y2026.M11.D12.H14.M16.log`, `label/lh.cortex.label`, `label/rh.cortex.label`, `scripts/log/label-cortex.lh.Y2026.M11.D12.H12.M54.log`, `scripts/log/label-cortex.lh.Y2026.M11.D12.H12.M58.log`, `scripts/log/label-cortex.lh.Y2026.M11.D12.H14.M00.log`, `scripts/log/label-cortex.lh.Y2026.M11.D12.H14.M10.log`, `scripts/log/label-cortex.lh.Y2026.M11.D12.H14.M22.log`, `scripts/log/label-cortex.lh.Y2026.M11.D12.H14.M42.log`, `scripts/log/label-cortex.lh.Y2026.M11.D12.H15.M24.log`, `scripts/log/label-cortex.lh.Y2026.M11.D12.H15.M50.log`, `scripts/log/label-cortex.lh.Y2026.M11.D12.H15.M55.log`, `scripts/log/label-cortex.lh.Y2026.M11.D12.H17.M19.log`, `scripts/log/label-cortex.lh.Y2026.M11.D12.H18.M17.log`, `scripts/log/label-cortex.rh.Y2026.M11.D12.H12.M55.log`, `scripts/log/label-cortex.rh.Y2026.M11.D12.H12.M58.log`, `scripts/log/label-cortex.rh.Y2026.M11.D12.H14.M01.log`, `scripts/log/label-cortex.rh.Y2026.M11.D12.H14.M10.log`, `scripts/log/label-cortex.rh.Y2026.M11.D12.H14.M23.log`, `scripts/log/label-cortex.rh.Y2026.M11.D12.H14.M42.log`, `scripts/log/label-cortex.rh.Y2026.M11.D12.H15.M25.log`, `scripts/log/label-cortex.rh.Y2026.M11.D12.H15.M50.log`, `scripts/log/label-cortex.rh.Y2026.M11.D12.H15.M55.log`, `scripts/log/label-cortex.rh.Y2026.M11.D12.H17.M19.log`, `scripts/log/label-cortex.rh.Y2026.M11.D12.H18.M17.log`
 - Data files of the package (2, 0.0 MB; data-files.toml): `build-stamp.txt`, `sources.csh`
 
 ## Options
@@ -48,7 +48,7 @@ Every option its parser compares, as written in its own source (older parsers co
 
 ## Checks
 
-- replay: 20 recorded steps in 10 runs
+- replay: 24 recorded steps in 12 runs
 
 ## Notes
 

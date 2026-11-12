@@ -65,7 +65,7 @@ Single-letter options of its `switch (toupper(*option))`: `F`, `H`, `N`, `R`, `U
 
 ## Checks
 
-- through mri_nu_correct.mni's recorded steps (17)
+- through mri_nu_correct.mni's recorded steps (18)
 
 ## Notes
 

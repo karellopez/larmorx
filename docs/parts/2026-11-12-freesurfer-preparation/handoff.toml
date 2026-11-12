@@ -1,0 +1,389 @@
+# FreeSurfer's preparation (step 3.0): the shared documents (relay 9, 2026-11-12). Reasons: HANDOFF.md.
+# python -P scripts/orchestration/apply_handoff.py <scratch>/freesurfer-0/HANDOFF.toml [--check]
+# Checked against main 0f310788 merged with the branch (its files and main's do not overlap).
+# Every text here is for documents a FreeSurfer clean-room implementer may read: layout, decisions, black-box
+# observations and measurements of the official programs; the source-derived facts stay in docs/freesurfer/.
+# The restricted paths for the audit: HANDOFF-audit.toml (restrictions.py and its tests).
+
+# ---------------------------------------------------------------------------------------------- freesurfer-plan.md
+
+[[op]]
+# the official build, as the binaries show it, and the update archive (relays 2, 4 and 5)
+do = "edit"
+file = "docs/freesurfer-plan.md"
+old = '''  file on every machine that runs it, its SHA-256 in each run's `RUN_INFO.txt`.
+'''
+new = '''  file on every machine that runs it, its SHA-256 in each run's `RUN_INFO.txt`.
+- **The official build** (measured on the package by the preparation; details in `docs/freesurfer/`,
+  replica side): every program names one compiler, GCC 8.4.0 (`Ubuntu 8.4.0-3ubuntu2`), the 4dfp tools
+  included (GNU Fortran, not Intel's), and links ITK 4.13.2 (not 5.4.5; `tags/ITK-v4.13.2`) and, where
+  it uses them, the reference Netlib BLAS and LAPACK. GCC 8.4.0 keeps the float roundings in N4's B-spline
+  fit that GCC 11 drops (CLAUDE.md's GCC 11 note does not apply to FreeSurfer's programs). sMRIPrep's and
+  fMRIPrep's calls of `mri_robust_register`, `mri_coreg` and `mri_robust_template` give the same files at
+  1, 2 and 4 threads.
+  FreeSurfer's post-release update for 8.2.0 (`patch_data_20260625.tgz`) changes only how `recon-all` and
+  `rca-surfreg` read expert-option files, and no data file: the reference runs stay on the package as
+  released; the ports follow the newest version.
+'''
+
+[[op]]
+# 3.0 item 3: what the inventory's output is (there is no inventory.md)
+do = "edit"
+file = "docs/freesurfer-plan.md"
+old = '''   size). Output: `docs/freesurfer/inventory.md` and `docs/freesurfer/cards/`.
+'''
+new = '''   size). **Done** (2026-11-12, nine relays): `docs/freesurfer/` (its README is the index: the programs,
+   the code, the third-party audit with the placement table, the data files, variation, the waves and
+   crates, the queue `docs/freesurfer/queue.md` with stable item numbers, one card per program in
+   `cards/`, and their machine-readable tables), made by the tools in
+   `validation/investigations/freesurfer-inventory/`; all of it closed to FreeSurfer clean-room
+   implementers, whose specs carry what they need.
+'''
+
+[[op]]
+# 3.0 items 1 and 4: done, with the replay tool's proof
+do = "edit"
+file = "docs/freesurfer-plan.md"
+old = '''   recorded head with no new full runs. It replaces "the templates" part's replay harness (the user,
+   2026-11-12).
+'''
+new = '''   recorded head with no new full runs. It replaces "the templates" part's replay harness (the user,
+   2026-11-12). **Done** (2026-11-12): the recorder in `validation/investigations/freesurfer-oracle/`, the
+   replay tool `larmorx_validation.freesurfer` (`python -m larmorx_validation freesurfer-replay
+   {steps,rebuild,run,compare}`, FreeSurfer's runs through the oracle-output cache, one thread by default);
+   proved on 68 recorded steps of both streams (38 v8 steps of one head, 15 classic steps, 7 long v8
+   steps, 4 of a second head, 3 at one thread, `mri_ca_register`'s warp): every one reproduced, one where
+   FreeSurfer itself varies (`defect2seg`'s colour table) and one with a message that varies
+   (`docs/validation/freesurfer-replay.md`). A FreeSurfer clean-room implementer runs it and never reads
+   it (the clean-room audit).
+'''
+
+[[op]]
+# the code's layout: the crates by name (W2), the two borrowed pieces in other companions, who creates the clean rooms
+do = "edit"
+file = "docs/freesurfer-plan.md"
+old = '''  by path, never `crates-gpl` or `crates-nc`. CLAUDE.md's rule 3 names it (the user, 2026-11-12).
+- **Clean rooms:** crates of the main package, named by the inventory; each added to the clean-room
+  audit's lists in the part that creates it (the porting guide; a test fails otherwise).
+'''
+new = '''  by path, never `crates-gpl` or `crates-nc`. CLAUDE.md's rule 3 names it (the user, 2026-11-12). Its
+  crates (`docs/freesurfer/waves.md` §4; the names decided 2026-11-12, W2): the libraries in layers,
+  `larmorx-freesurfer-core`, `-io`, `-volume`, `-filter`, `-surf`, `-deform`, `-defect`, `-gca`,
+  `-robust`; one program crate per wave, `-volumes` (3.2), `-atlas` (3.3), `-topology` (3.4), `-cortex`
+  (3.5), `-classic` (3.6), `-networks` (N), `-recon` (3.7); and `larmorx-freesurfer-cli` (the program and
+  wheel).
+- **Two borrowed pieces' replicas in the other companions** (the user, "No waiting for permissions"):
+  `crates-gpl/larmorx-gpl-gsl` (GSL's generators, alone in `larmorx-gpl`; no FreeSurfer program links it:
+  `mri_coreg`'s and `mris_expand`'s replicas use the clean-room generator) and
+  `crates-nc/larmorx-nc-tkregister2` (`tkregister2_cmdl`, its own program in `larmorx-nc`, no FSL code;
+  `bbregister`'s replica runs it when `larmorx-nc` is installed, the clean room otherwise).
+- **Permissive pieces** FreeSurfer bundles or relies on (VXL's routines, the readers of GIFTI, MINC's
+  `.xfm`, NIfTI and DICOM, nlohmann's JSON, ITK's filters, the networks' inference core, the x87 80-bit
+  arithmetic of its `long double`, ...) are ported from their own upstreams into the Apache crates
+  (`larmorx-core`, `larmorx-io`, `larmorx-image`, a new `larmorx-nn`); their clean rooms come with the
+  roadmap's step 6 (queue CP-01 to CP-13).
+- **Clean rooms:** crates of the main package, `larmorx-fs-core`, `larmorx-fs-gca`, `larmorx-fs-surf` and
+  one program crate per wave (`larmorx-fs-volumes`, ..., `larmorx-fs-recon`), with clean-room files in
+  `larmorx-io` (FreeSurfer's formats) and `larmorx-core` (the random generator and distributions, the
+  cubic spline); created, empty, by the first FreeSurfer clean-room relay from a clean brief (queue
+  C3.1-00), never by an agent that read FreeSurfer's material; each added to the clean-room audit's
+  lists in the part that creates it (the porting guide; a test fails otherwise). The main package's
+  plumbing (`larmorx-freesurfer` in `replica.rs`, the `freesurfer` family of the `larmorx` program,
+  `lx.freesurfer`) is queue item 3.2-41, best written by such a clean agent too.
+'''
+
+[[op]]
+# the wave table, corrected by the inventory (waves.md §1), with the queue's sizes
+do = "edit"
+file = "docs/freesurfer-plan.md"
+old = '''| Wave | What (the programs per wave: `docs/freesurfer/waves.md` and the queue, replica side) |
+|---|---|
+| 3.1 Foundations | the file formats, the image and surface structures, FreeSurfer's maths, random numbers and messages; x87 80-bit arithmetic; the third-party pieces (the placement table) |
+| 3.2 Volumes | the volume programs both streams run (`mri_convert`, `mri_nu_correct.mni` with ITK's N4, `AntsDenoiseImageFs`, `mri_normalize`, `mri_segment`, `mri_fill`, ...), and fMRIPrep's `mri_coreg`, `mri_robust_template` (with EPFL's B-splines) and `mri_robust_register`, early |
+| 3.3 Atlas | the atlas programs both streams run (`mri_em_register`, `mri_ca_normalize`, `mri_ca_register`) |
+| 3.4 First surfaces | tessellation to the fixed, remeshed surface |
+| 3.5 Final surfaces and statistics | placement, registration, parcellation, statistics; fMRIPrep's surface programs and `bbregister` (with `tkregister2_cmdl`) |
+| 3.6 The classic-only programs | `mri_watershed`, the Talairach chain (`talairach_avi`: a clean room only, its atlases fetched), `talairach_afd`, `mri_ca_label` |
+| N The v8 networks (a parallel track) | the inference core, the four network programs, their scripts |
+| 3.7 `recon-all` | the script's behaviour (its steps, flags, checks, logs, the resume logic sMRIPrep uses) |
+'''
+new = '''| Wave | What (the programs per wave: `docs/freesurfer/waves.md` and the queue, replica side) | Queue items (replica / clean room) |
+|---|---|---|
+| 3.1 Foundations | the file formats, the image and surface structures, FreeSurfer's maths, random numbers and messages; x87 80-bit arithmetic; the borrowed pieces of the placement table (GSL's generators alone in `larmorx-gpl`, Burkardt's spline, and the clean-room random generator and spline the replicas use); the VNL routines and C-library behaviours the replicas need; the unit oracle (done) | 52 / 8 |
+| 3.2 Volumes | the volume programs both streams run (`mri_convert`, `mri_info`, `mri_nu_correct.mni` with ITK's N4 `AntsN4BiasFieldCorrectionFs`, `AntsDenoiseImageFs`, `mri_normalize`, `mri_segment`, `mri_fill`, `mri_vol2vol`, ...), and fMRIPrep's `mri_coreg`, `mri_robust_template` and `mri_robust_register`, early, with EPFL's B-splines and the robust-registration library as items of their own; the main package's plumbing (3.2-41) | 41 / 30 |
+| 3.3 Atlas | the atlas programs both streams run (`mri_em_register`, `mri_ca_normalize`, `mri_ca_register`) | 17 / 4 |
+| 3.4 First surfaces | tessellation to the fixed, remeshed surface (with `mris_topo_fixer`, `mris_remesh`, `defect2seg` and the programs it runs) | 33 / 16 |
+| 3.5 Final surfaces and statistics | placement, registration, parcellation, statistics (`mri_relabel_hypointensities` among them); fMRIPrep's surface programs and `bbregister` (with `mri_segreg` and `tkregister2_cmdl`: its replica in `larmorx-nc`) | 37 / 29 |
+| 3.6 The classic-only programs | `mri_watershed`, the Talairach chain (`talairach_avi`, `mpr2mni305` and the four 4dfp programs: a clean room only, its atlases fetched), `talairach_afd`, `mri_ca_label` | 21 / 7 |
+| N The v8 networks (a parallel track) | the inference core, the four network programs (`mri_synthstrip`, `mri_synthseg`, `mri_synthmorph`, `mri_sclimbic_seg` with its three models), their scripts and what only those scripts run | 15 / 14 |
+| 3.7 `recon-all` | the script's behaviour (its steps, flags, checks, logs, the resume logic sMRIPrep uses) | 13 / 8 |
+| later | `nu_correct` (MNI's N3, only with `-no-ants-n4`), MINC's `talairach` (after two failed Talairach checks), MARS | - |
+
+The permissive pieces' clean rooms (13 items, CP-01 to CP-13) come with the roadmap's step 6. In all: 229
+replica items and 129 clean-room items, about 309,000 lines of function bodies to follow (static upper
+bounds, 90,000 of them the foundations); `mri_segment_hypointensities` is not run by 8.2.0.
+'''
+
+[[op]]
+# the data files, measured (relay 4), and D1, D2, D4 as decided
+do = "edit"
+file = "docs/freesurfer-plan.md"
+old = '''recon-all's classic stream reads about 25 data files: the GCA atlases (`RB_all_2019_10_25.talxfm.mni305.gca`,
+the with-skull one, `wmsa_new_eesmith.gca`), the cortical parcellation atlases (`*.gcs`), the folding
+atlas (`folding.atlas.acfb40.noaparc.i12.2016-08-02.tif`), `mni305.cor.mgz`, colour tables,
+`fsaverage`'s labels and the Talairach atlas; the v8 stream also reads the three networks' weights. The
+inventory lists each one's licence and source.'''
+new = '''**The files, measured** (the preparation ran every recorded step again under `strace`:
+`docs/freesurfer/data-files.md` and its table `data-files.toml`, replica side): the default paths of both
+streams and fMRIPrep's calls read 143 files of the package (4,195,460,712 bytes): 125 of them FreeSurfer's
+(atlases, colour tables, `fsaverage` with its labels and surfaces, the seven network weight files, priors,
+tables and four configuration files), 8 MINC models under MNI's notice (only for the classic stream's last
+Talairach fallback), 4 MNI-derived templates and Washington University's 6 Talairach atlas files (classic
+stream only). The classic stream's atlases are
+`RB_all_2020-01-02.gca` and `RB_all_withskull_2020_01_02.gca` (`RB_all_2019_10_25.talxfm.mni305.gca`
+only when `mri_em_register` is turned off; `wmsa_new_eesmith.gca` on no default path). Every large file
+has a stable SHA-256 in FreeSurfer's public git-annex remote. **Decided** (the orchestrator, 2026-11-12,
+within the rules): the annex remote is the first-use fetch address (the owner's own source; it
+rate-limits hard, so a fetch goes slowly and backs off), a local installation (`FREESURFER_HOME`) the
+alternative; the MNI-derived templates follow rule 2, as FreeSurfer's derivation; FreeSurfer's files up to
+2 MB may ship in `larmorx-freesurfer`, larger ones are fetched. The list's test and its site page come
+with the foundations.'''
+
+# ---------------------------------------------------------------------------------------------- next-steps.md
+
+[[op]]
+# the roadmap's row 3: the preparation done, the foundations in progress
+do = "edit"
+file = "docs/next-steps.md"
+old = '''(3.0 preparation, 3.1 foundations, waves 3.2 to 3.6, the networks' track N, 3.7 `recon-all`) | starting: 3.0 |'''
+new = '''(3.0 preparation, 3.1 foundations, waves 3.2 to 3.6, the networks' track N, 3.7 `recon-all`; the queue `docs/freesurfer/queue.md`, replica side) | 3.0 done 2026-11-12 (the inventory, the queue, the replay tool); 3.1 in progress |'''
+
+[[op]]
+# the roadmap's row 6: FreeSurfer's permissive pieces' clean rooms join the block (relay 8)
+do = "edit"
+file = "docs/next-steps.md"
+old = '''| 6 | **The clean rooms of the permissive ports**, one block (ANTs and ITK, sdcflows, fMRIPrep's resampler, nitransforms, the confounds, fMRIPrep's Python steps) | after FreeSurfer |'''
+new = '''| 6 | **The clean rooms of the permissive ports**, one block (ANTs and ITK, sdcflows, fMRIPrep's resampler, nitransforms, the confounds, fMRIPrep's Python steps; FreeSurfer's permissive pieces, queue CP-01 to CP-13: the bundled readers, the small pieces, x87 arithmetic, the random numbers, VNL and netlib, ITK 4.13.2's filters, the networks' inference core) | after FreeSurfer |'''
+
+[[op]]
+# the open FreeSurfer follow-up: ITK 4.13.2 confirmed by the inventory's comparison
+do = "edit"
+file = "docs/next-steps.md"
+old = '''unless given `-no-v8`; fMRIPrep 25.x runs the classic stream through 7.3.2): to decide with larmorprepx; and ITK 4.13.2
+    (what FreeSurfer 8.2.0's programs link) where it differs from 5.4.5, recommended, to confirm with the inventory's ITK
+    comparison (no arithmetic difference found on FreeSurfer's paths).'''
+new = '''unless given `-no-v8`; fMRIPrep 25.x runs the classic stream through 7.3.2): to decide with larmorprepx (with one
+    recorded run of sMRIPrep's own `recon-all` calls on 8.2.0, on the lab's server: what `-noskullstrip` and an injected
+    `brainmask.mgz` do in the v8 stream). ITK 4.13.2 (what FreeSurfer 8.2.0's programs link) where it differs from 5.4.5:
+    confirmed by the inventory's comparison (`docs/freesurfer/third-party.md` §10, replica side: no difference in the
+    arithmetic of what FreeSurfer's default paths compute with); the replicas reuse LARMORX's 5.4.5 ports where they give
+    FreeSurfer's bits at its settings and follow 4.13.2 (`tags/ITK-v4.13.2`) where not.'''
+
+[[op]]
+# the preparation's follow-ups (relay 7b's open items, the replay tool's limits, the observations)
+do = "edit"
+file = "docs/next-steps.md"
+old = '''- **From `t2smap`'s clean-room part (2026-11-11 and 12; 15 agents: nine clean relays, two replica-side spec'''
+new = '''- **From FreeSurfer's preparation (step 3.0, 2026-11-12; nine replica-side relays; the inventory
+  `docs/freesurfer/`, the queue `docs/freesurfer/queue.md` and the cards, closed to FreeSurfer clean-room
+  implementers; the replay tool's proof [freesurfer-replay.md](validation/freesurfer-replay.md)).** Left:
+  - *FreeSurfer's own variation, threads:* the network programs (`mri_synthstrip`, `mri_synthseg`,
+    `mri_synthmorph`, `mri_sclimbic_seg`) at 1 and 4 threads, and run twice; compare the classic stream's 1-thread
+    runs (the main machine, running) and the v8 stream's (the lab's server) with the 4-thread reference runs, step by
+    step, with the replay tool's comparison.
+  - *Two thread effects to size* (`docs/freesurfer/variation.md`, replica side): FreeSurfer's Gaussian smoothing
+    with a wide kernel on a large image at 1 and 4 threads; `mri_robust_template` as an unbiased template (without
+    `--fixtp`, sMRIPrep's longitudinal case) on four to six inputs at several thread counts and twice each.
+  - *Random sources:* two programs print FreeSurfer's own warning `... supposed to be reproducible but seed not set`
+    in every reference run (`mri_label2vol --defects` inside `defect2seg`, both streams; `mri_edit_wm_with_aseg`, v8);
+    the replays show `defect2seg`'s colour table changing from run to run and `mri_edit_wm_with_aseg`'s files not.
+    Left: whether fMRIPrep's `bbregister` (`mri_segreg`), `mri_vol2vol` and `mri_surf2surf` calls give the same files
+    twice (replays with the cache off), and `mri_edit_wm_with_aseg` on the other heads.
+  - *The classic stream's later steps* and the steps that need more than 12 GiB (`mri_synthseg`, about 23 GiB;
+    `fs-synthmorph-reg`'s deformable step, about 18 GiB) replayed in larger boxes; the replays' messages compared
+    with the recorded `recon-all.log`, step by step (the replay tool keeps no step's messages from the recording).
+  - *The proof page's tables:* `docs/validation/freesurfer-replay.md`'s "The result" is still empty: splice
+    `validation/investigations/freesurfer-oracle/proof_table.py`'s output from the second proof pass's reports
+    (68 steps; kept in the part's notes folder).
+  - *The reference runs' environment:* the recordings' `scripts/recon-all.env` carries FreeSurfer 6.0.0's
+    `MNI_DIR`, `MINC_*`, `PERL5LIB`, `FSFAST_HOME` and its `mni/bin` on `PATH` from the user's login profile (no
+    default step used them: N4 is the default); the server's runs should start from a clean environment. The file
+    also holds the session's whole environment: the recordings stay private.
+  - *Recordings added later* (the server's): re-run `validation/investigations/freesurfer-inventory/recording_source.py`
+    and add any new configuration blob to the clean-room audit (`FREESURFER_CONFIG_BLOBS`).
+  - *A coverage build* (W6): the unit oracle with `--coverage`, each recorded step replayed, to give the default paths'
+    exact functions (the queue's sizes are static upper bounds); a lab-server extra, not blocking.
+  - *A flaky test:* `validation/tests/test_oracle_cache.py::test_above_one_thread_a_run_is_served_after_three_identical_runs`
+    fails about one run in two under `pytest -n 3` and passes serially (seen at the preparation's base commit too).
+- **From `t2smap`'s clean-room part (2026-11-11 and 12; 15 agents: nine clean relays, two replica-side spec'''
+
+# ---------------------------------------------------------------------------------------------- decision-log.md
+
+[[op]]
+do = "append"
+file = "docs/decision-log.md"
+text = '''## 2026-11-12: FreeSurfer's preparation (the orchestrator's decisions within the user's rules)
+- **Data files** (after the inventory's list, `docs/freesurfer/data-files.md`): **D1** FreeSurfer's public git-annex
+  remote is the first-use fetch address: the owner's own source, each object named by its SHA-256 (its git-annex
+  key); all 32 objects the default paths need and the four tarballs answered; it rate-limits hard, so a fetch goes
+  slowly and backs off (HTTP 429); a local installation (`FREESURFER_HOME`) serves instead. **D2** the MNI-derived
+  templates (`mni305.cor*.mgz`, the ICBM 2009c registration targets) follow rule 2, as FreeSurfer's derivation (the
+  cautious reading). **D3** the newest 8.2.0 update archive (`patch_data_20260625.tgz`, 23.5 MB) downloaded and
+  listed: it changes only how `recon-all` and `rca-surfreg` read expert-option files, and no data file; the reference
+  runs stay on the package as released. **D4** FreeSurfer's files up to 2 MB may ship in `larmorx-freesurfer`; larger
+  ones are fetched.
+- **GCC 8.4.0 for the measurements:** conda-forge's, user-level (`oracles/toolchains/gcc-8.4`, 756 MB), to test GCC
+  bug 110182 on N4's fit as the official programs' compiler builds it (it keeps the roundings); the unit oracle then
+  used Ubuntu's own `gcc-8` 8.4.0-3ubuntu2 (`oracles/toolchains/gcc-8.4-ubuntu`), the compiler every official program
+  names. **x87 80-bit arithmetic** is a foundation item (an exact `long double` for the replicas, `larmorx_core::x87`).
+- **The waves** (W1 to W6, after the inventory's waves, `docs/freesurfer/waves.md` §6; the user heard the size, about
+  309,000 lines as an upper bound): **W1** fMRIPrep's programs outside `recon-all` come with the shared programs, early
+  (3.2, 3.5); **W2** the crate names `larmorx-freesurfer-*` (replicas), `larmorx-fs-*` (clean rooms), `larmorx-nn` (the
+  networks' inference core); **W3** the bundled parsers (expat under GIFTI, the DICOM probe, nlohmann's JSON reader)
+  become pure-Rust parsers that give the same values and the same failure messages on every path `recon-all` and
+  fMRIPrep reach, proved by differential tests against the originals, with the writers' number formatting ported
+  exactly (no full ports of those parsers); **W4** the unit oracle is a 3.1 item (done: `oracles/freesurfer-8.2.0-unit/`);
+  **W5** `recon-all` is wave 3.7, the classic-only programs taking 3.6; **W6** a coverage build to size the default
+  paths exactly: later, a lab-server extra (the sizes stay static upper bounds meanwhile).
+- **The borrowed pieces' crates in the other companions:** `crates-gpl/larmorx-gpl-gsl` (GSL's generators, alone in
+  `larmorx-gpl`; no FreeSurfer program links it: `mri_coreg`'s and `mris_expand`'s replicas use the clean-room
+  generator) and `crates-nc/larmorx-nc-tkregister2` (`tkregister2_cmdl`, its own program in `larmorx-nc`), as the
+  existing names go (`larmorx-gpl-tedana`, `larmorx-nc-*`). The permissive pieces' clean rooms (queue CP-01 to CP-13)
+  come with the roadmap's step 6, their crates decided then.
+- **The Talairach scope:** the user's "a clean room only" for Washington University's Talairach tools covers
+  `talairach_avi`, `mpr2mni305` (which carries Washington University's notice too) and the four 4dfp programs;
+  FreeSurfer's own `avi2talxfm`, `mri_matrix_multiply`, `fs_temp_dir` and the QA check get a replica and a clean room.
+- **Who creates what:** the clean rooms' crates are created, empty, by the first FreeSurfer clean-room relay from a
+  clean brief (queue C3.1-00), never by an agent that read FreeSurfer's material; the main package's plumbing
+  (`replica.rs`, the `freesurfer` family, `lx.freesurfer`) is queue item 3.2-41, best by such an agent too. The
+  queue's item numbers are stable (`docs/freesurfer/queue-ids.toml`): an item keeps its number, a new one takes the
+  next free number of its wave, a retired one is never reused.
+- **The replay tool and the audit (Q7):** the replay tool (`larmorx_validation.freesurfer`) and the unit oracle's
+  harness (`freesurfer_unit.py`) stay in the restriction table (R11): a FreeSurfer clean-room implementer runs them as
+  a black box and never reads them (their authors read source-derived notes). At the preparation's merge the table
+  also gains the recorder (`validation/investigations/freesurfer-oracle/`, run-only the same way), recon-all's
+  configuration wherever a subject directory or a recording's blobs hold it, and the two crates above (FreeSurfer's
+  family, not their workspaces').'''
+
+# ---------------------------------------------------------------------------------------------- oracle-cache.md
+
+[[op]]
+# the key: FreeSurfer's environment family (relay 7)
+do = "edit"
+file = "docs/validation/oracle-cache.md"
+old = '''argparse's `COLUMNS` and tqdm's `TQDM_*`, in the key of that family's runs only); for every program'''
+new = '''argparse's `COLUMNS` and tqdm's `TQDM_*`, in the key of that family's runs only), FreeSurfer's programs (the family `freesurfer`, 2026-11-12: the replay tool; `FS*` (`FS_LICENSE` by its content), `FREESURFER*`, `SUBJECTS_DIR` (a place, by its role), `MNI_*`, `MINC_*`, `PERL5LIB`, `FUNCTIONALS_DIR`, `LOCAL_DIR`, `FIX_VERTEX_AREA`, `OMP_*`, `GOMP_*`, `ITK_*`, `PYTHON*` and `PATH` (FreeSurfer's tcsh and Python scripts find the programs they run by it), in the key of that family's runs only); for every program'''
+
+[[op]]
+# the runners: the replay tool's row (relay 7)
+do = "insert"
+file = "docs/validation/oracle-cache.md"
+after = '''| `tedana-t2smap-replica` | `tedana_t2smap_replica.run_tedana`'''
+text = '''| `freesurfer-replay` | `larmorx_validation.freesurfer.replay.run_freesurfer` (a launcher per program, `oracles/inputs/freesurfer-replay/launchers/<tree>/<program>/`, beside a `PACKAGE.json` naming the whole installation: its build stamp, the package's SHA-256 and the SHA-256 of a manifest of its 70,117 files) | 1 by default (`--threads recorded`: the recording's 4, served after 3 identical runs) | every file of the rebuilt subject directory an input, the subjects directory the place; `Policy.formats = "freesurfer"`; a step FreeSurfer varies in (`defect2seg`'s colour table) never cached |'''
+
+[[op]]
+# differences: FreeSurfer's files compared provenance aside (relay 7)
+do = "edit"
+file = "docs/validation/oracle-cache.md"
+old = '''times, ITK-09; variable-length strings by their contents). What is served is always the stored
+bytes.'''
+new = '''times, ITK-09; variable-length strings by their contents; FreeSurfer's files by
+`larmorx_validation.freesurfer.files.same_result` where `Policy.formats` is `freesurfer`, since 2026-11-12: their
+provenance records left out, the command line, time, user and machine, a surface's stamp, the run's directories, the
+header lines of LTA and statistics files). What is served is always the stored bytes.'''
+
+# ---------------------------------------------------------------------------------------------- upstream.tsv
+
+[[op]]
+# FreeSurfer 8.2.0's release tag, as the workspace holds it (GitHub's v8.2.0 archive)
+do = "insert"
+file = "upstream.tsv"
+after = "nilearn-0.11.1\t"
+text = "freesurfer-8.2.0\thttps://github.com/freesurfer/freesurfer/archive/refs/tags/v8.2.0.tar.gz\tsha256:bb1699f7655ebf0f3790db6a78af9532ea7c832c97fe5f71bfd9f0e9526d7e78\tFreeSurfer-1.0\ttags"
+
+# ---------------------------------------------------------------------------------------------- CLAUDE.md
+
+[[op]]
+# Where things are: the preparation complete
+do = "edit"
+file = "CLAUDE.md"
+old = '''FreeSurfer 8.2.0 ([docs/freesurfer-plan.md](docs/freesurfer-plan.md)) side by side'''
+new = '''FreeSurfer 8.2.0 ([docs/freesurfer-plan.md](docs/freesurfer-plan.md); its preparation, 3.0, complete 2026-11-12: the inventory, the queue and the porting cards in `docs/freesurfer/`, closed to FreeSurfer clean-room implementers, the reference runs' recorder and the replay tool; the foundations, 3.1, in progress) side by side'''
+
+[[op]]
+# rule 1: the two crates by name
+do = "edit"
+file = "CLAUDE.md"
+old = '''`tkregister2_cmdl` (FreeSurfer's `bbregister` runs it), as **its own program**, never linked with FSL's code (it may build'''
+new = '''`tkregister2_cmdl` (FreeSurfer's `bbregister` runs it; `crates-nc/larmorx-nc-tkregister2`), as **its own program**, never linked with FSL's code (it may build'''
+
+[[op]]
+do = "edit"
+file = "CLAUDE.md"
+old = '''`crates-freesurfer/` by path for that one program); GSL's GPL generators go **alone** into `larmorx-gpl` (the user's'''
+new = '''`crates-freesurfer/` by path for that one program); GSL's GPL generators go **alone** into `larmorx-gpl` (`crates-gpl/larmorx-gpl-gsl`; the user's'''
+
+[[op]]
+# rule 1: what a FreeSurfer clean-room implementer never opens
+do = "edit"
+file = "CLAUDE.md"
+old = '''`tedana-t2smap.md`, the sections of `upstream-defects.md` marked restricted), nor `docs/parts/`'''
+new = '''`tedana-t2smap.md`, the sections of `upstream-defects.md` marked restricted; for FreeSurfer: `crates-freesurfer/`, `crates-gpl/larmorx-gpl-gsl`, `crates-nc/larmorx-nc-tkregister2`, `docs/freesurfer/`, `docs/findings/freesurfer-*.md`, the preparation's tools `validation/investigations/freesurfer-inventory/`, `freesurfer-unit-oracle/` and `freesurfer-oracle/`, recon-all's own copies in the recordings, the sources of the code FreeSurfer borrows (GSL, Burkardt's and EPFL's code, Washington University's 4dfp tools); the replay tool `larmorx_validation.freesurfer` and `freesurfer_unit.py` are run, never read), nor `docs/parts/`'''
+
+[[op]]
+# Facts worth knowing: the measured sizes (relay 2) and the queue (relay 6)
+do = "edit"
+file = "CLAUDE.md"
+old = '''  - FreeSurfer's recon-all path ≈ 200–250k lines (surface library 82k, GCA + GCA morph 44k)'''
+new = '''  - FreeSurfer 8.2.0's default paths (measured by its preparation, `docs/freesurfer/code.md`): the 72 compiled programs reach about 195k lines of library functions (50k a base nearly all share; GCA + GCA morph 28k, the surface library's files about 50k) plus 159k lines of their own files; the queue holds 229 replica items and 129 clean-room items, about 309k lines (static upper bounds)'''
+
+# ---------------------------------------------------------------------------------------------- porting-guide.md
+
+[[op]]
+# §1: the replica crates a clean-room implementer never opens
+do = "edit"
+file = "docs/porting-guide.md"
+old = '''and the spec writer's model `tools/glibc-dbl-model`, `crates-nc/`), or'''
+new = '''and the spec writer's model `tools/glibc-dbl-model`, `crates-nc/`, `crates-freesurfer/`), or'''
+
+[[op]]
+# §1: FreeSurfer's restricted material
+do = "edit"
+file = "docs/porting-guide.md"
+old = '''[findings/tedana-t2smap.md](findings/tedana-t2smap.md), [parts/](parts/) (other parts' briefs, reports and handoffs), and the sections of the'''
+new = '''[findings/tedana-t2smap.md](findings/tedana-t2smap.md), for FreeSurfer the preparation's inventory `docs/freesurfer/`, `docs/findings/freesurfer-*.md`, the tools `validation/investigations/freesurfer-inventory/`, `freesurfer-unit-oracle/` and `freesurfer-oracle/`, the replicas of its borrowed pieces (`crates-gpl/larmorx-gpl-gsl`, `crates-nc/larmorx-nc-tkregister2`) and those pieces' own sources (GSL, Burkardt's and EPFL's code, Washington University's 4dfp tools), recon-all's own copies in the recordings (`scripts/recon-config.yaml`, `recon-all.local-copy`); the replay tool `larmorx_validation.freesurfer` and the unit oracle's harness `freesurfer_unit.py` are run as black boxes, never read; [parts/](parts/) (other parts' briefs, reports and handoffs), and the sections of the'''
+
+# ---------------------------------------------------------------------------------------------- licensing.md
+
+[[op]]
+# the packages: the two crates by name
+do = "edit"
+file = "docs/licensing.md"
+old = '''`tkregister2_cmdl` as its own program, with no FSL code; `larmorx-gpl` holds GSL's generators alone; the user,
+decision log "No waiting for permissions").'''
+new = '''`tkregister2_cmdl` as its own program, with no FSL code, `crates-nc/larmorx-nc-tkregister2`; `larmorx-gpl` holds
+GSL's generators alone, `crates-gpl/larmorx-gpl-gsl`, which no FreeSurfer program links: `mri_coreg`'s replica uses
+the clean-room generator; the user, decision log "No waiting for permissions").'''
+
+[[op]]
+# the Talairach step: which programs the clean room covers
+do = "edit"
+file = "docs/licensing.md"
+old = '''problems"): no replica unless Washington University gives written permission; the atlases are fetched at first use. `mni305.cor.mgz` is'''
+new = '''problems"): no replica unless Washington University gives written permission; the atlases are fetched at first use.
+  The clean room covers the chain's Washington University programs, `talairach_avi`, `mpr2mni305` (which carries its
+  notice too) and the four 4dfp programs; FreeSurfer's own `avi2talxfm`, `mri_matrix_multiply`, `fs_temp_dir` and the
+  QA check get a replica and a clean room (the orchestrator, 2026-11-12). `mni305.cor.mgz` is'''
+
+# ---------------------------------------------------------------------------------------------- status.md
+
+[[op]]
+do = "insert"
+file = "docs/status.md"
+after = "- **The command line** (the easy command line, 2026-11-11)"
+text = '''- **FreeSurfer 8.2.0's reference runs, inventory and replay tool** (the preparation, step 3.0, 2026-11-12;
+  [freesurfer-plan.md](freesurfer-plan.md)): six heads recorded step by step in both streams on the main machine
+  (`oracles/freesurfer-8.2.0/runs/`, the recorder in `validation/investigations/freesurfer-oracle/`); the inventory,
+  the queue and one porting card per program in `docs/freesurfer/` (closed to FreeSurfer clean-room implementers);
+  the replay tool `larmorx_validation.freesurfer` (`python -m larmorx_validation freesurfer-replay`), proved on 68
+  recorded steps ([freesurfer-replay.md](validation/freesurfer-replay.md)).'''

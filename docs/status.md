@@ -34,6 +34,12 @@ Golden tests cover every tool on all six platforms (`docs/validation/golden.md`)
 - **Python environments:** `oracles/python-newest` (numpy 2.5.4, SciPy 1.18.1) beside the shared `.venv`; `--python newest|shared` (`LARMORX_PYTHON`) for `parity`, `evidence`, `difftest`; the step from the shared releases in the resample-series record. FSL's programs run on OpenBLAS's Haswell kernels (`OPENBLAS_CORETYPE=Haswell`, part of the oracle cache key; FSL-64).
 - **Releases** (the first, 0.1.0rc1, published 2026-11-11: PyPI, the GitHub Release, the images; [RELEASING.md](../RELEASING.md)): `.github/workflows/release.yml` builds and tests the three packages (wheels for the six platforms and the sdists), the standalone programs and two Linux container images on every dry run (a push to `release/dry-run`) and publishes them on a `v*` tag after the user's approval (PyPI's trusted publishing, the GitHub Release, `ghcr.io/karellopez/larmorx`); its helpers in `scripts/release/` (the version everywhere by `set_version.py`), the notes from `CHANGELOG.md`, the citation in `CITATION.cff`.
 - **The command line** (the easy command line, 2026-11-11): `larmorx [--n-threads N] [--implementation auto|replica|clean-room] [--upstream-defects fix|reproduce] <family> <tool> ...` and the same options in `larmorx-nc` and `larmorx-gpl` (`docs/architecture.md`); the console script shows a tool's messages while it runs; every FSL tool writes `.nii.gz` without `FSLOUTPUTTYPE` (FSL-11); the README's First steps; in `CHANGELOG.md`'s "Unreleased" until the next release.
+- **FreeSurfer 8.2.0's reference runs, inventory and replay tool** (the preparation, step 3.0, 2026-11-12;
+  [freesurfer-plan.md](freesurfer-plan.md)): six heads recorded step by step in both streams on the main machine
+  (`oracles/freesurfer-8.2.0/runs/`, the recorder in `validation/investigations/freesurfer-oracle/`); the inventory,
+  the queue and one porting card per program in `docs/freesurfer/` (closed to FreeSurfer clean-room implementers);
+  the replay tool `larmorx_validation.freesurfer` (`python -m larmorx_validation freesurfer-replay`), proved on 68
+  recorded steps ([freesurfer-replay.md](validation/freesurfer-replay.md)).
 **Next:** the move to the new main machine is done (2026-10-28: the copy, the build and the proof
 that results do not depend on the machine, [docs/findings/machine-move-proof.md](docs/findings/machine-move-proof.md));
 the old laptop is a helper (phase 4 of [docs/machine-move.md](docs/machine-move.md)). Ports first,

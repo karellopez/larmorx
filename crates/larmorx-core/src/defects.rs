@@ -957,6 +957,28 @@ defects! {
         "a sampled metric's derivative at a sample point outside the virtual region whose linear offset falls outside the derivative array is written past its end: memory it does not own";
     ITK_98 = "ITK-98", "ITK", true,
         "B-spline interpolation mirrors a support index only once at each end of an axis: on an axis too short for the spline's support (2 voxels for orders 3 and 4, 2 or 3 for order 5) it reads the coefficient image outside its buffer, memory it never wrote";
+    ITK_103 = "ITK-103", "VXL", false,
+        "VXL's L-BFGS (netlib's lbfgs translated by f2c) steps its line search's first stage from the unmodified function values where Nocedal's Fortran passes the modified ones (FXM, FYM), and then rebuilds them from stale values";
+    ITK_104 = "ITK-104", "VXL", true,
+        "VXL's L-BFGS resets ys to 0 on every call (a local of the C function, saved in the Fortran), so a caller that supplies the diagonal (DIAGCO) gets an infinite 1/ys";
+    ITK_105 = "ITK-105", "VXL", true,
+        "VXL's L-BFGS prints its vectors (IPRINT(2) of 1 and above) scaled from the signed value that last exceeded the running maximum in magnitude rather than from the largest magnitude, and divides a vector of zeros by 0";
+    ITK_106 = "ITK-106", "VXL", true,
+        "VXL's L-BFGS prints its vectors X and G (IPRINT(2) of 1 and above) from the double before each array, memory it does not own, and drops their last element (lb1 passes write50 the pointers it decremented for Fortran's indexing)";
+    ITK_107 = "ITK-107", "VXL", true,
+        "vnl_inverse of a 2 x 2, 3 x 3 or 4 x 4 matrix whose determinant is 0 returns an uninitialised vnl_matrix_fixed (its assertion is compiled out): memory contents";
+    ITK_108 = "ITK-108", "VXL", true,
+        "vnl_cholesky never initialises rcond_ and LINPACK's dpoco leaves it unset for a matrix that is not positive definite: rcond(), and the estimate_condition mode's message, give memory contents";
+    ITK_109 = "ITK-109", "VXL", true,
+        "vnl_cholesky::determinant (LINPACK's dpodi) keeps its mantissa in [1, 10) with loops that never end when it is not finite: a factor with an infinite or NaN diagonal entry, or one whose square overflows the mantissa";
+    ITK_110 = "ITK-110", "VXL", true,
+        "vnl_real_eigensystem never writes Vreal's columns of a complex eigenvalue pair (the matrix is allocated uninitialised): those columns are memory contents";
+    ITK_111 = "ITK-111", "VXL", true,
+        "when EISPACK's hqr2 fails (30 n iterations), vnl_real_eigensystem reads the eigenvalues it had not found from uninitialised vectors: D and the columns built from them depend on memory contents";
+    ITK_112 = "ITK-112", "VXL", true,
+        "EISPACK's balanc (vnl_real_eigensystem) never returns on a matrix with an infinite or NaN entry, or entries so large that a row's or column's scaled sum overflows, in the part it balances";
+    ITK_113 = "ITK-113", "VXL", true,
+        "vnl_qr::solve (and inverse) of a matrix with one row whose entry is 0 never writes the solution (LINPACK's info is 1 and VNL's vector is uninitialised): memory contents";
     ANTS_110 = "ANTS-110", "antsAI", true,
         "the blob alignment keeps the blob pairs whose displacements have about the same length as the others' (the squared distance between a pair's fixed and moving blob over another pair's), not those whose distances to the other blobs are preserved between the images, as its comment and ImageMath's MatchBlobs say";
     ANTS_111 = "ANTS-111", "antsAI", true,

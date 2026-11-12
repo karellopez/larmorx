@@ -957,6 +957,12 @@ defects! {
         "a sampled metric's derivative at a sample point outside the virtual region whose linear offset falls outside the derivative array is written past its end: memory it does not own";
     ITK_98 = "ITK-98", "ITK", true,
         "B-spline interpolation mirrors a support index only once at each end of an axis: on an axis too short for the spline's support (2 voxels for orders 3 and 4, 2 or 3 for order 5) it reads the coefficient image outside its buffer, memory it never wrote";
+    ITK_103 = "ITK-103", "VXL", true,
+        "VXL's L-BFGS (netlib's lbfgs translated by f2c) steps its line search's first stage from the unmodified function values where Nocedal's Fortran passes the modified ones (FXM, FYM), and then rebuilds them from stale values";
+    ITK_104 = "ITK-104", "VXL", true,
+        "VXL's L-BFGS resets ys to 0 on every call (a local of the C function, saved in the Fortran), so a caller that supplies the diagonal (DIAGCO) gets an infinite 1/ys";
+    ITK_105 = "ITK-105", "VXL", true,
+        "VXL's L-BFGS prints its vectors (IPRINT(2) of 1 and above) scaled from the signed value that last exceeded the running maximum in magnitude rather than from the largest magnitude, and divides a vector of zeros by 0";
     ANTS_110 = "ANTS-110", "antsAI", true,
         "the blob alignment keeps the blob pairs whose displacements have about the same length as the others' (the squared distance between a pair's fixed and moving blob over another pair's), not those whose distances to the other blobs are preserved between the images, as its comment and ImageMath's MatchBlobs say";
     ANTS_111 = "ANTS-111", "antsAI", true,

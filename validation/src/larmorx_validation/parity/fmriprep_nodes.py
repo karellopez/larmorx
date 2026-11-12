@@ -27,13 +27,35 @@ from pathlib import Path
 
 #: The oracle runs, relative to the workspace.
 ORACLE_RUNS = "oracles/fmriprep-25.2.6"
+#: The data panel's fourteen runs (``docs/validation/oracle-runs.md``: the five first runs and
+#: the panel's nine of 2026-10-24 and 25), the only runs whose nodes the panel's records compare.
+#: The folder holds other runs too (those of 2026-11-08, for tedana's ``t2smap`` and the field
+#: maps), which no record of the data panel compared: they are never read here, so a record made
+#: again and an evidence page exported again describe the same calls, on any machine.
+PANEL_RUNS = (
+    "ds000005-sub-01-noreconall",
+    "ds000228-sub-pixar008-noreconall",
+    "ds000256-sub-CTS203-noreconall",
+    "ds001600-sub-1-noreconall",
+    "ds002422-sub-02-noreconall",
+    "ds002603-sub-01-noreconall",
+    "ds003592-sub-280-noreconall",
+    "ds004173-sub-603309-noreconall",
+    "ds004884-sub-M2079-noreconall",
+    "ds004958-sub-fsm64ps-noreconall",
+    "ds005003-sub-RS001-noreconall",
+    "ds005040-sub-002-noreconall",
+    "ds005454-sub-16-noreconall",
+    "ds005752-sub-ON01016-noreconall",
+)
 #: fMRIPrep's version, as the runs' working directories name it.
 WORKFLOW = "fmriprep_25_2_wf"
 
 
 @functools.cache
 def root() -> Path | None:
-    """``oracles/fmriprep-25.2.6`` of the workspace (``LARMORX_FMRIPREP_RUNS`` overrides), its
+    """``oracles/fmriprep-25.2.6`` of the workspace (``LARMORX_FMRIPREP_RUNS`` names another
+    folder of the same runs, on another machine; which runs are read is :data:`PANEL_RUNS`), its
     links resolved: the runs' recorded mounts are real paths, and a node's directory must be
     named the same way (a checkout beside a link to ``oracles/`` found the runs through it, and
     the template registration's inputs were then not recognised as the node's)."""
@@ -47,13 +69,20 @@ def root() -> Path | None:
 
 @functools.cache
 def finished_runs() -> tuple[str, ...]:
-    """The names of the finished oracle runs, in name order (``()`` when there are none)."""
+    """The names of the data panel's finished oracle runs (:data:`PANEL_RUNS`), in name order
+    (``()`` when there are none): a run of the folder that is not the panel's is left out."""
     from larmorx_validation.stages.oracle import run_finished
 
     r = root()
     if r is None:
         return ()
-    return tuple(sorted(p.name for p in r.iterdir() if (p / "work").is_dir() and run_finished(p)))
+    return tuple(
+        sorted(
+            p.name
+            for p in r.iterdir()
+            if p.name in PANEL_RUNS and (p / "work").is_dir() and run_finished(p)
+        )
+    )
 
 
 @functools.cache

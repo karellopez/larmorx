@@ -269,8 +269,8 @@ def example(ctx: core.Context) -> dict:
                 "ANTS-106 corrected by default (with ITK-50 and ANTS-96): a partial-volume label "
                 "is a member of its own set in the MRF, so the boundary voxels between two "
                 "tissues can take it. Against the known fractions: ANTs "
-                f"{acc(lab['ants']):.1%}, larmorx's default {acc(lab['fix']):.1%} of the voxels "
-                "(the table below has the Dice per class)."
+                f"{acc(lab['ants']):.1%}, larmorx's default {acc(lab['fix']):.1%} of the mask's "
+                f"{int(inside.sum()):,} voxels (the table below has the Dice per class)."
             )
             x["links"] = [{"label": "ANTS-106", "href": "docs/findings/ants-atropos.md"}]
     at, _k = common.largest_in_slice(ex, "larmorx-fix", "ants", "labels")

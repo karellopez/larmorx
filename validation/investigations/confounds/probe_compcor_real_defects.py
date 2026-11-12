@@ -7,7 +7,8 @@ For every such node of ``oracles/fmriprep-25.2.6`` (its inputs and settings from
 ``larmorx.confounds.acompcor``/``tcompcor`` with fMRIPrep 25.2.6's libraries (numpy 2.2.6, SciPy
 1.15.2) in both modes; prints the default's notices (GLIBC-07: the cosine basis' correctly
 rounded ``cos`` against glibc's) and how many values of each file differ from ``reproduce``'s
-(the bits of the components and of the pre-filter basis; the metadata's text lines). larmorx
+(the components' and the pre-filter basis' 10-decimal values, each changed component column told
+apart as a sign flip (an SVD's sign is arbitrary) or another change; the metadata's text lines). larmorx
 alone (no original runs): any environment with the worktree's extension::
 
     PYTHONPATH=<worktree>/python python -P probe_compcor_real_defects.py [--quick]
@@ -74,6 +75,19 @@ def main() -> None:
             a, b = out["reproduce"], out["fix"]
             ca, cb = table(Path(a.components_file)), table(Path(b.components_file))
             comp = int(np.sum(ca != cb)) if ca.shape == cb.shape else -1
+            # per column: equal, the sign flipped (an SVD's sign is arbitrary), or other (the
+            # largest difference of the 10-decimal values)
+            flipped, other, worst = 0, 0, 0.0
+            if comp > 0:
+                for j in range(ca.shape[1]):
+                    x, y = ca[:, j], cb[:, j]
+                    if np.array_equal(x, y):
+                        continue
+                    if np.array_equal(x, -y):
+                        flipped += 1
+                    else:
+                        other += 1
+                        worst = max(worst, float(np.max(np.abs(np.abs(x) - np.abs(y)))))
             basis = 0
             if a.pre_filter_file and b.pre_filter_file:
                 pa, pb = table(Path(a.pre_filter_file)), table(Path(b.pre_filter_file))
@@ -85,11 +99,15 @@ def main() -> None:
                 meta = sum(x != y for x, y in zip(la, lb, strict=False)) + abs(len(la) - len(lb))
             totals["nodes"] += 1
             totals["changed"] += bool(comp or basis or meta)
+            totals["sign-flipped columns"] += flipped
+            totals["other columns"] += other
             for k in ids:
                 totals[k] += 1
             print(
                 f"{name}: notices {sorted(ids) or '-'}; differ from reproduce: components "
-                f"{comp} of {ca.size}, pre-filter {basis}, metadata lines {meta}",
+                f"{comp} of {ca.size} (columns: {flipped} sign-flipped, {other} other, largest "
+                f"|difference| of the magnitudes {worst:.1e}), pre-filter {basis}, metadata lines "
+                f"{meta}",
                 flush=True,
             )
     print("totals: " + ", ".join(f"{k} {v}" for k, v in sorted(totals.items())))

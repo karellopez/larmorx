@@ -11,10 +11,38 @@ built for the official binaries with GCC 8.4.0 (`docs/freesurfer/variation.md`).
 
 ## FreeSurfer files and functions translated
 
-None yet: the crate was created empty by queue item 3.1-01 (`docs/freesurfer/queue.md`). Each
-item that brings code adds its files and functions here, with the third-party code it found in
-them (CLAUDE.md rule 3: each ported file is audited for third-party code first).
+| Rust module | FreeSurfer file | Functions and data |
+|---|---|---|
+| `globals` | `utils/Progname.cpp`, `utils/diag.cpp` 47-68, `utils/log.cpp` 55-58, `utils/hips.cpp` 4-5 | `Progname`; `Gprofile`, `Gvx` ... `Gvz`, `Gsx` ... `Gsz`, `Gdiag`, `Gdiag_no`, `Gdiag_no2`, `Gx` ... `Gz2`, `IMAGE_SIZE`; `errorlog`, `exceptions`, `Gerror`; `hips_cplxtor`, `hips_rtocplx`; the `static` memories of `DiagHeartbeat` and `DiagShowPctDone`; the C library's `errno` |
+| `log` | `include/log.h`, `utils/log.cpp` | the error codes, `fs::fatal`, `fs::error`, `fs::warning`, `fs::debug`, `setErrorLog` and `throwExceptions` (as `Globals` fields), `writeToErrorLog`, `errorExit`, `ErrorPrintf`, `ErrorExit` (`ErrorReturn` is `ErrorPrintf` and a return); glibc's `strerror` texts (from glibc's documented messages); the `term` colours are always empty (`termAllowsColor` returns false) |
+| `diag` | `include/diag.h`, `utils/diag.cpp`, `utils/fsinit.cpp` | the `DIAG_*` bits, `DIAG_VERBOSE_ON`, `assertFailed`, `DiagInit`, `DiagPrintf`, `DiagBreak`, `DiagHeartbeat`, `DiagShowPctDone`, `check_finite`; `FSinit` and `setLocale` as far as they are seen (below) |
+| `machine` | `utils/machine.cpp` | `swapDouble`, `swapLong32`, `swapFloat`, `swapShort`, `swapInt` |
+| `cmdargs` | `utils/cmdargs.cpp` | `CMDargNErr`, `CMDisFlag`, `CMDsingleDash`, `CMDnthIsArg` |
+| `base` | `include/base.h` | `squaref`, `squared` |
+| `cstd` | none (larmorx's own) | the C library's `atoi`, `atof`, `sscanf`'s `%lx`, `printf`'s `%W.Pf`, x86-64's double-to-int conversion, written from the C standard and glibc's documented behaviour |
+| `run` | none (larmorx's own) | what `larmorx-freesurfer` gives a program (queue item 3.1-01) |
+
+Third-party code in these files (CLAUDE.md rule 3): none; each carries MGH's notice
+(`Copyright © 2021 The General Hospital Corporation (Boston, MA) "MGH"`) or none (`Progname.cpp`,
+`hips.cpp`, `fsinit.cpp`: FreeSurfer's own, Part B as far as MGH holds the rights,
+`docs/freesurfer/third-party.md` §2).
+
+Still to translate (queue item 3.1-22, part 2; NOTES of FreeSurfer's foundations, track A):
+`utils/utils.cpp` (the random numbers, the file-name and string helpers, `median`/`quick_select`,
+the memory reports, the temporary files), `utils/fsenv.cpp`, `utils/version.cpp`,
+`utils/timer.cpp` and `include/timer.h`, `utils/romp_support.cpp`, `utils/chklc.cpp`,
+`utils/xDebug.cpp`, `include/fio.h`.
 
 ## Changes from the originals
 
-None yet.
+- Process-wide globals are fields of `Globals`, one value per program run.
+- Where FreeSurfer exits, the functions return `log::Fatal`, which the program turns into its exit
+  status (the code's low 8 bits).
+- Variadic messages are formatted by the callers; the functions take the formatted text.
+- The defects FS-01 (a NUL byte after the C-style error messages), FS-02 (`PROFILE`'s undefined
+  conversion) and FS-03 (`assertFailed`'s deliberate segmentation fault) are corrected by default
+  and reproduced with `reproduce` (`docs/findings/freesurfer-core.md`).
+- `FSinit`'s locale is not set (numbers are written as in the C locale, which FreeSurfer's chosen
+  locales keep) and its warning about a missing locale is not printed; its one-thread default is
+  reported (`diag::fs_init`) for the programs whose arithmetic depends on their thread count.
+- `assertFailed`'s endless loop under `FREESURFER_HANG_ON_ASSERT` is not reproduced.

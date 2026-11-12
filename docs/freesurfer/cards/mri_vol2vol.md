@@ -70,4 +70,4 @@ Every option its parser compares, as written in its own source (older parsers co
 
 ## Checks
 
-- through fs-synthmorph-reg's recorded steps (5); fMRIPrep's calls on the recorded subjects (sMRIPrep's ApplyVolTransform)
+- through fs-synthmorph-reg's recorded steps (6); fMRIPrep's calls on the recorded subjects (sMRIPrep's ApplyVolTransform)

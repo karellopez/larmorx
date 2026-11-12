@@ -69,7 +69,7 @@ Every option its parser compares, as written in its own source (older parsers co
 
 ## Checks
 
-- through seg2cc's recorded steps (11)
+- through seg2cc's recorded steps (12)
 
 ## Notes
 

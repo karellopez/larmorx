@@ -24,7 +24,7 @@
 ## Inputs and outputs (measured)
 
 - Subject files read (strace of the recorded steps run again, relay 4): `<subj>/mri/transforms/synthmorph.mni305/log/rca-talairach.Y2026.M11.D12.H13.M58.log`, `<subj>/mri/transforms/synthmorph.mni305/log/rca-talairach.Y2026.M11.D12.H14.M50.log`
-- Files written (the recordings' outputs and the strace jobs): `<subj>/mri/transforms/synthmorph.mni305/log/rca-talairach.Y2026.M11.D12.H13.M58.log`, `<subj>/mri/transforms/synthmorph.mni305/log/rca-talairach.Y2026.M11.D12.H14.M50.log`, `mri/transforms/synthmorph.mni305/aff.lta`, `mri/transforms/synthmorph.mni305/log/fs-synthmorph-reg.Y2026.M11.D12.H12.M19.log`, `mri/transforms/synthmorph.mni305/log/fs-synthmorph-reg.Y2026.M11.D12.H12.M20.log`, `mri/transforms/synthmorph.mni305/log/fs-synthmorph-reg.Y2026.M11.D12.H13.M45.log`, `mri/transforms/synthmorph.mni305/log/fs-synthmorph-reg.Y2026.M11.D12.H14.M51.log`, `mri/transforms/synthmorph.mni305/log/rca-talairach.Y2026.M11.D12.H12.M19.log`, `mri/transforms/synthmorph.mni305/log/rca-talairach.Y2026.M11.D12.H12.M20.log`, `mri/transforms/synthmorph.mni305/log/rca-talairach.Y2026.M11.D12.H13.M45.log`, `mri/transforms/synthmorph.mni305/log/rca-talairach.Y2026.M11.D12.H14.M51.log`, `mri/transforms/synthmorph.mni305/reg.invol_to_targ.lta`, `mri/transforms/synthmorph.mni305/reg.targ_to_invol.lta`, `mri/transforms/talairach.xfm`, `mri/transforms/talairach.xfm.lta`
+- Files written (the recordings' outputs and the strace jobs): `<subj>/mri/transforms/synthmorph.mni305/log/rca-talairach.Y2026.M11.D12.H13.M58.log`, `<subj>/mri/transforms/synthmorph.mni305/log/rca-talairach.Y2026.M11.D12.H14.M50.log`, `mri/transforms/synthmorph.mni305/aff.lta`, `mri/transforms/synthmorph.mni305/log/fs-synthmorph-reg.Y2026.M11.D12.H12.M19.log`, `mri/transforms/synthmorph.mni305/log/fs-synthmorph-reg.Y2026.M11.D12.H12.M20.log`, `mri/transforms/synthmorph.mni305/log/fs-synthmorph-reg.Y2026.M11.D12.H13.M45.log`, `mri/transforms/synthmorph.mni305/log/fs-synthmorph-reg.Y2026.M11.D12.H14.M51.log`, `mri/transforms/synthmorph.mni305/log/fs-synthmorph-reg.Y2026.M11.D12.H17.M53.log`, `mri/transforms/synthmorph.mni305/log/rca-talairach.Y2026.M11.D12.H12.M19.log`, `mri/transforms/synthmorph.mni305/log/rca-talairach.Y2026.M11.D12.H12.M20.log`, `mri/transforms/synthmorph.mni305/log/rca-talairach.Y2026.M11.D12.H13.M45.log`, `mri/transforms/synthmorph.mni305/log/rca-talairach.Y2026.M11.D12.H14.M51.log`, `mri/transforms/synthmorph.mni305/log/rca-talairach.Y2026.M11.D12.H17.M53.log`, `mri/transforms/synthmorph.mni305/reg.invol_to_targ.lta`, `mri/transforms/synthmorph.mni305/reg.targ_to_invol.lta`, `mri/transforms/talairach.xfm`, `mri/transforms/talairach.xfm.lta`
 - Data files of the package (2, 0.0 MB; data-files.toml): `build-stamp.txt`, `sources.csh`
 
 ## Options
@@ -48,7 +48,7 @@ Every option its parser compares, as written in its own source (older parsers co
 
 ## Checks
 
-- replay: 5 recorded steps in 5 runs
+- replay: 6 recorded steps in 6 runs
 
 ## Notes
 

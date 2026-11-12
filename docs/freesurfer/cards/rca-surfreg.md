@@ -24,7 +24,7 @@
 ## Inputs and outputs (measured)
 
 - Subject files read (strace of the recorded steps run again, relay 4): `<subj>/scripts/rca-surfreg.Y2026.M11.D12.H14.M19.log`
-- Files written (the recordings' outputs and the strace jobs): `<subj>/scripts/rca-surfreg.Y2026.M11.D12.H14.M19.log`, `scripts/rca-surfreg.Y2026.M11.D12.H13.M10.log`, `scripts/rca-surfreg.Y2026.M11.D12.H13.M13.log`, `scripts/rca-surfreg.Y2026.M11.D12.H13.M14.log`, `scripts/rca-surfreg.Y2026.M11.D12.H14.M09.log`, `scripts/rca-surfreg.Y2026.M11.D12.H14.M26.log`, `scripts/rca-surfreg.Y2026.M11.D12.H14.M41.log`, `scripts/rca-surfreg.Y2026.M11.D12.H15.M02.log`, `scripts/rca-surfreg.Y2026.M11.D12.H15.M34.log`, `scripts/rca-surfreg.Y2026.M11.D12.H16.M04.log`, `scripts/rca-surfreg.Y2026.M11.D12.H16.M13.log`, `surf/lh.fsaverage.sphere.reg`, `surf/lh.sphere.reg`, `surf/rh.fsaverage.sphere.reg`, `surf/rh.sphere.reg`
+- Files written (the recordings' outputs and the strace jobs): `<subj>/scripts/rca-surfreg.Y2026.M11.D12.H14.M19.log`, `scripts/rca-surfreg.Y2026.M11.D12.H13.M10.log`, `scripts/rca-surfreg.Y2026.M11.D12.H13.M13.log`, `scripts/rca-surfreg.Y2026.M11.D12.H13.M14.log`, `scripts/rca-surfreg.Y2026.M11.D12.H14.M09.log`, `scripts/rca-surfreg.Y2026.M11.D12.H14.M26.log`, `scripts/rca-surfreg.Y2026.M11.D12.H14.M41.log`, `scripts/rca-surfreg.Y2026.M11.D12.H15.M02.log`, `scripts/rca-surfreg.Y2026.M11.D12.H15.M34.log`, `scripts/rca-surfreg.Y2026.M11.D12.H16.M04.log`, `scripts/rca-surfreg.Y2026.M11.D12.H16.M13.log`, `scripts/rca-surfreg.Y2026.M11.D12.H17.M29.log`, `scripts/rca-surfreg.Y2026.M11.D12.H18.M24.log`, `surf/lh.fsaverage.sphere.reg`, `surf/lh.sphere.reg`, `surf/rh.fsaverage.sphere.reg`, `surf/rh.sphere.reg`
 - Data files of the package (2, 0.0 MB; data-files.toml): `build-stamp.txt`, `sources.csh`
 
 ## Options
@@ -48,7 +48,7 @@ Every option its parser compares, as written in its own source (older parsers co
 
 ## Checks
 
-- replay: 10 recorded steps in 10 runs
+- replay: 12 recorded steps in 12 runs
 
 ## Notes
 

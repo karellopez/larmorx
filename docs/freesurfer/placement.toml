@@ -4,7 +4,10 @@
 # third-party.md, its licence, the package its replica would live in, whether that licence and FreeSurfer's
 # may be combined in one program, the process boundary where there is one, what larmorx-freesurfer's replica
 # uses where they may not be combined, and the permission still needed. Written by hand by relay 5; the prose
-# and the reasons are in third-party.md section 9. Facts and options only: the user decides.
+# and the reasons are in third-party.md section 9. The user decided every placement on 2026-11-12 (decision log
+# "FreeSurfer's borrowed pieces and its two streams", "No waiting for permissions", and "Washington University's
+# Talairach tools: a clean room only" with Burkardt's routines published normally, in "what `validated` means"):
+# each decided piece's `decided` says so, and its other fields follow it (relay 8); the facts stay as measured.
 #
 # Fields of [[piece]]:
 #   id, piece, findings (third-party.md's TP-xx), where (FreeSurfer's files), licence, terms (the relevant
@@ -15,13 +18,15 @@
 #   non-commercial terms), "no" (the cautious reading of both texts), "no-permission", "depends" (on which
 #   of the piece's terms is used: see basis)), basis (why),
 #   freesurfer_replica_uses (what larmorx-freesurfer's replica of the calling program uses for this part),
-#   clean_room ("larmorx" for every piece, the user's decision), permission (from whom, when one is needed),
-#   options (for the user, where the facts leave a choice), larmorx_today (what LARMORX already has),
-#   decided (where the user has decided the piece's placement: who, when, what; the other fields then follow it).
+#   clean_room ("larmorx" for every piece, the user's decision), permission (from whom, when one is needed;
+#   none is asked before building: the user, "No waiting for permissions"), options (for the user, where the
+#   facts leave a choice), larmorx_today (what LARMORX already has), decided (where the user has decided the
+#   piece's placement: who, when, what; the other fields then follow it), queue (its items, queue.md).
 
 schema = 1
 freesurfer = "8.2.0"
 written = "2026-11-12"
+updated = "2026-11-12 (relay 8: the user's decisions of the evening)"
 
 [freesurfer_licence]
 name = "FreeSurfer Software License Agreement, version 1.0 (February 2011), LICENSE.txt"
@@ -178,13 +183,15 @@ licence = "GPL-2.0-or-later (GSL 1.8's headers: 'either version 2 of the License
 terms = "GPL-2.0 section 2(b): a work that contains the Program or is derived from it must be 'licensed as a whole at no charge to all third parties under the terms of this License'; section 6: 'You may not impose any further restrictions on the recipients' exercise of the rights granted herein'. GPL-3.0 section 5(c): 'You must license the entire work, as a whole, under this License'; section 7 lists the only additional terms allowed (warranty and liability disclaimers, notices and attributions, marking of modified versions, limits on the use of names, trademarks, indemnification only by those who convey with contractual assumptions of liability); section 10: 'You may not impose any further restrictions'"
 runs = "mri_coreg by default (dithering, seed 53): fMRIPrep's bbregister --init-coreg; mris_expand only with -tmap_std"
 link = "in-process (compiled into mri_coreg from libutils; FreeSurfer has no process boundary here)"
-replica_package = "larmorx-gpl (as GPL-3.0-or-later)"
+replica_package = "larmorx-gpl, alone (GPL-3.0-or-later, as GSL 1.8's 'or (at your option) any later version' allows): the crate larmorx-gpl-gsl in crates-gpl/, which no FreeSurfer program links"
 combinable = "no"
 basis = "the GPL requires the whole program under it with no further restrictions, and FreeSurfer's B.1(b) makes B.5 (indemnity by every user), B.7 and Part C (Massachusetts law) apply to MGH's portions in it, terms outside GPL-3.0 section 7's list; MGH's own A.6 keeps GPL code out of FreeSurfer. Process boundary: GPL-3.0 section 5 calls separate and independent works 'not combined with it such as to form a larger program' an aggregate the licence does not reach"
 freesurfer_replica_uses = "the clean-room piece (larmorx, Apache-2.0): RANLUX389 and the distributions written from Luescher (1994), James (1994), Knuth and Marsaglia and a spec of the exact expressions FreeSurfer evaluates, by an agent that has read neither GSL nor FreeSurfer's transcription; bit-exact, because the algorithms define every operation"
-clean_room = "larmorx"
+clean_room = "larmorx (larmorx-core's clean-room files, from specs/ranlux.md)"
 permission = ""
-options = ["larmorx-gpl's replica serves as the bit-exact reference that checks the clean room (as crates-gpl/tools keeps glibc's translations for the AFNI and FSL replicas)", "or larmorx-freesurfer's mri_coreg runs a larmorx-gpl program that writes the random stream to a pipe or file (a process boundary; the FSF's FAQ warns that communication 'intimate enough' can still make one program)"]
+decided = "the user, 2026-11-12 ('No waiting for permissions'): GSL's generators alone in larmorx-gpl; mri_coreg's replica uses the clean-room generator, since GPL and FreeSurfer's licence cannot share one program; larmorx-gpl's replica is the clean room's bit-exact reference (the first of relay 5's options; the process-boundary option is not taken)"
+options = []
+queue = ["3.1-53 (the replica, larmorx-gpl-gsl)", "3.1-05 (specs/ranlux.md, then the clean room)"]
 larmorx_today = ""
 
 [[piece]]
@@ -196,13 +203,15 @@ licence = "2006 (the csit.fsu.edu copy FreeSurfer names): no statement on the pa
 terms = "LGPL-2.1 section 6: a work that uses the library may be combined with it and distributed 'under terms of your choice, provided that the terms permit modification of the work for the customer's own use and reverse engineering for debugging such modifications', with the library's source and a way to relink; MIT: the notice in all copies or substantial portions"
 runs = "every mri_normalize (T1.mgz and the brain normalisation, both streams)"
 link = "in-process"
-replica_package = "larmorx if the MIT terms cover the 2006 code; larmorx-gpl (LGPL-2.1 to GPL-3.0 by its section 3) if it is ported under the LGPL"
+replica_package = "larmorx-freesurfer, with FreeSurfer's code (the module fs.spline of larmorx-freesurfer-core), crediting Burkardt in its PROVENANCE.md and NOTICE; published normally (the user, 2026-11-12)"
 combinable = "depends"
 basis = "yes under MIT; under the LGPL only as a separate replaceable library (section 6), not as code inside a FreeSurfer-licensed file. Measured (burkardt_compare.py): FreeSurfer's d3_np_fs is identical to every release including today's MIT one; its SplineCubicSet is the 2006 form, the same as the 2012 (LGPL) release and rewritten in 2020 (five diagonals, another solver), so today's MIT release does not contain it; SplineCubicValue is Burkardt's arithmetic plus FreeSurfer's constant ends"
-freesurfer_replica_uses = "the MIT piece if Burkardt confirms the MIT terms for the 2006 version; otherwise the clean-room piece (the textbook cubic spline with first-derivative ends and a tridiagonal solve; bit-exactness to measure)"
-clean_room = "larmorx"
-permission = "John Burkardt (to confirm that his MIT terms cover the 2006 spline routines FreeSurfer copied)"
-options = ["ask Burkardt to confirm the MIT terms for the 2006 routines (one message)", "port under the LGPL from the 2010-2014 release (same code) into larmorx-gpl, unusable inside larmorx-freesurfer's mri_normalize", "clean room only"]
+freesurfer_replica_uses = "the replica (fs.spline, in mri_normalize's replica)"
+clean_room = "larmorx (larmorx-core's clean-room files, from specs/burkardt-spline.md: the textbook cubic spline with first-derivative ends and a tridiagonal solve; bit-exactness to measure)"
+permission = ""
+decided = "the user, 2026-11-12: 'the second the replica and clean room' (decision log, after 'No waiting for permissions'): a replica in larmorx-freesurfer with his credit, pushed like the rest, no local-only branch; and a clean room in larmorx. No message to Burkardt before (the user: 'Emails go after'); his code is MIT today, the 2006 form states no terms (the facts above). The orchestrator lists it among the pieces without a licence when the user decides on publishing"
+options = []
+queue = ["3.1-54 (the replica, fs.spline)", "3.1-06 (specs/burkardt-spline.md, then the clean room)"]
 larmorx_today = ""
 
 [[piece]]
@@ -222,6 +231,7 @@ clean_room = "larmorx (the published recursive filtering and Unser's pyramid pap
 permission = "none needed for the replica (the user, 2026-11-12); a courtesy request to EPFL's Biomedical Imaging Group (Philippe Thevenaz, the contact the page names; Michael Unser, its head) afterwards (the user: 'We will ask the author afterwards'), drafted by the orchestrator"
 decided = "the user, 2026-11-12 (decision log 'FreeSurfer's borrowed pieces and its two streams', with its correction of the same day): a replica in larmorx-freesurfer crediting EPFL, no private branch, and a clean room in larmorx; the user: 'please make sure EPFL's B-splines is ported'"
 options = []
+queue = ["3.2-01 (the replica, fs.bspline)", "C3.2-01 (its clean room)"]
 larmorx_today = "the B-spline decomposition of ITK 5.4.5 and SciPy's spline_filter (larmorx-interp, larmorx-registration)"
 
 [[piece]]
@@ -233,13 +243,15 @@ licence = "FreeSurfer/CorTechs Software License Agreement (distribution/docs/lic
 terms = "2(d): use, reproduction, derivative works, display and distribution 'limited to non-commercial internal research and educational purposes by not-for-profit entities'; 2(e): 'you may not use FreeSurfer in research that is sponsored by a commercial entity'; 2(f): 'you make the source code to any modifications to the Software freely available under terms consistent with and no more restrictive than those in this Agreement'; 2(b): the notices and 'This product includes FreeSurfer developed by CorTechs Labs, Inc. and The General Hospital Corporation' on all copies and documentation"
 runs = "fMRIPrep's bbregister: --regheader, --ltaout, --fslregout (programs.md section 5)"
 link = "separate-program (bbregister, a tcsh script, runs tkregister2_cmdl as its own program)"
-replica_package = "a non-commercial package (the user's decision): the program links FreeSurfer-licensed libutils code as well"
+replica_package = "larmorx-nc, as its own program (the user, 2026-11-12): the crate larmorx-nc-tkregister2 in crates-nc/ (a proposed name), which builds crates-freesurfer/ by path for this one program (it links FreeSurfer-licensed libutils code as the official program does) and links no FSL code; the larmorx-nc wheel then holds FSL's programs and this one side by side, never linked together (docs/licensing.md, 'Packages')"
 combinable = "yes-noncommercial"
 basis = "FreeSurfer's B.2(iii) allows additional terms on modifications and CorTechs 2(f) asks only that terms be no more restrictive than its own, so one program may hold both (FreeSurfer's official tkregister2_cmdl is that program); not with GPL code (2(d)-(e) are further restrictions), and not linked with FSL's code (the FSL Licence's conditions differ from CorTechs' and 2(f) forbids more restrictive ones)"
-freesurfer_replica_uses = "bbregister's replica (larmorx-freesurfer) runs the non-commercial package's tkregister2_cmdl when it is installed, and the clean room (larmorx) otherwise, as the larmorx program chooses implementations today"
-clean_room = "larmorx"
+freesurfer_replica_uses = "bbregister's replica (larmorx-freesurfer) runs larmorx-nc's tkregister2_cmdl when it is installed, and the clean room (larmorx) otherwise, as the larmorx program chooses implementations today"
+clean_room = "larmorx (larmorx-fs-cortex)"
 permission = ""
-options = ["a new package and program of its own (for example larmorx-freesurfer-nc) that depends on crates-freesurfer", "a second program inside the larmorx-nc wheel, linking no FSL code (one wheel with two licence families, which docs/licensing.md's 'one family per package' rule would have to allow)", "inside larmorx-freesurfer as one program under the CorTechs terms (the wheel would then hold a non-commercial program)"]
+decided = "the user, 2026-11-12 ('No waiting for permissions'): 'CorTechs' tkregister2_cmdl into larmorx-nc as its own program' (relay 5's option b; docs/licensing.md and CLAUDE.md rule 1 say so since); its clean room in larmorx"
+options = []
+queue = ["3.5-26, 3.5-27 (the replica, larmorx-nc-tkregister2)", "C3.5-21 (its clean room, larmorx-fs-cortex)"]
 larmorx_today = ""
 
 [[piece]]
@@ -251,13 +263,15 @@ licence = "LicenseRef-WashU-all-rights-reserved"
 terms = "'All Rights Reserved. This software may not be reproduced, copied, or distributed without written permission of Washington University' (talairach_avi/Getifh.c 5-11, eigen.f 2-6); fftsol.f is Singleton's 1968 FFT, polfit.f Bevington's POLFIT (1969)"
 runs = "the classic stream's talairach_avi (mpr2mni305); v8 uses rca-talairach (SynthMorph)"
 link = "separate-program (FreeSurfer's talairach_avi and mpr2mni305 scripts run them)"
-replica_package = "none until Washington University's written permission"
+replica_package = "none: a clean room only (the user, 2026-11-12), unless Washington University gives written permission later"
 combinable = "no-permission"
 basis = "no right to copy; FreeSurfer distributes them under an arrangement it does not document (docs/licensing.md); a quick search (2026-11-12) found no public release under open terms"
-freesurfer_replica_uses = "the clean-room piece (the settled choice of 2026-10-19: written from the method's publications, the atlas fetched from FreeSurfer on first use), run in place of the programs (a process boundary already separates them)"
-clean_room = "larmorx"
-permission = "Washington University in St. Louis (the 4dfp suite's author, Avi Snyder's laboratory; the university's technology office for a licence)"
-options = ["clean room only (settled for the default)", "ask Washington University for written permission for a replica in a package of its own"]
+freesurfer_replica_uses = "the clean room (written from the method's publications, behaviour and black-box runs, checked against the recorded heads, its atlases fetched at first use), run in place of the programs (a process boundary already separates them); talairach_avi and mpr2mni305 are clean rooms too, so the classic stream's whole Talairach registration is one"
+clean_room = "larmorx (larmorx-fs-classic)"
+permission = ""
+decided = "the user, 2026-11-12 ('Can we make a clean room of the first one to avoid the problems?'; decision log, in 'what `validated` means'): talairach_avi and its 4dfp tools get a clean room only, no replica unless Washington University gives written permission later; no request is sent (the user: 'We do not really have to write an email to anyone'). This replaces the 4dfp replica of 'No waiting for permissions'"
+options = []
+queue = ["3.6-01 (the 4dfp tools' shared code)", "3.6-14 to 3.6-17 (the four 4dfp programs), 3.6-18 talairach_avi, 3.6-19 mpr2mni305 (kind 'clean room only')"]
 larmorx_today = ""
 
 [[piece]]
@@ -269,12 +283,13 @@ licence = "a copyright line only: 'MARS Project (Thomas Yeo and Mert Sabuncu), M
 terms = "none stated"
 runs = "no default path (mris_sphere never sets complete_dist_mat)"
 link = "in-process"
-replica_package = "none until permission, or until FreeSurfer (MGH) confirms the files were contributed under Part A (A.4 licenses contributions to MGH with the right to sublicense)"
+replica_package = "later (the user, 2026-11-12: MARS on no default path); its package is placed when a program needs it (whether Part A covers the files, A.4, is not recorded)"
 combinable = "no-permission"
 basis = "no grant in the files; whether Part A covers them is not recorded"
 freesurfer_replica_uses = "nothing now (later, the user's decision)"
 clean_room = "larmorx (later)"
-permission = "Thomas Yeo and Mert Sabuncu (MIT CSAIL), or MGH's confirmation of a Part A contribution"
+permission = ""
+decided = "the user, 2026-11-12 (decision log 'FreeSurfer's borrowed pieces and its two streams'): MARS later, on no default path; no request before (the user: 'Emails go after')"
 larmorx_today = ""
 
 [[piece]]

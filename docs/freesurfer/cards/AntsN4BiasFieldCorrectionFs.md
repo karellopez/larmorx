@@ -68,7 +68,7 @@ Every option its parser compares, as written in its own source (older parsers co
 
 ## Checks
 
-- through mri_nu_correct.mni's recorded steps (17)
+- through mri_nu_correct.mni's recorded steps (18)
 
 ## Notes
 

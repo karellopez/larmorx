@@ -11,7 +11,7 @@ id = "perm.gifti"
 crate = "larmorx-io"
 kind = "permissive"
 wave = "3.1"
-title = "GIFTI: gifticlib and expat (P-05); the writer's long-double line formatting"
+title = "GIFTI: gifticlib, read over a pure-Rust XML parser in expat 2.0.1's place (W3); the writer exact, with its long-double line formatting (P-05)"
 lines = 10365
 programs = ["AntsDenoiseImageFs", "AntsN4BiasFieldCorrectionFs", "lta_convert", "mri_add_xform_to_header", "mri_binarize", "mri_brainvol_stats", "mri_ca_label", "mri_ca_normalize", "mri_ca_register", "mri_cc", "mri_compute_seg_overlap", "mri_concat", "mri_concatenate_lta", "mri_convert", "mri_cor2label", "mri_coreg", "mri_diff", "mri_edit_wm_with_aseg", "mri_em_register", "mri_fill", "mri_info", "mri_label2label", "mri_label2vol", "mri_make_uchar", "mri_mask", "mri_normalize", "mri_pretess", "mri_relabel_hypointensities", "mri_robust_register", "mri_robust_template", "mri_seg_diff", "mri_segment", "mri_segreg", "mri_segstats", "mri_surf2surf", "mri_surf2volseg", "mri_tessellate", "mri_vol2surf", "mri_vol2vol", "mri_warp_convert", "mri_watershed", "mris_anatomical_stats", "mris_autodet_gwstats", "mris_ca_label", "mris_calc", "mris_convert", "mris_curvature", "mris_curvature_stats", "mris_defects_pointset", "mris_euler_number", "mris_expand", "mris_extract_main_component", "mris_fix_topology", "mris_inflate", "mris_jacobian", "mris_label2annot", "mris_place_surface", "mris_register", "mris_remesh", "mris_remove_intersection", "mris_smooth", "mris_sphere", "mris_topo_fixer", "mris_volmask", "mrisp_paint", "talairach_afd", "tkregister2_cmdl"]
 files = ["packages/expat/xmlparse.c", "packages/expat/xmlrole.c", "packages/expat/xmltok.c", "packages/gifti/gifti_io.c", "packages/gifti/gifti_xml.c"]
@@ -21,7 +21,7 @@ id = "perm.minc"
 crate = "larmorx-io"
 kind = "permissive"
 wave = "3.1"
-title = "MINC's volume_io: the .xfm reader and writer (P-05; FreeSurfer's changes to the MINC files in larmorx-freesurfer-io)"
+title = "MINC's volume_io: the .xfm reader (W3: a pure-Rust parser, the same values and messages) and writer (exact) (P-05; FreeSurfer's changes to the MINC files in larmorx-freesurfer-io)"
 lines = 1676
 programs = ["AntsDenoiseImageFs", "AntsN4BiasFieldCorrectionFs", "lta_convert", "mri_add_xform_to_header", "mri_binarize", "mri_brainvol_stats", "mri_ca_label", "mri_ca_normalize", "mri_ca_register", "mri_cc", "mri_compute_seg_overlap", "mri_concat", "mri_concatenate_lta", "mri_convert", "mri_cor2label", "mri_coreg", "mri_diff", "mri_edit_wm_with_aseg", "mri_em_register", "mri_fill", "mri_info", "mri_label2label", "mri_label2vol", "mri_make_uchar", "mri_mask", "mri_normalize", "mri_pretess", "mri_relabel_hypointensities", "mri_robust_register", "mri_robust_template", "mri_seg_diff", "mri_segment", "mri_segreg", "mri_segstats", "mri_surf2surf", "mri_surf2volseg", "mri_tessellate", "mri_vol2surf", "mri_vol2vol", "mri_warp_convert", "mri_watershed", "mris_anatomical_stats", "mris_autodet_gwstats", "mris_ca_label", "mris_calc", "mris_convert", "mris_curvature", "mris_curvature_stats", "mris_defects_pointset", "mris_euler_number", "mris_expand", "mris_extract_main_component", "mris_fix_topology", "mris_inflate", "mris_jacobian", "mris_label2annot", "mris_place_surface", "mris_register", "mris_remesh", "mris_remove_intersection", "mris_smooth", "mris_sphere", "mris_topo_fixer", "mris_volmask", "mrisp_paint", "talairach_afd", "tkregister2_cmdl"]
 files = ["packages/minc/minc_files.c", "packages/minc/minc_gaussian.c", "packages/minc/minc_volume_io.c"]
@@ -41,7 +41,7 @@ id = "perm.dicom"
 crate = "larmorx-io"
 kind = "permissive"
 wave = "3.1"
-title = "CTN's DICOM library (P-05): the format probe of every volume reader; DICOM input later"
+title = "CTN's DICOM library (P-05): the format probe of every volume reader (W3: a pure-Rust probe, no port of CTN); DICOM input later"
 lines = 4371
 programs = ["AntsDenoiseImageFs", "AntsN4BiasFieldCorrectionFs", "lta_convert", "mri_add_xform_to_header", "mri_binarize", "mri_brainvol_stats", "mri_ca_label", "mri_ca_normalize", "mri_ca_register", "mri_cc", "mri_compute_seg_overlap", "mri_concat", "mri_concatenate_lta", "mri_convert", "mri_cor2label", "mri_coreg", "mri_diff", "mri_edit_wm_with_aseg", "mri_em_register", "mri_fill", "mri_info", "mri_label2label", "mri_label2vol", "mri_make_uchar", "mri_mask", "mri_normalize", "mri_pretess", "mri_relabel_hypointensities", "mri_robust_register", "mri_robust_template", "mri_seg_diff", "mri_segment", "mri_segreg", "mri_segstats", "mri_surf2surf", "mri_surf2volseg", "mri_tessellate", "mri_vol2surf", "mri_vol2vol", "mri_warp_convert", "mri_watershed", "mris_anatomical_stats", "mris_autodet_gwstats", "mris_ca_label", "mris_calc", "mris_convert", "mris_curvature", "mris_curvature_stats", "mris_defects_pointset", "mris_euler_number", "mris_expand", "mris_extract_main_component", "mris_fix_topology", "mris_inflate", "mris_jacobian", "mris_label2annot", "mris_place_surface", "mris_register", "mris_remesh", "mris_remove_intersection", "mris_smooth", "mris_sphere", "mris_topo_fixer", "mris_volmask", "mrisp_paint", "talairach_afd", "tkregister2_cmdl"]
 files = ["packages/dicom/condition.c", "packages/dicom/dcm.c", "packages/dicom/dcmcond.c", "packages/dicom/dcmdict.c", "packages/dicom/lst.c"]
@@ -61,7 +61,7 @@ id = "perm.json"
 crate = "larmorx-core"
 kind = "permissive"
 wave = "3.1"
-title = "nlohmann/json (P-06): its number formatting decides JSON outputs' bytes"
+title = "nlohmann/json 3.2.0 (P-06): a pure-Rust parser in its parser's place (W3); its writer exact (its number formatting decides JSON outputs' bytes)"
 lines = 3508
 programs = ["AntsN4BiasFieldCorrectionFs", "mri_brainvol_stats", "mri_ca_label", "mri_coreg", "mris_defects_pointset", "mris_expand", "mris_inflate", "mris_place_surface", "mris_register", "mris_remesh", "mris_remove_intersection", "mris_sphere", "mris_volmask"]
 files = ["include/json.h"]
@@ -102,7 +102,7 @@ crate = "larmorx-freesurfer-core"
 kind = "replica"
 wave = "3.1"
 title = "matrices (float and long double), the numerics wrappers over VNL and Cephes, fs_powell, fs_lbfgs, histograms, statistics, PDFs, random fields"
-lines = 6074
+lines = 5601
 programs = ["AntsDenoiseImageFs", "AntsN4BiasFieldCorrectionFs", "lta_convert", "mri_add_xform_to_header", "mri_binarize", "mri_brainvol_stats", "mri_ca_label", "mri_ca_normalize", "mri_ca_register", "mri_cc", "mri_compute_seg_overlap", "mri_concat", "mri_concatenate_lta", "mri_convert", "mri_cor2label", "mri_coreg", "mri_diff", "mri_edit_wm_with_aseg", "mri_em_register", "mri_fill", "mri_info", "mri_label2label", "mri_label2vol", "mri_make_uchar", "mri_mask", "mri_matrix_multiply", "mri_normalize", "mri_pretess", "mri_relabel_hypointensities", "mri_robust_register", "mri_robust_template", "mri_seg_diff", "mri_segment", "mri_segreg", "mri_segstats", "mri_surf2surf", "mri_surf2volseg", "mri_tessellate", "mri_vol2surf", "mri_vol2vol", "mri_warp_convert", "mri_watershed", "mris_anatomical_stats", "mris_autodet_gwstats", "mris_ca_label", "mris_calc", "mris_convert", "mris_curvature", "mris_curvature_stats", "mris_defects_pointset", "mris_euler_number", "mris_expand", "mris_extract_main_component", "mris_fix_topology", "mris_inflate", "mris_jacobian", "mris_label2annot", "mris_place_surface", "mris_register", "mris_remesh", "mris_remove_intersection", "mris_smooth", "mris_sphere", "mris_topo_fixer", "mris_volmask", "mrisp_paint", "talairach_afd", "tkregister2_cmdl"]
 files = ["include/affine.h", "include/affine.hpp", "include/fs_vnl/fs_powell.h", "utils/dmatrix.cpp", "utils/fs_cost_function.cpp", "utils/fs_lbfgs.cpp", "utils/fs_lbfgs_observer.cpp", "utils/fs_lbfgs_subject.cpp", "utils/fs_powell.cpp", "utils/histo.cpp", "utils/matrix.cpp", "utils/numerics.cpp", "utils/pdf.cpp", "utils/prime.cpp", "utils/randomfields.cpp", "utils/stats.cpp"]
 
@@ -151,7 +151,7 @@ id = "fs.filter"
 crate = "larmorx-freesurfer-filter"
 kind = "replica"
 wave = "3.1"
-title = "volume filters and morphology, intensity normalisation (with Burkardt's spline, P-09), segmentation helpers, flood fill, connected components, fast marching, clusters"
+title = "volume filters and morphology, intensity normalisation (its cubic spline: fs.spline), segmentation helpers, flood fill, connected components, fast marching, clusters"
 lines = 11201
 programs = ["AntsDenoiseImageFs", "AntsN4BiasFieldCorrectionFs", "lta_convert", "mri_add_xform_to_header", "mri_binarize", "mri_brainvol_stats", "mri_ca_label", "mri_ca_normalize", "mri_ca_register", "mri_cc", "mri_compute_seg_overlap", "mri_concat", "mri_concatenate_lta", "mri_convert", "mri_cor2label", "mri_coreg", "mri_diff", "mri_edit_wm_with_aseg", "mri_em_register", "mri_fill", "mri_info", "mri_label2label", "mri_label2vol", "mri_make_uchar", "mri_mask", "mri_normalize", "mri_pretess", "mri_relabel_hypointensities", "mri_robust_register", "mri_robust_template", "mri_seg_diff", "mri_segment", "mri_segreg", "mri_segstats", "mri_surf2surf", "mri_surf2volseg", "mri_tessellate", "mri_vol2surf", "mri_vol2vol", "mri_warp_convert", "mri_watershed", "mris_anatomical_stats", "mris_autodet_gwstats", "mris_ca_label", "mris_calc", "mris_convert", "mris_curvature", "mris_curvature_stats", "mris_defects_pointset", "mris_euler_number", "mris_expand", "mris_extract_main_component", "mris_fix_topology", "mris_inflate", "mris_jacobian", "mris_label2annot", "mris_place_surface", "mris_register", "mris_remesh", "mris_remove_intersection", "mris_smooth", "mris_sphere", "mris_topo_fixer", "mris_volmask", "mrisp_paint", "talairach_afd", "tkregister2_cmdl"]
 files = ["utils/connectcomp.cpp", "utils/diffuse.cpp", "utils/filter.cpp", "utils/fmriutils.cpp", "utils/gtm.cpp", "utils/mri_fastmarching.cpp", "utils/mrifilter.cpp", "utils/mriflood.cpp", "utils/mrinorm.cpp", "utils/mripolv.cpp", "utils/mrisegment.cpp", "utils/rfa.cpp", "utils/ventfix.cpp", "utils/volcluster.cpp"]
@@ -191,7 +191,7 @@ id = "fs.mars"
 crate = "larmorx-freesurfer-surf"
 kind = "replica"
 wave = "later"
-title = "MIT CSAIL's MARS distance transform (P-13: on no default path; later, with permission)"
+title = "MIT CSAIL's MARS distance transform (P-13: on no default path; later, the user)"
 lines = 328
 programs = ["mris_sphere"]
 files = ["utils/MARS_DT_Boundary.cpp", "utils/min_heap.cpp"]
@@ -231,10 +231,30 @@ id = "cr.4dfp"
 crate = "larmorx-fs-classic"
 kind = "clean-room-only"
 wave = "3.6"
-title = "Washington University's 4dfp tools (P-12): a clean room only, at the process boundary talairach_avi already has"
+title = "Washington University's 4dfp tools (P-12): a clean room only (the user, 2026-11-12), at the process boundary talairach_avi already has"
 lines = 1577
 programs = ["analyzeto4dfp", "compute_vox2vox", "gauss_4dfp", "imgreg_4dfp"]
 files = ["talairach_avi/Getifh.c", "talairach_avi/analyzeto4dfp.c", "talairach_avi/cflip.c", "talairach_avi/cgauss3d.c", "talairach_avi/cgauss3dd.c", "talairach_avi/compute_vox2vox.c", "talairach_avi/conc.c", "talairach_avi/endianio.c", "talairach_avi/gauss_4dfp.c", "talairach_avi/imgreg_4dfp.c", "talairach_avi/rec.c"]
+
+[[module]]
+id = "gpl.gsl"
+crate = "larmorx-gpl-gsl"
+kind = "gpl"
+wave = "3.1"
+title = "GSL 1.8's RANLUX389 and distributions as numerics.cpp transcribes them (P-08): the replica alone in larmorx-gpl (crates-gpl/, GPL-3.0-or-later), the clean room's bit-exact reference; FreeSurfer's replicas (mri_coreg, mris_expand) use the clean room"
+lines = 281
+programs = ["mri_coreg", "mris_expand"]
+files = ["utils/numerics.cpp"]
+
+[[module]]
+id = "fs.spline"
+crate = "larmorx-freesurfer-core"
+kind = "replica"
+wave = "3.1"
+title = "John Burkardt's 2006 cubic spline in numerics.cpp (SplineCubicSet, SplineCubicValue, d3_np_fs; P-09): the replica crediting Burkardt, published normally (the user, 2026-11-12)"
+lines = 192
+programs = ["mri_normalize"]
+files = ["utils/numerics.cpp"]
 
 [[program]]
 name = "recon-all"
@@ -309,7 +329,7 @@ note = "the scripts parse its printed header (not in the plan's waves)"
 runs = []
 item_lines = 1418
 inputs = "modules bspline, core, filter, io, labels, maths, surfio, volume, dicom, gifti, minc, misc, nifti; data: 1 files, 3.3 MB (mni305.cor.mgz); waits for deform (13), gca (6,014)"
-checks = "through seg2cc's recorded steps (11)"
+checks = "through seg2cc's recorded steps (12)"
 [program.reach]
 "fs.bspline" = 785
 "fs.core" = 1147
@@ -343,7 +363,7 @@ note = ""
 runs = []
 item_lines = 224
 inputs = "modules bspline, core, filter, io, labels, maths, surfio, volume, dicom, gifti, minc, misc, nifti; waits for deform (13), gca (6,014)"
-checks = "replay: 23 recorded steps in 12 runs"
+checks = "replay: 24 recorded steps in 12 runs"
 [program.reach]
 "fs.bspline" = 785
 "fs.core" = 1139
@@ -368,7 +388,7 @@ checks = "replay: 23 recorded steps in 12 runs"
 "ds000005-sub-01-classic" = 2
 "ds000005-sub-01-v8" = 2
 "ds000228-sub-pixar008-classic" = 2
-"ds000228-sub-pixar008-v8" = 1
+"ds000228-sub-pixar008-v8" = 2
 "ds002422-sub-02-classic" = 2
 "ds002422-sub-02-v8" = 2
 "ds004173-sub-603309-classic" = 2
@@ -466,11 +486,11 @@ group = "shared"
 crate = "larmorx-freesurfer-volumes"
 clean_room_crate = "larmorx-fs-volumes"
 items = ["3.2-24", "3.2-25"]
-note = "uses Burkardt's spline (P-09: the clean-room piece meanwhile)"
+note = "uses Burkardt's spline, its replica 3.1-54 (P-09)"
 runs = []
-item_lines = 4404
-inputs = "modules bspline, core, filter, io, labels, maths, surfio, volume, dicom, gifti, minc, misc, nifti; waits for deform (13), gca (6,089), surf (1,982)"
-checks = "replay: 22 recorded steps in 11 runs"
+item_lines = 4212
+inputs = "modules bspline, core, filter, io, labels, maths, spline, surfio, volume, dicom, gifti, minc, misc, nifti; waits for deform (13), gca (6,089), surf (1,982)"
+checks = "replay: 24 recorded steps in 12 runs"
 [program.reach]
 "fs.bspline" = 785
 "fs.core" = 1379
@@ -479,7 +499,8 @@ checks = "replay: 22 recorded steps in 11 runs"
 "fs.gca" = 6089
 "fs.io" = 15020
 "fs.labels" = 1575
-"fs.maths" = 2684
+"fs.maths" = 2492
+"fs.spline" = 192
 "fs.surf" = 1982
 "fs.surfio" = 7507
 "fs.volume" = 9655
@@ -497,6 +518,7 @@ checks = "replay: 22 recorded steps in 11 runs"
 "ds000005-sub-01-classic" = 2
 "ds000005-sub-01-v8" = 2
 "ds000228-sub-pixar008-classic" = 2
+"ds000228-sub-pixar008-v8" = 2
 "ds002422-sub-02-classic" = 2
 "ds002422-sub-02-v8" = 2
 "ds004173-sub-603309-classic" = 2
@@ -517,7 +539,7 @@ note = ""
 runs = []
 item_lines = 845
 inputs = "modules bspline, core, filter, io, labels, maths, surfio, volume, dicom, gifti, minc, misc, nifti; waits for deform (13), gca (6,198)"
-checks = "replay: 21 recorded steps in 11 runs"
+checks = "replay: 24 recorded steps in 12 runs"
 [program.reach]
 "fs.bspline" = 785
 "fs.core" = 1198
@@ -542,6 +564,7 @@ checks = "replay: 21 recorded steps in 11 runs"
 "ds000005-sub-01-classic" = 1
 "ds000005-sub-01-v8" = 3
 "ds000228-sub-pixar008-classic" = 1
+"ds000228-sub-pixar008-v8" = 3
 "ds002422-sub-02-classic" = 1
 "ds002422-sub-02-v8" = 3
 "ds004173-sub-603309-classic" = 1
@@ -562,7 +585,7 @@ note = "both streams (the plan says classic only)"
 runs = []
 item_lines = 5201
 inputs = "modules bspline, core, filter, gca, io, labels, maths, surfio, volume, dicom, gifti, minc, misc, nifti; data: 2 files, 148.3 MB (RB_all_2020-01-02.gca, RB_all_withskull_2020_01_02.gca); waits for deform (13)"
-checks = "replay: 17 recorded steps in 11 runs"
+checks = "replay: 18 recorded steps in 12 runs"
 [program.reach]
 "fs.bspline" = 785
 "fs.core" = 1390
@@ -586,6 +609,7 @@ checks = "replay: 17 recorded steps in 11 runs"
 "ds000005-sub-01-classic" = 2
 "ds000005-sub-01-v8" = 1
 "ds000228-sub-pixar008-classic" = 2
+"ds000228-sub-pixar008-v8" = 1
 "ds002422-sub-02-classic" = 2
 "ds002422-sub-02-v8" = 1
 "ds004173-sub-603309-classic" = 2
@@ -646,7 +670,7 @@ note = "both streams (the plan says classic only)"
 runs = []
 item_lines = 2337
 inputs = "modules bspline, core, filter, gca, io, labels, maths, surfio, volume, dicom, gifti, minc, misc, nifti; data: 1 files, 71.7 MB (RB_all_2020-01-02.gca); waits for deform (13)"
-checks = "replay: 11 recorded steps in 11 runs"
+checks = "replay: 12 recorded steps in 12 runs"
 [program.reach]
 "fs.bspline" = 785
 "fs.core" = 1206
@@ -670,6 +694,7 @@ checks = "replay: 11 recorded steps in 11 runs"
 "ds000005-sub-01-classic" = 1
 "ds000005-sub-01-v8" = 1
 "ds000228-sub-pixar008-classic" = 1
+"ds000228-sub-pixar008-v8" = 1
 "ds002422-sub-02-classic" = 1
 "ds002422-sub-02-v8" = 1
 "ds004173-sub-603309-classic" = 1
@@ -769,7 +794,7 @@ note = ""
 runs = []
 item_lines = 2807
 inputs = "modules bspline, core, filter, io, labels, maths, surfio, volume, dicom, gifti, minc, misc, nifti; waits for deform (13), gca (6,014)"
-checks = "through seg2cc's recorded steps (11)"
+checks = "through seg2cc's recorded steps (12)"
 [program.reach]
 "fs.bspline" = 785
 "fs.core" = 1215
@@ -803,7 +828,7 @@ note = ""
 runs = []
 item_lines = 3219
 inputs = "modules bspline, core, filter, io, labels, maths, surfio, volume, dicom, gifti, minc, misc, nifti; waits for deform (13), gca (6,014)"
-checks = "replay: 31 recorded steps in 11 runs"
+checks = "replay: 36 recorded steps in 12 runs"
 [program.reach]
 "fs.bspline" = 785
 "fs.core" = 1142
@@ -828,6 +853,7 @@ checks = "replay: 31 recorded steps in 11 runs"
 "ds000005-sub-01-classic" = 1
 "ds000005-sub-01-v8" = 5
 "ds000228-sub-pixar008-classic" = 1
+"ds000228-sub-pixar008-v8" = 5
 "ds002422-sub-02-classic" = 1
 "ds002422-sub-02-v8" = 5
 "ds004173-sub-603309-classic" = 1
@@ -848,7 +874,7 @@ note = "on by default before mri_segment (not in the plan's waves)"
 runs = []
 item_lines = 99
 inputs = "modules bspline, core, filter, io, labels, maths, surfio, volume, argparse, dicom, gifti, minc, misc, nifti; waits for deform (13), gca (6,014)"
-checks = "replay: 11 recorded steps in 11 runs"
+checks = "replay: 12 recorded steps in 12 runs"
 [program.reach]
 "fs.bspline" = 785
 "fs.core" = 1022
@@ -874,6 +900,7 @@ checks = "replay: 11 recorded steps in 11 runs"
 "ds000005-sub-01-classic" = 1
 "ds000005-sub-01-v8" = 1
 "ds000228-sub-pixar008-classic" = 1
+"ds000228-sub-pixar008-v8" = 1
 "ds002422-sub-02-classic" = 1
 "ds002422-sub-02-v8" = 1
 "ds004173-sub-603309-classic" = 1
@@ -894,7 +921,7 @@ note = "8.2.0's default intensity correction (not in the plan's waves; relay 1)"
 runs = []
 item_lines = 353
 inputs = "modules bspline, core, filter, io, labels, maths, surfio, volume, argparse, dicom, gifti, json, minc, misc, nifti; waits for deform (13), gca (6,014)"
-checks = "through mri_nu_correct.mni's recorded steps (17)"
+checks = "through mri_nu_correct.mni's recorded steps (18)"
 [program.reach]
 "fs.bspline" = 785
 "fs.core" = 1022
@@ -930,7 +957,7 @@ note = ""
 runs = []
 item_lines = 3233
 inputs = "modules bspline, core, filter, io, labels, maths, surfio, volume, dicom, gifti, minc, misc, nifti; waits for deform (13), gca (6,014)"
-checks = "replay: 11 recorded steps in 11 runs"
+checks = "replay: 12 recorded steps in 12 runs"
 [program.reach]
 "fs.bspline" = 785
 "fs.core" = 1284
@@ -955,6 +982,7 @@ checks = "replay: 11 recorded steps in 11 runs"
 "ds000005-sub-01-classic" = 1
 "ds000005-sub-01-v8" = 1
 "ds000228-sub-pixar008-classic" = 1
+"ds000228-sub-pixar008-v8" = 1
 "ds002422-sub-02-classic" = 1
 "ds002422-sub-02-v8" = 1
 "ds004173-sub-603309-classic" = 1
@@ -975,7 +1003,7 @@ note = ""
 runs = []
 item_lines = 1343
 inputs = "modules bspline, core, filter, io, labels, maths, surfio, volume, dicom, gifti, minc, misc, nifti; waits for deform (13), gca (6,014)"
-checks = "replay: 33 recorded steps in 11 runs"
+checks = "replay: 36 recorded steps in 12 runs"
 [program.reach]
 "fs.bspline" = 785
 "fs.core" = 1049
@@ -1000,6 +1028,7 @@ checks = "replay: 33 recorded steps in 11 runs"
 "ds000005-sub-01-classic" = 3
 "ds000005-sub-01-v8" = 3
 "ds000228-sub-pixar008-classic" = 3
+"ds000228-sub-pixar008-v8" = 3
 "ds002422-sub-02-classic" = 3
 "ds002422-sub-02-v8" = 3
 "ds004173-sub-603309-classic" = 3
@@ -1020,7 +1049,7 @@ note = ""
 runs = []
 item_lines = 7112
 inputs = "modules bspline, core, filter, io, labels, maths, surfio, volume, dicom, gifti, minc, misc, nifti; data: 1 files, 0.0 MB (SubCorticalMassLUT.txt); waits for deform (13), gca (6,192)"
-checks = "replay: 11 recorded steps in 11 runs"
+checks = "replay: 12 recorded steps in 12 runs"
 [program.reach]
 "fs.bspline" = 785
 "fs.core" = 1181
@@ -1045,6 +1074,7 @@ checks = "replay: 11 recorded steps in 11 runs"
 "ds000005-sub-01-classic" = 1
 "ds000005-sub-01-v8" = 1
 "ds000228-sub-pixar008-classic" = 1
+"ds000228-sub-pixar008-v8" = 1
 "ds002422-sub-02-classic" = 1
 "ds002422-sub-02-v8" = 1
 "ds004173-sub-603309-classic" = 1
@@ -1065,7 +1095,7 @@ note = "mri_nu_correct.mni's rescale and several scripts"
 runs = []
 item_lines = 2351
 inputs = "modules bspline, core, filter, io, labels, maths, surfio, volume, dicom, gifti, minc, misc, nifti; waits for deform (732), gca (6,014), surf (2,042)"
-checks = "through mri_nu_correct.mni, label-cortex, seg2cc's recorded steps (48)"
+checks = "through mri_nu_correct.mni, label-cortex, seg2cc's recorded steps (54)"
 [program.reach]
 "fs.bspline" = 785
 "fs.core" = 1408
@@ -1101,7 +1131,7 @@ note = "two items: its volume options in 3.2 (mri_nu_correct.mni's means), the s
 runs = []
 item_lines = 3399
 inputs = "modules bspline, core, filter, io, labels, maths, surfio, volume, dicom, gifti, minc, misc, nifti; data: 2 files, 0.0 MB (ASegStatsLUT.txt, WMParcStatsLUT.txt); waits for deform (13), gca (6,087), surf (1,936)"
-checks = "replay: 20 recorded steps in 10 runs"
+checks = "replay: 24 recorded steps in 12 runs"
 [program.reach]
 "fs.bspline" = 785
 "fs.core" = 1450
@@ -1128,8 +1158,10 @@ checks = "replay: 20 recorded steps in 10 runs"
 "ds000005-sub-01-classic" = 2
 "ds000005-sub-01-v8" = 2
 "ds000228-sub-pixar008-classic" = 2
+"ds000228-sub-pixar008-v8" = 2
 "ds002422-sub-02-classic" = 2
 "ds002422-sub-02-v8" = 2
+"ds004173-sub-603309-classic" = 2
 "ds004173-sub-603309-v8" = 2
 "ds005003-sub-RS001-classic" = 2
 "ds005003-sub-RS001-v8" = 2
@@ -1147,7 +1179,7 @@ note = "two items: its volume operations in 3.2 (mri_nu_correct.mni), surface ov
 runs = []
 item_lines = 2155
 inputs = "modules bspline, core, filter, io, labels, maths, surfio, volume, dicom, gifti, minc, misc, nifti; waits for deform (13), gca (6,014)"
-checks = "through mri_nu_correct.mni, vertexvol's recorded steps (37)"
+checks = "through mri_nu_correct.mni, vertexvol's recorded steps (42)"
 [program.reach]
 "fs.bspline" = 785
 "fs.core" = 1173
@@ -1181,7 +1213,7 @@ note = "mri_nu_correct.mni's last step"
 runs = []
 item_lines = 232
 inputs = "modules bspline, core, filter, io, labels, maths, surfio, volume, dicom, gifti, minc, misc, nifti; waits for deform (13), gca (6,014)"
-checks = "through mri_nu_correct.mni's recorded steps (17)"
+checks = "through mri_nu_correct.mni's recorded steps (18)"
 [program.reach]
 "fs.bspline" = 785
 "fs.core" = 1181
@@ -1215,7 +1247,7 @@ note = "only fs-synthmorph-reg runs it (the plan: 3.2)"
 runs = []
 item_lines = 636
 inputs = "modules bspline, core, filter, gca, io, labels, maths, surfio, volume, dicom, gifti, minc, misc, nifti; data: 1 files, 0.0 MB (reg.1.0mm.to.1.0mm.cropped.lta); waits for deform (13)"
-checks = "through fs-synthmorph-reg's recorded steps (5)"
+checks = "through fs-synthmorph-reg's recorded steps (6)"
 [program.reach]
 "fs.bspline" = 785
 "fs.core" = 1088
@@ -1248,7 +1280,7 @@ note = "only fs-synthmorph-reg runs it"
 runs = []
 item_lines = 1005
 inputs = "modules bspline, core, filter, gca, io, labels, maths, surfio, volume, dicom, gifti, minc, misc, nifti; waits for deform (13)"
-checks = "through fs-synthmorph-reg's recorded steps (5)"
+checks = "through fs-synthmorph-reg's recorded steps (6)"
 [program.reach]
 "fs.bspline" = 785
 "fs.core" = 1108
@@ -1281,7 +1313,7 @@ note = "moved from 3.5: a volume resampler the v8 scripts and sMRIPrep use"
 runs = []
 item_lines = 2951
 inputs = "modules bspline, core, filter, io, labels, maths, surfio, volume, dicom, gifti, minc, misc, nifti; data: 3 files, 0.4 MB (mca-dura.prior.warp.mni152.1.0mm.lh.nii.gz, mca-dura.prior.warp.mni152.1.0mm.rh.nii.gz, vsinus.no-sp.prior.mni152.1.0mm.mgz); waits for deform (13), gca (13,641)"
-checks = "through fs-synthmorph-reg's recorded steps (5); fMRIPrep's calls on the recorded subjects (sMRIPrep's ApplyVolTransform)"
+checks = "through fs-synthmorph-reg's recorded steps (6); fMRIPrep's calls on the recorded subjects (sMRIPrep's ApplyVolTransform)"
 [program.reach]
 "fs.bspline" = 896
 "fs.core" = 1273
@@ -1315,7 +1347,7 @@ note = "only fs-synthmorph-reg's --test print"
 runs = []
 item_lines = 1155
 inputs = "modules bspline, core, filter, gca, io, labels, maths, surfio, volume, dicom, gifti, minc, misc, nifti; waits for deform (13)"
-checks = "through fs-synthmorph-reg's recorded steps (5)"
+checks = "through fs-synthmorph-reg's recorded steps (6)"
 [program.reach]
 "fs.bspline" = 785
 "fs.core" = 1171
@@ -1348,7 +1380,7 @@ note = "a volume program (mri_mcadura_seg, pctsurfcon)"
 runs = []
 item_lines = 2574
 inputs = "modules bspline, core, filter, io, labels, maths, surfio, volume, dicom, gifti, minc, misc, nifti; data: 1 files, 0.0 MB (mca-dura.ctab); waits for deform (13), gca (6,014)"
-checks = "through pctsurfcon's recorded steps (20)"
+checks = "through pctsurfcon's recorded steps (24)"
 [program.reach]
 "fs.bspline" = 785
 "fs.core" = 1321
@@ -1382,7 +1414,7 @@ note = "seg2cc's and defect2seg's (not in the plan's waves)"
 runs = []
 item_lines = 2666
 inputs = "modules bspline, core, filter, io, labels, maths, surfio, volume, dicom, gifti, minc, misc, nifti; waits for defect (89), deform (13), gca (6,038), surf (2,080)"
-checks = "through defect2seg, seg2cc's recorded steps (21)"
+checks = "through defect2seg, seg2cc's recorded steps (24)"
 [program.reach]
 "fs.bspline" = 785
 "fs.core" = 1387
@@ -1420,7 +1452,7 @@ note = "moved from 3.3: it reads the white surfaces (autorecon3)"
 runs = []
 item_lines = 238
 inputs = "modules bspline, core, deform, filter, gca, io, labels, maths, surf, surfio, volume, dicom, gifti, minc, misc, nifti"
-checks = "replay: 10 recorded steps in 10 runs"
+checks = "replay: 12 recorded steps in 12 runs"
 [program.reach]
 "fs.bspline" = 785
 "fs.core" = 1326
@@ -1444,8 +1476,10 @@ checks = "replay: 10 recorded steps in 10 runs"
 "ds000005-sub-01-classic" = 1
 "ds000005-sub-01-v8" = 1
 "ds000228-sub-pixar008-classic" = 1
+"ds000228-sub-pixar008-v8" = 1
 "ds002422-sub-02-classic" = 1
 "ds002422-sub-02-v8" = 1
+"ds004173-sub-603309-classic" = 1
 "ds004173-sub-603309-v8" = 1
 "ds005003-sub-RS001-classic" = 1
 "ds005003-sub-RS001-v8" = 1
@@ -1463,7 +1497,7 @@ note = ""
 runs = []
 item_lines = 887
 inputs = "modules bspline, core, deform, filter, gca, io, labels, maths, surf, surfio, volume, dicom, gifti, minc, misc, nifti; data: 1 files, 0.1 MB (FreeSurferColorLUT.txt)"
-checks = "replay: 50 recorded steps in 10 runs"
+checks = "replay: 60 recorded steps in 12 runs"
 [program.reach]
 "fs.bspline" = 785
 "fs.core" = 1373
@@ -1487,8 +1521,10 @@ checks = "replay: 50 recorded steps in 10 runs"
 "ds000005-sub-01-classic" = 5
 "ds000005-sub-01-v8" = 5
 "ds000228-sub-pixar008-classic" = 5
+"ds000228-sub-pixar008-v8" = 5
 "ds002422-sub-02-classic" = 5
 "ds002422-sub-02-v8" = 5
+"ds004173-sub-603309-classic" = 5
 "ds004173-sub-603309-v8" = 5
 "ds005003-sub-RS001-classic" = 5
 "ds005003-sub-RS001-v8" = 5
@@ -1506,7 +1542,7 @@ note = ""
 runs = []
 item_lines = 250
 inputs = "modules bspline, core, deform, filter, gca, io, labels, maths, surf, surfio, volume, argparse, dicom, gifti, json, minc, misc, nifti; data: 1 files, 0.0 MB (ASegStatsLUT.txt)"
-checks = "replay: 10 recorded steps in 10 runs"
+checks = "replay: 12 recorded steps in 12 runs"
 [program.reach]
 "fs.bspline" = 785
 "fs.core" = 1206
@@ -1532,8 +1568,10 @@ checks = "replay: 10 recorded steps in 10 runs"
 "ds000005-sub-01-classic" = 1
 "ds000005-sub-01-v8" = 1
 "ds000228-sub-pixar008-classic" = 1
+"ds000228-sub-pixar008-v8" = 1
 "ds002422-sub-02-classic" = 1
 "ds002422-sub-02-v8" = 1
+"ds004173-sub-603309-classic" = 1
 "ds004173-sub-603309-v8" = 1
 "ds005003-sub-RS001-classic" = 1
 "ds005003-sub-RS001-v8" = 1
@@ -1551,7 +1589,7 @@ note = "moved from 3.5: defect2seg (stage 52) runs it first"
 runs = []
 item_lines = 2831
 inputs = "modules bspline, core, defect, deform, filter, gca, io, labels, maths, surf, surfio, volume, dicom, gifti, minc, misc, nifti; data: 77 files, 33.0 MB (lh.BA1_exvivo.label, lh.BA1_exvivo.thresh.label, lh.BA2_exvivo.label ...)"
-checks = "replay: 740 recorded steps in 10 runs"
+checks = "replay: 888 recorded steps in 12 runs"
 [program.reach]
 "fs.bspline" = 785
 "fs.core" = 1795
@@ -1576,8 +1614,10 @@ checks = "replay: 740 recorded steps in 10 runs"
 "ds000005-sub-01-classic" = 74
 "ds000005-sub-01-v8" = 74
 "ds000228-sub-pixar008-classic" = 74
+"ds000228-sub-pixar008-v8" = 74
 "ds002422-sub-02-classic" = 74
 "ds002422-sub-02-v8" = 74
+"ds004173-sub-603309-classic" = 74
 "ds004173-sub-603309-v8" = 74
 "ds005003-sub-RS001-classic" = 74
 "ds005003-sub-RS001-v8" = 74
@@ -1595,7 +1635,7 @@ note = ""
 runs = []
 item_lines = 2481
 inputs = "modules bspline, core, deform, filter, gca, io, labels, maths, surf, surfio, volume, dicom, gifti, minc, misc, nifti; data: 9 files, 15.5 MB (talairach.xfm, lh.sphere.reg, rh.sphere.reg ...)"
-checks = "through pctsurfcon, label-cortex's recorded steps (40); fMRIPrep's calls on the recorded subjects (fMRIPrep's SampleToSurface (--trgsubject fsaverage))"
+checks = "through pctsurfcon, label-cortex's recorded steps (48); fMRIPrep's calls on the recorded subjects (fMRIPrep's SampleToSurface (--trgsubject fsaverage))"
 [program.reach]
 "fs.bspline" = 785
 "fs.core" = 1352
@@ -1628,7 +1668,7 @@ note = "label-cortex's v8 option path (--fix-ga)"
 runs = []
 item_lines = 528
 inputs = "modules bspline, core, deform, filter, gca, io, labels, maths, surf, surfio, volume, dicom, gifti, minc, misc, nifti"
-checks = "through label-cortex's recorded steps (20)"
+checks = "through label-cortex's recorded steps (24)"
 [program.reach]
 "fs.bspline" = 785
 "fs.core" = 1332
@@ -1720,7 +1760,7 @@ note = ""
 runs = []
 item_lines = 575
 inputs = "modules bspline, core, deform, filter, gca, io, labels, maths, surf, surfio, volume, dicom, gifti, minc, misc, nifti"
-checks = "replay: 22 recorded steps in 11 runs"
+checks = "replay: 24 recorded steps in 12 runs"
 [program.reach]
 "fs.bspline" = 785
 "fs.core" = 1315
@@ -1744,6 +1784,7 @@ checks = "replay: 22 recorded steps in 11 runs"
 "ds000005-sub-01-classic" = 2
 "ds000005-sub-01-v8" = 2
 "ds000228-sub-pixar008-classic" = 2
+"ds000228-sub-pixar008-v8" = 2
 "ds002422-sub-02-classic" = 2
 "ds002422-sub-02-v8" = 2
 "ds004173-sub-603309-classic" = 2
@@ -1764,7 +1805,7 @@ note = ""
 runs = []
 item_lines = 25
 inputs = "modules bspline, core, deform, filter, gca, io, labels, maths, surf, surfio, volume, dicom, gifti, minc, misc, nifti"
-checks = "replay: 22 recorded steps in 11 runs"
+checks = "replay: 24 recorded steps in 12 runs"
 [program.reach]
 "fs.bspline" = 785
 "fs.core" = 1127
@@ -1788,6 +1829,7 @@ checks = "replay: 22 recorded steps in 11 runs"
 "ds000005-sub-01-classic" = 2
 "ds000005-sub-01-v8" = 2
 "ds000228-sub-pixar008-classic" = 2
+"ds000228-sub-pixar008-v8" = 2
 "ds002422-sub-02-classic" = 2
 "ds002422-sub-02-v8" = 2
 "ds004173-sub-603309-classic" = 2
@@ -1808,7 +1850,7 @@ note = ""
 runs = []
 item_lines = 872
 inputs = "modules bspline, core, deform, filter, gca, io, labels, maths, surf, surfio, volume, dicom, gifti, minc, misc, nifti"
-checks = "replay: 42 recorded steps in 11 runs"
+checks = "replay: 48 recorded steps in 12 runs"
 [program.reach]
 "fs.bspline" = 785
 "fs.core" = 1442
@@ -1832,9 +1874,10 @@ checks = "replay: 42 recorded steps in 11 runs"
 "ds000005-sub-01-classic" = 4
 "ds000005-sub-01-v8" = 4
 "ds000228-sub-pixar008-classic" = 4
+"ds000228-sub-pixar008-v8" = 4
 "ds002422-sub-02-classic" = 4
 "ds002422-sub-02-v8" = 4
-"ds004173-sub-603309-classic" = 2
+"ds004173-sub-603309-classic" = 4
 "ds004173-sub-603309-v8" = 4
 "ds005003-sub-RS001-classic" = 4
 "ds005003-sub-RS001-v8" = 4
@@ -1852,7 +1895,7 @@ note = ""
 runs = []
 item_lines = 1238
 inputs = "modules bspline, core, defect, deform, filter, gca, io, labels, maths, surf, surfio, volume, dicom, gifti, json, minc, misc, nifti"
-checks = "replay: 42 recorded steps in 11 runs"
+checks = "replay: 48 recorded steps in 12 runs"
 [program.reach]
 "fs.bspline" = 785
 "fs.core" = 1396
@@ -1878,9 +1921,10 @@ checks = "replay: 42 recorded steps in 11 runs"
 "ds000005-sub-01-classic" = 4
 "ds000005-sub-01-v8" = 4
 "ds000228-sub-pixar008-classic" = 4
+"ds000228-sub-pixar008-v8" = 4
 "ds002422-sub-02-classic" = 4
 "ds002422-sub-02-v8" = 4
-"ds004173-sub-603309-classic" = 2
+"ds004173-sub-603309-classic" = 4
 "ds004173-sub-603309-v8" = 4
 "ds005003-sub-RS001-classic" = 4
 "ds005003-sub-RS001-v8" = 4
@@ -1898,7 +1942,7 @@ note = ""
 runs = []
 item_lines = 1725
 inputs = "modules bspline, core, defect, deform, filter, gca, io, labels, maths, surf, surfio, volume, dicom, gifti, json, minc, misc, nifti; waits for mars (328)"
-checks = "replay: 42 recorded steps in 11 runs"
+checks = "replay: 48 recorded steps in 12 runs"
 [program.reach]
 "fs.bspline" = 785
 "fs.core" = 1410
@@ -1926,9 +1970,10 @@ checks = "replay: 42 recorded steps in 11 runs"
 "ds000005-sub-01-classic" = 4
 "ds000005-sub-01-v8" = 4
 "ds000228-sub-pixar008-classic" = 4
+"ds000228-sub-pixar008-v8" = 4
 "ds002422-sub-02-classic" = 4
 "ds002422-sub-02-v8" = 4
-"ds004173-sub-603309-classic" = 2
+"ds004173-sub-603309-classic" = 4
 "ds004173-sub-603309-v8" = 4
 "ds005003-sub-RS001-classic" = 4
 "ds005003-sub-RS001-v8" = 4
@@ -1946,7 +1991,7 @@ note = "with the defect crate"
 runs = []
 item_lines = 13518
 inputs = "modules bspline, core, defect, deform, filter, gca, io, labels, maths, surf, surfio, volume, dicom, gifti, minc, misc, nifti"
-checks = "replay: 21 recorded steps in 11 runs"
+checks = "replay: 24 recorded steps in 12 runs"
 [program.reach]
 "fs.bspline" = 785
 "fs.core" = 1406
@@ -1971,9 +2016,10 @@ checks = "replay: 21 recorded steps in 11 runs"
 "ds000005-sub-01-classic" = 2
 "ds000005-sub-01-v8" = 2
 "ds000228-sub-pixar008-classic" = 2
+"ds000228-sub-pixar008-v8" = 2
 "ds002422-sub-02-classic" = 2
 "ds002422-sub-02-v8" = 2
-"ds004173-sub-603309-classic" = 1
+"ds004173-sub-603309-classic" = 2
 "ds004173-sub-603309-v8" = 2
 "ds005003-sub-RS001-classic" = 2
 "ds005003-sub-RS001-v8" = 2
@@ -2058,7 +2104,7 @@ note = "on by default (not in the plan's waves)"
 runs = []
 item_lines = 2191
 inputs = "modules bspline, core, deform, filter, gca, io, labels, maths, surf, surfio, volume, argparse, dicom, gifti, json, minc, misc, nifti"
-checks = "replay: 20 recorded steps in 10 runs"
+checks = "replay: 24 recorded steps in 12 runs"
 [program.reach]
 "fs.bspline" = 785
 "fs.core" = 1246
@@ -2084,8 +2130,10 @@ checks = "replay: 20 recorded steps in 10 runs"
 "ds000005-sub-01-classic" = 2
 "ds000005-sub-01-v8" = 2
 "ds000228-sub-pixar008-classic" = 2
+"ds000228-sub-pixar008-v8" = 2
 "ds002422-sub-02-classic" = 2
 "ds002422-sub-02-v8" = 2
+"ds004173-sub-603309-classic" = 2
 "ds004173-sub-603309-v8" = 2
 "ds005003-sub-RS001-classic" = 2
 "ds005003-sub-RS001-v8" = 2
@@ -2103,7 +2151,7 @@ note = ""
 runs = []
 item_lines = 532
 inputs = "modules bspline, core, deform, filter, gca, io, labels, maths, surf, surfio, volume, dicom, gifti, json, minc, misc, nifti"
-checks = "replay: 20 recorded steps in 10 runs"
+checks = "replay: 24 recorded steps in 12 runs"
 [program.reach]
 "fs.bspline" = 785
 "fs.core" = 1394
@@ -2128,8 +2176,10 @@ checks = "replay: 20 recorded steps in 10 runs"
 "ds000005-sub-01-classic" = 2
 "ds000005-sub-01-v8" = 2
 "ds000228-sub-pixar008-classic" = 2
+"ds000228-sub-pixar008-v8" = 2
 "ds002422-sub-02-classic" = 2
 "ds002422-sub-02-v8" = 2
+"ds004173-sub-603309-classic" = 2
 "ds004173-sub-603309-v8" = 2
 "ds005003-sub-RS001-classic" = 2
 "ds005003-sub-RS001-v8" = 2
@@ -2147,7 +2197,7 @@ note = "defect2seg's (not in the plan's waves)"
 runs = []
 item_lines = 157
 inputs = "modules bspline, core, deform, filter, gca, io, labels, maths, surf, surfio, volume, argparse, dicom, gifti, json, minc, misc, nifti"
-checks = "through defect2seg's recorded steps (10)"
+checks = "through defect2seg's recorded steps (12)"
 [program.reach]
 "fs.bspline" = 785
 "fs.core" = 1240
@@ -2182,7 +2232,7 @@ note = ""
 runs = []
 item_lines = 302
 inputs = "modules bspline, core, deform, filter, gca, io, labels, maths, surf, surfio, volume, dicom, gifti, minc, misc, nifti"
-checks = "replay: 20 recorded steps in 10 runs"
+checks = "replay: 24 recorded steps in 12 runs"
 [program.reach]
 "fs.bspline" = 785
 "fs.core" = 1521
@@ -2206,8 +2256,10 @@ checks = "replay: 20 recorded steps in 10 runs"
 "ds000005-sub-01-classic" = 2
 "ds000005-sub-01-v8" = 2
 "ds000228-sub-pixar008-classic" = 2
+"ds000228-sub-pixar008-v8" = 2
 "ds002422-sub-02-classic" = 2
 "ds002422-sub-02-v8" = 2
+"ds004173-sub-603309-classic" = 2
 "ds004173-sub-603309-v8" = 2
 "ds005003-sub-RS001-classic" = 2
 "ds005003-sub-RS001-v8" = 2
@@ -2225,7 +2277,7 @@ note = ""
 runs = []
 item_lines = 9501
 inputs = "modules bspline, core, defect, deform, filter, gca, io, labels, maths, surf, surfio, volume, dicom, gifti, json, minc, misc, nifti"
-checks = "replay: 160 recorded steps in 10 runs"
+checks = "replay: 192 recorded steps in 12 runs"
 [program.reach]
 "fs.bspline" = 785
 "fs.core" = 1628
@@ -2251,8 +2303,10 @@ checks = "replay: 160 recorded steps in 10 runs"
 "ds000005-sub-01-classic" = 16
 "ds000005-sub-01-v8" = 16
 "ds000228-sub-pixar008-classic" = 16
+"ds000228-sub-pixar008-v8" = 16
 "ds002422-sub-02-classic" = 16
 "ds002422-sub-02-v8" = 16
+"ds004173-sub-603309-classic" = 16
 "ds004173-sub-603309-v8" = 16
 "ds005003-sub-RS001-classic" = 16
 "ds005003-sub-RS001-v8" = 16
@@ -2270,7 +2324,7 @@ note = ""
 runs = []
 item_lines = 1081
 inputs = "modules bspline, core, deform, filter, gca, io, labels, maths, surf, surfio, volume, dicom, gifti, minc, misc, nifti"
-checks = "replay: 40 recorded steps in 10 runs"
+checks = "replay: 48 recorded steps in 12 runs"
 [program.reach]
 "fs.bspline" = 785
 "fs.core" = 1499
@@ -2294,8 +2348,10 @@ checks = "replay: 40 recorded steps in 10 runs"
 "ds000005-sub-01-classic" = 4
 "ds000005-sub-01-v8" = 4
 "ds000228-sub-pixar008-classic" = 4
+"ds000228-sub-pixar008-v8" = 4
 "ds002422-sub-02-classic" = 4
 "ds002422-sub-02-v8" = 4
+"ds004173-sub-603309-classic" = 4
 "ds004173-sub-603309-v8" = 4
 "ds005003-sub-RS001-classic" = 4
 "ds005003-sub-RS001-v8" = 4
@@ -2313,7 +2369,7 @@ note = ""
 runs = []
 item_lines = 3926
 inputs = "modules bspline, core, defect, deform, filter, gca, io, labels, maths, surf, surfio, volume, dicom, gifti, json, minc, misc, nifti; data: 2 files, 5.7 MB (lh.folding.atlas.acfb40.noaparc.i12.2016-08-02.tif, rh.folding.atlas.acfb40.noaparc.i12.2016-08-02.tif)"
-checks = "through rca-surfreg's recorded steps (10)"
+checks = "through rca-surfreg's recorded steps (12)"
 [program.reach]
 "fs.bspline" = 785
 "fs.core" = 1527
@@ -2348,7 +2404,7 @@ note = ""
 runs = []
 item_lines = 241
 inputs = "modules bspline, core, deform, filter, gca, io, labels, maths, surf, surfio, volume, dicom, gifti, minc, misc, nifti"
-checks = "replay: 20 recorded steps in 10 runs"
+checks = "replay: 24 recorded steps in 12 runs"
 [program.reach]
 "fs.bspline" = 785
 "fs.core" = 1323
@@ -2372,8 +2428,10 @@ checks = "replay: 20 recorded steps in 10 runs"
 "ds000005-sub-01-classic" = 2
 "ds000005-sub-01-v8" = 2
 "ds000228-sub-pixar008-classic" = 2
+"ds000228-sub-pixar008-v8" = 2
 "ds002422-sub-02-classic" = 2
 "ds002422-sub-02-v8" = 2
+"ds004173-sub-603309-classic" = 2
 "ds004173-sub-603309-v8" = 2
 "ds005003-sub-RS001-classic" = 2
 "ds005003-sub-RS001-v8" = 2
@@ -2391,7 +2449,7 @@ note = ""
 runs = []
 item_lines = 458
 inputs = "modules bspline, core, deform, filter, gca, io, labels, maths, surf, surfio, volume, dicom, gifti, minc, misc, nifti; data: 2 files, 5.7 MB (lh.folding.atlas.acfb40.noaparc.i12.2016-08-02.tif, rh.folding.atlas.acfb40.noaparc.i12.2016-08-02.tif)"
-checks = "replay: 20 recorded steps in 10 runs"
+checks = "replay: 24 recorded steps in 12 runs"
 [program.reach]
 "fs.bspline" = 785
 "fs.core" = 1439
@@ -2415,8 +2473,10 @@ checks = "replay: 20 recorded steps in 10 runs"
 "ds000005-sub-01-classic" = 2
 "ds000005-sub-01-v8" = 2
 "ds000228-sub-pixar008-classic" = 2
+"ds000228-sub-pixar008-v8" = 2
 "ds002422-sub-02-classic" = 2
 "ds002422-sub-02-v8" = 2
+"ds004173-sub-603309-classic" = 2
 "ds004173-sub-603309-v8" = 2
 "ds005003-sub-RS001-classic" = 2
 "ds005003-sub-RS001-v8" = 2
@@ -2434,7 +2494,7 @@ note = ""
 runs = []
 item_lines = 1513
 inputs = "modules bspline, core, defect, deform, filter, gca, io, labels, maths, surf, surfio, volume, dicom, gifti, minc, misc, nifti; data: 6 files, 125.1 MB (lh.CDaparc.atlas.acfb40.noaparc.i12.2016-08-02.gcs, lh.DKTaparc.atlas.acfb40.noaparc.i12.2016-08-02.gcs, lh.DKaparc.atlas.acfb40.noaparc.i12.2016-08-02.gcs ...)"
-checks = "replay: 60 recorded steps in 10 runs"
+checks = "replay: 72 recorded steps in 12 runs"
 [program.reach]
 "fs.bspline" = 785
 "fs.core" = 1326
@@ -2459,8 +2519,10 @@ checks = "replay: 60 recorded steps in 10 runs"
 "ds000005-sub-01-classic" = 6
 "ds000005-sub-01-v8" = 6
 "ds000228-sub-pixar008-classic" = 6
+"ds000228-sub-pixar008-v8" = 6
 "ds002422-sub-02-classic" = 6
 "ds002422-sub-02-v8" = 6
+"ds004173-sub-603309-classic" = 6
 "ds004173-sub-603309-v8" = 6
 "ds005003-sub-RS001-classic" = 6
 "ds005003-sub-RS001-v8" = 6
@@ -2478,7 +2540,7 @@ note = "not in the plan's waves"
 runs = []
 item_lines = 3269
 inputs = "modules bspline, core, deform, filter, gca, io, labels, maths, surf, surfio, volume, dicom, gifti, minc, misc, nifti"
-checks = "replay: 20 recorded steps in 10 runs"
+checks = "replay: 24 recorded steps in 12 runs"
 [program.reach]
 "fs.bspline" = 785
 "fs.core" = 1499
@@ -2502,8 +2564,10 @@ checks = "replay: 20 recorded steps in 10 runs"
 "ds000005-sub-01-classic" = 2
 "ds000005-sub-01-v8" = 2
 "ds000228-sub-pixar008-classic" = 2
+"ds000228-sub-pixar008-v8" = 2
 "ds002422-sub-02-classic" = 2
 "ds002422-sub-02-v8" = 2
+"ds004173-sub-603309-classic" = 2
 "ds004173-sub-603309-v8" = 2
 "ds005003-sub-RS001-classic" = 2
 "ds005003-sub-RS001-v8" = 2
@@ -2521,7 +2585,7 @@ note = ""
 runs = []
 item_lines = 2577
 inputs = "modules bspline, core, deform, filter, gca, io, labels, maths, surf, surfio, volume, dicom, geomtools, gifti, json, minc, misc, nifti"
-checks = "replay: 10 recorded steps in 10 runs"
+checks = "replay: 12 recorded steps in 12 runs"
 [program.reach]
 "fs.bspline" = 785
 "fs.core" = 1248
@@ -2547,8 +2611,10 @@ checks = "replay: 10 recorded steps in 10 runs"
 "ds000005-sub-01-classic" = 1
 "ds000005-sub-01-v8" = 1
 "ds000228-sub-pixar008-classic" = 1
+"ds000228-sub-pixar008-v8" = 1
 "ds002422-sub-02-classic" = 1
 "ds002422-sub-02-v8" = 1
+"ds004173-sub-603309-classic" = 1
 "ds004173-sub-603309-v8" = 1
 "ds005003-sub-RS001-classic" = 1
 "ds005003-sub-RS001-v8" = 1
@@ -2566,7 +2632,7 @@ note = ""
 runs = []
 item_lines = 1319
 inputs = "modules bspline, core, deform, filter, gca, io, labels, maths, surf, surfio, volume, dicom, gifti, minc, misc, nifti"
-checks = "replay: 120 recorded steps in 10 runs"
+checks = "replay: 144 recorded steps in 12 runs"
 [program.reach]
 "fs.bspline" = 785
 "fs.core" = 1364
@@ -2590,8 +2656,10 @@ checks = "replay: 120 recorded steps in 10 runs"
 "ds000005-sub-01-classic" = 12
 "ds000005-sub-01-v8" = 12
 "ds000228-sub-pixar008-classic" = 12
+"ds000228-sub-pixar008-v8" = 12
 "ds002422-sub-02-classic" = 12
 "ds002422-sub-02-v8" = 12
+"ds004173-sub-603309-classic" = 12
 "ds004173-sub-603309-v8" = 12
 "ds005003-sub-RS001-classic" = 12
 "ds005003-sub-RS001-v8" = 12
@@ -2609,7 +2677,7 @@ note = "not in the plan's waves"
 runs = []
 item_lines = 707
 inputs = "modules bspline, core, deform, filter, gca, io, labels, maths, surf, surfio, volume, dicom, gifti, minc, misc, nifti; data: 3 files, 0.0 MB (colortable_BA.txt, colortable_BA_thresh.txt, colortable_vpnl.txt)"
-checks = "replay: 60 recorded steps in 10 runs"
+checks = "replay: 72 recorded steps in 12 runs"
 [program.reach]
 "fs.bspline" = 785
 "fs.core" = 1355
@@ -2633,8 +2701,10 @@ checks = "replay: 60 recorded steps in 10 runs"
 "ds000005-sub-01-classic" = 6
 "ds000005-sub-01-v8" = 6
 "ds000228-sub-pixar008-classic" = 6
+"ds000228-sub-pixar008-v8" = 6
 "ds002422-sub-02-classic" = 6
 "ds002422-sub-02-v8" = 6
+"ds004173-sub-603309-classic" = 6
 "ds004173-sub-603309-v8" = 6
 "ds005003-sub-RS001-classic" = 6
 "ds005003-sub-RS001-v8" = 6
@@ -2652,7 +2722,7 @@ note = ""
 runs = []
 item_lines = 2064
 inputs = "modules bspline, core, deform, filter, gca, io, labels, maths, surf, surfio, volume, dicom, gifti, minc, misc, nifti; data: 1 files, 0.1 MB (FreeSurferColorLUT.txt)"
-checks = "through vertexvol, label-cortex's recorded steps (40); fMRIPrep's calls on the recorded subjects (sMRIPrep's MRIsConvert (GIFTI))"
+checks = "through vertexvol, label-cortex's recorded steps (48); fMRIPrep's calls on the recorded subjects (sMRIPrep's MRIsConvert (GIFTI))"
 [program.reach]
 "fs.bspline" = 785
 "fs.core" = 1339
@@ -2714,10 +2784,10 @@ group = "fmriprep"
 crate = "larmorx-freesurfer-cortex"
 clean_room_crate = "larmorx-fs-cortex"
 items = ["3.5-24"]
-note = ""
+note = "-tmap_std's random map uses the clean-room RANLUX (3.1-05)"
 runs = []
 item_lines = 445
-inputs = "modules bspline, core, defect, deform, filter, gca, io, labels, maths, surf, surfio, volume, dicom, gifti, json, minc, misc, nifti"
+inputs = "modules bspline, core, defect, deform, filter, gca, io, labels, maths, surf, surfio, volume, RANLUX's clean room (3.1-05), dicom, gifti, json, minc, misc, nifti"
 checks = "fMRIPrep's calls on the recorded subjects (sMRIPrep's MakeMidthickness)"
 [program.reach]
 "fs.bspline" = 785
@@ -2728,10 +2798,11 @@ checks = "fMRIPrep's calls on the recorded subjects (sMRIPrep's MakeMidthickness
 "fs.gca" = 6014
 "fs.io" = 16468
 "fs.labels" = 1294
-"fs.maths" = 2569
+"fs.maths" = 2288
 "fs.surf" = 4372
 "fs.surfio" = 15116
 "fs.volume" = 7111
+"gpl.gsl" = 281
 "own" = 424
 "perm.dicom" = 4371
 "perm.gifti" = 10365
@@ -2784,10 +2855,10 @@ group = "fmriprep"
 crate = "larmorx-freesurfer-volumes"
 clean_room_crate = "larmorx-fs-volumes"
 items = ["3.2-17"]
-note = "uses the clean-room RANLUX389 and distributions (P-08)"
+note = "uses the clean-room RANLUX389 and distributions (3.1-05, P-08): GSL's replica stays alone in larmorx-gpl"
 runs = []
 item_lines = 2153
-inputs = "modules bspline, core, filter, io, labels, maths, surfio, volume, dicom, gifti, json, minc, misc, nifti; data: 1 files, 0.1 MB (FreeSurferColorLUT.txt); waits for deform (13), gca (6,014)"
+inputs = "modules bspline, core, filter, io, labels, maths, surfio, volume, RANLUX's clean room (3.1-05), dicom, gifti, json, minc, misc, nifti; data: 1 files, 0.1 MB (FreeSurferColorLUT.txt); waits for deform (13), gca (6,014)"
 checks = "fMRIPrep's calls on the recorded subjects (fMRIPrep's MRICoreg, bbregister --init-coreg)"
 [program.reach]
 "fs.bspline" = 785
@@ -2797,9 +2868,10 @@ checks = "fMRIPrep's calls on the recorded subjects (fMRIPrep's MRICoreg, bbregi
 "fs.gca" = 6014
 "fs.io" = 13971
 "fs.labels" = 1230
-"fs.maths" = 2733
+"fs.maths" = 2452
 "fs.surfio" = 78
 "fs.volume" = 7862
+"gpl.gsl" = 281
 "own" = 1805
 "perm.dicom" = 4371
 "perm.gifti" = 10365
@@ -2849,10 +2921,10 @@ checks = "fMRIPrep's calls on the recorded subjects (bbregister's)"
 name = "tkregister2_cmdl"
 wave = "3.5"
 group = "fmriprep"
-crate = "a non-commercial package (P-11, the user's P1)"
+crate = "larmorx-nc-tkregister2"
 clean_room_crate = "larmorx-fs-cortex"
 items = ["3.5-26", "3.5-27"]
-note = "CorTechs' terms (P-11): the clean room here; the replica in a non-commercial package (the user's P1)"
+note = "CorTechs' terms (P-11): the replica in larmorx-nc as its own program, the clean room here (the user, 2026-11-12)"
 runs = []
 item_lines = 4048
 inputs = "modules bspline, core, filter, gca, io, labels, maths, surf, surfio, volume, dicom, gifti, minc, misc, nifti"
@@ -2984,10 +3056,10 @@ checks = "synthetic cases and a recorded call of its own (no default step runs i
 name = "analyzeto4dfp"
 wave = "3.6"
 group = "classic-only"
-crate = "none: a clean room only (P-12)"
+crate = "none: a clean room only (P-12, the user)"
 clean_room_crate = "larmorx-fs-classic"
 items = ["3.6-14"]
-note = "Washington University's: a clean room only (P-12)"
+note = "Washington University's: a clean room only (P-12, the user)"
 runs = []
 item_lines = 338
 inputs = "modules 4dfp"
@@ -3001,10 +3073,10 @@ checks = "synthetic cases and a recorded call of its own (no default step runs i
 name = "gauss_4dfp"
 wave = "3.6"
 group = "classic-only"
-crate = "none: a clean room only (P-12)"
+crate = "none: a clean room only (P-12, the user)"
 clean_room_crate = "larmorx-fs-classic"
 items = ["3.6-15"]
-note = "Washington University's: a clean room only (P-12)"
+note = "Washington University's: a clean room only (P-12, the user)"
 runs = []
 item_lines = 604
 inputs = "modules 4dfp"
@@ -3018,10 +3090,10 @@ checks = "synthetic cases and a recorded call of its own (no default step runs i
 name = "imgreg_4dfp"
 wave = "3.6"
 group = "classic-only"
-crate = "none: a clean room only (P-12)"
+crate = "none: a clean room only (P-12, the user)"
 clean_room_crate = "larmorx-fs-classic"
 items = ["3.6-16"]
-note = "Washington University's: a clean room only (P-12)"
+note = "Washington University's: a clean room only (P-12, the user)"
 runs = []
 item_lines = 206
 inputs = "modules 4dfp; data: 6 files, 201.3 MB (3T18yoSchwartzReactN32_as_orig.4dfp.ifh, 3T18yoSchwartzReactN32_as_orig.4dfp.img, 711-2B_as_mni_average_305_mask.4dfp.ifh ...)"
@@ -3035,10 +3107,10 @@ checks = "synthetic cases and a recorded call of its own (no default step runs i
 name = "compute_vox2vox"
 wave = "3.6"
 group = "classic-only"
-crate = "none: a clean room only (P-12)"
+crate = "none: a clean room only (P-12, the user)"
 clean_room_crate = "larmorx-fs-classic"
 items = ["3.6-17"]
-note = "Washington University's: a clean room only (P-12)"
+note = "Washington University's: a clean room only (P-12, the user)"
 runs = []
 item_lines = 109
 inputs = "modules 4dfp; data: 2 files, 0.0 MB (3T18yoSchwartzReactN32_as_orig.4dfp.ifh, 711-2C_as_mni_average_305.4dfp.ifh)"
@@ -3103,7 +3175,7 @@ note = ""
 runs = []
 item_lines = 0
 inputs = "data: 4 files, 3,569.2 MB (mni305.cor.stripped.mgz, mni152.1.0mm.cropped.nii.gz, synthmorph.affine.2.h5 ...)"
-checks = "through fs-synthmorph-reg's recorded steps (5)"
+checks = "through fs-synthmorph-reg's recorded steps (6)"
 [program.reach]
 [program.waits]
 [program.recorded_steps]
@@ -3135,13 +3207,14 @@ note = "a script: N4 by default (not MNI's N3)"
 runs = ["AntsN4BiasFieldCorrectionFs", "mri_binarize", "mri_convert", "mri_make_uchar", "mri_segstats", "mris_calc", "nu_correct"]
 item_lines = 0
 inputs = "runs AntsN4BiasFieldCorrectionFs, mri_binarize, mri_convert, mri_make_uchar, mri_segstats, mris_calc, nu_correct; data: 1 files, 0.0 MB (sources.csh)"
-checks = "replay: 17 recorded steps in 11 runs"
+checks = "replay: 18 recorded steps in 12 runs"
 [program.reach]
 [program.waits]
 [program.recorded_steps]
 "ds000005-sub-01-classic" = 2
 "ds000005-sub-01-v8" = 1
 "ds000228-sub-pixar008-classic" = 2
+"ds000228-sub-pixar008-v8" = 1
 "ds002422-sub-02-classic" = 2
 "ds002422-sub-02-v8" = 1
 "ds004173-sub-603309-classic" = 2
@@ -3155,10 +3228,10 @@ checks = "replay: 17 recorded steps in 11 runs"
 name = "talairach_avi"
 wave = "3.6"
 group = "classic-only"
-crate = "larmorx-freesurfer-classic"
+crate = "none: a clean room only (P-12, the user)"
 clean_room_crate = "larmorx-fs-classic"
 items = ["3.6-18"]
-note = "classic only; its 4dfp tools a clean room only (the plan: 3.2)"
+note = "classic only; a clean room only, with mpr2mni305 and the 4dfp tools (the user, 2026-11-12: Washington University's Talairach tools; the script itself carries MGH's notice; the plan: 3.2)"
 runs = ["avi2talxfm", "lta_convert", "mpr2mni305", "mri_convert"]
 item_lines = 0
 inputs = "runs avi2talxfm, lta_convert, mpr2mni305, mri_convert; data: 1 files, 0.0 MB (sources.csh)"
@@ -3177,10 +3250,10 @@ checks = "replay: 6 recorded steps in 6 runs"
 name = "mpr2mni305"
 wave = "3.6"
 group = "classic-only"
-crate = "larmorx-freesurfer-classic"
+crate = "none: a clean room only (P-12, the user)"
 clean_room_crate = "larmorx-fs-classic"
 items = ["3.6-19"]
-note = "talairach_avi's"
+note = "talairach_avi's; Washington University's notice: a clean room only (P-12)"
 runs = ["analyzeto4dfp", "compute_vox2vox", "gauss_4dfp", "imgreg_4dfp"]
 item_lines = 0
 inputs = "runs analyzeto4dfp, compute_vox2vox, gauss_4dfp, imgreg_4dfp; data: 1 files, 0.0 MB (sources.csh)"
@@ -3216,11 +3289,12 @@ note = "v8's talairach.xfm"
 runs = ["fs-synthmorph-reg", "getfullpath", "lta_convert"]
 item_lines = 0
 inputs = "runs fs-synthmorph-reg, getfullpath, lta_convert; data: 2 files, 0.0 MB (build-stamp.txt, sources.csh)"
-checks = "replay: 5 recorded steps in 5 runs"
+checks = "replay: 6 recorded steps in 6 runs"
 [program.reach]
 [program.waits]
 [program.recorded_steps]
 "ds000005-sub-01-v8" = 1
+"ds000228-sub-pixar008-v8" = 1
 "ds002422-sub-02-v8" = 1
 "ds004173-sub-603309-v8" = 1
 "ds005003-sub-RS001-v8" = 1
@@ -3237,11 +3311,12 @@ note = "after 3.3: it runs mri_ca_register -invert-and-save"
 runs = ["getfullpath", "lta_convert", "mri_ca_register", "mri_concatenate_lta", "mri_convert", "mri_diff", "mri_mask", "mri_synthmorph", "mri_vol2vol", "mri_warp_convert"]
 item_lines = 0
 inputs = "runs getfullpath, lta_convert, mri_ca_register, mri_concatenate_lta, mri_convert, mri_diff, mri_mask, mri_synthmorph, mri_vol2vol, mri_warp_convert; data: 2 files, 0.0 MB (build-stamp.txt, sources.csh)"
-checks = "replay: 5 recorded steps in 5 runs"
+checks = "replay: 6 recorded steps in 6 runs"
 [program.reach]
 [program.waits]
 [program.recorded_steps]
 "ds000005-sub-01-v8" = 1
+"ds000228-sub-pixar008-v8" = 1
 "ds002422-sub-02-v8" = 1
 "ds004173-sub-603309-v8" = 1
 "ds005003-sub-RS001-v8" = 1
@@ -3306,13 +3381,14 @@ note = "the script that runs mri_cc"
 runs = ["getfullpath", "mergeseg", "mri_binarize", "mri_cc", "mri_convert", "mri_info", "mri_label2vol"]
 item_lines = 0
 inputs = "runs getfullpath, mergeseg, mri_binarize, mri_cc, mri_convert, mri_info, mri_label2vol; data: 2 files, 0.0 MB (build-stamp.txt, sources.csh)"
-checks = "replay: 11 recorded steps in 11 runs"
+checks = "replay: 12 recorded steps in 12 runs"
 [program.reach]
 [program.waits]
 [program.recorded_steps]
 "ds000005-sub-01-classic" = 1
 "ds000005-sub-01-v8" = 1
 "ds000228-sub-pixar008-classic" = 1
+"ds000228-sub-pixar008-v8" = 1
 "ds002422-sub-02-classic" = 1
 "ds002422-sub-02-v8" = 1
 "ds004173-sub-603309-classic" = 1
@@ -3333,7 +3409,7 @@ note = "seg2cc's path for an input not conformed to its smallest voxel"
 runs = []
 item_lines = 0
 inputs = ""
-checks = "through seg2cc's recorded steps (11)"
+checks = "through seg2cc's recorded steps (12)"
 [program.reach]
 [program.waits]
 [program.recorded_steps]
@@ -3349,15 +3425,17 @@ note = ""
 runs = ["mri_label2label", "mri_label2vol", "mris_defects_pointset"]
 item_lines = 0
 inputs = "runs mri_label2label, mri_label2vol, mris_defects_pointset; data: 2 files, 0.0 MB (build-stamp.txt, sources.csh)"
-checks = "replay: 10 recorded steps in 10 runs"
+checks = "replay: 12 recorded steps in 12 runs"
 [program.reach]
 [program.waits]
 [program.recorded_steps]
 "ds000005-sub-01-classic" = 1
 "ds000005-sub-01-v8" = 1
 "ds000228-sub-pixar008-classic" = 1
+"ds000228-sub-pixar008-v8" = 1
 "ds002422-sub-02-classic" = 1
 "ds002422-sub-02-v8" = 1
+"ds004173-sub-603309-classic" = 1
 "ds004173-sub-603309-v8" = 1
 "ds005003-sub-RS001-classic" = 1
 "ds005003-sub-RS001-v8" = 1
@@ -3375,15 +3453,17 @@ note = "a script (not in the plan's waves)"
 runs = ["fscalc", "fsr-getxopts", "mri_binarize", "mri_cor2label", "mri_label2label", "mri_mergelabels", "mri_vol2surf", "mris_convert"]
 item_lines = 0
 inputs = "runs fscalc, fsr-getxopts, mri_binarize, mri_cor2label, mri_label2label, mri_mergelabels, mri_vol2surf, mris_convert; data: 2 files, 0.0 MB (build-stamp.txt, sources.csh)"
-checks = "replay: 20 recorded steps in 10 runs"
+checks = "replay: 24 recorded steps in 12 runs"
 [program.reach]
 [program.waits]
 [program.recorded_steps]
 "ds000005-sub-01-classic" = 2
 "ds000005-sub-01-v8" = 2
 "ds000228-sub-pixar008-classic" = 2
+"ds000228-sub-pixar008-v8" = 2
 "ds002422-sub-02-classic" = 2
 "ds002422-sub-02-v8" = 2
+"ds004173-sub-603309-classic" = 2
 "ds004173-sub-603309-v8" = 2
 "ds005003-sub-RS001-classic" = 2
 "ds005003-sub-RS001-v8" = 2
@@ -3401,7 +3481,7 @@ note = "label-cortex's v8 option path (--fix-ga)"
 runs = ["mri_convert", "mris_calc"]
 item_lines = 0
 inputs = "runs mri_convert, mris_calc; data: 2 files, 0.0 MB (build-stamp.txt, sources.csh)"
-checks = "through label-cortex's recorded steps (20)"
+checks = "through label-cortex's recorded steps (24)"
 [program.reach]
 [program.waits]
 [program.recorded_steps]
@@ -3417,7 +3497,7 @@ note = "label-cortex's v8 option path (--fix-ga)"
 runs = []
 item_lines = 0
 inputs = "data: 1 files, 0.0 MB (sources.csh)"
-checks = "through label-cortex's recorded steps (20)"
+checks = "through label-cortex's recorded steps (24)"
 [program.reach]
 [program.waits]
 [program.recorded_steps]
@@ -3433,15 +3513,17 @@ note = "the script that runs mris_register"
 runs = ["fsr-getxopts", "mris_register"]
 item_lines = 0
 inputs = "runs fsr-getxopts, mris_register; data: 2 files, 0.0 MB (build-stamp.txt, sources.csh)"
-checks = "replay: 10 recorded steps in 10 runs"
+checks = "replay: 12 recorded steps in 12 runs"
 [program.reach]
 [program.waits]
 [program.recorded_steps]
 "ds000005-sub-01-classic" = 1
 "ds000005-sub-01-v8" = 1
 "ds000228-sub-pixar008-classic" = 1
+"ds000228-sub-pixar008-v8" = 1
 "ds002422-sub-02-classic" = 1
 "ds002422-sub-02-v8" = 1
+"ds004173-sub-603309-classic" = 1
 "ds004173-sub-603309-v8" = 1
 "ds005003-sub-RS001-classic" = 1
 "ds005003-sub-RS001-v8" = 1
@@ -3459,15 +3541,17 @@ note = "a script (not in the plan's waves)"
 runs = ["mris_calc", "mris_convert"]
 item_lines = 0
 inputs = "runs mris_calc, mris_convert; data: 1 files, 0.0 MB (sources.csh)"
-checks = "replay: 20 recorded steps in 10 runs"
+checks = "replay: 24 recorded steps in 12 runs"
 [program.reach]
 [program.waits]
 [program.recorded_steps]
 "ds000005-sub-01-classic" = 2
 "ds000005-sub-01-v8" = 2
 "ds000228-sub-pixar008-classic" = 2
+"ds000228-sub-pixar008-v8" = 2
 "ds002422-sub-02-classic" = 2
 "ds002422-sub-02-v8" = 2
+"ds004173-sub-603309-classic" = 2
 "ds004173-sub-603309-v8" = 2
 "ds005003-sub-RS001-classic" = 2
 "ds005003-sub-RS001-v8" = 2
@@ -3485,15 +3569,17 @@ note = ""
 runs = ["mri_concat", "mri_segstats", "mri_vol2surf"]
 item_lines = 0
 inputs = "runs mri_concat, mri_segstats, mri_vol2surf; data: 1 files, 0.0 MB (sources.csh)"
-checks = "replay: 20 recorded steps in 10 runs"
+checks = "replay: 24 recorded steps in 12 runs"
 [program.reach]
 [program.waits]
 [program.recorded_steps]
 "ds000005-sub-01-classic" = 2
 "ds000005-sub-01-v8" = 2
 "ds000228-sub-pixar008-classic" = 2
+"ds000228-sub-pixar008-v8" = 2
 "ds002422-sub-02-classic" = 2
 "ds002422-sub-02-v8" = 2
+"ds004173-sub-603309-classic" = 2
 "ds004173-sub-603309-v8" = 2
 "ds005003-sub-RS001-classic" = 2
 "ds005003-sub-RS001-v8" = 2
@@ -3559,7 +3645,7 @@ note = "the expert options of label-cortex and rca-surfreg, then recon-all's"
 runs = []
 item_lines = 0
 inputs = "data: 1 files, 0.0 MB (global-expert-options.v8.txt)"
-checks = "through label-cortex, rca-surfreg's recorded steps (30)"
+checks = "through label-cortex, rca-surfreg's recorded steps (36)"
 [program.reach]
 [program.waits]
 [program.recorded_steps]
@@ -3671,7 +3757,7 @@ note = "a helper of seg2cc, rca-talairach and fs-synthmorph-reg"
 runs = []
 item_lines = 0
 inputs = ""
-checks = "through fs-synthmorph-reg, seg2cc, rca-talairach's recorded steps (21)"
+checks = "through fs-synthmorph-reg, seg2cc, rca-talairach's recorded steps (24)"
 [program.reach]
 [program.waits]
 [program.recorded_steps]
@@ -3687,7 +3773,7 @@ note = "MNI's N3: only with -no-ants-n4"
 runs = []
 item_lines = 0
 inputs = ""
-checks = "through mri_nu_correct.mni's recorded steps (17)"
+checks = "through mri_nu_correct.mni's recorded steps (18)"
 [program.reach]
 [program.waits]
 [program.recorded_steps]
@@ -3712,7 +3798,7 @@ checks = "synthetic cases and a recorded call of its own (no default step runs i
 id = "3.1-01"
 wave = "3.1"
 kind = "plumbing"
-what = "the workspace crates-freesurfer/ (the crates of this layout, empty), the program and wheel larmorx-freesurfer (larmorx-freesurfer-cli: FreeSurfer's licence text and preface, NOTICE, PROVENANCE.md, the settings overlay of larmorx's three options), its CI check and test steps (minutes estimated first), lx.freesurfer's dispatch between replica and clean room; the clean-room crates crates/larmorx-fs-* (empty), each added to the clean-room audit's lists by the orchestrator"
+what = "the workspace crates-freesurfer/ (the crates of this layout, empty), the program and wheel larmorx-freesurfer (larmorx-freesurfer-cli: FreeSurfer's licence text and preface, NOTICE, PROVENANCE.md, the settings overlay of larmorx's three options), its CI check and test steps (minutes estimated first); the replica side only (split by the coherence review's finding 7): the main package's side is 3.2-41, the clean-room crates C3.1-00"
 crate = "crates-freesurfer/"
 lines = 0
 files = []
@@ -3723,8 +3809,8 @@ checks = "the three Rust workspaces' gates, check_spdx.py, test_release.py"
 id = "3.1-02"
 wave = "3.1"
 kind = "oracle"
-what = "a unit oracle: FreeSurfer 8.2.0's libutils and the packages it links, built from the tag with GCC 8.4.0 (oracles/toolchains/gcc-8.4) and the official flags (code.toml) against ITK 4.13.2's VNL, with a harness that calls single functions (the foundations' checks below; a proposal: the replay checks whole programs only)"
-crate = "validation/investigations/freesurfer-oracle/"
+what = "a unit oracle: FreeSurfer 8.2.0's libutils and the packages it links, built from the tag with GCC 8.4.0 and the official flags (code.toml) against ITK 4.13.2's VNL, with a harness that calls single functions (the foundations' checks below; W4: a queue item); done 2026-11-12 with Ubuntu's own gcc-8 8.4.0 (oracles/toolchains/gcc-8.4-ubuntu), the build in oracles/freesurfer-8.2.0-unit/, larmorx_validation.freesurfer_unit"
+crate = "validation/investigations/freesurfer-unit-oracle/"
 lines = 0
 files = []
 inputs = "code.md section 1 (the build as the official one ran), relay 5's gcc84/"
@@ -3744,8 +3830,8 @@ checks = "random operands and the 12 reached functions' patterns against the mac
 [[item]]
 id = "3.1-04"
 wave = "3.1"
-kind = "permissive"
-what = "random numbers: VXL's vnl_random (Marsaglia-Zaman, drand64's measured left-to-right order, TP-01), POSIX drand48/srand48/erand48 (TP-15); glibc 2.35's rand, srand, random and srandom from a behaviour spec only (a spec writer, then a clean-room implementer: the GNU family's precedent, specs/glibc-dbl.md); FreeSurfer's setRandomSeed and randomNumber come with fs.core"
+kind = "permissive; spec + clean room (glibc's part)"
+what = "random numbers: VXL's vnl_random (Marsaglia-Zaman, drand64's measured left-to-right order, TP-01) and POSIX drand48/srand48/erand48 (TP-15), ported from their own sources; glibc 2.35's rand, srand, random and srandom from a behaviour spec only (specs/glibc-random.md by a spec writer, then a clean-room implementer: the GNU family's precedent, specs/glibc-dbl.md; not the permissive track's part); FreeSurfer's setRandomSeed and randomNumber come with fs.core"
 crate = "larmorx-core"
 lines = 0
 files = []
@@ -3756,7 +3842,7 @@ checks = "sequences against the unit oracle and the machine's glibc; mri_normali
 id = "3.1-05"
 wave = "3.1"
 kind = "spec + clean room"
-what = "RANLUX389 and GSL 1.8's distributions (P-08, TP-03): specs/ranlux.md by a spec writer (from L\u00fcscher 1994, James 1994, Knuth, Marsaglia, with the exact expressions FreeSurfer evaluates), then the clean room by an implementer who has read neither GSL nor numerics.cpp (GSL's source joins the audit's restriction table); mri_coreg's replica uses it; the GSL replica as its bit-exact reference in larmorx-gpl (the user's P5)"
+what = "RANLUX389 and GSL 1.8's distributions (P-08, TP-03): specs/ranlux.md by a spec writer (from L\u00fcscher 1994, James 1994, Knuth, Marsaglia, with the exact expressions FreeSurfer evaluates), then the clean room by an implementer who has read neither GSL nor numerics.cpp (GSL's source joins the audit's restriction table); mri_coreg's and mris_expand's replicas use it (GPL code never joins a FreeSurfer program: the user, 'No waiting for permissions'); GSL's replica 3.1-53, alone in larmorx-gpl, is its bit-exact reference"
 crate = "larmorx-core (clean-room files, GSL family)"
 lines = 375
 files = []
@@ -3767,11 +3853,11 @@ checks = "streams against the unit oracle's sc_rng_* for many seeds; mri_coreg's
 id = "3.1-06"
 wave = "3.1"
 kind = "spec + clean room"
-what = "the cubic spline mri_normalize uses (P-09, TP-04: Burkardt's 2006 routines, the clean-room piece until Burkardt confirms his MIT terms cover them, the user's P2)"
+what = "the cubic spline mri_normalize uses (P-09, TP-04: Burkardt's 2006 routines): specs/burkardt-spline.md by a spec writer, then the clean room by an implementer who has read neither Burkardt's code nor numerics.cpp; the replica is 3.1-54 (larmorx-freesurfer, crediting Burkardt, published normally: the user, 2026-11-12), which mri_normalize's replica uses"
 crate = "larmorx-core (clean-room files)"
 lines = 0
 files = []
-inputs = "the placement table P-09"
+inputs = "the placement table P-09; numerics.cpp 1417-1680 (the spec writer only)"
 checks = "SplineCubicSet/SplineCubicValue against the unit oracle; mri_normalize's replays"
 
 [[item]]
@@ -3782,14 +3868,14 @@ what = "the VNL and netlib routines FreeSurfer calls that larmorx-core lacks (vn
 crate = "larmorx-core"
 lines = 0
 files = []
-inputs = "ITK 4.13.2's tarball (<scratch>/r5/itk-4.13.2/), itk-diff.toml"
+inputs = "ITK 4.13.2's source (<workspace>/tags/ITK-v4.13.2), itk-diff.toml"
 checks = "against the unit oracle; the existing vnl_svd_f32, vnl_qr, vnl_eigen ports re-checked at FreeSurfer's call sites"
 
 [[item]]
 id = "3.1-08"
 wave = "3.1"
 kind = "inventory + spec"
-what = "the C library behind the results: every libm function the reached code calls (exp, log, pow, sqrt, sin, cos, atan2, floor, ...) checked against larmorx_core::math (glibc 2.35's bits for reproduce where it lacks them: specs and clean rooms, the GNU family's precedent), glibc's qsort (a behaviour spec) and libstdc++'s std::sort (FSL-22's precedent)"
+what = "the C library behind the results: every libm function the reached code calls (exp, log, pow, sqrt, sin, cos, atan2, floor, ...) checked against larmorx_core::math (where it lacks glibc 2.35's bits for reproduce: a spec by a spec writer, then a clean room by an implementer, the GNU family's precedent), glibc's qsort (a behaviour spec) and libstdc++'s std::sort (FSL-22's precedent)"
 crate = "larmorx-core"
 lines = 0
 files = []
@@ -3799,63 +3885,52 @@ checks = "the unit oracle; the first replays"
 [[item]]
 id = "3.1-09"
 wave = "3.1"
-kind = "permissive"
-what = "perm.gifti (1 of 5) (GIFTI: gifticlib and expat (P-05); the writer's long-double line formatting): xmlparse.c (lines 648-3618)"
+kind = "W3 parser"
+what = "perm.gifti (1 of 4) (GIFTI: gifticlib, read over a pure-Rust XML parser in expat 2.0.1's place (W3); the writer exact, with its long-double line formatting (P-05)): the XML parser under GIFTI: a pure-Rust parser in expat 2.0.1's place (xmlparse.c, xmlrole.c, xmltok.c are the behaviour, not ported) that gives gifticlib the same elements, attributes and character data, and the same failure messages (expat's error text with its line and column, as gifticlib prints them) on every path the programs reach: UTF-8 and the encodings expat accepts, entities, CDATA, comments, the DOCTYPE, malformed and truncated files"
 crate = "larmorx-io"
-lines = 2010
-files = ["packages/expat/xmlparse.c"]
+lines = 5809
+files = ["packages/expat/xmlparse.c", "packages/expat/xmlrole.c", "packages/expat/xmltok.c"]
 inputs = "the 3.1 items before it"
-checks = "unit checks against the unit oracle; then the replays of the first programs that use it (67 programs reach the module)"
+checks = "differential tests against the original parser in the unit oracle (generated, malformed and truncated inputs: the same values, the same messages); then the replays of the first programs that read the format (67 programs reach the module)"
 
 [[item]]
 id = "3.1-10"
 wave = "3.1"
 kind = "permissive"
-what = "perm.gifti (2 of 5): xmlrole.c (lines 33-216), xmlparse.c (lines 3630-6255)"
+what = "perm.gifti (2 of 4): gifticlib's XML reading, ported (public domain) on the parser's events: gifti_xml.c's element callbacks and checks with their messages, the ASCII, Base64Binary and GZipBase64Binary decoding, the external-file data"
 crate = "larmorx-io"
-lines = 2493
-files = ["packages/expat/xmlparse.c", "packages/expat/xmlrole.c"]
+lines = 2173
+files = ["packages/gifti/gifti_xml.c"]
 inputs = "the 3.1 items before it"
-checks = "unit checks against the unit oracle; then the replays of the first programs that use it (67 programs reach the module)"
+checks = "unit checks against the unit oracle (every encoding and data type, malformed files and their messages); then the replays of the first programs that read the format (67 programs reach the module)"
 
 [[item]]
 id = "3.1-11"
 wave = "3.1"
 kind = "permissive"
-what = "perm.gifti (3 of 5): gifti_io.c (lines 137-1781), xmlrole.c (lines 234-1315), xmltok.c"
+what = "perm.gifti (3 of 4): gifticlib's structures and checks, ported: gifti_io.c's validity checks with their messages, the attribute tables, copies, meta-data, the external data reader"
 crate = "larmorx-io"
-lines = 2488
-files = ["packages/expat/xmlrole.c", "packages/expat/xmltok.c", "packages/gifti/gifti_io.c"]
+lines = 1430
+files = ["packages/gifti/gifti_io.c"]
 inputs = "the 3.1 items before it"
-checks = "unit checks against the unit oracle; then the replays of the first programs that use it (67 programs reach the module)"
+checks = "unit checks against the unit oracle (every encoding and data type, malformed files and their messages); then the replays of the first programs that read the format (67 programs reach the module)"
 
 [[item]]
 id = "3.1-12"
 wave = "3.1"
-kind = "permissive"
-what = "perm.gifti (4 of 5): gifti_xml.c (lines 121-2053), gifti_io.c (lines 1811-4216)"
+kind = "permissive (exact writer)"
+what = "perm.gifti (4 of 4): gifticlib's writer, exact: gifti_xml.c's ewrite_* with the long-double line formatting (3.1-03's x87 arithmetic), the Base64 and zlib output; gifti_io.c's write and display functions (their printed text)"
 crate = "larmorx-io"
-lines = 2320
+lines = 953
 files = ["packages/gifti/gifti_io.c", "packages/gifti/gifti_xml.c"]
 inputs = "the 3.1 items before it"
-checks = "unit checks against the unit oracle; then the replays of the first programs that use it (67 programs reach the module)"
-
-[[item]]
-id = "3.1-13"
-wave = "3.1"
-kind = "permissive"
-what = "perm.gifti (5 of 5): gifti_xml.c (lines 2109-3148)"
-crate = "larmorx-io"
-lines = 1054
-files = ["packages/gifti/gifti_xml.c"]
-inputs = "the 3.1 items before it"
-checks = "unit checks against the unit oracle; then the replays of the first programs that use it (67 programs reach the module)"
+checks = "the bytes of every output against the unit oracle's writer (generated values: every type, extreme numbers); then the replays of the programs that write the format (67 programs reach the module)"
 
 [[item]]
 id = "3.1-14"
 wave = "3.1"
 kind = "permissive"
-what = "perm.minc (MINC's volume_io: the .xfm reader and writer (P-05; FreeSurfer's changes to the MINC files in larmorx-freesurfer-io)): minc_gaussian.c, minc_files.c, minc_volume_io.c"
+what = "perm.minc (MINC's volume_io: the .xfm reader (W3: a pure-Rust parser, the same values and messages) and writer (exact) (P-05; FreeSurfer's changes to the MINC files in larmorx-freesurfer-io)): minc_gaussian.c, minc_files.c, minc_volume_io.c"
 crate = "larmorx-io"
 lines = 1676
 files = ["packages/minc/minc_files.c", "packages/minc/minc_gaussian.c", "packages/minc/minc_volume_io.c"]
@@ -3876,24 +3951,13 @@ checks = "unit checks against the unit oracle; then the replays of the first pro
 [[item]]
 id = "3.1-16"
 wave = "3.1"
-kind = "permissive"
-what = "perm.dicom (1 of 2) (CTN's DICOM library (P-05): the format probe of every volume reader; DICOM input later): dcmcond.c, dcmdict.c (lines 90-140), condition.c, dcm.c"
+kind = "W3 parser"
+what = "perm.dicom (1 of 1) (CTN's DICOM library (P-05): the format probe of every volume reader (W3: a pure-Rust probe, no port of CTN); DICOM input later): the DICOM probe: a pure-Rust check in CTN's place that answers as DCM_OpenFile does for IsDICOM, the format probe of every volume reader (the part-10 preamble and 'DICM', the elements it reads, implicit and explicit VR, little and big endian, the condition messages a failed open prints); CTN's dcm.c, dictionaries, lst.c and condition stack are the behaviour, not ported; DICOM input itself later (no default path reads DICOM)"
 crate = "larmorx-io"
-lines = 2473
-files = ["packages/dicom/condition.c", "packages/dicom/dcm.c", "packages/dicom/dcmcond.c", "packages/dicom/dcmdict.c"]
+lines = 4371
+files = ["packages/dicom/condition.c", "packages/dicom/dcm.c", "packages/dicom/dcmcond.c", "packages/dicom/dcmdict.c", "packages/dicom/lst.c"]
 inputs = "the 3.1 items before it"
-checks = "unit checks against the unit oracle; then the replays of the first programs that use it (67 programs reach the module)"
-
-[[item]]
-id = "3.1-17"
-wave = "3.1"
-kind = "permissive"
-what = "perm.dicom (2 of 2): lst.c, dcmdict.c (lines 165-2012)"
-crate = "larmorx-io"
-lines = 1898
-files = ["packages/dicom/dcmdict.c", "packages/dicom/lst.c"]
-inputs = "the 3.1 items before it"
-checks = "unit checks against the unit oracle; then the replays of the first programs that use it (67 programs reach the module)"
+checks = "differential tests against the original parser in the unit oracle (generated, malformed and truncated inputs: the same values, the same messages); then the replays of the first programs that read the format (67 programs reach the module)"
 
 [[item]]
 id = "3.1-18"
@@ -3909,24 +3973,24 @@ checks = "unit checks against the unit oracle; then the replays of the first pro
 [[item]]
 id = "3.1-19"
 wave = "3.1"
-kind = "permissive"
-what = "perm.json (1 of 2) (nlohmann/json (P-06): its number formatting decides JSON outputs' bytes): json.h (lines 655-10516)"
+kind = "W3 parser"
+what = "perm.json (1 of 2) (nlohmann/json 3.2.0 (P-06): a pure-Rust parser in its parser's place (W3); its writer exact (its number formatting decides JSON outputs' bytes)): nlohmann/json 3.2.0's parser replaced: a pure-Rust JSON reader giving its values (integers, unsigned and floating-point numbers as its lexer converts them, strings with their escapes and UTF-8 checks) and its parse_error messages (the byte position, the last token read) on every path the programs reach"
 crate = "larmorx-core"
-lines = 2483
+lines = 1913
 files = ["include/json.h"]
 inputs = "the 3.1 items before it"
-checks = "unit checks against the unit oracle; then the replays of the first programs that use it (13 programs reach the module)"
+checks = "differential tests against the original parser in the unit oracle (generated, malformed and truncated inputs: the same values, the same messages); then the replays of the first programs that read the format (13 programs reach the module)"
 
 [[item]]
 id = "3.1-20"
 wave = "3.1"
-kind = "permissive"
-what = "perm.json (2 of 2): json.h (lines 10692-18254)"
+kind = "permissive (exact writer)"
+what = "perm.json (2 of 2): nlohmann/json's writer and the values it orders, exact: dump with its indentation, dump_escaped's escapes and UTF-8 handling, dump_float's Grisu2 shortest digits and exponent format, the integer output; basic_json's object order (sorted keys), json_pointer and patch as the programs use them"
 crate = "larmorx-core"
-lines = 1021
+lines = 1591
 files = ["include/json.h"]
 inputs = "the 3.1 items before it"
-checks = "unit checks against the unit oracle; then the replays of the first programs that use it (13 programs reach the module)"
+checks = "the bytes of every output against the unit oracle's writer (generated values: every type, extreme numbers); then the replays of the programs that write the format (13 programs reach the module)"
 
 [[item]]
 id = "3.1-21"
@@ -3967,7 +4031,7 @@ wave = "3.1"
 kind = "replica"
 what = "fs.maths (2 of 2): prime.cpp, pdf.cpp, numerics.cpp, randomfields.cpp, matrix.cpp (lines 717-3613)"
 crate = "larmorx-freesurfer-core"
-lines = 2273
+lines = 1992
 files = ["utils/matrix.cpp", "utils/numerics.cpp", "utils/pdf.cpp", "utils/prime.cpp", "utils/randomfields.cpp"]
 inputs = "the 3.1 items before it"
 checks = "unit checks against the unit oracle; then the replays of the first programs that use it (68 programs reach the module)"
@@ -4163,7 +4227,7 @@ checks = "unit checks against the unit oracle; then the replays of the first pro
 id = "3.1-42"
 wave = "3.1"
 kind = "replica"
-what = "fs.filter (1 of 3) (volume filters and morphology, intensity normalisation (with Burkardt's spline, P-09), segmentation helpers, flood fill, connected components, fast marching, clusters): mri_fastmarching.cpp, diffuse.cpp, connectcomp.cpp, fmriutils.cpp, filter.cpp, mrifilter.cpp (lines 923-5395)"
+what = "fs.filter (1 of 3) (volume filters and morphology, intensity normalisation (its cubic spline: fs.spline), segmentation helpers, flood fill, connected components, fast marching, clusters): mri_fastmarching.cpp, diffuse.cpp, connectcomp.cpp, fmriutils.cpp, filter.cpp, mrifilter.cpp (lines 923-5395)"
 crate = "larmorx-freesurfer-filter"
 lines = 2269
 files = ["utils/connectcomp.cpp", "utils/diffuse.cpp", "utils/filter.cpp", "utils/fmriutils.cpp", "utils/mri_fastmarching.cpp", "utils/mrifilter.cpp"]
@@ -4281,6 +4345,39 @@ inputs = "the 3.1 items before it"
 checks = "unit checks against the unit oracle; then the replays of the first programs that use it (67 programs reach the module)"
 
 [[item]]
+id = "3.1-53"
+wave = "3.1"
+kind = "gpl"
+what = "gpl.gsl (GSL 1.8's RANLUX389 and distributions as numerics.cpp transcribes them (P-08): the replica alone in larmorx-gpl (crates-gpl/, GPL-3.0-or-later), the clean room's bit-exact reference; FreeSurfer's replicas (mri_coreg, mris_expand) use the clean room): numerics.cpp"
+crate = "larmorx-gpl-gsl"
+lines = 281
+files = ["utils/numerics.cpp"]
+inputs = "the 3.1 items before it"
+checks = "streams against the unit oracle's sc_rng_* and sc_ran_* for many seeds; then the bit-exact reference of the clean room (3.1-05)"
+
+[[item]]
+id = "3.1-54"
+wave = "3.1"
+kind = "replica"
+what = "fs.spline (John Burkardt's 2006 cubic spline in numerics.cpp (SplineCubicSet, SplineCubicValue, d3_np_fs; P-09): the replica crediting Burkardt, published normally (the user, 2026-11-12)): numerics.cpp"
+crate = "larmorx-freesurfer-core"
+lines = 192
+files = ["utils/numerics.cpp"]
+inputs = "the 3.1 items before it"
+checks = "SplineCubicSet and SplineCubicValue against the unit oracle; mri_normalize's replays"
+
+[[item]]
+id = "3.2-41"
+wave = "3.2"
+kind = "plumbing (main package)"
+what = "the main package's side of larmorx-freesurfer, split from 3.1-01 (the coherence review's finding 7): the package entry LARMORX_FREESURFER in crates/larmorx-cli/src/replica.rs (the program larmorx-freesurfer, LARMORX_FREESURFER_BIN, LicenseRef-FreeSurfer) with its REPLICAS lines, the family freesurfer in larmorx's command line, lx.freesurfer (python/larmorx/freesurfer/: the dispatch between the replica program and the clean room); best by an agent that never read FreeSurfer's material, because these files carry the clean rooms' side too"
+crate = "larmorx (crates/larmorx-cli, python/larmorx/freesurfer/)"
+lines = 0
+files = []
+inputs = "3.1-01; the first program item (3.2-04)"
+checks = "the larmorx and larmorx-freesurfer programs' tests, test_release.py, the golden registry"
+
+[[item]]
 id = "3.2-01"
 wave = "3.2"
 kind = "replica"
@@ -4366,7 +4463,7 @@ crate = "larmorx-freesurfer-volumes"
 lines = 1418
 files = ["mri_info/mri_info.cpp", "utils/histo.cpp"]
 inputs = "modules bspline, core, filter, io, labels, maths, surfio, volume, dicom, gifti, minc, misc, nifti; data: 1 files, 3.3 MB (mni305.cor.mgz); waits for deform (13), gca (6,014)"
-checks = "through seg2cc's recorded steps (11)"
+checks = "through seg2cc's recorded steps (12)"
 
 [[item]]
 id = "3.2-09"
@@ -4388,7 +4485,7 @@ crate = "larmorx-freesurfer-volumes"
 lines = 224
 files = ["mri_add_xform_to_header/mri_add_xform_to_header.cpp", "utils/mriio.cpp"]
 inputs = "modules bspline, core, filter, io, labels, maths, surfio, volume, dicom, gifti, minc, misc, nifti; waits for deform (13), gca (6,014)"
-checks = "replay: 23 recorded steps in 12 runs"
+checks = "replay: 24 recorded steps in 12 runs"
 
 [[item]]
 id = "3.2-11"
@@ -4410,7 +4507,7 @@ crate = "larmorx-freesurfer-volumes"
 lines = 0
 files = []
 inputs = ""
-checks = "through fs-synthmorph-reg, seg2cc, rca-talairach's recorded steps (21)"
+checks = "through fs-synthmorph-reg, seg2cc, rca-talairach's recorded steps (24)"
 
 [[item]]
 id = "3.2-13"
@@ -4464,7 +4561,7 @@ what = "mri_coreg"
 crate = "larmorx-freesurfer-volumes"
 lines = 2153
 files = ["include/pointset.h", "mri_coreg/mri_coreg.cpp", "utils/matrix.cpp", "utils/mriset.cpp", "utils/pointset.cpp", "utils/randomfields.cpp", "utils/transform.cpp"]
-inputs = "modules bspline, core, filter, io, labels, maths, surfio, volume, dicom, gifti, json, minc, misc, nifti; data: 1 files, 0.1 MB (FreeSurferColorLUT.txt); waits for deform (13), gca (6,014)"
+inputs = "modules bspline, core, filter, io, labels, maths, surfio, volume, RANLUX's clean room (3.1-05), dicom, gifti, json, minc, misc, nifti; data: 1 files, 0.1 MB (FreeSurferColorLUT.txt); waits for deform (13), gca (6,014)"
 checks = "fMRIPrep's calls on the recorded subjects (fMRIPrep's MRICoreg, bbregister --init-coreg)"
 
 [[item]]
@@ -4476,7 +4573,7 @@ crate = "larmorx-freesurfer-volumes"
 lines = 353
 files = ["AntsN4BiasFieldCorrectionFs/AntsN4BiasFieldCorrectionFs.cpp", "utils/mri2.cpp"]
 inputs = "modules bspline, core, filter, io, labels, maths, surfio, volume, argparse, dicom, gifti, json, minc, misc, nifti; waits for deform (13), gca (6,014)"
-checks = "through mri_nu_correct.mni's recorded steps (17)"
+checks = "through mri_nu_correct.mni's recorded steps (18)"
 
 [[item]]
 id = "3.2-19"
@@ -4487,7 +4584,7 @@ crate = "larmorx-freesurfer-volumes"
 lines = 2351
 files = ["mri_binarize/mri_binarize.cpp", "utils/cma.cpp", "utils/mri2.cpp", "utils/mriset.cpp", "utils/randomfields.cpp", "utils/sig.cpp", "utils/utils.cpp", "utils/volcluster.cpp"]
 inputs = "modules bspline, core, filter, io, labels, maths, surfio, volume, dicom, gifti, minc, misc, nifti; waits for deform (732), gca (6,014), surf (2,042)"
-checks = "through mri_nu_correct.mni, label-cortex, seg2cc's recorded steps (48)"
+checks = "through mri_nu_correct.mni, label-cortex, seg2cc's recorded steps (54)"
 
 [[item]]
 id = "3.2-20"
@@ -4498,7 +4595,7 @@ crate = "larmorx-freesurfer-volumes"
 lines = 3399
 files = ["mri_segstats/mri_segstats.cpp", "utils/gtm.cpp", "utils/mri.cpp", "utils/mri2.cpp", "utils/stats.cpp"]
 inputs = "modules bspline, core, filter, io, labels, maths, surfio, volume, dicom, gifti, minc, misc, nifti; data: 2 files, 0.0 MB (ASegStatsLUT.txt, WMParcStatsLUT.txt); waits for deform (13), gca (6,087), surf (1,936)"
-checks = "replay: 20 recorded steps in 10 runs"
+checks = "replay: 24 recorded steps in 12 runs"
 
 [[item]]
 id = "3.2-21"
@@ -4509,7 +4606,7 @@ crate = "larmorx-freesurfer-volumes"
 lines = 2155
 files = ["mris_calc/mris_calc.cpp"]
 inputs = "modules bspline, core, filter, io, labels, maths, surfio, volume, dicom, gifti, minc, misc, nifti; waits for deform (13), gca (6,014)"
-checks = "through mri_nu_correct.mni, vertexvol's recorded steps (37)"
+checks = "through mri_nu_correct.mni, vertexvol's recorded steps (42)"
 
 [[item]]
 id = "3.2-22"
@@ -4520,7 +4617,7 @@ crate = "larmorx-freesurfer-volumes"
 lines = 232
 files = ["mri_convert/mri_make_uchar.cpp", "utils/transform.cpp"]
 inputs = "modules bspline, core, filter, io, labels, maths, surfio, volume, dicom, gifti, minc, misc, nifti; waits for deform (13), gca (6,014)"
-checks = "through mri_nu_correct.mni's recorded steps (17)"
+checks = "through mri_nu_correct.mni's recorded steps (18)"
 
 [[item]]
 id = "3.2-23"
@@ -4531,7 +4628,7 @@ crate = "larmorx-freesurfer-volumes"
 lines = 0
 files = []
 inputs = "runs AntsN4BiasFieldCorrectionFs, mri_binarize, mri_convert, mri_make_uchar, mri_segstats, mris_calc, nu_correct; data: 1 files, 0.0 MB (sources.csh)"
-checks = "replay: 17 recorded steps in 11 runs"
+checks = "replay: 18 recorded steps in 12 runs"
 
 [[item]]
 id = "3.2-24"
@@ -4541,7 +4638,7 @@ what = "mri_normalize (1 of 2): mri_normalize.cpp, mrinorm.cpp (lines 80-81), mr
 crate = "larmorx-freesurfer-volumes"
 lines = 2447
 files = ["mri_normalize/mri_normalize.cpp", "utils/histo.cpp", "utils/label.cpp", "utils/mri.cpp", "utils/mrifilter.cpp", "utils/mrihisto.cpp", "utils/mrinorm.cpp"]
-inputs = "modules bspline, core, filter, io, labels, maths, surfio, volume, dicom, gifti, minc, misc, nifti; waits for deform (13), gca (6,089), surf (1,982)"
+inputs = "modules bspline, core, filter, io, labels, maths, spline, surfio, volume, dicom, gifti, minc, misc, nifti; waits for deform (13), gca (6,089), surf (1,982)"
 checks = "unit checks of its functions against the unit oracle"
 
 [[item]]
@@ -4550,10 +4647,10 @@ wave = "3.2"
 kind = "c++"
 what = "mri_normalize (2 of 2): mrinorm.cpp (lines 98-3635), numerics.cpp; the program assembled"
 crate = "larmorx-freesurfer-volumes"
-lines = 1957
+lines = 1765
 files = ["utils/mrinorm.cpp", "utils/numerics.cpp"]
 inputs = "the parts before it"
-checks = "replay: 22 recorded steps in 11 runs"
+checks = "replay: 24 recorded steps in 12 runs"
 
 [[item]]
 id = "3.2-26"
@@ -4564,7 +4661,7 @@ crate = "larmorx-freesurfer-volumes"
 lines = 845
 files = ["mri_mask/mri_mask.cpp", "utils/mri2.cpp", "utils/region.cpp", "utils/transform.cpp"]
 inputs = "modules bspline, core, filter, io, labels, maths, surfio, volume, dicom, gifti, minc, misc, nifti; waits for deform (13), gca (6,198)"
-checks = "replay: 21 recorded steps in 11 runs"
+checks = "replay: 24 recorded steps in 12 runs"
 
 [[item]]
 id = "3.2-27"
@@ -4575,7 +4672,7 @@ crate = "larmorx-freesurfer-volumes"
 lines = 2807
 files = ["mri_cc/mri_cc.cpp", "utils/mri.cpp", "utils/mriTransform.cpp", "utils/talairachex.cpp", "utils/voxlist.cpp"]
 inputs = "modules bspline, core, filter, io, labels, maths, surfio, volume, dicom, gifti, minc, misc, nifti; waits for deform (13), gca (6,014)"
-checks = "through seg2cc's recorded steps (11)"
+checks = "through seg2cc's recorded steps (12)"
 
 [[item]]
 id = "3.2-28"
@@ -4586,7 +4683,7 @@ crate = "larmorx-freesurfer-volumes"
 lines = 0
 files = []
 inputs = "runs getfullpath, mergeseg, mri_binarize, mri_cc, mri_convert, mri_info, mri_label2vol; data: 2 files, 0.0 MB (build-stamp.txt, sources.csh)"
-checks = "replay: 11 recorded steps in 11 runs"
+checks = "replay: 12 recorded steps in 12 runs"
 
 [[item]]
 id = "3.2-29"
@@ -4597,7 +4694,7 @@ crate = "larmorx-freesurfer-volumes"
 lines = 0
 files = []
 inputs = ""
-checks = "through seg2cc's recorded steps (11)"
+checks = "through seg2cc's recorded steps (12)"
 
 [[item]]
 id = "3.2-30"
@@ -4608,7 +4705,7 @@ crate = "larmorx-freesurfer-volumes"
 lines = 99
 files = ["AntsDenoiseImageFs/AntsDenoiseImageFs.cpp", "AntsDenoiseImageFs/itkAdaptiveNonLocalMeansDenoisingImageFilter.hxx"]
 inputs = "modules bspline, core, filter, io, labels, maths, surfio, volume, argparse, dicom, gifti, minc, misc, nifti; waits for deform (13), gca (6,014)"
-checks = "replay: 11 recorded steps in 11 runs"
+checks = "replay: 12 recorded steps in 12 runs"
 
 [[item]]
 id = "3.2-31"
@@ -4619,7 +4716,7 @@ crate = "larmorx-freesurfer-volumes"
 lines = 3233
 files = ["include/mrisurf_SurfaceFromMRISPV_generated_suffix.h", "include/mrisurf_SurfaceFromMRIS_generated_suffix.h", "mri_segment/mri_segment.cpp", "utils/diag.cpp", "utils/histo.cpp", "utils/mri2.cpp", "utils/mrifilter.cpp", "utils/mrihisto.cpp", "utils/mripolv.cpp", "utils/mrisegment.cpp", "utils/mrivoxel.cpp", "utils/tags.cpp"]
 inputs = "modules bspline, core, filter, io, labels, maths, surfio, volume, dicom, gifti, minc, misc, nifti; waits for deform (13), gca (6,014)"
-checks = "replay: 11 recorded steps in 11 runs"
+checks = "replay: 12 recorded steps in 12 runs"
 
 [[item]]
 id = "3.2-32"
@@ -4630,7 +4727,7 @@ crate = "larmorx-freesurfer-volumes"
 lines = 3219
 files = ["mri_edit_wm_with_aseg/mri_edit_wm_with_aseg.cpp", "utils/mri2.cpp"]
 inputs = "modules bspline, core, filter, io, labels, maths, surfio, volume, dicom, gifti, minc, misc, nifti; waits for deform (13), gca (6,014)"
-checks = "replay: 31 recorded steps in 11 runs"
+checks = "replay: 36 recorded steps in 12 runs"
 
 [[item]]
 id = "3.2-33"
@@ -4641,7 +4738,7 @@ crate = "larmorx-freesurfer-volumes"
 lines = 1343
 files = ["mri_mc/mri_pretess.cpp"]
 inputs = "modules bspline, core, filter, io, labels, maths, surfio, volume, dicom, gifti, minc, misc, nifti; waits for deform (13), gca (6,014)"
-checks = "replay: 33 recorded steps in 11 runs"
+checks = "replay: 36 recorded steps in 12 runs"
 
 [[item]]
 id = "3.2-34"
@@ -4685,7 +4782,7 @@ crate = "larmorx-freesurfer-volumes"
 lines = 361
 files = ["utils/mriprob.cpp", "utils/mriset.cpp", "utils/talairachex.cpp"]
 inputs = "the parts before it"
-checks = "replay: 11 recorded steps in 11 runs"
+checks = "replay: 12 recorded steps in 12 runs"
 
 [[item]]
 id = "3.2-38"
@@ -4696,7 +4793,7 @@ crate = "larmorx-freesurfer-volumes"
 lines = 2951
 files = ["include/mri.h", "mri_vol2vol/mri_vol2vol.cpp", "utils/mri.cpp", "utils/mri2.cpp", "utils/mrifilter.cpp", "utils/resample.cpp", "utils/transform.cpp"]
 inputs = "modules bspline, core, filter, io, labels, maths, surfio, volume, dicom, gifti, minc, misc, nifti; data: 3 files, 0.4 MB (mca-dura.prior.warp.mni152.1.0mm.lh.nii.gz, mca-dura.prior.warp.mni152.1.0mm.rh.nii.gz, vsinus.no-sp.prior.mni152.1.0mm.mgz); waits for deform (13), gca (13,641)"
-checks = "through fs-synthmorph-reg's recorded steps (5); fMRIPrep's calls on the recorded subjects (sMRIPrep's ApplyVolTransform)"
+checks = "through fs-synthmorph-reg's recorded steps (6); fMRIPrep's calls on the recorded subjects (sMRIPrep's ApplyVolTransform)"
 
 [[item]]
 id = "3.2-39"
@@ -4707,7 +4804,7 @@ crate = "larmorx-freesurfer-volumes"
 lines = 2574
 files = ["mri_concat/mri_concat.cpp", "utils/fmriutils.cpp", "utils/matrix.cpp", "utils/mri.cpp", "utils/mri2.cpp", "utils/mriset.cpp"]
 inputs = "modules bspline, core, filter, io, labels, maths, surfio, volume, dicom, gifti, minc, misc, nifti; data: 1 files, 0.0 MB (mca-dura.ctab); waits for deform (13), gca (6,014)"
-checks = "through pctsurfcon's recorded steps (20)"
+checks = "through pctsurfcon's recorded steps (24)"
 
 [[item]]
 id = "3.2-40"
@@ -4718,7 +4815,7 @@ crate = "larmorx-freesurfer-volumes"
 lines = 2666
 files = ["mri_label2vol/mri_label2vol.cpp", "utils/annotation.cpp", "utils/colortab.cpp", "utils/label.cpp", "utils/mri2.cpp", "utils/resample.cpp", "utils/transform.cpp"]
 inputs = "modules bspline, core, filter, io, labels, maths, surfio, volume, dicom, gifti, minc, misc, nifti; waits for defect (89), deform (13), gca (6,038), surf (2,080)"
-checks = "through defect2seg, seg2cc's recorded steps (21)"
+checks = "through defect2seg, seg2cc's recorded steps (24)"
 
 [[item]]
 id = "3.3-01"
@@ -4861,7 +4958,7 @@ crate = "larmorx-freesurfer-atlas"
 lines = 392
 files = ["utils/mrimorph.cpp", "utils/numerics.cpp", "utils/transform.cpp"]
 inputs = "the parts before it"
-checks = "replay: 17 recorded steps in 11 runs"
+checks = "replay: 18 recorded steps in 12 runs"
 
 [[item]]
 id = "3.3-14"
@@ -4872,7 +4969,7 @@ crate = "larmorx-freesurfer-atlas"
 lines = 2337
 files = ["mri_ca_normalize/mri_ca_normalize.cpp", "utils/gca.cpp", "utils/mri.cpp", "utils/mriio.cpp", "utils/mriset.cpp"]
 inputs = "modules bspline, core, filter, gca, io, labels, maths, surfio, volume, dicom, gifti, minc, misc, nifti; data: 1 files, 71.7 MB (RB_all_2020-01-02.gca); waits for deform (13)"
-checks = "replay: 11 recorded steps in 11 runs"
+checks = "replay: 12 recorded steps in 12 runs"
 
 [[item]]
 id = "3.3-15"
@@ -5021,7 +5118,7 @@ checks = "synthetic cases for each option path; the programs' records re-made"
 id = "3.4-11"
 wave = "3.4"
 kind = "completeness"
-what = "the option paths of 30 earlier programs into fs.deform (static reach, lines; most never run by default: each checked when its program's record is re-made): mri_binarize (732), mri_convert (13), AntsDenoiseImageFs (13), mri_cc (13), mri_normalize (13), mri_edit_wm_with_aseg (13) ..."
+what = "the option paths of 30 earlier programs into fs.deform (static reach, lines; most never run by default: each checked when its program's record is re-made): mri_binarize (732), AntsDenoiseImageFs (13), AntsN4BiasFieldCorrectionFs (13), lta_convert (13), mri_add_xform_to_header (13), mri_ca_normalize (13) ..."
 crate = "the programs' crates"
 lines = 0
 files = []
@@ -5048,7 +5145,7 @@ crate = "larmorx-freesurfer-topology"
 lines = 575
 files = ["mri_tessellate/mri_tessellate.cpp"]
 inputs = "modules bspline, core, deform, filter, gca, io, labels, maths, surf, surfio, volume, dicom, gifti, minc, misc, nifti"
-checks = "replay: 22 recorded steps in 11 runs"
+checks = "replay: 24 recorded steps in 12 runs"
 
 [[item]]
 id = "3.4-14"
@@ -5059,7 +5156,7 @@ crate = "larmorx-freesurfer-topology"
 lines = 25
 files = ["mri_mc/mris_extract_main_component.cpp"]
 inputs = "modules bspline, core, deform, filter, gca, io, labels, maths, surf, surfio, volume, dicom, gifti, minc, misc, nifti"
-checks = "replay: 22 recorded steps in 11 runs"
+checks = "replay: 24 recorded steps in 12 runs"
 
 [[item]]
 id = "3.4-15"
@@ -5070,7 +5167,7 @@ crate = "larmorx-freesurfer-topology"
 lines = 872
 files = ["include/mrisurf_SurfaceFromMRISPV_generated_suffix.h", "include/mrisurf_SurfaceFromMRIS_generated_suffix.h", "mris_smooth/mris_smooth.cpp", "utils/mrisurf_deform.cpp"]
 inputs = "modules bspline, core, deform, filter, gca, io, labels, maths, surf, surfio, volume, dicom, gifti, minc, misc, nifti"
-checks = "replay: 42 recorded steps in 11 runs"
+checks = "replay: 48 recorded steps in 12 runs"
 
 [[item]]
 id = "3.4-16"
@@ -5081,7 +5178,7 @@ crate = "larmorx-freesurfer-topology"
 lines = 1238
 files = ["mris_inflate/mris_inflate.cpp", "utils/mrisurf_base.cpp", "utils/mrisurf_deform.cpp", "utils/mrisurf_integrate.cpp", "utils/mrisurf_metricProperties.cpp", "utils/mrisurf_topology.cpp", "utils/mrisurf_vals.cpp"]
 inputs = "modules bspline, core, defect, deform, filter, gca, io, labels, maths, surf, surfio, volume, dicom, gifti, json, minc, misc, nifti"
-checks = "replay: 42 recorded steps in 11 runs"
+checks = "replay: 48 recorded steps in 12 runs"
 
 [[item]]
 id = "3.4-17"
@@ -5092,7 +5189,7 @@ crate = "larmorx-freesurfer-topology"
 lines = 1725
 files = ["mris_sphere/mris_sphere.cpp", "utils/mrisurf_deform.cpp", "utils/mrisurf_integrate.cpp", "utils/mrisurf_metricProperties.cpp", "utils/mrisurf_topology.cpp"]
 inputs = "modules bspline, core, defect, deform, filter, gca, io, labels, maths, surf, surfio, volume, dicom, gifti, json, minc, misc, nifti; waits for mars (328)"
-checks = "replay: 42 recorded steps in 11 runs"
+checks = "replay: 48 recorded steps in 12 runs"
 
 [[item]]
 id = "3.4-18"
@@ -5169,7 +5266,7 @@ crate = "larmorx-freesurfer-topology"
 lines = 637
 files = ["utils/realm.cpp", "utils/tritri.cpp"]
 inputs = "the parts before it"
-checks = "replay: 21 recorded steps in 11 runs"
+checks = "replay: 24 recorded steps in 12 runs"
 
 [[item]]
 id = "3.4-25"
@@ -5224,7 +5321,7 @@ crate = "larmorx-freesurfer-topology"
 lines = 2831
 files = ["mri_label2label/mri_label2label.cpp", "utils/label.cpp", "utils/mri.cpp", "utils/mrisurf_io.cpp", "utils/mrisurf_metricProperties.cpp", "utils/mrisurf_mri.cpp", "utils/mrisutils.cpp", "utils/path.cpp"]
 inputs = "modules bspline, core, defect, deform, filter, gca, io, labels, maths, surf, surfio, volume, dicom, gifti, minc, misc, nifti; data: 77 files, 33.0 MB (lh.BA1_exvivo.label, lh.BA1_exvivo.thresh.label, lh.BA2_exvivo.label ...)"
-checks = "replay: 740 recorded steps in 10 runs"
+checks = "replay: 888 recorded steps in 12 runs"
 
 [[item]]
 id = "3.4-30"
@@ -5235,7 +5332,7 @@ crate = "larmorx-freesurfer-topology"
 lines = 157
 files = ["mris_defects_pointset/mris_defects_pointset.cpp", "utils/pointset.cpp"]
 inputs = "modules bspline, core, deform, filter, gca, io, labels, maths, surf, surfio, volume, argparse, dicom, gifti, json, minc, misc, nifti"
-checks = "through defect2seg's recorded steps (10)"
+checks = "through defect2seg's recorded steps (12)"
 
 [[item]]
 id = "3.4-31"
@@ -5246,7 +5343,7 @@ crate = "larmorx-freesurfer-topology"
 lines = 0
 files = []
 inputs = "runs mri_label2label, mri_label2vol, mris_defects_pointset; data: 2 files, 0.0 MB (build-stamp.txt, sources.csh)"
-checks = "replay: 10 recorded steps in 10 runs"
+checks = "replay: 12 recorded steps in 12 runs"
 
 [[item]]
 id = "3.4-32"
@@ -5257,7 +5354,7 @@ crate = "larmorx-freesurfer-topology"
 lines = 2191
 files = ["include/mrisurf_SurfaceFromMRISPV_generated_suffix.h", "include/mrisurf_SurfaceFromMRIS_MP_generated_suffix.h", "include/mrisurf_SurfaceFromMRIS_generated_suffix.h", "mris_remesh/mris_remesh.cpp", "mris_remesh/remesher.cpp", "mris_remesh/remesher.h", "utils/mrisurf_base.cpp", "utils/rgb.cpp"]
 inputs = "modules bspline, core, deform, filter, gca, io, labels, maths, surf, surfio, volume, argparse, dicom, gifti, json, minc, misc, nifti"
-checks = "replay: 20 recorded steps in 10 runs"
+checks = "replay: 24 recorded steps in 12 runs"
 
 [[item]]
 id = "3.4-33"
@@ -5268,7 +5365,7 @@ crate = "larmorx-freesurfer-topology"
 lines = 532
 files = ["mris_fix_topology/mris_remove_intersection.cpp", "utils/mrisurf_deform.cpp", "utils/mrisurf_metricProperties.cpp", "utils/mrisurf_vals.cpp"]
 inputs = "modules bspline, core, deform, filter, gca, io, labels, maths, surf, surfio, volume, dicom, gifti, json, minc, misc, nifti"
-checks = "replay: 20 recorded steps in 10 runs"
+checks = "replay: 24 recorded steps in 12 runs"
 
 [[item]]
 id = "3.5-01"
@@ -5279,7 +5376,7 @@ crate = "larmorx-freesurfer-cortex"
 lines = 238
 files = ["mri_relabel_hypointensities/mri_relabel_hypointensities.cpp", "utils/mrishash.cpp"]
 inputs = "modules bspline, core, deform, filter, gca, io, labels, maths, surf, surfio, volume, dicom, gifti, minc, misc, nifti"
-checks = "replay: 10 recorded steps in 10 runs"
+checks = "replay: 12 recorded steps in 12 runs"
 
 [[item]]
 id = "3.5-02"
@@ -5290,7 +5387,7 @@ crate = "larmorx-freesurfer-cortex"
 lines = 887
 files = ["mri_aparc2aseg/mri_surf2volseg.cpp", "utils/mrisurf_metricProperties.cpp"]
 inputs = "modules bspline, core, deform, filter, gca, io, labels, maths, surf, surfio, volume, dicom, gifti, minc, misc, nifti; data: 1 files, 0.1 MB (FreeSurferColorLUT.txt)"
-checks = "replay: 50 recorded steps in 10 runs"
+checks = "replay: 60 recorded steps in 12 runs"
 
 [[item]]
 id = "3.5-03"
@@ -5301,7 +5398,7 @@ crate = "larmorx-freesurfer-cortex"
 lines = 250
 files = ["mri_brainvol_stats/mri_brainvol_stats.cpp", "utils/cma.cpp", "utils/transform.cpp"]
 inputs = "modules bspline, core, deform, filter, gca, io, labels, maths, surf, surfio, volume, argparse, dicom, gifti, json, minc, misc, nifti; data: 1 files, 0.0 MB (ASegStatsLUT.txt)"
-checks = "replay: 10 recorded steps in 10 runs"
+checks = "replay: 12 recorded steps in 12 runs"
 
 [[item]]
 id = "3.5-04"
@@ -5312,7 +5409,7 @@ crate = "larmorx-freesurfer-cortex"
 lines = 2481
 files = ["include/mrisurf.h", "mri_vol2surf/mri_vol2surf.cpp", "utils/icosahedron.cpp", "utils/label.cpp", "utils/matrix.cpp", "utils/mri2.cpp", "utils/mrisurf_metricProperties.cpp", "utils/mrisurf_mri.cpp", "utils/prime.cpp", "utils/resample.cpp"]
 inputs = "modules bspline, core, deform, filter, gca, io, labels, maths, surf, surfio, volume, dicom, gifti, minc, misc, nifti; data: 9 files, 15.5 MB (talairach.xfm, lh.sphere.reg, rh.sphere.reg ...)"
-checks = "through pctsurfcon, label-cortex's recorded steps (40); fMRIPrep's calls on the recorded subjects (fMRIPrep's SampleToSurface (--trgsubject fsaverage))"
+checks = "through pctsurfcon, label-cortex's recorded steps (48); fMRIPrep's calls on the recorded subjects (fMRIPrep's SampleToSurface (--trgsubject fsaverage))"
 
 [[item]]
 id = "3.5-05"
@@ -5323,7 +5420,7 @@ crate = "larmorx-freesurfer-cortex"
 lines = 528
 files = ["mri_cor2label/mri_cor2label.cpp", "utils/label.cpp"]
 inputs = "modules bspline, core, deform, filter, gca, io, labels, maths, surf, surfio, volume, dicom, gifti, minc, misc, nifti"
-checks = "through label-cortex's recorded steps (20)"
+checks = "through label-cortex's recorded steps (24)"
 
 [[item]]
 id = "3.5-06"
@@ -5334,7 +5431,7 @@ crate = "larmorx-freesurfer-cortex"
 lines = 302
 files = ["mris_make_surfaces/mris_autodet_gwstats.cpp"]
 inputs = "modules bspline, core, deform, filter, gca, io, labels, maths, surf, surfio, volume, dicom, gifti, minc, misc, nifti"
-checks = "replay: 20 recorded steps in 10 runs"
+checks = "replay: 24 recorded steps in 12 runs"
 
 [[item]]
 id = "3.5-07"
@@ -5389,7 +5486,7 @@ crate = "larmorx-freesurfer-cortex"
 lines = 201
 files = ["utils/targetpointset.cpp", "utils/voxlist.cpp"]
 inputs = "the parts before it"
-checks = "replay: 160 recorded steps in 10 runs"
+checks = "replay: 192 recorded steps in 12 runs"
 
 [[item]]
 id = "3.5-12"
@@ -5400,7 +5497,7 @@ crate = "larmorx-freesurfer-cortex"
 lines = 1081
 files = ["mris_curvature/mris_curvature.cpp", "utils/mrisurf_metricProperties.cpp", "utils/mrisurf_vals.cpp"]
 inputs = "modules bspline, core, deform, filter, gca, io, labels, maths, surf, surfio, volume, dicom, gifti, minc, misc, nifti"
-checks = "replay: 40 recorded steps in 10 runs"
+checks = "replay: 48 recorded steps in 12 runs"
 
 [[item]]
 id = "3.5-13"
@@ -5422,7 +5519,7 @@ crate = "larmorx-freesurfer-cortex"
 lines = 1631
 files = ["utils/mrisurf_deform.cpp", "utils/mrisurf_integrate.cpp", "utils/mrisurf_metricProperties.cpp", "utils/mrisurf_vals.cpp", "utils/vertexRotator.cpp"]
 inputs = "the parts before it"
-checks = "through rca-surfreg's recorded steps (10)"
+checks = "through rca-surfreg's recorded steps (12)"
 
 [[item]]
 id = "3.5-15"
@@ -5433,7 +5530,7 @@ crate = "larmorx-freesurfer-cortex"
 lines = 241
 files = ["mris_jacobian/mris_jacobian.cpp"]
 inputs = "modules bspline, core, deform, filter, gca, io, labels, maths, surf, surfio, volume, dicom, gifti, minc, misc, nifti"
-checks = "replay: 20 recorded steps in 10 runs"
+checks = "replay: 24 recorded steps in 12 runs"
 
 [[item]]
 id = "3.5-16"
@@ -5444,7 +5541,7 @@ crate = "larmorx-freesurfer-cortex"
 lines = 458
 files = ["mrisp_paint/mrisp_paint.cpp", "utils/mrisp.cpp", "utils/mrisurf_vals.cpp"]
 inputs = "modules bspline, core, deform, filter, gca, io, labels, maths, surf, surfio, volume, dicom, gifti, minc, misc, nifti; data: 2 files, 5.7 MB (lh.folding.atlas.acfb40.noaparc.i12.2016-08-02.tif, rh.folding.atlas.acfb40.noaparc.i12.2016-08-02.tif)"
-checks = "replay: 20 recorded steps in 10 runs"
+checks = "replay: 24 recorded steps in 12 runs"
 
 [[item]]
 id = "3.5-17"
@@ -5455,7 +5552,7 @@ crate = "larmorx-freesurfer-cortex"
 lines = 1513
 files = ["mris_ca_label/mris_ca_label.cpp", "utils/annotation.cpp", "utils/gcsa.cpp", "utils/label.cpp", "utils/mrisurf_defect.cpp", "utils/mrisurf_metricProperties.cpp", "utils/mrisurf_vals.cpp"]
 inputs = "modules bspline, core, defect, deform, filter, gca, io, labels, maths, surf, surfio, volume, dicom, gifti, minc, misc, nifti; data: 6 files, 125.1 MB (lh.CDaparc.atlas.acfb40.noaparc.i12.2016-08-02.gcs, lh.DKTaparc.atlas.acfb40.noaparc.i12.2016-08-02.gcs, lh.DKaparc.atlas.acfb40.noaparc.i12.2016-08-02.gcs ...)"
-checks = "replay: 60 recorded steps in 10 runs"
+checks = "replay: 72 recorded steps in 12 runs"
 
 [[item]]
 id = "3.5-18"
@@ -5466,7 +5563,7 @@ crate = "larmorx-freesurfer-cortex"
 lines = 3269
 files = ["mris_curvature_stats/mris_curvature_stats.cpp", "utils/label.cpp", "utils/mrishash.cpp", "utils/mrisurf_metricProperties.cpp"]
 inputs = "modules bspline, core, deform, filter, gca, io, labels, maths, surf, surfio, volume, dicom, gifti, minc, misc, nifti"
-checks = "replay: 20 recorded steps in 10 runs"
+checks = "replay: 24 recorded steps in 12 runs"
 
 [[item]]
 id = "3.5-19"
@@ -5477,7 +5574,7 @@ crate = "larmorx-freesurfer-cortex"
 lines = 2577
 files = ["include/MRISOBBTree.h", "include/MRISdistancefield.h", "include/json.h", "include/utilsmath.h", "mris_volmask/cmd_line_interface.cpp", "mris_volmask/cmd_line_interface.h", "mris_volmask/mris_volmask.cpp", "utils/cma.cpp", "utils/fsenv.cpp", "utils/mriflood.cpp", "utils/mriset.cpp"]
 inputs = "modules bspline, core, deform, filter, gca, io, labels, maths, surf, surfio, volume, dicom, geomtools, gifti, json, minc, misc, nifti"
-checks = "replay: 10 recorded steps in 10 runs"
+checks = "replay: 12 recorded steps in 12 runs"
 
 [[item]]
 id = "3.5-20"
@@ -5488,7 +5585,7 @@ crate = "larmorx-freesurfer-cortex"
 lines = 1319
 files = ["mris_anatomical_stats/mris_anatomical_stats.cpp", "utils/mrisurf_vals.cpp"]
 inputs = "modules bspline, core, deform, filter, gca, io, labels, maths, surf, surfio, volume, dicom, gifti, minc, misc, nifti"
-checks = "replay: 120 recorded steps in 10 runs"
+checks = "replay: 144 recorded steps in 12 runs"
 
 [[item]]
 id = "3.5-21"
@@ -5499,7 +5596,7 @@ crate = "larmorx-freesurfer-cortex"
 lines = 707
 files = ["mris_label2annot/mris_label2annot.cpp"]
 inputs = "modules bspline, core, deform, filter, gca, io, labels, maths, surf, surfio, volume, dicom, gifti, minc, misc, nifti; data: 3 files, 0.0 MB (colortable_BA.txt, colortable_BA_thresh.txt, colortable_vpnl.txt)"
-checks = "replay: 60 recorded steps in 10 runs"
+checks = "replay: 72 recorded steps in 12 runs"
 
 [[item]]
 id = "3.5-22"
@@ -5510,7 +5607,7 @@ crate = "larmorx-freesurfer-cortex"
 lines = 2064
 files = ["mris_convert/mris_convert.cpp", "utils/MRISurfOverlay.cpp", "utils/gifti.cpp", "utils/mrisurf.cpp", "utils/mrisurf_io.cpp", "utils/mrisurf_metricProperties.cpp", "utils/mrisutils.cpp", "utils/surfgrad.cpp"]
 inputs = "modules bspline, core, deform, filter, gca, io, labels, maths, surf, surfio, volume, dicom, gifti, minc, misc, nifti; data: 1 files, 0.1 MB (FreeSurferColorLUT.txt)"
-checks = "through vertexvol, label-cortex's recorded steps (40); fMRIPrep's calls on the recorded subjects (sMRIPrep's MRIsConvert (GIFTI))"
+checks = "through vertexvol, label-cortex's recorded steps (48); fMRIPrep's calls on the recorded subjects (sMRIPrep's MRIsConvert (GIFTI))"
 
 [[item]]
 id = "3.5-23"
@@ -5531,7 +5628,7 @@ what = "mris_expand"
 crate = "larmorx-freesurfer-cortex"
 lines = 445
 files = ["mris_expand/mris_expand.cpp", "utils/label.cpp"]
-inputs = "modules bspline, core, defect, deform, filter, gca, io, labels, maths, surf, surfio, volume, dicom, gifti, json, minc, misc, nifti"
+inputs = "modules bspline, core, defect, deform, filter, gca, io, labels, maths, surf, surfio, volume, RANLUX's clean room (3.1-05), dicom, gifti, json, minc, misc, nifti"
 checks = "fMRIPrep's calls on the recorded subjects (sMRIPrep's MakeMidthickness)"
 
 [[item]]
@@ -5550,7 +5647,7 @@ id = "3.5-26"
 wave = "3.5"
 kind = "c++"
 what = "tkregister2_cmdl (1 of 2): tkregister2.cpp (lines 204-2906)"
-crate = "a non-commercial package (P1); its clean room in larmorx-fs-cortex"
+crate = "`larmorx-nc-tkregister2` (crates-nc/: its own program in the larmorx-nc wheel, P-11); its clean room in larmorx-fs-cortex"
 lines = 2493
 files = ["tkregister2/tkregister2.cpp"]
 inputs = "modules bspline, core, filter, gca, io, labels, maths, surf, surfio, volume, dicom, gifti, minc, misc, nifti"
@@ -5561,7 +5658,7 @@ id = "3.5-27"
 wave = "3.5"
 kind = "c++"
 what = "tkregister2_cmdl (2 of 2): registerio.cpp, fio.cpp, mri.cpp, tkregister2.cpp (lines 2946-5388), mri2.cpp; the program assembled"
-crate = "a non-commercial package (P1); its clean room in larmorx-fs-cortex"
+crate = "`larmorx-nc-tkregister2` (crates-nc/: its own program in the larmorx-nc wheel, P-11); its clean room in larmorx-fs-cortex"
 lines = 1555
 files = ["tkregister2/tkregister2.cpp", "utils/fio.cpp", "utils/mri.cpp", "utils/mri2.cpp", "utils/registerio.cpp"]
 inputs = "the parts before it"
@@ -5576,7 +5673,7 @@ crate = "larmorx-freesurfer-cortex"
 lines = 0
 files = []
 inputs = "runs fscalc, fsr-getxopts, mri_binarize, mri_cor2label, mri_label2label, mri_mergelabels, mri_vol2surf, mris_convert; data: 2 files, 0.0 MB (build-stamp.txt, sources.csh)"
-checks = "replay: 20 recorded steps in 10 runs"
+checks = "replay: 24 recorded steps in 12 runs"
 
 [[item]]
 id = "3.5-29"
@@ -5587,7 +5684,7 @@ crate = "larmorx-freesurfer-cortex"
 lines = 0
 files = []
 inputs = "runs mri_convert, mris_calc; data: 2 files, 0.0 MB (build-stamp.txt, sources.csh)"
-checks = "through label-cortex's recorded steps (20)"
+checks = "through label-cortex's recorded steps (24)"
 
 [[item]]
 id = "3.5-30"
@@ -5598,7 +5695,7 @@ crate = "larmorx-freesurfer-cortex"
 lines = 0
 files = []
 inputs = "data: 1 files, 0.0 MB (sources.csh)"
-checks = "through label-cortex's recorded steps (20)"
+checks = "through label-cortex's recorded steps (24)"
 
 [[item]]
 id = "3.5-31"
@@ -5609,7 +5706,7 @@ crate = "larmorx-freesurfer-cortex"
 lines = 0
 files = []
 inputs = "runs fsr-getxopts, mris_register; data: 2 files, 0.0 MB (build-stamp.txt, sources.csh)"
-checks = "replay: 10 recorded steps in 10 runs"
+checks = "replay: 12 recorded steps in 12 runs"
 
 [[item]]
 id = "3.5-32"
@@ -5620,7 +5717,7 @@ crate = "larmorx-freesurfer-cortex"
 lines = 0
 files = []
 inputs = "runs mris_calc, mris_convert; data: 1 files, 0.0 MB (sources.csh)"
-checks = "replay: 20 recorded steps in 10 runs"
+checks = "replay: 24 recorded steps in 12 runs"
 
 [[item]]
 id = "3.5-33"
@@ -5631,7 +5728,7 @@ crate = "larmorx-freesurfer-cortex"
 lines = 0
 files = []
 inputs = "runs mri_concat, mri_segstats, mri_vol2surf; data: 1 files, 0.0 MB (sources.csh)"
-checks = "replay: 20 recorded steps in 10 runs"
+checks = "replay: 24 recorded steps in 12 runs"
 
 [[item]]
 id = "3.5-34"
@@ -5653,7 +5750,7 @@ crate = "larmorx-freesurfer-cortex"
 lines = 0
 files = []
 inputs = "data: 1 files, 0.0 MB (global-expert-options.v8.txt)"
-checks = "through label-cortex, rca-surfreg's recorded steps (30)"
+checks = "through label-cortex, rca-surfreg's recorded steps (36)"
 
 [[item]]
 id = "3.5-36"
@@ -5664,7 +5761,7 @@ crate = "larmorx-freesurfer-cortex"
 lines = 0
 files = []
 inputs = "modules bspline, core, deform, filter, gca, io, labels, maths, surf, surfio, volume, dicom, gifti, minc, misc, nifti; data: 2 files, 0.0 MB (ASegStatsLUT.txt, WMParcStatsLUT.txt); waits for deform (13), gca (6,087), surf (1,936)"
-checks = "replay: 20 recorded steps in 10 runs"
+checks = "replay: 24 recorded steps in 12 runs"
 
 [[item]]
 id = "3.5-37"
@@ -5675,13 +5772,13 @@ crate = "larmorx-freesurfer-cortex"
 lines = 0
 files = []
 inputs = "modules bspline, core, deform, filter, gca, io, labels, maths, surfio, volume, dicom, gifti, minc, misc, nifti; waits for deform (13), gca (6,014)"
-checks = "through mri_nu_correct.mni, vertexvol's recorded steps (37)"
+checks = "through mri_nu_correct.mni, vertexvol's recorded steps (42)"
 
 [[item]]
 id = "3.6-01"
 wave = "3.6"
 kind = "clean-room-only"
-what = "cr.4dfp (Washington University's 4dfp tools (P-12): a clean room only, at the process boundary talairach_avi already has): cflip.c, Getifh.c, rec.c, endianio.c"
+what = "cr.4dfp (Washington University's 4dfp tools (P-12): a clean room only (the user, 2026-11-12), at the process boundary talairach_avi already has): cflip.c, Getifh.c, rec.c, endianio.c"
 crate = "larmorx-fs-classic"
 lines = 320
 files = ["talairach_avi/Getifh.c", "talairach_avi/cflip.c", "talairach_avi/endianio.c", "talairach_avi/rec.c"]
@@ -5867,9 +5964,9 @@ checks = "synthetic cases and a recorded call of its own (no default step runs i
 [[item]]
 id = "3.6-18"
 wave = "3.6"
-kind = "tcsh"
+kind = "clean room only"
 what = "talairach_avi (253 lines of tcsh)"
-crate = "larmorx-freesurfer-classic"
+crate = "larmorx-fs-classic"
 lines = 0
 files = []
 inputs = "runs avi2talxfm, lta_convert, mpr2mni305, mri_convert; data: 1 files, 0.0 MB (sources.csh)"
@@ -5878,9 +5975,9 @@ checks = "replay: 6 recorded steps in 6 runs"
 [[item]]
 id = "3.6-19"
 wave = "3.6"
-kind = "csh"
+kind = "clean room only"
 what = "mpr2mni305 (215 lines of csh)"
-crate = "larmorx-freesurfer-classic"
+crate = "larmorx-fs-classic"
 lines = 0
 files = []
 inputs = "runs analyzeto4dfp, compute_vox2vox, gauss_4dfp, imgreg_4dfp; data: 1 files, 0.0 MB (sources.csh)"
@@ -5972,7 +6069,7 @@ crate = "larmorx-freesurfer-networks"
 lines = 0
 files = []
 inputs = "data: 4 files, 3,569.2 MB (mni305.cor.stripped.mgz, mni152.1.0mm.cropped.nii.gz, synthmorph.affine.2.h5 ...)"
-checks = "through fs-synthmorph-reg's recorded steps (5)"
+checks = "through fs-synthmorph-reg's recorded steps (6)"
 
 [[item]]
 id = "N-07"
@@ -5983,7 +6080,7 @@ crate = "larmorx-freesurfer-networks"
 lines = 636
 files = ["mri_concatenate_lta/mri_concatenate_lta.cpp"]
 inputs = "modules bspline, core, filter, gca, io, labels, maths, surfio, volume, dicom, gifti, minc, misc, nifti; data: 1 files, 0.0 MB (reg.1.0mm.to.1.0mm.cropped.lta); waits for deform (13)"
-checks = "through fs-synthmorph-reg's recorded steps (5)"
+checks = "through fs-synthmorph-reg's recorded steps (6)"
 
 [[item]]
 id = "N-08"
@@ -5994,7 +6091,7 @@ crate = "larmorx-freesurfer-networks"
 lines = 1005
 files = ["mri_warp_convert/mri_warp_convert.cpp", "utils/gcamorph.cpp", "utils/transform.cpp"]
 inputs = "modules bspline, core, filter, gca, io, labels, maths, surfio, volume, dicom, gifti, minc, misc, nifti; waits for deform (13)"
-checks = "through fs-synthmorph-reg's recorded steps (5)"
+checks = "through fs-synthmorph-reg's recorded steps (6)"
 
 [[item]]
 id = "N-09"
@@ -6005,7 +6102,7 @@ crate = "larmorx-freesurfer-networks"
 lines = 1155
 files = ["mri_diff/mri_diff.cpp", "utils/mri2.cpp"]
 inputs = "modules bspline, core, filter, gca, io, labels, maths, surfio, volume, dicom, gifti, minc, misc, nifti; waits for deform (13)"
-checks = "through fs-synthmorph-reg's recorded steps (5)"
+checks = "through fs-synthmorph-reg's recorded steps (6)"
 
 [[item]]
 id = "N-10"
@@ -6016,7 +6113,7 @@ crate = "larmorx-freesurfer-networks"
 lines = 0
 files = []
 inputs = "runs getfullpath, lta_convert, mri_ca_register, mri_concatenate_lta, mri_convert, mri_diff, mri_mask, mri_synthmorph, mri_vol2vol, mri_warp_convert; data: 2 files, 0.0 MB (build-stamp.txt, sources.csh)"
-checks = "replay: 5 recorded steps in 5 runs"
+checks = "replay: 6 recorded steps in 6 runs"
 
 [[item]]
 id = "N-11"
@@ -6027,7 +6124,7 @@ crate = "larmorx-freesurfer-networks"
 lines = 0
 files = []
 inputs = "runs fs-synthmorph-reg, getfullpath, lta_convert; data: 2 files, 0.0 MB (build-stamp.txt, sources.csh)"
-checks = "replay: 5 recorded steps in 5 runs"
+checks = "replay: 6 recorded steps in 6 runs"
 
 [[item]]
 id = "N-12"
@@ -6217,6 +6314,13 @@ inputs = "data: 1 files, 0.0 MB (sources.csh)"
 checks = "synthetic cases and a recorded call of its own (no default step runs it)"
 
 [[clean_room]]
+id = "C3.1-00"
+after_wave = "3.1"
+what = "the clean-room crates, empty (crates/larmorx-fs-core, -gca, -surf and the program crates -volumes, -atlas, -topology, -cortex, -classic, -networks, -recon), created by the first FreeSurfer clean-room relay from a clean brief (split from 3.1-01: no agent that read FreeSurfer's material creates them, the coherence review's finding 7); the orchestrator adds them to the clean-room audit's lists (CLEANROOM_CRATES, CLEANROOM_PATHS, a FreeSurfer entry like FSL_TOOLS) in that part"
+crate = "crates/larmorx-fs-*"
+lines = 0
+
+[[clean_room]]
 id = "C3.1-01"
 after_wave = "3.1"
 what = "fs.core's clean room (messages, diagnostics, program name, environment, version stamps, the ROMP switch, timers, paths, signals, the licence check's messages)"
@@ -6228,7 +6332,7 @@ id = "C3.1-02"
 after_wave = "3.1"
 what = "fs.maths's clean room (matrices (float and long double), the numerics wrappers over VNL and Cephes, fs_powell, fs_lbfgs, histograms, statistics, PDFs, random fields)"
 crate = "larmorx-fs-core"
-lines = 6074
+lines = 5601
 
 [[clean_room]]
 id = "C3.1-03"
@@ -6254,7 +6358,7 @@ lines = 26345
 [[clean_room]]
 id = "C3.1-06"
 after_wave = "3.1"
-what = "fs.filter's clean room (volume filters and morphology, intensity normalisation (with Burkardt's spline, P-09), segmentation helpers, flood fill, connected components, fast marching, clusters)"
+what = "fs.filter's clean room (volume filters and morphology, intensity normalisation (its cubic spline: fs.spline), segmentation helpers, flood fill, connected components, fast marching, clusters)"
 crate = "larmorx-fs-core"
 lines = 11201
 
@@ -6389,7 +6493,7 @@ id = "C3.2-18"
 after_wave = "3.2"
 what = "mri_normalize's clean room"
 crate = "larmorx-fs-volumes"
-lines = 4404
+lines = 4212
 
 [[clean_room]]
 id = "C3.2-19"
@@ -6854,20 +6958,6 @@ crate = "larmorx-fs-classic"
 lines = 25
 
 [[clean_room]]
-id = "C3.6-06"
-after_wave = "3.6"
-what = "talairach_avi's clean room"
-crate = "larmorx-fs-classic"
-lines = 253
-
-[[clean_room]]
-id = "C3.6-07"
-after_wave = "3.6"
-what = "mpr2mni305's clean room"
-crate = "larmorx-fs-classic"
-lines = 215
-
-[[clean_room]]
 id = "C3.6-08"
 after_wave = "3.6"
 what = "avi2talxfm's clean room"
@@ -7034,3 +7124,94 @@ after_wave = "3.7"
 what = "fs-check-os's clean room"
 crate = "larmorx-fs-recon"
 lines = 210
+
+[[clean_room]]
+id = "CP-01"
+after_wave = "step 6"
+what = "perm.gifti's clean room (GIFTI: gifticlib, read over a pure-Rust XML parser in expat 2.0.1's place (W3); the writer exact, with its long-double line formatting (P-05))"
+crate = "with step 6"
+lines = 10365
+
+[[clean_room]]
+id = "CP-02"
+after_wave = "step 6"
+what = "perm.minc's clean room (MINC's volume_io: the .xfm reader (W3: a pure-Rust parser, the same values and messages) and writer (exact) (P-05; FreeSurfer's changes to the MINC files in larmorx-freesurfer-io))"
+crate = "with step 6"
+lines = 1676
+
+[[clean_room]]
+id = "CP-03"
+after_wave = "step 6"
+what = "perm.nifti's clean room (niftilib and znzlib (P-05))"
+crate = "with step 6"
+lines = 335
+
+[[clean_room]]
+id = "CP-04"
+after_wave = "step 6"
+what = "perm.dicom's clean room (CTN's DICOM library (P-05): the format probe of every volume reader (W3: a pure-Rust probe, no port of CTN); DICOM input later)"
+crate = "with step 6"
+lines = 4371
+
+[[clean_room]]
+id = "CP-05"
+after_wave = "step 6"
+what = "perm.misc's clean room (miniz, libtiff, NrrdIO, Cephes, the FNV hash (P-05, P-06))"
+crate = "with step 6"
+lines = 1467
+
+[[clean_room]]
+id = "CP-06"
+after_wave = "step 6"
+what = "perm.json's clean room (nlohmann/json 3.2.0 (P-06): a pure-Rust parser in its parser's place (W3); its writer exact (its number formatting decides JSON outputs' bytes))"
+crate = "with step 6"
+lines = 3508
+
+[[clean_room]]
+id = "CP-07"
+after_wave = "step 6"
+what = "perm.geomtools's clean room (Geometric Tools' distances and bounding boxes (P-06, mris_volmask))"
+crate = "with step 6"
+lines = 424
+
+[[clean_room]]
+id = "CP-08"
+after_wave = "step 6"
+what = "perm.argparse's clean room (the argparse derived from Hilton Bristow's ArgumentParser (P-06): the newer programs' command lines and messages)"
+crate = "with step 6"
+lines = 396
+
+[[clean_room]]
+id = "CP-09"
+after_wave = "step 6"
+what = "the x87 80-bit arithmetic's improved form (3.1-03 is written from Intel's manual, no upstream code: a faster implementation where it pays)"
+crate = "with step 6"
+lines = 0
+
+[[clean_room]]
+id = "CP-10"
+after_wave = "step 6"
+what = "vnl_random's and drand48's clean rooms (3.1-04's permissive part)"
+crate = "with step 6"
+lines = 0
+
+[[clean_room]]
+id = "CP-11"
+after_wave = "step 6"
+what = "the VNL and netlib routines' clean rooms (3.1-07; with ANTs' and ITK's VNL ports)"
+crate = "with step 6"
+lines = 0
+
+[[clean_room]]
+id = "CP-12"
+after_wave = "step 6"
+what = "ITK 4.13.2's N4, B-spline, shrink and Gaussian filters and the non-local means denoiser (P-03, P-04; AntsN4BiasFieldCorrectionFs and AntsDenoiseImageFs): with ANTs' and ITK's clean rooms"
+crate = "with step 6"
+lines = 0
+
+[[clean_room]]
+id = "CP-13"
+after_wave = "step 6"
+what = "the networks' inference core's clean room (N-01, larmorx-nn)"
+crate = "with step 6"
+lines = 0

@@ -190,6 +190,8 @@ def make(d: Path) -> None:
         )
         write_mgh(d / f"m32-e{i}.mgh", x.astype(np.float32), obl)
         write_mgh(d / f"m16-e{i}.mgz", np.round(x).astype(np.int16), aff)
+        write_mgh(d / f"mu16-e{i}.mgz", np.round(np.abs(x)).astype(np.uint16), aff, good_ras=False)
+        write_mgh(d / f"m8-e{i}.mgz", np.clip(np.round(x / 6), 0, 255).astype(np.uint8), aff)
     # computed masks (nilearn's compute_epi_mask of the first echo) need a head: int16 MGZ, and
     # big-endian int16 ANALYZE with SPM2's scale factor and a MATLAB 5 `mat`
     for i, x in enumerate(_head_echoes(), 1):
@@ -208,8 +210,6 @@ def make(d: Path) -> None:
             np.array([[-3.0, 0, 0, 9], [0, 3, 0, -12], [0, 0, 3.5, -7], [0, 0, 0, 1]]),
             "5",
         )
-        write_mgh(d / f"mu16-e{i}.mgz", np.round(np.abs(x)).astype(np.uint16), aff, good_ras=False)
-        write_mgh(d / f"m8-e{i}.mgz", np.clip(np.round(x / 6), 0, 255).astype(np.uint8), aff)
     # a mask of each format
     write_analyze(d / "amask.hdr", mask, dtype="u1", origin=(3, 4, 2))
     write_analyze(d / "amask64.hdr", mask, dtype="u1", pixdim=(0.0, -3.0, 3.5), gz=True)

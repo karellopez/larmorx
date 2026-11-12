@@ -212,8 +212,8 @@ OPENBLAS_CORETYPE=Haswell scripts/orchestration/boxed.sh 32 <env>/bin/python -P 
   unknown ANALYZE type, MGH dimensions of 0, an MGH version other than 1, a `.mgh.gz` name; a
   head-shaped series for nilearn's computed mask of an ANALYZE and an MGZ reference):
   `make(<folder>)` writes them, `CASES` names them (20; the suite runs them in both environments,
-  `reproduce` bit for bit, the default pass). Result: 20 of 20 agree, 11 complete and 9 refused
-  alike (log `oracles/logs/t2smap-cr-rs2-formats3.log`).
+  `reproduce` bit for bit, the default pass). Result: 20 of 20 agree, 12 complete and 8 refused
+  alike (log `oracles/logs/t2smap-cr-rs2-formats4.log`).
 - `rs2_replayed_formats.py <work> <larmorx-gpl> <scratch>` (relay RS2): the replica
   (`reproduce`) against tedana's files on the replayed random-testing cases of the clean-room
   part whose inputs are ANALYZE or MGH (`<work>/f<n>/{inputs,tedana/out}` as

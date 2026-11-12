@@ -3,10 +3,12 @@
 **Closed to FreeSurfer clean-room implementers** (written from FreeSurfer's source; see
 [README.md](README.md)).
 
-Relay 1 of FreeSurfer's preparation, 2026-11-12. Everything below is read from the source; no
-recorded run existed yet (the package was still downloading). Each claim gives the file and line it
-comes from. The recordings (`<workspace>/oracles/freesurfer-8.2.0/runs/`) will confirm the lists;
-whatever they show differently is corrected here and noted as such.
+Relay 1 of FreeSurfer's preparation, 2026-11-12. Everything below is read from the source; each
+claim gives the file and line it comes from. The recordings (`<workspace>/oracles/freesurfer-8.2.0/runs/`)
+confirm or correct it: at the end of relay 1, the first ones (ds000005 sub-01, v8 steps 1-8 and
+classic steps 1-12) matched §3's order and arguments exactly, N4's call inside
+`mri_nu_correct.mni` included, and corrected one reading (`rca-talairach`'s thread count, §4).
+The next relays check the rest as the runs finish.
 
 Sources read:
 
@@ -217,9 +219,9 @@ programs too"). Lines are each script's.
   --vox2ras` twice and `mri_matrix_multiply -fsl` (47-56).
 - **`rca-talairach`** (tcsh, 299 lines; v8, stage 15): input forced to `mri/synthstrip.mgz` (258);
   `fs-synthmorph-reg --i synthstrip.mgz --t $FREESURFER/average/mni305.cor.stripped.mgz --affine-only
-  --o mri/transforms/synthmorph.mni305 --threads $OMP_NUM_THREADS` (87), where `OMP_NUM_THREADS` was
-  set to 1 at line 14, before `--threads` is read (so this registration runs at one thread whatever
-  recon-all asks; to be confirmed on the recordings); then (bare) `lta_convert --ltavox2vox --inlta
+  --o mri/transforms/synthmorph.mni305 --threads $OMP_NUM_THREADS` (87; `--threads` resets
+  `OMP_NUM_THREADS`, 165-170, so recon-all's count reaches it: the ds000005 v8 recording shows
+  `--threads 4` and `mri_synthmorph ... -j 4`); then (bare) `lta_convert --ltavox2vox --inlta
   aff.lta --outlta transforms/talairach.xfm.lta` and `lta_convert --inlta talairach.xfm.lta --outmni
   transforms/talairach.xfm` (103-106).
 - **`fs-synthmorph-reg`** (tcsh, 1001 lines; v8, stages 15, 16, and inside 20, 21). Defaults:
@@ -402,9 +404,8 @@ For the handoff (`docs/freesurfer-plan.md`, its waves; the final relay writes th
 
 Script behaviours worth a finding when the recordings confirm them (rules A-D apply when ported):
 the v8 `T1PialSurf` key that never matches, so `mrisps.pial.mgz` is never written (§1); the v8
-`mri_ca_label` options that no stream applies (§1); `rca-talairach` running SynthMorph's affine at
-one thread whatever `-openmp` says (§4); `mri_vsinus_seg` receiving the previous step's expert
-options (§4).
+`mri_ca_label` options that no stream applies (§1); `mri_vsinus_seg` receiving the previous step's
+expert options (§4).
 
 Open questions (also in the relay notes):
 

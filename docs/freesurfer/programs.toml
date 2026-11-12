@@ -1046,7 +1046,7 @@ run = "timed"
 stages = ["15"]
 uses = ["--s <subj> --threads N"]
 plan_wave = "3.3"
-notes = "fs-synthmorph-reg --affine-only to mni305.cor.stripped.mgz at one thread (OMP_NUM_THREADS set to 1 before --threads is read); lta_convert x2 (bare)"
+notes = "fs-synthmorph-reg --affine-only to mni305.cor.stripped.mgz with recon-all's thread count (recorded: --threads 4, mri_synthmorph -j 4); lta_convert x2 (bare)"
 
 [[program]]
 name = "fs-synthmorph-reg"
@@ -1056,7 +1056,7 @@ streams = ["v8"]
 called_by = ["recon-all", "rca-talairach", "mri_mcadura_seg", "mri_vsinus_seg"]
 run = "mixed"
 stages = ["15", "16"]
-uses = ["--s <subj> --threads N --i <sd>/mri/orig.mgz --test", "--i <sd>/mri/synthstrip.mgz --t $FREESURFER/average/mni305.cor.stripped.mgz --affine-only --o <sd>/mri/transforms/synthmorph.mni305 --threads 1"]
+uses = ["--s <subj> --threads N --i <sd>/mri/orig.mgz --test", "--i <sd>/mri/synthstrip.mgz --t $FREESURFER/average/mni305.cor.stripped.mgz --affine-only --o <sd>/mri/transforms/synthmorph.mni305 --threads N"]
 plan_wave = "3.3"
 notes = "mri_mask -bb 3, lta_convert, mri_synthmorph affine and deform, mri_concatenate_lta x2, mri_warp_convert, mri_ca_register -invert-and-save, mri_vol2vol, mri_convert -at, mri_diff"
 

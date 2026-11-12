@@ -124,6 +124,8 @@ class _Line(_Err):
         self.kind = "ValueError" if kind == "TraitError" else kind
         lines = str(exc).strip().splitlines()
         self.text = "" if kind_only else (lines[-1] if lines else "")
+        #: the whole message (the fix pass reads the defects it names)
+        self.full = str(exc)
 
 
 def _guard(fn: Callable[[], Any], *, kind_only: bool = False) -> Any:
@@ -137,9 +139,11 @@ def _guard(fn: Callable[[], Any], *, kind_only: bool = False) -> Any:
 def _canon(v: Any) -> Any:
     """``v`` with every NaN made one NaN (the suites count a NaN's payload apart)."""
     if isinstance(v, np.ndarray):
-        if v.dtype.kind == "f" and v.size and np.isnan(v).any():
+        if v.dtype.kind in "fc" and v.size and np.isnan(v).any():
             v = v.copy()
-            v[np.isnan(v)] = np.nan
+            parts = (v,) if v.dtype.kind == "f" else (v.real, v.imag)
+            for p in parts:
+                p[np.isnan(p)] = np.nan
         return v
     if isinstance(v, np.floating) and np.isnan(v):
         return type(v)(np.nan)
@@ -1731,7 +1735,7 @@ def _run_case(case: Case, checks: CheckList) -> None:
             warnings.simplefilter("always")
             fixed = CALLS[call](e, files, tmp, nt).larmorx("fix")
         entries = _entries(w3)
-        entries = list(dict.fromkeys([*entries, *(i for x in _errors(fixed) for i in _IDS.findall(x.text))]))
+        entries = list(dict.fromkeys([*entries, *(i for x in _errors(fixed) for i in _IDS.findall(getattr(x, "full", x.text)))]))
         fixed, got = _canon(fixed), _canon(got)
         change = defects.Change(0, 0, 0.0)
         other = ""

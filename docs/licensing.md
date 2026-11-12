@@ -276,10 +276,9 @@ decision log "No waiting for permissions").
   sources; FreeSurfer's licence text is not under the image's `/opt/freesurfer` either). A Rust
   translation of WashU's code is a derivative work that arrangement would not cover. Simplest
   way to settle it: ask Washington University (A. Z. Snyder's group) for written permission to
-  port the code and ship the atlases. **Decided 2026-11-12 (the user, "No waiting for permissions"):** a replica of
-  the Talairach step in `larmorx-freesurfer` and a clean room in `larmorx`, both built now, with no request first;
-  publishing is the user's call (until then the replica stays on a local branch, never pushed); the atlases are
-  fetched at first use. `mni305.cor.mgz` is
+  port the code and ship the atlases. **Decided 2026-11-12 (the user, "No waiting for permissions"):** first a replica and a
+  clean room; then, the same day, **a clean room only** (the user: "make a clean room of the first one to avoid the
+  problems"): no replica unless Washington University gives written permission; the atlases are fetched at first use. `mni305.cor.mgz` is
   derived from MNI's MINC average (MNI's terms are permissive).
 - **Eigen (MPL-2.0), one file in `larmorx-core`** (decided by the user, 2026-10-23: kept).
   `crates/larmorx-core/src/eigen_sym.rs` translates Eigen 3.4.90's self-adjoint eigensolver (as

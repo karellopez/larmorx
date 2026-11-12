@@ -2469,3 +2469,10 @@ replica's gaps, the site, the handoff); the clean relays never read the replica 
   37 records marked validated on 2026-11-12 keep their status (a frozen list, shown on the site); a new `validated`
   needs its extensive evidence named (the site's export refuses it otherwise). The porting guide's status paragraph and
   PLAN.md §4 follow at the documentation revision's merge.
+- **Washington University's Talairach tools: a clean room only** (the user, 2026-11-12: "Can we make a clean room of the
+  first one to avoid the problems?", after learning that the 4dfp source forbids reproduction without Washington
+  University's written permission). `talairach_avi` and its 4dfp tools get a clean room in `larmorx` (from behaviour and
+  black-box runs, checked against the recorded heads), its atlases fetched at first use; no replica, unless Washington
+  University gives written permission later. This replaces the 4dfp replica of "No waiting for permissions" above. Burkardt's
+  2006 spline routines: the orchestrator recommends publishing their replica normally with his credit (his code is MIT
+  today); the user to confirm.

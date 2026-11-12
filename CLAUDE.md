@@ -95,7 +95,7 @@ with fMRIPrep. Machine-only runs meanwhile: 8 heavy random-testing cases wait fo
   copies where the original holds none, and no speed cache that raises the peak.
   `tests/parity/test_memory_peak.py` holds the measured calls; every new port adds its own
   (`validation/investigations/difftest/memory_pair.py` measures one).
-- **Settled technical choices** (decision log): `.h5` files compared by content, not compressed bytes (2026-10-16; byte-identical deflate deferred); pretrained models re-implemented as Rust inference with the original weights, validated as equivalence (2026-10-19); FreeSurfer's licence key is a runtime check, not a licence term, so `larmorx-freesurfer` needs none; Washington University's Talairach step gets a clean-room original with its atlas fetched from FreeSurfer on first use (2026-10-19; `docs/licensing.md`), and a replica in `larmorx-freesurfer` (the user, 2026-11-12: "No waiting for permissions"; publishing it is the user's call).
+- **Settled technical choices** (decision log): `.h5` files compared by content, not compressed bytes (2026-10-16; byte-identical deflate deferred); pretrained models re-implemented as Rust inference with the original weights, validated as equivalence (2026-10-19); FreeSurfer's licence key is a runtime check, not a licence term, so `larmorx-freesurfer` needs none; Washington University's Talairach step gets a clean-room original with its atlas fetched from FreeSurfer on first use (2026-10-19; `docs/licensing.md`) (the user, 2026-11-12: a clean room only, no replica unless Washington University gives written permission).
 
 ## Workspace layout
 ```

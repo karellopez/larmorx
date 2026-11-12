@@ -94,7 +94,7 @@ from here".
 | 3.3 Atlas | the atlas programs both streams run (`mri_em_register`, `mri_ca_normalize`, `mri_ca_register`) |
 | 3.4 First surfaces | tessellation to the fixed, remeshed surface |
 | 3.5 Final surfaces and statistics | placement, registration, parcellation, statistics; fMRIPrep's surface programs and `bbregister` (with `tkregister2_cmdl`) |
-| 3.6 The classic-only programs | `mri_watershed`, the Talairach chain (`talairach_avi`: a replica and a clean room, its atlases fetched), `talairach_afd`, `mri_ca_label` |
+| 3.6 The classic-only programs | `mri_watershed`, the Talairach chain (`talairach_avi`: a clean room only, its atlases fetched), `talairach_afd`, `mri_ca_label` |
 | N The v8 networks (a parallel track) | the inference core, the four network programs, their scripts |
 | 3.7 `recon-all` | the script's behaviour (its steps, flags, checks, logs, the resume logic sMRIPrep uses) |
 
@@ -125,16 +125,16 @@ record, memory near the original's, its reference page and evidence page from th
 
 **Borrowed code inside FreeSurfer** (the user, 2026-11-12; decision log): every third-party piece gets a
 replica, in the package of its own licence family (GSL's GPL code in `larmorx-gpl`, CorTechs' non-commercial
-`tkregister2_cmdl` in `larmorx-nc` as its own program, Burkardt's spline and Washington University's 4dfp tools in
-`larmorx-freesurfer`, EPFL's B-splines
+`tkregister2_cmdl` in `larmorx-nc` as its own program, Burkardt's spline in `larmorx-freesurfer`, EPFL's B-splines
 (`mriBSpline.cpp`, carrying MGH's notice) in `larmorx-freesurfer` crediting EPFL), and an improved clean room in
 `larmorx`; `larmorx` keeps full freedom, and users install a restricted replica only if they want it. Where a
 piece's licence and FreeSurfer's cannot be combined in one program, the replica uses the clean-room piece there
 (the placement table, `docs/freesurfer/third-party.md`). MARS later; ITK 4.13.2 where it differs from 5.4.5.
 No waiting for permissions (the user, 2026-11-12): the replicas are built now. **Publishing is the user's call**:
 until the user says whether a push to the public repository counts as publishing, the replicas of pieces that carry
-no licence at all (Washington University's 4dfp tools, Burkardt's 2006 routines) stay on a local branch, never
-pushed, outside every wheel.
+no licence at all (Burkardt's 2006 routines) stay on a local branch, never pushed, outside every wheel.
+**Washington University's Talairach tools get a clean room only** (the user, 2026-11-12): their source forbids
+reproduction without written permission, so no replica unless that permission comes.
 
 The four rules (the user, 2026-11-12; decision log):
 

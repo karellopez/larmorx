@@ -561,6 +561,21 @@ def _repetition_time(img: Any, header_name: str, upstream_defects: str) -> np.fl
 _CLASS = {"CompCor": "CompCor", "aCompCor": "CompCor", "tCompCor": "TCompCor"}
 
 
+def _trait(spec: str, name: str, info: str, value: Any) -> ValueError:
+    """traits' ``TraitError`` text for a refused input value (as ``ValueError``)."""
+    return ValueError(
+        f"The '{name}' trait of a {spec} instance must be {info}, but a value of {value!r} "
+        f"{type(value)!r} was specified."
+    )
+
+
+def _xor(name: str, other: str) -> OSError:
+    """nipype's ``OSError`` for two exclusive inputs (``other`` set first)."""
+    return OSError(
+        f'Input "{name}" is mutually exclusive with input "{other}", which is already set'
+    )
+
+
 def _savetxt(path: str, data: np.ndarray, header: str) -> None:
     """nipype's ``np.savetxt(path, data, fmt="%.10f", delimiter="\\t", header=header,
     comments="")`` (Linux's line ends on every platform)."""
@@ -609,30 +624,52 @@ def _compcor(
             "removed or "
             "raise an error as of release 0.15.0 It has been replaced by pre_filter."
         )
-    if pre_filter not in ("polynomial", "cosine", False):
-        raise ValueError(f"pre_filter must be 'polynomial', 'cosine' or False, not {pre_filter!r}")
-    if num_components is not None and variance_threshold is not None:
-        raise ValueError("num_components and variance_threshold are mutually exclusive")
-    if num_components is not None and num_components != "all" and int(num_components) < 1:
-        raise ValueError("num_components must be 'all' or at least 1")
-    if variance_threshold is not None and not 0.0 < variance_threshold < 1.0:
-        raise ValueError("variance_threshold must be between 0 and 1, exclusive")
-    if merge_method is not None and mask_index is not None:
-        raise ValueError("merge_method and mask_index are mutually exclusive")
+    # The input spec's traits, with traits' and nipype's texts (TraitError as ValueError; the
+    # inputs in the signature's order, each value checked as it is set, then its exclusions).
+    spec = "TCompCorInputSpec" if header_name == "tCompCor" else "CompCorInputSpec"
+    iface = {"CompCor": "CompCor", "aCompCor": "ACompCor", "tCompCor": "TCompCor"}[header_name]
+
+    def integer(v: Any) -> bool:
+        return isinstance(v, int | np.integer)
+
     if merge_method is not None and merge_method not in ("union", "intersect", "none"):
-        raise ValueError(
-            f"merge_method must be 'union', 'intersect' or 'none', not {merge_method!r}"
-        )
-    if (merge_method is not None or mask_index is not None) and not mask_files:
-        raise ValueError("merge_method and mask_index require mask_files")
-    if int(regress_poly_degree) < 1 or int(ignore_initial_volumes) < 0:
-        raise ValueError(
-            "regress_poly_degree must be at least 1, ignore_initial_volumes at least 0"
-        )
+        raise _trait(spec, "merge_method", "'union' or 'intersect' or 'none'", merge_method)
+    if mask_index is not None:
+        if not integer(mask_index) or mask_index < 0:
+            raise _trait(spec, "mask_index", "an integer >= 0", mask_index)
+        if merge_method is not None:
+            raise _xor("mask_index", "merge_method")
+    if num_components is not None and not (
+        num_components == "all" or (integer(num_components) and num_components >= 1)
+    ):
+        raise _trait(spec, "num_components", "an integer >= 1 or 'all'", num_components)
+    if variance_threshold is not None:
+        if not (isinstance(variance_threshold, int | float) and 0.0 < variance_threshold < 1.0):
+            raise _trait(
+                spec, "variance_threshold", "0.0 < a floating point number < 1.0", variance_threshold
+            )
+        if num_components is not None:
+            raise _xor("variance_threshold", "num_components")
+    if pre_filter not in ("polynomial", "cosine", False):
+        raise _trait(spec, "pre_filter", "'polynomial' or 'cosine' or False", pre_filter)
+    if not integer(regress_poly_degree) or regress_poly_degree < 1:
+        raise _trait(spec, "regress_poly_degree", "an integer >= 1", regress_poly_degree)
+    if not integer(ignore_initial_volumes) or ignore_initial_volumes < 0:
+        raise _trait(spec, "ignore_initial_volumes", "an integer >= 0", ignore_initial_volumes)
     if failure_mode not in ("error", "NaN"):
-        raise ValueError(f"failure_mode must be 'error' or 'NaN', not {failure_mode!r}")
-    if percentile_threshold is not None and not 0.0 < percentile_threshold < 1.0:
-        raise ValueError("percentile_threshold must be between 0 and 1, exclusive")
+        raise _trait(spec, "failure_mode", "'error' or 'NaN'", failure_mode)
+    if percentile_threshold is not None and not (
+        isinstance(percentile_threshold, int | float) and 0.0 < percentile_threshold < 1.0
+    ):
+        raise _trait(
+            spec, "percentile_threshold", "0.0 < a floating point number < 1.0", percentile_threshold
+        )
+    for name, value in (("merge_method", merge_method), ("mask_index", mask_index)):
+        if value is not None and not mask_files:
+            raise ValueError(
+                f"{iface} requires a value for input 'mask_files' because '{name}' is set. For a "
+                f"list of required inputs, see {iface}.help()"
+            )
     out_dir = os.fspath(out_dir)
     os.makedirs(out_dir, exist_ok=True)
 

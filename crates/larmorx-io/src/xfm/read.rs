@@ -60,10 +60,10 @@ impl<'a> CStream<'a> {
     /// whatever is pushed back is never read: every path that gets here stops reading). `char`
     /// is signed on x86-64, so the byte 0xFF is `EOF` to `ungetc`, which then pushes nothing.
     fn ungetc(&mut self, ch: Option<u8>) {
-        if let Some(c) = ch {
-            if c != 0xFF {
-                self.back.push(c);
-            }
+        if let Some(c) = ch
+            && c != 0xFF
+        {
+            self.back.push(c);
         }
     }
 }
@@ -466,19 +466,19 @@ fn input_one_transform(
                 return err;
             }
             let mut volume_filename = volume_filename.expect("a token");
-            if volume_filename.first() != Some(&b'/') {
-                if let Some(f) = filename {
-                    let directory = Ctx {
-                        dialect,
-                        notices: &mut *notices,
-                    }
-                    .extract_directory(f);
-                    if !directory.is_empty() {
-                        let mut t = directory;
-                        t.push(b'/');
-                        t.extend_from_slice(&volume_filename);
-                        volume_filename = t;
-                    }
+            if volume_filename.first() != Some(&b'/')
+                && let Some(f) = filename
+            {
+                let directory = Ctx {
+                    dialect,
+                    notices: &mut *notices,
+                }
+                .extract_directory(f);
+                if !directory.is_empty() {
+                    let mut t = directory;
+                    t.push(b'/');
+                    t.extend_from_slice(&volume_filename);
+                    volume_filename = t;
                 }
             }
             let Ok(volume) = dialect.read_grid_volume(&volume_filename, streams) else {

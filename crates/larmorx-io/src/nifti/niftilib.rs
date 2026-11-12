@@ -210,16 +210,16 @@ pub fn findhdrname(name: &[u8], opts: &NiftiOptions, streams: &mut dyn Streams) 
     let ext = find_file_extension(name, opts, streams);
     let mut efirst = 1usize;
     let eisupper = ext.is_some_and(|at| is_uppercase(&name[at..]));
-    if let Some(at) = ext {
-        if fileexists(name) {
-            let e = &name[at..];
-            // fileext_n_compare(ext, ".img", 4) != 0
-            let img = e.len() >= 4 && (&e[..4] == b".img" || &e[..4] == b".IMG");
-            if !img {
-                return Some(name.to_vec());
-            }
-            efirst = 0;
+    if let Some(at) = ext
+        && fileexists(name)
+    {
+        let e = &name[at..];
+        // fileext_n_compare(ext, ".img", 4) != 0
+        let img = e.len() >= 4 && (&e[..4] == b".img" || &e[..4] == b".IMG");
+        if !img {
+            return Some(name.to_vec());
         }
+        efirst = 0;
     }
     let mut elist: [Vec<u8>; 2] = [b".hdr".to_vec(), b".nii".to_vec()];
     let mut extzip = b".gz".to_vec();

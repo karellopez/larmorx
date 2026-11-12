@@ -982,7 +982,8 @@ impl GzFile {
     }
 
     /// `gzrewind`.
-    /// `gzrewind`.
+    /// `gzrewind` (zlib's -1 as `Err`).
+    #[allow(clippy::result_unit_err)]
     pub fn gzrewind(&mut self) -> Result<(), ()> {
         if self.mode != GzMode::Read || (self.err != Z_OK && self.err != Z_BUF_ERROR) {
             return Err(());

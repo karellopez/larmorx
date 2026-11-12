@@ -370,11 +370,12 @@ pub fn open_file(
     let mut gzipped = false;
     if io == IoType::Read {
         gzipped = COMPRESSED_ENDINGS.iter().any(|e| ends_in(&expanded, e));
-        if !gzipped && !ctx.file_exists(&expanded) {
-            if let Some(c) = ctx.file_exists_as_compressed(&expanded) {
-                expanded = c;
-                gzipped = true;
-            }
+        if !gzipped
+            && !ctx.file_exists(&expanded)
+            && let Some(c) = ctx.file_exists_as_compressed(&expanded)
+        {
+            expanded = c;
+            gzipped = true;
         }
     }
     if gzipped && expanded.iter().any(|c| SHELL_SPECIAL.contains(c)) {

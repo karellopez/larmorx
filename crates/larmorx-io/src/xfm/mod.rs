@@ -26,6 +26,10 @@
 //! yet: the reader reports it, [`Dialect::read_grid_volume`]); not applied: thin-plate splines and
 //! grids ([`general_transform_point`] reports them).
 
+// volume_io's functions return OK or ERROR, their messages already printed: `Result<_, ()>` is that
+// status. The index loops are the C code's.
+#![allow(clippy::result_unit_err, clippy::needless_range_loop)]
+
 mod files;
 mod gaussian;
 mod read;
@@ -41,10 +45,9 @@ pub use write::{output_transform, output_transform_file, output_transform_to_str
 
 use larmorx_core::cfmt::Streams;
 
-/// D13 defects of volume_io's `.xfm` code that larmorx corrects (each with its `reproduce`
-/// behaviour where one is defined; `docs/findings/minc-xfm.md`).
+/// D13 defects of volume_io's `.xfm` code that larmorx corrects (`docs/findings/minc-xfm.md`;
+/// their register entries are `larmorx_core::defects::FS_71` to `FS_75`).
 pub mod defects {
-    //! Their register entries are `larmorx_core::defects::FS_71` to `FS_74`.
     /// The decompression of a compressed file runs `gunzip -c <name> > <temporary>` through the
     /// shell with the name unquoted (`files.c`, `open_file`): a name with a blank fails (or reads
     /// other files) and a name with shell syntax runs it. Corrected: decompressed in the process.

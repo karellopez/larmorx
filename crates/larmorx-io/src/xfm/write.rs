@@ -35,6 +35,7 @@ fn g15(v: f64) -> String {
 
 /// `output_one_transform`; a grid transform's volume is written by the dialect
 /// ([`Dialect::write_grid_volume`]), which larmorx cannot do yet (an error).
+#[allow(clippy::too_many_arguments)] // volume_io's arguments, and the dialect, streams and notices
 fn output_one_transform(
     out: &mut Vec<u8>,
     filename: Option<&[u8]>,

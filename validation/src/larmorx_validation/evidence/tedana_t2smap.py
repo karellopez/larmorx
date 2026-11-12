@@ -210,6 +210,11 @@ def _fmriprep_host(name: str) -> str:
     cpus = int(m.group(1)) if m else None
     if cpus == os.cpu_count():
         return "made on this machine, where numpy uses its AVX-512 kernels by default (NP-04)"
+    if run in NO_AVX512_RUNS:
+        return (
+            f"made on {NO_AVX512_RUNS[run]} ({cpus} logical CPUs), where numpy computes float64 "
+            "exp and log with glibc's functions"
+        )
     return f"made on another machine ({cpus} CPUs)"
 
 
@@ -641,12 +646,11 @@ def _verdicts(diffs: list[dict], named: list[str], links: dict, capped: int | No
                 "t25-ted": "tedana's own step from 25.0.1 (fMRIPrep 25.2.6's) to 26.0.3: "
                 + VERSION_STEP,
                 "t25-fmriprep": "tedana 25.0.1 in fMRIPrep's image, here with numpy's AVX-512 "
-                "kernels on as fMRIPrep's own run had them (its settings name only OpenBLAS's "
-                "Haswell kernels), against fMRIPrep's own run of it, " + host,
+                "kernels on (this CPU's default: fMRIPrep's runs set only OpenBLAS's Haswell "
+                "kernels), against fMRIPrep's own run of it, " + host,
                 "t25off-fmriprep": "tedana 25.0.1 in fMRIPrep's image, here with numpy's "
-                "AVX-512 kernels off (larmorx's reference setting), against fMRIPrep's own run "
-                "of it, " + host + ": numpy's float64 exp and log differ between the two paths "
-                "(NP-04)",
+                "AVX-512 kernels off (larmorx's reference setting: glibc 2.35's float64 exp and "
+                "log, NP-04), against fMRIPrep's own run of it, " + host,
             }[i]
             x["reason"] = lead + (
                 f"{body}: every one of the {total:,} values is the same."

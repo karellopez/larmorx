@@ -3,7 +3,7 @@
 `lx.confounds`: nipype 1.12.0's `algorithms/confounds.py` (Apache-2.0, the nipype developers;
 the same in every environment), niworkflows 1.15.4's and fMRIPrep 25.2.7's confound steps, ported
 with the arithmetic of the libraries they call (numpy, SciPy, nitime), bit for bit
-(`crates/larmorx-confounds`). A port in the main package; a clean-room original comes later (the
+(`crates/larmorx-confounds`). A port in the main package; a clean room comes later (the
 user, 2026-11-06 and 2026-11-11). The confounds' part fills this page step by step: today nipype's
 DVARS, CompCor, TSNR, NonSteadyStateDetector and FramewiseDisplacement with its `NIPY` source
 (nipy 0.6.1's `to_matrix44` and `aff2euler`): the whole of nipype's `algorithms/confounds.py` but

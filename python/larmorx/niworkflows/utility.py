@@ -120,7 +120,7 @@ def add_tsv_header(
         raise ValueError(
             f"AddTSVHeader: {len(columns)} column names for a table of {ncols} columns (PIPE-62)"
         )
-    np.savetxt(out, table, delimiter="\t", header="\t".join(columns), comments="")
+    tb.savetxt(out, table, delimiter="\t", header="\t".join(columns), comments="")
     return out
 
 

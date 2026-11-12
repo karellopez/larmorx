@@ -1129,7 +1129,7 @@ def normalize_motion_params(
             upstream_defects=mode,
         )
     out = os.path.join(d, "motion_params.txt")
-    np.savetxt(out, mpars)
+    tb.savetxt(out, mpars)
     return out
 
 

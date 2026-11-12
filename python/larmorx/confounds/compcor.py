@@ -563,8 +563,10 @@ _CLASS = {"CompCor": "CompCor", "aCompCor": "CompCor", "tCompCor": "TCompCor"}
 
 def _savetxt(path: str, data: np.ndarray, header: str) -> None:
     """nipype's ``np.savetxt(path, data, fmt="%.10f", delimiter="\\t", header=header,
-    comments="")``."""
-    np.savetxt(path, data, fmt="%.10f", delimiter="\t", header=header, comments="")
+    comments="")`` (Linux's line ends on every platform)."""
+    from larmorx.confounds._tables import savetxt
+
+    savetxt(path, data, fmt="%.10f", delimiter="\t", header=header, comments="")
 
 
 def _compcor(
@@ -763,7 +765,7 @@ def _compcor(
         not_retained = np.where(np.logical_not(metadata["retained"]))
         components_names[retained] = components_header
         components_names[not_retained] = [f"dropped{i}" for i in range(len(not_retained[0]))]
-        with open(metadata_path, "w", encoding="utf-8") as f:
+        with open(metadata_path, "w", encoding="utf-8", newline="\n") as f:
             f.write("\t".join(["component", *list(metadata.keys())]) + "\n")
             for i in zip(components_names, *metadata.values(), strict=False):
                 f.write(f"{i[0]}\t{i[1]}\t{i[2]:.10f}\t{i[3]:.10f}\t{i[4]:.10f}\t{i[5]}\n")

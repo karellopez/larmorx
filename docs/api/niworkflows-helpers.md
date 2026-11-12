@@ -225,8 +225,8 @@ larmorx's computation is deterministic, so it raises that error at once.
 ## `add_tsv_header`, `dict_merge`, `tsv2json`: `AddTSVHeader`, `DictMerge`, `TSV2JSON`
 
 niworkflows 1.15.4's `interfaces/utility.py` (the same in 1.15.2), under fMRIPrep's confounds
-(`docs/api/confounds.md`). They are importable from `lx.niworkflows` and join its `__all__` with
-their golden cases (the confounds' golden relay).
+(`docs/api/confounds.md`), in `lx.niworkflows` (with golden cases since 2026-11-12, the
+confounds' part).
 
 | larmorx | niworkflows | Notes |
 |---|---|---|
@@ -240,10 +240,11 @@ niworkflows 1.15.4's `interfaces/confounds.py` (the same in 1.15.2 and 1.15.3 on
 functions), `larmorx.niworkflows.confounds`: the last two steps of fMRIPrep's confounds
 (`docs/api/confounds.md`): `model_expansion` (`ExpandModel` with fMRIPrep's formula
 `(dd1(rps + wm + csf + gsr))^^2 + others`) and `spike_regressors` (`SpikeRegressors`), whose
-output is fMRIPrep's `desc-confounds_timeseries.tsv`. Importable from
-`larmorx.niworkflows.confounds`; they join `lx.niworkflows`' `__all__` with their golden cases
-(the confounds' golden relay). The tables are read and written as pandas reads and writes them
-(`docs/api/confounds.md`, "pandas' tables": PD-01).
+output is fMRIPrep's `desc-confounds_timeseries.tsv`. In `lx.niworkflows` (with golden cases
+since 2026-11-12, the confounds' part). The tables are read and written as pandas reads and
+writes them (`docs/api/confounds.md`, "pandas' tables": PD-01); `NormalizeMotionParams`' and
+`AddTSVHeader`'s text files (numpy's `savetxt`) as numpy writes them on Linux, on every platform
+(UTF-8, `\n` line ends; numpy's text mode writes `\r\n` on Windows).
 
 | larmorx | niworkflows | Notes |
 |---|---|---|
@@ -288,8 +289,8 @@ files by column name.
 
 ## `fsl_motion_params`, `fsl_rms_deviation`, `framewise_displacement`: niworkflows' copies of fMRIPrep's motion interfaces
 
-`larmorx.niworkflows.confounds` (not yet in `lx.niworkflows`' namespace: its golden cases come with
-the confounds' golden relay). niworkflows' `interfaces/confounds.py` carries fMRIPrep's
+`lx.niworkflows` (`larmorx.niworkflows.confounds`; with golden cases since 2026-11-12).
+niworkflows' `interfaces/confounds.py` carries fMRIPrep's
 `FSLMotionParams`, `FSLRMSDeviation` and `FramewiseDisplacement` (unused by fMRIPrep, which has its
 own): `fsl_motion_params(xfm_file, boldref_file, *, out_dir=".", niworkflows_version="1.15.4",
 numpy_version="2.5.4", upstream_defects="fix", n_threads=1)` is
@@ -301,8 +302,8 @@ defects (PIPE-71, PIPE-72, PIPE-73): `docs/api/confounds.md`, "fMRIPrep's motion
 
 ## `binary_dilation`, `binary_subtraction`, `image_binary_dilation`, `signal_extraction`: `BinaryDilation`, `BinarySubtraction`, `SignalExtraction`
 
-`larmorx.niworkflows.morphology` and `larmorx.niworkflows.images.signal_extraction` (not yet in
-`lx.niworkflows`' namespace: their golden cases come with the confounds' golden relay).
+`lx.niworkflows` (`larmorx.niworkflows.morphology` and `larmorx.niworkflows.images`; with golden
+cases since 2026-11-12).
 niworkflows 1.15.4's `interfaces/morphology.py` and `interfaces/images.py` (Apache-2.0, the NiPreps
 developers; the same in 1.15.2 and 1.15.3), with SciPy's `binary_dilation`, scikit-image's `ball`,
 nibabel and numpy, bit for bit. fMRIPrep's confounds make the crown mask with the first two (the brain

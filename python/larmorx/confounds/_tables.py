@@ -59,6 +59,7 @@ __all__ = [
     "Table",
     "pandas_series",
     "read_tsv",
+    "savetxt",
     "ujson_double",
     "write_tsv",
 ]
@@ -576,6 +577,15 @@ def write_tsv(path: str | os.PathLike[str], table: Table) -> str:
         with open(path, "wb") as f:
             f.write(data)
     return path
+
+
+def savetxt(path: str | os.PathLike[str], data: Any, **kwargs: Any) -> None:
+    """numpy's ``savetxt(path, data, **kwargs)`` as it writes on Linux, on every platform: UTF-8
+    (the locale's encoding there) and ``\n`` line ends (numpy opens the file in text mode, so
+    its ``\n`` becomes ``\r\n`` on Windows; larmorx's files are Linux's everywhere, as its
+    tables)."""
+    with open(os.fspath(path), "wb") as f:
+        np.savetxt(f, data, encoding="utf-8", **kwargs)
 
 
 # --- JSON ------------------------------------------------------------------------------------

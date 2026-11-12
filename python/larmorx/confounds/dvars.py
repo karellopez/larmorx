@@ -188,8 +188,9 @@ def _gen_fname(in_file: str, suffix: str, out_dir: str) -> str:
 
 
 def _savetxt(path: str, rows: list[str]) -> None:
-    """``np.savetxt``'s text: one line per row, written in text mode as numpy writes it."""
-    with open(path, "w", encoding="utf-8") as f:
+    """``np.savetxt``'s text: one line per row (Linux's line ends on every platform: numpy's
+    text mode writes ``\r\n`` on Windows)."""
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
         f.write("".join(r + "\n" for r in rows))
 
 

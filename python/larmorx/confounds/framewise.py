@@ -39,7 +39,7 @@ import numpy as np
 
 from larmorx import _core, _defects
 from larmorx._defects import UpstreamDefectsName
-from larmorx.confounds import _nipy
+from larmorx.confounds import _nipy, _tables
 
 __all__ = [
     "SOURCES",
@@ -235,7 +235,7 @@ def framewise_displacement(
         ):
             _glibc07(upstream_defects, "change the framewise displacement")
     out = os.path.abspath(os.path.join(out_dir, out_file))
-    np.savetxt(out, fd_res, header="FramewiseDisplacement", comments="")
+    _tables.savetxt(out, fd_res, header="FramewiseDisplacement", comments="")
     return FramewiseDisplacementResult(
         out_file=out, out_figure=None, fd_average=fd_average, fd=fd_res
     )

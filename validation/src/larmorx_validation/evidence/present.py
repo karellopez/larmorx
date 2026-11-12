@@ -180,7 +180,9 @@ _LABEL = [
     (r"\blarmorx reproduce\b", "{port}, reproduce"),
     (r"\blarmorx \(reproduce\)", "{port}, reproduce"),
     (r"\blarmorx \((--[\w-]+ [\w.]+)\)", r"{port} (\1)"),
+    (r"\blarmorx (--[\w-]+ [\w.]+|double),", r"{port}, \1,"),  # "larmorx --float 1, 12 threads"
     (r"\blarmorx\b", "{port}"),
+    (r"^(\w+ [0-9][\w.]*) (--[\w-]+ [\w.]+|double),", r"\1, \2,"),  # "ANTs 2.6.5 double, ..."
     (r"\bdefault − reproduce mode\b", "fix − reproduce"),
     (r"\bdefault mode − reproduce mode\b", "fix − reproduce"),
     (r"\b, default − reproduce\b", ", fix − reproduce"),

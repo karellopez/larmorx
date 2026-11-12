@@ -19,6 +19,7 @@ from pathlib import Path
 import numpy as np
 
 from larmorx_validation.evidence import common, core
+from larmorx_validation.evidence import present as present_
 from larmorx_validation.figures import cache as fcache
 from larmorx_validation.figures import records
 
@@ -714,7 +715,7 @@ def export(ctx: core.Context) -> dict:
     from larmorx_validation.evidence import ants_apply_transforms_bspline as bspline
 
     e = entry(ctx)
-    return {
+    doc = {
         "schema": 1,
         "tool": TOOL,
         "title": "antsApplyTransforms",
@@ -740,6 +741,96 @@ def export(ctx: core.Context) -> dict:
         "examples": [_example(ctx), bspline.example(ctx), *ants_panel.examples(ctx, TOOL)],
         **({"tables": [inventory]} if inventory else {}),
     }
+    return present(doc)
+
+
+#: The page in the writing guide's words (evidence/present.py); the B-spline example's history
+#: goes to the page's History.
+PAGE = present_.Page(
+    software="ANTs",
+    program="antsApplyTransforms",
+    version="2.6.5",
+    texts=[(r" Before A5 part 3 larmorx refused B-spline transform files\.", "")],
+)
+
+#: Each worked example's "What this shows" line and the verdict beside it, from the example's
+#: own metrics; the data panel's lines are written from their own verdicts (present.panel_shows).
+SHOWS = {
+    "fmriprep-anat2std": (
+        "With `--float 1`, as fMRIPrep ran it, the replica gives fMRIPrep's output bit for bit, "
+        "on 1 and 12 threads and in both modes; so does ANTs 2.6.5, on 1 and 8 threads, with "
+        "glibc's or correctly rounded maths. In double precision ANTs as built differs from the "
+        "replica only where glibc's `sin`, `cos` or `exp` is not correctly rounded (2,871 of "
+        "1,082,035 voxels, by at most 6.8e-13), while single against double precision changes "
+        "values by up to 0.013. No correction by default changes this call.",
+        ["lx-ants-float"],
+    ),
+    "bspline-transform": (
+        "The replica applies ANTs' B-spline transform as ANTs does: with `--float 1` it gives "
+        "ANTs' output bit for bit as built, and in double precision with correctly rounded "
+        "maths; ANTs as built in double precision differs only where glibc's `sin` or `cos` is "
+        "not correctly rounded (2,715 of 1,082,035 voxels, by at most 6.8e-13). It gives the "
+        "same bytes on 1 and 12 threads and in both modes.",
+        ["lx-ants-float"],
+    ),
+}
+TITLES = {
+    "fmriprep-anat2std": "fMRIPrep's T1w resampled into MNI space",
+    "bspline-transform": "A B-spline transform of a real T1w's registration, applied to it",
+}
+#: The labels of the original's comparisons whose shapes the presenter does not read: the
+#: version inside a bracket, a comparison of maths libraries without its version.
+_CR = "the original against itself: correctly rounded maths and glibc's"
+LABELS = {
+    "fmriprep-ants": (
+        "fMRIPrep's output (ANTs 2.6.2) − ANTs antsApplyTransforms 2.6.5, --float 1, 1 thread each",
+        "the original against itself: fMRIPrep's run and the repository's build",
+    ),
+    "cr-ants-float": (
+        "ANTs antsApplyTransforms 2.6.5, --float 1: correctly rounded − glibc's maths",
+        _CR,
+    ),
+    "cr-ants-double": (
+        "ANTs antsApplyTransforms 2.6.5, double: correctly rounded − glibc's maths",
+        _CR,
+    ),
+}
+#: The record's categories as the page names them.
+CATEGORIES = {
+    "interpolation": "interpolators",
+    "transform": "transforms and their files",
+    "bspline": "B-spline transforms",
+    "geometry": "geometries",
+    "output": "output types",
+    "time-series": "time series",
+    "float": "single precision (--float 1)",
+    "transform-output": "transform outputs",
+}
+
+
+def present(doc: dict) -> dict:
+    """antsApplyTransforms' page in the writing guide's words and order: texts, ports and
+    order only."""
+    for ex in doc["examples"]:
+        if ex["id"] in SHOWS:
+            shows, verdicts = SHOWS[ex["id"]]
+        else:
+            shows, verdicts = present_.panel_shows(PAGE, ex)
+        own = {k: v for k, v in LABELS.items() if k in {d["id"] for d in ex["diffs"]}}
+        present_.example(
+            PAGE, ex, shows=shows, verdicts=verdicts, title=TITLES.get(ex["id"]), diffs=own
+        )
+    for im in doc["implementations"]:
+        present_.implementation(PAGE, im, "standard comparison and data panel")
+    present_.speed(
+        PAGE,
+        doc.get("speed"),
+        "Seconds for the whole command (reading, resampling, writing), the median of repeated "
+        "runs, on a log scale. The factor is how many times faster the replica is than ANTs, "
+        "both on one thread.",
+    )
+    present_.random_testing(PAGE, doc, {"port": "replica"})
+    return present_.finish(PAGE, doc, CATEGORIES)
 
 
 if __name__ == "__main__":

@@ -165,10 +165,10 @@ pub struct Histogram2d {
 
 /// `counts[b]` where `b` may be outside the allocation (FS-22: 0).
 fn cnt(g: &mut Globals, h: &Histogram, b: i32, what: &str) -> f32 {
-    if b >= 0 {
-        if let Some(&v) = h.counts.get(b as usize) {
-            return v;
-        }
+    if b >= 0
+        && let Some(&v) = h.counts.get(b as usize)
+    {
+        return v;
     }
     g.notices.add(
         &FS_22,
@@ -179,10 +179,10 @@ fn cnt(g: &mut Globals, h: &Histogram, b: i32, what: &str) -> f32 {
 
 /// `bins[b]` where `b` may be outside the allocation (FS-22: 0).
 fn bin_value(g: &mut Globals, h: &Histogram, b: i32, what: &str) -> f32 {
-    if b >= 0 {
-        if let Some(&v) = h.bins.get(b as usize) {
-            return v;
-        }
+    if b >= 0
+        && let Some(&v) = h.bins.get(b as usize)
+    {
+        return v;
     }
     g.notices.add(
         &FS_22,
@@ -193,11 +193,11 @@ fn bin_value(g: &mut Globals, h: &Histogram, b: i32, what: &str) -> f32 {
 
 /// `counts[b] = v` where `b` may be outside the allocation (FS-22: dropped).
 fn set_cnt(g: &mut Globals, h: &mut Histogram, b: i32, v: f32, what: &str) {
-    if b >= 0 {
-        if let Some(p) = h.counts.get_mut(b as usize) {
-            *p = v;
-            return;
-        }
+    if b >= 0
+        && let Some(p) = h.counts.get_mut(b as usize)
+    {
+        *p = v;
+        return;
     }
     g.notices.add(
         &FS_22,
@@ -1858,8 +1858,8 @@ pub fn histo_soap_bubble_zeros(
     let mut tmp = vec![0.0f64; n];
     let last = d.nbins - 1;
     for _ in 0..niters {
-        for b in 0..n {
-            tmp[b] = if control[b] {
+        for (b, t) in tmp.iter_mut().enumerate() {
+            *t = if control[b] {
                 f64::from(hsrc.counts[b])
             } else {
                 let bi = b as i32;
@@ -1873,8 +1873,8 @@ pub fn histo_soap_bubble_zeros(
                 })
             };
         }
-        for b in 0..n {
-            d.counts[b] = tmp[b] as f32;
+        for (c, &t) in d.counts[..n].iter_mut().zip(&tmp) {
+            *c = t as f32;
         }
     }
     match fresh {

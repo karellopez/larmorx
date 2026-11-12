@@ -477,10 +477,10 @@ fn write_relt(g: &mut Globals, m: &mut Matrix, r: i32, c: i32, v: f32) {
 
 /// A float of `m`'s array read where the C pointer arithmetic may leave it (FS-16: 0 there).
 fn read_at(g: &mut Globals, m: &Matrix, i: isize) -> f32 {
-    if i >= 0 {
-        if let Some(&v) = m.store.get(i as usize) {
-            return v;
-        }
+    if i >= 0
+        && let Some(&v) = m.store.get(i as usize)
+    {
+        return v;
     }
     g.notices
         .add(&FS_16, "a matrix element read outside its array: 0 used");
@@ -489,11 +489,11 @@ fn read_at(g: &mut Globals, m: &Matrix, i: isize) -> f32 {
 
 /// A float of `m`'s array written where the C pointer arithmetic may leave it (FS-16).
 fn write_at(g: &mut Globals, m: &mut Matrix, i: isize, v: f32) {
-    if i >= 0 {
-        if let Some(p) = m.store.get_mut(i as usize) {
-            *p = v;
-            return;
-        }
+    if i >= 0
+        && let Some(p) = m.store.get_mut(i as usize)
+    {
+        *p = v;
+        return;
     }
     g.notices.add(
         &FS_16,

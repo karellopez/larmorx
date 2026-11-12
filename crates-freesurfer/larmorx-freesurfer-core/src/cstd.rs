@@ -409,8 +409,8 @@ mod tests {
             Some("<2.2   |%>")
         );
         assert_eq!(
-            format_double("%+08.2f", 3.14159).as_deref(),
-            Some("+0003.14")
+            format_double("%+08.2f", 3.12159).as_deref(),
+            Some("+0003.12")
         );
         assert_eq!(
             format_double("%F", f64::NEG_INFINITY).as_deref(),

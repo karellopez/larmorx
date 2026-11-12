@@ -452,10 +452,10 @@ pub fn dmatrix_add_mul(
     v2: f64,
     m_out: Option<&mut DMatrix>,
 ) -> Result<Ret<DMatrix>, Fatal> {
-    if let Some(m2) = m2 {
-        if dmatrix_check_dims(Some(m1), Some(m2), 3, out, "DMatrixAddMul(): ") != 0 {
-            return Ok(Ret::Null);
-        }
+    if let Some(m2) = m2
+        && dmatrix_check_dims(Some(m1), Some(m2), 3, out, "DMatrixAddMul(): ") != 0
+    {
+        return Ok(Ret::Null);
     }
     let mut fresh = None;
     let m_out: &mut DMatrix = match m_out {
@@ -478,13 +478,13 @@ pub fn dmatrix_add_mul(
                     val += m1.get(row, col);
                 }
             }
-            if let Some(m2) = m2 {
-                if v2 != 0.0 {
-                    if v2 != 1.0 {
-                        val += v2 * m2.get(row, col);
-                    } else {
-                        val += m2.get(row, col);
-                    }
+            if let Some(m2) = m2
+                && v2 != 0.0
+            {
+                if v2 != 1.0 {
+                    val += v2 * m2.get(row, col);
+                } else {
+                    val += m2.get(row, col);
                 }
             }
             m_out.set(row, col, val);

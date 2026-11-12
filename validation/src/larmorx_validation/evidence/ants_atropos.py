@@ -511,7 +511,10 @@ def _example(ctx: core.Context, reg: dict) -> dict:
                 "text": "fMRIPrep 25.2.6, `anat_fit_wf/brain_extraction_wf/"
                 "atropos_wf/01_atropos`, run with 8 threads",
             },
-            {"label": "Command", "text": "`" + core.short_path(info["command"]) + "`"},
+            {
+                "label": "Command",
+                "text": "`" + _priors_path(core.short_path(info["command"])) + "`",
+            },
             {
                 "label": "Programs",
                 "text": f"{vers.get('ants', '?')}; {image_ants} in fMRIPrep's "
@@ -657,7 +660,10 @@ def _priors_example(ctx: core.Context) -> dict:
                 "text": f"{common.DS000005['dataset']}, sub-01's T1w "
                 f"({common.DS000005['licence']}); {OASIS['dataset']} ({OASIS['licence']})",
             },
-            {"label": "Command", "text": "`" + core.short_path(info["command"]) + "`"},
+            {
+                "label": "Command",
+                "text": "`" + _priors_path(core.short_path(info["command"])) + "`",
+            },
             {
                 "label": "Programs",
                 "text": f"{info.get('versions', {}).get('ants', '?')}; "
@@ -700,7 +706,9 @@ def _cases(rec) -> list[dict]:
                 "divergence",
                 "ANTs weighs part of its samples with memory it never wrote (ANTS-107): its "
                 "values depend on the heap and change with the output paths' length; larmorx "
-                "weighs them 0. Everything else (exit status, headers, types, shapes) is compared.",
+                "weighs them 0. Everything else (exit status, headers, types, shapes) is compared; "
+                "the record passes the case on it, the heap's values not required, and this page "
+                "counts it with the expected divergences.",
             )
         elif v is None and r["case"] in rows:
             v = (
@@ -731,6 +739,16 @@ def _cases(rec) -> list[dict]:
             }
         )
     return out
+
+
+def _priors_path(command: str) -> str:
+    """The priors' folder of the figures cache, by what it holds (its path names this
+    machine's cache, not a file a reader can find)."""
+    return re.sub(
+        r"\S*/figures-cache/ants-atropos/[^/]+/(prior%02d\.nii\.gz)",
+        r"<the OASIS30ANTs priors in the T1w's space>/\1",
+        command,
+    )
 
 
 def _command(c) -> str:
@@ -829,8 +847,8 @@ SHOWS = {
     "pv-phantom": (
         "In `reproduce` the replica gives ANTs' labels voxel for voxel, as built and with "
         "correctly rounded maths. Its default, `fix`, corrects ANTS-106 (with ITK-50 and "
-        "ANTS-96): against the known fractions it labels 97.7 % of the voxels as the truth, "
-        "ANTs 94.0 %. The two partial-volume classes get 1,418 and 454 voxels; the truth has "
+        "ANTS-96): against the known fractions it labels 97.7 % of the voxels inside the "
+        "phantom's mask as the truth, ANTs 94.0 %. The two partial-volume classes get 1,418 and 454 voxels; the truth has "
         "1,368 and 408, and ANTs gives them 237 and 106.",
         ["lx-ants"],
     ),

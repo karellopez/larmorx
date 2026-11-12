@@ -133,7 +133,7 @@ def table(ctx: core.Context) -> dict:
     return common.table(
         "ants-106",
         "Partial-volume classes with the MRF on the phantom of known fractions: Dice per class "
-        "and the share of voxels labelled as the truth (the record's cases)",
+        "and the share of the mask's voxels labelled as the truth (the record's cases)",
         [
             "Run",
             {"label": "Dice 1", "num": True},
@@ -141,7 +141,7 @@ def table(ctx: core.Context) -> dict:
             {"label": "Dice 3", "num": True},
             {"label": "Dice 4 (1x2)", "num": True},
             {"label": "Dice 5 (2x3)", "num": True},
-            {"label": "voxels as the truth", "num": True},
+            {"label": "voxels of the mask as the truth", "num": True},
             "Verdict",
         ],
         rows,
@@ -229,13 +229,15 @@ def example(ctx: core.Context) -> dict:
             x["verdict"] = None
             if i == "ants-truth":
                 x["reason"] = (
-                    f"ANTs labels {acc(lab['ants']):.1%} of the voxels as the truth; it gives the "
+                    f"ANTs labels {acc(lab['ants']):.1%} of the mask's {int(inside.sum()):,} voxels "
+                    "as the truth; it gives the "
                     f"partial-volume classes {count(lab['ants'], 4)} and {count(lab['ants'], 5)} "
                     f"voxels, the truth has {count(lab['truth'], 4)} and {count(lab['truth'], 5)}."
                 )
             elif i == "fix-truth":
                 x["reason"] = (
-                    f"larmorx's default labels {acc(lab['fix']):.1%} of the voxels as the truth; "
+                    f"larmorx's default labels {acc(lab['fix']):.1%} of the mask's "
+                    f"{int(inside.sum()):,} voxels as the truth; "
                     f"{count(lab['fix'], 4)} and {count(lab['fix'], 5)} voxels in the "
                     "partial-volume classes."
                 )

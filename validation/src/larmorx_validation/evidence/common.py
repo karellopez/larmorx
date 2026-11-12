@@ -8,6 +8,7 @@ decided by the tool's module from these metrics (``finish(..., verdict=...)``)."
 
 from __future__ import annotations
 
+import json
 import re
 from collections.abc import Callable, Iterable
 from functools import cache
@@ -615,3 +616,17 @@ def command_text(program: str, args: Iterable[str], subs: Callable[[str], str]) 
 
     parts = [program, *(subs(a) for a in args)]
     return " ".join(shlex.quote(p) if re.search(r"\s", p) else p for p in parts)
+
+
+def difftest_descriptions(repo: Path, cases: list[dict], tool: str, prefix: str = "") -> None:
+    """Random testing's permanent cases (category ``difftest``), in place: each one's
+    description from its case file (``validation/difftest/cases/<tool>/<name>.json``) where
+    the record gives none; ``prefix`` the program's part of a case id ("antsAI/")."""
+    for c in cases:
+        if c["category"] != "difftest" or c.get("description"):
+            continue
+        name = c["id"].removeprefix(prefix).removeprefix("difftest/")
+        f = repo / "validation" / "difftest" / "cases" / tool / f"{name}.json"
+        if f.is_file():
+            text = json.loads(f.read_text(encoding="utf-8"))["description"]
+            c["description"] = "random testing's permanent case: " + text

@@ -423,3 +423,13 @@ def test_a_page_of_two_programs_and_what_a_panel_shows():
     )  # fmt: skip
     with pytest.raises(ValueError, match="without its mode"):
         present.example(page, bare, shows="x", verdicts=[])
+
+
+def test_a_port_run_in_a_variability_comparison_is_refused():
+    """Until each run's port comes from its own side (chunk X1): a hidden run whose id names
+    LARMORX in a comparison of the original's own variability is refused, never taken for the
+    original."""
+    ex = _example()
+    ex["diffs"][3]["a"] = "larmorx-8"
+    with pytest.raises(ValueError, match="variability comparison"):
+        _present(ex)

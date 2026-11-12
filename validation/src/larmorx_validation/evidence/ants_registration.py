@@ -960,6 +960,7 @@ def export(ctx: core.Context) -> dict:
     reg = core.register(ctx.repo)
     rec = records.load(ctx.repo, TOOL)
     cases = _cases(ctx)
+    common.difftest_descriptions(ctx.repo, cases, "ants-registration")
     from larmorx_validation.evidence import ants_panel
 
     prec = ants_panel.panel_record(ctx.repo, TOOL)
@@ -1016,7 +1017,7 @@ SHOWS = {
     "template-syn": (
         "In `reproduce`, on 1 and 12 threads, the replica gives ANTs' one-thread result with "
         "correctly rounded maths bit for bit: the warped T1w, every value of the displacement "
-        "field and all 865 lines of its output. ANTs as built differs only where glibc's `exp`, "
+        "field and all 865 lines of its output (addresses, times and paths masked, as the record compares them). ANTs as built differs only where glibc's `exp`, "
         "`log`, `sin` or `cos` is not correctly rounded, and the optimiser's iterations carry "
         "the change: up to 117 in the warped T1w, and a voxel's displacement moves by up to "
         "1.08 mm in the brain. ANTs' own thread counts move its result further: up to 240 and "
@@ -1026,7 +1027,7 @@ SHOWS = {
     "template-bsplinesyn": (
         "In `reproduce`, on 1 and 12 threads, the replica gives ANTs' one-thread result with "
         "correctly rounded maths bit for bit: the warped T1w, the B-spline smoothed field and "
-        "all 857 lines of its output. ANTs as built differs only where glibc's maths is not "
+        "all 857 lines of its output (addresses, times and paths masked, as the record compares them). ANTs as built differs only where glibc's maths is not "
         "correctly rounded: up to 57 in the warped T1w, and a voxel's displacement moves by up "
         "to 0.51 mm in the brain. ANTs' own thread counts move its result further: up to 232 at "
         "2 threads and 1.05 mm at 4 threads, against one. No correction by default changes "
@@ -1036,7 +1037,7 @@ SHOWS = {
     "template-tvf": (
         "In `reproduce`, on 1 and 12 threads, the replica gives ANTs' one-thread result with "
         "correctly rounded maths bit for bit: the warped T1w, the field integrated from the "
-        "velocity field and all 988 lines of its output. ANTs as built differs only where "
+        "velocity field and all 988 lines of its output (addresses, times and paths masked, as the record compares them). ANTs as built differs only where "
         "glibc's maths is not correctly rounded: up to 53 in the warped T1w, and a voxel's "
         "displacement moves by up to 0.27 mm in the brain. ANTs' own thread counts move its "
         "result further: up to 283 and 0.92 mm, 4 threads against one. No correction by "

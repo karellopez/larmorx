@@ -770,6 +770,7 @@ def _record_cases(rec, impl: str, program: str, module: str) -> list[dict]:
 def export(ctx: core.Context) -> dict:
     reg = core.register(ctx.repo)
     cases = _cases(ctx)
+    common.difftest_descriptions(ctx.repo, cases, "ants-ai", "antsAI/")
     a116, a116_sources = ants_ai_blobs.a116_table(ctx)
     from larmorx_validation.evidence import ants_panel
 

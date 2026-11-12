@@ -46,7 +46,7 @@ _ORACLE_TEXTS = [
     (r"\boracle runs\b", "fMRIPrep runs"),
     (r"\boracle run's\b", "fMRIPrep run's"),
     (r"\boracle run\b", "fMRIPrep run"),
-    (r"<fMRIPrep fMRIPrep run>", "<fMRIPrep oracle run>"),  # a command's placeholder stays
+    (r"<fMRIPrep fMRIPrep run>", "<fMRIPrep run>"),  # a command's placeholder, as in the cases
     (r"\bthe repository's oracle build\b", "the repository's build"),
     (r"\bthe current oracle build\b", "the repository's current build"),
     (r"\boracle build\b", "build"),
@@ -387,6 +387,10 @@ def example(
             if pid in by_id or pid in hidden:
                 continue
             if d["kind"] == "variability":
+                if pid.startswith("larmorx"):  # until X1: never take a port's run for the original
+                    raise ValueError(
+                        f"{ex['id']}: the port's run {pid} in a variability comparison"
+                    )
                 hidden[pid] = "original"
             elif pid.startswith("larmorx"):  # the port's run ("larmorx-seed", "larmorx-1")
                 hidden[pid] = page.port

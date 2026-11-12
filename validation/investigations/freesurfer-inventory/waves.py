@@ -1005,6 +1005,8 @@ def run_main() -> int:
             bs = bins("mod:" + mid)
             for i, (n, names, fl) in enumerate(bs, 1):
                 label = f"`{mid}`" + (f" ({i} of {len(bs)})" if len(bs) > 1 else "")
+                if i == 1:
+                    label += f" ({title})"
                 queue.append(
                     {
                         "wave": wave,
@@ -1031,8 +1033,6 @@ def run_main() -> int:
                         if mid.startswith(("fs.surf", "fs.deform", "fs.defect"))
                         else "larmorx-fs-gca"
                         if mid == "fs.gca"
-                        else CLEAN.get(wave, "larmorx-fs-core")
-                        if mid in ("fs.bspline", "fs.robust")
                         else "larmorx-fs-core",
                         "lines": mod_total[mid],
                     }

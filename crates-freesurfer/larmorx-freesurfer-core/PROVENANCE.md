@@ -28,6 +28,11 @@ built for the official binaries with GCC 8.4.0 (`docs/freesurfer/variation.md`).
 | `chklc` | `utils/chklc.cpp` | no translation: the replica checks no licence key (decision log 2026-10-19); `chklc`'s valid-key result only |
 | `xdebug` | `utils/xDebug.cpp`, `include/xDebug.h` | `xDbg_PushStack`, `xDbg_PopStack`, `xDbg_SetStackDesc`, `xDbg_SetCurrentNote`, `xDbg_Printf` (output off), `DebugEnterFunction`, `DebugExitFunction`; `xDbg_knMaxStackDepth`, `xDbg_knMaxDescLength`, `mCurrentStackDepth`, the stack's arrays |
 | `fio` | `include/fio.h` 95-112 | `TSV`'s fields, `ncols`, `nrows` |
+| `matrix` | `include/matrix.h`; `utils/matrix.cpp` 61-147, 150-181, 298-587, 587-710 | `MATRIX`, `VECTOR`, `MatrixBuffer`, `MATRIX_RELT`, `MATRIX_CELT`, `MATRIX_REAL`, `MATRIX_COMPLEX`, `MATRIX_SYM`/`UPPER`/`LOWER`; `MatrixStats`, `stats_compare`, `matrixStatsExitHandler`, `noteMatrixAlloced` (nothing seen: it returns at once), `MatrixCopy`, `MatrixAlloc_old`, `MatrixAlloc_new`, `use_new_MatricAlloc` (as `Globals::matrix_alloc_old`), `MatrixAlloc_wkr`, `MatrixAlloc2_wkr`, `MatrixFree`, `MatrixMultiplyD`; FS-13 to FS-16 |
+| `affine` | `include/affine.h` | `AffineVector`, `AffineMatrix`, `SetAffineVector`, `GetAffineVector`, `GetFloorAffineVector`, `SetAffineMatrix`, `GetAffineMatrix`, `AffineMatrixFree`, `AffineMatrixAlloc`, `AffineMatrixCopy`, `AffineMV`, `AffineMM` (the SSE branch, as built); FS-17's conversion |
+| `dmatrix` | `include/dmatrix.h`; `utils/dmatrix.cpp` 290-850 | `DMATRIX`, `DVECTOR`, `DMatrixCheckDims`, `DMatrixAlloc`, `DMatrixFree`, `DMatrixPrintFmt`, `DMatrixPrint`, `DMatrixCompareFMatrix`, `DMatrixCopyFMatrix`, `DMatrixCopy`, `DMatrixTranspose`, `DMatrixAddMul`, `DMatrixScalarMul`, `DMatrixSubtract`, `DMatrixAdd`, `DMatrixConstVal`, `DMatrixZero`, `DMatrixMaxAbs` |
+| `histo` | `include/histo.h`; `utils/histo.cpp` | `HISTOGRAM`, `HISTOGRAM2D`, `MAX_BINS`; the 55 reached functions: `HISTOfree`, `HISTOrealloc`, `HISTOalloc`, `HISTOcopy`, `HISTOclear`, `HISTOclearCounts`, `HISTOadd`, `HISTOsubtract`, `HISTOclearBins`, `HISTOsmooth`, `HISTOfindLastPeak`, `HISTOfindFirstPeak`, `HISTOfindValley`, `HISTOfindLastPeakInRegion`, `HISTOfindHighestPeakInRegion`, `HISTOplot`, `HISTOaddSample`, `HISTOfindPreviousValley`, `HISTOfindNextValley`, `HISTOfindNextPeak`, `HISTOfindPreviousPeak`, `HISTOfindStartOfPeak`, `HISTOfindEndOfPeak`, `HISTOfindCurrentPeak`, `HISTOfillHoles`, `HISTOtotalInRegion`, `HISTOtotal`, `HISTOclearZeroBin`, `HISTOfindBinWithCount`, `HISTOfindBin`, `HISTOgetCount`, `HISTOcorrelate`, `histoComputeLinearFitCorrelation`, `HISTOfindLinearFit`, `HISTOlinearScale`, `HISTOthreshSum`, `HISTOmakePDF`, `HISTObins`, `HISTOcount`, `HISTOvalToBin`, `HISTOinit`, `HISTOfindMedian`, `HISTOmakeReverseCDF`, `HISTOmakeCDF`, `HISTOrobustGaussianFit`, `HISTOabs`, `HISTOgetEntropy`, `HISTOsoapBubbleZeros`, `HISTO2DfindBin1`, `HISTO2DfindBin2`, `HISTO2DgetCount`, `HISTOcomputeFWHM`, `HISTOwriteTxt`, `HISTOsumNorm`, `HISTOcumsum`; `include/macros.h`'s `MIN`, `MAX`, `EVEN`, `FZERO`, `DZERO` as they evaluate; FS-17 to FS-24 |
+| `ret` | none (larmorx's own) | the result of a function with an optional output (`T *F(..., T *dst)`) |
 | `cstd` | none (larmorx's own) | the C library's `atoi`, `atof`, `sscanf`'s `%lx`, `printf`'s `%W.Pf`, x86-64's double-to-int conversion, written from the C standard and glibc's documented behaviour |
 | `cglob`, `ctime`, `system` | none (larmorx's own) | the C library's `glob` and `fnmatch` (from POSIX), `gmtime_r`, `localtime` and `strftime("%c")` in the C locale (from POSIX's `TZ`, RFC 8536's TZif files and two behaviours of glibc 2.35 measured against it, `validation/investigations/freesurfer-core/ctime_probe.py`: 180,240 cases, 0 differ), `getpwuid(geteuid())`, `uname`, `getcwd` (from `/proc`, `/etc/passwd` and the environment); no C library source |
 | `run` | none (larmorx's own) | what `larmorx-freesurfer` gives a program (queue item 3.1-01) |
@@ -58,6 +63,25 @@ statistics, ...).
 - Where FreeSurfer exits, the functions return `log::Fatal`, which the program turns into its exit
   status (the code's low 8 bits).
 - Variadic messages are formatted by the callers; the functions take the formatted text.
+- (`fs.maths`) A function with an optional output takes it as `Option<&mut T>` and returns
+  `ret::Ret` (the new object, the caller's, or `NULL`); where FreeSurfer's callers pass one object
+  as input and output and the aliasing changes the arithmetic (`HISTOsmooth`), an `_in_place` form
+  does what the C code does. Matrices keep FreeSurfer's array layout (two unused floats, one-based
+  rows, complex pairs), so a mixed real/complex access reads the floats FreeSurfer's does.
+- (`fs.maths`) `exp`, `log` and `pow` go through `larmorx_core::math::Libm` (correctly rounded by
+  default, glibc 2.35's with `reproduce`).
+- (`fs.maths`) Not translated: the unreached functions of these files (static reach: `HISTOdump`,
+  `HISTOcrunch`, `HISTOinvert`, `HISTOnormalize`, `HISTOcompose*`, `HISTOfillZeros`, `HISTOmul`,
+  `HISTO*PeakRelative`, `HISTOfindFirstPeakInRegion`, `HISTOcountPeaksInRegion`,
+  `HISTOaddFractionalSample`, `HISTOclearBG`, `HISTOvalToBinDirect`, `HISTOvalToCount`,
+  `HISTOwriteInto`, `HISTOreadFrom`, `HISTOgaussian*`, `HISTOscalarMul`, `HISTOscalarAdd`,
+  `HISTOfindMaxDerivative`, the other `HISTO2D*`, `HISTOrmsDifference`, `HISTOearthMoversDistance`,
+  `HISTOksDistance`, `HISTOerase*`, `HISTOisPeak`, `HISTOwrite`; `DMatrixTest`,
+  `GetFloorAffineVector`'s users aside). Still to come in item 3.1-23: `MatrixInverse` and
+  `MatrixQRdecomposition` (with `utils/numerics.cpp`'s VNL wrappers and the main package's `float`
+  VNL routines), `DMatrixMultiply`, `DVectorDot`, `DVectorLen`, `DVectorCrossProduct` (x87 `long
+  double`: `larmorx_core`'s 80-bit arithmetic), `DMatrixDRand48`, `fs_powell`, `fs_lbfgs`,
+  `fs_cost_function` (VNL's Powell, Brent and L-BFGS, item 3.1-07).
 - The defects FS-01 (a NUL byte after the C-style error messages), FS-02 (`PROFILE`'s undefined
   conversion) and FS-03 (`assertFailed`'s deliberate segmentation fault) are corrected by default
   and reproduced with `reproduce` (`docs/findings/freesurfer-core.md`).

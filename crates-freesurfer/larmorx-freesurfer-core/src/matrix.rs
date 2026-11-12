@@ -990,7 +990,9 @@ mod tests {
             matrix_multiply(&mut gl, &mut o, &mut e, Some(&a), Some(&b), Some(&mut bad)).unwrap();
         assert!(r.is_null());
         assert!(String::from_utf8_lossy(&o).ends_with(":748\n"));
-        assert!(String::from_utf8_lossy(&e).contains("MatrixMultiply: (2 x 2) * (2 x 2) != (3 x 3)"));
+        assert!(
+            String::from_utf8_lossy(&e).contains("MatrixMultiply: (2 x 2) * (2 x 2) != (3 x 3)")
+        );
         let (mut o, mut e) = (Vec::new(), Vec::new());
         let r = matrix_multiply(&mut gl, &mut o, &mut e, Some(&a), None, None);
         assert_eq!(r, Err(Fatal::Exit(-4)));

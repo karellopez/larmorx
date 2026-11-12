@@ -745,7 +745,7 @@ def _priors_path(command: str) -> str:
     """The priors' folder of the figures cache, by what it holds (its path names this
     machine's cache, not a file a reader can find)."""
     return re.sub(
-        r"\S*/figures-cache/ants-atropos/[^/]+/(prior%02d\.nii\.gz)",
+        r"[^\s,\[\]]*/figures-cache/ants-atropos/[^/]+/(prior%02d\.nii\.gz)",
         r"<the OASIS30ANTs priors in the T1w's space>/\1",
         command,
     )

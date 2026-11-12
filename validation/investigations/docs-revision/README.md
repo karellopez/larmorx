@@ -65,7 +65,9 @@ nothing in it.
 - `page_old_words.py <site>/_site/evidence/<page>/index.html`: the old words left in a built
   page's visible text, tooltips included, each distinct text once with its count, for a reader
   to judge (a message's `larmorx:` prefix, the provenance's commits and the random-testing
-  panel's texts stay until their chunks).
+  panel's texts stay until their chunks). Inside code it lists the placeholders and paths that
+  name the oracle, the workspace or the figures cache (`code` lines), which a command should
+  not show.
 
 ```
 PYTHONPATH=python:validation/src python -P validation/investigations/docs-revision/present_dry_run.py \

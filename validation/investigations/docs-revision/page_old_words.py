@@ -21,6 +21,9 @@ PAT = re.compile(
     r"|the replica \(the|(?-i:\blarmorx\b)|\bD13\b|golden test|\btool\b|implementation",
     re.I,
 )
+#: Inside code (commands, paths): a placeholder or a path of this machine that names the
+#: oracle, the workspace or the figures cache ("<fMRIPrep oracle run>", "<workspace>/...").
+CODE_PAT = re.compile(r"<[^<>]*(?:oracle|workspace)[^<>]*>|figures-cache|\boracle\b", re.I)
 
 
 class Texts(HTMLParser):
@@ -48,13 +51,17 @@ class Texts(HTMLParser):
     def handle_data(self, data: str) -> None:
         if not self.skip and not self.code and data.strip():
             self.out.append(("text", data))
+        elif not self.skip and self.code and CODE_PAT.search(data):
+            self.out.append(("code", data))
 
 
 def main() -> None:
     p = Texts()
     with open(sys.argv[1], encoding="utf-8") as f:
         p.feed(f.read())
-    hits = collections.Counter((kind, t.strip()[:200]) for kind, t in p.out if PAT.search(t))
+    hits = collections.Counter(
+        (kind, t.strip()[:200]) for kind, t in p.out if kind == "code" or PAT.search(t)
+    )
     for (kind, t), n in hits.most_common():
         print(f"{n:4d} {kind} | {t}")
 

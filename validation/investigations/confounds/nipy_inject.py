@@ -132,11 +132,11 @@ def _definitions(path: Path, names: tuple[str, ...], constants: tuple[str, ...])
     tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     keep = []
     for node in tree.body:
-        if isinstance(node, ast.FunctionDef) and node.name in names:
-            keep.append(node)
-        elif isinstance(node, ast.Assign) and any(
+        function = isinstance(node, ast.FunctionDef) and node.name in names
+        constant = isinstance(node, ast.Assign) and any(
             isinstance(t, ast.Name) and t.id in constants for t in node.targets
-        ):
+        )
+        if function or constant:
             keep.append(node)
     found = {n.name for n in keep if isinstance(n, ast.FunctionDef)}
     missing = set(names) - found

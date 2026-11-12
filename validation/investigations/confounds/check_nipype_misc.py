@@ -23,9 +23,24 @@ Sections:
 - ``fd``: nipype's ``FramewiseDisplacement`` against ``lx.confounds.framewise_displacement``
   (the file byte for byte, ``fd_average`` bit for bit): every source, 3 to 9 columns, 2 to 9,001
   volumes, five radii, NaN and infinite values, several text formats; the errors (one row, one
-  column, an empty file, too few columns, a lower-case source); ``NIPY`` (nipype: nipy is not
-  installed) and ``save_plot`` counted apart. ``normalize_mc_params`` on single rows of every
-  length and source, in any case.
+  column, an empty file, too few columns, a lower-case source); ``save_plot`` counted apart.
+  ``normalize_mc_params`` on single rows of every length and source, in any case.
+- ``nipy``: the ``NIPY`` source (nipy 0.6.1's ``to_matrix44`` and ``aff2euler``, which nipype
+  imports from nipy: ``nipy_inject.py`` compiles them from the tag's own source into
+  ``sys.modules``). ``normalize_mc_params(row, "NIPY")`` and ``FramewiseDisplacement`` against
+  nipype running nipy's functions in three forms: with glibc's ``exp`` and a correctly rounded
+  ``atan2`` (what ``upstream_defects="reproduce"`` follows), with every C function correctly
+  rounded (CORE-MATH's: the default), and as this machine runs them (``plain``: SVML's ``exp``
+  with AVX-512, glibc's ``atan2``), whose differences from ``reproduce`` are counted apart as
+  expected, each with its cause (``exp``: NP-04; ``atan2``: D4) told exactly by a fourth form
+  (numpy's own ``exp``, a correctly rounded ``atan2``). Rows of 0 to 15 values over eight scales
+  (the Taylor form below ``SMALL_ANGLE``, the identity above ``MAX_ANGLE``, both boundaries),
+  scales and log-scales (negative, zero, tiny, huge, NaN, infinite; clamped), gimbal lock, NaN
+  and infinite values everywhere; float32, float16, integer and boolean rows (the integer rows
+  whose squares wrap: PIPE-60), 2-D and 0-D arrays; GLIBC-07's notice exactly where the two
+  modes differ. ``FramewiseDisplacement`` files of 2 to 15 columns (the errors of 3 to 5 and 8
+  to 11, the valid 10 and 11 with a second vector above ``MAX_ANGLE``), 2 to 9,001 rows, five
+  radii, NaN rows.
 - ``robust``: niworkflows' ``RobustACompCor`` and ``RobustTCompCor`` against
   ``lx.niworkflows.robust_acompcor``/``robust_tcompcor`` (every file), and PIPE-48's retries
   measured with niworkflows' ``sleep`` replaced (the attempts, the sleeps asked for).
@@ -33,7 +48,9 @@ Sections:
   dataset) through ``TSNR`` (``regress_poly`` 1, none for the largest) and
   ``NonSteadyStateDetector``; real motion parameters through ``FramewiseDisplacement``:
   fMRIPrep's own motion columns (trans/rot) as SPM and FSL tables, AFNI ``3dvolreg``'s and FSL
-  ``mcflirt``'s files of the figures cache; with the times.
+  ``mcflirt``'s files of the figures cache, also read as nipy's parameters (``NIPY``; the
+  ``3dvolreg`` file with its index column gives seven columns: a scale, often negative); with
+  the times.
 
 ``--control`` tells larmorx the other numpy release (2.2.6 for numpy >= 2.3, else 2.5.4) and
 counts the cases whose bits change. Run it in each environment with the worktree's extension
@@ -67,6 +84,7 @@ from niworkflows.interfaces import patches as nwp
 import larmorx as lx
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import nipy_inject as ni
 from check_compcor import cwd, iface_inputs, same
 
 NUMPY = np.__version__
@@ -521,13 +539,8 @@ def fd_section(tier: str, tmp: Path) -> None:
     (tmp / "empty.txt").write_text("")
     fd_case("fd: errors", str(tmp / "empty.txt"), "FSL", "empty")
     fd_case("fd: errors", str(tmp / "m1.txt"), "fsl", "lower-case source")
-    # Counted apart: nipype without nipy, the plot.
+    # Counted apart: the plot (the NIPY source: section nipy).
     d = Path(tempfile.mkdtemp(dir=TMP))
-    want = run_nipype(
-        nac.FramewiseDisplacement, d / "n", in_file=str(tmp / "m1.txt"), parameter_source="NIPY"
-    )
-    got = run_lx(lx.confounds.framewise_displacement, d / "l", str(tmp / "m1.txt"), "NIPY")
-    APART[f"fd NIPY: nipype {want} | larmorx {got}"] += 1
     got = run_lx(
         lx.confounds.framewise_displacement, d / "p", str(tmp / "m1.txt"), "FSL", save_plot=True
     )
@@ -549,6 +562,349 @@ def fd_section(tier: str, tmp: Path) -> None:
                     except Exception as e:
                         got = last_line(e)
                 count("normalize_mc_params", same(want, got), f"{n} {src} {dtype}")
+
+
+# --- nipy ---------------------------------------------------------------------------------------
+
+NIPY_FORMS = ("reproduce", "fix", "plain", "reproduce-npexp")
+NIPY_MODULES: dict[str, object] = {}
+
+
+def nipy_form(form: str):
+    """nipype's ``normalize_mc_params`` will import nipy's functions in ``form``."""
+    if form not in NIPY_MODULES:
+        NIPY_MODULES[form] = ni.build(form)
+    for parent in ("nipy", "nipy.algorithms"):
+        sys.modules.setdefault(parent, type(sys)(parent))
+    sys.modules["nipy.algorithms.registration"] = NIPY_MODULES[form]
+
+
+def nipy_off() -> None:
+    for name in ("nipy.algorithms.registration", "nipy.algorithms", "nipy"):
+        sys.modules.pop(name, None)
+
+
+def outcome_of(fn):
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        try:
+            return fn()
+        except Exception as e:
+            return last_line(e)
+
+
+def nipype_row(row, form: str):
+    nipy_form(form)
+    return outcome_of(lambda: np.asarray(nac.normalize_mc_params(np.array(row, copy=True), "NIPY")))
+
+
+def lx_row(row, mode: str, notices: list):
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        try:
+            out = np.asarray(
+                lx.confounds.normalize_mc_params(
+                    np.array(row, copy=True), "NIPY", numpy_version=NP, upstream_defects=mode
+                )
+            )
+        except Exception as e:
+            out = last_line(e)
+    notices += [w.message.entry for w in caught if isinstance(w.message, lx.UpstreamDefectWarning)]
+    return out
+
+
+def takes_rust(row) -> bool:
+    """Whether larmorx computes this row with its own arithmetic (``framewise._nipy_row``)."""
+    a = np.asarray(row)
+    if a.ndim != 1:
+        return False
+    if a.dtype == np.float64:
+        return True
+    return a.dtype.kind in "iu" and all(
+        abs(int(v)) <= 2**25 for r in lx.confounds._nipy.squared(a) for v in r.tolist()
+    )
+
+
+def causes(refs: dict) -> str:
+    """Why nipype as this machine runs it differs from ``reproduce``'s form: ``exp`` (numpy's
+    own, NP-04) and/or ``atan2`` (glibc's, D4), each told by the form with numpy's own ``exp``
+    and a correctly rounded ``atan2``."""
+    why = []
+    if same(refs["reproduce-npexp"], refs["reproduce"]) != "identical":
+        why.append("exp (NP-04)")
+    if same(refs["reproduce-npexp"], refs["plain"]) != "identical":
+        why.append("atan2 (D4)")
+    return " and ".join(why) or "unexplained"
+
+
+def nipy_row_case(key: str, row, what: str) -> None:
+    a = np.asarray(row)
+    wraps = a.ndim == 1 and a.dtype.kind in "iu" and lx.confounds._nipy.squares_overflow(a)
+    rust = takes_rust(row)  # a boolean row is nipy's (its Taylor form negates booleans)
+    refs = {f: nipype_row(row, f) for f in NIPY_FORMS}
+    notes = {"reproduce": [], "fix": []}
+    got = {m: lx_row(row, m, notes[m]) for m in notes}
+    for mode in ("reproduce", "fix"):
+        if wraps and mode == "fix":
+            # PIPE-60 corrected: the angle from the exact sum of squares. A small row is the
+            # float64 row's (larmorx's own arithmetic: nipy's form "fix"); a large one follows
+            # nipy's numpy code with exact squares, here checked against nipy's code on the
+            # float64 row, whose squares and sums are exact for the values chosen.
+            f64 = np.asarray(row, dtype=np.float64)
+            want = nipype_row(f64, "fix") if rust else nipype_row(f64, "plain")
+        elif rust and not wraps:
+            want = refs[mode]
+        else:
+            want = refs["plain"]
+        count(f"{key} ({mode})", same(want, got[mode]), f"{what} {mode}: {want} | {got[mode]}")
+        pipe60 = "PIPE-60" in notes[mode]
+        count(
+            "nipy: PIPE-60 notice where the squares wrap",
+            "identical" if pipe60 == wraps else "differ",
+            f"{what} {mode}",
+        )
+        if pipe60:
+            NOTICES[f"PIPE-60 ({mode})"] += 1
+    if rust and not wraps:
+        v = same(refs["plain"], got["reproduce"])
+        if v != "identical":
+            why = causes(refs)
+            APART[f"nipy rows: nipype as run here differs from reproduce: {why}"] += 1
+            if why == "unexplained":
+                FAILS.append(f"{key}: {what}: {v}: {refs['plain']} | {got['reproduce']}")
+        differs = same(got["fix"], got["reproduce"]) != "identical"
+        for mode in ("reproduce", "fix"):
+            named = "GLIBC-07" in notes[mode]
+            count(
+                "nipy: GLIBC-07 notice exactly where the modes differ",
+                "identical" if named == differs else "differ",
+                f"{what} {mode}: notice {named}, modes differ {differs}",
+            )
+            if named:
+                NOTICES[f"GLIBC-07 nipy rows ({mode})"] += 1
+
+
+def nipy_rows(tier: str) -> list[tuple[str, object, str]]:
+    """``(key, row, what)`` for ``normalize_mc_params(row, "NIPY")``."""
+    rng = np.random.default_rng(29)
+    out = []
+    scales = (1e-31, 1e-4, 1e-2, 0.3, 3.0, 50.0, 1e9, 1e11)
+    n = 6 if tier == "full" else 2
+    for k in (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 15):
+        for sc in scales:
+            for _ in range(n if k in (6, 7, 12, 13) else 1):
+                row = rng.normal(0, sc, k)
+                if k >= 7:
+                    row[6:9] = rng.normal(0, 3, min(3, k - 6))
+                if k > 9:
+                    row[9:12] = rng.normal(0, sc, min(3, k - 9))
+                out.append(("nipy rows: random", row, f"k={k} scale={sc}"))
+    # More random rigid and scaled rows (the bulk: every path's last bits).
+    m = 3000 if tier == "full" else 400
+    for i in range(m):
+        k = (6, 7, 12)[i % 3]
+        row = np.concatenate([rng.normal(0, 2, 3), rng.normal(0, rng.choice((0.02, 0.5, 2.5)), 3)])
+        if k == 7:
+            row = np.append(row, rng.choice((-1, 1)) * rng.uniform(0.5, 2))
+        if k == 12:
+            row = np.concatenate([row, rng.normal(0, 1, 3), rng.normal(0, 0.5, 3)])
+        out.append(("nipy rows: random", row, f"bulk k={k}"))
+    # Boundaries.
+    ma, sa = 1e10 * 2 * np.pi, 1e-30
+    for v in (
+        ma,
+        np.nextafter(ma, 0),
+        np.nextafter(ma, np.inf),
+        sa,
+        np.nextafter(sa, 0),
+        np.nextafter(sa, 1),
+        0.0,
+        -0.0,
+        5e-324,
+    ):
+        out.append(("nipy rows: boundaries", np.array([1, 2, 3, v, 0, 0], float), f"r0={v!r}"))
+        out.append(("nipy rows: boundaries", np.array([1, 2, 3, 0, 0, -v], float), f"r2=-{v!r}"))
+        out.append(
+            (
+                "nipy rows: boundaries",
+                np.array([0, 0, 0, 0.1, 0.2, 0.3, 1, 1, 1, v], float),
+                f"q0={v!r} (10)",
+            )
+        )
+        out.append(
+            (
+                "nipy rows: boundaries",
+                np.array([0, 0, 0, 0.1, 0.2, 0.3, 1, 1, 1, v, -v], float),
+                f"q={v!r} (11)",
+            )
+        )
+    for v in (np.pi / 2, -np.pi / 2, np.nextafter(np.pi / 2, 0), np.pi, 2 * np.pi):
+        out.append(
+            ("nipy rows: gimbal lock", np.array([0, 0, 0, 0, v, 0], float), f"y rotation {v!r}")
+        )
+        out.append(
+            ("nipy rows: gimbal lock", np.array([0, 0, 0, 1e-9, v, 1e-9], float), f"near y {v!r}")
+        )
+    # Scales and log-scales.
+    for sc in (-2.0, -1.0, -1e-300, 1e-300, 1e300, -1e300, 0.0, -0.0, np.nan, np.inf, -np.inf, 3.0):
+        out.append(("nipy rows: scales", np.array([1, 2, 3, 0.1, -0.2, 0.3, sc]), f"scale {sc!r}"))
+    for ls in (30.0, -30.0, 23.0258509299, -23.0258509299, 700.0, np.nan, np.inf, -np.inf, 0.0):
+        out.append(
+            (
+                "nipy rows: scales",
+                np.array([1, 2, 3, 0.1, -0.2, 0.3, ls, -ls, 1.0, 0.2, 0.1, -0.3]),
+                f"log-scales ±{ls!r}",
+            )
+        )
+    # NaN and infinite values in every position of 6, 7 and 12 values.
+    for k in (6, 7, 12):
+        for pos in range(k):
+            for v in (np.nan, np.inf, -np.inf):
+                row = np.linspace(0.05, 0.6, k)
+                row[pos] = v
+                out.append(("nipy rows: NaN/inf", row, f"k={k} [{pos}]={v}"))
+    # Other types and shapes.
+    base = np.array([1.5, -2.0, 0.25, 0.01, -0.02, 0.03])
+    for dt in (np.float32, np.float16):
+        for k in (6, 7, 12, 4):
+            row = (np.resize(base, k) * (1 + np.arange(k) % 3)).astype(dt)
+            out.append(("nipy rows: other types", row, f"{np.dtype(dt).name} k={k}"))
+    for dt in (np.int8, np.int16, np.int32, np.int64, np.uint8, np.uint16, np.uint64, np.bool_):
+        for vals in (
+            [1, -2, 3, 0, 1, 0],
+            [0, 0, 0, 0, 0, 0],
+            [1, 2, 3, 2, 3, 1, 1],
+            [5, 4, 3, 1, 0, 2, 1, 1, 1, 0, 1, 1],
+        ):
+            row = np.array(vals).astype(dt)
+            out.append(("nipy rows: integer types", row, f"{np.dtype(dt).name} {vals}"))
+    for dt, vals in (
+        (np.int8, [0, 0, 0, 12, 0, 0]),
+        (np.int8, [0, 0, 0, 16, 0, 0]),
+        (np.int8, [0, 0, 0, 11, 11, 11]),
+        (np.uint8, [0, 0, 0, 16, 1, 0]),
+        (np.int16, [0, 0, 0, 200, 3, 1]),
+        (np.int32, [0, 0, 0, 50000, 0, 1]),
+        (np.int64, [0, 0, 0, 2_000_000_000, 2_000_000_000, 2_000_000_000]),
+        (np.int64, [0, 0, 0, 40_000_000, 0, 7]),
+        (np.int64, [0, 0, 0, 33_554_432, 1, 0]),
+        (np.int64, [0, 0, 0, 33_554_433, 1, 0]),
+        (np.uint64, [0, 0, 0, 5_000_000_000, 0, 0]),
+        (np.int8, [0, 0, 0, 1, 1, 1, 1, 1, 1, 12, 0, 0]),
+    ):
+        out.append(
+            ("nipy rows: integer types", np.array(vals, dtype=dt), f"{np.dtype(dt).name} {vals}")
+        )
+    out.append(("nipy rows: shapes", np.zeros((2, 6)), "2-D"))
+    out.append(("nipy rows: shapes", np.array(0.5), "0-D"))
+    out.append(("nipy rows: shapes", [1.0, 2.0, 3.0, 0.1, 0.2, 0.3], "list"))
+    return out
+
+
+def fd_nipy_case(key: str, f: str, what: str, **kw) -> None:
+    d = Path(tempfile.mkdtemp(dir=TMP))
+    refs = {}
+    for form in NIPY_FORMS:
+        nipy_form(form)
+        refs[form] = run_nipype(
+            nac.FramewiseDisplacement, d / f"n-{form}", in_file=f, parameter_source="NIPY", **kw
+        )
+    notes = {"reproduce": [], "fix": []}
+    got = {
+        m: run_lx(
+            lx.confounds.framewise_displacement,
+            d / f"l-{m}",
+            f,
+            "NIPY",
+            numpy_version=NP,
+            upstream_defects=m,
+            notices=notes[m],
+            **kw,
+        )
+        for m in notes
+    }
+
+    def verdict(want, have) -> str:
+        if isinstance(want, str) or isinstance(have, str):
+            return (
+                "identical"
+                if isinstance(want, str) and isinstance(have, str) and want == have
+                else "differ"
+            )
+        return (
+            "identical"
+            if want[0] == have[0] and float(want[1].fd_average).hex() == have[1].fd_average.hex()
+            else "differ"
+        )
+
+    for m in notes:
+        count(
+            f"{key} ({m})",
+            verdict(refs[m], got[m]),
+            f"{what} {m}: {refs[m] if isinstance(refs[m], str) else 'ok'} | {got[m] if isinstance(got[m], str) else 'ok'}",
+        )
+    if verdict(refs["plain"], got["reproduce"]) != "identical":
+        why = []
+        if verdict(refs["reproduce-npexp"], refs["reproduce"]) != "identical":
+            why.append("exp (NP-04)")
+        if verdict(refs["reproduce-npexp"], refs["plain"]) != "identical":
+            why.append("atan2 (D4)")
+        APART[
+            f"{key}: nipype as run here differs from reproduce: {' and '.join(why) or 'unexplained'}"
+        ] += 1
+    differs = verdict(got["fix"], got["reproduce"]) != "identical"
+    for m in notes:
+        named = "GLIBC-07" in notes[m]
+        count(
+            "nipy fd: GLIBC-07 notice exactly where the modes differ",
+            "identical" if named == differs else "differ",
+            f"{what} {m}: notice {named}, modes differ {differs}",
+        )
+        if named:
+            NOTICES[f"GLIBC-07 nipy fd ({m})"] += 1
+
+
+def nipy_section(tier: str, tmp: Path) -> None:
+    print(f"nipy: numpy's exp is glibc's here: {ni.numpy_exp_is_glibc()}", flush=True)
+    for key, row, what in nipy_rows(tier):
+        nipy_row_case(key, row, what)
+    rng = np.random.default_rng(31)
+    lengths = (2, 3, 10, 300, 9001) if tier == "full" else (2, 10, 300)
+    radii = (50, 50.0, 0.0, 35.5, -10.0) if tier == "full" else (50, 35.5)
+    i = 0
+    for nc in (6, 7, 12, 13, 15):
+        for t in lengths:
+            i += 1
+            x = np.cumsum(rng.normal(0, 0.01, (t, nc)), axis=0)
+            x[:, 3:6] *= 5
+            if nc == 7:
+                x[:, 6] = (-1) ** i * (1 + 0.05 * rng.normal(size=t))
+            f = tmp / f"nipy{i}.txt"
+            np.savetxt(f, x, fmt=("%.18e", "%.6f", "%g")[i % 3], delimiter="\t" if i % 2 else " ")
+            for r in radii if t < 9001 else radii[:2]:
+                fd_nipy_case("nipy fd", str(f), f"{nc} columns T={t}", radius=r)
+    for nc in (3, 4, 5, 8, 9, 10, 11):
+        x = rng.normal(0, 0.1, (12, nc))
+        f = tmp / f"nipy-err{nc}.txt"
+        np.savetxt(f, x)
+        fd_nipy_case("nipy fd: errors", str(f), f"{nc} columns")
+    for nc in (10, 11):
+        x = rng.normal(0, 0.1, (12, nc))
+        x[:, 9:] = 1e11
+        f = tmp / f"nipy-big{nc}.txt"
+        np.savetxt(f, x)
+        fd_nipy_case("nipy fd: a second vector above MAX_ANGLE", str(f), f"{nc} columns")
+    x = rng.normal(0, 0.1, (12, 6))
+    x[5, 4] = np.nan
+    np.savetxt(tmp / "nipy-nan.txt", x)
+    fd_nipy_case("nipy fd: errors", str(tmp / "nipy-nan.txt"), "a NaN rotation")
+    x[5, 4] = 0.1
+    x[7, 1] = np.nan
+    np.savetxt(tmp / "nipy-nant.txt", x)
+    fd_nipy_case("nipy fd: NaN translation", str(tmp / "nipy-nant.txt"), "a NaN translation")
+    fd_nipy_case("nipy fd: output name", str(tmp / "nipy1.txt"), "out_file", out_file="fd.tsv")
+    nipy_off()
+    fd_case("nipy fd: errors", str(tmp / "nipy1.txt"), "nipy", "lower-case source")
 
 
 # --- robust --------------------------------------------------------------------------------------
@@ -709,13 +1065,20 @@ def real_section(tier: str, tmp: Path) -> None:
         )
     for name, f, src in real_motion(tier):
         fd_case("real: FramewiseDisplacement", f, src, name)
+    t0 = time.perf_counter()
+    for name, f, _src in real_motion(tier):
+        fd_nipy_case("real: FramewiseDisplacement NIPY", f, name)
+    nipy_off()
+    print(
+        f"  FramewiseDisplacement NIPY of the real tables: {time.perf_counter() - t0:.1f} s (all forms)"
+    )
 
 
 def main() -> int:
     global CONTROL, NP, TMP
     p = argparse.ArgumentParser()
     p.add_argument("--tier", choices=("quick", "full"), default="quick")
-    p.add_argument("--sections", default="tsnr,nssd,fd,robust,real")
+    p.add_argument("--sections", default="tsnr,nssd,fd,nipy,robust,real")
     p.add_argument("--control", action="store_true")
     a = p.parse_args()
     CONTROL = a.control
@@ -739,6 +1102,7 @@ def main() -> int:
                 "tsnr": tsnr_section,
                 "nssd": nssd_section,
                 "fd": fd_section,
+                "nipy": nipy_section,
                 "robust": robust_section,
                 "real": real_section,
             }[s](a.tier, d)

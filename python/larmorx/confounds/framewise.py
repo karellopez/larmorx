@@ -20,8 +20,9 @@ and glibc 2.35's with ``upstream_defects="reproduce"`` (numpy's, on x86-64 CPUs 
 AVX-512: GLIBC-07, NP-04); ``atan2`` is correctly rounded in both. An integer row is taken the
 same way when its squares are exact in float64 (each squared value at most 2^25: the same bits as
 nipy's integer arithmetic), PIPE-60 when nipy's squares wrap around the row's type; any other
-row (float32, float16, larger integers, an array that is not one row) follows nipy's own numpy
-code in its type (``larmorx.confounds._nipy``), with this platform's numpy, as nipype.
+row (float32, float16, boolean, larger integers, an array that is not one row) follows nipy's own
+numpy code in its type (``larmorx.confounds._nipy``), with this platform's numpy, as nipype (a
+boolean row without rotation stops with numpy's ``TypeError``: nipy's Taylor form negates it).
 
 fMRIPrep computes its framewise displacement with its own interface (pandas, gzipped tables);
 nipype's is this one.
@@ -108,7 +109,7 @@ def _nipy_row(params: np.ndarray, numpy_version: str, mode: str) -> np.ndarray:
         if other is not None:
             _glibc07(mode, "change the motion parameters")
         return out[0]
-    if params.ndim == 1 and params.dtype.kind in "biu":
+    if params.ndim == 1 and params.dtype.kind in "iu":
         wraps = _nipy.squares_overflow(params)
         if wraps:
             _defects.warn(

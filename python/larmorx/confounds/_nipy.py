@@ -5,8 +5,8 @@
 # 2006-2024, NIPY Developers, under the BSD-3-Clause licence; and from nibabel 5.4.2
 # (nibabel/eulerangles.py, `mat2euler`), Copyright (c) 2009-2019 Matthew Brett and the nibabel
 # developers, under the MIT licence (the notices below and in NOTICE). Modified: the functions
-# only, with their docstrings shortened, and larmorx's `exact_squares` switch (PIPE-60) and the
-# `normalize`, `squared` and `squares_overflow` helpers added.
+# only, their docstrings shortened, two unused names prefixed with `_`; larmorx's `exact_squares`
+# switch (PIPE-60) and the `normalize`, `squared` and `squares_overflow` helpers added.
 #
 # nipy's notice: Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met: redistributions of
@@ -109,7 +109,7 @@ def mat2euler(M, cy_thresh=None):
             cy_thresh = np.finfo(M.dtype).eps * 4
         except ValueError:
             cy_thresh = _FLOAT_EPS_4
-    r11, r12, r13, r21, r22, r23, r31, r32, r33 = M.flat
+    r11, r12, r13, r21, r22, r23, _r31, _r32, r33 = M.flat
     # cy: sqrt((cos(y)*cos(z))**2 + (cos(x)*cos(y))**2)
     cy = math.sqrt(r33 * r33 + r23 * r23)
     if cy > cy_thresh:  # cos(y) not close to zero, standard form
@@ -136,7 +136,7 @@ def aff2rot_zooms(affine):
         RS[:, 0] *= -1
     # retrieve rotation matrix from RS with polar decomposition.
     # Discard shears
-    P, S, Qs = npl.svd(RS)
+    P, _S, Qs = npl.svd(RS)
     R = np.dot(P, Qs)
     return R, zooms
 

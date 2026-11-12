@@ -336,9 +336,20 @@ pub fn load_data(
     if data.len() == 1 {
         return load_zcat(&data[0], mask, n_echos, n_threads).map(|m| (m, LoadPath::ZCat));
     }
+    // `try: <fast path> except Exception: <nilearn's fallback>`: an error of the fallback is
+    // raised while the fast path's is handled, and Python prints both, chained (a format the
+    // replica does not read is its own refusal, not tedana's: not chained).
     match load_fast(data, mask, n_threads) {
         Ok(m) => Ok((m, LoadPath::Fast)),
-        Err(_) => load_nilearn(data, mask, n_threads).map(|m| (m, LoadPath::Nilearn)),
+        Err(first) => load_nilearn(data, mask, n_threads)
+            .map(|m| (m, LoadPath::Nilearn))
+            .map_err(|e| {
+                if first.class.starts_with("larmorx.") || e.class.starts_with("larmorx.") {
+                    e
+                } else {
+                    e.during_handling_of(first)
+                }
+            }),
     }
 }
 

@@ -389,6 +389,30 @@ def messages(r: Run) -> list[str]:
     return out
 
 
+_CHAINS = (
+    "During handling of the above exception, another exception occurred:",
+    "The above exception was the direct cause of the following exception:",
+)
+
+
+def exceptions(r: Run) -> list[str]:
+    """The traceback's exceptions in order: each ``Traceback`` line and its exception's first
+    line (the stack left out, the run directory masked), and the lines that chain them."""
+    out: list[str] = []
+    in_trace = False
+    for line in r.stderr.replace(str(r.cwd), "<run>").splitlines():
+        if line.startswith("Traceback (most recent call last):"):
+            out.append(line)
+            in_trace = True
+        elif in_trace:
+            if not line.startswith(" "):
+                out.append(line)
+                in_trace = False
+        elif line in _CHAINS:
+            out.append(line)
+    return out
+
+
 def last_error(r: Run) -> str:
     lines = [
         ln
@@ -422,6 +446,12 @@ def compare_runs(checks: CheckList, label: str, t: Run, r: Run) -> bool:
         te, re_ = last_error(t), last_error(r)
         ok &= checks(
             f"{label}: last error line", te == re_, detail=f"{te!r} / {re_!r}"[:400]
+        ).passed
+        tx, rx = exceptions(t), exceptions(r)
+        ok &= checks(
+            f"{label}: traceback chain",
+            tx == rx,
+            detail=f"{(len(tx) + 1) // 3} exception(s)" if tx == rx else f"{tx} / {rx}"[:400],
         ).passed
     tm, rm = messages(t), messages(r)
     first = next(
@@ -916,6 +946,11 @@ def suite() -> Suite:
         f"own files (tedana {FMRIPREP_TEDANA}) reported",
         thresholds=[
             ("Exit status, last error line", "the same"),
+            (
+                "Traceback chain",
+                "the same exceptions in the same order (chained ones: a fallback's error after "
+                "the error it handled), the stacks left out",
+            ),
             (
                 "Messages",
                 "tedana's log lines and Python's warnings identical (the run directory masked; "

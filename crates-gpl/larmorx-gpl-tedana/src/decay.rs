@@ -18,9 +18,12 @@
 //! swapped (tedana writes the variance of S0 as T2*'s and the reverse); TED-08, a failure (and
 //! the variances) of a voxel of count 1, fitted with two echoes, is not reported; TED-09, an
 //! infinite sample in one voxel makes every voxel of its count NaN in the log-linear fit (one
-//! least-squares problem for all of them); by default that voxel alone is NaN.
+//! least-squares problem for all of them); by default that voxel alone is NaN. TED-46, a voxel
+//! whose observations are all equal (no decay: saturated samples) gets the batch's rounding noise
+//! as its slope (T2* 1 ms, or 1e16 ms and more); by default it takes the exact solution, slope 0
+//! (T2* 500 ms after the floors), the rest of the batch unchanged (`specs/t2smap.md` §7.2).
 
-use larmorx_core::defects::{Notices, TED_09, TED_17};
+use larmorx_core::defects::{Notices, TED_09, TED_17, TED_46};
 use larmorx_core::parallel;
 use larmorx_optim::{Scipy, curve_fit2};
 use larmorx_transform::numpy_linalg::{LapackRelease, lstsq};
@@ -315,7 +318,20 @@ pub fn fit_loglinear(
         b.par_chunks_mut(m.max(1))
             .zip(solve_idx.par_iter())
             .for_each(|(col, &v)| column(v, col));
-        let sol = lstsq(
+        // TED-46: the columns whose observations are all equal, finite and not all 0 (a zero
+        // right-hand side gives tedana's exact 0 already), with their value.
+        let flat: Vec<(usize, f64)> = if m == 0 {
+            Vec::new()
+        } else {
+            b.chunks(m)
+                .enumerate()
+                .filter_map(|(j, col)| {
+                    let y = col[0];
+                    (y.is_finite() && y != 0.0 && col.iter().all(|&o| o == y)).then_some((j, y))
+                })
+                .collect()
+        };
+        let mut sol = lstsq(
             &a,
             m,
             2,
@@ -332,6 +348,35 @@ pub fn fit_loglinear(
                 "numpy/linalg/_linalg.py, in lstsq",
             )
         })?;
+        // In a design of rank 2 the exact solution of equal observations y is (y, 0); tedana's
+        // batch leaves rounding noise in the slope (its sign set by the column's place in the
+        // batch and the LAPACK and BLAS builds). The default writes the exact solution there
+        // and keeps every other column's (tedana's bits); `reproduce` keeps lstsq's.
+        if sol.rank == 2 && !flat.is_empty() {
+            let k = flat.len();
+            notices.add(
+                &TED_46,
+                if reproduce {
+                    format!(
+                        "{k} voxel(s) whose log-linear observations have no slope: tedana's \
+                         {n}-echo least squares leaves rounding noise there (T2* 1 ms, or 1e16 \
+                         ms and more)"
+                    )
+                } else {
+                    format!(
+                        "{k} voxel(s) whose log-linear observations have no slope fitted with \
+                         the slope 0 (no decay, T2* 500 ms); tedana's {n}-echo least squares \
+                         leaves rounding noise there (T2* 1 ms, or 1e16 ms and more)"
+                    )
+                },
+            );
+            if !reproduce {
+                for &(j, y) in &flat {
+                    sol.x[j] = y;
+                    sol.x[nrhs + j] = 0.0;
+                }
+            }
+        }
         let mut div0 = false;
         let mut overflow = false;
         for (j, &v) in solve_idx.iter().enumerate() {
@@ -620,4 +665,74 @@ pub fn fit_decay_ts(
         }
     }
     Ok(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use larmorx_core::defects::UpstreamDefects;
+
+    fn fit(data: &[f32], mode: UpstreamDefects) -> (Vec<f64>, Vec<f64>, Notices, String) {
+        // the same functions in both modes, so that only TED-46's choice differs
+        let maths = Maths::of_mode(UpstreamDefects::Fix);
+        let ctx = Context {
+            libraries: Libraries::Newest,
+            n_threads: 1,
+            maths: &maths,
+        };
+        let mut err = Vec::new();
+        let mut log = Log::with_bars(&mut err, false);
+        log.setup(false, false);
+        let mut notices = Notices::new(mode);
+        let tes = [12.0, 28.0, 44.0];
+        let (t2s, s0) =
+            fit_loglinear(data, 3, 2, &tes, &[3, 3, 3], &ctx, &mut log, &mut notices).unwrap();
+        drop(log);
+        (t2s, s0, notices, String::from_utf8(err).unwrap())
+    }
+
+    #[test]
+    fn equal_observations_take_the_exact_zero_slope_by_default() {
+        // three voxels, three echoes, two volumes: saturated (255 everywhere), decaying, zero
+        let mut data = vec![0.0f32; 3 * 3 * 2];
+        data[..6].fill(255.0);
+        for e in 0..3 {
+            for t in 0..2 {
+                data[6 + e * 2 + t] = 900.0 * (0.97f32).powi(16 * e as i32) + t as f32;
+            }
+        }
+        let (t2s, s0, notices, err) = fit(&data, UpstreamDefects::Fix);
+        assert_eq!(t2s[0], f64::INFINITY);
+        assert_eq!(
+            s0[0],
+            Maths::of_mode(UpstreamDefects::Fix).exp(f64::from(256.0f32.ln()))
+        );
+        assert!(
+            err.contains("divide by zero encountered in divide"),
+            "{err}"
+        );
+        let n = notices.as_slice();
+        assert_eq!(n.len(), 1);
+        assert!(
+            n[0].detail
+                .starts_with("1 voxel(s) whose log-linear observations have no slope fitted")
+                && n[0].detail.contains("tedana's 3-echo least squares"),
+            "{}",
+            n[0].detail
+        );
+        // the batch's other voxels keep lstsq's bits; observations all 0 are not TED-46's
+        let (t2r, s0r, nr, _) = fit(&data, UpstreamDefects::Reproduce);
+        assert_eq!(t2s[1].to_bits(), t2r[1].to_bits());
+        assert_eq!(s0[1].to_bits(), s0r[1].to_bits());
+        assert_eq!(t2s[2].to_bits(), t2r[2].to_bits());
+        assert!(
+            nr.as_slice()[0]
+                .detail
+                .ends_with("(T2* 1 ms, or 1e16 ms and more)")
+        );
+        let mut zeros = data.clone();
+        zeros[..6].fill(0.0);
+        let (_, _, nz, _) = fit(&zeros, UpstreamDefects::Fix);
+        assert!(nz.is_empty());
+    }
 }

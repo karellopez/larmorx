@@ -17,8 +17,9 @@
 //!
 //! TED-01: a NaN mean in the first echo inside the mask makes the percentile NaN, so no voxel
 //! equals it and tedana fails (`ValueError: attempt to get argmax of an empty sequence`); by
-//! default the percentile and the exemplars are taken over the finite means only (those voxels
-//! are dropped by the base count anyway), `reproduce` raises tedana's error.
+//! default the percentile and the exemplars are taken over the means that are not NaN (those
+//! voxels are dropped by the base count anyway; an infinite mean sorts and matches as in tedana:
+//! `specs/t2smap.md` §15.1), `reproduce` raises tedana's error.
 
 use larmorx_core::defects::{Notices, TED_01, TED_11};
 use larmorx_core::numpy::format::{array_str, scalar_str};
@@ -67,6 +68,88 @@ fn temporal_means(
         start = end;
     }
     out
+}
+
+/// Whether numpy's float32 sum of `x` adds +inf and -inf (IEEE's invalid operation: numpy's
+/// `RuntimeWarning: invalid value encountered in reduce`), in numpy's order: `+0 + pairwise(x)`
+/// (`larmorx_core::numpy::reduce::pairwise_sum`'s blocks and eight accumulators) along a
+/// contiguous axis, else `((+0 + x0) + x1) + ...` (an outer axis). A NaN met first makes the sum
+/// NaN quietly, so a series holding both infinities need not raise it.
+pub(crate) fn sum_adds_opposite_infinities(x: &[f32], pairwise: bool) -> bool {
+    fn add(a: f32, b: f32, hit: &mut bool) -> f32 {
+        if a.is_infinite() && b.is_infinite() && a.is_sign_positive() != b.is_sign_positive() {
+            *hit = true;
+        }
+        a + b
+    }
+    fn pw(x: &[f32], hit: &mut bool) -> f32 {
+        let n = x.len();
+        if n < 8 {
+            let mut res = -0.0f32;
+            for &v in x {
+                res = add(res, v, hit);
+            }
+            res
+        } else if n <= 128 {
+            let mut r = [0.0f32; 8];
+            r.copy_from_slice(&x[..8]);
+            let mut i = 8;
+            while i < n - n % 8 {
+                for (k, rk) in r.iter_mut().enumerate() {
+                    *rk = add(*rk, x[i + k], hit);
+                }
+                i += 8;
+            }
+            let (a, b) = (add(r[0], r[1], hit), add(r[2], r[3], hit));
+            let (c, d) = (add(r[4], r[5], hit), add(r[6], r[7], hit));
+            let (ab, cd) = (add(a, b, hit), add(c, d, hit));
+            let mut res = add(ab, cd, hit);
+            while i < n {
+                res = add(res, x[i], hit);
+                i += 1;
+            }
+            res
+        } else {
+            let mut n2 = n / 2;
+            n2 -= n2 % 8;
+            let a = pw(&x[..n2], hit);
+            let b = pw(&x[n2..], hit);
+            add(a, b, hit)
+        }
+    }
+    let mut hit = false;
+    if pairwise {
+        let s = pw(x, &mut hit);
+        add(0.0, s, &mut hit);
+    } else {
+        let mut s = 0.0f32;
+        for &v in x {
+            s = add(s, v, &mut hit);
+        }
+    }
+    hit
+}
+
+/// Whether [`temporal_means`] adds +inf and -inf in one of its sums (in its order: pairwise
+/// along the volumes, or in order when they are the outer axis, a last chunk of one row
+/// pairwise).
+fn means_add_opposite_infinities(
+    data: &[f32],
+    n_samples: usize,
+    n_echos: usize,
+    n_vols: usize,
+    time_outer: bool,
+) -> bool {
+    let rows = n_samples * n_echos;
+    let chunk = 8192;
+    (0..rows).any(|r| {
+        let series = &data[r * n_vols..(r + 1) * n_vols];
+        if !series.iter().any(|x| x.is_infinite()) {
+            return false;
+        }
+        let width = (rows - (r / chunk) * chunk).min(chunk);
+        sum_adds_opposite_infinities(series, !time_outer || width == 1)
+    })
 }
 
 /// The adaptive mask: `(mask, adaptive_mask)` as tedana returns them (`adaptive_mask` int64,
@@ -131,6 +214,16 @@ pub fn make_adaptive_mask(
                 );
             }
         }
+        // the sums of a series holding both infinities (unless a NaN came first)
+        if means_add_opposite_infinities(data, n_samples, n_echos, n_vols, time_outer) {
+            log.warn(
+                "numpy/_core/_methods.py",
+                libraries.methods_mean_sum_line(),
+                "RuntimeWarning",
+                "invalid value encountered in reduce",
+                "ret = umr_sum(arr, axis, dtype, out, keepdims, where=where)",
+            );
+        }
         temporal_means(data, n_samples, n_echos, n_vols, time_outer)
     } else {
         Vec::new()
@@ -143,16 +236,19 @@ pub fn make_adaptive_mask(
             .collect();
         let has_nan = first.iter().any(|m| m.is_nan());
         let pool: Vec<f32> = if has_nan && notices.fix() {
-            first.iter().copied().filter(|m| m.is_finite()).collect()
+            first.iter().copied().filter(|m| !m.is_nan()).collect()
         } else {
             first
         };
         if pool.is_empty() && has_nan && notices.fix() {
-            notices.add(&TED_01, "no voxel of the mask has a finite first-echo mean");
+            notices.add(
+                &TED_01,
+                "no voxel of the mask has a first-echo mean that is a number",
+            );
             return Err(PyError::value_error(
-                "no voxel of the mask has a finite non-zero first-echo mean, so the dropout \
-                 thresholds cannot be set (tedana fails with: attempt to get argmax of an empty \
-                 sequence)",
+                "no voxel of the mask has a non-zero first-echo mean that is a number, so the \
+                 dropout thresholds cannot be set (tedana fails with: attempt to get argmax of \
+                 an empty sequence)",
                 "tedana/utils.py, in make_adaptive_mask",
             ));
         }
@@ -175,7 +271,7 @@ pub fn make_adaptive_mask(
                 &TED_01,
                 if notices.fix() {
                     "the dropout thresholds are taken from the voxels whose first-echo mean is \
-                     finite (a NaN mean made tedana fail)"
+                     not NaN (a NaN mean made tedana fail)"
                 } else {
                     "a NaN first-echo mean makes the dropout percentile NaN"
                 },
@@ -418,6 +514,31 @@ fn percentile_higher_shared(a: &[f32]) -> Option<f32> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn opposite_infinities_in_numpys_order() {
+        let (inf, nan) = (f32::INFINITY, f32::NAN);
+        assert!(sum_adds_opposite_infinities(&[1.0, inf, -inf], true));
+        assert!(!sum_adds_opposite_infinities(&[inf, inf, 2.0], true));
+        // a NaN met first makes the sum NaN quietly
+        assert!(!sum_adds_opposite_infinities(&[nan, inf, -inf], true));
+        assert!(!sum_adds_opposite_infinities(&[inf, nan, -inf], true));
+        assert!(sum_adds_opposite_infinities(&[inf, -inf, nan], true));
+        // eight accumulators: +inf and -inf meet in the pairwise combination despite a NaN in
+        // another accumulator
+        let mut x = [0.0f32; 16];
+        x[1] = nan;
+        x[2] = inf;
+        x[3] = -inf;
+        assert!(sum_adds_opposite_infinities(&x, true));
+        // in order (an outer axis): the NaN at index 1 comes first
+        assert!(!sum_adds_opposite_infinities(&x, false));
+        // the same accumulator: inf at 0 and -inf at 8
+        let mut y = [1.0f32; 9];
+        y[0] = inf;
+        y[8] = -inf;
+        assert!(sum_adds_opposite_infinities(&y, true));
+    }
 
     #[test]
     fn temporal_means_follow_the_memory_order() {

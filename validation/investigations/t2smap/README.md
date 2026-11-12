@@ -188,7 +188,20 @@ OPENBLAS_CORETYPE=Haswell scripts/orchestration/boxed.sh 32 <env>/bin/python -P 
 - `check_failures.py --t2smap <env>/bin/t2smap --replica <target>/release/larmorx-gpl --work
   <dir>`: tedana's failure cases on tiny seeded echoes (TED-01, 02, 04, 10, 11, 12, 13 and three
   clear errors of tedana's own): with `reproduce` the replica ends as tedana does (status, last
-  line of standard error), by default it names the defect. 11 cases, all as expected.
+  line of standard error), by default it names the defect. 11 cases, all as expected; 24 since
+  the clean-room part's relay RS1 (2026-11-12: TED-31, TED-46, the chained tracebacks, the
+  temporal means' and the cast's warnings, the thresholds' printing, `--fitmode ts` with no
+  volume), which the parity suite's `fail/` cases run against tedana in full.
+- `rs1_probe.py <work dir> --t2smap <launcher-newest>/t2smap --replica <larmorx-gpl>
+  [--only <case>,...] [--show]` (relay RS1, 2026-11-12; run with the newest environment's Python,
+  boxed): tedana's program run **directly** (not through the oracle-output cache) and the replica
+  in both modes on a small seeded phantom: every line of standard error (warnings with their
+  source lines, chained tracebacks), the exit status and every file's bytes, tedana against the
+  replica's `reproduce`, and the default's notices. Result: 21 of 21 identical (log
+  `oracles/logs/t2smap-cr-rs1-probe2.log`; before the fixes 13 differed, `...-probe1.log`).
+  `--registry` runs tedana in process with `warnings`' filter changes traced (`##FILTERS`
+  lines): Python's warnings registry is reset when the libraries' versions are gathered and when
+  the confounds table is written (log `oracles/logs/t2smap-cr-rs1-registry.log`).
 - `check_outputs.py --replica <target>/release/larmorx-gpl --work <empty dir> --libraries
   newest|shared` (relay 5b; build with `cargo build --release --manifest-path crates-gpl/Cargo.toml
   -p larmorx-gpl-cli`): tedana's whole `t2smap` program (`t2smap._main(args)` in the environment's

@@ -99,8 +99,10 @@ that did not agree agrees with the final build (70 of 70,
 - `check_parser.py`: the command line against tedana's parser in-process: 109 cases (help at 19
   widths, every error argparse and `is_valid_file` give, abbreviations, `=` forms, clusters,
   negative numbers, `--`), all identical (exit status, standard output and error, values).
-- `check_failures.py`: 11 failure cases (the TED defects' and tedana's own clear errors): with
-  `reproduce` tedana's exit status and last line, by default the defect named.
+- `check_failures.py`: 24 failure cases (the TED defects' and tedana's own clear errors; 13 added
+  by the clean-room part's relay RS1, 2026-11-12: TED-31, TED-46, the chained tracebacks, the
+  temporal means' and the cast's warnings, the thresholds' printing, `--fitmode ts` with no
+  volume): with `reproduce` tedana's exit status and last line, by default the defect named.
 
 ## Verification (relay 5b, 2026-11-08)
 

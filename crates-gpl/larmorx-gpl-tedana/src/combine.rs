@@ -99,7 +99,7 @@ pub fn make_optcom(
     n_threads: usize,
     log: &mut Log<'_>,
     notices: &mut Notices,
-) -> Result<Vec<f32>, PyError> {
+) -> Result<(Vec<f32>, bool), PyError> {
     let place = "tedana/combine.py, in make_optcom";
     let n_samples = am.len();
     if tes.len() != n_echos {
@@ -137,6 +137,8 @@ pub fn make_optcom(
         ),
     }
     let mut combined = vec![0.0f32; n_samples * n_vols];
+    // a finite float64 value beyond float32's range (numpy's cast warning when it is written)
+    let mut overflows = false;
     for (n, idx) in groups(am) {
         debug_assert!(n <= n_echos, "adaptive-mask counts never exceed the echoes");
         // weights per voxel: (n, cols_w) C-ordered, cols_w = 1 (tiled over volumes) or n_vols
@@ -232,51 +234,56 @@ pub fn make_optcom(
                 weights[k].fill(1.0);
             }
         }
-        let out: Vec<(usize, Vec<f32>)> = larmorx_core::parallel::with_threads(n_threads, || {
-            idx.par_iter()
-                .zip(weights.par_iter())
-                .map(|(&v, w)| {
-                    let rows = &data[v * n_echos * n_vols..(v * n_echos + n) * n_vols];
-                    let mut res = vec![0.0f32; n_vols];
-                    let mut wv = vec![0.0f64; n];
-                    let mut pv = vec![0.0f64; n];
-                    let mut scl_const = None;
-                    for (t, r) in res.iter_mut().enumerate() {
-                        let c = if wcols == 1 { 0 } else { t };
-                        for e in 0..n {
-                            wv[e] = w[e * wcols + c];
-                            pv[e] = rows[e * n_vols + t].to_f64().mul(wv[e]);
-                        }
-                        let scl = match scl_const {
-                            Some(s) => s,
-                            None => {
-                                let s = sum(&wv, order_w);
-                                if wcols == 1 {
-                                    scl_const = Some(s);
-                                }
-                                s
+        let out: Vec<(usize, Vec<f32>, bool)> =
+            larmorx_core::parallel::with_threads(n_threads, || {
+                idx.par_iter()
+                    .zip(weights.par_iter())
+                    .map(|(&v, w)| {
+                        let rows = &data[v * n_echos * n_vols..(v * n_echos + n) * n_vols];
+                        let mut res = vec![0.0f32; n_vols];
+                        let mut wv = vec![0.0f64; n];
+                        let mut pv = vec![0.0f64; n];
+                        let mut scl_const = None;
+                        let mut over = false;
+                        for (t, r) in res.iter_mut().enumerate() {
+                            let c = if wcols == 1 { 0 } else { t };
+                            for e in 0..n {
+                                wv[e] = w[e * wcols + c];
+                                pv[e] = rows[e * n_vols + t].to_f64().mul(wv[e]);
                             }
-                        };
-                        *r = f32::from_f64(sum(&pv, order_p).div(scl));
-                    }
-                    (v, res)
-                })
-                .collect()
-        })
-        .expect("a thread pool");
-        for (v, res) in out {
+                            let scl = match scl_const {
+                                Some(s) => s,
+                                None => {
+                                    let s = sum(&wv, order_w);
+                                    if wcols == 1 {
+                                        scl_const = Some(s);
+                                    }
+                                    s
+                                }
+                            };
+                            let value = sum(&pv, order_p).div(scl);
+                            *r = f32::from_f64(value);
+                            over |= value.is_finite() && r.is_infinite();
+                        }
+                        (v, res, over)
+                    })
+                    .collect()
+            })
+            .expect("a thread pool");
+        for (v, res, over) in out {
             combined[v * n_vols..(v + 1) * n_vols].copy_from_slice(&res);
+            overflows |= over;
         }
     }
-    Ok(combined)
+    Ok((combined, overflows))
 }
 
 /// numpy's floating-point warnings of PAID's `data.mean(axis=-1)` and `data.std(axis=-1)` over
-/// one group's series (each warning once per place): a series holding both infinities (and no
-/// NaN) sums to NaN (`invalid value encountered in reduce`, in the mean and in the variance's
-/// mean), one holding infinities of one sign (and no NaN) has an infinite mean, from which its
-/// infinite samples subtract to NaN (`invalid value encountered in subtract`). (A series with a
-/// NaN as well can raise the first in an order-dependent way; not followed.)
+/// one group's series (each warning once per place): a series whose pairwise sum adds +inf and
+/// -inf (both infinities, unless a NaN reached the sums first: `crate::adaptive::
+/// sum_adds_opposite_infinities`) raises `invalid value encountered in reduce`, in the mean and
+/// in the variance's mean; a series whose mean is infinite subtracts it from its infinite samples
+/// of that sign to NaN (`invalid value encountered in subtract`).
 fn paid_warnings(
     data: &[f32],
     n_echos: usize,
@@ -290,13 +297,12 @@ fn paid_warnings(
     for &v in idx {
         for e in 0..n {
             let row = &data[(v * n_echos + e) * n_vols..(v * n_echos + e + 1) * n_vols];
-            let pos = row.contains(&f32::INFINITY);
-            let neg = row.contains(&f32::NEG_INFINITY);
-            if row.iter().any(|x| x.is_nan()) {
+            if !row.iter().any(|x| x.is_infinite()) {
                 continue;
             }
-            both |= pos && neg;
-            single |= pos != neg;
+            both |= crate::adaptive::sum_adds_opposite_infinities(row, true);
+            let mean = mean_axis(row, [1, n_vols, 1])[0];
+            single |= mean.is_infinite() && row.contains(&mean);
         }
     }
     if both {

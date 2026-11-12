@@ -16,7 +16,7 @@ use std::path::{Component, Path, PathBuf};
 
 use larmorx_core::defects::{
     GLIBC_07, NP_03, Notices, TED_02, TED_03, TED_04, TED_07, TED_08, TED_10, TED_12, TED_13,
-    TED_16, UpstreamDefects,
+    TED_16, TED_31, UpstreamDefects,
 };
 use larmorx_core::numpy::NpFloat;
 use larmorx_core::python::argparse::{formatter_width, py_repr_str};
@@ -261,6 +261,8 @@ pub fn prepare(
             wf,
         ));
     }
+    // get_system_version_info: the libraries it asks change the warnings filters.
+    log.reset_registry();
 
     // check_te_values
     let te_place = "tedana/utils.py, in check_te_values";
@@ -662,7 +664,10 @@ pub fn fit_stage(
     }
     drop(fit_data);
     let am: Vec<i64> = kept.iter().map(|&v| adaptive[v]).collect();
-    if e != tes.len() {
+    // fit_decay checks the echo times; fit_decay_ts calls it once per volume, so with no volume
+    // it checks nothing and fits nothing.
+    let fits_nothing = settings.fit_ts && nf == 0;
+    if e != tes.len() && !fits_nothing {
         return Err(PyError::value_error(
             format!(
                 "Second dimension of data ({e}) does not match number of echoes provided (tes; \
@@ -671,6 +676,29 @@ pub fn fit_stage(
             ),
             "tedana/decay.py, in fit_decay",
         ));
+    }
+    // TED-31: no voxel left for the fit (the adaptive mask removed them all): fit_loglinear's
+    // count-1 step indexes the first column of an array of no column.
+    if kept.is_empty() && !fits_nothing {
+        notices.add(
+            &TED_31,
+            format!("no voxel is left for the fit (the adaptive mask removed all {n_samp})"),
+        );
+        return Err(if notices.fix() {
+            PyError::value_error(
+                format!(
+                    "no voxel of the mask has good signal (the adaptive mask removed all \
+                     {n_samp}), so there is nothing to fit (tedana fails with IndexError)"
+                ),
+                wf,
+            )
+        } else {
+            PyError::new(
+                "IndexError",
+                "index 0 is out of bounds for axis 1 with size 0",
+                "tedana/decay.py, in fit_loglinear",
+            )
+        });
     }
     let ctx = Context {
         libraries: env.libraries,
@@ -726,6 +754,29 @@ fn to_f32(v: &[f64]) -> Vec<f32> {
 
 fn ms_to_s(v: &[f64]) -> Vec<f32> {
     v.iter().map(|&x| f32::from_f64(x.div(1000.0))).collect()
+}
+
+/// `save_img`'s `np.float32(data)` of a float64 image: numpy warns when a finite value lies
+/// beyond float32's range (it becomes infinite), once per place until the warnings registry is
+/// reset. `scale` is the image's division (1000 for the T2* maps in seconds, else 1).
+fn cast_warning(log: &mut Log<'_>, values: &[f64], scale: f64) {
+    let overflows = |x: f64| {
+        let y = if scale == 1.0 { x } else { x.div(scale) };
+        y.is_finite() && f32::from_f64(y).is_infinite()
+    };
+    if values.iter().any(|&x| overflows(x)) {
+        cast_overflow(log);
+    }
+}
+
+fn cast_overflow(log: &mut Log<'_>) {
+    log.warn(
+        "tedana/io.py",
+        352,
+        "RuntimeWarning",
+        "overflow encountered in cast",
+        "data = np.float32(data)",
+    );
 }
 
 /// `t2smap_workflow` after the fit, the stages that depend on the maths: the failures and
@@ -808,18 +859,21 @@ pub fn save_stage(
             }
             let (first, second) = if reproduce { (s0v, t2v) } else { (t2v, s0v) };
             let cov = fit.covar.as_ref().expect("curvefit");
+            cast_warning(log, first, 1.0);
             outputs.save_img(
                 "t2star variance img",
                 ImgData::F32(&to_f32(first)),
                 volumes,
                 Some(&denoise),
             )?;
+            cast_warning(log, second, 1.0);
             outputs.save_img(
                 "s0 variance img",
                 ImgData::F32(&to_f32(second)),
                 volumes,
                 Some(&denoise),
             )?;
+            cast_warning(log, cov, 1.0);
             outputs.save_img(
                 "t2star-s0 covariance img",
                 ImgData::F32(&to_f32(cov)),
@@ -835,6 +889,7 @@ pub fn save_stage(
     let t2s_limited = unmask(&maps.t2s_limited, &denoise, cols);
     let s0_limited = unmask(&maps.s0_limited, &denoise, cols);
     drop(maps);
+    cast_warning(log, &s0_full, 1.0);
     outputs.save_img("s0 img", ImgData::F32(&to_f32(&s0_full)), volumes, None)?;
     drop(s0_full);
     log.info(
@@ -866,7 +921,10 @@ pub fn save_stage(
     }
     outputs.save_img("rmse img", ImgData::F32(&rmse.map), None, None)?;
     outputs.save_tsv("confounds tsv", &confounds_tsv(&rmse))?;
+    // pandas changes the warnings filters while the table is written: each warning shows again.
+    log.reset_registry();
     drop(rmse);
+    cast_warning(log, &s0_limited, 1.0);
     outputs.save_img(
         "limited s0 img",
         ImgData::F32(&to_f32(&s0_limited)),
@@ -874,6 +932,7 @@ pub fn save_stage(
         None,
     )?;
     drop(s0_limited);
+    cast_warning(log, &t2s_limited, 1000.0);
     outputs.save_img(
         "limited t2star img",
         ImgData::F32(&ms_to_s(&t2s_limited)),
@@ -890,7 +949,7 @@ pub fn save_stage(
     } else {
         CombMode::T2s
     };
-    let combined = make_optcom(
+    let (combined, combined_overflows) = make_optcom(
         &masked.data,
         e,
         n_vols,
@@ -907,6 +966,7 @@ pub fn save_stage(
         notices,
     )?;
     drop(masked);
+    cast_warning(log, &t2s_full, 1000.0);
     outputs.save_img(
         "t2star img",
         ImgData::F32(&ms_to_s(&t2s_full)),
@@ -914,6 +974,9 @@ pub fn save_stage(
         None,
     )?;
     drop(t2s_full);
+    if combined_overflows {
+        cast_overflow(log);
+    }
     outputs.save_img("combined img", ImgData::F32(&combined), Some(n_vols), None)?;
     drop(combined);
     Ok(outputs)

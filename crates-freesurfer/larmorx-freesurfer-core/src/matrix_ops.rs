@@ -52,10 +52,11 @@ use crate::cstd;
 use crate::globals::Globals;
 use crate::log::{self, ERROR_BADPARM, Fatal, NO_ERROR};
 use crate::matrix::{
-    self, MATRIX_COMPLEX, MATRIX_REAL, Matrix, celt_read, matrix_alloc, read_relt, rptr,
-    write_at, write_relt,
+    self, MATRIX_COMPLEX, MATRIX_REAL, Matrix, celt_read, matrix_alloc, read_relt, rptr, write_at,
+    write_relt,
 };
 use crate::ret::Ret;
+use crate::sse;
 
 /// `X_ROTATION`, `Y_ROTATION`, `Z_ROTATION` (`include/matrix.h`).
 pub const X_ROTATION: i32 = 0;
@@ -251,7 +252,11 @@ pub fn matrix_print(
         return ERROR_BADPARM;
     };
     // a negative precision given to `*` is taken as if omitted: 6
-    let p = if precision_real < 0 { 6 } else { precision_real };
+    let p = if precision_real < 0 {
+        6
+    } else {
+        precision_real
+    };
     let spec = format!("% 2.{p}f");
     let r = print_body(g, fp, err, mat, &spec, ("% 2.3f", "% 2.3f"), b";\n");
     // fflush(stdout), not fp
@@ -294,8 +299,10 @@ pub fn matrix_clear(g: &mut Globals, mat: &mut Matrix) {
     if mat.mtype == MATRIX_COMPLEX {
         if !g.notices.reproduce() {
             if mat.data().iter().any(|&v| v != 0.0) {
-                g.notices
-                    .add(&FS_25, "MatrixClear of a complex matrix: every float cleared");
+                g.notices.add(
+                    &FS_25,
+                    "MatrixClear of a complex matrix: every float cleared",
+                );
             }
             for v in mat.data_mut() {
                 *v = 0.0;
@@ -370,14 +377,7 @@ pub fn matrix_transpose(
     let given = m_out.is_some();
     let mut fresh = None;
     let Some(m) = output(
-        g,
-        out,
-        err,
-        m_out,
-        &mut fresh,
-        m_in.cols,
-        m_in.rows,
-        m_in.mtype,
+        g, out, err, m_out, &mut fresh, m_in.cols, m_in.rows, m_in.mtype,
     )?
     else {
         return Ok(Ret::Null);
@@ -464,7 +464,17 @@ fn add_sub(
         for col in 1..=cols {
             let a = read_relt(g, m1, row, col);
             let b = read_relt(g, m2, row, col);
-            write_relt(g, m, row, col, if subtract { a - b } else { a + b });
+            write_relt(
+                g,
+                m,
+                row,
+                col,
+                if subtract {
+                    sse::sub(a, b)
+                } else {
+                    sse::add(a, b)
+                },
+            );
         }
     }
     Ok(done(fresh))
@@ -515,14 +525,7 @@ fn map_elts(
     let given = m_out.is_some();
     let mut fresh = None;
     let Some(m) = output(
-        g,
-        out,
-        err,
-        m_out,
-        &mut fresh,
-        m_in.rows,
-        m_in.cols,
-        m_in.mtype,
+        g, out, err, m_out, &mut fresh, m_in.rows, m_in.cols, m_in.mtype,
     )?
     else {
         return Ok(Ret::Null);
@@ -562,7 +565,9 @@ pub fn matrix_scalar_mul(
     val: f32,
     m_out: Option<&mut Matrix>,
 ) -> Result<Ret<Matrix>, Fatal> {
-    map_elts(g, out, err, "MatrixScalarMul", m_in, m_out, |v| v * val)
+    map_elts(g, out, err, "MatrixScalarMul", m_in, m_out, |v| {
+        sse::mul(v, val)
+    })
 }
 
 /// `MatrixScalarMul(m, val, m)`.
@@ -585,7 +590,9 @@ pub fn matrix_square_elts(
     m_in: &Matrix,
     m_out: Option<&mut Matrix>,
 ) -> Result<Ret<Matrix>, Fatal> {
-    map_elts(g, out, err, "MatrixSquareElts", m_in, m_out, |v| v * v)
+    map_elts(g, out, err, "MatrixSquareElts", m_in, m_out, |v| {
+        sse::mul(v, v)
+    })
 }
 
 /// `MatrixDiag(mDiag, mOut)`: the square matrix of `max(rows, cols)` with the column vector's
@@ -993,9 +1000,9 @@ pub fn vector_len(g: &mut Globals, err: &mut dyn Write, v: &Matrix) -> f32 {
     let mut len = 0.0f32;
     for i in 1..=v.rows {
         let vi = read_relt(g, v, i, 1);
-        len += vi * vi;
+        len = sse::add(len, sse::mul(vi, vi));
     }
-    len.sqrt()
+    sse::sqrt(len)
 }
 
 /// `VectorDot(v1, v2)`: the `float` sum of the products of the first columns, over `v1`'s rows.
@@ -1009,14 +1016,18 @@ pub fn vector_dot(g: &mut Globals, err: &mut dyn Write, v1: &Matrix, v2: &Matrix
             g,
             err,
             "VectorDot",
-            &format!("a {}-element vector with a {}-element one", v1.rows, v2.rows),
+            &format!(
+                "a {}-element vector with a {}-element one",
+                v1.rows, v2.rows
+            ),
         )
     {
         return 0.0;
     }
     let mut dot = 0.0f32;
     for i in 1..=v1.rows {
-        dot += read_relt(g, v1, i, 1) * read_relt(g, v2, i, 1);
+        let (a, b) = (read_relt(g, v1, i, 1), read_relt(g, v2, i, 1));
+        dot = sse::add(dot, sse::mul(a, b));
     }
     dot
 }
@@ -1032,15 +1043,18 @@ pub fn vector_distance(g: &mut Globals, err: &mut dyn Write, v1: &Matrix, v2: &M
             g,
             err,
             "VectorDistance",
-            &format!("a {}-element vector with a {}-element one", v1.rows, v2.rows),
+            &format!(
+                "a {}-element vector with a {}-element one",
+                v1.rows, v2.rows
+            ),
         )
     {
         return 0.0;
     }
     let mut dist = 0.0f32;
     for row in 1..=v1.rows {
-        let d = read_relt(g, v1, row, 1) - read_relt(g, v2, row, 1);
-        dist += d * d;
+        let d = sse::sub(read_relt(g, v1, row, 1), read_relt(g, v2, row, 1));
+        dist = sse::add(dist, sse::mul(d, d));
     }
     dist
 }
@@ -1136,9 +1150,10 @@ pub fn vector_cross_product(
     let e = |g: &mut Globals, v: &Matrix, i: i32| read_relt(g, v, i, 1);
     let (x1, y1, z1) = (e(g, v1, 1), e(g, v1, 2), e(g, v1, 3));
     let (x2, y2, z2) = (e(g, v2, 1), e(g, v2, 2), e(g, v2, 3));
-    write_relt(g, d, 1, 1, y1 * z2 - z1 * y2);
-    write_relt(g, d, 2, 1, z1 * x2 - x1 * z2);
-    write_relt(g, d, 3, 1, x1 * y2 - y1 * x2);
+    let cross = |a: f32, b: f32, c: f32, d: f32| sse::sub(sse::mul(a, b), sse::mul(c, d));
+    write_relt(g, d, 1, 1, cross(y1, z2, z1, y2));
+    write_relt(g, d, 2, 1, cross(z1, x2, x1, z2));
+    write_relt(g, d, 3, 1, cross(x1, y2, y1, x2));
     Ok(done(fresh))
 }
 
@@ -1159,9 +1174,10 @@ pub fn vector_triple_product(
     let (x1, y1, z1) = (e(g, v1, 1), e(g, v1, 2), e(g, v1, 3));
     let (x2, y2, z2) = (e(g, v2, 1), e(g, v2, 2), e(g, v2, 3));
     let (x3, y3, z3) = (e(g, v3, 1), e(g, v3, 2), e(g, v3, 3));
-    let mut total = x3 * (y1 * z2 - z1 * y2);
-    total += y3 * (z1 * x2 - x1 * z2);
-    total += z3 * (x1 * y2 - y1 * x2);
+    let cross = |a: f32, b: f32, c: f32, d: f32| sse::sub(sse::mul(a, b), sse::mul(c, d));
+    let mut total = sse::mul(x3, cross(y1, z2, z1, y2));
+    total = sse::add(total, sse::mul(y3, cross(z1, x2, x1, z2)));
+    total = sse::add(total, sse::mul(z3, cross(x1, y2, y1, x2)));
     total
 }
 
@@ -1188,21 +1204,27 @@ pub fn vector3_angle(g: &mut Globals, err: &mut dyn Write, v1: &Matrix, v2: &Mat
     let (a2, b2, c2) = (e(g, v2, 1), e(g, v2, 2), e(g, v2, 3));
     let len = |x: f32, y: f32, z: f32| {
         let (x, y, z) = (f64::from(x), f64::from(y), f64::from(z));
-        (x * x + y * y + z * z).sqrt()
+        sse::sqrt64(sse::add64(
+            sse::add64(sse::mul64(x, x), sse::mul64(y, y)),
+            sse::mul64(z, z),
+        ))
     };
     let (l1, l2) = (len(a1, b1, c1), len(a2, b2, c2));
-    let mut norm = l1 * l2;
+    let mut norm = sse::mul64(l1, l2);
     if fzero(norm) {
         return 0.0;
     }
-    let dot = f64::from(a1 * a2 + b1 * b2 + c1 * c2);
+    let dot = f64::from(sse::add(
+        sse::add(sse::mul(a1, a2), sse::mul(b1, b2)),
+        sse::mul(c1, c2),
+    ));
     if dot.abs() > norm.abs() {
         norm = dot.abs();
     }
     if dot > norm {
         larmorx_core::math::acos(1.0)
     } else {
-        larmorx_core::math::acos(dot / norm)
+        larmorx_core::math::acos(sse::div64(dot, norm))
     }
 }
 
@@ -1219,7 +1241,10 @@ pub struct Xyz {
 /// length is 0. Returns `(xyz, len)`.
 pub fn xyz_normalized_load(x: f32, y: f32, z: f32) -> (Xyz, f32) {
     let (dx, dy, dz) = (f64::from(x), f64::from(y), f64::from(z));
-    let len = (dx * dx + dy * dy + dz * dz).sqrt() as f32;
+    let len = sse::sqrt64(sse::add64(
+        sse::add64(sse::mul64(dx, dx), sse::mul64(dy, dy)),
+        sse::mul64(dz, dz),
+    )) as f32;
     if len == 0.0 {
         return (
             Xyz {
@@ -1230,12 +1255,12 @@ pub fn xyz_normalized_load(x: f32, y: f32, z: f32) -> (Xyz, f32) {
             len,
         );
     }
-    let inv = 1.0f32 / len;
+    let inv = sse::div(1.0, len);
     (
         Xyz {
-            x: x * inv,
-            y: y * inv,
-            z: z * inv,
+            x: sse::mul(x, inv),
+            y: sse::mul(y, inv),
+            z: sse::mul(z, inv),
         },
         len,
     )
@@ -1247,16 +1272,19 @@ pub fn xyz_normalized_load(x: f32, y: f32, z: f32) -> (Xyz, f32) {
 /// series' first term) from 0.99, as `float`.
 pub fn xyz_approx_angle_known_length(n: &Xyz, x2: f32, y2: f32, z2: f32, norm: f32) -> f32 {
     let (x1, y1, z1) = (f64::from(n.x), f64::from(n.y), f64::from(n.z));
-    let dot = (x1 * f64::from(x2) + y1 * f64::from(y2) + z1 * f64::from(z2)) as f32;
+    let dot = sse::add64(
+        sse::add64(sse::mul64(x1, f64::from(x2)), sse::mul64(y1, f64::from(y2))),
+        sse::mul64(z1, f64::from(z2)),
+    ) as f32;
     let mut norm = norm;
     if dot.abs() > norm {
         norm = dot.abs();
     }
-    let acos_input = f64::from(dot / norm);
+    let acos_input = f64::from(sse::div(dot, norm));
     if acos_input < f64::from(0.99f32) {
         larmorx_core::math::acos(acos_input) as f32
     } else {
-        (2.0 * (1.0 - acos_input)).sqrt() as f32
+        sse::sqrt64(sse::mul64(2.0, sse::sub64(1.0, acos_input))) as f32
     }
 }
 
@@ -1330,7 +1358,7 @@ pub fn matrix_trace(g: &mut Globals, err: &mut dyn Write, m: &Matrix) -> f32 {
     let nmax = if m.rows >= m.cols { m.cols } else { m.rows };
     let mut trace = 0.0f32;
     for n in 1..=nmax {
-        trace += read_relt(g, m, n, n);
+        trace = sse::add(trace, read_relt(g, m, n, n));
     }
     trace
 }
@@ -1415,7 +1443,7 @@ pub fn matrix_sum_elts(g: &mut Globals, err: &mut dyn Write, m: &Matrix) -> f64 
     let mut sum = 0.0f64;
     for r in 1..=m.rows {
         for c in 1..=m.cols {
-            sum += f64::from(read_relt(g, m, r, c));
+            sum = sse::add64(sum, f64::from(read_relt(g, m, r, c)));
         }
     }
     sum
@@ -1458,9 +1486,9 @@ pub fn matrix_normalize_col_scale(
         let mut sum2 = 0.0f64;
         for r in 1..=m.rows {
             let v = f64::from(read_relt(g, m, r, c));
-            sum2 += v * v;
+            sum2 = sse::add64(sum2, sse::mul64(v, v));
         }
-        write_relt(g, s, 1, c, sum2.sqrt() as f32);
+        write_relt(g, s, 1, c, sse::sqrt64(sum2) as f32);
     }
     Ok(done(fresh))
 }
@@ -1511,7 +1539,7 @@ pub fn matrix_normalize_col(
         let v = f64::from(read_relt(g, &lengths, 1, c));
         for r in 1..=m.rows {
             let x = if v != 0.0 {
-                (f64::from(read_relt(g, m, r, c)) / v) as f32
+                sse::div64(f64::from(read_relt(g, m, r, c)), v) as f32
             } else {
                 0.0
             };
@@ -1571,29 +1599,30 @@ pub fn gaussian_matrix(
         }
     };
     let libm = Libm::quiet(g.mode());
-    let var = std * std;
-    let mut f = ((2.0 * std::f64::consts::PI).sqrt() * f64::from(std)) as f32;
+    let var = sse::mul(std, std);
+    let mut f = sse::mul64((2.0 * std::f64::consts::PI).sqrt(), f64::from(std)) as f32;
     // C++'s float overload of exp: expf of the float argument, then a float division
-    let gauss = |d: f32, f: f32| -> f32 { libm.expf(-(d * d) / (2.0 * var)) / f };
+    let gauss =
+        |d: f32, f: f32| -> f32 { sse::div(libm.expf(sse::div(-(d * d), sse::mul(2.0, var))), f) };
     if norm == 1 {
         let mut sum = 0.0f32;
         for c in 0..len {
             let d = (c - len / 2) as f32;
-            sum += gauss(d, f);
+            sum = sse::add(sum, gauss(d, f));
         }
-        f /= sum;
+        f = sse::div(f, sum);
     }
     for r in 0..len {
         let mut sum = 0.0f32;
         for c in 0..len {
             let d = (c - r) as f32;
             let v = gauss(d, f);
-            sum += v;
+            sum = sse::add(sum, v);
             write_relt(g, m, r + 1, c + 1, v);
         }
         if norm == 2 {
             for c in 0..len {
-                let v = read_relt(g, m, r + 1, c + 1) / sum;
+                let v = sse::div(read_relt(g, m, r + 1, c + 1), sum);
                 write_relt(g, m, r + 1, c + 1, v);
             }
         }
@@ -1623,7 +1652,7 @@ pub fn gaussian_matrix2(
     let Some(mut g2) = gaussian_matrix(g, out, err, len, std2, norm, None)?.into_new() else {
         return Ok(Ret::Null);
     };
-    matrix_scalar_mul_in_place(g, out, err, &mut g2, 1.0 - w1)?;
+    matrix_scalar_mul_in_place(g, out, err, &mut g2, sse::sub(1.0, w1))?;
     matrix_add(g, out, err, &g1, &g2, gm)
 }
 

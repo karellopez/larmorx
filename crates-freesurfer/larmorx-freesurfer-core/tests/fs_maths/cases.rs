@@ -24,8 +24,8 @@ use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::histo::{self as h, Histogram};
 use larmorx_freesurfer_core::matrix::{self as m, MATRIX_COMPLEX, MATRIX_REAL, Matrix};
 use larmorx_freesurfer_core::matrix_ops::{self as mo, Region};
-use larmorx_freesurfer_core::{pdf, prime};
 use larmorx_freesurfer_core::ret::Ret;
+use larmorx_freesurfer_core::{pdf, prime};
 
 /// splitmix64.
 pub struct Gen(u64);
@@ -201,7 +201,6 @@ fn put_mat(s: &mut Vec<String>, g: &mut Gen, rows: i64, cols: i64, complex: bool
         s.push(fx(v));
     }
 }
-
 
 /// A matrix's values of one kind (seeded integers and exact divisions only): ordinary, all zero,
 /// tiny (around MatrixIsZero's 1e-11), or with an infinity or a NaN.
@@ -704,7 +703,11 @@ fn case(g: &mut Gen, cmd: &str) -> String {
             s.push("1".to_owned());
             for &v in &a {
                 // a nearly parallel vector, or another one
-                let w = if near { v + g.f(-1, 1, 64) / 64.0 } else { g.f(-100, 100, 64) };
+                let w = if near {
+                    v + g.f(-1, 1, 64) / 64.0
+                } else {
+                    g.f(-100, 100, 64)
+                };
                 s.push(fx(w));
             }
         }
@@ -730,7 +733,9 @@ fn case(g: &mut Gen, cmd: &str) -> String {
         "primes" => {
             s.push(g.int(1, 3000).to_string());
             let n = match g.below(4) {
-                0 => g.pick(&[1, 2, 3, 4, 6, 8, 97, 1024, 163842, 40962, 10242, 65536, 99991]),
+                0 => g.pick(&[
+                    1, 2, 3, 4, 6, 8, 97, 1024, 163842, 40962, 10242, 65536, 99991,
+                ]),
                 1 => g.int(1, 64),
                 _ => g.int(1, 400_000),
             };
@@ -1402,8 +1407,9 @@ pub fn run_line(line: &str, mode: UpstreamDefects, tmp: &Path) -> (String, Vec<&
             let x = mo::matrix_alloc_rotation(g, &mut so, &mut se, n, angle, which).unwrap();
             o.mn(&x, None);
             let mut mm = t.m(g, MATRIX_REAL);
-            let x = mo::matrix_realloc_rotation(g, &mut so, &mut se, n, angle, which, Some(&mut mm))
-                .unwrap();
+            let x =
+                mo::matrix_realloc_rotation(g, &mut so, &mut se, n, angle, which, Some(&mut mm))
+                    .unwrap();
             o.mn(&x, Some(&mm));
         }
         "mvec" => {
@@ -1454,8 +1460,22 @@ pub fn run_line(line: &str, mode: UpstreamDefects, tmp: &Path) -> (String, Vec<&
             let a = o.mt(g, &mut t);
             let prec = t.i();
             let mut f = Vec::new();
-            o.i(mo::matrix_print(g, Some(&mut f), &mut so, &mut se, Some(&a), prec));
-            o.i(mo::matrix_print_fmt(g, Some(&mut f), &mut so, &mut se, "%10f", Some(&a)));
+            o.i(mo::matrix_print(
+                g,
+                Some(&mut f),
+                &mut so,
+                &mut se,
+                Some(&a),
+                prec,
+            ));
+            o.i(mo::matrix_print_fmt(
+                g,
+                Some(&mut f),
+                &mut so,
+                &mut se,
+                "%10f",
+                Some(&a),
+            ));
             let _ = std::fs::write(tmp, &f);
             o.file(tmp);
             let _ = std::fs::remove_file(tmp);

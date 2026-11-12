@@ -61,8 +61,10 @@ pub fn pdf_gaussian(g: &mut Globals) -> f64 {
                     .add(&FS_30, "PDFgaussian: a radius of 0 drawn again");
                 continue;
             }
-            g.notices
-                .add(&FS_30, "PDFgaussian: a radius of 0 gives NaN, as FreeSurfer");
+            g.notices.add(
+                &FS_30,
+                "PDFgaussian: a radius of 0 gives NaN, as FreeSurfer",
+            );
         }
         return v1 * (-2.0 * libm.log(r2) / r2).sqrt();
     }

@@ -62,6 +62,7 @@ use crate::diag::BUILD_ROOT;
 use crate::globals::Globals;
 use crate::log::{self, ERROR_BADPARM, ERROR_NO_MEMORY, Fatal};
 use crate::ret::Ret;
+use crate::sse;
 
 /// `MATRIX_REAL`, `MATRIX_COMPLEX` (`include/matrix.h`).
 pub const MATRIX_REAL: i16 = 1;
@@ -620,7 +621,10 @@ pub fn matrix_multiply(
         return Ok(Ret::Null);
     };
     if m1.cols != m2.rows {
-        let _ = write!(out, "MatrixMultiply(): m1/m2 dim mismatch\n break {file}:733\n");
+        let _ = write!(
+            out,
+            "MatrixMultiply(): m1/m2 dim mismatch\n break {file}:733\n"
+        );
         let msg = format!(
             "MatrixMultiply: m1 cols {} does not match m2 rows {}\n",
             m1.cols, m2.rows
@@ -645,7 +649,10 @@ pub fn matrix_multiply(
         }
         Some(m3) => {
             if m3.rows != m1.rows || m3.cols != m2.cols {
-                let _ = write!(out, "MatrixMultiply(): m3 dim mismatch\n break {file}:748\n");
+                let _ = write!(
+                    out,
+                    "MatrixMultiply(): m3 dim mismatch\n break {file}:748\n"
+                );
                 let msg = format!(
                     "MatrixMultiply: ({} x {}) * ({} x {}) != ({} x {})\n",
                     m1.rows, m1.cols, m2.rows, m2.cols, m3.rows, m3.cols
@@ -715,14 +722,18 @@ pub(crate) fn multiply(
                         Acc::Double => {
                             let mut val = 0.0f64;
                             for i in 1..=m1_cols {
-                                val += f64::from(m1.relt(row, i)) * f64::from(m2.relt(i, col));
+                                let p = sse::mul64(
+                                    f64::from(m1.relt(row, i)),
+                                    f64::from(m2.relt(i, col)),
+                                );
+                                val = sse::add64(val, p);
                             }
                             val as f32
                         }
                         Acc::Float => {
                             let mut val = 0.0f32;
                             for i in 1..=m1_cols {
-                                val += m1.relt(row, i) * m2.relt(i, col);
+                                val = sse::add(val, sse::mul(m1.relt(row, i), m2.relt(i, col)));
                             }
                             val
                         }
@@ -742,8 +753,8 @@ pub(crate) fn multiply(
                     let a = read_at(g, m1, r1 + i);
                     let b = read_at(g, m2, r2 + i * cols as isize);
                     match acc {
-                        Acc::Double => vd += f64::from(a) * f64::from(b),
-                        Acc::Float => vf += a * b,
+                        Acc::Double => vd = sse::add64(vd, sse::mul64(f64::from(a), f64::from(b))),
+                        Acc::Float => vf = sse::add(vf, sse::mul(a, b)),
                     }
                 }
                 let v = match acc {
@@ -811,26 +822,32 @@ pub(crate) fn multiply(
                 };
                 match acc {
                     Acc::Double => {
+                        use sse::{add64 as add, mul64 as mul, sub64 as sub};
                         let (dr, di) = match (b, d) {
-                            (Some(b), Some(d)) => (a * c - b * d, a * d + b * c),
-                            (None, Some(d)) => (a * c, a * d),
-                            (Some(b), None) => (a * c, b * c),
+                            (Some(b), Some(d)) => {
+                                (sub(mul(a, c), mul(b, d)), add(mul(a, d), mul(b, c)))
+                            }
+                            (None, Some(d)) => (mul(a, c), mul(a, d)),
+                            (Some(b), None) => (mul(a, c), mul(b, c)),
                             (None, None) => unreachable!(),
                         };
-                        re = (f64::from(re) + dr) as f32;
-                        im = (f64::from(im) + di) as f32;
+                        re = add(f64::from(re), dr) as f32;
+                        im = add(f64::from(im), di) as f32;
                     }
                     Acc::Float => {
                         // the parts were floats: widening them was exact
                         let (a, c) = (a as f32, c as f32);
+                        use sse::{add, mul, sub};
                         let (dr, di) = match (b.map(|x| x as f32), d.map(|x| x as f32)) {
-                            (Some(b), Some(d)) => (a * c - b * d, a * d + b * c),
-                            (None, Some(d)) => (a * c, a * d),
-                            (Some(b), None) => (a * c, b * c),
+                            (Some(b), Some(d)) => {
+                                (sub(mul(a, c), mul(b, d)), add(mul(a, d), mul(b, c)))
+                            }
+                            (None, Some(d)) => (mul(a, c), mul(a, d)),
+                            (Some(b), None) => (mul(a, c), mul(b, c)),
                             (None, None) => unreachable!(),
                         };
-                        re += dr;
-                        im += di;
+                        re = add(re, dr);
+                        im = add(im, di);
                     }
                 }
             }
@@ -942,6 +959,45 @@ mod tests {
         assert!(String::from_utf8_lossy(&o).contains(":623\n"));
         let r = matrix_multiply_d(&mut gl, &mut o, &mut e, None, Some(&b), None);
         assert_eq!(r, Err(Fatal::Exit(-4)));
+    }
+
+    #[test]
+    fn multiply_float_messages_and_sums() {
+        let mut gl = g(UpstreamDefects::Fix);
+        let (mut o, mut e) = (Vec::new(), Vec::new());
+        let a = Matrix::from_rows(&[vec![1.0, 1e-8], vec![3.0, 4.0]]);
+        let b = Matrix::from_rows(&[vec![1.0, 2.0], vec![1.0, 0.5]]);
+        let c = matrix_multiply(&mut gl, &mut o, &mut e, Some(&a), Some(&b), None)
+            .unwrap()
+            .unwrap_new();
+        // float: 1 + 1e-8 rounds to 1
+        assert_eq!(c.relt(1, 1), 1.0);
+        let wide = Matrix::real(3, 1);
+        let r = matrix_multiply(&mut gl, &mut o, &mut e, Some(&a), Some(&wide), None).unwrap();
+        assert!(r.is_null());
+        let file = matrix_cpp();
+        assert_eq!(
+            String::from_utf8_lossy(&o),
+            format!("MatrixMultiply(): m1/m2 dim mismatch\n break {file}:733\n")
+        );
+        assert_eq!(
+            String::from_utf8_lossy(&e),
+            "error: MatrixMultiply: m1 cols 2 does not match m2 rows 3\n\n"
+        );
+        let (mut o, mut e) = (Vec::new(), Vec::new());
+        let mut bad = Matrix::real(3, 3);
+        let r =
+            matrix_multiply(&mut gl, &mut o, &mut e, Some(&a), Some(&b), Some(&mut bad)).unwrap();
+        assert!(r.is_null());
+        assert!(String::from_utf8_lossy(&o).ends_with(":748\n"));
+        assert!(String::from_utf8_lossy(&e).contains("MatrixMultiply: (2 x 2) * (2 x 2) != (3 x 3)"));
+        let (mut o, mut e) = (Vec::new(), Vec::new());
+        let r = matrix_multiply(&mut gl, &mut o, &mut e, Some(&a), None, None);
+        assert_eq!(r, Err(Fatal::Exit(-4)));
+        assert_eq!(
+            String::from_utf8_lossy(&o),
+            format!("MatrixMultiply(): m2 is null \n break {file}:729\n")
+        );
     }
 
     #[test]

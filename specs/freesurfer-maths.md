@@ -9,9 +9,11 @@ standards only.
 
 Status: **part 1** (§1-6): the float matrices' storage, allocation, copy and double-accumulated
 product; the 4 x 4 affine helpers; the double matrices with their long-double products; the
-histograms. To come: the matrices' remaining operations (inverse, determinant, decompositions,
-statistics), the numerics wrappers, the probability functions, the
-random fields.
+histograms. **Part 2** (§7-11, queue item 3.1-24, first piece): the NaN conventions; the float
+product; the element-wise operations, regions, vectors, printing, rotations and Gaussian matrices;
+prime factors; the Gaussian draws and the time-of-day seed. To come: the matrices' decompositions
+(inverse, determinant, eigensystems, SVD and what uses them), their text and binary files, the
+numerics wrappers, the random fields.
 
 ## 1. Conventions
 
@@ -430,3 +432,219 @@ from 0; when it is exactly 0 a peak search returns -1.
 - **The replays** of the first programs that use these functions (`mri_normalize`, `mri_segment`,
   `mris_make_surfaces`, `mri_ca_register`'s histograms, `mri_em_register`), with `reproduce`, on the
   recorded heads (queue: the programs' items).
+
+## 7. Conventions, part 2
+
+- **NaN bits.** The official build's arithmetic is SSE2's: a NaN made from numbers (`inf - inf`,
+  `0 * inf`, `0 / 0`, the square root of a negative number) has the sign bit set (`0xffc00000` in
+  float, `0xfff8000000000000` in double); a NaN operand passes on quieted (quiet bit set, sign and
+  payload kept); of two NaN operands, the **left** one of the expression as written (`x += y` gives
+  `x`'s; `a c - b d` the product `a c`'s). Every expression of §8-11 follows these rules on every
+  platform.
+- **The C library, C++'s overloads.** FreeSurfer's matrix code is C++: a function of a `float`
+  argument is the `float` function (`expf`, `sinf`, `cosf`, `sqrtf`), of a `double` the `double` one.
+  `expf`, `sinf`, `cosf`, `log` are correctly rounded by default and glibc 2.35's (x86-64, its FMA
+  build) with `reproduce`; `acos` is correctly rounded in both modes (glibc's `acos` differs from it on
+  about 0.1 % of arguments: queue item 3.1-08).
+- **Complex operands.** The operations of §8.2-8.6 not marked otherwise were written for real
+  matrices: they address a complex matrix as if real (§2.1). **FS-25:** **default:** such an operand
+  is refused: an error, code -4, `<function>: a complex matrix (the function handles real matrices
+  only)` + `\n`, then nothing returned (a number-valued function returns its error value: 0, or -4
+  for the finiteness check); **reproduce:** FreeSurfer's addresses (§2.1). Noted either way.
+- **Outputs that do not fit.** **FS-28:** where a function fills a given output without checking
+  that the result fits (said below), **default:** an error, code -4, `<function>: <what>` + `\n`,
+  nothing returned; **reproduce:** filled at FreeSurfer's addresses (§2.1; inside the array they
+  land in other rows, outside it they are dropped, FS-16). Noted either way.
+
+## 8. Float matrices, part 2
+
+### 8.1 Product accumulated in float
+
+As §2.5, with these differences:
+
+1. No `m1`: `MatrixMultiply(): m1 is null ` + `\n` + ` break <build root>/utils/matrix.cpp:725` +
+   `\n` on standard output, then the program ends: an error, code -4, `MatrixMultiply: m1 is null` +
+   `\n`. No `m2`: the same with `m2` and line 729.
+2. `m1`'s columns ≠ `m2`'s rows: `MatrixMultiply(): m1/m2 dim mismatch` + `\n` + ` break <build
+   root>/utils/matrix.cpp:733` + `\n` on standard output, then an error, code -4, `MatrixMultiply: m1
+   cols <c1> does not match m2 rows <r2>` + `\n`; nothing returned.
+3. A given `m3` of another size: `MatrixMultiply(): m3 dim mismatch` + `\n` + ` break <build
+   root>/utils/matrix.cpp:748` + `\n` on standard output, then an error, code -4, `MatrixMultiply:
+   (<r1> x <c1>) * (<r2> x <c2>) != (<r3> x <c3>)` + `\n`; nothing returned.
+4. Both real: each element = the **float** sum, from 0, for i = 1..m1.cols in order, of the float
+   products `m1(r, i) m2(i, c)` (each product and each sum rounded to float).
+5. The complex branches in float: `re = re + (a c' - b d)`, `im = im + (a d + b c')`, every operation
+   in float. FS-15 and FS-16 as §2.5 (`MatrixMultiply` in their messages).
+
+### 8.2 Element-wise operations
+
+Unless said, a new output has the input's size and type; a given output must have the size stated,
+else an error, code -4, with the message given, and nothing returned; each element is read before it
+is written (an output that is also an input gives the same result).
+
+- **Identity** (n, m): absent `m`: a new real n x n matrix with ones on the diagonal. Given: cleared
+  (below), then (i, i) = 1 for i = 1..n. FS-28: a given `m` with fewer than n rows or columns.
+- **Transpose** (in, out): out(c, r) = in(r, c); a new `out` is cols x rows. FS-28: a given `out`
+  that is not cols x rows.
+- **Add, subtract** (m1, m2, out): `m2` of another size: `MatrixAdd: incompatable matrices <r1> x
+  <c1> + <r2> x <c2>` (subtract: `MatrixSubtract: ...` with `-`) + `\n`; a given `out` of another size:
+  `MatrixAdd: incompatable matrices <r1> x <c1> = <r> x <c>` + `\n`. Each element in float.
+- **Scalar product** (in, v, out), **square** (in, out): each element `x v`, `x x` in float; a given
+  `out` of another size: `MatrixScalarMul: incompatable matrices <r> x <c> != <ro> x <co>` + `\n`
+  (`MatrixSquareElts: ...`).
+- **Clear** (m): every element 0 (and the unused float before the numbers). **FS-25** for a complex
+  matrix: FreeSurfer clears, for each row, the `cols + 1` floats from one float before the row's first
+  element in real addressing, which leaves most of a complex matrix; **default:** every float cleared;
+  **reproduce:** FreeSurfer's floats.
+- **Diagonal** (d, out): n = max(rows, cols) of `d`; absent `out`: a new n x n matrix of `d`'s type;
+  given: cleared first, then `MatrixDiag: incompatable matrices <n> x <n> != <r> x <c>` + `\n` if it is
+  not n x n (cleared all the same). With more than one row, (r, r) = d(r, 1) for r = 1..rows (the
+  first column); with one row, (c, c) = d(1, c).
+- **Symmetry test** (m): 0 when not square; else 1 unless some (r, c) ≠ (c, r) (float comparison: a
+  NaN element makes it 0).
+- **Zero test** (m): 0 at the first element (row by row) whose magnitude, widened to double, exceeds
+  `1e-11`; else 1 (NaNs count as zero).
+- **Finiteness check** (m): -4 at the first element that is infinite or NaN, else 0.
+- **Trace** (m): the float sum from 0 of (n, n), n = 1..min(rows, cols).
+- **Element sum** (m): the double sum from 0 of the elements widened, row by row.
+- **Constant** (v, rows, cols, X): absent `X`: a new real rows x cols matrix; every element of `X`
+  (its own sizes) = v. **Zero** is the constant 0. **Clone** (m): a copy of `m` (§2.4), then the
+  constant 0 over its own sizes (FS-14 and FS-25 for a complex `m`; **default:** all zeros).
+- **Reshape** (src, dst, rows, cols): a given `dst`'s own sizes replace rows and cols; absent, a new
+  rows x cols matrix of `src`'s type. The elements of `src` in row order go to `dst` in row order (its
+  columns as the row length) until rows x cols are placed or `src` ends; the rest of `dst` unchanged.
+- **Column lengths** (m, scale): a new 1 x cols real row (or the given `scale`, FS-28 when it has no
+  row or fewer columns) of `(float) sqrt(S)`, S the double sum from 0 of each column's elements
+  squared in double. **Column normalisation** (m, out, scale): absent `out`: a new real matrix of
+  `m`'s size; a given one of another size: `ERROR: MatrixNormalizeCol: dimension mismatch` + `\n` on
+  standard output, nothing returned. The lengths as above (into `scale` when given); each element
+  `(float)((double) m(r, c) / (double) length(c))`, or 0 for a column of length 0.
+
+### 8.3 Regions
+
+Three copies (src, dst, start_row, start_col, rows, cols, dest_row, dest_col): the region (whole
+elements), the real parts, the imaginary parts; `<name>` below is `MatrixCopyRegion`,
+`MatrixCopyRealRegion`, `MatrixCopyImagRegion`. In order:
+
+1. dest_row < 1 or dest_col < 1: an error, code -4, `<name>: bad destination (<dr>,<dc>)` + `\n`;
+   nothing returned.
+2. With end_row = start_row + rows - 1 and end_col = start_col + cols - 1: a start below 1 or beyond
+   `src`, or an end beyond it: an error, code -4, `<name>: bad source region (<sr>,<sc>) --> (<er>,<ec>)`
+   + `\n`; nothing returned.
+3. Absent `dst`: a new rows x cols matrix of `src`'s type.
+4. `dst` with fewer rows than `rows` or fewer columns than `cols`: an error, code -4, `<name>:
+   destination matrix not large enough (<rows>x<cols>)` + `\n`; nothing returned.
+5. For each source row from start_row (destination rows from dest_row) and each column from
+   start_col (destination columns from dest_col), by `dst`'s type: real `dst`: the source element
+   (region), its real part, its imaginary part; complex `dst`: the whole pair (region), the imaginary
+   part only (the other two copies). The parts are read as a complex matrix's (§2.1) whatever
+   `src`'s type; a `dst` of another type receives nothing.
+
+- **FS-26:** the real-part copy into a complex `dst` copies the imaginary parts. **Default:** the
+  real parts; **reproduce:** the imaginary parts.
+- **FS-27:** the part copies read a **real** `src` as complex (its "real part" at (r, c) is the float
+  of element (r, c + 1)'s place, see §2.1; the last ones beyond the array). **Default:** a real
+  `src`'s real part is its element, its imaginary part 0; **reproduce:** FreeSurfer's addresses
+  (beyond the array: 0, FS-16). The region copy between a real and a complex matrix addresses one
+  through the other's layout: **default:** refused, an error, code -4, `MatrixCopyRegion: a region
+  between a real and a complex matrix` + `\n`, nothing returned; **reproduce:** FreeSurfer's
+  addresses.
+- **FS-28:** step 4 does not check the destination region: dest_row + rows - 1 beyond `dst`'s rows or
+  dest_col + cols - 1 beyond its columns (and any dest beyond (1, 1) with an absent `dst`).
+
+**Real to complex** (re, im, out): absent `out`: a new complex matrix of `re`'s size; each element's
+real part = re(r, c), imaginary = im(r, c). FS-25 for a complex `re` or `im`; FS-28 for an `im` or a
+given `out` smaller than `re`, or a real `out`.
+
+### 8.4 Rotations
+
+**Rotation** (n, angle, which, m): absent `m`: a new n x n identity. c = cosf(angle), s =
+sinf(angle). which 0 (x): (2,2) = c, (2,3) = s, (3,2) = -s, (3,3) = c; 1 (y): (1,1) = c, (1,3) = -s,
+(3,1) = s, (3,3) = c; 2 (z): (1,1) = c, (1,2) = s, (2,1) = -s, (2,2) = c; any other value: `m`
+unchanged. Only those four elements are written.
+
+### 8.5 Vectors
+
+Vectors are matrices whose first column is read (element i is (i, 1)).
+
+- **Length** (v): `sqrtf` of the float sum from 0 of the squares, i = 1..rows.
+- **Dot** (v1, v2): the float sum from 0 of the products over v1's rows; **distance** (v1, v2): the
+  float sum from 0 of the squared differences over v1's rows: the **squared** distance.
+- **Cross product** (v1, v2, out) and **triple product** (v1, v2, v3): when v1 has neither 3 rows nor
+  1 column: an error, code -4, `VectorCrossProduct: must be 3-vectors` (no new line; the triple
+  product's message too), nothing returned (the triple product: 0). Absent `out`: a clone (§8.2) of
+  v1. With (x1, y1, z1), (x2, y2, z2), (x3, y3, z3) the first three elements: out = (y1 z2 - z1 y2,
+  z1 x2 - x1 z2, x1 y2 - y1 x2) in float; triple = `x3 (y1 z2 - z1 y2)`, then `+ y3 (z1 x2 - x1 z2)`,
+  then `+ z3 (x1 y2 - y1 x2)`, in float.
+- **Angle of 3-vectors** (v1, v2): the lengths l1, l2 in double (`sqrt` of `x² + y² + z²` of the
+  widened elements); norm = l1 l2; 0 when |norm| < `FLT_EPSILON`; the dot product of the first three
+  elements in **float**, widened; norm becomes |dot| when that is larger; `acos(1.0)` (0) when dot >
+  norm, else `acos(dot / norm)`, double.
+- **FS-31:** the size test above lets column vectors of 1 or 2 rows through and never tests v2, v3
+  or `out`; dot and distance read v2 to v1's length. **Default:** a vector with fewer than 3 rows (or
+  no column) for the 3-vector functions, or a v2 shorter than v1 for dot and distance, is refused: an
+  error, code -4, `<function>: <what>` + `\n`, nothing (0) returned; **reproduce:** FreeSurfer's reads
+  (beyond the array 0, FS-16).
+- **Normalised load** (x, y, z): len = `(float) sqrt(x² + y² + z²)` in double; the unit vector
+  `(x inv, y inv, z inv)` with inv = `1 / len` in float, or (1, 0, 0) when len = 0.
+- **Approximate angle** (n, x2, y2, z2, norm): dot = `(float)(n.x x2 + n.y y2 + n.z z2)` in double;
+  norm becomes |dot| when that is larger; q = `(double)(dot / norm)` (float division); below
+  `0.99f` the result is `(float) acos(q)`, else `(float) sqrt(2 (1 - q))` in double.
+
+### 8.6 Printing
+
+- **Print** (fp, m, p; p is 5 by default): no `fp`: an error, code -4, `MatrixPrint: fp = NULL!`
+  (no new line), then standard output. No `m`: an error, `MatrixPrint: mat = NULL!`, returns -4.
+  Each real element as `printf("% 2.<p>f")` (a negative p as 6), a complex one `% 2.3f + % 2.3f i`;
+  two spaces between elements, `;` + `\n` after each row; a type neither real nor complex: at its
+  first element an error, `MatrixPrint: unknown type <t>` + `\n`, returns -4. Returns 0.
+- **Print with a format** (fp, fmt, m): the same, each element with `fmt` (FreeSurfer passes
+  `%10f`), complex `<fmt> + <fmt> i`, `\n` after each row (no `;`).
+
+### 8.7 Similarity transform and Gaussian matrices
+
+- **Similarity** (src, mul, dst): `mul (src mulᵀ)` with §8.1's products (a size mismatch gives
+  §8.1's messages; the second product of a failed first one ends the program as `m2` absent).
+- **Gaussian matrix** (n, std, norm, G): absent `G`: a new real n x n; a given one of another size:
+  `ERROR: GaussianMatrix: dimension mismatch` + `\n` on standard output, nothing returned. var = std
+  std (float); f = `(float)(sqrt(2π) std)` in double. With g(d) = `expf(-(d d) / (2 var)) / f` in
+  float: norm 1: f = f / Σ g(c - n/2) for c = 0..n-1 (float sum from 0; n/2 integer division) — so
+  the centre row sums to 1, not every row (FreeSurfer's own comment says so); then row r, column c
+  (from 0) = g(c - r), the row's float sum S kept; norm 2: each element of the row / S in float.
+- **Mixture** (n, s1, s2, w1, norm, G): `w1 G1 + (1 - w1) G2` (1 - w1 in float), the two matrices
+  scaled (§8.2) then added (§8.2, into `G`).
+
+## 9. Prime numbers
+
+- **Primes** (nmax): nmax < 1: `ERROR: GetPrimes: cannot compute primes for <nmax>` + `\n` on
+  standard output, nothing returned. Else the primes up to nmax in increasing order (1 is not one).
+- **Prime factors** (N): N < 1: `ERROR: cannot compute prime factors of <N>` + `\n` on standard
+  output, nothing returned. Else N's prime factors with multiplicity, increasing; 1 has none.
+- **Closest prime factor** (N, P) and **closest below** (N, P): among the factors in increasing order,
+  the first whose |f - P| is smallest; below: only factors f < P are taken, and when none is, the
+  smallest factor. **FS-32:** N = 1 has no factor and FreeSurfer reads the empty list's first element
+  (0 under glibc's `calloc`). **Default:** 1; **reproduce:** 0. Noted either way. N < 1: FreeSurfer
+  crashes after the message (nothing returned).
+
+## 10. Random draws
+
+- **Gaussian draw** (Marsaglia's polar method on the C library's `drand48`, POSIX's definition: the
+  process's one 48-bit state, `srand48` seeds it): v1 = 2 u1 - 1, v2 = 2 u2 - 1 from two draws in
+  order, r2 = v1² + v2² (double), drawn again while r2 > 1; the result `v1 sqrt(-2 log(r2) / r2)`.
+  **FS-30:** r2 = 0 (both draws exactly 0.5) is accepted and gives NaN. **Default:** drawn again;
+  **reproduce:** the NaN. Noted either way.
+- **Time-of-day seed:** FreeSurfer returns `tv_sec + tv_usec` of the time of day as an unsigned
+  long. **FS-29:** **default:** the fixed seed 1; **reproduce:** the clock's. Noted either way.
+
+## 11. Validation plan, part 2
+
+- **Against the official code** (`validation/probes/fs-maths/`, 62 commands, the 13 new ones: the
+  float product, the element-wise operations on real matrices with zeros, tiny values, infinities
+  and NaNs, the same operations on complex matrices, the regions of all types and destinations, real
+  to complex, rotations, vectors and angles, Gaussian matrices, similarity transforms, printing,
+  primes and factors, the Gaussian draws). A case whose official run reads outside its arrays
+  (FS-22, FS-16) is counted, not compared. The angles go through `acos`: a difference there is
+  allowed only as one unit in the last place, counted apart. Measured: see the findings
+  (`docs/findings/freesurfer-maths.md`, "Part 2").
+- **The replays** of the programs that use these functions with `reproduce` on the recorded heads.
+

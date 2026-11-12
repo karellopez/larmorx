@@ -104,8 +104,10 @@ pub fn get_closest_prime_factor(
             );
             return Some(0);
         }
-        g.notices
-            .add(&FS_32, format!("{name}({n}, {p}): 1, which has no prime factor"));
+        g.notices.add(
+            &FS_32,
+            format!("{name}({n}, {p}): 1, which has no prime factor"),
+        );
         return Some(1);
     }
     let mut nmin = 0usize;
@@ -128,27 +130,48 @@ mod tests {
     #[test]
     fn primes_and_factors() {
         let mut o = Vec::new();
-        assert_eq!(get_primes(&mut o, 30).unwrap(), [2, 3, 5, 7, 11, 13, 17, 19, 23, 29]);
+        assert_eq!(
+            get_primes(&mut o, 30).unwrap(),
+            [2, 3, 5, 7, 11, 13, 17, 19, 23, 29]
+        );
         assert_eq!(get_primes(&mut o, 1).unwrap(), Vec::<i32>::new());
         assert!(get_primes(&mut o, 0).is_none());
         assert_eq!(o, b"ERROR: GetPrimes: cannot compute primes for 0\n");
         assert_eq!(get_prime_factors(&mut o, 360).unwrap(), [2, 2, 2, 3, 3, 5]);
         assert_eq!(get_prime_factors(&mut o, 97).unwrap(), [97]);
         assert_eq!(get_prime_factors(&mut o, 1).unwrap(), Vec::<i32>::new());
-        assert_eq!(get_prime_factors(&mut o, 163842).unwrap(), [2, 3, 7, 47, 83]);
+        assert_eq!(
+            get_prime_factors(&mut o, 163842).unwrap(),
+            [2, 3, 7, 47, 83]
+        );
     }
 
     #[test]
     fn closest_factors_fs32() {
         let mut o = Vec::new();
         let mut g = Globals::new(UpstreamDefects::Fix);
-        assert_eq!(get_closest_prime_factor(&mut g, &mut o, 163842, 50, false), Some(47));
-        assert_eq!(get_closest_prime_factor(&mut g, &mut o, 163842, 47, true), Some(7));
-        assert_eq!(get_closest_prime_factor(&mut g, &mut o, 8, 1, true), Some(2));
+        assert_eq!(
+            get_closest_prime_factor(&mut g, &mut o, 163842, 50, false),
+            Some(47)
+        );
+        assert_eq!(
+            get_closest_prime_factor(&mut g, &mut o, 163842, 47, true),
+            Some(7)
+        );
+        assert_eq!(
+            get_closest_prime_factor(&mut g, &mut o, 8, 1, true),
+            Some(2)
+        );
         assert!(!g.notices.contains(&FS_32));
-        assert_eq!(get_closest_prime_factor(&mut g, &mut o, 1, 5, false), Some(1));
+        assert_eq!(
+            get_closest_prime_factor(&mut g, &mut o, 1, 5, false),
+            Some(1)
+        );
         assert!(g.notices.contains(&FS_32));
         let mut g = Globals::new(UpstreamDefects::Reproduce);
-        assert_eq!(get_closest_prime_factor(&mut g, &mut o, 1, 5, true), Some(0));
+        assert_eq!(
+            get_closest_prime_factor(&mut g, &mut o, 1, 5, true),
+            Some(0)
+        );
     }
 }

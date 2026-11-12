@@ -68,6 +68,10 @@ Every option its parser compares, as written in its own source (older parsers co
 - MRIgaussianSmoothNI's kernel sums are long double, partitioned by thread (variation.md §2; measured: the same transform at 1, 2 and 4 threads with its defaults)
 - dithering on by default with seed 53: GSL-derived RANLUX389 (P-08)
 
+## Findings for the defect register (rules A to D when ported)
+
+- MRIgaussianSmoothNI's thread-partitioned long-double sums (larmorx: one fixed order; relay 5)
+
 ## Checks
 
 - fMRIPrep's calls on the recorded subjects (fMRIPrep's MRICoreg, bbregister --init-coreg)

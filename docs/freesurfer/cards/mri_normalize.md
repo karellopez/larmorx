@@ -69,6 +69,10 @@ Single-letter options of its `switch (toupper(*option))`: `A`, `B`, `D`, `F`, `G
 - MRIgaussianSmoothNI (smoothing options): long double, thread-partitioned
 - -seed 1234 from recon-all
 
+## Findings for the defect register (rules A to D when ported)
+
+- SplineCubicValue's end clamps (Burkardt's 2006 spline): harmless, rule C (relay 5)
+
 ## Checks
 
 - replay: 24 recorded steps in 12 runs

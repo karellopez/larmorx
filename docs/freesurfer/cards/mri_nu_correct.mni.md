@@ -47,6 +47,10 @@ Every option its parser compares, as written in its own source (older parsers co
 
 - nothing found beyond the common facts (variation.md: GCC 8.4.0, SSE2, glibc 2.35's libm, drand64 left to right)
 
+## Findings for the defect register (rules A to D when ported)
+
+- its last mri_convert --like ... --conform prints an unset field (mri_convert's card)
+
 ## Checks
 
 - replay: 18 recorded steps in 12 runs

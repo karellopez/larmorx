@@ -181,7 +181,9 @@ Their results are in `docs/freesurfer/` (closed too).
   jobs (the subject files each program read and wrote) and the recordings' step outputs; extracts
   the option names each program's parser compares from its own source files (C/C++ string
   comparisons and `addArgument`, tcsh `case` labels, Python `add_argument`; older parsers compare
-  without the leading dash: candidates, which each replica item confirms). Run waves.py first:
+  without the leading dash: candidates, which each replica item confirms), and a table of the
+  findings for the defect register per program (`REGISTER_CANDIDATES`, relay 9: relays 1, 5, 7
+  and 9's candidates, decided by rules A to D when each program is ported). Run waves.py first:
 
       python -P validation/investigations/freesurfer-inventory/cards.py \
           --tag <workspace>/tags/freesurfer-8.2.0 --docs docs/freesurfer \
@@ -189,3 +191,26 @@ Their results are in `docs/freesurfer/` (closed too).
           --out docs/freesurfer/cards
 
   (`<scratch>/r4/trace`: data_trace.py's job folder, relay 4.)
+
+- `clock_seeds.py`: relay 9, variation.md §3. Which recorded programs drew random numbers from a
+  clock seed: FreeSurfer's `randomNumber` prints `<comm> supposed to be reproducible but seed not
+  set` once per process when no seed is set, and recon-all's log keeps every program's standard
+  error. Prints, per program, the runs and processes and the calls (program and options, no paths):
+
+      python -P validation/investigations/freesurfer-inventory/clock_seeds.py \
+          <workspace>/oracles/freesurfer-8.2.0/runs [--run-pattern '-(classic|v8)$']
+
+  Result (12 reference runs): `mri_label2vol --defects` (both streams, 2 per run) and
+  `mri_edit_wm_with_aseg` (v8 only, 3 per run). `drand48`'s time-of-day seeds print nothing.
+- `recording_source.py`: relay 9, for the clean-room audit's restriction table. Lists the
+  recordings' blobs recorded as `scripts/recon-config.yaml` or `scripts/recon-all.local-copy`
+  (FreeSurfer's text under a hash name), with the frozenset for `restrictions.py`, and every blob
+  whose content is one of the installed package's source files (by the replay tool's manifest):
+
+      python -P validation/investigations/freesurfer-inventory/recording_source.py \
+          <workspace>/oracles/freesurfer-8.2.0 \
+          --manifest <workspace>/oracles/inputs/freesurfer-replay/manifest-<tree>.json
+
+  Result (19 recordings, 2026-11-12, 3,890 distinct blobs): two `recon-config.yaml` blobs
+  (`6930b943...` classic, `7d560ebd...` v8); no other blob is a package source file (one 1-byte
+  file, a newline, matches empty Python files). Re-run when new recordings arrive (the server's).

@@ -61,7 +61,11 @@ Every option its parser compares, as written in its own source (older parsers co
 
 ## Variation
 
-- nothing found beyond the common facts (variation.md: GCC 8.4.0, SSE2, glibc 2.35's libm, drand64 left to right)
+- --defects (defect2seg, both streams): a clock seed (randomNumber unseeded, no FREESURFER_SEED) colours the embedded colour table; the voxels do not depend on it (variation.md §3, measured on the 12 reference runs)
+
+## Findings for the defect register (rules A to D when ported)
+
+- --defects: MRISdefects2Seg (utils/mrisurf_defect.cpp 15443) gives the output a colour table of random colours (CTABunique over CTABrandom, colortab.cpp 495, 552) from randomNumber's clock seed: the colours change from run to run (nondeterminism: never reproduced by default, D13; a fixed seed by default, the clock with reproduce)
 
 ## Checks
 

@@ -66,7 +66,11 @@ Single-letter options of its `switch (toupper(*option))`: `H`, `U`
 
 ## Variation
 
-- nothing found beyond the common facts (variation.md: GCC 8.4.0, SSE2, glibc 2.35's libm, drand64 left to right)
+- a clock seed in the v8 stream (its -sa-fix-acj and -keep-in -fix-ento-wm calls, through CTABalloc/CTABrandom); the replayed steps reproduced their files with another clock (variation.md §3)
+
+## Findings for the defect register (rules A to D when ported)
+
+- draws from a clock seed in the v8 stream (variation.md §3): measure on other heads whether the draw can reach wm.asegedit.mgz or brain.finalsurfs.mgz before deciding (rule D)
 
 ## Checks
 

@@ -43,7 +43,11 @@ Every option its parser compares, as written in its own source (older parsers co
 
 ## Variation
 
-- nothing found beyond the common facts (variation.md: GCC 8.4.0, SSE2, glibc 2.35's libm, drand64 left to right)
+- its mri_label2vol --defects calls draw from a clock seed: surface.defects.mgz's colour table changes from run to run (variation.md §3; the replay tool reports it as varies)
+
+## Findings for the defect register (rules A to D when ported)
+
+- surface.defects.mgz's colour table changes from run to run (measured black box by the replay tool, relay 7; the cause is mri_label2vol's, see its card)
 
 ## Checks
 

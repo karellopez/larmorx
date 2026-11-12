@@ -96,6 +96,78 @@ VARIATION: dict[str, list[str]] = {
     "mri_synthseg": ["TensorFlow's threads (--threads): to measure (variation.md §5)"],
     "mri_synthmorph": ["TensorFlow's threads (-j): to measure; about 18 GiB at inference"],
     "mri_sclimbic_seg": ["TensorFlow's threads: to measure (variation.md §5)"],
+    "mri_label2vol": [
+        "--defects (defect2seg, both streams): a clock seed (randomNumber unseeded, no"
+        " FREESURFER_SEED) colours the embedded colour table; the voxels do not depend on it"
+        " (variation.md §3, measured on the 12 reference runs)",
+    ],
+    "defect2seg": [
+        "its mri_label2vol --defects calls draw from a clock seed: surface.defects.mgz's colour"
+        " table changes from run to run (variation.md §3; the replay tool reports it as varies)",
+    ],
+    "mri_edit_wm_with_aseg": [
+        "a clock seed in the v8 stream (its -sa-fix-acj and -keep-in -fix-ento-wm calls, through"
+        " CTABalloc/CTABrandom); the replayed steps reproduced their files with another clock"
+        " (variation.md §3)",
+    ],
+}
+
+# Findings for the defect register, to be decided by rules A to D when the program is ported (no
+# register IDs here: the preparation's brief gave the part no range). From relay 1 (the scripts),
+# relay 5 (variation.md), relay 7 (the replay tool, black box) and relay 9 (the clock seeds).
+REGISTER_CANDIDATES: dict[str, list[str]] = {
+    "mri_label2vol": [
+        "--defects: MRISdefects2Seg (utils/mrisurf_defect.cpp 15443) gives the output a colour"
+        " table of random colours (CTABunique over CTABrandom, colortab.cpp 495, 552) from"
+        " randomNumber's clock seed: the colours change from run to run (nondeterminism: never"
+        " reproduced by default, D13; a fixed seed by default, the clock with reproduce)",
+    ],
+    "defect2seg": [
+        "surface.defects.mgz's colour table changes from run to run (measured black box by the"
+        " replay tool, relay 7; the cause is mri_label2vol's, see its card)",
+    ],
+    "mri_convert": [
+        "--conform prints 'valid   : <number>' from vgprint(true) on MRIconformedTemplate's header"
+        " (mri_convert.cpp 2927-2928), whose valid field nothing sets: memory content, different in"
+        " every run (measured: rawavg to orig in both streams, mri_nu_correct.mni's --like call in"
+        " classic; relay 7 found it black box); a message only (D13: a defined value, a warning"
+        " where reproduce cannot give memory)",
+    ],
+    "mri_nu_correct.mni": [
+        "its last mri_convert --like ... --conform prints an unset field (mri_convert's card)",
+    ],
+    "mri_edit_wm_with_aseg": [
+        "draws from a clock seed in the v8 stream (variation.md §3): measure on other heads whether"
+        " the draw can reach wm.asegedit.mgz or brain.finalsurfs.mgz before deciding (rule D)",
+    ],
+    "mri_robust_template": [
+        "initialXforms' centroid summed in an OpenMP critical block: run-to-run nondeterministic for"
+        " an unbiased template with four or more inputs and more than one thread (larmorx: the sum"
+        " in input order; relay 5)",
+    ],
+    "mri_coreg": [
+        "MRIgaussianSmoothNI's thread-partitioned long-double sums (larmorx: one fixed order;"
+        " relay 5)",
+    ],
+    "mri_brainvol_stats": [
+        "ComputeBrainVolumeStats2's parallel VoxelVol sums for non-integer voxel volumes (larmorx:"
+        " one fixed order; relay 5)",
+    ],
+    "mri_normalize": [
+        "SplineCubicValue's end clamps (Burkardt's 2006 spline): harmless, rule C (relay 5)",
+    ],
+    "recon-all": [
+        "line 4220 `if($XOptsFile)` (fixed by the 2026-06-25 update: follow it, the newest"
+        " version; relay 5, variation.md §4)",
+        "the v8 options key T1PialSurf never matches PlaceT1PialSurf (line 4521): mrisps.pial.mgz"
+        " is never written (confirmed on the six v8 reference runs: only mrisps.wpa.mgz and"
+        " mrisps.white.mgz exist; relay 1, relay 9)",
+        "the v8 mri_ca_label options apply in no stream (relay 1, programs.md §1)",
+    ],
+    "mri_vsinus_seg": [
+        "receives the previous step's $xopts (recon-all 2241; harmless without expert options;"
+        " relay 1)",
+    ],
 }
 
 OPTION_PATTERNS = [
@@ -336,6 +408,9 @@ def main() -> int:
             "- nothing found beyond the common facts (variation.md: GCC 8.4.0, SSE2, glibc 2.35's"
             " libm, drand64 left to right)"
         ]
+        if REGISTER_CANDIDATES.get(n):
+            lines += ["", "## Findings for the defect register (rules A to D when ported)", ""]
+            lines += [f"- {v}" for v in REGISTER_CANDIDATES[n]]
         lines += ["", "## Checks", "", f"- {w['checks']}", ""]
         if p["notes"]:
             lines += ["## Notes", "", p["notes"], ""]

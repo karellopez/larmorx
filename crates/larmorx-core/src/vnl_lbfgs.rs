@@ -79,7 +79,6 @@
 // Fortran's 1-based indices are kept (`w[k]` is `W(k)`), so the port reads line by line
 // against lbfgs.c.
 #![allow(clippy::needless_range_loop)]
-
 // The expressions are kept as the C writes them (`-1.0 * x` is not `-x` for a NaN; the
 // constants are VXL's spellings; the negated comparisons are the f2c loops' NaN behaviour).
 #![allow(

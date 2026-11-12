@@ -709,7 +709,7 @@ def _orig_verdicts(
                     f"From the same matrix (-applyxfm), {img}: the windowed-sinc interpolation "
                     "follows FSL's within the last bits of its float arithmetic, and how FSL "
                     "rounds its kernel's weights is an open question of the specification "
-                    "(docs/findings/fsl-flirt-original.md). The record holds such images to "
+                    "(docs/findings/fsl-flirt-clean-room.md). The record holds such images to "
                     "1e-5 of their range."
                 )
                 continue
@@ -731,7 +731,7 @@ def _orig_verdicts(
                     if within
                     else f"Within the record's threshold ({threshold:g} mm), above FSL's own "
                     "variability on this input: the cost's last bits and the optimiser's path "
-                    "(docs/findings/fsl-flirt-original.md)."
+                    "(docs/findings/fsl-flirt-clean-room.md)."
                 )
             )
         elif i == "orig1-orig":
@@ -1371,7 +1371,7 @@ def case_verdict_orig(r: dict, desc: str, band: dict | None = None) -> tuple[str
     if disp:
         why += (
             " A clean-room registration: the cost's last bits and the optimiser's path "
-            "(docs/findings/fsl-flirt-original.md); "
+            "(docs/findings/fsl-flirt-clean-room.md); "
             + (
                 f"FSL's own variability on this call {band['p95']:.3g} mm."
                 if band is not None
@@ -1670,7 +1670,7 @@ def trial_catchup(ctx: core.Context) -> tuple[list[dict], dict]:
         f"trial_catchup_categories.py`, its output `{CATCHUP_TRIAGE}`), each category's cause "
         "established by replaying findings (`catchup_replay.py`, with the final build and with "
         "the build before the search's sort) and by probes (`catchup_finding.py`, "
-        "`catchup8_int_nn.py`; `docs/findings/fsl-flirt-original.md`); the triage's entries: "
+        "`catchup8_int_nn.py`; `docs/findings/fsl-flirt-clean-room.md`); the triage's entries: "
         "`validation/difftest/triage.toml`. The reproducer is a finding of the trial "
         "(`difftest --replay`).",
     )

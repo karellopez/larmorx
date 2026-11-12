@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """fslmaths' evidence (the larmorx-nc replica, FSL Licence, and LARMORX's clean-room original,
 crate larmorx-fsl, Apache-2.0, written from ``specs/fslmaths.md``: its parts in
-``fsl_maths_original``): fMRIPrep's own call (niworkflows' ``combine_masks``:
+``fsl_maths_clean_room``): fMRIPrep's own call (niworkflows' ``combine_masks``:
 ``fslmaths <mask> -mul <mask> <out>`` in every BOLD reference's brain mask; the record's four
 calls on three oracle runs) with the masks drawn over the reference they were made from;
 fMRIPrep's goodvoxels mask (``--project-goodvoxels``: its fourteen fslmaths calls in the
@@ -31,7 +31,7 @@ from pathlib import Path
 import numpy as np
 
 from larmorx_validation.evidence import common, core
-from larmorx_validation.evidence import fsl_maths_original as fo
+from larmorx_validation.evidence import fsl_maths_clean_room as fo
 from larmorx_validation.figures import cache as fcache
 from larmorx_validation.figures import records
 

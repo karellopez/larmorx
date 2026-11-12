@@ -49,7 +49,7 @@ from larmorx_validation.figures import records
 TOOL = "afni-volreg"
 RECORD = "afni-volreg-original"
 BENCH = "docs/benchmarks/afni-volreg.md"
-FINDINGS = "docs/findings/afni-volreg-original.md"
+FINDINGS = "docs/findings/afni-volreg-clean-room.md"
 SPEC = "specs/3dvolreg.md"
 REGISTER = "docs/findings/upstream-defects.md"
 #: The original's random-testing trial (``oracles/difftest/<TRIAL>``), its triage
@@ -104,7 +104,7 @@ PARAMS = ["roll (°)", "pitch (°)", "yaw (°)", "dS (mm)", "dL (mm)", "dP (mm)"
 
 
 def _suite():
-    from larmorx_validation.parity import afni_volreg_original as suite
+    from larmorx_validation.parity import afni_volreg_clean_room as suite
 
     return suite
 
@@ -1591,7 +1591,7 @@ def export(ctx: core.Context) -> dict:
     prov["cache"] = [*cache_prov, fcache.provenance(entry(ctx)), fcache.provenance(entry_high(ctx))]
     prov["difftest"] = [*prov.get("difftest", []), *trial_source]
     prov["original_exporter"] = core.tree_hash(
-        ctx.repo, "validation/src/larmorx_validation/evidence/afni_volreg_original.py"
+        ctx.repo, "validation/src/larmorx_validation/evidence/afni_volreg_clean_room.py"
     )
     return doc
 

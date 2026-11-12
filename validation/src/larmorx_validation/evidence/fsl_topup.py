@@ -94,7 +94,7 @@ TRIAGE = "validation/investigations/cleanroom-topup/trial_triage.json"
 #: 2026-11-03), and its findings in categories (``trial_categories.py``'s ``--json`` output).
 TRIAL_CATCHUP = "2026-11-05-catchup-topup"
 CATCHUP_TRIAGE = "validation/investigations/cleanroom-topup/trial_catchup_triage.json"
-FINDINGS = "docs/findings/fsl-topup-original.md"
+FINDINGS = "docs/findings/fsl-topup-clean-room.md"
 REGISTER = "docs/findings/upstream-defects.md"
 
 
@@ -2278,7 +2278,7 @@ def trial_original(ctx: core.Context) -> tuple[list[dict], dict]:
         note="Every differing case of the trial in one category by its recipe and its first "
         "failed check (`validation/investigations/cleanroom-topup/triage_counts.py`, its output "
         f"`{TRIAGE}`), each category's cause established by replaying samples with each fix and "
-        "by probes (`docs/findings/fsl-topup-original.md`, findings 29 to 36); the mistakes of "
+        "by probes (`docs/findings/fsl-topup-clean-room.md`, findings 29 to 36); the mistakes of "
         "LARMORX and of the suite are fixed, with permanent cases in the record; the reproducer "
         "is a finding of the trial (`difftest --replay`).",
     )
@@ -2437,7 +2437,7 @@ def trial_catchup(ctx: core.Context) -> tuple[list[dict], dict]:
         "(`validation/investigations/cleanroom-topup/trial_categories.py`, its output "
         f"`{CATCHUP_TRIAGE}`), each category's cause established by probes and samples "
         "(`trial_spread.py`, `trial_fsl_verbose.py`, `trial_quadratic.py`; "
-        "`docs/findings/fsl-topup-original.md`, findings 45 to 47); the triage's entries: "
+        "`docs/findings/fsl-topup-clean-room.md`, findings 45 to 47); the triage's entries: "
         "`validation/difftest/triage.toml`. The reproducer is a finding of the trial "
         "(`difftest --replay`).",
     )

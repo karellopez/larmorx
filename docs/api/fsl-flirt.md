@@ -176,7 +176,7 @@ product (FSL prints part of its output first), and a `-warp` of three volumes (F
 are not ported; other images get FSL's read error, since the catch-up of 2026-11-05). The fsl-flirt suite's 66 cases of these programs: 39 identical to FSL in every byte of
 text and file, 27 more where both refuse or abort alike; one more matrix of the findings
 (a reflection's `--inverteddies` check) differs in the sign of a 1e-10 residual
-([findings](../findings/fsl-flirt-original.md), "FLIRT's other programs").
+([findings](../findings/fsl-flirt-clean-room.md), "FLIRT's other programs").
 
 **FLIRT's other programs and scripts (part 2, relay 2, 2026-11-02).** `midtrans`, `pointflirt`,
 `applyxfm4D` and the scripts `pairreg`, `extracttxt` and `aff2rigid` (modules `flirt::fits` and
@@ -204,7 +204,7 @@ spline images at a correlation of 1.0000000 with FSL's, the last bits of single 
 23 more where both refuse or abort alike; `aff2rigid`'s corrected matrix identical to the
 replica's. Also in this relay: FLIRT's matrix files read as FSL reads them (`inf`, `nan` and words
 that are not numbers read 0 and stop their line, a value beyond the double range the largest
-double; [findings](../findings/fsl-flirt-original.md)).
+double; [findings](../findings/fsl-flirt-clean-room.md)).
 
 **The verbose levels and `-debug` (part 2, relay 3).** `-verbose 2` to `7` print FSL 6.0.7.23's
 lines in its order: the images as read and prepared, each `setscale`'s lines and evaluation
@@ -214,7 +214,7 @@ level lowered by 2; `-debugsave` writes the search's grids from level 6 (FSL wri
 `-debug` writes the reference pyramid, its weights and the input at 8 mm (FSL's bit for bit on the
 suite's cases), prints each `setscale`'s and the boundary-based cost's debug lines and makes the
 final debug call with BBR's volume `debug`
-([findings](../findings/fsl-flirt-original.md), "The verbose levels and -debug"). At level 5 and
+([findings](../findings/fsl-flirt-clean-room.md), "The verbose levels and -debug"). At level 5 and
 more the evaluation lines follow the optimisation's path, so their count differs from FSL's where
 the matrices differ in their last digits. The suite's 22 cases of these options (13 of the
 original's own): every line, exit status and file FSL's.
@@ -234,7 +234,7 @@ image's range; the command line's errors, `convert_xfm` and the schedules' messa
 costs FSL's printed values at every scale. The cases it misses and why are in the record (the
 optimisation's paths part from FSL's in the costs' last bits, BBR's normals from `-wmseg`,
 ill-posed registrations); what the spec does not say is in
-[`docs/findings/fsl-flirt-original.md`](../findings/fsl-flirt-original.md).
+[`docs/findings/fsl-flirt-clean-room.md`](../findings/fsl-flirt-clean-room.md).
 
 **Speed** ([benchmark report](../benchmarks/fsl-flirt.md): one run each on a shared machine,
 the original on at most 14 threads): fMRIPrep's boundary-based call on the standard tier's three
@@ -254,7 +254,7 @@ alike, 6 where FLIRT crashes or never finishes, and 8 failures (part 1: 22 of 15
 boundary-based case and fMRIPrep's three calls, `-anglerep quaternion`, `-usesqform`, `convert_xfm
 -fixscaleskew` and every spline output FSL's (the spline's and `-usesqform`'s bit for bit); the
 sinc outputs within 1e-5 of the image's range (1.6 % of the voxels in their last bit). The
-failures and why: [findings](../findings/fsl-flirt-original.md), "The spec writer's answers". Its
+failures and why: [findings](../findings/fsl-flirt-clean-room.md), "The spec writer's answers". Its
 defaults for the four defects the spec writer found: **FSL-90** (`-anglerep quaternion`: the
 search's starting points composed from their Euler angles; FLIRT's quaternion reading, with its
 messages, with `reproduce`), **FSL-91** (a `-refweight` or `-inweight` with no voxel of at least
@@ -285,7 +285,7 @@ scale or a non-finite entry); `pairreg`'s schedules carried, and a step that abo
 the shell's `Aborted` line. Found on the way (FSL's verbose lines): the centres' COG warning
 where `-verbose 3` measures them, the levels' fourth size (the image's TR as read, FSL's 0 for
 images without one), the sampling and initial matrices in scaled millimetres with a base scale
-([findings](../findings/fsl-flirt-original.md), "The clean-room catch-up").
+([findings](../findings/fsl-flirt-clean-room.md), "The clean-room catch-up").
 
 **The clean-room catch-up, numerics and `-debug` (2026-11-05).** Items 9 to 13 of the list:
 `leastsq` sums in three single-precision levels (`real/cost-leastsq` passes); applyxfm4D's spline
@@ -301,7 +301,7 @@ once; with `reproduce` and NaN centres (FSL-14) an optimisation starts from the 
 parameters where its own are NaN, and a NaN pre-image is outside (the background value): 52 of
 the 57 trial findings with non-finite voxels agree (37 before). Open: FSL-91's and FSL-92's
 `reproduce` traces part at the sign of a zero skew under gimbal lock, and the weighted `woods`
-registration at its cost's last bits ([findings](../findings/fsl-flirt-original.md), "numerics,
+registration at its cost's last bits ([findings](../findings/fsl-flirt-clean-room.md), "numerics,
 `-debug` and NaN centres"; the weighted `normcorr` FSL's matrix as text since 2026-11-07, its
 count's running total taking each point's weight as the point is visited).
 

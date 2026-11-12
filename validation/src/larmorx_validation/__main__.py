@@ -36,7 +36,7 @@ PARITY_MODULES = {
     "afni-automask": "afni_automask",
     "afni-unifize": "afni_unifize",
     "afni-volreg": "afni_volreg",
-    "afni-volreg-original": "afni_volreg_original",
+    "afni-volreg-original": "afni_volreg_clean_room",
     "resample-series": "resample_series",
     "numpy-linalg": "numpy_linalg",
     "sdcflows-fieldmap": "sdcflows_fieldmap",
@@ -72,7 +72,7 @@ PARITY_MODULES = {
     "ants-atropos": "ants_atropos",
     "fsl-bet": "fsl_bet",
     "tedana-t2smap-replica": "tedana_t2smap_replica",
-    "tedana-t2smap-original": "tedana_t2smap_original",
+    "tedana-t2smap-original": "tedana_t2smap_clean_room",
 }
 PARITY_SUITES = tuple(PARITY_MODULES)
 #: Benchmark suites: name -> module in ``larmorx_validation.bench`` (each has ``main(args)``).

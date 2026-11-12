@@ -528,17 +528,24 @@ def main() -> None:
         "random testing's permanent cases (identifiers in the records and the triage) and the "
         "investigations (history) keep their names. A file that a page made by a measurement "
         "links to (a record's or a benchmark report's page, which nobody edits) keeps its name "
-        "until that page is made again: *renamed later*, with the pages that link to it."
+        "until that page is made again: *renamed later*, with the pages that link to it. A record "
+        "is one pair, its `.json` and its `.md` read by one name: the `.json` keeps its name while "
+        "its page does."
     )
     L.append("")
     L.append("| File | Renamed? | Files naming it (whole name) | (without extension) |")
     L.append("|---|---|---|---|")
     tally: Counter = Counter()
     for rel, g in names:
+        # a record is one pair, <name>.json and <name>.md, read by one name
+        # (figures.records.load): its data keeps its name while its page does
+        page = rel[: -len(".json")] + ".md" if rel.startswith("docs/validation/") else None
         if g == kept:
             rename = "kept"
         elif linked_by.get(rel):
             rename = "renamed later (linked by " + ", ".join(f"`{x}`" for x in linked_by[rel]) + ")"
+        elif rel.endswith(".json") and page and linked_by.get(page):
+            rename = f"renamed later (with its record's page `{page}`)"
         else:
             rename = "renamed"
         tally[rename.split(" (")[0]] += 1

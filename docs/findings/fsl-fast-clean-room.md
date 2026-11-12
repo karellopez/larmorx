@@ -177,7 +177,7 @@ priors carry `pixdim[4] = 0` (the input's) and `pixdim[5..7] = 1` (the reference
 FLIRT wrote the reference's `pixdim[4] = 1` for a 3D input (`priors/A-a`: every image of the
 segmentation bit-identical, the header check of the three `_stdspace` images failed). Fixed in
 FLIRT's clean-room original in relay 3 (the apply path writes the input's TR, a 3D input's too:
-black-box evidence in [`fsl-flirt-original.md`](fsl-flirt-original.md), "`-applyxfm`'s TR").
+black-box evidence in [`fsl-flirt-clean-room.md`](fsl-flirt-clean-room.md), "`-applyxfm`'s TR").
 
 ## `-H nan` (FSL-99 with `reproduce`)
 

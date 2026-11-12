@@ -23,6 +23,21 @@ area), and every benchmark report but the README is a report; these keep their w
 is made again (the writing guide, section 1, "Where the old words stay"). A file named with
 *original* that one of these pages links to is marked *renamed later*, with the pages that link
 to it: it keeps its name until they are made again (section 1, "Renamed files").
+A record's `.json` keeps its name with its `.md`: one record, read by one name.
+
+`renames.py` makes the renames' references follow them (the rollout's chunk R): after `git mv` of
+the files the inventory marks *renamed* (its `RENAMES`), it changes every reference to them, the
+findings' paths and the Python modules' names, in the files that may change (both repositories),
+writes the changes to `docs/next-steps.md` as `[[op]]` edits for the orchestrator's handoff, and
+lists the references left as they are, by who may change them: history, the pages made by a
+measurement, the specifications, the clean rooms' own code, the generated files (exported again or
+made again). For those, each renamed finding keeps a short file at its old name that points to the
+new one, and the three packages of renamed modules import them under their old names too.
+
+```
+python -P validation/investigations/docs-revision/renames.py --repo . \
+    --site <checkout of larmorx_documentation> --handoff <out.toml> --kept <out.md> [--apply]
+```
 
 `evidence_roles.py` counts what the site's evidence compares: every comparison label
 (`role_label`) with its count and two examples, the panels' roles and the chart series' marks per

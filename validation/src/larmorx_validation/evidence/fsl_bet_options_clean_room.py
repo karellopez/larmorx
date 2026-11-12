@@ -56,7 +56,7 @@ RUNS = [
     ("orig-reproduce", "reproduce", "reproduce mode"),
 ]
 LABEL = "larmorx's clean-room original"
-FINDINGS = "docs/findings/fsl-bet-original.md"
+FINDINGS = "docs/findings/fsl-bet-clean-room.md"
 _NOTICE = re.compile(
     r"upstream defect ((?:FSL|GLIBC)-\d+) \(([^)]*)\) (corrected|reproduced|refused)"
 )
@@ -361,7 +361,7 @@ def _verdicts(diffs: list[dict], ex, outputs: list[dict], info: dict, rec_orig) 
                 + (
                     "bet2's brain and every step before betsurf are FSL's; betsurf decides its "
                     "profiles as FSL does and its surfaces settle a little "
-                    "elsewhere, the scalp most (docs/findings/fsl-bet-original.md, betsurf), "
+                    "elsewhere, the scalp most (docs/findings/fsl-bet-clean-room.md, betsurf), "
                     "held to its masks' thresholds (Dice >= 0.99, boundary p95 <= 1 voxel)."
                     if surf
                     else "The clean-room original runs the script's programs as its own "

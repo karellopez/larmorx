@@ -723,7 +723,7 @@ def compare(
             continue
         if _DEBUG_VOLUMES.match(name):
             # -debug's volumes before any registration: the header and the values (the
-            # pyramid's last bits, docs/findings/fsl-flirt-original.md)
+            # pyramid's last bits, docs/findings/fsl-flirt-clean-room.md)
             same = _same_streams(fa, fb, blank_descrip=True)
             rel = 0.0 if same else _relative_difference(fa, fb)
             checks(

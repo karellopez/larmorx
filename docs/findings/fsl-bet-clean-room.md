@@ -603,7 +603,7 @@ both final matrices' costs at 8, 4, 2 and 1 mm, and the output header given FSL'
   followed the matrix): standard_space_roi's matrices 37 to 303 mm (RMS) from FSL's and `bet -B`'s
   inner ones, on small heads whose every cost is 1 at the coarse scales (FSL's own measure of both
   matrices and of the identity): the search's starting points tied, and FSL sorts them with
-  `std::sort` (`docs/findings/fsl-flirt-original.md`, "The search's starting points of equal
+  `std::sort` (`docs/findings/fsl-flirt-clean-room.md`, "The search's starting points of equal
   cost"). All 20 agree on replay; `bet -B` 531, where FSL finished and the original's script had
   failed midway, among them. Permanent cases `original-ssroi-search-equal-costs`,
   `original-bet-B-search-equal-costs`.

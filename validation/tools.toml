@@ -501,7 +501,7 @@ status = "`validated` (full tier: [ants-atropos-full](record:ants-atropos-full);
 id = "mri-hmc"
 larmorx = "`lx.mri.hmc`, `larmorx mri hmc` (clean-room)"
 reference = "mcflirt (FSL 6.0.7.23 since 2026-10-29, on OpenBLAS's Haswell kernels: the recorded runs in `oracles/fsl-6.0.7.23/mcflirt-haswell/`, and FSL-20, -21, -65, -66's cases run live)"
-status = "`experimental` ({mri-hmc.pass} of {mri-hmc.compared} compared cases within thresholds, {mri-hmc.fail} missing them; {mri-hmc.expected} expected divergences, each with its reason in the record: since 2026-11-07 two synthetic runs whose search paths part from mcflirt's within mcflirt's own spread, docs/findings/mri-hmc-original.md)"
+status = "`experimental` ({mri-hmc.pass} of {mri-hmc.compared} compared cases within thresholds, {mri-hmc.fail} missing them; {mri-hmc.expected} expected divergences, each with its reason in the record: since 2026-11-07 two synthetic runs whose search paths part from mcflirt's within mcflirt's own spread, docs/findings/mri-hmc-clean-room.md)"
 
 [[record]]
 id = "fsl-mcflirt-replica"
@@ -537,7 +537,7 @@ status = "`validated` ({fsl-bet-replica-full.pass} of {fsl-bet-replica-full.comp
 id = "fsl-flirt"
 larmorx = "`lx.fsl.flirt(implementation=\"original\")` and FLIRT's other programs' functions (`convert_xfm`, `avscale`, `img2imgcoord`, `std2imgcoord`, `img2stdcoord`, `rmsdiff`, `makerot`, `midtrans`, `pointflirt`, `applyxfm4d`, `pairreg`, `extracttxt`, `aff2rigid`), `larmorx fsl <program>` (clean-room, `crates/larmorx-fsl`)"
 reference = "flirt, convert_xfm and FLIRT's other programs and scripts (FSL 6.0.7.23); the replica suite's cases, the original's own verbose, `-debug` and schedule cases and its permanent cases"
-status = "`experimental` (the clean-room catch-up of 2026-11-05: {fsl-flirt.pass} of {fsl-flirt.compared} compared cases within thresholds, fMRIPrep's three calls included; {fsl-flirt.fail} miss them (listed in the record, explained in docs/findings/fsl-flirt-original.md: the weighted `woods` registration; the weighted `normcorr` FSL's since 2026-11-07); {fsl-flirt.both} rejected by both, with the same messages and status; {fsl-flirt.expected} where FLIRT crashes or never finishes (FSL-71, FSL-72, FSL-75, FSL-93, FSL-204) or writes what the spec cannot define (FSL-241), refused or named)"
+status = "`experimental` (the clean-room catch-up of 2026-11-05: {fsl-flirt.pass} of {fsl-flirt.compared} compared cases within thresholds, fMRIPrep's three calls included; {fsl-flirt.fail} miss them (listed in the record, explained in docs/findings/fsl-flirt-clean-room.md: the weighted `woods` registration; the weighted `normcorr` FSL's since 2026-11-07); {fsl-flirt.both} rejected by both, with the same messages and status; {fsl-flirt.expected} where FLIRT crashes or never finishes (FSL-71, FSL-72, FSL-75, FSL-93, FSL-204) or writes what the spec cannot define (FSL-241), refused or named)"
 
 [[record]]
 id = "fsl-flirt-replica"
@@ -549,7 +549,7 @@ status = "`experimental` (part 3: {fsl-flirt-replica.pass} of {fsl-flirt-replica
 id = "fsl-fast"
 larmorx = "`lx.fsl.fast(implementation=\"original\")`, `larmorx fsl fast` (clean-room, `crates/larmorx-fsl`)"
 reference = "fast (FSL 6.0.7.23, fsl-fast4 2111.3), with correctly rounded maths (the CORE-MATH preload) where a check fails against FSL as built; the default against the replica's default (`larmorx-nc`, the same corrections); the replica suite's cases, the original's own cases and its permanent cases"
-status = "`experimental` ({fsl-fast.pass} of {fsl-fast.compared} compared cases within thresholds, fMRIPrep's {fsl-fast.fmriprep} calls included; {fsl-fast.fail} misses them (listed in the record: five channels, explained in docs/findings/fsl-fast-original.md); {fsl-fast.both} rejected by both, with the same messages, standard output and status; {fsl-fast.expected} expected divergences: channels of different sizes, refused in both modes, FSL-104; two channels whose defaults both correct FSL-98's cycle, the correctly rounded functions' band)"
+status = "`experimental` ({fsl-fast.pass} of {fsl-fast.compared} compared cases within thresholds, fMRIPrep's {fsl-fast.fmriprep} calls included; {fsl-fast.fail} misses them (listed in the record: five channels, explained in docs/findings/fsl-fast-clean-room.md); {fsl-fast.both} rejected by both, with the same messages, standard output and status; {fsl-fast.expected} expected divergences: channels of different sizes, refused in both modes, FSL-104; two channels whose defaults both correct FSL-98's cycle, the correctly rounded functions' band)"
 
 [[record]]
 id = "fsl-fast-replica"

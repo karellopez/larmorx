@@ -33,7 +33,7 @@ TOOLS: dict[str, tuple[str, str]] = {
     "afni-automask": ("afni_masks", "AUTOMASK"),
     "afni-unifize": ("afni_masks", "UNIFIZE"),
     "afni-volreg": ("afni_volreg", "TOOL"),
-    "afni-volreg-original": ("afni_volreg_original", "TOOL"),
+    "afni-volreg-original": ("afni_volreg_clean_room", "TOOL"),
     "mri-hmc": ("mri_hmc", "ORIGINAL"),
     "fsl-mcflirt": ("mri_hmc", "REPLICA"),
     "fsl-bet": ("fsl_bet", "TOOL"),
@@ -42,19 +42,19 @@ TOOLS: dict[str, tuple[str, str]] = {
     "fsl-flirt-part3": ("fsl_flirt", "PART3"),
     "fsl-flirt-original": ("fsl_flirt", "ORIGINAL"),
     "fsl-fast": ("fsl_fast", "TOOL"),
-    "fsl-fast-original": ("fsl_fast_original", "TOOL"),
+    "fsl-fast-original": ("fsl_fast_clean_room", "TOOL"),
     "fsl-topup": ("fsl_topup", "TOOL"),
-    "fsl-topup-original": ("fsl_topup_original", "TOOL"),
+    "fsl-topup-original": ("fsl_topup_clean_room", "TOOL"),
     "fsl-maths": ("fsl_avwutils", "MATHS"),
     "fsl-stats": ("fsl_avwutils", "STATS_TOOL"),
-    "fsl-maths-original": ("fsl_avwutils_original", "MATHS"),
-    "fsl-stats-original": ("fsl_avwutils_original", "STATS_TOOL"),
+    "fsl-maths-original": ("fsl_avwutils_clean_room", "MATHS"),
+    "fsl-stats-original": ("fsl_avwutils_clean_room", "STATS_TOOL"),
     "fsl-prelude": ("fsl_prelude", "TOOL"),
-    "fsl-prelude-original": ("fsl_prelude_original", "TOOL"),
+    "fsl-prelude-original": ("fsl_prelude_clean_room", "TOOL"),
     "resample-series": ("resample_series", "TOOL"),
     "sdcflows-fieldmap": ("sdcflows_fieldmap", "TOOL"),
     "tedana-t2smap": ("tedana_t2smap", "TOOL"),
-    "tedana-t2smap-original": ("tedana_t2smap_original", "TOOL"),
+    "tedana-t2smap-original": ("tedana_t2smap_clean_room", "TOOL"),
     "ndimage-skimage": ("fieldmaps_b", "NDIMAGE"),
     "niworkflows-helpers": ("fieldmaps_b", "NIWORKFLOWS"),
     "sdcflows-estimation": ("fieldmaps_b", "ESTIMATION"),
@@ -75,6 +75,30 @@ def get(name: str) -> Tool:
 
 def names() -> list[str]:
     return list(TOOLS)
+
+
+#: Modules renamed by the documentation revision (2026-11-12): ``<name>_original`` named a clean
+#: room, ``<name>_clean_room`` now. The old names still import (``from larmorx_validation.difftest.tools import
+#: <name>_original``), for the investigations that use them; history stays as written.
+_RENAMED = {
+    f"{m}_original": f"{m}_clean_room"
+    for m in (
+        "afni_volreg",
+        "fsl_avwutils",
+        "fsl_fast",
+        "fsl_prelude",
+        "fsl_topup",
+        "tedana_t2smap",
+    )
+}
+
+
+def __getattr__(name: str):
+    if name in _RENAMED:
+        import importlib
+
+        return importlib.import_module(f"{__name__}.{_RENAMED[name]}")
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 __all__ = ["SELFTESTS", "TOOLS", "get", "names"]

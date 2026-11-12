@@ -4,7 +4,7 @@
 ``lx.tedana.t2smap`` also runs since the wiring of 2026-11-12) against tedana 26.0.3's program, with the replica's default
 (``larmorx-gpl``, a black box) beside it: each case is one command line on multi-echo files the
 descriptor writes from the recipe, judged by the original's suite
-(``larmorx_validation.parity.tedana_t2smap_original``): (A) the original in ``reproduce`` against
+(``larmorx_validation.parity.tedana_t2smap_clean_room``): (A) the original in ``reproduce`` against
 tedana (exit status, standard output, the messages of §12, the files, the values by the spec's
 ``check.py`` and §17.3's thresholds), (B) the original's default against the replica's (the same,
 and the D13 notices). Written by the clean-room implementer from §17.4; the replica's descriptor
@@ -367,7 +367,7 @@ def case(
 
 
 def _run(case, checks) -> None:
-    from larmorx_validation.parity import tedana_t2smap_original as so
+    from larmorx_validation.parity import tedana_t2smap_clean_room as so
     from larmorx_validation.parity.harness import EXPECTED, CheckList, Outcome
 
     p = case.payload
@@ -421,7 +421,7 @@ def _run(case, checks) -> None:
 
 def _unavailable() -> str:
     try:
-        from larmorx_validation.parity import tedana_t2smap_original as so
+        from larmorx_validation.parity import tedana_t2smap_clean_room as so
     except (ImportError, StopIteration):
         return "the original's suite or the oracles are not on this machine"
     if not so.LAUNCHER.exists():

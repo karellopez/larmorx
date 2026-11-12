@@ -89,7 +89,7 @@ written as NIfTI-1 and read back; `FSLOUTPUTTYPE`, `FSL_LOAD_NIFTI_EXTENSIONS` a
 | `-e` | `mesh=True` | VTK; also switches the self-intersection test to the exact one |
 | `-v` | (command line only) | |
 | `-h` | (command line only) | |
-| `--tanh=correctly-rounded` (LARMORX's own option; also `--tanh correctly-rounded`, and passed on by `bet`) | `tanh="correctly-rounded"` | computes the surface's smoothness weight with the correctly rounded `tanh` (CORE-MATH's, `larmorx_core::math::tanh`) instead of glibc 2.35's, which FSL calls and which is the default (`glibc`; decision GLIBC-06). No notice: it is asked for. Where a surface self-intersects and is found again, the last bit can change the result (4 of the 13 real images of the clean room's standard comparison: [its findings](../findings/fsl-bet-original.md)). Clean room only: `implementation="replica"` refuses it, and `"auto"` runs the clean room |
+| `--tanh=correctly-rounded` (LARMORX's own option; also `--tanh correctly-rounded`, and passed on by `bet`) | `tanh="correctly-rounded"` | computes the surface's smoothness weight with the correctly rounded `tanh` (CORE-MATH's, `larmorx_core::math::tanh`) instead of glibc 2.35's, which FSL calls and which is the default (`glibc`; decision GLIBC-06). No notice: it is asked for. Where a surface self-intersects and is found again, the last bit can change the result (4 of the 13 real images of the clean room's standard comparison: [its findings](../findings/fsl-bet-clean-room.md)). Clean room only: `implementation="replica"` refuses it, and `"auto"` runs the clean room |
 | (`bet2`'s `-w`) | `smoothness` | bet2 only (`bet` does not pass it) |
 | (`bet2`'s `--ct`) | `head_ct=True` | bet2 only: the input in Hounsfield units |
 | `LARMORX_FSL_DATA` | `fsl_data` | where `-S`, `-B`, `-A` and `-A2` read FSL's standard images ([`bet`'s Python call](#python-bet)) |
@@ -183,7 +183,7 @@ its outline, an approximate skull and the surface as a mesh.
 | `--binaryMask <image>` | (command line only) | |
 | `-h`, `--help` | (command line only) | |
 | `--parameter_d1=`, `--parameter_d2=` | (command line only) | hidden search depths (7 and 3) |
-| `--tanh=correctly-rounded` (LARMORX's own option; also `--tanh correctly-rounded`, and passed on by `bet`) | `tanh="correctly-rounded"` | computes the surface's smoothness weight with the correctly rounded `tanh` (CORE-MATH's, `larmorx_core::math::tanh`) instead of glibc 2.35's, which FSL calls and which is the default (`glibc`; decision GLIBC-06). No notice: it is asked for. Where a surface self-intersects and is found again, the last bit can change the result (4 of the 13 real images of the clean room's standard comparison: [its findings](../findings/fsl-bet-original.md)). Clean room only: `implementation="replica"` refuses it, and `"auto"` runs the clean room |
+| `--tanh=correctly-rounded` (LARMORX's own option; also `--tanh correctly-rounded`, and passed on by `bet`) | `tanh="correctly-rounded"` | computes the surface's smoothness weight with the correctly rounded `tanh` (CORE-MATH's, `larmorx_core::math::tanh`) instead of glibc 2.35's, which FSL calls and which is the default (`glibc`; decision GLIBC-06). No notice: it is asked for. Where a surface self-intersects and is found again, the last bit can change the result (4 of the 13 real images of the clean room's standard comparison: [its findings](../findings/fsl-bet-clean-room.md)). Clean room only: `implementation="replica"` refuses it, and `"auto"` runs the clean room |
 | `FSLOUTPUTTYPE` | (always NIfTI-1 in Python) | on the command line read from the environment, as FSL does (unset: `NIFTI_GZ`, FSL-11) |
 | (`bet`'s variations) | `variation`, `t2`, `fsl_data` | `bet` only ([its options](#options-of-bet)) |
 
@@ -479,7 +479,7 @@ cannot use them.
 Written from [`specs/bet.md`](../../specs/bet.md), S. M. Smith's paper (Human Brain Mapping
 17(3), 2002) and black-box runs of FSL 6.0.7.23's programs, without FSL's source or the replica
 ([PROVENANCE](../../crates/larmorx-fsl/PROVENANCE.md); what the runs showed beyond the spec:
-[findings/fsl-bet-original.md](../findings/fsl-bet-original.md)). Since 2026-10-30: `bet2`
+[findings/fsl-bet-clean-room.md](../findings/fsl-bet-clean-room.md)). Since 2026-10-30: `bet2`
 complete (every option, message, exit status and failure case of the spec, with `fix` and
 `reproduce` for FSL-40, -42, -43, -56, -60, -61 and -62) and the `bet` script's default, `-R`
 (FSL-63), `-F` and `-Z` (FSL-45), FSL-44 and FSL-46. Since 2026-11-05 (the clean-room catch-up):

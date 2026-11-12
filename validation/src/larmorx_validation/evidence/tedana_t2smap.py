@@ -16,7 +16,7 @@ program, translated from tedana 26.0.3), against tedana itself and fMRIPrep 25.2
   testing's trial and its check, and the benchmark.
 - fMRIPrep's own files against tedana 25.0.1 run here in fMRIPrep's image with numpy's AVX-512
   kernels off and on (fMRIPrep's runs had them on), on its four curve-fit calls (2026-11-12).
-- The clean-room original's part (``tedana_t2smap_original.extend``, its implementer's module:
+- The clean-room original's part (``tedana_t2smap_clean_room.extend``, its implementer's module:
   its worked example, its record's cases as ``original/<case>``, its tables), and its series on
   the speed chart from its benchmark.
 
@@ -1689,9 +1689,9 @@ def export(ctx: core.Context) -> dict:
     }
     # The clean-room original's part (its own module, written by its implementer: its example,
     # its record's cases as original/<case>, its implementation, its tables, its provenance).
-    from larmorx_validation.evidence import tedana_t2smap_original
+    from larmorx_validation.evidence import tedana_t2smap_clean_room
 
-    return tedana_t2smap_original.extend(ctx, doc)
+    return tedana_t2smap_clean_room.extend(ctx, doc)
 
 
 if __name__ == "__main__":  # compute the cache entries only: python -m ... [--refresh]

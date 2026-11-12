@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """fslstats' evidence (the larmorx-nc replica, FSL Licence, and LARMORX's clean-room original,
 crate larmorx-fsl, Apache-2.0, written from ``specs/fslstats.md``: its parts in
-``fsl_maths_original``). fslstats prints numbers, so its evidence is text, not images: fMRIPrep's four calls in its goodvoxels mask (``--project-goodvoxels``) on ds005040, BET's
+``fsl_maths_clean_room``). fslstats prints numbers, so its evidence is text, not images: fMRIPrep's four calls in its goodvoxels mask (``--project-goodvoxels``) on ds005040, BET's
 call (``fslstats <T1w> -l 0.001 -C``), every option once on a real image (FSL's mean of
 ds005040's BOLD series in T1w space, fMRIPrep's brain mask, a label image of its segmentation),
 per volume (``-t``), per label (``-K``) and as JSON (``-json``), each printed text compared byte
@@ -18,7 +18,7 @@ import numpy as np
 
 from larmorx_validation.evidence import common, core
 from larmorx_validation.evidence import fsl_maths as fm
-from larmorx_validation.evidence import fsl_maths_original as fo
+from larmorx_validation.evidence import fsl_maths_clean_room as fo
 from larmorx_validation.figures import cache as fcache
 from larmorx_validation.figures import records
 

@@ -92,7 +92,7 @@ DEGENERATE_MM = 0.3
 #: place, 8 realisations, and the band's perturbations of ``mri_hmc_band`` (FSL 6.0.7.23, through
 #: the oracle cache, never kept; validation/investigations/cleanroom-align/hmc_spread.py and its
 #: results/hmc-spread-2026-11-07.json). Expected divergences with their reasons, every check still
-#: run and reported (docs/findings/mri-hmc-original.md, "The count per point"). A run beyond
+#: run and reported (docs/findings/mri-hmc-clean-room.md, "The count per point"). A run beyond
 #: mcflirt's own spread is never listed here: it fails with its numbers.
 PATH_DIVERGENCES = {
     "syn/orientation/ras-unflipped/reffile": (

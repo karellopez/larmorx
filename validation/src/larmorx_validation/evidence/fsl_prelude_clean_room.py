@@ -861,7 +861,7 @@ def export(ctx: core.Context) -> dict:
     prov["cache"] = [*prov.get("cache", []), *[fcache.provenance(d["entry"]) for d in done]]
     prov["difftest"] = [*prov.get("difftest", []), *trial_source]
     prov["original_exporter"] = core.tree_hash(
-        ctx.repo, "validation/src/larmorx_validation/evidence/fsl_prelude_original.py"
+        ctx.repo, "validation/src/larmorx_validation/evidence/fsl_prelude_clean_room.py"
     )
     return doc
 

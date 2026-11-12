@@ -35,7 +35,7 @@ from larmorx_validation.evidence import (
     common,
     core,
     fsl_bet_options,
-    fsl_bet_options_original,
+    fsl_bet_options_clean_room,
     fsl_step,
     words,
 )
@@ -563,7 +563,7 @@ def _orig_verdicts(diffs: list[dict], same: dict[str, bool], arrays: dict, outpu
             + ("; ".join(parts) or "values")
             + ". betsurf's profiles agree with FSL's one by one (330 of 330 probed); its surfaces "
             "settle a little elsewhere where few profiles vote and at the scalp "
-            "(docs/findings/fsl-bet-original.md, betsurf). The record holds betsurf to its masks "
+            "(docs/findings/fsl-bet-clean-room.md, betsurf). The record holds betsurf to its masks "
             "(Dice >= 0.99, boundary p95 <= 1 voxel), which these meet; the difference is not "
             "closed: the original could still match FSL."
         )
@@ -1449,7 +1449,7 @@ def case_verdict_orig(r: dict, desc: str, s, d13: dict | None = None) -> tuple[s
         f"max in voxels; drawn surfaces: their distance p95 / max): {shown}."
         + (
             " betsurf's profiles agree with FSL's one by one; where few of them vote, and at the "
-            "scalp, its surfaces settle a little elsewhere (docs/findings/fsl-bet-original.md, "
+            "scalp, its surfaces settle a little elsewhere (docs/findings/fsl-bet-clean-room.md, "
             "betsurf)."
             if surf
             else ""
@@ -1725,7 +1725,7 @@ def trial_catchup(ctx: core.Context) -> tuple[list[dict], dict]:
         "(`validation/investigations/cleanroom-bet/trial_catchup_categories.py`, its output "
         f"`{CATCHUP_TRIAGE}`; the replays: `replay_trial.py`), each category's cause established "
         "by replaying findings and by probes (`trial_ssroi_matrices.py`, `finding_dirs.py`, "
-        "`betsurf_shares.py`; `docs/findings/fsl-bet-original.md`); the triage's entries: "
+        "`betsurf_shares.py`; `docs/findings/fsl-bet-clean-room.md`); the triage's entries: "
         "`validation/difftest/triage.toml`. The reproducer is a finding of this run "
         "(`difftest --replay`).",
     )
@@ -1742,7 +1742,7 @@ def refresh_original(ctx: core.Context, why: str) -> None:
     """After a change of the clean-room original: its entries (every run in them is the
     original's) computed again: fMRIPrep's call and bet -R on ds000005, the data panel's child,
     betsurf on the synthetic head, and its runs of the variations' examples
-    (:mod:`fsl_bet_options_original`)."""
+    (:mod:`fsl_bet_options_clean_room`)."""
     fctx = ctx.figures_context()
     for case, what, compute in (
         (CASE, "the clean-room original on fMRIPrep's BET call (ds000005 sub-01 run 1) and bet "
@@ -1753,7 +1753,7 @@ def refresh_original(ctx: core.Context, why: str) -> None:
          "clean-room original", _compute_surf_orig),
     ):  # fmt: skip
         fcache.recompute(fctx, TOOL, f"{case}-original", what, compute, why)
-    fsl_bet_options_original.refresh(ctx, why)
+    fsl_bet_options_clean_room.refresh(ctx, why)
 
 
 def export(ctx: core.Context) -> dict:
@@ -1780,7 +1780,7 @@ def export(ctx: core.Context) -> dict:
     n, sn, pn = entry_new(ctx), surf_entry_new(ctx), panel_entry_new(ctx)
     o, so, po = entry_orig(ctx), surf_entry_orig(ctx), panel_entry_orig(ctx)
     opts = fsl_bet_options.entries(ctx)
-    opts_orig = fsl_bet_options_original.entries(ctx)
+    opts_orig = fsl_bet_options_clean_room.entries(ctx)
     tc, tcprov = trial_catchup(ctx)
     bench, chart = speed(ctx)
     doc = {
@@ -1833,8 +1833,8 @@ def export(ctx: core.Context) -> dict:
             _example_surf(ctx, s, sn, so),
             _example_panel(ctx, pe, pn, po),
             # the replica's examples of the variations, each with the clean-room original's
-            # panels (fsl_bet_options_original)
-            *fsl_bet_options_original.examples(ctx, rec_new, rec_orig),
+            # panels (fsl_bet_options_clean_room)
+            *fsl_bet_options_clean_room.examples(ctx, rec_new, rec_orig),
         ],
     }
     return present(doc)
@@ -2166,7 +2166,7 @@ if __name__ == "__main__":  # compute the cache entries only; refresh-original <
     c = core.Context(repo=REPO, site=Path("."), cache=default_cache())
     if sys.argv[1:2] == ["refresh-original"]:
         refresh_original(c, sys.argv[2])
-        print("refreshed", [x.dir for x in fsl_bet_options_original.entries(c)])
+        print("refreshed", [x.dir for x in fsl_bet_options_clean_room.entries(c)])
         raise SystemExit(0)
     print("done", entry(c).dir, surf_entry(c).dir, panel_entry(c).dir)
     print("done", entry_new(c).dir, surf_entry_new(c).dir, panel_entry_new(c).dir)

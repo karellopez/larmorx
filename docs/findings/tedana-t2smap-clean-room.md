@@ -7,7 +7,7 @@ oracle-output cache), of the replica's program (`larmorx-gpl` 0.1.0rc1 from PyPI
 SciPy and numpy (permissive libraries, run as black boxes) and nibabel 5.4.2's MIT source: no
 tedana source and no replica code were read. Unrestricted. The tools behind them are in
 `validation/investigations/t2smap-original/` (its README) and the parity suite
-`tedana-t2smap-original` (`validation/src/larmorx_validation/parity/tedana_t2smap_original.py`;
+`tedana-t2smap-original` (`validation/src/larmorx_validation/parity/tedana_t2smap_clean_room.py`;
 the record `docs/validation/tedana-t2smap-original.md`).
 
 ## What the original computes differently (and why the results stay within §17.3)

@@ -204,17 +204,23 @@ and links the list. A status is shown in one neutral style, never in a software'
   their record ids in `validation/tools.toml` and the generated tables. A renamed record or
   report keeps its contents byte for byte. Random testing's cases and the investigations keep
   their names. A file that a page made by a measurement links to keeps its name until that page
-  is made again. Today these are five: `docs/validation/afni-volreg-original.md` (the record),
-  `docs/findings/fsl-maths-original.md`, `docs/findings/fsl-prelude-original.md`,
-  `docs/validation/tedana-t2smap-original.md` and `docs/benchmarks/tedana-t2smap-original.json`,
-  which the benchmark reports of 3dvolreg, fslmaths, prelude and t2smap link. They are renamed
-  when those reports are made again. The inventory marks them "renamed later".
-- **Renamed identifiers**: a renamed comparison suite (`afni-volreg-original` becomes
-  `afni-volreg-clean-room`) keeps its old name as an accepted alias, so the "Generated: with
-  `python -m larmorx_validation parity afni-volreg-original`" lines of today's records still run
-  until each record is made again. Random testing's descriptor `NAME`s
+  is made again, and a record's `.json` keeps its name with its `.md` (one record, read by one
+  name). Today these are seven: the records `docs/validation/afni-volreg-original.md` and
+  `docs/validation/tedana-t2smap-original.md`, each with its `.json`,
+  `docs/findings/fsl-maths-original.md`, `docs/findings/fsl-prelude-original.md` and
+  `docs/benchmarks/tedana-t2smap-original.json`, which the benchmark reports of 3dvolreg,
+  fslmaths, prelude and t2smap link. They are renamed when those reports are made again. The
+  inventory marks them "renamed later". A finding renamed now leaves a short file at its old
+  name that points to the new one, for the links that are never edited: the records, the
+  specifications, the clean rooms' own code and the parts' history.
+- **Renamed identifiers**: a comparison suite's name is its record's (`afni-volreg-original`
+  names the files the suite writes), so it changes with its record, later; then the old name
+  stays an accepted alias, so the "Generated: with `python -m larmorx_validation parity
+  afni-volreg-original`" lines of today's records still run. Random testing's descriptor `NAME`s
   (`NAME = "afni-volreg-original"`, used in `validation/difftest/triage.toml` and the cases) stay
-  as they are, even where the module's file is renamed.
+  as they are, even where the module's file is renamed. A renamed Python module still imports
+  under its old name (`from larmorx_validation.parity import afni_volreg_original`), for the
+  investigations that use it.
 - **The evidence exported again** changes only texts, marks, the provenance's paths and the
   exporter's commit, which the provenance records. It also adds the fields that name each
   panel's and comparison's port and the order they are shown in (`port`, `order`, `shows`; the
@@ -788,8 +794,8 @@ again. It also holds the records' and reports' data (4) and the pages made by a 
 21 benchmark reports and the clean-room audit's page. These keep their words until each is made
 again. On the site, the pages (`content/`) hold 259 *clean-room original*, 60 *exact replica*
 and 294 words of jargon. The exported evidence holds 1,376 *clean-room original* and 143
-*original* for a clean room. Of the 47 files named with *original*, 28 are renamed in the
-rollout and 5 later, when the reports that link to them are made again (section 1, "Renamed
+*original* for a clean room. Of the 47 files named with *original*, 26 are renamed in the
+rollout and 7 later, when the reports that link to them are made again (section 1, "Renamed
 files"). 14 keep their names: 12 of random testing's cases and 2 investigation scripts. The last
 column counts words to read one by one; most of them name the program compared with, which is
 right.

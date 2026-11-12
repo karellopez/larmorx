@@ -68,7 +68,7 @@ The jargon by word (where users read): *oracle* 2691, *D13* 541, *parity* 380, *
 
 ## Files named with *original*
 
-This repository's tracked files whose name holds *original* (the site has none). *Files naming it*: how many other files of both repositories, outside what is kept as written, hold its whole name (links) and its name without the extension (links, suite and module names, identifiers). The writing guide's rule: records, findings, benchmark reports, tests and validation modules are renamed (*original* becomes *clean-room* or *clean_room*), a renamed record or benchmark report keeping its contents byte for byte; random testing's permanent cases (identifiers in the records and the triage) and the investigations (history) keep their names. A file that a page made by a measurement links to (a record's or a benchmark report's page, which nobody edits) keeps its name until that page is made again: *renamed later*, with the pages that link to it.
+This repository's tracked files whose name holds *original* (the site has none). *Files naming it*: how many other files of both repositories, outside what is kept as written, hold its whole name (links) and its name without the extension (links, suite and module names, identifiers). The writing guide's rule: records, findings, benchmark reports, tests and validation modules are renamed (*original* becomes *clean-room* or *clean_room*), a renamed record or benchmark report keeping its contents byte for byte; random testing's permanent cases (identifiers in the records and the triage) and the investigations (history) keep their names. A file that a page made by a measurement links to (a record's or a benchmark report's page, which nobody edits) keeps its name until that page is made again: *renamed later*, with the pages that link to it. A record is one pair, its `.json` and its `.md` read by one name: the `.json` keeps its name while its page does.
 
 | File | Renamed? | Files naming it (whole name) | (without extension) |
 |---|---|---|---|
@@ -83,9 +83,9 @@ This repository's tracked files whose name holds *original* (the site has none).
 | `docs/findings/fsl-topup-original.md` | renamed | 14 | 18 |
 | `docs/findings/mri-hmc-original.md` | renamed | 11 | 11 |
 | `docs/findings/tedana-t2smap-original.md` | renamed | 12 | 25 |
-| `docs/validation/afni-volreg-original.json` | renamed | 1 | 30 |
+| `docs/validation/afni-volreg-original.json` | renamed later (with its record's page `docs/validation/afni-volreg-original.md`) | 1 | 30 |
 | `docs/validation/afni-volreg-original.md` | renamed later (linked by `docs/benchmarks/afni-volreg.md`) | 13 | 30 |
-| `docs/validation/tedana-t2smap-original.json` | renamed | 4 | 25 |
+| `docs/validation/tedana-t2smap-original.json` | renamed later (with its record's page `docs/validation/tedana-t2smap-original.md`) | 4 | 25 |
 | `docs/validation/tedana-t2smap-original.md` | renamed later (linked by `docs/benchmarks/tedana-t2smap.md`) | 13 | 25 |
 | `tests/parity/test_afni_volreg_original.py` | renamed | 0 | 0 |
 | `tests/parity/test_fsl_output_types_original.py` | renamed | 4 | 4 |
@@ -120,7 +120,7 @@ This repository's tracked files whose name holds *original* (the site has none).
 | `validation/src/larmorx_validation/parity/tedana_t2smap_original.py` | renamed | 4 | 10 |
 | `validation/tests/test_evidence_tedana_t2smap_original.py` | renamed | 0 | 0 |
 
-28 renamed now, 5 renamed later, 14 kept.
+26 renamed now, 7 renamed later, 14 kept.
 
 ## File by file
 

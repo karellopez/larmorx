@@ -1432,7 +1432,7 @@ def test_larmorx_needs_no_more_memory_than_afni(tmp_path, program, args):
 #: §14.4) at one thread, in both modes, against AFNI's peak: RobustAverage's call on the 20
 #: volumes above (``bold20``), and on fMRIPrep's largest input of the validation, ds005454's
 #: sliced series (160 x 160 x 96 x 20; ``validation/src/larmorx_validation/parity/
-#: afni_volreg_original.py`` makes it from the oracle run: skipped until it exists). The outputs are
+#: afni_volreg_clean_room.py`` makes it from the oracle run: skipped until it exists). The outputs are
 #: not AFNI's bits (the record holds them to the spec's thresholds), so each run is only checked to
 #: write them.
 ORIGINAL_VOLREG_CASES = [
@@ -1448,7 +1448,7 @@ ORIGINAL_VOLREG_CASES = [
 @pytest.mark.parametrize(("name", "args"), ORIGINAL_VOLREG_CASES)
 def test_volreg_original_needs_no_more_memory_than_afni(tmp_path, name, args):
     ar = pytest.importorskip("larmorx_validation.parity.afni_replica")
-    vo = pytest.importorskip("larmorx_validation.parity.afni_volreg_original")
+    vo = pytest.importorskip("larmorx_validation.parity.afni_volreg_clean_room")
     afni = ar.afni_binary("3dvolreg", "26.3.05")
     if afni is None or not Path("/usr/bin/time").is_file():
         pytest.skip("the AFNI 26.3.05 3dvolreg oracle or /usr/bin/time was not found")
@@ -1739,7 +1739,7 @@ def test_t2smap_original_needs_no_more_memory_than_tedana(tmp_path, call, extra)
     if not Path("/usr/bin/time").is_file():
         pytest.skip("/usr/bin/time was not found")
     try:
-        from larmorx_validation.parity import tedana_t2smap_original as suite
+        from larmorx_validation.parity import tedana_t2smap_clean_room as suite
 
         blackbox, _, _, fmriprep = suite.tools()
     except (ImportError, StopIteration):

@@ -6,7 +6,7 @@ comes from the spec, AFNI's documentation and black-box runs of AFNI 26.3.05's `
 (through the oracle-output cache) and of the replica (`LARMORX_IMPLEMENTATION=replica`, a black
 box): no AFNI source and no replica code were read. Unrestricted. The tools behind them are in
 `validation/investigations/afni-volreg-original/` (its README) and the parity suite
-`afni-volreg-original` (`validation/src/larmorx_validation/parity/afni_volreg_original.py`; the
+`afni-volreg-original` (`validation/src/larmorx_validation/parity/afni_volreg_clean_room.py`; the
 record `docs/validation/afni-volreg-original.md`).
 
 ## The shear decomposition's exact ties decide the remaining differences
@@ -71,7 +71,7 @@ one failed even so:
 
 ## Random testing: the ties on small, sharp phantoms; runaways
 
-The descriptor (`validation/src/larmorx_validation/difftest/tools/afni_volreg_original.py`) draws
+The descriptor (`validation/src/larmorx_validation/difftest/tools/afni_volreg_clean_room.py`) draws
 moving head phantoms (nested ellipsoids with noise, sharp edges) and blobs on grids of 12 to 32
 voxels in-plane and 3 to 24 slices, every option. A check night (1,813 cases) and the trial
 (`oracles/difftest/2026-11-08-volreg-original-trial`: 0.5 h, 4 jobs, 21,710 cases) agree on 11,385
@@ -88,7 +88,7 @@ spread under the ties on such findings (AFNI's arithmetic with other tie choices
 resampling): its parameters move by a median of 25 thresholds and up to 256 (spec §5.3).
 
 **How the descriptor judges a case now** (the spec's §14.3 "The ties' spread", step 3 of
-2026-11-08; `parity/afni_volreg_original.ties_judgement`): first the fixed requirements (the coarse
+2026-11-08; `parity/afni_volreg_clean_room.ties_judgement`): first the fixed requirements (the coarse
 search's results reported, not required, in random testing); where they fail,
 - **a runaway** (a volume beyond 15° or 20 mm in AFNI's run or in any of the original's runs, its
   default and its 12 seeded ones, or AFNI-97: AFNI's crash, the original's stop with `reproduce`)

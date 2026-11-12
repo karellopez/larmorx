@@ -1008,7 +1008,7 @@ def _counts(x: dict, outputs: list[str], labels: dict[str, str], y: dict | None 
     return "; ".join(parts) + (f"; {more} more" if more > 0 else "")
 
 
-FINDINGS = "docs/findings/fsl-fast-original.md"
+FINDINGS = "docs/findings/fsl-fast-clean-room.md"
 REGISTER = "docs/findings/upstream-defects.md"
 #: The clean-room catch-up's trial of the original (2026-11-05), and its findings in categories
 #: (``validation/investigations/cleanroom-fast/trial_catchup_categories.py``'s ``--json`` output).
@@ -2175,7 +2175,7 @@ def trial_catchup(ctx: core.Context) -> tuple[list[dict], dict]:
         "(`validation/investigations/cleanroom-fast/trial_catchup_categories.py`, its output "
         f"`{CATCHUP_TRIAGE}`), each category's cause established by replaying the findings "
         "(`replay_findings.py`, with glibc's functions in the default: `glibc_default.patch`) and "
-        'by probes (`probe.py --finding --diff`; `docs/findings/fsl-fast-original.md`, "The '
+        'by probes (`probe.py --finding --diff`; `docs/findings/fsl-fast-clean-room.md`, "The '
         "catch-up's random-testing trial\"); the triage's entries: "
         "`validation/difftest/triage.toml`. The reproducer is a finding of the trial "
         "(`difftest --replay`).",

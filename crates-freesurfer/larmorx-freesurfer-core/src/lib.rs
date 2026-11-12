@@ -15,6 +15,18 @@
 //!
 //! - [`run`]: what the program `larmorx-freesurfer` gives a program's replica (its settings, an
 //!   environment table, the entry point every program crate registers); larmorx's own plumbing.
+//! - `fs.core` (queue item 3.1-22; the behaviour: `specs/freesurfer-core.md`): [`globals`]
+//!   (FreeSurfer's process-wide state, one value per run), [`log`] (messages, fatal errors, the
+//!   error codes; FS-01), [`diag`] (the diagnostic bits and `DiagInit`; FS-02, FS-03),
+//!   [`machine`] (byte swaps), [`cmdargs`], [`base`]; [`cstd`], the C library's conversions they
+//!   need (larmorx's own code).
 #![forbid(unsafe_code)]
 
+pub mod base;
+pub mod cmdargs;
+pub mod cstd;
+pub mod diag;
+pub mod globals;
+pub mod log;
+pub mod machine;
 pub mod run;

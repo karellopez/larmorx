@@ -971,6 +971,12 @@ defects! {
         "Gaussian interpolation given fewer sigmas than dimensions reads the missing sigmas past the end of their list: the result depends on memory the program never wrote";
     ANTS_162 = "ANTS-162", "ANTs", true,
         "N4BiasFieldCorrection's B-spline lattice and padding, and ResampleImage's and ResampleImageBySpacing's output grids, are sized from the image's physical extent with no check: a header in metres or micrometres, or a 4D image's time axis, can make a tiny input need more memory than any machine has, which fills the machine until the process is stopped";
+    FS_01 = "FS-01", "FreeSurfer", true,
+        "the C-style error messages (ErrorPrintf, ErrorExit, ErrorReturn and what calls them) end with a NUL byte before their newline, on standard error and in the error log, so recon-all.log and other logs that capture them read as binary files to grep and text tools";
+    FS_02 = "FS-02", "FreeSurfer", true,
+        "DiagInit converts the PROFILE variable to an integer with no range check: a value beyond the int range (or NaN) is an undefined conversion, which gives -2147483648 on x86-64";
+    FS_03 = "FS-03", "FreeSurfer", true,
+        "a failed internal assertion (assertFailed) ends the program by writing to address -1 on purpose, a segmentation fault, after its message; with FREESURFER_HANG_ON_ASSERT set it first loops for ever";
 }
 
 /// The register entry with ID `id`.

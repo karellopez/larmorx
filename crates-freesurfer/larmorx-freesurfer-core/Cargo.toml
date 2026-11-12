@@ -9,3 +9,6 @@ repository.workspace = true
 
 [dependencies]
 larmorx-core.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

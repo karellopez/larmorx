@@ -2422,3 +2422,20 @@ replica's gaps, the site, the handoff); the clean relays never read the replica 
   family's companion or fetched from its owner on first use; big files always fetched; one checked list shown on
   the site. LARMORX's code stays Apache-2.0; data keeps its own licence.
 - **Examples on program pages are run by the tests**, so they never go stale (accepted).
+
+## 2026-11-12: FreeSurfer's borrowed pieces and its two streams (the user)
+- **Every third-party piece inside FreeSurfer gets a replica and an improved clean room** (the user: "we should make
+  replicas of all them and also improved clean rooms from all of them. People that will use larmorx-freesurfer will
+  need to install the other licence packages if they want to use that ... larmorx package will have full freedom and
+  users will only install the licensed version if they really want to use the replicas that are restrictive with their
+  license"). Each piece's replica lives in the package of its own licence family (GSL's GPL code in `larmorx-gpl`,
+  CorTechs' non-commercial `tkregister2_cmdl` in a non-commercial package, Burkardt's MIT spline wherever MIT allows);
+  code with no licence at all (EPFL's B-splines) only with its authors' permission (the orchestrator drafts the request
+  for the user); the clean room of every piece in `larmorx`. Before building: a placement table per piece (package,
+  whether its licence and FreeSurfer's combine in one program; where they do not, the replica uses the clean-room piece
+  for that part), from FreeSurfer's preparation, for the user. MARS later (on no default path). ITK 4.13.2, what
+  FreeSurfer 8.2.0's programs link, where it differs from 5.4.5 (recommended; to be confirmed with the table).
+- **One FreeSurfer version, two streams:** FreeSurfer 8.2.0 only; its v8 and classic (`-no-v8`) streams share most
+  programs, each ported once. Order: the shared programs, then the classic-only ones (fMRIPrep's), with the v8-only
+  networks as a parallel track. FreeSurfer 7.3.2 (fMRIPrep 25's) is not ported; its runs are a reference for the final
+  comparisons; a later version step would port only the differences if ever needed.

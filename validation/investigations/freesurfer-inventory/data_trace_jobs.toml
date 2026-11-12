@@ -1,0 +1,620 @@
+# SPDX-License-Identifier: Apache-2.0
+# The jobs data_trace.py runs: one recorded step per program and argument shape (left hemisphere
+# where both run), the bare steps recon-all runs without fs_time, the conditional branches, and
+# fMRIPrep's and sMRIPrep's calls outside recon-all. {SD} is the rebuilt subject directory,
+# {SUBJECTS_DIR} its parent, {FS} FREESURFER_HOME, {TMP} a scratch folder for outputs.
+# CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS (built from docs/freesurfer/programs.md).
+
+[[job]]
+name = "v8-0001-mri_convert"
+run = "ds000005-sub-01-v8"
+step = 1
+
+[[job]]
+name = "v8-0002-mri_convert"
+run = "ds000005-sub-01-v8"
+step = 2
+
+[[job]]
+name = "v8-0003-mri_add_xform_to_header"
+run = "ds000005-sub-01-v8"
+step = 3
+
+[[job]]
+name = "v8-0004-lta_convert"
+run = "ds000005-sub-01-v8"
+step = 4
+
+[[job]]
+name = "v8-0005-mri_synthstrip"
+run = "ds000005-sub-01-v8"
+step = 5
+
+[[job]]
+name = "v8-0006-mri_synthseg"
+run = "ds000005-sub-01-v8"
+step = 6
+
+[[job]]
+name = "v8-0007-rca-talairach"
+run = "ds000005-sub-01-v8"
+step = 7
+
+[[job]]
+name = "v8-0008-fs-synthmorph-reg"
+run = "ds000005-sub-01-v8"
+step = 8
+timeout = 240
+note = "recorded 365 s; stopped at 240 s"
+
+[[job]]
+name = "v8-0009-mri_nu_correct.mni"
+run = "ds000005-sub-01-v8"
+step = 9
+timeout = 240
+
+[[job]]
+name = "v8-0011-mri_normalize"
+run = "ds000005-sub-01-v8"
+step = 11
+
+[[job]]
+name = "v8-0012-mri_em_register"
+run = "ds000005-sub-01-v8"
+step = 12
+timeout = 120
+note = "recorded 174 s; stopped at 120 s"
+
+[[job]]
+name = "v8-0013-mri_ca_normalize"
+run = "ds000005-sub-01-v8"
+step = 13
+
+[[job]]
+name = "v8-0014-seg2cc"
+run = "ds000005-sub-01-v8"
+step = 14
+
+[[job]]
+name = "v8-0015-mri_normalize"
+run = "ds000005-sub-01-v8"
+step = 15
+
+[[job]]
+name = "v8-0016-mri_mask"
+run = "ds000005-sub-01-v8"
+step = 16
+
+[[job]]
+name = "v8-0017-mri_mask"
+run = "ds000005-sub-01-v8"
+step = 17
+
+[[job]]
+name = "v8-0019-mri_edit_wm_with_aseg"
+run = "ds000005-sub-01-v8"
+step = 19
+
+[[job]]
+name = "v8-0020-mri_edit_wm_with_aseg"
+run = "ds000005-sub-01-v8"
+step = 20
+
+[[job]]
+name = "v8-0021-AntsDenoiseImageFs"
+run = "ds000005-sub-01-v8"
+step = 21
+
+[[job]]
+name = "v8-0022-mri_segment"
+run = "ds000005-sub-01-v8"
+step = 22
+
+[[job]]
+name = "v8-0023-mri_edit_wm_with_aseg"
+run = "ds000005-sub-01-v8"
+step = 23
+
+[[job]]
+name = "v8-0024-mri_pretess"
+run = "ds000005-sub-01-v8"
+step = 24
+
+[[job]]
+name = "v8-0027-mri_fill"
+run = "ds000005-sub-01-v8"
+step = 27
+
+[[job]]
+name = "v8-0029-mri_tessellate"
+run = "ds000005-sub-01-v8"
+step = 29
+
+[[job]]
+name = "v8-0030-mris_extract_main_component"
+run = "ds000005-sub-01-v8"
+step = 30
+
+[[job]]
+name = "v8-0034-mris_smooth"
+run = "ds000005-sub-01-v8"
+step = 34
+
+[[job]]
+name = "v8-0036-mris_inflate"
+run = "ds000005-sub-01-v8"
+step = 36
+
+[[job]]
+name = "v8-0038-mris_sphere"
+run = "ds000005-sub-01-v8"
+step = 38
+timeout = 90
+
+[[job]]
+name = "v8-0040-mris_fix_topology"
+run = "ds000005-sub-01-v8"
+step = 40
+timeout = 120
+note = "recorded 302 s; stopped at 120 s"
+
+[[job]]
+name = "v8-0042-defect2seg"
+run = "ds000005-sub-01-v8"
+step = 42
+
+[[job]]
+name = "v8-0043-mris_remesh"
+run = "ds000005-sub-01-v8"
+step = 43
+
+[[job]]
+name = "v8-0045-mris_remove_intersection"
+run = "ds000005-sub-01-v8"
+step = 45
+
+[[job]]
+name = "v8-0047-mris_autodet_gwstats"
+run = "ds000005-sub-01-v8"
+step = 47
+
+[[job]]
+name = "v8-0049-mris_place_surface"
+run = "ds000005-sub-01-v8"
+step = 49
+timeout = 120
+note = "recorded 178 s; stopped at 120 s"
+
+[[job]]
+name = "v8-0051-label-cortex"
+run = "ds000005-sub-01-v8"
+step = 51
+
+[[job]]
+name = "v8-0052-mri_label2label"
+run = "ds000005-sub-01-v8"
+step = 52
+
+[[job]]
+name = "v8-0055-mris_smooth"
+run = "ds000005-sub-01-v8"
+step = 55
+
+[[job]]
+name = "v8-0057-mris_inflate"
+run = "ds000005-sub-01-v8"
+step = 57
+
+[[job]]
+name = "v8-0059-mris_curvature"
+run = "ds000005-sub-01-v8"
+step = 59
+
+[[job]]
+name = "v8-0060-mris_curvature"
+run = "ds000005-sub-01-v8"
+step = 60
+
+[[job]]
+name = "v8-0063-mris_sphere"
+run = "ds000005-sub-01-v8"
+step = 63
+timeout = 90
+note = "recorded 388 s; stopped at 90 s"
+
+[[job]]
+name = "v8-0065-rca-surfreg"
+run = "ds000005-sub-01-v8"
+step = 65
+note = "recorded 502 s; stopped at 150 s"
+
+[[job]]
+name = "v8-0066-mris_jacobian"
+run = "ds000005-sub-01-v8"
+step = 66
+
+[[job]]
+name = "v8-0068-mrisp_paint"
+run = "ds000005-sub-01-v8"
+step = 68
+
+[[job]]
+name = "v8-0070-mris_ca_label"
+run = "ds000005-sub-01-v8"
+step = 70
+
+[[job]]
+name = "v8-0072-mris_place_surface"
+run = "ds000005-sub-01-v8"
+step = 72
+timeout = 120
+note = "recorded 139 s; stopped at 120 s"
+
+[[job]]
+name = "v8-0074-mris_place_surface"
+run = "ds000005-sub-01-v8"
+step = 74
+timeout = 120
+
+[[job]]
+name = "v8-0076-mris_place_surface"
+run = "ds000005-sub-01-v8"
+step = 76
+timeout = 120
+
+[[job]]
+name = "v8-0077-mris_place_surface"
+run = "ds000005-sub-01-v8"
+step = 77
+timeout = 120
+
+[[job]]
+name = "v8-0080-mris_place_surface"
+run = "ds000005-sub-01-v8"
+step = 80
+timeout = 120
+
+[[job]]
+name = "v8-0081-vertexvol"
+run = "ds000005-sub-01-v8"
+step = 81
+
+[[job]]
+name = "v8-0088-mris_curvature_stats"
+run = "ds000005-sub-01-v8"
+step = 88
+
+[[job]]
+name = "v8-0090-mris_volmask"
+run = "ds000005-sub-01-v8"
+step = 90
+
+[[job]]
+name = "v8-0091-mris_ca_label"
+run = "ds000005-sub-01-v8"
+step = 91
+
+[[job]]
+name = "v8-0093-mris_ca_label"
+run = "ds000005-sub-01-v8"
+step = 93
+
+[[job]]
+name = "v8-0095-pctsurfcon"
+run = "ds000005-sub-01-v8"
+step = 95
+
+[[job]]
+name = "v8-0097-mri_relabel_hypointensities"
+run = "ds000005-sub-01-v8"
+step = 97
+
+[[job]]
+name = "v8-0098-mri_surf2volseg"
+run = "ds000005-sub-01-v8"
+step = 98
+
+[[job]]
+name = "v8-0099-mri_brainvol_stats"
+run = "ds000005-sub-01-v8"
+step = 99
+
+[[job]]
+name = "v8-0100-mri_surf2volseg"
+run = "ds000005-sub-01-v8"
+step = 100
+
+[[job]]
+name = "v8-0103-mri_surf2volseg"
+run = "ds000005-sub-01-v8"
+step = 103
+
+[[job]]
+name = "v8-0104-mri_segstats"
+run = "ds000005-sub-01-v8"
+step = 104
+
+[[job]]
+name = "v8-0105-mris_anatomical_stats"
+run = "ds000005-sub-01-v8"
+step = 105
+
+[[job]]
+name = "v8-0113-mri_segstats"
+run = "ds000005-sub-01-v8"
+step = 113
+
+[[job]]
+name = "v8-0114-mri_label2label"
+run = "ds000005-sub-01-v8"
+step = 114
+
+[[job]]
+name = "v8-0128-mri_label2label"
+run = "ds000005-sub-01-v8"
+step = 128
+
+[[job]]
+name = "v8-0136-mris_label2annot"
+run = "ds000005-sub-01-v8"
+step = 136
+
+[[job]]
+name = "v8-0137-mri_label2label"
+run = "ds000005-sub-01-v8"
+step = 137
+
+[[job]]
+name = "v8-0151-mris_label2annot"
+run = "ds000005-sub-01-v8"
+step = 151
+
+[[job]]
+name = "v8-0152-mris_label2annot"
+run = "ds000005-sub-01-v8"
+step = 152
+
+[[job]]
+name = "v8-0153-mris_anatomical_stats"
+run = "ds000005-sub-01-v8"
+step = 153
+
+[[job]]
+name = "cl-0005-mri_nu_correct.mni"
+run = "ds000005-sub-01-classic"
+step = 5
+timeout = 240
+
+[[job]]
+name = "cl-0006-talairach_avi"
+run = "ds000005-sub-01-classic"
+step = 6
+
+[[job]]
+name = "cl-0007-talairach_afd"
+run = "ds000005-sub-01-classic"
+step = 7
+
+[[job]]
+name = "cl-0010-mri_normalize"
+run = "ds000005-sub-01-classic"
+step = 10
+
+[[job]]
+name = "cl-0011-mri_em_register"
+run = "ds000005-sub-01-classic"
+step = 11
+timeout = 120
+note = "recorded 158 s; stopped at 120 s"
+
+[[job]]
+name = "cl-0012-mri_watershed"
+run = "ds000005-sub-01-classic"
+step = 12
+
+[[job]]
+name = "cl-0015-mri_ca_register"
+run = "ds000005-sub-01-classic"
+step = 15
+note = "recorded 3660 s; stopped at 150 s"
+
+[[job]]
+name = "cl-0016-mri_ca_label"
+run = "ds000005-sub-01-classic"
+step = 16
+timeout = 200
+note = "recorded 1122 s; stopped at 200 s"
+
+[[job]]
+name = "cl-0018-mri_normalize"
+run = "ds000005-sub-01-classic"
+step = 18
+# ---- bare steps of the v8 stream (recon-all runs them without fs_time; commands from recon-all.log)
+[[job]]
+name = "v8-bare-csvprint"
+run = "ds000005-sub-01-v8"
+step = 7
+argv = ["csvprint", "--csv", "{SD}/stats/synthseg.vol.csv", "--f", "total intracranial"]
+cwd = "{SD}/mri"
+
+[[job]]
+name = "v8-bare-mri_mcadura_seg"
+run = "ds000005-sub-01-v8"
+step = 17
+argv = ["mri_mcadura_seg", "--i", "{SD}/mri/nu.mgz", "--o", "{SD}/mri/mca-dura.mgz", "--threads", "4", "--synthmorphdir", "{SD}/mri/transforms/synthmorph.1.0mm.1.0mm"]
+cwd = "{SD}/mri"
+timeout = 240
+
+[[job]]
+name = "v8-bare-mri_vsinus_seg"
+run = "ds000005-sub-01-v8"
+step = 17
+argv = ["mri_vsinus_seg", "--s", "sub-01", "--rca-synthseg", "--threads", "4", "--synthmorphdir", "{SD}/mri/transforms/synthmorph.1.0mm.1.0mm"]
+cwd = "{SD}/mri"
+timeout = 240
+
+[[job]]
+name = "v8-bare-mri_mask-synthstrip"
+run = "ds000005-sub-01-v8"
+step = 12
+argv = ["mri_mask", "{SD}/mri/T1.mgz", "{SD}/mri/synthstrip.mgz", "{SD}/mri/brainmask.mgz"]
+cwd = "{SD}/mri"
+
+[[job]]
+name = "v8-bare-mri_entowm_seg"
+run = "ds000005-sub-01-v8"
+step = 14
+argv = ["mri_entowm_seg", "--s", "sub-01", "--conform", "--threads", "4"]
+cwd = "{SD}/mri"
+timeout = 240
+
+# ---- SynthSeg on a cropped patch: the same files as recon-all's call, but it finishes inside the
+# 12 GiB box (the full call peaks at 21 GiB), so the files read after the prediction are seen too
+[[job]]
+name = "v8-variant-mri_synthseg-crop"
+run = "ds000005-sub-01-v8"
+step = 6
+argv = ["mri_synthseg", "--i", "{SD}/mri/orig.mgz", "--o", "{TMP}/synthseg.mgz", "--threads", "4", "--vol", "{TMP}/synthseg.vol.csv", "--keepgeom", "--addctab", "--cpu", "--crop", "96"]
+cwd = "{SD}/mri"
+timeout = 300
+note = "--crop 96 added (not recon-all's call) so that the run ends inside the memory box"
+
+# ---- recon-all itself: its set-up (configuration, version listing) before one cheap stage
+[[job]]
+name = "v8-recon-all-setup"
+run = "ds000005-sub-01-v8"
+step = 196
+argv = ["recon-all", "-s", "sub-01", "-avgcurv", "-openmp", "4"]
+cwd = "{SUBJECTS_DIR}"
+timeout = 400
+
+[[job]]
+name = "cl-recon-all-setup"
+run = "ds000005-sub-01-v8"
+step = 196
+argv = ["recon-all", "-s", "sub-01", "-no-v8", "-avgcurv", "-openmp", "4"]
+cwd = "{SUBJECTS_DIR}"
+timeout = 400
+
+# ---- the classic stream's bare and conditional Talairach steps
+[[job]]
+name = "cl-bare-lta_convert-mni305"
+run = "ds000005-sub-01-classic"
+step = 7
+argv = ["lta_convert", "--src", "orig.mgz", "--trg", "{FS}/average/mni305.cor.mgz", "--inxfm", "transforms/talairach.xfm", "--outlta", "{TMP}/talairach.xfm.lta", "--subject", "fsaverage", "--ltavox2vox"]
+cwd = "{SD}/mri"
+
+[[job]]
+name = "cl-cond-talairach_avi-3T18yo"
+run = "ds000005-sub-01-classic"
+step = 7
+argv = ["talairach_avi", "--i", "orig_nu.mgz", "--xfm", "{TMP}/talairach.auto.xfm", "--atlas", "3T18yoSchwartzReactN32_as_orig"]
+cwd = "{SD}/mri"
+note = "recon-all's first retry when talairach_afd or Avi's QA check fails"
+
+[[job]]
+name = "cl-cond-talairach-mritotal"
+run = "ds000005-sub-01-classic"
+step = 7
+argv = ["talairach", "--i", "orig_nu.mgz", "--xfm", "{TMP}/talairach.auto.xfm"]
+cwd = "{SD}/mri"
+timeout = 300
+note = "recon-all's second retry (MINC's mritotal)"
+
+# ---- fMRIPrep 25.2.6 / sMRIPrep 0.19.2 outside recon-all (programs.md section 5), on the finished subject
+[[job]]
+name = "fp-mri_robust_template"
+run = "ds000005-sub-01-v8"
+step = 196
+argv = ["mri_robust_template", "--mov", "{SD}/mri/orig/001.mgz", "{SD}/mri/rawavg.mgz", "--average", "1", "--template", "{TMP}/template.mgz", "--satit", "--inittp", "1", "--fixtp", "--noit", "--iscale", "--iscaleout", "{TMP}/s1.txt", "{TMP}/s2.txt", "--subsample", "200", "--lta", "{TMP}/a.lta", "{TMP}/b.lta"]
+cwd = "{TMP}"
+
+[[job]]
+name = "fp-lta_convert"
+run = "ds000005-sub-01-v8"
+step = 196
+argv = ["lta_convert", "--inlta", "identity.nofile", "--src", "{SD}/mri/rawavg.mgz", "--trg", "{SD}/mri/orig.mgz", "--outlta", "{TMP}/identity.lta"]
+cwd = "{TMP}"
+
+[[job]]
+name = "fp-mris_expand"
+run = "ds000005-sub-01-v8"
+step = 196
+argv = ["mris_expand", "-thickness", "{SD}/surf/lh.white", "0.5", "{TMP}/lh.midthickness"]
+cwd = "{TMP}"
+env = { OMP_NUM_THREADS = "4" }
+
+[[job]]
+name = "fp-mri_robust_register"
+run = "ds000005-sub-01-v8"
+step = 196
+argv = ["mri_robust_register", "--satit", "--iscale", "--mov", "{SD}/mri/T1.mgz", "--dst", "{SD}/mri/rawavg.mgz", "--lta", "{TMP}/robust.lta"]
+cwd = "{TMP}"
+
+[[job]]
+name = "fp-mri_coreg"
+run = "ds000005-sub-01-v8"
+step = 196
+argv = ["mri_coreg", "--s", "sub-01", "--mov", "{SD}/mri/rawavg.mgz", "--lta", "{TMP}/coreg.lta", "--dof", "6", "--sep", "4", "--ftol", "1.000000e-04", "--linmintol", "1.000000e-02"]
+cwd = "{TMP}"
+
+[[job]]
+name = "fp-bbregister"
+run = "ds000005-sub-01-v8"
+step = 196
+argv = ["bbregister", "--s", "sub-01", "--mov", "{SD}/mri/rawavg.mgz", "--t1", "--init-coreg", "--6", "--reg", "{TMP}/bbr.dat", "--lta", "{TMP}/bbr.lta"]
+cwd = "{TMP}"
+timeout = 400
+note = "--t1 for a T1w moving image (fMRIPrep passes --t2 for BOLD and T2w); the programs and data are the same"
+
+[[job]]
+name = "fp-mri_vol2vol"
+run = "ds000005-sub-01-v8"
+step = 196
+argv = ["mri_vol2vol", "--mov", "{SD}/mri/aseg.mgz", "--targ", "{SD}/mri/rawavg.mgz", "--lta", "{SD}/mri/rawavg2orig.lta", "--inv", "--interp", "nearest", "--o", "{TMP}/seg.nii.gz"]
+cwd = "{TMP}"
+
+[[job]]
+name = "fp-mris_convert-surface"
+run = "ds000005-sub-01-v8"
+step = 196
+argv = ["mris_convert", "--to-scanner", "{SD}/surf/lh.white", "{TMP}/lh.white.surf.gii"]
+cwd = "{TMP}"
+
+[[job]]
+name = "fp-mris_convert-data"
+run = "ds000005-sub-01-v8"
+step = 196
+argv = ["mris_convert", "-c", "{SD}/surf/lh.thickness", "{SD}/surf/lh.white", "{TMP}/lh.thickness.gii"]
+cwd = "{TMP}"
+
+[[job]]
+name = "fp-mri_vol2surf-fsaverage"
+run = "ds000005-sub-01-v8"
+step = 196
+links = ["fsaverage", "fsaverage5", "fsaverage6"]
+argv = ["mri_vol2surf", "--mov", "{SD}/mri/orig.mgz", "--regheader", "sub-01", "--hemi", "lh", "--interp", "trilinear", "--projfrac-avg", "0", "1", "0.2", "--trgsubject", "fsaverage", "--srcsubject", "sub-01", "--o", "{TMP}/lh.fsaverage.gii"]
+cwd = "{TMP}"
+
+[[job]]
+name = "fp-mri_vol2surf-fsaverage5"
+run = "ds000005-sub-01-v8"
+step = 196
+links = ["fsaverage", "fsaverage5", "fsaverage6"]
+argv = ["mri_vol2surf", "--mov", "{SD}/mri/orig.mgz", "--regheader", "sub-01", "--hemi", "lh", "--interp", "trilinear", "--projfrac-avg", "0", "1", "0.2", "--trgsubject", "fsaverage5", "--srcsubject", "sub-01", "--o", "{TMP}/lh.fsaverage5.gii"]
+cwd = "{TMP}"
+
+[[job]]
+name = "fp-mri_vol2surf-fsaverage6"
+run = "ds000005-sub-01-v8"
+step = 196
+links = ["fsaverage", "fsaverage5", "fsaverage6"]
+argv = ["mri_vol2surf", "--mov", "{SD}/mri/orig.mgz", "--regheader", "sub-01", "--hemi", "lh", "--interp", "trilinear", "--projfrac-avg", "0", "1", "0.2", "--trgsubject", "fsaverage6", "--srcsubject", "sub-01", "--o", "{TMP}/lh.fsaverage6.gii"]
+cwd = "{TMP}"
+
+[[job]]
+name = "fp-mri_vol2surf-fsnative"
+run = "ds000005-sub-01-v8"
+step = 196
+argv = ["mri_vol2surf", "--mov", "{SD}/mri/orig.mgz", "--regheader", "sub-01", "--hemi", "lh", "--interp", "trilinear", "--projfrac-avg", "0", "1", "0.2", "--trgsubject", "sub-01", "--srcsubject", "sub-01", "--o", "{TMP}/lh.fsnative.gii"]
+cwd = "{TMP}"

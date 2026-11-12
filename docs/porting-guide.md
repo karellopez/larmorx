@@ -87,7 +87,11 @@ every merge (docs/orchestration.md, step 5a) and stops a merge that lets an agen
 clean-room original after seeing restricted material of its family. A slip (restricted lines a
 search printed) is no failure by itself: declare it in the part's report, with what it showed;
 the audit compares the declarations with what it finds. Code similarity is reported beside it,
-as extra evidence only.
+as extra evidence only. **A part that adds a clean-room crate** (its `PROVENANCE.md` opens with
+"Clean-room implementation") adds it to the audit in the same part: `restrictions.CLEANROOM_CRATES`,
+`verdicts.CLEANROOM_PATHS`, `tool_of` and `TOOL_NAMES`, and similarity's upstream and replica sources
+(`validation/tests/test_cleanroom_verdicts.py::test_every_clean_room_crate_is_audited` fails until
+then; `crates/larmorx-tedana` was audited only from its merge, 2026-11-12).
 
 **Why both tracks for restricted upstreams:** the replica gives the upstream's exact bits
 (3dTshift: 279 of 279 compared cases); the original keeps the main package Apache-2.0 at the

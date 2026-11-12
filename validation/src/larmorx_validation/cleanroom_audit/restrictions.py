@@ -215,7 +215,12 @@ PROBE_FAMILIES = {
 }
 
 #: The clean-room crates (the originals' code; relay 2 adds the clean-room parts of other crates).
-CLEANROOM_CRATES = ("crates/larmorx-afni/", "crates/larmorx-mri/", "crates/larmorx-fsl/")
+CLEANROOM_CRATES = (
+    "crates/larmorx-afni/",
+    "crates/larmorx-mri/",
+    "crates/larmorx-fsl/",
+    "crates/larmorx-tedana/",
+)
 
 #: Workspace folders holding permissively licensed upstream source (allowed; logged).
 PERMISSIVE_DIRS = (

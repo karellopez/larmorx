@@ -1,5 +1,5 @@
 {
- "dossier": "2026-11-12-confounds-first-half",
+ "dossier": "2026-11-12-t2smap-clean-room",
  "edits": [
   {
    "added": null,
@@ -121,11 +121,11 @@
   }
  ],
  "evidence": {
-  "accesses": 319453,
-  "agents": 305,
+  "accesses": 323375,
+  "agents": 311,
   "archive_checksums_differ": 0,
-  "archive_checksums_matched": 398,
-  "archived_files": 398,
+  "archive_checksums_matched": 407,
+  "archived_files": 407,
   "archives": {
    "2026-11-05-session-transcripts": {
     "files": 244,
@@ -178,32 +178,36 @@
    "2026-11-12-session-transcripts-confounds-first-half": {
     "files": 25,
     "sha256": "549db515e64d62cd95a2b6d2900e8ec55ff99a34591bba63adab212147df0d10"
+   },
+   "2026-11-12-session-transcripts-t2smap-clean-room": {
+    "files": 24,
+    "sha256": "270fabe579ae46ec980c98fa1944da5c901164127803af20dc15e52efe4767ba"
    }
   },
-  "commits_printed": 3052,
-  "distinct_transcripts": 309,
+  "commits_printed": 3108,
+  "distinct_transcripts": 315,
   "first_record": "2026-10-09 11:38 UTC",
   "gaps": {
-   "agents_without_worktree": 210,
+   "agents_without_worktree": 216,
    "bad_lines": 0,
    "calls_without_result": 22,
    "compaction_parent_missing": 2,
-   "compactions": 74,
-   "refused_calls": 1573,
+   "compactions": 75,
+   "refused_calls": 1579,
    "refused_calls_restricted_accesses": 686,
    "request_only_calls": 0,
    "results_without_call": 0,
-   "unresolved_paths": 7651
+   "unresolved_paths": 7675
   },
-  "last_record": "2026-11-12 01:42 UTC",
-  "live_files": 309,
-  "live_files_also_archived": 307,
+  "last_record": "2026-11-12 07:31 UTC",
+  "live_files": 315,
+  "live_files_also_archived": 315,
   "sessions": 4,
-  "tool_calls": 92607,
+  "tool_calls": 93824,
   "tool_calls_by_tool": [
    [
     "Agent",
-    307
+    313
    ],
    [
     "Artifact",
@@ -215,7 +219,7 @@
    ],
    [
     "Bash",
-    78589
+    79710
    ],
    [
     "CronCreate",
@@ -227,7 +231,7 @@
    ],
    [
     "Edit",
-    4235
+    4255
    ],
    [
     "EnterWorktree",
@@ -235,11 +239,11 @@
    ],
    [
     "Monitor",
-    173
+    178
    ],
    [
     "Read",
-    2329
+    2351
    ],
    [
     "ReadNotifications",
@@ -255,7 +259,7 @@
    ],
    [
     "SubagentHandback",
-    315
+    323
    ],
    [
     "TaskOutput",
@@ -263,11 +267,11 @@
    ],
    [
     "TaskStop",
-    237
+    247
    ],
    [
     "ToolSearch",
-    196
+    200
    ],
    [
     "WebFetch",
@@ -279,12 +283,12 @@
    ],
    [
     "Write",
-    6009
+    6030
    ]
   ],
-  "transcript_bytes": 7688073900,
-  "transcript_files": 707,
-  "unique_paths": 66976
+  "transcript_bytes": 7893769553,
+  "transcript_files": 722,
+  "unique_paths": 67601
  },
  "levels": [
   [
@@ -364,8 +368,8 @@
  ],
  "made_from": {
   "scan": "scan",
-  "similarity_commit": "95ea64a8",
-  "verdicts_repository": "89030879"
+  "similarity_commit": "6e18b57d-dirty",
+  "verdicts_repository": "6e18b57d"
  },
  "overview": {
   "agents_by_role": [
@@ -375,7 +379,7 @@
    ],
    [
     "clean-room implementer",
-    85
+    87
    ],
    [
     "documentation",
@@ -387,11 +391,11 @@
    ],
    [
     "other",
-    109
+    111
    ],
    [
     "replica author",
-    83
+    85
    ],
    [
     "spec writer",
@@ -401,18 +405,18 @@
   "attributed_by": [
    [
     "printed",
-    240
+    258
    ],
    [
     "subject",
     13
    ]
   ],
-  "commits": 253,
+  "commits": 271,
   "commits_by_role": [
    [
     "clean-room implementer",
-    249
+    267
    ],
    [
     "integration",
@@ -423,7 +427,7 @@
     3
    ]
   ],
-  "implementers": 85,
+  "implementers": 87,
   "register_restricted_lines": 1476,
   "single_file_scopes": {
    "checked": 70,
@@ -698,7 +702,7 @@
     "tokens": 1813
    }
   ],
-  "commit": "95ea64a8",
+  "commit": "6e18b57d-dirty",
   "matrices": {
    "AFNI": {
     "cleanroom_vs_replica_floors": [
@@ -709,44 +713,44 @@
        "longest_run": 29,
        "shape_longest_run": 48
       },
-      "max_coverage_8": 0.11089,
-      "max_identifiers_shared": 0.42559,
+      "max_coverage_8": 0.11498,
+      "max_identifiers_shared": 0.43864,
       "max_longest_run": 63,
-      "max_shape_longest_run": 143,
-      "median_coverage_8": 0.09004,
-      "median_identifiers_shared": 0.32115,
-      "median_longest_run": 29.0,
-      "median_shape_longest_run": 43.0
+      "max_shape_longest_run": 144,
+      "median_coverage_8": 0.09755,
+      "median_identifiers_shared": 0.348565,
+      "median_longest_run": 31.5,
+      "median_shape_longest_run": 93.0
      },
      {
       "diagonal": {
-       "coverage_8": 0.34231,
-       "identifiers_shared": 0.58997,
+       "coverage_8": 0.31124,
+       "identifiers_shared": 0.5897,
        "longest_run": 334,
        "shape_longest_run": 300
       },
-      "max_coverage_8": 0.05691,
-      "max_identifiers_shared": 0.24394,
-      "max_longest_run": 27,
-      "max_shape_longest_run": 46,
-      "median_coverage_8": 0.04257,
-      "median_identifiers_shared": 0.19723,
-      "median_longest_run": 26.0,
-      "median_shape_longest_run": 42.0
+      "max_coverage_8": 0.09022,
+      "max_identifiers_shared": 0.29568,
+      "max_longest_run": 44,
+      "max_shape_longest_run": 79,
+      "median_coverage_8": 0.04632,
+      "median_identifiers_shared": 0.217605,
+      "median_longest_run": 26.5,
+      "median_shape_longest_run": 44.0
      },
      {
       "diagonal": {
-       "coverage_8": 0.15336,
-       "identifiers_shared": 0.45152,
+       "coverage_8": 0.15542,
+       "identifiers_shared": 0.45317,
        "longest_run": 45,
        "shape_longest_run": 151
       },
-      "max_coverage_8": 0.12833,
-      "max_identifiers_shared": 0.49697,
-      "max_longest_run": 29,
-      "max_shape_longest_run": 45,
-      "median_coverage_8": 0.09729,
-      "median_identifiers_shared": 0.3303,
+      "max_coverage_8": 0.13005,
+      "max_identifiers_shared": 0.52266,
+      "max_longest_run": 34,
+      "max_shape_longest_run": 50,
+      "median_coverage_8": 0.11193,
+      "median_identifiers_shared": 0.39275,
       "median_longest_run": 29.0,
       "median_shape_longest_run": 45.0
      },
@@ -757,14 +761,30 @@
        "longest_run": 58,
        "shape_longest_run": 87
       },
-      "max_coverage_8": 0.09233,
-      "max_identifiers_shared": 0.45062,
+      "max_coverage_8": 0.10896,
+      "max_identifiers_shared": 0.4537,
       "max_longest_run": 34,
       "max_shape_longest_run": 55,
-      "median_coverage_8": 0.07896,
-      "median_identifiers_shared": 0.34259,
+      "median_coverage_8": 0.087325,
+      "median_identifiers_shared": 0.35957,
       "median_longest_run": 34.0,
       "median_shape_longest_run": 53.0
+     },
+     {
+      "diagonal": {
+       "coverage_8": 0.15521,
+       "identifiers_shared": 0.35236,
+       "longest_run": 145,
+       "shape_longest_run": 150
+      },
+      "max_coverage_8": 0.09045,
+      "max_identifiers_shared": 0.33871,
+      "max_longest_run": 145,
+      "max_shape_longest_run": 145,
+      "median_coverage_8": 0.048575,
+      "median_identifiers_shared": 0.186725,
+      "median_longest_run": 29.0,
+      "median_shape_longest_run": 50.5
      }
     ],
     "cleanroom_vs_upstream_floors": [
@@ -779,40 +799,40 @@
       "max_identifiers_shared": 0.13316,
       "max_longest_run": 16,
       "max_shape_longest_run": 143,
-      "median_coverage_8": 0.00095,
-      "median_identifiers_shared": 0.05222,
+      "median_coverage_8": 0.00157,
+      "median_identifiers_shared": 0.050915,
       "median_longest_run": 13.0,
+      "median_shape_longest_run": 28.0
+     },
+     {
+      "diagonal": {
+       "coverage_8": 0.02945,
+       "identifiers_shared": 0.16944,
+       "longest_run": 38,
+       "shape_longest_run": 63
+      },
+      "max_coverage_8": 0.00242,
+      "max_identifiers_shared": 0.04651,
+      "max_longest_run": 9,
+      "max_shape_longest_run": 31,
+      "median_coverage_8": 0.000605,
+      "median_identifiers_shared": 0.034885,
+      "median_longest_run": 8.5,
       "median_shape_longest_run": 27.0
      },
      {
       "diagonal": {
-       "coverage_8": 0.03307,
-       "identifiers_shared": 0.16955,
-       "longest_run": 38,
-       "shape_longest_run": 63
-      },
-      "max_coverage_8": 0.00087,
-      "max_identifiers_shared": 0.05017,
-      "max_longest_run": 9,
-      "max_shape_longest_run": 31,
-      "median_coverage_8": 0.00049,
-      "median_identifiers_shared": 0.02768,
-      "median_longest_run": 8.0,
-      "median_shape_longest_run": 23.0
-     },
-     {
-      "diagonal": {
        "coverage_8": 0.0,
-       "identifiers_shared": 0.06364,
+       "identifiers_shared": 0.06344,
        "longest_run": 7,
        "shape_longest_run": 29
       },
       "max_coverage_8": 0.0,
-      "max_identifiers_shared": 0.14545,
+      "max_identifiers_shared": 0.14502,
       "max_longest_run": 7,
       "max_shape_longest_run": 29,
       "median_coverage_8": 0.0,
-      "median_identifiers_shared": 0.03636,
+      "median_identifiers_shared": 0.048335,
       "median_longest_run": 6.0,
       "median_shape_longest_run": 23.0
      },
@@ -828,9 +848,25 @@
       "max_longest_run": 9,
       "max_shape_longest_run": 33,
       "median_coverage_8": 0.00082,
-      "median_identifiers_shared": 0.06173,
+      "median_identifiers_shared": 0.0571,
       "median_longest_run": 8.0,
-      "median_shape_longest_run": 25.0
+      "median_shape_longest_run": 28.5
+     },
+     {
+      "diagonal": {
+       "coverage_8": 0.00321,
+       "identifiers_shared": 0.05831,
+       "longest_run": 16,
+       "shape_longest_run": 86
+      },
+      "max_coverage_8": 0.00884,
+      "max_identifiers_shared": 0.11414,
+      "max_longest_run": 47,
+      "max_shape_longest_run": 143,
+      "median_coverage_8": 0.001275,
+      "median_identifiers_shared": 0.030395,
+      "median_longest_run": 11.5,
+      "median_shape_longest_run": 31.5
      }
     ],
     "replica_vs_upstream_floors": [
@@ -841,45 +877,45 @@
        "longest_run": 49,
        "shape_longest_run": 48
       },
-      "max_coverage_8": 0.0054,
-      "max_identifiers_shared": 0.18861,
+      "max_coverage_8": 0.01699,
+      "max_identifiers_shared": 0.19217,
       "max_longest_run": 16,
       "max_shape_longest_run": 37,
-      "median_coverage_8": 0.00314,
-      "median_identifiers_shared": 0.08897,
-      "median_longest_run": 10.0,
-      "median_shape_longest_run": 29.0
+      "median_coverage_8": 0.00427,
+      "median_identifiers_shared": 0.092525,
+      "median_longest_run": 11.0,
+      "median_shape_longest_run": 32.5
      },
      {
       "diagonal": {
-       "coverage_8": 0.0626,
-       "identifiers_shared": 0.23086,
+       "coverage_8": 0.05889,
+       "identifiers_shared": 0.22592,
        "longest_run": 132,
        "shape_longest_run": 143
       },
-      "max_coverage_8": 0.00175,
-      "max_identifiers_shared": 0.05926,
+      "max_coverage_8": 0.00165,
+      "max_identifiers_shared": 0.06307,
       "max_longest_run": 8,
       "max_shape_longest_run": 31,
-      "median_coverage_8": 0.0,
-      "median_identifiers_shared": 0.0284,
-      "median_longest_run": 7.0,
-      "median_shape_longest_run": 28.0
+      "median_coverage_8": 0.000355,
+      "median_identifiers_shared": 0.039565,
+      "median_longest_run": 7.5,
+      "median_shape_longest_run": 29.5
      },
      {
       "diagonal": {
-       "coverage_8": 0.08499,
-       "identifiers_shared": 0.1891,
+       "coverage_8": 0.07879,
+       "identifiers_shared": 0.18413,
        "longest_run": 54,
        "shape_longest_run": 54
       },
-      "max_coverage_8": 0.00241,
-      "max_identifiers_shared": 0.19872,
-      "max_longest_run": 13,
-      "max_shape_longest_run": 33,
-      "median_coverage_8": 0.00175,
-      "median_identifiers_shared": 0.04808,
-      "median_longest_run": 8.0,
+      "max_coverage_8": 0.00775,
+      "max_identifiers_shared": 0.2,
+      "max_longest_run": 45,
+      "max_shape_longest_run": 53,
+      "median_coverage_8": 0.002075,
+      "median_identifiers_shared": 0.079365,
+      "median_longest_run": 10.5,
       "median_shape_longest_run": 30.0
      },
      {
@@ -889,104 +925,121 @@
        "longest_run": 35,
        "shape_longest_run": 53
       },
-      "max_coverage_8": 0.00999,
-      "max_identifiers_shared": 0.15161,
-      "max_longest_run": 8,
-      "max_shape_longest_run": 34,
-      "median_coverage_8": 0.00188,
-      "median_identifiers_shared": 0.08387,
+      "max_coverage_8": 0.01187,
+      "max_identifiers_shared": 0.15806,
+      "max_longest_run": 34,
+      "max_shape_longest_run": 36,
+      "median_coverage_8": 0.006055,
+      "median_identifiers_shared": 0.07097,
       "median_longest_run": 8.0,
-      "median_shape_longest_run": 30.0
+      "median_shape_longest_run": 31.0
+     },
+     {
+      "diagonal": {
+       "coverage_8": 0.11509,
+       "identifiers_shared": 0.29696,
+       "longest_run": 1050,
+       "shape_longest_run": 1046
+      },
+      "max_coverage_8": 0.01875,
+      "max_identifiers_shared": 0.14227,
+      "max_longest_run": 48,
+      "max_shape_longest_run": 143,
+      "median_coverage_8": 0.00584,
+      "median_identifiers_shared": 0.061465000000000006,
+      "median_longest_run": 16.5,
+      "median_shape_longest_run": 34.5
      }
     ],
     "tools": [
      "automask",
      "afni-shared",
      "tshift",
-     "unifize"
+     "unifize",
+     "volreg"
     ]
    },
    "FSL": {
     "cleanroom_vs_replica_floors": [
      {
       "diagonal": {
-       "coverage_8": 0.24296,
-       "identifiers_shared": 0.60836,
+       "coverage_8": 0.24253,
+       "identifiers_shared": 0.62344,
        "longest_run": 87,
        "shape_longest_run": 79
       },
-      "max_coverage_8": 0.13427,
-      "max_identifiers_shared": 0.41253,
+      "max_coverage_8": 0.13214,
+      "max_identifiers_shared": 0.40898,
       "max_longest_run": 59,
       "max_shape_longest_run": 86,
-      "median_coverage_8": 0.057245,
-      "median_identifiers_shared": 0.28459500000000004,
-      "median_longest_run": 18.5,
-      "median_shape_longest_run": 32.0
+      "median_coverage_8": 0.04287,
+      "median_identifiers_shared": 0.2793,
+      "median_longest_run": 18.0,
+      "median_shape_longest_run": 31.0
      },
      {
       "diagonal": {
        "coverage_8": 0.09906,
-       "identifiers_shared": 0.31924,
+       "identifiers_shared": 0.3189,
        "longest_run": 37,
        "shape_longest_run": 94
       },
-      "max_coverage_8": 0.13657,
-      "max_identifiers_shared": 0.43446,
+      "max_coverage_8": 0.13665,
+      "max_identifiers_shared": 0.43717,
       "max_longest_run": 57,
       "max_shape_longest_run": 111,
-      "median_coverage_8": 0.05315,
-      "median_identifiers_shared": 0.18922,
-      "median_longest_run": 23.0,
-      "median_shape_longest_run": 48.5
+      "median_coverage_8": 0.04758,
+      "median_identifiers_shared": 0.17423,
+      "median_longest_run": 20.0,
+      "median_shape_longest_run": 47.0
      },
      {
       "diagonal": {
-       "coverage_8": 0.15105,
-       "identifiers_shared": 0.33599,
+       "coverage_8": 0.1508,
+       "identifiers_shared": 0.33597,
        "longest_run": 36,
        "shape_longest_run": 70
       },
-      "max_coverage_8": 0.15148,
-      "max_identifiers_shared": 0.41733,
+      "max_coverage_8": 0.15171,
+      "max_identifiers_shared": 0.4204,
       "max_longest_run": 48,
       "max_shape_longest_run": 133,
-      "median_coverage_8": 0.06319999999999999,
-      "median_identifiers_shared": 0.184795,
-      "median_longest_run": 24.5,
-      "median_shape_longest_run": 58.5
+      "median_coverage_8": 0.05761,
+      "median_identifiers_shared": 0.18206,
+      "median_longest_run": 24.0,
+      "median_shape_longest_run": 59.0
      },
      {
       "diagonal": {
-       "coverage_8": 0.11447,
-       "identifiers_shared": 0.35371,
+       "coverage_8": 0.11399,
+       "identifiers_shared": 0.3599,
        "longest_run": 25,
        "shape_longest_run": 58
       },
-      "max_coverage_8": 0.1534,
-      "max_identifiers_shared": 0.38231,
+      "max_coverage_8": 0.15223,
+      "max_identifiers_shared": 0.38303,
       "max_longest_run": 32,
       "max_shape_longest_run": 65,
-      "median_coverage_8": 0.061810000000000004,
-      "median_identifiers_shared": 0.19441,
-      "median_longest_run": 18.5,
-      "median_shape_longest_run": 58.5
+      "median_coverage_8": 0.06142,
+      "median_identifiers_shared": 0.18766,
+      "median_longest_run": 18.0,
+      "median_shape_longest_run": 58.0
      },
      {
       "diagonal": {
        "coverage_8": 0.0938,
-       "identifiers_shared": 0.36538,
+       "identifiers_shared": 0.36674,
        "longest_run": 35,
        "shape_longest_run": 55
       },
-      "max_coverage_8": 0.13738,
-      "max_identifiers_shared": 0.51496,
+      "max_coverage_8": 0.13781,
+      "max_identifiers_shared": 0.52239,
       "max_longest_run": 35,
       "max_shape_longest_run": 134,
-      "median_coverage_8": 0.08279,
-      "median_identifiers_shared": 0.30769,
-      "median_longest_run": 17.5,
-      "median_shape_longest_run": 51.5
+      "median_coverage_8": 0.07683,
+      "median_identifiers_shared": 0.30277,
+      "median_longest_run": 17.0,
+      "median_shape_longest_run": 49.0
      },
      {
       "diagonal": {
@@ -995,14 +1048,14 @@
        "longest_run": 33,
        "shape_longest_run": 53
       },
-      "max_coverage_8": 0.12975,
-      "max_identifiers_shared": 0.43508,
-      "max_longest_run": 22,
+      "max_coverage_8": 0.13048,
+      "max_identifiers_shared": 0.43622,
+      "max_longest_run": 30,
       "max_shape_longest_run": 64,
-      "median_coverage_8": 0.067705,
-      "median_identifiers_shared": 0.19248500000000002,
-      "median_longest_run": 20.5,
-      "median_shape_longest_run": 41.5
+      "median_coverage_8": 0.05714,
+      "median_identifiers_shared": 0.17654,
+      "median_longest_run": 21.0,
+      "median_shape_longest_run": 43.0
      },
      {
       "diagonal": {
@@ -1015,10 +1068,26 @@
       "max_identifiers_shared": 0.71711,
       "max_longest_run": 17,
       "max_shape_longest_run": 38,
-      "median_coverage_8": 0.08629999999999999,
-      "median_identifiers_shared": 0.49671,
+      "median_coverage_8": 0.08141,
+      "median_identifiers_shared": 0.48684,
       "median_longest_run": 15.0,
-      "median_shape_longest_run": 32.0
+      "median_shape_longest_run": 31.0
+     },
+     {
+      "diagonal": {
+       "coverage_8": 0.05019,
+       "identifiers_shared": 0.30612,
+       "longest_run": 23,
+       "shape_longest_run": 101
+      },
+      "max_coverage_8": 0.09363,
+      "max_identifiers_shared": 0.51701,
+      "max_longest_run": 24,
+      "max_shape_longest_run": 117,
+      "median_coverage_8": 0.04755,
+      "median_identifiers_shared": 0.322,
+      "median_longest_run": 18.0,
+      "median_shape_longest_run": 44.0
      },
      {
       "diagonal": {
@@ -1028,111 +1097,111 @@
        "shape_longest_run": 39
       },
       "max_coverage_8": 0.20086,
-      "max_identifiers_shared": 0.65665,
+      "max_identifiers_shared": 0.66094,
       "max_longest_run": 40,
       "max_shape_longest_run": 114,
-      "median_coverage_8": 0.06353,
-      "median_identifiers_shared": 0.40558,
-      "median_longest_run": 20.5,
-      "median_shape_longest_run": 40.5
+      "median_coverage_8": 0.06449,
+      "median_identifiers_shared": 0.37339,
+      "median_longest_run": 20.0,
+      "median_shape_longest_run": 40.0
      },
      {
       "diagonal": {
-       "coverage_8": 0.07118,
-       "identifiers_shared": 0.25345,
+       "coverage_8": 0.07051,
+       "identifiers_shared": 0.24666,
        "longest_run": 52,
        "shape_longest_run": 96
       },
-      "max_coverage_8": 0.13701,
-      "max_identifiers_shared": 0.43915,
-      "max_longest_run": 39,
+      "max_coverage_8": 0.13541,
+      "max_identifiers_shared": 0.44107,
+      "max_longest_run": 34,
       "max_shape_longest_run": 100,
-      "median_coverage_8": 0.049339999999999995,
-      "median_identifiers_shared": 0.210165,
-      "median_longest_run": 18.5,
-      "median_shape_longest_run": 74.0
+      "median_coverage_8": 0.04455,
+      "median_identifiers_shared": 0.20292,
+      "median_longest_run": 19.0,
+      "median_shape_longest_run": 71.0
      }
     ],
     "cleanroom_vs_upstream_floors": [
      {
       "diagonal": {
        "coverage_8": 0.0,
-       "identifiers_shared": 0.22977,
+       "identifiers_shared": 0.22444,
        "longest_run": 7,
        "shape_longest_run": 55
       },
       "max_coverage_8": 0.0,
-      "max_identifiers_shared": 0.12272,
+      "max_identifiers_shared": 0.1197,
       "max_longest_run": 7,
-      "max_shape_longest_run": 61,
+      "max_shape_longest_run": 63,
       "median_coverage_8": 0.0,
-      "median_identifiers_shared": 0.056135,
+      "median_identifiers_shared": 0.04738,
       "median_longest_run": 6.0,
-      "median_shape_longest_run": 20.5
+      "median_shape_longest_run": 22.0
      },
      {
       "diagonal": {
        "coverage_8": 0.00328,
-       "identifiers_shared": 0.12368,
+       "identifiers_shared": 0.12355,
        "longest_run": 30,
        "shape_longest_run": 32
       },
-      "max_coverage_8": 0.00933,
-      "max_identifiers_shared": 0.2093,
+      "max_coverage_8": 0.00934,
+      "max_identifiers_shared": 0.20908,
       "max_longest_run": 46,
       "max_shape_longest_run": 73,
-      "median_coverage_8": 0.00025,
-      "median_identifiers_shared": 0.039639999999999995,
-      "median_longest_run": 10.0,
+      "median_coverage_8": 0.0,
+      "median_identifiers_shared": 0.04118,
+      "median_longest_run": 7.0,
       "median_shape_longest_run": 31.0
      },
      {
       "diagonal": {
        "coverage_8": 0.00207,
-       "identifiers_shared": 0.12202,
+       "identifiers_shared": 0.12137,
        "longest_run": 13,
        "shape_longest_run": 33
       },
       "max_coverage_8": 0.00929,
-      "max_identifiers_shared": 0.22281,
+      "max_identifiers_shared": 0.22164,
       "max_longest_run": 14,
       "max_shape_longest_run": 155,
-      "median_coverage_8": 0.0014650000000000002,
-      "median_identifiers_shared": 0.04642,
+      "median_coverage_8": 0.00177,
+      "median_identifiers_shared": 0.04485,
       "median_longest_run": 9.0,
       "median_shape_longest_run": 31.0
      },
      {
       "diagonal": {
-       "coverage_8": 0.00197,
-       "identifiers_shared": 0.14694,
+       "coverage_8": 0.00195,
+       "identifiers_shared": 0.14524,
        "longest_run": 10,
        "shape_longest_run": 41
       },
-      "max_coverage_8": 0.00404,
-      "max_identifiers_shared": 0.21977,
+      "max_coverage_8": 0.004,
+      "max_identifiers_shared": 0.21851,
       "max_longest_run": 15,
-      "max_shape_longest_run": 38,
-      "median_coverage_8": 0.00024000000000000003,
-      "median_identifiers_shared": 0.04486,
+      "max_shape_longest_run": 39,
+      "median_coverage_8": 0.00016,
+      "median_identifiers_shared": 0.04113,
       "median_longest_run": 8.0,
       "median_shape_longest_run": 35.0
      },
      {
       "diagonal": {
        "coverage_8": 0.00034,
-       "identifiers_shared": 0.1047,
+       "identifiers_shared": 0.10448,
        "longest_run": 8,
        "shape_longest_run": 24
       },
       "max_coverage_8": 0.00218,
-      "max_identifiers_shared": 0.23718,
+      "max_identifiers_shared": 0.23667,
       "max_longest_run": 10,
       "max_shape_longest_run": 33,
       "median_coverage_8": 0.0,
-      "median_identifiers_shared": 0.07372000000000001,
+      "median_identifiers_shared": 0.06823,
       "median_longest_run": 7.0,
-      "median_shape_longest_run": 24.5
+      "median_shape_longest_run": 24.0
      },
      {
       "diagonal": {
@@ -1145,10 +1214,10 @@
       "max_identifiers_shared": 0.19818,
       "max_longest_run": 14,
       "max_shape_longest_run": 45,
-      "median_coverage_8": 0.001225,
-      "median_identifiers_shared": 0.05524,
+      "median_coverage_8": 0.00117,
+      "median_identifiers_shared": 0.0467,
       "median_longest_run": 9.0,
-      "median_shape_longest_run": 28.0
+      "median_shape_longest_run": 31.0
      },
      {
       "diagonal": {
@@ -1162,9 +1231,25 @@
       "max_longest_run": 9,
       "max_shape_longest_run": 34,
       "median_coverage_8": 0.0,
-      "median_identifiers_shared": 0.141445,
+      "median_identifiers_shared": 0.11842,
       "median_longest_run": 6.0,
-      "median_shape_longest_run": 22.5
+      "median_shape_longest_run": 22.0
+     },
+     {
+      "diagonal": {
+       "coverage_8": 0.00115,
+       "identifiers_shared": 0.08617,
+       "longest_run": 9,
+       "shape_longest_run": 28
+      },
+      "max_coverage_8": 0.00283,
+      "max_identifiers_shared": 0.21769,
+      "max_longest_run": 9,
+      "max_shape_longest_run": 36,
+      "median_coverage_8": 0.00115,
+      "median_identifiers_shared": 0.06349,
+      "median_longest_run": 9.0,
+      "median_shape_longest_run": 25.0
      },
      {
       "diagonal": {
@@ -1178,23 +1263,23 @@
       "max_longest_run": 8,
       "max_shape_longest_run": 22,
       "median_coverage_8": 0.0,
-      "median_identifiers_shared": 0.09442,
+      "median_identifiers_shared": 0.07725,
       "median_longest_run": 7.0,
       "median_shape_longest_run": 19.0
      },
      {
       "diagonal": {
-       "coverage_8": 0.00079,
-       "identifiers_shared": 0.04391,
+       "coverage_8": 0.00076,
+       "identifiers_shared": 0.04253,
        "longest_run": 10,
        "shape_longest_run": 35
       },
-      "max_coverage_8": 0.0088,
-      "max_identifiers_shared": 0.21957,
+      "max_coverage_8": 0.00874,
+      "max_identifiers_shared": 0.2175,
       "max_longest_run": 16,
       "max_shape_longest_run": 82,
-      "median_coverage_8": 0.001255,
-      "median_identifiers_shared": 0.06148,
+      "median_coverage_8": 0.0012,
+      "median_identifiers_shared": 0.04374,
       "median_longest_run": 9.0,
       "median_shape_longest_run": 28.0
      }
@@ -1202,19 +1287,19 @@
     "replica_vs_upstream_floors": [
      {
       "diagonal": {
-       "coverage_8": 0.06852,
-       "identifiers_shared": 0.35855,
+       "coverage_8": 0.06798,
+       "identifiers_shared": 0.35528,
        "longest_run": 89,
        "shape_longest_run": 113
       },
-      "max_coverage_8": 0.00582,
-      "max_identifiers_shared": 0.07524,
+      "max_coverage_8": 0.00576,
+      "max_identifiers_shared": 0.07412,
       "max_longest_run": 15,
-      "max_shape_longest_run": 87,
-      "median_coverage_8": 0.0018349999999999998,
-      "median_identifiers_shared": 0.040355,
-      "median_longest_run": 9.5,
-      "median_shape_longest_run": 47.0
+      "max_shape_longest_run": 89,
+      "median_coverage_8": 0.00225,
+      "median_identifiers_shared": 0.03478,
+      "median_longest_run": 10.0,
+      "median_shape_longest_run": 32.0
      },
      {
       "diagonal": {
@@ -1227,9 +1312,9 @@
       "max_identifiers_shared": 0.21379,
       "max_longest_run": 20,
       "max_shape_longest_run": 55,
-      "median_coverage_8": 0.002265,
-      "median_identifiers_shared": 0.067585,
-      "median_longest_run": 11.0,
+      "median_coverage_8": 0.00236,
+      "median_identifiers_shared": 0.06621,
+      "median_longest_run": 10.0,
       "median_shape_longest_run": 25.0
      },
      {
@@ -1243,24 +1328,24 @@
       "max_identifiers_shared": 0.25867,
       "max_longest_run": 29,
       "max_shape_longest_run": 49,
-      "median_coverage_8": 0.00318,
-      "median_identifiers_shared": 0.067945,
+      "median_coverage_8": 0.00187,
+      "median_identifiers_shared": 0.05998,
       "median_longest_run": 10.0,
-      "median_shape_longest_run": 35.5
+      "median_shape_longest_run": 34.0
      },
      {
       "diagonal": {
-       "coverage_8": 0.07924,
-       "identifiers_shared": 0.43581,
+       "coverage_8": 0.07876,
+       "identifiers_shared": 0.43072,
        "longest_run": 69,
        "shape_longest_run": 92
       },
-      "max_coverage_8": 0.02594,
-      "max_identifiers_shared": 0.29561,
+      "max_coverage_8": 0.02578,
+      "max_identifiers_shared": 0.29215,
       "max_longest_run": 43,
       "max_shape_longest_run": 61,
-      "median_coverage_8": 0.001745,
-      "median_identifiers_shared": 0.048990000000000006,
+      "median_coverage_8": 0.0017,
+      "median_identifiers_shared": 0.05008,
       "median_longest_run": 10.0,
       "median_shape_longest_run": 31.0
      },
@@ -1275,10 +1360,10 @@
       "max_identifiers_shared": 0.24726,
       "max_longest_run": 9,
       "max_shape_longest_run": 38,
-      "median_coverage_8": 0.002015,
-      "median_identifiers_shared": 0.09956000000000001,
-      "median_longest_run": 8.5,
-      "median_shape_longest_run": 23.5
+      "median_coverage_8": 0.00236,
+      "median_identifiers_shared": 0.0919,
+      "median_longest_run": 8.0,
+      "median_shape_longest_run": 26.0
      },
      {
       "diagonal": {
@@ -1291,10 +1376,10 @@
       "max_identifiers_shared": 0.27706,
       "max_longest_run": 13,
       "max_shape_longest_run": 31,
-      "median_coverage_8": 0.001105,
-      "median_identifiers_shared": 0.08441499999999999,
+      "median_coverage_8": 0.00165,
+      "median_identifiers_shared": 0.08225,
       "median_longest_run": 9.0,
-      "median_shape_longest_run": 24.0
+      "median_shape_longest_run": 23.0
      },
      {
       "diagonal": {
@@ -1307,10 +1392,26 @@
       "max_identifiers_shared": 0.32189,
       "max_longest_run": 10,
       "max_shape_longest_run": 29,
-      "median_coverage_8": 0.0018,
-      "median_identifiers_shared": 0.139485,
+      "median_coverage_8": 0.0016,
+      "median_identifiers_shared": 0.13734,
       "median_longest_run": 8.0,
-      "median_shape_longest_run": 20.0
+      "median_shape_longest_run": 18.0
+     },
+     {
+      "diagonal": {
+       "coverage_8": 0.04463,
+       "identifiers_shared": 0.34118,
+       "longest_run": 21,
+       "shape_longest_run": 31
+      },
+      "max_coverage_8": 0.03614,
+      "max_identifiers_shared": 0.26471,
+      "max_longest_run": 11,
+      "max_shape_longest_run": 37,
+      "median_coverage_8": 0.01415,
+      "median_identifiers_shared": 0.09706,
+      "median_longest_run": 10.0,
+      "median_shape_longest_run": 25.0
      },
      {
       "diagonal": {
@@ -1324,7 +1425,7 @@
       "max_longest_run": 8,
       "max_shape_longest_run": 23,
       "median_coverage_8": 0.0,
-      "median_identifiers_shared": 0.09748500000000002,
+      "median_identifiers_shared": 0.08176,
       "median_longest_run": 6.0,
       "median_shape_longest_run": 22.0
      },
@@ -1339,9 +1440,9 @@
       "max_identifiers_shared": 0.29536,
       "max_longest_run": 17,
       "max_shape_longest_run": 112,
-      "median_coverage_8": 0.00347,
-      "median_identifiers_shared": 0.094935,
-      "median_longest_run": 8.5,
+      "median_coverage_8": 0.00324,
+      "median_identifiers_shared": 0.08228,
+      "median_longest_run": 8.0,
       "median_shape_longest_run": 24.0
      }
     ],
@@ -1353,6 +1454,7 @@
      "fast",
      "fslmaths",
      "fslroi",
+     "prelude",
      "standard_space_roi",
      "hmc"
     ]
@@ -1513,6 +1615,65 @@
      "sincos_glibc",
      "tanh_glibc"
     ]
+   },
+   "tedana": {
+    "cleanroom_vs_replica_floors": [
+     {
+      "diagonal": {
+       "coverage_8": 0.23467,
+       "identifiers_shared": 0.51004,
+       "longest_run": 94,
+       "shape_longest_run": 97
+      },
+      "max_coverage_8": null,
+      "max_identifiers_shared": null,
+      "max_longest_run": null,
+      "max_shape_longest_run": null,
+      "median_coverage_8": null,
+      "median_identifiers_shared": null,
+      "median_longest_run": null,
+      "median_shape_longest_run": null
+     }
+    ],
+    "cleanroom_vs_upstream_floors": [
+     {
+      "diagonal": {
+       "coverage_8": 0.0,
+       "identifiers_shared": 0.14994,
+       "longest_run": 6,
+       "shape_longest_run": 19
+      },
+      "max_coverage_8": null,
+      "max_identifiers_shared": null,
+      "max_longest_run": null,
+      "max_shape_longest_run": null,
+      "median_coverage_8": null,
+      "median_identifiers_shared": null,
+      "median_longest_run": null,
+      "median_shape_longest_run": null
+     }
+    ],
+    "replica_vs_upstream_floors": [
+     {
+      "diagonal": {
+       "coverage_8": 0.00047,
+       "identifiers_shared": 0.20422,
+       "longest_run": 13,
+       "shape_longest_run": 19
+      },
+      "max_coverage_8": null,
+      "max_identifiers_shared": null,
+      "max_longest_run": null,
+      "max_shape_longest_run": null,
+      "median_coverage_8": null,
+      "median_identifiers_shared": null,
+      "median_longest_run": null,
+      "median_shape_longest_run": null
+     }
+    ],
+    "tools": [
+     "t2smap"
+    ]
    }
   },
   "method": {
@@ -1537,12 +1698,12 @@
    "AFNI/afni-shared": {
     "cleanroom": {
      "files": 14,
-     "tokens": 18416
+     "tokens": 20682
     },
     "cleanroom_vs_replica": {
-     "identifiers_shared": 0.63322,
+     "identifiers_shared": 0.63455,
      "names": {
-      "coverage_8": 0.36322,
+      "coverage_8": 0.34049,
       "longest_run": {
        "ours": {
         "file": "crates/larmorx-afni/src/geometry.rs",
@@ -1563,9 +1724,9 @@
      }
     },
     "cleanroom_vs_upstream": {
-     "identifiers_shared": 0.18339,
+     "identifiers_shared": 0.18771,
      "names": {
-      "coverage_8": 0.03443,
+      "coverage_8": 0.0323,
       "longest_run": {
        "ours": {
         "file": "crates/larmorx-afni/src/geometry.rs",
@@ -1588,9 +1749,9 @@
     "family": "AFNI",
     "name": "larmorx-afni's shared code (datasets, FFT, messages, options)",
     "replica_vs_upstream": {
-     "identifiers_shared": 0.24568,
+     "identifiers_shared": 0.25229,
      "names": {
-      "coverage_8": 0.0626,
+      "coverage_8": 0.05913,
       "longest_run": {
        "ours": {
         "file": "crates/larmorx-afni-replica/src/csfft.rs",
@@ -1618,9 +1779,9 @@
      "tokens": 13716
     },
     "cleanroom_vs_replica": {
-     "identifiers_shared": 0.57441,
+     "identifiers_shared": 0.61097,
      "names": {
-      "coverage_8": 0.2056,
+      "coverage_8": 0.22769,
       "longest_run": {
        "ours": {
         "file": "crates/larmorx-afni/src/automask/program.rs",
@@ -1641,7 +1802,7 @@
      }
     },
     "cleanroom_vs_upstream": {
-     "identifiers_shared": 0.17755,
+     "identifiers_shared": 0.19321,
      "names": {
       "coverage_8": 0.01086,
       "longest_run": {
@@ -1666,9 +1827,9 @@
     "family": "AFNI",
     "name": "3dAutomask",
     "replica_vs_upstream": {
-     "identifiers_shared": 0.35587,
+     "identifiers_shared": 0.37011,
      "names": {
-      "coverage_8": 0.07216,
+      "coverage_8": 0.07565,
       "longest_run": {
        "ours": {
         "file": "crates/larmorx-afni-replica/src/mask.rs",
@@ -1693,18 +1854,18 @@
    "AFNI/tshift": {
     "cleanroom": {
      "files": 3,
-     "tokens": 8151
+     "tokens": 8197
     },
     "cleanroom_vs_replica": {
-     "identifiers_shared": 0.65152,
+     "identifiers_shared": 0.67976,
      "names": {
-      "coverage_8": 0.23396,
+      "coverage_8": 0.2557,
       "longest_run": {
        "ours": {
         "file": "crates/larmorx-afni/src/cli/tshift.rs",
         "lines": [
-         199,
-         200
+         213,
+         214
         ]
        },
        "theirs": {
@@ -1719,7 +1880,7 @@
      }
     },
     "cleanroom_vs_upstream": {
-     "identifiers_shared": 0.17273,
+     "identifiers_shared": 0.18429,
      "names": {
       "coverage_8": 0.0,
       "longest_run": {
@@ -1744,15 +1905,15 @@
     "family": "AFNI",
     "name": "3dTshift",
     "replica_vs_upstream": {
-     "identifiers_shared": 0.27885,
+     "identifiers_shared": 0.28889,
      "names": {
-      "coverage_8": 0.0874,
+      "coverage_8": 0.08806,
       "longest_run": {
        "ours": {
         "file": "crates/larmorx-afni-replica/src/shift.rs",
         "lines": [
-         257,
-         262
+         268,
+         273
         ]
        },
        "theirs": {
@@ -1774,9 +1935,9 @@
      "tokens": 9802
     },
     "cleanroom_vs_replica": {
-     "identifiers_shared": 0.64198,
+     "identifiers_shared": 0.66049,
      "names": {
-      "coverage_8": 0.20628,
+      "coverage_8": 0.23342,
       "longest_run": {
        "ours": {
         "file": "crates/larmorx-afni/src/unifize/duplo.rs",
@@ -1797,9 +1958,9 @@
      }
     },
     "cleanroom_vs_upstream": {
-     "identifiers_shared": 0.16975,
+     "identifiers_shared": 0.1821,
      "names": {
-      "coverage_8": 0.00173,
+      "coverage_8": 0.00255,
       "longest_run": {
        "ours": {
         "file": "crates/larmorx-afni/src/unifize/mod.rs",
@@ -1822,9 +1983,9 @@
     "family": "AFNI",
     "name": "3dUnifize",
     "replica_vs_upstream": {
-     "identifiers_shared": 0.3,
+     "identifiers_shared": 0.30968,
      "names": {
-      "coverage_8": 0.06536,
+      "coverage_8": 0.06712,
       "longest_run": {
        "ours": {
         "file": "crates/larmorx-afni-replica/src/unifize.rs",
@@ -1846,15 +2007,93 @@
     },
     "tool": "unifize"
    },
+   "AFNI/volreg": {
+    "cleanroom": {
+     "files": 12,
+     "tokens": 47421
+    },
+    "cleanroom_vs_replica": {
+     "identifiers_shared": 0.49504,
+     "names": {
+      "coverage_8": 0.20143,
+      "longest_run": {
+       "ours": {
+        "file": "crates/larmorx-afni/src/volreg/grid.rs",
+        "lines": [
+         246,
+         250
+        ]
+       },
+       "theirs": {
+        "file": "crates/larmorx-afni-replica/src/axes.rs",
+        "lines": [
+         86,
+         90
+        ]
+       },
+       "tokens": 145
+      }
+     }
+    },
+    "cleanroom_vs_upstream": {
+     "identifiers_shared": 0.15261,
+     "names": {
+      "coverage_8": 0.01238,
+      "longest_run": {
+       "ours": {
+        "file": "crates/larmorx-afni/src/volreg/rotate.rs",
+        "lines": [
+         77,
+         77
+        ]
+       },
+       "theirs": {
+        "file": "AFNI 26.3.05 src/3ddata.h",
+        "lines": [
+         2157,
+         2158
+        ]
+       },
+       "tokens": 47
+      }
+     }
+    },
+    "family": "AFNI",
+    "name": "3dvolreg",
+    "replica_vs_upstream": {
+     "identifiers_shared": 0.37707,
+     "names": {
+      "coverage_8": 0.12899,
+      "longest_run": {
+       "ours": {
+        "file": "crates/larmorx-afni-replica/src/shear.rs",
+        "lines": [
+         208,
+         366
+        ]
+       },
+       "theirs": {
+        "file": "AFNI 26.3.05 src/thd_shear3d.c",
+        "lines": [
+         308,
+         405
+        ]
+       },
+       "tokens": 1050
+      }
+     }
+    },
+    "tool": "volreg"
+   },
    "FSL/bet": {
     "cleanroom": {
      "files": 17,
-     "tokens": 50355
+     "tokens": 50341
     },
     "cleanroom_vs_replica": {
-     "identifiers_shared": 0.58245,
+     "identifiers_shared": 0.58289,
      "names": {
-      "coverage_8": 0.2533,
+      "coverage_8": 0.25421,
       "longest_run": {
        "ours": {
         "file": "crates/larmorx-fsl/src/bet/quatern.rs",
@@ -1875,7 +2114,7 @@
      }
     },
     "cleanroom_vs_upstream": {
-     "identifiers_shared": 0.29387,
+     "identifiers_shared": 0.29461,
      "names": {
       "coverage_8": 0.01577,
       "longest_run": {
@@ -1927,12 +2166,12 @@
    "FSL/fast": {
     "cleanroom": {
      "files": 9,
-     "tokens": 23402
+     "tokens": 23401
     },
     "cleanroom_vs_replica": {
-     "identifiers_shared": 0.65812,
+     "identifiers_shared": 0.66525,
      "names": {
-      "coverage_8": 0.23806,
+      "coverage_8": 0.23982,
       "longest_run": {
        "ours": {
         "file": "crates/larmorx-fsl/src/fast/stats.rs",
@@ -1953,7 +2192,7 @@
      }
     },
     "cleanroom_vs_upstream": {
-     "identifiers_shared": 0.31197,
+     "identifiers_shared": 0.3177,
      "names": {
       "coverage_8": 0.00252,
       "longest_run": {
@@ -1978,7 +2217,7 @@
     "family": "FSL",
     "name": "FAST",
     "replica_vs_upstream": {
-     "identifiers_shared": 0.48578,
+     "identifiers_shared": 0.49015,
      "names": {
       "coverage_8": 0.04503,
       "longest_run": {
@@ -2005,12 +2244,12 @@
    "FSL/flirt": {
     "cleanroom": {
      "files": 28,
-     "tokens": 76718
+     "tokens": 76738
     },
     "cleanroom_vs_replica": {
-     "identifiers_shared": 0.57118,
+     "identifiers_shared": 0.57432,
      "names": {
-      "coverage_8": 0.27303,
+      "coverage_8": 0.27453,
       "longest_run": {
        "ours": {
         "file": "crates/larmorx-fsl/src/flirt/schedule.rs",
@@ -2031,7 +2270,7 @@
      }
     },
     "cleanroom_vs_upstream": {
-     "identifiers_shared": 0.30504,
+     "identifiers_shared": 0.30431,
      "names": {
       "coverage_8": 0.01419,
       "longest_run": {
@@ -2083,12 +2322,12 @@
    "FSL/fsl-shared": {
     "cleanroom": {
      "files": 7,
-     "tokens": 9302
+     "tokens": 9611
     },
     "cleanroom_vs_replica": {
-     "identifiers_shared": 0.70496,
+     "identifiers_shared": 0.71322,
      "names": {
-      "coverage_8": 0.35078,
+      "coverage_8": 0.34887,
       "longest_run": {
        "ours": {
         "file": "crates/larmorx-fsl/src/cli/options.rs",
@@ -2109,7 +2348,7 @@
      }
     },
     "cleanroom_vs_upstream": {
-     "identifiers_shared": 0.32637,
+     "identifiers_shared": 0.32419,
      "names": {
       "coverage_8": 0.0,
       "longest_run": {
@@ -2134,9 +2373,9 @@
     "family": "FSL",
     "name": "larmorx-fsl's shared code (images, options, messages, data)",
     "replica_vs_upstream": {
-     "identifiers_shared": 0.3926,
+     "identifiers_shared": 0.39006,
      "names": {
-      "coverage_8": 0.07131,
+      "coverage_8": 0.07075,
       "longest_run": {
        "ours": {
         "file": "crates-nc/larmorx-nc-core/src/costfns.rs",
@@ -2161,12 +2400,12 @@
    "FSL/fslmaths": {
     "cleanroom": {
      "files": 15,
-     "tokens": 56193
+     "tokens": 56192
     },
     "cleanroom_vs_replica": {
-     "identifiers_shared": 0.58656,
+     "identifiers_shared": 0.5877,
      "names": {
-      "coverage_8": 0.23211,
+      "coverage_8": 0.23647,
       "longest_run": {
        "ours": {
         "file": "crates/larmorx-fsl/src/maths/ops.rs",
@@ -2212,9 +2451,9 @@
     "family": "FSL",
     "name": "fslmaths and fslstats",
     "replica_vs_upstream": {
-     "identifiers_shared": 0.43434,
+     "identifiers_shared": 0.43723,
      "names": {
-      "coverage_8": 0.03006,
+      "coverage_8": 0.03032,
       "longest_run": {
        "ours": {
         "file": "crates-nc/larmorx-nc-core/src/cprob.rs",
@@ -2244,7 +2483,7 @@
     "cleanroom_vs_replica": {
      "identifiers_shared": 0.75658,
      "names": {
-      "coverage_8": 0.23601,
+      "coverage_8": 0.2364,
       "longest_run": {
        "ours": {
         "file": "crates/larmorx-fsl/src/cli/fslroi.rs",
@@ -2317,18 +2556,18 @@
    "FSL/hmc": {
     "cleanroom": {
      "files": 19,
-     "tokens": 33055
+     "tokens": 34208
     },
     "cleanroom_vs_replica": {
-     "identifiers_shared": 0.57465,
+     "identifiers_shared": 0.56987,
      "names": {
-      "coverage_8": 0.23564,
+      "coverage_8": 0.23459,
       "longest_run": {
        "ours": {
         "file": "crates/larmorx-mri/src/cli/hmc.rs",
         "lines": [
-         353,
-         370
+         355,
+         372
         ]
        },
        "theirs": {
@@ -2343,9 +2582,9 @@
      }
     },
     "cleanroom_vs_upstream": {
-     "identifiers_shared": 0.27604,
+     "identifiers_shared": 0.27339,
      "names": {
-      "coverage_8": 0.01007,
+      "coverage_8": 0.00997,
       "longest_run": {
        "ours": {
         "file": "crates/larmorx-mri/src/hmc/rigid.rs",
@@ -2391,6 +2630,84 @@
      }
     },
     "tool": "hmc"
+   },
+   "FSL/prelude": {
+    "cleanroom": {
+     "files": 6,
+     "tokens": 14825
+    },
+    "cleanroom_vs_replica": {
+     "identifiers_shared": 0.65306,
+     "names": {
+      "coverage_8": 0.19379,
+      "longest_run": {
+       "ours": {
+        "file": "crates/larmorx-fsl/src/cli/prelude.rs",
+        "lines": [
+         7,
+         11
+        ]
+       },
+       "theirs": {
+        "file": "crates-nc/larmorx-nc-flirt/src/avscale.rs",
+        "lines": [
+         11,
+         15
+        ]
+       },
+       "tokens": 24
+      }
+     }
+    },
+    "cleanroom_vs_upstream": {
+     "identifiers_shared": 0.29705,
+     "names": {
+      "coverage_8": 0.00283,
+      "longest_run": {
+       "ours": {
+        "file": "crates/larmorx-fsl/src/prelude/volume.rs",
+        "lines": [
+         331,
+         331
+        ]
+       },
+       "theirs": {
+        "file": "crates-nc/fsl-source/fsl-newimage/costfns.cc",
+        "lines": [
+         3659,
+         3659
+        ]
+       },
+       "tokens": 9
+      }
+     }
+    },
+    "family": "FSL",
+    "name": "prelude (phase unwrapping)",
+    "replica_vs_upstream": {
+     "identifiers_shared": 0.5,
+     "names": {
+      "coverage_8": 0.06029,
+      "longest_run": {
+       "ours": {
+        "file": "crates-nc/larmorx-nc-fugue/src/unwarpfns.rs",
+        "lines": [
+         236,
+         239
+        ]
+       },
+       "theirs": {
+        "file": "crates-nc/fsl-source/fsl-fugue/unwarpfns.cc",
+        "lines": [
+         821,
+         824
+        ]
+       },
+       "tokens": 21
+      }
+     }
+    },
+    "tool": "prelude"
    },
    "FSL/standard_space_roi": {
     "cleanroom": {
@@ -2472,13 +2789,13 @@
    },
    "FSL/topup": {
     "cleanroom": {
-     "files": 13,
-     "tokens": 49708
+     "files": 14,
+     "tokens": 50225
     },
     "cleanroom_vs_replica": {
-     "identifiers_shared": 0.53316,
+     "identifiers_shared": 0.53856,
      "names": {
-      "coverage_8": 0.23159,
+      "coverage_8": 0.23188,
       "longest_run": {
        "ours": {
         "file": "crates/larmorx-fsl/src/topup/model.rs",
@@ -2499,9 +2816,9 @@
      }
     },
     "cleanroom_vs_upstream": {
-     "identifiers_shared": 0.30169,
+     "identifiers_shared": 0.30077,
      "names": {
-      "coverage_8": 0.0066,
+      "coverage_8": 0.00653,
       "longest_run": {
        "ours": {
         "file": "crates/larmorx-fsl/src/topup/apply.rs",
@@ -2524,15 +2841,15 @@
     "family": "FSL",
     "name": "topup and applytopup",
     "replica_vs_upstream": {
-     "identifiers_shared": 0.58784,
+     "identifiers_shared": 0.5818,
      "names": {
-      "coverage_8": 0.0995,
+      "coverage_8": 0.09889,
       "longest_run": {
        "ours": {
         "file": "crates-nc/larmorx-nc-topup/src/topup.rs",
         "lines": [
-         150,
-         155
+         165,
+         170
         ]
        },
        "theirs": {
@@ -2781,6 +3098,84 @@
      }
     },
     "tool": "tanh_glibc"
+   },
+   "tedana/t2smap": {
+    "cleanroom": {
+     "files": 15,
+     "tokens": 32931
+    },
+    "cleanroom_vs_replica": {
+     "identifiers_shared": 0.51004,
+     "names": {
+      "coverage_8": 0.23467,
+      "longest_run": {
+       "ours": {
+        "file": "crates/larmorx-tedana/src/cli.rs",
+        "lines": [
+         209,
+         229
+        ]
+       },
+       "theirs": {
+        "file": "crates-gpl/larmorx-gpl-tedana/src/parser.rs",
+        "lines": [
+         163,
+         183
+        ]
+       },
+       "tokens": 94
+      }
+     }
+    },
+    "cleanroom_vs_upstream": {
+     "identifiers_shared": 0.14994,
+     "names": {
+      "coverage_8": 0.0,
+      "longest_run": {
+       "ours": {
+        "file": "crates/larmorx-tedana/src/input.rs",
+        "lines": [
+         215,
+         215
+        ]
+       },
+       "theirs": {
+        "file": "tags/tedana-26.0.3/tedana/combine.py",
+        "lines": [
+         211,
+         211
+        ]
+       },
+       "tokens": 6
+      }
+     }
+    },
+    "family": "tedana",
+    "name": "t2smap (tedana's T2* and S0 maps, larmorx-tedana)",
+    "replica_vs_upstream": {
+     "identifiers_shared": 0.20422,
+     "names": {
+      "coverage_8": 0.00047,
+      "longest_run": {
+       "ours": {
+        "file": "crates-gpl/larmorx-gpl-tedana/src/workflow.rs",
+        "lines": [
+         139,
+         139
+        ]
+       },
+       "theirs": {
+        "file": "tags/tedana-26.0.3/tedana/utils.py",
+        "lines": [
+         866,
+         866
+        ]
+       },
+       "tokens": 13
+      }
+     }
+    },
+    "tool": "t2smap"
    }
   },
   "wide": {
@@ -2789,7 +3184,7 @@
     "floor": {
      "FSL/bet": {
       "names": {
-       "coverage_8": 0.0393
+       "coverage_8": 0.03931
       }
      },
      "FSL/fast": {
@@ -2799,17 +3194,17 @@
      },
      "FSL/flirt": {
       "names": {
-       "coverage_8": 0.05458
+       "coverage_8": 0.05456
       }
      },
      "FSL/fsl-shared": {
       "names": {
-       "coverage_8": 0.0186
+       "coverage_8": 0.018
       }
      },
      "FSL/fslmaths": {
       "names": {
-       "coverage_8": 0.0224
+       "coverage_8": 0.02241
       }
      },
      "FSL/fslroi": {
@@ -2819,7 +3214,12 @@
      },
      "FSL/hmc": {
       "names": {
-       "coverage_8": 0.03137
+       "coverage_8": 0.03078
+      }
+     },
+     "FSL/prelude": {
+      "names": {
+       "coverage_8": 0.01309
       }
      },
      "FSL/standard_space_roi": {
@@ -2829,7 +3229,7 @@
      },
      "FSL/topup": {
       "names": {
-       "coverage_8": 0.03436
+       "coverage_8": 0.03385
       }
      },
      "GNU/cbrtf_glibc": {
@@ -2846,12 +3246,17 @@
       "names": {
        "coverage_8": 0.00958
       }
+     },
+     "tedana/t2smap": {
+      "names": {
+       "coverage_8": 0.01901
+      }
      }
     },
     "replicas": {
      "AFNI/afni-shared": {
       "names": {
-       "coverage_8": 0.08574
+       "coverage_8": 0.08281
       }
      },
      "AFNI/automask": {
@@ -2861,21 +3266,26 @@
      },
      "AFNI/tshift": {
       "names": {
-       "coverage_8": 0.09385
+       "coverage_8": 0.09363
       }
      },
      "AFNI/unifize": {
       "names": {
        "coverage_8": 0.07946
       }
+     },
+     "AFNI/volreg": {
+      "names": {
+       "coverage_8": 0.18163
+      }
      }
     },
     "tokens": 7577567,
     "tools": {
      "AFNI/afni-shared": {
-      "identifiers_shared": 0.48789,
+      "identifiers_shared": 0.47841,
       "names": {
-       "coverage_8": 0.05881,
+       "coverage_8": 0.05241,
        "longest_run": {
         "ours": {
          "file": "crates/larmorx-afni/src/geometry.rs",
@@ -2919,15 +3329,15 @@
       }
      },
      "AFNI/tshift": {
-      "identifiers_shared": 0.54848,
+      "identifiers_shared": 0.54683,
       "names": {
-       "coverage_8": 0.00871,
+       "coverage_8": 0.00866,
        "longest_run": {
         "ours": {
          "file": "crates/larmorx-afni/src/cli/tshift.rs",
          "lines": [
-          340,
-          342
+          354,
+          356
          ]
         },
         "theirs": {
@@ -2963,6 +3373,29 @@
         "tokens": 16
        }
       }
+     },
+     "AFNI/volreg": {
+      "identifiers_shared": 0.4603,
+      "names": {
+       "coverage_8": 0.05538,
+       "longest_run": {
+        "ours": {
+         "file": "crates/larmorx-afni/src/volreg/rotate.rs",
+         "lines": [
+          77,
+          77
+         ]
+        },
+        "theirs": {
+         "file": "AFNI 26.3.05 src/3ddata.h",
+         "lines": [
+          2157,
+          2158
+         ]
+        },
+        "tokens": 47
+       }
+      }
      }
     }
    },
@@ -2971,7 +3404,7 @@
     "floor": {
      "AFNI/afni-shared": {
       "names": {
-       "coverage_8": 0.04007
+       "coverage_8": 0.03568
       }
      },
      "AFNI/automask": {
@@ -2981,12 +3414,17 @@
      },
      "AFNI/tshift": {
       "names": {
-       "coverage_8": 0.00294
+       "coverage_8": 0.00293
       }
      },
      "AFNI/unifize": {
       "names": {
        "coverage_8": 0.02918
+      }
+     },
+     "AFNI/volreg": {
+      "names": {
+       "coverage_8": 0.02883
       }
      },
      "GNU/cbrtf_glibc": {
@@ -3002,6 +3440,11 @@
      "GNU/tanh_glibc": {
       "names": {
        "coverage_8": 0.01198
+      }
+     },
+     "tedana/t2smap": {
+      "names": {
+       "coverage_8": 0.01187
       }
      }
     },
@@ -3023,7 +3466,7 @@
      },
      "FSL/fsl-shared": {
       "names": {
-       "coverage_8": 0.0924
+       "coverage_8": 0.09159
       }
      },
      "FSL/fslmaths": {
@@ -3041,6 +3484,11 @@
        "coverage_8": 0.02145
       }
      },
+     "FSL/prelude": {
+      "names": {
+       "coverage_8": 0.07143
+      }
+     },
      "FSL/standard_space_roi": {
       "names": {
        "coverage_8": 0.02011
@@ -3048,16 +3496,16 @@
      },
      "FSL/topup": {
       "names": {
-       "coverage_8": 0.11631
+       "coverage_8": 0.1156
       }
      }
     },
     "tokens": 3526125,
     "tools": {
      "FSL/bet": {
-      "identifiers_shared": 0.42918,
+      "identifiers_shared": 0.42872,
       "names": {
-       "coverage_8": 0.02939,
+       "coverage_8": 0.0294,
        "longest_run": {
         "ours": {
          "file": "crates/larmorx-fsl/src/bet/quatern.rs",
@@ -3078,7 +3526,7 @@
       }
      },
      "FSL/fast": {
-      "identifiers_shared": 0.4765,
+      "identifiers_shared": 0.47761,
       "names": {
        "coverage_8": 0.00799,
        "longest_run": {
@@ -3101,9 +3549,9 @@
       }
      },
      "FSL/flirt": {
-      "identifiers_shared": 0.44385,
+      "identifiers_shared": 0.44151,
       "names": {
-       "coverage_8": 0.03642,
+       "coverage_8": 0.03641,
        "longest_run": {
         "ours": {
          "file": "crates/larmorx-fsl/src/flirt/programs.rs",
@@ -3124,9 +3572,9 @@
       }
      },
      "FSL/fsl-shared": {
-      "identifiers_shared": 0.4282,
+      "identifiers_shared": 0.43142,
       "names": {
-       "coverage_8": 0.00559,
+       "coverage_8": 0.00541,
        "longest_run": {
         "ours": {
          "file": "crates/larmorx-fsl/src/cli/options.rs",
@@ -3193,9 +3641,9 @@
       }
      },
      "FSL/hmc": {
-      "identifiers_shared": 0.42033,
+      "identifiers_shared": 0.41677,
       "names": {
-       "coverage_8": 0.0232,
+       "coverage_8": 0.02266,
        "longest_run": {
         "ours": {
          "file": "crates/larmorx-mri/src/hmc/volume.rs",
@@ -3212,6 +3660,29 @@
          ]
         },
         "tokens": 18
+       }
+      }
+     },
+     "FSL/prelude": {
+      "identifiers_shared": 0.43991,
+      "names": {
+       "coverage_8": 0.01221,
+       "longest_run": {
+        "ours": {
+         "file": "crates/larmorx-fsl/src/prelude/components.rs",
+         "lines": [
+          63,
+          64
+         ]
+        },
+        "theirs": {
+         "file": "FSL 6.0.7.23 fsl-fabber_core/rundata_array.cc",
+         "lines": [
+          107,
+          109
+         ]
+        },
+        "tokens": 10
        }
       }
      },
@@ -3239,9 +3710,9 @@
       }
      },
      "FSL/topup": {
-      "identifiers_shared": 0.45514,
+      "identifiers_shared": 0.45373,
       "names": {
-       "coverage_8": 0.01877,
+       "coverage_8": 0.01858,
        "longest_run": {
         "ours": {
          "file": "crates/larmorx-fsl/src/cli/applytopup.rs",
@@ -4477,33 +4948,33 @@
    "similarity": {
     "files": 3,
     "replica": {
-     "coverage_8": 0.15336,
-     "identifiers_shared": 0.45152,
+     "coverage_8": 0.15542,
+     "identifiers_shared": 0.45317,
      "longest_run": 45,
      "shape_longest_run": 151
     },
     "replica_floor": {
-     "max": 0.12833,
-     "max_run": 29,
-     "median": 0.09729
+     "max": 0.13005,
+     "max_run": 34,
+     "median": 0.11193
     },
     "replica_upstream": {
-     "coverage_8": 0.08499,
-     "identifiers_shared": 0.1891,
+     "coverage_8": 0.07879,
+     "identifiers_shared": 0.18413,
      "longest_run": 54,
      "shape_longest_run": 54
     },
-    "tokens": 8151,
+    "tokens": 8197,
     "tree": {
-     "coverage_8": 0.00871,
+     "coverage_8": 0.00866,
      "family": "AFNI",
-     "floor_max": 0.05458,
+     "floor_max": 0.05456,
      "longest_run": 10,
-     "replica": 0.09385
+     "replica": 0.09363
     },
     "upstream": {
      "coverage_8": 0.0,
-     "identifiers_shared": 0.06364,
+     "identifiers_shared": 0.06344,
      "longest_run": 7,
      "shape_longest_run": 29
     },
@@ -4777,9 +5248,9 @@
      "shape_longest_run": 48
     },
     "replica_floor": {
-     "max": 0.11089,
+     "max": 0.11498,
      "max_run": 63,
-     "median": 0.09004
+     "median": 0.09755
     },
     "replica_upstream": {
      "coverage_8": 0.07068,
@@ -4791,7 +5262,7 @@
     "tree": {
      "coverage_8": 0.04229,
      "family": "AFNI",
-     "floor_max": 0.05458,
+     "floor_max": 0.05456,
      "longest_run": 18,
      "replica": 0.09683
     },
@@ -4804,7 +5275,7 @@
     "upstream_floor": {
      "max": 0.00714,
      "max_run": 16,
-     "median": 0.00095
+     "median": 0.00157
     }
    },
    "slips": [
@@ -5066,9 +5537,9 @@
      "shape_longest_run": 87
     },
     "replica_floor": {
-     "max": 0.09233,
+     "max": 0.10896,
      "max_run": 34,
-     "median": 0.07896
+     "median": 0.087325
     },
     "replica_upstream": {
      "coverage_8": 0.0516,
@@ -5080,7 +5551,7 @@
     "tree": {
      "coverage_8": 0.0251,
      "family": "AFNI",
-     "floor_max": 0.05458,
+     "floor_max": 0.05456,
      "longest_run": 16,
      "replica": 0.07946
     },
@@ -5544,40 +6015,40 @@
    "similarity": {
     "files": 14,
     "replica": {
-     "coverage_8": 0.34231,
-     "identifiers_shared": 0.58997,
+     "coverage_8": 0.31124,
+     "identifiers_shared": 0.5897,
      "longest_run": 334,
      "shape_longest_run": 300
     },
     "replica_floor": {
-     "max": 0.05691,
-     "max_run": 27,
-     "median": 0.04257
+     "max": 0.09022,
+     "max_run": 44,
+     "median": 0.04632
     },
     "replica_upstream": {
-     "coverage_8": 0.0626,
-     "identifiers_shared": 0.23086,
+     "coverage_8": 0.05889,
+     "identifiers_shared": 0.22592,
      "longest_run": 132,
      "shape_longest_run": 143
     },
-    "tokens": 18416,
+    "tokens": 20682,
     "tree": {
-     "coverage_8": 0.05881,
+     "coverage_8": 0.05241,
      "family": "AFNI",
-     "floor_max": 0.05458,
+     "floor_max": 0.05456,
      "longest_run": 38,
-     "replica": 0.08574
+     "replica": 0.08281
     },
     "upstream": {
-     "coverage_8": 0.03307,
-     "identifiers_shared": 0.16955,
+     "coverage_8": 0.02945,
+     "identifiers_shared": 0.16944,
      "longest_run": 38,
      "shape_longest_run": 63
     },
     "upstream_floor": {
-     "max": 0.00087,
+     "max": 0.00242,
      "max_run": 9,
-     "median": 0.00049
+     "median": 0.000605
     }
    },
    "slips": [
@@ -6083,15 +6554,15 @@
    "similarity": {
     "files": 19,
     "replica": {
-     "coverage_8": 0.07118,
-     "identifiers_shared": 0.25345,
+     "coverage_8": 0.07051,
+     "identifiers_shared": 0.24666,
      "longest_run": 52,
      "shape_longest_run": 96
     },
     "replica_floor": {
-     "max": 0.13701,
-     "max_run": 39,
-     "median": 0.049339999999999995
+     "max": 0.13541,
+     "max_run": 34,
+     "median": 0.04455
     },
     "replica_upstream": {
      "coverage_8": 0.01219,
@@ -6099,24 +6570,24 @@
      "longest_run": 17,
      "shape_longest_run": 26
     },
-    "tokens": 33055,
+    "tokens": 34208,
     "tree": {
-     "coverage_8": 0.0232,
+     "coverage_8": 0.02266,
      "family": "FSL",
      "floor_max": 0.16679,
      "longest_run": 18,
      "replica": 0.02145
     },
     "upstream": {
-     "coverage_8": 0.00079,
-     "identifiers_shared": 0.04391,
+     "coverage_8": 0.00076,
+     "identifiers_shared": 0.04253,
      "longest_run": 10,
      "shape_longest_run": 35
     },
     "upstream_floor": {
-     "max": 0.0088,
+     "max": 0.00874,
      "max_run": 16,
-     "median": 0.001255
+     "median": 0.0012
     }
    },
    "slips": [
@@ -6539,14 +7010,14 @@
     "files": 17,
     "replica": {
      "coverage_8": 0.09906,
-     "identifiers_shared": 0.31924,
+     "identifiers_shared": 0.3189,
      "longest_run": 37,
      "shape_longest_run": 94
     },
     "replica_floor": {
-     "max": 0.13657,
+     "max": 0.13665,
      "max_run": 57,
-     "median": 0.05315
+     "median": 0.04758
     },
     "replica_upstream": {
      "coverage_8": 0.07658,
@@ -6554,9 +7025,9 @@
      "longest_run": 92,
      "shape_longest_run": 81
     },
-    "tokens": 50355,
+    "tokens": 50341,
     "tree": {
-     "coverage_8": 0.02939,
+     "coverage_8": 0.0294,
      "family": "FSL",
      "floor_max": 0.16679,
      "longest_run": 46,
@@ -6564,14 +7035,14 @@
     },
     "upstream": {
      "coverage_8": 0.00328,
-     "identifiers_shared": 0.12368,
+     "identifiers_shared": 0.12355,
      "longest_run": 30,
      "shape_longest_run": 32
     },
     "upstream_floor": {
-     "max": 0.00933,
+     "max": 0.00934,
      "max_run": 46,
-     "median": 0.00025
+     "median": 0.0
     }
    },
    "slips": [
@@ -6998,15 +7469,15 @@
    "similarity": {
     "files": 28,
     "replica": {
-     "coverage_8": 0.15105,
-     "identifiers_shared": 0.33599,
+     "coverage_8": 0.1508,
+     "identifiers_shared": 0.33597,
      "longest_run": 36,
      "shape_longest_run": 70
     },
     "replica_floor": {
-     "max": 0.15148,
+     "max": 0.15171,
      "max_run": 48,
-     "median": 0.06319999999999999
+     "median": 0.05761
     },
     "replica_upstream": {
      "coverage_8": 0.01785,
@@ -7014,9 +7485,9 @@
      "longest_run": 35,
      "shape_longest_run": 46
     },
-    "tokens": 76718,
+    "tokens": 76738,
     "tree": {
-     "coverage_8": 0.03642,
+     "coverage_8": 0.03641,
      "family": "FSL",
      "floor_max": 0.16679,
      "longest_run": 15,
@@ -7024,14 +7495,14 @@
     },
     "upstream": {
      "coverage_8": 0.00207,
-     "identifiers_shared": 0.12202,
+     "identifiers_shared": 0.12137,
      "longest_run": 13,
      "shape_longest_run": 33
     },
     "upstream_floor": {
      "max": 0.00929,
      "max_run": 14,
-     "median": 0.0014650000000000002
+     "median": 0.00177
     }
    },
    "slips": [
@@ -7265,14 +7736,14 @@
     "files": 9,
     "replica": {
      "coverage_8": 0.0938,
-     "identifiers_shared": 0.36538,
+     "identifiers_shared": 0.36674,
      "longest_run": 35,
      "shape_longest_run": 55
     },
     "replica_floor": {
-     "max": 0.13738,
+     "max": 0.13781,
      "max_run": 35,
-     "median": 0.08279
+     "median": 0.07683
     },
     "replica_upstream": {
      "coverage_8": 0.03918,
@@ -7280,7 +7751,7 @@
      "longest_run": 21,
      "shape_longest_run": 38
     },
-    "tokens": 23402,
+    "tokens": 23401,
     "tree": {
      "coverage_8": 0.00799,
      "family": "FSL",
@@ -7290,7 +7761,7 @@
     },
     "upstream": {
      "coverage_8": 0.00034,
-     "identifiers_shared": 0.1047,
+     "identifiers_shared": 0.10448,
      "longest_run": 8,
      "shape_longest_run": 24
     },
@@ -7599,42 +8070,42 @@
     }
    ],
    "similarity": {
-    "files": 13,
+    "files": 14,
     "replica": {
-     "coverage_8": 0.11447,
-     "identifiers_shared": 0.35371,
+     "coverage_8": 0.11399,
+     "identifiers_shared": 0.3599,
      "longest_run": 25,
      "shape_longest_run": 58
     },
     "replica_floor": {
-     "max": 0.1534,
+     "max": 0.15223,
      "max_run": 32,
-     "median": 0.061810000000000004
+     "median": 0.06142
     },
     "replica_upstream": {
-     "coverage_8": 0.07924,
-     "identifiers_shared": 0.43581,
+     "coverage_8": 0.07876,
+     "identifiers_shared": 0.43072,
      "longest_run": 69,
      "shape_longest_run": 92
     },
-    "tokens": 49708,
+    "tokens": 50225,
     "tree": {
-     "coverage_8": 0.01877,
+     "coverage_8": 0.01858,
      "family": "FSL",
      "floor_max": 0.16679,
      "longest_run": 16,
-     "replica": 0.11631
+     "replica": 0.1156
     },
     "upstream": {
-     "coverage_8": 0.00197,
-     "identifiers_shared": 0.14694,
+     "coverage_8": 0.00195,
+     "identifiers_shared": 0.14524,
      "longest_run": 10,
      "shape_longest_run": 41
     },
     "upstream_floor": {
-     "max": 0.00404,
+     "max": 0.004,
      "max_run": 15,
-     "median": 0.00024000000000000003
+     "median": 0.00016
     }
    },
    "slips": [
@@ -7883,9 +8354,9 @@
      "shape_longest_run": 53
     },
     "replica_floor": {
-     "max": 0.12975,
-     "max_run": 22,
-     "median": 0.067705
+     "max": 0.13048,
+     "max_run": 30,
+     "median": 0.05714
     },
     "replica_upstream": {
      "coverage_8": 0.02217,
@@ -7893,7 +8364,7 @@
      "longest_run": 96,
      "shape_longest_run": 96
     },
-    "tokens": 56193,
+    "tokens": 56192,
     "tree": {
      "coverage_8": 0.01349,
      "family": "FSL",
@@ -7910,7 +8381,7 @@
     "upstream_floor": {
      "max": 0.00404,
      "max_run": 14,
-     "median": 0.001225
+     "median": 0.00117
     }
    },
    "slips": [
@@ -8096,7 +8567,7 @@
     "replica_floor": {
      "max": 0.20086,
      "max_run": 40,
-     "median": 0.06353
+     "median": 0.06449
     },
     "replica_upstream": {
      "coverage_8": 0.0,
@@ -8255,7 +8726,7 @@
     "replica_floor": {
      "max": 0.11898,
      "max_run": 17,
-     "median": 0.08629999999999999
+     "median": 0.08141
     },
     "replica_upstream": {
      "coverage_8": 0.0026,
@@ -8948,33 +9419,33 @@
    "similarity": {
     "files": 7,
     "replica": {
-     "coverage_8": 0.24296,
-     "identifiers_shared": 0.60836,
+     "coverage_8": 0.24253,
+     "identifiers_shared": 0.62344,
      "longest_run": 87,
      "shape_longest_run": 79
     },
     "replica_floor": {
-     "max": 0.13427,
+     "max": 0.13214,
      "max_run": 59,
-     "median": 0.057245
+     "median": 0.04287
     },
     "replica_upstream": {
-     "coverage_8": 0.06852,
-     "identifiers_shared": 0.35855,
+     "coverage_8": 0.06798,
+     "identifiers_shared": 0.35528,
      "longest_run": 89,
      "shape_longest_run": 113
     },
-    "tokens": 9302,
+    "tokens": 9611,
     "tree": {
-     "coverage_8": 0.00559,
+     "coverage_8": 0.00541,
      "family": "FSL",
      "floor_max": 0.16679,
      "longest_run": 9,
-     "replica": 0.0924
+     "replica": 0.09159
     },
     "upstream": {
      "coverage_8": 0.0,
-     "identifiers_shared": 0.22977,
+     "identifiers_shared": 0.22444,
      "longest_run": 7,
      "shape_longest_run": 55
     },
@@ -9598,7 +10069,45 @@
      "scope": "another family"
     }
    ],
-   "similarity": null,
+   "similarity": {
+    "files": 12,
+    "replica": {
+     "coverage_8": 0.15521,
+     "identifiers_shared": 0.35236,
+     "longest_run": 145,
+     "shape_longest_run": 150
+    },
+    "replica_floor": {
+     "max": 0.09045,
+     "max_run": 145,
+     "median": 0.048575
+    },
+    "replica_upstream": {
+     "coverage_8": 0.11509,
+     "identifiers_shared": 0.29696,
+     "longest_run": 1050,
+     "shape_longest_run": 1046
+    },
+    "tokens": 47421,
+    "tree": {
+     "coverage_8": 0.05538,
+     "family": "AFNI",
+     "floor_max": 0.05456,
+     "longest_run": 47,
+     "replica": 0.18163
+    },
+    "upstream": {
+     "coverage_8": 0.00321,
+     "identifiers_shared": 0.05831,
+     "longest_run": 16,
+     "shape_longest_run": 86
+    },
+    "upstream_floor": {
+     "max": 0.00884,
+     "max_run": 47,
+     "median": 0.001275
+    }
+   },
    "slips": [
     24,
     33
@@ -9855,7 +10364,45 @@
      "scope": "another family"
     }
    ],
-   "similarity": null,
+   "similarity": {
+    "files": 6,
+    "replica": {
+     "coverage_8": 0.05019,
+     "identifiers_shared": 0.30612,
+     "longest_run": 23,
+     "shape_longest_run": 101
+    },
+    "replica_floor": {
+     "max": 0.09363,
+     "max_run": 24,
+     "median": 0.04755
+    },
+    "replica_upstream": {
+     "coverage_8": 0.04463,
+     "identifiers_shared": 0.34118,
+     "longest_run": 21,
+     "shape_longest_run": 31
+    },
+    "tokens": 14825,
+    "tree": {
+     "coverage_8": 0.01221,
+     "family": "FSL",
+     "floor_max": 0.16679,
+     "longest_run": 10,
+     "replica": 0.07143
+    },
+    "upstream": {
+     "coverage_8": 0.00115,
+     "identifiers_shared": 0.08617,
+     "longest_run": 9,
+     "shape_longest_run": 28
+    },
+    "upstream_floor": {
+     "max": 0.00283,
+     "max_run": 9,
+     "median": 0.00115
+    }
+   },
    "slips": [
     21,
     34
@@ -9863,6 +10410,243 @@
    "verdict": {
     "status": "reviewed (every finding judged)",
     "words": "clean (names of restricted files, harness lines and a traceback's call lines of the replica suite, declared; the implementer's stand-in script named after the replica's program, a false match of the replica rule on its name)"
+   }
+  },
+  {
+   "accesses": [
+    {
+     "group": "the behaviour specs (specs/)",
+     "run": 0,
+     "seen": 70,
+     "written": 0
+    },
+    {
+     "group": "the clean-room code",
+     "run": 0,
+     "seen": 432,
+     "written": 63
+    },
+    {
+     "group": "larmorx's other files (records, documents, tests, permissive ports)",
+     "run": 215,
+     "seen": 1183,
+     "written": 34
+    },
+    {
+     "group": "oracle outputs and inputs",
+     "run": 24,
+     "seen": 217,
+     "written": 43
+    },
+    {
+     "group": "permissive upstream source (ANTs, ITK, nibabel, CORE-MATH, numpy, SciPy, ...)",
+     "run": 0,
+     "seen": 2,
+     "written": 0
+    },
+    {
+     "group": "the agent's own scratch notes, task outputs and memory",
+     "run": 521,
+     "seen": 439,
+     "written": 92
+    },
+    {
+     "group": "the system, the home directory, the workspace and the archive",
+     "run": 0,
+     "seen": 13,
+     "written": 0
+    },
+    {
+     "group": "restricted material (by rule and kind below)",
+     "run": 6,
+     "seen": 10,
+     "written": 4
+    }
+   ],
+   "cannot_see": {
+    "compactions": 0,
+    "listings": 127,
+    "program_runs": 338,
+    "unresolved": 24,
+    "without_worktree": 7
+   },
+   "commits": 18,
+   "commits_by_role": [
+    [
+     "clean-room implementer",
+     18
+    ]
+   ],
+   "family": "tedana",
+   "findings": [],
+   "first": "2026-11-11",
+   "id": "tedana/t2smap",
+   "implementers": [
+    {
+     "agent": "ac58a62848b737f87",
+     "commits": 2,
+     "description": "t2smap clean-room relay 2a",
+     "first": "2026-11-11",
+     "last": "2026-11-11"
+    },
+    {
+     "agent": "a72c002b2c008e16f",
+     "commits": 2,
+     "description": "t2smap clean-room relay 2b",
+     "first": "2026-11-11",
+     "last": "2026-11-11"
+    },
+    {
+     "agent": "a1f34dca9de0baf90",
+     "commits": 3,
+     "description": "t2smap clean-room relay 2c/3a",
+     "first": "2026-11-11",
+     "last": "2026-11-11"
+    },
+    {
+     "agent": "a66af652ffad03dfe",
+     "commits": 3,
+     "description": "t2smap clean-room relay 3a-ii",
+     "first": "2026-11-11",
+     "last": "2026-11-11"
+    },
+    {
+     "agent": "a7a5740ef2d065632",
+     "commits": 4,
+     "description": "t2smap clean-room relay 3c",
+     "first": "2026-11-11",
+     "last": "2026-11-11"
+    },
+    {
+     "agent": "af88c1561690e68ed",
+     "commits": 2,
+     "description": "t2smap clean-room wiring relay",
+     "first": "2026-11-11",
+     "last": "2026-11-11"
+    },
+    {
+     "agent": "a6199bbd34942e83e",
+     "commits": 2,
+     "description": "t2smap clean-room relay C4: spec answers in original",
+     "first": "2026-11-12",
+     "last": "2026-11-12"
+    }
+   ],
+   "last": "2026-11-12",
+   "name": "t2smap (tedana's T2* and S0 maps, larmorx-tedana)",
+   "other_roles": [],
+   "restricted": [
+    {
+     "after": 2,
+     "agents": 4,
+     "before": 3,
+     "level": "names",
+     "rule": "R10",
+     "scope": "this family"
+    },
+    {
+     "after": 1,
+     "agents": 1,
+     "before": 0,
+     "level": "build",
+     "rule": "R10",
+     "scope": "this family"
+    },
+    {
+     "after": 1,
+     "agents": 3,
+     "before": 3,
+     "level": "mention",
+     "rule": "R10",
+     "scope": "this family"
+    },
+    {
+     "after": 0,
+     "agents": 1,
+     "before": 1,
+     "level": "replica-run",
+     "rule": "R10",
+     "scope": "this family"
+    },
+    {
+     "after": 0,
+     "agents": 1,
+     "before": 3,
+     "level": "build-cache",
+     "rule": "R10",
+     "scope": "this family"
+    },
+    {
+     "after": 1,
+     "agents": 3,
+     "before": 4,
+     "level": "metadata",
+     "rule": "R10",
+     "scope": "this family"
+    },
+    {
+     "after": 0,
+     "agents": 1,
+     "before": 1,
+     "level": "content",
+     "rule": "R10",
+     "scope": "another family"
+    },
+    {
+     "after": 4,
+     "agents": 3,
+     "before": 2,
+     "level": "names",
+     "rule": "R10",
+     "scope": "another family"
+    },
+    {
+     "after": 0,
+     "agents": 2,
+     "before": 3,
+     "level": "metadata",
+     "rule": "R10",
+     "scope": "another family"
+    }
+   ],
+   "similarity": {
+    "files": 15,
+    "replica": {
+     "coverage_8": 0.23467,
+     "identifiers_shared": 0.51004,
+     "longest_run": 94,
+     "shape_longest_run": 97
+    },
+    "replica_floor": {
+     "max": null,
+     "max_run": null,
+     "median": null
+    },
+    "replica_upstream": {
+     "coverage_8": 0.00047,
+     "identifiers_shared": 0.20422,
+     "longest_run": 13,
+     "shape_longest_run": 19
+    },
+    "tokens": 32931,
+    "upstream": {
+     "coverage_8": 0.0,
+     "identifiers_shared": 0.14994,
+     "longest_run": 6,
+     "shape_longest_run": 19
+    },
+    "upstream_floor": {
+     "max": null,
+     "max_run": null,
+     "median": null
+    }
+   },
+   "slips": [
+    32
+   ],
+   "verdict": {
+    "status": "clean, with notes",
+    "words": "clean: seven clean relays wrote it from specs/t2smap.md and black-box runs of tedana; no content of tedana's source or of the replica seen before or during the work (names, builds, black-box runs of the replica program and licence files only; one declared slip of another family: the header bytes of the PyPI larmorx-nc program); its shared runs with the replica (23.5 % of tokens, read at the merge of 2026-11-12) are tedana's observable texts (messages, log locations, the help, dataset_description.json) written through the same main-package APIs (argparse, the defect notices, PyError)"
    }
   }
  ]

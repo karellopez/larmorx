@@ -6,7 +6,7 @@ any of them had seen restricted material of its family before or while doing so.
 
 From a scan (``cleanroom-audit scan``) and the repository's history:
 
-1. **The clean-room code** (:func:`tool_of`): the three clean-room crates, by tool, and the
+1. **The clean-room code** (:func:`tool_of`): the clean-room crates, by tool, and the
    clean-room files of ``larmorx-core`` (glibc's bits written from specs).
 2. **Who touched it**: every edit an agent's access log records on that code, and every commit
    that changed it (all refs), attributed to the agent that printed its hash right after making it
@@ -54,6 +54,7 @@ CLEANROOM_PATHS = (
     "crates/larmorx-afni",
     "crates/larmorx-mri",
     "crates/larmorx-fsl",
+    "crates/larmorx-tedana",
     *CORE_FILES,
 )
 #: larmorx-fsl's modules and programs by tool (the first match wins; the rest is shared code).
@@ -88,6 +89,7 @@ TOOL_NAMES = {
     ("FSL", "fslroi"): "fslroi",
     ("FSL", "prelude"): "prelude (phase unwrapping)",
     ("FSL", "fsl-shared"): "larmorx-fsl's shared code (images, options, messages, data)",
+    ("tedana", "t2smap"): "t2smap (tedana's T2* and S0 maps, larmorx-tedana)",
     ("GNU", "cbrtf_glibc"): "cbrtf with glibc 2.35's bits (larmorx-core)",
     ("GNU", "sincos_glibc"): "sin, cos, sincos with glibc 2.35's bits (larmorx-core)",
     ("GNU", "tanh_glibc"): "tanh with glibc 2.35's bits (larmorx-core, from fdlibm)",
@@ -98,12 +100,14 @@ def tool_of(rel: str) -> tuple[str, str] | None:
     """The (family, tool) a repository path's clean-room code belongs to, or None."""
     if rel in CORE_FILES:
         return CORE_FILES[rel]
-    m = re.match(r"^crates/larmorx-(afni|mri|fsl)(?:/(.*))?$", rel)
+    m = re.match(r"^crates/larmorx-(afni|mri|fsl|tedana)(?:/(.*))?$", rel)
     if not m:
         return None
     crate, p = m[1], m[2] or ""
     if crate == "mri":
         return ("FSL", "hmc")
+    if crate == "tedana":
+        return ("tedana", "t2smap")
     if crate == "afni":
         for t in ("tshift", "automask", "unifize", "volreg"):
             if re.search(rf"(^|/){t}(/|\.rs$)", p):
@@ -159,6 +163,10 @@ ROLE_BY_DESCRIPTION = {
     # crates-nc/ and crates-gpl/; they edited no clean-room code.
     "Easy CLI relay 1b: companions": "replica author",
     "Easy CLI relay 2c: larmorx-nc FSL default": "replica author",
+    # t2smap's clean-room part: a clean relay from the part's clean brief that put the spec
+    # writers' answers (specs/t2smap.md) into the original; "spec answers" in its description
+    # is not the spec-writer role (it never opened the replica side's notes or code).
+    "t2smap clean-room relay C4: spec answers in original": "clean-room implementer",
 }
 
 
@@ -413,6 +421,14 @@ def split_register(text: str) -> tuple[list[tuple[str, str]], list[str]]:
         else:
             open_.append(line)
     return restricted, open_
+
+
+def section_family(section: str) -> str:
+    """The family a restricted section of the register belongs to, from its heading."""
+    for fam in ("AFNI", "tedana"):
+        if fam in section:
+            return fam
+    return "FSL"
 
 
 def register_lines(texts: list[str], min_len: int = 40) -> dict[str, str]:
@@ -750,7 +766,7 @@ def run(scan: Path, repo: Path) -> dict:
             hits = printed_register_lines(txt, reg) if txt else []
             if hits:
                 sec = sorted({s for s, _ in hits})
-                fam = sorted({"AFNI" if "AFNI" in s else "FSL" for s in sec})
+                fam = sorted({section_family(s) for s in sec})
                 when = "before or during" if epoch(r["ts"]) <= epoch(last) else "after"
                 body = [x for _, x in hits if not is_heading(x)]
                 reg_hits.append(

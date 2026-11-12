@@ -20,6 +20,7 @@ from pathlib import Path
 import numpy as np
 
 from larmorx_validation.evidence import ants_atropos_pv, common, core
+from larmorx_validation.evidence import present as present_
 from larmorx_validation.figures import cache as fcache
 from larmorx_validation.figures import records
 
@@ -759,7 +760,7 @@ def export(ctx: core.Context) -> dict:
         cases += ants_panel.panel_cases_tidy(_cases(prec))
     inventory = ants_panel.inventory_table(prec, "panel-nodes", "Atropos")
     e, p = entry(ctx), priors_entry(ctx)
-    return {
+    doc = {
         "schema": 1,
         "tool": TOOL,
         "title": "Atropos",
@@ -790,6 +791,109 @@ def export(ctx: core.Context) -> dict:
         ],
         "tables": [ants_atropos_pv.table(ctx), *([inventory] if inventory else [])],
     }
+    return present(doc)
+
+
+#: The page in the writing guide's words (evidence/present.py). The ANTS-106 table's rows name
+#: the replica's runs in `fix`.
+PAGE = present_.Page(
+    software="ANTs",
+    program="Atropos",
+    version="2.6.5",
+    texts=[(r"^(MRF [\d.]+): larmorx's default$", r"\1: the replica, `fix`")],
+)
+
+#: Each worked example's "What this shows" line and the verdict beside it, from the example's
+#: own metrics, reasons and facts; the data panel's lines are written from their own verdicts
+#: (present.panel_shows).
+SHOWS = {
+    "fmriprep-atropos": (
+        "In `reproduce`, on 1 and 6 threads, the replica gives ANTs' one-thread result with "
+        "correctly rounded maths bit for bit. ANTs as built, and fMRIPrep's output, give the "
+        "same classified image; a few posteriors differ in their last bits (by at most 1.2e-07), "
+        "where glibc's `expf` and `logf` are not correctly rounded. Atropos does not depend on "
+        "ANTs' thread count, and fMRIPrep's output is ANTs 2.6.5's at 8 threads bit for bit. "
+        "With the clock's seed, ANTs' own runs differ from each other in up to 307 labels; the "
+        "replica with its fixed seed differs from ANTs' first run in 304. The default, `fix`, "
+        "corrects ITK-50 in this call: 1 of 5,898,240 labels changes, and the posteriors by up "
+        "to 0.038.",
+        ["lx-ants1"],
+    ),
+    "oasis-priors": (
+        "In `reproduce`, on 1 and 6 threads, the replica gives ANTs' result with correctly "
+        "rounded maths bit for bit. ANTs as built gives the same classified image; the grey "
+        "matter's posterior differs in its last bits (by at most 1.2e-07), where glibc's `expf` "
+        "and `logf` are not correctly rounded. No correction by default changes this call.",
+        ["lx-ants1"],
+    ),
+    "pv-phantom": (
+        "In `reproduce` the replica gives ANTs' labels voxel for voxel, as built and with "
+        "correctly rounded maths. Its default, `fix`, corrects ANTS-106 (with ITK-50 and "
+        "ANTS-96): against the known fractions it labels 97.7 % of the voxels as the truth, "
+        "ANTs 94.0 %. The two partial-volume classes get 1,418 and 454 voxels; the truth has "
+        "1,368 and 408, and ANTs gives them 237 and 106.",
+        ["lx-ants"],
+    ),
+}
+TITLES = {
+    "fmriprep-atropos": "sMRIPrep's segmentation of a real T1w",
+    "oasis-priors": "A segmentation of the same T1w with tissue priors",
+    "pv-phantom": "Partial-volume classes with the MRF, on a phantom of known fractions",
+}
+#: The phantom's run of ANTs with correctly rounded maths, whose label does not say so (its
+#: second line does: "CORE-MATH"), and the comparison with it.
+PANELS = {
+    "pv-phantom": {
+        "ants-cr": ("ANTs Atropos 2.6.5, correctly rounded maths", "1 thread · CORE-MATH"),
+    },
+}
+DIFFS = {
+    "pv-phantom": {
+        "lx-ants-cr": (
+            "replica, reproduce − ANTs Atropos 2.6.5, correctly rounded maths",
+            "the replica against the original: correctly rounded maths",
+        ),
+    },
+}
+#: The record's categories as the page names them.
+CATEGORIES = {
+    "messages": "messages",
+    "posteriors": "posteriors",
+    "initialization": "initializations",
+    "partial volume": "partial-volume classes",
+    "likelihood": "likelihood models",
+    "mrf": "the MRF",
+    "outliers": "outliers",
+    "verbose": "verbose output",
+    "real (sMRIPrep)": "real images: sMRIPrep's call",
+    "real (other)": "real images: other calls",
+    "real (priors)": "real images: tissue priors",
+    "real (partial volume)": "real images: partial-volume classes",
+    "dimensions": "dimensions",
+    "random seeds": "random seeds",
+}
+
+
+def present(doc: dict) -> dict:
+    """Atropos' page in the writing guide's words and order: texts, ports and order only."""
+    for ex in doc["examples"]:
+        if ex["id"] in SHOWS:
+            shows, verdicts = SHOWS[ex["id"]]
+        else:
+            shows, verdicts = present_.panel_shows(PAGE, ex)
+        present_.example(
+            PAGE,
+            ex,
+            shows=shows,
+            verdicts=verdicts,
+            title=TITLES.get(ex["id"]),
+            panels=PANELS.get(ex["id"]),
+            diffs=DIFFS.get(ex["id"]),
+        )
+    for im in doc["implementations"]:
+        present_.implementation(PAGE, im, "standard comparison and data panel")
+    present_.random_testing(PAGE, doc, {"port": "replica"})
+    return present_.finish(PAGE, doc, CATEGORIES)
 
 
 if __name__ == "__main__":  # compute the cache entries only

@@ -191,7 +191,7 @@ def _port_panel(page: Page, p: dict, against: str | None) -> tuple[str, str]:
     how = ", ".join([*rest, mode])
     second = f"{page.package} · {how}" + (f" · against {against}" if against else "")
     name = words.PORT_NAME[page.port]
-    if m.group(1):  # "Atropos: larmorx (port)"
+    if m.group(1) and m.group(1) != page.program:  # "antsAffineInitializer: larmorx" on antsAI's
         name = f"{m.group(1)}: {name}"
     return name, second
 

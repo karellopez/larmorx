@@ -1107,6 +1107,13 @@ def _calls_table(rec, bench) -> dict:
     )
 
 
+def _option_code(text: str) -> str:
+    """A row head that is a command-line option (``--n-threads 4``) as a code span: the site
+    renders row heads through markdown-it's typographer, which turns a leading ``--`` into an
+    en dash (relay RS4's typographer check, 2026-11-12)."""
+    return f"`{text}`" if text.startswith("--") else text
+
+
 def _spread_table(rec) -> dict:
     cases = [r for r in rec.results if r["category"] == "spread"]
     labels = []
@@ -1122,12 +1129,12 @@ def _spread_table(rec) -> dict:
     rows = []
     for k in labels:
         rows.append({
-            "head": k.removeprefix("tedana's spread: "),
+            "head": _option_code(k.removeprefix("tedana's spread: ")),
             "cells": [common.cell(int(r["reported"][k]), "count") if k in r.get("reported", {})
                       else common.cell("–") for r in cases],
         })  # fmt: skip
     rows.append({
-        "head": "larmorx (replica) at --n-threads 4",
+        "head": "larmorx (replica) at `--n-threads 4`",
         "cells": [common.cell(int(r.get("measured", {}).get("the replica at --n-threads 4", 0)),
                               "count") for r in cases],
     })  # fmt: skip
@@ -1262,7 +1269,8 @@ def _corrections_table(ctx: core.Context, links: dict, rec) -> dict:
         })  # fmt: skip
     return common.table(
         "corrections",
-        "tedana's defects found by the replica (TED-01 to TED-18) and the maths entries",
+        "tedana's defects (TED-01 to TED-18 found by the replica, TED-31 and TED-46 by the "
+        "clean-room part) and the maths entries",
         ["Entry", "What tedana does", "Rule", "larmorx's default", "The record's cases"],
         rows,
         note="Each decided by rules A to D (A: corrected by default; B: a clear error; C: kept "

@@ -4096,7 +4096,7 @@ implementation = "replica"
 signature = ["newest: last error line", "newest: messages", "shared: last error line", "shared: messages"]
 status = "register"
 defect = "TED-16"
-explanation = "--exclude removing every volume: tedana fits nothing (T2* 500 ms, S0 1 everywhere) and exits 0 with a curve fit's or the dropout method's unrelated errors otherwise; registered TED-16 (rule B): a clear error by default, reproduce follows tedana"
+explanation = "`--exclude` removing every volume: tedana fits nothing (T2* 500 ms, S0 1 everywhere) and exits 0 with a curve fit's or the dropout method's unrelated errors otherwise; registered TED-16 (rule B): a clear error by default, reproduce follows tedana"
 link = "validation/difftest/cases/tedana-t2smap/ted16-exclude-every-volume.json"
 
 [[difference]]

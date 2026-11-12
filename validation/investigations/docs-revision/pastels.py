@@ -15,7 +15,9 @@ and under protanopia and deuteranopia, Machado, Oliveira and Fernandes 2009, sev
   planned groups, FreeSurfer and Workbench, 9.0, 5.9 and 8.7). Pastels are pale, so they cannot
   be as far apart as the verdicts' fills (≥ 18 and ≥ 11), and a group is never told by colour
   alone: its name is on its chip;
-- a new pastel and every other pastel: normal vision ΔE ≥ 7;
+- a new pastel and every other pastel: normal vision ΔE ≥ 7, protanopia and deuteranopia
+  ΔE ≥ 4 (the reviewer's round 5: the closest such pair, tedana and LARMORX, is 4.3 under
+  protanopia);
 - the chip's text, the site's `--on-pastel` ink #16130f, at 4.5:1 or more on every pastel, and
   the new deep variants (marks on the light paper) at 3:1 or more against the light paper
   (today's are printed for information: ANTs' is 2.997:1 and LARMORX's 2.998:1);
@@ -23,7 +25,10 @@ and under protanopia and deuteranopia, Machado, Oliveira and Fernandes 2009, sev
   replica's blue and the clean room's apricot, and their chroma at least 0.05, so that none reads
   as the original's grey.
 
-Tritanopia and today's pairs are printed for information.
+Every pair is printed under normal vision, protanopia, deuteranopia and tritanopia (for the
+record); tritanopia and the pairs of today's pastels are information only. Three of today's
+pairs are under 4 for colour blindness (ANTs and FreeSurfer, AFNI and LARMORX, FSL and
+Workbench): they stay as they are, each always beside its name (the hero's legend, the chips).
 
     python -P validation/investigations/docs-revision/pastels.py <site checkout>
 
@@ -158,10 +163,15 @@ def main(argv: list[str]) -> int:
             continue
         ok_pair = de(x, y) >= 10 and all(de(x, y, k) >= 9 for k in ("protanopia", "deuteranopia"))
         check(ok_pair, line + " (normal ≥ 10, protanopia and deuteranopia ≥ 9)")
-    for x in NEW:
-        for y in ORDER:
-            if y != x and (y not in NEW or ORDER.index(y) > ORDER.index(x)):
-                check(de(x, y) >= 7, f"{x} / {y}: normal ΔE {de(x, y):.1f} (≥ 7, any two)")
+    for x, y in itertools.combinations(ORDER, 2):
+        line = f"{x} / {y}: normal {de(x, y):.1f}, " + ", ".join(
+            f"{k} {de(x, y, k):.1f}" for k in MACHADO
+        )
+        if x not in NEW and y not in NEW:
+            print("info  " + line + " (any two)")
+            continue
+        ok_pair = de(x, y) >= 7 and all(de(x, y, k) >= 4 for k in ("protanopia", "deuteranopia"))
+        check(ok_pair, line + " (any two: normal ≥ 7, protanopia and deuteranopia ≥ 4)")
     for x in ORDER:
         p = ecos[x]["pastel"]
         c = contrast(ON_PASTEL, p)

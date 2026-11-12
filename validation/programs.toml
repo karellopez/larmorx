@@ -17,7 +17,8 @@
 # `summary` (what it holds, for the home page), `planned` (a text, for software with no port yet).
 # Fields of a program: `group`, `name` (the command's own spelling; a module's name), `command`
 # (absent for a module), `also` (another command that runs the same port), `python`, `does` (one
-# sentence, in the words of its API page), `api`, `evidence` (its evidence page on the site),
+# sentence, in the words of its API page; absent where the API page holds the program's reference
+# block, whose first sentence of what it does is taken instead), `api`, `evidence` (its evidence page on the site),
 # `records` (per port: the records whose status it has; a module with no record takes the status
 # its API page states), `ports` (for a program the replica registry does not list), `original`
 # (where it is not the group's), `next_release` (ports that 0.1.0rc1 does not have: CHANGELOG.md's
@@ -279,7 +280,6 @@ group = "fsl"
 name = "bet"
 command = "larmorx fsl bet"
 python = "lx.fsl.bet"
-does = "FSL's `bet` script: `bet2` itself, or one of its variations (`-R`, `-F`, `-Z`, `-S`, `-B`, `-A`, `-A2`)."
 api = "docs/api/fsl-bet.md"
 evidence = "/evidence/fsl-bet/"
 records = { replica = ["fsl-bet-replica", "fsl-bet-replica-full"], clean-room = ["fsl-bet"] }
@@ -289,7 +289,6 @@ group = "fsl"
 name = "bet2"
 command = "larmorx fsl bet2"
 python = "lx.fsl.bet2"
-does = "FSL's brain extraction itself, which the `bet` script runs."
 api = "docs/api/fsl-bet.md"
 evidence = "/evidence/fsl-bet/"
 records = { replica = ["fsl-bet-replica", "fsl-bet-replica-full"], clean-room = ["fsl-bet"] }
@@ -299,7 +298,6 @@ group = "fsl"
 name = "betsurf"
 command = "larmorx fsl betsurf"
 python = "lx.fsl.betsurf"
-does = "The inner skull, outer skull and scalp surfaces, as FSL's `betsurf` finds them."
 api = "docs/api/fsl-bet.md"
 evidence = "/evidence/fsl-bet/"
 records = { replica = ["fsl-bet-replica", "fsl-bet-replica-full"], clean-room = ["fsl-bet"] }

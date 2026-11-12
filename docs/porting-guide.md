@@ -340,11 +340,23 @@ hand (the stage comparison re-renders from its JSON with `--render`). The model 
   next to larmorx's distance from them; where it fails silently (ANTS-45), the statuses must
   agree and larmorx must explain.
 
-**Status** (PLAN.md §4): `experimental` while any case fails its threshold, `validated` when
-every case of the oracle set passes, `stable` once the API is also frozen. One failing case
-keeps a tool `experimental`, however small the miss: `lx.mri.hmc` misses one FD-correlation
-threshold by 0.0008 and is `experimental`. Make no equivalence claim that the record's
-numbers do not show (rule 8).
+**Status** (PLAN.md §4, read with the user's decision on testing depth of 2026-10-28: each part
+tests every code path once, and the extensive evidence comes in one final validation phase;
+CLAUDE.md, "Every part, in full"):
+
+- `experimental`: the part's tests pass, but the final validation phase's evidence for the port
+  (the data panel, the long random-testing runs, the full tier) is still to come; or a case of
+  its record fails its threshold;
+- `validated`: every case of the record passes, and that evidence exists;
+- `stable`: validated, and the API frozen.
+
+So a part leaves a new port `experimental` even where every case passes, and the final
+validation phase makes it `validated`. One failing case keeps a tool `experimental`, however
+small the miss: `lx.mri.hmc` misses one FD-correlation threshold by 0.0008 and is
+`experimental`. The ports marked `validated` before this definition (2026-11-12) keep their
+status: ANTs' programs have their data panel (2026-10-27), and the others get the rest of the
+evidence in the final validation phase. Make no equivalence claim that the record's numbers do
+not show (rule 8).
 
 ## 8. Improvements and defects: D11 and D13
 

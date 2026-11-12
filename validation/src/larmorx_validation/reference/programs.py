@@ -20,7 +20,12 @@ The checks (every one a problem that stops the export):
   command that does not exist (``mri hmc`` is the clean room of ``fsl mcflirt``, its ``also``);
 - the ports a record names are the ones the replica registry lists (or the entry's ``ports``,
   for a program the registry does not list);
-- every record, API page and Python name exists; with a site, every evidence page too.
+- every record, API page and Python name exists; with a site, every evidence page too;
+- every API page of ``docs/api/`` but the register's (``upstream-defects.md``) is some entry's
+  ``api``, so a new module or API page without an entry is caught;
+- what a program does has one source: where its API page holds the program's reference block
+  (:mod:`larmorx_validation.reference.apipage`), the first sentence of its "what it does" text,
+  and the entry gives no ``does`` of its own; elsewhere the entry's ``does``.
 """
 
 from __future__ import annotations
@@ -30,6 +35,7 @@ import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from larmorx_validation.reference import apipage
 from larmorx_validation.reference.code import ports as registry_ports
 
 #: How a port is named, and its package and licence where the registry does not say.
@@ -40,6 +46,8 @@ LICENCE_WORDS = {
     "GNU GPL version 3": "GPL-3.0",
 }
 OUT = "data/programs.yml"
+#: API pages that describe no program or module (Validation links the register).
+NOT_PROGRAMS = {"docs/api/upstream-defects.md"}
 
 
 @dataclass
@@ -123,6 +131,22 @@ def _status(record: dict | None) -> str:
     return m.group(1) if m else ""
 
 
+def first_sentence(text: str) -> str:
+    """The first sentence of a paragraph of Markdown (its lines joined; a full stop that ends a
+    sentence is followed by a blank or the text's end)."""
+    flat = " ".join(text.split())
+    m = re.match(r"(.+?\.)(?:\s|$)", flat)
+    return m.group(1) if m else flat
+
+
+def _api_does(repo: Path, api: str) -> dict[str, str]:
+    """What each program with a reference block on the API page ``api`` does, by its name."""
+    if not (repo / api).is_file():
+        return {}
+    page = apipage.read(repo, api)
+    return {p.name: first_sentence(p.description.split("\n\n")[0]) for p in page.programs}
+
+
 def _page_exists(site: Path, url: str) -> bool:
     rel = url.strip("/")
     return (site / "content" / f"{rel}.md").is_file() or (
@@ -140,6 +164,7 @@ def build(repo: Path, site: Path | None) -> tuple[dict, list[Program], list[str]
     progs: list[Program] = []
     known = set(commands(repo))
     named: set[tuple[str, str]] = set()
+    api_does: dict[str, dict[str, str]] = {}
     for e in desc["program"]:
         where = f"validation/programs.toml: {e['group']} {e['name']}"
         if e["group"] not in groups:
@@ -174,6 +199,16 @@ def build(repo: Path, site: Path | None) -> tuple[dict, list[Program], list[str]
         for path in [e["api"]]:
             if not (repo / path).is_file():
                 problems.append(f"{where}: no {path}")
+        if e["api"] not in api_does:
+            api_does[e["api"]] = _api_does(repo, e["api"])
+        from_api = api_does[e["api"]].get(e["name"], "")
+        if from_api and e.get("does"):
+            problems.append(
+                f"{where}: `does` given, but {e['api']} says what it does (its reference block)"
+            )
+        does = from_api or " ".join(e.get("does", "").split())
+        if not does:
+            problems.append(f"{where}: no `does`, and {e['api']} has no reference block for it")
         if not _python_exists(repo, e["python"]):
             problems.append(f"{where}: no Python name {e['python']}")
         evidence = e.get("evidence", "")
@@ -207,7 +242,7 @@ def build(repo: Path, site: Path | None) -> tuple[dict, list[Program], list[str]
                 command=cmd,
                 also=e.get("also", ""),
                 python=e["python"],
-                does=" ".join(e["does"].split()),
+                does=does,
                 api=e["api"],
                 evidence=evidence,
                 reference=reference,
@@ -217,6 +252,9 @@ def build(repo: Path, site: Path | None) -> tuple[dict, list[Program], list[str]
         )
     for fam, tool in sorted(known - named):
         problems.append(f"validation/programs.toml: no entry for `larmorx {fam} {tool}`")
+    pages = {f"docs/api/{f.name}" for f in (repo / "docs/api").glob("*.md")}
+    for page in sorted(pages - NOT_PROGRAMS - {e["api"] for e in desc["program"]}):
+        problems.append(f"validation/programs.toml: no entry names {page} as its `api`")
     return groups, progs, problems
 
 
@@ -247,11 +285,12 @@ def render(groups: dict, progs: list[Program]) -> str:
         if n_mod:
             parts.append(_count(n_mod, "module", "modules"))
         kinds: dict[tuple, int] = {}
+        later: dict[tuple, bool] = {}
         for p in mine:
             for x in p.ports:
-                kinds[(x.kind, x.package, x.licence)] = (
-                    kinds.get((x.kind, x.package, x.licence), 0) + 1
-                )
+                key = (x.kind, x.package, x.licence)
+                kinds[key] = kinds.get(key, 0) + 1
+                later[key] = later.get(key, True) and x.next_release
         lines += [
             f"  - id: {gid}",
             f"    name: {_y(g['name'])}",
@@ -267,9 +306,10 @@ def render(groups: dict, progs: list[Program]) -> str:
         for (kind, package, licence), n in sorted(
             kinds.items(), key=lambda kv: order.index(kv[0][0])
         ):
+            nr = "true" if later[(kind, package, licence)] else "false"
             lines.append(
                 f"      - {{kind: {kind}, name: {_y(PORT_NAMES[kind])}, package: {package}, "
-                f"licence: {_y(licence)}, count: {n}}}"
+                f"licence: {_y(licence)}, count: {n}, next_release: {nr}}}"
             )
         lines.append("    programs:" + ("" if mine else " []"))
         for p in mine:

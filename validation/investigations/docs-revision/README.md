@@ -36,9 +36,10 @@ python -P validation/investigations/docs-revision/evidence_roles.py <checkout of
 `pastels.py` checks the software colours of the site's Programs page (the writing guide, §5):
 the pastels of tedana, sdcflows and fMRIPrep added in the Programs pilot against their neighbours
 in the page's order (OKLab ΔE under normal vision, protanopia and deuteranopia), against every
-other pastel, the chip's ink on each (WCAG 2's ratio), the new deep variants against the light
-paper, and their hue's distance from the ports' blue and apricot. Today's pairs and tritanopia
-are printed for information. It prints one line per check and PASS or FAIL.
+other pastel (under normal vision and, at least 4, under protanopia and deuteranopia), the chip's
+ink on each (WCAG 2's ratio), the new deep variants against the light paper, and their hue's
+distance from the ports' blue and apricot. Every pair is printed under the four visions; today's
+pairs and tritanopia are information only. It prints one line per check and PASS or FAIL.
 
 ```
 python -P validation/investigations/docs-revision/pastels.py <checkout of larmorx_documentation>

@@ -3,7 +3,8 @@
 How LARMORX's documentation is written: the website, this repository's documents and API pages,
 and the lines its programs print. The documentation revision
 ([documentation-plan.md](documentation-plan.md)) rewrites both repositories with it, and every
-page written afterwards follows it. Draft of 2026-11-12, for the user's approval.
+page written afterwards follows it. Written on 2026-11-12; the user approved its
+recommendations the same day (section 8).
 
 Every fact in this guide comes from files a clean-room implementer may read (section 1, "Who
 changes what"). They are the site's pages and evidence, the validation records (all but
@@ -58,7 +59,7 @@ How to use them:
 
 | Write | Not | Note |
 |---|---|---|
-| the original; a run of the original | the oracle; the upstream | Pages users read. Developer documents keep "oracle" and "upstream", and so do names (the oracle-output cache); question 5. |
+| the original; a run of the original | the oracle; the upstream | Pages users read. Developer documents keep "oracle" and "upstream", and so do names (the oracle-output cache); decision 5. |
 | the comparison with the original; the record | parity; the parity tests | Same note. |
 | the quick check, the standard comparison, the full comparison | the smoke, standard and full tiers | Say what runs and when; the names *smoke*, *standard* and *full* once, in italics, after the explanation. |
 | compared cases | | The cases both programs complete (neither refuses nor crashes). Say it once per page, with the whole: "198 of its 200 compared cases, out of 252". |
@@ -72,8 +73,26 @@ How to use them:
 | the family (`fsl` in `larmorx fsl bet`) | | Only for the command line's first word after the options. On user pages never for a group of licences: say "FSL's licence". |
 | program; function (a Python call with no command line) | tool | "tool" only in names that exist (`validation/tools.toml`). |
 | port; the replica; the clean room | implementation | `implementation` stays the option's name. |
-| `larmorx` (the package); LARMORX (the project) | the main package; LARMORX itself | Developer documents keep "the main package"; question 5. |
+| `larmorx` (the package); LARMORX (the project) | the main package; LARMORX itself | Developer documents keep "the main package"; decision 5. |
 | `larmorx-nc`, `larmorx-gpl` (the companion packages) | the companion wheels | Say what each holds and its licence. |
+
+### The three statuses
+
+A port's status is the one its record states (`validation/tools.toml`), and the pages define it in
+these words, on the Programs page in short and on Validation in full (`/validation/#statuses`):
+
+- *experimental*: the tests of its part pass, but the extensive evidence of the final validation
+  phase (the data panel, long random-testing runs, the full comparison) is still to come; or a
+  case of its record still fails;
+- *validated*: every case of its record passes, and that evidence exists;
+- *stable*: validated, and its Python and command-line interface no longer change.
+
+Since 2026-10-28 each part tests every code path once and leaves the extensive evidence to the
+final validation phase, so a new port is *experimental* even where every case of its record
+agrees. The pages say so, and say which ports were marked *validated* before this definition:
+ANTs' programs, with their data panel, and the ports whose parts marked them when every case
+passed (`docs/porting-guide.md`, "Status"). A status is shown in one neutral style, never in a
+software's pastel (section 5).
 
 ### Where the old words stay
 
@@ -246,7 +265,7 @@ counts every old word, file by file (section 7).
     rewritten sentence's facts against the old one.
 14. **Pages describe `main`**, which the tests run. What 0.1.0rc1, the published release, lacks
     is marked where a page first shows it, "from the next release", with 0.1.0rc1's way beside it
-    (as the installation page's "Coming with the next release" box does). Question 4.
+    (as the installation page's "Coming with the next release" box does). Decision 4.
 
 ## 3. Before and after
 
@@ -257,9 +276,11 @@ same records as the sentences they replace.
 
 1. Before (the end of the hero): "Many toolkits, *one* framework. Spins of five software
    ecosystems, precessing at one Larmor frequency, gather into one brain. Each keeps its colour."
-   After: "Spins in resonance. Five groups of spins, one colour each for ANTs, AFNI, FSL,
-   FreeSurfer and Workbench, come to one frequency and gather into a brain from the MNI template."
-   Why: the slogan goes; the text says what the animation shows.
+   After: "Many neuroimaging toolboxes working synergistically in one package. Five groups of
+   spins, one colour each for ANTs, AFNI, FSL, FreeSurfer and Workbench, come to one frequency and
+   gather into a brain from the MNI template."
+   Why: the slogan goes, replaced by the user's line (section 8, decision 1); the text says what
+   the animation shows.
 2. Before: "LARMORX is an open-source, cross-platform neuroimaging toolbox that reimplements
    established neuroimaging algorithms and command-line tools in Rust. It aims to reproduce the
    functionality and behaviour of tools from ANTs, AFNI, FreeSurfer and others, without requiring
@@ -571,10 +592,18 @@ bit-identical, the dashes let the original's line show through.
   three port colours (`data/ecosystems.yml`: tedana `#bab967`, sdcflows `#93e3b1`, fMRIPrep
   `#85dcfc`). They are checked with the verdicts' measures, to the thresholds pastels allow: a
   new pastel at least 10 from its neighbours under normal vision and 9 under protanopia and
-  deuteranopia, at least 7 from any other pastel, the chip's ink at 4.5:1 or more on each
-  (`validation/investigations/docs-revision/pastels.py`). Pastels are pale, so they cannot be as
-  far apart as the verdicts' fills (18 and 11); a group's name is always on its chip. Before the
-  pilot, `data/status.yml` gave them LARMORX's apricot (`eco: larmorx`).
+  deuteranopia, at least 7 from any other pastel under normal vision and 4 under protanopia and
+  deuteranopia, the chip's ink at 4.5:1 or more on each
+  (`validation/investigations/docs-revision/pastels.py`, which prints every pair). Pastels are
+  pale, so they cannot be as far apart as the verdicts' fills (18 and 11); a group's name is
+  always on its chip. fMRIPrep's pastel is 39° in hue from the replica's blue, so it never stands
+  next to a replica's mark without its chip's text. Before the pilot, `data/status.yml` gave them
+  LARMORX's apricot (`eco: larmorx`).
+- **A status is neutral**: *validated* in ink with a solid border, *experimental* with a dashed
+  one, never in a software's pastel, which would read as that software's name.
+- **The sidebar** lists the evidence pages grouped by software under a pastel chip with the
+  group's name, with no dot beside a program; each page's software is its group on the Programs
+  page (`eco` in `site.yml`).
 - **The site's accent** (focus rings, sliders, the brand) stays LARMORX's apricot: it marks
   controls, never data.
 - **What the rollout corrects.** Today every port's panel label is apricot, the replica's too. The
@@ -709,9 +738,9 @@ The header's links: Getting started, Concepts, Programs, Validation, Roadmap, Ab
 
 ### The home page, section by section
 
-1. **The hero**, as now: the animation and its still image, the name and the tagline (question 1
-   below), one line on what LARMORX is, `pip install larmorx`, the platforms. Its closing text
-   says what the animation shows (example 1).
+1. **The hero**, as now: the animation and its still image, the name and the tagline (decision 1
+   below), one line on what LARMORX is, `pip install larmorx`, the platforms. At the animation's
+   end, the user's line as its title and a text that says what the animation shows (example 1).
 2. **What LARMORX gives**, one short paragraph (example 2), and the state of the project: early
    development; 0.1.0rc1 is a pre-release.
 3. **Original, replica, clean room.** Three short cards, one per word (examples 3 to 6), with the
@@ -756,25 +785,27 @@ files"). 14 keep their names: 12 of random testing's cases and 2 investigation s
 column counts words to read one by one; most of them name the program compared with, which is
 right.
 
-## 8. Questions for the user
+## 8. The user's decisions
+
+The user decided the five questions of the draft on 2026-11-12, each as recommended ("Regarding
+the other decision and recommendation I agree"), and chose the line that replaces the slogan.
 
 1. **The tagline** ("Bringing Neuroimaging Tools into Resonance. Reimplemented in Rust.
-   Accessible through Python. Built for FAIR research.", yours, 2026-10-19). Recommendation: keep
-   it in the hero, where the animation shows it; "Many toolkits, one framework" goes.
-2. **Colours shared by a port and something else** (section 5). Three verdicts and the difference
-   maps share the apricot and the blue with the ports; ANTs' and LARMORX's own colours are the
-   replica's and the clean room's. Recommendation: keep the verdicts' and the difference maps'
-   colours, with the rule that ports are lines and labels and verdicts filled areas with a
-   pattern (changing them would redraw 81 images); show the software colours only as pastels
-   with their names, and give tedana, sdcflows and fMRIPrep a pastel each.
-3. **Shorter pages.** The rewrite shortens the prose, so a page's word count falls; every number,
-   figure, table, viewer, image, link and fact stays. Recommendation: the merge's before/after
-   inventory compares everything except words and lists the word counts beside it; the reviewer
-   checks page by page that every fact stays.
-4. **Which version the pages describe.** Recommendation: `main`, which the tests run, with what
-   0.1.0rc1 lacks marked "from the next release" and 0.1.0rc1's way beside it (section 2, rule
-   14). The other way, describing 0.1.0rc1, would leave tedana's clean room and the three options
-   off the pages until the next release.
+   Accessible through Python. Built for FAIR research.", the user's, 2026-10-19) stays in the
+   hero, where the animation shows it. "Many toolkits, one framework" goes. In its place, the
+   title at the animation's end is the user's line: "Many neuroimaging toolboxes working
+   synergistically in one package." It is the user's own sentence, so section 2's list of words
+   to leave out does not apply to it.
+2. **Colours shared by a port and something else** (section 5). The verdicts and the difference
+   maps keep their colours (changing them would redraw 81 images). Ports are lines, marks and
+   labels; verdicts are filled areas with a pattern. The software colours appear only as pastels
+   with their names, and tedana, sdcflows and fMRIPrep have a pastel each.
+3. **Shorter pages.** A rewrite shortens the prose, so a page's word count may fall, but every
+   number, figure, table, viewer, image, link and fact stays. The merge's before/after inventory
+   compares everything except words and lists the word counts beside it. The reviewer checks page
+   by page that every fact stays.
+4. **Which version the pages describe**: `main`, which the tests run. What 0.1.0rc1 lacks is
+   marked "from the next release", with 0.1.0rc1's way beside it (section 2, rule 14).
 5. **Developer words.** Developer documents keep *oracle*, *upstream*, *parity* and *the main
    package*, since directories and modules carry these names (`oracles/`, the oracle-output
-   cache, `tests/parity`); user pages use the new words. Recommendation: yes.
+   cache, `tests/parity`). User pages use the new words.

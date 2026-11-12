@@ -320,3 +320,50 @@ def test_programs_check_catches_a_missing_command(tmp_path, monkeypatch):
     monkeypatch.setattr(programs, "commands", lambda repo: [*real(repo), ("fsl", "fnirt")])
     _, _, problems = programs.build(reference.REPO, None)
     assert any("larmorx fsl fnirt" in p for p in problems)
+
+
+def test_programs_what_it_does_has_one_source(monkeypatch):
+    """Where an API page holds a program's reference block, the Programs page takes what the
+    program does from it, and an entry that also gives its own `does` is a problem."""
+    from larmorx_validation.reference import programs
+
+    _, progs, _ = programs.build(reference.REPO, None)
+    bet = next(p for p in progs if p.name == "bet")
+    page = apipage.read(REPO, API)
+    first = next(p for p in page.programs if p.name == "bet").description.split("\n\n")[0]
+    assert bet.does == programs.first_sentence(first)
+    real = programs._api_does
+    monkeypatch.setattr(
+        programs,
+        "_api_does",
+        lambda repo, api: {"antsRegistration": "It registers."}
+        if api == "docs/api/ants-registration.md"
+        else real(repo, api),
+    )
+    _, _, problems = programs.build(reference.REPO, None)
+    assert any("antsRegistration: `does` given" in p for p in problems), problems
+
+
+def test_programs_check_catches_an_api_page_without_an_entry(monkeypatch):
+    """Every API page but the register's is some entry's `api`."""
+    from larmorx_validation.reference import programs
+
+    monkeypatch.setattr(programs, "NOT_PROGRAMS", set())
+    _, _, problems = programs.build(reference.REPO, None)
+    assert problems == [
+        "validation/programs.toml: no entry names docs/api/upstream-defects.md as its `api`"
+    ]
+
+
+@pytest.mark.parametrize(
+    ("text", "first"),
+    [
+        ("`bet` finds the brain.\nIt writes it.", "`bet` finds the brain."),
+        ("FSL 6.0.7.23 runs it. Then", "FSL 6.0.7.23 runs it."),
+        ("No full stop", "No full stop"),
+    ],
+)
+def test_first_sentence(text, first):
+    from larmorx_validation.reference import programs
+
+    assert programs.first_sentence(text) == first

@@ -69,6 +69,11 @@ impl Tally {
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
+    if args.get(1).map(String::as_str) == Some("--replay") {
+        // fs-minc-nifti --replay <file> <mode> <comp 0|1> <reproduce 0|1> <ops in zt's spelling>...
+        checks_nifti::replay(&args[2..]);
+        return;
+    }
     let dir = std::path::PathBuf::from(args.get(1).expect("usage: fs-minc-nifti <build-dir> [scale] [--only <family>]"));
     let mut scale = 1u64;
     let mut only: Option<String> = None;

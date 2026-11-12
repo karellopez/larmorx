@@ -43,14 +43,14 @@ for f in niftilib/nifti1_io.c znzlib/znzlib.c; do
 done
 "$CC" "${FLAGS[@]}" "${SHIM[@]}" "${up_inc[@]}" -c "$here/shim_up.c" -o "$out/obj/shim_up.o"
 "$CC" "${FLAGS[@]}" "${up_inc[@]}" -c "$here/up_stubs.c" -o "$out/obj/stubs_up.o"
-"$CC" "${FLAGS[@]}" -DHAVE_ZLIB "${up_inc[@]}" -c "$here/shim_nifti.c" -o "$out/obj/shim_nifti_up.o"
+"$CC" "${FLAGS[@]}" "${SHIM[@]}" -DHAVE_ZLIB "${up_inc[@]}" -c "$here/shim_nifti.c" -o "$out/obj/shim_nifti_up.o"
 "$CC" -shared -fopenmp -Wl,-Bsymbolic -Wl,--no-undefined -o "$out/libup.so" \
   "$out/obj/shim_up.o" "$out/obj/stubs_up.o" "$out/obj/shim_nifti_up.o" "${objs[@]}" -lz -lm
 S="$unit/src/fs-shadow/packages"
 B="$unit/build/fs/packages"
 fs_inc=(-I"$S/minc" -I"$B/minc" -I"$S/netcdf" -I"$S/nifti" -I"$B/nifti")
 "$CC" "${FLAGS[@]}" "${SHIM[@]}" "${fs_inc[@]}" -c "$here/shim_fs.c" -o "$out/obj/shim_fs.o"
-"$CC" "${FLAGS[@]}" -DHAVE_ZLIB "${fs_inc[@]}" -c "$here/shim_nifti.c" -o "$out/obj/shim_nifti_fs.o"
+"$CC" "${FLAGS[@]}" "${SHIM[@]}" -DHAVE_ZLIB "${fs_inc[@]}" -c "$here/shim_nifti.c" -o "$out/obj/shim_nifti_fs.o"
 libs=("$B/minc/libminc.a" "$B/netcdf/libnetcdf.a" "$B/nifti/libnifti.a")
 "$CC" -shared -fopenmp -Wl,-Bsymbolic -Wl,--no-undefined -o "$out/libfs.so" \
   "$out/obj/shim_fs.o" "$out/obj/shim_nifti_fs.o" "${libs[@]}" -lz -lm

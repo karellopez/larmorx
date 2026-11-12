@@ -15,7 +15,7 @@ authors = [
 # AFNI's MCW code under CC BY 4.0, fdlibm, ...; their texts and notices in NOTICE and LICENSES/)
 # and the Rust crates it is built with (zlib-rs, libbz2-rs-sys; the wheel's SBOM lists them all).
 # scripts/release/licences.py derives it and checks it (validation/tests/test_release.py).
-license = "Apache-2.0 AND BSD-2-Clause AND BSD-3-Clause AND bzip2-1.0.6 AND CC-BY-4.0 AND HDF5 AND MIT AND MPL-2.0 AND PSF-2.0 AND SunPro AND Zlib"
+license = "Apache-2.0 AND BSD-2-Clause AND BSD-3-Clause AND bzip2-1.0.6 AND CC-BY-4.0 AND HDF5 AND LicenseRef-MNI AND MIT AND MPL-2.0 AND PSF-2.0 AND SunPro AND Zlib"
 license-files = ["LICENSE", "NOTICE", "LICENSES/*"]
 keywords = ["neuroimaging", "mri", "fmri", "registration", "preprocessing", "ants", "afni", "rust"]
 classifiers = [

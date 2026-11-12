@@ -83,6 +83,7 @@ dependencies = [
 name = "fs-minc-nifti"
 version = "0.0.1"
 dependencies = [
+ "flate2",
  "larmorx-core",
  "larmorx-io",
 ]

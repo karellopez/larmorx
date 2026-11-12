@@ -13,6 +13,7 @@ publish = false
 [dependencies]
 larmorx-core = { path = "../../../crates/larmorx-core" }
 larmorx-io = { path = "../../../crates/larmorx-io" }
+flate2 = { version = "1.1.10", default-features = false, features = ["zlib-rs"] }
 
 [profile.release]
 debug = false

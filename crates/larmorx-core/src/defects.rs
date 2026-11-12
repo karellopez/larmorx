@@ -1003,6 +1003,12 @@ defects! {
         "a thin-plate spline with an empty Points list frees a pointer that was never set (a crash or heap damage), and the writer writes such a list with no ';', so the file cannot be read back";
     FS_75 = "FS-75", "MINC volume_io", true,
         "a file name that starts with a $VAR (or ~) whose value is empty writes through a null pointer (expand_filename has not allocated its result yet): the program crashes";
+    FS_76 = "FS-76", "nifticlib", true,
+        "znzread or znzwrite on a compressed file with a member size of 0 divides by zero (nmemb - remain/size): a crash, or whatever the compiled code makes of it";
+    FS_77 = "FS-77", "nifticlib", true,
+        "znzread on a compressed file that ends inside a member counts that member as read (nmemb - remain/size rounds the missing members down): a caller checking the count takes a short read for a complete one";
+    FS_78 = "FS-78", "zlib 1.2.11", true,
+        "gzseek forward (or gzflush or gzclose after it) before the first gzwrite fills the gap with memory zlib never set instead of zeros: gz_zero clears its buffer once, before allocating it";
 }
 
 /// The register entry with ID `id`.

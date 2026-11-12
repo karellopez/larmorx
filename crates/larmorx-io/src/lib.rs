@@ -8,6 +8,7 @@
 //! - [`itk_hdf5`]: ITK's HDF5 transform files, read and written as ITK v5.4.5 reads and writes
 //!   them (through `larmorx-hdf5`).
 //!
+//! - [`znz`]: znzlib's files, plain or gzip (nifticlib 2.0.0 over zlib 1.2.11's file layer).
 //! - [`xfm`]: MNI transform files (`.xfm`), read and written as MINC 1.5.1's volume_io does.
 //!
 //! MGH/MGZ, GIFTI, CIFTI-2 and FreeSurfer surfaces follow.
@@ -20,3 +21,4 @@ pub mod itk_transform;
 mod itk_transform_names;
 pub mod nifti;
 pub mod xfm;
+pub mod znz;

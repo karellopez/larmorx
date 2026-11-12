@@ -17,3 +17,12 @@ python -P validation/investigations/docs-revision/old_words.py --repo . \
 It reads tracked files only and takes about 15 seconds. Run again after each step of the rollout:
 the columns of words to change should fall to zero in the areas the writer changes, and stay in
 the areas kept as written (history, identifiers).
+
+`evidence_roles.py` counts what the site's evidence compares: every comparison label
+(`role_label`) with its count and two examples, the panels' roles and the chart series' marks per
+page. The writing guide's section 4 maps each label to its new form, and section 5 gives each
+role and mark its colour.
+
+```
+python -P validation/investigations/docs-revision/evidence_roles.py <checkout of larmorx_documentation>
+```

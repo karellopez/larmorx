@@ -267,19 +267,25 @@ def _records(text: str) -> list[tuple[int, list[str]]]:
     return out
 
 
-def _dedup(names: list[str]) -> list[str]:
-    """pandas' ``_dedup_names`` (``mangle_dupe_cols``): ``x``, ``x.1``, ``x.2``, ..."""
+def _header(fields: list[str]) -> list[str]:
+    """The C engine's header (``TextReader._get_header``): an empty name ``Unnamed: <i>``, a
+    repeated one ``<name>.<k>`` with the first ``k`` not yet in the header, the named columns
+    renamed before the unnamed ones."""
+    header = [f if f != "" else f"Unnamed: {i}" for i, f in enumerate(fields)]
+    unnamed = [i for i, f in enumerate(fields) if f == ""]
+    order = [i for i in range(len(header)) if i not in unnamed] + unnamed
     counts: dict[str, int] = {}
-    out = []
-    for col in names:
+    for i in order:
+        col = header[i]
+        old = col
         cur = counts.get(col, 0)
         while cur > 0:
-            counts[col] = cur + 1
-            col = f"{col}.{cur}"
-            cur = counts.get(col, 0)
-        out.append(col)
+            counts[old] = cur + 1
+            col = f"{old}.{cur}"
+            cur = cur + 1 if col in header else counts.get(col, 0)
+        header[i] = col
         counts[col] = cur + 1
-    return out
+    return header
 
 
 def _int_or_none(tokens: list[str]) -> tuple[str, Any]:
@@ -448,7 +454,7 @@ def read_tsv(
     if not recs:
         raise EmptyDataError("No columns to parse from file")
     header = recs[0][1]
-    names = _dedup([n if n != "" else f"Unnamed: {i}" for i, n in enumerate(header)])
+    names = _header(header)
     width = len(names)
     rows = recs[1:]
     if rows and len(rows[0][1]) > width:

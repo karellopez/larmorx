@@ -148,21 +148,25 @@ def filter_dropped(
     path = _existing("_FilterDroppedInputSpec", "in_file", in_file)
     out = fname_presuffix(path, suffix="_filtered", newpath=_out_dir(out_dir))
     meta = tb.read_tsv(path, pandas_version=pandas_version, upstream_defects=upstream_defects)
-    keep = _retained(meta)
-    tb.write_tsv(out, meta.take_rows(keep))
+    keep = _retained(meta, pandas_version)
+    tb.write_tsv(out, Table([], [], []) if keep is None else meta.take_rows(keep))
     return out
 
 
-def _retained(meta: Table) -> list[int]:
-    """``metadata[metadata.retained]``'s rows."""
+def _retained(meta: Table, pandas_version: str) -> list[int] | None:
+    """``metadata[metadata.retained]``'s rows; ``None`` for pandas' empty selection of columns
+    (an empty ``retained`` column is no boolean mask: the table keeps no column and no row)."""
     if "retained" not in meta.names:
         raise AttributeError("'DataFrame' object has no attribute 'retained'")
     col = meta.column("retained")
     if col.kind == "bool":
         return np.flatnonzero(np.asarray(col.values)).tolist()
+    if len(col) == 0:
+        return None
     if col.kind == "object" and all(isinstance(v, bool) or v != v for v in col.values):
         raise ValueError("Cannot mask with non-boolean array containing NA / NaN values")
-    raise KeyError(f"None of [Index({list(col.values)!r}, dtype='object')] are in the [columns]")
+    dtype = "str" if tb.pandas_series(pandas_version) == "3.0" else "object"
+    raise KeyError(f"None of [Index({list(col.values)!r}, dtype='{dtype}')] are in the [columns]")
 
 
 @dataclass(frozen=True)
@@ -200,7 +204,10 @@ def rename_acompcor(
     d = _out_dir(out_dir)
     comp_out = fname_presuffix(comp_path, suffix="_renamed", newpath=d)
     meta_out = fname_presuffix(meta_path, suffix="_renamed", newpath=d)
-    retained = metadata.take_rows(_retained(metadata))
+    keep = _retained(metadata, pandas_version)
+    if keep is None:
+        raise KeyError("mask")
+    retained = metadata.take_rows(keep)
     masks = retained.column("mask").values
     names = retained.column("component").values
     rows = retained.index

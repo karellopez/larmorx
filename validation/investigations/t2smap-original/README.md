@@ -32,3 +32,9 @@ the results in the part's NOTES.
 | `classify.py` | a trial's findings by cause (the first rule matching a failed check's detail), with their signatures and examples: the categories of `validation/difftest/triage.toml`'s entries for the tool | `python3 classify.py <oracles/difftest/<trial>>` |
 | `retriage.sh` | every finding of a trial replayed through the current descriptor (`difftest --replay`), its verdict line and reason: which findings the fixes and the harness's changes settle (relay 3c: all 50 of trial 2) | `bash retriage.sh <oracles/difftest/<trial>> > log` (boxed, `LARMORX_GPL_BIN` set) |
 | `classify_replayed.py` | a trial's findings by cause after `retriage.sh`: the replay's reason (TED-46's expected divergence, the replica's gaps) or the failed checks' kind at the trial (a stopped run's partial outputs, TED-15's count, TED-01's infinite mean, the model's stop) | `python3 classify_replayed.py <oracles/difftest/<trial>> <retriage log>` |
+
+## Relay C5 (2026-11-12): the site's typographer
+
+| Script | What it shows | How to run |
+|---|---|---|
+| `typographer_hazards.py` | every text of an evidence part's JSON that the site renders as Markdown (the facts, summary, reasons, notes, titles, row heads and subs, cell texts, provenance), rendered as the site does (markdown-it with its typographer, the replacements and smart quotes), and each one whose rendering gains a sign (`(c)` ©, `(r)` ®, `(tm)` ™, `--` –, `+-` ±, `..` …) or holds a section the random-testing harness wrote as `§N.N`: in the part exported by relay C4, 29 (`(b)/(c)` in the reasons and the fMRIPrep table's note; `§N.N` in the trial table's row heads), none after relay C5 | `python3 typographer_hazards.py <part.json>` (markdown-it-py from the workspace's environment) |

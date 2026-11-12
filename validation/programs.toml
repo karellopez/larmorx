@@ -107,7 +107,7 @@ command = "larmorx ants DenoiseImage"
 python = "lx.ants.denoise_image"
 does = "Adaptive non-local means denoising; ANTs' single-thread result at any thread count."
 api = "docs/api/ants-denoise.md"
-evidence = "/tools/ants-denoise/"
+evidence = "/evidence/ants-denoise/"
 records = { replica = ["ants-denoise"] }
 
 [[program]]
@@ -117,7 +117,7 @@ command = "larmorx ants antsApplyTransforms"
 python = "lx.ants.apply_transforms"
 does = "Resampling through ITK transforms, in double and with `--float 1`; transform outputs."
 api = "docs/api/ants-apply-transforms.md"
-evidence = "/tools/ants-apply-transforms/"
+evidence = "/evidence/ants-apply-transforms/"
 records = { replica = ["ants-apply-transforms"] }
 
 [[program]]

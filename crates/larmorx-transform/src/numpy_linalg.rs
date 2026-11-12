@@ -127,6 +127,15 @@ pub enum LapackRelease {
 const EPS: f64 = f64::EPSILON * 0.5;
 /// `DLAMCH('S')`: the safe minimum, 2^-1022.
 const SAFMIN: f64 = f64::MIN_POSITIVE;
+/// `DBDSQR`'s `EPS**MEIGTH` (`MEIGTH = -0.125`), which gfortran computes at run time with
+/// glibc's `pow`: `pow(2^-53, -0.125)` = 2^6.625 correctly rounded, 98.70149282610821
+/// (`0x4058ACE5422AA0DB`; the unit test `dbdsqr_tolmul_is_pow_of_eps` checks it against both
+/// `larmorx_core::math::pow` and `pow_glibc`). Until 2026-11-12 the constant here was
+/// `0x4058ACDBEF8F9B61` (98.70092381500355), so `TOL` was 5.8e-6 too small in relative terms
+/// and a superdiagonal entry between the two tolerances converged one sweep later than in
+/// LAPACK (the confounds part's random-testing finding 54131: the cosine drift basis wider
+/// than the series, whose `DLASDQ` leaves have nearly equal diagonals).
+const DBDSQR_TOLMUL: f64 = f64::from_bits(0x4058_ACE5_422A_A0DB);
 
 /// Fortran's `SIGN(A, B)`: `|A|` with the sign bit of `B` (gfortran honours -0).
 #[inline]
@@ -1656,8 +1665,8 @@ fn dbdsqr_upper_ncc(
         let eps = EPS;
         let unfl = SAFMIN;
         // TOLMUL = MAX(10, MIN(100, EPS**(-1/8))): glibc's pow(2^-53, -0.125), correctly
-        // rounded (2^6.625).
-        let tolmul = 10f64.max(100f64.min(f64::from_bits(0x4058_ACDB_EF8F_9B61)));
+        // rounded (2^6.625 = 98.70149282610821; [`DBDSQR_TOLMUL`]).
+        let tolmul = 10f64.max(100f64.min(DBDSQR_TOLMUL));
         let tol = tolmul * eps;
         // Compute approximate maximum, minimum singular values.
         let mut smax = 0.0f64;
@@ -2251,6 +2260,18 @@ pub fn matmul3(p: &[[f64; 3]; 3], q: &[[f64; 3]; 3]) -> [[f64; 3]; 3] {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn dbdsqr_tolmul_is_pow_of_eps() {
+        // gfortran evaluates DBDSQR's EPS**MEIGTH with libm's pow at run time.
+        let want = larmorx_core::math::pow(EPS, -0.125);
+        assert_eq!(DBDSQR_TOLMUL.to_bits(), want.to_bits());
+        assert_eq!(
+            DBDSQR_TOLMUL.to_bits(),
+            larmorx_core::math::pow_glibc(EPS, -0.125).to_bits()
+        );
+        assert_eq!(DBDSQR_TOLMUL, 98.701_492_826_108_21);
+    }
 
     #[test]
     fn extended_root_of_two_squares() {

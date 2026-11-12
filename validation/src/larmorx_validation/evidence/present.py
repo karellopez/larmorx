@@ -136,6 +136,8 @@ def text(page: Page, s: str | None, code: bool = True) -> str | None:
 # ------------------------------------------------------------------------------- the panels
 
 _MODES = [
+    # "default mode (ANTS-112 corrected)": one bracket
+    (r"\bdefault mode \(([^()]*\bcorrected)\)", r"fix (the default, \1)"),
     (r"\bdefault mode\b", "fix (the default)"),
     (r"^default\b", "fix (the default)"),
     (r"\breproduce mode\b", "reproduce"),
@@ -159,13 +161,15 @@ def _original_panel(page: Page, p: dict) -> tuple[str, str, float]:
         program, label = m.group(1), m.group(2)
     m = re.match(
         rf"^{re.escape(page.software)}(?: (?P<ver>[0-9][\w.+-]*))?(?P<img> \(fMRIPrep's image\))?"
-        r"(?P<rest>,.*)?$",
+        r"(?:'s (?P<own>[\w -]+))?(?P<rest>,.*)?$",
         label,
     )
     if not m:
         raise ValueError(f"an original's panel of another shape: {p['label']!r}")
     ver = m.group("ver") or page.version
     rest = [r.strip() for r in (m.group("rest") or "").split(",") if r.strip()]
+    if m.group("own"):  # "ANTs 2.6.5's blobs": what the panel shows of the original's run
+        rest.insert(0, f"its {m.group('own')}")
     tail, rank = [], 0.0
     if m.group("img"):
         tail.append("fMRIPrep's build")
@@ -185,10 +189,12 @@ def _original_panel(page: Page, p: dict) -> tuple[str, str, float]:
 
 def _port_panel(page: Page, p: dict, against: str | None) -> tuple[str, str]:
     label, sub = p["label"], p.get("sub") or ""
-    m = re.match(r"^(?:(\w+): )?larmorx(?: \(port\))?(?P<rest>,.*)?$", label)
+    m = re.match(r"^(?:(\w+): )?larmorx(?: \(port\)|'s (?P<own>[\w -]+))?(?P<rest>,.*)?$", label)
     if not m:
         raise ValueError(f"a port's panel of another shape: {label!r}")
     rest = [r.strip() for r in (m.group("rest") or "").split(",") if r.strip()]
+    if m.group("own"):  # "larmorx's blobs": what the panel shows of the port's run
+        rest.insert(0, f"its {m.group('own')}")
     mode = _mode(sub)
     if "fix" not in mode and "reproduce" not in mode:
         raise ValueError(f"a port's panel without its mode: {label!r} ({sub!r})")
@@ -200,8 +206,11 @@ def _port_panel(page: Page, p: dict, against: str | None) -> tuple[str, str]:
     return name, second
 
 
-def _fmriprep_panel(p: dict) -> tuple[str, str]:
+def _fmriprep_panel(page: Page, p: dict) -> tuple[str, str]:
     run = p["label"].removesuffix("'s own output")
+    m = re.match(r"^(\w+): (.*)$", run)  # "antsAI: fMRIPrep 25.2.6, as it ran"
+    if m and m.group(1) in (page.program, *page.programs):
+        run = m.group(2)
     return "fMRIPrep's output", f"{run}: {p['sub']}" if p.get("sub") else run
 
 
@@ -229,15 +238,21 @@ _LABEL = [
 def _label(page: Page, old: str) -> str:
     """A comparison's label: LARMORX's port by its name, the original by its program."""
     s = old
+    program = page.program
+    # a label that begins with its program ("antsAI: larmorx − ANTs, 1 thread", on a page of
+    # two programs): the program goes to the original's name
+    m = re.match(r"^(\w+): (.*)$", s)
+    if m and m.group(1) in (page.program, *page.programs):
+        program, s = m.group(1), m.group(2)
     for pat, rep in _LABEL:
         s = re.sub(pat, rep.format(port=words.PORT_NAME[page.port]), s)
     # the first mention of the software names the program; a second one is the same program
     sw = re.escape(page.software)
     first = re.search(rf"\b{sw}\b", s)
-    if first and page.program:  # (an example of several programs' calls names the software)
+    if first and program:  # (an example of several programs' calls names the software)
         head, tail = s[: first.end()], s[first.end() :]
         tail = re.sub(rf"\b{sw} (?=[0-9])", "", tail)
-        s = f"{head} {page.program}{tail}" if not tail.startswith(f" {page.program}") else s
+        s = f"{head} {program}{tail}" if not tail.startswith(f" {program}") else s
     return s
 
 
@@ -347,7 +362,7 @@ def example(
         elif p["role"] == "input":
             new[pid] = (p["label"], text(page, p.get("sub"), code=False))
         elif p["role"] == "fmriprep":
-            new[pid] = _fmriprep_panel(p)
+            new[pid] = _fmriprep_panel(page, p)
             originals[pid] = "fMRIPrep's output"
     for pid, p in by_id.items():
         if p["role"] == "larmorx":
@@ -659,12 +674,17 @@ def random_testing(page: Page, doc: dict, names: dict[str, str]) -> None:
 
 
 def finish(
-    page: Page, doc: dict, labels: dict[str, str] | None = None, runs: tuple[str, ...] = ()
+    page: Page,
+    doc: dict,
+    labels: dict[str, str] | None = None,
+    runs: tuple[str, ...] = (),
+    pages: dict[str, Page] | None = None,
 ) -> dict:
-    """The page's tables (``runs``: the ids of those whose rows are a worked example's runs),
-    cases, its categories' names and the mark that it is presented."""
+    """The page's tables (``runs``: the ids of those whose rows are a worked example's runs;
+    ``pages``: a table's own page, where its runs are of another program of the page), cases,
+    its categories' names and the mark that it is presented."""
     for t in doc.get("tables", []):
-        table(page, t, runs=t["id"] in runs)
+        table((pages or {}).get(t["id"], page), t, runs=t["id"] in runs)
     cases(page, doc.get("cases", []))
     known = {**CATEGORY_LABELS, **(labels or {})}
     used = list(dict.fromkeys(c["category"] for c in doc.get("cases", [])))

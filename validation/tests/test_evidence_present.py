@@ -378,3 +378,48 @@ def test_a_page_of_several_programs():
     assert sp["title"].endswith("`MultiplyImages` 2.6.5")
     with pytest.raises(ValueError, match="without its program"):
         present.original_name(replace(page, programs=()))
+
+
+def test_a_page_of_two_programs_and_what_a_panel_shows():
+    """antsAI's page: a label that begins with its program, the other program's runs named
+    by it, a panel of the original's own result ("ANTs 2.6.5's blobs"), a port's panel whose
+    label gives no mode named by the page, and a correction named in the mode's bracket."""
+    from dataclasses import replace
+
+    page = replace(PAGE, program="antsAI", programs=("antsAI", "antsAffineInitializer"))
+    ex = _example()
+    ex["panels"] += [
+        {"id": "blobs", "role": "original", "label": "ANTs 2.6.5's blobs", "sub": "the probe",
+         "arrays": {}},
+        {"id": "lxb", "role": "larmorx", "label": "larmorx's blobs",
+         "sub": "default mode (ANTS-112 corrected)", "arrays": {}},
+        {"id": "init", "role": "larmorx", "label": "antsAffineInitializer: larmorx",
+         "sub": "niworkflows' arguments", "arrays": {}},
+    ]  # fmt: skip
+    ex["panels"][4]["label"] = "antsAI: fMRIPrep 25.2.6, as it ran"
+    ex["diffs"][0]["label"] = "antsAI: larmorx − ANTs 2.6.5, 1 thread, as built"
+    ex["diffs"].append(
+        {"id": "init-ants", "a": "init", "b": "ants", "kind": "main",
+         "label": "antsAffineInitializer: larmorx − ANTs (placed)", "role_label": "x",
+         "metrics": {}, "verdict": "bit-identical", "reason": ""}
+    )  # fmt: skip
+    named = {"init": ("antsAffineInitializer: replica", "reproduce, 8 threads")}
+    out = present.example(page, ex, shows="x", verdicts=["lx-ants"], panels=named)
+    p = {x["id"]: x for x in out["panels"]}
+    assert (p["blobs"]["label"], p["blobs"]["sub"]) == (
+        "ANTs antsAI 2.6.5",
+        "its blobs · the probe",
+    )
+    assert p["lxb"]["sub"].startswith("larmorx, Apache-2.0 · its blobs, fix (the default, ANTS-112")
+    assert p["init"]["label"] == "antsAffineInitializer: replica" and p["init"]["port"] == "replica"
+    assert p["fp"]["sub"].startswith("fMRIPrep 25.2.6, as it ran")
+    labels = {d["id"]: d["label"] for d in out["diffs"]}
+    assert labels["lx-ants"] == "replica − ANTs antsAI 2.6.5, 1 thread, as built"
+    assert labels["init-ants"] == "replica − ANTs antsAffineInitializer (placed)"
+    bare = _example()
+    bare["panels"].append(
+        {"id": "init", "role": "larmorx", "label": "antsAffineInitializer: larmorx",
+         "sub": "niworkflows' arguments", "arrays": {}}
+    )  # fmt: skip
+    with pytest.raises(ValueError, match="without its mode"):
+        present.example(page, bare, shows="x", verdicts=[])

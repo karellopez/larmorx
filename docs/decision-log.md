@@ -2444,3 +2444,9 @@ replica's gaps, the site, the handoff); the clean relays never read the replica 
   replica is built but kept off the public repositories (a local branch, never pushed, outside every wheel) until the
   authors' permission arrives (the orchestrator's caution: publishing a translation of unlicensed code would
   redistribute it without permission); the clean room is published as usual.
+- **Correction, EPFL's B-splines (the same day):** the file the replica translates, `utils/mriBSpline.cpp`, is Martin
+  Reuter's (FreeSurfer's team) and carries MGH's notice: FreeSurfer distributes it under FreeSurfer's licence; it is
+  "based on" EPFL's paper (Thévenaz, Blu, Unser 2000) and their 2D example code (routine names), whose own page states
+  no licence; the method is the published recursion LARMORX already ports from ITK and SciPy. So its replica goes into
+  `larmorx-freesurfer` like FreeSurfer's other files, crediting EPFL; no private branch is needed; the request to the
+  authors is a courtesy (the user: "We will ask the author afterwards").

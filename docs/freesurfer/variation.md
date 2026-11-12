@@ -94,7 +94,7 @@ archive (§4). What is still open is in §5. Lines are FreeSurfer 8.2.0's
   | Where | Programs | What it sums | Effect |
   |---|---|---|---|
   | `utils/mrifilter.cpp` 6713, `MRIgaussianSmoothNI` | `mri_coreg` (by default: its images are smoothed at each scale), `mri_convert`, `mri_normalize`, `mri_segreg`, `mri_vol2surf` (with smoothing options) | the kernel's sum and sum of squares, `long double`, partitioned by thread | **thread-count dependent**, at the `long double` level: FreeSurfer's comment (6738-6741) says `double` gave "small differences in voxel values ... across different number of threads" and `long double` "resolves the differences" (it makes them rarer; the order still changes) |
-  | `mri_robust_register/MultiRegistration.cpp` 1419-1423, `initialXforms` | `mri_robust_template` (several inputs: recon-all's MotionCor, sMRIPrep's template) | the centroid, a `vnl_vector_fixed<double,4>`, added in a `critical` block of a `parallel for schedule(static,1)` over the registrations | **run-to-run nondeterministic** with four or more inputs and more than one thread (three or more terms added in the order the registrations finish; two terms commute exactly) |
+  | `mri_robust_register/MultiRegistration.cpp` 1419-1423, `initialXforms` | `mri_robust_template` (several inputs: recon-all's MotionCor, sMRIPrep's template) | the centroid, a `vnl_vector_fixed<double,4>`, added in a `critical` block of a `parallel for schedule(static,1)` over the registrations | **run-to-run nondeterministic** with four or more inputs and more than one thread (three or more terms added in the order the registrations finish; two terms commute exactly), **but only for an unbiased template**: with `--fixtp` (recon-all's MotionCor, sMRIPrep's default) `initialXforms` returns before the centroid is used (1478); sMRIPrep's `--longitudinal` template drops `--fixtp --noit` |
   | `utils/cma.cpp` 1181, `ComputeBrainVolumeStats2` | `mri_brainvol_stats` | ten volumes as sums of `VoxelVol` | exact for 1 mm voxels (recon-all's conformed space: integers); thread-count dependent for non-integer voxel volumes (`-cm`, high-resolution conforming) |
   | `utils/mri2.cpp` 7492, `MRIcropToFoV` | `mri_mask` | voxel coordinates (integers) as `double` | exact |
   | `utils/mrisurf_mri.cpp` 1784, `MRIScomputeBorderValues_new` | `mris_place_surface` | four means, `double` | printed only (2556), no output depends on them |
@@ -111,7 +111,23 @@ archive (§4). What is still open is in §5. Lines are FreeSurfer 8.2.0's
   `utils/mri2.cpp` 7429 and 7956, `utils/surfgrad.cpp` 1362, ...) are in functions no default-path
   program reaches. The full table: `<scratch>/r5/omp-acc.tsv` (regenerate with the tool).
 - **Measured at 1, 2 and 4 threads** (relay 5, `thread_check.py` with `thread_jobs.toml`, on the
-  reference runs' subjects, in a 12 GiB box): MEASUREMENTS-PLACEHOLDER
+  reference runs' subjects, in a 12 GiB box; every run's output hashed, LTA files also without
+  their comment lines, which hold the account name and the time of the run):
+  - sMRIPrep's `mri_robust_register --satit --iscale --mov T1.mgz --dst <T1w> --lta` (ds000005's
+    T1.mgz onto its rawavg.mgz) at 1, 4, 4 and 2 threads: **the same transform in all four runs**
+    (only the `# created by` line differs), and the same time (66-68 s) at every count: nothing
+    parallel runs on this path, as the call graph says.
+  - `mri_coreg` with its defaults (dithering with seed 53, smoothing on: "DoSmoothing 1", both
+    images smoothed at each scale) at 1, 4, 4 and 2 threads (`--threads`): **the same transform in
+    all four runs**, 132 s at one thread and 52-60 s at four. The `long double` kernel sums of
+    `MRIgaussianSmoothNI` did not change this result; FreeSurfer's own case for a difference is a
+    large image with a kernel of 6 mm FWHM or more (§5).
+  - recon-all's MotionCor (`mri_robust_template --satit --inittp 1 --fixtp --noit --iscale
+    --subsample 200`) on four inputs (the conformed `orig.mgz` of four reference runs; the
+    raw images were refused: "images have different voxel sizes") at 1, 4, 4 and 4 threads:
+    **the same template (identical bytes) and the same four transforms in all four runs**, 95 s
+    at one thread, 43 s at four: the three registrations do run side by side, and with `--fixtp`
+    the centroid sum above is never used.
 - **ITK's threads.** Both ITK programs run ITK at one thread whatever recon-all's `-itkthreads`
   says: `AntsN4BiasFieldCorrectionFs` takes its count from `--threads-nondetermistic` (default 1,
   lines 81-86 and 158-163, which also print that more threads "may be non-deterministic") and recon-all passes
@@ -185,6 +201,7 @@ path. No data file and no compiled default-path program is patched.
    `mri_sclimbic_seg`): run twice and at two thread counts on one recorded step, compare bytes
    (with the replay tool, sub-task 7).
 2. `MRIgaussianSmoothNI` at 1 and 4 threads on a large image with a wide kernel (FreeSurfer's own
-   case), and `mri_robust_template` with six inputs, to size the two effects of §2.
+   case), and `mri_robust_template` as an unbiased template (without `--fixtp --noit`, sMRIPrep's
+   `--longitudinal`) on four or more inputs at several thread counts, to size the two effects of §2.
 3. The random sources on default paths (§3): which use a fixed seed, which the clock; whether a
    default call of `mri_segreg` draws from its time-of-day seed.

@@ -112,11 +112,19 @@ def main() -> int:
                 sort_keys=True,
             )
             vgroups.setdefault(key, []).append(i)
+        failed = [r["threads"] for r in results if r["rc"] != 0 or None in r["outputs"].values()]
         verdict = {
             "byte_groups": [[results[i]["threads"] for i in g] for g in groups.values()],
             "value_groups": [[results[i]["threads"] for i in g] for g in vgroups.values()],
+            "failed_runs": failed,
         }
         report[job["name"]] = {"job": job, "runs": results, "verdict": verdict}
+        if failed:
+            print(
+                f"{job['name']}: FAILED runs (exit status or missing outputs) at {failed} threads",
+                flush=True,
+            )
+            continue
         print(
             f"{job['name']}: runs with identical bytes, by thread count: {verdict['byte_groups']}; "
             f"identical values: {verdict['value_groups']}",

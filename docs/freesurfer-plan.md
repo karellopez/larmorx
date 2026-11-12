@@ -24,8 +24,10 @@ from here".
   (pretrained models: Rust inference with the original weights, decision log 2026-10-19). The
   **classic stream** (`-no-v8`, what fMRIPrep 25.x's FreeSurfer 7.3.2 runs): `mri_watershed`,
   `talairach_avi`, `mri_em_register`, `mri_ca_normalize`, `mri_ca_register`, `mri_ca_label`. Most
-  programs, the surface steps among them, are shared by both. Both streams are recorded; which is
-  ported first is the user's choice (decision log). Both streams correct the intensity with ITK's N4:
+  programs, the surface steps among them, are shared by both. Both streams are recorded. **The order
+  (the user, 2026-11-12):** the programs both streams share first, then the classic-only ones (fMRIPrep's),
+  with the v8-only networks as a parallel track; FreeSurfer 7.3.2 is not ported (a reference for the final
+  comparisons only). Both streams correct the intensity with ITK's N4:
   recon-all runs `mri_nu_correct.mni --ants-n4`, which calls `AntsN4BiasFieldCorrectionFs` (LARMORX's
   N4 replica may serve), and both run `AntsDenoiseImageFs` and `mris_remesh`; v8 keeps
   `mri_em_register` and `mri_ca_normalize` and runs `mri_ca_register -invert-and-save`, and a fourth
@@ -124,6 +126,14 @@ record, memory near the original's, its reference page and evidence page from th
   should bring the preparation, the foundations and most of wave 3.2.
 
 ## Data files
+
+**Borrowed code inside FreeSurfer** (the user, 2026-11-12; decision log): every third-party piece gets a
+replica, in the package of its own licence family (GSL's GPL code in `larmorx-gpl`, CorTechs' non-commercial
+`tkregister2_cmdl` in a non-commercial package, Burkardt's MIT spline where MIT allows, EPFL's B-splines
+(`mriBSpline.cpp`, carrying MGH's notice) in `larmorx-freesurfer` crediting EPFL), and an improved clean room in
+`larmorx`; `larmorx` keeps full freedom, and users install a restricted replica only if they want it. Where a
+piece's licence and FreeSurfer's cannot be combined in one program, the replica uses the clean-room piece there
+(the placement table, `docs/freesurfer/third-party.md`). MARS later; ITK 4.13.2 where it differs from 5.4.5.
 
 The four rules (the user, 2026-11-12; decision log):
 

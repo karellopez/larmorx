@@ -2330,3 +2330,47 @@ option names changed), one after the other, beside the `t2smap` clean-room and c
     descriptions, `docs/api`, the site's pages; a test in each repository.
   - The parity smoke tier at 6 workers while three agents share the machine (at 8, a 27 GiB box stopped one
     worker).
+
+## 2026-11-11 and 12: `t2smap`'s clean-room original and the main package's own `topup` settings (the orchestrator, by the rules and on the spec writers' measurements)
+
+Three agents at once (the user, 2026-11-11), this part beside the easy command line and the confounds' port; nine
+clean relays (the implementer), two replica-side spec writers and four replica-side relays (the spec's answers, the
+replica's gaps, the site, the handoff); the clean relays never read the replica side's notes.
+- **The `topup` settings** (relay 1; the user's decision of 2026-11-09): the six configurations compiled into
+  `larmorx-fsl` from `crates/larmorx-fsl/src/topup/settings/` and found by name after FSL's own places (an FSL
+  installation's file of the same name wins, as in FSL); `lx.sdcflows.topup_config_file` gives the bare name when
+  neither FSL nor larmorx-nc has the file (it raised `FileNotFoundError`), so `pip install larmorx` alone runs
+  sdcflows 2.17's wiring. The values are FSL's in every case, so no result depends on which file is found.
+- **NaN bits:** every NaN the clean-room original makes from numbers is x86-64's default NaN on every platform; the
+  spec's `check.py` takes NaN = NaN. The RMSE map's voxels without a value are numpy's `nan` (sign bit clear), as
+  tedana writes them (spec writer 2).
+- **`reproduce` within the thresholds for the fitted numbers** (as for 3dvolreg's original): the log-linear fit in
+  closed form and the curve fit by the original's own trust-region solver (analytic derivatives on the echoes'
+  means), in both modes; what the TED defects compute, refuse or write is exact where the spec states it. One
+  exception (relay C4): at TED-46's voxels `reproduce` runs the main package's exact ports of numpy's `lstsq` and
+  SciPy's `curve_fit`, so tedana's rounding noise there is reproduced bit for bit.
+- **The curve fit's robustness (D11):** a trust-region step that cancels a parameter onto its lower bound to within
+  4 ulps is taken as crossing it (SciPy's in/out decision rests on its last bits there), stated in the record and
+  the findings.
+- **TED-31** (rule B, relay 3c): no voxel left for the fit, a clear error; tedana's `IndexError` in `reproduce`.
+  **TED-46** (rule A, after spec writer 2's measurement: tedana's slope at equal observations is the batched least
+  squares' rounding noise, its sign set by the voxel's place in the batch and the LAPACK and BLAS builds): the slope
+  0 by default. **TED-46 in the curve fit** (rule D measured by spec writer 4, then A): the curve fit's exact
+  solution (S0 the samples' value, T2* 500 ms after the floor, not a failure); a finite start of 500 ms was measured
+  and not taken (it converges at 1e9 to 2e10 ms and moves the cap in 20 of 23 cases). **TED-01:** only NaN means are
+  left out (tedana fails on a NaN mean, sorts an infinite one). Both implementations take these corrections, with
+  the same notices (`larmorx_core::defects`).
+- **The output directory before `--exclude`'s errors:** tedana makes it and leaves it empty (spec writer 1, by
+  running tedana directly); a cached replay cannot show it (the oracle-output cache records files only: a
+  follow-up), so the planned replica "fix" was dropped and the original makes the directory too.
+- **Threads:** without `t2smap`'s own `--n-threads` the clean-room original takes the run's thread count
+  (`--n-threads`, else `OMP_NUM_THREADS`, else every logical CPU), as the replica does since the easy command line;
+  its files are the same at every count.
+- **ANALYZE 7.5 and MGH/MGZ** (D5): read as nibabel 5.4.2 loads them, by `larmorx_tedana::formats` (written from
+  nibabel's MIT source, a permitted upstream), which the replica now calls too; its move to `larmorx-io` waits for
+  the FreeSurfer part (which needs MGH).
+- **FSL-121's wording** differs between the two `topup` implementations: a follow-up.
+- **The evidence** (relay RS3): images holding NaN (the RMSE map) are compared NaN against NaN as equal, their sizes
+  and windows taken from the voxels with a value, the viewer leaving such a voxel undrawn; arrays without NaN keep
+  their earlier bits. Texts the site renders as Markdown escape what its typographer would turn into signs
+  (`\(c)`, code spans), checked by `typographer_hazards.py` (relay C5).

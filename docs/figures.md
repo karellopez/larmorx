@@ -93,6 +93,11 @@ evidence").
   Blobs are named by their SHA-256 (byte-deterministic with this machine's zlib), so an unchanged
   result is the same file. Still posters (lossless WebP) of the default view serve readers
   without JavaScript.
+- **Images holding NaN** (a voxel without a value, e.g. tedana's RMSE map where fewer than two echoes
+  are good; 2026-11-12): a comparison counts NaN against NaN, and the same infinity, as no difference and
+  NaN against a number as a difference without a size (`differ_nan`); the sizes and the windows come from
+  the voxels where both hold a number; the viewer leaves such a voxel undrawn. Arrays without NaN take the
+  earlier path, bit for bit.
 - **The shown region**: the existing examples show the brain (fMRIPrep's mask, dilated), as
   before. A **data-panel case** shows everything, background, noise, artefacts and every edge
   included (`common.unmasked(*arrays)`: the box where any array is not 0; outside it every array

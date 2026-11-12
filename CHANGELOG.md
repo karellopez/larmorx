@@ -34,6 +34,22 @@ The changes on `main` since 0.1.0rc1, for the next release.
   the `sysconfig` line, `python -m larmorx`), the three options with the variables they replace,
   an example from start to end for Linux and macOS and one for Windows PowerShell, and what the
   `upstream defect ... corrected` notices mean.
+- **tedana's `t2smap` in the main package** (`pip install larmorx` alone): a clean-room original
+  (`crates/larmorx-tedana`, Apache-2.0, written from `specs/t2smap.md`, tedana's documentation and runs
+  of tedana's program, never its source) with every option, message, exit status and failure case of
+  tedana 26.0.3's `t2smap`, its corrections each with `--upstream-defects reproduce`; it runs with
+  `implementation="clean-room"` (`--implementation clean-room`) and by default when `larmorx-gpl` is not
+  installed. Its T2* and S0 fits keep within `specs/t2smap.md` §17.3's thresholds of tedana's (and, by
+  default, of the replica's); on fMRIPrep's curve-fit calls it is 10 to 15 times tedana's speed at one
+  thread and 19 to 30 times at eight, with a quarter of its memory, the same bytes at every thread count.
+  Without its own `--n-threads` it takes the run's thread count, as the replica does.
+- **topup's settings without FSL:** `larmorx fsl topup --config=b02b0` (and `b02b0_1`, `b02b0_2`,
+  `b02b0_4`, `b02b0_7T`, `test_acqp`) finds the main package's own settings, written from
+  `specs/topup.md`, when neither an FSL installation nor `larmorx-nc` has the file (an FSL installation's
+  file of that name still comes first); `lx.sdcflows.topup_config_file` then gives the name, which topup
+  finds, where it raised `FileNotFoundError`.
+- **`t2smap` reads ANALYZE 7.5 and MGH/MGZ images** as tedana does through nibabel, in both
+  implementations (`larmorx-gpl` 0.1.0rc1 refused them).
 
 ### Changed
 
@@ -52,6 +68,14 @@ The changes on `main` since 0.1.0rc1, for the next release.
   words; FSL's own programs stop at their first image (exit 1; `standard_space_roi`'s script goes
   on and exits 0 without an image, which its notice says), which `--upstream-defects reproduce`
   gives. Setting the variable is optional.
+- **Two new corrections in `t2smap`, in both implementations** (`larmorx-gpl`'s replica included):
+  TED-31, no voxel left for the fit (tedana fails with `IndexError: index 0 is out of bounds ...`), is
+  a clear error; TED-46, a voxel whose log-linear observations are all equal (saturated samples: no
+  decay), takes the slope 0 (T2* 500 ms after tedana's floor) where tedana keeps its least squares'
+  rounding noise (T2* 1 ms, or 1e16 ms and more), and in the curve fit its exact solution (S0 the
+  samples' value, not a failure). TED-01 leaves out only NaN first-echo means (an infinite mean is kept,
+  as tedana keeps it). Each is named on one line, and `--upstream-defects reproduce` gives tedana's
+  result.
 
 ### Deprecated
 
@@ -70,6 +94,10 @@ The changes on `main` since 0.1.0rc1, for the next release.
 - `scripts/release/check_install.py` keeps pip's temporary files and cache in its work folder:
   inside Apptainer's `--containall`, `/tmp` and the home folder are a 64 MiB space that pip
   filled ("No space left on device").
+- `larmorx-gpl`'s `t2smap` prints tedana's chained tracebacks (a 3D echo, a mask of another grid: two
+  errors, "During handling of the above exception, another exception occurred"), the two Python warnings
+  it left out (`overflow encountered in cast` for a value beyond float32's range, the temporal means'
+  `invalid value encountered in reduce`) and numpy's own digits in the dropout thresholds' line.
 
 ## [0.1.0rc1] - 2026-11-11
 

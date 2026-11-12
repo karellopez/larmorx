@@ -12,7 +12,8 @@
 //! `write50`'s vectors, the errors, which have no final newline).
 //!
 //! Every operation is in double precision in the C order; the dot products and updates are the
-//! reference BLAS `ddot` (unrolled by five) and `daxpy` ([`crate::vnl_svd`]). The f2c macros
+//! reference BLAS `ddot` (unrolled by five) and `daxpy`, with x86-64's NaN made explicit there and
+//! in `write50`'s division (`math::x86_nan`: a diverging run prints `-nan` on every platform). The f2c macros
 //! `abs`, `min` and `max` are kept with their C semantics (`x >= 0 ? x : -x`, `a <= b ? a : b`,
 //! `a >= b ? a : b`), and `mcstep`'s `(float).66` is the float `0.66f` widened to double.
 //!
@@ -98,7 +99,44 @@
 use crate::cfmt::{self, Streams};
 use crate::defects::{ITK_103, ITK_104, ITK_105, ITK_106, Notice, UpstreamDefects};
 use crate::math;
-use crate::vnl_svd::{daxpy, ddot};
+use crate::math::x86_nan::{add_f64, div_f64, mul_f64};
+
+/// The reference BLAS `ddot` (unrolled by five) with SSE's NaN rules explicit (`math::x86_nan`): an
+/// L-BFGS run that diverges makes NaNs here (`inf * 0`, `inf - inf`), and the printed iterates
+/// show their sign (x86-64's `-nan`).
+fn ddot(x: &[f64], y: &[f64]) -> f64 {
+    let n = x.len();
+    let m = n % 5;
+    let mut t = 0.0f64;
+    for i in 0..m {
+        t = add_f64(t, mul_f64(x[i], y[i]));
+    }
+    let mut i = m;
+    while i + 5 <= n {
+        t = add_f64(
+            add_f64(
+                add_f64(
+                    add_f64(add_f64(t, mul_f64(x[i], y[i])), mul_f64(x[i + 1], y[i + 1])),
+                    mul_f64(x[i + 2], y[i + 2]),
+                ),
+                mul_f64(x[i + 3], y[i + 3]),
+            ),
+            mul_f64(x[i + 4], y[i + 4]),
+        );
+        i += 5;
+    }
+    t
+}
+
+/// The reference BLAS `daxpy`, `y += a·x`, with SSE's NaN rules explicit.
+fn daxpy(a: f64, x: &[f64], y: &mut [f64]) {
+    if a == 0.0 {
+        return;
+    }
+    for (yi, &xi) in y.iter_mut().zip(x) {
+        *yi = add_f64(*yi, mul_f64(a, xi));
+    }
+}
 
 /// f2c's `abs(x)`: `x >= 0 ? x : -x` (keeps `-0`, flips a NaN's sign).
 #[inline]
@@ -552,7 +590,8 @@ fn write50(v: &[f64], mode: UpstreamDefects, out: &mut dyn Streams, call: &mut L
             line.push('\n');
         }
         line.push(' ');
-        line.push_str(&cfmt::pad(&cfmt::f(vi / vmaxscale, 5), 10));
+        // a vector of zeros divides 0 by 0 (ITK-105): x86-64's -nan
+        line.push_str(&cfmt::pad(&cfmt::f(div_f64(vi, vmaxscale), 5), 10));
     }
     line.push('\n');
     out.out(&line);

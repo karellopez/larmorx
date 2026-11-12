@@ -195,7 +195,16 @@ fn the_command_line_runs_the_clean_room_original() {
     for (name, bytes) in &from_cli {
         assert!(*bytes == direct[name], "{name} differs");
     }
-    let log = |bytes: &[u8], dir: &Path| text(bytes).replace(&dir.display().to_string(), "<dir>");
+    // macOS's temporary folder is reached through a symbolic link (/var -> /private/var): the
+    // program run in it gets the real path back from the system (getcwd), so both spellings
+    // stand for the directory.
+    let log = |bytes: &[u8], dir: &Path| {
+        let mut t = text(bytes);
+        if let Ok(real) = std::fs::canonicalize(dir) {
+            t = t.replace(&real.display().to_string(), "<dir>");
+        }
+        t.replace(&dir.display().to_string(), "<dir>")
+    };
     assert_eq!(log(&o.stderr, &a), log(&err, &b));
     assert!(text(&o.stderr).contains("Workflow completed"));
 }

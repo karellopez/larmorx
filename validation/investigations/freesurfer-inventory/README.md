@@ -132,3 +132,19 @@ Their results are in `docs/freesurfer/` (closed too).
       python -P validation/investigations/freesurfer-inventory/gcc84/scan_folds.py <scratch>/gcc84-n4/dumps
       python -P validation/investigations/freesurfer-inventory/gcc84/fit_in_binary.py <scratch>/gcc84-n4/n4_tu.o \
           <package root>/bin/AntsN4BiasFieldCorrectionFs ThreadedGenerateDataForFitting UpdateBiasFieldEstimate
+- `omp_reductions.py`: sub-task 5 (relay 5). Every OpenMP accumulation (`reduction` clauses,
+  `critical` and `atomic` blocks that add) in the files the default-path programs are built from:
+  the enclosing function, the ROMP guard and whether the loop runs in parallel in the official
+  binaries, each variable's declared type, the default-path programs that reach the function
+  (variation.md §2).
+
+      python -P validation/investigations/freesurfer-inventory/omp_reductions.py \
+          <workspace>/tags/freesurfer-8.2.0 <scratch>/licences.json <scratch>/cg-all.json --tsv <scratch>/omp-acc.tsv
+- `thread_check.py` with `thread_jobs.toml`: sub-task 5 (relay 5). Runs official programs as the
+  default paths call them, on the reference runs' subjects, at several thread counts and twice at
+  the same count, and says which runs give the same bytes (and, for LTA files, the same values
+  without the file-name and date lines). Run it in a memory box:
+
+      scripts/orchestration/boxed.sh 12 python -P validation/investigations/freesurfer-inventory/thread_check.py \
+          --fs-home <package root> --license <licence file> --runs <workspace>/oracles/freesurfer-8.2.0/runs \
+          --jobs validation/investigations/freesurfer-inventory/thread_jobs.toml --out <scratch>/threads

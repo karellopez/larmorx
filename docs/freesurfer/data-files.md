@@ -271,7 +271,10 @@ proposed home and by where FreeSurfer serves the files.
   `bin/rca-surfreg` ("fixed bugs in expert options": `rca-surfreg` gains `--expert`; recon-all's
   `if($XOptsFile)` becomes `if($#XOptsFile)`; the patched recon-all's `FS_RECON_VERSION` line is
   left unconfigured, `'@FS_VERSION@ (@BUILD_STAMP@)'`) and one Ubuntu 24 SAMSEG library: no data
-  file. The reference runs use the package as released, without updates.
+  file. The reference runs use the package as released, without updates. *Relay 5 read the
+  newest* (`patch_data_20260625.tgz`, 23,515,931 bytes, the orchestrator's D3): for Ubuntu 22 it
+  replaces ten files, no data file; on a default path only `recon-all` (the same one-line fix) and
+  `rca-surfreg`, which change no run without `-expert` (variation.md §4).
 
 ## 5. Licences and origins
 
@@ -368,6 +371,7 @@ foundations' part.
   They are small (12,374,295 bytes for the four).
 - D3. The newest 8.2.0 update archive (22 MB): download it to list what it replaces (the rule
   "newest upstream versions" may make the updated files the reference), or keep the package as
-  released for the reference runs?
+  released for the reference runs? *Decided* (the orchestrator, 2026-11-12): download it and record
+  what it replaces, the reference runs stay unpatched; done by relay 5 (variation.md §4).
 - D4. The size limit for shipping small FreeSurfer files in `larmorx-freesurfer`: the TOML uses
   2,000,000 bytes; the folding atlases are 2.86 MB each, the `fsaverage` labels 9.4 MB together.

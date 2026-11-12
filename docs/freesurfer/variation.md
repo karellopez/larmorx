@@ -1,12 +1,15 @@
-# FreeSurfer 8.2.0: variation (first pass)
+# FreeSurfer 8.2.0: variation
 
 **Closed to FreeSurfer clean-room implementers.** Written from FreeSurfer's source and the official
 binaries by a replica-side agent (`docs/porting-guide.md` §1).
 
 Sub-task 5 of FreeSurfer's preparation: what can make an official program's result differ from
 what its source defines, or from one run to the next: the build's floating-point settings, the
-thread count, random seeds. This first pass (relay 4) holds what is measured or read so far; §4
-lists what the next relay checks. Lines are FreeSurfer 8.2.0's (`<workspace>/tags/freesurfer-8.2.0`).
+thread count, random seeds; and the post-release updates of 8.2.0 (§4). Relay 4 wrote the first
+pass; relay 5 settled GCC bug 110182 for N4 (§1), classified every OpenMP accumulation on the
+default paths and measured the ones fMRIPrep's calls reach (§2), and read the newest update
+archive (§4). What is still open is in §5. Lines are FreeSurfer 8.2.0's
+(`<workspace>/tags/freesurfer-8.2.0`).
 
 ## 1. The build
 
@@ -28,10 +31,45 @@ lists what the next relay checks. Lines are FreeSurfer 8.2.0's (`<workspace>/tag
   just before `drand64` in `mri_ca_register`). A replica's `reproduce`
   therefore needs glibc 2.35's functions (`larmorx_core::math`'s `*_glibc`), and the official
   results may differ on another glibc.
-- **Open: GCC bug 110182.** GCC 11.4 and 12.3 at `-O3` drop two float roundings in ITK's B-spline fit
-  (`docs/findings/ants-n4.md`); the faulty test is old (`TYPE_PRECISION` of a vector type in
-  match.pd's double-conversion rule), so GCC 8.4 may have it too, and 8.2.0's default intensity
-  correction is `AntsN4BiasFieldCorrectionFs` (ITK 4.13.2's N4, built by GCC 8.4). To measure (§4).
+- **GCC bug 110182 does not touch the official N4: GCC 8.4.0 keeps the source's float roundings.**
+  GCC 11.4 and 12.3 at `-O3` drop two float roundings in ITK's B-spline fit
+  (`docs/findings/ants-n4.md`): the SLP vectorizer builds `vector(2) double` → `vector(2) float` →
+  `vector(2) double` round trips and match.pd's `TYPE_PRECISION` test folds them away. 8.2.0's
+  default intensity correction is `AntsN4BiasFieldCorrectionFs` (ITK 4.13.2's N4, built by GCC
+  8.4.0). *Measured* (relay 5, `validation/investigations/freesurfer-inventory/gcc84/`, with
+  conda-forge's GCC 8.4.0 under `<workspace>/oracles/toolchains/gcc-8.4`):
+  - the probe of `scripts/build_ants_oracle.sh` (ITK's `r` computation in miniature): 0 of 120
+    values differ at `-O3`, with FreeSurfer's flags, with `-msse2 -mfpmath=sse` and with
+    `-march=corei7`; Ubuntu 22.04's `g++-11` at plain `-O3`: 31 of 120;
+  - FreeSurfer's N4 pipeline (`n4_tu.cxx`: its ITK calls on ITK 4.13.2, configured with
+    FreeSurfer's `packages/source/build_itk.sh` options) compiled by GCC 8.4.0 with FreeSurfer's
+    flags and Ubuntu's defaults (`-fcf-protection -fstack-protector-strong`, the official
+    binaries carry `endbr64` and stack canaries): its GIMPLE after the vectorizers holds **no
+    lossy vector conversion chain** for the bug to fold (`scan_folds.py`, the GCC 11
+    investigation's scanner: 0 chains; GCC 8.4 does vectorize other double pairs, 423
+    `vector(2) double` mentions in the SLP dump);
+  - the official binary: `fit_in_binary.py` locates the object's functions in the stripped
+    `AntsN4BiasFieldCorrectionFs` by runs of identical instructions (the B-spline fit at
+    `0x69660`, the control-point evaluation at `0x6d180`, `UpdateBiasFieldEstimate` at `0x6fa30`;
+    runs of 13 to 53 instructions, the rest differing in inlining and the system headers); in
+    those three windows of the official program there is **no packed floating-point
+    instruction at all**, and the fit's three divisions for `r` are scalar `divsd` each rounded
+    to float by `cvtsd2ss`, as the source says (GCC 11's oracle: `divpd`, kept in double).
+  So a replica that follows the source reproduces the official N4's fit; no `gcc_double_axes`
+  mode is needed for FreeSurfer.
+- **`long double` is the x87's 80-bit format, in 12 reached functions.** `FLT_EVAL_METHOD` 0
+  holds for `float` and `double` (SSE2), but `long double` on x86-64 Linux is the x87 extended
+  format (64-bit significand), computed with x87 instructions (the official `mri_coreg` holds 76
+  of them, `mris_place_surface` 202, `objdump`). Reached by default-path programs
+  (call graph, full view): `MRIgaussianSmoothNI` (the kernel sums; `mri_coreg`, `mri_convert`,
+  `mri_normalize`, `mri_segreg`, `mri_vol2surf`), `DMatrixMultiply`, `DVectorDot` and the
+  surface-gradient code of `utils/surfgrad.cpp` (`MRISfaceNormalFace`, `MRISfaceNormalGradFace`,
+  `SurfGradUnitVector`, `MRISedgeLengthCost`, `MRISedgeAngleCost`; `mris_place_surface`,
+  `mris_remesh`, `mris_remove_intersection`, `mris_convert`), `DListStats`, and two I/O helpers
+  (`gifti_xml.c`'s `ewrite_data_line`, nlohmann's `strtof`). A bit-exact replica needs
+  80-bit extended arithmetic (Rust has no such type: a software implementation of the x87's
+  add, multiply, divide, square root and conversions with round-to-nearest-even, the precision
+  control at its Linux default of 64 bits).
 
 ## 2. Threads
 
@@ -43,15 +81,43 @@ lists what the next relay checks. Lines are FreeSurfer 8.2.0's (`<workspace>/tag
   `experimental` run **serially** in the official programs; `assume_reproducible` and
   `shown_reproducible` loops run in parallel. Loops built with `romp_for_begin.h` (5 files) sum
   through `ROMP_Distributor`'s fixed partitions, the same for any thread count.
-- **Plain OpenMP reductions** (no ROMP guard), from a scan of the 543 reached files (relay 3's
-  list): 50 files hold 269 OpenMP pragmas, 68 of them with a `reduction` clause, 38 `critical`, 12
-  `atomic`. Floating-point sums with `schedule(static)` depend on the thread count (each thread's
-  share of the loop changes): `mri_robust_register/CostFunctions.cpp` (10 cost functions, `d`) and
-  `MyMRI.cpp` 1689, 1709 (`mean`, `std`), used by fMRIPrep's `mri_robust_register` and
-  `mri_robust_template`; candidates still to type-check and reach-check: `utils/surfgrad.cpp` 1362
-  (`cost`), `utils/mri2.cpp` 7429, 7492, 7956 (sums), `utils/mrifilter.cpp` 6713, `utils/dmatrix.cpp`
-  773, `utils/mrisurf_metricProperties_faster.cpp` 308 (`total_area`), `utils/cma.cpp` 1181 (the
-  volumes). Integer counts (`nhits`, `nswaps`, ...) are exact for any thread count.
+- **Every OpenMP accumulation, classified** (relay 5, `omp_reductions.py`, over the 543 reached
+  files: 50 files hold 269 OpenMP pragmas; 129 accumulated variables in `reduction` clauses and in
+  `critical` or `atomic` blocks). For each: the declared type (integer counts are exact in any
+  order), whether the loop runs in parallel in the official binaries (the ROMP switch above), and
+  whether a default-path program reaches the function (call graph, full view). A floating-point
+  sum in a parallel `reduction` depends on how the iterations are shared among the threads; in a
+  `critical` or `atomic` block also on the order in which the threads arrive, so it can change
+  from run to run. **24 floating-point accumulations run in parallel in reached functions**; read
+  one by one:
+
+  | Where | Programs | What it sums | Effect |
+  |---|---|---|---|
+  | `utils/mrifilter.cpp` 6713, `MRIgaussianSmoothNI` | `mri_coreg` (by default: its images are smoothed at each scale), `mri_convert`, `mri_normalize`, `mri_segreg`, `mri_vol2surf` (with smoothing options) | the kernel's sum and sum of squares, `long double`, partitioned by thread | **thread-count dependent**, at the `long double` level: FreeSurfer's comment (6738-6741) says `double` gave "small differences in voxel values ... across different number of threads" and `long double` "resolves the differences" (it makes them rarer; the order still changes) |
+  | `mri_robust_register/MultiRegistration.cpp` 1419-1423, `initialXforms` | `mri_robust_template` (several inputs: recon-all's MotionCor, sMRIPrep's template) | the centroid, a `vnl_vector_fixed<double,4>`, added in a `critical` block of a `parallel for schedule(static,1)` over the registrations | **run-to-run nondeterministic** with four or more inputs and more than one thread (three or more terms added in the order the registrations finish; two terms commute exactly) |
+  | `utils/cma.cpp` 1181, `ComputeBrainVolumeStats2` | `mri_brainvol_stats` | ten volumes as sums of `VoxelVol` | exact for 1 mm voxels (recon-all's conformed space: integers); thread-count dependent for non-integer voxel volumes (`-cm`, high-resolution conforming) |
+  | `utils/mri2.cpp` 7492, `MRIcropToFoV` | `mri_mask` | voxel coordinates (integers) as `double` | exact |
+  | `utils/mrisurf_mri.cpp` 1784, `MRIScomputeBorderValues_new` | `mris_place_surface` | four means, `double` | printed only (2556), no output depends on them |
+  | `utils/mrisurf_metricProperties_faster.cpp` 308 | 39 surface programs (static reach) | the total surface area, `double` | only with `FS_FASTER_MP` set (`MRIScomputeMetricProperties`, `mrisurf_metricProperties.cpp` 1846); no FreeSurfer script sets it |
+  | `utils/mrisurf_sseTerms.cpp` 2865 | 5 surface programs | three areas, `double` | inside `#ifdef BEVIN_MRISCOMPUTESSE_CHECK`, not compiled; the compiled pragma is `if_ROMP(fast)`: serial |
+
+  **Not on fMRIPrep's paths, against relay 4's first reading:** the ten `reduction(+:d)` loops of
+  `mri_robust_register/CostFunctions.cpp` (`mean`, `norm`, `leastSquares`, `absDiff`, `localNCC`,
+  `NCC`, `tukeyBiweight`) and `MyMRI::getNormalizedImage` (1689, 1709) serve only `RegPowell`'s
+  cost functions (`--cost` other than the robust default) and the normalised images; sMRIPrep's
+  `mri_robust_register --satit --iscale` and recon-all's `mri_robust_template --satit` run
+  `RegRobust`, which reaches none of them (call graph; `RegPowell.cpp` 151-166 are the only
+  callers). The other parallel floating-point reductions (`utils/dmatrix.cpp` 773,
+  `utils/mri2.cpp` 7429 and 7956, `utils/surfgrad.cpp` 1362, ...) are in functions no default-path
+  program reaches. The full table: `<scratch>/r5/omp-acc.tsv` (regenerate with the tool).
+- **Measured at 1, 2 and 4 threads** (relay 5, `thread_check.py` with `thread_jobs.toml`, on the
+  reference runs' subjects, in a 12 GiB box): MEASUREMENTS-PLACEHOLDER
+- **ITK's threads.** Both ITK programs run ITK at one thread whatever recon-all's `-itkthreads`
+  says: `AntsN4BiasFieldCorrectionFs` takes its count from `--threads-nondetermistic` (default 1,
+  lines 81-86 and 158-163, which also print that more threads "may be non-deterministic") and recon-all passes
+  none; `AntsDenoiseImageFs` sets 1 unconditionally (lines 42-47). So N4's B-spline fit uses one
+  work unit (the per-unit sums of `docs/findings/ants-n4.md` do not vary), and the denoiser's
+  filters run single-threaded.
 - **Thread counts in the reference runs:** recon-all's `-openmp 4 -itkthreads 4` (OMP_NUM_THREADS,
   ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS, and `--threads 4` to the network programs and wrappers;
   `mris_fix_topology` always `-threads 1`; programs.md §1).
@@ -82,15 +148,43 @@ lists what the next relay checks. Lines are FreeSurfer 8.2.0's (`<workspace>/tag
   call draws from it (for `mri_segreg`: the random rotations at 1314-1316) is the next relay's
   check.
 
-## 4. Next (relay 5)
+## 4. The post-release updates of 8.2.0 (D3)
 
-1. GCC 8.4.0 and bug 110182: run `scripts/build_ants_oracle.sh`'s float-roundings probe with GCC
-   8.4.0 itself (Ubuntu 20.04's `gcc-8` 8.4.0-3ubuntu2, extracted user-level; a download of about
-   30 MB the orchestrator approves), or find the B-spline fit in `AntsN4BiasFieldCorrectionFs`'s
-   code and look for the float round trip.
-2. The reductions above: each variable's type, whether a default-path call reaches the loop, and a
-   measurement at 1 and 4 threads on a recorded step (the replay tool, sub-task 7).
-3. ITK's threads (`AntsN4BiasFieldCorrectionFs`, `AntsDenoiseImageFs`), TensorFlow's and PyTorch's
-   (`mri_synthseg`, `mri_synthstrip`, `mri_synthmorph`, `mri_sclimbic_seg`): run twice and at two
-   thread counts on one recorded step, compare bytes.
-4. The random sources on default paths: which use a fixed seed, which the clock.
+FreeSurfer updates an installed 8.2.0 with `fs820_updates.sh`, which fetches the archive named in
+`pub/dist/freesurfer/.fs820_updates/default` (data-files.md §4). Relay 5 downloaded the current one
+(the orchestrator's D3): `patch_data_20260625.tgz`, 23,515,931 bytes, last modified 2026-06-25,
+SHA-256 `99361361e40fbb4044cbede4202e3ef2ddeacbae145637761db669f52cca3e70`, one folder per
+platform (CentOS 7, Rocky 8 and 9, Ubuntu 22 and 24, macOS Intel and Apple silicon). For the
+reference runs' platform (`ubuntu22_x86_64`, the package `freesurfer-linux-ubuntu22_x86_64-8.2.0-
+20260314-d932c45`) it replaces ten files, each with a one-line note (its `.msg`), compared with the
+installed package byte by byte:
+
+| File | Note in the archive | On a default path? |
+|---|---|---|
+| `bin/recon-all` | "recon-all rca-surfreg fixed bugs in expert options" | **yes**: one line differs from the release, 4220 `if($XOptsFile)` becomes `if($#XOptsFile)` (the call of `rca-surfreg`) |
+| `bin/rca-surfreg` | the same note | **yes** (v8's surface registration): accepts `--expert` (a `case "--expert":` added) |
+| `bin/mri_glmfit` | "Re-added Logan KM" | no |
+| `bin/mri_dualperm` | "Added MaxDV to mri_dualperm command." | no |
+| `bin/mri_tumorsynth`, `bin/create_nnUNet_v1.7_env.sh` | exit-status fix; Python 3.9 for nnU-Net | no |
+| `bin/SegmentAAN.sh`, `bin/segmentHA_T2.sh`, `bin/mri_histo_atlas_segment_fireants` | output path, typos, citations | no |
+| `python/packages/SuperSynth/scripts/inference.py` | "Reinstating logic that was unintentionally dropped during refactor" | no |
+
+**Neither default-path change alters a default run.** recon-all's `XOptsFile` is an empty list
+unless `-expert` is given (line 85), and tcsh evaluates `if()` on an empty list as false and
+`if(<file name>)` as a syntax error (*measured* with `/usr/bin/tcsh`: "if: Expression Syntax."):
+the release breaks `rca-surfreg`'s call only with an expert-options file, which the update fixes.
+The June archive's `recon-all` also carries the configured version line the March archive left as
+`'@FS_VERSION@ (@BUILD_STAMP@)'` (data-files.md §4), so against the release it differs in line 4220
+only. *For the replicas:* follow the updated `recon-all` and `rca-surfreg` (newest upstream; the
+change is a bug fix by rule A anyway); the unpatched reference runs stay valid for every default
+path. No data file and no compiled default-path program is patched.
+
+## 5. Next
+
+1. TensorFlow's and PyTorch's threads (`mri_synthseg`, `mri_synthstrip`, `mri_synthmorph`,
+   `mri_sclimbic_seg`): run twice and at two thread counts on one recorded step, compare bytes
+   (with the replay tool, sub-task 7).
+2. `MRIgaussianSmoothNI` at 1 and 4 threads on a large image with a wide kernel (FreeSurfer's own
+   case), and `mri_robust_template` with six inputs, to size the two effects of §2.
+3. The random sources on default paths (§3): which use a fixed seed, which the clock; whether a
+   default call of `mri_segreg` draws from its time-of-day seed.

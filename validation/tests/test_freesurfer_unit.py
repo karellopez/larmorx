@@ -40,6 +40,24 @@ def test_unknown_vnl_method_is_refused():
         fu.vnl_random(1, 1, "uniform")
 
 
+def test_fs_random_with_the_clock_seed_is_never_cached(monkeypatch):
+    seen = []
+
+    def fake_call(command, *args, never="", **kwargs):
+        seen.append((command, args[0], never))
+        return fu.Result([command, *args], 0, {"values": [{"hex": "0x1p-1"}]}, "", False)
+
+    monkeypatch.setattr(fu, "call", fake_call)
+    assert fu.fs_random(0, 1) == [0.5]
+    assert fu.fs_random(1234, 1) == [0.5]
+    assert fu.fs_random(-1, 1) == [0.5]
+    assert seen == [
+        ("fs-random", "0", fu.CLOCK_SEED),
+        ("fs-random", "1234", ""),
+        ("fs-random", "-1", ""),
+    ]
+
+
 needs_harness = pytest.mark.skipif(not fu.available(), reason="the unit oracle is not built here")
 
 
@@ -61,3 +79,15 @@ def test_matrix_inverse_of_a_diagonal(private_cache):
     inv = fu.matrix_inverse([[2.0, 0, 0, 0], [0, 4.0, 0, 0], [0, 0, 0.5, 0], [0, 0, 0, 1.0]])
     assert [inv[i][i] for i in range(4)] == [0.5, 0.25, 2.0, 1.0]
     assert fu.matrix_inverse([[1.0, 2.0], [2.0, 4.0]]) is None
+
+
+@needs_harness
+def test_fs_random_with_the_clock_seed_stays_out_of_the_cache(private_cache):
+    from larmorx_validation.oracle_cache.store import Store
+
+    first = fu.call("fs-random", "0", "2", "0x0p+0", "0x1p+0", never=fu.CLOCK_SEED)
+    again = fu.call("fs-random", "0", "2", "0x0p+0", "0x1p+0", never=fu.CLOCK_SEED)
+    assert not first.served and not again.served
+    assert "supposed to be reproducible but seed not set" in first.stderr
+    assert len(fu.fs_random(0, 2)) == 2
+    assert list(Store().entries()) == []

@@ -971,6 +971,11 @@ def real_section(tier: str, tmp: Path) -> None:
                 APART["real model_expansion: fMRIPrep's order = larmorx's (by chance)"] += (
                     names == ours
                 )
+                for g in blocks(names, parent) or []:
+                    sq = [c for c in g if c.endswith("_power2")]
+                    if len(sq) == 2:
+                        first = "x_power2" if sq[0] == g[0] + "_power2" else "x_derivative1_power2"
+                        APART[f"real model_expansion: fMRIPrep's groups with {first} first"] += 1
             else:
                 cells, changed = ct.cells_changed({"x": want}, {"x": _reorder(got, want)})
                 APART["real model_expansion default: cells changed"] += changed

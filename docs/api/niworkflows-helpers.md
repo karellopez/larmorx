@@ -234,6 +234,58 @@ their golden cases (the confounds' golden relay).
 | `dict_merge(in_dicts)` → a dictionary | `DictMerge(in_dicts)` → `out_dict` | the keys in order, a later dictionary's value winning; an element that is not a dictionary: traits' message as a `ValueError` |
 | `tsv2json(in_file, index_column, *, output=UNDEFINED, additional_metadata=None, drop_columns=None, enforce_case=True, out_dir=".", pandas_version="3.0.6", upstream_defects="fix")` → a dictionary or the path | `TSV2JSON` (`_tsv2json`) → `output` | the table read as pandas reads it (PD-01), `additional_metadata` set as columns (before `drop_columns`, which raises pandas' `KeyError` for a missing one) and again on every entry, keyed by `index_column` (a table without it keeps its row numbers, which `enforce_case` cannot turn to snake case: Python's `AttributeError`, as niworkflows), with `enforce_case` the keys in snake case and the fields title-cased then camel-cased (`Csf` → `CSF`); pandas' `ValueError` for keys or fields that are not unique; the numbers as pandas' `to_json` writes them and Python's `json` reads them back (10 decimals: PD-02), NaN and infinities `None`; `output=None`: the ordered dictionary, else written as JSON (indent 4, `\n` line ends), left undefined `<stem>.json` in `out_dir` |
 
+## `expand_model`, `spike_regressors_node`, `normalize_motion_params`: `ExpandModel`, `SpikeRegressors`, `NormalizeMotionParams`
+
+niworkflows 1.15.4's `interfaces/confounds.py` (the same in 1.15.2 and 1.15.3 on these
+functions), `larmorx.niworkflows.confounds`: the last two steps of fMRIPrep's confounds
+(`docs/api/confounds.md`): `model_expansion` (`ExpandModel` with fMRIPrep's formula
+`(dd1(rps + wm + csf + gsr))^^2 + others`) and `spike_regressors` (`SpikeRegressors`), whose
+output is fMRIPrep's `desc-confounds_timeseries.tsv`. Importable from
+`larmorx.niworkflows.confounds`; they join `lx.niworkflows`' `__all__` with their golden cases
+(the confounds' golden relay). The tables are read and written as pandas reads and writes them
+(`docs/api/confounds.md`, "pandas' tables": PD-01).
+
+| larmorx | niworkflows | Notes |
+|---|---|---|
+| `expand_model(confounds_file, model_formula=DEFAULT_FORMULA, *, output_file=None, out_dir=".", pandas_version="3.0.6", upstream_defects="fix")` → the path | `ExpandModel(confounds_file, model_formula, output_file)` → `confounds_file` | `parse_formula(..., unscramble=True)` of the table; `output_file` relative to `out_dir`, by default `<stem>_expansion.tsv` in `out_dir`; a formula that is not a string: traits' message as a `ValueError` |
+| `spike_regressors_node(confounds_file, *, fd_thresh=0.5, dvars_thresh=1.5, header_prefix="motion_outlier", lags=(0,), minimum_contiguous=None, concatenate=True, output_format="spikes", output_file=None, out_dir=".", pandas_version="3.0.6", upstream_defects="fix")` → the path | `SpikeRegressors(...)` → `confounds_file` | `spike_regressors` with `framewise_displacement > fd_thresh` and `std_dvars > dvars_thresh` (pandas' `KeyError` when a column is missing); by default `<stem>_desc-motion_outliers.tsv`; traits' messages for inputs of the wrong type |
+| `normalize_motion_params(in_file, *, format="FSL", out_dir=".", numpy_version="2.5.4", upstream_defects="fix")` → the path | `NormalizeMotionParams(in_file, format)` → `out_file` | numpy's `loadtxt`, every row through `lx.confounds.normalize_mc_params(row, format)` (`"FSL"`, `"AFNI"` with a leading index column when there are seven, `"FSFAST"`, `"NIPY"`: nipy 0.6.1's own arithmetic, `docs/api/confounds.md`), numpy's `savetxt` (`%.18e`, spaces) as `motion_params.txt`; `"SPM"` and other formats refused as niworkflows' `Enum` refuses them; one column, one value or an empty file: numpy's `AxisError`, too few columns numpy's `IndexError`, as niworkflows; PIPE-70 |
+| `parse_formula(model_formula, parent_data, unscramble=False, *, upstream_defects="fix")` → `ModelTerms(variables, data)` | `parse_formula` → `(variables, data)` | `parent_data` a `ConfoundTable` or a mapping of names to columns (1-D float64, int64, uint64, boolean or object arrays, lists of text); the result unpacks as niworkflows' tuple; `data` a `ConfoundTable` (names in order, one column per name); the grammar below; PIPE-43, PIPE-64, PIPE-65, PIPE-66 |
+| `temporal_derivatives(order, variables, data, *, upstream_defects="fix")`, `exponential_terms(...)` → `ModelTerms` | `temporal_derivatives`, `exponential_terms` → `(variables, data)` | `<v>_derivative<o>`: numpy's `diff` `o` times, the first `o` rows NaN, order 0 the variable; `<v>_power<o>`: numpy's `x ** o`, power 1 the variable; the orders taken as niworkflows takes them (a set when 0 or 1 is among them: ascending) |
+| `spike_regressors(data, criteria=None, header_prefix="motion_outlier", lags=None, minimum_contiguous=None, concatenate=True, output="spikes", *, upstream_defects="fix")` → `ConfoundTable` | `spike_regressors` → a `DataFrame` | `criteria`: column → (`"<"` or `">"`, threshold), by default FD > 0.5 or standardised DVARS > 1.5 (Power et al. 2014; NaN never flagged); the flagged volume always, and `lags` after it; `minimum_contiguous`: every shorter run of unflagged volumes flagged too; one regressor per flagged volume (`<prefix><kk>`, 1 at that volume) or, with `output="mask"`, one column of 1s at the flagged volumes; a table without rows: Python's `ValueError` for the regressors (the mask works), as niworkflows; PIPE-67, PIPE-68, PIPE-69 |
+
+**The formula.** Terms are added with `+`. A term is a column name, a shorthand (`rps` the six
+motion parameters `trans_x ... rot_z`; `wm`, `csf`, `gsr` the white-matter, CSF and global
+signals; `fd` the framewise displacement; `acc`, `tcc` the `a_comp_cor_<n>` and `t_comp_cor_<n>`
+columns; `dv` `std_dvars`; `dvall` every column whose name holds `dvars`; `nss` the
+`non_steady_state_outlier<n>` columns; `spikes` the `motion_outlier<n>` columns; `others` every
+column the formula does not name, in the table's order) or a group `( ... )` with temporal
+derivatives before it (`dd<n>`: the orders 0 to n; `d<n>`: the n-th; `d<n>-<m>`: n to m) and
+powers after it (`^^<n>`: 1 to n; `^<n>`; `^<n>-<m>`). An operator applies to the whole group
+(`(dd1(rps))^^2`: the motion parameters, their first derivatives and the squares of both; the
+power before the derivative when both adjoin one group: `d1(x)^2` is `x_power2_derivative1`). A
+column must not be named like an operator for niworkflows (PIPE-65).
+
+**The arithmetic.** A derivative is numpy's `diff` (exact subtractions, integers in their type,
+booleans as numpy's `not_equal`); a power of a float64 column is numpy's `x ** o`: `x * x` for
+2, 1 for 0, otherwise glibc 2.35's `pow` with `upstream_defects="reproduce"` (numpy's on CPUs
+without AVX-512) and the correctly rounded `pow` by default (GLIBC-07, its notice when a value
+differs: glibc's `pow` is not correctly rounded on about 0.4 % of cubes, measured by
+`check_model.py`'s `power` section). On x86-64 CPUs with AVX-512, numpy's wheels compute such
+powers with Intel's SVML instead, which larmorx does not follow (NP-04's class; fMRIPrep's
+formula only squares). Integer, boolean and text columns follow numpy's own `**` (wrapping
+integers; text: Python's `TypeError`); a group's columns are put side by side in pandas' common
+type first (an integer column beside a float one becomes float).
+
+**The column order (PIPE-43).** niworkflows orders a group's variables, and the `others`, as a
+Python set of strings, whose order changes from one process to the next (Python's per-process hash
+seed): in fMRIPrep's files a variable's square comes before or after the square of its derivative
+from run to run (169 and 155 times in the 36 oracle files). larmorx keeps the formula's order in
+both modes: each variable, its derivatives, then their powers in the same order (`x`,
+`x_derivative1`, `x_power2`, `x_derivative1_power2`), one order niworkflows can produce; its
+notice says so (never reproduced: nondeterminism). The values do not depend on it; compare such
+files by column name.
+
 ## Upstream defects of these steps (D13)
 
 | ID | Defect | larmorx by default (`upstream_defects="reproduce"`: the original) | Functions |
@@ -248,4 +300,13 @@ their golden cases (the confounds' golden relay).
 | PIPE-35 | `resample_by_spacing(smooth=True)` sets the Gaussian's sigma to `max(0, (old / new - 1) / 2)` voxels, positive only when the new grid is finer: a coarser grid (the anti-aliasing case) is never smoothed, so fMRIPrep's brain extraction regrids its 1 mm images to 4 mm without smoothing (scikit-image's `rescale` takes `(new / old - 1) / 2`) | rule D: niworkflows' sigma in both modes until the anatomical brain extraction's port measures whether smoothing changes its initialisation | `regrid_to_zooms`, `resample_by_spacing` |
 | PIPE-61 | `AddTSVHeader` reads with numpy's `loadtxt`, which squeezes a table of one row to a vector, written by `savetxt` as one column (the row's values one under the other), and a table of one value to a scalar, which `savetxt` refuses (`ValueError: Expected 1D or 2D array, got 0D array instead`) (rule A) | the table's shape kept: one row stays a row, one value is written | `add_tsv_header` |
 | PIPE-62 | `AddTSVHeader` writes a header with another number of names than the table's columns as given: the file's header and rows disagree (rule B) | a `ValueError` | `add_tsv_header` |
-| PD-01, PD-02 | pandas' `read_csv` and `to_json` (`docs/api/confounds.md`, "pandas' tables") | correctly rounded readings and 10-decimal values | `tsv2json` |
+| PIPE-43 | `parse_formula` orders the variables of each group, and the `others`, as a Python set of strings, whose order changes between processes, so `ExpandModel` writes a variable's expansions in another order from one run to the next | the formula's order in both modes (nondeterminism is never reproduced; a notice says so) | `parse_formula`, `expand_model` |
+| PIPE-64 | `_expand_shorthand` replaces the shorthands as text, anywhere and again inside every group: a name holding one is rewritten (`std_dvars` becomes `std_std_dvarsars`, once more in each group), `dvall` becomes `std_dvarsall` (`dv` is replaced first), a shorthand (or `others`) that matches no column leaves an empty term (`IndexError: string index out of range`), and the names `others` leaves out lose every `d<digits>` and `^<digits>` (a column `head1` is then repeated) (rule A) | whole names replaced, once, at the top; a shorthand that matches nothing adds no column | `parse_formula`, `expand_model` |
+| PIPE-65 | a term's operators are read with regular expressions over the whole term: text around a group other than a derivative before it and an exponent after it is ignored (`foo(a)`, `(a)b`, `d1x(a)`, `d1(a)(b)`, `dd1-2(a)`, `(a)^ ^2`), an exponent after a group that holds another single-caret exponent fails (`((a)^2)^3`: `TypeError`), and a name that starts like a derivative or ends like an exponent (`d1a`, `a^2`) is taken for an operator without its group (`TypeError`) (rule B for the ignored text, A for the others) | a `ValueError` for text around a group; the exponent after the group read alone; a term without a group read as a name | `parse_formula`, `expand_model` |
+| PIPE-66 | a variable reached by two terms (`a + (a)^^2`) is repeated: twice in `parse_formula`'s table, four times in `ExpandModel`'s file (pandas selects every column of a repeated name each time it is named), and a group that repeats one fails with pandas' `ValueError: Shape of passed values ...` (rule A) | each column once (its first) | `parse_formula`, `expand_model` |
+| PIPE-67 | `spike_regressors` adds each lag to the volumes the earlier lags flagged: lags `[1, 2]` (or `[0, 1, 2]`) flag the third volume after a spike too (rule A) | every lag added to the flagged volumes only | `spike_regressors`, `spike_regressors_node` |
+| PIPE-68 | `minimum_contiguous` takes the table's end one volume too far, so the last run of unflagged volumes counts one volume more and a final run one shorter than the minimum is kept (rule A) | the last run counted as it is | `spike_regressors`, `spike_regressors_node` |
+| PIPE-69 | a criterion other than `'<'` and `'>'` is skipped without an error (all of them: `TypeError: reduce() of empty iterable with no initial value`) (rule B) | a `ValueError` | `spike_regressors` |
+| PIPE-70 | `NormalizeMotionParams` reads with numpy's `loadtxt`, which squeezes a table of one row to a vector, which `apply_along_axis` refuses (`AxisError: axis 1 is out of bounds for array of dimension 1`) (rule A) | the row converted | `normalize_motion_params` |
+| GLIBC-07 | glibc's `pow` (numpy's float64 `x ** o` for exponents other than 0, 1 and 2) is not correctly rounded | the correctly rounded `pow` | `exponential_terms`, `parse_formula`, `expand_model` |
+| PD-01, PD-02 | pandas' `read_csv` and `to_json` (`docs/api/confounds.md`, "pandas' tables") | correctly rounded readings and 10-decimal values | `tsv2json`, `expand_model`, `spike_regressors_node` |

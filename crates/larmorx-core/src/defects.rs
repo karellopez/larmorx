@@ -993,6 +993,14 @@ defects! {
         "Gaussian interpolation given fewer sigmas than dimensions reads the missing sigmas past the end of their list: the result depends on memory the program never wrote";
     ANTS_162 = "ANTS-162", "ANTs", true,
         "N4BiasFieldCorrection's B-spline lattice and padding, and ResampleImage's and ResampleImageBySpacing's output grids, are sized from the image's physical extent with no check: a header in metres or micrometres, or a 4D image's time axis, can make a tiny input need more memory than any machine has, which fills the machine until the process is stopped";
+    FS_71 = "FS-71", "MINC volume_io", true,
+        "a compressed input (.gz, .Z, .z, or a missing name whose compressed file exists) is decompressed by running gunzip -c, then bunzip2 -c, through the shell with the file name unquoted: a name with a blank or shell syntax fails, reads other files or runs commands";
+    FS_72 = "FS-72", "MINC volume_io", true,
+        "a thin-plate spline's Points or Displacements list that reaches the end of the .xfm file after white space without its ';' is read forever (the same pushed-back character each time), the list growing until memory runs out";
+    FS_73 = "FS-73", "MINC volume_io", true,
+        "a thin-plate spline's Number_Dimensions of 0 divides by zero (the program crashes) and a negative one sizes its arrays negatively";
+    FS_74 = "FS-74", "MINC volume_io", true,
+        "a thin-plate spline with an empty Points list frees a pointer that was never set (a crash or heap damage), and the writer writes such a list with no ';', so the file cannot be read back";
 }
 
 /// The register entry with ID `id`.

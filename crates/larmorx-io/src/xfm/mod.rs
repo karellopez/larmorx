@@ -44,6 +44,7 @@ use larmorx_core::cfmt::Streams;
 /// D13 defects of volume_io's `.xfm` code that larmorx corrects (each with its `reproduce`
 /// behaviour where one is defined; `docs/findings/minc-xfm.md`).
 pub mod defects {
+    //! Their register entries are `larmorx_core::defects::FS_71` to `FS_74`.
     /// The decompression of a compressed file runs `gunzip -c <name> > <temporary>` through the
     /// shell with the name unquoted (`files.c`, `open_file`): a name with a blank fails (or reads
     /// other files) and a name with shell syntax runs it. Corrected: decompressed in the process.
@@ -136,6 +137,33 @@ impl std::fmt::Debug for GridVolume {
 /// The points where programs built on volume_io changed it; [`Mni`] is volume_io 1.5.1's own
 /// behaviour.
 pub trait Dialect {
+    /// `print_error`: volume_io formats a message into a C string and prints it on standard
+    /// error, so it ends at its first NUL (a `%c` of a NUL byte cuts it there).
+    fn print_error(&self, text: &str, streams: &mut dyn Streams) {
+        streams.err(text.split('\0').next().unwrap_or(""));
+    }
+    /// `mni_input_keyword_and_equal_sign` did not find `keyword =` (`got`: the token read, `None`
+    /// when the end of the file came in it); volume_io prints only when its caller asks.
+    fn keyword_mismatch(
+        &self,
+        keyword: &[u8],
+        got: Option<&[u8]>,
+        print_error_message: bool,
+        streams: &mut dyn Streams,
+    ) {
+        let _ = got;
+        if print_error_message {
+            self.print_error(
+                &format!("Expected \"{} =\"\n", String::from_utf8_lossy(keyword)),
+                streams,
+            );
+        }
+    }
+    /// Whether a NUL byte in a token ends the token (the rest of it is read and lost); in
+    /// volume_io it adds nothing and the token goes on.
+    fn nul_ends_token(&self) -> bool {
+        false
+    }
     /// `compute_transform_inverse`: the inverse, or `None` when the matrix is singular (the
     /// caller then uses the identity for both, as `create_linear_transform` does).
     fn invert(&self, t: &Transform, _streams: &mut dyn Streams) -> Option<Transform> {
@@ -148,7 +176,7 @@ pub trait Dialect {
             b"Thin_Plate_Spline_Transform" => Some(TransformType::ThinPlateSpline),
             b"Grid_Transform" => Some(TransformType::Grid),
             _ => {
-                streams.err("input_transform(): invalid transform type.\n");
+                self.print_error("input_transform(): invalid transform type.\n", streams);
                 None
             }
         }

@@ -13,6 +13,7 @@
 
 use larmorx_core::cfmt::Streams;
 use larmorx_core::cscan;
+use larmorx_core::defects::{self as d, Notices};
 
 use super::files::{IoType, OpenFile, extract_directory, lossy, open_file_with_default_suffix};
 use super::{Dialect, GeneralTransform, Status, TransformData, TransformType};
@@ -30,6 +31,7 @@ const DISPLACEMENT_VOLUME: &str = "Displacement_Volume";
 pub(crate) struct CStream<'a> {
     data: &'a [u8],
     pos: usize,
+    /// The characters pushed back, the next one last.
     back: Vec<u8>,
 }
 
@@ -92,30 +94,41 @@ fn show(c: u8) -> String {
 }
 
 /// `mni_skip_expected_character`.
-fn skip_expected(s: &mut CStream, expected: u8, streams: &mut dyn Streams) -> Status {
+fn skip_expected(
+    s: &mut CStream,
+    expected: u8,
+    dialect: &dyn Dialect,
+    streams: &mut dyn Streams,
+) -> Status {
     let mut ch = None;
     let mut status = get_nonwhite(s, &mut ch);
     if status == Status::Ok {
         let c = ch.expect("a character");
         if c != expected {
-            streams.err(&format!(
-                "Expected '{}', found '{}'.\n",
-                show(expected),
-                show(c)
-            ));
+            dialect.print_error(
+                &format!("Expected '{}', found '{}'.\n", show(expected), show(c)),
+                streams,
+            );
             status = Status::Error;
         }
     } else {
-        streams.err(&format!(
-            "Expected '{}', found end of file.\n",
-            show(expected)
-        ));
+        dialect.print_error(
+            &format!("Expected '{}', found end of file.\n", show(expected)),
+            streams,
+        );
     }
     status
 }
 
 /// `mni_input_string`: the status and the token (`None` unless the status is OK).
-fn input_string(s: &mut CStream, mut t1: u8, mut t2: u8) -> (Status, Option<Vec<u8>>) {
+fn input_string(
+    s: &mut CStream,
+    mut t1: u8,
+    mut t2: u8,
+    dialect: &dyn Dialect,
+) -> (Status, Option<Vec<u8>>) {
+    let nul_ends = dialect.nul_ends_token();
+    let mut ended = false;
     let mut out = Vec::new();
     let mut ch = None;
     let mut status = get_nonwhite(s, &mut ch);
@@ -130,8 +143,11 @@ fn input_string(s: &mut CStream, mut t1: u8, mut t2: u8) -> (Status, Option<Vec<
         if c == t1 || c == t2 || c == b'\n' {
             break;
         }
-        // A carriage return is dropped; a NUL appended to a C string adds nothing.
-        if c != b'\r' && c != 0 {
+        // A carriage return is dropped; a NUL appended to a C string adds nothing (or, in a
+        // dialect that keeps one buffer, ends the string there).
+        if c == 0 && nul_ends {
+            ended = true;
+        } else if c != b'\r' && c != 0 && !ended {
             out.push(c);
         }
         match s.getc() {
@@ -157,17 +173,16 @@ fn keyword_and_equal(
     s: &mut CStream,
     keyword: &[u8],
     print_error_message: bool,
+    dialect: &dyn Dialect,
     streams: &mut dyn Streams,
 ) -> Status {
-    let (status, str) = input_string(s, b'=', 0);
+    let (status, str) = input_string(s, b'=', 0, dialect);
     if status == Status::EndOfFile {
         return status;
     }
     let matches = status == Status::Ok && str.as_deref().unwrap_or(b"") == keyword;
-    if !matches || skip_expected(s, b'=', streams) != Status::Ok {
-        if print_error_message {
-            streams.err(&format!("Expected \"{} =\"\n", lossy(keyword)));
-        }
+    if !matches || skip_expected(s, b'=', dialect, streams) != Status::Ok {
+        dialect.keyword_mismatch(keyword, str.as_deref(), print_error_message, streams);
         return Status::Error;
     }
     status
@@ -182,7 +197,7 @@ fn unget_string(s: &mut CStream, token: &[u8]) {
 
 /// `mni_input_real`.
 fn input_real(s: &mut CStream, dialect: &dyn Dialect, streams: &mut dyn Streams) -> (Status, f64) {
-    let (mut status, str) = input_string(s, b' ', b';');
+    let (mut status, str) = input_string(s, b' ', b';', dialect);
     let mut value = 0.0;
     if status == Status::Ok {
         let token = str.expect("a token");
@@ -199,9 +214,8 @@ fn input_real(s: &mut CStream, dialect: &dyn Dialect, streams: &mut dyn Streams)
 }
 
 /// `mni_input_int`.
-fn input_int(s: &mut CStream, streams: &mut dyn Streams) -> (Status, i32) {
-    let _ = streams;
-    let (mut status, str) = input_string(s, b' ', b';');
+fn input_int(s: &mut CStream, dialect: &dyn Dialect) -> (Status, i32) {
+    let (mut status, str) = input_string(s, b' ', b';', dialect);
     let mut value = 0;
     if status == Status::Ok {
         let token = str.expect("a token");
@@ -223,16 +237,39 @@ fn input_reals(
     s: &mut CStream,
     dialect: &dyn Dialect,
     streams: &mut dyn Streams,
+    notices: &mut Notices,
 ) -> (Status, Vec<f64>) {
     let mut reals = Vec::new();
+    // volume_io appends the last value read for each end of file met (the loop stops only at
+    // ERROR); `last` is it.
+    let mut last = 0.0;
     loop {
-        let (st, d) = input_real(s, dialect, streams);
+        let (st, v) = input_real(s, dialect, streams);
         match st {
-            Status::Error | Status::EndOfFile => break,
-            _ => reals.push(d),
+            Status::Error => break,
+            Status::EndOfFile => {
+                // What was pushed back is read again by the next number: white space or a
+                // comment character (or nothing) gives the end of the file again, forever.
+                let again = match s.back.last() {
+                    None => true,
+                    Some(c) => b" \t\n\r%#".contains(c),
+                };
+                if again {
+                    notices.add(
+                        &d::FS_72,
+                        "a number list reached the end of the file without its ';' (volume_io reads forever)",
+                    );
+                    break;
+                }
+                reals.push(last);
+            }
+            _ => {
+                last = v;
+                reals.push(v);
+            }
         }
     }
-    (skip_expected(s, b';', streams), reals)
+    (skip_expected(s, b';', dialect, streams), reals)
 }
 
 /// `input_one_transform`: the status (`EndOfFile` when no further transform starts) and the
@@ -242,48 +279,49 @@ fn input_one_transform(
     filename: Option<&[u8]>,
     dialect: &dyn Dialect,
     streams: &mut dyn Streams,
+    notices: &mut Notices,
 ) -> (Status, Option<GeneralTransform>) {
     let err = (Status::Error, None);
     let mut inverse_flag = false;
-    let status = keyword_and_equal(s, TYPE_STRING, false, streams);
+    let status = keyword_and_equal(s, TYPE_STRING, false, dialect, streams);
     if status != Status::Ok {
         return (status, None);
     }
-    let (st, type_name) = input_string(s, b';', 0);
+    let (st, type_name) = input_string(s, b';', 0, dialect);
     if st != Status::Ok {
-        streams.err("input_transform(): missing transform type.\n");
+        dialect.print_error("input_transform(): missing transform type.\n", streams);
         return err;
     }
-    if skip_expected(s, b';', streams) != Status::Ok {
+    if skip_expected(s, b';', dialect, streams) != Status::Ok {
         return err;
     }
     let Some(kind) = dialect.transform_type(&type_name.expect("a token"), streams) else {
         return err;
     };
-    let (st, mut str) = input_string(s, b'=', 0);
+    let (st, mut str) = input_string(s, b'=', 0, dialect);
     if st != Status::Ok {
         return err;
     }
     if str.as_deref() == Some(INVERT_FLAG_STRING) {
-        if skip_expected(s, b'=', streams) != Status::Ok {
+        if skip_expected(s, b'=', dialect, streams) != Status::Ok {
             return err;
         }
-        let (st, flag) = input_string(s, b';', 0);
+        let (st, flag) = input_string(s, b';', 0, dialect);
         if st != Status::Ok {
             return err;
         }
-        if skip_expected(s, b';', streams) != Status::Ok {
+        if skip_expected(s, b';', dialect, streams) != Status::Ok {
             return err;
         }
         match flag.as_deref() {
             Some(b"True") => inverse_flag = true,
             Some(b"False") => inverse_flag = false,
             _ => {
-                streams.err("Expected True or False after Invert_Flag =\n");
+                dialect.print_error("Expected True or False after Invert_Flag =\n", streams);
                 return err;
             }
         }
-        let (st, next) = input_string(s, b'=', 0);
+        let (st, next) = input_string(s, b'=', 0, dialect);
         if st != Status::Ok {
             return err;
         }
@@ -291,7 +329,7 @@ fn input_one_transform(
     }
     let str = str.expect("a token");
     let expected = |what: &str, streams: &mut dyn Streams| {
-        streams.err(&format!("Expected {what} =\n"));
+        dialect.print_error(&format!("Expected {what} =\n"), streams);
     };
     let transform = match kind {
         TransformType::Linear => {
@@ -299,7 +337,7 @@ fn input_one_transform(
                 expected(LINEAR_TRANSFORM_STRING, streams);
                 return err;
             }
-            if skip_expected(s, b'=', streams) != Status::Ok {
+            if skip_expected(s, b'=', dialect, streams) != Status::Ok {
                 return err;
             }
             let mut t = super::make_identity_transform();
@@ -307,17 +345,20 @@ fn input_one_transform(
                 for j in 0..4 {
                     let (st, v) = input_real(s, dialect, streams);
                     if st != Status::Ok {
-                        streams.err(&format!(
-                            "input_transform(): error reading transform elem [{},{}]\n",
-                            i + 1,
-                            j + 1
-                        ));
+                        dialect.print_error(
+                            &format!(
+                                "input_transform(): error reading transform elem [{},{}]\n",
+                                i + 1,
+                                j + 1
+                            ),
+                            streams,
+                        );
                         return err;
                     }
                     t[i][j] = v;
                 }
             }
-            if skip_expected(s, b';', streams) != Status::Ok {
+            if skip_expected(s, b';', dialect, streams) != Status::Ok {
                 return err;
             }
             GeneralTransform::linear(Some(&t), dialect, streams)
@@ -327,42 +368,58 @@ fn input_one_transform(
                 expected(N_DIMENSIONS_STRING, streams);
                 return err;
             }
-            if skip_expected(s, b'=', streams) != Status::Ok {
+            if skip_expected(s, b'=', dialect, streams) != Status::Ok {
                 return err;
             }
-            let (st, n_dimensions) = input_int(s, streams);
+            let (st, n_dimensions) = input_int(s, dialect);
             if st != Status::Ok {
                 return err;
             }
-            if skip_expected(s, b';', streams) != Status::Ok {
+            if skip_expected(s, b';', dialect, streams) != Status::Ok {
                 return err;
             }
-            if keyword_and_equal(s, POINTS_STRING, true, streams) != Status::Ok {
+            if keyword_and_equal(s, POINTS_STRING, true, dialect, streams) != Status::Ok {
                 return err;
             }
-            let (st, points_1d) = input_reals(s, dialect, streams);
+            let (st, points_1d) = input_reals(s, dialect, streams, notices);
             if st != Status::Ok {
                 return err;
             }
             if n_dimensions <= 0 {
                 // volume_io divides by it (FS-73): a crash at 0, negative sizes below.
-                streams.err(&format!(
-                    "input_transform(): Number_Dimensions must be positive (it is {n_dimensions}).\n"
-                ));
+                notices.add(
+                    &d::FS_73,
+                    format!("Number_Dimensions = {n_dimensions} (volume_io crashes)"),
+                );
+                dialect.print_error(
+                    &format!(
+                        "input_transform(): Number_Dimensions must be positive (it is {n_dimensions}).\n"
+                    ),
+                    streams,
+                );
                 return err;
             }
             let nd = n_dimensions as usize;
             let n_total = points_1d.len() as i64;
             if n_total % n_dimensions as i64 != 0 {
-                streams.err(&format!(
-                    "Number of points ({}) must be multiple of number of dimensions ({})\n",
-                    n_total as i32, n_dimensions
-                ));
+                dialect.print_error(
+                    &format!(
+                        "Number of points ({}) must be multiple of number of dimensions ({})\n",
+                        n_total as i32, n_dimensions
+                    ),
+                    streams,
+                );
                 return err;
             }
             let n_points = points_1d.len() / nd;
+            if n_points == 0 {
+                notices.add(
+                    &d::FS_74,
+                    "an empty Points list (volume_io frees a pointer it never set)",
+                );
+            }
             let points: Vec<Vec<f64>> = points_1d.chunks(nd).map(<[f64]>::to_vec).collect();
-            if keyword_and_equal(s, DISPLACEMENTS_STRING, true, streams) != Status::Ok {
+            if keyword_and_equal(s, DISPLACEMENTS_STRING, true, dialect, streams) != Status::Ok {
                 return err;
             }
             let mut displacements = vec![vec![0.0; nd]; n_points + nd + 1];
@@ -370,13 +427,13 @@ fn input_one_transform(
                 for v in row.iter_mut() {
                     let (st, d) = input_real(s, dialect, streams);
                     if st != Status::Ok {
-                        streams.err("Expected more displacements.\n");
+                        dialect.print_error("Expected more displacements.\n", streams);
                         return err;
                     }
                     *v = d;
                 }
             }
-            if skip_expected(s, b';', streams) != Status::Ok {
+            if skip_expected(s, b';', dialect, streams) != Status::Ok {
                 return err;
             }
             GeneralTransform {
@@ -390,7 +447,7 @@ fn input_one_transform(
         }
         TransformType::Concatenated => {
             // Not a file type (a dialect that names it reads nothing).
-            streams.err("input_transform(): invalid transform type.\n");
+            dialect.print_error("input_transform(): invalid transform type.\n", streams);
             return err;
         }
         TransformType::Grid => {
@@ -398,14 +455,14 @@ fn input_one_transform(
                 expected(DISPLACEMENT_VOLUME, streams);
                 return err;
             }
-            if skip_expected(s, b'=', streams) != Status::Ok {
+            if skip_expected(s, b'=', dialect, streams) != Status::Ok {
                 return err;
             }
-            let (st, volume_filename) = input_string(s, b';', 0);
+            let (st, volume_filename) = input_string(s, b';', 0, dialect);
             if st != Status::Ok {
                 return err;
             }
-            if skip_expected(s, b';', streams) != Status::Ok {
+            if skip_expected(s, b';', dialect, streams) != Status::Ok {
                 return err;
             }
             let mut volume_filename = volume_filename.expect("a token");
@@ -447,9 +504,10 @@ pub fn input_transform_from_bytes(
     filename: Option<&[u8]>,
     dialect: &dyn Dialect,
     streams: &mut dyn Streams,
+    notices: &mut Notices,
 ) -> Result<GeneralTransform, ()> {
     let mut s = CStream::new(data);
-    input_transform(&mut s, filename, dialect, streams)
+    input_transform(&mut s, filename, dialect, streams, notices)
 }
 
 /// `input_transform` over a stream (see [`input_transform_from_bytes`]).
@@ -458,19 +516,20 @@ pub(crate) fn input_transform(
     filename: Option<&[u8]>,
     dialect: &dyn Dialect,
     streams: &mut dyn Streams,
+    notices: &mut Notices,
 ) -> Result<GeneralTransform, ()> {
-    let (st, line) = input_string(s, 0, 0);
+    let (st, line) = input_string(s, 0, 0, dialect);
     if st != Status::Ok {
-        streams.err("input_transform(): could not read header in file.\n");
+        dialect.print_error("input_transform(): could not read header in file.\n", streams);
         return Err(());
     }
     if line.as_deref() != Some(TRANSFORM_FILE_HEADER) {
-        streams.err("input_transform(): invalid header in file.\n");
+        dialect.print_error("input_transform(): invalid header in file.\n", streams);
         return Err(());
     }
     let mut transform: Option<GeneralTransform> = None;
     let status = loop {
-        let (st, next) = input_one_transform(s, filename, dialect, streams);
+        let (st, next) = input_one_transform(s, filename, dialect, streams, notices);
         if st != Status::Ok {
             break st;
         }
@@ -481,12 +540,12 @@ pub(crate) fn input_transform(
         });
     };
     if status == Status::Error {
-        streams.err("input_transform: error reading transform.\n");
+        dialect.print_error("input_transform: error reading transform.\n", streams);
         return Err(());
     }
     match transform {
         None => {
-            streams.err("input_transform: no transform present.\n");
+            dialect.print_error("input_transform: no transform present.\n", streams);
             Err(())
         }
         Some(t) => Ok(t),
@@ -499,10 +558,12 @@ pub fn input_transform_file(
     filename: &[u8],
     dialect: &dyn Dialect,
     streams: &mut dyn Streams,
+    notices: &mut Notices,
 ) -> Result<GeneralTransform, ()> {
-    let data = match open_file_with_default_suffix(filename, b"xfm", IoType::Read, dialect, streams)? {
-        OpenFile::Read(d) => d,
-        OpenFile::Write(_) => unreachable!("opened for reading"),
+    let opened =
+        open_file_with_default_suffix(filename, b"xfm", IoType::Read, dialect, streams, notices)?;
+    let OpenFile::Read(data) = opened else {
+        unreachable!("opened for reading")
     };
-    input_transform_from_bytes(&data, Some(filename), dialect, streams)
+    input_transform_from_bytes(&data, Some(filename), dialect, streams, notices)
 }

@@ -5,7 +5,8 @@ use super::*;
 
 fn read(text: &str) -> (Result<GeneralTransform, ()>, String) {
     let mut c = Captured::default();
-    let r = input_transform_from_bytes(text.as_bytes(), None, &Mni, &mut c);
+    let mut n = larmorx_core::defects::Notices::default();
+    let r = input_transform_from_bytes(text.as_bytes(), None, &Mni, &mut c, &mut n);
     (r, c.text(Stream::Err))
 }
 

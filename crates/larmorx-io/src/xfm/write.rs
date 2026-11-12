@@ -6,6 +6,7 @@
 use std::io::Write as _;
 
 use larmorx_core::cfmt::{self, Streams};
+use larmorx_core::defects::{self as d, Notices};
 
 use super::files::{IoType, OpenFile, lossy, open_file_with_default_suffix, remove_directories_from_filename};
 use super::{Dialect, GeneralTransform, TransformData};
@@ -42,6 +43,7 @@ fn output_one_transform(
     t: &GeneralTransform,
     dialect: &dyn Dialect,
     streams: &mut dyn Streams,
+    notices: &mut Notices,
 ) -> Result<(), ()> {
     match &t.data {
         TransformData::Linear { .. } => {
@@ -82,9 +84,9 @@ fn output_one_transform(
             }
             out.extend_from_slice(format!("Number_Dimensions = {n_dimensions};\n").as_bytes());
             out.extend_from_slice(b"Points =\n");
-            write_rows(out, points);
+            write_rows(out, points, notices);
             out.extend_from_slice(b"Displacements =\n");
-            write_rows(out, displacements);
+            write_rows(out, displacements, notices);
             Ok(())
         }
         TransformData::Grid { volume, .. } => {
@@ -124,11 +126,11 @@ fn output_one_transform(
             }
             if invert {
                 for sub in v.iter().rev() {
-                    output_one_transform(out, filename, volume_count, invert, sub, dialect, streams)?;
+                    output_one_transform(out, filename, volume_count, invert, sub, dialect, streams, notices)?;
                 }
             } else {
                 for sub in v {
-                    output_one_transform(out, filename, volume_count, invert, sub, dialect, streams)?;
+                    output_one_transform(out, filename, volume_count, invert, sub, dialect, streams, notices)?;
                 }
             }
             Ok(())
@@ -139,8 +141,12 @@ fn output_one_transform(
 /// The rows of a spline's points or displacements: ` %.15g` per value, `;` after the last row.
 /// volume_io writes no `;` at all for an empty list, which then cannot be read back (FS-74);
 /// larmorx writes it on a line of its own.
-fn write_rows(out: &mut Vec<u8>, rows: &[Vec<f64>]) {
+fn write_rows(out: &mut Vec<u8>, rows: &[Vec<f64>], notices: &mut Notices) {
     if rows.is_empty() {
+        notices.add(
+            &d::FS_74,
+            "an empty Points list written with its ';' (volume_io writes none)",
+        );
         out.extend_from_slice(b";\n");
         return;
     }
@@ -165,21 +171,31 @@ pub fn output_transform(
     t: &GeneralTransform,
     dialect: &dyn Dialect,
     streams: &mut dyn Streams,
+    notices: &mut Notices,
 ) -> Result<Vec<u8>, ()> {
     let mut out = b"MNI Transform File\n".to_vec();
     output_comments(&mut out, comments);
     out.push(b'\n');
     let mut own = 0;
     let count = volume_count.unwrap_or(&mut own);
-    output_one_transform(&mut out, filename, count, false, t, dialect, streams)?;
+    output_one_transform(&mut out, filename, count, false, t, dialect, streams, notices)?;
     Ok(out)
 }
 
 /// [`output_transform`] as text (the file is ASCII unless a comment is not).
 pub fn output_transform_to_string(t: &GeneralTransform, comments: Option<&str>) -> String {
     let mut quiet = larmorx_core::cfmt::Silent;
-    let bytes = output_transform(None, None, comments.map(str::as_bytes), t, &super::Mni, &mut quiet)
-        .unwrap_or_default();
+    let mut notices = Notices::default();
+    let bytes = output_transform(
+        None,
+        None,
+        comments.map(str::as_bytes),
+        t,
+        &super::Mni,
+        &mut quiet,
+        &mut notices,
+    )
+    .unwrap_or_default();
     lossy(&bytes).into_owned()
 }
 
@@ -191,12 +207,14 @@ pub fn output_transform_file(
     t: &GeneralTransform,
     dialect: &dyn Dialect,
     streams: &mut dyn Streams,
+    notices: &mut Notices,
 ) -> Result<(), ()> {
-    let file = open_file_with_default_suffix(filename, b"xfm", IoType::Write, dialect, streams)?;
+    let file =
+        open_file_with_default_suffix(filename, b"xfm", IoType::Write, dialect, streams, notices)?;
     let OpenFile::Write(mut file) = file else {
         unreachable!("opened for writing")
     };
     let mut count = 0;
-    let text = output_transform(Some(filename), Some(&mut count), comments, t, dialect, streams)?;
+    let text = output_transform(Some(filename), Some(&mut count), comments, t, dialect, streams, notices)?;
     file.write_all(&text).map_err(|_| ())
 }

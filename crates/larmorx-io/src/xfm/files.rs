@@ -12,6 +12,7 @@ use std::io::Read;
 use std::path::PathBuf;
 
 use larmorx_core::cfmt::Streams;
+use larmorx_core::defects::{self as d, Notices};
 
 use super::Dialect;
 
@@ -228,9 +229,12 @@ pub(crate) fn errno_of(e: &std::io::Error) -> i32 {
 }
 
 /// `print_system_error`.
-pub(crate) fn print_system_error(e: &std::io::Error, streams: &mut dyn Streams) {
-    streams.err(&format!("\nSystem message: {}\n", strerror(errno_of(e))));
+pub(crate) fn print_system_error(e: &std::io::Error, dialect: &dyn Dialect, streams: &mut dyn Streams) {
+    dialect.print_error(&format!("\nSystem message: {}\n", strerror(errno_of(e))), streams);
 }
+
+/// The characters a POSIX shell splits a word at or interprets (in `gunzip -c <name> > <tmp>`).
+const SHELL_SPECIAL: &[u8] = b" \t\n\"'`$\\;&|<>()*?[]#~={}!^%";
 
 /// What [`open_file`] opens.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -288,6 +292,7 @@ pub fn open_file(
     io: IoType,
     dialect: &dyn Dialect,
     streams: &mut dyn Streams,
+    notices: &mut Notices,
 ) -> Result<OpenFile, ()> {
     let mut expanded = expand_filename(filename);
     let mut gzipped = false;
@@ -300,17 +305,26 @@ pub fn open_file(
             }
         }
     }
+    if gzipped && expanded.iter().any(|c| SHELL_SPECIAL.contains(c)) {
+        notices.add(
+            &d::FS_71,
+            format!(
+                "{} decompressed in memory (volume_io passes the name to the shell unquoted)",
+                lossy(&expanded)
+            ),
+        );
+    }
     let path = to_path(&expanded);
     match io {
         IoType::Read => {
             let mut file = match std::fs::File::open(&path) {
                 Ok(f) => f,
                 Err(e) if !gzipped => {
-                    streams.err(&format!(
-                        "Error:  could not open file \"{}\".  ",
-                        lossy(&expanded)
-                    ));
-                    print_system_error(&e, streams);
+                    dialect.print_error(
+                        &format!("Error:  could not open file \"{}\".  ", lossy(&expanded)),
+                        streams,
+                    );
+                    print_system_error(&e, dialect, streams);
                     return Err(());
                 }
                 Err(_) => {
@@ -342,11 +356,11 @@ pub fn open_file(
             match o.open(&path) {
                 Ok(f) => Ok(OpenFile::Write(f)),
                 Err(e) => {
-                    streams.err(&format!(
-                        "Error:  could not open file \"{}\".  ",
-                        lossy(&expanded)
-                    ));
-                    print_system_error(&e, streams);
+                    dialect.print_error(
+                        &format!("Error:  could not open file \"{}\".  ", lossy(&expanded)),
+                        streams,
+                    );
+                    print_system_error(&e, dialect, streams);
                     Err(())
                 }
             }
@@ -355,11 +369,14 @@ pub fn open_file(
 }
 
 fn uncompress_failed(expanded: &[u8], dialect: &dyn Dialect, streams: &mut dyn Streams) {
-    streams.err(&format!(
-        "Error uncompressing {} into {} using gunzip and bunzip2\n",
-        lossy(expanded),
-        lossy(&dialect.temporary_name())
-    ));
+    dialect.print_error(
+        &format!(
+            "Error uncompressing {} into {} using gunzip and bunzip2\n",
+            lossy(expanded),
+            lossy(&dialect.temporary_name())
+        ),
+        streams,
+    );
 }
 
 /// `open_file_with_default_suffix`: for reading, a name without an extension that does not exist
@@ -370,6 +387,7 @@ pub fn open_file_with_default_suffix(
     io: IoType,
     dialect: &dyn Dialect,
     streams: &mut dyn Streams,
+    notices: &mut Notices,
 ) -> Result<OpenFile, ()> {
     let expanded = expand_filename(filename);
     let with_suffix = || {
@@ -392,5 +410,5 @@ pub fn open_file_with_default_suffix(
     } else {
         expanded.clone()
     };
-    open_file(&used, io, dialect, streams)
+    open_file(&used, io, dialect, streams, notices)
 }

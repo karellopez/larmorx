@@ -11,9 +11,11 @@
 //!
 //! - `%lf` reads the longest run of characters that can still begin a number (the sign, the
 //!   digits, one decimal point, an exponent letter after a digit and its sign; `0x` and the hex
-//!   digits and `p`; `inf`, `infinity`, `nan`, `nan(...)`), then converts that run with `strtod`;
-//!   the conversion succeeds when `strtod` uses a prefix of it, so `"1e"` and `"1e+"` read 1 and
-//!   `"0x"` reads 0 (ISO C's own example would reject `"100e"`; glibc does not).
+//!   digits and `p`; `inf`, `infinity`, `nan`), then converts that run with `strtod`; the
+//!   conversion succeeds when `strtod` uses a prefix of it, so `"1e"` and `"1e+"` read 1 (ISO C's
+//!   own example would reject `"100e"`; glibc does not); `"0x"` with nothing after it that the
+//!   run takes reads nothing (`"0x."` reads 0),
+//!   and `"nan(...)"` reads the default NaN (the parenthesis is not part of the run).
 //! - A run that `strtod` cannot use at all (`"-"`, `"."`, `"in"`) is a matching failure: no value.
 //! - `%d` converts its run as `strtol` would and keeps the low 32 bits of the `long` result.
 //!
@@ -294,23 +296,8 @@ fn float_run(s: &[u8], mut i: usize) -> usize {
         i += 1;
     }
     if i < s.len() && lower(s[i]) == b'n' {
-        // "nan", then an optional "(n-char-sequence)".
-        if !starts_ci(s, i, b"nan") {
-            return usize::MAX;
-        }
-        let mut j = i + 3;
-        if j < s.len() && s[j] == b'(' {
-            let mut k = j + 1;
-            while k < s.len() && (s[k].is_ascii_alphanumeric() || s[k] == b'_') {
-                k += 1;
-            }
-            if k < s.len() && s[k] == b')' {
-                j = k + 1;
-            } else {
-                return usize::MAX;
-            }
-        }
-        return j;
+        // "nan" (what follows, a parenthesis included, is not read).
+        return if starts_ci(s, i, b"nan") { i + 3 } else { usize::MAX };
     }
     if i < s.len() && lower(s[i]) == b'i' {
         if !starts_ci(s, i, b"inf") {
@@ -328,10 +315,12 @@ fn float_run(s: &[u8], mut i: usize) -> usize {
     }
     let mut hex = false;
     let mut got_digit = false;
+    let mut after_prefix = usize::MAX;
     if i + 1 < s.len() && s[i] == b'0' && lower(s[i + 1]) == b'x' {
+        // "0x" alone reads nothing; with anything read after it, strtod decides.
         hex = true;
         i += 2;
-        got_digit = true;
+        after_prefix = i;
     }
     let mut got_point = false;
     let mut got_e = false;
@@ -353,6 +342,9 @@ fn float_run(s: &[u8], mut i: usize) -> usize {
         } else {
             break;
         }
+    }
+    if hex && i == after_prefix {
+        return usize::MAX;
     }
     i
 }
@@ -427,7 +419,8 @@ mod tests {
         assert_eq!(sscanf_f64(b"0.1"), Some(0.1));
         assert_eq!(sscanf_f64(b"1e"), Some(1.0));
         assert_eq!(sscanf_f64(b"1e+"), Some(1.0));
-        assert_eq!(sscanf_f64(b"0x"), Some(0.0));
+        assert_eq!(sscanf_f64(b"0x"), None);
+        assert_eq!(strtod(b"0x").1, 1);
         assert_eq!(sscanf_f64(b"0x1p-1"), Some(0.5));
         assert_eq!(sscanf_f64(b"0x1.8p1"), Some(3.0));
         assert_eq!(sscanf_f64(b"-"), None);

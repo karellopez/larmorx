@@ -108,3 +108,27 @@ Their results are in `docs/freesurfer/` (closed too).
   4294967295.0² and the two calls before it, per binary (`objdump`, `readelf`).
 
       validation/investigations/freesurfer-inventory/drand64_order.sh <package root>/bin/mri_ca_register
+- `burkardt_compare.py`: sub-task 3b (relay 5). FreeSurfer's cubic spline routines
+  (`utils/numerics.cpp`) against one or more of John Burkardt's `spline.C`/`spline.cpp` files
+  (Wayback Machine snapshots and today's release), token by token after removing comments and
+  mapping names and `double` to FreeSurfer's (third-party.md §9, P-09).
+
+      python -P validation/investigations/freesurfer-inventory/burkardt_compare.py \
+          <workspace>/tags/freesurfer-8.2.0/utils/numerics.cpp <spline.C> [<spline.cpp> ...]
+- `itk_diff.py` and `itk_functions.py`: sub-task 3b (relay 5). ITK 4.13.2 (the official binaries')
+  against ITK 5.4.5 over every file FreeSurfer's default paths can compile in, per file and per
+  class, with relay 5's reading of the differing classes that compute (`REVIEW` in the tool) ->
+  `docs/freesurfer/itk-diff.toml`; `itk_functions.py` compares VNL's template definitions one by
+  one (third-party.md §10 has both commands).
+- `gcc84/`: sub-task 5 (relay 5), GCC 8.4.0 and GCC bug 110182. `gcc84_n4_dumps.sh` configures ITK
+  4.13.2 with GCC 8.4.0 and FreeSurfer's ITK options and compiles `n4_tu.cxx` (FreeSurfer's N4
+  pipeline) with FreeSurfer's flags and Ubuntu's code-generation defaults, with GIMPLE dumps;
+  `scan_folds.py` (from the GCC 11 investigation) lists the vector conversion chains the bug can
+  fold; `fit_in_binary.py` finds the object's functions in the stripped official program and says
+  how their divisions are rounded (variation.md §1). Run the compile in a memory box:
+
+      scripts/orchestration/boxed.sh 12 validation/investigations/freesurfer-inventory/gcc84/gcc84_n4_dumps.sh \
+          <itk-4.13.2> <workspace>/oracles/toolchains/gcc-8.4 <scratch>/gcc84-n4
+      python -P validation/investigations/freesurfer-inventory/gcc84/scan_folds.py <scratch>/gcc84-n4/dumps
+      python -P validation/investigations/freesurfer-inventory/gcc84/fit_in_binary.py <scratch>/gcc84-n4/n4_tu.o \
+          <package root>/bin/AntsN4BiasFieldCorrectionFs ThreadedGenerateDataForFitting UpdateBiasFieldEstimate

@@ -2476,3 +2476,6 @@ replica's gaps, the site, the handoff); the clean relays never read the replica 
   University gives written permission later. This replaces the 4dfp replica of "No waiting for permissions" above. Burkardt's
   2006 spline routines: the orchestrator recommends publishing their replica normally with his credit (his code is MIT
   today); the user to confirm.
+- **Burkardt's 2006 spline routines: a replica and a clean room, published normally** (the user, 2026-11-12: "the
+  second the replica and clean room"): the replica in `larmorx-freesurfer` with his credit, pushed like the rest; no
+  local-only branch remains for any borrowed piece.

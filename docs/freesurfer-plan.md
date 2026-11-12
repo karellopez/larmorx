@@ -130,9 +130,8 @@ replica, in the package of its own licence family (GSL's GPL code in `larmorx-gp
 `larmorx`; `larmorx` keeps full freedom, and users install a restricted replica only if they want it. Where a
 piece's licence and FreeSurfer's cannot be combined in one program, the replica uses the clean-room piece there
 (the placement table, `docs/freesurfer/third-party.md`). MARS later; ITK 4.13.2 where it differs from 5.4.5.
-No waiting for permissions (the user, 2026-11-12): the replicas are built now. **Publishing is the user's call**:
-until the user says whether a push to the public repository counts as publishing, the replicas of pieces that carry
-no licence at all (Burkardt's 2006 routines) stay on a local branch, never pushed, outside every wheel.
+No waiting for permissions (the user, 2026-11-12): the replicas are built now and published like the rest
+(Burkardt's 2006 routines included, with his credit).
 **Washington University's Talairach tools get a clean room only** (the user, 2026-11-12): their source forbids
 reproduction without written permission, so no replica unless that permission comes.
 

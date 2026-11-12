@@ -332,6 +332,21 @@ both modes):
 | PIPE-72 | a reference whose centre of gravity is undefined (constant under 25.2.7, whose weights `value - min` are all zero; a sum of zero under 25.2.6; a NaN or infinite voxel) gives NaN or infinite translations in every row (numpy's `RuntimeWarning` only), which `FramewiseDisplacement` turns into `n/a` everywhere | `ValueError` (rule B) |
 | PIPE-73 | every ITK text transform is read in single precision (`genfromtxt(dtype="f4")`), the `*_double_*` ones too, so their parameters are rounded to float32 | the `*_double_*` transforms' values read in double precision |
 
+**Validation** (`validation/investigations/confounds/check_motion.py`, in numpy 2.5.4 with SciPy
+1.18.1 and niworkflows 1.15.4, numpy 2.3.5 with SciPy 1.15.3 and niworkflows 1.15.3, and numpy 2.2.6
+with SciPy 1.15.2, niworkflows 1.15.2 and nibabel 5.3.2 inside fMRIPrep 25.2.6's image; fMRIPrep
+25.2.7's and 25.2.6's interfaces from their tags in each): SciPy's `from_matrix` quaternions bit for
+bit (5,138, both layouts, eight kinds of matrices, the errors) and its `as_euler` through a model of
+`_get_angles` that gives SciPy's 119,064 angles with glibc's `atan2` and `hypot` and larmorx's with
+the correctly rounded ones; nitransforms' `linear.load` and `from_ras` bit for bit (19 kinds of ITK
+files, 204 affines); both interfaces and niworkflows' copies on 21 synthetic cases per release, the
+tables byte for byte but the angles D4 names; **fMRIPrep's own `motion_params` and `rmsd` nodes of the
+36 confounds workflows of the oracle runs** with `fmriprep_version="25.2.6"`, `numpy_version="2.2.6"`
+and `reproduce`: the 36 `rmsd` files byte for byte, the 36 motion files with every `trans_*` cell
+identical and 15 of the 22,293 `rot_*` cells (12 files) changed by glibc's `atan2` (D4; glibc's
+`hypot` changes none); the default equals `reproduce` on every real node.
+
+
 ## pandas' tables (`larmorx.confounds._tables`)
 
 fMRIPrep's and niworkflows' steps read their inputs with `pandas.read_csv(path, sep="\t")`, write

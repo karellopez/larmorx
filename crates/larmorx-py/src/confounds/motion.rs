@@ -12,9 +12,7 @@
 
 use super::dvars::numpy_settings;
 use super::svd::{Mat, linalg_error, mat};
-use larmorx_confounds::motion::{
-    self, EulerSeq, FslSpace, MotionError, MotionRelease, SliceOrder,
-};
+use larmorx_confounds::motion::{self, EulerSeq, FslSpace, MotionError, MotionRelease, SliceOrder};
 use larmorx_core::linalg::{Mat3, Mat4};
 use numpy::{PyArray1, PyReadonlyArray2};
 use pyo3::exceptions::PyValueError;
@@ -23,7 +21,9 @@ use pyo3::prelude::*;
 fn rows4(a: &PyReadonlyArray2<'_, f64>) -> PyResult<Vec<Mat4>> {
     let v = a.as_array();
     if v.ncols() != 16 {
-        return Err(PyValueError::new_err("expected n x 16 rows (4 x 4 matrices, C order)"));
+        return Err(PyValueError::new_err(
+            "expected n x 16 rows (4 x 4 matrices, C order)",
+        ));
     }
     Ok(v.rows()
         .into_iter()
@@ -34,7 +34,9 @@ fn rows4(a: &PyReadonlyArray2<'_, f64>) -> PyResult<Vec<Mat4>> {
 fn rows3(a: &PyReadonlyArray2<'_, f64>) -> PyResult<Vec<Mat3>> {
     let v = a.as_array();
     if v.ncols() != 9 {
-        return Err(PyValueError::new_err("expected n x 9 rows (3 x 3 matrices, C order)"));
+        return Err(PyValueError::new_err(
+            "expected n x 9 rows (3 x 3 matrices, C order)",
+        ));
     }
     Ok(v.rows()
         .into_iter()
@@ -43,7 +45,12 @@ fn rows3(a: &PyReadonlyArray2<'_, f64>) -> PyResult<Vec<Mat3>> {
 }
 
 fn flat4<'py>(py: Python<'py>, m: &[Mat4]) -> PyResult<Mat<'py>> {
-    mat(py, m.len(), 16, m.iter().flatten().flatten().copied().collect())
+    mat(
+        py,
+        m.len(),
+        16,
+        m.iter().flatten().flatten().copied().collect(),
+    )
 }
 
 fn err(py: Python<'_>, e: MotionError) -> PyErr {
@@ -168,7 +175,9 @@ fn euler_seq(seq: &str) -> PyResult<EulerSeq> {
     }
     let extrinsic = b.iter().all(|c| b"xyz".contains(c));
     let intrinsic = b.iter().all(|c| b"XYZ".contains(c));
-    if !(extrinsic || intrinsic) || b[0].eq_ignore_ascii_case(&b[1]) || b[1].eq_ignore_ascii_case(&b[2])
+    if !(extrinsic || intrinsic)
+        || b[0].eq_ignore_ascii_case(&b[1])
+        || b[1].eq_ignore_ascii_case(&b[2])
     {
         return Err(bad());
     }
@@ -230,7 +239,12 @@ fn fmriprep_motion_params<'py>(
     });
     match out {
         Ok(m) => Ok((
-            Some(mat(py, m.params.len(), 6, m.params.into_iter().flatten().collect())?),
+            Some(mat(
+                py,
+                m.params.len(),
+                6,
+                m.params.into_iter().flatten().collect(),
+            )?),
             m.gimbal,
             None,
         )),

@@ -712,7 +712,10 @@ mod tests {
         let e = scipy_from_matrix(&[eye3(), m], SliceOrder::C, LapackRelease::V3_12_1);
         assert_eq!(e, Err(MotionError::NonPositiveDeterminant(1)));
         let z = [[0.0; 4]; 4];
-        assert_eq!(rms_deviation(&[z, eye4()], &[0.0; 3]), Err(MotionError::Singular));
+        assert_eq!(
+            rms_deviation(&[z, eye4()], &[0.0; 3]),
+            Err(MotionError::Singular)
+        );
     }
 
     fn eye3() -> Mat3 {

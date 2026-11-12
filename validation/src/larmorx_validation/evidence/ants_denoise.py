@@ -871,8 +871,9 @@ SHOWS = {
         "In `reproduce`, on 1 and 12 threads, the replica gives ANTs' output at one thread with "
         "correctly rounded maths, bit for bit; ANTs as built differs from it only where glibc's "
         "`expf` is not correctly rounded (5,522 of 5,898,240 voxels, by at most 0.0002). ANTs' "
-        "own result moves with its thread count, by up to 271 at 8 threads, and fMRIPrep's "
-        "output, made by its ANTs 2.6.2 at 8 threads, is one more of those results. The "
+        "own result moves with its thread count, by up to 271 at 8 threads against one; "
+        "fMRIPrep's output, made by its ANTs 2.6.2 at 8 threads, differs from ANTs 2.6.5's at 8 "
+        "threads by up to 73, although the two builds agree bit for bit at one thread. The "
         "default, `fix`, corrects ANTS-43 in this call: 437,915 voxels change, by up to 2.81.",
         ["lx-ants1"],
     ),

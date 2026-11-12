@@ -32,8 +32,8 @@ mod read;
 mod write;
 
 pub use files::{
-    IoType, OpenFile, expand_filename, extract_directory, file_exists, open_file,
-    open_file_with_default_suffix, remove_directories_from_filename,
+    IoType, OpenFile, expand_filename, expand_filename_in, extract_directory, file_exists,
+    open_file, open_file_with_default_suffix, remove_directories_from_filename,
 };
 pub use gaussian::invert_square_matrix;
 pub use read::{input_transform_file, input_transform_from_bytes};
@@ -59,6 +59,10 @@ pub mod defects {
     /// An empty `Points` list frees a pointer that was never set (`input_one_transform`).
     /// Corrected: a spline with no points (its affine part only), which the format allows.
     pub const EMPTY_POINTS: &str = "FS-74";
+    /// A `$VAR` (or `~`) that expands to nothing at the start of a file name writes through a
+    /// null pointer (`expand_filename` never allocated its result). Corrected: it expands to
+    /// nothing.
+    pub const EMPTY_EXPANSION: &str = "FS-75";
 }
 
 /// `Transform`: a 4 x 4 matrix, `t[i][j]` = volume_io's `Transform_elem(t, i, j)` (row `i`,
@@ -158,6 +162,11 @@ pub trait Dialect {
                 streams,
             );
         }
+    }
+    /// `get_user_home_directory` (for `~user`): the password file's home directory, `None` for an
+    /// unknown user (the `~user` is then kept as written).
+    fn user_home_directory(&self, user: &[u8]) -> Option<Vec<u8>> {
+        files::user_home_directory(user)
     }
     /// Whether a NUL byte in a token ends the token (the rest of it is read and lost); in
     /// volume_io it adds nothing and the token goes on.

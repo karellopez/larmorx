@@ -22,6 +22,8 @@ out=$(cd "$out" && pwd)
 export PATH=$(echo "$PATH" | tr ':' '\n' | grep -v /fsl | paste -sd:)
 CC="$unit/toolchain/bin/gcc"
 FLAGS=(-O3 -DNDEBUG -fopenmp -w -fPIC)
+# The shims themselves must declare everything they call (a pointer through an implicit int is cut).
+SHIM=(-Werror=implicit-function-declaration)
 V="$minc/volume_io"
 up_inc=(-I"$here/up-include" -I"$V/Include" -I"$minc/libsrc" -I"$nifti/niftilib" -I"$nifti/znzlib")
 up_src=(MNI_formats/gen_xf_io.c MNI_formats/gen_xfs.c MNI_formats/mni_io.c MNI_formats/thin_plate_spline.c
@@ -39,7 +41,7 @@ for f in niftilib/nifti1_io.c znzlib/znzlib.c; do
   "$CC" "${FLAGS[@]}" -DHAVE_ZLIB "${up_inc[@]}" -c "$nifti/$f" -o "$o"
   objs+=("$o")
 done
-"$CC" "${FLAGS[@]}" "${up_inc[@]}" -c "$here/shim_up.c" -o "$out/obj/shim_up.o"
+"$CC" "${FLAGS[@]}" "${SHIM[@]}" "${up_inc[@]}" -c "$here/shim_up.c" -o "$out/obj/shim_up.o"
 "$CC" "${FLAGS[@]}" "${up_inc[@]}" -c "$here/up_stubs.c" -o "$out/obj/stubs_up.o"
 "$CC" "${FLAGS[@]}" -DHAVE_ZLIB "${up_inc[@]}" -c "$here/shim_nifti.c" -o "$out/obj/shim_nifti_up.o"
 "$CC" -shared -fopenmp -Wl,-Bsymbolic -Wl,--no-undefined -o "$out/libup.so" \
@@ -47,7 +49,7 @@ done
 S="$unit/src/fs-shadow/packages"
 B="$unit/build/fs/packages"
 fs_inc=(-I"$S/minc" -I"$B/minc" -I"$S/netcdf" -I"$S/nifti" -I"$B/nifti")
-"$CC" "${FLAGS[@]}" "${fs_inc[@]}" -c "$here/shim_fs.c" -o "$out/obj/shim_fs.o"
+"$CC" "${FLAGS[@]}" "${SHIM[@]}" "${fs_inc[@]}" -c "$here/shim_fs.c" -o "$out/obj/shim_fs.o"
 "$CC" "${FLAGS[@]}" -DHAVE_ZLIB "${fs_inc[@]}" -c "$here/shim_nifti.c" -o "$out/obj/shim_nifti_fs.o"
 libs=("$B/minc/libminc.a" "$B/netcdf/libnetcdf.a" "$B/nifti/libnifti.a")
 "$CC" -shared -fopenmp -Wl,-Bsymbolic -Wl,--no-undefined -o "$out/libfs.so" \

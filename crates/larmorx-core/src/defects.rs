@@ -1001,6 +1001,8 @@ defects! {
         "a thin-plate spline's Number_Dimensions of 0 divides by zero (the program crashes) and a negative one sizes its arrays negatively";
     FS_74 = "FS-74", "MINC volume_io", true,
         "a thin-plate spline with an empty Points list frees a pointer that was never set (a crash or heap damage), and the writer writes such a list with no ';', so the file cannot be read back";
+    FS_75 = "FS-75", "MINC volume_io", true,
+        "a file name that starts with a $VAR (or ~) whose value is empty writes through a null pointer (expand_filename has not allocated its result yet): the program crashes";
 }
 
 /// The register entry with ID `id`.

@@ -8,7 +8,7 @@ use std::io::Write as _;
 use larmorx_core::cfmt::{self, Streams};
 use larmorx_core::defects::{self as d, Notices};
 
-use super::files::{IoType, OpenFile, lossy, open_file_with_default_suffix, remove_directories_from_filename};
+use super::files::{Ctx, IoType, OpenFile, lossy, open_file_with_default_suffix};
 use super::{Dialect, GeneralTransform, TransformData};
 
 /// `output_comments`: `%` before the comments and after each of their newlines but the last
@@ -114,7 +114,7 @@ fn output_one_transform(
             let mut volume_filename = prefix;
             volume_filename.extend_from_slice(format!("_grid_{volume_count}.mnc").as_bytes());
             *volume_count += 1;
-            let base = remove_directories_from_filename(&volume_filename);
+            let base = Ctx { dialect, notices: &mut *notices }.remove_directories(&volume_filename);
             out.extend_from_slice(b"Displacement_Volume = ");
             out.extend_from_slice(&base);
             out.extend_from_slice(b";\n");

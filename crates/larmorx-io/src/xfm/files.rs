@@ -63,7 +63,7 @@ pub(crate) fn getenv(name: &[u8]) -> Option<Vec<u8>> {
 
 /// `get_user_home_directory`: `getpwnam(user)->pw_dir`, from the password file (`/etc/passwd`;
 /// accounts known only to other name services are not found).
-fn user_home_directory(user: &[u8]) -> Option<Vec<u8>> {
+pub(crate) fn user_home_directory(user: &[u8]) -> Option<Vec<u8>> {
     let text = std::fs::read("/etc/passwd").ok()?;
     for line in text.split(|&c| c == b'\n') {
         let fields: Vec<&[u8]> = line.split(|&c| c == b':').collect();
@@ -79,6 +79,12 @@ fn user_home_directory(user: &[u8]) -> Option<Vec<u8>> {
 /// end; an unknown name is copied as written; a backslash escapes the next character and is
 /// dropped.
 pub fn expand_filename(filename: &[u8]) -> Vec<u8> {
+    expand_filename_in(filename, &super::Mni, &mut Notices::default())
+}
+
+/// [`expand_filename`] with a dialect's home directories; volume_io crashes on an expansion to
+/// nothing at the start of the name (FS-75), which larmorx expands to nothing.
+pub fn expand_filename_in(filename: &[u8], dialect: &dyn Dialect, notices: &mut Notices) -> Vec<u8> {
     // C's string ends at its first NUL.
     let filename = &filename[..filename.iter().position(|&b| b == 0).unwrap_or(filename.len())];
     let len = filename.len();
@@ -99,7 +105,7 @@ pub fn expand_filename(filename: &[u8]) -> Vec<u8> {
                 if env.is_empty() {
                     getenv(b"HOME")
                 } else {
-                    user_home_directory(env)
+                    dialect.user_home_directory(env)
                 }
             } else {
                 getenv(env)
@@ -107,6 +113,15 @@ pub fn expand_filename(filename: &[u8]) -> Vec<u8> {
             match value {
                 Some(v) => {
                     let end = v.iter().position(|&b| b == 0).unwrap_or(v.len());
+                    if end == 0 && out.is_empty() {
+                        notices.add(
+                            &d::FS_75,
+                            format!(
+                                "{} expanded to nothing at the start of a file name (volume_io crashes)",
+                                lossy(&filename[i..j])
+                            ),
+                        );
+                    }
                     out.extend_from_slice(&v[..end]);
                     i = j;
                 }
@@ -129,50 +144,81 @@ pub fn expand_filename(filename: &[u8]) -> Vec<u8> {
     out
 }
 
+/// The context the helpers expand names in: a dialect and the notices.
+pub(crate) struct Ctx<'a> {
+    pub dialect: &'a dyn Dialect,
+    pub notices: &'a mut Notices,
+}
+
+impl Ctx<'_> {
+    fn expand(&mut self, filename: &[u8]) -> Vec<u8> {
+        expand_filename_in(filename, self.dialect, self.notices)
+    }
+
+    /// `file_exists`.
+    pub(crate) fn file_exists(&mut self, filename: &[u8]) -> bool {
+        std::fs::File::open(to_path(&self.expand(filename))).is_ok()
+    }
+
+    /// `remove_directories_from_filename`.
+    pub(crate) fn remove_directories(&mut self, filename: &[u8]) -> Vec<u8> {
+        let e = self.expand(filename);
+        match e.iter().rposition(|&c| c == b'/') {
+            Some(p) => e[p + 1..].to_vec(),
+            None => e,
+        }
+    }
+
+    /// `has_no_extension`: no `.` in the file's own name.
+    pub(crate) fn has_no_extension(&mut self, filename: &[u8]) -> bool {
+        !self.remove_directories(filename).contains(&b'.')
+    }
+
+    /// `extract_directory`.
+    pub(crate) fn extract_directory(&mut self, filename: &[u8]) -> Vec<u8> {
+        let e = self.expand(filename);
+        match e.iter().rposition(|&c| c == b'/') {
+            Some(p) => e[..=p].to_vec(),
+            None => b".".to_vec(),
+        }
+    }
+
+    /// `file_exists_as_compressed`: the first of `name.z`, `name.Z`, `name.gz` that exists.
+    fn file_exists_as_compressed(&mut self, expanded: &[u8]) -> Option<Vec<u8>> {
+        let e = self.expand(expanded);
+        for ending in COMPRESSED_ENDINGS {
+            let mut c = e.clone();
+            c.extend_from_slice(ending);
+            if self.file_exists(&c) {
+                return Some(c);
+            }
+        }
+        None
+    }
+}
+
 /// `file_exists`: `fopen(expanded, "r")` succeeds.
 pub fn file_exists(filename: &[u8]) -> bool {
-    std::fs::File::open(to_path(&expand_filename(filename))).is_ok()
+    let mut n = Notices::default();
+    Ctx { dialect: &super::Mni, notices: &mut n }.file_exists(filename)
 }
 
 /// `remove_directories_from_filename`: what follows the expanded name's last `/`.
 pub fn remove_directories_from_filename(filename: &[u8]) -> Vec<u8> {
-    let e = expand_filename(filename);
-    match e.iter().rposition(|&c| c == b'/') {
-        Some(p) => e[p + 1..].to_vec(),
-        None => e,
-    }
-}
-
-/// `has_no_extension`: no `.` in the file's own name.
-pub(crate) fn has_no_extension(filename: &[u8]) -> bool {
-    !remove_directories_from_filename(filename).contains(&b'.')
+    let mut n = Notices::default();
+    Ctx { dialect: &super::Mni, notices: &mut n }.remove_directories(filename)
 }
 
 /// `extract_directory`: the expanded name up to and including its last `/`, or `.`.
 pub fn extract_directory(filename: &[u8]) -> Vec<u8> {
-    let e = expand_filename(filename);
-    match e.iter().rposition(|&c| c == b'/') {
-        Some(p) => e[..=p].to_vec(),
-        None => b".".to_vec(),
-    }
+    let mut n = Notices::default();
+    Ctx { dialect: &super::Mni, notices: &mut n }.extract_directory(filename)
 }
 
 fn ends_in(s: &[u8], ending: &[u8]) -> bool {
     s.len() >= ending.len() && &s[s.len() - ending.len()..] == ending
 }
 
-/// `file_exists_as_compressed`: the first of `name.z`, `name.Z`, `name.gz` that exists.
-fn file_exists_as_compressed(expanded: &[u8]) -> Option<Vec<u8>> {
-    let e = expand_filename(expanded);
-    for ending in COMPRESSED_ENDINGS {
-        let mut c = e.clone();
-        c.extend_from_slice(ending);
-        if file_exists(&c) {
-            return Some(c);
-        }
-    }
-    None
-}
 
 /// glibc's `strerror` text for an error number (the messages file operations give).
 pub(crate) fn strerror(errno: i32) -> String {
@@ -294,12 +340,13 @@ pub fn open_file(
     streams: &mut dyn Streams,
     notices: &mut Notices,
 ) -> Result<OpenFile, ()> {
-    let mut expanded = expand_filename(filename);
+    let mut ctx = Ctx { dialect, notices };
+    let mut expanded = ctx.expand(filename);
     let mut gzipped = false;
     if io == IoType::Read {
         gzipped = COMPRESSED_ENDINGS.iter().any(|e| ends_in(&expanded, e));
-        if !gzipped && !file_exists(&expanded) {
-            if let Some(c) = file_exists_as_compressed(&expanded) {
+        if !gzipped && !ctx.file_exists(&expanded) {
+            if let Some(c) = ctx.file_exists_as_compressed(&expanded) {
                 expanded = c;
                 gzipped = true;
             }
@@ -389,7 +436,11 @@ pub fn open_file_with_default_suffix(
     streams: &mut dyn Streams,
     notices: &mut Notices,
 ) -> Result<OpenFile, ()> {
-    let expanded = expand_filename(filename);
+    let mut ctx = Ctx {
+        dialect,
+        notices: &mut *notices,
+    };
+    let expanded = ctx.expand(filename);
     let with_suffix = || {
         let mut u = expanded.clone();
         u.push(b'.');
@@ -398,14 +449,14 @@ pub fn open_file_with_default_suffix(
     };
     let used = if io == IoType::Read {
         let mut used = expanded.clone();
-        if !file_exists(&expanded) && has_no_extension(&expanded) {
+        if !ctx.file_exists(&expanded) && ctx.has_no_extension(&expanded) {
             let u = with_suffix();
-            if file_exists(&u) {
+            if ctx.file_exists(&u) {
                 used = u;
             }
         }
         used
-    } else if has_no_extension(&expanded) {
+    } else if ctx.has_no_extension(&expanded) {
         with_suffix()
     } else {
         expanded.clone()

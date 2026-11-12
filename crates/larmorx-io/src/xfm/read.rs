@@ -15,7 +15,7 @@ use larmorx_core::cfmt::Streams;
 use larmorx_core::cscan;
 use larmorx_core::defects::{self as d, Notices};
 
-use super::files::{IoType, OpenFile, extract_directory, lossy, open_file_with_default_suffix};
+use super::files::{Ctx, IoType, OpenFile, lossy, open_file_with_default_suffix};
 use super::{Dialect, GeneralTransform, Status, TransformData, TransformType};
 
 const TRANSFORM_FILE_HEADER: &[u8] = b"MNI Transform File";
@@ -468,7 +468,7 @@ fn input_one_transform(
             let mut volume_filename = volume_filename.expect("a token");
             if volume_filename.first() != Some(&b'/') {
                 if let Some(f) = filename {
-                    let directory = extract_directory(f);
+                    let directory = Ctx { dialect, notices: &mut *notices }.extract_directory(f);
                     if !directory.is_empty() {
                         let mut t = directory;
                         t.push(b'/');

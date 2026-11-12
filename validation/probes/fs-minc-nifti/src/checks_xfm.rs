@@ -153,7 +153,8 @@ pub fn check_ops(up: &Lib, fs: &Lib, work: &Path, scale: u64, cap: &mut Capture)
     let mut t_cat = Tally::new("concat files");
     let mut t_exp = Tally::new("expand name");
     let mut g = Gen::new(0x0f0e_0002);
-    let mut fs_same = 0u64;
+    let mut fs_same = [0u64; 4];
+    let mut fs_kind = [0u64; 4];
     let mut fs_singular = (0u64, 0u64);
     for k in 0..50_000 * scale {
         let mut m = [[0.0f64; 4]; 4];
@@ -191,8 +192,9 @@ pub fn check_ops(up: &Lib, fs: &Lib, work: &Path, scale: u64, cap: &mut Capture)
             t_fsinv.cases += 1;
             match (ours, ok != 0) {
                 (Some(o), true) => {
+                    fs_kind[kind as usize] += 1;
                     if o.iter().flatten().zip(inv.iter()).all(|(a, b)| a.to_bits() == b.to_bits()) {
-                        fs_same += 1;
+                        fs_same[kind as usize] += 1;
                     }
                 }
                 (None, false) => fs_singular.0 += 1,
@@ -224,8 +226,8 @@ pub fn check_ops(up: &Lib, fs: &Lib, work: &Path, scale: u64, cap: &mut Capture)
         }
     }
     t_fsinv.notes.push(format!(
-        "FreeSurfer's inverse has MINC's bits in {fs_same} of {} cases; both singular {}, one singular {}",
-        t_fsinv.cases, fs_singular.0, fs_singular.1
+        "FreeSurfer's inverse has MINC's bits (all 16) in {}/{} affine (last row 0 0 0 1), {}/{} small-integer, {}/{} and {}/{} general matrices; both singular {}, one singular {}",
+        fs_same[0], fs_kind[0], fs_same[1], fs_kind[1], fs_same[2], fs_kind[2], fs_same[3], fs_kind[3], fs_singular.0, fs_singular.1
     ));
     // concat_general_transforms of two files (MINC: with inverse flags; FreeSurfer: linear only)
     for k in 0..4_000 * scale {
@@ -264,6 +266,7 @@ pub fn check_ops(up: &Lib, fs: &Lib, work: &Path, scale: u64, cap: &mut Capture)
         std::env::set_var("LXPROBE_B", "b$LXPROBE_A\\x");
         std::env::set_var("LXPROBE_E", "");
     }
+    let mut exp_crashes = 0u64;
     const PARTS: &[&str] = &["~", "~root", "~nosuchuser_x", "$LXPROBE_A", "$LXPROBE_B", "$LXPROBE_E", "$NOPE", "$", "\\", "\\$", "\\\\", "/", ".", "x", "$LXPROBE_A.", "a.b", "~/"];
     for k in 0..20_000 * scale {
         let n = 1 + g.below(5);
@@ -271,17 +274,35 @@ pub fn check_ops(up: &Lib, fs: &Lib, work: &Path, scale: u64, cap: &mut Capture)
         for _ in 0..n {
             name.push_str(g.pick(PARTS));
         }
-        let ours = xfm::expand_filename(name.as_bytes());
-        for lib in [up, fs] {
+        let mut crashes = 0;
+        for (lib, is_fs) in [(up, false), (fs, true)] {
+            let mut n = Notices::default();
+            let ours = if is_fs {
+                let probe_fs = ProbeFs { lib: fs, cap: RefCell::new(&mut *cap) };
+                xfm::expand_filename_in(name.as_bytes(), &probe_fs, &mut n)
+            } else {
+                xfm::expand_filename_in(name.as_bytes(), &ProbeMni, &mut n)
+            };
+            if !is_fs && n.contains(&d::FS_75) {
+                // MINC 1.5.1 writes through a null pointer here.
+                crashes += 1;
+                continue;
+            }
             let mut out = vec![0u8; 4096];
             let c = cstr(name.as_bytes());
             // SAFETY: a NUL-terminated name and an output buffer of the stated size.
             let len = unsafe { (lib.expand_filename.unwrap())(c.as_ptr(), out.as_mut_ptr().cast(), out.len() as i32) };
-            out.truncate(len as usize);
             t_exp.cases += 1;
+            if len < 0 {
+                t_exp.eq(&|| format!("case {k} {name:?}"), Some(&ours), None);
+                continue;
+            }
+            out.truncate(len as usize);
             t_exp.eq(&|| format!("case {k} {name:?}"), &ours, &out);
         }
+        exp_crashes += crashes;
     }
+    t_exp.notes.push(format!("{exp_crashes} names where MINC 1.5.1 crashes (FS-75), not run there"));
     vec![t_inv, t_fsinv, t_mul, t_pt, t_cat, t_exp]
 }
 

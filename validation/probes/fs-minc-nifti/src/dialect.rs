@@ -47,6 +47,10 @@ impl Dialect for ProbeFs<'_> {
             got.map_or("(null)".into(), String::from_utf8_lossy)
         ));
     }
+    /// FreeSurfer's volume_io is built without getpwnam: every `~user` is `.`.
+    fn user_home_directory(&self, _user: &[u8]) -> Option<Vec<u8>> {
+        Some(b".".to_vec())
+    }
     /// FreeSurfer's token is one C string: a NUL byte ends it.
     fn nul_ends_token(&self) -> bool {
         true

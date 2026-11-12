@@ -126,10 +126,15 @@ void fm_transform_point(const double *a, double x, double y, double z, double *o
     transform_point(&ta, x, y, z, &out[0], &out[1], &out[2]);
 }
 
-/* expand_filename into out (NUL-terminated); returns its length. */
+/* expand_filename into out (NUL-terminated); returns its length (-1: it returned NULL). */
 int fm_expand_filename(const char *name, char *out, int cap) {
     char *e = expand_filename((char *) name);
-    int n = (int) strlen(e);
+    int n;
+    if (e == NULL) {
+        flush_all();
+        return -1;
+    }
+    n = (int) strlen(e);
     if (n < cap) memcpy(out, e, n + 1);
     flush_all();
     return n;

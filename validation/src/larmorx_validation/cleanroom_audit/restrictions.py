@@ -548,7 +548,8 @@ def _classify_repo(rel: str, op: str) -> Class:
     ) and not rel.endswith("-clean-room.md"):
         return restricted("R11", "FreeSurfer", op, rel)
     m = re.match(r"^docs/findings/((?:fsl|afni)-[^/]+\.md)$", rel)
-    if m and not m[1].endswith("-original.md"):
+    # a clean room's own findings: "-original.md", renamed "-clean-room.md" by the documentation revision (2026-11-12)
+    if m and not m[1].endswith(("-original.md", "-clean-room.md")):
         return Class("findings-unlisted", None, m[1].split("-", 1)[0].upper())
     hits = _glob_hits_findings(rel)
     if hits:

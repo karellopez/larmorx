@@ -673,6 +673,8 @@ def test_glibc_source_dates_and_the_rules_table():
         (f"{WT}/docs/findings/fsl-newtool.md", "read", "findings-unlisted", None),
         (f"{WT}/docs/findings/fsl-prelude.md", "read", "restricted", "R11"),
         (f"{WT}/docs/findings/fsl-bet-original.md", "read", "repo", None),
+        (f"{WT}/docs/findings/fsl-bet-clean-room.md", "read", "repo", None),
+        (f"{WT}/docs/findings/afni-volreg-clean-room.md", "read", "repo", None),
         (f"{SCRATCH}/x/larmorx_documentation/content/a.md", "read", "repo-site", None),
         (f"{SCRATCH}/x/clone/crates-nc/fsl-source/a.cc", "read", "restricted", "R01"),
         (f"{HOME}/.claude/projects/-home-u-ws/s1/tool-results/b1.txt", "read", "tool-output", None),

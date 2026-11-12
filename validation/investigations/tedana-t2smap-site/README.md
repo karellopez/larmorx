@@ -12,6 +12,7 @@ from `validation/src/larmorx_validation/evidence/tedana_t2smap.py`), on a site c
 | `site_checks.sh <site> <port> <out> drawn` | every viewer loaded and drawn (no status message left, no canvas at the browser's default 300 x 150) |
 | `site_checks.sh <site> <port> <out> views` | every view of every viewer (each output in each plane, selected in turn) drawn: no error thrown, no status message left, no canvas at the browser's default size, every window a number (2026-11-12) |
 | `site_checks.sh <site> <port> <out> shots <name>=<selector>...` | element screenshots at 1440 and 390, light and dark |
+| `rerun_original_example.py "<why>"` | the clean-room original's worked example (its cache entry `fmriprep-ds003592-curvefit-original`): the original's and the replica's runs again from the current commit, tedana's kept, with the reason given recorded in its `RUN_INFO.json` (relay RS4, 2026-11-12; the evidence module, the clean-room original's, called as a library) |
 
 A copy of `../sdcflows-fieldmap/site_checks.sh` with this page's address. The before/after
 inventory of every page: `../cleanroom-bet/site_inventory.py` (`count`, `compare`). Leave TMPDIR

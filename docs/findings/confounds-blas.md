@@ -177,6 +177,13 @@ is not what was built: its CI checks out `v0.3.28`.)
   (`lstsq(X, data.T)`, `X` of `T × K`, `K <= 25` in every fMRIPrep run): path 1a, every routine
   unblocked, `DLALSD`'s small path; the divide-and-conquer path (`DLASDA`, `DLALS0`, `DLALSA`, for
   `K > 25`: a run longer than about 27 minutes) is ported and checked on synthetic designs.
+- **`DBDSQR`'s tolerance** (`TOL = TOLMUL · EPS`, `TOLMUL = MAX(10, MIN(100, EPS**MEIGTH))`,
+  `MEIGTH = -0.125`): gfortran evaluates `EPS**MEIGTH` with glibc's `pow` at run time, 2^6.625 =
+  98.70149282610821 correctly rounded (`0x4058ACE5422AA0DB`). Until relay 3a-iv larmorx's constant was
+  98.70092381500355, a `TOL` 5.8e-6 too small in relative terms: a superdiagonal between the two
+  tolerances converged one sweep later, which random testing met in the `DLASDQ` leaves of a cosine basis
+  wider than the series (nearly equal diagonals; finding 54131, 1 to 4 ulps). Fixed for every `DBDSQR` of
+  the port ([confounds-workflow.md](confounds-workflow.md), "Random testing").
 - **`DLALSD`'s large path**: `|D(i)| < EPS` becomes `SIGN(EPS, D(i))` before the pieces are cut, so
   `DBDSQR`'s `-0` never reaches it (the release control: 0 cases differ there); `C(J)`, `S(J)` of
   square nodes are never written nor read (larmorx starts them at 0); `INFO` is the last `DLASCL`'s.

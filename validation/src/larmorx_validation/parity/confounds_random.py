@@ -1729,8 +1729,15 @@ def _entries(record) -> list[str]:
 def run_case(case: Case, checks: CheckList) -> None:
     """A random or permanent case of the three tools (payload ``("random", spec)``), larmorx's
     nibabel arithmetic following this environment's LAPACK release (as
-    ``fieldmaps_b_random.run_case``), for this case only."""
-    contextvars.copy_context().run(_run_case, case, checks)
+    ``fieldmaps_b_random.run_case``), for this case only. numpy's and SciPy's OpenBLAS run at one
+    thread in the case (``threadpoolctl``), as in every check of the part: above OpenBLAS's
+    threading thresholds (a cosine basis of 444 columns and 484 series, the permanent case
+    ``cosine-filter-wide-basis-dbdsqr-tolerance``) more threads give numpy other bits, while the
+    trial ran with ``OPENBLAS_NUM_THREADS=1`` and the parity smoke tier does not set it."""
+    import threadpoolctl
+
+    with threadpoolctl.threadpool_limits(limits=1, user_api="blas"):
+        contextvars.copy_context().run(_run_case, case, checks)
 
 
 def _run_case(case: Case, checks: CheckList) -> None:

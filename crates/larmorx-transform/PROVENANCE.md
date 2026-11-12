@@ -343,6 +343,12 @@ dscal.c,daxpy.c,ddot.c,drot.c,drot_microk_haswell-2.c,dsymv_L.c,dgemv_n_4.c,dgem
 with the fused operations of the build numpy ships (checked in the disassembly of its
 `libscipy_openblas64_`). The logic is re-expressed in Rust; no code was copied.
 
+**Correction (2026-11-12, the confounds' part, relay 3a-iv):** `DBDSQR`'s `TOLMUL` (`EPS**MEIGTH`,
+evaluated by glibc's `pow` at run time in the reference build) is `DBDSQR_TOLMUL` = 2^6.625 correctly
+rounded (`0x4058ACE5422AA0DB`); the constant before was `0x4058ACDBEF8F9B61`, which made a superdiagonal
+at the tolerance converge one sweep later than LAPACK on clustered spectra (random-testing finding
+54131; `validation/investigations/confounds/scan_drift_svd.py`).
+
 `numpy_linalg::lstsq` (2026-11-08, the t2smap replica part; tedana's log-linear fit):
 `numpy.linalg.lstsq` of an `m × 2` design and any number of right-hand sides, from the same
 tarballs and numpy 2.5.4 and 2.3.5 (`numpy/linalg/umath_linalg.cpp`'s `lstsq` and `abs2`,

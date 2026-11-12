@@ -231,18 +231,30 @@ Explained: PD-01's notice names the table read's correction, whose values change
 `FramewiseDisplacement` and `SpikeRegressors` without `concatenate` may not show it. A harness matter: two
 refused CompCor inputs at once, whose error nipype chooses by its caller's keyword order.
 
-**Open (a larmorx difference)**: numpy's `svd`/`lstsq` of the cosine drift of 370 volumes at a cut-off that
-gives more columns than volumes (5 s at TR 3 s: 370 × 444; 4 s at TR 1 s: 185 × 370) differ from numpy
-2.3.5's LAPACK by 1 to 4 ulps in a cluster of near-equal singular values, through DBDSDC's lower-bidiagonal
-path (`scan_drift_svd.py`: 742 of 744 drift matrices identical). DGEBRD, the rotation to an upper bidiagonal
-and each DLASD0 subproblem alone are identical; the whole DBDSDC of the rotated problem differs from 348
-rows on. No fMRIPrep call reaches it (its cut-off of 128 s keeps the basis narrower than the series).
+**Fixed (a larmorx mistake, relay 3a-iv)**: numpy's `svd`/`lstsq` of the cosine drift of 370 volumes at a
+cut-off that gives more columns than volumes (5 s at TR 3 s: 370 × 444; 4 s at TR 1 s: 185 × 370) differed
+from numpy 2.3.5's LAPACK by 1 to 4 ulps in a cluster of near-equal singular values (finding 54131;
+`scan_drift_svd.py`: 742 of 744 drift matrices identical). At `DBDSDC`'s real epsilon (`DLAMCH('E')` =
+2^-53) the rotated problem is one subproblem; its `DLASD0` differed in one `DLASDQ` leaf (21 rows, the
+diagonals nearly equal, the superdiagonals at the convergence tolerance), and that leaf's `DBDSQR`,
+emulated in Python from `dbdsqr.f` with the library's own `DLARTG`, `DLAS2` and `DLASV2`, gave the
+library's bits and not larmorx's. The cause: larmorx's `TOLMUL` (`EPS**MEIGTH`, which gfortran computes
+with glibc's `pow` at run time) was the constant 98.70092381500355 instead of 2^6.625 =
+98.70149282610821, correctly rounded, so `TOL` was 5.8e-6 too small in relative terms and a superdiagonal
+between the two tolerances converged one sweep later. The constant is fixed (`numpy_linalg::DBDSQR_TOLMUL`,
+a unit test against `larmorx_core::math::pow` and `pow_glibc`); it serves every `DBDSQR` of the port
+(`DLASDQ` under `DBDSDC`, `DLALSD` and `DLASDA`, SciPy's `gesvd`, the `m × 2` SVD and `lstsq` of tedana's
+fits, the 3 × 3 SVD of nibabel's header arithmetic). After it: `scan_drift_svd.py` 744 of 744, the wide
+scan (`--t 300 471 1 --lstsq`: every `T` from 300 to 470, six cut-offs, both orientations, `svd` and
+`lstsq`) 4,104 of 4,104 identical in numpy 2.3.5 and in numpy 2.5.4 (`OPENBLAS_L2_SIZE=512`); the quick
+tiers of `check_svd.py`, `check_gesdd.py`, `check_gelsd.py`, `check_gesvd.py`, `check_compcor.py` (and
+CompCor's real nodes in fMRIPrep 25.2.6's image) and the field maps' `check_numpy_linalg.py` unchanged
+(every case identical); the finding agrees on replay and is the permanent case
+`cosine-filter-wide-basis-dbdsqr-tolerance`. No fMRIPrep call reaches the shape (its cut-off of 128 s keeps
+the basis narrower than the series).
 
 ## Follow-ups (open; each a bounded piece)
 
-- **DBDSDC on the clustered cosine spectra** (above): find the step that differs (the subproblem loop's
-  shared work arrays, the sort, the scaling) against LAPACK 3.12.0 and 3.12.1, fix it, re-run
-  `scan_drift_svd.py`, `check_svd.py` and the trial's finding 54131.
 - **PD-01 per step**: name PD-01 in `ExpandModel`, fMRIPrep's `FramewiseDisplacement` and
   `SpikeRegressors` only where the step's output changes.
 

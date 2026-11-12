@@ -405,3 +405,27 @@ def test_bet_pages_say_their_first_sentence_once():
     assert ledes["bet"] == "`bet` finds the brain in a head image."
     assert ledes["bet2"].startswith("`bet2` is FSL's brain extraction")
     assert ledes["betsurf"] == ""
+
+
+def test_validated_before_lists_the_earlier_ports(monkeypatch):
+    """The ports marked validated before the statuses' definition are listed by software from the
+    frozen VALIDATED_BEFORE; a port validated later is not, and a frozen record that disappears is
+    a problem."""
+    from larmorx_validation.reference import programs
+
+    groups, progs, problems = programs.build(reference.REPO, None)
+    assert problems == []
+    listed = {gid: text for gid, _, text in programs.validated_before(groups, progs)}
+    assert "the replica of `3dvolreg`" in listed["afni"]
+    assert "`bet`" in listed["fsl"] and "`flirt`" not in listed["fsl"]
+    assert "tedana" not in listed
+    earlier = {r for r in programs.VALIDATED_BEFORE}
+    monkeypatch.setattr(programs, "VALIDATED_BEFORE", frozenset(earlier - {"afni-volreg-replica"}))
+    groups, progs, _ = programs.build(reference.REPO, None)
+    listed = {gid: text for gid, _, text in programs.validated_before(groups, progs)}
+    assert "3dvolreg" not in listed["afni"]
+    monkeypatch.setattr(programs, "VALIDATED_BEFORE", frozenset(earlier | {"gone-record"}))
+    _, _, problems = programs.build(reference.REPO, None)
+    assert problems == [
+        "programs.py: VALIDATED_BEFORE names 'gone-record', which validation/tools.toml no longer has"
+    ]

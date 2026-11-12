@@ -25,7 +25,12 @@ The checks (every one a problem that stops the export):
   ``api``, so a new module or API page without an entry is caught;
 - what a program does has one source: where its API page holds the program's reference block
   (:mod:`larmorx_validation.reference.apipage`), the first sentence of its "what it does" text,
-  and the entry gives no ``does`` of its own; elsewhere the entry's ``does``.
+  and the entry gives no ``does`` of its own; elsewhere the entry's ``does``;
+- every record of :data:`VALIDATED_BEFORE` is still a record of ``validation/tools.toml``.
+
+``validated_before`` in ``data/programs.yml`` lists, by software, the ports marked *validated*
+before the statuses were defined as they are now (:data:`DEFINED`), which keep their status
+(docs/writing-guide.md §1, "The three statuses"); Validation's ``#statuses`` shows the list.
 """
 
 from __future__ import annotations
@@ -48,6 +53,53 @@ LICENCE_WORDS = {
 OUT = "data/programs.yml"
 #: API pages that describe no program or module (Validation links the register).
 NOT_PROGRAMS = {"docs/api/upstream-defects.md"}
+#: The day the statuses got their present definition: *validated* when every case of the record
+#: passes and the extensive evidence of the final validation phase exists (the writing guide, §1).
+DEFINED = "2026-11-12"
+#: The records whose ports were marked *validated* before :data:`DEFINED`, by the earlier rule
+#: (every case of the record passed), as ``validation/tools.toml`` stated them that day. Frozen:
+#: they keep their status, and a port validated later is not one of them.
+VALIDATED_BEFORE = frozenset(
+    {
+        "nifti-io",
+        "ants-apply-transforms",
+        "itk-hdf5",
+        "afni-tshift",
+        "afni-tshift-replica",
+        "afni-automask",
+        "afni-automask-replica",
+        "afni-unifize",
+        "afni-unifize-replica",
+        "afni-volreg-replica",
+        "resample-series",
+        "sdcflows-fieldmap",
+        "ndimage-skimage",
+        "ndimage-skimage-full",
+        "niworkflows-helpers",
+        "sdcflows-estimation",
+        "sdcflows-estimation-full",
+        "sdcflows-estimation-app-shared",
+        "numpy-linalg",
+        "ants-image-math",
+        "ants-threshold-image",
+        "ants-multiply-images",
+        "ants-smooth-image",
+        "ants-resample-image-by-spacing",
+        "ants-resample-image",
+        "ants-n4",
+        "ants-denoise",
+        "ants-registration",
+        "ants-registration-corrections",
+        "ants-registration-velocity-full",
+        "ants-ai",
+        "ants-affine-initializer",
+        "ants-atropos",
+        "fsl-mcflirt-replica",
+        "fsl-mcflirt-replica-full",
+        "fsl-bet-replica",
+        "fsl-bet-replica-full",
+    }
+)
 
 
 @dataclass
@@ -57,6 +109,7 @@ class Port:
     licence: str
     status: str
     next_release: bool = False
+    earlier: bool = False  # validated before DEFINED (VALIDATED_BEFORE): it keeps its status
 
 
 @dataclass
@@ -229,9 +282,15 @@ def build(repo: Path, site: Path | None) -> tuple[dict, list[Program], list[str]
                 package, licence = p.package, p.licence
             else:
                 package, licence = "larmorx", "Apache-2.0"
+            earlier = status == "validated" and bool(ids) and ids[0] in VALIDATED_BEFORE
             out_ports.append(
                 Port(
-                    kind, package, LICENCE_WORDS.get(licence, licence), status, kind in next_release
+                    kind,
+                    package,
+                    LICENCE_WORDS.get(licence, licence),
+                    status,
+                    kind in next_release,
+                    earlier,
                 )
             )
         progs.append(
@@ -252,6 +311,10 @@ def build(repo: Path, site: Path | None) -> tuple[dict, list[Program], list[str]
         )
     for fam, tool in sorted(known - named):
         problems.append(f"validation/programs.toml: no entry for `larmorx {fam} {tool}`")
+    for rid in sorted(VALIDATED_BEFORE - set(records)):
+        problems.append(
+            f"programs.py: VALIDATED_BEFORE names {rid!r}, which validation/tools.toml no longer has"
+        )
     pages = {f"docs/api/{f.name}" for f in (repo / "docs/api").glob("*.md")}
     for page in sorted(pages - NOT_PROGRAMS - {e["api"] for e in desc["program"]}):
         problems.append(f"validation/programs.toml: no entry names {page} as its `api`")
@@ -264,6 +327,41 @@ def _y(s: str) -> str:
 
 def _count(n: int, one: str, many: str) -> str:
     return f"{n} {one if n == 1 else many}"
+
+
+def _and(items: list[str]) -> str:
+    return items[0] if len(items) == 1 else ", ".join(items[:-1]) + " and " + items[-1]
+
+
+#: How the ports of a program are named in the list, singular and plural.
+_PORTS_WORDS = {
+    ("replica",): ("the replica of", "the replicas of"),
+    ("clean-room",): ("the clean room of", "the clean rooms of"),
+    ("replica", "clean-room"): ("the replica and the clean room of",) * 2,
+    ("own",): ("",) * 2,  # under the chip "LARMORX's own": the names alone
+}
+
+
+def validated_before(groups: dict, progs: list[Program]) -> list[tuple[str, str, str]]:
+    """``(group id, group name, text)`` for each software whose ports were marked *validated*
+    before :data:`DEFINED`: the ports named by program, in the Programs page's order."""
+    out = []
+    order = ["replica", "clean-room", "own"]
+    for gid, g in groups.items():
+        by_kinds: dict[tuple, list[str]] = {}
+        for p in progs:
+            if p.group != gid:
+                continue
+            kinds = tuple(k for k in order if any(x.kind == k and x.earlier for x in p.ports))
+            if kinds:
+                by_kinds.setdefault(kinds, []).append(f"`{p.name}`")
+        parts = []
+        for kinds, names in by_kinds.items():
+            one, many = _PORTS_WORDS[kinds]
+            parts.append(f"{one if len(names) == 1 else many} {_and(names)}".strip())
+        if parts:
+            out.append((gid, g["name"], "; ".join(parts)))
+    return out
 
 
 def render(groups: dict, progs: list[Program]) -> str:
@@ -331,6 +429,15 @@ def render(groups: dict, progs: list[Program]) -> str:
                     f"          - {{kind: {x.kind}, name: {_y(PORT_NAMES[x.kind])}, package: {x.package}, "
                     f"status: {_y(x.status)}, next_release: {'true' if x.next_release else 'false'}}}"
                 )
+    lines += [
+        "# The ports marked validated before the statuses' present definition, which keep their",
+        "# status (programs.py: DEFINED, VALIDATED_BEFORE; Validation's #statuses).",
+        "validated_before:",
+        f"  date: {_y(DEFINED)}",
+        "  groups:",
+    ]
+    for gid, name, text in validated_before(groups, progs):
+        lines.append(f"    - {{id: {gid}, name: {_y(name)}, text: {_y(text)}}}")
     return "\n".join(lines) + "\n"
 
 

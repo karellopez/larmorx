@@ -355,7 +355,9 @@ validation phase makes it `validated`. One failing case keeps a tool `experiment
 small the miss: `lx.mri.hmc` misses one FD-correlation threshold by 0.0008 and is
 `experimental`. The ports marked `validated` before this definition (2026-11-12) keep their
 status: ANTs' programs have their data panel (2026-10-27), and the others get the rest of the
-evidence in the final validation phase. Make no equivalence claim that the record's numbers do
+evidence in the final validation phase. Their records are listed in `VALIDATED_BEFORE`
+(`validation/src/larmorx_validation/reference/programs.py`), and the site's Validation page names
+their ports. Make no equivalence claim that the record's numbers do
 not show (rule 8).
 
 ## 8. Improvements and defects: D11 and D13

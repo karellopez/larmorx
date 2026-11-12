@@ -89,10 +89,13 @@ these words, on the Programs page in short and on Validation in full (`/validati
 
 Since 2026-10-28 each part tests every code path once and leaves the extensive evidence to the
 final validation phase, so a new port is *experimental* even where every case of its record
-agrees. The pages say so, and say which ports were marked *validated* before this definition:
-ANTs' programs, with their data panel, and the ports whose parts marked them when every case
-passed (`docs/porting-guide.md`, "Status"). A status is shown in one neutral style, never in a
-software's pastel (section 5).
+agrees. The pages say so, and say which ports were marked *validated* before this definition
+(2026-11-12): ANTs' programs, with their data panel, and the ports whose parts marked them when
+every case passed (`docs/porting-guide.md`, "Status"). Validation lists them all
+(`#validated-before`), from the frozen list `VALIDATED_BEFORE` of
+`validation/src/larmorx_validation/reference/programs.py`; the Programs page names the main ones
+and links the list. A status is shown in one neutral style, never in a software's pastel
+(section 5).
 
 ### Where the old words stay
 

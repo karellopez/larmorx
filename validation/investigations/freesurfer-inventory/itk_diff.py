@@ -270,6 +270,188 @@ def compare(
     return "differs", changed, q
 
 
+# Relay 5's reading of the differing files that compute on FreeSurfer's default paths (the
+# token diffs, --diff): "mechanical" = only modernisation (types spelled differently, nullptr,
+# default destructors, export macros, braces for casts); "refactored" = loops or threading
+# rewritten, the per-element arithmetic read as unchanged; "changed" = arithmetic or behaviour
+# differs. Classes not listed are infrastructure (objects, pipelines, iterators, containers):
+# "not-read".
+REVIEW = {
+    "itkN4BiasFieldCorrectionImageFilter": (
+        "refactored",
+        "iterators replaced by buffer ranges in the same raster order; per-thread work as "
+        "before; UseMaskLabel's default changed from true (label 1) to false (any non-zero), "
+        "the same for FreeSurfer's 0/1 masks; the filter's own output now one lambda "
+        "input / exp(bias) instead of ExpImageFilter then DivideImageFilter (FreeSurfer's "
+        "program does its own Exp and Divide on the reconstructed field and does not use it)",
+    ),
+    "itkBSplineScatteredDataPointSetToImageFilter": (
+        "refactored",
+        "threads became work units (one unit in FreeSurfer's single-thread N4); the "
+        "per-point fit (r, epsilon, p, the kernel product, the omega and delta sums) reads "
+        "the same; the residual update between levels moved into a threaded method "
+        "(multilevel fits only)",
+    ),
+    "itkBSplineControlPointImageFilter": (
+        "refactored",
+        "threading interface; evaluation read as unchanged",
+    ),
+    "itkCoxDeBoorBSplineKernelFunction": (
+        "mechanical",
+        "NumericTraits values and casts spelled as braces",
+    ),
+    "itkShrinkImageFilter": (
+        "refactored",
+        "DynamicThreadedGenerateData; TransformPhysicalPointToIndex now returns the index; "
+        "same sampling",
+    ),
+    "itkExpImageFilter": (
+        "mechanical",
+        "UnaryGeneratorImageFilter plumbing; Functor::Exp unchanged",
+    ),
+    "itkDivideImageFilter": (
+        "refactored",
+        "the constant-zero-divisor check moved from GenerateData to VerifyPreconditions "
+        "(its message and point of failure change); Functor::Div unchanged",
+    ),
+    "itkExtractImageFilter": (
+        "refactored",
+        "direction-collapse enum, a dimension check and its messages; copies unchanged",
+    ),
+    "itkStatisticsImageFilter": (
+        "changed",
+        "sums: 4.13.2 plain per-thread sums added in thread order, 5.4.5 CompensatedSummation "
+        "per chunk merged under a mutex; FreeSurfer's denoising reads only the minimum and "
+        "maximum (exact either way)",
+    ),
+    "itkMeanImageFilter": (
+        "refactored",
+        "ShapedImageNeighborhoodRange instead of ConstNeighborhoodIterator, same offsets and "
+        "zero-flux boundary; sum / size as before",
+    ),
+    "itkDiscreteGaussianImageFilter": (
+        "refactored",
+        "kernel generation moved into GenerateKernel, boundary conditions overridable "
+        "(default zero-flux as before), internal streaming removed; the kernel comes from the "
+        "same GaussianOperator: to confirm by measurement",
+    ),
+    "itkGaussianOperator": (
+        "mechanical",
+        "fabs spelled Math::abs; the too-wide-kernel message became a debug message (4.13.2 "
+        "prints a warning)",
+    ),
+    "itkNeighborhoodOperatorImageFilter": ("refactored", "threading interface; same inner product"),
+    "itkMathDetail": (
+        "mechanical",
+        "both select the SSE2 rounding implementation on Linux x86-64 (4.13.2 through "
+        "ITK_COMPILER_SUPPORTS_SSE2_64, set by its configure)",
+    ),
+    "vnl_c_vector": (
+        "mechanical",
+        "normalize's typedef moved into the class; dead #else branch removed",
+    ),
+    "vnl_sse": (
+        "refactored",
+        "VNL_CONFIG_ENABLE_SSE2 is 0 in FreeSurfer's ITK configuration, so 4.13.2 runs the "
+        "generic kernels; 5.4.5 keeps only those: dot_product, matrix_x_vector, "
+        "vector_x_matrix, sum, min, max, arg_min, arg_max, element_product and euclid_dist_sq "
+        "are identical after normalisation (the SSE specialisations were removed)",
+    ),
+    "vnl_matrix": (
+        "refactored",
+        "57 of 64 function definitions identical after normalisation; the others are "
+        "construction, destruction, set_size, set_identity and the unary minus (now typed "
+        "signed_t, the same values for float and double)",
+    ),
+    "vnl_vector": (
+        "refactored",
+        "28 of 50 definitions identical; construction changed and 4.13.2's tagged "
+        "constructors (vnl_tag_add, _sub, _mul, _div) gave way to operators in the header; "
+        "element-wise arithmetic and the products through vnl_sse are the same",
+    ),
+    "vnl_matrix_fixed": (
+        "refactored",
+        "55 of 56 definitions identical after normalisation (itk_functions.py)",
+    ),
+    "vnl_vector_fixed": (
+        "mechanical",
+        "7 of 7 out-of-line definitions identical after normalisation",
+    ),
+    "vnl_svd": ("mechanical", "the 'warned' flag became an atomic flag"),
+    "vnl_qr": ("mechanical", "0 spelled nullptr; an instantiation macro dropped"),
+    "vnl_symmetric_eigensystem": ("mechanical", ""),
+    "vnl_real_eigensystem": ("mechanical", ""),
+    "vnl_complex_eigensystem": ("mechanical", ""),
+    "vnl_cholesky": ("mechanical", "copy operations deleted"),
+    "vnl_determinant": ("mechanical", ""),
+    "vnl_matrix_inverse": ("mechanical", "instantiation macros dropped"),
+    "vnl_brent": ("mechanical", ""),
+    "vnl_brent_minimizer": ("mechanical", "an unused constant removed"),
+    "vnl_bracket_minimum": ("mechanical", ""),
+    "vnl_powell": ("mechanical", ""),
+    "vnl_random": (
+        "mechanical",
+        "the default constructor's initialisers moved into the header (TP-01)",
+    ),
+    "vnl_fft_prime_factors": ("mechanical", ""),
+    "dlamch": ("mechanical", "a local initialised"),
+    "zgemm": ("mechanical", "an unused local removed"),
+}
+
+
+def class_of(rel: str) -> str:
+    stem = Path(rel).name
+    for ext in (".hxx", ".txx", ".cxx", ".h", ".c"):
+        if stem.endswith(ext):
+            return stem[: -len(ext)]
+    return stem
+
+
+def write_toml(path: Path, rows: list[tuple], counts: dict[str, int]) -> None:
+    def q(s: object) -> str:
+        return '"' + str(s).replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+    by_class: dict[str, list[tuple]] = defaultdict(list)
+    for r in rows:
+        by_class[class_of(r[0])].append(r)
+    out = [
+        "# CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS: generated from ITK 4.13.2 and 5.4.5 and the files",
+        "# FreeSurfer 8.2.0's default-path programs are built from, by",
+        "# validation/investigations/freesurfer-inventory/itk_diff.py; what the fields mean:",
+        "# docs/freesurfer/third-party.md section 10. Do not edit by hand: regenerate.",
+        "",
+        "schema = 1",
+        'itk_official = "4.13.2"',
+        'itk_larmorx = "5.4.5"',
+        f"files = {len(rows)}",
+        "[counts]",
+    ]
+    out += [f"{k.replace('-', '_')} = {v}" for k, v in sorted(counts.items())]
+    for name in sorted(by_class):
+        rs = by_class[name]
+        statuses = sorted({r[1] for r in rs})
+        verdict, note = REVIEW.get(name, ("not-read", ""))
+        if statuses == ["identical"]:
+            verdict = "identical"
+        elif set(statuses) <= {"identical", "same-code", "same-mechanical"}:
+            verdict = "no-code-change"
+        elif statuses == ["absent"]:
+            verdict = "absent-in-5.4.5"
+        out += [
+            "",
+            "[[class]]",
+            f"name = {q(name)}",
+            f"status = [{', '.join(q(s) for s in statuses)}]",
+            f"tokens_differing = {sum(max(r[2], 0) for r in rs)}",
+            f"lines = {sum(r[3] for r in rs)}",
+            f"review = {q(verdict)}",
+        ]
+        if note:
+            out.append(f"note = {q(note)}")
+        out.append("files = [" + ", ".join(q(f"{r[0]}:{r[1]}:{r[2]}") for r in rs) + "]")
+    path.write_text("\n".join(out) + "\n", encoding="utf-8")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("itk413", type=Path)
@@ -277,6 +459,7 @@ def main() -> int:
     ap.add_argument("freesurfer", type=Path)
     ap.add_argument("licences_json", type=Path)
     ap.add_argument("--tsv", type=Path, required=True)
+    ap.add_argument("--toml", type=Path, help="per class: statuses, sizes, relay 5's reading")
     ap.add_argument("--diff", nargs="*", default=[], help="print the token diff of these files")
     a = ap.parse_args()
 
@@ -320,6 +503,8 @@ def main() -> int:
         )
         for r in rows:
             fh.write("\t".join(str(x) for x in r) + "\n")
+    if a.toml:
+        write_toml(a.toml, rows, counts)
     print(
         f"files in the closure: {len(rows)}; "
         + ", ".join(f"{k} {v}" for k, v in sorted(counts.items()))

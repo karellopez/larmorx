@@ -1,0 +1,4403 @@
+# CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS: generated from ITK 4.13.2 and 5.4.5 and the files
+# FreeSurfer 8.2.0's default-path programs are built from, by
+# validation/investigations/freesurfer-inventory/itk_diff.py; what the fields mean:
+# docs/freesurfer/third-party.md section 10. Do not edit by hand: regenerate.
+
+schema = 1
+itk_official = "4.13.2"
+itk_larmorx = "5.4.5"
+files = 796
+[counts]
+absent = 16
+differs = 312
+identical = 420
+same_code = 7
+same_mechanical = 41
+
+[[class]]
+name = "adaquad"
+status = ["absent"]
+tokens_differing = 0
+lines = 25
+review = "absent-in-5.4.5"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/mathews/adaquad.h:absent:-1"]
+
+[[class]]
+name = "balanc"
+status = ["identical"]
+tokens_differing = 0
+lines = 366
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/eispack/balanc.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/eispack/balanc.h:identical:0"]
+
+[[class]]
+name = "balbak"
+status = ["identical"]
+tokens_differing = 0
+lines = 166
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/eispack/balbak.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/eispack/balbak.h:identical:0"]
+
+[[class]]
+name = "cabs"
+status = ["identical"]
+tokens_differing = 0
+lines = 38
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/libf2c/cabs.c:identical:0"]
+
+[[class]]
+name = "camsun"
+status = ["identical"]
+tokens_differing = 0
+lines = 12
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/datapac/camsun.h:identical:0"]
+
+[[class]]
+name = "caxpy"
+status = ["identical"]
+tokens_differing = 0
+lines = 8
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/caxpy.h:identical:0"]
+
+[[class]]
+name = "ccopy"
+status = ["identical"]
+tokens_differing = 0
+lines = 7
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/ccopy.h:identical:0"]
+
+[[class]]
+name = "cdiv"
+status = ["identical"]
+tokens_differing = 0
+lines = 68
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/eispack/cdiv.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/eispack/cdiv.h:identical:0"]
+
+[[class]]
+name = "cdotc"
+status = ["identical"]
+tokens_differing = 0
+lines = 8
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/cdotc.h:identical:0"]
+
+[[class]]
+name = "cg"
+status = ["identical"]
+tokens_differing = 0
+lines = 70
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/napack/cg.h:identical:0"]
+
+[[class]]
+name = "cqrdc"
+status = ["identical"]
+tokens_differing = 0
+lines = 10
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/linpack/cqrdc.h:identical:0"]
+
+[[class]]
+name = "cqrsl"
+status = ["identical"]
+tokens_differing = 0
+lines = 14
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/linpack/cqrsl.h:identical:0"]
+
+[[class]]
+name = "cscal"
+status = ["identical"]
+tokens_differing = 0
+lines = 6
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/cscal.h:identical:0"]
+
+[[class]]
+name = "csrot"
+status = ["identical"]
+tokens_differing = 0
+lines = 9
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/csrot.h:identical:0"]
+
+[[class]]
+name = "csvdc"
+status = ["identical"]
+tokens_differing = 0
+lines = 12
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/linpack/csvdc.h:identical:0"]
+
+[[class]]
+name = "cswap"
+status = ["identical"]
+tokens_differing = 0
+lines = 7
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/cswap.h:identical:0"]
+
+[[class]]
+name = "d_asin"
+status = ["identical"]
+tokens_differing = 0
+lines = 19
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/libf2c/d_asin.c:identical:0"]
+
+[[class]]
+name = "d_imag"
+status = ["identical"]
+tokens_differing = 0
+lines = 16
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/libf2c/d_imag.c:identical:0"]
+
+[[class]]
+name = "d_int"
+status = ["identical"]
+tokens_differing = 0
+lines = 19
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/libf2c/d_int.c:identical:0"]
+
+[[class]]
+name = "d_lg10"
+status = ["identical"]
+tokens_differing = 0
+lines = 21
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/libf2c/d_lg10.c:identical:0"]
+
+[[class]]
+name = "d_sign"
+status = ["identical"]
+tokens_differing = 0
+lines = 18
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/libf2c/d_sign.c:identical:0"]
+
+[[class]]
+name = "d_sqrt"
+status = ["identical"]
+tokens_differing = 0
+lines = 19
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/libf2c/d_sqrt.c:identical:0"]
+
+[[class]]
+name = "dasum"
+status = ["identical"]
+tokens_differing = 0
+lines = 127
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/dasum.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/dasum.h:identical:0"]
+
+[[class]]
+name = "daxpy"
+status = ["identical"]
+tokens_differing = 0
+lines = 141
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/daxpy.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/daxpy.h:identical:0"]
+
+[[class]]
+name = "dcabs1"
+status = ["identical"]
+tokens_differing = 0
+lines = 50
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/dcabs1.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/dcabs1.h:identical:0"]
+
+[[class]]
+name = "dcopy"
+status = ["identical"]
+tokens_differing = 0
+lines = 142
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/dcopy.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/dcopy.h:identical:0"]
+
+[[class]]
+name = "ddot"
+status = ["identical"]
+tokens_differing = 0
+lines = 143
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/ddot.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/ddot.h:identical:0"]
+
+[[class]]
+name = "dgecon"
+status = ["identical"]
+tokens_differing = 0
+lines = 12
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/double/dgecon.h:identical:0"]
+
+[[class]]
+name = "dgemm"
+status = ["identical"]
+tokens_differing = 0
+lines = 17
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/dgemm.h:identical:0"]
+
+[[class]]
+name = "dgemv"
+status = ["identical"]
+tokens_differing = 0
+lines = 14
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/dgemv.h:identical:0"]
+
+[[class]]
+name = "dgeqr2"
+status = ["identical"]
+tokens_differing = 0
+lines = 9
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/double/dgeqr2.h:identical:0"]
+
+[[class]]
+name = "dgeqrf"
+status = ["identical"]
+tokens_differing = 0
+lines = 10
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/double/dgeqrf.h:identical:0"]
+
+[[class]]
+name = "dger"
+status = ["identical"]
+tokens_differing = 0
+lines = 11
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/dger.h:identical:0"]
+
+[[class]]
+name = "dgerq2"
+status = ["identical"]
+tokens_differing = 0
+lines = 9
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/double/dgerq2.h:identical:0"]
+
+[[class]]
+name = "dgesc2"
+status = ["identical"]
+tokens_differing = 0
+lines = 9
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/double/dgesc2.h:identical:0"]
+
+[[class]]
+name = "dgetc2"
+status = ["identical"]
+tokens_differing = 0
+lines = 8
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/double/dgetc2.h:identical:0"]
+
+[[class]]
+name = "dgetv0"
+status = ["identical"]
+tokens_differing = 0
+lines = 16
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/arpack/dgetv0.h:identical:0"]
+
+[[class]]
+name = "dggbak"
+status = ["identical"]
+tokens_differing = 0
+lines = 15
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/double/dggbak.h:identical:0"]
+
+[[class]]
+name = "dggbal"
+status = ["identical"]
+tokens_differing = 0
+lines = 15
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/double/dggbal.h:identical:0"]
+
+[[class]]
+name = "dgges"
+status = ["identical"]
+tokens_differing = 0
+lines = 28
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/double/dgges.h:identical:0"]
+
+[[class]]
+name = "dgghrd"
+status = ["identical"]
+tokens_differing = 0
+lines = 18
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/double/dgghrd.h:identical:0"]
+
+[[class]]
+name = "dgpfa"
+status = ["identical"]
+tokens_differing = 0
+lines = 151
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/temperton/dgpfa.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/temperton/dgpfa.h:identical:0"]
+
+[[class]]
+name = "dgpfa2f"
+status = ["identical"]
+tokens_differing = 0
+lines = 2085
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/temperton/dgpfa2f.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/temperton/dgpfa2f.h:identical:0"]
+
+[[class]]
+name = "dgpfa3f"
+status = ["identical"]
+tokens_differing = 0
+lines = 901
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/temperton/dgpfa3f.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/temperton/dgpfa3f.h:identical:0"]
+
+[[class]]
+name = "dgpfa5f"
+status = ["identical"]
+tokens_differing = 0
+lines = 1781
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/temperton/dgpfa5f.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/temperton/dgpfa5f.h:identical:0"]
+
+[[class]]
+name = "dhgeqz"
+status = ["identical"]
+tokens_differing = 0
+lines = 25
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/double/dhgeqz.h:identical:0"]
+
+[[class]]
+name = "dlabad"
+status = ["identical"]
+tokens_differing = 0
+lines = 92
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/double/dlabad.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/double/dlabad.h:identical:0"]
+
+[[class]]
+name = "dlabax"
+status = ["identical"]
+tokens_differing = 0
+lines = 7
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/laso/dlabax.h:identical:0"]
+
+[[class]]
+name = "dlabcm"
+status = ["identical"]
+tokens_differing = 0
+lines = 16
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/laso/dlabcm.h:identical:0"]
+
+[[class]]
+name = "dlabfc"
+status = ["identical"]
+tokens_differing = 0
+lines = 14
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/laso/dlabfc.h:identical:0"]
+
+[[class]]
+name = "dlacon"
+status = ["identical"]
+tokens_differing = 0
+lines = 8
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/double/dlacon.h:identical:0"]
+
+[[class]]
+name = "dlacpy"
+status = ["identical"]
+tokens_differing = 0
+lines = 10
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/double/dlacpy.h:identical:0"]
+
+[[class]]
+name = "dladiv"
+status = ["identical"]
+tokens_differing = 0
+lines = 110
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/double/dladiv.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/double/dladiv.h:identical:0"]
+
+[[class]]
+name = "dlae2"
+status = ["identical"]
+tokens_differing = 0
+lines = 7
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/double/dlae2.h:identical:0"]
+
+[[class]]
+name = "dlaeig"
+status = ["identical"]
+tokens_differing = 0
+lines = 17
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/laso/dlaeig.h:identical:0"]
+
+[[class]]
+name = "dlaev2"
+status = ["identical"]
+tokens_differing = 0
+lines = 10
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/double/dlaev2.h:identical:0"]
+
+[[class]]
+name = "dlag2"
+status = ["identical"]
+tokens_differing = 0
+lines = 12
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/double/dlag2.h:identical:0"]
+
+[[class]]
+name = "dlager"
+status = ["identical"]
+tokens_differing = 0
+lines = 8
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/laso/dlager.h:identical:0"]
+
+[[class]]
+name = "dlagv2"
+status = ["identical"]
+tokens_differing = 0
+lines = 13
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/double/dlagv2.h:identical:0"]
+
+[[class]]
+name = "dlamch"
+status = ["differs", "identical"]
+tokens_differing = 2
+lines = 1400
+review = "mechanical"
+note = "a local initialised"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/dlamch.c:differs:2", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/dlamch.h:identical:0"]
+
+[[class]]
+name = "dlange"
+status = ["identical"]
+tokens_differing = 0
+lines = 9
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/double/dlange.h:identical:0"]
+
+[[class]]
+name = "dlanhs"
+status = ["identical"]
+tokens_differing = 0
+lines = 8
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/double/dlanhs.h:identical:0"]
+
+[[class]]
+name = "dlanst"
+status = ["identical"]
+tokens_differing = 0
+lines = 7
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/double/dlanst.h:identical:0"]
+
+[[class]]
+name = "dlapy2"
+status = ["identical"]
+tokens_differing = 0
+lines = 103
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/double/dlapy2.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/double/dlapy2.h:identical:0"]
+
+[[class]]
+name = "dlapy3"
+status = ["identical"]
+tokens_differing = 0
+lines = 109
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/double/dlapy3.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/double/dlapy3.h:identical:0"]
+
+[[class]]
+name = "dlaran"
+status = ["identical"]
+tokens_differing = 0
+lines = 4
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/laso/dlaran.h:identical:0"]
+
+[[class]]
+name = "dlarf"
+status = ["identical"]
+tokens_differing = 0
+lines = 12
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/double/dlarf.h:identical:0"]
+
+[[class]]
+name = "dlarfb"
+status = ["identical"]
+tokens_differing = 0
+lines = 21
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/double/dlarfb.h:identical:0"]
+
+[[class]]
+name = "dlarfg"
+status = ["identical"]
+tokens_differing = 0
+lines = 7
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/double/dlarfg.h:identical:0"]
+
+[[class]]
+name = "dlarft"
+status = ["identical"]
+tokens_differing = 0
+lines = 13
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/double/dlarft.h:identical:0"]
+
+[[class]]
+name = "dlarnv"
+status = ["identical"]
+tokens_differing = 0
+lines = 6
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/double/dlarnv.h:identical:0"]
+
+[[class]]
+name = "dlartg"
+status = ["identical"]
+tokens_differing = 0
+lines = 8
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/double/dlartg.h:identical:0"]
+
+[[class]]
+name = "dlaruv"
+status = ["identical"]
+tokens_differing = 0
+lines = 5
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/double/dlaruv.h:identical:0"]
+
+[[class]]
+name = "dlascl"
+status = ["identical"]
+tokens_differing = 0
+lines = 13
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/double/dlascl.h:identical:0"]
+
+[[class]]
+name = "dlaset"
+status = ["identical"]
+tokens_differing = 0
+lines = 10
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/double/dlaset.h:identical:0"]
+
+[[class]]
+name = "dlasr"
+status = ["identical"]
+tokens_differing = 0
+lines = 14
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/double/dlasr.h:identical:0"]
+
+[[class]]
+name = "dlasrt"
+status = ["identical"]
+tokens_differing = 0
+lines = 7
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/double/dlasrt.h:identical:0"]
+
+[[class]]
+name = "dlassq"
+status = ["identical"]
+tokens_differing = 0
+lines = 7
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/double/dlassq.h:identical:0"]
+
+[[class]]
+name = "dlasv2"
+status = ["identical"]
+tokens_differing = 0
+lines = 11
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/double/dlasv2.h:identical:0"]
+
+[[class]]
+name = "dlaswp"
+status = ["identical"]
+tokens_differing = 0
+lines = 9
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/double/dlaswp.h:identical:0"]
+
+[[class]]
+name = "dlatdf"
+status = ["identical"]
+tokens_differing = 0
+lines = 11
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/double/dlatdf.h:identical:0"]
+
+[[class]]
+name = "dlatrs"
+status = ["identical"]
+tokens_differing = 0
+lines = 17
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/double/dlatrs.h:identical:0"]
+
+[[class]]
+name = "dll"
+status = ["differs"]
+tokens_differing = 1
+lines = 19
+review = "not-read"
+files = ["Modules/ThirdParty/VNL/src/vxl/core/vnl/dll.h:differs:1"]
+
+[[class]]
+name = "dmvpc"
+status = ["identical"]
+tokens_differing = 0
+lines = 11
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/laso/dmvpc.h:identical:0"]
+
+[[class]]
+name = "dnlaso"
+status = ["identical"]
+tokens_differing = 0
+lines = 69
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/laso/dnlaso.h:identical:0"]
+
+[[class]]
+name = "dnppla"
+status = ["identical"]
+tokens_differing = 0
+lines = 29
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/laso/dnppla.h:identical:0"]
+
+[[class]]
+name = "dnrm2"
+status = ["identical"]
+tokens_differing = 0
+lines = 133
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/dnrm2.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/dnrm2.h:identical:0"]
+
+[[class]]
+name = "dorg2r"
+status = ["identical"]
+tokens_differing = 0
+lines = 10
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/double/dorg2r.h:identical:0"]
+
+[[class]]
+name = "dorgqr"
+status = ["identical"]
+tokens_differing = 0
+lines = 11
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/double/dorgqr.h:identical:0"]
+
+[[class]]
+name = "dorgr2"
+status = ["identical"]
+tokens_differing = 0
+lines = 10
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/double/dorgr2.h:identical:0"]
+
+[[class]]
+name = "dorm2r"
+status = ["identical"]
+tokens_differing = 0
+lines = 16
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/double/dorm2r.h:identical:0"]
+
+[[class]]
+name = "dormqr"
+status = ["identical"]
+tokens_differing = 0
+lines = 17
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/double/dormqr.h:identical:0"]
+
+[[class]]
+name = "dormr2"
+status = ["identical"]
+tokens_differing = 0
+lines = 16
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/double/dormr2.h:identical:0"]
+
+[[class]]
+name = "dortqr"
+status = ["identical"]
+tokens_differing = 0
+lines = 7
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/laso/dortqr.h:identical:0"]
+
+[[class]]
+name = "dpmpar"
+status = ["identical"]
+tokens_differing = 0
+lines = 3
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/minpack/dpmpar.h:identical:0"]
+
+[[class]]
+name = "dpoco"
+status = ["identical"]
+tokens_differing = 0
+lines = 407
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/linpack/dpoco.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/linpack/dpoco.h:identical:0"]
+
+[[class]]
+name = "dpodi"
+status = ["identical"]
+tokens_differing = 0
+lines = 258
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/linpack/dpodi.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/linpack/dpodi.h:identical:0"]
+
+[[class]]
+name = "dpofa"
+status = ["identical"]
+tokens_differing = 0
+lines = 156
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/linpack/dpofa.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/linpack/dpofa.h:identical:0"]
+
+[[class]]
+name = "dposl"
+status = ["identical"]
+tokens_differing = 0
+lines = 144
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/linpack/dposl.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/linpack/dposl.h:identical:0"]
+
+[[class]]
+name = "dqrdc"
+status = ["identical"]
+tokens_differing = 0
+lines = 434
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/linpack/dqrdc.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/linpack/dqrdc.h:identical:0"]
+
+[[class]]
+name = "dqrsl"
+status = ["identical"]
+tokens_differing = 0
+lines = 528
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/linpack/dqrsl.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/linpack/dqrsl.h:identical:0"]
+
+[[class]]
+name = "drot"
+status = ["identical"]
+tokens_differing = 0
+lines = 116
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/drot.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/drot.h:identical:0"]
+
+[[class]]
+name = "drotg"
+status = ["identical"]
+tokens_differing = 0
+lines = 104
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/drotg.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/drotg.h:identical:0"]
+
+[[class]]
+name = "drscl"
+status = ["identical"]
+tokens_differing = 0
+lines = 6
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/double/drscl.h:identical:0"]
+
+[[class]]
+name = "dsaitr"
+status = ["identical"]
+tokens_differing = 0
+lines = 18
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/arpack/dsaitr.h:identical:0"]
+
+[[class]]
+name = "dsapps"
+status = ["identical"]
+tokens_differing = 0
+lines = 14
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/arpack/dsapps.h:identical:0"]
+
+[[class]]
+name = "dsaup2"
+status = ["identical"]
+tokens_differing = 0
+lines = 28
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/arpack/dsaup2.h:identical:0"]
+
+[[class]]
+name = "dsaupd"
+status = ["identical"]
+tokens_differing = 0
+lines = 20
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/arpack/dsaupd.h:identical:0"]
+
+[[class]]
+name = "dscal"
+status = ["identical"]
+tokens_differing = 0
+lines = 123
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/dscal.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/dscal.h:identical:0"]
+
+[[class]]
+name = "dsconv"
+status = ["identical"]
+tokens_differing = 0
+lines = 7
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/arpack/dsconv.h:identical:0"]
+
+[[class]]
+name = "dseigt"
+status = ["identical"]
+tokens_differing = 0
+lines = 10
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/arpack/dseigt.h:identical:0"]
+
+[[class]]
+name = "dsesrt"
+status = ["identical"]
+tokens_differing = 0
+lines = 10
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/arpack/dsesrt.h:identical:0"]
+
+[[class]]
+name = "dseupd"
+status = ["identical"]
+tokens_differing = 0
+lines = 27
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/arpack/dseupd.h:identical:0"]
+
+[[class]]
+name = "dsgets"
+status = ["identical"]
+tokens_differing = 0
+lines = 10
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/arpack/dsgets.h:identical:0"]
+
+[[class]]
+name = "dsortr"
+status = ["identical"]
+tokens_differing = 0
+lines = 8
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/arpack/dsortr.h:identical:0"]
+
+[[class]]
+name = "dspr"
+status = ["identical"]
+tokens_differing = 0
+lines = 10
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/double/dspr.h:identical:0"]
+
+[[class]]
+name = "dsptrf"
+status = ["identical"]
+tokens_differing = 0
+lines = 10
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/double/dsptrf.h:identical:0"]
+
+[[class]]
+name = "dsptrs"
+status = ["identical"]
+tokens_differing = 0
+lines = 12
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/double/dsptrs.h:identical:0"]
+
+[[class]]
+name = "dsteqr"
+status = ["identical"]
+tokens_differing = 0
+lines = 11
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/double/dsteqr.h:identical:0"]
+
+[[class]]
+name = "dstqrb"
+status = ["identical"]
+tokens_differing = 0
+lines = 8
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/arpack/dstqrb.h:identical:0"]
+
+[[class]]
+name = "dsvdc"
+status = ["identical"]
+tokens_differing = 0
+lines = 1060
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/linpack/dsvdc.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/linpack/dsvdc.h:identical:0"]
+
+[[class]]
+name = "dswap"
+status = ["identical"]
+tokens_differing = 0
+lines = 155
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/dswap.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/dswap.h:identical:0"]
+
+[[class]]
+name = "dtgex2"
+status = ["identical"]
+tokens_differing = 0
+lines = 19
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/double/dtgex2.h:identical:0"]
+
+[[class]]
+name = "dtgexc"
+status = ["identical"]
+tokens_differing = 0
+lines = 18
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/double/dtgexc.h:identical:0"]
+
+[[class]]
+name = "dtgsen"
+status = ["identical"]
+tokens_differing = 0
+lines = 27
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/double/dtgsen.h:identical:0"]
+
+[[class]]
+name = "dtgsy2"
+status = ["identical"]
+tokens_differing = 0
+lines = 25
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/double/dtgsy2.h:identical:0"]
+
+[[class]]
+name = "dtgsyl"
+status = ["identical"]
+tokens_differing = 0
+lines = 25
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/double/dtgsyl.h:identical:0"]
+
+[[class]]
+name = "dtrmm"
+status = ["identical"]
+tokens_differing = 0
+lines = 17
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/dtrmm.h:identical:0"]
+
+[[class]]
+name = "dtrmv"
+status = ["identical"]
+tokens_differing = 0
+lines = 13
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/dtrmv.h:identical:0"]
+
+[[class]]
+name = "dtrsv"
+status = ["identical"]
+tokens_differing = 0
+lines = 13
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/dtrsv.h:identical:0"]
+
+[[class]]
+name = "dvsort"
+status = ["identical"]
+tokens_differing = 0
+lines = 10
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/laso/dvsort.h:identical:0"]
+
+[[class]]
+name = "dzasum"
+status = ["identical"]
+tokens_differing = 0
+lines = 101
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/dzasum.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/dzasum.h:identical:0"]
+
+[[class]]
+name = "dznrm2"
+status = ["identical"]
+tokens_differing = 0
+lines = 153
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/dznrm2.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/dznrm2.h:identical:0"]
+
+[[class]]
+name = "dzsum1"
+status = ["identical"]
+tokens_differing = 0
+lines = 5
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/double/dzsum1.h:identical:0"]
+
+[[class]]
+name = "elmhes"
+status = ["identical"]
+tokens_differing = 0
+lines = 216
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/eispack/elmhes.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/eispack/elmhes.h:identical:0"]
+
+[[class]]
+name = "eltran"
+status = ["identical"]
+tokens_differing = 0
+lines = 167
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/eispack/eltran.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/eispack/eltran.h:identical:0"]
+
+[[class]]
+name = "enorm"
+status = ["identical"]
+tokens_differing = 0
+lines = 4
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/minpack/enorm.h:identical:0"]
+
+[[class]]
+name = "epslon"
+status = ["identical"]
+tokens_differing = 0
+lines = 3
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/eispack/epslon.h:identical:0"]
+
+[[class]]
+name = "err"
+status = ["identical"]
+tokens_differing = 0
+lines = 282
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/libf2c/err.c:identical:0"]
+
+[[class]]
+name = "fdjac2"
+status = ["identical"]
+tokens_differing = 0
+lines = 18
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/minpack/fdjac2.h:identical:0"]
+
+[[class]]
+name = "fio"
+status = ["identical"]
+tokens_differing = 0
+lines = 142
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/libf2c/fio.h:identical:0"]
+
+[[class]]
+name = "fmt"
+status = ["identical"]
+tokens_differing = 0
+lines = 629
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/libf2c/fmt.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/libf2c/fmt.h:identical:0"]
+
+[[class]]
+name = "gpfa"
+status = ["identical"]
+tokens_differing = 0
+lines = 150
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/temperton/gpfa.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/temperton/gpfa.h:identical:0"]
+
+[[class]]
+name = "gpfa2f"
+status = ["identical"]
+tokens_differing = 0
+lines = 2084
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/temperton/gpfa2f.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/temperton/gpfa2f.h:identical:0"]
+
+[[class]]
+name = "gpfa3f"
+status = ["identical"]
+tokens_differing = 0
+lines = 900
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/temperton/gpfa3f.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/temperton/gpfa3f.h:identical:0"]
+
+[[class]]
+name = "gpfa5f"
+status = ["identical"]
+tokens_differing = 0
+lines = 1780
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/temperton/gpfa5f.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/temperton/gpfa5f.h:identical:0"]
+
+[[class]]
+name = "hqr"
+status = ["identical"]
+tokens_differing = 0
+lines = 530
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/eispack/hqr.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/eispack/hqr.h:identical:0"]
+
+[[class]]
+name = "hqr2"
+status = ["identical"]
+tokens_differing = 0
+lines = 1032
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/eispack/hqr2.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/eispack/hqr2.h:identical:0"]
+
+[[class]]
+name = "idamax"
+status = ["identical"]
+tokens_differing = 0
+lines = 119
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/idamax.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/idamax.h:identical:0"]
+
+[[class]]
+name = "ieeeck"
+status = ["identical"]
+tokens_differing = 0
+lines = 256
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/util/ieeeck.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/util/ieeeck.h:identical:0"]
+
+[[class]]
+name = "ilaenv"
+status = ["identical"]
+tokens_differing = 0
+lines = 982
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/util/ilaenv.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/util/ilaenv.h:identical:0"]
+
+[[class]]
+name = "isamax"
+status = ["identical"]
+tokens_differing = 0
+lines = 5
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/isamax.h:identical:0"]
+
+[[class]]
+name = "itkAddImageFilter"
+status = ["differs"]
+tokens_differing = 130
+lines = 125
+review = "not-read"
+files = ["Modules/Filtering/ImageIntensity/include/itkAddImageFilter.h:differs:130"]
+
+[[class]]
+name = "itkArithmeticOpsFunctors"
+status = ["differs"]
+tokens_differing = 385
+lines = 392
+review = "not-read"
+files = ["Modules/Filtering/ImageIntensity/include/itkArithmeticOpsFunctors.h:differs:385"]
+
+[[class]]
+name = "itkArray"
+status = ["differs"]
+tokens_differing = 197
+lines = 422
+review = "not-read"
+files = ["Modules/Core/Common/include/itkArray.h:differs:81", "Modules/Core/Common/include/itkArray.hxx:differs:116"]
+
+[[class]]
+name = "itkAtomicInt"
+status = ["absent", "differs"]
+tokens_differing = 1177
+lines = 811
+review = "not-read"
+files = ["Modules/Core/Common/include/itkAtomicInt.h:differs:1177", "Modules/Core/Common/src/itkAtomicInt.cxx:absent:-1"]
+
+[[class]]
+name = "itkAtomicIntDetail"
+status = ["differs"]
+tokens_differing = 1038
+lines = 341
+review = "not-read"
+files = ["Modules/Core/Common/include/itkAtomicIntDetail.h:differs:1038"]
+
+[[class]]
+name = "itkAutoPointer"
+status = ["differs"]
+tokens_differing = 39
+lines = 231
+review = "not-read"
+files = ["Modules/Core/Common/include/itkAutoPointer.h:differs:39"]
+
+[[class]]
+name = "itkBSplineControlPointImageFilter"
+status = ["differs"]
+tokens_differing = 273
+lines = 933
+review = "refactored"
+note = "threading interface; evaluation read as unchanged"
+files = ["Modules/Filtering/ImageGrid/include/itkBSplineControlPointImageFilter.h:differs:79", "Modules/Filtering/ImageGrid/include/itkBSplineControlPointImageFilter.hxx:differs:194"]
+
+[[class]]
+name = "itkBSplineKernelFunction"
+status = ["differs"]
+tokens_differing = 221
+lines = 171
+review = "not-read"
+files = ["Modules/Core/Common/include/itkBSplineKernelFunction.h:differs:221"]
+
+[[class]]
+name = "itkBSplineScatteredDataPointSetToImageFilter"
+status = ["differs"]
+tokens_differing = 1411
+lines = 1709
+review = "refactored"
+note = "threads became work units (one unit in FreeSurfer's single-thread N4); the per-point fit (r, epsilon, p, the kernel product, the omega and delta sums) reads the same; the residual update between levels moved into a threaded method (multilevel fits only)"
+files = ["Modules/Filtering/ImageGrid/include/itkBSplineScatteredDataPointSetToImageFilter.h:differs:160", "Modules/Filtering/ImageGrid/include/itkBSplineScatteredDataPointSetToImageFilter.hxx:differs:1251"]
+
+[[class]]
+name = "itkBinaryFunctorImageFilter"
+status = ["differs"]
+tokens_differing = 228
+lines = 481
+review = "not-read"
+files = ["Modules/Filtering/ImageFilterBase/include/itkBinaryFunctorImageFilter.h:differs:33", "Modules/Filtering/ImageFilterBase/include/itkBinaryFunctorImageFilter.hxx:differs:195"]
+
+[[class]]
+name = "itkBoundingBox"
+status = ["differs"]
+tokens_differing = 512
+lines = 599
+review = "not-read"
+files = ["Modules/Core/Common/include/itkBoundingBox.h:differs:74", "Modules/Core/Common/include/itkBoundingBox.hxx:differs:438"]
+
+[[class]]
+name = "itkBoxImageFilter"
+status = ["differs", "same-mechanical"]
+tokens_differing = 19
+lines = 219
+review = "not-read"
+files = ["Modules/Filtering/ImageFilterBase/include/itkBoxImageFilter.h:differs:19", "Modules/Filtering/ImageFilterBase/include/itkBoxImageFilter.hxx:same-mechanical:0"]
+
+[[class]]
+name = "itkCastImageFilter"
+status = ["differs"]
+tokens_differing = 522
+lines = 257
+review = "not-read"
+files = ["Modules/Filtering/ImageFilterBase/include/itkCastImageFilter.h:differs:173", "Modules/Filtering/ImageFilterBase/include/itkCastImageFilter.hxx:differs:349"]
+
+[[class]]
+name = "itkCellInterface"
+status = ["differs"]
+tokens_differing = 410
+lines = 672
+review = "not-read"
+files = ["Modules/Core/Common/include/itkCellInterface.h:differs:358", "Modules/Core/Common/include/itkCellInterface.hxx:differs:52"]
+
+[[class]]
+name = "itkCellInterfaceVisitor"
+status = ["differs"]
+tokens_differing = 40
+lines = 146
+review = "not-read"
+files = ["Modules/Core/Common/include/itkCellInterfaceVisitor.h:differs:40"]
+
+[[class]]
+name = "itkCommand"
+status = ["differs"]
+tokens_differing = 431
+lines = 487
+review = "not-read"
+files = ["Modules/Core/Common/include/itkCommand.h:differs:331", "Modules/Core/Common/src/itkCommand.cxx:differs:100"]
+
+[[class]]
+name = "itkConceptChecking"
+status = ["differs"]
+tokens_differing = 124
+lines = 833
+review = "not-read"
+files = ["Modules/Core/Common/include/itkConceptChecking.h:differs:124"]
+
+[[class]]
+name = "itkConstNeighborhoodIterator"
+status = ["differs"]
+tokens_differing = 473
+lines = 1400
+review = "not-read"
+files = ["Modules/Core/Common/include/itkConstNeighborhoodIterator.h:differs:182", "Modules/Core/Common/include/itkConstNeighborhoodIterator.hxx:differs:291"]
+
+[[class]]
+name = "itkConstSliceIterator"
+status = ["differs"]
+tokens_differing = 23
+lines = 150
+review = "not-read"
+files = ["Modules/Core/Common/include/itkConstSliceIterator.h:differs:23"]
+
+[[class]]
+name = "itkContinuousIndex"
+status = ["differs"]
+tokens_differing = 53
+lines = 86
+review = "not-read"
+files = ["Modules/Core/Common/include/itkContinuousIndex.h:differs:53"]
+
+[[class]]
+name = "itkCovariantVector"
+status = ["differs", "same-mechanical"]
+tokens_differing = 569
+lines = 599
+review = "not-read"
+files = ["Modules/Core/Common/include/itkCovariantVector.h:differs:140", "Modules/Core/Common/include/itkCovariantVector.hxx:differs:429", "Modules/Core/Common/src/itkCovariantVector.cxx:same-mechanical:0"]
+
+[[class]]
+name = "itkCoxDeBoorBSplineKernelFunction"
+status = ["differs"]
+tokens_differing = 277
+lines = 420
+review = "mechanical"
+note = "NumericTraits values and casts spelled as braces"
+files = ["Modules/Filtering/ImageGrid/include/itkCoxDeBoorBSplineKernelFunction.h:differs:21", "Modules/Filtering/ImageGrid/include/itkCoxDeBoorBSplineKernelFunction.hxx:differs:256"]
+
+[[class]]
+name = "itkCreateObjectFunction"
+status = ["differs"]
+tokens_differing = 31
+lines = 104
+review = "not-read"
+files = ["Modules/Core/Common/include/itkCreateObjectFunction.h:differs:28", "Modules/Core/Common/src/itkCreateObjectFunction.cxx:differs:3"]
+
+[[class]]
+name = "itkDataObject"
+status = ["differs"]
+tokens_differing = 253
+lines = 975
+review = "not-read"
+files = ["Modules/Core/Common/include/itkDataObject.h:differs:88", "Modules/Core/Common/src/itkDataObject.cxx:differs:165"]
+
+[[class]]
+name = "itkDataObjectIterator"
+status = ["differs"]
+tokens_differing = 22
+lines = 106
+review = "not-read"
+files = ["Modules/Core/Common/include/itkDataObjectIterator.h:differs:22"]
+
+[[class]]
+name = "itkDefaultPixelAccessor"
+status = ["differs"]
+tokens_differing = 12
+lines = 83
+review = "not-read"
+files = ["Modules/Core/Common/include/itkDefaultPixelAccessor.h:differs:12"]
+
+[[class]]
+name = "itkDefaultPixelAccessorFunctor"
+status = ["differs"]
+tokens_differing = 1
+lines = 113
+review = "not-read"
+files = ["Modules/Core/Common/include/itkDefaultPixelAccessorFunctor.h:differs:1"]
+
+[[class]]
+name = "itkDefaultStaticMeshTraits"
+status = ["differs"]
+tokens_differing = 8
+lines = 141
+review = "not-read"
+files = ["Modules/Core/Common/include/itkDefaultStaticMeshTraits.h:differs:8"]
+
+[[class]]
+name = "itkDirectory"
+status = ["differs"]
+tokens_differing = 41
+lines = 155
+review = "not-read"
+files = ["Modules/Core/Common/include/itkDirectory.h:differs:14", "Modules/Core/Common/src/itkDirectory.cxx:differs:27"]
+
+[[class]]
+name = "itkDiscreteGaussianImageFilter"
+status = ["differs"]
+tokens_differing = 1472
+lines = 631
+review = "refactored"
+note = "kernel generation moved into GenerateKernel, boundary conditions overridable (default zero-flux as before), internal streaming removed; the kernel comes from the same GaussianOperator: to confirm by measurement"
+files = ["Modules/Filtering/Smoothing/include/itkDiscreteGaussianImageFilter.h:differs:447", "Modules/Filtering/Smoothing/include/itkDiscreteGaussianImageFilter.hxx:differs:1025"]
+
+[[class]]
+name = "itkDivideImageFilter"
+status = ["differs"]
+tokens_differing = 161
+lines = 122
+review = "refactored"
+note = "the constant-zero-divisor check moved from GenerateData to VerifyPreconditions (its message and point of failure change); Functor::Div unchanged"
+files = ["Modules/Filtering/ImageIntensity/include/itkDivideImageFilter.h:differs:161"]
+
+[[class]]
+name = "itkDomainThreader"
+status = ["differs"]
+tokens_differing = 194
+lines = 338
+review = "not-read"
+files = ["Modules/Core/Common/include/itkDomainThreader.h:differs:67", "Modules/Core/Common/include/itkDomainThreader.hxx:differs:127"]
+
+[[class]]
+name = "itkDynamicLoader"
+status = ["differs"]
+tokens_differing = 18
+lines = 153
+review = "not-read"
+files = ["Modules/Core/Common/include/itkDynamicLoader.h:differs:15", "Modules/Core/Common/src/itkDynamicLoader.cxx:differs:3"]
+
+[[class]]
+name = "itkEventObject"
+status = ["differs"]
+tokens_differing = 175
+lines = 280
+review = "not-read"
+files = ["Modules/Core/Common/include/itkEventObject.h:differs:155", "Modules/Core/Common/src/itkEventObject.cxx:differs:20"]
+
+[[class]]
+name = "itkExceptionObject"
+status = ["differs"]
+tokens_differing = 987
+lines = 677
+review = "not-read"
+files = ["Modules/Core/Common/include/itkExceptionObject.h:differs:469", "Modules/Core/Common/src/itkExceptionObject.cxx:differs:518"]
+
+[[class]]
+name = "itkExpImageFilter"
+status = ["differs"]
+tokens_differing = 117
+lines = 109
+review = "mechanical"
+note = "UnaryGeneratorImageFilter plumbing; Functor::Exp unchanged"
+files = ["Modules/Filtering/ImageIntensity/include/itkExpImageFilter.h:differs:117"]
+
+[[class]]
+name = "itkExtractImageFilter"
+status = ["differs"]
+tokens_differing = 325
+lines = 620
+review = "refactored"
+note = "direction-collapse enum, a dimension check and its messages; copies unchanged"
+files = ["Modules/Core/Common/include/itkExtractImageFilter.h:differs:149", "Modules/Core/Common/include/itkExtractImageFilter.hxx:differs:176"]
+
+[[class]]
+name = "itkExtractImageFilterRegionCopier"
+status = ["differs"]
+tokens_differing = 2
+lines = 162
+review = "not-read"
+files = ["Modules/Core/Common/include/itkExtractImageFilterRegionCopier.h:differs:2"]
+
+[[class]]
+name = "itkFastMutexLock"
+status = ["differs", "same-code"]
+tokens_differing = 26
+lines = 147
+review = "not-read"
+files = ["Modules/Core/Common/include/itkFastMutexLock.h:differs:26", "Modules/Core/Common/src/itkFastMutexLock.cxx:same-code:0"]
+
+[[class]]
+name = "itkFixedArray"
+status = ["differs"]
+tokens_differing = 1204
+lines = 545
+review = "not-read"
+files = ["Modules/Core/Common/include/itkFixedArray.h:differs:853", "Modules/Core/Common/include/itkFixedArray.hxx:differs:351"]
+
+[[class]]
+name = "itkFloatTypes"
+status = ["same-mechanical"]
+tokens_differing = 0
+lines = 35
+review = "no-code-change"
+files = ["Modules/Core/Common/include/itkFloatTypes.h:same-mechanical:0"]
+
+[[class]]
+name = "itkFunctionBase"
+status = ["differs"]
+tokens_differing = 19
+lines = 74
+review = "not-read"
+files = ["Modules/Core/Common/include/itkFunctionBase.h:differs:19"]
+
+[[class]]
+name = "itkGaussianOperator"
+status = ["differs"]
+tokens_differing = 296
+lines = 415
+review = "mechanical"
+note = "fabs spelled Math::abs; the too-wide-kernel message became a debug message (4.13.2 prints a warning)"
+files = ["Modules/Core/Common/include/itkGaussianOperator.h:differs:261", "Modules/Core/Common/include/itkGaussianOperator.hxx:differs:35"]
+
+[[class]]
+name = "itkImage"
+status = ["differs"]
+tokens_differing = 414
+lines = 481
+review = "not-read"
+files = ["Modules/Core/Common/include/itkImage.h:differs:378", "Modules/Core/Common/include/itkImage.hxx:differs:36"]
+
+[[class]]
+name = "itkImageAlgorithm"
+status = ["differs"]
+tokens_differing = 390
+lines = 485
+review = "not-read"
+files = ["Modules/Core/Common/include/itkImageAlgorithm.h:differs:154", "Modules/Core/Common/include/itkImageAlgorithm.hxx:differs:236"]
+
+[[class]]
+name = "itkImageBase"
+status = ["differs"]
+tokens_differing = 1326
+lines = 1367
+review = "not-read"
+files = ["Modules/Core/Common/include/itkImageBase.h:differs:736", "Modules/Core/Common/include/itkImageBase.hxx:differs:590"]
+
+[[class]]
+name = "itkImageBoundaryCondition"
+status = ["differs"]
+tokens_differing = 27
+lines = 150
+review = "not-read"
+files = ["Modules/Core/Common/include/itkImageBoundaryCondition.h:differs:27"]
+
+[[class]]
+name = "itkImageConstIterator"
+status = ["absent", "differs"]
+tokens_differing = 85
+lines = 459
+review = "not-read"
+files = ["Modules/Core/Common/include/itkImageConstIterator.h:differs:85", "Modules/Core/Common/include/itkImageConstIterator.hxx:absent:-1"]
+
+[[class]]
+name = "itkImageConstIteratorWithIndex"
+status = ["differs"]
+tokens_differing = 224
+lines = 555
+review = "not-read"
+files = ["Modules/Core/Common/include/itkImageConstIteratorWithIndex.h:differs:95", "Modules/Core/Common/include/itkImageConstIteratorWithIndex.hxx:differs:129"]
+
+[[class]]
+name = "itkImageDuplicator"
+status = ["differs"]
+tokens_differing = 151
+lines = 187
+review = "not-read"
+files = ["Modules/Core/Common/include/itkImageDuplicator.h:differs:82", "Modules/Core/Common/include/itkImageDuplicator.hxx:differs:69"]
+
+[[class]]
+name = "itkImageHelper"
+status = ["differs"]
+tokens_differing = 362
+lines = 149
+review = "not-read"
+files = ["Modules/Core/Common/include/itkImageHelper.h:differs:362"]
+
+[[class]]
+name = "itkImageIORegion"
+status = ["differs"]
+tokens_differing = 560
+lines = 558
+review = "not-read"
+files = ["Modules/Core/Common/include/itkImageIORegion.h:differs:58", "Modules/Core/Common/src/itkImageIORegion.cxx:differs:502"]
+
+[[class]]
+name = "itkImageIterator"
+status = ["differs"]
+tokens_differing = 126
+lines = 275
+review = "not-read"
+files = ["Modules/Core/Common/include/itkImageIterator.h:differs:44", "Modules/Core/Common/include/itkImageIterator.hxx:differs:82"]
+
+[[class]]
+name = "itkImageIteratorWithIndex"
+status = ["differs"]
+tokens_differing = 39
+lines = 224
+review = "not-read"
+files = ["Modules/Core/Common/include/itkImageIteratorWithIndex.h:differs:24", "Modules/Core/Common/include/itkImageIteratorWithIndex.hxx:differs:15"]
+
+[[class]]
+name = "itkImageRegion"
+status = ["differs"]
+tokens_differing = 982
+lines = 647
+review = "not-read"
+files = ["Modules/Core/Common/include/itkImageRegion.h:differs:653", "Modules/Core/Common/include/itkImageRegion.hxx:differs:329"]
+
+[[class]]
+name = "itkImageRegionConstIterator"
+status = ["differs"]
+tokens_differing = 133
+lines = 451
+review = "not-read"
+files = ["Modules/Core/Common/include/itkImageRegionConstIterator.h:differs:48", "Modules/Core/Common/include/itkImageRegionConstIterator.hxx:differs:85"]
+
+[[class]]
+name = "itkImageRegionConstIteratorWithIndex"
+status = ["differs"]
+tokens_differing = 38
+lines = 286
+review = "not-read"
+files = ["Modules/Core/Common/include/itkImageRegionConstIteratorWithIndex.h:differs:20", "Modules/Core/Common/include/itkImageRegionConstIteratorWithIndex.hxx:differs:18"]
+
+[[class]]
+name = "itkImageRegionIterator"
+status = ["differs"]
+tokens_differing = 132
+lines = 224
+review = "not-read"
+files = ["Modules/Core/Common/include/itkImageRegionIterator.h:differs:43", "Modules/Core/Common/include/itkImageRegionIterator.hxx:differs:89"]
+
+[[class]]
+name = "itkImageRegionIteratorWithIndex"
+status = ["differs"]
+tokens_differing = 45
+lines = 186
+review = "not-read"
+files = ["Modules/Core/Common/include/itkImageRegionIteratorWithIndex.h:differs:23", "Modules/Core/Common/include/itkImageRegionIteratorWithIndex.hxx:differs:22"]
+
+[[class]]
+name = "itkImageRegionSplitterBase"
+status = ["differs"]
+tokens_differing = 22
+lines = 190
+review = "not-read"
+files = ["Modules/Core/Common/include/itkImageRegionSplitterBase.h:differs:19", "Modules/Core/Common/src/itkImageRegionSplitterBase.cxx:differs:3"]
+
+[[class]]
+name = "itkImageRegionSplitterSlowDimension"
+status = ["differs"]
+tokens_differing = 46
+lines = 182
+review = "not-read"
+files = ["Modules/Core/Common/include/itkImageRegionSplitterSlowDimension.h:differs:15", "Modules/Core/Common/src/itkImageRegionSplitterSlowDimension.cxx:differs:31"]
+
+[[class]]
+name = "itkImageScanlineConstIterator"
+status = ["differs"]
+tokens_differing = 76
+lines = 342
+review = "not-read"
+files = ["Modules/Core/Common/include/itkImageScanlineConstIterator.h:differs:75", "Modules/Core/Common/include/itkImageScanlineConstIterator.hxx:differs:1"]
+
+[[class]]
+name = "itkImageScanlineIterator"
+status = ["differs"]
+tokens_differing = 71
+lines = 161
+review = "not-read"
+files = ["Modules/Core/Common/include/itkImageScanlineIterator.h:differs:49", "Modules/Core/Common/include/itkImageScanlineIterator.hxx:differs:22"]
+
+[[class]]
+name = "itkImageSource"
+status = ["differs"]
+tokens_differing = 631
+lines = 675
+review = "not-read"
+files = ["Modules/Core/Common/include/itkImageSource.h:differs:67", "Modules/Core/Common/include/itkImageSource.hxx:differs:564"]
+
+[[class]]
+name = "itkImageSourceCommon"
+status = ["differs"]
+tokens_differing = 105
+lines = 98
+review = "not-read"
+files = ["Modules/Core/Common/include/itkImageSourceCommon.h:differs:17", "Modules/Core/Common/src/itkImageSourceCommon.cxx:differs:88"]
+
+[[class]]
+name = "itkImageToImageFilter"
+status = ["differs"]
+tokens_differing = 208
+lines = 664
+review = "not-read"
+files = ["Modules/Core/Common/include/itkImageToImageFilter.h:differs:63", "Modules/Core/Common/include/itkImageToImageFilter.hxx:differs:145"]
+
+[[class]]
+name = "itkImageToImageFilterCommon"
+status = ["differs", "same-code"]
+tokens_differing = 6
+lines = 107
+review = "not-read"
+files = ["Modules/Core/Common/include/itkImageToImageFilterCommon.h:same-code:0", "Modules/Core/Common/src/itkImageToImageFilterCommon.cxx:differs:6"]
+
+[[class]]
+name = "itkImageToImageFilterDetail"
+status = ["differs"]
+tokens_differing = 8
+lines = 457
+review = "not-read"
+files = ["Modules/Core/Common/include/itkImageToImageFilterDetail.h:differs:8"]
+
+[[class]]
+name = "itkImageTransformHelper"
+status = ["absent"]
+tokens_differing = 0
+lines = 318
+review = "absent-in-5.4.5"
+files = ["Modules/Core/Common/include/itkImageTransformHelper.h:absent:-1"]
+
+[[class]]
+name = "itkImportImageContainer"
+status = ["differs"]
+tokens_differing = 78
+lines = 427
+review = "not-read"
+files = ["Modules/Core/Common/include/itkImportImageContainer.h:differs:29", "Modules/Core/Common/include/itkImportImageContainer.hxx:differs:49"]
+
+[[class]]
+name = "itkImportImageFilter"
+status = ["differs"]
+tokens_differing = 231
+lines = 389
+review = "not-read"
+files = ["Modules/Core/Common/include/itkImportImageFilter.h:differs:41", "Modules/Core/Common/include/itkImportImageFilter.hxx:differs:190"]
+
+[[class]]
+name = "itkInPlaceImageFilter"
+status = ["differs"]
+tokens_differing = 250
+lines = 373
+review = "not-read"
+files = ["Modules/Core/Common/include/itkInPlaceImageFilter.h:differs:82", "Modules/Core/Common/include/itkInPlaceImageFilter.hxx:differs:168"]
+
+[[class]]
+name = "itkIndent"
+status = ["differs"]
+tokens_differing = 4
+lines = 152
+review = "not-read"
+files = ["Modules/Core/Common/include/itkIndent.h:differs:2", "Modules/Core/Common/src/itkIndent.cxx:differs:2"]
+
+[[class]]
+name = "itkIndex"
+status = ["differs"]
+tokens_differing = 1414
+lines = 401
+review = "not-read"
+files = ["Modules/Core/Common/include/itkIndex.h:differs:1414"]
+
+[[class]]
+name = "itkInputDataObjectIterator"
+status = ["same-mechanical"]
+tokens_differing = 0
+lines = 49
+review = "no-code-change"
+files = ["Modules/Core/Common/include/itkInputDataObjectIterator.h:same-mechanical:0"]
+
+[[class]]
+name = "itkIntTypes"
+status = ["differs"]
+tokens_differing = 260
+lines = 168
+review = "not-read"
+files = ["Modules/Core/Common/include/itkIntTypes.h:differs:260"]
+
+[[class]]
+name = "itkIsSame"
+status = ["differs"]
+tokens_differing = 20
+lines = 49
+review = "not-read"
+files = ["Modules/Core/Common/include/itkIsSame.h:differs:20"]
+
+[[class]]
+name = "itkIterationReporter"
+status = ["same-mechanical"]
+tokens_differing = 0
+lines = 119
+review = "no-code-change"
+files = ["Modules/Core/Common/include/itkIterationReporter.h:same-mechanical:0", "Modules/Core/Common/src/itkIterationReporter.cxx:same-mechanical:0"]
+
+[[class]]
+name = "itkKernelFunctionBase"
+status = ["differs"]
+tokens_differing = 30
+lines = 75
+review = "not-read"
+files = ["Modules/Core/Common/include/itkKernelFunctionBase.h:differs:30"]
+
+[[class]]
+name = "itkLightObject"
+status = ["differs"]
+tokens_differing = 84
+lines = 423
+review = "not-read"
+files = ["Modules/Core/Common/include/itkLightObject.h:differs:36", "Modules/Core/Common/src/itkLightObject.cxx:differs:48"]
+
+[[class]]
+name = "itkMacro"
+status = ["differs"]
+tokens_differing = 2546
+lines = 1363
+review = "not-read"
+files = ["Modules/Core/Common/include/itkMacro.h:differs:2546"]
+
+[[class]]
+name = "itkMath"
+status = ["differs"]
+tokens_differing = 1649
+lines = 975
+review = "not-read"
+files = ["Modules/Core/Common/include/itkMath.h:differs:1642", "Modules/Core/Common/src/itkMath.cxx:differs:7"]
+
+[[class]]
+name = "itkMathDetail"
+status = ["differs"]
+tokens_differing = 160
+lines = 442
+review = "mechanical"
+note = "both select the SSE2 rounding implementation on Linux x86-64 (4.13.2 through ITK_COMPILER_SUPPORTS_SSE2_64, set by its configure)"
+files = ["Modules/Core/Common/include/itkMathDetail.h:differs:160"]
+
+[[class]]
+name = "itkMatrix"
+status = ["differs"]
+tokens_differing = 477
+lines = 533
+review = "not-read"
+files = ["Modules/Core/Common/include/itkMatrix.h:differs:319", "Modules/Core/Common/include/itkMatrix.hxx:differs:158"]
+
+[[class]]
+name = "itkMeanImageFilter"
+status = ["differs"]
+tokens_differing = 699
+lines = 212
+review = "refactored"
+note = "ShapedImageNeighborhoodRange instead of ConstNeighborhoodIterator, same offsets and zero-flux boundary; sum / size as before"
+files = ["Modules/Filtering/Smoothing/include/itkMeanImageFilter.h:differs:105", "Modules/Filtering/Smoothing/include/itkMeanImageFilter.hxx:differs:594"]
+
+[[class]]
+name = "itkMetaDataDictionary"
+status = ["differs"]
+tokens_differing = 508
+lines = 308
+review = "not-read"
+files = ["Modules/Core/Common/include/itkMetaDataDictionary.h:differs:305", "Modules/Core/Common/src/itkMetaDataDictionary.cxx:differs:203"]
+
+[[class]]
+name = "itkMetaDataObjectBase"
+status = ["differs"]
+tokens_differing = 71
+lines = 144
+review = "not-read"
+files = ["Modules/Core/Common/include/itkMetaDataObjectBase.h:differs:68", "Modules/Core/Common/src/itkMetaDataObjectBase.cxx:differs:3"]
+
+[[class]]
+name = "itkMetaProgrammingLibrary"
+status = ["differs"]
+tokens_differing = 79
+lines = 179
+review = "not-read"
+files = ["Modules/Core/Common/include/itkMetaProgrammingLibrary.h:differs:79"]
+
+[[class]]
+name = "itkMultiThreader"
+status = ["absent", "differs"]
+tokens_differing = 409
+lines = 730
+review = "not-read"
+files = ["Modules/Core/Common/include/itkMultiThreader.h:differs:409", "Modules/Core/Common/src/itkMultiThreader.cxx:absent:-1"]
+
+[[class]]
+name = "itkMultiThreaderNoThreads"
+status = ["absent"]
+tokens_differing = 0
+lines = 91
+review = "absent-in-5.4.5"
+files = ["Modules/Core/Common/src/itkMultiThreaderNoThreads.cxx:absent:-1"]
+
+[[class]]
+name = "itkMultiThreaderPThreads"
+status = ["absent"]
+tokens_differing = 0
+lines = 216
+review = "absent-in-5.4.5"
+files = ["Modules/Core/Common/src/itkMultiThreaderPThreads.cxx:absent:-1"]
+
+[[class]]
+name = "itkMultiThreaderWinThreads"
+status = ["absent"]
+tokens_differing = 0
+lines = 193
+review = "absent-in-5.4.5"
+files = ["Modules/Core/Common/src/itkMultiThreaderWinThreads.cxx:absent:-1"]
+
+[[class]]
+name = "itkMutexLock"
+status = ["differs", "same-mechanical"]
+tokens_differing = 29
+lines = 204
+review = "not-read"
+files = ["Modules/Core/Common/include/itkMutexLock.h:differs:29", "Modules/Core/Common/src/itkMutexLock.cxx:same-mechanical:0"]
+
+[[class]]
+name = "itkMutexLockHolder"
+status = ["differs"]
+tokens_differing = 12
+lines = 88
+review = "not-read"
+files = ["Modules/Core/Common/include/itkMutexLockHolder.h:differs:12"]
+
+[[class]]
+name = "itkMutexLockNoThreads"
+status = ["same-mechanical"]
+tokens_differing = 0
+lines = 59
+review = "no-code-change"
+files = ["Modules/Core/Common/src/itkMutexLockNoThreads.cxx:same-mechanical:0"]
+
+[[class]]
+name = "itkMutexLockPThreads"
+status = ["same-mechanical"]
+tokens_differing = 0
+lines = 68
+review = "no-code-change"
+files = ["Modules/Core/Common/src/itkMutexLockPThreads.cxx:same-mechanical:0"]
+
+[[class]]
+name = "itkMutexLockWinThreads"
+status = ["same-mechanical"]
+tokens_differing = 0
+lines = 69
+review = "no-code-change"
+files = ["Modules/Core/Common/src/itkMutexLockWinThreads.cxx:same-mechanical:0"]
+
+[[class]]
+name = "itkN4BiasFieldCorrectionImageFilter"
+status = ["differs"]
+tokens_differing = 1734
+lines = 1242
+review = "refactored"
+note = "iterators replaced by buffer ranges in the same raster order; per-thread work as before; UseMaskLabel's default changed from true (label 1) to false (any non-zero), the same for FreeSurfer's 0/1 masks; the filter's own output now one lambda input / exp(bias) instead of ExpImageFilter then DivideImageFilter (FreeSurfer's program does its own Exp and Divide on the reconstructed field and does not use it)"
+files = ["Modules/Filtering/BiasCorrection/include/itkN4BiasFieldCorrectionImageFilter.h:differs:221", "Modules/Filtering/BiasCorrection/include/itkN4BiasFieldCorrectionImageFilter.hxx:differs:1513"]
+
+[[class]]
+name = "itkNeighborhood"
+status = ["differs"]
+tokens_differing = 599
+lines = 506
+review = "not-read"
+files = ["Modules/Core/Common/include/itkNeighborhood.h:differs:140", "Modules/Core/Common/include/itkNeighborhood.hxx:differs:459"]
+
+[[class]]
+name = "itkNeighborhoodAccessorFunctor"
+status = ["differs"]
+tokens_differing = 44
+lines = 100
+review = "not-read"
+files = ["Modules/Core/Common/include/itkNeighborhoodAccessorFunctor.h:differs:44"]
+
+[[class]]
+name = "itkNeighborhoodAlgorithm"
+status = ["differs"]
+tokens_differing = 361
+lines = 283
+review = "not-read"
+files = ["Modules/Core/Common/include/itkNeighborhoodAlgorithm.h:differs:124", "Modules/Core/Common/include/itkNeighborhoodAlgorithm.hxx:differs:237"]
+
+[[class]]
+name = "itkNeighborhoodAllocator"
+status = ["differs"]
+tokens_differing = 411
+lines = 155
+review = "not-read"
+files = ["Modules/Core/Common/include/itkNeighborhoodAllocator.h:differs:411"]
+
+[[class]]
+name = "itkNeighborhoodInnerProduct"
+status = ["differs"]
+tokens_differing = 312
+lines = 195
+review = "not-read"
+files = ["Modules/Core/Common/include/itkNeighborhoodInnerProduct.h:differs:148", "Modules/Core/Common/include/itkNeighborhoodInnerProduct.hxx:differs:164"]
+
+[[class]]
+name = "itkNeighborhoodIterator"
+status = ["differs"]
+tokens_differing = 125
+lines = 561
+review = "not-read"
+files = ["Modules/Core/Common/include/itkNeighborhoodIterator.h:differs:42", "Modules/Core/Common/include/itkNeighborhoodIterator.hxx:differs:83"]
+
+[[class]]
+name = "itkNeighborhoodOperator"
+status = ["differs"]
+tokens_differing = 214
+lines = 348
+review = "not-read"
+files = ["Modules/Core/Common/include/itkNeighborhoodOperator.h:differs:166", "Modules/Core/Common/include/itkNeighborhoodOperator.hxx:differs:48"]
+
+[[class]]
+name = "itkNeighborhoodOperatorImageFilter"
+status = ["differs"]
+tokens_differing = 92
+lines = 330
+review = "refactored"
+note = "threading interface; same inner product"
+files = ["Modules/Filtering/ImageFilterBase/include/itkNeighborhoodOperatorImageFilter.h:differs:44", "Modules/Filtering/ImageFilterBase/include/itkNeighborhoodOperatorImageFilter.hxx:differs:48"]
+
+[[class]]
+name = "itkNumericTraits"
+status = ["differs"]
+tokens_differing = 5784
+lines = 1890
+review = "not-read"
+files = ["Modules/Core/Common/include/itkNumericTraits.h:differs:5315", "Modules/Core/Common/src/itkNumericTraits.cxx:differs:469"]
+
+[[class]]
+name = "itkNumericTraitsArrayPixel"
+status = ["differs"]
+tokens_differing = 120
+lines = 168
+review = "not-read"
+files = ["Modules/Core/Common/include/itkNumericTraitsArrayPixel.h:differs:120"]
+
+[[class]]
+name = "itkNumericTraitsCovariantVectorPixel"
+status = ["differs", "same-code"]
+tokens_differing = 47
+lines = 225
+review = "not-read"
+files = ["Modules/Core/Common/include/itkNumericTraitsCovariantVectorPixel.h:differs:47", "Modules/Core/Common/src/itkNumericTraitsCovariantVectorPixel.cxx:same-code:0"]
+
+[[class]]
+name = "itkNumericTraitsFixedArrayPixel"
+status = ["differs", "same-code"]
+tokens_differing = 48
+lines = 250
+review = "not-read"
+files = ["Modules/Core/Common/include/itkNumericTraitsFixedArrayPixel.h:differs:48", "Modules/Core/Common/src/itkNumericTraitsFixedArrayPixel.cxx:same-code:0"]
+
+[[class]]
+name = "itkNumericTraitsPointPixel"
+status = ["differs", "same-code"]
+tokens_differing = 47
+lines = 212
+review = "not-read"
+files = ["Modules/Core/Common/include/itkNumericTraitsPointPixel.h:differs:47", "Modules/Core/Common/src/itkNumericTraitsPointPixel.cxx:same-code:0"]
+
+[[class]]
+name = "itkNumericTraitsVectorPixel"
+status = ["differs", "same-code"]
+tokens_differing = 62
+lines = 263
+review = "not-read"
+files = ["Modules/Core/Common/include/itkNumericTraitsVectorPixel.h:differs:62", "Modules/Core/Common/src/itkNumericTraitsVectorPixel.cxx:same-code:0"]
+
+[[class]]
+name = "itkObject"
+status = ["differs"]
+tokens_differing = 724
+lines = 898
+review = "not-read"
+files = ["Modules/Core/Common/include/itkObject.h:differs:69", "Modules/Core/Common/src/itkObject.cxx:differs:655"]
+
+[[class]]
+name = "itkObjectFactory"
+status = ["same-mechanical"]
+tokens_differing = 0
+lines = 67
+review = "no-code-change"
+files = ["Modules/Core/Common/include/itkObjectFactory.h:same-mechanical:0"]
+
+[[class]]
+name = "itkObjectFactoryBase"
+status = ["differs"]
+tokens_differing = 1562
+lines = 1344
+review = "not-read"
+files = ["Modules/Core/Common/include/itkObjectFactoryBase.h:differs:149", "Modules/Core/Common/src/itkObjectFactoryBase.cxx:differs:1413"]
+
+[[class]]
+name = "itkOffset"
+status = ["differs"]
+tokens_differing = 1248
+lines = 283
+review = "not-read"
+files = ["Modules/Core/Common/include/itkOffset.h:differs:1248"]
+
+[[class]]
+name = "itkOutputDataObjectIterator"
+status = ["same-mechanical"]
+tokens_differing = 0
+lines = 49
+review = "no-code-change"
+files = ["Modules/Core/Common/include/itkOutputDataObjectIterator.h:same-mechanical:0"]
+
+[[class]]
+name = "itkOutputWindow"
+status = ["differs"]
+tokens_differing = 147
+lines = 278
+review = "not-read"
+files = ["Modules/Core/Common/include/itkOutputWindow.h:differs:28", "Modules/Core/Common/src/itkOutputWindow.cxx:differs:119"]
+
+[[class]]
+name = "itkPixelTraits"
+status = ["differs"]
+tokens_differing = 15
+lines = 1452
+review = "not-read"
+files = ["Modules/Core/Common/include/itkPixelTraits.h:differs:15"]
+
+[[class]]
+name = "itkPoint"
+status = ["differs"]
+tokens_differing = 637
+lines = 688
+review = "not-read"
+files = ["Modules/Core/Common/include/itkPoint.h:differs:410", "Modules/Core/Common/include/itkPoint.hxx:differs:227"]
+
+[[class]]
+name = "itkPointSet"
+status = ["differs"]
+tokens_differing = 323
+lines = 744
+review = "not-read"
+files = ["Modules/Core/Common/include/itkPointSet.h:differs:72", "Modules/Core/Common/include/itkPointSet.hxx:differs:251"]
+
+[[class]]
+name = "itkPointSetToImageFilter"
+status = ["differs"]
+tokens_differing = 253
+lines = 447
+review = "not-read"
+files = ["Modules/Core/Common/include/itkPointSetToImageFilter.h:differs:38", "Modules/Core/Common/include/itkPointSetToImageFilter.hxx:differs:215"]
+
+[[class]]
+name = "itkProcessObject"
+status = ["differs"]
+tokens_differing = 2431
+lines = 2879
+review = "not-read"
+files = ["Modules/Core/Common/include/itkProcessObject.h:differs:454", "Modules/Core/Common/src/itkProcessObject.cxx:differs:1977"]
+
+[[class]]
+name = "itkProgressAccumulator"
+status = ["differs"]
+tokens_differing = 59
+lines = 347
+review = "not-read"
+files = ["Modules/Core/Common/include/itkProgressAccumulator.h:differs:23", "Modules/Core/Common/src/itkProgressAccumulator.cxx:differs:36"]
+
+[[class]]
+name = "itkProgressReporter"
+status = ["differs"]
+tokens_differing = 183
+lines = 179
+review = "not-read"
+files = ["Modules/Core/Common/include/itkProgressReporter.h:differs:121", "Modules/Core/Common/src/itkProgressReporter.cxx:differs:62"]
+
+[[class]]
+name = "itkRealTimeInterval"
+status = ["differs"]
+tokens_differing = 71
+lines = 445
+review = "not-read"
+files = ["Modules/Core/Common/include/itkRealTimeInterval.h:differs:7", "Modules/Core/Common/src/itkRealTimeInterval.cxx:differs:64"]
+
+[[class]]
+name = "itkRealTimeStamp"
+status = ["differs"]
+tokens_differing = 79
+lines = 480
+review = "not-read"
+files = ["Modules/Core/Common/include/itkRealTimeStamp.h:differs:12", "Modules/Core/Common/src/itkRealTimeStamp.cxx:differs:67"]
+
+[[class]]
+name = "itkRegion"
+status = ["differs", "same-mechanical"]
+tokens_differing = 41
+lines = 158
+review = "not-read"
+files = ["Modules/Core/Common/include/itkRegion.h:differs:41", "Modules/Core/Common/src/itkRegion.cxx:same-mechanical:0"]
+
+[[class]]
+name = "itkShrinkImageFilter"
+status = ["differs"]
+tokens_differing = 162
+lines = 523
+review = "refactored"
+note = "DynamicThreadedGenerateData; TransformPhysicalPointToIndex now returns the index; same sampling"
+files = ["Modules/Filtering/ImageGrid/include/itkShrinkImageFilter.h:differs:24", "Modules/Filtering/ImageGrid/include/itkShrinkImageFilter.hxx:differs:138"]
+
+[[class]]
+name = "itkSimpleDataObjectDecorator"
+status = ["differs"]
+tokens_differing = 67
+lines = 202
+review = "not-read"
+files = ["Modules/Core/Common/include/itkSimpleDataObjectDecorator.h:differs:21", "Modules/Core/Common/include/itkSimpleDataObjectDecorator.hxx:differs:46"]
+
+[[class]]
+name = "itkSimpleFastMutexLock"
+status = ["differs", "same-mechanical"]
+tokens_differing = 1
+lines = 111
+review = "not-read"
+files = ["Modules/Core/Common/include/itkSimpleFastMutexLock.h:differs:1", "Modules/Core/Common/src/itkSimpleFastMutexLock.cxx:same-mechanical:0"]
+
+[[class]]
+name = "itkSimpleFastMutexLockNoThreads"
+status = ["same-mechanical"]
+tokens_differing = 0
+lines = 57
+review = "no-code-change"
+files = ["Modules/Core/Common/src/itkSimpleFastMutexLockNoThreads.cxx:same-mechanical:0"]
+
+[[class]]
+name = "itkSimpleFastMutexLockPThreads"
+status = ["same-mechanical"]
+tokens_differing = 0
+lines = 70
+review = "no-code-change"
+files = ["Modules/Core/Common/src/itkSimpleFastMutexLockPThreads.cxx:same-mechanical:0"]
+
+[[class]]
+name = "itkSimpleFastMutexLockWinThreads"
+status = ["same-code"]
+tokens_differing = 0
+lines = 68
+review = "no-code-change"
+files = ["Modules/Core/Common/src/itkSimpleFastMutexLockWinThreads.cxx:same-code:0"]
+
+[[class]]
+name = "itkSize"
+status = ["differs"]
+tokens_differing = 1163
+lines = 238
+review = "not-read"
+files = ["Modules/Core/Common/include/itkSize.h:differs:1163"]
+
+[[class]]
+name = "itkSliceIterator"
+status = ["differs"]
+tokens_differing = 25
+lines = 145
+review = "not-read"
+files = ["Modules/Core/Common/include/itkSliceIterator.h:differs:25"]
+
+[[class]]
+name = "itkSmartPointer"
+status = ["differs"]
+tokens_differing = 821
+lines = 188
+review = "not-read"
+files = ["Modules/Core/Common/include/itkSmartPointer.h:differs:821"]
+
+[[class]]
+name = "itkSmartPointerForwardReference"
+status = ["absent", "differs"]
+tokens_differing = 86
+lines = 312
+review = "not-read"
+files = ["Modules/Core/Common/include/itkSmartPointerForwardReference.h:absent:-1", "Modules/Core/Common/include/itkSmartPointerForwardReference.hxx:differs:86"]
+
+[[class]]
+name = "itkSpatialOrientation"
+status = ["differs"]
+tokens_differing = 2926
+lines = 313
+review = "not-read"
+files = ["Modules/Core/Common/include/itkSpatialOrientation.h:differs:2926"]
+
+[[class]]
+name = "itkStatisticsImageFilter"
+status = ["differs"]
+tokens_differing = 1808
+lines = 561
+review = "changed"
+note = "sums: 4.13.2 plain per-thread sums added in thread order, 5.4.5 CompensatedSummation per chunk merged under a mutex; FreeSurfer's denoising reads only the minimum and maximum (exact either way)"
+files = ["Modules/Filtering/ImageStatistics/include/itkStatisticsImageFilter.h:differs:366", "Modules/Filtering/ImageStatistics/include/itkStatisticsImageFilter.hxx:differs:1442"]
+
+[[class]]
+name = "itkStreamingImageFilter"
+status = ["differs"]
+tokens_differing = 80
+lines = 374
+review = "not-read"
+files = ["Modules/Core/Common/include/itkStreamingImageFilter.h:differs:23", "Modules/Core/Common/include/itkStreamingImageFilter.hxx:differs:57"]
+
+[[class]]
+name = "itkSubtractImageFilter"
+status = ["differs"]
+tokens_differing = 130
+lines = 112
+review = "not-read"
+files = ["Modules/Filtering/ImageIntensity/include/itkSubtractImageFilter.h:differs:130"]
+
+[[class]]
+name = "itkThreadJob"
+status = ["absent"]
+tokens_differing = 0
+lines = 98
+review = "absent-in-5.4.5"
+files = ["Modules/Core/Common/include/itkThreadJob.h:absent:-1"]
+
+[[class]]
+name = "itkThreadPool"
+status = ["differs"]
+tokens_differing = 1208
+lines = 446
+review = "not-read"
+files = ["Modules/Core/Common/include/itkThreadPool.h:differs:307", "Modules/Core/Common/src/itkThreadPool.cxx:differs:901"]
+
+[[class]]
+name = "itkThreadSupport"
+status = ["differs"]
+tokens_differing = 183
+lines = 103
+review = "not-read"
+files = ["Modules/Core/Common/include/itkThreadSupport.h:differs:183"]
+
+[[class]]
+name = "itkTimeStamp"
+status = ["differs"]
+tokens_differing = 248
+lines = 281
+review = "not-read"
+files = ["Modules/Core/Common/include/itkTimeStamp.h:differs:42", "Modules/Core/Common/src/itkTimeStamp.cxx:differs:206"]
+
+[[class]]
+name = "itkUnaryFunctorImageFilter"
+status = ["differs"]
+tokens_differing = 99
+lines = 263
+review = "not-read"
+files = ["Modules/Core/Common/include/itkUnaryFunctorImageFilter.h:differs:22", "Modules/Core/Common/include/itkUnaryFunctorImageFilter.hxx:differs:77"]
+
+[[class]]
+name = "itkVariableSizeMatrix"
+status = ["differs"]
+tokens_differing = 115
+lines = 506
+review = "not-read"
+files = ["Modules/Core/Common/include/itkVariableSizeMatrix.h:differs:46", "Modules/Core/Common/include/itkVariableSizeMatrix.hxx:differs:69"]
+
+[[class]]
+name = "itkVector"
+status = ["differs", "same-mechanical"]
+tokens_differing = 644
+lines = 619
+review = "not-read"
+files = ["Modules/Core/Common/include/itkVector.h:differs:299", "Modules/Core/Common/include/itkVector.hxx:differs:345", "Modules/Core/Common/src/itkVector.cxx:same-mechanical:0"]
+
+[[class]]
+name = "itkVectorContainer"
+status = ["differs"]
+tokens_differing = 509
+lines = 680
+review = "not-read"
+files = ["Modules/Core/Common/include/itkVectorContainer.h:differs:381", "Modules/Core/Common/include/itkVectorContainer.hxx:differs:128"]
+
+[[class]]
+name = "itkVectorIndexSelectionCastImageFilter"
+status = ["differs"]
+tokens_differing = 66
+lines = 175
+review = "not-read"
+files = ["Modules/Filtering/ImageIntensity/include/itkVectorIndexSelectionCastImageFilter.h:differs:66"]
+
+[[class]]
+name = "itkVersion"
+status = ["differs"]
+tokens_differing = 21
+lines = 163
+review = "not-read"
+files = ["Modules/Core/Common/include/itkVersion.h:differs:18", "Modules/Core/Common/src/itkVersion.cxx:differs:3"]
+
+[[class]]
+name = "itkWeakPointer"
+status = ["differs"]
+tokens_differing = 93
+lines = 153
+review = "not-read"
+files = ["Modules/Core/Common/include/itkWeakPointer.h:differs:93"]
+
+[[class]]
+name = "itkWin32Header"
+status = ["differs"]
+tokens_differing = 104
+lines = 77
+review = "not-read"
+files = ["Modules/Core/Common/include/itkWin32Header.h:differs:104"]
+
+[[class]]
+name = "itkWin32OutputWindow"
+status = ["differs"]
+tokens_differing = 43
+lines = 334
+review = "not-read"
+files = ["Modules/Core/Common/include/itkWin32OutputWindow.h:differs:16", "Modules/Core/Common/src/itkWin32OutputWindow.cxx:differs:27"]
+
+[[class]]
+name = "itkWindows"
+status = ["same-mechanical"]
+tokens_differing = 0
+lines = 33
+review = "no-code-change"
+files = ["Modules/Core/Common/include/itkWindows.h:same-mechanical:0"]
+
+[[class]]
+name = "itkZeroFluxNeumannBoundaryCondition"
+status = ["differs"]
+tokens_differing = 88
+lines = 329
+review = "not-read"
+files = ["Modules/Core/Common/include/itkZeroFluxNeumannBoundaryCondition.h:differs:39", "Modules/Core/Common/include/itkZeroFluxNeumannBoundaryCondition.hxx:differs:49"]
+
+[[class]]
+name = "izamax"
+status = ["identical"]
+tokens_differing = 0
+lines = 121
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/izamax.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/izamax.h:identical:0"]
+
+[[class]]
+name = "izmax1"
+status = ["identical"]
+tokens_differing = 0
+lines = 5
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/util/izmax1.h:identical:0"]
+
+[[class]]
+name = "lbfgs"
+status = ["identical"]
+tokens_differing = 0
+lines = 90
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/opt/lbfgs.h:identical:0"]
+
+[[class]]
+name = "lbfgsb"
+status = ["identical"]
+tokens_differing = 0
+lines = 356
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/opt/lbfgsb.h:identical:0"]
+
+[[class]]
+name = "lmder"
+status = ["identical"]
+tokens_differing = 0
+lines = 35
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/minpack/lmder.h:identical:0"]
+
+[[class]]
+name = "lmder1"
+status = ["identical"]
+tokens_differing = 0
+lines = 23
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/minpack/lmder1.h:identical:0"]
+
+[[class]]
+name = "lmdif"
+status = ["identical"]
+tokens_differing = 0
+lines = 33
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/minpack/lmdif.h:identical:0"]
+
+[[class]]
+name = "lmpar"
+status = ["identical"]
+tokens_differing = 0
+lines = 14
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/minpack/lmpar.h:identical:0"]
+
+[[class]]
+name = "lsame"
+status = ["identical"]
+tokens_differing = 0
+lines = 152
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/util/lsame.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/util/lsame.h:identical:0"]
+
+[[class]]
+name = "otqlrat"
+status = ["identical"]
+tokens_differing = 0
+lines = 6
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/eispack/otqlrat.h:identical:0"]
+
+[[class]]
+name = "pow_dd"
+status = ["identical"]
+tokens_differing = 0
+lines = 19
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/libf2c/pow_dd.c:identical:0"]
+
+[[class]]
+name = "pow_di"
+status = ["identical"]
+tokens_differing = 0
+lines = 41
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/libf2c/pow_di.c:identical:0"]
+
+[[class]]
+name = "pow_ii"
+status = ["identical"]
+tokens_differing = 0
+lines = 45
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/libf2c/pow_ii.c:identical:0"]
+
+[[class]]
+name = "pythag"
+status = ["identical"]
+tokens_differing = 0
+lines = 80
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/eispack/pythag.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/eispack/pythag.h:identical:0"]
+
+[[class]]
+name = "qrfac"
+status = ["identical"]
+tokens_differing = 0
+lines = 12
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/minpack/qrfac.h:identical:0"]
+
+[[class]]
+name = "qrsolv"
+status = ["identical"]
+tokens_differing = 0
+lines = 11
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/minpack/qrsolv.h:identical:0"]
+
+[[class]]
+name = "r_acos"
+status = ["identical"]
+tokens_differing = 0
+lines = 19
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/libf2c/r_acos.c:identical:0"]
+
+[[class]]
+name = "r_cos"
+status = ["identical"]
+tokens_differing = 0
+lines = 19
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/libf2c/r_cos.c:identical:0"]
+
+[[class]]
+name = "r_cosh"
+status = ["identical"]
+tokens_differing = 0
+lines = 19
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/libf2c/r_cosh.c:identical:0"]
+
+[[class]]
+name = "r_exp"
+status = ["identical"]
+tokens_differing = 0
+lines = 19
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/libf2c/r_exp.c:identical:0"]
+
+[[class]]
+name = "r_lg10"
+status = ["identical"]
+tokens_differing = 0
+lines = 21
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/libf2c/r_lg10.c:identical:0"]
+
+[[class]]
+name = "r_sign"
+status = ["identical"]
+tokens_differing = 0
+lines = 18
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/libf2c/r_sign.c:identical:0"]
+
+[[class]]
+name = "r_sinh"
+status = ["identical"]
+tokens_differing = 0
+lines = 19
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/libf2c/r_sinh.c:identical:0"]
+
+[[class]]
+name = "rebak"
+status = ["identical"]
+tokens_differing = 0
+lines = 8
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/eispack/rebak.h:identical:0"]
+
+[[class]]
+name = "reduc"
+status = ["identical"]
+tokens_differing = 0
+lines = 8
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/eispack/reduc.h:identical:0"]
+
+[[class]]
+name = "rg"
+status = ["identical"]
+tokens_differing = 0
+lines = 160
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/eispack/rg.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/eispack/rg.h:identical:0"]
+
+[[class]]
+name = "rpoly"
+status = ["absent"]
+tokens_differing = 0
+lines = 20
+review = "absent-in-5.4.5"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/toms/rpoly.h:absent:-1"]
+
+[[class]]
+name = "rs"
+status = ["identical"]
+tokens_differing = 0
+lines = 136
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/eispack/rs.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/eispack/rs.h:identical:0"]
+
+[[class]]
+name = "rsg"
+status = ["identical"]
+tokens_differing = 0
+lines = 12
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/eispack/rsg.h:identical:0"]
+
+[[class]]
+name = "s_cmp"
+status = ["identical"]
+tokens_differing = 0
+lines = 50
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/libf2c/s_cmp.c:identical:0"]
+
+[[class]]
+name = "s_copy"
+status = ["identical"]
+tokens_differing = 0
+lines = 58
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/libf2c/s_copy.c:identical:0"]
+
+[[class]]
+name = "saxpy"
+status = ["identical"]
+tokens_differing = 0
+lines = 141
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/saxpy.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/saxpy.h:identical:0"]
+
+[[class]]
+name = "scnrm2"
+status = ["identical"]
+tokens_differing = 0
+lines = 5
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/scnrm2.h:identical:0"]
+
+[[class]]
+name = "scopy"
+status = ["identical"]
+tokens_differing = 0
+lines = 142
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/scopy.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/scopy.h:identical:0"]
+
+[[class]]
+name = "sdot"
+status = ["identical"]
+tokens_differing = 0
+lines = 142
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/sdot.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/sdot.h:identical:0"]
+
+[[class]]
+name = "setdgpfa"
+status = ["identical"]
+tokens_differing = 0
+lines = 204
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/temperton/setdgpfa.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/temperton/setdgpfa.h:identical:0"]
+
+[[class]]
+name = "setgpfa"
+status = ["identical"]
+tokens_differing = 0
+lines = 204
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/temperton/setgpfa.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/temperton/setgpfa.h:identical:0"]
+
+[[class]]
+name = "sfe"
+status = ["identical"]
+tokens_differing = 0
+lines = 43
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/libf2c/sfe.c:identical:0"]
+
+[[class]]
+name = "sgemv"
+status = ["identical"]
+tokens_differing = 0
+lines = 14
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/sgemv.h:identical:0"]
+
+[[class]]
+name = "sgeqpf"
+status = ["identical"]
+tokens_differing = 0
+lines = 10
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/single/sgeqpf.h:identical:0"]
+
+[[class]]
+name = "sgeqr2"
+status = ["identical"]
+tokens_differing = 0
+lines = 9
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/single/sgeqr2.h:identical:0"]
+
+[[class]]
+name = "sger"
+status = ["identical"]
+tokens_differing = 0
+lines = 11
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/sger.h:identical:0"]
+
+[[class]]
+name = "sgerq2"
+status = ["identical"]
+tokens_differing = 0
+lines = 9
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/single/sgerq2.h:identical:0"]
+
+[[class]]
+name = "sggsvd"
+status = ["identical"]
+tokens_differing = 0
+lines = 28
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/single/sggsvd.h:identical:0"]
+
+[[class]]
+name = "sggsvp"
+status = ["identical"]
+tokens_differing = 0
+lines = 29
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/single/sggsvp.h:identical:0"]
+
+[[class]]
+name = "sig_die"
+status = ["identical"]
+tokens_differing = 0
+lines = 45
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/libf2c/sig_die.c:identical:0"]
+
+[[class]]
+name = "simpson"
+status = ["identical"]
+tokens_differing = 0
+lines = 14
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/mathews/simpson.h:identical:0"]
+
+[[class]]
+name = "slacpy"
+status = ["identical"]
+tokens_differing = 0
+lines = 10
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/single/slacpy.h:identical:0"]
+
+[[class]]
+name = "slags2"
+status = ["identical"]
+tokens_differing = 0
+lines = 15
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/single/slags2.h:identical:0"]
+
+[[class]]
+name = "slamch"
+status = ["identical"]
+tokens_differing = 0
+lines = 38
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/slamch.h:identical:0"]
+
+[[class]]
+name = "slange"
+status = ["identical"]
+tokens_differing = 0
+lines = 9
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/single/slange.h:identical:0"]
+
+[[class]]
+name = "slapll"
+status = ["identical"]
+tokens_differing = 0
+lines = 8
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/single/slapll.h:identical:0"]
+
+[[class]]
+name = "slapmt"
+status = ["identical"]
+tokens_differing = 0
+lines = 8
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/single/slapmt.h:identical:0"]
+
+[[class]]
+name = "slapy2"
+status = ["identical"]
+tokens_differing = 0
+lines = 4
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/single/slapy2.h:identical:0"]
+
+[[class]]
+name = "slarf"
+status = ["identical"]
+tokens_differing = 0
+lines = 12
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/single/slarf.h:identical:0"]
+
+[[class]]
+name = "slarfg"
+status = ["identical"]
+tokens_differing = 0
+lines = 7
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/single/slarfg.h:identical:0"]
+
+[[class]]
+name = "slartg"
+status = ["identical"]
+tokens_differing = 0
+lines = 8
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/single/slartg.h:identical:0"]
+
+[[class]]
+name = "slas2"
+status = ["identical"]
+tokens_differing = 0
+lines = 7
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/single/slas2.h:identical:0"]
+
+[[class]]
+name = "slaset"
+status = ["identical"]
+tokens_differing = 0
+lines = 10
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/single/slaset.h:identical:0"]
+
+[[class]]
+name = "slassq"
+status = ["identical"]
+tokens_differing = 0
+lines = 7
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/single/slassq.h:identical:0"]
+
+[[class]]
+name = "slasv2"
+status = ["identical"]
+tokens_differing = 0
+lines = 11
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/single/slasv2.h:identical:0"]
+
+[[class]]
+name = "snrm2"
+status = ["identical"]
+tokens_differing = 0
+lines = 133
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/snrm2.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/snrm2.h:identical:0"]
+
+[[class]]
+name = "sorg2r"
+status = ["identical"]
+tokens_differing = 0
+lines = 10
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/single/sorg2r.h:identical:0"]
+
+[[class]]
+name = "sorm2r"
+status = ["identical"]
+tokens_differing = 0
+lines = 16
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/single/sorm2r.h:identical:0"]
+
+[[class]]
+name = "sormr2"
+status = ["identical"]
+tokens_differing = 0
+lines = 16
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/single/sormr2.h:identical:0"]
+
+[[class]]
+name = "sqrdc"
+status = ["identical"]
+tokens_differing = 0
+lines = 434
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/linpack/sqrdc.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/linpack/sqrdc.h:identical:0"]
+
+[[class]]
+name = "sqrsl"
+status = ["identical"]
+tokens_differing = 0
+lines = 526
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/linpack/sqrsl.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/linpack/sqrsl.h:identical:0"]
+
+[[class]]
+name = "srot"
+status = ["identical"]
+tokens_differing = 0
+lines = 116
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/srot.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/srot.h:identical:0"]
+
+[[class]]
+name = "srotg"
+status = ["identical"]
+tokens_differing = 0
+lines = 103
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/srotg.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/srotg.h:identical:0"]
+
+[[class]]
+name = "sscal"
+status = ["identical"]
+tokens_differing = 0
+lines = 122
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/sscal.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/sscal.h:identical:0"]
+
+[[class]]
+name = "ssvdc"
+status = ["identical"]
+tokens_differing = 0
+lines = 1057
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/linpack/ssvdc.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/linpack/ssvdc.h:identical:0"]
+
+[[class]]
+name = "sswap"
+status = ["identical"]
+tokens_differing = 0
+lines = 155
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/sswap.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/sswap.h:identical:0"]
+
+[[class]]
+name = "stdint"
+status = ["absent"]
+tokens_differing = 0
+lines = 259
+review = "absent-in-5.4.5"
+files = ["Modules/ThirdParty/GDCM/src/gdcm/Utilities/C99/stdint.h:absent:-1"]
+
+[[class]]
+name = "stgsja"
+status = ["identical"]
+tokens_differing = 0
+lines = 30
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/single/stgsja.h:identical:0"]
+
+[[class]]
+name = "time"
+status = ["differs"]
+tokens_differing = 3
+lines = 48
+review = "not-read"
+files = ["Modules/ThirdParty/VNL/src/vxl/vcl/vcl_sys/time.h:differs:3"]
+
+[[class]]
+name = "tql1"
+status = ["identical"]
+tokens_differing = 0
+lines = 303
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/eispack/tql1.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/eispack/tql1.h:identical:0"]
+
+[[class]]
+name = "tql2"
+status = ["identical"]
+tokens_differing = 0
+lines = 365
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/eispack/tql2.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/eispack/tql2.h:identical:0"]
+
+[[class]]
+name = "trapezod"
+status = ["identical"]
+tokens_differing = 0
+lines = 14
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/mathews/trapezod.h:identical:0"]
+
+[[class]]
+name = "tred1"
+status = ["identical"]
+tokens_differing = 0
+lines = 300
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/eispack/tred1.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/eispack/tred1.h:identical:0"]
+
+[[class]]
+name = "tred2"
+status = ["identical"]
+tokens_differing = 0
+lines = 376
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/eispack/tred2.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/eispack/tred2.h:identical:0"]
+
+[[class]]
+name = "triangle"
+status = ["absent"]
+tokens_differing = 0
+lines = 16309
+review = "absent-in-5.4.5"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/triangle.c:absent:-1", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/triangle.h:absent:-1"]
+
+[[class]]
+name = "types"
+status = ["identical"]
+tokens_differing = 0
+lines = 9
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/vcl/vcl_sys/types.h:identical:0"]
+
+[[class]]
+name = "urand"
+status = ["identical"]
+tokens_differing = 0
+lines = 3
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/laso/urand.h:identical:0"]
+
+[[class]]
+name = "v3p_f2c"
+status = ["differs"]
+tokens_differing = 1
+lines = 78
+review = "not-read"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/v3p_f2c.h:differs:1"]
+
+[[class]]
+name = "v3p_f2c_mangle"
+status = ["identical"]
+tokens_differing = 0
+lines = 73
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/v3p_f2c_mangle.h:identical:0"]
+
+[[class]]
+name = "v3p_f2c_original"
+status = ["identical"]
+tokens_differing = 0
+lines = 222
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/v3p_f2c_original.h:identical:0"]
+
+[[class]]
+name = "v3p_f2c_unmangle"
+status = ["identical"]
+tokens_differing = 0
+lines = 73
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/v3p_f2c_unmangle.h:identical:0"]
+
+[[class]]
+name = "v3p_netlib"
+status = ["identical"]
+tokens_differing = 0
+lines = 49
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/v3p_netlib.h:identical:0"]
+
+[[class]]
+name = "v3p_netlib_mangle"
+status = ["differs"]
+tokens_differing = 4
+lines = 379
+review = "not-read"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/v3p_netlib_mangle.h:differs:4"]
+
+[[class]]
+name = "v3p_netlib_prototypes"
+status = ["same-mechanical"]
+tokens_differing = 0
+lines = 280
+review = "no-code-change"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/v3p_netlib_prototypes.h:same-mechanical:0"]
+
+[[class]]
+name = "v3p_netlib_unmangle"
+status = ["differs"]
+tokens_differing = 3
+lines = 370
+review = "not-read"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/v3p_netlib_unmangle.h:differs:3"]
+
+[[class]]
+name = "vcl_algorithm"
+status = ["differs"]
+tokens_differing = 64
+lines = 7
+review = "not-read"
+files = ["Modules/ThirdParty/VNL/src/vxl/vcl/vcl_algorithm.h:differs:64"]
+
+[[class]]
+name = "vcl_cassert"
+status = ["differs"]
+tokens_differing = 64
+lines = 7
+review = "not-read"
+files = ["Modules/ThirdParty/VNL/src/vxl/vcl/vcl_cassert.h:differs:64"]
+
+[[class]]
+name = "vcl_cfloat"
+status = ["differs"]
+tokens_differing = 64
+lines = 7
+review = "not-read"
+files = ["Modules/ThirdParty/VNL/src/vxl/vcl/vcl_cfloat.h:differs:64"]
+
+[[class]]
+name = "vcl_cmath"
+status = ["differs"]
+tokens_differing = 64
+lines = 7
+review = "not-read"
+files = ["Modules/ThirdParty/VNL/src/vxl/vcl/vcl_cmath.h:differs:64"]
+
+[[class]]
+name = "vcl_compiler"
+status = ["absent"]
+tokens_differing = 0
+lines = 993
+review = "absent-in-5.4.5"
+files = ["Modules/ThirdParty/VNL/src/vxl/vcl/vcl_compiler.h:absent:-1"]
+
+[[class]]
+name = "vcl_cstdlib"
+status = ["differs"]
+tokens_differing = 64
+lines = 7
+review = "not-read"
+files = ["Modules/ThirdParty/VNL/src/vxl/vcl/vcl_cstdlib.h:differs:64"]
+
+[[class]]
+name = "vcl_deprecated"
+status = ["differs", "same-mechanical"]
+tokens_differing = 98
+lines = 80
+review = "not-read"
+files = ["Modules/ThirdParty/VNL/src/vxl/vcl/vcl_deprecated.cxx:same-mechanical:0", "Modules/ThirdParty/VNL/src/vxl/vcl/vcl_deprecated.h:differs:98"]
+
+[[class]]
+name = "vcl_fstream"
+status = ["differs"]
+tokens_differing = 64
+lines = 7
+review = "not-read"
+files = ["Modules/ThirdParty/VNL/src/vxl/vcl/vcl_fstream.h:differs:64"]
+
+[[class]]
+name = "vcl_iomanip"
+status = ["differs"]
+tokens_differing = 64
+lines = 7
+review = "not-read"
+files = ["Modules/ThirdParty/VNL/src/vxl/vcl/vcl_iomanip.h:differs:64"]
+
+[[class]]
+name = "vcl_iostream"
+status = ["differs"]
+tokens_differing = 64
+lines = 7
+review = "not-read"
+files = ["Modules/ThirdParty/VNL/src/vxl/vcl/vcl_iostream.h:differs:64"]
+
+[[class]]
+name = "vcl_limits"
+status = ["differs"]
+tokens_differing = 64
+lines = 7
+review = "not-read"
+files = ["Modules/ThirdParty/VNL/src/vxl/vcl/vcl_limits.h:differs:64"]
+
+[[class]]
+name = "vnl_alloc"
+status = ["differs", "same-mechanical"]
+tokens_differing = 14
+lines = 269
+review = "not-read"
+files = ["Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_alloc.cxx:same-mechanical:0", "Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_alloc.h:differs:14"]
+
+[[class]]
+name = "vnl_bignum"
+status = ["differs"]
+tokens_differing = 978
+lines = 1748
+review = "not-read"
+files = ["Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_bignum.cxx:differs:633", "Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_bignum.h:differs:345"]
+
+[[class]]
+name = "vnl_bracket_minimum"
+status = ["differs", "same-mechanical"]
+tokens_differing = 8
+lines = 184
+review = "mechanical"
+files = ["Modules/ThirdParty/VNL/src/vxl/core/vnl/algo/vnl_bracket_minimum.cxx:same-mechanical:0", "Modules/ThirdParty/VNL/src/vxl/core/vnl/algo/vnl_bracket_minimum.h:differs:8"]
+
+[[class]]
+name = "vnl_brent"
+status = ["differs", "same-mechanical"]
+tokens_differing = 8
+lines = 131
+review = "mechanical"
+files = ["Modules/ThirdParty/VNL/src/vxl/core/vnl/algo/vnl_brent.cxx:same-mechanical:0", "Modules/ThirdParty/VNL/src/vxl/core/vnl/algo/vnl_brent.h:differs:8"]
+
+[[class]]
+name = "vnl_brent_minimizer"
+status = ["differs"]
+tokens_differing = 15
+lines = 384
+review = "mechanical"
+note = "an unused constant removed"
+files = ["Modules/ThirdParty/VNL/src/vxl/core/vnl/algo/vnl_brent_minimizer.cxx:differs:7", "Modules/ThirdParty/VNL/src/vxl/core/vnl/algo/vnl_brent_minimizer.h:differs:8"]
+
+[[class]]
+name = "vnl_c_vector"
+status = ["differs"]
+tokens_differing = 103
+lines = 618
+review = "mechanical"
+note = "normalize's typedef moved into the class; dead #else branch removed"
+files = ["Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_c_vector.h:differs:9", "Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_c_vector.hxx:differs:94"]
+
+[[class]]
+name = "vnl_cholesky"
+status = ["differs", "same-mechanical"]
+tokens_differing = 12
+lines = 241
+review = "mechanical"
+note = "copy operations deleted"
+files = ["Modules/ThirdParty/VNL/src/vxl/core/vnl/algo/vnl_cholesky.cxx:same-mechanical:0", "Modules/ThirdParty/VNL/src/vxl/core/vnl/algo/vnl_cholesky.h:differs:12"]
+
+[[class]]
+name = "vnl_complex"
+status = ["differs"]
+tokens_differing = 434
+lines = 79
+review = "not-read"
+files = ["Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_complex.h:differs:434"]
+
+[[class]]
+name = "vnl_complex_eigensystem"
+status = ["same-mechanical"]
+tokens_differing = 0
+lines = 184
+review = "no-code-change"
+files = ["Modules/ThirdParty/VNL/src/vxl/core/vnl/algo/vnl_complex_eigensystem.cxx:same-mechanical:0", "Modules/ThirdParty/VNL/src/vxl/core/vnl/algo/vnl_complex_eigensystem.h:same-mechanical:0"]
+
+[[class]]
+name = "vnl_complex_traits"
+status = ["differs"]
+tokens_differing = 46
+lines = 120
+review = "not-read"
+files = ["Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_complex_traits.h:differs:46"]
+
+[[class]]
+name = "vnl_complexify"
+status = ["differs"]
+tokens_differing = 70
+lines = 168
+review = "not-read"
+files = ["Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_complexify.h:differs:70"]
+
+[[class]]
+name = "vnl_copy"
+status = ["differs"]
+tokens_differing = 9
+lines = 121
+review = "not-read"
+files = ["Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_copy.cxx:differs:1", "Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_copy.h:differs:8"]
+
+[[class]]
+name = "vnl_cost_function"
+status = ["differs", "same-mechanical"]
+tokens_differing = 18
+lines = 152
+review = "not-read"
+files = ["Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_cost_function.cxx:same-mechanical:0", "Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_cost_function.h:differs:18"]
+
+[[class]]
+name = "vnl_det"
+status = ["identical", "same-mechanical"]
+tokens_differing = 0
+lines = 115
+review = "no-code-change"
+files = ["Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_det.h:same-mechanical:0", "Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_det.hxx:identical:0"]
+
+[[class]]
+name = "vnl_determinant"
+status = ["identical", "same-mechanical"]
+tokens_differing = 0
+lines = 210
+review = "no-code-change"
+files = ["Modules/ThirdParty/VNL/src/vxl/core/vnl/algo/vnl_determinant.cxx:same-mechanical:0", "Modules/ThirdParty/VNL/src/vxl/core/vnl/algo/vnl_determinant.h:identical:0", "Modules/ThirdParty/VNL/src/vxl/core/vnl/algo/vnl_determinant.hxx:same-mechanical:0"]
+
+[[class]]
+name = "vnl_diag_matrix"
+status = ["differs"]
+tokens_differing = 461
+lines = 427
+review = "not-read"
+files = ["Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_diag_matrix.h:differs:261", "Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_diag_matrix.hxx:differs:200"]
+
+[[class]]
+name = "vnl_diag_matrix_fixed"
+status = ["differs"]
+tokens_differing = 311
+lines = 399
+review = "not-read"
+files = ["Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_diag_matrix_fixed.h:differs:161", "Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_diag_matrix_fixed.hxx:differs:150"]
+
+[[class]]
+name = "vnl_error"
+status = ["differs"]
+tokens_differing = 12
+lines = 135
+review = "not-read"
+files = ["Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_error.cxx:differs:2", "Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_error.h:differs:10"]
+
+[[class]]
+name = "vnl_fastops"
+status = ["differs"]
+tokens_differing = 10
+lines = 793
+review = "not-read"
+files = ["Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_fastops.cxx:differs:2", "Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_fastops.h:differs:8"]
+
+[[class]]
+name = "vnl_fft"
+status = ["differs", "same-mechanical"]
+tokens_differing = 8
+lines = 88
+review = "not-read"
+files = ["Modules/ThirdParty/VNL/src/vxl/core/vnl/algo/vnl_fft.cxx:same-mechanical:0", "Modules/ThirdParty/VNL/src/vxl/core/vnl/algo/vnl_fft.h:differs:8"]
+
+[[class]]
+name = "vnl_fft_1d"
+status = ["differs", "identical"]
+tokens_differing = 8
+lines = 85
+review = "not-read"
+files = ["Modules/ThirdParty/VNL/src/vxl/core/vnl/algo/vnl_fft_1d.h:differs:8", "Modules/ThirdParty/VNL/src/vxl/core/vnl/algo/vnl_fft_1d.hxx:identical:0"]
+
+[[class]]
+name = "vnl_fft_base"
+status = ["differs", "same-mechanical"]
+tokens_differing = 12
+lines = 92
+review = "not-read"
+files = ["Modules/ThirdParty/VNL/src/vxl/core/vnl/algo/vnl_fft_base.h:differs:12", "Modules/ThirdParty/VNL/src/vxl/core/vnl/algo/vnl_fft_base.hxx:same-mechanical:0"]
+
+[[class]]
+name = "vnl_fft_prime_factors"
+status = ["differs"]
+tokens_differing = 8
+lines = 112
+review = "mechanical"
+files = ["Modules/ThirdParty/VNL/src/vxl/core/vnl/algo/vnl_fft_prime_factors.h:differs:7", "Modules/ThirdParty/VNL/src/vxl/core/vnl/algo/vnl_fft_prime_factors.hxx:differs:1"]
+
+[[class]]
+name = "vnl_fit_parabola"
+status = ["identical"]
+tokens_differing = 0
+lines = 31
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/core/vnl/algo/vnl_fit_parabola.h:identical:0"]
+
+[[class]]
+name = "vnl_fortran_copy"
+status = ["differs", "identical"]
+tokens_differing = 8
+lines = 89
+review = "not-read"
+files = ["Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_fortran_copy.h:differs:8", "Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_fortran_copy.hxx:identical:0"]
+
+[[class]]
+name = "vnl_fwd"
+status = ["same-mechanical"]
+tokens_differing = 0
+lines = 72
+review = "no-code-change"
+files = ["Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_fwd.h:same-mechanical:0"]
+
+[[class]]
+name = "vnl_imag"
+status = ["same-mechanical"]
+tokens_differing = 0
+lines = 104
+review = "no-code-change"
+files = ["Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_imag.h:same-mechanical:0"]
+
+[[class]]
+name = "vnl_inverse"
+status = ["differs"]
+tokens_differing = 6
+lines = 350
+review = "not-read"
+files = ["Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_inverse.h:differs:6"]
+
+[[class]]
+name = "vnl_math"
+status = ["differs"]
+tokens_differing = 3617
+lines = 1064
+review = "not-read"
+files = ["Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_math.cxx:differs:1977", "Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_math.h:differs:1640"]
+
+[[class]]
+name = "vnl_matlab_print"
+status = ["differs"]
+tokens_differing = 303
+lines = 297
+review = "not-read"
+files = ["Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_matlab_print.h:differs:14", "Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_matlab_print.hxx:differs:289"]
+
+[[class]]
+name = "vnl_matlab_print_format"
+status = ["identical", "same-mechanical"]
+tokens_differing = 0
+lines = 88
+review = "no-code-change"
+files = ["Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_matlab_print_format.cxx:same-mechanical:0", "Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_matlab_print_format.h:identical:0"]
+
+[[class]]
+name = "vnl_matlab_print_scalar"
+status = ["differs", "same-mechanical"]
+tokens_differing = 1
+lines = 291
+review = "not-read"
+files = ["Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_matlab_print_scalar.cxx:same-mechanical:0", "Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_matlab_print_scalar.h:differs:1"]
+
+[[class]]
+name = "vnl_matrix"
+status = ["differs"]
+tokens_differing = 2871
+lines = 2411
+review = "refactored"
+note = "57 of 64 function definitions identical after normalisation; the others are construction, destruction, set_size, set_identity and the unary minus (now typed signed_t, the same values for float and double)"
+files = ["Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_matrix.h:differs:1217", "Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_matrix.hxx:differs:1654"]
+
+[[class]]
+name = "vnl_matrix_fixed"
+status = ["differs"]
+tokens_differing = 983
+lines = 1922
+review = "refactored"
+note = "55 of 56 definitions identical after normalisation (itk_functions.py)"
+files = ["Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_matrix_fixed.h:differs:536", "Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_matrix_fixed.hxx:differs:447"]
+
+[[class]]
+name = "vnl_matrix_inverse"
+status = ["differs"]
+tokens_differing = 133
+lines = 76
+review = "mechanical"
+note = "instantiation macros dropped"
+files = ["Modules/ThirdParty/VNL/src/vxl/core/vnl/algo/vnl_matrix_inverse.h:differs:84", "Modules/ThirdParty/VNL/src/vxl/core/vnl/algo/vnl_matrix_inverse.hxx:differs:49"]
+
+[[class]]
+name = "vnl_matrix_ref"
+status = ["differs"]
+tokens_differing = 210
+lines = 100
+review = "not-read"
+files = ["Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_matrix_ref.h:differs:210"]
+
+[[class]]
+name = "vnl_netlib"
+status = ["identical"]
+tokens_differing = 0
+lines = 67
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/core/vnl/algo/vnl_netlib.h:identical:0"]
+
+[[class]]
+name = "vnl_nonlinear_minimizer"
+status = ["differs"]
+tokens_differing = 108
+lines = 256
+review = "not-read"
+files = ["Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_nonlinear_minimizer.cxx:differs:59", "Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_nonlinear_minimizer.h:differs:49"]
+
+[[class]]
+name = "vnl_numeric_traits"
+status = ["differs"]
+tokens_differing = 951
+lines = 595
+review = "not-read"
+files = ["Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_numeric_traits.cxx:differs:393", "Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_numeric_traits.h:differs:558"]
+
+[[class]]
+name = "vnl_powell"
+status = ["differs", "same-mechanical"]
+tokens_differing = 8
+lines = 235
+review = "mechanical"
+files = ["Modules/ThirdParty/VNL/src/vxl/core/vnl/algo/vnl_powell.cxx:same-mechanical:0", "Modules/ThirdParty/VNL/src/vxl/core/vnl/algo/vnl_powell.h:differs:8"]
+
+[[class]]
+name = "vnl_qr"
+status = ["differs"]
+tokens_differing = 30
+lines = 402
+review = "mechanical"
+note = "0 spelled nullptr; an instantiation macro dropped"
+files = ["Modules/ThirdParty/VNL/src/vxl/core/vnl/algo/vnl_qr.h:differs:10", "Modules/ThirdParty/VNL/src/vxl/core/vnl/algo/vnl_qr.hxx:differs:20"]
+
+[[class]]
+name = "vnl_random"
+status = ["differs"]
+tokens_differing = 35
+lines = 369
+review = "mechanical"
+note = "the default constructor's initialisers moved into the header (TP-01)"
+files = ["Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_random.cxx:differs:16", "Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_random.h:differs:19"]
+
+[[class]]
+name = "vnl_rational"
+status = ["differs"]
+tokens_differing = 967
+lines = 557
+review = "not-read"
+files = ["Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_rational.cxx:differs:135", "Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_rational.h:differs:832"]
+
+[[class]]
+name = "vnl_real"
+status = ["same-mechanical"]
+tokens_differing = 0
+lines = 103
+review = "no-code-change"
+files = ["Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_real.h:same-mechanical:0"]
+
+[[class]]
+name = "vnl_real_eigensystem"
+status = ["differs", "same-mechanical"]
+tokens_differing = 8
+lines = 115
+review = "mechanical"
+files = ["Modules/ThirdParty/VNL/src/vxl/core/vnl/algo/vnl_real_eigensystem.cxx:same-mechanical:0", "Modules/ThirdParty/VNL/src/vxl/core/vnl/algo/vnl_real_eigensystem.h:differs:8"]
+
+[[class]]
+name = "vnl_real_polynomial"
+status = ["differs"]
+tokens_differing = 9
+lines = 382
+review = "not-read"
+files = ["Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_real_polynomial.cxx:differs:1", "Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_real_polynomial.h:differs:8"]
+
+[[class]]
+name = "vnl_sse"
+status = ["differs"]
+tokens_differing = 6285
+lines = 1103
+review = "refactored"
+note = "VNL_CONFIG_ENABLE_SSE2 is 0 in FreeSurfer's ITK configuration, so 4.13.2 runs the generic kernels; 5.4.5 keeps only those: dot_product, matrix_x_vector, vector_x_matrix, sum, min, max, arg_min, arg_max, element_product and euclid_dist_sq are identical after normalisation (the SSE specialisations were removed)"
+files = ["Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_sse.h:differs:6285"]
+
+[[class]]
+name = "vnl_svd"
+status = ["differs"]
+tokens_differing = 27
+lines = 641
+review = "mechanical"
+note = "the 'warned' flag became an atomic flag"
+files = ["Modules/ThirdParty/VNL/src/vxl/core/vnl/algo/vnl_svd.h:differs:10", "Modules/ThirdParty/VNL/src/vxl/core/vnl/algo/vnl_svd.hxx:differs:17"]
+
+[[class]]
+name = "vnl_sym_matrix"
+status = ["differs"]
+tokens_differing = 36
+lines = 427
+review = "not-read"
+files = ["Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_sym_matrix.h:differs:35", "Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_sym_matrix.hxx:differs:1"]
+
+[[class]]
+name = "vnl_symmetric_eigensystem"
+status = ["differs", "same-mechanical"]
+tokens_differing = 9
+lines = 386
+review = "mechanical"
+files = ["Modules/ThirdParty/VNL/src/vxl/core/vnl/algo/vnl_symmetric_eigensystem.h:differs:9", "Modules/ThirdParty/VNL/src/vxl/core/vnl/algo/vnl_symmetric_eigensystem.hxx:same-mechanical:0"]
+
+[[class]]
+name = "vnl_tag"
+status = ["absent"]
+tokens_differing = 0
+lines = 19
+review = "absent-in-5.4.5"
+files = ["Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_tag.h:absent:-1"]
+
+[[class]]
+name = "vnl_transpose"
+status = ["differs"]
+tokens_differing = 111
+lines = 78
+review = "not-read"
+files = ["Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_transpose.h:differs:111"]
+
+[[class]]
+name = "vnl_unary_function"
+status = ["differs", "same-mechanical"]
+tokens_differing = 8
+lines = 94
+review = "not-read"
+files = ["Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_unary_function.h:differs:8", "Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_unary_function.hxx:same-mechanical:0"]
+
+[[class]]
+name = "vnl_vector"
+status = ["differs"]
+tokens_differing = 3030
+lines = 1467
+review = "refactored"
+note = "28 of 50 definitions identical; construction changed and 4.13.2's tagged constructors (vnl_tag_add, _sub, _mul, _div) gave way to operators in the header; element-wise arithmetic and the products through vnl_sse are the same"
+files = ["Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_vector.h:differs:1407", "Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_vector.hxx:differs:1623"]
+
+[[class]]
+name = "vnl_vector_fixed"
+status = ["differs"]
+tokens_differing = 716
+lines = 1048
+review = "mechanical"
+note = "7 of 7 out-of-line definitions identical after normalisation"
+files = ["Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_vector_fixed.h:differs:425", "Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_vector_fixed.hxx:differs:291"]
+
+[[class]]
+name = "vnl_vector_ref"
+status = ["differs"]
+tokens_differing = 151
+lines = 97
+review = "not-read"
+files = ["Modules/ThirdParty/VNL/src/vxl/core/vnl/vnl_vector_ref.h:differs:151"]
+
+[[class]]
+name = "vxl_version"
+status = ["differs"]
+tokens_differing = 15
+lines = 56
+review = "not-read"
+files = ["Modules/ThirdParty/VNL/src/vxl/core/vxl_version.h:differs:15"]
+
+[[class]]
+name = "wsfe"
+status = ["identical"]
+tokens_differing = 0
+lines = 78
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/libf2c/wsfe.c:identical:0"]
+
+[[class]]
+name = "xerbla"
+status = ["identical"]
+tokens_differing = 0
+lines = 73
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/xerbla.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/xerbla.h:identical:0"]
+
+[[class]]
+name = "z_abs"
+status = ["identical"]
+tokens_differing = 0
+lines = 18
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/libf2c/z_abs.c:identical:0"]
+
+[[class]]
+name = "z_cos"
+status = ["identical"]
+tokens_differing = 0
+lines = 21
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/libf2c/z_cos.c:identical:0"]
+
+[[class]]
+name = "z_div"
+status = ["identical"]
+tokens_differing = 0
+lines = 50
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/libf2c/z_div.c:identical:0"]
+
+[[class]]
+name = "z_sqrt"
+status = ["identical"]
+tokens_differing = 0
+lines = 35
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/libf2c/z_sqrt.c:identical:0"]
+
+[[class]]
+name = "zaxpy"
+status = ["identical"]
+tokens_differing = 0
+lines = 124
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/zaxpy.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/zaxpy.h:identical:0"]
+
+[[class]]
+name = "zcopy"
+status = ["identical"]
+tokens_differing = 0
+lines = 109
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/zcopy.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/zcopy.h:identical:0"]
+
+[[class]]
+name = "zdotc"
+status = ["identical"]
+tokens_differing = 0
+lines = 128
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/zdotc.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/zdotc.h:identical:0"]
+
+[[class]]
+name = "zdotu"
+status = ["identical"]
+tokens_differing = 0
+lines = 125
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/zdotu.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/zdotu.h:identical:0"]
+
+[[class]]
+name = "zdrot"
+status = ["identical"]
+tokens_differing = 0
+lines = 9
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/zdrot.h:identical:0"]
+
+[[class]]
+name = "zdrscl"
+status = ["identical"]
+tokens_differing = 0
+lines = 6
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zdrscl.h:identical:0"]
+
+[[class]]
+name = "zdscal"
+status = ["identical"]
+tokens_differing = 0
+lines = 103
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/zdscal.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/zdscal.h:identical:0"]
+
+[[class]]
+name = "zgebak"
+status = ["identical"]
+tokens_differing = 0
+lines = 339
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zgebak.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zgebak.h:identical:0"]
+
+[[class]]
+name = "zgebal"
+status = ["identical"]
+tokens_differing = 0
+lines = 580
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zgebal.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zgebal.h:identical:0"]
+
+[[class]]
+name = "zgecon"
+status = ["identical"]
+tokens_differing = 0
+lines = 12
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zgecon.h:identical:0"]
+
+[[class]]
+name = "zgees"
+status = ["identical"]
+tokens_differing = 0
+lines = 19
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zgees.h:identical:0"]
+
+[[class]]
+name = "zgeev"
+status = ["identical"]
+tokens_differing = 0
+lines = 735
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zgeev.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zgeev.h:identical:0"]
+
+[[class]]
+name = "zgehd2"
+status = ["identical"]
+tokens_differing = 0
+lines = 250
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zgehd2.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zgehd2.h:identical:0"]
+
+[[class]]
+name = "zgehrd"
+status = ["identical"]
+tokens_differing = 0
+lines = 428
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zgehrd.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zgehrd.h:identical:0"]
+
+[[class]]
+name = "zgemm"
+status = ["differs", "identical"]
+tokens_differing = 3
+lines = 946
+review = "mechanical"
+note = "an unused local removed"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/zgemm.c:differs:3", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/zgemm.h:identical:0"]
+
+[[class]]
+name = "zgemv"
+status = ["identical"]
+tokens_differing = 0
+lines = 574
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/zgemv.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/zgemv.h:identical:0"]
+
+[[class]]
+name = "zgeqr2"
+status = ["identical"]
+tokens_differing = 0
+lines = 9
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zgeqr2.h:identical:0"]
+
+[[class]]
+name = "zgeqrf"
+status = ["identical"]
+tokens_differing = 0
+lines = 10
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zgeqrf.h:identical:0"]
+
+[[class]]
+name = "zgerc"
+status = ["identical"]
+tokens_differing = 0
+lines = 294
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/zgerc.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/zgerc.h:identical:0"]
+
+[[class]]
+name = "zgeru"
+status = ["identical"]
+tokens_differing = 0
+lines = 11
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/zgeru.h:identical:0"]
+
+[[class]]
+name = "zgesc2"
+status = ["identical"]
+tokens_differing = 0
+lines = 9
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zgesc2.h:identical:0"]
+
+[[class]]
+name = "zgetc2"
+status = ["identical"]
+tokens_differing = 0
+lines = 8
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zgetc2.h:identical:0"]
+
+[[class]]
+name = "zggbak"
+status = ["identical"]
+tokens_differing = 0
+lines = 15
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zggbak.h:identical:0"]
+
+[[class]]
+name = "zggbal"
+status = ["identical"]
+tokens_differing = 0
+lines = 15
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zggbal.h:identical:0"]
+
+[[class]]
+name = "zgges"
+status = ["identical"]
+tokens_differing = 0
+lines = 27
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zgges.h:identical:0"]
+
+[[class]]
+name = "zgghrd"
+status = ["identical"]
+tokens_differing = 0
+lines = 18
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zgghrd.h:identical:0"]
+
+[[class]]
+name = "zhgeqz"
+status = ["identical"]
+tokens_differing = 0
+lines = 25
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zhgeqz.h:identical:0"]
+
+[[class]]
+name = "zhseqr"
+status = ["identical"]
+tokens_differing = 0
+lines = 890
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zhseqr.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zhseqr.h:identical:0"]
+
+[[class]]
+name = "zlacgv"
+status = ["identical"]
+tokens_differing = 0
+lines = 126
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zlacgv.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zlacgv.h:identical:0"]
+
+[[class]]
+name = "zlacn2"
+status = ["identical"]
+tokens_differing = 0
+lines = 8
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zlacn2.h:identical:0"]
+
+[[class]]
+name = "zlacpy"
+status = ["identical"]
+tokens_differing = 0
+lines = 181
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zlacpy.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zlacpy.h:identical:0"]
+
+[[class]]
+name = "zladiv"
+status = ["identical"]
+tokens_differing = 0
+lines = 96
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zladiv.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zladiv.h:identical:0"]
+
+[[class]]
+name = "zlahqr"
+status = ["identical"]
+tokens_differing = 0
+lines = 771
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zlahqr.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zlahqr.h:identical:0"]
+
+[[class]]
+name = "zlahrd"
+status = ["identical"]
+tokens_differing = 0
+lines = 360
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zlahrd.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zlahrd.h:identical:0"]
+
+[[class]]
+name = "zlange"
+status = ["identical"]
+tokens_differing = 0
+lines = 271
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zlange.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zlange.h:identical:0"]
+
+[[class]]
+name = "zlanhs"
+status = ["identical"]
+tokens_differing = 0
+lines = 276
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zlanhs.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zlanhs.h:identical:0"]
+
+[[class]]
+name = "zlarf"
+status = ["identical"]
+tokens_differing = 0
+lines = 200
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zlarf.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zlarf.h:identical:0"]
+
+[[class]]
+name = "zlarfb"
+status = ["identical"]
+tokens_differing = 0
+lines = 1030
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zlarfb.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zlarfb.h:identical:0"]
+
+[[class]]
+name = "zlarfg"
+status = ["identical"]
+tokens_differing = 0
+lines = 272
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zlarfg.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zlarfg.h:identical:0"]
+
+[[class]]
+name = "zlarft"
+status = ["identical"]
+tokens_differing = 0
+lines = 398
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zlarft.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zlarft.h:identical:0"]
+
+[[class]]
+name = "zlarfx"
+status = ["identical"]
+tokens_differing = 0
+lines = 2557
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zlarfx.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zlarfx.h:identical:0"]
+
+[[class]]
+name = "zlartg"
+status = ["identical"]
+tokens_differing = 0
+lines = 7
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zlartg.h:identical:0"]
+
+[[class]]
+name = "zlascl"
+status = ["identical"]
+tokens_differing = 0
+lines = 509
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zlascl.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zlascl.h:identical:0"]
+
+[[class]]
+name = "zlaset"
+status = ["identical"]
+tokens_differing = 0
+lines = 219
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zlaset.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zlaset.h:identical:0"]
+
+[[class]]
+name = "zlassq"
+status = ["identical"]
+tokens_differing = 0
+lines = 185
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zlassq.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zlassq.h:identical:0"]
+
+[[class]]
+name = "zlaswp"
+status = ["identical"]
+tokens_differing = 0
+lines = 9
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zlaswp.h:identical:0"]
+
+[[class]]
+name = "zlatdf"
+status = ["identical"]
+tokens_differing = 0
+lines = 11
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zlatdf.h:identical:0"]
+
+[[class]]
+name = "zlatrs"
+status = ["identical"]
+tokens_differing = 0
+lines = 1587
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zlatrs.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zlatrs.h:identical:0"]
+
+[[class]]
+name = "zqrdc"
+status = ["identical"]
+tokens_differing = 0
+lines = 10
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/linpack/zqrdc.h:identical:0"]
+
+[[class]]
+name = "zqrsl"
+status = ["identical"]
+tokens_differing = 0
+lines = 14
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/linpack/zqrsl.h:identical:0"]
+
+[[class]]
+name = "zrot"
+status = ["identical"]
+tokens_differing = 0
+lines = 9
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zrot.h:identical:0"]
+
+[[class]]
+name = "zscal"
+status = ["identical"]
+tokens_differing = 0
+lines = 100
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/zscal.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/zscal.h:identical:0"]
+
+[[class]]
+name = "zsvdc"
+status = ["identical"]
+tokens_differing = 0
+lines = 12
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/linpack/zsvdc.h:identical:0"]
+
+[[class]]
+name = "zswap"
+status = ["identical"]
+tokens_differing = 0
+lines = 121
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/zswap.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/zswap.h:identical:0"]
+
+[[class]]
+name = "ztgex2"
+status = ["identical"]
+tokens_differing = 0
+lines = 15
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/ztgex2.h:identical:0"]
+
+[[class]]
+name = "ztgexc"
+status = ["identical"]
+tokens_differing = 0
+lines = 16
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/ztgexc.h:identical:0"]
+
+[[class]]
+name = "ztgsen"
+status = ["identical"]
+tokens_differing = 0
+lines = 26
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/ztgsen.h:identical:0"]
+
+[[class]]
+name = "ztgsy2"
+status = ["identical"]
+tokens_differing = 0
+lines = 23
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/ztgsy2.h:identical:0"]
+
+[[class]]
+name = "ztgsyl"
+status = ["identical"]
+tokens_differing = 0
+lines = 25
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/ztgsyl.h:identical:0"]
+
+[[class]]
+name = "ztrevc"
+status = ["identical"]
+tokens_differing = 0
+lines = 717
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/ztrevc.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/ztrevc.h:identical:0"]
+
+[[class]]
+name = "ztrexc"
+status = ["identical"]
+tokens_differing = 0
+lines = 12
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/ztrexc.h:identical:0"]
+
+[[class]]
+name = "ztrmm"
+status = ["identical"]
+tokens_differing = 0
+lines = 934
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/ztrmm.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/ztrmm.h:identical:0"]
+
+[[class]]
+name = "ztrmv"
+status = ["identical"]
+tokens_differing = 0
+lines = 752
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/ztrmv.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/ztrmv.h:identical:0"]
+
+[[class]]
+name = "ztrsen"
+status = ["identical"]
+tokens_differing = 0
+lines = 19
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/ztrsen.h:identical:0"]
+
+[[class]]
+name = "ztrsv"
+status = ["identical"]
+tokens_differing = 0
+lines = 722
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/ztrsv.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/blas/ztrsv.h:identical:0"]
+
+[[class]]
+name = "ztrsyl"
+status = ["identical"]
+tokens_differing = 0
+lines = 17
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/ztrsyl.h:identical:0"]
+
+[[class]]
+name = "zung2r"
+status = ["identical"]
+tokens_differing = 0
+lines = 246
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zung2r.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zung2r.h:identical:0"]
+
+[[class]]
+name = "zunghr"
+status = ["identical"]
+tokens_differing = 0
+lines = 312
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zunghr.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zunghr.h:identical:0"]
+
+[[class]]
+name = "zungqr"
+status = ["identical"]
+tokens_differing = 0
+lines = 391
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zungqr.c:identical:0", "Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zungqr.h:identical:0"]
+
+[[class]]
+name = "zunm2r"
+status = ["identical"]
+tokens_differing = 0
+lines = 16
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zunm2r.h:identical:0"]
+
+[[class]]
+name = "zunmqr"
+status = ["identical"]
+tokens_differing = 0
+lines = 17
+review = "identical"
+files = ["Modules/ThirdParty/VNL/src/vxl/v3p/netlib/lapack/complex16/zunmqr.h:identical:0"]

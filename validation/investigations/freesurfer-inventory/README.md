@@ -148,3 +148,20 @@ Their results are in `docs/freesurfer/` (closed too).
       scripts/orchestration/boxed.sh 12 python -P validation/investigations/freesurfer-inventory/thread_check.py \
           --fs-home <package root> --license <licence file> --runs <workspace>/oracles/freesurfer-8.2.0/runs \
           --jobs validation/investigations/freesurfer-inventory/thread_jobs.toml --out <scratch>/threads
+- `waves.py`: sub-task 6 (relay 6), the waves and the layout. Puts every reached file of the core
+  call graph in a module (a piece of a crate) and every program in a wave and a crate, checks the
+  user's order (shared programs, then the classic-only ones, the v8 networks as a parallel track)
+  and that no script comes before a program it runs, gives each reached function to the one queue
+  item that brings it (the program alone, else its module's item; earlier programs' option paths
+  into a later module wait for it) and cuts items to a budget of lines; counts each program's
+  recorded steps in the reference runs. Writes `docs/freesurfer/waves.toml` and the generated
+  tables of `waves.md` and `queue.md` (between their `<!-- waves.py: ... -->` markers):
+
+      python -P validation/investigations/freesurfer-inventory/waves.py \
+          docs/freesurfer/programs.toml docs/freesurfer/code.toml <core.json> \
+          --data docs/freesurfer/data-files.toml --tag <workspace>/tags/freesurfer-8.2.0 \
+          --runs <workspace>/oracles/freesurfer-8.2.0/runs --toml docs/freesurfer/waves.toml \
+          --markdown docs/freesurfer/waves.md --queue docs/freesurfer/queue.md
+
+  `<core.json>` is `callgraph.py --core --json` (about 11 MB, regenerated as code.md §6 says). It
+  exits 1 with `PROBLEM:` lines when a file has no module or a placement breaks a rule.

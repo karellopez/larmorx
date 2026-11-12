@@ -67,6 +67,35 @@ _PORT_TEXTS = [
 ]
 
 
+#: Corrections that change no value on the calls the pages show, and only warn there: what the
+#: default does, in the register's words. ANTS-36 (the register's row and section): `-r` without
+#: a mask does nothing in both modes, and a warning says so; its other half, an unreadable mask,
+#: is an error, which no worked example meets.
+WARNS = {"ANTS-36": "warns that `-r` does nothing without a mask"}
+
+_CORRECTS = re.compile(r"\bcorrects ((?:[A-Z]+-\d+)(?:, [A-Z]+-\d+)*)( \(\[register\]\([^)]*\)\))?")
+
+
+def warnings(s: str | None) -> str | None:
+    """A reason's "corrects ANTS-36, ANTS-40" said as it is: the corrections that change
+    values, and what the default does for those that only warn (:data:`WARNS`)."""
+    if not s:
+        return s
+
+    def rep(m: re.Match[str]) -> str:
+        ids = m.group(1).split(", ")
+        fixed = [i for i in ids if i not in WARNS]
+        warned = [i for i in ids if i in WARNS]
+        if not warned:
+            return m.group(0)
+        said = " and ".join(f"{WARNS[i]} ({i})" for i in warned)
+        if not fixed:
+            return f"{said}{m.group(2) or ''}"
+        return f"corrects {' and '.join(fixed)}{m.group(2) or ''} and {said}"
+
+    return _CORRECTS.sub(rep, s)
+
+
 def oracle(s: str | None) -> str | None:
     """A text with the oracle's words replaced (:data:`_ORACLE_TEXTS`)."""
     if not s:
@@ -409,7 +438,7 @@ def example(
         f["text"] = text(page, f["text"])
     ex["metrics_note"] = text(page, ex.get("metrics_note"))
     for d in ex["diffs"]:
-        d["reason"] = text(page, d.get("reason"))
+        d["reason"] = warnings(text(page, d.get("reason")))
     ex["provenance"] = [oracle(x) for x in ex.get("provenance") or []]
     if ex.get("poster", {}).get("caption"):
         ex["poster"]["caption"] = text(page, ex["poster"]["caption"], code=False)
@@ -589,9 +618,14 @@ def panel_shows(page: Page, ex: dict) -> tuple[str, list[str]]:
     if fix and fix["verdict"] == "bit-identical":
         parts.append("No correction by default changes this call.")
     elif fix and fix["verdict"] == "d13":
-        ids = re.findall(r"\b(?:ANTS|ITK)-\d+\b", fix.get("reason") or "")
-        named = " and ".join(dict.fromkeys(ids))
-        parts.append(f"Its default, `fix`, corrects {named} here.")
+        # "corrects" only for the corrections that change values on this call (WARNS)
+        ids = list(dict.fromkeys(re.findall(r"\b(?:ANTS|ITK)-\d+\b", fix.get("reason") or "")))
+        fixed = [i for i in ids if i not in WARNS]
+        if not fixed:
+            raise ValueError(f"{ex['id']}: fix-lx changes values, but names only {ids}")
+        line = f"Its default, `fix`, corrects {' and '.join(fixed)} here"
+        warned = [f"{WARNS[i]} ({i})" for i in ids if i in WARNS]
+        parts.append(line + "".join(f" and {w}" for w in warned) + ".")
     elif fix:
         raise ValueError(f"{ex['id']}: fix-lx is {fix['verdict']}")
     return " ".join(parts), ["lx-ants"]

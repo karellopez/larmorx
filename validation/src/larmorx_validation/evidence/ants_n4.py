@@ -1143,6 +1143,13 @@ SHOWS = {
         ["fix-ants"],
     ),
 }
+SHOWS["panel-tumour"] = (
+    "In `reproduce`, on 1 and 8 threads, the replica gives ANTs' bytes with correctly rounded "
+    "maths; ANTs as built differs only where glibc's maths is not correctly rounded (largest "
+    "difference 0.0068). Its default, `fix`, leaves the zero and negative voxels out of the fit "
+    "(ANTS-40) and warns that `-r` does nothing without a mask (ANTS-36).",
+    ["lx-ants"],
+)
 TITLES = {"final-n4": "fMRIPrep's final N4 of a real T1w"}
 
 
@@ -1172,6 +1179,7 @@ def present(doc: dict) -> dict:
         )
         b["note"] = present_.text(PAGE, b.get("note"))
         b["port"] = PAGE.port
+        b["software"] = PAGE.software
     present_.random_testing(PAGE, doc, {"port": "replica"})
     return present_.finish(PAGE, doc)
 

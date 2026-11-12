@@ -914,6 +914,7 @@ def present(doc: dict) -> dict:
         )
         b["note"] = present_.text(PAGE, b.get("note"))
         b["port"] = PAGE.port
+        b["software"] = PAGE.software
     present_.random_testing(PAGE, doc, {"port": "replica"})
     return present_.finish(PAGE, doc)
 

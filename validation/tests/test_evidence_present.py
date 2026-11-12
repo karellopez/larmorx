@@ -228,3 +228,32 @@ def test_a_panel_command_names_each_file():
         "DenoiseImage -i sub-16_T1w.nii.gz -o [ denoised.nii.gz, noise.nii.gz ] -w "
         "<fMRIPrep oracle run>weight.nii.gz"
     )
+
+
+def test_a_correction_that_only_warns_is_not_said_to_correct():
+    """ANTS-36 changes no value where `-r` has no mask: the reason and the generated What this
+    shows line say that the default warns, and correct only what changes values."""
+    reason = (
+        "The replica's default, `fix`, corrects ANTS-36, ANTS-40 ([register](repo:x.md)); "
+        "`reproduce` gives ANTs' result."
+    )
+    assert present.warnings(reason) == (
+        "The replica's default, `fix`, corrects ANTS-40 ([register](repo:x.md)) and warns that "
+        "`-r` does nothing without a mask (ANTS-36); `reproduce` gives ANTs' result."
+    )
+    assert present.warnings("corrects ANTS-40 here") == "corrects ANTS-40 here"
+    page = present.Page(software="ANTs", program="N4BiasFieldCorrection", version="2.6.5")
+    ex = {
+        "id": "panel-x",
+        "diffs": [
+            {"id": "lx-ants", "verdict": "bit-identical", "label": "", "metrics": {}},
+            {"id": "fix-lx", "verdict": "d13", "label": "",
+             "reason": "larmorx's default corrects ANTS-36, ANTS-40 ([register](repo:x.md))"},
+        ],
+    }  # fmt: skip
+    shows, verdicts = present.panel_shows(page, ex)
+    assert shows.endswith(
+        "Its default, `fix`, corrects ANTS-40 here and warns that `-r` does nothing without a "
+        "mask (ANTS-36)."
+    )
+    assert verdicts == ["lx-ants"]

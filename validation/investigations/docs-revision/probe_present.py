@@ -180,7 +180,11 @@ def regress(site: Path, ref: str, before: str, intended: Path | None, only: list
                     ).stdout
                 )
                 module = evidence.TOOLS[name]
-                _dry(old, module, src, tmp / f"{name}.ref.json")
+                try:
+                    _dry(old, module, src, tmp / f"{name}.ref.json")
+                except subprocess.CalledProcessError:  # presented after <ref>: no baseline
+                    print(f"{name:24s} presented after {ref}: nothing to compare")
+                    continue
                 try:
                     _dry(REPO, module, src, tmp / f"{name}.now.json")
                 except subprocess.CalledProcessError as exc:  # its present refuses: listed

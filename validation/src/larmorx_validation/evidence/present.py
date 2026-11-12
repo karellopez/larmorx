@@ -133,13 +133,19 @@ def _own(page: Page, s: str | None, code: bool = True) -> str | None:
     return s
 
 
-def text(page: Page, s: str | None, code: bool = True) -> str | None:
+def text(page: Page, s: str | None, code: bool = True, port: str = "") -> str | None:
     """A text of the page in the guide's words, LARMORX's port named: the page's own
-    rewordings, then the guide's (:func:`words.reword`), the oracle's words and the port's."""
+    rewordings, then the guide's (:func:`words.reword`), the oracle's words and the port's
+    (``port``: the port a comparison's reason is about, by default the page's; ``"both"``: a
+    text about both ports of the page, where a bare "larmorx" is the project, LARMORX)."""
     if not s:
         return s
     s = oracle(words.reword(_own(page, s, code), code=code)) or ""
-    name = words.PORT_NAME[page.port]
+    if port == "both":
+        return re.sub(
+            r"(?<![\w./`-])larmorx(?![\w/`-]|\.\w|: \w+:|: upstream defect )", "LARMORX", s
+        )
+    name = words.PORT_NAME[port or page.port]
     for pat, rep in _PORT_TEXTS:
         if not code:
             rep = rep.replace("`", "")
@@ -758,17 +764,20 @@ def example(
     )
     if title:
         ex["title"] = title
-    # the port's own words in the example's texts (words.example has reworded them)
-    ex["summary"] = text(page, ex.get("summary"))
+    # the port's own words in the example's texts (words.example has reworded them); on a page
+    # of two ports the example's own texts are about both, each reason about its comparison's
+    both = "both" if len(set(ports.values())) > 1 else ""
+    ex["summary"] = text(page, ex.get("summary"), port=both)
     for f in ex.get("facts", []):
-        f["label"] = text(page, f["label"], code=False)
-        f["text"] = text(page, f["text"])
-    ex["metrics_note"] = text(page, ex.get("metrics_note"))
+        f["label"] = text(page, f["label"], code=False, port=both)
+        f["text"] = text(page, f["text"], port=both)
+    ex["metrics_note"] = text(page, ex.get("metrics_note"), port=both)
     for d in ex["diffs"]:
-        d["reason"] = warnings(text(page, d.get("reason")))
+        mine = d["port"] if d["port"] in words.PORT_NAME else both
+        d["reason"] = warnings(text(page, d.get("reason"), port=mine))
     ex["provenance"] = [oracle(x) for x in ex.get("provenance") or []]
     if ex.get("poster", {}).get("caption"):
-        ex["poster"]["caption"] = text(page, ex["poster"]["caption"], code=False)
+        ex["poster"]["caption"] = text(page, ex["poster"]["caption"], code=False, port=both)
     if ex.get("chain"):
         chain(page, ex["chain"])
     for t in ex.get("tables") or []:
@@ -917,27 +926,45 @@ def original_name(page: Page, code: bool = True) -> str:
     return f"{page.software} {prog} {page.version}"
 
 
-def implementation(page: Page, im: dict, comparison: str) -> None:
-    """An agreement chart's title and names (the guide's section 4)."""
-    who = words.PORT_NAME[page.port]
+def implementation(page: Page, im: dict, comparison: str, port: str = "") -> None:
+    """An agreement chart's title and names (the guide's section 4); ``port``: its record's
+    port, on a page of two (by default the page's)."""
+    port = port or page.port
+    who = words.PORT_NAME[port]
     im["title"] = f"Agreement, {who} against the original: {original_name(page)}"
     im["comparison"] = comparison
     im["label"] = f"{who} against the original: {original_name(page, code=False)} ({comparison})"
     im["short"] = who
-    im["port"] = page.port
+    im["port"] = port
 
 
-def speed(page: Page, sp: dict | None, caption: str, threads: str = "") -> None:
-    """A speed chart's title, caption and marks: the port's points by its name."""
+def speed(
+    page: Page,
+    sp: dict | None,
+    caption: str,
+    threads: str = "",
+    marks: dict[str, str] | None = None,
+    labels: dict[str, str] | None = None,
+) -> None:
+    """A speed chart's title, caption and marks: the port's points by its name. ``marks``: the
+    old marks' ports where "larmorx" is not the page's port (a page of two ports, whose old
+    "larmorx" mark is the clean room's); ``labels``: a series' new label by its old one."""
     if not sp:
         return
+    marks = marks or {"larmorx": page.port, "larmorx-open": f"{page.port}-open"}
+    ports = {m.removesuffix("-open") for m in marks.values()} | {
+        ser["mark"].removesuffix("-open") for ser in sp["series"] if ser["mark"] in PORTS_MARKS
+    }  # fmt: skip
     who = words.PORT_NAME[page.port]
-    sp["title"] = f"Speed, the {who} against the original: {original_name(page)}{threads}"
+    a = "both ports" if len(ports) > 1 else f"the {who}"
+    sp["title"] = f"Speed, {a} against the original: {original_name(page)}{threads}"
     sp["caption"] = caption
-    marks = {"larmorx": page.port, "larmorx-open": f"{page.port}-open"}
     for ser in sp["series"]:
         ser["mark"] = marks.get(ser["mark"], ser["mark"])
         ser["port"] = ser["mark"].removesuffix("-open")
+        if labels and ser["label"] in labels:
+            ser["label"] = labels[ser["label"]]
+            continue
         lab = re.sub(r"^larmorx\b", who, ser["label"])
         if page.program:
             lab = re.sub(
@@ -945,6 +972,10 @@ def speed(page: Page, sp: dict | None, caption: str, threads: str = "") -> None:
             )
         ser["label"] = lab
     sp["note"] = text(page, sp.get("note"))
+
+
+#: The marks of the ports' points (open: at several threads).
+PORTS_MARKS = ("replica", "replica-open", "clean-room", "clean-room-open")
 
 
 #: A category of a record's cases as the pages name it (the id stays the case explorer's

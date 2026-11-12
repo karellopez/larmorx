@@ -1,0 +1,12 @@
+[package]
+name = "larmorx-freesurfer-topology"
+description = "FreeSurfer 8.2.0's replica for larmorx: tessellation to the fixed, remeshed surface (mri_tessellate, mris_smooth, mris_inflate, mris_sphere, mris_fix_topology, mris_remesh, ..., defect2seg) (FreeSurfer's licence)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+larmorx-freesurfer-core.workspace = true
+larmorx-freesurfer-defect.workspace = true

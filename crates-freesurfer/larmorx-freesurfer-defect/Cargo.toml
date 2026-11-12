@@ -1,0 +1,11 @@
+[package]
+name = "larmorx-freesurfer-defect"
+description = "FreeSurfer 8.2.0's replica for larmorx: the topology fixer's defect code (FreeSurfer's licence)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+larmorx-freesurfer-deform.workspace = true

@@ -1,0 +1,12 @@
+[package]
+name = "larmorx-freesurfer-networks"
+description = "FreeSurfer 8.2.0's replica for larmorx: the v8 stream's network programs (mri_synthstrip, mri_synthseg, mri_synthmorph, mri_sclimbic_seg: Rust inference with the original weights), their scripts and the programs only those scripts run (FreeSurfer's licence)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+larmorx-freesurfer-core.workspace = true
+larmorx-freesurfer-volume.workspace = true

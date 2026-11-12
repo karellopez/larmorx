@@ -1,0 +1,12 @@
+[package]
+name = "larmorx-freesurfer-gca"
+description = "FreeSurfer 8.2.0's replica for larmorx: GCA atlases and GCA morphs (.gca, .m3z), the linear GCA nodes, MRI morphs, FLASH and the autoencoder (FreeSurfer's licence)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+larmorx-freesurfer-filter.workspace = true
+larmorx-freesurfer-surf.workspace = true

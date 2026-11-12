@@ -403,6 +403,8 @@ defects! {
         "mask_names shorter than the masks silently drops the masks without a name (zip): their components and metadata are not computed";
     PIPE_59 = "PIPE-59", "nipype compute_noise_components", true,
         "an SVD that fails with failure_mode='NaN' is replaced by T NaN singular values whatever the decomposition's size min(T, N), and with components_criterion 'all' by one NaN component while all T values are marked retained (CompCor's metadata then names every one after the first component)";
+    PIPE_60 = "PIPE-60", "nipy rotation_vec2mat", true,
+        "the angle of a rotation vector given as integers is the square root of its sum of squares computed in the vector's own type, which wraps around silently (a component of an int8 vector from 12, int16 from 182, int32 from 46,341; an int64 vector when the sum passes 2^63, from about 1.75e9 per component), so nipype's normalize_mc_params(params, 'NIPY') of such a row is another rotation or numpy's LinAlgError";
     SCI_02 = "SCI-02", "SciPy ndimage", true,
         "NaN and out-of-range values written to an integer output are converted as x86-64 converts them (C leaves the conversion undefined)";
     SCI_03 = "SCI-03", "SciPy ndimage", true,

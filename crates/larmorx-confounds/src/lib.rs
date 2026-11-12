@@ -19,6 +19,9 @@
 //! - [`compcor`]: nipype's CompCor numerics (`_cosine_drift`, `regress_poly`, `cosine_filter`,
 //!   `_compute_tSTD`, `TCompCor`'s high-variance mask, `compute_noise_components`; the corrections
 //!   PIPE-44, PIPE-45, PIPE-52, PIPE-54, PIPE-55, PIPE-57 and PIPE-59, GLIBC-07's cosine).
+//! - [`nipy`]: nipype's `normalize_mc_params(params, "NIPY")`, nipy 0.6.1's `to_matrix44` and
+//!   `aff2euler` with nibabel's `mat2euler` (BSD-3-Clause and MIT: the notices in the module),
+//!   for `FramewiseDisplacement(parameter_source="NIPY")`.
 //!
 //! This crate is the **port** (a replica of permissive upstreams, in the main package). The
 //! clean-room original of the same steps, planned later (the user, 2026-11-06 and 2026-11-11),
@@ -27,5 +30,6 @@
 
 pub mod compcor;
 pub mod dvars;
+pub mod nipy;
 pub mod nitime;
 pub mod scipy_fft;

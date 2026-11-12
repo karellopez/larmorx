@@ -2193,6 +2193,27 @@ pub fn det3_is_positive(a: &[[f64; 3]; 3]) -> bool {
     }
 }
 
+/// `numpy.linalg.det(a) < 0` for a float64 3 × 3 matrix, as [`det3_is_positive`] computes the
+/// determinant (an exactly zero pivot gives 0, a NaN pivot a NaN: neither is negative).
+pub fn det3_is_negative(a: &[[f64; 3]; 3]) -> bool {
+    match openblas::lu_sign_and_diagonal3(a) {
+        None => false,
+        Some((mut sign, diag)) => {
+            let mut logdet = 0.0f64;
+            for v in diag {
+                let mut a = v;
+                if a < 0.0 {
+                    sign = -sign;
+                    a = -a;
+                }
+                logdet += larmorx_core::math::log(a);
+            }
+            let det = sign * larmorx_core::math::exp(logdet);
+            det < 0.0
+        }
+    }
+}
+
 /// nibabel's `io_orientation` polar step (`orientations.py`, nibabel 5.4.2): `P, S, Qs =
 /// numpy.linalg.svd(RS, full_matrices=False)` (for a square matrix `dgesdd`'s `JOBZ='S'` path
 /// is `JOBZ='A'`'s), `keep = S > S.max() * 3 * eps`, `R = numpy.dot(P[:, keep], Qs[keep])`.

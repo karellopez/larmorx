@@ -2187,3 +2187,13 @@ def nipype_compute_noise_components(
     """nipype's ``compute_noise_components`` on each mask's rows: ``(components, float32,
     basis or None, metadata per mask, notices)`` (``larmorx.confounds.compute_noise_components``
     is the public form)."""
+
+def nipy_motion_params(
+    rows: np.ndarray, numpy: str = "2.5.4", upstream_defects: str = "fix"
+) -> tuple[np.ndarray, np.ndarray | None]:
+    """nipype's ``normalize_mc_params(row, "NIPY")`` of every row of an ``n × k`` float64 table
+    (nipy 0.6.1's ``to_matrix44`` and ``aff2euler``): ``(params, other)``, the ``n × 6``
+    parameters and, where a row differs in the other mode, that mode's (GLIBC-07); numpy's
+    ``IndexError`` or ``LinAlgError`` for the first row nipy cannot compute
+    (``larmorx.confounds.normalize_mc_params`` and ``framewise_displacement`` are the public
+    forms)."""

@@ -453,7 +453,7 @@ fn copy_elements(g: &mut Globals, m_in: &Matrix, dst: &mut Matrix) {
 }
 
 /// `*MATRIX_RELT(m, r, c)` read where it may fall outside the array (FS-16: 0 there).
-fn read_relt(g: &mut Globals, m: &Matrix, r: i32, c: i32) -> f32 {
+pub(crate) fn read_relt(g: &mut Globals, m: &Matrix, r: i32, c: i32) -> f32 {
     match m.relt_index(r, c) {
         Some(i) => m.store[i],
         None => {
@@ -465,7 +465,7 @@ fn read_relt(g: &mut Globals, m: &Matrix, r: i32, c: i32) -> f32 {
 }
 
 /// `*MATRIX_RELT(m, r, c) = v` where it may fall outside the array (FS-16: dropped there).
-fn write_relt(g: &mut Globals, m: &mut Matrix, r: i32, c: i32, v: f32) {
+pub(crate) fn write_relt(g: &mut Globals, m: &mut Matrix, r: i32, c: i32, v: f32) {
     match m.relt_index(r, c) {
         Some(i) => m.store[i] = v,
         None => g.notices.add(
@@ -476,7 +476,7 @@ fn write_relt(g: &mut Globals, m: &mut Matrix, r: i32, c: i32, v: f32) {
 }
 
 /// A float of `m`'s array read where the C pointer arithmetic may leave it (FS-16: 0 there).
-fn read_at(g: &mut Globals, m: &Matrix, i: isize) -> f32 {
+pub(crate) fn read_at(g: &mut Globals, m: &Matrix, i: isize) -> f32 {
     if i >= 0
         && let Some(&v) = m.store.get(i as usize)
     {
@@ -488,7 +488,7 @@ fn read_at(g: &mut Globals, m: &Matrix, i: isize) -> f32 {
 }
 
 /// A float of `m`'s array written where the C pointer arithmetic may leave it (FS-16).
-fn write_at(g: &mut Globals, m: &mut Matrix, i: isize, v: f32) {
+pub(crate) fn write_at(g: &mut Globals, m: &mut Matrix, i: isize, v: f32) {
     if i >= 0
         && let Some(p) = m.store.get_mut(i as usize)
     {
@@ -503,7 +503,7 @@ fn write_at(g: &mut Globals, m: &mut Matrix, i: isize, v: f32) {
 
 /// `rptr[r]`'s place in the array as the C code would compute it, for rows the matrix has
 /// (the caller checks them).
-fn rptr(m: &Matrix, r: i32) -> isize {
+pub(crate) fn rptr(m: &Matrix, r: i32) -> isize {
     LEAD + m.row_base(r).unwrap_or(isize::MIN / 4)
 }
 
@@ -586,15 +586,124 @@ pub fn matrix_multiply_d(
         );
         return Ok(Ret::Null);
     }
-    multiply_d(g, m1, m2, m3, given);
+    multiply(g, m1, m2, m3, given, Acc::Double);
     Ok(match fresh {
         Some(m) => Ret::New(m),
         None => Ret::Given,
     })
 }
 
-/// `MatrixMultiplyD`'s four branches on `m3` (`given`: the caller's, which FS-15 concerns).
-fn multiply_d(g: &mut Globals, m1: &Matrix, m2: &Matrix, m3: &mut Matrix, given: bool) {
+/// `MatrixMultiply(m1, m2, m3)` (`MatrixMultiply_wkr`): `m1 * m2`, each element accumulated in
+/// `float` (every product and sum rounded to `float`). `m1` or `m2` `NULL` ends the program
+/// (`MatrixMultiply(): m1 is null ` with the file and line on standard output, then
+/// `MatrixMultiply: m1 is null` as an error); `m1`'s columns not `m2`'s rows, or a given `m3` of
+/// another size, return `Null` after a line on standard output and an error. A new `m3` is
+/// complex when either input is. To multiply into an input, pass a copy of it as the input
+/// (FreeSurfer copies it first). FS-15, FS-16.
+pub fn matrix_multiply(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    m1: Option<&Matrix>,
+    m2: Option<&Matrix>,
+    m3: Option<&mut Matrix>,
+) -> Result<Ret<Matrix>, Fatal> {
+    let file = matrix_cpp();
+    let Some(m1) = m1 else {
+        let _ = write!(out, "MatrixMultiply(): m1 is null \n break {file}:725\n");
+        log::error_exit(g, err, ERROR_BADPARM, "MatrixMultiply: m1 is null\n")?;
+        return Ok(Ret::Null);
+    };
+    let Some(m2) = m2 else {
+        let _ = write!(out, "MatrixMultiply(): m2 is null \n break {file}:729\n");
+        log::error_exit(g, err, ERROR_BADPARM, "MatrixMultiply: m2 is null\n")?;
+        return Ok(Ret::Null);
+    };
+    if m1.cols != m2.rows {
+        let _ = write!(out, "MatrixMultiply(): m1/m2 dim mismatch\n break {file}:733\n");
+        let msg = format!(
+            "MatrixMultiply: m1 cols {} does not match m2 rows {}\n",
+            m1.cols, m2.rows
+        );
+        log::error_printf(g, err, ERROR_BADPARM, &msg);
+        return Ok(Ret::Null);
+    }
+    let either_complex = m1.mtype == MATRIX_COMPLEX || m2.mtype == MATRIX_COMPLEX;
+    let given = m3.is_some();
+    let mut fresh = None;
+    let m3: &mut Matrix = match m3 {
+        None => {
+            let t = if either_complex {
+                MATRIX_COMPLEX
+            } else {
+                m1.mtype
+            };
+            match matrix_alloc(g, out, err, m1.rows, m2.cols, t)? {
+                Some(m) => fresh.insert(m),
+                None => return Ok(Ret::Null),
+            }
+        }
+        Some(m3) => {
+            if m3.rows != m1.rows || m3.cols != m2.cols {
+                let _ = write!(out, "MatrixMultiply(): m3 dim mismatch\n break {file}:748\n");
+                let msg = format!(
+                    "MatrixMultiply: ({} x {}) * ({} x {}) != ({} x {})\n",
+                    m1.rows, m1.cols, m2.rows, m2.cols, m3.rows, m3.cols
+                );
+                log::error_printf(g, err, ERROR_BADPARM, &msg);
+                return Ok(Ret::Null);
+            }
+            m3
+        }
+    };
+    if either_complex && m3.mtype != MATRIX_COMPLEX && !g.notices.reproduce() {
+        // FS-16 (rule B), as MatrixMultiplyD.
+        log::error_printf(
+            g,
+            err,
+            ERROR_BADPARM,
+            "MatrixMultiply: a complex product into a real matrix\n",
+        );
+        g.notices.add(
+            &FS_16,
+            "MatrixMultiply: a complex product into a real matrix refused (FreeSurfer writes past its end)",
+        );
+        return Ok(Ret::Null);
+    }
+    multiply(g, m1, m2, m3, given, Acc::Float);
+    Ok(match fresh {
+        Some(m) => Ret::New(m),
+        None => Ret::Given,
+    })
+}
+
+/// The accumulation of a product: `MatrixMultiply`'s `float` (every product and sum rounded to
+/// `float`) or `MatrixMultiplyD`'s `double`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Acc {
+    Float,
+    Double,
+}
+
+impl Acc {
+    fn name(self) -> &'static str {
+        match self {
+            Acc::Float => "MatrixMultiply",
+            Acc::Double => "MatrixMultiplyD",
+        }
+    }
+}
+
+/// The four branches of `MatrixMultiply` (`acc` `Float`) and `MatrixMultiplyD` (`Double`) on
+/// `m3` (`given`: the caller's, which FS-15 concerns).
+pub(crate) fn multiply(
+    g: &mut Globals,
+    m1: &Matrix,
+    m2: &Matrix,
+    m3: &mut Matrix,
+    given: bool,
+    acc: Acc,
+) {
     let (rows, cols, m1_cols) = (m3.rows, m3.cols, m1.cols);
     let (t1, t2) = (m1.mtype, m2.mtype);
     if t1 == MATRIX_REAL && t2 == MATRIX_REAL {
@@ -602,11 +711,23 @@ fn multiply_d(g: &mut Globals, m1: &Matrix, m2: &Matrix, m3: &mut Matrix, given:
         if m3.mtype == MATRIX_REAL && m2.cols == cols {
             for row in 1..=rows {
                 for col in 1..=cols {
-                    let mut val = 0.0f64;
-                    for i in 1..=m1_cols {
-                        val += f64::from(m1.relt(row, i)) * f64::from(m2.relt(i, col));
-                    }
-                    m3.set_relt(row, col, val as f32);
+                    let v = match acc {
+                        Acc::Double => {
+                            let mut val = 0.0f64;
+                            for i in 1..=m1_cols {
+                                val += f64::from(m1.relt(row, i)) * f64::from(m2.relt(i, col));
+                            }
+                            val as f32
+                        }
+                        Acc::Float => {
+                            let mut val = 0.0f32;
+                            for i in 1..=m1_cols {
+                                val += m1.relt(row, i) * m2.relt(i, col);
+                            }
+                            val
+                        }
+                    };
+                    m3.set_relt(row, col, v);
                 }
             }
             return;
@@ -614,15 +735,22 @@ fn multiply_d(g: &mut Globals, m1: &Matrix, m2: &Matrix, m3: &mut Matrix, given:
         for row in 1..=rows {
             let r3 = rptr(m3, row) + 1;
             for col in 1..=cols {
-                let mut val = 0.0f64;
                 let r1 = rptr(m1, row) + 1;
                 let r2 = rptr(m2, 1) + col as isize;
+                let (mut vd, mut vf) = (0.0f64, 0.0f32);
                 for i in 0..m1_cols as isize {
                     let a = read_at(g, m1, r1 + i);
                     let b = read_at(g, m2, r2 + i * cols as isize);
-                    val += f64::from(a) * f64::from(b);
+                    match acc {
+                        Acc::Double => vd += f64::from(a) * f64::from(b),
+                        Acc::Float => vf += a * b,
+                    }
                 }
-                write_at(g, m3, r3 + col as isize - 1, val as f32);
+                let v = match acc {
+                    Acc::Double => vd as f32,
+                    Acc::Float => vf,
+                };
+                write_at(g, m3, r3 + col as isize - 1, v);
             }
         }
         return;
@@ -639,12 +767,17 @@ fn multiply_d(g: &mut Globals, m1: &Matrix, m2: &Matrix, m3: &mut Matrix, given:
             })
         });
         if nonzero {
+            let name = acc.name();
             g.notices.add(
                 &FS_15,
                 if clear {
-                    "MatrixMultiplyD: a complex product into a given matrix, its earlier contents cleared"
+                    format!(
+                        "{name}: a complex product into a given matrix, its earlier contents cleared"
+                    )
                 } else {
-                    "MatrixMultiplyD: a complex product added onto the given matrix's earlier contents"
+                    format!(
+                        "{name}: a complex product added onto the given matrix's earlier contents"
+                    )
                 },
             );
         }
@@ -658,24 +791,46 @@ fn multiply_d(g: &mut Globals, m1: &Matrix, m2: &Matrix, m3: &mut Matrix, given:
                 (read_at(g, m3, i3), read_at(g, m3, i3 + 1))
             };
             for i in 1..=m1.cols {
-                match (t1, t2) {
+                // a + ib times c + id; b = 0 for a real m1, d = 0 for a real m2.
+                let (a, b, c, d) = match (t1, t2) {
                     (MATRIX_COMPLEX, MATRIX_COMPLEX) => {
                         let (a, b) = celt_read(g, m1, row, i);
                         let (c, d) = celt_read(g, m2, i, col);
-                        re = (f64::from(re) + (a * c - b * d)) as f32;
-                        im = (f64::from(im) + (a * d + b * c)) as f32;
+                        (a, Some(b), c, Some(d))
                     }
                     (MATRIX_REAL, MATRIX_COMPLEX) => {
                         let a = f64::from(read_at(g, m1, rptr(m1, row) + i as isize));
                         let (c, d) = celt_read(g, m2, i, col);
-                        re = (f64::from(re) + a * c) as f32;
-                        im = (f64::from(im) + a * d) as f32;
+                        (a, None, c, Some(d))
                     }
                     _ => {
                         let (a, b) = celt_read(g, m1, row, i);
                         let c = f64::from(read_at(g, m2, rptr(m2, i) + col as isize));
-                        re = (f64::from(re) + a * c) as f32;
-                        im = (f64::from(im) + b * c) as f32;
+                        (a, Some(b), c, None)
+                    }
+                };
+                match acc {
+                    Acc::Double => {
+                        let (dr, di) = match (b, d) {
+                            (Some(b), Some(d)) => (a * c - b * d, a * d + b * c),
+                            (None, Some(d)) => (a * c, a * d),
+                            (Some(b), None) => (a * c, b * c),
+                            (None, None) => unreachable!(),
+                        };
+                        re = (f64::from(re) + dr) as f32;
+                        im = (f64::from(im) + di) as f32;
+                    }
+                    Acc::Float => {
+                        // the parts were floats: widening them was exact
+                        let (a, c) = (a as f32, c as f32);
+                        let (dr, di) = match (b.map(|x| x as f32), d.map(|x| x as f32)) {
+                            (Some(b), Some(d)) => (a * c - b * d, a * d + b * c),
+                            (None, Some(d)) => (a * c, a * d),
+                            (Some(b), None) => (a * c, b * c),
+                            (None, None) => unreachable!(),
+                        };
+                        re += dr;
+                        im += di;
                     }
                 }
             }
@@ -707,7 +862,7 @@ fn read_pair(m: &Matrix, i: isize) -> (f32, f32) {
 }
 
 /// `MATRIX_CELT_REAL(m, r, c)` and `MATRIX_CELT_IMAG(m, r, c)` as doubles (FS-16 outside).
-fn celt_read(g: &mut Globals, m: &Matrix, r: i32, c: i32) -> (f64, f64) {
+pub(crate) fn celt_read(g: &mut Globals, m: &Matrix, r: i32, c: i32) -> (f64, f64) {
     let i = rptr(m, r) + 2 * c as isize;
     (f64::from(read_at(g, m, i)), f64::from(read_at(g, m, i + 1)))
 }

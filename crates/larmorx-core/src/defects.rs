@@ -1000,7 +1000,7 @@ defects! {
     FS_14 = "FS-14", "FreeSurfer", true,
         "MatrixCopy copies a complex matrix float by float through its real-element pointers: of each row it copies as many floats as the matrix has columns, starting at the float before the row's first pair, so half the values are lost and the rest are shifted";
     FS_15 = "FS-15", "FreeSurfer", true,
-        "MatrixMultiplyD of complex matrices adds the product onto the output's earlier contents (it never clears the output): a given output, or one that is also an input, gives a wrong product";
+        "MatrixMultiply and MatrixMultiplyD of complex matrices add the product onto the output's earlier contents (they never clear the output): a given output, or one that is also an input, gives a wrong product";
     FS_16 = "FS-16", "FreeSurfer", true,
         "FreeSurfer's float matrices are addressed outside their arrays where types and sizes do not match (a complex product written into a real output writes past its end): memory the program does not own";
     FS_17 = "FS-17", "FreeSurfer", true,
@@ -1019,6 +1019,20 @@ defects! {
         "HISTOmakePDF given an output histogram other than its source normalises the output's own counts instead of the source's";
     FS_24 = "FS-24", "FreeSurfer", true,
         "HISTOrobustGaussianFit of a histogram of one bin never returns: the loop that widens its window cannot widen it";
+    FS_25 = "FS-25", "FreeSurfer", true,
+        "FreeSurfer's real-only matrix operations (identity, transpose, sums, differences, scalar products, squares, diagonals, constants, reshapes, traces, element sums, symmetry and zero tests, column norms, vector lengths and products) address a complex matrix's floats as if it were real, and MatrixClear clears only part of a complex matrix: wrong values, no message";
+    FS_26 = "FS-26", "FreeSurfer", true,
+        "MatrixCopyRealRegion into a complex destination copies the source's imaginary parts instead of its real parts";
+    FS_27 = "FS-27", "FreeSurfer", true,
+        "MatrixCopyRealRegion and MatrixCopyImagRegion read a real source as if it were complex (DCTcopy passes real vectors: each value comes from the next element, the last from beyond the array), and MatrixCopyRegion between a real and a complex matrix addresses one through the other's layout";
+    FS_28 = "FS-28", "FreeSurfer", true,
+        "matrix functions that fill a caller's output do not check that it fits (the region copies' destination region, MatrixTranspose's and MatrixRealToComplex's output, MatrixIdentity's given matrix, MatrixDiag's and MatrixNormalizeColScale's): elements are written into other rows or outside the array";
+    FS_29 = "FS-29", "FreeSurfer", true,
+        "PDFtodSeed seeds from the clock (seconds plus microseconds): the programs and random fields that take it when no seed is given never repeat a run";
+    FS_30 = "FS-30", "FreeSurfer", true,
+        "PDFgaussian divides zero by zero when both of its uniform draws give exactly 0 (drand48 returned 0.5 twice): it returns NaN";
+    FS_31 = "FS-31", "FreeSurfer", true,
+        "FreeSurfer's vector functions do not check their vectors' lengths (VectorCrossProduct's and VectorTripleProduct's test lets column vectors of one or two elements through and never tests the other vectors; VectorDot and VectorDistance read the second vector to the first's length): elements read outside the vectors";
 }
 
 /// The register entry with ID `id`.

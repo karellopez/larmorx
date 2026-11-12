@@ -44,6 +44,7 @@ pub mod histo;
 pub mod log;
 pub mod machine;
 pub mod matrix;
+pub mod matrix_ops;
 pub mod random;
 pub mod ret;
 pub mod romp;

@@ -202,7 +202,49 @@ validated: `smoke` the quick tiers of `check_blas`, `check_dvars` and `check_tab
 controls (62 of 62 cases pass, 3,227 checks); `full` the full tiers, `e1-zen`, the full controls and the
 extra runs. A negative control passes when the releases are told apart.
 
+## Random testing (validated in part; one difference open)
+
+Three tools, one per suite (`validation/src/larmorx_validation/difftest/tools/confounds.py`, runner
+`parity/confounds_random.py`; [docs/validation/difftest.md](../validation/difftest.md)), one drawn call per
+case against the original in-process, every output bit for bit, then the D13 fix pass. The probes before the
+trial and the trial (`oracles/difftest/2026-11-12-confounds-trial`, 30 minutes, 334,124 cases: 332,076 agree,
+528 notices, 28 differ, 1,492 skipped while numpy's `pow` is AVX-512's SVML) found these larmorx mistakes,
+each fixed with a permanent case (`validation/difftest/cases/confounds-*/`) and the triage in
+`validation/difftest/triage.toml`:
+
+- CompCor's refused inputs raised larmorx's own messages: now traits' `TraitError` texts (as `ValueError`),
+  nipype's `OSError` of two exclusive inputs and its `ValueError` of a missing `mask_files`.
+- `regress_poly` of Fortran-ordered rows with degree 0: numpy's `pinv(X).dot(data.T)` takes `gemv` on a
+  C-ordered `data.T`, whose sums run in another order (`probe_regress_layout.py`, 264 of 264 after).
+- The `KeyError` of `FilterDropped` and `RenameACompCor` for a `retained` column of text prints pandas'
+  `Index` repr with its line breaks at width 80 (`probe_index_repr.py`, 260 of 260 in pandas 3.0.6 and 2.2.3).
+- CompCor with no volume left (`ignore_initial_volumes` at least the series' length) raises numpy's
+  `cannot reshape array of size 0 into shape (0)` where nipype's mask loop meets it; PIPE-44's correction
+  is named in that error and in the shape error of a mask nipype never reaches (`probe_zero_volumes.py`,
+  224 of 224).
+- Notices that fired where nothing changed are named now only where the result changes: GLIBC-07 in the
+  cosine basis (the witness compares the basis values: a cosine one bit off can round to the same
+  product), DVARS' PIPE-46, -47 and -50 (an all-constant series is NaN both ways), PIPE-67 after
+  `minimum_contiguous`'s filling, PIPE-44 where a later mask adds components or changes the basis.
+
+Explained: PD-01's notice names the table read's correction, whose values change; `ExpandModel`, fMRIPrep's
+`FramewiseDisplacement` and `SpikeRegressors` without `concatenate` may not show it. A harness matter: two
+refused CompCor inputs at once, whose error nipype chooses by its caller's keyword order.
+
+**Open (a larmorx difference)**: numpy's `svd`/`lstsq` of the cosine drift of 370 volumes at a cut-off that
+gives more columns than volumes (5 s at TR 3 s: 370 × 444; 4 s at TR 1 s: 185 × 370) differ from numpy
+2.3.5's LAPACK by 1 to 4 ulps in a cluster of near-equal singular values, through DBDSDC's lower-bidiagonal
+path (`scan_drift_svd.py`: 742 of 744 drift matrices identical). DGEBRD, the rotation to an upper bidiagonal
+and each DLASD0 subproblem alone are identical; the whole DBDSDC of the rotated problem differs from 348
+rows on. No fMRIPrep call reaches it (its cut-off of 128 s keeps the basis narrower than the series).
+
 ## Follow-ups (open; each a bounded piece)
+
+- **DBDSDC on the clustered cosine spectra** (above): find the step that differs (the subproblem loop's
+  shared work arrays, the sort, the scaling) against LAPACK 3.12.0 and 3.12.1, fix it, re-run
+  `scan_drift_svd.py`, `check_svd.py` and the trial's finding 54131.
+- **PD-01 per step**: name PD-01 in `ExpandModel`, fMRIPrep's `FramewiseDisplacement` and
+  `SpikeRegressors` only where the step's output changes.
 
 - **`OPENBLAS_L2_SIZE` for everyone**: numpy 2.5.4 on this AMD Zen 4 machine blocks its products'
   depth by 512, not 256 ([confounds-blas.md](confounds-blas.md)); the confounds' runs set

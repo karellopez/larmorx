@@ -68,6 +68,22 @@ def _paths(in_file: Any) -> list[str]:
     return out
 
 
+def _reduce(a: np.ndarray, op: str, axis: int, numpy_version: str) -> np.ndarray:
+    """``np.mean``/``np.std(a, axis=axis)`` as numpy ``numpy_version`` sums ``a``'s memory: a
+    dense array in an axis order other than C's and Fortran's (``np.concatenate``'s choice for
+    volumes reshaped to four axes, whose new axis' stride ties with the third's) is reduced as
+    its C-ordered transpose, which numpy's iterator sums the same way."""
+    if a.flags.c_contiguous or a.flags.f_contiguous:
+        return np.asarray(_core.numpy_reduce(a, op, axis, numpy_version))
+    perm = sorted(range(a.ndim), key=lambda k: -abs(a.strides[k]))
+    view = a.transpose(perm)
+    if not view.flags.c_contiguous:
+        view = np.ascontiguousarray(view)  # not reached: nipype's arrays are dense
+    out = np.asarray(_core.numpy_reduce(view, op, perm.index(axis), numpy_version))
+    rest = [k for k in perm if k != axis]
+    return out.transpose([rest.index(k) for k in range(a.ndim) if k != axis])
+
+
 def tsnr(
     in_file: str | os.PathLike[str] | Sequence[str | os.PathLike[str]],
     regress_poly: int | None = None,
@@ -93,10 +109,9 @@ def tsnr(
 
     _defects.check(upstream_defects)
     files = _paths(in_file)
+    # traits' Range(low=1): an integer (True is 1) of at least 1.
     if regress_poly is not None and (
-        isinstance(regress_poly, bool)
-        or not isinstance(regress_poly, (int, np.integer))
-        or regress_poly < 1
+        not isinstance(regress_poly, (int, np.integer)) or regress_poly < 1
     ):
         raise ValueError(
             "The 'regress_poly' trait of a TSNRInputSpec instance must be an integer >= 1, but a "
@@ -159,8 +174,8 @@ def tsnr(
         data = res.reshape(shape)
         detrended_path = write(data, detrended_file)
 
-    mean = np.asarray(_core.numpy_reduce(data, "mean", 3, str(numpy_version)))
-    std = np.asarray(_core.numpy_reduce(data, "std", 3, str(numpy_version)))
+    mean = _reduce(data, "mean", 3, str(numpy_version))
+    std = _reduce(data, "std", 3, str(numpy_version))
     del data
     snr = np.zeros_like(mean)
     nonzero = std > 1.0e-3

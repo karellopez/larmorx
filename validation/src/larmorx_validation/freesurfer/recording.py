@@ -53,9 +53,7 @@ FINAL = "--larmorx-final"
 def skipped(rel: str) -> bool:
     """Whether the recorder leaves the subject directory's file ``rel`` out."""
     first = rel.split("/", 1)[0]
-    return (
-        ("/" in rel and first in SKIP_DIRS) or rel in SKIP_FILES or rel.startswith(SKIP_PREFIX)
-    )
+    return ("/" in rel and first in SKIP_DIRS) or rel in SKIP_FILES or rel.startswith(SKIP_PREFIX)
 
 
 @dataclass(frozen=True)

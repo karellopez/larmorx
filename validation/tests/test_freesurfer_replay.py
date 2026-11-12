@@ -105,16 +105,26 @@ def test_surfaces_stamp_and_volume_path_are_provenance(tmp_path):
     a, b, m = tmp_path / "lh.white", tmp_path / "b" / "lh.white", tmp_path / "m" / "lh.white"
     b.parent.mkdir()
     m.parent.mkdir()
-    nib.freesurfer.write_geometry(str(a), coords, faces, "created by alice on Thu Nov 12 12:55:29 2026", info)
+    nib.freesurfer.write_geometry(
+        str(a), coords, faces, "created by alice on Thu Nov 12 12:55:29 2026", info
+    )
     info_b = dict(info, filename=f"{REP}/s/mri/wm.mgz")
-    nib.freesurfer.write_geometry(str(b), coords, faces, "created by alice on Fri Nov 13 09:00:00 2026", info_b)
+    nib.freesurfer.write_geometry(
+        str(b), coords, faces, "created by alice on Fri Nov 13 09:00:00 2026", info_b
+    )
     c = ff.compare(a, b, ctx())
     assert c.verdict == ff.PROVENANCE and c.kind == "surface", c
     moved = coords.copy()
     moved[3] += np.float32(0.25)
-    nib.freesurfer.write_geometry(str(m), moved, faces, "created by alice on Fri Nov 13 09:00:00 2026", info_b)
+    nib.freesurfer.write_geometry(
+        str(m), moved, faces, "created by alice on Fri Nov 13 09:00:00 2026", info_b
+    )
     c = ff.compare(a, m, ctx())
-    assert c.verdict == ff.DIFFERS and "1 of 10 vertices moved" in c.detail and "same faces" in c.detail, c
+    assert (
+        c.verdict == ff.DIFFERS
+        and "1 of 10 vertices moved" in c.detail
+        and "same faces" in c.detail
+    ), c
 
 
 def test_curvatures_and_annotations_are_measured(tmp_path):
@@ -131,7 +141,9 @@ def test_curvatures_and_annotations_are_measured(tmp_path):
     names = [b"unknown", b"a", b"b"]
     x, y = tmp_path / "lh.x.annot", tmp_path / "lh.y.annot"
     nib.freesurfer.write_annot(str(x), labels, ctab, names, fill_ctab=True)
-    nib.freesurfer.write_annot(str(y), np.array([0, 1, 2, 2, 0], dtype=np.int32), ctab, names, fill_ctab=True)
+    nib.freesurfer.write_annot(
+        str(y), np.array([0, 1, 2, 2, 0], dtype=np.int32), ctab, names, fill_ctab=True
+    )
     c = ff.compare(x, y, ctx())
     assert c.kind == "annot" and "vertex labels: 1 of 5 differ" in c.detail, c
 
@@ -163,8 +175,12 @@ def test_text_files_mask_their_provenance_lines(tmp_path):
 
 def test_logs_mask_times_and_report_what_is_left(tmp_path):
     a, b, c_ = tmp_path / "x.log", tmp_path / "y.log", tmp_path / "z.log"
-    a.write_text("mri_fill done\nmri_fill took 0.85 minutes\n@#@FSTIME 2026:11:12:12:17:49 a N 1 e 0.8\n")
-    b.write_text("mri_fill done\nmri_fill took 0.91 minutes\n@#@FSTIME 2026:11:13:01:00:00 a N 1 e 0.9\n")
+    a.write_text(
+        "mri_fill done\nmri_fill took 0.85 minutes\n@#@FSTIME 2026:11:12:12:17:49 a N 1 e 0.8\n"
+    )
+    b.write_text(
+        "mri_fill done\nmri_fill took 0.91 minutes\n@#@FSTIME 2026:11:13:01:00:00 a N 1 e 0.9\n"
+    )
     c_.write_text("mri_fill failed\nmri_fill took 0.91 minutes\n")
     assert ff.compare(a, b, ctx()).verdict == ff.PROVENANCE
     c = ff.compare(a, c_, ctx())
@@ -223,10 +239,23 @@ def _fake_recording(root: Path) -> fr.Recording:
     steps = root / "record" / "steps"
     steps.mkdir(parents=True)
     base_env = {"SUBJECTS_DIR": sd, "OMP_NUM_THREADS": "4", "FREESURFER_HOME": "/opt/fs"}
-    before = {"scripts/recon-all.env": e, "mri/T1.mgz": t1, "surf/lh.white.preaparc": link, "surf/lh.white": link}
+    before = {
+        "scripts/recon-all.env": e,
+        "mri/T1.mgz": t1,
+        "surf/lh.white.preaparc": link,
+        "surf/lh.white": link,
+    }
     step = {
         "index": 2,
-        "argv": ["mris_place_surface", "--threads", "4", "--i", f"{sd}/s/surf/lh.white", "--o", "lh.pial"],
+        "argv": [
+            "mris_place_surface",
+            "--threads",
+            "4",
+            "--i",
+            f"{sd}/s/surf/lh.white",
+            "--o",
+            "lh.pial",
+        ],
         "cwd": f"{sd}/s/mri",
         "env": base_env,
         "start": 2e9,
@@ -235,7 +264,10 @@ def _fake_recording(root: Path) -> fr.Recording:
         "before": before,
         "between": {},
         "between_deleted": [],
-        "outputs": {"surf/lh.pial": put(b"pial"), "scripts/p.Y2026.M11.D12.H12.M19.log": put(b"log took 3 s\n")},
+        "outputs": {
+            "surf/lh.pial": put(b"pial"),
+            "scripts/p.Y2026.M11.D12.H12.M19.log": put(b"log took 3 s\n"),
+        },
         "deleted": [],
     }
     (steps / "0002-mris_place_surface.json").write_text(json.dumps(step))

@@ -55,7 +55,9 @@ def manifest(fs_home: Path, *, workers: int = 4, memo: Path | None = None) -> di
     """Every file of the installation ``fs_home``: relative path -> SHA-256 (a symbolic link:
     ``link:<its text>``). Hashes are remembered in ``memo`` by size and modification time."""
     fs_home = Path(fs_home).resolve()
-    memo = memo or base() / f"manifest-{hashlib.sha256(str(fs_home).encode()).hexdigest()[:16]}.json"
+    memo = (
+        memo or base() / f"manifest-{hashlib.sha256(str(fs_home).encode()).hexdigest()[:16]}.json"
+    )
     try:
         known = json.loads(memo.read_text(encoding="utf-8"))
     except (OSError, ValueError):
@@ -78,7 +80,9 @@ def manifest(fs_home: Path, *, workers: int = 4, memo: Path | None = None) -> di
             else:
                 todo.append((rel, p, stamp))
     with ThreadPoolExecutor(max(1, workers)) as ex:
-        for (rel, _p, stamp), digest in zip(todo, ex.map(lambda t: _sha256(t[1]), todo), strict=True):
+        for (rel, _p, stamp), digest in zip(
+            todo, ex.map(lambda t: _sha256(t[1]), todo), strict=True
+        ):
             out[rel] = digest
             known[rel] = [*stamp, digest]
     if todo:
@@ -130,6 +134,7 @@ def launcher(program: str, fs_home: str | Path, *, root: Path | None = None) -> 
         f"exec '{target}' \"$@\"\n"
     )
     package = json.dumps(ident, indent=1, sort_keys=True) + "\n"
+
     def holds(path: Path) -> str | None:
         try:
             return path.read_text(encoding="utf-8")

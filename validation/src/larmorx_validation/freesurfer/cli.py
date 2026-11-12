@@ -52,11 +52,15 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
     r.add_argument("run")
     r.add_argument("step")
     r.add_argument("dest", type=Path)
-    r.add_argument("--threads", type=_threads, default=1, help="a number, or 'recorded' (default 1)")
+    r.add_argument(
+        "--threads", type=_threads, default=1, help="a number, or 'recorded' (default 1)"
+    )
     x = sub.add_parser("run", help="replay steps and compare their files with the recorded ones")
     x.add_argument("run")
     x.add_argument("steps", nargs="+")
-    x.add_argument("--threads", type=_threads, default=1, help="a number, or 'recorded' (default 1)")
+    x.add_argument(
+        "--threads", type=_threads, default=1, help="a number, or 'recorded' (default 1)"
+    )
     x.add_argument(
         "--command",
         help="run this command line instead of FreeSurfer's program (uncached; '{program}' in it "
@@ -65,6 +69,11 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
     x.add_argument("--timeout", type=float, default=None, help="seconds per step")
     x.add_argument("--json", type=Path, help="write the reports here (one JSON list)")
     x.add_argument("--work", type=Path, help="the replays' root (default <base>/work/<run>/...)")
+    x.add_argument(
+        "--compare-only",
+        action="store_true",
+        help="compare replays made before again, without rebuilding or running",
+    )
     c = sub.add_parser("compare", help="compare two FreeSurfer files, provenance aside")
     c.add_argument("reference", type=Path)
     c.add_argument("replay", type=Path)
@@ -81,7 +90,11 @@ def _print_report(report) -> None:
         f"{' (served by the oracle cache)' if report.served else ''}"
     )
     for f in report.files:
-        name = f.path if f.path == f.replay_path or not f.replay_path else f"{f.path} | {f.replay_path}"
+        name = (
+            f.path
+            if f.path == f.replay_path or not f.replay_path
+            else f"{f.path} | {f.replay_path}"
+        )
         detail = f": {f.comparison.detail}" if f.comparison.detail else ""
         print(f"  {f.comparison.verdict:10} {f.comparison.kind:8} {name or f.replay_path}{detail}")
     if report.note:
@@ -94,7 +107,9 @@ def main(args: argparse.Namespace) -> int:
 
     if args.fs_command == "compare":
         pairs = tuple(tuple(x.split("=", 1)) for x in args.pair)
-        c = fsfiles.compare(args.reference, args.replay, fsfiles.Context(pairs=pairs), name=args.name)
+        c = fsfiles.compare(
+            args.reference, args.replay, fsfiles.Context(pairs=pairs), name=args.name
+        )
         print(f"{c.verdict} ({c.kind}){': ' + c.detail if c.detail else ''}")
         return 0 if c.same else 1
     rec = _recording(args.run)
@@ -105,7 +120,9 @@ def main(args: argparse.Namespace) -> int:
         return 0
     if args.fs_command == "rebuild":
         rb = rp.rebuild(rec, rec.select(args.step), args.dest, threads=args.threads)
-        print(f"rebuilt {rb.files} files ({rb.bytes / 2**20:.1f} MiB), {len(rb.links)} links: {rb.subject_dir}")
+        print(
+            f"rebuilt {rb.files} files ({rb.bytes / 2**20:.1f} MiB), {len(rb.links)} links: {rb.subject_dir}"
+        )
         print(f"cd {shlex.quote(str(rb.cwd))}")
         print(" ".join(shlex.quote(a) for a in rb.argv))
         return 0
@@ -118,13 +135,15 @@ def main(args: argparse.Namespace) -> int:
             dest = args.work / rec.name / f"{step.label}-{t}"
         command = shlex.split(args.command) if args.command else None
         report, _rb = rp.replay(rec, step, threads=args.threads, dest=dest, command=command,
-                                timeout=args.timeout)  # fmt: skip
+                                timeout=args.timeout, compare_only=args.compare_only)  # fmt: skip
         _print_report(report)
         sys.stdout.flush()
         reports.append(report)
     if args.json:
         args.json.parent.mkdir(parents=True, exist_ok=True)
-        args.json.write_text(json.dumps([r.to_dict() for r in reports], indent=1) + "\n", encoding="utf-8")
+        args.json.write_text(
+            json.dumps([r.to_dict() for r in reports], indent=1) + "\n", encoding="utf-8"
+        )
     bad = [r for r in reports if r.verdict == "differs"]
     print(f"REPLAY {len(reports) - len(bad)} of {len(reports)} reproduced")
     return 1 if bad else 0

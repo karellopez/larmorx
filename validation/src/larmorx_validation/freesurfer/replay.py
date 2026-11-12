@@ -97,7 +97,9 @@ class Rebuilt:
         return out
 
 
-def step_env(rec: Recording, step: Step, subjects_dir: Path, cwd: Path, threads: int | None) -> tuple[dict[str, str], int]:
+def step_env(
+    rec: Recording, step: Step, subjects_dir: Path, cwd: Path, threads: int | None
+) -> tuple[dict[str, str], int]:
     """The environment a replayed step runs in, and its thread count."""
     env = {k: v for k, v in rec.environment.items() if _keep(k)}
     env.update(step.env)
@@ -143,7 +145,7 @@ def rebuild(rec: Recording, step: Step, dest: Path, *, threads: int | None = 1) 
     subject.mkdir(parents=True)
     (dest / MARKER).write_text(f"{rec.root}\n{step.label}\n", encoding="utf-8")
     # directories that existed before the step (birth time), and the files' own directories
-    for t, kind, rel, text in rec.born:
+    for t, kind, rel, _text in rec.born:
         if kind == "d" and (t == 0.0 or t < step.start):
             (subjects / rel).mkdir(parents=True, exist_ok=True)
     n = size = 0
@@ -231,7 +233,9 @@ def run_command(rb: Rebuilt, command: Sequence[str], *, timeout: float | None = 
     argv = [*prefix, *rb.argv[1:]] if "{program}" in " ".join(command) else [*prefix, *rb.argv]
     start = time.perf_counter()
     try:
-        p = subprocess.run(argv, cwd=rb.cwd, env=rb.env, capture_output=True, timeout=timeout, check=False)
+        p = subprocess.run(
+            argv, cwd=rb.cwd, env=rb.env, capture_output=True, timeout=timeout, check=False
+        )
         code, out, err = p.returncode, p.stdout, p.stderr
     except subprocess.TimeoutExpired as e:
         code, out, err = None, e.stdout or b"", e.stderr or b""
@@ -317,7 +321,10 @@ class StepReport:
             "threads": self.threads,
             "verdict": self.verdict,
             "exit": {"recorded": self.exit_recorded, "replayed": self.exit_replayed},
-            "seconds": {"recorded": self.seconds_recorded, "replayed": round(self.seconds_replayed, 3)},
+            "seconds": {
+                "recorded": self.seconds_recorded,
+                "replayed": round(self.seconds_replayed, 3),
+            },
             "served_from_cache": self.served,
             "counts": self.counts(),
             "files": [
@@ -346,7 +353,9 @@ def compare_step(rb: Rebuilt, done) -> StepReport:
     expected = step.after()
     actual = scan(rb.subject_dir)
     before = step.before
-    changed_ref = {rel for rel, sha in expected.items() if before.get(rel) != sha} | set(step.deleted)
+    changed_ref = {rel for rel, sha in expected.items() if before.get(rel) != sha} | set(
+        step.deleted
+    )
     changed_rep = {rel for rel, sha in actual.items() if before.get(rel) != sha}
     changed_rep |= {rel for rel in before if rel not in actual and not skipped(rel)}
     # logs named by the time they were written: paired by their names without the time
@@ -387,6 +396,40 @@ def work_dir(rec: Recording, step: Step, threads: int | None) -> Path:
     return base() / "work" / rec.name / f"{step.label}-{t}"
 
 
+#: Beside the marker: how the replay's run ended (``--compare-only`` compares again from it).
+RESULT = ".larmorx-fs-replay-result.json"
+
+
+def _again(rec: Recording, step: Step, dest: Path, threads: int | None) -> tuple[Rebuilt, Ran]:
+    """A replay already made in ``dest``, as it was left (its run's result from :data:`RESULT`)."""
+    import json
+
+    marker, result = dest / MARKER, dest / RESULT
+    if not marker.is_file() or marker.read_text(encoding="utf-8").split("\n")[:2] != [
+        str(rec.root),
+        step.label,
+    ]:
+        raise FileNotFoundError(f"{dest} holds no replay of {rec.name} {step.label}")
+    r = json.loads(result.read_text(encoding="utf-8"))
+    subjects = dest / "subjects"
+    cwd = Path(_remap(step.cwd, rec.subjects_dir, str(subjects)))
+    env, n = step_env(rec, step, subjects, cwd, threads)
+    rb = Rebuilt(
+        rec,
+        step,
+        dest,
+        subjects,
+        subjects / rec.subject,
+        cwd,
+        step_argv(rec, step, subjects, threads),
+        env,
+        n,
+    )
+    return rb, Ran(
+        r["argv"], r["returncode"], b"", r.get("tail", "").encode(), r["seconds"], r["cached"]
+    )
+
+
 def replay(
     rec: Recording,
     step: Step,
@@ -395,10 +438,36 @@ def replay(
     dest: Path | None = None,
     command: Sequence[str] | None = None,
     timeout: float | None = None,
+    compare_only: bool = False,
 ) -> tuple[StepReport, Rebuilt]:
-    """Rebuild, run (FreeSurfer's program, or ``command``), compare."""
-    rb = rebuild(rec, step, dest or work_dir(rec, step, threads), threads=threads)
-    done = run_command(rb, command, timeout=timeout) if command else run_freesurfer(rb, timeout=timeout)
+    """Rebuild, run (FreeSurfer's program, or ``command``), compare; with ``compare_only`` only
+    compare a replay made before in ``dest`` again (after a change of the comparison)."""
+    import json
+
+    dest = dest or work_dir(rec, step, threads)
+    if compare_only:
+        rb, done = _again(rec, step, dest, threads)
+    else:
+        rb = rebuild(rec, step, dest, threads=threads)
+        done = (
+            run_command(rb, command, timeout=timeout)
+            if command
+            else run_freesurfer(rb, timeout=timeout)
+        )
+        tail = (done.stderr_bytes or done.stdout_bytes)[-600:].decode("utf-8", "replace")
+        (dest / RESULT).write_text(
+            json.dumps(
+                {
+                    "argv": [str(a) for a in getattr(done, "args", getattr(done, "argv", []))],
+                    "returncode": done.returncode,
+                    "seconds": round(float(done.seconds), 3),
+                    "cached": bool(getattr(done, "cached", False)),
+                    "tail": tail,
+                },
+                indent=1,
+            ),
+            encoding="utf-8",
+        )
     report = compare_step(rb, done)
     if done.returncode not in (0, step.exit):
         tail = (done.stderr_bytes or done.stdout_bytes)[-600:].decode("utf-8", "replace")

@@ -39,7 +39,6 @@ from __future__ import annotations
 import gzip
 import os
 import re
-from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -76,11 +75,18 @@ _CREATED = re.compile(r"created by \S+ on [^\n]*")
 #: What changes from run to run in a log and in a program's messages, besides dates: times and
 #: memory figures, fs_time's report line, process numbers in temporary names.
 LOG_MASKS: tuple[str | tuple[str, str], ...] = (
-    (r"(?m)^@#@FSTIME .*$", "@#@FSTIME …"),
+    # fs_time's report lines (@#@FSTIME, @#@FSLOADPRE, @#@FSLOADPOST: times, memory, the load)
+    (r"(?m)^(@#@FS[A-Z]+) .*$", r"\1 …"),
     (r"(?m)^#@#%# .*$", "#@#%# …"),
     (r"(?i)\b([0-9]+(?:\.[0-9]*)?)(\s*(?:min(?:ute)?s?|sec(?:ond)?s?|hours?|h|m|s)\b)", r"…\2"),
-    (r"(?i)((?:took|elapsed|time|runtime|duration|seconds|minutes|hours)[^0-9\n]{0,24})[0-9.:]+", r"\1…"),
-    (r"(?i)((?:vmpeak|vmsize|vmrss|vmhwm|maxrss|memory|mem|ram|KB|MB|GB)[^0-9\n]{0,12})[0-9.]+", r"\1…"),
+    (
+        r"(?i)((?:took|elapsed|time|runtime|duration|seconds|minutes|hours)[^0-9\n]{0,24})[0-9.:]+",
+        r"\1…",
+    ),
+    (
+        r"(?i)((?:vmpeak|vmsize|vmrss|vmhwm|maxrss|memory|mem|ram|KB|MB|GB)[^0-9\n]{0,12})[0-9.]+",
+        r"\1…",
+    ),
     (r"\b(tmp\.[A-Za-z0-9_.-]*?\.)\d+\b", r"\1…"),
     (r"\bpid\s*[=:]?\s*\d+\b", "pid …"),
 )
@@ -237,7 +243,9 @@ _NUMBER = re.compile(r"^[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?$")
 
 def _text_detail(a: str, b: str) -> str:
     la, lb = a.splitlines(), b.splitlines()
-    differing = [i for i in range(max(len(la), len(lb))) if i >= len(la) or i >= len(lb) or la[i] != lb[i]]
+    differing = [
+        i for i in range(max(len(la), len(lb))) if i >= len(la) or i >= len(lb) or la[i] != lb[i]
+    ]
     worst = 0.0
     for i in differing:
         if i >= len(la) or i >= len(lb):
@@ -249,9 +257,10 @@ def _text_detail(a: str, b: str) -> str:
             if x != y and _NUMBER.match(x) and _NUMBER.match(y):
                 worst = max(worst, abs(float(x) - float(y)))
     first = differing[0]
-    shown = (la[first] if first < len(la) else "<none>")[:120], (
-        lb[first] if first < len(lb) else "<none>"
-    )[:120]
+    shown = (
+        (la[first] if first < len(la) else "<none>")[:120],
+        (lb[first] if first < len(lb) else "<none>")[:120],
+    )
     lines = f"{len(differing)} of {max(len(la), len(lb))} lines differ"
     num = f", numbers by at most {worst:.6g}" if worst else ""
     return f"{lines}{num}; the first, line {first + 1}: {shown[0]!r} vs {shown[1]!r}"
@@ -280,7 +289,9 @@ def _values(kind: str, a: Path, b: Path, da: bytes, db: bytes) -> str:
         ia, ib = cls.from_bytes(da), cls.from_bytes(db)
         parts = []
         if ia.shape != ib.shape or ia.get_data_dtype() != ib.get_data_dtype():
-            parts.append(f"shape/type {ia.shape} {ia.get_data_dtype()} vs {ib.shape} {ib.get_data_dtype()}")
+            parts.append(
+                f"shape/type {ia.shape} {ia.get_data_dtype()} vs {ib.shape} {ib.get_data_dtype()}"
+            )
         if not np.array_equal(ia.affine, ib.affine):
             parts.append("the affines differ")
         parts.append(numbers(np.asanyarray(ia.dataobj), np.asanyarray(ib.dataobj), "voxels"))
@@ -310,9 +321,12 @@ def _values(kind: str, a: Path, b: Path, da: bytes, db: bytes) -> str:
 # The comparison
 
 
-def compare(a: Path | None, b: Path | None, ctx: Context = Context(), *, name: str = "") -> Comparison:
+def compare(
+    a: Path | None, b: Path | None, ctx: Context | None = None, *, name: str = ""
+) -> Comparison:
     """Compare the reference file ``a`` with the replay's ``b`` (``None``: absent). ``name``
     decides the kind when the paths carry none (the recordings' blobs are named by SHA-256)."""
+    ctx = ctx or Context()
     name = name or os.path.basename(str(b or a))
     if a is None or b is None:
         present = b if a is None else a

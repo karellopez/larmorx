@@ -38,6 +38,18 @@ class Page:
     #: a page whose original is a part of its software, not a program (ITK's "transform
     #: files"): the titles name it after the version, "ITK 5.4.5's transform files"
     part: str = ""
+    #: each port's package and licence where it is not ``package`` (a page of two ports: the
+    #: replica's "larmorx-nc, FSL Licence", the clean room's "larmorx, Apache-2.0")
+    packages: dict[str, str] = field(default_factory=dict)
+    #: every comparison's label names the version of the original's run ("replica (fix) − AFNI
+    #: 3dvolreg 26.3.05, LPS"), not only in an example of two versions
+    versions_in_labels: bool = False
+
+    def package_of(self, port: str) -> str:
+        """The package and licence of ``port``'s panels."""
+        if port in self.packages:
+            return self.packages[port]
+        return self.package if port == self.port else "larmorx, Apache-2.0"
 
 
 #: The oracle's words in texts (the guide's section 1): fMRIPrep's runs and the builds of the
@@ -141,6 +153,9 @@ def text(page: Page, s: str | None, code: bool = True) -> str | None:
 _MODES = [
     # "default mode (ANTS-112 corrected)": one bracket
     (r"\bdefault mode \(([^()]*\bcorrected)\)", r"fix (the default, \1)"),
+    # "D13" is the decision's number: `fix` is its corrections
+    (r"\bdefault mode \(D13 corrections\)", "fix (the default)"),
+    (r"\bdefault mode: corrected\b", "fix (the default), corrected"),
     (r"\bdefault mode\b", "fix (the default)"),
     (r"^default\b", "fix (the default)"),
     (r"\breproduce mode\b", "reproduce"),
@@ -153,24 +168,42 @@ def _mode(sub: str) -> str:
     return sub
 
 
-def _original_panel(page: Page, p: dict) -> tuple[str, str, float]:
-    """An original's panel: its name (the guide's "ANTs N4BiasFieldCorrection 2.6.5"), its
-    second line (how it ran) and its place among the original's panels (a version first, then
-    fMRIPrep's build, then correctly rounded maths)."""
+def _original_parts(page: Page, p: dict) -> tuple[str, str, list[str], list[str], float]:
+    """An original's panel read from its label: its program, its version, how it ran, its
+    builds' words and its place among the original's panels (a version first, then fMRIPrep's
+    build, then correctly rounded maths). The label's shapes: "ANTs 2.6.5, 1 thread",
+    "Atropos: ANTs 2.6.5", "AFNI 25.2.09, 3dTshift" (the program after the version), "mcflirt,
+    FSL 6.0.7.17" (before the software), "AFNI 25.2.09 in fMRIPrep's image" (or "(fMRIPrep's
+    image)"), "AFNI in fMRIPrep's image" (its version in the second line: "AFNI_25.2.09"),
+    "ANTs 2.6.5's blobs" (what the panel shows of the run)."""
     label, sub = p["label"], p.get("sub") or ""
+    sw = re.escape(page.software)
     program = page.program
     m = re.match(r"^(\w+): (.*)$", label)  # "Atropos: ANTs 2.6.5, 1 thread"
     if m and m.group(1) != page.software:
         program, label = m.group(1), m.group(2)
+    m = re.match(rf"^(\w+), ({sw}\b.*)$", label)  # "mcflirt, FSL 6.0.7.17"
+    if m:
+        program, label = m.group(1), m.group(2)
     m = re.match(
-        rf"^{re.escape(page.software)}(?: (?P<ver>[0-9][\w.+-]*))?(?P<img> \(fMRIPrep's image\))?"
+        rf"^{sw}(?: (?P<ver>[0-9][\w.+-]*))?(?P<img> \(fMRIPrep's image\)| in fMRIPrep's image)?"
         r"(?:'s (?P<own>[\w -]+))?(?P<rest>,.*)?$",
         label,
     )
     if not m:
         raise ValueError(f"an original's panel of another shape: {p['label']!r}")
-    ver = m.group("ver") or page.version
+    ver = m.group("ver")
+    if not ver:  # "AFNI in fMRIPrep's image": "fMRIPrep 25.2.6's build (AFNI_25.2.09 ...)"
+        v = re.search(rf"\b{sw}_(\d[\w.]*\d)", sub)
+        ver = v.group(1) if v else page.version
     rest = [r.strip() for r in (m.group("rest") or "").split(",") if r.strip()]
+    if rest and (rest[0] in page.programs or rest[0].split(" ")[0] in page.programs):
+        program = rest[0].split(" ")[0]  # "FSL 6.0.7.23, applytopup" on topup's page
+    if rest and program and rest[0].split(" ")[0] == program:
+        # "AFNI 25.2.09, 3dTshift": the program is in the name; "topup --nthr=4": its arguments
+        args = rest.pop(0).removeprefix(program).strip()
+        if args:
+            rest.insert(0, args)
     if m.group("own"):  # "ANTs 2.6.5's blobs": what the panel shows of the original's run
         rest.insert(0, f"its {m.group('own')}")
     tail, rank = [], 0.0
@@ -183,18 +216,70 @@ def _original_panel(page: Page, p: dict) -> tuple[str, str, float]:
         rank = max(rank, 2.0)
     elif p["role"] == "reference":
         rank = 2.0
+    return program, ver, rest, tail, rank
+
+
+#: What an original's run is to the ports, in its second line: the version they follow.
+_FOLLOWED = [
+    (r"\bboth implementations' reference\b", "the version both ports follow"),
+    (r"\bthe replica's reference\b", "the version the replica follows"),
+]
+
+
+def _original_panel(page: Page, p: dict) -> tuple[str, str, float]:
+    """An original's panel: its name (the guide's "ANTs N4BiasFieldCorrection 2.6.5"), its
+    second line (how it ran) and its place among the original's panels. A panel of the
+    original's kind that names no run of it ("Initial alignment (-init)", the starting point of
+    a registration) keeps its label as its name, after the original's runs."""
+    if not p["label"].startswith(page.software) and re.match(r"^[A-Z][a-z]", p["label"]):
+        if not re.search(r"\d+\.\d+", p["label"]):
+            return p["label"], text(page, p.get("sub"), code=False) or "", 3.0
+    program, ver, rest, tail, rank = _original_parts(page, p)
     # a page of several programs names a call's program in the example, not on each panel
     name = " ".join(x for x in (page.software, program, ver) if x) + "".join(f", {t}" for t in tail)
+    sub = p.get("sub") or ""
+    for pat, rep in _FOLLOWED:
+        sub = re.sub(pat, rep, sub)
     sub = text(page, sub, code=False) or ""
     second = " · ".join(x for x in (", ".join(rest), sub) if x)
     return name, second, rank
 
 
-def _port_panel(page: Page, p: dict, against: str | None) -> tuple[str, str]:
-    label, sub = p["label"], p.get("sub") or ""
-    m = re.match(r"^(?:(\w+): )?larmorx(?: \(port\)|'s (?P<own>[\w -]+))?(?P<rest>,.*)?$", label)
+#: A LARMORX panel's label: an optional program, LARMORX, its package, its port ("larmorx
+#: replica", "larmorx-nc replica", "LARMORX clean-room original", "larmorx's clean-room
+#: original", "larmorx (replica)", "larmorx (port)", "larmorx replica (larmorx-gpl)"), what the
+#: panel shows of the run ("'s series") and how it ran (", -peels 0", ", 1 thread").
+_PORT_LABEL = re.compile(
+    r"^(?:(?P<prog>\w+): )?(?:LARMORX|larmorx)(?P<pkg>-nc|-gpl)?"
+    r"(?P<kind>(?:'s)? clean-room original| clean room| replica| \((?:port|replica|clean room)\))?"
+    r"(?: \((?P<pkg2>larmorx-\w+)\))?(?:'s (?P<own>[\w -]+))?(?P<rest>,.*)?$"
+)
+
+
+def port_of_label(page: Page, label: str) -> str:
+    """The port a LARMORX panel's label names, or the page's own (``Page.port``) where it names
+    none ("larmorx (port), 1 thread")."""
+    m = _PORT_LABEL.match(label)
     if not m:
         raise ValueError(f"a port's panel of another shape: {label!r}")
+    kind = m.group("kind") or ""
+    if "clean" in kind:
+        return "clean-room"
+    if "replica" in kind:
+        return "replica"
+    return page.port
+
+
+def _port_panel(
+    page: Page, p: dict, against: str | None, port: str | None = None
+) -> tuple[str, str]:
+    """A port's panel: its name ("replica", "clean room") and its second line (its package and
+    licence, how it ran, what it is compared with)."""
+    label, sub = p["label"], p.get("sub") or ""
+    m = _PORT_LABEL.match(label)
+    if not m:
+        raise ValueError(f"a port's panel of another shape: {label!r}")
+    port = port or port_of_label(page, label)
     rest = [r.strip() for r in (m.group("rest") or "").split(",") if r.strip()]
     if m.group("own"):  # "larmorx's blobs": what the panel shows of the port's run
         rest.insert(0, f"its {m.group('own')}")
@@ -202,10 +287,11 @@ def _port_panel(page: Page, p: dict, against: str | None) -> tuple[str, str]:
     if "fix" not in mode and "reproduce" not in mode:
         raise ValueError(f"a port's panel without its mode: {label!r} ({sub!r})")
     how = ", ".join([*rest, mode])
-    second = f"{page.package} · {how}" + (f" · against {against}" if against else "")
-    name = words.PORT_NAME[page.port]
-    if m.group(1) and m.group(1) != page.program:  # "antsAffineInitializer: larmorx" on antsAI's
-        name = f"{m.group(1)}: {name}"
+    second = f"{page.package_of(port)} · {how}" + (f" · against {against}" if against else "")
+    name = words.PORT_NAME[port]
+    prog = m.group("prog")
+    if prog and prog != page.program:  # "antsAffineInitializer: larmorx" on antsAI's
+        name = f"{prog}: {name}"
     return name, second
 
 
@@ -235,36 +321,89 @@ _LABEL = [
     (r"\breproduce mode\b", "reproduce"),
     (r"\bfMRIPrep's own output\b", "fMRIPrep's output"),
     (r"\bfMRIPrep's own \(", "fMRIPrep's output ("),
+    # the modes of two ports' comparisons ("clean-room original, default − replica, default")
+    (r"\bfMRIPrep's own (?:reference|file|files)\b", "fMRIPrep's output"),
+    (r"\bfMRIPrep's own$", "fMRIPrep's output"),
+    (r"\(both default mode\)", "(both fix)"),
+    (r"\bboth in their default mode\b", "both fix"),
+    (r"\bboth default\b", "both fix"),
+    (r"\(default\)", "(fix)"),
+    (r"([,:]) default − ", r"\1 fix − "),
+    (r", default$", ", fix"),
+    (r"\bdefault mode\b", "fix"),
 ]
 
+#: A port's words at either end of a comparison's label, by the port the comparison's run has
+#: ("original − AFNI 25.2.09" on a page of two ports names the clean room).
+_PORT_WORDS = {
+    "clean-room": r"(?:the )?(?:LARMORX |larmorx )?(?:clean-room original|clean room|original)",
+    "replica": r"(?:the )?(?:larmorx(?:-nc|-gpl)? replica|larmorx \(replica\)|replica)",
+}
 
-def _label(page: Page, old: str) -> str:
-    """A comparison's label: LARMORX's port by its name, the original by its program."""
+
+def _label(page: Page, old: str, pa: str = "", pb: str = "", runs: dict | None = None) -> str:
+    """A comparison's label: LARMORX's port by its name (``pa``, ``pb``: the ports of its two
+    runs), the original by its program. ``runs``: each panel's new name and version, for the
+    labels that name a build without them ("fMRIPrep's AFNI", "the repository's AFNI")."""
     s = old
     program = page.program
+    runs = runs or {}
     # a label that begins with its program ("antsAI: larmorx − ANTs, 1 thread", on a page of
     # two programs): the program goes to the original's name
     m = re.match(r"^(\w+): (.*)$", s)
     if m and m.group(1) in (page.program, *page.programs):
         program, s = m.group(1), m.group(2)
+    # the ports by their own names, at either end
+    if pa in _PORT_WORDS:
+        s = re.sub(rf"^{_PORT_WORDS[pa]}(?![\w-])", words.PORT_NAME[pa], s)
+    if pb in _PORT_WORDS:
+        s = re.sub(rf" − {_PORT_WORDS[pb]}(?![\w-])", f" − {words.PORT_NAME[pb]}", s)
+    who = words.PORT_NAME.get(pa) or words.PORT_NAME[page.port]
     for pat, rep in _LABEL:
-        s = re.sub(pat, rep.format(port=words.PORT_NAME[page.port]), s)
-    # the first mention of the software names the program; a second one is the same program
+        s = re.sub(pat, rep.format(port=who), s)
     sw = re.escape(page.software)
+    a, b = runs.get("a") or {}, runs.get("b") or {}
+    # "fMRIPrep's AFNI − the repository's AFNI build": the builds by the runs' names
+    if a.get("name") and (m := re.match(rf"^fMRIPrep's (own )?{sw}\b", s)):
+        s = a["name"] + s[m.end() :]  # "fMRIPrep's own AFNI": fMRIPrep's output
+    if b.get("name") and "fMRIPrep's build" in b["name"]:  # "replica − fMRIPrep's AFNI"
+        s = re.sub(rf" − fMRIPrep's {sw}\b", f" − {b['name']}", s)
+    if b.get("name"):
+        rep = b["name"] if a.get("role") == "fmriprep" else "the repository's build"
+        s = re.sub(rf" − the repository's {sw}(?: build)?\b", f" − {rep}", s)
+    # the first mention of the software names the program; a second one is the same program
     first = re.search(rf"\b{sw}\b", s)
     if first and program:  # (an example of several programs' calls names the software)
         head, tail = s[: first.end()], s[first.end() :]
-        tail = re.sub(rf"\b{sw} (?=[0-9])", "", tail)
-        s = f"{head} {program}{tail}" if not tail.startswith(f" {program}") else s
+        named = tail.startswith(f" {program}")
+        tail = re.sub(rf"\b{sw} (?=\d+\.\d|on\b)", "", tail)
+        s = f"{head}{tail}" if named else f"{head} {program}{tail}"
+    # a mention without a version names its run's, in an example of two versions of the
+    # original and on the pages that ask for it (the ANTs pages, presented before, do not)
+    if first and program and (runs.get("versions", 0) > 1 or page.versions_in_labels):
+        m = re.search(rf"\b{sw} {re.escape(program)}(?! [0-9])", s)
+        if m:
+            side = a if " − " in s[m.end() :] or " − " not in s else b
+            if side.get("version"):
+                s = f"{s[: m.end()]} {side['version']}{s[m.end() :]}"
     return s
 
 
 _THREADS = re.compile(r"(\d+) threads?(?: [^−]*)? − (\d+) threads?")
 _IDS = re.compile(r"\(((?:[A-Z]+-\d+)(?:(?:, | and )[A-Z]+-\d+)*)\)")
+_VERSION = re.compile(r"\b\d+(?:\.\d+){2,}\b")
 
 
-def _what(old: str, a: dict | None, b: dict | None) -> str | None:
-    """What changes between two runs of one program, from a comparison's old label."""
+def _vkey(v: str) -> tuple[int, ...]:
+    return tuple(int(x) for x in re.findall(r"\d+", v))
+
+
+def _what(
+    old: str, a: dict | None, b: dict | None, rl: str = "", va: str = "", vb: str = ""
+) -> str | None:
+    """What changes between two runs of one program, from a comparison's old label (``rl``: its
+    old role label; ``va``, ``vb``: the versions of its two runs, where they are the
+    original's)."""
     if m := _THREADS.search(old):
         n = sorted({int(m.group(1)), int(m.group(2))})
         return f"{n[0]} and {n[1]} threads" if len(n) == 2 else None
@@ -282,30 +421,111 @@ def _what(old: str, a: dict | None, b: dict | None) -> str | None:
         return "the clock's seed and a fixed seed"
     if "the clock's seed: run" in old:
         return "two runs with the clock's seed"
+    # the shapes of the other software's pages
+    if a is not None and "fMRIPrep's image" in a.get("label", ""):  # "fMRIPrep's AFNI − ..."
+        if va and vb and va != vb:
+            return f"fMRIPrep's build of {va} and the repository's {vb}"
+        return "fMRIPrep's build and the repository's"
+    if m := re.search(r"(\d+) threads? − all CPUs", old):
+        return f"{m.group(1)} thread{'s' if m.group(1) != '1' else ''} and all CPUs"
+    if m := re.search(r"--nthr=(\d+) − --nthr=(\d+)|--n-threads (\d+) − (\d+)", old):
+        n = sorted({int(x) for x in m.groups() if x})
+        return f"{n[0]} and {n[1]} threads" if len(n) == 2 else None
+    if rl.startswith("the original against itself: ") and not rl.endswith("the version step"):
+        return rl.removeprefix("the original against itself: ")  # its own words already
+    if "numpy" in old and "SciPy" in old:
+        return "two releases of numpy and SciPy"
+    if rl.endswith("the version step") or len(set(_VERSION.findall(old))) == 2:
+        vs = sorted(set(_VERSION.findall(old)) or {va, vb} - {""}, key=_vkey)
+        return f"versions {vs[0]} and {vs[1]}" if len(vs) == 2 else None
+    if re.search(r"\bstored \w+ − \w+", old):
+        return "the same volumes stored another way"
+    if "usual encoding" in old:
+        return "two encodings"
+    if m := re.search(r"\bwith (?:the )?(\w+) − .*\bwithout (?:it|the \1)\b", old):
+        return f"with and without the {m.group(1)}"
+    if "second run − first run" in old:
+        return "two runs of the same command"
+    if "reversed input − unperturbed" in old:
+        return "the volumes in reverse order"
+    if "AVX-512 kernels on − off" in old:
+        return "numpy's AVX-512 kernels on and off"
     return None
 
 
-def _role(page: Page, d: dict, pa: str, pb: str, panels: dict) -> tuple[str, str]:
+#: Old role labels that say what a comparison is where its shape does not (the guide's
+#: section 4, "Today's comparison labels and the new ones"): the new role and its group.
+_ROLE_LABELS = {
+    "what the registration changed": (
+        "the original against its starting point: what the registration changed",
+        "its starting point",
+    ),
+    "the original against the truth": ("the original against the known answer", "the known answer"),
+    "the same data, two encodings": ("the input against itself: two encodings", "itself"),
+    "the two implementations of the corrections": (
+        "the clean room against the replica: both fix",
+        "the replica",
+    ),
+}
+
+
+def _defect(page: Page, old: str) -> str:
+    """"AFNI: -peels 0 − -peels 1", "AFNI on the negative scale factor − AFNI on the usual
+    encoding": the two runs that show an original's defect, by what differs."""
+    sw = re.escape(page.software)
+    sides = []
+    for x in old.split(" − "):
+        x = re.sub(rf"^{sw}(?: [0-9][\w.]*)?:? ", "", x.strip())
+        sides.append(x.removeprefix("on "))
+    if len(sides) != 2:
+        raise ValueError(f"a defect's comparison of another shape: {old!r}")
+    return f"the defect ({sides[0]} and {sides[1]})"
+
+
+def _role(
+    page: Page, d: dict, pa: str, pb: str, panels: dict, runs: dict | None = None
+) -> tuple[str, str]:
     """A comparison's role label (the guide's section 4) and what it is compared with, for the
     metrics table's groups."""
     old, who = d["label"], words.PORT_NAME.get(pa)
+    rl = d.get("role_label") or ""
     a, b = panels.get(d["a"]), panels.get(d["b"])
+    va, vb = ((runs or {}).get(x, {}).get("version", "") for x in (d["a"], d["b"]))
+    if rl in _ROLE_LABELS:
+        return _ROLE_LABELS[rl]
+    if rl == "against the truth" and (who or pa == "original"):
+        return f"the {who or 'original'} against the known answer", "the known answer"
+    if rl.startswith("the defect") and pa == pb == "original":
+        return f"the original against itself: {_defect(page, old)}", "itself"
+    if rl == "the corrected result" and who and pb == "original":
+        return f"the {who} against the original: fix, on the usual encoding", "the original"
     if who and pb == pa:
-        if "thread" in old and not re.search(r"default|reproduce|fix", old.split("−")[0]):
-            what = _what(old, a, b)
+        if rl in ("larmorx's corrections", "larmorx's correction"):
+            ids = _IDS.search(old)
+            what = "fix and reproduce" + (f" ({ids.group(1)})" if ids else "")
+        elif "thread" in old and not re.search(r"default|reproduce|fix", old.split("−")[0]):
+            what = _what(old, a, b, rl)
         elif re.search(r"\b(default|fix)\b.*− .*reproduce|reproduce.*− .*default", old):
             ids = _IDS.search(old)
             what = "fix and reproduce" + (f" ({ids.group(1)})" if ids else "")
         else:
-            what = _what(old, a, b)
+            what = _what(old, a, b, rl)
         if not what:
             raise ValueError(f"{d['id']}: what changes in {old!r}?")
         return f"the {who} against itself: {what}", "itself"
+    if pa == "clean-room" and pb == "replica":
+        left, _, right = old.partition(" − ")
+        both = ""
+        if re.search(r"\bdefault\b|\bfix\b", old) and "reproduce" not in old:
+            both = ": both fix"
+        elif "reproduce" in old and not re.search(r"\bdefault\b|\bfix\b", old):
+            both = ": both reproduce"
+        return f"the clean room against the replica{both}", "the replica"
     if who and pb in ("original", "fmriprep") and pb == "fmriprep":
         return f"the {who} against fMRIPrep's output", "fMRIPrep's output"
     if who and pb == "original":
         role = f"the {who} against the original"
-        if b is not None and b.get("role") == "reference":
+        if b is not None and b.get("role") == "reference" or b is None and "correctly rounded" in old:
             role += ": correctly rounded maths"
         elif b is not None and "fMRIPrep's image" in b.get("label", ""):
             role += ": fMRIPrep's build"
@@ -318,11 +538,16 @@ def _role(page: Page, d: dict, pa: str, pb: str, panels: dict) -> tuple[str, str
     if pa in ("original", "fmriprep") and pb == "input":
         return "the original against the known answer", "the known answer"
     if pa in ("original", "fmriprep") and pb in ("original", "fmriprep"):
-        what = _what(old, a, b)
+        what = _what(old, a, b, rl, va, vb)
         if not what:
             raise ValueError(f"{d['id']}: what changes in {old!r}?")
         return f"the original against itself: {what}", "itself"
     raise ValueError(f"{d['id']}: a comparison of {pa} and {pb}")
+
+
+#: A run's id that names one of LARMORX's ports ("larmorx-8", "lx-1", "replica-6",
+#: "original-6" for the clean room on a page of two ports): never taken for the original's.
+_PORT_ID = re.compile(r"^(?:larmorx|lx|replica|original|clean)\b")
 
 
 def example(
@@ -373,29 +598,45 @@ def example(
         ex["chain"]["note"] = _own(page, ex["chain"].get("note"))
     by_id = {p["id"]: p for p in ex["panels"]}
     ports, new, rank = {}, {}, {}
-    main_b = {}
+    main_b: dict[str, list[str]] = {}
     for d in ex["diffs"]:
-        if d["kind"] == "main" and d["a"] in by_id and d["a"] not in main_b:
-            main_b[d["a"]] = d["b"]
-    originals = {}
+        if d["kind"] == "main" and d["a"] in by_id:
+            main_b.setdefault(d["a"], []).append(d["b"])
+    originals, info = {}, {}
     for pid, p in by_id.items():
         if p["role"] in ("original", "reference"):
             fallback = (p["label"], p.get("sub"), 0.0)
             name, sub, r = attempt(_original_panel, page, p, fallback=fallback)
             new[pid], originals[pid], rank[pid] = (name, sub), name, r
+            info[pid] = {"name": name, "role": p["role"]}
+            if r == 0.0 and name != p["label"]:  # a run of a version, as built
+                info[pid]["version"] = attempt(_original_parts, page, p, fallback=("",) * 5)[1]
+            elif r == 1.0:  # fMRIPrep's build: its version, which may be another
+                info[pid]["version"] = attempt(_original_parts, page, p, fallback=("",) * 5)[1]
         elif p["role"] == "input":
             new[pid] = (p["label"], text(page, p.get("sub"), code=False))
         elif p["role"] == "fmriprep":
             new[pid] = _fmriprep_panel(page, p)
             originals[pid] = "fMRIPrep's output"
+            info[pid] = {"name": "fMRIPrep's output", "role": "fmriprep"}
+    versions = {i["version"] for k, i in info.items() if i.get("version") and rank.get(k) == 0.0}
     for pid, p in by_id.items():
         if p["role"] == "larmorx":
-            ports[pid] = page.port
+            ports[pid] = attempt(port_of_label, page, p["label"], fallback=page.port)
             if pid in (panels or {}):  # a panel the page names itself (its label has no mode)
                 continue
-            against = originals.get(main_b.get(pid, ""))
+            # what it is compared with: the version it follows where a panel says so, else the
+            # run of its first main comparison (none where that run is another port's)
+            bs = main_b.get(pid, [])
+            follows = [
+                b for b in bs if b in originals and re.search(
+                    "|".join(pat for pat, _ in _FOLLOWED), by_id[b].get("sub") or "")
+            ]  # fmt: skip
+            against = originals.get((follows or bs or [""])[0])
+            if against and follows:
+                against += ", which it follows"
             fallback = (p["label"], p.get("sub"))
-            new[pid] = attempt(_port_panel, page, p, against, fallback=fallback)
+            new[pid] = attempt(_port_panel, page, p, against, ports[pid], fallback=fallback)
     new.update(panels or {})
 
     def port_of(pid: str) -> str:
@@ -405,22 +646,24 @@ def example(
             return words.ROLE_PORT[by_id[pid]["role"]]
         return hidden[pid]
 
+    # each run a comparison names without a panel: its port from ``runs``, or from the run it
+    # is compared with (a check's: the same port; the original's in a comparison of the
+    # original's own variability, or as a main comparison's second run)
     hidden: dict[str, str] = dict(runs or {})
     for d in ex["diffs"]:
         for end, other in (("a", "b"), ("b", "a")):
             pid = d[end]
             if pid in by_id or pid in hidden:
                 continue
-            if d["kind"] == "variability":
-                if pid.startswith("larmorx"):  # until X1: never take a port's run for the original
+            if d["kind"] == "variability" or (d["kind"] in ("main", "fmriprep") and end == "b"):
+                if _PORT_ID.match(pid):  # a port's run is never taken for the original
                     hidden[pid] = refuse(
-                        f"{ex['id']}: the port's run {pid} in a variability comparison", "original"
+                        f"{ex['id']}: the port's run {pid} in a {d['kind']} comparison",
+                        "original",
                     )
                     continue
                 hidden[pid] = "original"
-            elif pid.startswith("larmorx"):  # the port's run ("larmorx-seed", "larmorx-1")
-                hidden[pid] = page.port
-            elif d[other] in by_id:
+            elif d["kind"] == "check" and d[other] in by_id:
                 hidden[pid] = port_of(d[other])
             else:
                 hidden[pid] = refuse(f"{ex['id']}: run {pid} of {d['id']} has no port", "original")
@@ -428,38 +671,55 @@ def example(
     for d in ex["diffs"]:
         pa, pb = port_of(d["a"]), port_of(d["b"])
         role, target[d["id"]] = attempt(
-            _role, page, d, pa, pb, by_id, fallback=("?", "the original")
+            _role, page, d, pa, pb, by_id, info, fallback=("?", "the original")
         )
-        out[d["id"]] = (_label(page, d["label"]), role)
+        runs_ = {"a": info.get(d["a"]), "b": info.get(d["b"]), "versions": len(versions)}
+        out[d["id"]] = (_label(page, d["label"], pa, pb, runs_), role)
     if errors:
         return ex
     for k, v in (diffs or {}).items():
         out[k] = v
         target[k] = v[1].split(" against ", 1)[1].split(":")[0]
-    # the metrics table's groups: the original against itself, then the port's comparisons
+    # the metrics table's groups: the input and the original against themselves, then each
+    # port's comparisons
     order = {p: (words.PORT_ORDER.index(port_of(p)), rank.get(p, 0.0), i)
              for i, p in enumerate(by_id)}  # fmt: skip
-    targets = ["the original", "fMRIPrep's output", "the known answer", "itself", "the replica"]
+    targets = [
+        "the original", "fMRIPrep's output", "the known answer", "its starting point", "itself",
+        "the replica",
+    ]  # fmt: skip
 
     def place(pid: str) -> tuple:
         return order.get(pid, (words.PORT_ORDER.index(port_of(pid)), 9.0, 99))
 
     groups = []
-    for port in ("original", page.port):
-        ds = [
-            d
-            for d in ex["diffs"]
-            if (port_of(d["a"]) in ("original", "fmriprep")) == (port == "original")
-        ]
+    side = {"input": "input", "fmriprep": "original"}
+    for port in ("input", "original", "replica", "clean-room"):
+        ds = [d for d in ex["diffs"] if side.get(port_of(d["a"]), port_of(d["a"])) == port]
         if not ds:
             continue
         ds.sort(key=lambda d: (targets.index(target[d["id"]]), place(d["a"]), place(d["b"])))
-        if port == "original":
-            # the original against the known answer (a phantom's truth), then against itself
-            known = [d["id"] for d in ds if target[d["id"]] == "the known answer"]
-            if known:
-                groups.append(("The original against the known answer", known))
-            rest = [d["id"] for d in ds if d["id"] not in known]
+        if port == "input":
+            whats = list(dict.fromkeys(out[d["id"]][1].split("itself: ", 1)[-1] for d in ds))
+            groups.append((f"The input against itself: {', '.join(whats)}", [d["id"] for d in ds]))
+        elif port == "original":
+            # the original against the known answer (a phantom's truth), against its starting
+            # point, then against itself
+            for t, title_ in (
+                ("the known answer", "The original against the known answer"),
+                ("its starting point", "The original against its starting point"),
+            ):
+                ids = [d["id"] for d in ds if target[d["id"]] == t]
+                if ids:
+                    groups.append((title_, ids))
+            # a defect of the original, shown by two of its runs, before its yardstick
+            defect = [d["id"] for d in ds if "against itself: the defect" in out[d["id"]][1]]
+            if defect:
+                groups.append(("The original against itself: the defect", defect))
+            rest = [
+                d["id"] for d in ds if d["id"] not in defect and target[d["id"]] not in (
+                    "the known answer", "its starting point")
+            ]  # fmt: skip
             if rest:
                 groups.append(("The original against itself: the yardstick", rest))
         else:
@@ -478,8 +738,8 @@ def example(
                 kinds = {
                     "thread counts" if w.endswith(" threads") else w.split(" (")[0] for w in whats
                 }
-                order = ["thread counts", "fix and reproduce", *sorted(kinds)]
-                named = ", ".join(k for k in dict.fromkeys(order) if k in kinds)
+                korder = ["thread counts", "fix and reproduce", *sorted(kinds)]
+                named = ", ".join(k for k in dict.fromkeys(korder) if k in kinds)
                 groups.append((f"The {who} against itself: {named}", [d["id"] for d in itself]))
     words.example(
         ex,
@@ -545,11 +805,12 @@ def chain(page: Page, ch: dict) -> None:
     for step in ch["steps"]:
         for n in step["nodes"]:
             if n["role"] == "larmorx":
-                m = re.match(r"^larmorx(?: \(port\))?(?P<rest>,.*)?$", n["label"])
-                if not m:
+                m = _PORT_LABEL.match(n["label"])
+                if not m or m.group("own") or m.group("prog"):
                     raise ValueError(f"a chain's run of another shape: {n['label']!r}")
-                n["label"] = who + _mode(m.group("rest") or "")
-                n["port"] = page.port
+                port = port_of_label(page, n["label"])
+                n["label"] = words.PORT_NAME[port] + _mode(m.group("rest") or "")
+                n["port"] = port
             elif n["role"] in ("original", "reference"):
                 name, second, _ = _original_panel(page, {"label": n["label"], "role": n["role"]})
                 n["label"] = f"{name}, {second}" if second else name

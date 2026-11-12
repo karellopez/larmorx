@@ -892,6 +892,11 @@ CATEGORIES = {
 }
 
 
+#: The port of a run a comparison names without a panel: the replica's run with a fixed seed,
+#: compared with ANTs' clock-seeded runs.
+RUNS = {"fmriprep-atropos": {"larmorx-seed": "replica"}}
+
+
 def present(doc: dict) -> dict:
     """Atropos' page in the writing guide's words and order: texts, ports and order only."""
     for ex in doc["examples"]:
@@ -907,6 +912,7 @@ def present(doc: dict) -> dict:
             title=TITLES.get(ex["id"]),
             panels=PANELS.get(ex["id"]),
             diffs=DIFFS.get(ex["id"]),
+            runs=RUNS.get(ex["id"]),
         )
     for im in doc["implementations"]:
         present_.implementation(PAGE, im, "standard comparison and data panel")

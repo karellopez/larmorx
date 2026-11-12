@@ -126,6 +126,8 @@ def _dry(code: Path, module: str, src: Path, dst: Path) -> None:
         env=env,
         check=True,
         stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        text=True,
     )
 
 
@@ -179,7 +181,12 @@ def regress(site: Path, ref: str, before: str, intended: Path | None, only: list
                 )
                 module = evidence.TOOLS[name]
                 _dry(old, module, src, tmp / f"{name}.ref.json")
-                _dry(REPO, module, src, tmp / f"{name}.now.json")
+                try:
+                    _dry(REPO, module, src, tmp / f"{name}.now.json")
+                except subprocess.CalledProcessError as exc:  # its present refuses: listed
+                    total += 1
+                    print(f"{name:24s} its present fails: {exc.stderr.strip().splitlines()[-1]}")
+                    continue
                 a = json.loads((tmp / f"{name}.ref.json").read_text(encoding="utf-8"))
                 b = json.loads((tmp / f"{name}.now.json").read_text(encoding="utf-8"))
                 diffs: list[str] = []

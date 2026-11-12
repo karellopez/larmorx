@@ -325,9 +325,10 @@ fn masks_of<T: Copy + NpFloat + numpy::Element>(
 /// float64, `t` columns), the criterion a number (`criterion_is_int`: a Python `int`) or `"all"`,
 /// `filter_type` `"cosine"`, `"polynomial"`, `"false"` (nipype's `False`) or `"other"`,
 /// `failure_mode` `"error"` or anything else (NaN), with numpy `numpy`'s and SciPy `scipy`'s
-/// libraries and D13's switch (`larmorx_confounds::compcor`'s documentation).
+/// libraries and D13's switch (`larmorx_confounds::compcor`'s documentation); `mismatch`: the
+/// `ValueError` text of a mask after these whose shape is not the series'.
 #[pyfunction]
-#[pyo3(signature = (masks, t, criterion, criterion_is_int, filter_type, degree, period_cut, repetition_time, failure_mode, numpy = "2.5.4", scipy = "1.18.1", upstream_defects = "fix", n_threads = 1))]
+#[pyo3(signature = (masks, t, criterion, criterion_is_int, filter_type, degree, period_cut, repetition_time, failure_mode, numpy = "2.5.4", scipy = "1.18.1", upstream_defects = "fix", n_threads = 1, mismatch = None))]
 #[allow(clippy::too_many_arguments)]
 fn nipype_compute_noise_components<'py>(
     py: Python<'py>,
@@ -344,6 +345,7 @@ fn nipype_compute_noise_components<'py>(
     scipy: &str,
     upstream_defects: &str,
     n_threads: usize,
+    mismatch: Option<String>,
 ) -> PyResult<NoiseOut<'py>> {
     let criterion = match criterion.extract::<String>() {
         Ok(s) if s == "all" => Criterion::All,
@@ -379,10 +381,10 @@ fn nipype_compute_noise_components<'py>(
         .is_some_and(|m| m.extract::<PyReadonlyArray2<'_, f32>>().is_ok());
     let r = if f32_series {
         let m = masks_of::<f32>(&masks, t)?;
-        py.detach(|| compcor::compute_noise_components(m, t, &o))
+        py.detach(|| compcor::compute_noise_components(m, t, &o, mismatch))
     } else {
         let m = masks_of::<f64>(&masks, t)?;
-        py.detach(|| compcor::compute_noise_components(m, t, &o))
+        py.detach(|| compcor::compute_noise_components(m, t, &o, mismatch))
     };
     let r = r.map_err(|e| err(py, e))?;
     let md = r

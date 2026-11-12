@@ -2120,3 +2120,68 @@ def nipype_compute_dvars(
     """nipype's ``compute_dvars`` on the masked series ``mfunc`` (float32, one row per voxel in
     the mask's C order): ``(dvars_stdz, dvars_nstd, dvars_vx_stdz, ar1, voxels, notices)``, or
     nipype's error (``larmorx.confounds.compute_dvars`` is the public form)."""
+
+# --- the confounds' part, relay 2f: nipype's CompCor numerics ----------------------------------
+
+def nipype_cosine_drift(
+    period_cut: float, frametimes: np.ndarray, upstream_defects: str = "fix"
+) -> tuple[np.ndarray, list[tuple[str, str, str, str]]]:
+    """nipype's ``_cosine_drift(period_cut, frametimes)``: the ``T × order`` basis (the constant
+    last) and the notices (GLIBC-07)."""
+
+def nipype_regress_poly(
+    degree: int,
+    data: np.ndarray,
+    remove_mean: bool = True,
+    numpy: str = "2.5.4",
+    upstream_defects: str = "fix",
+    n_threads: int = 1,
+) -> tuple[np.ndarray, np.ndarray | None, list[tuple[str, str, str, str]]]:
+    """nipype's ``regress_poly`` of a 2-D float32 or float64 array (one series per row):
+    ``(residuals, basis or None, notices)`` (``larmorx.confounds.regress_poly`` is the public
+    form)."""
+
+def nipype_cosine_filter(
+    data: np.ndarray,
+    timestep: float,
+    period_cut: float,
+    remove_mean: bool = True,
+    numpy: str = "2.5.4",
+    scipy: str = "1.18.1",
+    upstream_defects: str = "fix",
+    n_threads: int = 1,
+) -> tuple[np.ndarray, np.ndarray | None, list[tuple[str, str, str, str]]]:
+    """nipype's ``cosine_filter`` of a 2-D float32 or float64 array (one series per row):
+    ``(residuals, basis or None, notices)`` (``larmorx.confounds.cosine_filter`` is the public
+    form)."""
+
+def nipype_tcompcor_mask(
+    rows: np.ndarray, percentile_threshold: float = 0.02, numpy: str = "2.5.4", n_threads: int = 1
+) -> np.ndarray:
+    """``TCompCor._process_masks`` for one mask's rows (float64): the high-variance voxels."""
+
+def nipype_compute_noise_components(
+    masks: list[np.ndarray],
+    t: int,
+    criterion: float | str,
+    criterion_is_int: bool,
+    filter_type: str,
+    degree: int,
+    period_cut: float,
+    repetition_time: float | None,
+    failure_mode: str,
+    numpy: str = "2.5.4",
+    scipy: str = "1.18.1",
+    upstream_defects: str = "fix",
+    n_threads: int = 1,
+    mismatch: str | None = None,
+) -> tuple[
+    np.ndarray,
+    bool,
+    np.ndarray | None,
+    list[tuple[int, np.ndarray, np.ndarray, np.ndarray, int, bool]],
+    list[tuple[str, str, str, str]],
+]:
+    """nipype's ``compute_noise_components`` on each mask's rows: ``(components, float32,
+    basis or None, metadata per mask, notices)`` (``larmorx.confounds.compute_noise_components``
+    is the public form)."""

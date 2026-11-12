@@ -88,7 +88,9 @@ def main() -> None:
                 pos += 1
         else:
             tiny += 1
-    print(f"   2000 random designs with a zero/repeated column: -0.0 {neg}, +0.0 {pos}, tiny {tiny}")
+    print(
+        f"   2000 random designs with a zero/repeated column: -0.0 {neg}, +0.0 {pos}, tiny {tiny}"
+    )
     # every kind of exact zero singular value: zero or negative-zero columns and rows at any
     # place, signs flipped, both orientations, numpy's svd and SciPy's gesvd
     from scipy.linalg import svd as scipy_svd
@@ -134,7 +136,7 @@ def main() -> None:
         print(f"2. regress_poly degree {deg}: basis {basis.shape}, first column {first[:3]}...")
     # 3. empty masks.
     t, shape = 30, (3, 3, 2)
-    series = rng.standard_normal(shape + (t,)).astype(np.float32) + 100
+    series = rng.standard_normal((*shape, t)).astype(np.float32) + 100
     full = np.ones(shape, bool)
     empty = np.zeros(shape, bool)
     for crit in ("all", 0.5, 3):
@@ -197,10 +199,16 @@ def main() -> None:
                 )
     # 5. unknown filter, criterion 0 and below, axis=0.
     r, _ = outcome(compute_noise_components, series, [img(full)], 3, "foo", 0, 40, 2.0, "error")
-    print(f"5. filter 'foo': {r if isinstance(r, str) else (r[0].shape, r[0].dtype, r[2]['singular_value'][:2])}")
+    print(
+        f"5. filter 'foo': {r if isinstance(r, str) else (r[0].shape, r[0].dtype, r[2]['singular_value'][:2])}"
+    )
     for crit in (0, -2, 0.0):
-        r, _ = outcome(compute_noise_components, series, [img(full)], crit, "cosine", 0, 40, 2.0, "NaN")
-        print(f"5. criterion {crit!r}: {r if isinstance(r, str) else (r[0].shape, sum(r[2]['retained']))}")
+        r, _ = outcome(
+            compute_noise_components, series, [img(full)], crit, "cosine", 0, 40, 2.0, "NaN"
+        )
+        print(
+            f"5. criterion {crit!r}: {r if isinstance(r, str) else (r[0].shape, sum(r[2]['retained']))}"
+        )
     d2 = rng.standard_normal((9, 4)).astype(np.float32)
     a = regress_poly(1, d2, axis=0)[0]
     b = regress_poly(1, d2.T)[0].T
@@ -234,7 +242,11 @@ def main() -> None:
                             scipy_version=scipy.__version__,
                             upstream_defects=mode,
                         )
-                        g = g if isinstance(g, str) else [int(np.isfinite(x).sum()) for x in g.as_tuple()]
+                        g = (
+                            g
+                            if isinstance(g, str)
+                            else [int(np.isfinite(x).sum()) for x in g.as_tuple()]
+                        )
                         same += f", larmorx {mode} {'the same' if g == text else g}"
                 print(f"6. DVARS median 0 ({kind}, remove_zerovariance={rz}): {text}{same}")
 

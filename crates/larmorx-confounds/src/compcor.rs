@@ -200,12 +200,16 @@ pub enum CompcorError {
     /// PIPE-54's refusal (`ValueError`).
     #[error(
         "components_criterion must be 'all', a fraction in (0, 1) or a number of components of \
-         at least 1, not {0}"
+         at least 1, not {0} (PIPE-54)"
     )]
     BadCriterion(f64),
     /// PIPE-57's refusal (`ValueError`).
-    #[error("filter_type must be 'cosine', 'polynomial' or False")]
+    #[error("filter_type must be 'cosine', 'polynomial' or False (PIPE-57)")]
     BadFilter,
+    /// `ValueError` of a mask whose shape is not the series' (the caller's message), raised when
+    /// the loop reaches it.
+    #[error("{0}")]
+    ShapeMismatch(String),
     /// A path this port does not follow (`NotImplementedError`).
     #[error("{0}")]
     NotPorted(&'static str),
@@ -588,12 +592,16 @@ pub struct MaskRows<T> {
 ///
 /// # Errors
 /// The original's failures ([`CompcorError`]), and PIPE-54's and PIPE-57's refusals.
+///
+/// `mismatch`: the error of a mask after `masks` whose shape is not the series' (nipype raises it
+/// when its loop reaches that mask, so not after a `break`).
 pub fn compute_noise_components<T: NpFloat>(
     masks: Vec<MaskRows<T>>,
     t: usize,
     o: &NoiseOptions,
+    mismatch: Option<String>,
 ) -> Result<NoiseComponents, CompcorError> {
-    with_threads(o.n_threads, || noise(masks, t, o))?
+    with_threads(o.n_threads, || noise(masks, t, o, mismatch))?
 }
 
 /// What one mask gives before the components are chosen: `u` (`t × ucols`), `s`, the float32
@@ -610,6 +618,7 @@ fn noise<T: NpFloat>(
     masks: Vec<MaskRows<T>>,
     t: usize,
     o: &NoiseOptions,
+    mismatch: Option<String>,
 ) -> Result<NoiseComponents, CompcorError> {
     let fix = o.defects.fix();
     let mut notices = Notices::new(o.defects);
@@ -645,6 +654,7 @@ fn noise<T: NpFloat>(
     let mut basis_kept = false;
     let mut nan_fill_fixed = false;
     let mut filled = false;
+    let mut broke = false;
     let nmasks = masks.len();
     for (mi, mask) in masks.into_iter().enumerate() {
         let MaskRows { mut rows, n } = mask;
@@ -789,9 +799,10 @@ fn noise<T: NpFloat>(
                 }
                 continue;
             }
-            if mi + 1 < nmasks {
+            if mi + 1 < nmasks || mismatch.is_some() {
                 skipped_after = Some(mi);
             }
+            broke = true;
             break;
         }
         // u[:, :num] (numpy's slice of a negative stop included).
@@ -819,6 +830,11 @@ fn noise<T: NpFloat>(
             retained,
             f32: dec.s_f32,
         });
+    }
+    if let Some(msg) = mismatch
+        && !broke
+    {
+        return Err(CompcorError::ShapeMismatch(msg));
     }
     if zeroed_diff > 0 {
         notices.add(
@@ -1040,9 +1056,9 @@ mod tests {
             },
             FailureMode::Error,
         );
-        let a = compute_noise_components(masks(9), t, &o).unwrap();
+        let a = compute_noise_components(masks(9), t, &o, None).unwrap();
         o.n_threads = 5;
-        let b = compute_noise_components(masks(9), t, &o).unwrap();
+        let b = compute_noise_components(masks(9), t, &o, None).unwrap();
         assert_eq!(a, b);
         assert_eq!(a.metadata.len(), 2);
     }
@@ -1063,12 +1079,12 @@ mod tests {
             ]
         };
         let mut o = opts(FilterType::Cosine, Criterion::All, FailureMode::Error);
-        let r = compute_noise_components(masks(), t, &o).unwrap();
+        let r = compute_noise_components(masks(), t, &o, None).unwrap();
         assert_eq!(r.cols, 6);
         assert!(r.notices.iter().any(|n| n.defect.id == "PIPE-44"));
         o.defects = UpstreamDefects::Reproduce;
         assert!(matches!(
-            compute_noise_components(masks(), t, &o),
+            compute_noise_components(masks(), t, &o, None),
             Err(CompcorError::NoComponents)
         ));
     }
@@ -1092,10 +1108,10 @@ mod tests {
             },
             FailureMode::NaN,
         );
-        let r = compute_noise_components(masks(), t, &o).unwrap();
+        let r = compute_noise_components(masks(), t, &o, None).unwrap();
         assert!(r.components.iter().all(|v| v.is_finite()));
         o.defects = UpstreamDefects::Reproduce;
-        let r = compute_noise_components(masks(), t, &o).unwrap();
+        let r = compute_noise_components(masks(), t, &o, None).unwrap();
         assert!(r.components.iter().all(|v| v.is_nan()));
         assert_eq!(r.metadata[0].singular_value.len(), t);
     }

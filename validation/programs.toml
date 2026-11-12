@@ -87,7 +87,7 @@ command = "larmorx ants antsRegistration"
 python = "lx.ants.registration"
 does = "Registers one image to another, stage by stage: linear, SyN, B-spline SyN, B-spline, displacement-field, exponential and time-varying velocity-field, with image and point-set metrics."
 api = "docs/api/ants-registration.md"
-evidence = "/tools/ants-registration/"
+evidence = "/evidence/ants-registration/"
 records = { replica = ["ants-registration"] }
 
 [[program]]
@@ -207,7 +207,7 @@ command = "larmorx ants Atropos"
 python = "lx.ants.atropos"
 does = "Finite-mixture segmentation with a Markov random field prior: every initialization, likelihood model, outlier and partial-volume option."
 api = "docs/api/ants-atropos.md"
-evidence = "/tools/ants-atropos/"
+evidence = "/evidence/ants-atropos/"
 records = { replica = ["ants-atropos"] }
 
 [[program]]

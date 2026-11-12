@@ -2,7 +2,7 @@
  "environment": {
   "cpu": "AMD Ryzen 9 7945HX with Radeon Graphics",
   "larmorx": "0.1.0rc1",
-  "larmorx_commit": "9c34af60d378",
+  "larmorx_commit": "2825f3af3714",
   "larmorx_testdata_commit": "52e371aab0ac",
   "logical_cpus": 32,
   "os": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
@@ -25,8 +25,8 @@
   "location": "<workspace>/oracles/cache",
   "mode": "use",
   "ran": 3,
-  "saved_seconds": 481.6,
-  "served": 116
+  "saved_seconds": 498.4,
+  "served": 122
  },
  "reference": "tedana 26.0.3's t2smap (oracle cache); larmorx-gpl's replica by default",
  "results": [
@@ -41,7 +41,7 @@
     "(B) run 1 exit status": 0
    },
    "reason": "",
-   "seconds": 0.047,
+   "seconds": 0.033,
    "status": "pass"
   },
   {
@@ -55,7 +55,7 @@
     "(B) run 1 exit status": 0
    },
    "reason": "",
-   "seconds": 0.04,
+   "seconds": 0.051,
    "status": "pass"
   },
   {
@@ -69,7 +69,7 @@
     "(B) run 1 exit status": 2
    },
    "reason": "",
-   "seconds": 0.01,
+   "seconds": 0.036,
    "status": "pass"
   },
   {
@@ -83,7 +83,7 @@
     "(B) run 1 exit status": 2
    },
    "reason": "",
-   "seconds": 0.018,
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -97,7 +97,7 @@
     "(B) run 1 exit status": 2
    },
    "reason": "",
-   "seconds": 0.01,
+   "seconds": 0.006,
    "status": "pass"
   },
   {
@@ -111,7 +111,7 @@
     "(B) run 1 exit status": 2
    },
    "reason": "",
-   "seconds": 0.011,
+   "seconds": 0.005,
    "status": "pass"
   },
   {
@@ -129,7 +129,7 @@
     "(A) run 1 values identical": "10228/10228",
     "(B) run 1 values identical": "10228/10228"
    },
-   "seconds": 0.994,
+   "seconds": 0.982,
    "status": "pass"
   },
   {
@@ -147,7 +147,7 @@
     "(A) run 1 values identical": "10228/10228",
     "(B) run 1 values identical": "10228/10228"
    },
-   "seconds": 1.072,
+   "seconds": 1.263,
    "status": "pass"
   },
   {
@@ -165,7 +165,7 @@
     "(A) run 1 values identical": "every file",
     "(B) run 1 values identical": "every file"
    },
-   "seconds": 0.007,
+   "seconds": 0.009,
    "status": "pass"
   },
   {
@@ -183,7 +183,7 @@
     "(A) run 1 values identical": "every file",
     "(B) run 1 values identical": "every file"
    },
-   "seconds": 0.006,
+   "seconds": 0.009,
    "status": "pass"
   },
   {
@@ -201,7 +201,7 @@
     "(A) run 1 values identical": "every file",
     "(B) run 1 values identical": "every file"
    },
-   "seconds": 0.018,
+   "seconds": 0.043,
    "status": "pass"
   },
   {
@@ -219,7 +219,7 @@
     "(A) run 1 values identical": "every file",
     "(B) run 1 values identical": "every file"
    },
-   "seconds": 0.014,
+   "seconds": 0.086,
    "status": "pass"
   },
   {
@@ -239,7 +239,7 @@
     "(B) run 1 curve fit (b)/(c) share (%)": 0.0,
     "(B) run 1 values identical": "11519/11526"
    },
-   "seconds": 1.249,
+   "seconds": 1.376,
    "status": "pass"
   },
   {
@@ -259,7 +259,7 @@
     "(B) run 1 curve fit (b)/(c) share (%)": 0.0,
     "(B) run 1 values identical": "13358/13812"
    },
-   "seconds": 1.171,
+   "seconds": 1.399,
    "status": "pass"
   },
   {
@@ -277,7 +277,7 @@
     "(A) run 1 values identical": "25428/25428",
     "(B) run 1 values identical": "25428/25428"
    },
-   "seconds": 0.987,
+   "seconds": 1.234,
    "status": "pass"
   },
   {
@@ -297,7 +297,7 @@
     "(B) run 1 curve fit (b)/(c) share (%)": 0.0,
     "(B) run 1 values identical": "44340/46892"
    },
-   "seconds": 1.401,
+   "seconds": 1.559,
    "status": "pass"
   },
   {
@@ -315,7 +315,7 @@
     "(A) run 1 values identical": "10228/10228",
     "(B) run 1 values identical": "10228/10228"
    },
-   "seconds": 1.121,
+   "seconds": 1.124,
    "status": "pass"
   },
   {
@@ -333,7 +333,7 @@
     "(A) run 1 values identical": "25428/25428",
     "(B) run 1 values identical": "25428/25428"
    },
-   "seconds": 0.984,
+   "seconds": 1.081,
    "status": "pass"
   },
   {
@@ -351,7 +351,7 @@
     "(A) run 1 values identical": "5916/5916",
     "(B) run 1 values identical": "5916/5916"
    },
-   "seconds": 2.216,
+   "seconds": 2.904,
    "status": "pass"
   },
   {
@@ -369,7 +369,7 @@
     "(A) run 1 values identical": "10228/10228",
     "(B) run 1 values identical": "10228/10228"
    },
-   "seconds": 0.971,
+   "seconds": 0.897,
    "status": "pass"
   },
   {
@@ -387,7 +387,7 @@
     "(A) run 1 values identical": "10228/10228",
     "(B) run 1 values identical": "10228/10228"
    },
-   "seconds": 0.93,
+   "seconds": 1.228,
    "status": "pass"
   },
   {
@@ -405,7 +405,7 @@
     "(A) run 1 values identical": "10228/10228",
     "(B) run 1 values identical": "10228/10228"
    },
-   "seconds": 1.148,
+   "seconds": 1.133,
    "status": "pass"
   },
   {
@@ -423,7 +423,7 @@
     "(A) run 1 values identical": "8690/8690",
     "(B) run 1 values identical": "8690/8690"
    },
-   "seconds": 0.973,
+   "seconds": 1.095,
    "status": "pass"
   },
   {
@@ -441,7 +441,7 @@
     "(A) run 1 values identical": "every file",
     "(B) run 1 values identical": "every file"
    },
-   "seconds": 0.01,
+   "seconds": 0.029,
    "status": "pass"
   },
   {
@@ -459,7 +459,7 @@
     "(A) run 1 values identical": "10228/10228",
     "(B) run 1 values identical": "10228/10228"
    },
-   "seconds": 1.071,
+   "seconds": 1.155,
    "status": "pass"
   },
   {
@@ -477,7 +477,7 @@
     "(A) run 1 values identical": "8690/8690",
     "(B) run 1 values identical": "8690/8690"
    },
-   "seconds": 1.22,
+   "seconds": 1.238,
    "status": "pass"
   },
   {
@@ -495,7 +495,7 @@
     "(A) run 1 values identical": "8690/8690",
     "(B) run 1 values identical": "8690/8690"
    },
-   "seconds": 1.114,
+   "seconds": 1.27,
    "status": "pass"
   },
   {
@@ -509,7 +509,7 @@
     "(B) run 1 exit status": 1
    },
    "reason": "",
-   "seconds": 0.007,
+   "seconds": 0.022,
    "status": "pass"
   },
   {
@@ -523,7 +523,7 @@
     "(B) run 1 exit status": 1
    },
    "reason": "",
-   "seconds": 0.006,
+   "seconds": 0.014,
    "status": "pass"
   },
   {
@@ -537,7 +537,7 @@
     "(B) run 1 exit status": 1
    },
    "reason": "",
-   "seconds": 0.005,
+   "seconds": 0.004,
    "status": "pass"
   },
   {
@@ -551,7 +551,7 @@
     "(B) run 1 exit status": 2
    },
    "reason": "",
-   "seconds": 0.006,
+   "seconds": 0.005,
    "status": "pass"
   },
   {
@@ -583,7 +583,7 @@
     "(A) run 1 values identical": "every file",
     "(B) run 1 values identical": "every file"
    },
-   "seconds": 0.01,
+   "seconds": 0.011,
    "status": "pass"
   },
   {
@@ -601,7 +601,7 @@
     "(A) run 1 values identical": "every file",
     "(B) run 1 values identical": "every file"
    },
-   "seconds": 0.01,
+   "seconds": 0.035,
    "status": "pass"
   },
   {
@@ -619,7 +619,7 @@
     "(A) run 1 values identical": "every file",
     "(B) run 1 values identical": "every file"
    },
-   "seconds": 0.01,
+   "seconds": 0.048,
    "status": "pass"
   },
   {
@@ -637,7 +637,7 @@
     "(A) run 1 values identical": "every file",
     "(B) run 1 values identical": "every file"
    },
-   "seconds": 0.006,
+   "seconds": 0.008,
    "status": "pass"
   },
   {
@@ -655,7 +655,7 @@
     "(A) run 1 values identical": "10228/10228",
     "(B) run 1 values identical": "10228/10228"
    },
-   "seconds": 1.101,
+   "seconds": 1.19,
    "status": "pass"
   },
   {
@@ -673,7 +673,7 @@
     "(A) run 1 values identical": "10228/10228",
     "(B) run 1 values identical": "10228/10228"
    },
-   "seconds": 1.065,
+   "seconds": 1.182,
    "status": "pass"
   },
   {
@@ -691,7 +691,7 @@
     "(A) run 1 values identical": "10228/10228",
     "(B) run 1 values identical": "10228/10228"
    },
-   "seconds": 1.03,
+   "seconds": 1.194,
    "status": "pass"
   },
   {
@@ -709,7 +709,7 @@
     "(A) run 1 values identical": "10228/10228",
     "(B) run 1 values identical": "10228/10228"
    },
-   "seconds": 1.155,
+   "seconds": 1.306,
    "status": "pass"
   },
   {
@@ -727,7 +727,7 @@
     "(A) run 1 values identical": "every file",
     "(B) run 1 values identical": "every file"
    },
-   "seconds": 0.012,
+   "seconds": 0.042,
    "status": "pass"
   },
   {
@@ -747,7 +747,7 @@
     "(B) run 1 curve fit (b)/(c) share (%)": 0.0,
     "(B) run 1 values identical": "11519/11526"
    },
-   "seconds": 1.262,
+   "seconds": 1.175,
    "status": "pass"
   },
   {
@@ -765,7 +765,7 @@
     "(A) run 1 values identical": "10228/10228",
     "(B) run 1 values identical": "10228/10228"
    },
-   "seconds": 1.075,
+   "seconds": 1.109,
    "status": "pass"
   },
   {
@@ -787,7 +787,7 @@
     "(B) run 1 values identical": "10228/10228",
     "(B) run 2 values identical": "10228/10228"
    },
-   "seconds": 4.187,
+   "seconds": 4.324,
    "status": "pass"
   },
   {
@@ -809,7 +809,7 @@
     "(B) run 1 values identical": "10228/10228",
     "(B) run 2 values identical": "10228/10228"
    },
-   "seconds": 4.381,
+   "seconds": 4.632,
    "status": "pass"
   },
   {
@@ -827,7 +827,7 @@
     "(A) run 1 values identical": "every file",
     "(B) run 1 values identical": "every file"
    },
-   "seconds": 0.116,
+   "seconds": 0.08,
    "status": "pass"
   },
   {
@@ -845,7 +845,7 @@
     "(A) run 1 values identical": "10228/10228",
     "(B) run 1 values identical": "10228/10228"
    },
-   "seconds": 0.945,
+   "seconds": 0.926,
    "status": "pass"
   },
   {
@@ -863,7 +863,7 @@
     "(A) run 1 values identical": "10228/10228",
     "(B) run 1 values identical": "10228/10228"
    },
-   "seconds": 1.068,
+   "seconds": 0.939,
    "status": "pass"
   },
   {
@@ -881,7 +881,7 @@
     "(A) run 1 values identical": "every file",
     "(B) run 1 values identical": "every file"
    },
-   "seconds": 0.014,
+   "seconds": 0.005,
    "status": "pass"
   },
   {
@@ -899,7 +899,7 @@
     "(A) run 1 values identical": "10228/10228",
     "(B) run 1 values identical": "10228/10228"
    },
-   "seconds": 0.996,
+   "seconds": 1.314,
    "status": "pass"
   },
   {
@@ -912,13 +912,13 @@
     "(A) run 1 exit status": 1,
     "(B) run 1 exit status": 1
    },
-   "reason": "the replica prints only the last of tedana's two chained tracebacks for a 3D echo file (the original prints both, as tedana)",
+   "reason": "",
    "reported": {
     "(A) run 1 values identical": "every file",
     "(B) run 1 values identical": "every file"
    },
-   "seconds": 0.011,
-   "status": "expected-divergence"
+   "seconds": 0.044,
+   "status": "pass"
   },
   {
    "case": "mask-shifted",
@@ -935,7 +935,7 @@
     "(A) run 1 values identical": "10228/10228",
     "(B) run 1 values identical": "every file"
    },
-   "seconds": 0.451,
+   "seconds": 0.619,
    "status": "pass"
   },
   {
@@ -955,7 +955,7 @@
     "(B) run 1 curve fit (b)/(c) share (%)": 0.0,
     "(B) run 1 values identical": "11519/11526"
    },
-   "seconds": 1.181,
+   "seconds": 1.121,
    "status": "pass"
   },
   {
@@ -975,7 +975,7 @@
     "(B) run 1 curve fit (b)/(c) share (%)": 0.0,
     "(B) run 1 values identical": "11519/11526"
    },
-   "seconds": 1.204,
+   "seconds": 1.394,
    "status": "pass"
   },
   {
@@ -993,7 +993,7 @@
     "(A) run 1 values identical": "10228/10228",
     "(B) run 1 values identical": "10228/10228"
    },
-   "seconds": 1.01,
+   "seconds": 1.353,
    "status": "pass"
   },
   {
@@ -1011,7 +1011,7 @@
     "(A) run 1 values identical": "10228/10228",
     "(B) run 1 values identical": "10228/10228"
    },
-   "seconds": 1.034,
+   "seconds": 1.281,
    "status": "pass"
   },
   {
@@ -1029,7 +1029,7 @@
     "(A) run 1 values identical": "10228/10228",
     "(B) run 1 values identical": "10228/10228"
    },
-   "seconds": 1.032,
+   "seconds": 1.246,
    "status": "pass"
   },
   {
@@ -1047,7 +1047,7 @@
     "(A) run 1 values identical": "6383/6383",
     "(B) run 1 values identical": "6383/6383"
    },
-   "seconds": 1.067,
+   "seconds": 1.065,
    "status": "pass"
   },
   {
@@ -1065,7 +1065,7 @@
     "(A) run 1 values identical": "every file",
     "(B) run 1 values identical": "every file"
    },
-   "seconds": 0.035,
+   "seconds": 0.068,
    "status": "pass"
   },
   {
@@ -1083,7 +1083,7 @@
     "(A) run 1 values identical": "every file",
     "(B) run 1 values identical": "10228/10228"
    },
-   "seconds": 0.576,
+   "seconds": 0.561,
    "status": "pass"
   },
   {
@@ -1101,7 +1101,7 @@
     "(A) run 1 values identical": "every file",
     "(B) run 1 values identical": "1879/1879"
    },
-   "seconds": 0.554,
+   "seconds": 0.651,
    "status": "pass"
   },
   {
@@ -1119,7 +1119,7 @@
     "(A) run 1 values identical": "10228/10228",
     "(B) run 1 values identical": "10228/10228"
    },
-   "seconds": 2.099,
+   "seconds": 2.856,
    "status": "pass"
   },
   {
@@ -1132,13 +1132,13 @@
     "(A) run 1 exit status": 1,
     "(B) run 1 exit status": 1
    },
-   "reason": "the replica prints only nilearn's error where tedana chains it after its own 'Image/mask shape mismatch' (the original prints both, as tedana)",
+   "reason": "",
    "reported": {
     "(A) run 1 values identical": "every file",
     "(B) run 1 values identical": "every file"
    },
-   "seconds": 0.023,
-   "status": "expected-divergence"
+   "seconds": 0.024,
+   "status": "pass"
   },
   {
    "case": "x-n-independent-negative",
@@ -1155,7 +1155,7 @@
     "(A) run 1 values identical": "10228/10228",
     "(B) run 1 values identical": "10228/10228"
    },
-   "seconds": 0.908,
+   "seconds": 1.167,
    "status": "pass"
   },
   {
@@ -1173,7 +1173,7 @@
     "(A) run 1 values identical": "10228/10228",
     "(B) run 1 values identical": "every file"
    },
-   "seconds": 0.457,
+   "seconds": 0.433,
    "status": "pass"
   },
   {
@@ -1191,7 +1191,7 @@
     "(A) run 1 values identical": "every file",
     "(B) run 1 values identical": "every file"
    },
-   "seconds": 0.007,
+   "seconds": 0.005,
    "status": "pass"
   },
   {
@@ -1209,7 +1209,7 @@
     "(A) run 1 values identical": "25428/25428",
     "(B) run 1 values identical": "25428/25428"
    },
-   "seconds": 1.231,
+   "seconds": 1.191,
    "status": "pass"
   },
   {
@@ -1223,7 +1223,7 @@
     "(B) run 1 exit status": 0
    },
    "reason": "",
-   "seconds": 0.005,
+   "seconds": 0.004,
    "status": "pass"
   },
   {
@@ -1243,7 +1243,7 @@
     "(B) run 1 curve fit (b)/(c) share (%)": 0.0,
     "(B) run 1 values identical": "13365/14036"
    },
-   "seconds": 1.208,
+   "seconds": 1.31,
    "status": "pass"
   },
   {
@@ -1263,7 +1263,7 @@
     "(B) run 1 curve fit (b)/(c) share (%)": 0.066,
     "(B) run 1 values identical": "44216/48236"
    },
-   "seconds": 1.435,
+   "seconds": 1.672,
    "status": "pass"
   },
   {
@@ -1283,7 +1283,7 @@
     "(B) run 1 curve fit (b)/(c) share (%)": 0.0,
     "(B) run 1 values identical": "9546/9967"
    },
-   "seconds": 1.064,
+   "seconds": 1.404,
    "status": "pass"
   },
   {
@@ -1303,7 +1303,7 @@
     "(B) run 1 curve fit (b)/(c) share (%)": 0.0,
     "(B) run 1 values identical": "13359/13812"
    },
-   "seconds": 1.079,
+   "seconds": 1.191,
    "status": "pass"
   },
   {
@@ -1323,7 +1323,7 @@
     "(B) run 1 curve fit (b)/(c) share (%)": 0.0,
     "(B) run 1 values identical": "46892/46892"
    },
-   "seconds": 1.198,
+   "seconds": 1.229,
    "status": "pass"
   },
   {
@@ -1343,7 +1343,7 @@
     "(B) run 1 curve fit (b)/(c) share (%)": 0.0,
     "(B) run 1 values identical": "10751/10757"
    },
-   "seconds": 1.008,
+   "seconds": 1.095,
    "status": "pass"
   },
   {
@@ -1363,7 +1363,7 @@
     "(B) run 1 curve fit (b)/(c) share (%)": 0.0,
     "(B) run 1 values identical": "6646/6654"
    },
-   "seconds": 2.545,
+   "seconds": 2.805,
    "status": "pass"
   },
   {
@@ -1383,7 +1383,7 @@
     "(B) run 1 curve fit (b)/(c) share (%)": 0.0,
     "(B) run 1 values identical": "13412/13812"
    },
-   "seconds": 1.413,
+   "seconds": 1.307,
    "status": "pass"
   },
   {
@@ -1403,7 +1403,7 @@
     "(B) run 1 curve fit (b)/(c) share (%)": 0.0,
     "(B) run 1 values identical": "44611/46892"
    },
-   "seconds": 1.315,
+   "seconds": 1.642,
    "status": "pass"
   },
   {
@@ -1423,7 +1423,7 @@
     "(B) run 1 curve fit (b)/(c) share (%)": 0.0,
     "(B) run 1 values identical": "14036/14036"
    },
-   "seconds": 2.452,
+   "seconds": 1.572,
    "status": "pass"
   },
   {
@@ -1443,7 +1443,7 @@
     "(B) run 1 curve fit (b)/(c) share (%)": 0.0,
     "(B) run 1 values identical": "33153/33206"
    },
-   "seconds": 1.131,
+   "seconds": 1.442,
    "status": "pass"
   },
   {
@@ -1461,7 +1461,7 @@
     "(A) run 1 values identical": "10228/10228",
     "(B) run 1 values identical": "every file"
    },
-   "seconds": 0.537,
+   "seconds": 0.608,
    "status": "pass"
   },
   {
@@ -1479,7 +1479,7 @@
     "(A) run 1 values identical": "every file",
     "(B) run 1 values identical": "every file"
    },
-   "seconds": 0.045,
+   "seconds": 0.014,
    "status": "pass"
   },
   {
@@ -1497,7 +1497,7 @@
     "(A) run 1 values identical": "10228/10228",
     "(B) run 1 values identical": "every file"
    },
-   "seconds": 0.582,
+   "seconds": 0.519,
    "status": "pass"
   },
   {
@@ -1515,7 +1515,7 @@
     "(A) run 1 values identical": "every file",
     "(B) run 1 values identical": "every file"
    },
-   "seconds": 0.031,
+   "seconds": 0.021,
    "status": "pass"
   },
   {
@@ -1533,7 +1533,7 @@
     "(A) run 1 values identical": "every file",
     "(B) run 1 values identical": "every file"
    },
-   "seconds": 0.015,
+   "seconds": 0.013,
    "status": "pass"
   },
   {
@@ -1551,7 +1551,7 @@
     "(A) run 1 values identical": "every file",
     "(B) run 1 values identical": "every file"
    },
-   "seconds": 0.099,
+   "seconds": 0.015,
    "status": "pass"
   },
   {
@@ -1569,7 +1569,7 @@
     "(A) run 1 values identical": "5916/5916",
     "(B) run 1 values identical": "5916/5916"
    },
-   "seconds": 2.494,
+   "seconds": 2.558,
    "status": "pass"
   },
   {
@@ -1587,7 +1587,7 @@
     "(A) run 1 values identical": "every file",
     "(B) run 1 values identical": "every file"
    },
-   "seconds": 0.025,
+   "seconds": 0.024,
    "status": "pass"
   },
   {
@@ -1605,7 +1605,7 @@
     "(A) run 1 values identical": "every file",
     "(B) run 1 values identical": "every file"
    },
-   "seconds": 0.073,
+   "seconds": 0.02,
    "status": "pass"
   },
   {
@@ -1618,13 +1618,13 @@
     "(A) run 1 exit status": 0,
     "(B) run 1 exit status": 0
    },
-   "reason": "the replica does not show numpy's cast overflow again for the limited S0 map after the confounds table, where tedana's warnings registry has been reset (observed; the original shows it, as tedana)",
+   "reason": "",
    "reported": {
     "(A) run 1 values identical": "10228/10228",
     "(B) run 1 values identical": "10228/10228"
    },
-   "seconds": 1.106,
-   "status": "expected-divergence"
+   "seconds": 1.185,
+   "status": "pass"
   },
   {
    "case": "x-underflow-debug-curvefit",
@@ -1641,7 +1641,7 @@
     "(A) run 1 curve fit (b)/(c) share (%)": 2.368,
     "(A) run 1 values identical": "11098/11750"
    },
-   "seconds": 1.138,
+   "seconds": 1.098,
    "status": "expected-divergence"
   },
   {
@@ -1654,13 +1654,13 @@
     "(A) run 1 exit status": 0,
     "(B) run 1 exit status": 0
    },
-   "reason": "the replica does not show numpy's 'invalid value encountered in reduce' of the adaptive mask's means of a series holding both infinities (tedana does: observed; the original does too)",
+   "reason": "",
    "reported": {
     "(A) run 1 values identical": "10228/10228",
     "(B) run 1 values identical": "10228/10228"
    },
-   "seconds": 1.148,
-   "status": "expected-divergence"
+   "seconds": 1.108,
+   "status": "pass"
   },
   {
    "case": "x-inf-echo3-decay-paid",
@@ -1677,7 +1677,7 @@
     "(A) run 1 values identical": "10228/10228",
     "(B) run 1 values identical": "10228/10228"
    },
-   "seconds": 1.127,
+   "seconds": 1.055,
    "status": "pass"
   },
   {
@@ -1713,7 +1713,7 @@
     "(A) run 1 values identical": "10228/10228",
     "(B) run 1 values identical": "10228/10228"
    },
-   "seconds": 1.061,
+   "seconds": 1.055,
    "status": "pass"
   },
   {
@@ -1731,7 +1731,7 @@
     "(A) run 1 values identical": "25428/25428",
     "(B) run 1 values identical": "25428/25428"
    },
-   "seconds": 1.03,
+   "seconds": 1.261,
    "status": "pass"
   },
   {
@@ -1749,7 +1749,7 @@
     "(A) run 1 values identical": "10228/10228",
     "(B) run 1 values identical": "10228/10228"
    },
-   "seconds": 1.16,
+   "seconds": 1.185,
    "status": "pass"
   },
   {
@@ -1767,7 +1767,7 @@
     "(A) run 1 values identical": "every file",
     "(B) run 1 values identical": "every file"
    },
-   "seconds": 0.015,
+   "seconds": 0.026,
    "status": "pass"
   },
   {
@@ -1785,7 +1785,7 @@
     "(A) run 1 values identical": "10228/10228",
     "(B) run 1 values identical": "10228/10228"
    },
-   "seconds": 1.147,
+   "seconds": 1.13,
    "status": "pass"
   },
   {
@@ -1803,199 +1803,337 @@
     "(A) run 1 values identical": "10228/10228",
     "(B) run 1 values identical": "10228/10228"
    },
-   "seconds": 1.099,
+   "seconds": 1.101,
    "status": "pass"
   },
   {
    "case": "x-analyze",
    "category": "probe",
-   "checks_passed": 8,
-   "checks_total": 8,
+   "checks_passed": 13,
+   "checks_total": 13,
    "failed_checks": [],
    "measured": {
-    "(A) run 1 exit status": 0
+    "(A) run 1 exit status": 0,
+    "(B) run 1 exit status": 0
    },
    "reason": "",
    "reported": {
-    "(A) run 1 values identical": "10228/10228"
+    "(A) run 1 values identical": "10228/10228",
+    "(B) run 1 values identical": "10228/10228"
    },
-   "seconds": 0.529,
+   "seconds": 1.269,
    "status": "pass"
   },
   {
    "case": "x-analyze-nomask",
    "category": "probe",
-   "checks_passed": 8,
-   "checks_total": 8,
+   "checks_passed": 13,
+   "checks_total": 13,
    "failed_checks": [],
    "measured": {
-    "(A) run 1 exit status": 0
+    "(A) run 1 exit status": 0,
+    "(B) run 1 exit status": 0
    },
    "reason": "",
    "reported": {
-    "(A) run 1 values identical": "5916/5916"
+    "(A) run 1 values identical": "5916/5916",
+    "(B) run 1 values identical": "5916/5916"
    },
-   "seconds": 1.259,
+   "seconds": 2.469,
    "status": "pass"
   },
   {
    "case": "x-analyze-mask-4d",
    "category": "probe",
-   "checks_passed": 8,
-   "checks_total": 8,
+   "checks_passed": 13,
+   "checks_total": 13,
    "failed_checks": [],
    "measured": {
-    "(A) run 1 exit status": 0
+    "(A) run 1 exit status": 0,
+    "(B) run 1 exit status": 0
    },
    "reason": "",
    "reported": {
-    "(A) run 1 values identical": "10228/10228"
+    "(A) run 1 values identical": "10228/10228",
+    "(B) run 1 values identical": "10228/10228"
    },
-   "seconds": 0.517,
+   "seconds": 1.173,
    "status": "pass"
   },
   {
    "case": "x-analyze-be",
    "category": "probe",
-   "checks_passed": 8,
-   "checks_total": 8,
+   "checks_passed": 13,
+   "checks_total": 13,
    "failed_checks": [],
    "measured": {
-    "(A) run 1 exit status": 0
+    "(A) run 1 exit status": 0,
+    "(B) run 1 exit status": 0
    },
    "reason": "",
    "reported": {
-    "(A) run 1 values identical": "10228/10228"
+    "(A) run 1 values identical": "10228/10228",
+    "(B) run 1 values identical": "10228/10228"
    },
-   "seconds": 0.578,
+   "seconds": 1.253,
    "status": "pass"
   },
   {
    "case": "x-analyze-spm",
    "category": "probe",
-   "checks_passed": 8,
-   "checks_total": 8,
+   "checks_passed": 13,
+   "checks_total": 13,
    "failed_checks": [],
    "measured": {
-    "(A) run 1 exit status": 0
+    "(A) run 1 exit status": 0,
+    "(B) run 1 exit status": 0
    },
    "reason": "",
    "reported": {
-    "(A) run 1 values identical": "10228/10228"
+    "(A) run 1 values identical": "10228/10228",
+    "(B) run 1 values identical": "10228/10228"
    },
-   "seconds": 0.543,
+   "seconds": 1.086,
    "status": "pass"
   },
   {
    "case": "x-analyze-cal",
    "category": "probe",
-   "checks_passed": 8,
-   "checks_total": 8,
+   "checks_passed": 13,
+   "checks_total": 13,
    "failed_checks": [],
    "measured": {
-    "(A) run 1 exit status": 0
+    "(A) run 1 exit status": 0,
+    "(B) run 1 exit status": 0
    },
    "reason": "",
    "reported": {
-    "(A) run 1 values identical": "10228/10228"
+    "(A) run 1 values identical": "10228/10228",
+    "(B) run 1 values identical": "10228/10228"
    },
-   "seconds": 0.537,
+   "seconds": 1.156,
    "status": "pass"
   },
   {
    "case": "x-analyze-mat",
    "category": "probe",
-   "checks_passed": 8,
-   "checks_total": 8,
+   "checks_passed": 13,
+   "checks_total": 13,
    "failed_checks": [],
    "measured": {
-    "(A) run 1 exit status": 0
+    "(A) run 1 exit status": 0,
+    "(B) run 1 exit status": 0
    },
    "reason": "",
    "reported": {
-    "(A) run 1 values identical": "10228/10228"
+    "(A) run 1 values identical": "10228/10228",
+    "(B) run 1 values identical": "10228/10228"
    },
-   "seconds": 0.527,
+   "seconds": 1.051,
    "status": "pass"
   },
   {
    "case": "x-mgh",
    "category": "probe",
-   "checks_passed": 8,
-   "checks_total": 8,
+   "checks_passed": 13,
+   "checks_total": 13,
    "failed_checks": [],
    "measured": {
-    "(A) run 1 exit status": 0
+    "(A) run 1 exit status": 0,
+    "(B) run 1 exit status": 0
    },
    "reason": "",
    "reported": {
-    "(A) run 1 values identical": "10228/10228"
+    "(A) run 1 values identical": "10228/10228",
+    "(B) run 1 values identical": "10228/10228"
    },
-   "seconds": 0.541,
+   "seconds": 1.045,
    "status": "pass"
   },
   {
    "case": "x-mgh-nomask",
    "category": "probe",
-   "checks_passed": 8,
-   "checks_total": 8,
+   "checks_passed": 13,
+   "checks_total": 13,
    "failed_checks": [],
    "measured": {
-    "(A) run 1 exit status": 0
+    "(A) run 1 exit status": 0,
+    "(B) run 1 exit status": 0
    },
    "reason": "",
    "reported": {
-    "(A) run 1 values identical": "5916/5916"
+    "(A) run 1 values identical": "5916/5916",
+    "(B) run 1 values identical": "5916/5916"
    },
-   "seconds": 1.305,
+   "seconds": 2.42,
    "status": "pass"
   },
   {
    "case": "x-mgh-oblique-i16",
    "category": "probe",
-   "checks_passed": 8,
-   "checks_total": 8,
+   "checks_passed": 13,
+   "checks_total": 13,
    "failed_checks": [],
    "measured": {
-    "(A) run 1 exit status": 0
+    "(A) run 1 exit status": 0,
+    "(B) run 1 exit status": 0
    },
    "reason": "",
    "reported": {
-    "(A) run 1 values identical": "10228/10228"
+    "(A) run 1 values identical": "10228/10228",
+    "(B) run 1 values identical": "10228/10228"
    },
-   "seconds": 0.506,
+   "seconds": 1.08,
    "status": "pass"
   },
   {
    "case": "x-mgh-oblique-nomask",
    "category": "probe",
-   "checks_passed": 8,
-   "checks_total": 8,
+   "checks_passed": 13,
+   "checks_total": 13,
    "failed_checks": [],
    "measured": {
-    "(A) run 1 exit status": 0
+    "(A) run 1 exit status": 0,
+    "(B) run 1 exit status": 0
    },
    "reason": "",
    "reported": {
-    "(A) run 1 values identical": "5916/5916"
+    "(A) run 1 values identical": "5916/5916",
+    "(B) run 1 values identical": "5916/5916"
    },
-   "seconds": 1.259,
+   "seconds": 2.624,
    "status": "pass"
   },
   {
    "case": "x-mgh-mask-on-nifti",
    "category": "probe",
-   "checks_passed": 8,
-   "checks_total": 8,
+   "checks_passed": 13,
+   "checks_total": 13,
    "failed_checks": [],
    "measured": {
-    "(A) run 1 exit status": 0
+    "(A) run 1 exit status": 0,
+    "(B) run 1 exit status": 0
    },
    "reason": "",
    "reported": {
-    "(A) run 1 values identical": "10228/10228"
+    "(A) run 1 values identical": "10228/10228",
+    "(B) run 1 values identical": "10228/10228"
    },
-   "seconds": 0.44,
+   "seconds": 1.124,
+   "status": "pass"
+  },
+  {
+   "case": "x-ted46-loglin",
+   "category": "probe",
+   "checks_passed": 13,
+   "checks_total": 13,
+   "failed_checks": [],
+   "measured": {
+    "(A) run 1 exit status": 0,
+    "(B) run 1 exit status": 0
+   },
+   "reason": "",
+   "reported": {
+    "(A) run 1 values identical": "10228/10228",
+    "(B) run 1 values identical": "10228/10228"
+   },
+   "seconds": 1.186,
+   "status": "pass"
+  },
+  {
+   "case": "x-ted46-loglin-ts",
+   "category": "probe",
+   "checks_passed": 13,
+   "checks_total": 13,
+   "failed_checks": [],
+   "measured": {
+    "(A) run 1 exit status": 0,
+    "(B) run 1 exit status": 0
+   },
+   "reason": "",
+   "reported": {
+    "(A) run 1 values identical": "25428/25428",
+    "(B) run 1 values identical": "25428/25428"
+   },
+   "seconds": 1.23,
+   "status": "pass"
+  },
+  {
+   "case": "x-ted46-curvefit",
+   "category": "probe",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "measured": {
+    "(A) run 1 exit status": 0,
+    "(B) run 1 exit status": 0
+   },
+   "reason": "",
+   "reported": {
+    "(A) run 1 curve fit (b)/(c) share (%)": 0.0,
+    "(A) run 1 values identical": "13387/13812",
+    "(B) run 1 curve fit (b)/(c) share (%)": 0.0,
+    "(B) run 1 values identical": "13377/13812"
+   },
+   "seconds": 1.205,
+   "status": "pass"
+  },
+  {
+   "case": "x-ted46-curvefit-ts",
+   "category": "probe",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "measured": {
+    "(A) run 1 exit status": 0,
+    "(B) run 1 exit status": 0
+   },
+   "reason": "",
+   "reported": {
+    "(A) run 1 curve fit (b)/(c) share (%)": 0.0,
+    "(A) run 1 values identical": "44258/46892",
+    "(B) run 1 curve fit (b)/(c) share (%)": 0.0,
+    "(B) run 1 values identical": "44305/46892"
+   },
+   "seconds": 1.643,
+   "status": "pass"
+  },
+  {
+   "case": "x-ted46-curvefit-ts-2e",
+   "category": "probe",
+   "checks_passed": 15,
+   "checks_total": 15,
+   "failed_checks": [],
+   "measured": {
+    "(A) run 1 exit status": 0,
+    "(B) run 1 exit status": 0
+   },
+   "reason": "",
+   "reported": {
+    "(A) run 1 curve fit (b)/(c) share (%)": 0.0,
+    "(A) run 1 values identical": "46892/46892",
+    "(B) run 1 curve fit (b)/(c) share (%)": 0.0,
+    "(B) run 1 values identical": "46892/46892"
+   },
+   "seconds": 1.195,
+   "status": "pass"
+  },
+  {
+   "case": "x-dummy-all-none-ts-te2",
+   "category": "probe",
+   "checks_passed": 13,
+   "checks_total": 13,
+   "failed_checks": [],
+   "measured": {
+    "(A) run 1 exit status": 1,
+    "(B) run 1 exit status": 1
+   },
+   "reason": "",
+   "reported": {
+    "(A) run 1 values identical": "every file",
+    "(B) run 1 values identical": "every file"
+   },
+   "seconds": 0.017,
    "status": "pass"
   },
   {
@@ -2005,7 +2143,7 @@
    "checks_total": 5,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.034,
+   "seconds": 0.036,
    "status": "pass"
   },
   {
@@ -2015,7 +2153,7 @@
    "checks_total": 5,
    "failed_checks": [],
    "reason": "",
-   "seconds": 0.061,
+   "seconds": 0.086,
    "status": "pass"
   },
   {
@@ -2033,7 +2171,7 @@
     "(A) values identical": "11299199/11299200",
     "(B) values identical": "11299200/11299200"
    },
-   "seconds": 34.459,
+   "seconds": 28.726,
    "status": "pass"
   },
   {
@@ -2053,7 +2191,7 @@
     "(B) curve fit (b)/(c) share (%)": 0.259,
     "(B) values identical": "11380746/11406278"
    },
-   "seconds": 112.728,
+   "seconds": 87.427,
    "status": "pass"
   },
   {
@@ -2073,7 +2211,7 @@
     "(B) curve fit (b)/(c) share (%)": 0.259,
     "(B) values identical": "11485187/11569034"
    },
-   "seconds": 67.504,
+   "seconds": 40.466,
    "status": "pass"
   },
   {
@@ -2093,7 +2231,7 @@
     "(B) curve fit (b)/(c) share (%)": 0.0,
     "(B) values identical": "9430980/9436299"
    },
-   "seconds": 46.901,
+   "seconds": 29.63,
    "status": "pass"
   },
   {
@@ -2113,7 +2251,7 @@
     "(B) curve fit (b)/(c) share (%)": 0.002,
     "(B) values identical": "13935632/13946060"
    },
-   "seconds": 64.361,
+   "seconds": 40.18,
    "status": "pass"
   },
   {
@@ -2133,16 +2271,16 @@
     "(B) curve fit (b)/(c) share (%)": 0.076,
     "(B) values identical": "7312250/7342822"
    },
-   "seconds": 62.094,
+   "seconds": 33.054,
    "status": "pass"
   }
  ],
  "suite": "tedana-t2smap-original",
  "summary": {
   "both-error": 0,
-  "expected-divergence": 5,
+  "expected-divergence": 1,
   "fail": 0,
-  "pass": 114,
+  "pass": 124,
   "skipped": 0
  },
  "tier": "full"

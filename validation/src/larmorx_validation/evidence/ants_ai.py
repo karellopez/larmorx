@@ -503,7 +503,7 @@ def _example(ctx: core.Context, reg: dict) -> dict:
                 "antsAffineInitializer: larmorx default − reproduce",
                 "init-larmorx-fix",
                 "init-larmorx",
-                sub=", ".join(named["init-larmorx-fix"]) + " corrected (D13)"
+                sub=", ".join(named["init-larmorx-fix"]) + " corrected by default"
                 if named["init-larmorx-fix"]
                 else "no correction applies",
             ),
@@ -850,8 +850,8 @@ SHOWS = {
         "ANTs 2.6.2's at 8 threads, sends the template's brain at most 2.5e-13 mm from the "
         "replica's, where ANTs 2.6.5's own 8 and 1 threads differ by 3.2e-13 mm; the placed "
         "images are the same bytes. No correction by default changes antsAI's call; "
-        "antsAffineInitializer's default, `fix`, moves the brain by up to 0.059 mm (mean "
-        "0.054 mm) from `reproduce`.",
+        "antsAffineInitializer's default, `fix`, corrects ANTS-54 and ITK-21 here and moves the "
+        "brain by up to 0.059 mm (mean 0.054 mm) from `reproduce`.",
         ["lx-ants1"],
     ),
     "blobs-found": (

@@ -1385,7 +1385,9 @@ def case_verdict_orig(r: dict, desc: str, band: dict | None = None) -> tuple[str
         )
     elif any(k.startswith(("stdout", "stderr")) for k in differ):
         why += " Printed numbers differ in their last digits."
-    return "open", common.clip(why + note, 600)
+    # 610: the findings' new name (-clean-room.md) is two characters longer than the old one;
+    # a reason cut short keeps every character it showed
+    return "open", common.clip(why + note, 610)
 
 
 def cases(

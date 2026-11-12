@@ -335,12 +335,32 @@ def example(
     runs: dict[str, str] | None = None,
     panels: dict[str, tuple[str, str | None]] | None = None,
     diffs: dict[str, tuple[str, str]] | None = None,
+    errors: list[str] | None = None,
 ) -> dict:
     """One worked example of ``page`` in the guide's words and order. ``shows`` and
     ``verdicts`` as :func:`words.example`; ``title`` the example's new title; ``runs`` the
     port of a run a comparison names without a panel (by default: a variability comparison's
     is the original's, a check's the port of the run it is compared with); ``panels`` and
-    ``diffs`` override what the shapes give."""
+    ``diffs`` override what the shapes give. ``errors``: a dry run that lists every shape it
+    cannot name (each panel's, run's and comparison's) instead of stopping at the first, and
+    then returns ``ex`` unchanged but for the page's own rewordings
+    (``validation/investigations/docs-revision/probe_present.py``)."""
+
+    def attempt(fn, *args, fallback=None):
+        if errors is None:
+            return fn(*args)
+        try:
+            return fn(*args)
+        except ValueError as exc:
+            errors.append(str(exc))
+            return fallback
+
+    def refuse(msg: str, fallback: str) -> str:
+        if errors is None:
+            raise ValueError(msg)
+        errors.append(msg)
+        return fallback
+
     # the page's own rewordings first: :func:`words.example` rewords the texts in the guide's
     # words, whose forms may otherwise take a page's phrase for another page's
     for d in ex["diffs"]:
@@ -360,7 +380,8 @@ def example(
     originals = {}
     for pid, p in by_id.items():
         if p["role"] in ("original", "reference"):
-            name, sub, r = _original_panel(page, p)
+            fallback = (p["label"], p.get("sub"), 0.0)
+            name, sub, r = attempt(_original_panel, page, p, fallback=fallback)
             new[pid], originals[pid], rank[pid] = (name, sub), name, r
         elif p["role"] == "input":
             new[pid] = (p["label"], text(page, p.get("sub"), code=False))
@@ -373,7 +394,8 @@ def example(
             if pid in (panels or {}):  # a panel the page names itself (its label has no mode)
                 continue
             against = originals.get(main_b.get(pid, ""))
-            new[pid] = _port_panel(page, p, against)
+            fallback = (p["label"], p.get("sub"))
+            new[pid] = attempt(_port_panel, page, p, against, fallback=fallback)
     new.update(panels or {})
 
     def port_of(pid: str) -> str:
@@ -391,21 +413,26 @@ def example(
                 continue
             if d["kind"] == "variability":
                 if pid.startswith("larmorx"):  # until X1: never take a port's run for the original
-                    raise ValueError(
-                        f"{ex['id']}: the port's run {pid} in a variability comparison"
+                    hidden[pid] = refuse(
+                        f"{ex['id']}: the port's run {pid} in a variability comparison", "original"
                     )
+                    continue
                 hidden[pid] = "original"
             elif pid.startswith("larmorx"):  # the port's run ("larmorx-seed", "larmorx-1")
                 hidden[pid] = page.port
             elif d[other] in by_id:
                 hidden[pid] = port_of(d[other])
             else:
-                raise ValueError(f"{ex['id']}: run {pid} of {d['id']} has no port")
+                hidden[pid] = refuse(f"{ex['id']}: run {pid} of {d['id']} has no port", "original")
     out, target = {}, {}
     for d in ex["diffs"]:
         pa, pb = port_of(d["a"]), port_of(d["b"])
-        role, target[d["id"]] = _role(page, d, pa, pb, by_id)
+        role, target[d["id"]] = attempt(
+            _role, page, d, pa, pb, by_id, fallback=("?", "the original")
+        )
         out[d["id"]] = (_label(page, d["label"]), role)
+    if errors:
+        return ex
     for k, v in (diffs or {}).items():
         out[k] = v
         target[k] = v[1].split(" against ", 1)[1].split(":")[0]

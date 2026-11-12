@@ -460,3 +460,23 @@ def test_a_page_of_a_part_of_its_software():
     assert doc["category_labels"] == {"errors": "files refused"}
     with pytest.raises(ValueError, match="without its program"):
         present.original_name(present.Page("ITK", "", "5.4.5"))
+
+
+def test_a_dry_run_lists_every_shape_it_cannot_name():
+    """``errors``: every panel, run and comparison of another shape is listed, not only the
+    first, and the example comes back with its panels, comparisons and verdicts as they were."""
+    ex = _example()
+    ex["panels"][1]["label"] = "larmorx replica"  # a port named in another shape
+    ex["panels"][2]["label"] = "AFNI in fMRIPrep's image"  # an original of another software
+    ex["diffs"][0]["label"] = "original − replica (both default mode)"
+    before = copy.deepcopy(ex)
+    errors: list[str] = []
+    out = present.example(PAGE, ex, shows="x", verdicts=[], errors=errors)
+    assert any("a port's panel of another shape: 'larmorx replica'" in e for e in errors)
+    assert any("an original's panel of another shape" in e for e in errors)
+    assert len(errors) >= 2
+    assert [p["label"] for p in out["panels"]] == [p["label"] for p in before["panels"]]
+    assert [d["verdict"] for d in out["diffs"]] == [d["verdict"] for d in before["diffs"]]
+    # without ``errors`` the first refusal stops it, as before
+    with pytest.raises(ValueError):
+        present.example(PAGE, copy.deepcopy(before), shows="x", verdicts=[])

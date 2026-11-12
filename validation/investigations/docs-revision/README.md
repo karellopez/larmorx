@@ -60,6 +60,20 @@ pairs and tritanopia are information only. It prints one line per check and PASS
 python -P validation/investigations/docs-revision/pastels.py <checkout of larmorx_documentation>
 ```
 
+`probe_present.py` is the presenter's probe and regression gate (the rollout's chunk X). The
+probe dry-runs the shared presenter (`evidence/present.py`) over every worked example of every
+evidence page not yet presented, each page described as `validation/programs.toml` describes it,
+and lists every panel, run and comparison whose shape it cannot name; a page about to be
+rewritten must show 0 refused. With `--ref <commit>` it runs each presented page's own module on
+the page's JSON as the site published it before the revision (b768293) with this checkout's code
+and with the code at `<commit>`, and lists every difference not named in `--intended`: a change
+to the presenter must leave the pages already presented as they are.
+
+```
+PYTHONPATH=python:validation/src python -P validation/investigations/docs-revision/probe_present.py <site>
+PYTHONPATH=python:validation/src python -P validation/investigations/docs-revision/probe_present.py <site> --ref <commit>
+```
+
 ## Moving an evidence page into the guide's words
 
 Three helpers for the rollout's evidence pages (the part's notes say how a page moves). Each

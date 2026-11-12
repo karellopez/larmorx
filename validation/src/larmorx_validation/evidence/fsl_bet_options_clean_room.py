@@ -371,7 +371,9 @@ def _verdicts(diffs: list[dict], ex, outputs: list[dict], info: dict, rec_orig) 
                 + (" In the default also: " + GLIBC07 + "." if i == "orig-fsl23" else "")
                 + rec
                 + " The difference is not closed: the original could still give FSL's files.",
-                900,
+                # 910: the findings' new name (-clean-room.md) is two characters longer than
+                # the old one; a reason cut short keeps every character it showed
+                910,
             )
 
 

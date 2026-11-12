@@ -828,6 +828,11 @@ The items below keep their history.
     without files in it (tedana's output directory after a failed `--exclude`, 2026-11-11, first taken for a
     difference). Record directories too, or state the limit in `docs/validation/oracle-cache.md` and have suites
     that check directories run the original directly.
+  - *glibc's double `atan2` for `reproduce`* (2026-11-12, the confounds part): SciPy's `as_euler` in fMRIPrep's
+    motion parameters goes through glibc's `atan2`; LARMORX's correctly rounded one changes 15 of 22,293 rotation
+    cells in 12 of the 36 real files, so `reproduce` is not yet exact there (a D13 gap, GLIBC-07's row). A micro-part
+    as for `sincos_glibc`: a spec writer describes glibc 2.35's `atan2` (`specs/`), a clean-room agent writes
+    `atan2_glibc` in `larmorx_core::math` (glibc is LGPL: never translated); the audit's `CORE_FILES` gains it.
   - *The gates as CI runs them:* `verify-merge.sh` and the agents' gates run with this machine's `FSLDIR` set, CI
     without it: `crates/larmorx-cli/tests/fsl_output_types.rs` passed here and failed on all six platforms
     (2026-11-11, `52de0470`; fixed in `9abcd41a`). Run `cargo test` and the Python gates in `verify-merge.sh` with

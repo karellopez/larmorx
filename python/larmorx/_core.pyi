@@ -2223,3 +2223,50 @@ def numpy_power_f64(
     correctly rounded ``pow`` (``"fix"``) or glibc 2.35's (``"reproduce"``: numpy's on CPUs
     without AVX-512), and how many values differ between the two (GLIBC-07)
     (``larmorx.niworkflows.confounds`` is its caller)."""
+
+def nitransforms_itk_to_ras(params: np.ndarray, offsets: np.ndarray) -> np.ndarray:
+    """nitransforms' ``ITKLinearTransform.to_ras()`` of each row of ITK's 12 parameters
+    (``n × 12``) with its fixed parameters (``n × 3``): the ``n × 16`` RAS matrices (C order)
+    (``larmorx.confounds.motion`` is its caller)."""
+
+def numpy_first_singular4(mats: np.ndarray) -> int | None:
+    """The index of the first of ``n × 16`` matrices numpy's ``inv`` finds singular, or
+    ``None``."""
+
+def numpy_det4_is_positive(affine: np.ndarray) -> bool:
+    """numpy's ``det(affine) > 0`` of a ``1 × 16`` matrix (OpenBLAS's LU factors)."""
+
+def nitransforms_fsl_from_ras(ras: np.ndarray, affine: np.ndarray, shape0: int) -> np.ndarray:
+    """nitransforms' ``FSLLinearTransformArray.from_ras(ras, reference=img, moving=img)`` of
+    ``n × 16`` RAS matrices for an image of affine ``affine`` (``1 × 16``) and ``shape0`` voxels
+    along its first axis: the ``n × 16`` FSL parameters; numpy's ``LinAlgError("Singular
+    matrix")`` where its ``inv`` raises."""
+
+def scipy_rotation_from_matrix(
+    mats: np.ndarray, numpy: str = "2.5.4", order: str = "C"
+) -> tuple[np.ndarray | None, int | None]:
+    """SciPy's ``Rotation.from_matrix`` of ``n × 9`` matrices (stored in ``order``, as SciPy's
+    float64 copy): ``(quats, None)`` (``n × 4``, ``(x, y, z, w)``) or ``(None, i)`` for the
+    first matrix whose determinant is at most 0; numpy's ``LinAlgError("SVD did not
+    converge")`` for a matrix that is not finite."""
+
+def scipy_rotation_as_euler(quats: np.ndarray, seq: str) -> tuple[np.ndarray, int]:
+    """SciPy's ``Rotation.as_euler(seq)`` of ``n × 4`` quaternions with the correctly rounded
+    ``atan2`` and ``hypot``: ``(angles, gimbal)``, the ``n × 3`` angles in radians and how many
+    rotations were in gimbal lock."""
+
+def fmriprep_motion_params(
+    fsl: np.ndarray,
+    zooms: list[float],
+    com: list[float],
+    fmriprep: str = "25.2.7",
+    numpy: str = "2.5.4",
+) -> tuple[np.ndarray | None, int, int | None]:
+    """fMRIPrep's ``FSLMotionParams`` arithmetic on ``n × 16`` FSL matrices with the
+    reference's float32 zooms and centre of mass: ``(params, gimbal, None)`` (``n × 6``) or
+    ``(None, 0, i)`` for SciPy's non-positive determinant of matrix ``i``
+    (``larmorx.confounds.fsl_motion_params`` is the public form)."""
+
+def fmriprep_rms_deviation(fsl: np.ndarray, center: list[float]) -> np.ndarray:
+    """fMRIPrep's ``FSLRMSDeviation`` values (``n``, NaN first) of ``n × 16`` FSL matrices about
+    ``center`` (``larmorx.confounds.fsl_rms_deviation`` is the public form)."""

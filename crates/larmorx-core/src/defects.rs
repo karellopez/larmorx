@@ -427,6 +427,12 @@ defects! {
         "a criterion other than '<' and '>' is skipped without an error (when every criterion is: TypeError: reduce() of empty iterable with no initial value)";
     PIPE_70 = "PIPE-70", "niworkflows NormalizeMotionParams", true,
         "numpy's loadtxt squeezes a table of one row to a vector, which numpy's apply_along_axis refuses (AxisError: axis 1 is out of bounds for array of dimension 1)";
+    PIPE_71 = "PIPE-71", "nitransforms load", true,
+        "a transform file of one transform is loaded as one Affine, whose 4 x 4 matrix fMRIPrep's FSLMotionParams and FSLRMSDeviation then take as a series of four (its rows): a one-volume series stops with numpy's AxisError (axis2: axis 1 is out of bounds for array of dimension 1)";
+    PIPE_72 = "PIPE-72", "fMRIPrep FSLMotionParams", true,
+        "a reference image whose centre of gravity is undefined (a constant image under 25.2.7, whose weights value - min are all zero; a sum of zero under 25.2.6; a NaN or infinite voxel) gives NaN or infinite translations in every row without an error, which FramewiseDisplacement turns into n/a everywhere";
+    PIPE_73 = "PIPE-73", "nitransforms ITKLinearTransform", true,
+        "every ITK text transform is read in single precision (numpy's genfromtxt with dtype f4), the double-precision ones (AffineTransform_double_3_3) too, so their parameters are rounded to float32";
     PD_01 = "PD-01", "pandas read_csv", true,
         "the default float parser (precise_xstrtod) keeps at most 17 digit characters, the leading zeros of 0.00... included, accumulates them in a double and divides by one power of ten, so most values to_csv writes (their shortest repr, up to 17 significant digits) are read back as another double, one or more units in the last place off";
     PD_02 = "PD-02", "pandas to_json", true,

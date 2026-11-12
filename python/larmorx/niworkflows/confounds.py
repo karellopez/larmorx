@@ -15,6 +15,10 @@ for fMRIPrep 25.2.6's image) and numpy's arithmetic under them:
   appended to the table; fMRIPrep's ``desc-confounds_timeseries.tsv`` is this node's output.
 - :func:`normalize_motion_params`: ``NormalizeMotionParams``: motion parameters in SPM's order
   and units (nipype's ``normalize_mc_params``, :func:`larmorx.confounds.normalize_mc_params`).
+- :func:`fsl_motion_params`, :func:`fsl_rms_deviation`, :func:`framewise_displacement`:
+  niworkflows' copies of fMRIPrep's ``FSLMotionParams`` (fMRIPrep 25.2.7's form in 1.15.4,
+  25.2.6's before: ``niworkflows_version``), ``FSLRMSDeviation`` and ``FramewiseDisplacement``
+  (:mod:`larmorx.confounds.motion`, :func:`larmorx.confounds.fmriprep_framewise_displacement`).
 - :func:`parse_formula`, :func:`temporal_derivatives`, :func:`exponential_terms`,
   :func:`spike_regressors`: niworkflows' functions on tables (:class:`ConfoundTable`, or a
   mapping of column names to arrays as pandas' ``read_csv`` types them: float64, int64, uint64,
@@ -91,10 +95,14 @@ from larmorx.confounds._tables import PANDAS_NEWEST, Column, Table
 
 __all__ = [
     "DEFAULT_FORMULA",
+    "NIWORKFLOWS_NEWEST",
     "ConfoundTable",
     "ModelTerms",
     "expand_model",
     "exponential_terms",
+    "framewise_displacement",
+    "fsl_motion_params",
+    "fsl_rms_deviation",
     "normalize_motion_params",
     "parse_formula",
     "spike_regressors",
@@ -1123,3 +1131,80 @@ def normalize_motion_params(
     out = os.path.join(d, "motion_params.txt")
     np.savetxt(out, mpars)
     return out
+
+
+# --- niworkflows' copies of fMRIPrep's motion interfaces ---------------------------------------
+
+#: The newest niworkflows release, whose ``FSLMotionParams`` (fMRIPrep 25.2.7's) is the default.
+NIWORKFLOWS_NEWEST = "1.15.4"
+
+
+def _fmriprep_form(niworkflows_version: str) -> str:
+    """The fMRIPrep release whose ``FSLMotionParams`` niworkflows ``niworkflows_version``
+    carries: 25.2.6's up to 1.15.3, 25.2.7's from 1.15.4."""
+    try:
+        key = tuple(int(p) for p in str(niworkflows_version).split(".")[:3])
+    except ValueError:
+        raise ValueError(f"not a niworkflows version: {niworkflows_version!r}") from None
+    return "25.2.6" if key <= (1, 15, 3) else "25.2.7"
+
+
+def fsl_motion_params(
+    xfm_file: os.PathLike[str] | str,
+    boldref_file: os.PathLike[str] | str,
+    *,
+    out_dir: os.PathLike[str] | str = ".",
+    niworkflows_version: str = NIWORKFLOWS_NEWEST,
+    numpy_version: str = NUMPY_NEWEST,
+    upstream_defects: UpstreamDefectsName = "fix",
+    n_threads: int = 1,
+):
+    """niworkflows' ``FSLMotionParams`` (its copy of fMRIPrep's: 25.2.7's form in niworkflows
+    1.15.4, 25.2.6's in 1.15.2 and 1.15.3): :func:`larmorx.confounds.fsl_motion_params` with
+    that form; a :class:`larmorx.confounds.MotionParamsResult`."""
+    from larmorx.confounds.motion import fsl_motion_params as fmp
+
+    return fmp(
+        xfm_file,
+        boldref_file,
+        out_dir=out_dir,
+        fmriprep_version=_fmriprep_form(niworkflows_version),
+        numpy_version=numpy_version,
+        upstream_defects=upstream_defects,
+        n_threads=n_threads,
+    )
+
+
+def fsl_rms_deviation(
+    xfm_file: os.PathLike[str] | str,
+    boldref_file: os.PathLike[str] | str,
+    *,
+    out_dir: os.PathLike[str] | str = ".",
+    upstream_defects: UpstreamDefectsName = "fix",
+):
+    """niworkflows' ``FSLRMSDeviation`` (fMRIPrep's, the same in 1.15.2 to 1.15.4):
+    :func:`larmorx.confounds.fsl_rms_deviation`."""
+    from larmorx.confounds.motion import fsl_rms_deviation as frd
+
+    return frd(xfm_file, boldref_file, out_dir=out_dir, upstream_defects=upstream_defects)
+
+
+def framewise_displacement(
+    in_file: os.PathLike[str] | str,
+    *,
+    radius: float = 50.0,
+    out_dir: os.PathLike[str] | str = ".",
+    pandas_version: str = PANDAS_NEWEST,
+    upstream_defects: UpstreamDefectsName = "fix",
+) -> str:
+    """niworkflows' ``FramewiseDisplacement`` (fMRIPrep's, the same in 1.15.2 to 1.15.4):
+    :func:`larmorx.confounds.fmriprep_framewise_displacement`."""
+    from larmorx.confounds.fmriprep import fmriprep_framewise_displacement as ffd
+
+    return ffd(
+        in_file,
+        radius=radius,
+        out_dir=out_dir,
+        pandas_version=pandas_version,
+        upstream_defects=upstream_defects,
+    )

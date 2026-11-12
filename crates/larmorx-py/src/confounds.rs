@@ -30,6 +30,7 @@ mod expansion;
 mod fft;
 mod gelsd;
 mod gesvd;
+mod motion;
 mod nipy;
 mod pandas;
 mod reductions;
@@ -1157,5 +1158,6 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     nipy::register(m)?;
     pandas::register(m)?;
     expansion::register(m)?;
+    motion::register(m)?;
     Ok(())
 }

@@ -21,6 +21,10 @@ bit for bit (the confounds' part fills it step by step).
   :func:`gather_confounds`: fMRIPrep's own ``FramewiseDisplacement``, ``FilterDropped``,
   ``RenameACompCor`` and ``GatherConfounds`` (the tables read and written as pandas reads and
   writes them: PD-01).
+- :func:`fsl_motion_params`, :func:`fsl_rms_deviation`: fMRIPrep's ``FSLMotionParams`` (25.2.7's
+  and 25.2.6's forms) and ``FSLRMSDeviation``: the motion parameters and the root mean square
+  deviation of the head-motion transforms (nitransforms' ITK reading and FSL conversion, SciPy's
+  ``Rotation``).
 """
 
 from larmorx.confounds.compcor import (
@@ -56,6 +60,12 @@ from larmorx.confounds.framewise import (
     framewise_displacement,
     normalize_mc_params,
 )
+from larmorx.confounds.motion import (
+    MotionParamsResult,
+    RmsDeviationResult,
+    fsl_motion_params,
+    fsl_rms_deviation,
+)
 from larmorx.confounds.nonsteady import NonSteadyStateResult, nonsteady_state_detector
 from larmorx.confounds.tsnr import TsnrResult, tsnr
 
@@ -65,8 +75,10 @@ __all__ = [
     "DvarsResult",
     "FramewiseDisplacementResult",
     "GatherConfoundsResult",
+    "MotionParamsResult",
     "NonSteadyStateResult",
     "RenameACompCorResult",
+    "RmsDeviationResult",
     "TsnrResult",
     "acompcor",
     "combine_mask_files",
@@ -81,6 +93,8 @@ __all__ = [
     "filter_dropped",
     "fmriprep_framewise_displacement",
     "framewise_displacement",
+    "fsl_motion_params",
+    "fsl_rms_deviation",
     "full_rank",
     "gather_confounds",
     "nonsteady_state_detector",

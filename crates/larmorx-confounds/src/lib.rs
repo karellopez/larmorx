@@ -25,6 +25,9 @@
 //! - [`expansion`]: numpy's float64 `a ** o` for the integer exponents of niworkflows'
 //!   `ExpandModel` (`exponential_terms`): `x * x` for 2, glibc's `pow` (`reproduce`) or the
 //!   correctly rounded one (the default, GLIBC-07) for the others.
+//! - [`motion`]: fMRIPrep's `FSLMotionParams` (25.2.7 and 25.2.6) and `FSLRMSDeviation` on the
+//!   head-motion transforms: nitransforms' `to_ras` and `from_ras`, SciPy's `Rotation.from_matrix`
+//!   and `as_euler` (BSD-3-Clause and MIT: the notices in the module).
 //! - [`pandas`]: pandas' default float parser of `read_csv` (`precise_xstrtod`, pandas 3.0.6
 //!   and 2.2.3; BSD-3-Clause: the notice in the module) with the correctly rounded reading of
 //!   the same texts (PD-01), for the tables fMRIPrep's confound steps read.
@@ -37,6 +40,7 @@
 pub mod compcor;
 pub mod dvars;
 pub mod expansion;
+pub mod motion;
 pub mod nipy;
 pub mod nitime;
 pub mod pandas;

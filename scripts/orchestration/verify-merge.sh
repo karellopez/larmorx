@@ -6,7 +6,9 @@
 #                             or --suite "afni-tshift --implementation replica"; the suites run side by
 #                             side (run-suites.sh: their --jobs add up), their STEP5 lines in the order given
 #   --serial-suites           run the suites one after the other (before 2026-10-30)
-#   --site <site checkout>    a clean checkout of the agent's site branch, for the export check
+#   --site <site checkout>    a clean checkout of the agent's site branch, for the export check and the
+#                             programs' reference pages (STEP5 reference: every page and the Programs
+#                             page's data the same as their export from this checkout, which writes nothing)
 #   --evidence <tool>         re-export that tool's evidence into --site (repeatable); git must see no change
 #   --golden                  re-record the golden checksums from the merge (after parallel merges);
 #                             its parity smoke tier is step 4. Without it, step 4 runs the smoke tier
@@ -54,6 +56,9 @@ log "dirty after gates=[$(git -C "$R" status --porcelain | wc -l)]"
 for t in "${EVID[@]}"; do
   (export PYTHONPATH=$R/python:$R/validation/src; cd "$R" && ulimit -v 16000000 && python -m larmorx_validation evidence "$t" --no-compute --site "$SITE") >> "$OUT/evidence.log" 2>&1; log "STEP5 evidence $t exit $?"
 done
+if [ -n "$SITE" ]; then
+  (export PYTHONPATH=$R/python:$R/validation/src; cd "$R" && python -m larmorx_validation reference all --site "$SITE" --check) > "$OUT/reference.log" 2>&1; log "STEP5 reference exit $?"
+fi
 [ -n "$SITE" ] && log "site changes after re-export: [$(git -C "$SITE" status --porcelain | tr '\n' ' ')]"
 if [ $GOLDEN = 1 ]; then
   log "dirty before golden=[$(git -C "$R" status --porcelain | wc -l)]"

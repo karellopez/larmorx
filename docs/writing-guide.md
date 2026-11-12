@@ -155,7 +155,10 @@ How to use them:
   files (section 6, "One source"), so clean-room implementers may read it. A section of today's
   pages whose facts come from restricted material stays on the evidence page, and the reference
   page links to it. Today that is `bet`'s "The standard images the variations read" (`#data`),
-  which cites `docs/findings/fsl-bet.md`.
+  which cites `docs/findings/fsl-bet.md`. A reference page links no restricted file either (a
+  replica crate, a restricted finding, `docs/parts/`): it names the package and links
+  `docs/licensing.md` instead. The exporter's checks refuse such a link, by the clean-room audit's
+  restriction table and the briefs' lists.
 
 ### Mechanics of the rollout
 
@@ -232,7 +235,11 @@ counts every old word, file by file (section 7).
     source under the same licence".
 11. **Copyable shell blocks hold commands only**: no comments (zsh, macOS's shell, reads `#` as
     an argument), no prompts, every line runnable as it stands. Every example is run by the tests
-    (the reference page's template, step 2 of the plan, says how an example gets its input).
+    (the reference page's template, step 2 of the plan, says how an example gets its input). An
+    example shows an output only after an expression, as `# -> <repr>`, and the test checks that
+    the run gives it; a description goes on a line of its own. A synopsis, a command line with
+    placeholders such as `<input>`, does not run as it stands: it is a `text synopsis` block,
+    which has no Copy button.
 12. **Link instead of repeating**, and explain a term at its first use on a page or link Concepts.
 13. **Shorten words, never facts.** A rewrite keeps every fact of the sentence it replaces, on the
     same page or on the page it links to (History, Concepts, Validation). The reviewer checks each
@@ -561,8 +568,13 @@ bit-identical, the dashes let the original's line show through.
   beside a program's name, as today (`.dot` takes `--kd`): ANTs' deep colour is the replica's blue,
   LARMORX's the clean room's apricot.
 - **tedana, sdcflows and fMRIPrep get a pastel each**, chosen in the Programs pilot away from the
-  three port colours and checked as the verdicts' colours were (colour-vision deficiency, contrast
-  in both themes). Today `data/status.yml` gives them LARMORX's apricot (`eco: larmorx`).
+  three port colours (`data/ecosystems.yml`: tedana `#bab967`, sdcflows `#93e3b1`, fMRIPrep
+  `#85dcfc`). They are checked with the verdicts' measures, to the thresholds pastels allow: a
+  new pastel at least 10 from its neighbours under normal vision and 9 under protanopia and
+  deuteranopia, at least 7 from any other pastel, the chip's ink at 4.5:1 or more on each
+  (`validation/investigations/docs-revision/pastels.py`). Pastels are pale, so they cannot be as
+  far apart as the verdicts' fills (18 and 11); a group's name is always on its chip. Before the
+  pilot, `data/status.yml` gave them LARMORX's apricot (`eco: larmorx`).
 - **The site's accent** (focus rings, sliders, the brand) stays LARMORX's apricot: it marks
   controls, never data.
 - **What the rollout corrects.** Today every port's panel label is apricot, the replica's too. The
@@ -644,9 +656,13 @@ The header's links: Getting started, Concepts, Programs, Validation, Roadmap, Ab
   pages from it, the command-line definitions and the `.pyi` stubs. Nobody edits a reference page
   on the site by hand. The exporter reads only files a clean-room implementer may read: the API
   page, the main package's Python (`python/larmorx`), the command-line code of the clean rooms
-  and of `larmorx-cli`, larmorx-core's `cli.rs` and `defects.rs`, and `validation/tools.toml`;
-  never the replica crates. So a reference page holds no fact from the restricted material
-  (section 1).
+  and of `larmorx-cli`, larmorx-core's `cli.rs` and `defects.rs`, `validation/tools.toml` and
+  `CHANGELOG.md` (what the published release lacks); never the replica crates. So a reference
+  page holds no fact from the restricted material (section 1). Each page names the files it is
+  made from with the start of their SHA-256, and two checks keep the site's copies current: the
+  site's build compares those hashes with the main repository it is given (`--main-repo`), and
+  the merge's verification runs `python -m larmorx_validation reference all --site <site>
+  --check` (`verify-merge.sh --site`). A page left behind when the code changes stops both.
 - **An API page with several programs** holds one section per program, and the exporter writes
   one reference page from each section: `fsl-flirt.md` gives 14, `fsl-bet.md` 3, `fsl-roi.md`
   and `fsl-topup.md` 2 each. `sdcflows-fieldmap.md` gives the `sdcflows` command's page and the

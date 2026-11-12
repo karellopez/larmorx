@@ -125,11 +125,7 @@ def _link_map(page: apipage.ApiPage) -> dict[str, str]:
     for p in page.programs:
         out[p.section.anchor] = url_of(p)
         for c in p.section.children:
-            out[c.anchor] = (
-                url_of(p)
-                + "#"
-                + (c.keyword if c.keyword in PLACED else c.anchor)
-            )
+            out[c.anchor] = url_of(p) + "#" + (c.keyword if c.keyword in PLACED else c.anchor)
     ports = page.section("ports")
     if ports is not None:
         for p in page.programs:
@@ -424,7 +420,7 @@ def build(repo: Path, p: apipage.Program) -> Reference:
     out.append("  sources:")
     for s in ref.sources:
         digest = hashlib.sha256((repo / s).read_bytes()).hexdigest()[:16]
-        out.append(f"    {s}: {digest}")
+        out.append(f'    {s}: "{digest}"')  # quoted: YAML would read some as numbers
     out.append("---")
     out.append("")
     body = []
@@ -597,7 +593,7 @@ def build(repo: Path, p: apipage.Program) -> Reference:
         rid = ids[0] if ids else None
         where_pkg = f"`{x.package}`" + (" (built in)" if x.built_in and x.kind == "replica" else "")
         body.append(
-            f"| {PORT_NAMES[x.kind]} | {where_pkg} | {x.licence} | "
+            f"| {PORT_NAMES[x.kind]} | {_cell(where_pkg)} | {x.licence} | "
             f"{_status(records.get(rid))} | {recs} |"
         )
     body.append("")

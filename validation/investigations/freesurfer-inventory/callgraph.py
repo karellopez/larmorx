@@ -147,6 +147,65 @@ UNUSED_FORMATS = [
     "outputHelpXml",
 ]
 
+# member names the C++ standard library's containers and strings use: obj.m( reaches a FreeSurfer
+# class's m only when the calling function names that class (as a type, a call or a scope)
+STD_METHODS = set(
+    [
+        "push_back",
+        "pop_back",
+        "emplace_back",
+        "emplace",
+        "size",
+        "empty",
+        "clear",
+        "begin",
+        "end",
+        "rbegin",
+        "rend",
+        "cbegin",
+        "cend",
+        "at",
+        "front",
+        "back",
+        "data",
+        "insert",
+        "erase",
+        "find",
+        "count",
+        "resize",
+        "reserve",
+        "swap",
+        "length",
+        "append",
+        "substr",
+        "c_str",
+        "str",
+        "compare",
+        "value",
+        "get",
+        "set",
+        "reset",
+        "release",
+        "first",
+        "second",
+        "key",
+        "insert_or_assign",
+        "contains",
+        "max_size",
+        "assign",
+        "capacity",
+        "shrink_to_fit",
+        "replace",
+        "rfind",
+        "find_first_of",
+        "npos",
+        "dump",
+        "parse",
+        "items",
+        "type",
+    ]
+)
+
 KEYWORDS = set(
     [
         "if",
@@ -256,6 +315,7 @@ class Function:
     refs: set[str] = field(default_factory=set)  # identifiers in a value position
     members: set[str] = field(default_factory=set)  # .m / ->m
     scoped: set[str] = field(default_factory=set)  # A::m
+    types: set[str] = field(default_factory=set)  # names in a type position: Foo x, Foo *p, new Foo
 
     @property
     def lines(self) -> int:
@@ -521,10 +581,16 @@ def body_identifiers(tokens: list[tuple[str, str, int]], a: int, b: int, fn: Fun
         if nxt == "::":
             if k + 2 < b and tokens[k + 2][0] == "id":
                 fn.scoped.add(text + "::" + tokens[k + 2][1])
-            fn.refs.add(text)  # a class or namespace named: its constructors / operators
             continue
         if prev == "::" and k >= 2 and tokens[k - 2][0] == "id":
             continue  # recorded with its scope
+        after = tokens[k + 2] if k + 2 < b else ("", "", 0)
+        if (
+            prev == "new"
+            or (tokens[k + 1][0] == "id" if k + 1 < b else False)
+            or (nxt in ("*", "&", "&&") and after[0] == "id")
+        ):
+            fn.types.add(text)  # a declaration's type: a class's constructors and operators
         if nxt == "(":
             fn.calls.add(text)
         elif nxt == "<" and prev not in ("<",):
@@ -567,6 +633,8 @@ def index_file(path: Path, rel: str, pre: Preprocessor) -> FileInfo:
             seen_close = False
             init_list = False
             j = i
+            while j + 1 < end and tokens[j][1] == "template" and tokens[j + 1][1] == "<":
+                j = skip_angles(j + 1, end)  # a template's parameters may hold "=" and "::value"
             while j < end:
                 t = tokens[j][1]
                 if t in ("(", "["):
@@ -599,7 +667,12 @@ def index_file(path: Path, rel: str, pre: Preprocessor) -> FileInfo:
                 continue
             if t == ";":
                 # a declaration: a file-level variable whose initialiser names functions
-                if "=" in words and "(" not in words[: words.index("=")] and not cls:
+                if (
+                    "=" in words
+                    and "(" not in words[: words.index("=")]
+                    and not cls
+                    and not is_header
+                ):
                     k = words.index("=")
                     names = [
                         w
@@ -645,7 +718,7 @@ def index_file(path: Path, rel: str, pre: Preprocessor) -> FileInfo:
                 semi = close + 1
                 while semi < end and tokens[semi][1] != ";":
                     semi += 1
-                if names and not cls:
+                if names and not cls and not is_header:
                     var = Function(
                         f"{rel}:{tokens[start][2]}:{names[-1]}",
                         names[-1],
@@ -704,6 +777,24 @@ def index_file(path: Path, rel: str, pre: Preprocessor) -> FileInfo:
                     if ci is not None and ci.file == rel:
                         ci.methods[fn.name].append(fn.key)
             i = close + 1
+
+    def skip_angles(k: int, end: int) -> int:
+        depth = 0
+        while k < end:
+            t = tokens[k][1]
+            if t == "(":
+                k = match_close(tokens, k) + 1
+                continue
+            if t == "<":
+                depth += 1
+            elif t == ">":
+                depth -= 1
+                if depth == 0:
+                    return k + 1
+            elif t in (";", "{", "}"):
+                return k
+            k += 1
+        return k
 
     def function_header(
         start: int, brace: int, rel: str, cls: str | None, ns: str, anonymous: bool, is_header: bool
@@ -921,7 +1012,7 @@ def reach(
         out: list[Function] = []
         seen = visible.get(from_file, {from_file})
         for c in classes.get(name, []):
-            if c.file not in seen and layer_of.get(c.file) is None:
+            if c.file not in seen:
                 continue
             for fn in by_name_cls(name):
                 if members is None:
@@ -950,7 +1041,7 @@ def reach(
 
     def edges(fn: Function) -> list[Function]:
         out: list[Function] = []
-        names = set(fn.calls) | (set() if calls_only else set(fn.refs))
+        names = set(fn.calls) | set(fn.types) | (set() if calls_only else set(fn.refs))
         for name in names:
             if fn.cls:
                 hit = False
@@ -962,20 +1053,28 @@ def reach(
                 if hit:
                     continue
             got = pick(by_name.get(name, []), fn.file)
+            if name not in fn.calls:
+                # a namespaced function is named by a bare identifier only when it is called
+                got = [g for g in got if "::" not in g.qualified]
             if got:
                 out.extend(got)
-            if name in classes:
+            if name in classes and (name in fn.calls or name in fn.types):
                 out.extend(class_members(name, fn.file))
         for scoped in fn.scoped:
             a, m = scoped.split("::", 1)
+            if a == "std":
+                continue
             cands = [c for c in by_name.get(scoped, [])]
             if not cands:
                 cands = [c for base in bases_of(a) for c in by_name_cls(base) if c.name == m]
             out.extend(cands)
         if fn.members:
             seen = visible.get(fn.file, {fn.file})
+            named = fn.calls | fn.types | fn.refs | {s.split("::", 1)[0] for s in fn.scoped}
             for m in fn.members:
                 for cand in methods.get(m, []):
+                    if m in STD_METHODS and cand.cls not in named:
+                        continue  # obj.size(): a standard container's, unless the class is named here
                     if cand.file in seen or any(
                         c.file in seen for c in classes.get(cand.cls or "", [])
                     ):

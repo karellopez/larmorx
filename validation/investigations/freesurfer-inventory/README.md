@@ -14,13 +14,29 @@ Their results are in `docs/freesurfer/` (closed too).
 
   It is a reading aid: conditions around a command (`if(...)`) are not printed, so every line it
   shows was checked by hand in the script before it went into the inventory.
-- `cmake_targets.py`: the build graph. For every compiled program of
-  `docs/freesurfer/programs.toml`: its CMake target, its source files and their lines, the
-  internal libraries it reaches (transitively) and the external ones; then every internal library
-  reached, with its files and lines. Used for `docs/freesurfer/code.md` §1.
+- `cmake_targets.py`: the build graph. It interprets FreeSurfer's CMake files as the official 8.2.0
+  build ran them (Ubuntu 22.04, GCC 8.4.0, as the package's binaries show: `ASSUMED` in the tool):
+  scopes, options, `if` blocks, FreeSurfer's CMake functions, `find_library`. For every compiled
+  program of `docs/freesurfer/programs.toml`: its CMake target, its source files and their lines,
+  the internal libraries it reaches (transitively), the external ones, its compile flags; then
+  every internal library reached. Used for `docs/freesurfer/code.md` §1.
 
       python -P validation/investigations/freesurfer-inventory/cmake_targets.py \
-          <workspace>/tags/freesurfer-8.2.0 docs/freesurfer/programs.toml [--json out.json]
+          <workspace>/tags/freesurfer-8.2.0 docs/freesurfer/programs.toml --json <scratch>/cmake.json
 
-  Known gaps (relay 2 fixes them): `if()` blocks are not evaluated (conditional libraries are
-  listed), and a target named through a variable (`${DCM2NIIXFSLIB}`) is not resolved.
+- `callgraph.py`: the call graph, without a compiler. It indexes every file of each program and of
+  the libraries it links (preprocessor evaluated as the official build saw it), resolves names
+  approximately as the linker and compiler would, and walks from each program's `main`. Views:
+  the full static reach, `--core` (the readers and writers of formats recon-all and fMRIPrep never
+  use are not followed: `UNUSED_FORMATS`), `--calls-only` (names in a value position dropped).
+  `--toml programs.toml` adds the foundations (per function, file and library: how many programs
+  on a default path reach it); `--programs a,b --why <text>` prints the path from `main` to what
+  matches. About 90 seconds for every program. Used for code.md §2-§3.
+
+      python -P validation/investigations/freesurfer-inventory/callgraph.py \
+          <workspace>/tags/freesurfer-8.2.0 <scratch>/cmake.json \
+          --toml docs/freesurfer/programs.toml [--core] [--calls-only] --json <scratch>/<view>.json
+
+- `report_code.py`: code.md's tables (Markdown on standard output) and `docs/freesurfer/code.toml`
+  from the build graph and the three call-graph views (full, core, core calls-only); the commands
+  in code.md §6.

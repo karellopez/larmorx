@@ -6,6 +6,10 @@ CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS: its input is read from FreeSurfer'
     python -P validation/investigations/freesurfer-inventory/report_code.py \\
         docs/freesurfer/programs.toml <cmake.json> <full.json> <core.json> <core-calls.json> > tables.md
 
+With ``--toml-out <code.toml>`` it also writes one machine-readable entry per program (its build
+and its reach in the core view, with the files of ``utils``/``include/``/the packages it reaches
+by at least 50 lines), the base the porting cards are built from.
+
 ``<cmake.json>``: ``cmake_targets.py --json``; ``<full.json>``: ``callgraph.py --toml ... --json``;
 ``<core.json>``: the same with ``--core``; ``<core-calls.json>``: with ``--core --calls-only``.
 Prints Markdown: the build table, the reach per program, the foundations per library, per file
@@ -57,6 +61,11 @@ def k(n: int) -> str:
 
 
 def main(argv: list[str]) -> int:
+    toml_out = None
+    if "--toml-out" in argv:
+        i = argv.index("--toml-out")
+        toml_out = Path(argv[i + 1])
+        argv = argv[:i] + argv[i + 2 :]
     toml_path, cmake_path, full_path, core_path, calls_path = (Path(a) for a in argv[:5])
     table = tomllib.loads(toml_path.read_text(encoding="utf-8"))["program"]
     streams = {p["name"]: p["streams"] for p in table}
@@ -196,7 +205,76 @@ def main(argv: list[str]) -> int:
         f"| ({len(rest)} more files) | {sum(c for _, (c, _) in rest)} | {k(sum(lines for _, (_, lines) in rest))} |"
     )
     print("\n".join(out))
+    if toml_out is not None:
+        write_toml(toml_out, streams, cmake, full, core, calls)
     return 0
+
+
+def q(s: str) -> str:
+    return '"' + s.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+def write_toml(path: Path, streams: dict, cmake: dict, full: dict, core: dict, calls: dict) -> None:
+    lines = [
+        "# CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS: generated from FreeSurfer 8.2.0's source",
+        "# (docs/freesurfer/README.md) by validation/investigations/freesurfer-inventory/report_code.py;",
+        "# what each field means: docs/freesurfer/code.md. Do not edit by hand: regenerate.",
+        "",
+        "schema = 1",
+        'freesurfer = "8.2.0"',
+        "",
+    ]
+    for name, p in sorted(cmake["programs"].items(), key=lambda kv: kv[0].lower()):
+        if p is None:
+            continue
+        c = core["programs"].get(name)
+        lines += [
+            "[[program]]",
+            f"name = {q(name)}",
+            f"streams = [{', '.join(q(s) for s in streams.get(name, []))}]",
+        ]
+        lines += [f"directory = {q(p['directory'])}", f"defined_at = {q(p['defined_at'])}"]
+        lines += [f"sources = [{', '.join(q(s) for s in p['sources'])}]"]
+        lines += [f"own_files = {p['own_files']}", f"own_lines = {p['own_lines']}"]
+        lines += [f"internal_libraries = [{', '.join(q(s) for s in p['internal_libraries'])}]"]
+        lines += [f"external_libraries = [{', '.join(q(s) for s in p['external_libraries'])}]"]
+        lines += [
+            f"cxx_flags = {q(p['flags'].get('CXX', ''))}",
+            f"c_flags = {q(p['flags'].get('C', ''))}",
+        ]
+        if any(s.endswith((".f", ".F")) for s in p["sources"]):
+            lines += [f"fortran_flags = {q(p['flags'].get('Fortran', ''))}"]
+        lines += [f"definitions = [{', '.join(q(s) for s in p['compile_options'])}]"]
+        if c is not None:
+            pl = c["per_library"]
+            fns = sum(d.get("functions", 0) for d in pl.values())
+            lines += [f"core_functions = {fns}"]
+            parts = ", ".join(
+                f"{q(lib)} = {d.get('function_lines', 0)}"
+                for lib, d in sorted(pl.items())
+                if d.get("function_lines", 0)
+            )
+            lines += [f"core_lines = {{ {parts} }}"]
+            lines += [f"core_table_lines = {sum(d.get('table_lines', 0) for d in pl.values())}"]
+            lines += [
+                f"core_calls_only_lines = {sum(d.get('function_lines', 0) for d in calls['programs'][name]['per_library'].values())}"
+            ]
+            lines += [
+                f"full_lines = {sum(d.get('function_lines', 0) for d in full['programs'][name]['per_library'].values())}"
+            ]
+            files = sorted(
+                (
+                    (f, d.get("function_lines", 0))
+                    for f, d in c["per_file"].items()
+                    if d.get("function_lines", 0) >= 50 and not f.startswith(p["directory"] + "/")
+                ),
+                key=lambda x: (-x[1], x[0]),
+            )
+            lines += ["[program.files_reached]"] + [f"{q(f)} = {n}" for f, n in files]
+            if c["notes"]:
+                lines += ["[program.notes]", f"call_graph = {q('; '.join(c['notes']))}"]
+        lines.append("")
+    path.write_text("\n".join(lines), encoding="utf-8")
 
 
 if __name__ == "__main__":

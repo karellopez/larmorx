@@ -24,6 +24,7 @@ import copy
 import hashlib
 import json
 import os
+import re
 import shlex
 import sys
 from pathlib import Path
@@ -36,6 +37,7 @@ from larmorx_validation.evidence import (
     fsl_bet_options,
     fsl_bet_options_original,
     fsl_step,
+    words,
 )
 from larmorx_validation.figures import cache as fcache
 from larmorx_validation.figures import records
@@ -1779,7 +1781,7 @@ def export(ctx: core.Context) -> dict:
     opts_orig = fsl_bet_options_original.entries(ctx)
     tc, tcprov = trial_catchup(ctx)
     bench, chart = speed(ctx)
-    return {
+    doc = {
         "schema": 1,
         "tool": TOOL,
         "title": "BET",
@@ -1833,6 +1835,265 @@ def export(ctx: core.Context) -> dict:
             *fsl_bet_options_original.examples(ctx, rec_new, rec_orig),
         ],
     }
+    return present(doc)
+
+
+# ------------------------------------------------------------------- the writing guide's words
+
+#: "What this shows" of each worked example (the writing guide, section 4), from the example's
+#: own comparisons and their reasons; beside it the verdicts of the two ports' main comparisons.
+SHOWS = {
+    "fmriprep-bet": (
+        "On fMRIPrep's own call, the replica and the clean room both give FSL's brain and mask, "
+        "every voxel, and the replica also gives fMRIPrep's own output."
+    ),
+    "t1w-robust": (
+        "With `-R`, which runs bet2 again from the brain's centre, the replica and the clean "
+        "room both give FSL's brain and mask, every voxel."
+    ),
+    "betsurf-head": (
+        "The replica gives FSL's four masks, every voxel. The clean room's masks differ from "
+        "FSL's in 2 to 14 voxels at their edges, within its record's thresholds; the difference "
+        "is not closed."
+    ),
+    "panel-ds000228-child": (
+        "On the data panel's youngest head, the replica and the clean room both give FSL's brain "
+        "and mask, every voxel, and the replica also gives fMRIPrep's own output."
+    ),
+    "bet-S-adult": (
+        "With `-S`, the replica gives FSL's files in `fix` and in `reproduce`. The clean room "
+        "gives them in `reproduce`; in `fix` it corrects FSL-09 and computes the C library's "
+        "maths correctly rounded (GLIBC-07), and 1,277 brain values move."
+    ),
+    "bet-S-tumour": (
+        "With `-S` on a head with a tumour, the replica gives FSL's files in `fix` and in "
+        "`reproduce`. The clean room gives them in `reproduce`; in `fix` it corrects FSL-182 and "
+        "computes the C library's maths correctly rounded (GLIBC-07), and 470 brain values move."
+    ),
+    "bet-B-child": (
+        "With `-B`, the replica gives FSL's files in `reproduce`; in `fix` it corrects FSL-202, "
+        "and the brain mask moves (Dice 0.9955). The clean room differs from FSL in both modes: "
+        "in `reproduce` 2,439 brain values, its record's one failure among these heads."
+    ),
+    "bet-B-older": (
+        "With `-B -s`, both ports give FSL's files in `reproduce`. In `fix` both correct FSL-09 "
+        "and FSL-202, so the unbiased head and the brain move a little (the replica's mask: Dice "
+        "0.9862); the clean room's `fix` also computes the C library's maths correctly rounded "
+        "(GLIBC-07)."
+    ),
+    "bet-A-older": (
+        "With `-A`, the replica gives FSL's files in both modes. The clean room gives FSL's "
+        "brain; betsurf's masks differ at their edges (in `fix`, the non-zero voxels' Dice from "
+        "0.9922 for the skull mask to 0.9995 for the inner skull)."
+    ),
+    "bet-A2-child": (
+        "With `-A2` and a T2w, the replica gives FSL's files in both modes. The clean room gives "
+        "FSL's brain and mask; betsurf's masks differ at their edges (in `fix`, the non-zero "
+        "voxels' Dice from 0.9925 for the skull mask to 0.9994 for the inner skull)."
+    ),
+    "ssroi-child": (
+        "On the data panel's youngest head, the replica gives FSL's region in both modes. The "
+        "clean room gives it in `reproduce`; in `fix` it computes the C library's maths "
+        "correctly rounded (GLIBC-07), and 2,802 values move."
+    ),
+}
+
+#: A run of FSL in a panel's label: "FSL 6.0.7.23, bet -S -m".
+_FSL_RUN = re.compile(r"^FSL (\d[\d.]*), (\S+)(?: (.*))?$")
+
+
+def _port(pid: str) -> str | None:
+    if pid.startswith("replica"):
+        return "replica"
+    if pid.startswith("orig"):
+        return "clean-room"
+    return None
+
+
+def present(doc: dict) -> dict:
+    """BET's page in the writing guide's words and order (:mod:`words`): the ports named in
+    every panel and comparison, the panels and comparisons in the guide's order, a "What this
+    shows" line per worked example, the charts titled by what they compare. Texts only."""
+    for ex in doc["examples"]:
+        _present_example(ex)
+    titles = {
+        "replica": ("replica", "6.0.7.17", "full comparison", "replica, FSL 6.0.7.17"),
+        "replica-23": ("replica", fsl_step.NEW, "standard comparison", "replica, FSL 6.0.7.23"),
+        "original": ("clean room", fsl_step.NEW, "standard comparison", "clean room"),
+    }
+    for im in doc["implementations"]:
+        who, version, comparison, short = titles[im["id"]]
+        im["title"] = f"Agreement, {who} against the original: FSL `bet` {version}"
+        im["comparison"] = comparison
+        im["label"] = f"{who} against the original: FSL bet {version} ({comparison})"
+        im["short"] = short
+        im["port"] = "clean-room" if who == "clean room" else "replica"
+    sp = doc.get("speed")
+    if sp:
+        sp["caption"] = (
+            "Seconds for the whole command (reading, computing, writing), the median of repeated "
+            "runs, on a log scale. The factor is how many times faster the clean room is than "
+            "FSL, both on one thread."
+        )
+        sp["title"] = f"Speed, both ports against the original: FSL `bet` {fsl_step.NEW}"
+        marks = {"larmorx": "clean-room", "larmorx-open": "clean-room-open"}
+        for ser in sp["series"]:
+            ser["mark"] = marks.get(ser["mark"], ser["mark"])
+            ser["label"] = (
+                ser["label"]
+                .replace("clean-room original", "clean room")
+                .replace("FSL 6.0.7.23", "FSL bet 6.0.7.23")
+            )
+            ser["port"] = ser["mark"].removesuffix("-open")
+        sp["note"] = words.reword(sp.get("note"))
+    for t in doc.get("tables", []):
+        if t["id"] == "trial-catchup-triage":  # the clean room's differences: "the original" is it
+            for r in t["rows"]:
+                r["head"] = re.sub(r"\bthe original\b", "the clean room", r["head"])
+        words.table(t)
+    words.cases(doc["cases"])
+    doc["presentation"] = words.PRESENTATION
+    return doc
+
+
+def _present_example(ex: dict) -> None:
+    panels = {p["id"]: p for p in ex["panels"]}
+    diffs = ex["diffs"]
+    program = next(
+        m.group(2) for p in ex["panels"] if (m := _FSL_RUN.match(p["label"])) is not None
+    )
+    name: dict[str, str] = {}
+    new: dict[str, tuple[str, str | None]] = {}
+    ports: dict[str, str] = {}
+    rank: dict[str, float] = {}
+    follows: dict[str, str] = {}
+    main_b = {d["a"]: d["b"] for d in diffs if d["kind"] == "main"}
+    for pid, p in panels.items():
+        port = _port(pid) if p["role"] == "larmorx" else None
+        if p["role"] == "input":
+            new[pid] = (p["label"], None)
+            name[pid] = p["label"]
+        elif p["role"] == "original" and (m := _FSL_RUN.match(p["label"])):
+            version, prog, args = m.groups()
+            label = words.program_label("FSL", prog, version)
+            sub = (f"{prog} {args} · " if args else "") + words.reword(p.get("sub", ""), code=False)
+            new[pid], name[pid] = (label, sub), label
+            if pid.endswith("-plain"):
+                rank[pid] = 2.0  # the same head without the option, after the original's run
+        elif p["role"] == "original":  # FSL in fMRIPrep's image
+            label = f"FSL {program}, fMRIPrep's build"
+            new[pid], name[pid] = (label, p["sub"].replace("'s build", "'s image")), label
+            rank[pid] = 1.0  # an original's other builds after its versions
+        elif p["role"] == "fmriprep":
+            run = p["label"].removesuffix("'s own output")
+            new[pid] = ("fMRIPrep's output", f"{run}: {p['sub']}")
+            name[pid] = "fMRIPrep's output"
+        elif port:
+            ports[pid] = port
+            reproduce = "reproduce" in p.get("sub", "")
+            mode = "reproduce" if reproduce else "fix (the default)"
+            if "following" in p.get("sub", ""):
+                follows[pid] = p["sub"].split("following ", 1)[1]
+            package = "larmorx-nc, FSL Licence" if port == "replica" else "larmorx, Apache-2.0"
+            new[pid] = (words.PORT_NAME[port], f"{package} · {mode}")
+            name[pid] = words.PORT_NAME[port] + (" (reproduce)" if reproduce else "")
+        else:
+            raise ValueError(f"{ex['id']}: panel {pid} ({p['role']})")
+    # a port's second line ends with what it is compared with, by the original's new name
+    for pid in ports:
+        label, sub = new[pid]
+        against = name[main_b[pid]]
+        if pid in follows:  # "following FSL 6.0.7.23": the version it is compared with
+            if not against.endswith(follows[pid].removeprefix("FSL ")):
+                raise ValueError(f"{ex['id']}: {pid} follows {follows[pid]}, against {against}")
+            against += ", which it follows"
+        new[pid] = (label, f"{sub} · against {against}")
+
+    def port_of(pid: str) -> str:
+        return ports.get(pid) or words.ROLE_PORT[panels[pid]["role"]]
+
+    out: dict[str, tuple[str, str]] = {}
+    target: dict[str, str] = {}
+    for d in diffs:
+        a, b = d["a"], d["b"]
+        pa, pb = port_of(a), port_of(b)
+        old = d["label"]
+        if pa == pb and pa in words.PORT_NAME:
+            label = f"{words.PORT_NAME[pa]}, fix − reproduce"
+            role, target[d["id"]] = (
+                f"the {words.PORT_NAME[pa]} against itself: fix and reproduce",
+                "itself",
+            )
+        elif pa == "clean-room" and pb == "replica":
+            tail = old.split("replica", 1)[1].replace(", both defaults", ", both fix")
+            label = f"clean room − replica{tail}"
+            role, target[d["id"]] = "the clean room against the replica", "the replica"
+        elif pa in words.PORT_NAME and pb == "original":
+            label = f"{name[a]} − {name[b]}"
+            who = words.PORT_NAME[pa]
+            if panels[b]["id"] == "image":
+                role = f"the {who} against the original: fMRIPrep's build"
+            else:
+                role = f"the {who} against the original"
+            target[d["id"]] = "the original"
+        elif pa in words.PORT_NAME and pb == "fmriprep":
+            label = f"{name[a]} − {name[b]}"
+            role = f"the {words.PORT_NAME[pa]} against fMRIPrep's output"
+            target[d["id"]] = "fMRIPrep's output"
+        elif pa == "original" and pb == "original" and d["kind"] == "option":
+            option = d["role_label"].rsplit(" ", 1)[1]
+            label = old
+            role = f"the original against itself: with and without {option}"
+            target[d["id"]] = "itself"
+        elif pa == "original" and pb == "original":
+            label = f"{name[a]} − {name[b]}"
+            step = d["role_label"].endswith("the version step")
+            role = "the original against itself: " + (
+                "two versions" if step else "fMRIPrep's build"
+            )
+            target[d["id"]] = "itself"
+        else:
+            raise ValueError(f"{ex['id']}: comparison {d['id']} ({pa} − {pb})")
+        out[d["id"]] = (label, role)
+    # the metrics table's groups: the original against itself, then each port's comparisons
+    panel_rank = {p: (words.PORT_ORDER.index(port_of(p)), rank.get(p, 0.0), i)
+                  for i, p in enumerate(panels)}  # fmt: skip
+    targets = ["the original", "fMRIPrep's output", "itself", "the replica"]
+    groups = []
+    for port in ("original", "replica", "clean-room"):
+        ds = [d for d in diffs if port_of(d["a"]) == port]
+        if not ds:
+            continue
+        ds.sort(
+            key=lambda d: (targets.index(target[d["id"]]), panel_rank[d["a"]], panel_rank[d["b"]])
+        )
+        options = [d for d in ds if d["kind"] == "option"]
+        if port == "original":
+            title = "The original against itself: " + (
+                f"what {out[options[0]['id']][1].rsplit(' ', 1)[1]} changes"
+                if options
+                else "the yardstick"
+            )
+        else:
+            seen = list(dict.fromkeys(target[d["id"]] for d in ds))
+            title = f"The {words.PORT_NAME[port]} against " + (
+                seen[0] if len(seen) == 1 else ", ".join(seen[:-1]) + " and " + seen[-1]
+            )
+        groups.append((title, [d["id"] for d in ds]))
+    main = [
+        next((d["id"] for d in diffs if d["id"] == i), None)
+        for i in ("replica23-fsl23" if any(d["id"] == "replica23-fsl23" for d in diffs) else "replica-fsl", "orig-fsl23")
+    ]  # fmt: skip
+    words.example(
+        ex,
+        ports=ports,
+        panels=new,
+        diffs=out,
+        groups=groups,
+        shows=SHOWS[ex["id"]],
+        verdicts=[m for m in main if m],
+        rank=rank,
+    )
 
 
 if __name__ == "__main__":  # compute the cache entries only; refresh-original <why>

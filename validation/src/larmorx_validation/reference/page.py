@@ -527,6 +527,14 @@ def build(repo: Path, p: apipage.Program) -> Reference:
             f"How `{p.name}`'s ports compare with {original}, case by case: "
             f"[its evidence]({ev_url}).\n"
         )
+        # sections of the evidence page that hold what the reference page leaves out: facts a
+        # reference page cannot hold (it is readable material, the writing guide, section 1)
+        more = meta.get("evidence-sections") or {}
+        if more:
+            items = ", ".join(
+                f"[{_plain(str(t))}]({ev_url.split('#', 1)[0]}#{a})" for a, t in more.items()
+            )
+            body.append(f"On the same page, for `{p.name}`: {items}.\n")
     rest = [
         s for s in page.sections if s not in [q.section for q in page.programs] and s is not shared
     ]

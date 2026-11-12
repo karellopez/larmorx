@@ -14,6 +14,7 @@ GitHub does not show::
     command-line: crates/larmorx-fsl/src/cli/bet.rs
     records: {replica: [fsl-bet-replica], clean-room: [fsl-bet]}
     evidence: fsl-bet
+    evidence-sections: {data: "The standard images the variations read"}
     -->
 
 Its text before the first level-3 heading says what the program does. Its level-3 sections are
@@ -23,6 +24,10 @@ original's options, a column headed ``Python``, a column of notes), ``Examples .
 whose info string holds the word ``example``, after an ``<!-- inputs: name=kind ... -->`` comment
 naming the files the tests make for them). Any other level-3 section is kept as it is. A
 level-2 section titled ``Ports`` holds what every program of the page shares about its ports.
+``evidence-sections`` (optional) names sections of the evidence page, by anchor and title, that
+the reference page links to: what a reference page leaves out (a section whose facts come from
+material a clean-room implementer may not read stays on the evidence page; the writing guide,
+section 1).
 """
 
 from __future__ import annotations

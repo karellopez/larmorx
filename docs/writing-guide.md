@@ -191,10 +191,13 @@ How to use them:
   (`NAME = "afni-volreg-original"`, used in `validation/difftest/triage.toml` and the cases) stay
   as they are, even where the module's file is renamed.
 - **The evidence exported again** changes only texts, marks, the provenance's paths and the
-  exporter's commit, which the provenance records. Every blob stays byte for byte
+  exporter's commit, which the provenance records. It also adds the fields that name each
+  panel's and comparison's port and the order they are shown in (`port`, `order`, `shows`; the
+  evidence module's `words.py` says how). Every blob stays byte for byte
   (`static/evidence/blobs.sha256` unchanged, checked before the push), and every SHA-256 the
-  provenance cites stays the same. The JSON files change, and the merge's site inventory shows
-  each change for the merge to judge.
+  provenance cites stays the same. The lists of panels and comparisons keep their order in the
+  JSON, since the site's number check and the merge's inventory find a number by its place. The
+  JSON files change, and the merge's site inventory shows each change for the merge to judge.
 
 [validation/investigations/docs-revision/inventory.md](../validation/investigations/docs-revision/inventory.md)
 counts every old word, file by file (section 7).
@@ -497,8 +500,9 @@ label says "larmorx", the evidence module names the port.
 | the two implementations of the corrections (1) | the clean room against the replica: both `fix` |
 
 **A worked example** has a title that names the data and the call ("fMRIPrep's skull strip of a
-BOLD reference"), then one line, "What this shows: ...", with the verdict of the comparison that
-matters most. Its panels go in one order:
+BOLD reference"), then one line, "What this shows: ...". Beside it stands, for each port, the
+verdict of the comparison that matters most: the port against the original's newest version.
+Its panels go in one order:
 
 1. the input, and its known answer for a synthetic input;
 2. the original: each version, then its other builds (fMRIPrep's build, correctly rounded maths);

@@ -71,6 +71,7 @@ python: larmorx.fsl.bet
 command-line: crates/larmorx-fsl/src/cli/bet.rs
 records: {replica: [fsl-bet-replica, fsl-bet-replica-full], clean-room: [fsl-bet]}
 evidence: fsl-bet
+evidence-sections: {data: "The standard images the variations read"}
 -->
 
 FSL's `bet` script: `bet2` itself, or one of its variations (below).

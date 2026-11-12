@@ -54,3 +54,17 @@ Their results are in `docs/freesurfer/` (closed too).
           <workspace>/tags/freesurfer-8.2.0 docs/freesurfer/programs.toml <scratch>/cmake.json \
           <scratch>/full.json <scratch>/core.json --json <scratch>/licences.json \
           --toml-out docs/freesurfer/third-party.toml --rng <scratch>/rng.txt
+- `data_refs.py`: sub-task 4's first pass (relay 3). `refs` prints every line of the default-path
+  scripts and Python programs, the recon-all configuration files and the reached C/C++ files
+  (`--reached <licences.json>`) that names a data location (`FREESURFER_HOME`, `average/`,
+  `models/`, `fsaverage`, atlas and table extensions): a reading aid, the variables in the paths
+  are resolved by reading the scripts. `package` lists every file of the installed package's data
+  folders (`average`, `models`, `subjects`, `luts`, `mni`, `mni-1.4`, the top-level tables) with
+  its size and SHA-256.
+
+      python -P validation/investigations/freesurfer-inventory/data_refs.py refs \
+          <workspace>/tags/freesurfer-8.2.0 docs/freesurfer/programs.toml \
+          --reached <scratch>/licences.json > <scratch>/data-refs.txt
+      python -P validation/investigations/freesurfer-inventory/data_refs.py package \
+          <workspace>/oracles/freesurfer-8.2.0/root/usr/local/freesurfer/8.2.0 \
+          --tsv <scratch>/package-files.tsv --workers 4

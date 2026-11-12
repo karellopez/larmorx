@@ -31,6 +31,11 @@ pub struct Tally {
     pub differ: u64,
     pub shown: u32,
     pub notes: Vec<String>,
+    /// Compare a NaN with a NaN as equal (their signs and payloads counted in `nan_bits`): where
+    /// two NaNs meet, x86's result is the first operand's, an order the source leaves to the
+    /// compiler (GCC's and LLVM's differ).
+    pub nan_as_nan: bool,
+    pub nan_bits: u64,
 }
 
 impl Tally {
@@ -45,6 +50,10 @@ impl Tally {
     pub fn bits(&mut self, what: &dyn Fn() -> String, ours: u64, theirs: u64) -> bool {
         self.values += 1;
         if ours != theirs {
+            if self.nan_as_nan && f64::from_bits(ours).is_nan() && f64::from_bits(theirs).is_nan() {
+                self.nan_bits += 1;
+                return true;
+            }
             self.differ += 1;
             if self.shown < 12 {
                 self.shown += 1;
@@ -75,6 +84,13 @@ impl Tally {
     pub fn f32s(&mut self, what: &dyn Fn() -> String, ours: &[f32], theirs: &[f32]) -> bool {
         let mut ok = true;
         for (i, (a, b)) in ours.iter().zip(theirs).enumerate() {
+            if self.nan_as_nan && a.is_nan() && b.is_nan() {
+                self.values += 1;
+                if a.to_bits() != b.to_bits() {
+                    self.nan_bits += 1;
+                }
+                continue;
+            }
             ok &= self.bits(&|| format!("{} [{i}]", what()), u64::from(a.to_bits()), u64::from(b.to_bits()));
         }
         ok
@@ -184,6 +200,7 @@ fn main() {
     }
     if want("linalg") {
         let mut t = Tally::new("linalg");
+        t.nan_as_nan = true;
         checks_linalg::run(&lib, scale, &mut t);
         tallies.push(t);
     }
@@ -202,6 +219,9 @@ fn main() {
         );
         for n in &t.notes {
             let _ = writeln!(report, "        {n}");
+        }
+        if t.nan_as_nan {
+            let _ = writeln!(report, "        NaN compared as NaN: {} with other sign or payload bits", t.nan_bits);
         }
         failed |= t.differ > 0;
     }

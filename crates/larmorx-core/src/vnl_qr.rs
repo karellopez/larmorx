@@ -443,6 +443,7 @@ impl<T: ItkReal> Qr<T> {
                 if x[at(1, 1)] != T::ZERO {
                     b[0] = y[0] / x[at(1, 1)];
                 } else {
+                    // VNL's solution is never written: memory contents, 0 here (ITK-113).
                     info = 1;
                 }
             }
@@ -483,7 +484,8 @@ impl<T: ItkReal> Qr<T> {
     }
 
     /// `solve(b)`: the least-squares solution (`cols` entries) and `info`; VNL prints
-    /// [`RANK_DEFICIENT`] and `info` on standard error when it is not 0.
+    /// [`RANK_DEFICIENT`] and `info` on standard error when it is not 0. For one row whose entry
+    /// is 0 VNL leaves the solution unwritten (memory contents): 0 here (ITK-113).
     pub fn solve(&self, b: &[T]) -> Solved<T> {
         let (_, x, info) = self.qrsl(b, true);
         (x, info)

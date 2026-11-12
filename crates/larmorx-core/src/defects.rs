@@ -971,6 +971,14 @@ defects! {
         "vnl_cholesky never initialises rcond_ and LINPACK's dpoco leaves it unset for a matrix that is not positive definite: rcond(), and the estimate_condition mode's message, give memory contents";
     ITK_109 = "ITK-109", "VXL", true,
         "vnl_cholesky::determinant (LINPACK's dpodi) keeps its mantissa in [1, 10) with loops that never end when it is not finite: a factor with an infinite or NaN diagonal entry, or one whose square overflows the mantissa";
+    ITK_110 = "ITK-110", "VXL", true,
+        "vnl_real_eigensystem never writes Vreal's columns of a complex eigenvalue pair (the matrix is allocated uninitialised): those columns are memory contents";
+    ITK_111 = "ITK-111", "VXL", true,
+        "when EISPACK's hqr2 fails (30 n iterations), vnl_real_eigensystem reads the eigenvalues it had not found from uninitialised vectors: D and the columns built from them depend on memory contents";
+    ITK_112 = "ITK-112", "VXL", true,
+        "EISPACK's balanc (vnl_real_eigensystem) never returns on a matrix with an infinite or NaN entry, or entries so large that a row's or column's scaled sum overflows, in the part it balances";
+    ITK_113 = "ITK-113", "VXL", true,
+        "vnl_qr::solve (and inverse) of a matrix with one row whose entry is 0 never writes the solution (LINPACK's info is 1 and VNL's vector is uninitialised): memory contents";
     ANTS_110 = "ANTS-110", "antsAI", true,
         "the blob alignment keeps the blob pairs whose displacements have about the same length as the others' (the squared distance between a pair's fixed and moving blob over another pair's), not those whose distances to the other blobs are preserved between the images, as its comment and ImageMath's MatchBlobs say";
     ANTS_111 = "ANTS-111", "antsAI", true,

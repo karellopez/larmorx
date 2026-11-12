@@ -507,6 +507,7 @@ RANK = {"3.1": 1, "3.2": 2, "3.3": 3, "N": 3.5, "3.4": 4, "3.5": 5, "3.6": 6, "3
 # module items.
 EXTRA: list[dict] = [
     {
+        "key": "extra:workspace",
         "wave": "3.1",
         "kind": "plumbing",
         "crate": "crates-freesurfer/",
@@ -521,6 +522,7 @@ EXTRA: list[dict] = [
         "checks": "the three Rust workspaces' gates, check_spdx.py, test_release.py",
     },
     {
+        "key": "extra:unit-oracle",
         "wave": "3.1",
         "kind": "oracle",
         "crate": "validation/investigations/freesurfer-unit-oracle/",
@@ -534,6 +536,7 @@ EXTRA: list[dict] = [
         " steps (mri_add_xform_to_header, mri_normalize, mris_smooth)",
     },
     {
+        "key": "extra:x87",
         "wave": "3.1",
         "kind": "permissive",
         "crate": "larmorx-core",
@@ -549,6 +552,7 @@ EXTRA: list[dict] = [
         " x87 (a C probe compiled by GCC 8.4.0); golden cases on the six platforms",
     },
     {
+        "key": "extra:random",
         "wave": "3.1",
         "kind": "permissive",
         "crate": "larmorx-core",
@@ -563,6 +567,7 @@ EXTRA: list[dict] = [
         " mris_smooth's and mris_ca_label's -seed 1234 replays",
     },
     {
+        "key": "extra:ranlux",
         "wave": "3.1",
         "kind": "spec + clean room",
         "crate": "larmorx-core (clean-room files, GSL family)",
@@ -578,6 +583,7 @@ EXTRA: list[dict] = [
         " dithering (seed 53) through its replay",
     },
     {
+        "key": "extra:spline-clean",
         "wave": "3.1",
         "kind": "spec + clean room",
         "crate": "larmorx-core (clean-room files)",
@@ -588,6 +594,7 @@ EXTRA: list[dict] = [
         "checks": "SplineCubicSet/SplineCubicValue against the unit oracle; mri_normalize's replays",
     },
     {
+        "key": "extra:vnl",
         "wave": "3.1",
         "kind": "permissive",
         "crate": "larmorx-core",
@@ -602,6 +609,7 @@ EXTRA: list[dict] = [
         " re-checked at FreeSurfer's call sites",
     },
     {
+        "key": "extra:libc",
         "wave": "3.1",
         "kind": "inventory + spec",
         "crate": "larmorx-core",
@@ -615,6 +623,7 @@ EXTRA: list[dict] = [
         "checks": "the unit oracle; the first replays",
     },
     {
+        "key": "extra:nn",
         "wave": "N",
         "kind": "permissive",
         "crate": "larmorx-nn (new, main package)",
@@ -742,6 +751,74 @@ FMRIPREP = {
 }
 
 
+# The reference runs (one per head and stream, 4 threads: the queue's checks); the variability
+# runs beside them (`<head>-classic-1thread`, ...) are FreeSurfer's own variation, not counted.
+REFERENCE_RUNS = r"-(classic|v8)$"
+
+
+def assign_ids(path: Path | None, keys: list[tuple[str, str]], problems: list[str]) -> dict:
+    """The items' numbers, kept stable across regenerations (queue-ids.toml).
+
+    An item keeps the number its key was given; a new item takes the next free number of its
+    wave (``3.1-53``, ``C3.2-31``, ``CP-04``); a number whose item is gone stays in the file as
+    retired (with the reason, written by hand) and is never given again. Without the file the
+    items are numbered in the queue's order, as before relay 8, and the file is written."""
+    pinned: dict[str, str] = {}
+    retired: dict[str, tuple[str, str]] = {}  # id -> (key, reason)
+    if path is not None and path.exists():
+        for e in load_toml(path).get("id", []):
+            if e.get("retired"):
+                retired[e["id"]] = (e["key"], e["retired"])
+            else:
+                pinned[e["key"]] = e["id"]
+    used: dict[str, int] = defaultdict(int)
+    for i in [*pinned.values(), *retired]:
+        prefix, num = i.rsplit("-", 1)
+        used[prefix] = max(used[prefix], int(num))
+    out: dict[str, str] = {}
+    for key, prefix in keys:
+        if key in out:
+            problems.append(f"two queue items share the key {key}")
+        elif key in pinned:
+            out[key] = pinned[key]
+        else:
+            used[prefix] += 1
+            out[key] = f"{prefix}-{used[prefix]:02d}"
+    for key, i in pinned.items():
+        if key not in out:
+            problems.append(
+                f"{i} ({key}) is no longer generated: mark it retired in the ids file, with why"
+            )
+    if path is not None:
+        rows = [
+            "# CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS (docs/freesurfer/README.md). The queue's item",
+            "# numbers, kept stable: waves.py reads and rewrites this file (--ids). An item keeps its",
+            "# number while its key is generated; a new item takes the next free number of its wave;",
+            "# a number whose item is gone is marked retired (why, by hand) and never given again.",
+            "# Keys: extra:<name> (written by hand in waves.py), mod:<module>:<piece>, w3:<module>:<part>,",
+            "# paths:<module>, prog:<program>[:<piece>], split:<program>:<part>, script:<program>:<part>,",
+            "# clean:mod:<module>, clean:prog:<program>, clean:extra:<name>, cp:<piece>.",
+            "",
+            "schema = 1",
+            "",
+        ]
+        entries = [(i, k, "") for k, i in out.items()]
+        entries += [(i, k, why) for i, (k, why) in retired.items()]
+        entries += [(i, k, "") for k, i in pinned.items() if k not in out]
+
+        def order(e: tuple[str, str, str]) -> tuple:
+            prefix, num = e[0].rsplit("-", 1)
+            return (prefix.startswith("C"), RANK.get(prefix.lstrip("C"), 8), prefix, int(num))
+
+        for i, k, why in sorted(entries, key=order):
+            rows += ["[[id]]", f"id = {json.dumps(i)}", f"key = {json.dumps(k)}"]
+            if why:
+                rows.append(f"retired = {json.dumps(why)}")
+            rows.append("")
+        path.write_text("\n".join(rows), encoding="utf-8")
+    return out
+
+
 def load_toml(path: Path) -> dict:
     with path.open("rb") as fh:
         return tomllib.load(fh)
@@ -769,12 +846,13 @@ def group_of(streams: list[str]) -> str:
     return "conditional"
 
 
-def recorded_steps(runs: Path | None) -> dict[str, Counter]:
-    """program -> Counter(run -> number of recorded steps whose argv[0] is the program)."""
+def recorded_steps(runs: Path | None, pattern: str = REFERENCE_RUNS) -> dict[str, Counter]:
+    """program -> Counter(run -> number of recorded steps whose argv[0] is the program), in the
+    runs whose folder name matches ``pattern`` (the reference runs: one per head and stream)."""
     out: dict[str, Counter] = defaultdict(Counter)
     if runs is None or not runs.is_dir():
         return out
-    for run in sorted(p for p in runs.iterdir() if p.is_dir()):
+    for run in sorted(p for p in runs.iterdir() if p.is_dir() and re.search(pattern, p.name)):
         steps = run / "record" / "steps"
         if not steps.is_dir():
             continue
@@ -800,6 +878,16 @@ def run_main() -> int:
     ap.add_argument("--markdown", type=Path)
     ap.add_argument("--queue", type=Path)
     ap.add_argument("--budget", type=int, default=2500, help="lines per relay-sized item")
+    ap.add_argument(
+        "--ids",
+        type=Path,
+        help="docs/freesurfer/queue-ids.toml: the items' numbers, kept stable (read and rewritten)",
+    )
+    ap.add_argument(
+        "--run-pattern",
+        default=REFERENCE_RUNS,
+        help="the runs counted as recorded steps (a regular expression on the run's folder name)",
+    )
     args = ap.parse_args()
 
     programs = load_toml(args.programs)["program"]
@@ -904,7 +992,7 @@ def run_main() -> int:
         for p in progs:
             mod_progs[m].add(p)
             prog_mod[p][m] += fun_lines.get(r, 0)
-    steps = recorded_steps(args.runs)
+    steps = recorded_steps(args.runs, args.run_pattern)
 
     def checks_of(n: str) -> str:
         st = steps.get(n)
@@ -1009,6 +1097,7 @@ def run_main() -> int:
                     label += f" ({title})"
                 queue.append(
                     {
+                        "key": f"mod:{mid}:{i}",
                         "wave": wave,
                         "kind": kind,
                         "crate": crate,
@@ -1026,6 +1115,7 @@ def run_main() -> int:
             if kind == "replica":
                 clean[wave].append(
                     {
+                        "key": f"clean:mod:{mid}",
                         "what": f"`{mid}`'s clean room ({title})",
                         "crate": "larmorx-io"
                         if mid in ("fs.io", "fs.labels")
@@ -1046,6 +1136,7 @@ def run_main() -> int:
                 top = ", ".join(f"`{p}` ({waits[p][mid]:,})" for p in ps[:6])
                 queue.append(
                     {
+                        "key": f"paths:{mid}",
                         "wave": wave,
                         "kind": "completeness",
                         "crate": "the programs' crates",
@@ -1083,6 +1174,7 @@ def run_main() -> int:
                 for i, part in enumerate(sp, 1):
                     queue.append(
                         {
+                            "key": f"script:{n}:{i}",
                             "wave": wave,
                             "kind": kind,
                             "crate": crate,
@@ -1103,6 +1195,7 @@ def run_main() -> int:
                     last = i == len(pieces)
                     queue.append(
                         {
+                            "key": f"prog:{n}:{i}",
                             "wave": wave,
                             "kind": kind,
                             "crate": crate,
@@ -1120,6 +1213,7 @@ def run_main() -> int:
             else:
                 queue.append(
                     {
+                        "key": f"prog:{n}",
                         "wave": wave,
                         "kind": kind,
                         "crate": crate,
@@ -1135,6 +1229,7 @@ def run_main() -> int:
             if kind != "clean room only":
                 clean[wave].append(
                     {
+                        "key": f"clean:prog:{n}",
                         "what": f"`{n}`'s clean room",
                         "crate": CLEAN[wave] if n != "mri_ca_label" else CLEAN["3.3"],
                         "lines": lines or own_script,
@@ -1143,6 +1238,7 @@ def run_main() -> int:
         for n, (suffix, _pw, what) in extra_split:
             queue.append(
                 {
+                    "key": f"split:{n}:{suffix}",
                     "wave": wave,
                     "kind": by_name[n]["kind"],
                     "crate": CRATE[wave],
@@ -1160,10 +1256,17 @@ def run_main() -> int:
     counters: Counter = Counter()
     for q in queue:
         counters[q["wave"]] += 1
-        q["id"] = f"{q['wave']}-{counters[q['wave']]:02d}"
-    for wave, items in clean.items():
-        for i, c in enumerate(items, 1):
-            c["id"] = f"C{wave}-{i:02d}"
+    pins = assign_ids(
+        args.ids,
+        [(q["key"], q["wave"]) for q in queue]
+        + [(c["key"], "C" + wave) for wave, items in clean.items() for c in items],
+        problems,
+    )
+    for q in queue:
+        q["id"] = pins[q["key"]]
+    for items in clean.values():
+        for c in items:
+            c["id"] = pins[c["key"]]
 
     # ------------------------------------------------------------ Markdown
     md: dict[str, str] = {}

@@ -1,5 +1,5 @@
 {
- "dossier": "2026-11-11-easy-cli",
+ "dossier": "2026-11-12-confounds-first-half",
  "edits": [
   {
    "added": null,
@@ -103,14 +103,29 @@
     "larmorx-fsl's shared code (images, options, messages, data)"
    ],
    "what": "a merge's own resolution in larmorx-fsl's package manifest: the unused `libm` dependency removed, as the implementer's handoff asked"
+  },
+  {
+   "added": 0,
+   "agent": "orchestrator",
+   "comments_or_blank": null,
+   "commit": "e8b4474b9",
+   "date": "2026-11-11",
+   "description": "ORCHESTRATOR",
+   "judged": true,
+   "judgement": "no algorithmic content; nothing tedana-derived",
+   "relevant_content_before": 1,
+   "removed": 0,
+   "role": "orchestrator",
+   "tools": [],
+   "what": "the t2smap wiring relay's own merge of main (b13195fb) into its branch (made by that clean-room implementer, not the orchestrator): its resolution adds `mod tedana;` beside main's `mod stream;` in larmorx-py's module list and rewrites one row of docs/api/tedana-t2smap.md's option table (`--implementation`'s values); no clean-room crate file (the dossier's list is empty)"
   }
  ],
  "evidence": {
-  "accesses": 314867,
-  "agents": 298,
+  "accesses": 319453,
+  "agents": 305,
   "archive_checksums_differ": 0,
-  "archive_checksums_matched": 388,
-  "archived_files": 388,
+  "archive_checksums_matched": 398,
+  "archived_files": 398,
   "archives": {
    "2026-11-05-session-transcripts": {
     "files": 244,
@@ -159,32 +174,36 @@
    "2026-11-11-session-transcripts-release-0.1.0rc1": {
     "files": 24,
     "sha256": "efd9d017a3fceaac14ad1eda8cdda2ea52bd63124f0ec9b5e4e09378ee725646"
+   },
+   "2026-11-12-session-transcripts-confounds-first-half": {
+    "files": 25,
+    "sha256": "549db515e64d62cd95a2b6d2900e8ec55ff99a34591bba63adab212147df0d10"
    }
   },
-  "commits_printed": 3013,
-  "distinct_transcripts": 302,
+  "commits_printed": 3052,
+  "distinct_transcripts": 309,
   "first_record": "2026-10-09 11:38 UTC",
   "gaps": {
-   "agents_without_worktree": 203,
+   "agents_without_worktree": 210,
    "bad_lines": 0,
-   "calls_without_result": 20,
+   "calls_without_result": 22,
    "compaction_parent_missing": 2,
-   "compactions": 73,
-   "refused_calls": 1569,
+   "compactions": 74,
+   "refused_calls": 1573,
    "refused_calls_restricted_accesses": 686,
    "request_only_calls": 0,
    "results_without_call": 0,
-   "unresolved_paths": 7619
+   "unresolved_paths": 7651
   },
-  "last_record": "2026-11-11 21:00 UTC",
-  "live_files": 302,
-  "live_files_also_archived": 300,
+  "last_record": "2026-11-12 01:42 UTC",
+  "live_files": 309,
+  "live_files_also_archived": 307,
   "sessions": 4,
-  "tool_calls": 91198,
+  "tool_calls": 92607,
   "tool_calls_by_tool": [
    [
     "Agent",
-    300
+    307
    ],
    [
     "Artifact",
@@ -196,7 +215,7 @@
    ],
    [
     "Bash",
-    77274
+    78589
    ],
    [
     "CronCreate",
@@ -208,7 +227,7 @@
    ],
    [
     "Edit",
-    4229
+    4235
    ],
    [
     "EnterWorktree",
@@ -216,11 +235,11 @@
    ],
    [
     "Monitor",
-    164
+    173
    ],
    [
     "Read",
-    2322
+    2329
    ],
    [
     "ReadNotifications",
@@ -228,7 +247,7 @@
    ],
    [
     "SendMessage",
-    94
+    95
    ],
    [
     "Skill",
@@ -236,7 +255,7 @@
    ],
    [
     "SubagentHandback",
-    307
+    315
    ],
    [
     "TaskOutput",
@@ -244,11 +263,11 @@
    ],
    [
     "TaskStop",
-    229
+    237
    ],
    [
     "ToolSearch",
-    190
+    196
    ],
    [
     "WebFetch",
@@ -260,12 +279,12 @@
    ],
    [
     "Write",
-    5967
+    6009
    ]
   ],
-  "transcript_bytes": 7484635645,
-  "transcript_files": 690,
-  "unique_paths": 66271
+  "transcript_bytes": 7688073900,
+  "transcript_files": 707,
+  "unique_paths": 66976
  },
  "levels": [
   [
@@ -346,7 +365,7 @@
  "made_from": {
   "scan": "scan",
   "similarity_commit": "95ea64a8",
-  "verdicts_repository": "c2583cc0"
+  "verdicts_repository": "89030879"
  },
  "overview": {
   "agents_by_role": [
@@ -356,7 +375,7 @@
    ],
    [
     "clean-room implementer",
-    84
+    85
    ],
    [
     "documentation",
@@ -368,32 +387,32 @@
    ],
    [
     "other",
-    105
+    109
    ],
    [
     "replica author",
-    82
+    83
    ],
    [
     "spec writer",
-    21
+    22
    ]
   ],
   "attributed_by": [
    [
     "printed",
-    239
+    240
    ],
    [
     "subject",
     13
    ]
   ],
-  "commits": 252,
+  "commits": 253,
   "commits_by_role": [
    [
     "clean-room implementer",
-    248
+    249
    ],
    [
     "integration",
@@ -404,7 +423,7 @@
     3
    ]
   ],
-  "implementers": 84,
+  "implementers": 85,
   "register_restricted_lines": 1476,
   "single_file_scopes": {
    "checked": 70,

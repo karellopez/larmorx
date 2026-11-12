@@ -8,7 +8,17 @@ claim gives the file and line it comes from. The recordings (`<workspace>/oracle
 confirm or correct it: at the end of relay 1, the first ones (ds000005 sub-01, v8 steps 1-8 and
 classic steps 1-12) matched §3's order and arguments exactly, N4's call inside
 `mri_nu_correct.mni` included, and corrected one reading (`rca-talairach`'s thread count, §4).
-The next relays check the rest as the runs finish.
+Relay 2 (2026-11-12) checked ds002422 sub-02: v8 recorded steps 1-48 (§3's stages 1-55, through
+`mris_autodet_gwstats rh`) and classic steps 1-14 (stages 1-27, through `mri_ca_normalize`) match
+§3's order, arguments and timed/bare split, the bare stages included as the files they leave
+between two recorded steps (v8: `aseg.auto_noCCseg.mgz` and `synthseg.tiv.dat` before
+`rca-talairach`; `mca-dura.mgz`, `vsinus.mgz` and `brainmask.mgz` between `mri_normalize` and
+`mri_em_register`; `entowm.mgz` and `entowm.stats` before `seg2cc`; `aseg.presurf.mgz` before the
+second `mri_normalize`; `brain.finalsurfs.manedit.mgz` before `AntsDenoiseImageFs`). The
+per-hemisphere stages run as §3 says: Tessellate's three programs for `lh`, then for `rh`; each
+later stage `lh` then `rh`. Nested programs (inside `rca-talairach`, `fs-synthmorph-reg`,
+`seg2cc`, `defect2seg`, `mri_nu_correct.mni`) have no step of their own. The next relays check the
+rest as the runs finish.
 
 Sources read:
 

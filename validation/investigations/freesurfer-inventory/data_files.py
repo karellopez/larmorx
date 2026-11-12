@@ -8,7 +8,8 @@ CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS (built from FreeSurfer's source and
         --trace <scratch>/trace --package-tsv <scratch>/package-files.tsv \\
         --annex-tsv <scratch>/annex-keys.tsv --annex-urls <scratch>/annex-urls-retry.tsv \\
         --tag <workspace>/tags/freesurfer-8.2.0 --runs <workspace>/oracles/freesurfer-8.2.0/runs \\
-        --fs-home <package root> --toml docs/freesurfer/data-files.toml > <scratch>/data-files-tables.md
+        --fs-home <package root> --toml docs/freesurfer/data-files.toml \\
+        --markdown docs/freesurfer/data-files.md > <scratch>/data-files-tables.md
 
 Inputs: ``data_trace.py``'s job results (which program opened which file, per job), the package's
 files with sizes and SHA-256 (``data_refs.py package``), the tag's git-annex symlinks
@@ -26,6 +27,7 @@ import argparse
 import csv
 import glob
 import hashlib
+import io
 import json
 import os
 import re
@@ -272,6 +274,24 @@ def stream_of(job: str) -> str:
     return {"v8": "v8", "cl": "classic", "fp": "fmriprep"}[job.split("-", 1)[0]]
 
 
+def splice(md: Path, text: str) -> None:
+    """Replace the generated regions of data-files.md (between its data_files.py markers)."""
+    blocks = text.strip().split("\n\n")
+    files_table, totals, per_prog, homes, served = blocks[:5]
+    m = re.match(r"(\d+) files, ([\d,]+) bytes", totals)
+    regions = {
+        "programs": per_prog,
+        "files": f"{m.group(1)} files, {m.group(2)} bytes in all.\n\n{files_table}\n\n{homes}"
+        f"\n\n{served}",
+    }
+    doc = md.read_text(encoding="utf-8")
+    for name, body in regions.items():
+        begin, end = f"<!-- data_files.py: {name} -->", f"<!-- data_files.py: end {name} -->"
+        a, b = doc.index(begin) + len(begin), doc.index(end)
+        doc = doc[:a] + "\n" + body + "\n" + doc[b:]
+    md.write_text(doc, encoding="utf-8")
+
+
 def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--trace", required=True, type=Path)
@@ -282,6 +302,9 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--runs", required=True, type=Path)
     ap.add_argument("--fs-home", required=True)
     ap.add_argument("--toml", required=True, type=Path)
+    ap.add_argument(
+        "--markdown", type=Path, help="data-files.md: its generated regions are replaced"
+    )
     args = ap.parse_args(argv)
 
     package = {r["path"]: r for r in load_tsv(args.package_tsv)}
@@ -424,7 +447,9 @@ def main(argv: list[str]) -> int:
         lines.append("")
     args.toml.write_text("\n".join(lines), encoding="utf-8")
 
-    # Markdown: one row per file, grouped by kind
+    # Markdown (printed, and spliced into --markdown between its markers): one row per file
+    out, real = io.StringIO(), sys.stdout
+    sys.stdout = out
     print(
         "| File (under `FREESURFER_HOME`) | Kind | Size (bytes) | SHA-256 (first 12) | Programs | "
         "Streams | Served on its own | Proposed home |"
@@ -498,6 +523,10 @@ def main(argv: list[str]) -> int:
         v[1] += e["bytes"]
     for k, (n, b) in sorted(served.items()):
         print(f"| {k} | {n} | {b:,} |")
+    sys.stdout = real
+    print(out.getvalue(), end="")
+    if args.markdown:
+        splice(args.markdown, out.getvalue())
     return 0
 
 

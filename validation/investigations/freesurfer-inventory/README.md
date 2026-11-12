@@ -101,7 +101,8 @@ Their results are in `docs/freesurfer/` (closed too).
           --trace <scratch>/trace --package-tsv <scratch>/package-files.tsv \
           --annex-tsv <scratch>/annex-keys.tsv --annex-urls <scratch>/annex-urls.tsv \
           --tag <workspace>/tags/freesurfer-8.2.0 --runs <workspace>/oracles/freesurfer-8.2.0/runs \
-          --fs-home <package root> --toml docs/freesurfer/data-files.toml > <scratch>/tables.md
+          --fs-home <package root> --toml docs/freesurfer/data-files.toml \
+          --markdown docs/freesurfer/data-files.md > <scratch>/tables.md
 - `drand64_order.sh` with `find_consts.py`: sub-task 5 (relay 4). The order in which the official
   binaries evaluate `vnl_random::drand64`'s two `lrand32()` calls: the code that divides by
   4294967295.0² and the two calls before it, per binary (`objdump`, `readelf`).

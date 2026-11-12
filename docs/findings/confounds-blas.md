@@ -93,8 +93,8 @@ is not what was built: its CI checks out `v0.3.28`.)
   It reaches LAPACK: `DLARFB`'s and the recursive `DLARFT`'s products, so `DGEQRF`/`DGELQF` on any
   matrix with `min(m, n) > 128` and a first panel deeper than about 330 rows or columns (400 × 192
   already crashes), `DBDSDC`'s `DLASD3` products (832-row bidiagonals), `DORMBR`/`DORGBR` through
-  `DORMQR`/`DORGQR` (600 × 280 reductions), numpy's `svd`, `qr`, `lstsq` of `min(m, n) > 32` with
-  `max(m, n) > 298`. The undefined class can also **hang**: once `DORGLQ` of 600 × 600 with 450
+  `DORMQR`/`DORGQR` (600 × 280 reductions), numpy's `svd` and `qr` at CompCor's sizes, its `lstsq` of `min(m, n) > 32`
+  with `max(m, n) > 298`. The undefined class can also **hang**: once `DORGLQ` of 600 × 600 with 450
   reflectors spun at 100 % of a core for 11 minutes inside numpy's library (it had crashed in an
   earlier run: it depends on the memory around the buffer). Every crash and hang of the checks fell
   in the predicted class; the cases of that class that did not crash were still identical to

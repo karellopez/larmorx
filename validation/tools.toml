@@ -63,7 +63,7 @@ validation = "[{ants-denoise.identical} of {ants-denoise.compared}](record:ants-
 id = "ants-image-math"
 title = "ImageMath (every operation fMRIPrep, sMRIPrep and sdcflows call)"
 eco = "ants"
-page = "/tools/ants-programs/"
+page = "/evidence/ants-programs/"
 use = ["larmorx ants ImageMath", "lx.ants.image_math"]
 how = "replica"
 validation = "[{ants-image-math.cases} cases](record:ants-image-math): values bit-identical in {ants-image-math.identical} of {ants-image-math.compared}, headers in {ants-image-math.headers} of {ants-image-math.compared}; ANTS-17, -22 and -23 corrected, checked against known results; data panel: [{ants-image-math-panel.identical} of {ants-image-math-panel.compared}](record:ants-image-math-panel) bit-identical"
@@ -72,7 +72,7 @@ validation = "[{ants-image-math.cases} cases](record:ants-image-math): values bi
 id = "ants-programs"
 title = "ThresholdImage, MultiplyImages, SmoothImage, ResampleImage, ResampleImageBySpacing"
 eco = "ants"
-page = "/tools/ants-programs/"
+page = "/evidence/ants-programs/"
 use = ["larmorx ants ..."]
 how = "replica"
 # The records of the first four predate the reported values in their JSON: "bit-identical"

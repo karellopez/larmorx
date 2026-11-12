@@ -127,7 +127,7 @@ command = "larmorx ants ImageMath"
 python = "lx.ants.image_math"
 does = "Image arithmetic, morphology, filters and the other operations of `ImageMath` that fMRIPrep, sMRIPrep and sdcflows call."
 api = "docs/api/ants-image-math.md"
-evidence = "/tools/ants-programs/"
+evidence = "/evidence/ants-programs/"
 records = { replica = ["ants-image-math"] }
 
 [[program]]
@@ -137,7 +137,7 @@ command = "larmorx ants ThresholdImage"
 python = "lx.ants.threshold_image"
 does = "Thresholds an image; `lx.ants.otsu_threshold` finds Otsu's thresholds."
 api = "docs/api/ants-threshold-image.md"
-evidence = "/tools/ants-programs/"
+evidence = "/evidence/ants-programs/"
 records = { replica = ["ants-threshold-image"] }
 
 [[program]]
@@ -147,7 +147,7 @@ command = "larmorx ants MultiplyImages"
 python = "lx.ants.multiply_images"
 does = "Multiplies an image by another image or by a number, as sMRIPrep's brain extraction calls it."
 api = "docs/api/ants-multiply-images.md"
-evidence = "/tools/ants-programs/"
+evidence = "/evidence/ants-programs/"
 records = { replica = ["ants-multiply-images"] }
 
 [[program]]
@@ -157,7 +157,7 @@ command = "larmorx ants SmoothImage"
 python = "lx.ants.smooth_image"
 does = "Gaussian smoothing (ITK's recursive Gaussian), or median filtering."
 api = "docs/api/ants-smooth-image.md"
-evidence = "/tools/ants-programs/"
+evidence = "/evidence/ants-programs/"
 records = { replica = ["ants-smooth-image"] }
 
 [[program]]
@@ -167,7 +167,7 @@ command = "larmorx ants ResampleImage"
 python = "lx.ants.resample_image"
 does = "Resamples an image onto a grid with a new spacing or size, in any of ANTs' eight pixel types, without smoothing."
 api = "docs/api/ants-resample-image.md"
-evidence = "/tools/ants-programs/"
+evidence = "/evidence/ants-programs/"
 records = { replica = ["ants-resample-image"] }
 
 [[program]]
@@ -177,7 +177,7 @@ command = "larmorx ants ResampleImageBySpacing"
 python = "lx.ants.resample_image_by_spacing"
 does = "Resamples an image onto a grid with a new spacing, after an optional Gaussian smoothing."
 api = "docs/api/ants-resample-image-by-spacing.md"
-evidence = "/tools/ants-programs/"
+evidence = "/evidence/ants-programs/"
 records = { replica = ["ants-resample-image-by-spacing"] }
 
 [[program]]

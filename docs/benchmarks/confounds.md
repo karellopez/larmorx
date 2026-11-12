@@ -34,13 +34,13 @@ port is bit for bit (a replica); a clean room of the confounds, built for speed,
 The 26 nodes of fMRIPrep's `init_bold_confs_wf` that run Python (the two `antsApplyTransforms` nodes
 are programs: larmorx's ANTs port has its own benchmark, [ants-apply-transforms](ants-apply-transforms.md);
 the reportlets are not ported yet), each with the inputs fMRIPrep gave it in the first confounds
-workflow of three oracle runs: **ds000005** (64 × 64 × 34 × 240, 32,069 brain voxels, one dummy
+workflow of three of fMRIPrep's reference runs: **ds000005** (64 × 64 × 34 × 240, 32,069 brain voxels, one dummy
 scan), **ds004958** (104 × 104 × 72 × 600, multiband 8, the crown 30,453 voxels, three dummy scans) and
 **ds005454** (160 × 160 × 96 × 280, multiband, 436,984 brain voxels, the crown 60,968). The original is
 the interface fMRIPrep runs (niworkflows' `RobustACompCor` and `RobustTCompCor` for CompCor, nipype's
 `ComputeDVARS`, fMRIPrep's `FSLMotionParams`, `GatherConfounds`, ..., `_binary_union` through nipype's
 `Function`), run by `interface.run()`. "fMRIPrep recorded" is the node's duration in its
-`_report/report.rst` from the oracle run itself (fMRIPrep 25.2.6 in its image on the old laptop, an
+`_report/report.rst` from fMRIPrep's reference run itself (fMRIPrep 25.2.6 in its image on the old laptop, an
 Intel i7-8750H, with 6 to 8 nodes at once, one of the runs beside a development agent): another
 machine and other libraries, shown for scale only. In brackets the speed-up against the original
 measured here.
@@ -169,7 +169,7 @@ would make them faster with the same bits: "Where the time goes", below.
 of fMRIPrep's workflow but the reportlets, `antsApplyTransforms` through larmorx's ANTs port; each
 node's share timed inside the run. Against it, the original's 26 Python nodes measured here (the
 table above: the two `antsApplyTransforms` runs come on top, not run here) and the sum of the
-durations fMRIPrep's nipype recorded for the same nodes in the oracle run (the old laptop, for scale).
+durations fMRIPrep's nipype recorded for the same nodes in the reference run (the old laptop, for scale).
 
 | Run | the original's 26 Python nodes, here | larmorx `bold_confounds` (1) | larmorx `bold_confounds` (8) | fMRIPrep's nodes as recorded |
 |---|---|---|---|---|

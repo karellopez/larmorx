@@ -1,0 +1,13 @@
+[package]
+name = "larmorx-freesurfer-volumes"
+description = "FreeSurfer 8.2.0's replica for larmorx: the volume programs both streams run (mri_convert, mri_info, mri_normalize, mri_segment, mri_fill, ...), fMRIPrep's mri_coreg, mri_robust_register and mri_robust_template, and the scripts around them (mri_nu_correct.mni, seg2cc, ...) (FreeSurfer's licence)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+larmorx-freesurfer-core.workspace = true
+larmorx-freesurfer-filter.workspace = true
+larmorx-freesurfer-robust.workspace = true

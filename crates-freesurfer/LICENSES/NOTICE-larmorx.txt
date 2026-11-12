@@ -1,0 +1,754 @@
+larmorx
+Copyright 2026 Karel Lopez Vilaret
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+Third-party notices
+===================
+
+Parts of this product are translated into Rust from the projects below. Every source file
+names its licence in an SPDX header, and each crate's PROVENANCE.md lists the upstream files
+it was translated from.
+
+Insight Toolkit (ITK) v5.4.5 - Apache License, Version 2.0
+  Copyright 1999-2019 Insight Software Consortium
+  Copyright 2020-present NumFOCUS
+
+ITK remote module AdaptiveDenoising, commit 24825c8d (the one ITK v5.4.5 builds) - Apache License,
+Version 2.0
+  Copyright NumFOCUS
+
+Advanced Normalization Tools (ANTs) v2.6.5 - Apache License, Version 2.0
+  Copyright 2009-2023 ConsortiumOfANTS
+
+VXL, as bundled with ITK v5.4.5 (vnl's double and float SVD, QR decomposition, error function,
+gamma function and 1-D FFT with C. Temperton's GPFA routines) - BSD-3-Clause
+  Copyright 2000-2013 VXL Contributors
+  All rights reserved.
+
+  Redistribution and use in source and binary forms, with or without
+  modification, are permitted provided that the following conditions
+  are met:
+
+  * Redistributions of source code must retain the above copyright
+    notice, this list of conditions and the following disclaimer.
+
+  * Redistributions in binary form must reproduce the above copyright
+    notice, this list of conditions and the following disclaimer in the
+    documentation and/or other materials provided with the distribution.
+
+  * Neither the names of the copyright holders nor the names of their
+    contributors may be used to endorse or promote products derived
+    from this software without specific prior written permission.
+
+  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+  FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+  COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+  INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+  (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+  STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
+  OF THE POSSIBILITY OF SUCH DAMAGE.
+
+Eigen 3.4.90, as bundled with ITK v5.4.5 (SelfAdjointEigenSolver, Tridiagonalization,
+HouseholderSequence and Jacobi rotations of a 4 x 4 matrix) - Mozilla Public License 2.0
+  Copyright (C) 2008-2010 Gael Guennebaud <gael.guennebaud@inria.fr>
+  Copyright (C) 2010 Jitse Niesen <jitse@maths.leeds.ac.uk>
+  Copyright (C) 2009 Benoit Jacob <jacob.benoit.1@gmail.com>
+
+  The Rust translation (crates/larmorx-core/src/eigen_sym.rs) is a Modification of those files
+  and is distributed under the Mozilla Public License 2.0 together with Apache-2.0; its source
+  is that file of the larmorx repository (https://github.com/karellopez/larmorx). This Source
+  Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL
+  was not distributed with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+CORE-MATH, commit 040ee482a8ca (correctly rounded exp, log, sin, cos, asin, acos, atan2, cbrt, tanh, powf, expf, logf, sinf, cosf, tanhf, cbrtf) - MIT License
+  exp.c: Copyright (c) 2022-2025 Alexei Sibidanov.
+  log.c: Copyright (c) 2022 INRIA and CERN. Authors: Paul Zimmermann and Tom Hubrecht.
+  dint.h: Copyright (c) 2022 CERN. Author: Tom Hubrecht.
+  sin.c: Copyright (c) 2022-2026 Paul Zimmermann and Tom Hubrecht and Alexei Sibidanov.
+  cos.c: Copyright (c) 2022-2025 Paul Zimmermann and Tom Hubrecht.
+  powf.c: Copyright (c) 2022-2025 Alexei Sibidanov and Paul Zimmermann.
+  expf.c: Copyright (c) 2023-2025 Alexei Sibidanov.
+  logf.c: Copyright (c) 2023-2026 Alexei Sibidanov and Paul Zimmermann.
+  sinf.c: Copyright (c) 2022-2025 Alexei Sibidanov.
+  cosf.c: Copyright (c) 2022-2023 Alexei Sibidanov.
+  tanhf.c: Copyright (c) 2022-2025 Alexei Sibidanov.
+  tanh.c: Copyright (c) 2023-2026 Alexei Sibidanov, Cyprien Peignier, Paul Zimmermann.
+  cbrtf.c: Copyright (c) 2023 Alexei Sibidanov.
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to deal
+  in the Software without restriction, including without limitation the rights
+  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in all
+  copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+  SOFTWARE.
+
+NIfTI-1 reference library (nifti1_io.c, as bundled with ITK v5.4.5) - public domain.
+
+SciPy 1.15.2 (scipy/ndimage: map_coordinates, spline_filter, spline_filter1d) and SciPy 1.18.1
+(scipy/ndimage; since 2026-11-08 also scipy/sparse: kron, hstack, the CSR and CSC products;
+scipy/sparse/linalg: cg; scipy/interpolate: BSpline's de Boor evaluation; scipy/stats: mode, in
+crates/larmorx-sdcflows; since 2026-11-08 also scipy/optimize: curve_fit with bounds,
+least_squares' trust-region reflective method and approx_derivative, in crates/larmorx-optim;
+scipy/stats: scoreatpercentile, in crates/larmorx-core/src/numpy; scipy/ndimage:
+gaussian_filter1d, binary morphology and label, in crates/larmorx-interp; for tedana's t2smap;
+since 2026-11-09 also scipy/ndimage's filters, morphology and measurements (correlate1d, the
+Gaussian filters, the minimum, maximum, rank, median and percentile filters with _rank_filter_1d,
+grey and binary morphology, label, sum_labels, center_of_mass, watershed_ift) in
+crates/larmorx-ndimage and python/larmorx/_ndimage_filters.py, affine_transform in
+crates/larmorx-interp, and scipy/linalg's inv of 4x4 matrices with its condition estimates in
+crates/larmorx-transform/src/scipy_linalg.rs and scipy_lapack.rs; for the field maps' part B)
+- BSD-3-Clause
+  Copyright (c) 2001-2002 Enthought, Inc. 2003-2024, SciPy Developers.
+  All rights reserved.
+  scipy/ndimage/src/ni_interpolation.c and _interpolation.py:
+  Copyright (C) 2003-2005 Peter J. Verveer
+
+  Redistribution and use in source and binary forms, with or without
+  modification, are permitted provided that the following conditions
+  are met:
+
+  1. Redistributions of source code must retain the above copyright
+     notice, this list of conditions and the following disclaimer.
+
+  2. Redistributions in binary form must reproduce the above
+     copyright notice, this list of conditions and the following
+     disclaimer in the documentation and/or other materials provided
+     with the distribution.
+
+  3. Neither the name of the copyright holder nor the names of its
+     contributors may be used to endorse or promote products derived
+     from this software without specific prior written permission.
+     (Peter J. Verveer's files: "The name of the author may not be used
+     to endorse or promote products derived from this software without
+     specific prior written permission.")
+
+  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+OpenBLAS 0.3.30 (the operation order of its Haswell dgemm, dgemv and dgesv paths for 4x4
+matrices: products and inverses as numpy computes them) and OpenBLAS 0.3.34 (since 2026-11-08:
+the Haswell sdot kernel, in crates/larmorx-sdcflows/src/blas.rs; the BLAS kernels and getrf
+path of numpy's svd, eigh and det of 3x3 and 4x4 matrices, in
+crates/larmorx-transform/src/numpy_linalg.rs; since 2026-11-08 also the Haswell dgemv_t, daxpy,
+drot, dgemm and nrm2 kernels on numpy's lstsq and on SciPy's and numpy's m x 2 SVDs, in
+crates/larmorx-transform/src/numpy_linalg/, for tedana's t2smap; since 2026-11-09 also the Haswell
+dgemv_t kernel of numpy's float64 matrix-vector product, in crates/larmorx-core/src/numpy/dot.rs,
+and OpenBLAS's own dpotrf, dtrtri and dlauum with the BLAS kernels under SciPy 1.18.1's 4x4 inv, in
+crates/larmorx-transform/src/scipy_lapack.rs, for the field maps' part B) - BSD-3-Clause
+  Copyright (c) 2011-2014, The OpenBLAS Project
+  All rights reserved.
+
+  Redistribution and use in source and binary forms, with or without
+  modification, are permitted provided that the following conditions are
+  met:
+
+     1. Redistributions of source code must retain the above copyright
+        notice, this list of conditions and the following disclaimer.
+
+     2. Redistributions in binary form must reproduce the above copyright
+        notice, this list of conditions and the following disclaimer in
+        the documentation and/or other materials provided with the
+        distribution.
+     3. Neither the name of the OpenBLAS project nor the names of
+        its contributors may be used to endorse or promote products
+        derived from this software without specific prior written
+        permission.
+
+  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+  ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+  LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+  CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+  OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
+  USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+sdcflows 2.17.1 (sdcflows/transform.py, interfaces/bspline.py, interfaces/fmap.py,
+utils/phasemanip.py, utils/tools.py, workflows/fit/fieldmap.py: the field-map estimation, translated
+into Rust in crates/larmorx-sdcflows and into Python in python/larmorx/sdcflows/, since 2026-11-08;
+since 2026-11-09 the rest of its estimation and correction (its interfaces, utilities, estimator
+search with sdcflows 2.15.2's corrections, workflows, derivatives and BIDS app; brain_masker in
+crates/larmorx-sdcflows/src/masker.rs, the rest in python/larmorx/sdcflows/, larmorprepx's field-map
+stages after fMRIPrep's), and its data files shipped in python/larmorx/sdcflows/data/ (the ANTs
+registration settings, b02b0.cnf and the _quick topup settings, the atlas-to-MNI affine), for the
+field maps' part B)
+- Apache License, Version 2.0
+  sdcflows
+  Copyright 2021 The NiPreps Developers <nipreps@gmail.com>
+
+  We support and encourage derived works from this project, please read about our expectations at
+  https://www.nipreps.org/community/licensing/
+
+scikit-learn 1.9.1 (sklearn/linear_model/_ridge.py and _base.py: Ridge with the sparse_cg solver,
+its validation messages; crates/larmorx-sdcflows/src/ridge.rs, since 2026-11-08) - BSD-3-Clause
+  Copyright (c) 2007-2026 The scikit-learn developers.
+  All rights reserved.
+
+  Redistribution and use in source and binary forms, with or without
+  modification, are permitted provided that the following conditions are met:
+
+  * Redistributions of source code must retain the above copyright notice, this
+    list of conditions and the following disclaimer.
+
+  * Redistributions in binary form must reproduce the above copyright notice,
+    this list of conditions and the following disclaimer in the documentation
+    and/or other materials provided with the distribution.
+
+  * Neither the name of the copyright holder nor the names of its
+    contributors may be used to endorse or promote products derived from
+    this software without specific prior written permission.
+
+  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+  CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+  OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
+numpy 2.5.4 (the float32 dot product, median, mean and its pairwise sum, and the paths of
+numpy.linalg's svd, eigh and det; crates/larmorx-sdcflows and
+crates/larmorx-transform/src/numpy_linalg.rs, since 2026-11-08; and, for tedana's t2smap,
+numpy's reductions, percentiles, weighted average, float32 log kernel and float printing in
+crates/larmorx-core/src/numpy/ and src/math/logf_numpy.rs, numpy.linalg.lstsq in
+crates/larmorx-transform/src/numpy_linalg/, and the extended-precision dot product
+(LONGDOUBLE_dot) nibabel's get_qform takes, in crates/larmorx-io/src/nifti/nibabel_affine.rs; and,
+since 2026-11-09, for the field maps' part B, numpy's linear percentile and median, float32 exp,
+dot product and matrix-vector product, linspace and histogram, in crates/larmorx-core/src/numpy/
+and src/math/expf_numpy.rs)
+- BSD-3-Clause
+  Copyright (c) 2005-2025, NumPy Developers.
+  All rights reserved.
+
+  Redistribution and use in source and binary forms, with or without
+  modification, are permitted provided that the following conditions are
+  met:
+
+      * Redistributions of source code must retain the above copyright
+         notice, this list of conditions and the following disclaimer.
+
+      * Redistributions in binary form must reproduce the above
+         copyright notice, this list of conditions and the following
+         disclaimer in the documentation and/or other materials provided
+         with the distribution.
+
+      * Neither the name of the NumPy Developers nor the names of any
+         contributors may be used to endorse or promote products derived
+         from this software without specific prior written permission.
+
+  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
+LAPACK 3.12.1 and 3.12.0, as OpenBLAS 0.3.34 and 0.3.30 bundle them (lapack-netlib/SRC: dgesdd,
+dgebrd, dgebd2, dbdsdc, dlasdq, dbdsqr, dormbr, dormqr, dormlq, dorm2r, dorml2, dsyevd, dsytrd,
+dsytd2, dstedc, dsteqr, dormtr and the auxiliary routines they call;
+crates/larmorx-transform/src/numpy_linalg.rs, since 2026-11-08; and dgelsd, dgeqrf, dgeqr2,
+dlalsd, dlascl, dlacpy and dgesdd's paths for m x 2 matrices, in
+crates/larmorx-transform/src/numpy_linalg/, for tedana's t2smap; since 2026-11-09 also the routines
+of SciPy 1.18.1's 4x4 inv beyond its LU path, LAPACK 3.12.0's dgecon, dtrcon, dpocon and dsycon
+with dlacn2, dlatrs, drscl and dlantr, dpotri, dsytrf, dsytf2, dsytri and dsytrs, in
+crates/larmorx-transform/src/scipy_lapack.rs, for the field maps' part B) - modified BSD licence
+  Copyright (c) 1992-2023 The University of Tennessee and The University
+                          of Tennessee Research Foundation.  All rights
+                          reserved.
+  Copyright (c) 2000-2023 The University of California Berkeley. All
+                          rights reserved.
+  Copyright (c) 2006-2023 The University of Colorado Denver.  All rights
+                          reserved.
+
+  Redistribution and use in source and binary forms, with or without
+  modification, are permitted provided that the following conditions are
+  met:
+
+  - Redistributions of source code must retain the above copyright
+    notice, this list of conditions and the following disclaimer.
+
+  - Redistributions in binary form must reproduce the above copyright
+    notice, this list of conditions and the following disclaimer listed
+    in this license in the documentation and/or other materials
+    provided with the distribution.
+
+  - Neither the name of the copyright holders nor the names of its
+    contributors may be used to endorse or promote products derived from
+    this software without specific prior written permission.
+
+  The copyright holders provide no reassurances that the source code
+  provided does not infringe any patent, copyright, or any other
+  intellectual property rights of third parties.  The copyright holders
+  disclaim any liability to any recipient for claims brought against
+  recipient by any third party for infringement of that parties
+  intellectual property rights.
+
+  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+nitransforms 25.1.0 (coordinate mapping, transform chains, ITK transform loading; since 2026-11-09
+also the ITK text writer and asaffine, in python/larmorx/niworkflows/nitransforms.py, for the field
+maps' part B) - MIT License
+  Copyright (c) 2021 The NiPy developers
+
+nibabel 5.4.2 (orientation helpers, from_matvec, apply_affine; since 2026-11-08 also the scaled
+array writer of arraywriters.py and volumeutils.py, nifti1.py's set_qform and get_qform,
+quaternions.py and orientations.io_orientation, in python/larmorx/io/nibabel_writer.py,
+nibabel_header.py and crates/larmorx-io; since 2026-11-08 also get_qform in x86-64's extended
+precision, in crates/larmorx-io/src/nifti/nibabel_affine.rs, for tedana's t2smap; since 2026-11-11
+also the loading of ANALYZE 7.5 (SPM2) and MGH/MGZ images and MATLAB .mat sidecars of analyze.py,
+spm99analyze.py, spm2analyze.py, freesurfer/mghformat.py and the scaling of arrayproxy.py and
+volumeutils.py, in crates/larmorx-tedana/src/formats.rs) - MIT License
+  Copyright (c) 2009-2019 Matthew Brett <matthew.brett@gmail.com>
+  Copyright (c) 2010-2013 Stephan Gerhard <git@unidesign.ch>
+  Copyright (c) 2006-2014 Michael Hanke <michael.hanke@gmail.com>
+  Copyright (c) 2011 Christian Haselgrove <christian.haselgrove@umassmed.edu>
+  Copyright (c) 2010-2011 Jarrod Millman <jarrod.millman@gmail.com>
+  Copyright (c) 2011-2019 Yaroslav Halchenko <debian@onerussian.com>
+  Copyright (c) 2015-2019 Chris Markiewicz <effigies@gmail.com>
+
+  The MIT License, for nitransforms and nibabel:
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to deal
+  in the Software without restriction, including without limitation the rights
+  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in all
+  copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+  SOFTWARE.
+
+nilearn 0.14.1 (nilearn/masking.py: compute_epi_mask and the helpers it calls, in
+crates/larmorx-interp/src/nilearn.rs, since 2026-11-08, for tedana's t2smap; since 2026-11-09 also
+nilearn 0.14.1's and 0.11.1's image/resampling.py, resample_img with nearest-neighbour
+interpolation, in python/larmorx/niworkflows/sampling.py, for the field maps' part B) - BSD-3-Clause
+  Copyright (c) The nilearn developers.
+  All rights reserved.
+
+  Redistribution and use in source and binary forms, with or without
+  modification, are permitted provided that the following conditions
+  are met:
+  1. Redistributions of source code must retain the above copyright
+     notice, this list of conditions and the following disclaimer.
+  2. Redistributions in binary form must reproduce the above copyright
+     notice, this list of conditions and the following disclaimer in the
+     documentation and/or other materials provided with the distribution.
+  3. Neither the name of the University nor the names of its contributors
+     may be used to endorse or promote products derived from this software
+     without specific prior written permission.
+
+  THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+  ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+  OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+  OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+  SUCH DAMAGE.
+
+niworkflows 1.15.4 (the interfaces and workflows sdcflows and fMRIPrep's field-map steps call, in
+python/larmorx/niworkflows/, since 2026-11-09, for the field maps' part B; niworkflows'
+nipreps.json shipped in python/larmorx/bids/config/) - Apache License, Version 2.0
+  niworkflows
+  Copyright 2021 The NiPreps Developers <nipreps@gmail.com>
+
+  We support and encourage derived works from this project, please read about our expectations at
+  https://www.nipreps.org/community/licensing/
+
+nipype 1.12.0 (the command lines of the interfaces sdcflows runs, fname_presuffix, is_outlier and
+copy_header, in python/larmorx/_nipype.py, since 2026-11-09, for the field maps' part B) - Apache
+License, Version 2.0
+  Copyright (c) 2009-2016, Nipype developers
+
+pybids 0.22.0 (layout/layout.py, index.py, models.py, validation.py, utils.py, writing.py and the
+bids.json and derivatives.json configurations: the dataset index, its queries and build_path, in
+python/larmorx/bids/, since 2026-11-09, for the field maps' part B) - MIT License
+  Copyright (c) 2015-2016, Ariel Rokem, The University of Washington eScience Institute.
+  Copyright (c) 2016--, PyBIDS developers, Planet Earth
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to deal
+  in the Software without restriction, including without limitation the rights
+  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in
+  all copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+  THE SOFTWARE.
+
+toml 0.10.2 (toml/encoder.py: dumps, as sdcflows' BIDS app writes its settings, in
+python/larmorx/sdcflows/app.py, since 2026-11-09) - MIT License
+  Copyright 2013-2019 William Pearson
+  Copyright 2015-2016 Julien Enselme
+  Copyright 2016 Google Inc.
+  Copyright 2017 Samuel Vasko
+  Copyright 2017 Nate Prewitt
+  Copyright 2017 Jack Evans
+  Copyright 2019 Filippo Broggini
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to deal
+  in the Software without restriction, including without limitation the rights
+  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in
+  all copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+  THE SOFTWARE.
+
+scikit-image 0.26.0 (morphology/footprints.py: ball; filters/thresholding.py: threshold_otsu;
+exposure/exposure.py: histogram; segmentation/random_walker_segmentation.py: random_walker;
+exposure/histogram_matching.py: match_histograms; in crates/larmorx-ndimage/src/skimage/ and
+python/larmorx/skimage.py, since 2026-11-09, for the field maps' part B) - BSD-3-Clause
+(filters/thresholding.py: BSD-2-Clause)
+  Copyright (c) 2009-2022, the scikit-image team.
+  All rights reserved.
+  skimage/filters/thresholding.py (the 2-clause licence: clauses 1 and 2 below):
+  Copyright (c) 2009-2015 Board of Regents of the University of Wisconsin-Madison,
+  Broad Institute of MIT and Harvard, and Max Planck Institute of Molecular Cell
+  Biology and Genetics; 2009 Zachary Pincus; 2009 Almar Klein.
+
+  Redistribution and use in source and binary forms, with or without
+  modification, are permitted provided that the following conditions
+  are met:
+  1. Redistributions of source code must retain the above copyright
+     notice, this list of conditions and the following disclaimer.
+  2. Redistributions in binary form must reproduce the above copyright
+     notice, this list of conditions and the following disclaimer in the
+     documentation and/or other materials provided with the distribution.
+  3. Neither the name of the University nor the names of its contributors
+     may be used to endorse or promote products derived from this software
+     without specific prior written permission.
+
+  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+  ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE HOLDERS OR
+  CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+  EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+  PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+  LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+  NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+The running median of SciPy 1.18.1's scipy/ndimage/src/_rank_filter_1d.cpp (the 1-D rank filter,
+in crates/larmorx-ndimage/src/filters.rs, since 2026-11-08, for the field maps' part B) - MIT License
+  Copyright (c) 2011 ashelly.myopenid.com, modified in 2024 by Gideon Genadi Kogan
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to deal
+  in the Software without restriction, including without limitation the rights
+  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in
+  all copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+  THE SOFTWARE.
+
+transforms3d 0.4.2 (decompose44 and mat2axangle, for niworkflows' ValidateImage report, in
+python/larmorx/niworkflows/header.py, since 2026-11-09) - BSD-2-Clause
+  Copyright (c) 2009-2024, Matthew Brett and Christoph Gohlke
+  All rights reserved.
+
+  Redistribution and use in source and binary forms, with or without
+  modification, are permitted provided that the following conditions
+  are met:
+  1. Redistributions of source code must retain the above copyright
+     notice, this list of conditions and the following disclaimer.
+  2. Redistributions in binary form must reproduce the above copyright
+     notice, this list of conditions and the following disclaimer in the
+     documentation and/or other materials provided with the distribution.
+
+  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+  ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE HOLDERS OR
+  CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+  EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+  PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+  LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+  NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+CPython 3.12.16 (Lib/argparse.py, Lib/textwrap.py, Lib/json/encoder.py, Lib/shutil.py's
+get_terminal_size, Objects/floatobject.c, Objects/longobject.c and Python/pystrtod.c: options,
+usage, help and error messages, text wrapping, JSON with an indent, and the parsing and printing
+of numbers, in crates/larmorx-core/src/python/, since 2026-11-08, for tedana's t2smap) - PSF
+License Version 2
+  Copyright (c) 2001-2024 Python Software Foundation; All Rights Reserved.
+
+  The changes made (the PSF License's clause 3): the behaviours named above are re-expressed in
+  Rust, without copying code; argparse's positional arguments, subparsers, mutually exclusive
+  groups and fromfile prefixes are not reproduced; Unicode digits and Unicode's non-printable
+  categories beyond the control characters are approximated (crates/larmorx-core/PROVENANCE.md).
+
+  The licence, as CPython 3.12.16 distributes it (LICENSE.txt, part B):
+
+  PYTHON SOFTWARE FOUNDATION LICENSE VERSION 2
+  --------------------------------------------
+
+  1. This LICENSE AGREEMENT is between the Python Software Foundation
+  ("PSF"), and the Individual or Organization ("Licensee") accessing and
+  otherwise using this software ("Python") in source or binary form and
+  its associated documentation.
+
+  2. Subject to the terms and conditions of this License Agreement, PSF hereby
+  grants Licensee a nonexclusive, royalty-free, world-wide license to reproduce,
+  analyze, test, perform and/or display publicly, prepare derivative works,
+  distribute, and otherwise use Python alone or in any derivative version,
+  provided, however, that PSF's License Agreement and PSF's notice of copyright,
+  i.e., "Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010,
+  2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023 Python Software Foundation;
+  All Rights Reserved" are retained in Python alone or in any derivative version
+  prepared by Licensee.
+
+  3. In the event Licensee prepares a derivative work that is based on
+  or incorporates Python or any part thereof, and wants to make
+  the derivative work available to others as provided herein, then
+  Licensee hereby agrees to include in any such work a brief summary of
+  the changes made to Python.
+
+  4. PSF is making Python available to Licensee on an "AS IS"
+  basis.  PSF MAKES NO REPRESENTATIONS OR WARRANTIES, EXPRESS OR
+  IMPLIED.  BY WAY OF EXAMPLE, BUT NOT LIMITATION, PSF MAKES NO AND
+  DISCLAIMS ANY REPRESENTATION OR WARRANTY OF MERCHANTABILITY OR FITNESS
+  FOR ANY PARTICULAR PURPOSE OR THAT THE USE OF PYTHON WILL NOT
+  INFRINGE ANY THIRD PARTY RIGHTS.
+
+  5. PSF SHALL NOT BE LIABLE TO LICENSEE OR ANY OTHER USERS OF PYTHON
+  FOR ANY INCIDENTAL, SPECIAL, OR CONSEQUENTIAL DAMAGES OR LOSS AS
+  A RESULT OF MODIFYING, DISTRIBUTING, OR OTHERWISE USING PYTHON,
+  OR ANY DERIVATIVE THEREOF, EVEN IF ADVISED OF THE POSSIBILITY THEREOF.
+
+  6. This License Agreement will automatically terminate upon a material
+  breach of its terms and conditions.
+
+  7. Nothing in this License Agreement shall be deemed to create any
+  relationship of agency, partnership, or joint venture between PSF and
+  Licensee.  This License Agreement does not grant permission to use PSF
+  trademarks or trade name in a trademark sense to endorse or promote
+  products or services of Licensee, or any third party.
+
+  8. By copying, installing or otherwise using Python, Licensee
+  agrees to be bound by the terms and conditions of this License
+  Agreement.
+
+fMRIPrep, commit 21a490fb (the one-shot resampler of fmriprep/interfaces/resampling.py and
+fmriprep/utils/transforms.py), and fMRIPrep 25.2.7 (since 2026-11-09, for the field maps' part B:
+ReconstructFieldmap and DistortionParameters of fmriprep/interfaces/resampling.py in
+python/larmorx/transforms/fieldmap.py; the field-map steps of fmriprep/workflows/base.py and
+workflows/bold/ in python/larmorx/pipelines/larmorprepx/) - Apache License, Version 2.0
+  fMRIPrep
+  Copyright The NiPreps Developers.
+
+  This product includes software developed by
+  the NiPreps Community (https://nipreps.org/).
+
+  Portions of this software were developed at the Department of
+  Psychology at Stanford University, Stanford, CA, US.
+
+HDF5 1.12.1 (the version ITK v5.4.5 bundles; the file format and the library's reading,
+conversion and file layout, re-expressed in crates/larmorx-hdf5) - HDF5 licence (BSD-style)
+  Copyright Notice and License Terms for
+  HDF5 (Hierarchical Data Format 5) Software Library and Utilities
+
+  HDF5 (Hierarchical Data Format 5) Software Library and Utilities
+  Copyright 2006 by The HDF Group.
+
+  NCSA HDF5 (Hierarchical Data Format 5) Software Library and Utilities
+  Copyright 1998-2006 by The Board of Trustees of the University of Illinois.
+
+  All rights reserved.
+
+  Redistribution and use in source and binary forms, with or without
+  modification, are permitted for any purpose (including commercial purposes)
+  provided that the following conditions are met:
+
+  1. Redistributions of source code must retain the above copyright notice,
+     this list of conditions, and the following disclaimer.
+
+  2. Redistributions in binary form must reproduce the above copyright notice,
+     this list of conditions, and the following disclaimer in the documentation
+     and/or materials provided with the distribution.
+
+  3. Neither the name of The HDF Group, the name of the University, nor the
+     name of any Contributor may be used to endorse or promote products derived
+     from this software without specific prior written permission from
+     The HDF Group, the University, or the Contributor, respectively.
+
+  DISCLAIMER:
+  THIS SOFTWARE IS PROVIDED BY THE HDF GROUP AND THE CONTRIBUTORS
+  "AS IS" WITH NO WARRANTY OF ANY KIND, EITHER EXPRESSED OR IMPLIED. IN NO
+  EVENT SHALL THE HDF GROUP OR THE CONTRIBUTORS BE LIABLE FOR ANY DAMAGES
+  SUFFERED BY THE USERS ARISING OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+  ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+  You are under no obligation whatsoever to provide any bug fixes, patches, or
+  upgrades to the features, functionality or performance of the source code
+  ("Enhancements") to anyone; however, if you choose to make your Enhancements
+  available either publicly, or directly to The HDF Group, without imposing a
+  separate written license agreement for such Enhancements, then you hereby
+  grant the following license: a non-exclusive, royalty-free perpetual license
+  to install, use, modify, prepare derivative works, incorporate into other
+  computer software, distribute, and sublicense such enhancements or derivative
+  works thereof, in binary and source code form.
+
+  The lookup3 hash (H5checksum.c) is Bob Jenkins' public-domain code.
+
+AFNI 26.3.05 (tag AFNI_26.3.05; first translated from AFNI 25.2.09, tag AFNI_25.2.09) - the
+3dTshift, 3dAutomask, 3dUnifize and (since 2026-11-06, from 26.3.05) 3dvolreg programs and the
+routines they use, translated into Rust in crates/larmorx-afni-replica (the bit-exact replicas;
+crates/larmorx-afni, the clean-room originals, contain no AFNI code)
+  Major portions Copyright (C) 1994-2000 Medical College of Wisconsin (AFNI, Robert W. Cox et
+  al.). AFNI 26.3.05 releases them under the Creative Commons Attribution 4.0 International
+  licence (CC BY 4.0, https://creativecommons.org/licenses/by/4.0/; its legal code is in
+  LICENSES/CC-BY-4.0.txt); AFNI's doc/README/README.copyright: "These portions were originally
+  available publicly with GPL-2.0 license. As of May 12, 2026, MCW has granted NIH a Creative
+  Commons Attribution License (CC BY 4.0) for all of the code under its copyright." The material
+  is provided as is, without warranties of any kind (CC BY 4.0, section 5).
+  Source: https://github.com/afni/afni, tag AFNI_26.3.05.
+  Modified: translated into Rust, with the changes crates/larmorx-afni-replica/PROVENANCE.md lists;
+  the translation is distributed under the Apache License, Version 2.0, with this attribution
+  (CC BY 4.0 lets an adaptation carry the adapter's licence when it does not prevent recipients
+  from complying with CC BY 4.0, section 3(a)(4)). From 2026-10 to 2026-10-29 it was distributed
+  under the GNU GPL, version 3 or later, as the larmorx-gpl package.
+  The translated AFNI files written at the NIH are a "United States Government Work" in the public
+  domain (AFNI's LICENSE.txt), which asks to "provide appropriate attribution and cite the authors
+  in any work or product based on this material"; the NIfTI library states "This code is released
+  to the public domain."
+
+EISPACK's svd and pythag (Burton S. Garbow, Argonne National Laboratory, August 1983; a
+translation of Golub and Reinsch's Algol procedure), as AFNI 26.3.05 carries them translated by
+f2c (src/eispack/eis_svd.c, eis_pythag.c), and f2c's libf2c routine d_sign (src/f2c/d_sign.c) -
+3dvolreg's 3 x 3 singular value decomposition
+  EISPACK is freely available from netlib (AFNI's LICENSE.txt: "License: Free
+  [https://www.netlib.org/misc/faq.html]").
+  libf2c: Copyright 1990 - 1995 by AT&T Bell Laboratories and Bellcore.
+  Permission to use, copy, modify, and distribute this software and its documentation for any
+  purpose and without fee is hereby granted, provided that the above copyright notice appear in
+  all copies and that both that the copyright notice and this permission notice and warranty
+  disclaimer appear in supporting documentation, and that the names of AT&T Bell Laboratories or
+  Bellcore or any of their entities not be used in advertising or publicity pertaining to
+  distribution of the software without specific, written prior permission.
+  AT&T and Bellcore disclaim all warranties with regard to this software, including all implied
+  warranties of merchantability and fitness.  In no event shall AT&T or Bellcore be liable for
+  any special, indirect or consequential damages or any damages whatsoever resulting from loss of
+  use, data or profits, whether in an action of contract, negligence or other tortious action,
+  arising out of or in connection with the use or performance of this software.
+  Translated into Rust in crates/larmorx-afni-replica/src/eispack.rs, modified from the
+  originals (the operations kept in the Fortran's order, f2c's 1-based indices).
+
+Arm Optimized Routines v19.11 (math/sincosf.h, sincosf.c, sinf.c, cosf.c, sincosf_data.c,
+logf.c, logf_data.c, expf.c, exp2f_data.c, powf.c, powf_log2_data.c, exp.c, exp_data.c, log.c,
+log_data.c, pow.c, pow_log_data.c, math_config.h: the single-precision sine, cosine, logarithm,
+exponential and power and the double exponential, logarithm and power that glibc 2.35 ships) -
+MIT License
+  Copyright (c) 1999-2019, Arm Limited.
+  Translated into Rust in crates/larmorx-core/src/math/sincosf_glibc.rs, logf_glibc.rs,
+  expf_glibc.rs, powf_glibc.rs, exp_glibc.rs, log_glibc.rs and pow_glibc.rs (since 2026-11-04;
+  the AFNI replicas' sine and cosine, translated in crates/larmorx-afni-replica/src/sincosf.rs
+  from 2026-10-29, now use them), modified from the originals. The licence text is in
+  LICENSES/MIT-arm-optimized-routines.txt.
+
+fdlibm, as glibc 2.35 carries it (sysdeps/ieee754/flt-32/s_tanhf.c, s_expm1f.c, s_atanf.c,
+e_atan2f.c)
+  Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+  Developed at SunPro, a Sun Microsystems, Inc. business.
+  Permission to use, copy, modify, and distribute this software is freely granted, provided that
+  this notice is preserved.
+  Translated into Rust in crates/larmorx-afni-replica/src/fdlibm.rs (tanhf, expm1f) and
+  crates/larmorx-core/src/math/atanf_glibc.rs (atanf, atan2f; since 2026-11-04), modified from
+  the originals. The notice is in LICENSES/LicenseRef-fdlibm.txt.
+
+fdlibm 5.3, as netlib distributes it (s_tanh.c, s_expm1.c: the double-precision tanh glibc 2.35 ships)
+  Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+  Developed at SunSoft, a Sun Microsystems, Inc. business.
+  Permission to use, copy, modify, and distribute this software is freely granted, provided that
+  this notice is preserved.
+  Translated into Rust in crates/larmorx-core/src/math/tanh_glibc.rs (the clean-room originals'
+  reproduce mode), modified from the originals. The notice is in LICENSES/LicenseRef-fdlibm.txt.

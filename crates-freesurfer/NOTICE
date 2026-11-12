@@ -1,0 +1,54 @@
+larmorx-freesurfer
+Copyright 2026 Karel Lopez Vilaret
+
+larmorx-freesurfer holds bit-exact replicas of FreeSurfer's programs: Rust translations of
+FreeSurfer 8.2.0's source code, written to give its output bit for bit. They are modified versions
+of FreeSurfer, marked as such here and in every translated file (each names its origin in a
+comment and its licence in an SPDX header, LicenseRef-FreeSurfer; each crate's PROVENANCE.md lists
+the FreeSurfer files it was translated from and the changes made), and they are distributed under
+the FreeSurfer Software License (LICENSE: its Part B, prefaced with the words its paragraph 1(b)
+requires; the complete agreement as FreeSurfer 8.2.0 ships it is LICENSES/FreeSurfer-LICENSE.txt).
+Every user receives those terms: among them, the software is designed for research purposes only
+and has not been reviewed or approved by the Food and Drug Administration or any other agency;
+clinical applications are neither recommended nor advised (paragraph 4); it is provided "AS IS",
+without warranty, and every user assumes the liability for its use (paragraph 5). Its source code
+is published at https://github.com/karellopez/larmorx (directory crates-freesurfer/).
+
+The program is a separate work from larmorx (Apache-2.0), which runs it as a separate process
+when it is installed and exchanges files with it only. It is not the original FreeSurfer, does not
+present itself as FreeSurfer, and is not endorsed by The General Hospital Corporation, the
+Athinoula A. Martinos Center for Biomedical Imaging or FreeSurfer's developers (paragraph 6).
+FreeSurfer's own programs ask for a licence key (license.txt); that is a check inside FreeSurfer's
+programs, not a term of its licence, and larmorx-freesurfer asks for none (docs/licensing.md).
+
+
+Translated works
+================
+
+FreeSurfer 8.2.0 (https://github.com/freesurfer/freesurfer, tag v8.2.0), Copyright © 2021 The
+General Hospital Corporation (Boston, MA) "MGH" (as its files carry it; a few say 2011) - the
+FreeSurfer Software License, version 1.0 (LICENSE)
+  FreeSurfer's files say: "Terms and conditions for use, reproduction, distribution and
+  contribution are found in the 'FreeSurfer Software License Agreement' contained in the file
+  'LICENSE' found in the FreeSurfer distribution". The authors each file names are kept in the
+  translated files' comments.
+  Translated: none yet (queue item 3.1-01 created the workspace: the program, the wheel and empty
+  crates; docs/freesurfer/queue.md lists what comes next).
+  Modified: translated from C and C++ to Rust in 2026 by Karel Lopez Vilaret; the defects of
+  FreeSurfer's that change results are corrected by default and reproduced on request
+  (LARMORX_UPSTREAM_DEFECTS=reproduce; the FS entries of the repository's
+  docs/findings/upstream-defects.md); the maths default to correctly rounded functions.
+  The licence grants rights only in MGH's own software (paragraph 3): the third-party code
+  inside FreeSurfer is translated from its own upstream under its own licence (below, as each is
+  added), or replaced by larmorx's own code, as docs/freesurfer/third-party.md places it.
+
+
+Included works
+==============
+
+The program includes crates of larmorx (larmorx-core, larmorx-io), Copyright 2026 Karel Lopez
+Vilaret, licensed under the Apache License, Version 2.0 (LICENSES/Apache-2.0.txt), with the notices
+of the works they were translated from in LICENSES/NOTICE-larmorx.txt, a copy of the repository's
+NOTICE. Apache-2.0 code may be included in a work under other terms, with its notices kept. The
+Rust crates it is built with, and their licence texts, are listed in
+LICENSES/third-party-rust.txt.

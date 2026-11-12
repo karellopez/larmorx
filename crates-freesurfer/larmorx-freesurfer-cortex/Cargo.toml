@@ -1,0 +1,13 @@
+[package]
+name = "larmorx-freesurfer-cortex"
+description = "FreeSurfer 8.2.0's replica for larmorx: placement, registration, parcellation and statistics (mris_place_surface, mris_register, mris_ca_label, mris_anatomical_stats, ...), fMRIPrep's surface programs and bbregister with mri_segreg (FreeSurfer's licence)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+larmorx-freesurfer-core.workspace = true
+larmorx-freesurfer-defect.workspace = true
+larmorx-freesurfer-gca.workspace = true

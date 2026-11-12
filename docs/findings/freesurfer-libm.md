@@ -98,7 +98,7 @@ differs from the correctly rounded one (`libm_rates.c`, glibc 2.35 against CORE-
 | `exp`, `log`, `pow` (the 2.29 symbols), `expf`, `logf`, `powf`, `sinf`, `cosf`, `sincosf` | Arm's Optimized Routines (MIT) | `*_glibc` exist | | done |
 | `sin`, `cos`, `sincos` | IBM's Accurate Mathematical Library (LGPL) | `sin_glibc`, `cos_glibc`, `sincos_glibc` (clean room of `specs/glibc-dbl.md`) | | done |
 | `tanh`, `atanf`, `atan2f` | fdlibm (Sun's notice) | `tanh_glibc`, `atanf_glibc`, `atan2f_glibc` | | done |
-| `tanhf` | fdlibm (`s_tanhf.c`, Sun's notice) | `tanhf` (correctly rounded) only | 2.76 % of all floats | **needed** (§3): a translation from fdlibm as glibc carries it, the `tanh_glibc` route (no spec) |
+| `tanhf` | fdlibm (`s_tanhf.c`, Sun's notice; it calls `expm1f`, fdlibm's `s_expm1f.c`; one build on x86-64, no FMA) | `tanhf` (correctly rounded) only | 2.76 % of all floats | **needed** (§3): a translation of both, the `tanh_glibc` route (no spec): netlib's fdlibm 5.3 has no float versions; the float ones with Sun's notice are NetBSD's 1995 files (`$NetBSD: s_tanhf.c,v 1.4`), which glibc carries; checked on all 2³² floats against glibc 2.35 |
 | `log10f`, `acosf`, `asinf` | fdlibm (Sun's notice) | none | 0.69 % of all floats; 0.25 %, 0.22 % of the floats in [−1, 1] | the same route if §3 finds them needed |
 | `log10` | fdlibm (`e_log10.c`, Sun's notice) | none | 3.26 % (log-uniform 2⁻⁴⁰ to 2⁴¹) | the same route if needed |
 | `log2`, `log2f` | Arm's code (glibc's `e_log2.c`, `e_log2f.c`; MIT in Arm's Optimized Routines v19.11) | none | 0.017 %; 0.0073 % of all floats | a translation from Arm's MIT code, the `log_glibc` route (no spec), if §3 finds them needed |

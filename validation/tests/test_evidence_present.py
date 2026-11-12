@@ -353,3 +353,28 @@ def test_the_original_against_a_known_answer_has_its_own_group():
     groups = dict((t, ids) for t, ids in _present(ex)["order"]["groups"])
     assert groups["The original against the known answer"] == ["ants-truth"]
     assert groups["The original against itself: the yardstick"] == ["ants8-ants1", "fp-ants"]
+
+
+def test_a_page_of_several_programs():
+    """ImageMath and the filters: an example of several programs' calls names the software
+    only, on its panels and comparisons; the titles that cover the page name every program."""
+    from dataclasses import replace
+
+    page = replace(PAGE, program="", programs=("ImageMath", "ThresholdImage", "MultiplyImages"))
+    ex = present.example(page, _example(), shows="x", verdicts=["lx-ants"])
+    names = {p["id"]: p["label"] for p in ex["panels"]}
+    assert names["ants"] == "ANTs 2.6.5"
+    assert names["cr"] == "ANTs 2.6.5, correctly rounded maths"
+    labels = {d["id"]: d["label"] for d in ex["diffs"]}
+    assert labels["lx-ants"] == "replica − ANTs 2.6.5, 1 thread, as built"
+    assert labels["fp-ants"] == "fMRIPrep's output − ANTs 2.6.5, 1 thread"
+    assert present.original_name(page) == (
+        "ANTs `ImageMath`, `ThresholdImage` and `MultiplyImages` 2.6.5"
+    )
+    sp = {"series": [{"id": "a", "label": "ANTs, 1 thread", "mark": "original"},
+                     {"id": "b", "label": "larmorx, 1 thread", "mark": "larmorx"}]}  # fmt: skip
+    present.speed(page, sp, "caption")
+    assert [s["label"] for s in sp["series"]] == ["ANTs, 1 thread", "replica, 1 thread"]
+    assert sp["title"].endswith("`MultiplyImages` 2.6.5")
+    with pytest.raises(ValueError, match="without its program"):
+        present.original_name(replace(page, programs=()))

@@ -32,6 +32,9 @@ class Page:
     #: a page's own rewordings (pattern, replacement), applied first, before the guide's
     #: words: "(the row above)" named by what that row compares, where the order moves it
     texts: list[tuple[str, str]] = field(default_factory=list)
+    #: a page of several programs (ImageMath and the filters): their names, for the titles
+    #: of what covers them all; ``program`` is then empty on the page and named per example
+    programs: tuple[str, ...] = ()
 
 
 #: The oracle's words in texts (the guide's section 1): fMRIPrep's runs and the builds of the
@@ -173,7 +176,8 @@ def _original_panel(page: Page, p: dict) -> tuple[str, str, float]:
         rank = max(rank, 2.0)
     elif p["role"] == "reference":
         rank = 2.0
-    name = f"{page.software} {program} {ver}" + "".join(f", {t}" for t in tail)
+    # a page of several programs names a call's program in the example, not on each panel
+    name = " ".join(x for x in (page.software, program, ver) if x) + "".join(f", {t}" for t in tail)
     sub = text(page, sub, code=False) or ""
     second = " · ".join(x for x in (", ".join(rest), sub) if x)
     return name, second, rank
@@ -230,7 +234,7 @@ def _label(page: Page, old: str) -> str:
     # the first mention of the software names the program; a second one is the same program
     sw = re.escape(page.software)
     first = re.search(rf"\b{sw}\b", s)
-    if first:
+    if first and page.program:  # (an example of several programs' calls names the software)
         head, tail = s[: first.end()], s[first.end() :]
         tail = re.sub(rf"\b{sw} (?=[0-9])", "", tail)
         s = f"{head} {page.program}{tail}" if not tail.startswith(f" {page.program}") else s
@@ -348,6 +352,8 @@ def example(
     for pid, p in by_id.items():
         if p["role"] == "larmorx":
             ports[pid] = page.port
+            if pid in (panels or {}):  # a panel the page names itself (its label has no mode)
+                continue
             against = originals.get(main_b.get(pid, ""))
             new[pid] = _port_panel(page, p, against)
     new.update(panels or {})
@@ -587,7 +593,11 @@ def dots(page: Page, s: dict | None, title: str, labels: dict[str, str]) -> None
 
 def original_name(page: Page, code: bool = True) -> str:
     """The original in a title: "ANTs `N4BiasFieldCorrection` 2.6.5"."""
-    prog = f"`{page.program}`" if code else page.program
+    names = [page.program] if page.program else list(page.programs)
+    if not names:
+        raise ValueError("a page without its program")
+    q = [f"`{n}`" if code else n for n in names]
+    prog = q[0] if len(q) == 1 else ", ".join(q[:-1]) + " and " + q[-1]
     return f"{page.software} {prog} {page.version}"
 
 
@@ -613,9 +623,11 @@ def speed(page: Page, sp: dict | None, caption: str, threads: str = "") -> None:
         ser["mark"] = marks.get(ser["mark"], ser["mark"])
         ser["port"] = ser["mark"].removesuffix("-open")
         lab = re.sub(r"^larmorx\b", who, ser["label"])
-        ser["label"] = re.sub(
-            rf"^{re.escape(page.software)}(?=,)", f"{page.software} {page.program}", lab
-        )
+        if page.program:
+            lab = re.sub(
+                rf"^{re.escape(page.software)}(?=,)", f"{page.software} {page.program}", lab
+            )
+        ser["label"] = lab
     sp["note"] = text(page, sp.get("note"))
 
 

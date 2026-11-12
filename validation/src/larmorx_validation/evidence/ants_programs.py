@@ -15,11 +15,13 @@ from __future__ import annotations
 
 import re
 import shlex
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
 
 from larmorx_validation.evidence import common, core
+from larmorx_validation.evidence import present as present_
 from larmorx_validation.figures import cache as fcache
 from larmorx_validation.figures import records
 
@@ -708,7 +710,7 @@ def export(ctx: core.Context) -> dict:
         )
     speed = _speed(ctx)
     bench_sources = speed.pop("sources") if speed else []
-    return {
+    doc = {
         "schema": 1,
         "tool": TOOL,
         "title": "ImageMath and the filters",
@@ -736,6 +738,113 @@ def export(ctx: core.Context) -> dict:
         ],
         "tables": inventory,
     }
+    return present(doc)
+
+
+# ------------------------------------------------------------------ the writing guide's words
+
+PAGE = present_.Page(
+    software="ANTs",
+    program="",
+    version="2.6.5",
+    programs=tuple(program for program, _n, _m in PROGRAMS.values()),
+)
+#: The program of each worked example's calls ("" for sMRIPrep's brain extraction, whose
+#: calls are of ImageMath, ThresholdImage and MultiplyImages, chosen under Output).
+EXAMPLE_PROGRAM = {
+    "brain-extraction-t1w": "",
+    "brain-extraction-pad": "",
+    "ants-17": "ImageMath",
+    "panel-truncate-7t": "ImageMath",
+    "panel-smooth-flair": "SmoothImage",
+    "panel-otsu-7t": "ThresholdImage",
+    "panel-multiply-stroke": "MultiplyImages",
+    "panel-laplacian-toddler": "ImageMath",
+}
+#: Each worked example's "What this shows" line and the verdict beside it, from the example's
+#: own metrics, reasons and facts; the data panel's lines from their own verdicts
+#: (present.panel_shows).
+SHOWS = {
+    "brain-extraction-t1w": (
+        "In `reproduce`, on 8 threads, the replica gives ANTs' bytes in each of the four calls, "
+        "as built and with correctly rounded maths, and the bytes fMRIPrep wrote in its run. "
+        "ANTs gives the same bytes at 1 and 8 threads, and ANTs 2.6.2 in fMRIPrep's image the "
+        "same as 2.6.5. No correction by default changes these calls.",
+        ["lx-ants"],
+    ),
+    "brain-extraction-pad": (
+        "In `reproduce`, on 8 threads, the replica gives ANTs' bytes in each of the five calls, "
+        "as built and with correctly rounded maths, and the bytes fMRIPrep wrote in its run. "
+        "ANTs gives the same bytes at 1 and 8 threads, and ANTs 2.6.2 in fMRIPrep's image the "
+        "same as 2.6.5. No correction by default changes these calls.",
+        ["lx-ants"],
+    ),
+    "ants-17": (
+        "In `reproduce` the replica gives ANTs' result bit for bit, as built and with correctly "
+        "rounded maths. Its default, `fix`, corrects ANTS-17: of the 309,453 white-matter "
+        "voxels it keeps the 141,229 that survive the erosion, where ANTs' output is 1 on "
+        "593,700 voxels, the 452,471 of the other labels among them.",
+        ["fix-ants"],
+    ),
+}
+TITLES: dict[str, str] = {}
+#: The record's categories as the page names them: ImageMath's operations by their names.
+CATEGORIES = {
+    "dispatch": "the command line",
+    "arithmetic": "arithmetic (m, +, -, /, ^)",
+    "truncate": "TruncateImageIntensity",
+    "normalize": "Normalize",
+    "rescale": "RescaleImage",
+    "G": "G (Gaussian smoothing)",
+    "laplacian": "Laplacian",
+    "grad": "Grad",
+    "unsharp": "UnsharpMask",
+    "binary-morphology": "binary morphology (MD, ME, MO, MC)",
+    "grayscale-morphology": "grayscale morphology (GD, GE, GO, GC)",
+    "fill-holes": "FillHoles",
+    "pad-image": "PadImage",
+    "largest-component": "GetLargestComponent",
+    "danielsson": "D (Danielsson's distance map)",
+    "maurer": "MaurerDistance",
+    "extract-contours": "ExtractContours",
+    "threshold-at-mean": "ThresholdAtMean",
+    "replace-voxel-value": "ReplaceVoxelValue",
+    "range": "thresholds by range",
+    "otsu": "Otsu's thresholds",
+    "divergence": "Kmeans (not ported)",
+    "product": "products",
+    "gaussian": "Gaussian smoothing",
+    "median": "median smoothing",
+    "dimensions": "dimensions",
+    "spacing": "spacings",
+    "size": "sizes",
+    "interpolation": "interpolations",
+    "pixel-type": "pixel types",
+}
+
+
+def present(doc: dict) -> dict:
+    """The page of ImageMath and the filters in the writing guide's words and order: texts,
+    ports and order only."""
+    for ex in doc["examples"]:
+        page = replace(PAGE, program=EXAMPLE_PROGRAM[ex["id"]])
+        if ex["id"] in SHOWS:
+            shows, verdicts = SHOWS[ex["id"]]
+        else:
+            shows, verdicts = present_.panel_shows(page, ex)
+        present_.example(page, ex, shows=shows, verdicts=verdicts, title=TITLES.get(ex["id"]))
+    for im in doc["implementations"]:
+        page = replace(PAGE, program=PROGRAMS[im["id"]][0])
+        present_.implementation(page, im, "standard comparison and data panel")
+    present_.speed(
+        PAGE,
+        doc.get("speed"),
+        "Seconds for the whole command (reading, the operation, writing), the median of "
+        "repeated runs, on a log scale; the pipelines' own calls first. The factor is how many "
+        "times faster the replica is than ANTs, both on one thread.",
+    )
+    present_.random_testing(PAGE, doc, {"port": "replica"})
+    return present_.finish(PAGE, doc, CATEGORIES)
 
 
 if __name__ == "__main__":

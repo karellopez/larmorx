@@ -84,6 +84,10 @@ pub struct Globals {
     pub xdebug: XDebug,
     /// `ROMP_main_started`'s file and line.
     pub romp_main: Option<(String, i32)>,
+    /// `use_new_MatricAlloc()`'s answer inverted: the variable `FREESURFER_MatrixAlloc_old` is
+    /// set ([`crate::matrix`]; FreeSurfer reads it at the first allocation, no program sets it,
+    /// so the program's start sets this from its environment).
+    pub matrix_alloc_old: bool,
     /// D13's choice and the notices of the defects that changed this run's results.
     pub notices: Notices,
 }
@@ -125,6 +129,7 @@ impl Globals {
             logic_reports: LogicReports::default(),
             xdebug: XDebug::default(),
             romp_main: None,
+            matrix_alloc_old: false,
             notices: Notices::new(mode),
         }
     }

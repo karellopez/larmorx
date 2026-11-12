@@ -243,6 +243,114 @@ pub fn fmt_f(x: f64, width: usize, prec: usize) -> String {
     format!("{body:>width$}")
 }
 
+/// `printf(fmt, x)` for a format with one `double` conversion `%[-+ 0#][width][.prec][l]f`
+/// (or `F`) and any text and `%%` around it, as glibc writes it; `None` for any other format
+/// (FreeSurfer's callers of these helpers pass `%f` formats only).
+pub fn format_double(fmt: &str, x: f64) -> Option<String> {
+    let b = fmt.as_bytes();
+    let mut out = String::new();
+    let mut i = 0;
+    let mut done = false;
+    while i < b.len() {
+        if b[i] != b'%' {
+            let start = i;
+            while i < b.len() && b[i] != b'%' {
+                i += 1;
+            }
+            out.push_str(&fmt[start..i]);
+            continue;
+        }
+        i += 1;
+        if b.get(i) == Some(&b'%') {
+            out.push('%');
+            i += 1;
+            continue;
+        }
+        if done {
+            return None;
+        }
+        let (mut left, mut plus, mut space, mut zero, mut alt) =
+            (false, false, false, false, false);
+        while let Some(&c) = b.get(i) {
+            match c {
+                b'-' => left = true,
+                b'+' => plus = true,
+                b' ' => space = true,
+                b'0' => zero = true,
+                b'#' => alt = true,
+                _ => break,
+            }
+            i += 1;
+        }
+        let mut width = 0usize;
+        while let Some(&c) = b.get(i).filter(|c| c.is_ascii_digit()) {
+            width = width * 10 + usize::from(c - b'0');
+            i += 1;
+        }
+        let mut prec = 6usize;
+        if b.get(i) == Some(&b'.') {
+            i += 1;
+            prec = 0;
+            while let Some(&c) = b.get(i).filter(|c| c.is_ascii_digit()) {
+                prec = prec * 10 + usize::from(c - b'0');
+                i += 1;
+            }
+        }
+        if matches!(b.get(i), Some(b'l') | Some(b'L')) {
+            i += 1;
+        }
+        let upper = match b.get(i) {
+            Some(b'f') => false,
+            Some(b'F') => true,
+            _ => return None,
+        };
+        i += 1;
+        done = true;
+        let neg = x.is_sign_negative();
+        let mut digits = if x.is_nan() {
+            "nan".to_owned()
+        } else if x.is_infinite() {
+            "inf".to_owned()
+        } else {
+            let mut d = format!("{:.prec$}", x.abs());
+            if alt && prec == 0 {
+                d.push('.');
+            }
+            d
+        };
+        if upper {
+            digits = digits.to_uppercase();
+        }
+        let sign = if neg {
+            "-"
+        } else if plus {
+            "+"
+        } else if space {
+            " "
+        } else {
+            ""
+        };
+        let len = sign.len() + digits.len();
+        if len >= width {
+            out.push_str(sign);
+            out.push_str(&digits);
+        } else if left {
+            out.push_str(sign);
+            out.push_str(&digits);
+            out.push_str(&" ".repeat(width - len));
+        } else if zero && x.is_finite() {
+            out.push_str(sign);
+            out.push_str(&"0".repeat(width - len));
+            out.push_str(&digits);
+        } else {
+            out.push_str(&" ".repeat(width - len));
+            out.push_str(sign);
+            out.push_str(&digits);
+        }
+    }
+    Some(out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -291,5 +399,24 @@ mod tests {
         assert_eq!(fmt_f(5.0, 2, 1), "5.0");
         assert_eq!(fmt_f(0.25, 4, 1), " 0.2");
         assert_eq!(fmt_f(-f64::NAN, 2, 1), "-nan");
+        assert_eq!(format_double("%8.5lf", -0.25).as_deref(), Some("-0.25000"));
+        assert_eq!(
+            format_double("%12.10f", 1.0 / 3.0).as_deref(),
+            Some("0.3333333333")
+        );
+        assert_eq!(
+            format_double("<%-6.1f|%%>", 2.25).as_deref(),
+            Some("<2.2   |%>")
+        );
+        assert_eq!(
+            format_double("%+08.2f", 3.14159).as_deref(),
+            Some("+0003.14")
+        );
+        assert_eq!(
+            format_double("%F", f64::NEG_INFINITY).as_deref(),
+            Some("-INF")
+        );
+        assert_eq!(format_double("%#.0f", 2.0).as_deref(), Some("2."));
+        assert_eq!(format_double("%d", 2.0), None);
     }
 }

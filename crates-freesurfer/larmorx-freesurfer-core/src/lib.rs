@@ -28,6 +28,7 @@
 //!   `strftime("%c")`), [`system`] (the user's and the machine's names).
 #![forbid(unsafe_code)]
 
+pub mod affine;
 pub mod base;
 pub mod cglob;
 pub mod chklc;
@@ -35,12 +36,16 @@ pub mod cmdargs;
 pub mod cstd;
 pub mod ctime;
 pub mod diag;
+pub mod dmatrix;
 pub mod fio;
 pub mod fsenv;
 pub mod globals;
+pub mod histo;
 pub mod log;
 pub mod machine;
+pub mod matrix;
 pub mod random;
+pub mod ret;
 pub mod romp;
 pub mod run;
 pub mod system;

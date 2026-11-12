@@ -101,6 +101,10 @@ KEPT = [
     (r"^docs/parts/|^docs/status-log\.md$|^docs/decision-log\.md$|^CHANGELOG\.md$", "history"),
     (r"^validation/(?:investigations|probes)/(?!docs-revision/)", "history"),
     (r"^validation/investigations/docs-revision/inventory\.md$", "generated: old_words.py"),
+    (
+        r"^validation/investigations/docs-revision/renames\.py$|^docs/writing-guide\.md$",
+        "the old names on purpose (this list; the guide's example of an old import)",
+    ),
     (r"^specs/", "a spec writer"),
     (
         r"^crates/larmorx-(?:afni|mri|fsl|tedana)/|^crates/larmorx-core/src/math/"

@@ -339,6 +339,12 @@ def cmd_oracle_cache(args: argparse.Namespace) -> int:
     return cli.main(args)
 
 
+def cmd_freesurfer_replay(args: argparse.Namespace) -> int:
+    from larmorx_validation.freesurfer import cli
+
+    return cli.main(args)
+
+
 def cmd_difftest(args: argparse.Namespace) -> int:
     from larmorx_validation.difftest import cli
 
@@ -449,6 +455,16 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     oracle_arguments(oc)
     oc.set_defaults(func=cmd_oracle_cache)
+    fr = sub.add_parser(
+        "freesurfer-replay",
+        help="FreeSurfer's recorded reference runs: rebuild the subject directory before a step, "
+        "replay the step (FreeSurfer's program through the oracle cache, or another), compare "
+        "FreeSurfer's files provenance aside",
+    )
+    from larmorx_validation.freesurfer.cli import add_arguments as freesurfer_arguments
+
+    freesurfer_arguments(fr)
+    fr.set_defaults(func=cmd_freesurfer_replay)
     dtp = sub.add_parser(
         "difftest",
         help="differential random testing: random valid inputs and options through each original "

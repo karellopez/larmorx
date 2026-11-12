@@ -419,9 +419,18 @@ mod tests {
     fn the_official_sequences() {
         use sha2::{Digest, Sha256};
         let want = [
-            (-1i64, "417f30724a318bfa4fdceaf8c5d7c5fd790f3cd2dccd994cec78209048a20598"),
-            (1234, "26d7d15e40cda364532d58b44d33d46963c3af567b63c6cbcbc2a3509a6282b4"),
-            (53, "0e82b68234fe567f8ff8c4ca45c771b58efdbeb95f413708aaaeb0d766ba340f"),
+            (
+                -1i64,
+                "417f30724a318bfa4fdceaf8c5d7c5fd790f3cd2dccd994cec78209048a20598",
+            ),
+            (
+                1234,
+                "26d7d15e40cda364532d58b44d33d46963c3af567b63c6cbcbc2a3509a6282b4",
+            ),
+            (
+                53,
+                "0e82b68234fe567f8ff8c4ca45c771b58efdbeb95f413708aaaeb0d766ba340f",
+            ),
         ];
         let env = Environment::from_pairs(Vec::<(String, String)>::new());
         for (seed, hash) in want {

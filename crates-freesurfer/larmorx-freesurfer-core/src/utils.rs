@@ -368,6 +368,41 @@ fn to_int(g: &mut Globals, x: f64, what: &str) -> i32 {
     x.trunc() as i32
 }
 
+/// `DListStats(dlist, nlist, stats)`: `[nlist, mean, stddev, min, max]` of the list: the sum and
+/// the sum of the `double` squares in x87 `long double` (`larmorx_core::x87::F80`), `mean = sum /
+/// nlist` (as a `double`), `stddev = sqrtl(sum2 / nlist - mean * mean)` (the square of the
+/// `double` mean in `double`, the rest in `long double`), as a `double`; min and max from the
+/// first element. `None` after `ERROR: DListStats() nlist = <n>` (or `... dlist is NULL`) on
+/// standard output.
+pub fn dlist_stats(out: &mut dyn Write, dlist: Option<&[f64]>, nlist: i32) -> Option<[f64; 5]> {
+    use larmorx_core::x87::F80;
+    if nlist <= 0 {
+        let _ = writeln!(out, "ERROR: DListStats() nlist = {nlist}");
+        return None;
+    }
+    let Some(dlist) = dlist else {
+        let _ = writeln!(out, "ERROR: DListStats() dlist is NULL");
+        return None;
+    };
+    let list = &dlist[..nlist as usize];
+    let (mut sum, mut sum2) = (F80::ZERO, F80::ZERO);
+    let (mut min, mut max) = (list[0], list[0]);
+    for &x in list {
+        sum += F80::from_f64(x);
+        sum2 += F80::from_f64(x * x);
+        if min > x {
+            min = x;
+        }
+        if max < x {
+            max = x;
+        }
+    }
+    let n = F80::from(nlist);
+    let mean = (sum / n).to_f64();
+    let stddev = (sum2 / n - F80::from_f64(mean * mean)).sqrt().to_f64();
+    Some([f64::from(nlist), mean, stddev, min, max])
+}
+
 /// `nint(f)`: `f + 0.5` (or `f - 0.5` below 0) truncated (FS-12).
 pub fn nint(g: &mut Globals, f: f64) -> i32 {
     to_int(g, if f < 0.0 { f - 0.5 } else { f + 0.5 }, "nint")

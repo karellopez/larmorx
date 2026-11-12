@@ -8,9 +8,9 @@ the probe `validation/probes/fs-maths/`, a black-box run of FreeSurfer's code) a
 standards only.
 
 Status: **part 1** (§1-6): the float matrices' storage, allocation, copy and double-accumulated
-product; the 4 x 4 affine helpers; the double matrices (without their long-double products); the
+product; the 4 x 4 affine helpers; the double matrices with their long-double products; the
 histograms. To come: the matrices' remaining operations (inverse, determinant, decompositions,
-statistics), the long-double products, the numerics wrappers, the probability functions, the
+statistics), the numerics wrappers, the probability functions, the
 random fields.
 
 ## 1. Conventions
@@ -176,6 +176,16 @@ The layout of §2.1 with doubles, real only.
 - **Print with a format** (stream, format, m): each row's elements in the `printf` format (a `%f`
   one: `%8.5lf` for the plain print), two spaces between elements, a newline after each row; no m:
   an error, code -4, `DMatrixPrint: mat = NULL!`, and -4 returned; else 0.
+- **Product** (m1, m2, m3): the size check (kind 4, standard output, prefix `DMatrixMultiply(): `)
+  first; m3 absent: a new m1.rows x m2.cols matrix; given of another size: `DMatrixMultiply(): m1/m2
+  dim mismatch` + `\n` + ` break <build root>/utils/dmatrix.cpp:429` + `\n` on standard output, then
+  an error, code -4, `DMatrixMultiply: (<r1> x <c1>) * (<r2> x <c2>) != (<r3> x <c3>)` + `\n`,
+  nothing returned. Each element: the **x87 extended** (`long double`: 64-bit significand, round to
+  nearest even) sum from 0, in order, of the double products `m1(r, i) m2(i, c)`, each widened
+  exactly before the addition; the sum rounded to double.
+- **Dot product** (v1, v2): the size check (kind 3, prefix `DDVectorDot(): `), failing:
+  `-10e10`; else the extended sum of the **extended** products of the first columns' elements
+  (both widened first), rounded to double.
 - **Comparison with a float matrix**: the largest `|(double) f(r, c) - d(r, c)|`, -1 after
   `ERROR: DMatrixCompareFMatrix(): mf is NULL` (or `md is NULL`, `row mismatch <a> <b>`, `col
   mismatch <a> <b>`) + `\n`. **Copy of a float matrix**: the values widened; the same messages with
@@ -410,11 +420,12 @@ from 0; when it is exactly 0 a peak search returns -1.
   runs FreeSurfer's own functions from the unit oracle's build (queue item 3.1-02: the official
   build's library, byte-identical programs) on seeded cases of 47 commands (every function of §2-5:
   the in-place forms, the outputs given and absent, the defects' cases), each number as its bits.
-  Measured 2026-11-12: 47,000 cases, `reproduce` identical on all 46,138 comparable ones (862 read
-  outside FreeSurfer's arrays: FS-22, not comparable; in 819 of them FreeSurfer's memory happened to
-  hold 0); `fix` differs only where FS-14, FS-15, FS-18, FS-19 or FS-20 changed the result, and in 8
-  entropies, where the correctly rounded `log` moved the last bit. The SHA-256 of the official
-  outputs of seed 1 (470 cases) is checked by the port's test on every platform.
+  Measured 2026-11-12: 49,000 cases of 49 commands, `reproduce` identical on all 48,185 comparable
+  ones (815 read outside FreeSurfer's arrays: FS-22, not comparable; in 768 of them FreeSurfer's
+  memory happened to hold 0); `fix` differs only where FS-14, FS-15, FS-18, FS-19 or FS-20 changed
+  the result, and in 13 entropies, where the correctly rounded `log` moved the last bit. The
+  SHA-256 of the official outputs of seed 1 (490 cases) is checked by the port's test on every
+  platform.
 - **The defects' two modes**: the port's unit tests (`crates-freesurfer/larmorx-freesurfer-core`).
 - **The replays** of the first programs that use these functions (`mri_normalize`, `mri_segment`,
   `mris_make_surfaces`, `mri_ca_register`'s histograms, `mri_em_register`), with `reproduce`, on the

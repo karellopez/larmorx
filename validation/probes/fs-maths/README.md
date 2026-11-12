@@ -12,9 +12,10 @@ default differs only where a defect it corrects changed the result (`docs/findin
 
 - `fsmaths.cpp`: reads a case file (one case per line: a command and its inputs, every float and
   double as the hexadecimal of its bits), calls FreeSurfer's functions, writes one line per case in
-  the same form. 47 commands: every reached function of `utils/histo.cpp` (with the in-place forms
+  the same form. 49 commands: every reached function of `utils/histo.cpp` (with the in-place forms
   and given outputs), `MatrixAlloc`, `MatrixCopy`, `MatrixMultiplyD` (real and complex),
-  `include/affine.h`, `utils/dmatrix.cpp`'s double-precision operations.
+  `include/affine.h`, `utils/dmatrix.cpp`'s operations (the x87 `long double` products
+  included), `utils/utils.cpp`'s `DListStats`.
 - `build.sh [<workspace>]`: compiles it with the unit oracle's compiler and flags and links it with
   the unit oracle's libraries as the unit oracle's harness is linked
   (`validation/investigations/freesurfer-unit-oracle/`: the official build's `utils` and packages,
@@ -29,7 +30,7 @@ default differs only where a defect it corrects changed the result (`docs/findin
   thread), runs the port in both modes and prints the counts: lines identical with `reproduce`,
   cases where FreeSurfer reads outside its arrays (FS-22: the port notes it; not comparable),
   lines where the default differs and the defects noted there; and `official_sha256_skip`, the
-  hash `tests/fs_maths_official.rs` records (seed 1, 470 cases).
+  hash `tests/fs_maths_official.rs` records (seed 1, 490 cases).
 
 Run (the unit oracle built):
 
@@ -38,7 +39,7 @@ validation/probes/fs-maths/build.sh
 scripts/orchestration/boxed.sh 8 python -P validation/probes/fs-maths/check.py --seed 7 --n 47000
 ```
 
-Measured 2026-11-12: seed 7, 47,000 cases: 46,138 of 46,138 comparable lines identical with
-`reproduce`, 862 FS-22; the default differs on 2,362 lines, all with a defect's notice but 8
-entropies (the correctly rounded `log`). Seed 1, 470 cases: 461 identical, 9 FS-22, hash
-`658b0ffaf12d685e225df01da0b23bf7e959d9d050b6ffc8457ae29764aebadb`.
+Measured 2026-11-12: seed 7, 49,000 cases: 48,185 of 48,185 comparable lines identical with
+`reproduce`, 815 FS-22; the default differs on 2,348 lines, all with a defect's notice but 13
+entropies (the correctly rounded `log`). Seed 1, 490 cases: 481 identical, 9 FS-22, hash
+`394127d7bcefb0a2849cdac19b2465fb05c1ace98069d89983a22fb95e224054`.

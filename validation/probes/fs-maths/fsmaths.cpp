@@ -475,6 +475,18 @@ void run_case(const char *tmpfile)
     putdm(DMatrixCopy(a, NULL));
     putd(DMatrixMaxAbs(a));
   }
+  else if (cmd == "dmmul") {
+    DMATRIX *a = getdm(), *b = getdm(), *u = getdm(), *v = getdm();
+    putdm(DMatrixMultiply(a, b, NULL));
+    putd(DVectorDot(u, v));
+  }
+  else if (cmd == "dliststats") {
+    int n = geti();
+    std::vector<double> v(n);
+    for (int i = 0; i < n; i++) v[i] = getd();
+    double *st = DListStats(v.data(), n, NULL);
+    for (int i = 0; i < 5; i++) putd(st[i]);
+  }
   else
     fail("unknown case");
 }

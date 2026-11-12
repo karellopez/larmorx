@@ -30,7 +30,7 @@ built for the official binaries with GCC 8.4.0 (`docs/freesurfer/variation.md`).
 | `fio` | `include/fio.h` 95-112 | `TSV`'s fields, `ncols`, `nrows` |
 | `matrix` | `include/matrix.h`; `utils/matrix.cpp` 61-147, 150-181, 298-587, 587-710 | `MATRIX`, `VECTOR`, `MatrixBuffer`, `MATRIX_RELT`, `MATRIX_CELT`, `MATRIX_REAL`, `MATRIX_COMPLEX`, `MATRIX_SYM`/`UPPER`/`LOWER`; `MatrixStats`, `stats_compare`, `matrixStatsExitHandler`, `noteMatrixAlloced` (nothing seen: it returns at once), `MatrixCopy`, `MatrixAlloc_old`, `MatrixAlloc_new`, `use_new_MatricAlloc` (as `Globals::matrix_alloc_old`), `MatrixAlloc_wkr`, `MatrixAlloc2_wkr`, `MatrixFree`, `MatrixMultiplyD`; FS-13 to FS-16 |
 | `affine` | `include/affine.h` | `AffineVector`, `AffineMatrix`, `SetAffineVector`, `GetAffineVector`, `GetFloorAffineVector`, `SetAffineMatrix`, `GetAffineMatrix`, `AffineMatrixFree`, `AffineMatrixAlloc`, `AffineMatrixCopy`, `AffineMV`, `AffineMM` (the SSE branch, as built); FS-17's conversion |
-| `dmatrix` | `include/dmatrix.h`; `utils/dmatrix.cpp` 290-850 | `DMATRIX`, `DVECTOR`, `DMatrixCheckDims`, `DMatrixAlloc`, `DMatrixFree`, `DMatrixPrintFmt`, `DMatrixPrint`, `DMatrixCompareFMatrix`, `DMatrixCopyFMatrix`, `DMatrixCopy`, `DMatrixTranspose`, `DMatrixAddMul`, `DMatrixScalarMul`, `DMatrixSubtract`, `DMatrixAdd`, `DMatrixConstVal`, `DMatrixZero`, `DMatrixMaxAbs` |
+| `dmatrix` | `include/dmatrix.h`; `utils/dmatrix.cpp` 290-850 | `DMATRIX`, `DVECTOR`, `DMatrixCheckDims`, `DMatrixAlloc`, `DMatrixFree`, `DMatrixMultiply`, `DVectorDot` (x87 `long double` through `larmorx_core::x87::F80`), `DMatrixPrintFmt`, `DMatrixPrint`, `DMatrixCompareFMatrix`, `DMatrixCopyFMatrix`, `DMatrixCopy`, `DMatrixTranspose`, `DMatrixAddMul`, `DMatrixScalarMul`, `DMatrixSubtract`, `DMatrixAdd`, `DMatrixConstVal`, `DMatrixZero`, `DMatrixMaxAbs` |
 | `histo` | `include/histo.h`; `utils/histo.cpp` | `HISTOGRAM`, `HISTOGRAM2D`, `MAX_BINS`; the 55 reached functions: `HISTOfree`, `HISTOrealloc`, `HISTOalloc`, `HISTOcopy`, `HISTOclear`, `HISTOclearCounts`, `HISTOadd`, `HISTOsubtract`, `HISTOclearBins`, `HISTOsmooth`, `HISTOfindLastPeak`, `HISTOfindFirstPeak`, `HISTOfindValley`, `HISTOfindLastPeakInRegion`, `HISTOfindHighestPeakInRegion`, `HISTOplot`, `HISTOaddSample`, `HISTOfindPreviousValley`, `HISTOfindNextValley`, `HISTOfindNextPeak`, `HISTOfindPreviousPeak`, `HISTOfindStartOfPeak`, `HISTOfindEndOfPeak`, `HISTOfindCurrentPeak`, `HISTOfillHoles`, `HISTOtotalInRegion`, `HISTOtotal`, `HISTOclearZeroBin`, `HISTOfindBinWithCount`, `HISTOfindBin`, `HISTOgetCount`, `HISTOcorrelate`, `histoComputeLinearFitCorrelation`, `HISTOfindLinearFit`, `HISTOlinearScale`, `HISTOthreshSum`, `HISTOmakePDF`, `HISTObins`, `HISTOcount`, `HISTOvalToBin`, `HISTOinit`, `HISTOfindMedian`, `HISTOmakeReverseCDF`, `HISTOmakeCDF`, `HISTOrobustGaussianFit`, `HISTOabs`, `HISTOgetEntropy`, `HISTOsoapBubbleZeros`, `HISTO2DfindBin1`, `HISTO2DfindBin2`, `HISTO2DgetCount`, `HISTOcomputeFWHM`, `HISTOwriteTxt`, `HISTOsumNorm`, `HISTOcumsum`; `include/macros.h`'s `MIN`, `MAX`, `EVEN`, `FZERO`, `DZERO` as they evaluate; FS-17 to FS-24 |
 | `ret` | none (larmorx's own) | the result of a function with an optional output (`T *F(..., T *dst)`) |
 | `cstd` | none (larmorx's own) | the C library's `atoi`, `atof`, `sscanf`'s `%lx`, `printf`'s `%W.Pf`, x86-64's double-to-int conversion, written from the C standard and glibc's documented behaviour |
@@ -50,9 +50,10 @@ translation may then be checked against or replaced by. `OpenRan1`
 calls VXL's `vnl_random` (TP-01, BSD-3-Clause), which this crate does not contain: it reaches the
 main package's port (`larmorx_core::vnl_random`, queue item 3.1-04) through `random::Ran1Source`.
 
-Still to translate in `fs.core` (each comes with the module or item that needs it): `utils.cpp`'s
-`DListStats` (its sums are x87 `long double`: with `larmorx_core`'s 80-bit arithmetic, queue item
-3.1-03, once merged); the unreached functions of these files (static reach, `code.md` §6:
+`utils.cpp`'s `DListStats` (lines 1832-1865) is in `utils` (`dlist_stats`, its sums in x87 `long
+double` through `larmorx_core::x87::F80`); `OpenRan1` draws from `larmorx_core::vnl_random` by
+default (`random::vnl_source`). Still to translate in `fs.core` (each comes with the module or
+item that needs it): the unreached functions of these files (static reach, `code.md` §6:
 `IntSqrt`, `StrReplace`, `FileType`, `FileNumber`, `mad`, `FindMatches`, `GetVmSize`,
 `PrintMemUsage`, `SetProgressCallback`, `FSENVprintenv`, `xDbg_Init` and the other `xDbg_*`, ROMP's
 statistics, ...).
@@ -78,8 +79,7 @@ statistics, ...).
   `HISTOfindMaxDerivative`, the other `HISTO2D*`, `HISTOrmsDifference`, `HISTOearthMoversDistance`,
   `HISTOksDistance`, `HISTOerase*`, `HISTOisPeak`, `HISTOwrite`; `DMatrixTest`). Still to come in item 3.1-23: `MatrixInverse` and
   `MatrixQRdecomposition` (with `utils/numerics.cpp`'s VNL wrappers and the main package's `float`
-  VNL routines), `DMatrixMultiply`, `DVectorDot`, `DVectorLen`, `DVectorCrossProduct` (x87 `long
-  double`: `larmorx_core`'s 80-bit arithmetic), `DMatrixDRand48`, `fs_powell`, `fs_lbfgs`,
+  VNL routines), `fs_powell`, `fs_lbfgs`,
   `fs_cost_function` (VNL's Powell, Brent and L-BFGS, item 3.1-07).
 - The defects FS-01 (a NUL byte after the C-style error messages), FS-02 (`PROFILE`'s undefined
   conversion) and FS-03 (`assertFailed`'s deliberate segmentation fault) are corrected by default

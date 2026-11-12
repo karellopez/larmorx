@@ -248,6 +248,8 @@ const COMMANDS: &[&str] = &[
     "mmdc",
     "affine",
     "dmat",
+    "dmmul",
+    "dliststats",
 ];
 
 /// One case line of command `cmd`.
@@ -498,6 +500,27 @@ fn case(g: &mut Gen, cmd: &str) -> String {
             s.push(dx(g.pick(&[0.0, 1.0, -1.0, 2.5, r])));
             let r = g.d(-10, 10, 64);
             s.push(dx(g.pick(&[0.0, 1.0, -1.0, 0.25, r])));
+        }
+        "dmmul" => {
+            let (r, k, c) = (g.int(1, 6), g.int(1, 6), g.int(1, 6));
+            let n = g.int(1, 12);
+            for (rows, cols) in [(r, k), (k, c), (n, 1), (n, 1)] {
+                s.push(rows.to_string());
+                s.push(cols.to_string());
+                for _ in 0..rows * cols {
+                    let big = g.pick(&[1.0, 1e8, 1e-6, 3.0]);
+                    let v = g.d(-1000, 1000, 1 << 20) * big;
+                    s.push(dx(v));
+                }
+            }
+        }
+        "dliststats" => {
+            let n = g.int(1, 40);
+            s.push(n.to_string());
+            let base = g.pick(&[0.0, 1e6, -250.0, 1e12]);
+            for _ in 0..n {
+                s.push(dx(base + g.d(-100, 100, 1 << 16)));
+            }
         }
         _ => unreachable!("{cmd}"),
     }
@@ -992,6 +1015,22 @@ pub fn run_line(line: &str, mode: UpstreamDefects, tmp: &Path) -> (String, Vec<&
             let x = r(dmatrix::dmatrix_copy(g, &mut so, &mut se, Some(&a), None).unwrap());
             o.dm(x.as_ref());
             o.d(dmatrix::dmatrix_max_abs(&mut so, Some(&a)));
+        }
+        "dmmul" => {
+            let (a, b, u, v) = (t.dm(), t.dm(), t.dm(), t.dm());
+            let x = dmatrix::dmatrix_multiply(g, &mut so, &mut se, Some(&a), Some(&b), None)
+                .unwrap()
+                .into_new();
+            o.dm(x.as_ref());
+            o.d(dmatrix::dvector_dot(&mut so, Some(&u), Some(&v)));
+        }
+        "dliststats" => {
+            let n = t.i();
+            let v: Vec<f64> = (0..n).map(|_| t.d()).collect();
+            let st = larmorx_freesurfer_core::utils::dlist_stats(&mut so, Some(&v), n).unwrap();
+            for x in st {
+                o.d(x);
+            }
         }
         _ => panic!("unknown case {cmd}"),
     }

@@ -6,10 +6,11 @@
 //! `DMatrixCheckDims`, `DMatrixAlloc`, `DMatrixFree`, `DMatrixPrintFmt`, `DMatrixPrint`,
 //! `DMatrixCompareFMatrix`, `DMatrixCopyFMatrix`, `DMatrixCopy`, `DMatrixTranspose`,
 //! `DMatrixAddMul`, `DMatrixScalarMul`, `DMatrixSubtract`, `DMatrixAdd`, `DMatrixConstVal`,
-//! `DMatrixZero`, `DMatrixMaxAbs`. `DMatrixMultiply`, `DVectorDot`, `DVectorLen` and
-//! `DVectorCrossProduct` accumulate in x87 `long double` and come with `larmorx_core`'s 80-bit
-//! arithmetic (queue item 3.1-03); `DMatrixDRand48` with its `drand48` (3.1-04); `DMatrixTest`
-//! is a self-test no program runs.
+//! `DMatrixZero`, `DMatrixMaxAbs`, and `DMatrixMultiply` and `DVectorDot`, which accumulate in
+//! x87 `long double` (`larmorx_core::x87::F80`, queue item 3.1-03: the official build's x87
+//! arithmetic at its default 64-bit precision). Not translated (no program reaches them):
+//! `DVectorLen` (an OpenMP reduction whose order depends on the threads), `DVectorCrossProduct`,
+//! `DMatrixDRand48`, `DMatrixTest` (a self-test).
 //!
 //! A `DMATRIX` has the layout of a real `MATRIX` ([`crate::matrix`]) with `double` numbers: one
 //! array, two unused numbers before the first, rows one-based. `DMatrixAddMul`'s OpenMP loop
@@ -20,6 +21,8 @@
 //! it was given: kept, a message only).
 
 use std::io::Write;
+
+use larmorx_core::x87::F80;
 
 use crate::cstd::format_double;
 use crate::diag::BUILD_ROOT;
@@ -208,6 +211,83 @@ pub fn dmatrix_alloc(
 pub fn dmatrix_free(m: &mut Option<DMatrix>) -> i32 {
     *m = None;
     0
+}
+
+/// `DMatrixMultiply(m1, m2, m3)`: `m1 m2`, each element the x87 `long double` sum (from 0, in
+/// order) of the `double` products `m1(r, i) m2(i, c)`, stored as a `double`. `Null` after
+/// [`dmatrix_check_dims`]'s message (kind 4, standard output) for `NULL` inputs or a size
+/// mismatch, or after `DMatrixMultiply(): m1/m2 dim mismatch` (with the file and line 429) on
+/// standard output and `DMatrixMultiply: (r1 x c1) * (r2 x c2) != (r3 x c3)` as an error for a
+/// given `m3` of another size. To multiply into an input, pass a copy of it as the input
+/// (FreeSurfer does not copy it: its loop would read the elements it has already written; no
+/// caller does that).
+pub fn dmatrix_multiply(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    m1: Option<&DMatrix>,
+    m2: Option<&DMatrix>,
+    m3: Option<&mut DMatrix>,
+) -> Result<Ret<DMatrix>, Fatal> {
+    if dmatrix_check_dims(m1, m2, 4, out, "DMatrixMultiply(): ") != 0 {
+        return Ok(Ret::Null);
+    }
+    let (m1, m2) = (m1.expect("checked"), m2.expect("checked"));
+    let mut fresh = None;
+    let m3: &mut DMatrix = match m3 {
+        None => match dmatrix_alloc(g, out, err, m1.rows, m2.cols, m1.mtype)? {
+            Some(m) => fresh.insert(m),
+            None => return Ok(Ret::Null),
+        },
+        Some(m3) => {
+            if m3.rows != m1.rows || m3.cols != m2.cols {
+                let _ = write!(
+                    out,
+                    "DMatrixMultiply(): m1/m2 dim mismatch\n break {}:429\n",
+                    dmatrix_cpp()
+                );
+                log::error_printf(
+                    g,
+                    err,
+                    ERROR_BADPARM,
+                    &format!(
+                        "DMatrixMultiply: ({} x {}) * ({} x {}) != ({} x {})\n",
+                        m1.rows, m1.cols, m2.rows, m2.cols, m3.rows, m3.cols
+                    ),
+                );
+                return Ok(Ret::Null);
+            }
+            m3
+        }
+    };
+    for row in 1..=m3.rows {
+        for col in 1..=m3.cols {
+            let mut val = F80::ZERO;
+            for i in 1..=m1.cols {
+                val += F80::from_f64(m1.get(row, i) * m2.get(i, col));
+            }
+            m3.set(row, col, val.to_f64());
+        }
+    }
+    Ok(match fresh {
+        Some(m) => Ret::New(m),
+        None => Ret::Given,
+    })
+}
+
+/// `DVectorDot(v1, v2)`: the x87 `long double` sum of the `long double` products of the first
+/// columns' elements, as a `double`; `-10e10` after [`dmatrix_check_dims`]'s message (kind 3,
+/// standard output, prefix `DDVectorDot(): `) for `NULL` vectors or a size mismatch.
+pub fn dvector_dot(out: &mut dyn Write, v1: Option<&DMatrix>, v2: Option<&DMatrix>) -> f64 {
+    if dmatrix_check_dims(v1, v2, 3, out, "DDVectorDot(): ") != 0 {
+        return -10e10;
+    }
+    let (v1, v2) = (v1.expect("checked"), v2.expect("checked"));
+    let mut dot = F80::ZERO;
+    for i in 1..=v1.rows {
+        dot += F80::from_f64(v1.get(i, 1)) * F80::from_f64(v2.get(i, 1));
+    }
+    dot.to_f64()
 }
 
 /// `DMatrixPrintFmt(fp, fmt, mat)`: each row's elements in `fmt` (a `%f` format), two spaces

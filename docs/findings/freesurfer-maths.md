@@ -9,18 +9,24 @@ the probe `validation/probes/fs-maths/` (FreeSurfer's own functions from the uni
 
 ## The measurement
 
-`check.py --seed 7 --n 47000` (2026-11-12): 47,000 cases of 47 commands (every reached function of
+`check.py --seed 7 --n 49000` (2026-11-12): 49,000 cases of 49 commands (every reached function of
 `histo.cpp`, `MatrixAlloc`/`MatrixCopy`/`MatrixMultiplyD` with real and complex matrices, the
-affine helpers, the double matrices). The port with `reproduce`: **46,138 of 46,138 comparable
-lines identical**; 862 cases read outside FreeSurfer's arrays (FS-22: `HISTOrobustGaussianFit`
-304, `HISTOfindStartOfPeak` 299, `HISTOfindNextPeak` 156, `HISTOfindNextValley` 50,
-`HISTOfindPreviousValley` 45, `HISTOfindPreviousPeak` 8), where the heap's contents decide; in 819
-of them they happened to equal the port's 0. The port's default differs from FreeSurfer on 2,362
-lines, each with the notice of the defect that changed it (FS-18 1,000, FS-15 989, FS-14 681,
-FS-20 298, FS-19 150), except 8 entropies (`HISTOgetEntropy`), where larmorx's correctly rounded
-`log` moved the last bit (rule 5; `reproduce` uses glibc's). Seed 1, 470 cases: 461 identical, 9
-FS-22; the official outputs' SHA-256 `658b0ffa...` is checked by `tests/fs_maths_official.rs` on
-every platform. The C side is 35 s for the 47,000 cases, the port 1.1 s (release builds).
+affine helpers, the double matrices with the x87 `long double` products `DMatrixMultiply` and
+`DVectorDot`, and `utils.cpp`'s `DListStats`). The port with `reproduce`: **48,185 of 48,185
+comparable lines identical** (the 2,000 long-double cases included: `larmorx_core::x87::F80`);
+815 cases read outside FreeSurfer's arrays (FS-22: `HISTOfindStartOfPeak` 288,
+`HISTOrobustGaussianFit` 277, `HISTOfindNextPeak` 144, `HISTOfindPreviousValley` 54,
+`HISTOfindNextValley` 48, `HISTOfindPreviousPeak` 4), where the heap's contents decide; in 768 of
+them they happened to equal the port's 0. The port's default differs from FreeSurfer on 2,348
+lines, each with the notice of the defect that changed it (FS-18 1,000, FS-15 993, FS-14 649,
+FS-20 287, FS-19 144), except 13 entropies (`HISTOgetEntropy`), where larmorx's correctly rounded
+`log` moved the last bit (rule 5; `reproduce` uses glibc's). Seed 1, 490 cases: 481 identical, 9
+FS-22; the official outputs' SHA-256 `394127d7...` is checked by `tests/fs_maths_official.rs` on
+every platform. A first run (47,000 cases, 47 commands, before the long-double ones) gave the
+same: 46,138 of 46,138. The C side takes about 35 s for such a run, the port about 1 s (release
+builds). `randomNumber`'s sequences (`fs.core`, now drawing from `larmorx_core::vnl_random`) for
+the seeds -1, 1234 and 53 equal the unit oracle's `fs-random` (250 numbers each; the test
+`random::tests::the_official_sequences`).
 
 ## FS-13: impossible matrix sizes (rule B: a clear error)
 

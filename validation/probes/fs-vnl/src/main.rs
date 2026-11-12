@@ -10,7 +10,8 @@
 //! at), `lbfgs` (netlib's `lbfgs_` in lock step with the port under `reproduce`: `x`, `w`, `diag`,
 //! `iflag` and the whole state after every call, and the printed text), `linalg` (the small
 //! matrices' determinants and inverses, QR in float and double, the float SVD, the SVD inverse,
-//! the symmetric and the real eigensystems, Cholesky), `fft` (`vnl_fft_1d<double>`). Prints the
+//! the symmetric and the real eigensystems, Cholesky), `fft` (`vnl_fft_1d<double>`); `--only itk103` measures ITK-103's correction on the port alone
+//! (not part of the default run). Prints the
 //! counts per family and `VERIFY-PASS` or `VERIFY-FAIL` (exit status 1).
 
 mod checks_lbfgs;
@@ -196,6 +197,11 @@ fn main() {
     if want("lbfgs") {
         let mut t = Tally::new("lbfgs");
         checks_lbfgs::run(&lib, scale, &mut t);
+        tallies.push(t);
+    }
+    if only.as_deref() == Some("itk103") {
+        let mut t = Tally::new("itk103");
+        checks_lbfgs::measure_itk103(20_000 * scale, &mut t);
         tallies.push(t);
     }
     if want("linalg") {

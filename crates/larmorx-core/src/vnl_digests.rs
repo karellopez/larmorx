@@ -204,13 +204,18 @@ fn digest_lbfgs() -> u64 {
         let x0: Vec<f64> = (0..n)
             .map(|_| rng.range(-3000, 3000) as f64 / 997.0)
             .collect();
-        for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+        for (mode, nocedal) in [
+            (UpstreamDefects::Fix, false),
+            (UpstreamDefects::Reproduce, false),
+            (UpstreamDefects::Fix, true),
+        ] {
             let mut x = x0.clone();
             let mut g = vec![0.0; n];
             let mut diag = vec![0.0; n];
             let mut w = vec![0.0; n * (2 * m as usize + 1) + 2 * m as usize];
             let mut gl = LbfgsGlobal::new();
             gl.gtol = gtol;
+            gl.nocedal_first_stage = nocedal;
             let mut iflag = 0i64;
             let iprint = if case % 7 == 0 { [1, 1] } else { [-1, 0] };
             let mut out = Captured::default();
@@ -360,7 +365,7 @@ fn digest_linalg() -> u64 {
 /// The digests recorded on Linux x86-64 (2026-11-12, from this module's own code at the commit
 /// that added it; `validation/probes/fs-vnl` proved the ports bit-identical to ITK 4.13.2's VNL).
 const MINIMIZERS: u64 = 0x8ef6_0bae_2f47_905c;
-const LBFGS: u64 = 0xc0c7_b1b2_cc03_6ee5;
+const LBFGS: u64 = 0xa7dc_aba7_d3f5_47ed;
 const LINALG: u64 = 0xce29_4ebf_05c7_3ab3;
 
 #[test]

@@ -164,7 +164,7 @@ fn state_rust(gl: &LbfgsGlobal) -> (Vec<i64>, Vec<f64>) {
 
 /// One minimization run by the port alone: `(final f, function evaluations, last iflag, any
 /// ITK-103 notice)`.
-fn port_run(p: &LProblem, x0: &[f64], m: i64, gtol: f64, eps: f64, xtol: f64, mode: UpstreamDefects) -> (f64, u32, i64, bool) {
+fn port_run(p: &LProblem, x0: &[f64], m: i64, gtol: f64, eps: f64, xtol: f64, nocedal: bool) -> (f64, u32, i64, bool) {
     let n = p.n;
     let mut x = x0.to_vec();
     let mut g = vec![0.0; n];
@@ -172,6 +172,8 @@ fn port_run(p: &LProblem, x0: &[f64], m: i64, gtol: f64, eps: f64, xtol: f64, mo
     let mut w = vec![0.0; n * (2 * m as usize + 1) + 2 * m as usize];
     let mut gl = LbfgsGlobal::new();
     gl.gtol = gtol;
+    gl.nocedal_first_stage = nocedal;
+    let mode = UpstreamDefects::Fix;
     let mut iflag = 0i64;
     let mut evals = 0u32;
     let mut noticed = false;
@@ -189,10 +191,45 @@ fn port_run(p: &LProblem, x0: &[f64], m: i64, gtol: f64, eps: f64, xtol: f64, mo
     (f, evals, iflag, noticed)
 }
 
+/// ITK-103's measurement alone (the port only, no original): `problems` problems at FreeSurfer's
+/// `OpenDFPMin` settings (memory 7, line-search accuracy 0.1, `xtol` 1e-16, `diagco` false) and at
+/// VNL's defaults (memory 5, `gtol` 0.9), each run with Nocedal's first stage and with VXL's.
+pub fn measure_itk103(problems: u64, t: &mut Tally) {
+    let mut rng = SplitMix64::new(0x0103_5eed);
+    for (label, m, gtol) in [("FreeSurfer's OpenDFPMin (m 7, gtol 0.1)", 7i64, 0.1), ("VNL's defaults (m 5, gtol 0.9)", 5, 0.9)] {
+        let (mut changed, mut lower_f, mut higher_f, mut fewer, mut more, mut fail_fix, mut fail_vxl) = (0u64, 0u64, 0u64, 0u64, 0u64, 0u64, 0u64);
+        let (mut evals_fix, mut evals_vxl) = (0u64, 0u64);
+        for _ in 0..problems {
+            t.cases += 1;
+            let n = 1 + rng.below(30) as usize;
+            let mut p = LProblem::new(&mut rng, n);
+            p.bad_gradient = false;
+            let x0: Vec<f64> = (0..n).map(|_| (rng.range(-3000, 3000) as f64) / 997.0).collect();
+            let eps = [1e-5, 1e-4, 1e-6][rng.below(3) as usize];
+            let fix = port_run(&p, &x0, m, gtol, eps, 1e-16, true);
+            let vxl = port_run(&p, &x0, m, gtol, eps, 1e-16, false);
+            evals_fix += u64::from(fix.1);
+            evals_vxl += u64::from(vxl.1);
+            if fix.0.to_bits() != vxl.0.to_bits() || fix.1 != vxl.1 || fix.2 != vxl.2 {
+                changed += 1;
+                lower_f += u64::from(fix.0 < vxl.0);
+                higher_f += u64::from(fix.0 > vxl.0);
+                fewer += u64::from(fix.1 < vxl.1);
+                more += u64::from(fix.1 > vxl.1);
+            }
+            fail_fix += u64::from(fix.2 < 0);
+            fail_vxl += u64::from(vxl.2 < 0);
+        }
+        t.notes.push(format!(
+            "{label}: {problems} problems, the correction changed {changed} (final f lower {lower_f}, higher {higher_f}; fewer evaluations {fewer}, more {more}); evaluations in all {evals_fix} corrected, {evals_vxl} VXL; line-search failures {fail_fix} corrected, {fail_vxl} VXL"
+        ));
+    }
+}
+
 pub fn run(lib: &Lib, scale: u64, t: &mut Tally) {
     let mut rng = SplitMix64::new(0x1bf9_5eed);
     let mut capture = crate::ffi::Capture::new(&std::env::temp_dir());
-    let (mut calls, mut stage1_cases) = (0u64, 0u64);
+    let mut calls = 0u64;
     // ITK-103's measurement: cases where the correction changed the run, and how.
     let (mut changed, mut lower_f, mut higher_f, mut fewer, mut more) = (0u64, 0u64, 0u64, 0u64, 0u64);
     let (mut fail_fix, mut fail_vxl) = (0u64, 0u64);
@@ -262,9 +299,7 @@ pub fn run(lib: &Lib, scale: u64, t: &mut Tally) {
                 UpstreamDefects::Reproduce, &mut msgs,
             );
             calls += 1;
-            if res.notices.iter().any(|nt| nt.defect.id == "ITK-103") {
-                stage1_cases += 1;
-            }
+            let _ = &res;
             let w = || format!("case {case} call {call} n={n} m={m} gtol={gtol} kind={} diagco={diagco}", p.kind);
             let mut ok = t.f64s(&|| format!("{} x", w()), &xr, &xcb[1..]);
             ok &= t.bits(&|| format!("{} iflag", w()), ifr as u64, ifc as u64);
@@ -287,8 +322,8 @@ pub fn run(lib: &Lib, scale: u64, t: &mut Tally) {
         unsafe { (lib.lbfgs_free)(gc_state as *mut c_void) };
 
         // ITK-103: the port's correction against VXL's behaviour, the port alone.
-        let fix = port_run(&p, &x0, m, gtol, eps, xtol, UpstreamDefects::Fix);
-        let vxl = port_run(&p, &x0, m, gtol, eps, xtol, UpstreamDefects::Reproduce);
+        let fix = port_run(&p, &x0, m, gtol, eps, xtol, true);
+        let vxl = port_run(&p, &x0, m, gtol, eps, xtol, false);
         if fix.0.to_bits() != vxl.0.to_bits() || fix.1 != vxl.1 || fix.2 != vxl.2 {
             changed += 1;
             if fix.0 < vxl.0 {
@@ -305,9 +340,9 @@ pub fn run(lib: &Lib, scale: u64, t: &mut Tally) {
         fail_fix += u64::from(fix.2 < 0);
         fail_vxl += u64::from(vxl.2 < 0);
     }
-    t.notes.push(format!("{calls} lbfgs calls in lock step; ITK-103 named in {stage1_cases} of them (reproduce)"));
+    t.notes.push(format!("{calls} lbfgs calls in lock step (reproduce)"));
     t.notes.push(format!(
-        "ITK-103 measured on {} problems: the correction changed {changed} runs (final f lower in {lower_f}, higher in {higher_f}; fewer evaluations in {fewer}, more in {more}); line-search failures: corrected {fail_fix}, VXL {fail_vxl}",
+        "ITK-103 measured on {} problems (Nocedal's first stage against VXL's): the correction changed {changed} runs (final f lower in {lower_f}, higher in {higher_f}; fewer evaluations in {fewer}, more in {more}); line-search failures: corrected {fail_fix}, VXL {fail_vxl}",
         t.cases
     ));
 }

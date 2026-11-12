@@ -16,13 +16,15 @@
 //! `abs`, `min` and `max` are kept with their C semantics (`x >= 0 ? x : -x`, `a <= b ? a : b`,
 //! `a >= b ? a : b`), and `mcstep`'s `(float).66` is the float `0.66f` widened to double.
 //!
-//! Two defects of VXL's translation (both in ITK 4.13.2 and 5.4.5), each with its switch
-//! ([`UpstreamDefects`]):
-//! - **ITK-103**: in the line search's first stage, when the function decreased but not enough,
-//!   Nocedal's Fortran passes the *modified* function values `FXM`, `FYM` to `MCSTEP`; VXL's
-//!   `mcstep_` reads its struct's `fx`, `fy` instead (the unmodified values), so the step is
-//!   computed from inconsistent values and `fx`, `fy` are then rebuilt from stale ones. `Fix`
-//!   passes the modified values as the Fortran does; `Reproduce` gives VXL's.
+//! Four defects of VXL's translation (all in ITK 4.13.2 and 5.4.5):
+//! - **ITK-103** (rule C, measured): in the line search's first stage, when the function
+//!   decreased but not enough, Nocedal's Fortran passes the *modified* function values `FXM`,
+//!   `FYM` to `MCSTEP`; VXL's `mcstep_` reads its struct's `fx`, `fy` instead (the unmodified
+//!   values), so later steps of that search are computed from inconsistent values. Measured on
+//!   200,000 smooth problems at FreeSurfer's and VNL's settings, the correction changed no run
+//!   (`validation/probes/fs-vnl --only itk103`), so VXL's behaviour is kept in both modes and
+//!   Nocedal's is on request ([`LbfgsGlobal::nocedal_first_stage`], with [`UpstreamDefects::Fix`]),
+//!   named where it changes the search's state.
 //! - **ITK-104**: `ys` is a local of the C function (`SAVE`d in the Fortran), reset to 0 on
 //!   every call, so a caller that supplies the diagonal (`diagco`, `iflag = 2`) gets `1 / 0`.
 //!   `Fix` keeps it across calls; `Reproduce` divides by 0. FreeSurfer and VNL never supply it.
@@ -174,6 +176,10 @@ pub struct LbfgsGlobal {
     pub dgtest: f64,
     /// `ys` kept between calls (ITK-104's correction; not in VXL's struct).
     pub ys: f64,
+    /// Nocedal's first stage (`MCSTEP` with `FXM`, `FYM`) instead of VXL's, with
+    /// [`UpstreamDefects::Fix`] (ITK-103; not in VXL's struct). Default `false`: VXL's, which the
+    /// correction did not change in the measurement (rule C).
+    pub nocedal_first_stage: bool,
 }
 
 impl LbfgsGlobal {
@@ -780,20 +786,23 @@ fn mcsrch(
                 gl.dgx = gl.dgxm + gl.dgtest;
                 gl.dgy = gl.dgym + gl.dgtest;
             };
-            let mut other = gl.clone();
-            let vxl = mode == UpstreamDefects::Reproduce;
-            run(gl, vxl);
-            run(&mut other, !vxl);
-            other.ys = gl.ys;
-            if !same_state(gl, &other) {
-                crate::defects::push_once(
-                    &mut call.notices,
-                    Notice::new(
-                        &ITK_103,
-                        mode,
-                        "the line search's first stage stepped with the modified function values (VXL's translation uses the unmodified ones)",
-                    ),
-                );
+            let nocedal = gl.nocedal_first_stage && mode == UpstreamDefects::Fix;
+            if !nocedal {
+                run(gl, true);
+            } else {
+                let mut other = gl.clone();
+                run(gl, false);
+                run(&mut other, true);
+                if !same_state(gl, &other) {
+                    crate::defects::push_once(
+                        &mut call.notices,
+                        Notice::new(
+                            &ITK_103,
+                            mode,
+                            "the line search's first stage stepped with the modified function values, as Nocedal's Fortran (VXL's translation uses the unmodified ones)",
+                        ),
+                    );
+                }
             }
         } else {
             let (mut fx, mut fy, mut dx, mut dy) = (gl.fx, gl.fy, gl.dgx, gl.dgy);

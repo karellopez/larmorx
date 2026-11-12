@@ -957,7 +957,7 @@ defects! {
         "a sampled metric's derivative at a sample point outside the virtual region whose linear offset falls outside the derivative array is written past its end: memory it does not own";
     ITK_98 = "ITK-98", "ITK", true,
         "B-spline interpolation mirrors a support index only once at each end of an axis: on an axis too short for the spline's support (2 voxels for orders 3 and 4, 2 or 3 for order 5) it reads the coefficient image outside its buffer, memory it never wrote";
-    ITK_103 = "ITK-103", "VXL", true,
+    ITK_103 = "ITK-103", "VXL", false,
         "VXL's L-BFGS (netlib's lbfgs translated by f2c) steps its line search's first stage from the unmodified function values where Nocedal's Fortran passes the modified ones (FXM, FYM), and then rebuilds them from stale values";
     ITK_104 = "ITK-104", "VXL", true,
         "VXL's L-BFGS resets ys to 0 on every call (a local of the C function, saved in the Fortran), so a caller that supplies the diagonal (DIAGCO) gets an infinite 1/ys";

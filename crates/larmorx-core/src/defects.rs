@@ -375,6 +375,8 @@ defects! {
         "the index matches the entity patterns against each file's absolute path, so the folders above the dataset give its files entities: below a folder named func, sub-pilot or run-2 every file gets datatype func, subject pilot or run 2, and with the derivatives configuration (whose den-, res-, desc-, ... patterns have no separator before them) below golden-x or andres-lab every file gets den or res";
     PIPE_40 = "PIPE-40", "niworkflows IntraModalMerge", true,
         "with to_ras the series is reoriented to RAS but in_mask is not, so grand_mean_scaling indexes the RAS series with the mask on the input's grid: numpy's IndexError when the shapes differ, a mirrored or permuted mask when they agree";
+    PIPE_43 = "PIPE-43", "niworkflows parse_formula", true,
+        "the variables of each group of a model formula, and the columns others stands for, are ordered as a Python set of strings, whose order changes between processes (the per-process hash seed), so ExpandModel writes the expansion's columns of a variable in another order from one run to the next (x_power2 before or after x_derivative1_power2); never reproduced";
     PIPE_44 = "PIPE-44", "nipype compute_noise_components", true,
         "a mask that gives no component (an empty mask with components_criterion 'all') ends the loop over the masks (break): the masks after it are skipped, their components and metadata lost, and when no component was found failure_mode='NaN' stops with ValueError: need at least one array to concatenate instead of returning";
     PIPE_45 = "PIPE-45", "nipype compute_noise_components", true,
@@ -411,6 +413,20 @@ defects! {
         "a header with another number of names than the table's columns is written as given, so the file's header and rows disagree";
     PIPE_63 = "PIPE-63", "fMRIPrep GatherConfounds", true,
         "a shorter table is aligned with the last rows (its missing rows first), but pandas' concat joins the row labels without sorting them: when an earlier table is the shorter one (no signals table, a DVARS table first), the first volume's row is written last and every other row one volume early";
+    PIPE_64 = "PIPE-64", "niworkflows parse_formula", true,
+        "the shorthands (wm, gsr, rps, fd, acc, tcc, dv, dvall, nss, spikes, others) are replaced as text, anywhere and again inside every group: a name that holds one is rewritten (std_dvars becomes std_std_dvarsars), dvall becomes std_dvarsall (dv is replaced first), a shorthand that matches no column leaves an empty term (IndexError: string index out of range), and the names others leaves out lose every d<digits> and ^<digits> in them";
+    PIPE_65 = "PIPE-65", "niworkflows parse_formula", true,
+        "a term's operators are read with regular expressions over the whole term: text around a group other than a derivative before it and an exponent after it is ignored (foo(a), (a)b and d1x(a) give a's columns), an exponent after a group that holds another single-caret exponent fails with TypeError (((a)^2)^3), and a name that starts like a derivative or ends like an exponent (d1a, a^2) is taken for an operator without its group (TypeError)";
+    PIPE_66 = "PIPE-66", "niworkflows parse_formula", true,
+        "a variable reached by two terms of the formula (a + (a)^^2) is repeated: twice in parse_formula's table and four times in ExpandModel's file (pandas selects every column of a repeated name each time it is named), and a group that repeats one fails with pandas' ValueError (Shape of passed values ...)";
+    PIPE_67 = "PIPE-67", "niworkflows spike_regressors", true,
+        "each lag is added to the volumes the earlier lags flagged, so lags [1, 2] (or [0, 1, 2]) flag the third volume after a spike too";
+    PIPE_68 = "PIPE-68", "niworkflows spike_regressors", true,
+        "minimum_contiguous counts the last run of unflagged volumes one volume longer than it is (its end is taken one past the table), so a final run one volume shorter than the minimum is not flagged";
+    PIPE_69 = "PIPE-69", "niworkflows spike_regressors", true,
+        "a criterion other than '<' and '>' is skipped without an error (when every criterion is: TypeError: reduce() of empty iterable with no initial value)";
+    PIPE_70 = "PIPE-70", "niworkflows NormalizeMotionParams", true,
+        "numpy's loadtxt squeezes a table of one row to a vector, which numpy's apply_along_axis refuses (AxisError: axis 1 is out of bounds for array of dimension 1)";
     PD_01 = "PD-01", "pandas read_csv", true,
         "the default float parser (precise_xstrtod) keeps at most 17 digit characters, the leading zeros of 0.00... included, accumulates them in a double and divides by one power of ten, so most values to_csv writes (their shortest repr, up to 17 significant digits) are read back as another double, one or more units in the last place off";
     PD_02 = "PD-02", "pandas to_json", true,

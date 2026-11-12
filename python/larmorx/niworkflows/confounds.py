@@ -25,9 +25,10 @@ values), the first rows NaN; a power ``o`` is numpy's ``x ** o`` (``x * x`` for 
 integers in their own type, which wraps around); for other exponents on floats glibc 2.35's
 ``pow`` with ``upstream_defects="reproduce"`` (numpy's on CPUs without AVX-512; with AVX-512
 numpy's wheels take Intel's SVML ``pow``, which larmorx does not follow: NP-04's class) and the
-correctly rounded ``pow`` by default (GLIBC-07, the notice when a value differs). The columns
-must be numbers where a derivative or a power is computed (larmorx does not follow pandas'
-arithmetic on boolean and text columns: ``TypeError``); every other column passes through.
+correctly rounded ``pow`` by default (GLIBC-07, the notice when a value differs). Integer,
+boolean and text columns follow numpy's own arithmetic (``diff`` of booleans is their
+difference as numpy's ``not_equal``; text raises Python's ``TypeError``), as pandas hands them
+to numpy; the columns of a group are put side by side in pandas' common type first.
 
 The defects (``upstream_defects="fix"`` corrects them, ``"reproduce"`` gives niworkflows'
 result; :mod:`larmorx._defects`):
@@ -163,6 +164,8 @@ def _column(name: str, values: Any) -> Column:
     if isinstance(values, Column):
         return values
     if isinstance(values, np.ndarray):
+        if values.dtype == object and values.ndim == 1:
+            return Column("object", values.tolist())
         kind = _KINDS.get(values.dtype.str[1:])
         if kind is None or values.ndim != 1:
             raise TypeError(
@@ -218,26 +221,36 @@ def _concat(parts: list[Table], index: list[int]) -> Table:
     return Table(names, cols, list(index))
 
 
-def _values(table: Table, what: str) -> np.ndarray:
-    """``numpy.asarray(frame)``: the columns side by side in pandas' common type (float64 for
-    int64 beside float64 or uint64); ``TypeError`` for boolean and text columns, whose pandas
-    arithmetic larmorx does not follow."""
+def _array(c: Column) -> np.ndarray:
+    """A column as numpy holds it in pandas' block (text and Python integers as objects)."""
+    if c.kind == "object":
+        out = np.empty(len(c.values), dtype=object)
+        out[:] = list(c.values)
+        return out
+    return np.asarray(c.values)
+
+
+def _values(table: Table) -> np.ndarray:
+    """``numpy.asarray(frame)``: the columns side by side in pandas' common type (numpy's
+    promotion: float64 for int64 beside float64 or uint64; objects for booleans beside other
+    types, and for text)."""
     n = table.n_rows
     if not table.columns:
         return np.empty((n, 0))
-    kinds = {c.kind for c in table.columns}
-    if kinds - {"float64", "int64", "uint64"}:
-        bad = [m for m, c in zip(table.names, table.columns, strict=True) if c.kind not in (
-            "float64", "int64", "uint64")]  # fmt: skip
-        raise TypeError(
-            f"{what}: the columns {bad} hold booleans or text; larmorx computes derivatives and "
-            "powers of numbers only (it does not follow pandas' arithmetic on other columns)"
-        )
-    dtype = np.dtype(kinds.pop()) if len(kinds) == 1 else np.dtype(np.float64)
-    out = np.empty((n, len(table.columns)), dtype=dtype)
-    for j, c in enumerate(table.columns):
-        out[:, j] = np.asarray(c.values).astype(dtype)
+    arrays = [_array(c) for c in table.columns]
+    kinds = {a.dtype.kind for a in arrays}
+    if "O" in kinds or ("b" in kinds and len(kinds) > 1):
+        dtype = np.dtype(object)
+    else:
+        dtype = np.result_type(*arrays)
+    out = np.empty((n, len(arrays)), dtype=dtype)
+    for j, a in enumerate(arrays):
+        out[:, j] = a
     return out
+
+
+def _kind(dtype: np.dtype) -> str:
+    return {"f": "float64", "i": "int64", "u": "uint64", "b": "bool"}.get(dtype.kind, "object")
 
 
 def _frame(names: list[str], data: np.ndarray, index: list[int]) -> Table:
@@ -247,8 +260,11 @@ def _frame(names: list[str], data: np.ndarray, index: list[int]) -> Table:
         raise ValueError(
             f"Shape of passed values is {data.shape}, indices imply {(data.shape[0], len(names))}"
         )
-    kind = _KINDS[data.dtype.str[1:]]
-    cols = [Column(kind, np.ascontiguousarray(data[:, j])) for j in range(data.shape[1])]
+    kind = _kind(data.dtype)
+    cols = [
+        Column(kind, data[:, j].tolist() if kind == "object" else np.ascontiguousarray(data[:, j]))
+        for j in range(data.shape[1])
+    ]
     return Table(list(names), cols, list(index))
 
 
@@ -572,24 +588,23 @@ def _temporal_derivatives(order: Any, variables: Any, data: Any, parent: Table, 
         order = set(order) - {0}
     for o in order:
         variables_deriv[o] = [f"{v}_derivative{o}" for v in variables]
-        sel = _values(data.select(variables), "a temporal derivative")
+        sel = _values(data.select(variables))
         arr = np.tile(np.nan, sel.shape)
         with np.errstate(all="ignore"):
             arr[o:, :] = np.diff(sel, n=o, axis=0)
         data_deriv[o] = arr
     names = reduce(operator.add, variables_deriv.values())
-    parts = [
-        _values(d, "a temporal derivative") if isinstance(d, Table) else d
-        for d in data_deriv.values()
-    ]
+    parts = [_values(d) if isinstance(d, Table) else d for d in data_deriv.values()]
     return names, _frame(names, np.concatenate(parts, axis=1), parent.index)
 
 
 def _power(table: Table, o: int, run: _Run) -> Table:
-    """``frame ** o`` column by column (pandas' blocks): floats through numpy's ``power``
-    (``larmorx_confounds::expansion``), integers in their own type (numpy's)."""
+    """``frame ** o`` column by column (pandas' blocks): float64 through numpy's ``power``
+    (``larmorx_confounds::expansion``: glibc's or the correctly rounded ``pow``), the other
+    columns with numpy's own ``**`` (integers and booleans in their types, wrapping around; text
+    and Python integers as Python computes them)."""
     cols = []
-    for name, c in zip(table.names, table.columns, strict=True):
+    for c in table.columns:
         if c.kind == "float64":
             vals, differ = _core.numpy_power_f64(
                 np.ascontiguousarray(c.values, dtype=np.float64), float(o), run.mode
@@ -598,15 +613,11 @@ def _power(table: Table, o: int, run: _Run) -> Table:
                 run.pow_values += len(vals)
                 run.pow_differ += differ
             cols.append(Column("float64", vals))
-        elif c.kind in ("int64", "uint64"):
-            with np.errstate(all="ignore"):
-                cols.append(Column(c.kind, np.power(np.asarray(c.values), o)))
         else:
-            raise TypeError(
-                f"an exponential term: the column {name!r} holds "
-                f"{'booleans' if c.kind == 'bool' else 'text'}; larmorx computes derivatives and "
-                "powers of numbers only (it does not follow pandas' arithmetic on other columns)"
-            )
+            with np.errstate(all="ignore"):
+                vals = _array(c) ** o
+            kind = _kind(vals.dtype)
+            cols.append(Column(kind, vals.tolist() if kind == "object" else vals))
     return Table(list(table.names), cols, list(table.index))
 
 
@@ -627,7 +638,7 @@ def _exponential_terms(order: Any, variables: Any, data: Any, parent: Table, run
         variables_exp[o] = [f"{v}_power{o}" for v in variables]
         data_exp[o] = _power(data.select(variables), o, run)
     names = reduce(operator.add, variables_exp.values())
-    parts = [_values(d, "an exponential term") for d in data_exp.values()]
+    parts = [_values(d) for d in data_exp.values()]
     return names, _frame(names, np.concatenate(parts, axis=1), parent.index)
 
 

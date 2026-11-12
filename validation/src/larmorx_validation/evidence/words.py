@@ -42,6 +42,7 @@ _REWORD: list[tuple[str, str, str]] = [
     (r"\bthe larmorx-nc replica\b", "the replica (larmorx-nc)", "the replica (larmorx-nc)"),
     (r"\bThe clean-room original\b", "The clean room", "The clean room"),
     (r"\bthe clean-room original\b", "the clean room", "the clean room"),
+    (r"\bClean-room originals?\b", "Clean room", "Clean room"),
     (r"\bclean-room originals\b", "clean rooms", "clean rooms"),
     (r"\bclean-room original\b", "clean room", "clean room"),
     (r"\bboth implementations\b", "both ports", "both ports"),
@@ -56,7 +57,15 @@ _REWORD: list[tuple[str, str, str]] = [
     (r"\bThe default mode\b", "The default, `fix`,", "The default, fix,"),
     (r"\bthe default mode\b", "the default, `fix`,", "the default, fix,"),
     (r"\bits default mode\b", "its default, `fix`,", "its default, fix,"),
+    (r"'s default mode\b", "'s default, `fix`,", "'s default, fix,"),
     (r"\bdefault mode\b", "`fix`, the default", "fix, the default"),
+    (r"\bfMRIPrep oracle run's\b", "fMRIPrep run's", "fMRIPrep run's"),
+    # a row named, not placed: the guide's order moves the rows
+    (
+        r"\(the row (?:above|of the reproduce mode)\)",
+        "(the row of `reproduce` against FSL in this table)",
+        "(the row of reproduce against FSL in this table)",
+    ),
     (
         r"\bThe original's reproduce mode\b",
         "The clean room's `reproduce`",
@@ -79,6 +88,12 @@ _REWORD: list[tuple[str, str, str]] = [
     ),
     (r"\bstandard tier\b", "standard comparison", "standard comparison"),
     (r"\bfull tier\b", "full comparison", "full comparison"),
+    (r"\bthe full-tier record\b", "the full comparison's record", "the full comparison's record"),
+    (
+        r"\bthe standard record\b",
+        "the standard comparison's record",
+        "the standard comparison's record",
+    ),
     (r"\bthe parity suite's\b", "the comparison's", "the comparison's"),
     # D13, a decision's number: its section of a record by the record's own name for it
     (
@@ -196,6 +211,7 @@ def example(
     ex["shows"] = {"text": shows, "verdicts": shown}
     ex["summary"] = reword(ex.get("summary"))
     for f in ex.get("facts", []):
+        f["label"] = reword(f["label"], code=False)
         f["text"] = reword(f["text"])
     ex["metrics_note"] = reword(ex.get("metrics_note"))
     ex.pop("groups", None)  # replaced by order.groups

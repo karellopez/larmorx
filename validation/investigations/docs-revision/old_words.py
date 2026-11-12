@@ -538,9 +538,7 @@ def main() -> None:
         if g == kept:
             rename = "kept"
         elif linked_by.get(rel):
-            rename = "renamed later (linked by " + ", ".join(
-                f"`{x}`" for x in linked_by[rel]
-            ) + ")"
+            rename = "renamed later (linked by " + ", ".join(f"`{x}`" for x in linked_by[rel]) + ")"
         else:
             rename = "renamed"
         tally[rename.split(" (")[0]] += 1

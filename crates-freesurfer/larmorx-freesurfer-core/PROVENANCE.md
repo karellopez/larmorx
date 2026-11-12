@@ -19,7 +19,17 @@ built for the official binaries with GCC 8.4.0 (`docs/freesurfer/variation.md`).
 | `machine` | `utils/machine.cpp` | `swapDouble`, `swapLong32`, `swapFloat`, `swapShort`, `swapInt` |
 | `cmdargs` | `utils/cmdargs.cpp` | `CMDargNErr`, `CMDisFlag`, `CMDsingleDash`, `CMDnthIsArg` |
 | `base` | `include/base.h` | `squaref`, `squared` |
+| `random` | `utils/utils.cpp` 73-162, 1557-1573; `utils/numerics.cpp` 1256-1279 | `seedHasBeenSet`, `idum`, `nrgcalls`, `setRandomSeed`, `getRandomSeed`, `getRandomCalls`, `randomNumber` (with its `static laterTime`), `compute_permutation`; `OpenRan1` (its `static` seed and generator; item 3.1-24's file, brought forward: `randomNumber`'s only source) |
+| `utils` | `utils/utils.cpp` 284-306, 347-488, 711-720, 788-808, 838-849, 930-1009, 1011-1149, 1169-1490, 1521-1580, 1582-1697, 1699-1744, 1749-1830, 1881-1968, 1990-1998 | `fgetl` (with `fgets`), `StrUpper`, `StrLower`, `FileNameOnly`, `FileExists`, `FileName`, `stricmp`, `FileNamePath`, `deltaAngle`, `devIsinf`, `devIsnan`, `devFinite`, `FileNameRemoveExtension`, `FileNameExtension`, `FileNameFromWildcard`, `getMemoryUsed`, `strcpyalloc` (a `String`'s copy), `ItemsInString`, `deblank`, `str_toupper` (as `StrUpper`), `sum2stddev`, `compare_ints`, `compare_floats`, `nunqiue_int_list`, `unqiue_int_list`, `most_frequent_int_list`, `CountItemsInString`, `GetNthItemFromString`, `kth_smallest`, `quick_select`, `median`, `nint`, `nint2`, `global_progress_range` and `exec_progress_callback` (no callback is ever installed on the programs' paths: not translated beyond that), `GetVmPeak`, `GetMemUsage`, `PrintRUsage`, `WriteRUsage`, `Pi`, `halfPi`, `fastApproxAtan2fWkr`, `fastApproxAtan2f`, `ReportEntry`, `reportEntry`, `spendTimeCheckingForLogicProblem`, `copeWithLogicProblem2`, `getEnvironVar`, `directoryExists`, `directoryIsWritable`, `getBaseTempDir`, `makeTempFile`, `makeTempDir`, `FindFirstMatch`; `include/const.h`'s `STR_LEN` |
+| `version` | `utils/version.cpp` | `PLATFORM`, `COMPILER_NAME`, `COMPILER_VERSION` (the official build's), `ver_string`'s result, `argv2cmdline`, `VERuser`, `VERfileTimeStamp`, `VERcurTimeStamp`, `getVersion`, `getBuildStamp`, `handleVersionOption`, `getAllInfo`; `FS_VERSION`, `FS_BUILD_STAMP` and `__DATE__ __TIME__` as the official programs print them |
+| `fsenv` | `utils/fsenv.cpp`, `include/fsenv.h`; `include/mri.h` 80-81 | `FSENV`, `FSENVgetenv` (the colour table read by the caller's function), `FSENVfree` (dropping the value), `FSENVgetSUBJECTS_DIR`, `FSENVsetSUBJECTS_DIR`; `BVEC_SPACE_SCANNER`, `BVEC_SPACE_VOXEL` |
+| `timer` | `include/timer.h`, `utils/timer.cpp` | `Timer` and its methods, `TIMER_INTERVAL_END`'s line, `currentDateTime` |
+| `romp` | `utils/romp_support.cpp` (with `ROMP_SUPPORT_ENABLED` off, as built), `include/base.h` 70 | `before_main`'s thread limit, `romp_omp_get_thread_num`, `ROMP_main_started`, `initMainTimer` and `rompExitHandler` (nothing seen); `_MAX_FS_THREADS` |
+| `chklc` | `utils/chklc.cpp` | no translation: the replica checks no licence key (decision log 2026-10-19); `chklc`'s valid-key result only |
+| `xdebug` | `utils/xDebug.cpp`, `include/xDebug.h` | `xDbg_PushStack`, `xDbg_PopStack`, `xDbg_SetStackDesc`, `xDbg_SetCurrentNote`, `xDbg_Printf` (output off), `DebugEnterFunction`, `DebugExitFunction`; `xDbg_knMaxStackDepth`, `xDbg_knMaxDescLength`, `mCurrentStackDepth`, the stack's arrays |
+| `fio` | `include/fio.h` 95-112 | `TSV`'s fields, `ncols`, `nrows` |
 | `cstd` | none (larmorx's own) | the C library's `atoi`, `atof`, `sscanf`'s `%lx`, `printf`'s `%W.Pf`, x86-64's double-to-int conversion, written from the C standard and glibc's documented behaviour |
+| `cglob`, `ctime`, `system` | none (larmorx's own) | the C library's `glob` and `fnmatch` (from POSIX), `gmtime_r`, `localtime` and `strftime("%c")` in the C locale (from POSIX's `TZ`, RFC 8536's TZif files and two behaviours of glibc 2.35 measured against it, `validation/investigations/freesurfer-core/ctime_probe.py`: 180,240 cases, 0 differ), `getpwuid(geteuid())`, `uname`, `getcwd` (from `/proc`, `/etc/passwd` and the environment); no C library source |
 | `run` | none (larmorx's own) | what `larmorx-freesurfer` gives a program (queue item 3.1-01) |
 
 Third-party code in these files (CLAUDE.md rule 3): none; each carries MGH's notice
@@ -27,11 +37,20 @@ Third-party code in these files (CLAUDE.md rule 3): none; each carries MGH's not
 `hips.cpp`, `fsinit.cpp`: FreeSurfer's own, Part B as far as MGH holds the rights,
 `docs/freesurfer/third-party.md` §2).
 
-Still to translate (queue item 3.1-22, part 2; NOTES of FreeSurfer's foundations, track A):
-`utils/utils.cpp` (the random numbers, the file-name and string helpers, `median`/`quick_select`,
-the memory reports, the temporary files), `utils/fsenv.cpp`, `utils/version.cpp`,
-`utils/timer.cpp` and `include/timer.h`, `utils/romp_support.cpp`, `utils/chklc.cpp`,
-`utils/xDebug.cpp`, `include/fio.h`.
+Third-party code in the part 2 files: `kth_smallest` and `quick_select` are N. Devillard's 1998
+public-domain code (Wirth's algorithm; Numerical Recipes' description; TP-07, the placement table's
+P-06), translated here from FreeSurfer's copy as part of `utils.cpp`; the placement table puts
+Devillard's own code in the main package (the permissive track, from its own upstream), which this
+translation may then be checked against or replaced by. `OpenRan1`
+calls VXL's `vnl_random` (TP-01, BSD-3-Clause), which this crate does not contain: it reaches the
+main package's port (`larmorx_core::vnl_random`, queue item 3.1-04) through `random::Ran1Source`.
+
+Still to translate in `fs.core` (each comes with the module or item that needs it): `utils.cpp`'s
+`DListStats` (its sums are x87 `long double`: with `larmorx_core`'s 80-bit arithmetic, queue item
+3.1-03, once merged); the unreached functions of these files (static reach, `code.md` §6:
+`IntSqrt`, `StrReplace`, `FileType`, `FileNumber`, `mad`, `FindMatches`, `GetVmSize`,
+`PrintMemUsage`, `SetProgressCallback`, `FSENVprintenv`, `xDbg_Init` and the other `xDbg_*`, ROMP's
+statistics, ...).
 
 ## Changes from the originals
 
@@ -46,3 +65,16 @@ the memory reports, the temporary files), `utils/fsenv.cpp`, `utils/version.cpp`
   locales keep) and its warning about a missing locale is not printed; its one-thread default is
   reported (`diag::fs_init`) for the programs whose arithmetic depends on their thread count.
 - `assertFailed`'s endless loop under `FREESURFER_HANG_ON_ASSERT` is not reproduced.
+- Part 2: the defects FS-04 (unseeded numbers from the clock), FS-05 (`FREESURFER_SEED`'s
+  uncaught exception), FS-07 (the version options' argument loop), FS-10 (empty integer lists) and
+  FS-12 (`nint`'s undefined conversion) are corrected by default and reproduced with `reproduce`;
+  FS-06 (the arctangent's lookup outside its table), FS-08 (`FSENVgetenv`'s unset memory), FS-09
+  (the median of an empty list) and FS-11 (fixed stack buffers) are memory errors, filled
+  deterministically in both modes with a notice (`docs/findings/freesurfer-core.md`).
+- `OpenRan1`'s generator is installed by the program (`random::Random::set_source`) rather than
+  being a `static` object; its thread-0 check is not needed (the replica draws on one thread).
+- `Timer` reads the monotonic clock (FreeSurfer's `high_resolution_clock` is libstdc++'s wall
+  clock); `getMemoryUsed` reads `/proc/self/status` itself instead of running `grep` and `cut`
+  through a shell; `PrintRUsage` reads `getrusage`'s counters from `/proc`; the temporary names'
+  six characters come from larmorx's own unpredictable choice instead of glibc's.
+- The licence check is not translated (decision log 2026-10-19).

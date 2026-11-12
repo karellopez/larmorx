@@ -72,7 +72,7 @@ clock, as FreeSurfer (and `abs(INT_MIN)` stays `INT_MIN`). The line is printed i
 `std::out_of_range` beyond a 64-bit `long`; nothing catches it, so libstdc++'s terminate handler
 writes `terminate called after throwing an instance of 'std::invalid_argument'` and `  what():  stol`
 and aborts (exit status 134; measured with a GCC build of the same call,
-`<scratch>`-only probe: `abc` and `99999999999999999999`). `Setting seed for random number
+`validation/investigations/freesurfer-core/stol_probe.cpp`: `abc` and `99999999999999999999`). `Setting seed for random number
 genererator to <value>` (FreeSurfer's spelling) is printed first. `stol` takes leading white space,
 a sign and decimal digits and ignores what follows (`" 12abc"` is 12, `"-0x10"` is 0). The input
 makes no sense and the original crashes: rule B. Default: `error: FREESURFER_SEED must be an

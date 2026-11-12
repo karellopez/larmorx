@@ -29,3 +29,8 @@ empty, zone files with and without footers, POSIX strings with and without rules
 names) at seeded times from 1900 to 2100 and every 7 hours over two years. Result (2026-11-12,
 `--cases 5000`): 180,240 cases, 0 differ (before the two measured rules were added, 1,187 POSIX-rule
 cases differed: the rule's year is the UTC year, and before 1970 glibc uses 1970's change times).
+
+`stol_probe.cpp` shows what an uncaught `std::stol` exception does (FS-05): built with the
+machine's `g++` and run on `abc` and `99999999999999999999`, it prints its first line, then
+`terminate called after throwing an instance of 'std::invalid_argument'` (or `'std::out_of_range'`)
+and `  what():  stol` on standard error, and aborts (exit status 134); `" 12x"` gives 12.

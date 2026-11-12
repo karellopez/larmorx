@@ -4449,7 +4449,10 @@ explanation = "Trial 2026-11-11-t2smap-original-2: 1 case outside check.py's mod
 # The descriptor's probes before the trial (seeds probe to probe4, in-process) and the trial
 # oracles/difftest/2026-11-12-confounds-trial (seed confounds-trial, 30 minutes, 5 jobs on 8 CPUs,
 # 3 GiB a case: 334,124 cases; 332,076 agree, 528 notices, 28 differ, 1,492 skipped: ExpandModel's
-# powers above 2 while numpy's pow is AVX-512's SVML). Every one rerun with the final build.
+# powers above 2 while numpy's pow is AVX-512's SVML). Every one rerun with the final build; then two checks
+# of the final build: oracles/difftest/2026-11-12-confounds-check (seed confounds-check, 10 minutes, the three
+# tools: 140,003 cases, every one agrees, 645 skipped) and -check-noavx512 (seed confounds-check-noavx512, 5
+# minutes of confounds-fmriprep with numpy's AVX-512 kernels off, powers above 2 included: 40,567, every one agrees).
 
 [[difference]]
 tool = "confounds-nipype"

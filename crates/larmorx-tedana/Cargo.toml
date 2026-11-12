@@ -11,14 +11,16 @@ larmorx-core.workspace = true
 larmorx-io.workspace = true
 # nilearn's compute_epi_mask (the mask without --mask)
 larmorx-interp.workspace = true
-# LapackRelease: nibabel's qform arithmetic in the outputs' headers (numpy's LAPACK release)
+# LapackRelease: nibabel's qform arithmetic in the outputs' headers (numpy's LAPACK release);
+# numpy's lstsq (its exact port): TED-46's log-linear fits in `reproduce` (tedana's noise)
 larmorx-transform.workspace = true
+# SciPy's curve_fit (its exact port): TED-46's curve fits in `reproduce`, and the reference of
+# the curve fit's unit test
+larmorx-optim.workspace = true
 # gzip (.mgz, .hdr.gz/.img.gz) and MATLAB 7's compressed elements (.mat)
 flate2.workspace = true
 ndarray.workspace = true
 rayon.workspace = true
 
 [dev-dependencies]
-# SciPy's curve_fit (its port), the reference of the curve fit's unit test
-larmorx-optim.workspace = true
 tempfile.workspace = true

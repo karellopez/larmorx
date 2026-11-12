@@ -17,11 +17,13 @@ thread, numpy's AVX-512 kernels off, §17.1):
     ``LARMORX_UPSTREAM_DEFECTS=reproduce``: the exit status, standard output, the messages (every
     log line and error; Python's warnings by category and message, their location lines being
     outside the contract, §12.3), the files written, and the values by the spec's ``check.py``
-    (§17.3's thresholds), or file by file (``outputs.py``) where ``check.py``'s model cannot read
-    the inputs (pairs, ANALYZE, MGH, a 4D mask);
+    (§17.3's thresholds; its model reads every image form of §4.1), or file by file
+    (``outputs.py``) where its model cannot follow the run (TED-01's NaN sample);
 (B) the replica's default against the original's default: the same, and the defects' notices
     the same (NP-03 and GLIBC-07 aside: the original's maths notices follow §15.2's one-pass
-    rule).
+    rule). The replica is a program built from the same branch (``LARMORX_GPL_BIN``; since relay
+    C4, 2026-11-12, it reads ANALYZE and MGH and has the corrections the original has); without
+    it (B) is not run.
 
 The cases (§17.2): the spec probe's 54 (``validation/investigations/t2smap-spec/blackbox.py``)
 and the clean-room part's 82 added ones (``validation/investigations/t2smap-original/
@@ -74,25 +76,15 @@ EXPECTED_A = {
     "fit's OptimizeWarning only); one voxel whose SciPy fit overflows converges in the "
     "original (its values pass §17.3 (b)/(c))",
 }
-#: Cases whose (B) comparison is expected to differ, with the reason (black-box facts).
+#: Cases whose (B) comparison is expected to differ, with the reason (black-box facts). The
+#: replica's earlier message gaps (``x-underflow-debug``, ``x-inf-both-paid``, ``three-d``,
+#: ``x-mask-grid``) are gone in the replica of this branch (relay C4, 2026-11-12).
 EXPECTED_B = {
-    "x-underflow-debug": "the replica does not show numpy's cast overflow again for the limited "
-    "S0 map after the confounds table, where tedana's warnings registry has been reset "
-    "(observed; the original shows it, as tedana)",
-    "x-inf-both-paid": "the replica does not show numpy's 'invalid value encountered in "
-    "reduce' of the adaptive mask's means of a series holding both infinities (tedana does: "
-    "observed; the original does too)",
-    "three-d": "the replica prints only the last of tedana's two chained tracebacks for a 3D "
-    "echo file (the original prints both, as tedana)",
-    "x-mask-grid": "the replica prints only nilearn's error where tedana chains it after its "
-    "own 'Image/mask shape mismatch' (the original prints both, as tedana)",
     "x-underflow-debug-curvefit": "a chaotic regime (noise voxels with T2* ~ 0.2 ms and S0 ~ "
     "1e28 from echo times 0.05 ms apart): one voxel's fits end at different local optima; "
     "tedana's own result differs from the replica's default far more (33 % of the fit voxels "
     "by §17.3 (b)); the replica keeps SciPy's failure count (48), the original 47",
 }
-#: The replica's documented gap: it refuses ANALYZE and MGH images, which tedana reads.
-REPLICA_FORMATS_GAP = re.compile(r"^x-(analyze|mgh)")
 #: Cases outside ``check.py``'s model, judged file by file: its model reproduces tedana's
 #: behaviour, which TED-01's NaN sample makes fail (since spec writer 2, 2026-11-11, the model
 #: reads every image form of §4.1 and nilearn's masking path, so the readers' cases are judged by
@@ -166,9 +158,10 @@ def inputs_dir() -> Path:
     """The probe's inputs and the harness's, made once (atomically: the workers share them)."""
     root = WORKSPACE / "oracles" / "inputs" / SUITE
     d = root / f"suite-{INPUTS_VERSION}"
-    if (d / "suite.done").exists():
-        return d
     blackbox, compare, _, _ = tools()
+    if (d / "suite.done").exists():
+        _later_inputs(d, root, compare)
+        return d
     root.mkdir(parents=True, exist_ok=True)
     tmp = Path(tempfile.mkdtemp(dir=root, prefix="making-"))
     work = tmp / "inputs"
@@ -176,11 +169,27 @@ def inputs_dir() -> Path:
     compare.extra_inputs(work)
     compare.format_inputs(work)
     compare.more_inputs(work)
+    compare.ted46_inputs(work)
     (work / "suite.done").write_text(f"{INPUTS_VERSION}\n", encoding="utf-8")
     with contextlib.suppress(OSError):  # another worker made them first
         work.rename(d)
     shutil.rmtree(tmp, ignore_errors=True)
     return d
+
+
+def _later_inputs(d: Path, root: Path, compare) -> None:
+    """Inputs added to an existing folder after its first making (their own marker; the files
+    already there keep their bytes, so the oracle cache's entries of the earlier cases stay
+    valid): made in a folder of their own, then moved in one by one, the marker last."""
+    if (d / "ted46.done").exists():
+        return
+    tmp = Path(tempfile.mkdtemp(dir=root, prefix="adding-"))
+    try:
+        compare.ted46_inputs(tmp)
+        for f in sorted(tmp.iterdir(), key=lambda f: f.name == "ted46.done"):
+            os.replace(f, d / f.name)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
 
 
 # --------------------------------------------------------------------------------------------
@@ -491,77 +500,13 @@ def compare_runs(
 # --------------------------------------------------------------------------------------------
 # known divergences (black-box facts and decisions, each with its reason)
 
-#: The replica's default's known message gaps (relays 2a, 2c, 3a-ii: black-box facts, in the
-#: replica-side relay's list): a chained traceback printed as its last part only, numpy's
-#: RuntimeWarning lines it does not print, numpy's scientific thresholds padded with zeros.
-_CHAIN = "During handling of the above exception, another exception occurred:"
-_WARNING_LINE = re.compile(r"^RuntimeWarning: ")
-_THRESHOLDS = re.compile(r"^(INFO +utils:make_adaptive_mask:\d+ Echo-wise intensity thresholds for adaptive mask: )\[(.*)\]$")  # fmt: skip
-#: The lines TED-46's equal observations change (§7.2: tedana's slope there is rounding noise,
-#: not 0): numpy's divide warning, the curve fit's failure counts and SciPy's warning.
-_TED46_LINES = re.compile(
-    r"^(RuntimeWarning: divide by zero encountered in divide|OptimizeWarning: |DEBUG +decay:"
-    r"fit_monoexponential:\d+ With \d+ echoes, monoexponential fit failed)"
-)
-_TED46 = re.compile(r"upstream defect TED-46 ")
-_TED31 = re.compile(r"upstream defect TED-31 ")
-REASON_TED46_A = (
-    "TED-46 (§7.2's observations without a slope): reproduce writes the exact zero slope where "
-    "tedana's batched least squares leaves rounding noise (1 ms or 1e16 ms and more), until the "
-    "exact port of numpy's lstsq serves reproduce"
-)
-REASON_TED46_B = (
-    "TED-46: the replica's default does not take the slope 0 at observations without a slope "
-    "yet (its record's list for the replica-side relay)"
-)
-REASON_TED31_B = (
-    "TED-31: the replica's default does not refuse a run with no voxel left for the fit yet (it "
-    "completes the log-linear fit, and stops with nilearn's empty-mask text in the curve fit)"
-)
-REASON_REPLICA_GAPS = (
-    "the replica's known message gaps (one of two chained tracebacks, numpy's RuntimeWarning "
-    "lines, the thresholds' zero-padded digits)"
-)
-
-
-def join_wrapped(lines: list[str]) -> list[str]:
-    """numpy's printing of a long thresholds array goes on over several lines: one line again."""
-    out: list[str] = []
-    for line in lines:
-        prev = out[-1] if out else ""
-        if prev.startswith("INFO") and "intensity thresholds" in prev and "]" not in prev:
-            out[-1] = f"{prev} {line.strip()}"
-            continue
-        out.append(line)
-    return out
-
-
-def by_value(line: str) -> str:
-    """The dropout thresholds' line with each number as the float32 it names (larmorx-gpl
-    0.1.0rc1 pads numpy's scientific form with zeros where numpy prints the element's own further
-    digits: the same values)."""
-    import numpy as np
-
-    m = _THRESHOLDS.match(line)
-    if not m:
-        return line
-    values = [repr(float(np.float32(w))) for w in m.group(2).split()]
-    return f"{m.group(1)}{values}"
-
-
-def without_replica_gaps(lines: list[str]) -> list[str]:
-    """The messages with what the replica's known gaps change taken out."""
-    lines = join_wrapped(lines)
-    if _CHAIN in lines:
-        first = lines.index("Traceback (most recent call last):")
-        last = len(lines) - 1 - lines[::-1].index("Traceback (most recent call last):")
-        lines = lines[:first] + lines[last:]
-    return [by_value(x) for x in lines if not _WARNING_LINE.match(x)]
-
-
-def _failed(part: CheckList) -> list[str]:
-    """The failed checks' names without their label (``(A)``, ``(B) run 2``, ...)."""
-    return [re.sub(r"^\([AB]\)( run \d+)? ", "", c.name) for c in part.checks if not c.passed]
+# Until relay C4 (2026-11-12) this section also took as expected the replica's (larmorx-gpl
+# 0.1.0rc1's) black-box gaps (one of two chained tracebacks, numpy's RuntimeWarning lines it did
+# not print, the thresholds' zero-padded digits, ANALYZE and MGH refused) and the corrections it
+# did not take (TED-31, TED-46), and in (A) TED-46's equal observations, where reproduce wrote
+# the exact zero slope. The replica built from this branch has them all, and reproduce computes
+# tedana's rounding noise (the exact lstsq port): (B) is run against a replica of this branch
+# (``LARMORX_GPL_BIN``), and no such reason is left.
 
 
 def explain(
@@ -575,49 +520,10 @@ def explain(
 ) -> str | None:
     """The reason of ``part``'s failures when every one is a known divergence, else ``None``:
     (A) tedana against the original's ``reproduce``, (B) the replica's default against the
-    original's default (``other`` is always the original's run)."""
-    failed = _failed(part)
-    if not failed:
-        return None
-    m_ref = messages(ref[2], ref_case.parent, inputs)
-    m_other = messages(other[2], other_case.parent, inputs)
-    m_ref = [x.replace(f"<W>/{ref_case.name}/", "<W>/<case>/") for x in m_ref]
-    m_other = [x.replace(f"<W>/{other_case.name}/", "<W>/<case>/") for x in m_other]
-    if label.startswith("(B)") and _TED31.search(other[2]):
-        return REASON_TED31_B
-    if _TED46.search(other[2]):
-
-        def strip46(lines: list[str]) -> list[str]:
-            return [x for x in lines if not _TED46_LINES.match(x)]
-
-        # TED-46's values move the cap (TED-05's count) and the curve fit's failures (TED-07's,
-        # TED-08's, TED-15's counts): the same defects named, their numbers aside
-        def named(err: str) -> list[str]:
-            return sorted(
-                {
-                    re.sub(r"\d+", "<n>", x)
-                    for x in notices(err)
-                    if not re.search(r"defect TED-(46|05) ", x)
-                }
-            )
-
-        n_ref, n_other = named(ref[2]), named(other[2])
-        ok = {"values (§17.3)"}
-        if strip46(m_ref) == strip46(m_other) or (
-            label.startswith("(B)")
-            and without_replica_gaps(strip46(m_ref)) == without_replica_gaps(strip46(m_other))
-        ):
-            ok.add("messages")
-        if n_ref == n_other:
-            ok.add("notices")
-        if all(f in ok for f in failed):
-            return REASON_TED46_A if label.startswith("(A)") else REASON_TED46_B
-    if (
-        label.startswith("(B)")
-        and all(f == "messages" for f in failed)
-        and without_replica_gaps(m_ref) == without_replica_gaps(m_other)
-    ):
-        return REASON_REPLICA_GAPS
+    original's default (``other`` is always the original's run). None is known today (the
+    cases' own reasons are ``EXPECTED_A`` and ``EXPECTED_B``); the random-testing descriptor
+    calls it too."""
+    del label, part, ref, other, ref_case, other_case, inputs
     return None
 
 
@@ -703,16 +609,6 @@ def run_probe(case: Case, checks: CheckList) -> None:
             checks("(B) the replica", True, detail="larmorx-gpl not found: (B) not run")
             _expected(checks, expected)
             return
-        if REPLICA_FORMATS_GAP.match(case.id):
-            code, _, err = run_replica(full, dirs["replica"], env)
-            if "UnsupportedFormat" in err:
-                checks("(B) the replica refuses ANALYZE and MGH (its documented gap)", code == 1)
-                res_d = run_original(
-                    full, dirs["default"], {**env, "LARMORX_UPSTREAM_DEFECTS": "fix"}
-                )
-                default_reads(checks, res_d, res_r[0])
-                _expected(checks, expected)
-                return
         res_p, res_d = [], []
         denv = {**env, "LARMORX_UPSTREAM_DEFECTS": "fix"}
         for _run in range(runs):
@@ -740,21 +636,6 @@ def run_probe(case: Case, checks: CheckList) -> None:
         _expected(checks, expected)
     finally:
         shutil.rmtree(work, ignore_errors=True)
-
-
-def default_reads(
-    checks: CheckList, default: tuple[int, str, str], reproduce: tuple[int, str, str]
-):
-    """Where the replica refuses ANALYZE and MGH: the original's default reads them, and where its
-    exit status differs from ``reproduce``'s a corrected defect's notice says why."""
-    explained = default[0] == reproduce[0] or bool(
-        re.search(r"^larmorx: upstream defect \S+ \(\w+\) corrected: ", default[2], re.M)
-    )
-    checks(
-        "(B) the original's default reads them",
-        "UnsupportedFormat" not in default[2] and explained,
-        detail=f"exit {default[0]} (reproduce {reproduce[0]})",
-    )
 
 
 def _expected(checks: CheckList, reasons: list[str | None]) -> None:

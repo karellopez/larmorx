@@ -26,12 +26,25 @@
 //! raise in the middle of a fit (a truncated step a hair outside the trust region), the
 //! original takes the step on the region's boundary instead: such a fit completes (§17.3's
 //! criterion (b) judges it). The covariance is §7.3's, from the final Jacobian.
+//!
+//! TED-46 (§7.3's last paragraph): by default a fit whose samples are all equal (x), whose
+//! log-linear observations were TED-46's, takes the curve fit's exact solution S0 = x, T2* = +∞
+//! (a residual of 0), not a failure, its covariance SciPy's for a residual of 0 (0 when m > 2,
+//! +∞ with SciPy's warning when m ≤ 2). `reproduce` fits those voxels as tedana does, from its
+//! start (its rounding noise, §7.2) with the main package's exact port of SciPy's `curve_fit`
+//! (`larmorx_optim::curve_fit2`, §13.5, §13.9): at a T2* start of 1e16 ms and more, SciPy's
+//! forward differences find no slope along T2* (the model does not change in float64) and only
+//! S0 moves, where this solver's own derivatives find one; elsewhere `reproduce` keeps this
+//! solver (within §17.3).
 
-use larmorx_core::math;
+use larmorx_core::UpstreamDefects;
+use larmorx_core::math::{self, Libm};
+use larmorx_optim::Scipy;
 use rayon::prelude::*;
 
 use crate::fit::Maps;
 use crate::input::Data;
+use crate::options::Libraries;
 
 /// SciPy's default tolerances (§7.3).
 pub const FTOL: f64 = 1e-8;
@@ -852,9 +865,69 @@ pub struct Curve {
     pub warn: Vec<bool>,
 }
 
+/// TED-46's exact solution of the curve fit (§7.3): samples all equal to x (finite) give S0 = x,
+/// T2* = +∞ and a residual of 0, so the covariance is 0 (m > 2), or +∞ with SciPy's warning.
+pub fn equal_samples(s: &Samples) -> Option<Fit> {
+    if !(s.finite && s.tu > 0 && s.ymin == s.ymax) {
+        return None;
+    }
+    let m = s.m();
+    Some(Fit {
+        s0: s.ymin,
+        t2s: f64::INFINITY,
+        pcov: if m > 2 { [0.0; 3] } else { [f64::INFINITY; 3] },
+        warn: m <= 2,
+        nfev: 0,
+        status: 0,
+    })
+}
+
+/// TED-46's fits in `reproduce` (§7.3): SciPy's `curve_fit` itself (its exact port) on the
+/// voxel's samples `ydata` at the echo times `xdata` (echo by echo), from tedana's start, with
+/// tedana's model S0 · exp(−TE / T2*) (glibc's exponential, §13.3).
+fn scipy_fit(
+    xdata: &[f64],
+    ydata: &[f64],
+    start: [f64; 2],
+    scipy: Scipy,
+    libm: &Libm,
+) -> Result<Fit, Failure> {
+    let mut model = |xd: &[f64], p: &[f64; 2], out: &mut [f64]| {
+        for (o, &te) in out.iter_mut().zip(xd) {
+            *o = p[0] * math::exp_glibc(-te / p[1]);
+        }
+    };
+    let lb = [ydata.iter().copied().fold(f64::INFINITY, f64::min), 0.0];
+    let f = larmorx_optim::curve_fit2(
+        &mut model,
+        xdata,
+        ydata,
+        start,
+        lb,
+        [f64::INFINITY; 2],
+        scipy,
+        libm,
+    )
+    .map_err(|e| match e {
+        larmorx_optim::CurveFitError::NotFinite => Failure::NotFinite,
+        larmorx_optim::CurveFitError::NotFound => Failure::MaxNfev,
+        _ => Failure::Start,
+    })?;
+    Ok(Fit {
+        s0: f.popt[0],
+        t2s: f.popt[1],
+        pcov: [f.pcov[0][0], f.pcov[1][1], f.pcov[0][1]],
+        warn: f.warn_cov,
+        nfev: f.nfev,
+        status: f.status,
+    })
+}
+
 /// The curve fit of every fit voxel (§7.3; every volume's own in `ts`, §7.4) from the
 /// log-linear `maps`, which receive the fitted S0 and T2* (their `s0_other` NaN: no longer a
-/// log-linear value). Voxels are independent: fitted in parallel, in fixed chunks.
+/// log-linear value). Voxels are independent: fitted in parallel, in fixed chunks. By default
+/// TED-46's fits of equal samples take the exact solution ([`equal_samples`]); in `reproduce`
+/// TED-46's fits are SciPy's ([`scipy_fit`], `libraries` naming its release).
 pub fn run(
     data: &Data,
     count: &[u8],
@@ -862,6 +935,7 @@ pub fn run(
     volumes: Option<&[usize]>,
     maps: &mut Maps,
     reproduce: bool,
+    libraries: Libraries,
 ) -> Curve {
     let cols = maps.cols;
     // `ts` fits each volume alone (its columns are the volumes; with one volume both modes read
@@ -874,6 +948,11 @@ pub fn run(
         warn: vec![false; n_vox * cols],
     };
     let exp = model_exp(reproduce);
+    let scipy = match libraries {
+        Libraries::Newest => Scipy::V1_18_1,
+        Libraries::Shared => Scipy::V1_15_3,
+    };
+    let libm = Libm::quiet(UpstreamDefects::Reproduce);
     (
         maps.t2s.par_chunks_mut(cols.max(1)),
         maps.s0.par_chunks_mut(cols.max(1)),
@@ -881,13 +960,14 @@ pub fn run(
         curve.failed.par_chunks_mut(cols.max(1)),
         curve.pcov.par_chunks_mut(cols.max(1)),
         curve.warn.par_chunks_mut(cols.max(1)),
+        maps.flat.par_chunks(cols.max(1)),
     )
         .into_par_iter()
         .enumerate()
         .with_min_len(64)
         .for_each_init(
             || (Samples::default(), Work::default()),
-            |(samples, work), (v, (t2s, s0, s0_other, failed, pcov, warn))| {
+            |(samples, work), (v, (t2s, s0, s0_other, failed, pcov, warn, flat))| {
                 if count[v] == 0 {
                     return;
                 }
@@ -904,7 +984,36 @@ pub fn run(
                             }),
                         }
                     }
-                    match fit(samples, [s0[t], t2s[t]], exp, work) {
+                    let start = [s0[t], t2s[t]];
+                    let result = if !flat[t] {
+                        fit(samples, start, exp, work)
+                    } else if reproduce {
+                        // the samples as tedana hands them to SciPy, echo by echo
+                        let mut xdata = Vec::with_capacity(samples.m());
+                        let mut ydata = Vec::with_capacity(samples.m());
+                        for (e, &te) in tes.iter().enumerate().take(n) {
+                            let s = data.series(v, e);
+                            let mut push = |x: f32| {
+                                xdata.push(te);
+                                ydata.push(f64::from(x));
+                            };
+                            if ts {
+                                push(s[t]);
+                            } else {
+                                match volumes {
+                                    None => s.iter().copied().for_each(&mut push),
+                                    Some(vols) => vols.iter().for_each(|&tt| push(s[tt])),
+                                }
+                            }
+                        }
+                        scipy_fit(&xdata, &ydata, start, scipy, &libm)
+                    } else {
+                        match equal_samples(samples) {
+                            Some(f) => Ok(f),
+                            None => fit(samples, start, exp, work),
+                        }
+                    };
+                    match result {
                         Ok(f) => {
                             s0[t] = f.s0;
                             t2s[t] = f.t2s;

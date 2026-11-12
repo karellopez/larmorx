@@ -374,14 +374,19 @@ fn run(
     outputs.image("adaptive mask img", &spec, &counts32, 1, false)?;
     // 15. the fit
     log.info("t2smap:t2smap_workflow:458", "Computing T2* map");
-    if data.n_echo != tes.len() {
+    let ts = o.fitmode == FitMode::Ts;
+    // `--fitmode ts` checks the echo times in each volume's fit, so with no volume (every one a
+    // dummy scan: TED-13 in `reproduce`) neither that check nor TED-31's is reached (§3 step 15,
+    // observed)
+    let no_volume_fit = ts && n_t == 0;
+    if data.n_echo != tes.len() && !no_volume_fit {
         return Err(PyError::value(format!(
             "Second dimension of data ({}) does not match number of echoes provided (tes; {})",
             data.n_echo,
             tes.len()
         )));
     }
-    if n_fit == 0 {
+    if n_fit == 0 && !no_volume_fit {
         // every voxel removed by the adaptive mask (an empty mask failed at its image, §6.6)
         notices.add(
             &defects::TED_31,
@@ -412,8 +417,17 @@ fn run(
             ));
         }
     }
-    let ts = o.fitmode == FitMode::Ts;
-    let mut maps = fit::loglin(&data, &count, &tes, used.volumes, ts, log, notices)?;
+    let mut maps = fit::loglin(
+        &data,
+        &count,
+        &tes,
+        used.volumes,
+        ts,
+        ImageSpec::lapack_for(o.libraries),
+        n_threads,
+        log,
+        notices,
+    )?;
     let cols = maps.cols;
     if o.fittype == FitType::Curvefit {
         // a voxel with no sample (every volume excluded or a dummy scan: TED-16, TED-13 in
@@ -431,6 +445,7 @@ fn run(
             used.volumes,
             &mut maps,
             notices.reproduce(),
+            o.libraries,
         );
         curve_messages(&curve, &count, cols, log);
         // 16. the failures; with --verbose the variances

@@ -497,7 +497,9 @@ fn open_mgh(path: &Path, given: &str) -> Result<Head, PyError> {
     };
     // MdcD = Mdc.T · delta (float32); the centre (MdcD · dims) / 2 in float64 (each product of
     // a float32 and an integer is exact in float64, so numpy's order of the sum does not show
-    // for grids of realistic size); the translation Pxyz_c − centre
+    // for grids of realistic size); the translation Pxyz_c − centre, computed in float64 and
+    // stored in nibabel's `from_matvec` array, which has MdcD's type: rounded to float32 (the
+    // image's affine is then that float32 matrix widened)
     let mdcd: [[f32; 3]; 3] =
         std::array::from_fn(|i| std::array::from_fn(|j| mdc[j][i] * delta[j]));
     let mut rows = *Affine::IDENTITY.rows();
@@ -509,7 +511,7 @@ fn open_mgh(path: &Path, given: &str) -> Result<Head, PyError> {
         for j in 0..3 {
             rows[i][j] = f64::from(mdcd[i][j]);
         }
-        rows[i][3] = f64::from(c[i]) - centre;
+        rows[i][3] = f64::from((f64::from(c[i]) - centre) as f32);
     }
     let n: usize = dims.iter().map(|&d| d as usize).product();
     let footer = 284 + n * stored.size();
@@ -1215,7 +1217,11 @@ mod tests {
                 + f64::from(mdcd[i][2]) * 2.0)
                 / 2.0;
             let c = [1.25f32, -2.5, 7.0][i];
-            assert_eq!(rows[i][3], f64::from(c) - centre);
+            // nibabel's from_matvec array is MdcD's float32: the translation rounded to it
+            assert_eq!(rows[i][3], f64::from((f64::from(c) - centre) as f32));
+            if i == 0 {
+                assert_ne!(rows[i][3], f64::from(c) - centre);
+            }
             for j in 0..3 {
                 assert_eq!(rows[i][j], f64::from(mdcd[i][j]));
             }

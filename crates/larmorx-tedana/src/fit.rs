@@ -9,10 +9,18 @@
 //! writes the same float32 maps within §17.3's two units in the last place). The rank rule is
 //! lstsq's: singular values below eps · max(m, 2) · s_max are dropped (equal echo times: the
 //! minimum-norm solution of the rank-1 problem).
+//!
+//! TED-46 (§7.2's observations without a slope): a fit whose observations are all equal (and
+//! not all 0) in a design of rank 2 has the exact solution (y, 0), which the default takes;
+//! tedana's batch leaves rounding noise there, whose sign the voxel's place in the batch decides,
+//! so `reproduce` solves that group's whole batch with the main package's exact port of numpy's
+//! `lstsq` (`larmorx_transform::numpy_linalg::lstsq`, §13.4, §13.9) and takes its solution at
+//! those fits only (every other fit keeps the closed form, within §17.3).
 
 use larmorx_core::defects::{self, Notices};
 use larmorx_core::math;
 use larmorx_core::numpy::NpFloat;
+use larmorx_transform::numpy_linalg::{LapackRelease, lstsq};
 use rayon::prelude::*;
 
 use crate::input::Data;
@@ -121,6 +129,9 @@ pub struct Maps {
     /// exp(β0) with the other function (glibc's in the default, the correctly rounded one in
     /// `reproduce`); NaN where the S0 is not a log-linear one.
     pub s0_other: Vec<f64>,
+    /// The fits of TED-46 (§7.2): observations all equal, finite and not 0, in a design of rank
+    /// 2 (the curve fit's default takes their exact solution too, §7.3).
+    pub flat: Vec<bool>,
 }
 
 /// The observation's logarithm (§13.3): correctly rounded by default, numpy's own float32
@@ -137,13 +148,17 @@ fn obs(x: f32, reproduce: bool) -> f64 {
 
 /// The log-linear fit of every group (§7.2), `volumes` the used ones (`None`: all), or with
 /// `ts` one fit per volume (§7.4). Every voxel is solved alone, in parallel, straight into the
-/// maps (no per-voxel intermediate array: the memory of §16).
+/// maps (no per-voxel intermediate array: the memory of §16); in `reproduce` the groups that
+/// hold TED-46's fits are also solved as tedana's batch (`release`: numpy's LAPACK, §13.4).
+#[allow(clippy::too_many_arguments)]
 pub fn loglin(
     data: &Data,
     count: &[u8],
     tes: &[f64],
     volumes: Option<&[usize]>,
     ts: bool,
+    release: LapackRelease,
+    n_threads: usize,
     log: &mut Log<'_>,
     notices: &mut Notices,
 ) -> Result<Maps, PyError> {
@@ -155,7 +170,12 @@ pub fn loglin(
         t2s: vec![0.0; n_vox * cols],
         s0: vec![0.0; n_vox * cols],
         s0_other: vec![f64::NAN; n_vox * cols],
+        flat: vec![false; n_vox * cols],
     };
+    if cols == 0 {
+        // `--fitmode ts` with no volume: no fit (and no echo-time check, §3 step 15)
+        return Ok(maps);
+    }
     let tu = if ts {
         1
     } else {
@@ -218,8 +238,10 @@ pub fn loglin(
         };
         notices.add(&defects::TED_09, detail);
     }
-    // the fits whose observations have no slope (TED-46): taken as exactly 0 (no decay)
-    let mut flat = vec![false; n_vox * cols];
+    // the fits whose observations have no slope (TED-46): taken as exactly 0 (no decay) by
+    // default; in `reproduce` replaced below by tedana's batched solution (so their slope's
+    // division is counted there)
+    let mut flat = std::mem::take(&mut maps.flat);
     let divide_by_zero = maps
         .t2s
         .par_chunks_mut(cols.max(1))
@@ -263,23 +285,27 @@ pub fn loglin(
                     };
                 }
                 let y0 = first.unwrap_or(0.0);
-                // equal observations: the least squares' exact solution, (y, 0) (§7.2's
-                // observations without a slope: tedana's batch leaves rounding noise there)
-                let (mut b0, mut b1) = if design.rank2 && tu > 0 && equal {
+                let poisoned = reproduce && poison[n * cols + t];
+                // equal observations, finite and not all 0 (a zero right-hand side gives
+                // tedana's exact 0 too), in a design of rank 2: the least squares' exact
+                // solution, (y, 0) (TED-46: tedana's batch leaves rounding noise there)
+                flat[t] = design.rank2 && tu > 0 && equal && y0.is_finite() && y0 != 0.0;
+                let (mut b0, mut b1) = if flat[t] {
                     (y0, 0.0)
                 } else {
                     design.solve(&s[..n])
                 };
-                if (reproduce && poison[n * cols + t]) || s[..n].iter().any(|x| x.is_infinite()) {
+                if poisoned || s[..n].iter().any(|x| x.is_infinite()) {
                     b0 = f64::NAN;
                     b1 = f64::NAN;
+                    flat[t] = false;
                 }
                 if tu > 0 && b1 == 0.0 {
                     b1 = 0.0; // a closed form's −0 is the same slope
-                    // observations all 0 give tedana's exact 0 too (a zero right-hand side)
-                    flat[t] = !(equal && y0 == 0.0);
                 }
-                zero |= b1 == 0.0;
+                // in `reproduce` TED-46's fits take tedana's batch below
+                let later = reproduce && flat[t];
+                zero |= b1 == 0.0 && !later;
                 t2s[t] = 1.0f64.div(b1);
                 let (ours, other) = if reproduce {
                     (math::exp_glibc(b0), math::exp(b0))
@@ -288,13 +314,21 @@ pub fn loglin(
                 };
                 s0[t] = ours;
                 s0_other[t] = other;
-                overflow |= b0.is_finite() && ours.is_infinite();
+                overflow |= b0.is_finite() && ours.is_infinite() && !later;
             }
             (zero, overflow)
         })
         .reduce(|| (false, false), |a, b| (a.0 || b.0, a.1 || b.1));
     no_slope_notice(&flat, &groups, cols, reproduce, notices);
-    let (divide_by_zero, overflow) = divide_by_zero;
+    let (mut divide_by_zero, mut overflow) = divide_by_zero;
+    if reproduce && flat.iter().any(|&f| f) {
+        let (zero, over) = batch_noise(
+            data, count, tes, volumes, ts, &groups, &flat, &mut maps, release, n_threads,
+        )?;
+        divide_by_zero |= zero;
+        overflow |= over;
+    }
+    maps.flat = flat;
     if divide_by_zero {
         log.py_warning(
             "fit.rs:200",
@@ -311,6 +345,87 @@ pub fn loglin(
         );
     }
     Ok(maps)
+}
+
+/// TED-46 in `reproduce` (§7.2, §13.4): every group (and volume in `ts`) that holds such fits is
+/// solved as tedana solves it, numpy's `lstsq` of the m × 2 design (rows (1, −TE_e), echo by
+/// echo, the used volumes in order) with one right-hand side per voxel of the group in voxel
+/// order (float32 observations widened), through the exact port, whose solution then replaces
+/// the closed form's at those fits only: their slope is tedana's rounding noise (the noise of a
+/// column depends on its place in the batch, so the whole batch is solved). Returns whether a
+/// slope is 0 (numpy's division warning) and whether an S0 overflows.
+#[allow(clippy::too_many_arguments)]
+fn batch_noise(
+    data: &Data,
+    count: &[u8],
+    tes: &[f64],
+    volumes: Option<&[usize]>,
+    ts: bool,
+    groups: &[(usize, Vec<usize>)],
+    flat: &[bool],
+    maps: &mut Maps,
+    release: LapackRelease,
+    n_threads: usize,
+) -> Result<(bool, bool), PyError> {
+    let cols = maps.cols;
+    let used: Vec<usize> = if ts {
+        Vec::new()
+    } else {
+        volumes.map_or_else(|| (0..data.n_t).collect(), <[usize]>::to_vec)
+    };
+    let (mut zero, mut overflow) = (false, false);
+    for t in 0..cols {
+        for (n, members) in groups {
+            let n = *n;
+            if !members.iter().any(|&v| flat[v * cols + t]) {
+                continue;
+            }
+            debug_assert!(members.iter().all(|&v| usize::from(count[v]).max(2) == n));
+            let rows: Vec<usize> = if ts { vec![t] } else { used.clone() };
+            let tu = rows.len();
+            let m = n * tu;
+            let mut a = Vec::with_capacity(2 * m);
+            for &te in &tes[..n] {
+                for _ in 0..tu {
+                    a.extend([1.0, -te]);
+                }
+            }
+            let nrhs = members.len();
+            let mut b = vec![0.0f64; m * nrhs];
+            b.par_chunks_mut(m.max(1))
+                .zip(members.par_iter())
+                .with_min_len(64)
+                .for_each(|(col, &v)| {
+                    for e in 0..n {
+                        let series = data.series(v, e);
+                        for (k, &tt) in rows.iter().enumerate() {
+                            col[e * tu + k] = obs(series[tt], true);
+                        }
+                    }
+                });
+            let sol = lstsq(&a, m, 2, &mut b, nrhs, None, release, n_threads).map_err(|_| {
+                PyError::new(
+                    "numpy.linalg.LinAlgError",
+                    "SVD did not converge in Linear Least Squares",
+                )
+            })?;
+            drop(b);
+            for (j, &v) in members.iter().enumerate() {
+                let i = v * cols + t;
+                if !flat[i] {
+                    continue;
+                }
+                let (b0, b1) = (sol.x[j], sol.x[nrhs + j]);
+                zero |= b1 == 0.0;
+                maps.t2s[i] = 1.0f64.div(b1);
+                let ours = math::exp_glibc(b0);
+                maps.s0[i] = ours;
+                maps.s0_other[i] = math::exp(b0);
+                overflow |= b0.is_finite() && ours.is_infinite();
+            }
+        }
+    }
+    Ok((zero, overflow))
 }
 
 /// TED-46's notice (§15): the fits whose log-linear observations have no slope, counted at the
@@ -334,8 +449,7 @@ fn no_slope_notice(
     let detail = if reproduce {
         format!(
             "{k} voxel(s) whose log-linear observations have no slope: tedana's {n}-echo least \
-             squares leaves rounding noise there (T2* 1 ms, or 1e16 ms and more), which this \
-             build does not compute yet; it writes the slope 0 (no decay, T2* 500 ms)"
+             squares leaves rounding noise there (T2* 1 ms, or 1e16 ms and more)"
         )
     } else {
         format!(

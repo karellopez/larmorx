@@ -14,7 +14,7 @@ A case (§17.2, §17.4): two to six echoes (seconds or milliseconds), 1 to 12 vo
 voxels in-plane and 1 to 8 slices, voxels of 2 to 4 mm, plumb or oblique (a rational rotation);
 float32, float64, int16 (scaled or not), uint16 or uint8, little- or big-endian; one file per echo
 (``.nii.gz``, ``.nii``, NIfTI-1 pairs, NIfTI-2) or z-concatenated, now and then ANALYZE 7.5 or
-MGH (the replica refuses those: its documented gap, as in the suite); a head phantom's S0 and
+MGH; a head phantom's S0 and
 per-voxel T2* (the decay a product of per-millisecond factors), temporal noise or none, dropout
 and rising voxels, special samples (NaN, ±inf, 0, −0, negative); a mask (ones, the head, a box, a
 4D mask of one volume, an empty one, another grid) or none; every option of §2.2 (the mask
@@ -23,11 +23,12 @@ not), ``--n-independent-echos``, both conventions, a prefix, ``--verbose``, ``--
 ``--quiet``). Inputs are written under ``TMPDIR`` (no random tedana run is stored in the
 oracle-output cache).
 
-Known differences (the suite's ``explain``, each with its reason) are taken as expected: in (B)
-the replica's default's black-box gaps (one of two chained tracebacks, numpy's ``RuntimeWarning``
-lines it does not print, the thresholds' zero-padded digits, ANALYZE and MGH refused) and the
-corrections it does not take yet (TED-31, TED-46); in (A) TED-46's equal observations, where
-``reproduce`` writes the exact zero slope until the exact port of numpy's lstsq serves it.
+Known differences (the suite's ``explain``, each with its reason) are taken as expected. Until
+relay C4 (2026-11-12) they were the replica's (larmorx-gpl 0.1.0rc1's) black-box gaps (one of two
+chained tracebacks, numpy's ``RuntimeWarning`` lines, the thresholds' zero-padded digits, ANALYZE
+and MGH refused), the corrections it did not take (TED-31, TED-46) and, in (A), TED-46's equal
+observations; the replica of this branch (``LARMORX_GPL_BIN``) has them all and ``reproduce``
+computes tedana's rounding noise there, so none is left.
 """
 
 from __future__ import annotations
@@ -402,21 +403,13 @@ def _run(case, checks) -> None:
             checks("(B) the replica", True, detail="larmorx-gpl not found: (B) not run")
         else:
             res_p = so.run_replica(args, dirs["replica"], env)
-            if "UnsupportedFormat" in res_p[2]:
-                checks(
-                    "(B) the replica refuses ANALYZE and MGH (its documented gap)", res_p[0] == 1
-                )
-                so.default_reads(checks, res_d, res_r)
-            else:
-                b = CheckList()
-                so.compare_runs(
-                    b, "(B)", res_p, res_d, dirs["replica"], dirs["default"], inputs,
-                    file_by_file=False, with_notices=True,
-                )  # fmt: skip
-                reason_b = so.explain(
-                    "(B)", b, res_p, res_d, dirs["replica"], dirs["default"], inputs
-                )
-                met.append(so._settle(checks, b, reason_b))
+            b = CheckList()
+            so.compare_runs(
+                b, "(B)", res_p, res_d, dirs["replica"], dirs["default"], inputs,
+                file_by_file=False, with_notices=True,
+            )  # fmt: skip
+            reason_b = so.explain("(B)", b, res_p, res_d, dirs["replica"], dirs["default"], inputs)
+            met.append(so._settle(checks, b, reason_b))
         reasons = [r for r in met if r]
         if reasons and all(c.passed for c in checks.checks):
             raise Outcome(EXPECTED, "; ".join(reasons))

@@ -741,8 +741,9 @@ fn no_voxel_left_for_the_fit_is_ted31() {
 }
 
 /// TED-46 (§7.2's observations without a slope): a voxel whose samples are all equal takes the
-/// slope 0 (T2* 500 ms) with the notice; the RMSE map's voxels without a value are numpy's `nan`
-/// (0x7FC00000, §9); a voxel with observations all 0 is not TED-46's (tedana's slope is 0 too).
+/// slope 0 (T2* 500 ms) with the notice by default, and tedana's rounding noise in `reproduce`
+/// (numpy's lstsq of the group's batch: T2* 1 ms or 1e16 ms and more, no divide warning); the
+/// RMSE map's voxels without a value are numpy's `nan` (0x7FC00000, §9).
 #[test]
 fn equal_observations_take_the_slope_zero() {
     let dir = tempfile::tempdir().unwrap();
@@ -777,11 +778,19 @@ fn equal_observations_take_the_slope_zero() {
             )),
             "{err}"
         );
-        assert!(err.contains("RuntimeWarning: divide by zero encountered in divide"));
+        assert!(!err.contains("does not compute yet"), "{err}");
+        // tedana's noise is never an exact 0: no division by zero in `reproduce`
+        assert_eq!(
+            err.contains("RuntimeWarning: divide by zero encountered in divide"),
+            mode == "fix",
+            "{err}"
+        );
         let out = dir.path().join(mode);
         let t2s = read_f32(&out.join("T2starmap.nii.gz"));
         if mode == "reproduce" {
-            assert_eq!(t2s[at(2, 3, 1, 0)], 0.5);
+            // the noise's T2* (seconds): 1 ms where it is negative, 1e16 ms and more otherwise
+            let x = t2s[at(2, 3, 1, 0)];
+            assert!(x == 0.001 || x > 1e12, "{x}");
         } else {
             // 500 ms lies above ten caps: TED-05 caps the full map too
             let limited = read_f32(&out.join("desc-limited_T2starmap.nii.gz"));
@@ -859,6 +868,220 @@ fn ted15_counts_the_first_fit_group() {
         err.contains(
             "upstream defect TED-15 (tedana) corrected: 2 voxel(s) whose good echoes do not vary \
              over time"
+        ),
+        "{err}"
+    );
+}
+
+/// TED-46 in the curve fit (§7.3's last paragraph, spec writer 4): by default a voxel of equal
+/// samples takes the exact solution S0 = x, T2* +∞ (500 ms), not a failure, variances 0 (more
+/// than two samples) or +∞ with SciPy's warning (two); `reproduce` fits from tedana's noise.
+#[test]
+fn equal_samples_take_the_curve_fits_exact_solution() {
+    let dir = tempfile::tempdir().unwrap();
+    write_inputs(dir.path());
+    let at = |x: usize, y: usize, z: usize, t: usize| x + NX * (y + NY * (z + NZ * t));
+    for e in 1..=3 {
+        let p = dir.path().join(format!("e{e}.nii.gz"));
+        let mut v = read_f32(&p);
+        for t in 0..NT {
+            v[at(2, 3, 1, t)] = 255.0;
+        }
+        write_f32(dir.path(), &format!("e{e}.nii.gz"), &[NX, NY, NZ, NT], v);
+    }
+    let k = at(2, 3, 1, 0);
+    let warns = |err: &str| err.contains("OptimizeWarning: Covariance of the parameters");
+    for (mode, extra) in [
+        (
+            "all",
+            &["--fittype", "curvefit", "--verbose", "--masktype", "none"][..],
+        ),
+        (
+            "ts",
+            &[
+                "--fittype",
+                "curvefit",
+                "--fitmode",
+                "ts",
+                "--verbose",
+                "--masktype",
+                "none",
+            ][..],
+        ),
+    ] {
+        let out = format!("cf46-{mode}");
+        let mut args = base(extra);
+        args.extend(["--out-dir", &out]);
+        let (code, _, err) = run(dir.path(), &args, &[]);
+        assert_eq!(code, 0, "{err}");
+        assert!(
+            err.contains("upstream defect TED-46 (tedana) corrected"),
+            "{err}"
+        );
+        assert!(!warns(&err), "{err}");
+        let o = dir.path().join(&out);
+        let s0 = read_f32(&o.join("S0map.nii.gz"));
+        let t2s = read_f32(&o.join("T2starmap.nii.gz"));
+        let failures = nifti::read(
+            o.join("desc-decayFitFailures_mask.nii.gz"),
+            &Default::default(),
+        )
+        .unwrap();
+        let larmorx_core::array::DynArray::U8(failures) = failures.data else {
+            panic!("uint8")
+        };
+        let var = read_f32(&o.join("stat-variance_desc-s0_statmap.nii.gz"));
+        let cols = if mode == "ts" { NT } else { 1 };
+        let n3 = NX * NY * NZ;
+        for t in 0..cols {
+            let i = k + n3 * t;
+            assert_eq!(s0[i], 255.0, "{mode} {t}");
+            assert_eq!(
+                failures.as_slice_memory_order().unwrap()[i],
+                0,
+                "{mode} {t}"
+            );
+            assert_eq!(var[i], 0.0, "{mode} {t}");
+        }
+        // 500 ms lies above ten caps: TED-05 caps the full map too (the limited map's value)
+        let limited = read_f32(&o.join("desc-limited_T2starmap.nii.gz"));
+        assert_eq!(t2s[k], limited[k], "{mode}");
+    }
+    // two echoes per volume (ts with two echoes: m = 2): the covariance +∞ with SciPy's warning
+    let args = [
+        "-d",
+        "e1.nii.gz",
+        "e2.nii.gz",
+        "-e",
+        "0.012",
+        "0.028",
+        "--mask",
+        "mask.nii.gz",
+        "--fittype",
+        "curvefit",
+        "--fitmode",
+        "ts",
+        "--verbose",
+        "--masktype",
+        "none",
+        "--out-dir",
+        "cf46-two",
+    ];
+    let (code, _, err) = run(dir.path(), &args, &[]);
+    assert_eq!(code, 0, "{err}");
+    assert!(warns(&err), "{err}");
+    let o = dir.path().join("cf46-two");
+    assert_eq!(read_f32(&o.join("S0map.nii.gz"))[k], 255.0);
+    assert_eq!(
+        read_f32(&o.join("stat-variance_desc-s0_statmap.nii.gz"))[k],
+        f32::INFINITY
+    );
+    // reproduce: the start is tedana's noise, never the exact solution
+    let mut args = base(&["--fittype", "curvefit", "--masktype", "none"]);
+    args.extend(["--out-dir", "cf46-reproduce"]);
+    let (code, _, err) = run(
+        dir.path(),
+        &args,
+        &[("LARMORX_UPSTREAM_DEFECTS", "reproduce")],
+    );
+    assert_eq!(code, 0, "{err}");
+    assert!(
+        err.contains("upstream defect TED-46 (tedana) reproduced"),
+        "{err}"
+    );
+    let s0 = read_f32(&dir.path().join("cf46-reproduce").join("S0map.nii.gz"))[k];
+    assert_ne!(s0, 255.0);
+}
+
+/// TED-01 with no first-echo mean that is a number (every non-zero one NaN): the default's error
+/// with its notice (§15.1, spec writer 3).
+#[test]
+fn ted01_none_left_names_the_defect() {
+    let dir = tempfile::tempdir().unwrap();
+    write_inputs(dir.path());
+    let p = dir.path().join("e1.nii.gz");
+    let v: Vec<f32> = read_f32(&p)
+        .iter()
+        .enumerate()
+        .map(|(i, &x)| if i < NX * NY * NZ { f32::NAN } else { x })
+        .collect();
+    write_f32(dir.path(), "e1.nii.gz", &[NX, NY, NZ, NT], v);
+    let mut args = base(&[]);
+    args.extend(["--out-dir", "ted01"]);
+    let (code, _, err) = run(dir.path(), &args, &[]);
+    assert_eq!(code, 1, "{err}");
+    assert!(
+        err.contains(
+            "ValueError: no voxel of the mask has a non-zero first-echo mean that is a number, so \
+             the dropout thresholds cannot be set (tedana fails with: attempt to get argmax of an \
+             empty sequence)\n"
+        ),
+        "{err}"
+    );
+    assert!(
+        err.contains(
+            "larmorx: upstream defect TED-01 (tedana) corrected: no voxel of the mask has a \
+             first-echo mean that is a number"
+        ),
+        "{err}"
+    );
+}
+
+/// `--fitmode ts` with no volume left (every volume a dummy scan: TED-13 in `reproduce`): the echo
+/// times are checked in each volume's fit, so a count that does not match is not met; tedana
+/// writes the adaptive mask and the S0 map and fails at the confounds table (§3 step 15, §5.1,
+/// spec writer 3).
+#[test]
+fn ts_with_no_volume_checks_no_echo_times() {
+    let dir = tempfile::tempdir().unwrap();
+    write_inputs(dir.path());
+    let args = [
+        "-d",
+        "e1.nii.gz",
+        "e2.nii.gz",
+        "e3.nii.gz",
+        "-e",
+        "0.012",
+        "0.028",
+        "--mask",
+        "mask.nii.gz",
+        "--fitmode",
+        "ts",
+        "--masktype",
+        "none",
+        "--dummy-scans",
+        "5",
+        "--out-dir",
+        "none-left",
+    ];
+    let (code, _, err) = run(
+        dir.path(),
+        &args,
+        &[("LARMORX_UPSTREAM_DEFECTS", "reproduce")],
+    );
+    assert_eq!(code, 1, "{err}");
+    assert!(!err.contains("does not match number of echoes"), "{err}");
+    assert!(
+        err.contains("ValueError: Shape of passed values is (0, 3), indices imply (0, 9)\n"),
+        "{err}"
+    );
+    let o = dir.path().join("none-left");
+    assert!(o.join("desc-adaptiveGoodSignal_mask.nii.gz").exists());
+    assert!(o.join("S0map.nii.gz").exists());
+    // the same run of every fit mode: `all` checks the echo times once
+    let mut all = args.to_vec();
+    all[10] = "all";
+    all[16] = "all-left";
+    let (code, _, err) = run(
+        dir.path(),
+        &all,
+        &[("LARMORX_UPSTREAM_DEFECTS", "reproduce")],
+    );
+    assert_eq!(code, 1, "{err}");
+    assert!(
+        err.contains(
+            "ValueError: Second dimension of data (3) does not match number of echoes provided \
+             (tes; 2)"
         ),
         "{err}"
     );

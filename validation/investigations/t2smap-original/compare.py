@@ -195,6 +195,18 @@ def more_inputs(d: Path) -> None:
     (d / "more.done").write_text("relay 2c\n", encoding="utf-8")
 
 
+def ted46_inputs(d: Path) -> None:
+    """Inputs added by relay C4 (2026-11-12): a block of 18 head voxels whose samples are 255 at
+    every echo and volume (saturated), so their log-linear observations are all equal (TED-46,
+    §7.2: tedana's batch leaves rounding noise there) and so are their samples (§7.3's last
+    paragraph: the curve fit's exact solution)."""
+    for i, e in enumerate(blackbox.series(), 1):
+        s = e.copy()
+        s[9:12, 5:8, 2:4, :] = 255.0
+        blackbox.save(s, d / f"sat-e{i}.nii.gz")
+    (d / "ted46.done").write_text("relay C4\n", encoding="utf-8")
+
+
 def files(names: list[str]) -> list[str]:
     return ["-d", *(f"<I>/{n}" for n in names)]
 
@@ -503,6 +515,31 @@ EXTRA += [
     ("x-mgh-oblique-nomask", [*files([f"mo-e{i}.mgh" for i in (1, 2, 3)]), *TES], 1),
     ("x-mgh-mask-on-nifti", [*E3, *TES, "--mask", "<I>/mn-mask.mgz"], 1),
 ]
+# relay C4 (2026-11-12): TED-46's saturated voxels in both fits and modes (reproduce: tedana's
+# batch noise through the exact lstsq port; the default: the slope 0, and in the curve fit the
+# exact solution with its covariance, +inf with SciPy's warning for two samples), and --fitmode
+# ts with no volume left, whose echo times are never checked (§3 step 15)
+SAT = files([f"sat-e{i}.nii.gz" for i in (1, 2, 3)])
+CURVE = ["--fittype", "curvefit"]
+EXTRA += [
+    ("x-ted46-loglin", [*SAT, *TES, *MASK], 1),
+    ("x-ted46-loglin-ts", [*SAT, *TES, *MASK, "--fitmode", "ts"], 1),
+    ("x-ted46-curvefit", [*SAT, *TES, *MASK, *CURVE, "--verbose", "--debug"], 1),
+    ("x-ted46-curvefit-ts", [*SAT, *TES, *MASK, *CURVE, "--fitmode", "ts", "--verbose"], 1),
+    (
+        "x-ted46-curvefit-ts-2e",
+        [
+            *files(["sat-e1.nii.gz", "sat-e2.nii.gz"]),
+            *("-e", "0.012", "0.028", *MASK, *CURVE, "--fitmode", "ts", "--verbose", "--debug"),
+        ],
+        1,
+    ),
+    (
+        "x-dummy-all-none-ts-te2",
+        [*E3, "-e", "0.012", "0.028", *MASK, *NONE, "--dummy-scans", "6", "--fitmode", "ts"],
+        1,
+    ),
+]
 NO_OUT_DIR = blackbox.NO_OUT_DIR | {"x-help-40"}
 CASE_ENV = {"x-help-40": {"COLUMNS": "40"}}
 
@@ -561,6 +598,8 @@ def main(argv: list[str]) -> int:
         format_inputs(inputs)
     if not (inputs / "more.done").exists():
         more_inputs(inputs)
+    if not (inputs / "ted46.done").exists():
+        ted46_inputs(inputs)
     env = blackbox.environment()
     for kv in a.env:
         k, _, v = kv.partition("=")

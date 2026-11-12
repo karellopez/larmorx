@@ -225,29 +225,34 @@ fn dropout_thresholds(
     let perc = if notices.fix() {
         // TED-01 is a NaN mean's (an infinite one sorts and matches as tedana's does: the
         // replica's default, observed, random testing 2026-11-11)
-        let finite: Vec<f32> = nonzero.iter().copied().filter(|x| !x.is_nan()).collect();
+        let numbers: Vec<f32> = nonzero.iter().copied().filter(|x| !x.is_nan()).collect();
         // an empty mask or first-echo means all 0 are not TED-01's: tedana's IndexError below,
         // in both modes (observed, random testing 2026-11-11)
-        if finite.is_empty() && !nonzero.is_empty() {
+        if numbers.is_empty() && !nonzero.is_empty() {
+            // a correction that changes the message is named (§15.1)
+            notices.add(
+                &defects::TED_01,
+                "no voxel of the mask has a first-echo mean that is a number",
+            );
             return Err(PyError::value(
                 "no voxel of the mask has a non-zero first-echo mean that is a number, so the \
                  dropout thresholds cannot be set (tedana fails with: attempt to get argmax of an \
                  empty sequence)",
             ));
         }
-        if finite.len() != nonzero.len() {
+        if numbers.len() != nonzero.len() {
             let tedana = percentile_higher(&nonzero, libraries);
-            let ours = percentile_higher(&finite, libraries);
+            let ours = percentile_higher(&numbers, libraries);
             if nan_present || tedana.map(f32::to_bits) != ours.map(f32::to_bits) {
                 notices.add(
                     &defects::TED_01,
                     "the dropout thresholds are taken from the voxels whose first-echo mean is \
-                     finite (a NaN mean made tedana fail)",
+                     not NaN (a NaN mean made tedana fail)",
                 );
             }
             ours
         } else {
-            percentile_higher(&finite, libraries)
+            percentile_higher(&numbers, libraries)
         }
     } else {
         if nan_present {

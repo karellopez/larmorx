@@ -9214,3 +9214,30 @@ def _(ctx: Context) -> dict[str, Any]:
 def _(ctx: Context) -> dict[str, Any]:
     """MGH echoes (``.mgz``, float32, oblique, the TR from the footer) and an ``.mgh`` mask."""
     return _t2smap_run(ctx, "out", *_t2smap_mgh(ctx), *T2SMAP_TES)
+
+
+@case("tedana.t2smap.cleanroom.ted46")
+def _(ctx: Context) -> dict[str, Any]:
+    """TED-46 (relay C4, 2026-11-12): a block of 18 head voxels saturated at 255 in every echo
+    and volume. ``reproduce`` solves their group as tedana's batch with the exact port of
+    numpy's ``lstsq`` (their slope tedana's rounding noise); the default's curve fit takes the
+    exact solution there (S0 255, T2* +inf, variances 0), and with two echoes per volume
+    (``--fitmode ts``) their covariance +inf with SciPy's warning."""
+    aff = _t2smap_affine()
+    names = []
+    for e, echo in enumerate(_t2smap_echoes(), 1):
+        sat = echo.copy()
+        sat[4:7, 3:6, 3:5, :] = 255.0
+        data = np.asfortranarray(sat.astype(np.float32))
+        lx.save(lx.Image(data, aff, _t2smap_header(data, aff)), ctx.out(f"s{e}.nii.gz"))
+        names.append(f"s{e}.nii.gz")
+    mask = _t2smap_mask()
+    lx.save(lx.Image(mask, aff, header_for(mask, aff)), ctx.out("mask.nii.gz"))
+    m = ("--mask", "mask.nii.gz")
+    curve = ("--fittype", "curvefit", "--verbose")
+    two = ("-d", *names[:2], "-e", "0.012", "0.028", *m, *curve, "--fitmode", "ts")
+    return {
+        **_t2smap_run(ctx, "noise", "-d", *names, *T2SMAP_TES, *m, mode=REPRODUCE),
+        **_t2smap_run(ctx, "exact", "-d", *names, *T2SMAP_TES, *m, *curve, "--debug"),
+        **_t2smap_run(ctx, "two", *two),
+    }

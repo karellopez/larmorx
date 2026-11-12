@@ -390,8 +390,24 @@ volumes again (`mask2vf`) and takes as grey matter only the voxels whose GM frac
 (`uint8` truncation), dilated by `ball(3)`: WM and CSF voxels partly in grey matter stay in the aCompCor
 masks. No oracle run reaches it (all are `--fs-no-reconall`); the check runs the path on FAST-like maps.
 
-**Validation** (`validation/investigations/confounds/check_masks.py`; see the section's record in
-NOTES until the part's record): VALIDATION_MASKS
+**Validation** (`validation/investigations/confounds/check_masks.py`, in numpy 2.5.4 with SciPy 1.18.1,
+scikit-image 0.26.0 and niworkflows 1.15.4, numpy 2.3.5 with SciPy 1.15.3 and niworkflows 1.15.3, and
+numpy 2.2.6 with SciPy 1.15.2, scikit-image 0.25.2, niworkflows 1.15.2 and nibabel 5.3.2 inside
+fMRIPrep 25.2.6's image; fMRIPrep 25.2.7's functions from its tag in each): `_binary_union` on 31 pairs
+of masks (every NIfTI type, NaN, infinities, `uint64` values about `2**63`, scaled, NIfTI-2, shapes
+numpy broadcasts and others), `acompcor_masks` on 31 sets of maps (both paths, the GM map in four
+storages, FAST-like maps on the segmentation path, PIPE-76's casts, the errors), `aCompCorMasks` on 11,
+`mask2vf`'s arrays bit for bit (32) and files (16), `_get_zooms` on 5 headers, the files byte for byte
+(decompressed) or the errors by type and last line; the defaults against fMRIPrep run on the masks with
+their undefined values clamped (PIPE-74, PIPE-76) and against PIPE-75's `ValueError`; niworkflows'
+morphology and `SignalExtraction` (`docs/api/niworkflows-helpers.md`) on 135 and 106 cases. **fMRIPrep's
+own `union_mask`, `dilated_mask`, `subtract_mask`, `acc_masks` and `signals` nodes of the 36 confounds
+workflows of the oracle runs**: larmorx's files byte for byte (decompressed) with the nodes' (the CSF
+map is the node's input, as there), the default equal to `reproduce` on every node, `get_zooms` of the
+series equal to the nodes' `bold_zooms`, and the originals run again in every environment equal to
+larmorx. Speed (the 36 nodes, one environment): `aCompCorMasks` 15 s in all against fMRIPrep's 62 s,
+`SignalExtraction` 33 s against niworkflows' 54 s (larmorx reads a `float32` series as stored and never
+copies the masked voxels), the mask steps under a second either way.
 
 ## pandas' tables (`larmorx.confounds._tables`)
 

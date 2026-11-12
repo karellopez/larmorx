@@ -286,6 +286,19 @@ both modes: each variable, its derivatives, then their powers in the same order 
 notice says so (never reproduced: nondeterminism). The values do not depend on it; compare such
 files by column name.
 
+## `fsl_motion_params`, `fsl_rms_deviation`, `framewise_displacement`: niworkflows' copies of fMRIPrep's motion interfaces
+
+`larmorx.niworkflows.confounds` (not yet in `lx.niworkflows`' namespace: its golden cases come with
+the confounds' golden relay). niworkflows' `interfaces/confounds.py` carries fMRIPrep's
+`FSLMotionParams`, `FSLRMSDeviation` and `FramewiseDisplacement` (unused by fMRIPrep, which has its
+own): `fsl_motion_params(xfm_file, boldref_file, *, out_dir=".", niworkflows_version="1.15.4",
+numpy_version="2.5.4", upstream_defects="fix", n_threads=1)` is
+`larmorx.confounds.fsl_motion_params` with fMRIPrep 25.2.7's form for niworkflows 1.15.4 and 25.2.6's
+for 1.15.2 and 1.15.3 (niworkflows 1.15.4 made fMRIPrep 25.2.7's change in its copy);
+`fsl_rms_deviation` and `framewise_displacement` are `larmorx.confounds.fsl_rms_deviation` and
+`fmriprep_framewise_displacement` (the same in every release). The options, the arithmetic and the
+defects (PIPE-71, PIPE-72, PIPE-73): `docs/api/confounds.md`, "fMRIPrep's motion parameters".
+
 ## Upstream defects of these steps (D13)
 
 | ID | Defect | larmorx by default (`upstream_defects="reproduce"`: the original) | Functions |

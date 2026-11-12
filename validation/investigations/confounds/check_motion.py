@@ -440,11 +440,21 @@ def itk_section(tier: str, tmp: Path) -> None:
             path = tmp / f"{name.replace(' ', '_').replace(',', '')}-{n}.txt"
             path.write_text(text, encoding="utf-8")
             want, got = nt_matrix(path), lx_matrix(path)
+            if name in ("no banner", "not ITK at all"):
+                # larmorx reads ITK's text files only (nitransforms' LTA, AFNI and FSL readers
+                # are not ported); nitransforms' own outcome on these is counted apart.
+                ok = isinstance(got, str) and "not an ITK text transform file" in got
+                count("itk a file that is not ITK text: refused", ok, f"{name} {n}: {got}")
+                APART[f"itk {name}: nitransforms gives {str(want)[:70]!r}"] += 1
+                continue
             count(f"itk {name}", same(want, got), f"{n}: {str(want)[:120]} | {str(got)[:120]}")
             if name == "double type, repr":
                 with warnings.catch_warnings(record=True) as caught:
                     warnings.simplefilter("always")
-                    fix = lx_matrix(path, "fix")
+                    try:
+                        fix = lm._hmc_matrices(str(path), "fix")[0]
+                    except Exception as e:
+                        fix = last_line(e)
                 entries = {
                     w.message.entry
                     for w in caught
@@ -504,7 +514,9 @@ def fsl_section(tier: str, tmp: Path) -> None:
         aff_nb = img.affine
         got = lm._fsl(ras, aff_nb, shape[0])
         count("fsl from_ras", bits(want) == bits(got), f"{shape} {np.round(aff_nb, 3).tolist()}")
-    img = nb.Nifti1Image(np.zeros((4, 4, 4), dtype=np.float32), np.diag([1.0, 1, 0, 1]))
+    from types import SimpleNamespace
+
+    img = SimpleNamespace(affine=np.diag([1.0, 1, 0, 1]), shape=(4, 4, 4))
     try:
         nt.io.fsl.FSLLinearTransformArray.from_ras(ras, reference=img, moving=img)
         want = "no error"
@@ -723,7 +735,8 @@ def iface_cases(rng: np.random.Generator, tmp: Path, tier: str):
         ("large motion", xfm(40, "i", scale=30.0), reference(tmp, "i", vol.astype(np.float32), obl), set()),
         ("double transforms", xfm(40, "j", "repr", "double"), reference(tmp, "j", vol.astype(np.float32), base), {"PIPE-73"}),
         ("one volume", xfm(1, "k"), reference(tmp, "k", vol.astype(np.float32), base), {"PIPE-71"}),
-        ("constant reference", xfm(40, "l"), reference(tmp, "l", np.full(shape, 7, np.float32), base), {"PIPE-72"}),
+        ("constant reference", xfm(40, "l"), reference(tmp, "l", np.full(shape, 7, np.float32), base), {"PIPE-72 25.2.7"}),
+        ("a sum of zero", xfm(40, "p"), reference(tmp, "p", np.where(np.arange(vol.size).reshape(shape) % 2, 1.0, -1.0).astype(np.float32), base), {"PIPE-72 25.2.6"}),
         ("a NaN voxel", xfm(40, "m"), reference(tmp, "m", np.where(vol > 990, np.nan, vol).astype(np.float32), base), {"PIPE-72"}),
         ("4-D reference", xfm(40, "n"), reference(tmp, "n", vol[..., None].astype(np.float32), base), set()),
         ("2-D reference", xfm(40, "o"), reference(tmp, "o", vol[:, :, 0].astype(np.float32), base), set()),
@@ -749,19 +762,29 @@ def iface_cases(rng: np.random.Generator, tmp: Path, tier: str):
 
 
 def iface_section(tier: str, tmp: Path) -> None:
+    import niworkflows
     from niworkflows.interfaces import confounds as nwc
+
+    from larmorx.niworkflows import confounds as lnc
 
     rng = np.random.default_rng(3)
     mods = {v: fmriprep_module(v) for v in ("25.2.6", "25.2.7")}
     nw_release = "25.2.7" if "data.min()" in Path(nwc.__file__).read_text() else "25.2.6"
-    for name, xfm, ref, expect in iface_cases(rng, tmp, tier):
+    for name, xfm, ref, expected in iface_cases(rng, tmp, tier):
+        every = {e for e in expected if " " not in e}
         for release, mod in mods.items():
             key = f"{name} {release}"
+            expect = every | {e.split()[0] for e in expected if e.endswith(release)}
             d = tmp / "runs" / key.replace(" ", "_")
             want = run_orig(mod.FSLMotionParams, d / "orig", xfm_file=xfm, boldref_file=ref)
             if release == nw_release:
                 nwant = run_orig(nwc.FSLMotionParams, d / "nw", xfm_file=xfm, boldref_file=ref)
                 count("iface niworkflows FSLMotionParams = fMRIPrep's", nwant == want, key)
+                nlx, _ = run_lx(
+                    lnc.fsl_motion_params, d / "nwlx", xfm, ref,
+                    niworkflows_version=niworkflows.__version__, numpy_version=NUMPY,
+                    upstream_defects="reproduce",
+                )  # fmt: skip
             got, entries = run_lx(
                 lx.confounds.fsl_motion_params, d / "lx", xfm, ref,
                 fmriprep_version=release, numpy_version=NUMPY, upstream_defects="reproduce",
@@ -770,6 +793,8 @@ def iface_section(tier: str, tmp: Path) -> None:
             if not isinstance(want, str):
                 model = motion_model(xfm, ref, release)
             compare_motion(f"iface FSLMotionParams: {key}", want, got, model, release)
+            if release == nw_release:
+                count("iface larmorx.niworkflows' copy = lx.confounds'", nlx == got, key)
             fixed, fentries = run_lx(
                 lx.confounds.fsl_motion_params, d / "fix", xfm, ref,
                 fmriprep_version=release, numpy_version=NUMPY,
@@ -865,7 +890,12 @@ def real_section(tier: str, tmp: Path) -> None:
         count("real node rmsd", node == got, tag)
         # Both releases again in this environment.
         for release, mod in mods.items():
+            t0 = time.perf_counter()
             want = run_orig(mod.FSLMotionParams, d / f"o{release}", xfm_file=xfm, boldref_file=ref)
+            SECONDS[f"fMRIPrep {release} FSLMotionParams"] += time.perf_counter() - t0
+            t0 = time.perf_counter()
+            run_orig(mod.FSLRMSDeviation, d / f"r{release}", xfm_file=xfm, boldref_file=ref)
+            SECONDS[f"fMRIPrep {release} FSLRMSDeviation"] += time.perf_counter() - t0
             got, _ = run_lx(
                 lx.confounds.fsl_motion_params, d / f"l{release}", xfm, ref,
                 fmriprep_version=release, numpy_version=NUMPY, upstream_defects="reproduce",

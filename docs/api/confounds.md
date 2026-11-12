@@ -7,8 +7,9 @@ with the arithmetic of the libraries they call (numpy, SciPy, nitime), bit for b
 user, 2026-11-06 and 2026-11-11). The confounds' part fills this page step by step: today nipype's
 DVARS, CompCor, TSNR, NonSteadyStateDetector and FramewiseDisplacement with its `NIPY` source
 (nipy 0.6.1's `to_matrix44` and `aff2euler`): the whole of nipype's `algorithms/confounds.py` but
-the plots; and fMRIPrep's own table steps (`FramewiseDisplacement`, `FilterDropped`,
-`RenameACompCor`, `GatherConfounds`) on pandas' reading and writing of tables, without pandas.
+the plots; fMRIPrep's own table steps (`FramewiseDisplacement`, `FilterDropped`,
+`RenameACompCor`, `GatherConfounds`) on pandas' reading and writing of tables, without pandas; and
+fMRIPrep's motion parameters and root mean square deviation (`FSLMotionParams`, `FSLRMSDeviation`).
 
 **Status: `experimental`** (checked bit for bit against nipype, nitime, SciPy and numpy in the
 three environments, against fMRIPrep's own DVARS and CompCor files and on the oracle runs' raw
@@ -294,6 +295,42 @@ line; the default against the same interfaces run with pandas' correctly rounded
 (`float_precision="round_trip"`) and, for PIPE-63, the rows sorted after each `concat`; section `real`: fMRIPrep's own nodes (`fdisp`, `rename_acompcor`,
 `acc_metadata_filter`, `tcc_metadata_filter`, `concat`) in every oracle run's working directory,
 with their own inputs, byte for byte with `pandas_version="2.2.3"` and `upstream_defects="reproduce"`.
+
+## fMRIPrep's motion parameters: `fsl_motion_params`, `fsl_rms_deviation`
+
+fMRIPrep 25.2.7's and 25.2.6's `FSLMotionParams` and `FSLRMSDeviation` (`interfaces/confounds.py`,
+Apache-2.0, the NiPreps developers; niworkflows 1.15.4 and 1.15.2 carry the same interfaces:
+`larmorx.niworkflows.confounds.fsl_motion_params`, `fsl_rms_deviation`, `framewise_displacement`)
+with nitransforms 25.1.0's reading of the head-motion transforms (`linear.load`: ITK's text files;
+`io/fsl.py`: `FSLLinearTransformArray.from_ras`; MIT), SciPy's `ndimage.center_of_mass` and
+`Rotation.from_matrix`/`as_euler` (SciPy 1.18.1 and 1.15.x: the same arithmetic) and numpy's 3 × 3
+and 4 × 4 products, inverses, determinants and SVDs (OpenBLAS's Haswell kernels, LAPACK 3.12.0 or
+3.12.1 by `numpy_version`), bit for bit, in Rust (`larmorx_confounds::motion`). The tables are
+written as pandas' `to_csv` writes them (`larmorx.confounds._tables`).
+
+| larmorx | fMRIPrep | Notes |
+|---|---|---|
+| `fsl_motion_params(xfm_file, boldref_file, *, out_dir=".", fmriprep_version="25.2.7", numpy_version="2.5.4", upstream_defects="fix", n_threads=1)` → `MotionParamsResult(out_file, params)` | `FSLMotionParams(xfm_file, boldref_file)` → `out_file` | `params`: `n × 6` float64 |
+| `xfm_file` | the same | an ITK text file of affine transforms, one per volume (fMRIPrep's `*_from-orig_to-boldref_mode-image_desc-hmc_xfm.txt`): nitransforms' reading (the banner `#Insight Transform File V1.0`, one `#Transform` block each: the type line is not read, 12 parameters, 3 fixed parameters, numpy's `genfromtxt` in float32), each `to_ras()` (`LPS · c_pos · P · c_neg · LPS`), the last row checked (`ValueError: The last row of a homogeneus matrix should be (0, 0, 0, 1), got [...]`) and inverted (`LinAlgError: Singular matrix`); its errors as nitransforms raises them (a missing line: `IndexError`; another number of parameters: numpy's `ValueError: cannot reshape array ...`; no transform: `ValueError: need at least one array to stack`). Not ported (a refusal, `TransformFileError`): nitransforms' `.mat` and `.h5` readers and the LTA, AFNI and FSL formats it tries after ITK's text (the AFNI and FSL ones fail there without a reference anyway) |
+| `boldref_file` | the same | the reference (any NIfTI type; its header as nibabel reads it): its affine, first axis and voxel sizes for the FSL coordinates, its centre of gravity for the translations; a reference that is not 3-D stops with numpy's `matmul` error, as in fMRIPrep |
+| `fmriprep_version` | the release | `"25.2.7"` (and later): `cog = diag(zooms) @ center_of_mass(get_fdata() - min)` with the first axis reversed when `det(affine) > 0` (FSL's `cog("scaled_mm")`), `trans = M @ cog + b - cog`, `rot = -as_euler(from_matrix(M), "XYZ")`; `"25.2.6"` (and earlier): `cog = diag(zooms) @ center_of_mass(dataobj)` (the stored values in their own type), `trans = b - M.T @ cog + cog`, `rot = as_euler(from_matrix(M.T), "XYZ")`, with `[M b; 0 1]` each volume's FSL matrix (`inv((post @ ras @ pre).T).T`, nitransforms' `_fsl_aff_adapt`) |
+| `numpy_version` | the environment | numpy's sums in `center_of_mass` (pairwise from 2.3, in chunks of 8,192 before; a big-endian image's float sum in chunks in every release) and its LAPACK for SciPy's SVDs (3.12.1 from 2.5, 3.12.0 before) |
+| output | `<boldref stem>_motion.tsv<ext>` | `trans_x`, `trans_y`, `trans_z` (mm), `rot_x`, `rot_y`, `rot_z` (radians); gzipped for a `.nii.gz` reference (`*_desc-hmc_boldref_motion.tsv.nii.gz`); SciPy's `UserWarning` "Gimbal lock detected. ..." when a rotation is in gimbal lock |
+| `fsl_rms_deviation(xfm_file, boldref_file, *, out_dir=".", upstream_defects="fix")` → `RmsDeviationResult(out_file, rmsd)` | `FSLRMSDeviation(xfm_file, boldref_file)` → `out_file` | Jenkinson's root mean square deviation over a sphere of 80 mm about the centre `0.5 · (shape - 1) · zooms`: `sqrt(diag(t @ t.T) + trace(M.T @ M) · 80² / 5)` of `D = F[i] @ inv(F[i - 1]) - I` (`M = D[:3, :3]`, `t = D[:3, 3] + M @ center`), `rmsd`, `n/a` first; only the reference's header is read; the same in every numpy release |
+
+SciPy's `as_euler` calls the C library's `atan2` and `hypot` (glibc's, not correctly rounded on
+about 0.1 % and 0.6 % of uniform pairs); larmorx takes the correctly rounded ones in both modes (the
+orchestrator's D4 of 2026-11-11: glibc's own code is never translated), so an angle can differ from
+fMRIPrep's in its last bits, a documented divergence the validation counts and names (below).
+
+Corrected by default (`upstream_defects="reproduce"` gives fMRIPrep's result; a notice names it in
+both modes):
+
+| ID | fMRIPrep and nitransforms do | larmorx by default |
+|---|---|---|
+| PIPE-71 | nitransforms' `load` gives a file of one transform as one `Affine`, whose 4 × 4 matrix `from_ras` then takes as a series of four (its rows): a one-volume series stops with numpy's `AxisError: axis2: axis 1 is out of bounds for array of dimension 1` | a series of one (motion parameters of one row; `rmsd` one `n/a`) |
+| PIPE-72 | a reference whose centre of gravity is undefined (constant under 25.2.7, whose weights `value - min` are all zero; a sum of zero under 25.2.6; a NaN or infinite voxel) gives NaN or infinite translations in every row (numpy's `RuntimeWarning` only), which `FramewiseDisplacement` turns into `n/a` everywhere | `ValueError` (rule B) |
+| PIPE-73 | every ITK text transform is read in single precision (`genfromtxt(dtype="f4")`), the `*_double_*` ones too, so their parameters are rounded to float32 | the `*_double_*` transforms' values read in double precision |
 
 ## pandas' tables (`larmorx.confounds._tables`)
 

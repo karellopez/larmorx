@@ -13,10 +13,11 @@ git-annex key (``SHA256E-s<size>--<sha256><extension>``). FreeSurfer's remote
 (``https://surfer.nmr.mgh.harvard.edu/pub/dist/freesurfer/repo/annex.git``, a bare repository,
 annex version 8) stores the object at ``annex/objects/<md5(key)[0:3]>/<md5(key)[3:6]>/<key>/<key>``
 (git-annex's lower-case hash directories for bare repositories). The server refuses clients that
-ask quickly (HTTP 429, then refused connections for an hour or more, measured 2026-11-12 after
-about 100 requests in a minute), so the requests go one at a time, ``--spacing`` seconds apart,
-and the run stops at the first refused connection; rows already in the TSV are kept, so a later
-run continues.
+ask quickly (measured 2026-11-12: about 100 requests in a minute brought HTTP 429 and then
+refused connections for about an hour; later, requests 20 seconds apart got 429 again after nine),
+so the requests go one at a time, ``--spacing`` seconds apart (60 by default), a 429 waits
+``--backoff`` seconds (300) before asking again (twice at most), and the run stops at the first
+refused connection; rows already answered are kept, so a later run continues.
 """
 
 from __future__ import annotations
@@ -58,14 +59,23 @@ def head(url: str) -> tuple[str, str]:
     return status, length
 
 
+def write(tsv: Path, rows: dict[str, dict[str, str]]) -> None:
+    with tsv.open("w", encoding="utf-8", newline="") as f:
+        w = csv.DictWriter(f, FIELDS, delimiter="\t", lineterminator="\n")
+        w.writeheader()
+        for r in rows.values():
+            w.writerow({k: r.get(k, "") for k in FIELDS})
+
+
 def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("tag", type=Path)
     ap.add_argument("--paths", nargs="*", default=[])
     ap.add_argument("--toml", type=Path, help="data-files.toml: check every annexed tag_path in it")
     ap.add_argument("--tsv", type=Path, required=True)
-    ap.add_argument("--spacing", type=float, default=20.0)
-    ap.add_argument("--again", action="store_true", help="re-check rows that already answered")
+    ap.add_argument("--spacing", type=float, default=60.0)
+    ap.add_argument("--backoff", type=float, default=300.0, help="seconds to wait after a 429")
+    ap.add_argument("--again", action="store_true", help="re-check rows that already answered 200")
     args = ap.parse_args(argv)
     paths = list(args.paths)
     if args.toml:
@@ -78,10 +88,15 @@ def main(argv: list[str]) -> int:
             rows = {r["path"]: r for r in csv.DictReader(f, delimiter="\t")}
     for p in paths:
         r = rows.get(p)
-        if r and r["http_status"] not in ("", "000", "429") and not args.again:
+        if r and r["http_status"] == "200" and not args.again:
             continue
         key = os.path.basename(os.readlink(args.tag / p))
         status, length = head(object_url(key))
+        for _ in range(2):  # HTTP 429: the server's rate limit; wait it out, then ask again
+            if status != "429":
+                break
+            time.sleep(args.backoff)
+            status, length = head(object_url(key))
         rows[p] = {
             "path": p,
             "key": key,
@@ -90,15 +105,12 @@ def main(argv: list[str]) -> int:
             "content_length": length,
         }
         print(status, length, p, flush=True)
+        write(args.tsv, rows)  # after every answer, so a stopped run keeps what it learnt
         if status == "000":
             print("connection refused: stopping (run again later)", flush=True)
             break
         time.sleep(args.spacing)
-    with args.tsv.open("w", encoding="utf-8", newline="") as f:
-        w = csv.DictWriter(f, FIELDS, delimiter="\t", lineterminator="\n")
-        w.writeheader()
-        for r in rows.values():
-            w.writerow({k: r.get(k, "") for k in FIELDS})
+    write(args.tsv, rows)
     print("ANNEX-CHECK DONE", flush=True)
     return 0
 

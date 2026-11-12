@@ -87,7 +87,7 @@ Their results are in `docs/freesurfer/` (closed too).
       python -P validation/investigations/freesurfer-inventory/data_trace.py report \
           --out <scratch>/trace --json <scratch>/trace/summary.json
 - `annex_check.py`: whether FreeSurfer serves an annexed file on its own (HEAD requests to its
-  git-annex remote, one every 20 seconds: the server refuses clients that ask faster).
+  git-annex remote, one every 60 seconds with a pause after a refusal: the server limits how fast a client may ask).
 
       python -P validation/investigations/freesurfer-inventory/annex_check.py \
           <workspace>/tags/freesurfer-8.2.0 --toml docs/freesurfer/data-files.toml \

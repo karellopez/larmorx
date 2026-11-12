@@ -66,10 +66,10 @@ CODE_SUFFIXES = (
     ".dist-info",
 )
 LINE = re.compile(r"^(\d+)\s+(.*)$")
-EXEC = re.compile(r'^execve\("([^"]*)", \[(.*?)\](?:, 0x[0-9a-f]+)?.*\) = (-?\d+)')
+EXEC = re.compile(r'^execve\("([^"]*)", \[(.*?)\](?:, 0x[0-9a-f]+)?.*\)\s+= (-?\d+)')
 OPEN2 = re.compile(r'^(?:open|openat|openat2|creat)\((?:AT_FDCWD, |\d+, )?"([^"]*)",? ?(.*)$')
-RET = re.compile(r"\) = (-?\d+)(?: (E[A-Z]+))?")
-CLONE = re.compile(r"^(?:clone|clone3|fork|vfork)\(.*\) = (\d+)")
+RET = re.compile(r"\)\s+= (-?\d+)(?: (E[A-Z]+))?")
+CLONE = re.compile(r"^(?:clone|clone3|fork|vfork)\(.*\)\s+= (\d+)")
 RESUMED = re.compile(r"^<\.\.\. (\w+) resumed>(.*)$")
 
 
@@ -172,16 +172,20 @@ def attribute(calls, fs_home: str) -> dict:
             label = None
             if path.startswith(fs_home) and base not in WRAPPERS:
                 label = base
-            else:
+            elif base in WRAPPERS or base.startswith("python"):
+                # an interpreter: named by the FreeSurfer script it runs, if any
                 for a in argv[1:]:
-                    if a.startswith(fs_home + "/") and not a.endswith(CODE_SUFFIXES[:2]):
+                    if a.startswith("-"):
+                        continue
+                    if a.startswith(fs_home + "/") and (
+                        "/bin/" in a or "/scripts/" in a or a.endswith(".py")
+                    ):
                         b = os.path.basename(a)
-                        if b not in WRAPPERS:
-                            label = b
-                            break
-                    elif a.startswith(fs_home + "/") and a.endswith(".py"):
-                        label = os.path.basename(a)[:-3]
-                        break
+                        label = b[:-3] if b.endswith(".py") else b
+                        if label in WRAPPERS:
+                            label = None
+                            continue
+                    break
             if label is None:
                 label = name_of(parent.get(pid, -1)) if pid in parent else name_of(pid)
             own[pid] = label
@@ -209,13 +213,22 @@ def attribute(calls, fs_home: str) -> dict:
 def classify(path: str, fs_home: str, subjects: str, license_file: str) -> tuple[str, str]:
     if path == license_file:
         return "licence", path
-    real = os.path.realpath(path) if os.path.isabs(path) else path
     if not os.path.isabs(path):
         return "relative", path
+    m = re.match(re.escape(subjects) + r"/(fsaverage[0-9a-z_]*)/(.*)$", path)
+    if m:  # recon-all's link SUBJECTS_DIR/fsaverage -> FREESURFER_HOME/subjects/fsaverage
+        path = f"{fs_home}/subjects/{m.group(1)}/{m.group(2)}"
+    real = os.path.realpath(path)
     if real.startswith(fs_home + "/") or path.startswith(fs_home + "/"):
         rel = (real if real.startswith(fs_home + "/") else path)[len(fs_home) + 1 :]
         top = rel.split("/", 1)[0]
-        if top in ("bin", "lib") or "/bin/" in rel or rel.startswith("tktools/"):
+        if (
+            top in ("bin", "lib")
+            or "/bin/" in rel
+            or "/lib/" in rel
+            or "/perl5/" in rel  # MINC's Perl modules
+            or rel.startswith("tktools/")
+        ):
             return "code", rel
         if top == "python":
             if rel.endswith(CODE_SUFFIXES) or any(
@@ -227,6 +240,45 @@ def classify(path: str, fs_home: str, subjects: str, license_file: str) -> tuple
     if path.startswith(subjects + "/"):
         return "subject", path[len(subjects) + 1 :]
     return "system", path
+
+
+def collect(log: Path, fs_home: str, subjects: str, license_file: str):
+    """The files of one job's strace log, by program and class."""
+    result = attribute(parse(log), fs_home)
+    files: dict[str, dict[str, list[str]]] = {}
+    for prog, kinds in result["opens"].items():
+        for kind, paths in kinds.items():
+            for path in paths:
+                cls, rel = classify(path, fs_home, subjects, license_file)
+                if cls in ("system", "relative") or (cls == "code" and kind == "missing"):
+                    continue
+                if cls == "subject" and kind == "read":
+                    cls = "subject-read"
+                key = f"{cls}:{kind}" if cls not in ("subject-read",) else cls
+                files.setdefault(prog, {}).setdefault(key, [])
+                if rel not in files[prog][key]:
+                    files[prog][key].append(rel)
+    return files, result
+
+
+def reparse(args) -> int:
+    """Recompute every job's file lists from its kept strace log (after a change to the rules)."""
+    out = Path(args.out)
+    fs_home = str(Path(args.fs_home).resolve())
+    subjects = str(out / "work" / "subjects")
+    for f in sorted(out.glob("*.json")):
+        log = Path(str(f)[: -len(".json")] + ".strace.gz")
+        if f.name == "summary.json" or not log.exists():
+            continue
+        rec = json.loads(f.read_text(encoding="utf-8"))
+        files, result = collect(log, fs_home, subjects, args.license)
+        rec["programs"] = {
+            p: {k: sorted(v) for k, v in d.items()} for p, d in sorted(files.items())
+        }
+        rec["executed"] = sorted({label for label, _ in result["execs"]})
+        f.write_text(json.dumps(rec, indent=1) + "\n", encoding="utf-8")
+    print("reparsed", flush=True)
+    return 0
 
 
 def run_jobs(args) -> int:
@@ -304,20 +356,7 @@ def run_jobs(args) -> int:
         with log.open("rb") as src, gzip.open(str(log) + ".gz", "wb") as dst:
             shutil.copyfileobj(src, dst)
         log.unlink()
-        result = attribute(parse(Path(str(log) + ".gz")), str(fs_home))
-        files: dict[str, dict[str, list[str]]] = {}
-        for prog, kinds in result["opens"].items():
-            for kind, paths in kinds.items():
-                for path in paths:
-                    cls, rel = classify(path, str(fs_home), str(subjects), args.license)
-                    if cls in ("system", "relative") or (cls == "code" and kind == "missing"):
-                        continue
-                    if cls == "subject" and kind == "read":
-                        cls = "subject-read"
-                    key = f"{cls}:{kind}" if cls not in ("subject-read",) else cls
-                    files.setdefault(prog, {}).setdefault(key, [])
-                    if rel not in files[prog][key]:
-                        files[prog][key].append(rel)
+        files, result = collect(Path(str(log) + ".gz"), str(fs_home), str(subjects), args.license)
         record = {
             "name": job["name"],
             "run": job["run"],
@@ -406,10 +445,16 @@ def main(argv: list[str]) -> int:
     r.add_argument("--max-threads", type=int, default=4, help="cap on the recorded thread counts")
     r.add_argument("--only", nargs="*")
     r.add_argument("--again", action="store_true", help="re-run jobs that already have a result")
+    q = sub.add_parser("reparse")
+    q.add_argument("--out", required=True)
+    q.add_argument("--fs-home", required=True)
+    q.add_argument("--license", required=True)
     p = sub.add_parser("report")
     p.add_argument("--out", required=True)
     p.add_argument("--json")
     args = parser.parse_args(argv)
+    if args.mode == "reparse":
+        return reparse(args)
     return run_jobs(args) if args.mode == "run" else report(args)
 
 

@@ -109,8 +109,28 @@ RULES: list[tuple[str, str, str, str]] = [
         SLA,
         "MGH: priors for the v8 dura and venous-sinus segmentations, in MNI152 1 mm space",
     ),
+    (
+        r"^average/rigidly_aligned_brain_template\.tif$",
+        "template (.tif)",
+        SLA,
+        "MGH: the brain template mri_watershed reads by default (classic stream; opened at start)",
+    ),
+    (
+        r"^mni/etc/mni_autoreg/",
+        "MINC configuration",
+        "MNI's notice (license.minc.txt)",
+        "MNI: mritotal's settings (Collins et al. 1994)",
+    ),
     (r"^average/colortable_.*\.txt$", "colour table", SLA, "MGH (FreeSurfer)"),
     (r"^[A-Za-z]+LUT\.txt$", "colour table", SLA, "MGH (FreeSurfer)"),
+    (
+        r"^models/synthseg_.*\.npy$",
+        "label list (.npy)",
+        SLA,
+        "UCL/MGH: SynthSeg 2.0's label numbers, names and topological classes",
+    ),
+    (r"^models/.*\.ctab$", "colour table", SLA, "MGH: the v8 segmentations' colour tables"),
+    (r"^models/.*\.csv$", "table", SLA, "MGH: sclimbic's volume statistics table"),
     (
         r"^models/synthstrip\..*\.pt$",
         "network weights (PyTorch)",
@@ -118,8 +138,8 @@ RULES: list[tuple[str, str, str, str]] = [
         "MGH: SynthStrip (Hoopes et al. 2022)",
     ),
     (
-        r"^models/synthseg_.*\.(h5|npy)$",
-        "network weights (Keras HDF5) or label list (.npy)",
+        r"^models/synthseg_.*\.h5$",
+        "network weights (Keras HDF5)",
         SLA + "; no separate terms stated with the weights (SynthSeg's code is Apache-2.0)",
         "UCL/MGH: SynthSeg 2.0 (Billot et al. 2023)",
     ),
@@ -130,8 +150,8 @@ RULES: list[tuple[str, str, str, str]] = [
         "MGH: SynthMorph (Hoffmann et al. 2022, 2024)",
     ),
     (
-        r"^models/(sclimbic|entowm|mca-dura|vsinus).*",
-        "network weights (Keras HDF5) or table",
+        r"^models/(sclimbic|entowm|mca-dura|vsinus).*\.h5$",
+        "network weights (Keras HDF5)",
         SLA + "; no separate terms stated with the weights",
         "MGH: the sclimbic network family (Greve et al. 2021), models for v8's entorhinal white "
         "matter, MCA/dura and venous sinus segmentations",
@@ -205,19 +225,46 @@ def tag_regular_files(tag: Path, sizes: set[int]) -> dict[tuple[int, str], str]:
     return found
 
 
-def recorded_reads(runs: Path, fs_home: str) -> dict[str, set[str]]:
-    """Package files named on recorded command lines, by program."""
-    named: dict[str, set[str]] = {}
+def annex_links(tag: Path) -> dict[str, dict[str, str]]:
+    """sha256 -> {path} for every git-annex link in the tag, both key backends: SHA256E
+    (``SHA256E-s<size>--<sha256><ext>``) and the older SHA256 (``SHA256-s<size>--<sha256>``)."""
+    key = re.compile(r"^SHA256E?-s(\d+)--([0-9a-f]{64})")
+    found: dict[str, dict[str, str]] = {}
+    for d, _, files in os.walk(tag):
+        for name in files:
+            p = Path(d) / name
+            if p.is_symlink():
+                m = key.match(os.path.basename(os.readlink(p)))
+                if m:
+                    rel = str(p.relative_to(tag))
+                    prev = found.get(m.group(2))
+                    if prev is None or (
+                        prev["path"].startswith("attic/") and not rel.startswith("attic/")
+                    ):
+                        found[m.group(2)] = {"path": rel, "bytes": m.group(1), "sha256": m.group(2)}
+    return found
+
+
+def recorded_reads(runs: Path, fs_home: str) -> dict[str, tuple[set[str], set[str]]]:
+    """Package files named on recorded command lines: their programs and streams."""
+    named: dict[str, tuple[set[str], set[str]]] = {}
     for f in glob.glob(str(runs / "*" / "record" / "steps" / "*.json")):
         step = json.loads(Path(f).read_text(encoding="utf-8"))
         home = step["env"].get("FREESURFER_HOME", fs_home)
+        subjects = step["env"].get("SUBJECTS_DIR", "")
         prog = os.path.basename(step["argv"][0])
+        stream = "v8" if Path(f).parents[2].name.endswith("-v8") else "classic"
         for arg in step["argv"]:
             for tok in re.split(r"[,=]", arg):
+                m = re.match(re.escape(subjects) + r"/(fsaverage[0-9a-z_]*/.*)$", tok)
+                if subjects and m:  # recon-all's link to the package's fsaverage
+                    tok = f"{home}/subjects/{m.group(1)}"
                 if tok.startswith(home + "/"):
                     rel = tok[len(home) + 1 :].split("#")[0]
                     if os.path.isfile(os.path.join(home, rel)):
-                        named.setdefault(rel, set()).add(prog)
+                        progs, streams = named.setdefault(rel, (set(), set()))
+                        progs.add(prog)
+                        streams.add(stream)
     return named
 
 
@@ -238,8 +285,8 @@ def main(argv: list[str]) -> int:
     args = ap.parse_args(argv)
 
     package = {r["path"]: r for r in load_tsv(args.package_tsv)}
-    annex_by_sha: dict[str, dict[str, str]] = {}
-    for r in load_tsv(args.annex_tsv):
+    annex_by_sha = annex_links(args.tag)
+    for r in load_tsv(args.annex_tsv):  # relay 3's table: the same links, kept as a cross-check
         annex_by_sha.setdefault(r["sha256"], r)
     urls = {r["path"]: r for r in load_tsv(args.annex_urls)}
 
@@ -261,13 +308,27 @@ def main(argv: list[str]) -> int:
                 e["programs"].add(prog)
                 e["jobs"].add(rec["name"])
                 (e["cond"] if cond else e["streams"]).add(stream)
-    for rel, progs in recorded_reads(args.runs, args.fs_home).items():
+    for rel, (progs, streams) in recorded_reads(args.runs, args.fs_home).items():
         e = reads.setdefault(
             rel, {"programs": set(), "streams": set(), "jobs": set(), "cond": set()}
         )
         e["programs"] |= progs
+        e["streams"] |= streams
         e["jobs"].add("recorded command lines")
 
+    # The jobs ran the left hemisphere of each per-hemisphere stage; recon-all runs the right one
+    # the same way (programs.md section 3), so each lh file has its rh twin read by the same programs.
+    for rel in list(reads):
+        twin = re.sub(r"(^|/)lh\.", r"\1rh.", rel)
+        if twin != rel and (Path(args.fs_home) / twin).is_file():
+            e = reads[rel]
+            t = reads.setdefault(
+                twin, {"programs": set(), "streams": set(), "jobs": set(), "cond": set()}
+            )
+            t["programs"] |= e["programs"]
+            t["streams"] |= e["streams"]
+            t["cond"] |= e["cond"]
+            t["jobs"].add("right-hemisphere twin of " + rel)
     missing = sorted(r for r in reads if r not in package)
     for rel in missing:  # outside data_refs.py's folders (etc/, fsafd/, ...): measured here
         p = Path(args.fs_home) / rel
@@ -320,8 +381,10 @@ def main(argv: list[str]) -> int:
             home = "fetched on first use (rule 2: terms unknown)"
         elif size > SMALL:
             home = "fetched on first use (rule 3: large)"
-        elif licence.startswith("MNI"):
+        elif licence.startswith("MNI") and "MGH" in licence:
             home = "fetched, or the main package if MGH's conversion is judged free (rule 1)"
+        elif licence.startswith("MNI"):
+            home = "the main package (rule 1: MNI's notice), or fetched from MNI's own release"
         else:
             home = "larmorx-freesurfer, or fetched (rule 2: FreeSurfer's terms allow it)"
         entries.append(
@@ -367,7 +430,20 @@ def main(argv: list[str]) -> int:
         "Streams | Served on its own | Proposed home |"
     )
     print("|---|---|---:|---|---|---|---|---|")
+    labels = [e for e in entries if e["kind"] == "label (fsaverage)"]
     for e in sorted(entries, key=lambda x: (x["kind"], x["path"])):
+        if e["kind"] == "label (fsaverage)":
+            if e is not min(labels, key=lambda x: x["path"]):
+                continue
+            # one row for fsaverage's labels (the TOML lists each)
+            print(
+                f"| `subjects/fsaverage/label/{{lh,rh}}.*` ({len(labels)} files: 14 `*_exvivo`, "
+                f"14 `*_exvivo.thresh`, 8 `*.mpm.vpnl` per hemisphere) | {e['kind']} | "
+                f"{sum(x['bytes'] for x in labels):,} | (each in the TOML) | "
+                f"{', '.join(e['programs'])} | {', '.join(e['streams'])} | in its tarball, annex "
+                f"{e['url_status'] or '?'} | {e['proposed_home']} |"
+            )
+            continue
         if "tarball" in e["served"]:
             served = "in its tarball, annex " + (e["url_status"] or "?")
         elif "GitHub" in e["served"]:
@@ -383,6 +459,45 @@ def main(argv: list[str]) -> int:
         )
     total = sum(e["bytes"] for e in entries)
     print(f"\n{len(entries)} files, {total:,} bytes; not in the package's file list: {missing}")
+
+    # Per program: its data files (configuration left out), grouped by folder
+    print("\n| Program | Data files it reads (count, bytes) |\n|---|---|")
+    by_prog: dict[str, list[dict]] = {}
+    for e in entries:
+        if e["kind"] == "configuration":
+            continue
+        for prog in e["programs"]:
+            by_prog.setdefault(prog, []).append(e)
+    for prog, es in sorted(by_prog.items()):
+        names = ", ".join(f"`{x['path']}`" for x in sorted(es, key=lambda x: x["path"])[:8])
+        more = f" and {len(es) - 8} more" if len(es) > 8 else ""
+        print(f"| `{prog}` | {len(es)}, {sum(x['bytes'] for x in es):,}: {names}{more} |")
+
+    # Totals by proposed home and by where FreeSurfer serves the file
+    print("\n| Proposed home | Files | Bytes |\n|---|---:|---:|")
+    homes: dict[str, list[int]] = {}
+    for e in entries:
+        h = homes.setdefault(e["proposed_home"], [0, 0])
+        h[0] += 1
+        h[1] += e["bytes"]
+    for home, (n, b) in sorted(homes.items(), key=lambda x: -x[1][1]):
+        print(f"| {home} | {n} | {b:,} |")
+    print("\n| Served on its own | Files | Bytes |\n|---|---:|---:|")
+    served: dict[str, list[int]] = {}
+    for e in entries:
+        if "tarball" in e["served"]:
+            k = "inside an annexed tarball (" + e["tag_path"].rsplit("/", 1)[-1] + ")"
+        elif "GitHub" in e["served"]:
+            k = "GitHub, FreeSurfer's repository at v8.2.0"
+        elif "annex" in e["served"]:
+            k = "git-annex object, remote answered " + (e["url_status"] or "not checked")
+        else:
+            k = "only inside the package"
+        v = served.setdefault(k, [0, 0])
+        v[0] += 1
+        v[1] += e["bytes"]
+    for k, (n, b) in sorted(served.items()):
+        print(f"| {k} | {n} | {b:,} |")
     return 0
 
 

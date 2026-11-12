@@ -449,9 +449,10 @@ timeout = 240
 name = "v8-bare-mri_vsinus_seg"
 run = "ds000005-sub-01-v8"
 step = 17
-argv = ["mri_vsinus_seg", "--s", "sub-01", "--rca-synthseg", "--threads", "4", "--synthmorphdir", "{SD}/mri/transforms/synthmorph.1.0mm.1.0mm"]
+argv = ["mri_vsinus_seg", "--s", "sub-01", "--rca-synthseg", "--threads", "4", "--synthmorphdir", "{SD}/mri/transforms/synthmorph.1.0mm.1.0mm", "--force"]
 cwd = "{SD}/mri"
 timeout = 240
+note = "--force added: without it the script found its outputs up to date in the rebuilt directory and stopped"
 
 [[job]]
 name = "v8-bare-mri_mask-synthstrip"

@@ -243,9 +243,13 @@ def regress_poly(
         return data, np.array([])
     _check_axis(data, axis, upstream_defects, "regress_poly")
     k = len(range(degree))  # nipype's range(degree): a float raises TypeError
+    # nipype's data.reshape((-1, T)) is a view of Fortran-ordered rows when no axes merge: then
+    # data.T is C-ordered and numpy's pinv(X).dot(data.T) sums in another order
+    view = data.reshape((-1, timepoints))
+    fortran = bool(view.flags.f_contiguous and not view.flags.c_contiguous)
     flat = _rows(data, timepoints)
     res, basis, notices = _core.nipype_regress_poly(
-        k, flat, bool(remove_mean), str(numpy_version), upstream_defects, n_threads
+        k, flat, bool(remove_mean), str(numpy_version), upstream_defects, n_threads, fortran
     )
     _defects.warn(notices)
     return res.reshape(datashape), (basis if basis is not None else np.array([]))

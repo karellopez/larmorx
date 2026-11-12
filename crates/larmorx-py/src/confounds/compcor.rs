@@ -161,7 +161,8 @@ fn glibc07(mode: larmorx_core::defects::UpstreamDefects, differed: bool) -> Vec<
 /// `"error"` is the caller's): `(residuals, basis, notices)`, the residuals float64, the basis
 /// nipype's `X[:, :-1]` (PIPE-52, by default `X[:, 1:]`) or `None` (`np.array([])`).
 #[pyfunction]
-#[pyo3(signature = (degree, data, remove_mean = true, numpy = "2.5.4", upstream_defects = "fix", n_threads = 1))]
+#[pyo3(signature = (degree, data, remove_mean = true, numpy = "2.5.4", upstream_defects = "fix", n_threads = 1, fortran = false))]
+#[allow(clippy::too_many_arguments)]
 fn nipype_regress_poly<'py>(
     py: Python<'py>,
     degree: usize,
@@ -170,6 +171,7 @@ fn nipype_regress_poly<'py>(
     numpy: &str,
     upstream_defects: &str,
     n_threads: usize,
+    fortran: bool,
 ) -> PyResult<FilterOut<'py>> {
     let mode = mode_from_py(upstream_defects)?;
     let libs = libraries(numpy, "1.18.1")?;
@@ -180,8 +182,12 @@ fn nipype_regress_poly<'py>(
     let fix = mode.fix();
     let r = py.detach(|| {
         with_threads(n_threads, || match &rows {
-            Rows::F32(v, ..) => compcor::regress_poly(degree, v, n, t, remove_mean, fix, &libs),
-            Rows::F64(v, ..) => compcor::regress_poly(degree, v, n, t, remove_mean, fix, &libs),
+            Rows::F32(v, ..) => {
+                compcor::regress_poly_layout(degree, v, n, t, fortran, remove_mean, fix, &libs)
+            }
+            Rows::F64(v, ..) => {
+                compcor::regress_poly_layout(degree, v, n, t, fortran, remove_mean, fix, &libs)
+            }
         })
     });
     let f = r

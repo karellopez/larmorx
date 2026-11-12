@@ -165,8 +165,75 @@ def _retained(meta: Table, pandas_version: str) -> list[int] | None:
         return None
     if col.kind == "object" and all(isinstance(v, bool) or v != v for v in col.values):
         raise ValueError("Cannot mask with non-boolean array containing NA / NaN values")
-    dtype = "str" if tb.pandas_series(pandas_version) == "3.0" else "object"
-    raise KeyError(f"None of [Index({list(col.values)!r}, dtype='{dtype}')] are in the [columns]")
+    raise KeyError(f"None of [{_index_repr(col, pandas_version)}] are in the [columns]")
+
+
+def _pprint(v: Any) -> str:
+    """pandas' ``default_pprint``: strings quoted with their tabs and line breaks escaped."""
+    if isinstance(v, str):
+        return "'" + v.translate({9: "\\t", 10: "\\n", 13: "\\r"}) + "'"
+    if isinstance(v, float):
+        return repr(v)
+    return str(v)
+
+
+def _index_repr(col: Column, pandas_version: str) -> str:
+    """``repr(pandas.Index(values))`` of a column's values (pandas' ``format_object_summary`` at
+    its default display width of 80 and 100 items, as a script prints it)."""
+    values = list(col.values) if col.kind == "object" else np.asarray(col.values).tolist()
+    if col.kind == "object":
+        # pandas 3's ``str`` dtype holds missing values as NaN; pandas 2.2's object Index of
+        # strings and NaN is "mixed" (justified)
+        newest = tb.pandas_series(pandas_version) == "3.0"
+        texts = all(isinstance(v, str) or (isinstance(v, float) and v != v) for v in values)
+        strings = texts if newest else all(isinstance(v, str) for v in values)
+        dtype = "str" if texts and newest else "object"
+    else:
+        strings = False
+        dtype = col.kind
+    width, max_items, name = 80, 100, "Index"
+    space1, space2 = "\n" + " " * (len(name) + 1), "\n" + " " * (len(name) + 2)
+    n = len(values)
+    truncated = n > max_items
+    if n == 0:
+        summary = "[], "
+    elif n == 1:
+        summary = f"[{_pprint(values[0])}], "
+    elif n == 2:
+        summary = f"[{_pprint(values[0])}, {_pprint(values[-1])}], "
+    else:
+        if truncated:
+            head = [_pprint(v) for v in values[:10]]
+            tail = [_pprint(v) for v in values[-10:]]
+        else:
+            head, tail = [], [_pprint(v) for v in values]
+        if not strings and (
+            truncated or not (len(", ".join(head)) < width and len(", ".join(tail)) < width)
+        ):
+            longest = max(len(x) for x in head + tail)
+            head = [x.rjust(longest) for x in head]
+            tail = [x.rjust(longest) for x in tail]
+
+        def extend(summary: str, line: str, value: str, limit: int) -> tuple[str, str]:
+            if len(line.rstrip()) + len(value.rstrip()) >= limit:
+                summary += line.rstrip()
+                line = space2
+            return summary, line + value
+
+        summary, line = "", space2
+        for v in head:
+            summary, line = extend(summary, line, v + ", ", width)
+        if truncated:
+            summary += line.rstrip() + space2 + "..."
+            line = space2
+        for v in tail[:-1]:
+            summary, line = extend(summary, line, v + ", ", width)
+        summary, line = extend(summary, line, tail[-1], width - 2)
+        summary += line + "],"
+        summary += space1 if len(summary) > width else " "
+        summary = "[" + summary[len(space2) :]
+    attrs = f"dtype='{dtype}'" + (f", length={n}" if truncated else "")
+    return f"{name}({summary}{attrs})"
 
 
 @dataclass(frozen=True)

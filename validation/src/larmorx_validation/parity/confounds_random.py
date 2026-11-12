@@ -162,8 +162,8 @@ def _content(p: Path) -> Any:
             img = nb.load(p)
             data = np.asarray(img.dataobj)
             return ("nifti", img.header.binaryblock, data)
-        except Exception as exc:
-            return ("unreadable", type(exc).__name__)
+        except Exception:  # a table named after a NIfTI reference (FSLMotionParams' .tsv.nii.gz)
+            pass
     data = p.read_bytes()
     if p.name.endswith(".gz"):
         data = gzip.decompress(data)
@@ -1322,15 +1322,18 @@ def _fp_spikes(e, files, tmp, nt):
     f = _write_frame(tmp, "confounds.tsv", _confounds_frame(e["confounds"]), e["confounds"]["format"])
     kw = dict(e["kw"])
     return _Call(
-        lambda: _iface(SpikeRegressors, tmp, ("output_file",), confounds_file=f, **kw),
+        lambda: _iface(SpikeRegressors, tmp, ("confounds_file",), confounds_file=f, **kw),
         lambda mode: _lx(
             lnw.spike_regressors_node,
             tmp,
-            ("output_file",),
+            ("confounds_file",),
             f,
             **kw,
             **_kw(lnw.spike_regressors_node, upstream_defects=mode),
         ),
+        # PD-01's notice is the table's read (its values change); without ``concatenate`` only
+        # the thresholded flags are written, which the read's last bits rarely move
+        silent=() if kw.get("concatenate", True) else ("PD-01",),
     )
 
 
@@ -1658,6 +1661,17 @@ CALLS: dict[str, Callable[[dict, dict, Path, int], _Call]] = {
 }
 
 
+def _errors(v: Any) -> list[_Err]:
+    """The errors a result holds (a call's, or its parts')."""
+    if isinstance(v, _Err):
+        return [v]
+    if isinstance(v, dict):
+        return [e for x in v.values() for e in _errors(x)]
+    if isinstance(v, list | tuple):
+        return [e for x in v for e in _errors(x)]
+    return []
+
+
 def _entries(record) -> list[str]:
     from larmorx_validation.parity import defects
 
@@ -1717,8 +1731,7 @@ def _run_case(case: Case, checks: CheckList) -> None:
             warnings.simplefilter("always")
             fixed = CALLS[call](e, files, tmp, nt).larmorx("fix")
         entries = _entries(w3)
-        if isinstance(fixed, _Err):
-            entries = list(dict.fromkeys([*entries, *_IDS.findall(fixed.text)]))
+        entries = list(dict.fromkeys([*entries, *(i for x in _errors(fixed) for i in _IDS.findall(x.text))]))
         fixed, got = _canon(fixed), _canon(got)
         change = defects.Change(0, 0, 0.0)
         other = ""

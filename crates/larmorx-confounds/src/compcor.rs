@@ -317,6 +317,27 @@ pub fn regress_poly<T: NpFloat>(
     fix_basis: bool,
     libs: &Libraries,
 ) -> Result<Filtered, CompcorError> {
+    regress_poly_layout(degree, rows, n, t, false, remove_mean, fix_basis, libs)
+}
+
+/// [`regress_poly`] of rows nipype holds in Fortran order (`fortran`: `data.reshape((-1, T))`
+/// is a Fortran-ordered view, so `data.T` is C-ordered): numpy's `pinv(X).dot(data.T)` then
+/// takes the other BLAS path for one row of `pinv(X)` (degree 0: `gemv` on a row-major matrix),
+/// whose sums run in another order. `rows` are given in C order either way.
+///
+/// # Errors
+/// [`CompcorError::Pinv`] (not reached: the design is finite).
+#[allow(clippy::too_many_arguments)]
+pub fn regress_poly_layout<T: NpFloat>(
+    degree: usize,
+    rows: &[T],
+    n: usize,
+    t: usize,
+    fortran: bool,
+    remove_mean: bool,
+    fix_basis: bool,
+    libs: &Libraries,
+) -> Result<Filtered, CompcorError> {
     assert_eq!(rows.len(), n * t, "rows holds n × t values");
     let k = degree + 1;
     // X = [ones, P1(x), ..., Pd(x)], T × k, C order.
@@ -355,7 +376,39 @@ pub fn regress_poly<T: NpFloat>(
         numpy_pinv(libs.lapack, xv, 1e-15).map_err(|_| CompcorError::Pinv)?
     };
     let mut data = as_f64(rows);
-    // betas = pinv(X).dot(data.T): (k × t) · (t × n), data.T the transposed C rows.
+    // data.T in nipype's memory order: the transposed C rows, or (Fortran rows) a C-ordered
+    // t × n copy of them.
+    let transposed: Vec<f64> = if fortran {
+        let mut v = vec![0.0f64; t * n];
+        v.par_chunks_mut(n.max(1)).enumerate().for_each(|(kk, row)| {
+            for (i, x) in row.iter_mut().enumerate() {
+                *x = data[i * t + kk];
+            }
+        });
+        v
+    } else {
+        Vec::new()
+    };
+    let data_t = if fortran {
+        Array2 {
+            data: &transposed,
+            off: 0,
+            rows: t,
+            cols: n,
+            s0: n,
+            s1: 1,
+        }
+    } else {
+        Array2 {
+            data: &data,
+            off: 0,
+            rows: t,
+            cols: n,
+            s0: 1,
+            s1: t,
+        }
+    };
+    // betas = pinv(X).dot(data.T): (k × t) · (t × n).
     let betas = numpy_matmul_with(
         Array2 {
             data: &pinv,
@@ -365,16 +418,10 @@ pub fn regress_poly<T: NpFloat>(
             s0: t,
             s1: 1,
         },
-        Array2 {
-            data: &data,
-            off: 0,
-            rows: t,
-            cols: n,
-            s0: 1,
-            s1: t,
-        },
+        data_t,
         libs.lapack.gemm_q,
     );
+    drop(transposed);
     // datahat = X.dot(betas) (or X[:, 1:].dot(betas[1:])): t × n.
     let (c0, cols) = if remove_mean { (0, k) } else { (1, k - 1) };
     let hat = numpy_matmul_with(

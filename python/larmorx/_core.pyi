@@ -2147,8 +2147,10 @@ def nipype_regress_poly(
     numpy: str = "2.5.4",
     upstream_defects: str = "fix",
     n_threads: int = 1,
+    fortran: bool = False,
 ) -> tuple[np.ndarray, np.ndarray | None, list[tuple[str, str, str, str]]]:
-    """nipype's ``regress_poly`` of a 2-D float32 or float64 array (one series per row):
+    """nipype's ``regress_poly`` of a 2-D float32 or float64 array (one series per row; ``fortran``:
+    nipype holds the rows in Fortran order, so ``data.T`` is C-ordered):
     ``(residuals, basis or None, notices)`` (``larmorx.confounds.regress_poly`` is the public
     form)."""
 

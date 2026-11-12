@@ -2439,3 +2439,8 @@ replica's gaps, the site, the handoff); the clean relays never read the replica 
   programs, each ported once. Order: the shared programs, then the classic-only ones (fMRIPrep's), with the v8-only
   networks as a parallel track. FreeSurfer 7.3.2 (fMRIPrep 25's) is not ported; its runs are a reference for the final
   comparisons; a later version step would port only the differences if ever needed.
+- **EPFL's B-splines** (no licence stated; `mriBSpline.cpp`, in `mri_robust_template`'s final resampling): a replica
+  and a clean room both (the user: "do both replica and clean room as well. We will ask the author afterwards"). The
+  replica is built but kept off the public repositories (a local branch, never pushed, outside every wheel) until the
+  authors' permission arrives (the orchestrator's caution: publishing a translation of unlicensed code would
+  redistribute it without permission); the clean room is published as usual.

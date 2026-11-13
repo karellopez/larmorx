@@ -9,6 +9,24 @@
 //!
 //! Translated from FreeSurfer's source under FreeSurfer's licence (`crates-freesurfer/LICENSE`);
 //! larmorx (Apache-2.0) never links this crate: it runs the `larmorx-freesurfer` program as a
-//! separate process (`docs/licensing.md`). Empty until its queue items bring the code
-//! (`docs/freesurfer/queue.md`); `PROVENANCE.md` lists what each item translates.
+//! separate process (`docs/licensing.md`). Its queue items bring the code
+//! (`docs/freesurfer/queue.md`); `PROVENANCE.md` lists what each item translates; the behaviour
+//! is `specs/freesurfer-surfio.md`.
+//!
+//! - [`aaa`]: the primitive types and constants (`mrisurf_aaa.h`), `MRIS_Status` and its texts,
+//!   the surface library's process-wide variables ([`aaa::SurfGlobals`]).
+//! - [`mris`]: `FACE`, `VERTEX_TOPOLOGY`, `VERTEX`, `MRIS`.
+//! - [`mris_mp`]: `MRIS_MP`, the metric-properties copy.
+//! - [`views`]: the generated views' accessors ([`views::MetricSurface`] over `MRIS` and
+//!   `MRIS_MP`), `MRISvertexCoord2XYZ_float`.
+//! - [`topology`]: the neighbour counts (`modVnum` and its wrappers, `VERTEXvnum`,
+//!   `mrisVertexNeighborIndex`, `vertexNeighbor`).
+//! - [`base`]: `mrisurf_base.h`'s helpers and `Vec3`.
 #![forbid(unsafe_code)]
+
+pub mod aaa;
+pub mod base;
+pub mod mris;
+pub mod mris_mp;
+pub mod topology;
+pub mod views;

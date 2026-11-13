@@ -507,20 +507,20 @@ pub fn label_read_from(
                 lv.stat = stat;
                 lv.vno = vno;
             }
-            None => outside += 1,
+            None => {
+                if outside == 0 {
+                    g.notices.add(
+                        &FS_424,
+                        "LabelReadFrom: a point count of 0 with point lines: the points not stored (FreeSurfer writes them outside the label)",
+                    );
+                }
+                outside += 1;
+            }
         }
         nlines += 1;
         if nlines == area.n_points {
             break;
         }
-    }
-    if outside > 0 {
-        g.notices.add(
-            &FS_424,
-            format!(
-                "LabelReadFrom: a point count of 0 with {outside} point lines: the points not stored (FreeSurfer writes them outside the label)"
-            ),
-        );
     }
     if nlines == 0 {
         let m = format!("{}: no data in label file", g.progname);
@@ -733,7 +733,11 @@ pub fn label_write(
         f.extend_from_slice(b".label");
         f
     };
-    let Ok(mut fp) = CFile::open(dir, &lossy(&fname), "w") else {
+    let opened = CFile::open(dir, &lossy(&fname), "w");
+    if let Err(e) = &opened {
+        g.errno = *e;
+    }
+    let Ok(mut fp) = opened else {
         let mut m = format!("{}: could not open label file ", g.progname).into_bytes();
         m.extend_from_slice(&fname);
         log::error_printf_bytes(g, err, ERROR_NO_FILE, &m);

@@ -37,6 +37,10 @@
 //! Cubic B-spline sampling (`SAMPLE_CUBIC_BSPLINE`) needs `fs.bspline` (wave 3.2): a port error
 //! until it is ported.
 
+// C's comparisons, as written (`if (v < 0) v = 0; if (v > 255) v = 255;`: the same values as
+// `clamp`, NaN kept)
+#![allow(clippy::manual_clamp)]
+
 use std::collections::HashMap;
 use std::io::Write;
 
@@ -322,10 +326,9 @@ fn trilinear(si_f: f32, sj_f: f32, sk_f: f32, c: &Corners) -> f32 {
 
 /// The nearest corner: each fraction below 0.5 takes the lower one (NaN the upper).
 fn nearest(si_f: f32, sj_f: f32, sk_f: f32, c: &Corners) -> f32 {
-    let a = usize::from(!(si_f < 0.5));
-    let b = usize::from(!(sj_f < 0.5));
-    let k = usize::from(!(sk_f < 0.5));
-    c.0[(a << 2) | (b << 1) | k]
+    // `if (f < 0.5)` the lower corner, else (NaN included) the upper one
+    let upper = |f: f32| if f < 0.5 { 0 } else { 1 };
+    c.0[(upper(si_f) << 2) | (upper(sj_f) << 1) | upper(sk_f)]
 }
 
 /// `SAMPLE_WEIGHTED` ("unfinished" in FreeSurfer): each corner weighs the sum of the inverse
@@ -347,11 +350,11 @@ fn weighted(si_f: f32, sj_f: f32, sk_f: f32, c: &Corners) -> f32 {
     }
     // wi[n]: the first corner of n's value (C's chain of equality tests, the lowest match last)
     let mut wi = [0usize; 8];
-    for n in 0..8 {
-        wi[n] = n;
+    for (n, w) in wi.iter_mut().enumerate() {
+        *w = n;
         for k in (0..n).rev() {
             if c.0[n] == c.0[k] {
-                wi[n] = k;
+                *w = k;
             }
         }
     }

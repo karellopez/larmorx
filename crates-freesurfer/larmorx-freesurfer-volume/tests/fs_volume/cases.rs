@@ -3189,9 +3189,9 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
             }
             let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
             let r = if plain != 0 {
-                rsm::mri_resample(g, a, b, &src, &tmpl, ty as i32)?
+                rsm::mri_resample(g, a, b, &src, &tmpl, ty)?
             } else {
-                rsm::mri_resample_fill(g, a, b, &src, &tmpl, ty as i32, fill)?
+                rsm::mri_resample_fill(g, a, b, &src, &tmpl, ty, fill)?
             };
             o.vol(r.as_ref());
         }

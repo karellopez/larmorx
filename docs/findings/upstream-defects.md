@@ -240,6 +240,17 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | FS-76 | nifticlib `znzread`, `znzwrite` | a member size of 0 on a compressed file computes `0/0` | a | none | 0, named | – |
 | FS-77 | nifticlib `znzread` | a compressed read that ends inside a member counts that member as read (`nmemb - remain/size`) | c (rule A, 2026-11-13) | none | the complete members; `reproduce` nifticlib's count, named | – |
 | FS-78 | zlib 1.2.11 `gz_zero` (`gzseek` then `gzputc`, `gzflush`, `gzclose`) | a forward seek before the first write fills the gap with memory zlib never set instead of zeros | a | none | zeros, named; never reproduced (memory) | – |
+| FS-79 | MINC volume_io `expand_filename` (and `remove_directories_from_filename`, `extract_directory`, the default suffix's extension test, grid volume names) | a backslash is an escape that is dropped and only `/` separates directories: a Windows path (`C:\Users\RUNNER~1\...`) loses its separators, so its directory, base name and extension are misread and the file beside it is not found | c (rule A, 2026-11-13) | none (FreeSurfer runs on Linux and macOS) | on Windows a backslash separates directories (`\` and a drive letter start an absolute name); elsewhere volume_io's rules; `reproduce` keeps the escape, named | – |
+| FS-80 | gifticlib 1.12 label tables | colours given for some `Label`s only leave holes in the colour array (or make it short); a `Label` without a valid `Key` gets no key: the writer, the validity check and the display read memory never written | a | none | 0, named (both modes) | – |
+| FS-81 | gifticlib 1.12 Base64 decoding | after skipped characters outside the alphabet, the bytes carried to the next piece of character data are taken from the wrong place | c (rule A, 2026-11-13) | none (FreeSurfer writes clean Base64) | the real remainder; `reproduce` the wrong bytes (never-written ones as 0), named | – |
+| FS-82 | gifticlib 1.12 type table | `NIFTI_TYPE_FLOAT128` is 6 bytes (a `long double` takes 16): arrays are sized and decoded with 6 bytes a value | c (rule A, 2026-11-13) | none | 16; `reproduce` 6, named | – |
+| FS-83 | gifticlib 1.12 ASCII decoding | the counters of a value's pieces (COMPLEX64, COMPLEX128, RGB24) persist from one array, or file, to the next: an incomplete last value shifts the next array | c (rule A, 2026-11-13) | none | reset for each `Data`; `reproduce` kept, named | – |
+| FS-84 | gifticlib 1.12 metadata | an `MD` without a `Name` text is compared through a null pointer (`gifti_get_meta_value`, `gifti_add_to_meta`): a crash | a | none | no match, named (both modes) | – |
+| FS-85 | gifticlib 1.12 element stack and writer | an element outside its parent (`Data`, `MatrixData`, a coordinate system outside a `DataArray`, `Name` or `Value` outside an `MD`), the end of a `Data` of an array a `DataArray` list leaves out before any array is stored, a dimension past `Dim7` or values past the data when writing: a null or out-of-range pointer (a crash or memory never written) | a | none | skipped or zeros, named (both modes) | – |
+| FS-86 | gifticlib 1.12 text elements | character data (white space included) after a CDATA section or a child element inside `Name`, `Value`, `Label`, `DataSpace` or `TransformedSpace`, or inside one of them outside its parent, is written through a null pointer: `<Name> <![CDATA[x]]> </Name>` crashes | a | none | appended to the element's text (dropped where it has none), named (both modes) | – |
+| FS-87 | gifticlib 1.12 messages | at verbosity 6 and 7 the `MatrixData` reader's buffer messages show the `Data` element's buffer and length, partly memory never written | f | none | the matrix buffer's; `reproduce` the `Data` buffer's (never-written bytes from zeros), named | – |
+| FS-88 | expat 2.0.1 | a UTF-16 document of an odd length whose last token is cut by its odd byte (white space, a name, a literal or `]` at the end of the prolog or the content) is converted past its end: a crash or a hang | a | none | the odd byte dropped, named (both modes) | – |
+| FS-89 | expat 2.0.1 `XML_GetCurrentLineNumber` | an error reported inside a multibyte character (a non-ASCII character in an XML declaration's pseudo-attribute) makes the line count step over the error position and read past the document: a crash | a | none | the lines before it, named (both modes) | – |
 | HDF-01 | HDF5 1.12 `H5T__conv_f_f` | non-native floats converted with state carried from one element to the next | c | none (fMRIPrep's are native floats) | corrected by default (`upstream_defects`, 2026-10-16) | – |
 | PIPE-01 | nipype, niworkflows | `shrink_factor=2` dropped: the BOLD reference's N4 shrinks by 4 | c | every run | not a tool defect | later (decided 2026-10-23: when larmorprepx is built) |
 | PIPE-02 | fMRIPrep `ResampleSeries`, OpenBLAS | volumes corrupted when OpenBLAS runs threads | b | outside fMRIPrep's image | thread-independent | – |
@@ -623,18 +634,18 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | FSL-272 † | prelude | the phase range check (more than 3π refused) and the rewrap to [−π, π] (beyond 1.001π) take the image's maximum and minimum from its first value on: a NaN first value (the first voxel of a masked or divided phase map) makes both NaN, so a phase from 0 to 2π is not rewrapped and is unwrapped with whole cycles wrong in some regions, and a phase of any range is not refused (measured with FSL's runs, `validation/investigations/prelude-spec/fsl272_measure.py`: fMRIPrep's seven prelude calls and a synthetic map moved to [0, 2π) with the first value NaN: 7 of 8 unwrapped whole cycles from FSL's own result without the NaN, in 0.1 to 100 % of the mask, up to 18.8 rad; a 4π range processed, exit 0) | c | none for fMRIPrep's calls (sdcflows' `au2rads` rescales the phase to [0, 2π] from its minimum and maximum, so a NaN anywhere would make every value NaN); other users' phase maps in [0, 2π] with a NaN first voxel | rule D measured, then A: the replica (2026-11-06) takes the extrema of the values that are not NaN by default (the rewrap, or FSL's range error with status 255, as without the NaN), FSL's with `reproduce`, named when the two decide differently; the clean-room original the same in both modes since 2026-11-06 (record `fsl-prelude`), from `specs/prelude.md` §4.2 and §9.1 (suite cases `opt/nan-first-twopi`, `opt/nan-first-range`; the site's example on ds002603's map: the default gives FSL's own result without the NaN bit for bit) | – |
 | FSL-273 † | applytopup | `--method=jac` divides the field's derivatives by the field's own voxel sizes (a coefficient field's intent parameters, a field image's header) while the displacement it applies is laid at the images' voxel indices in the images' voxel sizes: a field of the images' shape whose voxel sizes differ from the images' gets a Jacobian determinant scaled along each encoded axis by their ratio (`dx/fx`, `dy/fy`; a field image `dx/fx`, `dx/fy` with FSL-134), not the Jacobian of the displacement applied, so the intensities are modulated wrongly (black box: FSL's outputs on one image's data stored with 6, 4 and 3 mm voxels are `S (1 + c g)` with `c = dy/fy`, `validation/investigations/spec-answers-4/jac_scales.py`) | c | none on fMRIPrep's calls (sdcflows applies its own field; topup's coefficients are on the images' grid) | rule A: the replica (2026-11-06) computes the Jacobian of the mapping applied by default (the same numbers wherever the voxel sizes agree), FSL's scales with `reproduce`, named when an encoded axis' voxel sizes differ (suite cases `at/jac-coef-aniso`, `at/jac-field-aniso`); the clean-room original: a field image already so, a coefficient field since 2026-11-07 (PRELUDE's clean-room original part: scale 1 by default, FSL's `dx / fx` with `reproduce`, named; `at/jac-coef-aniso`; `validation/investigations/cleanroom-topup/jac_fsl273.py`) | – |
 
-**Counts** (565 entries, recounted from the table on 2026-11-13, after FreeSurfer's foundations, track C's relays 2 to 4 (ITK-103 to ITK-116 and FS-71 to FS-78 new; FreeSurfer's FS-01 to FS-51 and FS-100 to FS-104 are in `larmorx_core::defects` and enter this table with their tracks' handoffs); before it `t2smap`'s clean-room part (TED-31 and TED-46 new; TED-32 to TED-45, TED-47 to TED-55 and FSL-280 to FSL-289 unused); before it the field maps' part B (SDC-12 to SDC-46, PIPE-18 to PIPE-40, SCI-06 to SCI-32 and SKI-01 to SKI-04 new; SDC-47 to SDC-55 and SCI-33 to SCI-40 unused); before it tedana's `t2smap` replica (TED-01 to TED-18, NP-03 and NP-04 new; TED-19 to TED-30 unused) and the field maps' part A (SDC-01 to SDC-11 new)
+**Counts** (576 entries, recounted from the table on 2026-11-13, after FreeSurfer's foundations, track C's relays 2 to 6 (ITK-103 to ITK-116 and FS-71 to FS-89 new; FreeSurfer's FS-01 to FS-51 and FS-100 to FS-104 are in `larmorx_core::defects` and enter this table with their tracks' handoffs); before it `t2smap`'s clean-room part (TED-31 and TED-46 new; TED-32 to TED-45, TED-47 to TED-55 and FSL-280 to FSL-289 unused); before it the field maps' part B (SDC-12 to SDC-46, PIPE-18 to PIPE-40, SCI-06 to SCI-32 and SKI-01 to SKI-04 new; SDC-47 to SDC-55 and SCI-33 to SCI-40 unused); before it tedana's `t2smap` replica (TED-01 to TED-18, NP-03 and NP-04 new; TED-19 to TED-30 unused) and the field maps' part A (SDC-01 to SDC-11 new)
 (`scripts/orchestration/register_counts.py`); an entry with two classes counts under its first; "c (c? until …)"
 entries, decided, count as (c)):
 
 | Class | Entries | of them questionable (c?) |
 |---|---|---|
-| (a) crash, undefined behaviour, out of bounds | 137 | |
+| (a) crash, undefined behaviour, out of bounds | 143 | |
 | (b) race, nondeterminism | 17 | |
-| (c) deterministic bug that changes results | 275 | 14 |
+| (c) deterministic bug that changes results | 279 | 14 |
 | (d) imprecision | 27 | |
 | (e) command-line or parsing quirk | 79 | |
-| (f) documentation or message only | 28 | |
+| (f) documentation or message only | 29 | |
 | explained, not a defect | 2 | |
 
 The gap column today (2026-11-10): no **decide**; no **yes** (FSL-67 measured in FLIRT's part 2 and
@@ -3753,6 +3764,57 @@ by behaviour, are in `docs/findings/minc-xfm.md` and `nifti-znz.md`. The check:
   scale-1 run).
 - **fMRIPrep:** none. **FreeSurfer:** none on its default paths.
 - **larmorx:** zeros, named; never reproduced (memory contents). Found 2026-11-13.
+- **D13 / gap:** none.
+
+### FS-79 MINC volume_io drops a Windows path's backslashes — (c, rule A)
+- **What:** `expand_filename` takes a backslash as an escape (it drops it and keeps the next
+  character), and the file-name helpers split directories at `/` only; a Windows path such as
+  `C:\Users\RUNNER~1\AppData\Local\Temp\...\t1` becomes one name with a `.` in it, so the
+  default `.xfm` suffix is not added and the file is not found.
+- **Evidence:** verified (CI's Windows x64 and arm64 jobs on main f43acf5b:
+  `xfm::tests::files_compressed_defaults_and_dialects`; the rules checked on every platform by
+  `expansion_of_names`).
+- **fMRIPrep:** none. **FreeSurfer:** none (it does not run on Windows).
+- **larmorx:** on Windows a backslash separates directories (never an escape; a `$NAME` ends at
+  it; `\` and a drive letter with `:` start an absolute name); elsewhere volume_io's rules;
+  `reproduce` keeps the escape on Windows too; a notice in both modes. A `~` not at the start of
+  a name (`RUNNER~1`) and blanks were already kept as volume_io keeps them. Found 2026-11-13.
+- **D13 / gap:** none.
+
+### FS-80 to FS-87 gifticlib 1.12: GIFTI files read through memory never written, null pointers and a 6-byte FLOAT128
+- **What:** gifticlib 1.12's reader and writer, as `docs/findings/gifti.md` describes them (its
+  table): label colours and keys never written (FS-80); the Base64 bytes carried across a piece
+  from the wrong place after skipped characters (FS-81); `NIFTI_TYPE_FLOAT128` sized as 6 bytes
+  (FS-82); the ASCII decoder's piece counters persisting across arrays (FS-83); a nameless `MD`
+  compared through a null pointer (FS-84); elements outside their parents, a left-out array's
+  `Data` before any stored one, writing past `Dim7` or past the data (FS-85); text after a CDATA
+  section or a child element inside a text element written through a null pointer (FS-86, which
+  crashes on `<Name> <![CDATA[x]]> </Name>`, a well-formed file); the `MatrixData` messages at
+  verbosity 6 and 7 showing the `Data` buffer (FS-87).
+- **Evidence:** verified (`validation/probes/fs-gifti`: gifticlib 1.12 from its commit 8ec2a95
+  and FreeSurfer 8.2.0's copy, generated files in forked children; the crashes reproduced under
+  gdb).
+- **fMRIPrep:** none. **FreeSurfer:** none on its default paths (it writes its GIFTI files
+  itself; `docs/findings/freesurfer-permissive.md`, closed to FreeSurfer's clean-room implementers).
+- **larmorx:** corrected by default where the input makes sense (FS-81 to FS-83, FS-87, rule A),
+  with `reproduce` giving gifticlib's results; crashes and memory never written are never
+  reproduced (FS-80, FS-84 to FS-86: zeros, skipped elements or the text appended, named). Found
+  2026-11-13.
+- **D13 / gap:** none.
+
+### FS-88, FS-89 expat 2.0.1 reads past the document — (a)
+- **What:** FS-88: in a UTF-16 document of an odd length, a token cut by the odd byte at the end
+  (white space, a name, a literal, `]`) is passed on with the odd end, and expat's UTF-16
+  conversion loops step over it and read past the buffer (a crash or a hang). FS-89: an XML
+  declaration's error reported inside a multibyte character (expat 2.0.1's one-byte `toAscii`
+  stops in the middle of a non-ASCII character of a pseudo-attribute's name) makes
+  `XML_GetCurrentLineNumber`'s count step over the error position and read past the buffer (a
+  crash).
+- **Evidence:** verified (`validation/probes/fs-gifti`: expat 2.0.1 from its tag and FreeSurfer's
+  copy, both crash; gdb in `normal_updatePosition` and the conversion loops).
+- **fMRIPrep:** none. **FreeSurfer:** none (its GIFTI files are UTF-8 with an ASCII declaration).
+- **larmorx:** the odd byte dropped (FS-88), the lines counted up to the character (FS-89), named,
+  in both modes. Found 2026-11-13.
 - **D13 / gap:** none.
 
 ## fMRIPrep and its libraries

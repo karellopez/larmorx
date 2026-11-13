@@ -36,6 +36,8 @@ built for the official binaries with GCC 8.4.0 (`docs/freesurfer/variation.md`).
 | `matrix_ops` | `include/matrix.h` 193-297; `utils/matrix.cpp` 844-880, 892-926, 1072-1195, 1232-1272, 1359-1543, 1586-1602, 1673-1690, 1931-1963, 2289-2313, 2342-2356, 2444-2462, 2530-2551, 2582-2602, 2638-2774, 2848-2911, 3039-3065, 3162-3172, 3428-3501, 3543-3612 | `MatrixPrint`, `MatrixPrintFmt`, `MatrixIdentity`, `MatrixTranspose`, `MatrixAdd`, `MatrixSubtract`, `MatrixScalarMul`, `MatrixClear`, `MatrixSquareElts`, `MatrixDiag`, `MatrixCopyRegion`, `MatrixCopyRealRegion`, `MatrixCopyImagRegion`, `MatrixRealToComplex`, `MatrixIsSymmetric`, `MatrixReallocRotation`, `MatrixAllocRotation`, `VectorLen`, `VectorDot`, `VectorDistance`, `MatrixIsZero`, `VectorCrossProduct`, `VectorTripleProduct`, `Vector3Angle`, `XYZ_NORMALIZED_LOAD`, `XYZApproxAngle_knownLength`, `MatrixCheck`, `MatrixReshape`, `MatrixTrace`, `MatrixConstVal`, `MatrixZero`, `MatrixSumElts`, `MatrixNormalizeColScale`, `MatrixNormalizeCol`, `MatrixSimilarityTransform`, `GaussianMatrix2`, `GaussianMatrix`; the macros `VECTOR_ELT`, `RVECTOR_ELT`, `V3_X`/`Y`/`Z`, `V3_DOT`, `MatrixClone`, `VectorClone`, `X_ROTATION`/`Y`/`Z`, `XYZ`; FS-25 to FS-28, FS-31 |
 | `matrix_ops` (3.1-23) | `utils/matrix.cpp` 183-296, 1604 | `MatrixQRdecomposition`, `MatrixInverse` (real and complex), `MatrixDeterminant`; FS-33 |
 | `numerics` | `utils/numerics.cpp` 1091-1219 | `OpenLUMatrixInverse`, `OpenQRdecomposition`, `OpenMatrixDeterminant` (on the main package's `float` VNL: `larmorx_core::vnl_fixed`, `larmorx_core::vnl_qr::Qr<f32>`, item 3.1-07); FS-33 |
+| `numerics` (3.1-23, 3.1-24) | `utils/numerics.cpp` 69-110, 846-926, 980-1089, 1683-1727; `include/numerics.h` | `ConvertFromFloatToVNLDouble`, `ConvertFromVNLDoubleToFloat` (vector and matrix forms), `OpenDFPMin`, `OpenPowell`, `OpenPowell2`, `vector`, `matrix`, `free_vector`, `free_matrix` (`NrVector`, `NrMatrix`; the frees are their drop), `NR_END`; FS-34, FS-35, FS-36, FS-38, FS-39 |
+| `fs_vnl` (3.1-23) | `utils/fs_cost_function.cpp`, `utils/fs_powell.cpp`, `utils/fs_lbfgs.cpp`, `utils/fs_lbfgs_subject.cpp`, `utils/fs_lbfgs_observer.cpp`; `include/fs_vnl/*.h` | `fs_cost_function` (both constructors, `f`, `gradf`, `copyFromVNLToFloat`; `compute` as VNL's base class has it), `fs_powell` (`minimize` with `fs_powell_1dfun`, `set_linmin_xtol`, `set_initial_step`, `pub_report_eval`), the global `powell_iteration_func` (as `FsFunctions::powell_iteration`), `fs_lbfgs` (`init_parameters`, `minimize`), `fs_lbfgs_subject` (its one observer), `fs_lbfgs_observer` (`update`, the step function and user callback as `FsFunctions` methods, `getNumberOfOptimalUpdates`); on the main package's VNL (`larmorx_core::vnl_minimize`, `larmorx_core::vnl_lbfgs`, item 3.1-07): this crate contains no VXL code; FS-35, FS-37 |
 | `prime` | `utils/prime.cpp` 20-235 | `GetPrimes`, `GetPrimeFactors`, `CompareFactors` (as a sort of integers), `GetClosestPrimeFactor`, `GetClosestPrimeFactorLess`; FS-32 |
 | `pdf` | `utils/pdf.cpp` 26-61 | `PDFtodSeed`, `PDFgaussian`; FS-29, FS-30 |
 | `sse` | none (larmorx's own) | SSE2's NaN rules for the official build's arithmetic (the porting guide's "NaN bits are part of the output") |
@@ -88,16 +90,27 @@ statistics, ...).
   eigensystems, `MatrixSVD*`, `MatrixConditionNumber`, `MatrixNSConditionNumber`,
   `MatrixPseudoInverse`, `MatrixSVDPseudoInverse`), its text and binary files (`MatrixReadTxt`,
   `MatrixAsciiWriteInto`, `MatrixAsciiReadFrom`, `MatrixReadFrom`, `MatrixWriteTxt`),
-  `numerics.cpp`'s VNL and Numerical Recipes wrappers (without its GSL functions, item 3.1-53 in
-  `larmorx-gpl`, and Burkardt's spline, item 3.1-54) and `randomfields.cpp`.
+  `numerics.cpp`'s other VNL wrappers (`OpenEigenSystem`, `OpenNonSymmetricEigenSystem`,
+  `OpenSvdcmp`, `OpenSpline`, `OpenSplint`; without its GSL functions, item 3.1-53 in `larmorx-gpl`,
+  and Burkardt's spline, item 3.1-54) and `randomfields.cpp`.
 - (`fs.maths`) Not translated: the unreached functions of these files (static reach: `HISTOdump`,
   `HISTOcrunch`, `HISTOinvert`, `HISTOnormalize`, `HISTOcompose*`, `HISTOfillZeros`, `HISTOmul`,
   `HISTO*PeakRelative`, `HISTOfindFirstPeakInRegion`, `HISTOcountPeaksInRegion`,
   `HISTOaddFractionalSample`, `HISTOclearBG`, `HISTOvalToBinDirect`, `HISTOvalToCount`,
   `HISTOwriteInto`, `HISTOreadFrom`, `HISTOgaussian*`, `HISTOscalarMul`, `HISTOscalarAdd`,
   `HISTOfindMaxDerivative`, the other `HISTO2D*`, `HISTOrmsDifference`, `HISTOearthMoversDistance`,
-  `HISTOksDistance`, `HISTOerase*`, `HISTOisPeak`, `HISTOwrite`; `DMatrixTest`). Still to come in item 3.1-23: `fs_powell`, `fs_lbfgs`,
-  `fs_cost_function` (VNL's Powell, Brent and L-BFGS, item 3.1-07).
+  `HISTOksDistance`, `HISTOerase*`, `HISTOisPeak`, `HISTOwrite`; `DMatrixTest`). Item 3.1-23 is
+  complete (`fs_vnl`, 2026-11-13). `fs_lbfgs`'s `check_derivatives_` branch (a finite-difference
+  check of the gradient) is not translated: FreeSurfer's only caller never sets it.
+- (`fs.maths`, 3.1-23) The double matrices' `double` arithmetic follows SSE2's NaN rules in the
+  official build's measured operand order (`DMatrixAddMul`, `DMatrixMultiply`'s products,
+  `DListStats`' squares), and `DVectorDot` takes `v1`'s element as the x87 multiplication's memory
+  operand (a signalling NaN kept signalling), as GCC 8.4.0 compiled it.
+- (`fs.maths`, 3.1-23) The C function pointers the minimizers take (cost, gradient,
+  `powell_iteration_func`, the observer's step function with its `void *` data, the user callback)
+  are one trait, `fs_vnl::FsFunctions`, so a program's functions can share their state; the
+  parameter arrays keep Numerical Recipes' 1-based indexing, their unset element 0 given as 0.
+  FS-37's crash is not reproduced: `reproduce` gives the starting point there and `OpenDFPMin` stops.
 - The defects FS-01 (a NUL byte after the C-style error messages), FS-02 (`PROFILE`'s undefined
   conversion) and FS-03 (`assertFailed`'s deliberate segmentation fault) are corrected by default
   and reproduced with `reproduce` (`docs/findings/freesurfer-core.md`).

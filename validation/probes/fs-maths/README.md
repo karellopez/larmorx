@@ -15,7 +15,13 @@ default differs only where a defect it corrects changed the result (`docs/findin
   the same form. 49 commands: every reached function of `utils/histo.cpp` (with the in-place forms
   and given outputs), `MatrixAlloc`, `MatrixCopy`, `MatrixMultiplyD` (real and complex),
   `include/affine.h`, `utils/dmatrix.cpp`'s operations (the x87 `long double` products
-  included), `utils/utils.cpp`'s `DListStats`.
+  included, with NaNs and infinities among the inputs), `utils/utils.cpp`'s `DListStats`; since
+  item 3.1-24 the float matrices' operations, vectors, printing, primes and draws; since 3.1-23's
+  minimizers `powell`, `powell2`, `dfpmin` (`OpenPowell`, `OpenPowell2`, `OpenDFPMin` on four seeded
+  float costs passed as C function pointers, with the iteration callback, the step function and
+  the user callback; every evaluation and callback hashed; standard output and error captured
+  while FreeSurfer runs and hex-encoded into the line; `OpenDFPMin` in a child process, its line
+  `CRASH` when FreeSurfer dies of a signal, FS-37).
 - `build.sh [<workspace>]`: compiles it with the unit oracle's compiler and flags and links it with
   the unit oracle's libraries as the unit oracle's harness is linked
   (`validation/investigations/freesurfer-unit-oracle/`: the official build's `utils` and packages,

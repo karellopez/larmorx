@@ -567,6 +567,17 @@ fn minimizer_case(g: &mut Gen, cmd: &str) -> String {
     s.join(" ")
 }
 
+/// The special doubles of the double matrices' cases: infinities, quiet NaNs of both signs
+/// with and without a payload, a signalling NaN.
+const SPECIAL64: [f64; 6] = [
+    f64::INFINITY,
+    f64::NEG_INFINITY,
+    f64::from_bits(0x7ff8_0000_0000_0000),
+    f64::from_bits(0xfff8_0000_0000_0005),
+    f64::from_bits(0x7ff8_0000_0000_0123),
+    f64::from_bits(0x7ff0_0000_0000_0042),
+];
+
 /// One case line of command `cmd`.
 fn case(g: &mut Gen, cmd: &str) -> String {
     let mut s = vec![cmd.to_owned()];
@@ -799,11 +810,16 @@ fn case(g: &mut Gen, cmd: &str) -> String {
         }
         "dmat" => {
             let (r, c) = (g.int(1, 5), g.int(1, 5));
+            // a third of the cases with NaNs (of both signs, payloads, a signalling one) and
+            // infinities among the numbers and the factors
+            let special = g.below(3) == 0;
             for _ in 0..2 {
                 s.push(r.to_string());
                 s.push(c.to_string());
                 for _ in 0..r * c {
-                    let v = if g.below(6) == 0 {
+                    let v = if special && g.below(4) == 0 {
+                        g.pick(&SPECIAL64)
+                    } else if g.below(6) == 0 {
                         g.pick(&[0.0, -0.0])
                     } else {
                         g.d(-1000, 1000, 1024)
@@ -812,19 +828,30 @@ fn case(g: &mut Gen, cmd: &str) -> String {
                 }
             }
             let r = g.d(-10, 10, 64);
-            s.push(dx(g.pick(&[0.0, 1.0, -1.0, 2.5, r])));
+            let sp = g.pick(&SPECIAL64);
+            let v = if special && g.below(3) == 0 { sp } else { r };
+            s.push(dx(g.pick(&[0.0, 1.0, -1.0, 2.5, v])));
             let r = g.d(-10, 10, 64);
-            s.push(dx(g.pick(&[0.0, 1.0, -1.0, 0.25, r])));
+            let sp = g.pick(&SPECIAL64);
+            let v = if special && g.below(3) == 0 { sp } else { r };
+            s.push(dx(g.pick(&[0.0, 1.0, -1.0, 0.25, v])));
         }
         "dmmul" => {
             let (r, k, c) = (g.int(1, 6), g.int(1, 6), g.int(1, 6));
             let n = g.int(1, 12);
+            let special = g.below(3) == 0;
             for (rows, cols) in [(r, k), (k, c), (n, 1), (n, 1)] {
                 s.push(rows.to_string());
                 s.push(cols.to_string());
                 for _ in 0..rows * cols {
                     let big = g.pick(&[1.0, 1e8, 1e-6, 3.0]);
-                    let v = g.d(-1000, 1000, 1 << 20) * big;
+                    let v = if special && g.below(4) == 0 {
+                        g.pick(&SPECIAL64)
+                    } else if special && g.below(4) == 0 {
+                        0.0
+                    } else {
+                        g.d(-1000, 1000, 1 << 20) * big
+                    };
                     s.push(dx(v));
                 }
             }
@@ -833,7 +860,12 @@ fn case(g: &mut Gen, cmd: &str) -> String {
             let n = g.int(1, 40);
             s.push(n.to_string());
             let base = g.pick(&[0.0, 1e6, -250.0, 1e12]);
+            let special = g.below(4) == 0;
             for _ in 0..n {
+                if special && g.below(5) == 0 {
+                    s.push(dx(g.pick(&SPECIAL64)));
+                    continue;
+                }
                 s.push(dx(base + g.d(-100, 100, 1 << 16)));
             }
         }

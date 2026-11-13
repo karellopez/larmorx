@@ -296,3 +296,124 @@ the determinant of an empty matrix.
 - `MatrixPrint` flushes standard output, not its own stream (878).
 - The cross product's test refuses a 1 x 3 row vector.
 
+
+# Part 3 (item 3.1-23's minimizers; the double matrices' NaNs)
+
+## The measurement, part 3
+
+`validation/probes/fs-maths/` gained `powell`, `powell2` and `dfpmin` (`OpenPowell`, `OpenPowell2`,
+`OpenDFPMin` on four seeded float costs given as C function pointers: a positive-definite
+quadratic, Rosenbrock's, the quadratic rounded down to multiples of 1/q with the quadratic's
+gradient, weighted absolute values; the iteration callback `powell_iteration_func`, the step
+function and the user callback; every evaluation and callback hashed; standard output and error
+captured byte for byte; `OpenDFPMin` in a child process, since FreeSurfer crashes there, FS-37),
+and NaNs and infinities among the double matrices' inputs (`dmat`, `dmmul`, `dliststats`).
+2026-11-13, seed 7, 67,000 cases of 67 commands: `reproduce` identical on 65,994 of 65,995
+comparable lines (the one other: an `acos` last bit, counted apart as before); 1,005 not comparable
+(870 FS-22, 135 `dfpmin` lines with VNL's L-BFGS printout of the vectors under `DIAG_VERBOSE`,
+ITK-106, which prints the double before each vector: a heap header in FreeSurfer, 0 in the port;
+956 of the 1,005 were identical anyway). The default differs only with a defect's notice, but the
+known correctly rounded `sinf`/`cosf`/`log`/`acos` last bits (30 lines). All 1,000 `powell`, 1,000
+`powell2` and 1,000 `dfpmin` comparable lines identical, including every evaluated point and the
+printed text. FreeSurfer **crashed** in 42 of the 1,000 `OpenDFPMin` cases (FS-37). Seed 1, 670
+cases (the recorded test, `tests/fs_maths_official.rs`): 657 identical, 13 not comparable.
+
+On x86 with AArch64's NaN emulated (`nan_trap.c`, `NAN_TRAP_ARM=1`, `NAN_TRAP_DIR` set): the
+recorded test passes in debug and release builds; the probe's 67,000 lines are identical with and
+without the trap in `fix`, and in `reproduce` but for 17 `dfpmin` lines of the verbose L-BFGS
+printout (ITK-105/ITK-106, below; they are among those not compared).
+
+## The double matrices' NaN operands (measured; a porting trap, not a defect)
+
+With two NaN operands SSE2 returns the first source operand's, so the order GCC chose matters.
+Measured on 3,000 cases with NaNs of both signs, payloads and a signalling NaN: `DMatrixAddMul`'s
+`val += v * m[r][c]` is computed as `(m[r][c] * v) + val` (the element's NaN in the product, the
+product's in the sum; not the left-operand order §7 of the spec found for the float matrices),
+`val += m[r][c]` (factor exactly 1) as `val + m[r][c]`; `DMatrixMultiply`'s products as `m1 * m2`.
+`DVectorDot` (dmatrix.cpp 712) is `fldl v2[i]; fmull v1[i]; faddp` (the official `dmatrix.cpp.o`):
+`fld` makes a signalling NaN quiet, `fmul`'s memory operand keeps it signalling, and of a quiet and
+a signalling NaN the x87 returns the quiet one, so `v1`'s signalling NaN loses to `v2`'s quiet one
+(the port's first version, loading both, gave the signalling one's payload: 1 of 1,000 cases).
+`DListStats` loads its values (`fldl`) and squares them in SSE; its minimum and maximum are
+`minsd`/`maxsd` with the C comparisons' NaN behaviour. All 3,000 cases identical after the change.
+
+## FS-34: the Powell wrappers write the directions through `NULL` (a crash, never reproduced)
+
+`numerics.cpp` 1001-1003 and 1059-1061 accept `ioInitialDirection == NULL` (the identity), but
+1018 and 1074 write the final directions through it unconditionally: a segmentation fault. Every
+caller in the tree passes a matrix. Both modes write nothing (noted).
+
+## FS-35: `fs_powell`'s return codes (rule C: kept)
+
+VNL's Powell (ITK 4.13.2 `vnl_powell.cxx` 127, 175) returns `TOO_MANY_ITERATIONS` when its
+iteration limit ends the loop and `FAILED_USER_REQUEST` only when `report_iter` asks to stop (173).
+FreeSurfer's copy returns `FAILED_USER_REQUEST` in both places (`fs_powell.cpp` 192, 224) and
+ignores `report_iter`. So `OpenPowell`'s `ErrorExit(..., "powell exceeding maximum iterations.")`
+(1007) and `OpenPowell2`'s `powell exceeded maximum iterations` with return 1 (1076-1079) never
+run. The change looks deliberate (with VNL's code, a program whose Powell reached 2000 iterations
+in `OpenPowell` would exit); every caller (`mri_segreg`, `mrimorph.cpp`, `mri_hires_register`,
+...) ignores `OpenPowell2`'s value. Kept in both modes, documented.
+
+## FS-36: `OpenPowell`'s tolerance has no effect (rule C: kept)
+
+`numerics.cpp` 991 `set_x_tolerance(iTolerance)`: VNL's Powell and FreeSurfer's copy read only
+`ftol` (default 1e-10) for their stop, never `xtol`; `fs_powell.cpp` 95's comment says otherwise.
+Every `OpenPowell` call (`mrimorph.cpp`'s, `mri_hires_register`'s, ...) therefore stops at a
+relative change of 1e-10 of the cost, whatever it asks; with float costs that means "no change at
+all". Honouring the tolerance would change those programs' results; nothing says which they were
+tuned for: kept, documented.
+
+## FS-37: `fs_lbfgs`' best point (rule A; its crash never reproduced)
+
+`fs_lbfgs.cpp` 87-115: `best_f` starts at the first value but `best_x` stays empty until a value
+below it; 166-171 on success `x = best_x` and `end_error_ = f` (the last value evaluated); 173-198
+on failure the same only `if (best_x.size() != 0)` ("an DJ addition"). So:
+
+- a run that converges without improving on its start (an accepted line-search step whose value
+  equals the start's: L-BFGS's sufficient-decrease test `f <= f0 + 1e-4 stp g'd` holds with
+  equality when the term is below `f0`'s last bit, common with float costs) returns **empty**
+  parameters; `OpenDFPMin` then either runs the next pass on them (the bridge copies nothing, the
+  cost function reads stale stack floats, `lbfgs_` dereferences the null data pointer) or converts
+  them back (`ConvertFromVNLDoubleToFloat` reads the empty vector): a crash either way. Measured: 42
+  of 1,000 probe cases (`CRASH` lines, signal 11). `mrimorph.cpp` 6743 has `if (iter == 0) break;
+  // parms can be corrupted if no step taken`.
+- a failed run without an improvement leaves `x` at the line search's last trial point (netlib's
+  `mcsrch` returns with it) and `end_error_` at the previous pass's value;
+- otherwise `end_error_` is the last value evaluated, which can be a worse trial point's than the
+  best point returned.
+
+Rule A: the starting point is the best until a smaller value, every return gives the best point and
+its value. `reproduce` gives FreeSurfer's, but where it empties the parameters: there the starting
+point, and `OpenDFPMin` stops (the crash is never reproduced). This changes `mri_em_register`'s
+quasi-Newton passes (`mrimorph.cpp` 5728, 6719) where a pass ends without improvement.
+
+## FS-38: `OpenDFPMin`'s passes (rule A)
+
+`numerics.cpp` 885-896: `previousValue` is set once, from the caller's `*oFinalFunctionReturn`,
+and the loop continues while `(previousValue - currentValue) / previousValue > iTolerance`; its
+comment says "keep iterating if the error isn't significantly better", i.e. than the previous
+pass's. As written the improvement only grows, so the passes repeat until one fails (or FreeSurfer
+crashes, FS-37); a NaN ratio (a cost of 0) continues too. With FS-37 corrected, a pass that cannot
+improve returns the same point and value forever, so the loop must compare with the previous pass:
+rule A (the intent written beside it; without it the corrected driver would not end). Default:
+continue only while the pass improved on the previous one by more than the tolerance relative to it
+(a NaN stops); `reproduce`: FreeSurfer's. Noted where the decisions differ (81 of 1,000 probe cases).
+
+## FS-39: `OpenDFPMin` at the evaluation limit (rule A)
+
+`numerics.cpp` 905-924: `FAILED_USER_REQUEST` (`fs_lbfgs`' 2,000-evaluation limit, 189) matches
+none of the branches: the parameters, the iteration count and the final value are not written,
+and the code 9 is returned, which `mrimorph.cpp` ignores ("retval is not to be trusted"); its
+`iter` is then an unset local. Rule A: written as for `ERROR_FAILURE`. Not met in the probe.
+
+## For the main package's VNL (track C), found here
+
+- VXL's `write50` (L-BFGS's printout under `IPRINT(2) = 1`, ITK-105) divides 0 by 0 for a vector of
+  zeros with `reproduce`: x86 prints `-nan`, an AArch64 run of the port `nan` (17 probe lines under
+  the emulation; they are lines ITK-106 already makes non-comparable). Using SSE's default NaN there
+  (`-nan` on every platform) would make the port's `reproduce` output the same everywhere.
+- On a cost that falls without end along a line, `vnl_bracket_minimum` runs into infinities and
+  makes NaNs from them (`inf - inf`); their sign differs on AArch64, so the points handed to the cost
+  function differ in their NaN bits (an earlier version of the probe's absolute-value cost, with
+  cross terms, showed it in 17 Powell cases; the results were the same). FreeSurfer's costs are
+  bounded; noted only.

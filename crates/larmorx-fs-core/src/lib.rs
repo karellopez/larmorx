@@ -29,6 +29,7 @@ pub mod fsenv;
 pub mod logic;
 pub mod maths;
 pub mod messages;
+pub mod mri;
 pub mod numbers;
 pub mod process;
 pub mod random;

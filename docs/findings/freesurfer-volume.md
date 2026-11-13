@@ -387,3 +387,55 @@ Source: `utils/mri.cpp` 12072-12657 (`MRIresample`, `MRIresampleFill`), 75-95 (t
   templates the source's grid): trilinear 124 outputs with sampled values (23 float outputs holding
   NaNs), nearest 32, sinc 17, cubic 34, weighted 19, vote 93, an unknown type 13; every comparable line
   identical with `reproduce`.
+
+## 12. Statistics, orientation strings, voxel-to-RAS matrices, 2-D images, neighbourhoods and labels (3.1-37 pieces a and b, 3.1-35's image part; relay 19)
+Source: `utils/mri.cpp` 12681-12828 (`MRIprintStats`, `MRIstats`), 12863-12908 (`stuff_four_by_four`),
+12992-13075 (`MRIvoxelXformToRasXform`, `MRIsetVoxelToRasXform`), 13124-13362 (`MRIsmoothParcellation`,
+`MRIeraseBorderPlanes`, `MRImaxInNbhd`, `MRIcountNonzeroInNbhd`, `MRIareNonzeroInNbhd`), 13363-13401
+(`MRIfindNearestNonzeroLocation`), 14108-14269 (the label means, `MRImakePositive`), 14671-14765
+(`MRImarkLabelBorderVoxels`, `MRIcomputeLabelNbhd`), 14776-14842 (`MRIcalcCRASforSampledVolume`), 15191-15212
+(`MRIcropBoundingBox`, `MRIgetVoxelToVoxelXform`), 15256-15398 (`MRIorientationStringToDircos`,
+`MRIcheckOrientationString`), 15807-15857 (`MRIlabelsIn(Planar)Nbhd`), 16224-16250 (`MRIlabelBoundingBox`),
+16373-16404 (`MRIcountThreshInNbhd`, `MRIfillBox`), 16518-16558 (`MRImaskZero`, `MRItype2str`), 17744-17776
+(`MRIclipBrightWM`), 6796-7314 (`MRItoImageView`, `MRItoImage`, `ImageToMRI`); `include/mri_circulars.h`
+declares the image functions; `include/image.h` 297-337 the pixel macros.
+- **FS-329** (c, rule A): `MRIstats`' `MRI_LONG` branch reads with `MRILseq_vox`, a `long32` (`int`)
+  pointer: element `x` of the row is the low or high half of voxel `x / 2`. The default reads the 64-bit
+  voxels; `reproduce` the halves.
+- **FS-330** (a, memory): `MRIprintStats`' `min`, `max`, `n`, `mean`, `std` are locals `MRIstats` writes only
+  for a volume with `slices` and (for `min`, `max`) one of the six types; otherwise their stack contents are
+  printed. Both modes print 0, noted; the probe counts these lines.
+- **FS-462** (a, crash): `src->width / dst->width` with a destination extent of 0 is an integer division by
+  zero (SIGFPE). An error in both modes.
+- **FS-463** (a, memory): `MRIcheckOrientationString` reads `ostr[0..2]` whatever the string's length; the
+  probe saw a one-character string's third byte come from the token's buffer (`e`). Places past the
+  terminator are taken as NUL in both modes. A NUL at place 2 (a two-character string) is defined: the
+  character appended to the `std::string` and the `strncpy` into the 1000-byte buffer cuts the text at it.
+- **FS-464** (a, memory): `MRIsetVoxelToRasXform` reads rows 1-3 and columns 1-4 without a size check. An
+  error in both modes for a smaller matrix.
+- **FS-465** (a, memory): `MRItoImage` copies `width` elements per row into a given image at `yp ocols` of
+  the volume type's element size, whatever the image's format and size; `ImageToMRI` reads `pix_per_frame
+  frame` elements past the first frame with `rows cols` (not `orows ocols`). Both modes write and read only
+  inside the pixels (0 outside), noted; the probe counts these lines (the official build's heap layout made
+  them agree on all 30 of seed 13, not a guarantee).
+- **FS-466** (c, rule A): `ImageToMRI`'s RGB branch adds `frame_offset` (pixels) to `IMAGERGBpix`'s byte
+  pointer, so frame `f` starts `f rows cols` bytes in, not `3 f rows cols`. Default: each frame's own
+  pixels. The 4-byte `int` read of the last pixel reads one byte past the 3-byte pixels; it is masked off
+  (`& 0x00ffffff`), so only the 3 bytes are read here.
+- **FS-467** (a, memory): `MRIsmoothParcellation`'s `int counts[32768]` indexed by a `short` label; a negative
+  label increments and reads stack memory below the array (the probe saw a -1 label written where the port,
+  counting it in its own bin, did not: other locals alias it). Both modes count it in its own bin, noted; the
+  probe counts these lines.
+- **FS-468** (a, undefined conversion): `MRIclipBrightWM` assigns `MRIgetVoxVal`'s float to a `BUFTYPE`; GCC
+  8.4.0 converts with `cvttss2si` to 32 bits and keeps the low byte. `reproduce` gives that; the default
+  clamps to [0, 255] (NaN 0), the D13 rule for undefined conversions. A non-byte T1 loses its fractions in
+  both modes (rule C: FreeSurfer's T1 is a byte volume).
+- `MRItoImageView`'s `(ubyte)` conversion of `255 (val - min) / (max - min)` is always in [0, 255] or NaN: the
+  samples are whole-coordinate nearest voxels, exact `float`s, so `min <= val <= max`; the `float` range
+  `max - min` rounded down by half an ulp gives at most 255.0000152 (255); infinities give 0 or NaN (0, as
+  x86-64's conversion). No defect.
+- The `(int)` truncations of voxel labels (`MRImarkLabelBorderVoxels`, `MRIcomputeLabelNbhd`,
+  `MRIlabelBoundingBox`, `MRImaxInNbhd`'s result) follow FS-12's rule, as `MRIextractInto`'s voxel sizes do.
+- `MRIstats`, `MRIsetVoxelToRasXform`, `MRIcalcCRASforSampledVolume` and `MRIfindNearestNonzeroLocation`
+  give FreeSurfer's NaN bits in the C expressions' operand orders (no object-code reading was needed: the
+  probe's special floats agreed on every case).

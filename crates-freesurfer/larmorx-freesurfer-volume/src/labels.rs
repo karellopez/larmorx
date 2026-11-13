@@ -53,10 +53,8 @@ pub const DEFAULT_DESIRED_WHITE_MATTER_VALUE: i32 = 110;
 /// `(int) x` of a voxel value (C's truncation); FS-12 beyond the `int` range and for NaN.
 pub(crate) fn int_of(g: &mut Globals, what: &str, x: f64) -> i32 {
     if x.is_nan() || x >= 2147483648.0 || x <= -2147483649.0 {
-        g.notices.add(
-            &FS_12,
-            format!("{what}: a value of {x} converted to int"),
-        );
+        g.notices
+            .add(&FS_12, format!("{what}: a value of {x} converted to int"));
         if g.notices.reproduce() {
             return i32::MIN;
         }
@@ -212,6 +210,9 @@ pub fn mri_erase_border_planes(
     Ok(NO_ERROR)
 }
 
+/// A window's visitor: `true` stops the walk.
+type Visit<'a> = dyn FnMut(&mut Globals, &mut dyn Write, i32, i32, i32) -> Result<bool, Fatal> + 'a;
+
 /// Visits the window `-whalf..=whalf` around `(x, y, z)`, z outermost, then y, then x, each
 /// coordinate through its index table; stops when `f` returns `true`.
 #[allow(clippy::too_many_arguments)]
@@ -222,7 +223,7 @@ fn window(
     mri: &Mri,
     whalf: i32,
     (x, y, z): (i32, i32, i32),
-    f: &mut dyn FnMut(&mut Globals, &mut dyn Write, i32, i32, i32) -> Result<bool, Fatal>,
+    f: &mut Visit,
 ) -> Result<(), Fatal> {
     for zk in -whalf..=whalf {
         let zi = index(g, err, what, mri, Axis::Z, z + zk)?;
@@ -255,13 +256,21 @@ pub fn mri_max_in_nbhd(
 ) -> Result<i32, Fatal> {
     const WHAT: &str = "MRImaxInNbhd";
     let mut max_val = -1e10f64;
-    window(g, err, WHAT, mri, (wsize - 1) / 2, (x, y, z), &mut |g, err, xi, yi, zi| {
-        let v = f64::from(mri_get_vox_val(g, err, mri, xi, yi, zi, frame, 0)?);
-        if v > max_val {
-            max_val = v;
-        }
-        Ok(false)
-    })?;
+    window(
+        g,
+        err,
+        WHAT,
+        mri,
+        (wsize - 1) / 2,
+        (x, y, z),
+        &mut |g, err, xi, yi, zi| {
+            let v = f64::from(mri_get_vox_val(g, err, mri, xi, yi, zi, frame, 0)?);
+            if v > max_val {
+                max_val = v;
+            }
+            Ok(false)
+        },
+    )?;
     Ok(int_of(g, WHAT, max_val))
 }
 
@@ -292,7 +301,15 @@ pub fn mri_count_thresh_in_nbhd(
     z: i32,
     thresh: f32,
 ) -> Result<i32, Fatal> {
-    mri_count_thresh_in_nbhd_as(g, err, "MRIcountThreshInNbhd", mri, wsize, (x, y, z), thresh)
+    mri_count_thresh_in_nbhd_as(
+        g,
+        err,
+        "MRIcountThreshInNbhd",
+        mri,
+        wsize,
+        (x, y, z),
+        thresh,
+    )
 }
 
 fn mri_count_thresh_in_nbhd_as(
@@ -305,12 +322,20 @@ fn mri_count_thresh_in_nbhd_as(
     thresh: f32,
 ) -> Result<i32, Fatal> {
     let mut total = 0;
-    window(g, err, what, mri, (wsize - 1) / 2, at, &mut |g, err, xi, yi, zi| {
-        if mri_get_vox_val(g, err, mri, xi, yi, zi, 0, 0)? > thresh {
-            total += 1;
-        }
-        Ok(false)
-    })?;
+    window(
+        g,
+        err,
+        what,
+        mri,
+        (wsize - 1) / 2,
+        at,
+        &mut |g, err, xi, yi, zi| {
+            if mri_get_vox_val(g, err, mri, xi, yi, zi, 0, 0)? > thresh {
+                total += 1;
+            }
+            Ok(false)
+        },
+    )?;
     Ok(total)
 }
 
@@ -364,7 +389,16 @@ pub fn mri_find_nearest_nonzero_location(
     let (x, y, z) = (nint(g, xr), nint(g, yr), nint(g, zr));
     need_voxels(g, err, WHAT, mri)?;
     let vox = |g: &mut Globals, x: i32, y: i32, z: i32| {
-        rows::read(g, WHAT, mri, i64::from(z), i64::from(y), i64::from(x), MRI_UCHAR).f()
+        rows::read(
+            g,
+            WHAT,
+            mri,
+            i64::from(z),
+            i64::from(y),
+            i64::from(x),
+            MRI_UCHAR,
+        )
+        .f()
     };
     let v0 = vox(g, x, y, z);
     if v0 > 0.0 {
@@ -630,6 +664,7 @@ pub fn mri_make_positive(
 /// `MRIsetVoxVal`) at each voxel whose label (`(int)` of frame 0) is `label` and one of its 26
 /// neighbours' (6 when `six_connected`; through the index tables) is not, or the other way round;
 /// the destination a clone of the source when none is given (`MRIclone`).
+#[allow(clippy::too_many_arguments)]
 pub fn mri_mark_label_border_voxels(
     g: &mut Globals,
     out: &mut dyn Write,
@@ -740,6 +775,7 @@ pub fn mri_compute_label_nbhd(
 
 /// `MRIlabelsInNbhd(mri, x, y, z, whalf, label)`: how many voxels of the window (z outermost,
 /// through the index tables) carry `label` (`nint` of frame 0).
+#[allow(clippy::too_many_arguments)]
 pub fn mri_labels_in_nbhd(
     g: &mut Globals,
     err: &mut dyn Write,
@@ -751,12 +787,20 @@ pub fn mri_labels_in_nbhd(
     label: i32,
 ) -> Result<i32, Fatal> {
     let mut count = 0;
-    window(g, err, "MRIlabelsInNbhd", mri, whalf, (x, y, z), &mut |g, err, xi, yi, zi| {
-        if label_at(g, err, mri, xi, yi, zi)? == label {
-            count += 1;
-        }
-        Ok(false)
-    })?;
+    window(
+        g,
+        err,
+        "MRIlabelsInNbhd",
+        mri,
+        whalf,
+        (x, y, z),
+        &mut |g, err, xi, yi, zi| {
+            if label_at(g, err, mri, xi, yi, zi)? == label {
+                count += 1;
+            }
+            Ok(false)
+        },
+    )?;
     Ok(count)
 }
 
@@ -968,11 +1012,21 @@ pub fn mri_clip_bright_wm(
             for x in 0..w {
                 let v = mri_get_vox_val(g, err, t1, x, y, z, 0, 0)?;
                 let mut val = to_buftype(g, v);
-                let wmv = match rows::read(g, WHAT, wm, i64::from(z), i64::from(y), i64::from(x), MRI_UCHAR) {
+                let wmv = match rows::read(
+                    g,
+                    WHAT,
+                    wm,
+                    i64::from(z),
+                    i64::from(y),
+                    i64::from(x),
+                    MRI_UCHAR,
+                ) {
                     Num::I(b) => b,
                     Num::F(_) => 0,
                 };
-                if wmv >= i64::from(WM_MIN_VAL) && i32::from(val) > DEFAULT_DESIRED_WHITE_MATTER_VALUE {
+                if wmv >= i64::from(WM_MIN_VAL)
+                    && i32::from(val) > DEFAULT_DESIRED_WHITE_MATTER_VALUE
+                {
                     n += 1;
                     val = DEFAULT_DESIRED_WHITE_MATTER_VALUE as u8;
                 }

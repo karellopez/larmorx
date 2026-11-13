@@ -1596,12 +1596,15 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
                     .collect();
                 if g.chance(2) {
                     // a valid string, sometimes
-                    let axes = [[b'L', b'R'], [b'P', b'A'], [b'I', b'S']];
+                    let axes = [*b"LR", *b"PA", *b"IS"];
                     let mut order = [0usize, 1, 2];
                     for k in (1..3).rev() {
                         order.swap(k, g.below(k as u64 + 1) as usize);
                     }
-                    o = order.iter().map(|&a| axes[a][g.below(2) as usize]).collect();
+                    o = order
+                        .iter()
+                        .map(|&a| axes[a][g.below(2) as usize])
+                        .collect();
                     if g.chance(4) {
                         o[0] = o[0].to_ascii_lowercase();
                     }
@@ -1658,7 +1661,8 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
                 vol_of(&mut g, &mut t, s);
                 let e = g.chance(4);
                 t.push(i64::from(e).to_string());
-                let txt: &[u8] = g.pick(&[&b"0.5"[..], b"1e-9", b"abc", b"1000", b" 0.01x", b"nan"]);
+                let txt: &[u8] =
+                    g.pick(&[&b"0.5"[..], b"1e-9", b"abc", b"1000", b" 0.01x", b"nan"]);
                 t.push(hex(txt));
                 let (r, c) = if g.chance(12) { (5, 6) } else { (4, 4) };
                 mat_toks(&mut g, &mut t, r, c);
@@ -1721,7 +1725,11 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
                 } else {
                     g.pick(&[0i64, 1, 2, 3, 35])
                 };
-                let nf = if g.chance(6) { g.pick(&[0i64, 2, 3]) } else { 1 };
+                let nf = if g.chance(6) {
+                    g.pick(&[0i64, 2, 3])
+                } else {
+                    1
+                };
                 let (r, c) = (g.int(1, 4), g.int(1, 4));
                 img_toks(&mut g, &mut t, r, c, format, nf);
             }
@@ -1770,7 +1778,11 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
                     "nearnz" => {
                         t.push(wsz(&mut g).to_string());
                         for v in pt(&mut g, s) {
-                            let d = if g.chance(3) { 0.0 } else { g.pick(&[0.25f64, -0.4, 0.5, 0.49]) };
+                            let d = if g.chance(3) {
+                                0.0
+                            } else {
+                                g.pick(&[0.25f64, -0.4, 0.5, 0.49])
+                            };
                             t.push(dx(v as f64 + d));
                         }
                         t.push(i64::from(!g.chance(4)).to_string());
@@ -2595,7 +2607,15 @@ impl Out {
             self.0 += "NULL ";
             return;
         };
-        for v in [i.rows, i.cols, i.orows, i.ocols, i.num_frame, i.pixel_format, i.sizepix] {
+        for v in [
+            i.rows,
+            i.cols,
+            i.orows,
+            i.ocols,
+            i.num_frame,
+            i.pixel_format,
+            i.sizepix,
+        ] {
             self.i(i64::from(v));
         }
         self.i(i.sizeimage as i64);
@@ -3704,7 +3724,9 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
             let mut m = get_vol(cx, t)?;
             let s = t.hex();
             let (g, a) = (&mut cx.g, &mut cx.a);
-            o.i(i64::from(orn::orientation_string_to_dircos(g, a, &mut m, &s)));
+            o.i(i64::from(orn::orientation_string_to_dircos(
+                g, a, &mut m, &s,
+            )));
             o.geom_v(&m.vg, false);
         }
         "s44" => {
@@ -3835,7 +3857,9 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
             let mut m = get_vol(cx, t)?;
             let border = t.i();
             let (g, b) = (&mut cx.g, &mut cx.b);
-            o.i(i64::from(lb::mri_erase_border_planes(g, b, &mut m, border)?));
+            o.i(i64::from(lb::mri_erase_border_planes(
+                g, b, &mut m, border,
+            )?));
             o.vol(Some(&m));
         }
         "nbhd" => {
@@ -3967,7 +3991,9 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
                 dz: 0,
             };
             let (g, b) = (&mut cx.g, &mut cx.b);
-            o.i(i64::from(lb::mri_label_bounding_box(g, b, &m, label, &mut r)?));
+            o.i(i64::from(lb::mri_label_bounding_box(
+                g, b, &m, label, &mut r,
+            )?));
             for v in [r.x, r.y, r.z, r.dx, r.dy, r.dz] {
                 o.i(i64::from(v));
             }

@@ -236,11 +236,7 @@ pub fn mri_calc_cras_for_sampled_volume(
             m[12 + i],
         )
     };
-    let (pr, pa, ps) = (
-        f64::from(lane(0)),
-        f64::from(lane(1)),
-        f64::from(lane(2)),
-    );
+    let (pr, pa, ps) = (f64::from(lane(0)), f64::from(lane(1)), f64::from(lane(2)));
     if g.gdiag & DIAG_SHOW != 0 && g.gdiag & DIAG_VERBOSE != 0 {
         let f = |x: f64| cfmt::f(x, 6);
         let _ = writeln!(

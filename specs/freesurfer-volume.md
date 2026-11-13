@@ -974,3 +974,172 @@ where FreeSurfer reads memory it does not own or crashes (FS-53, FS-58, FS-290, 
 and not compared; the default differs only with a notice. FS-326 and FS-461 are checked by the port's
 tests (`vote_counts_past_255`, `byte_replacement_in_every_frame`): 280 votes for one label and 320 for
 another in one voxel; a two-frame byte volume.
+
+## 33. Statistics, orientation strings and voxel-to-RAS matrices (3.1-37, piece a)
+- `MRIstats(mri, &min, &max, &n, &mean, &std)`: a volume without voxels: nothing written, `NO_ERROR`.
+  Otherwise `n` = width x height x depth x frames (32-bit, wrapping). For bytes, shorts, unsigned shorts,
+  32-bit integers, 64-bit integers and floats: `min` and `max` start at the first voxel; every voxel (x
+  outermost, then y, z, the frame innermost) is compared (`<`, `>`: a NaN never replaces them) and added to
+  a `float` sum and its `float` square to a `float` sum of squares (`sum + v`, `sq + v v`, in that order).
+  Another type: `min`, `max` not written, the sums 0. Then `mean = sum / (float) n` and `std = sqrt((sq - (n
+  mean) mean) / ((double) n - 1.0))`: the numerator in `float`, the quotient in `double` rounded to `float`,
+  its square root in `double` rounded to `float` (n = 1 gives an infinity or NaN). FS-329: FreeSurfer reads a
+  64-bit volume's voxels as 32-bit integers at the voxels' indices (`reproduce`); the default reads the
+  voxels.
+- `MRIprintStats(mri, stream)`: the statistics, then `<n> values`, `min = <g>`, `max = <g>`, `mean = <g>`,
+  `std = <g>` (`%g` of the `float`s), then `com = <g> <g> <g>` from `MRIcenterOfMass` at threshold 0;
+  `NO_ERROR`. FS-330: the values the statistics do not write (a volume without voxels; `min` and `max` of
+  a type they do not read) are memory contents in FreeSurfer: 0 here, noted.
+- `MRItype2str(type)`: `uchar`, `short`, `ushrt`, `int`, `long`, `float`, `bitmap`, `tensor`, `RGB`, else
+  `unknown data type` (the complex types too).
+- `MRIcropBoundingBox(mri, box)`: `x, y, z` raised to 0; `dx = min(width - x, dx)` (and y, z; after the
+  raise; 32-bit); `NO_ERROR`.
+- `MRIcalcCRASforSampledVolume(src, dst, &r, &a, &s)`: factors `src.width / dst.width` (and height, depth;
+  C's truncating integer division), the destination's centre `dst.width / 2` (integer), the source point
+  `centre factor + (factor - 1.0) / 2.0` in `double`, rounded to `float`; a source without cached matrices
+  gets both computed and kept; the point times the cached voxel-to-RAS matrix in `float` (per output: `((x
+  m0 + y m4) + z m8) + m12`, each product with the coordinate first), widened to `double`. With `Gdiag &
+  DIAG_SHOW` and `DIAG_VERBOSE`: `c_ras for sample volume is (<r>, <a>, <s>) compared with the src (<c_r>,
+  <c_a>, <c_s>)` (`%f`) on standard error. FS-462: an extent of 0 in the destination (or a division that
+  overflows) ends FreeSurfer (a crash); an error here in both modes.
+- `MRIcheckOrientationString(ostr)`: the first three characters, any case; NULL when they name each axis
+  once (L or R; P or A; I or S). Otherwise the errors' text, built in this order: for each character that
+  is not one of the six, `Character <c> in position <k> is invalid.` and a newline, `<c>` the byte itself;
+  the text is kept in a C buffer, so a NUL as the character cuts it just before the NUL (`Character ` stays,
+  the rest of that line is lost); then for each axis named more than once `  LR axis represented multiple
+  times.` (`PA`, `IS`), then for each axis not named `  LR axis not represented.`, each with a newline.
+  FS-463: a string of fewer than two characters is read past its terminator (memory); here the places past
+  it are taken as NUL in both modes, noted.
+- `MRIorientationStringToDircos(mri, ostr)`: a refused string: `ERROR: in orientation string <ostr>` and a
+  newline, then the errors' text, on standard output; returns 1, nothing changed. Otherwise the three
+  direction cosine columns (x, y, z) become the unit vectors the letters name (L (-1, 0, 0),
+  R (1, 0, 0), P (0, -1, 0), A (0, 1, 0), I (0, 0, -1), S (0, 0, 1)); returns 0; nothing else changes.
+- `stuff_four_by_four(m, m11, ..., m44)`: NULL: the error `stuff_four_by_four(): matrix is NULL`, another
+  size than 4 x 4: `stuff_four_by_four(): matrix is not four-by-four` (both `ERROR_BADPARM`, returned);
+  otherwise the values row by row into the real element places (`MATRIX_RELT`: for a complex matrix the
+  floats at those offsets of its storage), `NO_ERROR`.
+- `MRIvoxelXformToRasXform(src, dst, m_vox, m_ras)`: `vox2ras(dst or src) * (m_vox * ras2vox(src))`, the two
+  products with `MatrixMultiply` (into `m_ras` when given). `MRIgetVoxelToVoxelXform(src, dst)`:
+  `ras2vox(dst) * vox2ras(src)`.
+- `MRIsetVoxelToRasXform(mri, M)`: the column scales `sqrt(M1c^2 + M2c^2 + M3c^2)` (each square in `float`,
+  summed in `double` from 0 in row order, `sqrt` in `double`); `thresh` 0.001 or the value `sscanf("%lf")`
+  reads from the environment variable `FS_SetVoxToRasXform_Change_VoxSize` (unchanged when it reads
+  nothing). When `|size - scale| > thresh` on any axis (`double`): `WARNING: MRIsetVoxelToRasXform(): voxel
+  size is inconsistent with scale (thresh=<g>)`, `  scale <g> <g> <g>`, `  vs <g> <g> <g>` on standard
+  output, and when the variable is set `  changing voxel size to scale` and the voxel sizes set to the
+  scales (as `float`s). Then `x_r = M11 / xsize`, `y_r = M12 / ysize`, `z_r = M13 / zsize`, the same for rows
+  2 (a) and 3 (s), in `float`; `ci = width / 2.0` (and cj, ck) as `float`s; `c_r = M14 + ((M11 ci + M12 cj) +
+  M13 ck)` in `float` (rows 2, 3 for `c_a`, `c_s`); `ras_good_flag = 1`; the cached matrices recomputed;
+  `NO_ERROR`. FS-464: a matrix smaller than 3 x 4 is read past its elements in FreeSurfer; an error here.
+
+## 34. Slices as 2-D images (3.1-35's image part)
+An image's pixel `(x, y)` is element `y ocols + x` of its pixels (an RGB pixel the 3 bytes from `3 (y ocols +
+x)`); image row `h - (y + 1)` holds the volume's row `y` (the image runs upwards).
+- `MRItoImageView(mri, I, slice, view, frame)`: the volume's principal slice direction (coronal, sagittal,
+  horizontal, as `MRIsliceDirectionName` finds it) must be known, else the error `MRItoImageView(<slice>,
+  <view>): unsupported view/slice direction -1` (`ERROR_UNSUPPORTED`), NULL. For direction D and view V the
+  image is `w x h` with the slices along `d`: D coronal: V coronal (width, height; slices along depth), V
+  sagittal (depth, height; along width), V horizontal (width, depth; along height); D sagittal: coronal
+  (depth, height; width), sagittal (width, height; depth), horizontal (depth, width; height); D horizontal:
+  coronal (width, depth; height), sagittal (height, depth; width), horizontal (width, height; depth). A
+  view that is none of the three: 0 x 0, no slices. The image's columns run against the volume's axis
+  when (D coronal: V coronal `x_r > 0`, V sagittal `z_a <= 0`, V horizontal `x_r > 0`; D sagittal: coronal
+  `z_r > 0`, sagittal `x_a <= 0`, horizontal `z_r > 0`; D horizontal: coronal `x_r > 0`, sagittal `y_a <=
+  0`, horizontal `x_r > 0`); its rows run against it when (D coronal: `y_s > 0`, `y_s > 0`, `z_a <= 0`; D
+  sagittal: `y_s > 0`, `y_s > 0`, `x_a <= 0`; D horizontal: `z_s > 0`, `z_s > 0`, `y_a <= 0`). For D
+  sagittal and V horizontal the volume's x comes from the image row and its z from the image column. A
+  negative slice becomes `nint(frac d)` (`frac` a `float`, 0.4 when V is D, else 0.6; the product in
+  `float`); a slice at or past `d`: `MRItoImageView: bad slice <s>` and a newline (`ERROR_BADPARM`), NULL.
+  The image is a byte image: a given one of another size or format is replaced by a new `ImageAlloc(h, w,
+  PFBYTE, 1)`. `xsize`, `ysize` are the volume's in-plane voxel sizes for D coronal, else 1. Each pixel
+  samples the frame at its voxel (`MRIsampleVolumeFrame`, whole coordinates: the nearest voxel, as that
+  function reads it); the extremes start at 1e7 and -1e7 (`float`s; a sample replaces them when `>` or
+  `<` in `double`). A range `|max - min| < FLT_EPSILON` (`float` difference): the error `MRItoImageView:
+  constant image`, the image returned as it is (its sizes set). Otherwise each pixel is `(ubyte) (255.0
+  (val - min) / (max - min))` in `double` (`max - min` in `float`), which is in [0, 255] or NaN (0).
+- `MRItoImage(mri, I, slice)`: a slice outside `[0, depth)`: `MRItoImage: bad slice <s>` and a newline
+  (`ERROR_BADPARM`), NULL. Without a given image, `ImageAlloc(height, width, format, 1)` with `PFINT` for
+  32-bit integers, `PFFLOAT` for floats, `PFBYTE` otherwise; the image's `xsize`, `ysize` the volume's.
+  Each row of frame 0 (bytes, 32-bit integers, floats: `width` elements) is copied as it is into image row
+  `height - (y + 1)` at element offset `row ocols` of the image's pixel size by the volume's type. Another
+  volume type with at least one row: `MRItoImage: unsupported type <t>` (`ERROR_UNSUPPORTED`), NULL (the
+  image freed). FS-465: a given image smaller than the copy (or of a narrower pixel format) is written past
+  its pixels in FreeSurfer; here only the bytes inside are written, noted.
+- `ImageToMRI(I)`: the volume's type by the pixel format: `PFBYTE` bytes, `PFSHORT` and `PFINT` 32-bit
+  integers, `PFFLOAT` floats, `PFRGB` RGB (after `reading RGB image....` on standard output); another format
+  ends the program (`IMAGE type = <f> not supported`, `ERROR_BADPARM`). The volume is `ocols x orows x 1`
+  (`MRIalloc` for at most one frame, else `MRIallocSequence` with the frames). An image size within 1e-15
+  of 0 becomes 1 in the image. `MRIsetResolution(xsize, ysize, 1)`; then `nframes` = the image's count (0 or
+  negative kept), `imnr0 = imnr1 = 1`, `xend = (width xsize) / 2.0` (the product in `float`, halved in
+  `double`, rounded to `float`), `xstart = -xend`, the same for y and z, `fov` the larger of `xend - xstart`
+  and `yend - ystart` (`>`; the second when equal or NaN), the direction cosines `x = (-1, 0, 0)`, `y = (0,
+  0, -1)`, `z = (0, 1, 0)` and the centre 0. Each frame `f` of the image (at `f rows cols` elements) fills
+  frame `f`: voxel `(x, y)` from pixel `(x, height - (y + 1))`: bytes and floats as they are, `PFSHORT`
+  pixels as unsigned 16-bit numbers, `PFINT` pixels as they are, RGB pixels as the 24-bit number `b0 + 256
+  b1 + 65536 b2` (`MRIsetVoxVal`). FS-466: FreeSurfer reads an RGB image's frame `f` at `f rows cols` bytes,
+  not `3 f rows cols` (`reproduce`); the default reads the frame's own pixels. FS-465: pixels past the image's
+  buffer are read as 0, noted.
+
+## 35. Neighbourhoods and labels (3.1-37, piece b)
+A window of half-width `whalf` around `(x, y, z)` visits `-whalf..=whalf` on each axis through the boundary
+index tables (a coordinate clamped into the volume; more than 500 outside is an error, FS-323), z
+outermost, then y, then x, unless said otherwise. `(int) v` of a voxel truncates; NaN and values beyond the
+`int` range follow FS-12 (x86-64's -2147483648 with `reproduce`, clamped, NaN 0, by default). Voxels are read
+and written with `MRIgetVoxVal` and `MRIsetVoxVal` (frame 0) unless said otherwise.
+- `MRIsmoothParcellation(mri, count)`: shorts only (else `MRIsmoothParcellation(): only supported for shorts
+  data`, `ERROR_UNSUPPORTED`, NULL); a copy (`MRIcopy`) in which each voxel with 1 <= x < width - 1 (and y,
+  z) takes, of its 26 neighbours in the order (x + 1, y + 1, z + 1), (x + 1, y + 1, z), (x + 1, y + 1, z -
+  1), (x + 1, y, z + 1), ..., (x - 1, y - 1, z - 1) (the first offset varying slowest; the voxel itself
+  skipped), the last whose label at least `count` of the 26 carry; the source's own frame-0 shorts.
+  FS-467: a negative label is counted outside FreeSurfer's array (memory); here in a bin of its own, noted.
+- `MRIeraseBorderPlanes(mri, b)`: for every frame, voxels at z = i and z = depth - i - 1 (i < b; x, y over
+  the volume), then x = i and width - i - 1, then y = i and height - i - 1, set to 0; `NO_ERROR`.
+- `MRImaxInNbhd(mri, wsize, x, y, z, frame)`: whalf = `(wsize - 1) / 2`; the largest voxel of the frame
+  (`double`, from -1e10, `>`), returned as `(int)` (FS-12 for -1e10, an empty window).
+  `MRIcountNonzeroInNbhd`: how many voxels are `> 0`; `MRIcountThreshInNbhd(..., thresh)`: `> thresh`
+  (`float`); `MRIareNonzeroInNbhd`: 1 at the first voxel `> 0` (the walk stops), else 0.
+- `MRIfindNearestNonzeroLocation(mri, wsize, xr, yr, zr, &xv, &yv, &zv)`: the byte at `nint` of the point
+  (the row's `x`-th byte whatever the type) when above 0, as a `float`; otherwise over the window the byte
+  voxels above 0 at the smallest `dist = sqrt((dx dx + dy dy) + dz dz)` (`dx = (float)(xi - xr)` in
+  `double` rounded to `float`, the sum in `float`, the root in `double` rounded to `float`; `<`, from
+  100000; the first of equals), its value and, when asked, its place; 0 when none.
+- The label of a voxel in the means and counts: `nint` of the voxel.
+  `MRImeanInLabelMultispectral(src, lab, label)`: a vector of the source's frames; frame f's mean (`double`
+  sum of the `float` voxels over the source's extent, x outermost, divided by the count, at least 1; rounded
+  to `float`). `MRImeanInLabel`: frame 0's mean (`double`). `MRImeanAndStdInLabel(..., &std)`: and `std =
+  sqrt(sq / n - mean mean)`, `sq` the `double` sum of `float` squares. `MRImeanInLabelInRegion(src, lab,
+  label, x0, y0, z0, whalf, &sigma)`: the same over the box `x0 - whalf..=x0 + whalf` (and y, z; places
+  outside the source skipped). `MRImaxInLabelInRegion`: the largest voxel of the label in the box, from 0.
+- `MRImakePositive(src, dst)`: `MRIcopy(src, dst)`; when the smallest voxel (`MRIvalRange`) is below 0,
+  every voxel of every frame minus it (`float`).
+- `MRImarkLabelBorderVoxels(src, dst, label, mark, six)`: the destination (a clone without one) gets `mark`
+  at each voxel where `(int)` of the voxel equals `label` and `(int)` of one of its neighbours (x, then y,
+  then z offsets -1, 0, 1; with `six` only those one step away) does not, or the reverse.
+- `MRIcomputeLabelNbhd(labels, vals, x, y, z, counts, means, whalf, max_labels)`: counts (and means)
+  zeroed; over the window (x outermost) each label `(int)` in `[0, max_labels)` counted, and with `vals`
+  its value added to `means[label]` in `float`; then each mean with a count divided by it (`float`).
+- `MRIlabelsInNbhd(mri, x, y, z, whalf, label)`: how many window voxels carry `label`.
+  `MRIlabelsInPlanarNbhd(..., which)`: in the plane: horizontal (z outer, x inner; y as given), sagittal (z
+  outer, y inner; x as given), coronal (x outer, y inner; z as given); another plane `MRIlabelsInPlanarNbhd:
+  which=<w> not supported yet` (`ERROR_UNSUPPORTED`) and 0.
+- `MRIlabelBoundingBox(mri, label, box)`: the smallest box holding the voxels with `(int)` equal to
+  `label`; none: `x, y, z` the extents and `dx = -1 - x + 1` (32-bit). `MRIfillBox(mri, box, v)`: frame 0's
+  voxels of the box cut to the volume (`start + extent - 1` in 32-bit) set to `v`.
+- `MRImaskZero(src, mask, dst)`: the destination (a clone without one; it may be the source) gets, over the
+  source's extent, the source's voxel where the mask's is `> 0`, else 0 (frame 0).
+- `MRIclipBrightWM(T1, wm)`: each voxel of the T1 volume's frame 0 converted to a byte (FS-468), lowered to
+  110 where the white-matter volume's byte (the row's `x`-th byte whatever its type) is at least 5 and the
+  byte above 110 (counted), stored back; then `MRIclipBrightWM(): nthresh=<n>, wmmin=5, clip=110 ` and a
+  newline on standard output; `NO_ERROR`. A T1 volume of another type than bytes loses its fractions (kept:
+  rule C, FreeSurfer's T1 is bytes). FS-468: a value outside [0, 255] or NaN becomes x86-64's low byte of
+  its 32-bit truncation (0 for NaN and beyond the `int` range) with `reproduce`, clamped (NaN 0) by default.
+
+## 36. Validation plan (sections 33 to 35)
+The probe's commands `stats`, `type2s`, `cropbb`, `crass`, `chkostr`, `o2dc`, `s44`, `vx2rx`, `v2v`, `setv2r`
+(section 33), `toimgv`, `toimg`, `img2mri` (section 34), `smpar`, `erasebp`, `nbhd`, `nearnz`, `lmeans`,
+`mkpos`, `mlbv`, `lnbhd`, `linbhd`, `lbbox`, `fillbox`, `mskz`, `clipwm` (section 35), on the probe's random
+volumes (every type, odd frames, header-only volumes, special floats), orientation strings of every length
+and case, signed permutation direction cosines for the image views, images of every format with zero and
+tiny sizes, volumes painted with small labels (and -1, 250). Expected: identical with `reproduce` but where
+FreeSurfer reads or writes memory it does not own or crashes (FS-53, FS-58, FS-163, FS-290, FS-323, FS-330,
+FS-463, FS-465, FS-467), counted and not compared; the default differs only with a notice.

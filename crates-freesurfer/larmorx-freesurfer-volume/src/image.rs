@@ -26,9 +26,7 @@ use larmorx_freesurfer_core::log::{self, ERROR_BADPARM, ERROR_UNSUPPORTED, Fatal
 use larmorx_freesurfer_core::ret::Ret;
 use larmorx_freesurfer_core::sse::{div64, mul, mul64, sub, sub64};
 use larmorx_freesurfer_core::utils::nint;
-use larmorx_freesurfer_io::image::{
-    Image, PFBYTE, PFFLOAT, PFINT, PFRGB, PFSHORT, image_alloc,
-};
+use larmorx_freesurfer_io::image::{Image, PFBYTE, PFFLOAT, PFINT, PFRGB, PFSHORT, image_alloc};
 use larmorx_freesurfer_mri::mri::{
     MRI_FLOAT, MRI_INT, MRI_RGB, MRI_UCHAR, Mri, mri_alloc, mri_alloc_sequence,
 };
@@ -269,13 +267,7 @@ pub fn mri_to_image_view(
                 f64::from(range),
             ));
             let off = i64::from(yp) * i64::from(im.ocols) + i64::from(x);
-            put(
-                g,
-                im,
-                off,
-                &[b],
-                "MRItoImageView",
-            );
+            put(g, im, off, &[b], "MRItoImageView");
         }
     }
     Ok(ret(fresh))
@@ -450,7 +442,16 @@ pub fn image_to_mri(
                     MRI_UCHAR => {
                         let b = get::<1>(g, im, e, WHAT);
                         let sl = i64::from(frame);
-                        rows::write(g, WHAT, &mut mri, sl, i64::from(y), x64, MRI_UCHAR, Num::I(i64::from(b[0])));
+                        rows::write(
+                            g,
+                            WHAT,
+                            &mut mri,
+                            sl,
+                            i64::from(y),
+                            x64,
+                            MRI_UCHAR,
+                            Num::I(i64::from(b[0])),
+                        );
                     }
                     MRI_INT => {
                         let v = if im.pixel_format == PFSHORT {
@@ -458,11 +459,29 @@ pub fn image_to_mri(
                         } else {
                             i64::from(i32::from_le_bytes(get::<4>(g, im, 4 * e, WHAT)))
                         };
-                        rows::write(g, WHAT, &mut mri, i64::from(frame), i64::from(y), x64, MRI_INT, Num::I(v));
+                        rows::write(
+                            g,
+                            WHAT,
+                            &mut mri,
+                            i64::from(frame),
+                            i64::from(y),
+                            x64,
+                            MRI_INT,
+                            Num::I(v),
+                        );
                     }
                     _ => {
                         let v = f32::from_le_bytes(get::<4>(g, im, 4 * e, WHAT));
-                        rows::write(g, WHAT, &mut mri, i64::from(frame), i64::from(y), x64, MRI_FLOAT, Num::F(v));
+                        rows::write(
+                            g,
+                            WHAT,
+                            &mut mri,
+                            i64::from(frame),
+                            i64::from(y),
+                            x64,
+                            MRI_FLOAT,
+                            Num::F(v),
+                        );
                     }
                 }
             }

@@ -72,7 +72,9 @@ pub fn check_orientation_string(g: &mut Globals, ostr: &[u8]) -> Option<Vec<u8>>
     }
     for (n, axis) in [(nsag, "LR"), (ncor, "PA"), (nax, "IS")] {
         if n > 1 {
-            errstr.extend_from_slice(format!("  {axis} axis represented multiple times.\n").as_bytes());
+            errstr.extend_from_slice(
+                format!("  {axis} axis represented multiple times.\n").as_bytes(),
+            );
             err = true;
         }
     }
@@ -134,7 +136,12 @@ pub fn stuff_four_by_four(
     v: &[f32; 16],
 ) -> i32 {
     let Some(m) = m else {
-        log::error_printf(g, err, ERROR_BADPARM, "stuff_four_by_four(): matrix is NULL");
+        log::error_printf(
+            g,
+            err,
+            ERROR_BADPARM,
+            "stuff_four_by_four(): matrix is NULL",
+        );
         return ERROR_BADPARM;
     };
     if m.rows != 4 || m.cols != 4 {
@@ -154,9 +161,9 @@ pub fn stuff_four_by_four(
     NO_ERROR
 }
 
-/// `MRIvoxelXformToRasXform(src, dst, m_voxel_xform, m_ras_xform)`: `vox2ras(dst) * (m_voxel_xform
-/// * ras2vox(src))` (`MatrixMultiply`; `dst` the source when there is none), into `m_ras_xform`
-/// when given.
+/// `MRIvoxelXformToRasXform(src, dst, m_voxel_xform, m_ras_xform)`: the product `vox2ras(dst)`
+/// times (`m_voxel_xform` times `ras2vox(src)`) (`MatrixMultiply`; `dst` the source when there is
+/// none), into `m_ras_xform` when given.
 pub fn mri_voxel_xform_to_ras_xform(
     g: &mut Globals,
     out: &mut dyn Write,
@@ -205,8 +212,7 @@ pub fn mri_set_voxel_to_ras_xform(
     mri: &mut Mri,
     m: &Matrix,
 ) -> Result<i32, Fatal> {
-    if (1..=3).any(|r| (1..=4).any(|c| m.relt_index(r, c).is_none())) || m.rows < 3 || m.cols < 4
-    {
+    if (1..=3).any(|r| (1..=4).any(|c| m.relt_index(r, c).is_none())) || m.rows < 3 || m.cols < 4 {
         g.notices.add(
             &FS_464,
             "a voxel-to-RAS matrix smaller than 3 x 4 is read past its elements",

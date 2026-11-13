@@ -118,3 +118,16 @@ FS-327), 0 different; `fix` different only with notices. Seed 1, 1,900 cases: 1,
 comparable, hash `0b5f671441495eed2d7a7aa8001aa5317d3c1cf986fe06d3c1bf0a911498246b`, passing with
 AArch64's NaN emulated in debug and release (`oracles/logs/fs-found-c-r18-trap-volume.log`). The port's
 debug and release builds agree on the 4,000 cases of seed 13 in both modes.
+
+Measured 2026-11-13 (part 9, relay 19: 3.1-37's statistics, orientation strings and voxel-to-RAS matrices
+`stats`, `type2s`, `cropbb`, `crass`, `chkostr`, `o2dc`, `s44`, `vx2rx`, `v2v`, `setv2r`; 3.1-35's 2-D images
+`toimgv`, `toimg`, `img2mri` (images of every format, given images of the right and other sizes); 3.1-37's
+neighbourhoods and labels `smpar`, `erasebp`, `nbhd`, `nearnz`, `lmeans`, `mkpos`, `mlbv`, `lnbhd`, `linbhd`,
+`lbbox`, `fillbox`, `mskz`, `clipwm` (volumes painted with small labels); 121 commands; logs
+`oracles/logs/fs-found-c-r19-*.log`): seed 13, piece a 4,000 cases: 3,992 identical with `reproduce`, 8 not
+comparable; images 3,000 cases: 2,944 identical, 56 not comparable; piece b 13,000 cases: 11,761 identical,
+1,239 not comparable (FS-53, FS-58, FS-163, FS-290, FS-467), 0 different; `fix`
+different only with notices. Seed 1, 2,420 cases: 2,254 identical, 166 not comparable, hash
+`3834ef65feb37ff13903d5bf1458c793ceae37307d8779a87e70c4b755ef40a7`, passing with AArch64's NaN emulated in
+debug and release (`oracles/logs/fs-found-c-r19-trap-volume.log`). `check.py`'s `SKIP` adds FS-163 (MRIcopy past a
+smaller destination), FS-330, FS-463, FS-465 and FS-467.

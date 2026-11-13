@@ -89,3 +89,22 @@ No third-party code in these lines (the audit of `docs/freesurfer/third-party.md
 - `src/arith.rs`, relay 18 (3.1-38): `utils/mriset.cpp` `MRIcheckVolDims` (73-98), `MRIreplaceValues` (2263-2297),
   `MRIreplaceValuesUchar` (2338-2368). Change: FS-461 (every frame replaced), rule A. FreeSurfer's OpenMP loop over
   the slices writes each voxel once: run in order.
+- `src/stats.rs` (3.1-37; relay 19): `utils/mri.cpp` `MRIprintStats`, `MRIstats` (12681-12828), `MRItype2str`
+  (16535-16558), `MRIcropBoundingBox` (15191-15200), `MRIcalcCRASforSampledVolume` (14776-14842; `affine.h`'s
+  `AffineMV` as in `MRIcalcCRASforExtractedVolume`). Changes: FS-329 (the 64-bit voxels read), rule A; FS-330 (0 for
+  values never written), FS-462 (an error), both modes.
+- `src/orient.rs` (3.1-37; relay 19): `utils/mri.cpp` `stuff_four_by_four` (12863-12908), `MRIvoxelXformToRasXform`
+  (12992-13008), `MRIsetVoxelToRasXform` (13019-13075), `MRIgetVoxelToVoxelXform` (15202-15212),
+  `MRIorientationStringToDircos` (15256-15319), `MRIcheckOrientationString` (15328-15398); `getenv` through the
+  caller's `Environment`. Changes: FS-463 (NUL past the end), FS-464 (an error), both modes.
+- `src/image.rs` (3.1-35's image part; relay 19): `utils/mri.cpp` `MRItoImageView` (6796-7106), `MRItoImage`
+  (7115-7155), `ImageToMRI` (7157-7314), on track A's `larmorx_freesurfer_io::image`. Changes: FS-466 (each RGB frame's
+  own pixels), rule A; FS-465 (only the pixels written and read), both modes.
+- `src/labels.rs` (3.1-37; relay 19): `utils/mri.cpp` `MRIsmoothParcellation` (13124-13186), `MRIeraseBorderPlanes`
+  (13188-13220), `MRImaxInNbhd` (13286-13304), `MRIcountNonzeroInNbhd`, `MRIareNonzeroInNbhd` (13329-13362),
+  `MRIfindNearestNonzeroLocation` (13363-13401), `MRImeanInLabelMultispectral` .. `MRImaxInLabelInRegion` (14108-14246),
+  `MRImakePositive` (14247-14269), `MRImarkLabelBorderVoxels` (14671-14718), `MRIcomputeLabelNbhd` (14720-14765),
+  `MRIlabelsInNbhd`, `MRIlabelsInPlanarNbhd` (15807-15857), `MRIlabelBoundingBox` (16224-16250), `MRIcountThreshInNbhd`,
+  `MRIfillBox` (16373-16404), `MRImaskZero` (16518-16533), `MRIclipBrightWM` (17744-17776); `WM_MIN_VAL`
+  (`include/mri.h`), `DEFAULT_DESIRED_WHITE_MATTER_VALUE` (`include/mrinorm.h`). Changes: FS-468 (clamped bytes), rule
+  A; FS-467 (a bin of its own), both modes; FS-12's rule for the `(int)` truncations.

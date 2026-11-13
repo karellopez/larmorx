@@ -1436,7 +1436,14 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
                         }
                     }
                 } else if !g.chance(3) {
-                    // the template on the source's grid, its voxels scaled and its centre moved
+                    // the template on the source's grid, its voxels scaled and its centre moved;
+                    // mostly a source with a good RAS and voxel sizes that make a matrix
+                    if !g.chance(4) {
+                        t[gs + 7] = "1".into();
+                        for k in 4..=6 {
+                            t[gs + k] = fx(g.pick(&[1.0f32, 1.0, 0.5, 2.0, 1.5, 0.9375]));
+                        }
+                    }
                     for k in 4..=22 {
                         t[gt + k] = t[gs + k].clone();
                     }

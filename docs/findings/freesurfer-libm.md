@@ -163,6 +163,33 @@ So on this head **only glibc's `tanhf` decides results**, in `mri_watershed`'s s
 change no file; the correctly rounded `acos` (up to 438 million calls, 760,000 of them different) and
 `atan2` gave FreeSurfer's files on every step.
 
+### fMRIPrep's calls
+
+The programs fMRIPrep and sMRIPrep run outside recon-all (`docs/freesurfer/programs.toml`, stream
+`fmriprep`, run `bare`: no recording holds them) were run under the shim by
+`libm-shim/fmriprep_calls.sh` on a finished subject (the recording's final subject directory, copied),
+with fMRIPrep's options, one thread, 2026-11-13: `mri_coreg` (`--dof 6 --sep 4 --ftol 1e-4
+--linmintol 1e-2`, the BOLD reference of fMRIPrep's oracle run) and `bbregister` from it (`--t2 --6
+--init-reg`: `mri_segreg` twice, `mri_surf2surf`, `tkregister2_cmdl`, `lta_convert`), sMRIPrep's
+`mri_robust_register --satit --iscale`, `mris_expand -thickness ... 0.5`, three `mris_convert`,
+`lta_convert --invert`, `mri_vol2surf` to fsnative and fsaverage5 (`--projfrac-avg 0 1 0.2`, the T1w
+reference standing in for the BOLD series), and `mri_robust_template` on two images of the head.
+`libm-shim/compare_calls.sh` compares the outputs of two runs (provenance aside).
+
+| Head | Calls (differing from the correctly rounded value) | Correctly rounded | Result |
+|---|---|---|---|
+| ds000005 sub-01 | `mri_coreg`: `log2` 34,032,856 (1,487); `mri_robust_register`, `mri_robust_template`: `acos` 67, 54 (0), `log10` 180, 142 (0), `csqrt` 1,396, 1,177 (no reference); `mris_expand`: `log2` 2 (0); `atan2`'s table in `mri_segreg`, `mris_convert`, `mris_expand`, `mri_vol2surf` | `log2` alone (`mri_coreg`, `bbregister`) | every output identical (`coreg.lta`, `bbreg.lta`, `bbreg.dat`, the costs) |
+| ds000005 sub-01 | (as above) | every function of the shim, every call | every output identical (the LTAs and `.dat`, `lh.midthickness`, the GIFTI surfaces and samplings, the template) |
+| ds000005 sub-01 | (as above) | `csqrt` moved by one unit in the last place (both parts; the shim's `ulp` mode: no correctly rounded `csqrt` exists to compare with) | `rr.lta`, `rt1.lta`, `rt2.lta`, `rt.mgz` identical |
+| ds000228 sub-pixar008 (a 3.5-year-old) | `mri_coreg`: `log2` 39,556,088 (1,523); `acos` 51, 78 (0), `log10` 136, 208 (0), `csqrt` 1,237, 1,882; `mris_expand`: `log2` 2 (0); the `atan2` table | `log2` alone (`mri_coreg`, `bbregister`) | every output identical |
+| ds000228 sub-pixar008 | (as above) | `csqrt` moved by one unit (`ulp`) | every output identical |
+
+So fMRIPrep's FreeSurfer calls need **no glibc-exact function** on these two heads: the correctly
+rounded `log2` gives `mri_coreg`'s registration exactly (its 1,487 and 1,523 different values in 34
+and 40 million change no cost decision), the correctly rounded `acos`, `log10` and `atan2` everything
+else, and `csqrt`'s last bits (moved by one unit) change nothing in `mri_robust_register` and
+`mri_robust_template`, so any faithful `csqrt` gives their results there.
+
 ## 4. `tan`
 
 The double `tan` is reached at run time only by `sc_gamma_large`, the gamma draw for shapes of 12

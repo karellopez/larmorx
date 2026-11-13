@@ -232,7 +232,9 @@ transform's file name; `imnr0` and `imnr1` when the depths agree; `ptype`, `fov`
 `location`, start and end coordinates, flip angle, TR, TE, TI, the file name, cosines, centre,
 `ras_good_flag`, `brightness`; the registration matrix (FS-56: FreeSurfer loses it when the
 destination has none: by default it is copied; with no source matrix the destination's is
-dropped); the subject, path, format and stem names; the cached matrices; `AutoAlign` and
+dropped); the subject, path, format and stem names; the cached matrices (the voxel-to-RAS matrix's 16
+floats into the destination's, the RAS-to-voxel matrix by the matrix copy of
+`specs/freesurfer-maths.md` §2.4: none when the source has none); `AutoAlign` and
 `origRas2Vox` when the source has them; the command lines (the destination's replaced); the colour
 table when the source has one (the destination's replaced; with `DIAG_SHOW` and verbose diagnostics
 it prints `MRIcopyHeader(): source has ctab. Copying ctab ...`). The destination's counts and bytes
@@ -241,7 +243,10 @@ are recomputed from its own extent and type. Not copied: extent, type, frames, `
 the GCA-morph fields, the voxels. FS-60: a destination that owned a transform, given a source with
 none, has its transform freed, yet FreeSurfer's copy still reports a linear transform and its
 ownership, whose matrices are then freed memory (**(observed)**: `copyxfm`, memory lines); both
-modes drop the transform and the flag.
+modes drop the transform and the flag. FS-252: a source without its cached voxel-to-RAS matrix
+crashes FreeSurfer's header copy (FreeSurfer's own volumes always have that matrix: every allocation
+of §4 computes it, so only a volume made otherwise lacks it); both modes copy none (the destination
+then has none, as its source; its RAS-to-voxel matrix as above) and note FS-252.
 
 Also: `MRIcopyPulseParameters` (flip angle, TR, TE, TI); `MRIcopyVolGeomToMRI` (sizes, cosines,
 centre; no extent, no name, the cache not recomputed); `MRIcopyVolGeomFromMRI` (sizes, cosines,
@@ -636,7 +641,8 @@ allocator cannot make the wrapped sizes those reach. Every call gets 10 seconds.
 - Then what the probe cannot show (FreeSurfer crashes or reads memory there, or larmorx defines both
   modes): FS-58's error (§5, §13, §17), FS-197's return, FS-198's dropped matrix, FS-264's error,
   FS-165's error (§9), FS-53's writes (nothing written) and reads (`outside_val`, or 0 with
-  `reproduce`): the clean room's own tests, against this spec's text.
+  `reproduce`), FS-252's copy without the voxel-to-RAS matrix (the probe's volumes always have it):
+  the clean room's own tests, against this spec's text.
 
 ### 23.2 The groups and their reference hashes **(observed)**
 
@@ -710,5 +716,6 @@ bounding box and an array's copy. Later: the replays of the first programs that 
 | FS-196 | a missing or smaller destination matrix in a transform's copy | A | the copy kept | none, or the old numbers |
 | FS-197 | freeing no array | crash | nothing, 0 (both modes) | nothing, 0 |
 | FS-198 | a transform's copy from a missing matrix frees the destination's | use after free | dropped (both modes) | dropped |
+| FS-252 | the header copy from a source without its cached voxel-to-RAS matrix (§6) | crash | none copied (both modes) | none copied |
 | FS-264 | the 4 x 4 helpers given a matrix with fewer than 4 rows or columns | B | the error (both modes) | the error |
 | FS-331 | tkregister RAS to scanner RAS into a given matrix larger than 4 x 4 (§9) | A | the result in its top-left 4 x 4 | FreeSurfer's: the inverse laid out, its check, the product |

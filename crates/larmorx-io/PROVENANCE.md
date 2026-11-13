@@ -17,6 +17,7 @@
 | `NiftiHeader::base_affine`, `best_affine` | `get_base_affine` (`shape_zoom_affine` with x flip) and `get_best_affine` |
 | `NiftiHeader::slope_inter` | `Nifti1Header.get_slope_inter` |
 | `nifti::read`, `Scaling` | `ArrayProxy._get_scaled` and `volumeutils.apply_read_scaling` (result types; multiply only if slope ≠ 1, add only if intercept ≠ 0; numpy's complex arithmetic) |
+| `nifti::read_first_volumes` (the confounds' part, 2026-11-12) | `ArrayProxy.__getitem__` with `[:, :, :, :k]` (`fileslice`: only the first `k` volumes of each index after the fourth axis are read, the values scaled as `_get_scaled` scales them) |
 | `nifti::header_for_image` | `SpatialImage.update_header` and `Nifti1Pair._affine2header` (keep the header's xforms when the affine is `allclose` to them; else sform code 2, qform code 0) |
 | `Extension::read_all` | `Nifti1Extensions.from_fileobj` |
 

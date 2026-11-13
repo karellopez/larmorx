@@ -1,0 +1,92 @@
+{
+ "defect": null,
+ "description": "SpikeRegressors with lags [1, 2] and minimum_contiguous 5 (the trial's notice verdicts): the filling of short runs made both lag rules flag the same volumes, yet PIPE-67 fired. Fixed: PIPE-67 is named where the flagged volumes differ after the filling.",
+ "expect": "pass",
+ "found": {
+  "detail": "SpikeRegressors with lags [1, 2] and minimum_contiguous 5 (the trial's notice verdicts): the filling of short runs made both lag rules flag the same volumes, yet PIPE-67 fired. Fixed: PIPE-67 is named where the flagged volumes differ after the filling.",
+  "n": 1234,
+  "seed": "confounds-trial",
+  "shrink_moves": [],
+  "signature": [
+   "D13 fix pass"
+  ]
+ },
+ "id": "spikes-pipe67-after-filling",
+ "implementations": [
+  "port"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "call": "spikes",
+   "confounds": {
+    "acc": 6,
+    "cos": 2,
+    "extra": "none",
+    "fd_scale": 1.0,
+    "format": "%.10f",
+    "nss": 2,
+    "seed": 1107818948,
+    "t": 95,
+    "tcc": 1
+   },
+   "kw": {
+    "concatenate": true,
+    "dvars_thresh": 3.0,
+    "fd_thresh": 1.0,
+    "header_prefix": "spike_",
+    "lags": [
+     1,
+     2
+    ],
+    "minimum_contiguous": 5,
+    "output_format": "spikes"
+   },
+   "threads": 3
+  },
+  "features": {
+   "a_comp_cor columns": 6,
+   "call": "spikes",
+   "concatenate": true,
+   "cosine columns": 2,
+   "dvars_thresh": 3.0,
+   "extra columns": "none",
+   "extreme": false,
+   "fd scale": 1.0,
+   "fd_thresh": 1.0,
+   "header_prefix": true,
+   "lags": 3,
+   "minimum_contiguous": true,
+   "minimum_contiguous value": 5,
+   "non_steady_state columns": 2,
+   "one volume": false,
+   "output_format": "spikes",
+   "t_comp_cor columns": 1,
+   "table format": "%.10f",
+   "threads": 3,
+   "volumes": 95
+  },
+  "groups": [
+   {
+    "args": [
+     "spikes"
+    ],
+    "name": "spikes",
+    "optional": false
+   }
+  ],
+  "inputs": {},
+  "n": 1234,
+  "options": [
+   "lags [1, 2]",
+   "spikes"
+  ],
+  "seed": "confounds-trial",
+  "tool": "confounds-fmriprep"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "confounds-fmriprep",
+ "tier": "smoke",
+ "tool": "confounds-fmriprep"
+}

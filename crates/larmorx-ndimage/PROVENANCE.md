@@ -88,7 +88,7 @@ SciPy's labels on request (`upstream_defects`).
 
 | Rust | Upstream | Licence |
 |---|---|---|
-| `skimage::ball` | `src/skimage/morphology/footprints.py` (`ball`, no decomposition) and numpy's `mgrid` with a complex step (`numpy/lib/_index_tricks_impl.py`, `nd_grid`) | BSD-3-Clause |
+| `skimage::ball` | `src/skimage/morphology/footprints.py` (`ball`, no decomposition) and numpy's `mgrid` with a complex step (`numpy/lib/_index_tricks_impl.py`, `nd_grid`: `int(abs(step))` points, so a negative radius gives scikit-image's own footprint; followed since 2026-11-12, the confounds' part) | BSD-3-Clause |
 | `skimage::otsu` (`threshold_otsu`, `threshold_otsu_int`, `threshold_otsu_hist`) | `src/skimage/filters/thresholding.py` (`threshold_otsu`, `_validate_image_histogram`), `src/skimage/exposure/exposure.py` (`histogram`, `_histogram`, `_bincount_histogram`, `_bincount_histogram_centers`, `_offset_array`) | BSD-2-Clause (`thresholding.py`, its own notice in `otsu.rs`), BSD-3-Clause (`exposure.py`) |
 | `skimage::random_walker` (`preprocess`, `random_walker`, `RwOutput::full_prob`, `labels`) | `src/skimage/segmentation/random_walker_segmentation.py` (`_make_graph_edges_3d`, `_compute_weights_3d`, `_build_laplacian`, `_build_linear_system`, `_solve_linear_system`'s `cg` and `cg_j`, `_preprocess`, `random_walker`); SciPy's `_compressed.py` (`_setdiag`, `_minor_index_fancy`, `diagonal`), `_coo.py` (`_setdiag`, `_coo_to_compressed`), `_base.py` (`sum`), `sparsetools/csr.h` (`csr_matvecs`, `csc_matvecs`, `csr_matmat`, `csr_diagonal`, `coo_tocsr`), `_dia.py` (`dia_matvec`), `sparse/linalg/_isolve/iterative.py` (`cg`, `_get_atol_rtol`) and `utils.py` (`make_system`), SciPy 1.18.1 and 1.15.3 (the rows' order: measured, `check_skimage.py`) | BSD-3-Clause |
 

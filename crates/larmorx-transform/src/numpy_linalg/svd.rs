@@ -723,23 +723,29 @@ mod tests {
     }
 
     /// `u·diag(s)·vt` rebuilds `a`, `u` and `vt` are orthonormal, the values descend; every path.
+    /// The unblocked shapes run in both releases; the blocked ones (`min(m, n) = 129`, just above
+    /// `NX = 128`; `m = 237 = MNTHR + 1` for path 3) each in one, every blocked path in one of them
+    /// and each release on both orientations (the smallest sizes, for CI's budget).
     #[test]
     fn rebuilds_every_path() {
         for release in [LapackRelease::V3_12_0, LapackRelease::V3_12_1] {
             let lp = Lapack::new(release);
-            for &(m, n) in &[
+            let blocked: &[(usize, usize)] = match release {
+                LapackRelease::V3_12_0 => &[(237, 129), (129, 135)],
+                LapackRelease::V3_12_1 => &[(135, 129), (129, 237)],
+            };
+            for &(m, n) in [
                 (1, 1),
                 (7, 1),
                 (40, 3),
                 (30, 20),
                 (26, 25),
-                (150, 140),
-                (300, 140),
                 (3, 40),
                 (20, 30),
-                (140, 150),
-                (140, 300),
-            ] {
+            ]
+            .iter()
+            .chain(blocked)
+            {
                 let a = matrix(m, n, (m * 1000 + n) as u64);
                 let svd = numpy_svd(lp, view(&a, m, n)).unwrap();
                 let k = m.min(n);

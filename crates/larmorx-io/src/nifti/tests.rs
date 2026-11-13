@@ -201,6 +201,51 @@ fn scaling_modes() {
 }
 
 #[test]
+fn first_volumes_are_the_whole_read_sliced() {
+    use larmorx_core::ndarray::{Axis, Slice};
+    let dir = tmp();
+    for (shape, k) in [
+        (vec![4, 3, 2, 9], 5),
+        (vec![4, 3, 2, 9, 3], 4),
+        (vec![3, 2, 2, 6, 2, 2], 1),
+        (vec![4, 3, 2, 5], 5),
+        (vec![4, 3, 2, 5], 50),
+        (vec![4, 3, 2], 2),
+    ] {
+        let data = ramp(&shape, |i| i as i16 - 40);
+        for name in ["v.nii", "v.nii.gz", "v.img.gz"] {
+            let path = dir.path().join(name);
+            let mut hdr =
+                header_for_image(None, None, data.shape(), DataType::I16, &Affine::IDENTITY)
+                    .unwrap();
+            hdr.byte_order = ByteOrder::Big;
+            hdr.scl_slope = 0.5;
+            hdr.scl_inter = 1.0;
+            write(&path, &hdr, data.view(), &WriteOptions::default()).unwrap();
+            let whole = read(&path, &ReadOptions::default()).unwrap();
+            let first = read_first_volumes(&path, &ReadOptions::default(), k).unwrap();
+            let mut expect = whole.data.as_typed::<f64>().unwrap().clone();
+            if shape.len() >= 4 && k < shape[3] {
+                expect.slice_axis_inplace(Axis(3), Slice::from(..k));
+            }
+            let got = first.data.as_typed::<f64>().unwrap();
+            assert_eq!(got.shape(), expect.shape(), "{shape:?} {k} {name}");
+            assert_eq!(got, &expect, "{shape:?} {k} {name}");
+            assert!(got.t().is_standard_layout(), "Fortran order");
+            assert_eq!(first.header.shape().unwrap(), expect.shape().to_vec());
+        }
+    }
+    // A file that ends inside the volumes kept is an error.
+    let path = dir.path().join("short.nii");
+    let data = ramp(&[4, 3, 2, 9], |i| i as f32);
+    let hdr = header_for_image(None, None, data.shape(), DataType::F32, &Affine::IDENTITY).unwrap();
+    write(&path, &hdr, data.view(), &WriteOptions::default()).unwrap();
+    let bytes = std::fs::read(&path).unwrap();
+    std::fs::write(&path, &bytes[..bytes.len() - 4 * 24 * 7]).unwrap();
+    assert!(read_first_volumes(&path, &ReadOptions::default(), 3).is_err());
+}
+
+#[test]
 fn negative_zero_survives_a_zero_intercept() {
     let dir = tmp();
     let path = dir.path().join("z.nii");

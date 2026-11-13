@@ -648,7 +648,7 @@ def _example(ctx: core.Context, e: fcache.Entry) -> dict:
             + "; ".join(
                 f"{k} ({v.split('sha256 ')[-1].rstrip(')')[:16]}…)" for k, v in sha.items()
             ),
-            f"Runs: figures cache entry `{TOOL}/{CASE}`, computed {info['computed']} with "
+            f"Runs: figures cache entry `{TOOL}/{CASE}`, {common.computed(info)} with "
             f"larmorx `{info['larmorx_commit'][:12]}`; every command, its environment, threads, "
             "exit status and time are in its `RUN_INFO.json`",
             "Data: " + f"{DATA['dataset']}, {DATA['subject']}, {DATA['licence']}",

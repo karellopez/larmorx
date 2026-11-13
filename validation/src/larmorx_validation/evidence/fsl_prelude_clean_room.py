@@ -494,7 +494,7 @@ def _extend(ctx: core.Context, ex: dict, name: str) -> dict:
                           f"larmorx at commit `{oinfo['larmorx_commit'][:12]}`")  # fmt: skip
     ex["provenance"].append(
         f"Runs of the clean-room original: figures cache entry `{TOOL}/{name}-original`, "
-        f"computed {oinfo['computed']} with larmorx `{oinfo['larmorx_commit'][:12]}` (python -m "
+        f"{common.computed(oinfo)} with larmorx `{oinfo['larmorx_commit'][:12]}` (python -m "
         "larmorx with LARMORX_IMPLEMENTATION=original, reproduce mode at 14 threads and at one, "
         "default mode at 14), on the replica's entry's inputs; every command, its environment, "
         "threads and exit status are in its `RUN_INFO.json`"

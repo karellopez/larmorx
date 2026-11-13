@@ -1636,6 +1636,7 @@ TEXTS = [
     (r"\(relay 7's check, below; at relay 5 ", "(checked again on 2026-11-04; on 2026-11-03 "),
     (r", the user's decision of (\d{4}-\d\d-\d\d)\)", r", as decided on \1)"),
     (r"\bglibc's bits with reproduce\b", "glibc's bits in `reproduce`"),
+    (r"\bSince (\d{4}-\d\d-\d\d) its reproduce mode gives\b", r"Since \1 its `reproduce` gives"),
     (r"\bthe original finishes and names it \(rule A\)",
      "the clean room finishes and names it, correcting it by default"),
     (r"\btakes glibc's sincos from LARMORX's clean-room implementation of its behavioural "

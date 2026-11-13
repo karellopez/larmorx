@@ -407,7 +407,7 @@ Kept and documented (rule C): `_binary_union`'s truncation (a fraction below 1 i
 while niworkflows' morphology takes every non-zero value as inside); the second mask's affine and the
 WM and CSF maps' affines are never compared with the first's (all fMRIPrep's inputs share a grid).
 
-**A finding for the workflow (the confounds' workflow relay, PIPE-79 proposed):** fMRIPrep passes
+**A finding for the workflow (PIPE-79, rule D: measured on fMRIPrep runs with FreeSurfer, its wiring kept meanwhile):** fMRIPrep passes
 `is_aseg=freesurfer` (`run_reconall`, true by default), but its `t1w_tpms` are FAST's partial-volume
 maps in every case (smriprep's `fast2bids`), so with FreeSurfer the segmentation path smooths partial
 volumes again (`mask2vf`) and takes as grey matter only the voxels whose GM fraction is exactly 1

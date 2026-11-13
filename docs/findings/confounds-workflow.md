@@ -207,7 +207,7 @@ pass (1,673 checks), `confounds-nipype` 24 of 24 (570 checks; 8 permanent cases)
 of 72 cases, against the earlier run's 3,227 of 62 (since then the scripts' timing lines are left out of
 the records and the 10 permanent cases joined).
 
-## Random testing (validated in part; one difference open)
+## Random testing (validated; its one larmorx difference fixed)
 
 Three tools, one per suite (`validation/src/larmorx_validation/difftest/tools/confounds.py`, runner
 `parity/confounds_random.py`; [docs/validation/difftest.md](../validation/difftest.md)), one drawn call per
@@ -236,7 +236,7 @@ Explained: PD-01's notice names the table read's correction, whose values change
 `FramewiseDisplacement` and `SpikeRegressors` without `concatenate` may not show it. A harness matter: two
 refused CompCor inputs at once, whose error nipype chooses by its caller's keyword order.
 
-**Fixed (a larmorx mistake, relay 3a-iv)**: numpy's `svd`/`lstsq` of the cosine drift of 370 volumes at a
+**Fixed (a larmorx mistake, 2026-11-12)**: numpy's `svd`/`lstsq` of the cosine drift of 370 volumes at a
 cut-off that gives more columns than volumes (5 s at TR 3 s: 370 × 444; 4 s at TR 1 s: 185 × 370) differed
 from numpy 2.3.5's LAPACK by 1 to 4 ulps in a cluster of near-equal singular values (finding 54131;
 `scan_drift_svd.py`: 742 of 744 drift matrices identical). At `DBDSDC`'s real epsilon (`DLAMCH('E')` =

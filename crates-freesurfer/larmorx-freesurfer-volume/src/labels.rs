@@ -904,18 +904,19 @@ pub fn mri_voxels_in_label_with_partial_volume_effects(
                 if vox_label != label && border == 0 {
                     continue;
                 }
-                if let Some(sb) = segborder {
-                    if vox_label != label && border != 0 {
-                        let mut ok = false;
-                        for f in 1..sb.nframes {
-                            if mri_get_vox_val(g, err, sb, x, y, z, f, 0)? == label as f32 {
-                                ok = true;
-                                break;
-                            }
+                if let Some(sb) = segborder
+                    && vox_label != label
+                    && border != 0
+                {
+                    let mut ok = false;
+                    for f in 1..sb.nframes {
+                        if mri_get_vox_val(g, err, sb, x, y, z, f, 0)? == label as f32 {
+                            ok = true;
+                            break;
                         }
-                        if !ok {
-                            continue;
-                        }
+                    }
+                    if !ok {
+                        continue;
                     }
                 }
                 // FreeSurfer's three tables of `maxlabels` entries on the stack, every voxel here

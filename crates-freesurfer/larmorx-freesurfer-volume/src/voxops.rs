@@ -453,10 +453,10 @@ pub fn mri_vote(
     for c in 0..nc {
         for r in 0..nr {
             for s in 0..ns {
-                if let Some(mk) = mask {
-                    if mri_get_vox_val(g, err, mk, c, r, s, 0, 0)? < 0.5 {
-                        continue;
-                    }
+                if let Some(mk) = mask
+                    && mri_get_vox_val(g, err, mk, c, r, s, 0, 0)? < 0.5
+                {
+                    continue;
                 }
                 let mut vmax = 0.0f64;
                 let mut runlenmax = 0;
@@ -751,13 +751,13 @@ pub fn mri_cut_end_slices(
     mri_copy_header(g, out, err, mri, Some(&mut o))?;
     for c in 0..mri.vg.width {
         for r in 0..mri.vg.height {
-            let mut scut = 0;
             for s in ncut..mri.vg.depth - ncut {
+                // the destination slice `scut` counts from 0
+                let scut = s - ncut;
                 for f in 0..mri.nframes {
                     let v = mri_get_vox_val(g, err, mri, c, r, s, f, 0)?;
                     mri_set_vox_val(g, err, &mut o, c, r, scut, f, v, 0)?;
                 }
-                scut += 1;
             }
         }
     }

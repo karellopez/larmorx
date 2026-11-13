@@ -382,10 +382,10 @@ pub fn mri_sort(
     for s in 0..ns {
         for r in 0..nr {
             for c in 0..nc {
-                if let Some(mk) = mask {
-                    if mri_get_vox_val(g, err, mk, c, r, s, 0, 0)? < 0.5 {
-                        continue;
-                    }
+                if let Some(mk) = mask
+                    && mri_get_vox_val(g, err, mk, c, r, s, 0, 0)? < 0.5
+                {
+                    continue;
                 }
                 for (f, v) in vf.iter_mut().enumerate() {
                     *v = widen(mri_get_vox_val(g, err, input, c, r, s, f as i32, 0)?);
@@ -416,10 +416,10 @@ pub fn mri_sort_in_place(
     for s in 0..ns {
         for r in 0..nr {
             for c in 0..nc {
-                if let Some(mk) = mask {
-                    if mri_get_vox_val(g, err, mk, c, r, s, 0, 0)? < 0.5 {
-                        continue;
-                    }
+                if let Some(mk) = mask
+                    && mri_get_vox_val(g, err, mk, c, r, s, 0, 0)? < 0.5
+                {
+                    continue;
                 }
                 for (f, v) in vf.iter_mut().enumerate() {
                     *v = widen(mri_get_vox_val(g, err, mri, c, r, s, f as i32, 0)?);

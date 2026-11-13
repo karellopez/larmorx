@@ -320,20 +320,20 @@ pub fn mri_diff2vect(
         let _ = writeln!(out, "MRIdiff2Vect(): ERROR: dimension mismatch");
         return Ok(None);
     }
-    if let Some(m) = mask {
-        if mri_dim_mismatch(mri1, m, false) != 0 {
-            let _ = writeln!(out, "MRIdiff2Vect(): ERROR: dimension mismatch with mask");
-            return Ok(None);
-        }
+    if let Some(m) = mask
+        && mri_dim_mismatch(mri1, m, false) != 0
+    {
+        let _ = writeln!(out, "MRIdiff2Vect(): ERROR: dimension mismatch with mask");
+        return Ok(None);
     }
     let mut v = Vec::new();
     for c in 0..mri1.vg.width {
         for r in 0..mri1.vg.height {
             for s in 0..mri1.vg.depth {
-                if let Some(m) = mask {
-                    if mri_get_vox_val(g, err, m, c, r, s, 0, 0)? < 0.5 {
-                        continue;
-                    }
+                if let Some(m) = mask
+                    && mri_get_vox_val(g, err, m, c, r, s, 0, 0)? < 0.5
+                {
+                    continue;
                 }
                 let a = widen(mri_get_vox_val(g, err, mri1, c, r, s, 0, 0)?);
                 let b = widen(mri_get_vox_val(g, err, mri2, c, r, s, 0, 0)?);
@@ -429,14 +429,14 @@ pub fn mri_apply_diff_vect(
             return Ok(Ret::Null);
         }
     }
-    if let Some(m) = mask {
-        if mri_dim_mismatch(mri1, m, false) != 0 {
-            let _ = writeln!(
-                out,
-                "MRIapplyDiffVect(): ERROR: dimension mismatch with mask"
-            );
-            return Ok(Ret::Null);
-        }
+    if let Some(m) = mask
+        && mri_dim_mismatch(mri1, m, false) != 0
+    {
+        let _ = writeln!(
+            out,
+            "MRIapplyDiffVect(): ERROR: dimension mismatch with mask"
+        );
+        return Ok(Ret::Null);
     }
     let (w, h, dd) = (mri1.vg.width, mri1.vg.height, mri1.vg.depth);
     for e in diffvec {
@@ -458,10 +458,10 @@ pub fn mri_apply_diff_vect(
             );
             return Ok(Ret::Null);
         }
-        if let Some(m) = mask {
-            if mri_get_vox_val(g, err, m, c, r, s, 0, 0)? < 0.5 {
-                continue;
-            }
+        if let Some(m) = mask
+            && mri_get_vox_val(g, err, m, c, r, s, 0, 0)? < 0.5
+        {
+            continue;
         }
         let d2: &mut Mri = match (fresh.as_mut(), given_ref.as_deref_mut()) {
             (Some(m), _) => m,

@@ -8,9 +8,9 @@
 //! volume (`MRISwriteGIFTI` 2419-2465, `MRISwriteGIFTIIntent`, `Shape`, `Stats` 2536-2744), the
 //! combined writer `MRISwriteGIFTICombined` (2470-2532) and `getShapeStatIntentCount` (2746-2855),
 //! over gifticlib 1.12 (`larmorx_io::gifti`, track C's port) with FreeSurfer's two changes to it
-//! ([`FsGifti`]). `MRISurfOverlay::getGIFTIIntent` (`utils/MRISurfOverlay.cpp` 225-284) and
-//! `colortab.cpp`'s `CTABfindAnnotation` and `CTABfindRGBi` (1492-1508, 1611-1632; fs.labels) are
-//! taken early, as the writers call them.
+//! ([`FsGifti`]). `MRISurfOverlay::getGIFTIIntent` (`utils/MRISurfOverlay.cpp` 225-284) is taken
+//! early, as the writers call it; `colortab.cpp`'s `CTABfindAnnotation` is fs.labels'
+//! (`larmorx_freesurfer_io::colortab`).
 //!
 //! Every file carries `UserName` (the effective user's name from the password database: `/proc`
 //! and `/etc/passwd` here; `USER` or `USERNAME` where they cannot be read; none when nothing gives
@@ -40,8 +40,8 @@ use larmorx_freesurfer_core::matrix::{Matrix, matrix_copy, matrix_multiply};
 use larmorx_freesurfer_core::matrix_ops::{matrix_identity, matrix_inverse};
 use larmorx_freesurfer_core::run::Environment;
 use larmorx_freesurfer_core::timer::current_date_time;
+use larmorx_freesurfer_io::colortab::ctab_find_annotation;
 use larmorx_freesurfer_io::gifti::gifti_alloc_and_add_darray;
-use larmorx_freesurfer_mri::ctab::ColorTable;
 use larmorx_freesurfer_mri::mri::Mri;
 use larmorx_freesurfer_mri::voxel::mri_get_vox_val;
 use larmorx_freesurfer_volume::vgeom::{tkr_vox2ras_from_vol_geom, vg_i_to_r};
@@ -85,29 +85,6 @@ pub fn get_gifti_intent(overlaytype: i32) -> i32 {
         224 => NIFTI_INTENT_ESTIMATE,
         _ => NIFTI_INTENT_NONE,
     }
-}
-
-/// `CTABfindRGBi(ct, r, g, b, &index)` for components in [0, 255]: the first entry with those
-/// integer colours, else -1.
-pub fn ctab_find_rgbi(ct: &ColorTable, r: i32, g: i32, b: i32) -> i32 {
-    ct.entries
-        .iter()
-        .position(|e| {
-            e.as_ref()
-                .is_some_and(|e| e.ri == r && e.gi == g && e.bi == b)
-        })
-        .map_or(-1, |k| k as i32)
-}
-
-/// `CTABfindAnnotation(ct, annotation, &index)`: the entry of an annotation's colours (its low
-/// byte red, then green, then blue), else -1.
-pub fn ctab_find_annotation(ct: &ColorTable, annotation: i32) -> i32 {
-    ctab_find_rgbi(
-        ct,
-        annotation & 0xff,
-        (annotation >> 8) & 0xff,
-        (annotation >> 16) & 0xff,
-    )
 }
 
 /// `(T) value` for an integer type of 8, 16 or 32 bits as x86-64 converts a `double`: through a

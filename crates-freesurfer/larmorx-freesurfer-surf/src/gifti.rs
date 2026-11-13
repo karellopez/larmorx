@@ -5,9 +5,9 @@
 //! track D): `mrisReadGIFTIdanum` (424-1203) and `mrisReadGIFTIfile` (1217-1222), with the two
 //! colour-table builders they use, `makeColorTable` (338-410, file-local) and `readLabelTable`
 //! (2857-3006), over gifticlib 1.12 (`larmorx_io::gifti`, track C's port) with FreeSurfer's two
-//! changes to it ([`FsGifti`]) and fs.io's helper `gifti_get_DA_value_2D` (track A's). Three small
-//! functions of `utils/colortab.cpp` (fs.labels) are taken early here, as the reader calls them:
-//! `CTABgetNumberOfValidEntries`, `CTABfindDuplicateNames`, `CTABrgb2Annotation`.
+//! changes to it ([`FsGifti`]) and fs.io's helper `gifti_get_DA_value_2D` (track A's). The reader's
+//! three functions of `utils/colortab.cpp` (`CTABgetNumberOfValidEntries`,
+//! `CTABfindDuplicateNames`, `CTABrgb2Annotation`) are fs.labels' (`larmorx_freesurfer_io::colortab`).
 //!
 //! gifticlib's settings and persistent state are the run's ([`SurfGlobals::gifti`]); messages go
 //! to standard output and error as FreeSurfer prints them.
@@ -38,6 +38,10 @@ use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::Fatal;
 use larmorx_freesurfer_core::matrix::{MATRIX_REAL, matrix_alloc};
 use larmorx_freesurfer_core::random::{random_number, set_random_seed};
+use larmorx_freesurfer_io::colortab::{
+    CTAB_VERSION_TO_WRITE, ctab_find_duplicate_names, ctab_get_number_of_valid_entries,
+    ctab_rgb2_annotation,
+};
 use larmorx_freesurfer_io::gifti::gifti_get_da_value_2d;
 use larmorx_freesurfer_mri::ctab::{ColorTable, ColorTableEntry};
 use larmorx_freesurfer_mri::mri::{MRI_FLOAT, Mri};
@@ -73,8 +77,6 @@ pub const FS_MRISURFOVERLAY_SHAPE: i32 = 100;
 pub const FS_MRISURFOVERLAY_STATS: i32 = 200;
 /// `GIFTI_FILE` (`mri.h`).
 pub const GIFTI_FILE: i32 = 27;
-/// `CTAB_VERSION_TO_WRITE` (`colortab.h`).
-pub const CTAB_VERSION_TO_WRITE: i32 = 2;
 /// `NUM_VOLGEOM_META` (`gifti.cpp` line 40): the volume geometry's metadata entries.
 const NUM_VOLGEOM_META: i32 = 19;
 /// `STRLEN`: the size of the surface's, the volume geometry's and a colour entry's names.
@@ -254,52 +256,6 @@ pub(crate) fn value(
     gifti_get_da_value_2d(g, &mut w, Some(da), row, col)
 }
 
-// ---- colortab.cpp's three functions, taken early ------------------------------------------------
-
-/// `CTABgetNumberOfValidEntries(ct, &num)`: the entries that are not empty.
-pub fn ctab_get_number_of_valid_entries(ct: &ColorTable) -> i32 {
-    ct.entries.iter().filter(|e| e.is_some()).count() as i32
-}
-
-/// `CTABrgb2Annotation(r, g, b)`: `(b << 16) + (g << 8) + r` in `int` (wrapping as the official
-/// build's shifts and sums do).
-pub fn ctab_rgb2_annotation(r: i32, g: i32, b: i32) -> i32 {
-    b.wrapping_shl(16)
-        .wrapping_add(g.wrapping_shl(8))
-        .wrapping_add(r)
-}
-
-/// `CTABfindDuplicateNames(ct)`: every ordered pair of entries with the same name gives `ERROR:
-/// label name '<name>' is duplicated!` on standard output, then, when any did, `CTABfindDuplicateNames:
-/// <n> duplicate names found in:` and the table's file name; returns the pairs' number.
-pub fn ctab_find_duplicate_names(io: &mut Io, ct: &ColorTable) -> i32 {
-    let mut dup = 0;
-    for (i1, e1) in ct.entries.iter().enumerate() {
-        let Some(e1) = e1 else { continue };
-        for (i2, e2) in ct.entries.iter().enumerate() {
-            if let Some(e2) = e2
-                && i1 != i2
-                && e1.name == e2.name
-            {
-                dup += 1;
-                let _ = io.out.write_all(b"ERROR: label name '");
-                let _ = io.out.write_all(&e1.name);
-                let _ = io.out.write_all(b"' is duplicated!\n");
-            }
-        }
-    }
-    if dup > 0 {
-        let _ = write!(
-            io.out,
-            "CTABfindDuplicateNames: {} duplicate names found in:\n  ",
-            dup / 2
-        );
-        let _ = io.out.write_all(&ct.fname);
-        let _ = io.out.write_all(b"\n");
-    }
-    dup / 2
-}
-
 /// C's `strncpy(dst, src, STRLEN - 1)` into a zeroed buffer: the name up to its first NUL, at most
 /// 1,023 bytes.
 pub(crate) fn name_bytes(s: &[u8]) -> Vec<u8> {
@@ -379,7 +335,7 @@ fn make_color_table(
         );
         ct.entries.push(Some(Box::new(e)));
     }
-    ctab_find_duplicate_names(io, &ct);
+    ctab_find_duplicate_names(io.out, &ct);
     ct
 }
 
@@ -508,7 +464,7 @@ pub fn read_label_table(
             set += 1;
         }
     }
-    ctab_find_duplicate_names(io, &ct);
+    ctab_find_duplicate_names(io.out, &ct);
     Ok(Some(ct))
 }
 

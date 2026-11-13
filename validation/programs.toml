@@ -141,7 +141,6 @@ group = "ants"
 name = "MultiplyImages"
 command = "larmorx ants MultiplyImages"
 python = "lx.ants.multiply_images"
-does = "Multiplies an image by another image or by a number, as sMRIPrep's brain extraction calls it."
 api = "docs/api/ants-multiply-images.md"
 evidence = "/evidence/ants-programs/"
 records = { replica = ["ants-multiply-images"] }

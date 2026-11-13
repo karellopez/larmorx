@@ -8,7 +8,9 @@ as niworkflows calls it (`lx.ndimage`, `lx.skimage`, `larmorx_core::numpy`,
 clean room comes later, after FreeSurfer (the user, 2026-11-06 and 2026-11-11).
 
 **Status: `experimental`** (checked file for file against niworkflows in both kept environments
-and against fMRIPrep's own files; the record comes with the part's records).
+and against fMRIPrep's own files; records: [niworkflows-helpers](../validation/niworkflows-helpers.md)
+for the field maps' steps, [confounds-fmriprep](../validation/confounds-fmriprep.md) for the confound
+steps and [confounds-nipype](../validation/confounds-nipype.md) for `Robust*CompCor`).
 
 ## `intensity_clip`: `IntensityClip`
 

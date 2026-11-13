@@ -200,7 +200,12 @@ the shared environment, `e3` fMRIPrep 25.2.6's image through Apptainer), with ea
 validated: `smoke` the quick tiers of `check_blas`, `check_dvars` and `check_tables` (about 35 s);
 `standard` every script's quick tier in every environment it was validated in and the quick negative
 controls (62 of 62 cases pass, 3,227 checks); `full` the full tiers, `e1-zen`, the full controls and the
-extra runs. A negative control passes when the releases are told apart.
+extra runs. A negative control passes when the releases are told apart. The records (standard tier, from
+one clean commit, 2026-11-13, with the permanent cases of random testing): `confounds-linalg` 32 of 32 cases
+pass (1,673 checks), `confounds-nipype` 24 of 24 (570 checks; 8 permanent cases), `confounds-fmriprep` 16 of
+16 (990 checks; 2 permanent cases) ([docs/validation/](../validation/confounds-fmriprep.md)): 3,233 checks
+of 72 cases, against the earlier run's 3,227 of 62 (since then the scripts' timing lines are left out of
+the records and the 10 permanent cases joined).
 
 ## Random testing (validated in part; one difference open)
 
@@ -252,6 +257,25 @@ CompCor's real nodes in fMRIPrep 25.2.6's image) and the field maps' `check_nump
 (every case identical); the finding agrees on replay and is the permanent case
 `cosine-filter-wide-basis-dbdsqr-tolerance`. No fMRIPrep call reaches the shape (its cut-off of 128 s keeps
 the basis narrower than the series).
+
+**What else the fix reaches, re-checked (2026-11-13).** Every other part whose code calls this `DBDSQR`
+(a grep of `numpy_linalg`'s callers: the field maps through nibabel's header arithmetic and `io_orientation`,
+`lx.niworkflows`, tedana's `t2smap` replica in `larmorx-gpl` and its clean room through `lstsq` and
+`curve_fit`'s `m × 2` SVD) had its records re-made from one clean commit of this branch, the programs built
+from it, and compared case by case with the committed ones
+(`validation/investigations/confounds/tolmul_reach.sh`, `compare_remade_records.py`): **no result changed**.
+`sdcflows-fieldmap` 37 of 37 cases identical (821 checks), `sdcflows-estimation` 19 of 19 (the contract
+audit's counts of public functions and stubs, which the confounds raise, and `match-histogram`'s message
+text, which a later fix of the field maps' random testing made numpy's, are the only fields that differ;
+its 8 permanent cases added since pass), `sdcflows-estimation-full` 14 of 14 (245 checks),
+`sdcflows-estimation-app-shared` 8 of 8 (152), `niworkflows-helpers` 5 of 5 (its 2 permanent cases added
+since pass), `tedana-t2smap-replica` 102 of 102 (1,000 checks: 62 pass, 40 refused by both alike),
+`tedana-t2smap-original` 125 of 125 (1,637 checks). The golden checksums recorded after the fix: every one
+of the 318 cases recorded before it unchanged (the 15 new ones of this part added: 333 cases, 3,586
+outputs). Records made after the field maps' `129854e9` whose code calls none of these routines
+(`fsl-prelude`, `mri-hmc`, `ndimage-skimage`, `nifti-io`) were not re-made; `numpy-linalg`'s
+`ensure_positive_cosines` takes vnl's SVD, not this one. A superdiagonal between the two tolerances
+(relative width 5.8e-6) is the only way a result could have changed, and none of these calls meets one.
 
 ## Follow-ups (open; each a bounded piece)
 

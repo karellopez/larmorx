@@ -18,9 +18,12 @@ and the workflow that composes them, fMRIPrep's `init_bold_confs_wf` with its `d
 
 **Status: `experimental`** (checked bit for bit against nipype, nitime, SciPy and numpy in the
 three environments, against fMRIPrep's own DVARS and CompCor files and on fMRIPrep's reference runs' raw
-series and real motion parameters; the record comes with the
-part's records; `lx.confounds` and the workflow in the golden registry since 2026-11-12, their
-checksums recorded with the part's records). The text files numpy's `savetxt` writes in nipype
+series and real motion parameters; the records, standard tier, 2026-11-13:
+[confounds-nipype](../validation/confounds-nipype.md) (24 of 24 cases pass, the permanent cases of
+random testing included), [confounds-fmriprep](../validation/confounds-fmriprep.md) (16 of 16) and
+[confounds-linalg](../validation/confounds-linalg.md) (32 of 32: numpy's, OpenBLAS's, LAPACK's and
+SciPy's arithmetic underneath); `lx.confounds` and the workflow in the golden registry since
+2026-11-12, their checksums recorded 2026-11-12). The text files numpy's `savetxt` writes in nipype
 (CompCor's, DVARS', `FramewiseDisplacement`'s) are written as numpy writes them on Linux, on every
 platform (UTF-8, `\n` line ends; numpy's text mode writes `\r\n` on Windows), as the tables.
 

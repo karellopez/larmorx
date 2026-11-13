@@ -183,7 +183,9 @@ is not what was built: its CI checks out `v0.3.28`.)
   98.70092381500355, a `TOL` 5.8e-6 too small in relative terms: a superdiagonal between the two
   tolerances converged one sweep later, which random testing met in the `DLASDQ` leaves of a cosine basis
   wider than the series (nearly equal diagonals; finding 54131, 1 to 4 ulps). Fixed for every `DBDSQR` of
-  the port ([confounds-workflow.md](confounds-workflow.md), "Random testing").
+  the port ([confounds-workflow.md](confounds-workflow.md), "Random testing"); the records of every other
+  part that calls it (the field maps, `lx.niworkflows`, tedana's replica and clean room) and the golden
+  checksums, re-made after the fix, did not change (the same section).
 - **`DLALSD`'s large path**: `|D(i)| < EPS` becomes `SIGN(EPS, D(i))` before the pieces are cut, so
   `DBDSQR`'s `-0` never reaches it (the release control: 0 cases differ there); `C(J)`, `S(J)` of
   square nodes are never written nor read (larmorx starts them at 0); `INFO` is the last `DLASCL`'s.

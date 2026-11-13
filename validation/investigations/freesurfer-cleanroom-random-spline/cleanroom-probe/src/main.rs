@@ -15,8 +15,12 @@
 //! probe uses), `tan-list` (the `k` in [0, 2^24) where the C library's `tan` of `fl(pi*k*2^-24)`
 //! differs from larmorx's correctly rounded `tan`: the system's `tan` run as a black box, through
 //! Rust's `f64::tan`), `bench <seed> <count>` (the generator's speed, nothing printed).
+//!
+//! glibc's random numbers and sort: `glibc <command>` (`glibc.rs`) and `qsort`, `qsort-bench`
+//! (`qsort.rs`), the lines of the probes `glibc_random_probe` and `glibc_qsort_probe`.
 
 mod glibc;
+mod qsort;
 mod spline;
 
 use larmorx_core::UpstreamDefects;
@@ -259,7 +263,7 @@ fn run(args: &[String]) -> Result<(), String> {
     let mut hits: Vec<usize> = Vec::new();
     let stdout = std::io::stdout();
     let mut out = BufWriter::with_capacity(1 << 16, stdout.lock());
-    let usage = "usage: cleanroom-probe [--reproduce] [--system-tan] [--tan-hits FILE] raw|dist|mixed|infer-mixed|tan-list|bench|cases|d3|set1|glibc ...";
+    let usage = "usage: cleanroom-probe [--reproduce] [--system-tan] [--tan-hits FILE] raw|dist|mixed|infer-mixed|tan-list|bench|cases|d3|set1|glibc|qsort|qsort-bench ...";
     match args.first().map(String::as_str) {
         Some("raw") if args.len() == 3 => {
             let mut r = opts.generator(parse_seed(&args[1])?);
@@ -415,6 +419,8 @@ fn run(args: &[String]) -> Result<(), String> {
         }
         Some("cases" | "d3" | "set1") => return spline::run(args, &mut out, opts.mode),
         Some("glibc") => return glibc::run(&args[1..], &mut out),
+        Some("qsort") => return qsort::run(&args[1..], &mut out),
+        Some("qsort-bench") => return qsort::bench(&args[1..], &mut out),
         _ => return Err(usage.to_string()),
     }
     if let Some(path) = &opts.tan_hits {

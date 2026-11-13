@@ -56,6 +56,8 @@
 //! - [`stl`]: STL surfaces, read (binary or text) and written (FS-151, FS-152, FS-157..FS-160).
 //! - [`surfread`]: the file-local surface readers (ASCII, movie.byu and its positions, the
 //!   triangle file's positions) and the old writer's quadrangles (FS-147, FS-150..FS-156).
+//! - [`trifile`]: the binary triangle and quadrangle surface files, read and written, with
+//!   their tags (FS-346..FS-353).
 #![forbid(unsafe_code)]
 
 pub mod aaa;
@@ -83,4 +85,5 @@ pub mod stl;
 pub mod surfbase;
 pub mod surfread;
 pub mod topology;
+pub mod trifile;
 pub mod views;

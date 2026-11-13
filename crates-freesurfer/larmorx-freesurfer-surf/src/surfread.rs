@@ -61,7 +61,7 @@ fn io_cpp() -> String {
     format!("{}/utils/mrisurf_io.cpp", diag::BUILD_ROOT)
 }
 
-fn verbose_show(g: &Globals) -> bool {
+pub(crate) fn verbose_show(g: &Globals) -> bool {
     g.gdiag & DIAG_SHOW != 0 && diag::verbose_on(g)
 }
 
@@ -176,7 +176,7 @@ fn first_line(
 
 /// `vertices_topology[v].num++` of a face's vertex: one byte (FS-147: past 255 the count wraps
 /// around; refused by default, `false` then).
-fn count_face(g: &mut Globals, mris: &mut Mris, v: usize, fname: &str) -> bool {
+pub(crate) fn count_face(g: &mut Globals, mris: &mut Mris, v: usize, fname: &str) -> bool {
     if mris.topology(v).num == u8::MAX {
         g.notices.add(
             &FS_147,
@@ -655,7 +655,7 @@ fn triangle_counts(g: &mut Globals, fp: &mut CFile) -> (i32, i32) {
     (nvertices, nfaces)
 }
 
-fn show_counts(g: &Globals, io: &mut Io, fname: &str, nvertices: i32, nfaces: i32) {
+pub(crate) fn show_counts(g: &Globals, io: &mut Io, fname: &str, nvertices: i32, nfaces: i32) {
     if verbose_show(g) {
         let _ = writeln!(
             io.out,

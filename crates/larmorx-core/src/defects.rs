@@ -1497,6 +1497,22 @@ defects! {
         "reading a volume-geometry block, a blank line counts as a repeat of the line before it and takes one of the block's eight places: the block's last line (the centre, cras) is then not read and the line after the block is";
     FS_288 = "FS-288", "FreeSurfer", true,
         "reading a volume-geometry block whose first line is blank compares memory contents with the block's keys";
+    FS_346 = "FS-346", "FreeSurfer", true,
+        "the binary triangle and quadrangle surface readers given a command-line tag whose length is -1 read the rest of the file into a block of no bytes: memory corruption or a crash when more than a few bytes follow";
+    FS_347 = "FS-347", "FreeSurfer", true,
+        "the binary triangle and quadrangle surface readers given more than 1,000 command-line tags store the 1,001st past the surface's list of command lines, over its command-line count and group-average area (values from a memory address, then wrong command lines or a crash)";
+    FS_348 = "FS-348", "FreeSurfer", true,
+        "the quadrangle surface reader given a command-line tag whose length cannot be allocated (below -1, or 2^63 - 1) writes through the failed allocation: a segmentation fault";
+    FS_349 = "FS-349", "FreeSurfer", true,
+        "the quadrangle surface reader given room for fewer faces than its quadrangles make (a size multiplier below 1) writes the others past its face array before its own check ends the program";
+    FS_350 = "FS-350", "FreeSurfer", true,
+        "the binary triangle and quadrangle surface writers given a surface whose command-line count is larger than the command lines it holds end the program with a segmentation fault (signal 11), leaving a partial file";
+    FS_351 = "FS-351", "FreeSurfer", true,
+        "the quadrangle surface reader accepts a quadrangle vertex number at or above the surface's vertex count (within its room for vertices): the surface's faces then refer to a vertex it does not have";
+    FS_352 = "FS-352", "FreeSurfer", true,
+        "the quadrangle surface reader given a quadrangle vertex number beyond the surface's room for vertices counts the face in memory outside its vertex arrays (memory corruption or a crash)";
+    FS_353 = "FS-353", "FreeSurfer", true,
+        "the quadrangle surface reader drops both triangles of a quadrangle whose first triangle (by the split it chooses) has two equal vertices: a single triangle the quadrangle writer stored as v0 v1 v1 v2 is lost on reading for about half of the vertex pairs";
 }
 
 /// The register entry with ID `id`.

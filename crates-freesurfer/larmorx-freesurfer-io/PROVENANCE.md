@@ -20,7 +20,7 @@ code: none in these files (FreeSurfer's own: Bruce Fischl, Douglas Greve).
 | `packages/nifti/znzlib.c` (FreeSurfer's copy of znzlib, public domain) | `znzread`, `znzwrite` (the compressed branch: one `gzread`/`gzwrite`, the count over the member size) | `fio::fs_znzread`, `fs_znzwrite`, on `larmorx_io::znz`'s zlib layer |
 | `utils/bfileio.cpp` | `byteswapbufdouble` (51), `byteswapbuffloat` (81), `byteswapbufshort` (103) | `bfileio` |
 | `utils/MRIio_old.cpp` | `MGHprint_error` (29), `lcalloc` (44) | `mriio_old` |
-| (larmorx's own) | C's `FILE` as these functions use it: `fopen`'s modes and `errno`, `fread`/`fwrite` of members, `getc`, `fgets`, `feof`, `ferror`, `fclose`, `scanf`'s input; written from ISO C 7.21 and glibc 2.35's measured behaviour | `cfile` |
+| (larmorx's own) | C's `FILE` as these functions use it: `fopen`'s modes and `errno`, `fread`/`fwrite` of members, `getc`, `fgets`, `feof`, `ferror`, `fclose`, `fseek`, `rewind`, `ftell`, `scanf`'s input; written from ISO C 7.21 and glibc 2.35's measured behaviour (`validation/investigations/glibc-stdio-probe/` for the seeks) | `cfile` |
 
 Queue item 3.1-25, piece 2 (track A, relay 11), with tags.cpp (3.1-30) and colortab.cpp's binary
 tables (3.1-33) taken early (the orchestrator's decision of 2026-11-13). Audited for third-party
@@ -41,6 +41,22 @@ The one-number readers and writers the inventory does not list as reached (`putf
 `fwrite1`, `fwrite4`, `fwriteShort`, `freadShort`, the other `Ex` readers, `fwriteDouble`, `znzread2/3/4`,
 `znzwrite1/2/3/4`, `znzreadDoubleEx`, `znzreadShortEx`) are translated all the same (relay 12): the
 surface files' readers and writers (`fs.surfio`, `mrisurf_io.cpp`) and `vlabels.cpp` call them.
+
+Queue item 3.1-25, piece 3 (track A, relay 13). Audited for third-party code: none (fscnpy.cpp and
+fscnpy.h without an author line; gifti.cpp by Kevin Teich and Nick Schmansky; dti.cpp by Douglas
+Greve; the General Hospital Corporation's copyright). gifti.cpp's helpers work on gifticlib's
+structures through `larmorx_io::gifti` (track C's port of gifticlib 1.12, public domain).
+
+| file (FreeSurfer 8.2.0) | functions (lines) | module |
+|---|---|---|
+| `utils/fscnpy.cpp`, `include/fscnpy.h` | `fscnpy::fscnpy` (8), `~fscnpy` (29: Rust's drop), `npy2mri` (67), `__parse_header_dictionary` (215), `__getmritype` (371), `__getarchendian` (416: `<`, every supported platform), `__contiguousreorder` (470) | `fscnpy` |
+| `utils/gifti.cpp` | `gifti_alloc_and_add_darray` (47), `gifti_get_DA_value_2D` (69-212) | `gifti` |
+| `utils/dti.cpp` | `DTIwriteBValues` (848), `DTIwriteBVectors` (931), `DTIparsePulseSeqName` (980), `DTIbvecChangeSpace` (1083) | `dti` |
+| (larmorx's own) | `fscnpy::ShapeVec`: libstdc++'s `std::vector<int>` as `npy2mri` uses it (`push_back`'s growth by doubling with new places unwritten, `pop_back`, `erase(begin())`), from the C++ standard's and libstdc++'s documented behaviour, for FS-206 | `fscnpy` |
+
+Not translated: `fscnpy::read` (no caller), `fscnpy::write` (empty), `exec_progress_callback` (freeview's
+progress bar: nothing without its callback); the rest of gifti.cpp (3.1-26) and of dti.cpp (the items
+that reach it).
 
 Not reached by any default-path program, so not translated: `MGHopen_file`, `fio_NLines`, `fio_pushd`, `fio_popd`, `fio_fullpath`, `fio_mkdirp`,
 `fio_FileHasCarriageReturn`, `makelocallink`, `TSV::IsTSVExt` (`mri_glmfit` only); `lmalloc`,
@@ -69,3 +85,11 @@ Not reached by any default-path program, so not translated: `MGHopen_file`, `fio
 - `CFile::tell` (`ftell`) for `TAGwriteStart`'s position.
 - `lcalloc` returns a vector of the caller's element type (`nmemb` elements; the C `size` is checked
   for the product's overflow).
+- Piece 3: FS-199 to FS-220 (`docs/findings/freesurfer-io.md` Part 3; FS-206 in
+  `larmorx-freesurfer-mri`). `npy2mri` reads the header into a heap buffer of the bytes the file gives
+  (zeros after them), whatever its length; its parse runs on that buffer with FreeSurfer's NUL writes
+  and stops at its end. Its messages go to the caller's standard output; its exits are
+  `Fatal::Exit(1)`. The volume's voxels are copied into `Mri::chunk`. `gifti_get_DA_value_2D` reads
+  the data's little-endian bytes (zeros past them: gifticlib's arrays always hold their values).
+  `DTIbvecChangeSpace` copies `bvec` before the in-place product. The b-value writers write the
+  file's text at once.

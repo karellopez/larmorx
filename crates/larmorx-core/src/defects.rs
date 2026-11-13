@@ -1329,8 +1329,6 @@ defects! {
         "the rows of a tensor volume, as code that goes through a volume row by row sees them (MRIcopy), all start at its first voxel: such code reads and writes only the volume's first row";
     FS_261 = "FS-261", "FreeSurfer", true,
         "the byte-order swap of a buffer of n items of 2, 4 or 8 bytes (ByteSwapBuf) reverses only the first n/2, n/4 or n/8 items (rounded up) and leaves the rest as they were";
-    FS_262 = "FS-262", "FreeSurfer", true,
-        "the byte-order swap of a 64-bit integer (swapLong64) returns the reversed value rounded to a double's 53 significant bits (only values whose reversed form needs more bits change; none below 2^40)";
     FS_263 = "FS-263", "FreeSurfer", true,
         "with exceptions switched on, a fatal error with a nonzero code aborts the program (exit status 134, after the C++ library's terminate message) instead of passing the code to the program's handler";
     FS_167 = "FS-167", "FreeSurfer", true,
@@ -1350,7 +1348,7 @@ defects! {
     FS_174 = "FS-174", "FreeSurfer", true,
         "an allocation that fails in lcalloc ends the program with exit status 0, as if it had succeeded, after printing Cannot calloc()";
     FS_176 = "FS-176", "FreeSurfer", true,
-        "the readers and writers of a 64-bit integer (freadLong, fwriteLong, znzreadLong, znzwriteLong) round it to a double's 53 significant bits: a number read comes back rounded (-2^63 where the rounding reaches 2^63), and a number written is stored with the low bits of its first bytes changed, whenever its byte-reversed form needs more than 53 bits (most negative numbers, and numbers whose last bytes are not zero)";
+        "the byte-order swap of a 64-bit integer (swapLong64) and the readers and writers of a 64-bit integer (freadLong, fwriteLong, znzreadLong, znzwriteLong) round it to a double's 53 significant bits: a number swapped or read comes back rounded (-2^63 where the rounding reaches 2^63), and a number written is stored with the low bits of its first bytes changed, whenever its byte-reversed form needs more than 53 bits (most negative numbers, and numbers whose last bytes are not zero)";
     FS_175 = "FS-175", "FreeSurfer", true,
         "byteswapbufshort, byteswapbuffloat and byteswapbufdouble given a byte count that is not a multiple of the number's size reverse the bytes of a whole last number past the count: past the end of a buffer that ends at the count (memory the program does not own)";
     FS_177 = "FS-177", "FreeSurfer", true,
@@ -1397,6 +1395,50 @@ defects! {
         "freeing no linear transform array (LTAfree of a null array) crashes";
     FS_198 = "FS-198", "FreeSurfer", true,
         "copying a linear transform array from one whose transforms lack a matrix onto one that has it leaves the destination's matrix unusable: using or freeing the copy later crashes or reads garbage";
+    FS_199 = "FS-199", "FreeSurfer", true,
+        "npy2mri (reading a NumPy .npy file) reads the header length of a file of format version 3.0 from 3 bytes instead of NumPy's 4: the header text starts a byte early and lacks its last byte, and the reading runs on past it (a crash or a header from memory contents); versions 3.1 and later crash";
+    FS_200 = "FS-200", "FreeSurfer", true,
+        "npy2mri of a .npy file of format version 0 or 4 to 255 reads its header length with a size taken from memory contents: a crash or a header read from memory contents";
+    FS_201 = "FS-201", "FreeSurfer", true,
+        "npy2mri of a .npy file whose header length is about 8 MiB or more (the program's default stack size; version 2 headers may give up to 4 GiB) crashes";
+    FS_202 = "FS-202", "FreeSurfer", true,
+        "npy2mri of a .npy file that ends inside its header takes the header's missing bytes from memory contents";
+    FS_203 = "FS-203", "FreeSurfer", true,
+        "npy2mri reads past a .npy header that has no newline, or whose descr, fortran_order or shape value or a key without a colon runs to its end: memory contents beyond the header (a crash, or a type, order or shape read from memory)";
+    FS_204 = "FS-204", "FreeSurfer", true,
+        "npy2mri crashes on a shape with an empty element: every one-dimensional array as NumPy writes it, (3,), and shapes such as (3, ) or (3,,4)";
+    FS_205 = "FS-205", "FreeSurfer", true,
+        "npy2mri crashes on an array whose extents are all 1 (a single value of any number of dimensions) or that has none";
+    FS_206 = "FS-206", "FreeSurfer", true,
+        "a volume made from fewer than 3 extents (a two- or one-dimensional .npy array, or one whose leading or trailing extents of 1 npy2mri drops) gets its missing extents from memory: for an array whose extents of 1 were dropped, a dropped or earlier extent (an array of shape (1, 3, 4, 1) becomes a volume of 3 x 4 x 4 voxels, (1, 1, 2) one of 2 x 2 x 2), otherwise memory contents (often 0: a volume without voxels)";
+    FS_207 = "FS-207", "FreeSurfer", true,
+        "npy2mri of a .npy header without a descr or a fortran_order entry takes the data type or the order from memory contents, and of one without a shape entry crashes";
+    FS_208 = "FS-208", "FreeSurfer", true,
+        "npy2mri reverses the bytes of a big-endian array of 8-byte integers in 4-byte halves: every value is wrong";
+    FS_209 = "FS-209", "FreeSurfer", true,
+        "npy2mri's verbose output for a C-order array prints memory addresses, which differ from run to run";
+    FS_210 = "FS-210", "FreeSurfer", true,
+        "npy2mri takes any fortran_order value other than False (such as 0, false or a misspelling) as True: the voxels are placed transposed";
+    FS_211 = "FS-211", "FreeSurfer", true,
+        "npy2mri reads a slice of 2 GiB or more wrongly or past the volume's memory (its byte count does not fit 32 bits)";
+    FS_212 = "FS-212", "FreeSurfer", true,
+        "npy2mri of a .npy file shorter than its array leaves the missing voxels 0 without a message";
+    FS_213 = "FS-213", "FreeSurfer", true,
+        "npy2mri of a .npy header whose length does not make the data start at a multiple of 16 bytes skips the bytes up to the next multiple: the voxels are shifted by those bytes (NumPy reads the data right after the header)";
+    FS_214 = "FS-214", "FreeSurfer", true,
+        "gifti_get_DA_value_2D's message for a GIFTI data array without data prints the array's memory address as data= (it differs from run to run), not the data's (nil)";
+    FS_215 = "FS-215", "FreeSurfer", true,
+        "gifti_get_DA_value_2D reads a COMPLEX64 array's values as 8-byte doubles: each value is a meaningless number made of a value's real and imaginary parts";
+    FS_216 = "FS-216", "FreeSurfer", true,
+        "gifti_get_DA_value_2D reads the elements of an array of more than 2^31 values beyond the 2^31st from the wrong place";
+    FS_217 = "FS-217", "FreeSurfer", true,
+        "DTIwriteBValues and DTIwriteBVectors given no matrix create (or empty) the file and crash";
+    FS_218 = "FS-218", "FreeSurfer", true,
+        "DTIwriteBVectors of a matrix with fewer than 3 columns, and DTIwriteBValues of one without columns, write the next rows' numbers in each row's missing columns and, past the matrix's last number, memory contents";
+    FS_219 = "FS-219", "FreeSurfer", true,
+        "DTIparsePulseSeqName of a name with 100 characters or more before or after its # overflows a buffer: a crash or wrong values";
+    FS_220 = "FS-220", "FreeSurfer", true,
+        "DTIbvecChangeSpace of gradient directions with fewer than 3 columns reads and writes past each row: it changes the next rows' numbers, and past the matrix's last number it reads memory contents and writes outside the matrix";
 }
 
 /// The register entry with ID `id`.

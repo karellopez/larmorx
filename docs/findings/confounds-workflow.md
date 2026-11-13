@@ -276,6 +276,11 @@ outputs). Records made after the field maps' `129854e9` whose code calls none of
 (`fsl-prelude`, `mri-hmc`, `ndimage-skimage`, `nifti-io`) were not re-made; `numpy-linalg`'s
 `ensure_positive_cosines` takes vnl's SVD, not this one. A superdiagonal between the two tolerances
 (relative width 5.8e-6) is the only way a result could have changed, and none of these calls meets one.
+The full tiers of this part's scripts through `DBDSQR`, after the fix: the record `confounds-linalg-full`
+(`check_svd`, `check_gesdd`, `check_gelsd`, `check_gesvd` in numpy 2.3.5, in numpy 2.5.4 and in numpy 2.5.4 at
+the machine's `GEMM_Q` 512: 12 of 12 cases, 840 checks, up to CompCor's largest real shapes) and
+`confounds-nipype-full` (`check_compcor`'s full tier: fMRIPrep's 108 real CompCor nodes against fMRIPrep's
+files and against nipype, in the three environments: 3 of 3 cases, 90 checks).
 
 ## Follow-ups (open; each a bounded piece)
 

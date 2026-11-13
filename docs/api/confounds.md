@@ -22,7 +22,10 @@ series and real motion parameters; the records, standard tier, 2026-11-13:
 [confounds-nipype](../validation/confounds-nipype.md) (24 of 24 cases pass, the permanent cases of
 random testing included), [confounds-fmriprep](../validation/confounds-fmriprep.md) (16 of 16) and
 [confounds-linalg](../validation/confounds-linalg.md) (32 of 32: numpy's, OpenBLAS's, LAPACK's and
-SciPy's arithmetic underneath); `lx.confounds` and the workflow in the golden registry since
+SciPy's arithmetic underneath), with the full tiers through the SVDs in
+[confounds-linalg-full](../validation/confounds-linalg-full.md) and
+[confounds-nipype-full](../validation/confounds-nipype-full.md) (fMRIPrep's 108 real CompCor nodes);
+`lx.confounds` and the workflow in the golden registry since
 2026-11-12, their checksums recorded 2026-11-12). The text files numpy's `savetxt` writes in nipype
 (CompCor's, DVARS', `FramewiseDisplacement`'s) are written as numpy writes them on Linux, on every
 platform (UTF-8, `\n` line ends; numpy's text mode writes `\r\n` on Windows), as the tables.

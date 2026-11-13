@@ -74,3 +74,12 @@ and `tftype` cases: 5,691 identical, 461 not comparable, 0 different; seed 1 unc
 `scanf_word_errno.c` (build and run with `gcc -O0 scanf_word_errno.c && ./a.out`) measures what glibc's
 `sscanf` leaves in `errno` when a conversion meets the end of the string: 0, or, after an earlier item that
 ended at the end, the value `errno` had when that item met it (before its own `ERANGE`).
+
+Measured 2026-11-13 (part 5, relay 15: the CMA labels and segmentation functions `cmalab`, `cmavol`,
+`lrswap`, `fixrib`, `lrseg`, `ohe`, `bvc`, `bvr`; 73 commands; logs `oracles/logs/fs-found-c-r15-cma3.log`
+and `-cma4.log`): seed 7, 8,000 cases of the new commands: 7,427 identical with `reproduce`, 573 not
+comparable (FS-314: FreeSurfer aborts, `CRASH 6`; FS-315: lists read past their numbers; FS-53, FS-58),
+0 different; seed 13, 16,000: 14,785 identical, 1,215 not comparable, 0 different; all 73 commands at
+seed 7, 7,300 cases: 6,841 identical, 459 not comparable, 0 different; `fix` different only with
+notices. Seed 1, 1,460 cases: 1,365 identical, 95 not comparable, hash
+`dfb6450d2777761356d5587e0e2c2b8bd737ed1d1e1b82352d58a8e59b6ac530`.

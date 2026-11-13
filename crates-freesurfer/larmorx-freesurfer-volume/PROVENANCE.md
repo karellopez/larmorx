@@ -24,6 +24,7 @@ built for the official binaries with GCC 8.4.0 (`docs/freesurfer/variation.md`).
 | `utils/mri.cpp` 6313-6349, 6472-6556, 6670-6735 | `MRItranslate`, `MRIrotateX_I`, `MRIrotateY_I`, `MRIrotateZ_I`, `MRIrotate_I` | 3.1-35 | `rotate.rs` |
 | `utils/mri.cpp` 2754-3011 | `MRIfindApproximateSkullBoundingBox` (`MIN_DARK`, `MAX_LIGHT`) | 3.1-35 | `skull.rs` |
 | `utils/transform.cpp` 1576-1621, 2737-3240, 3332-3365; `utils/utils.cpp` 284-304 | `TransformFileNameType`, `ltaReadRegisterDat`, `mincFindVolume`, `mincGetVolumeInfo`, `mincGetVolInfo`, `ltaMNIreadEx`, `ltaReadFileEx`, `LTAreadExType`, `LTAreadEx`, `ltaFSLread`; `fgetl`'s buffer as these functions read it | 3.1-39 | `ltaread.rs` |
+| `include/cma.h` (whole); `utils/cma.cpp` 463-1098, 1541-1645, 2117-2160 | the label numbers and the `IS_*` macros (transcribed mechanically); `IsSubCorticalGray`, `SupraTentorialVolCorrection`, `CorticalGMVolCorrection`, `MRIasegContraLatLabel`, `MRIlrswapAseg`, `MRIlrswapSeg`, `MRIfixAsegWithRibbon`, `brainVolumeStatsFilename`, `CacheBrainVolumeStats`, `ReadCachedBrainVolumeStats` (its compute step the caller's), `MRIoneHotEncode`; libstdc++'s `>> double` (`num_get`, "C" locale) as these functions read the cache | 3.1-35 | `cma.rs` |
 
 No third-party code in these lines (the audit of `docs/freesurfer/third-party.md`). `readVolGeom`'s
 `sscanf` calls are modelled on glibc 2.35's behaviour measured as a black box (the open
@@ -49,3 +50,9 @@ No third-party code in these lines (the audit of `docs/freesurfer/third-party.md
   (FS-306), both modes; the crashes and hangs errors (FS-302, FS-304, FS-305, FS-307, FS-309, FS-310).
   `MRIrotateX_I` and the others do not allocate the clone FreeSurfer loses. `MRIreadHeader` and
   `regio_read_register` (fs.io) are the caller's (`ltaread::LtaIo`).
+- The CMA labels and segmentation functions: FS-311 to FS-315 (`docs/findings/freesurfer-volume.md` §8):
+  a voxel label that is NaN or beyond `int` saturates (FS-311), a thalamus voxel counts once (FS-312),
+  `Right_vessel` counts as `Left_vessel` does (FS-313), rule A; a cache line without a number that
+  ends in white space gives no number (FS-314, an error under `reproduce`); label lists read past
+  their numbers an error (FS-315). `USE_AVERAGE305` comes from `ltaread::LtaIo::env` (the program's
+  environment), not the process's.

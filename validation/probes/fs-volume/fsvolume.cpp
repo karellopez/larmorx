@@ -18,6 +18,8 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include <sys/stat.h>
+
 #include <cerrno>
 #include <cinttypes>
 #include <cstdint>
@@ -27,6 +29,7 @@
 #include <string>
 #include <vector>
 
+#include "cma.h"
 #include "diag.h"
 #include "error.h"
 #include "matrix.h"
@@ -250,6 +253,36 @@ void spill(const std::string &path, const std::string &bytes)
   if (!f) fail("cannot write the case's file");
   fwrite(bytes.data(), 1, bytes.size(), f);
   fclose(f);
+}
+
+// the IS_* macros of cma.h on a label, as 0/1 characters, in cma.h's order (cases.rs's MACROS)
+template <typename T> std::string cma_bits(T v)
+{
+  std::string b;
+  b += IS_FUTURE_WMSA(v) ? '1' : '0'; b += IS_LH_LAYER(v) ? '1' : '0'; b += IS_CC(v) ? '1' : '0'; b += IS_RH_LAYER(v) ? '1' : '0'; b += IS_LAYER(v) ? '1' : '0'; b += IS_UNKNOWN(v) ? '1' : '0'; b += IS_BRAIN(v) ? '1' : '0'; b += IS_WM(v) ? '1' : '0'; b += IS_CEREBRAL_WM(v) ? '1' : '0'; b += IS_HYPO(v) ? '1' : '0'; b += IS_WMSA(v) ? '1' : '0'; b += IS_WMH(v) ? '1' : '0'; b += IS_THALAMUS(v) ? '1' : '0'; b += IS_GM(v) ? '1' : '0'; b += IS_VENTRAL_DC(v) ? '1' : '0'; b += IS_CEREBELLAR_WM(v) ? '1' : '0'; b += IS_CEREBELLAR_GM(v) ? '1' : '0'; b += IS_CEREBELLUM(v) ? '1' : '0'; b += IS_CHOROID(v) ? '1' : '0'; b += IS_HIPPO(v) ? '1' : '0'; b += IS_AMYGDALA(v) ? '1' : '0'; b += IS_MTL(v) ? '1' : '0'; b += IS_CORTEX(v) ? '1' : '0'; b += IS_LAT_VENT(v) ? '1' : '0'; b += IS_CSF(v) ? '1' : '0'; b += IS_INF_LAT_VENT(v) ? '1' : '0'; b += IS_VENTRICLE(v) ? '1' : '0'; b += IS_CAUDATE(v) ? '1' : '0'; b += IS_PUTAMEN(v) ? '1' : '0'; b += IS_CLAUSTRUM(v) ? '1' : '0'; b += IS_ACCUMBENS(v) ? '1' : '0'; b += IS_PALLIDUM(v) ? '1' : '0'; b += LABEL_WITH_NO_TOPOLOGY_CONSTRAINT(v) ? '1' : '0'; b += IS_FIMBRIA(v) ? '1' : '0'; b += IS_GRAY_MATTER(v) ? '1' : '0'; b += IS_WHITE_MATTER(v) ? '1' : '0'; b += IS_FLUID(v) ? '1' : '0'; b += IS_LH_CLASS(v) ? '1' : '0'; b += IS_RH_CLASS(v) ? '1' : '0'; b += IS_GRAY_CLASS(v) ? '1' : '0'; b += IS_WHITE_CLASS(v) ? '1' : '0'; b += IS_CSF_CLASS(v) ? '1' : '0';
+  for (int c : {CSF_CLASS, GM_CLASS, WM_CLASS, OTHER_CLASS}) b += IS_CLASS(v, c) ? '1' : '0';
+  return b;
+}
+
+// voxels of frame 0 painted with values of the case: n, then x y z value
+void paint(MRI *m)
+{
+  int n = geti();
+  for (int i = 0; i < n; i++) {
+    int x = geti(), y = geti(), z = geti();
+    float v = getf();
+    MRIsetVoxVal(m, x, y, z, 0, v);
+  }
+}
+
+// a label list: rows cols, then rows * cols numbers
+MATRIX *get_list()
+{
+  int rows = geti(), cols = geti();
+  MATRIX *m = MatrixAlloc(rows, cols, MATRIX_REAL);
+  for (int r = 1; r <= rows; r++)
+    for (int c = 1; c <= cols; c++) m->rptr[r][c] = getf();
+  return m;
 }
 
 void run_case()
@@ -640,6 +673,90 @@ void run_case()
       if (cmd == "coef") od(MRIcubicCoeff(x, geti()));
       else od(ham_sinc(x, getd()));
     }
+  } else if (cmd == "cmalab") {
+    int n = geti();
+    for (int i = 0; i < n; i++) {
+      int v = geti();
+      float f = getf();
+      out += cma_bits(v) + " " + cma_bits(f) + " " + cma_bits((double)f) + " ";
+      oi(IsSubCorticalGray(v));
+      fflush(stdout);
+      oi(MRIasegContraLatLabel(v));
+      fflush(stdout);
+    }
+  } else if (cmd == "cmavol") {
+    MRI *aseg = get_vol();
+    paint(aseg);
+    MRI *ribbon = get_vol();
+    paint(ribbon);
+    int hemi = geti();
+    fflush(stdout);
+    od(SupraTentorialVolCorrection(aseg, ribbon));
+    od(CorticalGMVolCorrection(aseg, ribbon, hemi));
+    fflush(stdout);
+  } else if (cmd == "lrswap") {
+    MRI *aseg = get_vol();
+    paint(aseg);
+    fflush(stdout);
+    MRI *r = MRIlrswapAseg(aseg);
+    fflush(stdout);
+    put_vol(r);
+  } else if (cmd == "fixrib") {
+    MRI *aseg = get_vol();
+    paint(aseg);
+    MRI *ribbon = get_vol();
+    paint(ribbon);
+    MRI *dst = get_dst(aseg);
+    MRI *r = MRIfixAsegWithRibbon(aseg, ribbon, dst);
+    oi(r != NULL && r == dst);
+    put_vol(r);
+  } else if (cmd == "lrseg") {
+    MRI *seg = get_vol();
+    paint(seg);
+    MATRIX *lh = get_list(), *rh = get_list();
+    fflush(stdout);
+    MRI *r = MRIlrswapSeg(seg, lh, rh);
+    fflush(stdout);
+    put_vol(r);
+  } else if (cmd == "ohe") {
+    MRI *seg = get_vol();
+    paint(seg);
+    int n = geti();
+    std::vector<int> list;
+    for (int i = 0; i < n; i++) list.push_back(geti());
+    int force1 = geti();
+    fflush(stdout);
+    MRI *r = MRIoneHotEncode(seg, list, force1);
+    fflush(stdout);
+    put_vol(r);
+  } else if (cmd == "bvc" || cmd == "bvr") {
+    // the subject's folder beside the scratch file; its stats folder when the case says so
+    std::string dir = scratch.substr(0, scratch.rfind('/'));
+    if (chdir(dir.c_str())) fail("chdir");
+    std::string subj = "fsvol-subj";
+    unlink((subj + "/stats/brainvol.stats").c_str());
+    rmdir((subj + "/stats").c_str());
+    rmdir(subj.c_str());
+    if (geti()) {
+      mkdir(subj.c_str(), 0700);
+      mkdir((subj + "/stats").c_str(), 0700);
+    }
+    if (cmd == "bvc") {
+      std::vector<double> stats;
+      for (int i = 0; i < 16; i++) stats.push_back(getd());
+      fflush(stdout);
+      CacheBrainVolumeStats(stats, subj, ".");
+      ohex(slurp(subj + "/stats/brainvol.stats"));
+    } else {
+      spill(subj + "/stats/brainvol.stats", gethex());
+      fflush(stdout);
+      std::vector<double> stats = ReadCachedBrainVolumeStats(subj, ".");
+      fflush(stdout);
+      for (double v : stats) od(v);
+    }
+    unlink((subj + "/stats/brainvol.stats").c_str());
+    rmdir((subj + "/stats").c_str());
+    rmdir(subj.c_str());
   } else {
     fail("unknown command");
   }

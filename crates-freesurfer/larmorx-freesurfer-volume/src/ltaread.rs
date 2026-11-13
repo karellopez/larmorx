@@ -31,9 +31,7 @@ use std::io::{BufRead, Read, Write};
 use std::path::Path;
 
 use larmorx_core::defects::{FS_306, FS_307, FS_308, FS_309, FS_310};
-use larmorx_freesurfer_core::cscan::{
-    Bytes, Call, ERANGE, Scan, Stream, scan_f32, skip_space,
-};
+use larmorx_freesurfer_core::cscan::{Bytes, Call, ERANGE, Scan, Stream, scan_f32, skip_space};
 use larmorx_freesurfer_core::cstd::is_space;
 use larmorx_freesurfer_core::diag::{DIAG_SHOW, DIAG_VERBOSE};
 use larmorx_freesurfer_core::globals::Globals;
@@ -41,8 +39,8 @@ use larmorx_freesurfer_core::log::{self, ERROR_BADFILE, ERROR_BADPARM, ERROR_NOF
 use larmorx_freesurfer_core::matrix::{Matrix, matrix_copy};
 use larmorx_freesurfer_core::matrix_io::matrix_ascii_read_from;
 use larmorx_freesurfer_core::matrix_ops::matrix_identity;
-use larmorx_freesurfer_core::run::Environment;
 use larmorx_freesurfer_core::ret::Ret;
+use larmorx_freesurfer_core::run::Environment;
 use larmorx_freesurfer_core::utils::file_name_only;
 use larmorx_freesurfer_io::cfile::CFile;
 use larmorx_freesurfer_mri::lta::{
@@ -892,12 +890,18 @@ mod tests {
                 (true, false) if !at_end => 0,
                 _ => -1,
             };
-            let (mut b, mut call, mut errno) = (Bytes::new(input.as_bytes()), WordCall::default(), 7);
+            let (mut b, mut call, mut errno) =
+                (Bytes::new(input.as_bytes()), WordCall::default(), 7);
             let first = call.word(&mut b, &mut errno).is_some();
             let second = first && call.word(&mut b, &mut errno).is_some();
             let at_end = b.peek().is_none();
-            assert_eq!((ret(first, second, at_end), errno), (s_ret, s_errno), "{input:?} %s");
-            let (mut b, mut call, mut errno) = (Bytes::new(input.as_bytes()), WordCall::default(), 7);
+            assert_eq!(
+                (ret(first, second, at_end), errno),
+                (s_ret, s_errno),
+                "{input:?} %s"
+            );
+            let (mut b, mut call, mut errno) =
+                (Bytes::new(input.as_bytes()), WordCall::default(), 7);
             let first = call.word(&mut b, &mut errno).is_some();
             let before = b.i;
             let second = first && call.f32(&mut b, &mut errno).is_some();

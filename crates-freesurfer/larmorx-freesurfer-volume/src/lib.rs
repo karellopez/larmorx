@@ -13,6 +13,7 @@
 #![forbid(unsafe_code)]
 
 pub mod arith;
+pub mod cma;
 pub mod coords;
 pub mod ltaread;
 pub mod rotate;

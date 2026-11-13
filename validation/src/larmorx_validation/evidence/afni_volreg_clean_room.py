@@ -1598,10 +1598,17 @@ def export(ctx: core.Context) -> dict:
 
 def present(doc: dict) -> dict:
     """The page in the writing guide's words (the replica's module, :mod:`afni_volreg`, as a
-    black box: texts, ports and order only)."""
+    black box: texts, ports and order only). A shape the presenter refuses is reported without
+    its message, which may quote a label of the replica's page (the reviewer's round 16): a
+    documentation agent runs ``afni_volreg.present`` itself to see it."""
     from larmorx_validation.evidence import afni_volreg
 
-    return afni_volreg.present(doc)
+    try:
+        return afni_volreg.present(doc)
+    except ValueError:
+        raise RuntimeError(
+            "3dvolreg's page: the presenter refused a shape; a documentation agent must look"
+        ) from None
 
 
 if __name__ == "__main__":  # the original's cache entries only (``refresh WHY``: refresh)

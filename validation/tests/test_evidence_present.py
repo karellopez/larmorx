@@ -874,3 +874,19 @@ def test_an_fsl_page_of_two_ports():
     ex2["diffs"][3]["verdict"] = "open"  # beyond FSL's own and without the threshold's words
     with pytest.raises(ValueError, match="the clean room's verdict"):
         fsl_flirt.SHOWS["panel-ds003592-older"](ex2)
+
+
+def test_the_clean_rooms_exporter_hides_a_refusal_of_the_replicas_presenter(monkeypatch):
+    """Round 16's hardening: 3dvolreg's clean room's exporter calls the replica's ``present`` as
+    a black box; a refusal's message, which may quote a label of the replica's page, is not
+    shown."""
+    from larmorx_validation.evidence import afni_volreg, afni_volreg_clean_room
+
+    def refuse(doc):
+        raise ValueError("a port's panel of another shape: 'a label of the replica's page'")
+
+    monkeypatch.setattr(afni_volreg, "present", refuse)
+    with pytest.raises(RuntimeError, match="a documentation agent must look") as e:
+        afni_volreg_clean_room.present({})
+    assert "label" not in str(e.value)
+    assert e.value.__cause__ is None and e.value.__suppress_context__

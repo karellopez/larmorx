@@ -120,5 +120,7 @@ Python API on the same inputs); the click layer, all 61 helps at two widths, arg
 errors, every interface larmorx runs with its options, and fMRIPrep's real calls of the confounds
 nodes of three reference runs (single-band, multiband with 280 volumes, multi-echo): 226 of 226
 cases, 51 real calls among them (15 of which nipype's command line refuses: PIPE-81, PIPE-82); the
-parity suite `confounds-nipype` runs the check as its cases `cli-quick-e1` and `cli-full-e1`. The
+parity suite `confounds-nipype` runs the check as its cases `cli-quick-e1` and `cli-full-e1`
+(the record [confounds-nipype](../validation/confounds-nipype.md), standard tier, 2026-11-13: 25 of 25
+cases, `cli-quick-e1` among them, 18 of 18 checks). The
 golden case `cli.nipype.run`; `tests/python/test_nipype_run.py`.

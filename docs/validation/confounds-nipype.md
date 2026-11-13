@@ -1,14 +1,14 @@
-# Parity: nipype's confound algorithms (DVARS, CompCor, TSNR, the non-steady-state detector, framewise displacement)
+# Parity: nipype's confound algorithms (DVARS, CompCor, TSNR, the non-steady-state detector, framewise displacement) and nipype's interface runner (larmorx nipype run)
 
-**All cases agree.** 24 cases on the `standard` tier: 24 pass, 0 rejected by both, 0 expected divergences, 0 failures.
+**All cases agree.** 25 cases on the `standard` tier: 25 pass, 0 rejected by both, 0 expected divergences, 0 failures.
 
-- **Validated:** `lx.confounds` (`crates/larmorx-confounds`), niworkflows' `robust_acompcor` and `robust_tcompcor`
-- **Reference:** nipype 1.12.0 and nitime in-process in the newest and the shared library releases and in fMRIPrep 25.2.6's image, and fMRIPrep 25.2.6's own node files of 21 oracle runs
+- **Validated:** `lx.confounds` (`crates/larmorx-confounds`), niworkflows' `robust_acompcor` and `robust_tcompcor`, `lx.nipype`
+- **Reference:** nipype 1.12.0 and nitime in-process in the newest and the shared library releases and in fMRIPrep 25.2.6's image, fMRIPrep 25.2.6's own node files of 21 oracle runs, and nipype 1.12.0's own nipypecli run with niworkflows 1.15.4 and fMRIPrep 25.2.7
 - **Test data:** larmorx-testdata `52e371aab0ac`, tier `standard`
 - **Generated:** 2026-11-13 on Linux x86_64, with `python -m larmorx_validation parity confounds-nipype --tier standard`
 - **Original programs:** 0 runs: 0 from the oracle cache, 0 run; cache `<workspace>/oracles/cache`, mode `use`
 
-281 comparison lines in 24 script runs (e1 6, e2 4, e3 6, exact 1, left 1, nothing 1, notices 1, rows 1, shape 1, text 1, tolerance 1).
+289 comparison lines in 25 script runs (e1 7, e2 4, e3 6, exact 1, left 1, nothing 1, notices 1, rows 1, shape 1, text 1, tolerance 1).
 
 ## Thresholds
 
@@ -25,6 +25,7 @@
 |---|---|---|---|---|---|
 | check_compcor | 5 | 5 | 0 | 0 | 0 |
 | check_dvars | 6 | 6 | 0 | 0 | 0 |
+| check_nipype_cli | 1 | 1 | 0 | 0 | 0 |
 | check_nipype_misc | 5 | 5 | 0 | 0 | 0 |
 | difftest | 8 | 8 | 0 | 0 | 0 |
 
@@ -32,7 +33,7 @@
 
 | Component | Version |
 |---|---|
-| larmorx | 0.1.0rc1 (9a106cf16763) |
+| larmorx | 0.1.0rc1 (34272ae120de) |
 | larmorx-testdata | 52e371aab0ac |
 | Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
@@ -69,6 +70,7 @@ Each case is one of the investigation's check scripts (some of its sections, a t
 | `misc-quick-e3` | pass | 69/69 | nipype's TSNR, NonSteadyStateDetector, FramewiseDisplacement (every source, NIPY included) and niworkflows' RobustAComp… |
 | `misc-control-quick-e1` | pass | 46/46 | the negative control of check_nipype_misc.py: larmorx told the other library release must differ (quick tier, numpy 2.5… |
 | `misc-control-quick-e3` | pass | 46/46 | the negative control of check_nipype_misc.py: larmorx told the other library release must differ (quick tier, fMRIPrep … |
+| `cli-quick-e1` | pass | 18/18 | larmorx nipype run against nipype's own nipypecli run: the click layer, the 61 helps, argparse's and traits' errors, th… |
 | `difftest/compcor-no-volume-left` | pass | 2/2 | random testing: DN fix pass |
 | `difftest/compcor-pipe44-later-masks-add-nothing` | pass | 2/2 | ACompCor whose second mask gives no component and whose later masks give none either (the trial's notice verdicts): the… |
 | `difftest/compcor-pipe44-reaches-other-shape` | pass | 2/2 | random testing: DN fix pass |

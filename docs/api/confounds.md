@@ -19,7 +19,7 @@ and the workflow that composes them, fMRIPrep's `init_bold_confs_wf` with its `d
 **Status: `experimental`** (checked bit for bit against nipype, nitime, SciPy and numpy in the
 three environments, against fMRIPrep's own DVARS and CompCor files and on fMRIPrep's reference runs' raw
 series and real motion parameters; the records, standard tier, 2026-11-13:
-[confounds-nipype](../validation/confounds-nipype.md) (24 of 24 cases pass, the permanent cases of
+[confounds-nipype](../validation/confounds-nipype.md) (25 of 25 cases pass, `larmorx nipype run`'s quick tier and the permanent cases of
 random testing included), [confounds-fmriprep](../validation/confounds-fmriprep.md) (16 of 16) and
 [confounds-linalg](../validation/confounds-linalg.md) (32 of 32: numpy's, OpenBLAS's, LAPACK's and
 SciPy's arithmetic underneath), with the full tiers through the SVDs in

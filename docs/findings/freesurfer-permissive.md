@@ -207,6 +207,25 @@ Where FreeSurfer calls them (the call sites the cards name):
 - The probe `validation/probes/fs-dicom` compares the port with the unit oracle's `libdicom.a`
   through the probe's `FsDialect` (the two changes above): its README has the numbers.
 
+## nlohmann/json (items 3.1-19 and 3.1-20)
+
+- FreeSurfer 8.2.0's `include/json.h` is nlohmann/json 3.2.0's single header (its version macros
+  say 3.2.0) with later type traits backported (`void_t`, `is_detected`, `is_basic_json` in the
+  conversions) and one change of behaviour: `operator[]`'s `type_error.305` reads "cannot use
+  operator[] with a string argument with <type>" for a key and "... with a numeric argument with
+  <type>" for an index (3.2.0: "cannot use operator[] with <type>"); the lexer, parser,
+  serializer and Grisu2 are 3.2.0's line for line. The probe's `FsDialect`
+  (`validation/probes/fs-json/src/main.rs`) is the model for track A's dialect.
+- Callers: `utils/pointset.cpp` (`loadfsPointSet`: `is >> j`, `j["vox2ras"]` to a string, a
+  range-for over `j["points"]`, `coord["x"]` to `double`, `point["legacy_stat"]`);
+  `mris_reposition_surface` and `utils/targetpointset.cpp`, `utils/mrisurf_sseTerms.cpp`
+  (`MRISpointSetLocationError`), `mris_place_surface` (`istream >> j`, `["points"].size()`,
+  `js_pts[i]["coordinates"]["x"].get<float>()`, `js["vox2ras"].get<std::string>()`): reading
+  Freeview's point sets, always through `operator>>` (not strict: what follows the value is
+  ignored). `mri_seg_overlap` writes its report with `out << std::setw(4) << json` (pretty, indent
+  4, `std::map` order: "inputs", "measures", "names"; numbers by Grisu2). `fsPointSet::save`
+  writes its JSON by hand with `std::ofstream` (not this library).
+
 ## The probes that name FreeSurfer's internals (for the clean-room audit's restriction table)
 
 `validation/probes/fs-vnl` (its shim's comments: FreeSurfer's call sites and flags),
@@ -214,5 +233,6 @@ Where FreeSurfer calls them (the call sites the cards name):
 `validation/probes/fs-random` (FreeSurfer's seeds and its `drand64` cast),
 `validation/probes/fs-minc-nifti` (`ProbeFs`, `Flavour::FreeSurfer`: FreeSurfer's copies' changes)
 `validation/probes/fs-gifti` (`dialect.rs`: FreeSurfer's two GIFTI changes) and
-`validation/probes/fs-dicom` (`port.rs`'s `FsDialect`: FreeSurfer's changes to CTN) are closed to
+`validation/probes/fs-dicom` (`port.rs`'s `FsDialect`: FreeSurfer's changes to CTN) and
+`validation/probes/fs-json` (`FsDialect`: its `json.h`'s messages) are closed to
 FreeSurfer's clean-room implementers, as this file is.

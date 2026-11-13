@@ -41,6 +41,7 @@ pub mod element;
 pub mod grid;
 pub mod image;
 pub mod itk_real;
+pub mod json;
 pub mod linalg;
 pub mod math;
 pub mod numpy;

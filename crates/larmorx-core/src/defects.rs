@@ -1055,6 +1055,8 @@ defects! {
         "sequences are read by recursion, one level per nesting: a file nesting them deeply enough exhausts the stack and the program crashes";
     FS_98 = "FS-98", "CTN", true,
         "a fragment of encapsulated pixel data whose length is odd (or over the remaining count) closes the object, and the reader then writes through the closed object: the program crashes";
+    FS_99 = "FS-99", "nlohmann/json", true,
+        "the pretty printer's indent string (512 characters) is doubled once, with spaces, when an indent passes it (past 512 characters a tab indent becomes spaces; an indent more than twice the string's length is read past its memory), and the writer and the value's destructor recurse once per nesting level: a value nested deeply enough exhausts the stack";
 }
 
 /// The register entry with ID `id`.

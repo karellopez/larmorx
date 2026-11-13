@@ -53,7 +53,6 @@ use crate::mp_faster;
 use crate::mp_slow;
 use crate::mris::Mris;
 use crate::mris_mp::MrisMp;
-use crate::mrisurf::{FNV_INIT, fnv_add};
 use crate::topology::vertex_vsize;
 
 /// `ROMP_DISTRIBUTOR_PARTIAL_CAPACITY` (`include/romp_support.h`).
@@ -84,19 +83,9 @@ pub fn romp_total(start: f64, partials: &[f64]) -> f64 {
     partials.iter().fold(start, |s, &p| add64(s, p))
 }
 
-/// `fnv_hash(i, k, &random_counter, lo, hi)` (`include/fnv_hash.h`): the FNV hash of the three
-/// `unsigned int`s `i`, `k` and the counter (then incremented), its low 32 bits as a fraction of
-/// `0xffffffff`, mapped to `lo..hi` in double and rounded to `float`.
-pub fn fnv_hash(i: i32, k: i32, counter: &mut i32, lo: f64, hi: f64) -> f32 {
-    let mut b = [0u8; 12];
-    b[0..4].copy_from_slice(&(i as u32).to_le_bytes());
-    b[4..8].copy_from_slice(&(k as u32).to_le_bytes());
-    b[8..12].copy_from_slice(&(*counter as u32).to_le_bytes());
-    *counter = counter.wrapping_add(1);
-    let hash = fnv_add(FNV_INIT, &b);
-    let f = (hash & 0xffff_ffff) as f64 / f64::from(0xffff_ffffu32);
-    ((hi - lo) * f + lo) as f32
-}
+/// `fnv_hash(i, k, &random_counter, lo, hi)` (`include/fnv_hash.h`): fs.core's
+/// ([`larmorx_freesurfer_core::fnv::fnv_hash`]).
+pub use larmorx_freesurfer_core::fnv::fnv_hash;
 
 /// `RAN` (`MRIScomputeNormals`): the random moves' range, a thousandth of a millimetre.
 pub const RAN: f64 = 0.001;

@@ -39,8 +39,8 @@ use larmorx_freesurfer_core::ret::Ret;
 use larmorx_freesurfer_core::timer::current_date_time;
 use larmorx_freesurfer_io::cfile::CFile;
 use larmorx_freesurfer_io::fio::{
-    fread1, fread2, fread3, fread_float, fread_int, fread_int_ex, fread_long, fwrite3, fwrite_float,
-    fwrite_int,
+    fread_float, fread_int, fread_int_ex, fread_long, fread1, fread2, fread3, fwrite_float,
+    fwrite_int, fwrite3,
 };
 use larmorx_freesurfer_io::tags::{
     TAG_CMDLINE, TAG_GROUP_AVG_SURFACE_AREA, TAG_OLD_COLORTABLE, TAG_OLD_MGH_XFORM,
@@ -85,7 +85,9 @@ fn room(g: &mut Globals, x: f64) -> i32 {
     if x.is_nan() || x >= 2147483648.0 || x <= -2147483649.0 {
         g.notices.add(
             &FS_02,
-            format!("a surface's room of {x} elements, outside the int range: an undefined conversion"),
+            format!(
+                "a surface's room of {x} elements, outside the int range: an undefined conversion"
+            ),
         );
         if g.notices.reproduce() {
             return double_to_int_x86(x);
@@ -174,10 +176,7 @@ fn read_cmdline(
             g,
             io.err,
             ERROR_NOMEMORY,
-            &format!(
-                "{who}({fname}): too many commands ({}) in file",
-                mris.ncmds
-            ),
+            &format!("{who}({fname}): too many commands ({}) in file", mris.ncmds),
         )?;
     }
     if mris.ncmds == MAX_CMDS as i32 {
@@ -189,10 +188,7 @@ fn read_cmdline(
             g,
             io.err,
             ERROR_NOMEMORY,
-            &format!(
-                "{who}({fname}): too many commands ({}) in file",
-                mris.ncmds
-            ),
+            &format!("{who}({fname}): too many commands ({}) in file", mris.ncmds),
         )?;
     }
     // calloc(len + 1, 1): it fails for a size beyond the largest object (a length below -1 or
@@ -313,7 +309,13 @@ fn read_tags(
 
 /// `ErrorExit(ERROR_BADFILE, "<program>: vertex <v> <axis> coordinate <%f>!")` of a coordinate
 /// beyond 10000 in size or not finite.
-fn check_coordinate(g: &mut Globals, io: &mut Io, vno: i32, name: &str, c: f32) -> Result<(), Fatal> {
+fn check_coordinate(
+    g: &mut Globals,
+    io: &mut Io,
+    vno: i32,
+    name: &str,
+    c: f32,
+) -> Result<(), Fatal> {
     if c.abs() > 10000.0 || !c.is_finite() {
         log::error_exit(
             g,
@@ -807,7 +809,14 @@ pub fn write_triangular_surface_tags(
             let s = vg_i_to_r(g, io.out, io.err, &mris.vg)?;
             let t = tkr_vox2ras_from_vol_geom(g, io.out, io.err, &mris.vg)?;
             let sinv = new(matrix_inverse(g, io.out, io.err, Some(&s), None)?);
-            matrixdata = new(matrix_multiply(g, io.out, io.err, Some(&t), sinv.as_ref(), None)?);
+            matrixdata = new(matrix_multiply(
+                g,
+                io.out,
+                io.err,
+                Some(&t),
+                sinv.as_ref(),
+                None,
+            )?);
             dataspace = SCANNER;
             transformedspace = UNKNOWN;
         } else {
@@ -819,7 +828,14 @@ pub fn write_triangular_surface_tags(
         let s = vg_i_to_r(g, io.out, io.err, &mris.vg)?;
         let t = tkr_vox2ras_from_vol_geom(g, io.out, io.err, &mris.vg)?;
         let tinv = new(matrix_inverse(g, io.out, io.err, Some(&t), None)?);
-        matrixdata = new(matrix_multiply(g, io.out, io.err, Some(&s), tinv.as_ref(), None)?);
+        matrixdata = new(matrix_multiply(
+            g,
+            io.out,
+            io.err,
+            Some(&s),
+            tinv.as_ref(),
+            None,
+        )?);
         dataspace = UNKNOWN;
         transformedspace = SCANNER;
     } else if let Some(m) = mris.SRASToTalSRAS_.as_ref()

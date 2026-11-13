@@ -68,11 +68,14 @@ fn coord(g: &mut Gen, heavy: bool) -> f32 {
 /// voxel size (now and then a zero size, a singular geometry), axis-aligned direction cosines
 /// with signs (now and then any), a centre, a name.
 fn vg_values(g: &mut Gen) -> VolGeom {
-    let mut vg = VolGeom::default();
-    vg.valid = if g.chance(4) { 0 } else { 1 };
-    vg.width = g.pick(&[256, 1, 64, 32, 3]);
-    vg.height = g.pick(&[256, 1, 64, 32, 5]);
-    vg.depth = g.pick(&[256, 1, 64, 32, 7]);
+    // (the fields in the order the generator draws them)
+    let mut vg = VolGeom {
+        valid: if g.chance(4) { 0 } else { 1 },
+        width: g.pick(&[256, 1, 64, 32, 3]),
+        height: g.pick(&[256, 1, 64, 32, 5]),
+        depth: g.pick(&[256, 1, 64, 32, 7]),
+        ..Default::default()
+    };
     let size = |g: &mut Gen| -> f32 {
         if g.chance(30) {
             0.0
@@ -90,7 +93,14 @@ fn vg_values(g: &mut Gen) -> VolGeom {
             }
         }
     } else {
-        let perms = [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]];
+        let perms = [
+            [0, 1, 2],
+            [0, 2, 1],
+            [1, 0, 2],
+            [1, 2, 0],
+            [2, 0, 1],
+            [2, 1, 0],
+        ];
         let p = perms[g.below(6) as usize];
         for (k, r) in cos.iter_mut().enumerate() {
             r[p[k]] = if g.chance(2) { 1.0 } else { -1.0 };
@@ -275,7 +285,9 @@ fn triangle_file(g: &mut Gen, noextra: bool, heavy: bool) -> (Vec<u8>, bool) {
         // a line of more than 199 bytes (FS-354) not with seed 1: FreeSurfer then reads text as
         // the counts, whose allocations the machine's memory decides
         match g.below(40) {
-            0 if g.1 => b.extend_from_slice(format!("created by {} on today\n", "u".repeat(210)).as_bytes()),
+            0 if g.1 => {
+                b.extend_from_slice(format!("created by {} on today\n", "u".repeat(210)).as_bytes())
+            }
             1..=3 => b.extend_from_slice(b"created by me on today\n"),
             _ => b.extend_from_slice(b"created by me on Thu Nov 12 20:55:19 2026\n\n"),
         }
@@ -396,11 +408,7 @@ pub(super) fn tri_tokens(t: &mut Vec<String>, g: &mut Gen) {
     }
     ix(t, env);
     hx(t, &printable(g, 1, 12));
-    let date: &[u8] = g.pick(&[
-        b"Thu Nov 12 20:55:19 2026".as_slice(),
-        b"",
-        b"x y",
-    ]);
+    let date: &[u8] = g.pick(&[b"Thu Nov 12 20:55:19 2026".as_slice(), b"", b"x y"]);
     hx(t, date);
     let nops = if g.chance(3) { g.int(2, 3) } else { 1 };
     let mut ops: Vec<String> = Vec::new();

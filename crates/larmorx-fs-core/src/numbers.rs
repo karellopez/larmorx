@@ -169,7 +169,8 @@ impl Process {
     }
 }
 
-/// `kth_smallest(a, n, k)` (k from 1 to n): Wirth's selection, reordering the list (§11's steps).
+/// `kth_smallest(a, n, k)` (k from 1 to n; panics outside that range, where FreeSurfer reads
+/// outside the list): Wirth's selection, reordering the list (§11's steps).
 pub fn kth_smallest(a: &mut [f32], k: usize) -> f32 {
     let n = a.len();
     let t = k - 1;
@@ -204,8 +205,8 @@ pub fn kth_smallest(a: &mut [f32], k: usize) -> f32 {
     a[t]
 }
 
-/// `quick_select(a, n, k)` (k from 1 to n): the median-of-three partition (§11's steps),
-/// reordering the list.
+/// `quick_select(a, n, k)` (k from 1 to n; panics outside that range): the median-of-three
+/// partition (§11's steps), reordering the list.
 pub fn quick_select(a: &mut [f32], k: usize) -> f32 {
     let t = k - 1;
     let (mut low, mut high) = (0usize, a.len() - 1);

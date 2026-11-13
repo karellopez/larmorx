@@ -8,6 +8,8 @@ probe of the open folder [`../freesurfer-maths-probe/`](../freesurfer-maths-prob
 | Path | What it is |
 |---|---|
 | `candidate/` | `fs-maths-candidate batch <file>`: the probe's commands and print forms over the clean room (its own Cargo workspace, a validation tool outside larmorx's build); each line on a process state of its own, `LARMORX_UPSTREAM_DEFECTS` the mode, the defect notices of a line on its standard error |
+| `../../../crates/larmorx-fs-core/tests/maths_cmd/` | the commands themselves (the probe's grammar and print forms, the minimizers' four test costs and their FNV-1a hash), shared with the crate's golden cases (`tests/golden_maths.rs`); the candidate includes the folder by path |
+| `speed.py` | the products, the inverse, the SVD and the histograms against the probe, black box (indicative) |
 
 ## Running it
 
@@ -19,7 +21,7 @@ PYTHONPATH=validation/src scripts/orchestration/boxed.sh 8 python -P \
   --candidate <target>/release/fs-maths-candidate --scratch <scratch>/maths --mode reproduce   # then fix
 ```
 
-## Results (2026-11-13, seed 7; the probe's reference hashes are the spec's §23.2)
+## Results (2026-11-13, seed 7, every group again after relay 4; the probe's reference hashes are the spec's §23.2)
 
 `compare.py` per group: calls, identical, FreeSurfer did not finish, memory, defect corrected,
 unexplained.
@@ -49,7 +51,10 @@ unexplained.
 | svd | 1,920 | 1,514 / 333 / 65 / 0 / **8** | 1,088 / 333 / 95 / 404 / **0** |
 | mfiles | 635 | 634 / 0 / 1 / 0 / **0** | 359 / 0 / 1 / 275 / **0** |
 | rfields | 16 | 16 / 0 / 0 / 0 / **0** | 16 / 0 / 0 / 0 / **0** |
-| minimizers | 181 | not yet (§13) | not yet |
+| minimizers | 181 | 179 / 2 / 0 / 0 / **0** | 160 / 2 / 9 / 10 / **0** |
+
+Totals: `reproduce` 25,739 of 26,707 identical (672 not finished, 249 memory, 47 below); `fix`
+22,533 identical (672 not finished, 383 memory, 3,092 corrected by a noted defect, 27 below).
 
 The differences left, all understood:
 
@@ -74,3 +79,28 @@ size `<= 0` becomes 1 (a NaN stays), `HISTOfindLinearFit` starts at (a, b) = (1,
 `HISTOfindCurrentPeak` clips a start beyond the last bin, `hp.plt` is Z's bins with the fitted curve;
 and FS-49's `reproduce`: FreeSurfer reads each number of a binary matrix file into one stack slot it
 byte-swaps in place, so a short read keeps the previous number's other bytes, swapped (not zeros).
+
+## Golden cases, defect tests, speed
+
+- `cargo test -p larmorx-fs-core --test golden_maths`: every command of the probe's grammar on seeded
+  arguments, both modes, 16 SHA-256 (record: `FS_CORE_GOLDEN_RECORD=1 ... -- --nocapture`;
+  `FS_CORE_GOLDEN_DUMP=<folder>` writes each case's bytes). Identical in debug and release builds
+  and under the AArch64 NaN emulation (`validation/probes/fsl-mcflirt-affine-trace/nan_trap.c`, built
+  as `libnan_trap.so`; run the test binary with `LD_PRELOAD=<scratch>/libnan_trap.so NAN_TRAP_ARM=1
+  NAN_TRAP_DIR=<scratch>/nt`). The inverse, determinant, QR factors and `OpenEigenSystem` /
+  `OpenNonSymmetricEigenSystem` get finite arguments: VNL's ports in the main package do not yet
+  give the official build's NaN bits there (the findings).
+- `cargo test -p larmorx-fs-core --test defects_maths`: each defect of the spec's §24 noted in both
+  modes on a line of the comparison's own batches (the shortest), the two modes' results different
+  where the correction changes them; FS-29, FS-35 and FS-36 (kept, not noted), FS-39 at the driver.
+  Not covered: FS-30 (unreachable through `drand48`, the findings), FS-41, FS-42, ITK-111.
+- `speed.py` (2026-11-13, one thread, indicative): products of 256 x 256 about 1.7 to 1.9 times the
+  probe's speed, the inverse of 128 x 128 1.8 times, the SVD 1.5 times, `HISTOcount` 2.8 times;
+  `HISTOsmooth` and `HISTOrobustGaussianFit` slower by under 1.5 ms a call. The table:
+  [`docs/findings/fs-maths-clean-room.md`](../../../docs/findings/fs-maths-clean-room.md).
+
+```sh
+scripts/orchestration/boxed.sh 4 python -P validation/investigations/freesurfer-cleanroom-maths/speed.py \
+  --probe <workspace>/oracles/freesurfer-8.2.0-unit/probes/fs_maths_probe \
+  --candidate <target>/release/fs-maths-candidate --scratch <scratch>/speed
+```

@@ -132,3 +132,16 @@ bounds as `x >= n`, the remainder from the division); C's `ungetc` modelled by a
 compressed variable read with glibc's allocation sizes (zero within, memory contents beyond, noted);
 `MatlabRead2`'s and `MatFileRead`'s files closed (FS-242). The corrected readers (`fix`) are larmorx's
 own: MATLAB's version 4 and 5 formats read by their definition (MATLAB's MAT-file format document).
+
+## FreeSurfer files and functions translated (part 6, relay 16: reading volumes and registration files)
+
+| FreeSurfer file | What | Here |
+|---|---|---|
+| `utils/mriio.cpp` 204-257, 488-1105 | `setDirectionCosine`, `mri_read`, `nan_inf_check`, `MRIreadType`, `MRIreadInfo`, `MRIreadHeader` (taken early from 3.1-28) | `mriio.rs` |
+| `utils/mriio.cpp` 10853-11245, 12195-12420 | `local_buffer_to_image`, `mghRead`, `MRITAGread` (taken early from 3.1-30) | `mriio.rs` |
+| `utils/registerio.cpp` 43-162 | `regio_read_register` (taken early from 3.1-34; its `.lta` branch through `RegisterLta`) | `registerio.rs` |
+| `utils/resample.cpp` 109-118 | `float2int_code` | `registerio.rs` |
+| `packages/minc/minc_gaussian.c` 157-290, `minc_volume_io.c` (its changes to MINC 1.5.1's reader: messages, transform types, tokens, `~user`) | `invert_4x4_matrix`, FreeSurfer's volume_io dialect of `larmorx_io::xfm` (MNI's notice: `LicenseRef-MNI`) | `minc.rs` |
+
+Third-party code: `packages/minc` is MNI's volume_io reworked by FreeSurfer (MNI's permissive notice); `minc.rs`
+carries both licence names. No other third-party code in these lines.

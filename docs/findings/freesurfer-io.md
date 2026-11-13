@@ -613,3 +613,59 @@ known. The mosaic functions serve the Siemens DICOM reader (fs.dicomread, 3.7).
   hash in `fsio.cpp` had the 64-bit offset basis with a digit dropped, found by computing the hash of
   the official numbers in Python (the port's was right).
 
+
+## Part 6: reading volumes and registration files (relay 16 of track A, for track D's surfaces)
+
+**Source-derived (FreeSurfer 8.2.0's `utils/mriio.cpp` 109, 488-1105, 10853-11245, 12195-12420;
+`utils/registerio.cpp` 43-162; `utils/resample.cpp` 109-118; `packages/minc/minc_gaussian.c`,
+`minc_volume_io.c`): closed to FreeSurfer's clean-room implementers.**
+
+- `mri_read` finds the last `@` and the last `#` on the whole name with `strrchr` before it writes
+  a NUL at either: so in `x.mgz@mgz#0` the format's text ends at the `#` (`mgz`) and in
+  `x.mgz#0@mgz` the frames' text ends at the `@`.
+- `nan_inf_check` on a volume read without voxels: `MRIFseq_vox` through `slices`, which
+  `MRIallocHeader` never allocates: a crash for a float volume with a frame list (FS-255; reached
+  by `MRIreadHeader`/`MRIreadInfo` of `name#n`).
+- `mghRead`'s header skip in a compressed file ends with `znzread(buf, total_bytes - count, 1,
+  fp)`: for a volume without voxels the member size is 0, and FreeSurfer's `znzread` divides the
+  bytes read by it (SIGFPE, measured: the probe's `CRASH 8`; FS-76's mechanism, nifticlib's).
+- `MRI::initSlices` advances the row pointer only for uchar, short, unsigned short, RGB, int, long,
+  float and (by the byte count) float complex: a tensor (and bitmap, double complex) volume's rows
+  all point at the chunk's start, so `mghRead`'s `MRIFseq_vox` writes overwrite one row.
+- `mghRead`'s `buf = calloc(bytes, ...)` with a negative `int` byte count fails (`errno` ENOMEM,
+  measured), and `znzread` into the null buffer of a compressed file returns -1 (zlib's
+  `(int)len < 0` check, which also sets the stream's error so every later read fails: the TR, the
+  tags); the replica gives `larmorx_io::znz::GzFile::gzread_too_long` for that state.
+- `FS_MGZIO_USEVOXELBUFREAD`: `bufsrc = &MRIseq_vox(mri, 0, 0, 0, start_frame)` dereferences
+  `slices[start_frame * depth]`: past the one-frame volume for a frame after the first, and a
+  crash for a volume without slices (`slices` of 0 entries; measured `CRASH 11`) (FS-256).
+- `MRITAGread` is called by `mghRead` with its defaults (`ras_xform` NULL): the
+  `TAG_RAS_XFORM_EXTRA` case has no `niftiheaderext` check and calls `read_ras_xform_extra(NULL)`
+  (FS-253).
+- `TAG_MGH_XFORM`: `fstagsio.read_data(mri->transform_fname, len)` reads `len` bytes into the
+  1,024-byte field (FS-254 past it; `transform_fname` is followed by the `General_transform`);
+  `sprintf(tmpstr, "%s/transforms/talairach.xfm", fio_dirname(fname))` into 1,000 bytes (FS-254).
+  The file is read with `input_transform_file`, FreeSurfer's copy (`packages/minc`), whose
+  `create_linear_transform` uses `minc_volume_io.c`'s static `compute_transform_inverse` (no
+  identity check; `minc_inverse.c`'s global one checks the first product against the identity and
+  exits) on `minc_gaussian.c`'s `invert_4x4_matrix` (`invert_4x4_matrix_wkr_fast`; `doPrint` is
+  false in the build).
+- `TAG_CMDLINE` and `TAG_PEDIR`: `calloc(len + 1)` then `read_data(.., len)` and `[len] = 0`: a
+  length of -1 gives an empty string after writing one byte before the allocation; below -1 or
+  beyond memory a null buffer and a crash (FS-257). `TAG_FIELDSTRENGTH` reads `sizeof(float)`
+  bytes whatever the tag's length (no defect ID: FreeSurfer always writes 4; a file with another
+  length is then read as further tags, both modes).
+- `regio_read_register`'s `char tmp[1000]` takes `fscanf("%s")` without a width (FS-258); the `.lta`
+  branch reads `lta->xforms[0]` without checking `num_xforms` (FS-258) and calls `LTAread` and
+  `TransformLTA2RegDat` (transform.cpp, fs.volume: the replica takes them through
+  `registerio::RegisterLta`). `perror` (glibc 2.35) duplicates standard error's descriptor and
+  `fdopen`s it `"w+"` while standard error is not yet oriented: on a descriptor open for writing
+  only that fails with EINVAL and `errno` stays EINVAL (measured in the probe's child, whose
+  standard error is a file opened `O_WRONLY`); the probe orients standard error first.
+- `chklc()` in `MRIreadType`/`MRIread` exits 255 without `FREESURFER_HOME` (the licence check, a
+  runtime matter larmorx's replica does not have: `larmorx-freesurfer-core::chklc` returns 1); the
+  probe calls `mri_read` directly for its `mrd` command.
+- Measured (2026-11-13, the probe's piece 6): seed 3, 310 cases; seed 5, 1,250; seed 11, 2,500:
+  `reproduce` identical on 1,777 of 1,778 comparable lines (572 not compared: formats not ported,
+  `.lta`, crashes, skips beyond 256 MiB; 150 compared apart), the one other FS-256's crash, since
+  noted.

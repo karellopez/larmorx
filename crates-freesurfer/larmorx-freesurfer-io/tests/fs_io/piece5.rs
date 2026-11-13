@@ -161,7 +161,9 @@ fn v4_var(g: &mut Gen, portable: bool) -> Vec<u8> {
         g.int(1, 5) as u8
     };
     let mut ty = if be { 1000 } else { 0 } + i32::from(p) * 10;
-    if g.chance(12) {
+    // the odd types (some read as sizes of hundreds of millions of numbers, printed for minutes:
+    // not in the portable cases, which the recorded test runs in a debug build)
+    if g.chance(12) && !portable {
         ty = g.pick(&[-1, 2, 7, 60, 100, 4052, 1001, 255, 1050, 30]);
     }
     let dim = |g: &mut Gen| -> i32 {

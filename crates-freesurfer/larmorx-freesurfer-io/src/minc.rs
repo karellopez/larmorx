@@ -106,6 +106,8 @@ impl Dialect for FsVolumeIo {
 /// substitution from the last row (each later row's multiple subtracted, then `* (1 / a_ii)`). The
 /// result's row `i` is the permuted inverse's row `map[i]`. Double arithmetic in SSE2's order, with
 /// x86-64's NaNs.
+// the C loops over the row map, as written
+#[allow(clippy::needless_range_loop)]
 pub fn invert_4x4_matrix(m: &Transform) -> Result<Transform, &'static str> {
     let mut mat = [0.0f64; 16];
     for i in 0..4 {

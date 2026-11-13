@@ -180,7 +180,8 @@ fn mgh_bytes(g: &mut Gen, small: bool) -> (Vec<u8>, Vec<(String, Vec<u8>)>) {
         * (h.max(0) as usize)
         * (d.max(0) as usize)
         * bpv;
-    let n = n.min(1 << 16);
+    // at most 4 KiB of voxels (a larger extent is the skip's and the read's matter: the file ends)
+    let n = n.min(1 << 12);
     for _ in 0..n {
         b.push(if g.chance(3) {
             0

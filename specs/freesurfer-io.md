@@ -674,3 +674,9 @@ On gifticlib's image and data-array structures (the clean room's GIFTI port, `la
   a place was never written, FS-207, FS-209, FS-214, FS-218 and FS-220 past the matrix) are compared
   and counted apart; FreeSurfer's crashes (FS-199, FS-200, FS-201, FS-203, FS-204, FS-205, FS-207
   without a shape, FS-211, FS-217, FS-219) are counted, not compared.
+- Measured on the replica (2026-11-13): seed 7, 58,000 cases of the 29 commands (2,000 each):
+  `reproduce` identical on 51,221 of 51,221 comparable lines (1,761 with memory digits), 3,745 lines of
+  memory contents or addresses compared apart (2,009 equal), 3,034 not comparable; of part 3's 12,000
+  cases 10,387 comparable lines identical (`npy` 1,055, `gda` 2,000, `gdv` 1,802, `bvw` 1,720, `psn`
+  1,953, `bcs` 1,857). `fix` differs only with a notice. Seed 1, 2,800 portable cases: 2,468
+  identical (73 with memory digits), 332 not compared.

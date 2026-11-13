@@ -351,3 +351,24 @@ relay 13. The behaviour is in `specs/freesurfer-io.md` §19-24; the defect texts
 
 `npy`, `gda`, `gdv`, `bvw`, `psn`, `bcs` (validation/probes/fs-io/fsio.cpp; the port's side
 `tests/fs_io/piece3.rs`). Results: below, "Measured (piece 3)".
+
+### Measured (piece 3, 2026-11-13, the probe `validation/probes/fs-io/`, unit oracle's build)
+
+- Seed 7, 58,000 cases (29 commands x 2,000; boxed 12 GiB, about 35 minutes): `reproduce` identical on
+  51,221 of 51,221 comparable lines (1,761 with memory digits); 3,745 lines of memory contents or
+  addresses compared apart (2,009 equal); 3,034 not comparable. Piece 3's 12,000 cases: 10,387
+  comparable lines identical (`npy` 1,055 with 636 not comparable and 309 compared apart; `gda` 2,000;
+  `gdv` 1,802 and 198 apart: FS-214's addresses; `bvw` 1,720, 69 crashes of FS-217, 211 apart; `psn`
+  1,953, 47 of FS-219; `bcs` 1,857, 143 apart: FS-220 past the matrix). `fix` differs only with a notice
+  (piece 3's: FS-206 202, FS-213 207, FS-218 194, FS-55 217, FS-212 70, FS-220 49, FS-210 30, FS-208 21,
+  FS-215 11). The port's 58,000 lines are identical with and without AArch64's NaN rules emulated
+  (NAN_TRAP_ARM=1 with NAN_TRAP_DIR set; 1,877 and 1,996 NaNs flipped in `fix` and `reproduce`).
+- Seed 1, 2,800 portable cases (`tests/fs_io_official.rs`): 2,468 identical (73 with memory digits),
+  332 hashed as SKIP, SHA-256 5832c485...; passing in debug and release and under the trap (150 and
+  148 flips).
+- What the first runs taught (fixed): (1) the shape's places past a list of fewer than 3 extents are
+  set even where they all hold 1 (the first run left them 0: `(2, 4, 1)` gave depth 0, FreeSurfer 1);
+  (2) a message that prints the data file's name differs between the two sides' file names: the
+  `.npy` cases now read `x.npy` in the fixture on both; (3) in the first full run two piece-2 cases
+  (`ctr`, `ztr`) ended by the probe's 5-second alarm (`CRASH 14`) while six agents loaded the machine;
+  run alone, both gave the port's lines at once.

@@ -46,7 +46,16 @@ the switches `FREESURFER_OLD_`/`NEW_MRIScomputeMetricProperties`, `FS_FASTER_MP`
 the deviation; `G` where a vertex would read distances it has not), `MRISupdateEllipsoidSurface`,
 `mrisOrientSurface`, `mrisOrientPlane`, `mrisComputeSurfaceDimensions`, `MRISsmoothSurface`,
 `mrisDisturbVertices`, `MRISrecenter`, `MRISscaleBrainArea`, `MRISscaleVertexCoordinates`,
-`MRISscaleBrain`; then the state), 29 commands. `build.sh` also builds
+`MRISscaleBrain`; then the state), 29 commands; since relay 11 (queue item 3.1-47 part b) `sfile` (each
+case in an empty work folder `<cases>.d` with a subfolder `d`: its input files, a surface from
+`MRISoverAlloc` with every face place and the face-normal cache, `FS_POSIX`, `MRIS_READVAL_FRAME`,
+`Gdiag`, `fix_vertex_area`; then 1 to 3 of `MRISsetReadFrame`, `MRISgetReadFrame`,
+`MRISreadTriangleProperties`, `MRISwriteTriangleProperties`, `MRISwriteDists`, `MRISwriteAreaError`,
+`MRISwriteAngleError`, `MRISwriteCurvatureToWFile`, `MRISreadValuesBak`, `MRISreadImagValues`,
+`MRIScopyMarksToAnnotation`, `MRISmaxMarked`, `MRISwriteAscii`, `MRISwriteNormalsAscii`, `MRISwriteVTK`,
+`MRISwriteCurvVTK` on names relative to the folder, each passed with two NUL bytes before it; `G` where
+FreeSurfer would read memory it does not own; then the state and every file in the folder with its
+bytes; the port's side in `tests/fs_surfio/sfile.rs`, in a temporary folder), 30 commands. `build.sh` also builds
   `fssurfio-mpstub`: the same probe with a stub `MRIScomputeMetricProperties` (it writes `MP`),
   linked first with `--allow-multiple-definition` so the library's own call (`MRISsmoothSurface`'s
   last step) reaches it; `check.py` runs `metric`'s cases through it.
@@ -57,6 +66,16 @@ the deviation; `G` where a vertex would read distances it has not), `MRISupdateE
   cache at one thread, the port in both modes, the comparison (`reproduce` identical; `fix`
   different only with a notice), and the hash the test checks. Run it inside
   `scripts/orchestration/boxed.sh`.
+
+Measured 2026-11-13 (relay 11, 30 commands): seed 7, 60,000 cases: 59,497 identical with `reproduce`,
+503 counted, not compared (404 `mprop` cases of FS-121, FS-123, FS-06; 99 `sfile` cases of FS-167, the
+readers' memory digits, and FS-06); `fix` differs only with notices (FS-126..FS-133 among them) and in 5
+`surf` and 77 `posn` cases (`fix_libm`); the port's outputs byte-identical with and without AArch64's
+NaN emulated (70,295 and 70,313 NaNs flipped), both modes (log
+`<workspace>/oracles/logs/fs-surfio-relay11-seed7.log`). `sfile` alone, seed 7: 1,000 cases, every
+comparable one identical (49 counted, not compared). Seed 1, 900 cases: 894 identical, 6 `SKIP`, hash
+`d927ce4b6aebe9a1f899c92080b8c11b8d45a50b15208a50043e8cb464ca45ef`, with the emulation too (1,925 and
+13,214 NaNs flipped), debug and release.
 
 Measured 2026-11-13 (relay 10, 29 commands): seed 7, 58,000 cases: 57,557 identical with `reproduce`,
 443 counted, not compared (440 `mprop` cases where FreeSurfer reads memory it never wrote or does not

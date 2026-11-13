@@ -2,12 +2,13 @@
 // Part of larmorx-freesurfer (FreeSurfer's licence; see crates-freesurfer/LICENSE). Copyright
 // 2026 Karel Lopez Vilaret.
 //! fs.surfio against FreeSurfer 8.2.0's official code on every platform: the SHA-256 of the
-//! official build's output lines for the probe's cases of seed 1 (870 cases, thirty of each of
-//! the 29 commands; `metric`'s through the probe built with a stub metric-properties step),
-//! recorded by `validation/probes/fs-surfio/check.py --seed 1 --n 870` on Linux x64 from the unit
-//! oracle's build (2026-11-13: 865 lines identical, 5 `mprop` cases counted, not compared, where
-//! FreeSurfer reads memory it never wrote: `SKIP`), against the port's output with `reproduce`
-//! (a case the port marks with one of those defects hashed as `SKIP`, as `check.py` does).
+//! official build's output lines for the probe's cases of seed 1 (900 cases, thirty of each of
+//! the 30 commands; `metric`'s through the probe built with a stub metric-properties step),
+//! recorded by `validation/probes/fs-surfio/check.py --seed 1 --n 900` on Linux x64 from the unit
+//! oracle's build (2026-11-13, relay 11: 894 lines identical, 5 `mprop` cases and 1 `sfile` case
+//! counted, not compared, where FreeSurfer reads memory it never wrote: `SKIP`), against the
+//! port's output with `reproduce` (a case the port marks with one of those defects hashed as
+//! `SKIP`, as `check.py` does). The `sfile` cases run in a temporary folder of their own.
 
 #[path = "fs_surfio/cases.rs"]
 mod cases;
@@ -17,15 +18,15 @@ use larmorx_freesurfer_surf::aaa::SurfGlobals;
 use sha2::{Digest, Sha256};
 
 /// `check.py`'s `SKIP` and `SKIP_WHEN_REFUSED`.
-const SKIP: [&str; 3] = ["FS-121", "FS-123", "FS-06"];
+const SKIP: [&str; 4] = ["FS-121", "FS-123", "FS-06", "FS-167"];
 const SKIP_WHEN_REFUSED: [&str; 1] = ["FS-114"];
 
-const OFFICIAL_SHA256: &str = "16d6b5a0f4b53fe3a13a05708f5cdcd842a026a4ec1737698d1b7f9008125e3b";
+const OFFICIAL_SHA256: &str = "d927ce4b6aebe9a1f899c92080b8c11b8d45a50b15208a50043e8cb464ca45ef";
 
 #[test]
 fn reproduce_gives_the_official_outputs() {
     let mut h = Sha256::new();
-    for line in cases::generate(1, 870) {
+    for line in cases::generate(1, 900) {
         let (out, ids) = cases::run_line(&line, UpstreamDefects::Reproduce);
         let refused = out.starts_with("EXIT ");
         let skip = ids.iter().any(|x| SKIP.contains(x))
@@ -52,7 +53,7 @@ fn fs120_the_face_angles_are_written_back_only_on_request() {
         ..SurfGlobals::default()
     };
     let (mut noted, mut changed, mut cases) = (0, 0, 0);
-    for line in cases::generate(1, 870 * 4) {
+    for line in cases::generate(1, 900 * 4) {
         if !line.starts_with("mprop ") {
             continue;
         }

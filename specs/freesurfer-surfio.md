@@ -19,10 +19,13 @@ the curvature operations and saved coordinates; **part 5** (queue item 3.1-50's 
 original area and storing and restoring the metric properties; **part 6** (queue item 3.1-47's
 part a, §30-37): a surface's room, counts and life, the metadata copy, the dumps, rip flags and
 arrays, the curvature names and registration scales, the extra gradients and NaN check, the column
-printing and progress bar, the vector searches and sort comparisons, whether two edges cross. Later
-parts: reading and writing surfaces, curvatures, patches and overlays (3.1-47's part b, 3.1-48), the metric properties every read
-computes (3.1-49 to 3.1-52); the midline marking, the label normal and the coordinate copy (they
-need the volume structure).
+printing and progress bar, the vector searches and sort comparisons, whether two edges cross;
+**part 7** (queue items 3.1-51 and 3.1-52, §38-46): the metric properties every read computes;
+**part 8** (queue item 3.1-47's part b, §47-55): the small file readers and writers (the read
+frame, the triangle-property files, the distance, area-error, angle-error and curvature files, the
+backup and imaginary value readers, the marks, the ASCII and VTK formats). Later parts: reading and
+writing surfaces, curvatures, patches, overlays and value files (3.1-47's part c, 3.1-48); the
+midline marking, the label normal and the coordinate copy (they need the volume structure).
 
 ## 1. Conventions
 
@@ -1210,3 +1213,205 @@ border, sign, face number and distances; each face's area, angles, original angl
 byte; the box, the areas, the mean distance and deviation, `dist_nsize`, `dist_alloced_flags`).
 Cases where larmorx notes FS-121, FS-123 or FS-06 (FreeSurfer reads memory it never wrote or does
 not own) are counted, not compared.
+
+# Part 8: the small file readers and writers (queue item 3.1-47 part b)
+
+Every function here takes a file name relative to the program's working directory (or absolute).
+A file that cannot be opened sets the C library's `errno` (Linux's numbers), which the error message
+that follows prints first (`specs/freesurfer-core.md`'s errors: `error: <strerror text>` then
+`error: <message>`, the message ending in a NUL byte and a newline, FS-01); `errno` stays set
+afterwards, so a later error of the same process prints it again. Numbers in binary files are
+big-endian: a **2-byte number** is an `int` clamped to [-32767, 32767] then written as a `short`;
+a **3-byte number** the low 24 bits of an `int` (-1 is `ff ff ff`), read back as an unsigned
+24-bit number; a **4-byte integer** an `int`; a **float** its four bytes. A number a file ends
+before is read as specified in `specs/freesurfer-io.md` (FS-167: the missing bytes are memory
+contents in FreeSurfer). `<n>` in a message is `%d`; `%f` six decimals; the text formats use the C
+library's `printf` (glibc 2.35: correctly rounded decimals, `nan`, `-nan`, `inf`, `-inf`).
+
+**Names of 1,024 bytes or more (FS-126, FS-134).** FreeSurfer builds or copies some names into
+1,024-byte buffers. Where it **copies** a whole given name (the area-error file's name; the
+distance file's name when it holds a `/`), a name of 1,024 bytes or more ends the program with
+`*** buffer overflow detected ***: terminated` on standard error and signal 6. Where it **builds**
+a name from parts (the triangle-property files, the distance file without a `/`), a result of
+1,024 bytes or more is cut to its first 1,023 bytes, after the message `<function>: Truncation on
+line <line>` and a newline on standard error (the functions and lines below), and the cut name is
+opened. Where it takes the **folder** of a surface name of 1,024 bytes or more (the
+triangle-property files), it writes past a 1,024-byte buffer: what follows depends on the build
+(observed: the cut name of the whole result, and for names of about 2,000 bytes `*** stack smashing
+detected ***: terminated` and signal 6 when the function returns). larmorx takes every name whole
+(FS-126, FS-134 noted); with `reproduce` it aborts and cuts as FreeSurfer does (the folder's
+overrun: the cut of the whole result, no abort).
+
+## 47. The frame `MRISreadValues` reads
+
+A process-wide frame number, -1 at the start. **Setting** it stores the number. **Getting** it:
+the stored number when it is 0 or more; else the environment variable `MRIS_READVAL_FRAME` read as
+`sscanf("%d")` (glibc's: leading white space skipped, an optional sign, digits; a number beyond the
+`int` range is the C library's `long` result cut to 32 bits (`99999999999` gives `1215752191`,
+`errno` `ERANGE`); no digits leave 0); 0 when the variable is unset.
+
+## 48. The triangle-property files
+
+The **hemisphere** of a surface name is the two bytes before its last `.` (a name without a dot:
+`ERROR_BADPARM` (-4) after the error `<function>(<name>): could not scan hemisphere from fname`,
+the writer's text `could not scanhemisphere from fname`, without the space). **FS-129** (rule B):
+when the last dot is the name's first or second byte FreeSurfer reads the hemisphere from the
+memory before the name; larmorx refuses such a name with the same error; `reproduce` takes the
+bytes before the name as 0 (an empty hemisphere: `<folder>/.triangle_area`). The **folder** is the
+name up to its last `/` (`/name` gives the empty folder, a name without `/` gives `.`). The two
+files are `<folder>/<hemi>.triangle_area` and `<folder>/<hemi>.triangle_angle` (cut at 1,023 bytes
+with `MRISreadTriangleProperties: Truncation on line 126` and `... line 174`, or
+`MRISwriteTriangleProperties: Truncation on line 236` and `... line 254`, FS-126).
+
+**Writing** (`MRISwriteTriangleProperties`): first the triangle properties are computed (§41:
+every face's area, normal and angles, the vertices' areas, the total area), then the name is
+checked, then the area file is created (`wb`; failing: `ERROR_NO_FILE` (-1) after
+`MRISwriteTriangleProperties: could not open <file>`): the vertex count and the face count (4-byte integers), each face's area (floats); then
+the angle file likewise: the two counts, then three floats per face. **FS-128** (rule A):
+FreeSurfer writes, for every face, the angles of the place after the last face: a spare face place
+of the surface when it has more places than faces (whatever angles that place holds), memory past
+the faces otherwise; larmorx writes each face's own three angles; `reproduce` writes the spare
+place's (0 when there is none, noted). A surface without faces writes the counts only. Returns 0.
+
+**Reading** (`MRISreadTriangleProperties`): with `DIAG_SHOW` and `DIAG_VERBOSE` both set,
+`reading triangle files...` (no newline) on standard output first. The name is checked; the area
+file opened for reading; when it cannot be, `\nno precomputed triangle areas and angles -
+computing...\n` on standard output and the result 1 (nothing changed). The two counts: **FS-127**
+(rule A): FreeSurfer reads each as a float and converts it to an integer (towards 0; NaN and values
+beyond the `int` range give -2147483648), so the counts its writer writes (integers) read as 0 (a
+denormal float) and every file of a surface with vertices is refused; larmorx reads them as the
+integers the writer writes; `reproduce` as floats. A vertex count other than the surface's:
+`ERROR_NOFILE` (-1) after `MRISreadTriangleProperties: incompatible vertex number in file <file>`
+(the file closed). **FS-133** (rule B): FreeSurfer then reads as many faces as the file's count,
+into the surface's spare face places and past its arrays (memory corruption) when the count exceeds
+its faces; larmorx refuses a face count other than the surface's with `ERROR_NOFILE` after
+`MRISreadTriangleProperties: incompatible face number in file <file>`; `reproduce` reads up to the
+surface's face places (0 or a negative count reads none) and refuses only a count beyond them.
+Then the surface's original area is 0 and, per face, a float read (`freadFloat`: an error at the
+end of the file, FS-167) is set as the face's cached original area (§27, bit 2 cleared) and added:
+`orig_area ⊕ a` (f). Then each of the file's vertices (the vertex count) gets the original area
+`0`, then for each of its faces in order `a_face ⊕ origarea` (f; the face's area on the **left**),
+the face's cached original area read as §27 says (FS-116 for a deferred one). With `DIAG_SHOW` and
+`DIAG_VERBOSE`: `total area = <orig_area %2.0f>.` and a newline. Then the angle file: missing gives
+1 (the areas kept); the counts and checks as for the area file; three floats per face into its
+original angles. Returns 0. FreeSurfer never closes the two files when it succeeds (no output
+depends on it).
+
+## 49. The distance file (`MRISwriteDists`)
+
+The file: the name itself when it holds a `/` (a whole copy, FS-126's abort at 1,024 bytes);
+otherwise beside the surface's own file (`<folder>/<name>`, the folder of the surface's name as
+§48's), with the hemisphere's prefix `lh.` (the surface's hemisphere 0) or `rh.` (any other) when
+the name has no `.`; with the environment variable `FS_POSIX` set (to anything) `./` replaces the
+folder. Built names are cut at 1,023 bytes with `MRISwriteDists: Truncation on line <line>`: line
+361 (`FS_POSIX`, no dot), 369 (no dot), 377 (`FS_POSIX`, a dot), 384 (a dot). The file (`wb`;
+failing: `ERROR_NOFILE` after `MRISwriteDists: could not open <file>`): the vertex count and the
+face count (3-byte numbers), then each vertex's `d` as a 2-byte number of `nint(d ⊗ 100.0)` (d)
+(`specs/freesurfer-core.md`'s `nint`: FS-12 beyond the `int` range). Returns 0.
+
+## 50. The area-error and angle-error files
+
+**Area error** (`MRISwriteAreaError`): the name copied whole (FS-126's abort at 1,024 bytes); with
+`DIAG_SHOW` and `DIAG_VERBOSE`, `writing area error file <file>...` before and `done.` and a
+newline after, on standard output; the file (`wb`; failing: `ERROR_NOFILE` after
+`MRISwriteAreaError: could not open <file>`): the two counts (3-byte numbers), then per vertex a
+2-byte number of `nint(((area ⊖ orig) ⊗ 100) ⊘ num)` (f, then `nint` of the float as a double),
+`area` the float sum (from 0, `area ⊕ face_area`) of its faces' areas and `orig` the float sum
+(`orig ⊕ cached`) of their cached original areas read as §27's "read the normal" (a deferred face
+computed and stored), in the vertex's face order, `num` its face count (as a float; 0 makes `0 ⊘
+0`, a NaN, and `nint`'s FS-12). Returns 0.
+
+**Angle error** (`MRISwriteAngleError`): with `DIAG_SHOW` and `DIAG_VERBOSE`, `writing angular
+error file <file>...` and `done.`; the file as above (`MRISwriteAngleError: could not open
+<file>`), the two counts, then per vertex a 2-byte number: for each of its faces in order, for each
+of the three angles, `e ⊕ |δ|` (f), `δ` the difference of the face's angle and original angle
+folded once by 2π (`specs/freesurfer-core.md`'s `deltaAngle`), `|·|` clearing the sign bit;
+**FS-130** (rule A): FreeSurfer divides the running sum by `3 num` (as a float) after **every**
+face (`e ⊘ (3 num)` (f)), so a vertex of more than one face gets less than the mean; larmorx divides
+once, after the last face (a vertex without faces: 0); `reproduce` after every face. The error in
+hundredths of a degree: `((e ⊗ 360) ⊘ 2π) ⊗ 100` (d, `e` widened, 2π the double nearest), converted
+towards 0. **FS-131** (rule A, D13's conversions): a NaN or a value beyond the `int` range converts
+to -2147483648 in FreeSurfer (then clamped to -32767); larmorx clamps (NaN 0, beyond the range the
+nearest end, then the 2-byte clamp); `reproduce` gives -2147483648. Returns 0.
+
+## 51. The curvature as a w file (`MRISwriteCurvatureToWFile`)
+
+With `DIAG_SHOW`: `writing out surface values to <file>.` and a newline on standard output. The
+file (`wb`); when it cannot be created the program ends: the error `Can't create file <file>`
+followed by a newline (then FS-01's NUL and newline), exit status 255. Its contents: a 2-byte 0,
+the vertex count (3 bytes), then per vertex its number (3 bytes) and its curvature (a float). A
+curvature that is not finite: the error `MRISwriteCurvatureToWFile(<file>): val at vertex <k> is
+notfinite` (no space before `finite`), and the value written anyway. Over the vertices in order,
+`sum ⊕ c` (d, `c` widened), `(c ⊗ c) ⊕ sum2` (the square in float, widened, on the **left**), and
+the extremes from max -1000 and min 1000 (`c > max`, `c < min`, compared in double: a NaN changes
+neither). Then `mean = sum ⊘ n` (d), `sd = sqrt((sum2 ⊘ n) ⊖ (mean ⊗ mean))` (d), `n` the vertex
+count (0 gives NaNs); the square root is the C library's: a negative argument (rounding) gives the
+default NaN and sets `errno` to `EDOM` (33) whether or not anything is printed (so a later error
+of the process prints `error: Numerical argument out of domain` first). With `DIAG_SHOW`: `avg =
+<mean>, stdev = <sd>, min = <min>, max = <max>` (each `%2.3f`) and a newline. Returns 0.
+
+## 52. The backup and imaginary value readers
+
+`MRISreadValuesBak` and `MRISreadImagValues` read a w file into each vertex's backup value or
+imaginary value. The file opened for reading (failing: `ERROR_NOFILE` after `<function>: File
+<file> not found` and a newline, then FS-01's NUL and newline); a 2-byte number (read, unused);
+every vertex's value 0; a 3-byte count; then per entry a 3-byte vertex number and a float
+(`freadFloat`: FS-167 at the end of the file); a number at or beyond the vertex count prints
+`<function>: vertex index out of range: <k> f=<value %f>` and a newline on standard output (the
+value dropped), any other sets that vertex's value (a later entry wins). Returns 0.
+
+## 53. The marks
+
+**Marks to annotations**: each unripped vertex's annotation becomes its mark (the number); returns
+0. **The largest mark**: the largest mark of the unripped vertices. **FS-132** (rule A): FreeSurfer
+starts from vertex 0's mark whatever its rip flag (so a ripped vertex 0's mark counts), and for a
+surface without vertices reads vertex 0's place (a spare place's mark, 0 for a new one; memory past
+an empty array when it has no place); larmorx takes the unripped vertices only, 0 when there is
+none; `reproduce` starts from vertex 0's place (0 when the surface has no vertex place, noted).
+
+## 54. The ASCII and VTK formats
+
+**ASCII** (`MRISwriteAscii`, opened `w`; failing: `ERROR_NOFILE` after `MRISwriteAscii: could not
+open file <file>`): `#!ascii version of <surface's name>` and a newline; `<vertices> <faces>`; per
+vertex `<x>  <y>  <z>  <rip>` (`%f`, two spaces, the rip flag as a number); per face `<v0> <v1> <v2>
+<rip>` (each followed by a space but the last, then a newline). **Normals as ASCII**
+(`MRISwriteNormalsAscii`, `MRISwriteNormalsAscii: could not open file <file>`): the same with the
+first line `#!ascii version of <name> (vertices are surface normals)` and each vertex's normal in
+place of its coordinates. **VTK** (`MRISwriteVTK`, opened `w`, `MRISwriteVTK: could not open file
+<file>`): `# vtk DataFile Version 1.0`, `vtk output`, `ASCII`, `DATASET POLYDATA`, `POINTS <n>
+float`, per vertex `<x>  <y>  <z>` (`%.9f`, two spaces), `POLYGONS <faces> <4 faces>`, per face `3
+<v0> <v1> <v2> ` (a space after each number) and a newline. **The curvature into a VTK file**
+(`MRISwriteCurvVTK`, opened for appending `a`; failing: `ERROR_NOFILE` after `MRISwriteScalarVTK:
+could not open file <file>`): `POINT_DATA <n>`, `FIELD FieldData 1`, `curv 1 <n> double`, then one
+`%.9f` curvature per line. Each returns 0.
+
+## 55. Validation plan, part 8
+
+The probe's `sfile` command (`validation/probes/fs-surfio/`): each case in an empty work folder
+with a subfolder `d`, its input files written first, then a surface of `nv` 0 to 7 vertices with
+`max` 0 to 3 more vertex places, `nf` 0 to 6 faces when `nv ≥ 3` with 0 to 2 more face places (every
+place's three distinct corners, rip flag one in eight, area, angles, original angles, cache entry
+and deferral byte, nonzero one in five), each vertex's coordinates, normal, `d`, curvature, value,
+backup and imaginary values, areas (specials and NaN payloads, more in a third of the cases), mark,
+annotation, rip flag (one in six) and its faces and corners from the faces; the hemisphere 0 to 2;
+the surface's name (in the folder, in `d`, in a folder that does not exist, empty); `FS_POSIX` one
+case in four, `MRIS_READVAL_FRAME` one in four (`3`, `-2`, `x`, ` 12`, `99999999999`, empty, `7x`,
+`0`), `DIAG_SHOW` and `DIAG_VERBOSE` each one in two, `fix_vertex_area` 0 one in four; then 1 to 3
+of the operations of §47-54 on names in the folder, in `d`, in a missing folder, with and without a
+dot, with the dot first or second (FS-129), and, for seeds other than 1, now and then of 1,015 to
+1,032 bytes (FS-126, FS-134). The readers' input files: triangle-property files with the writer's
+integer counts, float counts (the surface's face count, one less, one more within its places, -1,
+NaN, other bits whose float count stays within the places), mixed counts, the face values after
+them, now and then cut; w files with 0 to 8 entries (vertex numbers within, at and beyond the
+surface, `ff ff ff`), the count now and then beyond the entries, now and then cut; an existing VTK
+file to append to. Then the state: each vertex's backup and imaginary values, area, original area,
+normal's x and z and annotation; each face's area, angles, original angles, cached original area and
+byte; the surface's original and total areas; then every file in the folder (its name relative to
+it, sorted, and its bytes). An operation is skipped with `G` where FreeSurfer would read or write
+memory it does not own: the writer of triangle properties when the surface has no spare face place
+(FS-128), either triangle-property function with a name of 1,024 bytes or more (FS-134), the largest
+mark of a surface with no vertex place (FS-132). Cases where larmorx notes FS-167 or FS-06 (memory
+contents in FreeSurfer) are counted, not compared. Observed (relay 11): seed 7, 1,000 `sfile` cases
+of 30,000: every comparable case identical with `reproduce` (49 counted, not compared); the default
+differs only in cases with notices; with the whole probe (seed 7, 60,000 cases, 2,000 `sfile`): every
+comparable case identical.

@@ -482,8 +482,9 @@ one caller, `MRIScomputeSSE_asThoughGradientApplied` (`mrisurf_deform.cpp` 993-1
   behaviour (`fixed_by_default` false, as FS-35/FS-36) until those ports measure it; the correction is
   `SurfGlobals::fs120_write_face_angles` with `fix` (the angles copied, a notice when one changes);
   `reproduce` leaves them. The hash test's `fs120_the_face_angles_are_written_back_only_on_request`:
-  seed 1's 120 `mprop` cases, no FS-120 notice by default, 24 noted with the request, 21 of them
-  printing other angles (in the other 3 a later step recomputes them).
+  seed 1's 120 `mprop` cases (of the 30-command set since relay 11), no FS-120 notice by default, 33
+  noted with the request, 30 of them printing other angles (in the other 3 a later step recomputes
+  them; with relay 10's 29-command set: 24 and 21).
 - **What the copy never writes (FS-121).** `MRISMP_load` `malloc`s the `V_OUT` and `F_OUT` arrays
   and fills them only with `loadOutputs`. (1) `v_nx/ny/nz` are written by `MRISMP_computeNormals` only
   when a vertex's normal is found (`!count || mrisNormalize(snorm) > 0`); a vertex still pending
@@ -565,3 +566,88 @@ one caller, `MRIScomputeSSE_asThoughGradientApplied` (`mrisurf_deform.cpp` 993-1
   3.1-51's lines (`mrisurf_metricProperties.cpp` 9465-13617: gradients' averaging, second
   fundamental forms, curvature uses, radii, `MRISbinarizeVolume`, orientation marks, the surface
   checks, smoothing kernels, `MRISclone`, the statistics prints): later relays.
+
+## 13. Queue item 3.1-47, part b: the small file readers and writers (relay 11)
+
+`utils/mrisurf_io.cpp` 64-89 (`mris_readval_frame`, `MRISsetReadFrame`, `MRISgetReadFrame`),
+99-211 (`MRISreadTriangleProperties`), 213-275 (`MRISwriteTriangleProperties`), 343-401
+(`MRISwriteDists`), 535-584 (`MRISwriteAreaError`), 625-666 (`MRISwriteAngleError`), 668-719
+(`MRISwriteCurvatureToWFile`), 2042-2077 (`MRISreadValuesBak`), 2079-2111 (`MRISreadImagValues`),
+2113-2146 (`MRIScopyMarksToAnnotation`, `MRISmaxMarked`), 2625-2686 (`MRISwriteAscii`,
+`MRISwriteNormalsAscii`), 2794-2853 (`MRISwriteVTK`, `MRISwriteCurvVTK`); `utils/fio.cpp`'s
+`fread4`/`fwrite4` (the counts), `utils/utils.cpp` 788-808 (`FileNamePath`), `include/macros.h` 70
+(`DEGREES`). Port: `larmorx-freesurfer-surf`'s `src/sfile.rs`; probe command `sfile`.
+
+- **The counts of the triangle-property files (FS-127).** `MRISwriteTriangleProperties` writes
+  `fwrite4(mris->nvertices, fp)` (`int fwrite4(int v, FILE *fp)`: the integer's bytes, swapped),
+  `MRISreadTriangleProperties` reads `fread4(&f, fp); vnum = (int)f;` (`int fread4(float *v, FILE
+  *fp)`: a float): the integer 10's bytes are the denormal 1.4e-44, `cvttss2si` gives 0, so the
+  vertex check fails for every written file of a surface with vertices (observed: the probe's `wt`
+  then `rt` of one case, `incompatible vertex number in file d/lh.triangle_area`). The only caller
+  of the reader is under `#if AVERAGE_AREAS` in `mrisurf_integrate.cpp` 453-456 (0 in 8.2.0), and
+  the writer has no caller: neither is reached by recon-all. Rule A (read the writer's integers);
+  the conversions are `cvttss2si` (the object code: `cvttss2si 0x3c(%rsp),%r14d` and `%r15d` after
+  each `fread4`), so `reproduce` converts through x86-64's `(int)` of the float (NaN and out of range
+  -2147483648).
+- **The face count is never checked (FS-133).** The reader loops `fno < fnum` over
+  `mris->faces[fno]` and `setFaceOrigArea(mris, fno, f)` (the cache entry `fno`), past `nfaces` and
+  past `max_faces`. Rule B (refuse a count other than the surface's); `reproduce` keeps writing the
+  spare places (the arrays hold `max_faces`, zeroed above `nfaces` by `MRISreallocFaces`) and
+  refuses beyond them (writing past them is heap corruption: never reproduced). The probe's
+  generator keeps the float counts within the places (a guard would have to parse the file).
+- **The angle loop's stale counter (FS-128).** The writer's second loop is `for (vno = 0; vno <
+  mris->nfaces; vno++) { face = &mris->faces[fno]; ...}` with `fno == nfaces` from the first loop:
+  `nfaces` copies of `faces[nfaces]`'s angles (observed: a spare place's 0.1/0.2/0.3 in the probe's
+  first hand case; with `nfaces == max_faces` the bytes after the array, 0.577 three times in that
+  build, memory). Rule A. The probe skips (`G`) the writer when `nf == maxf` (memory).
+- **The hemisphere before the name (FS-129).** `cp = strrchr(name, '.'); strncpy(hemi, cp - 2,
+  2)`: a dot at index 0 or 1 reads one or two bytes before the string. The probe passes every name
+  with two NUL bytes before it (`name_tok`), which makes FreeSurfer's hemisphere empty, as
+  `reproduce` takes it (observed: `./.triangle_area`). Rule B.
+- **Names (FS-126, FS-134).** Measured on the probe (`fssurfio`, linked with the unit oracle's
+  libutils, Ubuntu's gcc-8 with its default `_FORTIFY_SOURCE`): `MRISwriteAreaError`'s `strcpy(fname,
+  name)` and `MRISwriteDists`'s `strcpy` branch abort at 1,024 bytes (`__strcpy_chk`: `*** buffer
+  overflow detected ***: terminated`, signal 6), 1,023 pass; the `snprintf` branches print
+  `<__FUNCTION__>: Truncation on line <__LINE__>` (`std::cerr`, the lines of the `cerr` statements:
+  126, 174, 236, 254, 361, 369, 377, 384) and open the cut name; `FileNamePath(mris_fname, fpref)`
+  (`utils.cpp` 792 `strcpy(pathName, fname)`, unchecked: the destination's size is unknown there)
+  overruns `fpref[STRLEN]` for names of 1,024 bytes or more: at 1,100 bytes the function went on
+  (the cut message, `could not open <first 1,023 bytes>`), at 2,100 bytes `*** stack smashing
+  detected ***` at its return. `MRISwriteDists`' `FileNamePath(mris->fname, path)` cannot overrun:
+  `MRIS::fname` is a `FixedSizeArray<char, STRLEN>`.
+- **The angle error (FS-130, FS-131).** `error /= (float)(v->num * ANGLES_PER_TRIANGLE)` is inside
+  the face loop (`divss` at 0xff, in the loop body); `i = DEGREES(error) * 100.0;` is `cvttsd2si`
+  (0x127), after `mulsd` 360, `divsd` 2π, `mulsd` 100 (the error in the destination each time).
+  Callers: `mris_errors`, `mris_flatten` (not recon-all).
+- **The largest mark (FS-132).** `max_marked = mris->vertices[0].marked;` before the loop from 1
+  (which skips ripped vertices); for `nvertices == 0` the array is `realloc(NULL, max_vertices *
+  sizeof(VERTEX))`: with `max_vertices` 0 a 0-byte block (observed: 12336, memory), else a zeroed
+  place (0). Caller: `mris_make_face_parcellation` (not recon-all).
+- **The official build's operand orders** (`objdump -dr -C` of the unit oracle's
+  `mrisurf_io.cpp.o`; `<scratch>/D/relay11/io.asm` in the session): the reader's `orig_area += f`
+  is `movss orig_area,%xmm0; addss f,%xmm0` (the sum on the left); `v->origarea +=
+  getFaceOrigArea(...)` is `addss 0x194(%r15),%xmm0` with the returned area in `%xmm0` (the face's
+  area on the left); `MRISwriteAreaError`'s two sums keep the sum on the left (`addss 0xc(%rax),%xmm1`,
+  `addss 0xc(%rbx),%xmm0`), then `subss`, `mulss` 100.0f, `cvtsi2ss` of `num`, `divss`, `nint(double)`;
+  `MRISwriteCurvatureToWFile`'s `sum += f` keeps the sum on the left (`addsd %xmm0,%xmm5`) but `sum2
+  += f * f` is `mulss %xmm1,%xmm1; cvtss2sd; addsd 0x10(%rsp),%xmm1` (the square on the left: seed
+  7's one NaN-sign difference before the fix, `stdev = nan` against `-nan`); its `sqrt` is a call
+  to the C library's (`R_X86_64_PLT32 sqrt`), made whether or not `DIAG_SHOW` prints the result:
+  glibc 2.35's wrapper sets `EDOM` for a negative argument, and a later `ErrorPrintf` of the process
+  prints it. The extremes are `minsd`/`maxsd` with the value in the destination: a NaN keeps the
+  extreme, as the C comparisons.
+- **Not ported here (wait for `mri_identify`, fs.io):** `MRISwriteValues` (its first step is
+  `mri_identify(sname)`, which probes the file's contents for every format when the extension does
+  not decide) and `MRISwriteAreaErrorToValFile` (its only output goes through `MRISwriteValues`).
+  Found while reading it: its loop reads `getFaceNorm(mris, fno)` with `fno` the vertex's face
+  **index**, not the face number (`vt->f[fno]`): the original areas of faces 0..num-1 of the
+  surface, not the vertex's (for the register when it is ported).
+- **Measured (relay 11).** Seed 7, `sfile` alone: 1,000 cases, every comparable one identical with
+  `reproduce` (49 counted, not compared: FS-167's memory digits in the readers, FS-06's table
+  arctangent in the writer's triangle properties); the default differs in 412, every one with a
+  notice. The whole probe, seed 7 (60,000 cases of 30 commands): 59,497 identical with `reproduce`,
+  503 counted, not compared (404 `mprop`, 99 `sfile`), the default different only with notices or the
+  correctly rounded maths (5 `surf`, 77 `posn`), the port's lines identical under AArch64's NaN
+  emulation in both modes (70,295 and 70,313 flips). Seed 1 (900 cases of 30 commands): 894
+  identical, 6 `SKIP`; hash `d927ce4b...` passing in debug and release and under `NAN_TRAP_ARM=1`
+  with `NAN_TRAP_DIR` set (1,925 and 13,214 NaNs flipped).

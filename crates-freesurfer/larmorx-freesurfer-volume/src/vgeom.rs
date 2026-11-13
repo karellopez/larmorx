@@ -397,14 +397,14 @@ pub fn read_vol_geom(g: &mut Globals, err: &mut dyn Write, fp: &mut CFile, vg: &
                 }
             },
         };
-        if let Some(key) = key {
-            if let Some(k) = KEYS.iter().position(|&x| x == key.as_slice()) {
-                scan_value(g, line, k, vg, &mut noted);
-                if k == 0 {
-                    vg_read = true;
-                }
-                counter += 1;
+        if let Some(key) = key
+            && let Some(k) = KEYS.iter().position(|&x| x == key.as_slice())
+        {
+            scan_value(g, line, k, vg, &mut noted);
+            if k == 0 {
+                vg_read = true;
             }
+            counter += 1;
         }
         pos = fp.tell();
     }

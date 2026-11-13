@@ -149,13 +149,65 @@ fn the_writer_formats_with_15_digits() {
 
 #[test]
 fn expansion_of_names() {
-    assert_eq!(expand_filename(b"a\\$b"), b"a$b".to_vec());
+    use super::files::{Ctx, expand_with};
+    use larmorx_core::defects::{FS_79, Notices, UpstreamDefects};
+    let mut n = Notices::default();
+    // volume_io's rules (every platform but Windows, and Windows with `reproduce`): a backslash
+    // escapes, a `~` that does not start the name is kept, `$NAME` ends at `/`, `.` or the end
+    assert_eq!(expand_with(b"a\\$b", &Mni, &mut n, false), b"a$b".to_vec());
     assert_eq!(
-        expand_filename(b"$LARMORX_SURELY_UNSET_9/x"),
+        expand_with(b"$LARMORX_SURELY_UNSET_9/x", &Mni, &mut n, false),
         b"$LARMORX_SURELY_UNSET_9/x".to_vec()
     );
-    assert_eq!(extract_directory(b"d/e/f.xfm"), b"d/e/".to_vec());
-    assert_eq!(extract_directory(b"f.xfm"), b".".to_vec());
+    let posix = b"/tmp/RUNNER~1/a b/t1".to_vec();
+    assert_eq!(expand_with(&posix, &Mni, &mut n, false), posix);
+    let mut c = Ctx {
+        dialect: &Mni,
+        notices: &mut n,
+        windows: false,
+    };
+    assert_eq!(c.extract_directory(b"d/e/f.xfm"), b"d/e/".to_vec());
+    assert_eq!(c.extract_directory(b"f.xfm"), b".".to_vec());
+    assert_eq!(c.remove_directories(&posix), b"t1".to_vec());
+    assert!(c.has_no_extension(&posix));
+    assert!(!c.is_absolute(br"C:\x"));
+    assert!(!n.contains(&FS_79));
+    // Windows (FS-79): a backslash separates directories, as `/` does
+    let w = br"C:\Users\RUNNER~1\AppData\Local\Temp\.tmp x\t1".to_vec();
+    let mut n = Notices::default();
+    assert_eq!(expand_with(&w, &Mni, &mut n, true), w);
+    assert!(n.contains(&FS_79));
+    assert_eq!(
+        expand_with(br"C:\a\$LARMORX_SURELY_UNSET_9\b", &Mni, &mut n, true),
+        br"C:\a\$LARMORX_SURELY_UNSET_9\b".to_vec()
+    );
+    let mut c = Ctx {
+        dialect: &Mni,
+        notices: &mut n,
+        windows: true,
+    };
+    assert_eq!(c.remove_directories(&w), b"t1".to_vec());
+    assert!(c.has_no_extension(&w));
+    assert_eq!(
+        c.extract_directory(&w),
+        br"C:\Users\RUNNER~1\AppData\Local\Temp\.tmp x\".to_vec()
+    );
+    assert!(c.is_absolute(&w) && c.is_absolute(br"\\server\share\f") && c.is_absolute(b"/x"));
+    assert!(!c.is_absolute(br"rel\f") && !c.is_absolute(b"1:x"));
+    // `reproduce` keeps volume_io's escape on Windows
+    let mut r = Notices::new(UpstreamDefects::Reproduce);
+    assert_eq!(
+        expand_with(&w, &Mni, &mut r, true),
+        b"C:UsersRUNNER~1AppDataLocalTemp.tmp xt1".to_vec()
+    );
+    assert!(r.contains(&FS_79));
+    let mut c = Ctx {
+        dialect: &Mni,
+        notices: &mut r,
+        windows: true,
+    };
+    assert!(!c.has_no_extension(&w));
+    assert!(!c.is_absolute(br"\\server\share"));
 }
 
 #[test]
@@ -183,7 +235,13 @@ fn gaussian_inverse() {
 #[test]
 fn files_compressed_defaults_and_dialects() {
     use std::io::Write as _;
-    let dir = tempfile::tempdir().unwrap();
+    // a temporary folder whose path holds a `~` that does not start it and blanks, as GitHub's
+    // Windows runners' do (C:\Users\RUNNER~1\AppData\...): every platform's own separators
+    let root = tempfile::tempdir().unwrap();
+    let dir = tempfile::Builder::new()
+        .prefix("RUNNER~1 a b.")
+        .tempdir_in(root.path())
+        .unwrap();
     let mut c = Captured::default();
     let mut n = larmorx_core::defects::Notices::default();
     // `.xfm` added to a name without an extension

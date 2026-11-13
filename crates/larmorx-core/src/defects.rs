@@ -1113,6 +1113,8 @@ defects! {
         "znzread on a compressed file that ends inside a member counts that member as read (nmemb - remain/size rounds the missing members down): a caller checking the count takes a short read for a complete one";
     FS_78 = "FS-78", "zlib 1.2.11", true,
         "gzseek forward (or gzflush or gzclose after it) before the first gzwrite fills the gap with memory zlib never set instead of zeros: gz_zero clears its buffer once, before allocating it";
+    FS_79 = "FS-79", "MINC volume_io", true,
+        "a backslash in a file name is an escape that expand_filename drops, and only '/' separates directories: a Windows path (C:\\Users\\...) loses its separators, its directory, base name and extension are misread, and a file next to it is never found";
     FS_100 = "FS-100", "FreeSurfer", true,
         "the gamma draw converts its shape's integer part to a 32-bit unsigned integer, which C leaves undefined outside [0, 2^32): a shape of 2^32 or more gives a value of the wrong size, NaN and +inf the value of a shape below 1, and a negative shape or -inf a draw that does not return in practice";
     FS_101 = "FS-101", "FreeSurfer", true,

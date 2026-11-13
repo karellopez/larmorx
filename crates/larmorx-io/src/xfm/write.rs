@@ -105,7 +105,11 @@ fn output_one_transform(
             };
             if filename.is_some_and(|f| !f.is_empty()) {
                 let mut i = prefix.len() as i64 - 1;
-                while i > 0 && prefix[i as usize] != b'.' && prefix[i as usize] != b'/' {
+                let backslash = super::files::backslash_separates(cfg!(windows), notices);
+                while i > 0
+                    && prefix[i as usize] != b'.'
+                    && !super::files::is_separator(prefix[i as usize], backslash)
+                {
                     i -= 1;
                 }
                 if i >= 0 && prefix[i as usize] == b'.' {
@@ -115,11 +119,7 @@ fn output_one_transform(
             let mut volume_filename = prefix;
             volume_filename.extend_from_slice(format!("_grid_{volume_count}.mnc").as_bytes());
             *volume_count += 1;
-            let base = Ctx {
-                dialect,
-                notices: &mut *notices,
-            }
-            .remove_directories(&volume_filename);
+            let base = Ctx::new(dialect, &mut *notices).remove_directories(&volume_filename);
             out.extend_from_slice(b"Displacement_Volume = ");
             out.extend_from_slice(&base);
             out.extend_from_slice(b";\n");

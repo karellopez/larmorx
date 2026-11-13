@@ -36,7 +36,7 @@ is the same code). The writer is ported for larmorx's own use and checked agains
   expands again, `has_no_extension` once more).
 - On x86-64 `char` is signed, so `ungetc` of the byte 0xFF is `ungetc(EOF)`, which pushes nothing.
 
-## Defects (D13; register entries FS-71 to FS-75)
+## Defects (D13; register entries FS-71 to FS-75, FS-79)
 
 | ID | What volume_io does | larmorx |
 |---|---|---|
@@ -45,9 +45,16 @@ is the same code). The writer is ported for larmorx's own use and checked agains
 | FS-73 | `Number_Dimensions = 0` divides by zero (a crash); a negative one sizes arrays negatively | an error message |
 | FS-74 | an empty `Points` list frees a pointer never set; the writer writes such a list without its `;` | a spline with no points (its affine part); the writer writes the `;` |
 | FS-75 | a name that starts with a `$VAR` (or `~`) whose value is empty writes through a null pointer | expands to nothing |
+| FS-79 | `expand_filename` takes a backslash as an escape (it drops it and keeps the next character) and only `/` separates directories (`remove_directories_from_filename`, `extract_directory`, the default `.xfm` suffix's extension test, a grid volume's name, the writer's grid file name): a Windows path (`C:\Users\RUNNER~1\...`) loses every separator, so its directory, base name and extension are misread and the file next to it is not found | on Windows, a backslash separates directories as `/` does (never an escape; a `$NAME` also ends at it), and a name starting with `\` or a drive letter and `:` is absolute; elsewhere volume_io's rules; `reproduce` keeps the escape on Windows too |
 
-None is reproduced (crashes, hangs and memory contents never are, CLAUDE.md D13); each gives a
-notice. In the probe: 390 of 20,000 generated files and 327 of 40,000 names reach them (MINC is
+FS-71 to FS-75 are not reproduced (crashes, hangs and memory contents never are, CLAUDE.md D13);
+each gives a notice. FS-79 (rule A: a Windows path is a sensible input whose result is wrong)
+gives a notice whenever a Windows name holds a backslash, in both modes. A `~` that does not start
+the name (`RUNNER~1`, Windows' short names) is kept as written by volume_io and the port alike
+(only a leading `~` names a home directory); blanks are ordinary characters. Found by CI's Windows
+jobs on main f43acf5b (GitHub's runners' temporary folders are under `C:\Users\RUNNER~1\`); the
+test `files_compressed_defaults_and_dialects` now reads and writes in a folder named
+`RUNNER~1 a b.*`, and `expansion_of_names` checks the Windows rules on every platform. In the probe: 390 of 20,000 generated files and 327 of 40,000 names reach them (MINC is
 not run there).
 
 ## The numbers (the probe at scale 1, 2026-11-13, from 78828906's code; the later commits change

@@ -1,0 +1,17 @@
+[package]
+name = "fs-maths-candidate"
+description = "larmorx's clean room of FreeSurfer's mathematics (larmorx-fs-core's maths) behind the commands of the black-box probe fs_maths_probe, for comparing them (specs/freesurfer-maths.md §23)"
+version = "0.0.1"
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+
+# Its own workspace: a validation tool, never part of larmorx's build.
+[workspace]
+
+[dependencies]
+larmorx-core = { path = "../../../../crates/larmorx-core" }
+larmorx-fs-core = { path = "../../../../crates/larmorx-fs-core" }
+
+[profile.release]
+debug = false

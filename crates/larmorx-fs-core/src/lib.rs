@@ -27,6 +27,7 @@ pub mod env;
 pub mod files;
 pub mod fsenv;
 pub mod logic;
+pub mod maths;
 pub mod messages;
 pub mod numbers;
 pub mod process;

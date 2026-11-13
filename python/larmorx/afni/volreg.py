@@ -250,7 +250,7 @@ def volreg(
         if save_displacements:
             outputs += ["-savedisp", out("sd.nii")]
         if selected is None:
-            _run_clean_room([*args, *outputs, source], n_threads, upstream_defects, settings)
+            _run_original([*args, *outputs, source], n_threads, upstream_defects, settings)
         else:
             _common.run_replica(
                 selected,
@@ -278,7 +278,7 @@ def volreg(
         )
 
 
-def _run_clean_room(
+def _run_original(
     args: list[str], n_threads: int, upstream_defects: str, settings: dict[str, str]
 ) -> None:
     """Runs the clean room's command line in this process; its warnings become Python

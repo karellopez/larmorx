@@ -195,7 +195,7 @@ def test_the_wrappers_notices_and_failures(tmp_path: Path) -> None:
     named = [str(w.message).split(" ")[0] for w in caught]
     assert "TED-46" in named, named  # (TED-05's cap applies too)
     assert "upstream defect" not in res.log
-    with pytest.raises(RuntimeError, match="the clean-room original") as e:
+    with pytest.raises(RuntimeError, match=r"\(the clean room\) failed") as e:
         lx.tedana.t2smap(echoes, [0.012, 0.028, 0.044], mask=mask, exclude=[5],
                          implementation="clean-room")  # fmt: skip
     assert "is not below the number of timepoints in the data (5)." in str(e.value)

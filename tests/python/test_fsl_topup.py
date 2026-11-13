@@ -173,7 +173,7 @@ def test_without_the_replica(scripts, tmp_path):
     with pytest.raises(lx.ReplicaNotFoundError, match="larmorx-nc"):
         lx.fsl.topup(path, ACQ, implementation="replica")
     # a failure of the original: topup's message in the error
-    with pytest.raises(RuntimeError, match=r"clean-room original.*exit code 1"):
+    with pytest.raises(RuntimeError, match=r"\(the clean room\) failed.*exit code 1"):
         lx.fsl.topup(path, [[0, 1, 0, 0.05]], **kw)
     # applytopup with the result: least-squares restoration of the pair, Jacobian modulation
     pair_imgs = [path, path]
@@ -191,7 +191,7 @@ def test_without_the_replica(scripts, tmp_path):
     assert np.asarray(v.corrected.data).shape == (12, 10, 6, 2)
     assert np.isfinite(np.asarray(v.corrected.data)).all()
     # FSL-144: jac with a phase encoding along z (which topup refuses) is refused by default
-    with pytest.raises(RuntimeError, match=r"(?s)applytopup \(the clean-room original\).*FSL-144"):
+    with pytest.raises(RuntimeError, match=r"(?s)applytopup \(the clean room\).*FSL-144"):
         lx.fsl.applytopup(path, [[0, 0, 1, 0.05]], [1], r, method="jac")
 
 

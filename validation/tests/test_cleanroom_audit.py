@@ -706,6 +706,15 @@ def test_glibc_source_dates_and_the_rules_table():
         ),
         (f"{WT}/validation/investigations/glibc-qsort-probe/README.md", "read", "repo", None),
         (f"{WT}/validation/investigations/freesurfer-ranlux-probe/README.md", "read", "repo", None),
+        # track E's open probes of fs.maths and fs.mri hold calls only (2026-11-13)
+        (f"{WT}/validation/investigations/freesurfer-maths-probe/compare.py", "read", "repo", None),
+        (
+            f"{WT}/validation/investigations/freesurfer-mri-probe/fs_mri_probe.cpp",
+            "read",
+            "repo",
+            None,
+        ),
+        (f"{WT}/validation/investigations/freesurfer-mri-probe/README.md", "read", "repo", None),
         (f"{WT}/validation/probes/fs-maths/check.py", "read", "restricted", "R14"),
         (f"{WT}/validation/probes/fs-mri/README.md", "read", "restricted", "R14"),
         (f"{WT}/validation/probes/x87-extended/patterns.cpp", "read", "restricted", "R14"),

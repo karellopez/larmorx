@@ -230,7 +230,6 @@ fn faces_around_vertex_reorder(
             break;
         }
         let fi = mris.face(f[ii as usize] as usize);
-        let mut found = false;
         for j in 0..nfaces {
             let k = (i + j) % nfaces;
             let fj = mris.face(f[k] as usize);
@@ -238,11 +237,9 @@ fn faces_around_vertex_reorder(
             if common == 2 && !order.contains(&(k as i32)) {
                 order[i + 1] = k as i32;
                 packed += 1;
-                found = true;
                 break;
             }
         }
-        let _ = found;
     }
     let count = sg.around_vertex_count;
     sg.around_vertex_count += 1;
@@ -409,6 +406,8 @@ pub fn faces_hcurvature_determine_sign(
 /// `VERTEX_faceAngles_determine: acos error - angle set to zero ...`, never fires: the argument is
 /// limited to [-1, 1], and glibc's `acosf` leaves `errno` alone for a NaN). Returns the angles
 /// (the vertex's face count of them).
+// the limits as FreeSurfer compares (the pseudo-normal's lower one makes -0 into +0)
+#[allow(clippy::manual_clamp)]
 pub fn vertex_face_angles_determine(g: &mut Globals, mris: &mut Mris, vno: usize) -> Vec<f32> {
     let v = mris.vertex(vno);
     let a = [v.nx, v.ny, v.nz];
@@ -438,6 +437,8 @@ pub fn vertex_face_angles_determine(g: &mut Globals, mris: &mut Mris, vno: usize
 /// sqrt(iz² + (ix² + iy²))` and `|j| = sqrt((jx² + jy²) + jz²)`. A normal longer than 1.0001
 /// ends the program (`FACES_angleNormal_find: face normal not unit length -- Ni: <|i|>, Nj:
 /// <|j|>`, code -4), before the sign is looked for.
+// the limits as FreeSurfer compares (the pseudo-normal's lower one makes -0 into +0)
+#[allow(clippy::manual_clamp)]
 pub fn faces_angle_normal_find(
     g: &mut Globals,
     sg: &mut SurfGlobals,
@@ -480,6 +481,7 @@ pub fn faces_angle_normal_find(
 /// later, so the caller's values stay otherwise). A vertex without faces ends the program
 /// (`VERTEX_faceMinMaxAngles_determine: error with determining face angles.`, code -4). Returns the
 /// face count.
+#[allow(clippy::too_many_arguments)]
 pub fn vertex_face_min_max_angles_determine(
     g: &mut Globals,
     io: &mut Io,
@@ -724,6 +726,8 @@ pub fn compute_second_fundamental_form_discrete(
 /// <f>`, `error for vn1 ...`, `error for vn2 ...`, `error for vn ...` as they apply, then `face <f>
 /// (<a>,<b>,<c>) != (<vno>)`; with `verbose` 3 `computeVertexPseudoNormal: SHOULD NOT HAPPEN`; with 4
 /// the program ends with it, `ERROR_BADPARM`), and summed all the same.
+// the limits as FreeSurfer compares (the pseudo-normal's lower one makes -0 into +0)
+#[allow(clippy::manual_clamp)]
 pub fn compute_vertex_pseudo_normal(
     g: &mut Globals,
     io: &mut Io,

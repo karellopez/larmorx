@@ -336,6 +336,9 @@ impl CFile {
 }
 
 impl Stream for CFile {
+    fn hit_end(&mut self) -> bool {
+        self.eof && self.rpos >= self.rbuf.len()
+    }
     fn peek(&mut self) -> Option<u8> {
         if !self.fill() {
             return None;

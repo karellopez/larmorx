@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//! Cross-platform checks of the VNL and netlib ports of FreeSurfer's foundations (item 3.1-07):
+//! Cross-platform checks of the VNL and netlib ports (item 3.1-07 of the FreeSurfer foundations):
 //! digests of their outputs on seeded inputs, recorded on Linux x86-64 (where
 //! `validation/probes/fs-vnl` proves the ports bit-identical to ITK 4.13.2's VNL built by GCC
 //! 8.4.0), checked on every platform by `cargo test`. Inputs are SplitMix64 streams and integer

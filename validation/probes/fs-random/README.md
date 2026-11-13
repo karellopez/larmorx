@@ -1,5 +1,8 @@
 # fs-random
 
+**Closed to FreeSurfer's clean-room implementers** (it names FreeSurfer's call sites, flags, seeds or
+patterns; `docs/findings/freesurfer-permissive.md`, 2026-11-13).
+
 The check of FreeSurfer 8.2.0's two permissive random-number sources, ported into `larmorx-core`
 (the FreeSurfer foundations' item 3.1-04, `docs/freesurfer/queue.md`):
 

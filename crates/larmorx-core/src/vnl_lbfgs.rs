@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0 AND BSD-3-Clause
 //! Jorge Nocedal's limited-memory BFGS (1990) with Moré and Thuente's line search, as VXL's
 //! `v3p/netlib/opt/lbfgs.c` (an f2c translation, edited by VXL to keep its state in a struct)
-//! computes it: `v3p_netlib_lbfgs_`, the routine FreeSurfer's `fs_lbfgs` (`OpenDFPMin`:
-//! `mri_em_register`, `mri_ca_register`) and VNL's `vnl_lbfgs` drive by reverse communication.
+//! computes it: `v3p_netlib_lbfgs_`, the routine VNL's `vnl_lbfgs` (and other callers) drive by
+//! reverse communication.
 //!
 //! [`lbfgs`] is one call of the routine: the caller evaluates `f` and `g` at `x`, calls, and
 //! acts on `iflag` (1: evaluate again at the new `x`; 2: give the diagonal `diag`; 0: done;
@@ -22,13 +22,14 @@
 //!   decreased but not enough, Nocedal's Fortran passes the *modified* function values `FXM`,
 //!   `FYM` to `MCSTEP`; VXL's `mcstep_` reads its struct's `fx`, `fy` instead (the unmodified
 //!   values), so later steps of that search are computed from inconsistent values. Measured on
-//!   200,000 smooth problems at FreeSurfer's and VNL's settings, the correction changed no run
+//!   200,000 smooth problems at two settings (VNL's defaults, and memory 7, line-search accuracy
+//!   0.1, `xtol` 1e-16), the correction changed no run
 //!   (`validation/probes/fs-vnl --only itk103`), so VXL's behaviour is kept in both modes and
 //!   Nocedal's is on request ([`LbfgsGlobal::nocedal_first_stage`], with [`UpstreamDefects::Fix`]),
 //!   named where it changes the search's state.
 //! - **ITK-104**: `ys` is a local of the C function (`SAVE`d in the Fortran), reset to 0 on
 //!   every call, so a caller that supplies the diagonal (`diagco`, `iflag = 2`) gets `1 / 0`.
-//!   `Fix` keeps it across calls; `Reproduce` divides by 0. FreeSurfer and VNL never supply it.
+//!   `Fix` keeps it across calls; `Reproduce` divides by 0. VNL's own driver never supplies it.
 //! - **ITK-105** (printing only): `write50` takes the largest value with its sign (a negative
 //!   one stops the scale's search) and divides by 0 for a vector of zeros. `Fix` scales by the
 //!   largest magnitude and prints a zero vector unscaled; `Reproduce` prints as VXL.

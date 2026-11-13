@@ -10,8 +10,8 @@
 //!   and are not computed; every update of the Hessenberg matrix `hqr2` makes is, over the
 //!   ranges `hqr2` uses.
 //!
-//! - [`real_eigensystem`]: `vnl_real_eigensystem` with its eigenvectors (`D`, `V`, `Vreal`), as
-//!   FreeSurfer 8.2.0's `OpenNonSymmetricEigenSystem` reads them (ITK 4.13.2: `rg` with
+//! - [`real_eigensystem`]: `vnl_real_eigensystem` with its eigenvectors (`D`, `V`, `Vreal`; ITK
+//!   4.13.2: `rg` with
 //!   `balanc`, `elmhes`, `eltran`, `hqr2` and `balbak`, written again with the f2c macros `abs`,
 //!   `max` in their C semantics; three defects of VNL's, ITK-110 to ITK-112, are documented
 //!   there).
@@ -897,7 +897,7 @@ pub fn real_eigenvalue_product(m: &[f64], n: usize) -> Option<(f64, f64)> {
 }
 
 // ------------------------------------------------------------------------------------------------
-// vnl_real_eigensystem with its eigenvectors (FreeSurfer's OpenNonSymmetricEigenSystem), ITK
+// vnl_real_eigensystem with its eigenvectors (D, V, Vreal), ITK
 // 4.13.2: rg with matz = 1 (balanc, elmhes, eltran, hqr2, balbak), statement by statement, the f2c
 // macros abs, min and max with their C semantics.
 
@@ -1758,7 +1758,7 @@ fn balbak(n: usize, low: usize, igh: usize, scale: &[f64], m: usize, z: &mut For
     }
 }
 
-/// `vnl_symmetric_eigensystem<float>(A)` as FreeSurfer's `OpenEigenSystem` reads it: EISPACK's
+/// `vnl_symmetric_eigensystem<float>(A)`, its eigenvalues and eigenvectors: EISPACK's
 /// `rs` in double on the matrix converted to double ([`symmetric_eigensystem`]), the eigenvalues
 /// and eigenvectors rounded to float. `ierr` as in [`SymmetricEigen`] (VNL then prints
 /// `vnl_symmetric_eigensystem: ierr = …` and leaves `V` unset: memory contents, here the double

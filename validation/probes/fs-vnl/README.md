@@ -1,5 +1,8 @@
 # fs-vnl
 
+**Closed to FreeSurfer's clean-room implementers** (it names FreeSurfer's call sites, flags, seeds or
+patterns; `docs/findings/freesurfer-permissive.md`, 2026-11-13).
+
 The check of the VNL and netlib routines FreeSurfer 8.2.0 calls, ported into `larmorx-core`
 (the FreeSurfer foundations' item 3.1-07, `docs/freesurfer/queue.md`), against **ITK 4.13.2's own
 VNL** as the FreeSurfer unit oracle built it (`validation/investigations/freesurfer-unit-oracle/

@@ -1,23 +1,22 @@
 // SPDX-License-Identifier: Apache-2.0 AND BSD-3-Clause
-//! vnl's derivative-free minimizers, as FreeSurfer 8.2.0 calls them through ITK 4.13.2's VNL:
+//! vnl's derivative-free minimizers, as ITK 4.13.2's VNL computes them:
 //!
 //! - [`fit_parabola`], [`bracket_minimum`]: Tim Cootes' bracketing of a 1-D minimum
 //!   (`vnl_bracket_minimum`, with `vnl_fit_parabola`'s parabolic step);
 //! - [`BrentMinimizer`]: Brent's 1-D minimization on a bracket (`vnl_brent_minimizer`:
 //!   `minimize_given_bounds`, `minimize_given_bounds_and_one_f`, `minimize_given_bounds_and_all_f`,
-//!   `minimize`), and [`Brent`], the deprecated `vnl_brent` wrapper that FreeSurfer's
-//!   `fs_powell` uses (`bracket_minimum` with its reversed arguments, `minimize_given_bounds`
-//!   with a tolerance);
+//!   `minimize`), and [`Brent`], the deprecated `vnl_brent` wrapper (`bracket_minimum` with its
+//!   reversed arguments, `minimize_given_bounds` with a tolerance, `minimize`);
 //! - [`NonlinearMinimizer`]: the state and counters of `vnl_nonlinear_minimizer` (tolerances,
 //!   evaluation and iteration counts, `report_eval`, `report_iter` with its verbose line) and its
 //!   [`ReturnCode`]s;
 //! - [`Powell`]: `vnl_powell::minimize` (Powell's direction-set method on the new Brent
-//!   minimizer), as `mri_robust_register`'s Powell registration calls it.
+//!   minimizer).
 //!
-//! Every expression is evaluated in double precision in the C++ order (no fused multiply-add:
-//! the official binaries are built for baseline x86-64), so the evaluated points and the result
-//! are bit-identical to VNL's on every platform; `validation/probes/fs-vnl` compares them with
-//! ITK 4.13.2's own VNL built by GCC 8.4.0 with FreeSurfer's flags. The cost function is the
+//! Every expression is evaluated in double precision in the C++ order (no fused multiply-add: a
+//! build for baseline x86-64 has none), so the evaluated points and the result are bit-identical
+//! to VNL's on every platform; `validation/probes/fs-vnl` compares them with ITK 4.13.2's own VNL
+//! built by GCC 8.4.0 with ITK's Release flags. The cost function is the
 //! caller's (`vnl_cost_function::f`); it receives the same points in the same order.
 //!
 //! On costs that fall without end the minimizers reach infinities and make NaNs of them
@@ -37,7 +36,7 @@
 //! minimizer's `notices`.
 //!
 //! Ported from VXL as bundled with ITK v4.13.2 (BSD licence; the same code in v5.4.5 but for
-//! `nullptr` and export macros, `docs/freesurfer/third-party.md` §10):
+//! `nullptr` and export macros):
 //! `core/vnl/algo/vnl_bracket_minimum.cxx`, `vnl_fit_parabola.h`, `vnl_brent_minimizer.cxx`,
 //! `vnl_brent.cxx`, `vnl_powell.{h,cxx}`, `core/vnl/vnl_nonlinear_minimizer.{h,cxx}`.
 
@@ -507,8 +506,7 @@ impl BrentMinimizer {
     }
 }
 
-/// `vnl_brent` (deprecated in VNL, a wrapper of [`BrentMinimizer`]), as FreeSurfer's `fs_powell`
-/// calls it.
+/// `vnl_brent` (deprecated in VNL, a wrapper of [`BrentMinimizer`]).
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Brent {
     pub inner: BrentMinimizer,

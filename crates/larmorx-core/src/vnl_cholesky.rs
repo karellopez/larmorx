@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0 AND BSD-3-Clause
 //! `vnl_cholesky`: LINPACK's Cholesky factorization of a symmetric positive-definite matrix, as
-//! FreeSurfer 8.2.0 calls it through ITK 4.13.2's VNL (numerics.cpp's
-//! `sc_linalg_cholesky_decomp`: the default `verbose` mode, `rank_deficiency()`,
-//! `upper_triangle()`), with the class's other members: `solve`, `determinant`, `inverse`,
-//! `lower_triangle` and the `estimate_condition` mode's `rcond`.
+//! ITK 4.13.2's VNL computes it, in its three modes (`quiet`, `verbose`, `estimate_condition`),
+//! with `rank_deficiency()`, `upper_triangle()`, `lower_triangle()`, `solve`, `determinant`,
+//! `inverse` and the `estimate_condition` mode's `rcond`.
 //!
 //! VNL hands its row-major data to LINPACK, which reads it column-major: `dpofa` factors the
 //! upper triangle of `Mᵀ`, that is `M`'s lower triangle as stored, and leaves the rest of the

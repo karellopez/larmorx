@@ -8,11 +8,9 @@
 //! Each expression is evaluated left to right as C++ evaluates it (no fused multiply-adds),
 //! so the results are bit-identical to vnl's on every platform.
 //!
-//! The functions are generic over `float` and `double` ([`ItkReal`]): FreeSurfer 8.2.0 computes
-//! its small determinants and inverses in `float` (numerics.cpp's `OpenLUMatrixInverse` and
-//! `OpenMatrixDeterminant` through `vnl_matrix_fixed<float, n, n>`) and `MatrixSqrt` in
-//! `double`; each operation is in that type (ITK 4.13.2's `vnl_det.hxx` and `vnl_inverse.h`,
-//! the same expressions as 5.4.5's). [`determinant`] of more than 4 rows is
+//! The functions are generic over `float` and `double` ([`ItkReal`]), as `vnl_matrix_fixed<T, n,
+//! n>` is; each operation is in that type (ITK 4.13.2's `vnl_det.hxx` and `vnl_inverse.h`, the
+//! same expressions as 5.4.5's). [`determinant`] of more than 4 rows is
 //! `vnl_determinant<T>`'s QR determinant ([`crate::vnl_qr::Qr`]), and
 //! [`determinant_balanced`] its `balance` form. `vnl_inverse` of a matrix whose determinant is 0
 //! returns VNL's uninitialised `vnl_matrix_fixed` (its assertion is compiled out): memory

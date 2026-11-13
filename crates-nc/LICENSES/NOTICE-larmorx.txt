@@ -101,6 +101,39 @@ CORE-MATH, commit 040ee482a8ca (correctly rounded exp, log, sin, cos, asin, acos
 
 NIfTI-1 reference library (nifti1_io.c, as bundled with ITK v5.4.5) - public domain.
 
+nifticlib 2.0.0 (niftilib/nifti1_io.c: the file names and is_nifti_file; znzlib/znzlib.c, Mark
+Jenkinson, FMRIB Centre, University of Oxford) - public domain; translated into Rust in
+crates/larmorx-io/src/nifti/niftilib.rs and crates/larmorx-io/src/znz.rs.
+
+MINC 1.5.1's volume_io (MNI_formats/gen_xf_io.c, gen_xfs.c, mni_io.c; Geometry/transforms.c,
+inverse.c, gaussian.c; Prog_utils/files.c, string.c, print.c), translated into Rust in
+crates/larmorx-io/src/xfm/. The notice (LICENSES/LicenseRef-MNI.txt):
+
+  Copyright 1993,1994,1995 David MacDonald, McConnell Brain Imaging Centre,
+  Montreal Neurological Institute, McGill University.
+  Copyright 1993-2000 Peter Neelin and David MacDonald, McConnell Brain Imaging Centre,
+  Montreal Neurological Institute, McGill University.
+  Permission to use, copy, modify, and distribute this software and its documentation for any
+  purpose and without fee is hereby granted, provided that the above copyright notice appear in
+  all copies. The author and McGill University make no representations about the suitability of
+  this software for any purpose. It is provided "as is" without express or implied warranty.
+
+zlib 1.2.11's file layer (gzlib.c, gzread.c, gzwrite.c, gzclose.c), translated into Rust in
+crates/larmorx-io/src/znz.rs (an altered version: inflate and deflate are zlib-rs's). Its licence:
+
+  (C) 1995-2017 Jean-loup Gailly and Mark Adler
+  This software is provided 'as-is', without any express or implied warranty. In no event will
+  the authors be held liable for any damages arising from the use of this software.
+  Permission is granted to anyone to use this software for any purpose, including commercial
+  applications, and to alter it and redistribute it freely, subject to the following
+  restrictions:
+  1. The origin of this software must not be misrepresented; you must not claim that you wrote
+     the original software. If you use this software in a product, an acknowledgment in the
+     product documentation would be appreciated but is not required.
+  2. Altered source versions must be plainly marked as such, and must not be misrepresented as
+     being the original software.
+  3. This notice may not be removed or altered from any source distribution.
+
 SciPy 1.15.2 (scipy/ndimage: map_coordinates, spline_filter, spline_filter1d) and SciPy 1.18.1
 (scipy/ndimage; since 2026-11-08 also scipy/sparse: kron, hstack, the CSR and CSC products;
 scipy/sparse/linalg: cg; scipy/interpolate: BSpline's de Boor evaluation; scipy/stats: mode, in

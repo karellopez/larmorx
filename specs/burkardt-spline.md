@@ -187,6 +187,27 @@ Through the probe `fs_spline_probe` (built by `build.sh <workspace> <output> fs_
 against the unit oracle's libraries, which reproduce the official programs' code) and the official
 programs; suites run them through the oracle-output cache.
 
+**The probe's formats** (every float as the 8 hexadecimal digits of its binary32 bits, fields
+separated by blanks, one case per line):
+
+- `fs_spline_probe cases`, standard input: `n ibcbeg ybcbeg ibcend ybcend m t₀ … t_{n−1} y₀ … y_{n−1}
+  x₀ … x_{m−1}` (`n`, `ibcbeg`, `ibcend`, `m` in decimal; `ybcbeg`, `ybcend`, the knots `t`, the
+  values `y` and the `m` evaluation points `x` as bits). Output per case: a line `ypp` and the `n`
+  second derivatives of `SplineCubicSet(n, t, y, ibcbeg, ybcbeg, ibcend, ybcend)`; then one line per
+  evaluation point, `val` and three floats: the value, the first and the second derivative written by
+  `SplineCubicValue` (the two derivative outputs start as `7fc00bad`, so an output left unwritten
+  shows); then a line `wrap` with the `n` second derivatives of `OpenSpline(t, y, n, ybcbeg, ybcend)`
+  (always first-derivative ends: `ibcbeg` and `ibcend` do not apply) followed by `OpenSplint`'s `m`
+  values at the same points.
+- `fs_spline_probe d3`, standard input: `n a₀ … a_{3n−1} b₀ … b_{n−1}` (`n` decimal; the band of
+  §2's `A` column by column, three entries per column: `a_{3j} = U_{j−1}`, `a_{3j+1} = D_j`,
+  `a_{3j+2} = L_{j+1}`, so `a₀` and `a_{3n−1}` are never read and may be 0; then the right-hand side
+  `B`; all as bits). Output: a line `x` and the `n` solution values, or `null` when it
+  refuses (a zero diagonal entry).
+- `fs_spline_probe set1 n ibcbeg ibcend t… y…` (decimal arguments, the end values 0): one call of
+  `SplineCubicSet`, for the messages and the exit status of §7; prints `ypp` and the second
+  derivatives when it returns.
+
 1. **`cases`** (every float as its bits): seeded random cases, compared bit for bit (second
    derivatives, value, both derivative outputs with the sentinel `0x7fc00bad` showing unwritten
    outputs, and the wrappers): `n` from 2 to 80; knots strictly increasing (integer row positions as

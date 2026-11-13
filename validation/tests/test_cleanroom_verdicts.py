@@ -41,6 +41,7 @@ WT = f"{WS}/larmorx/.claude/worktrees/agent-a1"
         ("crates/larmorx-core/src/ranlux/mod.rs", ("FreeSurfer", "ranlux")),
         ("crates/larmorx-core/src/cubic_spline/solve.rs", ("FreeSurfer", "cubic_spline")),
         ("crates/larmorx-core/src/glibc_random/mod.rs", ("GNU", "glibc_random")),
+        ("crates/larmorx-core/src/glibc_qsort/merge.rs", ("GNU", "glibc_qsort")),
         ("crates/larmorx-core/src/ranlux.rs", None),  # the module must be a folder of its own
         ("crates/larmorx-afni-replica/src/tshift.rs", None),
         ("crates-nc/larmorx-nc-bet/src/lib.rs", None),

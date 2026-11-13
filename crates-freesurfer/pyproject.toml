@@ -27,7 +27,7 @@ authors = [
 # FreeSurfer's licence (LICENSE) first; then every licence of the code the wheel holds: the
 # Apache-2.0 larmorx crates with the works they translate (LICENSES/NOTICE-larmorx.txt) and the Rust
 # crates it is built with (LICENSES/third-party-rust.txt). scripts/release/licences.py derives it.
-license = "LicenseRef-FreeSurfer AND Apache-2.0 AND BSD-3-Clause AND HDF5 AND MIT AND MPL-2.0 AND PSF-2.0 AND SunPro AND Zlib"
+license = "LicenseRef-FreeSurfer AND Apache-2.0 AND BSD-3-Clause AND bzip2-1.0.6 AND HDF5 AND LicenseRef-MNI AND MIT AND MPL-2.0 AND PSF-2.0 AND SunPro AND Zlib"
 license-files = [
     "LICENSE",
     "NOTICE",

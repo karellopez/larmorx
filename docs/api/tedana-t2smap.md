@@ -315,4 +315,4 @@ and `reproduce` (which names them the same way) take about as long as tedana at 
   port of numpy's `lstsq`) and fits those voxels with its exact port of SciPy's `curve_fit` (from
   a start of 1e13 s SciPy's forward differences move S0 only, where the original's own solver
   moved T2* as well): every value at those voxels tedana's.
-- **Findings**: [`tedana-t2smap-original`](../findings/tedana-t2smap-original.md).
+- **Findings**: [`tedana-t2smap-original`](../findings/tedana-t2smap-clean-room.md).

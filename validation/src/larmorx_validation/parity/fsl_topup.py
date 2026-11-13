@@ -1188,7 +1188,7 @@ def _fmriprep_case(payload: tuple[str, str], checks: CheckList) -> None:
 
 
 def difftest_case(payload: tuple[rep.Run, rep.Run | None], checks: CheckList) -> None:
-    """A random case (``difftest/tools/fsl_topup_original.py``, the replica's draw) or a
+    """A random case (``difftest/tools/fsl_topup_clean_room.py``, the replica's draw) or a
     permanent case it found: ``(topup, None)`` compares a topup run as every case does;
     ``(topup, applytopup)`` takes FSL's topup run of the case's own pair (through the oracle
     cache; its ``--out`` is ``rep.DIFFTEST_SOURCE``) and compares applytopup on its coefficients

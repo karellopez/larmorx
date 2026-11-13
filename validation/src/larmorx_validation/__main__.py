@@ -36,7 +36,7 @@ PARITY_MODULES = {
     "afni-automask": "afni_automask",
     "afni-unifize": "afni_unifize",
     "afni-volreg": "afni_volreg",
-    "afni-volreg-original": "afni_volreg_original",
+    "afni-volreg-original": "afni_volreg_clean_room",
     "resample-series": "resample_series",
     "numpy-linalg": "numpy_linalg",
     "sdcflows-fieldmap": "sdcflows_fieldmap",
@@ -72,7 +72,7 @@ PARITY_MODULES = {
     "ants-atropos": "ants_atropos",
     "fsl-bet": "fsl_bet",
     "tedana-t2smap-replica": "tedana_t2smap_replica",
-    "tedana-t2smap-original": "tedana_t2smap_original",
+    "tedana-t2smap-original": "tedana_t2smap_clean_room",
     "confounds-linalg": "confounds_linalg",
     "confounds-nipype": "confounds_nipype",
     "confounds-fmriprep": "confounds_fmriprep",
@@ -360,6 +360,12 @@ def cmd_tables(args: argparse.Namespace) -> int:
     return tables.main(args)
 
 
+def cmd_reference(args: argparse.Namespace) -> int:
+    from larmorx_validation import reference
+
+    return reference.main(args)
+
+
 def cmd_cleanroom_audit(args: argparse.Namespace) -> int:
     from larmorx_validation.cleanroom_audit import cli
 
@@ -486,6 +492,15 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     tables_arguments(tb)
     tb.set_defaults(func=cmd_tables)
+    rf = sub.add_parser(
+        "reference",
+        help="write the programs' reference pages of the documentation site from docs/api/ and "
+        "the code, checking each API page against the code (larmorx_validation.reference)",
+    )
+    from larmorx_validation.reference import add_arguments as reference_arguments
+
+    reference_arguments(rf)
+    rf.set_defaults(func=cmd_reference)
     ca = sub.add_parser(
         "cleanroom-audit",
         help="the clean-room audit: every agent's access log from the session transcripts "

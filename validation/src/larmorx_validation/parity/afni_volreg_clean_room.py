@@ -4189,7 +4189,7 @@ def run_case(case: Case, checks: CheckList) -> None:
 
 def run_argv(case: Case, checks: CheckList, argv: list[str], env: tuple = ()) -> None:
     """A whole command line (absolute input paths, outputs named in the run's directory)
-    compared as a case is: random testing's cases (``difftest/tools/afni_volreg_original.py``),
+    compared as a case is: random testing's cases (``difftest/tools/afni_volreg_clean_room.py``),
     judged by §14.3's fixed requirements, then, where they fail, by "The ties' spread"
     (:func:`ties_judgement`); the coarse search's results reported, not required."""
     run = Run(tuple(argv), None, outputs=(), env=tuple(env))

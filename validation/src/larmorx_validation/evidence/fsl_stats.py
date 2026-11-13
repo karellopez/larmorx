@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """fslstats' evidence (the larmorx-nc replica, FSL Licence, and LARMORX's clean-room original,
 crate larmorx-fsl, Apache-2.0, written from ``specs/fslstats.md``: its parts in
-``fsl_maths_original``). fslstats prints numbers, so its evidence is text, not images: fMRIPrep's four calls in its goodvoxels mask (``--project-goodvoxels``) on ds005040, BET's
+``fsl_maths_clean_room``). fslstats prints numbers, so its evidence is text, not images: fMRIPrep's four calls in its goodvoxels mask (``--project-goodvoxels``) on ds005040, BET's
 call (``fslstats <T1w> -l 0.001 -C``), every option once on a real image (FSL's mean of
 ds005040's BOLD series in T1w space, fMRIPrep's brain mask, a label image of its segmentation),
 per volume (``-t``), per label (``-K``) and as JSON (``-json``), each printed text compared byte
@@ -16,9 +16,10 @@ from pathlib import Path
 
 import numpy as np
 
-from larmorx_validation.evidence import common, core
+from larmorx_validation.evidence import common, core, fsl_pages
 from larmorx_validation.evidence import fsl_maths as fm
-from larmorx_validation.evidence import fsl_maths_original as fo
+from larmorx_validation.evidence import fsl_maths_clean_room as fo
+from larmorx_validation.evidence import present as present_
 from larmorx_validation.figures import cache as fcache
 from larmorx_validation.figures import records
 
@@ -336,7 +337,7 @@ def export(ctx: core.Context) -> dict:
     to, toprov = fo.trial(ctx, TOOL)
     bench, chart, bt = fo.speed(ctx, "fslstats")
     entries = [ge, oe, ne, fo.entry(ctx, TOOL, "goodvoxels"), fo.entry(ctx, TOOL, "options"), de]
-    return {
+    doc = {
         "schema": 1,
         "tool": TOOL,
         "title": "fslstats",
@@ -366,6 +367,60 @@ def export(ctx: core.Context) -> dict:
         "tables": [gt, ot, tt, *to, bt],
         "examples": [],
     }
+    return present(doc)
+
+
+# ------------------------------------------------------------------- the writing guide's words
+
+#: fslstats' page: fslmaths' rewordings (:data:`fsl_maths.TEXTS`), before the FSL pages'.
+PAGE = fsl_pages.page("fslstats", texts=fm.TEXTS)
+#: The clean room's random-testing tables (a bare "larmorx" there is the clean room).
+TRIAL_CLEAN = fsl_pages.page("fslstats", port="clean-room", texts=fm.TEXTS)
+#: The case categories of fslstats' records, as the page names them.
+CATEGORIES = {
+    "fmriprep": "fMRIPrep's calls",
+    "bet": "BET's call",
+    "cli": "the command line",
+    "opt": "options",
+    "order": "the options' order",
+    "ts": "per volume (-t)",
+    "types": "data types",
+    "d13": "defects of FSL",
+    "fsltest": "FSL's own tests",
+    "orig": "the clean room's own cases",
+}
+#: The page's own tables' titles (the shared ones: :data:`fsl_maths.TITLES`).
+TITLES = {
+    "goodvoxels": "fMRIPrep's goodvoxels mask, both ports against the original: FSL `fslstats` "
+    "6.0.7.23 (its four calls)",
+    "options": "Every option on a real image, both ports against the original: FSL `fslstats` "
+    "6.0.7.23",
+}
+
+
+def present(doc: dict) -> dict:
+    """fslstats' page in the writing guide's words and order: texts, ports and order only (no
+    worked example: its evidence is printed text, in the tables)."""
+    note = (doc.get("speed") or {}).get("note")
+    fsl_pages.present(
+        doc,
+        PAGE,
+        {},
+        "Seconds for the whole call (reading the image, computing, printing), one run each, on a "
+        "log scale. The factor is how many times faster the clean room is than FSL, both on one "
+        "thread.",
+        {k: v.format(program="fslstats") for k, v in fm.SPEED_LABELS.items()},
+        categories=CATEGORIES,
+        tables={"trial-original": TRIAL_CLEAN, "trial-original-triage": TRIAL_CLEAN},
+    )
+    if doc.get("speed"):  # its build is LARMORX's at a commit, not a port's
+        doc["speed"]["note"] = present_.text(PAGE, note, port="both")
+    fm.present_tables(doc, "fslstats")
+    fm.present_cases(doc)
+    for t in doc["tables"]:
+        if t["id"] in TITLES:
+            t["title"] = TITLES[t["id"]]
+    return doc
 
 
 if __name__ == "__main__":  # compute the cache entries only:

@@ -2,7 +2,7 @@
 """3dvolreg's clean-room original (``larmorx afni 3dvolreg``, crate larmorx-afni, written from
 ``specs/3dvolreg.md``) against AFNI 26.3.05's 3dvolreg, with the replica's default as a black
 box: each case is one command line, judged by the original's suite
-(``larmorx_validation.parity.afni_volreg_original.run_argv``: §14.3's fixed requirements against
+(``larmorx_validation.parity.afni_volreg_clean_room.run_argv``: §14.3's fixed requirements against
 AFNI with ``reproduce``, the replica's default against the original's, the D13 pass; the coarse
 search's results reported, not required; where the fixed requirements fail, §14.3's "The ties'
 spread": a runaway, beyond 15 degrees or 20 mm or AFNI-97, held to the output's structure, else
@@ -247,7 +247,7 @@ def _argv(recipe: dict, prefix: str) -> list[str]:
 
 
 def _run(case, checks) -> None:
-    from larmorx_validation.parity import afni_volreg_original as vo
+    from larmorx_validation.parity import afni_volreg_clean_room as vo
     from larmorx_validation.parity.harness import EXPECTED, Outcome
 
     p = case.payload
@@ -260,7 +260,7 @@ def _run(case, checks) -> None:
 
 
 def _unavailable() -> str:
-    from larmorx_validation.parity import afni_volreg_original as vo
+    from larmorx_validation.parity import afni_volreg_clean_room as vo
 
     return "" if vo.afni_binary() else "AFNI 26.3.05's 3dvolreg was not found"
 

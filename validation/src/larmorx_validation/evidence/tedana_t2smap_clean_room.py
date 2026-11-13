@@ -46,7 +46,7 @@ TOOL = "tedana-t2smap"
 RECORD = "tedana-t2smap-original"
 BENCH = "docs/benchmarks/tedana-t2smap.md"
 BENCH_JSON = "docs/benchmarks/tedana-t2smap-original.json"
-FINDINGS = "docs/findings/tedana-t2smap-original.md"
+FINDINGS = "docs/findings/tedana-t2smap-clean-room.md"
 SPEC = "specs/t2smap.md"
 #: The original's random-testing trial (``oracles/difftest/<TRIAL>``) and its triage (the
 #: entries of ``DIFFTEST_TOOL`` in ``validation/difftest/triage.toml``).
@@ -114,7 +114,7 @@ def _signature(text: str) -> str:
 
 
 def _suite():
-    from larmorx_validation.parity import tedana_t2smap_original as suite
+    from larmorx_validation.parity import tedana_t2smap_clean_room as suite
 
     return suite
 
@@ -634,7 +634,7 @@ def extend(ctx: core.Context, doc: dict) -> dict:
     prov["cache"] = [*cache_prov, fcache.provenance(entry(ctx))]
     prov["difftest"] = [*prov.get("difftest", []), *trial_source]
     prov["original_exporter"] = core.tree_hash(
-        ctx.repo, "validation/src/larmorx_validation/evidence/tedana_t2smap_original.py"
+        ctx.repo, "validation/src/larmorx_validation/evidence/tedana_t2smap_clean_room.py"
     )
     return doc
 

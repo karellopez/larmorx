@@ -713,6 +713,44 @@ def test_the_site_shows_the_newest_dated_night_not_a_trial(tmp_path, monkeypatch
     assert ev.latest_night(tmp_path) == tmp_path / "oracles" / "difftest" / "2026-10-25"
 
 
+def test_the_site_names_ports_and_reads_the_runs_since_the_long_run(tmp_path):
+    """The site's random testing in the writing guide's words: each implementation by its
+    port's name, the triage's explanations reworded outside code spans, and the runs of half an
+    hour since the long run read from their recorded summaries, one row per port (the documentation
+    revision, chunk E)."""
+    from larmorx_validation.evidence import difftest as ev
+
+    assert ev.PORT_NAMES["original"] == "clean room"
+    assert ev.TOOL_PORTS["nifti-io"]["port"] == "LARMORX's own"
+    assert all(page.startswith("/evidence/") for page, _ in ev.PAGES.values())
+    text = ev._prose(
+        "larmorx failed where `larmorx_io::x` and larmorx-nc did not; "
+        "fixed in the clean-room original (in larmorx.)"
+    )
+    assert text == (
+        "LARMORX failed where `larmorx_io::x` and larmorx-nc did not; "
+        "fixed in the clean room (in LARMORX.)"
+    )
+    night = tmp_path / "2026-10-25"
+    night.mkdir()
+    for run, tool, impl, *_ in ev.RUNS:
+        d = tmp_path / run
+        d.mkdir(exist_ok=True)
+        f = d / "summary.json"
+        s = (
+            json.loads(f.read_text())
+            if f.is_file()
+            else {"date": run[:10], "seed": "s", "elapsed_s": 1800.0, "tools": {}}
+        )
+        t = s["tools"].setdefault(tool, {"implementations": {}})
+        t["implementations"][impl] = {"agree": 3, "differ": 1, "timeout": 1}
+        f.write_text(json.dumps(s))
+    rows = ev.runs_since(night)
+    assert len(rows) == len(ev.RUNS)
+    assert rows[0]["cases"] == 5 and rows[0]["unclear"] == 1 and rows[0]["minutes"] == 30.0
+    assert {r["port"] for r in rows} == {"replica", "clean room"}
+
+
 @pytest.mark.skipif(not Path("/proc/self/status").is_file(), reason="Linux's /proc")
 def test_a_run_stopped_for_time_leaves_no_process_behind(tmp_path):
     """What a timeout leaves in a worker's leaf (a script's child, orphaned) is stopped; the

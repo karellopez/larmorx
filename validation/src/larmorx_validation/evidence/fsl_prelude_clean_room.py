@@ -494,7 +494,7 @@ def _extend(ctx: core.Context, ex: dict, name: str) -> dict:
                           f"larmorx at commit `{oinfo['larmorx_commit'][:12]}`")  # fmt: skip
     ex["provenance"].append(
         f"Runs of the clean-room original: figures cache entry `{TOOL}/{name}-original`, "
-        f"computed {oinfo['computed']} with larmorx `{oinfo['larmorx_commit'][:12]}` (python -m "
+        f"{common.computed(oinfo)} with larmorx `{oinfo['larmorx_commit'][:12]}` (python -m "
         "larmorx with LARMORX_IMPLEMENTATION=original, reproduce mode at 14 threads and at one, "
         "default mode at 14), on the replica's entry's inputs; every command, its environment, "
         "threads and exit status are in its `RUN_INFO.json`"
@@ -861,9 +861,25 @@ def export(ctx: core.Context) -> dict:
     prov["cache"] = [*prov.get("cache", []), *[fcache.provenance(d["entry"]) for d in done]]
     prov["difftest"] = [*prov.get("difftest", []), *trial_source]
     prov["original_exporter"] = core.tree_hash(
-        ctx.repo, "validation/src/larmorx_validation/evidence/fsl_prelude_original.py"
+        ctx.repo, "validation/src/larmorx_validation/evidence/fsl_prelude_clean_room.py"
     )
-    return doc
+    return present(doc)
+
+
+def present(doc: dict) -> dict:
+    """The page in the writing guide's words (the replica's module, :mod:`fsl_prelude`, as a
+    black box: texts, ports and order only). A shape the presenter refuses, or any other failure
+    of it, is reported without its message or traceback, which may quote a label or a line of
+    the replica's module (the reviewer's rounds 16 and 17): a documentation agent runs
+    ``fsl_prelude.present`` itself to see it."""
+    from larmorx_validation.evidence import fsl_prelude
+
+    try:
+        return fsl_prelude.present(doc)
+    except Exception:
+        raise RuntimeError(
+            "prelude's page: the presenter refused a shape; a documentation agent must look"
+        ) from None
 
 
 if __name__ == "__main__":  # the original's cache entries only (``refresh WHY``: refresh)

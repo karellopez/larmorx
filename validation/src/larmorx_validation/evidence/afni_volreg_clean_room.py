@@ -49,7 +49,7 @@ from larmorx_validation.figures import records
 TOOL = "afni-volreg"
 RECORD = "afni-volreg-original"
 BENCH = "docs/benchmarks/afni-volreg.md"
-FINDINGS = "docs/findings/afni-volreg-original.md"
+FINDINGS = "docs/findings/afni-volreg-clean-room.md"
 SPEC = "specs/3dvolreg.md"
 REGISTER = "docs/findings/upstream-defects.md"
 #: The original's random-testing trial (``oracles/difftest/<TRIAL>``), its triage
@@ -104,7 +104,7 @@ PARAMS = ["roll (°)", "pitch (°)", "yaw (°)", "dS (mm)", "dL (mm)", "dP (mm)"
 
 
 def _suite():
-    from larmorx_validation.parity import afni_volreg_original as suite
+    from larmorx_validation.parity import afni_volreg_clean_room as suite
 
     return suite
 
@@ -943,8 +943,8 @@ def _texts(ex: dict, oinfo: dict, sentence: str) -> None:
             f["text"] += ("; LARMORX's clean-room original (crate larmorx-afni, Apache-2.0, "
                           f"experimental), from larmorx at commit `{oinfo['larmorx_commit'][:12]}`")  # fmt: skip
     ex["provenance"].append(
-        f"Runs of the clean-room original: figures cache entry `{TOOL}/{CASE}`, computed "
-        f"{oinfo['computed']} with larmorx `{oinfo['larmorx_commit'][:12]}` (python -m larmorx with "
+        f"Runs of the clean-room original: figures cache entry `{TOOL}/{CASE}`, "
+        f"{common.computed(oinfo)} with larmorx `{oinfo['larmorx_commit'][:12]}` (python -m larmorx with "
         "LARMORX_IMPLEMENTATION=original: default mode at 14 threads and at one, reproduce mode at "
         "14; on the volumes stored LPS both modes), on the replica's entry's inputs; every "
         "command, its environment, threads and exit status are in its `RUN_INFO.json`"
@@ -1591,9 +1591,25 @@ def export(ctx: core.Context) -> dict:
     prov["cache"] = [*cache_prov, fcache.provenance(entry(ctx)), fcache.provenance(entry_high(ctx))]
     prov["difftest"] = [*prov.get("difftest", []), *trial_source]
     prov["original_exporter"] = core.tree_hash(
-        ctx.repo, "validation/src/larmorx_validation/evidence/afni_volreg_original.py"
+        ctx.repo, "validation/src/larmorx_validation/evidence/afni_volreg_clean_room.py"
     )
-    return doc
+    return present(doc)
+
+
+def present(doc: dict) -> dict:
+    """The page in the writing guide's words (the replica's module, :mod:`afni_volreg`, as a
+    black box: texts, ports and order only). A shape the presenter refuses, or any other failure
+    of it, is reported without its message or traceback, which may quote a label or a line of
+    the replica's module (the reviewer's rounds 16 and 17): a documentation agent runs
+    ``afni_volreg.present`` itself to see it."""
+    from larmorx_validation.evidence import afni_volreg
+
+    try:
+        return afni_volreg.present(doc)
+    except Exception:
+        raise RuntimeError(
+            "3dvolreg's page: the presenter refused a shape; a documentation agent must look"
+        ) from None
 
 
 if __name__ == "__main__":  # the original's cache entries only (``refresh WHY``: refresh)

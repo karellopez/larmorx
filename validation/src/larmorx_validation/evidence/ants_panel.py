@@ -51,7 +51,8 @@ def _cmd(program: str, args) -> str:
         return m.group(0).rsplit("/", 1)[-1]
 
     text = " ".join(args).replace("{in:", "").replace("{out:", "").replace("}", "")
-    return f"{program} " + re.sub(r"/[^\s,\[\]]+", name, text)
+    # a path by its file's name, the relative ones' first folder too ("openneuro/ds005454/...")
+    return f"{program} " + re.sub(r"[^\s,\[\]<>]*/[^\s,\[\]]+", name, text)
 
 
 # ----------------------------------------------------------------------------- the specs

@@ -56,7 +56,7 @@ RUNS = [
     ("orig-reproduce", "reproduce", "reproduce mode"),
 ]
 LABEL = "larmorx's clean-room original"
-FINDINGS = "docs/findings/fsl-bet-original.md"
+FINDINGS = "docs/findings/fsl-bet-clean-room.md"
 _NOTICE = re.compile(
     r"upstream defect ((?:FSL|GLIBC)-\d+) \(([^)]*)\) (corrected|reproduced|refused)"
 )
@@ -267,8 +267,8 @@ def _counts(x: dict, ex, outputs: list[dict]) -> str:
 MISSES = {
     "real/child-3y-B": "the record's failure: -B's last step, bet -R with -c from the robust "
     "centre, starts bet2 a few bits from FSL's on this neurologically stored image (the "
-    "specification's open question of the trial's cases 622 and 677: the conversion of a centre "
-    "in voxels into FSL's radiological frame)",
+    "specification's open question of random testing's cases 622 and 677: the conversion of a "
+    "centre in voxels into FSL's radiological frame)",
 }
 
 
@@ -360,8 +360,8 @@ def _verdicts(diffs: list[dict], ex, outputs: list[dict], info: dict, rec_orig) 
                 f"Not FSL 6.0.7.23's values: {counts}. "
                 + (
                     "bet2's brain and every step before betsurf are FSL's; betsurf decides its "
-                    "profiles as FSL does (relay 7's rules) and its surfaces settle a little "
-                    "elsewhere, the scalp most (docs/findings/fsl-bet-original.md, betsurf), "
+                    "profiles as FSL does and its surfaces settle a little "
+                    "elsewhere, the scalp most (docs/findings/fsl-bet-clean-room.md, betsurf), "
                     "held to its masks' thresholds (Dice >= 0.99, boundary p95 <= 1 voxel)."
                     if surf
                     else "The clean-room original runs the script's programs as its own "
@@ -371,7 +371,9 @@ def _verdicts(diffs: list[dict], ex, outputs: list[dict], info: dict, rec_orig) 
                 + (" In the default also: " + GLIBC07 + "." if i == "orig-fsl23" else "")
                 + rec
                 + " The difference is not closed: the original could still give FSL's files.",
-                900,
+                # 910: the findings' new name (-clean-room.md) is two characters longer than
+                # the old one; a reason cut short keeps every character it showed
+                910,
             )
 
 
@@ -455,8 +457,8 @@ def examples(ctx: core.Context, rec_new, rec_orig) -> list[dict]:
             }
         )
         doc["provenance"].append(
-            f"Runs of the clean-room original: figures cache entry `{TOOL}/{e.case}`, computed "
-            f"{info.get('computed')} with larmorx `{info['larmorx_commit'][:12]}`; "
+            f"Runs of the clean-room original: figures cache entry `{TOOL}/{e.case}`, "
+            f"{common.computed(info)} with larmorx `{info['larmorx_commit'][:12]}`; "
             f"{info['versions']['larmorx']}; every command, its environment and exit status in "
             "its `RUN_INFO.json`"
         )

@@ -5,7 +5,7 @@ sign shows), and the random-testing table's row heads give the section that the 
 signatures write with ``N`` for each digit."""
 
 import pytest
-from larmorx_validation.evidence import tedana_t2smap_original as m
+from larmorx_validation.evidence import tedana_t2smap_clean_room as m
 
 
 def test_signature_gives_the_section_again():

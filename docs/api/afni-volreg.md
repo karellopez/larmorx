@@ -48,7 +48,7 @@ the same thresholds, with the defects named the same; every byte the same at 1, 
 threads), and a random-testing trial (21,710 cases, 11,385 agreeing; a seeded sample of 1,200 of
 the differences judged again with the final build: 67 agree, 860 within 3 times the original's
 own spread under the ties, 268 runaways whose structure agrees, 5 explained; triaged in
-`validation/difftest/triage.toml`; [findings](../findings/afni-volreg-original.md)).
+`validation/difftest/triage.toml`; [findings](../findings/afni-volreg-clean-room.md)).
 
 ## Quick start
 

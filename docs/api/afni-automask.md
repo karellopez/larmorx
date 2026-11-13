@@ -123,7 +123,7 @@ it shapes fMRIPrep's BOLD masks).
   sform can differ from AFNI's in the 7th digit (ds005454: voxel sizes 1.40000034 against the
   header's 1.39999998 mm, the origin by up to 3.8e-5 mm). The data are AFNI's; AFNI run on the
   input without its extension writes the original's header byte for byte
-  ([findings](../findings/afni-masks-original.md)). The replica reproduces AFNI's reading.
+  ([findings](../findings/afni-masks-clean-room.md)). The replica reproduces AFNI's reading.
 
 ## Known last-bit differences
 
@@ -136,11 +136,11 @@ steps the spec states exactly).
 The original decides every pass of the mask operations voxel by voxel in parallel over z planes
 (the result does not depend on the thread count), finds clusters by run-based union-find, and
 replaces two of AFNI's repeated sweeps (the exterior clip, the depth) by breadth-first searches
-with the same results ([findings](../findings/afni-masks-original.md), "Speed"). AFNI's
+with the same results ([findings](../findings/afni-masks-clean-room.md), "Speed"). AFNI's
 3dAutomask is single-threaded. Its time is mostly reading and writing compressed NIfTI: in
 informal timings (2026-10-24, a shared machine) fMRIPrep's call on ds005454's BOLD reference took
 1.6 s in AFNI, 1.9 s in the replica and 1.7 s in the original at one thread, 0.72 s in the
-original at six ([findings](../findings/afni-masks-original.md#informal-timings-2026-10-24-not-a-benchmark-report)).
+original at six ([findings](../findings/afni-masks-clean-room.md#informal-timings-2026-10-24-not-a-benchmark-report)).
 There is no benchmark report yet.
 
 ## Rust

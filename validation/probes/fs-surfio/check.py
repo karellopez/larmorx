@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import itertools
 import json
 import os
 import subprocess
@@ -54,7 +55,7 @@ def libm_case(cmd: str, toks: list[str]) -> bool:
     if cmd == "surf":
         return "Z" in toks
     if cmd == "posn":
-        return "cc" in toks or any(a == "sv" and b == "3" for a, b in zip(toks, toks[1:]))
+        return "cc" in toks or any(a == "sv" and b == "3" for a, b in itertools.pairwise(toks))
     return False
 
 

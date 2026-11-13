@@ -16,6 +16,7 @@
 //!   [`vnl_eigen`]: vnl's symmetric and real eigensystems (EISPACK); [`vnl_fixed`]: vnl's
 //!   closed-form determinants and inverses of small matrices; [`vnl_random`]: vnl's
 //!   subtract-with-borrow random numbers (FreeSurfer's `-seed` generator).
+//! - [`cscan`]: C's `sscanf` conversions `%lf` and `%d` and `strtod`, as the C library reads them.
 //! - [`drand48`]: POSIX's 48-bit random numbers, as the C library gives them.
 //! - [`cubic_spline`]: the cubic spline of FreeSurfer's intensity normalisation (a clean room of
 //!   `specs/burkardt-spline.md`).
@@ -36,6 +37,7 @@ pub mod alloc;
 pub mod array;
 pub mod cfmt;
 pub mod cli;
+pub mod cscan;
 pub mod cubic_spline;
 pub mod defects;
 pub mod drand48;

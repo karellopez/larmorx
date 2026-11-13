@@ -586,3 +586,13 @@ from `84a2044d`): 20,000 cases (296,786 evaluation points, every output line), 1
 systems, the five messages byte for byte with their exit status, FS-103's 500 NaN-knot cases under
 `reproduce`. The unit tests check the probe's values and messages and 12 golden checksums (each
 pair of end conditions, two knots with conditions 0 and 0, 80 knots; every evaluation branch).
+
+## C's `sscanf` conversions and `strtod` (`src/cscan.rs`; FreeSurfer's foundations, item 3.1-14, 2026-11-12)
+
+**Original implementation**, written from the C standard's description (ISO C 7.21.6.2, 7.22.1.3,
+7.22.1.4); where the standard leaves room, glibc 2.35's choices measured as a black box (no glibc
+code read or translated): the run `%lf` reads, `0x` alone failing, `nan(...)` read as `nan`, `%d`'s
+low 32 bits of `strtol`. Decimal strings through Rust's correctly rounded parser; hexadecimal ones
+rounded here, ties to even, subnormals included. `validation/probes/fs-minc-nifti` (family `scan`)
+compares it with glibc's `sscanf("%lf")`, `sscanf("%d")` and `strtod`: 400,000 generated strings of
+each, 0 differences (scale 1, 2026-11-13; `docs/findings/minc-xfm.md`).

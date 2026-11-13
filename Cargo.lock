@@ -331,6 +331,7 @@ name = "larmorx-io"
 version = "0.1.0-rc.1"
 dependencies = [
  "bytemuck",
+ "bzip2",
  "crc32fast",
  "flate2",
  "larmorx-core",

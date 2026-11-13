@@ -1,0 +1,19 @@
+[package]
+name = "fs-minc-nifti"
+description = "larmorx-io's ports of MINC 1.5.1's .xfm reader and writer and of nifticlib 2.0.0's file names and znzlib, against the originals (MINC 1.5.1 and nifticlib 2.0.0 built from their release tarballs, and FreeSurfer 8.2.0's copies as the unit oracle built them: GCC 8.4.0, FreeSurfer's flags)"
+version = "0.0.1"
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+
+# Its own workspace: a measurement tool, never part of larmorx's build (it calls libraries compiled
+# from the originals through the dynamic loader).
+[workspace]
+
+[dependencies]
+larmorx-core = { path = "../../../crates/larmorx-core" }
+larmorx-io = { path = "../../../crates/larmorx-io" }
+flate2 = { version = "1.1.10", default-features = false, features = ["zlib-rs"] }
+
+[profile.release]
+debug = false

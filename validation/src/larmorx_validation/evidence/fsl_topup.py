@@ -2539,6 +2539,8 @@ TEXTS = [
     (r"\bshared with another agent's work\b", "shared with other work"),
     (r"; trial of (\d{4}-\d\d-\d\d), the drawn case\)", r"; the random-testing run of \1, the drawn case)"),
     (r"\bfixed during the trial's triage\b", "fixed during the run's triage"),
+    # the comparison suite by its module's name, as code
+    (r"\(parity\.fsl_topup's `measures`\)", "(`measures` of the comparison suite `parity.fsl_topup`)"),
 ]  # fmt: skip
 #: The page's topup calls; applytopup's three examples name their own program; the agreement
 #: charts, the speed chart and random testing cover both programs.

@@ -187,7 +187,13 @@ pub fn grow_nvertices(
     nvertices: i32,
 ) -> Result<(), Fatal> {
     if nvertices > mris.max_vertices {
-        return Err(assert_at(g, out, err, 559, "nvertices <= mris->max_vertices"));
+        return Err(assert_at(
+            g,
+            out,
+            err,
+            559,
+            "nvertices <= mris->max_vertices",
+        ));
     }
     mris.nvertices = nvertices;
     Ok(())
@@ -498,6 +504,7 @@ pub fn dtr(g: &mut Globals, err: &mut dyn Write, mris: &mut Mris) {
 }
 
 /// `MRISoverAlloc(max_vertices, max_faces, nvertices, nfaces)`: a new surface, [`ctr`].
+#[allow(clippy::too_many_arguments)]
 pub fn over_alloc(
     g: &mut Globals,
     out: &mut dyn Write,
@@ -642,7 +649,10 @@ mod tests {
         let mut g = Globals::new(UpstreamDefects::Fix);
         let (mut o, mut e) = (Vec::new(), Vec::new());
         let m = over_alloc(&mut g, &mut o, &mut e, &SurfGlobals::default(), 5, 3, 2, 1).unwrap();
-        assert_eq!((m.nvertices, m.max_vertices, m.nfaces, m.max_faces), (2, 5, 1, 3));
+        assert_eq!(
+            (m.nvertices, m.max_vertices, m.nfaces, m.max_faces),
+            (2, 5, 1, 3)
+        );
         assert_eq!((m.nsize, m.max_nsize), (1, 1));
         assert_eq!(m.vertices.as_ref().map(Vec::len), Some(5));
         assert_eq!(m.faces.as_ref().map(Vec::len), Some(3));

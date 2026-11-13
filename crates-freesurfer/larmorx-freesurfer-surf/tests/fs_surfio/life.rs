@@ -46,7 +46,11 @@ struct LifeState {
 /// above or negative.
 fn within(g: &mut Gen, hi: i64) -> i64 {
     if g.chance(15) {
-        if g.chance(3) { -1 } else { hi.max(0) + g.int(1, 2) }
+        if g.chance(3) {
+            -1
+        } else {
+            hi.max(0) + g.int(1, 2)
+        }
     } else {
         g.int(0, hi.max(0))
     }
@@ -223,7 +227,11 @@ fn dump_ok(m: &Mris, vno: i32) -> bool {
         }
     }
     if vt.num > 0
-        && (vt.n.is_none() || !vt.f.as_ref().is_some_and(|f| f.len() >= usize::from(vt.num)))
+        && (vt.n.is_none()
+            || !vt
+                .f
+                .as_ref()
+                .is_some_and(|f| f.len() >= usize::from(vt.num)))
     {
         return false;
     }
@@ -344,7 +352,9 @@ pub fn life_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
                     o.s("G");
                     continue;
                 }
-                o.i(i64::from(alloc::realloc_vertices(g, a, b, sg, &mut m, x, y)?));
+                o.i(i64::from(alloc::realloc_vertices(
+                    g, a, b, sg, &mut m, x, y,
+                )?));
             }
             "rf" => {
                 let (x, y) = (t.i(), t.i());
@@ -757,7 +767,14 @@ pub fn misc_tokens(t: &mut Vec<String>, g: &mut Gen) {
         t.push(op.to_owned());
         match op {
             "cn" => {
-                ix(t, if g.chance(5) { g.int(3, 4) } else { g.int(0, 2) });
+                ix(
+                    t,
+                    if g.chance(5) {
+                        g.int(3, 4)
+                    } else {
+                        g.int(0, 2)
+                    },
+                );
                 let n = g.int(0, 20) as usize;
                 let b = bytes(g, n);
                 hx(t, &b);
@@ -830,7 +847,11 @@ pub fn misc_tokens(t: &mut Vec<String>, g: &mut Gen) {
                 for k in 0..2 {
                     ix(t, g.int(0, 9));
                     for c in 0..3 {
-                        let b = if k == 1 && g.chance(2) { a[c] } else { small(g) };
+                        let b = if k == 1 && g.chance(2) {
+                            a[c]
+                        } else {
+                            small(g)
+                        };
                         t.push(format!("{:08x}", if k == 0 { a[c] } else { b }));
                     }
                 }
@@ -840,7 +861,14 @@ pub fn misc_tokens(t: &mut Vec<String>, g: &mut Gen) {
                 for k in 0..2 {
                     ix(t, g.int(0, 9));
                     for c in 0..3 {
-                        ix(t, if k == 0 || g.chance(2) { a[c] } else { g.int(0, 4) });
+                        ix(
+                            t,
+                            if k == 0 || g.chance(2) {
+                                a[c]
+                            } else {
+                                g.int(0, 4)
+                            },
+                        );
                     }
                 }
             }

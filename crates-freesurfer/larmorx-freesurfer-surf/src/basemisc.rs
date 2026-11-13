@@ -54,8 +54,12 @@ pub fn export_face_ripflags(mris: &Mris) -> Option<Vec<i8>> {
 
 /// `MRISimportFaceRipflags(mris, flags)`: each in-use face's rip flag from `flags`.
 pub fn import_face_ripflags(mris: &mut Mris, flags: &[i8]) {
-    for fno in 0..nonneg(mris.nfaces) {
-        mris.face_mut(fno).ripflag = flags[fno];
+    assert!(
+        flags.len() >= nonneg(mris.nfaces),
+        "fewer rip flags than faces: FreeSurfer reads past the list"
+    );
+    for (fno, &flag) in flags.iter().enumerate().take(nonneg(mris.nfaces)) {
+        mris.face_mut(fno).ripflag = flag;
     }
 }
 
@@ -73,8 +77,12 @@ pub fn export_vertex_ripflags(mris: &Mris) -> Option<Vec<i8>> {
 
 /// `MRISimportVertexRipflags(mris, flags)`.
 pub fn import_vertex_ripflags(mris: &mut Mris, flags: &[i8]) {
-    for vno in 0..nonneg(mris.nvertices) {
-        mris.vertex_mut(vno).ripflag = flags[vno];
+    assert!(
+        flags.len() >= nonneg(mris.nvertices),
+        "fewer rip flags than vertices: FreeSurfer reads past the list"
+    );
+    for (vno, &flag) in flags.iter().enumerate().take(nonneg(mris.nvertices)) {
+        mris.vertex_mut(vno).ripflag = flag;
     }
 }
 
@@ -169,15 +177,11 @@ pub fn get_face_normal_array(mris: &mut Mris) -> Vec<f32> {
 }
 
 /// `MRISsetCurvatureName(nth, name)`: the `nth` curvature name (0 to 2) becomes a copy of `name`
-/// (its bytes before a NUL); returns 0. For `nth` above 2: `ERROR: MRISsetCurvatureName() nth=<n>
-/// > 2` on standard output, 1. A negative `nth` writes before FreeSurfer's array (FreeSurfer's
-/// callers give 0, 1 and 2): out of range here (a panic).
-pub fn set_curvature_name(
-    sg: &mut SurfGlobals,
-    out: &mut dyn Write,
-    nth: i32,
-    name: &[u8],
-) -> i32 {
+/// (its bytes before a NUL); returns 0. For `nth` above 2 it prints
+/// `ERROR: MRISsetCurvatureName() nth=<n> > 2` on standard output and returns 1. A negative `nth`
+/// writes before FreeSurfer's array (FreeSurfer's callers give 0, 1 and 2): out of range here (a
+/// panic).
+pub fn set_curvature_name(sg: &mut SurfGlobals, out: &mut dyn Write, nth: i32, name: &[u8]) -> i32 {
     if nth > 2 {
         let _ = writeln!(out, "ERROR: MRISsetCurvatureName() nth={nth} > 2");
         return 1;

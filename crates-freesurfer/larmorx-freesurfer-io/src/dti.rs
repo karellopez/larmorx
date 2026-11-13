@@ -79,7 +79,9 @@ fn write_columns(
         fp.close();
         g.notices.add(
             &FS_217,
-            format!("{what} of no matrix: FreeSurfer crashes after making the file; the file left empty"),
+            format!(
+                "{what} of no matrix: FreeSurfer crashes after making the file; the file left empty"
+            ),
         );
         let _ = writeln!(out, "ERROR: {what}(): no matrix");
         return 1;
@@ -280,7 +282,14 @@ pub fn dti_bvec_change_space(
         );
         let _ = writeln!(out, "M------------------------------");
         let mut text: Vec<u8> = Vec::new();
-        matrix_print(g, Some(&mut text as &mut dyn Write), out, err, m.as_ref(), 5);
+        matrix_print(
+            g,
+            Some(&mut text as &mut dyn Write),
+            out,
+            err,
+            m.as_ref(),
+            5,
+        );
         let _ = out.write_all(&text);
         let _ = writeln!(out, "------------------------------");
     }
@@ -321,4 +330,57 @@ pub fn dti_bvec_change_space(
     }
     vol.bvec_space = desired;
     Ok(0)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use larmorx_core::defects::UpstreamDefects;
+
+    #[test]
+    fn pulse_sequence_names_as_the_official_build_parses_them() {
+        // the fs-io probe's psn command on the official build (2026-11-13)
+        let mut g = Globals::new(UpstreamDefects::Fix);
+        let unset = f64::from_bits(0x7ff8_dead_beef_0001);
+        for (name, r, b, n) in [
+            (&b"ep_b1000#1"[..], 0, 1000.0f64.to_bits(), 1),
+            (b"ep_b", 1, unset.to_bits(), -7777),
+            (b"ep_b1000", 1, unset.to_bits(), -7777),
+            (b"ep_b#", 1, unset.to_bits(), -7777),
+            (b"ep_b.5#999999999999", 0, 0.5f64.to_bits(), -727_379_969),
+        ] {
+            let (mut bv, mut nth) = (unset, -7777);
+            assert_eq!(dti_parse_pulse_seq_name(&mut g, name, &mut bv, &mut nth), r);
+            assert_eq!((bv.to_bits(), nth), (b, n));
+        }
+    }
+
+    #[test]
+    fn bvector_lines() {
+        let dir = tempfile::Builder::new().prefix("dti ~").tempdir().unwrap();
+        let mut g = Globals::new(UpstreamDefects::Fix);
+        let mut out = Vec::new();
+        let m = Matrix::from_rows(&[
+            vec![1.0, f32::NAN, f32::NEG_INFINITY],
+            vec![1.1, 0.1, -std::f32::consts::PI],
+        ]);
+        assert_eq!(
+            dti_write_bvectors(&mut g, &mut out, Some(dir.path()), Some(&m), "b"),
+            0
+        );
+        // the official build's bytes for the same matrix (the probe's bvw command)
+        assert_eq!(
+            std::fs::read(dir.path().join("b")).unwrap(),
+            b"1.00000000000000              nan             -inf\n1.10000002384186 0.10000000149012 -3.14159274101257\n"
+        );
+        assert_eq!(
+            dti_write_bvalues(&mut g, &mut out, Some(dir.path()), Some(&m), "v"),
+            0
+        );
+        assert_eq!(
+            std::fs::read(dir.path().join("v")).unwrap(),
+            b"1.000000\n1.100000\n"
+        );
+        assert!(out.is_empty());
+    }
 }

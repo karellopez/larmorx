@@ -222,7 +222,9 @@ fn npy_file(g: &mut Gen, small: bool) -> Vec<u8> {
 fn psn_name(g: &mut Gen) -> Vec<u8> {
     let num = |g: &mut Gen| -> String {
         match g.below(8) {
-            0 => g.pick(&["", "x", "1e", "inf", "-nan", "0x1p3", "1e400", " 5", "+.5"]).into(),
+            0 => g
+                .pick(&["", "x", "1e", "inf", "-nan", "0x1p3", "1e400", " 5", "+.5"])
+                .into(),
             1 => format!("{}.{}", g.int(0, 3000), g.int(0, 99)),
             _ => g.int(0, 3000).to_string(),
         }
@@ -234,7 +236,9 @@ fn psn_name(g: &mut Gen) -> Vec<u8> {
         s.push(b'#');
     }
     let n = match g.below(8) {
-        0 => g.pick(&["", "x", "-3", "99999999999", "2147483648", " 7", "12abc"]).into(),
+        0 => g
+            .pick(&["", "x", "-3", "99999999999", "2147483648", " 7", "12abc"])
+            .into(),
         _ => g.int(0, 60).to_string(),
     };
     s.extend_from_slice(n.as_bytes());
@@ -441,7 +445,14 @@ pub fn run(
         let d = n.detail.as_str();
         let skip = matches!(
             n.defect.id,
-            "FS-199" | "FS-200" | "FS-201" | "FS-203" | "FS-204" | "FS-205" | "FS-211" | "FS-217"
+            "FS-199"
+                | "FS-200"
+                | "FS-201"
+                | "FS-203"
+                | "FS-204"
+                | "FS-205"
+                | "FS-211"
+                | "FS-217"
                 | "FS-219"
         ) || (n.defect.id == "FS-207" && d.contains("shape"));
         let vary = matches!(n.defect.id, "FS-202" | "FS-209" | "FS-214")
@@ -549,7 +560,8 @@ fn answer(
             }
             let da = (!isnull).then_some(da);
             let mut sw = Sw(err);
-            let v = gifti::gifti_get_da_value_2d(g, &mut sw, da.as_ref(), row, col).map_err(fatal)?;
+            let v =
+                gifti::gifti_get_da_value_2d(g, &mut sw, da.as_ref(), row, col).map_err(fatal)?;
             od(o, v);
         }
         "bvw" => {
@@ -583,7 +595,9 @@ fn answer(
             let s = dec(t.s()).unwrap_or_default();
             let mut b = f64::from_bits(0x7ff8_dead_beef_0001);
             let mut nth = -7777;
-            o.i(i64::from(dti::dti_parse_pulse_seq_name(g, &s, &mut b, &mut nth)));
+            o.i(i64::from(dti::dti_parse_pulse_seq_name(
+                g, &s, &mut b, &mut nth,
+            )));
             od(o, b);
             o.i(i64::from(nth));
         }

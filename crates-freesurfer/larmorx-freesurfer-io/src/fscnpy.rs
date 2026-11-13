@@ -30,8 +30,8 @@ use std::io::Write;
 use std::path::Path;
 
 use larmorx_core::defects::{
-    FS_199, FS_200, FS_201, FS_202, FS_203, FS_204, FS_205, FS_207, FS_208, FS_209, FS_210,
-    FS_211, FS_212, FS_213,
+    FS_199, FS_200, FS_201, FS_202, FS_203, FS_204, FS_205, FS_207, FS_208, FS_209, FS_210, FS_211,
+    FS_212, FS_213,
 };
 use larmorx_freesurfer_core::cstd::atoi;
 use larmorx_freesurfer_core::globals::Globals;
@@ -358,7 +358,7 @@ pub fn npy2mri(
     }
     // the padding: FreeSurfer skips to the next multiple of 16 bytes
     let total = 6 + 2 + hlb as u64 + header_len;
-    if total % 16 != 0 {
+    if !total.is_multiple_of(16) {
         let rest = 16 - total % 16;
         g.notices.add(
             &FS_213,
@@ -410,9 +410,15 @@ pub fn npy2mri(
             id,
             "a .npy header without a shape: FreeSurfer crashes; refused",
         );
-        return Err(exit_with(out, &format!("Error {npy}: npy header has no shape\n")));
+        return Err(exit_with(
+            out,
+            &format!("Error {npy}: npy header has no shape\n"),
+        ));
     }
-    for (key, have) in [("descr", h.has_descr), ("fortran_order", h.fortran.is_some())] {
+    for (key, have) in [
+        ("descr", h.has_descr),
+        ("fortran_order", h.fortran.is_some()),
+    ] {
         if !have {
             g.notices.add(
                 &FS_207,
@@ -422,7 +428,10 @@ pub fn npy2mri(
                 ),
             );
             if !reproduce {
-                return Err(exit_with(out, &format!("Error {npy}: npy header has no {key}\n")));
+                return Err(exit_with(
+                    out,
+                    &format!("Error {npy}: npy header has no {key}\n"),
+                ));
             }
         }
     }
@@ -607,9 +616,7 @@ pub fn npy2mri(
         if !reproduce {
             return Err(exit_with(
                 out,
-                &format!(
-                    "Error {npy}: {bytesread} bytes of data read, {expected} expected\n"
-                ),
+                &format!("Error {npy}: {bytesread} bytes of data read, {expected} expected\n"),
             ));
         }
     }
@@ -659,7 +666,11 @@ fn contiguous_reorder(
     dtype: i32,
     verbose: bool,
 ) -> Result<Option<Mri>, Fatal> {
-    if ![MRI_UCHAR, MRI_SHORT, MRI_USHRT, MRI_INT, MRI_LONG, MRI_FLOAT].contains(&dtype) {
+    if ![
+        MRI_UCHAR, MRI_SHORT, MRI_USHRT, MRI_INT, MRI_LONG, MRI_FLOAT,
+    ]
+    .contains(&dtype)
+    {
         let _ = writeln!(out, "Unsupported datatype, no array contiguous reordering");
         return Ok(None);
     }
@@ -692,10 +703,8 @@ fn contiguous_reorder(
                     let from = bpv * voxel;
                     if verbose {
                         let _ = writeln!(out, "memcpy({}, {}, {bpv})", ptr(from), ptr(at));
-                        let _ = writeln!(
-                            out,
-                            "      offset_voxel = {voxel}, offset_bytes = {from}"
-                        );
+                        let _ =
+                            writeln!(out, "      offset_voxel = {voxel}, offset_bytes = {from}");
                     }
                     let (a, n) = (at as usize, bpv as usize);
                     dst[a..a + n].copy_from_slice(&src[from as usize..from as usize + n]);
@@ -707,3 +716,111 @@ fn contiguous_reorder(
     Ok(Some(new))
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use larmorx_core::defects::UpstreamDefects;
+
+    /// A NumPy header (version 1.0, aligned to 64 bytes) and the data.
+    fn npy(dict: &str, data: &[u8]) -> Vec<u8> {
+        let mut body = dict.as_bytes().to_vec();
+        let base = 10 + body.len() + 1;
+        body.extend(std::iter::repeat_n(b' ', (64 - base % 64) % 64));
+        body.push(b'\n');
+        let mut f = b"\x93NUMPY\x01\x00".to_vec();
+        f.extend_from_slice(&(body.len() as u16).to_le_bytes());
+        f.extend_from_slice(&body);
+        f.extend_from_slice(data);
+        f
+    }
+
+    fn read(file: &[u8], mode: UpstreamDefects) -> (Result<Option<Mri>, Fatal>, String, Globals) {
+        let dir = tempfile::Builder::new().prefix("npy ~").tempdir().unwrap();
+        std::fs::write(dir.path().join("a.npy"), file).unwrap();
+        let mut g = Globals::new(mode);
+        let (mut out, mut err) = (Vec::new(), Vec::new());
+        let r = npy2mri(&mut g, &mut out, &mut err, Some(dir.path()), "a.npy", false);
+        out.extend_from_slice(&err);
+        (r, String::from_utf8_lossy(&out).into_owned(), g)
+    }
+
+    #[test]
+    fn shape_vec_keeps_what_libstdcxx_keeps() {
+        let mut v = ShapeVec::default();
+        for x in [1, 3, 4, 1] {
+            v.push(x);
+        }
+        v.pop();
+        v.erase_front();
+        assert_eq!(v.elements(), vec![3, 4]);
+        assert_eq!(v.beyond(), vec![Some(4), Some(1)]);
+        let mut w = ShapeVec::default();
+        w.push(2);
+        w.push(3);
+        assert_eq!(w.beyond(), Vec::<Option<i32>>::new());
+        w.push(5);
+        assert_eq!(w.beyond(), vec![None]);
+    }
+
+    #[test]
+    fn c_order_floats_as_the_official_build_reads_them() {
+        // the official build (the fs-io probe, 2026-11-13): (2, 3, 4) float32 0..23 in C order
+        let data: Vec<u8> = (0..24).flat_map(|i| (i as f32).to_le_bytes()).collect();
+        let file = npy(
+            "{'descr': '<f4', 'fortran_order': False, 'shape': (2, 3, 4), }",
+            &data,
+        );
+        let (r, text, _) = read(&file, UpstreamDefects::Fix);
+        let m = r.unwrap().unwrap();
+        assert_eq!(
+            (m.vg.width, m.vg.height, m.vg.depth, m.nframes),
+            (2, 3, 4, 1)
+        );
+        assert_eq!(text, "array contiguous reordering ...\n");
+        let chunk = m.chunk.unwrap();
+        let v: Vec<f32> = chunk
+            .chunks(4)
+            .map(|b| f32::from_le_bytes(b.try_into().unwrap()))
+            .collect();
+        assert_eq!(&v[..6], &[0.0, 12.0, 4.0, 16.0, 8.0, 20.0]);
+    }
+
+    #[test]
+    fn squeezed_extents_past_the_list() {
+        // official: |u1 (1, 3, 4, 1) gives a volume of 3 x 4 x 4 (FS-206, reproduce); 3 x 4 x 1 by default
+        let file = npy(
+            "{'descr': '|u1', 'fortran_order': False, 'shape': (1, 3, 4, 1), }",
+            &(0..12).collect::<Vec<u8>>(),
+        );
+        let (r, _, g) = read(&file, UpstreamDefects::Reproduce);
+        let m = r.unwrap().unwrap();
+        assert_eq!((m.vg.width, m.vg.height, m.vg.depth), (3, 4, 4));
+        assert!(g.notices.contains(&larmorx_core::defects::FS_206));
+        let (r, _, _) = read(&file, UpstreamDefects::Fix);
+        let m = r.unwrap().unwrap();
+        assert_eq!((m.vg.width, m.vg.height, m.vg.depth), (3, 4, 1));
+    }
+
+    #[test]
+    fn one_dimensional_arrays_and_failures() {
+        // FreeSurfer crashes on NumPy's (3,) (FS-204); the port reads one extent
+        let file = npy(
+            "{'descr': '<f4', 'fortran_order': False, 'shape': (3,), }",
+            &[0; 12],
+        );
+        let (r, _, g) = read(&file, UpstreamDefects::Fix);
+        let m = r.unwrap().unwrap();
+        assert_eq!((m.vg.width, m.vg.height, m.vg.depth), (3, 1, 1));
+        assert!(g.notices.contains(&FS_204));
+        let (r, text, _) = read(b"\x93NUMPX", UpstreamDefects::Fix);
+        assert_eq!(r.err(), Some(Fatal::Exit(1)));
+        assert_eq!(text, "Error a.npy is not npy file\n");
+        let file = npy(
+            "{'descr': '<f8', 'fortran_order': True, 'shape': (2, 2, 2), }",
+            &[0; 64],
+        );
+        let (r, text, _) = read(&file, UpstreamDefects::Reproduce);
+        assert_eq!(r.err(), Some(Fatal::Exit(1)));
+        assert!(text.starts_with("WARN: !!! unsupported __dtype_char=f, __dtype_len=8\n"));
+    }
+}

@@ -188,10 +188,7 @@ impl Process {
                 );
                 return Ok(Some(d));
             }
-            self.note(
-                &FS_164,
-                "the registration that cannot be inverted: refused",
-            );
+            self.note(&FS_164, "the registration that cannot be inverted: refused");
             self.error_exit(
                 codes::BAD_PARM,
                 b"MRItkReg2Native: the registration cannot be inverted",
@@ -383,7 +380,7 @@ impl Process {
             b.push(b'\n');
             self.put_out(&b);
             for (which, det, g) in [("Mov", det_m, mv), ("Ref", det_r, rf)] {
-                if !(det > 0.0) {
+                if det.partial_cmp(&0.0) != Some(std::cmp::Ordering::Greater) {
                     continue;
                 }
                 self.put_out(
@@ -476,7 +473,15 @@ impl Process {
         let fill = |m: &mut Matrix| {
             for r in 1..=4 {
                 for c in 1..=4 {
-                    m.set(r, c, if r == c || (c == 4 && r < 4) { 1.0 } else { 0.0 });
+                    m.set(
+                        r,
+                        c,
+                        if r == c || (c == 4 && r < 4) {
+                            1.0
+                        } else {
+                            0.0
+                        },
+                    );
                 }
             }
         };

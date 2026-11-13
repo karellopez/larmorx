@@ -132,12 +132,15 @@ impl Process {
     /// (FS-60 when the source has none).
     fn copy_transform(&mut self, src: &Mri, d: &mut Mri) -> Result<(), Stop> {
         let owned = d.free_transform != 0 && d.transform.is_some();
-        if owned && let Some(t) = &d.transform {
-            if let TransformKind::Other(_) = t.kind {
-                self.put_err(b"delete_general_transform\n");
-                self.flush();
-                return Err(Stop::Exit(1));
-            }
+        if owned
+            && let Some(MincTransform {
+                kind: TransformKind::Other(_),
+                ..
+            }) = &d.transform
+        {
+            self.put_err(b"delete_general_transform\n");
+            self.flush();
+            return Err(Stop::Exit(1));
         }
         let Some(t) = &src.transform else {
             if owned {
@@ -252,7 +255,10 @@ impl Process {
         let conversion = matches!(
             (sk, dk),
             (types::FLOAT, types::SHORT | types::USHRT | types::UCHAR)
-                | (types::UCHAR | types::SHORT | types::INT | types::RGB, types::FLOAT)
+                | (
+                    types::UCHAR | types::SHORT | types::INT | types::RGB,
+                    types::FLOAT
+                )
                 | (types::SHORT, types::UCHAR)
         );
         if conversion {
@@ -346,9 +352,9 @@ impl Process {
                     let Some(dof) = Self::row_offset(d, t, y, len) else {
                         return self.too_small();
                     };
-                    let row =
-                        src.voxels.as_ref().expect("voxels")[so as usize..(so + len) as usize]
-                            .to_vec();
+                    let row = src.voxels.as_ref().expect("voxels")
+                        [so as usize..(so + len) as usize]
+                        .to_vec();
                     d.voxels.as_mut().expect("voxels")[dof as usize..(dof + len) as usize]
                         .copy_from_slice(&row);
                 }

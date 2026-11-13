@@ -198,8 +198,8 @@ impl Line {
         g.zsize = self.getf();
         g.ras_good_flag = self.geti();
         for v in [&mut g.x, &mut g.y, &mut g.z, &mut g.c, &mut g.s] {
-            for k in 0..3 {
-                v[k] = self.getf();
+            for x in v.iter_mut() {
+                *x = self.getf();
             }
         }
         let n = self.getx();
@@ -300,14 +300,7 @@ impl Line {
         for v in [m.roi.dx, m.roi.dy, m.roi.dz] {
             self.puti(i64::from(v));
         }
-        for v in [
-            m.version,
-            m.intent,
-            m.dof,
-            m.brightness,
-            m.yinvert,
-            m.ptype,
-        ] {
+        for v in [m.version, m.intent, m.dof, m.brightness, m.yinvert, m.ptype] {
             self.puti(i64::from(v));
         }
         self.putd(m.outside_val);
@@ -495,8 +488,8 @@ impl Line {
         m.ti = self.getf();
         m.geom.fname = fixed_name(&self.getx(), 1024);
         for v in [&mut m.geom.x, &mut m.geom.y, &mut m.geom.z, &mut m.geom.c] {
-            for k in 0..3 {
-                v[k] = self.getf();
+            for x in v.iter_mut() {
+                *x = self.getf();
             }
         }
         m.geom.ras_good_flag = self.geti();

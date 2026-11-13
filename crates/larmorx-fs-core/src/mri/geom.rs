@@ -165,7 +165,8 @@ impl VolGeom {
         let fb = b.float_fields();
         for k in 0..fa.len() {
             let d = sse::sub32(fa[k], fb[k]).abs();
-            if !(f64::from(d) < t) {
+            // `|a - b| < t` or the field differs (NaN always differs)
+            if f64::from(d).partial_cmp(&t) != Some(std::cmp::Ordering::Less) {
                 return 5 + k as i32;
             }
         }
@@ -176,8 +177,8 @@ impl VolGeom {
     fn float_fields(&self) -> [f32; 18] {
         [
             self.xsize, self.ysize, self.zsize, self.x[0], self.x[1], self.x[2], self.y[0],
-            self.y[1], self.y[2], self.z[0], self.z[1], self.z[2], self.c[0], self.c[1],
-            self.c[2], self.s[0], self.s[1], self.s[2],
+            self.y[1], self.y[2], self.z[0], self.z[1], self.z[2], self.c[0], self.c[1], self.c[2],
+            self.s[0], self.s[1], self.s[2],
         ]
     }
 
@@ -194,8 +195,8 @@ impl Process {
     pub fn vg_assign(&mut self, dst: &mut VolGeom, src: &VolGeom) {
         let reg = dst.register_mat.take();
         let (old_i, old_r) = (dst.i_to_r.take(), dst.r_to_i.take());
-        let stale = (src.i_to_r.is_none() && old_i.is_some())
-            || (src.r_to_i.is_none() && old_r.is_some());
+        let stale =
+            (src.i_to_r.is_none() && old_i.is_some()) || (src.r_to_i.is_none() && old_r.is_some());
         *dst = VolGeom {
             register_mat: reg,
             ..src.clone()
@@ -222,18 +223,13 @@ impl Process {
     }
 
     /// `MRIxfmCRS2XYZ(mri, base, shear)` (§3): the scanner voxel-to-RAS matrix of a geometry.
-    pub fn vox2ras_scanner(
-        &mut self,
-        g: &VolGeom,
-        base: i32,
-        shear: bool,
-    ) -> Result<Matrix, Stop> {
+    pub fn vox2ras_scanner(&mut self, g: &VolGeom, base: i32, shear: bool) -> Result<Matrix, Stop> {
         let mut m = Matrix::zeros(4, 4, MATRIX_REAL);
         for j in 0..3 {
             let cos = g.cosine(j);
             let size = sse::widen(g.size(j));
-            for r in 0..3 {
-                let v = sse::narrow(sse::mul64(sse::widen(cos[r]), size));
+            for (r, &x) in cos.iter().enumerate() {
+                let v = sse::narrow(sse::mul64(sse::widen(x), size));
                 m.set(r as i32 + 1, j as i32 + 1, v);
             }
         }
@@ -381,8 +377,8 @@ impl Process {
     ) -> Result<Returned<Matrix>, Stop> {
         let fill = |m: &mut Matrix| {
             for (j, v) in [g.x, g.y, g.z, g.c].iter().enumerate() {
-                for r in 0..3 {
-                    m.set(r as i32 + 1, j as i32 + 1, v[r]);
+                for (r, &x) in v.iter().enumerate() {
+                    m.set(r as i32 + 1, j as i32 + 1, x);
                 }
             }
             for j in 1..=3 {

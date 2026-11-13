@@ -275,7 +275,9 @@ impl Process {
             if self.mode().reproduce() {
                 self.note(
                     &FS_55,
-                    format!("a volume of type {kind}, which has no size, allocated with the size -1"),
+                    format!(
+                        "a volume of type {kind}, which has no size, allocated with the size -1"
+                    ),
                 );
             } else {
                 self.note(
@@ -476,9 +478,8 @@ impl Process {
     ) -> Result<Returned<Matrix>, Stop> {
         self.fill_helper("MRImatrixOfDirectionCosines", given, |m| {
             for j in 0..3 {
-                let cos = g.cosine(j);
-                for r in 0..3 {
-                    m.set(r as i32 + 1, j as i32 + 1, cos[r]);
+                for (r, &x) in g.cosine(j).iter().enumerate() {
+                    m.set(r as i32 + 1, j as i32 + 1, x);
                 }
             }
             m.set(4, 4, 1.0);
@@ -548,7 +549,10 @@ impl Process {
                 sse::widen(m.at(2, c)),
                 sse::widen(m.at(3, c)),
             );
-            let s = sse::add64(sse::add64(sse::mul64(x, x), sse::mul64(y, y)), sse::mul64(z, z));
+            let s = sse::add64(
+                sse::add64(sse::mul64(x, x), sse::mul64(y, y)),
+                sse::mul64(z, z),
+            );
             *l = sse::sqrt64(s);
         }
         let sizes = [g.xsize, g.ysize, g.zsize];
@@ -569,12 +573,12 @@ impl Process {
             self.put_out(&b);
             self.matrix_print(Some(false), Some(m), 5);
         }
-        for j in 0..3 {
+        for (j, &l) in len.iter().enumerate() {
             let c = j as i32 + 1;
             let v = [
-                sse::narrow(sse::div64(sse::widen(m.at(1, c)), len[j])),
-                sse::narrow(sse::div64(sse::widen(m.at(2, c)), len[j])),
-                sse::narrow(sse::div64(sse::widen(m.at(3, c)), len[j])),
+                sse::narrow(sse::div64(sse::widen(m.at(1, c)), l)),
+                sse::narrow(sse::div64(sse::widen(m.at(2, c)), l)),
+                sse::narrow(sse::div64(sse::widen(m.at(3, c)), l)),
             ];
             match j {
                 0 => g.x = v,
@@ -600,11 +604,7 @@ impl Process {
         m.set(3, 4, sse::narrow(s0));
         let mut p = Matrix::zeros(4, 1, MATRIX_REAL);
         for j in 0..3 {
-            p.set(
-                j as i32 + 1,
-                1,
-                sse::narrow(f64::from(g.extent(j)) / 2.0),
-            );
+            p.set(j as i32 + 1, 1, sse::narrow(f64::from(g.extent(j)) / 2.0));
         }
         p.set(4, 1, 1.0);
         if let Returned::New(c) = self.matrix_multiply(Some(&m), Some(&p), None)? {

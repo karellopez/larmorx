@@ -225,13 +225,16 @@ impl G {
         if special && self.one_in(10) {
             return self.pick(&["00000000", "7fc00000", "bf800000"]).to_owned();
         }
-        self.pick(&["3f800000", "3f000000", "40000000", "3fc00000", "40400000", "3f700000"])
-            .to_owned()
+        self.pick(&[
+            "3f800000", "3f000000", "40000000", "3fc00000", "40400000", "3f700000",
+        ])
+        .to_owned()
     }
 
     /// A string: empty, a name, or one byte.
     fn x(&mut self) -> String {
-        self.pick(&["x", "x6f7269672e6d677a", "x612062", "x41"]).to_owned()
+        self.pick(&["x", "x6f7269672e6d677a", "x612062", "x41"])
+            .to_owned()
     }
 
     /// V: a volume (`types` its voxel types, `hdr` 0 voxels / 1 header / 2 either).
@@ -268,7 +271,14 @@ impl G {
         if self.one_in(5) {
             m = [[H, H, 0.0], [-H, H, 0.0], [0.0, 0.0, 1.0]];
         } else {
-            let perms = [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]];
+            let perms = [
+                [0, 1, 2],
+                [0, 2, 1],
+                [1, 0, 2],
+                [1, 2, 0],
+                [2, 0, 1],
+                [2, 1, 0],
+            ];
             let p = perms[self.below(6) as usize];
             for (j, &axis) in p.iter().enumerate() {
                 m[j][axis] = if self.one_in(2) { 1.0 } else { -1.0 };
@@ -293,12 +303,27 @@ impl G {
             }
         };
         let (w, h, d) = (e(self), e(self), e(self));
-        let sizes = format!("{} {} {}", self.size(special), self.size(special), self.size(special));
+        let sizes = format!(
+            "{} {} {}",
+            self.size(special),
+            self.size(special),
+            self.size(special)
+        );
         let ras = self.int(0, 1);
         let cos = self.cosines(special);
-        let c = format!("{} {} {}", self.f(special), self.f(special), self.f(special));
+        let c = format!(
+            "{} {} {}",
+            self.f(special),
+            self.f(special),
+            self.f(special)
+        );
         let s = if self.one_in(3) {
-            format!("{} {} {}", self.pick(&["00000000", "3c23d70a", "3e4ccccd", "bdcccccd"]), self.pick(&["00000000", "3e4ccccd"]), self.pick(&["00000000", "358637bd", "3c23d70a"]))
+            format!(
+                "{} {} {}",
+                self.pick(&["00000000", "3c23d70a", "3e4ccccd", "bdcccccd"]),
+                self.pick(&["00000000", "3e4ccccd"]),
+                self.pick(&["00000000", "358637bd", "3c23d70a"])
+            )
         } else {
             "00000000 00000000 00000000".to_owned()
         };
@@ -322,8 +347,8 @@ impl G {
     /// M of 4 x 4, or another size with `odd`.
     fn m4(&mut self, special: bool, maybe_null: bool, odd: bool) -> String {
         if odd && self.one_in(3) {
-            let (r, c) = [(3, 3), (4, 5), (5, 5), (5, 4), (4, 3), (4, 1), (3, 4)]
-                [self.below(7) as usize];
+            let (r, c) =
+                [(3, 3), (4, 5), (5, 5), (5, 4), (4, 3), (4, 1), (3, 4)][self.below(7) as usize];
             return self.m(r, c, special, false);
         }
         self.m(4, 4, special, maybe_null)
@@ -343,7 +368,13 @@ impl G {
             return "null".to_owned();
         }
         let n = self.int(0, 3);
-        let mut s = format!("{n} {} {} {} {}", self.x(), self.int(0, 3), self.int(0, 5), self.x());
+        let mut s = format!(
+            "{n} {} {} {} {}",
+            self.x(),
+            self.int(0, 3),
+            self.int(0, 5),
+            self.x()
+        );
         for _ in 0..n {
             if self.one_in(4) {
                 s.push_str(" 0");
@@ -364,7 +395,11 @@ impl G {
                 self.int(0, 500)
             ));
         }
-        let t = if inner { "null".to_owned() } else { self.ct(true) };
+        let t = if inner {
+            "null".to_owned()
+        } else {
+            self.ct(true)
+        };
         s.push(' ');
         s.push_str(&t);
         s
@@ -389,7 +424,14 @@ impl G {
             s.push(' ');
             s.push_str(&self.f(true));
         }
-        s.push_str(&format!(" {} {} {} {} {}", self.d(true), self.f(false), self.f(false), self.f(false), self.x()));
+        s.push_str(&format!(
+            " {} {} {} {} {}",
+            self.d(true),
+            self.f(false),
+            self.f(false),
+            self.f(false),
+            self.x()
+        ));
         s.push(' ');
         s.push_str(&self.cosines(false));
         for _ in 0..3 {
@@ -495,20 +537,84 @@ const ALL_TYPES: &[i32] = &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
 
 const ALLOC: &[(&str, Make)] = &[
     ("alloc", |g| g.v(ALL_TYPES, 2, true)),
-    ("alloc", |g| format!("{} {} {} {} {} 1", g.int(1, 2), g.int(1, 2), g.int(1, 2), g.int(0, 10), g.int(-1, 2))),
-    ("allocvg", |g| format!("{} {} 1 {}", g.g(true), g.pick(&["0", "3", "4"]), g.int(0, 1))),
-    ("fromvg", |g| format!("{} {} 1 {}", g.g(true), g.pick(&["0", "3", "4"]), g.int(0, 1))),
+    ("alloc", |g| {
+        format!(
+            "{} {} {} {} {} 1",
+            g.int(1, 2),
+            g.int(1, 2),
+            g.int(1, 2),
+            g.int(0, 10),
+            g.int(-1, 2)
+        )
+    }),
+    ("allocvg", |g| {
+        format!(
+            "{} {} 1 {}",
+            g.g(true),
+            g.pick(&["0", "3", "4"]),
+            g.int(0, 1)
+        )
+    }),
+    ("fromvg", |g| {
+        format!(
+            "{} {} 1 {}",
+            g.g(true),
+            g.pick(&["0", "3", "4"]),
+            g.int(0, 1)
+        )
+    }),
     ("free2", |g| g.v(SIZED, 2, false)),
     ("sizeof", |g| format!("{}", g.int(-1, 12))),
-    ("intent", |g| format!("{} {}", g.int(-1, 6), g.pick(&["x4d5249", "x5348415045", "x57415250", "x"]))),
+    ("intent", |g| {
+        format!(
+            "{} {}",
+            g.int(-1, 6),
+            g.pick(&["x4d5249", "x5348415045", "x57415250", "x"])
+        )
+    }),
 ];
 
 const MATRICES: &[(&str, Make)] = &[
-    ("xfm", |g| format!("{} {} {} {} {}", g.v(SIZED, 1, false), g.g(true), g.int(0, 1), g.int(0, 1), g.m4(true, true, true))),
-    ("+gdiag=10000 xfm", |g| format!("{} {} {} 1 {}", g.v(SIZED, 1, false), g.g(true), g.int(0, 1), g.m4(false, true, false))),
-    ("setv2r", |g| format!("{} {} {}", g.v(SIZED, 1, false), g.g(true), g.m4(true, false, true))),
-    ("p0", |g| format!("{} {} {} {} {}", g.v(SIZED, 1, false), g.g(true), g.d(true), g.d(true), g.d(true))),
-    ("reinit", |g| format!("{} {}", g.v(SIZED, 1, false), g.g(true))),
+    ("xfm", |g| {
+        format!(
+            "{} {} {} {} {}",
+            g.v(SIZED, 1, false),
+            g.g(true),
+            g.int(0, 1),
+            g.int(0, 1),
+            g.m4(true, true, true)
+        )
+    }),
+    ("+gdiag=10000 xfm", |g| {
+        format!(
+            "{} {} {} 1 {}",
+            g.v(SIZED, 1, false),
+            g.g(true),
+            g.int(0, 1),
+            g.m4(false, true, false)
+        )
+    }),
+    ("setv2r", |g| {
+        format!(
+            "{} {} {}",
+            g.v(SIZED, 1, false),
+            g.g(true),
+            g.m4(true, false, true)
+        )
+    }),
+    ("p0", |g| {
+        format!(
+            "{} {} {} {} {}",
+            g.v(SIZED, 1, false),
+            g.g(true),
+            g.d(true),
+            g.d(true),
+            g.d(true)
+        )
+    }),
+    ("reinit", |g| {
+        format!("{} {}", g.v(SIZED, 1, false), g.g(true))
+    }),
 ];
 
 fn vox_ops(g: &mut G, n: i64) -> String {
@@ -516,18 +622,31 @@ fn vox_ops(g: &mut G, n: i64) -> String {
     for _ in 0..n {
         let at = |g: &mut G| {
             if g.one_in(5) {
-                format!("{} {} {} {}", g.int(-1, 4), g.int(-1, 4), g.int(-1, 4), g.int(-1, 2))
+                format!(
+                    "{} {} {} {}",
+                    g.int(-1, 4),
+                    g.int(-1, 4),
+                    g.int(-1, 4),
+                    g.int(-1, 2)
+                )
             } else {
                 format!("{} {} {} 0", g.int(0, 2), g.int(0, 2), g.int(0, 2))
             }
         };
         match g.below(5) {
-            0 | 1 => s.push_str(&format!(" get {} {}", at(g), g.pick(&["0", "0", "0", "1", "1", "2"]))),
+            0 | 1 => s.push_str(&format!(
+                " get {} {}",
+                at(g),
+                g.pick(&["0", "0", "0", "1", "1", "2"])
+            )),
             2 | 3 => s.push_str(&format!(
                 " set {} {} {}",
                 at(g),
                 g.pick(&["0", "0", "1"]),
-                g.pick(&["437f8000", "c3000000", "4f000000", "cf000000", "7fc00000", "3fc00000", "bfc00000", "5f000000", "477fff00"])
+                g.pick(&[
+                    "437f8000", "c3000000", "4f000000", "cf000000", "7fc00000", "3fc00000",
+                    "bfc00000", "5f000000", "477fff00"
+                ])
             )),
             _ => s.push_str(&format!(" {} {}", g.pick(&["dx", "dy", "dz"]), at(g))),
         }
@@ -565,10 +684,16 @@ const HEADERS: &[(&str, Make)] = &[
     }),
     ("copyxfm", |g| {
         let a = g.xfm();
-        let b = if g.one_in(3) { "new".to_owned() } else { g.xfm() };
+        let b = if g.one_in(3) {
+            "new".to_owned()
+        } else {
+            g.xfm()
+        };
         format!("{a} {b}")
     }),
-    ("pulse", |g| format!("{} {} {} {}", g.d(true), g.f(true), g.f(true), g.f(true))),
+    ("pulse", |g| {
+        format!("{} {} {} {}", g.d(true), g.f(true), g.f(true), g.f(true))
+    }),
     ("ctab", |g| format!("{} {}", g.ct(false), g.int(0, 1))),
     ("ctabnull", |_| String::new()),
 ];
@@ -576,16 +701,39 @@ const HEADERS: &[(&str, Make)] = &[
 const GEOMETRY: &[(&str, Make)] = &[
     ("vgcopy", |g| g.gf()),
     ("vgassign", |g| format!("{} {}", g.gf(), g.gf())),
-    ("usevg", |g| format!("{} {} {}", g.g(true), g.v(SIZED, 1, false), g.g(true))),
-    ("vgtomri", |g| format!("{} {} {}", g.g(true), g.v(SIZED, 1, false), g.g(true))),
-    ("vgfrommri", |g| format!("{} {} {}", g.v(SIZED, 1, false), g.g(true), g.g(true))),
+    ("usevg", |g| {
+        format!("{} {} {}", g.g(true), g.v(SIZED, 1, false), g.g(true))
+    }),
+    ("vgtomri", |g| {
+        format!("{} {} {}", g.g(true), g.v(SIZED, 1, false), g.g(true))
+    }),
+    ("vgfrommri", |g| {
+        format!("{} {} {}", g.v(SIZED, 1, false), g.g(true), g.g(true))
+    }),
     ("sphinx", |g| g.g(true)),
-    ("tomat", |g| format!("{} {}", g.g(true), g.m4(true, true, true))),
+    ("tomat", |g| {
+        format!("{} {}", g.g(true), g.m4(true, true, true))
+    }),
 ];
 
 const TKREG: &[(&str, Make)] = &[
-    ("tkreg", |g| format!("{} {} {} {}", g.v(SIZED, 1, false), g.g(true), g.int(0, 1), g.int(0, 1))),
-    ("ras2s", |g| format!("{} {} {}", g.v(SIZED, 1, false), g.g(true), g.m4(true, true, true))),
+    ("tkreg", |g| {
+        format!(
+            "{} {} {} {}",
+            g.v(SIZED, 1, false),
+            g.g(true),
+            g.int(0, 1),
+            g.int(0, 1)
+        )
+    }),
+    ("ras2s", |g| {
+        format!(
+            "{} {} {}",
+            g.v(SIZED, 1, false),
+            g.g(true),
+            g.m4(true, true, true)
+        )
+    }),
     ("crs1", |g| g.m4(false, true, true)),
 ];
 
@@ -620,15 +768,42 @@ const REGISTRATIONS: &[(&str, Make)] = &[
         let sp = g.one_in(6);
         format!("{v} {}", g.m4(sp, true, true))
     }),
-    ("fixtk", |g| format!("{} {} {} {}", g.v(SIZED, 1, false), g.g(true), g.int(0, 99), g.m4(false, true, true))),
+    ("fixtk", |g| {
+        format!(
+            "{} {} {} {}",
+            g.v(SIZED, 1, false),
+            g.g(true),
+            g.int(0, 99),
+            g.m4(false, true, true)
+        )
+    }),
     ("fsl2tk", |g| {
-        let t = g.pick(&["x4e49465449", "x4e494654495f4741", "x4e494654495f505a", "x414e414c595a45", "unset"]);
-        let m = if g.one_in(8) { "null".to_owned() } else { g.m4(false, false, true) };
+        let t = g.pick(&[
+            "x4e49465449",
+            "x4e494654495f4741",
+            "x4e494654495f505a",
+            "x414e414c595a45",
+            "unset",
+        ]);
+        let m = if g.one_in(8) {
+            "null".to_owned()
+        } else {
+            g.m4(false, false, true)
+        };
         format!("{t} {} {m}", two_volumes(g))
     }),
     ("tk2fsl", |g| {
-        let t = g.pick(&["x4e49465449", "x4e494654495f4741", "x414e414c595a45", "unset"]);
-        let m = if g.one_in(8) { "null".to_owned() } else { g.m4(false, false, true) };
+        let t = g.pick(&[
+            "x4e49465449",
+            "x4e494654495f4741",
+            "x414e414c595a45",
+            "unset",
+        ]);
+        let m = if g.one_in(8) {
+            "null".to_owned()
+        } else {
+            g.m4(false, false, true)
+        };
         format!("{t} {} {m}", two_volumes(g))
     }),
 ];
@@ -640,13 +815,21 @@ const COORDS: &[(&str, Make)] = &[("v2w", |g| {
     let n = g.int(1, 4);
     let mut s = format!("{v} {geo} {cache} {n}");
     for _ in 0..n {
-        s.push_str(&format!(" {} {} {} {}", g.d(true), g.d(true), g.d(true), g.int(0, 1)));
+        s.push_str(&format!(
+            " {} {} {} {}",
+            g.d(true),
+            g.d(true),
+            g.d(true),
+            g.int(0, 1)
+        ));
     }
     s
 })];
 
 const PRINTING: &[(&str, Make)] = &[
-    ("vgprint", |g| format!("{} {} {}", g.g(true), g.int(0, 1), g.int(0, 1))),
+    ("vgprint", |g| {
+        format!("{} {} {}", g.g(true), g.int(0, 1), g.int(0, 1))
+    }),
     ("vgeq", |g| {
         let a = g.g(false);
         let b = if g.one_in(2) { a.clone() } else { g.g(false) };
@@ -663,16 +846,34 @@ const PRINTING: &[(&str, Make)] = &[
             g.int(0, 1)
         )
     }),
-    ("shearless", |g| format!("{} {}", g.v(SIZED, 1, false), g.g(true))),
+    ("shearless", |g| {
+        format!("{} {}", g.v(SIZED, 1, false), g.g(true))
+    }),
 ];
 
 const NAMES: &[(&str, Make)] = &[
     ("codes", |g| {
         format!(
             "{} {} {} {}",
-            g.pick(&["x6e656172657374", "x54524931", "x746c69", "x53696e63", "x637562", "x6e65", "x"]),
+            g.pick(&[
+                "x6e656172657374",
+                "x54524931",
+                "x746c69",
+                "x53696e63",
+                "x637562",
+                "x6e65",
+                "x"
+            ]),
             g.int(-1, 6),
-            g.pick(&["x7563686172", "x53484f5254", "x7573687274", "x696e74", "x6c6f6e67", "x666c6f6174", "x666c"]),
+            g.pick(&[
+                "x7563686172",
+                "x53484f5254",
+                "x7573687274",
+                "x696e74",
+                "x6c6f6e67",
+                "x666c6f6174",
+                "x666c"
+            ]),
             g.int(-1, 11)
         )
     }),
@@ -696,25 +897,41 @@ const COPIES: &[(&str, Make)] = &[("copy", |g| {
     let h_fields = g.h();
     let dst = match g.below(8) {
         0 | 1 => "none".to_owned(),
-        2 => format!("{} {} {}", g.v(SIZED, 2, false), g.int(-1, 255), g.int(0, 3)),
+        2 => format!(
+            "{} {} {}",
+            g.v(SIZED, 2, false),
+            g.int(-1, 255),
+            g.int(0, 3)
+        ),
         _ => {
             let t2 = SIZED[g.below(SIZED.len() as u64) as usize];
             let dh = if g.one_in(8) { 1 } else { 0 };
-            format!("{w} {h} {d} {t2} {nf} {dh} {} {}", g.int(-1, 255), g.int(0, 3))
+            format!(
+                "{w} {h} {d} {t2} {nf} {dh} {} {}",
+                g.int(-1, 255),
+                g.int(0, 3)
+            )
         }
     };
     format!("{w} {h} {d} {t} {nf} {hdr} {seed} {h_fields} {dst}")
 })];
 
-const BBOX: &[(&str, Make)] = &[(
-    "bbox",
-    |g| format!("{} {}", g.b(), g.pick(&["70", "0", "-1", "255", "2147483647"])),
-)];
+const BBOX: &[(&str, Make)] = &[("bbox", |g| {
+    format!(
+        "{} {}",
+        g.b(),
+        g.pick(&["70", "0", "-1", "255", "2147483647"])
+    )
+})];
 
 const LTA: &[(&str, Make)] = &[
     ("ltaalloc", |g| {
         let n = g.int(-1, 2);
-        let m = if g.one_in(2) { "none".to_owned() } else { g.b() };
+        let m = if g.one_in(2) {
+            "none".to_owned()
+        } else {
+            g.b()
+        };
         format!("{n} {m}")
     }),
     ("ltacopy", |g| {
@@ -732,7 +949,11 @@ const LTA: &[(&str, Make)] = &[
     }),
     ("ltcopy", |g| {
         let a = g.lta(1);
-        let d = if g.one_in(4) { "null".to_owned() } else { g.lta(1) };
+        let d = if g.one_in(4) {
+            "null".to_owned()
+        } else {
+            g.lta(1)
+        };
         format!("{a} {d}")
     }),
     ("ltafreenull", |_| String::new()),

@@ -48,7 +48,10 @@ pub fn precision_code(name: &[u8]) -> i32 {
 
 /// `MRIprecisionString(code)` (§12): the name, or none.
 pub fn precision_string(code: i32) -> Option<&'static str> {
-    PRECISIONS.iter().find(|&&(_, c)| c == code).map(|&(p, _)| p)
+    PRECISIONS
+        .iter()
+        .find(|&&(_, c)| c == code)
+        .map(|&(p, _)| p)
 }
 
 /// A volume's shape (`MRI::Shape`, §15): width, height, depth and frames; equal when those

@@ -46,10 +46,7 @@ fn fs58_volume_without_voxels_both_modes() {
     for mode in [Fix, Reproduce] {
         let mut p = proc(mode);
         let mut h = p.mri_alloc_header(2, 2, 2, types::FLOAT, 1).unwrap();
-        assert_eq!(
-            p.mri_get_vox_val(&h, 0, 0, 0, 0, 0),
-            Err(Stop::Exit(252))
-        );
+        assert_eq!(p.mri_get_vox_val(&h, 0, 0, 0, 0, 0), Err(Stop::Exit(252)));
         assert_eq!(
             p.mri_set_vox_val(&mut h, 0, 0, 0, 0, 1.0, 0),
             Err(Stop::Exit(252))
@@ -79,7 +76,11 @@ fn fs52_fs53_outside_the_volume() {
         assert_eq!(v, if mode.reproduce() { 3.0 } else { 9.0 });
         assert!(noted(&p, "FS-52"));
         p.mri_set_vox_val(&mut m, 2, 0, 0, 0, 7.0, 0).unwrap();
-        let want: &[u8] = if mode.reproduce() { &[1, 2, 7, 4] } else { &[1, 2, 3, 4] };
+        let want: &[u8] = if mode.reproduce() {
+            &[1, 2, 7, 4]
+        } else {
+            &[1, 2, 3, 4]
+        };
         assert_eq!(m.voxels.as_deref(), Some(want));
         // beyond the buffer (FS-53): outside_val, or 0 with reproduce; nothing written
         let v = p.mri_get_vox_val(&m, 1, 5, 0, 0, 0).unwrap();
@@ -103,13 +104,27 @@ fn fs54_long_voxels() {
         let v1 = i64::from_le_bytes(v[8..16].try_into().unwrap());
         assert_eq!(v1, -5);
         // FreeSurfer also stores the int into the high half of voxel 0
-        assert_eq!(v0, if mode.reproduce() { -5i64 << 32 & !0xffff_ffff } else { 0 });
+        assert_eq!(
+            v0,
+            if mode.reproduce() {
+                -5i64 << 32 & !0xffff_ffff
+            } else {
+                0
+            }
+        );
         assert!(noted(&p, "FS-54"));
         // beyond the int range: the long range by default, -2^31 with reproduce
         p.mri_set_vox_val(&mut m, 0, 0, 0, 0, 1e10, 0).unwrap();
         let v = m.voxels.clone().unwrap();
         let v0 = i64::from_le_bytes(v[0..8].try_into().unwrap());
-        assert_eq!(v0, if mode.reproduce() { -2147483648 } else { 10_000_000_000 });
+        assert_eq!(
+            v0,
+            if mode.reproduce() {
+                -2147483648
+            } else {
+                10_000_000_000
+            }
+        );
     }
 }
 
@@ -122,7 +137,9 @@ fn fs55_types_without_a_size() {
     );
     assert!(noted(&p, "FS-55"));
     let mut p = proc(Reproduce);
-    let m = p.mri_alloc_header(2, 2, 2, types::DOUBLE_COMPLEX, 1).unwrap();
+    let m = p
+        .mri_alloc_header(2, 2, 2, types::DOUBLE_COMPLEX, 1)
+        .unwrap();
     assert_eq!(m.bytes_per_vox, u64::MAX);
     assert_eq!(m.bytes_total, 8u64.wrapping_mul(u64::MAX));
     assert_eq!(
@@ -232,7 +249,12 @@ fn fs162_narrowing_conversions() {
     for mode in [Fix, Reproduce] {
         let mut p = proc(mode);
         let mut src = p.mri_alloc_sequence(2, 1, 1, types::FLOAT, 1).unwrap();
-        src.voxels = Some([40000.0f32, -5.0].iter().flat_map(|v| v.to_le_bytes()).collect());
+        src.voxels = Some(
+            [40000.0f32, -5.0]
+                .iter()
+                .flat_map(|v| v.to_le_bytes())
+                .collect(),
+        );
         let mut dst = p.mri_alloc_sequence(2, 1, 1, types::SHORT, 1).unwrap();
         p.mri_copy(&src, Some(&mut dst)).unwrap();
         let v = dst.voxels.clone().unwrap();
@@ -251,13 +273,19 @@ fn fs163_destination_of_another_extent() {
     let mut p = proc(Fix);
     let src = p.mri_alloc_sequence(2, 2, 2, types::UCHAR, 1).unwrap();
     let mut dst = p.mri_alloc_sequence(3, 3, 3, types::UCHAR, 1).unwrap();
-    assert_eq!(p.mri_copy(&src, Some(&mut dst)).map(|_| ()), Err(Stop::Exit(252)));
+    assert_eq!(
+        p.mri_copy(&src, Some(&mut dst)).map(|_| ()),
+        Err(Stop::Exit(252))
+    );
     assert!(noted(&p, "FS-163"));
     // reproduce: FreeSurfer's placement, the error where a row would not land inside
     let mut p = proc(Reproduce);
     assert!(p.mri_copy(&src, Some(&mut dst)).is_ok());
     let mut small = p.mri_alloc_sequence(2, 1, 1, types::UCHAR, 1).unwrap();
-    assert_eq!(p.mri_copy(&src, Some(&mut small)).map(|_| ()), Err(Stop::Exit(252)));
+    assert_eq!(
+        p.mri_copy(&src, Some(&mut small)).map(|_| ()),
+        Err(Stop::Exit(252))
+    );
     assert!(noted(&p, "FS-163"));
 }
 
@@ -334,7 +362,10 @@ fn fs264_matrices_of_another_size_both_modes() {
         let mut p = proc(mode);
         let mut g = geom(4, 4, 4, 1.0);
         let small = Matrix::zeros(3, 3, MATRIX_REAL);
-        assert_eq!(p.set_vox2ras_from_matrix(&mut g, &small), Err(Stop::Exit(252)));
+        assert_eq!(
+            p.set_vox2ras_from_matrix(&mut g, &small),
+            Err(Stop::Exit(252))
+        );
         let mut col = Matrix::zeros(4, 1, MATRIX_REAL);
         assert!(p.matrix_of_voxel_sizes(&g, Some(&mut col)).is_err());
         assert!(p.vg_to_matrix(&g, Some(&mut col)).is_err());
@@ -358,7 +389,10 @@ fn fs331_tkregister_matrix_into_a_larger_one() {
     };
     let mut wide = Matrix::zeros(4, 5, MATRIX_REAL);
     wide.set(1, 5, 9.0);
-    assert_eq!(p.tkreg_to_scanner(&g, Some(&mut wide)).unwrap(), Returned::Output);
+    assert_eq!(
+        p.tkreg_to_scanner(&g, Some(&mut wide)).unwrap(),
+        Returned::Output
+    );
     for r in 1..=4 {
         for c in 1..=4 {
             assert_eq!(wide.at(r, c), want.at(r, c));
@@ -369,8 +403,14 @@ fn fs331_tkregister_matrix_into_a_larger_one() {
     // reproduce: FreeSurfer's inverse and product into the given matrix; five rows refused
     let mut p = proc(Reproduce);
     let mut tall = Matrix::zeros(5, 5, MATRIX_REAL);
-    assert_eq!(p.tkreg_to_scanner(&g, Some(&mut tall)).unwrap(), Returned::Nothing);
+    assert_eq!(
+        p.tkreg_to_scanner(&g, Some(&mut tall)).unwrap(),
+        Returned::Nothing
+    );
     let mut wide = Matrix::zeros(4, 5, MATRIX_REAL);
-    assert_eq!(p.tkreg_to_scanner(&g, Some(&mut wide)).unwrap(), Returned::Output);
+    assert_eq!(
+        p.tkreg_to_scanner(&g, Some(&mut wide)).unwrap(),
+        Returned::Output
+    );
     assert!(noted(&p, "FS-331"));
 }

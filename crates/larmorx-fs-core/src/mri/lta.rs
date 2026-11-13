@@ -216,7 +216,10 @@ impl Process {
             }
             (Some(s), None) => {
                 if reproduce {
-                    self.note(&FS_196, "a missing destination matrix stayed missing (FreeSurfer's copy)");
+                    self.note(
+                        &FS_196,
+                        "a missing destination matrix stayed missing (FreeSurfer's copy)",
+                    );
                 } else {
                     self.note(&FS_196, "the source's matrix copied into a missing one");
                     *dst = Some(s.clone());
@@ -289,7 +292,11 @@ impl Process {
         }
         d.kind = lta.kind;
         d.fscale = lta.fscale;
-        let end = lta.subject.iter().position(|&b| b == 0).unwrap_or(lta.subject.len());
+        let end = lta
+            .subject
+            .iter()
+            .position(|&b| b == 0)
+            .unwrap_or(lta.subject.len());
         d.subject = lta.subject[..end].to_vec();
         for i in 0..lta.xforms.len() {
             self.lt_copy(&lta.xforms[i], Some(&mut d.xforms[i]));

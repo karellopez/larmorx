@@ -1,0 +1,16 @@
+[package]
+name = "fs-misc"
+description = "larmorx-core's miniz inflater (miniz 1.15 r4), FNV-1a, libtiff's message handlers and NrrdIO's and Cephes' constants against miniz 1.15 r4 and FreeSurfer 8.2.0's copies, compiled by the unit oracle's GCC 8.4.0"
+version = "0.0.1"
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+
+# Its own workspace: a measurement tool, never part of larmorx's build.
+[workspace]
+
+[dependencies]
+larmorx-core = { path = "../../../crates/larmorx-core" }
+
+[profile.release]
+debug = false

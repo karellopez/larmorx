@@ -226,6 +226,66 @@ Where FreeSurfer calls them (the call sites the cards name):
   4, `std::map` order: "inputs", "measures", "names"; numbers by Grisu2). `fsPointSet::save`
   writes its JSON by hand with `std::ofstream` (not this library).
 
+## miniz, libtiff, NrrdIO, Cephes and the FNV hash (item 3.1-18); argparse (item 3.1-21)
+
+What the queue's reach numbers (`docs/freesurfer/code.toml`, the call graph's foundations) count for
+these files, checked against the build (relay 8, 2026-11-13; the call graph:
+`validation/investigations/freesurfer-inventory/callgraph.py --core --why`):
+
+- **miniz** (`packages/dcm2niix/miniz.c`, 65 programs by the call graph): the call graph resolves
+  `compress2` in `gifti_xml.c` (`ewrite_data`) and `uncompress` in `utils/matfile.cpp`
+  (`znzMatReadHeader`) to miniz's `#define compress2 mz_compress2` and `#define uncompress
+  mz_uncompress`; but those macros live only inside `nii_dicom_batch.cpp`, the one file that
+  includes `miniz.c` (with `MiniZ` defined, as FreeSurfer's build does: `BUILD_SCRIBBLE` off), and
+  the official programs import `compress2`, `deflate`, `inflate` from the system's zlib (`nm -D
+  mri_cc`). miniz's code is linked into every program with dcm2niix (the wrapper reaches
+  `nii_dicom_batch.cpp`), and runs on one path: `geProtocolBlock` (GE's gzip-compressed protocol
+  block, read when dcm2niix converts a GE DICOM series: `mz_inflateInit2(-15)`, one
+  `mz_inflate(MZ_SYNC_FLUSH)` with the whole block after its gzip header and before its 8-byte
+  trailer, `avail_out` the trailer's ISIZE, success only on `MZ_STREAM_END`, the CRC never
+  checked). miniz's compressor runs only in dcm2niix's writers (`writeNiiGz`, the MGH and JNIfTI
+  writers) when `opts.isGz` is set, which `dcm2niix_fswrapper` sets false: never in FreeSurfer.
+  So only the inflater is ported (`larmorx_core::miniz`). FreeSurfer's copy is miniz 1.15 r4
+  (GitHub richgel999/miniz commit 28f5066e, 2013-10-14) with a 5-line note on top, three comment
+  spellings and three `#pragma unused` lines in the ZIP functions (`diff`).
+- **libtiff** (`tif_error.c`, `tif_unix.c`, `tif_fax3.c`, 7 programs): the call graph matches
+  `extension(...)` in `mri_cc.cpp`'s `find_corpus_callosum` to `tif_fax3.c`'s file-local macro
+  `#define extension(a0) Fax3Extension(module, tif, a0)`: not a call. libtiff runs only when a
+  program reads a TIFF volume (`mri_read`'s TIFF type), an unused format. FreeSurfer's three files
+  are libtiff 3.6.1's (`diff`: identical); its `tiffvers.h` says 3.6.1 (2003-12-26).
+- **NrrdIO** (`754.c`'s `airFloatQNaN`, 65 programs): reached through `AIR_NAN` in
+  `simple.c`'s `ERROR` macro, which the call graph matches to MINC's `ERROR` in
+  `minc_volume_io.c`: not a call. NrrdIO runs only reading NRRD files (unused). FreeSurfer
+  builds it with `TEEM_QNANHIBIT=1` (its CMake file); its NrrdIO is Teem 1.9.0's.
+- **Cephes** (`const.c`'s `PI`, 65 programs): `utils/mri.cpp` (`ham_sinc`) writes `PI`, which
+  FreeSurfer's `include/const.h` defines as `M_PI`; the call graph matched it to Cephes' global
+  `double PI`. No Cephes function is on a default path. The global's bits are `M_PI`'s
+  (0x400921fb54442d18, the probe): nothing to port.
+- **FNV** (`include/fnv_hash.h`, 39 programs; `include/fnvhash.h`, 65): both are FreeSurfer's
+  files, not a third party's: `fnv_hash.h` carries MGH's FreeSurfer notice ("Original Author:
+  Bevin Brett", 2021), `fnvhash.h` no notice. They implement FNV-1a with the 32-bit offset basis
+  and prime in an `unsigned long` (64 bits on Linux: the multiplication wraps modulo 2^64, the
+  high bits carry on). Callers: `utils/mrisurf.cpp`'s surface hashes (`fnv_init`, `fnv_add` over
+  the vertices', faces' and surface's members), `utils/mrisurf_metricProperties_slow.h`'s
+  `fnv_hash(trial, k, &random_counter, -RAN, RAN)` (FreeSurfer's own mapping of the hash of three
+  `unsigned int`s to a float in [LO, HI]: `(double)(hash & 0xffffffff) / (double)0xffffffff`, then
+  `(float)((HI-LO)*f + LO)`), and `utils/gcamorph.cpp`'s `__m3zWrite` (`FnvHash::add` over the
+  morph's data; `FnvHash::write` writes the decimal value and `std::endl`). larmorx-core has the
+  algorithm (`larmorx_core::fnv::fnv1a_32_wide`, from FNV's public description); `fnv_hash`'s
+  float mapping and `FnvHash::write`'s file are FreeSurfer's: track A's, in crates-freesurfer.
+  The audit's TP-13 calls both files the FNV hash (public domain): the algorithm is; the files
+  are FreeSurfer's.
+- **argparse** (`include/argparse.h`, `utils/argparse.cpp`, 7 programs): "contains code that was
+  derived from the ArgumentParser project by Hilton Bristow" (BSD-3-Clause). Measured against
+  Bristow's last commit (github.com/hbristow/argparse 43edb8ac, `argparse.hpp`, 434 lines):
+  923 of FreeSurfer's 3,968 tokens (23 %; comments and layout ignored; the tool
+  `<scratch>/C/tools/toksim.py` of relays 3 and 6) are in the same order as Bristow's 2,904. The
+  shared part is the class's shape (the `Any` holder, `insertArgument`'s index map, `retrieve`);
+  the behaviour a caller sees (argument types and their checks, `stob`, the XML help, the error
+  messages through `log.h`'s `fs::fatal`, `exists`, `strip`/`unstrip`) is FreeSurfer's. So item
+  3.1-21 is FreeSurfer's code: its replica belongs in crates-freesurfer (track A); a port of
+  Bristow's upstream alone would serve no program. Relay 8 ported nothing of it (handoff).
+
 ## The probes that name FreeSurfer's internals (for the clean-room audit's restriction table)
 
 `validation/probes/fs-vnl` (its shim's comments: FreeSurfer's call sites and flags),
@@ -234,5 +294,6 @@ Where FreeSurfer calls them (the call sites the cards name):
 `validation/probes/fs-minc-nifti` (`ProbeFs`, `Flavour::FreeSurfer`: FreeSurfer's copies' changes)
 `validation/probes/fs-gifti` (`dialect.rs`: FreeSurfer's two GIFTI changes) and
 `validation/probes/fs-dicom` (`port.rs`'s `FsDialect`: FreeSurfer's changes to CTN) and
-`validation/probes/fs-json` (`FsDialect`: its `json.h`'s messages) are closed to
+`validation/probes/fs-json` (`FsDialect`: its `json.h`'s messages) and
+`validation/probes/fs-misc` (`facts.cpp` includes FreeSurfer's FNV headers) are closed to
 FreeSurfer's clean-room implementers, as this file is.

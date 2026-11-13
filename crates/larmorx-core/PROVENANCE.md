@@ -602,3 +602,29 @@ Original code (Apache-2.0).
   doubles printed, recorded on Linux x86-64, also under the AArch64 NaN trap, debug and release);
   the differential probe `validation/probes/fs-json` against nlohmann/json 3.2.0 and the copy the
   unit oracle's GCC 8.4.0 compiles (README there).
+
+## miniz's inflater, the FNV hash, libtiff's messages, NrrdIO's constants (FreeSurfer's foundations, item 3.1-18, 2026-11-13)
+
+| larmorx file | Upstream | Licence |
+|---|---|---|
+| `src/miniz.rs` | miniz 1.15 r4 (`miniz.c`: `tinfl_decompress` with its macros `TINFL_GET_BYTE`, `TINFL_NEED_BITS`, `TINFL_GET_BITS`, `TINFL_SKIP_BITS`, `TINFL_HUFF_BITBUF_FILL`, `TINFL_HUFF_DECODE`; `inflate_state`, `mz_inflateInit2`, `mz_inflateInit`, `mz_inflate`, `mz_inflateEnd`, `mz_uncompress`, `mz_error`) | public domain (the Unlicense; Rich Geldreich) |
+| `src/miniz/streams.rs`, `src/miniz/tests.rs` | larmorx's own deflate writer for the checks (RFC 1950, RFC 1951) | Apache-2.0 |
+| `src/fnv.rs` | the FNV-1a algorithm (Fowler, Noll, Vo; Noll's FNV page and `draft-eastlake-fnv`: written from the description) | public domain |
+| `src/libtiff.rs` | libtiff 3.6.1 (`tif_error.c`, `tif_warning.c`, `tif_unix.c`'s `unixErrorHandler` and `unixWarningHandler`) | libtiff's notice (Sam Leffler, Silicon Graphics; `LICENSES/libtiff.txt`) |
+| `src/nrrdio.rs` | NrrdIO 1.9.0 (Teem's `754.c`: `airFloatQNaN`, `airFloatSNaN`, `airFloatPosInf`, `airFloatNegInf` with `TEEM_QNANHIBIT=1`) | Zlib (Gordon Kindlmann, the University of Utah) |
+
+- miniz 1.15 r4 is GitHub richgel999/miniz commit 28f5066e332590c8a68fa4870e89233e72ce7a44
+  (2013-10-14; the repository has no v1.15 tag), pinned in `<workspace>/tags/miniz-1.15r4`
+  (GitHub's archive of the commit, SHA-256
+  fd4502d4dd563a2de8df3b6ba6ec101ff55992e3b779586dd28d987b1238e45a). libtiff 3.6.1 is
+  `tiff-v3.6.1.tar.gz` (download.osgeo.org/libtiff/old, SHA-256
+  538c6302bb2426a69d25e45dcb5e5b11d7235cf497368651b2d6c92612dbf83f), pinned in
+  `<workspace>/tags/libtiff-3.6.1`. NrrdIO 1.9.0's constants are bit patterns, checked against a
+  build of it (the probe).
+- Kept from the C: the decoder's resumption points and read-ahead (the bytes taken from each
+  piece of input, `total_in`), the 64-bit bit buffer, the dictionary's copy-out, every return
+  code, the adler-32 of the output in blocks of 5,552 bytes. Changed only where the C cannot
+  define a result, with D13 switches: FS-281 to FS-284 (`docs/findings/miniz-inflate.md`).
+- Checks: `src/miniz/tests.rs`, `src/fnv.rs`'s and `src/libtiff.rs`'s tests (digests recorded on
+  Linux x86-64), and the differential probe `validation/probes/fs-misc` against miniz 1.15 r4
+  and the copies the unit oracle's GCC 8.4.0 compiles (README there).

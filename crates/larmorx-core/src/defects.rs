@@ -1057,6 +1057,14 @@ defects! {
         "a fragment of encapsulated pixel data whose length is odd (or over the remaining count) closes the object, and the reader then writes through the closed object: the program crashes";
     FS_99 = "FS-99", "nlohmann/json", true,
         "the pretty printer's indent string (512 characters) is doubled once, with spaces, when an indent passes it (past 512 characters a tab indent becomes spaces; an indent more than twice the string's length is read past its memory), and the writer and the value's destructor recurse once per nesting level: a value nested deeply enough exhausts the stack";
+    FS_281 = "FS-281", "miniz 1.15", true,
+        "a deflate stream that ends early, read with no more input to come (the zlib stream API's MZ_FINISH, mz_uncompress), is padded with zero bytes, which are decoded as if they were the stream's: a truncated stream can be accepted with bytes it never held";
+    FS_282 = "FS-282", "miniz 1.15", true,
+        "the length symbols 286 and 287 and the distance symbols 30 and 31, which deflate does not define, are accepted: such a length copies 3 bytes and moves the output by 3 (past the end of the buffer when fewer than 3 bytes are left), such a distance copies the byte under the cursor";
+    FS_283 = "FS-283", "miniz 1.15", true,
+        "a Huffman code with no codes or a single code is accepted whatever its length, and a bit pattern it gives no symbol to is decoded as symbol 0 (from the lookup table without taking any bits)";
+    FS_284 = "FS-284", "miniz 1.15", true,
+        "in the zlib-style stream API, a match farther back than the output so far (or of distance 0 before 32 KiB were output) copies from the 32 KiB dictionary where nothing was written yet: memory never written";
 }
 
 /// The register entry with ID `id`.

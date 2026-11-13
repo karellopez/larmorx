@@ -927,8 +927,8 @@ GROUPS = [
 # ---- running ------------------------------------------------------------------------------------
 
 BASE_ENV = {"PATH": "/usr/bin:/bin", "LC_ALL": "C", "OMP_NUM_THREADS": "1"}
-#: The guard runs: the guard allocator with two fill bytes.
-GUARDS = ("90", "165")
+#: The guard runs: the guard allocator past the end and before the start, with two fill bytes.
+GUARDS = (("over", "90"), ("under", "165"))
 NOTICE = re.compile(rb"^upstream defect (\S+) .*$\n?", re.M)
 
 
@@ -997,8 +997,8 @@ class Runner:
                 self._run(argv, dict(env, MALLOC_PERTURB_="0"), b.never, "freesurfer-maths-probe")
             )
         ]
-        for fill in GUARDS:
-            genv = dict(env, LD_PRELOAD=str(self.guard), MALLOC_PERTURB_=fill)
+        for mode, fill in GUARDS:
+            genv = dict(env, LD_PRELOAD=str(self.guard), MALLOC_GUARD_=mode, MALLOC_PERTURB_=fill)
             others.append(parse(self._run(argv, genv, b.never, "freesurfer-maths-probe")))
         if self.save is not None:
             self.save.mkdir(parents=True, exist_ok=True)

@@ -15,7 +15,7 @@ tree, which is closed to FreeSurfer's clean-room implementers, so they never bui
 | File | What it is |
 |---|---|
 | `fs_maths_probe.cpp` | the probe: a batch of calls from a file, each in a child process of its own; its commands below |
-| `guard_malloc.c` | the guard allocator of the guard runs (`LD_PRELOAD`): in each child, every allocation on pages of its own, surrounded by 64 bytes of a fill byte (`MALLOC_PERTURB_`'s value) and by inaccessible pages; no other program's code |
+| `guard_malloc.c` | the guard allocator of the guard runs (`LD_PRELOAD`): in each child, every allocation on pages of its own, with an inaccessible page right after its last byte (`MALLOC_GUARD_` unset or `over`) or right before its first (`MALLOC_GUARD_=under`), its other bytes a fill byte (`MALLOC_PERTURB_`'s value); no other program's code |
 | `build.sh` | builds both with the unit oracle's compiler (Ubuntu's GCC 8.4.0) and FreeSurfer's flags against `<workspace>/oracles/freesurfer-8.2.0-unit` (queue item 3.1-02): `build.sh <workspace> <output>`, the allocator as `guard_malloc.so` beside the output (the spec writer's or the orchestrator's step, not the implementer's) |
 | `compare.py` | the comparison loop of the spec's §23: 24 groups of seeded cases, run on the probe (four times: plainly, plainly again in another process and in two guard runs, through the oracle-output cache) and on a candidate program that takes the same commands; `list`, `refs`, `compare` |
 
@@ -227,10 +227,12 @@ IDs. The cases are generated from `--seed` (default 7) into `<scratch>/batch`; f
 
 **The guard runs.** Each batch runs on the probe four times: plainly; plainly again, in another
 process, with `MALLOC_PERTURB_` 0 (glibc's allocator as it is, the stack below each call zeroed);
-and with `LD_PRELOAD` set to `guard_malloc.so` and `MALLOC_PERTURB_` 90, then 165. A line whose four
-results are not the same read memory FreeSurfer did not write or does not own (a little outside an
-array: the fill bytes; further: a crash; memory whose contents follow the process's addresses: the
-second plain run; stack memory nothing wrote: the stack's fill): a **memory** line. The clean room
+and with `LD_PRELOAD` set to `guard_malloc.so`, `MALLOC_GUARD_=over` and `MALLOC_PERTURB_` 90, then
+`MALLOC_GUARD_=under` and 165. A line whose four results are not the same read memory FreeSurfer did
+not write or does not own (past an array's end: a crash in the first guard run, the fill byte in
+the second; before its start: the other way round; memory never written or freed: the fill bytes,
+a crash; memory whose contents follow the process's addresses: the second plain run; stack memory
+nothing wrote: the stack's fill): a **memory** line. The clean room
 gives 0 for such reads (spec §1), so these lines may differ. A memory line, or one where
 FreeSurfer crashed (often a read further outside an array, which may or may not reach mapped
 memory), counts in the reference hash by its place only (`<memory>`). One known case: `mpinverse`

@@ -51,7 +51,7 @@ voxel 0's high half 5). Corrected: one `long` store rounded in the long range; `
 ## FS-55: `MRIsizeof` of an unknown type (rule B)
 
 `MRIsizeof` (1470) returns `-1` as `size_t` for `MRI_BITMAP`, `MRI_DOUBLE_COMPLEX` and unknown codes;
-`MRI::MRI`'s check `if (bytes_per_vox < 1) fs::fatal() << "unsupported MRI data type: "` (208) is on
+`MRI::MRI`'s check `if (bytes_per_vox < 1) fs::fatal() << "unsupported MRI data type: "` (203) is on
 a `size_t`, never true. `bytes_total` wraps (`SIZE_MAX * vox_total`), `calloc` fails, then
 `initSlices`' per-slice buffer `calloc(width * height * bytes_per_vox, 1)` fails: `could not allocate
 memory for slice 1 out of N`; for counts whose product wraps to a small number the chunk succeeds
@@ -59,12 +59,12 @@ memory for slice 1 out of N`; for counts whose product wraps to a small number t
 
 ## FS-56: `MRIcopyHeader` loses the registration matrix (rule A)
 
-`mri.cpp` 6267: `MatrixCopy(mri_src->register_mat, mri_dst->register_mat)` discards its result: a
+`mri.cpp` 6269: `MatrixCopy(mri_src->register_mat, mri_dst->register_mat)` discards its result: a
 destination without one gets a new matrix that is lost (a leak); `register_mat` stays `NULL`.
 
 ## FS-57: `CTABdeepCopy` drops `idbase` and leaves `count` unset (rule A; memory)
 
-`colortab.cpp` 291-342: the table is `calloc`'d (so `idbase` 0) and each entry `malloc`'d with every
+`colortab.cpp` 291-347: the table is `calloc`'d (so `idbase` 0) and each entry `malloc`'d with every
 field but `count` copied (memory contents). The probe does not print `count`.
 
 ## FS-58: voxels of a volume without voxels (a crash)

@@ -1177,7 +1177,11 @@ volume come with the generator's distributions and the volumes.
 ## 20. Validation plan, part 4
 
 In §23 (the groups `eigen`, `svd`, `mfiles`, `rfields`). §18.1's conversions are glibc 2.35's, as
-the main package's `larmorx_core::cscan` gives them.
+the main package's `larmorx_core::cscan` gives them. The **(observed)** marks of §8.8, §17 and
+§18.2 about matrices with infinite or NaN entries and files cut short (the batches
+`eigen-nonfinite`, `svd-nonfinite`, `mfiles-cut` and the explorations of 400 matrices) are measured
+by `validation/investigations/freesurfer-maths-nonfinite/` (open: the probe's runs against the main
+package's VNL ports and §18.2's rule).
 
 
 ## 21. Conventions, part 5: the histograms' NaN operands

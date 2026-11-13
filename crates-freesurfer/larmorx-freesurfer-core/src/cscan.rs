@@ -1108,6 +1108,38 @@ mod tests {
             assert_eq!(run(input, &f1), one, "%f on {input:?}");
             assert_eq!(run(input, &word_f), word, "%*s %f on {input:?}");
         }
+        // track E's fixed calls (specs/freesurfer-maths.md §18.1; glibc 2.35 measured by
+        // validation/probes/fs-maths/scanf_errno_cases.py): white space at the format's end reads,
+        // so `"%f "` on `1e40` sets errno back to its value from before the overflow
+        let fs = |n: usize, blank: bool| {
+            move |sc: &mut Scanf, e: &mut i32| {
+                for k in 0..n {
+                    if k > 0 {
+                        sc.text(e, b" ");
+                    }
+                    sc.f(e, true);
+                }
+                if blank {
+                    sc.text(e, b" ");
+                }
+            }
+        };
+        for (input, n, blank, want) in [
+            ("1e40", 1, false, (1, 34)),
+            ("1e40", 1, true, (1, 7)),
+            ("1e40", 2, false, (1, 7)),
+            ("1e40 ", 2, false, (1, 0)),
+            ("1 2 ", 3, false, (2, 0)),
+            ("1e-50 3", 3, false, (2, 34)),
+            ("-1877   1e40", 4, false, (2, 7)),
+            ("", 1, false, (-1, 0)),
+        ] {
+            assert_eq!(
+                run(input, &fs(n, blank)),
+                want,
+                "{n} %f, blank {blank}, on {input:?}"
+            );
+        }
     }
 
     /// `validation/investigations/glibc-scanf-probe/scanf_errno.c`'s measurements (track D's: the

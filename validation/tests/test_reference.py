@@ -508,6 +508,28 @@ def test_afni_usage_names_another_spelling_unifize():
     assert by["-oink"].spellings == ["-nosquash", "-oink"]
 
 
+def test_afni_usage_heads_volreg():
+    """3dvolreg's usage heads: alternatives after `/`, other values after `|`, several options
+    with values on one line (their description on the next), a value glued after `=`; the
+    spellings its parser compares one by one (`arg == "-wtrim"`)."""
+    cl, by = _cl("crates/larmorx-afni/src/cli/volreg.rs", "3dvolreg", "larmorx afni 3dvolreg")
+    assert (
+        by["-noclip"].help
+        == by["-clipit"].help
+        == "clip each output to its input's range (default on)"
+    )
+    assert (by["-base"].arg, by["-edging"].arg, by["-source"].arg) == (
+        "n | dset",
+        "ee | ee%",
+        "dset",
+    )
+    assert by["-base"].help.startswith("the n'th sub-brick of the input")
+    assert (by["-x_thresh"].arg, by["-params"].arg, by["-x_thresh"].help) == ("x", "m x r d", "")
+    assert by["-coarse"].help == "two passes: a coarse search on blurred bricks first"
+    assert by["-D"].help == "set AFNI's environment variable 'name' for this run"
+    assert {"-wtrim", "-SAVEDISP"} <= set(by) and {"-wtrim", "-SAVEDISP"} <= cl.parsed
+
+
 def test_mri_hmc_as_mcflirt():
     """`mri hmc`'s usage, read for mcflirt's page: spellings separated by commas, values in
     brackets, the parser's lists of options; the synopsis with mcflirt's command."""

@@ -254,7 +254,6 @@ group = "afni"
 name = "3dvolreg"
 command = "larmorx afni 3dvolreg"
 python = "lx.afni.volreg"
-does = "Rigid-body registration of every volume of a series to a base volume."
 api = "docs/api/afni-volreg.md"
 evidence = "/evidence/afni-volreg/"
 records = { replica = ["afni-volreg-replica"], clean-room = ["afni-volreg-original"] }

@@ -555,8 +555,9 @@ def build(repo: Path, p: apipage.Program) -> Reference:
                 seen = set()
                 for s in r.options:
                     o = accepted.get(s)
-                    if o is not None and o.help and id(o) not in seen:
-                        seen.add(id(o))
+                    # one line per text: `-input` and `-source` share theirs
+                    if o is not None and o.help and o.help not in seen:
+                        seen.add(o.help)
                         helps.append(o.help)
             if helps:
                 note = note + "".join(

@@ -632,11 +632,66 @@ _NAMED = r"--?(?:[A-Za-z][\w+.-]*|\d[A-Za-z][\w+.-]*)"
 _VALUES = r"(?:<[^>]*>|\{[^}]*\})(?: (?:<[^>]*>|\{[^}]*\}))*"
 
 
+def _head_options(head: str) -> list[Option]:
+    """The options of a usage line's head, before its description: alternatives after ``/``
+    (``-clipit / -noclip``, ``-input dset / -source dset``), other values after ``|`` (``-base n |
+    -base dset``, ``-edging ee | ee%``), several options with their values (``-maxite m
+    -x_thresh x``), a value glued after ``=`` (``-Dname=value``)."""
+    out: list[Option] = []
+    sep = ""
+    for w in head.split():
+        if w in ("/", "|"):
+            sep = w
+            continue
+        glued = re.fullmatch(rf"({_SPELLING})(=\S+)", w)
+        if glued or re.fullmatch(_SPELLING, w):
+            name = glued.group(1) if glued else w
+            if sep == "|" and out and name in out[-1].spellings:
+                out[-1].arg += " |"  # the same option with another value
+            else:
+                out.append(Option([name], glued.group(2) if glued else ""))
+        elif out:
+            joined = " | " if sep == "|" and out[-1].arg and not out[-1].arg.endswith("|") else " "
+            out[-1].arg = (out[-1].arg + joined + w).strip()
+        sep = ""
+    return out
+
+
+def _complex_head(line: str) -> tuple[str, str] | None:
+    """A usage line whose head the simple reading misses, split into its head and description:
+    a head with ``/`` or ``|`` between its words, or several options with values separated by
+    two blanks. The description follows the last gap of two blanks or more that is not followed
+    by an option; on a line without such gaps, it starts at ``column``-wide heads' column (23,
+    AFNI's) when a word starts there."""
+    text = line.strip()
+    gaps = list(re.finditer(r" {2,}", text))
+    desc_at = None
+    for g in gaps:
+        if not re.match(_SPELLING, text[g.end() :]):
+            desc_at = g
+    head = text[: desc_at.start()] if desc_at else text
+    desc = text[desc_at.end() :] if desc_at else ""
+    words = head.split()
+    several = sum(1 for g in gaps if re.match(_SPELLING, text[g.end() :])) > 0 and any(
+        not re.fullmatch(_SPELLING, w) for w in words
+    )
+    if not ("/" in words or "|" in words or several):
+        return None
+    if not gaps:
+        indent = len(line) - len(line.lstrip(" "))
+        at = 23 - indent
+        if len(text) > at and text[at - 1] == " " and text[at] != " ":
+            head, desc = text[:at].strip(), text[at:]
+    return head, desc
+
+
 def spaced_usage_options(usage: str) -> list[Option]:
     """The options of a usage text laid out in columns: ``  -TR ddd     use ddd as the TR``,
     ``  -out, -o <outfile>   (default is infile_mcf)``; several options on one line with their
     description on the next (``  -Fourier -linear ...``); a description continued on the lines
-    indented further. The options' lines are the lines at the indentation of the first one."""
+    indented further; heads with alternatives, other values or several options with values
+    (:func:`_complex_head`). The options' lines are the lines at the indentation of the first
+    one."""
     out: list[Option] = []
     column = None
     last: list[Option] = []
@@ -647,8 +702,16 @@ def spaced_usage_options(usage: str) -> list[Option]:
             column = indent
             spellings = re.split(r",\s*", m.group(1))
             rest = m.group(2)
+            glued = re.match(r"^(=\S+)(.*)$", rest)  # ``-Dname=value``: the value glued
+            if glued:
+                rest = " " + glued.group(1) + glued.group(2)
             words = rest.split()
-            if words and all(re.fullmatch(_SPELLING, w) for w in words):
+            split = _complex_head(line)
+            if split is not None:
+                last = _head_options(split[0])
+                for o in last:
+                    o.help = split[1].strip()
+            elif words and all(re.fullmatch(_SPELLING, w) for w in words):
                 last = [Option([s]) for s in spellings + words]
             else:
                 a = re.match(rf"^\s*({_VALUES})\s*(.*)$", rest) or re.match(
@@ -711,6 +774,8 @@ def spaced(repo: Path, rel: str, program: str, command: str) -> CommandLine:
     text = (repo / rel).read_text(encoding="utf-8")
     usage = rust_string(text, "USAGE") or ""
     arms = match_options(text) + [Option([s]) for s in _str_arrays(text)]
+    # the spellings the parser compares one by one (3dvolreg's ``arg == "-wtrim"``)
+    arms += [Option([s]) for s in dict.fromkeys(re.findall(rf'\barg == "({_NAMED})"', text))]
     found = spaced_usage_options(usage) + arms
     exact, prefixes = _option_literals(text)
     for o in found:  # ``-nosquash  ... (also -oink)``: another spelling the parser accepts

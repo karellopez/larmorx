@@ -577,13 +577,17 @@ def example(
     runs: dict[str, str] | None = None,
     panels: dict[str, tuple[str, str | None]] | None = None,
     diffs: dict[str, tuple[str, str]] | None = None,
+    known: tuple[str, ...] = (),
     errors: list[str] | None = None,
 ) -> dict:
     """One worked example of ``page`` in the guide's words and order. ``shows`` and
     ``verdicts`` as :func:`words.example`; ``title`` the example's new title; ``runs`` the
     port of a run a comparison names without a panel (by default: a variability comparison's
     is the original's, a check's the port of the run it is compared with); ``panels`` and
-    ``diffs`` override what the shapes give. ``errors``: a dry run that lists every shape it
+    ``diffs`` override what the shapes give; ``known``: the panels that hold the known answer
+    (sdcflows' exact field, computed another way: the role ``reference`` holds it beside the
+    original's runs), shown in the input's grey (the guide's section 5) and compared as "the
+    known answer". ``errors``: a dry run that lists every shape it
     cannot name (each panel's, run's and comparison's) instead of stopping at the first, and
     then returns ``ex`` unchanged but for the page's own rewordings
     (``validation/investigations/docs-revision/probe_present.py``)."""
@@ -621,7 +625,12 @@ def example(
             main_b.setdefault(d["a"], []).append(d["b"])
     originals, info = {}, {}
     for pid, p in by_id.items():
-        if p["role"] in ("original", "reference"):
+        if pid in known:  # the known answer: the input's port, its label kept
+            if p["role"] not in ("reference", "input"):
+                raise ValueError(f"{ex['id']}: the known answer {pid} is a {p['role']} panel")
+            new[pid] = (p["label"], text(page, p.get("sub"), code=False))
+            ports[pid] = "input"
+        elif p["role"] in ("original", "reference"):
             fallback = (p["label"], p.get("sub"), 0.0)
             name, sub, r = attempt(_original_panel, page, p, fallback=fallback)
             new[pid], originals[pid], rank[pid] = (name, sub), name, r
@@ -772,7 +781,7 @@ def example(
         ex["title"] = title
     # the port's own words in the example's texts (words.example has reworded them); on a page
     # of two ports the example's own texts are about both, each reason about its comparison's
-    both = "both" if len(set(ports.values())) > 1 else ""
+    both = "both" if len({v for v in ports.values() if v in words.PORT_NAME}) > 1 else ""
     ex["summary"] = text(page, ex.get("summary"), port=both)
     for f in ex.get("facts", []):
         f["label"] = text(page, f["label"], code=False, port=both)

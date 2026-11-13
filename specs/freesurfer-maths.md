@@ -46,7 +46,7 @@ and where they are specified:
 |---|---|
 | §2, §8.1, §16 | `MatrixAlloc` (and its old allocator, `FREESURFER_MatrixAlloc_old`), `MatrixAlloc2` (a caller's buffer), `MatrixFree`, `MatrixCopy`, `MatrixMultiplyD`, `MatrixMultiply` |
 | §3 | `SetAffineVector`, `GetAffineVector`, `GetFloorAffineVector`, `SetAffineMatrix`, `GetAffineMatrix`, `AffineMV`, `AffineMM` |
-| §4, §12 | `DMatrixAlloc`, `DMatrixCheckDims`, `DMatrixAddMul`, `DMatrixAdd`, `DMatrixSubtract`, `DMatrixScalarMul`, `DMatrixCopy`, `DMatrixTranspose`, `DMatrixPrint`, `DMatrixPrintFmt`, `DMatrixMultiply`, `DVectorDot`, `DMatrixCompareFMatrix`, `DMatrixCopyFMatrix`, `DMatrixConstVal`, `DMatrixZero`, `DMatrixMaxAbs`, `DMatrixFree`, `DListStats` |
+| §4, §12 | `DMatrixAlloc`, `DMatrixCheckDims`, `DMatrixAddMul`, `DMatrixAdd`, `DMatrixSubtract`, `DMatrixScalarMul`, `DMatrixCopy`, `DMatrixTranspose`, `DMatrixPrint`, `DMatrixPrintFmt`, `DMatrixMultiply`, `DVectorDot`, `DMatrixCompareFMatrix`, `DMatrixCopyFMatrix`, `DMatrixConstVal`, `DMatrixZero`, `DMatrixMaxAbs`, `DListStats` |
 | §5, §21 | `HISTOalloc`, `HISTOrealloc`, `HISTOfree`, `HISTOcopy`, `HISTOclear`, `HISTOclearCounts`, `HISTOinit`, `HISTObins`, `HISTOadd`, `HISTOsubtract`, `HISTOlinearScale`, `HISTOmakePDF`, `HISTOsumNorm`, `HISTOcumsum`, `HISTOclearBins`, `HISTOabs`, `HISTOmakeCDF`, `HISTOmakeReverseCDF`, `HISTOsoapBubbleZeros`, `HISTOfillHoles`, `HISTOsmooth`, `HISTOfindLastPeak`, `HISTOfindFirstPeak`, `HISTOfindValley`, `HISTOfindLastPeakInRegion`, `HISTOfindHighestPeakInRegion`, `HISTOfindPreviousValley`, `HISTOfindNextValley`, `HISTOfindNextPeak`, `HISTOfindPreviousPeak`, `HISTOfindStartOfPeak`, `HISTOfindEndOfPeak`, `HISTOfindCurrentPeak`, `HISTOfindBin`, `HISTOgetCount`, `HISTOfindBinWithCount`, `HISTOvalToBin`, `HISTOcount`, `HISTO2DfindBin1`, `HISTO2DfindBin2`, `HISTO2DgetCount`, `HISTOaddSample`, `HISTOtotalInRegion`, `HISTOtotal`, `HISTOclearZeroBin`, `HISTOthreshSum`, `HISTOfindMedian`, `HISTOgetEntropy`, `HISTOcorrelate`, `HISTOfindLinearFit`, `HISTOcomputeFWHM`, `HISTOrobustGaussianFit`, `HISTOplot`, `HISTOwriteTxt` |
 | §8.2 | `MatrixIdentity`, `MatrixTranspose`, `MatrixAdd`, `MatrixSubtract`, `MatrixScalarMul`, `MatrixSquareElts`, `MatrixClear`, `MatrixDiag`, `MatrixIsSymmetric`, `MatrixIsZero`, `MatrixCheck`, `MatrixTrace`, `MatrixSumElts`, `MatrixConstVal`, `MatrixZero`, `MatrixClone` (`VectorClone`), `MatrixReshape`, `MatrixNormalizeColScale`, `MatrixNormalizeCol` |
 | §8.3 | `MatrixCopyRegion`, `MatrixCopyRealRegion`, `MatrixCopyImagRegion`, `MatrixRealToComplex` |
@@ -130,7 +130,8 @@ allocator never uses the buffer.
 
 ### 2.3 Freeing
 
-Freeing sets the caller's matrix to none and returns 0.
+Freeing sets the caller's matrix to none and returns 0 (none given: 0 too, **(observed)** `mfree null`). A
+matrix in a caller's buffer (§2.2) is set to none the same way (`malloc2`: `0 none`).
 
 ### 2.4 Copy
 
@@ -194,7 +195,8 @@ by column** (float `i + 4j` is row i, column j, from 0).
   x3` in float, the sum **starting from the first product** (not from 0: four products of -0 give
   -0).
 - **Matrix × matrix:** output column j = the matrix × vector of the second matrix's column j.
-- **Floor of a vector:** `(int) floor(v)` of each of the first three (FS-17).
+- **Get a vector:** its first three floats. **Floor of a vector:** `(int) floor(v)` of each of the first
+  three (FS-17).
 - A new affine matrix is all zeros (FreeSurfer's is not cleared; its callers set it).
 
 ## 4. Double matrices
@@ -254,7 +256,8 @@ The layout of §2.1 with doubles, real only.
 practice), `bins[b]` (a float value per bin, its position), `counts[b]` (a float count per bin),
 `bin_size`, `min`, `max` (floats). A new histogram of n bins: `max_bins = nbins = n`, zeros
 everywhere. n negative: the program ends, code -2, `HISTOalloc(<n>): could not allocate
-histogram` (reallocation: `HISTOrealloc(<n>): ...`). "The histogram's bins" below are `0..nbins-1`.
+histogram` (reallocation: `HISTOrealloc(<n>): ...`). Freeing sets the caller's histogram to none and
+returns 0 (none given: 0 too, **(observed)** `hfree null`). "The histogram's bins" below are `0..nbins-1`.
 Reading bin b with b < 0 or b ≥ the allocation is **FS-22** (§1's out-of-range rule).
 
 ### 5.2 Making and copying
@@ -377,7 +380,7 @@ from 0; when it is exactly 0 a peak search returns -1.
   (float); from `b0 - 1` down to v, the first bin whose count is below t; else `v - 1` (v = -1 makes
   the scan read bin -1, FS-22). **End of peak** (h, b0, p): the next valley v of b0; b0 itself when
   ≥ `nbins`; from `b0 + 1` up to v, the first bin below t; else **the last bin** (kept as FreeSurfer
-  has it: the test `nbins ≥ b` always holds).
+  has it: never `v + 1`, the mirror of the start's `v - 1`).
 - **Current peak** (h, b0, wsize, pct): the highest peak of the whole histogram (-1 when none); the
   minimum `pct ×` its count; the float sums of the counts in `[b0 - whalf, b0)` and `(b0, b0 + whalf]`
   inside the histogram; when the later sum is larger, forward from `b0 - whalf` (from 0): the first
@@ -651,7 +654,7 @@ Vectors are matrices whose first column is read (element i is (i, 1)).
   Each real element as `printf("% 2.<p>f")` (a negative p as 6), a complex one `% 2.3f + % 2.3f i`;
   two spaces between elements, `;` + `\n` after each row; a type neither real nor complex: at its
   first element an error, `MatrixPrint: unknown type <t>` + `\n`, returns -4. Returns 0.
-- **Print with a format** (fp, fmt, m): the same, each element with `fmt` (FreeSurfer passes
+- **Print with a format** (fp, fmt, m): the same, each element with `fmt` (for example
   `%10f`), complex `<fmt> + <fmt> i`, `\n` after each row (no `;`).
 
 ### 8.7 Similarity transform and Gaussian matrices
@@ -662,7 +665,7 @@ Vectors are matrices whose first column is read (element i is (i, 1)).
   `ERROR: GaussianMatrix: dimension mismatch` + `\n` on standard output, nothing returned. var = std
   std (float); f = `(float)(sqrt(2π) std)` in double. With g(d) = `expf(-(d d) / (2 var)) / f` in
   float: norm 1: f = f / Σ g(c - n/2) for c = 0..n-1 (float sum from 0; n/2 integer division) — so
-  the centre row sums to 1, not every row (FreeSurfer's own comment says so); then row r, column c
+  the centre row sums to 1, not every row; then row r, column c
   (from 0) = g(c - r), the row's float sum S kept; norm 2: each element of the row / S in float.
 - **Mixture** (n, s1, s2, w1, norm, G): `w1 G1 + (1 - w1) G2` (1 - w1 in float), the two matrices
   scaled (§8.2) then added (§8.2, into `G`).
@@ -732,9 +735,9 @@ the last place is allowed in both modes until glibc's `acos` is in the main pack
 
 ## 12. Conventions, part 3: the double matrices' NaN operands
 
-§7's NaN rules hold, with the official build's operand order measured where two NaNs meet (the
-fs-maths probe's NaN inputs: infinities, quiet NaNs of both signs with and without payloads, a
-signalling NaN):
+§7's NaN rules hold, with the official build's operand order measured where two NaNs meet (on
+infinities, quiet NaNs of both signs with and without payloads, a signalling NaN among the inputs;
+§23's `dmatrix` group):
 
 - **Weighted sum** (§4): for a factor other than 0 and 1 the term is `(element × factor) + val` (of
   two NaNs, the element's in the product and the product's in the sum); for a factor of exactly 1
@@ -825,7 +828,8 @@ step; value and gradient at `x`; on the first evaluation the start value and the
 this value; later, a value **strictly below** the best: the best point = `x`, the best value = it,
 and the observer is told (below). Then one call of `lbfgs` (no caller diagonal; `eps = gtol`, `xtol
 = 1e-16`; IPRINT (1, 1) when the diagnostic bits hold `DIAG_VERBOSE`, else (1, 0) with trace and
-(-1, 0) without; its text on standard output); the iteration count goes up; with verbose and not
+(-1, 0) without; its text on standard output, as `larmorx_core::vnl_lbfgs` prints it: with IPRINT (1, 1)
+the vectors' printout holds memory the program does not own, ITK-106, a **memory** line of §23); the iteration count goes up; with verbose and not
 trace `<iflag>:<value %g> ` on standard error. `iflag` 0: success; negative: failure; else the
 evaluation count goes up, and above `maxfev` (as an `int`) the failure code becomes
 FAILED_USER_REQUEST: failure. (With verbose and not trace, `done` + newline at the end.)
@@ -1072,14 +1076,18 @@ nothing.
 - **Text write** (file name, m): not openable: an error `MatrixWriteTxt(<name>) - file open failed` +
   `\n`, code -1, returned. Each row: each element `%+4.5f` and a space, then `\n`. Real only (FS-25).
   Success.
+- **Binary write** (stream, m): the type, rows and columns as big-endian 32-bit integers, then each
+  element row by row as a big-endian double widened from its float (complex: the real part, then the
+  imaginary part); returns 0 (`mwritebin`).
 
 ## 19. Random-field specifications
 
 A specification holds a name, a code, up to 20 parameters, a mean, a standard deviation, a generator
 and a seed. **Name to code:** `uniform` 1, `gaussian` 2, `z` 3, `t` 4, `F` 5, `chi2` 6, any other -1
-(stored and returned). **Init** (seed): a cleared specification with a new generator (RANLUX389,
-`specs/ranlux.md`), then **set seed** (seed): 0 takes the time-of-day seed (§10, FS-29), any other is
-kept; the generator is set to it. The draws (`RFsynth`, `RFdrawVal`) and the global statistics of a
+(stored and returned). **Init** (seed): a cleared specification (no name, code 0, no parameters, mean
+and deviation 0) with a new generator (RANLUX389, `specs/ranlux.md`), then **set seed** (seed): 0
+takes the time-of-day seed (§10, FS-29), any other is kept; the generator is set to it; it returns 0
+(**(observed)** `rfinit`). The draws (`RFsynth`, `RFdrawVal`) and the global statistics of a
 volume come with the generator's distributions and the volumes.
 
 ## 20. Validation plan, part 4

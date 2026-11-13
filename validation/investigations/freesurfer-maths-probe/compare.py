@@ -871,7 +871,8 @@ def main() -> int:
             d = digest.setdefault(b.group, hashlib.sha256())
             c = counts.setdefault(b.group, Counter())
             for ln, mem in zip(plain, memory, strict=True):
-                d.update(mask(b, ln) + b"\n")
+                # a memory line's bytes may change from run to run: only its place counts
+                d.update(b"<memory>\n" if mem else mask(b, ln) + b"\n")
                 head = ln.split(b" ", 1)[0].decode()
                 c["calls"] += 1
                 c["memory"] += mem

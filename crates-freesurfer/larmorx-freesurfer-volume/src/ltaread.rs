@@ -9,7 +9,9 @@
 //!
 //! A relative name is opened in `dir`, the program's working directory, when given (`CFile::open`'s
 //! rule). Two functions of fs.io are the caller's ([`LtaIo`]): `MRIreadHeader` (for a volume an `.xfm`
-//! names that exists) and `regio_read_register` (`registerio.cpp`, item 3.1-34).
+//! names that exists) and `regio_read_register` (`registerio.cpp`, item 3.1-34); so is the
+//! environment `USE_AVERAGE305` is looked up in ([`LtaIo::env`], the program's
+//! [`Settings`](larmorx_freesurfer_core::run::Settings)`::env`, never the process's).
 //!
 //! Defects (`larmorx_core::defects`; `docs/findings/freesurfer-volume.md` §7):
 //! - **FS-306** (memory): `TransformFileNameType` copies the name into 500 bytes: a longer name
@@ -37,6 +39,7 @@ use larmorx_freesurfer_core::log::{self, ERROR_BADFILE, ERROR_BADPARM, ERROR_NOF
 use larmorx_freesurfer_core::matrix::{Matrix, matrix_copy};
 use larmorx_freesurfer_core::matrix_io::matrix_ascii_read_from;
 use larmorx_freesurfer_core::matrix_ops::matrix_identity;
+use larmorx_freesurfer_core::run::Environment;
 use larmorx_freesurfer_core::ret::Ret;
 use larmorx_freesurfer_core::utils::file_name_only;
 use larmorx_freesurfer_io::cfile::CFile;
@@ -62,8 +65,13 @@ pub struct RegisterDat {
     pub float2int: i32,
 }
 
-/// fs.io's functions the readers call (track A's `mriio.cpp` and `registerio.cpp`).
+/// What the readers take from the program: fs.io's functions they call (track A's `mriio.cpp` and
+/// `registerio.cpp`) and the program's environment.
 pub trait LtaIo {
+    /// The environment the original's `getenv` would read (`USE_AVERAGE305`): the program's
+    /// [`Settings`](larmorx_freesurfer_core::run::Settings)`::env`, so that a program run in
+    /// `recon-all`'s replica, or a probe, sets it per call.
+    fn env(&self) -> &Environment;
     /// `MRIreadHeader(name, MRI_VOLUME_TYPE_UNKNOWN)`: the volume's geometry, or `None` for `NULL`
     /// (its messages written as it writes them).
     fn read_header(
@@ -550,8 +558,8 @@ pub fn minc_get_volume_info(
 
 /// `mincGetVolInfo(infoline, infoline2, vgSrc, vgDst)`: [`minc_find_volume`]'s volumes through
 /// [`minc_get_volume_info`]; a destination without a valid geometry takes `average_305`'s when the
-/// environment has `USE_AVERAGE305` (`INFO: using average_305 info, since ` and `INFO: environment
-/// var USE_AVERAGE305 set` on standard error).
+/// program's environment ([`LtaIo::env`]) has `USE_AVERAGE305`, whatever its value (`INFO: using
+/// average_305 info, since ` and `INFO: environment var USE_AVERAGE305 set` on standard error).
 #[allow(clippy::too_many_arguments)]
 pub fn minc_get_vol_info(
     g: &mut Globals,
@@ -567,7 +575,7 @@ pub fn minc_get_vol_info(
     let (_, s, d) = minc_find_volume(g, out, err, info, info2)?;
     minc_get_volume_info(g, out, err, dir, s.as_deref(), src, io)?;
     minc_get_volume_info(g, out, err, dir, d.as_deref(), dst, io)?;
-    if dst.valid == 0 && std::env::var_os("USE_AVERAGE305").is_some() {
+    if dst.valid == 0 && io.env().get("USE_AVERAGE305").is_some() {
         let _ = err.write_all(b"INFO: using average_305 info, since \n");
         let _ = err.write_all(b"INFO: environment var USE_AVERAGE305 set\n");
         average_305(dst);

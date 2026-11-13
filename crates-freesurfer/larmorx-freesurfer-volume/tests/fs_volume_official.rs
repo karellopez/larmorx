@@ -14,12 +14,13 @@ mod cases;
 use larmorx_core::defects::UpstreamDefects;
 use sha2::{Digest, Sha256};
 
-/// Recorded 2026-11-13 (65 commands: transform.cpp's VOL_GEOM functions and `LTAreadEx`, 3.1-35's
-/// voxel arithmetic, coordinates and geometry, moves and head box, `MRIaverage`, 3.1-36's
-/// samplers): 1,300 cases, 1,224 lines identical, 76 hashed as `SKIP`.
+/// Recorded 2026-11-13 (65 commands: transform.cpp's VOL_GEOM functions and `LTAreadEx` with
+/// `USE_AVERAGE305` unset, `true` or empty, 3.1-35's voxel arithmetic, coordinates and geometry,
+/// moves and head box, `MRIaverage`, 3.1-36's samplers): 1,300 cases, 1,198 lines identical, 102
+/// hashed as `SKIP`.
 const N: usize = 1300;
-const OFFICIAL_SHA256: &str = "2499daba233eec8c8278d5d5c3b9be2d32569776f9f5d0d4a7eed9571bf94791";
-const SKIPPED: usize = 76;
+const OFFICIAL_SHA256: &str = "571a038fdaebd6929c884ca4065eebd07e8143122f07e57fcfc9c6b71175f1c1";
+const SKIPPED: usize = 102;
 
 /// `check.py`'s `SKIP`.
 const SKIP: [&str; 20] = [

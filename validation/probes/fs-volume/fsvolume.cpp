@@ -606,6 +606,9 @@ void run_case()
     std::string name = "fsvol-lta" + gethex();
     std::string bytes = gethex();
     int have = geti();
+    int avg = geti();  // USE_AVERAGE305: 0 unset, 1 "true", 2 set and empty
+    if (avg) setenv("USE_AVERAGE305", avg == 1 ? "true" : "", 1);
+    else unsetenv("USE_AVERAGE305");
     unlink(name.c_str());
     if (have) spill(name, bytes);
     errno = 0;

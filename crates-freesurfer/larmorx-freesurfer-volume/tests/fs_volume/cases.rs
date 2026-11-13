@@ -18,6 +18,7 @@ use larmorx_freesurfer_core::log::Fatal;
 use larmorx_freesurfer_core::matrix as mx;
 use larmorx_freesurfer_core::matrix::Matrix;
 use larmorx_freesurfer_core::ret::Ret;
+use larmorx_freesurfer_core::run::Environment;
 use larmorx_freesurfer_io::cfile::CFile;
 use larmorx_freesurfer_mri::mri::{self as mm, Mri, MriRegion};
 use larmorx_freesurfer_mri::vol_geom::VolGeom;
@@ -948,6 +949,8 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
                 t.push(hex(ext.as_bytes()));
                 t.push(hex(&bytes));
                 t.push(i64::from(kind < 3 && !g.chance(30)).to_string());
+                // USE_AVERAGE305: 0 unset, 1 `true`, 2 set and empty
+                t.push(g.below(3).to_string());
             }
             "coef" | "hsinc" => {
                 let n = 6;
@@ -1840,6 +1843,11 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
             let ext = String::from_utf8(t.hex()).expect("an ASCII name");
             let bytes = t.hex();
             let have = t.i() != 0;
+            let env = match t.i() {
+                0 => Environment::default(),
+                1 => Environment::from_pairs([("USE_AVERAGE305", "true")]),
+                _ => Environment::from_pairs([("USE_AVERAGE305", "")]),
+            };
             let dir =
                 std::env::temp_dir().join(format!("larmorx-fsvol-lta-{}", std::process::id()));
             std::fs::create_dir_all(&dir).expect("a scratch folder");
@@ -1850,7 +1858,7 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
                 std::fs::write(&path, &bytes).expect("the case's file");
             }
             g.errno = 0;
-            let r = lr::lta_read_ex(g, a, b, Some(&dir), &name, &mut NoIo);
+            let r = lr::lta_read_ex(g, a, b, Some(&dir), &name, &mut NoIo(env));
             if have {
                 let _ = std::fs::remove_file(&path);
             }
@@ -2027,10 +2035,13 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
 
 /// `cmph`'s header fields beyond the volume's tokens.
 /// fs.io's functions for the transform readers: never reached by the cases (they name no volume
-/// that exists and no `register.dat`).
-struct NoIo;
+/// that exists and no `register.dat`); the case's environment.
+struct NoIo(Environment);
 
 impl lr::LtaIo for NoIo {
+    fn env(&self) -> &Environment {
+        &self.0
+    }
     fn read_header(
         &mut self,
         _: &mut Globals,

@@ -537,8 +537,11 @@ in the first walk.
   `.mnc`. A named volume that exists gives its header's geometry; one that does not and whose name
   contains `average_305` the average brain's (172 x 220 x 156, 1 mm, identity directions, centre
   (-0.095, -16.51, 9.75), valid); else the default geometry; the name (or `unknown`) kept. With
-  `USE_AVERAGE305` in the environment a destination without a valid geometry takes the average's
-  (two INFO lines on standard error). Type RAS-to-RAS.
+  `USE_AVERAGE305` in the program's environment (set, whatever its value, the empty string
+  included) a destination without a valid geometry takes the average's (two INFO lines on standard
+  error: `INFO: using average_305 info, since ` and `INFO: environment var USE_AVERAGE305 set`). The
+  environment is the program's (the one a caller gives the reader), not necessarily the process's,
+  so that programs run in one process each see their own. Type RAS-to-RAS.
 - **FSL** (`.fslmat`): three rows `%f %f %f %f`, type `FSLREG_TYPE`. **`register.dat`**: an INFO line
   (`INFO: This REGISTER_DAT transform is valid only for volumes between  COR types with c_(r,a,s) =
   0.`), then `regio_read_register`'s subject, intensity (`fscale`) and matrix; the source geometry not
@@ -553,5 +556,5 @@ past the volume's, half-widths 0 to 6 and 70, 1000, -1, `outside_val` 0, -5.5, a
 centre), `rotx`, `roty`, `rotz` (NaN and infinite angles), `skull` (volumes of 6 to 48 voxels with
 painted boxes, thresholds -5 to 300), `tftype` (names with `.`, `@`, `#`, `nii.gz`, 600-byte names) and
 `ltaread` (`.xfm`, `.lta`, `.fslmat` texts with odd numbers, cut files, missing lines, the
-volume-information forms). Expected: identical with `reproduce` but where FreeSurfer reads memory it
+volume-information forms; `USE_AVERAGE305` unset, set to `true` and set empty). Expected: identical with `reproduce` but where FreeSurfer reads memory it
 does not own, crashes or never returns (FS-300, FS-302 to FS-310), counted and not compared.

@@ -62,3 +62,10 @@ different (641 of the 1,000 `skull` cases find a box); 2,000 transform-reading c
 commands, log `oracles/logs/fs-found-c-r13-seed1.log`): 1,224 identical, 76 not comparable, hash
 `2499daba233eec8c8278d5d5c3b9be2d32569776f9f5d0d4a7eed9571bf94791`. Not comparable now also: FS-300 (a
 cubic window never read), FS-302 to FS-310 (crashes, hangs, memory never set).
+
+Measured 2026-11-13 (relay 15: `ltaread` sets `USE_AVERAGE305` per case, unset, `true` or empty, in
+the official child's environment and in the port's `LtaIo::env`): seed 1, 1,300 cases (log
+`oracles/logs/fs-found-c-r15-avg.log`): 1,198 identical, 102 not comparable, hash
+`571a038fdaebd6929c884ca4065eebd07e8143122f07e57fcfc9c6b71175f1c1`. Seed 7, 923 `ltaread` cases: 867
+identical, 55 not comparable, 1 different (an `errno` the port kept after `sscanf` met the end of a line:
+fixed in the next commit, `scanf_word_errno.c`).

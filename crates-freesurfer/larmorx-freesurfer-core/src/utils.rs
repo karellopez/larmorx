@@ -1065,7 +1065,7 @@ pub fn directory_is_writable(dir: Option<&Path>, directory: &str) -> bool {
 /// leaves it); `fs::fatal` `Can not write to temporary directory <dir>` (exit 1) when the choice
 /// is not writable.
 pub fn get_base_temp_dir(
-    g: &Globals,
+    g: &mut Globals,
     env: &Environment,
     dir: Option<&Path>,
     err: &mut dyn Write,
@@ -1094,7 +1094,7 @@ pub fn get_base_temp_dir(
 /// `makeTempFile(suffix)`: a new empty file `<base>/tmp.XXXXXX<suffix>`; `Could not create
 /// temporary file in <base>` (exit 1) when it cannot be made.
 pub fn make_temp_file(
-    g: &Globals,
+    g: &mut Globals,
     env: &Environment,
     dir: Option<&Path>,
     err: &mut dyn Write,
@@ -1121,7 +1121,7 @@ pub fn make_temp_file(
 /// `makeTempDir()`: a new directory `<base>/tmp.XXXXXX`; `Could not create temporary directory
 /// in <base>` (exit 1) when it cannot be made.
 pub fn make_temp_dir(
-    g: &Globals,
+    g: &mut Globals,
     env: &Environment,
     dir: Option<&Path>,
     err: &mut dyn Write,
@@ -1362,31 +1362,31 @@ mod tests {
         let base = tempfile::tempdir().unwrap();
         let b = base.path().to_string_lossy().into_owned();
         let env = Environment::from_pairs([("TMPDIR", b.as_str())]);
-        let gl = g(UpstreamDefects::Fix);
+        let mut gl = g(UpstreamDefects::Fix);
         let mut err = Vec::new();
-        assert_eq!(get_base_temp_dir(&gl, &env, None, &mut err).unwrap(), b);
-        let f = make_temp_file(&gl, &env, None, &mut err, ".mgz").unwrap();
+        assert_eq!(get_base_temp_dir(&mut gl, &env, None, &mut err).unwrap(), b);
+        let f = make_temp_file(&mut gl, &env, None, &mut err, ".mgz").unwrap();
         assert!(
             f.starts_with(&format!("{b}/tmp.")) && f.ends_with(".mgz") && f.len() == b.len() + 15
         );
         assert!(Path::new(&f).is_file());
-        let d = make_temp_dir(&gl, &env, None, &mut err).unwrap();
+        let d = make_temp_dir(&mut gl, &env, None, &mut err).unwrap();
         assert!(Path::new(&d).is_dir());
         assert!(err.is_empty());
         // An unwritable variable is skipped; the last one's value (TEMPDIR) is what is left.
         let env = Environment::from_pairs([("FS_TMPDIR", "/nonexistent-dir-x")]);
         if directory_is_writable(None, "/tmp") {
             assert_eq!(
-                get_base_temp_dir(&gl, &env, None, &mut err).unwrap(),
+                get_base_temp_dir(&mut gl, &env, None, &mut err).unwrap(),
                 "/tmp"
             );
         }
         let env =
             Environment::from_pairs([("TMPDIR", b.as_str()), ("TEMPDIR", "/nonexistent-dir-x")]);
-        assert_eq!(get_base_temp_dir(&gl, &env, None, &mut err).unwrap(), b);
+        assert_eq!(get_base_temp_dir(&mut gl, &env, None, &mut err).unwrap(), b);
         let env = Environment::from_pairs([("TEMPDIR", "/nonexistent-dir-x")]);
         assert_eq!(
-            get_base_temp_dir(&gl, &env, None, &mut err),
+            get_base_temp_dir(&mut gl, &env, None, &mut err),
             Err(Fatal::Exit(1))
         );
         assert_eq!(

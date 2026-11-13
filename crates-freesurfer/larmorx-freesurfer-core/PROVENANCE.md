@@ -16,7 +16,7 @@ built for the official binaries with GCC 8.4.0 (`docs/freesurfer/variation.md`).
 | `globals` | `utils/Progname.cpp`, `utils/diag.cpp` 47-68, `utils/log.cpp` 55-58, `utils/hips.cpp` 4-5 | `Progname`; `Gprofile`, `Gvx` ... `Gvz`, `Gsx` ... `Gsz`, `Gdiag`, `Gdiag_no`, `Gdiag_no2`, `Gx` ... `Gz2`, `IMAGE_SIZE`; `errorlog`, `exceptions`, `Gerror`; `hips_cplxtor`, `hips_rtocplx`; the `static` memories of `DiagHeartbeat` and `DiagShowPctDone`; the C library's `errno` |
 | `log` | `include/log.h`, `utils/log.cpp` | the error codes, `fs::fatal`, `fs::error`, `fs::warning`, `fs::debug`, `setErrorLog` and `throwExceptions` (as `Globals` fields), `writeToErrorLog`, `errorExit`, `ErrorPrintf`, `ErrorExit` (`ErrorReturn` is `ErrorPrintf` and a return); glibc's `strerror` texts (from glibc's documented messages); the `term` colours are always empty (`termAllowsColor` returns false) |
 | `diag` | `include/diag.h`, `utils/diag.cpp`, `utils/fsinit.cpp` | the `DIAG_*` bits, `DIAG_VERBOSE_ON`, `assertFailed`, `DiagInit`, `DiagPrintf`, `DiagBreak`, `DiagHeartbeat`, `DiagShowPctDone`, `check_finite`; `FSinit` and `setLocale` as far as they are seen (below) |
-| `machine` | `utils/machine.cpp` | `swapDouble`, `swapLong32`, `swapFloat`, `swapShort`, `swapInt`; `swapLong64` (37-53, with fs.io's 64-bit readers, 3.1-25; FS-176) |
+| `machine` | `utils/machine.cpp` | `swapDouble`, `swapLong32`, `swapFloat`, `swapShort`, `swapInt`; `swapLong64` (37-53, with fs.io's 64-bit readers, 3.1-25; FS-176); `swapUShort`, `ByteSwapBuf` (215), `ByteSwap2` (240), `ByteSwap4` (258), `ByteSwap8` (286) (track A relay 12, from track E's report; FS-261) |
 | `cmdargs` | `utils/cmdargs.cpp` | `CMDargNErr`, `CMDisFlag`, `CMDsingleDash`, `CMDnthIsArg` |
 | `base` | `include/base.h` | `squaref`, `squared` |
 | `random` | `utils/utils.cpp` 73-162, 1557-1573; `utils/numerics.cpp` 1256-1279 | `seedHasBeenSet`, `idum`, `nrgcalls`, `setRandomSeed`, `getRandomSeed`, `getRandomCalls`, `randomNumber` (with its `static laterTime`), `compute_permutation`; `OpenRan1` (its `static` seed and generator; item 3.1-24's file, brought forward: `randomNumber`'s only source) |
@@ -172,3 +172,10 @@ empty solution). Validation: `validation/investigations/freesurfer-spline-replic
   through a shell; `PrintRUsage` reads `getrusage`'s counters from `/proc`; the temporary names'
   six characters come from larmorx's own unpredictable choice instead of glibc's.
 - The licence check is not translated (decision log 2026-10-19).
+- (track A relay 12) `log::error_exit_code` (`fs::detail::errorExit` as `fs::fatal`'s destructor calls
+  it) takes the error stream and mutable `Globals`: FS-263 (exceptions on, a nonzero code: FreeSurfer
+  terminates from the destructor; by default `Fatal::Throw(code)` reaches the caller, `reproduce`
+  writes libstdc++'s `terminate called after throwing an instance of 'int'` and ends with 134);
+  `log::fatal` and `utils::get_base_temp_dir`, `make_temp_file`, `make_temp_dir` take `&mut Globals`
+  with it. `matrix_ops::xyz_approx_angle_known_length`'s third product is `z2 * n.z`, the official
+  build's order (`docs/findings/freesurfer-maths.md`).

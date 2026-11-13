@@ -49,7 +49,9 @@ fn dbits(v: f64) -> String {
 fn coord_text(g: &mut Gen) -> String {
     match g.below(24) {
         0 => g
-            .pick(&["nan", "-inf", "1e40", "1e-50", "-0", "0x1p3", "+.5", "1.", "7e"])
+            .pick(&[
+                "nan", "-inf", "1e40", "1e-50", "-0", "0x1p3", "+.5", "1.", "7e",
+            ])
             .into(),
         1 => "x".into(),
         2 => format!("{}", g.int(-3000, 3000)),
@@ -93,7 +95,11 @@ fn label_text(g: &mut Gen) -> Vec<u8> {
     if g.chance(30) {
         return s;
     }
-    let k = if g.chance(12) { g.int(0, 40) } else { g.int(1, 6) };
+    let k = if g.chance(12) {
+        g.int(0, 40)
+    } else {
+        g.int(1, 6)
+    };
     if g.chance(5) {
         s.extend_from_slice(g.pick(&[b"# c\n".as_slice(), b"\n", b"   \n", b"\t# x\n"]));
     }
@@ -101,7 +107,9 @@ fn label_text(g: &mut Gen) -> Vec<u8> {
         0 => "0".to_string(),
         1 => format!("{}", k + g.int(1, 3)),
         2 => format!("{}", (k - 1).max(0)),
-        3 => g.pick(&["abc", "-1", "-3", "99999999999", " 4 # c", "2x"]).into(),
+        3 => g
+            .pick(&["abc", "-1", "-3", "99999999999", " 4 # c", "2x"])
+            .into(),
         _ => k.to_string(),
     };
     s.extend_from_slice(count.as_bytes());
@@ -154,15 +162,28 @@ fn label_toks(g: &mut Gen, may_null: bool) -> Vec<String> {
     if may_null && g.chance(4) {
         return vec!["N".into()];
     }
-    let max_points = if g.chance(10) { g.int(30, 90) } else { g.int(0, 8) };
+    let max_points = if g.chance(10) {
+        g.int(30, 90)
+    } else {
+        g.int(0, 8)
+    };
     let n_points = g.int(0, max_points);
     let mut t = vec![
         max_points.to_string(),
         g.int(0, 3).to_string(),
         n_points.to_string(),
-        enc(Some(g.pick(&[b"".as_slice(), b"lh.cortex.label", b"w/a.label"]))),
+        enc(Some(g.pick(&[
+            b"".as_slice(),
+            b"lh.cortex.label",
+            b"w/a.label",
+        ]))),
         enc(Some(g.pick(&[b"".as_slice(), b"s1", b"bert"]))),
-        enc(Some(g.pick(&[b"TkReg".as_slice(), b"scanner", b"voxel", b""]))),
+        enc(Some(g.pick(&[
+            b"TkReg".as_slice(),
+            b"scanner",
+            b"voxel",
+            b"",
+        ]))),
         dbits(g.int(-4, 4) as f64 * 0.25),
         max_points.to_string(),
     ];
@@ -259,8 +280,12 @@ fn atable_text(g: &mut Gen) -> Vec<u8> {
         let name: Vec<u8> = match g.below(20) {
             0 => vec![b'n'; g.pick(&[99usize, 100, 150])],
             1 => b"with#hash".to_vec(),
-            _ => format!("{}-region{}", g.pick(&["ctx", "Left", "unknown"]), g.int(0, 9))
-                .into_bytes(),
+            _ => format!(
+                "{}-region{}",
+                g.pick(&["ctx", "Left", "unknown"]),
+                g.int(0, 9)
+            )
+            .into_bytes(),
         };
         let mut l = format!("{} ", if g.chance(8) { g.int(-5, 5) } else { i }).into_bytes();
         l.extend_from_slice(&name);
@@ -380,7 +405,11 @@ pub fn generate(g: &mut Gen, kind: &str, _portable: bool) -> Vec<String> {
                 }
                 .to_string(),
             );
-            t.push(if g.chance(2) { "N".into() } else { enc(Some(b"s1")) });
+            t.push(if g.chance(2) {
+                "N".into()
+            } else {
+                enc(Some(b"s1"))
+            });
             t.push(if g.chance(3) {
                 "N".into()
             } else {
@@ -452,7 +481,9 @@ pub fn generate(g: &mut Gen, kind: &str, _portable: bool) -> Vec<String> {
                 }
                 .to_string(),
             );
-            t.push(enc(Some(g.pick(&["w/o.dat", "w/o.dat", "w/nodir/o.dat"]).as_bytes())));
+            t.push(enc(Some(
+                g.pick(&["w/o.dat", "w/o.dat", "w/nodir/o.dat"]).as_bytes(),
+            )));
         }
         "cfp" => {
             let (w, h, d) = (g.int(1, 6), g.int(1, 6), g.int(1, 6));
@@ -492,7 +523,10 @@ pub fn generate(g: &mut Gen, kind: &str, _portable: bool) -> Vec<String> {
                 t.push(g.int(0, w - 1).to_string());
                 t.push(g.int(0, h - 1).to_string());
                 t.push(g.int(0, d - 1).to_string());
-                t.push(format!("{:08x}", (g.pick(&[127.0f32, 255.0, 3.0])).to_bits()));
+                t.push(format!(
+                    "{:08x}",
+                    (g.pick(&[127.0f32, 255.0, 3.0])).to_bits()
+                ));
             }
             t.push(g.pick(&[0i64, 0, 1, 127, 255, 7]).to_string());
             t.push(g.int(0, 1).to_string());
@@ -568,7 +602,11 @@ pub fn generate(g: &mut Gen, kind: &str, _portable: bool) -> Vec<String> {
             t.push(d_entry("w/sub"));
             t.push(g.pick(&["1", "1", "0"]).into());
             t.push(g.pick(&["1", "1", "0"]).into());
-            t.push(enc(Some(g.pick(&[b"scanner_ras".as_slice(), b"tkreg", b""]))));
+            t.push(enc(Some(g.pick(&[
+                b"scanner_ras".as_slice(),
+                b"tkreg",
+                b"",
+            ]))));
             let k = g.int(0, 5);
             t.push(k.to_string());
             for _ in 0..k {
@@ -577,11 +615,14 @@ pub fn generate(g: &mut Gen, kind: &str, _portable: bool) -> Vec<String> {
             let nops = g.int(1, 6);
             t.push(nops.to_string());
             for _ in 0..nops {
-                let op = g.pick(&["S", "C", "P", "K", "W", "T", "G", "E", "F", "A", "R", "Z", "T"]);
+                let op = g.pick(&[
+                    "S", "C", "P", "K", "W", "T", "G", "E", "F", "A", "R", "Z", "T",
+                ]);
                 t.push(op.into());
                 let file = |g: &mut Gen| {
                     enc(Some(
-                        g.pick(&["w/p.json", "w/sub/p.dat", "w/nodir/p.txt"]).as_bytes(),
+                        g.pick(&["w/p.json", "w/sub/p.dat", "w/nodir/p.txt"])
+                            .as_bytes(),
                     ))
                 };
                 match op {
@@ -824,8 +865,8 @@ fn read_mri(g: &mut Globals, tk: &mut Toks) -> Mri {
     );
     let mut sink = Vec::new();
     let mut sink2 = Vec::new();
-    let mut m = larmorx_freesurfer_mri::mri::mri_alloc(g, &mut sink, &mut sink2, w, h, d, ty)
-        .unwrap();
+    let mut m =
+        larmorx_freesurfer_mri::mri::mri_alloc(g, &mut sink, &mut sink2, w, h, d, ty).unwrap();
     let mut f = || f32_of(tk.next());
     m.vg.xsize = f();
     m.vg.ysize = f();
@@ -932,8 +973,8 @@ fn answer(
             g.errno = 0;
             let subj = super::dec(tk.next());
             let name = tk.string();
-            let a = label::label_read(g, &env, out, err, dir, subj.as_deref(), &name)
-                .map_err(fatal)?;
+            let a =
+                label::label_read(g, &env, out, err, dir, subj.as_deref(), &name).map_err(fatal)?;
             print_label(o, a.as_ref());
         }
         "lwr" => {
@@ -1024,7 +1065,8 @@ fn answer(
             let count = tk.int() as i32;
             let real = tk.int() as i32;
             let name = tk.string();
-            let r = ctrpoints::mri_write_control_points(g, &env, err, dir, &pts, count, real, &name);
+            let r =
+                ctrpoints::mri_write_control_points(g, &env, err, dir, &pts, count, real, &name);
             oi(o, i64::from(r));
             odir(o, w);
         }
@@ -1055,13 +1097,8 @@ fn answer(
             } else {
                 let ct = read_table(&mut tk);
                 let given = tk.int() != 0;
-                let r = annotation::set_atable_from_ctable(
-                    g,
-                    out,
-                    err,
-                    &mut t,
-                    given.then_some(&ct),
-                );
+                let r =
+                    annotation::set_atable_from_ctable(g, out, err, &mut t, given.then_some(&ct));
                 oi(o, i64::from(r));
             }
             let k = tk.int();

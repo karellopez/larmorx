@@ -91,10 +91,9 @@ fn scan_line(g: &mut Globals, e: &mut AtableElt, line: &[u8]) {
     let _ = sc.d(&mut errno, false);
     sc.finish(&mut errno);
     g.errno = errno;
-    e.annotation = e
-        .r
-        .wrapping_add(e.g.wrapping_shl(8))
-        .wrapping_add(e.b.wrapping_shl(16));
+    e.annotation =
+        e.r.wrapping_add(e.g.wrapping_shl(8))
+            .wrapping_add(e.b.wrapping_shl(16));
 }
 
 /// The table read from `fname` (the two readers' common part): `None` when it does not open
@@ -217,7 +216,16 @@ pub fn read_annotation_table(
             f
         }
     };
-    read_table(g, out, err, dir, t, &fname, "read_annotation_table", &fname.clone())
+    read_table(
+        g,
+        out,
+        err,
+        dir,
+        t,
+        &fname,
+        "read_annotation_table",
+        &fname.clone(),
+    )
 }
 
 /// The table, read first ([`read_annotation_table`]) when `num_entries` is 0 or less.
@@ -312,7 +320,10 @@ pub fn annotation_to_name(
     entries(t)
         .iter()
         .find(|e| e.annotation == annotation)
-        .map_or_else(|| (b"NOT_FOUND".to_vec(), -1), |e| (e.name.clone(), e.index))
+        .map_or_else(
+            || (b"NOT_FOUND".to_vec(), -1),
+            |e| (e.name.clone(), e.index),
+        )
 }
 
 /// `set_atable_from_ctable(pct)`: `ERROR_BAD_PARM` for no table; `NO_ERROR` at once when a
@@ -396,9 +407,7 @@ pub fn print_annotation_colortable(
     for e in entries(t) {
         let mut l = format!("{:3}   ", e.index).into_bytes();
         l.extend_from_slice(&e.name);
-        for _ in e.name.len()..40 {
-            l.push(b' ');
-        }
+        l.resize(l.len() + 40usize.saturating_sub(e.name.len()), b' ');
         l.extend_from_slice(format!("  {:3} {:3} {:3}  0\n", e.r, e.g, e.b).as_bytes());
         let _ = fp.write_all(&l);
     }

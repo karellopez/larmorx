@@ -768,15 +768,13 @@ pub fn label_remove_duplicates(g: &mut Globals, err: &mut dyn Write, area: &mut 
         }
         for n2 in n1 + 1..n {
             let lv2 = &mut area.lv[n2];
-            if lv1.vno >= 0 && lv2.vno >= 0 && lv1.vno == lv2.vno {
-                deleted = deleted.wrapping_add(1);
-                lv2.deleted = 1;
-            } else if lv1.vno < 0
+            let same_vertex = lv1.vno >= 0 && lv2.vno >= 0 && lv1.vno == lv2.vno;
+            let same_point = lv1.vno < 0
                 && lv2.vno < 0
                 && fequal(lv1.x, lv2.x)
                 && fequal(lv1.y, lv2.y)
-                && fequal(lv1.z, lv2.z)
-            {
+                && fequal(lv1.z, lv2.z);
+            if same_vertex || same_point {
                 deleted = deleted.wrapping_add(1);
                 lv2.deleted = 1;
             }

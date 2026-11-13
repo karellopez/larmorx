@@ -226,6 +226,7 @@ fn print_g(x: f64) -> String {
 /// rounded (`nint`); each such voxel inside the volume whose frame-0 value is not the fill value
 /// is set to it. `nhits = <voxels set>`. 0. A vox2ras that cannot be inverted ends the program
 /// in the product.
+#[allow(clippy::too_many_arguments)]
 pub fn mri_fill_points(
     g: &mut Globals,
     out: &mut dyn Write,
@@ -287,11 +288,12 @@ pub fn mri_fill_points(
                         matrix_multiply(g, out, err, ras2vox.as_ref(), Some(&ras), Some(c))?;
                     }
                     None => {
-                        crs = match matrix_multiply(g, out, err, ras2vox.as_ref(), Some(&ras), None)?
-                        {
-                            Ret::New(m) => Some(m),
-                            _ => None,
-                        };
+                        crs =
+                            match matrix_multiply(g, out, err, ras2vox.as_ref(), Some(&ras), None)?
+                            {
+                                Ret::New(m) => Some(m),
+                                _ => None,
+                            };
                     }
                 }
                 let Some(c) = crs.as_ref() else {

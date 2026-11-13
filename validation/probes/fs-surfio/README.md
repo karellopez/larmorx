@@ -36,7 +36,17 @@
   `MRISfree`), `meta` (`MRIScopyMetadata` into a new or a given surface, with an `LTAalloc`
   transform array and the Talairach matrices), `misc` (the curvature names, the registration
   sigmas, `cprints`/`cprintd`/`cprintf`, `MRIS_vertexProgress_print`, the vector searches,
-  `signum_eval`, the two sort comparisons) and `edges` (`edgesIntersect`), 28 commands. `build.sh` also builds
+  `signum_eval`, the two sort comparisons) and `edges` (`edgesIntersect`), 28 commands; since relay 10
+(queue items 3.1-51 and 3.1-52) `mprop` (a surface with a mesh's topology from the case: each
+vertex's faces and corners, its 1- to 3-hop rings, distances with their storage, the faces' cache;
+the switches `FREESURFER_OLD_`/`NEW_MRIScomputeMetricProperties`, `FS_FASTER_MP`,
+`FS_WEIGHTS_NORMS_BY_ANGLE`, `FREESURFER_fastApproxAtan2f_use_atanf2`, `FREESURFER_reportLogicErrors`,
+`FREESURFER_SEED`; `UnitizeNormalFace`, `fix_vertex_area`; then 1 to 4 of `MRIScomputeMetricProperties`,
+`MRIScomputeTriangleProperties`, `MRIScomputeNormals`, `MRIScomputeAvgInterVertexDist` (with and without
+the deviation; `G` where a vertex would read distances it has not), `MRISupdateEllipsoidSurface`,
+`mrisOrientSurface`, `mrisOrientPlane`, `mrisComputeSurfaceDimensions`, `MRISsmoothSurface`,
+`mrisDisturbVertices`, `MRISrecenter`, `MRISscaleBrainArea`, `MRISscaleVertexCoordinates`,
+`MRISscaleBrain`; then the state), 29 commands. `build.sh` also builds
   `fssurfio-mpstub`: the same probe with a stub `MRIScomputeMetricProperties` (it writes `MP`),
   linked first with `--allow-multiple-definition` so the library's own call (`MRISsmoothSurface`'s
   last step) reaches it; `check.py` runs `metric`'s cases through it.
@@ -47,6 +57,18 @@
   cache at one thread, the port in both modes, the comparison (`reproduce` identical; `fix`
   different only with a notice), and the hash the test checks. Run it inside
   `scripts/orchestration/boxed.sh`.
+
+Measured 2026-11-13 (relay 10, 29 commands): seed 7, 58,000 cases: 57,557 identical with `reproduce`,
+443 counted, not compared (440 `mprop` cases where FreeSurfer reads memory it never wrote or does not
+own: FS-121, FS-123, or the fast arctangent's table outside its range, FS-06: `check.py`'s `SKIP`; 3
+`metric` cases of FS-114); `fix` differs only with notices (FS-01, FS-03, FS-12, FS-111, FS-113,
+FS-115..FS-120, FS-122, FS-124) and in 4 `surf` and 70 `posn` cases (`fix_libm`); the port's outputs
+byte-identical with and without AArch64's NaN emulated (69,001 and 69,038 NaNs flipped), both modes
+(log `<workspace>/oracles/logs/fs-surfio-relay10-seed7.log`). `mprop` alone, seeds 11, 13 and 17:
+10,000 cases, every comparable one identical (1,729 counted, not compared); the default different
+only with notices. Seed 1, 870 cases: 865 identical, 5 `SKIP`, hash
+`16d6b5a0f4b53fe3a13a05708f5cdcd842a026a4ec1737698d1b7f9008125e3b` (the test, which hashes the
+`SKIP` cases as `SKIP` as `check.py` does), with the emulation too, debug and release.
 
 Measured 2026-11-13 (relay 9, 28 commands): seed 7, 56,000 cases: all identical with `reproduce`
 (4,584 of them failed assertions, FS-03; 63 FS-117, 319 FS-118, 16 FS-119); `fix` differs only with

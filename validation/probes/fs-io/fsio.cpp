@@ -319,12 +319,17 @@ int ***labels_alloc(int x0, int y0, int z0)
 bool more() { return pos < toks.size(); }
 
 // ---- piece 3: .npy volumes, gifti.cpp's two helpers, dti.cpp's b-value files and names ----
-// a fixture name, or `-` for the data file written from the hex token that follows
+// a fixture name, or `-` for the file x.npy written in the fixture from the hex token that follows
+// (a name relative to the fixture: messages that print it read the same on both sides)
 std::string where_of(const char *w, const char *hexdata)
 {
   if (strcmp(w, "-") == 0) {
-    write_file(unhex(hexdata));
-    return dat;
+    std::vector<unsigned char> b = unhex(hexdata);
+    FILE *fp = fopen("x.npy", "wb");
+    if (!fp) fail("cannot write x.npy");
+    if (!b.empty()) fwrite(b.data(), 1, b.size(), fp);
+    fclose(fp);
+    return "x.npy";
   }
   return w;
 }

@@ -486,8 +486,8 @@ fn answer(
             let wh = t.s();
             let data = t.s();
             let path = if wh == "-" {
-                std::fs::write(&w.dat, unhex(data)).unwrap();
-                dat
+                std::fs::write(w.fix.join("x.npy"), unhex(data)).unwrap();
+                "x.npy".to_owned()
             } else {
                 wh.to_owned()
             };

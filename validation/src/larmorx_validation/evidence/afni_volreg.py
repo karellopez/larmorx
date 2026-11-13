@@ -1139,10 +1139,18 @@ def run_name(s: str | None) -> str | None:
 
 def _rows(t: dict, names: dict[str, str]) -> None:
     """A table whose rows compare runs: each row's name as the example names that comparison
-    (``names``: its old label -> its new), else by :func:`run_name`; its columns' runs too."""
+    (``names``: its old label -> its new), else by :func:`run_name`; its columns' runs too; the
+    replica's rows before the clean room's."""
     for r in t["rows"]:
         head = r.get("head")
         r["head"] = names.get(head) or run_name(head)
+    # the guide's one order: the replica's rows before the clean room's, the others in place
+    ports = [
+        i for i, r in enumerate(t["rows"]) if re.match(r"^(?:replica|clean room)\b", r["head"])
+    ]
+    ordered = sorted((t["rows"][i] for i in ports), key=lambda r: r["head"].startswith("clean"))
+    for i, r in zip(ports, ordered, strict=True):
+        t["rows"][i] = r
     for c in t.get("columns", []):
         c["label"] = re.sub(r"^original \((\d+)\)$", r"clean room (\1)", c["label"])
         c["label"] = re.sub(r"^(clean room|replica) \(1\)$", r"\1 (1 thread)", c["label"])

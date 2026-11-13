@@ -217,8 +217,7 @@ count, the result to reproduce is that thread count's.
   more than 0.10 (float subtraction, compared in double), it is remembered and, with the heartbeat bit
   `0x4000` set, `<100*fraction>% finished\n` is written on standard error (`%2.1f`, the product in
   float). **Percent done** (a fraction and a count n) does the same with its own memory and the step
-  `1/n` in float, compared in float (n = 0: never prints; a negative n prints at every call that does
-  not reset). **(observed)**: the fractions 0, 0.1, 0.2, 0.3, 0.1, 1, 0.95, 0.96, 1.2, -0.5, 0, 0.2000001
+  `1/n` in float, compared in float (n = 0 gives an infinite step: it never prints). **(observed)**: the fractions 0, 0.1, 0.2, 0.3, 0.1, 1, 0.95, 0.96, 1.2, -0.5, 0, 0.2000001
   (as floats) print `0.0`, `10.0`, `20.0`, `30.0`, `10.0`, `100.0`, `95.0`, `120.0`, `-50.0`, `0.0`,
   `20.0` `% finished`; with n = 4 percent done prints `0.0`, `30.0`, `10.0`, `100.0`, `95.0`, `120.0`,
   `-50.0`, `0.0`.
@@ -235,8 +234,9 @@ count, the result to reproduce is that thread count's.
 - **FS-262. A 64-bit integer:** FreeSurfer reverses the bytes, then rounds the reversed value (a
   signed 64-bit integer) to the nearest double (ties to even) and converts it back, truncating (a
   value rounded up to 2^63 gives -2^63). The result differs from the exact reversal only when the
-  reversed value needs more than 53 significant bits, which never happens for values below 2^40 (the
-  lengths of FreeSurfer's file tags, which its MGH and MGZ files write through it). **(observed)**:
+  reversed value needs more than 53 significant bits, which never happens for values below 2^40
+  (FreeSurfer's MGH and MGZ files hold their tags' lengths as such byte-swapped 64-bit integers, all
+  far below). **(observed)**:
   `swaplong64 72057594037927937` (0x0100000000000001) gives 72057594037927936;
   `swaplong64 81985529216486895` (0x0123456789abcdef) gives -1167088121787636992, the exact reversal
   being -1167088121787636991. Rule A. **Default:** the exact reversal; **reproduce:** FreeSurfer's
@@ -247,8 +247,8 @@ count, the result to reproduce is that thread count's.
 - **FS-261.** For k = 2, 4 and 8 FreeSurfer reverses the bytes of the **first ⌈n/k⌉ items only**
   (it counts the items in bytes), leaving the others as they were. **(observed)**: `byteswapbuf 2 4
   x0102030405060708` gives `x0201040305060708`, `byteswapbuf 4 2 x0102030405060708` gives
-  `x0403020105060708`. FreeSurfer's reader of Siemens IMA files swaps its pixel data this way (off
-  the default paths). Rule A. **Default:** every item reversed; **reproduce:** the first ⌈n/k⌉. Noted
+  `x0403020105060708`. FreeSurfer's reading of Siemens IMA files (off the default paths) swaps its
+  pixel data this way (from the source; no IMA file was at hand to observe it). Rule A. **Default:** every item reversed; **reproduce:** the first ⌈n/k⌉. Noted
   when they differ (n ≥ 2).
 
 ## 7. Command-line helpers of the older programs
@@ -343,7 +343,7 @@ Seed 53, then a number between 5 and -3 (swapped): `400203bb00000000`.
 
 **FS-11.** FreeSurfer's case-insensitive compare and extension helper copy their argument into a
 1,024-byte buffer: a string of 1,024 bytes or more overflows it. Both modes work on the whole string,
-with a notice. (Not probed: the overflow corrupts the probe.)
+with a notice. (Not probed: an overflow would make the probe's own results meaningless.)
 
 ## 11. Numbers and lists
 
@@ -439,7 +439,8 @@ platform `Linux`; compiler `GCC` `8.4.0` (**(observed)** `versionstrings`, `alli
   **prefixes** (`--versionx` counts), `--all-info` and `-all-info` exactly (`-all-infox` does not). A
   version option writes `<name> freesurfer 8.2.0` + `\n` on standard output, `<name>` the name the
   program passes (`mri_info` for `mri_info`); an all-info option writes one line: `ProgramName:
-  <name>  ProgramArguments: <the arguments, the program's own path first, one space apart>
+  <name>  ProgramArguments: <the arguments, the program as it was started (its first argument)
+  first, one space apart>
   ProgramVersion: 8.2.0  TimeStamp: <now, below>  BuildTime: Mar 14 2026 12:21:06  BuildStamp:
   <stamp>  User: <user>  Machine: <host name>  Platform: Linux  PlatformVersion: <kernel release>
   CompilerName: GCC  CompilerVersion: 8.4.0` (pairs two spaces apart; `UNKNOWN` for the user, or for

@@ -625,8 +625,9 @@ pub fn run(
         {
             extra.push("SKIP");
         }
-        // FreeSurfer's numbers from memory contents (a header cut short)
-        if matches!(n.defect.id, "FS-49" | "FS-167") {
+        // FreeSurfer's numbers from memory contents (a header cut short), a transform name read
+        // past its tag's text (FS-421)
+        if matches!(n.defect.id, "FS-49" | "FS-167" | "FS-421") {
             extra.push("VARY");
         }
     }

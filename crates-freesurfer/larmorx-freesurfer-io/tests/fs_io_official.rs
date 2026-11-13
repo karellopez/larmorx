@@ -3,18 +3,19 @@
 // 2026 Karel Lopez Vilaret.
 //! fs.io against FreeSurfer 8.2.0's official code on every platform: the SHA-256 of the official
 //! build's output lines for the probe's recorded cases (`cases::recorded_cases`: seed 1's 4,800
-//! portable cases, about 61 of each of the 79 commands that behave alike on every platform: piece
+//! portable cases, about 53 of each of the 90 commands that behave alike on every platform: piece
 //! 1's ten, piece 2's twelve, piece 3's six, piece 4's seven (the format probe's file cases made
 //! portable), piece 5's seven (mosaics, MATLAB files), piece 6's five (reading volumes and
-//! registration files), piece 7's seven (Bruker studies), piece 8's twelve (2-D images) and piece
-//! 9's one (fs.core's ArgumentParser), without those that take seconds in a debug build,
-//! `cases::HEAVY_SEED1`, which the probe's runs keep), recorded by `validation/probes/fs-io/check.py
-//! --seed 1 --n 4800 --portable --light` on Linux x64 from the unit oracle's build (2026-11-13,
-//! track A relay 18, with pieces 8 and 9: 4,798 cases, 4,196 lines identical, 69 of them with
-//! memory digits; 602 hashed as `SKIP`), against the port's output with `reproduce`. A `?` digit (a
-//! byte FreeSurfer reads from memory contents) is hashed as `?`; the lines the port marks `SKIP` or
-//! `VARY` are hashed as `SKIP` (lines where FreeSurfer crashes, reads for ever, depends on the
-//! machine or on memory contents, and formats not ported yet).
+//! registration files), piece 7's seven (Bruker studies), piece 8's twelve (2-D images), piece 9's
+//! one (fs.core's ArgumentParser) and piece 10's eleven (fs.labels' text colour tables and
+//! lookups), without those that take seconds in a debug build, `cases::HEAVY_SEED1`, which the
+//! probe's runs keep), recorded by `validation/probes/fs-io/check.py --seed 1 --n 4800 --portable
+//! --light` on Linux x64 from the unit oracle's build (2026-11-13, track A relay 19, with piece 10:
+//! 4,796 cases, 4,164 lines identical, 55 of them with memory digits; 632 hashed as `SKIP`),
+//! against the port's output with `reproduce`. A `?` digit (a byte FreeSurfer reads from memory
+//! contents) is hashed as `?`; the lines the port marks `SKIP` or `VARY` are hashed as `SKIP`
+//! (lines where FreeSurfer crashes, reads for ever, depends on the machine or on memory contents,
+//! and formats not ported yet).
 
 #[path = "fs_io/cases.rs"]
 mod cases;
@@ -22,8 +23,8 @@ mod cases;
 use larmorx_core::defects::UpstreamDefects;
 use sha2::{Digest, Sha256};
 
-const OFFICIAL_SHA256: &str = "51212c14653ce81ece2346642bdf92504bc9d436e1ef96429173bbee38c93506";
-const SKIPPED: usize = 602;
+const OFFICIAL_SHA256: &str = "d9fa9bdaf03981b69287a0006cd16aacdc367f1fffa611d9da2c2bf12c30eb94";
+const SKIPPED: usize = 632;
 
 #[test]
 fn reproduce_gives_the_official_outputs() {

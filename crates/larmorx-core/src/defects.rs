@@ -1561,6 +1561,8 @@ defects! {
         "the tissue-type schemas' table of tissue classes keeps the random float colours it was made with: its float colours do not match its integer ones (kept: no FreeSurfer program reads them)";
     FS_420 = "FS-420", "FreeSurfer", true,
         "a text colour table whose largest structure number (or tissue-type number) is beyond the machine's memory, or a table of random colours of such a count, gives an error message, a crash or a table depending on the machine's memory";
+    FS_421 = "FS-421", "FreeSurfer", true,
+        "reading an MGH volume whose talairach tag's text has no NUL byte (and fewer than 1,024 bytes) takes the transform's name on past the text from memory never written: a garbled name, so the transform is not found or another file is read";
     FS_285 = "FS-285", "FreeSurfer", true,
         "reading a volume-geometry block (the text block of linear transform and surface files) whose line starts with a word of 64 bytes or more writes the word past its buffer: memory corruption, a crash or wrong values";
     FS_286 = "FS-286", "FreeSurfer", true,

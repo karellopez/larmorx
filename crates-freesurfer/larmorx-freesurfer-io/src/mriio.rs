@@ -34,7 +34,7 @@
 use std::io::Write;
 use std::path::Path;
 
-use larmorx_core::defects::{FS_76, FS_249, FS_253, FS_254, FS_255, FS_256, FS_257};
+use larmorx_core::defects::{FS_76, FS_249, FS_253, FS_254, FS_255, FS_256, FS_257, FS_421};
 use larmorx_freesurfer_core::diag::{self, DIAG_INFO, DIAG_SHOW};
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{
@@ -998,10 +998,12 @@ pub fn mri_tag_read(
         return Ok(());
     }
     let info = g.gdiag & DIAG_INFO != 0;
-    // the transform name's buffer (a fresh volume's: zeros)
+    // the transform name's buffer: a fresh volume's has its first byte 0 and the rest never written
+    // (FS-421; 0 here), a name copied in has its NUL; `tname_known` bytes are written
     let mut tname = [0u8; STRLEN];
     let n0 = m.transform_fname.len().min(STRLEN);
     tname[..n0].copy_from_slice(&m.transform_fname.as_bytes()[..n0]);
+    let mut tname_known = (n0 + 1).min(STRLEN);
     let mut io = FsTagsIo::new(fp, niftiheaderext);
     loop {
         let mut len: i64 = 0;
@@ -1110,11 +1112,20 @@ pub fn mri_tag_read(
                 // the bytes over the name's buffer; a longer tag's name is its bytes up to a NUL
                 let n = data.len().min(STRLEN);
                 tname[..n].copy_from_slice(&data[..n]);
+                tname_known = tname_known.max(n);
                 let mut name: Vec<u8> = if data.len() > STRLEN {
                     c_str(&data).to_vec()
                 } else {
                     c_str(&tname).to_vec()
                 };
+                if data.len() <= STRLEN && !tname[..tname_known].contains(&0) {
+                    g.notices.add(
+                        &FS_421,
+                        format!(
+                            "MRITAGread: a talairach tag of {len} bytes without a NUL: the name's bytes after it never written (0 here)"
+                        ),
+                    );
+                }
                 if info {
                     let _ = writeln!(
                         out,
@@ -1127,6 +1138,7 @@ pub fn mri_tag_read(
                     let k = name.len().min(STRLEN - 1);
                     tname[..k].copy_from_slice(&name[..k]);
                     tname[k] = 0;
+                    tname_known = tname_known.max(k + 1);
                 }
                 let lossy = String::from_utf8_lossy(&name).into_owned();
                 m.transform_fname = lossy.clone();

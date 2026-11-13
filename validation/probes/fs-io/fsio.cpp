@@ -622,9 +622,12 @@ void ostdstr(const std::string &v)
 }
 const unsigned char help9[] = "<help><name>probe</name><synopsis>probe [options]</synopsis></help>";
 
+// piece 10: fs.labels' text colour tables and lookups (colortab.cpp)
+void run_piece10(const std::string &cmd);
+
 void run_piece9(const std::string &cmd)
 {
-  if (cmd != "apa") fail("unknown command");
+  if (cmd != "apa") { run_piece10(cmd); return; }
   fwide(stderr, -1);
   ArgumentParser parser;
   int nconf = (int)geti();
@@ -675,9 +678,176 @@ void run_piece9(const std::string &cmd)
   }
 }
 
+// a table: <version> <nentries> <idbase> <fname> <k>, then k entries <index> <name> <r> <g> <b> <a>
+// <tissue type> <count> (float colours from the integer ones, as the readers make them)
+COLOR_TABLE *read_ct10()
+{
+  COLOR_TABLE *ct = (COLOR_TABLE *)calloc(1, sizeof(COLOR_TABLE));
+  ct->version = (int)geti();
+  ct->nentries = (int)geti();
+  ct->idbase = (int)geti();
+  bool n;
+  std::string fn = getstr(&n);
+  strncpy(ct->fname, fn.c_str(), STRLEN - 1);
+  ct->entries = (COLOR_TABLE_ENTRY **)calloc(ct->nentries > 0 ? ct->nentries : 1, sizeof(CTE *));
+  int k = (int)geti();
+  for (int i = 0; i < k; i++) {
+    int idx = (int)geti();
+    CTE *e = (CTE *)calloc(1, sizeof(CTE));
+    std::string nm = getstr(&n);
+    strncpy(e->name, nm.c_str(), STRLEN - 1);
+    e->ri = (int)geti(); e->gi = (int)geti(); e->bi = (int)geti(); e->ai = (int)geti();
+    e->rf = (float)e->ri / 255.0; e->gf = (float)e->gi / 255.0; e->bf = (float)e->bi / 255.0;
+    e->af = (float)e->ai / 255.0;
+    e->TissueType = (int)geti();
+    e->count = (int)geti();
+    ct->entries[idx] = e;
+  }
+  return ct;
+}
+// a table: N, or its fields and non-empty entries (`alloc`: entries CTABalloc made, whose tissue
+// type and count are memory contents, left out), then its tissue-type table (`T`)
+void print_ct10(const COLOR_TABLE *ct, bool alloc, bool sub_alloc)
+{
+  if (!ct) { out += "N "; return; }
+  oi(ct->nentries); oi(ct->version); oi(ct->idbase); ocs(ct->fname); ocs(ct->TissueTypeSchema);
+  for (int i = 0; i < ct->nentries; i++) {
+    const CTE *e = ct->entries[i];
+    if (!e) continue;
+    out += "@" + std::to_string(i) + " ";
+    ocs(e->name); oi(e->ri); oi(e->gi); oi(e->bi); oi(e->ai);
+    of(e->rf); of(e->gf); of(e->bf); of(e->af);
+    if (!alloc) { oi(e->TissueType); oi(e->count); }
+  }
+  out += "T ";
+  print_ct10(ct->ctabTissueType, sub_alloc, false);
+}
+// three environment variables: FREESURFER_HOME, SUBJECTS_DIR, FS_DESIRED_BVEC_SPACE (N: unset)
+void env10()
+{
+  const char *names[] = {"FREESURFER_HOME", "SUBJECTS_DIR", "FS_DESIRED_BVEC_SPACE"};
+  for (const char *nm : names) {
+    bool n;
+    std::string v = getstr(&n);
+    if (n) unsetenv(nm);
+    else setenv(nm, v.c_str(), 1);
+  }
+}
+std::string name10() { bool n; return getstr(&n); }
+
+void run_piece10(const std::string &cmd)
+{
+  fwide(stderr, -1);
+  unsetenv("FREESURFER_SEED");
+  if (cmd == "cra") {
+    int check = (int)geti();
+    setup(next());
+    errno = 0;
+    std::string fn = name10();
+    ctabDuplicates = -7;
+    COLOR_TABLE *ct = CTABreadASCII2(fn.c_str(), check);
+    print_ct10(ct, false, false);
+    oi(ctabDuplicates);
+  } else if (cmd == "crt") {
+    setup(next());
+    errno = 0;
+    std::string fn = name10();
+    print_ct10(CTABreadASCIIttHeader(fn.c_str()), false, false);
+  } else if (cmd == "ctd") {
+    env10();
+    setup(next());
+    errno = 0;
+    print_ct10(CTABreadDefault(), false, false);
+  } else if (cmd == "cal") {
+    setRandomSeed(strtol(next(), NULL, 10));
+    int n = (int)geti();
+    print_ct10(CTABalloc(n), true, false);
+  } else if (cmd == "cun") {
+    setRandomSeed(strtol(next(), NULL, 10));
+    int nmax = (int)geti();
+    COLOR_TABLE *ct = read_ct10();
+    oi(CTABunique(ct, nmax));
+    print_ct10(ct, false, false);
+  } else if (cmd == "ccr") {
+    int brk = (int)geti();
+    COLOR_TABLE *ct = read_ct10();
+    oi(CTABcountRepeats(ct, brk));
+  } else if (cmd == "cq") {
+    COLOR_TABLE *ct = read_ct10();
+    int nops = (int)geti();
+    for (int k = 0; k < nops; k++) {
+      std::string op = next();
+      int a = -7, b = -7, c = -7, d = -7;
+      if (op == "v") { oi(CTABgetNumberOfValidEntries(ct, &a)); oi(a); }
+      else if (op == "t") { oi(CTABgetNumberOfTotalEntries(ct, &a)); oi(a); }
+      else if (op == "e") { int i = (int)geti(); oi(CTABisEntryValid(ct, i, &a)); oi(a); }
+      else if (op == "h") { int i = (int)geti(); oi(CTABhasEntry(ct, i)); }
+      else if (op == "r") { int i = (int)geti(); oi(CTABrgbAtIndexi(ct, i, &a, &b, &c)); oi(a); oi(b); oi(c); }
+      else if (op == "n") {
+        int i = (int)geti();
+        int len = (int)geti();
+        static char buf[4096];
+        memset(buf, 'Z', sizeof buf);
+        oi(CTABcopyName(ct, i, buf, len));
+        size_t m = strnlen(buf, len);
+        out += "x";
+        obytes(std::vector<unsigned char>(buf, buf + m));
+        if (m == 0) { out.pop_back(); out.pop_back(); out += " "; }
+      }
+      else if (op == "a") { int r = (int)geti(), g = (int)geti(), bb = (int)geti(); oi(CTABrgb2Annotation(r, g, bb)); }
+      else if (op == "x") { std::string nm = name10(); oi(CTABentryNameToIndex(nm.c_str(), ct)); }
+      else if (op == "y") { std::string nm = name10(); oi(CTABentryNameToAnnotation(nm.c_str(), ct)); }
+      else if (op == "i") { int i = (int)geti(); oi(CTABannotationAtIndex(ct, i, &a)); oi(a); }
+      else if (op == "f") { int an = (int)geti(); oi(CTABfindAnnotation(ct, an, &a)); oi(a); }
+      else if (op == "F") { int an = (int)geti(); oi(CTABfindIndexFromAnnotation(ct, an, &a)); oi(a); }
+      else if (op == "g") { int r = (int)geti(), g = (int)geti(), bb = (int)geti(); oi(CTABfindRGBi(ct, r, g, bb, &a)); oi(a); }
+      else if (op == "m") { std::string nm = name10(); oi(CTABfindName(ct, nm.c_str(), &a)); oi(a); }
+      else if (op == "d") { oi(CTABfindDuplicateNames(ct)); }
+      else fail("unknown query");
+      (void)d;
+    }
+  } else if (cmd == "cpw") {
+    Gdiag = (int)geti();
+    setup(next());
+    errno = 0;
+    COLOR_TABLE *ct = read_ct10();
+    std::string fn = name10();
+    oi(CTABwriteFileASCII(ct, fn.c_str()));
+    obytes(read_file(fn));
+  } else if (cmd == "cps") {
+    Gdiag = (int)geti();
+    COLOR_TABLE *ct = read_ct10();
+    oi(CTABprintASCII(ct, stdout));
+  } else if (cmd == "cts") {
+    std::string schema = name10();
+    setRandomSeed(strtol(next(), NULL, 10));
+    env10();
+    setup(next());
+    errno = 0;
+    COLOR_TABLE *ct = geti() ? read_ct10() : NULL;
+    print_ct10(TissueTypeSchema(ct, schema.c_str()), false, true);
+  } else if (cmd == "cme") {
+    COLOR_TABLE *ct = read_ct10();
+    COLOR_TABLE *m = read_ct10();
+    oi(CTABmerge(ct, m));
+    print_ct10(ct, false, false);
+  } else {
+    fail("unknown command");
+  }
+  oi(Gerror);
+}
+
+bool piece10_cmd(const std::string &cmd)
+{
+  static const char *k[] = {"cra", "crt", "ctd", "cal", "cun", "ccr", "cq", "cpw", "cps", "cts", "cme"};
+  for (const char *c : k)
+    if (cmd == c) return true;
+  return false;
+}
+
 void run_piece8(const std::string &cmd)
 {
-  if (cmd == "apa") { run_piece9(cmd); return; }
+  if (cmd == "apa" || piece10_cmd(cmd)) { run_piece9(cmd); return; }
   fwide(stderr, -1);
   Gerror = (int)geti();
   if (cmd == "ial") {

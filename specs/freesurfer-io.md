@@ -13,7 +13,9 @@ the zeroed allocation that ends the program. **Part 2** (§10-18, the item's sec
 tags, the matrix tags, the binary colour tables, a volume geometry's stored form, the tags of an
 `.mgz` and of FreeSurfer's NIfTI header extension (`FStagsIO`). **Part 3** (§19-24, the item's third
 piece): NumPy `.npy` volumes, two GIFTI helpers, the diffusion files, names and gradient spaces.
-Later parts: the volume formats.
+Later parts: the volume formats (parts 4 to 7), 2-D images (part 8), and **part 9** (§65-74, queue item
+3.1-33's first piece, fs.labels): text colour tables, their lookups, random colours, tissue-type
+schemas.
 
 ## 1. Conventions
 
@@ -1571,3 +1573,206 @@ counted); `fix` differs only where a defect is noted. FS-412: a scale whose exte
 fails); the default refuses it: `ImageScaleUp`/`ImageScaleDown` print `<function>: scale <s> gives
 extents beyond the int range` + newline and return -1, `ImageRescale` without an output ends the
 program with that message (code -4).
+
+## 65. Conventions of part 9 (fs.labels: text colour tables and lookups)
+
+Queue item 3.1-33's first piece (`fs.labels`). A colour table (§13) has `nentries` places, each
+empty or holding an entry: a name (a C string, at most 1,023 bytes), integer red, green, blue and
+alpha, float red, green, blue and alpha, a tissue type and a voxel count; and the table's file name,
+version, `idbase` (added to the structure numbers when written), a tissue-type schema name and an
+optional tissue-type table (itself a colour table). The place of an entry is its **structure
+number**. An entry's **annotation** packs its colour into one 32-bit `int`: blue × 65,536 + green ×
+256 + red, computed as `(b << 16) + (g << 8) + r` in 32-bit two's complement (wrapping for components
+outside 0 to 255); an annotation's colour is its low three bytes (red the lowest). A float colour is
+the integer one converted to `float`, divided by 255 in `double`, rounded to `float`. Errors that
+"return" print `error: <message>` (FS-01's NUL byte under `reproduce`) after `errno`'s text when
+`errno` is not 0, and set `Gerror` (`specs/freesurfer-core.md` §2). Lines are read as C's `fgets`
+with a 1,024-byte buffer (a longer line is taken in pieces of 1,023 bytes, each a line; a NUL byte
+ends what the line holds), numbers and names with `sscanf` (`%d`, `%s`; `specs/freesurfer-maths.md`
+§18.1 for `errno`). "Standard output" messages are `printf`s. The random colours come from fs.core's
+`randomNumber(0, 255)` rounded by `nint` (`specs/freesurfer-core.md` §9 and §11: the stream
+`setRandomSeed` starts, `FREESURFER_SEED` or the clock when none was set).
+
+## 66. Reading a text colour table (`CTABreadASCII`, `CTABreadASCII2`)
+
+`CTABreadASCII(name)` is `CTABreadASCII2(name, 1)`. A file that does not open: the error
+`CTABreadASCII(<name>): could not open file` (`ERROR_NOFILE`), no table. Otherwise two passes:
+
+1. **The size.** Each line through `fgetl` (`specs/freesurfer-core.md` §10: lines empty or starting
+   with `#` after white space skipped, the rest cut at the first `#`, the newline dropped): when
+   `"%d %s %d %d %d %d"` assigns six values, its first is a candidate; the table's size is the
+   largest candidate plus one (32-bit, wrapping). No candidate above 0 (a table of only structure 0
+   included): the error `CTABreadASCII(<name>): badly formed file` (`ERROR_NOFILE`), no table.
+2. **The entries.** From the start again, every line as it is (`fgets`, comments not cut), numbered
+   from 1 (each piece of a long line counts): `"%d %s %d %d %d %d %d"`; six or seven values make an
+   entry at the first value's place: the name, red, green, blue, alpha 255 minus the sixth value
+   (wrapping), the float colours, the tissue type the seventh value (-1 when there is none), count
+   0. A place already taken: `CTABreadASCII(<name>): Line <n>: Duplicate structure index <s>, was
+   <name> <r> <g> <b> <a>` + newline on standard output (the entry already there), the line
+   dropped, and the global count `ctabDuplicates` (set to 0 before this pass) raised.
+
+Then, when asked (the second argument not 0), the duplicate names (§70); then the tissue-type table
+(§67), which reopens the file. The table's file name is the name given (at most 1,023 bytes),
+version 2, `idbase` 0, schema empty. `errno` is what the reads left (a folder read fails with 21,
+`Is a directory`, printed before a later error; a number beyond `int` leaves 34).
+
+**FS-413:** a second-pass line whose structure number is negative, or is not below the size (the
+largest number's line has a `#` in its name: the first pass cut it as a comment; the second does
+not), is stored outside FreeSurfer's table: memory corruption, a crash, or another object's values.
+Default: a negative number is the error `CTABreadASCII(<name>): Line <n>: negative structure index
+<s>` (`ERROR_BADFILE`), no table (rule B); a larger one grows the table to hold it (rule A: such a
+name is kept when its number is within the table, so it is kept here too). `reproduce`: both lines
+are left out. Both noted. **FS-420:** a size above 2^24 (16,777,216) is refused as FreeSurfer's
+failed allocation: `errno` 12 and `CTABreadASCII(<name>): could not allocate <size> entries`
+(`ERROR_NO_MEMORY`), no table, noted (FreeSurfer's outcome depends on the machine's memory). The
+same for a larger number met in the second pass by default.
+
+## 67. The tissue-type lines (`CTABreadASCIIttHeader`)
+
+The lines `#ctTType <structure> <name> <r> <g> <b> <transparency>` (as `CTABprintASCIItt` writes
+them) describe the tissue classes. A file that does not open: `ERROR: CTABreadASCIItt(): cannot
+open <name>` + newline (standard output), no table. Each line is read whole (`fgets`); the file's
+last line is taken twice (no visible effect). A line counts when it has an item by
+`CountItemsInString` (items separated by spaces and tabs; a newline or carriage return where an
+item would start ends the count) and its first white-space separated item is exactly `#ctTType`.
+First pass: `sscanf("%d")` of the second item gives the largest structure number (`segidmax`, -1
+before any). No such line: no table (FreeSurfer leaves the file open: FS-415; both modes close it,
+no notice). The table has `segidmax + 1` places, no file name, version 0. Second pass:
+`"%*s %d %s  %d %d %d  %d"` of each such line: the entry at the structure's place: the name,
+red, green, blue, alpha 255 minus the transparency, float colours 0, tissue type the structure
+number, count 0.
+
+**FS-414:** (1) a line whose only content is vertical tabs, form feeds or carriage returns among
+spaces and tabs counts as having an item but has no first item: FreeSurfer prints `error: asking
+for item 0, but 0 items in string` and crashes; both modes skip the line (the default without the
+message). (2) A `#ctTType` line without a second item: FreeSurfer prints `error: asking for item 1,
+but 1 items in string` and crashes; both modes give no tissue-type table (the default with the
+message below, `reproduce` with FreeSurfer's). (3) A `#ctTType` line whose structure number, name,
+colour or transparency does not read keeps the value of the last line that read it (memory never
+written before the first), and a structure number outside the table is stored outside it. Default:
+every `#ctTType` line must read six values with a structure number of 0 or more, else `ERROR:
+CTABreadASCIItt(): bad tissue type line in <name>: <the line without its newline>` + newline
+(standard output) and no tissue-type table (rule B). `reproduce`: the earlier lines' values, 0 (and
+an empty name) for memory never written, a structure outside the table left out; noted.
+
+## 68. The default table (`CTABreadDefault`)
+
+`FSENVgetenv` (`specs/freesurfer-core.md` §15, which itself reads
+`$FREESURFER_HOME/FreeSurferColorLUT.txt` with §66 and prints its messages), then §66 of the same
+file again: the default table's messages appear twice (kept). **FS-416:** when `FSENVgetenv` gives
+nothing (`FREESURFER_HOME not defined`, the table unreadable with `ERROR: reading <file>`, a wrong
+`FS_DESIRED_BVEC_SPACE`), FreeSurfer crashes; both modes give no table after those messages, noted.
+
+## 69. Tables of random colours (`CTABalloc`, `CTABunique`, `CTABrandom`, `CTABcountRepeats`)
+
+- `CTABalloc(n)`: a negative `n`: the error `CTABalloc: nentries was <n>` (`ERROR_BADPARM`), no
+  table. Otherwise `n` entries, in order: red, green, blue each `nint(randomNumber(0, 255))`, alpha
+  255, the float colours, name `cluster<i>`; file name `none`, version 2, `idbase` 0; then
+  `CTABunique(table, 100)`. The entries' tissue type and count are memory contents in FreeSurfer
+  that nothing reached reads (0 in both modes, no notice). **FS-420:** above 2^20 entries: `errno`
+  12, `CTABalloc: could not allocate <n> entries` (`ERROR_NO_MEMORY`), no table, noted.
+- `CTABunique(table, nmax)`: up to `nmax` tries (none when `nmax` ≤ 0): `CTABrandom`, then stop when
+  `CTABcountRepeats(table, 1)` is 0. Then entry 0 becomes `unknown`, colour, alpha and float colours
+  0. When the number of tries made equals `nmax` (also when the last try succeeded, and for
+  `nmax` = 0: kept, rule C): `INFO: CTABunique() could not find a unique set in <nmax> tries` +
+  newline (standard output) and -1; else 0.
+- `CTABrandom(table)`: every entry in order gets new red, green, blue (drawn as above), alpha 255
+  and the float colours; 0.
+- `CTABcountRepeats(table, stop)`: for each entry i and each later entry j with the same float red,
+  green and blue, one repeat; with `stop`, only the first such j per i. Returns the count.
+
+**FS-417:** FreeSurfer crashes on an empty place in `CTABrandom`, `CTABcountRepeats` and
+`CTABunique`, and in `CTABunique` (so `CTABalloc(0)`) on a table without entry 0; both modes skip
+empty places (no colours drawn for them) and make no `unknown` entry, noted.
+
+## 70. Counts, tests and lookups
+
+| function | result |
+|---|---|
+| `CTABgetNumberOfValidEntries` | the non-empty places (`NO_ERROR`) |
+| `CTABgetNumberOfTotalEntries` | `nentries` |
+| `CTABisEntryValid(i)` | 1 or 0; outside 0 to `nentries` - 1: error `CTABisEntryValid: index <i> was OOB`, `ERROR_BADPARM`, the answer untouched |
+| `CTABhasEntry(i)` | true for a non-empty place inside the table, false otherwise (no message) |
+| `CTABrgbAtIndexi(i)` | the integer colour; outside: error `CTABrgbAtIndexi: index <i> was OOB`; an empty place: `ERROR_BADPARM` silently, outputs untouched |
+| `CTABcopyName(i, buf, len)` | `strncpy` of the name into `len` bytes (no NUL when the name has `len` bytes or more); outside: `CTABcopyName: index <i> was OOB`; empty: `ERROR_BADPARM` silently |
+| `CTABrgb2Annotation(r, g, b)` | the annotation (§65) |
+| `CTABentryNameToIndex(name)` | the first entry whose name equals `name` ignoring ASCII case (`stricmp`), else -1 |
+| `CTABentryNameToAnnotation(name)` | that entry's annotation, else -1 |
+| `CTABannotationAtIndex(i)` | the annotation; outside: `CTABannotationAtIndex: index <i> was OOB`; empty: `ERROR_BADPARM` silently |
+| `CTABfindAnnotation(a)`, `CTABfindIndexFromAnnotation(a)` | the first entry of the annotation's colour, else -1 (`NO_ERROR`) |
+| `CTABfindRGBi(r, g, b)` | the first entry of that integer colour, else -1; a component outside 0 to 255: error `CTABfindRGBi: rgb was invalid`, `ERROR_BADPARM`, the answer untouched |
+| `CTABfindName(name)` | as `CTABentryNameToIndex` (`NO_ERROR`) |
+| `CTABfindDuplicateNames` | for every ordered pair of non-empty places with equal names (`strcmp`), `ERROR: label name '<name>' is duplicated!` + newline; then, when there was one, `CTABfindDuplicateNames: <pairs / 2> duplicate names found in:` + newline + two spaces + the file name + newline (standard output); returns pairs / 2 |
+
+A name of 1,024 bytes or more in `stricmp` overflows FreeSurfer's buffer (FS-11, noted).
+
+## 71. Writing a text table (`CTABprintASCII`, `CTABwriteFileASCII`)
+
+`CTABprintASCII(table, stream)`: with `Gdiag`'s `DIAG_INFO` (0x10000), first `[DEBUG]
+CTABprintASCII(): fname = '<file name>' (<its length> bytes)` + newline on standard output. Then
+each non-empty place in order as `%3d  %-30s  %3d %3d %3d  %3d` + newline: the structure number
+plus `idbase` (wrapping), the name without its white-space bytes (C's `isspace`), red, green, blue,
+255 minus alpha (wrapping) (`%-30s` pads with spaces to 30 bytes, longer names are kept whole);
+`ERROR_NONE`. `CTABwriteFileASCII(table, name)`: a new file (`fopen` mode `w`); one that does not
+open: the error `CTABwriteFileASCII(<name>): could not open for writing` + newline (`ERROR_NOFILE`,
+so the message has a newline, then FS-01's NUL, then a newline); else §71's lines into it.
+
+## 72. Tissue-type schemas (`TissueTypeSchema`, `TissueTypeSchemaDefault`, `TissueTypeSchemaDefaultHead`)
+
+`TissueTypeSchema(table, schema)`: `default-jan-2014` → `TissueTypeSchemaDefault`;
+`default-jan-2014+head` or `default-apr-2019+head` → `TissueTypeSchemaDefaultHead`; another: `ERROR:
+tissue type schema <schema> unrecognized` + newline (standard output), no table.
+
+Both schemas: `TissueTypeSchemaDefaultHead` first prints `Entering TissueTypeSchemaDefaultHead()`.
+Without a table, `FSENVgetenv` and §66 of `$FREESURFER_HOME/FreeSurferColorLUT.txt` (FS-416: when
+either gives nothing FreeSurfer crashes; both modes no table). The schema name becomes
+`default-jan-2014`, resp. `default-apr-2019+head` (then `schema <name>` printed). The tissue-type
+table is `CTABalloc(5)`, resp. `CTABalloc(6)` (§69: the random draws happen), its first entries then
+renamed and recoloured (integer colours only): `unknown` 0 0 0, `cortex` 205 62 78, `subcort_gm` 230
+148 34, `wm` 0 255 0, `csf` 120 18 134 and (head) `head` 150 150 200; its float colours stay those
+drawn (entry 0's are 0), alpha 255 (entry 0's 0). **FS-419** (kept, rule C): those float colours do
+not match the integer ones; no reached code reads them. Then every non-empty entry's tissue type, by
+its structure number n (-1 where nothing applies):
+
+- unknown (0): n = 0;
+- cortex (1): 3, 42;
+- subcortical grey matter (2): 8, 47, 17, 53, 18, 54, 13, 52, 10, 49, 51, 12, 50, 11, 26, 58, 28, 60,
+  16, 126, 174, 29, 61, 80; with head also 172, 179, 267, 819, 820, 843, 844, 865, 866, 869, 870;
+- white matter (3): 2, 41, 7, 46, 690, 691, 77, 78, 79, 85, 930, 192, 251 to 255, 34, 66; with head
+  also 821, 822, 853;
+- CSF (4): 14, 15, 24, 257, 4, 43, 5, 44, 31, 63, 72, 30, 62, 914; with head also 75, 76;
+- head (5, head schema only): 258, 165, 259, 118 to 124, 127, 129 to 135, 143 to 145, 167, 262, 263,
+  264, 902, 907, 908, 909, 911, 915, 916;
+- otherwise, the ranges checked in this order, a later match winning: 1000-1035 and 2000-2035
+  cortex; 3000-3035 and 4000-4035 white matter; (head) 3201-3207 and 4201-4207 white matter;
+  1100-1181 and 2100-2181 cortex; 3100-3181 and 4100-4181 white matter; 5001, 5002 white matter;
+  11100-11300 and 12100-12300 cortex.
+
+## 73. Merging (`CTABmerge`)
+
+`CTABmerge(table, merge)`: each non-empty place of `merge` is copied whole (name, colours, tissue
+type, count) into the same place of `table`, replacing what was there; returns 0. **FS-418:** a
+`merge` with more places than `table` makes FreeSurfer write past `table`; by default `table` grows
+to hold them (rule A), `reproduce` leaves those entries out; noted.
+
+## 74. Validation plan (part 9)
+
+The probe's commands (`validation/probes/fs-io/`, piece 10): `cra` (`CTABreadASCII2` with and without
+the duplicate-name check, `ctabDuplicates` set to -7 before), `crt` (`CTABreadASCIIttHeader`), `ctd`
+(`CTABreadDefault` with `FREESURFER_HOME`, `SUBJECTS_DIR`, `FS_DESIRED_BVEC_SPACE` set or not) on
+generated table files: entry lines with every separator, signs, numbers beyond `int`, stray
+characters, a seventh column or not, duplicate structure numbers, names with `#`, case variants and
+bytes beyond ASCII; comments, blank lines, CR LF, lines longer than 1,023 bytes, NUL bytes,
+`#ctTType` lines whole and broken, lines of vertical tabs and form feeds; missing files and folders.
+`cal` (`CTABalloc` after `setRandomSeed`), `cun` (`CTABunique`), `ccr` (`CTABcountRepeats`), `cq`
+(every lookup of §70 on generated tables with empty places, out-of-range indices and components,
+names of every case and length), `cpw` (`CTABwriteFileASCII` and the file's bytes, `DIAG_INFO` on
+or off, names deblanked and longer than 30 bytes, `idbase`, places that do not open), `cps`
+(`CTABprintASCII` to standard output), `cts` (`TissueTypeSchema` of a given table with the schemas'
+structure numbers, or of the default table), `cme` (`CTABmerge`). Each table printed with its
+fields, its non-empty entries (float colours as bits; tissue type and count except for `CTABalloc`'s
+entries) and its tissue-type table; `Gerror` last. Lines with FS-413, FS-416, FS-417, FS-418,
+FS-420, FS-11, or FS-414's crashes and stores outside the table are counted, not compared; FS-414's
+memory never written compared apart. Measured (2026-11-13): seed 13, 1,664 piece-10 cases:
+`reproduce` identical on 1,415, 0 different (230 counted, 19 apart); `fix` differs only where a
+defect is noted (FS-414's default error, FS-01).

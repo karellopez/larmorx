@@ -1183,6 +1183,22 @@ def first_difference(a: bytes, b: bytes) -> str:
     return f"lengths: probe {len(la)} lines, candidate {len(lb)} lines"
 
 
+def calls(case: Case) -> int:
+    """The calls a run makes: one per line of a batch file, else one."""
+    if case.args[0] == "batch":
+        return sum(
+            1
+            for line in Path(case.args[1]).read_text(encoding="latin-1").splitlines()
+            if line.strip()
+        )
+    return 1
+
+
+def differing_lines(a: bytes, b: bytes) -> int:
+    la, lb = a.split(b"\n"), b.split(b"\n")
+    return sum(1 for x, y in zip(la, lb, strict=False) if x != y) + abs(len(la) - len(lb))
+
+
 def describe(case: Case) -> str:
     args = []
     for a in case.args:
@@ -1224,9 +1240,14 @@ def main() -> int:
     gen = Gen(scratch, a.seed, a.fs_home)
     cases = all_cases(gen, groups)
     if a.command == "list":
+        per_group: dict[str, list[int]] = {}
         for c in cases:
             print(describe(c))
-        print(f"{len(cases)} runs", file=sys.stderr)
+            n = per_group.setdefault(c.group, [0, 0])
+            n[0] += 1
+            n[1] += calls(c)
+        for g, (runs, n) in per_group.items():
+            print(f"{g:9s} {runs:4d} runs {n:7d} calls", file=sys.stderr)
         return 0
     if a.probe is None:
         ap.error("--probe is needed")
@@ -1262,8 +1283,9 @@ def main() -> int:
     for c in cases:
         p = masked(c, runner.probe_run(c), masks)
         q = masked(c, runner.candidate_run(link, c, a.mode), masks)
-        t = tally.setdefault(c.group, [0, 0, 0, 0])
+        t = tally.setdefault(c.group, [0, 0, 0, 0, 0, 0])
         t[0] += 1
+        t[4] += calls(c)
         if serial(p) == serial(q):
             t[1] += 1
             continue
@@ -1280,6 +1302,7 @@ def main() -> int:
         else:
             what = "unexplained"
         t[3] += 1
+        t[5] += max(1, differing_lines(p.out, q.out)) if c.args[0] == "batch" else 1
         bad += 1
         if t[3] <= 3:
             print(f"DIFFERS ({what}): {describe(c)}")
@@ -1292,11 +1315,14 @@ def main() -> int:
             ):
                 if x != y:
                     print(f"    {name}: {first_difference(x, y)}")
-    print(f"mode {a.mode}: group, runs, identical, allowed differences, unexplained differences")
+    print(
+        f"mode {a.mode}: group, runs (calls): identical, allowed differences, unexplained"
+        " differences (calls differing)"
+    )
     for g in groups:
         if g in tally:
-            n, same, allowed, diff = tally[g]
-            print(f"  {g:9s} {n:4d} {same:4d} {allowed:4d} {diff:4d}")
+            n, same, allowed, diff, ncalls, dcalls = tally[g]
+            print(f"  {g:9s} {n:4d} ({ncalls:6d}): {same:4d} {allowed:4d} {diff:4d} ({dcalls})")
     return 1 if bad else 0
 
 

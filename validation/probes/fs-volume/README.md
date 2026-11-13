@@ -139,8 +139,10 @@ d's first part `fpow`, `mbin`, `reshape`, `mmax`, `mconst`, `fbin`, `vote`, `msq
 `oracles/logs/fs-found-c-r20-*.log`): `pvlab` seed 7, 2,000 cases: 1,540 identical with `reproduce`, 460 not
 comparable, 0 different; piece c seed 7, 16,000 cases: 14,704 identical, 1,296 not comparable, 0 different; seed 13
 (with `pvlab`), 34,000 cases: 30,950 identical, 3,050 not comparable, 0 different; piece d seed 7, 13,000 cases:
-11,988 identical, 1,012 not comparable, 0 different; `fix` different only with notices (GLIBC-07 for `powf` and
-`cos`). Seed 1, 3,020 cases: 2,813 identical, 207 not comparable, hash
+11,988 identical, 1,012 not comparable, 0 different; seed 13, 26,000 cases: 23,856 identical, 2,143 not
+comparable, 1 different (`revs`: `MRIsetVoxelToRasXform`'s centre adds column 4 last in the official build; fixed,
+then `revs`, `setv2r`, `vx2rx` at seed 13, 12,000 cases: 11,700 identical, 300 not comparable, 0 different); `fix`
+different only with notices (GLIBC-07 for `powf` and `cos`). Seed 1, 3,020 cases: 2,813 identical, 207 not comparable, hash
 `0b75c43a5ca8662cac67b4bce54b64c9d718499cda9360cecd3086fb190d45d3`, passing with AArch64's NaN emulated in debug
 (36,191 flips) and release (30,739) (`oracles/logs/fs-found-c-r20-trap-volume.log`); the port's debug and release
 builds agree on 47,000 cases in both modes. `check.py`'s `SKIP` adds FS-469, FS-470, FS-471, FS-473, FS-475 and

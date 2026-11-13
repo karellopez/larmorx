@@ -20,7 +20,7 @@
 //! its spaces), FS-388 (a data array number outside the file's), FS-389 (a negative label key),
 //! FS-390 (sparse arrays shorter than the surface: refused, kept), FS-391 and FS-392 (the shape
 //! overlays' data type and name), FS-393 (the colours' alpha past the stored three), FS-394 (the
-//! statistics overlays: kept until measured), FS-395 (a file without a Version); FS-17 (a value outside `int` made an integer),
+//! statistics overlays: kept until measured), FS-395 (a file without a Version), FS-396 (a label array without data); FS-17 (a value outside `int` made an integer),
 //! FS-147 (a vertex of more than 255 faces), FS-356 (a file name of 1,024 bytes or more).
 
 use std::collections::BTreeMap;
@@ -29,7 +29,7 @@ use std::path::{Path, PathBuf};
 use larmorx_core::cfmt::{Streams, Writers};
 use larmorx_core::defects::{
     FS_80, FS_356, FS_381, FS_382, FS_383, FS_384, FS_385, FS_386, FS_387, FS_388, FS_389, FS_390,
-    FS_391, FS_392, FS_393, FS_394, FS_395, Notices,
+    FS_391, FS_392, FS_393, FS_394, FS_395, FS_396, Notices,
 };
 use larmorx_freesurfer_core::affine::float_to_int;
 use larmorx_freesurfer_core::cscan::Bytes;
@@ -1036,6 +1036,21 @@ pub fn mris_read_gifti_danum(
             );
             if target.ct.is_none() {
                 return fail(io, "mrisReadGIFTIdanum: NULL colortable\n");
+            }
+            if darray.data.is_none() && target.nvertices > 0 {
+                g.notices.add(
+                    &FS_396,
+                    format!("{fname}: a label array without data (FreeSurfer reads through a null pointer)"),
+                );
+                if g.notices.reproduce() {
+                    return Err(Fatal::Exit(139));
+                }
+                return fail(
+                    io,
+                    &format!(
+                        "mrisReadGIFTIdanum: label data array [{k}] has no data in file {fname}\n"
+                    ),
+                );
             }
             let (mut nindex, mut vno) = (0i32, 0i32);
             while vno < target.nvertices {

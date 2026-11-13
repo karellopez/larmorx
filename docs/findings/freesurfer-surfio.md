@@ -1381,6 +1381,9 @@ depends on it. The mechanisms behind the defects:
   one-frame volume of depth 1 (outside from the run's third array). Rule D: `MRISurfOverlay`'s
   readers (mris_convert's `--merge-gifti` and the overlay tools) are its only users; measured when
   they are ported.
+- **FS-396**: line 981 `label_data` is `darray->data`, `NULL` when gifticlib could not decode the
+  values (its `** decode_ascii cannot decode type 768` for ASCII `UINT32`); `*(label_data + da_index)`
+  crashes (gdb: the load in `mrisReadGIFTIdanum`, `<scratch>/D/relay21/c1.txt`).
 - **Operand order and conversions**: the colour components `floor(c * 256)` are `float` products
   (`floor` of a `float` exact either way); `(int)` conversions of the values are x86-64's `cvttsd2si`
   (FS-17's `INT_MIN`).

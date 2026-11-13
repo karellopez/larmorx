@@ -108,9 +108,11 @@ SKIP: tuple[str, ...] = (
     "FS-392",
     "FS-53",
 )
-# gifticlib's messages that print pointers (`** UPB: bad params (<buf>,<blen>,<n>)`): the port
+# gifticlib's messages that print pointers (`** UPB: bad params (<buf>,<blen>,<n>)`, `** A2D: bad
+# setup (<da>,...`): the port
 # writes placeholders, the official build addresses
 POINTERS = re.compile(r"\(0x[0-9a-f]+,0x[0-9a-f]+,")
+A2D = re.compile(r"A2D: bad setup \(0x[0-9a-f]+,")
 SKIP_WHEN_REFUSED: tuple[str, ...] = ("FS-114",)
 
 
@@ -207,7 +209,9 @@ def main(argv: list[str] | None = None) -> int:
             official[i] = line
         served.append(done.cached)
 
-    official = [POINTERS.sub("(<buf>,<blen>,", x) for x in official]
+    official = [
+        A2D.sub("A2D: bad setup (<da>,", POINTERS.sub("(<buf>,<blen>,", x)) for x in official
+    ]
 
     def port_lines(mode: str) -> list[tuple[str, list[str]]]:
         out = subprocess.run(

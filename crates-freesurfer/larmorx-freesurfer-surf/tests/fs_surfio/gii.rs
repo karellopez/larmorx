@@ -286,7 +286,11 @@ fn coord_meta(g: &mut Gen, heavy: bool) -> Vec<(String, String)> {
     }
     if g.chance(3) {
         let n = g.int(0, 3);
-        let said = if g.chance(5) { n + g.int(-1, 2) } else { n };
+        let mut said = if g.chance(5) { n + g.int(-1, 2) } else { n };
+        if heavy && g.chance(40) {
+            // more than 1,000 command lines: FreeSurfer never returns (FS-382)
+            said = 1000 + g.int(1, 3);
+        }
         m.push(("NUM_TAG_CMDLINE".into(), format!("{said}")));
         for k in 0..n {
             m.push((

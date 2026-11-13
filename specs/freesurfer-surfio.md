@@ -3460,7 +3460,9 @@ negative` on standard error, failure. Finally the duplicate-name check (§107.5)
   FS-391, memory contents in FreeSurfer; 255 bytes of a longer one, FS-391), format `GIFTI_FILE`
   (27), one value per vertex, the volume.
 - **Labels** (`NIFTI_INTENT_LABEL`): `parsing dataarray #<k> (NIFTI_INTENT_LABEL) ...` on standard
-  output; without a colour table on the surface: `mrisReadGIFTIdanum: NULL colortable`, `NULL`. For
+  output; without a colour table on the surface: `mrisReadGIFTIdanum: NULL colortable`, `NULL`; an
+  array gifticlib gave no values (one it could not decode, such as ASCII `UINT32`; FS-396): FreeSurfer
+  crashes, by default `mrisReadGIFTIdanum: label data array [<k>] has no data in file <file>`, `NULL`. For
   each vertex (or each node-index row, stopping after the last; the loop also stops once a vertex
   number at or past the vertex count has been visited) the value is the key: FreeSurfer reads the
   array's bytes as 32-bit unsigned integers whatever its type (FS-385; by default the value by its
@@ -3524,5 +3526,5 @@ lines, Talairach matrix, colour table with each entry's names and colours, but n
 array's table, FS-393; per vertex coordinates, curvature, `val`, `stat`, `dx dy dz`, annotation, face
 count; per face its vertices), the kept surface, then the overlays (name, type, intent, data type,
 format, values per vertex, volume size and first slice). `srd` reads GIFTI surfaces too. Counted, not
-compared: FS-382 to FS-384, FS-386, FS-388, FS-389, FS-391, FS-392, fs.mri's FS-53. FS-387's and
-FS-395's cases compare as FreeSurfer's crash. Observed (relay 21): the probe README.
+compared: FS-382 to FS-384, FS-386, FS-388, FS-389, FS-391, FS-392, fs.mri's FS-53. FS-387's,
+FS-395's and FS-396's cases compare as FreeSurfer's crash. Observed (relay 21): the probe README.

@@ -15,7 +15,6 @@
 // The loops index as FreeSurfer's C does (one vertex number for several arrays).
 #![allow(clippy::needless_range_loop)]
 
-
 use larmorx_freesurfer_core::diag::{self, DIAG_SHOW};
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::Fatal;
@@ -26,8 +25,8 @@ use crate::coords::{self, Io};
 use crate::facenorm;
 use crate::metric;
 use crate::mp::{
-    Instance, RAN, avg_dist, face_area_normal, fnv_hash, nbrs, orients_as_ellipsoid, points_inwards,
-    reports_degenerate, romp_partials, romp_total, sphere_area, takes_sphere_area,
+    Instance, RAN, avg_dist, face_area_normal, fnv_hash, nbrs, orients_as_ellipsoid,
+    points_inwards, reports_degenerate, romp_partials, romp_total, sphere_area, takes_sphere_area,
     triangle_props, vertex_area_share, vertex_face_area, vertex_normal, vface, vix,
 };
 use crate::mris::Mris;
@@ -43,7 +42,11 @@ fn xyz(mris: &Mris, vno: usize) -> [f32; 3] {
 
 fn face_xyz(mris: &Mris, fno: usize) -> [[f32; 3]; 3] {
     let v = mris.face(fno).v;
-    [xyz(mris, vix(v[0])), xyz(mris, vix(v[1])), xyz(mris, vix(v[2]))]
+    [
+        xyz(mris, vix(v[0])),
+        xyz(mris, vix(v[1])),
+        xyz(mris, vix(v[2])),
+    ]
 }
 
 fn set_area_normal(mris: &mut Mris, fno: usize) {
@@ -57,12 +60,7 @@ fn set_area_normal(mris: &mut Mris, fno: usize) {
 /// to five rounds, its unit normal and area (its original area too when negative), a degenerate
 /// vertex moved with its 1-hop neighbours and retried. A vertex whose normal cannot be computed in
 /// five rounds keeps its normal. Returns `NO_ERROR`.
-pub fn compute_normals(
-    g: &mut Globals,
-    sg: &SurfGlobals,
-    io: &mut Io,
-    mris: &mut Mris,
-) -> i32 {
+pub fn compute_normals(g: &mut Globals, sg: &SurfGlobals, io: &mut Io, mris: &mut Mris) -> i32 {
     let nv = usz(mris.nvertices);
     for k in 0..usz(mris.nfaces) {
         let f = mris.face(k);

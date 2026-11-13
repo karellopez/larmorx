@@ -38,9 +38,7 @@ use larmorx_freesurfer_core::diag::{self, DIAG_SHOW};
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::Fatal;
 use larmorx_freesurfer_core::matrix_ops::{Xyz, xyz_normalized_load};
-use larmorx_freesurfer_core::sse::{
-    add, add64, div, div64, mul, mul64, sqrt, sqrt64, sub, sub64,
-};
+use larmorx_freesurfer_core::sse::{add, add64, div, div64, mul, mul64, sqrt, sqrt64, sub, sub64};
 use larmorx_freesurfer_core::utils::{cope_with_logic_problem2, fast_approx_atan2f};
 
 use crate::aaa::{
@@ -349,8 +347,7 @@ pub fn mp_copy(
     dst.f_orig_angle = src.f_orig_angle.clone();
     if !only_inputs {
         for fno in 0..nf {
-            arr_mut(&mut dst.f_norm_set, "f_normSet")[fno] =
-                arr(&src.f_norm_set, "f_normSet")[fno];
+            arr_mut(&mut dst.f_norm_set, "f_normSet")[fno] = arr(&src.f_norm_set, "f_normSet")[fno];
             arr_mut(&mut dst.f_norm, "f_norm")[fno] = arr(&src.f_norm, "f_norm")[fno];
             let a = arr(&src.f_angle, "f_angle")[fno];
             copy_angles_per_triangle(&mut arr_mut(&mut dst.f_angle, "f_angle")[fno], &a);
@@ -713,14 +710,23 @@ pub fn mp_unload(
                     .as_ref()
                     .expect("VERTEX::dist is NULL");
                 for n in 0..usz(vtotal) {
-                    c.cmp(vno as i32, f64::from(sd[n]), f64::from(md[n]), "mris_dist[n]");
+                    c.cmp(
+                        vno as i32,
+                        f64::from(sd[n]),
+                        f64::from(md[n]),
+                        "mris_dist[n]",
+                    );
                 }
             }
         }
         {
             let v = mris.vertex(vno);
             let pairs = [
-                (v.ripflag as f32, shared(&mp.v_ripflag, "")[vno] as f32, "v->ripflag"),
+                (
+                    v.ripflag as f32,
+                    shared(&mp.v_ripflag, "")[vno] as f32,
+                    "v->ripflag",
+                ),
                 (v.whitex, shared(&mp.v_whitex, "")[vno], "v->whitex"),
                 (v.whitey, shared(&mp.v_whitey, "")[vno], "v->whitey"),
                 (v.whitez, shared(&mp.v_whitez, "")[vno], "v->whitez"),
@@ -771,7 +777,12 @@ pub fn mp_unload(
         let oa = shared(&mp.f_norm_orig_area, "f_norm_orig_area")[fno];
         let oang = shared(&mp.f_orig_angle, "f_orig_angle")[fno];
         if check {
-            c.cmp(fno as i32, f64::from(e.orig_area), f64::from(oa), "fNorm->orig_area");
+            c.cmp(
+                fno as i32,
+                f64::from(e.orig_area),
+                f64::from(oa),
+                "fNorm->orig_area",
+            );
             let d = aaa::cmp_angles_per_triangle(&mris.face(fno).orig_angle, &oang);
             c.cmp(
                 fno as i32,
@@ -901,12 +912,7 @@ pub(crate) fn triangle_area(p0: [f32; 3], p1: [f32; 3], p2: [f32; 3]) -> f32 {
 
 /// `mrismp_NormalFace` (and `mrisNormalFace`): [`edges_cross`] of the two edges made unit length
 /// first (`mrisNormalize`), the product too when `UnitizeNormalFace` is set.
-pub(crate) fn normal_face(
-    sg: &SurfGlobals,
-    p0: [f32; 3],
-    p1: [f32; 3],
-    p2: [f32; 3],
-) -> [f32; 3] {
+pub(crate) fn normal_face(sg: &SurfGlobals, p0: [f32; 3], p1: [f32; 3], p2: [f32; 3]) -> [f32; 3] {
     let mut a = diff3(p2, p0);
     let mut b = diff3(p1, p2);
     mris_normalize(&mut a);
@@ -1031,14 +1037,9 @@ fn mp_compute_normals(
             let r = {
                 let m: &MrisMp = mp;
                 let frip = shared(&m.f_ripflag, "f_ripflag");
-                vertex_normal(
-                    sg,
-                    mris,
-                    k,
-                    &|f| frip[f] != 0,
-                    &|f| mp_face(m, f),
-                    &|v| mp_xyz(m, v),
-                )
+                vertex_normal(sg, mris, k, &|f| frip[f] != 0, &|f| mp_face(m, f), &|v| {
+                    mp_xyz(m, v)
+                })
             };
             match r {
                 Some((snorm, area)) => {

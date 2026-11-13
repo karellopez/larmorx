@@ -101,7 +101,10 @@ pub(super) fn mprop_tokens(t: &mut Vec<String>, g: &mut Gen) {
         match op {
             "ss" => {
                 ix(&mut opt, g.int(0, 3));
-                opt.push(format!("{:08x}", g.pick(&[0.5f32, 0.25, 1.0, 1.5, -0.5]).to_bits()));
+                opt.push(format!(
+                    "{:08x}",
+                    g.pick(&[0.5f32, 0.25, 1.0, 1.5, -0.5]).to_bits()
+                ));
             }
             "dv" => {
                 envs |= 64;
@@ -111,8 +114,14 @@ pub(super) fn mprop_tokens(t: &mut Vec<String>, g: &mut Gen) {
                 ix(&mut opt, g.pick(&[2, 8, 9, 7, 2]));
                 ix(&mut opt, if g.chance(8) { 2 } else { 3 });
             }
-            "sv" => opt.push(format!("{:016x}", g.pick(&[1.5f64, 0.5, -1.0, 1.0]).to_bits())),
-            "sB" => opt.push(format!("{:08x}", g.pick(&[1.5f32, 0.5, 2.0, 1.0]).to_bits())),
+            "sv" => opt.push(format!(
+                "{:016x}",
+                g.pick(&[1.5f64, 0.5, -1.0, 1.0]).to_bits()
+            )),
+            "sB" => opt.push(format!(
+                "{:08x}",
+                g.pick(&[1.5f32, 0.5, 2.0, 1.0]).to_bits()
+            )),
             _ => {}
         }
     }
@@ -148,7 +157,14 @@ pub(super) fn mprop_tokens(t: &mut Vec<String>, g: &mut Gen) {
     };
     ix(t, status);
     ix(t, g.pick(&[0, 2, 4, 5, 1]));
-    ix(t, if g.chance(30) { g.pick(&[0, 4]) } else { g.int(1, 3) });
+    ix(
+        t,
+        if g.chance(30) {
+            g.pick(&[0, 4])
+        } else {
+            g.int(1, 3)
+        },
+    );
     ix(t, g.int(0, 3));
     ix(t, g.int(0, 3));
     if heavy && g.chance(4) {
@@ -192,7 +208,11 @@ pub(super) fn mprop_tokens(t: &mut Vec<String>, g: &mut Gen) {
         ix(t, i64::from(g.chance(4)));
         ix(t, i64::from(g.chance(7)));
         let [r1, r2, r3] = &rs[vno];
-        let counts = [r1.len(), r1.len() + r2.len(), r1.len() + r2.len() + r3.len()];
+        let counts = [
+            r1.len(),
+            r1.len() + r2.len(),
+            r1.len() + r2.len() + r3.len(),
+        ];
         let nsize_v = g.int(1, 3) as usize;
         let vtotal = counts[nsize_v - 1];
         let nsize_max = g.int(0, nsize_v as i64);
@@ -278,7 +298,16 @@ fn dump_mprop(m: &Mris, o: &mut Out) {
         ));
     }
     for x in [
-        m.xlo, m.ylo, m.zlo, m.xhi, m.yhi, m.zhi, m.xctr, m.yctr, m.zctr, m.total_area,
+        m.xlo,
+        m.ylo,
+        m.zlo,
+        m.xhi,
+        m.yhi,
+        m.zhi,
+        m.xctr,
+        m.yctr,
+        m.zctr,
+        m.total_area,
     ] {
         o.f(x);
     }

@@ -28,8 +28,8 @@ use crate::coords::{Io, centre};
 use crate::dist;
 use crate::facenorm;
 use crate::mp::{
-    RAN, diff3, fnv_hash, nbrs, orients_as_ellipsoid, romp_partials, romp_total,
-    sphere_area, sphere_distance, sphere_info, takes_sphere_area, vface, vix,
+    RAN, diff3, fnv_hash, nbrs, orients_as_ellipsoid, romp_partials, romp_total, sphere_area,
+    sphere_distance, sphere_info, takes_sphere_area, vface, vix,
 };
 use crate::mris::Mris;
 
@@ -156,12 +156,7 @@ impl Calc {
     }
 
     /// `computeNormalsAreasAndAngles()`.
-    fn normals_areas_angles(
-        &mut self,
-        g: &mut Globals,
-        io: &mut Io,
-        mris: &mut Mris,
-    ) {
+    fn normals_areas_angles(&mut self, g: &mut Globals, io: &mut Io, mris: &mut Mris) {
         for trial in 0..5 {
             let mut total_area = 0.0f64;
             self.vertex_areas.iter_mut().for_each(|a| *a = 0.0);
@@ -174,7 +169,11 @@ impl Calc {
                 let mut fnorm = vec_cross(diff3(p1, p0), diff3(p2, p0));
                 let mut area = face_length(fnorm);
                 if f64::from(area) > 0.0 {
-                    fnorm = [div(fnorm[0], area), div(fnorm[1], area), div(fnorm[2], area)];
+                    fnorm = [
+                        div(fnorm[0], area),
+                        div(fnorm[1], area),
+                        div(fnorm[2], area),
+                    ];
                 }
                 area = div64(f64::from(area), 2.0) as f32;
                 self.face_areas[fno] = area;
@@ -227,9 +226,7 @@ impl Calc {
                             self.face_angles[fno][index]
                         } else {
                             // one past the corners: the next face's first angle in C's array
-                            self.face_angles
-                                .get(fno + 1)
-                                .map_or(0.0, |a| a[0])
+                            self.face_angles.get(fno + 1).map_or(0.0, |a| a[0])
                         };
                         // `norm[k] += face_norm[k] * angle`, each product first (the third as
                         // `angle * face_norm[2]`)
@@ -241,7 +238,11 @@ impl Calc {
                 area = div(area, self.vertex_area_fix_value);
                 let length = length_zfirst(norm);
                 if length > 0.0 {
-                    norm = [div(norm[0], length), div(norm[1], length), div(norm[2], length)];
+                    norm = [
+                        div(norm[0], length),
+                        div(norm[1], length),
+                        div(norm[2], length),
+                    ];
                 } else {
                     must_move = true;
                     area = -1.0;
@@ -312,8 +313,8 @@ impl Calc {
     /// `computeVertexDistances()`: a sphere's or a parameterized sphere's arcs, any other
     /// surface's straight lines, into each unripped vertex's first `vtotal` distances.
     fn vertex_distances(&self, mris: &mut Mris) {
-        let sphere = mris.status == MrisStatus::SPHERE
-            || mris.status == MrisStatus::PARAMETERIZED_SPHERE;
+        let sphere =
+            mris.status == MrisStatus::SPHERE || mris.status == MrisStatus::PARAMETERIZED_SPHERE;
         let info: Vec<_> = if sphere {
             (0..self.nvertices)
                 .map(|v| sphere_info(self.vertex_ripped[v], self.vertices[v]))
@@ -374,7 +375,11 @@ impl Calc {
             s2.push(sum2);
             c.push(n);
         }
-        let (sum, sum2, n) = (romp_total(0.0, &s), romp_total(0.0, &s2), romp_total(0.0, &c));
+        let (sum, sum2, n) = (
+            romp_total(0.0, &s),
+            romp_total(0.0, &s2),
+            romp_total(0.0, &c),
+        );
         let avg = div64(sum, n);
         let std = sqrt64(div64(
             mul64(n, sub64(div64(sum2, n), mul64(avg, avg))),

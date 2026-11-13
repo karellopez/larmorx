@@ -28,10 +28,10 @@
 //! code where GCC 8.4 swaps a commutative operation's operands, `docs/findings/freesurfer-surfio.md`
 //! §9), so the NaNs are the official build's on every platform.
 //!
-//! Not here yet: `MRIScomputeMetricProperties` (it runs `utils/mrisurf_metricProperties_fast.h`
-//! and `_slow.h`, queue items 3.1-51 and 3.1-52), so `MRISsmoothSurface`'s last step,
-//! `MRISrecenter` and `MRISscaleBrainArea`; `MRISltaMultiply`, `MRIStransform` (an `LTA`, a `TRANSFORM`: fs.volume); `MRISnonmaxSuppress`
-//! (a spherical parameterization: fs.surf).
+//! `MRIScomputeMetricProperties` and the callers that end with it (`MRISsmoothSurface`,
+//! `MRISrecenter`, `MRISscaleBrainArea`, `mrisDisturbVertices`) are [`crate::mp`] (queue items
+//! 3.1-51 and 3.1-52). Not here yet: `MRISltaMultiply`, `MRIStransform` (an `LTA`, a
+//! `TRANSFORM`: fs.volume); `MRISnonmaxSuppress` (a spherical parameterization: fs.surf).
 
 // The loops index as FreeSurfer's C does (one vertex number for several arrays).
 #![allow(clippy::needless_range_loop)]

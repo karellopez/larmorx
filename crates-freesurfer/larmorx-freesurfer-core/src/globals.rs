@@ -98,6 +98,9 @@ pub struct Globals {
     /// `MRIsampleVolumeDerivativeSign` (`mri.cpp`): the sign the volume derivatives' magnitudes
     /// are multiplied by, 1 until `MRIsetSampleVolumeDerivativeSign` changes it.
     pub sample_volume_derivative_sign: f64,
+    /// `mincFindVolume`'s static `count` (`transform.cpp`): 1 after a `minctracc` line named one
+    /// `.mnc` volume, until a later line names another.
+    pub minc_find_volume_count: i32,
     /// D13's choice and the notices of the defects that changed this run's results.
     pub notices: Notices,
 }
@@ -143,6 +146,7 @@ impl Globals {
             drand48: Drand48::default(),
             vg_is_equal_threshold: f64::from(f32::EPSILON),
             sample_volume_derivative_sign: 1.0,
+            minc_find_volume_count: 0,
             notices: Notices::new(mode),
         }
     }

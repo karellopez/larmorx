@@ -596,6 +596,40 @@ void run_case()
     fflush(stdout);
     oi(r);
     oi(box.x); oi(box.y); oi(box.z); oi(box.dx); oi(box.dy); oi(box.dz);
+  } else if (cmd == "tftype") {
+    int n = geti();
+    for (int i = 0; i < n; i++) oi(TransformFileNameType(gethex().c_str()));
+  } else if (cmd == "ltaread") {
+    // a relative name in the scratch's folder (the messages name it)
+    std::string dir = scratch.substr(0, scratch.rfind('/'));
+    if (chdir(dir.c_str())) fail("chdir");
+    std::string name = "fsvol-lta" + gethex();
+    std::string bytes = gethex();
+    int have = geti();
+    unlink(name.c_str());
+    if (have) spill(name, bytes);
+    errno = 0;
+    fflush(stdout);
+    LTA *lta = LTAreadEx(name.c_str());
+    fflush(stdout);
+    oi(errno);
+    if (!lta) {
+      out += "NULL ";
+    } else {
+      oi(lta->type);
+      oi(lta->num_xforms);
+      for (int i = 0; i < lta->num_xforms; i++) {
+        LINEAR_TRANSFORM *lt = &lta->xforms[i];
+        of(lt->x0); of(lt->y0); of(lt->z0); of(lt->sigma);
+        om(lt->m_L);
+        oi(lt->type);
+        put_geom(&lt->src);
+        put_geom(&lt->dst);
+      }
+      ohex(std::string(lta->subject));
+      of(lta->fscale);
+    }
+    if (have) unlink(name.c_str());
   } else if (cmd == "coef" || cmd == "hsinc") {
     int n = geti();
     for (int i = 0; i < n; i++) {

@@ -1059,6 +1059,10 @@ defects! {
         "MatrixInverse and MatrixDeterminant of a 0 x 0 matrix read memory VNL never allocated (the inverse goes through the 4 x 4 closed form and copies 16 floats past its output; the determinant reads the empty QR factor's first element), and MatrixInverse of a singular complex matrix crashes (it copies from the NULL inverse of its real form)";
     FS_31 = "FS-31", "FreeSurfer", true,
         "FreeSurfer's vector functions do not check their vectors' lengths (VectorCrossProduct's and VectorTripleProduct's test lets column vectors of one or two elements through and never tests the other vectors; VectorDot and VectorDistance read the second vector to the first's length): elements read outside the vectors";
+    FS_100 = "FS-100", "FreeSurfer", true,
+        "the gamma draw converts its shape's integer part to a 32-bit unsigned integer, which C leaves undefined outside [0, 2^32): a shape of 2^32 or more gives a value of the wrong size, NaN and +inf the value of a shape below 1, and a negative shape or -inf a draw that does not return in practice";
+    FS_101 = "FS-101", "FreeSurfer", true,
+        "a seed whose 24 seeded values are all 0 (2147483563, -2147483563 and other multiples of 2147483563) makes the random generator give 0 for ever (its initial carry is 0): flat draws are constant and most other draws never return";
 }
 
 /// The register entry with ID `id`.

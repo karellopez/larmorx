@@ -795,7 +795,15 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
                         ])));
                     }
                 } else {
-                    let a = g.pick(&[0.0f32, 0.3, -0.7, 1.5707964, 3.1415927, 0.05, 2.0]);
+                    let a = g.pick(&[
+                        0.0f32,
+                        0.3,
+                        -0.7,
+                        std::f32::consts::FRAC_PI_2,
+                        std::f32::consts::PI,
+                        0.05,
+                        2.0,
+                    ]);
                     let (c, sn) = (a.cos(), a.sin());
                     let base = match g.below(4) {
                         0 => [1.0, 0.0, 0.0, 0.0, c, sn, 0.0, -sn, c],
@@ -840,8 +848,8 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
                     0.0f32,
                     0.1,
                     0.5,
-                    1.5707964,
-                    3.1415927,
+                    std::f32::consts::FRAC_PI_2,
+                    std::f32::consts::PI,
                     -0.7,
                     1e-6,
                     f32::NAN,

@@ -264,7 +264,7 @@ pub fn lta_fsl_read(
             return Ok(None);
         };
         let m = lta.xforms[0].m_l.as_mut().expect("LTAalloc's matrix");
-        scan_row(g, &line[at..].to_vec(), m, row);
+        scan_row(g, &line[at..], m, row);
     }
     lta.ltype = FSLREG_TYPE;
     Ok(Some(lta))
@@ -367,7 +367,7 @@ pub fn lta_mni_read_ex(
             return Ok(None);
         };
         let m = lta.xforms[0].m_l.as_mut().expect("LTAalloc's matrix");
-        scan_row(g, &line[at..].to_vec(), m, row);
+        scan_row(g, &line[at..], m, row);
     }
     drop(fp);
     if !no_volinfo {
@@ -673,7 +673,7 @@ pub fn lta_read_file_ex(
         );
         return Ok(None);
     };
-    let ty = lit_int(g, &line[at..].to_vec(), b"type      = ");
+    let ty = lit_int(g, &line[at..], b"type      = ");
     let Some(at) = fgetl_buf(&mut fp, STRLEN - 1, &mut line) else {
         g.notices
             .add(&FS_309, "ltaReadFile of a file without a second line");
@@ -685,7 +685,7 @@ pub fn lta_read_file_ex(
         )?;
         return Ok(None);
     };
-    let nx = lit_int(g, &line[at..].to_vec(), b"nxforms   = ");
+    let nx = lit_int(g, &line[at..], b"nxforms   = ");
     if ty.is_none() || nx.is_none() {
         g.notices.add(
             &FS_308,

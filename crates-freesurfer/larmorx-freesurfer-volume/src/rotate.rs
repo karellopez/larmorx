@@ -46,7 +46,7 @@ struct Dst<'a> {
 }
 
 enum DstVol<'a> {
-    New(Mri),
+    New(Box<Mri>),
     Given(&'a mut Mri),
 }
 
@@ -66,7 +66,7 @@ impl Dst<'_> {
     }
     fn done(self) -> Ret<Mri> {
         match self.dst {
-            DstVol::New(m) => Ret::New(m),
+            DstVol::New(m) => Ret::New(*m),
             DstVol::Given(_) => Ret::Given,
         }
     }
@@ -86,7 +86,7 @@ fn prepare<'a>(
             };
             Dst {
                 src: Some(s),
-                dst: DstVol::New(m),
+                dst: DstVol::New(Box::new(m)),
             }
         }
         Pair::Given(s, d) => {

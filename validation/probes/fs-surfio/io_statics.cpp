@@ -65,3 +65,20 @@ bool fssurfio_quad_combine(int quad[4], int vA[3], int vB[3])
 {
   return quadCombine(quad, vA, vB);
 }
+
+// relay 14 (3.1-48): the binary triangle and quadrangle surface files (MRISwriteTriangularSurface
+// has an external symbol: the probe calls it directly)
+MRIS *fssurfio_read_triangle_file(const char *fname, double nVFMultiplier)
+{
+  return mrisReadTriangleFile(fname, nVFMultiplier);
+}
+
+MRIS *fssurfio_read_quadrangle_file(const char *fname, double nVFMultiplier)
+{
+  return __MRISreadQuadrangleFile(fname, nVFMultiplier);
+}
+
+int fssurfio_write_quadrangle_file(MRIS *mris, const char *fname)
+{
+  return __MRISwriteQuadrangleFile(mris, fname);
+}

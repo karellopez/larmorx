@@ -24,18 +24,12 @@ use crate::aaa::{MAX_CMDS, MrisHash};
 use crate::mris::Mris;
 use crate::topology::vertex_vsize;
 
-/// `fnv_init()` (`include/fnv_hash.h`): the 32-bit FNV offset basis, held in an `unsigned long`.
-pub const FNV_INIT: u64 = 0x811c_9dc5;
+/// `fnv_init()` (`include/fnv_hash.h`): the 32-bit FNV offset basis, held in an `unsigned long`
+/// (fs.core's [`larmorx_freesurfer_core::fnv`]).
+pub const FNV_INIT: u64 = larmorx_freesurfer_core::fnv::fnv_init();
 
-/// `fnv_add(hash, p, size)`: for each byte, `hash ^= byte; hash *= 16777619` in 64-bit unsigned
-/// arithmetic (FNV-1a's step with the 32-bit prime, never reduced to 32 bits).
-pub fn fnv_add(mut hash: u64, bytes: &[u8]) -> u64 {
-    for &b in bytes {
-        hash ^= u64::from(b);
-        hash = hash.wrapping_mul(16_777_619);
-    }
-    hash
-}
+/// `fnv_add(hash, p, size)`: fs.core's ([`larmorx_freesurfer_core::fnv::fnv_add`]).
+pub use larmorx_freesurfer_core::fnv::fnv_add;
 
 /// `MRISaddCommandLine(mris, cmdline)`: the command line (its bytes before a NUL) becomes the
 /// surface's next one. A surface that holds `MAX_CMDS` (1,000) already gets the message `error:

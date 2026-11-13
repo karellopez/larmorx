@@ -63,7 +63,7 @@ fn text_num(g: &mut Gen, c: f32) -> String {
 
 /// The facets of a case: triangles of pool points, now and then a fan around one point (16 to
 /// 20 facets: a vertex of more than 30 neighbours, `modVnum`'s message; rarely 256: FS-157).
-fn facets(g: &mut Gen, pool: &[[f32; 3]]) -> Vec<[[f32; 3]; 4]> {
+pub(super) fn facets(g: &mut Gen, pool: &[[f32; 3]]) -> Vec<[[f32; 3]; 4]> {
     let normal = |g: &mut Gen| {
         [
             (g.int(-8, 8) as f32) / 8.0,
@@ -91,7 +91,7 @@ fn facets(g: &mut Gen, pool: &[[f32; 3]]) -> Vec<[[f32; 3]; 4]> {
 /// A text STL file of these facets, with variations: comments and blank lines, numbers that
 /// cannot be read, a facet of two or four corners, a corner before the first facet, an
 /// unrecognized line, a second solid.
-fn text_stl(g: &mut Gen, fs: &[[[f32; 3]; 4]]) -> Vec<u8> {
+pub(super) fn text_stl(g: &mut Gen, fs: &[[[f32; 3]; 4]]) -> Vec<u8> {
     if g.chance(30) {
         return g
             .pick(&["", "solid x\n", "# nothing\n"])
@@ -150,7 +150,7 @@ fn text_stl(g: &mut Gen, fs: &[[[f32; 3]; 4]]) -> Vec<u8> {
 
 /// A binary STL file of these facets (its header sometimes starting with `solid`, as many
 /// writers do), now and then one byte longer (no longer binary: read as text).
-fn binary_stl(g: &mut Gen, fs: &[[[f32; 3]; 4]]) -> Vec<u8> {
+pub(super) fn binary_stl(g: &mut Gen, fs: &[[[f32; 3]; 4]]) -> Vec<u8> {
     let mut b = Vec::new();
     let head: &[u8] = if g.chance(3) {
         b"solid binary"
@@ -331,7 +331,7 @@ pub(super) fn stl_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
                 let r = stl::read_stl(&mut cx.g, &mut cx.sg, &mut io, d, &n)?;
                 dump_stl_surface(o, r.as_ref());
             }
-            "ws" => o.i(i64::from(stl::write_stl(d, &mut m, &n))),
+            "ws" => o.i(i64::from(stl::write_stl(&mut cx.g, d, &mut m, &n))),
             _ => panic!("stl op {op}"),
         }
     }

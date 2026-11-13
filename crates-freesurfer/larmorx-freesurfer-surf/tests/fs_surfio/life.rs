@@ -650,7 +650,7 @@ fn set_vg(t: &mut Toks, vg: &mut VolGeom) {
     vg.fname.strcpy_bytes(&t.h());
 }
 
-fn dump_vg(vg: &VolGeom, o: &mut Out) {
+pub(super) fn dump_vg(vg: &VolGeom, o: &mut Out) {
     for x in [vg.valid, vg.width, vg.height, vg.depth] {
         o.i(i64::from(x));
     }

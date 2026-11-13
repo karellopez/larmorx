@@ -1342,7 +1342,7 @@ defects! {
     FS_147 = "FS-147", "FreeSurfer", true,
         "MRISreadVTK and the ASCII and movie.byu surface readers count a vertex's faces in one byte: a vertex of more than 255 faces gets its count modulo 256";
     FS_148 = "FS-148", "FreeSurfer", true,
-        "MRISbuildFileName_read with a name whose first dot is its first character, or its second after an h, reads one or two bytes before the name to decide whether it names a hemisphere";
+        "MRISbuildFileName_read with a name whose first dot is its first character, or its second after an h, and the curvature reader's file-name choice with a name whose first dot is its first or second character, read one or two bytes before the name to decide whether it names a hemisphere";
     FS_149 = "FS-149", "FreeSurfer", true,
         "MRISbuildFileName_read (a name with a slash, or without a hemisphere when FS_POSIX is unset) and __MRISapplyFSGIIwrite (FS_GII set to .gii) write a file name of 1,024 bytes or more past their caller's 1,024-byte buffer";
     FS_150 = "FS-150", "FreeSurfer", true,
@@ -1495,6 +1495,46 @@ defects! {
         "DTIparsePulseSeqName of a name with 100 characters or more before or after its # overflows a buffer: a crash or wrong values";
     FS_220 = "FS-220", "FreeSurfer", true,
         "DTIbvecChangeSpace of gradient directions with fewer than 3 columns reads and writes past each row: it changes the next rows' numbers, and past the matrix's last number it reads memory contents and writes outside the matrix";
+    FS_346 = "FS-346", "FreeSurfer", true,
+        "the binary triangle and quadrangle surface readers given a command-line tag whose length is -1 read the rest of the file into a block of no bytes: memory corruption or a crash when more than a few bytes follow";
+    FS_347 = "FS-347", "FreeSurfer", true,
+        "the binary triangle and quadrangle surface readers given more than 1,000 command-line tags store the 1,001st past the surface's list of command lines, over its command-line count and group-average area (values from a memory address, then wrong command lines or a crash)";
+    FS_348 = "FS-348", "FreeSurfer", true,
+        "the quadrangle surface reader given a command-line tag whose length cannot be allocated (below -1, or 2^63 - 1) writes through the failed allocation: a segmentation fault";
+    FS_349 = "FS-349", "FreeSurfer", true,
+        "the quadrangle surface reader given room for fewer faces than its quadrangles make (a size multiplier below 1) writes the others past its face array before its own check ends the program";
+    FS_350 = "FS-350", "FreeSurfer", true,
+        "the binary triangle and quadrangle surface writers given a surface whose command-line count is larger than the command lines it holds end the program with a segmentation fault (signal 11), leaving a partial file";
+    FS_351 = "FS-351", "FreeSurfer", true,
+        "the quadrangle surface reader accepts a quadrangle vertex number at or above the surface's vertex count (within its room for vertices): the surface's faces then refer to a vertex it does not have";
+    FS_352 = "FS-352", "FreeSurfer", true,
+        "the quadrangle surface reader given a quadrangle vertex number beyond the surface's room for vertices counts the face in memory outside its vertex arrays (memory corruption or a crash)";
+    FS_353 = "FS-353", "FreeSurfer", true,
+        "the quadrangle surface reader drops both triangles of a quadrangle whose first triangle (by the split it chooses) has two equal vertices: a single triangle the quadrangle writer stored as v0 v1 v1 v2 is lost on reading for about half of the vertex pairs";
+    FS_354 = "FS-354", "FreeSurfer", true,
+        "the binary triangle surface readers given a creator's line of more than 199 bytes (a long user name or creation date in the file's first line) read its remaining bytes as the vertex and face counts: the file's surface cannot be read";
+    FS_355 = "FS-355", "FreeSurfer", true,
+        "the surface library's annotation reader, given an annotation name without a folder that starts with the surface's hemisphere letters (lh.aparc.annot for a left surface), adds the hemisphere again (label/lh.lh.aparc.annot), so it does not find the file the annotation writer wrote for the same name; it takes a name as naming the hemisphere only when the name is the two letters alone, in any case";
+    FS_356 = "FS-356", "FreeSurfer", true,
+        "the surface library's file-type test and the curvature and annotation name builders, given a name (or a surface name) whose folder or last part is 1,024 bytes or more, write past a 1,024-byte buffer (the program can end with '*** stack smashing detected ***' or go on with corrupted names); the surface reader (MRISread), looking for the subject's Talairach transform beside a surface name of 300 bytes or more, writes past a 300-byte buffer";
+    FS_357 = "FS-357", "FreeSurfer", true,
+        "the surface library's neighbourhood search (the 2- and 3-hop neighbours MRISread and others compute), given a vertex with a ripped vertex among its known neighbours, reads its neighbour list past the part it filled: the vertex's neighbourhood then depends on memory contents (MRISread then ends with a failed assertion at the ripped vertex)";
+    FS_358 = "FS-358", "FreeSurfer", true,
+        "the surface library's older neighbourhood search (taken when MRISfindNeighborsAtVertex_old is set), given a vertex with more than 1,024 vertices within the hops asked for, writes past its caller's 1,024-entry list";
+    FS_359 = "FS-359", "FreeSurfer", true,
+        "the surface reader (MRISread) given a quadrangle surface file in the old format (no magic number) reads each vertex's face list past its end (its count is the file's count plus the faces found): the surface's neighbours depend on memory contents";
+    FS_360 = "FS-360", "FreeSurfer", true,
+        "the surface reader (MRISread), given a surface file with a vertex of more than 255 faces whose one-byte count wrapped around (FS-147 reproduced), writes the vertex's face list past its end";
+    FS_361 = "FS-361", "FreeSurfer", true,
+        "the icosahedron reader (ICOread, and MRISread of a .tri or .ico file), given a surface that is not closed (a vertex with more neighbours than faces) or a vertex of more than 255 faces, writes past the vertex's neighbour or face list (memory corruption or a crash)";
+    FS_362 = "FS-362", "FreeSurfer", true,
+        "the icosahedron reader (ICOread, and MRISread of a .tri or .ico file), given a vertex or face count it cannot read, a vertex or face number outside the counts, or a face whose vertices are not all among the file's vertices (a face line missing, or holding 0), writes or reads outside its arrays (memory corruption or a crash)";
+    FS_363 = "FS-363", "FreeSurfer", true,
+        "the surface library's plane fit (mrisComputeOptimalPlane) fits its plane through the origin instead of the vertices' mean, includes ripped vertices, and returns the centre (0, 0, 0)";
+    FS_364 = "FS-364", "FreeSurfer", true,
+        "MRIShistoThresholdCurvature (mris_curvature's outlier removal) of a surface whose unripped curvatures are all equal, or one of which is not finite (NaN, infinite), writes far outside its 1,000-bin histogram: a segmentation fault";
+    FS_365 = "FS-365", "FreeSurfer", true,
+        "MRIShistoThresholdCurvature of a surface with no unripped vertex reads memory before its histogram (no effect on the result)";
     FS_221 = "FS-221", "FreeSurfer", true,
         "the volume format probe (mri_identify, the format tests and the volume-name helpers) misbehaves for a file name of 1,024 bytes or more (a Bruker study's file names of 512 or more, the stem helpers' names of 2,000 or more): its answer is undefined and the program can crash";
     FS_222 = "FS-222", "FreeSurfer", true,

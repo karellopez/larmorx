@@ -189,10 +189,10 @@ pub fn compute_triangle_properties(
 /// `MRIScomputeAvgInterVertexDist(mris, StdDev)`: the mean of the 1-hop distances between
 /// unripped neighbours (`v->dist`) into `avg_vertex_dist` (`mrisSetAvgInterVertexDist`), and their
 /// standard deviation, returned for `StdDev` (as the copy's, [`avg_dist`]).
-pub fn compute_avg_inter_vertex_dist(mris: &mut Mris) -> f64 {
+pub fn compute_avg_inter_vertex_dist(g: &mut Globals, mris: &mut Mris) -> f64 {
     let (avg, std) = {
         let m: &Mris = mris;
-        avg_dist(m, &|v| m.vertex(v).ripflag != 0, &|v, k| {
+        avg_dist(&mut g.errno, m, &|v| m.vertex(v).ripflag != 0, &|v, k| {
             m.vertex(v).dist.as_ref().expect("VERTEX::dist is NULL")[k]
         })
     };
@@ -345,7 +345,7 @@ pub fn compute_metric_properties_wkr(
     metric::compute_vertex_distances(g, io, mris)?;
     compute_triangle_properties(g, sg, io, mris);
     mris.avg_vertex_area = f64::from(div(mris.total_area, mris.nvertices as f32));
-    mris.std_vertex_dist = compute_avg_inter_vertex_dist(mris);
+    mris.std_vertex_dist = compute_avg_inter_vertex_dist(g, mris);
     orient_surface(sg, mris);
     if takes_sphere_area(mris.status) {
         mris.total_area = sphere_area(mris.radius);

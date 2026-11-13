@@ -180,3 +180,12 @@ empty solution). Validation: `validation/investigations/freesurfer-spline-replic
   `log::fatal` and `utils::get_base_temp_dir`, `make_temp_file`, `make_temp_dir` take `&mut Globals`
   with it. `matrix_ops::xyz_approx_angle_known_length`'s third product is `z2 * n.z`, the official
   build's order (`docs/findings/freesurfer-maths.md`).
+
+## Relay 16 (track A)
+
+- `matrix.rs`: `Matrix::negative`, FS-13 under `reproduce` (`utils/matrix.cpp`'s `MatrixAlloc_new` 394-516: the block
+  size's arithmetic for negative sizes, measured with `validation/probes/fs-maths/matrixalloc_negative.cpp`).
+- `matrix_io.rs`: `MatrixReadFrom`'s FS-49 under `reproduce` (`Slot`: `utils/fio.cpp`'s `freadInt` and `freadDouble`
+  as the official build lays out their variables, track E's amended spec §18.2).
+- `numerics.rs`: `OpenEigenSystem`'s FS-47 and `OpenSvdcmp`'s FS-48 under `reproduce` (the main package's
+  `vnl_eigen::symmetric_eigensystem_f32_full`, `vnl_svd_f32::vnl_svd_f32_full`).

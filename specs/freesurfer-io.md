@@ -905,3 +905,387 @@ first group 0008, its first element of that tag):
   `reproduce` identical on 65,077 of 65,077 comparable lines; piece 4's 14,000 cases: 13,914
   identical, 86 not compared (FreeSurfer's crashes: FS-221, FS-227, FS-228); `fix` differs only with a
   notice. Seed 1, 3,600 portable cases: 3,243 identical, 357 not compared.
+
+## 34. Conventions of part 5
+
+Part 5 (queue item 3.1-27's second piece): mosaics (`VolSS2MosSS`, `MosSS2VolSS`, `CheckMosaic`)
+and MATLAB `.mat` files (`MatlabWrite`, `MatFileWrite`, `MatlabRead`, `MatlabRead2`, `MatFileRead`,
+`ReadMatlabFileContents`, `ReadMatlabFileVariable`, `MLFCprint`, `MLFCfree`, `Matlab_Install_printf`).
+§1's conventions hold. "Standard output" and "an error" (FreeSurfer's error stream, `error: ` and
+FS-01's byte) as in §1. A **`long32`** is a 32-bit signed integer; FreeSurfer prints one with `%ld`
+as the unsigned value of its 32 bits (-1 prints `4294967295`). **`errno`** is part of every result,
+as in §25: an allocation that fails sets 12. "Memory never written" and "memory contents" mark values
+FreeSurfer takes from memory; larmorx uses 0 there in both modes and notes the defect named and
+FS-245 (the result depends on memory contents: never compared).
+
+## 35. Mosaics
+
+A mosaic holds a volume's slices as tiles, `ncmos / ncvol` tiles per row of tiles, slice `s` in
+tile row `s / ntiles` and tile column `s % ntiles`. All arithmetic is on 32-bit signed integers,
+division truncating toward zero, products and sums wrapping at 32 bits.
+
+- `VolSS2MosSS(cvol, rvol, svol, ncvol, nrvol, ncmos, nrmos, &cmos, &rmos, oob)`: if `ncmos % ncvol`
+  is not 0, the error text `ERROR: VolSS2MosSS: number of columns in the mosaic (<ncmos>) \nis not
+  an integer multiple of the number of columns in \nthe image (<ncvol>)\n` on standard error (plain,
+  not through FreeSurfer's error stream) and 1; then the same for rows: `ERROR: VolSS2MosSS: number of
+  row in the mosaic (<nrmos>) \nis not an integer multiple of the number of rows in \nthe image
+  (<nrvol>)\n` and 1. Otherwise `t = ncmos / ncvol`, `cmos = (svol % t) * ncvol + cvol`,
+  `rmos = (svol / t) * nrvol + rvol`; `oob` (when given) 1 when `cmos < 0`, `cmos >= ncmos`,
+  `rmos < 0` or `rmos >= nrmos`, else 0; returns 0. On a return of 1 nothing is written.
+- `MosSS2VolSS(cmos, rmos, ncmos, nrmos, ncvol, nrvol, nsvol, &cvol, &rvol, &svol, oob)`: the same
+  two checks with the name `MosSS2Vol` in the messages; then `cvol = cmos % ncvol`, `rvol = rmos %
+  nrvol`, `svol = cmos / ncvol + (rmos / nrvol) * (ncmos / ncvol)`; `oob` 1 when `cvol` is outside
+  `0 .. ncvol - 1`, `rvol` outside `0 .. nrvol - 1` or `svol` outside `0 .. nsvol - 1`; returns 0.
+- A division by zero (`ncvol` or `nrvol` 0; for `VolSS2MosSS` also `ncmos / ncvol` 0, that is `ncmos`
+  0) or of -2147483648 by -1 crashes FreeSurfer (`SIGFPE`, FS-229). Both modes: the error text
+  `ERROR: <function>: the image (<ncvol> x <nrvol>) cannot tile the mosaic (<ncmos> x <nrmos>)` and a
+  new line on standard error, nothing written, 1.
+- `CheckMosaic()`: a volume of 8 x 3 x 11 in a mosaic of 32 x 9; for each slice, row and column (in
+  that nesting) the voxel to the mosaic and back, one line `printf("%5d  %2d %2d %2d   %3d %3d    %2d
+  %2d %2d  %d  %d\n", n, c, r, s, cmos, rmos, c2, r2, s2, oob, ok)` (`n` from 0, `ok` 1 when the voxel
+  came back); then `-----------------------------------\n`; then slice 11 (column 0, row 0) to the
+  mosaic, printed with `n` = 264, the column, row and slice 8, 3, 11 and the last loop's `c2`, `r2`,
+  `s2`, the new `oob` and the last `ok`; then that pixel back to the volume, printed the same way
+  with the new `c2`, `r2`, `s2` and `oob`. Returns 0.
+
+## 36. Writing a `.mat` file
+
+`MatFileWrite(fname, data, rows, cols, name)` writes a MATLAB version 4 file of one real matrix:
+five 32-bit little-endian integers (type 0, `rows`, `cols`, 0, the name's length plus one), the name
+and a zero byte, then `rows * cols` doubles (little-endian), column by column, element `(row, col)`
+being the float `data[row * cols + col]` converted to double. Returns 0; -1 when the file cannot be
+created (no message; `errno` as `fopen` left it); -2 when the header or a number cannot be
+written, -3 the name. `MatlabWrite(mat, fname, name)` writes the matrix's numbers so, the name
+`matrix` when `name` is `NULL`. Of a complex matrix FreeSurfer writes its first `rows * cols`
+floats, real and imaginary parts interleaved, as a real matrix (FS-247); the default writes a
+complex matrix: the fourth integer 1, the real parts then the imaginary parts, each column by
+column.
+
+## 37. The `.mat` formats as the readers take them
+
+**Version 4.** A variable is a header of five `long32` (type, rows, columns, imaginary flag, name
+length), the name (the length counts its zero byte), then the numbers column by column, the real
+part then (when the flag is not 0) the imaginary part. The type's digits: thousands = byte order
+(0 little-endian, 1 big-endian), tens = element (0 double, 1 single, 2 32-bit signed, 3 16-bit
+signed, 4 16-bit unsigned, 5 8-bit unsigned). **Version 5.** A 128-byte header (byte 126 `I` for a
+little-endian writer, `M` for a big-endian one), then data elements: a tag of two 32-bit numbers
+(type, bytes) and the data padded to 8 bytes, or a small element (4 bytes or fewer: one 32-bit
+word, type in its low 16 bits and bytes in its high 16 bits, then the data in the next 4 bytes).
+A matrix element (type 14) holds the array flags (an element of two 32-bit words: class in bits
+0-7, complex 0x0800), the dimensions (32-bit), the name (8-bit), the real part, the imaginary part.
+Types: 1 int8, 2 uint8, 3 int16, 4 uint16, 5 int32, 6 uint32, 7 single, 9 double. A compressed
+element (type 15) holds a zlib stream of a matrix element.
+
+**Reading a file's first variable (`MatlabRead2`; `MatlabRead` prints `Using MatlabRead2()` on
+standard output first when `Gdiag_no` is above 0).** The file cannot be opened: `NULL`, no message.
+Diagnostics with `Gdiag` holding `DIAG_SHOW` and `DIAG_VERBOSE`: `MatlabRead: opening file
+<fname>\n`, `MatReadHeader: fp=<address>, mf=<address>\n` (addresses: never compared), `MatlabRead:
+reading header\n`, `MatlabRead: allocating real matrix (r=<rows>,c=<cols>)\n`, `MatlabRead: done real
+mtx alloc\n`, `MatlabRead: done\n` at those steps (standard output). The version: the first four
+bytes, read as signed characters; one of them -1 (the end of the file, or a byte 0xff: FS-251) gives
+the error `matfile: could not detect the version of the Matfile\n`; one of them 0: version 4, else 5.
+
+- Version 4: the header's 20 bytes (`matfile: only read <n> bytes of header\n` when fewer, `NULL`);
+  with `DIAG_VERBOSE`: `type = <type>\n`; the byte order is taken as the other one when the type is
+  not 0 in FreeSurfer (FS-230: every little-endian matrix that is not of doubles is then read
+  byte-swapped), when the type read is outside 0 to 999 by default; then `mat file generated with
+  different endian\n` (`DIAG_VERBOSE`) and the type, rows, columns and name length are byte-swapped
+  (the imaginary flag is not); `after swap, type = <type>\n`, `MatReadHeader: nitems = 20,
+  namelen=<length+1>\n` (`DIAG_VERBOSE`). The name: `length + 1` bytes are allocated (a negative
+  count: the exit `matReadHeader: couldn't allocate <length+1> bytes for name` with
+  `ERROR_NO_MEMORY`, no new line), `length` read (`matfile: only read <n> bytes of name (<length>
+  specified)\n` and `NULL` when fewer); `MATFILE5: <rows> x <cols>, imag <flag>, name '<name>'\n`
+  (`DIAG_VERBOSE`).
+- Version 5, FreeSurfer: the byte-order letter at 126 (`I`: this machine's order); the element type
+  at 128 (not 14 or 15: `WARNING: matlab elment type is <type>, which is not a matrix.\n` on standard
+  output, and it goes on); 15: compressed (below). Otherwise the flags word at 144, whose complex
+  bit FreeSurfer never sees (it takes 0x10 of the word's high byte: FS-236); rows and columns at
+  160 and 164; the name at 168: the small form when the word's bytes 2 and 3 (in file order for a
+  little-endian file; bytes 0 and 1 for the other order) are not both 0, its length then the low 16
+  bits of that word (the element type, 1: a name of one character, FS-239), followed by 4 - length
+  bytes; the normal form's length at 172, the name, then `8 - length % 8` bytes skipped (8 for a
+  multiple of 8: FS-238); the numbers' type, then 4 bytes skipped and the numbers. A small numbers
+  element is taken as a type of `bytes << 16 | type` (FS-237: unsupported). A third dimension is
+  taken as the name's tag (FS-246). Where the file ends before a field, FreeSurfer uses memory never
+  written (FS-241); an error reading gives `matfile: encountered error while reading Matfile\n`.
+  With `DIAG_VERBOSE`: `MATFILE5: <rows> x <cols>, imag <flag>, name '<name>'\n` (the name as FreeSurfer
+  read it: one character for the small form; the normal form's printed past its end where its
+  allocation has no zero after it, FS-239).
+- Version 5, the default: each element by its tag (small or normal), the complex bit 0x0800, the
+  dimensions (other than 2: the error `matfile: an array of <n> dimensions is not a matrix\n` and
+  `NULL`, FS-246), the whole name, the numbers' tag (small or normal); a file that ends inside the
+  header: the error `matfile: the file ends in the variable's header\n` and `NULL` (FS-241).
+- Compressed, FreeSurfer (FS-240): the file is opened again; the stored size at 132; that many bytes
+  are read and decoded with zlib's `uncompress` into a buffer of 100 times the size (`ERROR: in
+  uncompressing\n` on standard output when it does not return `Z_OK`, then for `Z_BUF_ERROR` the error
+  `    not enough memory in buffer\n` with error code `DIAG_VERBOSE`); from the decoded bytes `b`: the
+  flag `0x10 & b[18]`, rows `b[32..36]`, columns and flag `b[36..44]` (the flag becomes the name's
+  tag word), then the name: when `b[40]` and `b[41]` are both 0 (the order's bytes) the length and
+  "version" from `b[44..52]`, the name from 48, the type and rows from `b[48 + (length-1)/8 + 1]`;
+  otherwise length and "version" from `b[40..48]` (the length's low 16 bits), the name from 44, the
+  type and rows from `b[48..56]`. The byte order of each later step is the version 5 rule only when
+  that "version" is 5, else the version 4 rule on the type, which FreeSurfer has not read yet when
+  the small form is checked (memory never written). The line `MATFILE5: <rows> x <cols>, type
+  <type>, imagf <flag>, name '<name>'\n` is printed as an error (code `DIAG_VERBOSE`) every time. The
+  numbers: element `(row, col)` at `56 + (col * rows + row) * size` (size 8 for 32-bit integers,
+  which it reads as 8 bytes), the imaginary part (doubles only; other types 1.0, byte-swapped for
+  every other element when the order is the other) after `rows * cols * 8` more; bytes past the
+  decoded data are zero within the allocation and memory contents beyond.
+- Compressed, the default: the stream decoded whole and the element read as an uncompressed one;
+  the same `MATFILE5` line with the right values; a stream that does not decode: `ERROR: in
+  uncompressing\n` and `NULL`.
+
+**The numbers (both versions; FreeSurfer, then the default).** The element type gives the size:
+FreeSurfer reads doubles (8), singles (4), 32-bit integers as 8 bytes (FS-232), 16-bit integers by
+a read whose count is compared with 1, so each fails (FS-231), and bytes, all as signed numbers
+(FS-233); the other byte order swaps doubles, 16-bit numbers and 32-bit integers (the low 32 bits
+of the 8 read), and singles through a conversion to a 32-bit integer (FS-234). An unsupported type:
+the error `unsupported matlab format <type> (unknown)\n` and no numbers (version 5's type 0 is read
+as bytes after the message). A number the file does not hold: the error `matfile: could not read
+val[<row>, <col>] from .mat file\n` (` - imag` before the new line for the imaginary part) and the
+rest 0. The imaginary part: doubles read; other types keep the last double read (memory never
+written when none, FS-235). The default reads every type in its own size, unsigned types as
+unsigned, swaps every size bytewise, and reads the imaginary part in the real part's type (version
+5: after the real part's padding and its own tag). The matrix: `MatrixAlloc(rows, cols)` complex when
+the flag is not 0, each number converted to float. Sizes: rows or columns negative give the error
+`could not allocate <rows> x <cols> matrix\n` (`errno` 12) and the numbers are not kept; larger
+than the machine allows: FS-243 (larmorx refuses above 256 MiB of numbers as such a failure).
+
+## 38. The other readers
+
+- `MatFileRead(fname, type)`: `NULL` when the file cannot be opened; a version 4 header as above
+  (its messages, the final one `MATFILE: <rows> x <cols>, type <type>, imagf <flag>, name
+  '<name>'\n`), and when it cannot be read FreeSurfer goes on with the fields read so far and 0
+  (FS-250, both modes); the numbers; then `type` `MAT_BYTE` (0): `rows * cols` bytes, each number
+  converted to a 32-bit integer and its low byte kept (beyond the 32-bit range or NaN: 0; FS-244: the
+  default saturates to -128..127, NaN 0); `MAT_FLOAT` (4): the numbers as floats; another: the error
+  `MatFileRead: unsupported data format <type>\n` and no data. The structure (type, rows, columns,
+  flag, name length, version 0, data). The file stays open (FS-242; larmorx closes it).
+- `ReadMatlabFileContents(fname)`: `ERROR: could not open <fname>\n` (standard output) and `NULL`;
+  then variable after variable (version 4 only) until a byte read as -1 (the end, or 0xff: FS-251) or
+  a header that cannot be read; each `MatrixAlloc`ed and filled; `ERROR: did not find any variable in
+  <fname>\n` and `NULL` when none. More than 1,000 variables overflow FreeSurfer's lists (FS-248; the
+  default keeps them all).
+- `ReadMatlabFileVariable(fname, varname)`: the contents, then a copy of the first variable whose
+  name equals `varname`; `ERROR: varname <varname> not found in <fname>\n` (standard output) and
+  `NULL`.
+- `MLFCprint(fp, mlfc)`: `mfile: <fname>\n`, `number of variables: <n>\n`, then for each `n = <i>
+  ---------------------\n`, its name and a new line, and `MatrixPrint(fp, matrix)` (§ fs.core's
+  matrix printing, precision 5); 0. `MLFCfree`: 0. `Matlab_Install_printf`: keeps a function it never
+  calls; 0.
+
+## 39. Validation plan (part 5)
+
+- The probe's commands: `mvm`, `mmv` (sizes from 1 to 256, 0, -1, -8, -2147483648, 2147483647 and
+  2^20; mosaics a whole number of tiles or a few pixels off; coordinates inside, at the edges and
+  extreme; with and without the out-of-bounds flag), `mck`, `mlw` (named, unnamed, real and complex
+  matrices up to 4 x 4 of any float bits, into a new file, a folder and a missing folder; the
+  file's bytes), `mlr`, `mfr` (types 0, 4, 1, 3), `mrc` (with a variable's name, another, or none):
+  version 4 files of every type and both byte orders, complex, names with and without their zero
+  byte, sizes negative and huge, several variables; version 5 files of both orders with every
+  numbers type, small and normal names and numbers, complex, 1, 2 or 3 dimensions, compressed at
+  levels 1 to 9 and one decoding to more than 100 times its size; each cut at a random byte, with
+  bytes changed or a first byte 0xff; `Gdiag` 0, `DIAG_VERBOSE`, `DIAG_SHOW` and both; `Gdiag_no`
+  -1, 0, 1. Lines where FreeSurfer crashes or its outcome depends on the machine (FS-13, FS-229,
+  FS-243, FS-248) are counted, not compared; those where it reads memory (FS-245, the addresses of
+  `DIAG_SHOW` with `DIAG_VERBOSE`) are compared apart.
+- Measured on the replica (2026-11-13): seed 9, 3,500 cases of the seven commands (500 each):
+  `reproduce` identical on 2,990 of 2,990 comparable lines (308 not compared, 202 compared apart);
+  `fix` differs only with a notice. Seed 1, 4,300 portable cases of the 43 commands: 3,836
+  identical, 464 not compared. `matfile_scipy.py`: the default reads 400 of 400 matrices SciPy wrote
+  (version 4: 136, version 5: 136, compressed: 128) as written; FreeSurfer's reading gets 51, 33 and
+  0 of them right. Seed 7, 86,000 cases of the 43 commands (2,000 each): `reproduce` identical on
+  76,947 of 76,949 comparable lines (the two others: the official build stopped by the probe's
+  5-second alarm under load, identical when run again alone); piece 5's 14,000: 11,902 compared, all
+  identical, 1,276 not compared, 822 compared apart.
+
+## 40. Conventions of part 6 (reading volumes and registration files)
+
+Part 6 (relay 16 of track A, 2026-11-13) covers what the surfaces need first: reading a volume's
+header or voxels by name (MGH and MGZ; `.npy` through §20's reader), the tags after an MGH volume's
+data, the talairach transform an MGH volume names, and tkregister's `register.dat`. The other
+formats' readers come with their queue items (3.1-28 to 3.1-30); until then a request for one is
+refused with `larmorx-freesurfer: reading <format> volumes is not ported yet (<name>)` on standard
+error and no volume. Errors are printed as fs.core's `ErrorPrintf` prints them (`error: <text>`,
+with FS-01's NUL byte under `reproduce`).
+
+## 41. A volume's name
+
+- A name holding no `/` gets the working directory and `/` before it. FS-249: a result of 1,024
+  bytes or more is used whole (FreeSurfer writes past its buffers).
+- A null or empty name: `mri_read(): empty fname!` + newline, no volume.
+- The last `@` and the last `#` (the latter only while the frame-list switch is on; programs turn
+  it off with `MRIIO_Strip_Pound`) are both found first; the name ends at the first of them, the
+  text after `@` (up to a `#` after it) names the format, the text after `#` (up to an `@` after
+  it) lists frames.
+- A format named after `@` is one of `string_to_type`'s (§25); another: `mri_read(): unknown type
+  '<text>'` + newline. Without `@`, an unknown type is found by the format probe (§26); none:
+  `mri_read(): couldn't determine type of file <name>` (the name with the directory, no newline).
+- Frames: `<a>:<b>` or `<a>` (C's `strtol` of each piece, base 10; the pieces must be whole
+  numbers: `mri_read(): bad start frame ('<a>')`, `bad end frame ('<b>')`, `bad frame ('<a>')`;
+  `<a>:` alone: `bad frame specification ('<a>:')`; an empty `<a>` is 0); each kept in an `int`
+  (its low 32 bits); a negative one: `mri_read(): frame (<n>) is less than zero`; `<a>` above `<b>`:
+  `mri_read(): the start frame (<a>) is greater than the end frame (<b>)` (each with a newline).
+
+## 42. Reading a volume (`mri_read`)
+
+The format's reader gives the volume (its header only when the voxels are not asked for), or none.
+Then the volume's name becomes the name as given (with any `@` or `#` part), and its cached
+voxel-to-RAS matrix and inverse are computed again from its geometry (fs.mri's cache). Without
+frames the volume is returned. With frames:
+
+- a start frame not below the volume's frame count: `mri_read(): start frame (<a>) is out of range
+  (<n> frames in volume)`; the end frame likewise (`end frame (<b>) ...`); no volume;
+- the header only: a float volume's voxels are checked (below; FS-255: a header has none, so both
+  modes skip the check, noted: FreeSurfer crashes when the volume has voxels in its extent), then a
+  copy of the header (fs.mri's `MRIcopy` of a volume without voxels) with the frame count
+  `b - a + 1`;
+- the voxels, all frames listed: the check, then the volume; some frames: a new volume of those
+  frames (the header copied, `imnr0` the frame count), the frames' voxels copied for the types
+  uchar, short, unsigned short, int, long and float (other types' voxels stay 0), then the check
+  of the whole first volume.
+
+The check (`nan_inf_check`): a float volume with an infinite or NaN voxel (the first found with x
+the outermost loop, then y, z, and the frame innermost) gives `nan_inf_check(): Inf at voxel
+<x>, <y>, <z>, <f>` or `NaN at voxel ...` (an error) and no volume.
+
+`MRIreadHeader(name, type)`: the name gets the working directory as above; an unknown type is found
+by the format probe and, when it finds none, `ERROR: could not find volume <name>.  Does it
+exist?` (the name as given does not exist) or `ERROR: could not determine type of <name>`
+(standard output), no volume; then `mri_read` of that name and type without voxels.
+`MRIreadInfo(name)`: `mri_read` without voxels; `MRIreadType(name, type)`: with them.
+
+## 43. MGH and MGZ (`mghRead`)
+
+The file: `.mgz` and `.mgh.gz` are gzip-compressed (the name's last extension `mgz` in any case,
+or `mgh.gz` anywhere in it), `.mgh` plain; any other name: `mghRead(<name>, <frame>): could not
+open file.` + newline + `Filename extension must be .mgh, .mgh.gz or .mgz` (with `errno`'s text
+first when it is set); a file that does not open: `mghRead(<name>, <frame>): could not open file`.
+All numbers are big-endian. The header: the version (`mghRead(<name>, <frame>): read error` when
+its four bytes are not all there), width, height, depth, frames, type and degrees of freedom
+(`int`s), the RAS flag (`short`), and when the flag is above 0 fifteen floats (the voxel sizes x, y,
+z; the x, y and z direction cosines; the centre); 254 bytes after the flag in all (194 after the
+floats). A tensor volume (type 6) has 9 frames whatever the header says. The intent is
+`(version >> 8) & 0xffff`.
+
+- **The header alone:** a volume without voxels (fs.mri's `MRIallocHeader`; its messages for
+  extents that are not above 0), then the data skipped: `frames x width x height x depth x bytes per
+  voxel` bytes (64-bit arithmetic; an unknown type's size is -1), read in pieces of 1,024 bytes and
+  a last piece in a compressed file (FS-76: a last piece of 0 bytes, a volume without voxels,
+  divides by zero in FreeSurfer: no read, noted), passed over in a plain one.
+- **The voxels:** frame 0 or more reads that frame alone (the data before it passed over), below
+  -1 the first `-frame` frames, -1 all. The bytes per slice are `width x height x bytes per voxel` in
+  a 32-bit `int` (a negative count: `errno` ENOMEM, the C library's failed allocation). Each slice
+  is read whole (`mghRead(<name>): could not read <n> bytes at slice <z>`, no volume) and stored by
+  type: uchar as is; short, unsigned short (2 bytes), int, float, tensor (4 bytes) and float complex
+  (two floats) with each number's bytes reversed; any other type `mghRead: unsupported type <t>`,
+  no volume. A tensor volume's rows all start at the voxels' first byte (fs.mri's structure gives
+  that type no row stride): each row read overwrites the first row, the rest stays 0.
+  `FS_MGZIO_USEVOXELBUFREAD` set (a volume with its voxels in one block): `INFO: Environment
+  variable FS_MGZIO_USEVOXELBUFREAD set` and `mghRead(): read voxel buffer ...`, then the frames
+  read slice after slice into the block from the start frame's place, 2-byte numbers swapped in
+  pairs, 4- and 8-byte numbers in 4-byte groups (`mghRead (FS_MGZIO_USEVOXELBUFREAD): could not
+  read <n> bytes per slice, read only <m> bytes`); FS-256: one frame after the first goes into the
+  volume's only frame (FreeSurfer writes past it). `FS_MGZIO_TIMING` set: `INFO: Environment
+  variable FS_MGZIO_TIMING set` and `Total time (mghRead) = <s>.<ns> seconds` (+ ` (USEVOXELBUF)`).
+- **The geometry:** with the RAS flag the fifteen floats (pixel size and slice thickness the x and
+  z sizes, the RAS flag of the volume 1); without it the coronal orientation (x = (-1, 0, 0),
+  y = (0, 0, -1), z = (0, 1, 0), centre 0; with `DIAG_SHOW` and `DIAG_VERBOSE` a framed message on
+  standard error naming the file).
+- **The scan parameters:** TR, the flip angle (a float, kept as a double), TE, TI and the field of
+  view, each read only after the one before it was read whole (a number cut short keeps its bytes
+  over the earlier value, reversed).
+- **The tags** (§44), then: the start and end of each axis `-n / 2 x size` and `n / 2 x size` (in
+  double, stored as float), the field of view the largest span (float), the volume's name the
+  file's.
+
+## 44. The tags after an MGH volume's data (`MRITAGread`)
+
+Nothing with `FS_SKIP_TAGS` set. Otherwise tags until the end of the file (a tag number of 0, or the
+end met in the number); each tag's length as §17's tag reader gives it (32-bit for the old talairach
+tag, none for the old colour table and the morph's geometry and labels, 64-bit for the others).
+With `DIAG_INFO`, `[DEBUG] MRITAGread(): remaining taglen = <n> (tag = <t>, len = <l>)` before each
+and `... (tag = 0)` at the end. By tag:
+
+- degrees of freedom (7), scan parameters (45), RAS transform (8): only in FreeSurfer's NIfTI header
+  extension; in an MGH file `[WARN] skip unexpected tag TAG_DOF, nifti header extension only` (and
+  `TAG_SCAN_PARAMETERS`, `TAG_RAS_XFORM`) on standard output and the tag skipped; the RAS
+  transform's extra fields (9): FS-253, both modes skip it (FreeSurfer crashes), noted;
+- frames (42): §18's frame reader (`couldn't read frame structure from file` when it fails);
+- the old colour table (1): §19's binary colour table becomes the volume's;
+- the talairach transform (30 and 31): the tag's bytes over the volume's 1,024-byte transform name
+  (bytes past the tag's are what an earlier name left; FS-254: a tag of more than 1,024 bytes, or a
+  folder name of 975 bytes or more, both modes use the whole name, noted); `<the file's folder>/
+  transforms/talairach.xfm` replaces the name when that file exists; when the named file exists it
+  is read as an `.xfm` (§45): the volume's transform and its linear part and inverse, `INFO: loaded
+  talairach xform : <name>` on standard error with `DIAG_VERBOSE`; one that does not read: `error
+  loading transform from <name>` (an error, `errno` cleared first), no transform, the name emptied;
+- command lines (3): the tag's bytes up to their first NUL (FS-257: a length below 0 or above
+  2^31 - 1, both modes keep the bytes the file has, noted); more than 1,000:
+  `MRITAGread(<name>): too many commands (<n>) in file` and the program ends (`ERROR_NOMEMORY`);
+- auto-align (33), original RAS-to-voxel (44), the morph's affine (14): §17's 1,600-byte matrix
+  text (`[DEBUG] MRITAGread() TAG_GCAMORPH_AFFINE` and the matrix with `DIAG_INFO`);
+- phase-encoding direction (41): the tag's bytes up to their first NUL (FS-257 as above);
+- field strength (43): four bytes in the machine's (little-endian) order over the earlier value,
+  whatever the tag's length (a length other than 4 leaves the rest to be read as tags);
+- the morph's metadata (13): two `int`s and a float (`[DEBUG]` lines with `DIAG_INFO`); geometries
+  (10: shearless, no length; 15: with shears): §17's geometry reader into the morph's source and
+  target geometries; labels (12, no length): the volume's extent of `int`s, x slowest;
+- any other tag: skipped (§17's skip, FS-177 and FS-178).
+
+In FreeSurfer's NIfTI extension (part of NIfTI's reader, later) the tag lengths are 64-bit and the
+reading stops when fewer than 12 bytes of the extension's length are left.
+
+## 45. FreeSurfer's `.xfm` reader
+
+MINC 1.5.1's reader (the main package's `larmorx_io::xfm`), as FreeSurfer's copy changes it: only
+`Linear` transforms (another type: `input_transform(): invalid transform type <name>.`); a number
+that does not convert: `<token> is not a valid double` first; a keyword that does not match:
+`Expected "<keyword> =" got str:<token>` (`(null)` at the end of the file); a NUL byte ends a token;
+`~user` is `.`; the inverse of the 4 x 4 matrix by Gaussian elimination with scaled partial
+pivoting: each row scaled by `1 / max |a_ij|` (a row of zeros: `Some row is all zeros`), for the
+first three columns the remaining row whose scaled entry is largest in magnitude (the first on
+ties; none above 0: `Some col is all zeros`) chosen as the pivot and eliminated from the later rows
+(the multiplier `a_ki x (1 / a_ii)`, applied to the matrix's later columns and all of the
+inverse's), a last pivot of 0: `last col all zeros`; then back substitution from the last row (each
+later row's multiple subtracted, then multiplied by `1 / a_ii`); x86-64's double arithmetic and
+NaNs. A failure prints `invert_4x4_matrix failed, <reason>` on standard output and the transform
+is the identity both ways.
+
+## 46. Registration files (`regio_read_register`)
+
+- A name whose last extension is `lta` in any case (FS-11's limits): `regio_read_register: loading
+  lta` (standard output), the linear transform array read (`LTAread`, fs.volume: 1 when it does
+  not read), its subject (`subject-unknown` when empty), its intensity scale, the first transform's
+  source voxel sizes (x in-plane, z between planes; FS-258: an array without transforms, both
+  modes 0, noted), round as the method, and the array's tkregister matrix; 0.
+- Otherwise the file (`regio_read_register(): <errno's text>` and `Could not open <name>` on standard
+  error, 1): the subject (`%s`), the in-plane and between-plane resolutions and the intensity
+  (`%f` each), sixteen `%f` row by row into a new 4 x 4 matrix (§ fs.core's scanning; each failure:
+  `regio_read_register(): <errno's text>` and `Error reading subject from <name>`, `... inplaneres
+  ...`, `... betplaneres ...`, `... intensity ...`, `Error reading R[<r>][<c>] from <name>`, 1; the
+  values read before it kept), then a word: none, tkregister's method (2); `round` or `rint` 0,
+  `floor` 1, a word starting with `tkreg` 2 (any case); another: `ERROR: regio_read_register():
+  float2int method <w> from file <name>, match not found` (standard output), 1. FS-258: a word of
+  1,000 bytes or more is kept whole (FreeSurfer writes past its buffer), noted. Returns 0.
+- `errno`: glibc's `perror` leaves it as it was once standard error has been written to (an
+  unoriented standard error open for writing only gets EINVAL from glibc's internal `fdopen`; the
+  replica follows the first case, the probe orients standard error first).
+
+## 47. Validation plan (part 6)
+
+- The probe's commands: `mrh` (`MRIreadHeader` with a type: unknown, MGH, Bruker, NIfTI, COR),
+  `mri` (`MRIreadInfo`), `mrd` (`mri_read` with voxels), `mgr` (`mghRead` with or without voxels
+  and frames -3 to 2), `rrr` (`regio_read_register`), with `Gdiag` 0, `DIAG_INFO`, `DIAG_SHOW` with
+  `DIAG_VERBOSE`, the frame-list switch on and off, `FS_SKIP_TAGS` and `FS_MGZIO_USEVOXELBUFREAD`.
+  The MGH files are built from the format: extents 1 to 4 (0, -1, 2 or 300 at times), frames 0 to
+  3, every type FreeSurfer names and an unknown one, the RAS flag 1, 0, -1, 2, voxel sizes and
+  cosines with NaNs, infinities and signed zeros, voxels with NaN and infinite floats, 0 to 5 scan
+  parameters, 0 to 4 tags of every kind above (lengths the file does not have, negative ones,
+  talairach names of 990 to 1,100 bytes, `.xfm` files beside them right, cut, singular, of other
+  types, inverted), plain or compressed, whole or cut, the compressed stream cut; names with
+  `#frames` and `@format` in both orders, missing files, names without `/`. `register.dat` files
+  with 0 to 21 values, special numbers and the four method words; `.lta` names (counted, not
+  compared, until fs.volume's `LTAread` is wired). Lines of formats not ported, of crashes (FS-76,
+  FS-249, FS-253 to FS-258) and of skips beyond 256 MiB (FS-178, the probe's memory limit) are
+  counted, not compared; those with numbers from memory (FS-49, FS-167) compared apart.

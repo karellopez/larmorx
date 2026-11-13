@@ -112,3 +112,36 @@ AND LicenseRef-CTN, the main package's crate, used as a dependency).
 | `utils/DICOMRead.cpp` | `IsDICOM` (5410), `IsSiemensDICOM` (1479), `GetObjectFromFile` (1207), `GetElementFromFile` (1164), `AllocElementData` (1252) and `FreeElementData` (1408) for the Manufacturer element, `DCMPrintCond` (5523); `IsDICOM`'s static answer | `dicom_probe`; the state in `Globals::dicom` |
 | `packages/dicom/dcm.c` (FreeSurfer's copy of CTN 3.0.6) | `DCM_GetElement` (2699) with `locateElement` (6601), `DCM_GetElementValue` (950) for one element of the object's top level read into memory; FreeSurfer's two changes to CTN's behaviour (the "Data Element ... longer" message, the 4-byte swap in pairs) as `dicom_probe::FsDialect` | `dicom_probe` |
 | (larmorx's own) | `COND_DumpConditions`'s output byte for byte (`dicom_probe::dump_conditions`: larmorx-io's `CondStack::dump` goes through text streams); `CFile`'s reads of a folder failing with `EISDIR` on every platform and the failed read's `errno` | `dicom_probe`, `cfile` |
+
+Queue item 3.1-27, piece 2 (track A, relay 15): mosaics and MATLAB files. Audited for third-party
+code: mosaic.cpp (Douglas Greve) and matfile.cpp (Bruce Fischl): FreeSurfer's own, the General
+Hospital Corporation's copyright. matfile.cpp calls the system zlib's `uncompress` (zlib 1.2.11 on
+the official build's Ubuntu): larmorx decodes with `flate2` on `zlib-rs` (Zlib licence, a dependency
+already in the lock file), its results mapped to `uncompress`'s (`Z_OK`, `Z_BUF_ERROR`,
+`Z_DATA_ERROR`).
+
+| file (FreeSurfer 8.2.0) | functions (lines) | module |
+|---|---|---|
+| `utils/mosaic.cpp`, `include/mosaic.h` | `VolSS2MosSS` (72), `MosSS2VolSS` (129), `CheckMosaic` (205) | `mosaic` |
+| `utils/matfile.cpp`, `include/matfile.h` | `Matlab_Install_printf` (55), `MatlabWrite` (61), `MatlabRead` (68), `MatFileRead` (141), `MatFileWrite` (206), `matFree` (276), `matAlloc` (286), `readMatFile` (310), `MatReadHeader0` (458), `swapBytes` (503), `ReadMatlabFileVariable` (516), `ReadMatlabFileContents` (545), `MLFCprint` (628), `MLFCfree` (645), `znzreadMatFile` (671), `MatlabRead2` (765), `MatReadHeader` (863), `znzMatReadHeader` (1061); the `MAT_*`, `MATFILE_*` constants, `MATFILE`, `MLFC` | `matfile` |
+
+Changes for piece 2: the official build's integer arithmetic for mosaics (GCC 8.4.0 at `-O3`: the
+bounds as `x >= n`, the remainder from the division); C's `ungetc` modelled by a push-back stack over
+`CFile` (`matfile::Pb`), a relative seek counting the bytes given back; `matAlloc`'s rows held flat;
+`MATFILE`'s fields never written tracked by a mask (0 in their place, noted); the decoded buffer of a
+compressed variable read with glibc's allocation sizes (zero within, memory contents beyond, noted);
+`MatlabRead2`'s and `MatFileRead`'s files closed (FS-242). The corrected readers (`fix`) are larmorx's
+own: MATLAB's version 4 and 5 formats read by their definition (MATLAB's MAT-file format document).
+
+## FreeSurfer files and functions translated (part 6, relay 16: reading volumes and registration files)
+
+| FreeSurfer file | What | Here |
+|---|---|---|
+| `utils/mriio.cpp` 204-257, 488-1105 | `setDirectionCosine`, `mri_read`, `nan_inf_check`, `MRIreadType`, `MRIreadInfo`, `MRIreadHeader` (taken early from 3.1-28) | `mriio.rs` |
+| `utils/mriio.cpp` 10853-11245, 12195-12420 | `local_buffer_to_image`, `mghRead`, `MRITAGread` (taken early from 3.1-30) | `mriio.rs` |
+| `utils/registerio.cpp` 43-162 | `regio_read_register` (taken early from 3.1-34; its `.lta` branch through `RegisterLta`) | `registerio.rs` |
+| `utils/resample.cpp` 109-118 | `float2int_code` | `registerio.rs` |
+| `packages/minc/minc_gaussian.c` 157-290, `minc_volume_io.c` (its changes to MINC 1.5.1's reader: messages, transform types, tokens, `~user`) | `invert_4x4_matrix`, FreeSurfer's volume_io dialect of `larmorx_io::xfm` (MNI's notice: `LicenseRef-MNI`) | `minc.rs` |
+
+Third-party code: `packages/minc` is MNI's volume_io reworked by FreeSurfer (MNI's permissive notice); `minc.rs`
+carries both licence names. No other third-party code in these lines.

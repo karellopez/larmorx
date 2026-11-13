@@ -135,6 +135,43 @@ impl Matrix {
         })
     }
 
+    /// FS-13 under `reproduce`: the matrix `MatrixAlloc_new` makes for a negative size where it
+    /// succeeds. Its block is the header (64 bytes), `rows + 1` row pointers and
+    /// `(rows * cols + 2) * (2 for complex)` floats, each part rounded up to 64 bytes, in C's
+    /// unsigned arithmetic: it is made (its numbers zeroed) when the number of floats is not
+    /// negative and the block can be allocated (rows of -16 or more: below, the pointers' part
+    /// wraps to a size no allocation gives). Measured on the unit oracle with
+    /// `validation/probes/fs-maths/matrixalloc_negative.cpp` (every size from -20 to 3 with a
+    /// negative one, both types: exactly these succeed). The matrix keeps its negative sizes (no
+    /// rows or columns to visit).
+    pub fn negative(rows: i32, cols: i32, mtype: i16) -> Option<Matrix> {
+        if rows >= 0 && cols >= 0 {
+            return None;
+        }
+        let pair = if mtype == MATRIX_COMPLEX { 2 } else { 1 };
+        let nelts = rows.wrapping_mul(cols).wrapping_add(2).wrapping_mul(pair);
+        if nelts < 0 {
+            return None;
+        }
+        let round = |x: u64| x.wrapping_add(63) & !63;
+        let mut size = round(40);
+        size = size.wrapping_add((i64::from(rows.wrapping_add(1)) as u64).wrapping_mul(8));
+        size = round(size);
+        let data_offset = size;
+        size = round(size.wrapping_add(nelts as u64 * 4));
+        // the header's zeroing covers `data_offset` bytes of the block
+        if data_offset > 1 << 40 || size > 1 << 40 {
+            return None;
+        }
+        Some(Matrix {
+            mtype,
+            in_buf: false,
+            rows,
+            cols,
+            store: vec![0.0; nelts as usize],
+        })
+    }
+
     /// A real matrix of zeros (the new allocator's layout); panics where FreeSurfer's allocation
     /// would fail (for code that knows its sizes are valid).
     pub fn real(rows: i32, cols: i32) -> Matrix {
@@ -328,7 +365,22 @@ fn matrix_alloc_wkr(
     // as a real one by both.
     let mut m = match Matrix::zeros(rows, cols, mtype, old) {
         Ok(m) => m,
-        Err(f) => return Err(alloc_failed(g, out, err, f)),
+        Err(f) => {
+            // FS-13 (decided 2026-11-13): FreeSurfer's empty matrix under `reproduce` for the
+            // negative sizes its new allocator makes one for; the exit otherwise
+            match Matrix::negative(rows, cols, mtype).filter(|_| !old && g.notices.reproduce()) {
+                Some(m) => {
+                    g.notices.add(
+                        &FS_13,
+                        format!(
+                            "MatrixAlloc({rows}, {cols}): FreeSurfer's empty matrix of a negative size"
+                        ),
+                    );
+                    m
+                }
+                None => return Err(alloc_failed(g, out, err, f)),
+            }
+        }
     };
     if !old && buf {
         m.in_buf = matrix_alloc_new_size(rows, cols, mtype) <= MATRIX_BUFFER_SIZE;
@@ -913,6 +965,34 @@ pub(crate) fn celt_read(g: &mut Globals, m: &Matrix, r: i32, c: i32) -> (f64, f6
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// FS-13 under `reproduce`: the negative sizes FreeSurfer's allocator makes a matrix for, as
+    /// measured on the unit oracle (`validation/probes/fs-maths/matrixalloc_negative.cpp`: 724 of
+    /// the 1,120 sizes from -20 to 3 with a negative one, both types).
+    #[test]
+    fn negative_sizes_under_reproduce() {
+        use larmorx_core::defects::UpstreamDefects;
+        let mut ok = 0;
+        for mtype in [MATRIX_REAL, MATRIX_COMPLEX] {
+            for r in -20..=3 {
+                for c in -20..=3 {
+                    if r >= 0 && c >= 0 {
+                        continue;
+                    }
+                    let mut g = Globals::new(UpstreamDefects::Reproduce);
+                    let (mut o, mut e) = (Vec::new(), Vec::new());
+                    let m = matrix_alloc(&mut g, &mut o, &mut e, r, c, mtype);
+                    let made = matches!(m, Ok(Some(_)));
+                    let n = r * c;
+                    assert_eq!(made, n >= -2 && r >= -16, "{mtype} {r} {c}");
+                    ok += usize::from(made);
+                    let mut g = Globals::new(UpstreamDefects::Fix);
+                    assert!(matrix_alloc(&mut g, &mut o, &mut e, r, c, mtype).is_err());
+                }
+            }
+        }
+        assert_eq!(ok, 724);
+    }
     use larmorx_core::defects::UpstreamDefects;
 
     fn g(mode: UpstreamDefects) -> Globals {

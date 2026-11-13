@@ -48,6 +48,33 @@ number on C streams and znz files, `fio_dirname`, `fio_basename`, `fio_extension
   CTN's messages name the file as the port opened it (joined to the fixture's path): the port's lines
   show it relative to the fixture, as `fsio` (which runs in the fixture) does. `SKIP` where FreeSurfer
   crashes or overflows (FS-221, FS-227, FS-228). `build.sh` adds CTN's include folder.
+- Piece 5 (queue item 3.1-27's second piece, relay 15): mosaics and MATLAB files. `mvm` (`VolSS2MosSS`),
+  `mmv` (`MosSS2VolSS`), each printing the return, the three outputs (-7 where untouched) and the
+  out-of-bounds flag (7 where untouched, or not given), `mck` (`CheckMosaic`), `mlw` (`MatlabWrite` of a
+  real or complex matrix of any float bits, then the file's bytes), `mlr` (`MatlabRead`), `mfr`
+  (`MatFileRead` with a type; the structure's fields and data), `mrc` (`ReadMatlabFileContents`,
+  `MLFCprint` to standard output, `MLFCfree`, then `ReadMatlabFileVariable`), the readers with `Gdiag`
+  and `Gdiag_no` set; the `.mat` files built by `tests/fs_io/piece5.rs` from MATLAB's version 4 and 5
+  formats (both byte orders, every numbers type, complex, small and normal names and numbers, 1 to 3
+  dimensions, zlib-compressed, one compressing more than 100 to 1), cut or changed. A matrix of more
+  than 65,536 numbers prints as `fnv<FNV-1a 64 of its floats' bytes>`. `SKIP` where FreeSurfer crashes,
+  its outcome depends on the machine's memory or it passes the 5 seconds printing (FS-13, FS-229,
+  FS-243, FS-248); `VARY` where it reads memory (FS-245, the addresses printed with `DIAG_SHOW` and
+  `DIAG_VERBOSE`).
+- Piece 6 (relay 16, for track D's surfaces): reading volumes and registration files. `mrh` (`MRIreadHeader` with a
+  type), `mri` (`MRIreadInfo`), `mrd` (`mri_read` with voxels, called directly: `MRIreadType`'s licence check exits
+  without `FREESURFER_HOME`), `mgr` (`mghRead` with or without voxels and a frame), `rrr` (`regio_read_register`), with
+  `Gdiag`, the frame-list switch, `FS_SKIP_TAGS` and `FS_MGZIO_USEVOXELBUFREAD`; the MGH files (plain and compressed, whole
+  or cut) built by `tests/fs_io/piece6.rs` from the format with every tag kind and `.xfm` files beside them; each volume
+  printed as its header fields, transforms, tags' values and an FNV-1a hash of its voxels. Names and messages are printed
+  with the fixture's path removed on both sides (`fsio` prints names escaped with an `n` before them; its piece-6
+  messages lose the fixture's path), and standard error is oriented first (glibc's `perror` then leaves `errno` alone).
+  `SKIP` for formats not ported yet, `.lta` names (fs.volume's `LTAread`), crashes (FS-76, FS-249, FS-253 to FS-258) and
+  skips beyond 256 MiB (FS-178); `VARY` for numbers from memory (FS-49, FS-167).
+- `matfile_scipy.py`: 400 matrices written by SciPy's `savemat` (version 4; version 5 plain and
+  compressed; doubles, singles, signed and unsigned 8- to 32-bit integers, complex) read by the port's
+  `MatlabRead`: the default (`fix`) must read each as SciPy wrote it; FreeSurfer's reading
+  (`reproduce`) is counted per format.
 - `scanf_lf.c`: glibc's `sscanf("%lf")` as a black box (bits, `errno`, bytes read), the measurements
   behind `larmorx-freesurfer-core::cscan`'s `%lf` test.
 
@@ -55,8 +82,9 @@ Run (inside a memory box; the port and FreeSurfer run on generated inputs):
 
     validation/probes/fs-io/build.sh <workspace>
     scripts/orchestration/boxed.sh 6 python -P validation/probes/fs-io/check.py --seed 1 --n 1100
-    scripts/orchestration/boxed.sh 10 python -P validation/probes/fs-io/check.py --seed 1 --n 3600 --portable
-    scripts/orchestration/boxed.sh 12 python -P validation/probes/fs-io/check.py --seed 7 --n 72000
+    scripts/orchestration/boxed.sh 10 python -P validation/probes/fs-io/check.py --seed 1 --n 4800 --portable
+    scripts/orchestration/boxed.sh 12 python -P validation/probes/fs-io/check.py --seed 7 --n 86000
+    scripts/orchestration/boxed.sh 6 python -P validation/probes/fs-io/matfile_scipy.py
 
 The portable run's hash (`official_sha256_skip`) is `tests/fs_io_official.rs`'s, checked on every
 platform. Results (2026-11-13): `docs/findings/freesurfer-io.md`.

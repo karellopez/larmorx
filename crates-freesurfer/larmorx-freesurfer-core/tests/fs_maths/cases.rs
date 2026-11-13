@@ -2659,6 +2659,16 @@ pub fn run_line(line: &str, mode: UpstreamDefects, tmp: &Path) -> (String, Vec<&
         _ => panic!("unknown case {cmd}"),
     }
     let _ = so.flush();
-    let ids = gl.notices.as_slice().iter().map(|n| n.defect.id).collect();
+    let mut ids: Vec<&'static str> = gl.notices.as_slice().iter().map(|n| n.defect.id).collect();
+    // FS-47 and FS-48 where FreeSurfer hangs (VNL never returns): not comparable; FS-49 where a
+    // number took a byte of memory FreeSurfer never wrote
+    for n in gl.notices.as_slice() {
+        if matches!(n.defect.id, "FS-47" | "FS-48") && n.detail.contains("hangs") {
+            ids.push("HANG");
+        }
+        if n.defect.id == "FS-49" && n.detail.contains("memory") {
+            ids.push("MEM49");
+        }
+    }
     (o.0.join(" "), ids)
 }

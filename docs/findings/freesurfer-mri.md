@@ -306,3 +306,15 @@ FS-58), `fixtk` 8); the four new commands: 5,625 of 5,625 comparable lines ident
 passing under `NAN_TRAP_ARM=1` with `NAN_TRAP_DIR` in debug (2,806 NaNs flipped) and release (2,354);
 the port's 49,000 seed-7 lines identical with and without the emulation in both modes (198,749
 flips each).
+
+## FS-252: `MRIcopyHeader` from a source without its voxel-to-RAS matrix (track A relay 15)
+
+Found by track C's relay 11 (docs/findings/freesurfer-volume.md §3): `MRIcopyHeader` (`utils/mri.cpp`
+6278) does `mri_dst->i_to_r__ = AffineMatrixCopy(mri_src->i_to_r__, mri_dst->i_to_r__)`, whose
+`memcpy` (`include/affine.h` 156) reads `src->mat` without a check: a source whose `i_to_r__` is
+`NULL` crashes the official build (observed: `SIGSEGV` at `MRIcopyHeader+0x39c`, `movdqu (%r12)` with
+`r12 = 0`). FreeSurfer's constructors always compute it (`MRI::MRI`, mri.cpp 217-218; `MRIallocHeader`
+through the same constructor; 1414-1415), so only a structure made otherwise lacks it (the port's
+own `VolGeom::default()`, a probe's hand-made volume). Rule: a crash, never reproduced; the input
+cannot arise from FreeSurfer's own volumes, so both modes copy none (the destination is then like its
+source, as FS-59's default) and note FS-252. Before this relay the port copied none without a notice.

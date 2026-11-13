@@ -960,6 +960,16 @@ impl GzFile {
         n as i32
     }
 
+    /// `gzread` of a length that does not fit an `int` (`(int)len < 0`): zlib's `request does not
+    /// fit in an int`, the stream's error set (every later read fails), -1.
+    pub fn gzread_too_long(&mut self) -> i32 {
+        if self.mode != GzMode::Read || (self.err != Z_OK && self.err != Z_BUF_ERROR) {
+            return -1;
+        }
+        self.error(Z_STREAM_ERROR);
+        -1
+    }
+
     /// `gzgetc`.
     pub fn gzgetc(&mut self) -> i32 {
         if self.mode != GzMode::Read || (self.err != Z_OK && self.err != Z_BUF_ERROR) {

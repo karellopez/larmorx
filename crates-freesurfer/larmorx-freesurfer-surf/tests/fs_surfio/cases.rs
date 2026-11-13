@@ -1123,6 +1123,9 @@ struct Ctx {
     sg: SurfGlobals,
     a: Shared,
     b: Shared,
+    /// The case's work folder, when it has one whose absolute path a message may give (relay 19:
+    /// written `<w>`, as the official probe writes its own).
+    work: Option<String>,
 }
 
 /// `set_coords`'s 45 floats.
@@ -2738,6 +2741,7 @@ pub fn run_line_with(
         sg,
         a: shared.clone(),
         b: shared.clone(),
+        work: None,
     };
     let mut t = Toks {
         t: line.split_whitespace().collect(),
@@ -2745,7 +2749,24 @@ pub fn run_line_with(
     };
     let mut o = Out::default();
     let res = case(&mut cx, &mut t, &mut o);
-    let text = escape(&shared.0.borrow());
+    let work = |b: &[u8]| -> Vec<u8> {
+        let Some(w) = cx.work.as_deref().filter(|w| !w.is_empty()) else {
+            return b.to_vec();
+        };
+        let (w, mut r, mut i) = (w.as_bytes(), Vec::new(), 0);
+        while i < b.len() {
+            if b[i..].starts_with(w) {
+                r.extend_from_slice(b"<w>");
+                i += w.len();
+            } else {
+                r.push(b[i]);
+                i += 1;
+            }
+        }
+        r
+    };
+    let text = escape(&work(&shared.0.borrow()));
+    o.0 = String::from_utf8(work(o.0.as_bytes())).expect("the output's text");
     let result = match res {
         Ok(()) => o.0.trim_end().to_owned(),
         // FS-03 reproduced: FreeSurfer's failed assertion faults on purpose (signal 11)

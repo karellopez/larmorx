@@ -2991,6 +2991,11 @@ int main(int argc, char *argv[])
     } else {
       result = "EXIT " + std::to_string(WEXITSTATUS(status));
     }
+    // relay 19: the work folder's absolute path (a volume reader's messages name it) as `<w>`,
+    // as the port writes its own temporary folder's
+    for (std::string *t : {&result, &text})
+      for (size_t at = t->find(workdir); at != std::string::npos; at = t->find(workdir, at + 3))
+        t->replace(at, workdir.size(), "<w>");
     printf("%s | %s\n", result.c_str(), escape(text).c_str());
   }
   unlink(scratch.c_str());

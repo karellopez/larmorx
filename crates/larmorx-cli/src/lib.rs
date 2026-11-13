@@ -111,9 +111,10 @@ fn usage_error(prog: &str, message: &str, err: &mut dyn Write) -> u8 {
     }
 }
 
-/// A Python program of the command line (sdcflows' BIDS app), as the Python package's console
-/// script runs it before this parser sees the command (`python/larmorx/cli/__init__.py`): its
-/// arguments, and the changes larmorx's own options make to its environment.
+/// A Python program of the command line (sdcflows' BIDS app, nipype's interface runner), as the
+/// Python package's console script runs it before this parser sees the command
+/// (`python/larmorx/cli/__init__.py`): its arguments, and the changes larmorx's own options make
+/// to its environment.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PythonProgram {
     pub family: String,
@@ -124,16 +125,14 @@ pub struct PythonProgram {
     pub environment: Vec<(&'static str, Option<String>)>,
 }
 
-/// `args` (program name first) when they name a Python program ([`PYTHON_TOOLS`]) after
+/// `args` (program name first) when they name a Python program ([`PYTHON_PROGRAMS`]) after
 /// larmorx's own options; `None` otherwise, and when the options are wrong (the command line
 /// then reports the error).
 pub fn python_program(args: &[String]) -> Option<PythonProgram> {
     let rest = args.get(1..)?;
     let (globals, k) = parse_globals(rest).ok()?;
     let (family, tool) = (rest.get(k)?, rest.get(k + 1)?);
-    if family != "sdcflows" || !PYTHON_TOOLS.contains(&tool.as_str()) {
-        return None;
-    }
+    python_program_name(family, tool)?;
     Some(PythonProgram {
         family: family.clone(),
         tool: tool.clone(),
@@ -157,13 +156,41 @@ pub const FAMILIES: &[(&str, &[&str])] = &[
     ("fsl", FSL_TOOLS),
     ("mri", larmorx_mri::cli::TOOLS),
     ("tedana", larmorx_tedana::cli::TOOLS),
-    ("sdcflows", PYTHON_TOOLS),
+    ("sdcflows", SDCFLOWS_TOOLS),
+    ("nipype", NIPYPE_TOOLS),
 ];
 
-/// The tools that are Python programs (sdcflows' BIDS app, `larmorx.sdcflows.run_app`): the
-/// `larmorx` command of the Python package runs them before this parser sees them; here they
-/// are listed, and running one says that it needs the Python package.
-const PYTHON_TOOLS: &[&str] = &["sdcflows"];
+/// sdcflows' BIDS app (`larmorx.sdcflows.run_app`), a Python program.
+const SDCFLOWS_TOOLS: &[&str] = &["sdcflows"];
+
+/// nipype's interface runner, `nipypecli run` (`larmorx.nipype.run`), a Python program.
+const NIPYPE_TOOLS: &[&str] = &["run"];
+
+/// The tools that are Python programs, with what they are: the `larmorx` command of the Python
+/// package runs them before this parser sees them; here they are listed, and running one says
+/// that it needs the Python package.
+pub const PYTHON_PROGRAMS: &[(&str, &str, &str, &str)] = &[
+    (
+        "sdcflows",
+        "sdcflows",
+        "sdcflows' BIDS app",
+        "<bids_dir> <output_dir> participant ...",
+    ),
+    (
+        "nipype",
+        "run",
+        "nipype's interface runner, nipypecli run",
+        "<module> <Interface> ...",
+    ),
+];
+
+/// What the Python program `family tool` is, and its arguments' form; `None` if it is not one.
+fn python_program_name(family: &str, tool: &str) -> Option<(&'static str, &'static str)> {
+    PYTHON_PROGRAMS
+        .iter()
+        .find(|(f, t, _, _)| *f == family && *t == tool)
+        .map(|(_, _, what, form)| (*what, *form))
+}
 
 /// Exit status of a tool this binary cannot run (the shell's "command not found").
 pub const EXIT_NOT_AVAILABLE: u8 = 127;
@@ -407,12 +434,12 @@ fn run_tool(
         "mri" => larmorx_mri::cli::run_given(tool, args, &given, out, err),
         // tedana's t2smap: the clean-room original (the replica is larmorx-gpl's program)
         "tedana" => larmorx_tedana::cli::run_given(tool, args, &given, out, err),
-        "sdcflows" if PYTHON_TOOLS.contains(&tool) => {
+        "sdcflows" | "nipype" if let Some((what, form)) = python_program_name(family, tool) => {
             let written = writeln!(
                 err,
-                "error: '{family} {tool}' (sdcflows' BIDS app) is a Python program: install the \
-                 larmorx Python package (pip install larmorx) and run it with the larmorx command \
-                 it installs (larmorx {family} {tool} <bids_dir> <output_dir> participant ...)"
+                "error: '{family} {tool}' ({what}) is a Python program: install the larmorx \
+                 Python package (pip install larmorx) and run it with the larmorx command it \
+                 installs (larmorx {family} {tool} {form})"
             );
             Some(if written.is_ok() {
                 EXIT_NOT_AVAILABLE
@@ -563,6 +590,8 @@ Options (before the family; each one given wins over the environment variable it
   The ANTs programs' thread variables are NSLOTS and ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS. A tool
   whose original has its own thread option uses it when it is given, else --n-threads: tedana
   t2smap --n-threads, sdcflows sdcflows --nprocs and --omp-nthreads, fsl topup --nthr.
+  sdcflows sdcflows and nipype run are Python programs: the larmorx command of the Python
+  package runs them.
 
 Data:
   {prog} fetch fsl-standard [<package>]   FSL's standard images, fetched ahead into the data cache
@@ -646,6 +675,17 @@ mod tests {
         assert!(err.contains("unknown sdcflows tool 'other'"), "{err}");
         let (_, out, _) = run_capture(&["larmorx", "--help"]);
         assert!(out.contains("sdcflows sdcflows"), "{out}");
+        // nipype's interface runner, the same way
+        let (code, out, err) = run_capture(&["larmorx", "nipype", "run", "--list"]);
+        assert_eq!(code, EXIT_NOT_AVAILABLE);
+        assert_eq!(out, "");
+        assert!(err.contains("'nipype run' (nipype's interface runner"), "{err}");
+        assert!(err.contains("larmorx nipype run <module> <Interface>"), "{err}");
+        let (code, _, err) = run_capture(&["larmorx", "nipype", "crash"]);
+        assert_eq!(code, EXIT_USAGE);
+        assert!(err.contains("unknown nipype tool 'crash' (available: run)"), "{err}");
+        let (_, out, _) = run_capture(&["larmorx", "--help"]);
+        assert!(out.contains("nipype run"), "{out}");
     }
 
     #[test]

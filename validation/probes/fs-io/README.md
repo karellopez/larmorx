@@ -131,6 +131,16 @@ number on C streams and znz files, `fio_dirname`, `fio_basename`, `fio_extension
   places (FNV-1a 64 beyond 2,000 characters), vertex indices and transforms. `SKIP` for FS-423, FS-424, FS-426,
   FS-427, FS-429, FS-430, FS-431 and FS-11. Seed 13, 2,678 piece-11 cases: `reproduce` identical on 2,594, 0
   different; seed 7, 8,034: identical on 7,783, 0 different.
+- Piece 12 (relay 21): `mgi` (`mri_read` of generated GIFTI files, as `mrd` with the volume flag; the volume
+  printed as piece 6's with its colour table), `mwr` (`MRIwrite` of one to three volumes given by extent, type,
+  frames, geometry, repetition time, name suffix and voxels, with `FREESURFER_REPLACEMENT_FOR_CREATION_TIME_STRING`
+  and `SURFER_SIDEDOOR` set; every file under `w` printed, `.gii` files in any case with fs-surfio's `gii_normal`:
+  the user name `U`, each payload Base64-decoded and inflated), `lps` (`loadfsPointSet`; the set's `vox2ras`, points),
+  `hlp` (`outputHelpXml` of a text or NULL; the text printed and the status). The GIFTI files, point-set files and
+  help texts are built by `tests/fs_io/piece12.rs`. `SKIP` for the writers not ported yet, FS-521, FS-255, the
+  GIFTI reader's crashes, FS-434 and help texts that are not well formed; `VARY` for FS-214's address. Seed 7, 1,800
+  `mgi`/`mwr`/`lps` cases: `reproduce` identical on 1,589, 0 different; FreeSurfer 8.2.0's 86 `.help.xml` files
+  (`hlp x<hex of the file>`): identical; seed 13, 594 `hlp` cases: identical on 465, 0 different.
 - `matfile_scipy.py`: 400 matrices written by SciPy's `savemat` (version 4; version 5 plain and
   compressed; doubles, singles, signed and unsigned 8- to 32-bit integers, complex) read by the port's
   `MatlabRead`: the default (`fix`) must read each as SciPy wrote it; FreeSurfer's reading

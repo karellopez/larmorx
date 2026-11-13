@@ -120,10 +120,9 @@ when it ends with `/`).
 
 ## 5. The help
 
-The help text is FreeSurfer's XML help, rendered by `outputHelpXml`: no text → `No xml string
+The help text is FreeSurfer's XML help, rendered by `outputHelpXml` (§7): no text → `No xml string
 passed.` and a newline on standard error; an empty text → `Document not parsed successfully. ` and a
-newline; otherwise the XML rendered (FreeSurfer's help renderer, `utils/fsPrintHelp.cpp`, with libxml2:
-not part of this module; larmorx's replica says it is not ported yet).
+newline; otherwise the XML rendered.
 
 ## 6. Validation plan
 
@@ -134,6 +133,58 @@ XML), a command line (made for the configuration half of the time: each argument
 type, words of every kind for `stoi`, `stof` and the booleans, stray words, `--version`; otherwise
 random names, unknown flags and words), then `exists` and `retrieve` queries of the right and wrong
 types and unknown names. Lines whose answer depends on the index's order (two matching names) or on the
-time (`--all-info`) are compared apart; lines where an XML help text is rendered are counted. Measured
-(2026-11-13): seed 13, 2,352 cases: `reproduce` identical on 2,265, 0 different (61 counted, 26
-apart).
+time (`--all-info`) are compared apart. Measured (2026-11-13): seed 13, 2,352 cases: `reproduce`
+identical on 2,265, 0 different (61 counted, 26 apart); since the renderer (2026-11-14), seed 13, 297
+cases: identical on 294, 0 different (3 apart).
+
+## 7. The XML help renderer (`outputHelpXml`, `outputHelp`, `outputHelpDoc`; `utils/fsPrintHelp.cpp`)
+
+The text is read as an XML document as libxml2 2.7.7 reads it with its defaults (entities not
+substituted, blank text kept, no DTD loaded): the XML declaration with encoding UTF-8 (default),
+ISO-8859-1 (each byte of 128 or more becomes its two-byte UTF-8 form) or ASCII; a byte-order mark; the
+document type and its internal subset (entity declarations; element, attribute-list and notation
+declarations change nothing); `\r\n` and `\r` read as `\n`; the predefined entities `lt`, `gt`,
+`amp`, `apos`, `quot` always give their characters, whatever the internal subset declares (the help
+files declare `lt` as `#38;#60;`); character references give their character in UTF-8. A text that is
+not well formed: libxml2 prints its messages (`Entity: line <n>: parser error : <message>`, the line,
+a caret) and then `Document not parsed successfully. ` (larmorx: one line `larmorx-freesurfer: the help
+text is not well-formed XML (<what>); libxml2's messages are not reproduced`, then the same last line);
+status -1. The programs' own help texts are well formed.
+
+The document's root element must be `help` (any case), else `Document id of the wrong type!  The root
+node is not help.` (standard error, -1). Standard output: `\t\t\t\tHelp`; then, for each child of the
+root: text (blank or not) and elements named `text` (any case) are skipped; an `arguments` element
+prints, for each of its children but text: two newlines and its name in capitals with its first `_`
+and its first `-` made spaces, then ` ARGUMENTS`, then each of that child's children but text: before
+each `intro` or `argument` but the first a newline, then the child's contents; an `outputs` element
+prints its name the same way and then its children as the kinds of arguments do (`intro` and `output`
+take the newline); `example` elements print their name and ` <n>` (numbered from 1 in the document);
+every other element its name and its contents. At the end three newlines; status 0.
+
+An element's contents: the concatenated text of its direct text and CDATA children (references
+replaced; nested elements, comments and processing instructions contribute nothing). Printed in
+lines: each starts with a newline and a tab (two tabs in an `explanation`, any case); one space at the
+line's start is skipped; a line holds at most 70 characters (62 in an explanation): characters are
+copied one by one while the word starting at the current character (its length the characters up to
+the next space, `_` or `/`, or the end; a newline does not end a word) fits in what is left of the
+line, a newline in the text ends the line (and is not printed); a word longer than the whole line is
+cut at the line's end. FS-435: FreeSurfer then drops the character after the cut (by default larmorx
+starts the next line with it; `reproduce` drops it; FreeSurfer 8.2.0's `mri_ca_normalize`,
+`mri_ca_register` and `mri_cal_renormalize_gca` help texts have such words). FS-434: an element with no
+text or CDATA child, and a comment, processing instruction or CDATA section among the root's children
+or among an argument kind's or `outputs`' children, crash FreeSurfer; larmorx prints nothing for them
+(both modes). FS-436: a comment or processing instruction among the `arguments` element's children is
+printed by FreeSurfer as a kind `<TARGET> ARGUMENTS` (a comment: `COMMENT ARGUMENTS`) with nothing
+under it; by default larmorx skips it, `reproduce` prints it.
+
+`outputHelp(name)`: no name → `No filename passed.`, -1; a name that does not open as a file is looked
+up as `$FREESURFER_HOME/docs/xml/<name>.help.xml` (no `FREESURFER_HOME`: -1, nothing printed); the file
+read as above.
+
+Validation: the fs.io probe's piece 12 (`hlp`): FreeSurfer 8.2.0's 86 `.help.xml` files and generated
+help texts (sections in any case, kinds of arguments, intros, explanations, outputs, examples, both
+encodings, the help files' document type, references, CDATA, comments and elements inside text, tabs,
+line ends of every form, words around the line widths, the separators `_` and `/`, non-ASCII letters,
+stray comments and processing instructions, empty elements, cut texts). Measured (2026-11-14): the 86
+files identical in `reproduce` (83 in `fix`: FS-435); seed 13, 594 generated texts: identical on 465, 0
+different (129 counted: FreeSurfer crashes, FS-434, or not well formed).

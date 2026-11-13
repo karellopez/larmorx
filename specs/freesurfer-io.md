@@ -2061,3 +2061,74 @@ indices and transforms; `Gerror` last. Lines with FS-423, FS-424, FS-426, FS-427
 FS-431 or FS-11 are counted, not compared. Measured (2026-11-13): seed 13, 2,678 piece-11 cases:
 `reproduce` identical on 2,594, 0 different (84 counted); seed 7, 8,034: identical on 7,783, 0
 different (251 counted); `fix` differs only where a defect is noted (FS-01, FS-12, FS-425).
+
+## 83. Reading GIFTI files as volumes (part 11, `MRIread`'s GIFTI branch)
+
+A name whose format is GIFTI (`.gii` in any case, or `@gii`) is read by the GIFTI volume reader
+(§107-111 of `specs/freesurfer-surfio.md`: one column per vertex, one frame per data array of the
+first intent found), then as any volume (§§ on `mri_read`): the volume's name is the name as given,
+its cached matrices recomputed, a frame list (`#n`, `#a:b`) applied. A file that does not open leaves
+`errno` at the open's error (2 for a missing file); a file that opens leaves `errno` as the version
+check's two `sscanf("%f")` of the file's version and of `1.0` leave it.
+
+## 84. Writing volumes (`MRIwrite`, `MRIwriteType`)
+
+`MRIwrite(mri, name, several, intent)`: the format from the name (`mri_identify`; none:
+`unknown file type for file (<name>)`, `ERROR_BADPARM`, nothing written). With one volume (or a list
+of at most one) the volume is written by `MRIwriteType`. With several, each volume of the list is
+written in that format under its own name: the stem and the extension are cut at the last dot before
+the first `.gz` (which stays with the extension; no dot: the whole name is the stem and the extension
+is the text `(null)`), and the name is `<stem><suffix>.<extension>`, the suffix the volume's own name
+suffix (set by the readers of multi-echo series) or `_<n>` (its place, from 0) when it has none;
+FS-432: names of 1,024 bytes or more (FreeSurfer overflows its buffer; larmorx writes the whole
+name, noted). The status is the last volume's.
+
+`MRIwriteType(mri, name, type, intent)`: for every type but COR, a name that is an existing folder
+is refused: `MRIwriteType(): <name> is an existing directory. (type=<t>)` and, on a second line
+indented 16 spaces, `A filename should be specified instead.` (`ERROR_BADFILE`). An image file needs
+a depth of 1 (`MRIwriteType(<name>): image files cannnot have depth > 1`, the program ends with
+`ERROR_BADPARM`); a GCA or ITK morph three frames (`MRIwriteType: gcam - input mri must have 3 frames,
+not <n>`, `MRIwriteType: itk warp - input mri must have 3 frames, not <n>`, status -1). Refused with
+`MRIwriteType(): writing of <format> file type not supported` (`ERROR_BADPARM`): GENESIS, GE LX,
+SIEMENS, SDT, OTL, RAW, SIGNA, DICOM, SIEMENS DICOM, BRUKER, XIMG; any other unknown type: `MRIwriteType():
+code inconsistency (file type recognized but not caught)`. GIFTI: §110 of
+`specs/freesurfer-surfio.md` (`mriWriteGifti`); `errno` is 0 after it (the user-name lookup) unless
+the file does not open (its error). After a writer that succeeds, a volume with b-values writes them
+beside it: `Saving bvals and bvecs` on standard output, `<stem>.bvals` and
+`<stem>.<scanner|voxel|unknown>_space.bvecs` (§ on `DTIwriteBValues`/`DTIwriteBVectors`), the stem the
+name without its volume extension (`IDstemFromName`; none: nothing more written). Not ported yet in
+larmorx (a message, status -1): COR, MINC, image, `.bhdr`, bshort, bfloat, ANALYZE, ANALYZE 4D, BRIK,
+GCA and ITK morphs, MGH/MGZ, GDF, NIfTI-1, NIfTI, NRRD.
+
+## 85. Reading point sets (`loadfsPointSet`)
+
+The JSON file (§81's `save` form) read whole (a file that does not open reads as empty): `vox2ras`
+must be a string (missing: null, an error), `points` is visited as nlohmann visits a value (an array's
+elements, an object's values in key order, nothing for null or a missing key, any other value once);
+each point must be an object (or null) whose `coordinates` is an object (or null); of each point
+`legacy_stat`, then the coordinates' `z`, `y` and `x` are read, in that order, as numbers (integers or
+floats; null, booleans, strings, arrays and objects are errors); the point is added with index and
+count 0. FS-433: a text that is not JSON (nlohmann's `parse_error` texts, `[json.exception.parse_error.101]
+parse error at <n>: ...`), a value of another type (`[json.exception.type_error.302] type must be number,
+but is <type>`, `... type must be string, but is <type>`, `[json.exception.type_error.305] cannot use
+operator[] with a string argument with <type>`) or a folder (`basic_filebuf::underflow error reading the
+file: Is a directory`) ends FreeSurfer with `terminate called after throwing an instance of
+'nlohmann::detail::<kind>'` (`'std::__ios_failure'` for the folder), `  what():  <text>` and an abort;
+by default larmorx prints `error: loadfsPointSet(<file>): <text>` and ends with status 1, `reproduce`
+the abort's lines and status 134.
+
+## 86. Validation plan (part 11)
+
+The probe's piece 12 (`validation/probes/fs-io/`): `mgi` (`mri_read` of generated GIFTI files: 0 to 3
+data arrays of every intent, of float, int and byte types, ASCII, Base64 and gzip-Base64 encodings,
+both byte orders, one or two dimensions, both index orders, `TimeStep` metadata, label tables with
+negative keys, counts and lengths that disagree, version `1`, cut files, random bytes; names with
+`#` frames, `@gii`, upper case, missing files; with and without voxels, `Gdiag`, the frame switch),
+`mwr` (`MRIwrite` of one to three volumes of every type, 1 to 6 x 3 x 2 voxels and 3 frames, with
+name suffixes, to `.gii` names in any case, a folder, a missing folder, names of other or unknown
+formats; every file under the case's folder printed, GIFTI files with their user name as `U`, the
+creation time fixed and each payload decoded and inflated), `lps` (point-set files as `save` writes
+them, with fields missing, reordered or of every other type, points as objects, not JSON, a BOM,
+trailing text, a missing file, a folder). Lines with FS-521, FS-255 and the GIFTI reader's crashes are
+counted, not compared; FS-214's address apart. Measured (2026-11-14): seed 7, 1,800 cases: `reproduce`
+identical on 1,589, 0 different (210 counted, mostly the writers not ported yet).

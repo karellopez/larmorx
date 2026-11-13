@@ -1005,3 +1005,37 @@ options (`MRIreadControlPoints`; `MRIfillPoints` from `mri_edit_wm_with_aseg`'s 
   upper-case name is `w/b.LABEL` there; seed 1's light set re-recorded (`5f2d9dfd...`, the same
   4,291 identical and 506 SKIP or VARY). The test names its first differing case from per-case
   digests (`tests/fs_io/official_digests.txt`).
+
+## Part 11: MRIread's and MRIwrite's GIFTI branches, MRIwrite, loadfsPointSet (relay 21 of track A)
+
+Restricted (FreeSurfer's internals). Behaviour: `specs/freesurfer-io.md` §83-86.
+
+### Mechanisms
+- `mri_read` (mriio.cpp 783-784) calls `MRISreadGiftiAsMRI(fname_copy, volume_flag)` with the copy
+  that has the working directory before a name without `/`; `MRIwrite` (1309) runs `chklc()`, then
+  `mri_identify(fname)` (negative: `ErrorReturn(ERROR_BADPARM, ...)`), then `MRIwriteType` (1109); the
+  directory check is `stat` + `S_ISDIR` (no readability test, unlike `fio_IsDirectory`), skipped for
+  `MRI_CORONAL_SLICE_DIRECTORY`; `mriWriteGifti` at 1214-1215.
+- FS-432: the vector branch builds each name with `sprintf(tmp, ...)` into `char tmp[1024]`; `ext` is
+  `strrchr`'s result after `.gz` was cut with a NUL and put back, so the extension keeps `.gz`; a NULL
+  `ext` prints `(null)` (glibc's `%s`).
+- `errno`: `stat` of a name that does not exist sets 2 before the writer; `insertCommonMetaData`'s
+  `getpwuid(geteuid())` ends with `errno` 0 (glibc's `getXXbyYY_r` wrapper sets `errno` to its status,
+  0 for found and not found; measured with gdb on the probe: 2 at `mriWriteGifti`'s entry, 0 at
+  `gifti_valid_gifti_image`). gifticlib's `fopen` of a file that does not open leaves its error (2).
+  Both are set in `gifti_vol.rs` and `gifti_common.rs` (track D's code in this crate: the surface writers'
+  `insertCommonMetaData` calls in larmorx-freesurfer-surf do not set it yet: track D's note).
+- loadfsPointSet (pointset.cpp 74-92): `std::ifstream is(filename); is >> j;` (nlohmann 3.2.0's stream
+  adapter: a stream that did not open reads EOF; a folder opens and its first `underflow` throws
+  libstdc++'s `std::__ios_failure` with `errno`'s text), `ps.vox2ras = j["vox2ras"]` (non-const
+  `operator[]`, `get<std::string>`), the range-for over `j["points"]` copying each point, `point["coordinates"]`
+  copied, `ps.add(coord["x"], coord["y"], coord["z"], point["legacy_stat"])`: GCC 8.4.0 evaluates the
+  four arguments right to left (measured: a point with a string `x` and an array `legacy_stat` throws the
+  array's message), so `legacy_stat`, `z`, `y`, `x`. FreeSurfer's copy of json.h words `type_error.305`
+  "with a string argument with" (json.h 14249). The probe's `CRASH 6` is the port's status 134.
+
+### Measured (piece 12, 2026-11-14, the probe `validation/probes/fs-io/`, unit oracle's build)
+- `mgi`, `mwr`, `lps` seed 13 (900 cases) and seed 7 (1,800): `reproduce` identical on 1,589 of seed
+  7's, 0 different (210 counted: the writers not ported yet, FS-521's files mixing intents, FS-255);
+  `fix` differs only with notices (FS-433, FS-01, FS-522). Track D's `larmorx-freesurfer-surf` tests
+  (`fs_surfio_official`, `gifti_writers`) unchanged with the errno changes.

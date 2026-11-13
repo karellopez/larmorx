@@ -245,3 +245,19 @@ Behaviour: `specs/freesurfer-surfio.md` §107-111; mechanisms: `docs/findings/fr
 Changes for this part: gifticlib's settings and persistent state (its globals `G` and `GXD`) are
 fs.core's `Globals::gifti`, one per run as in FreeSurfer, which the volume and the surface functions
 share (before relay 23 they were the surface crate's `SurfGlobals::gifti`).
+
+## FreeSurfer files and functions translated (part 11, relay 21 of track A: GIFTI branches, MRIwrite, point-set files)
+
+| FreeSurfer file | What | Here |
+|---|---|---|
+| `utils/mriio.cpp` 783-784 | `mri_read`'s GIFTI branch (`MRISreadGiftiAsMRI`) | `mriio.rs` |
+| `utils/mriio.cpp` 1109-1295, 1309-1360; `include/mri.h` 1906-1908 | `MRIwriteType` (the directory check, the refusals, the GIFTI branch, the b-values tail), `MRIwrite` (the several volumes' names, FS-432) | `mriio.rs` |
+| `utils/pointset.cpp` 74-92; `include/json.h` 14249 | `loadfsPointSet` (FS-433), FreeSurfer's `type_error.305` wording | `pointset.rs` |
+
+Changes for part 11: the writers not ported yet (COR, MINC, image, `.bhdr`, bshort, bfloat, ANALYZE,
+BRIK, the morphs, MGH, GDF, NIfTI, NRRD) answer with a message and -1; `chklc` passes (the port needs
+no key); `stat` as `std::fs::metadata`; the several volumes as a slice; `loadfsPointSet`'s nlohmann
+values through `larmorx_core::json` (track C's port), its uncaught exceptions as FS-433's clear error
+(status 1) or, with `reproduce`, the abort's lines and status 134. `errno` set as FreeSurfer leaves it
+after gifticlib's failed `fopen` (read and write) and after `getpwuid` (0) in `gifti_common.rs` and
+`gifti_vol.rs`.

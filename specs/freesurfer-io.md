@@ -363,8 +363,8 @@ read and dropped. FS-186: FreeSurfer does not end the name after the bytes read:
 over a longer earlier name keeps that name's rest after it, a length of 0 or less leaves the earlier
 name, and an `.mgz` name of 512 bytes or more continues with the field's bytes after 512. Rule A: by
 default a NUL follows the bytes the file gave (where FreeSurfer's name runs on); `reproduce` keeps
-FreeSurfer's. FS-185: FreeSurfer skips the rest of a long extension name in stack memory of its size:
-beyond about 8 MiB it crashes; both modes skip it (noted above 1 MiB).
+FreeSurfer's. FS-185: FreeSurfer crashes for an extension name length beyond about 8 MiB (Linux's
+default stack size); both modes skip the rest (noted above 1 MiB).
 
 ## 16. The tags of an `.mgz` and of FreeSurfer's NIfTI extension: writers
 

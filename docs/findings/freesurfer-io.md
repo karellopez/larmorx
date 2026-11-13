@@ -142,3 +142,91 @@ empty tables), 1,453 `SKIP` (864 FS-175, 519 tables, 70 FS-169); `fix` differs o
 (FS-01 831, FS-49 207, FS-167 729, FS-171 1, FS-172 44, FS-174 1,162, FS-176 810). Portable seed 1, 1,000 cases: 911 identical,
 89 hashed as `SKIP`, hash `ce3ddcd0...` (`tests/fs_io_official.rs`), passing with AArch64's NaN
 emulated (`nan_trap.c`, `NAN_TRAP_ARM=1`, `NAN_TRAP_DIR` set: 0 NaNs to flip) in debug and release.
+
+## Part 2: tags.cpp, fstagsio.cpp, mri.h's VOL_GEOM::write/read, colortab.cpp's binary tables (3.1-25, piece 2)
+
+**Restricted** (closed to FreeSurfer clean-room implementers: it cites FreeSurfer's source). Track A,
+relay 11. Taken early by the orchestrator's decision of 2026-11-13: tags.cpp's reached functions (queue
+item 3.1-30) and colortab.cpp's binary readers and writers (3.1-33), which FStagsIO calls.
+
+### The name buffers (the orchestrator's decision (2), 2026-11-13)
+
+- `VOL_GEOM::fname[STRLEN]` has the member initialiser `= {'\0'}` (mri.h 202): every `VOL_GEOM`, an
+  `MRI` (a subclass) included, starts with 1,024 zero bytes. The copy constructor (mri.h 250) runs the
+  initialiser and then `strcpy`: a copy's bytes after the name are zeros; the assignment operator (293)
+  `strcpy`s into the existing buffer: the bytes after the name stay. `VOL_GEOM::write` (512-559) writes
+  `memcpy(buf, fname, 512)` (`.mgz`): those bytes reach the file. Every reached allocation of a
+  structure holding a `VOL_GEOM` is zeroed (transform.cpp 646-651 `calloc` for LTAs, 2132 and 2614 for
+  TRANSFORMs; gcamorph.cpp's GCAMalloc `calloc`; MRI's constructor), so no reached name byte is memory
+  never written: the decision's second clause ("default zeros with a notice") has no case today; a later
+  item that meets a `malloc`ed one adds the notice. `MRI_FRAME::name` (mri.h 114) is the same (frames
+  `calloc`ed, mri.cpp 211) and `write_mri_frames` writes all 1,024 bytes (fstagsio.cpp 441).
+- Port: `larmorx-freesurfer-core::cname::CName` (1,024 bytes, `strcpy` keeps the tail); `VolGeom::fname`
+  and `MriFrame::name` use it (fs.mri: every `fname = x.fname.clone()` was a `strcpy`: vol_geom.rs'
+  copy_fields, mri.rs's MRIallocFromVolGeom/copyVolGeom/MRIcopyVolGeomFromMRI/MRIcopyHeader, copy.rs's
+  MRIcopy). The fs-mri probe's hash is unchanged by it.
+- In `write_gcamorph_geom` (fstagsio.cpp 534-535) the geometries are written from copies, so their tails
+  are zeros there: the only writer of `VOL_GEOM::write` today never writes a stale tail. A frame name's
+  tail does reach the `.mgz`.
+
+### Mechanisms of FS-177 to FS-194
+
+- **FS-177** tags.cpp 42 and 241, fstagsio.cpp 1065: `ErrorExit(..., "failed to calloc %u bytes!\n",
+  tag, len)` with `len` a `long long`: `%u` takes the low 32 bits (measured: -1 prints 4294967295).
+- **FS-178** the skippers `calloc(len, 1)` the whole length before `fread`/`znzread` (tags.cpp 41, 240;
+  fstagsio.cpp 1064); read_mri_frames' rest (fstagsio.cpp 950-952, 1189-1191) `calloc`s and reads into a
+  NULL buffer when the allocation fails (no check: a crash where the file has bytes). In the probe (1 GiB
+  address space) lengths beyond about 1 GiB fail; the probe skips cases above 256 MiB.
+- **FS-179** `fscanf(fp, "%s", buf)` into `char buf[MATRIX_STRLEN]` (tags.cpp 182, 186), `sscanf(buf, "%s ...",
+  ch, ...)` into `char ch[100]` (tags.cpp 409 in znzReadMatrix; fstagsio.cpp 836 in read_matrix).
+- **FS-180** the 1,600-byte `buf` is not NUL-terminated (tags.cpp 407, fstagsio.cpp 831: `znzread` of
+  exactly MATRIX_STRLEN into an uninitialised stack array); glibc's `sscanf` takes the string's length
+  first (`_IO_str_init_static_internal` with size 0: `strlen`), so it reads past the array whenever the
+  bytes hold no NUL; the numbers change only where the scan reaches the end.
+- **FS-181** `M->rptr[1..4][1..4]` (tags.cpp 154-169, 202-217, 357-372; fstagsio.cpp 362-377,
+  1088-1103) with `rptr` of a smaller matrix: an out-of-bounds pointer read.
+- **FS-182** `strcat(cmd_line, argv[i])` (tags.cpp 129-131) into `mri_segment`'s `char
+  cmdline[CMD_LINE_LEN]` (4,096, const.h 53; mri_segment.cpp 125).
+- **FS-183** fstagsio.cpp 1019-1020: `calloc(dlen + 1)` with `dlen` = the tag length - 20: -1 gives
+  `calloc(0)` then `znzread(p, 1, SIZE_MAX)` (a plain file reads the rest of the file into it; zlib's
+  `gzread` refuses the negative `int` and returns -1); below -1 the allocation fails and `pedir` is NULL
+  (a crash later wherever a caller `strlen`s it).
+- **FS-184** fstagsio.cpp 222: `dlen += (x * y * z * len)` in `int`s.
+- **FS-185** mri.h 611: `char buf[remaining]`, a VLA of the name's length - 512.
+- **FS-186** mri.h 604: `znzread(fname, 1, to_read, fp)` without clearing or terminating; a `to_read` of
+  0 or less reads nothing (the old name stays); the `.mgz` form (593-594) clears only 512 bytes.
+- **FS-187** colortab.cpp 612-616, 747-751, 990-992 (`malloc(len + 1)`, `fread`/`znzread` of `len`,
+  `strncpy` from it: no NUL unless the file's bytes hold one), 647, 804, 1021 (`strncpy(..., STRLEN-1)`
+  into a `malloc`ed entry whose last byte is never written), 1174 (znz version 2 reads straight into the
+  `malloc`ed entry name). Version 1 entries end at `name[len] = 0` (648, 1022), so their names are
+  defined when the file gives all `len` bytes.
+- **FS-188** colortab.cpp 648, 1022: `name[len] = 0` with `len` ≥ STRLEN; `sizeof(CTE)` is 1,064 (the
+  probe's `fsl sizeof`): 1,024 ≤ `len` < 1,064 lands on `ri`..`count`, rewritten or unused.
+- **FS-189** colortab.cpp 774 and 1147: `ct->entries[structure]` with `structure` ≥ `nentries`.
+- **FS-190** colortab.cpp 1124-1125, 1173-1174: `toread = min(len, STRLEN-1)` and no skip.
+- **FS-191** colortab.cpp 588-595 (version 1: `CTABfree(&ct)` then `ct->nentries` in the message: a NULL
+  dereference), 612, 643, 747, 800, 990, 1019 (`malloc(len + 1)`: `len + 1` overflows for INT_MAX; a failed allocation
+  passes NULL to `fread` and `strncpy`: crashes, measured in the probe).
+- **FS-192** the readers' `freadInt`/`znzreadInt` at the end of the file return memory contents (FS-49,
+  FS-167); the probe's official runs show such tables crashing (a garbage name length) or reading
+  garbage entries.
+- **FS-193** fstagsio.cpp 182-185 (strlen whole) against mri.h 551-552 (at most 512 written).
+- **FS-194** colortab.cpp 679-701, 1053-1071: version 1 writes `nentries` but only the non-NULL entries;
+  CTAB_VERSION_TO_WRITE (colortab.h 33; set at colortab.cpp 115, 452) is 2; version 1 is set only by the version-1 readers
+  (599, 977).
+
+### Other facts
+
+- `sizeof(MRI_FRAME)` is 1,288 on x86-64 (measured: `fsl sizeof`): the `.mgz` frame tag's length is
+  12,880 per frame. The frame's float `TM` written by `write_mri_frames` is the double `MRI_FRAME::TM`
+  converted (fstagsio.cpp 445), read back as a float into the double (890) and, for a diffusion frame,
+  again as a double (922; written as a double at 479).
+- `255 - t` (colortab.cpp 654, 811, 1028, 1181) overflows for `t` = INT_MIN (undefined; the official build wraps):
+  the port wraps (`wrapping_sub`). No file stores such an alpha; not registered.
+- `VOL_GEOM`'s default constructor leaves `valid`, `width`, `height`, `depth` unset (mri.h's `VOL_GEOM()
+  {}` with no initialisers for them): the probe sets them before printing (a probe's own fix, found when
+  its first run printed stack values).
+- The C-stream colour table readers print `CTABreadFromBinaryV1: could not read parameter(s)` for
+  version 2's names too (colortab.cpp 749, 802: the version-1 text); `ErrorPrintf` prints `strerror(errno)`
+  first when `errno` is set (the probe saw `Cannot allocate memory` from a failed `malloc` of a garbage
+  length before the crash).

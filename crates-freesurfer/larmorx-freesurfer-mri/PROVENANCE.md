@@ -67,3 +67,10 @@ kind `copy_and_invert_transform bad kind` and `exit(1)`).
 - Products FreeSurfer writes into one of their own inputs (`MatrixMultiply(D, R, D)`,
   `MatrixInverse(D, D)`) are computed from a copy of that input, as `MatrixMultiply` and
   `MatrixInverse` copy it.
+- (3.1-25 piece 2, track A relay 11) `VOL_GEOM::fname` and `MRI_FRAME::name` are 1,024-byte C
+  buffers (`larmorx-freesurfer-core::cname::CName`) with C's `strcpy` semantics: the bytes after a
+  name are an earlier, longer name's (both modes keep them: the orchestrator's decision of
+  2026-11-13; they reach the `.mgz` writer's files). A copy of a whole geometry starts from zeros, as
+  C++'s copy constructor does. The colour table's names are byte strings (`Vec<u8>`: any bytes a file
+  holds) and its entries are boxed (`Option<Box<ColorTableEntry>>`, 8 bytes per empty place, as C's
+  array of pointers); `MRI::pedir` is a byte string.

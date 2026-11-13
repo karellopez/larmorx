@@ -368,6 +368,18 @@ BIN_WITH = {
     "utils/Bruker.cpp": "utils/mri_identify.cpp",
     "utils/DICOMRead.cpp": "utils/mri_identify.cpp",
 }
+# Notes appended to an item's text, by its key: pieces another item took early (the orchestrator's
+# decision of 2026-11-13 on fs.io's second piece).
+ITEM_NOTES = {
+    "mod:fs.io:1": "its second piece also took tags.cpp's reached functions (from [[mod:fs.io:6]])"
+    " and colortab.cpp's binary colour tables (from [[mod:fs.labels:1]]), which FStagsIO calls"
+    " (track A, relay 11)",
+    "mod:fs.io:6": "tags.cpp's reached functions were taken early by [[mod:fs.io:1]]'s second"
+    " piece (track A, relay 11)",
+    "mod:fs.labels:1": "colortab.cpp's binary readers and writers (CTABreadFromBinary,"
+    " CTABwriteIntoBinary, their versions 1 and 2, the znz forms) were taken early by"
+    " [[mod:fs.io:1]]'s second piece (track A, relay 11)",
+}
 # Modules whose functions always go to the module's own item (never to a program's).
 OWN_ITEM = {"gpl.gsl", "fs.spline"}
 
@@ -1652,6 +1664,8 @@ def run_main() -> int:
         return re.sub(r"\[\[([^\]]+)\]\]", one, text)
 
     for q in queue:
+        if q.get("key") in ITEM_NOTES:
+            q["what"] = q["what"] + "; " + ITEM_NOTES[q["key"]]
         for f in ("what", "inputs", "checks"):
             q[f] = refs(q.get(f, ""))
     for items in [*clean.values(), perm_clean]:

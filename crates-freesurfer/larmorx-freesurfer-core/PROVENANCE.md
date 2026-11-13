@@ -72,6 +72,9 @@ item that needs it): the unreached functions of these files (static reach, `code
 `PrintMemUsage`, `SetProgressCallback`, `FSENVprintenv`, `xDbg_Init` and the other `xDbg_*`, ROMP's
 statistics, ...).
 
+`cname` (larmorx's own, 3.1-25 piece 2): a C `char[STRLEN]` name field with ISO C's `strcpy`,
+`memset` and `strlen` (the bytes after a name kept), for `VOL_GEOM::fname` and `MRI_FRAME::name`.
+
 ## Changes from the originals
 
 - Process-wide globals are fields of `Globals`, one value per program run.

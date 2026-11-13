@@ -72,7 +72,8 @@ _ORACLE_TEXTS = [
 #: The port's name in texts, after :func:`words.reword` (``{port}`` = "replica"). A bare
 #: "larmorx" names the port, not a module path (``larmorx.ants``), a code span or the prefix of
 #: a message the program prints ("larmorx: N4BiasFieldCorrection: cannot read ...", the notice
-#: "larmorx: upstream defect ANTS-62 (antsRegistration) reproduced: ...").
+#: "larmorx: upstream defect ANTS-62 (antsRegistration) reproduced: ...") or the package at a
+#: commit ("larmorx `6d4f2edb8992`", as a random-testing run's note names its build).
 _PORT_TEXTS = [
     (r"\blarmorx's reproduce-mode output\b", "the {port}'s output in `reproduce`"),
     (r"\blarmorx's `reproduce`", "the {port}'s `reproduce`"),
@@ -80,7 +81,10 @@ _PORT_TEXTS = [
     (r"\blarmorx's default\b", "the {port}'s default, `fix`,"),
     (r"\blarmorx's\b", "the {port}'s"),
     (r"\blarmorx \(port\)", "the {port}"),
-    (r"(?<![\w./`-])larmorx(?![\w/`-]|\.\w|: \w+:|: upstream defect )", "the {port}"),
+    (
+        r"(?<![\w./`-])larmorx(?![\w/`-]|\.\w|: \w+:|: upstream defect | `[0-9a-f]{7,}`)",
+        "the {port}",
+    ),
     (r"^`reproduce` gives\b", "In `reproduce`, the {port} gives"),
     (r"\bReproduce mode gives\b", "In `reproduce`, the {port} gives"),
 ]
@@ -143,7 +147,9 @@ def text(page: Page, s: str | None, code: bool = True, port: str = "") -> str | 
     s = oracle(words.reword(_own(page, s, code), code=code)) or ""
     if port == "both":
         return re.sub(
-            r"(?<![\w./`-])larmorx(?![\w/`-]|\.\w|: \w+:|: upstream defect )", "LARMORX", s
+            r"(?<![\w./`-])larmorx(?![\w/`-]|\.\w|: \w+:|: upstream defect | `[0-9a-f]{7,}`)",
+            "LARMORX",
+            s,
         )
     name = words.PORT_NAME[port or page.port]
     for pat, rep in _PORT_TEXTS:
@@ -913,6 +919,51 @@ def dots(page: Page, s: dict | None, title: str, labels: dict[str, str]) -> None
         ser["port"] = ser["mark"].removesuffix("-open")
     s["note"] = text(page, s.get("note"))
     s["port"] = page.port
+
+
+#: The marks of a line chart's series on a page in the guide's words (section 5): the original
+#: solid, the replica long dashes, the clean room short dashes, ``-reproduce`` a thinner line of
+#: the same port; ``band`` a limit's band (a wash of the original's ink).
+LINE_MARKS = (
+    "original", "replica", "replica-reproduce", "clean-room", "clean-room-reproduce", "band",
+)  # fmt: skip
+
+
+def lines(
+    page: Page,
+    spec: dict,
+    title: str,
+    marks: dict[str, str],
+    labels: dict[str, str],
+    panel_labels: list[tuple[str, str]] = (),
+) -> None:
+    """A line chart over one x axis (a run's motion parameters, volume by volume): its title by
+    the guide's pattern, each key's and series' mark by its port (``marks``: the old mark -> one
+    of :data:`LINE_MARKS`; the old "larmorx" is a port's, which the chart says), each key's and
+    series' label by ``labels`` (old -> new; every label must be named), each panel's label by
+    ``panel_labels`` (pattern, replacement); its note and its table of statistics in the
+    guide's words (the table's rows are runs compared: their names by the page's own
+    rewordings)."""
+    spec["title"] = title
+    for k in spec["key"]:
+        k["mark"] = marks.get(k["mark"], k["mark"])
+        k["label"] = labels[k["label"]]
+    for p in spec["panels"]:
+        for pat, rep in panel_labels:
+            p["label"] = re.sub(pat, rep, p["label"])
+        for ser in p["series"]:
+            ser["mark"] = marks.get(ser["mark"], ser["mark"])
+            ser["label"] = labels[ser["label"]]
+        for b in p.get("bands") or []:
+            b["mark"] = marks.get(b["mark"], b["mark"])
+    used = {k["mark"] for k in spec["key"]} | {
+        s["mark"] for p in spec["panels"] for s in [*p["series"], *(p.get("bands") or [])]
+    }  # fmt: skip
+    if bad := sorted(used - set(LINE_MARKS)):
+        raise ValueError(f"a line chart's marks without a port: {bad}")
+    spec["note"] = text(page, spec.get("note"))
+    if spec.get("stats"):
+        table(page, spec["stats"])
 
 
 def original_name(page: Page, code: bool = True) -> str:

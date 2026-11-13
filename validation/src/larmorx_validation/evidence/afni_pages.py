@@ -50,10 +50,12 @@ TEXTS = [
     (r"\bthe repository's oracle builds\b", "the repository's builds"),
     (r"\bgive the oracle's bytes\b", "give the bytes of the repository's build"),
     (r"\bAFNI's oracle output\b", "the output of the repository's AFNI build"),
-    (r"\bThe original's\b", "The clean room's"),
-    (r"\bthe original's\b", "the clean room's"),
-    (r"\bThe original\b", "The clean room"),
-    (r"\bthe original\b", "the clean room"),
+    # not the original in a quoted phrase: "*the original against itself*" (the metrics
+    # table's rows of AFNI's own variability) and "'Memory similar to the original's'" (a title)
+    (r"(?<!\*)\bThe original's\b(?!')", "The clean room's"),
+    (r"(?<!\*)\bthe original's\b(?!')", "the clean room's"),
+    (r"(?<!\*)\bThe original\b(?! against itself\*)", "The clean room"),
+    (r"(?<!\*)\bthe original\b(?! against itself\*|'s')", "the clean room"),
 ]
 
 #: The categories of the records' cases as the pages name them.
@@ -109,10 +111,12 @@ def present(
     speed_caption: str,
     speed_labels: dict[str, str],
     speed_version: str,
+    categories: dict[str, str] | None = None,
 ) -> dict:
     """One AFNI page: each worked example (its "What this shows" line from ``shows``, else the
     data panel's from its verdicts), the agreement charts by their records' ports, the speed
-    chart (``speed_version``: the AFNI its timings ran), the cases and their categories."""
+    chart (``speed_version``: the AFNI its timings ran), the cases and their categories
+    (``categories``: a page's own, beside :data:`CATEGORIES`)."""
     for ex in doc["examples"]:
         for ser in ex.get("series") or []:  # a voxel's time course: each run by its name
             ser["label"] = SERIES.get(ser["label"], ser["label"])
@@ -138,4 +142,4 @@ def present(
             else f"Speed, both ports against the original: AFNI `{pg.program}`"
         )
     present_.random_testing(pg, doc, dict(PORTS))
-    return present_.finish(pg, doc, CATEGORIES, ports=PORTS)
+    return present_.finish(pg, doc, {**CATEGORIES, **(categories or {})}, ports=PORTS)

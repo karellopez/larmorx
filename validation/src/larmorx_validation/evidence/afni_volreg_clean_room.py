@@ -1593,7 +1593,15 @@ def export(ctx: core.Context) -> dict:
     prov["original_exporter"] = core.tree_hash(
         ctx.repo, "validation/src/larmorx_validation/evidence/afni_volreg_clean_room.py"
     )
-    return doc
+    return present(doc)
+
+
+def present(doc: dict) -> dict:
+    """The page in the writing guide's words (the replica's module, :mod:`afni_volreg`, as a
+    black box: texts, ports and order only)."""
+    from larmorx_validation.evidence import afni_volreg
+
+    return afni_volreg.present(doc)
 
 
 if __name__ == "__main__":  # the original's cache entries only (``refresh WHY``: refresh)

@@ -26,7 +26,8 @@ from pathlib import Path
 import numpy as np
 
 from larmorx_validation.evidence import afni_automask as am
-from larmorx_validation.evidence import common, core
+from larmorx_validation.evidence import afni_pages, common, core
+from larmorx_validation.evidence import present as present_
 from larmorx_validation.figures import cache as fcache
 from larmorx_validation.figures import records
 
@@ -1008,6 +1009,295 @@ def export(ctx: core.Context) -> dict:
             _afni99_example(ctx, e, reg),
         ],
     }
+
+
+# ------------------------------------------------------------------- the page's presentation
+#
+# The writing guide's presentation of the page (docs/writing-guide.md, sections 1, 4 and 5;
+# :mod:`afni_pages` and :mod:`present` do the work): texts, the ``port``/``order``/``shows``
+# fields, the order of ids and the line charts' marks change; arrays, metrics and verdicts do
+# not. The page is exported by :mod:`afni_volreg_clean_room`, which calls :func:`present` last.
+
+PAGE = afni_pages.page("3dvolreg")
+#: This page's own rewordings, before the AFNI pages' (``afni_pages.TEXTS``): the old texts'
+#: modes by their values, random testing's run by what it is, a note that named its example by
+#: its place.
+PAGE.texts[:0] = [
+    (
+        r"\bthe default computes it for the voxel itself, reproduce gives AFNI's numbers\b",
+        "`fix`, the default, computes it for the voxel itself; `reproduce` gives AFNI's numbers",
+    ),
+    (
+        r"\bThe maximum displacements are the reproduce mode's \(AFNI's convention; the default's "
+        r"are AFNI-99's correction, the next example\)",
+        "The maximum displacements are those of `reproduce` (AFNI's convention; those of `fix` are "
+        "AFNI-99's correction, shown in its own example)",
+    ),
+    (r"\(reproduce mode, AFNI's convention\)", "(`reproduce`, AFNI's convention)"),
+    (r"\bin the default \(", "in `fix` ("),
+    (r"\bfollow AFNI-99 in the default\b", "follow AFNI-99 in `fix`"),
+    (r"\bAFNI-99 named by the default\b", "AFNI-99, named by `fix`,"),
+    (r"\bthe default's correction of AFNI-99\b", "the correction of AFNI-99 in `fix`"),
+    (
+        r"\bThe original names AFNI-97 by default and stops as AFNI does with reprod",
+        "The clean room names AFNI-97 in `fix` and stops as AFNI does with reprod",
+    ),
+    (r"\bDifferential random testing's trial\b", "The random-testing run"),
+    (r"\bthe trial's\b", "the run's"),
+    (r"\bThe trial's\b", "The run's"),
+    (r"\bat the trial\b", "in the run"),
+    (r"\bsince the trial\b", "since the run"),
+    (r"\bafter the night\b", "after the run"),
+    (r"\bAfter the night\b", "After the run"),
+    (r"\bwhile the night ran\b", "while the run went on"),
+    (r"\bThe two implementations' defaults\b", "The two ports' defaults (`fix`)"),
+    (r"\b([Tt]he replica) \(default\)", r"\1 (`fix`)"),
+]
+#: The categories of the two records' cases as the page names them (the ids stay the case
+#: explorer's filter).
+CATEGORIES = {
+    "interpolation": "interpolation methods",
+    "base": "the base volume (-base)",
+    "twopass": "two passes and the coarse search (-twopass)",
+    "weights": "weights and edging",
+    "outputs": "outputs",
+    "tshift": "slice timing first (-tshift)",
+    "rotparent": "another dataset's motion or grid (-rotparent, -gridparent)",
+    "twodup": "-twodup",
+    "messages": "messages",
+    "edge cases": "edge cases",
+    "edge": "edge cases",
+    "global": "global options",
+    "global options": "global options",
+    "settings": "the fit's settings",
+    "threads": "thread counts",
+}
+
+#: Each worked example's "What this shows" line and the verdicts beside it, one per port.
+SHOWS: afni_pages.Shows = {
+    "fmriprep-volreg": lambda ex: (
+        "On fMRIPrep's call the replica gives AFNI's registered series, every value, and its "
+        "parameters and matrices as text: in both releases, in fMRIPrep's build, on 1 and 6 "
+        "threads. Its default, `fix`, changes only the maximum displacements, where it corrects "
+        "AFNI-99; `reproduce` gives every file AFNI writes. The clean room's values are not "
+        "AFNI's bits, by design: each of the 20 volumes stays within its limit "
+        "(specs/3dvolreg.md §14.3), the closest at 0.00035 of it.",
+        ["replica-afni26", "original-afni26"],
+    ),
+    "fmriprep-boldref": lambda ex: (
+        "The replica's registered volumes give fMRIPrep's BOLD reference of this run, every "
+        "value, as AFNI 26.3.05's do. The clean room's give a median that differs in 1,979 of "
+        "its 139,264 values, at 0.00011 of the limit its volumes imply (specs/3dvolreg.md "
+        "§14.3).",
+        ["replica-fmriprep", "original-fmriprep"],
+    ),
+    "afni-99": lambda ex: (
+        "AFNI's maximum displacements change with the storage order, by up to 0.011 mm on this "
+        "run (AFNI-99). In `fix`, their default, both ports compute the displacements of the "
+        "voxels themselves and name AFNI-99. In `reproduce` the replica gives AFNI's numbers "
+        "byte for byte; the clean room follows AFNI's convention, within its derived bounds. "
+        "The registered volumes do not depend on it: the replica's are AFNI's, the clean "
+        "room's within §14.3's limits.",
+        ["lps-replica-afni", "lps-original-afni"],
+    ),
+    "fmriprep-ds000256-original": lambda ex: (
+        "On the data panel's run with the most motion the replica gives AFNI's registered "
+        "volumes bit for bit. The clean room's differ within specs/3dvolreg.md §14.3's limits "
+        "and come closest to them here: sub-brick 11 at 0.68 of its limit, as close as AFNI's "
+        "own results come when its ties are decided the other way.",
+        ["replica-afni26", "original-afni26"],
+    ),
+}
+
+#: A run's name in a table's rows and a line chart's series, by its port: the clean room
+#: (the old "original"), the replica, AFNI by its program; `fix` for the default.
+_RUN_NAMES = [
+    (r"^the clean-room original's\b", "the clean room's"),
+    (r"^(?:LARMORX )?clean-room original\b", "clean room"),
+    (r"^original\b", "clean room"),
+    (r" − original\b", " − clean room"),
+    (r"\bboth default\b", "both fix"),
+    (r"\(default\)", "(fix)"),
+    (r", default\b", ", fix"),
+    (r": default − reproduce\b", ": fix − reproduce"),
+    (r"\bdefault mode\b", "fix"),
+    (r"\breproduce mode\b", "reproduce"),
+    (r"\bfMRIPrep 25\.2\.6's reference\b", "fMRIPrep's output"),
+    (r"^AFNI (?=\d)", "AFNI 3dvolreg "),
+    (r" − AFNI (?=\d)", " − AFNI 3dvolreg "),
+]
+
+
+def run_name(s: str | None) -> str | None:
+    """A run or a comparison of runs as a table's row or a chart's series names it."""
+    if not s:
+        return s
+    for pat, rep in _RUN_NAMES:
+        s = re.sub(pat, rep, s)
+    return s
+
+
+def _rows(t: dict, names: dict[str, str]) -> None:
+    """A table whose rows compare runs: each row's name as the example names that comparison
+    (``names``: its old label -> its new), else by :func:`run_name`; its columns' runs too."""
+    for r in t["rows"]:
+        head = r.get("head")
+        r["head"] = names.get(head) or run_name(head)
+    for c in t.get("columns", []):
+        c["label"] = re.sub(r"^original \((\d+)\)$", r"clean room (\1)", c["label"])
+        c["label"] = re.sub(r"^(clean room|replica) \(1\)$", r"\1 (1 thread)", c["label"])
+        c["label"] = re.sub(r"^clean room \((\d+)\)$", r"clean room (\1 threads)", c["label"])
+
+
+_PARAMS_LABELS = {
+    "AFNI 26.3.05": "AFNI 26.3.05",
+    "larmorx replica, default mode": "replica, fix",
+    "larmorx replica, reproduce mode (AFNI's bytes)": "replica, reproduce (AFNI's bytes)",
+    "replica, default": "replica, fix",
+    "replica, reproduce": "replica, reproduce",
+}
+_DIFF_LABELS = {
+    "LARMORX clean-room original (default) − AFNI 26.3.05": "clean room (fix) − AFNI 3dvolreg 26.3.05",
+    "specs/3dvolreg.md §14.3's limit for the volume": "the volume's limit (specs/3dvolreg.md §14.3)",
+    "original − AFNI": "clean room − AFNI",
+}
+#: Each line chart: its title by the guide's pattern, its marks and its labels.
+LINES = {
+    ("fmriprep-volreg", "params"): (
+        "The six motion parameters and the maximum displacements over the 20 volumes, the "
+        "replica against the original: AFNI `3dvolreg` 26.3.05",
+        {"larmorx": "replica", "replica": "replica-reproduce"},
+        _PARAMS_LABELS,
+    ),
+    ("fmriprep-volreg", "params-original"): (
+        "Differences volume by volume, the clean room against the original: AFNI `3dvolreg` "
+        "26.3.05 (the six parameters, the maximum displacement and each registered volume's "
+        "share of its limit)",
+        {"larmorx": "clean-room"},
+        _DIFF_LABELS,
+    ),
+    ("afni-99", "md"): (
+        "Maximum displacements over the 20 volumes in two storage orders, the replica against "
+        "the original: AFNI `3dvolreg` 26.3.05",
+        {"larmorx": "replica"},
+        {
+            "AFNI 26.3.05 (the replica's reproduce mode gives these numbers)": "AFNI 3dvolreg 26.3.05 (the replica in reproduce gives these numbers)",
+            "larmorx replica, default mode": "replica, fix",
+            "AFNI 26.3.05": "AFNI 26.3.05",
+            "replica, default": "replica, fix",
+        },
+    ),
+    ("fmriprep-ds000256-original", "params"): (
+        "The six motion parameters over the 20 volumes, the clean room against the original: "
+        "AFNI `3dvolreg` 26.3.05",
+        {"larmorx": "clean-room"},
+        {
+            "AFNI 26.3.05 (the replica gives these numbers)": "AFNI 3dvolreg 26.3.05 (the replica gives these numbers)",
+            "LARMORX clean-room original, default mode": "clean room, fix",
+            "AFNI 26.3.05": "AFNI 26.3.05",
+            "original": "clean room",
+        },
+    ),
+    ("fmriprep-ds000256-original", "params-original"): (
+        "Differences volume by volume, the clean room against the original: AFNI `3dvolreg` "
+        "26.3.05 (the six parameters and each registered volume's share of its limit)",
+        {"larmorx": "clean-room"},
+        _DIFF_LABELS,
+    ),
+}
+#: A line chart's panels: the clean room by its name.
+_PANEL_LABELS = [(r": original\b", ": clean room")]
+
+#: The page's tables: each title by the guide's pattern where it names what it compares.
+TITLES = {
+    "fmriprep-calls-original": "fMRIPrep's calls, the clean room against the original: AFNI "
+    "`3dvolreg` 26.3.05 (its record's standard comparison)",
+    "trial-original": "Random testing, the clean room against the original: AFNI `3dvolreg` "
+    "26.3.05 (a run of half an hour, 2026-11-08)",
+    "benchmark": "Wall-clock seconds of the whole program, both ports against the original: "
+    "AFNI `3dvolreg` 26.3.05 (the benchmark report; in brackets the speed-up against AFNI)",
+    "benchmark-memory": "Peak resident memory, both ports against the original: AFNI "
+    "`3dvolreg` 26.3.05 (MiB; the rule: at most 1.1 × AFNI's peak + 8 MiB, at one thread)",
+    "volreg-volumes-original": "The registered volumes against their limits, volume by volume, "
+    "the clean room against the original: AFNI `3dvolreg` 26.3.05 (`fix`; specs/3dvolreg.md "
+    "§14.3)",
+    "high-volumes-original": "The registered volumes against their limits, volume by volume, "
+    "the clean room against the original: AFNI `3dvolreg` 26.3.05 (`fix`; specs/3dvolreg.md "
+    "§14.3)",
+    "boldref-original": "fMRIPrep's median of the clean room's volumes against fMRIPrep's "
+    "output, its own reference (specs/3dvolreg.md §14.3)",
+}
+#: A worked example's title that names the clean room in the old words.
+EXAMPLE_TITLES = {
+    "fmriprep-ds000256-original": "A child's high-motion run: where the clean room comes "
+    "closest to its limits",
+}
+#: The metrics table's note on the example of AFNI-99, whose rows of AFNI against itself are
+#: the same volumes stored another way (the note the replica's examples share named the first
+#: example's).
+AFNI99_NOTE = (
+    "The rows *the original against itself* are AFNI's own variability on this input: its "
+    "previous release and fMRIPrep's build.",
+    "The row *the original against itself* is AFNI's own variability on this input: the same "
+    "volumes stored another way.",
+)
+
+
+def present(doc: dict) -> dict:
+    """3dvolreg's page in the writing guide's words and order: texts, ports and order only."""
+    pg = PAGE
+    names: dict[str, dict[str, str]] = {}
+    for ex in doc["examples"]:
+        if ex["id"] in EXAMPLE_TITLES:
+            ex["title"] = EXAMPLE_TITLES[ex["id"]]
+        if ex["id"] == "afni-99":
+            old, new = AFNI99_NOTE
+            if old not in (ex.get("metrics_note") or ""):
+                raise ValueError("afni-99: the metrics note's old sentence is gone")
+            ex["metrics_note"] = ex["metrics_note"].replace(old, new)
+        names[ex["id"]] = {d["label"]: d["id"] for d in ex["diffs"]}
+    afni_pages.present(
+        doc,
+        pg,
+        SHOWS,
+        "Seconds for the whole call (reading, both passes, writing), on a log scale. The factor "
+        "is how many times faster the clean room is than AFNI, both on one thread.",
+        {
+            "AFNI 26.3.05 (one thread on this path)": "AFNI 3dvolreg 26.3.05, one thread on this path",
+            "replica (one thread, as AFNI)": "replica, one thread, as AFNI",
+            "clean-room original, 1 thread": "clean room, 1 thread",
+            "clean-room original, 14 threads": "clean room, 14 threads",
+        },
+        "26.3.05",
+        categories=CATEGORIES,
+    )
+    for ex in doc["examples"]:
+        new = {old: next(d["label"] for d in ex["diffs"] if d["id"] == i)
+               for old, i in names[ex["id"]].items()}  # fmt: skip
+        for t in ex.get("tables") or []:
+            _rows(t, new)
+            t["title"] = TITLES.get(t["id"], t["title"])
+        for lid, spec in (ex.get("lines") or {}).items():
+            title, marks, labels = LINES[(ex["id"], lid)]
+            present_.lines(pg, spec, title, marks, labels, _PANEL_LABELS)
+            if spec.get("stats"):
+                _rows(spec["stats"], new)
+                spec["stats"]["title"] = TITLES.get(spec["stats"]["id"], spec["stats"]["title"])
+    for t in doc.get("tables", []):
+        _rows(t, {})
+        t["title"] = TITLES.get(t["id"], t["title"])
+    present_.dots(
+        pg,
+        doc["dots"]["speed-replica"],
+        "Speed, the replica against the original: AFNI `3dvolreg` 26.3.05, fMRIPrep's "
+        "RobustAverage call (informal timings of 2026-11-06)",
+        {
+            "AFNI": "AFNI 3dvolreg 26.3.05, 1 thread",
+            "larmorx": "replica, larmorx afni 3dvolreg",
+            "python -m larmorx": "replica, python -m larmorx",
+        },
+    )
+    return doc
 
 
 if __name__ == "__main__":  # compute the cache entry only

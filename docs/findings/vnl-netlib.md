@@ -88,6 +88,19 @@ hashes a NaN as one value). Reproducing GCC's choice would need its operand orde
 operation (as `math::x86_nan` does for glibc's functions); no FreeSurfer result on a default path
 depends on it.
 
+**A NaN made from numbers is x86's on every platform** (2026-11-13, the ARM CI failure of
+`vnl_digests::the_ports_give_linux_x86_64s_bits` on main 85ba578a: only the L-BFGS digest
+differed). x86-64's SSE gives `0/0`, `inf - inf` or `0 * inf` its default NaN with the sign set,
+AArch64 with the sign clear; L-BFGS runs that diverge make such NaNs in `ddot` and `daxpy`, and
+`write50` divides a vector of zeros by 0 (ITK-105), and the printed iterates show the sign (`-nan`
+on x86-64, as GCC's build prints). Those three sites now compute with SSE's rules made explicit
+(`larmorx_core::math::x86_nan`, the helpers the glibc-exact functions already use: the default NaN
+for an undefined result of numbers, a NaN operand quieted, the first of two), through the L-BFGS
+port's own `ddot` and `daxpy`. Proof: `validation/probes/fsl-mcflirt-affine-trace/nan_trap.c` with `NAN_TRAP_ARM=1`
+(x86 computing with ARM's NaN) reproduced ARM's digest `0x1fa99563fe359c4d` before the change and
+gives x86's `0xa7dcaba7d3f547ed` after it, in a debug and a release build; the whole crate's tests
+pass under it.
+
 ## F-VNLN-6. Values VNL never writes (ITK-107, ITK-108, ITK-110, ITK-111, ITK-113, *read*)
 
 VNL allocates `vnl_matrix`, `vnl_vector` and `vnl_matrix_fixed` of `double` and `float`

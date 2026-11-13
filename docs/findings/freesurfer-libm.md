@@ -1,0 +1,202 @@
+# FreeSurfer 8.2.0's C-library maths: what it calls, and where glibc's last bits matter
+
+**Closed to FreeSurfer clean-room implementers** (source-derived: it names FreeSurfer's functions).
+Written by track D's spec writer (FreeSurfer's foundations, queue item 3.1-08, 2026-11-12) for the
+replicas (`larmorx-freesurfer`, `reproduce`) and for whoever writes the missing glibc-exact
+functions. larmorx's **default** stays correctly rounded everywhere (CLAUDE.md rule 5); the question
+here is only what `reproduce` (the bit-for-bit mode the parity checks use) needs: where FreeSurfer's
+results depend on glibc 2.35's own last bits, a replica needs glibc's function, and where they do
+not, the correctly rounded one gives FreeSurfer's results too. Every claim below is measured (the
+tools: `validation/investigations/freesurfer-libm-inventory/`, closed, and the open shim
+`validation/investigations/libm-shim/`).
+
+## 1. What the programs call (static)
+
+- **The imports.** The 70 compiled programs on FreeSurfer's default paths (recon-all's two streams
+  and fMRIPrep's calls, `docs/freesurfer/programs.toml`) import 45 C-library maths symbols (`nm -D`
+  on the official binaries). Every transcendental one is a double or float function; the only
+  `long double` one is `sqrtl` (4 programs: `mris_remesh`, `mris_remove_intersection`,
+  `mris_place_surface`, `mris_convert`), an exact operation. No program loads `libmvec` (no vector
+  maths).
+- **Who calls them.** The 526 objects of the programs (the unit oracle's `utils` and packages, built
+  from the tag with the official compiler and flags, and the 103 of the 104 default-path program
+  sources compiled the same way; `tkregister2.cpp` needs Tcl's headers) hold 1,331 functions that
+  call the C library's maths; joined with the call graph's core view, the table below counts the
+  reached ones (some callers are inlined into functions of other names, so the source's view, last
+  column, is the other half of the evidence).
+- **`-fno-builtin`.** FreeSurfer compiles its C++ with `-fno-builtin`, so GCC neither merges a
+  `sin` and a `cos` of one argument into `sincos` nor inlines `sqrt`, `floor` or `fabs`: the calls in
+  the source are the calls made. Two exceptions: the C++ overloads for `float` (`std::sin(float)`,
+  `std::exp(float)`, ...) are builtins whatever the flag, so a float `sin` and `cos` of one argument
+  become one `sincosf` (`MatrixReallocRotation`, `MRISrotate`, `MRISgradientToParameterization`;
+  glibc's `sincosf` gives `sinf`'s and `cosf`'s bits, `larmorx_core::math::sincosf_glibc`); and the
+  code compiled without the flag (ITK's, in `AntsN4BiasFieldCorrectionFs`; the Talairach C tools,
+  `gauss_4dfp`) has a double `sincos`, whose sine differs from `sin`'s on some arguments
+  (`specs/glibc-dbl.md` §7.4: `larmorx_core::math::sincos_glibc`).
+
+| Symbol | Programs importing it | Reached functions calling it (objects) | Programs reaching them | Reached functions naming it (source) |
+|---|---:|---:|---:|---:|
+| `acos@GLIBC_2.2.5` | 38 | 11 | 40 | 14 |
+| `acosf@GLIBC_2.2.5` | 63 | 4 | 6 | 1 |
+| `asin@GLIBC_2.2.5` | 1 | 1 | 1 | 1 |
+| `atan2@GLIBC_2.2.5` | 63 | 3 | 40 | 12 |
+| `atan2f@GLIBC_2.2.5` | 41 | 12 | 41 | 3 |
+| `atanf@GLIBC_2.2.5` | 1 | 1 | 1 | 0 |
+| `cabs@GLIBC_2.2.5` | 1 | 0 | 0 | 0 |
+| `ceil@GLIBC_2.2.5` | 63 | 26 | 67 | 0 |
+| `ceilf@GLIBC_2.2.5` | 1 | 1 | 1 | 0 |
+| `copysign@GLIBC_2.2.5` | 1 | 0 | 0 | 0 |
+| `cos@GLIBC_2.2.5` | 63 | 12 | 67 | 20 |
+| `cosf@GLIBC_2.2.5` | 66 | 1 | 1 | 0 |
+| `csqrt@GLIBC_2.2.5` | 1 | 1 | 1 | 0 |
+| `exp@GLIBC_2.29` | 67 | 36 | 68 | 44 |
+| `expf@GLIBC_2.27` | 17 | 6 | 13 | 0 |
+| `fabs@GLIBC_2.2.5` | 63 | 251 | 67 | 0 |
+| `fabsf@GLIBC_2.2.5` | 37 | 5 | 39 | 0 |
+| `fegetround@GLIBC_2.2.5` | 1 | 0 | 0 | 0 |
+| `floor@GLIBC_2.2.5` | 63 | 21 | 67 | 0 |
+| `fmax@GLIBC_2.2.5` | 63 | 0 | 0 | 0 |
+| `fminf@GLIBC_2.2.5` | 63 | 0 | 0 | 0 |
+| `fmodf@GLIBC_2.2.5` | 63 | 1 | 1 | 0 |
+| `log@GLIBC_2.29` | 66 | 36 | 67 | 49 |
+| `log10@GLIBC_2.2.5` | 63 | 4 | 4 | 7 |
+| `log10f@GLIBC_2.2.5` | 64 | 3 | 67 | 0 |
+| `log2@GLIBC_2.29` | 6 | 3 | 5 | 3 |
+| `log2f@GLIBC_2.27` | 2 | 1 | 2 | 0 |
+| `logf@GLIBC_2.27` | 63 | 18 | 67 | 1 |
+| `lroundf@GLIBC_2.2.5` | 4 | 0 | 0 | 0 |
+| `pow@GLIBC_2.29` | 66 | 34 | 67 | 42 |
+| `powf@GLIBC_2.27` | 9 | 4 | 5 | 1 |
+| `remainder@GLIBC_2.2.5` | 1 | 1 | 1 | 0 |
+| `rint@GLIBC_2.2.5` | 63 | 1 | 67 | 0 |
+| `round@GLIBC_2.2.5` | 63 | 14 | 11 | 0 |
+| `roundf@GLIBC_2.2.5` | 63 | 1 | 1 | 0 |
+| `sin@GLIBC_2.2.5` | 67 | 10 | 67 | 18 |
+| `sincos@GLIBC_2.2.5` | 2 | 0 | 0 | 0 |
+| `sincosf@GLIBC_2.2.5` | 14 | 7 | 13 | 0 |
+| `sinf@GLIBC_2.2.5` | 63 | 1 | 1 | 0 |
+| `sqrt@GLIBC_2.2.5` | 67 | 228 | 68 | 0 |
+| `sqrtf@GLIBC_2.2.5` | 66 | 168 | 67 | 0 |
+| `sqrtl@GLIBC_2.2.5` | 4 | 3 | 4 | 0 |
+| `tan@GLIBC_2.2.5` | 63 | 1 | 2 | 1 |
+| `tanh@GLIBC_2.2.5` | 7 | 3 | 7 | 6 |
+| `tanhf@GLIBC_2.2.5` | 3 | 4 | 3 | 0 |
+
+(The source scan looks for the transcendental families only, so the exact operations have 0 there.
+`sincos` (double) is imported by `AntsN4BiasFieldCorrectionFs` and `gauss_4dfp`, from code outside
+FreeSurfer's own objects; `fmax`, `fminf`, `copysign`, `fegetround`, `lroundf`, `cabs` are called
+by unreached functions or by code outside the indexed objects.)
+
+## 2. Each function's route for `reproduce`
+
+glibc 2.35's code for each function, where `larmorx_core::math` stands, and how often glibc's result
+differs from the correctly rounded one (`libm_rates.c`, glibc 2.35 against CORE-MATH, 2026-11-12;
+`specs/glibc-dbl.md` §10.3 for the double `tan`, `asin`, `acos`, `atan`):
+
+| Function | glibc 2.35's code | `larmorx_core::math` | glibc ≠ correctly rounded | Route for glibc's bits |
+|---|---|---|---|---|
+| `exp`, `log`, `pow` (the 2.29 symbols), `expf`, `logf`, `powf`, `sinf`, `cosf`, `sincosf` | Arm's Optimized Routines (MIT) | `*_glibc` exist | | done |
+| `sin`, `cos`, `sincos` | IBM's Accurate Mathematical Library (LGPL) | `sin_glibc`, `cos_glibc`, `sincos_glibc` (clean room of `specs/glibc-dbl.md`) | | done |
+| `tanh`, `atanf`, `atan2f` | fdlibm (Sun's notice) | `tanh_glibc`, `atanf_glibc`, `atan2f_glibc` | | done |
+| `tanhf` | fdlibm (`s_tanhf.c`, Sun's notice; it calls `expm1f`, fdlibm's `s_expm1f.c`; one build on x86-64, no FMA) | `tanhf` (correctly rounded) only | 2.76 % of all floats | **needed** (§3): a translation of both, the `tanh_glibc` route (no spec): netlib's fdlibm 5.3 has no float versions; the float ones with Sun's notice are NetBSD's 1995 files (`$NetBSD: s_tanhf.c,v 1.4`), which glibc carries; checked on all 2³² floats against glibc 2.35 |
+| `log10f`, `acosf`, `asinf` | fdlibm (Sun's notice) | none | 0.69 % of all floats; 0.25 %, 0.22 % of the floats in [−1, 1] | the same route if §3 finds them needed |
+| `log10` | fdlibm (`e_log10.c`, Sun's notice) | none | 3.26 % (log-uniform 2⁻⁴⁰ to 2⁴¹) | the same route if needed |
+| `log2`, `log2f` | Arm's code (glibc's `e_log2.c`, `e_log2f.c`; MIT in Arm's Optimized Routines v19.11) | none | 0.017 %; 0.0073 % of all floats | a translation from Arm's MIT code, the `log_glibc` route (no spec), if §3 finds them needed |
+| `acos`, `asin`, `atan`, `tan` | IBM (LGPL; tables of searched points) | correctly rounded `acos`, `asin`, `tan`, `atan2` | 0.05 %, 0.08 %, 0.07 %, 0.19 % (`glibc-dbl.md` §10.3) | **decided: correctly rounded in `reproduce` too** (the user, 2026-11-04, `glibc-dbl.md` §9: their tables are glibc data); §3 measures the cost |
+| `atan2` | IBM (LGPL; the same tables as `atan`) | correctly rounded | 0.087 % (uniform on [−1, 1]² and [−1000, 1000]²) | as `atan`: a spec would need glibc's tables; §3 |
+| `csqrt` | glibc's own (LGPL) | none | not measured (no correctly rounded reference) | a behaviour spec if §3 finds it needed |
+| `sqrt`, `sqrtf`, `sqrtl`, `floor`, `ceil`, `ceilf`, `fabs`, `fabsf`, `rint`, `round`, `roundf`, `lroundf`, `fmodf`, `remainder`, `fmax`, `fminf`, `copysign`, `fegetround` | | exact operations (`sqrtl`: x87 `fsqrt` at 64-bit precision, `larmorx_core::x87`) | 0 by definition | any correct implementation |
+| `hypot`, `hypotf`, `erf`, `erfc`, `expm1`, `log1p`, `tgamma` | | | | not reached in the core view |
+
+## 3. Where the last bits matter (run time)
+
+**The method** (`libm-shim/README.md`): the recorded steps of the reference runs are replayed
+(`larmorx_validation`'s FreeSurfer replay) with an `LD_PRELOAD` shim. In `count` mode it returns
+glibc's values and counts, per function, the calls and the calls whose value differs from the
+correctly rounded one (a replay must still reproduce the recorded files: the shim's own check); in
+`cr` mode it returns the correctly rounded values for the functions named, and the replay shows
+whether FreeSurfer's files change. All on the main machine, 2026-11-12, the recording
+`ds000005-sub-01-classic-1thread` (the classic stream at one thread).
+
+**Count mode.** Every step of the recording but one (60 of the 61 recorded so far: the recording was
+still being made; `mri_ca_register`'s step, about two hours, was still running at the time of writing),
+**all reproduced under the shim** (`defect2seg` only with a shorter work folder: §6). The steps that
+called none of the shim's functions: the conversions and headers (1-4, 9), `mri_nu_correct.mni` (5,
+8), `talairach_avi` (6) and `talairach_afd` (7), `mri_normalize` (10, 18), `mri_em_register` (11,
+13), `mri_ca_normalize` (14), `mri_ca_label` (16), `mri_mask` (19), `AntsDenoiseImageFs` (20),
+`mri_segment` (21), `mri_edit_wm_with_aseg` (22), `mri_pretess` (23, 25, 28), `mri_fill` (24),
+`mri_tessellate` (26, 29). The others:
+
+| Step | Calls of the shim's functions (of them, differing from the correctly rounded value) |
+|---|---|
+| `seg2cc` (17: `mri_cc`) | `asin` 2 (0) |
+| `mri_watershed` (12) | `tanhf` 450,648 (26,974) |
+| `mris_fix_topology` (37, 38) | `acosf` 54,114,482 (3,335,320) and 44,208,261 (2,640,446); `tanhf` 6,241,925 (151,512) and 5,568,550 (147,571); `acos` 80,028 (242) and 80,382 (221) |
+| `mris_sphere` (35, 36, 60, 61) | `acos` 3,126,439 (11,265), 2,790,472 (9,905), 279,422,769 (711,903), 290,228,661 (759,217) |
+| `mris_curvature` (57, 59) | `acos` 438,535,528 (600,971), 433,304,952 (592,516) |
+| `mris_remesh` (40, 41) | `acos` 2,583,042 (4,506), 2,550,114 (4,355) |
+| `mris_place_surface` (46, 47) | `acos` 2,583,042 (4,133), 2,550,114 (4,102) |
+| every surface program, `mri_label2label`, `mri_label2vol`, `mris_defects_pointset` | `atan2` 100,001 (207) once per process |
+
+The 100,001 `atan2` calls are `fastApproxAtan2f`'s table, `(float) atan2(i, 100000)` for `i` = 0 to
+100,000, built once per process: 207 of its doubles differ from the correctly rounded ones, **none
+of its floats** (`libm_rates.c`, every entry): the correctly rounded `atan2` gives FreeSurfer's
+table exactly. `log2`, `log2f`, `log10`, `log10f`, `asinf`, `atan`, `tan`, `csqrt` and the
+unreached functions: no call in these steps.
+
+**`cr` mode** (the correctly rounded values returned):
+
+| Step | Correctly rounded | Result |
+|---|---|---|
+| `mris_curvature` (56) | every function of the shim | REPRODUCED |
+| `mris_sphere` (35), `mris_remesh` (40), `mris_curvature` (57) | `acos` | REPRODUCED |
+| `mris_fix_topology` (37, 38), `mris_place_surface` (46, 47), `mris_sphere` (60) | every function of the shim (`acos`, `acosf`, `tanhf` included) | REPRODUCED |
+| `mris_sphere` (61), `mri_watershed` (12) | every function but `tanhf` | REPRODUCED |
+| `mri_ca_label` (16) | every function of the shim | REPRODUCED (none is called) |
+| `mri_watershed` (12) | every function of the shim | **DIFFERS**: `brainmask.auto.mgz`, 10,878 of 16,777,216 voxels, by at most 178 |
+| `mri_watershed` (12) | `tanhf` alone | **DIFFERS**: the same 10,878 voxels |
+| `mri_watershed` (12) | `atan2` alone | REPRODUCED |
+
+So on this head **only glibc's `tanhf` decides results**, in `mri_watershed`'s skull strip (through
+`MRISFineSegmentation` and `MRISCorrectSurface`): `reproduce` needs a `tanhf_glibc`. In
+`mris_fix_topology` the 151,512 different `tanhf` values and 3.3 million different `acosf` values
+change no file; the correctly rounded `acos` (up to 438 million calls, 760,000 of them different) and
+`atan2` gave FreeSurfer's files on every step.
+
+## 4. `tan`
+
+The double `tan` is reached at run time only by `sc_gamma_large`, the gamma draw for shapes of 12
+or more (`specs/ranlux.md` §4.5), which no default-path program runs: `mri_coreg` dithers with flat
+draws, `mris_expand`'s random target map is off in fMRIPrep's call, and the distributions that use
+it (chi-squared from 24 degrees of freedom, t, F) belong to `mri_volsynth` and `mri_glmfit`'s
+simulations. dcm2niix's gantry-tilt functions call it too (DICOM input, not reached in the core
+view). glibc's `tan` differs from the correctly rounded one on 41,708 of the 2²⁴ arguments
+`sc_gamma_large` can pass (`tan_check.c`). A glibc-exact `tan` needs glibc's table of 186 searched
+points (`glibc-dbl.md` §9: no definition reproduces them), so the user's decision of 2026-11-04
+holds: `tan` stays correctly rounded in `reproduce` too, and `specs/ranlux.md` §6 says what that
+costs (large-shape gamma draws whose uniform falls on one of those 41,708 values, off the default
+paths). Not a defect of FreeSurfer's: the register's GLIBC-07 covers glibc's `tan`.
+
+## 5. Still to measure
+
+`mri_ca_register` (step 15) in count mode (running at the time of writing); the recording's later
+steps once it is complete (`mris_register`, `mris_ca_label`, the statistics, `mri_aparc2aseg`, ...;
+the 4-thread recordings have them, but their comparison needs the steps to be deterministic at 4
+threads, `docs/freesurfer/variation.md`); the v8 stream; fMRIPrep's calls (`mri_coreg` through
+`bbregister`: `log2` in its NMI cost); a second head for `tanhf`, `acosf` and `acos`. Each function
+with differing calls is then run in `cr` mode alone.
+
+## 6. A side finding: FS-104, long paths abort the DICOM format probe
+
+Replaying `defect2seg` in a work folder whose paths were about 240 characters long, its
+`mri_label2vol --defects` aborted with `*** buffer overflow detected ***: terminated` (signal 6);
+the same step in a short folder reproduces. The backtrace (gdb on the official binary) ends in
+`strcpy` into a 256-byte buffer, with the text "DCM failed to open file: <path> ...": CTN's DICOM
+condition stack (`packages/dicom/condition.c` 91 and 162, `statusText[256]`, the message
+`DCM_FILEOPENFAILED`, `dcmcond.c` 67, "DCM failed to open file: %s in %s"), which the volume reader's
+format probe reaches for a file without a known extension (`surf/lh.defect_labels`). The official
+build's `_FORTIFY_SOURCE` turns the overflow into an abort. **Measured** with the official
+`mri_info` on a copy of that file: a path of 213 bytes is read, one of 215 bytes or more aborts.
+recon-all's `defect2seg` (both streams) therefore fails when `<SUBJECTS_DIR>/<subject>/surf/lh.defect_labels`
+reaches 215 bytes (a subjects directory of about 185 characters for a subject named `sub-01`). A crash: never
+reproduced (D13); the DICOM item (3.1-16) decides the text (rule A: any path length).

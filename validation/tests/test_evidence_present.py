@@ -926,3 +926,90 @@ def test_a_cache_entrys_runs_made_again_are_dated():
     assert common.computed(info).endswith(
         "; its runs made again since, last on 2026-11-08T00:00:00+00:00,"
     )
+
+
+def _applytopup_like(fix: str = "bit-identical") -> dict:
+    """applytopup's restoration in topup's shapes: FSL's applytopup, the replica in larmorx-nc,
+    the clean room (the old texts' "original"); ``fix``: the clean room's `fix − reproduce`."""
+
+    def panel(i, role, label, sub=""):
+        return {"id": i, "role": role, "label": label, "sub": sub, "arrays": {"all": {"blob": i}}}
+
+    def diff(i, a, b, kind, verdict, label, reason, differ=0, max_abs=0.0):
+        return {
+            "id": i, "a": a, "b": b, "kind": kind, "label": label, "role_label": "x",
+            "metrics": {"hifi": {"identical": not differ, "differ": differ, "max_abs": max_abs}},
+            "verdict": verdict, "reason": reason,
+        }  # fmt: skip
+
+    return {
+        "id": "lsr",
+        "title": "applytopup: least-squares restoration",
+        "summary": "FSL 6.0.7.23 and the replica's reproduce mode give the same bytes; the "
+        "replica's default corrects FSL-132. LARMORX's clean-room original runs the same call in "
+        "its reproduce mode (at 14 threads and at one) and its default mode, which makes the same "
+        "correction.",
+        "facts": [],
+        "metrics_note": "",
+        "provenance": [],
+        "panels": [
+            panel("in1", "input", "ds005040, +y image"),
+            panel("fsl", "original", "FSL 6.0.7.23, applytopup", "as built, one thread"),
+            panel("replica", "larmorx", "larmorx-nc replica", "reproduce mode"),
+            panel("replica-fix", "larmorx", "larmorx-nc replica", "default mode (D13 corrections)"),
+            panel("original", "larmorx", "LARMORX clean-room original", "reproduce mode, 14 threads"),
+            panel("original-1", "larmorx", "LARMORX clean-room original", "reproduce mode, 1 thread"),
+            panel("original-fix", "larmorx", "LARMORX clean-room original", "default mode, 14 threads"),
+        ],
+        "diffs": [
+            diff("replica-fsl", "replica", "fsl", "main", "bit-identical", "replica − FSL 6.0.7.23",
+                 "The same values, every one."),
+            diff("fix-replica", "replica-fix", "replica", "d13", "d13",
+                 "replica, default − reproduce mode", "FSL-132, corrected by default.", 5136, 0.0078125),
+            diff("original-fsl", "original", "fsl", "main", "open",
+                 "clean-room original − FSL 6.0.7.23",
+                 "Within the record's thresholds (specs/topup.md §12): hifi: relative difference "
+                 "inside the brain, 99th percentile 1.19e-05 (§12: 0.001).", 16831, 0.81),
+            diff("original1-original", "original-1", "original", "check", "bit-identical",
+                 "clean-room original, 1 thread − 14 threads", "The same values."),
+            diff("ofix-original", "original-fix", "original", "d13", fix,
+                 "clean-room original, default − reproduce mode",
+                 "No correction of the register applies to this call." if fix == "bit-identical"
+                 else "FSL-132, corrected by default.", 0 if fix == "bit-identical" else 9),
+        ],
+        "default": {"panels": ["in1", "fsl", "replica", "original"], "diffs": ["replica-fsl"]},
+    }  # fmt: skip
+
+
+def test_topups_page_names_applytopups_calls_and_says_what_the_clean_rooms_default_did():
+    """S9: applytopup's examples on topup's page name their own program (fsl_pages.present's
+    ``examples=``); the summaries' clean-room sentence says what the clean room's default did on the
+    call, from its own `fix − reproduce` (the old "which makes the same correction" did not); the
+    "What this shows" line refuses a verdict it does not say."""
+    from larmorx_validation.evidence import fsl_topup
+
+    ex = _applytopup_like()
+    fsl_topup._clean_sentence(ex)
+    assert ex["summary"].endswith(
+        "LARMORX's clean room runs the same call in `reproduce` (at 14 threads and at one) and in "
+        "`fix`, its default: on this call the two give the same values."
+    )
+    line, verdicts = fsl_topup.SHOWS["lsr"](ex)
+    assert "changes 5,136 values by at most 0.0078" in line
+    assert "1.2 × 10⁻⁵ relative at the 99th percentile of the brain" in line
+    assert verdicts == ["replica-fsl", "original-fsl"]
+    out = present.example(fsl_topup.APPLY, ex, shows=line, verdicts=verdicts)
+    p = {x["id"]: x for x in out["panels"]}
+    d = {x["id"]: x for x in out["diffs"]}
+    assert p["fsl"]["label"] == "FSL applytopup 6.0.7.23"
+    assert d["replica-fsl"]["label"] == "replica − FSL applytopup 6.0.7.23"
+    assert d["original-fsl"]["label"] == "clean room − FSL applytopup 6.0.7.23"
+    corrected = _applytopup_like(fix="d13")
+    fsl_topup._clean_sentence(corrected)
+    assert corrected["summary"].endswith(", which corrects FSL-132 as the replica's does.")
+    with pytest.raises(ValueError, match="ofix-original is d13, not bit-identical"):
+        fsl_topup.SHOWS["lsr"](corrected)
+    gone = _applytopup_like()
+    gone["summary"] = gone["summary"].replace("which makes the same correction", "which corrects")
+    with pytest.raises(ValueError, match="the summary's last words changed"):
+        fsl_topup._clean_sentence(gone)

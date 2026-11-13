@@ -11,7 +11,10 @@ coordinate sets and their selector, the kinds of surface, the neighbour counts, 
 helpers every surface computation shares; **part 2** (the rest of 3.1-46 that needs no volume,
 §8-13): command lines, the neighbourhood checksum, the simple surface comparison, borrowed marks,
 per-vertex scratch arrays and the integrator's file names; **part 3** (queue item 3.1-49's
-first part, §14-16): the neighbour distances' storage and the coordinate operations. Later parts: reading and writing
+first part, §14-16): the neighbour distances' storage and the coordinate operations; **part 4**
+(queue item 3.1-49's parts b and c, §18-24): averaging and smoothing positions, centring a sphere,
+computing and checking the neighbour distances, the areas, triangle corners and coordinate sets,
+the curvature operations and saved coordinates. Later parts: reading and writing
 surfaces, curvatures, patches and overlays (3.1-47, 3.1-48), the metric properties every read
 computes (3.1-49 to 3.1-52); the midline marking, the label normal and the coordinate copy (they
 need the volume structure).
@@ -383,3 +386,188 @@ off), then the whole state. Measured 2026-11-13: seed 11, 4,000 such cases ident
 random spherical coordinates identical (glibc 2.35's `atan2` differs from the correctly rounded
 one in the last bit of about 0.09 % of random arguments, measured; none of those reaches a float
 result here, so a correctly rounded `atan2` suffices).
+
+## 18. Averaging and smoothing positions
+
+Notation as §14. `s` a vertex's 1-hop neighbours: the first `vnum` entries of its neighbour list;
+"unripped" neighbours are those whose rip flag is 0.
+
+- **Averaging the positions `n` times** (`n` an int; none for `n <= 0`): the distances (not the
+  original ones) are freed (§15), then each round computes, for every vertex from the previous
+  round's positions, `x' = (x ⊕ Σ xn) ⊘ c` (f), the sum in neighbour order (`x ⊕ xn1 ⊕ xn2 ...`,
+  left to right), over its unripped neighbours, `c` their count plus 1 as a float. A ripped
+  vertex, or one with `vnum <= 0`, keeps its position **without** the division (a signalling NaN
+  stays signalling; with neighbours that are all ripped the division by 1 is made and quiets it).
+  The rounds' results then replace the current coordinates as the import of §16 does (the box and
+  centre; no logic problem, since the distances were freed). Returns 0.
+- **Smoothing `n` times with step `t`** (`t` a float, cut to 1 when `t > 1`): first the logic
+  problem `MRISsmoothSurface was calling MRIScomputeMetricProperties too soon` (FreeSurfer's
+  report of `specs/freesurfer-core.md`, function `MRISsmoothSurface`, at
+  `<BUILD_ROOT>/utils/mrisurf_metricProperties.cpp:1172`; the variable
+  `FREESURFER_fix_MRISsmoothSurface1` names the fix and changes nothing else); the distances freed;
+  each round, for every vertex, `m = (0 ⊕ Σ xn) ⊘ c` (f) over its unripped neighbours (none for a
+  ripped vertex; `c` their count, so `0 ⊘ 0`, the default NaN, without any) and then, when `t` is
+  exactly 1, `x' = m`, else `x' = ((m ⊖ x) ⊗ t) ⊕ x` (f; a NaN `t` takes this branch); the rounds'
+  results imported as above; then the metric properties are computed (queue items 3.1-51 and
+  3.1-52).
+
+## 19. Centring a sphere
+
+The current coordinates are moved and scaled so the surface's centre is the origin and its radius
+100, in double unless marked (f):
+
+1. `Finding true center and radius of Spherical Surface...` on standard error (no newline).
+2. A surface with **no vertex** never returns in FreeSurfer (its energy is 0 and its gradient
+   `0 ⊘ 0`, so the step search of 5 never ends): **FS-114**; larmorx refuses it, in both modes, with
+   the fatal error `MRIScenterSphere: the surface has no vertex, so it has no centre` (code -4,
+   FreeSurfer's fatal-error form) after the message of 1.
+3. The bounding box over every vertex (from -10000 and 10000, each widened coordinate above or
+   below replacing the end; NaNs never enter); the start `c = (lo ⊕ hi) ⊗ 0.5` per axis.
+4. With `dx = x - cx` widened (d), the **squared radius** `R²(c) = (Σ ((dx⊗dx ⊕ dy⊗dy) ⊕ dz⊗dz)) ⊘ N`
+   (each term added to the running sum, the sum on the left), and the **energy**
+   `E(c, R²) = Σ ((((dy⊗dy) ⊕ (dx⊗dx)) ⊕ (dz⊗dz)) ⊖ R²)²` (note: `dy²` first), over every vertex,
+   `N` the vertex count as a double.
+5. `R² = R²(c)`, `E = E(c, R²)`. If `E(0, 10000) < E`: `c = 0`, `R² = 10000`, `E = E(0, 10000)`.
+   If `E(0, R²(0)) < E`: `c = 0`, `R² = R²(0)`, `E = E(0, R²)`.
+6. `last = E ⊕ 1`; while `E < last` (at most 100 rounds; the 101st stops before doing anything):
+   `last = E`; the **gradient** `g = (Σ (dx ⊗ e), Σ (dy ⊗ e), Σ (e ⊗ dz)) ⊘ N` with
+   `e = ((dx⊗dx ⊕ dy⊗dy) ⊕ dz⊗dz) ⊖ R²` (sums as in 4); `d = sqrt((gx⊗gx ⊕ gy⊗gy) ⊕ gz⊗gz)`; when
+   `d > 1`, `g = g ⊘ d`. Then with `ε = 2`, while `E >= last` (a NaN energy ends it): `ε = ε ⊗ 0.5`, the trial
+   centre `c' = (g ⊗ ε) ⊕ c` per axis, `E = E(c', R²(c'))`, `d` recomputed from `g` as above, and
+   the repeat ends at once when `ε ⊗ d < 1e-11`. After the repeat: when `E < last`, `c = c'` and `R² = R²(c)`; else `E = E(c, R²)`.
+7. `k = sqrt(10000 ⊘ R²)`; every vertex `x = ((x ⊖ cx) ⊗ k) ⊕ 0` (stored as float).
+8. Twice for every vertex: `r² = ((y⊗y) ⊕ (x⊗x)) ⊕ (z⊗z)` (f, widened), `k = 100 ⊘ sqrt(r²)`,
+   `x = x ⊗ k` (d, stored as float), likewise `y`, `z`.
+9. `done\nSurface centered at (0,0,0) with radius 100.0 in <n> iterations\n` on standard error, `n`
+   the rounds started in 6 (101 when the limit stopped them).
+
+## 20. The neighbour distances
+
+A vertex's **count in use** for distances is `vtotal`; when checking, it is its count at the
+stored number of hops (`vnum`, `v2num`, `v3num` for 1, 2, 3). The **formula** comes from the kind of
+surface (§4): the plane formula, or the sphere's for the kinds that use it; the current
+coordinates use `status`, the original ones `origxyz_status`; a kind outside the list is §4's
+failed assertion (`<BUILD_ROOT>/utils/mrisurf_base.cpp:63 false`).
+
+**Computing** the distances (current: into `dist`; original: into `dist_orig`) at `h` hops:
+`h <= 0` is a failed assertion `<BUILD_ROOT>/utils/mrisComputeVertexDistancesWkr_extracted.h:15 0 <
+new_dist_nsize`, `h > 3` one at `:16 new_dist_nsize <= 3`. For every unripped vertex the distances
+are **made** (§15: room for the size in use, all zero), then for each of its first count-in-use
+neighbours (ripped ones too):
+
+- **plane formula:** with `xd = x ⊖ xn` (f), `d = sqrt((zd⊗zd) ⊕ ((yd⊗yd) ⊕ (xd⊗xd)))` (f,
+  correctly rounded; `sqrt` of a negative cannot occur, of a NaN passes it);
+- **sphere's formula:** 0 when the neighbour is ripped or its length (below) is below
+  `FLT_EPSILON`; else `|angle| ⊗ r` (f), `r` the vertex's own length, `angle` the approximate
+  angle between the vertex's unit vector and the neighbour's position (`specs/freesurfer-maths.md`'s
+  approximate angle with a known length; its dot product's third term is `z2 ⊗ n.z`, the
+  neighbour's coordinate first). A vertex's **length** and **unit vector** are the normalised load
+  of its position (`specs/freesurfer-maths.md`: `sqrt((x⊗x ⊕ y⊗y) ⊕ z⊗z)` in double rounded to
+  float; the unit vector `(x, y, z) ⊗ (1 ⊘ len)` (f), or `(1, 0, 0)` for length 0); the vertex's own
+  length may be 0 or not finite (its distances are then whatever the product gives).
+
+Then, when no unripped vertex has a non-zero x coordinate (counted over every unripped vertex;
+when checking with the plane formula, only over those whose distances exist), the logic problem
+`all xyz inputs zero - cant fix` with no fixing variable (file
+`<BUILD_ROOT>/utils/mrisComputeVertexDistancesWkr_extracted.h`, line 232, function
+`mrisComputeVertexDistancesWkr`, or `mrisComputeOriginalVertexDistancesWkr` for the original
+ones). Computing returns 0 and sets `dist_nsize` (`dist_orig_nsize`) to the surface's `nsize`,
+the number of hops used.
+
+**Checking** the stored distances: true at once when `dist_nsize` (`dist_orig_nsize`) is 0; else
+the same computation at that many hops (its assertions too), only for vertices whose distances
+exist, nothing made or stored: true when every computed distance equals the stored one (a NaN never
+equals), false otherwise. In the plane formula the checking sum is
+`(zd⊗zd) ⊕ ((xd⊗xd) ⊕ (yd⊗yd))` (the computing one adds `yd²` first): only NaN bits can differ.
+
+**Computing the original distances if necessary:** nothing when bit 2 of `dist_alloced_flags` is
+set; else the logic problem `dist_orig not already computed` (line 1628, function
+`mrisComputeOriginalVertexDistancesIfNecessaryWkr`, fixed by `FREESURFER_fix_missing_dist_orig`),
+the original distances computed, and, unless that variable is set, every vertex's original
+distances set to 0 for its whole capacity (FreeSurfer's earlier behaviour, kept on purpose).
+
+**Clearing the original distances:** every unripped vertex's first `vtotal` original distances 0
+(a vertex without them, or with fewer, is outside the behaviour). **Scaling the distances** by `k`
+(float): every unripped vertex's distances in use (the size of §9) `d ⊗ k` (f). Both return 0.
+
+**The percent distance error:** for a patch the scale is 1; otherwise a total area or original
+area not above 0 is a failed assertion (`...mrisurf_metricProperties.cpp:1682 mris->total_area >
+0.0`, `:1683 mris->orig_area > 0.0`) and the scale is `sqrt(orig_area ⊘ total_area)` (f, then
+widened). For every unripped vertex and each of its first `vtotal` neighbours, `dist = d ⊗ scale`
+(d; 0 without distances), `odist` the original distance widened (0 without them); the sums
+`Σdist ⊕= dist`, `Σodist ⊕= odist`, `Σerr = |dist ⊖ odist| ⊕ Σerr` (the new term on the left) and
+the count of pairs. With `DIAG_VERBOSE` set, the debug messages `MRISpercentDistanceError called
+when all dist zero` when `Σdist == 0` and `MRISpercentDistanceError called when all dist_orig zero`
+when `Σodist == 0`. With a count of 0 nothing is divided (the count becomes 1); else `Σodist` and
+`Σerr` are divided by the count; the result is 100000 when `|Σodist| < FLT_EPSILON`, else
+`100 ⊗ (Σerr ⊘ Σodist)`.
+
+## 21. Areas, triangle corners and coordinate sets
+
+- **Clearing the original area** sets every unripped vertex's `origarea` to 0 (returns 0); the
+  variant with `val2` clears both.
+- **A face's area at corner `n`** (0, 1, 2; `n0` the previous corner, `n1` the next, cyclically):
+  with `p` the corner's current position, `v0 = p ⊖ p0`, `v1 = p1 ⊖ p` (f), the cross product
+  `d1 = (v0y⊗v1z) ⊖ (v1y⊗v0z)`, `d2 = (v0z⊗v1x) ⊖ (v1z⊗v0x)`, `d3 = (v0x⊗v1y) ⊖ (v1x⊗v0y)`, the
+  length `L = sqrt((d1⊗d1 ⊕ d2⊗d2) ⊕ d3⊗d3)` (f) and `dot = ((px⊗d1) ⊕ (d2⊗py)) ⊕ (d3⊗pz)` (f);
+  the area is `-L` (the sign bit flipped, also of a NaN) when `dot < 0`, else `L`.
+- **Zeroing negative areas:** every unripped vertex's and face's area below 0 becomes 0 (NaN
+  stays); returns 0.
+- **A face's three corners** as doubles: the original coordinates; or the white set (9), the pial
+  set (7), or the current set for any other kind. Returns 0.
+- **Extracting a coordinate set** into three float arrays: current (4), target (10), white (9),
+  layer IV (11), pial (7), inflated (5), flattened (6), canonical (3), original (0), the second
+  temporary set (8) or the temporary set (2), every vertex; any other kind is the fatal error
+  `MRISextractVertexCoords: which <n> not supported` (code -3) at the first vertex (nothing without
+  vertices). Returns 0.
+
+## 22. The curvature operations
+
+The surface's curvature **range** (`max_curv`, `min_curv`): from the first unripped vertex's `curv`
+both, then each `curv` above the maximum or below the minimum replacing it (NaN never enters
+after the first); unchanged with no unripped vertex. Below, `mean` is the unripped vertices' mean
+curvature, `Σ ⊕= curv` (d) divided by their count (`0 ⊘ 0` without any); every result is stored as
+float; each operation returns 0.
+
+| Operation | Behaviour |
+|---|---|
+| clear | every unripped vertex's `curv` 0 (the variant with `val2` clears both) |
+| rectify | every vertex's `curv` (ripped too) its absolute value (sign bit cleared), then the range |
+| scale to `[a, b]` (floats) | over the unripped vertices, the old range from -100000 and 100000 (doubles: each `curv` above or below replacing it), `k = (b ⊖ a) (f, widened) ⊘ (old max ⊖ old min)`, each `curv = ((curv ⊖ mean) ⊗ k) ⊕ mean`; the range is not updated |
+| smooth the mean curvature `n` times | each round, for every unripped vertex, `d = H' ⊘ w` (d) with `H' = (H ⊗ 0.4 (f), widened) ⊕ Σ(0.25 ⊗ Hn)` over the first `vnum` neighbours then `⊕ Σ(0.05 ⊗ Hn)` from there up to `v2num` (0.05 being `0.25 - 0.4/2` in float; products in double), `w = (0.4 + vnum·0.25) + (v2num - vnum)·0.05` (f, the counts as floats); then every unripped vertex's `H` becomes its `d` |
+| zero mean | every unripped `curv = curv ⊖ mean`; with `DIAG_SHOW` and `DIAG_VERBOSE`, `curvature mean = %2.3f` on standard output first; then the range |
+| normalise, median (1) | every vertex's `curv` (ripped too) sorted by the C library's `qsort` with the float comparison (`specs/glibc-qsort.md`; a NaN compares equal), the median the element at `nvertices / 2` (widened); `std = sqrt(Σ(curv ⊖ median)² ⊘ count)` over the unripped; `curvature median = %2.3f, std = %2.3f` on standard output; every unripped `curv = (curv ⊖ median) ⊘ std`; then the range. A surface with no vertex is outside the behaviour (FreeSurfer reads one past its empty copy) |
+| normalise, none (-1) | nothing |
+| normalise, any other value (the mean, 0) | `std = sqrt(Σ(curv ⊖ mean)² ⊘ count)`; `curvature mean = %2.3f, std = %2.3f` on standard output; every unripped `curv = (curv ⊖ mean) ⊘ std`; then the range |
+| normalise the variance | as the mean's, but `curv = ((curv ⊖ mean) ⊘ std) ⊕ mean`, and the message only with `DIAG_SHOW` and `DIAG_VERBOSE` |
+| count compressed edges closer than `m` (double) | for every unripped vertex and each unripped 1-hop neighbour, `dx = xn ⊖ x` (f, widened), `sqrt((dx⊗dx ⊕ dy⊗dy) ⊕ dz⊗dz) < m`; returns the count (each pair counted from both ends) |
+| store the mean curvature | every unripped vertex's `H` becomes its `curv` |
+
+The messages' numbers are `printf`'s `%2.3f` of the doubles (`nan`, `-nan`, `inf`, `-inf` as glibc
+writes them).
+
+## 23. Saved coordinates
+
+**Saving** the current coordinates keeps the vertex count and every vertex's `x, y, z`.
+**Loading** them back sets each vertex's coordinates through the setter of §16 (its logic problem,
+at the setter's place `<BUILD_ROOT>/utils/mrisurf_metricProperties.cpp:3148`, once per vertex as
+the report's thinning allows); a saved count other than the surface's is a failed assertion
+`...:3145 nvertices == mris->nvertices`. **Popping** loads and then frees them.
+
+## 24. Validation plan, part 4
+
+The probe's `metric` command (run on the probe built with a stub metric-properties step that
+writes `MP`, so the smoothing's averaging is compared alone): a surface of 0 to 6 vertices and up
+to 4 faces from the case (every coordinate set, `curv`, `H`, `val2`, `d`, areas, rip flags, the
+neighbour counts with a neighbour list of their largest length, distances in every state as §17,
+the face areas and rip flags), the kinds (valid and outside the list), `dist_alloced_flags`, the
+three hop counts (0 to 3, -1, 4), patch, total and original areas, the curvature range, the logic
+problem's report on or off, the two fixing variables, `DIAG_SHOW|DIAG_VERBOSE` on or off; one case
+in three NaN-heavy (a NaN of either sign with payloads, signalling ones, or an infinity in one value
+of four); then 1 to 6 of the operations of §18-23; then the whole state. An operation whose reads
+or writes would leave what the case allocated (clearing or scaling distances shorter than the
+count in use, checking or the percent error over distances shorter than the count read) prints
+`G` and is skipped, on both sides. Measured 2026-11-13: seeds 13 and 17, 2,000 and 10,000 such
+cases identical with `reproduce` but FS-114's (FreeSurfer's never return: the probe's 5-second
+alarm, `CRASH 14`, against larmorx's refusal; counted, not compared); the probe's whole-run numbers
+are in `validation/probes/fs-surfio/README.md`.

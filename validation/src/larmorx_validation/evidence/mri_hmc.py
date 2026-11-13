@@ -1702,6 +1702,9 @@ def present(doc: dict) -> dict:
         LINE_LABELS,
         _LINE_PANELS,
     )
+    # the legend in the guide's one order: the original, the replica, the clean room, the band
+    order = ("original", "replica", "clean-room", "band")
+    spec["key"].sort(key=lambda k: order.index(k["mark"]) if k["mark"] in order else len(order))
     spec["stats"]["title"] = (  # after its texts: "the original" here is FSL's
         "The matrices compared, volume by volume, both ports against the original: FSL `mcflirt` "
         "6.0.7.17 and 6.0.7.23 (RMS deviation over an 80 mm sphere; parameter differences about "

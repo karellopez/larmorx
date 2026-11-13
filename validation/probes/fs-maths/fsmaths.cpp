@@ -1029,6 +1029,14 @@ void run_case(const char *tmpfile)
     MATRIX *v1 = getm(MATRIX_REAL), *v2 = getm(MATRIX_REAL);
     putd(Vector3Angle(v1, v2));
   }
+  else if (cmd == "xyzang") {
+    XYZ n;
+    n.x = getf();
+    n.y = getf();
+    n.z = getf();
+    float x2 = getf(), y2 = getf(), z2 = getf(), norm = getf();
+    putf(XYZApproxAngle_knownLength(&n, x2, y2, z2, norm));
+  }
   else if (cmd == "mgauss") {
     int len = geti();
     float std1 = getf(), std2 = getf(), w1 = getf();

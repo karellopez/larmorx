@@ -580,6 +580,7 @@ name = "confounds"
 python = "lx.confounds"
 does = "fMRIPrep's confound estimation, ported step by step: CompCor, DVARS, framewise displacement, the motion parameters and the rest of fMRIPrep's confounds file."
 api = "docs/api/confounds.md"
+evidence = "/evidence/confounds/"
 records = { replica = ["confounds-fmriprep", "confounds-nipype", "confounds-nipype-full", "confounds-linalg", "confounds-linalg-full"] }
 original = "nipype 1.12.0, niworkflows 1.15.4 and fMRIPrep 25.2.7"
 next_release = ["replica"]
@@ -591,6 +592,7 @@ command = "larmorx nipype run"
 python = "lx.nipype.run"
 does = "nipype's `nipypecli run` for the 37 interfaces of fMRIPrep's confound estimation that LARMORX ports: it lists a module's interfaces, prints an interface's help and runs one from the shell, without nipype."
 api = "docs/api/nipype-run.md"
+evidence = "/evidence/confounds/"
 records = { replica = ["confounds-nipype"] }
 ports = ["replica"]
 original = "nipype 1.12.0"

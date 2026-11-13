@@ -259,6 +259,12 @@ PAGES = [
         [("replica", "sdcflows-estimation", "validated", None, None)],
     ),
     (
+        "/evidence/confounds/",
+        "fMRIPrep's confound estimation",
+        "fmriprep",
+        [("replica", "confounds-fmriprep", "experimental", None, None)],
+    ),
+    (
         "/evidence/nifti-io/",
         "NIfTI I/O",
         "larmorx",

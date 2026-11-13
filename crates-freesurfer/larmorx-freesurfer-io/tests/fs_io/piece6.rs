@@ -450,9 +450,7 @@ pub(super) fn oname(o: &mut Out, w: &Work, s: Option<&[u8]>) {
         o.0.push_str("N ");
         return;
     };
-    let mut pfx = w.fix.to_string_lossy().into_owned().into_bytes();
-    pfx.push(b'/');
-    let s = super::replace_all(s, &pfx, b"");
+    let s = super::strip_fix(s, &w.fix);
     o.0.push('n');
     for c in s {
         if c <= 0x20 || c > 0x7e || c == b'\\' {

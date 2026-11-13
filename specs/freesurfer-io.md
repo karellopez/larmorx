@@ -50,11 +50,16 @@ big-endian:
 | `freadDouble(fp)` | 8 | IEEE double, bits kept | (none) | an error `freadDouble: fread failed` |
 | `freadFloat(fp)` | 4 | IEEE float, bits kept | (none) | an error `freadFloat: fread failed` |
 | `freadIntEx(&i, fp)` | 4 | signed 32-bit, into the caller's `i` | 1 or 0 | none |
+| `fread4(&f, fp)` | 4 | IEEE float, bits kept (the surface files' coordinates) | 1 or 0 | none |
+| `getf(fp)` | 4 | IEEE float, bits kept | (none) | an error `getf: fread failed` |
+| `freadShort(fp)` | 2 | signed 16-bit | (none) | an error `freadShort: fread failed` |
+| `freadFloatEx(&f, fp)`, `freadDoubleEx(&d, fp)`, `freadShortEx(&s, fp)` | 4, 8, 2 | into the caller's variable, as `freadIntEx` (bits kept) | 1 or 0 | none |
 
 At the end of the file the bytes the file gave are used as the number's first bytes:
 
 - `fread3`: the missing bytes are 0 (defined).
-- `freadIntEx`: the caller's variable keeps its own bytes where the file ended, **in memory order**:
+- `freadIntEx` (and `freadFloatEx`, `freadDoubleEx`, `freadShortEx` alike): the caller's variable
+  keeps its own bytes where the file ended, **in memory order**:
   the variable's little-endian bytes are overwritten from the first by the file's bytes, and then the
   four bytes are reversed. So at the very end of the file (no byte) the caller's value comes back
   byte-reversed (`0x11223344` becomes `0x44332211`). Kept (rule C: FreeSurfer's loops stop on the
@@ -75,12 +80,14 @@ As §2, through FreeSurfer's znz reading (§1), with these messages and results:
 | `znzreadDouble(fp)` | 8 | double | an error `znzreadDouble: znzread failed` |
 | `znzreadFloat(fp)` | 4 | float | an error `freadFloat: fread failed` (these words) |
 | `znzreadIntEx(&i, fp)`, `znzreadFloatEx(&f, fp)` | 4 | into the caller's variable, as `freadIntEx`; return the count | none |
+| `znzreadDoubleEx(&d, fp)`, `znzreadShortEx(&s, fp)` | 8, 2 | the same | none |
+| `znzread2(&v, fp)`, `znzread3(&v, fp)`, `znzread4(&f, fp)` | 2, 3, 4 | as `fread2`, `fread3`, `fread4`; return the count (-1 for zlib's error) | none |
 
 The messages of `znzreadShort`, `znzreadInt`, `znzreadLong` and `znzreadDouble` appear only when the
 read returned another count than 1, the file is **not** at its end (`znzeof` false after the read),
 and `Gdiag_no >= 0`: an `.mgz`'s optional fields end at the end of the file, which is no error.
 `znzreadFloat`'s message appears whenever the read fails, at the end of the file too. Missing bytes:
-memory contents (FS-167), as in §2.
+memory contents (FS-167), as in §2 (`znzread3`'s are 0, as `fread3`'s).
 
 ## 4. Writing one number
 
@@ -90,8 +97,13 @@ memory contents (FS-167), as in §2.
 | `fwrite3(v, fp)` | the low 24 bits of `v` (a negative `v` too: -1 gives `ff ff ff`; numbers beyond 24 bits lose their high bits: the format's limit, kept, rule C) | count |
 | `fwriteInt(v, fp)` | 4 bytes | count |
 | `fwriteLong(v, fp)` | 8 bytes (FS-176) | count |
-| `fwriteFloat(f, fp)` | 4 bytes, bits kept | count |
+| `fwriteFloat(f, fp)`, `putf(f, fp)` | 4 bytes, bits kept | count |
+| `fwrite1(v, fp)` | the low 8 bits of `v`, 1 byte | count |
+| `fwrite4(v, fp)` | 4 bytes (as `fwriteInt`; the surface files' counts) | count |
+| `fwriteShort(s, fp)` | 2 bytes | count |
+| `fwriteDouble(d, fp)` | 8 bytes, bits kept | count |
 | `znzwriteShort`, `znzwriteUShort`, `znzwriteInt`, `znzwriteLong` (FS-176), `znzwriteFloat`, `znzwriteDouble` | 2, 2, 4, 8, 4, 8 bytes | the count (§1) |
+| `znzwrite1`, `znzwrite2`, `znzwrite3`, `znzwrite4` | as `fwrite1`, `fwrite2` (clamped), `fwrite3` (low 24 bits), `fwrite4` | the count (§1) |
 
 **FS-176 (the 64-bit numbers).** FreeSurfer's byte reversal of a 64-bit integer stores its result
 in a double before returning it: the reversed number is rounded to 53 significant bits (to nearest,
@@ -202,6 +214,10 @@ returning 1 (`%a` too, which C defines but larmorx does not print). Returns 0.
 - Bytes from memory contents (FS-49, FS-167) are compared as wildcards; FS-168 and FS-170 results are
   compared and counted apart; FS-169, FS-172 where the clean room refuses, FS-173 and FS-175 are
   counted, not compared.
+- The readers' and writers' siblings of §2-4 that the surface files use (`fread4`, `fwrite4`, and the
+  rest of the family: relay 12) are in the same commands: the portable seed-1 run with them
+  (2026-11-13, 2,200 cases): `reproduce` identical on 1,935 of 1,935 comparable lines (76 with memory
+  digits), 265 not compared.
 - Measured on the replica (2026-11-13): seed 1, 1,100 cases, `reproduce` identical on 1,000 of 1,000
   comparable lines (98 with memory digits), 12 varying lines identical, 88 not comparable; seed 7,
   22,000 cases: identical on 20,279 of 20,279 comparable lines (2,150 with memory digits), 268

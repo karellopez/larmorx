@@ -250,12 +250,15 @@ pub fn generate(seed: u64, n: usize, portable: bool) -> Vec<String> {
         let mut t: Vec<String> = vec![kind.into()];
         match kind {
             "rd" => {
-                let f = g.pick(&["r1", "r2", "r3", "rd", "ri", "rl", "rix", "rf"]);
+                let f = g.pick(&[
+                    "r1", "r2", "r3", "rd", "ri", "rl", "rix", "rf", "r4", "gf", "rs", "rfx",
+                    "rdx", "rsx",
+                ]);
                 let size = match f {
                     "r1" => 1,
-                    "r2" => 2,
+                    "r2" | "rs" | "rsx" => 2,
                     "r3" => 3,
-                    "rd" | "rl" => 8,
+                    "rd" | "rl" | "rdx" => 8,
                     _ => 4,
                 };
                 let count = g.int(1, 4);
@@ -266,11 +269,15 @@ pub fn generate(seed: u64, n: usize, portable: bool) -> Vec<String> {
                 t.push(hex(&bytes(&mut g, size * count + 2)));
             }
             "zr" => {
-                let f = g.pick(&["z1", "zs", "zi", "zl", "zf", "zd", "zix", "zfx"]);
+                let f = g.pick(&[
+                    "z1", "zs", "zi", "zl", "zf", "zd", "zix", "zfx", "z2", "z3", "z4", "zdx",
+                    "zsx",
+                ]);
                 let size = match f {
                     "z1" => 1,
-                    "zs" => 2,
-                    "zl" | "zd" => 8,
+                    "zs" | "z2" | "zsx" => 2,
+                    "z3" => 3,
+                    "zl" | "zd" | "zdx" => 8,
                     _ => 4,
                 };
                 let count = g.int(1, 4);
@@ -282,10 +289,11 @@ pub fn generate(seed: u64, n: usize, portable: bool) -> Vec<String> {
                 t.push(hex(&bytes(&mut g, size * count + 2)));
             }
             "wr" => {
-                let f = g.pick(&["w2", "w3", "wi", "wl", "wf"]);
+                let f = g.pick(&["w2", "w3", "wi", "wl", "wf", "w1", "w4", "wsh", "pf", "wd"]);
                 t.push(f.into());
                 let v = match f {
-                    "wf" => format!("{:08x}", g.next() as u32),
+                    "wf" | "pf" => format!("{:08x}", g.next() as u32),
+                    "wd" => format!("{:016x}", g.next()),
                     "wl" => {
                         if g.chance(2) {
                             (g.next() as i64).to_string()
@@ -320,15 +328,33 @@ pub fn generate(seed: u64, n: usize, portable: bool) -> Vec<String> {
                 t.push(v);
             }
             "zw" => {
-                let f = g.pick(&["zws", "zwus", "zwi", "zwl", "zwf", "zwd"]);
+                let f = g.pick(&[
+                    "zws", "zwus", "zwi", "zwl", "zwf", "zwd", "zw1", "zw2", "zw3", "zw4",
+                ]);
                 t.push(f.into());
                 t.push(g.int(0, 1).to_string());
                 let v = match f {
                     "zwf" => format!("{:08x}", g.next() as u32),
                     "zwd" => format!("{:016x}", g.next()),
                     "zwl" => (g.next() as i64).to_string(),
+                    _ if g.chance(3) => (g.next() as i32).to_string(),
                     _ => g
-                        .pick(&[0i64, -1, 1, 32767, 65535, 65536, -32768, 0x1234_5678])
+                        .pick(&[
+                            0i64,
+                            -1,
+                            1,
+                            255,
+                            256,
+                            32767,
+                            32768,
+                            -32767,
+                            -32768,
+                            65535,
+                            65536,
+                            1 << 24,
+                            0x1234_5678,
+                            i64::from(i32::MIN),
+                        ])
                         .to_string(),
                 };
                 t.push(v);
@@ -604,10 +630,48 @@ pub fn run_line(line: &str, mode: UpstreamDefects, w: &Work) -> (String, Vec<&'s
                             o.i(i64::from(r));
                             o.x(&v.to_be_bytes(), 4);
                         }
-                        _ => {
+                        "rf" => {
                             let got = take(4);
                             let v = fio::fread_float(&mut g, &mut io, &mut fp);
                             o.x(&v.to_be_bytes(), mem_of(4, got));
+                        }
+                        "r4" => {
+                            let got = take(4);
+                            let (r, v) = fio::fread4(&mut g, &mut fp);
+                            o.i(i64::from(r));
+                            o.x(&v.to_be_bytes(), mem_of(4, got));
+                        }
+                        "gf" => {
+                            let got = take(4);
+                            let v = fio::getf(&mut g, &mut io, &mut fp);
+                            o.x(&v.to_be_bytes(), mem_of(4, got));
+                        }
+                        "rs" => {
+                            let got = take(2);
+                            let v = fio::fread_short(&mut g, &mut io, &mut fp);
+                            o.x(&v.to_be_bytes(), mem_of(2, got));
+                        }
+                        "rfx" => {
+                            take(4);
+                            let mut v = f32::from_bits(init as u32);
+                            let r = fio::fread_float_ex(&mut fp, &mut v);
+                            o.i(i64::from(r));
+                            o.x(&v.to_be_bytes(), 4);
+                        }
+                        "rdx" => {
+                            take(8);
+                            let u = init as u32 as u64;
+                            let mut v = f64::from_bits((u << 32) | u);
+                            let r = fio::fread_double_ex(&mut fp, &mut v);
+                            o.i(i64::from(r));
+                            o.x(&v.to_be_bytes(), 8);
+                        }
+                        _ => {
+                            take(2);
+                            let mut v = init as i16;
+                            let r = fio::fread_short_ex(&mut fp, &mut v);
+                            o.i(i64::from(r));
+                            o.x(&v.to_be_bytes(), 2);
                         }
                     }
                 }
@@ -677,12 +741,45 @@ pub fn run_line(line: &str, mode: UpstreamDefects, w: &Work) -> (String, Vec<&'s
                             o.i(i64::from(r));
                             o.x(&v.to_be_bytes(), 4);
                         }
-                        _ => {
+                        "zfx" => {
                             take(4);
                             let mut v = f32::from_bits(init);
                             let r = fio::znz_read_float_ex(&mut z, &mut v);
                             o.i(i64::from(r));
                             o.x(&v.to_be_bytes(), 4);
+                        }
+                        "z2" => {
+                            let got = take(2);
+                            let (r, v) = fio::znzread2(&mut g, &mut z);
+                            o.i(i64::from(r));
+                            o.x(&v.to_be_bytes(), if got == 0 { 0 } else { 2 + got });
+                        }
+                        "z3" => {
+                            take(3);
+                            let (r, v) = fio::znzread3(&mut z);
+                            o.i(i64::from(r));
+                            o.x(&v.to_be_bytes(), 4);
+                        }
+                        "z4" => {
+                            let got = take(4);
+                            let (r, v) = fio::znzread4(&mut g, &mut z);
+                            o.i(i64::from(r));
+                            o.x(&v.to_be_bytes(), mem_of(4, got));
+                        }
+                        "zdx" => {
+                            take(8);
+                            let u = u64::from(init);
+                            let mut v = f64::from_bits((u << 32) | u);
+                            let r = fio::znz_read_double_ex(&mut z, &mut v);
+                            o.i(i64::from(r));
+                            o.x(&v.to_be_bytes(), 8);
+                        }
+                        _ => {
+                            take(2);
+                            let mut v = init as i16;
+                            let r = fio::znz_read_short_ex(&mut z, &mut v);
+                            o.i(i64::from(r));
+                            o.x(&v.to_be_bytes(), 2);
                         }
                     }
                 }
@@ -697,6 +794,14 @@ pub fn run_line(line: &str, mode: UpstreamDefects, w: &Work) -> (String, Vec<&'s
                     "w3" => fio::fwrite3(&mut fp, v.parse::<i64>().unwrap() as i32),
                     "wi" => fio::fwrite_int(&mut fp, v.parse::<i64>().unwrap() as i32),
                     "wl" => fio::fwrite_long(&mut g, &mut fp, v.parse::<i64>().unwrap()),
+                    "w1" => fio::fwrite1(&mut fp, v.parse::<i64>().unwrap() as i32),
+                    "w4" => fio::fwrite4(&mut fp, v.parse::<i64>().unwrap() as i32),
+                    "wsh" => fio::fwrite_short(&mut fp, v.parse::<i64>().unwrap() as i16),
+                    "pf" => fio::putf(&mut fp, f32::from_bits(u32::from_str_radix(v, 16).unwrap())),
+                    "wd" => fio::fwrite_double(
+                        &mut fp,
+                        f64::from_bits(u64::from_str_radix(v, 16).unwrap()),
+                    ),
                     _ => fio::fwrite_float(
                         &mut fp,
                         f32::from_bits(u32::from_str_radix(v, 16).unwrap()),
@@ -720,6 +825,10 @@ pub fn run_line(line: &str, mode: UpstreamDefects, w: &Work) -> (String, Vec<&'s
                         &mut z,
                         f32::from_bits(u32::from_str_radix(v, 16).unwrap()),
                     ),
+                    "zw1" => fio::znzwrite1(&mut z, v.parse::<i64>().unwrap() as i32),
+                    "zw2" => fio::znzwrite2(&mut z, v.parse::<i64>().unwrap() as i32),
+                    "zw3" => fio::znzwrite3(&mut z, v.parse::<i64>().unwrap() as i32),
+                    "zw4" => fio::znzwrite4(&mut z, v.parse::<i64>().unwrap() as i32),
                     _ => fio::znz_write_double(
                         &mut z,
                         f64::from_bits(u64::from_str_radix(v, 16).unwrap()),

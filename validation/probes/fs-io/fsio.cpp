@@ -654,6 +654,15 @@ void run_case()
       else if (fn == "rl") { long long l = freadLong(fp); ox(&l, 8); }
       else if (fn == "rix") { int i = init; oi(freadIntEx(&i, fp)); ox(&i, 4); }
       else if (fn == "rf") { float f = freadFloat(fp); ox(&f, 4); }
+      else if (fn == "r4") { float v; memcpy(&v, &init, 4); oi(fread4(&v, fp)); ox(&v, 4); }
+      else if (fn == "gf") { float f = getf(fp); ox(&f, 4); }
+      else if (fn == "rs") { short s = freadShort(fp); ox(&s, 2); }
+      else if (fn == "rfx") { float f; memcpy(&f, &init, 4); oi(freadFloatEx(&f, fp)); ox(&f, 4); }
+      else if (fn == "rdx") {
+        uint64_t u = ((uint64_t)(uint32_t)init << 32) | (uint32_t)init;
+        double d; memcpy(&d, &u, 8); oi(freadDoubleEx(&d, fp)); ox(&d, 8);
+      }
+      else if (fn == "rsx") { short s = (short)init; oi(freadShortEx(&s, fp)); ox(&s, 2); }
       else fail("unknown reader");
     }
     oi(feof(fp) != 0);
@@ -684,6 +693,14 @@ void run_case()
       else if (fn == "zd") { double d = znzreadDouble(z); ox(&d, 8); }
       else if (fn == "zix") { int i = (int)init; oi(znzreadIntEx(&i, z)); ox(&i, 4); }
       else if (fn == "zfx") { float f; memcpy(&f, &init, 4); oi(znzreadFloatEx(&f, z)); ox(&f, 4); }
+      else if (fn == "z2") { int v = 0x5a5a5a5a; oi(znzread2(&v, z)); ox(&v, 4); }
+      else if (fn == "z3") { int v = 0x5a5a5a5a; oi(znzread3(&v, z)); ox(&v, 4); }
+      else if (fn == "z4") { float v; memcpy(&v, &init, 4); oi(znzread4(&v, z)); ox(&v, 4); }
+      else if (fn == "zdx") {
+        uint64_t u = ((uint64_t)init << 32) | init;
+        double d; memcpy(&d, &u, 8); oi(znzreadDoubleEx(&d, z)); ox(&d, 8);
+      }
+      else if (fn == "zsx") { short s = (short)init; oi(znzreadShortEx(&s, z)); ox(&s, 2); }
       else fail("unknown reader");
     }
     oi(znzeof(z) != 0);
@@ -699,6 +716,11 @@ void run_case()
     else if (fn == "wi") r = fwriteInt((int)strtoll(v, NULL, 10), fp);
     else if (fn == "wl") r = fwriteLong(strtoll(v, NULL, 10), fp);
     else if (fn == "wf") { uint32_t u = (uint32_t)strtoul(v, NULL, 16); float f; memcpy(&f, &u, 4); r = fwriteFloat(f, fp); }
+    else if (fn == "w1") r = fwrite1((int)strtoll(v, NULL, 10), fp);
+    else if (fn == "w4") r = fwrite4((int)strtoll(v, NULL, 10), fp);
+    else if (fn == "wsh") r = fwriteShort((short)strtoll(v, NULL, 10), fp);
+    else if (fn == "pf") { uint32_t u = (uint32_t)strtoul(v, NULL, 16); float f; memcpy(&f, &u, 4); r = putf(f, fp); }
+    else if (fn == "wd") { uint64_t u = strtoull(v, NULL, 16); double d; memcpy(&d, &u, 8); r = fwriteDouble(d, fp); }
     else fail("unknown writer");
     fclose(fp);
     oi(r);
@@ -716,6 +738,10 @@ void run_case()
     else if (fn == "zwl") r = znzwriteLong(strtoll(v, NULL, 10), z);
     else if (fn == "zwf") { uint32_t u = (uint32_t)strtoul(v, NULL, 16); float f; memcpy(&f, &u, 4); r = znzwriteFloat(f, z); }
     else if (fn == "zwd") { uint64_t u = strtoull(v, NULL, 16); double d; memcpy(&d, &u, 8); r = znzwriteDouble(d, z); }
+    else if (fn == "zw1") r = znzwrite1((int)strtoll(v, NULL, 10), z);
+    else if (fn == "zw2") r = znzwrite2((int)strtoll(v, NULL, 10), z);
+    else if (fn == "zw3") r = znzwrite3((int)strtoll(v, NULL, 10), z);
+    else if (fn == "zw4") r = znzwrite4((int)strtoll(v, NULL, 10), z);
     else fail("unknown writer");
     znzclose(z);
     oi(r);

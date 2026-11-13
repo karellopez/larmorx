@@ -15,9 +15,13 @@ exists. The replica (``larmorx-freesurfer-surf``'s ``views``) is checked against
 
     python -P validation/investigations/freesurfer-surfio/accessors.py <freesurfer-tag> summary
     python -P validation/investigations/freesurfer-surfio/accessors.py <freesurfer-tag> json <out>
+    python -P validation/investigations/freesurfer-surfio/accessors.py <freesurfer-tag> rust <views.rs>
 
 ``summary`` prints the counts, every storage that differs between levels (none expected), every
 body that is neither a plain read nor a plain write, and the ``which_coords`` cases of each level.
+``rust`` checks the replica's ``MetricSurface`` (``larmorx-freesurfer-surf/src/views.rs``) against
+the ``MRIS_MP`` views' ``AllM`` level: every getter and setter present with the same read-only
+status, but the ones the replica leaves out on purpose (``EXCLUDED``).
 """
 
 from __future__ import annotations
@@ -139,7 +143,7 @@ def summary(t: dict) -> int:
             per_level[(r["level"], r["class"])] += 1
             key = (r["class"], r["name"], r["args"])
             if r["name"] == "which_coords":
-                cases[r["level"]] = which_cases(r["body"])
+                cases[r["level"]] = which_cases(r["body"]) or [("body", r["body"])]
                 continue
             storage[key].add(r["body"])
             if r["kind"] == "other":
@@ -150,9 +154,7 @@ def summary(t: dict) -> int:
                 "  "
                 + lv
                 + ": "
-                + ", ".join(
-                    f"{c} {per_level[(lv, c)]}" for c in CLASSES if per_level.get((lv, c))
-                )
+                + ", ".join(f"{c} {per_level[(lv, c)]}" for c in CLASSES if per_level.get((lv, c)))
             )
         diff = {k: v for k, v in storage.items() if len(v) > 1}
         print(f"  distinct functions {len(storage)}; bodies differing between levels: {len(diff)}")
@@ -168,7 +170,46 @@ def summary(t: dict) -> int:
     return 1 if bad else 0
 
 
+#: MRIS_MP accessors the replica's trait leaves out (views.rs explains why).
+EXCLUDED = {
+    ("Face", "norm"),
+    ("Surface", "faceNormCacheEntries"),
+    ("Surface", "faceNormDeferredEntries"),
+    ("Surface", "vertices"),
+    ("Surface", "faces"),
+}
+
+
+def rust_check(t: dict, views: Path) -> int:
+    text = views.read_text(encoding="utf-8")
+    trait = text[text.index("pub trait MetricSurface") :]
+    trait = trait[: trait.index("\n            }\n")]
+    have = set(re.findall(r"fn (\w+)\(", trait))
+    rows = re.findall(r"^\s+(\w+)(?: / (\w+))?: ", text[text.index("    table! {") :], re.M)
+    for get, set_ in rows:
+        have.add(get)
+        if set_:
+            have.add(set_)
+    prefix = {"Vertex": "v_", "Face": "f_", "Surface": ""}
+    want = set()
+    for r in t["MRIS_MP"]:
+        if r["level"] != "AllM" or r["name"] == "which_coords":
+            continue
+        base = r["name"][4:] if r["name"].startswith("set_") else r["name"]
+        if (r["class"], base) in EXCLUDED:
+            continue
+        p = prefix[r["class"]]
+        want.add(("set_" + p + base) if r["name"].startswith("set_") else (p + base))
+    missing, extra = sorted(want - have), sorted(have - want)
+    print(f"MRIS_MP AllM accessors: {len(want)}; replica's: {len(have & want)}")
+    print(f"  missing in the replica: {missing}")
+    print(f"  in the replica only: {extra}")
+    return 1 if missing or extra else 0
+
+
 def main(argv: list[str]) -> int:
+    if len(argv) >= 3 and argv[1] == "rust":
+        return rust_check(table(Path(argv[0])), Path(argv[2]))
     if len(argv) < 2 or argv[1] not in ("summary", "json"):
         print(__doc__)
         return 2

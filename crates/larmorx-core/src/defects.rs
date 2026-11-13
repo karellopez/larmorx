@@ -1147,6 +1147,24 @@ defects! {
         "MRIfixTkReg of a registration matrix with four columns and another number of rows crashes";
     FS_166 = "FS-166", "FreeSurfer", true,
         "the rows of a tensor volume, as code that goes through a volume row by row sees them (MRIcopy), all start at its first voxel: such code reads and writes only the volume's first row";
+    FS_167 = "FS-167", "FreeSurfer", true,
+        "the binary readers of one number (fread1, fread2, freadLong, freadFloat, and znzread1, znzreadShort, znzreadInt, znzreadLong, znzreadFloat, znzreadDouble) at the end of a file return a number whose missing bytes are memory contents";
+    FS_168 = "FS-168", "FreeSurfer", true,
+        "fio_dirname of a name of one character (a, or a/ with trailing slashes) can return / instead of ., depending on what the memory allocator left in memory it had just been given back";
+    FS_169 = "FS-169", "FreeSurfer", true,
+        "fio_DirIsWritable of a directory name of 1,982 bytes or more writes past a 2,000-byte buffer: the program aborts (stack smashing detected) or corrupts memory";
+    FS_170 = "FS-170", "FreeSurfer", true,
+        "TSV::read of an empty file takes its column names from memory contents";
+    FS_171 = "FS-171", "FreeSurfer", true,
+        "TSV::read of a file whose first line is empty reads, and can change, a byte of memory outside the line it read";
+    FS_172 = "FS-172", "FreeSurfer", true,
+        "TSV::read of a table with an entry that is not a number stores the previous number (memory contents for the first) in its place and, unless the characters it passes over lead to a number, never returns: it reads empty rows until memory runs out";
+    FS_173 = "FS-173", "FreeSurfer", true,
+        "TSV::print and TSV::write with a format that does not print exactly one double (a conversion of another type, or more than one), or of more than 998 bytes, print memory contents or crash";
+    FS_174 = "FS-174", "FreeSurfer", true,
+        "an allocation that fails in lcalloc ends the program with exit status 0, as if it had succeeded, after printing Cannot calloc()";
+    FS_175 = "FS-175", "FreeSurfer", true,
+        "byteswapbufshort, byteswapbuffloat and byteswapbufdouble given a byte count that is not a multiple of the number's size reverse the bytes of a whole last number past the count: past the end of a buffer that ends at the count (memory the program does not own)";
 }
 
 /// The register entry with ID `id`.

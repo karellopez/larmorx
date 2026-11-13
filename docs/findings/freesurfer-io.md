@@ -489,3 +489,127 @@ FreeSurfer's copy has them) for that element only.
   streams turned a broken VR code's byte into U+FFFD: the port dumps it byte for byte; (2) `IDisCurv`
   and `is_signa` of a folder leave `errno` 21 from the failed read: `CFile` now keeps a failed read's
   error (and fails a folder's reads on every platform).
+
+## Part 5: mosaics and MATLAB files (3.1-27, piece 2)
+
+**Restricted** (closed to FreeSurfer clean-room implementers: it cites FreeSurfer's source). Track A,
+relay 15. The behaviour is in `specs/freesurfer-io.md` §34-39; the defect texts (behaviour only) in
+`larmorx_core::defects` (FS-229 to FS-248, FS-250, FS-251; FS-249 was not used). FS-245 marks every
+result that depends on memory contents (the cause noted with its own defect as well): larmorx keeps
+one notice per defect, so a "memory" detail of a defect already noted for another reason was lost
+and such lines were compared (one in the seed-7 run: a compressed stream cut by the file's end, which
+FreeSurfer decodes on into its uninitialised buffer). Ported: `utils/mosaic.cpp` whole, `utils/matfile.cpp` whole.
+
+### Code generation
+
+- `VolSS2MosSS`/`MosSS2VolSS` (official object code): the `floor()` calls on integer quotients are
+  folded away; the tile column is the `idiv` remainder; the bounds `x > n - 1` are compiled as
+  `n <= x` (they differ from the source only for `n` = -2^31); the order of the divisions is
+  `ncmos % ncvol`, `nrmos % nrvol`, then `svol / (ncmos / ncvol)` (`MosSS2VolSS`: `cmos / ncvol`,
+  `rmos / nrvol`); each `idiv` faults on 0 or on -2^31 / -1 (FS-229, `SIGFPE`: probe `CRASH 8`).
+- matfile.cpp passes its `long32` fields to `%ld` zero-extended (`mov 0x4(%rbx),%edx`): -1 prints
+  4294967295. `(char)real_matrix[row][col]` is `cvttsd2si` to 32 bits and the low byte (FS-244).
+  `(long32)fval` is `cvttss2si` (FS-234).
+
+### Mechanisms
+
+- **FS-229.** `ncmos % ncvol` and the other divisions of mosaic.cpp 79, 89, 100 and 104 (`VolSS2MosSS`), 145,
+  155, 166, 170 and 171 (`MosSS2VolSS`) have no zero check.
+- **FS-230.** `DIFFERENT_ENDIAN(mf)` (matfile.cpp 47) is `mf->type != MATFILE_PC` for every version
+  but 5, `MATFILE_PC` being 0: only type 0 (little-endian, double, full) is taken as this machine's
+  order. `MatReadHeader0` (458-501) and `MatReadHeader`'s version 4 part (1023-1052) then call
+  `swapBytes` (503-509: type, rows, columns, name length; not `imagf`), and `readMatFile` swaps the
+  numbers. MATLAB's own rule is the thousands digit of the type (0 little-endian, 1 big-endian).
+- **FS-231.** `readMatFile` 386-388: `nitems = fread(&sval, 1, sizeof(short), fp); if (nitems !=
+  sizeof(char))`: a 2-byte read fails the test. With 1 byte left the read passes and `sval`'s other
+  byte is the uninitialised local's.
+- **FS-232.** `readMatFile` 397 and `znzreadMatFile` 723-724 read `sizeof(long)` (8) bytes per
+  32-bit element; the swap is `swapLong32(lval)`, of its low 32 bits.
+- **FS-233.** `char bval` and `short sval` (signed on x86-64) for every 8- and 16-bit type, `long` of
+  4 file bytes never for unsigned 32-bit; the version 5 comments of 320-335 have signed and unsigned
+  the wrong way round, both mapped alike.
+- **FS-234.** `fval = (float)swapLong32((long32)fval)` (414, 731).
+- **FS-235.** The imaginary loop (433-452) reads only `MAT_DOUBLE` and for the other types assigns
+  `dval`, an uninitialised local in `readMatFile` (315; 1.0 in `znzreadMatFile`, 676, swapped again at
+  every element of the other byte order).
+- **FS-236.** `mf->imagf = (long)(m & ctmp[3])` (939) with `m = 1 << 4` and `ctmp` the flags word's
+  bytes: the complex flag is bit 11 of the word (byte 1 in little-endian order), and `ctmp[3]` is its
+  high byte; `znzMatReadHeader` (1123-1124) tests `unbuff[18]` likewise and then overwrites `imagf` (1127).
+  The imaginary numbers follow the real ones directly in `readMatFile`, without the real part's
+  padding and the imaginary part's tag.
+- **FS-237.** After the name, `fread(&(mf->type), 1, 4)` (1005) and `fseek(fp, 4, SEEK_CUR)` (1011)
+  take a small numbers element's word as the type and skip its data.
+- **FS-238.** `padding = 8 - ((int)mf->namlen - (int)mf->namlen / 8 * 8)` (985).
+- **FS-239.** The small form's `memmove(&namlen_temp, &mf->namlen, sizeof(short))` (993) keeps the
+  word's low half, the element type (1); names are `calloc(namlen)` with no room for a zero (980,
+  995, 1140, 1152) and printed with `%s` (1014, 1160).
+- **FS-240.** `znzMatReadHeader` (1061-1169): `memmove(&(mf->mrows), &unbuff[32], sizeof(long))` and
+  the same for `ncols`, `namlen` and `type` copy 8 bytes into 4-byte fields (`imagf`, `version`,
+  `mrows` overwritten); `test_data[0] == 0 && test_data[1] == 0` (1137) is false for every name tag
+  MATLAB writes (its type 1 is in byte 0), so the small branch runs, whose `DIFFERENT_ENDIAN` (1149)
+  reads `mf->type`, never set by `MatlabRead2`'s uninitialised `MATFILE mf` (768) when the clobbered
+  version is not 5; `padding = 48 + ((((int)mf->namlen - 1) / 8) + 1)` (1142) counts blocks, not
+  bytes; `size_unbuff = 100 * size` (1109) bounds the decoding; `znzreadMatFile` reads at the fixed
+  offset 56 (712-750). The line of 1158-1165 is an `ErrorPrintf(DIAG_VERBOSE, ...)`: printed always.
+- **FS-241.** `MatlabRead2`'s `MATFILE mf` (768) and `MatReadHeader`'s `dt` and `tmp` (869, 871) are
+  uninitialised; `fread(...) != 1 && ferror(fp)` (its version 5 reads, 911-1008) reports errors only,
+  so at the end of the file they stay as they were.
+- **FS-242.** `MatlabRead2` never closes `fp` (uncompressed) or `znzfp` (792; `fp` 781); `MatFileRead` never
+  closes `fp` (153).
+- **FS-243.** `matAlloc` (286-307), the names' `calloc` (480, 980, 995, 1040, 1140, 1152), `malloc(size)`
+  (1102) and `calloc(size_unbuff)` (1110) of sizes from the file; `matFree(NULL, rows)` after a failed
+  `matAlloc` (MatFileRead 200) dereferences a null pointer; under the probe's 1 GiB address space the
+  official build also throws `std::bad_alloc` from `ErrorPrintf`'s formatting (probe `CRASH 6`).
+- **FS-244.** `bval = (char)real_matrix[row][col]` (190).
+- **FS-246.** `MatReadHeader` reads two dimensions at 160 and 164 and then the name tag at 168, which
+  is the third dimension's place for a 3-D array.
+- **FS-248.** `MLFC`'s `varname[1000]` and `varmtx[1000]` (matfile.h) are filled by
+  `mlfc->nvars++` (570-613) without a bound.
+- **FS-250.** `MatFileRead` ignores `MatReadHeader0`'s `NULL` (158).
+- **FS-251.** `if ((a == (char)EOF) || ...)` (888) and `if (c == (char)EOF)` (572) compare `char`s
+  with -1.
+
+### Decisions
+
+Rules (CLAUDE.md, D13): FS-229 B (both modes return 1 with a clear message; the crash is never
+reproduced); FS-230 to FS-238 and FS-240 A (the default reads MATLAB's formats by their
+definition); FS-239 A (messages: the whole name); FS-241 B (a clear error, `NULL`); FS-242
+resource leak (both modes close; no answer changes, no notice); FS-243 crash or machine-dependent
+(not reproduced; larmorx refuses above 256 MiB of numbers as a failed allocation, both modes);
+FS-244 A (saturation, the rule of FS-02); FS-245 memory contents (both modes 0, never
+compared); FS-246 B; FS-247 A; FS-248 A (all kept); FS-250 C (no
+caller; kept in both modes); FS-251 C (no valid file holds 0xff there; kept in both modes).
+
+### Who calls these
+
+`MatlabRead` is `MatrixRead` (matrix.cpp 1064), `mri_glmfit`'s design matrices (`--X`), the
+ANALYZE reader's orientation file beside an `.img` (mriio.cpp 5066); `MatlabWrite` is `MatrixWrite`
+and the ANALYZE writer's `.mat` (mriio.cpp 5563, 5861); `ReadMatlabFileVariable` is `fsgdf.cpp` 340.
+recon-all's volumes are `.mgz` and NIfTI, and fMRIPrep reads none of these files: no fMRIPrep impact
+known. The mosaic functions serve the Siemens DICOM reader (fs.dicomread, 3.7).
+
+### Measured
+
+- The probe (`validation/probes/fs-io/`, piece 5): seed 9, 3,500 cases of `mvm`, `mmv`, `mck`, `mlw`,
+  `mlr`, `mfr`, `mrc`: `reproduce` identical on 2,990 of 2,990 comparable lines; 308 not compared
+  (FreeSurfer's crashes: `SIGFPE`, `SIGSEGV` after `matAlloc` fails, `std::bad_alloc` thrown while
+  formatting an error under the probe's 1 GiB, prints passing the 5 seconds), 202 compared apart
+  (memory contents); `fix` differs only with notices. Seed 1, 4,300 portable cases of the 43
+  commands: 3,836 identical, 464 hashed as `SKIP` (`e8e6a116...`, `tests/fs_io_official.rs`, passing
+  in debug and release and under `NAN_TRAP_ARM=1` with `NAN_TRAP_DIR`).
+- Seed 7, 86,000 cases of the 43 commands: `reproduce` identical on 76,947 of 76,949 comparable lines
+  (1,699 with memory digits); 4,496 not compared, 4,555 compared apart. The two others are a
+  `VOL_GEOM::read` and an `FStagsIO` case of piece 2 where the official build was stopped by the
+  probe's 5-second alarm (`CRASH 14`) while this relay built and tested beside the run; run again
+  alone they are identical (the oracle-output cache keeps the timed-out lines). Piece 5's 14,000
+  cases: 11,902 compared, all identical, 1,276 not compared, 822 compared apart; `fix` differs only
+  with notices.
+- SciPy's files (`matfile_scipy.py`, 400 matrices: version 4, version 5, compressed; doubles, singles,
+  signed and unsigned 8- to 32-bit integers, complex): FreeSurfer reads 51 of 136 version 4 matrices
+  right (the little-endian doubles, and the big-endian ones), 33 of 136 version 5 and 0 of 128
+  compressed; the default reads all 400 as SciPy wrote them.
+- The probe's harness: a matrix of more than 65,536 numbers is printed as an FNV-1a hash of its floats
+  (`FSIO_HASH_MIN` sets the limit for the official side, to print one whole); the first build of that
+  hash in `fsio.cpp` had the 64-bit offset basis with a digit dropped, found by computing the hash of
+  the official numbers in Python (the port's was right).
+

@@ -51,6 +51,8 @@
 #include "DICOMRead.h"
 #include "Bruker.h"
 #include "signa.h"
+#include "mosaic.h"
+#include "matfile.h"
 
 // gifti.cpp's two file-local helpers, compiled into the probe by gifti_statics.cpp
 giiDataArray *fsio_gifti_alloc_and_add_darray(gifti_image *image);
@@ -404,6 +406,98 @@ void setup(const char *spec)
   }
 }
 
+// piece 5 (3.1-27): mosaics and MATLAB files
+void print_anymat(const MATRIX *m)
+{
+  if (!m) { out += "N "; return; }
+  oi(m->rows); oi(m->cols); oi(m->type);
+  // more than 65,536 numbers: FNV-1a (64 bits) of the floats' bytes in memory order
+  static long hash_min = getenv("FSIO_HASH_MIN") ? atol(getenv("FSIO_HASH_MIN")) : 65536;
+  bool big = (long)m->rows * m->cols > hash_min;
+  uint64_t h = 0xcbf29ce484222325ull;
+  auto put = [&](float f) {
+    if (!big) { of(f); return; }
+    unsigned char b[4];
+    memcpy(b, &f, 4);
+    for (unsigned char x : b) { h ^= x; h *= 1099511628211ull; }
+  };
+  for (int r = 1; r <= m->rows; r++)
+    for (int c = 1; c <= m->cols; c++) {
+      if (m->type == MATRIX_COMPLEX) { put(MATRIX_CELT_REAL(m, r, c)); put(MATRIX_CELT_IMAG(m, r, c)); }
+      else put(*MATRIX_RELT(m, r, c));
+    }
+  if (big) { char t[32]; snprintf(t, sizeof t, "fnv%016" PRIx64 " ", h); out += t; }
+}
+
+void run_piece5(const std::string &cmd)
+{
+  if (cmd == "mvm" || cmd == "mmv") {
+    int a[7];
+    for (int &v : a) v = (int)geti();
+    int null_oob = (int)geti();
+    int x = -7, y = -7, z = -7, oob = 7;
+    int r;
+    if (cmd == "mvm")
+      r = VolSS2MosSS(a[0], a[1], a[2], a[3], a[4], a[5], a[6], &x, &y, null_oob ? NULL : &oob);
+    else
+      r = MosSS2VolSS(a[0], a[1], a[2], a[3], a[4], a[5], a[6], &x, &y, &z, null_oob ? NULL : &oob);
+    oi(r); oi(x); oi(y); oi(z); oi(oob);
+  } else if (cmd == "mck") {
+    oi(CheckMosaic());
+  } else if (cmd == "mlw") {
+    bool n;
+    std::string name = getstr(&n);
+    int rows = (int)geti(), cols = (int)geti(), cplx = (int)geti();
+    MATRIX *m = MatrixAlloc(rows, cols, cplx ? MATRIX_COMPLEX : MATRIX_REAL);
+    for (int r = 1; r <= rows; r++)
+      for (int c = 1; c <= cols; c++) {
+        if (cplx) { MATRIX_CELT_REAL(m, r, c) = getf(); MATRIX_CELT_IMAG(m, r, c) = getf(); }
+        else *MATRIX_RELT(m, r, c) = getf();
+      }
+    bool fn_null;
+    std::string fname = getstr(&fn_null);
+    setup(next());
+    errno = 0;
+    oi(MatlabWrite(m, fname.c_str(), n ? NULL : name.c_str()));
+    ofile(fname);
+    MatrixFree(&m);
+  } else if (cmd == "mlr" || cmd == "mfr" || cmd == "mrc") {
+    Gdiag = strtoull(next(), NULL, 16);
+    Gdiag_no = (int)geti();
+    int type = cmd == "mfr" ? (int)geti() : 0;
+    bool vn = true;
+    std::string var = cmd == "mrc" ? getstr(&vn) : "";
+    bool fn_null;
+    std::string fname = getstr(&fn_null);
+    setup(next());
+    errno = 0;
+    if (cmd == "mlr") {
+      MATRIX *m = MatlabRead(fname.c_str());
+      print_anymat(m);
+      if (m) MatrixFree(&m);
+    } else if (cmd == "mfr") {
+      MATFILE *mf = MatFileRead(fname.c_str(), type);
+      if (!mf) out += "N ";
+      else {
+        oi(mf->type); oi(mf->mrows); oi(mf->ncols); oi(mf->imagf); oi(mf->namlen); oi(mf->version);
+        long n = (long)mf->mrows * mf->ncols * (type == MAT_FLOAT ? 4 : 1);
+        if (!mf->data || n < 0) out += "N ";
+        else obytes(std::vector<unsigned char>(mf->data, mf->data + n));
+      }
+    } else {
+      MLFC *c = ReadMatlabFileContents(fname.c_str());
+      if (!c) out += "N ";
+      else { oi(c->nvars); MLFCprint(stdout, c); MLFCfree(&c); }
+      if (!vn) print_anymat(ReadMatlabFileVariable(fname.c_str(), var.c_str()));
+    }
+    oi(errno);
+    Gdiag = 0;
+    Gdiag_no = -1;
+  } else {
+    fail("unknown command");
+  }
+}
+
 void run_piece4(const std::string &cmd)
 {
   if (cmd == "sty") {
@@ -484,7 +578,7 @@ void run_piece4(const std::string &cmd)
     oi(errno);
     if (cmd == "dcm" || cmd == "mid") COND_DumpConditions();
   } else {
-    fail("unknown command");
+    run_piece5(cmd);
   }
 }
 

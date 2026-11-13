@@ -8,6 +8,7 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+flate2.workspace = true
 larmorx-freesurfer-core.workspace = true
 larmorx-freesurfer-mri.workspace = true
 larmorx-io.workspace = true

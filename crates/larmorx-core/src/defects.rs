@@ -1163,6 +1163,14 @@ defects! {
         "a seed whose 24 seeded values are all 0 (2147483563, -2147483563 and other multiples of 2147483563) makes the random generator give 0 for ever (its initial carry is 0): flat draws are constant and most other draws never return";
     FS_103 = "FS-103", "FreeSurfer", true,
         "the cubic spline's check that the knots increase strictly is false for a NaN knot, so a NaN knot is accepted and the spline's values become NaN";
+    FS_111 = "FS-111", "FreeSurfer", true,
+        "setting the inflated surface's name (mris_register -inflated) builds the name of its curvature file in a buffer of 1,024 bytes: a name of 1,022 bytes or more ends the program with a buffer-overflow abort (signal 6)";
+    FS_112 = "FS-112", "FreeSurfer", true,
+        "adding a command line to a surface that already holds 1,000 prints an error and then stores the line past the end of the list, over the count of lines, which becomes a memory address";
+    FS_113 = "FS-113", "FreeSurfer", true,
+        "scaling a surface by a negative factor (and the scale-then-translate operation with a negative factor) leaves its bounding box upside down: the low end above the high end";
+    FS_114 = "FS-114", "FreeSurfer", true,
+        "centring a spherical surface that has no vertex never returns: the search for its centre keeps halving its step without end";
     FS_161 = "FS-161", "FreeSurfer", true,
         "MRIcopy of a tensor or complex volume into one of the same type copies only the first width bytes of each row (a quarter or an eighth of its voxels' bytes), leaving the rest of the destination as it was";
     FS_162 = "FS-162", "FreeSurfer", true,

@@ -1000,9 +1000,9 @@ defects! {
     ANTS_162 = "ANTS-162", "ANTs", true,
         "N4BiasFieldCorrection's B-spline lattice and padding, and ResampleImage's and ResampleImageBySpacing's output grids, are sized from the image's physical extent with no check: a header in metres or micrometres, or a 4D image's time axis, can make a tiny input need more memory than any machine has, which fills the machine until the process is stopped";
     FS_01 = "FS-01", "FreeSurfer", true,
-        "error messages printed in FreeSurfer's C style (ErrorPrintf, ErrorExit, ErrorReturn and the functions that report through them) end with a NUL byte before their newline, on standard error and in the error log, so recon-all.log and other logs that capture them read as binary files to grep and text tools";
+        "the error messages most of FreeSurfer's library prints (its C-style errors: ErrorPrintf, ErrorExit, ErrorReturn) end with a NUL byte before their newline, on standard error and in the error log, so recon-all.log and other logs that capture them read as binary files to grep and text tools";
     FS_02 = "FS-02", "FreeSurfer", true,
-        "a PROFILE environment variable beyond the int range, or NaN, is read as -2147483648 on x86-64 (the C conversion is undefined there)";
+        "a PROFILE environment variable beyond the 32-bit integer range, or NaN, sets the profiling level -2147483648";
     FS_03 = "FS-03", "FreeSurfer", true,
         "a failed internal assertion ends the program with a segmentation fault (exit status 139) after its message; with FREESURFER_HANG_ON_ASSERT set it first waits for ever";
     FS_04 = "FS-04", "FreeSurfer", true,
@@ -1016,13 +1016,13 @@ defects! {
     FS_08 = "FS-08", "FreeSurfer", true,
         "FSENVgetenv returns memory contents for the b-vector space when FS_DESIRED_BVEC_SPACE holds no number, and for the working directory when it cannot be read";
     FS_09 = "FS-09", "FreeSurfer", true,
-        "the median (and quick_select) of an empty list returns memory contents (the number stored just before the list)";
+        "the median (and quick_select) of an empty list returns memory contents";
     FS_10 = "FS-10", "FreeSurfer", true,
         "the unique-integer helpers (count, list and most frequent value of a list) given an empty list report one item, whose value is memory contents";
     FS_11 = "FS-11", "FreeSurfer", true,
         "the case-insensitive string comparison (stricmp) and the file-name extension helper crash or corrupt memory when given a string of more than 1,023 bytes";
     FS_12 = "FS-12", "FreeSurfer", true,
-        "nint and nint2 (FreeSurfer's rounding to an integer) give -2147483648 for values beyond the int range and NaN on x86-64 (the C conversion is undefined there)";
+        "nint and nint2 (FreeSurfer's rounding to an integer) give -2147483648 for values beyond the 32-bit integer range and for NaN";
     FS_13 = "FS-13", "FreeSurfer", true,
         "MatrixAlloc of a negative size, or of more numbers than an int holds, crashes or corrupts memory after printing that it uses an mmap'd file, or exits";
     FS_14 = "FS-14", "FreeSurfer", true,
@@ -1183,6 +1183,12 @@ defects! {
         "MRIfixTkReg of a registration matrix with four columns and another number of rows crashes";
     FS_166 = "FS-166", "FreeSurfer", true,
         "the rows of a tensor volume, as code that goes through a volume row by row sees them (MRIcopy), all start at its first voxel: such code reads and writes only the volume's first row";
+    FS_261 = "FS-261", "FreeSurfer", true,
+        "the byte-order swap of a buffer of n items of 2, 4 or 8 bytes (ByteSwapBuf) reverses only the first n/2, n/4 or n/8 items (rounded up) and leaves the rest as they were";
+    FS_262 = "FS-262", "FreeSurfer", true,
+        "the byte-order swap of a 64-bit integer (swapLong64) returns the reversed value rounded to a double's 53 significant bits (only values whose reversed form needs more bits change; none below 2^40)";
+    FS_263 = "FS-263", "FreeSurfer", true,
+        "with exceptions switched on, a fatal error with a nonzero code aborts the program (exit status 134, after the C++ library's terminate message) instead of passing the code to the program's handler";
     FS_167 = "FS-167", "FreeSurfer", true,
         "the binary readers of one number (fread1, fread2, freadLong, freadFloat, and znzread1, znzreadShort, znzreadInt, znzreadLong, znzreadFloat, znzreadDouble) at the end of a file return a number whose missing bytes are memory contents";
     FS_168 = "FS-168", "FreeSurfer", true,

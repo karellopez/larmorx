@@ -14,7 +14,7 @@ use larmorx_freesurfer_mri::vol_geom::VolGeom;
 use larmorx_freesurfer_surf::alloc;
 use larmorx_freesurfer_surf::basemisc::{self, FaceSort, VertexSort};
 use larmorx_freesurfer_surf::edges::{self, Edge};
-use larmorx_freesurfer_surf::lta::Lta;
+use larmorx_freesurfer_surf::lta;
 
 fn floats(t: &mut Vec<String>, g: &mut Gen, n: usize) {
     for _ in 0..n {
@@ -646,7 +646,8 @@ fn set_vg(t: &mut Toks, vg: &mut VolGeom) {
     (vg.z_r, vg.z_a, vg.z_s) = (t.f(), t.f(), t.f());
     (vg.c_r, vg.c_a, vg.c_s) = (t.f(), t.f(), t.f());
     (vg.s_r, vg.s_a, vg.s_s) = (t.f(), t.f(), t.f());
-    vg.fname = String::from_utf8(t.h()).expect("a printable name");
+    // snprintf(fname, STRLEN, "%s", name): the name cut at 1,023 bytes, then its NUL
+    vg.fname.strcpy_bytes(&t.h());
 }
 
 fn dump_vg(vg: &VolGeom, o: &mut Out) {
@@ -663,12 +664,12 @@ fn dump_vg(vg: &VolGeom, o: &mut Out) {
     ] {
         o.f(x);
     }
-    o.h(Some(vg.fname.as_bytes()));
+    o.h(Some(vg.fname.c_bytes()));
     o.i(i64::from(vg.i_to_r.is_some()));
     o.i(i64::from(vg.r_to_i.is_some()));
 }
 
-fn set_meta(t: &mut Toks, m: &mut Mris) {
+fn set_meta(cx: &mut Ctx, t: &mut Toks, m: &mut Mris) -> Result<(), Fatal> {
     m.r#type = t.i();
     m.status = MrisStatus(t.i());
     m.hemisphere = t.i();
@@ -676,11 +677,10 @@ fn set_meta(t: &mut Toks, m: &mut Mris) {
     set_vg(t, &mut m.vg);
     let nx = t.i();
     if nx > 0 {
-        m.lta = Some(Lta {
-            num_xforms: nx,
-            r#type: t.i(),
-            ..Lta::default()
-        });
+        // LTAalloc(nx, NULL), then its type
+        let mut l = lta::lta_alloc(&mut cx.g, &mut cx.a, &mut cx.b, nx, None)?;
+        l.ltype = t.i();
+        m.lta = Some(l);
     }
     for k in 0..2 {
         if t.i() == 0 {
@@ -698,6 +698,7 @@ fn set_meta(t: &mut Toks, m: &mut Mris) {
             m.SRASToTalSRAS_ = Some(mt);
         }
     }
+    Ok(())
 }
 
 fn dump_meta(m: &Mris, o: &mut Out) {
@@ -715,7 +716,7 @@ fn dump_meta(m: &Mris, o: &mut Out) {
     match &m.lta {
         Some(l) => {
             o.i(i64::from(l.num_xforms));
-            o.i(i64::from(l.r#type));
+            o.i(i64::from(l.ltype));
         }
         None => o.s("NULL"),
     }
@@ -734,19 +735,19 @@ fn dump_meta(m: &Mris, o: &mut Out) {
 }
 
 pub fn meta_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
-    let (g, a, b, sg) = (&mut cx.g, &mut cx.a, &mut cx.b, &cx.sg);
     let (nv, nf) = (t.i(), t.i());
-    let mut src = alloc::alloc(g, a, b, sg, nv, nf)?;
-    set_meta(t, &mut src);
+    let mut src = alloc::alloc(&mut cx.g, &mut cx.a, &mut cx.b, &cx.sg, nv, nf)?;
+    set_meta(cx, t, &mut src)?;
     let dst = if t.i() != 0 {
         let (nv2, nf2) = (t.i(), t.i());
-        let mut d = alloc::alloc(g, a, b, sg, nv2, nf2)?;
-        set_meta(t, &mut d);
+        let mut d = alloc::alloc(&mut cx.g, &mut cx.a, &mut cx.b, &cx.sg, nv2, nf2)?;
+        set_meta(cx, t, &mut d)?;
         Some(d)
     } else {
         None
     };
     let given = dst.is_some();
+    let (g, a, b, sg) = (&mut cx.g, &mut cx.a, &mut cx.b, &cx.sg);
     let r = alloc::copy_metadata(g, a, b, sg, &src, dst)?;
     o.i(i64::from(given));
     o.0 += "| ";

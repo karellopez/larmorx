@@ -14,10 +14,10 @@
 //! of their own, as in C.
 //!
 //! Since queue item 3.1-47 the structure is whole: `MRIS::vg` is fs.mri's [`VolGeom`], `MRIS::ct`
-//! its [`ColorTable`], `MRIS::lta` the transform array of [`crate::lta`] (a placeholder until
-//! fs.mri carries FreeSurfer's `LTA`; [`crate::lta`] is the one place that changes), and
+//! its [`ColorTable`], `MRIS::lta` fs.mri's transform array (`LTA`, through [`crate::lta`]), and
 //! `MRIS::mri_sras2vox` (`MRI *`, a volume the surface points at but does not own) an [`Opaque`].
 
+use larmorx_freesurfer_core::cname::CName;
 use larmorx_freesurfer_core::dmatrix::DMatrix;
 use larmorx_freesurfer_core::matrix::Matrix;
 use larmorx_freesurfer_mri::ctab::ColorTable;
@@ -202,7 +202,7 @@ pub struct Vertex {
 
 /// `MRIS` (`MRI_SURFACE`).
 #[allow(non_snake_case)]
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct Mris {
     #[allow(non_snake_case)]
     pub nverticesFrozen: i32,
@@ -348,7 +348,7 @@ pub fn zeroed_vol_geom() -> VolGeom {
         s_r: 0.0,
         s_a: 0.0,
         s_s: 0.0,
-        fname: String::new(),
+        fname: CName::default(),
         i_to_r: None,
         r_to_i: None,
         register_mat: None,

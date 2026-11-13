@@ -5,30 +5,9 @@
 //! things a surface does with it: `LTAcopy(lta, NULL)` in `MRIScopyMetadata` and `LTAfree` in
 //! `MRISdtr`.
 //!
-//! **A placeholder** (the orchestrator's decision of 2026-11-13): FreeSurfer's `LTA` structure is
-//! fs.volume's (`utils/transform.cpp`, queue item 3.1-40), which track A brings into
-//! `larmorx-freesurfer-mri` early. Until then [`Lta`] holds the fields a surface's copy and free
-//! carry over (the number of transforms, the type, the scale and the subject); the transforms
-//! themselves are not here. When the structure arrives this module re-exports it with its
-//! `LTAcopy` and `LTAfree` instead, and nothing else in the crate changes.
+//! FreeSurfer's structure itself, from `larmorx-freesurfer-mri`'s [`larmorx_freesurfer_mri::lta`]
+//! (track A took it early from fs.volume's queue item 3.1-40, 2026-11-13); until then this module
+//! held a placeholder of the four fields a surface's copy and free carried over (relay 9 of
+//! fs.surfio). Its `LTAcopy` and `LTAfree` are fs.mri's: [`lta_copy`] and [`lta_free`].
 
-/// `LTA` (placeholder: the fields named in the module's documentation).
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct Lta {
-    pub num_xforms: i32,
-    pub r#type: i32,
-    pub fscale: f32,
-    /// `subject[STRLEN]` (the bytes before the NUL).
-    pub subject: Vec<u8>,
-}
-
-/// `LTAcopy(lta, NULL)`: a new transform array with as many transforms as `lta`, its type, scale,
-/// subject and transforms.
-pub fn lta_copy(lta: &Lta) -> Lta {
-    lta.clone()
-}
-
-/// `LTAfree(&lta)`: the array freed, `lta` `NULL`.
-pub fn lta_free(lta: &mut Option<Lta>) {
-    *lta = None;
-}
+pub use larmorx_freesurfer_mri::lta::{LinearTransform, Lta, lta_alloc, lta_copy, lta_free};

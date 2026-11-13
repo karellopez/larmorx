@@ -259,8 +259,9 @@ first). The probe reads them into locals first.
     (`mulsd %xmm1,%xmm2`, the neighbour's coordinate in the destination), the first two `n.x*x2`,
     `n.y*y2`. fs.core's `xyz_approx_angle_known_length` takes `n.z*z2`: one probe case (seed 17: a
     NaN unit vector, from an infinite position, against a signalling NaN neighbour) differed.
-    `larmorx-freesurfer-surf`'s `metric.rs` keeps its own copy with the official order; fs.core's
-    owner is told (HANDOFF).
+    `larmorx-freesurfer-surf`'s `metric.rs` kept its own copy with the official order until fs.core
+    took it (track A's 99562005, merged in relay 11): both callers (`metric.rs`, `mp.rs`) now use
+    fs.core's.
   - `MRISpercentDistanceError`: `dist_scale = sqrt(orig_area / total_area)` is computed in float
     (`sqrtss`, then widened: a different number from the double square root of the widened
     quotient: seed 13's one numeric difference, `40a2a871fbf4fb4f` against `40a2a871fde6e735`);
@@ -406,7 +407,11 @@ first). The probe reads them into locals first.
   surface code only copies (`LTAcopy`: `LTAalloc(num_xforms, NULL)`, then `type`, `fscale`,
   `subject`, each `LTcopy` of `xforms` and `inv_xforms`) and frees it (`LTAfree`, in `MRISdtr` only
   when `free_transform`); the probe's `meta` checks `num_xforms` and `type` after the copy. Track
-  A's `LTA` (fs.volume's 3.1-40, brought into `larmorx-freesurfer-mri`) replaces the module.
+  A's `LTA` (fs.volume's 3.1-40, brought into `larmorx-freesurfer-mri`, ba29424f) replaced it in
+  relay 11: `src/lta.rs` re-exports fs.mri's `Lta`, `LTAcopy` and `LTAfree` (FS-195..198 are
+  track A's); the probe's `meta` side builds the arrays with `LTAalloc` as the official probe does;
+  the seed-1 hash unchanged. `Mris` lost its Rust `Clone` (the real `LTA`, like C's structure, has
+  no copy but `LTAcopy`; nothing cloned a surface).
 - **`MRISdtr`** frees nothing observable: `CTABfree` only when `ct` is set (no message), the vertex
   and face destructors (`VERTEX_TOPOLOGYdtr`, `VERTEXdtr`, `FACEdtr`, `MRIS_EDGEdtr` (not `gradU`),
   `MRIS_CORNERdtr`) for the in-use places, `lta`/`SRASToTalSRAS_`/`TalSRASToSRAS_` only with

@@ -33,7 +33,7 @@
 //!   storing and restoring the metric properties.
 //! - [`positions`]: the saved vertex positions and normals (FS-115), the canonical coordinates.
 //! - [`facenorm`]: the face-normal cache (FS-116).
-//! - [`lta`]: `MRIS::lta`'s type (a placeholder until fs.mri carries FreeSurfer's `LTA`).
+//! - [`lta`]: `MRIS::lta`'s type, fs.mri's `LTA` (with `LTAcopy` and `LTAfree`).
 //! - [`alloc`]: a surface's life: allocation, reallocation (FS-117), the metadata copy,
 //!   destruction, the dumps.
 //! - [`basemisc`]: the rip flags, the arrays, the curvature names, the registration's scales, the

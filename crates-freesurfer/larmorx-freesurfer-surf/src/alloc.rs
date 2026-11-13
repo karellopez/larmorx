@@ -422,7 +422,11 @@ pub fn copy_metadata(
     target.hemisphere = source.hemisphere;
     target.vg.assign(g, &source.vg);
     if let Some(l) = &source.lta {
-        target.lta = Some(lta_copy(l));
+        // LTAcopy into no array: a new one of the source's size (never NULL: the counts agree)
+        target.lta = match lta_copy(g, out, err, l, None)? {
+            Ret::New(l) => Some(l),
+            Ret::Given | Ret::Null => None,
+        };
     }
     if let Some(m) = &source.SRASToTalSRAS_ {
         target.SRASToTalSRAS_ = copy_matrix(g, out, err, m)?;
@@ -492,7 +496,7 @@ pub fn dtr(g: &mut Globals, err: &mut dyn Write, mris: &mut Mris) {
         mris.SRASToTalSRAS_ = None;
         mris.TalSRASToSRAS_ = None;
         if mris.lta.is_some() {
-            lta_free(&mut mris.lta);
+            lta_free(g, &mut mris.lta);
         }
     }
     for i in 0..nonneg(mris.ncmds).min(MAX_CMDS) {

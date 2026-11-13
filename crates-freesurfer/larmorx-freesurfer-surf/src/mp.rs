@@ -1142,7 +1142,14 @@ pub(crate) fn sphere_distance(vi: &SphereInfo, vi2: &SphereInfo) -> f32 {
         return 0.0;
     }
     let [x2, y2, z2] = vi2.unnormalized;
-    let angle = crate::metric::approx_angle(&vi.normalized, x2, y2, z2, vi2.length).abs();
+    let angle = larmorx_freesurfer_core::matrix_ops::xyz_approx_angle_known_length(
+        &vi.normalized,
+        x2,
+        y2,
+        z2,
+        vi2.length,
+    )
+    .abs();
     mul(angle, vi.length)
 }
 

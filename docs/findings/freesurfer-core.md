@@ -176,3 +176,24 @@ no range check; beyond the `int` range or NaN `cvttsd2si` gives `INT_MIN`. Defau
   cases in 24 zones (`ctime_probe.py`): the replica's agrees on every one; glibc applies a POSIX
   `TZ` rule to the UTC year and, before 1970, uses 1970's change times (northern rules never in
   daylight time, southern ones always).
+
+## The register's texts before the open-files rewrite (2026-11-13)
+
+The orchestrator's rule of 2026-11-13 ("open files carry behaviour only", the foundations' brief):
+`crates/larmorx-core/src/defects.rs` is open to FreeSurfer's clean-room implementers, so its texts
+describe only what a caller sees (inputs, outputs, messages, exit status). The texts it held
+before, with the mechanisms they named (pointers, which function passes what, the libraries
+underneath, the casts), are kept here verbatim; the sections above give their evidence.
+
+- **FS-01**: the C-style error messages (ErrorPrintf, ErrorExit, ErrorReturn and what calls them) end with a NUL byte before their newline, on standard error and in the error log, so recon-all.log and other logs that capture them read as binary files to grep and text tools
+- **FS-02**: DiagInit converts the PROFILE variable to an integer with no range check: a value beyond the int range (or NaN) is an undefined conversion, which gives -2147483648 on x86-64
+- **FS-03**: a failed internal assertion (assertFailed) ends the program by writing to address -1 on purpose, a segmentation fault, after its message; with FREESURFER_HANG_ON_ASSERT set it first loops for ever
+- **FS-04**: a program that draws random numbers before setting a seed (or after setting seed 0), with FREESURFER_SEED unset, seeds the generator from the clock: no two runs agree
+- **FS-05**: a FREESURFER_SEED that is not an integer, or is beyond a 64-bit integer, ends the program with an uncaught C++ exception (abort, exit status 134) at its first random number
+- **FS-06**: the fast arctangent's table lookup (fastApproxAtan2f) reads outside its table when an argument is NaN, both are infinite, or the larger magnitude is so large that 100000 times the smaller overflows a float
+- **FS-07**: the --version and --all-info handling skips the argument that follows each option it removes and examines the last arguments again: a second version option can be missed, another handled twice
+- **FS-08**: FSENVgetenv reads memory it never wrote: the b-vector space when FS_DESIRED_BVEC_SPACE holds no number, the working directory when it cannot be read
+- **FS-09**: the median (and quick_select) of an empty list reads the value before the list
+- **FS-10**: the unique-integer helpers (count, list and most frequent value of a list) given an empty list read the integer past its end and report one item
+- **FS-11**: the case-insensitive string comparison (stricmp) and the file-name extension helper copy their argument into a 1,024-byte buffer on the stack with no check: a longer string overflows it
+- **FS-12**: nint and nint2 (FreeSurfer's rounding to an integer) convert values beyond the int range, and NaN, with no check, an undefined conversion that gives -2147483648 on x86-64

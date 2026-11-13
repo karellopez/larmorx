@@ -935,6 +935,8 @@ class Unit:
     libraries: dict[str, list[str]]
     include_dirs: list[Path]
     parent: dict[str, str | None] = field(default_factory=dict)
+    # caller key -> the callee keys reach() followed from it (--edges)
+    edges: dict[str, set[str]] = field(default_factory=dict)
 
 
 def reach(
@@ -1106,9 +1108,11 @@ def reach(
         if fn.key in reached:
             continue
         reached[fn.key] = fn
+        out_edges = unit.edges.setdefault(fn.key, set())
         for e in edges(fn):
             if e.name in cut:
                 continue
+            out_edges.add(e.key)
             if e.key not in parent:
                 parent[e.key] = fn.key
                 queue.append(e)
@@ -1146,6 +1150,13 @@ def main(argv: list[str]) -> int:
         help="programs.toml: adds the foundations (programs on a default path)",
     )
     parser.add_argument(
+        "--edges",
+        type=Path,
+        default=None,
+        help="write the call edges followed (caller key -> callee keys, the union over the"
+        " programs; macros included) as JSON",
+    )
+    parser.add_argument(
         "--why",
         default=None,
         help="print the path from main to the functions whose key holds this text",
@@ -1165,6 +1176,7 @@ def main(argv: list[str]) -> int:
         "programs": {},
         "problems": {},
     }
+    all_edges: dict[str, set[str]] = defaultdict(set)
     for name, prog in sorted(graph["programs"].items()):
         if prog is None or (wanted and name not in wanted):
             continue
@@ -1185,6 +1197,8 @@ def main(argv: list[str]) -> int:
         }
         unit = Unit(name, own, libraries, [root / prog["directory"]])
         reached, layer_of, notes = reach(cb, unit, args.calls_only, cut)
+        for caller, callees in unit.edges.items():
+            all_edges[caller].update(callees)
         if args.why:
             for key in sorted(k for k in reached if args.why in k)[:5]:
                 path, k = [], key
@@ -1239,6 +1253,11 @@ def main(argv: list[str]) -> int:
         print(f"  problem {f}: {'; '.join(p)}")
     if args.json:
         args.json.write_text(json.dumps(report, indent=0, sort_keys=True) + "\n", encoding="utf-8")
+    if args.edges:
+        args.edges.write_text(
+            json.dumps({k: sorted(v) for k, v in sorted(all_edges.items())}, indent=0) + "\n",
+            encoding="utf-8",
+        )
     return 0
 
 

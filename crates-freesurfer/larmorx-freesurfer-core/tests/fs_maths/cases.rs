@@ -10,7 +10,12 @@
 //! The cases come from a seeded generator of integers and exact divisions only (no
 //! transcendental function), so they are the same on every platform. They stay inside what
 //! FreeSurfer's code addresses within its arrays, except where FreeSurfer's own searches read
-//! past them (FS-22): the port notes those, and their lines are compared as `SKIP`.
+//! past them (FS-22): the port notes those, and their lines are compared as `SKIP`. About a third
+//! of the histograms, and some of the histogram commands' scalar inputs, carry NaNs (quiet and
+//! signalling, both signs, with payloads) and infinities, from a second generator that never
+//! draws from the first (the other commands' cases stay as they were); FreeSurfer's bin numbers
+//! from them address memory far outside its arrays (FS-22), and the probe runs each histogram case
+//! in a child process (`CRASH`, `TIMEOUT`, `EXIT <status>` lines).
 
 // The minimizers' problems keep the C expressions (`s = s + ...`) and its 1-based loops.
 #![allow(dead_code, clippy::needless_range_loop, clippy::assign_op_pattern)]
@@ -24,6 +29,7 @@ use larmorx_freesurfer_core::dmatrix::{self, DMatrix};
 use larmorx_freesurfer_core::fs_vnl::FsFunctions;
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::histo::{self as h, Histogram};
+use larmorx_freesurfer_core::log::Fatal;
 use larmorx_freesurfer_core::matrix::{self as m, MATRIX_COMPLEX, MATRIX_REAL, Matrix};
 use larmorx_freesurfer_core::matrix_decomp as md;
 use larmorx_freesurfer_core::matrix_io as mio;
@@ -70,7 +76,9 @@ impl Gen {
     }
 }
 
-/// A generated histogram: what the line carries.
+/// A generated histogram: what the line carries. `bin_size`, `min` and `max` stay finite (the
+/// generator derives ranges from them); `head` is what the line carries for them, where a
+/// non-finite value may replace one.
 #[derive(Clone)]
 struct Gh {
     bin_size: f32,
@@ -78,6 +86,80 @@ struct Gh {
     max: f32,
     bins: Vec<f32>,
     counts: Vec<f32>,
+    head: [f32; 3],
+}
+
+/// The non-finite values the histograms' cases carry: quiet and signalling NaNs of both signs
+/// with different payloads (where two meet, which one the result keeps is the operand order of
+/// the official build's instructions), and the infinities.
+const NONFINITE: [u32; 8] = [
+    0x7fc0_0000,
+    0xffc0_0000,
+    0x7fc1_2345,
+    0xffd0_0001,
+    0x7f80_0001,
+    0xff81_2345,
+    0x7f80_0000,
+    0xff80_0000,
+];
+
+/// A second generator for the non-finite values, seeded from `g`'s state and `salt` without
+/// drawing from `g`: the cases of every other command stay as they were before the histograms'
+/// cases carried NaNs and infinities.
+fn side(g: &Gen, salt: u64) -> Gen {
+    let mut s = Gen(g.0 ^ salt.wrapping_mul(0xd6e8_feb8_6659_fd93));
+    s.next();
+    s
+}
+
+/// One of [`NONFINITE`], from the side generator.
+fn nonfinite(s: &mut Gen) -> f32 {
+    f32::from_bits(s.pick(&NONFINITE))
+}
+
+/// `v`, or with probability `1 / every` a non-finite value (a scalar input of a histogram case).
+fn maybe_nonfinite(g: &Gen, salt: u64, every: u64, v: f32) -> f32 {
+    let mut s = side(g, salt);
+    if s.below(every) == 0 {
+        nonfinite(&mut s)
+    } else {
+        v
+    }
+}
+
+/// As [`maybe_nonfinite`] for a `double` input (the `float` value widened: a signalling NaN's
+/// payload moved up, as `cvtss2sd` would, but kept signalling).
+fn maybe_nonfinite64(g: &Gen, salt: u64, every: u64, v: f64) -> f64 {
+    let mut s = side(g, salt);
+    if s.below(every) != 0 {
+        return v;
+    }
+    let u = s.pick(&NONFINITE);
+    let sign = u64::from(u >> 31) << 63;
+    let payload = u64::from(u & 0x007f_ffff) << 29;
+    f64::from_bits(sign | 0x7ff0_0000_0000_0000 | payload)
+}
+
+/// Non-finite values put into a quarter of the histograms: one to three counts; in one of eight a
+/// bin's value between the ends (the ends give `min` and `max`, which the generator uses); in one
+/// of 24 the line's bin size, minimum or maximum.
+fn inject_nonfinite(g: &Gen, h: &mut Gh) {
+    let mut s = side(g, 1);
+    let n = h.bins.len() as u64;
+    if s.below(4) == 0 {
+        for _ in 0..s.int(1, 3) {
+            let b = s.below(n) as usize;
+            h.counts[b] = nonfinite(&mut s);
+        }
+    }
+    if n > 2 && s.below(8) == 0 {
+        let b = 1 + s.below(n - 2) as usize;
+        h.bins[b] = nonfinite(&mut s);
+    }
+    if s.below(24) == 0 {
+        let k = s.below(3) as usize;
+        h.head[k] = nonfinite(&mut s);
+    }
 }
 
 impl Gh {
@@ -163,13 +245,16 @@ fn hist(g: &mut Gen, nbins: usize, nonneg: bool) -> Gh {
     }
     let mn = bins[0];
     let mx = bins[nbins - 1];
-    Gh {
+    let mut h = Gh {
         bin_size,
         min: mn,
         max: mx,
         bins,
         counts,
-    }
+        head: [bin_size, mn, mx],
+    };
+    inject_nonfinite(g, &mut h);
+    h
 }
 
 fn nbins(g: &mut Gen) -> usize {
@@ -186,9 +271,7 @@ fn dx(v: f64) -> String {
 
 fn put_gh(s: &mut Vec<String>, h: &Gh) {
     s.push(h.n().to_string());
-    s.push(fx(h.bin_size));
-    s.push(fx(h.min));
-    s.push(fx(h.max));
+    s.extend(h.head.iter().map(|&v| fx(v)));
     s.extend(h.bins.iter().map(|&v| fx(v)));
     s.extend(h.counts.iter().map(|&v| fx(v)));
 }
@@ -665,7 +748,7 @@ fn case(g: &mut Gen, cmd: &str) -> String {
             put_gh(&mut s, &h);
             let r = g.int(1, 40) as f32 / 4.0;
             let sigma = g.pick(&[0.5f32, 1.0, 2.0, 3.25, r]);
-            s.push(fx(sigma));
+            s.push(fx(maybe_nonfinite(g, 2, 16, sigma)));
         }
         "smoothinto" => {
             let h = hist(g, nb, false);
@@ -709,15 +792,16 @@ fn case(g: &mut Gen, cmd: &str) -> String {
                     let span = (h.max - h.min).abs() + 4.0 * h.bin_size;
                     h.min - 2.0 * h.bin_size + span * (g.int(0, 1000) as f32 / 1000.0)
                 };
-                s.push(fx(v));
+                s.push(fx(maybe_nonfinite(g, 3, 12, v)));
             }
             if g.below(2) == 0 {
                 s.push(fx(0.0));
                 s.push(fx(0.0));
             } else {
                 let a = g.f(-50, 50, 4);
-                s.push(fx(a));
-                s.push(fx(a + g.f(1, 300, 4)));
+                s.push(fx(maybe_nonfinite(g, 4, 16, a)));
+                let b = a + g.f(1, 300, 4);
+                s.push(fx(maybe_nonfinite(g, 5, 16, b)));
             }
         }
         "prevvalley" | "nextvalley" => {
@@ -758,7 +842,7 @@ fn case(g: &mut Gen, cmd: &str) -> String {
             let mut h = hist(g, nb, false);
             if h.bins[nb - 1] < 0.0 {
                 let shift = -h.bins[nb - 1] + 1.0;
-                for b in h.bins.iter_mut() {
+                for b in h.bins.iter_mut().filter(|b| b.is_finite()) {
                     *b += shift;
                 }
             }
@@ -772,7 +856,7 @@ fn case(g: &mut Gen, cmd: &str) -> String {
             } else {
                 h.min - 3.0 + (h.max - h.min + 6.0) * (g.int(0, 1000) as f32 / 1000.0)
             };
-            s.push(fx(v));
+            s.push(fx(maybe_nonfinite(g, 6, 8, v)));
         }
         "correlate" | "threshsum" | "addsub" => {
             let a = hist(g, nb, false);
@@ -784,7 +868,8 @@ fn case(g: &mut Gen, cmd: &str) -> String {
             put_gh(&mut s, &a);
             put_gh(&mut s, &b);
             if cmd == "threshsum" {
-                s.push(fx(g.f(0, 50, 2)));
+                let t = g.f(0, 50, 2);
+                s.push(fx(maybe_nonfinite(g, 9, 12, t)));
             }
         }
         "linfit" => {
@@ -802,8 +887,10 @@ fn case(g: &mut Gen, cmd: &str) -> String {
         }
         "linscale" => {
             put_gh(&mut s, &hist(g, nb, false));
-            s.push(fx(g.f(-4, 4, 8)));
-            s.push(fx(g.f(-100, 100, 4)));
+            let scale = g.f(-4, 4, 8);
+            s.push(fx(maybe_nonfinite(g, 7, 12, scale)));
+            let offset = g.f(-100, 100, 4);
+            s.push(fx(maybe_nonfinite(g, 8, 12, offset)));
         }
         "makepdf" => {
             put_gh(&mut s, &hist(g, nb, false));
@@ -826,7 +913,7 @@ fn case(g: &mut Gen, cmd: &str) -> String {
             s.push(n.to_string());
             for _ in 0..n {
                 let v = f64::from(h.min) - 5.0 + f64::from(h.max - h.min + 10.0) * g.d(0, 1, 1000);
-                s.push(dx(v));
+                s.push(dx(maybe_nonfinite64(g, 10, 12, v)));
             }
         }
         "initgiven" => {
@@ -1393,6 +1480,17 @@ impl<'a> Toks<'a> {
 struct Out(Vec<String>);
 
 impl Out {
+    /// A call's value, or `None` when FreeSurfer's code ends the program: the line is then
+    /// `EXIT <status>`, as `fsmaths`' child process ends (its earlier numbers never written).
+    fn ok<T>(&mut self, r: Result<T, Fatal>) -> Option<T> {
+        match r {
+            Ok(v) => Some(v),
+            Err(f) => {
+                self.0 = vec!["EXIT".to_owned(), f.status().to_string()];
+                None
+            }
+        }
+    }
     fn i(&mut self, v: i32) {
         self.0.push(v.to_string());
     }
@@ -1614,7 +1712,9 @@ pub fn run_line(line: &str, mode: UpstreamDefects, tmp: &Path) -> (String, Vec<&
         }
         "correlate" => {
             let (a, b) = (t.h(), t.h());
-            o.d(h::histo_correlate(g, &mut se, &a, &b).unwrap());
+            if let Some(c) = o.ok(h::histo_correlate(g, &mut se, &a, &b)) {
+                o.d(c);
+            }
         }
         "linfit" => {
             let (a, b) = (t.h(), t.h());
@@ -1644,7 +1744,9 @@ pub fn run_line(line: &str, mode: UpstreamDefects, tmp: &Path) -> (String, Vec<&
         "bins" => {
             let n = t.i();
             let (mn, mx) = (t.d(), t.d());
-            o.h(&h::histo_bins(g, &mut se, n, mn, mx).unwrap());
+            if let Some(r) = o.ok(h::histo_bins(g, &mut se, n, mn, mx)) {
+                o.h(&r);
+            }
         }
         "count" => {
             let mut hh = t.h();
@@ -1659,14 +1761,19 @@ pub fn run_line(line: &str, mode: UpstreamDefects, tmp: &Path) -> (String, Vec<&
         "init" => {
             let n = t.i();
             let (mn, mx) = (t.d(), t.d());
-            o.h(&new_h(h::histo_init(g, &mut se, None, n, mn, mx).unwrap()));
+            if let Some(r) = o.ok(h::histo_init(g, &mut se, None, n, mn, mx)) {
+                o.h(&new_h(r));
+            }
         }
         "initgiven" => {
             let mut hh = t.h();
             let n = t.i();
             let (mn, mx) = (t.d(), t.d());
-            h::histo_init(g, &mut se, Some(&mut hh), n, mn, mx).unwrap();
-            o.h(&hh);
+            if o.ok(h::histo_init(g, &mut se, Some(&mut hh), n, mn, mx))
+                .is_some()
+            {
+                o.h(&hh);
+            }
         }
         "median" => {
             let hh = t.h();
@@ -1674,24 +1781,36 @@ pub fn run_line(line: &str, mode: UpstreamDefects, tmp: &Path) -> (String, Vec<&
         }
         "cdf" => {
             let hh = t.h();
-            o.h(&new_h(h::histo_make_cdf(g, &mut se, &hh, None).unwrap()));
-            o.h(&new_h(
-                h::histo_make_reverse_cdf(g, &mut se, &hh, None).unwrap(),
-            ));
+            if let Some(r) = o.ok(h::histo_make_cdf(g, &mut se, &hh, None)) {
+                o.h(&new_h(r));
+                if let Some(r) = o.ok(h::histo_make_reverse_cdf(g, &mut se, &hh, None)) {
+                    o.h(&new_h(r));
+                }
+            }
         }
         "robust" => {
             let mut hh = t.h();
             let p = t.d();
-            let (status, off, sig) =
-                h::histo_robust_gaussian_fit(g, &mut se, None, &mut hh, p).unwrap();
-            o.i(status);
-            o.d(off.unwrap_or(-1.0));
-            o.d(sig.unwrap_or(-1.0));
-            o.f(hh.bin_size);
+            if let Some((status, off, sig)) =
+                o.ok(h::histo_robust_gaussian_fit(g, &mut se, None, &mut hh, p))
+            {
+                o.i(status);
+                o.d(off.unwrap_or(-1.0));
+                o.d(sig.unwrap_or(-1.0));
+                o.f(hh.bin_size);
+            }
+            // FreeSurfer never returns (the probe's child is stopped by its alarm)
+            if mode == UpstreamDefects::Reproduce
+                && g.notices.contains(&larmorx_core::defects::FS_51)
+            {
+                o.0 = vec!["TIMEOUT".to_owned()];
+            }
         }
         "abs" => {
             let hh = t.h();
-            o.h(&new_h(h::histo_abs(g, &mut se, &hh, None).unwrap()));
+            if let Some(r) = o.ok(h::histo_abs(g, &mut se, &hh, None)) {
+                o.h(&new_h(r));
+            }
         }
         "entropy" => {
             let hh = t.h();
@@ -1731,8 +1850,7 @@ pub fn run_line(line: &str, mode: UpstreamDefects, tmp: &Path) -> (String, Vec<&
             o.h(&new_h(h::histo_add(g, &a, Some(&b), None)));
             o.h(&new_h(h::histo_subtract(g, &a, &b, None)));
             o.h(&new_h(h::histo_add(g, &a, None, None)));
-            let a1 = a.clone();
-            h::histo_add(g, &a1, Some(&b), Some(&mut a));
+            h::histo_add_into_first(g, &mut a, &b);
             o.h(&a);
         }
         "clearcounts" => {

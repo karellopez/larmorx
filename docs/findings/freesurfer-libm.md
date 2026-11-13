@@ -237,7 +237,10 @@ have a temporary array) for a clean room, checked on 16,544 cases against glibc.
 **The callers** (2026-11-13; the call graph's core view scanned for `qsort`, `qsort_r`, `bsearch` and
 the C++ sorts, `inv/scan.py`'s pattern; element sizes from the objects' relocations): 32 reached
 functions call `qsort` (none `qsort_r`; `MRISedgeSort`'s `qsort_r`, 160-byte elements, is not
-reached), one `bsearch`, two `std::sort`.
+reached, even in the full view), one `bsearch`, two `std::sort`. The full view adds six, all for
+input formats off the default paths: dcm2niix's `readDICOMx`, `nii_saveDTI`,
+`ensureSequentialSlicePositions`, `nii_loadDirCore`, CTN's `SortDCMFileInfo` (DICOM) and libtiff's
+`_TIFFMergeFieldInfo`.
 
 | Kind of comparator | Functions (programs) | Element | Does glibc's order decide bits? |
 |---|---|---|---|

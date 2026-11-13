@@ -59,11 +59,11 @@ AFNI is public domain; newer NIH programs call MCW library routines
 
 The clean-room implementer must not open the upstream source, the replica crates
 (`crates/larmorx-afni-replica`, `crates-gpl/` with tedana's replica and its glibc tools, among them `tools/glibc-reference`
-and the spec writer's model `tools/glibc-dbl-model`, `crates-nc/`), or
+and the spec writer's model `tools/glibc-dbl-model`, `crates-nc/`, `crates-freesurfer/`), or
 findings written from the source: [findings/afni-tshift.md](findings/afni-tshift.md),
 [findings/afni-automask.md](findings/afni-automask.md), [findings/afni-unifize.md](findings/afni-unifize.md),
 [findings/afni-licence-routines.md](findings/afni-licence-routines.md), [findings/afni-volreg.md](findings/afni-volreg.md),
-[findings/fsl-mcflirt.md](findings/fsl-mcflirt.md), [findings/fsl-bet.md](findings/fsl-bet.md), [findings/fsl-flirt.md](findings/fsl-flirt.md), [findings/fsl-fast.md](findings/fsl-fast.md), [findings/fsl-topup.md](findings/fsl-topup.md), [findings/fsl-maths.md](findings/fsl-maths.md), [findings/fsl-prelude.md](findings/fsl-prelude.md), [findings/tedana-t2smap.md](findings/tedana-t2smap.md), [parts/](parts/) (other parts' briefs, reports and handoffs), and the sections of the
+[findings/fsl-mcflirt.md](findings/fsl-mcflirt.md), [findings/fsl-bet.md](findings/fsl-bet.md), [findings/fsl-flirt.md](findings/fsl-flirt.md), [findings/fsl-fast.md](findings/fsl-fast.md), [findings/fsl-topup.md](findings/fsl-topup.md), [findings/fsl-maths.md](findings/fsl-maths.md), [findings/fsl-prelude.md](findings/fsl-prelude.md), [findings/tedana-t2smap.md](findings/tedana-t2smap.md), for FreeSurfer the preparation's inventory `docs/freesurfer/`, `docs/findings/freesurfer-*.md`, the tools `validation/investigations/freesurfer-inventory/`, `freesurfer-unit-oracle/` and `freesurfer-oracle/`, the replicas of its borrowed pieces (`crates-gpl/larmorx-gpl-gsl`, `crates-nc/larmorx-nc-tkregister2`) and those pieces' own sources (GSL, Burkardt's and EPFL's code, Washington University's 4dfp tools), recon-all's own copies in the recordings (`scripts/recon-config.yaml`, `recon-all.local-copy`); the replay tool `larmorx_validation.freesurfer` and the unit oracle's harness `freesurfer_unit.py` are run as black boxes, never read; [parts/](parts/) (other parts' briefs, reports and handoffs), and the sections of the
 [defect register](findings/upstream-defects.md) marked **restricted**. What the implementer
 learns from black-box runs goes back into the spec, marked (observed). The models are
 [specs/3dTshift.md](../specs/3dTshift.md) and [specs/mcflirt.md](../specs/mcflirt.md); the

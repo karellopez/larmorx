@@ -35,15 +35,19 @@ Porting classes (what a file or a finding means for LARMORX):
 | `portable` | into `larmorx-freesurfer` under FreeSurfer's licence (Part B, §2) | 339 | 527,907 |
 | `portable-with-notice` | permissive third-party terms: portable, keeping that notice beside FreeSurfer's | 175 | 197,083 |
 | `clean-room-only` | no permission to copy: a clean room only (Washington University's 4dfp tools) | 26 | 5,635 |
-| `question` | the rules do not settle it (§7) | 3 | 5,881 |
+| `noncommercial-program` | non-commercial terms: the replica in `larmorx-nc` as a program of its own (the user, 2026-11-12) | 1 | 5,392 |
+| `later` | on no default path: ported later (the user, 2026-11-12) | 2 | 489 |
+| `gpl-alone` | GPL code: its replica alone in `larmorx-gpl`, FreeSurfer's replicas use its clean room (findings only: TP-03) | - | - |
+| `question` | the rules do not settle it (§7): none left since the user's decisions of 2026-11-12 | 0 | 0 |
 | `published-description` | to be written from a published description (findings only: TP-15) | - | - |
 | `nothing-to-port` | no behaviour of its own (findings only: TP-06) | - | - |
 
-The three `question` files are `tkregister2/tkregister2.cpp` (CorTechs, TP-10) and the two MARS
-files (TP-14). Three more questions concerned code inside files that are otherwise `portable`
-(TP-03, TP-04, TP-05; TP-05 is decided since, `portable-with-notice` crediting EPFL, §9 P-10): a
-file's class is its notice's; its findings (the `findings` field in `third-party.toml`) override it
-for the functions they name.
+The three files that were `question` until the user's decisions of 2026-11-12 (§7) are
+`tkregister2/tkregister2.cpp` (CorTechs, TP-10: now `noncommercial-program`) and the two MARS files
+(TP-14: now `later`). Three more questions concerned code inside files that are otherwise `portable`
+(TP-03, now `gpl-alone`; TP-04, now `portable-with-notice` crediting Burkardt; TP-05,
+`portable-with-notice` crediting EPFL; §9): a file's class is its notice's; its findings (the
+`findings` field in `third-party.toml`) override it for the functions they name.
 
 ## 2. FreeSurfer's own licence and its scope
 
@@ -151,7 +155,8 @@ code). The algorithms themselves are published: M. Lüscher, Comput. Phys. Commu
 exercise 16); Marsaglia's polar method; Marsaglia (1980) for the t distribution. **Runs:**
 `mri_coreg` by default (coordinate and intensity dithering are on, seed 53, `mri_coreg.cpp`
 207-208, 227, 419-444): fMRIPrep's `bbregister --init-coreg` runs it; `mris_expand` only with a
-random thickness map. Porting: a question (§7, Q2).
+random thickness map. Porting: decided (§7, Q2; §9, P-08): the replica alone in `larmorx-gpl`,
+FreeSurfer's replicas use the clean room.
 
 **TP-04. `mri_normalize`'s cubic spline is John Burkardt's spline library.**
 `SplineCubicSet`, `SplineCubicValue`, `d3_np_fs` (`utils/numerics.cpp` 1417-1680 with their
@@ -163,7 +168,8 @@ probability routines in the same file (`OpenBetaIncomplete`, `OpenGammaIncomplet
 Applied Statistics AS63 and AS239) are reached by no default-path program. **Runs:** every
 `mri_normalize` (MRInormalize calls `MRIsplineNormalize` unconditionally, `utils/mrinorm.cpp`
 749): T1.mgz and brain normalisation on both streams. The maths is a textbook cubic spline with
-first-derivative ends and a tridiagonal solve; porting: a question (§7, Q3).
+first-derivative ends and a tridiagonal solve; porting: decided (§7, Q3; §9, P-09): a replica in
+`larmorx-freesurfer` crediting Burkardt, and a clean room.
 
 **TP-05. `mriBSpline.cpp` follows EPFL's B-spline code.** Martin Reuter's file: "This Code is
 based on: P. Thevenaz, T. Blu, M. Unser, Interpolation Revisited, IEEE TMI 19 (2000) 739-758 and
@@ -219,8 +225,8 @@ the source of modifications under no more restrictive terms (2(f)), and require 
 acknowledgment "This product includes FreeSurfer developed by CorTechs Labs, Inc. and The General
 Hospital Corporation" (2(b)). It is the only file in the audit under these terms (the others are
 the Tcl scripts of `tktools/`, not on any path). **Runs:** fMRIPrep's `bbregister`: the header
-registration (`--regheader`), `--ltaout`, `--fslregout` (programs.md §5). Porting: a question
-(§7, Q1).
+registration (`--regheader`), `--ltaout`, `--fslregout` (programs.md §5). Porting: decided (§7,
+Q1; §9, P-11): the replica in `larmorx-nc` as its own program, the clean room in `larmorx`.
 
 **TP-11. The official binaries use ITK 4.13.2.** `CMakeLists.txt` 690: Ubuntu 22 with GCC 8 takes
 `itk/4.13.2_ubuntu20` (with GCC 11 it would take a 5.4 release candidate); the official binaries'
@@ -229,7 +235,7 @@ embedded build paths name `itk/4.13.2/src/ITK/Modules/...` (`strings` on `mri_ca
 -mfpmath=sse`, C++11. ITK 4.x is Apache-2.0, its VNL BSD-3-Clause; the adaptive non-local means
 filter in `AntsDenoiseImageFs/` is ITK's (Apache-2.0). Portable with notice, but **the version
 differs from LARMORX's ITK 5.4.5 ports**: the replicas of `AntsN4BiasFieldCorrectionFs`,
-`AntsDenoiseImageFs` and of every VNL call follow 4.13.2's source where it differs (§7, Q6). ITK
+`AntsDenoiseImageFs` and of every VNL call follow 4.13.2's source where it differs (§7, Q6; §10). ITK
 4.13.2's source is not in the workspace (FreeSurfer's annexed tarball is absent; the tag is public).
 
 **TP-12. The network programs.** `mri_synthseg` and `mri_sclimbic_seg` carry neurite's U-Net layers
@@ -251,7 +257,7 @@ Geometric Tools' distance and bounding-box code (Boost Software License 1.0; `mr
 reached by `mris_sphere` only through `MRISunfold` → `MRIScomputeAllDistances` →
 `MRISdistanceTransform`, which runs only when `complete_dist_mat` is set; `mris_sphere` never sets
 it (its `parms` is a zero-initialised static, `mris_sphere.cpp` 57). **Not run on any default
-path**; a question only if a later program needs it (§7, Q5).
+path**; later (§7, Q5: the user, 2026-11-12).
 
 **TP-15. The C library's generators.** Not FreeSurfer's code, but their behaviour is part of the
 results: `drand48`/`srand48` (POSIX defines the 48-bit LCG and its seeding exactly) in
@@ -310,38 +316,40 @@ Under Part B as far as MGH holds the rights (§2); what each holds:
   scripts.
 - `talairach_avi/` (10 Fortran files, 2,676 lines): Washington University's (TP-09), not Part B.
 
-## 7. Questions (listed, not decided; the same in NOTES.md)
+## 7. Questions (all answered by the user, 2026-11-12)
 
-*Since relay 3:* the user decided (2026-11-12, decision log "FreeSurfer's borrowed pieces and its
-two streams") that every piece gets a replica in the package of its own licence family and an
-improved clean room in `larmorx`, MARS later, and ITK 4.13.2 where it differs from 5.4.5 (to be
-confirmed with the table). Q1 to Q4 and Q6 are now questions of placement and permission: §9 has
-the facts for each and §10 the ITK comparison; Q5 is answered (later).
+The user decided (2026-11-12; decision log "FreeSurfer's borrowed pieces and its two streams", "No
+waiting for permissions", and in "what `validated` means" the Talairach tools and Burkardt's
+routines) that every piece gets a replica in the package of its own licence family and an
+improved clean room in `larmorx`, the replicas built now with no request sent before ("Emails go
+after"); §9 has the facts and the placements. The questions as relay 3 asked them, with the
+answers:
 
 - **Q1 (TP-10).** `tkregister2_cmdl` (fMRIPrep's `bbregister`) is under the non-commercial
-  FreeSurfer/CorTechs licence, unlike every other file. Put its replica in `larmorx-freesurfer`
-  with those terms (the wheel would then carry non-commercial terms for one program), or give it a
-  clean room only (its uses in `bbregister` are a header registration and conversions between
-  `register.dat`, LTA and FSL matrices, which `lta_convert`, under FreeSurfer's licence, also
-  performs)?
+  FreeSurfer/CorTechs licence, unlike every other file: its replica in `larmorx-freesurfer`, or a
+  clean room only? *Answered:* its replica in `larmorx-nc` **as its own program** (never linked
+  with FSL's code; it builds `crates-freesurfer/` by path for that one program), and a clean room
+  in `larmorx` (§9, P-11).
 - **Q2 (TP-03).** `mri_coreg`'s dithering (on by default; fMRIPrep's `bbregister --init-coreg`)
-  draws from a GSL-derived RANLUX389 and GSL-derived distributions. Can that code enter
-  `larmorx-freesurfer`, or are these functions written from the published descriptions (Lüscher,
-  James, Knuth, Marsaglia) by an agent that has not read GSL or FreeSurfer's transcription, with
-  the exact expressions FreeSurfer evaluates given to it as a spec? (Relay 3 read GSL's files to
-  establish the finding.)
-- **Q3 (TP-04).** `mri_normalize`'s spline: port Burkardt's code under his present MIT terms, or
-  write the spline from its published description?
-- **Q4 (TP-05).** The cubic B-spline code derived from EPFL's (no licence statement): port it as
-  part of FreeSurfer's file, or write it from the published method (LARMORX already ports the same
-  recursion from ITK and SciPy)? *Answered (the user, 2026-11-12):* both, as for every piece; the
-  replica in `larmorx-freesurfer` with FreeSurfer's other files, crediting EPFL (§9, P-10).
-- **Q5 (TP-14).** MARS's distance transform runs on no default path: leave it out of the replicas
-  until a program needs it?
-- **Q6 (TP-11).** The official 8.2.0 binaries link ITK 4.13.2 (chosen by `CMakeLists.txt` for
-  Ubuntu 22 with GCC 8; GCC 11 would select 5.4rc01). Which ITK do the replicas of `Ants*Fs` and of
-  FreeSurfer's VNL calls follow: 4.13.2 (pin a `tags/ITK-v4.13.2` and diff each routine used
-  against 5.4.5), or 5.4.5 with the differences measured as findings?
+  draws from a GSL-derived RANLUX389 and GSL-derived distributions: can that code enter
+  `larmorx-freesurfer`, or are these functions written from the published descriptions? *Answered:*
+  GSL's generators go **alone** into `larmorx-gpl`; `mri_coreg`'s (and `mris_expand`'s) replica uses
+  the clean-room generator, written from the published descriptions (Lüscher, James, Knuth,
+  Marsaglia) and a spec of the exact expressions, by an agent that has read neither GSL nor
+  FreeSurfer's transcription, since GPL code and FreeSurfer's licence cannot share one program
+  (§9, P-08; relay 3 read GSL's files to establish the finding).
+- **Q3 (TP-04).** `mri_normalize`'s spline: port Burkardt's code, or write it from its published
+  description? *Answered:* both: a replica in `larmorx-freesurfer` crediting Burkardt, published
+  normally ("the second the replica and clean room"), and a clean room (§9, P-09).
+- **Q4 (TP-05).** The cubic B-spline code derived from EPFL's: *answered:* both, the replica in
+  `larmorx-freesurfer` with FreeSurfer's other files, crediting EPFL (§9, P-10).
+- **Q5 (TP-14).** MARS's distance transform runs on no default path: *answered:* later.
+- **Q6 (TP-11).** Which ITK do the replicas of `Ants*Fs` and of FreeSurfer's VNL calls follow?
+  *Answered:* ITK 4.13.2, what the official binaries link, where it differs from 5.4.5 (the user's
+  decision, with §10's comparison; the foundations pin `tags/ITK-v4.13.2`).
+- **The Talairach tools (TP-09)**, not a question then (a clean room only, the settled choice of
+  2026-10-19): *confirmed* by the user (2026-11-12): `talairach_avi` and its 4dfp tools get a
+  clean room only, no replica unless Washington University gives written permission later.
 
 ## 8. How the findings were checked, and regenerating
 
@@ -383,9 +391,12 @@ restrictive package only when they want its replicas. This section gives, per pi
 placing it: its licence, the package its replica would live in, whether that licence and
 FreeSurfer's may be combined in one program (with the words that decide it), whether a process
 boundary already separates the piece in FreeSurfer, what `larmorx-freesurfer`'s replica uses where
-the two may not be combined, and the permission still needed. Facts and options only: the user
-decides. The table with every field is [placement.toml](placement.toml). This is a reading of the
-licence texts by an engineer, not legal advice.
+the two may not be combined, and the permission still needed. The user decided every placement on
+2026-11-12 ("No waiting for permissions": every replica built now in its licence family's package,
+no request sent before; the Talairach tools a clean room only; Burkardt's routines published
+normally); the table shows the decisions, and the facts behind each stay below. The table with every
+field is [placement.toml](placement.toml) (each decided piece's `decided` and `queue`). This is a
+reading of the licence texts by an engineer, not legal advice.
 
 **FreeSurfer's side of every combination.** Part B grants rights "with respect to MGH's rights in
 the software" and requires that "in connection with any copy of or sublicense of all or any portion
@@ -407,7 +418,9 @@ General Public License ...)" (A.6).
 (`docs/licensing.md`, "Packages"); permissive code (Apache-2.0, MIT, BSD, public domain) is in every
 package's program already (the companions build the Apache crates by path). So "its own licence
 family" means: permissive pieces in `larmorx`, FreeSurfer's code in `larmorx-freesurfer`, GPL code
-in `larmorx-gpl`, non-commercial code in a non-commercial package.
+in `larmorx-gpl` (alone: no FreeSurfer program links it), CorTechs' non-commercial program in
+`larmorx-nc` as a program of its own (one wheel may hold separate programs of compatible families,
+never linked together: `docs/licensing.md`, "Packages", since 2026-11-12).
 
 | Piece (placement.toml) | Licence | Replica's package | With FreeSurfer's code in one program | In FreeSurfer | `larmorx-freesurfer` uses |
 |---|---|---|---|---|---|
@@ -418,18 +431,18 @@ in `larmorx-gpl`, non-commercial code in a non-commercial package.
 | P-05 the bundled packages (MINC, netCDF, CTN DICOM, libxml2, expat, IJG jpeg, libtiff, NrrdIO, niftilib, gifticlib, dcm2niix, Cephes) | permissive notices; public domain | `larmorx`; FreeSurfer's changes (twelve MINC files) in `larmorx-freesurfer` | yes | in-process | the replica |
 | P-06 json.h, argparse, Geometric Tools, FNV, quickselect (TP-07, TP-13) | MIT, BSD-3-Clause, BSL-1.0, public domain | `larmorx` | yes | in-process | the replica |
 | P-07 the networks' upstream code and runtime (neurite, SynthSeg, voxelmorph, surfa; TensorFlow, PyTorch, numpy, SciPy, nibabel, h5py; TP-12) | Apache-2.0, MIT, BSD-3-Clause | `larmorx` (Rust inference with the original weights) | yes | in-process (Python) | the replica |
-| **P-08 GSL 1.8's RANLUX389 and distributions (TP-03)** | **GPL-2.0-or-later** | **`larmorx-gpl`** | **no** | in-process (`mri_coreg`; no boundary) | **the clean-room piece** |
-| **P-09 Burkardt's cubic spline (TP-04)** | **2006: none stated; ~2010-2022: LGPL; since ~2024: MIT** | `larmorx` under MIT; `larmorx-gpl` under the LGPL | **depends on the terms** | in-process (`mri_normalize`) | the MIT piece if Burkardt confirms MIT for the 2006 code, else the clean-room piece |
+| **P-08 GSL 1.8's RANLUX389 and distributions (TP-03)** | **GPL-2.0-or-later** | **`larmorx-gpl`, alone (`larmorx-gpl-gsl`; the user, 2026-11-12)** | **no** | in-process (`mri_coreg`; no boundary) | **the clean-room piece** |
+| **P-09 Burkardt's cubic spline (TP-04)** | **2006: none stated; ~2010-2022: LGPL; since ~2024: MIT** | **`larmorx-freesurfer`, crediting Burkardt, published normally (the user, 2026-11-12)** | depends on the terms (the facts) | in-process (`mri_normalize`) | the replica |
 | P-10 EPFL's B-splines and Unser's NIH pyramids, in Reuter's `mriBSpline.cpp` (TP-05) | FreeSurfer's (MGH's notice); EPFL's own example code states none | `larmorx-freesurfer`, crediting EPFL (the user, 2026-11-12) | yes (FreeSurfer's file) | in-process (`mri_robust_template`) | the replica |
-| **P-11 `tkregister2_cmdl` (TP-10)** | **FreeSurfer/CorTechs, non-commercial** | **a non-commercial package** | yes, the program then non-commercial; not with GPL or FSL code | **separate program** (run by `bbregister`) | the non-commercial package's program when installed, the clean room otherwise |
-| **P-12 Washington University's 4dfp tools (TP-09)** | **all rights reserved** | **none until Washington University's written permission** | no permission | **separate programs** (run by `talairach_avi`) | **the clean-room piece** (settled 2026-10-19) |
-| P-13 MARS (TP-14) | a copyright line, no terms | none until permission | no permission | in-process; no default path | nothing now (later) |
+| **P-11 `tkregister2_cmdl` (TP-10)** | **FreeSurfer/CorTechs, non-commercial** | **`larmorx-nc`, as its own program (`larmorx-nc-tkregister2`; the user, 2026-11-12)** | yes, the program then non-commercial; not with GPL or FSL code | **separate program** (run by `bbregister`) | `larmorx-nc`'s program when installed, the clean room otherwise |
+| **P-12 Washington University's 4dfp tools (TP-09)** | **all rights reserved** | **none: a clean room only, with `talairach_avi` and `mpr2mni305` (the user, 2026-11-12)** | no permission | **separate programs** (run by `talairach_avi`) | **the clean room** |
+| P-13 MARS (TP-14) | a copyright line, no terms | later (the user, 2026-11-12) | no permission | in-process; no default path | nothing now (later) |
 | P-14 Numerical Recipes' allocators (TP-06) | NR's terms | none: nothing to port | - | in-process | Rust's allocation |
 | P-15 glibc's behaviours (drand48, rand/random, qsort, libm; TP-15) | LGPL-2.1-or-later; POSIX | `larmorx`, from definitions and specs (rule 2) | yes (dynamic linking, LGPL-2.1 §6) | dynamic | the spec-written functions |
 | P-16 libstdc++'s `std::sort`, libgomp's schedules | GPL-3.0 with the GCC Runtime Library Exception | `larmorx`, from descriptions (FSL-22's precedent) | yes (compiled code) | dynamic | the description-written versions |
 | P-17 zlib (MGZ's gzip) | Zlib | `larmorx` | yes | dynamic | the replica |
 
-The five that needed a decision or a permission, with the facts behind each (P-10 decided since):
+The five that needed a decision, with the facts behind each and the user's decisions (2026-11-12):
 
 - **P-08, GSL (TP-03).** GPL-2.0 §2(b): a work containing the Program must be "licensed as a whole
   at no charge to all third parties under the terms of this License", §6: "You may not impose any
@@ -439,18 +452,18 @@ The five that needed a decision or a permission, with the facts behind each (P-1
   material ... with contractual assumptions of liability"), §10 forbids further restrictions.
   FreeSurfer's B.5 asks every user to indemnify MGH, and Part C sets the governing law: outside
   §7's list. *So the replica cannot run inside `larmorx-freesurfer`'s `mri_coreg`*, and FreeSurfer
-  has no process boundary there (the functions are in `libutils`). What fits: the GSL piece's
-  replica in `larmorx-gpl` (GPL-3.0-or-later, as GSL 1.8's "or (at your option) any later
-  version" allows), and `larmorx-freesurfer`'s `mri_coreg` uses the clean-room RANLUX389 and
-  distributions from `larmorx`, which can be bit-exact because Lüscher's and James's papers, Knuth
-  and Marsaglia define every operation (the spec gives the exact expressions FreeSurfer evaluates;
-  its implementer reads neither GSL nor FreeSurfer's transcription, and GSL's source joins the
-  audit's restriction table, as relay 3 noted). The `larmorx-gpl` replica is then the bit-exact
-  reference that checks the clean room, as `crates-gpl/tools/` keeps glibc's translations. *Another
-  option:* `larmorx-freesurfer`'s `mri_coreg` runs a `larmorx-gpl` program that writes the random
-  stream (GPL-3.0 §5: separate works "not combined with it such as to form a larger program" are an
-  aggregate), with the FSF's caution that communication "intimate enough" can still make one
-  program.
+  has no process boundary there (the functions are in `libutils`). **Decided (the user,
+  2026-11-12, "No waiting for permissions"):** GSL's generators go alone into `larmorx-gpl`
+  (GPL-3.0-or-later, as GSL 1.8's "or (at your option) any later version" allows; the crate
+  `larmorx-gpl-gsl`, queue 3.1-53), and `larmorx-freesurfer`'s `mri_coreg` and `mris_expand` use
+  the clean-room RANLUX389 and distributions from `larmorx` (queue 3.1-05), which can be bit-exact
+  because Lüscher's and James's papers, Knuth and Marsaglia define every operation (the spec gives
+  the exact expressions FreeSurfer evaluates; its implementer reads neither GSL nor FreeSurfer's
+  transcription, and GSL's source joins the audit's restriction table, as relay 3 noted). The
+  `larmorx-gpl` replica is the bit-exact reference that checks the clean room, as
+  `crates-gpl/tools/` keeps glibc's translations. The other option relay 5 listed (a `larmorx-gpl`
+  program writing the random stream to `mri_coreg` through a pipe, with the FSF's caution that
+  communication "intimate enough" can still make one program) is not taken.
 - **P-09, Burkardt's spline (TP-04).** Measured (`burkardt_compare.py`, Wayback snapshots, SHA-256
   below): Burkardt's page and `spline.C` of 2006 (the `csit.fsu.edu` copy FreeSurfer names) carry
   no licence statement; the page of 2010 to 2022 says "The computer code and data files described
@@ -463,10 +476,13 @@ The five that needed a decision or a permission, with the facts behind each (P-1
   lets a work that uses the library be distributed "under terms of your choice, provided that the
   terms permit modification of the work for the customer's own use and reverse engineering for
   debugging such modifications", with the library kept replaceable; code copied into a
-  FreeSurfer-licensed file is not that. *Options:* ask Burkardt to confirm that his MIT terms cover
-  the 2006 routines (then the replica goes to `larmorx` and runs in `mri_normalize`'s replica);
-  port under the LGPL into `larmorx-gpl` (then `mri_normalize`'s replica cannot use it); clean room
-  only.
+  FreeSurfer-licensed file is not that. **Decided (the user, 2026-11-12: "the second the replica and
+  clean room"):** a replica in `larmorx-freesurfer` with FreeSurfer's code (the module `fs.spline`
+  of `larmorx-freesurfer-core`, queue 3.1-54), crediting Burkardt in its `PROVENANCE.md` and
+  `NOTICE`, published normally (no local-only branch), which `mri_normalize`'s replica uses; and a
+  clean room in `larmorx` (queue 3.1-06, from `specs/burkardt-spline.md`). No message to Burkardt
+  before ("Emails go after"); when the user decides on publishing, the orchestrator lists this piece
+  among those whose copied form states no licence, so the user decides knowingly.
 - **P-10, EPFL (TP-05). Decided (the user, 2026-11-12; decision log "FreeSurfer's borrowed pieces
   and its two streams", with its correction of the same day):** `utils/mriBSpline.cpp` is Martin
   Reuter's file, carries MGH's notice and is distributed by FreeSurfer under its licence, so its
@@ -496,19 +512,27 @@ The five that needed a decision or a permission, with the facts behind each (P-1
   join it (2(d)-(e) are further restrictions), nor FSL's code (the FSL Licence's conditions differ,
   and 2(f) forbids more restrictive ones). **A process boundary already exists:** `bbregister`
   runs `tkregister2_cmdl` as a program (`--regheader`, `--ltaout`, `--fslregout`), so
-  `larmorx-freesurfer`'s `bbregister` can run the non-commercial package's program when installed
-  and the clean room otherwise, as the `larmorx` program chooses implementations today. *Options
-  for the non-commercial package:* (a) a package and program of its own (for example
-  `larmorx-freesurfer-nc`) that builds `crates-freesurfer` by path; (b) a second program in the
-  `larmorx-nc` wheel linking no FSL code (one wheel with two licence families, which
-  `docs/licensing.md`'s rule would have to allow); (c) inside `larmorx-freesurfer` (that wheel
-  would then hold a non-commercial program).
+  `larmorx-freesurfer`'s `bbregister` can run `larmorx-nc`'s program when installed and the clean
+  room otherwise, as the `larmorx` program chooses implementations today. **Decided (the user,
+  2026-11-12, "No waiting for permissions"):** relay 5's option (b): the replica is a program of
+  its own in the `larmorx-nc` wheel, linking no FSL code (`crates-nc/larmorx-nc-tkregister2`, a
+  proposed name; it builds `crates-freesurfer/` by path for this one program; queue 3.5-26 and
+  3.5-27); `docs/licensing.md` ("Packages") and CLAUDE.md rule 1 allow separate programs of
+  compatible families in one wheel since. The other options (a package of its own, or inside
+  `larmorx-freesurfer`) are not taken. Its clean room is in `larmorx-fs-cortex` (C3.5-21).
 - **P-12, Washington University (TP-09).** "All Rights Reserved. This software may not be
   reproduced, copied, or distributed without written permission of Washington University."
   FreeSurfer's scripts run the 4dfp tools as programs, so the clean room (settled 2026-10-19) can
-  stand in for them at that boundary. A replica needs the university's written permission (the
-  4dfp suite is Avi Snyder's laboratory's; a licence would come through the university's technology
-  office). A quick search (2026-11-12) found no public release under open terms.
+  stand in for them at that boundary. A quick search (2026-11-12) found no public release under
+  open terms. **Decided (the user, 2026-11-12: "Can we make a clean room of the first one to avoid
+  the problems?"):** `talairach_avi` and its 4dfp tools get a clean room only (with `mpr2mni305`,
+  which carries the university's notice; `talairach_avi` itself is FreeSurfer's script, but the
+  decision names it, so the classic stream's whole Talairach registration is one clean room, queue
+  3.6-01, 3.6-14 to 3.6-17 for the four programs, 3.6-18 and 3.6-19), written from behaviour and black-box runs,
+  checked against the recorded heads, its atlases fetched at first use; no replica unless
+  Washington University gives written permission later (the 4dfp suite is Avi Snyder's
+  laboratory's; a licence would come through the university's technology office); no request is
+  sent. This replaces the 4dfp replica of "No waiting for permissions".
 
 **Not a third-party question, for the replica relays:** `SplineCubicSet` ends with `exit(1)` where
 Burkardt returns `NULL`, and `OpenSpline` never frees the coefficients it gets (memory, not

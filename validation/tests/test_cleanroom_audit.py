@@ -673,6 +673,34 @@ def test_glibc_source_dates_and_the_rules_table():
         (f"{WT}/docs/findings/fsl-newtool.md", "read", "findings-unlisted", None),
         (f"{WT}/docs/findings/fsl-prelude.md", "read", "restricted", "R11"),
         (f"{WT}/docs/findings/fsl-bet-original.md", "read", "repo", None),
+        (f"{WT}/docs/findings/fsl-bet-clean-room.md", "read", "repo", None),
+        (
+            f"{WT}/validation/investigations/freesurfer-ranlux-spec-check/model.py",
+            "read",
+            "restricted",
+            "R11",
+        ),
+        (
+            f"{WT}/validation/investigations/freesurfer-spline-spec-check/check.py",
+            "read",
+            "restricted",
+            "R11",
+        ),
+        (
+            f"{WT}/validation/investigations/freesurfer-libm-inventory/a.py",
+            "read",
+            "restricted",
+            "R11",
+        ),
+        (
+            f"{WT}/validation/investigations/glibc-random-spec-check/model.py",
+            "read",
+            "restricted",
+            "R11",
+        ),
+        (f"{WT}/validation/investigations/freesurfer-ranlux-probe/README.md", "read", "repo", None),
+        (f"{WT}/validation/investigations/glibc-random-probe/README.md", "read", "repo", None),
+        (f"{WT}/docs/findings/afni-volreg-clean-room.md", "read", "repo", None),
         (f"{SCRATCH}/x/larmorx_documentation/content/a.md", "read", "repo-site", None),
         (f"{SCRATCH}/x/clone/crates-nc/fsl-source/a.cc", "read", "restricted", "R01"),
         (f"{HOME}/.claude/projects/-home-u-ws/s1/tool-results/b1.txt", "read", "tool-output", None),
@@ -735,6 +763,76 @@ def test_glibc_source_dates_and_the_rules_table():
             "restricted",
             "R11",
         ),
+        (
+            f"{WT}/validation/src/larmorx_validation/freesurfer/replay.py",
+            "read",
+            "restricted",
+            "R11",
+        ),
+        (f"{WT}/validation/src/larmorx_validation/freesurfer_unit.py", "read", "restricted", "R11"),
+        (
+            f"{WT}/validation/investigations/freesurfer-unit-oracle/build.sh",
+            "read",
+            "restricted",
+            "R11",
+        ),
+        (f"{WS}/oracles/freesurfer-8.2.0-unit/src/utils/mri.cpp", "read", "restricted", "R03"),
+        (f"{WS}/oracles/freesurfer-8.2.0-unit/bin/fsunit", "exec", "run", None),
+        # FreeSurfer's preparation, the restricted paths (2026-11-12, relay 9)
+        (
+            f"{WS}/oracles/freesurfer-8.2.0/runs/a-v8/record/blobs/7d/"
+            "7d560ebd1430a9050bec9c3f71ed4e350f472304f418bb07aa7435fccc1a9ef7",
+            "read",
+            "restricted",
+            "R03",
+        ),
+        (
+            f"{WS}/oracles/freesurfer-8.2.0/runs/a-classic/record/blobs/69/"
+            "6930b94343b8c1767ce6fdfa301cdb4fe381ee885ce4b20a99097e2184ca0ba6",
+            "list",
+            "restricted-names",
+            "R03",
+        ),
+        (
+            f"{WS}/oracles/freesurfer-8.2.0/runs/a-v8/record/blobs/00/"
+            "002d0ee74c1a7f151c6a766d0e101f035357cae587bf56439be7fdacf89c4ac9",
+            "read",
+            "oracle",
+            None,
+        ),
+        (
+            f"{WS}/oracles/freesurfer-8.2.0/failed/a-v8-x/subjects/s/scripts/recon-config.yaml",
+            "read",
+            "restricted",
+            "R03",
+        ),
+        (
+            f"{WS}/oracles/inputs/freesurfer-replay/work/a-v8/0019-x-recorded/subjects/s/scripts/recon-config.yaml",
+            "read",
+            "restricted",
+            "R03",
+        ),
+        (
+            f"{WS}/oracles/inputs/freesurfer-replay/work/a-v8/0019-x-recorded/subjects/s/mri/wm.mgz",
+            "read",
+            "oracle",
+            None,
+        ),
+        (
+            f"{SCRATCH}/t/replay/subjects/s/scripts/recon-all.local-copy",
+            "read",
+            "restricted",
+            "R03",
+        ),
+        (f"{WT}/crates-gpl/larmorx-gpl-gsl/src/ranlux.rs", "read", "restricted", "R10"),
+        (f"{WT}/crates-nc/larmorx-nc-tkregister2/src/main.rs", "read", "restricted", "R10"),
+        (
+            f"{WT}/validation/investigations/freesurfer-oracle/README.md",
+            "read",
+            "restricted",
+            "R11",
+        ),
+        (f"{WT}/docs/validation/freesurfer-replay.md", "read", "repo", None),
     ],
 )
 def test_classification(path, op, category, rule):
@@ -753,3 +851,25 @@ def test_shown_locations_carry_no_account_name():
     ):
         shown = rs.locate(p, CTX).show()
         assert not shown.startswith("/") and "/home" not in shown, shown
+
+
+@pytest.mark.parametrize(
+    ("path", "family"),
+    [
+        (f"{WT}/crates-gpl/larmorx-gpl-gsl/src/ranlux.rs", "FreeSurfer"),
+        (f"{SCRATCH}/t/clone/crates-gpl/larmorx-gpl-gsl/Cargo.toml", "FreeSurfer"),
+        (f"{WT}/crates-gpl/larmorx-gpl-tedana/src/decay.rs", "tedana"),
+        (f"{WT}/crates-gpl/larmorx-gpl-cli/src/main.rs", "AFNI/tedana"),
+        (f"{WT}/crates-nc/larmorx-nc-tkregister2/src/main.rs", "FreeSurfer"),
+        (f"{WT}/crates-nc/larmorx-nc-bet/src/lib.rs", "FSL"),
+        (f"{WT}/crates-nc/target/release/larmorx-nc", "FSL/FreeSurfer"),
+        (
+            f"{WS}/oracles/inputs/freesurfer-replay/work/a/0001-x/subjects/s/scripts/recon-config.yaml",
+            "FreeSurfer",
+        ),
+    ],
+)
+def test_freesurfer_pieces_in_other_companions_are_freesurfer_family(path, family):
+    """FreeSurfer's preparation (2026-11-12): GSL's and tkregister2_cmdl's replicas, and recon-all's copies."""
+    cls = rs.classify(rs.locate(path, CTX), "read")
+    assert cls.family == family

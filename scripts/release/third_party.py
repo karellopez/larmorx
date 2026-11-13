@@ -1,12 +1,13 @@
 # SPDX-License-Identifier: Apache-2.0
 """The third-party Rust crates of each package and their licence texts: ``third-party-rust.txt``.
 
-Each of the three packages ships programs built from crates of crates.io (larmorx: the extension
-``larmorx._core`` and the standalone ``larmorx``/``lx``; larmorx-nc and larmorx-gpl: their
-program). Their licences (MIT's and Apache-2.0's notices, bzip2-1.0.6's "Redistributions in
-binary form must reproduce the above copyright notice", ...) ask for their texts to go with the
-binaries, so each package carries ``LICENSES/third-party-rust.txt`` (larmorx: ``LICENSES/``,
-the companions: ``crates-nc/LICENSES/``, ``crates-gpl/LICENSES/``; listed in the packages'
+Each of the packages ships programs built from crates of crates.io (larmorx: the extension
+``larmorx._core`` and the standalone ``larmorx``/``lx``; larmorx-nc, larmorx-gpl and
+larmorx-freesurfer: their program). Their licences (MIT's and Apache-2.0's notices,
+bzip2-1.0.6's "Redistributions in binary form must reproduce the above copyright notice", ...)
+ask for their texts to go with the binaries, so each package carries
+``LICENSES/third-party-rust.txt`` (larmorx: ``LICENSES/``, the companions: ``crates-nc/LICENSES/``,
+``crates-gpl/LICENSES/``, ``crates-freesurfer/LICENSES/``; listed in the packages'
 ``license-files``, so the wheels and the sdists hold it). The file lists
 
 1. the crates compiled into the programs: the normal-dependency closure of each program crate
@@ -27,7 +28,7 @@ exactly the registry crates of that graph; ``--check`` regenerates the files and
 
 Usage:
     python -P scripts/release/third_party.py            # a summary per package
-    python -P scripts/release/third_party.py --write    # write the three files
+    python -P scripts/release/third_party.py --write    # write the files
     python -P scripts/release/third_party.py --check    # exit 1 if a file is not up to date
 
 Needs ``cargo`` and the crates' sources in Cargo's registry cache (``--locked --offline``: as
@@ -95,6 +96,11 @@ PACKAGES = (
     ),
     Package("larmorx-nc", ROOT / "crates-nc", (("larmorx-nc-cli", "the program larmorx-nc"),)),
     Package("larmorx-gpl", ROOT / "crates-gpl", (("larmorx-gpl-cli", "the program larmorx-gpl"),)),
+    Package(
+        "larmorx-freesurfer",
+        ROOT / "crates-freesurfer",
+        (("larmorx-freesurfer-cli", "the program larmorx-freesurfer"),),
+    ),
 )
 
 #: Section 3's reasons.

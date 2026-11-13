@@ -91,7 +91,13 @@ RNG = re.compile(
 #   clean-room-only        no permission to copy: a clean-room original only
 #   published-description  to be written from a published description (paper, book, standard)
 #   nothing-to-port        no behaviour of its own (memory helpers, platform code)
-#   question               the rules do not settle it: NOTES.md asks the orchestrator
+#   gpl-alone              GPL code: its replica alone in larmorx-gpl, FreeSurfer's replicas use its
+#                          clean room (the user, 2026-11-12: GSL's generators)
+#   noncommercial-program  non-commercial terms: its replica in larmorx-nc as a program of its own
+#                          (the user, 2026-11-12: CorTechs' tkregister2_cmdl)
+#   later                  on no default path, ported later (the user, 2026-11-12: MARS)
+#   question               the rules do not settle it: NOTES.md asks the orchestrator (none left
+#                          since relay 8: the user decided TP-03, TP-04, TP-10 and TP-14 on 2026-11-12)
 FREESURFER = ("FreeSurfer's licence (LICENSE.txt Part B)", "portable")
 WASHU = (
     "Washington University: all rights reserved, no copying or distribution without written "
@@ -130,7 +136,7 @@ FAMILY_BY_PACKAGE = {
 FAMILY_BY_FILE = {
     "tkregister2/tkregister2.cpp": (
         "FreeSurfer/CorTechs Software License (non-commercial)",
-        "question",
+        "noncommercial-program",
     ),
     "include/utilsmath.h": ("Geometric Tools, Boost Software License 1.0", "portable-with-notice"),
     "include/json.h": ("nlohmann/json, MIT", "portable-with-notice"),
@@ -150,9 +156,9 @@ FAMILY_BY_FILE = {
     "utils/fs_lbfgs.cpp": ("FreeSurfer's wrapper of VNL's netlib L-BFGS", "portable-with-notice"),
     "utils/MARS_DT_Boundary.cpp": (
         "MIT CSAIL's MARS project: a copyright line, no terms",
-        "question",
+        "later",
     ),
-    "utils/min_heap.cpp": ("MIT CSAIL's MARS project: a copyright line, no terms", "question"),
+    "utils/min_heap.cpp": ("MIT CSAIL's MARS project: a copyright line, no terms", "later"),
     "AntsDenoiseImageFs/itkAdaptiveNonLocalMeansDenoisingImageFilter.hxx": (
         "Apache-2.0 (ITK)",
         "portable-with-notice",
@@ -230,7 +236,7 @@ FINDINGS = [
         ],
         "origin": "a statement-by-statement transcription, renamed, of GSL 1.8's rng/ranlux.c and randist/{gamma,gauss,tdist,fdist,chisq,exponential,flat}.c (James Theiler, Brian Gough); the algorithms are Luescher's RANLUX with F. James's seeding and Knuth's and Marsaglia's methods",
         "terms": "GSL is GPL-2.0-or-later (1.8; GPL-3.0-or-later since 1.12); the file carries FreeSurfer's notice only",
-        "porting": "question",
+        "porting": "gpl-alone",
         "runs": "mri_coreg by default (coordinate and intensity dithering on, seed 53: bbregister --init-coreg in fMRIPrep); mris_expand only with a random thickness map (-tmap_std)",
     },
     {
@@ -245,7 +251,7 @@ FINDINGS = [
         ],
         "origin": "John Burkardt's C++ spline library (Florida State University, the csit.fsu.edu address of about 2006); the function comments are his",
         "terms": "his page says MIT today (checked 2026-11-12); the terms of the copy FreeSurfer took are not recorded",
-        "porting": "question",
+        "porting": "portable-with-notice",
         "runs": "mri_normalize on every default path (MRInormalize calls MRIsplineNormalize unconditionally, utils/mrinorm.cpp 749)",
     },
     {
@@ -308,7 +314,7 @@ FINDINGS = [
         "where": ["tkregister2/tkregister2.cpp"],
         "origin": "Martin Sereno and Anders Dale, 1996; Doug Greve, 2002; CorTechs Labs and MGH",
         "terms": "non-commercial internal research and education by not-for-profit entities, no commercially sponsored research, modifications' source to be made available (distribution/docs/license.cortechs.txt, paragraphs 2(d)-(f))",
-        "porting": "question",
+        "porting": "noncommercial-program",
         "runs": "fMRIPrep's bbregister: the header registration (--regheader) and the conversions --ltaout, --fslregout",
     },
     {
@@ -362,7 +368,7 @@ FINDINGS = [
         "where": ["utils/MARS_DT_Boundary.cpp", "utils/min_heap.cpp"],
         "origin": "the MARS project (Thomas Yeo, Mert Sabuncu), MIT CSAIL, 2006-2008",
         "terms": "a copyright line, no licence terms",
-        "porting": "question",
+        "porting": "later",
         "runs": "no default path at run time: only MRIScomputeAllDistances (MRISunfold with complete_dist_mat, which mris_sphere never sets) reaches it",
     },
     {
@@ -399,6 +405,9 @@ FINDINGS = [
 
 PORTING_ORDER = [
     "question",
+    "gpl-alone",
+    "noncommercial-program",
+    "later",
     "clean-room-only",
     "published-description",
     "portable-with-notice",

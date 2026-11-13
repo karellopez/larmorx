@@ -55,7 +55,9 @@ jobs:
   # larmorx-gpl: tedana's t2smap since 2026-11-08): the program's two crates, with its golden
   # tests (larmorx-gpl-cli/tests/golden.rs) and the check of the notices it carries; its
   # verification tools (tools/, glibc's translations) are run by hand on Linux and not built
-  # here. Tests that need an oracle skip where it is absent.
+  # here. crates-freesurfer/ (FreeSurfer's licence, larmorx-freesurfer, since 2026-11-12): the
+  # whole workspace (measured cold on 4 threads: clippy 7 s, test 11 s). Tests that need an
+  # oracle skip where it is absent.
   gpl:
     name: gpl (${{ matrix.platform }})
     runs-on: ${{ matrix.runner }}
@@ -83,6 +85,7 @@ jobs:
           workspaces: |
             crates-nc
             crates-gpl
+            crates-freesurfer
       - name: rustfmt (crates-nc)
         run: cargo fmt --all --check
       - name: clippy (crates-nc)
@@ -106,6 +109,21 @@ jobs:
         working-directory: crates-gpl
         run: |
           cargo test -p larmorx-gpl-tedana -p larmorx-gpl-cli --locked 2>&1 | tee cargo-test.log || {
+            "$(command -v python || command -v python3)" ../scripts/ci_cargo_failures.py cargo-test.log
+            exit 1
+          }
+        env:
+          LARMORX_GOLDEN_MISMATCHES: ${{ github.workspace }}/golden-mismatches
+      - name: rustfmt (crates-freesurfer)
+        working-directory: crates-freesurfer
+        run: cargo fmt --all --check
+      - name: clippy (crates-freesurfer)
+        working-directory: crates-freesurfer
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: cargo test (crates-freesurfer)
+        working-directory: crates-freesurfer
+        run: |
+          cargo test --workspace --locked 2>&1 | tee cargo-test.log || {
             "$(command -v python || command -v python3)" ../scripts/ci_cargo_failures.py cargo-test.log
             exit 1
           }

@@ -1,0 +1,24 @@
+[package]
+name = "larmorx-freesurfer-cli"
+description = "The larmorx-freesurfer command line: bit-exact replicas of FreeSurfer 8.2.0's programs with the original programs' arguments (FreeSurfer's licence)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+autobins = false
+
+[[bin]]
+name = "larmorx-freesurfer"
+path = "src/main.rs"
+
+[dependencies]
+larmorx-core.workspace = true
+larmorx-freesurfer-core.workspace = true
+larmorx-freesurfer-volumes.workspace = true
+larmorx-freesurfer-atlas.workspace = true
+larmorx-freesurfer-topology.workspace = true
+larmorx-freesurfer-cortex.workspace = true
+larmorx-freesurfer-classic.workspace = true
+larmorx-freesurfer-networks.workspace = true
+larmorx-freesurfer-recon.workspace = true

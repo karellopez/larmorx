@@ -60,4 +60,4 @@ No option comparisons found in its own files (read its parser).
 
 ## Checks
 
-- replay: 22 recorded steps in 11 runs
+- replay: 24 recorded steps in 12 runs

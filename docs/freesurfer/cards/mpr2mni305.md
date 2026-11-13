@@ -8,14 +8,14 @@
 | Source | `talairach_avi/mpr2mni305` |
 | Streams | classic (classic-only) |
 | Wave | 3.6 |
-| Replica's crate | `larmorx-freesurfer-classic` |
+| Replica's crate | none: a clean room only (P-12, the user) |
 | Clean room's crate | `larmorx-fs-classic` |
 | Queue items | 3.6-19 |
 | Called by | talairach_avi |
 | Runs | `analyzeto4dfp`, `compute_vox2vox`, `gauss_4dfp`, `imgreg_4dfp` |
 | How it runs in the reference runs | bare |
 | Stages (programs.md §3) | 11 |
-| Why this wave | talairach_avi's |
+| Why this wave | talairach_avi's; Washington University's notice: a clean room only (P-12) |
 
 ## The calls recon-all and fMRIPrep make
 

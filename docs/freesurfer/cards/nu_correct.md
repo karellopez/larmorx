@@ -44,7 +44,7 @@ No option comparisons found in its own files (read its parser).
 
 ## Checks
 
-- through mri_nu_correct.mni's recorded steps (17)
+- through mri_nu_correct.mni's recorded steps (18)
 
 ## Notes
 

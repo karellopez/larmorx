@@ -60,7 +60,7 @@ No option comparisons found in its own files (read its parser).
 
 ## Checks
 
-- replay: 10 recorded steps in 10 runs
+- replay: 12 recorded steps in 12 runs
 
 ## Notes
 

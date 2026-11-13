@@ -61,6 +61,10 @@ Every option its parser compares, as written in its own source (older parsers co
 
 - ComputeBrainVolumeStats2 sums VoxelVol in parallel: exact for 1 mm voxels, thread-count dependent for non-integer voxel volumes
 
+## Findings for the defect register (rules A to D when ported)
+
+- ComputeBrainVolumeStats2's parallel VoxelVol sums for non-integer voxel volumes (larmorx: one fixed order; relay 5)
+
 ## Checks
 
-- replay: 10 recorded steps in 10 runs
+- replay: 12 recorded steps in 12 runs

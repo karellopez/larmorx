@@ -1,0 +1,11 @@
+[package]
+name = "larmorx-freesurfer-deform"
+description = "FreeSurfer 8.2.0's replica for larmorx: surface deformation: the time steps, the integration, the gradients and the SSE terms (FreeSurfer's licence)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+larmorx-freesurfer-surf.workspace = true

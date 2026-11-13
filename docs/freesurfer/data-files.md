@@ -366,12 +366,19 @@ foundations' part.
 - D1. FreeSurfer's annex remote as the fetch address: it serves the objects publicly and their
   checksums are in the keys, but FreeSurfer documents it for developers, and its rate limit is
   strict. Use it (slowly, verified), or ask FreeSurfer, or fetch from the package (9 GB) only?
+  *Decided* (the orchestrator, 2026-11-12): yes, the annex remote is the first-use fetch address
+  (the owner's official source; SHA-256 from the annex keys), used slowly (backing off on 429), a
+  local FreeSurfer installation (`FREESURFER_HOME`) as the alternative.
 - D2. The MNI-derived templates (`mni305.cor*.mgz`, the ICBM 2009c registration targets): treat
   them as MNI's (rule 1: the main package or fetched) or as FreeSurfer's derivation (rule 2)?
-  They are small (12,374,295 bytes for the four).
+  They are small (12,374,295 bytes for the four). *Decided* (the orchestrator, 2026-11-12): rule 2,
+  FreeSurfer's derivation (the cautious reading): in `larmorx-freesurfer` or fetched, never the main
+  package.
 - D3. The newest 8.2.0 update archive (22 MB): download it to list what it replaces (the rule
   "newest upstream versions" may make the updated files the reference), or keep the package as
   released for the reference runs? *Decided* (the orchestrator, 2026-11-12): download it and record
   what it replaces, the reference runs stay unpatched; done by relay 5 (variation.md §4).
 - D4. The size limit for shipping small FreeSurfer files in `larmorx-freesurfer`: the TOML uses
   2,000,000 bytes; the folding atlases are 2.86 MB each, the `fsaverage` labels 9.4 MB together.
+  *Decided* (the orchestrator, 2026-11-12): files up to 2 MB may ship in `larmorx-freesurfer`;
+  larger ones are fetched.

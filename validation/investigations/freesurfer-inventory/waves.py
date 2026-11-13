@@ -42,23 +42,27 @@ from pathlib import Path
 # --------------------------------------------------------------------------------------------
 # Modules: (id, crate, kind, title, patterns). kind: "replica" (crates-freesurfer/, FreeSurfer's
 # licence), "permissive" (a permissive third-party piece: its replica in the main package,
-# placement.toml), "clean-room-only" (no replica: placement.toml), "program" (a program's own
-# files). Patterns are matched against the path under the tag; the first match wins.
+# placement.toml), "gpl" (a GPL piece: its replica alone in larmorx-gpl, crates-gpl/; FreeSurfer's
+# replicas use its clean room), "clean-room-only" (no replica: placement.toml), "program" (a
+# program's own files). Patterns are matched against the path under the tag; the first match
+# wins. FUNCTION_MODULES puts single functions of a file in another module (checked first).
 
 MODULES: list[tuple[str, str, str, str, list[str]]] = [
     (
         "perm.gifti",
         "larmorx-io",
         "permissive",
-        "GIFTI: gifticlib and expat (P-05); the writer's long-double line formatting",
+        "GIFTI: gifticlib, read over a pure-Rust XML parser in expat 2.0.1's place (W3); the"
+        " writer exact, with its long-double line formatting (P-05)",
         [r"^packages/gifti/", r"^packages/expat/"],
     ),
     (
         "perm.minc",
         "larmorx-io",
         "permissive",
-        "MINC's volume_io: the .xfm reader and writer (P-05; FreeSurfer's changes to the MINC files"
-        " in larmorx-freesurfer-io)",
+        "MINC's volume_io: the .xfm reader (W3: a pure-Rust parser, the same values and"
+        " messages) and writer (exact) (P-05; FreeSurfer's changes to the MINC files in"
+        " larmorx-freesurfer-io)",
         [r"^packages/minc/", r"^packages/netcdf/"],
     ),
     (
@@ -72,7 +76,8 @@ MODULES: list[tuple[str, str, str, str, list[str]]] = [
         "perm.dicom",
         "larmorx-io",
         "permissive",
-        "CTN's DICOM library (P-05): the format probe of every volume reader; DICOM input later",
+        "CTN's DICOM library (P-05): the format probe of every volume reader (W3: a pure-Rust"
+        " probe, no port of CTN); DICOM input later",
         [r"^packages/dicom/"],
     ),
     (
@@ -94,7 +99,8 @@ MODULES: list[tuple[str, str, str, str, list[str]]] = [
         "perm.json",
         "larmorx-core",
         "permissive",
-        "nlohmann/json (P-06): its number formatting decides JSON outputs' bytes",
+        "nlohmann/json 3.2.0 (P-06): a pure-Rust parser in its parser's place (W3); its writer"
+        " exact (its number formatting decides JSON outputs' bytes)",
         [r"^include/json\.h$"],
     ),
     (
@@ -187,7 +193,7 @@ MODULES: list[tuple[str, str, str, str, list[str]]] = [
         "fs.filter",
         "larmorx-freesurfer-filter",
         "replica",
-        "volume filters and morphology, intensity normalisation (with Burkardt's spline, P-09),"
+        "volume filters and morphology, intensity normalisation (its cubic spline: fs.spline),"
         " segmentation helpers, flood fill, connected components, fast marching, clusters",
         [
             r"^utils/(mrifilter|mrinorm|mrisegment|mriflood|connectcomp|mripolv|filter|"
@@ -244,7 +250,7 @@ MODULES: list[tuple[str, str, str, str, list[str]]] = [
         "fs.mars",
         "larmorx-freesurfer-surf",
         "replica",
-        "MIT CSAIL's MARS distance transform (P-13: on no default path; later, with permission)",
+        "MIT CSAIL's MARS distance transform (P-13: on no default path; later, the user)",
         [r"^utils/(MARS_DT_Boundary|min_heap)\.cpp$"],
     ),
     (
@@ -277,11 +283,37 @@ MODULES: list[tuple[str, str, str, str, list[str]]] = [
         "cr.4dfp",
         "larmorx-fs-classic",
         "clean-room-only",
-        "Washington University's 4dfp tools (P-12): a clean room only, at the process boundary"
-        " talairach_avi already has",
+        "Washington University's 4dfp tools (P-12): a clean room only (the user, 2026-11-12), at"
+        " the process boundary talairach_avi already has",
         [r"^talairach_avi/(?!talairach_avi$)[^/]+\.(c|f)$"],
     ),
+    (
+        "gpl.gsl",
+        "larmorx-gpl-gsl",
+        "gpl",
+        "GSL 1.8's RANLUX389 and distributions as numerics.cpp transcribes them (P-08): the"
+        " replica alone in larmorx-gpl (crates-gpl/, GPL-3.0-or-later), the clean room's"
+        " bit-exact reference; FreeSurfer's replicas (mri_coreg, mris_expand) use the clean room",
+        [],
+    ),
+    (
+        "fs.spline",
+        "larmorx-freesurfer-core",
+        "replica",
+        "John Burkardt's 2006 cubic spline in numerics.cpp (SplineCubicSet, SplineCubicValue,"
+        " d3_np_fs; P-09): the replica crediting Burkardt, published normally (the user,"
+        " 2026-11-12)",
+        [],
+    ),
 ]
+
+# Single functions of a file that belong to another module than the file's ("file:line:name").
+FUNCTION_MODULES: list[tuple[str, str]] = [
+    (r"^utils/numerics\.cpp:\d+:sc_\w+$", "gpl.gsl"),
+    (r"^utils/numerics\.cpp:\d+:(SplineCubicSet|SplineCubicValue|d3_np_fs)$", "fs.spline"),
+]
+# Modules whose functions always go to the module's own item (never to a program's).
+OWN_ITEM = {"gpl.gsl", "fs.spline"}
 
 # --------------------------------------------------------------------------------------------
 # Program placement: wave, crate of the replica, and why (when it differs from the plan or from
@@ -335,7 +367,11 @@ PLACE: dict[str, tuple[str, str]] = {
         "with EPFL's B-splines (fs.bspline) as an item of their own, the user's request",
     ),
     "mri_robust_register": ("3.2", ""),
-    "mri_coreg": ("3.2", "uses the clean-room RANLUX389 and distributions (P-08)"),
+    "mri_coreg": (
+        "3.2",
+        "uses the clean-room RANLUX389 and distributions ([[extra:ranlux]], P-08): GSL's replica"
+        " stays alone in larmorx-gpl",
+    ),
     "AntsN4BiasFieldCorrectionFs": (
         "3.2",
         "8.2.0's default intensity correction (not in the plan's waves; relay 1)",
@@ -354,7 +390,7 @@ PLACE: dict[str, tuple[str, str]] = {
     ),
     "mri_make_uchar": ("3.2", "mri_nu_correct.mni's last step"),
     "mri_nu_correct.mni": ("3.2", "a script: N4 by default (not MNI's N3)"),
-    "mri_normalize": ("3.2", "uses Burkardt's spline (P-09: the clean-room piece meanwhile)"),
+    "mri_normalize": ("3.2", "uses Burkardt's spline, its replica [[mod:fs.spline:1]] (P-09)"),
     "mri_mask": ("3.2", ""),
     "mri_cc": ("3.2", ""),
     "seg2cc": ("3.2", "the script that runs mri_cc"),
@@ -417,24 +453,32 @@ PLACE: dict[str, tuple[str, str]] = {
     "pctsurfcon": ("3.5", ""),
     "mri_vol2surf": ("3.5", ""),
     "mris_convert": ("3.5", ""),
-    "mris_expand": ("3.5", ""),
+    "mris_expand": ("3.5", "-tmap_std's random map uses the clean-room RANLUX ([[extra:ranlux]])"),
     "mri_surf2surf": ("3.5", "bbregister's RMS check"),
     "bbregister": ("3.5", ""),
     "mri_segreg": ("3.5", "bbregister's optimiser (not in the plan's waves)"),
     "tkregister2_cmdl": (
         "3.5",
-        "CorTechs' terms (P-11): the clean room here; the replica in a non-commercial package"
-        " (the user's P1)",
+        "CorTechs' terms (P-11): the replica in larmorx-nc as its own program, the clean room"
+        " here (the user, 2026-11-12)",
     ),
     # 3.6 the classic-only programs
     "mri_watershed": ("3.6", "classic only (the plan: 3.2)"),
-    "talairach_avi": ("3.6", "classic only; its 4dfp tools a clean room only (the plan: 3.2)"),
-    "mpr2mni305": ("3.6", "talairach_avi's"),
+    "talairach_avi": (
+        "3.6",
+        "classic only; a clean room only, with mpr2mni305 and the 4dfp tools (the user,"
+        " 2026-11-12: Washington University's Talairach tools; the script itself carries MGH's"
+        " notice; the plan: 3.2)",
+    ),
+    "mpr2mni305": (
+        "3.6",
+        "talairach_avi's; Washington University's notice: a clean room only (P-12)",
+    ),
     "avi2talxfm": ("3.6", "talairach_avi's"),
-    "analyzeto4dfp": ("3.6", "Washington University's: a clean room only (P-12)"),
-    "gauss_4dfp": ("3.6", "Washington University's: a clean room only (P-12)"),
-    "imgreg_4dfp": ("3.6", "Washington University's: a clean room only (P-12)"),
-    "compute_vox2vox": ("3.6", "Washington University's: a clean room only (P-12)"),
+    "analyzeto4dfp": ("3.6", "Washington University's: a clean room only (P-12, the user)"),
+    "gauss_4dfp": ("3.6", "Washington University's: a clean room only (P-12, the user)"),
+    "imgreg_4dfp": ("3.6", "Washington University's: a clean room only (P-12, the user)"),
+    "compute_vox2vox": ("3.6", "Washington University's: a clean room only (P-12, the user)"),
     "mri_matrix_multiply": ("3.6", "avi2talxfm's"),
     "fs_temp_dir": ("3.6", "avi2talxfm's"),
     "extract_talairach_avi_QA.awk": ("3.6", "the Talairach check's"),
@@ -497,6 +541,8 @@ MODULE_WAVE = {
     "fs.defect": "3.4",
     "fs.robust": "3.2",
     "cr.4dfp": "3.6",
+    "gpl.gsl": "3.1",
+    "fs.spline": "3.1",
 }
 # the order of work; N runs beside 3.2-3.5 (its network programs need only 3.1, its scripts 3.3)
 QUEUE_WAVES = ("3.1", "3.2", "3.3", "3.4", "3.5", "3.6", "N", "3.7")
@@ -507,33 +553,38 @@ RANK = {"3.1": 1, "3.2": 2, "3.3": 3, "N": 3.5, "3.4": 4, "3.5": 5, "3.6": 6, "3
 # module items.
 EXTRA: list[dict] = [
     {
+        "key": "extra:workspace",
         "wave": "3.1",
         "kind": "plumbing",
         "crate": "crates-freesurfer/",
         "what": "the workspace crates-freesurfer/ (the crates of this layout, empty), the program"
         " and wheel larmorx-freesurfer (larmorx-freesurfer-cli: FreeSurfer's licence text and"
         " preface, NOTICE, PROVENANCE.md, the settings overlay of larmorx's three options), its"
-        " CI check and test steps (minutes estimated first), lx.freesurfer's dispatch between"
-        " replica and clean room; the clean-room crates crates/larmorx-fs-* (empty), each added"
-        " to the clean-room audit's lists by the orchestrator",
+        " CI check and test steps (minutes estimated first); the replica side only (split by the"
+        " coherence review's finding 7): the main package's side is [[extra:main-plumbing]], the"
+        " clean-room crates [[clean:extra:crates]]",
         "lines": 0,
         "inputs": "this layout; crates-nc/ and crates-gpl/ as models",
         "checks": "the three Rust workspaces' gates, check_spdx.py, test_release.py",
     },
     {
+        "key": "extra:unit-oracle",
         "wave": "3.1",
         "kind": "oracle",
-        "crate": "validation/investigations/freesurfer-oracle/",
+        "crate": "validation/investigations/freesurfer-unit-oracle/",
         "what": "a unit oracle: FreeSurfer 8.2.0's libutils and the packages it links, built from"
-        " the tag with GCC 8.4.0 (oracles/toolchains/gcc-8.4) and the official flags (code.toml)"
-        " against ITK 4.13.2's VNL, with a harness that calls single functions (the foundations'"
-        " checks below; a proposal: the replay checks whole programs only)",
+        " the tag with GCC 8.4.0 and the official flags (code.toml) against ITK 4.13.2's VNL,"
+        " with a harness that calls single functions (the foundations' checks below; W4: a"
+        " queue item); done 2026-11-12 with Ubuntu's own gcc-8 8.4.0"
+        " (oracles/toolchains/gcc-8.4-ubuntu), the build in oracles/freesurfer-8.2.0-unit/,"
+        " larmorx_validation.freesurfer_unit",
         "lines": 0,
         "inputs": "code.md section 1 (the build as the official one ran), relay 5's gcc84/",
         "checks": "three programs built from it give the official binaries' outputs on recorded"
         " steps (mri_add_xform_to_header, mri_normalize, mris_smooth)",
     },
     {
+        "key": "extra:x87",
         "wave": "3.1",
         "kind": "permissive",
         "crate": "larmorx-core",
@@ -549,45 +600,54 @@ EXTRA: list[dict] = [
         " x87 (a C probe compiled by GCC 8.4.0); golden cases on the six platforms",
     },
     {
+        "key": "extra:random",
         "wave": "3.1",
-        "kind": "permissive",
+        "kind": "permissive; spec + clean room (glibc's part)",
         "crate": "larmorx-core",
         "what": "random numbers: VXL's vnl_random (Marsaglia-Zaman, drand64's measured left-to-right"
-        " order, TP-01), POSIX drand48/srand48/erand48 (TP-15); glibc 2.35's rand, srand, random"
-        " and srandom from a behaviour spec only (a spec writer, then a clean-room implementer:"
-        " the GNU family's precedent, specs/glibc-dbl.md); FreeSurfer's setRandomSeed and"
-        " randomNumber come with fs.core",
+        " order, TP-01) and POSIX drand48/srand48/erand48 (TP-15), ported from their own sources;"
+        " glibc 2.35's rand, srand, random and srandom from a behaviour spec only"
+        " (specs/glibc-random.md by a spec writer, then a clean-room implementer: the GNU family's"
+        " precedent, specs/glibc-dbl.md; not the permissive track's part); FreeSurfer's"
+        " setRandomSeed and randomNumber come with fs.core",
         "lines": 0,
         "inputs": "ITK 4.13.2's vnl_random.cxx (third-party.md section 8), POSIX",
         "checks": "sequences against the unit oracle and the machine's glibc; mri_normalize's,"
         " mris_smooth's and mris_ca_label's -seed 1234 replays",
     },
     {
+        "key": "extra:ranlux",
         "wave": "3.1",
         "kind": "spec + clean room",
         "crate": "larmorx-core (clean-room files, GSL family)",
         "what": "RANLUX389 and GSL 1.8's distributions (P-08, TP-03): specs/ranlux.md by a spec"
         " writer (from Lüscher 1994, James 1994, Knuth, Marsaglia, with the exact expressions"
         " FreeSurfer evaluates), then the clean room by an implementer who has read neither GSL"
-        " nor numerics.cpp (GSL's source joins the audit's restriction table); mri_coreg's"
-        " replica uses it; the GSL replica as its bit-exact reference in larmorx-gpl (the"
-        " user's P5)",
+        " nor numerics.cpp (GSL's source joins the audit's restriction table); mri_coreg's and"
+        " mris_expand's replicas use it (GPL code never joins a FreeSurfer program: the user,"
+        " 'No waiting for permissions'); GSL's replica [[mod:gpl.gsl:1]], alone in larmorx-gpl,"
+        " is its bit-exact reference",
         "lines": 375,
         "inputs": "the placement table P-08; numerics.cpp 1856-2230 (the spec writer only)",
         "checks": "streams against the unit oracle's sc_rng_* for many seeds; mri_coreg's default"
         " dithering (seed 53) through its replay",
     },
     {
+        "key": "extra:spline-clean",
         "wave": "3.1",
         "kind": "spec + clean room",
         "crate": "larmorx-core (clean-room files)",
-        "what": "the cubic spline mri_normalize uses (P-09, TP-04: Burkardt's 2006 routines, the"
-        " clean-room piece until Burkardt confirms his MIT terms cover them, the user's P2)",
+        "what": "the cubic spline mri_normalize uses (P-09, TP-04: Burkardt's 2006 routines):"
+        " specs/burkardt-spline.md by a spec writer, then the clean room by an implementer who"
+        " has read neither Burkardt's code nor numerics.cpp; the replica is [[mod:fs.spline:1]]"
+        " (larmorx-freesurfer, crediting Burkardt, published normally: the user, 2026-11-12),"
+        " which mri_normalize's replica uses",
         "lines": 0,
-        "inputs": "the placement table P-09",
+        "inputs": "the placement table P-09; numerics.cpp 1417-1680 (the spec writer only)",
         "checks": "SplineCubicSet/SplineCubicValue against the unit oracle; mri_normalize's replays",
     },
     {
+        "key": "extra:vnl",
         "wave": "3.1",
         "kind": "permissive",
         "crate": "larmorx-core",
@@ -597,24 +657,44 @@ EXTRA: list[dict] = [
         " vnl_fft where larmorx-image's differs), at ITK 4.13.2 (the same arithmetic as 5.4.5,"
         " third-party.md section 10)",
         "lines": 0,
-        "inputs": "ITK 4.13.2's tarball (<scratch>/r5/itk-4.13.2/), itk-diff.toml",
+        "inputs": "ITK 4.13.2's source (<workspace>/tags/ITK-v4.13.2), itk-diff.toml",
         "checks": "against the unit oracle; the existing vnl_svd_f32, vnl_qr, vnl_eigen ports"
         " re-checked at FreeSurfer's call sites",
     },
     {
+        "key": "extra:libc",
         "wave": "3.1",
         "kind": "inventory + spec",
         "crate": "larmorx-core",
         "what": "the C library behind the results: every libm function the reached code calls"
         " (exp, log, pow, sqrt, sin, cos, atan2, floor, ...) checked against larmorx_core::math"
-        " (glibc 2.35's bits for reproduce where it lacks them: specs and clean rooms, the GNU"
-        " family's precedent), glibc's qsort (a behaviour spec) and libstdc++'s std::sort (FSL-22's"
-        " precedent)",
+        " (where it lacks glibc 2.35's bits for reproduce: a spec by a spec writer, then a clean"
+        " room by an implementer, the GNU family's precedent), glibc's qsort (a behaviour spec)"
+        " and libstdc++'s std::sort (FSL-22's precedent)",
         "lines": 0,
         "inputs": "the call graph (full view); larmorx_core::math",
         "checks": "the unit oracle; the first replays",
     },
     {
+        "key": "extra:main-plumbing",
+        "wave": "3.2",
+        "kind": "plumbing (main package)",
+        "crate": "larmorx (crates/larmorx-cli, python/larmorx/freesurfer/)",
+        "what": "the main package's side of larmorx-freesurfer, split from 3.1-01 (the coherence"
+        " review's finding 7): the package entry LARMORX_FREESURFER in"
+        " crates/larmorx-cli/src/replica.rs (the program larmorx-freesurfer, LARMORX_FREESURFER_BIN,"
+        " LicenseRef-FreeSurfer) with its REPLICAS lines, the family freesurfer in larmorx's"
+        " command line, lx.freesurfer (python/larmorx/freesurfer/: the dispatch between the"
+        " replica program and the clean room); best by an agent that never read FreeSurfer's"
+        " material, because these files carry the clean rooms' side too",
+        "lines": 0,
+        "inputs": "3.1-01; the first program item ([[prog:mri_convert:1]])",
+        "checks": "the larmorx and larmorx-freesurfer programs' tests, test_release.py, the golden"
+        " registry",
+        "first": True,
+    },
+    {
+        "key": "extra:nn",
         "wave": "N",
         "kind": "permissive",
         "crate": "larmorx-nn (new, main package)",
@@ -631,6 +711,146 @@ EXTRA: list[dict] = [
         " run), then the programs' replays (equivalence, decision log 2026-10-19)",
         "first": True,
     },
+]
+
+# W3 (the orchestrator, 2026-11-12, after relay 6): the permissive parsers are pure-Rust parsers
+# giving the same values and the same failure messages on every path recon-all and fMRIPrep can
+# reach, proved by differential tests (no full ports of expat, the DICOM probe or nlohmann's
+# parser); the writers' number formatting is ported exactly. These modules' items are by role,
+# not by lines: (part, regex on "file:line:name" (the first part that matches takes the function),
+# kind, what). Their lines are the reach of the code whose behaviour the item gives.
+W3: dict[str, list[tuple[str, str, str, str]]] = {
+    "perm.gifti": [
+        (
+            "xml",
+            r"^packages/expat/",
+            "W3 parser",
+            "the XML parser under GIFTI: a pure-Rust parser in expat 2.0.1's place (xmlparse.c,"
+            " xmlrole.c, xmltok.c are the behaviour, not ported) that gives gifticlib the same"
+            " elements, attributes and character data, and the same failure messages (expat's"
+            " error text with its line and column, as gifticlib prints them) on every path the"
+            " programs reach: UTF-8 and the encodings expat accepts, entities, CDATA, comments,"
+            " the DOCTYPE, malformed and truncated files",
+        ),
+        (
+            "read-xml",
+            r"^packages/gifti/gifti_xml\.c:\d+:(?!\w*(write|disp|encode|dump))",
+            "permissive",
+            "gifticlib's XML reading, ported (public domain) on the parser's events: gifti_xml.c's"
+            " element callbacks and checks with their messages, the ASCII, Base64Binary and"
+            " GZipBase64Binary decoding, the external-file data",
+        ),
+        (
+            "read-io",
+            r"^packages/gifti/gifti_io\.c:\d+:(?!\w*(write|disp|encode))",
+            "permissive",
+            "gifticlib's structures and checks, ported: gifti_io.c's validity checks with their"
+            " messages, the attribute tables, copies, meta-data, the external data reader",
+        ),
+        (
+            "write",
+            r"^packages/gifti/",
+            "permissive (exact writer)",
+            "gifticlib's writer, exact: gifti_xml.c's ewrite_* with the long-double line"
+            " formatting (3.1-03's x87 arithmetic), the Base64 and zlib output; gifti_io.c's write"
+            " and display functions (their printed text)",
+        ),
+    ],
+    "perm.dicom": [
+        (
+            "probe",
+            r"^packages/dicom/",
+            "W3 parser",
+            "the DICOM probe: a pure-Rust check in CTN's place that answers as DCM_OpenFile does"
+            " for IsDICOM, the format probe of every volume reader (the part-10 preamble and"
+            " 'DICM', the elements it reads, implicit and explicit VR, little and big endian, the"
+            " condition messages a failed open prints); CTN's dcm.c, dictionaries, lst.c and"
+            " condition stack are the behaviour, not ported; DICOM input itself later (no default"
+            " path reads DICOM)",
+        ),
+    ],
+    "perm.json": [
+        (
+            "parse",
+            r"^include/json\.h:\d+:\S*(lexer|parser|input_adapter|json_sax|from_json|parse)",
+            "W3 parser",
+            "nlohmann/json 3.2.0's parser replaced: a pure-Rust JSON reader giving its values"
+            " (integers, unsigned and floating-point numbers as its lexer converts them, strings"
+            " with their escapes and UTF-8 checks) and its parse_error messages (the byte"
+            " position, the last token read) on every path the programs reach",
+        ),
+        (
+            "write",
+            r"^include/json\.h:",
+            "permissive (exact writer)",
+            "nlohmann/json's writer and the values it orders, exact: dump with its indentation,"
+            " dump_escaped's escapes and UTF-8 handling, dump_float's Grisu2 shortest digits and"
+            " exponent format, the integer output; basic_json's object order (sorted keys),"
+            " json_pointer and patch as the programs use them",
+        ),
+    ],
+}
+W3_CHECKS = {
+    "W3 parser": "differential tests against the original parser in the unit oracle (generated,"
+    " malformed and truncated inputs: the same values, the same messages); then the replays of"
+    " the first programs that read the format",
+    "permissive": "unit checks against the unit oracle (every encoding and data type, malformed"
+    " files and their messages); then the replays of the first programs that read the format",
+    "permissive (exact writer)": "the bytes of every output against the unit oracle's writer"
+    " (generated values: every type, extreme numbers); then the replays of the programs that"
+    " write the format",
+}
+# Module items whose checks are not the generic ones.
+MODULE_CHECKS = {
+    "gpl.gsl": "streams against the unit oracle's sc_rng_* and sc_ran_* for many seeds; then"
+    " the bit-exact reference of the clean room (3.1-05)",
+    "fs.spline": "SplineCubicSet and SplineCubicValue against the unit oracle; mri_normalize's"
+    " replays",
+}
+
+# Clean-room-only programs (no replica: the user, 2026-11-12, "Washington University's Talairach
+# tools: a clean room only", naming talairach_avi and its 4dfp tools; mpr2mni305 carries
+# Washington University's notice).
+CLEAN_ONLY = {
+    "talairach_avi",
+    "mpr2mni305",
+    "analyzeto4dfp",
+    "gauss_4dfp",
+    "imgreg_4dfp",
+    "compute_vox2vox",
+}
+# Replicas outside crates-freesurfer/ (the user, 2026-11-12, "No waiting for permissions").
+OTHER_REPLICA = {
+    "tkregister2_cmdl": (
+        "larmorx-nc-tkregister2",
+        "`larmorx-nc-tkregister2` (crates-nc/: its own program in the larmorx-nc wheel, P-11)",
+    ),
+}
+
+# The permissive pieces' clean rooms (finding 16 of the coherence review): with the roadmap's
+# step 6, the permissive ports' clean rooms in one block. (key, what); the modules' own come
+# from MODULES.
+PERMISSIVE_CLEAN: list[tuple[str, str]] = [
+    (
+        "cp:extra:x87",
+        "the x87 80-bit arithmetic's improved form ([[extra:x87]] is written from Intel's manual,"
+        " no upstream code: a faster implementation where it pays)",
+    ),
+    (
+        "cp:extra:random",
+        "vnl_random's and drand48's clean rooms ([[extra:random]]'s permissive part)",
+    ),
+    (
+        "cp:extra:vnl",
+        "the VNL and netlib routines' clean rooms ([[extra:vnl]]; with ANTs' and ITK's VNL ports)",
+    ),
+    (
+        "cp:itk",
+        "ITK 4.13.2's N4, B-spline, shrink and Gaussian filters and the non-local means denoiser"
+        " (P-03, P-04; AntsN4BiasFieldCorrectionFs and AntsDenoiseImageFs): with ANTs' and ITK's"
+        " clean rooms",
+    ),
+    ("cp:extra:nn", "the networks' inference core's clean room ([[extra:nn]], larmorx-nn)"),
 ]
 
 # Program items that are split (name -> [(suffix, wave, what)]); the first part carries the code.
@@ -742,6 +962,74 @@ FMRIPREP = {
 }
 
 
+# The reference runs (one per head and stream, 4 threads: the queue's checks); the variability
+# runs beside them (`<head>-classic-1thread`, ...) are FreeSurfer's own variation, not counted.
+REFERENCE_RUNS = r"-(classic|v8)$"
+
+
+def assign_ids(path: Path | None, keys: list[tuple[str, str]], problems: list[str]) -> dict:
+    """The items' numbers, kept stable across regenerations (queue-ids.toml).
+
+    An item keeps the number its key was given; a new item takes the next free number of its
+    wave (``3.1-53``, ``C3.2-31``, ``CP-04``); a number whose item is gone stays in the file as
+    retired (with the reason, written by hand) and is never given again. Without the file the
+    items are numbered in the queue's order, as before relay 8, and the file is written."""
+    pinned: dict[str, str] = {}
+    retired: dict[str, tuple[str, str]] = {}  # id -> (key, reason)
+    if path is not None and path.exists():
+        for e in load_toml(path).get("id", []):
+            if e.get("retired"):
+                retired[e["id"]] = (e["key"], e["retired"])
+            else:
+                pinned[e["key"]] = e["id"]
+    used: dict[str, int] = defaultdict(int)
+    for i in [*pinned.values(), *retired]:
+        prefix, num = i.rsplit("-", 1)
+        used[prefix] = max(used[prefix], int(num))
+    out: dict[str, str] = {}
+    for key, prefix in keys:
+        if key in out:
+            problems.append(f"two queue items share the key {key}")
+        elif key in pinned:
+            out[key] = pinned[key]
+        else:
+            used[prefix] += 1
+            out[key] = f"{prefix}-{used[prefix]:02d}"
+    for key, i in pinned.items():
+        if key not in out:
+            problems.append(
+                f"{i} ({key}) is no longer generated: mark it retired in the ids file, with why"
+            )
+    if path is not None:
+        rows = [
+            "# CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS (docs/freesurfer/README.md). The queue's item",
+            "# numbers, kept stable: waves.py reads and rewrites this file (--ids). An item keeps its",
+            "# number while its key is generated; a new item takes the next free number of its wave;",
+            "# a number whose item is gone is marked retired (why, by hand) and never given again.",
+            "# Keys: extra:<name> (written by hand in waves.py), mod:<module>:<piece>, w3:<module>:<part>,",
+            "# paths:<module>, prog:<program>[:<piece>], split:<program>:<part>, script:<program>:<part>,",
+            "# clean:mod:<module>, clean:prog:<program>, clean:extra:<name>, cp:<piece>.",
+            "",
+            "schema = 1",
+            "",
+        ]
+        entries = [(i, k, "") for k, i in out.items()]
+        entries += [(i, k, why) for i, (k, why) in retired.items()]
+        entries += [(i, k, "") for k, i in pinned.items() if k not in out]
+
+        def order(e: tuple[str, str, str]) -> tuple:
+            prefix, num = e[0].rsplit("-", 1)
+            return (prefix.startswith("C"), RANK.get(prefix.lstrip("C"), 8), prefix, int(num))
+
+        for i, k, why in sorted(entries, key=order):
+            rows += ["[[id]]", f"id = {json.dumps(i)}", f"key = {json.dumps(k)}"]
+            if why:
+                rows.append(f"retired = {json.dumps(why)}")
+            rows.append("")
+        path.write_text("\n".join(rows), encoding="utf-8")
+    return out
+
+
 def load_toml(path: Path) -> dict:
     with path.open("rb") as fh:
         return tomllib.load(fh)
@@ -769,12 +1057,13 @@ def group_of(streams: list[str]) -> str:
     return "conditional"
 
 
-def recorded_steps(runs: Path | None) -> dict[str, Counter]:
-    """program -> Counter(run -> number of recorded steps whose argv[0] is the program)."""
+def recorded_steps(runs: Path | None, pattern: str = REFERENCE_RUNS) -> dict[str, Counter]:
+    """program -> Counter(run -> number of recorded steps whose argv[0] is the program), in the
+    runs whose folder name matches ``pattern`` (the reference runs: one per head and stream)."""
     out: dict[str, Counter] = defaultdict(Counter)
     if runs is None or not runs.is_dir():
         return out
-    for run in sorted(p for p in runs.iterdir() if p.is_dir()):
+    for run in sorted(p for p in runs.iterdir() if p.is_dir() and re.search(pattern, p.name)):
         steps = run / "record" / "steps"
         if not steps.is_dir():
             continue
@@ -800,6 +1089,16 @@ def run_main() -> int:
     ap.add_argument("--markdown", type=Path)
     ap.add_argument("--queue", type=Path)
     ap.add_argument("--budget", type=int, default=2500, help="lines per relay-sized item")
+    ap.add_argument(
+        "--ids",
+        type=Path,
+        help="docs/freesurfer/queue-ids.toml: the items' numbers, kept stable (read and rewritten)",
+    )
+    ap.add_argument(
+        "--run-pattern",
+        default=REFERENCE_RUNS,
+        help="the runs counted as recorded steps (a regular expression on the run's folder name)",
+    )
     args = ap.parse_args()
 
     programs = load_toml(args.programs)["program"]
@@ -864,6 +1163,12 @@ def run_main() -> int:
                 else:
                     m = "own"
             file_module[f] = m
+    fun_module: dict[str, str] = {}
+    for funs in reached.values():
+        for r in funs:
+            if r not in fun_module:
+                fm = next((mid for pat, mid in FUNCTION_MODULES if re.search(pat, r)), None)
+                fun_module[r] = fm or file_module[r.split(":")[0]]
     for m in [x[0] for x in MODULES]:
         if m not in MODULE_WAVE:
             problems.append(f"module without a wave: {m}")
@@ -875,13 +1180,13 @@ def run_main() -> int:
     owner: dict[str, str] = {}
     waits: dict[str, Counter] = defaultdict(Counter)  # program -> module -> lines
     for r, progs in fun_progs.items():
-        m = file_module[r.split(":")[0]]
+        m = fun_module[r]
         n = fun_lines.get(r, 0)
         if m == "own":
             owner[r] = "prog:" + sorted(progs)[0]
             continue
         mw = MODULE_WAVE.get(m, "3.1")
-        if len(progs) == 1:
+        if len(progs) == 1 and m not in OWN_ITEM:
             (p,) = progs
             if RANK[wave_of[p]] >= RANK[mw]:
                 owner[r] = "prog:" + p
@@ -899,12 +1204,12 @@ def run_main() -> int:
     mod_progs: dict[str, set[str]] = defaultdict(set)
     prog_mod: dict[str, Counter] = defaultdict(Counter)
     for r, progs in fun_progs.items():
-        m = file_module[r.split(":")[0]]
+        m = fun_module[r]
         mod_total[m] += fun_lines.get(r, 0)
         for p in progs:
             mod_progs[m].add(p)
             prog_mod[p][m] += fun_lines.get(r, 0)
-    steps = recorded_steps(args.runs)
+    steps = recorded_steps(args.runs, args.run_pattern)
 
     def checks_of(n: str) -> str:
         st = steps.get(n)
@@ -924,7 +1229,7 @@ def run_main() -> int:
 
     def inputs_of(n: str, wave: str) -> str:
         mods = [
-            m.split(".", 1)[1]
+            "RANLUX's clean room ([[extra:ranlux]])" if m == "gpl.gsl" else m.split(".", 1)[1]
             for m, k in sorted(prog_mod[n].items())
             if m != "own" and k and RANK[MODULE_WAVE.get(m, "3.1")] <= RANK[wave]
         ]
@@ -995,12 +1300,53 @@ def run_main() -> int:
     # ------------------------------------------------------------ the queue
     queue: list[dict] = []
     clean: dict[str, list[dict]] = defaultdict(list)  # wave of the replica -> clean-room items
+    clean["3.1"].append(
+        {
+            "key": "clean:extra:crates",
+            "what": "the clean-room crates, empty (crates/larmorx-fs-core, -gca, -surf and the"
+            " program crates -volumes, -atlas, -topology, -cortex, -classic, -networks, -recon),"
+            " created by the first FreeSurfer clean-room relay from a clean brief (split from"
+            " 3.1-01: no agent that read FreeSurfer's material creates them, the coherence"
+            " review's finding 7); the orchestrator adds them to the clean-room audit's lists"
+            " (CLEANROOM_CRATES, CLEANROOM_PATHS, a FreeSurfer entry like FSL_TOOLS) in that part",
+            "crate": "crates/larmorx-fs-*",
+            "lines": 0,
+        }
+    )
     for wave in QUEUE_WAVES:
         for x in EXTRA:
             if x["wave"] == wave and x.get("first", True):
                 queue.append(dict(x, files=[], what=x["what"]))
         for mid, crate, kind, title, _ in MODULES:
             if MODULE_WAVE[mid] != wave or not item_file.get("mod:" + mid):
+                continue
+            if mid in W3:
+                parts: dict[str, list[str]] = defaultdict(list)
+                for r in item_funs["mod:" + mid]:
+                    part = next((x[0] for x in W3[mid] if re.search(x[1], r)), None)
+                    if part is None:
+                        problems.append(f"{r}: in no W3 part of {mid}")
+                    else:
+                        parts[part].append(r)
+                for i, (part, _pat, pkind, pwhat) in enumerate(W3[mid], 1):
+                    funs = parts.get(part, [])
+                    label = f"`{mid}` ({i} of {len(W3[mid])})"
+                    if i == 1:
+                        label += f" ({title})"
+                    queue.append(
+                        {
+                            "key": f"w3:{mid}:{part}",
+                            "wave": wave,
+                            "kind": pkind,
+                            "crate": crate,
+                            "what": f"{label}: {pwhat}",
+                            "lines": sum(fun_lines.get(r, 0) for r in funs),
+                            "files": sorted({r.split(":")[0] for r in funs}),
+                            "inputs": "the 3.1 items before it",
+                            "checks": W3_CHECKS[pkind]
+                            + f" ({len(mod_progs[mid])} programs reach the module)",
+                        }
+                    )
                 continue
             bs = bins("mod:" + mid)
             for i, (n, names, fl) in enumerate(bs, 1):
@@ -1009,6 +1355,7 @@ def run_main() -> int:
                     label += f" ({title})"
                 queue.append(
                     {
+                        "key": f"mod:{mid}:{i}",
                         "wave": wave,
                         "kind": kind,
                         "crate": crate,
@@ -1018,14 +1365,20 @@ def run_main() -> int:
                         "inputs": "the 3.1 items before it"
                         if wave == "3.1"
                         else f"3.1; {mid}'s programs below",
-                        "checks": "unit checks against the unit oracle; then the replays of the"
-                        f" first programs that use it ({len(mod_progs[mid])} programs reach"
-                        " the module)",
+                        "checks": MODULE_CHECKS.get(
+                            mid,
+                            "unit checks against the unit oracle; then the replays of the"
+                            f" first programs that use it ({len(mod_progs[mid])} programs reach"
+                            " the module)",
+                        ),
                     }
                 )
-            if kind == "replica":
+            if (
+                kind == "replica" and mid != "fs.spline"
+            ):  # the spline's clean room: extra:spline-clean
                 clean[wave].append(
                     {
+                        "key": f"clean:mod:{mid}",
                         "what": f"`{mid}`'s clean room ({title})",
                         "crate": "larmorx-io"
                         if mid in ("fs.io", "fs.labels")
@@ -1041,11 +1394,14 @@ def run_main() -> int:
         for mid, *_ in MODULES:
             if MODULE_WAVE[mid] != wave:
                 continue
-            ps = sorted((p for p, w in waits.items() if mid in w), key=lambda p: -waits[p][mid])
+            ps = sorted(
+                (p for p, w in waits.items() if mid in w), key=lambda p: (-waits[p][mid], p)
+            )
             if ps and wave != "3.1":
                 top = ", ".join(f"`{p}` ({waits[p][mid]:,})" for p in ps[:6])
                 queue.append(
                     {
+                        "key": f"paths:{mid}",
                         "wave": wave,
                         "kind": "completeness",
                         "crate": "the programs' crates",
@@ -1071,11 +1427,11 @@ def run_main() -> int:
             lines = sum(item_file["prog:" + n].values())
             own_script = script_lines(n)
             crate = CRATE[wave] if n != "mri_ca_label" else CRATE["3.3"]
-            kind = by_name[n]["kind"]
-            if n in ("analyzeto4dfp", "gauss_4dfp", "imgreg_4dfp", "compute_vox2vox"):
+            kind = lang = by_name[n]["kind"]
+            if n in CLEAN_ONLY:
                 kind, crate = "clean room only", CLEAN[wave]
-            if n == "tkregister2_cmdl":
-                crate = "a non-commercial package (P1); its clean room in " + CLEAN[wave]
+            if n in OTHER_REPLICA:
+                crate = OTHER_REPLICA[n][1] + "; its clean room in " + CLEAN[wave]
             pieces = bins("prog:" + n) if lines > args.budget * 3 // 2 else []
             label = f"`{n}`" + (f" ({suffix}: {what})" if suffix else "")
             if n in SCRIPT_PARTS:
@@ -1083,11 +1439,12 @@ def run_main() -> int:
                 for i, part in enumerate(sp, 1):
                     queue.append(
                         {
+                            "key": f"script:{n}:{i}",
                             "wave": wave,
                             "kind": kind,
                             "crate": crate,
                             "what": f"{label} ({i} of {len(sp)}): {part}"
-                            + (f" (the script: {own_script:,} lines of {kind})" if i == 1 else ""),
+                            + (f" (the script: {own_script:,} lines of {lang})" if i == 1 else ""),
                             "lines": 0,
                             "files": [],
                             "program": n,
@@ -1103,6 +1460,7 @@ def run_main() -> int:
                     last = i == len(pieces)
                     queue.append(
                         {
+                            "key": f"prog:{n}:{i}",
                             "wave": wave,
                             "kind": kind,
                             "crate": crate,
@@ -1120,11 +1478,12 @@ def run_main() -> int:
             else:
                 queue.append(
                     {
+                        "key": f"prog:{n}",
                         "wave": wave,
                         "kind": kind,
                         "crate": crate,
                         "what": label
-                        + (f" ({own_script:,} lines of {kind})" if own_script else ""),
+                        + (f" ({own_script:,} lines of {lang})" if own_script else ""),
                         "lines": lines,
                         "files": sorted(item_file["prog:" + n]),
                         "program": n,
@@ -1135,6 +1494,7 @@ def run_main() -> int:
             if kind != "clean room only":
                 clean[wave].append(
                     {
+                        "key": f"clean:prog:{n}",
                         "what": f"`{n}`'s clean room",
                         "crate": CLEAN[wave] if n != "mri_ca_label" else CLEAN["3.3"],
                         "lines": lines or own_script,
@@ -1143,6 +1503,7 @@ def run_main() -> int:
         for n, (suffix, _pw, what) in extra_split:
             queue.append(
                 {
+                    "key": f"split:{n}:{suffix}",
                     "wave": wave,
                     "kind": by_name[n]["kind"],
                     "crate": CRATE[wave],
@@ -1157,13 +1518,53 @@ def run_main() -> int:
         for x in EXTRA:
             if x["wave"] == wave and not x.get("first", True):
                 queue.append(dict(x, files=[]))
+    perm_clean: list[dict] = []
+    for mid, _crate, kind, title, _ in MODULES:
+        if kind == "permissive" and mod_total[mid]:
+            perm_clean.append(
+                {
+                    "key": f"cp:mod:{mid}",
+                    "what": f"`{mid}`'s clean room ({title})",
+                    "crate": "with step 6",
+                    "lines": mod_total[mid],
+                }
+            )
+    for key, what in PERMISSIVE_CLEAN:
+        perm_clean.append({"key": key, "what": what, "crate": "with step 6", "lines": 0})
     counters: Counter = Counter()
     for q in queue:
         counters[q["wave"]] += 1
-        q["id"] = f"{q['wave']}-{counters[q['wave']]:02d}"
-    for wave, items in clean.items():
-        for i, c in enumerate(items, 1):
-            c["id"] = f"C{wave}-{i:02d}"
+    pins = assign_ids(
+        args.ids,
+        [(q["key"], q["wave"]) for q in queue]
+        + [(c["key"], "C" + wave) for wave, items in clean.items() for c in items]
+        + [(c["key"], "CP") for c in perm_clean],
+        problems,
+    )
+    for q in queue:
+        q["id"] = pins[q["key"]]
+    for items in [*clean.values(), perm_clean]:
+        for c in items:
+            c["id"] = pins[c["key"]]
+
+    def refs(text: str) -> str:
+        """[[key]] -> the item's number."""
+
+        def one(m: re.Match) -> str:
+            if m[1] not in pins:
+                problems.append(f"a reference to an unknown item: {m[1]}")
+                return m[1]
+            return pins[m[1]]
+
+        return re.sub(r"\[\[([^\]]+)\]\]", one, text)
+
+    for q in queue:
+        for f in ("what", "inputs", "checks"):
+            q[f] = refs(q.get(f, ""))
+    for items in [*clean.values(), perm_clean]:
+        for c in items:
+            c["what"] = refs(c["what"])
+    place_note = {n: refs(note) for n, (_w, note) in PLACE.items()}
 
     # ------------------------------------------------------------ Markdown
     md: dict[str, str] = {}
@@ -1208,15 +1609,15 @@ def run_main() -> int:
         for n in [x for x in by_name if PLACE[x][0] == wave]:
             p = by_name[n]
             crate = CRATE[wave] if n != "mri_ca_label" else CRATE["3.3"]
-            if n in ("analyzeto4dfp", "gauss_4dfp", "imgreg_4dfp", "compute_vox2vox"):
+            if n in CLEAN_ONLY:
                 crate = "none (a clean room only)"
-            elif n == "tkregister2_cmdl":
-                crate = "a non-commercial package (P1)"
+            elif n in OTHER_REPLICA:
+                crate = OTHER_REPLICA[n][1]
             elif crate:
                 crate = f"`{crate}`"
             rows.append(
                 f"| {wave} | `{n}` | {p['kind']} | {', '.join(p['streams']) or '-'} |"
-                f" {group_of(p['streams'])} | {crate} | {PLACE[n][1]} |"
+                f" {group_of(p['streams'])} | {crate} | {place_note[n]} |"
             )
     md["waves"] = "\n".join(rows)
 
@@ -1261,6 +1662,15 @@ def run_main() -> int:
             for c in clean[wave]:
                 rows.append(f"| {c['id']} | {c['what']} | `{c['crate']}` | {c['lines']:,} |")
             rows.append("")
+    rows += [
+        "### The permissive pieces' clean rooms (with the roadmap's step 6)",
+        "",
+        "| Item | Clean room | Crate | Size of what it follows (lines) |",
+        "|---|---|---|---:|",
+    ]
+    for c in perm_clean:
+        lines = f"{c['lines']:,}" if c["lines"] else "-"
+        rows.append(f"| {c['id']} | {c['what']} | {c['crate']} | {lines} |")
     md["queue"] = "\n".join(rows).rstrip()
 
     total: Counter = Counter()
@@ -1275,9 +1685,10 @@ def run_main() -> int:
             f"| {wave} {WAVE_TITLE[wave]} | {counters[wave]} | {total[wave]:,} |"
             f" {len(clean.get(wave, []))} |"
         )
+    rows.append(f"| the permissive pieces' clean rooms (with step 6) | - | - | {len(perm_clean)} |")
     rows.append(
         f"| all | {sum(counters.values())} | {sum(total.values()):,} |"
-        f" {sum(len(v) for v in clean.values())} |"
+        f" {sum(len(v) for v in clean.values()) + len(perm_clean)} |"
     )
     md["totals"] = "\n".join(rows)
 
@@ -1305,16 +1716,18 @@ def run_main() -> int:
                 f"title = {json.dumps(title)}",
                 f"lines = {mod_total[mid]}",
                 f"programs = {json.dumps(sorted(mod_progs[mid]))}",
-                f"files = {json.dumps(sorted(f for f, m in file_module.items() if m == mid))}",
+                "files = "
+                + json.dumps(sorted({r.split(":")[0] for r, m in fun_module.items() if m == mid})),
                 "",
             ]
         for n, p in by_name.items():
-            wave, note = PLACE[n]
+            wave = PLACE[n][0]
+            note = place_note[n]
             crate = CRATE[wave] if n != "mri_ca_label" else CRATE["3.3"]
-            if n in ("analyzeto4dfp", "gauss_4dfp", "imgreg_4dfp", "compute_vox2vox"):
-                crate = "none: a clean room only (P-12)"
-            elif n == "tkregister2_cmdl":
-                crate = "a non-commercial package (P-11, the user's P1)"
+            if n in CLEAN_ONLY:
+                crate = "none: a clean room only (P-12, the user)"
+            elif n in OTHER_REPLICA:
+                crate = OTHER_REPLICA[n][0]
             ccrate = CLEAN[wave] if n != "mri_ca_label" else CLEAN["3.3"]
             ids = [q["id"] for q in queue if q.get("program") == n]
             out += [
@@ -1328,7 +1741,7 @@ def run_main() -> int:
                 f"note = {json.dumps(note)}",
                 f"runs = {json.dumps(sorted(calls.get(n, [])))}",
                 f"item_lines = {sum(item_file['prog:' + n].values())}",
-                f"inputs = {json.dumps(inputs_of(n, wave))}",
+                f"inputs = {json.dumps(refs(inputs_of(n, wave)))}",
                 f"checks = {json.dumps(checks_of(n))}",
                 "[program.reach]",
             ]
@@ -1363,6 +1776,16 @@ def run_main() -> int:
                     f"lines = {c['lines']}",
                     "",
                 ]
+        for c in perm_clean:
+            out += [
+                "[[clean_room]]",
+                f"id = {json.dumps(c['id'])}",
+                'after_wave = "step 6"',
+                f"what = {json.dumps(c['what'].replace('`', ''))}",
+                f"crate = {json.dumps(c['crate'])}",
+                f"lines = {c['lines']}",
+                "",
+            ]
         args.toml.write_text("\n".join(out), encoding="utf-8")
 
     for path in (args.markdown, args.queue):

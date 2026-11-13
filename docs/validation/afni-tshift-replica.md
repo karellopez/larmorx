@@ -2,10 +2,10 @@
 
 **All cases agree.** 317 cases on the `standard` tier: 282 pass, 32 rejected by both, 3 expected divergences, 0 failures.
 
-- **Validated:** the bit-exact replica (larmorx 0.0.1 (crate larmorx-afni-replica, built in): the translation of AFNI 26.3.05's source, Apache-2.0 with CC BY 4.0's attribution, part of larmorx since 2026-10-29), in-process: `larmorx afni 3dTshift` with `LARMORX_IMPLEMENTATION=replica` and `lx.afni.tshift(..., implementation="replica")`
+- **Validated:** the bit-exact replica (larmorx 0.1.0rc1 (crate larmorx-afni-replica, built in): the translation of AFNI 26.3.05's source, Apache-2.0 with CC BY 4.0's attribution, part of larmorx since 2026-10-29), in-process: `larmorx afni 3dTshift` with `LARMORX_IMPLEMENTATION=replica` and `lx.afni.tshift(..., implementation="replica")`
 - **Reference:** 3dTshift from AFNI (AFNI_26.3.05), the binary built by `scripts/build_afni_oracle.sh`
-- **Test data:** larmorx-testdata `52124bc98f9f`, tier `standard`
-- **Generated:** 2026-11-04 on Linux x86_64, with `python -m larmorx_validation parity afni-tshift --tier standard --implementation replica`
+- **Test data:** larmorx-testdata `52e371aab0ac`, tier `standard`
+- **Generated:** 2026-11-13 on Linux x86_64, with `python -m larmorx_validation parity afni-tshift --tier standard --implementation replica`
 - **Original programs:** 634 runs: 628 from the oracle cache, 6 run (2 never cached: the original varies); cache `<workspace>/oracles/cache`, mode `use`
 
 **Bit-identical: 282 of 282 passing cases** produce exactly the bytes of AFNI's output data.
@@ -120,8 +120,8 @@
 
 | Component | Version |
 |---|---|
-| larmorx | 0.0.1 (3a795ff019fb-dirty) |
-| larmorx-testdata | 52124bc98f9f |
+| larmorx | 0.1.0rc1 (629e357ab4aa) |
+| larmorx-testdata | 52e371aab0ac |
 | Python | 3.12.16 |
 | Platform | Linux x86_64 (Linux-6.8.0-124-generic-x86_64-with-glibc2.35) |
 | CPU | AMD Ryzen 9 7945HX with Radeon Graphics, 32 logical CPUs |

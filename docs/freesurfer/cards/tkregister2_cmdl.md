@@ -8,14 +8,14 @@
 | Source | `tkregister2/tkregister2.cpp` |
 | Streams | fmriprep (fmriprep) |
 | Wave | 3.5 |
-| Replica's crate | a non-commercial package (P-11, the user's P1) |
+| Replica's crate | `larmorx-nc-tkregister2` |
 | Clean room's crate | `larmorx-fs-cortex` |
 | Queue items | 3.5-26, 3.5-27 |
 | Called by | bbregister |
 | Runs | - |
 | How it runs in the reference runs | bare |
 | Stages (programs.md §3) | fmriprep |
-| Why this wave | CorTechs' terms (P-11): the clean room here; the replica in a non-commercial package (the user's P1) |
+| Why this wave | CorTechs' terms (P-11): the replica in larmorx-nc as its own program, the clean room here (the user, 2026-11-12) |
 
 ## The calls recon-all and fMRIPrep make
 
@@ -52,14 +52,14 @@ Every option its parser compares, as written in its own source (older parsers co
 - TP-02: The Open* wrappers of numerics.cpp call VNL's linear algebra and optimisers (BSD-3-Clause (VXL); the netlib parts through v3p; portable-with-notice)
 - TP-05: The B-spline interpolation and pyramids of mriBSpline.cpp follow EPFL's code (the file carries FreeSurfer's notice; EPFL's code states no terms; Unser's 1992 filters were written at NIH; portable-with-notice)
 - TP-06: Numerical Recipes' nrutil allocators (Numerical Recipes' terms (not checked: nothing of it is ported); nothing-to-port)
-- TP-10: tkregister2_cmdl is under the FreeSurfer/CorTechs licence (non-commercial internal research and education by not-for-profit entities, no commercially sponsored research, modifications' source to be made available (distribution/docs/license.cortechs.txt, paragraphs 2(d)-(f)); question)
+- TP-10: tkregister2_cmdl is under the FreeSurfer/CorTechs licence (non-commercial internal research and education by not-for-profit entities, no commercially sponsored research, modifications' source to be made available (distribution/docs/license.cortechs.txt, paragraphs 2(d)-(f)); noncommercial-program)
 - TP-13: Small permissive pieces (MIT, BSD-3-Clause, BSL-1.0, public domain; portable-with-notice)
 - TP-15: The C library's generators (not FreeSurfer's code) (drand48: a published definition; glibc: LGPL-2.1-or-later, never copied (a behaviour spec, as specs/glibc-dbl.md); published-description)
 - P-01 (VXL's VNL as ITK 4.13.2 bundles it: linear algebra, optimisers, vnl_random, vnl_fft): its replica in larmorx; larmorx-freesurfer uses the replica (larmorx's VNL ports, at ITK 4.13.2's version: section 10 finds no change of arithmetic in the VNL routines FreeSurfer calls)
 - P-02 (netlib through VXL's v3p: LINPACK, EISPACK, LAPACK, BLAS, libf2c, Nocedal's L-BFGS): its replica in larmorx; larmorx-freesurfer uses the replica
 - P-06 (small permissive pieces: nlohmann/json (with Grisu2 and Hoehrmann's UTF-8 decoder), Bristow's argparse, Geometric Tools' distances, the FNV hash, Devillard's quickselect): its replica in larmorx (argparse's FreeSurfer changes in larmorx-freesurfer); larmorx-freesurfer uses the replica
 - P-10 (EPFL's cubic B-spline coefficients and Unser's 1992 NIH pyramid filters, in Reuter's 3D code): its replica in larmorx-freesurfer, like FreeSurfer's other files, crediting EPFL (the paper, and the 2D example code whose routine names it keeps: ConvertToInterpolationCoefficients, InitialCausalCoefficient, InitialAntiCausalCoefficient) in the crate's PROVENANCE.md and NOTICE; larmorx-freesurfer uses the replica (mriBSpline.cpp translated, its own queue item in wave 3.2 with mri_robust_template)
-- P-11 (tkregister2_cmdl (CorTechs Labs and MGH)): its replica in a non-commercial package (the user's decision): the program links FreeSurfer-licensed libutils code as well; larmorx-freesurfer uses bbregister's replica (larmorx-freesurfer) runs the non-commercial package's tkregister2_cmdl when it is installed, and the clean room (larmorx) otherwise, as the larmorx program chooses implementations today
+- P-11 (tkregister2_cmdl (CorTechs Labs and MGH)): its replica in larmorx-nc, as its own program (the user, 2026-11-12): the crate larmorx-nc-tkregister2 in crates-nc/ (a proposed name), which builds crates-freesurfer/ by path for this one program (it links FreeSurfer-licensed libutils code as the official program does) and links no FSL code; the larmorx-nc wheel then holds FSL's programs and this one side by side, never linked together (docs/licensing.md, 'Packages'); larmorx-freesurfer uses bbregister's replica (larmorx-freesurfer) runs larmorx-nc's tkregister2_cmdl when it is installed, and the clean room (larmorx) otherwise, as the larmorx program chooses implementations today
 - P-14 (Numerical Recipes' nrutil allocators): its replica in none: nothing to port (Rust's own vectors); larmorx-freesurfer uses Rust allocation
 - P-15 (the C library's behaviours: drand48/srand48, rand/srand/srandom (random_r), qsort, the libm functions): its replica in larmorx, from definitions and behaviour specs (drand48 from POSIX; random_r, qsort and the libm functions not yet covered by larmorx_core::math from specs); larmorx-freesurfer uses the spec-written functions (larmorx_core::math's *_glibc and its specs)
 

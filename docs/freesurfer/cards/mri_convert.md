@@ -71,6 +71,10 @@ Every option its parser compares, as written in its own source (older parsers co
 
 - MRIgaussianSmoothNI (smoothing options): long double, thread-partitioned
 
+## Findings for the defect register (rules A to D when ported)
+
+- --conform prints 'valid   : <number>' from vgprint(true) on MRIconformedTemplate's header (mri_convert.cpp 2927-2928), whose valid field nothing sets: memory content, different in every run (measured: rawavg to orig in both streams, mri_nu_correct.mni's --like call in classic; relay 7 found it black box); a message only (D13: a defined value, a warning where reproduce cannot give memory)
+
 ## Checks
 
 - replay: 24 recorded steps in 12 runs; fMRIPrep's calls on the recorded subjects (niworkflows' licence check, bbregister)

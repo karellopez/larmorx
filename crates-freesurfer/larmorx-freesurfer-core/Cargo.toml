@@ -1,0 +1,15 @@
+[package]
+name = "larmorx-freesurfer-core"
+description = "FreeSurfer 8.2.0's replica for larmorx: FreeSurfer's messages, diagnostics, program name, environment, version stamps, the ROMP switch, timers, paths, signals and the licence check's messages (fs.core); its matrices (float and long double), the numerics wrappers over VNL and Cephes, fs_powell, fs_lbfgs, histograms, statistics, PDFs and random fields (fs.maths) (FreeSurfer's licence)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+larmorx-core.workspace = true
+
+[dev-dependencies]
+sha2.workspace = true
+tempfile.workspace = true

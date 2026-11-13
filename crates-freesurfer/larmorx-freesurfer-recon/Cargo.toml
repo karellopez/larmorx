@@ -1,0 +1,17 @@
+[package]
+name = "larmorx-freesurfer-recon"
+description = "FreeSurfer 8.2.0's replica for larmorx: recon-all (its steps, flags, checks, logs and the resume logic sMRIPrep uses) and its helpers, which run the other crates' programs in-process (FreeSurfer's licence)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+larmorx-freesurfer-core.workspace = true
+larmorx-freesurfer-volumes.workspace = true
+larmorx-freesurfer-atlas.workspace = true
+larmorx-freesurfer-topology.workspace = true
+larmorx-freesurfer-cortex.workspace = true
+larmorx-freesurfer-classic.workspace = true
+larmorx-freesurfer-networks.workspace = true

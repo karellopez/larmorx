@@ -48,7 +48,9 @@ Their results are in `docs/freesurfer/` (closed too).
   from elsewhere) with the programs reaching each in the core and full views. `--toml-out` writes
   `docs/freesurfer/third-party.toml`; `--rng` lists the reached functions whose bodies call a
   random-number source (the seeds' findings). The families, classes and findings are the audit's
-  reading, each with its evidence in `docs/freesurfer/third-party.md`; the tool applies them.
+  reading, each with its evidence in `docs/freesurfer/third-party.md`; the tool applies them
+  (since relay 8 the user's decisions of 2026-11-12 too: the classes `gpl-alone`,
+  `noncommercial-program` and `later` in place of the former questions).
 
       python -P validation/investigations/freesurfer-inventory/licences.py \
           <workspace>/tags/freesurfer-8.2.0 docs/freesurfer/programs.toml <scratch>/cmake.json \
@@ -154,14 +156,22 @@ Their results are in `docs/freesurfer/` (closed too).
   and that no script comes before a program it runs, gives each reached function to the one queue
   item that brings it (the program alone, else its module's item; earlier programs' option paths
   into a later module wait for it) and cuts items to a budget of lines; counts each program's
-  recorded steps in the reference runs. Writes `docs/freesurfer/waves.toml` and the generated
-  tables of `waves.md` and `queue.md` (between their `<!-- waves.py: ... -->` markers):
+  recorded steps in the reference runs (`--run-pattern`: the folders ending in `-classic` or `-v8`,
+  not the variability runs beside them). Since relay 8 it also follows the user's placements of
+  2026-11-12 (`FUNCTION_MODULES` and `OWN_ITEM`: GSL's generators and Burkardt's spline as modules
+  of their own; `W3`: the parser modules' items by role; `CLEAN_ONLY`, `OTHER_REPLICA`; the
+  permissive pieces' clean rooms, `PERMISSIVE_CLEAN`) and keeps the items' numbers stable in
+  `docs/freesurfer/queue-ids.toml` (`--ids`: a new item takes the next free number of its wave; one
+  no longer generated must be marked retired by hand, with why; `[[key]]` in a text is replaced
+  by that item's number). Writes `docs/freesurfer/waves.toml` and the generated tables of
+  `waves.md` and `queue.md` (between their `<!-- waves.py: ... -->` markers):
 
       python -P validation/investigations/freesurfer-inventory/waves.py \
           docs/freesurfer/programs.toml docs/freesurfer/code.toml <core.json> \
           --data docs/freesurfer/data-files.toml --tag <workspace>/tags/freesurfer-8.2.0 \
           --runs <workspace>/oracles/freesurfer-8.2.0/runs --toml docs/freesurfer/waves.toml \
-          --markdown docs/freesurfer/waves.md --queue docs/freesurfer/queue.md
+          --markdown docs/freesurfer/waves.md --queue docs/freesurfer/queue.md \
+          --ids docs/freesurfer/queue-ids.toml
 
   `<core.json>` is `callgraph.py --core --json` (about 11 MB, regenerated as code.md §6 says). It
   exits 1 with `PROBLEM:` lines when a file has no module or a placement breaks a rule.
@@ -171,7 +181,9 @@ Their results are in `docs/freesurfer/` (closed too).
   jobs (the subject files each program read and wrote) and the recordings' step outputs; extracts
   the option names each program's parser compares from its own source files (C/C++ string
   comparisons and `addArgument`, tcsh `case` labels, Python `add_argument`; older parsers compare
-  without the leading dash: candidates, which each replica item confirms). Run waves.py first:
+  without the leading dash: candidates, which each replica item confirms), and a table of the
+  findings for the defect register per program (`REGISTER_CANDIDATES`, relay 9: relays 1, 5, 7
+  and 9's candidates, decided by rules A to D when each program is ported). Run waves.py first:
 
       python -P validation/investigations/freesurfer-inventory/cards.py \
           --tag <workspace>/tags/freesurfer-8.2.0 --docs docs/freesurfer \
@@ -179,3 +191,26 @@ Their results are in `docs/freesurfer/` (closed too).
           --out docs/freesurfer/cards
 
   (`<scratch>/r4/trace`: data_trace.py's job folder, relay 4.)
+
+- `clock_seeds.py`: relay 9, variation.md §3. Which recorded programs drew random numbers from a
+  clock seed: FreeSurfer's `randomNumber` prints `<comm> supposed to be reproducible but seed not
+  set` once per process when no seed is set, and recon-all's log keeps every program's standard
+  error. Prints, per program, the runs and processes and the calls (program and options, no paths):
+
+      python -P validation/investigations/freesurfer-inventory/clock_seeds.py \
+          <workspace>/oracles/freesurfer-8.2.0/runs [--run-pattern '-(classic|v8)$']
+
+  Result (12 reference runs): `mri_label2vol --defects` (both streams, 2 per run) and
+  `mri_edit_wm_with_aseg` (v8 only, 3 per run). `drand48`'s time-of-day seeds print nothing.
+- `recording_source.py`: relay 9, for the clean-room audit's restriction table. Lists the
+  recordings' blobs recorded as `scripts/recon-config.yaml` or `scripts/recon-all.local-copy`
+  (FreeSurfer's text under a hash name), with the frozenset for `restrictions.py`, and every blob
+  whose content is one of the installed package's source files (by the replay tool's manifest):
+
+      python -P validation/investigations/freesurfer-inventory/recording_source.py \
+          <workspace>/oracles/freesurfer-8.2.0 \
+          --manifest <workspace>/oracles/inputs/freesurfer-replay/manifest-<tree>.json
+
+  Result (19 recordings, 2026-11-12, 3,890 distinct blobs): two `recon-config.yaml` blobs
+  (`6930b943...` classic, `7d560ebd...` v8); no other blob is a package source file (one 1-byte
+  file, a newline, matches empty Python files). Re-run when new recordings arrive (the server's).

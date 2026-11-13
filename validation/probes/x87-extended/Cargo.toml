@@ -1,0 +1,17 @@
+[package]
+name = "x87-probe"
+description = "larmorx_core::x87::F80 against the machine's x87 (C and C++ compiled by GCC 8.4.0 with FreeSurfer 8.2.0's flags)"
+version = "0.0.1"
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+
+# Its own workspace: a measurement tool, never part of larmorx's build (it calls a C library
+# compiled from x87_ops.c and patterns.cpp through the dynamic loader).
+[workspace]
+
+[dependencies]
+larmorx-core = { path = "../../../crates/larmorx-core" }
+
+[profile.release]
+debug = false

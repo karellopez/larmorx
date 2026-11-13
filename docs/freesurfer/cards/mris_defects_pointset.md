@@ -63,4 +63,4 @@ Every option its parser compares, as written in its own source (older parsers co
 
 ## Checks
 
-- through defect2seg's recorded steps (10)
+- through defect2seg's recorded steps (12)

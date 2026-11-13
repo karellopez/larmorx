@@ -395,3 +395,194 @@ which never depend on a clean-room crate, print the same line (`larmorx-nc: upst
 re-exports it, and `defects::fsl11_what_fsl_does` says what FSL's program does with the variable
 unset, per tool (its first image stops it, exit 1; `standard_space_roi`'s script goes on after its
 steps stop there and exits 0 without an image: FSL 6.0.7.23 run black box).
+
+## The x87's 80-bit extended arithmetic (`src/x87/`; FreeSurfer's foundations, item 3.1-03, 2026-11-12)
+
+**Not ported:** written for LARMORX (Apache-2.0) from Intel's description of the x87 (*Intel 64 and
+IA-32 Architectures Software Developer's Manual*, volume 1, chapters 4 and 8: the extended format,
+its special and unsupported encodings, the NaN rules, the masked responses to invalid operations,
+division by zero, overflow and underflow) and IEEE 754's definition of correctly rounded
+operations; no upstream code. `F80` is `long double` on x86-64 Linux as GCC computes it, under the
+control word Linux gives every process (`0x037f`: 64-bit precision, round to nearest even, every
+exception masked): the four operations and the square root correctly rounded with the 15-bit
+exponent range (denormal results rounded once, overflow to infinity), the real indefinite for
+invalid operations and for every unsupported encoding (pseudo-NaN, pseudo-infinity, unnormal), the
+x87's NaN propagation (a quiet NaN before a signalling one, then the larger significand, then the
+positive sign), canonical results (pseudo-denormals read as exponent 1, never written); the
+conversions GCC emits (`fld`, `fild`, `fst`, `fistp` under truncation with the integer indefinite,
+GCC 8.4.0's sequences for `unsigned long` and `unsigned int`), `llrintl`'s rounding, and IEEE 754's
+comparisons. FreeSurfer 8.2.0 computes in `long double` in 12 reached functions
+(`docs/freesurfer/variation.md` §1).
+
+**Bit-identical to the machine's x87** (AMD Ryzen 9 7945HX, Zen 4; glibc 2.35;
+`validation/probes/x87-extended`, log `oracles/logs/fs-found-c-x87-probe-24.log`, 2026-11-12):
+4,748,983,348 comparisons, 0 differences: 2^24 seeded cases of each of 14 operations (add, subtract,
+multiply, divide, square root (`fsqrt`, glibc's `sqrtl` and GCC's `__builtin_sqrtl`, all three),
+the six comparisons, the conversions to `double`, `float`, `long`, `int`, `short`, `unsigned long`,
+`unsigned int`, `llrintl`) in each of 17 operand families (random bit patterns, normals of every
+exponent, nearby exponents, sparse significands with exact results and exact ties, cancellations,
+products and quotients in the denormal range and near overflow, denormals and pseudo-denormals,
+exact `double`s, `float`s and integers, special values, the boundaries of `double`, `float` and the
+integer types), every pair of 42 special values (unsupported encodings and NaN payloads included),
+2^24 inputs of each conversion from `double`, `float`, `long`, `int`, `unsigned long`, `unsigned
+int` (every bit pattern), and 2^20 cases of six arithmetic patterns of FreeSurfer's `long double`
+functions (sums of `double` products, a mean, variance and standard deviation, cross products of
+`float` edge vectors and their length, a unit vector and its gradient, `float` kernel weights over
+their sum, squared length differences) written as plain C++ loops and compiled by GCC 8.4.0 with
+FreeSurfer's C++ flags; computed in `double` instead, 1.8 % to 71 % of each pattern's outputs
+differ (55 % of the dot products, 71 % of the statistics, 5.3 % of the cross products, 60 % of the
+unit vectors and gradients, 3.0 % of the normalised weights, 1.8 % of the edge costs: the control
+that the patterns depend on the extended precision). Among the results: 7.8 million denormal
+products and 8.0 million denormal quotients, 6.4 million overflows, 250,342 exact ties among
+16.8 million sparse products. The unit tests (`src/x87/tests.rs`) check the hardware's
+recorded hashes (`src/x87/hardware.rs`) on the first 1,024 cases of every operation and family,
+every pair of special values, 1,024 inputs of each conversion and 256 cases of each pattern, on
+every platform.
+
+## vnl's random numbers (`src/vnl_random.rs`; FreeSurfer's foundations, item 3.1-04, 2026-11-12)
+
+**Ported** from VXL as bundled with ITK 4.13.2, the version FreeSurfer 8.2.0's official binaries
+link (BSD-3-Clause; the file's SPDX header is `Apache-2.0 AND BSD-3-Clause`):
+`core/vnl/vnl_random.h` (SHA-256 `373697ca2304…`) and `vnl_random.cxx` (`75550ff547df…`), identical in
+ITK 5.4.5 apart from the default constructor's initialisers (`docs/freesurfer/third-party.md` §8):
+the linear congruential seeding (`x · 1664525 + 1 mod 2^32`, 1,000 warm-up draws), Marsaglia and
+Zaman's subtract-with-borrow on 37 words, `lrand32` and its two ranged forms, `drand32`, `drand64`
+(the first of its two draws divided by `0xffffffff`, as GCC 8.4.0 compiles it and as every official
+binary does: `docs/freesurfer/variation.md` §3), `normal` and `normal64` (Marsaglia's polar method;
+the caller passes the logarithm: `math::log_glibc` for the original's bits), `restart` and both
+reseeds. Left out: the time-seeded constructor and `reseed()`. Two VXL defects not reproduced (not
+reached by FreeSurfer, whose generator is never copied and never draws a range): a copy keeps the
+cached normal number (the C++ copy constructor and assignment leave it uninitialised), and
+`lrand32(lower, upper)` computes its range in 64 bits (the C++'s `int` overflows beyond `2^31 - 1`:
+a division by zero at `2^32`, no return from `2^31` to `2^32 - 1`); `lower > upper` panics.
+
+**Bit-identical to ITK 4.13.2's own `vnl_random.cxx`** compiled by GCC 8.4.0 with FreeSurfer's C++
+flags and glibc 2.35's logarithm (`validation/probes/fs-random`, log
+`oracles/logs/fs-found-c-random-probe.log`, 2026-11-12): 4,000,005 calls, 0 differences (2,000
+seeds, FreeSurfer's 1234 and 53 among them, 2,000 randomly chosen calls each, FreeSurfer's
+`(float) drand64(0.0, 1.0)` included). With the correctly rounded `math::log`, 125 of about 667,000
+normal numbers change. The unit tests check the original's hashes of a fixed sequence for five
+seeds on every platform.
+
+## POSIX's 48-bit random numbers (`src/drand48.rs`; FreeSurfer's foundations, item 3.1-04, 2026-11-12)
+
+**Not ported:** written from POSIX's definition (IEEE Std 1003.1, *drand48*), which fixes every
+bit (the generator, its defaults, `srand48`'s `0x330E`, the 16-bit words' order, which bits each
+function returns); glibc's code is never used (LGPL-2.1, CLAUDE.md rule 2). What POSIX leaves open
+was measured on glibc 2.35 as a black box: the state before any seeding is `X = 0`.
+
+**Identical to the machine's C library** (glibc 2.35; `validation/probes/fs-random`, 2026-11-12):
+12,002,016 calls, 0 differences (16 calls before any seeding; 2,000 seeds of `srand48`, 53 first,
+`AntsN4BiasFieldCorrectionFs`'s, each followed by 1,000 randomly chosen calls of the nine
+functions, then `seed48` (its returned previous state compared) and `lcong48` with random
+parameters, each followed by 1,000 more). The unit tests check the C library's hashes of a fixed
+sequence for five seeds on every platform.
+
+## vnl's and netlib's routines for FreeSurfer (FreeSurfer's foundations, item 3.1-07, 2026-11-12)
+
+**Ported** from VXL as bundled with ITK 4.13.2, the version FreeSurfer 8.2.0's official binaries
+link (`<workspace>/tags/ITK-v4.13.2`; BSD-3-Clause; LINPACK, EISPACK, the reference BLAS and
+Nocedal's L-BFGS from netlib as VXL distributes them, f2c-translated; every file's SPDX header is
+`Apache-2.0 AND BSD-3-Clause`), the same code as 5.4.5's but for `nullptr` and export macros
+(`docs/freesurfer/third-party.md` §10). SHA-256 prefixes of the files read, under
+`Modules/ThirdParty/VNL/src/vxl/`:
+- `src/vnl_minimize.rs`: `core/vnl/algo/vnl_bracket_minimum.cxx` (`4edba4c5d1f1…`),
+  `vnl_fit_parabola.h` (`9519af2d7eb2…`), `vnl_brent_minimizer.cxx` (`1f36978fdea3…`),
+  `vnl_brent.cxx` (`e37c4a57cfc9…`), `vnl_powell.cxx` (`63ce301c12e8…`) and `.h`,
+  `core/vnl/vnl_nonlinear_minimizer.cxx` (`77ce15efc129…`) and `.h`;
+- `src/vnl_lbfgs.rs`: `v3p/netlib/opt/lbfgs.c` (`63fe947289a1…`; `lbfgs_`, `lb1_`, `write50`,
+  `mcsrch_`, `mcstep_`, `v3p_netlib_lbfgs_init`) and `lbfgs.h`, with `lbfgs.f` (Nocedal's Fortran)
+  the reference for ITK-103 and ITK-104;
+- `src/vnl_cholesky.rs`: `core/vnl/algo/vnl_cholesky.cxx` (`8ac4541af962…`) and `.h`,
+  `v3p/netlib/linpack/{dpofa (9327f080d6a4…), dposl (a8bf870376c4…), dpodi (23988b1a90ec…),
+  dpoco (b53b3853e6ef…)}.c`, `v3p/netlib/blas/dasum.c` (`139d999917e4…`);
+- `src/vnl_qr.rs` (`Qr<T>`): `core/vnl/algo/vnl_qr.hxx` (`cfae1afd8e51…`),
+  `v3p/netlib/linpack/{sqrdc (7dbbd9cae762…), sqrsl (dc6289dc71df…)}.c` and their double versions,
+  the single-precision BLAS (`snrm2`, `sdot`, `saxpy`, `sscal`);
+- `src/vnl_fixed.rs` (for `float`, and `determinant_balanced`): `core/vnl/vnl_det.hxx`
+  (`833ae550ccfb…`), `core/vnl/vnl_inverse.h` (`bd0d7dc0ab2f…`), `core/vnl/algo/vnl_determinant.hxx`
+  (`1140fe95da6f…`), `core/vnl/vnl_c_vector.hxx` (`rms_norm`);
+- `src/vnl_eigen.rs` (`real_eigensystem`, `symmetric_eigensystem_f32`):
+  `core/vnl/algo/vnl_real_eigensystem.cxx` (`4551bad87f2e…`),
+  `vnl_symmetric_eigensystem.hxx` (`58cb2655d44f…`), `v3p/netlib/eispack/{rg (aae4796dc48e…),
+  balanc (b5d53c13c3aa…), elmhes (460159c440a2…), eltran (4174a06adc21…), hqr2 (70b52aceece7…),
+  balbak (6ebb4b0be540…), cdiv (86a0bd5ce479…)}.c`;
+- `src/cfmt.rs` (not ported: written from the C standard's description of `printf`'s conversions);
+- `src/vnl_digests.rs` (tests only).
+
+FreeSurfer's call sites (`utils/numerics.cpp`, `mri_robust_register/`, `AntsN4BiasFieldCorrectionFs`)
+were read for which routines, types and modes it calls; no FreeSurfer code is in these files.
+Eleven VNL defects (ITK-103 to ITK-113, `docs/findings/vnl-netlib.md`) have their switch or their
+deterministic fill.
+
+**Bit-identical to ITK 4.13.2's VNL** as the FreeSurfer unit oracle built it (Ubuntu's `gcc-8`
+8.4.0-3ubuntu2, ITK's Release flags; `validation/probes/fs-vnl`, whose `build.sh` checks the
+oracle's VNL tree against the pinned tag and records the libraries' SHA-256), 2026-11-12, at scale
+200 from af0c5620 (log `oracles/logs/fs-found-c-vnl-probe-200.log`): 7,655,619,214 values, 0
+differences. C's `printf` 155,485,224 conversions; the minimizers 1,420,803,455 values (1,200,000
+cases); L-BFGS 4,482,647,023 values (600,000 problems, 28,923,878 calls in lock step); the linear
+algebra 1,563,979,512 values (4,000,000 cases); the FFT 32,704,000 values. At scale 1: C's `printf` 777,393
+conversions; the minimizers 4,481,262 values (6,000 cases: brackets, the four Brent entry points,
+`fs_powell`'s `vnl_brent` step, `vnl_brent::minimize`, `vnl_powell` in 1 to 6 dimensions with its
+verbose lines; every evaluated point in order); L-BFGS 22,998,582 values (3,000 problems, 148,167
+calls in lock step: `x`, `diag`, `w`, `iflag`, the whole state and the printed text, `reproduce`);
+the linear algebra 7,764,649 values (20,000 cases: fixed determinants and inverses in float and
+double, `vnl_determinant` to 10 × 10 plain and balanced, `vnl_qr<float/double>`, `vnl_svd<float>`,
+`vnl_matrix_inverse<double>`, the symmetric eigensystems, `vnl_real_eigensystem`, `vnl_cholesky`
+in its three modes; messages included; a NaN compared as a NaN); `vnl_fft_1d<double>` 163,520
+values (2 to 512 points); 0 differences. Not compared: memory VNL never writes (ITK-107, ITK-110,
+ITK-113, counted). The existing ports `vnl_svd_f32`, `vnl_svd::vnl_inverse`,
+`vnl_eigen::symmetric_eigensystem` and `vnl_qr::VnlQr` were re-checked at FreeSurfer's call sites
+in the same run. `vnl_digests.rs` checks digests of the ports' outputs on seeded inputs, recorded on
+Linux x86-64, on every platform (debug and release alike; a NaN hashed as one value).
+
+
+## RANLUX389 and FreeSurfer's random distributions (`src/ranlux/`; FreeSurfer's foundations, item 3.1-05, 2026-11-13)
+
+**Clean-room implementation from [`specs/ranlux.md`](../../specs/ranlux.md)** (Apache-2.0; the spec
+at commit `6b052bda`, SHA-256 `f623cdac8bd3…`), by an implementer who never opened GSL's source (any
+release or copy), FreeSurfer's source, the GSL replica, the documents written from FreeSurfer's
+source (`docs/freesurfer/`, `docs/findings/freesurfer-*.md`), the spec writer's check, the probes'
+sources and build script, or `docs/parts/`. Its inputs: the spec; the papers it cites as background
+(Lüscher 1994, James 1994, L'Ecuyer 1988, Schrage 1979, Knuth's vol. 2 §3.4.1, Marsaglia and Bray
+1964, Marsaglia 1980); `larmorx_core::math` (glibc 2.35's `log` and `exp` as `log_glibc` and
+`exp_glibc`, the correctly rounded `tan`, `x86_nan`'s SSE rules) and `larmorx_core::defects`;
+black-box runs of FreeSurfer's compiled functions through the prebuilt probe `fs_rng_probe`, of
+FreeSurfer 8.2.0's official `mri_volsynth`, and of the system's `tan` (through Rust's `f64::tan`);
+the probe folder's README, `refs.sh`, `run_zero.sh` and `volsynth_compare.py` (calls only).
+
+The generator keeps the 24 values before each group of 389 and the group in one buffer, computes the
+group in one loop (the borrow from the sign of each difference) and delivers its first 24 values;
+seeding is Schrage's evaluation of the spec's congruential generator. The distributions are methods of
+the generator, operation by operation as the spec writes them; the large-shape gamma's tangent is
+`math::tan` (replaceable only for validation, `set_tan`, hidden). FS-100 and FS-101 follow the
+generator's `UpstreamDefects` mode; draws that give no number are `DrawError`s; the notices are
+collected per generator (`notices`, `take_notices`). `src/ranlux/sha256.rs` is SHA-256 (FIPS 180-4),
+for the tests' golden checksums only.
+
+**Bit-identical to FreeSurfer's functions** on everything but the tangent's 41,708 arguments
+(`docs/findings/ranlux-clean-room.md`, `validation/investigations/freesurfer-cleanroom-random-spline/`,
+2026-11-13 from `84a2044d`): 2,022 seeds × 100,000 values; 8,381,462 of 8,382,003 draws (421 cases),
+the 541 others large-shape gamma draws that met a differing tangent, and all 8,382,003 with the
+system's `tan` in its place; FS-100 and FS-101 under `reproduce`; the official `mri_volsynth`'s
+10,080 voxels. The unit tests check the spec's streams and hashes (§2.5, §10.2), FS-100's and
+FS-101's values and messages, and 28 golden checksums of the clean room's own outputs (one per path)
+on every platform.
+
+## The cubic spline of FreeSurfer's intensity normalisation (`src/cubic_spline/`; FreeSurfer's foundations, item 3.1-06, 2026-11-13)
+
+**Clean-room implementation from [`specs/burkardt-spline.md`](../../specs/burkardt-spline.md)**
+(Apache-2.0; the spec at commit `ca340f58`, SHA-256 `8cccc1e10680…`), by the same implementer, who
+never opened John Burkardt's spline routines (any release or copy), FreeSurfer's source, the replica,
+the documents written from FreeSurfer's source, the spec writer's check, the probe's source or
+`docs/parts/`. Its inputs: the spec; textbook material on cubic splines with first-derivative ends and
+tridiagonal elimination (de Boor, *A Practical Guide to Splines*, ch. IV; Burden and Faires,
+*Numerical Analysis*, §3.5); `larmorx_core::cfmt::g` (C's `%g`), `x86_nan`'s SSE rules and
+`larmorx_core::defects`; black-box runs of FreeSurfer's compiled functions through the prebuilt probe
+`fs_spline_probe` (its input forms read from its outputs).
+
+**Bit-identical to FreeSurfer's functions** (`docs/findings/cubic-spline-clean-room.md`, 2026-11-13
+from `84a2044d`): 20,000 cases (296,786 evaluation points, every output line), 1,000 tridiagonal
+systems, the five messages byte for byte with their exit status, FS-103's 500 NaN-knot cases under
+`reproduce`. The unit tests check the probe's values and messages and 12 golden checksums (each
+pair of end conditions, two knots with conditions 0 and 0, 80 knots; every evaluation branch).

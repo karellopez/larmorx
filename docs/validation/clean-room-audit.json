@@ -1,5 +1,5 @@
 {
- "dossier": "2026-11-12-t2smap-clean-room",
+ "dossier": "2026-11-13-freesurfer-foundations-arm",
  "edits": [
   {
    "added": null,
@@ -121,11 +121,11 @@
   }
  ],
  "evidence": {
-  "accesses": 323375,
-  "agents": 311,
+  "accesses": 360077,
+  "agents": 366,
   "archive_checksums_differ": 0,
-  "archive_checksums_matched": 407,
-  "archived_files": 407,
+  "archive_checksums_matched": 496,
+  "archived_files": 496,
   "archives": {
    "2026-11-05-session-transcripts": {
     "files": 244,
@@ -179,35 +179,59 @@
     "files": 25,
     "sha256": "549db515e64d62cd95a2b6d2900e8ec55ff99a34591bba63adab212147df0d10"
    },
+   "2026-11-12-session-transcripts-freesurfer-foundations-ac": {
+    "files": 20,
+    "sha256": "4bb7b39280e436488181ebb786bcac61d06e7d5b6e336183449bc275ef0fed06"
+   },
+   "2026-11-12-session-transcripts-freesurfer-foundations-ac2": {
+    "files": 25,
+    "sha256": "08b774e709eb066f348d5b5d37e19ae561be50389c679c6e92046e86c86a36d7"
+   },
+   "2026-11-12-session-transcripts-freesurfer-foundations-b": {
+    "files": 108,
+    "sha256": "288dfd5c5be533f9f1e81af035b0da00ad1d25ab562f25c99057a293cd5de079"
+   },
+   "2026-11-12-session-transcripts-freesurfer-foundations-d1": {
+    "files": 6,
+    "sha256": "db4f3837913af0782b3703968ff88bd789a02b129db72578860c0a0405319de2"
+   },
+   "2026-11-12-session-transcripts-freesurfer-preparation": {
+    "files": 8,
+    "sha256": "9f829e9c3abd74e10e29c36458ba0bcfbd5d41700f763894f3b262211b8612db"
+   },
    "2026-11-12-session-transcripts-t2smap-clean-room": {
     "files": 24,
     "sha256": "270fabe579ae46ec980c98fa1944da5c901164127803af20dc15e52efe4767ba"
+   },
+   "2026-11-13-session-transcripts-freesurfer-foundations-arm": {
+    "files": 23,
+    "sha256": "246d88c724835fe011c7d0aab2f547b65d18afed6245cba44d391d971eae2e8a"
    }
   },
-  "commits_printed": 3108,
-  "distinct_transcripts": 315,
+  "commits_printed": 3428,
+  "distinct_transcripts": 370,
   "first_record": "2026-10-09 11:38 UTC",
   "gaps": {
-   "agents_without_worktree": 216,
+   "agents_without_worktree": 265,
    "bad_lines": 0,
-   "calls_without_result": 22,
+   "calls_without_result": 44,
    "compaction_parent_missing": 2,
-   "compactions": 75,
-   "refused_calls": 1579,
-   "refused_calls_restricted_accesses": 686,
+   "compactions": 77,
+   "refused_calls": 1645,
+   "refused_calls_restricted_accesses": 734,
    "request_only_calls": 0,
    "results_without_call": 0,
-   "unresolved_paths": 7675
+   "unresolved_paths": 8417
   },
-  "last_record": "2026-11-12 07:31 UTC",
-  "live_files": 315,
-  "live_files_also_archived": 315,
+  "last_record": "2026-11-13 00:58 UTC",
+  "live_files": 370,
+  "live_files_also_archived": 369,
   "sessions": 4,
-  "tool_calls": 93824,
+  "tool_calls": 103650,
   "tool_calls_by_tool": [
    [
     "Agent",
-    313
+    368
    ],
    [
     "Artifact",
@@ -219,7 +243,7 @@
    ],
    [
     "Bash",
-    79710
+    88457
    ],
    [
     "CronCreate",
@@ -231,7 +255,7 @@
    ],
    [
     "Edit",
-    4255
+    4453
    ],
    [
     "EnterWorktree",
@@ -239,11 +263,11 @@
    ],
    [
     "Monitor",
-    178
+    205
    ],
    [
     "Read",
-    2351
+    2663
    ],
    [
     "ReadNotifications",
@@ -251,7 +275,11 @@
    ],
    [
     "SendMessage",
-    95
+    118
+   ],
+   [
+    "SendUserFile",
+    4
    ],
    [
     "Skill",
@@ -259,7 +287,7 @@
    ],
    [
     "SubagentHandback",
-    323
+    384
    ],
    [
     "TaskOutput",
@@ -267,28 +295,28 @@
    ],
    [
     "TaskStop",
-    247
+    275
    ],
    [
     "ToolSearch",
-    200
+    223
    ],
    [
     "WebFetch",
-    62
+    64
    ],
    [
     "WebSearch",
-    5
+    6
    ],
    [
     "Write",
-    6030
+    6375
    ]
   ],
-  "transcript_bytes": 7893769553,
-  "transcript_files": 722,
-  "unique_paths": 67601
+  "transcript_bytes": 9765420176,
+  "transcript_files": 866,
+  "unique_paths": 75061
  },
  "levels": [
   [
@@ -369,7 +397,7 @@
  "made_from": {
   "scan": "scan",
   "similarity_commit": "6e18b57d-dirty",
-  "verdicts_repository": "6e18b57d"
+  "verdicts_repository": "92b9d579"
  },
  "overview": {
   "agents_by_role": [
@@ -383,7 +411,7 @@
    ],
    [
     "documentation",
-    1
+    22
    ],
    [
     "integration",
@@ -391,15 +419,15 @@
    ],
    [
     "other",
-    111
+    125
    ],
    [
     "replica author",
-    85
+    102
    ],
    [
     "spec writer",
-    22
+    25
    ]
   ],
   "attributed_by": [
@@ -428,7 +456,7 @@
    ]
   ],
   "implementers": 87,
-  "register_restricted_lines": 1476,
+  "register_restricted_lines": 1489,
   "single_file_scopes": {
    "checked": 70,
    "shown": 3

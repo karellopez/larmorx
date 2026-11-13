@@ -8,14 +8,14 @@
 | Source | `talairach_avi/imgreg_4dfp.c` |
 | Streams | classic (classic-only) |
 | Wave | 3.6 |
-| Replica's crate | none: a clean room only (P-12) |
+| Replica's crate | none: a clean room only (P-12, the user) |
 | Clean room's crate | `larmorx-fs-classic` |
 | Queue items | 3.6-16 |
 | Called by | mpr2mni305 |
 | Runs | - |
 | How it runs in the reference runs | bare |
 | Stages (programs.md §3) | 11 |
-| Why this wave | Washington University's: a clean room only (P-12) |
+| Why this wave | Washington University's: a clean room only (P-12, the user) |
 
 ## The calls recon-all and fMRIPrep make
 
@@ -45,7 +45,7 @@ Every option its parser compares, as written in its own source (older parsers co
 ## Borrowed code
 
 - TP-09: Washington University's 4dfp tools (classic Talairach) (all rights reserved; no copying or distribution without Washington University's written permission; clean-room-only)
-- P-12 (Washington University's 4dfp tools (the classic Talairach registration)): its replica in none until Washington University's written permission; larmorx-freesurfer uses the clean-room piece (the settled choice of 2026-10-19: written from the method's publications, the atlas fetched from FreeSurfer on first use), run in place of the programs (a process boundary already separates them)
+- P-12 (Washington University's 4dfp tools (the classic Talairach registration)): its replica in none: a clean room only (the user, 2026-11-12), unless Washington University gives written permission later; larmorx-freesurfer uses the clean room (written from the method's publications, behaviour and black-box runs, checked against the recorded heads, its atlases fetched at first use), run in place of the programs (a process boundary already separates them); talairach_avi and mpr2mni305 are clean rooms too, so the classic stream's whole Talairach registration is one
 
 ## Variation
 

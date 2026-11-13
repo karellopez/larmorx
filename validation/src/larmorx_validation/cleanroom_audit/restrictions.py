@@ -476,6 +476,9 @@ def _probe_family(folder: str) -> str | None:
         return "AFNI"
     if folder.startswith(("glibc-", "libstdc")):
         return "GNU"
+    # FreeSurfer's foundations (2026-11-13): probes that call FreeSurfer's functions or name its call sites
+    if folder.startswith("fs-") or folder == "x87-extended":
+        return "FreeSurfer"
     return None
 
 
@@ -573,6 +576,11 @@ def _classify_repo(rel: str, op: str) -> Class:
                 "validation/investigations/freesurfer-ranlux-spec-check/",
                 "validation/investigations/freesurfer-spline-spec-check/",
                 "validation/investigations/freesurfer-libm-inventory/",
+                # track D's replica checks (written by the replicas' author, who read GSL, Burkardt and FreeSurfer):
+                # closed to FreeSurfer's clean-room implementers (2026-11-13); the FreeSurfer probes (fs-*,
+                # x87-extended) are closed by the probe rule's family (_probe_family)
+                "validation/investigations/freesurfer-gsl-replica-check/",
+                "validation/investigations/freesurfer-spline-replica-check/",
                 # the replay tool and the unit oracle's harness, written from FreeSurfer's source: a FreeSurfer
                 # clean-room implementer runs them (black box) but never reads them (2026-11-12)
                 "validation/src/larmorx_validation/freesurfer/",

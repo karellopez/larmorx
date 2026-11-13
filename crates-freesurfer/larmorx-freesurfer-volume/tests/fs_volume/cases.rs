@@ -26,6 +26,7 @@ use larmorx_freesurfer_mri::vol_geom::reinit_cache;
 use larmorx_freesurfer_volume::arith::{self as ar, Pair, Tri};
 use larmorx_freesurfer_volume::cma as cm;
 use larmorx_freesurfer_volume::coords as co;
+use larmorx_freesurfer_volume::deriv as dv;
 use larmorx_freesurfer_volume::ltaread as lr;
 use larmorx_freesurfer_volume::resize as rs;
 use larmorx_freesurfer_volume::rotate as rt;
@@ -33,6 +34,7 @@ use larmorx_freesurfer_volume::sample as sm;
 use larmorx_freesurfer_volume::seq as sq;
 use larmorx_freesurfer_volume::skull as sk;
 use larmorx_freesurfer_volume::vgeom;
+use larmorx_freesurfer_volume::xform as xf;
 
 /// The cases' random numbers.
 pub struct Gen(u64);
@@ -1285,6 +1287,114 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
                     }
                 }
             }
+            "deriv" | "grad" | "nbrs" => {
+                let mut s = shape(&mut g);
+                if g.chance(3) {
+                    s.ty = 3;
+                }
+                if !g.chance(4) {
+                    s.hdr = false;
+                }
+                vol_of(&mut g, &mut t, s);
+                if cmd == "nbrs" {
+                    let n = 3;
+                    t.push(n.to_string());
+                    for _ in 0..n {
+                        let kind = g.int(0, 7);
+                        t.push(kind.to_string());
+                        let edge = g.chance(4);
+                        for (k, m) in [(s.w, 3), (s.h, 2), (s.d, 2)] {
+                            let v = if edge { g.int(-m, k + m - 1) } else { g.int(0, (k - 1).max(0)) };
+                            t.push(v.to_string());
+                        }
+                        let a = match kind {
+                            2 => g.int(1, 5),
+                            4 => frame_of(&mut g, s).max(0),
+                            _ => g.pick(&[0, 1, 2, 100, 128, 255, -1, 3]),
+                        };
+                        t.push(a.to_string());
+                        t.push(g.pick(&[0, 1, 2, 100, 255, -1]).to_string());
+                        t.push(fx(fval(&mut g)));
+                        t.push(fx(fval(&mut g)));
+                    }
+                } else {
+                    t.push(dx(g.pick(&[1.0, 1.0, -1.0, 0.5, f64::from_bits(0x7ff8_0000_0000_0042)])));
+                    let n = 4;
+                    t.push(n.to_string());
+                    for _ in 0..n {
+                        for k in [s.w, s.h, s.d] {
+                            t.push(dx(scoord(&mut g, k)));
+                        }
+                        t.push(g.int(0, 1).to_string());
+                        if cmd == "grad" {
+                            t.push(frame_of(&mut g, s).max(0).to_string());
+                            continue;
+                        }
+                        for _ in 0..3 {
+                            t.push(dx(if g.chance(12) {
+                                g.pick(&[f64::NAN, f64::INFINITY, 1e10, -1e10])
+                            } else {
+                                g.pick(&[0.0, 1.0, -1.0, 0.5, 0.7071067811865476, -0.25, 2.0])
+                            }));
+                        }
+                        t.push(dx(if g.chance(150) {
+                            g.pick(&[1e308, f64::INFINITY])
+                        } else {
+                            g.pick(&[0.0, 0.0, 1e-8, 0.5, 1.0, 2.0, 3.3, -1.0, f64::NAN, 1e300, 0.2])
+                        }));
+                    }
+                }
+            }
+            "lxf" | "rsmat" => {
+                let mut s = shape(&mut g);
+                if g.chance(3) {
+                    s.ty = 3;
+                }
+                if !g.chance(6) {
+                    s.hdr = false;
+                }
+                vol_of(&mut g, &mut t, s);
+                if cmd == "rsmat" {
+                    let o = like(&mut g, s);
+                    vol_of(&mut g, &mut t, o);
+                    t.push(i64::from(g.chance(8)).to_string());
+                    lines.push(t.join(" "));
+                    continue;
+                }
+                t.push(dx(g.pick(&[0.0, 0.0, 0.0, 5.0, -2.5, 1e-9, f64::from_bits(0x7ff8_0000_0000_0077)])));
+                if g.chance(4) {
+                    t.push("1".into());
+                    let o = like(&mut g, s);
+                    vol_of(&mut g, &mut t, o);
+                } else {
+                    t.push("0".into());
+                }
+                t.push(g.int(0, 5).to_string());
+                t.push(g.pick(&[0, 0, 1, 1, 1, 2, 3, 4]).to_string());
+                if g.chance(30) {
+                    t.push("0".into());
+                } else {
+                    t.push("1".into());
+                    let kind = g.int(0, 5);
+                    for r in 0..4 {
+                        for c in 0..4 {
+                            let v: f32 = match (kind, r, c) {
+                                (_, 3, 3) => 1.0,
+                                (_, 3, _) => 0.0,
+                                (0, r, c) if r == c => 1.0,
+                                (0, _, _) => 0.0,
+                                (1, r, c) if r == c => g.pick(&[1.0, 2.0, 0.5, -1.0, 1.5]),
+                                (1, _, 3) => g.pick(&[0.0, 1.0, -0.5, 0.25, 2.0]),
+                                (1, _, _) => 0.0,
+                                (2, 2, _) if g.chance(3) => 0.0,
+                                (4, _, _) if g.chance(20) => f32::from_bits(g.pick(&[0x7fc00000, 0x7f800000])),
+                                _ => num(&mut g, -20, 20, 10),
+                            };
+                            t.push(fx(v));
+                        }
+                    }
+                }
+            }
             c => panic!("no generator for {c}"),
         }
         lines.push(t.join(" "));
@@ -1558,7 +1668,7 @@ fn perturb(g: &mut Gen, v: &mut [String], e: &mut [String]) {
 }
 
 /// The probe's commands, in the order the generator cycles through them.
-pub const COMMANDS: [&str; 88] = [
+pub const COMMANDS: [&str; 93] = [
     "vgwrite",
     "vgread",
     "vgread",
@@ -1647,6 +1757,11 @@ pub const COMMANDS: [&str; 88] = [
     "sseq",
     "sxyz",
     "tkern",
+    "deriv",
+    "grad",
+    "nbrs",
+    "lxf",
+    "rsmat",
 ];
 
 /// One buffer both streams write into, in order (FreeSurfer's standard output and error go to
@@ -2804,6 +2919,105 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
                     o.d(w);
                 }
             }
+        }
+        "deriv" | "grad" => {
+            let m = get_vol(cx, t)?;
+            cx.g.sample_volume_derivative_sign = t.d();
+            let n = t.i();
+            let (g, b) = (&mut cx.g, &mut cx.b);
+            for _ in 0..n {
+                let (x, y, z, kind) = (t.d(), t.d(), t.d(), t.i());
+                if cmd == "deriv" {
+                    let (ddx, ddy, ddz, sigma) = (t.d(), t.d(), t.d(), t.d());
+                    let mut mag = -7.0;
+                    let r = if kind != 0 {
+                        dv::sample_volume_derivative_scale(
+                            g, b, &m, x, y, z, ddx, ddy, ddz, &mut mag, sigma,
+                        )?
+                    } else {
+                        dv::sample_volume_derivative(g, b, &m, x, y, z, ddx, ddy, ddz, &mut mag)
+                    };
+                    o.i(i64::from(r));
+                    o.d(mag);
+                } else {
+                    let frame = t.i();
+                    let (mut p, mut q, mut w) = (-7.0, -7.0, -7.0);
+                    let r = if kind != 0 {
+                        dv::sample_volume_gradient_frame(
+                            g, b, &m, x, y, z, &mut p, &mut q, &mut w, frame,
+                        )
+                    } else {
+                        dv::sample_volume_gradient(g, b, &m, x, y, z, &mut p, &mut q, &mut w)
+                    };
+                    o.i(i64::from(r));
+                    o.d(p);
+                    o.d(q);
+                    o.d(w);
+                }
+            }
+        }
+        "nbrs" => {
+            let m = get_vol(cx, t)?;
+            let n = t.i();
+            let (g, b) = (&mut cx.g, &mut cx.b);
+            for _ in 0..n {
+                let (kind, x, y, z, a1, b1) = (t.i(), t.i(), t.i(), t.i(), t.i(), t.i());
+                let (lo, hi) = (t.f(), t.f());
+                let r = match kind {
+                    0 => dv::neighbors_on(g, b, &m, x, y, z, a1)?,
+                    1 => dv::neighbors_on_3x3(g, b, &m, x, y, z, a1)?,
+                    2 => dv::neighbors_in_window(g, b, &m, x, y, z, a1, b1)?,
+                    3 => dv::neighbors(g, b, &m, x, y, z, a1)?,
+                    4 => dv::neighbors_in_range(g, b, &m, x, y, z, a1, lo, hi)?,
+                    5 => dv::neighbors_3x3(g, b, &m, x, y, z, a1)?,
+                    6 => dv::neighbors_off(g, &m, x, y, z, a1),
+                    _ => dv::neighbors_off_3x3(g, b, &m, x, y, z, a1)?,
+                };
+                o.i(i64::from(r));
+            }
+        }
+        "lxf" => {
+            let mut src = get_vol(cx, t)?;
+            src.outside_val = t.d();
+            let mut dst = if t.i() != 0 {
+                Some(get_vol(cx, t)?)
+            } else {
+                None
+            };
+            let (kind, interp) = (t.i(), t.i());
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let ma = if t.i() != 0 {
+                let mut m = mx::matrix_alloc(g, a, b, 4, 4, mx::MATRIX_REAL)?.expect("4 x 4");
+                for r in 1..=4 {
+                    for c in 1..=4 {
+                        m.set_relt(r, c, t.f());
+                    }
+                }
+                Some(m)
+            } else {
+                None
+            };
+            let (ma, d) = (ma.as_ref(), dst.as_mut());
+            let r = match kind {
+                0 => xf::mri_linear_transform_interp(g, a, b, &src, d, ma, interp)?,
+                1 => xf::mri_linear_transform(g, a, b, &src, d, ma)?,
+                2 => xf::mri_inverse_linear_transform(g, a, b, &src, d, ma)?,
+                3 => xf::mri_apply_ras_linear_transform_interp(g, a, b, &src, d, ma, interp)?,
+                4 => xf::mri_apply_ras_linear_transform(g, a, b, &src, d, ma)?,
+                _ => xf::mri_apply_ras_inverse_linear_transform(g, a, b, &src, d, ma)?,
+            };
+            o.ret(&r, dst.as_ref());
+        }
+        "rsmat" => {
+            let src = get_vol(cx, t)?;
+            let tmpl = get_vol(cx, t)?;
+            if t.i() != 0 {
+                cx.g.gdiag |= larmorx_freesurfer_core::diag::DIAG_SHOW
+                    | larmorx_freesurfer_core::diag::DIAG_VERBOSE;
+            }
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let m = xf::mri_get_resample_matrix(g, a, b, &src, &tmpl)?;
+            o.m(m.as_ref());
         }
         c => panic!("unknown command {c}"),
     }

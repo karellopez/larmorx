@@ -1515,6 +1515,14 @@ defects! {
         "trilinear splatting of a value into an integer volume (MRIinterpolateIntoVolume) adds each corner's rounded share to the voxel in the voxel's type: a sum beyond the type's range wraps around (bytes, shorts, 32-bit integers)";
     FS_321 = "FS-321", "FreeSurfer", true,
         "trilinear splatting of a value into a volume of 64-bit integers (long) adds into 32-bit integers at the voxel's index: it changes halves of other voxels";
+    FS_322 = "FS-322", "FreeSurfer", true,
+        "the directional derivatives and gradients of a volume of a type the trilinear sampler refuses (RGB, complex) use sample values never written: memory contents";
+    FS_323 = "FS-323", "FreeSurfer", true,
+        "the neighbour counts of a voxel more than 500 voxels outside the volume read its boundary index tables past their ends: memory contents";
+    FS_324 = "FS-324", "FreeSurfer", true,
+        "the directional derivative at a scale (MRIsampleVolumeDerivativeScale) with an infinite scale, or one whose double overflows, never returns";
+    FS_325 = "FS-325", "FreeSurfer", true,
+        "the linear transform of a volume (MRIlinearTransformInterp) stores, where a sample fails (sinc sampling, a type the trilinear sampler refuses), the last sample that succeeded, and before the first a value never written: memory contents";
 }
 
 /// The register entry with ID `id`.

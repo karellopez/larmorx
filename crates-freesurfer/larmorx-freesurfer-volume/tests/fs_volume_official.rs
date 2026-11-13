@@ -15,20 +15,21 @@ mod cases;
 use larmorx_core::defects::UpstreamDefects;
 use sha2::{Digest, Sha256};
 
-/// Recorded 2026-11-13 (84 commands: transform.cpp's VOL_GEOM functions and `LTAreadEx` with
+/// Recorded 2026-11-13 (93 commands: transform.cpp's VOL_GEOM functions and `LTAreadEx` with
 /// `USE_AVERAGE305` unset, `true` or empty, 3.1-35's voxel arithmetic, coordinates and geometry,
 /// moves and head box, `MRIaverage`, 3.1-36's samplers, resolution, planes, fills, resampling by whole
-/// factors and changes of type, the CMA labels and segmentation functions): 1,680 cases, 1,546 lines
-/// identical, 134 hashed as `SKIP`.
-const N: usize = 1680;
-const OFFICIAL_SHA256: &str = "919eb356853935742497415be1a6e96cc024dc5e7efdff0dd7499caf1638bf6e";
-const SKIPPED: usize = 134;
+/// factors and changes of type, frame-range samplers, the trilinear kernel and splatting, derivatives,
+/// gradients, neighbour counts and linear transforms, the CMA labels and segmentation functions):
+/// 1,860 cases, 1,713 lines identical, 147 hashed as `SKIP`.
+const N: usize = 1860;
+const OFFICIAL_SHA256: &str = "718b2164c1606fdac499763c22925f59159265321405289580253ec012eefa7c";
+const SKIPPED: usize = 147;
 
 /// `check.py`'s `SKIP`.
-const SKIP: [&str; 22] = [
+const SKIP: [&str; 26] = [
     "FS-288", "FS-53", "FS-58", "FS-290", "FS-294", "FS-47", "FS-48", "ITK-112", "ITK-115",
     "ITK-116", "FS-300", "FS-302", "FS-303", "FS-304", "FS-305", "FS-306", "FS-307", "FS-308",
-    "FS-309", "FS-310", "FS-314", "FS-315",
+    "FS-309", "FS-310", "FS-314", "FS-315", "FS-322", "FS-323", "FS-324", "FS-325",
 ];
 
 #[test]

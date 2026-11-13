@@ -289,7 +289,8 @@ The second volume is walked with the first's extent and frames.
   4. Starts below 0 become 0; `dx` is cut to `width - x0` and then to `dst.width - x1` (the same for
      `y`, `z`).
   5. A new destination: `xstart += x0 * xsize`, `xend = xstart + dx * xsize` (and `y`, `z`) with the
-     voxel sizes truncated to integers (FS-295: `reproduce`; by default the float sizes).
+     voxel sizes truncated to integers (FS-295: `reproduce`; by default the float sizes where a size
+     is not a whole number, the integer product, with its signed zeros, where it is).
   6. A source type other than `uchar`, `short`, `ushort`, `int`, `long`, `float`: the program ends
      (`MRIextractInto: unsupported source type <t>`, status -3).
   7. For every frame, slice and row of the box, `dx` voxels copied (a negative `dx`: FS-294, the
@@ -380,6 +381,20 @@ accumulation) and inverses `MatrixInverse`'s (none when an element of the result
   (`specs/freesurfer-maths.md`); `NO_ERROR`. FreeSurfer never returns for a covariance with
   infinite or NaN entries (FS-47, ITK-112: an error by default and in `reproduce`).
 
+## 15b. Running average (`MRIaverage(src, dof, dst)`)
+
+Without a destination, a new one-frame volume of the source's extent and type (`MRIalloc`) with
+the source's header (`MRIcopyHeader`). A destination whose extent differs from the source's
+(`MRIcheckSize`) gives the error `MRIaverage: incompatible volume dimensions` and `NULL`. Otherwise
+for each frame of the destination, each slice, row and column (x innermost) both voxels are sampled
+nearest at the whole coordinates (`MRIsampleVolumeFrameType`: `outside_val` never, as the
+coordinates are inside; the voxel of that frame as a `float`, an unsupported type 0 with the error
+`MRIsampleVolumeFrameType: unsupported volume type <t>`; a source with fewer frames reads memory it
+does not own, FS-290) and the destination's voxel set (`MRIsetVoxVal`) to the `double`
+`(dof * dst + src) / (dof + 1)` (the product with `dof` as its first operand, then `src` added, `dof
++ 1` computed in 32-bit `int`), rounded to `float`. The destination may be the source itself. The
+destination's `dof` is incremented; the destination is returned.
+
 ## 16. Header comparison, dump, derivative sign
 
 - `MRIcompareHeaders(a, b)`: 1 when either is absent; 1 when any of the voxel sizes, field of view,
@@ -401,7 +416,8 @@ accumulation) and inverses `MatrixInverse`'s (none when an element of the result
 
 ## 17. Validation plan (part 3)
 
-The probe's commands `dsign`, `sras` (the four matrices), `spt` (the three point conversions),
+The probe's commands `avg` (destination new, given or the source; `dof` 0 to 7, negative and
+`INT_MAX`), `dsign`, `sras` (the four matrices), `spt` (the three point conversions),
 `ostr`, `vtal` (with and without a transform of finite or special entries), `com`, `pca`, `cmph`
 (against nothing, itself, another volume or a copy with one field nudged by 1e-8 to 0.5), `dump`
 (with and without a registration matrix), on part 2's volumes with their cached matrices kept,

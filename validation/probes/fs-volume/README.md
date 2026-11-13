@@ -41,3 +41,13 @@ them identical all the same), 0 different; `fix` different on 5,580 lines, each 
 `3a5943ae54ab373ec10757ccc3aa7b5561ec09592777384c022b863a7f010f5d`, passing with AArch64's NaN emulated in
 debug and release. The official build's operand orders behind the NaN payloads, its crashes and
 `readVolGeom`'s frame: `docs/findings/freesurfer-volume.md`.
+
+Measured 2026-11-13 (part 3, 3.1-35's coordinates and geometry and `MRIaverage`: `avg`, `dsign`, `sras`,
+`spt`, `ostr`, `vtal`, `com`, `pca`, `cmph`, `dump`; 46 then 47 commands): seed 7, 46,000 cases (46
+commands, boxed 10 GiB, log `oracles/logs/fs-found-c-r12-volume-probe-46000.log`): 43,544 identical with
+`reproduce`, 2,456 not comparable (479 identical all the same), 0 different; `fix` different only with
+notices. FreeSurfer's eigen-systems that never return (`pca` on infinite voxels: the child's alarm,
+`CRASH 14`) are counted as not comparable (FS-47, FS-48, ITK-112, ITK-115, ITK-116). Seed 7, 4,700 cases
+(47 commands): 4,456 identical, 244 not comparable, 0 different. Seed 1, 940 cases: 886 identical, 54 not
+comparable, hash `2b37ea96a0d3665073c7c7b2fc0563aa984f9826fc4d736a8f2c8a702114b30b`, passing with AArch64's
+NaN emulated in debug and release.

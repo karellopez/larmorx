@@ -254,15 +254,17 @@ difference is unexplained: exit status 1, the first three of each group printed.
 per group, the identical lines and those of each allowed kind, and the IDs the candidate noted on
 the allowed lines.
 
-**The batches of both kinds** (2026-11-13, spec §17): `eigen-nonfinite` (symmetric
+**The batches of both kinds** (2026-11-13, spec §17 and §18.2): `eigen-nonfinite` (symmetric
 matrices of 1 to 5 rows with 1 to 3 infinite or NaN entries, on the diagonal, mirrored, in the upper
 triangle only or below the diagonal, which the routine never reads; `oeigen`, the helper's symmetric
 path, `meigen` where the matrix is symmetric without a NaN; and 11 picked matrices),
 `svd-nonfinite` (matrices of up to 6 x 5 with such entries: `msvd`, `msvdvalues`, `mcond`,
 `msvdpinverse`; 6 picked matrices; 16 condition numbers of finite rows and columns whose products
 overflow) hold matrices on which FreeSurfer never returns and matrices it finishes: with `--mode
-reproduce` the finished ones are compared as every other line. Each batch has a generator of its
-own, so the groups' other batches keep their cases.
+reproduce` the finished ones are compared as every other line. `mfiles-cut` holds binary matrix
+files cut at every byte of the header, of the first element (into FreeSurfer's matrix and into a
+given one), of a later element and of a complex element's parts (FS-49). Each batch has a generator
+of its own, so the groups' other batches keep their cases.
 
 ## Results (2026-11-13, the reference machine: glibc 2.35, Linux 6.8, x86-64)
 
@@ -274,8 +276,8 @@ own, so the groups' other batches keep their cases.
   26,610 lines identical, 71 memory lines whose contents changed from process to process, 26 where
   the probe crashed in one process and not in the other (`svd`'s `mpinverse` with a given output
   FreeSurfer frees).
-- 2026-11-13 (track E, relay 4): the batches `eigen-nonfinite` and `svd-nonfinite` added; `refs
-  --groups eigen,svd` cold, warm and without the cache give the spec's new hashes
+- 2026-11-13 (track E, relay 4): the batches `eigen-nonfinite`, `svd-nonfinite` and `mfiles-cut`
+  added; `refs --groups eigen,svd,mfiles` cold, warm and without the cache give the spec's new hashes
   (`oracles/logs/fs-maths-probe-r4-refs-2026-11-13.log`); the groups' other batches unchanged.
   `standin.py` as the candidate (`--mode reproduce`, groups `eigen` and `svd`): no unexplained
   difference, 295 lines where FreeSurfer did not finish (each with the refusal), 164 "NaN bits only";

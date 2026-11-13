@@ -8,8 +8,9 @@ black-box validation plan (§23) with its open probe, a read-through as a clean-
 filled from the source as behaviour (§0, §3, §5.1, §18.2, §19), the defects' texts in
 `larmorx_core::defects` checked. Amended by its relay 4 (2026-11-13), from the clean room's
 black-box runs: §17.1, §17.2 and §17.4 (which matrices with infinite or NaN entries make FreeSurfer
-hang and which it finishes, with their results under `reproduce`). What black-box runs confirmed is
-marked **(observed)**, with the probe command or the comparison group behind it.
+hang and which it finishes, with their results under `reproduce`), §18.2 (the bytes of a file cut
+short under `reproduce`). What black-box runs confirmed is marked
+**(observed)**, with the probe command or the comparison group behind it.
 
 **Whoever implements it must not open:** FreeSurfer's source (`<workspace>/tags/freesurfer-8.2.0`,
 any other copy, the installed package's scripts, Python and libraries), the replica crates
@@ -1128,9 +1129,31 @@ nothing.
 - **Binary read** (stream, m): the type, rows and columns as big-endian 32-bit integers, then each
   element as a big-endian double (complex: two) rounded to float; a matrix and a given `m` as the ASCII
   read (`MatrixReadFrom: could not allocate matrix`, `MatrixReadFrom: specified matrix does not match
-  file`). A double cut short prints `freadDouble: fread failed` (code -5). **FS-49:** a file that ends
-  early gives FreeSurfer the stack's bytes; **default:** an error `MatrixReadFrom: the file ends before
-  the matrix does`, code -5, nothing returned; **reproduce:** the missing bytes 0.
+  file`). A double cut short prints `freadDouble: fread failed` (code -5); an integer cut short prints
+  nothing. **FS-49:** a file that ends early. **Default:** an error `MatrixReadFrom: the file ends
+  before the matrix does`, code -5, nothing returned. **Reproduce:** FreeSurfer reads each number's
+  bytes over the bytes that held the number read before it, so a number the file cuts short (k of
+  its 4 or 8 bytes read, 0 ≤ k < its size) is the k bytes read followed by the rest of those earlier
+  bytes, taken big-endian:
+  - **the type, rows and columns** (32-bit): the missing bytes of each are the previous integer's as
+    the file gave them (rows cut after k bytes: the file's k bytes of rows, then the type's bytes k
+    to 3 in file order; the columns likewise from the rows); the type's own missing bytes are memory
+    FreeSurfer does not own (0 here, §1);
+  - **an element** (a double; a complex element's real part, then its imaginary part, each one
+    such double): the missing bytes are those of the double read just before it **as the machine
+    holds its value**, its least significant byte first: byte j (counting from 0 in the file's order)
+    of the new number is byte j of that value stored little-endian. Once nothing more is read, each
+    further element is the previous one with its 8 bytes in reverse order, so the values alternate
+    between two numbers (**(observed)**: a 3 x 1 complex file holding two doubles reads
+    `c01c767fb336de2a`, `c0022d0fb62dea84`, then `84ea2db60f2d02c0`, `c0022d0fb62dea84`,
+    `84ea2db60f2d02c0`, `c0022d0fb62dea84`);
+  - **the first element:** into a given matrix, its missing bytes 4 to 7 are the file's bytes 8 to
+    11 (the column count as written), its missing bytes 0 to 3 memory (0 here); into a matrix
+    FreeSurfer made, every missing byte is memory (0 here).
+
+  Each element is then rounded to float as usual. **(observed)** every `mreadbin` case of §23's
+  `mfiles` and `mfiles-cut` batches whose bytes come from the file or earlier numbers: FreeSurfer's
+  numbers; those that take a byte from memory are the probe's memory lines.
 - **Text write** (file name, m): not openable: an error `MatrixWriteTxt(<name>) - file open failed` +
   `\n`, code -1, returned. Each row: each element `%+4.5f` and a space, then `\n`. Real only (FS-25).
   Success.
@@ -1246,13 +1269,13 @@ it, and again from the cache:
 | `nr` | 14 | 5 | 0 | 0 | 0 | `ba8b8aea531d281110a5a52a4a2455fe313fc4e8b3a5a4ce6b1e1cc19eaad69d` |
 | `eigen` | 17.1 to 17.3 | 1,460 | 252 | 0 | 153 | `c3ddceff612985227ad6d69acf56662aaa0584974c847c827005539ce38b17f3` |
 | `svd` | 17.4, 17.5 | 2,280 | 354 | 0 | 142 | `af777aba4138e1ab5d48ba2ee4e4cc8477a2f3d0abc1d9334c05d1a10c40aad7` |
-| `mfiles` | 18 | 635 | 1 | 0 | 0 | `e8ab918477d85396d2d7c0f8e040499d134ecc8d49200dcde7300b11718ac045` |
+| `mfiles` | 18 | 699 | 28 | 0 | 1 | `ac865eb3e87ec634b6e1580d41005a8da591aff62d674f3463bf984a0b38f157` |
 | `rfields` | 19 | 16 | 0 | 0 | 0 | `6f26117e696800de35160344e0a49825b4ff992d68dc6a500ca215703240ce15` |
-| all | | 27,303 | 1,346 | 41 | 298 | |
+| all | | 27,367 | 1,373 | 41 | 299 | |
 
-The groups `eigen` and `svd` gained the batches `eigen-nonfinite` and `svd-nonfinite` (§17;
-generators of their own, the groups' other cases unchanged) on 2026-11-13; their two hashes are from
-then, the others from the first runs.
+The groups `eigen`, `svd` and `mfiles` gained the batches `eigen-nonfinite`, `svd-nonfinite` and
+`mfiles-cut` (§17, §18.2; generators of their own, the groups' other cases unchanged) on 2026-11-13;
+their three hashes are from then, the others from the first runs.
 
 ### 23.3 The comparison
 
@@ -1276,7 +1299,8 @@ standard error) are taken out and their IDs kept. Every line must be identical, 
 
 So with `--mode reproduce` the matrices with infinite or NaN entries that FreeSurfer finishes (FS-47,
 FS-48: the batches `eigen-nonfinite` and `svd-nonfinite` hold both kinds) are compared as any other
-line.
+line, and the files cut short (FS-49: the batch `mfiles-cut`, every byte of the header, of the first
+element and of later ones) likewise, but where a byte comes from memory.
 
 The loop prints, per group, the identical lines and those of each allowed kind, and the IDs noted on
 the allowed lines; exit status 1 for any other difference.

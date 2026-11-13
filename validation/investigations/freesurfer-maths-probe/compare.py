@@ -1023,7 +1023,32 @@ class Gen:
             a = self.mat(r, r.randint(1, 4), r.randint(1, 4), typ, special=0.2)
             L += [f"mwriteasc {a}", f"mwritebin {a}", f"mwritetxt {xs('w.txt')} {a}"]
         L.append(f"mwritetxt {xs('no/such/w.txt')} {self.mat(r, 2, 2)}")
-        return [Batch("mfiles", "mfiles", L)]
+        return [Batch("mfiles", "mfiles", L), self.mfiles_cut()]
+
+    @staticmethod
+    def mfiles_cut() -> Batch:
+        """FS-49 (spec §18.2): binary matrix files cut short at every byte of the header, of the
+        first element (FreeSurfer's matrix and a given one), of a later element and of a complex
+        element's two parts."""
+        hdr = lambda t, n, c: struct.pack(">iii", t, n, c)  # noqa: E731
+        d = lambda v: struct.pack(">d", v)  # noqa: E731
+        L = []
+        for k in range(8):
+            L.append(f"mreadbin x{(hdr(1, 1, 2) + d(3.25)[:k]).hex()} new")
+            L.append(f"mreadbin x{(hdr(1, 1, 2) + d(3.25)[:k]).hex()} 1 1 2 3f800000 40000000")
+        for k in range(12):
+            L.append(f"mreadbin x{hdr(1, 1, 1)[:k].hex()} 1 1 1 3f800000")
+            L.append(f"mreadbin x{hdr(1, 1, 1)[:k].hex()} new")
+        full = hdr(2, 1, 2) + d(-1.5) + d(2.75)
+        for k in range(8, 16):
+            L.append(f"mreadbin x{full[: 12 + k].hex()} 2 1 2 3f800000 40000000 40400000 40800000")
+        for k in range(8):
+            L.append(
+                f"mreadbin x{(hdr(1, 1, 3) + d(1.0e10) + d(-7.5)[:k]).hex()} 1 1 3 3f800000 40000000 40400000"
+            )
+        for k in range(8):  # after the end, each element the previous one's bytes reversed
+            L.append(f"mreadbin x{(hdr(1, 2, 3) + d(0.1) + d(-2.0e-3)[:k]).hex()} new")
+        return Batch("mfiles", "mfiles-cut", L)
 
     def rfields(self) -> list[Batch]:
         names = ["uniform", "gaussian", "z", "t", "F", "chi2", "f", "Gaussian", "", "normal", "chi"]

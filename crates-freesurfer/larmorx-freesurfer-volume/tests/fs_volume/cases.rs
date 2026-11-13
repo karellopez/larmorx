@@ -15,13 +15,13 @@ use larmorx_freesurfer_core::affine::AffineMatrix;
 use larmorx_freesurfer_core::cname::CName;
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::Fatal;
+use larmorx_freesurfer_core::matrix as mx;
 use larmorx_freesurfer_core::matrix::Matrix;
 use larmorx_freesurfer_core::ret::Ret;
 use larmorx_freesurfer_io::cfile::CFile;
 use larmorx_freesurfer_mri::mri::{self as mm, Mri, MriRegion};
 use larmorx_freesurfer_mri::vol_geom::VolGeom;
 use larmorx_freesurfer_mri::vol_geom::reinit_cache;
-use larmorx_freesurfer_core::matrix as mx;
 use larmorx_freesurfer_volume::arith::{self as ar, Pair, Tri};
 use larmorx_freesurfer_volume::coords as co;
 use larmorx_freesurfer_volume::vgeom;
@@ -631,7 +631,16 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
                 t.push(g.pick(&[0, 1, 2, 7, -1, -2, 2147483647]).to_string());
             }
             "dsign" => {
-                t.push(dx(g.pick(&[1.0, -1.0, 0.0, 2.5, f64::NAN, 1e300, -0.0, 0.1])));
+                t.push(dx(g.pick(&[
+                    1.0,
+                    -1.0,
+                    0.0,
+                    2.5,
+                    f64::NAN,
+                    1e300,
+                    -0.0,
+                    0.1,
+                ])));
             }
             "sras" | "spt" | "ostr" | "vtal" => {
                 let mut s = shape(&mut g);

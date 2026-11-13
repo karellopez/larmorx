@@ -23,7 +23,8 @@ const SKIPPED: usize = 54;
 
 /// `check.py`'s `SKIP`.
 const SKIP: [&str; 10] = [
-    "FS-288", "FS-53", "FS-58", "FS-290", "FS-294", "FS-47", "FS-48", "ITK-112", "ITK-115", "ITK-116",
+    "FS-288", "FS-53", "FS-58", "FS-290", "FS-294", "FS-47", "FS-48", "ITK-112", "ITK-115",
+    "ITK-116",
 ];
 
 #[test]

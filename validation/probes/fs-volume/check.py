@@ -40,7 +40,18 @@ from larmorx_validation.oracle_cache.store import workspace  # noqa: E402
 # them deterministic, and reproduce follows it
 # and the matrices FreeSurfer's eigen-systems never return on (FS-47, FS-48, ITK-112, ITK-115,
 # ITK-116: the official code hangs, the port gives an error)
-SKIP = ("FS-288", "FS-53", "FS-58", "FS-290", "FS-294", "FS-47", "FS-48", "ITK-112", "ITK-115", "ITK-116")
+SKIP = (
+    "FS-288",
+    "FS-53",
+    "FS-58",
+    "FS-290",
+    "FS-294",
+    "FS-47",
+    "FS-48",
+    "ITK-112",
+    "ITK-115",
+    "ITK-116",
+)
 
 
 def probe_binary(ws: Path) -> Path:

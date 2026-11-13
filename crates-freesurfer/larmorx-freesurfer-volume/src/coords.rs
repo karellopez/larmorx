@@ -42,7 +42,11 @@ pub const SAMPLE_NEAREST: i32 = 0;
 
 /// `MRIsetSampleVolumeDerivativeSign(newsign)`: the sign kept, `Settting
 /// MRIsampleVolumeDerivativeSign to <%g>` on standard output; the sign.
-pub fn set_sample_volume_derivative_sign(g: &mut Globals, out: &mut dyn Write, newsign: f64) -> f64 {
+pub fn set_sample_volume_derivative_sign(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    newsign: f64,
+) -> f64 {
     g.sample_volume_derivative_sign = newsign;
     let _ = writeln!(
         out,
@@ -84,7 +88,14 @@ fn diag_print(
     if g.gdiag_no > 0 && (g.gdiag & DIAG_VERBOSE) != 0 {
         let _ = out.write_all(title.as_bytes());
         let mut buf = Vec::new();
-        matrix_print(g, Some(&mut buf as &mut dyn Write), &mut std::io::sink(), err, m, 5);
+        matrix_print(
+            g,
+            Some(&mut buf as &mut dyn Write),
+            &mut std::io::sink(),
+            err,
+            m,
+            5,
+        );
         let _ = out.write_all(&buf);
     }
 }
@@ -558,11 +569,7 @@ pub fn compare_headers(m1: Option<&Mri>, m2: Option<&Mri>) -> i32 {
         return 1;
     };
     let (u, v) = (&a.vg, &b.vg);
-    let floats = [
-        (u.xsize, v.xsize),
-        (u.ysize, v.ysize),
-        (u.zsize, v.zsize),
-    ];
+    let floats = [(u.xsize, v.xsize), (u.ysize, v.ysize), (u.zsize, v.zsize)];
     if floats.iter().any(|&(x, y)| !fequal(x, y)) {
         return 1;
     }
@@ -586,7 +593,8 @@ pub fn compare_headers(m1: Option<&Mri>, m2: Option<&Mri>) -> i32 {
     if rest.iter().any(|&(x, y)| !fequal(x, y)) {
         return 1;
     }
-    if !((a.flip_angle - b.flip_angle).abs() < f64::from(f32::EPSILON)) {
+    let d = (a.flip_angle - b.flip_angle).abs();
+    if d.is_nan() || d >= f64::from(f32::EPSILON) {
         return 1;
     }
     let geo = [
@@ -714,7 +722,14 @@ pub fn mri_dump(
     if let Some(m) = &vg.register_mat {
         let _ = fp.write_all(b"register_mat = \n");
         let mut buf = Vec::new();
-        matrix_print(g, Some(&mut buf as &mut dyn Write), &mut std::io::sink(), err, Some(m), 5);
+        matrix_print(
+            g,
+            Some(&mut buf as &mut dyn Write),
+            &mut std::io::sink(),
+            err,
+            Some(m),
+            5,
+        );
         let _ = fp.write_all(&buf);
     }
     Ok(NO_ERROR)

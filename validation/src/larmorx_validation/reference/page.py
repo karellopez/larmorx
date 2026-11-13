@@ -562,22 +562,23 @@ def build(repo: Path, p: apipage.Program) -> Reference:
         q = fn.param(o.python)
         default = q.default if q is not None and q.default is not None else ""
         doc = q.doc if q is not None else ""
-        if q is None:
-            problems.append(f"{where}: {fn.public} has no `{o.python}` argument ({o.option})")
         values = o.values.replace(" | ", "|")
         text = links(doc, page, problems)
+        if q is None:
+            # a function without the argument: the option is the command line's only
+            text = f"The command line's only: `{fn.public}` takes no `{o.python}`."
         if o.option == "--n-threads":
             # larmorx_core::cli: unset, the command line runs on every logical CPU (CHANGELOG.md)
-            text += f" Default: every logical CPU on the command line (`0`), `{default}` in Python."
+            text += " Default: every logical CPU on the command line (`0`)" + (
+                f", `{default}` in Python." if q is not None else "."
+            )
         text += (
             f" The variable `{o.variable}` in {released}."
             if released
             else f" Replaces `{o.variable}`, which keeps working."
         )
-        body.append(
-            f"| {_cell(f'`{o.option}` `{values}`')}<br>{_cell(f'`{o.python}={default}`')} | "
-            f"{_cell(text.strip())} |"
-        )
+        python = _cell(f"`{o.python}={default}`") if q is not None else "(no Python argument)"
+        body.append(f"| {_cell(f'`{o.option}` `{values}`')}<br>{python} | {_cell(text.strip())} |")
     body.append("")
 
     body.append("## Examples {#examples}\n")

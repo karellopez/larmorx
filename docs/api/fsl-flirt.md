@@ -2,40 +2,70 @@
 
 `lx.fsl.flirt` and `lx.fsl.convert_xfm` (command line `larmorx fsl flirt`, `larmorx fsl
 convert_xfm`): FSL 6.0.7.23's linear (affine) registration, with every cost function and
-boundary-based registration (BBR), and its matrix tool. Since part 2 (2026-11-01) also FLIRT's
-other programs `avscale`, `img2imgcoord`, `std2imgcoord`, `img2stdcoord`, `rmsdiff` and
-`makerot` (`lx.fsl.avscale`, ... below), and since part 3 `midtrans`, `pointflirt`, `applyxfm4D`
-and the scripts `pairreg`, `extracttxt`, `aff2rigid` (`lx.fsl.midtrans`, ... below), with every
-schedule command (`alignpaxes` and any parameter-subset mask) and `-debug`.
+boundary-based registration (BBR), and its matrix tool. Also FLIRT's other programs `avscale`,
+`img2imgcoord`, `std2imgcoord`, `img2stdcoord`, `rmsdiff`, `makerot`, `midtrans`, `pointflirt`,
+`applyxfm4D` and the scripts `pairreg`, `extracttxt`, `aff2rigid` (`lx.fsl.avscale`, ...
+below), with every schedule command (`alignpaxes` and any parameter-subset mask) and `-debug`.
 
-**Two implementations.** FSL is distributed under the FSL Licence (non-commercial use only), so
-larmorx keeps its FSL tools in two implementations ([licensing](../licensing.md)): the bit-exact
-**replica**, `larmorx-nc fsl flirt|convert_xfm` (package `larmorx-nc`, `crates-nc/`, under the FSL
-Licence's terms; translated from FSL's source:
-[PROVENANCE](../../crates-nc/larmorx-nc-flirt/PROVENANCE.md)), done (parts 1 to 3, 2026-11-01/02),
-and the clean-room **original** of `flirt` and `convert_xfm` in the main package (Apache-2.0,
-`crates/larmorx-fsl`, written from [`specs/flirt.md`](../../specs/flirt.md) on the registration
-engine it shares with `lx.mri.hmc`; part 1, 2026-11-02: [PROVENANCE](../../crates/larmorx-fsl/PROVENANCE.md),
-section "FLIRT"). `implementation="auto"` runs the replica when `larmorx-nc` is installed, else
-the clean-room original; `"clean-room"` (`"original"`, 0.1.0rc1's spelling, still works) runs the clean-room original in this process. Of FLIRT's other programs,
-`avscale`, the coordinate programs, `rmsdiff` and `makerot` have their clean-room original too
-(part 2 of the original, 2026-11-02); `midtrans`, `pointflirt`, `applyxfm4D` and the scripts have
-their replica only for now (`"auto"` needs `larmorx-nc` for them). The command line chooses alike
-(`LARMORX_IMPLEMENTATION`).
+The ports come first. One section per program follows: `flirt` and `convert_xfm` here, then
+FLIRT's other programs in their tables. Each program's section is the source of its reference
+page on the documentation site (`python -m larmorx_validation reference`), with its options table
+checked against the code. What the programs share comes after them, and the page's dates are in
+its [History](#history).
 
-**Status: `experimental`** (part 1): the replica against FSL 6.0.7.23 itself
-([record](../validation/fsl-flirt-replica.md), standard tier): fMRIPrep's boundary-based calls on
-three oracle runs (ds005040, ds003592, ds000228) bit-identical, their matrices also identical as
-text to fMRIPrep's own (its container's FSL); every cost function, search option, schedule FSL
-ships, `-applyxfm` 3D and 4D with every interpolation and data type, the BBR variants and the
-command line's errors. What waits for part 2 is listed below.
+## Ports
 
-## Quick start
+FSL's licence allows non-commercial use only, so each of FLIRT's programs has two ports, a
+replica and a clean room, in different packages ([licensing](../licensing.md) says what each
+package holds):
+
+- **The replica** is translated from FSL's source. The package `larmorx-nc` holds it (`crates-nc/`),
+  under the FSL Licence's terms, and `larmorx` runs it as a separate program, `larmorx-nc fsl
+  <program>`, when `larmorx-nc` is installed (`pip install larmorx-nc`).
+- **The clean room** is written from [`specs/flirt.md`](../../specs/flirt.md) by an implementer who
+  never read FSL's source or the replica. It is part of `larmorx`, under Apache-2.0
+  (`crates/larmorx-fsl`, with its [PROVENANCE](../../crates/larmorx-fsl/PROVENANCE.md), section
+  "FLIRT"), and runs on the main package's clean-room registration engine, shared with
+  `lx.mri.hmc`.
+
+`implementation="auto"` runs the replica when `larmorx-nc` is installed, and the clean room
+otherwise. `"replica"` and `"clean-room"` choose one (`"original"`, 0.1.0rc1's spelling of
+`"clean-room"`, still works); `"clean-room"` runs the clean room in this process. On the command
+line, `--implementation auto|replica|clean-room` before the family chooses alike, from the next
+release; in 0.1.0rc1 the variable `LARMORX_IMPLEMENTATION` chooses (`original` for the clean
+room).
+
+## `flirt`
+
+<!-- reference
+program: flirt
+group: fsl
+original: FSL 6.0.7.23
+python: larmorx.fsl.flirt
+command-line: crates/larmorx-fsl/src/cli/flirt.rs
+records: {replica: [fsl-flirt-replica], clean-room: [fsl-flirt]}
+evidence: fsl-flirt
+-->
+
+`flirt` registers one image to another with an affine transform, with every cost function and
+boundary-based registration (BBR). It finds a transform of 6, 7, 9 or 12 degrees of freedom, or
+applies a given matrix (`-applyxfm`, `-applyisoxfm`), and writes the 4 × 4 matrix from the
+input's FSL millimetres to the reference's (`-omat`) and, on request, the input resampled onto the
+reference's grid (`-out`).
+
+### Python (`flirt`)
+
+`lx.fsl.flirt(in_image, ref_image, *, init=None, dof=12, cost="corratio", search_cost="corratio", bins=256, interp="trilinear", sinc_width=7, sinc_window="hanning", search_rx=(-90.0, 90.0), search_ry=(-90.0, 90.0), search_rz=(-90.0, 90.0), no_search=False, coarse_search=60.0, fine_search=18.0, schedule=None, apply_xfm=False, apply_isoxfm=None, use_sqform=False, out=True, datatype=None, ref_weight=None, in_weight=None, wm_seg=None, wm_coords=None, wm_norms=None, fieldmap=None, fieldmap_mask=None, pe_dir=None, echo_spacing=0.0005, bbr_type="signed", bbr_slope=-0.5, padding_size=0.0, background=None, no_resample=False, no_clamp=False, no_resample_blur=False, force_scaling=False, min_sampling=None, base_scale=None, two_d=False, n_threads=1, implementation="auto", upstream_defects="fix")`
+
+Images are paths or `lx.Image` objects. `init` is a 4 × 4 matrix (an array or a `.mat` file),
+`schedule` a schedule file. The result's `matrix` maps the input's FSL millimetres to the
+reference's, as `-omat` writes it; its `image` is the input on the reference's grid (`None`
+unless `out`); its `stdout` holds FLIRT's verbose lines and a schedule's `print`.
+
+fMRIPrep's boundary-based registration of a BOLD reference to the T1w (no FreeSurfer), with
+FSL's `bbr.sch` (in `$FSLDIR/etc/flirtsch`):
 
 ```python
-import larmorx as lx
-
-# fMRIPrep's boundary-based registration of a BOLD reference to the T1w (no FreeSurfer).
 r = lx.fsl.flirt(
     "boldref.nii.gz", "T1w_brain.nii.gz",
     init="init.mat", cost="bbr", search_cost="bbr", dof=6, base_scale=1,
@@ -43,18 +73,14 @@ r = lx.fsl.flirt(
 )
 r.matrix     # 4 x 4, input FSL mm -> reference FSL mm (as -omat writes it)
 r.image      # the BOLD reference on the T1w's grid
-
-# A default 12-dof registration, then the inverse matrix.
-r = lx.fsl.flirt("epi.nii.gz", "T1w.nii.gz")
-inv = lx.fsl.convert_xfm(r.matrix, inverse=True)
 ```
 
-## Options (`flirt`)
+### Options of `flirt`
 
-| FLIRT option | `lx.fsl.flirt` | Notes |
+| FLIRT option | Python | Notes |
 |---|---|---|
 | `-in`, `-ref` | `in_image`, `ref_image` | paths or `lx.Image` |
-| `-out`, `-omat` | `out=True` (the image), the matrix always | returned in `FlirtResult` |
+| `-out`, `-omat` | `out=True` (the image), the matrix always | returned in `FlirtResult`; `-o` is `-out` |
 | `-init` | `init` | a 4 x 4 array or a `.mat` file |
 | `-applyxfm`, `-applyisoxfm s` | `apply_xfm=True`, `apply_isoxfm=s` | need `init` (or `use_sqform`) |
 | `-usesqform` | `use_sqform` | |
@@ -63,7 +89,7 @@ inv = lx.fsl.convert_xfm(r.matrix, inverse=True)
 | `-bins` | `bins` | 256 |
 | `-interp` | `interp` | `trilinear`, `nearestneighbour`, `sinc`, `spline` |
 | `-sincwidth`, `-sincwindow` | `sinc_width`, `sinc_window` | 7, `hanning` |
-| `-searchrx/ry/rz a b`, `-nosearch` | `search_rx`, `search_ry`, `search_rz`, `no_search` | degrees |
+| `-searchrx a b`, `-searchry a b`, `-searchrz a b`, `-nosearch` | `search_rx`, `search_ry`, `search_rz`, `no_search` | degrees |
 | `-coarsesearch`, `-finesearch` | `coarse_search`, `fine_search` | 60, 18 degrees |
 | `-schedule` | `schedule` | a schedule file |
 | `-datatype` | `datatype` | `char`, `short`, `int`, `float`, `double` |
@@ -75,12 +101,98 @@ inv = lx.fsl.convert_xfm(r.matrix, inverse=True)
 | `-noresample`, `-noclamp`, `-noresampblur`, `-forcescaling` | `no_resample`, `no_clamp`, `no_resample_blur`, `force_scaling` | |
 | `-minsampling`, `-basescale` | `min_sampling`, `base_scale` | |
 | `-2D` | `two_d` | |
-| `-v`, `-verbose`, `-printinit`, `-debugsave`, `-debug`, `-i`, `-help`, `-version`, `-anglerep` | command line only | `-anglerep quaternion` since part 2 |
+| `-v`, `-verbose`, `-printinit`, `-displayinit`, `-debugsave`, `-debug`, `-i`, `-help`, `-version`, `-anglerep`, `-applynonisoxfm`, `-nosave` | command line only | `-anglerep quaternion` since part 2 |
 | `OMP_NUM_THREADS` | `n_threads` | the results do not depend on it |
 | `LARMORX_UPSTREAM_DEFECTS` | `upstream_defects` | `fix` (default) or `reproduce` |
 
-`convert_xfm`: `-omat` (the result), `-concat` (`concat`), `-fixscaleskew` (`fix_scale_skew`),
-`-inverse` (`inverse`), `-v`, `-verbose`, `-help` (command line).
+### Examples of `flirt`
+
+<!-- inputs: epi.nii.gz=head T1w.nii.gz=head -->
+
+```python example
+import larmorx as lx
+
+# A default 12-dof registration.
+r = lx.fsl.flirt("epi.nii.gz", "T1w.nii.gz")
+r.matrix.shape  # -> (4, 4)
+
+# The same call, the clean room chosen, without the resampled image.
+c = lx.fsl.flirt("epi.nii.gz", "T1w.nii.gz", out=False, implementation="clean-room")
+c.image is None  # -> True
+```
+
+```bash example
+larmorx fsl flirt -in epi.nii.gz -ref T1w.nii.gz -omat epi2t1.mat -out epi2t1.nii.gz
+```
+
+### Ports of `flirt`
+
+The replica's record, against FSL 6.0.7.23 itself on the standard tier, holds fMRIPrep's
+boundary-based calls on three oracle runs (ds005040, ds003592, ds000228), bit-identical, their
+matrices also identical as text to fMRIPrep's own (its container's FSL); every cost function,
+search option, schedule FSL ships, `-applyxfm` 3D and 4D with every interpolation and data type,
+the BBR variants and the command line's errors. The clean room is within the thresholds in 238 of the 240
+compared cases of its record, which holds FLIRT's fourteen programs; the 2 it misses are two
+weighted registrations whose paths part at their costs' last bits. fMRIPrep's three boundary-based
+calls are within 0.1 mm of FSL's matrices at the 95th percentile over the brain (0.053, 0.011 and
+0.030 mm), their images' correlation with FSL's 0.9993 to 0.99996.
+
+## `convert_xfm`
+
+<!-- reference
+program: convert_xfm
+group: fsl
+original: FSL 6.0.7.23
+python: larmorx.fsl.convert_xfm
+command-line: crates/larmorx-fsl/src/cli/convert_xfm.rs
+records: {replica: [fsl-flirt-replica], clean-room: [fsl-flirt]}
+evidence: fsl-flirt
+-->
+
+`convert_xfm` is FLIRT's matrix tool: it inverts a 4 × 4 matrix (`-inverse`), composes two
+(`-concat`) and gives a matrix another's scales and skews (`-fixscaleskew`). It applies
+`-fixscaleskew` first, then `-concat` (that matrix times the input), then `-inverse`, and writes
+the result (`-omat`).
+
+### Python (`convert_xfm`)
+
+`lx.fsl.convert_xfm(matrix, *, concat=None, fix_scale_skew=None, inverse=False, implementation="auto")`
+
+`matrix`, `concat` and `fix_scale_skew` are 4 × 4 arrays or matrix files. The result is a 4 × 4
+array, as FSL writes it (10 significant digits).
+
+### Options of `convert_xfm`
+
+| `convert_xfm` option | Python | Notes |
+|---|---|---|
+| `<input-matrix-filename>` | `matrix` | a 4 × 4 array or a matrix file |
+| `-omat` | the result | |
+| `-concat` | `concat` | |
+| `-fixscaleskew` | `fix_scale_skew` | |
+| `-inverse` | `inverse=True` | |
+| `-v`, `-verbose`, `-help` | command line only | |
+
+### Examples of `convert_xfm`
+
+<!-- inputs: epi2t1.mat=matrix -->
+
+```python example
+import larmorx as lx
+
+# The inverse of a FLIRT matrix.
+inv = lx.fsl.convert_xfm("epi2t1.mat", inverse=True)
+inv.shape  # -> (4, 4)
+```
+
+```bash example
+larmorx fsl convert_xfm -omat t12epi.mat -inverse epi2t1.mat
+```
+
+### Ports of `convert_xfm`
+
+Both ports are complete. The replica is translated from FSL 6.0.7.23's source, bit-exact. In the
+clean room, `convert_xfm`'s messages are FSL's, and `-fixscaleskew` aborts where its decomposition
+does not solve (a zero scale or a non-finite entry), as `avscale` does.
 
 ## FLIRT's other programs (part 2)
 
@@ -403,3 +515,15 @@ ported); `flirt_average` and `epi_reg` (scripts of FSL's other programs: not por
 NaN results can differ from FSL's (`nan` against `-nan`; the values are NaN in both); FSL-91's and
 FSL-92's `reproduce` runs (every cost equal) and the weighted `woods` registration of the
 record part from FSL's paths (the catch-up's findings, above).
+
+## History
+
+- **The replica**, parts 1 to 3 (2026-11-01 and 02; its
+  [PROVENANCE](../../crates-nc/larmorx-nc-flirt/PROVENANCE.md)): `flirt` and `convert_xfm` in part 1;
+  `avscale`, `img2imgcoord`, `std2imgcoord`, `img2stdcoord`, `rmsdiff` and `makerot` in part 2
+  (2026-11-01); `midtrans`, `pointflirt`, `applyxfm4D` and the scripts `pairreg`, `extracttxt` and
+  `aff2rigid` in part 3.
+- **The clean room**: `flirt` and `convert_xfm` in part 1 (2026-11-02); FLIRT's other programs and
+  scripts, the verbose levels and `-debug`, and the spec writer's answers in part 2 (2026-11-02);
+  the clean-room catch-up (2026-11-05), after which its record was made again from `a835ddd`; the
+  weighted `normcorr` FSL's matrix as text since 2026-11-07.

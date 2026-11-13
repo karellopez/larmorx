@@ -28,6 +28,7 @@ the replica and the clean room run directly. Usage (README): ``python -P compare
 from __future__ import annotations
 
 import argparse
+import hashlib
 import importlib.util
 import json
 import os
@@ -213,7 +214,18 @@ def main() -> int:
     crafted_ctx.probe = Path(args.crafted_probe)
     replica, cleanroom = Path(args.replica), Path(args.cleanroom)
     result: dict = {"date": time.strftime("%Y-%m-%d"), "machine": os.uname().machine}
-    result.update(cr.stamp(ctx.probe, crafted_ctx.probe, replica, cleanroom))
+    stamp = cr.stamp(ctx.probe)
+    stamp["sha256"] = {
+        role: hashlib.sha256(path.read_bytes()).hexdigest()
+        for role, path in (
+            ("fs_rng_probe", ctx.probe),
+            ("fs_rng_probe_crafted", crafted_ctx.probe),
+            ("mri_volsynth", ctx.fs_home / "bin/mri_volsynth"),
+            ("replica", replica),
+            ("cleanroom", cleanroom),
+        )
+    }
+    result.update(stamp)
     status = 0
     for name in args.sections.split(","):
         t0 = time.perf_counter()

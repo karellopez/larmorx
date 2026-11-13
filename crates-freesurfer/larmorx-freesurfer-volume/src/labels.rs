@@ -7,8 +7,8 @@
 //! (`MRImeanInLabelMultispectral`, `MRImeanInLabel`, `MRImeanAndStdInLabel`,
 //! `MRImeanInLabelInRegion`, `MRImaxInLabelInRegion`), `MRImakePositive`,
 //! `MRImarkLabelBorderVoxels`, `MRIcomputeLabelNbhd`, `MRIlabelsInNbhd`, `MRIlabelsInPlanarNbhd`,
-//! `MRIlabelBoundingBox`, `MRIcountThreshInNbhd`, `MRIfillBox`, `MRImaskZero` and
-//! `MRIclipBrightWM`.
+//! `MRIlabelBoundingBox`, `MRIcountThreshInNbhd`, `MRIfillBox`, `MRImaskZero`,
+//! `MRIclipBrightWM` and `MRIvoxelsInLabelWithPartialVolumeEffects`.
 //!
 //! A neighbourhood `-whalf..=whalf` around a voxel goes through the volume's boundary index tables
 //! (`mri->xi[x + k]`: the coordinate clamped to the volume); an index more than `MAX_INDEX` outside
@@ -24,13 +24,17 @@
 //!   a value outside [0, 255] or NaN converts as x86-64 converts it (the low byte of the 32-bit
 //!   truncation; -2147483648 for NaN and beyond the `int` range) with `reproduce`, clamped (NaN 0)
 //!   by default.
+//! - **FS-469** (memory), **FS-470** (crash), **FS-471** (crash): the partial-volume count of a
+//!   label; see [`mri_voxels_in_label_with_partial_volume_effects`].
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::io::Write;
 
-use larmorx_core::defects::{FS_12, FS_467, FS_468};
+use larmorx_core::defects::{FS_12, FS_467, FS_468, FS_469, FS_470, FS_471};
 use larmorx_freesurfer_core::globals::Globals;
-use larmorx_freesurfer_core::log::{self, ERROR_NOMEMORY, ERROR_UNSUPPORTED, Fatal, NO_ERROR};
+use larmorx_freesurfer_core::log::{
+    self, ERROR_BADPARM, ERROR_NOMEMORY, ERROR_UNSUPPORTED, Fatal, NO_ERROR,
+};
 use larmorx_freesurfer_core::matrix::{MATRIX_REAL, Matrix, matrix_alloc};
 use larmorx_freesurfer_core::ret::Ret;
 use larmorx_freesurfer_core::sse::{add, add64, div, div64, mul, mul64, sqrt64, sub, sub64};
@@ -771,6 +775,283 @@ pub fn mri_compute_label_nbhd(
         }
     }
     Ok(NO_ERROR)
+}
+
+/// One window of `MRIcomputeLabelNbhd` kept sparse: the labels in `[0, max_labels)` it meets
+/// (and `extra`, a label outside that range whose mean the caller needs: FS-469), in ascending
+/// order, each with its count and its values' `float` sum in window order (`vals`). The same reads
+/// as [`mri_compute_label_nbhd`] (and the extra label's values), without tables of `max_labels`.
+#[allow(clippy::too_many_arguments)]
+fn label_window(
+    g: &mut Globals,
+    err: &mut dyn Write,
+    labels: &Mri,
+    vals: Option<&Mri>,
+    (x, y, z): (i32, i32, i32),
+    whalf: i32,
+    max_labels: i32,
+    extra: Option<i32>,
+) -> Result<BTreeMap<i32, (i32, f32)>, Fatal> {
+    const WHAT: &str = "MRIcomputeLabelNbhd";
+    let mut win: BTreeMap<i32, (i32, f32)> = BTreeMap::new();
+    for xk in -whalf..=whalf {
+        let xi = index(g, err, WHAT, labels, Axis::X, x + xk)?;
+        for yk in -whalf..=whalf {
+            let yi = index(g, err, WHAT, labels, Axis::Y, y + yk)?;
+            for zk in -whalf..=whalf {
+                let zi = index(g, err, WHAT, labels, Axis::Z, z + zk)?;
+                let v = mri_get_vox_val(g, err, labels, xi, yi, zi, 0, 0)?;
+                let label = int_of(g, WHAT, f64::from(v));
+                if (label < 0 || label >= max_labels) && extra != Some(label) {
+                    continue;
+                }
+                let e = win.entry(label).or_insert((0, 0.0));
+                e.0 += 1;
+                if let Some(m) = vals {
+                    let val = mri_get_vox_val(g, err, m, xi, yi, zi, 0, 0)?;
+                    e.1 = add(e.1, val);
+                }
+            }
+        }
+    }
+    Ok(win)
+}
+
+/// A label's mean in a window of [`label_window`] (`MRIcomputeLabelNbhd`'s `label_means`: the
+/// sum divided by the count in `float`, 0 for a label the window does not hold).
+fn window_mean(win: &BTreeMap<i32, (i32, f32)>, label: i32) -> f32 {
+    match win.get(&label) {
+        Some(&(c, s)) if c > 0 => div(s, c as f32),
+        _ => 0.0,
+    }
+}
+
+/// Linux's default stack (8 MiB): FreeSurfer's three tables of `maxlabels` entries (4 bytes each)
+/// beyond it crash the program (FS-471).
+const STACK_BYTES: i64 = 8 << 20;
+
+/// `MRIvoxelsInLabelWithPartialVolumeEffects(mri, mri_vals, label, mri_mixing_coef,
+/// mri_nbr_labels, maxlabels, segborder)`: the volume (`float`) of `label` in the segmentation
+/// `mri` (frame 0, `(int)` labels), its border voxels weighted by their intensities in `vals`.
+///
+/// - `label >= maxlabels`: `ERROR: MRIvoxelsInLabelWithPartialVolumeEffects()` and ` label <l>
+///   exceeds maximum label number <m>` on standard output, -100000.
+/// - The border: `segborder` (frame 0 non-zero on a border, later frames the neighbours'
+///   labels), or [`mri_mark_label_border_voxels`] of `label` (mark 1, 6 face neighbours).
+/// - Each voxel (x outermost, then y, z) whose label is `label` or that lies on the border
+///   counts; with `segborder`, a border voxel of another label only when one of its later frames
+///   holds `label` (as a `float`). A counted voxel not on the border adds the voxel volume
+///   (`xsize * ysize * zsize` in `float`). A border voxel: the labels' counts in its 3 x 3 x 3
+///   window and their counts and mean intensities in its 15 x 15 x 15 window
+///   ([`mri_compute_label_nbhd`], whalf 1 then 7); of the labels in `[0, maxlabels)` but its own
+///   that the small window holds, in ascending order, the first of the largest wide count whose
+///   mean lies strictly on the other side of the voxel's intensity from its own label's mean
+///   (`(mean - val) * (own mean - val) < 0` in `float`) is the neighbour label. Neither the
+///   voxel's label nor the neighbour's `label`: skipped. No neighbour label: the voxel volume
+///   added, and with `mri_nbr_labels` the first label of the largest wide count (but its own) of
+///   the small window written there (-1 for none) and 1 into `mri_mixing_coef` when given. Else
+///   `pv = (val - nbr mean) / (own mean - nbr mean)` (`float`), at most 1, a negative one
+///   skipped, `1 - pv` for a voxel of another label; `vox_vol * pv` added (`float`), `pv`
+///   written into `mri_mixing_coef`, and into `mri_nbr_labels` the voxel's label when it is not
+///   `label`, else the neighbour label. Writes go through `MRIsetVoxVal` (frame 0).
+/// - FS-469: a border voxel's own label outside `[0, maxlabels)`: both modes use that label's
+///   mean in its wide window (FreeSurfer reads memory), noted. FS-470: no `vals` at a border voxel
+///   it weighs: an error (FreeSurfer crashes). FS-471: a negative `maxlabels` at the first counted
+///   voxel: an error (FreeSurfer crashes); tables beyond the stack: counted all the same, noted.
+///
+/// FreeSurfer writes the border volume to `b.mgz` when `Gdiag` has `DIAG_WRITE` and verbose
+/// output is on: a diagnostic this port does not write.
+#[allow(clippy::too_many_arguments)]
+pub fn mri_voxels_in_label_with_partial_volume_effects(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    mri: &Mri,
+    vals: Option<&Mri>,
+    label: i32,
+    mut mixing: Option<&mut Mri>,
+    mut nbr_labels: Option<&mut Mri>,
+    maxlabels: i32,
+    segborder: Option<&Mri>,
+) -> Result<f32, Fatal> {
+    const WHAT: &str = "MRIvoxelsInLabelWithPartialVolumeEffects";
+    if label >= maxlabels {
+        let _ = write!(
+            out,
+            "ERROR: MRIvoxelsInLabelWithPartialVolumeEffects()\n label {label} exceeds maximum label number {maxlabels}\n"
+        );
+        return Ok(-100000.0);
+    }
+    let vox_vol = mul(mul(mri.vg.xsize, mri.vg.ysize), mri.vg.zsize);
+    let marked;
+    let border_vol: &Mri = match segborder {
+        Some(b) => b,
+        None => {
+            marked =
+                mri_mark_label_border_voxels(g, out, err, mri, None, label, 1, true)?.unwrap_new();
+            &marked
+        }
+    };
+    let mut volume = 0.0f32;
+    let mut stack_noted = false;
+    for x in 0..mri.vg.width {
+        for y in 0..mri.vg.height {
+            for z in 0..mri.vg.depth {
+                let v = mri_get_vox_val(g, err, mri, x, y, z, 0, 0)?;
+                let vox_label = int_of(g, WHAT, f64::from(v));
+                let b = mri_get_vox_val(g, err, border_vol, x, y, z, 0, 0)?;
+                let border = int_of(g, WHAT, f64::from(b));
+                if vox_label != label && border == 0 {
+                    continue;
+                }
+                if let Some(sb) = segborder {
+                    if vox_label != label && border != 0 {
+                        let mut ok = false;
+                        for f in 1..sb.nframes {
+                            if mri_get_vox_val(g, err, sb, x, y, z, f, 0)? == label as f32 {
+                                ok = true;
+                                break;
+                            }
+                        }
+                        if !ok {
+                            continue;
+                        }
+                    }
+                }
+                // FreeSurfer's three tables of `maxlabels` entries on the stack, every voxel here
+                if maxlabels < 0 {
+                    g.notices.add(
+                        &FS_471,
+                        format!(
+                            "{WHAT} sets aside tables of {maxlabels} labels (FreeSurfer ends here)"
+                        ),
+                    );
+                    log::error_exit(
+                        g,
+                        err,
+                        ERROR_BADPARM,
+                        &format!(
+                            "{WHAT}(): a negative maximum label number {maxlabels} (FreeSurfer crashes here)\n"
+                        ),
+                    )?;
+                    return Ok(volume);
+                }
+                if !stack_noted && 12 * i64::from(maxlabels) > STACK_BYTES {
+                    stack_noted = true;
+                    g.notices.add(
+                        &FS_471,
+                        format!(
+                            "{WHAT} sets aside three tables of {maxlabels} labels on the stack, past Linux's default 8 MiB (FreeSurfer ends here); counted all the same"
+                        ),
+                    );
+                }
+                if border == 0 {
+                    volume = add(volume, vox_vol);
+                    continue;
+                }
+                let at = (x, y, z);
+                let near = label_window(g, err, mri, vals, at, 1, maxlabels, None)?;
+                let outside = vox_label < 0 || vox_label >= maxlabels;
+                let wide = label_window(
+                    g,
+                    err,
+                    mri,
+                    vals,
+                    at,
+                    7,
+                    maxlabels,
+                    outside.then_some(vox_label),
+                )?;
+                let Some(vm) = vals else {
+                    g.notices.add(
+                        &FS_470,
+                        format!("{WHAT} weighs a border voxel without an intensity volume (FreeSurfer ends here)"),
+                    );
+                    log::error_exit(
+                        g,
+                        err,
+                        ERROR_BADPARM,
+                        &format!(
+                            "{WHAT}(): no intensity volume for the border voxel ({x}, {y}, {z}) (FreeSurfer crashes here)\n"
+                        ),
+                    )?;
+                    return Ok(volume);
+                };
+                let val = mri_get_vox_val(g, err, vm, x, y, z, 0, 0)?;
+                if outside {
+                    g.notices.add(
+                        &FS_469,
+                        format!(
+                            "{WHAT}: the border voxel ({x}, {y}, {z}) of label {vox_label} (limit {maxlabels}) takes its label's mean in its window"
+                        ),
+                    );
+                }
+                let mean_label = window_mean(&wide, vox_label);
+                let wide_count = |l: i32| wide.get(&l).map_or(0, |e| e.0);
+                let mut nbr_label = -1;
+                let mut max_count = 0;
+                for &t in near.keys() {
+                    if t == vox_label {
+                        continue;
+                    }
+                    let c = wide_count(t);
+                    if c > max_count
+                        && mul(sub(window_mean(&wide, t), val), sub(mean_label, val)) < 0.0
+                    {
+                        max_count = c;
+                        nbr_label = t;
+                    }
+                }
+                if vox_label != label && nbr_label != label {
+                    continue;
+                }
+                if max_count == 0 {
+                    volume = add(volume, vox_vol);
+                    if let Some(nl) = nbr_labels.as_deref_mut() {
+                        for &t in near.keys() {
+                            if t == vox_label {
+                                continue;
+                            }
+                            let c = wide_count(t);
+                            if c > max_count {
+                                max_count = c;
+                                nbr_label = t;
+                            }
+                        }
+                        mri_set_vox_val(g, err, nl, x, y, z, 0, nbr_label as f32, 0)?;
+                        if let Some(mx) = mixing.as_deref_mut() {
+                            mri_set_vox_val(g, err, mx, x, y, z, 0, 1.0, 0)?;
+                        }
+                    }
+                } else {
+                    let mean_nbr = window_mean(&wide, nbr_label);
+                    let mut pv = div(sub(val, mean_nbr), sub(mean_label, mean_nbr));
+                    if pv > 1.0 {
+                        pv = 1.0;
+                    }
+                    if pv < 0.0 {
+                        continue;
+                    }
+                    if vox_label != label {
+                        pv = sub(1.0, pv);
+                    }
+                    volume = add(mul(vox_vol, pv), volume);
+                    if let Some(mx) = mixing.as_deref_mut() {
+                        mri_set_vox_val(g, err, mx, x, y, z, 0, pv, 0)?;
+                    }
+                    if let Some(nl) = nbr_labels.as_deref_mut() {
+                        let l = if vox_label != label {
+                            vox_label
+                        } else {
+                            nbr_label
+                        };
+                        mri_set_vox_val(g, err, nl, x, y, z, 0, l as f32, 0)?;
+                    }
+                }
+            }
+        }
+    }
+    Ok(volume)
 }
 
 /// `MRIlabelsInNbhd(mri, x, y, z, whalf, label)`: how many voxels of the window (z outermost,

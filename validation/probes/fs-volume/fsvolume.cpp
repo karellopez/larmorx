@@ -308,6 +308,25 @@ void paint(MRI *m)
   }
 }
 
+// frames filled, then voxels painted (MRIsetVoxVal): k, then the values frames 0 to k - 1 are
+// filled with; n, then x y z frame value
+void fill_paint(MRI *m)
+{
+  int k = geti();
+  for (int f = 0; f < k; f++) {
+    float v = getf();
+    for (int x = 0; x < m->width; x++)
+      for (int y = 0; y < m->height; y++)
+        for (int z = 0; z < m->depth; z++) MRIsetVoxVal(m, x, y, z, f, v);
+  }
+  int n = geti();
+  for (int i = 0; i < n; i++) {
+    int x = geti(), y = geti(), z = geti(), f = geti();
+    float v = getf();
+    MRIsetVoxVal(m, x, y, z, f, v);
+  }
+}
+
 // a label list: rows cols, then rows * cols numbers
 MATRIX *get_list()
 {
@@ -1264,6 +1283,22 @@ void run_case()
     oi(MRIclipBrightWM(t1, wm));
     fflush(stdout);
     put_vol(t1);
+  } else if (cmd == "pvlab") {
+    MRI *lab = get_vol();
+    fill_paint(lab);
+    MRI *vals = geti() ? get_vol() : NULL;
+    if (vals) fill_paint(vals);
+    int label = geti(), maxl = geti();
+    MRI *mix = geti() ? get_vol() : NULL;
+    MRI *nbr = geti() ? get_vol() : NULL;
+    MRI *sb = geti() ? get_vol() : NULL;
+    if (sb) fill_paint(sb);
+    fflush(stdout);
+    float r = MRIvoxelsInLabelWithPartialVolumeEffects(lab, vals, label, mix, nbr, maxl, sb);
+    fflush(stdout);
+    of(r);
+    put_vol(mix);
+    put_vol(nbr);
   } else {
     fail("unknown command");
   }

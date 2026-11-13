@@ -1653,6 +1653,12 @@ defects! {
         "the smoothing of a parcellation (MRIsmoothParcellation) counts its neighbours' labels in an array indexed by the label: a negative label is counted outside the array: memory contents";
     FS_468 = "FS-468", "FreeSurfer", true,
         "the clipping of bright white matter (MRIclipBrightWM) stores every voxel through a byte: a value below 0 or above 255, or NaN, becomes the low byte of its 32-bit truncation (0 for NaN and beyond the 32-bit range)";
+    FS_469 = "FS-469", "FreeSurfer", true,
+        "the partial-volume count of a label (MRIvoxelsInLabelWithPartialVolumeEffects) reads, for a voxel on the label's border whose own label is negative or not below the label limit, that label's mean outside the table of means: memory contents";
+    FS_470 = "FS-470", "FreeSurfer", true,
+        "the partial-volume count of a label (MRIvoxelsInLabelWithPartialVolumeEffects) given no intensity volume reads the first border voxel's intensity from no volume: the program crashes";
+    FS_471 = "FS-471", "FreeSurfer", true,
+        "the partial-volume count of a label (MRIvoxelsInLabelWithPartialVolumeEffects) sets aside three tables of the label limit's size on the stack at every voxel it counts: a negative limit, or one whose tables pass the stack (about 699,000 labels with Linux's default 8 MiB stack), crashes the program";
 }
 
 /// The register entry with ID `id`.

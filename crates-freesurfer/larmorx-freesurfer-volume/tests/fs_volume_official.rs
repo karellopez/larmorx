@@ -28,11 +28,11 @@ const OFFICIAL_SHA256: &str = "3834ef65feb37ff13903d5bf1458c793ceae37307d8779a87
 const SKIPPED: usize = 166;
 
 /// `check.py`'s `SKIP`.
-const SKIP: [&str; 32] = [
+const SKIP: [&str; 35] = [
     "FS-288", "FS-53", "FS-58", "FS-290", "FS-294", "FS-47", "FS-48", "ITK-112", "ITK-115",
     "ITK-116", "FS-300", "FS-302", "FS-303", "FS-304", "FS-305", "FS-306", "FS-307", "FS-308",
     "FS-309", "FS-310", "FS-314", "FS-315", "FS-322", "FS-323", "FS-324", "FS-325", "FS-327",
-    "FS-330", "FS-463", "FS-465", "FS-467", "FS-163",
+    "FS-330", "FS-463", "FS-465", "FS-467", "FS-163", "FS-469", "FS-470", "FS-471",
 ];
 
 #[test]

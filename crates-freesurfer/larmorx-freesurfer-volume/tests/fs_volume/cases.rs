@@ -1925,6 +1925,59 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
                     }
                 }
             }
+            "pvlab" => {
+                // a segmentation of a few labels, an intensity volume, the outputs, a border
+                let mut s = shape(&mut g);
+                if !g.chance(12) {
+                    s.hdr = false;
+                }
+                if g.chance(3) {
+                    (s.w, s.h, s.d) = (g.int(2, 6), g.int(2, 6), g.int(2, 5));
+                }
+                vol_of(&mut g, &mut t, s);
+                let labels: &[f32] = &[0.0, 1.0, 2.0, 3.0, 3.0, 2.0, 7.0, -1.0, 250.0, 1.0, -5.0];
+                fill_paint(&mut g, &mut t, s, &[&[0.0, 0.0, 1.0, 2.0]], &[labels]);
+                let v = !g.chance(12);
+                t.push(i64::from(v).to_string());
+                if v {
+                    let mut o = like(&mut g, s);
+                    if !g.chance(4) {
+                        o.ty = 3;
+                    }
+                    vol_of(&mut g, &mut t, o);
+                    let ints: &[f32] =
+                        &[10.0, 20.0, 30.0, 40.0, 50.0, 100.0, 0.0, 25.5, -5.0, 35.0];
+                    fill_paint(&mut g, &mut t, o, &[&[20.0, 40.0, 10.0, 100.0]], &[ints]);
+                }
+                t.push(
+                    g.pick(&[0i64, 1, 1, 2, 2, 3, 7, -1, 250, 5, -5])
+                        .to_string(),
+                );
+                t.push(
+                    g.pick(&[8i64, 8, 8, 256, 256, 20000, 4, 3, 1, 0, -1, -3, 1 << 30])
+                        .to_string(),
+                );
+                for _ in 0..2 {
+                    // the mixing coefficients, the neighbour labels
+                    let d = g.chance(2);
+                    t.push(i64::from(d).to_string());
+                    if d {
+                        let o = like(&mut g, s);
+                        vol_of(&mut g, &mut t, o);
+                    }
+                }
+                let b = g.chance(3);
+                t.push(i64::from(b).to_string());
+                if b {
+                    // frame 0 the border flags, the later frames the neighbours' labels
+                    let mut o = like(&mut g, s);
+                    o.nf = g.int(1, 4);
+                    o.ty = g.pick(&[1, 3, 0]);
+                    vol_of(&mut g, &mut t, o);
+                    let flags: &[f32] = &[0.0, 1.0, 1.0, 2.0];
+                    fill_paint(&mut g, &mut t, o, &[&[0.0, 1.0], labels], &[flags, labels]);
+                }
+            }
             c => panic!("no generator for {c}"),
         }
         lines.push(t.join(" "));
@@ -1950,6 +2003,38 @@ fn paint(g: &mut Gen, t: &mut Vec<String>, s: Shape, vals: &[f32]) {
         t.push(g.int(0, s.h - 1).to_string());
         t.push(g.int(0, s.d - 1).to_string());
         t.push(fx(if g.chance(12) { fval(g) } else { g.pick(vals) }));
+    }
+}
+
+/// `fsvolume.cpp`'s `fill_paint`'s tokens: `k` frames filled (each with a value of `fills[f]`, the
+/// last list for later frames), then `n` voxels painted (`x y z frame value`, a value of
+/// `vals[frame]` or an odd one); none for a volume without voxels or frames.
+fn fill_paint(g: &mut Gen, t: &mut Vec<String>, s: Shape, fills: &[&[f32]], vals: &[&[f32]]) {
+    let has = !s.hdr && s.nf > 0;
+    let k = if has && !g.chance(5) {
+        g.int(1, s.nf)
+    } else {
+        0
+    };
+    t.push(k.to_string());
+    for f in 0..k {
+        let l = fills[(f as usize).min(fills.len() - 1)];
+        t.push(fx(g.pick(l)));
+    }
+    let n = if has {
+        g.int(0, (s.w * s.h * s.d).min(24))
+    } else {
+        0
+    };
+    t.push(n.to_string());
+    for _ in 0..n {
+        t.push(g.int(0, s.w - 1).to_string());
+        t.push(g.int(0, s.h - 1).to_string());
+        t.push(g.int(0, s.d - 1).to_string());
+        let f = if g.chance(4) { g.int(0, s.nf - 1) } else { 0 };
+        t.push(f.to_string());
+        let l = vals[(f as usize).min(vals.len() - 1)];
+        t.push(fx(if g.chance(12) { fval(g) } else { g.pick(l) }));
     }
 }
 
@@ -2198,7 +2283,7 @@ fn perturb(g: &mut Gen, v: &mut [String], e: &mut [String]) {
 }
 
 /// The probe's commands, in the order the generator cycles through them.
-pub const COMMANDS: [&str; 121] = [
+pub const COMMANDS: [&str; 122] = [
     "vgwrite",
     "vgread",
     "vgread",
@@ -2320,6 +2405,7 @@ pub const COMMANDS: [&str; 121] = [
     "fillbox",
     "mskz",
     "clipwm",
+    "pvlab",
 ];
 
 /// One buffer both streams write into, in order (FreeSurfer's standard output and error go to
@@ -2643,6 +2729,29 @@ fn painted(cx: &mut Ctx, t: &mut Toks) -> Result<Mri, Fatal> {
         )?;
     }
     Ok(m)
+}
+
+/// `fsvolume.cpp`'s `fill_paint`: frames filled (`k`, then each frame's value), then voxels
+/// painted (`n`, then `x y z frame value`), through `MRIsetVoxVal`.
+fn fill_painted(cx: &mut Ctx, t: &mut Toks, m: &mut Mri) -> Result<(), Fatal> {
+    use larmorx_freesurfer_mri::voxel::mri_set_vox_val;
+    let k = t.i();
+    for f in 0..k {
+        let v = t.f();
+        for x in 0..m.vg.width {
+            for y in 0..m.vg.height {
+                for z in 0..m.vg.depth {
+                    mri_set_vox_val(&mut cx.g, &mut cx.b, m, x, y, z, f, v, 0)?;
+                }
+            }
+        }
+    }
+    let n = t.i();
+    for _ in 0..n {
+        let (x, y, z, f, v) = (t.i(), t.i(), t.i(), t.i(), t.f());
+        mri_set_vox_val(&mut cx.g, &mut cx.b, m, x, y, z, f, v, 0)?;
+    }
+    Ok(())
 }
 
 /// A label list of the case: rows, cols, the numbers row by row (`fsvolume.cpp`'s `get_list`).
@@ -4033,6 +4142,51 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
             let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
             o.i(i64::from(lb::mri_clip_bright_wm(g, a, b, &mut t1, &wm)?));
             o.vol(Some(&t1));
+        }
+        "pvlab" => {
+            let mut lab = get_vol(cx, t)?;
+            fill_painted(cx, t, &mut lab)?;
+            let vals = if t.i() != 0 {
+                let mut m = get_vol(cx, t)?;
+                fill_painted(cx, t, &mut m)?;
+                Some(m)
+            } else {
+                None
+            };
+            let (label, maxl) = (t.i(), t.i());
+            let mut mix = if t.i() != 0 {
+                Some(get_vol(cx, t)?)
+            } else {
+                None
+            };
+            let mut nbr = if t.i() != 0 {
+                Some(get_vol(cx, t)?)
+            } else {
+                None
+            };
+            let sb = if t.i() != 0 {
+                let mut m = get_vol(cx, t)?;
+                fill_painted(cx, t, &mut m)?;
+                Some(m)
+            } else {
+                None
+            };
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = lb::mri_voxels_in_label_with_partial_volume_effects(
+                g,
+                a,
+                b,
+                &lab,
+                vals.as_ref(),
+                label,
+                mix.as_mut(),
+                nbr.as_mut(),
+                maxl,
+                sb.as_ref(),
+            )?;
+            o.f(r);
+            o.vol(mix.as_ref());
+            o.vol(nbr.as_ref());
         }
         "rsmat" => {
             let src = get_vol(cx, t)?;

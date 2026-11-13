@@ -106,6 +106,10 @@ nothing in it.
 - `dirty_provenance.py <site>`: every benchmark report and figures-cache entry the site's
   evidence files cite whose LARMORX commit ends in `-dirty` (made from a modified checkout),
   with its page; the list behind the follow-up in `docs/next-steps.md` (relay 21).
+- `site_paths_check.py <site>`: no file of the site, its source and its build, holds a home path,
+  the workspace's folder or its parent's, an agent's worktree or scratch folder, the account's or
+  the machine's name (read from the machine, never written here). Step 1's merge check (relay 27,
+  after `figures.cache.machine_paths` and the eight pages exported again: 0; the site before, 42).
 - `panel_runs_check.py <site>`: every fMRIPrep run an evidence page names in its data panel's
   cases and worked examples is one of the panel's fourteen (`fmriprep_nodes.PANEL_RUNS`); run it
   after every export, beside `summary_check.py`. Since relay 15 `fmriprep_nodes` reads only

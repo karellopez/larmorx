@@ -163,7 +163,7 @@ the result (`-omat`).
 
 ### Python (`convert_xfm`)
 
-`lx.fsl.convert_xfm(matrix, *, concat=None, fix_scale_skew=None, inverse=False, implementation="auto")`
+`lx.fsl.convert_xfm(matrix, *, concat=None, fix_scale_skew=None, inverse=False, n_threads=1, implementation="auto")`
 
 ### Options of `convert_xfm`
 
@@ -219,7 +219,7 @@ inversion's matrices.
 
 ### Python (`avscale`)
 
-`lx.fsl.avscale(matrix, volume=None, *, all_params=False, inverted_eddies=False, implementation="auto")`
+`lx.fsl.avscale(matrix, volume=None, *, all_params=False, inverted_eddies=False, n_threads=1, implementation="auto")`
 
 ### Options of `avscale`
 
@@ -272,7 +272,7 @@ default, millimetres with `-mm`.
 
 ### Python (`img2imgcoord`)
 
-`lx.fsl.img2imgcoord(coords, src, dest, *, xfm=None, mm=False, implementation="auto")`
+`lx.fsl.img2imgcoord(coords, src, dest, *, xfm=None, mm=False, n_threads=1, implementation="auto")`
 
 ### Options of `img2imgcoord`
 
@@ -330,7 +330,7 @@ matrix: millimetres by default, the image's voxels with `-vox`.
 
 ### Python (`std2imgcoord`)
 
-`lx.fsl.std2imgcoord(coords, img, std=None, *, xfm=None, vox=False, implementation="auto")`
+`lx.fsl.std2imgcoord(coords, img, std=None, *, xfm=None, vox=False, n_threads=1, implementation="auto")`
 
 ### Options of `std2imgcoord`
 
@@ -386,7 +386,7 @@ voxels by default, output in the standard image's millimetres.
 
 ### Python (`img2stdcoord`)
 
-`lx.fsl.img2stdcoord(coords, img, std=None, *, xfm=None, mm=False, implementation="auto")`
+`lx.fsl.img2stdcoord(coords, img, std=None, *, xfm=None, mm=False, n_threads=1, implementation="auto")`
 
 ### Options of `img2stdcoord`
 
@@ -442,7 +442,7 @@ over the mask's voxels.
 
 ### Python (`rmsdiff`)
 
-`lx.fsl.rmsdiff(matrix1, matrix2, ref, mask=None, *, implementation="auto")`
+`lx.fsl.rmsdiff(matrix1, matrix2, ref, mask=None, *, n_threads=1, implementation="auto")`
 
 ### Options of `rmsdiff`
 
@@ -490,7 +490,7 @@ evidence: fsl-flirt
 
 ### Python (`makerot`)
 
-`lx.fsl.makerot(theta, axis=None, centre=None, *, cov=None, upstream_defects="fix", implementation="auto")`
+`lx.fsl.makerot(theta, axis=None, centre=None, *, cov=None, n_threads=1, upstream_defects="fix", implementation="auto")`
 
 The result is a 4 × 4 array.
 
@@ -552,7 +552,7 @@ composed with it is written too.
 
 ### Python (`midtrans`)
 
-`lx.fsl.midtrans(transforms, *, template=None, separate=None, implementation="auto", upstream_defects="fix")`
+`lx.fsl.midtrans(transforms, *, template=None, separate=None, n_threads=1, implementation="auto", upstream_defects="fix")`
 
 `template` is a path or an `lx.Image`.
 
@@ -612,7 +612,7 @@ three points is read with one point per column, as FSL reads it.
 
 ### Python (`pointflirt`)
 
-`lx.fsl.pointflirt(in_points, ref_points, *, in_image=None, ref_image=None, implementation="auto")`
+`lx.fsl.pointflirt(in_points, ref_points, *, in_image=None, ref_image=None, n_threads=1, implementation="auto")`
 
 The two sets hold as many points; `in_image` and `ref_image` are paths or `lx.Image` objects,
 given both or neither.
@@ -677,7 +677,7 @@ default), trilinear, nearest neighbour or spline, and the output keeps the input
 
 ### Python (`applyxfm4D`)
 
-`lx.fsl.applyxfm4d(in_image, ref_image, out_image, transforms, *, single_matrix=False, four_digit=False, user_prefix=None, interp="sinc", three_d=False, implementation="auto", upstream_defects="fix")`
+`lx.fsl.applyxfm4d(in_image, ref_image, out_image, transforms, *, single_matrix=False, four_digit=False, user_prefix=None, interp="sinc", three_d=False, n_threads=1, implementation="auto", upstream_defects="fix")`
 
 The images and `transforms` are paths.
 
@@ -750,7 +750,7 @@ the brains first, then the skulls, then the brains again; `brain1` and `skull1` 
 
 ### Python (`pairreg`)
 
-`lx.fsl.pairreg(brain1, brain2, skull1, skull2, *, flirt_args=None, implementation="auto", upstream_defects="fix")`
+`lx.fsl.pairreg(brain1, brain2, skull1, skull2, *, flirt_args=None, n_threads=1, implementation="auto", upstream_defects="fix")`
 
 The images are paths; `flirt_args` is a list of FLIRT's options. The result is the 4 × 4 matrix
 from `brain2` to `brain1`.
@@ -807,7 +807,7 @@ FSL's messages for ranges before the first line.
 
 ### Python (`extracttxt`)
 
-`lx.fsl.extracttxt(search_word, file, trailing_lines=None, relative_start=None, *, implementation="auto")`
+`lx.fsl.extracttxt(search_word, file, trailing_lines=None, relative_start=None, *, n_threads=1, implementation="auto")`
 
 The result is the text printed, as a string. `relative_start` needs `trailing_lines`.
 
@@ -865,7 +865,7 @@ anterior commissure, the AC-PC line and the mid-sagittal plane.
 
 ### Python (`aff2rigid`)
 
-`lx.fsl.aff2rigid(matrix, *, implementation="auto", upstream_defects="fix")`
+`lx.fsl.aff2rigid(matrix, *, n_threads=1, implementation="auto", upstream_defects="fix")`
 
 ### Options of `aff2rigid`
 

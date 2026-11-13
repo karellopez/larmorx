@@ -1,56 +1,78 @@
 # 3dTshift
 
-`lx.afni.tshift` (command line `larmorx afni 3dTshift`; Rust crate `larmorx-afni`):
-slice-timing correction, compatible with AFNI's `3dTshift` (26.3.05; first 25.2.09).
+`lx.afni.tshift` (command line `larmorx afni 3dTshift`): slice-timing correction, as AFNI's
+`3dTshift` computes it (26.3.05; first 25.2.09).
 
-**AFNI versions** (2026-10-29): both implementations follow AFNI 26.3.05 and are validated against it (the clean-room original since its alignment the same day). The two releases differ, for these programs, in two corrections larmorx already made by default (AFNI-03, header slice code 2; AFNI-05, 3dTshift's `-no_detrend`): AFNI 26.3.05 behaves as larmorx corrected them, so `reproduce` now gives the same result as the default where they apply, and neither is named ([findings](../findings/afni-relicensing-26.md) for the new licence).
+**AFNI versions** (2026-10-29): both ports follow AFNI 26.3.05 and are validated against it (the clean room since its alignment the same day). The two releases differ, for these programs, in two corrections larmorx already made by default (AFNI-03, header slice code 2; AFNI-05, 3dTshift's `-no_detrend`): AFNI 26.3.05 behaves as larmorx corrected them, so `reproduce` now gives the same result as the default where they apply, and neither is named ([findings](../findings/afni-relicensing-26.md) for the new licence).
 
-**Clean-room re-implementation.** AFNI's 3dTshift was GPL-2 code until AFNI 26.3.05, so
-larmorx wrote its original without it: from the behaviour spec
-[`specs/3dTshift.md`](../../specs/3dTshift.md), AFNI's help text and black-box runs of the AFNI
-binary, without AFNI's source code ([provenance](../../crates/larmorx-afni/PROVENANCE.md)). It is
-built for speed.
+The ports come first, then the program's section, the source of its reference page on the
+documentation site (`python -m larmorx_validation reference`), with its options table checked
+against the code, and how the two ports run; then how AFNI reads and writes NIfTI, AFNI's
+defects as both ports correct them, AFNI's global options and environment variables, AFNI's
+settings in Python, the behaviour found by black-box runs, the differences by design, the known
+last-bit differences and the Rust API.
 
-**Status: `validated`** against AFNI 26.3.05 itself, both: the clean-room original (see the
-[validation record](../validation/afni-tshift.md); against AFNI 25.2.09 until 2026-10-29)
-and the replica ([replica record](../validation/afni-tshift-replica.md)). The record covers
-315 cases:
-- every file of `larmorx-testdata` `synthetic/tshift/` (every FFT length class, every data
-  type AFNI reads, edge content);
-- every method, option and `-tpattern` form, slice timing from NIfTI headers, the "copy of
-  input" cases, AFNI's defects (D13) and 21 error cases (3 of them failed writes, AFNI-26);
-- 20 runs on real BOLD data (ds000210 multi-echo, ds001600, ds003345, ds005454 multiband
-  with 96 slices, ds006010, ds006736), called as fMRIPrep calls 3dTshift;
-- AFNI's global options and environment variables (60 cases), where exit statuses and
-  messages are compared byte for byte too.
+## Ports
 
-All 315 agree: 280 compared, 32 rejected by both, and 3 documented divergences (AFNI's own
-output format and `-voxshift`, which larmorx does not support, and a dataset of one row,
-which AFNI writes as a text file with a random identifier, AFNI-20). 178 of the 280 compared
-are byte-identical in their data; in every compared case the header fields are AFNI's and the
-geometry agrees to 1e-6 mm (the whole header byte for byte where the record compares it), and
-in the 60 cases of the global options and variables and the 3 failed writes, where exit
-statuses and both output streams are compared byte for byte too, all 63 are identical
-(2026-10-12, completing 3dTshift, part 2b, and AFNI-26's switch). The Lagrange and weighted-sinc methods and the
-copies give **the same bytes** as AFNI (131 of 133). The Fourier method (the default) differs
-in the last float32 bits, at most 4.3e-7 of the largest value, because AFNI's FFT is float32
-and larmorx's is double; integer outputs then differ by at most 1, in a few values per million
-on the real runs (up to 0.2 % on a synthetic series built to clip). The known last-bit
-differences are listed at the end of this page.
+`3dTshift` has two ports, both in `pip install larmorx`:
 
-**Bit-exact replica.** `larmorx afni 3dTshift` with `LARMORX_IMPLEMENTATION=replica` (the
-default; `crates/larmorx-afni-replica`, part of `pip install larmorx`: Apache-2.0, with CC BY 4.0's attribution for the code of the Medical College of Wisconsin, which AFNI 26.3.05 releases under CC BY 4.0 ([NOTICE](../../NOTICE), [licensing](../licensing.md))) is a translation
-of AFNI's own source, with AFNI's float32 FFT and glibc 2.35's `sinf`/`cosf` translated from Arm's
-Optimized Routines (MIT), proved equal to glibc's on every input. Until 2026-10-29 it was the
-separate GPL program `larmorx-gpl`. It takes the same arguments as the original, follows the
-same conventions (NIfTI output only, an existing output is an error), corrects the same AFNI
-defects by default, and with `LARMORX_UPSTREAM_DEFECTS=reproduce` gives AFNI's output bytes
-on every compared parity case ([replica record](../validation/afni-tshift-replica.md); see
-[Upstream defects](#upstream-defects-d13)).
-`lx.afni.tshift` and `larmorx afni 3dTshift` run it by default, in the same process (see
-[Choosing the implementation](#choosing-the-implementation)).
+- **The replica** is bit-exact, translated from AFNI's own source
+  (`crates/larmorx-afni-replica`; Apache-2.0, with CC BY 4.0's attribution for the code of the
+  Medical College of Wisconsin, which AFNI 26.3.05 releases under CC BY 4.0
+  ([NOTICE](../../NOTICE), [licensing](../licensing.md)); until 2026-10-29 the separate GPL
+  program `larmorx-gpl`), with AFNI's float32 FFT and glibc 2.35's `sinf`/`cosf` translated from
+  Arm's Optimized Routines (MIT), proved equal to glibc's on every input. With
+  `LARMORX_UPSTREAM_DEFECTS=reproduce` it gives AFNI's output bytes on every compared parity
+  case.
+- **The clean room** (`crates/larmorx-afni`, Apache-2.0) is built for speed. AFNI's 3dTshift
+  was GPL-2 code until AFNI 26.3.05, so larmorx wrote it without AFNI's source code: from the
+  behaviour spec [`specs/3dTshift.md`](../../specs/3dTshift.md), AFNI's help text and black-box
+  runs of the AFNI binary ([PROVENANCE](../../crates/larmorx-afni/PROVENANCE.md)).
 
-## Quick start
+Both take the same arguments, follow the same conventions (NIfTI output only, an existing output
+is an error) and correct the same AFNI defects by default
+([Upstream defects](#upstream-defects-d13)). `implementation="auto"` (the default, and
+`larmorx afni 3dTshift`) runs the replica, in the same process; `implementation="replica"` or
+`"clean-room"` (`"original"`, 0.1.0rc1's spelling, still works) (`--implementation` before the
+family, or `LARMORX_IMPLEMENTATION`) forces one. Each image's `implementation` names the one that
+ran.
+
+## `3dTshift`
+
+<!-- reference
+program: 3dTshift
+group: afni
+original: AFNI 26.3.05
+python: larmorx.afni.tshift
+command-line: crates/larmorx-afni/src/cli/tshift.rs
+records: {replica: [afni-tshift-replica], clean-room: [afni-tshift]}
+evidence: afni-tshift
+-->
+
+`3dTshift` corrects slice timing: it aligns every slice of a 4D series to one time origin. Each
+voxel's time series is detrended (a least-squares line), shifted in time so that its slice
+refers to `tzero`, clipped to its own range, and given its trend back. The output at time point
+`n` estimates the signal at `n·TR + tzero`.
+
+### Python (`3dTshift`)
+
+`lx.afni.tshift(image, *, slice_times, tr=None, tzero=None, slice=None, ignore=0, method="fourier", restore="trend", detrend=True, n_threads=1, implementation="auto", upstream_defects="fix", afni_settings=None)`
+
+Returns an `lx.Image` with the header `3dTshift` writes: `pixdim[4]` = TR (seconds),
+`toffset` = `tzero`, no slice timing, millimetres and seconds. Data keep AFNI's storage type
+(`uint8`, `int16` or `float32`); when the output has a brick factor (`scl_slope`), the data
+are the scaled values, as `lx.load` returns them. `img.implementation` says which port computed
+it.
+
+**Files and in-memory images.** Paths are read with AFNI's rules
+([How AFNI reads and writes NIfTI](#how-afni-reads-and-writes-nifti-reproduced)), which is what
+makes the result match AFNI. In-memory images (`lx.Image`, nibabel images, `(array, affine)`)
+keep `uint8`, `int16` and `float32` data and convert other types to `float32`; `tr` is required
+when they have no NIfTI header.
+
+`lx.afni.fmriprep_slice_timing(slice_timing, slice_encoding_direction)` gives the slice times
+and `tzero` fMRIPrep passes: `SliceTiming` reversed when the direction ends in `-`, and
+`round(min + 0.5·(max − min), 3)`.
 
 ```python
 import json
@@ -72,57 +94,81 @@ stc.save("sub-01_task-rest_desc-stc_bold.nii.gz")
 img = lx.afni.tshift("bold.nii.gz", slice_times="alt+z", method="heptic")
 ```
 
-The same from a shell, with AFNI's own arguments:
+### Options of `3dTshift`
 
-```bash
-larmorx afni 3dTshift -ignore 0 -tzero 0.969 -TR 2.0s -tpattern @slice_timing.1D \
-    -prefix sub-01_desc-stc_bold.nii.gz sub-01_task-rest_bold.nii.gz
-```
-
-## `lx.afni.tshift(image, *, slice_times, tr=None, tzero=None, slice=None, ignore=0, method="fourier", restore="trend", detrend=True, n_threads=1, implementation="auto", upstream_defects="fix", afni_settings=None)`
-
-Each voxel's time series is detrended (least-squares line), shifted in time so that its slice
-refers to `tzero`, clipped to its own range, and given its trend back. The output at time
-point `n` estimates the signal at `n·TR + tzero`.
-
-Returns an `lx.Image` with the header `3dTshift` writes: `pixdim[4]` = TR (seconds),
-`toffset` = `tzero`, no slice timing, millimetres and seconds. Data keep AFNI's storage type
-(`uint8`, `int16` or `float32`); when the output has a brick factor (`scl_slope`), the data
-are the scaled values, as `lx.load` returns them. `img.implementation` says which
-implementation computed it (below).
-
-**Files and in-memory images.** Paths are read with AFNI's rules (below), which is what makes
-the result match AFNI. In-memory images (`lx.Image`, nibabel images, `(array, affine)`) keep
-`uint8`, `int16` and `float32` data and convert other types to `float32`; `tr` is required
-when they have no NIfTI header.
-
-`lx.afni.fmriprep_slice_timing(slice_timing, slice_encoding_direction)` gives the slice times
-and `tzero` fMRIPrep passes: `SliceTiming` reversed when the direction ends in `-`, and
-`round(min + 0.5·(max − min), 3)`.
-
-### Option mapping
-
-| 3dTshift | `lx.afni.tshift` | Notes |
+| AFNI option | Python | Notes |
 |---|---|---|
-| `dataset` | `image` | a 4D NIfTI path, `lx.Image`, nibabel image or `(array, affine)` |
-| `-prefix out` | the returned `Image` (`.save(path)`) | the CLI needs `.nii` or `.nii.gz` and refuses an existing file |
+| the last word (`dataset`) | `image` | the input: a 4D NIfTI path, or in Python an `lx.Image`, a nibabel image or `(array, affine)` |
+| `-prefix ppp` | the result | the returned image (its `.save(path)` writes it); the command line needs `.nii` or `.nii.gz` and refuses an existing file |
 | `-tpattern alt+z` (and `altplus`, `alt+z2`, `alt-z`, `altminus`, `alt-z2`, `seq+z`, `seqplus`, `seq-z`, `seqminus`, `zero`, `simult`) | `slice_times="alt+z"` | case-sensitive, except `zero` and `simult` |
-| `-tpattern @file`, `-tpattern '@1D: ...'` | `slice_times=[...]` (seconds) | values must lie in `[0, TR]`; the file is AFNI 1D text (see below) |
-| (no `-tpattern`) | – | the CLI uses the header's slice timing, or copies the input when there is none |
+| `-tpattern @file`, `-tpattern '@1D: ...'` | `slice_times=[...]` (seconds) | values must lie in `[0, TR]`; the file is AFNI 1D text ([Behaviour found by black-box runs](#behaviour-found-by-black-box-runs)) |
+| (no `-tpattern`) | – | the command line uses the header's slice timing, or copies the input when there is none |
 | `-TR 2s`, `-TR 2000ms` | `tr=2.0` | default: the header's TR (ms and µs converted), 1 s if not positive |
 | `-tzero z` | `tzero=z` | default: the mean slice time; must be ≥ 0 |
 | `-slice k` | `slice=k` | wins over `tzero` |
 | `-ignore n` | `ignore=n` | at most nt − 5 |
-| `-Fourier` `-linear` `-cubic` `-quintic` `-heptic` `-wsinc5` `-wsinc9` | `method="fourier"` (default), `"linear"`, … | the CLI compares 4 characters (`-cub`), 7 for `-wsinc5/9` (any case) |
+| `-Fourier` `-linear` `-cubic` `-quintic` `-heptic` `-wsinc5` `-wsinc9` | `method="fourier"` (default), `"linear"`, … | the command line compares 4 characters (`-cub`), 7 for `-wsinc5/9` (any case) |
 | `-rlt` / `-rlt+` | `restore="none"` / `"intercept"` | `-rlt+` adds back the fitted intercept, not the mean |
-| `-no_detrend` | `detrend=False` | every voxel's mean removed and restored, in both modes, as AFNI 26.3.05 does (AFNI 25.2.09's voxel pairs: AFNI-05, below) |
-| `-verbose` | – | progress on stderr |
+| `-no_detrend` | `detrend=False` | every voxel's mean removed and restored, in both modes, as AFNI 26.3.05 does (AFNI 25.2.09's voxel pairs: AFNI-05, in [Upstream defects](#upstream-defects-d13)) |
+| `-verbose` | – | progress on standard error; its first line names the port that runs |
 | `-voxshift dset` | – | not supported |
-| (threads: `OMP_NUM_THREADS`) | `n_threads=1` (0 = all CPUs) | AFNI is single-threaded; the result does not depend on the thread count |
-| (`--implementation auto\|replica\|clean-room` before the family, or `LARMORX_IMPLEMENTATION`) | `implementation="auto"` | larmorx's choice between the replica and the clean-room original (below) |
-| (`LARMORX_UPSTREAM_DEFECTS=fix\|reproduce`) | `upstream_defects="fix"` | AFNI's defects corrected (default) or reproduced ([upstream defects](#upstream-defects-d13), [upstream-defects.md](upstream-defects.md)) |
-| AFNI's environment variables, `-Dname=value` | `afni_settings={"AFNI_NIFTI_PRIORITY": "Q"}` | the command line reads the process environment, as AFNI does; Python never does: [AFNI's settings in Python](#afnis-settings-in-python) |
-| `-overwrite`, `-ok_1D_text`, `-skip_afnirc` | – | the Python API writes no output file and its own slice-time file |
+| `-Dname=value`; AFNI's environment variables | `afni_settings={"AFNI_NIFTI_PRIORITY": "Q"}` | the command line reads the process environment, as AFNI does, and `-D` sets a variable for the run; Python never reads the environment ([AFNI's settings in Python](#afnis-settings-in-python)) |
+| `-overwrite`, `-ok_1D_text`, `-skip_afnirc` | – | AFNI's global options, anywhere on the command line; the Python API writes no output file and its own slice-time file |
+| `OMP_NUM_THREADS` | `n_threads=1` (0 = all CPUs) | AFNI is single-threaded; the result does not depend on the thread count |
+| `LARMORX_UPSTREAM_DEFECTS` | `upstream_defects="fix"` | AFNI's defects corrected (default) or reproduced (`reproduce`; [Upstream defects](#upstream-defects-d13), [upstream-defects.md](upstream-defects.md)) |
+| `LARMORX_IMPLEMENTATION` | `implementation="auto"` | `auto`, `replica` or `clean-room` (`--implementation` before the family) |
+
+### Examples of `3dTshift`
+
+<!-- inputs: bold.nii.gz=bold slice_timing.1D=slice-timing -->
+
+```python example
+import larmorx as lx
+
+# As fMRIPrep calls 3dTshift: the run's SliceTiming, tzero in the middle of the acquisition.
+slice_timing = [float(t) for t in open("slice_timing.1D").read().split()]
+times, t0 = lx.afni.fmriprep_slice_timing(slice_timing)
+t0  # -> 0.975
+stc = lx.afni.tshift("bold.nii.gz", slice_times=times, tzero=t0, tr=2.0)
+stc.data.shape  # -> (40, 48, 40, 8)
+```
+
+```bash example
+larmorx afni 3dTshift -ignore 0 -tzero 0.975 -TR 2.0s -tpattern @slice_timing.1D -prefix bold_stc.nii.gz bold.nii.gz
+```
+
+### Ports of `3dTshift`
+
+Both are `validated` against AFNI 26.3.05 itself (the clean room against AFNI 25.2.09 until
+2026-10-29), on the same 317 cases of the standard tier: every file of `larmorx-testdata`'s
+`synthetic/tshift/` (every FFT length class, every data type AFNI reads, edge content); every
+method, option and `-tpattern` form, slice timing from NIfTI headers, the copies of the input,
+AFNI's defects (D13) and 21 error cases; 20 runs on real BOLD data (ds000210 multi-echo,
+ds001600, ds003345, ds005454 multiband with 96 slices, ds006010, ds006736), called as fMRIPrep
+calls 3dTshift; and 60 cases of AFNI's global options and environment variables. In both
+records 282 cases pass, 32 are rejected by both alike and 3 are expected divergences (AFNI's own
+output format and `-voxshift`, which larmorx does not support, and a dataset of one row, which
+AFNI writes as a text file with a random identifier, AFNI-20).
+
+- **The replica** ([its record](../validation/afni-tshift-replica.md), 2026-11-13): all 282
+  compared cases are AFNI's output data bit for bit (the Fourier method's 147 and the other
+  methods' and copies' 135); in the 63 cases of AFNI's global options, variables and failed
+  writes, the exit status and both output streams are AFNI's byte for byte too (AFNI's version
+  banner and larmorx's own lines set aside).
+- **The clean room** ([its record](../validation/afni-tshift.md), 2026-11-04): 180 of the 282
+  compared cases are AFNI's output data bit for bit. The Lagrange and weighted-sinc methods and
+  the copies give the same bytes as AFNI in 133 of 135; the Fourier method (the default) in 47
+  of 147, because AFNI's FFT is float32 and the clean room's is double. The outputs that differ
+  do so in the last float32 bits, by at most 3.7e-7 of AFNI's largest value (5.6e-8 on the real
+  runs); integer outputs by at most 1. In every compared case the header fields are AFNI's and
+  the geometry agrees to 1e-6 mm; in the 63 cases of AFNI's global options, variables and failed
+  writes, the exit status and both output streams are AFNI's byte for byte (AFNI's version
+  banner and larmorx's own lines set aside). The known last-bit differences are listed in
+  [Known last-bit differences](#known-last-bit-differences).
+
+In both records the Python call gives the command line's output bit for bit (data and header) on
+the 194 passing cases it can express, 149 of 149 from an image in memory, and on the 28 cases of
+AFNI's variables and global options it can express, with `afni_settings`.
 
 ## Choosing the implementation
 
@@ -137,7 +183,7 @@ lx.afni.tshift("bold.nii.gz", slice_times="alt+z", implementation="clean-room")
 - **`"auto"`** (the default) runs the bit-exact replica; **`"replica"`** and **`"clean-room"`**
   (`"original"`, 0.1.0rc1's spelling, still works) force one. Both are part of `pip install larmorx` (on PyPI from 0.1.0rc1, or built from the
   repository, `docs/licensing.md`, "Packages"); until 2026-10-29 the replica was the separate
-  `larmorx-gpl` package, and `"auto"` ran the original without it.
+  `larmorx-gpl` package, and `"auto"` ran the clean room without it.
 - **How it runs** (`docs/licensing.md`, "Choosing at run time"): in the same process (without
   the GIL), on files in a temporary directory, exactly as the command line runs it. A path is passed as it is; an in-memory image is written
   first, with its data as they are (no scaling). The keyword arguments become `3dTshift`
@@ -154,15 +200,15 @@ lx.afni.tshift("bold.nii.gz", slice_times="alt+z", implementation="clean-room")
   `lx.ReplicaError`, with its exit code and messages.
 - **Errors.** Both implementations check the arguments that do not need the image the same
   way (`ValueError`). The checks that need the image (the number of slice times, their range,
-  `slice`, `ignore`) come from the implementation that runs: a `ValueError` from the original,
+  `slice`, `ignore`) come from the implementation that runs: a `ValueError` from the clean room,
   an `lx.ReplicaError` with AFNI's message from the replica.
 - **Command line:** `larmorx afni 3dTshift` follows the same rule; `--implementation` before
   the family (`larmorx --implementation clean-room afni 3dTshift ...`) or
   `LARMORX_IMPLEMENTATION` overrides it. With `-verbose`, the first line names the
   implementation: `++ implementation: clean-room (larmorx <version>, Apache-2.0), clean-room
   3dTshift` or `++ implementation: replica (larmorx <version>, Apache-2.0 AND CC-BY-4.0),
-  bit-exact translation of AFNI 26.3.05's 3dTshift` (0.1.0rc1 named the clean-room original
-  `original` in this line).
+  bit-exact translation of AFNI 26.3.05's 3dTshift` (0.1.0rc1 named the clean room `original`
+  in this line).
 
 ## How AFNI reads and writes NIfTI (reproduced)
 
@@ -184,7 +230,7 @@ tilt (AFNI-16; AFNI's test is in single precision, so the angle depends on the v
 0.024° for a 2 mm voxel, 0.013° for 3 mm). larmorx keeps the input's matrix by default (user
 decision, 2026-10-12): the sform and the qform describe the input's grid, as AFNI writes them
 for an oblique one. With `upstream_defects="reproduce"` both implementations write AFNI's
-plumb matrix, the header byte for byte (the clean-room original since 2026-10-12: AFNI's
+plumb matrix, the header byte for byte (the clean room since 2026-10-12: AFNI's
 plumb test in single precision, the cardinal matrix with its signed zeros, the quaternion by
 the NIfTI reference library's method in double, with the steps AFNI's x86-64 build carries out
 in x87 extended precision emulated with integers, so NIfTI-2 headers are AFNI's on every
@@ -225,15 +271,15 @@ parity records' "D13 fix pass" lists what the corrections change, case by case.
 
 **The two implementations.** Both correct the same defects by default and, with
 `reproduce`, give AFNI's output: the replica (which reads the choice from
-`LARMORX_UPSTREAM_DEFECTS` on the command line) byte for byte, the clean-room original within its thresholds for
+`LARMORX_UPSTREAM_DEFECTS` on the command line) byte for byte, the clean room within its thresholds for
 the values (the last bits of its Fourier, quintic, heptic, weighted-sinc and `-no_detrend`
 numerics) and as AFNI otherwise: identical header fields and file names, the geometry to
 1e-6 mm (byte for byte where the header is compared whole), and exit statuses and messages
 byte for byte in the cases of AFNI's global options and variables. So `implementation="auto"` gives the corrected output
-whichever runs. The replica's record compares its default with the original's on every case
+whichever runs. The replica's record compares its default with the clean room's on every case
 where a correction applies: they agree in every header field, the geometry, the scaling and
 the slice fields of copies (AFNI-08's included), and in the values up to those last bits. The
-original follows AFNI's geometry, the slice fields of copies and the output-name rules since
+clean room follows AFNI's geometry, the slice fields of copies and the output-name rules since
 2026-10-12 (completing 3dTshift, part 2b; before, these were expected divergences in its record),
 and AFNI 26.3.05's header slice code 2 and `-no_detrend` since 2026-10-29. Warning and error labels: AFNI writes them in terminal
 colour codes, also into files and pipes (AFNI-21, messages only); larmorx does so in
@@ -243,11 +289,11 @@ colour codes, also into files and pipes (AFNI-21, messages only); larmorx does s
 
 `-wsinc5` and `-wsinc9` take their weights' sines and cosines from glibc 2.35's `sinf` and `cosf` in
 AFNI (spec §5.3), which are not correctly rounded: about 1 % of the weights differ in their last bit
-from the correctly rounded ones. The clean-room original computes them correctly rounded by default
+from the correctly rounded ones. The clean room computes them correctly rounded by default
 (the double functions rounded to float32) and takes glibc's with `upstream_defects="reproduce"`
 (`larmorx_core::math`'s `*_glibc` functions, proved bit for bit against glibc 2.35; the user's
 decision of 2026-11-04: glibc's bits for `reproduce` only). The weights are computed once per slice:
-where the other choice gives other weights, the original shifts the slice's series with both and
+where the other choice gives other weights, the clean room shifts the slice's series with both and
 names GLIBC-07, in both modes, exactly where the other choice stores another value (the record's
 `methods/glibc-sinf-wsinc5` and `-wsinc9`).
 
@@ -332,7 +378,7 @@ img = lx.afni.tshift(
 )
 ```
 
-- **Both implementations** read exactly these variables (the clean-room original since
+- **Both implementations** read exactly these variables (the clean room since
   2026-10-12). The replica runs with them, every AFNI variable of the process environment
   removed (whatever its case), plus the ones `lx.afni.tshift` sets itself for its
   own use of the replica: a path is always one file (`AFNI_PATH_SPACES_OK=YES`; temporary
@@ -365,7 +411,7 @@ img = lx.afni.tshift(
   line's output ([record](../validation/afni-tshift.md),
   [replica record](../validation/afni-tshift-replica.md)). Tests on all six platforms check
   that the replica program receives `afni_settings` and none of the environment's AFNI
-  variables, and that the original applies them and ignores the environment
+  variables, and that the clean room applies them and ignores the environment
   (`tests/python/test_replica.py`).
 
 ## Behaviour found by black-box runs

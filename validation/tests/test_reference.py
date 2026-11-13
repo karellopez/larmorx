@@ -24,6 +24,7 @@ import shutil
 import subprocess
 import sys
 import tokenize
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -339,18 +340,17 @@ def test_programs_what_it_does_has_one_source(monkeypatch):
     page = apipage.read(REPO, API)
     first = next(p for p in page.programs if p.name == "bet").description.split("\n\n")[0]
     assert bet.does == programs.first_sentence(first)
+    # an entry that still gives its own `does` (its API page has no reference block yet)
+    entries = tomllib.loads((REPO / "validation/programs.toml").read_text(encoding="utf-8"))
+    e = next(x for x in entries["program"] if "does" in x and "api" in x)
     real = programs._api_does
     monkeypatch.setattr(
         programs,
         "_api_does",
-        lambda repo, api: (
-            {"antsRegistration": "It registers."}
-            if api == "docs/api/ants-registration.md"
-            else real(repo, api)
-        ),
+        lambda repo, api: {e["name"]: "It does."} if api == e["api"] else real(repo, api),
     )
     _, _, problems = programs.build(reference.REPO, None)
-    assert any("antsRegistration: `does` given" in p for p in problems), problems
+    assert any(f"{e['name']}: `does` given" in p for p in problems), problems
 
 
 def test_programs_check_catches_an_api_page_without_an_entry(monkeypatch):
@@ -508,6 +508,45 @@ def test_afni_usage_names_another_spelling_unifize():
     assert by["-oink"].spellings == ["-nosquash", "-oink"]
 
 
+def test_afni_usage_heads_volreg():
+    """3dvolreg's usage heads: alternatives after `/`, other values after `|`, several options
+    with values on one line (their description on the next), a value glued after `=`; the
+    spellings its parser compares one by one (`arg == "-wtrim"`)."""
+    cl, by = _cl("crates/larmorx-afni/src/cli/volreg.rs", "3dvolreg", "larmorx afni 3dvolreg")
+    assert (
+        by["-noclip"].help
+        == by["-clipit"].help
+        == "clip each output to its input's range (default on)"
+    )
+    assert (by["-base"].arg, by["-edging"].arg, by["-source"].arg) == (
+        "n | dset",
+        "ee | ee%",
+        "dset",
+    )
+    assert by["-base"].help.startswith("the n'th sub-brick of the input")
+    assert (by["-x_thresh"].arg, by["-params"].arg, by["-x_thresh"].help) == ("x", "m x r d", "")
+    assert by["-coarse"].help == "two passes: a coarse search on blurred bricks first"
+    assert by["-D"].help == "set AFNI's environment variable 'name' for this run"
+    assert {"-wtrim", "-SAVEDISP"} <= set(by) and {"-wtrim", "-SAVEDISP"} <= cl.parsed
+
+
+def test_click_command_nipype_run():
+    """`larmorx nipype run`, a click command emulated in Python: the flags its `_click_args`
+    compares, `-h` read letter by letter joined to `--help`, the synopsis from `run`'s
+    docstring; its page's address with a hyphen for the blank of `nipypecli run`."""
+    from larmorx_validation import reference
+
+    cl, by = _cl("python/larmorx/nipype/_run.py", "nipypecli run", "larmorx nipype run")
+    assert set(by) == {"--list", "-h", "--help"} and by["-h"].spellings == ["-h", "--help"]
+    assert cl.synopsis == ["larmorx nipype run [--list] <module> [<Interface> [inputs]]"]
+    (ref,) = reference.references("nipype-run")
+    assert (ref.url, ref.path) == (
+        "/programs/fmriprep/nipypecli-run/",
+        "content/programs/fmriprep/nipypecli-run.md",
+    )
+    assert "measured against nipype, case by case" in ref.markdown
+
+
 def test_mri_hmc_as_mcflirt():
     """`mri hmc`'s usage, read for mcflirt's page: spellings separated by commas, values in
     brackets, the parser's lists of options; the synopsis with mcflirt's command."""
@@ -660,13 +699,29 @@ def test_port_words_are_named_as_the_ports(monkeypatch):
 
 
 def test_an_absent_own_argument_is_the_command_lines_only():
-    """A function without one of LARMORX's own arguments (convert_xfm takes no `n_threads` and
-    no `upstream_defects`): its row names the option as the command line's only."""
+    """A function without one of LARMORX's own arguments (convert_xfm takes no
+    `upstream_defects`): its row names the option as the command line's only, and an argument it
+    takes (`n_threads`, since the documentation revision's step 2) has its Python cell."""
     page = apipage.read(REPO, "docs/api/fsl-flirt.md")
     p = next(p for p in page.programs if p.name == "convert_xfm")
     from larmorx_validation.reference.page import build
 
     ref = build(REPO, p)
     assert ref.problems == []
-    assert 'takes no <code><span class="nw">n&#95;threads</span></code>' in ref.markdown
+    assert 'takes no <code><span class="nw">upstream&#95;defects</span></code>' in ref.markdown
+    assert 'takes no <code><span class="nw">n&#95;threads</span></code>' not in ref.markdown
     assert "(no Python argument)" in ref.markdown
+
+
+def test_a_restricted_record_is_named_not_linked():
+    """t2smap's replica's record is closed to its clean-room implementers (their briefs): the
+    Ports table of its reference page names it; the clean room's record stays a link."""
+    page = apipage.read(REPO, "docs/api/tedana-t2smap.md")
+    p = next(p for p in page.programs if p.name == "t2smap")
+    from larmorx_validation.reference.page import build
+
+    ref = build(REPO, p)
+    assert ref.problems == []
+    assert "`tedana-t2smap-replica`" in ref.markdown
+    assert "repo:docs/validation/tedana-t2smap-replica.md" not in ref.markdown
+    assert "(repo:docs/validation/tedana-t2smap-original.md)" in ref.markdown

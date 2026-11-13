@@ -139,7 +139,7 @@ def _run_original(
     if code != 0:
         tail = "\n".join((out + err).strip().splitlines()[-20:])
         raise RuntimeError(
-            f"larmorx fsl fast (the clean-room original) failed with exit code {code}:\n{tail}"
+            f"larmorx fsl fast (the clean room) failed with exit code {code}:\n{tail}"
         )
     return out
 

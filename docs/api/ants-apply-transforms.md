@@ -1,11 +1,136 @@
 # antsApplyTransforms
 
 `lx.ants.apply_transforms`, `lx.ants.apply_transforms_to_points`, `lx.ants.combine_transforms`
-and `lx.transforms` (command line `larmorx ants antsApplyTransforms`; Rust crates `larmorx-ants`,
-`larmorx-interp`, `larmorx-transform`, `larmorx-io`). Ported from ANTs 2.6.5 on ITK 5.4.5.
+and `lx.transforms` (command line `larmorx ants antsApplyTransforms`): resampling through ITK
+transforms and the transform outputs, as ANTs 2.6.5's `antsApplyTransforms` computes them.
 
-**Status: `validated`** against antsApplyTransforms itself (see the
-[validation record](../validation/ants-apply-transforms.md)). The record covers 258 cases:
+The port comes first, then the program's section, the source of its reference page on the
+documentation site (`python -m larmorx_validation reference`), with its options table checked
+against the code; then the transform outputs, the other Python functions (points, combined
+transforms, transform files), the Rust API, ANTs' and ITK's defects as the port corrects them,
+the differences and the performance.
+
+## Ports
+
+`antsApplyTransforms` has one port, in `pip install larmorx`: **the replica** (Rust crates
+`larmorx-ants`, `larmorx-interp`, `larmorx-transform`, `larmorx-io`; Apache-2.0), translated from
+ANTs 2.6.5 on ITK 5.4.5. Its result does not depend on the thread count.
+
+## `antsApplyTransforms`
+
+<!-- reference
+program: antsApplyTransforms
+group: ants
+original: ANTs 2.6.5
+python: larmorx.ants.apply_transforms
+command-line: crates/larmorx-ants/src/cli/apply_transforms.rs
+records: {replica: [ants-apply-transforms]}
+evidence: ants-apply-transforms
+-->
+
+`antsApplyTransforms` resamples an image onto the grid of a reference image through a chain of
+ITK transforms (linear transforms, displacement fields, B-spline transforms and composites of
+them), or writes the chain itself as one transform. [Transform outputs](#transform-outputs)
+says how it writes the chain. fMRIPrep runs it for the masks, references, tissue maps and segmentations it moves to the
+templates and the T1w, its confounds' masks and its reports' images.
+
+### Python (`antsApplyTransforms`)
+
+`lx.ants.apply_transforms(image, reference, transforms=(), *, invert=None, interpolation="linear", sigma=None, alpha=None, order=3, time_series=None, default_value=0.0, dtype=None, precision="float64", n_threads=1, upstream_defects="fix")`
+
+Resamples `image` onto the grid of `reference`. Returns an `lx.Image`: float64 data (float32
+with `precision="float32"`) on the reference grid, plus a time axis for a series.
+
+**Precision.** `precision="float64"` (the default) computes in double, as ANTs does by
+default; `precision="float32"` computes in single precision exactly as
+`antsApplyTransforms --float 1` does: the image is read as float32, transform files are read as
+ITK's float reader reads them (a text file's numbers rounded once to float), points, transform
+arithmetic and continuous indices are float, and the result is float32. What is float and what
+stays double, step by step: [ants-float.md](../findings/ants-float.md).
+
+**Transform order.** As with `-t`, for each point of the output grid the *first* transform
+acts first. So `[warp, affine]` maps an output point `x` to `affine(warp(x))`. Equivalently,
+the image moves by the affine first, then the warp; that is ANTs' "last transform is applied
+first". `apply_transforms_to_points` maps points the same way.
+
+**Files and in-memory images.** Paths are read as ITK reads them: ITK's choice between qform
+and sform, and ITK's rescaling of scaled integer data through float32. This is what makes the
+output match ANTs bit for bit. `lx.Image` objects, nibabel images and `(array, affine)` pairs
+are placed by their affine.
+
+```python
+import larmorx as lx
+
+# fMRIPrep's T1w → MNI (an .h5 composite: affine + warp), onto the 2 mm template grid
+mni = lx.ants.apply_transforms(
+    "sub-01_desc-preproc_T1w.nii.gz",
+    "tpl-MNI152NLin2009cAsym_res-02_T1w.nii.gz",
+    ["sub-01_from-T1w_to-MNI152NLin2009cAsym_mode-image_xfm.h5"],
+    interpolation="lanczos",
+    n_threads=8,
+)
+mni.save("sub-01_space-MNI_T1w.nii.gz")
+
+# A 4D BOLD series into T1w space, labels with GenericLabel
+bold_t1 = lx.ants.apply_transforms(bold_path, t1w_path, [xfm_txt], interpolation="lanczos")
+aseg = lx.ants.apply_transforms(aseg_path, boldref_path, [xfm_txt], interpolation="genericlabel", dtype="int16")
+```
+
+### Options of `antsApplyTransforms`
+
+| ANTs option | Python | Notes |
+|---|---|---|
+| `-d 3`, `--dimensionality` | – | 3D only for now |
+| `-i file`, `--input` | `image` | path, `lx.Image`, nibabel image or `(array, affine)` |
+| `-r file`, `--reference-image` | `reference` | only its grid is used |
+| `-o file`, `--output` | the result | the returned image (its `.save(path)` writes it) |
+| `-o Linear[file,<invert=0>]` | (another function) | `lx.ants.combine_transforms(..., output="linear", invert_linear=...)`: [Transform outputs](#transform-outputs) |
+| `-o CompositeTransform[file]` | (another function) | `lx.ants.combine_transforms(..., output="composite")`: [Transform outputs](#transform-outputs) |
+| `-o DisplacementField[file]`, `-o [file,1]` | (another function) | `lx.ants.combine_transforms(..., output="displacement_field", reference=...)`: [Transform outputs](#transform-outputs) |
+| `-t file` / `-t [file,1]`, `--transform` | `transforms=[file]`, `invert=[True]` | files or `lx.transforms.read(...)` lists: linear transforms, displacement fields, B-spline transforms (`BSplineTransform_double_3_3`, `_float_3_3`, as antsRegistration's `BSpline` stage writes them) and composites of them; linear transforms only can be inverted (a field or a B-spline transform has no inverse: `[file,1]` fails, as in ANTs). **Nothing is inverted by default**, unlike ANTsPy, which inverts the first of `[.mat, warp]` |
+| `-t identity` | `transforms=()` | |
+| `-n Linear`, `--interpolation` | `interpolation="linear"` | default |
+| `-n NearestNeighbor` | `interpolation="nearest"` | |
+| `-n BSpline[order]` | `interpolation="bspline"`, `order=3` | orders 0–5 |
+| `-n Gaussian[sigma,alpha]` | `interpolation="gaussian"`, `sigma=`, `alpha=` | sigma in mm (one value or three); defaults: input spacing, 1 |
+| `-n MultiLabel[sigma,alpha]` | `interpolation="multilabel"`, `sigma=`, `alpha=` | alpha default 4 (ANTs ignores the command line's, ANTS-33 in [Upstream defects](#upstream-defects-d13)) |
+| `-n GenericLabel[Linear]` | `interpolation="genericlabel"` | `GenericLabel[NearestNeighbor]` interpolates each label's mask by nearest neighbour (ANTs ignores the parameter, ANTS-33) |
+| `-n LanczosWindowedSinc` (and Cosine, Hamming, Welch, Blackman) | `interpolation="lanczos"`, `"cosine"`, `"hamming"`, `"welch"`, `"blackman"` | ANTs' names are accepted too |
+| `-e 0` / `-e 3`, `--input-image-type` | `time_series=None/False/True` | 4D images are resampled volume by volume by default; `False` with 4D is an error, as `-e 0` is |
+| `--time-index t` | `image.data[..., t]` | |
+| `-f value`, `--default-value` | `default_value=` | value outside the input |
+| `-u type`, `--output-data-type` | `dtype=` | `char`, `uchar`, `short`, `int`, `float`, `double`; default: the computation type (float64, or float32 with `precision="float32"`). Integers truncate toward zero; out-of-range values clamp (ANTs wraps them, ANTS-06 in [Upstream defects](#upstream-defects-d13); [finding](../findings/ants-cli.md)) |
+| `--float 1` | `precision="float32"` | single precision exactly as ANTs computes it ([finding](../findings/ants-float.md)); `--float 0` is `"float64"`, the default |
+| `-z`, `--static-cast-for-R` | (command line only) | accepted; it changes nothing the port writes |
+| `-v 1`, `--verbose` | – | |
+| `-h`, `--help` | (command line only) | ANTs' help |
+| `ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS` (or `NSLOTS`, as ITK reads them) | `n_threads=1` (0 = all CPUs) | the result does not depend on it |
+| `LARMORX_UPSTREAM_DEFECTS` | `upstream_defects` | `fix` (default) or `reproduce` ([Upstream defects](#upstream-defects-d13)) |
+
+Not supported yet (the command line says so): vector, tensor, multichannel and 5D images (`-e
+1, 2, 4, 5, 6`); `-d 2` and `-d 4`; initializers (`-t [fixed,moving,feature]`); MINC transform
+files (`.xfm`).
+
+### Examples of `antsApplyTransforms`
+
+<!-- inputs: t1w.nii.gz=head -->
+
+```python example
+import larmorx as lx
+
+# No transform (the identity), Lanczos interpolation, onto the image's own grid.
+out = lx.ants.apply_transforms("t1w.nii.gz", "t1w.nii.gz", interpolation="lanczos")
+out.data.dtype  # -> dtype('float64')
+```
+
+```bash example
+larmorx ants antsApplyTransforms -d 3 -i t1w.nii.gz -r t1w.nii.gz -t identity -n LanczosWindowedSinc -o out.nii.gz --float 1
+```
+
+### Ports of `antsApplyTransforms`
+
+**The replica: status `validated`** against antsApplyTransforms itself (its
+[record](../validation/ants-apply-transforms.md), 2026-10-22). The record covers 258 cases:
 - every interpolator;
 - every transform type and file format, `.h5` files written by ITK (linear, inverted, float,
   six types in one composite, a dense group of nine affines, a float field) and by larmorx
@@ -44,89 +169,6 @@ MNI, the stroke's lesion mask to MNI, the 82-year-old's FLAIR onto its T1w): **4
 bit-identical with CORE-MATH, 329 to the unmodified ANTs**, all 167 `--float 1` calls among them
 (the others where ITK calls glibc's `exp`, `log`, `sin` or `cos` in double).
 
-## Quick start
-
-```python
-import larmorx as lx
-
-# fMRIPrep's T1w → MNI (an .h5 composite: affine + warp), onto the 2 mm template grid
-mni = lx.ants.apply_transforms(
-    "sub-01_desc-preproc_T1w.nii.gz",
-    "tpl-MNI152NLin2009cAsym_res-02_T1w.nii.gz",
-    ["sub-01_from-T1w_to-MNI152NLin2009cAsym_mode-image_xfm.h5"],
-    interpolation="lanczos",
-    n_threads=8,
-)
-mni.save("sub-01_space-MNI_T1w.nii.gz")
-
-# A 4D BOLD series into T1w space, labels with GenericLabel
-bold_t1 = lx.ants.apply_transforms(bold_path, t1w_path, [xfm_txt], interpolation="lanczos")
-aseg = lx.ants.apply_transforms(aseg_path, boldref_path, [xfm_txt], interpolation="genericlabel", dtype="int16")
-```
-
-The same from a shell, with ANTs' own arguments:
-
-```bash
-larmorx ants antsApplyTransforms -d 3 -i sub-01_desc-preproc_T1w.nii.gz \
-    -r tpl-MNI152NLin2009cAsym_res-02_T1w.nii.gz \
-    -t sub-01_from-T1w_to-MNI152NLin2009cAsym_mode-image_xfm.h5 \
-    -n LanczosWindowedSinc -o sub-01_space-MNI_T1w.nii.gz
-```
-
-## `lx.ants.apply_transforms(image, reference, transforms=(), *, ...)`
-
-Resamples `image` onto the grid of `reference`. Returns an `lx.Image`: float64 data (float32
-with `precision="float32"`) on the reference grid, plus a time axis for a series.
-
-**Precision.** `precision="float64"` (the default) computes in double, as ANTs does by
-default; `precision="float32"` computes in single precision exactly as
-`antsApplyTransforms --float 1` does: the image is read as float32, transform files are read as
-ITK's float reader reads them (a text file's numbers rounded once to float), points, transform
-arithmetic and continuous indices are float, and the result is float32. What is float and what
-stays double, step by step: [ants-float.md](../findings/ants-float.md).
-
-**Transform order.** As with `-t`, for each point of the output grid the *first* transform
-acts first. So `[warp, affine]` maps an output point `x` to `affine(warp(x))`. Equivalently,
-the image moves by the affine first, then the warp; that is ANTs' "last transform is applied
-first". `apply_transforms_to_points` maps points the same way.
-
-**Files and in-memory images.** Paths are read as ITK reads them: ITK's choice between qform
-and sform, and ITK's rescaling of scaled integer data through float32. This is what makes the
-output match ANTs bit for bit. `lx.Image` objects, nibabel images and `(array, affine)` pairs
-are placed by their affine.
-
-### Option mapping
-
-| antsApplyTransforms | `lx.ants.apply_transforms` | Notes |
-|---|---|---|
-| `-d 3` | – | 3D only for now |
-| `-i file` | `image` | path, `lx.Image`, nibabel image or `(array, affine)` |
-| `-r file` | `reference` | only its grid is used |
-| `-o file` | the returned `Image` (`.save(path)`) | |
-| `-o Linear[file,<invert=0>]` | `combine_transforms(..., output="linear", invert_linear=)` | [below](#transform-outputs) |
-| `-o CompositeTransform[file]` | `combine_transforms(..., output="composite")` | [below](#transform-outputs) |
-| `-o DisplacementField[file]`, `-o [file,1]` | `combine_transforms(..., output="displacement_field", reference=)` | [below](#transform-outputs) |
-| `-t file` / `-t [file,1]` | `transforms=[file]`, `invert=[True]` | files or `lx.transforms.read(...)` lists: linear transforms, displacement fields, B-spline transforms (`BSplineTransform_double_3_3`, `_float_3_3`, as antsRegistration's `BSpline` stage writes them) and composites of them; linear transforms only can be inverted (a field or a B-spline transform has no inverse: `[file,1]` fails, as in ANTs). **Nothing is inverted by default**, unlike ANTsPy, which inverts the first of `[.mat, warp]` |
-| `-t identity` | `transforms=()` | |
-| `-n Linear` | `interpolation="linear"` | default |
-| `-n NearestNeighbor` | `"nearest"` | |
-| `-n BSpline[order]` | `"bspline"`, `order=3` | orders 0–5 |
-| `-n Gaussian[sigma,alpha]` | `"gaussian"`, `sigma=`, `alpha=` | sigma in mm (one value or three); defaults: input spacing, 1 |
-| `-n MultiLabel[sigma,alpha]` | `"multilabel"`, `sigma=`, `alpha=` | alpha default 4 (ANTs ignores the command line's, ANTS-33 below) |
-| `-n GenericLabel[Linear]` | `"genericlabel"` | `GenericLabel[NearestNeighbor]` interpolates each label's mask by nearest neighbour (ANTs ignores the parameter, ANTS-33) |
-| `-n LanczosWindowedSinc` (and Cosine, Hamming, Welch, Blackman) | `"lanczos"`, `"cosine"`, `"hamming"`, `"welch"`, `"blackman"` | ANTs' names are accepted too |
-| `-e 0` / `-e 3` | `time_series=None/False/True` | 4D images are resampled volume by volume by default; `False` with 4D is an error, as `-e 0` is |
-| `--time-index t` | `image.data[..., t]` | |
-| `-f value` | `default_value=` | value outside the input |
-| `-u type` | `dtype=` | `char`, `uchar`, `short`, `int`, `float`, `double`; default: the computation type (float64, or float32 with `precision="float32"`). Integers truncate toward zero; out-of-range values clamp (ANTs wraps them, ANTS-06 below; [finding](../findings/ants-cli.md)) |
-| `--float 1` | `precision="float32"` | single precision exactly as ANTs computes it ([finding](../findings/ants-float.md)); `--float 0` is `"float64"`, the default |
-| `-v 1` | – | |
-| (threads: `ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS` or `NSLOTS`, as ITK reads them) | `n_threads=1` (0 = all CPUs) | the result does not depend on it |
-
-Not supported yet (the CLI says so): vector, tensor, multichannel and 5D images (`-e 1, 2, 4,
-5, 6`); `-d 2` and `-d 4`; initializers (`-t [fixed,moving,feature]`); MINC transform files
-(`.xfm`).
-
 ## Transform outputs
 
 `-o Linear[file,<invert>]`, `-o CompositeTransform[file]` and `-o DisplacementField[file]`
@@ -138,7 +180,7 @@ the same transforms as `ItkTransform` objects, which `lx.transforms.write` write
   (`_double_3_3`, or `_float_3_3` with `--float 1`). An inverted transform (`-t [file,1]`) has
   the class ITK's inverse makes: an `AffineTransform` stays one, a `TranslationTransform` is the
   opposite translation, and every other matrix-offset class (Euler, versor, similarity, rigid)
-  becomes a `MatrixOffsetTransformBase` with the original's fixed parameters (four for an
+  becomes a `MatrixOffsetTransformBase` with the inverted transform's fixed parameters (four for an
   Euler transform: its centre and its ZYX flag). A chain without parameters (no `-t`) gets the
   identity `MatrixOffsetTransformBase` ANTs adds.
 - **`CompositeTransform[file]`** writes a `CompositeTransform` and the chain's transforms in
@@ -164,12 +206,13 @@ Validated against antsApplyTransforms: the record's `transform-output` cases, ev
 byte for byte (text, MATLAB), header and vectors bit for bit (NIfTI) or dataset for dataset
 (HDF5, whose bytes differ only as [transforms-hdf5.md](transforms-hdf5.md) describes).
 
-## `lx.ants.apply_transforms_to_points(points, transforms=(), *, invert=None, coordinates="lps")`
+## `lx.ants.apply_transforms_to_points(points, transforms=(), *, invert=None, coordinates="lps", n_threads=1)`
 
 Maps an `(n, 3+)` array of points (extra columns kept) through the transforms, like
 `antsApplyTransformsToPoints`. ANTs works in LPS millimetres; `coordinates="ras"` takes and
 returns RAS+. To move points from the moving image to the fixed one, give the inverse
-transforms, as with ANTs.
+transforms, as with ANTs. The points are mapped on one thread; `n_threads` (0 = all) is taken as
+by every other call, and the result does not depend on it.
 
 ## `lx.ants.combine_transforms(transforms=(), *, invert=None, output="composite", ...)`
 

@@ -72,8 +72,13 @@ class Reference:
     sources: list[str] = field(default_factory=list)
 
 
+def slug(name: str) -> str:
+    """A program's name in its page's address: blanks as hyphens (``nipypecli run``)."""
+    return name.replace(" ", "-")
+
+
 def url_of(p: apipage.Program) -> str:
-    return f"/programs/{p.group}/{p.name}/"
+    return f"/programs/{p.group}/{slug(p.name)}/"
 
 
 # ------------------------------------------------------------------------------------------------
@@ -100,7 +105,7 @@ def read_row(cells: list[str], header: list[str], params: set[str]) -> Row:
     for span in _spans(first):
         for w in span.split():
             w = w.split("=", 1)[0]
-            if re.fullmatch(r"--?[\w][\w-]*", w):
+            if re.fullmatch(r"--?[\w][\w+.-]*", w):  # AFNI's `-rlt+`
                 options.append(w)
             elif re.fullmatch(r"[A-Z][A-Z0-9_]{2,}", w):
                 variables.append(w)
@@ -269,13 +274,15 @@ def next_release(repo: Path, options: list[str]) -> str | None:
 
 def build(repo: Path, p: apipage.Program) -> Reference:
     page = p.page
-    ref = Reference(p, url_of(p), f"content/programs/{p.group}/{p.name}.md")
+    ref = Reference(p, url_of(p), f"content/programs/{p.group}/{slug(p.name)}.md")
     problems = ref.problems
     where = f"{page.path} ({p.name})"
     meta = p.meta
     if p.group not in GROUPS:
         problems.append(f"{where}: unknown group {p.group!r} (one of {', '.join(GROUPS)})")
-    software = SOFTWARE.get(p.group, p.group)
+    # a program of another software than its group's (nipype's ``nipypecli run`` among
+    # fMRIPrep's programs) names it in its reference block
+    software = str(meta.get("software") or SOFTWARE.get(p.group, p.group))
     original = str(meta["original"])
     if original not in page.text:
         problems.append(f"{where}: the page never names its original, {original!r}")
@@ -555,8 +562,9 @@ def build(repo: Path, p: apipage.Program) -> Reference:
                 seen = set()
                 for s in r.options:
                     o = accepted.get(s)
-                    if o is not None and o.help and id(o) not in seen:
-                        seen.add(id(o))
+                    # one line per text: `-input` and `-source` share theirs
+                    if o is not None and o.help and o.help not in seen:
+                        seen.add(o.help)
                         helps.append(o.help)
             if helps:
                 note = note + "".join(
@@ -637,7 +645,14 @@ def build(repo: Path, p: apipage.Program) -> Reference:
     body.append("| Port | Package | Licence | Status | Records |\n|---|---|---|---|---|")
     for x in reg:
         ids = port_records.get(x.kind) or []
-        recs = ", ".join(f"[{i}](repo:docs/validation/{i}.md)" for i in ids)
+        # a record the clean-room briefs forbid (t2smap's replica's) is named, not linked: a
+        # reference page is readable material (the writing guide, section 1)
+        recs = ", ".join(
+            f"`{i}`"
+            if restricted(f"docs/validation/{i}.md")
+            else f"[{i}](repo:docs/validation/{i}.md)"
+            for i in ids
+        )
         rid = ids[0] if ids else None
         where_pkg = f"`{x.package}`" + (" (built in)" if x.built_in and x.kind == "replica" else "")
         body.append(

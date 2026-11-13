@@ -58,6 +58,61 @@ def _make_head4d(path: Path) -> None:
     _save(path, *_head((40, 48, 40, 4)))
 
 
+def _make_head_mask(path: Path) -> None:
+    """The synthetic head's brain: 1 inside its bright ellipsoid, 0 elsewhere (uint8)."""
+    data, affine = _head()
+    _save(path, (data >= 600).astype(np.uint8), affine)
+
+
+def _make_bold(path: Path) -> None:
+    _save(path, *_head((40, 48, 40, 8)))
+
+
+def _make_echo(path: Path, factor: float) -> None:
+    """One echo of a multi-echo series: the 8-volume series times ``factor``, the decay since the
+    first echo (0.6 per echo spacing: a T2* of about 29 ms for echoes 15 ms apart)."""
+    data, affine = _head((40, 48, 40, 8))
+    _save(path, (data * np.float32(factor)).astype(np.float32), affine)
+
+
+def _make_bids_pepolar(path: Path) -> None:
+    """A BIDS dataset (a folder) of one participant: two PEPOLAR images (``dir-AP`` along ``j-``,
+    ``dir-PA`` along ``j``, 2 volumes of 10 × 12 × 10 voxels of 4 mm) meant for a BOLD run of 3
+    volumes, with their sidecars; enough for sdcflows' search of estimators."""
+    import json
+
+    import larmorx as lx
+
+    fmap, func = path / "sub-01" / "fmap", path / "sub-01" / "func"
+    fmap.mkdir(parents=True)
+    func.mkdir(parents=True)
+    (path / "dataset_description.json").write_text(
+        json.dumps({"Name": "example", "BIDSVersion": "1.9.0"}), encoding="utf-8"
+    )
+    affine = np.diag([4.0, 4.0, 4.0, 1.0])
+    bold = "func/sub-01_task-rest_bold.nii.gz"
+    for d, pe in (("AP", "j-"), ("PA", "j")):
+        data = np.full((10, 12, 10, 2), 100.0, np.float32)
+        lx.save(lx.Image(data, affine), str(fmap / f"sub-01_dir-{d}_epi.nii.gz"))
+        meta = {"PhaseEncodingDirection": pe, "TotalReadoutTime": 0.05, "IntendedFor": bold}
+        (fmap / f"sub-01_dir-{d}_epi.json").write_text(json.dumps(meta), encoding="utf-8")
+    lx.save(
+        lx.Image(np.full((10, 12, 10, 3), 50.0, np.float32), affine), str(path / "sub-01" / bold)
+    )
+    meta = {"PhaseEncodingDirection": "j", "TotalReadoutTime": 0.05, "RepetitionTime": 2.0}
+    (func / "sub-01_task-rest_bold.json").write_text(json.dumps(meta), encoding="utf-8")
+
+
+def _make_slice_timing(path: Path) -> None:
+    """The times of 40 slices acquired interleaved (even slices first) within 2 s, 0.05 s apart,
+    on one line separated by tabs, as fMRIPrep writes a ``-tpattern`` file."""
+    order = list(range(0, 40, 2)) + list(range(1, 40, 2))
+    times = [0.0] * 40
+    for n, k in enumerate(order):
+        times[k] = n * 5 / 100
+    path.write_text("\t".join(str(t) for t in times) + "\n", encoding="utf-8")
+
+
 def _make_matrix(path: Path) -> None:
     path.write_text("1 0 0 0\n0 1 0 0\n0 0 1 0\n0 0 0 1\n", encoding="utf-8")
 
@@ -108,6 +163,25 @@ def _make_log(path: Path) -> None:
 KINDS: dict[str, Kind] = {
     "head": Kind("a synthetic head of 40 × 48 × 40 voxels of 4 mm", _make_head),
     "head4d": Kind("a synthetic series of 4 such heads", _make_head4d),
+    "head-mask": Kind(
+        "the synthetic head's brain as a mask (1 inside, 0 outside)", _make_head_mask
+    ),
+    "bold": Kind("a synthetic series of 8 heads of 40 × 48 × 40 voxels of 4 mm", _make_bold),
+    "echo-1": Kind(
+        "the first echo of a synthetic multi-echo series: 8 heads of 40 × 48 × 40 voxels of 4 mm",
+        lambda path: _make_echo(path, 1.0),
+    ),
+    "echo-2": Kind("the second echo: the first times 0.6", lambda path: _make_echo(path, 0.6)),
+    "echo-3": Kind("the third echo: the first times 0.36", lambda path: _make_echo(path, 0.36)),
+    "bids-pepolar": Kind(
+        "a BIDS dataset of one participant with two PEPOLAR images and a BOLD run (a folder)",
+        _make_bids_pepolar,
+    ),
+    "slice-timing": Kind(
+        "the times of 40 slices acquired interleaved within 2 s, on one line, as fMRIPrep writes "
+        "them",
+        _make_slice_timing,
+    ),
     "matrix": Kind("the identity as a 4 × 4 text matrix", _make_matrix),
     "coords": Kind("two coordinates, one `x y z` per line", _make_coords),
     "points": Kind("eight points in millimetres, one `x y z` per line", _make_points),

@@ -96,7 +96,7 @@ def _run(
         if code != 0:
             message = "\n".join(s for s in (stderr.strip(), _clean_stdout(stdout)) if s)
             raise RuntimeError(
-                f"larmorx fsl fslstats (the clean-room original) failed with exit code {code}"
+                f"larmorx fsl fslstats (the clean room) failed with exit code {code}"
                 + (f":\n{message}" if message else "")
             )
         return stdout, path

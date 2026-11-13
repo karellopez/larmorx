@@ -31,7 +31,7 @@ import numpy as np
 from larmorx import _core, _defects, _replica
 from larmorx._defects import UpstreamDefectsName
 from larmorx._replica import ImplementationName
-from larmorx.fsl.bet import _read_image, _write_image
+from larmorx.fsl.bet import _read_image, _threads, _write_image
 from larmorx.fsl.flirt import _warn
 from larmorx.image import Image
 
@@ -63,9 +63,11 @@ def _run(
     implementation: str,
     upstream_defects: str,
     env: dict[str, str | None],
+    n_threads: int,
 ):
-    """Runs ``fsl tool`` (the clean room in this process, or the replica's program) in ``tmp``;
-    returns the implementation and ``(exit status, standard output, standard error)``."""
+    """Runs ``fsl tool`` (the clean room in this process, or the replica's program) in ``tmp``
+    with ``n_threads`` (``OMP_NUM_THREADS``; 0: unset, all); returns the implementation and
+    ``(exit status, standard output, standard error)``."""
     _defects.check(upstream_defects)
     selected = _replica.select("fsl", tool, implementation)
     if selected is None:
@@ -82,6 +84,8 @@ def _run(
             table += [(k, os.environ[k]) for k in _DATA_VARIABLES if os.environ.get(k)]
         else:
             table.append(("PATH", tmp))
+        if n_threads > 0:
+            table.append(("OMP_NUM_THREADS", str(n_threads)))
         code, stdout, stderr = _core.fsl_run_original(tool, list(args), table, tmp)
         _warn(stderr)
         return _replica.ORIGINAL, (code, stdout, stderr)
@@ -89,7 +93,7 @@ def _run(
         selected,
         args,
         cwd=tmp,
-        n_threads=1,
+        n_threads=n_threads,
         upstream_defects=upstream_defects,
         env={"FSLOUTPUTTYPE": "NIFTI", "PATH": tmp, **env},
         exclude=lambda name: name.upper().startswith("FSL") or name in ("maskthr", FSL_DATA_ENV),
@@ -105,6 +109,7 @@ def fslroi(
     y: Region = None,
     z: Region = None,
     t: Region = None,
+    n_threads: int = 1,
     implementation: ImplementationName = "auto",
     upstream_defects: UpstreamDefectsName = "fix",
 ) -> Image:
@@ -115,6 +120,9 @@ def fslroi(
 
     Parameters
     ----------
+    n_threads
+        Threads (0 = all), given to the program as ``OMP_NUM_THREADS`` and to the reading and
+        writing of images; the result does not depend on it.
     implementation
         ``"auto"`` (default): the replica when ``larmorx-nc`` is installed, else the clean room;
         ``"replica"`` or ``"clean-room"`` (``"original"``, 0.1.0rc1's spelling, still works).
@@ -125,6 +133,7 @@ def fslroi(
     spatial = (x, y, z)
     if t is None and all(a is None for a in spatial):
         raise ValueError("fslroi needs a region: x, y, z and/or t")
+    n_threads = _threads(n_threads)
     numbers: list[int] = []
     if any(a is not None for a in spatial):
         for a in spatial:
@@ -133,14 +142,20 @@ def fslroi(
     if t is not None:
         numbers += [int(t[0]), int(t[1])]
     with tempfile.TemporaryDirectory(prefix="larmorx-fslroi-") as tmp:
-        src = _write_image(image, tmp, "in", 1)
+        src = _write_image(image, tmp, "in", n_threads)
         out = os.path.join(tmp, "roi.nii")
         impl, (code, _stdout, stderr) = _run(
-            "fslroi", [src, out, *map(str, numbers)], tmp, implementation, upstream_defects, {}
+            "fslroi",
+            [src, out, *map(str, numbers)],
+            tmp,
+            implementation,
+            upstream_defects,
+            {},
+            n_threads,
         )
         if code != 0 or not os.path.exists(out):
             raise RuntimeError(f"fslroi failed (exit {code}):\n{stderr}")
-        return _read_image(out, 1, impl)
+        return _read_image(out, n_threads, impl)
 
 
 @dataclass(frozen=True)
@@ -164,6 +179,7 @@ def standard_space_roi(
     betpremask: bool = False,
     flirt_args: list[str] | None = None,
     fsl_data: str | os.PathLike | None = None,
+    n_threads: int = 1,
     implementation: ImplementationName = "auto",
     upstream_defects: UpstreamDefectsName = "fix",
 ) -> StandardSpaceRoiResult:
@@ -179,6 +195,9 @@ def standard_space_roi(
 
     Parameters
     ----------
+    n_threads
+        Threads (0 = all), given to the program as ``OMP_NUM_THREADS`` and to the reading and
+        writing of images; the result does not depend on it.
     implementation
         ``"auto"`` (default): the replica when ``larmorx-nc`` is installed, else the clean room;
         ``"replica"`` or ``"clean-room"`` (``"original"``, 0.1.0rc1's spelling, still works).
@@ -186,9 +205,10 @@ def standard_space_roi(
         ``"fix"`` (default) or ``"reproduce"``: FSL's defects corrected, or FSL's behaviour
         (``docs/api/fsl-roi.md``, "Defects of the original, corrected by default").
     """
+    n_threads = _threads(n_threads)
     args: list[str] = []
     with tempfile.TemporaryDirectory(prefix="larmorx-ssroi-") as tmp:
-        src = _write_image(image, tmp, "in", 1)
+        src = _write_image(image, tmp, "in", n_threads)
         if betpremask:
             args.append("-b")
         for kind, value, prefix in (("mask", mask, "-mask"), ("roi", roi, "-roi")):
@@ -197,11 +217,11 @@ def standard_space_roi(
             if isinstance(value, str) and value in ("fov", "none"):
                 args.append(f"{prefix}{value.upper()}")
             else:
-                args += [f"{prefix}MASK", _write_image(value, tmp, f"{kind}mask", 1)]
+                args += [f"{prefix}MASK", _write_image(value, tmp, f"{kind}mask", n_threads)]
         if reference is not None:
-            args += ["-ssref", _write_image(reference, tmp, "ref", 1)]
+            args += ["-ssref", _write_image(reference, tmp, "ref", n_threads)]
         if alt_input is not None:
-            args += ["-altinput", _write_image(alt_input, tmp, "alt", 1)]
+            args += ["-altinput", _write_image(alt_input, tmp, "alt", n_threads)]
         args.append("-d")
         env: dict[str, str | None] = {}
         data = fsl_data if fsl_data is not None else os.environ.get(FSL_DATA_ENV)
@@ -217,12 +237,13 @@ def standard_space_roi(
             implementation,
             upstream_defects,
             env,
+            n_threads,
         )
         image_out = out + ".nii"
         if code != 0 or not os.path.exists(image_out):
             raise RuntimeError(f"standard_space_roi failed (exit {code}):\n{stdout}{stderr}")
         return StandardSpaceRoiResult(
-            image=_read_image(image_out, 1, impl),
+            image=_read_image(image_out, n_threads, impl),
             to_standard=np.loadtxt(out + "_tmp_to_std.mat"),
             from_standard=np.loadtxt(out + "_tmp_to_std_inv.mat"),
         )

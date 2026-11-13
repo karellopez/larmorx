@@ -1,26 +1,45 @@
 # ThresholdImage
 
-`lx.ants.threshold_image`, `lx.ants.otsu_threshold` (command line
-`larmorx ants ThresholdImage`; Rust `larmorx_ants::threshold_image`,
-`larmorx_image::threshold`). A replica of ANTs 2.6.5 on ITK 5.4.5 (Apache-2.0).
+`lx.ants.threshold_image`, `lx.ants.otsu_threshold` (command line `larmorx ants
+ThresholdImage`): an image thresholded to two values between two bounds, or into classes by
+Otsu's thresholds, as ANTs 2.6.5's `ThresholdImage` computes them.
 
-**Status: `validated`** against ThresholdImage itself (see the
-[validation record](../validation/ants-threshold-image.md)): 41 cases, every compared case
-bit-identical, with ANTs' exact header bytes. `Kmeans` is not supported yet. Compared with
-ANTs' defects reproduced (`LARMORX_UPSTREAM_DEFECTS=reproduce`); the record's "D13 fix pass"
-lists what larmorx's default changes.
+The port comes first, then the program's section, the source of its reference page on the
+documentation site (`python -m larmorx_validation reference`), with its options table checked
+against the code; then the speed, the behaviour worth knowing and ANTs' defects as the port
+corrects them.
 
-**Speed** ([benchmark](../benchmarks/ants-programs.md)): `0.5 1` on the 1 mm MNI probability
-map 100 ms on one thread, 49 ms on 12 (ANTs: 115 ms and 103 ms); `Otsu 3` with a mask on
-fMRIPrep's T1w 205 ms and 125 ms (ANTs: 558 ms and 315 ms).
+## Ports
 
-**On the data panel** ([record](../validation/ants-threshold-image-panel.md), 2026-10-26):
-sMRIPrep's `ThresholdImage` in the brain extraction of all fourteen finished oracle runs, each
-replayed from its node with its inputs, and four calls fMRIPrep never makes (Otsu with 4, 3 and 2
-thresholds on the 7 T MP2RAGE, the 82-year-old's FLAIR and the 1.5 T T1w as float; a range on the
-stroke's lesion mask): **18 of 18 bit-identical, header bytes included**.
+`ThresholdImage` has one port, in `pip install larmorx`: **the replica** (`crates/larmorx-ants`,
+`crates/larmorx-image`; Apache-2.0; Rust `larmorx_ants::threshold_image`,
+`larmorx_image::threshold`), translated from ANTs 2.6.5 on ITK 5.4.5 (Apache-2.0).
 
-## Quick start
+## `ThresholdImage`
+
+<!-- reference
+program: ThresholdImage
+group: ants
+original: ANTs 2.6.5
+python: larmorx.ants.threshold_image
+command-line: crates/larmorx-ants/src/cli/threshold_image.rs
+records: {replica: [ants-threshold-image]}
+evidence: ants-programs
+-->
+
+`ThresholdImage` sets the voxels between two bounds to one value and the others to another, or
+labels an image's classes by Otsu's thresholds. sMRIPrep's brain extraction, which fMRIPrep runs,
+binarises a brain probability map with it (`0.5 1 1 0`).
+
+### Python (`ThresholdImage`)
+
+`lx.ants.threshold_image(image, lower, upper, inside=1.0, outside=0.0, *, n_threads=1)`
+
+Returns a float32 `lx.Image`: `inside` where `lower <= v <= upper` (the bounds compared in
+float32), else `outside`; `lower > upper` raises `ValueError` (ANTs aborts). Otsu's mode is a
+function of its own, `lx.ants.otsu_threshold(image, n_thresholds=1, *, mask=None, n_threads=1,
+upstream_defects="fix")`, which returns `OtsuResult(image, thresholds)`, the thresholds being
+the upper bounds of the chosen histogram bins.
 
 ```python
 import larmorx as lx
@@ -33,24 +52,62 @@ r = lx.ants.otsu_threshold(t1w, 2, mask=brain_mask)
 r.image, r.thresholds
 ```
 
-```bash
-larmorx ants ThresholdImage 3 prob.nii.gz mask.nii.gz 0.5 1 1 0
-larmorx ants ThresholdImage 3 t1w.nii.gz otsu.nii.gz Otsu 2 brain_mask.nii.gz
+### Options of `ThresholdImage`
+
+| ANTs argument (positional) | Python | Notes |
+|---|---|---|
+| 1 `ImageDimension` | – | 2, 3, 4; Python takes any array shape |
+| 2 `ImageIn.ext` | `image` | path, `lx.Image`, nibabel image or `(array, affine)` |
+| 3 `outImage.ext` | the result | float32, as ANTs writes it |
+| 4 `threshlo` | `lower` | inclusive; read with `atof`, then compared in float |
+| 5 `threshhi` | `upper` | inclusive |
+| 6 `insideValue` | `inside` | default 1 |
+| 7 `outsideValue` | `outside` | default 0 |
+| 4 `Otsu`, 5 `NumberofThresholds` | `lx.ants.otsu_threshold(image, n_thresholds)` | ITK's `OtsuMultipleThresholdsImageFilter`, 128 bins, labels `0..n` |
+| 6 `maskImage.ext` (with `Otsu`) | `lx.ants.otsu_threshold(..., mask=...)` | ANTs' own code: region = mask value 1 (as `int`), 200 bins, labels `1..n+1` inside, 0 outside; the output takes the mask's geometry |
+| 4 `Kmeans`, 5 `NumberofThresholds`, 6 `maskImage.ext` | – | not supported yet |
+| `ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS` (or `NSLOTS`, as ITK reads them) | `n_threads` | the result does not depend on it |
+
+### Examples of `ThresholdImage`
+
+<!-- inputs: prob.nii.gz=head mask.nii.gz=head-mask -->
+
+```python example
+import larmorx as lx
+
+# 1 where 300 <= v <= 700 (the head's brain and skull), else 0.
+inside = lx.ants.threshold_image("prob.nii.gz", 300.0, 700.0)
+sorted(set(inside.data.ravel().tolist()))  # -> [0.0, 1.0]
+# Otsu's single threshold inside the mask: labels 1 and 2 there, 0 outside.
+r = lx.ants.otsu_threshold("prob.nii.gz", 1, mask="mask.nii.gz")
+r.image.data.dtype  # -> dtype('float32')
 ```
 
-## Option mapping
+```bash example
+larmorx ants ThresholdImage 3 prob.nii.gz binary.nii.gz 300 700 1 0
+larmorx ants ThresholdImage 3 prob.nii.gz otsu.nii.gz Otsu 1 mask.nii.gz
+```
 
-| ThresholdImage | Python | Notes |
-|---|---|---|
-| `d in out lo hi` | `threshold_image(in, lo, hi)` | inclusive; bounds compared in float32 (`atof`, then float) |
-| `... inside outside` | `inside=1.0, outside=0.0` | |
-| `d in out Otsu n` | `otsu_threshold(in, n)` | ITK's `OtsuMultipleThresholdsImageFilter`, 128 bins, labels `0..n` |
-| `d in out Otsu n mask` | `otsu_threshold(in, n, mask=mask)` | ANTs' own code: region = mask value 1 (as `int`), 200 bins, labels `1..n+1` inside, 0 outside; the output takes the mask's geometry |
-| `d in out Kmeans n [mask]` | – | not supported yet |
-| `d` = 2, 3, 4 | any array shape | |
+### Ports of `ThresholdImage`
 
-Outputs are float32, as ANTs writes them. `otsu_threshold` returns `OtsuResult(image,
-thresholds)`, the thresholds being the upper bounds of the chosen histogram bins.
+**The replica: status `validated`** against ThresholdImage itself (its
+[record](../validation/ants-threshold-image.md), 2026-10-12): 41 cases, 35 compared, 5 rejected
+by both alike, 1 expected divergence (`Kmeans`, not supported yet); every compared case
+bit-identical, with ANTs' exact header bytes. Compared with ANTs' defects reproduced
+(`LARMORX_UPSTREAM_DEFECTS=reproduce`); the record's "D13 fix pass" lists what larmorx's default
+changes.
+
+**On the data panel** ([record](../validation/ants-threshold-image-panel.md), 2026-10-26):
+sMRIPrep's `ThresholdImage` in the brain extraction of all fourteen finished oracle runs, each
+replayed from its node with its inputs, and four calls fMRIPrep never makes (Otsu with 4, 3 and 2
+thresholds on the 7 T MP2RAGE, the 82-year-old's FLAIR and the 1.5 T T1w as float; a range on the
+stroke's lesion mask): **18 of 18 bit-identical, header bytes included**.
+
+## Speed
+
+From the [benchmark](../benchmarks/ants-programs.md): `0.5 1` on the 1 mm MNI probability map 100
+ms on one thread, 49 ms on 12 (ANTs: 115 ms and 103 ms); `Otsu 3` with a mask on fMRIPrep's T1w
+205 ms and 125 ms (ANTs: 558 ms and 315 ms).
 
 ## Behaviour worth knowing
 

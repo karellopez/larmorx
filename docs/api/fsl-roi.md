@@ -50,7 +50,7 @@ image (zeros there). The indices are NIfTI voxel indices, from 0.
 
 ### Python (`fslroi`)
 
-`lx.fsl.fslroi(image, *, x=None, y=None, z=None, t=None, implementation="auto", upstream_defects="fix")`
+`lx.fsl.fslroi(image, *, x=None, y=None, z=None, t=None, n_threads=1, implementation="auto", upstream_defects="fix")`
 
 `image` is a path or an `lx.Image`; `x`, `y`, `z` and `t` are `(min, size)` pairs. Only `t`, only
 space (`x`, `y`, `z`) or all four; an axis of space not given is whole, `(0, -1)`. The result is
@@ -115,7 +115,7 @@ it and/or cuts the input down to its bounding box. `bet -S` and `bet -B` run it 
 
 ### Python (`standard_space_roi`)
 
-`lx.fsl.standard_space_roi(image, *, mask=None, roi=None, reference=None, alt_input=None, betpremask=False, flirt_args=None, fsl_data=None, implementation="auto", upstream_defects="fix")`
+`lx.fsl.standard_space_roi(image, *, mask=None, roi=None, reference=None, alt_input=None, betpremask=False, flirt_args=None, fsl_data=None, n_threads=1, implementation="auto", upstream_defects="fix")`
 
 The images are paths or `lx.Image` objects.
 

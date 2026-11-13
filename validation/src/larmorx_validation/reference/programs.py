@@ -267,7 +267,7 @@ def build(repo: Path, site: Path | None) -> tuple[dict, list[Program], list[str]
         evidence = e.get("evidence", "")
         if evidence and site is not None and not _page_exists(site, evidence):
             problems.append(f"{where}: the site has no page {evidence}")
-        ref = f"/programs/{e['group']}/{e['name']}/"
+        ref = f"/programs/{e['group']}/{e['name'].replace(' ', '-')}/"
         reference = ref if site is not None and _page_exists(site, ref) else ""
         api_status = _api_status(repo, e["api"]) if (repo / e["api"]).is_file() else ""
         out_ports = []

@@ -118,12 +118,11 @@ correctly rounded one (a replay must still reproduce the recorded files: the shi
 whether FreeSurfer's files change. All on the main machine, 2026-11-12, the recording
 `ds000005-sub-01-classic-1thread` (the classic stream at one thread).
 
-**Count mode.** Every step of the recording but one (60 of the 61 recorded so far: the recording was
-still being made; `mri_ca_register`'s step, about two hours, was still running at the time of writing),
-**all reproduced under the shim** (`defect2seg` only with a shorter work folder: §6). The steps that
-called none of the shim's functions: the conversions and headers (1-4, 9), `mri_nu_correct.mni` (5,
-8), `talairach_avi` (6) and `talairach_afd` (7), `mri_normalize` (10, 18), `mri_em_register` (11,
-13), `mri_ca_normalize` (14), `mri_ca_label` (16), `mri_mask` (19), `AntsDenoiseImageFs` (20),
+**Count mode.** Steps 1 to 61 of the recording, **all reproduced under the shim** (`defect2seg`
+only with a shorter work folder: §6; `mri_ca_register`, step 15, in 5,141 s on 2026-11-13). The steps
+that called none of the shim's functions: the conversions and headers (1-4, 9), `mri_nu_correct.mni`
+(5, 8), `talairach_avi` (6) and `talairach_afd` (7), `mri_normalize` (10, 18), `mri_em_register` (11,
+13), `mri_ca_normalize` (14), `mri_ca_register` (15), `mri_ca_label` (16), `mri_mask` (19), `AntsDenoiseImageFs` (20),
 `mri_segment` (21), `mri_edit_wm_with_aseg` (22), `mri_pretess` (23, 25, 28), `mri_fill` (24),
 `mri_tessellate` (26, 29). The others:
 

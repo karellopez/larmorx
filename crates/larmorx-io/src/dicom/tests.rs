@@ -204,6 +204,63 @@ fn the_stack_keeps_256_bytes_and_overflows_at_98() {
 }
 
 #[test]
+fn the_dump_prints_message_bytes_as_they_are() {
+    use larmorx_core::cfmt::Writers;
+    let mut s = CondStack::new();
+    let mut n = Notices::new(UpstreamDefects::Fix);
+    let (mut o, mut e) = (Vec::new(), Vec::new());
+    let mut w = Writers {
+        out: &mut o,
+        err: &mut e,
+    };
+    s.push(
+        DCM_UNRECOGNIZEDVRCODE,
+        ctn_message(DCM_UNRECOGNIZEDVRCODE),
+        &[Arg::Str(b"P\xbd"), Arg::Str(b"readFile")],
+        &mut w,
+        &mut n,
+    );
+    s.dump(&mut w);
+    assert_eq!(
+        e,
+        b"  280092 DCM Unrecognized VR code (P\xbd) in readFile\n".to_vec(),
+        "{:?}",
+        String::from_utf8_lossy(&e)
+    );
+    assert!(o.is_empty());
+    assert!(s.entries().is_empty());
+    assert!(s.stderr_oriented);
+    // the overflow dump too
+    let mut e = Vec::new();
+    let mut o = Vec::new();
+    let mut w = Writers {
+        out: &mut o,
+        err: &mut e,
+    };
+    // the 99th entry overflows the stack: all 99 printed
+    for _ in 0..99 {
+        s.push(
+            DCM_UNRECOGNIZEDVRCODE,
+            ctn_message(DCM_UNRECOGNIZEDVRCODE),
+            &[Arg::Str(b"\xff\xfe"), Arg::Str(b"x")],
+            &mut w,
+            &mut n,
+        );
+    }
+    let line = b"  280092 DCM Unrecognized VR code (\xff\xfe) in x\n";
+    let mut want = line.repeat(99);
+    want.extend_from_slice(b"CONDITION Stack overflow\n");
+    assert!(e == want, "{}", String::from_utf8_lossy(&e));
+    // a text stream gets U+FFFD in place of the invalid bytes (the trait's default)
+    let mut c = Captured::default();
+    s.dump(&mut c);
+    assert_eq!(
+        c.text(Stream::Err),
+        "  280092 DCM Unrecognized VR code (\u{fffd}\u{fffd}) in x\n"
+    );
+}
+
+#[test]
 fn a_part10_file_switches_to_its_transfer_syntax() {
     let d = scratch("p10");
     let mut ds = Vec::new();

@@ -261,8 +261,10 @@ FreeSurfer's clean-room implementers).
 - CTN's global state is a value (`CondStack`): the condition stack, and `errno` and the
   descriptors as CTN's calls leave them (a read with a negative count, a descriptor closed twice,
   glibc's first `perror` on a write-only standard error), so `perror`'s texts are CTN's; errno
-  texts are glibc's on every platform. Texts printed to the streams are UTF-8 (other bytes
-  replaced); the condition stack keeps the bytes.
+  texts are glibc's on every platform. The condition stack keeps the bytes, and its dumps
+  (`CondStack::dump`, the overflow dump in `push`) print them unchanged through
+  `Streams::err_bytes` on a byte stream (`larmorx_core::cfmt::Writers`); a text-only stream gets
+  U+FFFD for bytes that are not UTF-8.
 - The C arithmetic is kept: 32-bit lengths that wrap, `fileSize`'s `int`, the group lengths
   recomputed, the transfer syntax applied when the object's size reaches the meta group's end, a
   delimiter at any level ending the data set, the explicit VR code compared as a C string (the

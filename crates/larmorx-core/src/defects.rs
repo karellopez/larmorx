@@ -1108,7 +1108,7 @@ defects! {
     FS_16 = "FS-16", "FreeSurfer", true,
         "matrix functions given an output whose type or size differs from the result's (a complex product into a real matrix) write outside the output: memory the program does not own";
     FS_17 = "FS-17", "FreeSurfer", true,
-        "FreeSurfer's matrices and histograms give -2147483648 on x86-64 where they turn a float or double beyond the int range, or NaN, into an integer (bin numbers, counts compared as integers, the floor of a vector); the C conversion is undefined there";
+        "FreeSurfer's matrices and histograms give -2147483648 where a float or double beyond the 32-bit integer range, or NaN, becomes an integer (bin numbers, counts compared as integers, the floor of a vector)";
     FS_18 = "FS-18", "FreeSurfer", true,
         "HISTOclearCounts resets only the first count of the histogram (and, making a new histogram, copies only the first bin's value): the counts it is meant to reset keep accumulating";
     FS_19 = "FS-19", "FreeSurfer", true,
@@ -1142,13 +1142,13 @@ defects! {
     FS_31 = "FS-31", "FreeSurfer", true,
         "FreeSurfer's vector functions do not check their vectors' lengths (VectorCrossProduct and VectorTripleProduct accept column vectors of one or two elements and never check the other vectors; VectorDot and VectorDistance take the second vector to the first's length): values are read from outside the vectors";
     FS_34 = "FS-34", "FreeSurfer", true,
-        "OpenPowell and OpenPowell2 called with no initial directions (NULL) crash when they return the final directions";
+        "OpenPowell and OpenPowell2 called with no initial directions crash at the end of the minimization";
     FS_35 = "FS-35", "FreeSurfer", false,
-        "fs_powell reports FAILED_USER_REQUEST, not FAILED_TOO_MANY_ITERATIONS, when it reaches its iteration limit, so OpenPowell's exit and OpenPowell2's message and return value 1 for too many iterations never happen (kept: FreeSurfer's change keeps programs from exiting at the limit)";
+        "OpenPowell and OpenPowell2 never report too many iterations: at the iteration limit OpenPowell does not end the program, and OpenPowell2 neither prints its message nor returns 1 (kept: FreeSurfer's change keeps programs from exiting at the limit)";
     FS_36 = "FS-36", "FreeSurfer", false,
         "OpenPowell's tolerance argument has no effect: every call stops at a relative tolerance of 1e-10 on the cost (kept: the programs' results depend on it)";
     FS_37 = "FS-37", "FreeSurfer", true,
-        "fs_lbfgs never returns its starting point as the best one: when no evaluation improves on it, a successful run returns empty parameters (OpenDFPMin then crashes) and a failed one returns the line search's last trial point with the previous run's end value; and the end value it reports is the last one evaluated, which can be a worse point's";
+        "OpenDFPMin's L-BFGS passes never take the starting point as the best one: when no evaluation improves on it, a successful pass gives empty parameters (OpenDFPMin then crashes) and a failed one the line search's last trial point with the previous pass's end value; and the end value a pass reports is the last one evaluated, which can be a worse point's";
     FS_38 = "FS-38", "FreeSurfer", true,
         "OpenDFPMin repeats its minimization while the cost is better than the caller's starting value by more than the tolerance, never comparing with the previous pass's, so it repeats until a pass fails or crashes (FS-37)";
     FS_39 = "FS-39", "FreeSurfer", true,
@@ -1172,7 +1172,7 @@ defects! {
     FS_48 = "FS-48", "FreeSurfer", true,
         "the SVD functions (MatrixSVD, the SVD inverses and pseudo-inverses, the condition numbers) never return for some matrices with infinite or NaN entries";
     FS_49 = "FS-49", "FreeSurfer", true,
-        "freadInt and freadDouble at the end of a file return memory contents (freadInt prints nothing), so MatrixReadFrom of a file that ends early fills the matrix's type, sizes or elements with memory contents";
+        "freadInt and freadDouble at the end of a file return memory contents (freadInt prints nothing), and MatrixReadFrom of a file that ends early fills the matrix's type, sizes or elements with memory contents";
     FS_50 = "FS-50", "FreeSurfer", true,
         "HISTOabs of a histogram whose absolute bin values span an infinite range, or whose bin size is 0 or NaN, ends the program with 'could not allocate histogram' (the bin count it needs is beyond the int range)";
     FS_51 = "FS-51", "FreeSurfer", true,

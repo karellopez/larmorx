@@ -12,4 +12,11 @@
 //! separate process (`docs/licensing.md`). `PROVENANCE.md` lists what each item translates.
 #![forbid(unsafe_code)]
 
+pub mod arith;
+pub mod coords;
+pub mod ltaread;
+pub mod rotate;
+mod rows;
+pub mod sample;
+pub mod skull;
 pub mod vgeom;

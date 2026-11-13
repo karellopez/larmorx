@@ -35,6 +35,10 @@
 #include "utils.h"
 
 extern double vg_isEqual_Threshold;
+// defined in mri.cpp, not declared in its headers
+double ham_sinc(double x, double fullwidth);
+int MRIcubicSampleVolumeFrame(MRI *mri, double x, double y, double z, int frame, double *pval);
+int MRIsincSampleVolumeFrame(MRI *mri, double x, double y, double z, int frame, int hw, double *pval);
 
 const char *Progname = "fsvolume";
 
@@ -133,9 +137,10 @@ void set_geom(VOL_GEOM *v)
   strcpy(v->fname, f.c_str());
 }
 // the fields the VOL_GEOM functions here read or write (not the cached matrices)
-void put_geom(const VOL_GEOM *v)
+// with_valid: an MRI's `valid` is never set by its constructors (memory contents): not printed
+void put_geom(const VOL_GEOM *v, bool with_valid = true)
 {
-  oi(v->valid);
+  if (with_valid) oi(v->valid);
   oi(v->width); oi(v->height); oi(v->depth);
   of(v->xsize); of(v->ysize); of(v->zsize);
   oi(v->ras_good_flag);
@@ -145,6 +150,88 @@ void put_geom(const VOL_GEOM *v)
   of(v->c_r); of(v->c_a); of(v->c_s);
   of(v->s_r); of(v->s_a); of(v->s_s);
   ohex(std::string(v->fname));
+}
+
+
+// the float voxels the cases draw from (FTAB in tests/fs_volume/cases.rs)
+const uint32_t FTAB[] = {
+  0x00000000u, 0x80000000u, 0x3f800000u, 0xbf800000u, 0x3f000000u, 0x3fc00000u, 0x40200000u,
+  0xc0200000u, 0x437f0000u, 0x437f8000u, 0x43800000u, 0xc3962000u, 0x477fff9au, 0x501502f9u,
+  0xd01502f9u, 0x7f7fc99eu, 0x000116c2u, 0x7f800000u, 0xff800000u, 0x7fc00000u, 0x7fa12345u,
+  0xffc00001u, 0x40490fd0u, 0x24e69595u, 0x42fecccdu, 0x3dcccccdu, 0x41200000u, 0xc1a00000u};
+const size_t NF = sizeof FTAB / sizeof FTAB[0];
+
+// a volume of the case: w h d type nframes hdr seed, then its geometry, its header fields and
+// what to do with its cached matrices (0 keep, 1 MRIreInitCache, 2 drop them)
+MRI *get_vol()
+{
+  int w = geti(), h = geti(), d = geti(), type = geti(), nf = geti(), hdr = geti();
+  unsigned seed = (unsigned)geti();
+  MRI *m = hdr ? MRIallocHeader(w, h, d, type, nf) : MRIallocSequence(w, h, d, type, nf);
+  if (m->chunk && m->ischunked) {
+    unsigned char *b = (unsigned char *)m->chunk;
+    if (type == MRI_FLOAT) {
+      for (size_t i = 0; i < m->bytes_total / 4; i++) memcpy(b + 4 * i, &FTAB[(i * 7 + seed) % NF], 4);
+    } else {
+      for (size_t k = 0; k < m->bytes_total; k++)
+        b[k] = (unsigned char)((k * 37u + seed * 101u + (k >> 3) * 13u) & 0xffu);
+    }
+  }
+  set_geom(m);
+  // the geometry's fields but its extent (the volume's own)
+  m->width = w; m->height = h; m->depth = d;
+  m->imnr0 = geti(); m->imnr1 = geti();
+  m->xstart = getf(); m->xend = getf(); m->ystart = getf(); m->yend = getf();
+  m->zstart = getf(); m->zend = getf();
+  m->thick = getf(); m->ps = getf();
+  m->tr = getf(); m->te = getf(); m->ti = getf(); m->flip_angle = getd();
+  m->dof = geti();
+  int cache = geti();
+  if (cache == 1) MRIreInitCache(m);
+  else if (cache == 2) { AffineMatrixFree(&m->i_to_r__); MatrixFree(&m->r_to_i__); }
+  return m;
+}
+
+void oam(const AffineMatrix *am)
+{
+  if (!am) { out += "NULL "; return; }
+  for (int i = 0; i < 16; i++) of(am->mat[i]);
+}
+
+void put_vol(const MRI *m)
+{
+  if (!m) { out += "NULL "; return; }
+  oi(m->width); oi(m->height); oi(m->depth); oi(m->nframes); oi(m->type);
+  oi(m->imnr0); oi(m->imnr1);
+  of(m->xstart); of(m->xend); of(m->ystart); of(m->yend); of(m->zstart); of(m->zend);
+  of(m->thick); of(m->ps); of(m->tr); of(m->te); of(m->ti); od(m->flip_angle); oi(m->dof);
+  put_geom(m, false);
+  oam(m->i_to_r__);
+  om(m->r_to_i__);
+  if (m->chunk && m->ischunked) {
+    std::string b((const char *)m->chunk, m->bytes_total);
+    ohex(b);
+  } else {
+    out += "nochunk ";
+  }
+}
+
+// the destination of f(src, dst, ...): 0 NULL, 1 a volume of the case, 2 the source itself
+MRI *get_dst(MRI *src)
+{
+  int mode = geti();
+  if (mode == 1) return get_vol();
+  if (mode == 2) return src;
+  return NULL;
+}
+// of f(mri1, mri2, dst): 0 NULL, 1 a volume, 2 mri1, 3 mri2
+MRI *get_dst2(MRI *a, MRI *b)
+{
+  int mode = geti();
+  if (mode == 1) return get_vol();
+  if (mode == 2) return a;
+  if (mode == 3) return b;
+  return NULL;
 }
 
 std::string slurp(const std::string &path)
@@ -227,6 +314,329 @@ void run_case()
     vg_isEqual_Threshold = getd();
     oi(vg_isNotEqualThresh(&a, &b, thresh));
     oi(vg_isEqual(&a, &b));
+  } else if (cmd == "clone") {
+    MRI *src = get_vol();
+    MRI *dst = geti() ? get_vol() : NULL;
+    MRI *r = MRIclone(src, dst);
+    oi(dst != NULL && r == dst);
+    put_vol(r);
+  } else if (cmd == "clonesp") {
+    MRI *src = get_vol();
+    int t = geti(), nf = geti();
+    put_vol(MRIcloneBySpace(src, t, nf));
+  } else if (cmd == "clear") {
+    MRI *m = get_vol();
+    oi(MRIclear(m));
+    put_vol(m);
+  } else if (cmd == "match") {
+    MRI *a = get_vol();
+    MRI *b = get_vol();
+    int w = geti(), h = geti(), d = geti(), nocheck = geti();
+    oi(MRImatch(a, b));
+    oi(MRImatchDimensions(a, b));
+    oi(MRIcheckSize(a, nocheck ? NULL : b, w, h, d));
+  } else if (cmd == "cpframe" || cmd == "cpframes") {
+    MRI *src = get_vol();
+    MRI *dst = get_dst(src);
+    MRI *r;
+    if (cmd == "cpframe") {
+      int sf = geti(), df = geti();
+      r = MRIcopyFrame(src, dst, sf, df);
+    } else {
+      int s0 = geti(), s1 = geti(), d0 = geti();
+      r = MRIcopyFrames(src, dst, s0, s1, d0);
+    }
+    oi(r != NULL && r == dst);
+    put_vol(r);
+  } else if (cmd == "linscale" || cmd == "smul" || cmd == "smulf" || cmd == "thresh" || cmd == "uthresh" ||
+             cmd == "invc" || cmd == "binz" || cmd == "abs" || cmd == "pos" || cmd == "neg") {
+    MRI *src = get_vol();
+    MRI *dst = get_dst(src);
+    MRI *r = NULL;
+    if (cmd == "linscale") {
+      float sc = getf(), off = getf();
+      int nz = geti();
+      r = MRIlinearScale(src, dst, sc, off, nz);
+    } else if (cmd == "smul") {
+      r = MRIscalarMul(src, dst, getf());
+    } else if (cmd == "smulf") {
+      float sc = getf();
+      r = MRIscalarMulFrame(src, dst, sc, geti());
+    } else if (cmd == "thresh") {
+      r = MRIthreshold(src, dst, getf());
+    } else if (cmd == "uthresh") {
+      r = MRIupperthresholdAllFrames(src, dst, getf());
+    } else if (cmd == "invc") {
+      r = MRIinvertContrast(src, dst, getf());
+    } else if (cmd == "binz") {
+      float t = getf(), lo = getf(), hi = getf();
+      r = MRIbinarize(src, dst, t, lo, hi);
+    } else if (cmd == "abs") {
+      r = MRIabs(src, dst);
+    } else if (cmd == "pos") {
+      r = MRIpos(src, dst);
+    } else {
+      r = MRIneg(src, dst);
+    }
+    oi(r != NULL && r == dst);
+    put_vol(r);
+  } else if (cmd == "mul2" || cmd == "sub2" || cmd == "add2" || cmd == "div2" || cmd == "sam") {
+    MRI *a = get_vol();
+    MRI *b = get_vol();
+    MRI *dst = get_dst2(a, b);
+    MRI *r;
+    if (cmd == "mul2") r = MRImultiply(a, b, dst);
+    else if (cmd == "sub2") r = MRIsubtract(a, b, dst);
+    else if (cmd == "add2") r = MRIadd(a, b, dst);
+    else if (cmd == "div2") r = MRIdivide(a, b, dst);
+    else r = MRIscaleAndMultiply(a, getf(), b, dst);
+    oi(r != NULL && r == dst);
+    put_vol(r);
+  } else if (cmd == "vrange") {
+    MRI *m = get_vol();
+    float lo = -7, hi = -7;
+    oi(MRIvalRange(m, &lo, &hi));
+    of(lo); of(hi);
+  } else if (cmd == "vrangef") {
+    MRI *m = get_vol();
+    float lo = -7, hi = -7;
+    oi(MRIvalRangeFrame(m, &lo, &hi, geti()));
+    of(lo); of(hi);
+  } else if (cmd == "vrangereg") {
+    MRI *m = get_vol();
+    MRI_REGION r;
+    r.x = geti(); r.y = geti(); r.z = geti(); r.dx = geti(); r.dy = geti(); r.dz = geti();
+    float lo = -7, hi = -7;
+    oi(MRIvalRangeRegion(m, &lo, &hi, &r));
+    of(lo); of(hi);
+  } else if (cmd == "lrange") {
+    MRI *m = get_vol();
+    MRI *l = get_vol();
+    float lo = -7, hi = -7;
+    oi(MRIlabelValRange(m, l, geti(), &lo, &hi));
+    of(lo); of(hi);
+  } else if (cmd == "extract") {
+    MRI *src = get_vol();
+    MRI *dst = geti() ? get_vol() : NULL;
+    int x0 = geti(), y0 = geti(), z0 = geti(), dx = geti(), dy = geti(), dz = geti();
+    int x1 = geti(), y1 = geti(), z1 = geti();
+    MRI *r = MRIextractInto(src, dst, x0, y0, z0, dx, dy, dz, x1, y1, z1);
+    oi(r != NULL && r == dst);
+    put_vol(r);
+    oam(src->i_to_r__);
+  } else if (cmd == "cras") {
+    MRI *src = get_vol();
+    MRI *dst = get_vol();
+    int x0 = geti(), y0 = geti(), z0 = geti(), x1 = geti(), y1 = geti(), z1 = geti();
+    double r, a, s;
+    MRIcalcCRASforExtractedVolume(src, dst, x0, y0, z0, x1, y1, z1, &r, &a, &s);
+    od(r); od(a); od(s);
+    oam(src->i_to_r__);
+    om(src->r_to_i__);
+  } else if (cmd == "avg") {
+    MRI *src = get_vol();
+    MRI *dst = get_dst(src);
+    int dof = geti();
+    MRI *r = MRIaverage(src, dof, dst);
+    oi(r != NULL && r == dst);
+    put_vol(r);
+  } else if (cmd == "dsign") {
+    od(MRIsetSampleVolumeDerivativeSign(getd()));
+  } else if (cmd == "sras") {
+    MRI *m = get_vol();
+    int k = geti();
+    MATRIX *r;
+    if (k == 0) r = surfaceRASFromVoxel_(m);
+    else if (k == 1) r = voxelFromSurfaceRAS_(m);
+    else if (k == 2) r = surfaceRASFromRAS_(m);
+    else r = GetSurfaceRASToVoxelMatrix(m);
+    om(r);
+    oam(m->i_to_r__);
+    om(m->r_to_i__);
+  } else if (cmd == "spt") {
+    MRI *m = get_vol();
+    int k = geti();
+    double x = getd(), y = getd(), z = getd(), a = -7, b = -7, c = -7;
+    int r;
+    if (k == 0) r = MRIRASToSurfaceRAS(m, x, y, z, &a, &b, &c);
+    else if (k == 1) r = MRIvoxelToSurfaceRAS(m, x, y, z, &a, &b, &c);
+    else r = MRIsurfaceRASToVoxel(m, x, y, z, &a, &b, &c);
+    oi(r); od(a); od(b); od(c);
+    oam(m->i_to_r__);
+    om(m->r_to_i__);
+  } else if (cmd == "ostr") {
+    MRI *m = get_vol();
+    char o[4] = {'x', 'x', 'x', 'x'};
+    oi(MRIdircosToOrientationString(m, o));
+    ohex(std::string(o, 4));
+    os(MRIsliceDirectionName(m));
+    oi(getSliceDirection(m));
+  } else if (cmd == "vtal") {
+    MRI *m = get_vol();
+    if (geti()) {
+      m->linear_transform = (Transform *)calloc(1, sizeof(Transform));
+      for (int i = 0; i < 4; i++)
+        for (int j = 0; j < 4; j++) Transform_elem(*m->linear_transform, i, j) = getd();
+    }
+    double x = getd(), y = getd(), z = getd(), a = -7, b = -7, c = -7;
+    oi(MRIvoxelToTalairach(m, x, y, z, &a, &b, &c));
+    od(a); od(b); od(c);
+    oam(m->i_to_r__);
+    om(m->r_to_i__);
+  } else if (cmd == "com" || cmd == "pca") {
+    MRI *m = get_vol();
+    BUFTYPE th = (BUFTYPE)geti();
+    double means[3] = {-7, -7, -7};
+    if (cmd == "com") {
+      oi(MRIcenterOfMass(m, means, th));
+      od(means[0]); od(means[1]); od(means[2]);
+    } else {
+      MATRIX *ev = MatrixAlloc(3, 3, MATRIX_REAL);
+      float evalues[3] = {-7, -7, -7};
+      oi(MRIprincipleComponents(m, ev, evalues, means, th));
+      od(means[0]); od(means[1]); od(means[2]);
+      of(evalues[0]); of(evalues[1]); of(evalues[2]);
+      om(ev);
+    }
+  } else if (cmd == "cmph") {
+    MRI *a = get_vol();
+    a->fov = getf(); a->location = getf(); a->ptype = geti();
+    int mode = geti();
+    MRI *b = NULL;
+    if (mode == 1) {
+      b = get_vol();
+      b->fov = getf(); b->location = getf(); b->ptype = geti();
+    } else if (mode == 2) {
+      b = a;
+    }
+    oi(MRIcompareHeaders(a, b));
+    oi(MRIcompareHeaders(b, a));
+  } else if (cmd == "dump") {
+    MRI *m = get_vol();
+    m->fov = getf();
+    m->brightness = geti();
+    strcpy(m->subject_name, gets().c_str());
+    strcpy(m->path_to_t1, gets().c_str());
+    strcpy(m->fname_format, gets().c_str());
+    if (geti()) {
+      m->register_mat = MatrixAlloc(4, 4, MATRIX_REAL);
+      for (int i = 1; i <= 4; i++)
+        for (int j = 1; j <= 4; j++) m->register_mat->rptr[i][j] = getf();
+    }
+    fflush(stdout);
+    oi(MRIdump(m, stdout));
+    fflush(stdout);
+  } else if (cmd == "stri" || cmd == "styp" || cmd == "sfrm" || cmd == "sfty" || cmd == "scub" ||
+             cmd == "scubf" || cmd == "ssinc" || cmd == "ssincf") {
+    MRI *m = get_vol();
+    m->outside_val = getd();
+    int n = geti();
+    for (int i = 0; i < n; i++) {
+      double x = getd(), y = getd(), z = getd();
+      int frame = geti(), aux = geti();
+      double val = -7;
+      int r;
+      if (cmd == "stri") r = MRIsampleVolume(m, x, y, z, &val);
+      else if (cmd == "styp") r = MRIsampleVolumeType(m, x, y, z, &val, aux);
+      else if (cmd == "sfrm") r = MRIsampleVolumeFrame(m, x, y, z, frame, &val);
+      else if (cmd == "sfty") r = MRIsampleVolumeFrameType(m, x, y, z, frame, aux, &val);
+      else if (cmd == "scub") r = MRIcubicSampleVolume(m, x, y, z, &val);
+      else if (cmd == "scubf") r = MRIcubicSampleVolumeFrame(m, x, y, z, frame, &val);
+      else if (cmd == "ssinc") r = MRIsincSampleVolume(m, x, y, z, aux, &val);
+      else r = MRIsincSampleVolumeFrame(m, x, y, z, frame, aux, &val);
+      oi(r);
+      od(val);
+    }
+  } else if (cmd == "trans" || cmd == "rot") {
+    MRI *src = get_vol();
+    MRI *dst = get_dst(src);
+    MRI *r;
+    if (cmd == "trans") {
+      double dx = getd(), dy = getd(), dz = getd();
+      r = MRItranslate(src, dst, dx, dy, dz);
+    } else {
+      MATRIX *mR = MatrixAlloc(3, 3, MATRIX_REAL);
+      for (int i = 1; i <= 3; i++)
+        for (int j = 1; j <= 3; j++) mR->rptr[i][j] = getf();
+      MATRIX *mO = NULL;
+      if (geti()) {
+        mO = MatrixAlloc(3, 1, MATRIX_REAL);
+        for (int i = 1; i <= 3; i++) mO->rptr[i][1] = getf();
+      }
+      r = MRIrotate_I(src, dst, mR, mO);
+    }
+    oi(r != NULL && r == dst);
+    put_vol(r);
+  } else if (cmd == "rotx" || cmd == "roty" || cmd == "rotz") {
+    MRI *src = get_vol();
+    MRI *dst = geti() ? get_vol() : NULL;
+    float angle = getf();
+    MRI *r;
+    if (cmd == "rotx") r = MRIrotateX_I(src, dst, angle);
+    else if (cmd == "roty") r = MRIrotateY_I(src, dst, angle);
+    else r = MRIrotateZ_I(src, dst, angle);
+    oi(r != NULL && r == dst);
+    put_vol(r);
+    put_vol(dst);
+  } else if (cmd == "skull") {
+    MRI *m = get_vol();
+    int nb = geti();
+    for (int b = 0; b < nb; b++) {
+      int x0 = geti(), y0 = geti(), z0 = geti(), x1 = geti(), y1 = geti(), z1 = geti();
+      float v = getf();
+      for (int z = z0; z <= z1; z++)
+        for (int y = y0; y <= y1; y++)
+          for (int x = x0; x <= x1; x++) MRIsetVoxVal(m, x, y, z, 0, v);
+    }
+    int th = geti();
+    MRI_REGION box;
+    box.x = box.y = box.z = box.dx = box.dy = box.dz = -7;
+    fflush(stdout);
+    int r = MRIfindApproximateSkullBoundingBox(m, th, &box);
+    fflush(stdout);
+    oi(r);
+    oi(box.x); oi(box.y); oi(box.z); oi(box.dx); oi(box.dy); oi(box.dz);
+  } else if (cmd == "tftype") {
+    int n = geti();
+    for (int i = 0; i < n; i++) oi(TransformFileNameType(gethex().c_str()));
+  } else if (cmd == "ltaread") {
+    // a relative name in the scratch's folder (the messages name it)
+    std::string dir = scratch.substr(0, scratch.rfind('/'));
+    if (chdir(dir.c_str())) fail("chdir");
+    std::string name = "fsvol-lta" + gethex();
+    std::string bytes = gethex();
+    int have = geti();
+    unlink(name.c_str());
+    if (have) spill(name, bytes);
+    errno = 0;
+    fflush(stdout);
+    LTA *lta = LTAreadEx(name.c_str());
+    fflush(stdout);
+    oi(errno);
+    if (!lta) {
+      out += "NULL ";
+    } else {
+      oi(lta->type);
+      oi(lta->num_xforms);
+      for (int i = 0; i < lta->num_xforms; i++) {
+        LINEAR_TRANSFORM *lt = &lta->xforms[i];
+        of(lt->x0); of(lt->y0); of(lt->z0); of(lt->sigma);
+        om(lt->m_L);
+        oi(lt->type);
+        put_geom(&lt->src);
+        put_geom(&lt->dst);
+      }
+      ohex(std::string(lta->subject));
+      of(lta->fscale);
+    }
+    if (have) unlink(name.c_str());
+  } else if (cmd == "coef" || cmd == "hsinc") {
+    int n = geti();
+    for (int i = 0; i < n; i++) {
+      double x = getd();
+      if (cmd == "coef") od(MRIcubicCoeff(x, geti()));
+      else od(ham_sinc(x, getd()));
+    }
   } else {
     fail("unknown command");
   }

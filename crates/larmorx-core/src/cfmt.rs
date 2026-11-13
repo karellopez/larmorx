@@ -18,6 +18,40 @@ pub trait Streams {
     fn out(&mut self, text: &str);
     /// Text the original writes to standard error.
     fn err(&mut self, text: &str);
+    /// Bytes the original writes to standard output that need not be UTF-8 (a message that
+    /// carries a file's bytes as they are). A stream that can hold bytes writes them unchanged;
+    /// the default passes them to [`Streams::out`] with each invalid sequence as U+FFFD.
+    fn out_bytes(&mut self, bytes: &[u8]) {
+        self.out(&String::from_utf8_lossy(bytes));
+    }
+    /// Bytes the original writes to standard error that need not be UTF-8 (see
+    /// [`Streams::out_bytes`]).
+    fn err_bytes(&mut self, bytes: &[u8]) {
+        self.err(&String::from_utf8_lossy(bytes));
+    }
+}
+
+/// [`Streams`] onto two byte writers (a program's standard output and standard error, or
+/// buffers): text and bytes written unchanged, write errors ignored as C's `fprintf` callers
+/// ignore them.
+pub struct Writers<'a> {
+    pub out: &'a mut dyn std::io::Write,
+    pub err: &'a mut dyn std::io::Write,
+}
+
+impl Streams for Writers<'_> {
+    fn out(&mut self, text: &str) {
+        let _ = self.out.write_all(text.as_bytes());
+    }
+    fn err(&mut self, text: &str) {
+        let _ = self.err.write_all(text.as_bytes());
+    }
+    fn out_bytes(&mut self, bytes: &[u8]) {
+        let _ = self.out.write_all(bytes);
+    }
+    fn err_bytes(&mut self, bytes: &[u8]) {
+        let _ = self.err.write_all(bytes);
+    }
 }
 
 /// One stream of [`Streams`].

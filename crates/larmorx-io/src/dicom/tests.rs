@@ -204,6 +204,63 @@ fn the_stack_keeps_256_bytes_and_overflows_at_98() {
 }
 
 #[test]
+fn the_dump_prints_message_bytes_as_they_are() {
+    use larmorx_core::cfmt::Writers;
+    let mut s = CondStack::new();
+    let mut n = Notices::new(UpstreamDefects::Fix);
+    let (mut o, mut e) = (Vec::new(), Vec::new());
+    let mut w = Writers {
+        out: &mut o,
+        err: &mut e,
+    };
+    s.push(
+        DCM_UNRECOGNIZEDVRCODE,
+        ctn_message(DCM_UNRECOGNIZEDVRCODE),
+        &[Arg::Str(b"P\xbd"), Arg::Str(b"readFile")],
+        &mut w,
+        &mut n,
+    );
+    s.dump(&mut w);
+    assert_eq!(
+        e,
+        b"  280092 DCM Unrecognized VR code (P\xbd) in readFile\n".to_vec(),
+        "{:?}",
+        String::from_utf8_lossy(&e)
+    );
+    assert!(o.is_empty());
+    assert!(s.entries().is_empty());
+    assert!(s.stderr_oriented);
+    // the overflow dump too
+    let mut e = Vec::new();
+    let mut o = Vec::new();
+    let mut w = Writers {
+        out: &mut o,
+        err: &mut e,
+    };
+    // the 99th entry overflows the stack: all 99 printed
+    for _ in 0..99 {
+        s.push(
+            DCM_UNRECOGNIZEDVRCODE,
+            ctn_message(DCM_UNRECOGNIZEDVRCODE),
+            &[Arg::Str(b"\xff\xfe"), Arg::Str(b"x")],
+            &mut w,
+            &mut n,
+        );
+    }
+    let line = b"  280092 DCM Unrecognized VR code (\xff\xfe) in x\n";
+    let mut want = line.repeat(99);
+    want.extend_from_slice(b"CONDITION Stack overflow\n");
+    assert!(e == want, "{}", String::from_utf8_lossy(&e));
+    // a text stream gets U+FFFD in place of the invalid bytes (the trait's default)
+    let mut c = Captured::default();
+    s.dump(&mut c);
+    assert_eq!(
+        c.text(Stream::Err),
+        "  280092 DCM Unrecognized VR code (\u{fffd}\u{fffd}) in x\n"
+    );
+}
+
+#[test]
 fn a_part10_file_switches_to_its_transfer_syntax() {
     let d = scratch("p10");
     let mut ds = Vec::new();
@@ -251,6 +308,62 @@ fn a_part10_file_switches_to_its_transfer_syntax() {
         r.stack.entries()[0].1,
         b"DCM group/element out of order (0000 0000) in checkAttributeOrder"
     );
+    std::fs::remove_dir_all(&d).ok();
+}
+
+#[test]
+fn a_name_given_apart_from_the_path_shows_in_messages_and_the_object() {
+    let d = scratch("named");
+    let mut ds = Vec::new();
+    el(&mut ds, 0x0008_0018, None, 4, b"1.2\0", false);
+    let f = d.join("a.dcm");
+    std::fs::write(&f, part10(&ds, b"1.2.840.10008.1.2\0")).unwrap();
+    let named = |path: &Path, name: &[u8], options: u64| {
+        let mut r = Run {
+            cond: 0,
+            object: None,
+            stack: CondStack::new(),
+            out: Captured::default(),
+            notices: Notices::new(UpstreamDefects::Fix),
+        };
+        r.cond = open_file_named(
+            path,
+            name,
+            options,
+            &mut r.object,
+            &Ctn,
+            &mut r.stack,
+            &mut r.out,
+            &mut r.notices,
+        )
+        .unwrap();
+        r
+    };
+    // read: the object keeps the name given
+    let r = named(&f, b"sub/a.dcm", opt::PART10FILE);
+    assert_eq!(r.cond, DCM_NORMAL);
+    assert_eq!(r.object.as_ref().unwrap().file_name, b"sub/a.dcm");
+    // a failure while reading names it in CTN's last message
+    let r = named(&f, b"sub/a.dcm", opt::ORDERLITTLEENDIAN);
+    assert_eq!(r.cond, DCM_FILEOPENFAILED);
+    assert_eq!(
+        r.stack.entries().last().unwrap().1,
+        b"DCM failed to open file: sub/a.dcm in DCM_OpenFile"
+    );
+    // a file that cannot be opened: the name given, errno from the path
+    let r = named(&d.join("none"), b"none", opt::PART10FILE);
+    assert_eq!(r.cond, DCM_FILEOPENFAILED);
+    assert_eq!(
+        r.stack.entries()[0].1,
+        b"DCM failed to open file: none in DCM_OpenFile"
+    );
+    assert_eq!(r.stack.errno, 2);
+    // open_file is open_file_named with the path's own bytes
+    let a = open(&f, opt::ORDERLITTLEENDIAN, UpstreamDefects::Fix, &Ctn);
+    let p = f.to_string_lossy().into_owned();
+    let b = named(&f, p.as_bytes(), opt::ORDERLITTLEENDIAN);
+    assert_eq!(a.stack.entries(), b.stack.entries());
+    assert_eq!(a.object, b.object);
     std::fs::remove_dir_all(&d).ok();
 }
 

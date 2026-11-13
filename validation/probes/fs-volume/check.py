@@ -38,7 +38,30 @@ from larmorx_validation.oracle_cache.store import workspace  # noqa: E402
 # memory FreeSurfer does not own: FS-288 (a buffer never written compared with the keys). FS-285
 # and FS-286 (words written past their buffers) are compared: the official build's layout makes
 # them deterministic, and reproduce follows it
-SKIP = ("FS-288",)
+# and the matrices FreeSurfer's eigen-systems never return on (FS-47, FS-48, ITK-112, ITK-115,
+# ITK-116: the official code hangs, the port gives an error)
+SKIP = (
+    "FS-288",
+    "FS-53",
+    "FS-58",
+    "FS-290",
+    "FS-294",
+    "FS-47",
+    "FS-48",
+    "ITK-112",
+    "ITK-115",
+    "ITK-116",
+    "FS-300",
+    "FS-302",
+    "FS-303",
+    "FS-304",
+    "FS-305",
+    "FS-306",
+    "FS-307",
+    "FS-308",
+    "FS-309",
+    "FS-310",
+)
 
 
 def probe_binary(ws: Path) -> Path:
@@ -78,6 +101,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--jobs", type=int, default=6)
     ap.add_argument("--json", type=Path)
     ap.add_argument("--show", type=int, default=5, help="differing cases to print")
+    ap.add_argument(
+        "--only", help="comma-separated commands to keep (a check while porting; no official hash)"
+    )
     a = ap.parse_args(argv)
     ws = workspace()
     if ws is None:
@@ -86,10 +112,14 @@ def main(argv: list[str] | None = None) -> int:
     port = port_binary(a.jobs)
     inputs = ws / "oracles" / "inputs" / "fs-volume"
     inputs.mkdir(parents=True, exist_ok=True)
-    cases_path = inputs / f"cases-{a.seed}-{a.n}.txt"
+    tag = f"-{a.only.replace(',', '_')}" if a.only else ""
+    cases_path = inputs / f"cases-{a.seed}-{a.n}{tag}.txt"
     text = subprocess.run(
         [str(port), "cases", str(a.seed), str(a.n)], check=True, capture_output=True, text=True
     ).stdout
+    if a.only:
+        keep = set(a.only.split(","))
+        text = "".join(line for line in text.splitlines(True) if line.split()[0] in keep)
     cases_path.write_text(text, encoding="utf-8")
     cases = text.splitlines()
     env = {"PATH": "/usr/bin:/bin", "LC_ALL": "C", "LANG": "C", "OMP_NUM_THREADS": "1"}

@@ -11,12 +11,23 @@ use std::io::Write;
 use std::rc::Rc;
 
 use larmorx_core::defects::UpstreamDefects;
+use larmorx_freesurfer_core::affine::AffineMatrix;
 use larmorx_freesurfer_core::cname::CName;
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::Fatal;
+use larmorx_freesurfer_core::matrix as mx;
 use larmorx_freesurfer_core::matrix::Matrix;
+use larmorx_freesurfer_core::ret::Ret;
 use larmorx_freesurfer_io::cfile::CFile;
+use larmorx_freesurfer_mri::mri::{self as mm, Mri, MriRegion};
 use larmorx_freesurfer_mri::vol_geom::VolGeom;
+use larmorx_freesurfer_mri::vol_geom::reinit_cache;
+use larmorx_freesurfer_volume::arith::{self as ar, Pair, Tri};
+use larmorx_freesurfer_volume::coords as co;
+use larmorx_freesurfer_volume::ltaread as lr;
+use larmorx_freesurfer_volume::rotate as rt;
+use larmorx_freesurfer_volume::sample as sm;
+use larmorx_freesurfer_volume::skull as sk;
 use larmorx_freesurfer_volume::vgeom;
 
 /// The cases' random numbers.
@@ -315,6 +326,112 @@ fn vg_file(g: &mut Gen) -> Vec<u8> {
     f
 }
 
+/// The float voxels the cases draw from (`FTAB` in `fsvolume.cpp`).
+const FTAB: [u32; 28] = [
+    0x00000000, 0x80000000, 0x3f800000, 0xbf800000, 0x3f000000, 0x3fc00000, 0x40200000, 0xc0200000,
+    0x437f0000, 0x437f8000, 0x43800000, 0xc3962000, 0x477fff9a, 0x501502f9, 0xd01502f9, 0x7f7fc99e,
+    0x000116c2, 0x7f800000, 0xff800000, 0x7fc00000, 0x7fa12345, 0xffc00001, 0x40490fd0, 0x24e69595,
+    0x42fecccd, 0x3dcccccd, 0x41200000, 0xc1a00000,
+];
+
+/// A volume's shape in the cases: extent, type, frames, header only.
+#[derive(Clone, Copy)]
+struct Shape {
+    w: i64,
+    h: i64,
+    d: i64,
+    ty: i64,
+    nf: i64,
+    hdr: bool,
+    /// Whether the cached matrices may be dropped.
+    drop: bool,
+}
+
+fn shape(g: &mut Gen) -> Shape {
+    let ty = if g.chance(10) {
+        g.pick(&[9, 7, 2])
+    } else {
+        g.pick(&[0, 0, 1, 3, 3, 4, 10, 2])
+    };
+    let odd = g.chance(25);
+    Shape {
+        w: g.int(1, 4),
+        h: g.int(1, 4),
+        d: g.int(1, 3),
+        ty,
+        nf: if odd { g.pick(&[0, 3]) } else { g.int(1, 2) },
+        hdr: g.chance(40),
+        drop: false,
+    }
+}
+
+/// A second volume: usually the first's shape, sometimes another.
+fn like(g: &mut Gen, s: Shape) -> Shape {
+    if g.chance(5) {
+        let mut o = shape(g);
+        if g.chance(2) {
+            o.ty = s.ty;
+        }
+        o
+    } else if g.chance(6) {
+        Shape {
+            ty: g.pick(&[0, 1, 3, 4, 10, 2]),
+            ..s
+        }
+    } else {
+        Shape { hdr: false, ..s }
+    }
+}
+
+/// `get_vol`'s tokens.
+fn vol_of(g: &mut Gen, t: &mut Vec<String>, s: Shape) {
+    for v in [s.w, s.h, s.d, s.ty, s.nf, i64::from(s.hdr), g.int(0, 255)] {
+        t.push(v.to_string());
+    }
+    geom(g, t);
+    // `valid` from geom is the second token of the geometry: fine for an MRI
+    t.push(g.int(-2, 3).to_string());
+    t.push(g.int(-2, 5).to_string());
+    for _ in 0..6 {
+        t.push(fx(num(g, -100, 100, 4)));
+    }
+    t.push(fx(g.pick(&[1.0, 1.5, 0.0, 2.0])));
+    t.push(fx(g.pick(&[1.0, 0.9375, 0.0])));
+    for _ in 0..3 {
+        t.push(fx(g.pick(&[0.0, 2000.0, 30.5, 1e-3])));
+    }
+    t.push(dx(g.pick(&[0.0, 0.17453292519943295, 1.5])));
+    t.push(g.int(0, 3).to_string());
+    // the cached matrices dropped (2) only where no MRIcopyHeader copies them: FreeSurfer's
+    // AffineMatrixCopy of a source without one crashes (the probe's finding for fs.mri)
+    let modes: &[i64] = if s.drop { &[0, 1, 1, 2] } else { &[0, 1, 1] };
+    t.push(g.pick(modes).to_string());
+}
+
+fn vol(g: &mut Gen, t: &mut Vec<String>) -> Shape {
+    let s = shape(g);
+    vol_of(g, t, s);
+    s
+}
+
+fn fval(g: &mut Gen) -> f32 {
+    if g.chance(10) {
+        return f32::from_bits(g.pick(&[0x7fc00000, 0x7fa12345, 0xffc00001]));
+    }
+    if g.chance(8) {
+        return f32::from_bits(g.pick(&FTAB));
+    }
+    g.pick(&[0.0, 1.0, 2.0, 0.5, -1.0, 100.0, 127.5, 255.0, 3.0, 0.25])
+}
+
+fn frame_of(g: &mut Gen, s: Shape) -> i64 {
+    if g.chance(10) {
+        g.pick(&[-1, s.nf, s.nf + 1])
+    } else {
+        g.int(0, (s.nf - 1).max(0))
+    }
+}
+
 pub fn generate(seed: u64, n: usize) -> Vec<String> {
     let mut g = Gen::new(seed);
     let mut lines = Vec::with_capacity(n);
@@ -355,6 +472,501 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
                 t.push(dx(g.pick(&[f64::from(f32::EPSILON), 1e-6, 1e-3, 0.0, 1.0])));
                 t.push(dx(g.pick(&[f64::from(f32::EPSILON), 1e-4, 0.0])));
             }
+            "clone" => {
+                let s = vol(&mut g, &mut t);
+                if g.chance(3) {
+                    t.push("1".into());
+                    let o = like(&mut g, s);
+                    vol_of(&mut g, &mut t, o);
+                } else {
+                    t.push("0".into());
+                }
+            }
+            "clonesp" => {
+                vol(&mut g, &mut t);
+                t.push(g.pick(&[-1, -1, 0, 3, 4]).to_string());
+                t.push(g.pick(&[-1, -1, 1, 2]).to_string());
+            }
+            "clear" | "vrange" => {
+                vol(&mut g, &mut t);
+            }
+            "vrangef" => {
+                let s = vol(&mut g, &mut t);
+                t.push(frame_of(&mut g, s).to_string());
+            }
+            "vrangereg" => {
+                let s = vol(&mut g, &mut t);
+                for k in [s.w, s.h, s.d] {
+                    t.push(g.int(-2, k).to_string());
+                }
+                for k in [s.w, s.h, s.d] {
+                    t.push(g.int(-1, k + 2).to_string());
+                }
+            }
+            "lrange" => {
+                let s = vol(&mut g, &mut t);
+                let mut o = like(&mut g, s);
+                if g.chance(2) {
+                    o.ty = 0;
+                }
+                vol_of(&mut g, &mut t, o);
+                t.push(g.int(0, 40).to_string());
+            }
+            "match" => {
+                let s = vol(&mut g, &mut t);
+                let o = like(&mut g, s);
+                vol_of(&mut g, &mut t, o);
+                for k in [s.w, s.h, s.d] {
+                    t.push(if g.chance(2) { 0 } else { g.int(1, k + 1) }.to_string());
+                }
+                t.push(i64::from(g.chance(6)).to_string());
+            }
+            "cpframe" | "cpframes" | "linscale" | "smul" | "smulf" | "thresh" | "uthresh"
+            | "invc" | "binz" | "abs" | "pos" | "neg" => {
+                let mut s = vol(&mut g, &mut t);
+                let mode = g.pick(&[0, 0, 1, 2]);
+                t.push(mode.to_string());
+                if mode == 1 {
+                    let o = like(&mut g, s);
+                    vol_of(&mut g, &mut t, o);
+                    s.nf = s.nf.min(o.nf);
+                }
+                match cmd {
+                    "cpframe" => {
+                        t.push(frame_of(&mut g, s).to_string());
+                        t.push(frame_of(&mut g, s).to_string());
+                    }
+                    "cpframes" => {
+                        let a = frame_of(&mut g, s);
+                        t.push(a.to_string());
+                        t.push((a + g.int(-1, 1)).to_string());
+                        t.push(frame_of(&mut g, s).to_string());
+                    }
+                    "linscale" => {
+                        t.push(fx(fval(&mut g)));
+                        t.push(fx(fval(&mut g)));
+                        t.push(g.int(0, 1).to_string());
+                    }
+                    "smul" | "thresh" | "uthresh" | "invc" => t.push(fx(fval(&mut g))),
+                    "smulf" => {
+                        t.push(fx(fval(&mut g)));
+                        t.push(frame_of(&mut g, s).to_string());
+                    }
+                    "binz" => {
+                        for _ in 0..3 {
+                            t.push(fx(fval(&mut g)));
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            "mul2" | "sub2" | "add2" | "div2" | "sam" => {
+                let s = vol(&mut g, &mut t);
+                let mut o = like(&mut g, s);
+                if (cmd == "div2" || cmd == "sam") && g.chance(2) {
+                    o.ty = 0;
+                }
+                vol_of(&mut g, &mut t, o);
+                let mode = g.pick(&[0, 0, 1, 2, 3]);
+                t.push(mode.to_string());
+                if mode == 1 {
+                    let mut p = like(&mut g, s);
+                    if cmd == "div2" && g.chance(2) {
+                        p.ty = 0;
+                    }
+                    vol_of(&mut g, &mut t, p);
+                }
+                if cmd == "sam" {
+                    t.push(fx(fval(&mut g)));
+                }
+            }
+            "extract" | "cras" => {
+                let mut s = shape(&mut g);
+                s.drop = cmd == "cras";
+                vol_of(&mut g, &mut t, s);
+                if cmd == "extract" {
+                    if g.chance(3) {
+                        t.push("1".into());
+                        let mut o = shape(&mut g);
+                        if g.chance(4) {
+                            o.ty = s.ty;
+                            o.nf = s.nf;
+                        }
+                        vol_of(&mut g, &mut t, o);
+                    } else {
+                        t.push("0".into());
+                    }
+                } else {
+                    let o = shape(&mut g);
+                    vol_of(&mut g, &mut t, o);
+                }
+                for k in [s.w, s.h, s.d] {
+                    t.push(
+                        if g.chance(10) {
+                            k + g.int(0, 1)
+                        } else {
+                            g.int(-1, k - 1)
+                        }
+                        .to_string(),
+                    );
+                }
+                if cmd == "extract" {
+                    for k in [s.w, s.h, s.d] {
+                        let n = if g.chance(8) {
+                            g.int(-1, 0)
+                        } else {
+                            g.int(1, k + 1)
+                        };
+                        t.push(n.to_string());
+                    }
+                }
+                for _ in 0..3 {
+                    t.push(g.int(-1, 2).to_string());
+                }
+            }
+            "avg" => {
+                let s = vol(&mut g, &mut t);
+                let mode = g.pick(&[0, 1, 1, 2]);
+                t.push(mode.to_string());
+                if mode == 1 {
+                    let o = like(&mut g, s);
+                    vol_of(&mut g, &mut t, o);
+                }
+                t.push(g.pick(&[0, 1, 2, 7, -1, -2, 2147483647]).to_string());
+            }
+            "dsign" => {
+                t.push(dx(g.pick(&[
+                    1.0,
+                    -1.0,
+                    0.0,
+                    2.5,
+                    f64::NAN,
+                    1e300,
+                    -0.0,
+                    0.1,
+                ])));
+            }
+            "sras" | "spt" | "ostr" | "vtal" => {
+                let mut s = shape(&mut g);
+                s.drop = true;
+                vol_of(&mut g, &mut t, s);
+                match cmd {
+                    "sras" => t.push(g.int(0, 3).to_string()),
+                    "spt" => {
+                        t.push(g.int(0, 2).to_string());
+                        for _ in 0..3 {
+                            t.push(dx(coord(&mut g)));
+                        }
+                    }
+                    "vtal" => {
+                        let lt = g.chance(2);
+                        t.push(i64::from(lt).to_string());
+                        if lt {
+                            for i in 0..16 {
+                                let v = if g.chance(30) {
+                                    g.pick(&[f64::NAN, f64::INFINITY, -0.0, 1e300])
+                                } else if i >= 12 {
+                                    g.pick(&[0.0, 0.0, 0.0, 1.0, 0.5, 2.0])
+                                } else {
+                                    g.pick(&[1.0, 0.0, -1.0, 0.98, 1.1, 0.05, -12.5, 30.0])
+                                };
+                                t.push(dx(if i == 15 && v == 0.0 && g.chance(2) {
+                                    1.0
+                                } else {
+                                    v
+                                }));
+                            }
+                        }
+                        for _ in 0..3 {
+                            t.push(dx(coord(&mut g)));
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            "com" | "pca" => {
+                vol(&mut g, &mut t);
+                t.push(g.pick(&[0, 0, 1, 10, 100, 200, 255]).to_string());
+            }
+            "cmph" => {
+                let mut a = Vec::new();
+                vol(&mut g, &mut a);
+                let ea = hdr_extra(&mut g);
+                t.extend(a.iter().cloned());
+                t.extend(ea.iter().cloned());
+                let mode = g.pick(&[0, 1, 1, 1, 2]);
+                t.push(mode.to_string());
+                if mode == 1 {
+                    if g.chance(4) {
+                        vol(&mut g, &mut t);
+                        t.extend(hdr_extra(&mut g));
+                    } else {
+                        let mut b = a.clone();
+                        let mut eb = ea.clone();
+                        for _ in 0..g.int(0, 2) {
+                            perturb(&mut g, &mut b, &mut eb);
+                        }
+                        t.extend(b);
+                        t.extend(eb);
+                    }
+                }
+            }
+            "dump" => {
+                vol(&mut g, &mut t);
+                t.push(fx(num(&mut g, -300, 300, 4)));
+                t.push(g.int(-1, 3).to_string());
+                for _ in 0..3 {
+                    t.push(g.pick(&NAMES).to_owned());
+                }
+                let reg = g.chance(3);
+                t.push(i64::from(reg).to_string());
+                if reg {
+                    for _ in 0..16 {
+                        t.push(fx(num(&mut g, -50, 50, 8)));
+                    }
+                }
+            }
+            "stri" | "styp" | "sfrm" | "sfty" | "scub" | "scubf" | "ssinc" | "ssincf" => {
+                let mut s = shape(&mut g);
+                if g.chance(3) {
+                    s.ty = 3;
+                }
+                if !g.chance(4) {
+                    s.hdr = false;
+                }
+                vol_of(&mut g, &mut t, s);
+                t.push(dx(g.pick(&[
+                    0.0,
+                    0.0,
+                    0.0,
+                    -5.5,
+                    f64::from_bits(0x7ff8_0000_0000_1234),
+                    1e300,
+                ])));
+                let n = 4;
+                t.push(n.to_string());
+                for _ in 0..n {
+                    for k in [s.w, s.h, s.d] {
+                        t.push(dx(scoord(&mut g, k)));
+                    }
+                    t.push(frame_of(&mut g, s).to_string());
+                    let aux = if cmd.starts_with("ssinc") {
+                        if g.chance(40) {
+                            g.pick(&[70, 1000, -1])
+                        } else {
+                            g.int(0, 6)
+                        }
+                    } else {
+                        g.int(-1, 7)
+                    };
+                    t.push(aux.to_string());
+                }
+            }
+            "trans" | "rot" => {
+                let mut s = shape(&mut g);
+                if g.chance(2) {
+                    s.ty = 0;
+                }
+                if !g.chance(6) {
+                    s.hdr = false;
+                }
+                vol_of(&mut g, &mut t, s);
+                let mode = g.pick(&[0, 0, 0, 1, 2]);
+                t.push(mode.to_string());
+                if mode == 1 {
+                    let o = like(&mut g, s);
+                    vol_of(&mut g, &mut t, o);
+                }
+                if cmd == "trans" {
+                    for _ in 0..3 {
+                        t.push(dx(g.pick(&[
+                            0.0,
+                            1.0,
+                            -1.0,
+                            0.5,
+                            -0.5,
+                            1.25,
+                            2.0,
+                            -2.75,
+                            0.3,
+                            1e-8,
+                            f64::NAN,
+                            1e10,
+                        ])));
+                    }
+                } else {
+                    let a = g.pick(&[
+                        0.0f32,
+                        0.3,
+                        -0.7,
+                        std::f32::consts::FRAC_PI_2,
+                        std::f32::consts::PI,
+                        0.05,
+                        2.0,
+                    ]);
+                    let (c, sn) = (a.cos(), a.sin());
+                    let base = match g.below(4) {
+                        0 => [1.0, 0.0, 0.0, 0.0, c, sn, 0.0, -sn, c],
+                        1 => [c, 0.0, -sn, 0.0, 1.0, 0.0, sn, 0.0, c],
+                        2 => [c, sn, 0.0, -sn, c, 0.0, 0.0, 0.0, 1.0],
+                        _ => {
+                            let mut m = [0.0f32; 9];
+                            for v in m.iter_mut() {
+                                *v = g.pick(&[0.0, 1.0, -1.0, 0.5, 2.0, 0.25]);
+                            }
+                            m
+                        }
+                    };
+                    for v in base {
+                        t.push(fx(if g.chance(60) { f32::NAN } else { v }));
+                    }
+                    let o = g.chance(2);
+                    t.push(i64::from(o).to_string());
+                    if o {
+                        for _ in 0..3 {
+                            t.push(fx(g.pick(&[0.0, 1.0, 1.5, 2.0, -1.0, 0.75])));
+                        }
+                    }
+                }
+            }
+            "rotx" | "roty" | "rotz" => {
+                let mut s = shape(&mut g);
+                if g.chance(2) {
+                    s.ty = 0;
+                }
+                if !g.chance(6) {
+                    s.hdr = false;
+                }
+                vol_of(&mut g, &mut t, s);
+                let d = g.chance(4);
+                t.push(i64::from(d).to_string());
+                if d {
+                    let o = like(&mut g, s);
+                    vol_of(&mut g, &mut t, o);
+                }
+                t.push(fx(g.pick(&[
+                    0.0f32,
+                    0.1,
+                    0.5,
+                    std::f32::consts::FRAC_PI_2,
+                    std::f32::consts::PI,
+                    -0.7,
+                    1e-6,
+                    f32::NAN,
+                    f32::INFINITY,
+                ])));
+            }
+            "skull" => {
+                let s = Shape {
+                    w: g.int(6, 48),
+                    h: g.int(6, 48),
+                    d: g.int(1, 14),
+                    ty: g.pick(&[0, 0, 0, 3, 4, 1]),
+                    nf: 1,
+                    hdr: false,
+                    drop: false,
+                };
+                vol_of(&mut g, &mut t, s);
+                let nb = g.int(0, 3);
+                t.push(nb.to_string());
+                for b in 0..nb {
+                    let (w, h, d) = (s.w, s.h, s.d);
+                    let full = b == 0 && g.chance(2);
+                    let (x0, y0, z0) = if full {
+                        (0, 0, 0)
+                    } else {
+                        (g.int(0, w - 1), g.int(0, h - 1), g.int(0, d - 1))
+                    };
+                    let (x1, y1, z1) = if full {
+                        (w - 1, h - 1, d - 1)
+                    } else {
+                        (g.int(x0, w - 1), g.int(y0, h - 1), g.int(z0, d - 1))
+                    };
+                    for v in [x0, y0, z0, x1, y1, z1] {
+                        t.push(v.to_string());
+                    }
+                    let v = if full {
+                        g.pick(&[0.0f32, 0.0, 5.0, 2.0])
+                    } else if g.chance(20) {
+                        g.pick(&[f32::INFINITY, f32::NAN, 1e30])
+                    } else {
+                        g.pick(&[100.0f32, 200.0, 255.0, 60.0, 0.0, 30.0])
+                    };
+                    t.push(fx(v));
+                }
+                t.push(g.pick(&[0, 10, 50, 100, 128, 300, -5, 20]).to_string());
+            }
+            "tftype" => {
+                let n = 6;
+                t.push(n.to_string());
+                for _ in 0..n {
+                    let mut name = g
+                        .pick(&["talairach", "a/b.c/reg", "x", "", "dir.d/sub", "nii.gz"])
+                        .to_owned();
+                    for _ in 0..g.int(0, 2) {
+                        name += g.pick(&[
+                            ".xfm", ".XFM", ".lta", ".Lta", ".fslmat", ".m3z", ".M3D", ".mgz",
+                            ".nii", ".nii.gz", ".oct", ".dat", ".reg", ".txt", "#3", "@xfm",
+                            "@lta", "#a@b", ".", "@", ".gz",
+                        ]);
+                    }
+                    if g.chance(60) {
+                        name += &"z".repeat(600);
+                    }
+                    t.push(if name.is_empty() {
+                        "-".to_owned()
+                    } else {
+                        hex(name.as_bytes())
+                    });
+                }
+            }
+            "ltaread" => {
+                let kind = g.below(4);
+                let ext = match kind {
+                    0 => g.pick(&[".xfm", ".XFM", ".xfm#1", ".lta@xfm"]),
+                    1 => g.pick(&[".lta", ".LTA", "", ".oct", ".m3z"]),
+                    2 => g.pick(&[".fslmat", ".FSLMAT"]),
+                    _ => g.pick(&["/identity.nofile", ".xfm", ".lta", ".fslmat"]),
+                };
+                let text = match kind {
+                    0 => xfm_text(&mut g),
+                    1 => lta_text(&mut g),
+                    2 => {
+                        let mut s = String::new();
+                        for _ in 0..g.int(2, 4) {
+                            s += &num_row(&mut g);
+                        }
+                        s
+                    }
+                    _ => String::new(),
+                };
+                let mut bytes = text.into_bytes();
+                if kind < 3 && g.chance(6) {
+                    let cut = g.below(bytes.len() as u64 + 1) as usize;
+                    bytes.truncate(cut);
+                }
+                t.push(hex(ext.as_bytes()));
+                t.push(hex(&bytes));
+                t.push(i64::from(kind < 3 && !g.chance(30)).to_string());
+            }
+            "coef" | "hsinc" => {
+                let n = 6;
+                t.push(n.to_string());
+                for _ in 0..n {
+                    let x = if g.chance(8) {
+                        g.pick(&[f64::NAN, f64::INFINITY, 1e-6, -1e-6, 0.0, -0.0, 1e300])
+                    } else {
+                        g.int(-40, 40) as f64 / g.pick(&[1.0, 4.0, 7.0, 10.0, 3.0])
+                            + g.pick(&[0.0, 0.0, 1e-9, 0.123456789])
+                    };
+                    t.push(dx(x));
+                    if cmd == "coef" {
+                        t.push(g.int(-1, 4).to_string());
+                    } else {
+                        t.push(dx(g.pick(&[10.0, 10.0, 2.0, 0.0, 1.0, 12.0, -4.0])));
+                    }
+                }
+            }
             c => panic!("no generator for {c}"),
         }
         lines.push(t.join(" "));
@@ -362,10 +974,249 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
     lines
 }
 
+/// A row of four numbers as a transform file writes them (sometimes odd).
+fn num_row(g: &mut Gen) -> String {
+    let mut s = String::new();
+    if g.chance(8) {
+        s += "  ";
+    }
+    for i in 0..4 {
+        let v = if g.chance(25) {
+            g.pick(&["nan", "1e40", "-inf", "abc", "0x1p3", ""])
+                .to_owned()
+        } else {
+            format!(
+                "{}",
+                g.int(-2000, 2000) as f64 / g.pick(&[1.0, 7.0, 1000.0, 3.0])
+            )
+        };
+        s += &v;
+        if i < 3 {
+            s += g.pick(&[" ", " ", "\t", "  "]);
+        }
+    }
+    s += g.pick(&["\n", "\n", ";\n", " # c\n", "\n\n"]);
+    s
+}
+
+/// A MINC `.xfm` text: its header lines (the volume information in several forms), its rows.
+fn xfm_text(g: &mut Gen) -> String {
+    let mut s = String::from(if g.chance(15) {
+        "MNI Transform Fil\n"
+    } else {
+        "MNI Transform File\n"
+    });
+    s += g.pick(&[
+        "% avi2talxfm\n",
+        "%Generated by lta_convert src none dst none\n",
+        "%Generated by x src average_305.mnc dst nofile.mnc\n",
+        "%Volume: a.mnc\n%Volume: average_305.mnc\n",
+        "% minctracc -clobber o.mnc average_305_8.mnc t.xfm\n",
+        "% minctracc only.mnc\n",
+        "%Generated by x src\n",
+        "",
+        "%a\n%b\n%c\n",
+    ]);
+    if g.chance(3) {
+        s += "\n";
+    }
+    if !g.chance(8) {
+        s += "Transform_Type = Linear;\n";
+    }
+    if !g.chance(8) {
+        s += "Linear_Transform = \n";
+    }
+    for _ in 0..g.int(2, 3) {
+        s += &num_row(g);
+    }
+    if g.chance(15) {
+        s += "%tail\n";
+    }
+    s
+}
+
+/// A FreeSurfer `.lta` text: header, transforms, volume information, extras.
+fn lta_text(g: &mut Gen) -> String {
+    let nx = g.pick(&[1, 1, 1, 2, 0]);
+    let mut s = String::new();
+    if !g.chance(12) {
+        s += &format!("type      = {}\n", g.pick(&[0, 1, 1, 14]));
+    }
+    if !g.chance(15) {
+        s += &format!("nxforms   = {nx}\n");
+    }
+    for _ in 0..nx {
+        s += "mean      = 0.0000 0.0000 0.0000\n";
+        s += g.pick(&[
+            "sigma     = 1.0000\n",
+            "sigma     = 10000.0\n",
+            "sigma = x\n",
+        ]);
+        s += g.pick(&["1 4 4\n", "1 4 4\n", "1 3 3\n"]);
+        for _ in 0..4 {
+            s += &num_row(g);
+        }
+    }
+    for k in 0..nx {
+        if g.chance(4) {
+            continue;
+        }
+        for which in ["src", "dst"] {
+            s += &format!("{which} volume info\n");
+            s += &format!("valid = {}  # volume info valid\n", g.int(0, 1));
+            s += g.pick(&["filename = /a/b.mgz\n", "filename = \n"]);
+            s += &format!("volume = {} 256 {}\n", 128 + k, g.int(1, 300));
+            s += "voxelsize = 1.000000000000000e+00 1.000000000000000e+00 1.200000047683716e+00\n";
+            s += "xras   = -1.000000000000000e+00 0.000000000000000e+00 0.000000000000000e+00\n";
+            s += "yras   = 0.000000000000000e+00 0.000000000000000e+00 -1.000000000000000e+00\n";
+            s += "zras   = 0.000000000000000e+00 1.000000000000000e+00 0.000000000000000e+00\n";
+            s += "cras   = 1.500000000000000e+00 -2.000000000000000e+01 3.000000000000000e+00\n";
+        }
+    }
+    if g.chance(2) {
+        s += g.pick(&["subject bert\n", "subject\n", "subject a b\n"]);
+    }
+    if g.chance(2) {
+        s += g.pick(&["fscale 0.1\n", "fscale x\n", "fscale 1e50\n"]);
+    }
+    s
+}
+
+/// A sampler's coordinate on an axis of `n` voxels: inside, at the edges, whole or within
+/// `FLT_EPSILON` of whole, outside, NaN and infinite.
+fn scoord(g: &mut Gen, n: i64) -> f64 {
+    if g.chance(25) {
+        return g.pick(&[f64::NAN, f64::INFINITY, -f64::INFINITY, 1e10, -0.0, 3e9]);
+    }
+    let k = g.int(-1, n) as f64;
+    if g.chance(6) {
+        return k;
+    }
+    if g.chance(10) {
+        return k + g.pick(&[1e-8, -1e-8, 1e-7, 1.25e-7, -3e-7]);
+    }
+    if g.chance(5) {
+        return n as f64 - 1.0 + g.pick(&[0.2, 0.4, 0.49, 0.5, 0.51, 0.6, 0.75]);
+    }
+    if g.chance(8) {
+        return g.pick(&[-0.3, -0.49, -0.5, -0.51, -0.75]);
+    }
+    k + g.pick(&[0.5, 0.25, 0.75, 0.1, 0.9, 0.3, 0.6, 0.45, 0.55, 0.999])
+}
+
+/// A point's coordinate in the cases.
+fn coord(g: &mut Gen) -> f64 {
+    if g.chance(30) {
+        return g.pick(&[f64::NAN, f64::INFINITY, -f64::INFINITY, 1e10, -0.0]);
+    }
+    g.pick(&[0.0, 1.0, -1.0, 2.5, 128.0, -30.25, 0.5, 3.0, 17.75])
+}
+
+/// `cmph`'s header fields beyond the volume's: field of view, location, `ptype`.
+fn hdr_extra(g: &mut Gen) -> Vec<String> {
+    vec![
+        fx(g.pick(&[0.0, 256.0, 240.0, 1e-9])),
+        fx(g.pick(&[0.0, 1.5, -2.0])),
+        g.pick(&[0, 0, 1, 2]).to_string(),
+    ]
+}
+
+/// One small change to a copy of a volume's tokens or its header fields (a float nudged, an
+/// integer changed).
+fn perturb(g: &mut Gen, v: &mut [String], e: &mut [String]) {
+    if g.chance(4) {
+        let k = g.below(3) as usize;
+        e[k] = if k == 2 {
+            g.int(0, 3).to_string()
+        } else {
+            let x = f32::from_bits(u32::from_str_radix(&e[k], 16).unwrap());
+            fx(x + g.pick(&[1e-8f32, 1e-6, 1e-3, 0.5]))
+        };
+        return;
+    }
+    // the floats of the geometry (tokens 11 to 13 sizes, 15 to 29 cosines and centre) and the
+    // header (33 to 43), the flip angle (44, a double), ras_good_flag (14)
+    let k = g.pick(&[11, 12, 13, 14, 15, 18, 24, 26, 33, 36, 38, 41, 42, 43, 44]);
+    v[k] = match k {
+        14 => g.int(0, 1).to_string(),
+        44 => {
+            let x = f64::from_bits(u64::from_str_radix(&v[k], 16).unwrap());
+            dx(x + g.pick(&[1e-9, 1e-7, 1e-3]))
+        }
+        _ => {
+            let x = f32::from_bits(u32::from_str_radix(&v[k], 16).unwrap());
+            fx(x + g.pick(&[1e-8f32, 1e-6, 1e-3, 0.5]))
+        }
+    };
+}
+
 /// The probe's commands, in the order the generator cycles through them.
-pub const COMMANDS: [&str; 10] = [
-    "vgwrite", "vgread", "vgread", "vgprint0", "getvg", "copyvg", "vgi2r", "vgr2i", "tkrv2r",
+pub const COMMANDS: [&str; 65] = [
+    "vgwrite",
+    "vgread",
+    "vgread",
+    "vgprint0",
+    "getvg",
+    "copyvg",
+    "vgi2r",
+    "vgr2i",
+    "tkrv2r",
     "vgeq0",
+    "clone",
+    "clonesp",
+    "clear",
+    "match",
+    "cpframe",
+    "cpframes",
+    "linscale",
+    "smul",
+    "smulf",
+    "thresh",
+    "uthresh",
+    "invc",
+    "binz",
+    "abs",
+    "pos",
+    "neg",
+    "mul2",
+    "sub2",
+    "add2",
+    "div2",
+    "sam",
+    "vrange",
+    "vrangef",
+    "vrangereg",
+    "lrange",
+    "extract",
+    "cras",
+    "avg",
+    "dsign",
+    "sras",
+    "spt",
+    "ostr",
+    "vtal",
+    "com",
+    "pca",
+    "cmph",
+    "dump",
+    "stri",
+    "styp",
+    "sfrm",
+    "sfty",
+    "scub",
+    "scubf",
+    "ssinc",
+    "ssincf",
+    "coef",
+    "hsinc",
+    "trans",
+    "rot",
+    "rotx",
+    "roty",
+    "rotz",
+    "skull",
+    "tftype",
+    "ltaread",
 ];
 
 /// One buffer both streams write into, in order (FreeSurfer's standard output and error go to
@@ -453,7 +1304,13 @@ impl Out {
         }
     }
     fn geom(&mut self, v: &VolGeom) {
-        self.i(i64::from(v.valid));
+        self.geom_v(v, true);
+    }
+    /// `with_valid`: an MRI's `valid` is never set by its constructors (memory contents).
+    fn geom_v(&mut self, v: &VolGeom, with_valid: bool) {
+        if with_valid {
+            self.i(i64::from(v.valid));
+        }
         for x in [v.width, v.height, v.depth] {
             self.i(i64::from(x));
         }
@@ -508,6 +1365,133 @@ fn geom_of(t: &mut Toks) -> VolGeom {
     let mut v = VolGeom::default();
     set_geom(t, &mut v);
     v
+}
+
+fn get_vol(cx: &mut Ctx, t: &mut Toks) -> Result<Mri, Fatal> {
+    let (w, h, d, ty, nf, hdr) = (t.i(), t.i(), t.i(), t.i(), t.i(), t.i());
+    let seed = t.i() as u32 as u64;
+    let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+    let mut m = if hdr != 0 {
+        mm::mri_alloc_header(g, a, b, w, h, d, ty, nf)?
+    } else {
+        mm::mri_alloc_sequence(g, a, b, w, h, d, ty, nf)?
+    };
+    if let Some(c) = m.chunk.as_mut() {
+        if ty == mm::MRI_FLOAT {
+            for i in 0..c.len() / 4 {
+                let v = FTAB[((i as u64 * 7 + seed) % FTAB.len() as u64) as usize];
+                c[4 * i..4 * i + 4].copy_from_slice(&v.to_le_bytes());
+            }
+        } else {
+            for (k, x) in c.iter_mut().enumerate() {
+                let k = k as u64;
+                *x = ((k * 37 + seed * 101 + (k >> 3) * 13) & 0xff) as u8;
+            }
+        }
+    }
+    set_geom(t, &mut m.vg);
+    // the geometry's fields but its extent (the volume's own)
+    m.vg.width = w;
+    m.vg.height = h;
+    m.vg.depth = d;
+    m.imnr0 = t.i();
+    m.imnr1 = t.i();
+    m.xstart = t.f();
+    m.xend = t.f();
+    m.ystart = t.f();
+    m.yend = t.f();
+    m.zstart = t.f();
+    m.zend = t.f();
+    m.thick = t.f();
+    m.ps = t.f();
+    m.tr = t.f();
+    m.te = t.f();
+    m.ti = t.f();
+    m.flip_angle = t.d();
+    m.dof = t.i();
+    match t.i() {
+        1 => {
+            reinit_cache(g, a, b, &mut m.vg)?;
+        }
+        2 => {
+            m.vg.i_to_r = None;
+            m.vg.r_to_i = None;
+        }
+        _ => {}
+    }
+    Ok(m)
+}
+
+impl Out {
+    fn am(&mut self, a: Option<&AffineMatrix>) {
+        match a {
+            None => self.0 += "NULL ",
+            Some(a) => {
+                for v in a.mat {
+                    self.f(v);
+                }
+            }
+        }
+    }
+    fn vol(&mut self, m: Option<&Mri>) {
+        let Some(m) = m else {
+            self.0 += "NULL ";
+            return;
+        };
+        for v in [
+            m.vg.width,
+            m.vg.height,
+            m.vg.depth,
+            m.nframes,
+            m.mtype,
+            m.imnr0,
+            m.imnr1,
+        ] {
+            self.i(i64::from(v));
+        }
+        for v in [
+            m.xstart, m.xend, m.ystart, m.yend, m.zstart, m.zend, m.thick, m.ps, m.tr, m.te, m.ti,
+        ] {
+            self.f(v);
+        }
+        self.d(m.flip_angle);
+        self.i(i64::from(m.dof));
+        self.geom_v(&m.vg, false);
+        self.am(m.vg.i_to_r.as_ref());
+        self.m(m.vg.r_to_i.as_ref());
+        match &m.chunk {
+            Some(c) => self.hex(c),
+            None => self.0 += "nochunk ",
+        }
+    }
+    /// `r != NULL && r == dst`, then the volume returned.
+    fn ret(&mut self, r: &Ret<Mri>, given: Option<&Mri>) {
+        self.i(i64::from(matches!(r, Ret::Given)));
+        match r {
+            Ret::New(m) => self.vol(Some(m)),
+            Ret::Given => self.vol(given),
+            Ret::Null => self.vol(None),
+        }
+    }
+}
+
+/// The destination of `f(src, dst, ...)`: 0 `NULL`, 1 a volume of the case, 2 the source.
+fn dst_mode(cx: &mut Ctx, t: &mut Toks) -> Result<(i32, Option<Mri>), Fatal> {
+    let mode = t.i();
+    let d = if mode == 1 {
+        Some(get_vol(cx, t)?)
+    } else {
+        None
+    };
+    Ok((mode, d))
+}
+
+fn pair<'a>(mode: i32, src: &'a mut Mri, dst: &'a mut Option<Mri>) -> Pair<'a> {
+    match mode {
+        1 => Pair::Given(src, dst.as_mut().expect("a destination")),
+        2 => Pair::Same(src),
+        _ => Pair::New(src),
+    }
 }
 
 fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
@@ -580,9 +1564,525 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
             o.i(i64::from(vgeom::vg_is_not_equal_thresh(&va, &vb, thresh)));
             o.i(i64::from(vgeom::vg_is_equal(g, &va, &vb)));
         }
+        "clone" => {
+            let src = get_vol(cx, t)?;
+            let mut dst = if t.i() != 0 {
+                Some(get_vol(cx, t)?)
+            } else {
+                None
+            };
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = ar::mri_clone(g, a, b, &src, dst.as_mut())?;
+            o.ret(&r, dst.as_ref());
+        }
+        "clonesp" => {
+            let src = get_vol(cx, t)?;
+            let (ty, nf) = (t.i(), t.i());
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = ar::mri_clone_by_space(g, a, b, &src, ty, nf)?;
+            o.vol(Some(&r));
+        }
+        "clear" => {
+            let mut m = get_vol(cx, t)?;
+            let r = ar::mri_clear(&mut cx.g, &mut cx.b, &mut m)?;
+            o.i(i64::from(r));
+            o.vol(Some(&m));
+        }
+        "match" => {
+            let va = get_vol(cx, t)?;
+            let vb = get_vol(cx, t)?;
+            let (w, h, d, nocheck) = (t.i(), t.i(), t.i(), t.i());
+            o.i(i64::from(ar::mri_match(&va, &vb)));
+            o.i(i64::from(ar::mri_match_dimensions(&va, &vb)));
+            let chk = if nocheck != 0 { None } else { Some(&vb) };
+            o.i(i64::from(ar::mri_check_size(&va, chk, w, h, d)));
+        }
+        "cpframe" | "cpframes" | "linscale" | "smul" | "smulf" | "thresh" | "uthresh" | "invc"
+        | "binz" | "abs" | "pos" | "neg" => {
+            let mut src = get_vol(cx, t)?;
+            let (mode, mut dst) = dst_mode(cx, t)?;
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let p = pair(mode, &mut src, &mut dst);
+            let r = match cmd {
+                "cpframe" => {
+                    let (sf, df) = (t.i(), t.i());
+                    ar::mri_copy_frame(g, a, b, p, sf, df)?
+                }
+                "cpframes" => {
+                    let (s0, s1, d0) = (t.i(), t.i(), t.i());
+                    ar::mri_copy_frames(g, a, b, p, s0, s1, d0)?
+                }
+                "linscale" => {
+                    let (sc, off, nz) = (t.f(), t.f(), t.i());
+                    ar::mri_linear_scale(g, a, b, p, sc, off, nz != 0)?
+                }
+                "smul" => ar::mri_scalar_mul(g, a, b, p, t.f())?,
+                "smulf" => {
+                    let sc = t.f();
+                    ar::mri_scalar_mul_frame(g, a, b, p, sc, t.i())?
+                }
+                "thresh" => ar::mri_threshold(g, a, b, p, t.f())?,
+                "uthresh" => ar::mri_upper_threshold_all_frames(g, a, b, p, t.f())?,
+                "invc" => ar::mri_invert_contrast(g, a, b, p, t.f())?,
+                "binz" => {
+                    let (th, lo, hi) = (t.f(), t.f(), t.f());
+                    ar::mri_binarize(g, a, b, p, th, lo, hi)?
+                }
+                "abs" => ar::mri_abs(g, a, b, p)?,
+                "pos" => ar::mri_pos(g, a, b, p)?,
+                _ => ar::mri_neg(g, a, b, p)?,
+            };
+            let given = if mode == 2 { Some(&src) } else { dst.as_ref() };
+            o.ret(&r, given);
+        }
+        "mul2" | "sub2" | "add2" | "div2" | "sam" => {
+            let mut v1 = get_vol(cx, t)?;
+            let mut v2 = get_vol(cx, t)?;
+            let mode = t.i();
+            let mut d3 = if mode == 1 {
+                Some(get_vol(cx, t)?)
+            } else {
+                None
+            };
+            let scale = if cmd == "sam" { t.f() } else { 0.0 };
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let tri = match mode {
+                1 => Tri::Given(&v1, &v2, d3.as_mut().expect("a destination")),
+                2 => Tri::First(&mut v1, &v2),
+                3 => Tri::Second(&v1, &mut v2),
+                _ => Tri::New(&v1, &v2),
+            };
+            let r = match cmd {
+                "mul2" => ar::mri_multiply(g, a, b, tri)?,
+                "sub2" => ar::mri_subtract(g, a, b, tri)?,
+                "add2" => ar::mri_add(g, a, b, tri)?,
+                "div2" => ar::mri_divide(g, a, b, tri)?,
+                _ => ar::mri_scale_and_multiply(g, a, b, tri, scale)?,
+            };
+            let given = match mode {
+                1 => d3.as_ref(),
+                2 => Some(&v1),
+                3 => Some(&v2),
+                _ => None,
+            };
+            o.ret(&r, given);
+        }
+        "vrange" => {
+            let m = get_vol(cx, t)?;
+            let (r, lo, hi) = ar::mri_val_range(&mut cx.g, &mut cx.b, &m)?;
+            o.i(i64::from(r));
+            o.f(lo);
+            o.f(hi);
+        }
+        "vrangef" => {
+            let m = get_vol(cx, t)?;
+            let f = t.i();
+            let (r, lh) = ar::mri_val_range_frame(&mut cx.g, &mut cx.b, &m, f)?;
+            let (lo, hi) = lh.unwrap_or((-7.0, -7.0));
+            o.i(i64::from(r));
+            o.f(lo);
+            o.f(hi);
+        }
+        "vrangereg" => {
+            let m = get_vol(cx, t)?;
+            let reg = MriRegion {
+                x: t.i(),
+                y: t.i(),
+                z: t.i(),
+                dx: t.i(),
+                dy: t.i(),
+                dz: t.i(),
+            };
+            let (r, lo, hi) = ar::mri_val_range_region(&mut cx.g, &mut cx.b, &m, &reg)?;
+            o.i(i64::from(r));
+            o.f(lo);
+            o.f(hi);
+        }
+        "lrange" => {
+            let m = get_vol(cx, t)?;
+            let l = get_vol(cx, t)?;
+            let label = t.i();
+            let (r, lo, hi) = ar::mri_label_val_range(&mut cx.g, &mut cx.b, &m, &l, label)?;
+            o.i(i64::from(r));
+            o.f(lo);
+            o.f(hi);
+        }
+        "extract" => {
+            let mut src = get_vol(cx, t)?;
+            let mut dst = if t.i() != 0 {
+                Some(get_vol(cx, t)?)
+            } else {
+                None
+            };
+            let p0 = [t.i(), t.i(), t.i()];
+            let sz = [t.i(), t.i(), t.i()];
+            let p1 = [t.i(), t.i(), t.i()];
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = ar::mri_extract_into(g, a, b, &mut src, dst.as_mut(), p0, sz, p1)?;
+            o.ret(&r, dst.as_ref());
+            o.am(src.vg.i_to_r.as_ref());
+        }
+        "cras" => {
+            let mut src = get_vol(cx, t)?;
+            let dst = get_vol(cx, t)?;
+            let v: Vec<i32> = (0..6).map(|_| t.i()).collect();
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let (r, aa, ss) = ar::mri_calc_cras_for_extracted_volume(
+                g, a, b, &mut src, &dst, v[0], v[1], v[2], v[3], v[4], v[5],
+            )?;
+            o.d(r);
+            o.d(aa);
+            o.d(ss);
+            o.am(src.vg.i_to_r.as_ref());
+            o.m(src.vg.r_to_i.as_ref());
+        }
+        "avg" => {
+            let mut src = get_vol(cx, t)?;
+            let (mode, mut dst) = dst_mode(cx, t)?;
+            let dof = t.i();
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let p = pair(mode, &mut src, &mut dst);
+            let r = ar::mri_average(g, a, b, p, dof)?;
+            let given = if mode == 2 { Some(&src) } else { dst.as_ref() };
+            o.ret(&r, given);
+        }
+        "stri" | "styp" | "sfrm" | "sfty" | "scub" | "scubf" | "ssinc" | "ssincf" => {
+            samplers(cx, t, o, cmd)?;
+        }
+        "trans" | "rot" => {
+            let mut src = get_vol(cx, t)?;
+            let (mode, mut dst) = dst_mode(cx, t)?;
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = if cmd == "trans" {
+                let (dx, dy, dz) = (t.d(), t.d(), t.d());
+                let p = pair(mode, &mut src, &mut dst);
+                rt::mri_translate(g, a, b, p, dx, dy, dz)?
+            } else {
+                let mut mr = mx::matrix_alloc(g, a, b, 3, 3, mx::MATRIX_REAL)?.expect("3 x 3");
+                for i in 1..=3 {
+                    for j in 1..=3 {
+                        mr.set_relt(i, j, t.f());
+                    }
+                }
+                let mo = if t.i() != 0 {
+                    let mut m = mx::matrix_alloc(g, a, b, 3, 1, mx::MATRIX_REAL)?.expect("3 x 1");
+                    for i in 1..=3 {
+                        m.set_relt(i, 1, t.f());
+                    }
+                    Some(m)
+                } else {
+                    None
+                };
+                let p = pair(mode, &mut src, &mut dst);
+                rt::mri_rotate_i(g, a, b, p, &mr, mo.as_ref())?
+            };
+            let given = if mode == 2 { Some(&src) } else { dst.as_ref() };
+            o.ret(&r, given);
+        }
+        "rotx" | "roty" | "rotz" => {
+            let src = get_vol(cx, t)?;
+            let mut dst = if t.i() != 0 {
+                Some(get_vol(cx, t)?)
+            } else {
+                None
+            };
+            let angle = t.f();
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = match cmd {
+                "rotx" => rt::mri_rotate_x_i(g, a, b, &src, dst.as_mut(), angle)?,
+                "roty" => rt::mri_rotate_y_i(g, a, b, &src, dst.as_mut(), angle)?,
+                _ => rt::mri_rotate_z_i(g, a, b, &src, dst.as_mut(), angle)?,
+            };
+            o.i(0);
+            o.vol(r.as_ref());
+            o.vol(dst.as_ref());
+        }
+        "skull" => {
+            let mut m = get_vol(cx, t)?;
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let nb = t.i();
+            for _ in 0..nb {
+                let (x0, y0, z0, x1, y1, z1) = (t.i(), t.i(), t.i(), t.i(), t.i(), t.i());
+                let v = t.f();
+                for z in z0..=z1 {
+                    for y in y0..=y1 {
+                        for x in x0..=x1 {
+                            larmorx_freesurfer_mri::voxel::mri_set_vox_val(
+                                g, b, &mut m, x, y, z, 0, v, 0,
+                            )?;
+                        }
+                    }
+                }
+            }
+            let th = t.i();
+            let mut bx = MriRegion {
+                x: -7,
+                y: -7,
+                z: -7,
+                dx: -7,
+                dy: -7,
+                dz: -7,
+            };
+            let r = sk::find_approximate_skull_bounding_box(g, a, b, &m, th, &mut bx)?;
+            o.i(i64::from(r));
+            for v in [bx.x, bx.y, bx.z, bx.dx, bx.dy, bx.dz] {
+                o.i(i64::from(v));
+            }
+        }
+        "tftype" => {
+            let n = t.i();
+            for _ in 0..n {
+                let name = t.hex();
+                o.i(i64::from(lr::transform_file_name_type(g, &name)));
+            }
+        }
+        "ltaread" => {
+            let ext = String::from_utf8(t.hex()).expect("an ASCII name");
+            let bytes = t.hex();
+            let have = t.i() != 0;
+            let dir =
+                std::env::temp_dir().join(format!("larmorx-fsvol-lta-{}", std::process::id()));
+            std::fs::create_dir_all(&dir).expect("a scratch folder");
+            let name = format!("fsvol-lta{ext}");
+            let path = dir.join(&name);
+            let _ = std::fs::remove_file(&path);
+            if have {
+                std::fs::write(&path, &bytes).expect("the case's file");
+            }
+            g.errno = 0;
+            let r = lr::lta_read_ex(g, a, b, Some(&dir), &name, &mut NoIo);
+            if have {
+                let _ = std::fs::remove_file(&path);
+            }
+            let r = r?;
+            o.i(i64::from(g.errno));
+            match r {
+                None => o.0 += "NULL ",
+                Some(lta) => {
+                    o.i(i64::from(lta.ltype));
+                    o.i(i64::from(lta.num_xforms));
+                    for lt in &lta.xforms {
+                        for v in [lt.x0, lt.y0, lt.z0, lt.sigma] {
+                            o.f(v);
+                        }
+                        o.m(lt.m_l.as_ref());
+                        o.i(i64::from(lt.ltype));
+                        o.geom(&lt.src);
+                        o.geom(&lt.dst);
+                    }
+                    o.hex(lta.subject.c_bytes());
+                    o.f(lta.fscale);
+                }
+            }
+        }
+        "coef" | "hsinc" => {
+            let n = t.i();
+            let libm = larmorx_core::math::Libm::quiet(g.mode());
+            for _ in 0..n {
+                let x = t.d();
+                if cmd == "coef" {
+                    let it = t.i();
+                    o.d(sm::cubic_coeff(g, b, x, it));
+                } else {
+                    let fw = t.d();
+                    o.d(sm::ham_sinc(&libm, x, fw));
+                }
+            }
+        }
+        "dsign" => {
+            let v = t.d();
+            o.d(co::set_sample_volume_derivative_sign(g, a, v));
+        }
+        "sras" => {
+            let mut m = get_vol(cx, t)?;
+            let k = t.i();
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = match k {
+                0 => Some(co::surface_ras_from_voxel(g, a, b, &mut m.vg)?),
+                1 => co::voxel_from_surface_ras(g, a, b, &mut m.vg)?,
+                2 => co::surface_ras_from_ras(g, a, b, &m.vg)?,
+                _ => co::get_surface_ras_to_voxel_matrix(g, a, b, &mut m.vg)?,
+            };
+            o.m(r.as_ref());
+            o.am(m.vg.i_to_r.as_ref());
+            o.m(m.vg.r_to_i.as_ref());
+        }
+        "spt" => {
+            let mut m = get_vol(cx, t)?;
+            let k = t.i();
+            let (x, y, z) = (t.d(), t.d(), t.d());
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let (r, p) = match k {
+                0 => co::ras_to_surface_ras(g, a, b, &m.vg, x, y, z)?,
+                1 => co::voxel_to_surface_ras(g, a, b, &mut m.vg, x, y, z)?,
+                _ => co::surface_ras_to_voxel(g, a, b, &mut m.vg, x, y, z)?,
+            };
+            o.i(i64::from(r));
+            for v in p {
+                o.d(v);
+            }
+            o.am(m.vg.i_to_r.as_ref());
+            o.m(m.vg.r_to_i.as_ref());
+        }
+        "ostr" => {
+            let m = get_vol(cx, t)?;
+            let (r, s3) = co::dircos_to_orientation_string(&m.vg);
+            o.i(i64::from(r));
+            o.hex(&[s3[0], s3[1], s3[2], 0]);
+            o.0 += co::slice_direction_name(&m.vg);
+            o.0 += " ";
+            o.i(i64::from(co::get_slice_direction(&m.vg)));
+        }
+        "vtal" => {
+            let mut m = get_vol(cx, t)?;
+            if t.i() != 0 {
+                let mut tr = [[0.0f64; 4]; 4];
+                for row in tr.iter_mut() {
+                    for v in row.iter_mut() {
+                        *v = t.d();
+                    }
+                }
+                m.linear_transform = Some(tr);
+            }
+            let (x, y, z) = (t.d(), t.d(), t.d());
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let (r, p) = co::voxel_to_talairach(g, a, b, &mut m, x, y, z)?;
+            o.i(i64::from(r));
+            for v in p.unwrap_or([-7.0; 3]) {
+                o.d(v);
+            }
+            o.am(m.vg.i_to_r.as_ref());
+            o.m(m.vg.r_to_i.as_ref());
+        }
+        "com" | "pca" => {
+            let m = get_vol(cx, t)?;
+            let th = t.i() as u8;
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            if cmd == "com" {
+                let (r, means) = co::center_of_mass(g, b, &m, th)?;
+                o.i(i64::from(r));
+                for v in means {
+                    o.d(v);
+                }
+            } else {
+                let mut ev = mx::matrix_alloc(g, a, b, 3, 3, mx::MATRIX_REAL)?.expect("3 x 3");
+                let mut evalues = [-7.0f32; 3];
+                let (r, means, _) =
+                    co::principle_components(g, a, b, &m, Some(&mut ev), &mut evalues, th)?;
+                o.i(i64::from(r));
+                for v in means {
+                    o.d(v);
+                }
+                for v in evalues {
+                    o.f(v);
+                }
+                o.m(Some(&ev));
+            }
+        }
+        "cmph" => {
+            let mut va = get_vol(cx, t)?;
+            hdr_fields(t, &mut va);
+            let mode = t.i();
+            let vb = if mode == 1 {
+                let mut v = get_vol(cx, t)?;
+                hdr_fields(t, &mut v);
+                Some(v)
+            } else {
+                None
+            };
+            let b2 = match mode {
+                1 => vb.as_ref(),
+                2 => Some(&va),
+                _ => None,
+            };
+            o.i(i64::from(co::compare_headers(Some(&va), b2)));
+            o.i(i64::from(co::compare_headers(b2, Some(&va))));
+        }
+        "dump" => {
+            let mut m = get_vol(cx, t)?;
+            m.fov = t.f();
+            m.brightness = t.i();
+            m.subject_name = t.s();
+            m.path_to_t1 = t.s();
+            m.fname_format = t.s();
+            if t.i() != 0 {
+                let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+                let mut r = mx::matrix_alloc(g, a, b, 4, 4, mx::MATRIX_REAL)?.expect("4 x 4");
+                for i in 1..=4 {
+                    for j in 1..=4 {
+                        r.set_relt(i, j, t.f());
+                    }
+                }
+                m.vg.register_mat = Some(r);
+            }
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let mut fp = a.clone();
+            let r = co::mri_dump(g, a, b, &m, &mut fp)?;
+            o.i(i64::from(r));
+        }
         c => panic!("unknown command {c}"),
     }
     Ok(())
+}
+
+/// `cmph`'s header fields beyond the volume's tokens.
+/// fs.io's functions for the transform readers: never reached by the cases (they name no volume
+/// that exists and no `register.dat`).
+struct NoIo;
+
+impl lr::LtaIo for NoIo {
+    fn read_header(
+        &mut self,
+        _: &mut Globals,
+        _: &mut dyn Write,
+        _: &mut dyn Write,
+        _: Option<&std::path::Path>,
+        name: &str,
+    ) -> Result<Option<VolGeom>, Fatal> {
+        panic!("MRIreadHeader({name}) is fs.io's")
+    }
+    fn read_register(
+        &mut self,
+        _: &mut Globals,
+        _: &mut dyn Write,
+        _: &mut dyn Write,
+        _: Option<&std::path::Path>,
+        name: &str,
+    ) -> Result<Option<lr::RegisterDat>, Fatal> {
+        panic!("regio_read_register({name}) is fs.io's")
+    }
+}
+
+/// The samplers' commands: each point's result and value.
+fn samplers(cx: &mut Ctx, t: &mut Toks, o: &mut Out, cmd: &str) -> Result<(), Fatal> {
+    let mut m = get_vol(cx, t)?;
+    m.outside_val = t.d();
+    let n = t.i();
+    let (g, b) = (&mut cx.g, &mut cx.b);
+    for _ in 0..n {
+        let (x, y, z) = (t.d(), t.d(), t.d());
+        let (frame, aux) = (t.i(), t.i());
+        let mut val = -7.0f64;
+        let r = match cmd {
+            "stri" => sm::sample_volume(g, b, &m, x, y, z, &mut val),
+            "styp" => sm::sample_volume_type(g, b, &m, x, y, z, &mut val, aux)?,
+            "sfrm" => sm::sample_volume_frame(g, b, &m, x, y, z, frame, &mut val),
+            "sfty" => sm::sample_volume_frame_type(g, b, &m, x, y, z, frame, aux, &mut val),
+            "scub" => sm::cubic_sample_volume(g, b, &m, x, y, z, &mut val),
+            "scubf" => sm::cubic_sample_volume_frame(g, b, &m, x, y, z, frame, &mut val),
+            "ssinc" => sm::sinc_sample_volume(g, b, &m, x, y, z, aux, &mut val)?,
+            _ => sm::sinc_sample_volume_frame(g, b, &m, x, y, z, frame, aux, &mut val)?,
+        };
+        o.i(i64::from(r));
+        o.d(val);
+    }
+    Ok(())
+}
+
+fn hdr_fields(t: &mut Toks, m: &mut Mri) {
+    m.fov = t.f();
+    m.location = t.f();
+    m.ptype = t.i();
 }
 
 fn escape(b: &[u8]) -> String {

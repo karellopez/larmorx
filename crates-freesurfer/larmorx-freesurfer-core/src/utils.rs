@@ -368,6 +368,41 @@ fn to_int(g: &mut Globals, x: f64, what: &str) -> i32 {
     x.trunc() as i32
 }
 
+/// `DListStats(dlist, nlist, stats)`: `[nlist, mean, stddev, min, max]` of the list: the sum and
+/// the sum of the `double` squares in x87 `long double` (`larmorx_core::x87::F80`), `mean = sum /
+/// nlist` (as a `double`), `stddev = sqrtl(sum2 / nlist - mean * mean)` (the square of the
+/// `double` mean in `double`, the rest in `long double`), as a `double`; min and max from the
+/// first element. `None` after `ERROR: DListStats() nlist = <n>` (or `... dlist is NULL`) on
+/// standard output.
+pub fn dlist_stats(out: &mut dyn Write, dlist: Option<&[f64]>, nlist: i32) -> Option<[f64; 5]> {
+    use larmorx_core::x87::F80;
+    if nlist <= 0 {
+        let _ = writeln!(out, "ERROR: DListStats() nlist = {nlist}");
+        return None;
+    }
+    let Some(dlist) = dlist else {
+        let _ = writeln!(out, "ERROR: DListStats() dlist is NULL");
+        return None;
+    };
+    let list = &dlist[..nlist as usize];
+    let (mut sum, mut sum2) = (F80::ZERO, F80::ZERO);
+    let (mut min, mut max) = (list[0], list[0]);
+    for &x in list {
+        sum += F80::from_f64(x);
+        sum2 += F80::from_f64(x * x);
+        if min > x {
+            min = x;
+        }
+        if max < x {
+            max = x;
+        }
+    }
+    let n = F80::from(nlist);
+    let mean = (sum / n).to_f64();
+    let stddev = (sum2 / n - F80::from_f64(mean * mean)).sqrt().to_f64();
+    Some([f64::from(nlist), mean, stddev, min, max])
+}
+
 /// `nint(f)`: `f + 0.5` (or `f - 0.5` below 0) truncated (FS-12).
 pub fn nint(g: &mut Globals, f: f64) -> i32 {
     to_int(g, if f < 0.0 { f - 0.5 } else { f + 0.5 }, "nint")
@@ -381,9 +416,15 @@ pub fn nint2(g: &mut Globals, f: f64) -> i32 {
 /// `sum2stddev(xsum, xsum2, nx)`: `sqrt((xsum2 - 2*mean*xsum + nx*mean*mean) / (nx - 1))`, mean
 /// `xsum / nx`, in that order.
 pub fn sum2stddev(xsum: f64, xsum2: f64, nx: i32) -> f64 {
-    let xmean = xsum / f64::from(nx);
-    ((xsum2 - 2.0 * xmean * xsum + f64::from(nx) * xmean * xmean) / f64::from(nx.wrapping_sub(1)))
-        .sqrt()
+    use crate::sse::{add64, div64, mul64, sqrt64, sub64};
+    let n = f64::from(nx);
+    let xmean = div64(xsum, n);
+    let t = add64(
+        sub64(xsum2, mul64(mul64(2.0, xmean), xsum)),
+        mul64(mul64(n, xmean), xmean),
+    );
+    // SSE2's NaN rules (crate::sse): nx of 0 or 1 makes 0 / 0
+    sqrt64(div64(t, f64::from(nx.wrapping_sub(1))))
 }
 
 /// `compare_ints`: -1, 1 or 0.

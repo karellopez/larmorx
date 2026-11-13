@@ -68,4 +68,4 @@ Single-letter options of its `switch (toupper(*option))`: `A`, `C`, `F`, `H`, `N
 
 ## Checks
 
-- through vertexvol, label-cortex's recorded steps (40); fMRIPrep's calls on the recorded subjects (sMRIPrep's MRIsConvert (GIFTI))
+- through vertexvol, label-cortex's recorded steps (48); fMRIPrep's calls on the recorded subjects (sMRIPrep's MRIsConvert (GIFTI))

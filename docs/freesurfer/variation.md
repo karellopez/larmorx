@@ -154,8 +154,21 @@ archive (§4). What is still open is in §5. Lines are FreeSurfer 8.2.0's
   back to `-abs(time(NULL))` (148) after a warning, unless `FREESURFER_SEED` is set (119). recon-all
   passes `-seed 1234` to most programs (programs.md §3). Relay 3's list of reached functions calling
   a random source has 97 rows (`drand48`, `srand48`, `rand`, `setRandomSeed`, `randomNumber`, ...;
-  third-party.md, TP-15 for glibc's generators); which of them run with a clock seed on a default
-  path is the next relay's check.
+  third-party.md, TP-15 for glibc's generators).
+- **Clock seeds on the default paths, measured** (relay 9, `clock_seeds.py`: `randomNumber`'s
+  fallback prints `<comm> supposed to be reproducible but seed not set` once per process, and
+  recon-all's log keeps every program's standard error): in the 12 reference runs exactly two
+  programs draw from a clock seed. **`mri_label2vol --defects`** (inside `defect2seg`, both
+  streams, once per hemisphere: 24 processes): `MRISdefects2Seg` (`utils/mrisurf_defect.cpp`
+  15443) gives the volume a colour table from `CTABunique` (10 tries) over `CTABrandom`
+  (`utils/colortab.cpp` 495, 552), so `surface.defects.mgz`'s embedded colours change from run to
+  run while its voxels do not (the replay tool measured the same, black box: relay 7's finding).
+  **`mri_edit_wm_with_aseg`**, v8 stream only, three processes per run (its two `-sa-fix-acj`
+  calls and the `-keep-in -fix-ento-wm` call), through `CTABalloc`/`CTABrandom` (`colortab.cpp`
+  420, 552): its replayed steps (v8 0019 and classic 0022 of ds000005) reproduced the recorded
+  files with another clock, so on that head the draw does not reach what it writes. The six
+  classic 1-thread runs show the same `mri_label2vol` calls. `FREESURFER_SEED` makes both
+  deterministic; recon-all does not set it.
 - **Time-of-day seeds in fMRIPrep's programs.** `mri_segreg` (387-388, bbregister's optimiser),
   `mri_vol2vol` (663-664) and `mri_surf2surf` (844-848, only when synthesizing data) seed
   `drand48` with `PDFtodSeed()` unless a seed is given: `tv_sec + tv_usec` of the time of day
@@ -203,5 +216,8 @@ path. No data file and no compiled default-path program is patched.
 2. `MRIgaussianSmoothNI` at 1 and 4 threads on a large image with a wide kernel (FreeSurfer's own
    case), and `mri_robust_template` as an unbiased template (without `--fixtp --noit`, sMRIPrep's
    `--longitudinal`) on four or more inputs at several thread counts, to size the two effects of §2.
-3. The random sources on default paths (§3): which use a fixed seed, which the clock; whether a
-   default call of `mri_segreg` draws from its time-of-day seed.
+3. The random sources on default paths (§3): `randomNumber`'s clock seed is measured (two
+   programs); left: the time-of-day seeds of `drand48` (`PDFtodSeed`), which print nothing: whether a
+   default call of `mri_segreg` (bbregister), `mri_vol2vol` or `mri_surf2surf` draws from it (a
+   replay twice with the cache off, or the unit oracle with a breakpoint on `drand48`), and whether
+   `mri_edit_wm_with_aseg`'s draw can reach its output on another head.

@@ -957,6 +957,28 @@ defects! {
         "a sampled metric's derivative at a sample point outside the virtual region whose linear offset falls outside the derivative array is written past its end: memory it does not own";
     ITK_98 = "ITK-98", "ITK", true,
         "B-spline interpolation mirrors a support index only once at each end of an axis: on an axis too short for the spline's support (2 voxels for orders 3 and 4, 2 or 3 for order 5) it reads the coefficient image outside its buffer, memory it never wrote";
+    ITK_103 = "ITK-103", "VXL", false,
+        "VXL's L-BFGS (netlib's lbfgs translated by f2c) steps its line search's first stage from the unmodified function values where Nocedal's Fortran passes the modified ones (FXM, FYM), and then rebuilds them from stale values";
+    ITK_104 = "ITK-104", "VXL", true,
+        "VXL's L-BFGS resets ys to 0 on every call (a local of the C function, saved in the Fortran), so a caller that supplies the diagonal (DIAGCO) gets an infinite 1/ys";
+    ITK_105 = "ITK-105", "VXL", true,
+        "VXL's L-BFGS prints its vectors (IPRINT(2) of 1 and above) scaled from the signed value that last exceeded the running maximum in magnitude rather than from the largest magnitude, and divides a vector of zeros by 0";
+    ITK_106 = "ITK-106", "VXL", true,
+        "VXL's L-BFGS prints its vectors X and G (IPRINT(2) of 1 and above) from the double before each array, memory it does not own, and drops their last element (lb1 passes write50 the pointers it decremented for Fortran's indexing)";
+    ITK_107 = "ITK-107", "VXL", true,
+        "vnl_inverse of a 2 x 2, 3 x 3 or 4 x 4 matrix whose determinant is 0 returns an uninitialised vnl_matrix_fixed (its assertion is compiled out): memory contents";
+    ITK_108 = "ITK-108", "VXL", true,
+        "vnl_cholesky never initialises rcond_ and LINPACK's dpoco leaves it unset for a matrix that is not positive definite: rcond(), and the estimate_condition mode's message, give memory contents";
+    ITK_109 = "ITK-109", "VXL", true,
+        "vnl_cholesky::determinant (LINPACK's dpodi) keeps its mantissa in [1, 10) with loops that never end when it is not finite: a factor with an infinite or NaN diagonal entry, or one whose square overflows the mantissa";
+    ITK_110 = "ITK-110", "VXL", true,
+        "vnl_real_eigensystem never writes Vreal's columns of a complex eigenvalue pair (the matrix is allocated uninitialised): those columns are memory contents";
+    ITK_111 = "ITK-111", "VXL", true,
+        "when EISPACK's hqr2 fails (30 n iterations), vnl_real_eigensystem reads the eigenvalues it had not found from uninitialised vectors: D and the columns built from them depend on memory contents";
+    ITK_112 = "ITK-112", "VXL", true,
+        "EISPACK's balanc (vnl_real_eigensystem) never returns on a matrix with an infinite or NaN entry, or entries so large that a row's or column's scaled sum overflows, in the part it balances";
+    ITK_113 = "ITK-113", "VXL", true,
+        "vnl_qr::solve (and inverse) of a matrix with one row whose entry is 0 never writes the solution (LINPACK's info is 1 and VNL's vector is uninitialised): memory contents";
     ANTS_110 = "ANTS-110", "antsAI", true,
         "the blob alignment keeps the blob pairs whose displacements have about the same length as the others' (the squared distance between a pair's fixed and moving blob over another pair's), not those whose distances to the other blobs are preserved between the images, as its comment and ImageMath's MatchBlobs say";
     ANTS_111 = "ANTS-111", "antsAI", true,
@@ -995,6 +1017,48 @@ defects! {
         "the case-insensitive string comparison (stricmp) and the file-name extension helper copy their argument into a 1,024-byte buffer on the stack with no check: a longer string overflows it";
     FS_12 = "FS-12", "FreeSurfer", true,
         "nint and nint2 (FreeSurfer's rounding to an integer) convert values beyond the int range, and NaN, with no check, an undefined conversion that gives -2147483648 on x86-64";
+    FS_13 = "FS-13", "FreeSurfer", true,
+        "MatrixAlloc of a negative size, or of more numbers than an int holds, crashes or corrupts memory after printing that it uses an mmap'd file (the new allocator reads a file pointer it never set or clears memory with a wrapped size), or exits";
+    FS_14 = "FS-14", "FreeSurfer", true,
+        "MatrixCopy copies a complex matrix float by float through its real-element pointers: of each row it copies as many floats as the matrix has columns, starting at the float before the row's first pair, so half the values are lost and the rest are shifted";
+    FS_15 = "FS-15", "FreeSurfer", true,
+        "MatrixMultiply and MatrixMultiplyD of complex matrices add the product onto the output's earlier contents (they never clear the output): a given output, or one that is also an input, gives a wrong product";
+    FS_16 = "FS-16", "FreeSurfer", true,
+        "FreeSurfer's float matrices are addressed outside their arrays where types and sizes do not match (a complex product written into a real output writes past its end): memory the program does not own";
+    FS_17 = "FS-17", "FreeSurfer", true,
+        "FreeSurfer's matrices and histograms convert floats and doubles beyond the int range, and NaN, to int with no check (bins, counts compared as integers, floor of a vector), an undefined conversion that gives -2147483648 on x86-64";
+    FS_18 = "FS-18", "FreeSurfer", true,
+        "HISTOclearCounts clears only the first count of the histogram (and, making a new histogram, copies only the first bin's value): the counts it is meant to reset keep accumulating";
+    FS_19 = "FS-19", "FreeSurfer", true,
+        "HISTOaddSample decides where a sample outside the range goes by comparing its bin number with the range's lower intensity: below a negative lower intensity it is dropped, above the range with a lower intensity beyond the bin count it is counted in the first bin; a NaN sample is counted in the first bin";
+    FS_20 = "FS-20", "FreeSurfer", true,
+        "HISTOaddSample gives a sample exactly at a bin's value the weight 0 in both neighbouring bins, so it is not counted at all (with a bin size of 1 and integer intensities, no sample is counted)";
+    FS_21 = "FS-21", "FreeSurfer", true,
+        "HISTOcopy, HISTOadd, HISTOsubtract and HISTOcumsum write past the arrays of an output histogram that has fewer bins allocated than the result: memory the program does not own";
+    FS_22 = "FS-22", "FreeSurfer", true,
+        "FreeSurfer's histogram searches and helpers read and write bins outside the histogram's arrays when given a start bin outside it (a search's -1 passed on), when a peak window reaches past an end, and for histograms of 0 or 1 bins: memory the program does not own";
+    FS_23 = "FS-23", "FreeSurfer", true,
+        "HISTOmakePDF given an output histogram other than its source normalises the output's own counts instead of the source's";
+    FS_24 = "FS-24", "FreeSurfer", true,
+        "HISTOrobustGaussianFit of a histogram of one bin never returns: the loop that widens its window cannot widen it";
+    FS_25 = "FS-25", "FreeSurfer", true,
+        "FreeSurfer's real-only matrix operations (identity, transpose, sums, differences, scalar products, squares, diagonals, constants, reshapes, traces, element sums, symmetry and zero tests, column norms, vector lengths and products) address a complex matrix's floats as if it were real, and MatrixClear clears only part of a complex matrix: wrong values, no message";
+    FS_26 = "FS-26", "FreeSurfer", true,
+        "MatrixCopyRealRegion into a complex destination copies the source's imaginary parts instead of its real parts";
+    FS_27 = "FS-27", "FreeSurfer", true,
+        "MatrixCopyRealRegion and MatrixCopyImagRegion read a real source as if it were complex (DCTcopy passes real vectors: each value comes from the next element, the last from beyond the array), and MatrixCopyRegion between a real and a complex matrix addresses one through the other's layout";
+    FS_28 = "FS-28", "FreeSurfer", true,
+        "matrix functions that fill a caller's output do not check that it fits (the region copies' destination region, MatrixTranspose's and MatrixRealToComplex's output, MatrixIdentity's given matrix, MatrixDiag's and MatrixNormalizeColScale's): elements are written into other rows or outside the array";
+    FS_29 = "FS-29", "FreeSurfer", true,
+        "PDFtodSeed seeds from the clock (seconds plus microseconds): the programs and random fields that take it when no seed is given never repeat a run";
+    FS_30 = "FS-30", "FreeSurfer", true,
+        "PDFgaussian divides zero by zero when both of its uniform draws give exactly 0 (drand48 returned 0.5 twice): it returns NaN";
+    FS_32 = "FS-32", "FreeSurfer", true,
+        "GetClosestPrimeFactor and GetClosestPrimeFactorLess of 1, which has no prime factor, read the first element of the empty factor list (0 from glibc's calloc): mri_surf2surf and mri_vol2surf reshape a one-vertex surface by a factor of 0";
+    FS_33 = "FS-33", "FreeSurfer", true,
+        "MatrixInverse and MatrixDeterminant of a 0 x 0 matrix read memory VNL never allocated (the inverse goes through the 4 x 4 closed form and copies 16 floats past its output; the determinant reads the empty QR factor's first element), and MatrixInverse of a singular complex matrix crashes (it copies from the NULL inverse of its real form)";
+    FS_31 = "FS-31", "FreeSurfer", true,
+        "FreeSurfer's vector functions do not check their vectors' lengths (VectorCrossProduct's and VectorTripleProduct's test lets column vectors of one or two elements through and never tests the other vectors; VectorDot and VectorDistance read the second vector to the first's length): elements read outside the vectors";
 }
 
 /// The register entry with ID `id`.

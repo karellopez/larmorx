@@ -65,4 +65,4 @@ Every option its parser compares, as written in its own source (older parsers co
 
 ## Checks
 
-- replay: 60 recorded steps in 10 runs
+- replay: 72 recorded steps in 12 runs

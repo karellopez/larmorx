@@ -37,6 +37,9 @@ from pathlib import Path
 DEFAULT = Path("oracles") / "freesurfer-8.2.0-unit" / "bin" / "fsunit"
 ENV_PATH = "LARMORX_FS_UNIT"
 
+#: Why a call whose numbers come from the clock is never cached (the policy's rule).
+CLOCK_SEED = "clock seed"
+
 #: The methods of ``vnl_random`` the harness draws with.
 VNL_METHODS = ("lrand32", "drand32", "drand64", "normal", "normal64")
 
@@ -185,8 +188,12 @@ def vnl_random(seed: int, count: int, method: str = "drand64") -> list:
 
 
 def fs_random(seed: int, count: int, low: float = 0.0, high: float = 1.0) -> list[float]:
-    """FreeSurfer's ``setRandomSeed(seed)`` then ``count`` calls of ``randomNumber(low, high)``."""
-    res = call("fs-random", str(seed), str(count), low.hex(), high.hex())
+    """FreeSurfer's ``setRandomSeed(seed)`` then ``count`` calls of ``randomNumber(low, high)``.
+
+    Seed 0 leaves FreeSurfer's generator unseeded, so ``randomNumber`` seeds it from the clock
+    (``FREESURFER_SEED`` is not in the harness's environment; FS-04): such a call is never cached."""
+    never = CLOCK_SEED if seed == 0 else ""
+    res = call("fs-random", str(seed), str(count), low.hex(), high.hex(), never=never)
     return values(res.data["values"])
 
 

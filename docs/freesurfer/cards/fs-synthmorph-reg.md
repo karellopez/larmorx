@@ -25,7 +25,7 @@
 ## Inputs and outputs (measured)
 
 - Subject files read (strace of the recorded steps run again, relay 4): `<subj>/mri/transforms/synthmorph.1.0mm.1.0mm/log/fs-synthmorph-reg.Y2026.M11.D12.H13.M58.log`, `<subj>/mri/transforms/synthmorph.mni305/log/fs-synthmorph-reg.Y2026.M11.D12.H13.M58.log`, `<subj>/mri/transforms/synthmorph.mni305/log/fs-synthmorph-reg.Y2026.M11.D12.H14.M50.log`
-- Files written (the recordings' outputs and the strace jobs): `<subj>/mri/transforms/synthmorph.1.0mm.1.0mm/log/fs-synthmorph-reg.Y2026.M11.D12.H13.M58.log`, `<subj>/mri/transforms/synthmorph.mni305/log/fs-synthmorph-reg.Y2026.M11.D12.H13.M58.log`, `<subj>/mri/transforms/synthmorph.mni305/log/fs-synthmorph-reg.Y2026.M11.D12.H14.M50.log`, `mri/transforms/synthmorph.1.0mm.1.0mm/aff.lta`, `mri/transforms/synthmorph.1.0mm.1.0mm/log/fs-synthmorph-reg.Y2026.M11.D12.H12.M19.log`, `mri/transforms/synthmorph.1.0mm.1.0mm/log/fs-synthmorph-reg.Y2026.M11.D12.H12.M21.log`, `mri/transforms/synthmorph.1.0mm.1.0mm/log/fs-synthmorph-reg.Y2026.M11.D12.H13.M45.log`, `mri/transforms/synthmorph.1.0mm.1.0mm/log/fs-synthmorph-reg.Y2026.M11.D12.H14.M51.log`, `mri/transforms/synthmorph.1.0mm.1.0mm/reg.invol_to_targ.lta`, `mri/transforms/synthmorph.1.0mm.1.0mm/reg.invol_to_targ.xfm`, `mri/transforms/synthmorph.1.0mm.1.0mm/reg.targ_to_invol.lta`, `mri/transforms/synthmorph.1.0mm.1.0mm/test.nii.gz`, `mri/transforms/synthmorph.1.0mm.1.0mm/warp.to.mni152.1.0mm.1.0mm.inv.nii.gz`, `mri/transforms/synthmorph.1.0mm.1.0mm/warp.to.mni152.1.0mm.1.0mm.nii.gz`
+- Files written (the recordings' outputs and the strace jobs): `<subj>/mri/transforms/synthmorph.1.0mm.1.0mm/log/fs-synthmorph-reg.Y2026.M11.D12.H13.M58.log`, `<subj>/mri/transforms/synthmorph.mni305/log/fs-synthmorph-reg.Y2026.M11.D12.H13.M58.log`, `<subj>/mri/transforms/synthmorph.mni305/log/fs-synthmorph-reg.Y2026.M11.D12.H14.M50.log`, `mri/transforms/synthmorph.1.0mm.1.0mm/aff.lta`, `mri/transforms/synthmorph.1.0mm.1.0mm/log/fs-synthmorph-reg.Y2026.M11.D12.H12.M19.log`, `mri/transforms/synthmorph.1.0mm.1.0mm/log/fs-synthmorph-reg.Y2026.M11.D12.H12.M21.log`, `mri/transforms/synthmorph.1.0mm.1.0mm/log/fs-synthmorph-reg.Y2026.M11.D12.H13.M45.log`, `mri/transforms/synthmorph.1.0mm.1.0mm/log/fs-synthmorph-reg.Y2026.M11.D12.H14.M51.log`, `mri/transforms/synthmorph.1.0mm.1.0mm/log/fs-synthmorph-reg.Y2026.M11.D12.H17.M53.log`, `mri/transforms/synthmorph.1.0mm.1.0mm/reg.invol_to_targ.lta`, `mri/transforms/synthmorph.1.0mm.1.0mm/reg.invol_to_targ.xfm`, `mri/transforms/synthmorph.1.0mm.1.0mm/reg.targ_to_invol.lta`, `mri/transforms/synthmorph.1.0mm.1.0mm/test.nii.gz`, `mri/transforms/synthmorph.1.0mm.1.0mm/warp.to.mni152.1.0mm.1.0mm.inv.nii.gz`, `mri/transforms/synthmorph.1.0mm.1.0mm/warp.to.mni152.1.0mm.1.0mm.nii.gz`
 - Data files of the package (2, 0.0 MB; data-files.toml): `build-stamp.txt`, `sources.csh`
 
 ## Options
@@ -49,7 +49,7 @@ Every option its parser compares, as written in its own source (older parsers co
 
 ## Checks
 
-- replay: 5 recorded steps in 5 runs
+- replay: 6 recorded steps in 6 runs
 
 ## Notes
 

@@ -44,10 +44,10 @@ starts no other agent.
 |---|---|---|
 | 1 | **Confounds**: CompCor, DVARS, framewise displacement, fMRIPrep's confound steps and table, `larmorx nipype run` (item 4 (9)) | in progress: the first half merged 2026-11-12; relays 2g, 2h, 3a/3b, 2i, 4, 5 left |
 | 2 | **The documentation revision**, website and repository: [documentation-plan.md](documentation-plan.md) | starting |
-| 3 | **FreeSurfer 8.2.0**, a replica and a clean room of every program of `recon-all`'s two streams and of fMRIPrep's FreeSurfer programs: [freesurfer-plan.md](freesurfer-plan.md) (3.0 preparation, 3.1 foundations, waves 3.2 to 3.6, the networks' track N, 3.7 `recon-all`) | starting: 3.0 |
+| 3 | **FreeSurfer 8.2.0**, a replica and a clean room of every program of `recon-all`'s two streams and of fMRIPrep's FreeSurfer programs: [freesurfer-plan.md](freesurfer-plan.md) (3.0 preparation, 3.1 foundations, waves 3.2 to 3.6, the networks' track N, 3.7 `recon-all`; the queue `docs/freesurfer/queue.md`, replica side) | 3.0 done 2026-11-12 (the inventory, the queue, the replay tool); 3.1 in progress |
 | 4 | **Surfaces**: Workbench-compatible tools (a replica in `larmorx-gpl`, a clean room in `larmorx`), MSM (a clean room only, after a patent check) | planned |
 | 5 | **larmorprepx**, the pipeline, with the MNI-template steps (TemplateFlow; niworkflows' `init_enhance_and_skullstrip_bold_wf`, the data sink's `template_metadata`) | planned |
-| 6 | **The clean rooms of the permissive ports**, one block (ANTs and ITK, sdcflows, fMRIPrep's resampler, nitransforms, the confounds, fMRIPrep's Python steps) | after FreeSurfer |
+| 6 | **The clean rooms of the permissive ports**, one block (ANTs and ITK, sdcflows, fMRIPrep's resampler, nitransforms, the confounds, fMRIPrep's Python steps; FreeSurfer's permissive pieces, queue CP-01 to CP-13: the bundled readers, the small pieces, x87 arithmetic, the random numbers, VNL and netlib, ITK 4.13.2's filters, the networks' inference core) | after FreeSurfer |
 | 7 | **The completeness parts**: FSL's FNIRT, `applywarp`, `convertwarp`, `fugue` (each a replica and a clean room), then the FLIRT pieces that wait for them; ANTs' missing operations; FreeSurfer's optional streams | after FreeSurfer |
 | 8 | **The final validation phase** (item 5), then the stage-by-stage and end-to-end comparisons with fMRIPrep | planned |
 | 9 | **Release 0.1.0**, once the full pipeline exists (the user, 2026-11-11) | planned |
@@ -829,9 +829,12 @@ The items below keep their history.
     difference). Record directories too, or state the limit in `docs/validation/oracle-cache.md` and have suites
     that check directories run the original directly.
   - *Open, FreeSurfer (2026-11-12):* which stream larmorprepx runs by default (FreeSurfer 8.2.0's `recon-all` runs v8
-    unless given `-no-v8`; fMRIPrep 25.x runs the classic stream through 7.3.2): to decide with larmorprepx; and ITK 4.13.2
-    (what FreeSurfer 8.2.0's programs link) where it differs from 5.4.5, recommended, to confirm with the inventory's ITK
-    comparison (no arithmetic difference found on FreeSurfer's paths).
+    unless given `-no-v8`; fMRIPrep 25.x runs the classic stream through 7.3.2): to decide with larmorprepx (with one
+    recorded run of sMRIPrep's own `recon-all` calls on 8.2.0, on the lab's server: what `-noskullstrip` and an injected
+    `brainmask.mgz` do in the v8 stream). ITK 4.13.2 (what FreeSurfer 8.2.0's programs link) where it differs from 5.4.5:
+    confirmed by the inventory's comparison (`docs/freesurfer/third-party.md` §10, replica side: no difference in the
+    arithmetic of what FreeSurfer's default paths compute with); the replicas reuse LARMORX's 5.4.5 ports where they give
+    FreeSurfer's bits at its settings and follow 4.13.2 (`tags/ITK-v4.13.2`) where not.
   - *A flaky test under load:* `validation/tests/test_difftest.py::test_a_case_over_the_memory_limit_is_recorded_and_the_night_goes_on`
     fails inside a small memory box with several pytest workers (seen by several relays, 2026-11-11 and 12) and passes alone:
     make it independent of the box it runs in (its own memory limit measured against the box's, or run serially).
@@ -845,6 +848,37 @@ The items below keep their history.
     (2026-11-11, `52de0470`; fixed in `9abcd41a`). Run `cargo test` and the Python gates in `verify-merge.sh` with
     `FSLDIR` unset as CI does (the orchestrator did by hand from 2026-11-12), with `LARMORX_GPL_BIN` at the merged
     tree's `crates-gpl` build (`t2smap`'s follow-up below).
+- **From FreeSurfer's preparation (step 3.0, 2026-11-12; nine replica-side relays; the inventory
+  `docs/freesurfer/`, the queue `docs/freesurfer/queue.md` and the cards, closed to FreeSurfer clean-room
+  implementers; the replay tool's proof [freesurfer-replay.md](validation/freesurfer-replay.md)).** Left:
+  - *FreeSurfer's own variation, threads:* the network programs (`mri_synthstrip`, `mri_synthseg`,
+    `mri_synthmorph`, `mri_sclimbic_seg`) at 1 and 4 threads, and run twice; compare the classic stream's 1-thread
+    runs (the main machine, running) and the v8 stream's (the lab's server) with the 4-thread reference runs, step by
+    step, with the replay tool's comparison.
+  - *Two thread effects to size* (`docs/freesurfer/variation.md`, replica side): FreeSurfer's Gaussian smoothing
+    with a wide kernel on a large image at 1 and 4 threads; `mri_robust_template` as an unbiased template (without
+    `--fixtp`, sMRIPrep's longitudinal case) on four to six inputs at several thread counts and twice each.
+  - *Random sources:* two programs print FreeSurfer's own warning `... supposed to be reproducible but seed not set`
+    in every reference run (`mri_label2vol --defects` inside `defect2seg`, both streams; `mri_edit_wm_with_aseg`, v8);
+    the replays show `defect2seg`'s colour table changing from run to run and `mri_edit_wm_with_aseg`'s files not.
+    Left: whether fMRIPrep's `bbregister` (`mri_segreg`), `mri_vol2vol` and `mri_surf2surf` calls give the same files
+    twice (replays with the cache off), and `mri_edit_wm_with_aseg` on the other heads.
+  - *The classic stream's later steps* and the steps that need more than 12 GiB (`mri_synthseg`, about 23 GiB;
+    `fs-synthmorph-reg`'s deformable step, about 18 GiB) replayed in larger boxes; the replays' messages compared
+    with the recorded `recon-all.log`, step by step (the replay tool keeps no step's messages from the recording).
+  - *The proof page's tables:* `docs/validation/freesurfer-replay.md`'s "The result" is still empty: splice
+    `validation/investigations/freesurfer-oracle/proof_table.py`'s output from the second proof pass's reports
+    (68 steps; kept in the part's notes folder).
+  - *The reference runs' environment:* the recordings' `scripts/recon-all.env` carries FreeSurfer 6.0.0's
+    `MNI_DIR`, `MINC_*`, `PERL5LIB`, `FSFAST_HOME` and its `mni/bin` on `PATH` from the user's login profile (no
+    default step used them: N4 is the default); the server's runs should start from a clean environment. The file
+    also holds the session's whole environment: the recordings stay private.
+  - *Recordings added later* (the server's): re-run `validation/investigations/freesurfer-inventory/recording_source.py`
+    and add any new configuration blob to the clean-room audit (`FREESURFER_CONFIG_BLOBS`).
+  - *A coverage build* (W6): the unit oracle with `--coverage`, each recorded step replayed, to give the default paths'
+    exact functions (the queue's sizes are static upper bounds); a lab-server extra, not blocking.
+  - *A flaky test:* `validation/tests/test_oracle_cache.py::test_above_one_thread_a_run_is_served_after_three_identical_runs`
+    fails about one run in two under `pytest -n 3` and passes serially (seen at the preparation's base commit too).
 - **From `t2smap`'s clean-room part (2026-11-11 and 12; 15 agents: nine clean relays, two replica-side spec
   writers, four replica-side relays; [findings](findings/tedana-t2smap-original.md), record
   [tedana-t2smap-original](validation/tedana-t2smap-original.md), [benchmarks](benchmarks/tedana-t2smap.md),

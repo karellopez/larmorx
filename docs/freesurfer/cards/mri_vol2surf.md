@@ -66,7 +66,7 @@ Every option its parser compares, as written in its own source (older parsers co
 
 ## Checks
 
-- through pctsurfcon, label-cortex's recorded steps (40); fMRIPrep's calls on the recorded subjects (fMRIPrep's SampleToSurface (--trgsubject fsaverage))
+- through pctsurfcon, label-cortex's recorded steps (48); fMRIPrep's calls on the recorded subjects (fMRIPrep's SampleToSurface (--trgsubject fsaverage))
 
 ## Notes
 

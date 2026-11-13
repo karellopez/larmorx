@@ -67,6 +67,10 @@ Every option its parser compares, as written in its own source (older parsers co
 - initialXforms' centroid summed in an OpenMP critical block: run-to-run nondeterministic with four or more inputs and more than one thread, only for an unbiased template (with --fixtp, recon-all's and sMRIPrep's default, never used; measured)
 - glibc rand() for a random first time point (only without --inittp)
 
+## Findings for the defect register (rules A to D when ported)
+
+- initialXforms' centroid summed in an OpenMP critical block: run-to-run nondeterministic for an unbiased template with four or more inputs and more than one thread (larmorx: the sum in input order; relay 5)
+
 ## Checks
 
 - fMRIPrep's calls on the recorded subjects (sMRIPrep's StructuralReference with several T1w; recon-all's MotionCor)

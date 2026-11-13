@@ -65,7 +65,7 @@ Single-letter options of its `switch (toupper(*option))`: `A`, `D`, `F`, `H`, `M
 
 ## Checks
 
-- through seg2cc's recorded steps (11)
+- through seg2cc's recorded steps (12)
 
 ## Notes
 

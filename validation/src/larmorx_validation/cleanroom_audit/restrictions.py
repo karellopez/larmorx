@@ -254,6 +254,17 @@ PERMISSIVE_DIRS = (
 PERMISSIVE_TAGS = ("ANTs-", "ITK-", "ITKAdaptiveDenoising", "core-math", "numpy-", "scipy-")
 PERMISSIVE_TAGS += ("OpenBLAS-", "nitransforms-")
 
+#: The recordings' blobs (record/blobs/<2 hex>/<sha256>) that hold FreeSurfer's own text: recon-all's configuration
+#: (scripts/recon-config.yaml; recon-all.local-copy is never recorded), classic and v8. Listed by
+#: validation/investigations/freesurfer-inventory/recording_source.py (19 recordings, 2026-11-12: no other blob is a
+#: file of the package's source folders); re-run it when new recordings arrive (the lab server's).
+FREESURFER_CONFIG_BLOBS = frozenset(
+    {
+        "6930b94343b8c1767ce6fdfa301cdb4fe381ee885ce4b20a99097e2184ca0ba6",
+        "7d560ebd1430a9050bec9c3f71ed4e350f472304f418bb07aa7435fccc1a9ef7",
+    }
+)
+
 #: Hosts and paths of source code on the web (WebFetch, curl, wget).
 URL_RULES = (
     (re.compile(r"^https?://git\.fmrib\.ox\.ac\.uk/"), "R01"),
@@ -310,6 +321,10 @@ TASK_OUTPUT = re.compile(r"^/tmp/claude-\d+/[^/]+/[^/]+/tasks/")
 ANCHORS = (
     (re.compile(r"/crates-nc/fsl-source(/|$)"), "R01", "FSL"),
     (re.compile(r"/fsl-source(-[0-9.]+)?(/|$)"), "R01", "FSL"),
+    # tkregister2_cmdl's replica (2026-11-12: CorTechs' terms, its own program in larmorx-nc, queue 3.5-26/27): FreeSurfer's
+    # code, so FreeSurfer's family (before crates-nc's FSL anchors)
+    (re.compile(r"/crates-nc/larmorx-nc-tkregister2(/|$)"), "R10", "FreeSurfer"),
+    (re.compile(r"/larmorx[-_]nc[-_]tkregister2(/|$)"), "R10", "FreeSurfer"),
     (re.compile(r"/crates-nc(/|$)"), "R10", "FSL"),
     (re.compile(r"/larmorx[-_]nc([-_][a-z0-9]+)*(/|$)"), "R10", "FSL"),
     (re.compile(r"/crates/larmorx-afni-replica(/|$)"), "R10", "AFNI"),
@@ -318,6 +333,10 @@ ANCHORS = (
     # tedana's t2smap replica (2026-11-08): its crate, and the program's crate (AFNI's until 2026-10-29)
     (re.compile(r"/crates-gpl/larmorx-gpl-tedana(/|$)"), "R10", "tedana"),
     (re.compile(r"/larmorx[-_]gpl[-_]tedana(/|$)"), "R10", "tedana"),
+    # GSL's generators as FreeSurfer's numerics.cpp transcribes them (2026-11-12: alone in larmorx-gpl, queue 3.1-53): closed
+    # to the RANLUX clean room's implementer (3.1-05) as to every FreeSurfer clean room (before crates-gpl's anchors)
+    (re.compile(r"/crates-gpl/larmorx-gpl-gsl(/|$)"), "R10", "FreeSurfer"),
+    (re.compile(r"/larmorx[-_]gpl[-_]gsl(/|$)"), "R10", "FreeSurfer"),
     (re.compile(r"/crates-gpl(/|$)"), "R10", "AFNI/tedana"),
     (re.compile(r"/larmorx[-_]gpl([-_][a-z0-9]+)*(/|$)"), "R10", "AFNI/tedana"),
     # tedana's source wherever a copy lives: the tags, every installed package (D9, 2026-11-08)
@@ -326,6 +345,9 @@ ANCHORS = (
     # FreeSurfer's replicas (2026-11-12: a workspace of several crates, the wheel larmorx-freesurfer)
     (re.compile(r"/crates-freesurfer(/|$)"), "R10", "FreeSurfer"),
     (re.compile(r"/larmorx[-_]freesurfer([-_][a-z0-9]+)*(/|$)"), "R10", "FreeSurfer"),
+    # recon-all copies itself and its configuration into a subject's scripts/: every copy (a recording's subject, the
+    # replay tool's rebuilt directories, a stopped run) is FreeSurfer's text (2026-11-12, FreeSurfer's preparation)
+    (re.compile(r"/scripts/(recon-config\.yaml|recon-all\.local-copy)$"), "R03", "FreeSurfer"),
     (re.compile(r"/docs/parts(/|$)"), "R13", "all"),
     (re.compile(r"/validation/probes(/|$)"), "R14", None),
 )
@@ -476,8 +498,12 @@ def classify(loc: Location, op: str) -> Class:
     if loc.area in ("larmorx", "site", "testdata", "scratch", "workspace", "home", "system"):
         s = ("/" + rel) if loc.area != "system" else rel
         if BUILD_OUTPUT.search(s):
-            return Class("replica-build-output", "R10", "FSL" if "nc" in s else "AFNI/tedana")
+            # crates-nc's and crates-gpl's builds hold FreeSurfer's replicas too (tkregister2_cmdl, GSL's generators)
+            fam = "FSL/FreeSurfer" if "nc" in s else "AFNI/tedana/FreeSurfer"
+            return Class("replica-build-output", "R10", fam)
         if REPLICA_METADATA.search(s) and op not in ("build", "exec"):
+            if re.search(r"/larmorx-(gpl-gsl|nc-tkregister2)/", s):
+                return Class("replica-metadata", "R10", "FreeSurfer")
             return Class("replica-metadata", "R10", "FSL" if "crates-nc" in s else "AFNI/tedana")
         hit = _anchor(s)
         if hit and not (loc.area == "workspace" and rel.startswith("archive/")):
@@ -538,6 +564,15 @@ def _classify_repo(rel: str, op: str) -> Class:
                 "docs/freesurfer/",
                 "validation/investigations/freesurfer-inventory/",
                 "validation/investigations/freesurfer-unit-oracle/",
+                # the recorder of the reference runs (written after reading the inventory; its README documents
+                # recon-all's steps): run, never read (FreeSurfer's preparation, 2026-11-12)
+                "validation/investigations/freesurfer-oracle/",
+                # the spec writer's own models and inventories of FreeSurfer's borrowed pieces (track D, 2026-11-12):
+                # closed to the clean-room implementers of specs/ranlux.md and specs/burkardt-spline.md; the probe
+                # folder freesurfer-ranlux-probe/ holds calls only and stays open
+                "validation/investigations/freesurfer-ranlux-spec-check/",
+                "validation/investigations/freesurfer-spline-spec-check/",
+                "validation/investigations/freesurfer-libm-inventory/",
                 # the replay tool and the unit oracle's harness, written from FreeSurfer's source: a FreeSurfer
                 # clean-room implementer runs them (black box) but never reads them (2026-11-12)
                 "validation/src/larmorx_validation/freesurfer/",
@@ -547,6 +582,9 @@ def _classify_repo(rel: str, op: str) -> Class:
         or re.match(r"^docs/findings/freesurfer-[^/]+\.md$", rel)
     ) and not rel.endswith("-clean-room.md"):
         return restricted("R11", "FreeSurfer", op, rel)
+    # the spec writer's model of specs/glibc-random.md (track D, 2026-11-12; it read glibc's random.c): closed
+    if rel.startswith("validation/investigations/glibc-random-spec-check/"):
+        return restricted("R11", "GNU", op, rel)
     m = re.match(r"^docs/findings/((?:fsl|afni)-[^/]+\.md)$", rel)
     # a clean room's own findings: "-original.md", renamed "-clean-room.md" by the documentation revision (2026-11-12)
     if m and not m[1].endswith(("-original.md", "-clean-room.md")):
@@ -621,9 +659,16 @@ def _classify_workspace(rel: str, op: str) -> Class:
         return restricted("R03", "FreeSurfer", op, rel)
     # a recorded run: recon-all copies itself and its configuration into the subject's scripts/
     if re.match(
-        r"^oracles/freesurfer-[^/]+/runs/.*/scripts/(recon-all\.local-copy|recon-config\.yaml)$",
+        r"^oracles/freesurfer-[^/]+/(?:runs|failed)/.*/scripts/(recon-all\.local-copy|recon-config\.yaml)$",
         rel,
     ):
+        return restricted("R03", "FreeSurfer", op, rel)
+    # ... and the recording keeps that configuration among its blobs, named by SHA-256 only
+    m = re.match(
+        r"^oracles/freesurfer-[^/]+/(?:runs|failed)/[^/]+/record/blobs/[0-9a-f]{2}/(?P<sha>[0-9a-f]{64})$",
+        rel,
+    )
+    if m and m["sha"] in FREESURFER_CONFIG_BLOBS:
         return restricted("R03", "FreeSurfer", op, rel)
     if rel.startswith("reference_src/workbench"):
         return restricted("R04", "Workbench", op, rel)

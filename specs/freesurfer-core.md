@@ -227,6 +227,15 @@ with a notice.
   rounded to float). Callers that read the list afterwards see these algorithms' orders. **FS-09:**
   FreeSurfer's median of an empty list reads the value before it. Both modes: NaN, with a notice.
 
+**List statistics** (a list of n doubles; FreeSurfer's `DListStats`): n ≤ 0: `ERROR: DListStats()
+nlist = <n>` + `\n` on standard output, nothing returned; no list: `ERROR: DListStats() dlist is
+NULL` + `\n`. Else `[n, mean, sd, min, max]`: the sum S and the sum Q of the double squares in x87
+extended precision (each double widened exactly, then added), `mean = (double)(S / n)`, `sd =
+(double) sqrt_ext(Q / n - (extended)(mean mean))` (the mean's square in double, the square root
+in extended precision), min and max from the first element with strict comparisons. Checked
+against the official code: 1,000 lists in the fs.maths probe (`specs/freesurfer-maths.md` §6), all
+identical.
+
 ## 12. The fast arctangent
 
 A table T of 100,001 floats: `T[i]` = `atan2(i, 100000)` in double (correctly rounded; glibc's

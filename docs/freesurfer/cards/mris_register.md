@@ -67,7 +67,7 @@ Single-letter options of its `switch (toupper(*option))`: `A`, `C`, `E`, `H`, `L
 
 ## Checks
 
-- through rca-surfreg's recorded steps (10)
+- through rca-surfreg's recorded steps (12)
 
 ## Notes
 

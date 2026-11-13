@@ -45,7 +45,7 @@ No option comparisons found in its own files (read its parser).
 
 ## Checks
 
-- through fs-synthmorph-reg, seg2cc, rca-talairach's recorded steps (21)
+- through fs-synthmorph-reg, seg2cc, rca-talairach's recorded steps (24)
 
 ## Notes
 

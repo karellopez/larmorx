@@ -1,44 +1,49 @@
 # Atropos
 
-`lx.ants.atropos` (command line `larmorx ants Atropos`; Rust `larmorx_ants::atropos::Atropos`,
-the command line `larmorx_ants::cli::atropos`). A replica of ANTs 2.6.5's `Atropos` on ITK
-5.4.5: finite-mixture segmentation with a Markov random field prior (Avants et al., *An open
-source multivariate framework for n-tissue segmentation with evaluation on public data*,
-Neuroinformatics 9:381-400, 2011). sMRIPrep runs it once per subject, in its brain extraction
-(`atropos_wf`): K-means with three classes, Gaussian likelihoods, MRF 0.1, three iterations,
-the fixed seed.
+`lx.ants.atropos` (command line `larmorx ants Atropos`): finite-mixture segmentation with a
+Markov random field prior, as ANTs 2.6.5's `Atropos` computes it.
 
-**Status: `validated`** against Atropos itself (see the
-[validation record](../validation/ants-atropos.md)), on every option and failure case on
-phantoms, and on sMRIPrep's call and antsCorticalThickness-style prior-based segmentations of
-the five fMRIPrep oracle runs' T1w images (standard tier: 93 cases, 56 compared):
-- against the **unmodified ANTs 2.6.5 binary** (one thread): 25 of 56 compared cases
-  bit-identical, the classified image identical in all 56. The others' posteriors differ in
-  their last bits where glibc's functions are not correctly rounded for a value the run
-  meets: on sMRIPrep's call, in 11 to 4,175 of 5.9 to 17.5 million values of a posterior
-  image (none on ds001600), by at most 1.2e-7;
-- against the **same binary with glibc's `expf`, `logf`, `exp`, `log`, `pow` (and the others)
-  replaced by CORE-MATH's correctly rounded ones** (`LD_PRELOAD`,
-  `scripts/build_crmath_preload.sh`), the arithmetic larmorx uses: **56 of 56 bit-identical**, sMRIPrep's call on the five oracle
-  runs and two prior-based segmentations included;
-- **ANTs' Atropos does not depend on its thread count**, and neither does larmorx's; with the
-  clock's seed (`-r 1`, Atropos' default) two ANTs runs of sMRIPrep's options on ds000005 disagree on 343 labels
-  (smallest Dice 0.99942) and on posteriors by up to 0.28; larmorx, with its fixed seed,
-  is as far from them (294 and 327 labels).
+The port comes first, then the program's section, the source of its reference page on the
+documentation site (`python -m larmorx_validation reference`), with its options table checked
+against the code; then ANTs' and ITK's defects as the port corrects them, the differences by
+design and the Rust API.
 
-**On the data panel** ([record](../validation/ants-atropos-panel.md), 2026-10-26): sMRIPrep's
-call in all fourteen finished oracle runs (the 3.5-year-old, the glioma, the stroke, strong
-motion, 1.5 T, 7 T and the 82-year-old among them), its inputs from each run's working directory,
-and three calls fMRIPrep never makes (the stroke outside its manual lesion mask, a child's T1w and
-T2w as two channels, a FLAIR of 3 mm slices): **17 of 17 compared cases bit-identical with
-CORE-MATH, the classified image identical in all 17** (3 bit-identical to the unmodified ANTs).
-Against fMRIPrep's own files (ANTs 2.6.2, glibc's maths): the same segmentation in every run,
-the posteriors different in 0 to 4,175 voxels (their last bits, as above). The panel found a
-missing check, now ported: an input on another grid (the FLAIR's mask written from its affine,
-2.9e-6 mm off) makes ITK throw, as ANTs does ([findings](../findings/ants-atropos.md), "Inputs
-on another grid").
+## Ports
 
-## Quick start
+`Atropos` has one port, in `pip install larmorx`: **the replica** (`crates/larmorx-ants`,
+`crates/larmorx-image`; Apache-2.0; Rust `larmorx_ants::atropos::Atropos`, the command line
+`larmorx_ants::cli::atropos`), translated from ANTs 2.6.5's `Atropos` on ITK 5.4.5. Neither
+ANTs' result nor its result depends on the thread count.
+
+## `Atropos`
+
+<!-- reference
+program: Atropos
+group: ants
+original: ANTs 2.6.5
+python: larmorx.ants.atropos
+command-line: crates/larmorx-ants/src/cli/atropos.rs
+records: {replica: [ants-atropos]}
+evidence: ants-atropos
+-->
+
+`Atropos` segments an image into tissue classes by a finite mixture model with a Markov random
+field prior. The method is Avants et al.'s (*An open source multivariate framework for n-tissue
+segmentation with evaluation on public data*, Neuroinformatics 9:381-400, 2011); sMRIPrep runs it
+once per subject, in its brain extraction (`atropos_wf`): K-means with three classes, Gaussian
+likelihoods, MRF 0.1, three iterations, the fixed seed.
+
+### Python (`Atropos`)
+
+`lx.ants.atropos(images, mask, *, classes=3, initialization="kmeans", kmeans_centers=None, priors=None, prior_label=None, prior_weight=0.0, prior_threshold=None, likelihood=None, posterior_formulation="socrates", use_mixture_model_proportions=True, annealing=(1.0, 1.0, 0.1), iterations=5, convergence_threshold=0.001, mrf_smoothing=0.3, mrf_radius=1, icm=True, icm_iterations=1, use_random_seed=True, euclidean_distance=False, label_propagation=None, minimize_memory=False, outliers=None, partial_volume=(), partial_volume_likelihoods=False, adaptive_smoothing=0.0, bspline=(6, 1, 3), likelihood_images=False, distance_images=False, smoothed_images=False, icm_code_image=False, dimension=None, n_threads=1, upstream_defects="fix")`
+
+Returns an `AtroposResult`: `labels` (the classified image, `uint32`), `posteriors` (one
+`float32` image per class, 0 outside the mask), with the arguments that ask for them
+`likelihoods`, `distances`, `smoothed` and `icm_codes`, and `iterations` and `log` (the
+progress lines and the filter's settings and models). `lx.ants.atropos` raises
+`lx.ants.AtroposError` with ANTs' message where Atropos stops (a class that loses all its
+voxels, a singular covariance, a missing file), and `ValueError` for arguments the command line
+cannot express.
 
 ```python
 import larmorx as lx
@@ -61,46 +66,89 @@ seg = lx.ants.atropos([t1w, t2w], mask, initialization="otsu",
                       outliers=lx.ants.BoxPlot())
 ```
 
-```bash
-larmorx ants Atropos -d 3 -a t1w_n4.nii.gz -x brain_mask.nii.gz -i KMeans[3] -k Gaussian \
-    -m [0.1,1x1x1] -c [3,0] -r 0 -o [labels.nii.gz,POSTERIOR_%02d.nii.gz]
-```
+### Options of `Atropos`
 
-## Option mapping
-
-| Atropos | Python | Notes |
+| ANTs option | Python | Notes |
 |---|---|---|
-| `-d 2/3/4` | `dimension` (default: the first image's) | without `-d` ANTs reads every image as 3D (ANTS-99 below); the Python wrapper always passes it |
-| `-a image` / `-a [image,w]` (repeatable) | `images` (one or a list); `adaptive_smoothing=w` (one value, or one per image) | paths, `lx.Image`, nibabel images or `(array, affine)`, read as `float` on the first image's grid; the weight mixes the intensity with its B-spline fit per class, for prior-based initializations only (ANTS-93 below) |
-| `-x mask` | `mask` | required; read as `unsigned int` (0.6 is 0); its non-zero voxels are segmented |
-| `-i Random[K]` | `initialization="random"`, `classes=K` | labels drawn with the filter's generator |
+| `-d 2/3/4`, `--image-dimensionality` | `dimension` | default: the first image's; without `-d` ANTs reads every image as 3D (ANTS-99, in [Upstream defects](#upstream-defects-d13)); the Python wrapper always passes it |
+| `-a image` / `-a [image,w]` (repeatable), `--intensity-image` | `images` (one or a list); `adaptive_smoothing=w` (one value, or one per image) | paths, `lx.Image`, nibabel images or `(array, affine)`, read as `float` on the first image's grid; the weight mixes the intensity with its B-spline fit per class, for prior-based initializations only (ANTS-93) |
+| `-x mask`, `--mask-image` | `mask` | required; read as `unsigned int` (0.6 is 0); its non-zero voxels are segmented |
+| `-i Random[K]`, `--initialization` | `initialization="random"`, `classes=K` | labels drawn with the filter's generator |
 | `-i Otsu[K]` | `initialization="otsu"` | Otsu's thresholds of the first image (200 bins) |
 | `-i KMeans[K]` / `KMeans[K,c1xc2x...]` | `initialization="kmeans"`, `kmeans_centers=[...]` | k-means on the first image from centres spread over its range in the mask, or given; with several images, a second k-means on all |
 | `-i PriorProbabilityImages[K,pattern%02d,w(,t)]` | `initialization="prior-probabilities"`, `priors=[...]`, `prior_weight=w`, `prior_threshold=t` | one image per class (paths or images; the wrapper names them as a `%02d` series), or one vector image on the command line; `t`: below it a voxel counts as without priors |
 | `-i PriorLabelImage[K,labels,w]` | `initialization="prior-label"`, `prior_label`, `prior_weight` | labels 1 to K; unlabelled voxels of the mask are reached by propagation |
-| `-p Socrates[mix,T0,rate,Tmin]` (`Plato`, `Aristotle`, `Sigmoid`) | `posterior_formulation="socrates"`, `use_mixture_model_proportions`, `annealing=(T0, rate, Tmin)` | see the [findings](../findings/ants-atropos.md#the-algorithm-as-the-code-has-it); annealing applies only when `T0` is not 1 |
-| `-k Gaussian` | `likelihood=lx.ants.GaussianLikelihood()` (the default) | weighted mean and covariance per class |
-| `-k HistogramParzenWindows[σ,bins]` | `lx.ants.HistogramParzenWindows(sigma, bins)` | |
-| `-k ManifoldParzenWindows[σr,kEval,kCov,σk]` | `lx.ants.ManifoldParzenWindows(regularization_sigma, evaluation_k, covariance_k, kernel_sigma)` | ANTS-95, ANTS-104 |
-| `-k JointShapeAndOrientationProbability[σs,bs,σo,bo]` | `lx.ants.JointShapeAndOrientationProbability(...)` | tensors: 6 images in 3D (xx xy xz yy yz zz); ANTS-103 |
-| `-k LogEuclideanGaussian` | `lx.ants.LogEuclideanGaussian()` | tensors, as above |
-| `-c [n,threshold]` | `iterations=5`, `convergence_threshold=0.001` | stops when the mean largest posterior grows by less than the threshold |
-| `-m [β,radius]` / `-m [coefficients,radius]` | `mrf_smoothing=0.3` (a number or an image), `mrf_radius=1` (one value or one per axis) | |
-| `-g [async,iterations,codes]` | `icm=True`, `icm_iterations=1`, `icm_code_image=True` → `AtroposResult.icm_codes` | the documented bracketed form makes ANTs abort (ANTS-102); the wrapper writes `-g 1[1,n]` |
-| `-r 0/1` | `use_random_seed=True` | ANTs seeds from the clock (`1`, its default) or with 19650218 (`0`); larmorx never reads the clock: `1` gives the seed 121212 |
-| `-e 0/1` | `euclidean_distance` | propagate prior labels by Euclidean distance instead of fast marching |
-| `-l [λ,p]` / `-l label[λ,p]` | `label_propagation=(λ, p)` / `{label: (λ, p)}` | |
-| `-u 0/1` | `minimize_memory` | ANTS-97, ANTS-105 |
-| `-w BoxPlot[l,u,w]` / `-w GrubbsRosner[s,w]` | `outliers=lx.ants.BoxPlot(...)` / `lx.ants.GrubbsRosner(...)` | ANTS-94, ANTS-107, ITK-51 |
-| `-s 1x2` (repeatable), `--use-partial-volume-likelihoods` | `partial_volume=[(1, 2)]`, `partial_volume_likelihoods` | partial-volume classes (labels after the tissues, in the order given); with the MRF, ANTs' partial-volume labels hardly win a voxel and Atropos often stops (ANTS-106, corrected below) |
-| `-b [levels,mesh,order]` | `bspline=(6, 1, 3)` | the adaptive smoothing's B-spline fit |
-| `-o [seg,post%02d,lik%02d,dist%02d,bsp%02d]` | `AtroposResult.labels`, `.posteriors`; `likelihood_images`, `distance_images`, `smoothed_images` → `.likelihoods`, `.distances`, `.smoothed` | the classified image as `uint32`, the others `float32`, 0 outside the mask |
-| `-v 1` | `AtroposResult.iterations`, `.log` | the progress lines and the filter's settings and models |
+| `-p Socrates[mix,T0,rate,Tmin]` (`Plato`, `Aristotle`, `Sigmoid`), `--posterior-formulation` | `posterior_formulation="socrates"`, `use_mixture_model_proportions`, `annealing=(T0, rate, Tmin)` | see the [findings](../findings/ants-atropos.md#the-algorithm-as-the-code-has-it); annealing applies only when `T0` is not 1 |
+| `-k Gaussian`, `--likelihood-model` | `likelihood=lx.ants.GaussianLikelihood()` (the default) | weighted mean and covariance per class |
+| `-k HistogramParzenWindows[σ,bins]` | `likelihood=lx.ants.HistogramParzenWindows(sigma, bins)` | |
+| `-k ManifoldParzenWindows[σr,kEval,kCov,σk]` | `likelihood=lx.ants.ManifoldParzenWindows(regularization_sigma, evaluation_k, covariance_k, kernel_sigma)` | ANTS-95, ANTS-104 |
+| `-k JointShapeAndOrientationProbability[σs,bs,σo,bo]` | `likelihood=lx.ants.JointShapeAndOrientationProbability(...)` | tensors: 6 images in 3D (xx xy xz yy yz zz); ANTS-103 |
+| `-k LogEuclideanGaussian` | `likelihood=lx.ants.LogEuclideanGaussian()` | tensors, as above |
+| `-c [n,threshold]`, `--convergence` | `iterations=5`, `convergence_threshold=0.001` | stops when the mean largest posterior grows by less than the threshold |
+| `-m [β,radius]` / `-m [coefficients,radius]`, `--mrf` | `mrf_smoothing=0.3` (a number or an image), `mrf_radius=1` (one value or one per axis) | |
+| `-g [async,iterations,codes]`, `--icm` | `icm=True`, `icm_iterations=1`, `icm_code_image=True` | the result's `icm_codes`; the documented bracketed form makes ANTs abort (ANTS-102); the wrapper writes `-g 1[1,n]` |
+| `-r 0/1`, `--use-random-seed` | `use_random_seed=True` | ANTs seeds from the clock (`1`, its default) or with 19650218 (`0`); larmorx never reads the clock: `1` gives the seed 121212 |
+| `-e 0/1`, `--use-euclidean-distance` | `euclidean_distance` | propagate prior labels by Euclidean distance instead of fast marching |
+| `-l [λ,p]` / `-l label[λ,p]`, `--label-propagation` | `label_propagation=(λ, p)` / `{label: (λ, p)}` | |
+| `-u 0/1`, `--minimize-memory-usage` | `minimize_memory` | ANTS-97, ANTS-105 |
+| `-w BoxPlot[l,u,w]` / `-w GrubbsRosner[s,w]`, `--winsorize-outliers` | `outliers=lx.ants.BoxPlot(...)` / `lx.ants.GrubbsRosner(...)` | ANTS-94, ANTS-107, ITK-51 |
+| `-s 1x2` (repeatable), `--partial-volume-label-set`, `--use-partial-volume-likelihoods` | `partial_volume=[(1, 2)]`, `partial_volume_likelihoods` | partial-volume classes (labels after the tissues, in the order given); with the MRF, ANTs' partial-volume labels hardly win a voxel and Atropos often stops (ANTS-106, corrected by default) |
+| `-b [levels,mesh,order]`, `--bspline` | `bspline=(6, 1, 3)` | the adaptive smoothing's B-spline fit |
+| `-o [seg,post%02d,lik%02d,dist%02d,bsp%02d]`, `--output` | `likelihood_images`, `distance_images`, `smoothed_images` | the result's `labels` and `posteriors`, and with those arguments its `likelihoods`, `distances` and `smoothed`: the classified image as `uint32`, the others `float32`, 0 outside the mask |
+| `-v 1`, `--verbose` | the result | its `iterations` and `log`: the progress lines and the filter's settings and models |
+| `-h`, `--help` | (command line only) | ANTs' short and long help |
 | `ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS` | `n_threads` | neither ANTs' result nor larmorx's depends on it |
+| `LARMORX_UPSTREAM_DEFECTS` | `upstream_defects` | `fix` (default) or `reproduce` ([Upstream defects](#upstream-defects-d13)) |
 
-`lx.ants.atropos` raises `lx.ants.AtroposError` with ANTs' message where Atropos stops (a
-class that loses all its voxels, a singular covariance, a missing file), and `ValueError` for
-arguments the command line cannot express.
+### Examples of `Atropos`
+
+<!-- inputs: t1w.nii.gz=head mask.nii.gz=head-mask -->
+
+```python example
+import larmorx as lx
+
+# sMRIPrep's call: K-means with three classes, MRF 0.1, three iterations, the fixed seed.
+seg = lx.ants.atropos("t1w.nii.gz", "mask.nii.gz", classes=3, mrf_smoothing=0.1,
+                      iterations=3, convergence_threshold=0, use_random_seed=False)
+seg.labels.data.dtype  # -> dtype('uint32')
+```
+
+```bash example
+larmorx ants Atropos -d 3 -a t1w.nii.gz -x mask.nii.gz -i KMeans[3] -k Gaussian -m [0.1,1x1x1] -c [3,0] -r 0 -o [labels.nii.gz,POSTERIOR_%02d.nii.gz]
+```
+
+### Ports of `Atropos`
+
+**The replica: status `validated`** against Atropos itself (its
+[record](../validation/ants-atropos.md), 2026-10-23, standard tier: 97 cases, 62 pass, 27
+rejected by both alike, 8 expected divergences; 58 compared), on every option and failure case
+on phantoms, and on sMRIPrep's call and antsCorticalThickness-style prior-based segmentations of
+the five fMRIPrep oracle runs' T1w images:
+- against the **unmodified ANTs 2.6.5 binary** (one thread): 27 of 58 compared cases
+  bit-identical, the classified image identical in all 58. The others' posteriors differ in
+  their last bits where glibc's functions are not correctly rounded for a value the run
+  meets: on sMRIPrep's call, in 11 to 4,175 of 5.9 to 17.5 million values of a posterior
+  image (none on ds001600), by at most 1.2e-7;
+- against the **same binary with glibc's `expf`, `logf`, `exp`, `log`, `pow` (and the others)
+  replaced by CORE-MATH's correctly rounded ones** (`LD_PRELOAD`,
+  `scripts/build_crmath_preload.sh`), the arithmetic larmorx uses: **58 of 58 bit-identical**,
+  sMRIPrep's call on the five oracle runs and two prior-based segmentations included;
+- **ANTs' Atropos does not depend on its thread count**, and neither does larmorx's; with the
+  clock's seed (`-r 1`, Atropos' default) two ANTs runs of sMRIPrep's options on ds000005
+  disagree on 306 labels (smallest Dice 0.99947) and on posteriors by up to 0.168; larmorx, with
+  its fixed seed, is as far from them (221 and 217 labels).
+
+**On the data panel** ([record](../validation/ants-atropos-panel.md), 2026-10-26): sMRIPrep's
+call in all fourteen finished oracle runs (the 3.5-year-old, the glioma, the stroke, strong
+motion, 1.5 T, 7 T and the 82-year-old among them), its inputs from each run's working directory,
+and three calls fMRIPrep never makes (the stroke outside its manual lesion mask, a child's T1w and
+T2w as two channels, a FLAIR of 3 mm slices): **17 of 17 compared cases bit-identical with
+CORE-MATH, the classified image identical in all 17** (3 bit-identical to the unmodified ANTs).
+Against fMRIPrep's own files (ANTs 2.6.2, glibc's maths): the same segmentation in every run,
+the posteriors different in 0 to 4,175 voxels (their last bits, as in the standard tier). The panel found a
+missing check, now ported: an input on another grid (the FLAIR's mask written from its affine,
+2.9e-6 mm off) makes ITK throw, as ANTs does ([findings](../findings/ants-atropos.md), "Inputs
+on another grid").
 
 ## Upstream defects (D13)
 

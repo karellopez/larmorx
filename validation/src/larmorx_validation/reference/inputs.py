@@ -58,6 +58,12 @@ def _make_head4d(path: Path) -> None:
     _save(path, *_head((40, 48, 40, 4)))
 
 
+def _make_head_mask(path: Path) -> None:
+    """The synthetic head's brain: 1 inside its bright ellipsoid, 0 elsewhere (uint8)."""
+    data, affine = _head()
+    _save(path, (data >= 600).astype(np.uint8), affine)
+
+
 def _make_bold(path: Path) -> None:
     _save(path, *_head((40, 48, 40, 8)))
 
@@ -122,6 +128,7 @@ def _make_log(path: Path) -> None:
 KINDS: dict[str, Kind] = {
     "head": Kind("a synthetic head of 40 × 48 × 40 voxels of 4 mm", _make_head),
     "head4d": Kind("a synthetic series of 4 such heads", _make_head4d),
+    "head-mask": Kind("the synthetic head's brain as a mask (1 inside, 0 outside)", _make_head_mask),
     "bold": Kind("a synthetic series of 8 heads of 40 × 48 × 40 voxels of 4 mm", _make_bold),
     "slice-timing": Kind(
         "the times of 40 slices acquired interleaved within 2 s, on one line, as fMRIPrep writes "

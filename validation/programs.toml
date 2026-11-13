@@ -203,7 +203,6 @@ group = "ants"
 name = "Atropos"
 command = "larmorx ants Atropos"
 python = "lx.ants.atropos"
-does = "Finite-mixture segmentation with a Markov random field prior: every initialization, likelihood model, outlier and partial-volume option."
 api = "docs/api/ants-atropos.md"
 evidence = "/evidence/ants-atropos/"
 records = { replica = ["ants-atropos"] }

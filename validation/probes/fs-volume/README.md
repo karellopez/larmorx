@@ -68,4 +68,9 @@ the official child's environment and in the port's `LtaIo::env`): seed 1, 1,300 
 `oracles/logs/fs-found-c-r15-avg.log`): 1,198 identical, 102 not comparable, hash
 `571a038fdaebd6929c884ca4065eebd07e8143122f07e57fcfc9c6b71175f1c1`. Seed 7, 923 `ltaread` cases: 867
 identical, 55 not comparable, 1 different (an `errno` the port kept after `sscanf` met the end of a line:
-fixed in the next commit, `scanf_word_errno.c`).
+fixed in the next commit, `scanf_word_errno.c`). After it (log `oracles/logs/fs-found-c-r15-fixcheck.log`):
+seed 7, 3,076 `ltaread` cases: 2,908 identical, 168 not comparable, 0 different; seed 13, 6,152 `ltaread`
+and `tftype` cases: 5,691 identical, 461 not comparable, 0 different; seed 1 unchanged (hash `571a038f...`).
+`scanf_word_errno.c` (build and run with `gcc -O0 scanf_word_errno.c && ./a.out`) measures what glibc's
+`sscanf` leaves in `errno` when a conversion meets the end of the string: 0, or, after an earlier item that
+ended at the end, the value `errno` had when that item met it (before its own `ERANGE`).

@@ -23,10 +23,11 @@
 //!
 //! **`errno` at the end of the input** (measured, [`Call`]): a conversion that meets the end of the
 //! input before its item's first character sets `errno` to 0, unless an earlier item of the same
-//! call ended at the end of the input (then `errno` is left alone); white-space directives that meet
-//! it leave `errno` alone (`fscanf(fp, "%f", ...)` at the end of a file returns `EOF` with `errno`
-//! 0; `sscanf("1 2", "%d %d %d", ...)` returns 2 with `errno` unchanged; `"%f %f"` on `"5 "`
-//! returns 1 with `errno` 0).
+//! call ended at the end of the input: then to the value `errno` had when that item met the end,
+//! before the item's own `ERANGE` (`sscanf("1e40", "%f %f", ...)` returns 1 with `errno` as it was
+//! before the call, not `ERANGE`); white-space directives that meet it leave `errno` alone
+//! (`fscanf(fp, "%f", ...)` at the end of a file returns `EOF` with `errno` 0; `sscanf("1 2", "%d
+//! %d %d", ...)` returns 2 with `errno` unchanged; `"%f %f"` on `"5 "` returns 1 with `errno` 0).
 
 use std::cmp::Ordering;
 use std::io::BufRead;
@@ -563,12 +564,14 @@ impl Ord for Big {
     }
 }
 
-/// One `scanf` call's conversions with glibc's `errno` rules: `ERANGE` from a conversion, 0 for a
-/// conversion that meets the end of the input before its item unless an earlier item of the call
-/// ended there.
+/// One `scanf` call's conversions with glibc's `errno` rules: `ERANGE` from a conversion; a
+/// conversion that meets the end of the input before its item sets `errno` to 0, or, when an
+/// earlier item of the call ended at the end, to the value `errno` had when that item met it (before
+/// that item's own `ERANGE`: `sscanf("1e40", "%f %f")` leaves `errno` as it was before the call).
 #[derive(Default)]
 pub struct Call {
-    latched: bool,
+    /// `errno` when an item first met the end of the input.
+    latched: Option<i32>,
 }
 
 impl Call {
@@ -579,24 +582,22 @@ impl Call {
     fn after<T>(&mut self, st: &mut dyn Stream, r: Scan<T>, errno: &mut i32) -> Option<T> {
         match r {
             Scan::Value(v, erange) => {
+                if self.latched.is_none() && st.hit_end() {
+                    self.latched = Some(*errno);
+                }
                 if erange {
                     *errno = ERANGE;
-                }
-                if st.hit_end() {
-                    self.latched = true;
                 }
                 Some(v)
             }
             Scan::Fail => {
-                if st.hit_end() {
-                    self.latched = true;
+                if self.latched.is_none() && st.hit_end() {
+                    self.latched = Some(*errno);
                 }
                 None
             }
             Scan::Eof => {
-                if !self.latched {
-                    *errno = 0;
-                }
+                *errno = self.latched.unwrap_or(0);
                 None
             }
         }
@@ -744,23 +745,32 @@ mod tests {
         assert_eq!(bits("  \t\n7"), (0x40e0_0000, false, 5));
     }
 
-    /// `eof2.c`'s measurements: `"%f %f"` and `"%d %d"` on each input, `errno` 7 before.
+    /// `eof2.c`'s measurements: `"%f %f"` and `"%d %d"` on each input, `errno` 7 before; and
+    /// `validation/probes/fs-volume/scanf_word_errno.c`'s for an `ERANGE` at the end (`%f` only:
+    /// `"%f %f %f %f"`).
     #[test]
     fn errno_at_the_end_of_the_input() {
-        for (input, n, errno) in [
-            ("", 0, 0),
-            (" ", 0, 0),
-            ("5", 1, 7),
-            ("5 ", 1, 0),
-            ("5  ", 1, 0),
-            ("5 6", 2, 7),
+        for (input, n, errno, float_only) in [
+            ("", 0, 0, false),
+            (" ", 0, 0, false),
+            ("5", 1, 7, false),
+            ("5 ", 1, 0, false),
+            ("5  ", 1, 0, false),
+            ("5 6", 2, 7, false),
+            ("1e40", 1, 7, true),
+            ("1e40 ", 1, 0, true),
+            ("-1877   1e40", 2, 7, true),
+            ("1e-50 3", 2, 34, true),
         ] {
             for int in [false, true] {
+                if int && float_only {
+                    continue;
+                }
                 let mut b = Bytes::new(input.as_bytes());
                 let mut call = Call::new();
                 let mut e = 7;
                 let mut got = 0;
-                for _ in 0..2 {
+                for _ in 0..if float_only { 4 } else { 2 } {
                     let ok = if int {
                         call.i32(&mut b, &mut e).is_some()
                     } else {

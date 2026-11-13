@@ -1282,7 +1282,9 @@ it, and again from the cache:
 
 The groups `eigen`, `svd` and `mfiles` gained the batches `eigen-nonfinite`, `svd-nonfinite` and
 `mfiles-cut` (§17, §18.2; generators of their own, the groups' other cases unchanged) on 2026-11-13;
-their three hashes are from then, the others from the first runs.
+their three hashes are from then (through the cache, from it and without it, identical, every line
+classified alike), the others from the first runs. `mfiles`' one `TIMEOUT` is a memory line (an empty
+file read into a new matrix: its sizes come from memory) that ends otherwise in some processes.
 
 ### 23.3 The comparison
 

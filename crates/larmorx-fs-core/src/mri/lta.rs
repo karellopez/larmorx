@@ -7,7 +7,6 @@ use larmorx_core::defects::{FS_195, FS_196, FS_197, FS_198};
 use super::geom::VolGeom;
 use super::types;
 use super::volume::{ENOMEM, Mri, Region};
-use super::voxels::Place;
 use crate::maths::matrix::{MATRIX_REAL, Matrix};
 use crate::maths::{Output, Returned};
 use crate::process::{Process, Stop, codes};
@@ -118,33 +117,34 @@ impl Process {
             return Ok(0);
         }
         let (mut xmax, mut ymax, mut zmax) = (0, 0, 0);
+        // the first frame row by row: each row's first and last voxel above the threshold
+        let size = m.bytes_per_vox as usize;
+        let row_bytes = w.max(0) as usize * size;
         let tf = thresh as f32;
-        for z in 0..d {
-            for y in 0..h {
-                for x in 0..w {
-                    let Place::In(o) = m.flat_place(x, y, z, 0) else {
-                        continue;
-                    };
-                    let v = m.voxels.as_ref().expect("voxels");
-                    let o = o as usize;
-                    let above = match m.kind {
-                        types::UCHAR => i32::from(v[o]) > thresh,
-                        types::SHORT => i32::from(i16::from_le_bytes([v[o], v[o + 1]])) > thresh,
-                        types::USHRT => i32::from(u16::from_le_bytes([v[o], v[o + 1]])) > thresh,
-                        types::INT => {
-                            i32::from_le_bytes(v[o..o + 4].try_into().expect("4")) > thresh
-                        }
-                        _ => f32::from_le_bytes(v[o..o + 4].try_into().expect("4")) > tf,
-                    };
-                    if above {
-                        b.x = b.x.min(x);
-                        b.y = b.y.min(y);
-                        b.z = b.z.min(z);
-                        xmax = xmax.max(x);
-                        ymax = ymax.max(y);
-                        zmax = zmax.max(z);
-                    }
-                }
+        let above = |c: &[u8]| match m.kind {
+            types::UCHAR => i32::from(c[0]) > thresh,
+            types::SHORT => i32::from(i16::from_le_bytes([c[0], c[1]])) > thresh,
+            types::USHRT => i32::from(u16::from_le_bytes([c[0], c[1]])) > thresh,
+            types::INT => i32::from_le_bytes([c[0], c[1], c[2], c[3]]) > thresh,
+            _ => f32::from_le_bytes([c[0], c[1], c[2], c[3]]) > tf,
+        };
+        let v = m.voxels.as_deref().unwrap_or(&[]);
+        for z in 0..d.max(0) {
+            for y in 0..h.max(0) {
+                let start = (z as usize * h as usize + y as usize) * row_bytes;
+                let Some(row) = v.get(start..start + row_bytes) else {
+                    continue;
+                };
+                let Some(first) = row.chunks_exact(size).position(above) else {
+                    continue;
+                };
+                let last = row.chunks_exact(size).rposition(above).unwrap_or(first);
+                b.x = b.x.min(first as i32);
+                xmax = xmax.max(last as i32);
+                b.y = b.y.min(y);
+                ymax = ymax.max(y);
+                b.z = b.z.min(z);
+                zmax = zmax.max(z);
             }
         }
         b.dx = xmax - b.x + 1;

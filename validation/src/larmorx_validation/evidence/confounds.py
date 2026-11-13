@@ -1545,18 +1545,18 @@ def _corrections_table(ctx: core.Context) -> dict:
 def _memory_table(ctx: core.Context) -> dict:
     e = memory_entry(ctx)
     peaks = e.info()["peaks_mib"]
-    rows = []
+    rows, met = [], 0
     for name, call, run in MEMORY_CALLS:
         p = peaks[name]
         o = p["original"]
         worst = max(v for k, v in p.items() if k != "original")
+        met += worst <= 1.1 * o + 8
         rows.append({
             "head": f"{call}, {run.split('-')[0]}",
             "cells": [common.cell(round(o), "count"), common.cell(round(p["larmorx-reproduce-1"]), "count"),
                       common.cell(round(p["larmorx-fix-1"]), "count"),
                       common.cell(round(p["larmorx-fix-8"]), "count"),
                       common.cell(worst / o, "sig")],
-            "verdict": "bit-identical" if worst <= 1.1 * o + 8 else "open",
         })  # fmt: skip
     return common.table(
         "memory",
@@ -1571,7 +1571,8 @@ def _memory_table(ctx: core.Context) -> dict:
         "memory_call.py, the calls of tests/parity/test_memory_peak.py: fMRIPrep's acompcor, "
         "tcompcor, dvars and signals nodes with their own inputs), its peak resident memory from "
         "/usr/bin/time -v, in the newest environment. The rule: at most 10 % above the "
-        "original's peak plus 8 MiB (the verdict column: the rule met).",
+        "original's peak plus 8 MiB: "
+        f"{met} of the {len(rows)} calls meet it.",
     )  # fmt: skip
 
 

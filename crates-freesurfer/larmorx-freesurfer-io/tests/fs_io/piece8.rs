@@ -128,7 +128,7 @@ fn img(g: &mut Gen, t: &mut Vec<String>, fmts: &[i32], rows: Option<i64>, cols: 
     let mut bs = 0u64;
     let mut len = sizeimage.wrapping_mul(nf as u64);
     if g.chance(20) && sizeimage > 0 {
-        bs = g.pick(&[1u64, 4, 8, len.saturating_sub(4).max(1), len + 8]);
+        bs = g.pick(&[1u64, 4, 8, len.saturating_sub(4).max(1), len.wrapping_add(8)]);
         len = bs;
     }
     let len = if len > 1 << 20 || sizeimage == 0 {

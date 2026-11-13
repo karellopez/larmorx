@@ -23,8 +23,8 @@ mod cases;
 use larmorx_core::defects::UpstreamDefects;
 use sha2::{Digest, Sha256};
 
-const OFFICIAL_SHA256: &str = "5e19ca254e22b4181be30f12b4b91826613836d7fc67b7dd78bfeeb8234b87fa";
-const SKIPPED: usize = 580;
+const OFFICIAL_SHA256: &str = "48b6b766e91769872cd3b03268c5e30731d504117c3ebb949a50563106f1c1f2";
+const SKIPPED: usize = 506;
 
 #[test]
 fn reproduce_gives_the_official_outputs() {

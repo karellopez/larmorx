@@ -991,3 +991,8 @@ options (`MRIreadControlPoints`; `MRIfillPoints` from `mri_edit_wm_with_aseg`'s 
   FS-430 19, FS-431 15, FS-423 3, FS-424 3, FS-426 2). Seed 7, 8,034: identical on 7,783, 0 different
   (251 SKIP). `fix` differs only where a defect is noted (FS-01's NUL byte, FS-12's clamped `nint`
   in `MRIfillPoints`, FS-425's short labels).
+- Seed 1's light set with piece 11 (the recorded test, `HEAVY_SEED1` re-measured: [2248, 3687, 4361]):
+  4,797 cases, 4,291 identical (51 with memory digits), 0 different, 506 SKIP or VARY
+  (`48b6b766...`), debug 1.1 s; the NaN trap (AArch64's NaN rules) passes in debug (2,857 flips)
+  and release (2,683). The new case stream met a debug-build overflow in piece 8's generator (a
+  wrapped buffer length plus 8): now `wrapping_add`, the value a release build always gave.

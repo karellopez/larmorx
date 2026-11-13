@@ -3,7 +3,7 @@
 **Closed to FreeSurfer clean-room implementers** (it names FreeSurfer's files, functions and lines;
 the behaviour is `specs/freesurfer-surfio.md`). Queue items 3.1-45 and 3.1-46's structure, replica in
 `crates-freesurfer/larmorx-freesurfer-surf` (track D, relay 5, 2026-11-13); §7 the rest of 3.1-46
-without a volume (relay 6).
+without a volume, §8 queue item 3.1-49's coordinate operations (relay 6).
 
 ## 1. The generated views are storage maps
 
@@ -158,3 +158,70 @@ first). The probe reads them into locals first.
 - **Waiting for fs.mri:** `MRISripMidline` (358-807), `MRIcomputeLabelNormal` (809-878),
   `MRIScopyCoords` (888-922, it copies `vg`); the realm-tree list (`mrisurf_base.cpp` 159-195) with
   fs.surf's `RealmTree`.
+
+## 8. Queue item 3.1-49, part a: the coordinate operations and the distances' storage (relay 6)
+
+- **GCC 8.4's operand orders.** Where two NaNs meet, x86's SSE returns the first source operand's
+  (the destination register). GCC treats `+` and `*` as commutative and the official build's code
+  differs from the C text in many places; read from the unit oracle's `mrisurf_metricProperties.cpp.o`
+  (`objdump -d -C`, the same compiler and flags as the official binaries) and confirmed by the
+  probe (seed 11: 34 of 4,000 `surf` cases differed before, 0 after):
+  - `MRIStranslate`: the box and centre are two `addps` of four lanes with the shifts as the
+    destination (`[dy dz dx dy] + [ylo zlo xhi yhi]`, `[dx dy dz dx] + [xctr yctr zctr xlo]`), `zhi`
+    a scalar `zhi + dz`; the vertices `x + dx`.
+  - `MRISscale`: `zhi` is `scale * zhi` (`mulsd %xmm1,%xmm0` with the scale in `xmm0`), the other
+    eight `mulpd` with the fields first; the `if (scale < 0)` block (FS-113) is compiled away (it
+    stores each low end back over itself).
+  - `MRISscaleThenTranslate`: `ylo`, `zlo` are `d + s*e` (`mulpd %xmm0,%xmm1` with `[sy sz]` in
+    `xmm1`, then `addpd %xmm1,%xmm4` with `[dy dz]` in `xmm4`), the rest `e*s + d`; its three
+    `if (s < 0)` swaps are compiled away too.
+  - `MRISanisotropicScale`: the high ends are `x0 + sx*(xhi - x0)`, the low ends `(xlo - x0)*sx +
+    x0`; `0.5f * (float)((double)xlo + (double)xhi)` is computed as `(xhi' + xlo') * 0.5f` in
+    float (exact: the double sum of two floats rounds to the float sum).
+  - `MRISrotate` (template, `._omp_fn.0`): the twelve products as `cacb = ca*cb, cacg = ca*cg,
+    cacgsb = cacg*sb, sasg = sg*sa, cgsa = cg*sa, casbsg = (sb*ca)*sg, cbsa = cb*sa, cgsasb =
+    sb*cgsa, casg = ca*sg, sasbsg = (sa*sb)*sg, cbcg = cg*cb, cbsg = sg*cb`; the per-vertex `xp =
+    (K1*z + cacb*x) + K2*y`, `yp = (K3*z - x*cbsa) + K4*y` (the source's `-x * cbsa + ...` becomes a
+    subtraction, which changes a NaN's sign), `zp = (z*cbcg + x*sb) + y*cbsg`; the sines and
+    cosines are three `sincosf` calls (libstdc++'s `std::sin(float)` is `__builtin_sinf`, which
+    `-fno-builtin` does not stop, and GCC pairs it with `cosf`), made before
+    `MRISfreeDistsButNotOrig`.
+  - `MRISblendXYZandTXYZ`: `x*a + tx*b`; `MRISblendXYZandNXYZ`: `nx*a + x`;
+    `MRIStranslate_along_vertex_dxdydz` (`._omp_fn.3`): `dx*dt + x` in double.
+  - `MRISavgVetexRadius`: `zz + (xx + yy)` in float with `sqrtss` (the `float` overload of `sqrt`),
+    `(sum2/N - avg*avg) * N / (N - 1)`; `MRISsphericalCoords`: `d2 = xx + yy`, `r = sqrt(zz + d2)`.
+  - `MRIScenterCOG2` negates after rounding to float (`cvtsd2ss` then `xorps`): the same bits as
+    rounding the negated double.
+- **glibc's `atan2` with NaNs** returns `x + y` (1,331 probe cases of NaN, signalling-NaN, infinite
+  and zero coordinates; the replica adds them in that order). Its last bit differs from CORE-MATH's
+  on about 0.09 % of random arguments (`docs/findings/freesurfer-libm.md` §3), but 300,000 random
+  spherical coordinates rounded to float were identical.
+- **The distances' storage model.** FreeSurfer keeps `mris->dist_storage[vno]` and points
+  `v->dist` at it (or `NULL`); the replica holds the buffer in `v.dist` while valid and in
+  `dist_storage[vno]` while not, never both (`crates-freesurfer/larmorx-freesurfer-surf/src/dist.rs`).
+  The probe sets FreeSurfer's two pointers equal wherever a case's distances are valid, as
+  `changeDistOrDistOrig` and `mrisSetDist` leave them. `realloc`'s new memory is undefined:
+  `growDistOrDistOrig` zeroes from `vtotal` (`dist`) or the old capacity (`dist_orig`) to the new
+  capacity, so a buffer shorter than `vtotal`, or none at all, leaves undefined values below
+  `vtotal` (the probe printed heap contents for such cases, e.g. `e861ace0 00007086`); the replica
+  gives 0 there and the probe's generator avoids those states (FreeSurfer's callers grow the
+  distances of vertices whose buffer covers `vtotal`). `MRISmakeFloatPerVertex`'s `malloc` is the
+  same matter (no caller).
+- **`MRISsetOriginalXYZfromXYZ`** tells the active realm trees about vertex `nvertices` (the loop
+  variable after the loop), one past the end; harmless with no realm tree (this module's callers),
+  to be looked at with fs.surf's realm trees.
+- **FS-113.** `MRISscale` (`mrisurf_metricProperties.cpp` 408-412) and `MRISscaleThenTranslate`
+  (499-501) mean to swap a negatively scaled axis's ends but write the low end back over itself:
+  `float xlo = mris->xlo; mris->xlo = mris->xhi; mris->xlo = xlo;`. The box stays upside down until
+  the next `mrisComputeSurfaceDimensions`. Callers: `mris_convert`'s scale option (the user's
+  factor, `mris_convert.cpp` 441); `mri_watershed` (recon-all's skull strip, `mri_watershed.cpp`
+  6503) and `mri_brain_volume` (2473) scale the icosahedron by radii `MIN(xmax - xCOG, xCOG -
+  xmin)`, negative only when the centre of gravity lies outside the brain's box. Rule A: larmorx
+  swaps; `reproduce` keeps the original's.
+- **Unreached:** the `MRIS_MP` overloads of `MRISrotate` and `MRIStranslate_along_vertex_dxdydz`
+  fail `MRISfreeDistsButNotOrig(MRIS_MP*)`'s assertion; the only `MRIS_MP` caller
+  (`mrisurf_deform.cpp` 1023, `MRIScomputeSSE_asThoughGradientApplied`) is behind `useNewBehaviour`,
+  set to `false` unconditionally (line 1006).
+- **Waiting:** `MRIStalairachTransform` (needs `MRISclone` and the `LTA`), `MRISrotate(src, NULL,
+  ...)` and `MRISprojectOntoTranslatedSphere` (`MRISclone`, 3.1-51's lines; the latter also
+  `MRISupdateEllipsoidSurface`), `mrisDisturbVertices` (`MRIScomputeMetricProperties`).

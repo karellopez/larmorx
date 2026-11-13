@@ -10,7 +10,8 @@ Status: **part 1** (queue items 3.1-45 and the record of 3.1-46): what a surface
 coordinate sets and their selector, the kinds of surface, the neighbour counts, the small geometric
 helpers every surface computation shares; **part 2** (the rest of 3.1-46 that needs no volume,
 §8-13): command lines, the neighbourhood checksum, the simple surface comparison, borrowed marks,
-per-vertex scratch arrays and the integrator's file names. Later parts: reading and writing
+per-vertex scratch arrays and the integrator's file names; **part 3** (queue item 3.1-49's
+first part, §14-16): the neighbour distances' storage and the coordinate operations. Later parts: reading and writing
 surfaces, curvatures, patches and overlays (3.1-47, 3.1-48), the metric properties every read
 computes (3.1-49 to 3.1-52); the midline marking, the label normal and the coordinate copy (they
 need the volume structure).
@@ -289,3 +290,96 @@ the file names (sequences of the three settings, NULs, high bytes, inflated name
 bytes). Measured 2026-11-13: seed 1, 630 cases, all identical with `reproduce` (the port's test
 checks their SHA-256 on every platform); the default differs only with the notices of FS-01, FS-03,
 FS-12 and FS-111 (FS-112's cases give the same output in both modes).
+
+## 14. Notation for the coordinate operations
+
+`a ⊕ b`, `a ⊖ b`, `a ⊗ b` are one IEEE operation in the type named (float or double), with the
+official build's NaN rule: a NaN made from numbers is the default NaN with the sign set; where both
+operands are NaNs the result is the **left** one's, quieted (§1). The formulas below are written in
+the order that rule needs; for numbers any order gives the same result. "(f)" is a float
+operation, "(d)" a double one; a float widened to double or a double rounded to float keeps a NaN's
+sign and the top of its payload.
+
+## 15. The neighbour distances' storage
+
+Each vertex has distances to its neighbours in the current coordinates (`dist`, with a capacity)
+and in the original ones (`dist_orig`, with its own capacity). The surface remembers, as bit 1 and
+bit 2 of `dist_alloced_flags`, whether some vertex's distances (original distances) are in use.
+When distances are **freed** they become absent with capacity 0, but their buffer is kept for the
+next use.
+
+- **Freeing the distances** sets `dist_nsize` to 0; when bit 1 is set, every vertex's distances
+  become absent and the bit is cleared (bit 2 and the original distances likewise for **freeing
+  the original distances**, which leaves `dist_orig_nsize`).
+- **Making** a vertex's distances (original distances): room for the vertex's size in use (§9's
+  `s`), all zero.
+- **Growing** them to a minimum capacity `c`: room for the larger of `s` and `c`; the values below
+  the vertex's `vtotal` (for original distances: below their old capacity) are kept, the rest zero.
+- In both, when the capacity is already enough nothing is reallocated (the values from the old
+  size on are still zeroed). When it is not, the kept buffer is resized to exactly the new
+  capacity, keeping the values it holds up to the shorter length; making a buffer for a vertex
+  whose distances were absent sets the bit. A buffer that never existed holds no values: growing
+  it keeps undefined values in FreeSurfer (larmorx gives 0; findings).
+- **Taking the buffer** for a new set of distances of capacity `c`: the kept buffer (when the
+  distances are absent; it then leaves the vertex) or a new one, resized to `c`.
+- **Setting** a vertex's distances to a buffer with a new capacity sets bit 1, frees the kept
+  buffer and makes the given one the distances; a new capacity below the present one is a failed
+  assertion, `<BUILD_ROOT>/utils/mrisurf_base.cpp:334 newCapacity >= v->dist_capacity`.
+- The metric-properties copy's freeing was never written: a failed assertion,
+  `<BUILD_ROOT>/utils/mrisurf_base.cpp:414 !"MRISfreeDistsButNotOrig(MRIS_MP* mris) NYI"`, so its
+  rotation and its step along the motion vectors always end that way.
+
+## 16. The coordinate operations
+
+"Every vertex" includes ripped ones unless said. The **bounding box** of a set of points: from
+`lo = 10000`, `hi = -10000` (floats), each coordinate above `hi` replaces it and below `lo`
+replaces it (so NaNs never enter); the centre is `0.5 ⊗ (lo ⊕ hi)` (f) (a double sum of the two
+widened, rounded to float, gives the same number). **Computing the surface's dimensions** stores
+the current coordinates' box (`xlo ylo zlo`, `xhi yhi zhi`) and centre (`xctr yctr zctr`).
+
+The **logic problem** of setting coordinates: when bit 1 (for current coordinates; bit 2 for the
+original ones) of `dist_alloced_flags` is set, FreeSurfer's logic-problem report of
+`specs/freesurfer-core.md` (shown with `FREESURFER_reportLogicErrors`, thinned per place) with the
+message `dist not freed when setXYZ called.  Add call to MRISfreeDistsButNotOrig(MRIS*)`
+(`dist_orig not freed when setOriginalXYZ called.  Add call to MRISfreeDistOrigs(MRIS*)`), the
+function name `<unknown>` and the caller's file and line; the coordinates are set anyway.
+
+| Operation | Behaviour |
+|---|---|
+| set a vertex's current (original) coordinates | the logic problem; a vertex outside `[0, nvertices)` is a failed assertion `<BUILD_ROOT>/utils/mrisurf_metricProperties.cpp:65 (0 <= vno) && (vno < mris->nvertices)` (`:180` for original coordinates) |
+| export | three arrays of the current x, y, z; a negative vertex count is a failed assertion `...:80 0 == posix_memalign((void**)ppx, 64, n*sizeof(float))` |
+| import from three arrays | the logic problem (line 131), the coordinates, the box and centre |
+| copy from another surface | the logic problem (line 151); another vertex count is a failed assertion `...:154 nvertices == mris_from->nvertices`; the coordinates, the box and centre |
+| original from current | frees the original distances, `origxyz_status = status`, every vertex's original coordinates become its current ones |
+| mean radius | `d = sqrt((z⊗z) ⊕ ((x⊗x) ⊕ (y⊗y)))` (f; a negative argument cannot occur, NaN passes), `sum ⊕= d`, `sum2 ⊕= d⊗d` (d) over every vertex; mean `sum ⊘ N`; with a deviation asked, `sqrt((((sum2 ⊘ N) ⊖ (mean⊗mean)) ⊗ N) ⊘ (N - 1))` (d; `N` the vertex count: 0 gives NaN, 1 a division by 0) |
+| import from three arrays of a kind | kind 4 (current) frees the distances and sets the current coordinates; any other kind is the fatal error `MRISimportVertexCoords: which <n> not supported` (code -3) at the first vertex, nothing with no vertices; returns 0 |
+| reverse a set | for every unripped vertex of the current (4), canonical (3) or original (0) set, the sign of x (direction 0 and any other value), y (1) or z (2) flips (original coordinates through their setter, line 328); any other set is the fatal error `MRISreverseCoords: unsupported which_vertices <n>` (code -3) at the first unripped vertex; direction 0 with the face flag reverses the faces; returns 0. The plain **reverse** does the same on the current set |
+| reverse the faces | every face's first and third vertices swap; for each of its three vertices, the vertex's position in the face (the first match) is written into its position list wherever its face list (first `num`) names this face; a vertex not in the face is a failed assertion `<BUILD_ROOT>/utils/mrisurf_topology.cpp:1929 n < VERTICES_PER_FACE` |
+| scale by `s` (double) | frees the distances; each current coordinate `x ⊗ s` (d, stored as float); the box's ends and centre likewise but `zhi`, which is `s ⊗ zhi` (d). With `s < 0` the box stays upside down in FreeSurfer (**FS-113**; larmorx swaps each axis's ends, `reproduce` does not); returns 0 |
+| flip a patch | every `x` negated; `xlo = -xhi`, `xhi = -xlo` (the old values), `xctr = -xctr`; returns 0 |
+| translate by `d` (floats) | every current coordinate `x ⊕ dx` (f); the box and centre `dx ⊕ xlo`, ... for all but `zhi`, which is `zhi ⊕ dz`; the distances are not freed; returns 0 |
+| scale then translate (`s`, `d` doubles) | frees the distances; each coordinate `(x ⊗ s) ⊕ d` (d, stored as float); the box and centre likewise (each end and the centre `(e ⊗ s) ⊕ d`, but `ylo`, `zlo`: `d ⊕ (s ⊗ e)`); a negative factor leaves that axis's box upside down (FS-113, as for the scale) |
+| anisotropic scale (`sx sy sz` floats) | computes the dimensions and frees the distances; when all three are 1 nothing else; else, around the centre `c`, each coordinate `((x ⊖ c) ⊗ s) ⊕ c` (f); the low ends the same, the high ends `c ⊕ (s ⊗ (hi ⊖ c))`; each axis's two results stored in order (the first as `lo` when it is below the second, else swapped: NaN swaps); the new centre `(hi' ⊕ lo') ⊗ 0.5` (f) of the two results before ordering; returns 0 |
+| rotate by `α, β, γ` (radians, floats) | frees the distances; `sa, ca` the float sine and cosine of α (likewise `sb cb`, `sg cg`; glibc's with `reproduce`); with `cacb = ca⊗cb`, `cacg = ca⊗cg`, `cacgsb = cacg⊗sb`, `sasg = sg⊗sa`, `cgsa = cg⊗sa`, `casbsg = (sb⊗ca)⊗sg`, `cbsa = cb⊗sa`, `cgsasb = sb⊗cgsa`, `casg = ca⊗sg`, `sasbsg = (sa⊗sb)⊗sg`, `cbcg = cg⊗cb`, `cbsg = sg⊗cb`, `k1 = (-cacgsb) ⊖ sasg`, `k2 = cgsa ⊖ casbsg`, `k3 = cgsasb ⊖ casg`, `k4 = cacg ⊕ sasbsg` (all f), each vertex becomes `x' = ((k1⊗z) ⊕ (cacb⊗x)) ⊕ (k2⊗y)`, `y' = ((k3⊗z) ⊖ (x⊗cbsa)) ⊕ (k4⊗y)`, `z' = ((z⊗cbcg) ⊕ (x⊗sb)) ⊕ (y⊗cbsg)` (the rotation Z(α)·Y(β)·X(γ)) |
+| multiply by a matrix `M` | frees the distances; each vertex's `(x, y, z, 1)` times `M` with FreeSurfer's float matrix product (`specs/freesurfer-maths.md`); the first three rows are the new coordinates; when `M` is not 4 x 4 the product prints its error for every vertex and the vertex becomes `(0, 0, 0)`; an absent `M` is the product's fatal error; returns 0 |
+| spherical coordinates | frees the distances; with `x, y, z` widened, `d2 = (x⊗x) ⊕ (y⊗y)`, `(x, y, z)` become `(atan2(y, x), atan2(z, sqrt(d2)), sqrt((z⊗z) ⊕ d2))` (d, stored as float); `atan2` with a NaN argument gives `x ⊕ y` (observed); returns 0 |
+| move the origin to `p` | computes the dimensions, translates by `px ⊖ xctr`, ... (f), then the centre is exactly `p` |
+| centre | moves the origin to `(0, 0, 0)` |
+| centre of gravity | the sums `s ⊕= x` (d) over every vertex, each divided by the vertex count (d); **centring on it** translates by minus the centre rounded to float and returns the centre |
+| blend with the temporary set (`a`, `b` floats) | frees the distances; `x = (x ⊗ a) ⊕ (tx ⊗ b)` (f) |
+| blend with the normals (`a`) | frees the distances; `x = (nx ⊗ a) ⊕ x` (f) |
+| step along the motion (`dt` double) | frees the distances; every unripped vertex `x = (dx ⊗ dt) ⊕ x` (d, from the float step and coordinate; stored as float) |
+
+## 17. Validation plan, part 3
+
+The probe's `surf` command: a surface of 0 to 5 vertices and up to 3 faces from the case (every
+coordinate set the operations use, rip flags, neighbour counts and face lists, distances in every
+state: absent, valid, freed with a kept buffer, with capacities below their buffers), its box,
+`dist_alloced_flags`, `dist_nsize` and kinds, then 1 to 5 of the operations of §15-16 (special
+floats: NaNs of both signs with payloads, signalling ones, infinities, zeros, subnormals; negative,
+unit and NaN factors; matrices of 4 x 4, 3 x 4, 4 x 3 and none; the logic problem's report on and
+off), then the whole state. Measured 2026-11-13: seed 11, 4,000 such cases identical with
+`reproduce`; 1,331 cases of NaN and special coordinates for the spherical coordinates; 300,000
+random spherical coordinates identical (glibc 2.35's `atan2` differs from the correctly rounded
+one in the last bit of about 0.09 % of random arguments, measured; none of those reaches a float
+result here, so a correctly rounded `atan2` suffices).

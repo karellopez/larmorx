@@ -10,8 +10,11 @@ oracle's build, linked as the official programs are) by the oracle-output cache 
 the port on the same cases with ``--upstream-defects`` ``reproduce`` and ``fix``, and compares the
 lines (the result and the text FreeSurfer's code printed): ``reproduce`` must give FreeSurfer's on
 every case (``SKIP`` lists the defects whose cases are counted, not compared: none); ``fix`` may
-differ only where a defect it corrects changed the result (its notices). Prints the counts and the
-hash the port's recorded test checks (``tests/fs_surfio_official.rs``).
+differ only where a defect it corrects changed the result (its notices), or where the default's
+correctly rounded ``sinf``/``cosf`` replace glibc's (a ``surf`` case that rotates, ``Z``: the
+rotation names nothing, as every FreeSurfer computation that takes ``larmorx_core::math::Libm``'s
+quiet choice; counted as ``fix_libm``). Prints the counts and the hash the port's recorded test
+checks (``tests/fs_surfio_official.rs``).
 
     python -P validation/probes/fs-surfio/check.py --seed 1 --n 660 [--json out.json]
 """
@@ -114,6 +117,7 @@ def main(argv: list[str] | None = None) -> int:
     assert len(official) == len(rep) == len(fix) == len(cases)
     equal, differ, skipped = Counter(), Counter(), Counter()
     fix_differ, fix_unexplained, fix_ids, rep_ids = Counter(), Counter(), Counter(), Counter()
+    fix_libm = Counter()
     hashed = hashlib.sha256()
     first_differ = []
     for case, c, (r, ids), (f, fids) in zip(cases, official, rep, fix, strict=True):
@@ -134,7 +138,9 @@ def main(argv: list[str] | None = None) -> int:
                 first_differ.append(case[:200])
         if f != c:
             fix_differ[cmd] += 1
-            if not fids:
+            if not fids and cmd == "surf" and "Z" in case.split():
+                fix_libm[cmd] += 1
+            elif not fids:
                 fix_unexplained[cmd] += 1
             for x in fids:
                 fix_ids[x] += 1
@@ -148,6 +154,7 @@ def main(argv: list[str] | None = None) -> int:
         "reproduce_notices": dict(rep_ids),
         "fix_differ": dict(fix_differ),
         "fix_differ_without_notice": dict(fix_unexplained),
+        "fix_libm": dict(fix_libm),
         "fix_notices": dict(fix_ids),
         "official_sha256_skip": hashed.hexdigest(),
         "first_differ": first_differ,

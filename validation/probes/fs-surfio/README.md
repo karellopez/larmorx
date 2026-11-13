@@ -14,7 +14,12 @@
   `EXIT <status> | <text>`, `CRASH <signal> | <text>`. 15 commands: `coord`, `vnum`, `nbr`,
   `modvnum`, `norm`, `close`, `proj`, `sign`, `status`, `sortcmp`, `angles`, `split`, `vec3`,
   `view` (every metric accessor of an `MRIS` and of an `MRIS_MP` loaded on it by hand, read and
-  written through both views), `fixarea`.
+  written through both views), `fixarea`; since relay 6 (2026-11-13) also `addcmd`
+  (`MRISaddCommandLine`), `vhash` (`mrisVertexHash`, `mrisVertexVSize`), `diff`
+  (`MRISdiffSimple`), `temps` (`MRIS_acquireTemp` & co), `fpv` (`MRISmakeFloatPerVertex`),
+  `names` (the integrator's file names, `NEG_AREA_K`) and `surf` (a surface from the case, 1 to 5
+  of 34 operations: `mrisurf_metricProperties.cpp`'s coordinate operations, the distances' storage
+  of `mrisurf_base.cpp`, `MRISreverseFaceOrder`; then the surface's whole state). 22 commands.
 - The port's side: `crates-freesurfer/larmorx-freesurfer-surf/examples/fs_surfio_probe.rs` (`cases
   <seed> <n>`, `run <cases> fix|reproduce`; the generator and the answers in
   `tests/fs_surfio/cases.rs`, shared with the hash test `tests/fs_surfio_official.rs`).
@@ -23,7 +28,18 @@
   different only with a notice), and the hash the test checks. Run it inside
   `scripts/orchestration/boxed.sh`.
 
-Measured 2026-11-13: seed 7, 30,000 cases: all identical with `reproduce`; `fix` differs only with
+Measured 2026-11-13 (relay 6, 22 commands): seed 7, 44,000 cases: all identical with `reproduce`;
+`fix` differs only with the notices of FS-01, FS-03, FS-12, FS-111 and FS-113 and in 3 `surf` cases
+that rotate (the default's correctly rounded `sinf`/`cosf`, `fix_libm`); the port's outputs
+byte-identical with and without AArch64's NaN emulated (200 NaNs flipped). Seed 1, 660 cases: all
+identical, hash `6803ed271fff9ae3fe95d6dc7ee1f86b34d4b362f52515c50d9a42cdcbebd4a6` (the test), with
+the emulation too, debug and release. Seed 11: 4,000 `surf` cases identical (34 differed before the
+NaN operand orders were read from the object code: `docs/findings/freesurfer-surfio.md` §8).
+`addcmd` past 1,000 lines prints only the message (FreeSurfer then writes a pointer over the count);
+`surf`'s generator keeps every distance buffer at least the vertex's size in use and never grows a
+vertex with no buffer whose `vtotal` is positive (memory FreeSurfer never writes).
+
+Measured 2026-11-13 (relay 5): seed 7, 30,000 cases: all identical with `reproduce`; `fix` differs only with
 the notices of FS-01, FS-03 and FS-12. Seed 1, 450 cases: all identical, hash
 `0cbc85857870611ee541f61cfe41040af6675957c02a27b57eb9825576f93358`, also with AArch64's NaN emulated
 (`validation/probes/fsl-mcflirt-affine-trace/nan_trap.c`, `NAN_TRAP_ARM=1` with `NAN_TRAP_DIR`) in
@@ -33,5 +49,5 @@ operand order is each caller's compiled code (`docs/findings/freesurfer-surfio.m
 
 ```
 validation/probes/fs-surfio/build.sh <workspace>
-scripts/orchestration/boxed.sh 8 python -P validation/probes/fs-surfio/check.py --seed 7 --n 30000
+scripts/orchestration/boxed.sh 8 python -P validation/probes/fs-surfio/check.py --seed 7 --n 44000
 ```

@@ -448,6 +448,43 @@ pub fn call(p: &mut Process, l: &mut Line, c: &str) -> Result<bool, Stop> {
                 }
             }
         }
+        // -- §17.1 to §17.3
+        "oeigen" | "oeigenns" => {
+            let n = l.geti();
+            let a: Vec<f32> = (0..(n * n).max(0)).map(|_| l.getf()).collect();
+            let nu = n.max(0) as usize;
+            let e = if c == "oeigen" {
+                p.open_eigen_system(&a, nu)
+            } else {
+                p.open_non_symmetric_eigen_system(&a, nu)
+            };
+            l.puti(i64::from(e.status));
+            for i in 0..nu {
+                l.putf(e.values.as_ref().map_or(7.0, |v| v[i]));
+            }
+            for i in 0..nu * nu {
+                l.putf(e.vectors.as_ref().map_or(7.0, |v| v[i]));
+            }
+        }
+        "meigen" | "meigenhelper" => {
+            let a = l.getm(p)?.expect("a matrix");
+            let sym = if c == "meigenhelper" { l.geti() } else { -1 };
+            let o = l.getm_out(p)?;
+            let n = if a.rows > 0 { a.rows as usize } else { 1 };
+            let mut vals = None;
+            mout(l, Some(&a), None, o, |o| {
+                let (r, v) = if sym < 0 {
+                    p.matrix_eigen_system(&a, o)?
+                } else {
+                    p.matrix_eigen_helper(&a, o, sym != 0)?
+                };
+                vals = v;
+                Ok(r)
+            })?;
+            for i in 0..n {
+                l.putf(vals.as_ref().and_then(|v| v.get(i).copied()).unwrap_or(7.0));
+            }
+        }
         // -- §18
         "mreadtxt" | "mreadtxtmissing" => {
             let name = l.getx();

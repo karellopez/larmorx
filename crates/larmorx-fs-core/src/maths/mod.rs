@@ -16,6 +16,7 @@
 
 pub mod affine;
 pub mod dmatrix;
+pub mod eigen;
 pub mod elements;
 pub mod histo;
 pub mod inverse;

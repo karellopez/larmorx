@@ -118,13 +118,18 @@ correctly rounded one (a replay must still reproduce the recorded files: the shi
 whether FreeSurfer's files change. All on the main machine, 2026-11-12, the recording
 `ds000005-sub-01-classic-1thread` (the classic stream at one thread).
 
-**Count mode.** Steps 1 to 61 of the recording, **all reproduced under the shim** (`defect2seg`
-only with a shorter work folder: §6; `mri_ca_register`, step 15, in 5,141 s on 2026-11-13). The steps
+**Count mode.** Every step of the recording (1 to 192), **all reproduced under the shim**
+(`defect2seg` only with a shorter work folder: §6; `mri_ca_register`, step 15, and the later steps 62
+to 192 on 2026-11-13). The steps
 that called none of the shim's functions: the conversions and headers (1-4, 9), `mri_nu_correct.mni`
 (5, 8), `talairach_avi` (6) and `talairach_afd` (7), `mri_normalize` (10, 18), `mri_em_register` (11,
 13), `mri_ca_normalize` (14), `mri_ca_register` (15), `mri_ca_label` (16), `mri_mask` (19), `AntsDenoiseImageFs` (20),
 `mri_segment` (21), `mri_edit_wm_with_aseg` (22), `mri_pretess` (23, 25, 28), `mri_fill` (24),
-`mri_tessellate` (26, 29). The others:
+`mri_tessellate` (26, 29); and of the later steps every one but those in the table, apart from
+`atan2`'s table (`mris_jacobian`, `mrisp_paint`, `mris_ca_label`, `mris_place_surface`'s later calls,
+`vertexvol`, `mris_volmask`, `pctsurfcon`, `mri_relabel_hypointensities`, `mri_surf2volseg`,
+`mri_brainvol_stats`, `mri_segstats`, `mris_anatomical_stats`, `mri_label2label`, `mris_label2annot`).
+The others:
 
 | Step | Calls of the shim's functions (of them, differing from the correctly rounded value) |
 |---|---|
@@ -135,6 +140,9 @@ that called none of the shim's functions: the conversions and headers (1-4, 9), 
 | `mris_curvature` (57, 59) | `acos` 438,535,528 (600,971), 433,304,952 (592,516) |
 | `mris_remesh` (40, 41) | `acos` 2,583,042 (4,506), 2,550,114 (4,355) |
 | `mris_place_surface` (46, 47) | `acos` 2,583,042 (4,133), 2,550,114 (4,102) |
+| `rca-surfreg` (62: `mris_register`, both hemispheres) | `acos` 3,194,109 (12,197) and 3,374,218 (12,744) |
+| `mris_place_surface` (69 to 72: white and pial, both hemispheres) | `acos` 2,583,042 (4,563), 2,550,114 (4,489), 2,583,042 (4,555), 2,550,114 (4,557) |
+| `mris_curvature_stats` (85, 86) | `acosf` 738,012 (1,000), 728,604 (1,096) |
 | every surface program, `mri_label2label`, `mri_label2vol`, `mris_defects_pointset` | `atan2` 100,001 (207) once per process |
 
 The 100,001 `atan2` calls are `fastApproxAtan2f`'s table, `(float) atan2(i, 100000)` for `i` = 0 to

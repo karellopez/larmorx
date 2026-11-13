@@ -78,8 +78,6 @@ fn writes_and_reads_back() {
     let mut g = image();
     assert_eq!(lib.write_image(&mut g, &f, true, &mut c, &mut n), 0);
     let text = std::fs::read_to_string(&f).unwrap();
-        eprintln!("{text}");
-    }
     assert!(text.starts_with("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE GIFTI SYSTEM \"http://gifti.projects.nitrc.org/gifti.dtd\">\n<GIFTI Version=\"1.0\"  NumberOfDataArrays=\"2\">\n"));
     assert!(text.contains("<Data>\n         0.500000 -1.250000 3.000000 \n         0.000000 123456.750000 -0.000000 \n      </Data>\n"));
     assert!(text.contains("<Name><![CDATA[gifticlib-version]]></Name>"));

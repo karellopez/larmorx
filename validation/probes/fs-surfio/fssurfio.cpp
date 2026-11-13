@@ -90,6 +90,9 @@ bool mrisWriteSTL(const MRIS *mris, const std::string &filename);
 
 const char *Progname = "fssurfio";
 
+// relay 19: the obsolete H sign has no declaration in FreeSurfer's headers
+int MRIS_Hcurvature_determineSign(MRIS *apmris);
+
 namespace {
 
 std::vector<std::string> toks;
@@ -2649,6 +2652,134 @@ void mpc_case()
   }
 }
 
+
+// ---- relay 19: mpd, the discrete curvatures of 3.1-50 part b and computeVertexPseudoNormal ------
+
+void dump_kh(MRIS *s)
+{
+  of(s->Kmin); of(s->Kmax); of(s->Hmin); of(s->Hmax); od(s->Ktotal);
+  for (int vno = 0; vno < s->nvertices; vno++) {
+    VERTEX *v = &s->vertices[vno];
+    of(v->K); of(v->H); of(v->k1); of(v->k2); oi(v->marked);
+  }
+}
+
+void dump_order(MRIS *s)
+{
+  for (int vno = 0; vno < s->nvertices; vno++) {
+    VERTEX_TOPOLOGY *vt = &s->vertices_topology[vno];
+    oi(s->vertices[vno].marked);
+    for (int n = 0; n < vt->num; n++) { oi(vt->f[n]); oi(vt->n[n]); }
+  }
+}
+
+// mpd: Gdiag's bits (1 show, 2 verbose), the environment (1: BEVIN_TESTING_dumpFacesAroundVertex),
+// a surface file read by MRISread (d/lh.s0), for each vertex a mask (1 ripped, 2 marked: a number,
+// 4 current position, 8 normal, 16 original position, 32 K and H, 64 area) with its values, for
+// each face a mask (1 ripped, 2 area, 4 angles, 8 cached normal) with its values, then the
+// operations, each printing what it gives
+void mpd_case()
+{
+  mkdir(workdir.c_str(), 0700);
+  clear_dir(workdir, true);
+  if (chdir(workdir.c_str()) != 0) fail("chdir");
+  mkdir("d", 0700);
+  int gd = geti();
+  if (gd & 1) Gdiag |= DIAG_SHOW;
+  if (gd & 2) Gdiag |= DIAG_VERBOSE;
+  if (geti() & 1) setenv("BEVIN_TESTING_dumpFacesAroundVertex", "1", 1);
+  setenv("SURFER_SIDEDOOR", "1", 1);
+  std::string bytes = geth();
+  FILE *fp = fopen("d/lh.s0", "wb");
+  if (!fp) fail("the surface file");
+  fwrite(bytes.data(), 1, bytes.size(), fp);
+  fclose(fp);
+  errno = 0;
+  MRIS *s = MRISread("d/lh.s0");
+  if (!s) { out += "NULL "; return; }
+  int nv = geti(), nf = geti();
+  if (nv != s->nvertices || nf != s->nfaces) { oi(s->nvertices); oi(s->nfaces); out += "COUNTS "; return; }
+  for (int vno = 0; vno < nv; vno++) {
+    VERTEX *v = &s->vertices[vno];
+    int m = geti();
+    if (m & 1) v->ripflag = 1;
+    if (m & 2) v->marked = geti();
+    if (m & 4) { v->x = getf(); v->y = getf(); v->z = getf(); }
+    if (m & 8) { v->nx = getf(); v->ny = getf(); v->nz = getf(); }
+    if (m & 16) { v->origx = getf(); v->origy = getf(); v->origz = getf(); }
+    if (m & 32) { v->K = getf(); v->H = getf(); }
+    if (m & 64) v->area = getf();
+  }
+  for (int fno = 0; fno < nf; fno++) {
+    int m = geti();
+    if (m & 1) s->faces[fno].ripflag = 1;
+    if (m & 2) s->faces[fno].area = getf();
+    if (m & 4) for (int k = 0; k < 3; k++) s->faces[fno].angle[k] = getf();
+    if (m & 8) { float a = getf(), b = getf(), c = getf(); setFaceNorm(s, fno, a, b, c); }
+  }
+  int nops = geti();
+  for (int k = 0; k < nops; k++) {
+    std::string op = next();
+    out += op + " ";
+    if (op == "sff") {
+      int sg = geti();
+      oi(MRIScomputeSecondFundamentalFormDiscrete(s, sg));
+      dump_kh(s);
+      dump_order(s);
+    } else if (op == "fvr") {
+      oi(MRIS_facesAtVertices_reorder(s));
+      dump_order(s);
+    } else if (op == "khc") {
+      oi(MRIS_discreteKH_compute(s));
+      dump_kh(s);
+    } else if (op == "k12") {
+      int sg = geti();
+      oi(MRIS_discretek1k2_compute(s, sg));
+      dump_kh(s);
+    } else if (op == "hcs") {
+      int a = geti(), b = geti();
+      oi(FACES_Hcurvature_determineSign(s, a, b));
+    } else if (op == "anf") {
+      int a = geti(), b = geti();
+      of(FACES_angleNormal_find(s, a, b));
+    } else if (op == "vfa") {
+      int vno = geti(), n = s->vertices_topology[vno].num;
+      VECTOR *a = VectorAlloc(n > 0 ? n : 1, MATRIX_REAL);
+      oi(VERTEX_faceAngles_determine(s, vno, a));
+      for (int i = 0; i < n; i++) of(VECTOR_ELT(a, i + 1));
+      VectorFree(&a);
+    } else if (op == "vmm") {
+      int vno = geti(), mi = -7, ma = -7;
+      float mn = 7, mx = 7;
+      oi(VERTEX_faceMinMaxAngles_determine(s, vno, &mi, &mn, &ma, &mx));
+      oi(mi); of(mn); oi(ma); of(mx);
+    } else if (op == "mhs") {
+      oi(MRIS_Hcurvature_determineSign(s));
+      for (int vno = 0; vno < s->nvertices; vno++) oi(s->vertices[vno].undefval);
+    } else if (op == "vpn") {
+      int vno = geti(), verbose = geti();
+      float n[3] = {7, 7, 7};
+      computeVertexPseudoNormal(s, vno, n, verbose);
+      for (float x : n) of(x);
+    } else if (op == "fvi") {
+      int f = geti(), vno = geti();
+      oi(FACE_vertexIndex_find(&s->faces[f], vno));
+    } else if (op == "fvm") {
+      int a = geti(), b = geti();
+      VECTOR *c = VectorAlloc(3, MATRIX_REAL);
+      oi(VERTICES_commonInFaces_find(&s->faces[a], &s->faces[b], c));
+      oi(FACE_vertexIndexAtMask_find(&s->faces[a], c));
+      VectorFree(&c);
+    } else if (op == "dil") {
+      oi(MRISdilateMarked(s, geti()));
+      for (int vno = 0; vno < s->nvertices; vno++) { oi(s->vertices[vno].marked); of(s->vertices[vno].tx); }
+    } else if (op == "clm") {
+      oi(MRISclearMarks(s));
+      oi(MRIScountAllMarked(s));
+    } else fail("mpd op");
+  }
+}
+
 void run_case()
 {
   std::string cmd = next();
@@ -2879,6 +3010,8 @@ void run_case()
     mpb_case();
   } else if (cmd == "mpc") {
     mpc_case();
+  } else if (cmd == "mpd") {
+    mpd_case();
   } else if (cmd == "names") {
     int n = geti();
     keep.reserve(n);

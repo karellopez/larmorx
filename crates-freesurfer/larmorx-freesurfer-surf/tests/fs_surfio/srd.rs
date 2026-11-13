@@ -31,7 +31,7 @@ pub(super) struct Mesh {
 #[allow(clippy::approx_constant)]
 const T: f32 = 1.618_034;
 
-const ICOSA_V: [[f32; 3]; 12] = [
+pub(super) const ICOSA_V: [[f32; 3]; 12] = [
     [-1.0, T, 0.0],
     [1.0, T, 0.0],
     [-1.0, -T, 0.0],
@@ -46,7 +46,7 @@ const ICOSA_V: [[f32; 3]; 12] = [
     [-T, 0.0, 1.0],
 ];
 
-const ICOSA_F: [[i64; 3]; 20] = [
+pub(super) const ICOSA_F: [[i64; 3]; 20] = [
     [0, 11, 5],
     [0, 5, 1],
     [0, 1, 7],

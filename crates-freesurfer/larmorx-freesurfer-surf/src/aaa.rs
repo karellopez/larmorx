@@ -389,6 +389,12 @@ pub struct SurfGlobals {
     pub check_vv_force_always: Option<bool>,
     /// `mrisCheckVertexVertexTopologyWkr`'s `checkDist` (`FREESURFER_checkDist` set), read once.
     pub check_vv_check_dist: Option<bool>,
+    /// `FACES_Hcurvature_determineSign`'s `calls` (its completed calls, named in its message).
+    pub hcurv_sign_calls: i32,
+    /// `FACES_aroundVertex_reorder`'s `count` and `limit` (the program's calls of it; the next
+    /// call at which `BEVIN_TESTING_dumpFacesAroundVertex` dumps the faces).
+    pub around_vertex_count: u64,
+    pub around_vertex_limit: u64,
 }
 
 /// `sigmas_default` (`mrisurf_base.cpp` line 962).
@@ -425,6 +431,9 @@ impl Default for SurfGlobals {
             find_nbrs_status: Vec::new(),
             check_vv_force_always: None,
             check_vv_check_dist: None,
+            hcurv_sign_calls: 0,
+            around_vertex_count: 0,
+            around_vertex_limit: 1,
         }
     }
 }

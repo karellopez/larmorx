@@ -41,6 +41,8 @@ mod life;
 mod mpb;
 #[path = "mpc.rs"]
 mod mpc;
+#[path = "mpd.rs"]
+mod mpd;
 #[path = "mprop.rs"]
 mod mprop;
 #[path = "sfile.rs"]
@@ -131,11 +133,11 @@ fn ix(t: &mut Vec<String>, v: i64) {
     t.push(v.to_string());
 }
 
-const COMMANDS: [&str; 39] = [
+const COMMANDS: [&str; 40] = [
     "coord", "vnum", "nbr", "modvnum", "norm", "close", "proj", "sign", "status", "sortcmp",
     "angles", "split", "vec3", "view", "fixarea", "addcmd", "vhash", "diff", "temps", "fpv",
     "names", "surf", "metric", "posn", "life", "meta", "misc", "edges", "mprop", "sfile", "cfile",
-    "sread", "stl", "tri", "fnam", "swr", "srd", "mpb", "mpc",
+    "sread", "stl", "tri", "fnam", "swr", "srd", "mpb", "mpc", "mpd",
 ];
 
 /// A byte string's token: `h` and the bytes in hex.
@@ -1018,6 +1020,7 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
             "srd" => srd::srd_tokens(&mut t, &mut g),
             "mpb" => mpb::mpb_tokens(&mut t, &mut g),
             "mpc" => mpc::mpc_tokens(&mut t, &mut g),
+            "mpd" => mpd::mpd_tokens(&mut t, &mut g),
             "names" => {
                 let n = g.int(1, 5);
                 ix(&mut t, n);
@@ -2685,6 +2688,7 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
         "srd" => srd::srd_case(cx, t, o)?,
         "mpb" => mpb::mpb_case(cx, t, o)?,
         "mpc" => mpc::mpc_case(cx, t, o)?,
+        "mpd" => mpd::mpd_case(cx, t, o)?,
         "names" => {
             let n = t.i();
             for _ in 0..n {

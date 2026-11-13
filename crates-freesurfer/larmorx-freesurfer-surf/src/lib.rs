@@ -74,6 +74,7 @@ pub mod base;
 pub mod basemisc;
 pub mod coords;
 pub mod curvio;
+pub mod discrete;
 pub mod dist;
 pub mod edges;
 pub mod facenorm;

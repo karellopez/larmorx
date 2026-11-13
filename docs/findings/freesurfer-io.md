@@ -728,3 +728,197 @@ Measured (the probe's piece 7, `tests/fs_io/piece7.rs`): seed 11, 763 cases: `re
 648, 0 different, 85 counted (FS-259, FS-403), 30 apart (FS-401); seed 13, 3,815 cases: 3,221
 identical, 0 different, 426 counted, 168 apart; `fix` differs only with FS-402 (39) or FS-404 (16)
 noted.
+
+## Part 8: FreeSurfer's 2-D images (3.1-26's line 65 and 3.1-27's image.cpp 104-3815, relay 18 of track A)
+
+Restricted (FreeSurfer's source lines). `utils/image.cpp` (the 14 functions the programs reach, of
+the file's 73: `ImageAlloc` 65, `ImageAllocBuffer` 104, `ImageFree` 136, `ImageCopy` 384,
+`ImageClearArea` 526, `ImageCheckSize` 977, `ImageSetSize` 1005, `ImageCopyFrames` 1021,
+`ImageRescale` 1217, `ImageScaleDown` 1241, `ImageScaleUp` 1368, `init_header` 3748, `h_copy` 3808,
+`free_header` 3815), `utils/hips.cpp` 4-5 and 42-47 (the globals and the conversion stubs) and
+`utils/filter.cpp` 713-1041 (`ImageConvolve1d`, `ImageReduce`, `ImageReduce1d`, which
+`ImageScaleDown` calls; ported into `larmorx-freesurfer-io::image` because fs.filter's crate sits
+above fs.io). Callers in the reach (the callgraph of `<scratch>/A/r8/edges.json`): `MRItoImageView`,
+`MRItoImage` (mri.cpp, track C's fs.volume), `mrisp.cpp` (`MRISPalloc`, `MRISPread`, `MRISPclone`,
+`MRIStoParameterization(s)`, `MRISgradientToParameterization`), `filter.cpp`'s `ImageReduce`,
+`mrimorph.cpp`'s `mriWriteImageView` (the only `ImageRescale` caller: `mri_em_register`'s
+diagnostic image views, `scale = target_size / rows`); `mriio.cpp`'s `mri_read` and `MRIwriteType`
+free images. None of them passes `imagebufsize` (always 0), converts formats in `ImageCopy` or
+`ImageCopyFrames` (`mrisp.cpp`'s `ImageCopyFrames(Ip, Itmp, 0, Ip->num_frame, 0)`: floats), or
+scales a multi-frame image.
+
+### Code generation (the official object, `oracles/freesurfer-8.2.0-unit/build/fs/utils/CMakeFiles/utils.dir/`)
+- `ImageReduce1d`: `movss pixel, %xmm0; mulss k[i], %xmm0; addss %xmm0, %xmm1` (the total the
+  destination: `total + pixel * k`). `ImageConvolve1d`: the same `addss` order (`mulss`'s order
+  does not matter: the kernel is never NaN). No vectorised float reductions in either.
+- `ImageClearArea`'s `(char)val`, `ImageScaleDown`'s and `ImageScaleUp`'s `(unsigned char)float`:
+  `cvttss2si` into 32 bits, the low byte stored. `ImageScaleUp`'s `(int)((float)outCol / scale)`:
+  `cvttss2si` (and `cvttps2dq` in the vectorised byte loop: the same results).
+- `ImageCopyFrames`' `(float)unsigned int`: `cvtsi2ss` of the zero-extended 64-bit value (scalar)
+  and `cvtdq2ps` halves (vectorised): both the correctly rounded conversion.
+- `ISPOW2` (`macros.h` 118, with `exp2(f)` defined as `pow(2.0, f)` there): `log2f`, `nint`,
+  `pow`; `nint(log2(1.0 / scale))` with double `log2`. The relocations of `ImageScaleDown`: `log2f`,
+  `log2`, `pow`, `nint` (14 calls).
+
+### Mechanisms
+- **FS-405** (class a; both modes skip the write and read 0, noted; counted, not compared). No
+  function checks a frame, an area or a pixel place against the buffer: `ImageClearArea` with a
+  `frame` at or beyond `num_frame`, or extents in use beyond the stored ones;
+  `ImageAllocBuffer`'s `hmemset(I->image, 0, I->sizeimage * I->num_frame)` after `calloc(npix)` of a
+  given smaller `imagebufsize`; `ImageCopy`'s `h_copy` of `Isrc->numpix * Isrc->sizepix` bytes into a
+  new image allocated from `Isrc->rows`/`cols` (not `orows`/`ocols`), or with a frame count of 0;
+  `ImageCopyFrames`' frame places; the scales' coordinates; `ImageConvolve1d`/`ImageReduce1d` on
+  images whose extents in use pass the stored ones; `h_copy`'s `int bytes` (a frame of 2 GiB or more:
+  a short or negative `memmove`); `while (size--)` with a negative `size`; `ImageScaleDown`'s
+  power-of-two path with 0 reductions copies `ImageCopy(inImage, outImage)` of every frame from the
+  advanced pointer (frames past the end), and its `ImageCopy` frees a caller's output smaller than
+  the reduction (use after free). Seed 11: of the 119 counted lines, 51 crash in FreeSurfer, 20 end
+  with other bytes, 48 happen to agree.
+- **FS-406** (class a, undefined conversions; `reproduce` x86-64's `cvttss2si` results, the default
+  clamps, CLAUDE.md's rule for undefined float-to-integer conversions).
+- **FS-407** (class c, rule A). `ImageCopyFrames` (1088-1110): the byte-to-float and byte-to-int
+  branches write `IMAGEFseq_pix(outImage, 0, 0, frameno)` / `IMAGEIseq_pix(outImage, 0, 0,
+  frameno)`, and the int branches `IMAGEFpix(outImage, 0, 0) + pix_per_frame * frameno` etc.,
+  where the same-format branches use `dst_frame + frameno - start`. Unreached by the programs (no
+  caller converts).
+- **FS-408** (class c, rule A: the default reduces every frame and keeps the output's frame count;
+  `reproduce` stops after the first). `ImageScaleDown` (1316-1327) reassigns `inImage` to the
+  reduction (`inImage = ImageReduce(Itmp, NULL)`, one frame), and the frame loop's condition `frame <
+  inImage->num_frame` then ends the loop after frame 0; `ImageCopy(inImage, outImage)` sets
+  `outImage->num_frame` to the reduction's 1. The end of the function restores `inImage->image` on
+  the leaked reduction (the caller's input is never advanced on that path, its `firstpix` untouched).
+- **FS-409** (class a, use after free; both modes return the copy, noted; counted). `ImageRescale`
+  (1226) ignores `ImageCopy`'s result; `ImageCopy` frees an `outImage` with fewer pixels or frames
+  and copies into a new one; `ImageRescale` then sets the freed image's sizes and returns it.
+  Unreached (its only caller passes no output).
+- **FS-412** (class a, rule B: the default refuses the scale with an error; `reproduce` goes on).
+  `ImageScaleUp`/`ImageScaleDown`/`ImageRescale` compute `nint((float)rows * scale)`: beyond the int
+  range or NaN, `nint`'s `(int)` gives -2147483648 (FS-12), `ImageCheckSize`'s 64-bit products wrap
+  (`INT_MIN * INT_MIN * frames` is 0 or -2^62 or 2^62 ...), so the check can pass and the loops run over
+  -2147483648 extents (nothing done) or `ImageRescale`'s `ImageAlloc` fails. Found by the port: with
+  FS-12's default clamp the same products let a scale of 1e30 loop 2^31 times per pixel (a case of seed
+  13 never ended), so the default refuses such scales before any of that.
+- **FS-410** (class c, rule A: the default exits with `ERROR_NO_MEMORY`). `ImageAlloc` (75):
+  `ErrorExit(Gerror, ...)` after `ImageAllocBuffer` returns `ERROR_NO_MEMORY` without setting
+  `Gerror`: the code is the previous error's, usually `NO_ERROR` (0), so `exit(0)`. Measured: the
+  probe's `ial` of 2^53 bytes with `Gerror` 0 ends with status 0 after `error: Cannot allocate
+  memory` and the message.
+
+### Behaviours kept (rule C, both modes; no ID)
+- `init_header` (3748) has no case for `PFCOMPLEX` (4) and `PFDBLCOM` (7): they take `sizepix` 1
+  (`default:` with `PFBYTE`), so a complex image gets a byte per pixel. Nothing in the reach makes a
+  complex image (MRISP, MRItoImage: floats and bytes), so a correction would change no result
+  (rule C: measured to bring no gain); the spec says so.
+- `init_header` with `alloc` (`ImageAllocHeader`, unreached) sets `firstpix` before allocating
+  (NULL).
+- The HIPS conversions are stubs (`error: hips is not supported`, 0): `ImageCopy` between formats
+  copies nothing after the message. FreeSurfer removed HIPS deliberately; kept.
+- `ImageReduce`'s `static IMAGE *Itmp` and `ImageConvolve1d`'s `static` index tables: only memory
+  differs (the port makes them each call); the tables are pure functions of the extents and the
+  length.
+- `ImageScaleDown`'s byte-to-byte bounds check prints `in: %d, %d --> out: %d, %d!` and `exit(2)`;
+  negative places are not checked (FS-405).
+
+## Part 9: fs.labels' text colour tables and lookups (3.1-33's first piece, relay 19 of track A)
+
+Restricted (FreeSurfer's source lines). `utils/colortab.cpp`: `CTABreadASCII` 55, `CTABreadASCII2` 70,
+`CTABreadASCIIttHeader` 191, `CTABalloc` 420, `CTABunique` 495, `CTABcountRepeats` 527, `CTABrandom`
+552, `CTABreadDefault` 1245, the counts and lookups 1267-1677 (`CTABhasEntry` 1314 too), `CTABprintASCII`
+1690, `CTABwriteFileASCII` 1720, `TissueTypeSchema` 1779, `TissueTypeSchemaDefault` 1800,
+`TissueTypeSchemaDefaultHead` 1957, `CTABmerge` 2480 (the binary tables: Part 2; `CTABfree` and
+`CTABdeepCopy`: fs.mri's `ctab`). Callers in the reach: `FSENVgetenv` (every program that reads the
+environment), `mri_segstats`, `mri_aparc2aseg`, `mri_ca_label`, `mris_volmask` (`CTABreadDefault`),
+`mri_gtmseg`, `mri_compute_volume_fractions`, `mri_label2vol`, `cma.cpp` (`TissueTypeSchema`),
+`mrisurf_defect.cpp` (`CTABalloc` + `CTABunique` + `CTABmerge` with a table sized to hold the merged
+one: `MAX(nentries, vol->ct->nentries)`), `mri_gtmseg`'s `--ctab-merge` (`CTABmerge` of a user's
+table: FS-418 reachable), `mris_make_face_parcellation` (`CTABcountRepeats`), track D's GIFTI reader
+(`CTABgetNumberOfValidEntries`, `CTABfindDuplicateNames`, `CTABrgb2Annotation`).
+
+### Mechanisms
+- FS-413: `CTABreadASCII2`'s first pass reads lines through `fgetl` (which cuts each line at its
+  first `#`), its second through `fgets` (whole lines). A name holding `#` hides its line from the
+  first pass (`sscanf` assigns 2 values), so the size `max_structure + 1` does not count it; the
+  second pass assigns 6 or 7 and indexes `ct->entries[structure]` without a bound check. A negative
+  structure (the first pass ignores it: `structure > max_structure` is false) indexes before the
+  array. Both read `ct->entries[structure]` (a heap word: a non-NULL value prints the duplicate
+  message through a wild pointer, NULL stores a fresh `malloc` there). Measured: crashes (signal 11)
+  or wrong alpha values (`-1215751936`) in the probe.
+- FS-414: `CTABreadASCIIttHeader` (a) calls `GetNthItemFromString(line, 0)` whenever
+  `CountItemsInString(line)` > 0: the latter counts items separated by `isblank` (space, tab), the
+  former by the C++ stream's white space (`isspace`): a line of `\v`, `\f` or `\r` among blanks has 1
+  item for the first and none for the second (`fs::error() << "asking for item 0, but 0 items in
+  string"`, NULL, then `strcmp(NULL, "#ctTType")`: signal 11); (b) `GetNthItemFromString(line, 1)` on
+  `#ctTType` alone (NULL into `sscanf`: signal 11); (c) `int segid` and the second pass's `structure`,
+  `name[STRLEN]`, `r`, `g`, `b`, `t` are locals that `sscanf` leaves untouched when it stops (the
+  return values are not checked): an earlier line's values, or the stack's contents before any; a
+  structure outside `[0, segidmax]` indexes `ct->entries` out of bounds. The loops are `cp = (char
+  *)1; while (cp != NULL) { cp = fgets(...); ...}`: at the end of the file `fgets` returns NULL with
+  the buffer unchanged, so the last line is processed once more (no visible effect); an empty file
+  (unreachable through `CTABreadASCII2`, which needs a structure line) would read `line[5000]`
+  uninitialised.
+- FS-415: `CTABreadASCIIttHeader` returns NULL for `nct == 0` before `fclose(fp)`.
+- FS-416: `CTABreadDefault` dereferences `fsenv->FREESURFER_HOME` after `FSENVgetenv()` without a
+  NULL check; `TissueTypeSchemaDefault(Head)` the same, and then `sprintf(ct->TissueTypeSchema, ...)`
+  on the NULL `CTABreadASCII` gives when the table does not read.
+- FS-417: `CTABrandom`, `CTABcountRepeats` read and write `ct->entries[i]->...` for every `i <
+  nentries` without a NULL check; `CTABunique` writes `ct->entries[0]` (for `CTABalloc(0)`: the
+  `calloc(0, 8)` block's first word, NULL in practice: signal 11).
+- FS-418: `CTABmerge` loops over `merge->nentries` and indexes `ct->entries[n]` without comparing
+  with `ct->nentries`.
+- FS-419: `TissueTypeSchemaDefault(Head)` overwrite `ri`, `gi`, `bi` of `CTABalloc(5|6)`'s entries but
+  not `rf`, `gf`, `bf`, which keep `CTABalloc`'s random draws (entry 0's are zeroed by `CTABunique`).
+- FS-420: `calloc(max_structure + 1, 8)` (and `calloc(segidmax + 1, 8)`, `CTABalloc`'s `malloc` per
+  entry): beyond the machine's memory `calloc` fails and the error returns (or, in `CTABalloc`, the
+  error's argument `ct->nentries` dereferences the NULL `CTABfree` left: a crash); within it, a
+  table. The probe's child has 1 GiB of address space.
+- FS-421 (fs.io, `MRITAGread`): `MRI::MRI` sets only `transform_fname[0] = '\0'`; `TAG_MGH_XFORM`
+  reads the tag's `len` bytes into the buffer with `fstagsio.read_data` without adding a NUL, so a
+  text without one continues into the buffer's never-written bytes (a fresh `new MRI`: heap
+  contents). Found by seed 1's light run once piece 10 changed the probe's heap history: the
+  official line printed `w/none.xfm` followed by an earlier case's output text.
+
+### Behaviours kept (rule C, both modes; no ID)
+- `CTABreadDefault` reads the default table twice (once inside `FSENVgetenv`, once itself): its
+  duplicate and error messages appear twice.
+- `CTABunique` reports failure (`INFO: ... could not find a unique set in <nmax> tries`, -1) when the
+  last try succeeded, and for `nmax` ≤ 0.
+- A table of only structure 0 is `badly formed` (`max_structure <= 0`).
+- `CTABalloc`'s entries' `TissueType` and `count` are never written (memory contents): no reached code
+  reads them (the probe does not print them); 0 here.
+- `CTABcopyName` (`strncpy`) leaves the caller's buffer without a NUL when the name has `name_len`
+  bytes or more; the reached callers pass `STRLEN`-sized buffers, longer than any name.
+- `CTABfindDuplicateNames` counts ordered pairs (each pair twice, three equal names six times) and
+  prints a line for each, then halves the count.
+- Signed overflow of `structure + idbase`, `255 - t`, `(b << 16) + ...`: GCC's code wraps (32-bit
+  `add`/`sub`/`shl`); the port wraps.
+
+### Code generation
+- The float colours `(float)i / 255.0`: `cvtsi2ss`, `cvtss2sd`, `divsd` by 255.0, `cvtsd2ss` (the
+  division in double, then rounded to float); `CTABcountRepeats` compares the floats with `ucomiss`
+  (no NaN possible).
+
+### Measured (piece 10, 2026-11-13, the probe `validation/probes/fs-io/`, unit oracle's build)
+- Seed 11, 330 piece-10 cases: `reproduce` identical on 279, 0 different (44 SKIP, 6 VARY).
+- Seed 13, 1,664 piece-10 cases: `reproduce` identical on 1,415, 0 different (230 SKIP: FS-416 76,
+  FS-417 52, FS-414 crashes 32, FS-413 20, FS-420 12, FS-418 8, FS-11 3; 19 VARY: FS-414's memory
+  never written). `fix` differs only where a defect is noted (FS-414's default error, FS-01).
+- Seed 1's light set with piece 10 (the recorded test): 4,796 cases, 4,164 identical (55 with
+  memory digits), 0 different, 632 SKIP or VARY; `d9fa9bda...`; the NaN trap (AArch64's NaN rules)
+  passes in debug (3,835 flips) and release (3,546).
+
+### Registration files, the rest (3.1-34, relay 19)
+Restricted. `utils/registerio.cpp`: `regio_print_register` 161, `regio_write_register` 207,
+`regio_read_mincxfm` 243, `regio_write_mincxfm` 322, `regio_read_registermat` 523 (callers in the
+reach: `mri_vol2vol`, `mri_surf2surf`, `bbregister`'s helpers, `mri_coreg`, `tkregister2_cmdl` (the
+`larmorx-nc` program), `talairach_avi`'s `.xfm` writers through `regio_write_mincxfm`).
+- FS-422: `regio_read_mincxfm` returns 1 after the `MNI Transform File` check without `fclose(fp)`.
+- Kept (rule C, no ID): `fgetl`'s return value is ignored, so the first line is compared and the
+  file information copied from the buffer itself (leading white space included); at the end of the
+  file the second `fgetl` leaves the first line's text, which becomes the file information;
+  `regio_write_register` returns 0 whatever `regio_print_register` returned; the messages'
+  `unrecoginized` and `Could open ... for writing`; `*R` set before the numbers are read, so a failed
+  read hands the caller a partial matrix with status 1; the file reopened without a check (a file
+  removed between the two opens crashes: not reachable).
+- Measured: seed 13, 710 piece-10 registration cases (142 of each): `reproduce` and `fix` identical
+  on all; seed 1's light set with them: 4,797 cases, 4,217 identical, 0 different, 580 SKIP or VARY
+  (`5e19ca25...`), the NaN trap passes in debug (4,084 flips) and release (3,954).

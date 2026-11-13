@@ -1655,6 +1655,42 @@ defects! {
         "reading a Bruker study whose 2dseq file is shorter than the volume crashes (the volume is freed twice)";
     FS_404 = "FS-404", "FreeSurfer", true,
         "reading a Bruker study ignores RECO_byte_order: a big-endian 2dseq is read in the machine's byte order, so its values are wrong";
+    FS_405 = "FS-405", "FreeSurfer", true,
+        "FreeSurfer's 2-D image functions (allocating, clearing an area, copying frames, scaling, the pyramid reduction) read and write outside an image's pixels when given a frame, an area, a size or a buffer the image does not have: memory corruption, a crash or memory contents";
+    FS_406 = "FS-406", "FreeSurfer", true,
+        "FreeSurfer's 2-D image functions turn a float beyond the target type's range, or NaN, into a pixel byte or a pixel coordinate without a check: a fill value or a float pixel beyond the byte range becomes the low byte of -2147483648 or of its integer part, a coordinate -2147483648";
+    FS_407 = "FS-407", "FreeSurfer", true,
+        "ImageCopyFrames, converting frames (bytes into floats or integers, integers into anything), writes each frame into the output frame of the same number, not into the destination frame it was given";
+    FS_408 = "FS-408", "FreeSurfer", true,
+        "ImageScaleDown of a float image of more than one frame by a power of two (0.5, 0.25, ...) reduces only the first frame: the output's other frames are left as they were";
+    FS_409 = "FS-409", "FreeSurfer", true,
+        "ImageRescale by 1 with a given output smaller than its input returns that output after freeing it, without the copy: memory contents or a crash";
+    FS_410 = "FS-410", "FreeSurfer", true,
+        "ImageAlloc, when the pixels cannot be allocated, ends the program with the code of FreeSurfer's previous error, 0 when there was none: a program that ran out of memory exits with status 0 (success)";
+    FS_411 = "FS-411", "FreeSurfer", true,
+        "a newer-style FreeSurfer program without a help text (mri_brainvol_stats) run without a required input prints, before its error, a help line chosen by memory never written: No xml string passed. when that memory holds 0, otherwise an XML parser's message";
+    FS_412 = "FS-412", "FreeSurfer", true,
+        "ImageScaleUp, ImageScaleDown and ImageRescale with a scale that makes the image's rows or columns beyond the 32-bit integer range (or NaN) go on with extents of -2147483648: nothing is scaled, or the image cannot be allocated, with no message about the scale";
+    FS_413 = "FS-413", "FreeSurfer", true,
+        "reading a text colour table, an entry line whose structure number is negative, or is the table's largest while its name holds a #, is stored outside the table: memory corruption, a crash or another object's values (a smaller number with a # in its name is read as an entry)";
+    FS_414 = "FS-414", "FreeSurfer", true,
+        "reading a text colour table's tissue-type lines (#ctTType): a line of vertical tabs, form feeds or carriage returns only, or a #ctTType line with nothing after the keyword, crashes FreeSurfer; a #ctTType line whose structure number, name, colour or transparency does not read takes that value from an earlier such line or from memory never written, and one whose structure number is negative or does not read can be stored outside the table";
+    FS_415 = "FS-415", "FreeSurfer", true,
+        "reading a text colour table without tissue-type lines leaves the file open: a program that reads many tables runs out of file descriptors";
+    FS_416 = "FS-416", "FreeSurfer", true,
+        "reading the default colour table (CTABreadDefault), and adding a tissue-type schema without a table, crash when FreeSurfer's environment cannot be read: FREESURFER_HOME not set, its FreeSurferColorLUT.txt missing or unreadable, or a wrong FS_DESIRED_BVEC_SPACE";
+    FS_417 = "FS-417", "FreeSurfer", true,
+        "a table of random colours of no entries (CTABalloc of 0), and drawing new colours for or counting the repeated colours of a table with empty places, crash FreeSurfer";
+    FS_418 = "FS-418", "FreeSurfer", true,
+        "merging a colour table with more places into a smaller one (CTABmerge) writes past the smaller table: memory corruption or a crash";
+    FS_419 = "FS-419", "FreeSurfer", false,
+        "the tissue-type schemas' table of tissue classes keeps the random float colours it was made with: its float colours do not match its integer ones (kept: no FreeSurfer program reads them)";
+    FS_420 = "FS-420", "FreeSurfer", true,
+        "a text colour table whose largest structure number (or tissue-type number) is beyond the machine's memory, or a table of random colours of such a count, gives an error message, a crash or a table depending on the machine's memory";
+    FS_421 = "FS-421", "FreeSurfer", true,
+        "reading an MGH volume whose talairach tag's text has no NUL byte (and fewer than 1,024 bytes) takes the transform's name on past the text from memory never written: a garbled name, so the transform is not found or another file is read";
+    FS_422 = "FS-422", "FreeSurfer", true,
+        "reading an MNI transform file (regio_read_mincxfm) whose first line is not MNI Transform File leaves the file open: a program that reads many runs out of file descriptors";
     FS_285 = "FS-285", "FreeSurfer", true,
         "reading a volume-geometry block (the text block of linear transform and surface files) whose line starts with a word of 64 bytes or more writes the word past its buffer: memory corruption, a crash or wrong values";
     FS_286 = "FS-286", "FreeSurfer", true,

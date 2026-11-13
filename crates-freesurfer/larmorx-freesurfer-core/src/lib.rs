@@ -31,6 +31,7 @@
 #![forbid(unsafe_code)]
 
 pub mod affine;
+pub mod argparse;
 pub mod base;
 pub mod cglob;
 pub mod chklc;

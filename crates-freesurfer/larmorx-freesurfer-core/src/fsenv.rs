@@ -58,7 +58,7 @@ pub fn fsenv_getenv<C>(
     env: &Environment,
     dir: Option<&Path>,
     out: &mut dyn Write,
-    read_ctab: impl FnOnce(&str) -> Option<C>,
+    read_ctab: impl FnOnce(&mut Globals, &mut dyn Write, &str) -> Option<C>,
 ) -> Option<Fsenv<C>> {
     let Some(home) = var(env, "FREESURFER_HOME") else {
         let _ = writeln!(out, "FREESURFER_HOME not defined");
@@ -87,7 +87,7 @@ pub fn fsenv_getenv<C>(
         None => (String::new(), String::new(), String::new()),
     };
     let ctab_file = format!("{home}/FreeSurferColorLUT.txt");
-    let Some(ctab) = read_ctab(&ctab_file) else {
+    let Some(ctab) = read_ctab(g, out, &ctab_file) else {
         let _ = writeln!(out, "ERROR: reading {ctab_file}");
         return None;
     };
@@ -151,7 +151,7 @@ mod tests {
         let env = Environment::from_pairs(pairs.iter().copied());
         let mut g = Globals::new(UpstreamDefects::Fix);
         let mut out = Vec::new();
-        let r = fsenv_getenv(&mut g, &env, Some(Path::new("/w")), &mut out, |f| {
+        let r = fsenv_getenv(&mut g, &env, Some(Path::new("/w")), &mut out, |_, _, f| {
             assert_eq!(f, "/fs/FreeSurferColorLUT.txt");
             ctab.then_some(7u8)
         });

@@ -157,3 +157,45 @@ to the source's `/ 2.`); the files closed where FreeSurfer leaves them open (FS-
 FS-402 and FS-404 are larmorx's own: the voxels read by their type's size and in `$RECO_byte_order`'s
 order (ParaVision's documented parameter).
 
+
+## FreeSurfer files and functions translated (part 8, relay 18: FreeSurfer's 2-D images)
+
+| FreeSurfer file | What | Here |
+|---|---|---|
+| `utils/image.cpp` 65-145, 384-468, 526-569, 977-1500, 3748-3822; `include/image.h`, `include/hips.h` (the `IMAGE` header, the formats, the pixel macros) | `ImageAlloc` (65, 3.1-26's line), `ImageAllocBuffer`, `ImageFree`, `ImageCopy`, `ImageClearArea`, `ImageCheckSize`, `ImageSetSize`, `ImageCopyFrames`, `ImageRescale`, `ImageScaleDown`, `ImageScaleUp`, `init_header`, `h_copy`, `free_header` (the reached 14 of the file's 73 functions) | `image.rs` |
+| `utils/hips.cpp` 4-5, 42-47 | `hips_cplxtor`, `hips_rtocplx` (fs.core's globals), the conversion stubs `h_tob` ... `h_toi` | `image.rs` |
+| `utils/filter.cpp` 713-1041 | `ImageConvolve1d`, `ImageReduce` with its kernel, `ImageReduce1d` (fs.filter's, here because `ImageScaleDown` calls them and fs.filter's crate sits above fs.io) | `image.rs` |
+| `include/macros.h` 35, 118 | `exp2` as `pow(2.0, f)`, `ISPOW2` (decided exactly: `ispow2`, `nint_log2`) | `image.rs` |
+
+Changes for part 8: the pixels one `Vec<u8>` of the length FreeSurfer allocates, the pointer walks
+(`image += sizeimage` per frame, restored at the end) as byte offsets, every pixel access checked
+(FS-405: both modes skip the write and read 0); floats as their little-endian bytes; the sums in the
+official object's operand order through `larmorx_freesurfer_core::sse`; `ImageReduce`'s `static`
+work image and `ImageConvolve1d`'s `static` index tables made each call (only memory differs);
+`ISPOW2` and `nint(log2(1 / scale))` decided without `log2f`/`log2`/`pow` (exact for the values they
+meet: a power of two's logarithm is exact in glibc, and the count is computed only next to one).
+The defaults of FS-406 (clamped conversions), FS-407 (the destination frame), FS-408 (every frame
+reduced), FS-409 (the copy returned) and FS-410 (`ERROR_NO_MEMORY`) are larmorx's own.
+
+
+## FreeSurfer files and functions translated (part 9, relay 19: fs.labels' text colour tables and lookups)
+
+| FreeSurfer file | What | Here |
+|---|---|---|
+| `utils/colortab.cpp` 55-262, 420-571, 1245-1765, 1779-2167, 2480-2496; `include/colortab.h` (`CTAB_VERSION_TO_WRITE`, `ctabDuplicates`, `AnnotToRGB`) | `CTABreadASCII`, `CTABreadASCII2` (with `ctabDuplicates`), `CTABreadASCIIttHeader`, `CTABalloc`, `CTABunique`, `CTABcountRepeats`, `CTABrandom`, `CTABreadDefault`, `CTABgetNumberOfValidEntries`, `CTABgetNumberOfTotalEntries`, `CTABisEntryValid`, `CTABhasEntry`, `CTABrgbAtIndexi`, `CTABcopyName`, `CTABrgb2Annotation`, `CTABentryNameToIndex`, `CTABentryNameToAnnotation`, `CTABannotationAtIndex`, `CTABfindAnnotation`, `CTABfindDuplicateNames`, `CTABfindIndexFromAnnotation`, `CTABfindRGBi`, `CTABfindName`, `CTABprintASCII`, `CTABwriteFileASCII`, `TissueTypeSchema`, `TissueTypeSchemaDefault`, `TissueTypeSchemaDefaultHead`, `CTABmerge` | `colortab.rs` |
+| `include/cma.h` | the structure numbers the two schemas name (`Left_Cerebral_Cortex` 3 ... `Head_ExtraCerebral` 258) | `colortab.rs` (`tt_default`, `tt_default_head`) |
+| `utils/registerio.cpp` 161-350, 523-534 | `regio_print_register`, `regio_write_register`, `regio_read_mincxfm`, `regio_write_mincxfm`, `regio_read_registermat` (3.1-34) | `registerio.rs` |
+| `utils/mriio.cpp` 12278-12310 (part 6's `MRITAGread`, changed) | the transform name's buffer: its bytes never written tracked (FS-421) | `mriio.rs` |
+
+Changes for part 9: the table's places a `Vec<Option<Box<ColorTableEntry>>>` (fs.mri's structure);
+lines read through `CFile::fgets` with FreeSurfer's 1,024-byte buffer and `fgetl`'s rules, numbers
+and names through fs.core's `cscan::Scanf` (glibc's `sscanf`, `errno` kept in `Globals`);
+`CTABreadASCIIttHeader`'s two passes over the lines read once (the last line twice, as `fgets`
+leaves its buffer at the end); `stricmp` on bytes (FS-11 noted for 1,024 bytes or more);
+`CTABprintASCII`'s `%3d` and `%-30s` written byte by byte; `ctabDuplicates` returned by
+`ctab_read_ascii2_counted` (no global); `CTABprintASCII(ct, stdout)` as `ctab_print_ascii_stdout`;
+`FSENVgetenv`'s colour-table reader given the program's globals and output (fs.core's
+`fsenv_getenv`). The defaults of FS-413 (a negative structure an error, a larger one kept), FS-414
+(a bad `#ctTType` line an error), FS-417 (empty places skipped), FS-418 (the table grown) and the
+caps of FS-420 (2^24 places, 2^20 random entries) are larmorx's own; FS-415 closes the file (no
+notice), FS-416 returns no table.

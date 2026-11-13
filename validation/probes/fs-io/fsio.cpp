@@ -54,6 +54,8 @@
 #include "mosaic.h"
 #include "matfile.h"
 #include "registerio.h"
+#include "image.h"
+#include "argparse.h"
 
 // gifti.cpp's two file-local helpers, compiled into the probe by gifti_statics.cpp
 giiDataArray *fsio_gifti_alloc_and_add_darray(gifti_image *image);
@@ -556,6 +558,407 @@ void ocstr(const char *s)
   obytes(std::vector<unsigned char>(s, s + strlen(s)));
 }
 
+
+// piece 8: FreeSurfer's 2-D images (image.cpp, filter.cpp's reduction)
+std::vector<std::pair<IMAGE *, unsigned long>> imlens;  // the probe's images and their bytes
+// the bytes the probe knows an image's pixels have (false: an image FreeSurfer made)
+bool img_len(IMAGE *I, unsigned long *len)
+{
+  for (auto &p : imlens)
+    if (p.first == I) { *len = p.second; return true; }
+  return false;
+}
+// an image: ImageAlloc(rows, cols, format, frames, bufsize), its extents (not the stored ones)
+// set when not -7, its pixel sizes, then its bytes from hex
+IMAGE *mkimg()
+{
+  if (strcmp(toks[pos].c_str(), "N") == 0) { pos++; return NULL; }
+  int rows = (int)geti(), cols = (int)geti(), fmt = (int)geti(), nf = (int)geti();
+  unsigned long bs = strtoull(next(), NULL, 10);
+  int sr = (int)geti(), sc = (int)geti();
+  float xs = getf(), ys = getf();
+  std::vector<unsigned char> b = unhex(next());
+  IMAGE *I = ImageAlloc(rows, cols, fmt, nf, bs);
+  unsigned long len = I->image ? (bs ? bs : I->sizeimage * (unsigned long)(long)I->num_frame) : 0;
+  if (sr != -7) I->rows = sr;
+  if (sc != -7) I->cols = sc;
+  I->xsize = xs;
+  I->ysize = ys;
+  if (I->image) memcpy(I->image, b.data(), b.size() < len ? b.size() : len);
+  imlens.push_back({I, len});
+  return I;
+}
+// an image FreeSurfer is about to free (its address may come back for a new image)
+void forget(IMAGE *I)
+{
+  for (auto &p : imlens)
+    if (p.first == I) p.first = NULL;
+}
+void print_img(IMAGE *I)
+{
+  if (!I) { out += "N "; return; }
+  oi(I->num_frame); oi(I->orows); oi(I->ocols); oi(I->rows); oi(I->cols); oi(I->frow); oi(I->fcol);
+  oi(I->pixel_format); oi(I->numcolor); oi((long long)I->numpix); oi(I->sizepix);
+  oi((long long)I->sizeimage); oi(I->imdealloc);
+  if (!I->firstpix) out += "N ";
+  else oi((long long)(I->firstpix - I->image));
+  of(I->xsize); of(I->ysize);
+  if (!I->image) { out += "B- "; return; }
+  unsigned long n = I->sizeimage * (unsigned long)(long)I->num_frame;
+  unsigned long known = 0;
+  if (img_len(I, &known) && known < n) n = known;
+  if (n <= 128) obytes(std::vector<unsigned char>(I->image, I->image + n));
+  else fnv_bytes(I->image, n);
+}
+
+
+// piece 9: FreeSurfer's ArgumentParser (argparse.cpp, fs.core)
+std::string hexstr() { std::vector<unsigned char> b = unhex(next()); return std::string(b.begin(), b.end()); }
+void ostdstr(const std::string &v)
+{
+  out += "x";
+  obytes(std::vector<unsigned char>(v.begin(), v.end()));
+  if (v.empty()) { out.pop_back(); out.pop_back(); out += " "; }
+}
+const unsigned char help9[] = "<help><name>probe</name><synopsis>probe [options]</synopsis></help>";
+
+// piece 10: fs.labels' text colour tables and lookups (colortab.cpp)
+void run_piece10(const std::string &cmd);
+
+void run_piece9(const std::string &cmd)
+{
+  if (cmd != "apa") { run_piece10(cmd); return; }
+  fwide(stderr, -1);
+  ArgumentParser parser;
+  int nconf = (int)geti();
+  for (int i = 0; i < nconf; i++) {
+    std::string k = next();
+    if (k == "H") {
+      int mode = (int)geti();
+      if (mode == 1) parser.addHelp(help9, 0);
+      else parser.addHelp(help9, sizeof help9 - 1);
+    } else if (k == "A1") {
+      std::string name = hexstr();
+      char nargs = (char)geti();
+      ArgType t = (ArgType)geti();
+      bool req = geti() != 0;
+      parser.addArgument(name, nargs, t, req);
+    } else {
+      std::string sn = hexstr();
+      std::string name = hexstr();
+      char nargs = (char)geti();
+      ArgType t = (ArgType)geti();
+      bool req = geti() != 0;
+      parser.addArgument(sn, name, nargs, t, req);
+    }
+  }
+  int nargv = (int)geti();
+  std::vector<std::string> args;
+  for (int i = 0; i < nargv; i++) args.push_back(hexstr());
+  std::vector<char *> av;
+  for (std::string &a : args) av.push_back(&a[0]);
+  av.push_back(NULL);
+  out += "parsed ";
+  fflush(stdout);
+  parser.parse(args.size(), av.data());
+  int nq = (int)geti();
+  for (int i = 0; i < nq; i++) {
+    std::string k = next();
+    std::string name = hexstr();
+    if (k == "E") { oi(parser.exists(name)); continue; }
+    std::string t = next();
+    if (t == "i") oi(parser.retrieve<int>(name));
+    else if (t == "f") of(parser.retrieve<float>(name));
+    else if (t == "b") oi(parser.retrieve<bool>(name));
+    else if (t == "s") ostdstr(parser.retrieve<std::string>(name));
+    else if (t == "I") { std::vector<int> v = parser.retrieve<std::vector<int>>(name); oi((long long)v.size()); for (int x : v) oi(x); }
+    else if (t == "F") { std::vector<float> v = parser.retrieve<std::vector<float>>(name); oi((long long)v.size()); for (float x : v) of(x); }
+    else if (t == "B") { std::vector<bool> v = parser.retrieve<std::vector<bool>>(name); oi((long long)v.size()); for (bool x : v) oi(x); }
+    else { std::vector<std::string> v = parser.retrieve<std::vector<std::string>>(name); oi((long long)v.size()); for (std::string &x : v) ostdstr(x); }
+  }
+}
+
+// a table: <version> <nentries> <idbase> <fname> <k>, then k entries <index> <name> <r> <g> <b> <a>
+// <tissue type> <count> (float colours from the integer ones, as the readers make them)
+COLOR_TABLE *read_ct10()
+{
+  COLOR_TABLE *ct = (COLOR_TABLE *)calloc(1, sizeof(COLOR_TABLE));
+  ct->version = (int)geti();
+  ct->nentries = (int)geti();
+  ct->idbase = (int)geti();
+  bool n;
+  std::string fn = getstr(&n);
+  strncpy(ct->fname, fn.c_str(), STRLEN - 1);
+  ct->entries = (COLOR_TABLE_ENTRY **)calloc(ct->nentries > 0 ? ct->nentries : 1, sizeof(CTE *));
+  int k = (int)geti();
+  for (int i = 0; i < k; i++) {
+    int idx = (int)geti();
+    CTE *e = (CTE *)calloc(1, sizeof(CTE));
+    std::string nm = getstr(&n);
+    strncpy(e->name, nm.c_str(), STRLEN - 1);
+    e->ri = (int)geti(); e->gi = (int)geti(); e->bi = (int)geti(); e->ai = (int)geti();
+    e->rf = (float)e->ri / 255.0; e->gf = (float)e->gi / 255.0; e->bf = (float)e->bi / 255.0;
+    e->af = (float)e->ai / 255.0;
+    e->TissueType = (int)geti();
+    e->count = (int)geti();
+    ct->entries[idx] = e;
+  }
+  return ct;
+}
+// a table: N, or its fields and non-empty entries (`alloc`: entries CTABalloc made, whose tissue
+// type and count are memory contents, left out), then its tissue-type table (`T`)
+void print_ct10(const COLOR_TABLE *ct, bool alloc, bool sub_alloc)
+{
+  if (!ct) { out += "N "; return; }
+  oi(ct->nentries); oi(ct->version); oi(ct->idbase); ocs(ct->fname); ocs(ct->TissueTypeSchema);
+  for (int i = 0; i < ct->nentries; i++) {
+    const CTE *e = ct->entries[i];
+    if (!e) continue;
+    out += "@" + std::to_string(i) + " ";
+    ocs(e->name); oi(e->ri); oi(e->gi); oi(e->bi); oi(e->ai);
+    of(e->rf); of(e->gf); of(e->bf); of(e->af);
+    if (!alloc) { oi(e->TissueType); oi(e->count); }
+  }
+  out += "T ";
+  print_ct10(ct->ctabTissueType, sub_alloc, false);
+}
+// three environment variables: FREESURFER_HOME, SUBJECTS_DIR, FS_DESIRED_BVEC_SPACE (N: unset)
+void env10()
+{
+  const char *names[] = {"FREESURFER_HOME", "SUBJECTS_DIR", "FS_DESIRED_BVEC_SPACE"};
+  for (const char *nm : names) {
+    bool n;
+    std::string v = getstr(&n);
+    if (n) unsetenv(nm);
+    else setenv(nm, v.c_str(), 1);
+  }
+}
+std::string name10() { bool n; return getstr(&n); }
+
+void run_piece10(const std::string &cmd)
+{
+  fwide(stderr, -1);
+  unsetenv("FREESURFER_SEED");
+  if (cmd == "cra") {
+    int check = (int)geti();
+    setup(next());
+    errno = 0;
+    std::string fn = name10();
+    ctabDuplicates = -7;
+    COLOR_TABLE *ct = CTABreadASCII2(fn.c_str(), check);
+    print_ct10(ct, false, false);
+    oi(ctabDuplicates);
+  } else if (cmd == "crt") {
+    setup(next());
+    errno = 0;
+    std::string fn = name10();
+    print_ct10(CTABreadASCIIttHeader(fn.c_str()), false, false);
+  } else if (cmd == "ctd") {
+    env10();
+    setup(next());
+    errno = 0;
+    print_ct10(CTABreadDefault(), false, false);
+  } else if (cmd == "cal") {
+    setRandomSeed(strtol(next(), NULL, 10));
+    int n = (int)geti();
+    print_ct10(CTABalloc(n), true, false);
+  } else if (cmd == "cun") {
+    setRandomSeed(strtol(next(), NULL, 10));
+    int nmax = (int)geti();
+    COLOR_TABLE *ct = read_ct10();
+    oi(CTABunique(ct, nmax));
+    print_ct10(ct, false, false);
+  } else if (cmd == "ccr") {
+    int brk = (int)geti();
+    COLOR_TABLE *ct = read_ct10();
+    oi(CTABcountRepeats(ct, brk));
+  } else if (cmd == "cq") {
+    COLOR_TABLE *ct = read_ct10();
+    int nops = (int)geti();
+    for (int k = 0; k < nops; k++) {
+      std::string op = next();
+      int a = -7, b = -7, c = -7, d = -7;
+      if (op == "v") { oi(CTABgetNumberOfValidEntries(ct, &a)); oi(a); }
+      else if (op == "t") { oi(CTABgetNumberOfTotalEntries(ct, &a)); oi(a); }
+      else if (op == "e") { int i = (int)geti(); oi(CTABisEntryValid(ct, i, &a)); oi(a); }
+      else if (op == "h") { int i = (int)geti(); oi(CTABhasEntry(ct, i)); }
+      else if (op == "r") { int i = (int)geti(); oi(CTABrgbAtIndexi(ct, i, &a, &b, &c)); oi(a); oi(b); oi(c); }
+      else if (op == "n") {
+        int i = (int)geti();
+        int len = (int)geti();
+        static char buf[4096];
+        memset(buf, 'Z', sizeof buf);
+        oi(CTABcopyName(ct, i, buf, len));
+        size_t m = strnlen(buf, len);
+        out += "x";
+        obytes(std::vector<unsigned char>(buf, buf + m));
+        if (m == 0) { out.pop_back(); out.pop_back(); out += " "; }
+      }
+      else if (op == "a") { int r = (int)geti(), g = (int)geti(), bb = (int)geti(); oi(CTABrgb2Annotation(r, g, bb)); }
+      else if (op == "x") { std::string nm = name10(); oi(CTABentryNameToIndex(nm.c_str(), ct)); }
+      else if (op == "y") { std::string nm = name10(); oi(CTABentryNameToAnnotation(nm.c_str(), ct)); }
+      else if (op == "i") { int i = (int)geti(); oi(CTABannotationAtIndex(ct, i, &a)); oi(a); }
+      else if (op == "f") { int an = (int)geti(); oi(CTABfindAnnotation(ct, an, &a)); oi(a); }
+      else if (op == "F") { int an = (int)geti(); oi(CTABfindIndexFromAnnotation(ct, an, &a)); oi(a); }
+      else if (op == "g") { int r = (int)geti(), g = (int)geti(), bb = (int)geti(); oi(CTABfindRGBi(ct, r, g, bb, &a)); oi(a); }
+      else if (op == "m") { std::string nm = name10(); oi(CTABfindName(ct, nm.c_str(), &a)); oi(a); }
+      else if (op == "d") { oi(CTABfindDuplicateNames(ct)); }
+      else fail("unknown query");
+      (void)d;
+    }
+  } else if (cmd == "cpw") {
+    Gdiag = (int)geti();
+    setup(next());
+    errno = 0;
+    COLOR_TABLE *ct = read_ct10();
+    std::string fn = name10();
+    oi(CTABwriteFileASCII(ct, fn.c_str()));
+    obytes(read_file(fn));
+  } else if (cmd == "cps") {
+    Gdiag = (int)geti();
+    COLOR_TABLE *ct = read_ct10();
+    oi(CTABprintASCII(ct, stdout));
+  } else if (cmd == "cts") {
+    std::string schema = name10();
+    setRandomSeed(strtol(next(), NULL, 10));
+    env10();
+    setup(next());
+    errno = 0;
+    COLOR_TABLE *ct = geti() ? read_ct10() : NULL;
+    print_ct10(TissueTypeSchema(ct, schema.c_str()), false, true);
+  } else if (cmd == "cme") {
+    COLOR_TABLE *ct = read_ct10();
+    COLOR_TABLE *m = read_ct10();
+    oi(CTABmerge(ct, m));
+    print_ct10(ct, false, false);
+  } else if (cmd == "rpr" || cmd == "rwr") {
+    // regio_print_register / regio_write_register
+    bool n;
+    std::string subj = getstr(&n);
+    float ip = getf(), bp = getf(), in = getf();
+    MATRIX *R = read_mat();
+    int f2i = (int)geti();
+    if (cmd == "rpr") {
+      oi(regio_print_register(stdout, n ? NULL : subj.c_str(), ip, bp, in, R, f2i));
+    } else {
+      setup(next());
+      errno = 0;
+      std::string fn = name10();
+      oi(regio_write_register(fn.c_str(), n ? NULL : subj.c_str(), ip, bp, in, R, f2i));
+      obytes(read_file(fn));
+    }
+  } else if (cmd == "rrx") {
+    int want = (int)geti();
+    setup(next());
+    errno = 0;
+    std::string fn = name10();
+    MATRIX *R = NULL;
+    char *info = NULL;
+    oi(regio_read_mincxfm(fn.c_str(), &R, want ? &info : NULL));
+    print_mat(R);
+    if (info) ocs(info); else out += "N ";
+  } else if (cmd == "rwx") {
+    setenv("FREESURFER_REPLACEMENT_FOR_CREATION_TIME_STRING", "Thu Jan  1 00:00:00 2026", 1);
+    MATRIX *R = read_mat();
+    bool n;
+    std::string info = getstr(&n);
+    setup(next());
+    errno = 0;
+    std::string fn = name10();
+    oi(regio_write_mincxfm(fn.c_str(), R, n ? NULL : info.c_str()));
+    obytes(read_file(fn));
+  } else if (cmd == "rrm") {
+    setup(next());
+    errno = 0;
+    std::string fn = name10();
+    print_mat(regio_read_registermat(fn.c_str()));
+  } else {
+    fail("unknown command");
+  }
+  oi(Gerror);
+}
+
+bool piece10_cmd(const std::string &cmd)
+{
+  static const char *k[] = {"cra", "crt", "ctd", "cal", "cun", "ccr", "cq", "cpw", "cps", "cts", "cme",
+                            "rpr", "rwr", "rrx", "rwx", "rrm"};
+  for (const char *c : k)
+    if (cmd == c) return true;
+  return false;
+}
+
+void run_piece8(const std::string &cmd)
+{
+  if (cmd == "apa" || piece10_cmd(cmd)) { run_piece9(cmd); return; }
+  fwide(stderr, -1);
+  Gerror = (int)geti();
+  if (cmd == "ial") {
+    int rows = (int)geti(), cols = (int)geti(), fmt = (int)geti(), nf = (int)geti();
+    unsigned long bs = strtoull(next(), NULL, 10);
+    IMAGE *I = ImageAlloc(rows, cols, fmt, nf, bs);
+    imlens.push_back({I, I->image ? (bs ? bs : I->sizeimage * (unsigned long)(long)I->num_frame) : 0});
+    print_img(I);
+  } else if (cmd == "icp") {
+    IMAGE *s = mkimg();
+    IMAGE *d = mkimg();
+    if (d && (d->numpix < s->numpix || d->num_frame < s->num_frame)) forget(d);
+    IMAGE *r = ImageCopy(s, d);
+    print_img(s); print_img(r);
+  } else if (cmd == "ica") {
+    IMAGE *I = mkimg();
+    int r0 = (int)geti(), c0 = (int)geti(), rows = (int)geti(), cols = (int)geti();
+    float val = getf();
+    int frame = (int)geti();
+    oi(ImageClearArea(I, r0, c0, rows, cols, val, frame)); print_img(I);
+  } else if (cmd == "ick") {
+    IMAGE *a = mkimg();
+    IMAGE *b = mkimg();
+    int rows = (int)geti(), cols = (int)geti(), nf = (int)geti();
+    oi(ImageCheckSize(a, b, rows, cols, nf));
+  } else if (cmd == "iss") {
+    IMAGE *I = mkimg();
+    int rows = (int)geti(), cols = (int)geti();
+    oi(ImageSetSize(I, rows, cols)); print_img(I);
+  } else if (cmd == "icf") {
+    IMAGE *a = mkimg();
+    IMAGE *b = mkimg();
+    int start = (int)geti(), nf = (int)geti(), dst = (int)geti();
+    oi(ImageCopyFrames(a, b, start, nf, dst)); print_img(b);
+  } else if (cmd == "irs") {
+    IMAGE *a = mkimg();
+    IMAGE *b = mkimg();
+    float scale = getf();
+    IMAGE *r = ImageRescale(a, b, scale);
+    print_img(a); print_img(r);
+  } else if (cmd == "isd" || cmd == "isu") {
+    IMAGE *a = mkimg();
+    IMAGE *b = mkimg();
+    float scale = getf();
+    int r = cmd == "isd" ? ImageScaleDown(a, b, scale) : ImageScaleUp(a, b, scale);
+    oi(r); print_img(a); print_img(b);
+  } else if (cmd == "ird") {
+    IMAGE *a = mkimg();
+    IMAGE *b = mkimg();
+    if (b && !ImageCheckSize(a, b, a->rows / 2, a->cols / 2, 0)) forget(b);
+    IMAGE *r = ImageReduce(a, b);
+    print_img(r);
+  } else if (cmd == "ic1" || cmd == "ir1") {
+    IMAGE *a = mkimg();
+    IMAGE *b = mkimg();
+    int axis = (int)geti();
+    int len = (int)geti();
+    std::vector<float> k(len);
+    for (float &x : k) x = getf();
+    if (cmd == "ic1") ImageConvolve1d(a, b, k.data(), len, axis);
+    else ImageReduce1d(a, b, k.data(), len, axis);
+    print_img(b);
+  } else {
+    run_piece9(cmd);
+    return;
+  }
+  oi(Gerror);
+}
+
 void run_piece7(const std::string &cmd)
 {
   if (cmd == "bsp") {
@@ -615,7 +1018,7 @@ void run_piece7(const std::string &cmd)
     oi(errno);
     Gdiag = 0;
   } else {
-    fail("unknown command");
+    run_piece8(cmd);
   }
 }
 

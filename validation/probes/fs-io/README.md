@@ -78,6 +78,44 @@ number on C streams and znz files, `fio_dirname`, `fio_basename`, `fio_extension
   ParaVision's `##$NAME=value` form (most complete; missing, odd, CR LF, overlong and cut lines; unsupported types; 2dseq
   files of the right length, half, a byte more). `SKIP` for FS-259 and FS-403, `VARY` for FS-401 (values never written).
   Seed 13, 3,815 piece-7 cases: `reproduce` identical on 3,221, 0 different.
+- Piece 8 (relay 18): FreeSurfer's 2-D images (`image.cpp`, `filter.cpp`'s pyramid reduction). Each case starts with
+  `Gerror`'s value and ends by printing it: `ial` (`ImageAlloc`), `icp` (`ImageCopy`), `ica` (`ImageClearArea`), `ick`
+  (`ImageCheckSize`), `iss` (`ImageSetSize`), `icf` (`ImageCopyFrames`), `irs` (`ImageRescale`), `isd`/`isu`
+  (`ImageScaleDown`/`ImageScaleUp` called directly), `ird` (`ImageReduce`), `ic1`/`ir1` (`ImageConvolve1d`/
+  `ImageReduce1d` with a given kernel); an image is given as `ImageAlloc`'s arguments, its extents in use (-7: as
+  allocated), its pixel sizes and its bytes (`N`: none), built by `tests/fs_io/piece8.rs` (up to 13 by 13 pixels and 3
+  frames, every format, odd extents, frames and buffers, floats of every kind) and printed as its fields and its bytes
+  (hex up to 128, else FNV-1a 64; the probe keeps the length of the buffers it made and forgets an image FreeSurfer is
+  about to free). `SKIP` for FS-405 (outside the pixels) and FS-409 (an image used after it is freed). Seed 11, 1,068
+  piece-8 cases: `reproduce` identical on 949, 0 different; seed 13, 5,292: identical on 4,605, 0 different.
+- Piece 9 (relay 18): fs.core's `ArgumentParser` (`argparse.cpp`, the newer programs' command lines). `apa`: a
+  configuration (`A1`/`A2` `addArgument`, `H` `addHelp` with an empty or an XML text; the seven programs' own or
+  random ones), a command line (its first word the program's name; made for the configuration half of the time) and
+  `exists`/`retrieve` queries; `parsed` and the answers, or `EXIT` with the messages. Built by
+  `tests/fs_io/piece9.rs`. `SKIP` where an XML help text is rendered (FreeSurfer's help renderer, `fsPrintHelp.cpp`,
+  is not ported yet), `VARY` where the answer depends on the name index's order (libstdc++'s hash order: two names
+  match) or on the time (`--all-info`). Seed 13, 2,352 cases: `reproduce` identical on 2,265, 0 different.
+- Piece 10 (relay 19): fs.labels' text colour tables and lookups (`colortab.cpp`). `cra` (`CTABreadASCII2` with or
+  without the duplicate-name check; `ctabDuplicates` set to -7 before and printed after), `crt`
+  (`CTABreadASCIIttHeader`), `ctd` (`CTABreadDefault` with `FREESURFER_HOME`, `SUBJECTS_DIR`, `FS_DESIRED_BVEC_SPACE`
+  set or unset: `N` or `x<hex>`), `cal` (`setRandomSeed`, then `CTABalloc`), `cun` (`CTABunique`), `ccr`
+  (`CTABcountRepeats`), `cq` (a list of lookups: `v t e h r n a x y i f F g m d`, each answer after the function's
+  status, outputs preset to -7), `cpw` (`CTABwriteFileASCII` and the file's bytes, `Gdiag` given), `cps`
+  (`CTABprintASCII` to standard output), `cts` (`TissueTypeSchema` of a given table or of the default one), `cme`
+  (`CTABmerge`). A table is given as `<version> <nentries> <idbase> <fname> <k>` and `k` entries `<index> <name> <r>
+  <g> <b> <a> <tissue type> <count>`; printed as its fields, its non-empty entries (float colours as bits; tissue type
+  and count left out for `CTABalloc`'s entries, memory contents in FreeSurfer) and its tissue-type table after `T`;
+  `Gerror` last. Table files are built by `tests/fs_io/piece10.rs` (entry lines with every separator, sign, overflow
+  and stray character; comments, CR LF, long lines, NUL bytes, `#ctTType` lines whole and broken, lines of vertical
+  tabs and form feeds; the default table's first rows). `errno` is set to 0 after each case's files are made (making
+  them leaves `EISDIR`). `SKIP` where FreeSurfer crashes or writes outside its tables (FS-413, FS-414's crashes and
+  outside stores, FS-416, FS-417, FS-418), where the port refuses a size the machine decides (FS-420), or a name
+  overflows `stricmp` (FS-11); `VARY` for FS-414's memory never written. Seed 13, 1,664 piece-10 cases: `reproduce`
+  identical on 1,415, 0 different.
+  Registration files (3.1-34): `rpr` (`regio_print_register` to standard output), `rwr` (`regio_write_register` and
+  the file's bytes), `rrx` (`regio_read_mincxfm` with or without the file information), `rwx` (`regio_write_mincxfm`,
+  `FREESURFER_REPLACEMENT_FOR_CREATION_TIME_STRING` set, `Progname` `fsio`), `rrm` (`regio_read_registermat`); the
+  matrices as `4` and 16 float bits. Seed 13, 710 such cases: identical in both modes.
 - `matfile_scipy.py`: 400 matrices written by SciPy's `savemat` (version 4; version 5 plain and
   compressed; doubles, singles, signed and unsigned 8- to 32-bit integers, complex) read by the port's
   `MatlabRead`: the default (`fix`) must read each as SciPy wrote it; FreeSurfer's reading

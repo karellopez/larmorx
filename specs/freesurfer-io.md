@@ -13,7 +13,9 @@ the zeroed allocation that ends the program. **Part 2** (§10-18, the item's sec
 tags, the matrix tags, the binary colour tables, a volume geometry's stored form, the tags of an
 `.mgz` and of FreeSurfer's NIfTI header extension (`FStagsIO`). **Part 3** (§19-24, the item's third
 piece): NumPy `.npy` volumes, two GIFTI helpers, the diffusion files, names and gradient spaces.
-Later parts: the volume formats.
+Later parts: the volume formats (parts 4 to 7), 2-D images (part 8), and **part 9** (§65-74, queue item
+3.1-33's first piece, fs.labels): text colour tables, their lookups, random colours, tissue-type
+schemas; §75 (3.1-34): the rest of the registration files.
 
 ## 1. Conventions
 
@@ -1406,3 +1408,416 @@ voxels, `IM_SIT` after `IM_SIZ`, 2dseq files of the right length, half of it, a 
 longer, a missing file. Lines with FS-259 or FS-403 are counted, not compared; those with FS-401
 compared apart. Measured (2026-11-13): seed 13, 3,815 cases: `reproduce` identical on 3,221, 0
 different (426 counted, 168 apart); `fix` differs only where FS-402 or FS-404 is noted.
+
+## 56. Conventions of part 8 (2-D images)
+
+FreeSurfer's 2-D image (`IMAGE`, HIPS's image header) has: the frame count, the stored extents
+(`orows`, `ocols`) and the extents in use (`rows`, `cols`), a first row and column (`frow`,
+`fcol`, 0 in every image these functions make), the pixel format, `numcolor` (0), the pixel count
+`numpix` and the bytes of one frame `sizeimage` (both 64-bit unsigned), the bytes per pixel
+`sizepix`, the pixels (one buffer, or none), a flag `imdealloc`, the first pixel's place
+`firstpix` (an offset into the pixels, or none) and two float pixel sizes `xsize`, `ysize`. The
+formats and their bytes per pixel: 0 bytes (1), 1 shorts (2), 2 integers (4), 3 floats (4), 6
+doubles (8), 35 and 41 RGB/BGR (3), 36, 37, 42, 43 RGB with a zero byte (4), 50 and 51 pyramids (4);
+every other format (4 and 7, the complex ones, included) 1. Pixels are placed row by row with the
+stored width: pixel `(x, y)` of frame `f` is element `f × ocols × orows + y × ocols + x` (64-bit
+arithmetic); bytes are little-endian, floats IEEE single precision with their bits kept. When a
+function below reads or writes outside the pixels FreeSurfer has (a frame, an area or a size the
+image does not have, a buffer given smaller than the frames), FreeSurfer corrupts memory, crashes
+or reads memory contents: FS-405 (both modes: nothing written there, 0 read, noted). Errors that
+"return" print `error: <message>` (with FS-01's NUL byte under `reproduce`) and set `Gerror`
+(`specs/freesurfer-core.md`'s `ErrorPrintf`); errors that "end the program" are `ErrorExit` with the
+code given.
+
+## 57. Making an image (`ImageAlloc`, `ImageFree`)
+
+`ImageAlloc(rows, cols, format, frames, bufsize)`: a header with the frames, both pairs of
+extents, the format and its pixel size, `numpix = rows × cols` and `sizeimage = numpix ×
+sizepix` (each in 64-bit unsigned arithmetic of the sign-extended numbers, wrapping: `rows = cols
+= -1` gives one pixel), pixel sizes 0. No pixels when `sizeimage` is 0 (`imdealloc` 0). Otherwise
+`bufsize` bytes (0: `sizeimage × frames`, wrapping) of zeros, `imdealloc` 1, `firstpix` at the
+first pixel (0); a buffer given smaller than `sizeimage × frames` is cleared past its end by
+FreeSurfer (FS-405). When the bytes cannot be had (more than 128 TiB, or the machine refuses):
+`errno` ENOMEM, then the program ends with `ImageAlloc: could not allocate <rows>x<cols> buffer`
+and a newline as its message (after `Cannot allocate memory`) and FreeSurfer's previous error code
+as its code: 0 when there was none, an exit status of 0 (FS-410: the default exits with -2, status
+254; with exceptions on and code 0 FreeSurfer goes on with an image without pixels).
+`ImageFree` of no image ends the program (`ImageFree: null pointer`, code -4).
+
+## 58. Sizes (`ImageCheckSize`, `ImageSetSize`)
+
+`ImageCheckSize(in, out, rows, cols, frames)`: 0 for no output; otherwise 1 when `out.numpix ×
+out.frames ≥ rows × cols × frames` (64-bit signed, wrapping), a 0 argument meaning the input's
+value; the pixel sizes play no part. `ImageSetSize(I, rows, cols)`: when `ImageCheckSize(I, I,
+rows, cols, 0)` holds, both pairs of extents become `rows`, `cols`, the first row and column 0,
+`numpix = rows × cols` and `sizeimage = rows × cols × sizepix` computed in 32-bit signed
+arithmetic (wrapping) and sign-extended; 1. Otherwise nothing changes; 0.
+
+## 59. Copying (`ImageCopy`)
+
+`ImageCopy(src, dst)`: a `dst` with fewer pixels (`numpix`) or frames than `src` is freed and, as
+for no `dst`, a new one made by `ImageAlloc(src.rows, src.cols, src.format, src.frames, 0)`. Then
+`dst` takes `src`'s extents in use (`rows`, `cols`; not the stored ones) and, frame by frame (each
+frame's start `sizeimage` bytes after the last, in each image): when the formats agree,
+`numpix × sizepix` of `src`'s bytes (in 32-bit signed arithmetic: a frame of 2 GiB or more is
+copied short, or not at all) into `dst`; otherwise, for a `dst` of doubles, floats, complex,
+double complex, integers or bytes, the line `error: hips is not supported` on standard error and
+nothing copied (the HIPS conversions are gone: kept, nothing calls them); another `dst` format ends
+the program (`ImageCopy <src>--><dst>, unsupported conversion` and a newline, code -3). Finally
+both images' `firstpix` are their first pixel and `dst`'s frame count is `src`'s.
+
+## 60. Clearing an area (`ImageClearArea`)
+
+`ImageClearArea(I, r0, c0, rows, cols, val, frame)`: `r0`, `c0` raised to 0; a negative `rows`
+or `cols` means the image's; the area ends at `min(I.rows, r0 + rows)` and `min(I.cols, c0 + cols)`
+(32-bit additions); `frame` < 0 means every frame. Floats are set to `val`; bytes to `(char)val`
+(truncated towards 0; beyond -128 to 127, and NaN, FS-406: `reproduce` the low byte of
+-2147483648 or of the integer part, the default clamps to -128 and 127, NaN 0). Another format: the
+error `ImageClearArea: unsupported image format <f>` (no newline) at the first row, returns -3. 0.
+
+## 61. Copying frames (`ImageCopyFrames`)
+
+`ImageCopyFrames(in, out, start, n, dst)`: unless `ImageCheckSize(in, out, 0, 0, dst + n)`, the
+error `ImageCopyFrames: outImage not large enough` + newline, -1. Each source frame `k` from `start`
+to `start + n - 1` (each of `in.rows × in.cols` pixels) goes to output frame `dst + k - start`:
+doubles and floats into the same format only (another ends the program: `ImageCopyFrames:
+unsupported image pixel format <in> -> <out>` + newline, code -3), bytes into bytes, bytes
+converted into floats and unsigned integers, integers into floats (rounded to nearest), integers
+and bytes (the integer's low byte), RGB into RGB (the whole run of `n` frames at once, again for
+each frame); another pair ends the program with that message (without the newline for bytes,
+integers and RGB, with it for the other input formats). FS-407: FreeSurfer writes the converted
+frames, and integers into integers, at the output frame of the source frame's number (`k`), placed
+for bytes as frames `k × ocols × orows` (32-bit for unsigned integers) and for integers at `k ×
+in.rows × in.cols` pixels; the default writes them at frame `dst + k - start` placed as the other
+copies. Finally `ImageSetSize(out, in.rows, in.cols)`; 0.
+
+## 62. Scaling (`ImageRescale`, `ImageScaleUp`, `ImageScaleDown`)
+
+`nint(x)` is FreeSurfer's rounding (`specs/freesurfer-core.md`: `x + 0.5` truncated, `x - 0.5`
+below 0; FS-12 beyond the int range); products and quotients are single precision unless said.
+- `ImageRescale(in, out, s)`: `cols' = nint(in.cols × s)`, `rows' = nint(in.rows × s)`; no `out`:
+  `ImageAlloc(rows', cols', in.format, in.frames, 0)`. `s` = 1: `ImageCopy`; `s` > 1:
+  `ImageScaleUp`; otherwise (NaN included) `ImageScaleDown`. Then `out.xsize = in.xsize / s`,
+  `out.ysize = in.ysize / s` (x86-64's NaN rules). FS-409: with `s` = 1 and an `out` too small for
+  §59, FreeSurfer returns the image it freed; both modes return the copy.
+- `ImageScaleUp(in, out, s)`: unless `ImageCheckSize(in, out, nint(in.rows × s), nint(in.cols ×
+  s), in.frames)`, the error `ImageScaleUp: output image not large enough <in.rows> x <in.cols> ->
+  <out.rows> x <out.cols>` + newline, -1. `out.cols`, `out.rows` (not the stored ones) become
+  `nint(in.cols × s)`, `nint(in.rows × s)`. Per frame (each `sizeimage` bytes on, in each image):
+  bytes into bytes: output pixel `(c, r)` (written one after another from the frame's start, `rows`
+  by `cols` of the new extents) takes input pixel `((int)(c / s), (int)(r / s))` (FS-406 beyond the
+  int range: `reproduce` -2147483648, the default clamps, NaN 0); bytes into floats, floats into
+  bytes or floats, integers into anything: input pixel `k` (the input's pixels one after another,
+  `in.rows` by `in.cols`) at `(c, r)` fills the output block of rows `nint(r × s)` to `nint(r × s +
+  s)` (excluded) and columns `nint(c × s)` to `nint(c × s + s)`, each output row placed by
+  `out.ocols`, as a float, as `(unsigned char)` of the float (defined from -1 to 256 excluded; beyond
+  and NaN FS-406: `reproduce` the low byte of `cvttss2si`'s result, the default clamps to 0 and 255,
+  NaN 0), as the float's bits, or as the integer's 4 bytes (4 bytes per output pixel whatever its
+  format). Other pairs: `ImageScaleUp: unsupported output pixel format <f>` + newline, -1 (byte or
+  float input), `ImageScaleUp: unsupported input pixel format <f>` + newline, -2. Both images'
+  `firstpix` end at their first pixel; 0.
+- `ImageScaleDown(in, out, s)`: unless `ImageCheckSize(in, out, nint(in.rows × s), nint(in.cols ×
+  s), in.frames)`, the error `ImageScaleDown: output image not big enough` + newline, -1; then
+  `ImageSetSize(out, nint(in.rows × s), nint(in.cols × s))`. Per frame, output pixel `(c, r)` (one
+  after another, `out.rows` by `out.cols`) takes input pixel `(nint(c / s), nint(r / s))` (the
+  quotient in single precision, then doubled): bytes into floats; bytes into bytes, where an input
+  place at or beyond the input's extents prints `in: <r'>, <c'> --> out: <r>, <c>!` + newline on
+  standard error and ends the program with status 2; floats into bytes (§62's byte conversion);
+  floats into floats: when `1 / s` (single precision) is a power of two (`ISPOW2`: a positive power
+  of two; also ±0 under `reproduce` and the default alike), the input is reduced `nint(log2(1 /
+  s))` times (the quotient and logarithm in double precision) by `ImageReduce` (§63) and copied
+  into the output by `ImageCopy` (§59, so the output takes the reduction's extents and its single
+  frame count); FS-408: FreeSurfer does this for the first frame only (its loop then ends: the
+  output keeps one frame); the default reduces every frame and keeps the output's frame count. With
+  0 reductions or fewer the input is copied by `ImageCopy` from the frame's place. Otherwise the
+  nearest pixel as above (the float's bits). Other pairs: `ImageScaleDown: unsupported output pixel
+  format <f>` + newline, -1 (byte or float input); `ImageScaleDown: unsupported pixel format <f>` +
+  newline, -2. The output's `firstpix` ends at its first pixel, the input's too unless it was
+  reduced; 0.
+
+## 63. The pyramid reduction (`ImageReduce`, `ImageConvolve1d`, `ImageReduce1d`)
+
+The kernel `k = (0.25 − 0.4/2, 0.25, 0.4, 0.25, 0.25 − 0.4/2)` in single precision (`0.25 − 0.2`
+rounded once). `ImageConvolve1d(I, J, k, axis)` (`len` the kernel's length, `h = len / 2`): every
+pixel of `J`, written one after another from its first (`I.cols` by `I.rows`), is the single-
+precision sum `total = total + k[i] × p` (from 0, `i` from 0, the total the first operand of the
+addition: a NaN total stays) of `I`'s pixels at the place `i − h` from it along the axis, places
+before 0 taken at 0 and beyond the extent at its last; horizontally (axis 1) a row's pixels are
+placed by `I.ocols`, vertically (axis 0) the rows by `I.cols`. A negative `I.cols + 2h` or
+`I.rows + 2h` ends the program (`ImageConvolve1d: could not allocate LUT` + newline, code -2, after
+`Cannot allocate memory`). `ImageReduce1d(I, J, k, axis)` (`h = (len − 1) / 2`): `J`'s pixel `(x,
+y)` (placed by `J.ocols`; `J.cols` by `J.rows` of them) is the sum `total = total + p × k[i]` over
+`I`'s pixels `(2x + i − h, 2y)` horizontally or `(2x, 2y + i − h)` vertically, the moving coordinate
+clamped to `I`'s extent, placed by `I.ocols`. `ImageReduce(src, dst)`: a float image of `src.rows`
+by `src.cols` (FreeSurfer keeps one between calls; only memory differs), `ImageConvolve1d(src,
+tmp, k, vertical)`, then `ImageReduce1d(tmp, dst', k, horizontal)` where `dst'` is `dst` set to
+`src.rows / 2` by `src.cols / 2` (integer halves; `ImageSetSize`) when `ImageCheckSize(src, dst,
+rows / 2, cols / 2, 0)` holds, else a new one-frame float image of those extents (a given `dst`
+freed). Returns `dst'`.
+
+## 64. Validation plan (part 8)
+
+The probe's commands (`validation/probes/fs-io/`, piece 8), each with `Gerror`'s value first and
+`Gerror` printed last: `ial` (`ImageAlloc`: extents from -1 to 13, every format, 0 to 3 and -1
+frames, given buffers, sizes that wrap, 2^53 bytes), `icp`, `ica`, `ick`, `iss`, `icf`, `irs`,
+`isd`, `isu`, `ird`, `ic1`, `ir1` on images made by `ImageAlloc` (extents up to 13 by 13, 0 to 3
+frames, extents in use changed by 1 now and then, buffers given short or long, pixels of every
+kind: floats with NaN payloads, infinities, -0, subnormal numbers, values beyond the byte and
+integer ranges; scales 0.5, 0.25, 0.125, 0.75, 0.3, 0.4999999, 1, 1.5 to 4, NaN, infinities, 0,
+negative), each image printed as its fields, its pixel sizes' bits and its bytes (in hex up to 128,
+else their FNV-1a 64 hash; `sizeimage × frames` of them, at most the buffer). Lines with FS-405 or
+FS-409 are counted, not compared. Measured (2026-11-13): seed 11, 1,068 piece-8 cases: `reproduce`
+identical on 949, 0 different (119 counted); seed 13, 5,292: identical on 4,605, 0 different (687
+counted); `fix` differs only where a defect is noted. FS-412: a scale whose extents leave the int range
+(or NaN): FreeSurfer goes on with -2147483648 extents (nothing scaled, or `ImageRescale`'s allocation
+fails); the default refuses it: `ImageScaleUp`/`ImageScaleDown` print `<function>: scale <s> gives
+extents beyond the int range` + newline and return -1, `ImageRescale` without an output ends the
+program with that message (code -4).
+
+## 65. Conventions of part 9 (fs.labels: text colour tables and lookups)
+
+Queue item 3.1-33's first piece (`fs.labels`). A colour table (§13) has `nentries` places, each
+empty or holding an entry: a name (a C string, at most 1,023 bytes), integer red, green, blue and
+alpha, float red, green, blue and alpha, a tissue type and a voxel count; and the table's file name,
+version, `idbase` (added to the structure numbers when written), a tissue-type schema name and an
+optional tissue-type table (itself a colour table). The place of an entry is its **structure
+number**. An entry's **annotation** packs its colour into one 32-bit `int`: blue × 65,536 + green ×
+256 + red, computed as `(b << 16) + (g << 8) + r` in 32-bit two's complement (wrapping for components
+outside 0 to 255); an annotation's colour is its low three bytes (red the lowest). A float colour is
+the integer one converted to `float`, divided by 255 in `double`, rounded to `float`. Errors that
+"return" print `error: <message>` (FS-01's NUL byte under `reproduce`) after `errno`'s text when
+`errno` is not 0, and set `Gerror` (`specs/freesurfer-core.md` §2). Lines are read as C's `fgets`
+with a 1,024-byte buffer (a longer line is taken in pieces of 1,023 bytes, each a line; a NUL byte
+ends what the line holds), numbers and names with `sscanf` (`%d`, `%s`; `specs/freesurfer-maths.md`
+§18.1 for `errno`). "Standard output" messages are `printf`s. The random colours come from fs.core's
+`randomNumber(0, 255)` rounded by `nint` (`specs/freesurfer-core.md` §9 and §11: the stream
+`setRandomSeed` starts, `FREESURFER_SEED` or the clock when none was set).
+
+## 66. Reading a text colour table (`CTABreadASCII`, `CTABreadASCII2`)
+
+`CTABreadASCII(name)` is `CTABreadASCII2(name, 1)`. A file that does not open: the error
+`CTABreadASCII(<name>): could not open file` (`ERROR_NOFILE`), no table. Otherwise two passes:
+
+1. **The size.** Each line through `fgetl` (`specs/freesurfer-core.md` §10: lines empty or starting
+   with `#` after white space skipped, the rest cut at the first `#`, the newline dropped): when
+   `"%d %s %d %d %d %d"` assigns six values, its first is a candidate; the table's size is the
+   largest candidate plus one (32-bit, wrapping). No candidate above 0 (a table of only structure 0
+   included): the error `CTABreadASCII(<name>): badly formed file` (`ERROR_NOFILE`), no table.
+2. **The entries.** From the start again, every line as it is (`fgets`, comments not cut), numbered
+   from 1 (each piece of a long line counts): `"%d %s %d %d %d %d %d"`; six or seven values make an
+   entry at the first value's place: the name, red, green, blue, alpha 255 minus the sixth value
+   (wrapping), the float colours, the tissue type the seventh value (-1 when there is none), count
+   0. A place already taken: `CTABreadASCII(<name>): Line <n>: Duplicate structure index <s>, was
+   <name> <r> <g> <b> <a>` + newline on standard output (the entry already there), the line
+   dropped, and the global count `ctabDuplicates` (set to 0 before this pass) raised.
+
+Then, when asked (the second argument not 0), the duplicate names (§70); then the tissue-type table
+(§67), which reopens the file. The table's file name is the name given (at most 1,023 bytes),
+version 2, `idbase` 0, schema empty. `errno` is what the reads left (a folder read fails with 21,
+`Is a directory`, printed before a later error; a number beyond `int` leaves 34).
+
+**FS-413:** a second-pass line whose structure number is negative, or is not below the size (the
+largest number's line has a `#` in its name: the first pass cut it as a comment; the second does
+not), is stored outside FreeSurfer's table: memory corruption, a crash, or another object's values.
+Default: a negative number is the error `CTABreadASCII(<name>): Line <n>: negative structure index
+<s>` (`ERROR_BADFILE`), no table (rule B); a larger one grows the table to hold it (rule A: such a
+name is kept when its number is within the table, so it is kept here too). `reproduce`: both lines
+are left out. Both noted. **FS-420:** a size above 2^24 (16,777,216) is refused as FreeSurfer's
+failed allocation: `errno` 12 and `CTABreadASCII(<name>): could not allocate <size> entries`
+(`ERROR_NO_MEMORY`), no table, noted (FreeSurfer's outcome depends on the machine's memory). The
+same for a larger number met in the second pass by default.
+
+## 67. The tissue-type lines (`CTABreadASCIIttHeader`)
+
+The lines `#ctTType <structure> <name> <r> <g> <b> <transparency>` (as `CTABprintASCIItt` writes
+them) describe the tissue classes. A file that does not open: `ERROR: CTABreadASCIItt(): cannot
+open <name>` + newline (standard output), no table. Each line is read whole (`fgets`); the file's
+last line is taken twice (no visible effect). A line counts when it has an item by
+`CountItemsInString` (items separated by spaces and tabs; a newline or carriage return where an
+item would start ends the count) and its first white-space separated item is exactly `#ctTType`.
+First pass: `sscanf("%d")` of the second item gives the largest structure number (`segidmax`, -1
+before any). No such line: no table (FreeSurfer leaves the file open: FS-415; both modes close it,
+no notice). The table has `segidmax + 1` places, no file name, version 0. Second pass:
+`"%*s %d %s  %d %d %d  %d"` of each such line: the entry at the structure's place: the name,
+red, green, blue, alpha 255 minus the transparency, float colours 0, tissue type the structure
+number, count 0.
+
+**FS-414:** (1) a line whose only content is vertical tabs, form feeds or carriage returns among
+spaces and tabs counts as having an item but has no first item: FreeSurfer prints `error: asking
+for item 0, but 0 items in string` and crashes; both modes skip the line (the default without the
+message). (2) A `#ctTType` line without a second item: FreeSurfer prints `error: asking for item 1,
+but 1 items in string` and crashes; both modes give no tissue-type table (the default with the
+message below, `reproduce` with FreeSurfer's). (3) A `#ctTType` line whose structure number, name,
+colour or transparency does not read keeps the value of the last line that read it (memory never
+written before the first), and a structure number outside the table is stored outside it. Default:
+every `#ctTType` line must read six values with a structure number of 0 or more, else `ERROR:
+CTABreadASCIItt(): bad tissue type line in <name>: <the line without its newline>` + newline
+(standard output) and no tissue-type table (rule B). `reproduce`: the earlier lines' values, 0 (and
+an empty name) for memory never written, a structure outside the table left out; noted.
+
+## 68. The default table (`CTABreadDefault`)
+
+`FSENVgetenv` (`specs/freesurfer-core.md` §15, which itself reads
+`$FREESURFER_HOME/FreeSurferColorLUT.txt` with §66 and prints its messages), then §66 of the same
+file again: the default table's messages appear twice (kept). **FS-416:** when `FSENVgetenv` gives
+nothing (`FREESURFER_HOME not defined`, the table unreadable with `ERROR: reading <file>`, a wrong
+`FS_DESIRED_BVEC_SPACE`), FreeSurfer crashes; both modes give no table after those messages, noted.
+
+## 69. Tables of random colours (`CTABalloc`, `CTABunique`, `CTABrandom`, `CTABcountRepeats`)
+
+- `CTABalloc(n)`: a negative `n`: the error `CTABalloc: nentries was <n>` (`ERROR_BADPARM`), no
+  table. Otherwise `n` entries, in order: red, green, blue each `nint(randomNumber(0, 255))`, alpha
+  255, the float colours, name `cluster<i>`; file name `none`, version 2, `idbase` 0; then
+  `CTABunique(table, 100)`. The entries' tissue type and count are memory contents in FreeSurfer
+  that nothing reached reads (0 in both modes, no notice). **FS-420:** above 2^20 entries: `errno`
+  12, `CTABalloc: could not allocate <n> entries` (`ERROR_NO_MEMORY`), no table, noted.
+- `CTABunique(table, nmax)`: up to `nmax` tries (none when `nmax` ≤ 0): `CTABrandom`, then stop when
+  `CTABcountRepeats(table, 1)` is 0. Then entry 0 becomes `unknown`, colour, alpha and float colours
+  0. When the number of tries made equals `nmax` (also when the last try succeeded, and for
+  `nmax` = 0: kept, rule C): `INFO: CTABunique() could not find a unique set in <nmax> tries` +
+  newline (standard output) and -1; else 0.
+- `CTABrandom(table)`: every entry in order gets new red, green, blue (drawn as above), alpha 255
+  and the float colours; 0.
+- `CTABcountRepeats(table, stop)`: for each entry i and each later entry j with the same float red,
+  green and blue, one repeat; with `stop`, only the first such j per i. Returns the count.
+
+**FS-417:** FreeSurfer crashes on an empty place in `CTABrandom`, `CTABcountRepeats` and
+`CTABunique`, and in `CTABunique` (so `CTABalloc(0)`) on a table without entry 0; both modes skip
+empty places (no colours drawn for them) and make no `unknown` entry, noted.
+
+## 70. Counts, tests and lookups
+
+| function | result |
+|---|---|
+| `CTABgetNumberOfValidEntries` | the non-empty places (`NO_ERROR`) |
+| `CTABgetNumberOfTotalEntries` | `nentries` |
+| `CTABisEntryValid(i)` | 1 or 0; outside 0 to `nentries` - 1: error `CTABisEntryValid: index <i> was OOB`, `ERROR_BADPARM`, the answer untouched |
+| `CTABhasEntry(i)` | true for a non-empty place inside the table, false otherwise (no message) |
+| `CTABrgbAtIndexi(i)` | the integer colour; outside: error `CTABrgbAtIndexi: index <i> was OOB`; an empty place: `ERROR_BADPARM` silently, outputs untouched |
+| `CTABcopyName(i, buf, len)` | `strncpy` of the name into `len` bytes (no NUL when the name has `len` bytes or more); outside: `CTABcopyName: index <i> was OOB`; empty: `ERROR_BADPARM` silently |
+| `CTABrgb2Annotation(r, g, b)` | the annotation (§65) |
+| `CTABentryNameToIndex(name)` | the first entry whose name equals `name` ignoring ASCII case (`stricmp`), else -1 |
+| `CTABentryNameToAnnotation(name)` | that entry's annotation, else -1 |
+| `CTABannotationAtIndex(i)` | the annotation; outside: `CTABannotationAtIndex: index <i> was OOB`; empty: `ERROR_BADPARM` silently |
+| `CTABfindAnnotation(a)`, `CTABfindIndexFromAnnotation(a)` | the first entry of the annotation's colour, else -1 (`NO_ERROR`) |
+| `CTABfindRGBi(r, g, b)` | the first entry of that integer colour, else -1; a component outside 0 to 255: error `CTABfindRGBi: rgb was invalid`, `ERROR_BADPARM`, the answer untouched |
+| `CTABfindName(name)` | as `CTABentryNameToIndex` (`NO_ERROR`) |
+| `CTABfindDuplicateNames` | for every ordered pair of non-empty places with equal names (`strcmp`), `ERROR: label name '<name>' is duplicated!` + newline; then, when there was one, `CTABfindDuplicateNames: <pairs / 2> duplicate names found in:` + newline + two spaces + the file name + newline (standard output); returns pairs / 2 |
+
+A name of 1,024 bytes or more in `stricmp` overflows FreeSurfer's buffer (FS-11, noted).
+
+## 71. Writing a text table (`CTABprintASCII`, `CTABwriteFileASCII`)
+
+`CTABprintASCII(table, stream)`: with `Gdiag`'s `DIAG_INFO` (0x10000), first `[DEBUG]
+CTABprintASCII(): fname = '<file name>' (<its length> bytes)` + newline on standard output. Then
+each non-empty place in order as `%3d  %-30s  %3d %3d %3d  %3d` + newline: the structure number
+plus `idbase` (wrapping), the name without its white-space bytes (C's `isspace`), red, green, blue,
+255 minus alpha (wrapping) (`%-30s` pads with spaces to 30 bytes, longer names are kept whole);
+`ERROR_NONE`. `CTABwriteFileASCII(table, name)`: a new file (`fopen` mode `w`); one that does not
+open: the error `CTABwriteFileASCII(<name>): could not open for writing` + newline (`ERROR_NOFILE`,
+so the message has a newline, then FS-01's NUL, then a newline); else §71's lines into it.
+
+## 72. Tissue-type schemas (`TissueTypeSchema`, `TissueTypeSchemaDefault`, `TissueTypeSchemaDefaultHead`)
+
+`TissueTypeSchema(table, schema)`: `default-jan-2014` → `TissueTypeSchemaDefault`;
+`default-jan-2014+head` or `default-apr-2019+head` → `TissueTypeSchemaDefaultHead`; another: `ERROR:
+tissue type schema <schema> unrecognized` + newline (standard output), no table.
+
+Both schemas: `TissueTypeSchemaDefaultHead` first prints `Entering TissueTypeSchemaDefaultHead()`.
+Without a table, `FSENVgetenv` and §66 of `$FREESURFER_HOME/FreeSurferColorLUT.txt` (FS-416: when
+either gives nothing FreeSurfer crashes; both modes no table). The schema name becomes
+`default-jan-2014`, resp. `default-apr-2019+head` (then `schema <name>` printed). The tissue-type
+table is `CTABalloc(5)`, resp. `CTABalloc(6)` (§69: the random draws happen), its first entries then
+renamed and recoloured (integer colours only): `unknown` 0 0 0, `cortex` 205 62 78, `subcort_gm` 230
+148 34, `wm` 0 255 0, `csf` 120 18 134 and (head) `head` 150 150 200; its float colours stay those
+drawn (entry 0's are 0), alpha 255 (entry 0's 0). **FS-419** (kept, rule C): those float colours do
+not match the integer ones; no reached code reads them. Then every non-empty entry's tissue type, by
+its structure number n (-1 where nothing applies):
+
+- unknown (0): n = 0;
+- cortex (1): 3, 42;
+- subcortical grey matter (2): 8, 47, 17, 53, 18, 54, 13, 52, 10, 49, 51, 12, 50, 11, 26, 58, 28, 60,
+  16, 126, 174, 29, 61, 80; with head also 172, 179, 267, 819, 820, 843, 844, 865, 866, 869, 870;
+- white matter (3): 2, 41, 7, 46, 690, 691, 77, 78, 79, 85, 930, 192, 251 to 255, 34, 66; with head
+  also 821, 822, 853;
+- CSF (4): 14, 15, 24, 257, 4, 43, 5, 44, 31, 63, 72, 30, 62, 914; with head also 75, 76;
+- head (5, head schema only): 258, 165, 259, 118 to 124, 127, 129 to 135, 143 to 145, 167, 262, 263,
+  264, 902, 907, 908, 909, 911, 915, 916;
+- otherwise, the ranges checked in this order, a later match winning: 1000-1035 and 2000-2035
+  cortex; 3000-3035 and 4000-4035 white matter; (head) 3201-3207 and 4201-4207 white matter;
+  1100-1181 and 2100-2181 cortex; 3100-3181 and 4100-4181 white matter; 5001, 5002 white matter;
+  11100-11300 and 12100-12300 cortex.
+
+## 73. Merging (`CTABmerge`)
+
+`CTABmerge(table, merge)`: each non-empty place of `merge` is copied whole (name, colours, tissue
+type, count) into the same place of `table`, replacing what was there; returns 0. **FS-418:** a
+`merge` with more places than `table` makes FreeSurfer write past `table`; by default `table` grows
+to hold them (rule A), `reproduce` leaves those entries out; noted.
+
+## 74. Validation plan (part 9)
+
+The probe's commands (`validation/probes/fs-io/`, piece 10): `cra` (`CTABreadASCII2` with and without
+the duplicate-name check, `ctabDuplicates` set to -7 before), `crt` (`CTABreadASCIIttHeader`), `ctd`
+(`CTABreadDefault` with `FREESURFER_HOME`, `SUBJECTS_DIR`, `FS_DESIRED_BVEC_SPACE` set or not) on
+generated table files: entry lines with every separator, signs, numbers beyond `int`, stray
+characters, a seventh column or not, duplicate structure numbers, names with `#`, case variants and
+bytes beyond ASCII; comments, blank lines, CR LF, lines longer than 1,023 bytes, NUL bytes,
+`#ctTType` lines whole and broken, lines of vertical tabs and form feeds; missing files and folders.
+`cal` (`CTABalloc` after `setRandomSeed`), `cun` (`CTABunique`), `ccr` (`CTABcountRepeats`), `cq`
+(every lookup of §70 on generated tables with empty places, out-of-range indices and components,
+names of every case and length), `cpw` (`CTABwriteFileASCII` and the file's bytes, `DIAG_INFO` on
+or off, names deblanked and longer than 30 bytes, `idbase`, places that do not open), `cps`
+(`CTABprintASCII` to standard output), `cts` (`TissueTypeSchema` of a given table with the schemas'
+structure numbers, or of the default table), `cme` (`CTABmerge`). Each table printed with its
+fields, its non-empty entries (float colours as bits; tissue type and count except for `CTABalloc`'s
+entries) and its tissue-type table; `Gerror` last. Lines with FS-413, FS-416, FS-417, FS-418,
+FS-420, FS-11, or FS-414's crashes and stores outside the table are counted, not compared; FS-414's
+memory never written compared apart. Measured (2026-11-13): seed 13, 1,664 piece-10 cases:
+`reproduce` identical on 1,415, 0 different (230 counted, 19 apart); `fix` differs only where a
+defect is noted (FS-414's default error, FS-01).
+
+## 75. Registration files, the rest (`regio_print_register`, `regio_write_register`, `regio_read_mincxfm`, `regio_write_mincxfm`, `regio_read_registermat`)
+
+Queue item 3.1-34 (with §46's reader). Numbers are printed as glibc's `printf` writes them
+(`specs/freesurfer-core.md`'s formatting: correctly rounded, `nan`, `-nan`, `inf`).
+
+- `regio_print_register(stream, subject, inplaneres, betplaneres, intensity, R, method)`: the
+  subject and a newline (`subject-unknown` when none or empty); the three numbers, each `%f` and a
+  newline; `R`'s first three rows, each of its four numbers `%18.15e` followed by a space, then a
+  newline; `0 0 0 1` and a newline; the method's name and a newline: `tkregister` (2), `floor` (1),
+  `round` (0). Another method: after the matrix, `ERROR: regio_print_register: f2i code = <code>,
+  unrecoginized` (FreeSurfer's spelling) + newline on standard output, no method line, 1; else 0.
+- `regio_write_register(name, ...)`: the same into a new file (`fopen` mode `w`); 0 whatever the
+  print returned. A file that does not open: `regio_write_register: <errno's text>` + newline
+  (standard error), 1.
+- `regio_read_mincxfm(name, &R, fileinfo)`: a file that does not open: `regio_read_mincxfm: <errno's
+  text>` + newline (standard error), `ERROR: could not read <name>` + newline (standard output), 1,
+  `R` untouched. Otherwise the first line by `fgetl` with a 900-byte buffer (comment and blank lines
+  skipped; the text compared is the buffer's: the line's leading white space included, cut at its
+  first `#`, without its newline; at the end of the file the buffer holds the last line read):
+  unless its first 18 bytes are `MNI Transform File`, `ERROR: <name> does not start as 'MNI
+  Transform File'` (no newline, standard output) and 1 (FS-422: FreeSurfer leaves the file open;
+  both modes close it, no notice). The next `fgetl` gives the file information (at the end of the
+  file: the buffer as the first read left it): when asked for, it is kept and printed as a newline,
+  the text and two newlines; otherwise `Not reading in xfm fileinfo` + newline. Then the file is
+  read again: its lines counted (`fgets` with 1,000 bytes: a longer line counts as several), all
+  but the last three skipped, and twelve `%f` read from there (each a separate `fscanf`, white space
+  and line ends skipped) into rows 1-3 of a 4 x 4 matrix of zeros, then 1 at (4, 4); 0. A number that
+  does not read: `regio_read_mincxfm(): <errno's text>` and `Error reading R[<r>][<c>] from <name>`
+  (0-based) on standard error, 1, `R` the matrix read so far (no 1 at (4, 4)). Blank lines at the
+  end take the last three lines' places (the read then fails): kept.
+- `regio_write_mincxfm(name, R, fileinfo)`: `MNI Transform File`; `% <fileinfo>` when given; `% This
+  file was created by <program name>`; `% <currentDateTime()>` (`FREESURFER_REPLACEMENT_FOR_CREATION_TIME_STRING`
+  when set); an empty line; `Transform_Type = Linear;`; `Linear_Transform =`; `R`'s first three
+  rows, each number `%e` and a space, the first two rows ended by a newline, the third by `;` and a
+  newline; 0. A file that does not open: `regio_write_mincxfm: <errno's text>` (standard error),
+  `Could open <name> for writing` (standard output, FreeSurfer's words), 1.
+- `regio_read_registermat(name)`: §46's matrix, nothing when §46 gives 1.
+
+Validation: the probe's piece 10 commands `rpr`, `rwr`, `rrx`, `rwx`, `rrm` (subjects absent, empty,
+with spaces; numbers of every kind: NaN, infinities, -0, subnormal, huge; methods 0, 1, 2 and others;
+`.xfm` files whole or with comments, blank lines, indentation, CR LF, a wrong or indented first line,
+fewer rows, numbers that do not read, trailing blank lines; `register.dat` files whole or short, an
+unknown method; files and folders that do not open). Measured (2026-11-13): seed 13, 710 cases:
+`reproduce` and `fix` identical on all.

@@ -445,7 +445,7 @@ fn dh(o: &mut Out, v: f64) {
 }
 
 /// A name with the fixture's path removed, escaped (`n<text>`), or `N`.
-fn oname(o: &mut Out, w: &Work, s: Option<&[u8]>) {
+pub(super) fn oname(o: &mut Out, w: &Work, s: Option<&[u8]>) {
     let Some(s) = s else {
         o.0.push_str("N ");
         return;
@@ -499,7 +499,7 @@ fn vg6(o: &mut Out, w: &Work, v: &VolGeom) {
     oname(o, w, Some(v.fname.c_bytes()));
 }
 
-fn print_mri(o: &mut Out, w: &Work, m: Option<&Mri>) {
+pub(super) fn print_mri(o: &mut Out, w: &Work, m: Option<&Mri>) {
     let Some(m) = m else {
         o.0.push_str("N ");
         return;

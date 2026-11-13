@@ -404,10 +404,17 @@ _TITLE = re.compile(
 )
 
 
+#: The page's own rewordings of the record's texts (applied first): the words of developer
+#: documents on a page users read (the guide, section 1).
+TEXTS = [(r"\bfor brain-extraction parity\b", "for the comparison of brain extractions")]
+
+
 def _text(s: str | None, code: bool = True) -> str | None:
     """A text in the guide's words, a bare "larmorx" the project, LARMORX."""
     from larmorx_validation.evidence import present as present_
 
+    for pat, rep in TEXTS:
+        s = re.sub(pat, rep, s) if s else s
     return present_.text(_page_(), s, code=code, port="both")
 
 

@@ -598,7 +598,7 @@ pub fn read_bruker_acqp(
             }
             b"$ACQ_flip_angle" => {
                 scan_list(g, &v, &mut [&mut *flip_angle], false, lf1);
-                *flip_angle = flip_angle.map(|f| div64(mul64(f, 3.141_592_653_589_793), 180.0));
+                *flip_angle = flip_angle.map(|f| div64(mul64(f, std::f64::consts::PI), 180.0));
             }
             _ => {}
         }

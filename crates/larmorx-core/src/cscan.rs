@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//! C's `sscanf` conversions `%lf` (a `double`) and `%d` (an `int`) of one string, and `strtod`,
+//! C's `sscanf` conversions `%lf` (a `double`), `%f` (a `float`) and `%d` (an `int`) of one string,
+//! and `strtod` and `strtof`,
 //! as the C library reads them, for ports of C parsers whose values come from `sscanf` (MINC's
 //! `.xfm` reader reads every number with `sscanf(token, "%lf", &d)`).
 //!
@@ -43,6 +44,48 @@ fn starts_ci(s: &[u8], i: usize, word: &[u8]) -> bool {
 /// `strtod(s, &end)`: the value and the number of bytes used (0: no conversion, value 0).
 /// Leading white space is skipped (and counted when a number follows).
 pub fn strtod(s: &[u8]) -> (f64, usize) {
+    let (v, n) = strto(s, Prec::Double);
+    (f64::from_bits(v), n)
+}
+
+/// `strtof(s, &end)`: as [`strtod`], the value rounded once, correctly, to a `float` (never
+/// through a `double`); a NaN's payload goes into the significand's low 22 bits.
+pub fn strtof(s: &[u8]) -> (f32, usize) {
+    let (v, n) = strto(s, Prec::Single);
+    (f32::from_bits(v as u32), n)
+}
+
+/// The two IEEE formats `strto` rounds to.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Prec {
+    Single,
+    Double,
+}
+
+impl Prec {
+    /// Significand bits (with the leading one) and the largest exponent.
+    fn params(self) -> (i64, i64) {
+        match self {
+            Prec::Single => (24, 127),
+            Prec::Double => (53, 1023),
+        }
+    }
+    fn inf(self) -> u64 {
+        let (p, emax) = self.params();
+        ((2 * emax + 1) as u64) << (p - 1)
+    }
+    fn neg(self, bits: u64) -> u64 {
+        let (p, emax) = self.params();
+        bits | (1u64 << (p - 1 + bit_len(2 * emax + 1)))
+    }
+}
+
+fn bit_len(v: i64) -> i64 {
+    64 - (v as u64).leading_zeros() as i64
+}
+
+/// `strtod` or `strtof`: the result's bits.
+fn strto(s: &[u8], prec: Prec) -> (u64, usize) {
     let mut i = 0;
     while i < s.len() && is_c_space(s[i]) {
         i += 1;
@@ -53,7 +96,7 @@ pub fn strtod(s: &[u8]) -> (f64, usize) {
         neg = s[i] == b'-';
         i += 1;
     }
-    let sign = |v: f64| if neg { -v } else { v };
+    let sign = |v: u64| if neg { prec.neg(v) } else { v };
     // INF / INFINITY
     if starts_ci(s, i, b"inf") {
         let end = if starts_ci(s, i, b"infinity") {
@@ -61,7 +104,7 @@ pub fn strtod(s: &[u8]) -> (f64, usize) {
         } else {
             i + 3
         };
-        return (sign(f64::INFINITY), end);
+        return (sign(prec.inf()), end);
     }
     // NAN / NAN(n-char-sequence)
     if starts_ci(s, i, b"nan") {
@@ -77,15 +120,16 @@ pub fn strtod(s: &[u8]) -> (f64, usize) {
                 end = j + 1;
             }
         }
-        return (sign(nan_with_payload(payload)), end);
+        return (sign(nan_with_payload(payload, prec)), end);
     }
     // Hexadecimal: 0x, then hex digits with an optional point, then an optional binary exponent.
     if i + 1 < s.len() && s[i] == b'0' && lower(s[i + 1]) == b'x' {
-        if let Some((v, end)) = hex_float(s, i + 2) {
-            return (sign(v), end);
+        if let Some((mant, sticky, exp, end)) = hex_float(s, i + 2) {
+            let (p, emax) = prec.params();
+            return (sign(compose(mant, sticky, exp, p, emax)), end);
         }
         // "0x" without a hex digit after it: the subject is the "0".
-        return (sign(0.0), i + 1);
+        return (sign(0), i + 1);
     }
     // Decimal.
     let mut j = i;
@@ -103,7 +147,7 @@ pub fn strtod(s: &[u8]) -> (f64, usize) {
     }
     if digits == 0 {
         let _ = start;
-        return (0.0, 0);
+        return (0, 0);
     }
     let mantissa_end = j;
     if j < s.len() && lower(s[j]) == b'e' {
@@ -123,14 +167,31 @@ pub fn strtod(s: &[u8]) -> (f64, usize) {
     // (an exponent too large for its integer is clamped first: the value is then 0 or infinity
     // either way).
     let text = std::str::from_utf8(&s[i..j]).expect("ASCII digits");
-    let v = parse_decimal(text);
+    let v = match prec {
+        Prec::Double => parse_decimal::<f64>(text).to_bits(),
+        Prec::Single => parse_decimal::<f32>(text).to_bits() as u64,
+    };
     (sign(v), j)
+}
+
+/// The two float types `parse_decimal` rounds to.
+trait Decimal: std::str::FromStr {
+    const ZERO: Self;
+    const INFINITY: Self;
+}
+impl Decimal for f64 {
+    const ZERO: f64 = 0.0;
+    const INFINITY: f64 = f64::INFINITY;
+}
+impl Decimal for f32 {
+    const ZERO: f32 = 0.0;
+    const INFINITY: f32 = f32::INFINITY;
 }
 
 /// A decimal subject (digits, an optional point, an optional exponent; no sign), correctly
 /// rounded.
-fn parse_decimal(text: &str) -> f64 {
-    match text.parse::<f64>() {
+fn parse_decimal<T: Decimal>(text: &str) -> T {
+    match text.parse::<T>() {
         Ok(v) => v,
         Err(_) => {
             // An exponent beyond Rust's range: split it off and clamp it.
@@ -140,24 +201,26 @@ fn parse_decimal(text: &str) -> f64 {
             let digits = e.trim_start_matches(['+', '-']);
             let mant_zero = m.bytes().all(|c| c == b'0' || c == b'.');
             if mant_zero {
-                0.0
+                T::ZERO
             } else if neg {
                 let _ = digits;
-                0.0
+                T::ZERO
             } else {
-                f64::INFINITY
+                T::INFINITY
             }
         }
     }
 }
 
-/// glibc's NaN for `strtod`: the default quiet NaN, or with a payload from `nan(n-char-sequence)`
-/// read as an unsigned number (decimal, `0x` hexadecimal or `0` octal) into the significand's low
-/// 51 bits when it is one.
-fn nan_with_payload(payload: Option<&[u8]>) -> f64 {
-    const QUIET: u64 = 0x7ff8_0000_0000_0000;
+/// glibc's NaN for `strtod` (`strtof`): the default quiet NaN, or with a payload from
+/// `nan(n-char-sequence)` read as an unsigned number (decimal, `0x` hexadecimal or `0` octal) into
+/// the significand's low 51 (22) bits when it is one.
+fn nan_with_payload(payload: Option<&[u8]>, prec: Prec) -> u64 {
+    let (p, _) = prec.params();
+    let quiet: u64 = prec.inf() | (1u64 << (p - 2));
+    let low = (1u64 << (p - 2)) - 1;
     let Some(p) = payload else {
-        return f64::from_bits(QUIET);
+        return quiet;
     };
     let (digits, radix) = if p.len() > 1 && p[0] == b'0' && lower(p[1]) == b'x' {
         (&p[2..], 16)
@@ -172,22 +235,23 @@ fn nan_with_payload(payload: Option<&[u8]>) -> f64 {
             b'0'..=b'9' => (c - b'0') as u64,
             b'a'..=b'f' => (c - b'a' + 10) as u64,
             b'A'..=b'F' => (c - b'A' + 10) as u64,
-            _ => return f64::from_bits(QUIET),
+            _ => return quiet,
         };
         if d >= radix {
-            return f64::from_bits(QUIET);
+            return quiet;
         }
         value = match value.checked_mul(radix).and_then(|v| v.checked_add(d)) {
             Some(v) => v,
-            None => return f64::from_bits(QUIET),
+            None => return quiet,
         };
     }
-    f64::from_bits(QUIET | (value & ((1u64 << 51) - 1)))
+    quiet | (value & low)
 }
 
 /// The hexadecimal significand at `s[i..]` (after `0x`), its optional point and binary
-/// exponent: the value and the end, or `None` when no hex digit follows.
-fn hex_float(s: &[u8], mut i: usize) -> Option<(f64, usize)> {
+/// exponent: the significand's leading 64 bits, whether a nonzero tail was dropped, the binary
+/// exponent of the bits kept and the end; `None` when no hex digit follows.
+fn hex_float(s: &[u8], mut i: usize) -> Option<(u64, bool, i64, usize)> {
     let hexval = |c: u8| -> Option<u64> {
         match c {
             b'0'..=b'9' => Some((c - b'0') as u64),
@@ -245,55 +309,58 @@ fn hex_float(s: &[u8], mut i: usize) -> Option<(f64, usize)> {
             i = k;
         }
     }
-    Some((compose(mant, sticky, exp), i))
+    Some((mant, sticky, exp, i))
 }
 
 /// `mant × 2^exp` (with `sticky`: a nonzero tail below `mant`'s last bit) rounded to the nearest
-/// double, ties to even, subnormals and overflow included.
-fn compose(mant: u64, sticky: bool, exp: i64) -> f64 {
+/// value of the format with `p` significand bits and largest exponent `emax`, ties to even,
+/// subnormals and overflow included: its bits (positive).
+fn compose(mant: u64, sticky: bool, exp: i64, p: i64, emax: i64) -> u64 {
     if mant == 0 {
-        return 0.0;
+        return 0;
     }
+    let emin = 1 - emax;
+    let frac = p - 1;
+    let inf = ((2 * emax + 1) as u64) << frac;
     // Normalise: the leading bit at position 63.
     let lz = mant.leading_zeros() as i64;
     let m = mant << lz;
     // value = m × 2^(exp - lz), m in [2^63, 2^64).
     let e2 = exp - lz + 63; // the unbiased exponent of the leading bit
-    if e2 > 1023 {
-        return f64::INFINITY;
+    if e2 > emax {
+        return inf;
     }
-    // Bits to keep: 53 for normal numbers, fewer for subnormals.
-    let keep: i64 = if e2 >= -1022 { 53 } else { 53 - (-1022 - e2) };
+    // Bits to keep: p for normal numbers, fewer for subnormals.
+    let keep: i64 = if e2 >= emin { p } else { p - (emin - e2) };
     if keep <= 0 {
         // Below half the smallest subnormal, or exactly at it (round to even: zero), or above.
         if keep == 0 {
-            // m × 2^(e2-63) with e2 = -1075: the value is in [2^-1075, 2^-1074).
+            // the value is in [2^(emin-p), 2^(emin-p+1)): half the smallest subnormal or more
             let half = m == 1u64 << 63 && !sticky;
-            return if half { 0.0 } else { f64::from_bits(1) };
+            return if half { 0 } else { 1 };
         }
-        return 0.0;
+        return 0;
     }
     let drop = 64 - keep; // bits of m below the kept ones
     let kept = m >> drop;
     let rem = m & ((1u64 << drop) - 1);
     let halfway = 1u64 << (drop - 1);
     let round_up = rem > halfway || (rem == halfway && (sticky || kept & 1 == 1));
-    let round_up = round_up || (rem == halfway && sticky);
     let mut q = kept + round_up as u64;
     let mut e = e2;
-    if e2 >= -1022 {
-        if q == 1u64 << 53 {
+    if e2 >= emin {
+        if q == 1u64 << p {
             q >>= 1;
             e += 1;
-            if e > 1023 {
-                return f64::INFINITY;
+            if e > emax {
+                return inf;
             }
         }
-        let bits = (((e + 1023) as u64) << 52) | (q & ((1u64 << 52) - 1));
-        f64::from_bits(bits)
+        (((e + emax) as u64) << frac) | (q & ((1u64 << frac) - 1))
     } else {
-        // Subnormal: q counts units of 2^-1074 (it may round up to the smallest normal).
-        f64::from_bits(q)
+        // Subnormal: q counts units of the smallest subnormal (it may round up to the smallest
+        // normal, whose bits are the same number).
+        q
     }
 }
 
@@ -382,6 +449,23 @@ pub fn sscanf_f64(s: &[u8]) -> Option<f64> {
     if used == 0 { None } else { Some(v) }
 }
 
+/// `sscanf(s, "%f", &f) == 1`: the value, or `None` (as [`sscanf_f64`], converted by [`strtof`]).
+pub fn sscanf_f32(s: &[u8]) -> Option<f32> {
+    let mut i = 0;
+    while i < s.len() && is_c_space(s[i]) {
+        i += 1;
+    }
+    if i >= s.len() {
+        return None;
+    }
+    let end = float_run(s, i);
+    if end == usize::MAX || end == i {
+        return None;
+    }
+    let (v, used) = strtof(&s[i..end]);
+    if used == 0 { None } else { Some(v) }
+}
+
 /// `strtol(s, &end, 10)` on 64-bit `long`: the value (clamped to the `long` range on overflow)
 /// and the bytes used (0: no conversion).
 pub fn strtol10(s: &[u8]) -> (i64, usize) {
@@ -465,5 +549,29 @@ mod tests {
         assert_eq!(sscanf_i32(b"4294967297"), Some(1));
         assert_eq!(sscanf_i32(b"x"), None);
         assert_eq!(sscanf_i32(b"+"), None);
+    }
+
+    #[test]
+    fn floats_rounded_once() {
+        // glibc's strtof (validation/probes/fs-gifti's scan family: 20,000 strings, 0 differ)
+        let b = |s: &str| sscanf_f32(s.as_bytes()).map(f32::to_bits);
+        assert_eq!(b("1.0"), Some(0x3f80_0000));
+        assert_eq!(b(" 1.0x"), Some(0x3f80_0000));
+        assert_eq!(b("abc"), None);
+        assert_eq!(b(""), None);
+        // a value just above a float midpoint that a double would round onto it
+        assert_eq!(b("1.00000017881393432617187501"), Some(0x3f80_0002));
+        assert_eq!(b("1.000000178813934326171875"), Some(0x3f80_0002));
+        assert_eq!(b("1.00000017881393432617187499"), Some(0x3f80_0001));
+        assert_eq!(b("3.4028236e38"), Some(0x7f80_0000));
+        assert_eq!(b("7e-46"), Some(0)); // below half the smallest subnormal
+        assert_eq!(b("7.1e-46"), Some(0x0000_0001));
+        assert_eq!(b("1e-46"), Some(0));
+        assert_eq!(b("0x1.ffffffp127"), Some(0x7f80_0000));
+        assert_eq!(b("0x1p-149"), Some(1));
+        assert_eq!(b("-nan"), Some(0xffc0_0000));
+        assert_eq!(b("nan(0x7f)"), Some(0x7fc0_0000));
+        assert_eq!(b("-Infinity"), Some(0xff80_0000));
+        assert_eq!(strtof(b"nan(0x7f)").0.to_bits(), 0x7fc0_007f);
     }
 }

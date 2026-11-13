@@ -677,3 +677,9 @@ fallback leaves the array, the same calls before the same stopping point. As fas
 (glibc's time over the clean room's: 0.83 to 1.38 on 10⁵ to 10⁷ elements). The unit tests check the reference
 lines, the spec's examples and 18 golden checksums on every platform.
 
+## `cfmt::f80_f`: C's `%Lf` of an x86-64 `long double`
+
+Written from the C standard's description of `%f` (ISO C 7.21.6.1) and glibc's spellings of the
+special values, for gifticlib's writer of `NIFTI_TYPE_FLOAT128` and `COMPLEX256` data: the exact
+value of the 80-bit number, correctly rounded with ties to even (glibc's default rounding).
+Original code (Apache-2.0).

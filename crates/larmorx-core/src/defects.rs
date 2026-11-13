@@ -1137,6 +1137,26 @@ defects! {
         "gzseek forward (or gzflush or gzclose after it) before the first gzwrite fills the gap with memory zlib never set instead of zeros: gz_zero clears its buffer once, before allocating it";
     FS_79 = "FS-79", "MINC volume_io", true,
         "a backslash in a file name is an escape that expand_filename drops, and only '/' separates directories: a Windows path (C:\\Users\\...) loses its separators, its directory, base name and extension are misread, and a file next to it is never found";
+    FS_80 = "FS-80", "gifticlib", true,
+        "a label table whose Labels carry colours for some labels only leaves holes in its colour array (or makes it shorter than the table), and a Label whose Key attribute is missing or wrong is given no key: the writer, the validity check and the display read memory never written";
+    FS_81 = "FS-81", "gifticlib", true,
+        "Base64 data whose character data hold characters outside the alphabet (skipped and counted, the default) take the bytes carried to the next piece from the wrong place when a group of four is cut at the piece's end: the values after it are decoded from earlier text or from memory never written";
+    FS_82 = "FS-82", "gifticlib", true,
+        "NIFTI_TYPE_FLOAT128 is 6 bytes per value in gifticlib's type table (a long double takes 16): its arrays are allocated, decoded and written with 6 bytes per value, and the ASCII writer reads 16 per value, past the data";
+    FS_83 = "FS-83", "gifticlib", true,
+        "the ASCII decoder's count of a value's pieces (COMPLEX64, COMPLEX128, RGB24) persists from one array to the next, even of another file: after an array whose last value is incomplete the next array of that type starts in the middle of a value";
+    FS_84 = "FS-84", "gifticlib", true,
+        "a metadata entry without a name (an MD whose Name has no text) is compared through a null pointer by gifti_get_meta_value and, at verbosity 2 and below, gifti_add_to_meta: the program crashes";
+    FS_85 = "FS-85", "gifticlib", true,
+        "a GIFTI element outside the element it belongs to (Data, MatrixData, a coordinate system outside a DataArray, a Name or Value outside an MD, a dimension past Dim7 when writing) is read or written through a null or out-of-range pointer: the program crashes or reads memory it never wrote";
+    FS_86 = "FS-86", "gifticlib", true,
+        "character data (white space included) after a CDATA section or a child element inside a GIFTI Name, Value, Label, DataSpace or TransformedSpace, or inside one of them outside its parent, is written through a null pointer: the program crashes";
+    FS_88 = "FS-88", "expat", true,
+        "a UTF-16 document of an odd length whose last token is cut by its odd byte (white space, a name or a ']' at the end of the prolog or the content) is converted past its end: the program crashes or never returns";
+    FS_89 = "FS-89", "expat", true,
+        "an error reported inside a multibyte character (a non-ASCII character in an XML declaration's pseudo-attribute) makes the line count step over the error position and read past the document: the program crashes";
+    FS_87 = "FS-87", "gifticlib", true,
+        "at verbosity 6 and 7 the GIFTI reader's messages about a MatrixData buffer show the Data element's buffer and length instead, including memory never written";
     FS_100 = "FS-100", "FreeSurfer", true,
         "the gamma draw converts its shape's integer part to a 32-bit unsigned integer, which C leaves undefined outside [0, 2^32): a shape of 2^32 or more gives a value of the wrong size, NaN and +inf the value of a shape below 1, and a negative shape or -inf a draw that does not return in practice";
     FS_101 = "FS-101", "FreeSurfer", true,

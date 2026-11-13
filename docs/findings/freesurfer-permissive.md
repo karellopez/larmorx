@@ -148,10 +148,36 @@ Where FreeSurfer calls them (the call sites the cards name):
 - FreeSurfer reads `.xfm` numbers through MINC's `sscanf("%lf")` and its matrix files through
   `MatrixReadTxt`, `MatrixAsciiReadFrom` (track A's `matrix_io`, on `cscan`).
 
+## GIFTI: gifticlib and expat (items 3.1-09 to 3.1-12)
+
+- FreeSurfer 8.2.0's `packages/gifti` is gifticlib 1.12 (github.com/NIFTI-Imaging/gifti_clib at
+  8ec2a95, 2012-06-15) reformatted, with two changes that alter behaviour (token comparison,
+  `<scratch>` tools of relay 5; confirmed by the probe below):
+  1. `gifti_valid_gifti_image`'s version check reads the image's `Version` and "1.0" with
+     `sscanf("%f")` and compares the two `float`s ("NJS: original code checks string, not value,
+     so '1' fails"); when they differ it prints `** invalid: gim version = %f, expected %f` and
+     counts an error. An image without a `Version` reads 0 on both sides: valid. A version of
+     " 1.0", "1", "1.00" is valid; "1.0x" is too (the number read stops at the 'x'); "nan" and
+     "2.0" are not. `larmorx_io::gifti::Dialect::check_version`.
+  2. `push_cstm` accepts a coordinate system under a `NIFTI_INTENT_TIME_SERIES` array as well as
+     a `NIFTI_INTENT_POINTSET` one; the message names both: `** DA[%d] has coordsys with intent %s
+     (should be %s or %s)`. `Dialect::coordsys_intent_message`.
+  Track A's replica of FreeSurfer's GIFTI calls supplies this dialect (the probe's `ProbeFs` is a
+  model of it; `larmorx_core::cscan::sscanf_f32` reads the `float`s as glibc does).
+- FreeSurfer's `packages/expat` is expat 2.0.1 (libexpat tag R_2_0_1) built with `XML_DTD`,
+  `XML_NS` and `XML_CONTEXT_BYTES` 1024 (its `expat_config.h`), without one `memmove` guard; no
+  difference in behaviour was found (the probe below: every event and error equal).
+- `validation/probes/fs-gifti` compares the port with gifticlib 1.12 + expat 2.0.1 + nifticlib
+  2.0.0 built from their pinned sources and with FreeSurfer's copies as the unit oracle built them
+  (`libgifti.a`, `libexpat.a`, `libnifti.a`; GCC 8.4.0, FreeSurfer's flags); its README has the
+  numbers. FreeSurfer reads and writes GIFTI through `gifti_read_image`, `gifti_write_image` and
+  `gifti_valid_gifti_image` (its `utils/gifti.cpp`, track A).
+
 ## The probes that name FreeSurfer's internals (for the clean-room audit's restriction table)
 
 `validation/probes/fs-vnl` (its shim's comments: FreeSurfer's call sites and flags),
 `validation/probes/x87-extended` (`patterns.cpp`: FreeSurfer's `long double` patterns),
-`validation/probes/fs-random` (FreeSurfer's seeds and its `drand64` cast) and
+`validation/probes/fs-random` (FreeSurfer's seeds and its `drand64` cast),
 `validation/probes/fs-minc-nifti` (`ProbeFs`, `Flavour::FreeSurfer`: FreeSurfer's copies' changes)
-are closed to FreeSurfer's clean-room implementers, as this file is.
+and `validation/probes/fs-gifti` (`dialect.rs`: FreeSurfer's two GIFTI changes) are closed to
+FreeSurfer's clean-room implementers, as this file is.

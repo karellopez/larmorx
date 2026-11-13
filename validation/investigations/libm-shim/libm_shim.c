@@ -7,10 +7,14 @@
      - the C library's value      with LARMORX_LIBM_SHIM=count (the default): the program's results
                                   are the official ones, only counted;
      - the correctly rounded one  with LARMORX_LIBM_SHIM=cr (for the functions named in
-                                  LARMORX_LIBM_SHIM_FUNCS, comma-separated; every one when unset).
+                                  LARMORX_LIBM_SHIM_FUNCS, comma-separated; every one when unset);
+     - the C library's value moved by one unit in the last place away from zero (zeros, infinities
+       and NaNs unchanged)        with LARMORX_LIBM_SHIM=ulp (the same choice of functions): a
+                                  sensitivity test for csqrt, which has no correctly rounded
+                                  reference (both parts of its result are moved).
    At exit it appends one line per function called to LARMORX_LIBM_SHIM_LOG (default
    /tmp/larmorx-libm-shim.log): program, pid, mode, function, calls, differing. csqrt has no
-   correctly rounded reference: counted only. Calls of the C library only; no glibc code.
+   correctly rounded reference: counted (differing 0), and moved in ulp mode only. Calls of the C library only; no glibc code.
    Build: build_shim.sh (README.md). */
 #define _GNU_SOURCE
 #include <complex.h>
@@ -32,8 +36,8 @@ static const char *names[NF] = {"acos", "asin", "atan", "atan2", "tan", "log10",
   "hypotf", "csqrt"};
 static unsigned long long calls[NF], differ[NF];
 static void *real[NF];
-static int use_cr[NF];
-static int mode_cr;
+static int use_cr[NF], use_ulp[NF];
+static int mode_cr, mode_ulp;
 
 double cr_acos(double); double cr_asin(double); double cr_atan(double); double cr_atan2(double, double);
 double cr_tan(double); double cr_log10(double); double cr_log2(double); double cr_hypot(double, double);
@@ -52,16 +56,19 @@ __attribute__((constructor)) static void shim_init(void)
 {
   const char *m = getenv("LARMORX_LIBM_SHIM");
   mode_cr = m && !strcmp(m, "cr");
+  mode_ulp = m && !strcmp(m, "ulp");
   const char *f = getenv("LARMORX_LIBM_SHIM_FUNCS");
   for (int i = 0; i < NF; i++) {
     lookup(i);
-    use_cr[i] = mode_cr && i != CSQRT;
-    if (mode_cr && f && *f) {
-      use_cr[i] = 0;
+    int chosen = 1;
+    if (f && *f) {
+      chosen = 0;
       size_t n = strlen(names[i]);
       for (const char *p = f; (p = strstr(p, names[i])); p += n)
-        if ((p == f || p[-1] == ',') && (p[n] == ',' || p[n] == 0)) use_cr[i] = i != CSQRT;
+        if ((p == f || p[-1] == ',') && (p[n] == ',' || p[n] == 0)) chosen = 1;
     }
+    use_cr[i] = mode_cr && chosen && i != CSQRT;
+    use_ulp[i] = mode_ulp && chosen;
   }
 }
 
@@ -73,7 +80,7 @@ __attribute__((destructor)) static void shim_fini(void)
   for (int i = 0; i < NF; i++)
     if (calls[i])
       fprintf(out, "%s %d %s %s %llu %llu\n", program_invocation_short_name, (int)getpid(),
-              use_cr[i] ? "cr" : "count", names[i], calls[i], differ[i]);
+              use_cr[i] ? "cr" : use_ulp[i] ? "ulp" : "count", names[i], calls[i], differ[i]);
   fclose(out);
 }
 
@@ -92,6 +99,18 @@ static int same32(float a, float b)
   return x == y || (isnan(a) && isnan(b));
 }
 
+/* one unit in the last place away from zero; zeros, infinities and NaNs unchanged */
+static double bump64(double a)
+{
+  return (a == 0 || !isfinite(a)) ? a : nextafter(a, a > 0 ? INFINITY : -INFINITY);
+}
+static float bump32(float a)
+{
+  return (a == 0 || !isfinite(a)) ? a : nextafterf(a, a > 0 ? INFINITY : -INFINITY);
+}
+#define BUMP_double bump64
+#define BUMP_float bump32
+
 /* errno as the C library left it, so a correctly rounded value does not change it */
 #define WRAP1(T, NAME, IDX, SAME)                                                       \
   T NAME(T x)                                                                           \
@@ -103,7 +122,7 @@ static int same32(float a, float b)
     errno = e;                                                                          \
     __atomic_fetch_add(&calls[IDX], 1, __ATOMIC_RELAXED);                               \
     if (!SAME(a, c)) __atomic_fetch_add(&differ[IDX], 1, __ATOMIC_RELAXED);             \
-    return use_cr[IDX] ? c : a;                                                         \
+    return use_cr[IDX] ? c : use_ulp[IDX] ? BUMP_##T(a) : a;                             \
   }
 #define WRAP2(T, NAME, IDX, SAME)                                                       \
   T NAME(T x, T y)                                                                      \
@@ -115,7 +134,7 @@ static int same32(float a, float b)
     errno = e;                                                                          \
     __atomic_fetch_add(&calls[IDX], 1, __ATOMIC_RELAXED);                               \
     if (!SAME(a, c)) __atomic_fetch_add(&differ[IDX], 1, __ATOMIC_RELAXED);             \
-    return use_cr[IDX] ? c : a;                                                         \
+    return use_cr[IDX] ? c : use_ulp[IDX] ? BUMP_##T(a) : a;                             \
   }
 
 WRAP1(double, acos, ACOS, same64)
@@ -142,5 +161,10 @@ double complex csqrt(double complex z)
 {
   double complex (*g)(double complex) = (double complex(*)(double complex))lookup(CSQRT);
   __atomic_fetch_add(&calls[CSQRT], 1, __ATOMIC_RELAXED);
-  return g(z);
+  double complex r = g(z);
+  if (!use_ulp[CSQRT]) return r;
+  int e = errno;
+  r = CMPLX(bump64(creal(r)), bump64(cimag(r)));
+  errno = e;
+  return r;
 }

@@ -43,6 +43,17 @@ FreeSurfer Software License, version 1.0 (LICENSE)
   added), or replaced by larmorx's own code, as docs/freesurfer/third-party.md places it.
 
 
+John Burkardt's spline routines (Florida State University, about 2006;
+http://www.csit.fsu.edu/~burkardt/cpp_src/spline/spline.html, as FreeSurfer 8.2.0 credits them)
+  Translated: SplineCubicSet, SplineCubicValue and d3_np_fs as FreeSurfer 8.2.0's
+  utils/numerics.cpp carries them (converted by FreeSurfer to single precision, the evaluation
+  constant outside the knots), with FreeSurfer's wrappers OpenSpline and OpenSplint (crate
+  larmorx-freesurfer-core, module spline; its PROVENANCE.md). The 2006 code states no licence;
+  Burkardt's later releases of these routines are under the GNU LGPL (about 2010 to 2022) and the
+  MIT licence (since about 2024). Modified: translated from C++ to Rust in 2026 by Karel Lopez
+  Vilaret; FreeSurfer's acceptance of a NaN knot (FS-103) is an error by default and reproduced
+  on request.
+
 Included works
 ==============
 

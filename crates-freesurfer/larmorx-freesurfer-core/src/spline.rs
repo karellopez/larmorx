@@ -7,8 +7,8 @@
 //! `fs.spline` (queue item 3.1-54): the cubic spline of FreeSurfer's intensity normalisation
 //! (`mri_normalize`'s `MRIsplineNormalize` calls `OpenSpline` and `OpenSplint`), translated
 //! statement by statement from FreeSurfer 8.2.0's `utils/numerics.cpp`: `OpenSpline` (1287-1296),
-//! `OpenSplint` (1305-1312), `SplineCubicSet` (1416-1530), `SplineCubicValue` (1572-1610) and
-//! `d3_np_fs` (1649-1681), John Burkardt's 2006 routines as FreeSurfer converted them to `float`
+//! `OpenSplint` (1305-1312), `SplineCubicSet` (1417-1535), `SplineCubicValue` (1572-1611) and
+//! `d3_np_fs` (1648-1680), John Burkardt's 2006 routines as FreeSurfer converted them to `float`
 //! and made the evaluation constant outside the knots; `include/numerics.h`'s `SPLINE_USE_*`.
 //!
 //! Bit for bit with FreeSurfer's official build (GCC 8.4.0, x86-64 SSE2, no FMA): `float`

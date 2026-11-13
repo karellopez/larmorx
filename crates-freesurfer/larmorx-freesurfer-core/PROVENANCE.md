@@ -45,6 +45,7 @@ built for the official binaries with GCC 8.4.0 (`docs/freesurfer/variation.md`).
 | `cscan` | none (larmorx's own) | the C library's `scanf` conversions `%f` and `%d` as glibc 2.35 behaves, written from the C standard and black-box measurements (`validation/probes/fs-maths/scanf/`), no glibc code |
 | `prime` | `utils/prime.cpp` 20-235 | `GetPrimes`, `GetPrimeFactors`, `CompareFactors` (as a sort of integers), `GetClosestPrimeFactor`, `GetClosestPrimeFactorLess`; FS-32 |
 | `pdf` | `utils/pdf.cpp` 26-61 | `PDFtodSeed`, `PDFgaussian`; FS-29, FS-30 |
+| `spline` (3.1-54, `fs.spline`) | `utils/numerics.cpp` 1287-1312, 1417-1535, 1572-1611, 1648-1680; `include/numerics.h` 28-30 | `OpenSpline`, `OpenSplint`, `SplineCubicSet`, `SplineCubicValue`, `d3_np_fs` (John Burkardt's routines, below), `SPLINE_USE_QUADRATIC`, `SPLINE_USE_FIRST_DERIVATIVE`, `SPLINE_USE_SECOND_DERIVATIVE`; FS-103 |
 | `sse` | none (larmorx's own) | SSE2's NaN rules for the official build's arithmetic (the porting guide's "NaN bits are part of the output") |
 | `ret` | none (larmorx's own) | the result of a function with an optional output (`T *F(..., T *dst)`) |
 | `cstd` | none (larmorx's own) | the C library's `atoi`, `atof`, `sscanf`'s `%lx`, `printf`'s `%W.Pf`, x86-64's double-to-int conversion, written from the C standard and glibc's documented behaviour |
@@ -72,6 +73,27 @@ item that needs it): the unreached functions of these files (static reach, `code
 `PrintMemUsage`, `SetProgressCallback`, `FSENVprintenv`, `xDbg_Init` and the other `xDbg_*`, ROMP's
 statistics, ...).
 
+Third-party code in `spline` (item 3.1-54; `docs/freesurfer/third-party.md` TP-04, the placement
+P-09): `SplineCubicSet`, `SplineCubicValue` and `d3_np_fs` are **John Burkardt's** (Florida State
+University) spline routines of about 2006, which FreeSurfer's file credits ("Original Author: John
+Burkardt, http://www.csit.fsu.edu/~burkardt/cpp_src/spline/spline.html", his comments kept), as
+FreeSurfer converted them to `float` and made `SplineCubicValue` constant outside the knots;
+`OpenSpline` and `OpenSplint` are FreeSurfer's wrappers. Burkardt's page and code of 2006 state no
+licence; his releases of about 2010 to 2022 are under the GNU LGPL, his current one under the MIT
+licence (read 2026-11-12; `d3_np_fs` is identical in all of them, the 2006 `SplineCubicSet` in the
+2012 one; third-party.md §9, P-09). The user decided (2026-11-12) that this replica is published with
+FreeSurfer's code, crediting Burkardt here and in `crates-freesurfer/NOTICE`. Translated from
+FreeSurfer 8.2.0's copy (`utils/numerics.cpp`, SHA-256
+`a40443aad70cd37f1ccd6c75a7891d2bf8760a16dafe594ef03c50c0a0039009`), with the official build's
+code (the unit oracle's `numerics.cpp.o`, disassembled) for what C leaves open: `float` divisions by
+the `double` constants 3.0 and 6.0 (the source's `double` steps, the same bits as the `float`
+division the build makes), `SplineCubicValue`'s mixed steps, and the operand order of each operation
+where two NaNs can meet (the source's order, but `d3_np_fs`'s products with the super-diagonal,
+`a[0 + i * 3] * xmult` and `x[i + 1] * a[0 + (i + 1) * 3]` in the build). Not reproduced (reached by
+no FreeSurfer caller): `SplineCubicValue` with one knot and a NaN point reads `t[-1]` (here the
+point, quieted, as larmorx's clean room gives it), `d3_np_fs` of order 0 divides `x[-1]` (here the
+empty solution). Validation: `validation/investigations/freesurfer-spline-replica-check/`.
+
 ## Changes from the originals
 
 - Process-wide globals are fields of `Globals`, one value per program run.
@@ -91,7 +113,7 @@ statistics, ...).
 - (`fs.maths`, 3.1-24) The float matrices' arithmetic follows SSE2's NaN rules on every platform
   (`sse`); `PDFgaussian` draws from the C library's 48-bit generator through
   `larmorx_core::drand48` (POSIX's definition, `Globals::drand48`). Item 3.1-24's remaining
-  pieces: `OpenSpline` and `OpenSplint` (they call Burkardt's spline, item 3.1-54),
+  pieces: `OpenSpline` and `OpenSplint` (with Burkardt's spline: item 3.1-54, `spline`, 2026-11-13),
   `numerics.cpp`'s GSL functions (item 3.1-53 in `larmorx-gpl`, never here), `randomfields.cpp`'s
   `RFsynth` and `RFdrawVal` (GSL's distributions: items 3.1-05 and 3.1-53) and `RFglobalStats`
   (`MRI` volumes: `fs.volume`).

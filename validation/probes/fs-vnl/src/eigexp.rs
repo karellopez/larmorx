@@ -950,7 +950,11 @@ pub static ORDER0: [u8; SITES] = {
     // the two-root step: `d_sign(zz, p) + p`; its row loop (one by one, two at a time, the one
     // left over) and column loop (every element alike)
     o[13] = 1;
-    let row: [(usize, [u8; 5]); 3] = [(19, [1, 0, 0, 1, 0]), (196, [1, 0, 1, 1, 1]), (201, [1, 0, 1, 1, 0])];
+    let row: [(usize, [u8; 5]); 3] = [
+        (19, [1, 0, 0, 1, 0]),
+        (196, [1, 0, 1, 1, 1]),
+        (201, [1, 0, 1, 1, 0]),
+    ];
     let mut r = 0;
     while r < 3 {
         let mut k = 0;
@@ -1054,13 +1058,21 @@ fn order(site: usize) -> u8 {
 /// `a + b` at a site.
 #[inline(always)]
 fn add(site: usize, a: f64, b: f64) -> f64 {
-    if order(site) == 0 { a.sse_add(b) } else { b.sse_add(a) }
+    if order(site) == 0 {
+        a.sse_add(b)
+    } else {
+        b.sse_add(a)
+    }
 }
 
 /// `a * b` at a site.
 #[inline(always)]
 fn mul(site: usize, a: f64, b: f64) -> f64 {
-    if order(site) == 0 { a.sse_mul(b) } else { b.sse_mul(a) }
+    if order(site) == 0 {
+        a.sse_mul(b)
+    } else {
+        b.sse_mul(a)
+    }
 }
 
 /// `-a * b` at a site (where GCC puts the negation, and which operand comes first): 0 `(-a) * b`,
@@ -1598,20 +1610,44 @@ fn hqr2_full(
                         } else {
                             201
                         };
-                        h.set(na, j, add(b, mul(b + 1, q, zz), mul(b + 2, p, h.at(enu, j))));
-                        h.set(enu, j, mul(b + 3, q, h.at(enu, j)).sse_sub(mul(b + 4, p, zz)));
+                        h.set(
+                            na,
+                            j,
+                            add(b, mul(b + 1, q, zz), mul(b + 2, p, h.at(enu, j))),
+                        );
+                        h.set(
+                            enu,
+                            j,
+                            mul(b + 3, q, h.at(enu, j)).sse_sub(mul(b + 4, p, zz)),
+                        );
                     }
                     for i in 1..=enu {
                         zz = h.at(i, na);
                         let v = vpos(i - 1, enu);
-                        h.set(i, na, add(24 + v, mul(27 + v, q, zz), mul(30 + v, p, h.at(i, enu))));
-                        h.set(i, enu, mul(33 + v, q, h.at(i, enu)).sse_sub(mul(36 + v, p, zz)));
+                        h.set(
+                            i,
+                            na,
+                            add(24 + v, mul(27 + v, q, zz), mul(30 + v, p, h.at(i, enu))),
+                        );
+                        h.set(
+                            i,
+                            enu,
+                            mul(33 + v, q, h.at(i, enu)).sse_sub(mul(36 + v, p, zz)),
+                        );
                     }
                     for i in low..=igh {
                         zz = z.at(i, na);
                         let v = vpos(i - low, igh + 1 - low);
-                        z.set(i, na, add(148 + v, mul(151 + v, q, zz), mul(154 + v, p, z.at(i, enu))));
-                        z.set(i, enu, mul(157 + v, q, z.at(i, enu)).sse_sub(mul(160 + v, p, zz)));
+                        z.set(
+                            i,
+                            na,
+                            add(148 + v, mul(151 + v, q, zz), mul(154 + v, p, z.at(i, enu))),
+                        );
+                        z.set(
+                            i,
+                            enu,
+                            mul(157 + v, q, z.at(i, enu)).sse_sub(mul(160 + v, p, zz)),
+                        );
                     }
                 }
                 found[na] = true;
@@ -1646,7 +1682,11 @@ fn hqr2_full(
                 zz = h.at(m, m);
                 r = x.sse_sub(zz);
                 s = y.sse_sub(zz);
-                p = add(134, mul(135, r, s).sse_sub(w).sse_div(h.at(m + 1, m)), h.at(m, m + 1));
+                p = add(
+                    134,
+                    mul(135, r, s).sse_sub(w).sse_div(h.at(m + 1, m)),
+                    h.at(m, m + 1),
+                );
                 q = h.at(m + 1, m + 1).sse_sub(zz).sse_sub(r).sse_sub(s);
                 r = h.at(m + 2, m + 1);
                 s = add(136, add(137, abs_m(p), abs_m(q)), abs_m(r));
@@ -1691,7 +1731,10 @@ fn hqr2_full(
                     r = r.sse_div(x);
                 }
                 // L170.
-                s = d_sign_f(add(140, add(141, p.sse_mul(p), q.sse_mul(q)), r.sse_mul(r)).sqrt(), p);
+                s = d_sign_f(
+                    add(140, add(141, p.sse_mul(p), q.sse_mul(q)), r.sse_mul(r)).sqrt(),
+                    p,
+                );
                 if k != m {
                     h.set(k, k - 1, neg_mul(142, s, x));
                 } else if l != m {
@@ -1714,13 +1757,21 @@ fn hqr2_full(
                     }
                     for i in 1..=jmax {
                         let v = vpos(i - 1, jmax);
-                        p = add(43 + v, mul(46 + v, x, h.at(i, k)), mul(49 + v, y, h.at(i, k + 1)));
+                        p = add(
+                            43 + v,
+                            mul(46 + v, x, h.at(i, k)),
+                            mul(49 + v, y, h.at(i, k + 1)),
+                        );
                         h.set(i, k, h.at(i, k).sse_sub(p));
                         h.set(i, k + 1, h.at(i, k + 1).sse_sub(mul(52 + v, p, q)));
                     }
                     for i in low..=igh {
                         let v = vpos(i - low, igh + 1 - low);
-                        p = add(163 + v, mul(166 + v, x, z.at(i, k)), mul(169 + v, y, z.at(i, k + 1)));
+                        p = add(
+                            163 + v,
+                            mul(166 + v, x, z.at(i, k)),
+                            mul(169 + v, y, z.at(i, k + 1)),
+                        );
                         z.set(i, k, z.at(i, k).sse_sub(p));
                         z.set(i, k + 1, z.at(i, k + 1).sse_sub(mul(172 + v, p, q)));
                     }
@@ -1739,7 +1790,11 @@ fn hqr2_full(
                         let v = vpos(i - 1, jmax);
                         p = add(
                             62 + v,
-                            add(65 + v, mul(68 + v, x, h.at(i, k)), mul(71 + v, y, h.at(i, k + 1))),
+                            add(
+                                65 + v,
+                                mul(68 + v, x, h.at(i, k)),
+                                mul(71 + v, y, h.at(i, k + 1)),
+                            ),
                             mul(74 + v, zz, h.at(i, k + 2)),
                         );
                         h.set(i, k, h.at(i, k).sse_sub(p));
@@ -1750,7 +1805,11 @@ fn hqr2_full(
                         let v = vpos(i - low, igh + 1 - low);
                         p = add(
                             175 + v,
-                            add(178 + v, mul(181 + v, x, z.at(i, k)), mul(184 + v, y, z.at(i, k + 1))),
+                            add(
+                                178 + v,
+                                mul(181 + v, x, z.at(i, k)),
+                                mul(184 + v, y, z.at(i, k + 1)),
+                            ),
                             mul(187 + v, zz, z.at(i, k + 2)),
                         );
                         z.set(i, k, z.at(i, k).sse_sub(p));
@@ -1841,7 +1900,9 @@ fn hqr2_full(
                     }
                     // L784.
                     let d1 = add(98, mul(99, x, r).sse_sub(mul(100, zz, ra)), mul(101, q, sa));
-                    let d2 = mul(102, x, s).sse_sub(mul(103, zz, sa)).sse_sub(mul(104, q, ra));
+                    let d2 = mul(102, x, s)
+                        .sse_sub(mul(103, zz, sa))
+                        .sse_sub(mul(104, q, ra));
                     let (cr, ci) = cdiv(d1, d2, vr, vi);
                     h.set(i, nau, cr);
                     h.set(i, en, ci);
@@ -1849,8 +1910,12 @@ fn hqr2_full(
                         h.set(
                             i + 1,
                             nau,
-                            add(105, (-ra).sse_sub(mul(106, w, h.at(i, nau))), mul(107, q, h.at(i, en)))
-                                .sse_div(x),
+                            add(
+                                105,
+                                (-ra).sse_sub(mul(106, w, h.at(i, nau))),
+                                mul(107, q, h.at(i, en)),
+                            )
+                            .sse_div(x),
                         );
                         h.set(
                             i + 1,

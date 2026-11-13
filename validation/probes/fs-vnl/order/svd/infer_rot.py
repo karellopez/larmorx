@@ -13,6 +13,7 @@ configurations (length, alignment, distance, direction) that show it, and `MODEL
 import re
 import sys
 from collections import defaultdict
+from pathlib import Path
 
 NAMES = "csxy"
 
@@ -43,7 +44,7 @@ def predict(model, s):
 def main():
     pats = defaultdict(list)
     ok = True
-    for line in open(sys.argv[1]):
+    for line in Path(sys.argv[1]).read_text().splitlines():
         head, _, rest = line.partition(":")
         n = int(re.search(r"n=(\d+)", head).group(1))
         res = rest.split()
@@ -51,7 +52,10 @@ def main():
         outs = {k + 1: r.split("/") for k, r in enumerate(res)}
         model_per_i = []
         for i in range(n):
-            g = lambda k, w: outs[k][w][i]  # noqa: E731
+
+            def g(k, w, outs=outs, i=i):
+                return outs[k][w][i]
+
             m1 = "N" if g(5, 0) == "C" else "S"
             m2 = "N" if g(10, 0) == "S" else "S"
             a = "N" if g(3, 0) == "C" else "S"
@@ -61,7 +65,16 @@ def main():
             for k in range(1, 16):
                 if predict(model, subset(k)) != (g(k, 0), g(k, 1)):
                     ok = False
-                    print("MISMATCH", head, "element", i, "subset", sorted(subset(k)), outs[k][0][i], outs[k][1][i])
+                    print(
+                        "MISMATCH",
+                        head,
+                        "element",
+                        i,
+                        "subset",
+                        sorted(subset(k)),
+                        outs[k][0][i],
+                        outs[k][1][i],
+                    )
             model_per_i.append("".join(model))
         pats[" ".join(model_per_i)].append(head.strip())
     for p, heads in sorted(pats.items(), key=lambda kv: len(kv[0])):

@@ -2,6 +2,7 @@
 //! The probe's volume commands: allocation, sizes and intents (§4), voxels (§5), the header and
 //! full copies (§6, §13, §14), pulse parameters, colour tables (§7), names and shapes (§12, §15).
 
+use larmorx_fs_core::maths::Returned;
 use larmorx_fs_core::mri::names::{interp_code, interp_string, precision_code, precision_string};
 use larmorx_fs_core::mri::volume::{intent_code, intent_name};
 use larmorx_fs_core::mri::{VolGeom, sizeof};
@@ -75,6 +76,73 @@ pub fn call(p: &mut Process, l: &mut Line, c: &str) -> Result<bool, Stop> {
                 }
             }
             l.putvox(&m);
+        }
+        "copyhdr" | "copy" => {
+            let mut src = l.getv(p)?;
+            let seed = l.geti();
+            Line::fill(&mut src, seed);
+            l.seth(p, &mut src)?;
+            let mut dst = None;
+            if !l.take("none") {
+                let mut d = l.getv(p)?;
+                let seed = l.geti();
+                Line::fill(&mut d, seed);
+                if c == "copyhdr" {
+                    l.seth(p, &mut d)?;
+                } else {
+                    d.ptype = l.geti();
+                }
+                dst = Some(d);
+            }
+            let r = if c == "copyhdr" {
+                p.mri_copy_header(&src, dst.as_mut())?
+            } else {
+                p.mri_copy(&src, dst.as_mut())?
+            };
+            let res = match r {
+                Returned::Nothing => {
+                    l.out("null");
+                    None
+                }
+                Returned::Output => {
+                    l.out("given");
+                    dst
+                }
+                Returned::New(m) => {
+                    l.out("new");
+                    Some(m)
+                }
+            };
+            if let Some(m) = res {
+                l.puthdr(&m);
+                l.putd(m.mean);
+                l.putct(m.ct.as_ref(), false);
+                if c == "copy" {
+                    l.putvox(&m);
+                }
+            }
+        }
+        "copyxfm" => {
+            let mut src = p.mri_alloc_header(2, 2, 2, 0, 1)?;
+            l.getxfm(&mut src);
+            let mut dst = None;
+            if !l.take("new") {
+                let mut d = p.mri_alloc_header(2, 2, 2, 0, 1)?;
+                l.getxfm(&mut d);
+                dst = Some(d);
+            }
+            let r = p.mri_copy_header(&src, dst.as_mut())?;
+            let res = match r {
+                Returned::New(m) => {
+                    l.out("new");
+                    m
+                }
+                _ => {
+                    l.out("given");
+                    dst.expect("the given volume")
+                }
+            };
+            l.putxfm(&res);
         }
         "pulse" => {
             let mut a = p.mri_alloc_header(1, 1, 1, 0, 1)?;

@@ -548,6 +548,17 @@ coordinate); with the port computing as on AArch64 (`nan_trap.c`, `NAN_TRAP_ARM=
 on x86 and each cost capped at 10^6 calls, 74,492 values, 0 differences (the port's former plain
 arithmetic: 104). `vnl_digests.rs`'s `UNBOUNDED` digest hashes the NaN bits exactly.
 
+**Infinities and NaNs in the eigensystems and the float SVD** (2026-11-13): `vnl_eigen::pythag`
+follows f2c's `abs`, `max` and `min` macros (it had used Rust's NaN-dropping `max` and `min`) and
+returns `None` where VXL's loop never ends; `symmetric_eigensystem` stops there (ITK-115, and the
+path that runs past the arrays) with a notice; `vnl_svd_f32` follows LINPACK's two tests on the
+sign and the order of a singular value as written (a NaN takes the other branch), stops the
+deflation steps' endless loops (ITK-116) and, through `vnl_svd_f32_full`, returns `info` with
+`U`, `W`, `V`. `validation/probes/fs-vnl`'s `nonfinite` family (VNL in a child process with a time
+limit): 93,205 values, 0 differences; every call the port says never returns (222 sampled
+`pythag` pairs, 2,001 eigensystems, 129 SVDs) still computing in VNL at the limit. The `linalg`
+family's numbers are unchanged (20,000 cases, 7,764,649 values, 0 differences).
+
 ## C's `sscanf` conversions and `strtod` (`src/cscan.rs`; FreeSurfer's foundations, item 3.1-14, 2026-11-12)
 
 **Original implementation**, written from the C standard's description (ISO C 7.21.6.2, 7.22.1.3,

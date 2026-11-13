@@ -59,6 +59,8 @@
 // The loops keep LINPACK's 1-based Fortran indices, so the port can be checked line by line
 // against ssvdc.c.
 #![allow(clippy::needless_range_loop)]
+// LINPACK's tests are kept as written where a NaN takes the other branch (`!(s >= 0.0)`).
+#![allow(clippy::neg_cmp_op_on_partial_ord)]
 
 // ------------------------------------------------------------------------------------------------
 // Single-precision reference BLAS (unit stride), as f2c translated them.
@@ -227,10 +229,43 @@ impl Fortran {
 
 /// The SVD of a `rows × cols` float matrix (row-major input), as `vnl_svd<float>` computes
 /// it: `(U (rows × cols, column-major), w (singular values, ≥ 0), V (cols × cols,
-/// column-major))`, or `None` if LINPACK fails to converge. Requires `rows ≥ cols` (economy
-/// size, `job = 21`).
-#[allow(clippy::many_single_char_names)]
+/// column-major))`, or `None` if LINPACK fails to converge ([`SvdF32::info`] not 0). Requires
+/// `rows ≥ cols` (economy size, `job = 21`).
 pub fn vnl_svd_f32(m: &[f32], rows: usize, cols: usize) -> Option<(Vec<f32>, Vec<f32>, Vec<f32>)> {
+    let svd = vnl_svd_f32_full(m, rows, cols);
+    (svd.info == 0).then_some((svd.u, svd.w, svd.v))
+}
+
+/// What `vnl_svd<float>` holds after LINPACK's `ssvdc`: `U`, `W` and `V` (as
+/// [`vnl_svd_f32`] returns them), whether or not it converged, and `ssvdc`'s `info`.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SvdF32 {
+    /// `U` (rows × cols, column-major).
+    pub u: Vec<f32>,
+    /// The singular values' magnitudes (`W`'s diagonal; 0 beyond `min(rows + 1, cols)`).
+    pub w: Vec<f32>,
+    /// `V` (cols × cols, column-major).
+    pub v: Vec<f32>,
+    /// LINPACK's `info`: 0, or the `m` of its main loop when it stopped (the singular values
+    /// `info + 1 ..` and their vectors are correct): after 1,000 QR steps on one value (VNL then
+    /// prints its "suspicious return value" lines and marks the decomposition invalid), or where
+    /// VNL would never return (ITK-116: the port stops there with this `info`).
+    pub info: usize,
+    /// larmorx's own: ITK-116 when VNL would never return.
+    pub notices: Vec<crate::defects::Notice>,
+}
+
+impl SvdF32 {
+    /// Whether VNL's SVD would never return on this matrix (ITK-116).
+    pub fn never_returns(&self) -> bool {
+        self.notices.iter().any(|n| n.defect.id == "ITK-116")
+    }
+}
+
+/// [`vnl_svd_f32`] with `ssvdc`'s `info`, the decomposition as VNL keeps it when `info` is not 0,
+/// and the notices.
+#[allow(clippy::many_single_char_names)]
+pub fn vnl_svd_f32_full(m: &[f32], rows: usize, cols: usize) -> SvdF32 {
     let (n, p) = (rows, cols);
     assert!(n >= p && p > 0 && m.len() == n * p);
     let mut x = Fortran::new(n, p);
@@ -385,9 +420,26 @@ pub fn vnl_svd_f32(m: &[f32], rows: usize, cols: usize) -> Option<(Vec<f32>, Vec
     let mm = m_;
     let mut iter = 0;
     let maxit = 1000;
+    let mut info = 0usize;
+    let mut notices = Vec::new();
+    // The deflation and splitting steps (kases 1 and 2) do not count as iterations: on an
+    // infinite or NaN entry they can come back to the same singular values and superdiagonal for
+    // ever (ITK-116). The state the next pass reads (s, e, m, iter; a NaN counted as one, as its
+    // bits decide nothing) is compared with one saved at the powers of two (Brent's cycle
+    // detection); U and V never feed back.
+    let state = |s: &[f32], e: &[f32], m: usize, iter: usize| -> Vec<u32> {
+        let b = |y: &f32| if y.is_nan() { u32::MAX } else { y.to_bits() };
+        let mut v: Vec<u32> = s.iter().chain(e.iter()).map(b).collect();
+        v.push(m as u32);
+        v.push(iter as u32);
+        v
+    };
+    let mut saved = state(&s, &e, m_, iter);
+    let (mut power, mut steps) = (1u64, 0u64);
     while m_ != 0 {
         if iter >= maxit {
-            return None;
+            info = m_;
+            break;
         }
         let mut l = 0usize;
         for ll in 1..=m_ {
@@ -530,14 +582,16 @@ pub fn vnl_svd_f32(m: &[f32], rows: usize, cols: usize) -> Option<(Vec<f32>, Vec
                 iter += 1;
             }
             _ => {
-                // Convergence: make the singular value positive, then order them.
-                if s[l] < 0.0 {
+                // Convergence: make the singular value positive, then order them. The tests are
+                // LINPACK's (`if (s(l) .ge. 0.0e0) go to 590`, `if (s(l) .ge. s(l+1)) go to 600`),
+                // negated: a NaN singular value is negated with its vector, and moved down.
+                if !(s[l] >= 0.0) {
                     s[l] = -s[l];
                     if wantv {
                         sscal(-1.0, v.col_mut(1, l, p));
                     }
                 }
-                while l != mm && s[l] < s[l + 1] {
+                while l != mm && !(s[l] >= s[l + 1]) {
                     s.swap(l, l + 1);
                     if wantv && l < p {
                         let (a, b) = v.two_cols(1, l, l + 1, p);
@@ -553,11 +607,35 @@ pub fn vnl_svd_f32(m: &[f32], rows: usize, cols: usize) -> Option<(Vec<f32>, Vec
                 m_ -= 1;
             }
         }
+        let now = state(&s, &e, m_, iter);
+        if now == saved {
+            info = m_;
+            notices.push(crate::defects::Notice::new(
+                &crate::defects::ITK_116,
+                crate::defects::UpstreamDefects::Fix,
+                format!(
+                    "LINPACK's ssvdc came back to a state it had been in ({rows} x {cols} matrix, singular value {m_}): VNL never returns; stopped with info {m_}"
+                ),
+            ));
+            break;
+        }
+        steps += 1;
+        if steps == power {
+            saved = now;
+            power = power.saturating_mul(2);
+            steps = 0;
+        }
     }
     let w = (0..p)
         .map(|j| if j < mm_len { s[j + 1].abs() } else { 0.0 })
         .collect();
-    Some((u.data, w, v.data))
+    SvdF32 {
+        u: u.data,
+        w,
+        v: v.data,
+        info,
+        notices,
+    }
 }
 
 /// `vnl_matrix<float>::operator*`: `a (l × m) · b (m × n)`, row-major, each entry summed from
@@ -643,6 +721,24 @@ pub fn vnl_determinant3_f32(m: &[[f32; 3]; 3]) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// ITK-116: on these matrices LINPACK's deflation steps come back to the same state for ever
+    /// (ITK 4.13.2's own `ssvdc` confirmed still computing by the probe's `nonfinite` family);
+    /// the port stops with `info` = m, as at the iteration limit, and a notice.
+    #[test]
+    fn ssvdc_stops_where_vnl_never_returns() {
+        let a = [-1.0, -1.0, -5.0, -1.0, 1.0, f32::INFINITY];
+        let s = vnl_svd_f32_full(&a, 3, 2);
+        assert!(s.never_returns(), "{s:?}");
+        assert_eq!(s.info, 2);
+        assert!(vnl_svd_f32(&a, 3, 2).is_none());
+        let a = [1.0, -5.0, 5.0, 1.0, f32::NEG_INFINITY, -5.0, -4.0, 2.0, 5.0];
+        let s = vnl_svd_f32_full(&a, 3, 3);
+        assert!(s.never_returns(), "{s:?}");
+        assert_eq!(s.info, 3);
+        let s = vnl_svd_f32_full(&[3.0, 1.0, 1.0, 2.0, 0.5, -1.0], 3, 2);
+        assert!(s.info == 0 && s.notices.is_empty());
+    }
 
     #[test]
     fn solves_well_conditioned_systems() {

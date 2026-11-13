@@ -138,7 +138,7 @@ uninitialised (`vnl_c_vector_construct` does nothing for them):
 In the symmetric eigensystem, a failed `tql2` leaves `V` unset (the port returns the vectors as
 far as computed, with `ierr`).
 
-## F-VNLN-7. Loops that never end (ITK-109, ITK-112, ITK-114, *read*, *verified*)
+## F-VNLN-7. Loops that never end (ITK-109, ITK-112, ITK-114 to ITK-116, *read*, *verified*)
 
 - EISPACK's `balanc` (every `vnl_real_eigensystem`): `while (c < g)` and `while (c >= g)` written
   as `goto` loops on `c >= g` and `c < g`: an infinite or NaN off-diagonal entry in the balanced
@@ -162,6 +162,41 @@ far as computed, with `ierr`).
   overflows and the cost is `-inf` everywhere near the point, the search creeps outward by its
   tolerance (10^-8 of the point) for about 2·10^8 evaluations until the point overflows; VNL
   returns then, and so does the port (identical points, seconds of computing).
+- EISPACK's `pythag` (`vnl_symmetric_eigensystem`'s `tql2`; ITK-115, *verified*) takes
+  `p = max(|a|, |b|)` and `r = (min(|a|, |b|)/p)^2` with f2c's macros (`a >= b ? a : b`,
+  `a <= b ? a : b`, `x >= 0 ? x : -x`) and iterates until `4 + r == 4`. A NaN `b` (the macros
+  then give the NaN), two infinities (`inf/inf`) or two NaNs make `r` NaN, and the loop never
+  ends; a NaN `a` with a number `b` gives `pythag(|b|, |b|)`, and `pythag(NaN, 0)` is 0. `tql2`
+  calls it with its subdiagonal entries as `b`, so a NaN or infinite entry of the matrix usually
+  hangs the eigensystem. One more path: when an earlier step left `0 · inf` (a NaN) at the end of
+  the subdiagonal, `tql2`'s search for a small entry runs past the arrays (`m = n + 1`), reads and
+  writes `d[n + 1]`, and then calls `pythag(p, e[n])` with that NaN: it never returns either.
+  larmorx's port used Rust's `f64::max` and `min`, which drop a NaN: it returned where VXL hangs
+  (`pythag(x, NaN)`) and hung where VXL hangs too. It now follows the macros; `pythag` returns
+  `None` where VXL's loop never ends, and the eigensystem stops there with ITK-115's notice
+  (`SymmetricEigen::never_returns`; `ierr` is the eigenvalue being worked on), in both modes.
+- LINPACK's `ssvdc` (`vnl_svd<float>`; ITK-116, *verified*) counts only its QR steps towards its
+  limit of 1,000; its deflation and splitting steps (kases 1 and 2) do not, and on a matrix with
+  an infinite entry they can come back to the same singular values and superdiagonal for ever
+  (Brent's cycle detection on that state, which is all the next step reads; `U` and `V` never
+  feed back). The port stops there with `info` set to the current `m`, as at the iteration
+  limit, and a notice. `vnl_svd_f32_full` returns `U`, `W`, `V` and `info` whatever `info` is, as
+  VNL keeps them (`vnl_svd_f32` still returns `None` when `info` is not 0). Two of LINPACK's tests
+  had been written negated in the port, `if (s(l) >= 0) go to 590` and `if (s(l) >= s(l+1)) go to
+  600`: a NaN singular value takes the other branch in Fortran's form (its sign and its vector's
+  are flipped, and it is moved down the order); the port had kept it, which gave the opposite
+  sign of `V` for a matrix with a NaN entry. Fixed.
+- Measured (`validation/probes/fs-vnl`, family `nonfinite`, scale 1, 2026-11-13; VNL in a child
+  process with a time limit, its CPU time measured, so a child the machine kept waiting is not
+  taken for one that loops): `pythag` on 20,014 pairs of infinities, NaNs of both signs and with
+  payloads, signed zeros, huge and ordinary numbers: the 11,906 the port returns identical to
+  VNL's, the 8,108 it says never return sampled six of each of 37 kinds of pair (222), VNL still
+  computing at the limit for all 222; the symmetric eigensystems (double and float) of 2,003
+  symmetric matrices with one to three infinite or NaN entries: 2,005 returned in both and were
+  compared (a NaN compared as a NaN), 2,001 never return in the port and VNL was still computing
+  for all of them; `ssvdc` on 2,003 matrices up to 7 × 5 with such entries: 1,874 returned in both
+  (`info`, `U`, `W`, `V` compared), 129 never return in the port, all confirmed: 93,205 values,
+  0 differences. The unit tests' cases are the probe's first.
 
 ## F-VNLN-8. Smaller facts (*read*, *verified* where the probe compares them)
 
@@ -179,7 +214,8 @@ far as computed, with `ierr`).
 - `vnl_qr::solve` of a matrix with more columns than rows copies `cols` values from a `Qᵀb` of
   `rows` values (reads past it); the port refuses it.
 - f2c's `abs`, `min`, `max` macros (`x >= 0 ? x : -x`, ...) are not `fabs`/`fmin`/`fmax`: they keep
-  `-0` and flip a NaN's sign; GCC keeps them as written. f2c's `snrm2` returns `scale·sqrt(ssq)`
+  `-0` and flip a NaN's sign, and of a NaN and a number `max` and `min` give the number only when
+  the NaN comes first; GCC keeps them as written (`pythag`, F-VNLN-7). f2c's `snrm2` returns `scale·sqrt(ssq)`
   computed in double and rounded to float once; `sdot` returns its float sum widened.
 - `vnl_fft_1d<double>` for 2 to 512 points is identical to `larmorx_image::vnl_fft`; from 1024 the
   latter's correctly rounded twiddle factors differ from glibc's `sincos` (its own documentation).

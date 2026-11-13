@@ -57,6 +57,8 @@ lib! {
     qr_qtb_f64: "fv_qr_qtb_f64" => unsafe extern "C" fn(c_int, c_int, *const f64, *const f64, *mut f64),
     svd_f32: "fv_svd_f32" => unsafe extern "C" fn(c_int, c_int, *const f32, *mut f32, *mut f32, *mut f32) -> c_int,
     matrix_inverse_f64: "fv_matrix_inverse_f64" => unsafe extern "C" fn(c_int, *const f64, *mut f64),
+    ssvdc_f32: "fv_ssvdc_f32" => unsafe extern "C" fn(c_int, c_int, *const f32, *mut f32, *mut f32, *mut f32) -> c_long,
+    pythag: "fv_pythag" => unsafe extern "C" fn(f64, f64) -> f64,
     symeig_f32: "fv_symeig_f32" => unsafe extern "C" fn(c_int, *const f32, *mut f32, *mut f32),
     symeig_f64: "fv_symeig_f64" => unsafe extern "C" fn(c_int, *const f64, *mut f64, *mut f64),
     realeig: "fv_realeig" => unsafe extern "C" fn(c_int, *const f64, *mut f64, *mut f64, *mut f64, *mut f64, *mut f64),

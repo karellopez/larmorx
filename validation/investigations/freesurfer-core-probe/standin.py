@@ -2,9 +2,10 @@
 """A stand-in candidate for the comparison loop's own check of its fix-mode checks (README.md,
 "What may differ"): the probe's output, corrected from the probe's output alone, never from the
 loop's code. FS-12: a rounding that printed -2147483648 prints 0 for a NaN input and 2147483647 for
-a positive one, with a notice on standard error; FS-01: the NUL byte before a newline removed. With
-``--break nul`` a byte stays in the NUL's place; with ``--break sat`` a NaN rounds to 2147483647: the
-loop must refuse both.
+a positive one, with a notice on standard error; FS-01: the NUL byte before a newline removed (in
+every run, so a C-style error of a case not tagged FS-01 shows as unexplained). With ``--break nul``
+a byte stays in the NUL's place; with ``--break sat`` a NaN rounds to 2147483647: the loop must
+refuse both.
 
     python -P standin.py make OUT --probe P [--break nul|sat]   write the candidate OUT
     python -P compare.py compare --probe P --candidate OUT --scratch DIR --groups numbers --mode fix
@@ -37,9 +38,10 @@ def run(probe: str, brk: str, args: list[str]) -> int:
                     res[i] = nan if v != v else ("2147483647" if v > 0 else res[i])
                     changed = changed or res[i] != "-2147483648"
             out = "\n".join(res).encode("latin-1")
-        err = err.replace(b"\x00\n", b"?\n" if brk == "nul" else b"\n")
         if changed:
             err = b"notice: FS-12 corrected\n" + err
+    if os.environ.get("LARMORX_UPSTREAM_DEFECTS") == "fix":
+        err = err.replace(b"\x00\n", b"?\n" if brk == "nul" else b"\n")
     sys.stdout.buffer.write(out)
     sys.stderr.buffer.write(err)
     return r.returncode if r.returncode >= 0 else 128 - r.returncode

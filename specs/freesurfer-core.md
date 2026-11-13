@@ -473,12 +473,26 @@ platform `Linux`; compiler `GCC` `8.4.0` (**(observed)** `versionstrings`, `alli
 - **Local time** follows the program's `TZ`: unset, the zone file `/etc/localtime`; empty, UTC;
   otherwise (one leading `:` dropped) a zone file (an absolute path, or a name under `TZDIR`, else
   `/usr/share/zoneinfo`; RFC 8536's format, its footer rule after the last transition, before the
-  first transition the first standard-time type) and, when no file can be read, a POSIX `TZ` string
-  (a `dst` name without a rule takes `M3.2.0,M11.1.0`, change times 02:00 by default), else UTC. A
-  POSIX rule applies to the **UTC** year, and **before 1970 the change times of 1970** are used
-  (glibc 2.35, **(observed)**: `TZ=EST5EDT,M3.2.0,M11.1.0` is never in daylight time before 1970,
-  `AEST-10AEDT,M10.1.0,M4.1.0/3` always; the group `time` compares 24 zones at 435 times each,
-  `gmtime`, `localtime` and `%c`).
+  first transition the first standard-time type) and, when no file can be read, a POSIX `TZ` string,
+  else UTC. A POSIX rule applies to the **UTC** year, and **before 1970 the change times of 1970** are
+  used (glibc 2.35, **(observed)**: `TZ=EST5EDT,M3.2.0,M11.1.0` is never in daylight time before 1970,
+  `AEST-10AEDT,M10.1.0,M4.1.0/3` always).
+- **A `dst` name without a rule** (`TZ=ABC3DEF`; the daylight offset one hour east of the standard
+  one unless given) takes the zone file `posixrules` (found as a zone name is: under `TZDIR`, else
+  `/usr/share/zoneinfo`) when it can be read: its transitions, each a change to standard or daylight
+  time as the file's type for it is, with the `TZ` string's names and offsets; each transition's
+  instant moved by the `TZ` string's offset minus the file's, both those in force just before it (the
+  daylight ones when the time before it was daylight time and the file does not mark the transition
+  as given in standard time, else the standard ones; a transition the file marks as given in UT not
+  moved); before its first transition the `TZ` string's standard time; **after its last transition
+  the file's own footer rule, with the file's own names and offsets**. Only where no `posixrules`
+  can be read: `M3.2.0,M11.1.0`, change times 02:00 local. **(observed)** on the reference machine
+  (its `posixrules` is New York's file, transitions until 2037): `TZ=ABC3DEF` is in daylight time
+  from 2006-04-02 09:00 to 2006-10-29 08:00 UTC (New York's 07:00 and 06:00, moved by the 2 hours
+  between the offsets) and on 1960-07-07, not on 2006-03-20; in 2040 it changes at New York's 07:00
+  and 06:00 UTC and shows `EST`/`EDT` with -5 and -4 hours; with `TZDIR` naming a folder without
+  `posixrules`, it follows `M3.2.0,M11.1.0` (daylight time on 2006-03-20, none before 1970). The group
+  `time` compares 26 zones (these two included) at 451 times each, `gmtime`, `localtime` and `%c`.
 - **Timers:** elapsed time from a clock in nanoseconds; milliseconds truncated, seconds, minutes and
   hours as `ns / 1e9`, `/ 6e10`, `/ 3.6e12` in double. An interval line: `<file>:<line> interval took
   <ms> msec` + `\n` on standard output. (FreeSurfer's clock is the wall clock; timings never reach a
@@ -611,7 +625,8 @@ error and the files a case names, byte for byte, after the masks of the README.
 - `--mode fix`: every run without a defect identical; a run marked with a defect may differ (the
   notice, the corrected value), and where the corrected output follows from the inputs the loop
   checks it itself: for FS-261 and FS-176 the byte reversal of every item, for FS-12 (`numbers-fs12`)
-  the saturated values on standard output (NaN 0), for the finite check (`numbers-fs01`, FS-01) the
+  the saturated values on standard output (NaN 0), for the finite check (`numbers-fs01`, FS-01) and
+  the environment record without a package (`fsenv`, `FREESURFER_HOME=/nonexistent`, FS-01) the
   probe's standard output and its standard error without the NUL byte.
 - Then the cases the probe cannot show (both modes defined by larmorx, or a crash): FS-03's exit
   status 1, FS-04's seed -1, FS-05's error line, FS-06's values against `atan2f` on NaN, infinite and
@@ -623,7 +638,7 @@ error and the files a case names, byte for byte, after the masks of the README.
 `compare.py refs --seed 7` on the prebuilt probe (2026-11-13, the reference machine; SHA-256 of
 each group's masked results in order; identical through the cache, without it, and on a second
 run; the group `numbers` again after its rounding and finite-check calls moved to batches of their
-own). The hashes hold for the whole list of groups: one random sequence runs through the groups in
+own, the group `time` after its two zones without a rule were added). The hashes hold for the whole list of groups: one random sequence runs through the groups in
 order, so `--groups` with a part of the list generates other cases (they compare as well, with other
 hashes). The `time` group depends on the machine's `/etc/localtime` (its first zone is TZ unset) and on
 the system's time-zone files; the others on nothing but the probe.
@@ -640,13 +655,13 @@ the system's time-zone files; the others on nothing but the probe.
 | atan2 | 3 | 120,054 | §12: `(i, 100000)` for every table index, 20,000 random pairs, signed zeros, the `atan2f` switch | `2bd50151bb181e72fa2ea8d021c0c57dde8023341f378dd3c0a015e61bdb84ab` |
 | romp | 2 | 708 | §19's levels, pieces and sums (1 and 8 threads) | `5ba96f5fd86e169cf448c12364e808b04893ca2d245051053f3c31b237edf853` |
 | clib | 1 | 370 | the C library's readings §2, §4, §9 and §15 rely on: `strerror`, `atoi`, `atof`, `%lx`, `%d`, `stol` | `5b4d0b4d2633e5f379d0163ecb6b814f29ea705a34bac2c387ba333c1fbaf96b` |
-| time | 24 | 31,320 | §14: `gmtime`, `localtime`, `%c` in 24 zones (zone files, POSIX rules, unreadable names) | `d5a48a4bc6f897db839d1d3f636c7fa8b2b3bbf3726ce8a42c8d554d4ce91140` |
+| time | 26 | 35,178 | §14: `gmtime`, `localtime`, `%c` in 26 zones (zone files, POSIX rules, a daylight name without a rule with and without `posixrules`, unreadable names) | `d532ad87e384da97be0ce8e04af36c97a88983bdd55e6141ef429e5560f557a0` |
 | files | 1 | 34 | §10's file existence and wildcards on a small tree | `bdd5c3e1318ad004926129e66839c5c1c43f709b8843218b5f6ba207e9aa18df` |
 | init | 27 | 27 | §4 (FS-02 included) | `ea9c12da2d0372d2e27c4ba104db66f2c981c611e6614b8a3ab4404fb202ed6e` |
 | messages | 72 | 72 | §2, §3, §5 (FS-01, FS-03, FS-263), the error log, HIPS | `9d47b1773af33de00cafed87333934d73ba3161cb62c84bde1f81e48aaf0666d` |
 | random | 36 | 36 | §9: 21 seeds, reseeding, ranges, permutations, `FREESURFER_SEED` (FS-04, FS-05) | `37d801a215a260eb086c55459f5d33f195214a2ac57ebadeb5a19a01151bb4bb` |
 | version | 139 | 139 | §13: 127 argument lists (FS-07), stamps, the date string | `07004daeeed7aa67ec6d13bdfa3cd0a76186a42284caf742738b17e98e16701f` |
-| fsenv | 18 | 18 | §15 (FS-08) | `7e85be0e7e40424c9dd2c38fbabc87ae04fd76909dfd1509488f4aeb4d490396` |
+| fsenv | 18 | 18 | §15 (FS-08; FS-01 in the colour table's error without a package) | `7e85be0e7e40424c9dd2c38fbabc87ae04fd76909dfd1509488f4aeb4d490396` |
 | logic | 7 | 7 | §17 | `90d5854f75b15b63a7104fcf977f2d9c0574ec8550e87f3ebae19804cd5b0ec4` |
 | temp | 37 | 37 | §18: each variable set to a writable, unwritable, missing, file and empty value | `9de571991793d2afbd6d343dded69b1e9de75f11e90d375ded48118a60835967` |
 | usage | 5 | 5 | §16 (formats) | `38a3e55a0bc7847d14e401269dc3ca92d613ab47f9cbb831e97f0c6e8f5a849e` |

@@ -15,7 +15,7 @@ tree, which is closed to FreeSurfer's clean-room implementers, so they never bui
 |---|---|
 | `fs_core_probe.cpp` | the probe: one call (or one sequence of calls) of FreeSurfer's core functions per run, or a batch of calls from a file; its commands below |
 | `build.sh` | builds the probe with the unit oracle's compiler (Ubuntu's GCC 8.4.0) and FreeSurfer's flags against `<workspace>/oracles/freesurfer-8.2.0-unit` (queue item 3.1-02): `build.sh <workspace> <output>` (the spec writer's or the orchestrator's step, not the implementer's) |
-| `compare.py` | the comparison loop of the spec's §20: 22 groups of cases (about 162,700 calls in 369 runs), run on the probe (through the oracle-output cache) and on a candidate program that takes the same commands; `list`, `refs`, `compare` |
+| `compare.py` | the comparison loop of the spec's §20: 22 groups of cases (about 166,600 calls in 371 runs), run on the probe (through the oracle-output cache) and on a candidate program that takes the same commands; `list`, `refs`, `compare` |
 | `official.sh` | the official `mri_info` as a black box (the spec's §20.4): a missing file, the diagnostic variables, the version options: `official.sh <FREESURFER_HOME>` |
 | `standin.py` | a stand-in candidate for the loop's own check of its fix-mode checks (the probe's output corrected from the probe's output alone; `--break nul` or `sat` makes it wrong, and the loop must refuse it): `python -P standin.py make <out> --probe <fs_core_probe> [--break nul\|sat]` |
 | `guards.py` | whether the selections and the median depend on memory outside the list, on lists with NaNs and infinities (three guards): `python -P guards.py <fs_core_probe> <scratch folder>` |
@@ -136,8 +136,9 @@ fix`: there larmorx corrects FreeSurfer. Where the corrected output follows from
 checks it itself: FS-261 and FS-176 (FS-262 until 2026-11-13: a duplicate, retired), the byte
 reversal of every item; FS-12 (the batch `numbers-fs12`, every rounding of the group whose value
 leaves the int range), the saturated values on standard output (NaN 0; the notices on standard error
-are not compared); the finite check's batch `numbers-fs01` (FS-01), the probe's standard output and
-its standard error without the NUL byte. A failed check prints the first line where the candidate
+are not compared); FS-01 (the finite check's batch `numbers-fs01`, and the environment record
+without a package, `fsenv` with `FREESURFER_HOME=/nonexistent`), the probe's standard output and its
+standard error without the NUL byte. A failed check prints the first line where the candidate
 differs from the corrected output. A run marked `memory` (FS-08, FS-09, FS-10) shows what FreeSurfer
 read outside the memory it wrote (the guard, or whatever lay there): it may differ in both modes.
 Every other run must be identical, byte for byte, in both modes. Exit status 1 when a difference is
@@ -160,7 +161,12 @@ that). `--no-cache` runs them directly.
 - The fix-mode checks of FS-12 and FS-01 (the group `numbers`, its three batches since 2026-11-13; its
   hash re-observed the same through the cache, a second time and without it): `standin.py`'s
   candidate passes (1 run identical, 2 allowed), and with `--break nul` or `--break sat` the loop
-  refuses it (exit status 1, the first differing line shown against the corrected output).
+  refuses it (exit status 1, the first differing line shown against the corrected output). The
+  stand-in takes the NUL byte out of every run in `--mode fix`: across all groups no difference is
+  unexplained, so every C-style error is on a case tagged FS-01.
+- The group `time` holds `TZ=ABC3DEF` with and without a readable `posixrules` (an empty `TZDIR`),
+  the spec's §14; its hash and every other group's re-observed through the cache's path and without
+  it (`time` is never cached: it reads the system's zone files).
 - `guards.py`: 3,000 lists with NaNs and infinities through `kth`, `qselect` and `median` with three
   different guards (7777, -7777, 0): no result and no order depends on memory outside the list.
 - `official.sh`: the official `mri_info` prints the C-style error with its NUL byte and exits 1,

@@ -15,6 +15,9 @@ test_reference.py``):
   as ``bet``'s ``-h``);
 - the call written in the API page's Python section is the function's signature;
 - the records named exist, and the ports named are the ones the replica registry lists;
+- no text of a program's section (or the shared Ports section) points at the API page's other
+  sections by place ("(above)", "as for `avscale` (above)", a link "[below](...)"): each section
+  is a page of its own;
 - the page links no restricted file (a replica crate, a source-derived finding, ``docs/parts/``,
   the probes, the files the clean-room briefs forbid): a reference page is readable material
   (the writing guide, section 1).
@@ -279,12 +282,14 @@ def build(repo: Path, p: apipage.Program) -> Reference:
     command = str(meta.get("command", f"larmorx {p.group} {p.name}"))
 
     fn = code.function(repo, str(meta["python"]))
-    cl = code.command_line(repo, str(meta["command-line"]), p.name)
+    parser = str(meta["parser"]) if meta.get("parser") else None
+    cl = code.command_line(repo, str(meta["command-line"]), p.name, command, parser)
     ref.sources = sorted(
         {
             page.path.as_posix(),
             fn.path,
             cl.path,
+            *cl.extra,
             "crates/larmorx-core/src/cli.rs",
             "crates/larmorx-core/src/defects.rs",
             "crates/larmorx-cli/src/replica.rs",
@@ -295,6 +300,19 @@ def build(repo: Path, p: apipage.Program) -> Reference:
     params = {q.name for q in fn.params}
     own = code.own_options(repo)
     released = next_release(repo, [o.option for o in own])
+
+    # A section is a page of its own: it cannot point at the API page's other sections by place.
+    ports = page.section("ports")
+    for where_text in (p.section.text(), ports.text() if ports is not None else ""):
+        # "(below)" may point further down the same page (bet's variations, in its options); a
+        # link "below" leaves the page, and "above" names what the page does not hold
+        for m in re.finditer(
+            r"\((?:see |as for [^)]*)?above\b[^)]*\)|\[(?:above|below)\]\(", where_text
+        ):
+            problems.append(
+                f"{where}: {m.group(0)!r} points by place, which its reference page cannot "
+                "follow: name or link what it means"
+            )
 
     # The Python section: the call written there is the signature.
     py = p.child("python")
@@ -333,6 +351,9 @@ def build(repo: Path, p: apipage.Program) -> Reference:
             if r.remark:
                 continue
             for s in r.options:
+                glued = next((g for g in cl.glued if s.startswith(g) and s != g), None)
+                if glued is not None and s not in accepted:
+                    s = glued  # `-Dname=value` names AFNI's `-D`
                 if s not in accepted:
                     problems.append(f"{where}: a row names `{s}`, which {cl.path} does not accept")
                 else:
@@ -438,9 +459,7 @@ def build(repo: Path, p: apipage.Program) -> Reference:
     body.append(what + "\n")
 
     body.append("## Command line {#command-line}\n")
-    syn = [f"larmorx {p.group} {s}" for s in cl.synopsis] or [f"{command} ..."]
-    if command != f"larmorx {p.group} {p.name}":
-        syn = [command + s[len(f"larmorx {p.group} {p.name}") :] for s in syn]
+    syn = cl.synopsis or [f"{command} ..."]
     body.append("```text synopsis\n" + "\n".join(syn) + "\n```\n")
     body.append(
         f"Everything after `{command}` is the original's command line: the arguments of "
@@ -457,8 +476,8 @@ def build(repo: Path, p: apipage.Program) -> Reference:
     if cl.usage:
         usage = cl.usage.strip("\n")
         body.append(
-            f'<details class="usage"><summary><code>{p.name}</code>\'s usage text, as the clean '
-            f"room prints it</summary>\n\n```text\n{usage}\n```\n\n</details>\n"
+            f'<details class="usage"><summary><code>{p.name}</code>\'s usage text, as the '
+            f"{cl.port} prints it</summary>\n\n```text\n{usage}\n```\n\n</details>\n"
         )
 
     body.append("## Python {#python}\n")
@@ -500,8 +519,14 @@ def build(repo: Path, p: apipage.Program) -> Reference:
         f"that does the same. The rows are checked against the code at every test run: the "
         f"options `{p.name}` accepts (`{cl.path}`) and the arguments of `{fn.public}` "
         f"(`{fn.path}`), whose defaults and descriptions are taken from it. Under each "
-        f"option, in grey, {software}'s own help for it.\n"
+        + (
+            f"option, in grey, {software}'s own help for it.\n"
+            if cl.words == "original"
+            else f"option, in grey, its line of the usage text the {cl.port} prints, in the "
+            f"{cl.port}'s own words.\n"
+        )
     )
+    help_label = software if cl.words == "original" else f"The {cl.port}'s usage"
     for t, rows in rows_by_table:
         with_default = len(t.header) > 1 and t.header[1].strip() == "Python"
         header = (
@@ -535,7 +560,7 @@ def build(repo: Path, p: apipage.Program) -> Reference:
                         helps.append(o.help)
             if helps:
                 note = note + "".join(
-                    f'<span class="opt-help">{software}: “{_html(h)}”</span>' for h in helps
+                    f'<span class="opt-help">{help_label}: “{_html(h)}”</span>' for h in helps
                 )
             row.append(links(note, page, problems))
             body.append("| " + " | ".join(_cell(c) for c in row) + " |")
@@ -543,33 +568,46 @@ def build(repo: Path, p: apipage.Program) -> Reference:
     body.append("### LARMORX's own options {#larmorx-options}\n")
     if released:
         body.append(_not_yet(own, released) + "\n")
+    present = [f"`{o.python}`" for o in own if fn.param(o.python) is not None]
+    if len(present) == len(own):
+        python_words = f" and are arguments of `{fn.public}`"
+    elif present:
+        rest = len(own) - len(present)
+        python_words = (
+            f"; `{fn.public}` takes {' and '.join(present)} as "
+            + ("an argument" if len(present) == 1 else "arguments")
+            + (", and the other is" if rest == 1 else ", and the others are")
+            + " the command line's only"
+        )
+    else:
+        python_words = f"; `{fn.public}` takes none of them"
     body.append(
         f"They stand between `larmorx` and `{p.group}` on the command line "
-        f"(`larmorx --n-threads 4 {command.split(' ', 1)[1]} ...`) and are arguments of "
-        f"`{fn.public}`. Each one given wins over its environment variable, which keeps "
-        "working.\n"
+        f"(`larmorx --n-threads 4 {command.split(' ', 1)[1]} ...`){python_words}. Each one "
+        "given wins over its environment variable, which keeps working.\n"
     )
     body.append("| Command line, then Python | What it does |\n|---|---|")
     for o in own:
         q = fn.param(o.python)
         default = q.default if q is not None and q.default is not None else ""
         doc = q.doc if q is not None else ""
-        if q is None:
-            problems.append(f"{where}: {fn.public} has no `{o.python}` argument ({o.option})")
         values = o.values.replace(" | ", "|")
         text = links(doc, page, problems)
+        if q is None:
+            # a function without the argument: the option is the command line's only
+            text = f"The command line's only: `{fn.public}` takes no `{o.python}`."
         if o.option == "--n-threads":
             # larmorx_core::cli: unset, the command line runs on every logical CPU (CHANGELOG.md)
-            text += f" Default: every logical CPU on the command line (`0`), `{default}` in Python."
+            text += " Default: every logical CPU on the command line (`0`)" + (
+                f", `{default}` in Python." if q is not None else "."
+            )
         text += (
             f" The variable `{o.variable}` in {released}."
             if released
             else f" Replaces `{o.variable}`, which keeps working."
         )
-        body.append(
-            f"| {_cell(f'`{o.option}` `{values}`')}<br>{_cell(f'`{o.python}={default}`')} | "
-            f"{_cell(text.strip())} |"
-        )
+        python = _cell(f"`{o.python}={default}`") if q is not None else "(no Python argument)"
+        body.append(f"| {_cell(f'`{o.option}` `{values}`')}<br>{python} | {_cell(text.strip())} |")
     body.append("")
 
     body.append("## Examples {#examples}\n")

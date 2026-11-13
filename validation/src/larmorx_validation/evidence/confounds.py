@@ -1843,7 +1843,7 @@ def export(ctx: core.Context) -> dict:
         *trial_tables,
     ]
     bench = ctx.repo / BENCH
-    return {
+    doc = {
         "schema": 1,
         "tool": TOOL,
         "title": "fMRIPrep's confounds: the workflow, nipype's CompCor, DVARS and framewise "
@@ -1879,6 +1879,300 @@ def export(ctx: core.Context) -> dict:
         "tables": tables,
         "examples": examples,
     }
+    return present(doc)
+
+
+# ---------------------------------------------------------------------- the presentation
+
+#: The originals the records compare with, in titles: the newest releases the replica follows
+#: (fMRIPrep 25.2.6's own releases and files on request and in the record of its runs).
+ORIGINALS = "fMRIPrep 25.2.7, nipype 1.12.0, niworkflows 1.15.4, numpy, SciPy and pandas"
+
+
+def _page(software: str = "fMRIPrep", program: str = "", version: str = "25.2.7"):
+    from larmorx_validation.evidence import present as present_
+
+    part = "" if program else "confound estimation"
+    return present_.Page(software, program, version, part=part, texts=TEXTS)
+
+
+#: The page's own rewordings (applied before the guide's words): LARMORX's run of the workflow is
+#: the replica's; its modes by their names (`reproduce`, `fix`); the replica of ANTs underneath
+#: by its name; the register's corrections as the corrections by default.
+TEXTS = [
+    (r"\brun end to end by LARMORX\b", "run end to end by the replica"),
+    (r"\bin reproduce with\b", "in `reproduce` with"),
+    (r"\band by default \(the corrections\), at (\d+) threads and, by default, at (\d+)\.",
+     r"and in `fix`, its default (the corrections), at \1 threads and, in `fix`, at \2."),
+    (r"\bLARMORX's file has\b", "the replica's file has"),
+    (r"\bLARMORX's default \(the newest releases, its corrections\) gives\b",
+     "In `fix`, its default (the newest releases, the corrections), the replica gives"),
+    (r"\bLARMORX's result does not depend\b", "The replica's result does not depend"),
+    (r"\bNo correction of the register changes\b", "No correction by default changes"),
+    (r"\bboth modes give the same bytes\b", "`fix` and `reproduce` give the same bytes"),
+    (r"\bBoth modes compute\b", "`fix` and `reproduce` compute"),
+    (r"\bLARMORX's ANTs port \(CLAUDE\.md rule 5, both modes\)",
+     "LARMORX's replica of ANTs (LARMORX's rule of correctly rounded maths, in `fix` and "
+     "`reproduce`)"),
+    (r"\bgives LARMORX's bytes\b", "gives the replica's bytes"),
+    (r"\bthan LARMORX's\b", "than the replica's"),
+    (r"\bthe lines of fMRIPrep's file and of LARMORX's reproduce coincide\b",
+     "the lines of fMRIPrep's file and of the replica in `reproduce` coincide"),
+    (r"\bThe lines of fMRIPrep's file and of LARMORX's reproduce coincide\b",
+     "The lines of fMRIPrep's file and of the replica in `reproduce` coincide"),
+    (r"\bLARMORX in reproduce\b", "the replica in `reproduce`"),
+    (r"\breproduce with the newest releases\b", "`reproduce` with the newest releases"),
+    (r"\bLARMORX against fMRIPrep's file\b", "the replica against fMRIPrep's file"),
+    (r"\bLARMORX by default\b", "The replica in fix, its default"),
+    (r"^LARMORX, reproduce\b", "replica, reproduce"),
+    (r"^LARMORX, default\b", "replica, fix"),
+    (r"^LARMORX ÷ the original$", "replica ÷ the original"),
+    (r"^LARMORX = ANTs with CORE-MATH$", "replica = ANTs with correctly rounded maths"),
+    (r"^The records of the part: every case passes$",
+     "The replica's records against the originals: " + ORIGINALS + " (every case passes)"),
+    (r"^Random testing: the part's trial and the checks of the final build$",
+     "Random testing, the replica against the originals: " + ORIGINALS + " (the run of "
+     "2026-11-12 and the checks of the final build)"),
+    (r"^Random testing: every difference of the part's runs, triaged$",
+     "The replica's differences from the originals in the runs of 2026-11-12, triaged"),
+    (r"^Peak memory \(MiB\): the memory rule's calls of the part$",
+     "Peak memory, the replica against the originals (MiB, the memory rule's calls)"),
+    (r"\bthe part's trial\b", "the run of 2026-11-12"),
+    (r"\bfound by the part\b", "found while porting"),
+    (r"\bThe default: ", "`fix`, the default: "),
+    (r"\b[Tt]he default (reads|goes on|now names)\b", r"`fix` \1"),
+    (r"\ba D13 gap of reproduce\b", "a gap of `reproduce`"),
+    (r"\bthe D13 corrections\b", "the corrections by default"),
+    (r"\b(?:the D13 rule|D13's rule)\b", "the rule of the corrections by default"),
+    (r"\ba D13 gap\b", "a gap of `reproduce`"),
+    (r"\(CLAUDE\.md rule 5; reproduce glibc's cos_glibc\)",
+     "(LARMORX's rule of correctly rounded maths; `reproduce` glibc's `cos`)"),
+    (r"(?<![\w`='/-])reproduce(?![\w`'-])", "`reproduce`"),
+    (r"\ball 36 oracle files\b", "all 36 files of fMRIPrep's runs"),
+    (r"\bthe register's rows come with the part's merge\b", "the register holds its rows"),
+    (r"(?<![\w`/-])LARMORX(?!'s replica|'s rule|_)", "larmorx"),
+]  # fmt: skip
+#: The tables' columns, as the page names them.
+COLUMNS = {
+    "The default: cells changed": "fix: cells changed",
+    "The default: columns negated": "fix: columns negated",
+    "The default: changed": "fix: changed",
+    "The default: negated": "fix: negated",
+    "LARMORX, reproduce, 1 thread": "replica, reproduce, 1 thread",
+    "LARMORX, default, 1 thread": "replica, fix, 1 thread",
+    "LARMORX, default, 8 threads": "replica, fix, 8 threads",
+    "LARMORX ÷ the original": "replica ÷ the original",
+    "LARMORX = ANTs with CORE-MATH": "replica = ANTs with correctly rounded maths",
+    "LARMORX by default": "the replica in fix, its default",
+}
+
+
+def _diff(ex: dict, i: str) -> dict:
+    return next(d for d in ex["diffs"] if d["id"] == i)
+
+
+def _want(ex: dict, **verdicts: str | None) -> None:
+    """Raise unless each comparison (``lx_fmriprep`` for ``lx-fmriprep``) has its verdict."""
+    for i, v in verdicts.items():
+        got = _diff(ex, i.replace("_", "-")).get("verdict")
+        if got != v:
+            raise ValueError(f"{ex['id']}: {i.replace('_', '-')} is {got}, not {v}")
+
+
+def _fact(ex: dict, label: str) -> str:
+    return next(f["text"] for f in ex["facts"] if f["label"] == label)
+
+
+def _shows_run(ex: dict) -> tuple[str, list[str]]:
+    """A confounds workflow of fMRIPrep's runs: its masks fMRIPrep's in both modes, its table
+    column by column (the file's verdict: identical, or glibc's atan2 in the motion chain)."""
+    _want(ex, lx_fmriprep="bit-identical", fix_fmriprep="bit-identical", fix_lx="bit-identical")
+    threads = "1 and 8 threads alike" if any(d["id"] == "fix1-fix" for d in ex["diffs"]) else ""
+    if threads:
+        _want(ex, fix1_fix="bit-identical")
+    verdict = _fact(ex, "Verdict of the file")
+    m = re.match(r"divergence: (\d+) cells of the motion chain \(([^)]*)\): glibc's atan2", verdict)
+    if verdict.startswith("bit-identical"):
+        table = (
+            "its confounds table holds every column of fMRIPrep's file, cell for cell, and "
+            "its JSON byte for byte"
+        )
+    elif m:
+        table = (
+            f"its confounds table holds every column of fMRIPrep's file, cell for cell, but "
+            f"{m.group(1)} cells of the motion chain, where glibc's `atan2` rounds an angle "
+            "otherwise than the replica's correctly rounded one (with fMRIPrep's own motion "
+            "table, none differs); its JSON byte for byte"
+        )
+    else:
+        raise ValueError(f"{ex['id']}: a file verdict of another shape: {verdict[:80]}")
+    return (
+        "In `reproduce`, with fMRIPrep 25.2.6's releases, the replica writes every CompCor mask "
+        "of fMRIPrep's run, voxel for voxel and header for header, and " + table + ". In `fix`, "
+        "its default, with the newest releases, the masks are the same bytes"
+        + (f", at {threads}" if threads else "")
+        + "; the table below says, column by column, "
+        "what the newest releases and the corrections change."
+    ), ["lx-fmriprep"]
+
+
+def _shows_gaussian(ex: dict) -> tuple[str, list[str]]:
+    """The aCompCor masks' Gaussian resampling: ANTs' bytes with correctly rounded maths, the
+    last bits of fMRIPrep's file from glibc's exp and log."""
+    _want(ex, lx_fmriprep="identical-cr", lx_antscr="bit-identical", fix_lx="bit-identical")
+    n = re.search(r"^(\d+) voxels differ in their last bits", _diff(ex, "lx-fmriprep")["reason"])
+    if not n:
+        raise ValueError(f"{ex['id']}: lx-fmriprep's reason without its voxel count")
+    return (
+        "The replica gives the bytes of ANTs 2.6.5's `antsApplyTransforms` when its `exp` and "
+        f"`log` are correctly rounded. Against fMRIPrep's own file {n.group(1)} voxels differ in "
+        "their last bits: fMRIPrep's ANTs computes the Gaussian kernel's error function with "
+        "glibc's `exp` and `log`, and ANTs as built here gives fMRIPrep's bytes. No voxel "
+        "crosses the masks' threshold, so the masks the confounds use are fMRIPrep's."
+    ), ["lx-antscr"]
+
+
+SHOWS = {
+    "confounds-ds000005": _shows_run,
+    "confounds-gaussian-ds000005": _shows_gaussian,
+    "confounds-ds000256": _shows_run,
+    "confounds-ds004958": _shows_run,
+    "confounds-ds003592": _shows_run,
+}
+_RUN_DIFFS = {
+    "lx-fmriprep": ("replica, reproduce − fMRIPrep's output", "the replica against fMRIPrep's "
+                    "output"),
+    "fix-fmriprep": ("replica, fix − fMRIPrep's output", "the replica against fMRIPrep's output"),
+    "fix-lx": ("replica: fix − reproduce", "the replica against itself: fix and reproduce"),
+    "fix1-fix": ("replica, fix: 1 thread − 8 threads", "the replica against itself: 1 and 8 "
+                 "threads"),
+}  # fmt: skip
+_ANTS = "ANTs antsApplyTransforms 2.6.5"
+#: The comparisons the shapes name otherwise, per example.
+DIFFS = {
+    "confounds-gaussian-ds000005": {
+        "lx-fmriprep": ("replica, reproduce − fMRIPrep's output", "the replica against fMRIPrep's "
+                        "output"),
+        "lx-antscr": (f"replica − {_ANTS}, 1 thread, correctly rounded maths",
+                      "the replica against the original: correctly rounded maths"),
+        "antscr-fmriprep": (f"{_ANTS}, correctly rounded maths − fMRIPrep's output",
+                            "the original against itself: correctly rounded maths and glibc's"),
+        "glibc-fmriprep": (f"{_ANTS} as built (glibc's maths) − fMRIPrep's output",
+                           "the original against itself: the repository's build and fMRIPrep's"),
+        "image-fmriprep": ("fMRIPrep's image's ANTs, run again − fMRIPrep's output",
+                           "the original against itself: two runs of the same command"),
+        "fix-lx": ("replica: fix − reproduce", "the replica against itself: fix and reproduce"),
+    },
+}  # fmt: skip
+#: Each example's own original where it is not the page's: the Gaussian resampling of the
+#: aCompCor masks is ANTs' antsApplyTransforms, run by fMRIPrep's node and by the replica of it.
+PAGES = {"confounds-gaussian-ds000005": ("ANTs", "antsApplyTransforms", "2.6.5")}
+#: The records' threshold, in each example's metrics note (the records' own words).
+THRESHOLD = (
+    "The records' threshold: in `reproduce`, every array, file, table cell, header, warning, "
+    "message and exit status bit-identical to the originals' (or fMRIPrep's own files)."
+)
+#: The case categories (the records' check scripts), as the page names them.
+CATEGORIES = {
+    "check_tables": "the confounds table and its JSON",
+    "check_model": "the motion model's columns",
+    "check_motion": "the motion parameters and framewise displacement",
+    "check_compcor": "CompCor",
+    "check_dvars": "DVARS",
+    "check_masks": "the CompCor masks",
+    "check_workflow": "the whole workflow",
+    "check_nipype_cli": "nipype's command line",
+    "check_nipype_misc": "nipype's other interfaces",
+    "check_blas": "OpenBLAS' kernels",
+    "check_lapack": "LAPACK",
+    "check_gesdd": "LAPACK's divide-and-conquer SVD",
+    "check_gesvd": "LAPACK's SVD",
+    "check_gelsd": "LAPACK's least squares",
+    "check_svd": "numpy's and SciPy's SVD",
+    "check_fft": "SciPy's FFTs",
+    "check_numpy_reductions": "numpy's reductions",
+}
+#: The time series' labels, as the page names them.
+LINE_LABELS = {
+    "fMRIPrep 25.2.6's own file": "fMRIPrep's output (fMRIPrep 25.2.6's run)",
+    "larmorx (port), reproduce": "replica, reproduce",
+    "larmorx (port), default": "replica, fix (the default)",
+    "larmorx (port), reproduce, fMRIPrep 25.2.6's releases": "replica, reproduce, fMRIPrep "
+    "25.2.6's releases",
+    "larmorx (port), default, the newest releases": "replica, fix (the default), the newest "
+    "releases",
+}
+#: The speed chart's series, as the page names them.
+SPEED_LABELS = {
+    "the original, 1 thread (in-process)": "the originals, 1 thread (in-process)",
+    "LARMORX (port), 1 thread": "replica, 1 thread",
+    "LARMORX (port), 8 threads": "replica, 8 threads",
+}
+#: The record's implementation: its id (the case explorer's) and port.
+PORTS = {"port": "replica"}
+
+
+def present(doc: dict) -> dict:
+    """fMRIPrep's confound estimation in the writing guide's words and order: texts, ports and
+    order only."""
+    from larmorx_validation.evidence import present as present_
+
+    page = _page()
+    for ex in doc["examples"]:
+        line, verdicts = SHOWS[ex["id"]](ex)
+        own = _page(*PAGES[ex["id"]]) if ex["id"] in PAGES else page
+        present_.example(
+            own, ex, shows=line, verdicts=verdicts, split=True,
+            diffs={k: v for k, v in DIFFS.get(ex["id"], _RUN_DIFFS).items()
+                   if any(d["id"] == k for d in ex["diffs"])},
+        )  # fmt: skip
+        note = ex.get("metrics_note") or ""
+        if THRESHOLD in note:
+            raise ValueError(f"{ex['id']}: the threshold is in its note already")
+        ex["metrics_note"] = f"{note} {THRESHOLD}".strip()
+        if ex.get("lines"):
+            spec = ex["lines"]["confounds"]
+            n = len(spec["x"])
+            # a Δ panel's series are the columns that differ, named by their column
+            columns = {
+                ser["label"]: ser["label"]
+                for p in spec["panels"]
+                for ser in p["series"]
+                if re.fullmatch(r"[a-z][a-z0-9_]*", ser["label"])
+            }
+            present_.lines(
+                page, spec,
+                f"The confounds over the {n} volumes, the replica against fMRIPrep's output: "
+                "fMRIPrep 25.2.6's run",
+                {"larmorx": "replica-reproduce", "larmorx-open": "replica"},
+                {**columns, **LINE_LABELS},
+                [(r"^larmorx \(reproduce\) − fMRIPrep's file, the columns that differ \(D4\)$",
+                  "replica, reproduce − fMRIPrep's output, the columns that differ (D4: glibc's "
+                  "atan2)")],
+            )  # fmt: skip
+    for im in doc["implementations"]:
+        present_.implementation(page, im, "standard comparison", port=PORTS[im["id"]])
+        im["title"] = f"Agreement, the replica against the originals: {ORIGINALS}"
+        im["label"] = f"replica against the originals: {ORIGINALS} (standard comparison)"
+    present_.speed(
+        page,
+        doc.get("speed"),
+        "Seconds per call (the best of three runs) on a log scale; the factor is the original's "
+        "time divided by the replica's, both on one thread.",
+        labels=SPEED_LABELS,
+    )
+    if doc.get("speed"):
+        doc["speed"]["title"] = f"Speed, the replica against the originals: {ORIGINALS}"
+    present_.random_testing(page, doc, dict(PORTS))
+    present_.finish(page, doc, CATEGORIES, ports=PORTS)
+    for t in doc.get("tables", []):
+        for c in t["columns"]:
+            c["label"] = COLUMNS.get(c["label"], c["label"])
+    for ex in doc["examples"]:
+        for t in [ex.get("lines", {}).get("confounds", {}).get("stats"), *ex.get("tables", [])]:
+            for c in (t or {}).get("columns", []):
+                c["label"] = COLUMNS.get(c["label"], c["label"])
+    return doc
 
 
 if __name__ == "__main__":  # compute the cache entries only

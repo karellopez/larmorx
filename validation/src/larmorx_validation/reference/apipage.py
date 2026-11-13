@@ -35,7 +35,9 @@ a reference page leaves out (a section whose facts come from material a clean-ro
 may not read stays on the evidence page; the writing guide, section 1). ``usage-only``
 (optional) names the spellings the usage text lists that the parser does not match by name,
 because its fallback handles them (``bet``'s ``-h``, which prints the usage); any other spelling
-of the usage text must be one the parser accepts.
+of the usage text must be one the parser accepts. ``parser`` (optional) names the function whose
+body holds the command line's parser, where the file matches other words too
+(``standard_space_roi``'s ``parse``, beside its reading of bash's ``test``).
 """
 
 from __future__ import annotations

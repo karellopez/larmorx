@@ -5,10 +5,10 @@ of several transforms), ``pointflirt`` (an affine matrix from point corresponden
 ``pairreg`` (brain and skull registration), ``extracttxt`` (lines of a text file) and
 ``aff2rigid`` (a 6-parameter approximation of a standard-space matrix), FSL 6.0.7.23's.
 
-Each has two implementations (``docs/licensing.md``): the bit-exact replica from ``larmorx-nc``
-(FSL Licence), run as a separate program, and the clean-room original (Apache-2.0, written from
+Each has two ports (``docs/licensing.md``): the bit-exact replica from ``larmorx-nc`` (FSL
+Licence), run as a separate program, and the clean room (Apache-2.0, written from
 ``specs/flirt.md``), run in this process; ``implementation="auto"`` runs the replica when it is
-installed, else the original. A run that fails raises :class:`RuntimeError` with its messages.
+installed, else the clean room. A run that fails raises :class:`RuntimeError` with its messages.
 """
 
 from __future__ import annotations
@@ -48,8 +48,8 @@ _OUTPUT_TYPES = (
 
 
 def _call(tool: str, args: list[str], tmp: str, implementation: str, upstream_defects: str):
-    """``tool`` with ``args`` in ``tmp`` (its replica or its original, :func:`_run`; ``FSLDIR``
-    passed on when set, the original's ``pairreg`` carrying FSL's schedules itself); a failure
+    """``tool`` with ``args`` in ``tmp`` (its replica or its clean room, :func:`_run`; ``FSLDIR``
+    passed on when set, the clean room's ``pairreg`` carrying FSL's schedules itself); a failure
     (exit status not 0) raises :class:`RuntimeError` with its messages."""
     selected = _replica.select("fsl", tool, implementation)
     extra = (("FSLDIR", os.environ["FSLDIR"]),) if os.environ.get("FSLDIR") else ()
@@ -90,7 +90,17 @@ def midtrans(
     """FSL's ``midtrans``: the 4 x 4 transform from the template space of ``transforms`` (4 x 4
     arrays or files, at least two) to their "middle" (FSL's Procrustes average about the MNI
     origin, or about the centre of gravity of ``template``). With ``separate`` (a path prefix)
-    each transform composed with it is also written to ``<separate>0001.mat`` and so on."""
+    each transform composed with it is also written to ``<separate>0001.mat`` and so on.
+
+    Parameters
+    ----------
+    implementation
+        ``"auto"`` (default): the replica when ``larmorx-nc`` is installed, else the clean room;
+        ``"replica"`` or ``"clean-room"`` (``"original"``, 0.1.0rc1's spelling, still works).
+    upstream_defects
+        ``"fix"`` (default) or ``"reproduce"``: FSL's defects corrected, or FSL's behaviour
+        (``docs/api/fsl-flirt.md``, "Defects of the original, corrected by default").
+    """
     if len(transforms) < 2:
         raise ValueError("midtrans needs at least 2 transforms")
     with tempfile.TemporaryDirectory(prefix="larmorx-midtrans-") as tmp:
@@ -115,7 +125,14 @@ def pointflirt(
 ) -> np.ndarray:
     """FSL's ``pointflirt``: the affine 4 x 4 matrix that maps ``in_points`` onto ``ref_points``
     (N x 3 arrays or text files, in mm; with ``in_image`` and ``ref_image``, in voxels, scaled
-    by their voxel sizes: ``--vox``) in the least-squares sense."""
+    by their voxel sizes: ``--vox``) in the least-squares sense.
+
+    Parameters
+    ----------
+    implementation
+        ``"auto"`` (default): the replica when ``larmorx-nc`` is installed, else the clean room;
+        ``"replica"`` or ``"clean-room"`` (``"original"``, 0.1.0rc1's spelling, still works).
+    """
     with tempfile.TemporaryDirectory(prefix="larmorx-pointflirt-") as tmp:
         out = os.path.join(tmp, "aff.mat")
         args = [
@@ -156,7 +173,17 @@ def applyxfm4d(
     ``MAT_0000n`` files, ``MAT_000n`` with ``four_digit``, ``<user_prefix>000n`` with
     ``user_prefix``), written to ``out_image`` in the input's data type (its extension chooses
     the format: ``.nii.gz``, ``.nii``, ``.hdr``/``.img``; none: ``.nii.gz``); ``three_d``
-    resamples one volume (``-3D``). Returns the path written."""
+    resamples one volume (``-3D``). Returns the path written.
+
+    Parameters
+    ----------
+    implementation
+        ``"auto"`` (default): the replica when ``larmorx-nc`` is installed, else the clean room;
+        ``"replica"`` or ``"clean-room"`` (``"original"``, 0.1.0rc1's spelling, still works).
+    upstream_defects
+        ``"fix"`` (default) or ``"reproduce"``: FSL's defects corrected, or FSL's behaviour
+        (``docs/api/fsl-flirt.md``, "Defects of the original, corrected by default").
+    """
     selected = _replica.select("fsl", "applyxfm4D", implementation)
     with tempfile.TemporaryDirectory(prefix="larmorx-applyxfm4d-") as tmp:
         out, kind = _output_type(os.path.abspath(os.fspath(out_image)))
@@ -176,7 +203,7 @@ def applyxfm4d(
         if three_d:
             args.append("-3D")
         if selected is None:
-            # the clean-room original, in this process
+            # the clean room, in this process
             env = [("FSLOUTPUTTYPE", kind), ("PATH", tmp), (_defects.ENV, upstream_defects)]
             code, _, err = _core.fsl_run_original("applyxfm4D", args, env, tmp)
             _warn(err)
@@ -210,8 +237,17 @@ def pairreg(
     """FSL's ``pairreg``: the matrix from ``brain2`` to ``brain1`` (``brain1`` and ``skull1``
     the references), found with the brains, refined with the skulls and finished with the
     brains (three FLIRT runs with FSL's ``pairreg1.sch`` to ``pairreg3.sch`` schedules, which the
-    clean-room original carries: no ``$FSLDIR`` needed); ``flirt_args`` are passed to every FLIRT
-    run."""
+    clean room carries: no ``$FSLDIR`` needed); ``flirt_args`` are passed to every FLIRT run.
+
+    Parameters
+    ----------
+    implementation
+        ``"auto"`` (default): the replica when ``larmorx-nc`` is installed, else the clean room;
+        ``"replica"`` or ``"clean-room"`` (``"original"``, 0.1.0rc1's spelling, still works).
+    upstream_defects
+        ``"fix"`` (default) or ``"reproduce"``: FSL's defects corrected, or FSL's behaviour
+        (``docs/api/fsl-flirt.md``, "Defects of the original, corrected by default").
+    """
     with tempfile.TemporaryDirectory(prefix="larmorx-pairreg-") as tmp:
         out = os.path.join(tmp, "pair.mat")
         files = [os.path.abspath(os.fspath(p)) for p in (brain1, brain2, skull1, skull2)]
@@ -232,7 +268,14 @@ def extracttxt(
 ) -> str:
     """FSL's ``extracttxt``: the lines of ``file`` from the first that matches ``search_word``
     (a basic regular expression, as grep reads it) to the end, or ``trailing_lines`` of them,
-    starting ``relative_start`` lines after (or before) the match."""
+    starting ``relative_start`` lines after (or before) the match.
+
+    Parameters
+    ----------
+    implementation
+        ``"auto"`` (default): the replica when ``larmorx-nc`` is installed, else the clean room;
+        ``"replica"`` or ``"clean-room"`` (``"original"``, 0.1.0rc1's spelling, still works).
+    """
     if relative_start is not None and trailing_lines is None:
         raise ValueError("extracttxt's relative_start needs trailing_lines")
     with tempfile.TemporaryDirectory(prefix="larmorx-extracttxt-") as tmp:
@@ -253,8 +296,18 @@ def aff2rigid(
     """FSL's ``aff2rigid``: the rigid (6-parameter) 4 x 4 matrix that keeps the anterior
     commissure, the AC-PC line and the mid-sagittal plane of the 12-parameter input-to-standard
     ``matrix`` (array or file). FSL 6.0.7.23's script stops before writing it (FSL-81); the
-    replica and the original compute it as the script defines it (``upstream_defects="reproduce"``
-    fails as FSL)."""
+    replica and the clean room compute it as the script defines it (``upstream_defects="reproduce"``
+    fails as FSL).
+
+    Parameters
+    ----------
+    implementation
+        ``"auto"`` (default): the replica when ``larmorx-nc`` is installed, else the clean room;
+        ``"replica"`` or ``"clean-room"`` (``"original"``, 0.1.0rc1's spelling, still works).
+    upstream_defects
+        ``"fix"`` (default) or ``"reproduce"``: FSL's defects corrected, or FSL's behaviour
+        (``docs/api/fsl-flirt.md``, "Defects of the original, corrected by default").
+    """
     with tempfile.TemporaryDirectory(prefix="larmorx-aff2rigid-") as tmp:
         out = os.path.join(tmp, "rigid.mat")
         args = [_matrix_file(matrix, tmp, "in"), out]

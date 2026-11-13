@@ -13,5 +13,6 @@
 #![forbid(unsafe_code)]
 
 pub mod arith;
+pub mod coords;
 mod rows;
 pub mod vgeom;

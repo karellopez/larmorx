@@ -95,6 +95,9 @@ pub struct Globals {
     /// `vg_isEqual_Threshold` (`transform.h`): the tolerance of `VOL_GEOM::operator==` and
     /// `vg_isEqual`, `FLT_EPSILON` until a program sets it (several set 1e-3).
     pub vg_is_equal_threshold: f64,
+    /// `MRIsampleVolumeDerivativeSign` (`mri.cpp`): the sign the volume derivatives' magnitudes
+    /// are multiplied by, 1 until `MRIsetSampleVolumeDerivativeSign` changes it.
+    pub sample_volume_derivative_sign: f64,
     /// D13's choice and the notices of the defects that changed this run's results.
     pub notices: Notices,
 }
@@ -139,6 +142,7 @@ impl Globals {
             matrix_alloc_old: false,
             drand48: Drand48::default(),
             vg_is_equal_threshold: f64::from(f32::EPSILON),
+            sample_volume_derivative_sign: 1.0,
             notices: Notices::new(mode),
         }
     }

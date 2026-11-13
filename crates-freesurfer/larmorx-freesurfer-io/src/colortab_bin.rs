@@ -13,7 +13,7 @@
 
 use std::io::Write;
 
-use larmorx_core::defects::{FS_187, FS_188, FS_189, FS_190, FS_191, FS_192};
+use larmorx_core::defects::{FS_187, FS_188, FS_189, FS_190, FS_191, FS_192, FS_194};
 use larmorx_freesurfer_core::diag::{DIAG_INFO, DIAG_SHOW};
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{self, ERROR_BADFILE, ERROR_BADPARM, ERROR_NO_MEMORY, NO_ERROR};
@@ -573,7 +573,14 @@ impl Out<'_> {
 
 /// `CTABwriteIntoBinaryV1` / `znzCTABwriteIntoBinaryV1`: the entry count, the file name, then each
 /// non-empty entry's name and colour (`255 - ai`).
-fn write_v1(ct: &ColorTable, fp: &mut Out<'_>) -> i32 {
+fn write_v1(g: &mut Globals, ct: &ColorTable, fp: &mut Out<'_>) -> i32 {
+    let empty = ct.entries.iter().filter(|e| e.is_none()).count();
+    if empty > 0 {
+        g.notices.add(
+            &FS_194,
+            format!("a first-version table of {} entries written with {empty} empty places left out (kept)", ct.nentries()),
+        );
+    }
     fp.int(ct.nentries());
     fp.name(&ct.fname);
     for e in ct.entries.iter().flatten() {
@@ -630,7 +637,7 @@ fn write_any(
         return ERROR_BADPARM;
     };
     match ct.version {
-        1 => write_v1(ct, &mut fp),
+        1 => write_v1(g, ct, &mut fp),
         2 => write_v2(g, out, ct, &mut fp),
         _ => {
             log::error_printf(

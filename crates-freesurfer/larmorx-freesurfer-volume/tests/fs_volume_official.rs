@@ -5,8 +5,8 @@
 //! official build's output lines for the probe's cases of seed 1, recorded by
 //! `validation/probes/fs-volume/check.py --seed 1 --n <N>` on Linux x64 from the unit oracle's build,
 //! against the port's output with `reproduce` (lines where FreeSurfer reads or writes memory it does
-//! not own or crashes, FS-53, FS-58, FS-288, FS-290, FS-294, and the eigen-systems it never returns from, FS-47, FS-48,
-//! ITK-112, ITK-115, ITK-116, hashed as `SKIP`).
+//! not own or crashes, FS-53, FS-58, FS-288, FS-290, FS-294, FS-300, FS-302 to FS-310, and the
+//! eigen-systems it never returns from, FS-47, FS-48, ITK-112, ITK-115, ITK-116, hashed as `SKIP`).
 
 #[path = "fs_volume/cases.rs"]
 mod cases;
@@ -14,17 +14,18 @@ mod cases;
 use larmorx_core::defects::UpstreamDefects;
 use sha2::{Digest, Sha256};
 
-/// Recorded 2026-11-13 (47 commands: transform.cpp's VOL_GEOM functions, 3.1-35's voxel
-/// arithmetic, coordinates and geometry, `MRIaverage`): 940 cases, 886 lines identical, 54 hashed
-/// as `SKIP`.
-const N: usize = 940;
-const OFFICIAL_SHA256: &str = "2b37ea96a0d3665073c7c7b2fc0563aa984f9826fc4d736a8f2c8a702114b30b";
-const SKIPPED: usize = 54;
+/// Recorded 2026-11-13 (65 commands: transform.cpp's VOL_GEOM functions and `LTAreadEx`, 3.1-35's
+/// voxel arithmetic, coordinates and geometry, moves and head box, `MRIaverage`, 3.1-36's
+/// samplers): 1,300 cases, 1,224 lines identical, 76 hashed as `SKIP`.
+const N: usize = 1300;
+const OFFICIAL_SHA256: &str = "2499daba233eec8c8278d5d5c3b9be2d32569776f9f5d0d4a7eed9571bf94791";
+const SKIPPED: usize = 76;
 
 /// `check.py`'s `SKIP`.
-const SKIP: [&str; 10] = [
+const SKIP: [&str; 20] = [
     "FS-288", "FS-53", "FS-58", "FS-290", "FS-294", "FS-47", "FS-48", "ITK-112", "ITK-115",
-    "ITK-116",
+    "ITK-116", "FS-300", "FS-302", "FS-303", "FS-304", "FS-305", "FS-306", "FS-307", "FS-308",
+    "FS-309", "FS-310",
 ];
 
 #[test]
@@ -69,4 +70,23 @@ fn fix_keeps_freesurfers_start_for_integral_voxel_sizes() {
     let (f, ids) = cases::run_line(line, UpstreamDefects::Fix);
     assert!(ids.is_empty(), "{ids:?}");
     assert_eq!(r, f);
+}
+
+/// FS-302: a sinc half-width whose window holds more than 128 voxels on an axis is an error in both
+/// modes (FreeSurfer writes past its weight arrays); 64 is the widest that always fits.
+#[test]
+fn sinc_with_more_than_128_weights_is_an_error() {
+    use larmorx_freesurfer_core::globals::Globals;
+    use larmorx_freesurfer_mri::mri::{MRI_UCHAR, mri_alloc};
+    use larmorx_freesurfer_volume::sample::sinc_sample_volume;
+    for mode in [UpstreamDefects::Fix, UpstreamDefects::Reproduce] {
+        let mut g = Globals::new(mode);
+        let (mut out, mut err) = (Vec::new(), Vec::new());
+        let m = mri_alloc(&mut g, &mut out, &mut err, 300, 1, 1, MRI_UCHAR).unwrap();
+        let mut v = -7.0;
+        assert!(sinc_sample_volume(&mut g, &mut err, &m, 150.5, 0.0, 0.0, 64, &mut v).is_ok());
+        let r = sinc_sample_volume(&mut g, &mut err, &m, 150.5, 0.0, 0.0, 65, &mut v);
+        assert!(r.is_err());
+        assert!(g.notices.as_slice().iter().any(|n| n.defect.id == "FS-302"));
+    }
 }

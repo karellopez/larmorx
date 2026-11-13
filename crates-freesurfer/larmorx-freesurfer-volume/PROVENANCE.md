@@ -20,6 +20,10 @@ built for the official binaries with GCC 8.4.0 (`docs/freesurfer/variation.md`).
 | `packages/minc/minc_volume_io.c` 199-250 | `transform_point` (`homogenous_transform_point` with `w = 1`) in the official build's operand order (`coords::transform_point_fs`) | 3.1-14 | `coords.rs` |
 | `utils/mri.cpp` 11600 | `MRIcopyFrame` (taken early for `MRIcopyFrames`) | 3.1-36 | `arith.rs` |
 | `utils/mri.cpp` 14858 | `MRIcalcCRASforExtractedVolume` (taken early for `MRIextractInto`; `affine.h`'s `AffineMV` as the official build inlines it) | 3.1-37 | `arith.rs` |
+| `utils/mri.cpp` 9033-9146, 9371-9501, 9688-9765, 10187-10207, 10254-10372, 10463-10581, 10582-10813 | `MRIsampleVolumeFrame`, `MRIsampleVolumeType`, `MRIsampleVolumeFrameType`, `MRIsampleVolume`, `MRIcubicCoeff`, `MRIcubicSampleVolume`, `MRIcubicSampleVolumeFrame`, `ham_sinc`, `MRIsincSampleVolume`, `MRIsincSampleVolumeFrame` (the official build's operand orders from the unit oracle's `mri.cpp.o`; `include/machine.h`'s `long32`) | 3.1-36 | `sample.rs` |
+| `utils/mri.cpp` 6313-6349, 6472-6556, 6670-6735 | `MRItranslate`, `MRIrotateX_I`, `MRIrotateY_I`, `MRIrotateZ_I`, `MRIrotate_I` | 3.1-35 | `rotate.rs` |
+| `utils/mri.cpp` 2754-3011 | `MRIfindApproximateSkullBoundingBox` (`MIN_DARK`, `MAX_LIGHT`) | 3.1-35 | `skull.rs` |
+| `utils/transform.cpp` 1576-1621, 2737-3240, 3332-3365; `utils/utils.cpp` 284-304 | `TransformFileNameType`, `ltaReadRegisterDat`, `mincFindVolume`, `mincGetVolumeInfo`, `mincGetVolInfo`, `ltaMNIreadEx`, `ltaReadFileEx`, `LTAreadExType`, `LTAreadEx`, `ltaFSLread`; `fgetl`'s buffer as these functions read it | 3.1-39 | `ltaread.rs` |
 
 No third-party code in these lines (the audit of `docs/freesurfer/third-party.md`). `readVolGeom`'s
 `sscanf` calls are modelled on glibc 2.35's behaviour measured as a black box (the open
@@ -38,3 +42,10 @@ No third-party code in these lines (the audit of `docs/freesurfer/third-party.md
   of another type kept (FS-293); a negative row length an error (FS-294); the new volume's start and
   end with the float voxel sizes (FS-295); a NaN stored as 0 (FS-296); 64-bit rows copied from their
   column (FS-297).
+- The samplers, moves, head box and transform reading: FS-298 to FS-310 (`docs/findings/freesurfer-volume.md`
+  §5-7): long volumes sampled whole (FS-298), cubic sums over 8 (FS-299), samples stored with the
+  volume's conversion (FS-301), rule A; the cubic frame window's unread points 0 (FS-300), a sample
+  never set 0 (FS-303), the `.lta` header values never set 0 (FS-308), a long name classified whole
+  (FS-306), both modes; the crashes and hangs errors (FS-302, FS-304, FS-305, FS-307, FS-309, FS-310).
+  `MRIrotateX_I` and the others do not allocate the clone FreeSurfer loses. `MRIreadHeader` and
+  `regio_read_register` (fs.io) are the caller's (`ltaread::LtaIo`).

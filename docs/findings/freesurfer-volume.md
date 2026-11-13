@@ -137,3 +137,75 @@ waits for `MRIsampleVolumeFrameType` (9434, 3.1-36).
   `reproduce`, 233 not comparable, the 2 `pca` hangs above (before they were added to the skipped
   defects), 0 other differences; `fix` different only with notices. Seed 1, 920 cases: 862
   identical, 58 not comparable, hash `772e44de...`.
+
+## 5. The samplers (3.1-36)
+
+- **Operand orders** (`objdump -dr` of the unit oracle's `mri.cpp.o`): `MRIsampleVolume` and
+  `MRIsampleVolumeFrame` compute the eight weights as written (`(xpd * ypd) * zpd`, ...; GCC keeps
+  `xpd * ypd` and the like once) and add the terms as `t1 + t2`, `s + t3`, `t4 + s`, `s + t5`, `t6 + s`,
+  `t7 + s`, `s + t8` (the destination register first: `addsd %xmm9,%xmm6`, `addsd %xmm6,%xmm4`, ...);
+  the products' order does not matter (weights are finite). `MRIcubicSampleVolume(Frame)` calls
+  `MRIcubicCoeff` (not inlined) and computes `((fx * v) * fy) * fz` then `term + val` (`addsd
+  (%rsp),%xmm0`); the frame variant multiplies by 0.125 (`mulsd .LC149`). `MRIsincSampleVolume(Frame)`:
+  weight sums `w + sum`, `sum_x + v * (w / S)` with `v` first in the product, `sum_y + sum_x * (w /
+  S)`, `sum_z + sum_y * (w / S)`. `ham_sinc` calls glibc's `sin` and `cos` (`-fno-builtin`); `cos(inf)`
+  returns SSE's default NaN (`0xfff8...`) and sets `errno` to `EDOM` (seen in the probe's messages
+  after `MatrixAllocRotation` of an infinite angle: `Numerical argument out of domain`).
+- **FS-298**: `MRILvox` and `MRILseq_vox` are `((long32 *) row)[x]` (`machine.h`: `typedef int
+  long32`), while an `MRI_LONG` volume stores `long` (8 bytes; `MRIsizeof`): the samplers read the low
+  half of voxel `x / 2` (even `x`) or its high half (odd `x`). Observed: identical with `reproduce`.
+- **FS-299**: FreeSurfer 8.2.0's `MRIcubicSampleVolume` counts the points it adds (`nvals`) and divides
+  by it; `MRIcubicSampleVolumeFrame` (and earlier FreeSurfer, per its structure) divides by 8. The four
+  weights of `MRIcubicCoeff` sum to 2 for any fraction, so 8 is the normalisation; inside the volume
+  `nvals` is 64. Observed: 469 of 10,000 sampler cases changed by the default, identical with
+  `reproduce`.
+- **FS-300**: `MRIcubicSampleVolumeFrame` fills `vv[4][4][4]` (a stack array, never initialised) only
+  inside the volume but sums all 64; the official build's sums then depend on the stack (443 cases
+  skipped, 2 identical by chance).
+- **FS-302**: `coeff_x[128]` (and y, z) on the stack; the window holds `min(floor + hw, extent - 1) -
+  max(ceil - hw, 0)` weights, more than 128 only for `hw > 64` on an axis of more than 128 voxels (not
+  reached by the probe's small volumes).
+- **Kept (rule C, no register entry)**: the sinc window stops below `extent - 1` and below `floor + hw`
+  (asymmetric: one weight fewer above), and a point with `ceil(z) == depth` (z in `(depth - 1, depth -
+  0.5)`) gives 0 while x and y are clamped: the sampler's definition since FreeSurfer's first versions;
+  `SAMPLE_SINC` is not on a default path.
+
+## 6. The moves and the head box (3.1-35)
+
+- **FS-301**: `MRItranslate` writes through `BUFTYPE *pdst = &MRIvox(mri_dst, 0, y2, y3)`,
+  `MRIrotate_I` through `mri_dst->slices[y3][y2][y1]` (a `BUFTYPE`): byte `y1` of the row whatever the
+  type. Their callers (`mri_em_register`, `mri_linear_register`, `mri_average`, their optional starting
+  translation and rotations) pass byte volumes in the usual pipeline; a float input there gets bytes.
+- **FS-303**: `double val;` without a value; `MRIsampleVolume` returns before setting it for an
+  unsupported type (the nearest path sets 0).
+- **FS-304**: `MRIrotateX_I` and the others do `mri_dst = MRIrotate_I(...); mri_dst->ras_good_flag =
+  0;`: `NULL` from a singular `MatrixInverse` (a NaN or infinite angle) is dereferenced (observed
+  `CRASH 11` after the error message). They also clone the source first and lose that volume (no
+  effect but memory; the port does not allocate it).
+- **FS-305**: `MRIcenterOfMass` of a volume with infinite voxels above the threshold gives NaN means;
+  `nint(NaN)` (FS-12) starts the walks at `INT_MIN`, so the upward walks run 2^31 samples outside the
+  volume, and `means[1] -= 10` never makes `means[1] < 0` (observed: the probe's 5-second alarm, `CRASH
+  14`).
+
+## 7. Reading transforms (`LTAreadEx`, 3.1-39)
+
+- `fgetl(line, n, fp)` returns a pointer past leading white space, but `ltaMNIreadEx` tests the buffer
+  `line` (its first byte, `strncmp`, `strcpy`), which keeps the leading white space and, at the end of
+  the file, the last line `fgets` read (also shown in `could not read row` messages). The port keeps
+  that buffer.
+- **FS-306**: `char buf[500]; strcpy(buf, fname)` in `TransformFileNameType`.
+- **FS-307**: `while (line[0] == '%') fgetl(line, 900, fp);` with `fgetl` at the end of the file
+  leaving `line` as it was.
+- **FS-308**, **FS-309**: `int type, nxforms;` without values and `sscanf(cp, ...)` with `cp` from
+  `fgetl` (`NULL` at the end); the official build's garbage happened to give the port's 0 in 31 of the
+  probe's cases (skipped all the same).
+- **FS-310**: `pch = strtok(NULL, " "); *srcVol = malloc(strlen(pch) + 1)` with no word left.
+- `mincFindVolume`'s `static int count` survives between calls (a `minctracc` line with one `.mnc`
+  word makes the next file's first `.mnc` word the destination): `Globals::minc_find_volume_count`.
+  Its `%Generated by` branch matches any word containing `src` or `dst` (a path such as
+  `/usr/src/...` would count): kept (rule C, FreeSurfer's own files write `src <v> dst <v>`).
+- `mincGetVolumeInfo` calls `stat` first: a missing volume leaves `errno` at `ENOENT`, which the next
+  `ErrorPrintf` prints. The recorded heads' `talairach.xfm`: the classic stream writes `% avi2talxfm`
+  (no volume looked for); the v8 stream `%Generated by lta_convert src <subject>/mri/orig.mgz dst
+  /autofs/.../mni152.1.0mm.nii.gz` (`orig.mgz` read with `MRIreadHeader` when it exists; the
+  destination does not exist: the default geometry named by it).

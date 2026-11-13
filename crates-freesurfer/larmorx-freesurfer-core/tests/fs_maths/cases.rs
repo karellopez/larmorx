@@ -12,7 +12,8 @@
 //! FreeSurfer's code addresses within its arrays, except where FreeSurfer's own searches read
 //! past them (FS-22): the port notes those, and their lines are compared as `SKIP`.
 
-#![allow(dead_code)]
+// The minimizers' problems keep the C expressions (`s = s + ...`) and its 1-based loops.
+#![allow(dead_code, clippy::needless_range_loop, clippy::assign_op_pattern)]
 
 use std::io::Write;
 use std::path::Path;
@@ -20,10 +21,12 @@ use std::path::Path;
 use larmorx_core::defects::UpstreamDefects;
 use larmorx_freesurfer_core::affine::{self, AffineMatrix, AffineVector};
 use larmorx_freesurfer_core::dmatrix::{self, DMatrix};
+use larmorx_freesurfer_core::fs_vnl::FsFunctions;
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::histo::{self as h, Histogram};
 use larmorx_freesurfer_core::matrix::{self as m, MATRIX_COMPLEX, MATRIX_REAL, Matrix};
 use larmorx_freesurfer_core::matrix_ops::{self as mo, Region};
+use larmorx_freesurfer_core::numerics::{self as nu, NrMatrix, NrVector};
 use larmorx_freesurfer_core::ret::Ret;
 use larmorx_freesurfer_core::{pdf, prime};
 
@@ -328,7 +331,241 @@ const COMMANDS: &[&str] = &[
     "pdfg",
     "minv",
     "mqr",
+    "powell",
+    "powell2",
+    "dfpmin",
 ];
+
+/// The minimizers' problems (`fsmaths.cpp`'s `Problem`, the same float expressions): 0 a
+/// quadratic, 1 Rosenbrock's, 2 the quadratic rounded down to a multiple of `1/q` (its gradient
+/// the quadratic's), 3 weighted absolute values (bounded below; every problem is, so no
+/// minimizer runs into infinities). Every call is hashed (FNV-1a over the bits) and counted.
+struct Problem {
+    kind: i32,
+    n: usize,
+    f0: f32,
+    b: f32,
+    q: f32,
+    a: Vec<f32>,
+    c: Vec<f32>,
+    iter_set: bool,
+    step_set: bool,
+    user_set: bool,
+    hash: u64,
+    nf: i32,
+    ng: i32,
+    ni: i32,
+    ns: i32,
+    nu: i32,
+}
+
+impl Problem {
+    fn fnv(&mut self, v: u32) {
+        for k in 0..4 {
+            self.hash ^= u64::from((v >> (8 * k)) & 0xff);
+            self.hash = self.hash.wrapping_mul(0x100_0000_01b3);
+        }
+    }
+    fn hashp(&mut self, p: &[f32], from: usize) {
+        for i in from..=self.n {
+            self.fnv(p[i].to_bits());
+        }
+    }
+}
+
+impl FsFunctions for Problem {
+    fn function(&mut self, p: &[f32]) -> f32 {
+        let n = self.n;
+        let mut s = self.f0;
+        if self.kind == 1 {
+            for i in 1..n {
+                let t = p[i + 1] - p[i] * p[i];
+                let u = 1.0f32 - p[i];
+                s = s + 100.0f32 * t * t + u * u;
+            }
+        } else {
+            for i in 1..=n {
+                let d = p[i] - self.c[i];
+                if self.kind == 3 {
+                    s = s + self.a[i] * d.abs();
+                } else {
+                    s = s + self.a[i] * d * d;
+                }
+            }
+            if self.kind != 3 {
+                for i in 1..n {
+                    s = s + self.b * ((p[i] - self.c[i]) * (p[i + 1] - self.c[i + 1]));
+                }
+            }
+            if self.kind == 2 {
+                s = (s * self.q).floor() / self.q;
+            }
+        }
+        self.nf += 1;
+        self.fnv(1);
+        self.hashp(p, 1);
+        self.fnv(s.to_bits());
+        s
+    }
+    fn gradient(&mut self, p: &[f32], g: &mut [f32]) {
+        let n = self.n;
+        for gi in g.iter_mut().take(n + 1).skip(1) {
+            *gi = 0.0;
+        }
+        if self.kind == 1 {
+            for i in 1..n {
+                let t = p[i + 1] - p[i] * p[i];
+                let u = 1.0f32 - p[i];
+                g[i] = g[i] + (-400.0f32 * t * p[i] - 2.0f32 * u);
+                g[i + 1] = g[i + 1] + 200.0f32 * t;
+            }
+        } else {
+            for i in 1..=n {
+                let d = p[i] - self.c[i];
+                let mut gi = if self.kind == 3 {
+                    self.a[i]
+                        * if d > 0.0 {
+                            1.0f32
+                        } else if d < 0.0 {
+                            -1.0
+                        } else {
+                            0.0
+                        }
+                } else {
+                    2.0f32 * self.a[i] * d
+                };
+                if i > 1 && self.kind != 3 {
+                    gi = gi + self.b * (p[i - 1] - self.c[i - 1]);
+                }
+                if i < n && self.kind != 3 {
+                    gi = gi + self.b * (p[i + 1] - self.c[i + 1]);
+                }
+                g[i] = gi;
+            }
+        }
+        self.ng += 1;
+        self.fnv(2);
+        self.hashp(p, 1);
+        self.hashp(g, 1);
+    }
+    fn powell_iteration(&mut self, p: &[f32], nparms: i32) {
+        if !self.iter_set {
+            return;
+        }
+        self.ni += 1;
+        self.fnv(3);
+        self.fnv(nparms as u32);
+        self.hashp(p, 0);
+    }
+    fn step(&mut self, itno: i32, sse: f32, p: &[f32]) {
+        if !self.step_set {
+            return;
+        }
+        self.ns += 1;
+        self.fnv(4);
+        self.fnv(itno as u32);
+        self.fnv(sse.to_bits());
+        self.hashp(p, 1);
+    }
+    fn user_callback(&mut self, p: &[f32]) {
+        if !self.user_set {
+            return;
+        }
+        self.nu += 1;
+        self.fnv(5);
+        self.hashp(p, 1);
+    }
+}
+
+/// A problem's tokens: kind n f0 b q a[1..n] c[1..n] (n at most 12; a positive definite
+/// quadratic: |b| < the smallest a / 2).
+fn put_problem(s: &mut Vec<String>, g: &mut Gen, kind: i64, n: i64) {
+    s.push(kind.to_string());
+    s.push(n.to_string());
+    let f0 = g.int(0, 4000) as f32 / 4.0;
+    s.push(fx(g.pick(&[0.0f32, 1.0, f0])));
+    s.push(fx(g.int(-6, 6) as f32 / 32.0));
+    s.push(fx(g.pick(&[1.0f32, 4.0, 64.0, 4096.0])));
+    for _ in 0..n {
+        s.push(fx(g.int(4, 32) as f32 / 8.0));
+    }
+    for _ in 0..n {
+        s.push(fx(g.int(-32, 32) as f32 / 8.0));
+    }
+}
+
+/// A minimizer case: the problem, the starting point (never the quadratics' centre on its first
+/// coordinate: a zero gradient makes L-BFGS divide by 0), the directions for Powell.
+fn minimizer_case(g: &mut Gen, cmd: &str) -> String {
+    let kind = g.pick(&[0i64, 0, 1, 2, 2, 3]);
+    let n = match cmd {
+        "dfpmin" => g.pick(&[2i64, 3, 4, 6, 12]),
+        _ => g.pick(&[1i64, 2, 3, 4, 6]),
+    };
+    let n = if kind == 1 { n.max(2) } else { n };
+    let mut s = vec![cmd.to_owned()];
+    put_problem(&mut s, g, kind, n);
+    let c1 = f32::from_bits(u32::from_str_radix(&s[6 + n as usize], 16).unwrap());
+    for i in 0..n {
+        let mut v = g.int(-64, 64) as f32 / 8.0;
+        if i == 0 && v == c1 {
+            v += 0.5;
+        }
+        s.push(fx(v));
+    }
+    match cmd {
+        "dfpmin" => {
+            s.push(fx(g.pick(&[1e-2f32, 1e-4, 1e-6])));
+            s.push(g.pick(&[0, 0, 0, 1, 2]).to_string());
+            s.push(if g.below(8) == 0 { "1" } else { "0" }.to_owned());
+            s.push(g.below(2).to_string());
+            s.push(g.below(2).to_string());
+        }
+        _ => {
+            let dkind = g.below(4);
+            for r in 0..n {
+                for k in 0..n {
+                    let v = match dkind {
+                        0 | 1 => {
+                            if r == k {
+                                1.0f32
+                            } else {
+                                0.0
+                            }
+                        }
+                        2 => {
+                            if r == k {
+                                g.int(1, 4) as f32 / 2.0
+                            } else {
+                                0.0
+                            }
+                        }
+                        _ => {
+                            if r == k {
+                                1.0
+                            } else if r > k {
+                                g.int(-4, 4) as f32 / 8.0
+                            } else {
+                                0.0
+                            }
+                        }
+                    };
+                    s.push(fx(v));
+                }
+            }
+            if cmd == "powell" {
+                s.push(fx(g.pick(&[1e-4f32, 1e-2, 1e-6])));
+            } else {
+                s.push(fx(g.pick(&[1e-1f32, 1e-2, 1e-3, 1e-4, 1e-6, 1e-8])));
+                s.push(fx(g.pick(&[1e-1f32, 1e-2, 1e-3])));
+                s.push(g.pick(&[0, 1, 2, 4, 36, 36]).to_string());
+                s.push(if g.below(6) == 0 { "1" } else { "0" }.to_owned());
+            }
+            s.push(g.below(2).to_string());
+        }
+    }
+    s.join(" ")
+}
 
 /// One case line of command `cmd`.
 fn case(g: &mut Gen, cmd: &str) -> String {
@@ -779,6 +1016,7 @@ fn case(g: &mut Gen, cmd: &str) -> String {
             let (r, c) = (g.int(1, 6), g.int(1, 6));
             put_mat(&mut s, g, r, c, false);
         }
+        "powell" | "powell2" | "dfpmin" => return minimizer_case(g, cmd),
         _ => unreachable!("{cmd}"),
     }
     s.join(" ")
@@ -847,6 +1085,37 @@ impl<'a> Toks<'a> {
         }
         mm
     }
+    fn problem(&mut self) -> Problem {
+        let kind = self.i();
+        let n = self.i() as usize;
+        let (f0, b, q) = (self.f(), self.f(), self.f());
+        let mut a = vec![0.0f32; n + 1];
+        let mut c = vec![0.0f32; n + 1];
+        for v in a.iter_mut().skip(1) {
+            *v = self.f();
+        }
+        for v in c.iter_mut().skip(1) {
+            *v = self.f();
+        }
+        Problem {
+            kind,
+            n,
+            f0,
+            b,
+            q,
+            a,
+            c,
+            iter_set: false,
+            step_set: false,
+            user_set: false,
+            hash: 0xcbf2_9ce4_8422_2325,
+            nf: 0,
+            ng: 0,
+            ni: 0,
+            ns: 0,
+            nu: 0,
+        }
+    }
     fn dm(&mut self) -> DMatrix {
         let (rows, cols) = (self.i(), self.i());
         let mut d = DMatrix::zeros(rows, cols);
@@ -913,6 +1182,20 @@ impl Out {
                     self.d(v);
                 }
             }
+        }
+    }
+    fn counts(&mut self, pr: &Problem) {
+        for v in [pr.nf, pr.ng, pr.ni, pr.ns, pr.nu] {
+            self.i(v);
+        }
+        self.0.push(format!("{:016x}", pr.hash));
+    }
+    fn cap(&mut self, bytes: &[u8]) {
+        if bytes.is_empty() {
+            self.0.push("-".to_owned());
+        } else {
+            self.0
+                .push(bytes.iter().map(|b| format!("{b:02x}")).collect::<String>());
         }
     }
     fn file(&mut self, p: &Path) {
@@ -1563,6 +1846,125 @@ pub fn run_line(line: &str, mode: UpstreamDefects, tmp: &Path) -> (String, Vec<&
             ));
             o.mraw(&q);
             o.mraw(&r);
+        }
+        "powell" | "powell2" | "dfpmin" => {
+            let mut pr = t.problem();
+            let n = pr.n;
+            let mut p = NrVector::new(1, n as i64);
+            for i in 1..=n as i64 {
+                p[i] = t.f();
+            }
+            let (mut co, mut ce) = (Vec::new(), Vec::new());
+            if cmd == "dfpmin" {
+                let tol = t.f();
+                let init = t.i();
+                let verbose = t.i();
+                pr.step_set = t.i() != 0;
+                pr.user_set = t.i() != 0;
+                let f = pr.function(p.as_slice());
+                let mut fret = match init {
+                    0 => f,
+                    1 => 0.0,
+                    _ => 2.0 * f,
+                };
+                let mut iter = -7;
+                let gdiag = g.gdiag;
+                if verbose != 0 {
+                    g.gdiag |= larmorx_freesurfer_core::diag::DIAG_VERBOSE;
+                }
+                let r = nu::open_dfp_min(
+                    g,
+                    &mut co,
+                    &mut ce,
+                    p.as_mut_slice(),
+                    n as i32,
+                    tol,
+                    &mut iter,
+                    &mut fret,
+                    &mut pr,
+                )
+                .unwrap();
+                g.gdiag = gdiag;
+                if mode == UpstreamDefects::Reproduce
+                    && g.notices
+                        .as_slice()
+                        .iter()
+                        .any(|x| x.defect.id == "FS-37" && x.detail.contains("crashes"))
+                {
+                    o.0.push("CRASH".to_owned());
+                } else {
+                    o.i(r);
+                    o.i(iter);
+                    o.f(fret);
+                    for i in 1..=n as i64 {
+                        o.f(p[i]);
+                    }
+                    o.counts(&pr);
+                    o.cap(&co);
+                    o.cap(&ce);
+                }
+            } else {
+                let mut xi = NrMatrix::new(1, n as i64, 1, n as i64);
+                for r in 1..=n as i64 {
+                    for k in 1..=n as i64 {
+                        xi[(r, k)] = t.f();
+                    }
+                }
+                let mut iter = -7;
+                let mut fret = -7.0f32;
+                if cmd == "powell" {
+                    let tol = t.f();
+                    pr.iter_set = t.i() != 0;
+                    nu::open_powell(
+                        g,
+                        &mut co,
+                        &mut ce,
+                        p.as_mut_slice(),
+                        Some(&mut xi),
+                        n as i32,
+                        tol,
+                        &mut iter,
+                        &mut fret,
+                        &mut pr,
+                    )
+                    .unwrap();
+                } else {
+                    let (ftol, lin) = (t.f(), t.f());
+                    let (maxit, gno) = (t.i(), t.i());
+                    pr.iter_set = t.i() != 0;
+                    let save = g.gdiag_no;
+                    g.gdiag_no = gno;
+                    let r = nu::open_powell2(
+                        g,
+                        &mut co,
+                        &mut ce,
+                        p.as_mut_slice(),
+                        Some(&mut xi),
+                        n as i32,
+                        ftol,
+                        lin,
+                        maxit,
+                        &mut iter,
+                        &mut fret,
+                        &mut pr,
+                    );
+                    g.gdiag_no = save;
+                    o.i(r);
+                }
+                o.i(iter);
+                o.f(fret);
+                for i in 1..=n as i64 {
+                    o.f(p[i]);
+                }
+                for r in 1..=n as i64 {
+                    for k in 1..=n as i64 {
+                        o.f(xi[(r, k)]);
+                    }
+                }
+                o.counts(&pr);
+                o.cap(&co);
+                o.cap(&ce);
+            }
         }
         _ => panic!("unknown case {cmd}"),
     }

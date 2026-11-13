@@ -9,8 +9,9 @@ through ``fsmaths`` (``build.sh``: FreeSurfer's histograms, matrices, double mat
 helpers from the unit oracle's build, linked as the official programs are) by the oracle-output
 cache at one thread, runs the port on the same cases with ``--upstream-defects`` ``reproduce``
 and ``fix``, and compares the lines: ``reproduce`` must give FreeSurfer's bits on every case, but
-those where FreeSurfer reads outside its arrays (FS-22, FS-16: the port notes it; such lines
-are counted, not compared); ``fix`` may differ only where a defect it corrects changed the result
+those where FreeSurfer reads outside its arrays (FS-22, FS-16, ITK-106: the port notes it; such
+lines are counted, not compared; a case where FreeSurfer crashes, ``OpenDFPMin``'s FS-37, is the
+line ``CRASH`` on both sides); ``fix`` may differ only where a defect it corrects changed the result
 (its notices) or where the correctly rounded maths moved a last bit (``log`` in the entropy).
 Prints the counts, the hash the port's recorded test checks (``tests/fs_maths_official.rs``),
 and writes ``--json``.
@@ -35,6 +36,11 @@ sys.path.insert(0, str(REPO / "validation" / "src"))
 
 from larmorx_validation import oracle_cache  # noqa: E402
 from larmorx_validation.oracle_cache.store import workspace  # noqa: E402
+
+#: Defects whose lines are counted, not compared: FreeSurfer reads or writes memory it does not
+#: own (FS-22, FS-16; ITK-106: VXL's L-BFGS printout of ``OpenDFPMin`` under ``DIAG_VERBOSE``
+#: prints the double before its vectors, a heap header in FreeSurfer, 0 in the port).
+SKIP = ("FS-22", "FS-16", "ITK-106")
 
 #: Commands whose results go through the C library's ``acos``: the port uses the correctly
 #: rounded one in both modes (glibc's is not ported yet, queue item 3.1-08), so a line may differ
@@ -145,7 +151,7 @@ def main(argv: list[str] | None = None) -> int:
     first_differ = []
     for case, c, (r, ids), (f, fids) in zip(cases, official, rep, fix, strict=True):
         cmd = case.split()[0]
-        if "FS-22" in ids or "FS-16" in ids:
+        if any(x in ids for x in SKIP):
             skipped[cmd] += 1
             skip_same += c == r
             hashed.update(b"SKIP\n")

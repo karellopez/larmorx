@@ -1067,8 +1067,8 @@ defects! {
         "OpenPowell's tolerance argument sets VNL's x tolerance, which Powell's method never reads: every call stops at VNL's default relative tolerance on the cost, 1e-10 (kept: the programs' results depend on it)";
     FS_37 = "FS-37", "FreeSurfer", true,
         "fs_lbfgs records its best point only from the second evaluation on and reports the last value evaluated: without an improvement on the starting point a successful run empties the parameters (OpenDFPMin then crashes) and a failed one leaves them at the line search's last trial point with the previous run's end value; otherwise the end value can be a worse point's";
-    FS_38 = "FS-38", "FreeSurfer", false,
-        "OpenDFPMin repeats the minimization while the cost improved by more than the tolerance relative to the caller's first value, never to the previous pass's, so it repeats until a pass fails (to be measured on mri_em_register before deciding: rule D)";
+    FS_38 = "FS-38", "FreeSurfer", true,
+        "OpenDFPMin repeats the minimization while the cost improved by more than the tolerance relative to the caller's first value, never to the previous pass's (its comment: keep iterating if the error is not significantly better), so it repeats until a pass fails or FreeSurfer crashes (FS-37)";
     FS_39 = "FS-39", "FreeSurfer", true,
         "OpenDFPMin returns FAILED_USER_REQUEST without writing the parameters, the iteration count or the final value when an L-BFGS pass reaches its evaluation limit: the progress made is dropped and the caller reads its own unset count";
 }

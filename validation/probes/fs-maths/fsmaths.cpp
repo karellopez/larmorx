@@ -12,11 +12,18 @@
 // Written for LARMORX (Apache-2.0); the binary it builds links FreeSurfer's code and stays on
 // the machine that built it.
 
+#include <fcntl.h>
+#include <signal.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
 #include <cinttypes>
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <iostream>
 #include <string>
 #include <vector>
 
@@ -26,12 +33,16 @@
 #include "error.h"
 #include "histo.h"
 #include "matrix.h"
+#include "numerics.h"
 #include "pdf.h"
 #include "prime.h"
 #include "utils.h"
 
 // declared in utils/matrix.cpp only (external linkage)
 int MatrixIsSymmetric(MATRIX *matrix);
+
+// defined in utils/fs_powell.cpp (oct_register_mosaic declares it so)
+extern void (*powell_iteration_func)(float *p, int nparms);
 
 const char *Progname = "fsmaths";
 
@@ -193,6 +204,316 @@ void putfile(const char *path)
   }
   fclose(fp);
   line_out += " ";
+}
+
+// ---- the minimizers' cases (OpenPowell, OpenPowell2, OpenDFPMin) ----
+// A seeded cost of n parameters (1-based, as FreeSurfer's callers index them), in float, the
+// same expressions as the port's side (tests/fs_maths/cases.rs): 0 a quadratic, 1 Rosenbrock's,
+// 2 the quadratic rounded down to a multiple of 1/q (its gradient the quadratic's), 3 weighted
+// absolute values (bounded below: with cross terms it would fall without end, the bracketing
+// would run into infinities). Every call is hashed (FNV-1a over the bits).
+struct Problem {
+  int kind = 0, n = 0;
+  float f0 = 0, b = 0, q = 1;
+  float a[16] = {0}, c[16] = {0};
+  bool iter_set = false;
+  uint64_t hash = 0xcbf29ce484222325ULL;
+  int nf = 0, ng = 0, ni = 0, ns = 0, nu = 0;
+} P;
+
+void fnv(uint32_t v)
+{
+  for (int k = 0; k < 4; k++) {
+    P.hash ^= (v >> (8 * k)) & 0xff;
+    P.hash *= 0x100000001b3ULL;
+  }
+}
+
+uint32_t bits(float f)
+{
+  uint32_t u;
+  memcpy(&u, &f, 4);
+  return u;
+}
+
+void hashp(const float *p, int from)
+{
+  for (int i = from; i <= P.n; i++) fnv(bits(p[i]));
+}
+
+float cost(float p[])
+{
+  int n = P.n;
+  float s = P.f0;
+  if (P.kind == 1) {
+    for (int i = 1; i < n; i++) {
+      float t = p[i + 1] - p[i] * p[i];
+      float u = 1.0f - p[i];
+      s = s + 100.0f * t * t + u * u;
+    }
+  }
+  else {
+    for (int i = 1; i <= n; i++) {
+      float d = p[i] - P.c[i];
+      if (P.kind == 3)
+        s = s + P.a[i] * fabsf(d);
+      else
+        s = s + P.a[i] * d * d;
+    }
+    if (P.kind != 3)
+      for (int i = 1; i < n; i++) s = s + P.b * ((p[i] - P.c[i]) * (p[i + 1] - P.c[i + 1]));
+    if (P.kind == 2) s = floorf(s * P.q) / P.q;
+  }
+  P.nf++;
+  fnv(1);
+  hashp(p, 1);
+  fnv(bits(s));
+  return s;
+}
+
+void gradient(float p[], float g[])
+{
+  int n = P.n;
+  for (int i = 1; i <= n; i++) g[i] = 0.0f;
+  if (P.kind == 1) {
+    for (int i = 1; i < n; i++) {
+      float t = p[i + 1] - p[i] * p[i];
+      float u = 1.0f - p[i];
+      g[i] = g[i] + (-400.0f * t * p[i] - 2.0f * u);
+      g[i + 1] = g[i + 1] + 200.0f * t;
+    }
+  }
+  else {
+    for (int i = 1; i <= n; i++) {
+      float d = p[i] - P.c[i];
+      float gi;
+      if (P.kind == 3)
+        gi = P.a[i] * (d > 0.0f ? 1.0f : (d < 0.0f ? -1.0f : 0.0f));
+      else
+        gi = 2.0f * P.a[i] * d;
+      if (i > 1 && P.kind != 3) gi = gi + P.b * (p[i - 1] - P.c[i - 1]);
+      if (i < n && P.kind != 3) gi = gi + P.b * (p[i + 1] - P.c[i + 1]);
+      g[i] = gi;
+    }
+  }
+  P.ng++;
+  fnv(2);
+  hashp(p, 1);
+  hashp(g, 1);
+}
+
+void iteration(float *p, int nparms)
+{
+  P.ni++;
+  fnv(3);
+  fnv((uint32_t)nparms);
+  hashp(p, 0);
+}
+
+void step(int itno, float sse, void *parms, float *p)
+{
+  (void)parms;
+  P.ns++;
+  fnv(4);
+  fnv((uint32_t)itno);
+  fnv(bits(sse));
+  hashp(p, 1);
+}
+
+void user(float p[])
+{
+  P.nu++;
+  fnv(5);
+  hashp(p, 1);
+}
+
+// the problem's tokens: kind n f0 b q a[1..n] c[1..n]
+void getproblem()
+{
+  P = Problem();
+  P.kind = geti();
+  P.n = geti();
+  P.f0 = getf();
+  P.b = getf();
+  P.q = getf();
+  for (int i = 1; i <= P.n; i++) P.a[i] = getf();
+  for (int i = 1; i <= P.n; i++) P.c[i] = getf();
+}
+
+void puthash()
+{
+  char b[32];
+  snprintf(b, sizeof b, "%016" PRIx64 " ", P.hash);
+  line_out += b;
+}
+
+// standard output and error captured into files beside the cases while FreeSurfer runs
+struct Capture {
+  int so, se;
+  std::string fo, fe;
+};
+
+void cap_begin(Capture &c, const char *tmp)
+{
+  fflush(stdout);
+  fflush(stderr);
+  std::cerr.flush();
+  c.fo = std::string(tmp) + ".out";
+  c.fe = std::string(tmp) + ".err";
+  c.so = dup(1);
+  c.se = dup(2);
+  int fo = open(c.fo.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0600);
+  int fe = open(c.fe.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0600);
+  dup2(fo, 1);
+  dup2(fe, 2);
+  close(fo);
+  close(fe);
+}
+
+void putcap(const std::string &path)
+{
+  FILE *fp = fopen(path.c_str(), "rb");
+  std::string h;
+  int ch;
+  char b[4];
+  while (fp && (ch = fgetc(fp)) != EOF) {
+    snprintf(b, sizeof b, "%02x", ch);
+    h += b;
+  }
+  if (fp) fclose(fp);
+  remove(path.c_str());
+  line_out += h.empty() ? "- " : h + " ";
+}
+
+void cap_end(Capture &c)
+{
+  fflush(stdout);
+  fflush(stderr);
+  std::cerr.flush();
+  dup2(c.so, 1);
+  dup2(c.se, 2);
+  close(c.so);
+  close(c.se);
+  putcap(c.fo);
+  putcap(c.fe);
+}
+
+void putcounts()
+{
+  puti(P.nf);
+  puti(P.ng);
+  puti(P.ni);
+  puti(P.ns);
+  puti(P.nu);
+  puthash();
+}
+
+void run_minimizer(const std::string &cmd, const char *tmpfile)
+{
+  getproblem();
+  int n = P.n;
+  float *p = vector(1, n);
+  for (int i = 1; i <= n; i++) p[i] = getf();
+  if (cmd == "dfpmin") {
+    float tol = getf();
+    int init = geti();
+    int verbose = geti();
+    int stepf = geti(), userf = geti();
+    float f = cost(p);
+    float fret = init == 0 ? f : (init == 1 ? 0.0f : 2.0f * f);
+    int iter = -7;
+    unsigned long gdiag = Gdiag;
+    if (verbose) Gdiag |= DIAG_VERBOSE;
+    Capture c;
+    cap_begin(c, tmpfile);
+    int r = OpenDFPMin(p, n, tol, &iter, &fret, cost, gradient, stepf ? step : NULL, NULL, userf ? user : NULL);
+    Gdiag = gdiag;
+    puti(r);
+    puti(iter);
+    putf(fret);
+    for (int i = 1; i <= n; i++) putf(p[i]);
+    putcounts();
+    cap_end(c);
+    free_vector(p, 1, n);
+    return;
+  }
+  float **xi = matrix(1, n, 1, n);
+  for (int r = 1; r <= n; r++)
+    for (int k = 1; k <= n; k++) xi[r][k] = getf();
+  int iter = -7;
+  float fret = -7.0f;
+  Capture c;
+  if (cmd == "powell") {
+    float tol = getf();
+    P.iter_set = geti() != 0;
+    powell_iteration_func = P.iter_set ? iteration : NULL;
+    cap_begin(c, tmpfile);
+    OpenPowell(p, xi, n, tol, &iter, &fret, cost);
+  }
+  else {
+    float ftol = getf(), lin = getf();
+    int maxit = geti(), gno = geti();
+    P.iter_set = geti() != 0;
+    powell_iteration_func = P.iter_set ? iteration : NULL;
+    int save = Gdiag_no;
+    Gdiag_no = gno;
+    cap_begin(c, tmpfile);
+    int r = OpenPowell2(p, xi, n, ftol, lin, maxit, &iter, &fret, cost);
+    Gdiag_no = save;
+    puti(r);
+  }
+  powell_iteration_func = NULL;
+  puti(iter);
+  putf(fret);
+  for (int i = 1; i <= n; i++) putf(p[i]);
+  for (int r = 1; r <= n; r++)
+    for (int k = 1; k <= n; k++) putf(xi[r][k]);
+  putcounts();
+  cap_end(c);
+  free_matrix(xi, 1, n, 1, n);
+  free_vector(p, 1, n);
+}
+
+// a case that may crash FreeSurfer (OpenDFPMin, FS-37) runs in a child process: its line, or
+// CRASH when the child dies of a signal (TIMEOUT after 600 s)
+void run_forked(const std::string &cmd, const char *tmpfile)
+{
+  int fd[2];
+  if (pipe(fd) != 0) fail("pipe");
+  fflush(stdout);
+  fflush(stderr);
+  pid_t pid = fork();
+  if (pid < 0) fail("fork");
+  if (pid == 0) {
+    close(fd[0]);
+    alarm(600);
+    line_out.clear();
+    run_minimizer(cmd, tmpfile);
+    size_t off = 0;
+    while (off < line_out.size()) {
+      ssize_t w = write(fd[1], line_out.data() + off, line_out.size() - off);
+      if (w <= 0) break;
+      off += (size_t)w;
+    }
+    close(fd[1]);
+    _exit(0);
+  }
+  close(fd[1]);
+  std::string got;
+  char buf[65536];
+  ssize_t k;
+  while ((k = read(fd[0], buf, sizeof buf)) > 0) got.append(buf, (size_t)k);
+  close(fd[0]);
+  int status = 0;
+  waitpid(pid, &status, 0);
+  if (WIFSIGNALED(status)) {
+    line_out = WTERMSIG(status) == SIGALRM ? "TIMEOUT " : "CRASH ";
+    std::string t = std::string(tmpfile);
+    remove((t + ".out").c_str());
+    remove((t + ".err").c_str());
+  }
+  else
+    line_out = got;
 }
 
 void run_case(const char *tmpfile)
@@ -681,6 +1002,12 @@ void run_case(const char *tmpfile)
     puti(MatrixQRdecomposition(a, q, r));
     putm_raw(q);
     putm_raw(r);
+  }
+  else if (cmd == "powell" || cmd == "powell2") {
+    run_minimizer(cmd, tmpfile);
+  }
+  else if (cmd == "dfpmin") {
+    run_forked(cmd, tmpfile);
   }
   else
     fail("unknown case");

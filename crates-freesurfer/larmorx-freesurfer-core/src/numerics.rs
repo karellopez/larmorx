@@ -18,15 +18,15 @@
 //! Defects (`larmorx_core::defects`; `docs/findings/freesurfer-maths.md`): **FS-33**, the 0 x 0
 //! matrix (see [`open_lu_matrix_inverse`] and [`open_matrix_determinant`]); **FS-34**, the
 //! directions written through `NULL` ([`open_powell`], [`open_powell2`]); **FS-35** and **FS-36**
-//! (kept), the Powell wrappers' return codes and tolerance; **FS-38** (kept until measured) and
-//! **FS-39**, [`open_dfp_min`]'s passes and its evaluation limit.
+//! (kept), the Powell wrappers' return codes and tolerance; **FS-38** and **FS-39**,
+//! [`open_dfp_min`]'s passes and its evaluation limit.
 
 use std::io::Write;
 use std::ops::{Index, IndexMut};
 
-use larmorx_core::defects::{FS_33, FS_34, FS_39};
-use larmorx_core::vnl_minimize::ReturnCode;
+use larmorx_core::defects::{FS_33, FS_34, FS_38, FS_39};
 use larmorx_core::vnl_fixed;
+use larmorx_core::vnl_minimize::ReturnCode;
 use larmorx_core::vnl_qr::{Qr, RANK_DEFICIENT};
 
 use crate::fs_vnl::{FsCostFunction, FsFunctions, FsLbfgs, FsLbfgsObserver, FsPowell};
@@ -235,13 +235,7 @@ pub fn open_powell(
             *o_iterations = minimizer.base.num_iterations as i32;
             *o_final_function_return = minimizer.base.end_error as f32;
             vnl_to_float(&final_parameters, ia_params, n);
-            put_directions(
-                g,
-                &initial_direction,
-                io_initial_direction,
-                n,
-                "OpenPowell",
-            );
+            put_directions(g, &initial_direction, io_initial_direction, n, "OpenPowell");
             Ok(())
         }
     }
@@ -322,9 +316,10 @@ pub fn open_powell2(
 /// iDerivativeFunction, iStepFunction, iStepFunctionParams, iUserCallBackFunction)`: quasi-Newton
 /// minimization of `iFunction` (with its gradient, [`FsFunctions`]) from `p[1..=n]` by
 /// [`FsLbfgs`] (`memory` 7, line search accuracy 0.1, `gtol = iTolerance`; the x and f tolerances
-/// it sets are not used), repeated while the end value improved on `*oFinalFunctionReturn` (the
-/// caller's value on entry) by more than `iTolerance` relative to it (**FS-38**, kept) and the
-/// pass succeeded; each new best point goes to the step function and the user callback, and
+/// it sets are not used), repeated while the pass succeeded and its end value improved by more
+/// than `iTolerance` relative to the previous pass's (the first pass: to `*oFinalFunctionReturn`,
+/// the caller's value); **FS-38**: FreeSurfer compares every pass with the caller's value and
+/// continues where the relative improvement is a NaN (`reproduce`); each new best point goes to the step function and the user callback, and
 /// their count is the iteration count. Returns 0 (and writes the count, the end value and `p`)
 /// when the last pass succeeded; otherwise the minimizer's failure code: `ERROR_FAILURE` (-1)
 /// writes them too, `ERROR_DODGY_INPUT` and the tolerance codes exit (`ERROR_BADPARM`; never
@@ -352,9 +347,14 @@ pub fn open_dfp_min(
     minimizer.base.set_x_tolerance(0.001);
     minimizer.base.ftol = 0.1;
     minimizer.base.gtol = f64::from(i_tolerance);
+    let reproduce = g.notices.reproduce();
     let mut is_success = true;
-    let previous_value = *o_final_function_return;
+    // FreeSurfer compares every pass with the caller's value (FS-38); the default with the
+    // previous pass's, and stops unless the improvement is more than the tolerance.
+    let first_value = *o_final_function_return;
+    let mut previous_value = first_value;
     let mut should_continue = true;
+    let mut pass = 0;
     while should_continue && is_success {
         is_success = minimizer.minimize(
             g,
@@ -364,8 +364,37 @@ pub fn open_dfp_min(
             out,
             err,
         );
+        pass += 1;
+        if minimizer.crashed {
+            // FreeSurfer crashes here (FS-37, noted): the starting point, as a success.
+            break;
+        }
         let current_value = minimizer.base.end_error as f32;
-        if (previous_value - current_value) / previous_value <= i_tolerance {
+        let fs_stop = (first_value - current_value) / first_value <= i_tolerance;
+        // a NaN improvement (0 / 0) is not one: stop
+        let improvement = (previous_value - current_value) / previous_value;
+        let fixed_stop = improvement.is_nan() || improvement <= i_tolerance;
+        let stop = if reproduce { fs_stop } else { fixed_stop };
+        if is_success && fs_stop != fixed_stop {
+            let what = match (reproduce, fs_stop) {
+                (false, true) => {
+                    "continues: the pass improved on the previous one by more than the tolerance (FreeSurfer compares with its first value and stops)"
+                }
+                (false, false) => {
+                    "stops: the pass did not improve on the previous one by more than the tolerance (FreeSurfer compares with its first value and continues)"
+                }
+                (true, true) => {
+                    "stops (FreeSurfer's comparison with its first value; compared with the previous pass it would continue)"
+                }
+                (true, false) => {
+                    "continues (FreeSurfer's comparison with its first value; compared with the previous pass it would stop)"
+                }
+            };
+            g.notices
+                .add(&FS_38, format!("OpenDFPMin after pass {pass} {what}"));
+        }
+        previous_value = current_value;
+        if stop {
             should_continue = false;
         }
     }

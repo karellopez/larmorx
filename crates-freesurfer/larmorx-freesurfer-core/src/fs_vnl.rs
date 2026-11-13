@@ -423,6 +423,9 @@ pub struct FsLbfgs {
     pub line_search_accuracy: f64,
     /// `default_step_length` (default 1.0): the line search's `stpinit`.
     pub default_step_length: f64,
+    /// Set by [`FsLbfgs::minimize`] with `reproduce` where FreeSurfer empties the parameters
+    /// (FS-37): its caller crashes there, so `OpenDFPMin` stops (larmorx's own field).
+    pub crashed: bool,
 }
 
 impl Default for FsLbfgs {
@@ -439,6 +442,7 @@ impl FsLbfgs {
             memory: 5,
             line_search_accuracy: 0.9,
             default_step_length: 1.0,
+            crashed: false,
         }
     }
 
@@ -522,21 +526,8 @@ impl FsLbfgs {
                 err: &mut *err,
             };
             let call = lbfgs(
-                n,
-                m,
-                x,
-                fv,
-                &gvec,
-                false,
-                &mut diagv,
-                iprint,
-                eps,
-                local_xtol,
-                &mut w,
-                &mut iflag,
-                &mut gl,
-                mode,
-                &mut s,
+                n, m, x, fv, &gvec, false, &mut diagv, iprint, eps, local_xtol, &mut w, &mut iflag,
+                &mut gl, mode, &mut s,
             );
             g.notices.extend(call.notices);
             self.base.num_iterations = self.base.num_iterations.wrapping_add(1);
@@ -589,6 +580,7 @@ impl FsLbfgs {
             };
             g.notices.add(&FS_37, detail);
         }
+        self.crashed = reproduce && fs_x.is_none();
         if reproduce {
             *x = fs_x.unwrap_or(start);
             self.base.end_error = fs_end;
@@ -642,7 +634,10 @@ mod tests {
         let (mut o, mut e) = (Vec::new(), Vec::new());
         let code = pw.minimize(&mut cf, &mut p, &mut xi, &mut o, &mut e);
         assert_eq!(code, ReturnCode::ConvergedFtol);
-        assert!((p[0] - 1.0).abs() < 1e-3 && (p[1] + 2.0).abs() < 1e-3, "{p:?}");
+        assert!(
+            (p[0] - 1.0).abs() < 1e-3 && (p[1] + 2.0).abs() < 1e-3,
+            "{p:?}"
+        );
         let text = String::from_utf8(o).unwrap();
         assert!(text.starts_with(
             "fs_powell::minimize\n  nparams 2\n  maxfev 2000\n  ftol   0.000000\n  linmin_xtol_   0.000100\n  powell nthiter 0: fret = 12.000000\n"
@@ -665,7 +660,10 @@ mod tests {
             let (mut o, mut e) = (Vec::new(), Vec::new());
             let ok = lb.minimize(&mut g, &mut cf, Some(&mut obs), &mut x, &mut o, &mut e);
             assert!(ok);
-            assert!((x[0] - 1.0).abs() < 1e-3 && (x[1] + 2.0).abs() < 1e-3, "{x:?}");
+            assert!(
+                (x[0] - 1.0).abs() < 1e-3 && (x[1] + 2.0).abs() < 1e-3,
+                "{x:?}"
+            );
             assert!(obs.number_of_optimal_updates > 0);
             assert_eq!(q.steps.len() as i32, obs.number_of_optimal_updates);
         }

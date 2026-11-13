@@ -416,7 +416,7 @@ impl Tinfl {
                                 [(!temp + ((self.bit_buf >> code_len) & 1) as i32) as usize]
                                 as i32;
                             code_len += 1;
-                            if !(temp < 0 && self.num_bits >= code_len + 1) {
+                            if !(temp < 0 && self.num_bits > code_len) {
                                 break;
                             }
                         }

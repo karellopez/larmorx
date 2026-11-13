@@ -285,7 +285,7 @@ fn fs284_farther_back_than_the_output() {
 fn digest_of_generated_streams() {
     let mut rng = Rng(2026);
     let mut h = 0xcbf2_9ce4_8422_2325u64;
-    let mut eat = |h: &mut u64, bytes: &[u8]| {
+    let eat = |h: &mut u64, bytes: &[u8]| {
         for &x in bytes {
             *h = (*h ^ x as u64).wrapping_mul(0x0000_0100_0000_01b3);
         }

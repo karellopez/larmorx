@@ -890,3 +890,18 @@ def test_the_clean_rooms_exporter_hides_a_refusal_of_the_replicas_presenter(monk
         afni_volreg_clean_room.present({})
     assert "label" not in str(e.value)
     assert e.value.__cause__ is None and e.value.__suppress_context__
+
+
+def test_the_clean_rooms_exporter_hides_any_failure_of_the_replicas_presenter(monkeypatch):
+    """Round 17's finding 9: a failure of another kind (a key of the replica's module, which a
+    traceback would show with its line) is hidden alike."""
+    from larmorx_validation.evidence import afni_volreg, afni_volreg_clean_room
+
+    def fail(doc):
+        return {}["('fmriprep-volreg', 'a line of the replica's module')"]
+
+    monkeypatch.setattr(afni_volreg, "present", fail)
+    with pytest.raises(RuntimeError, match="a documentation agent must look") as e:
+        afni_volreg_clean_room.present({})
+    assert "replica's module" not in str(e.value)
+    assert e.value.__cause__ is None and e.value.__suppress_context__

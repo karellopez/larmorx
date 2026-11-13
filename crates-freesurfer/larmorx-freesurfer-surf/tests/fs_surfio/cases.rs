@@ -13,7 +13,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use larmorx_core::defects::{FS_03, FS_111, UpstreamDefects};
-use larmorx_freesurfer_core::diag::DIAG_VERBOSE;
+use larmorx_freesurfer_core::diag::{DIAG_SHOW, DIAG_VERBOSE};
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::Fatal;
 use larmorx_freesurfer_core::matrix::Matrix;
@@ -26,7 +26,7 @@ use larmorx_freesurfer_surf::mrisurf;
 use larmorx_freesurfer_surf::surfbase::{self, MrisTempAssigned};
 use larmorx_freesurfer_surf::topology;
 use larmorx_freesurfer_surf::views::{self, MetricSurface, MpView};
-use larmorx_freesurfer_surf::{coords, dist};
+use larmorx_freesurfer_surf::{coords, dist, metric};
 
 pub struct Gen(u64);
 
@@ -101,10 +101,10 @@ fn ix(t: &mut Vec<String>, v: i64) {
     t.push(v.to_string());
 }
 
-const COMMANDS: [&str; 22] = [
+const COMMANDS: [&str; 23] = [
     "coord", "vnum", "nbr", "modvnum", "norm", "close", "proj", "sign", "status", "sortcmp",
     "angles", "split", "vec3", "view", "fixarea", "addcmd", "vhash", "diff", "temps", "fpv",
-    "names", "surf",
+    "names", "surf", "metric",
 ];
 
 /// A byte string's token: `h` and the bytes in hex.
@@ -424,6 +424,150 @@ fn surf_tokens(t: &mut Vec<String>, g: &mut Gen) {
     }
 }
 
+/// A small float, mostly: k/4 for k in [-400, 400] (a special one now and then), or any float;
+/// with `heavy` a NaN (of both signs, with payloads) or an infinity one time in four, so that two
+/// NaNs meet in one operation often enough to show the official build's operand order.
+fn smallish(g: &mut Gen, heavy: bool) -> u32 {
+    if heavy && g.chance(4) {
+        return g.pick(&[
+            0x7fc0_0000,
+            0xffc0_0000,
+            0x7fa0_0001,
+            0xff80_0123,
+            0x7fc0_0042,
+            0xffd0_0007,
+            0x7f80_0000,
+            0xff80_0000,
+        ]);
+    }
+    if g.chance(8) { f32bits(g) } else { small(g) }
+}
+
+/// `metric`'s case: the surface (15 coordinate sets, curvatures, areas, rip flags, neighbour
+/// lists, distances with their storage, faces), then 1 to 6 operations.
+fn metric_tokens(t: &mut Vec<String>, g: &mut Gen) {
+    let heavy = g.chance(3);
+    ix(t, i64::from(g.chance(3)));
+    ix(t, g.int(0, 3));
+    ix(t, i64::from(g.chance(4)));
+    let nv = g.int(0, 6);
+    let nf = if nv == 0 { 0 } else { g.int(0, 4) };
+    ix(t, nv);
+    ix(t, nf);
+    for _ in 0..2 {
+        // mostly a valid status (10 kinds), now and then one outside the list
+        ix(t, if g.chance(12) { g.pick(&[10, -1]) } else { g.int(0, 9) });
+    }
+    ix(t, g.int(0, 3));
+    for _ in 0..2 {
+        ix(t, g.pick(&[0, 1, 2, 3, 1, 2, 1, -1, 4]));
+    }
+    ix(t, g.pick(&[1, 2, 3, 1, 1, 0, 4]));
+    ix(t, i64::from(g.chance(4)));
+    for _ in 0..4 {
+        t.push(format!("{:08x}", smallish(g, heavy)));
+    }
+    let mut vsizes = Vec::new();
+    for _ in 0..nv {
+        for _ in 0..45 {
+            t.push(format!("{:08x}", smallish(g, heavy)));
+        }
+        for _ in 0..6 {
+            t.push(format!("{:08x}", smallish(g, heavy)));
+        }
+        ix(t, i64::from(g.chance(6)));
+        let hi = nv.min(5);
+        let (vnum, v2num, v3num, vtotal) = (g.int(0, hi), g.int(0, hi + 2), g.int(0, hi + 3), g.int(0, hi + 1));
+        let nsize_max = g.int(0, 3);
+        for v in [vnum, v2num, v3num, vtotal, nsize_max] {
+            ix(t, v);
+        }
+        let len = vnum.max(v2num).max(v3num).max(vtotal);
+        ix(t, len);
+        for _ in 0..len {
+            ix(t, g.int(0, nv - 1));
+        }
+        let count = match nsize_max {
+            1 => vnum,
+            2 => v2num,
+            3 => v3num,
+            _ => 0,
+        };
+        let vsize = count.max(vtotal);
+        vsizes.push(vsize);
+        for _ in 0..2 {
+            if g.chance(5) {
+                ix(t, -1);
+                continue;
+            }
+            let blen = (vsize + g.int(-1, 3)).max(0);
+            ix(t, blen);
+            ix(t, if g.chance(3) { blen } else { g.int(0, blen) });
+            ix(t, i64::from(!g.chance(4)));
+            for _ in 0..blen {
+                t.push(format!("{:08x}", small(g)));
+            }
+        }
+    }
+    for _ in 0..nf {
+        for _ in 0..3 {
+            ix(t, g.int(0, nv - 1));
+        }
+        t.push(format!("{:08x}", small(g)));
+        ix(t, i64::from(g.chance(5)));
+    }
+    let nops = g.int(1, 6);
+    ix(t, nops);
+    let mut ops: Vec<&str> = vec![
+        "av", "sm", "cs", "co", "sc", "kd", "ko", "vd", "vo", "vn", "pe", "ca", "cv", "zn", "ex",
+        "cc", "c2", "rc", "sk", "sh", "zm", "nc", "nv", "cp", "sH", "mm", "sx", "lx", "px", "lb",
+    ];
+    if nf > 0 {
+        ops.extend(["ar", "lo", "lt"]);
+    }
+    // FS-114's case (no vertex) seldom: the official build never returns from it (the probe's
+    // alarm ends it after 5 seconds)
+    if nv == 0 && !g.chance(10) {
+        ops.retain(|o| *o != "cs");
+    }
+    for _ in 0..nops {
+        let op = g.pick(&ops);
+        t.push(op.to_owned());
+        match op {
+            "av" | "sh" => ix(t, g.int(-1, 4)),
+            "sm" => {
+                ix(t, g.int(-1, 4));
+                let s = if g.chance(2) { g.pick(&[0.5f32, 1.0, 1.5, 0.25]).to_bits() } else { smallish(g, heavy) };
+                t.push(format!("{s:08x}"));
+            }
+            "sc" => t.push(format!("{:08x}", smallish(g, heavy))),
+            "ar" => {
+                ix(t, g.int(0, nf - 1));
+                ix(t, g.int(0, 2));
+            }
+            "lo" => ix(t, g.int(0, nf - 1)),
+            "lt" => {
+                ix(t, g.int(0, nf - 1));
+                ix(t, g.pick(&[4, 9, 7, 0, 3]));
+            }
+            "ex" => ix(t, g.pick(&[4, 10, 9, 11, 7, 5, 6, 3, 0, 8, 2, 1, 12, -1])),
+            "sk" => {
+                t.push(format!("{:08x}", smallish(g, heavy)));
+                t.push(format!("{:08x}", smallish(g, heavy)));
+            }
+            "nc" => ix(t, g.pick(&[-1, 0, 1, 1, 2])),
+            "cp" => {
+                if g.chance(3) {
+                    dx(t, g);
+                } else {
+                    t.push(format!("{:016x}", (g.int(0, 400) as f64 / 8.0).to_bits()));
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
 /// `n` case lines from `seed`, the commands in turn.
 pub fn generate(seed: u64, n: usize) -> Vec<String> {
     let mut g = Gen::new(seed);
@@ -679,6 +823,7 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
                 ix(&mut t, g.int(0, 4));
             }
             "surf" => surf_tokens(&mut t, &mut g),
+            "metric" => metric_tokens(&mut t, &mut g),
             "names" => {
                 let n = g.int(1, 5);
                 ix(&mut t, n);
@@ -1442,6 +1587,308 @@ fn surf_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
     Ok(())
 }
 
+/// The probe's `G` test: whether an operation's reads and writes stay inside what the case
+/// allocated (FreeSurfer reads and writes the distances unchecked).
+fn metric_guard(m: &Mris, op: &str) -> bool {
+    let vnum_at = |vt: &VertexTopology, n: i8| -> i32 {
+        i32::from(match n {
+            1 => vt.vnum,
+            2 => vt.v2num,
+            3 => vt.v3num,
+            _ => 0,
+        })
+    };
+    for vno in 0..m.nvertices.max(0) as usize {
+        let v = m.vertex(vno);
+        let vt = m.topology(vno);
+        if v.ripflag != 0 {
+            continue;
+        }
+        let vtotal = i32::from(vt.vtotal);
+        match op {
+            "co" if vtotal > 0 && (v.dist_orig.is_none() || v.dist_orig_capacity < vtotal) => {
+                return false;
+            }
+            "sc" => {
+                let vs = topology::vertex_vsize(m, vno);
+                if vs > 0 && (v.dist.is_none() || v.dist_capacity < vs) {
+                    return false;
+                }
+            }
+            "kd" if (1..=3).contains(&m.dist_nsize)
+                && v.dist.is_some()
+                && v.dist_capacity < vnum_at(vt, m.dist_nsize) =>
+            {
+                return false;
+            }
+            "ko" if (1..=3).contains(&m.dist_orig_nsize)
+                && v.dist_orig.is_some()
+                && v.dist_orig_capacity < vnum_at(vt, m.dist_orig_nsize) =>
+            {
+                return false;
+            }
+            "pe" if vtotal > 0
+                && ((v.dist.is_some() && v.dist_capacity < vtotal)
+                    || (v.dist_orig.is_some() && v.dist_orig_capacity < vtotal)) =>
+            {
+                return false;
+            }
+            _ => {}
+        }
+    }
+    true
+}
+
+fn dump_metric(m: &Mris, o: &mut Out) {
+    for vno in 0..m.nvertices.max(0) as usize {
+        let v = m.vertex(vno);
+        for x in [
+            v.x, v.y, v.z, v.origx, v.origy, v.origz, v.curv, v.H, v.val2, v.d, v.area, v.origarea,
+        ] {
+            o.f(x);
+        }
+        for k in 0..2 {
+            let (d, cap, st) = if k == 1 {
+                (&v.dist_orig, v.dist_orig_capacity, &m.dist_orig_storage.as_ref().unwrap()[vno])
+            } else {
+                (&v.dist, v.dist_capacity, &m.dist_storage.as_ref().unwrap()[vno])
+            };
+            o.i(i64::from(d.is_some()));
+            o.i(i64::from(d.is_some() || st.is_some()));
+            o.i(i64::from(cap));
+            if let Some(d) = d {
+                for x in &d[..cap as usize] {
+                    o.f(*x);
+                }
+            }
+        }
+    }
+    for fno in 0..m.nfaces.max(0) as usize {
+        o.f(m.face(fno).area);
+    }
+    for x in [
+        i64::from(m.dist_alloced_flags),
+        i64::from(m.dist_nsize),
+        i64::from(m.dist_orig_nsize),
+        // the enum's storage: an unsigned int
+        i64::from(m.status.0 as u32),
+        i64::from(m.origxyz_status.0 as u32),
+    ] {
+        o.i(x);
+    }
+    for x in [
+        m.max_curv, m.min_curv, m.xlo, m.ylo, m.zlo, m.xhi, m.yhi, m.zhi, m.xctr, m.yctr, m.zctr,
+    ] {
+        o.f(x);
+    }
+}
+
+fn metric_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
+    let mut pairs: Vec<(&str, &str)> = Vec::new();
+    if t.i() != 0 {
+        pairs.push(("FREESURFER_reportLogicErrors", "1"));
+    }
+    let fixes = t.i();
+    if fixes & 1 != 0 {
+        pairs.push(("FREESURFER_fix_MRISsmoothSurface1", "1"));
+    }
+    if fixes & 2 != 0 {
+        pairs.push(("FREESURFER_fix_missing_dist_orig", "1"));
+    }
+    let env = Environment::from_pairs(pairs);
+    if t.i() != 0 {
+        cx.g.gdiag |= DIAG_SHOW | DIAG_VERBOSE;
+    }
+    let (nv, nf) = (t.i(), t.i());
+    let mut m = mris_alloc(nv as usize, nf as usize);
+    m.status = MrisStatus(t.i());
+    m.origxyz_status = MrisStatus(t.i());
+    m.dist_alloced_flags = t.i() as i8;
+    m.dist_nsize = t.i() as i8;
+    m.dist_orig_nsize = t.i() as i8;
+    m.nsize = t.i() as i8;
+    m.patch = t.i();
+    (m.total_area, m.orig_area, m.max_curv, m.min_curv) = (t.f(), t.f(), t.f(), t.f());
+    for vno in 0..nv as usize {
+        {
+            let v = m.vertex_mut(vno);
+            set_coords(t, v);
+            (v.curv, v.H, v.val2, v.d, v.area, v.origarea) = (t.f(), t.f(), t.f(), t.f(), t.f(), t.f());
+            v.ripflag = t.i() as i8;
+        }
+        {
+            let vt = m.topology_mut(vno);
+            vt.vnum = t.i() as i16;
+            vt.v2num = t.i() as i16;
+            vt.v3num = t.i() as i16;
+            vt.vtotal = t.i() as i16;
+            vt.nsizeMax = t.i() as u8;
+            let len = t.i();
+            vt.v = Some((0..len).map(|_| t.i()).collect());
+        }
+        for k in 0..2 {
+            let len = t.i();
+            if len < 0 {
+                continue;
+            }
+            let (cap, valid) = (t.i(), t.i() != 0);
+            let buf: Vec<f32> = (0..len).map(|_| t.f()).collect();
+            let v = m.vertex_mut(vno);
+            let (d, c) = if k == 1 {
+                (&mut v.dist_orig, &mut v.dist_orig_capacity)
+            } else {
+                (&mut v.dist, &mut v.dist_capacity)
+            };
+            if valid {
+                *d = Some(buf);
+                *c = cap;
+            } else {
+                let st = if k == 1 {
+                    &mut m.dist_orig_storage
+                } else {
+                    &mut m.dist_storage
+                };
+                st.as_mut().unwrap()[vno] = Some(buf);
+            }
+        }
+    }
+    for fno in 0..nf as usize {
+        let f = m.face_mut(fno);
+        for k in 0..3 {
+            f.v[k] = t.i();
+        }
+        f.area = t.f();
+        f.ripflag = t.i() as i8;
+    }
+    let nops = t.i();
+    let g = &mut cx.g;
+    let mut io = coords::Io {
+        out: &mut cx.a,
+        err: &mut cx.b,
+        env: &env,
+    };
+    let nvu = nv as usize;
+    let mut saved: Option<metric::SavedXyz> = None;
+    for _ in 0..nops {
+        let op = t.next();
+        if matches!(op, "co" | "sc" | "kd" | "ko" | "pe") && !metric_guard(&m, op) {
+            o.s("G");
+            if op == "sc" {
+                t.f();
+            }
+            continue;
+        }
+        match op {
+            "av" => {
+                let n = t.i();
+                o.i(i64::from(metric::average_vertex_positions(g, &mut io, &mut m, n)?));
+            }
+            "sm" => {
+                let (n, st) = (t.i(), t.f());
+                metric::smooth_surface_positions(g, &mut io, &mut m, n, st)?;
+                // the stub's MRIScomputeMetricProperties
+                o.s("MP");
+            }
+            "cs" => metric::center_sphere(g, &mut io, &mut m)?,
+            "co" => o.i(i64::from(metric::clear_orig_distances(&mut m))),
+            "sc" => {
+                let s = t.f();
+                o.i(i64::from(metric::scale_distances(&mut m, s)));
+            }
+            "kd" => o.i(i64::from(metric::check_dist(g, &mut io, &mut m)?)),
+            "ko" => o.i(i64::from(metric::check_dist_orig(g, &mut io, &mut m)?)),
+            "vd" => o.i(i64::from(metric::compute_vertex_distances(g, &mut io, &mut m)?)),
+            "vo" => o.i(i64::from(metric::compute_original_vertex_distances(
+                g, &mut io, &mut m,
+            )?)),
+            "vn" => metric::compute_original_vertex_distances_if_necessary(g, &mut io, &mut m)?,
+            "pe" => o.d(metric::percent_distance_error(g, &mut io, &m)?),
+            "ca" => o.i(i64::from(metric::clear_orig_area(&mut m))),
+            "cv" => metric::clear_orig_area_and_val2(&mut m),
+            "ar" => {
+                let (fac, n) = (t.i() as usize, t.i() as usize);
+                o.f(metric::compute_area(&m, fac, n));
+            }
+            "zn" => o.i(i64::from(metric::zero_negative_areas(&mut m))),
+            "lo" | "lt" => {
+                let fno = t.i() as usize;
+                let u = if op == "lo" {
+                    metric::load_orig_triangle_vertices(&m, fno)
+                } else {
+                    let which = t.i();
+                    metric::load_triangle_vertices(&m, fno, which)
+                };
+                o.i(0);
+                for row in u {
+                    for x in row {
+                        o.d(x);
+                    }
+                }
+            }
+            "ex" => {
+                let which = t.i();
+                let mut loc = [vec![-7.0f32; nvu], vec![-7.0f32; nvu], vec![-7.0f32; nvu]];
+                let r = metric::extract_vertex_coords(g, &mut io, &m, &mut loc, which)?;
+                o.i(i64::from(r));
+                for a in &loc {
+                    for x in a {
+                        o.f(*x);
+                    }
+                }
+            }
+            "cc" => o.i(i64::from(metric::clear_curvature(&mut m))),
+            "c2" => metric::clear_curv_and_val2(&mut m),
+            "rc" => o.i(i64::from(metric::rectify_curvature(&mut m))),
+            "sk" => {
+                let (a, b) = (t.f(), t.f());
+                o.i(i64::from(metric::scale_curvatures(&mut m, a, b)));
+            }
+            "sh" => {
+                let n = t.i();
+                o.i(i64::from(metric::smooth_curvatures(&mut m, n)));
+            }
+            "zm" => o.i(i64::from(metric::zero_mean_curvature(g, &mut io, &mut m))),
+            "nc" => {
+                let w = t.i();
+                if w == metric::NORM_MEDIAN && nv == 0 {
+                    o.s("G");
+                    continue;
+                }
+                o.i(i64::from(metric::normalize_curvature(&mut io, &mut m, w)));
+            }
+            "nv" => o.i(i64::from(metric::normalize_curvature_variance(g, &mut io, &mut m))),
+            "cp" => {
+                let d = t.d();
+                o.i(i64::from(metric::count_compressed(&m, d)));
+            }
+            "sH" => o.i(i64::from(metric::store_mean_curvature(&mut m))),
+            "mm" => o.i(i64::from(metric::compute_curvature_min_max(&mut m))),
+            "sx" => saved = Some(metric::save_xyz(&m)),
+            "lx" => match &saved {
+                Some(sv) => metric::load_xyz(g, &mut io, &mut m, sv)?,
+                None => o.s("N"),
+            },
+            "px" => {
+                if saved.is_some() {
+                    metric::pop_xyz(g, &mut io, &mut m, &mut saved)?;
+                } else {
+                    o.s("N");
+                }
+                o.i(i64::from(saved.is_some()));
+            }
+            "lb" => {
+                let b = mris_alloc(nvu + 1, 0);
+                let sb = metric::save_xyz(&b);
+                metric::load_xyz(g, &mut io, &mut m, &sb)?;
+            }
+            op => panic!("metric op {op}"),
+        }
+    }
+    o.0 += "| ";
+    dump_metric(&m, o);
+    Ok(())
+}
+
 fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
     let cmd = t.next();
     match cmd {
@@ -1736,6 +2183,7 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
             }
         }
         "surf" => surf_case(cx, t, o)?,
+        "metric" => metric_case(cx, t, o)?,
         "names" => {
             let n = t.i();
             for _ in 0..n {

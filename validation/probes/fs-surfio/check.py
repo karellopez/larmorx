@@ -6,7 +6,8 @@ is a black-box run of FreeSurfer's code).
 
 Generates seeded cases with larmorx-freesurfer-surf's example ``fs_surfio_probe``, runs them
 through ``fssurfio`` (``build.sh``: FreeSurfer's surface structure helpers and views from the unit
-oracle's build, linked as the official programs are) by the oracle-output cache at one thread, runs
+oracle's build, linked as the official programs are; ``metric``'s cases through ``fssurfio-mpstub``,
+whose ``MRIScomputeMetricProperties`` is a stub) by the oracle-output cache at one thread, runs
 the port on the same cases with ``--upstream-defects`` ``reproduce`` and ``fix``, and compares the
 lines (the result and the text FreeSurfer's code printed): ``reproduce`` must give FreeSurfer's on
 every case (``SKIP`` lists the defects whose cases are counted, not compared: none); ``fix`` may
@@ -16,7 +17,7 @@ rotation names nothing, as every FreeSurfer computation that takes ``larmorx_cor
 quiet choice; counted as ``fix_libm``). Prints the counts and the hash the port's recorded test
 checks (``tests/fs_surfio_official.rs``).
 
-    python -P validation/probes/fs-surfio/check.py --seed 1 --n 660 [--json out.json]
+    python -P validation/probes/fs-surfio/check.py --seed 1 --n 690 [--json out.json]
 """
 
 from __future__ import annotations
@@ -38,11 +39,15 @@ from larmorx_validation import oracle_cache  # noqa: E402
 from larmorx_validation.oracle_cache.store import workspace  # noqa: E402
 
 SKIP: tuple[str, ...] = ()
-SKIP_WHEN_REFUSED: tuple[str, ...] = ()
+SKIP_WHEN_REFUSED: tuple[str, ...] = ("FS-114",)
 
 
-def probe_binary(ws: Path) -> Path:
-    exe = ws / "oracles" / "freesurfer-8.2.0-probes" / "fs-surfio" / "fssurfio"
+# the commands whose cases run on fssurfio-mpstub (MRIScomputeMetricProperties a stub)
+STUB_COMMANDS = ("metric",)
+
+
+def probe_binary(ws: Path, name: str = "fssurfio") -> Path:
+    exe = ws / "oracles" / "freesurfer-8.2.0-probes" / "fs-surfio" / name
     if not exe.is_file():
         raise SystemExit(f"no {exe}: run validation/probes/fs-surfio/build.sh first")
     return exe
@@ -82,6 +87,7 @@ def main(argv: list[str] | None = None) -> int:
     if ws is None:
         raise SystemExit("no workspace with oracles/")
     exe = probe_binary(ws)
+    stub = probe_binary(ws, "fssurfio-mpstub")
     port = port_binary(a.jobs)
     inputs = ws / "oracles" / "inputs" / "fs-surfio"
     inputs.mkdir(parents=True, exist_ok=True)
@@ -92,16 +98,30 @@ def main(argv: list[str] | None = None) -> int:
     cases_path.write_text(text, encoding="utf-8")
     cases = text.splitlines()
     env = {"PATH": "/usr/bin:/bin", "LC_ALL": "C", "LANG": "C", "OMP_NUM_THREADS": "1"}
-    done = oracle_cache.run(
-        [exe, cases_path],
-        env=env,
-        policy=oracle_cache.Policy(threads=1, family="freesurfer"),
-        timeout=3600,
-        runner="fs-surfio-probe",
-    )
-    if done.returncode != 0:
-        raise SystemExit(f"fssurfio failed ({done.returncode}): {done.stderr[-2000:]}")
-    official = done.stdout.splitlines()
+    official: list[str] = [""] * len(cases)
+    served = []
+    for binary, on_stub in ((exe, False), (stub, True)):
+        idx = [i for i, c in enumerate(cases) if (c.split()[0] in STUB_COMMANDS) == on_stub]
+        if not idx:
+            continue
+        part = cases_path if not on_stub and len(idx) == len(cases) else None
+        if part is None:
+            part = inputs / f"cases-{a.seed}-{a.n}-{binary.name}.txt"
+            part.write_text("".join(cases[i] + "\n" for i in idx), encoding="utf-8")
+        done = oracle_cache.run(
+            [binary, part],
+            env=env,
+            policy=oracle_cache.Policy(threads=1, family="freesurfer"),
+            timeout=3600,
+            runner="fs-surfio-probe",
+        )
+        if done.returncode != 0:
+            raise SystemExit(f"{binary.name} failed ({done.returncode}): {done.stderr[-2000:]}")
+        lines = done.stdout.splitlines()
+        assert len(lines) == len(idx), (binary.name, len(lines), len(idx))
+        for i, line in zip(idx, lines, strict=True):
+            official[i] = line
+        served.append(done.cached)
 
     def port_lines(mode: str) -> list[tuple[str, list[str]]]:
         out = subprocess.run(
@@ -147,7 +167,7 @@ def main(argv: list[str] | None = None) -> int:
     summary = {
         "seed": a.seed,
         "cases": len(cases),
-        "served": done.cached,
+        "served": served,
         "reproduce_equal": sum(equal.values()),
         "reproduce_differ": dict(differ),
         "skipped": dict(skipped),

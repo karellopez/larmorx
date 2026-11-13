@@ -1125,6 +1125,8 @@ defects! {
         "adding a command line to a surface that already holds 1,000 prints an error and then stores the line past the end of the list, over the count of lines, which becomes a memory address";
     FS_113 = "FS-113", "FreeSurfer", true,
         "scaling a surface by a negative factor (and the scale-then-translate operation with a negative factor) leaves its bounding box upside down: the low end above the high end";
+    FS_114 = "FS-114", "FreeSurfer", true,
+        "centring a spherical surface that has no vertex never returns: the search for its centre keeps halving its step without end";
 }
 
 /// The register entry with ID `id`.

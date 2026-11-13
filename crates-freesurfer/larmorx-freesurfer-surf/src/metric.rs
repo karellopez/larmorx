@@ -38,7 +38,8 @@
 
 use larmorx_freesurfer_core::diag::{self, DIAG_SHOW, DIAG_VERBOSE};
 use larmorx_freesurfer_core::globals::Globals;
-use larmorx_freesurfer_core::log::{self, ERROR_UNSUPPORTED, Fatal};
+use larmorx_core::defects::FS_114;
+use larmorx_freesurfer_core::log::{self, ERROR_BADPARM, ERROR_UNSUPPORTED, Fatal};
 use larmorx_freesurfer_core::matrix_ops::{xyz_approx_angle_known_length, xyz_normalized_load};
 use larmorx_freesurfer_core::sse;
 use larmorx_freesurfer_core::utils::{LogicProblemResponse, cope_with_logic_problem2};
@@ -120,8 +121,15 @@ fn average_wkr_part1(
             } else {
                 (0.0f32, 0.0f32, 0.0f32, 0i32)
             };
-            if mris.vertex(vno).ripflag == 0 {
-                let vnum = usize::try_from(mris.topology(vno).vnum).unwrap_or(0);
+            let vnum = usize::try_from(mris.topology(vno).vnum).unwrap_or(0);
+            let ripped = mris.vertex(vno).ripflag != 0;
+            if include_center && (ripped || vnum == 0) {
+                // the official build stores the vertex's own position undivided here (its count
+                // is known to be 1): a signalling NaN stays unquieted
+                (qx[vno], qy[vno], qz[vno]) = (x, y, z);
+                continue;
+            }
+            if !ripped {
                 for k in 0..vnum {
                     let vno2 = nbr(mris, vno, k);
                     if mris.vertex(vno2).ripflag != 0 {
@@ -140,9 +148,10 @@ fn average_wkr_part1(
             if scale == 1.0 {
                 (qx[vno], qy[vno], qz[vno]) = (x, y, z);
             } else {
-                qx[vno] = sse::add(px[vno], sse::mul(scale, sse::sub(x, px[vno])));
-                qy[vno] = sse::add(py[vno], sse::mul(scale, sse::sub(y, py[vno])));
-                qz[vno] = sse::add(pz[vno], sse::mul(scale, sse::sub(z, pz[vno])));
+                // `p + scale * (x - p)` as `(x - p) * scale + p`
+                qx[vno] = sse::add(sse::mul(sse::sub(x, px[vno]), scale), px[vno]);
+                qy[vno] = sse::add(sse::mul(sse::sub(y, py[vno]), scale), py[vno]);
+                qz[vno] = sse::add(sse::mul(sse::sub(z, pz[vno]), scale), pz[vno]);
             }
         }
         std::mem::swap(&mut px, &mut qx);
@@ -203,15 +212,20 @@ fn sqr(x: f64) -> f64 {
     sse::mul64(x, x)
 }
 
-/// `SQR(x - cx) + SQR(y - cy) + SQR(z - cz)` of a vertex (in `double`).
-fn r2_of(x: f32, y: f32, z: f32, cx: f64, cy: f64, cz: f64) -> f64 {
-    sse::add64(
-        sse::add64(
-            sqr(sse::sub64(f64::from(x), cx)),
-            sqr(sse::sub64(f64::from(y), cy)),
-        ),
-        sqr(sse::sub64(f64::from(z), cz)),
-    )
+/// `SQR(x - cx) + SQR(y - cy) + SQR(z - cz)` of a vertex (in `double`): `(x² + y²) + z²`, or with
+/// `y_first` `(y² + x²) + z²` (the official build's order in `estimateNRG`'s inlined copies).
+#[allow(clippy::too_many_arguments)]
+fn r2_of(x: f32, y: f32, z: f32, cx: f64, cy: f64, cz: f64, y_first: bool) -> f64 {
+    let (a, b) = (
+        sqr(sse::sub64(f64::from(x), cx)),
+        sqr(sse::sub64(f64::from(y), cy)),
+    );
+    let ab = if y_first {
+        sse::add64(b, a)
+    } else {
+        sse::add64(a, b)
+    };
+    sse::add64(ab, sqr(sse::sub64(f64::from(z), cz)))
 }
 
 /// `estimateNRG(mris, cx, cy, cz, R2)`: `sum((|v - c|² - R2)²)` over every vertex.
@@ -219,7 +233,8 @@ fn estimate_nrg(mris: &Mris, cx: f64, cy: f64, cz: f64, r2: f64) -> f64 {
     let mut nrg = 0.0f64;
     for vno in 0..nverts(mris) {
         let v = mris.vertex(vno);
-        nrg = sse::add64(nrg, sqr(sse::sub64(r2_of(v.x, v.y, v.z, cx, cy, cz), r2)));
+        let e = sse::sub64(r2_of(v.x, v.y, v.z, cx, cy, cz, true), r2);
+        nrg = sse::add64(nrg, sqr(e));
     }
     nrg
 }
@@ -229,19 +244,20 @@ fn estimate_squared_radius(mris: &Mris, cx: f64, cy: f64, cz: f64) -> f64 {
     let mut r2 = 0.0f64;
     for vno in 0..nverts(mris) {
         let v = mris.vertex(vno);
-        r2 = sse::add64(r2, r2_of(v.x, v.y, v.z, cx, cy, cz));
+        r2 = sse::add64(r2, r2_of(v.x, v.y, v.z, cx, cy, cz, false));
     }
     sse::div64(r2, f64::from(mris.nvertices))
 }
 
-/// `computeGradient(mris, cx, cy, cz, R2, ...)`: the mean of `(|v - c|² - R2) (v - c)`.
+/// `computeGradient(mris, cx, cy, cz, R2, ...)`: the mean of `(|v - c|² - R2) (v - c)` (the
+/// products `dx e`, `dy e`, `e dz` in the official build's order).
 fn compute_gradient(mris: &Mris, cx: f64, cy: f64, cz: f64, r2: f64) -> (f64, f64, f64) {
     let (mut tx, mut ty, mut tz) = (0.0f64, 0.0f64, 0.0f64);
     for vno in 0..nverts(mris) {
         let v = mris.vertex(vno);
-        let e = sse::sub64(r2_of(v.x, v.y, v.z, cx, cy, cz), r2);
-        tx = sse::add64(tx, sse::mul64(e, sse::sub64(f64::from(v.x), cx)));
-        ty = sse::add64(ty, sse::mul64(e, sse::sub64(f64::from(v.y), cy)));
+        let e = sse::sub64(r2_of(v.x, v.y, v.z, cx, cy, cz, false), r2);
+        tx = sse::add64(tx, sse::mul64(sse::sub64(f64::from(v.x), cx), e));
+        ty = sse::add64(ty, sse::mul64(sse::sub64(f64::from(v.y), cy), e));
         tz = sse::add64(tz, sse::mul64(e, sse::sub64(f64::from(v.z), cz)));
     }
     let n = f64::from(mris.nvertices);
@@ -256,12 +272,27 @@ fn compute_gradient(mris: &Mris, cx: f64, cy: f64, cz: f64, r2: f64) -> (f64, f6
 /// falls or the step is below 1e-11); then every vertex moved to `100 / sqrt(R2) (v - c)` and
 /// scaled twice onto the sphere of radius 100 (`DEFAULT_RADIUS / sqrt(x² + y² + z²)`, the squares
 /// in `float`); `done\nSurface centered at (0,0,0) with radius 100.0 in <n> iterations` on
-/// standard error.
-pub fn center_sphere(io: &mut Io, mris: &mut Mris) {
+/// standard error. A surface with no vertex: FreeSurfer's search never ends (its energy is 0, its
+/// gradient `0 / 0`); here, in both modes, the error `MRIScenterSphere: the surface has no
+/// vertex, so it has no centre` (code -4) after the first message (FS-114, rule B).
+pub fn center_sphere(g: &mut Globals, io: &mut Io, mris: &mut Mris) -> Result<(), Fatal> {
     let _ = write!(
         io.err,
         "Finding true center and radius of Spherical Surface..."
     );
+    if mris.nvertices <= 0 {
+        g.notices.add(
+            &FS_114,
+            "a surface without vertices is refused: the original's search for its centre never ends",
+        );
+        log::error_exit(
+            g,
+            io.err,
+            ERROR_BADPARM,
+            "MRIScenterSphere: the surface has no vertex, so it has no centre",
+        )?;
+        return Ok(());
+    }
     let (mut xhi, mut yhi, mut zhi) = (-10000.0f64, -10000.0f64, -10000.0f64);
     let (mut xlo, mut ylo, mut zlo) = (10000.0f64, 10000.0f64, 10000.0f64);
     for vno in 0..nverts(mris) {
@@ -318,10 +349,11 @@ pub fn center_sphere(io: &mut Io, mris: &mut Mris) {
         let mut epsilon = 2.0f64;
         while nrg >= last_nrg {
             epsilon /= 2.0;
+            // `x + epsilon * dx` as `dx * epsilon + x`
             let (ex, ey, ez) = (
-                sse::add64(x, sse::mul64(epsilon, dx)),
-                sse::add64(y, sse::mul64(epsilon, dy)),
-                sse::add64(z, sse::mul64(epsilon, dz)),
+                sse::add64(sse::mul64(dx, epsilon), x),
+                sse::add64(sse::mul64(dy, epsilon), y),
+                sse::add64(sse::mul64(dz, epsilon), z),
             );
             nrg = estimate_nrg(mris, ex, ey, ez, estimate_squared_radius(mris, ex, ey, ez));
             d = sse::sqrt64(sse::add64(sse::add64(sqr(dx), sqr(dy)), sqr(dz)));
@@ -330,9 +362,9 @@ pub fn center_sphere(io: &mut Io, mris: &mut Mris) {
             }
         }
         if nrg < last_nrg {
-            x = sse::add64(x, sse::mul64(epsilon, dx));
-            y = sse::add64(y, sse::mul64(epsilon, dy));
-            z = sse::add64(z, sse::mul64(epsilon, dz));
+            x = sse::add64(sse::mul64(dx, epsilon), x);
+            y = sse::add64(sse::mul64(dy, epsilon), y);
+            z = sse::add64(sse::mul64(dz, epsilon), z);
             r2 = estimate_squared_radius(mris, x, y, z);
         } else {
             nrg = estimate_nrg(mris, x, y, z, r2);
@@ -342,15 +374,17 @@ pub fn center_sphere(io: &mut Io, mris: &mut Mris) {
     let scale = sse::sqrt64(sse::div64(sqr(radius), r2));
     for vno in 0..nverts(mris) {
         let v = mris.vertex_mut(vno);
-        v.x = sse::add64(0.0, sse::mul64(scale, sse::sub64(f64::from(v.x), x))) as f32;
-        v.y = sse::add64(0.0, sse::mul64(scale, sse::sub64(f64::from(v.y), y))) as f32;
-        v.z = sse::add64(0.0, sse::mul64(scale, sse::sub64(f64::from(v.z), z))) as f32;
+        // `cx + scale * (v - x)` as `(v - x) * scale + cx`
+        v.x = sse::add64(sse::mul64(sse::sub64(f64::from(v.x), x), scale), 0.0) as f32;
+        v.y = sse::add64(sse::mul64(sse::sub64(f64::from(v.y), y), scale), 0.0) as f32;
+        v.z = sse::add64(sse::mul64(sse::sub64(f64::from(v.z), z), scale), 0.0) as f32;
     }
     for vno in 0..nverts(mris) {
         let v = mris.vertex_mut(vno);
         for _ in 0..2 {
+            // `SQR(x) + SQR(y) + SQR(z)` in float as `(y² + x²) + z²`
             let r2 = f64::from(sse::add(
-                sse::add(sse::mul(v.x, v.x), sse::mul(v.y, v.y)),
+                sse::add(sse::mul(v.y, v.y), sse::mul(v.x, v.x)),
                 sse::mul(v.z, v.z),
             ));
             let scale = sse::div64(f64::from(DEFAULT_RADIUS), sse::sqrt64(r2));
@@ -363,6 +397,7 @@ pub fn center_sphere(io: &mut Io, mris: &mut Mris) {
         io.err,
         "done\nSurface centered at (0,0,0) with radius 100.0 in {niters} iterations"
     );
+    Ok(())
 }
 
 // ---- the distances -----------------------------------------------------------------------------
@@ -431,7 +466,7 @@ struct PerVertexInfo {
 /// `1..=3` fails a `cheapAssert` (lines 15, 16; FS-03). For each unripped vertex, its distance to
 /// each of its first `vtotal` neighbours (`check`: of its first `VERTEXvnum(vt, new_dist_nsize)`,
 /// and only where the distances exist): with the plane formula `sqrt(xd² + yd² + zd²)` (in
-/// `float`; the square root as `sqrt`'s, rounded to `float`); with the sphere's formula (a
+/// `float`); with the sphere's formula (a
 /// spherical status) the angle `|XYZApproxAngle_knownLength|` between the two position vectors
 /// times the vertex's own radius, 0 where the neighbour is ripped or at the origin. `check`
 /// compares with the stored distances instead of storing them. When no unripped vertex has a
@@ -527,11 +562,15 @@ pub fn compute_vertex_distances_wkr(
                 for k in 0..total {
                     let [nx, ny, nz] = pos(mris, nbr(mris, vno, k));
                     let (xd, yd, zd) = (sse::sub(vx, nx), sse::sub(vy, ny), sse::sub(vz, nz));
-                    let d = sse::add(
-                        sse::add(sse::mul(xd, xd), sse::mul(yd, yd)),
-                        sse::mul(zd, zd),
-                    );
-                    ds.push(sse::sqrt64(f64::from(d)) as f32);
+                    // `xd*xd + yd*yd + zd*zd` as the official build sums it: `zd² + (yd² + xd²)`
+                    // where it stores, `zd² + (xd² + yd²)` where it checks; `sqrtss`
+                    let (x2, y2, z2) = (sse::mul(xd, xd), sse::mul(yd, yd), sse::mul(zd, zd));
+                    let d = if check {
+                        sse::add(z2, sse::add(x2, y2))
+                    } else {
+                        sse::add(z2, sse::add(y2, x2))
+                    };
+                    ds.push(sse::sqrt(d));
                 }
                 store_or_check(mris, vno, orig, check, &ds, &mut errors);
             }
@@ -733,7 +772,7 @@ pub fn percent_distance_error(
     } else {
         for (ok, line, tst) in [
             (f64::from(mris.total_area) > 0.0, 1682, "mris->total_area > 0.0"),
-            (f64::from(mris.orig_area) > 0.0, 1683, "mris->orig_area  > 0.0"),
+            (f64::from(mris.orig_area) > 0.0, 1683, "mris->orig_area > 0.0"),
         ] {
             if !ok {
                 return Err(diag::assert_failed(
@@ -746,7 +785,8 @@ pub fn percent_distance_error(
                 ));
             }
         }
-        sse::sqrt64(f64::from(sse::div(mris.orig_area, mris.total_area)))
+        // in float (`sqrtss`), then widened
+        f64::from(sse::sqrt(sse::div(mris.orig_area, mris.total_area)))
     };
     let (mut mean_dist, mut mean_odist, mut mean_error, mut pct) = (0.0f64, 0.0, 0.0, 0.0);
     let mut nnbrs = 0i32;
@@ -769,7 +809,8 @@ pub fn percent_distance_error(
             mean_dist = sse::add64(mean_dist, dist);
             mean_odist = sse::add64(mean_odist, odist);
             let e = sse::sub64(dist, odist).abs();
-            mean_error = sse::add64(mean_error, e);
+            // `mean_error += fabs(...)` as `fabs(...) + mean_error`
+            mean_error = sse::add64(e, mean_error);
             if !fzero(odist) {
                 pct = sse::add64(pct, sse::div64(e, odist));
             }
@@ -845,22 +886,20 @@ pub fn compute_area(mris: &Mris, fac: usize, n: usize) -> f32 {
         sse::sub(p1[1], p[1]),
         sse::sub(p1[2], p[2]),
     ];
-    let d1 = sse::add(sse::mul(-v1[1], v0[2]), sse::mul(v0[1], v1[2]));
-    let d2 = sse::sub(sse::mul(v1[0], v0[2]), sse::mul(v0[0], v1[2]));
-    let d3 = sse::add(sse::mul(-v1[0], v0[1]), sse::mul(v0[0], v1[1]));
+    // the official build's form: `-a*b + c*d` as `c*d - a*b`, the products' operands swapped
+    // where GCC swapped them (`v1[0]*v0[2]` as `v0[2]*v1[0]`, `y*d2` as `d2*y`, `z*d3` as `d3*z`)
+    let d1 = sse::sub(sse::mul(v0[1], v1[2]), sse::mul(v1[1], v0[2]));
+    let d2 = sse::sub(sse::mul(v0[2], v1[0]), sse::mul(v1[2], v0[0]));
+    let d3 = sse::sub(sse::mul(v0[0], v1[1]), sse::mul(v1[0], v0[1]));
     let dot = sse::add(
-        sse::add(sse::mul(p[0], d1), sse::mul(p[1], d2)),
-        sse::mul(p[2], d3),
+        sse::add(sse::mul(p[0], d1), sse::mul(d2, p[1])),
+        sse::mul(d3, p[2]),
     );
-    let len = sse::sqrt64(f64::from(sse::add(
+    let len = sse::sqrt(sse::add(
         sse::add(sse::mul(d1, d1), sse::mul(d2, d2)),
         sse::mul(d3, d3),
-    )));
-    if dot < 0.0 {
-        (-len) as f32
-    } else {
-        len as f32
-    }
+    ));
+    if dot < 0.0 { -len } else { len }
 }
 
 /// `MRISzeroNegativeAreas(mris)`: every unripped vertex's and face's negative area 0. Returns

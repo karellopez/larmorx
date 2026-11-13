@@ -6,7 +6,8 @@
 # is. The unit oracle must be built first (validation/investigations/freesurfer-unit-oracle,
 # build.py all). The headers' __FILE__ (cheapAssert's messages in mrisurf.h) is mapped to the
 # official build's source folder, read from the unit oracle's library, as the unit oracle maps its
-# own. Output: <workspace>/oracles/freesurfer-8.2.0-probes/fs-surfio/fssurfio.
+# own. Output: <workspace>/oracles/freesurfer-8.2.0-probes/fs-surfio/fssurfio and fssurfio-mpstub
+# (MRIScomputeMetricProperties replaced by the probe's stub, for MRISsmoothSurface).
 #
 #   validation/probes/fs.surfio/build.sh [<workspace>]
 set -euo pipefail
@@ -30,17 +31,24 @@ flags=(-DHAVE_OPENGL -DHAVE_OPENMP -DHAVE_ZLIB -DITK_USE_SYSTEM_ZLIB -DLinux -DU
   -Wno-cpp -Wno-restrict -Wno-format-overflow -Wno-sign-compare -Wno-unused-result
   -Wno-unused-parameter -Wno-bool-compare -Wno-unused-but-set-variable -fPIC -fdata-sections
   -ffunction-sections -O3 -DNDEBUG -std=c++11 "-fmacro-prefix-map=$s=$official")
-"$gcc" "${flags[@]}" -c "$here/fssurfio.cpp" -o "$out/fssurfio.o"
 libs=("$b/utils/libutils.a")
 for p in jpeg/libjpeg tiff/libtiff xml2/libxml2 minc/libminc netcdf/libnetcdf nrrdio/libnrrdio \
   dicom/libdicom cephes/libcephes nifti/libnifti dcm2niix/libdcm2niixfs gifti/libgifti expat/libexpat; do
   libs+=("$b/packages/$p.a")
 done
 for l in vnl_algo vnl v3p_netlib netlib vcl; do libs+=("$itk/lib/libitk$l-4.13.a"); done
-"$gcc" -fopenmp -fdata-sections -ffunction-sections -Wl,--gc-sections -O3 "$out/fssurfio.o" -o "$out/fssurfio" \
-  "${libs[@]}" /usr/lib/x86_64-linux-gnu/libz.so -lm \
-  "$ws/oracles/toolchains/gcc-8.4-ubuntu/usr/lib/gcc/x86_64-linux-gnu/8/libgomp.so" \
-  /lib/x86_64-linux-gnu/libpthread.a -lcrypt -lrt
-sha256sum "$out/fssurfio" "$here/fssurfio.cpp" > "$out/BUILD_INFO.txt"
+# fssurfio, and fssurfio-mpstub: the same probe with a stub MRIScomputeMetricProperties that the
+# library's own calls reach (its definition first, --allow-multiple-definition)
+for variant in fssurfio fssurfio-mpstub; do
+  extra=()
+  link=()
+  if [ "$variant" = fssurfio-mpstub ]; then extra=(-DPROBE_MP_STUB); link=(-Wl,--allow-multiple-definition); fi
+  "$gcc" "${flags[@]}" "${extra[@]}" -c "$here/fssurfio.cpp" -o "$out/$variant.o"
+  "$gcc" -fopenmp -fdata-sections -ffunction-sections -Wl,--gc-sections "${link[@]}" -O3 "$out/$variant.o" \
+    -o "$out/$variant" "${libs[@]}" /usr/lib/x86_64-linux-gnu/libz.so -lm \
+    "$ws/oracles/toolchains/gcc-8.4-ubuntu/usr/lib/gcc/x86_64-linux-gnu/8/libgomp.so" \
+    /lib/x86_64-linux-gnu/libpthread.a -lcrypt -lrt
+done
+sha256sum "$out/fssurfio" "$out/fssurfio-mpstub" "$here/fssurfio.cpp" > "$out/BUILD_INFO.txt"
 "$gcc" --version | head -1 >> "$out/BUILD_INFO.txt"
-echo "built $out/fssurfio"
+echo "built $out/fssurfio and $out/fssurfio-mpstub"

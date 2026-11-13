@@ -8,86 +8,18 @@
 //! it (`<result> | x<standard output> x<standard error>`); each line runs on a process state of
 //! its own (the probe's child process), `LARMORX_UPSTREAM_DEFECTS` chooses the mode, and the
 //! notices of the defects a line met are added to its standard error (`upstream defect ...`).
+//!
+//! The commands are the crate's own test module `crates/larmorx-fs-core/tests/maths_cmd/`, which
+//! the golden cases run too.
 
-mod args;
-mod hist;
-mod mat;
-mod mini;
+#[path = "../../../../../crates/larmorx-fs-core/tests/maths_cmd/mod.rs"]
+mod maths_cmd;
 
 use std::io::Write;
 use std::process::ExitCode;
-use std::sync::{Arc, Mutex};
 
 use larmorx_core::defects::UpstreamDefects;
-use larmorx_fs_core::{Environment, Process, Stop};
-
-pub use args::Line;
-
-/// A stream that keeps what is written.
-#[derive(Clone, Default)]
-struct Buf(Arc<Mutex<Vec<u8>>>);
-
-impl Write for Buf {
-    fn write(&mut self, b: &[u8]) -> std::io::Result<usize> {
-        self.0.lock().expect("buffer").extend_from_slice(b);
-        Ok(b.len())
-    }
-    fn flush(&mut self) -> std::io::Result<()> {
-        Ok(())
-    }
-}
-
-fn hexbytes(b: &[u8]) -> String {
-    let mut o = String::with_capacity(1 + 2 * b.len());
-    o.push('x');
-    for x in b {
-        o.push_str(&format!("{x:02x}"));
-    }
-    o
-}
-
-/// One call: the command's printed values, or the end of the program.
-fn call(p: &mut Process, l: &mut Line) -> Result<(), Stop> {
-    let c = l.tok().to_owned();
-    if hist::call(p, l, &c)? || mat::call(p, l, &c)? || mini::call(p, l, &c)? {
-        return Ok(());
-    }
-    eprintln!("candidate: unknown command {c}");
-    Err(Stop::Exit(3))
-}
-
-fn run_line(toks: &[String], mode: UpstreamDefects, env: &Environment) -> String {
-    let mut first = 0;
-    let mut gdiag = 0u64;
-    while first < toks.len() {
-        let t = &toks[first];
-        if t.starts_with('@') {
-        } else if let Some(h) = t.strip_prefix("+gdiag=") {
-            gdiag = u64::from_str_radix(h, 16).unwrap_or(0);
-        } else {
-            break;
-        }
-        first += 1;
-    }
-    let (o, e) = (Buf::default(), Buf::default());
-    let mut p = Process::new(env.clone(), mode, Box::new(o.clone()), Box::new(e.clone()));
-    p.gdiag = gdiag;
-    let mut l = Line::new(toks[first..].to_vec());
-    let r = call(&mut p, &mut l);
-    p.flush();
-    let res = match r {
-        Ok(()) => l.result(),
-        Err(s) => format!("EXIT {}", s.status()),
-    };
-    let notices = p.take_notices();
-    let mut err = e.0.lock().expect("buffer").clone();
-    for n in notices.as_slice() {
-        err.extend_from_slice(n.line().as_bytes());
-        err.push(b'\n');
-    }
-    let out = o.0.lock().expect("buffer").clone();
-    format!("{res} | {} {}", hexbytes(&out), hexbytes(&err))
-}
+use larmorx_fs_core::Environment;
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().collect();
@@ -119,7 +51,7 @@ fn main() -> ExitCode {
             let _ = writeln!(out);
             continue;
         }
-        let _ = writeln!(out, "{}", run_line(&toks, mode, &env));
+        let _ = writeln!(out, "{}", maths_cmd::run_line(&toks, mode, &env));
     }
     let _ = out.flush();
     ExitCode::SUCCESS

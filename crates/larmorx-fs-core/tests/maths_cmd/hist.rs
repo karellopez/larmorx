@@ -5,7 +5,7 @@ use larmorx_fs_core::maths::histo::{Histogram, Histogram2d};
 use larmorx_fs_core::maths::{Output, Returned};
 use larmorx_fs_core::{Process, Stop};
 
-use crate::args::{Line, Out};
+use super::args::{Line, Out};
 
 fn slurp(path: &str) -> Option<Vec<u8>> {
     std::fs::read(path).ok()
@@ -13,7 +13,7 @@ fn slurp(path: &str) -> Option<Vec<u8>> {
 
 fn putfile(l: &mut Line, path: &str) {
     match slurp(path) {
-        Some(b) => l.out(crate::hexbytes(&b)),
+        Some(b) => l.out(super::hexbytes(&b)),
         None => l.out("nofile"),
     }
 }

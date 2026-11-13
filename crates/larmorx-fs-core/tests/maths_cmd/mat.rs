@@ -11,7 +11,7 @@ use larmorx_fs_core::maths::{Output, Returned};
 use larmorx_fs_core::numbers::ListStats;
 use larmorx_fs_core::{Process, Stop};
 
-use crate::args::{Line, Out};
+use super::args::{Line, Out};
 
 /// A product's output resolved (`self`/`other`: the input copied first, the matrix itself the
 /// output), then printed as the probe prints it: result, O, then each input that is not O.
@@ -607,7 +607,7 @@ pub fn call(p: &mut Process, l: &mut Line, c: &str) -> Result<bool, Stop> {
                 p.matrix_write_into(&a)
             };
             l.puti(0);
-            l.out(crate::hexbytes(&b));
+            l.out(super::hexbytes(&b));
         }
         "mwritetxt" => {
             let name = l.getx();
@@ -617,7 +617,7 @@ pub fn call(p: &mut Process, l: &mut Line, c: &str) -> Result<bool, Stop> {
             let v = p.matrix_write_txt(&name, &a);
             l.puti(i64::from(v));
             match std::fs::read(&path) {
-                Ok(b) => l.out(crate::hexbytes(&b)),
+                Ok(b) => l.out(super::hexbytes(&b)),
                 Err(_) => l.out("nofile"),
             }
             let _ = std::fs::remove_file(&path);
@@ -632,10 +632,10 @@ pub fn call(p: &mut Process, l: &mut Line, c: &str) -> Result<bool, Stop> {
             l.puti(i64::from(r.code));
         }
         "rfinit" => {
-            let seed = crate::args::strtoul10(l.tok());
+            let seed = super::args::strtoul10(l.tok());
             let mut r = p.rf_spec_init(seed);
             match &r.name {
-                Some(n) => l.out(crate::hexbytes(n)),
+                Some(n) => l.out(super::hexbytes(n)),
                 None => l.out("null"),
             }
             l.puti(i64::from(r.code));
@@ -643,7 +643,7 @@ pub fn call(p: &mut Process, l: &mut Line, c: &str) -> Result<bool, Stop> {
             l.putd(r.mean);
             l.putd(r.stddev);
             l.puti(r.seed as i64);
-            let s2 = crate::args::strtoul10(l.tok());
+            let s2 = super::args::strtoul10(l.tok());
             let v = p.rf_spec_set_seed(&mut r, s2);
             l.puti(i64::from(v));
             l.puti(r.seed as i64);

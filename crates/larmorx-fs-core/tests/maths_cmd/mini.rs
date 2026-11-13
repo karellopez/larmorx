@@ -12,7 +12,7 @@ use larmorx_fs_core::process::DIAG_VERBOSE;
 use larmorx_fs_core::sse::{add32, div32, mul32, sub32};
 use larmorx_fs_core::{Process, Stop};
 
-use crate::args::Line;
+use super::args::Line;
 
 /// A test cost (`<kind> <n> <f0> <b> <q> <a[1..n]> <c[1..n]>`), its counts and hash.
 struct Cost {

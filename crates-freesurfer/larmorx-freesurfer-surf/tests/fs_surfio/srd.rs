@@ -23,6 +23,8 @@ struct Mesh {
     f: Vec<[i64; 3]>,
 }
 
+/// The icosahedron's coordinate (the golden ratio as the generator writes it: its float is the case's).
+#[allow(clippy::approx_constant)]
 const T: f32 = 1.618_034;
 
 const ICOSA_V: [[f32; 3]; 12] = [

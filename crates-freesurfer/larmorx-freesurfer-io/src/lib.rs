@@ -14,12 +14,16 @@
 #![forbid(unsafe_code)]
 
 pub mod bfileio;
+pub mod bruker;
 pub mod cfile;
 pub mod colortab_bin;
+pub mod dicom_probe;
 pub mod dti;
 pub mod fio;
 pub mod fscnpy;
 pub mod fstagsio;
 pub mod gifti;
+pub mod identify;
 pub mod mriio_old;
+pub mod signa;
 pub mod tags;

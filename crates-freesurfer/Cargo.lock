@@ -206,6 +206,7 @@ name = "larmorx-freesurfer-core"
 version = "0.1.0-rc.1"
 dependencies = [
  "larmorx-core",
+ "larmorx-io",
  "sha2",
  "tempfile",
 ]

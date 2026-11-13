@@ -703,6 +703,27 @@ modes); seed 1, 760 cases of 76 commands: 734 identical, 26 not comparable, hash
 `2b67d14767130507cd9f5804c61af52fd736629169f68c74b6beaeb9821d338d` (`tests/fs_maths_official.rs`),
 passing under `NAN_TRAP_ARM=1` with `NAN_TRAP_DIR` in debug (8,295 flips) and release (8,299).
 
+## FNV: FreeSurfer's side of the FNV hashes (track A relay 14)
+
+- `include/fnv_hash.h` (Bevin Brett) and `include/fnvhash.h` keep the hash in `unsigned long`
+  (`hash *= 16777619L`, `value *= prime`): FNV-1a 32's basis and prime with a 64-bit accumulator on
+  LP64 (`larmorx_core::fnv::fnv1a_32_wide`). On Windows' LLP64 `unsigned long` has 32 bits, so a
+  Windows build of FreeSurfer would hash differently; the replica follows the Linux build everywhere.
+- `fnv_hash` hashes `unsigned int combined[3] = {i, k, (*random_counter)++}` by its memory
+  (`(unsigned char*)&combined[0]`, 12 bytes, little-endian on x86-64); the `int` counter's increase
+  past 2^31 - 1 is undefined in C++ (GCC's `addl` wraps): the replica wraps.
+- `(double)(hash & 0xffffffff) / (double)0xffffffff` then `(HI-LO)*f + LO` in `double` (x86-64's baseline,
+  FreeSurfer's flags, has no FMA: a product then a sum, each rounded), then the conversion to `float`;
+  the probe's `fnvh` lines, built with the same flags, agree bit for bit.
+- `FnvHash::write` opens an `std::ofstream` and writes `value << std::endl` (or `<< " | " << suffix`);
+  a failed open is silent.
+- Measured (2026-11-13, the probe's `fnvh`): seed 7, 1,000 cases identical with `reproduce` and
+  `fix`; the probe's official hash re-recorded (seed 1, 770 cases of 77 commands, 747 identical, 23
+  not comparable, ae473ef0...; it was 2b67d147... with 760 cases of 76 commands before `fnvh`).
+- Users: track D's surface metric properties (`mrisurf_metricProperties_*`: `fnv_hash` for the random
+  moves, `fnv_add` for `mrisVertexHash`; D keeps local copies until it switches), `mri.cpp`'s
+  `MRI::hash`, `realm.cpp`.
+
 ## The register's texts before the open-files rewrite (2026-11-13)
 
 The orchestrator's rule of 2026-11-13 ("open files carry behaviour only", the foundations' brief):

@@ -22,7 +22,7 @@ use std::path::{Path, PathBuf};
 
 use larmorx_core::defects::FS_49;
 
-use crate::cscan::{self, Bytes, Call, Reader, Stream};
+use crate::cscan::{Bytes, Call, Reader, Scanf, Stream};
 use crate::cstd;
 use crate::globals::Globals;
 use crate::log::{self, ERROR_BADFILE, ERROR_BADPARM, ERROR_NO_FILE, Fatal, NO_ERROR};
@@ -158,14 +158,21 @@ pub fn matrix_ascii_read_from(
     fp: &mut dyn BufRead,
     m: Option<&mut Matrix>,
 ) -> Result<Ret<Matrix>, Fatal> {
+    // `sscanf(cp, "%d %d %d\n", &type, &rows, &cols) != 3`
     let parms = utils::fgetl(fp, 199).and_then(|line| {
         let mut b = Bytes::new(&line);
-        let mut call = Call::new();
+        let mut sc = Scanf::new(&mut b);
         let mut v = [0i32; 3];
-        for x in v.iter_mut() {
-            *x = call.i32(&mut b, &mut g.errno)?;
+        for (k, x) in v.iter_mut().enumerate() {
+            if k > 0 {
+                sc.text(&mut g.errno, b" ");
+            }
+            if let Some(d) = sc.d(&mut g.errno, true) {
+                *x = d;
+            }
         }
-        Some(v)
+        sc.text(&mut g.errno, b"\n");
+        (sc.finish(&mut g.errno) == 3).then_some(v)
     });
     let Some([mtype, rows, cols]) = parms else {
         log::error_printf(
@@ -215,30 +222,41 @@ pub fn matrix_ascii_read_from(
                 );
             };
             if m.mtype == MATRIX_COMPLEX {
+                // `fscanf(fp, "%f %f   ", &re, &im) != 2`: each value assigned as it is read
                 let i = rptr(m, row) + 2 * col as isize;
-                let mut call = Call::new();
-                let Some(re) = call.f32(&mut st, &mut g.errno) else {
+                let mut sc = Scanf::new(&mut st);
+                let re = sc.f(&mut g.errno, true);
+                sc.text(&mut g.errno, b" ");
+                let im = sc.f(&mut g.errno, true);
+                sc.text(&mut g.errno, b"   ");
+                let n = sc.finish(&mut g.errno);
+                if let Some(re) = re {
+                    write_at(g, m, i, re);
+                }
+                if let Some(im) = im {
+                    write_at(g, m, i + 1, im);
+                }
+                if n != 2 {
                     fail(g, err);
                     return Ok(Ret::Null);
-                };
-                write_at(g, m, i, re);
-                cscan::skip_space(&mut st);
-                let Some(im) = call.f32(&mut st, &mut g.errno) else {
-                    fail(g, err);
-                    return Ok(Ret::Null);
-                };
-                write_at(g, m, i + 1, im);
-                cscan::skip_space(&mut st);
+                }
             } else {
-                let Some(v) = scan_value(g, &mut st) else {
+                // `fscanf(fp, "%f  ", &x) != 1`
+                let mut sc = Scanf::new(&mut st);
+                let v = sc.f(&mut g.errno, true);
+                sc.text(&mut g.errno, b"  ");
+                let n = sc.finish(&mut g.errno);
+                let Some(v) = v.filter(|_| n == 1) else {
                     fail(g, err);
                     return Ok(Ret::Null);
                 };
                 write_relt(g, m, row, col, v);
-                cscan::skip_space(&mut st);
             }
         }
-        cscan::skip_space(&mut st);
+        // `fscanf(fp, "\n")`: 0 (it assigns nothing; a read error is not possible on this path)
+        let mut sc = Scanf::new(&mut st);
+        sc.text(&mut g.errno, b"\n");
+        sc.finish(&mut g.errno);
     }
     Ok(match fresh {
         Some(x) => Ret::New(x),

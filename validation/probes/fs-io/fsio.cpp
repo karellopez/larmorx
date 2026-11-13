@@ -47,6 +47,10 @@
 #include "dti.h"
 #include "fscnpy.h"
 #include "gifti_io.h"
+#include "mri_identify.h"
+#include "DICOMRead.h"
+#include "Bruker.h"
+#include "signa.h"
 
 // gifti.cpp's two file-local helpers, compiled into the probe by gifti_statics.cpp
 giiDataArray *fsio_gifti_alloc_and_add_darray(gifti_image *image);
@@ -357,6 +361,133 @@ void print_rmat(const MATRIX *m)
     for (int c = 1; c <= m->cols; c++) of(m->rptr[r][c]);
 }
 
+// piece 4 (3.1-27): the format probe. A case's files are made in the fixture's folder `w`
+// (removed first): `-`, or entries separated by `,`: `D<hex name>` a folder, `F<hex name>:<size>`
+// a file of that many zero bytes, then `+<offset>:<hex bytes>` patches.
+int rm_entry(const char *p, const struct stat *, int, struct FTW *);
+void setup(const char *spec)
+{
+  nftw("w", rm_entry, 16, FTW_DEPTH | FTW_PHYS);
+  if (mkdir("w", 0700)) fail("cannot make w");
+  if (strcmp(spec, "-") == 0) return;
+  std::string all(spec);
+  size_t p = 0;
+  while (p <= all.size()) {
+    size_t q = all.find(',', p);
+    if (q == std::string::npos) q = all.size();
+    std::string e = all.substr(p, q - p);
+    p = q + 1;
+    if (e.empty()) continue;
+    if (e[0] == 'D') {
+      std::vector<unsigned char> n = unhex(e.c_str() + 1);
+      if (mkdir(std::string(n.begin(), n.end()).c_str(), 0700)) fail("cannot make a folder");
+      continue;
+    }
+    size_t c = e.find(':');
+    std::vector<unsigned char> n = unhex(e.substr(1, c - 1).c_str());
+    size_t plus = e.find('+', c);
+    long size = strtol(e.substr(c + 1, plus == std::string::npos ? std::string::npos : plus - c - 1).c_str(), NULL, 10);
+    std::vector<unsigned char> b(size, 0);
+    while (plus != std::string::npos) {
+      size_t c2 = e.find(':', plus);
+      size_t nx = e.find('+', plus + 1);
+      long off = strtol(e.substr(plus + 1, c2 - plus - 1).c_str(), NULL, 10);
+      std::vector<unsigned char> h = unhex(e.substr(c2 + 1, nx == std::string::npos ? std::string::npos : nx - c2 - 1).c_str());
+      for (size_t k = 0; k < h.size(); k++)
+        if (off + (long)k < (long)b.size()) b[off + k] = h[k];
+      plus = nx;
+    }
+    FILE *fp = fopen(std::string(n.begin(), n.end()).c_str(), "wb");
+    if (!fp) fail("cannot write a case file");
+    if (!b.empty()) fwrite(b.data(), 1, b.size(), fp);
+    fclose(fp);
+  }
+}
+
+void run_piece4(const std::string &cmd)
+{
+  if (cmd == "sty") {
+    bool n;
+    std::string s = getstr(&n);
+    oi(string_to_type(s.c_str()));
+  } else if (cmd == "tts") {
+    char *r = type_to_string((int)geti());
+    ostr(r);
+    free(r);
+  } else if (cmd == "mgvn") {
+    MRIIO_Strip_Pound = (int)geti();
+    bool n;
+    std::string s = getstr(&n);
+    static char buf[1 << 16];
+    MRIgetVolumeName(s.c_str(), buf);
+    ostr(buf);
+    MRIIO_Strip_Pound = 1;
+  } else if (cmd == "mid" || cmd == "isx" || cmd == "idf" || cmd == "dcm") {
+    std::string fn = cmd == "mid" ? "" : next();
+    int dbg = (cmd == "mid" || cmd == "dcm") ? (int)geti() : 0;
+    bool n;
+    std::string name = getstr(&n);
+    setup(next());
+    if (dbg) setenv("FS_DICOM_DEBUG", "1", 1);
+    char *c = (char *)name.c_str();
+    errno = 0;
+    if (cmd == "mid") {
+      oi(mri_identify(c));
+    } else if (cmd == "dcm") {
+      for (char k : fn) {
+        if (k == 'd') oi(IsDICOM(c));
+        else if (k == 's') oi(IsSiemensDICOM(c));
+        else if (k == 'm') oi(mri_identify(c));
+        else fail("unknown dcm step");
+      }
+    } else if (cmd == "isx") {
+      int r;
+      if (fn == "cor") r = is_cor(c);
+      else if (fn == "brik") r = is_brik(c);
+      else if (fn == "siemens") r = is_siemens(c);
+      else if (fn == "genesis") r = is_genesis(c);
+      else if (fn == "gelx") r = is_ge_lx(c);
+      else if (fn == "analyze") r = is_analyze(c);
+      else if (fn == "mnc") r = is_mnc(c);
+      else if (fn == "mgh") r = is_mgh(c);
+      else if (fn == "bshort") r = is_bshort(c);
+      else if (fn == "bfloat") r = is_bfloat(c);
+      else if (fn == "bhdr") r = is_bhdr(c);
+      else if (fn == "sdt") r = is_sdt(c);
+      else if (fn == "gdf") r = is_gdf(c);
+      else if (fn == "otl") r = is_otl(c);
+      else if (fn == "ximg") r = is_ximg(c);
+      else if (fn == "nifti1") r = is_nifti1(c);
+      else if (fn == "nii") r = is_nii(c);
+      else if (fn == "nrrd") r = is_nrrd(c);
+      else if (fn == "curv") r = IDisCurv(c);
+      else if (fn == "signa") r = is_signa(c);
+      else if (fn == "bruker") r = is_bruker(c);
+      else fail("unknown test");
+      oi(r);
+    } else {
+      if (fn == "stem") { char *r = IDstemFromName(c); ostr(r); free(r); }
+      else if (fn == "ext") { char *r = IDextensionFromName(c); ostr(r); free(r); }
+      else if (fn == "name") { char *r = IDnameFromStem(c); ostr(r); free(r); }
+      else if (fn == "type") oi(IDtypeFromStem(c));
+      else if (fn == "bstem") { char *r = bhdr_stem(c); ostr(r); free(r); }
+      else if (fn == "bfirst") { char *r = bhdr_firstslicefname(c); ostr(r); free(r); }
+      else if (fn == "bprecs") { char *r = bhdr_precisionstring(c); ostr(r); free(r); }
+      else if (fn == "bprec") oi(bhdr_precision(c));
+      else if (fn == "bruk") {
+        static char f[5][4096];
+        memset(f, 0, sizeof f);
+        oi(checkBrukerFiles(c, f[0], f[1], f[2], f[3], f[4], 1));
+        for (int k = 0; k < 5; k++) ostr(f[k]);
+      } else fail("unknown helper");
+    }
+    oi(errno);
+    if (cmd == "dcm" || cmd == "mid") COND_DumpConditions();
+  } else {
+    fail("unknown command");
+  }
+}
+
 void run_piece3(const std::string &cmd)
 {
   if (cmd == "npy") {
@@ -440,7 +571,7 @@ void run_piece3(const std::string &cmd)
     print_rmat(mri->bvecs);
     Gdiag_no = -1;
   } else {
-    fail("unknown command");
+    run_piece4(cmd);
   }
 }
 

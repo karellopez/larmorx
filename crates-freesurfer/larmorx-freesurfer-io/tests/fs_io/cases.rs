@@ -29,6 +29,8 @@ use larmorx_io::znz::ZnzFile;
 mod piece2;
 #[path = "piece3.rs"]
 mod piece3;
+#[path = "piece4.rs"]
+mod piece4;
 
 /// The cases' random numbers.
 pub struct Gen(u64);
@@ -244,6 +246,7 @@ pub fn generate(seed: u64, n: usize, portable: bool) -> Vec<String> {
     };
     kinds.extend(piece2::KINDS);
     kinds.extend(piece3::KINDS);
+    kinds.extend(piece4::KINDS);
     for i in 0..n {
         let kind = kinds[i % kinds.len()];
         if piece2::KINDS.contains(&kind) {
@@ -252,6 +255,10 @@ pub fn generate(seed: u64, n: usize, portable: bool) -> Vec<String> {
         }
         if piece3::KINDS.contains(&kind) {
             lines.push(piece3::generate(&mut g, kind, portable).join(" "));
+            continue;
+        }
+        if piece4::KINDS.contains(&kind) {
+            lines.push(piece4::generate(&mut g, kind, portable).join(" "));
             continue;
         }
         let mut t: Vec<String> = vec![kind.into()];
@@ -467,6 +474,22 @@ pub fn generate(seed: u64, n: usize, portable: bool) -> Vec<String> {
     lines
 }
 
+/// `b` with every `from` replaced by `to`.
+fn replace_all(b: &[u8], from: &[u8], to: &[u8]) -> Vec<u8> {
+    let mut r = Vec::with_capacity(b.len());
+    let mut i = 0;
+    while i < b.len() {
+        if !from.is_empty() && b[i..].starts_with(from) {
+            r.extend_from_slice(to);
+            i += from.len();
+        } else {
+            r.push(b[i]);
+            i += 1;
+        }
+    }
+    r
+}
+
 /// The C escaping of `fsio`'s text.
 fn escape(b: &[u8]) -> String {
     let mut r = String::new();
@@ -584,6 +607,11 @@ pub fn run_line(line: &str, mode: UpstreamDefects, w: &Work) -> (String, Vec<&'s
             let mut o2 = shared.clone();
             let mut e2 = shared.clone();
             return piece3::run(&t, &mut g, &mut o2, &mut e2, &mut o, w, &mut extra);
+        }
+        if piece4::KINDS.contains(&t[0]) {
+            let mut o2 = shared.clone();
+            let mut e2 = shared.clone();
+            return piece4::run(&t, &mut g, &mut o2, &mut e2, &mut o, w, &mut extra);
         }
         match t[0] {
             "rd" => {
@@ -961,14 +989,20 @@ pub fn run_line(line: &str, mode: UpstreamDefects, w: &Work) -> (String, Vec<&'s
         .borrow()
         .windows(32)
         .any(|w| w == b"has an entry that is not a numbe");
-    let raw = shared.0.borrow();
+    let mut raw = shared.0.borrow().clone();
+    if piece4::KINDS.contains(&t[0]) {
+        // CTN's messages name the file by the port's path into the fixture; fsio runs in the
+        // fixture and names it from there
+        let mut prefix = w.fix.to_string_lossy().into_owned().into_bytes();
+        prefix.push(std::path::MAIN_SEPARATOR as u8);
+        raw = replace_all(&raw, &prefix, b"");
+    }
     // as fsio: messages beyond 1 MiB shown by their length
     let text = if raw.len() > 1 << 20 {
         format!("BIGTEXT {}", raw.len())
     } else {
         escape(&raw)
     };
-    drop(raw);
     let result = match res {
         Ok(()) => o.0.trim_end().to_owned(),
         Err(status) => format!("EXIT {status}"),

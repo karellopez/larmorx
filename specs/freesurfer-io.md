@@ -680,3 +680,228 @@ On gifticlib's image and data-array structures (the clean room's GIFTI port, `la
   cases 10,387 comparable lines identical (`npy` 1,055, `gda` 2,000, `gdv` 1,802, `bvw` 1,720, `psn`
   1,953, `bcs` 1,857). `fix` differs only with a notice. Seed 1, 2,800 portable cases: 2,468
   identical (73 with memory digits), 332 not compared.
+
+## 25. Conventions of part 4
+
+Part 4 (queue item 3.1-27's first piece, with the pieces it needs taken early: the rest of
+`mri_identify.cpp` from 3.1-28, `MRIgetVolumeName` from `mriio.cpp`, GE Signa's header test from
+`signa.cpp`, the DICOM format probe from `DICOMRead.cpp`): the volume format probe. §1's conventions
+hold. A name's **extension** is what follows its last `.` anywhere in the name (a dot in a
+folder's name counts: `a.b/c` has the extension `b/c`); "case-insensitive" compares ASCII letters
+only. **`errno`** is part of every result (later messages print it): a test that cannot open a file
+for reading sets `errno` to 0 unless this section says it keeps the open's error; a failed status
+query (`stat`) keeps its error (2 for a missing file or an empty name, 20 for a name through a
+file, 13 without permission, 36 for a name too long); a read of a folder sets 21. A name of 1,024
+bytes or more (or as this section says) overflows FreeSurfer's buffers (FS-221): FreeSurfer's
+answer is then undefined; both modes use the whole name.
+
+## 26. Format numbers and extensions
+
+The formats' numbers: unknown -1, gzip -2 (only as an intermediate), COR 0, MINC 1, ANALYZE 2,
+MGH 3, Genesis 4, GE LX 5, Siemens 6, BRIK 7, bshort 8, bfloat 9, Varian (SDT) 10, outline 11,
+GDF 12, raw 13, Signa 14, DICOM 15, ANALYZE-4D 16, Siemens DICOM 17, Bruker 18, XIMG 19, NIfTI-1
+pair 20, image 21, GCA 22, bhdr 23, NIfTI single file 24, curvature 25, NRRD 26, GIFTI 27, VTK 28,
+morph 29, autoencoder 30, ITK morph 31, label 32, annotation 33, `.npy` 34, ASCII 35.
+
+**`string_to_type(s)`**: empty → -1. Lower-cased, `s` names: `gz` → -2; `ae`, `sae`, `csae` → 30;
+`m3z`, `m3d` → 29; `cor` → 0; `minc`, `mnc` → 1; `spm`, `analyze`, `analyze3d` → 2; `analyze4d`,
+`img` → 16; `mgh`, `mgz` → 3; `gca` → 22; `signa` → 14; `ge`, `genesis` → 4; `gelx`, `lx` → 5;
+`bshort` → 8; `bfloat` → 9; `bhdr` → 23; `siemens`, `ima` → 6; `dicom` → 15; `siemens_dicom` → 17;
+`brik`, `afni` → 7; `sdt`, `varian` → 10; `otl`, `outline` → 11; `gdf` → 12; `bruker` → 18;
+`ximg` → 19; `nifti1` → 20; `nii` → 24; `nrrd` → 26; `mat`, `svs`, `tif`, `tiff`, `jpg`, `jpeg`,
+`pgm`, `ppm`, `pbm`, `rgb` → 21; `curv` → 25; `gii` → 27; `vtk` → 28; `label` → 32; `annot` → 33;
+`npy` → 34; anything else → -1. A string of 1,024 bytes or more: FS-221.
+
+**`type_to_string(t)`**: 0 `COR`, 22 `GCA`, 1 `MINC`, 2 `analyze3d`, 16 `analyze4d`, 3 `MGH`, 4
+`genesis`, 5 `gelx`, 6 `siemens`, 15 `dicom`, 17 `siemens_dicom`, 7 `brik`, 8 `bshort`, 9 `bfloat`,
+23 `bhdr`, 10 `varian`, 11 `outline`, 12 `gdf`, 18 `bruker`, 19 `ximg`, 20 `nifti1`, 24 `nii`, 26
+`nrrd`, 25 `curv`, 27 `gii`, 33 `annot`, 34 `npy`; every other number (Signa, raw, image, VTK, the
+morphs, label, ASCII, unknown) `unknown`.
+
+**`MRIgetVolumeName(s)`**: `s` without what follows its last `@` (the `@` removed too), then,
+while the program's switch `MRIIO_Strip_Pound` is on (it is unless a program turns it off),
+without what follows its last `#`.
+
+## 27. `mri_identify(name)`
+
+1. The name is reduced by `MRIgetVolumeName` (a result of 1,024 bytes or more: FS-221).
+2. If it is not a folder (`fio_IsDirectory`, §6) and has an extension, the extension's number
+   (§26) is checked:
+   - -2 (gzip): MGH (3) if the name contains `.mgh.gz` anywhere, else NIfTI (24) if it contains
+     `.nii.gz`, else prints `INFO: Currently supports gzipped mgh or nifti file (.mgz, .mgh.gz, or
+     nii.gz) only.` and `fname = <name>` (each with a newline) and returns -1.
+   - 21, 34, 3: returned as they are.
+   - 22, 23, 16, 27, 33, 28, 32: returned.
+   - 18, 0, 8, 9, 17, 15, 4, 14, 5, 10, 1, 24, 20, 6, 7, 11, 12, 19, 26: returned if that format's
+     test (§28-§31) says yes; for ANALYZE (2): NIfTI-1 pair (20) if `is_nifti1` says yes, else 2
+     if `is_analyze` does.
+   - any other number (-1, 25, 29, 30): no answer yet.
+3. Otherwise (a folder, no extension, or no answer) the tests run in this order and the first that
+   says yes gives the format: Bruker 18, COR 0, bshort 8, bfloat 9, Siemens DICOM 17, DICOM 15,
+   Genesis 4, NRRD 26, curvature 25, Signa 14, GE LX 5, Varian 10, MINC 1, NIfTI-1 pair 20, NIfTI
+   24, ANALYZE 2, Siemens 6, BRIK 7, outline 11, GDF 12, XIMG 19 (never). Then 29 or 30 if the
+   extension named them; else -1. (So a folder that is not Bruker's is COR, and a `.curv` file is
+   found by its content only.)
+
+## 28. The format tests
+
+Each returns 1 or 0. "Opens" is `fopen(name, "r")` as §1 describes (a folder opens; its reads
+fail). "Reads n bytes" fails on a shorter file; a failed open or read sets `errno` 0 unless said.
+
+- `is_cor`: the name exists (status query; a failure keeps its `errno`) and is a folder, or its last
+  path component (trailing slashes ignored) starts with `COR-`.
+- `is_brik`: extension `BRIK`, case-insensitive.
+- `is_siemens`: extension `ima`, case-insensitive; else the file opens and the bytes at offsets
+  5,790 (2 bytes), 5,802 (2) and 5,838 (3), each read as a C string (it ends at a zero byte), are
+  `SL`, `SP` and `FoV`.
+- `is_genesis`: the whole name (folders included) starts with `I.`; or the extension is exactly
+  `MR`; or the file opens and its first 4 bytes, big-endian, are `0x494d4746` (`IMGF`).
+- `is_ge_lx`: the file opens and its 4 bytes at offset 3,228 are `IMGF`.
+- `is_analyze`: a name with an extension: 1 if the extension is `img` (case-insensitive), else 0.
+  A name without one: `<name>.hdr` opens and gives 348 bytes; its length (in bytes) equals the
+  big-endian 32-bit integer at offset 0, the big-endian integer at offset 32 is 16,384 and the byte
+  at offset 38 is `r`. (`<name>.hdr` of 1,024 bytes or more: FS-221.)
+- `is_mnc`: extension `mnc` (case-insensitive); or extension `gz` and the name ends with `.mnc.gz`
+  (case-insensitive) counted from the dot before the last one (from the name's start when there is
+  none); or the file opens and its first 3 bytes are `CDF`. FS-222: a name whose only dot is its
+  first character (`.gz`) makes FreeSurfer read one byte before the name; the answer is never
+  changed by it.
+- `is_mgh`: 0 without a dot; by default 1 for a name ending in `.mgh`, `.mgz` or `.mgh.gz`; FS-223
+  (rule A; `reproduce`): 1 only for the names `.mgh`, `.mgz` and `.mgh.gz` themselves. No program
+  calls it.
+- `is_bshort`, `is_bfloat`, `is_bhdr`, `is_gdf`, `is_otl`: the extension is exactly `bshort`,
+  `bfloat`, `bhdr`, `gdf`, `otl`. `is_ximg`: always 0.
+- `is_sdt`: the file opens, and so does its header: the name with its extension replaced by `spr`
+  (or `.spr` added when there is no dot).
+- `is_nifti1`: the name without a last `.img` or `.hdr` (exactly), plus `.hdr`: that file opens and
+  its 4 bytes at offset 344 are `ni1\0`.
+- `is_nii`: the extension is exactly `nii`; or it is `gz` and the name contains `.nii.gz`; or the
+  file opens and its 4 bytes at 344 are `n+1\0`.
+- `is_nrrd`: the extension is exactly `nrrd`; or the file opens and its first 4 bytes are `NRRD`.
+- `IDisCurv`: the file opens and its first 3 bytes, big-endian (missing bytes 0), are 16,777,215.
+  A failed open keeps its `errno`; a folder leaves 21.
+
+## 29. Stems and volume extensions
+
+- `IDstemFromName(name)`: names shorter than 3 bytes → none. The first match of: ends with `.w`
+  (removed); a name of at least 5 bytes ending with `.nii`, `.mgz`, `.mgh` or `.img`; at least 6
+  bytes, `.bhdr`; at least 8, `.nii.gz`; at least 12, `_000.bfloat` or `_000.bshort`. Each check
+  that the name is too short for ends the search (none).
+- `IDextensionFromName(name)`: names shorter than 5 bytes → none. The first match of: the name
+  ends with `nii`, `mgz`, `mgh` or `img` (→ that); at least 6 bytes, `bhdr`; at least 8,
+  `nii.gz`; at least 12, `_000.bfloat` → `bfloat`, `_000.bshort` → `bshort`; each length check
+  ends the search. FS-226 (rule A): by default each of the first five must follow a `.`; with
+  `reproduce` they need not (`brainnii` → `nii`).
+- `IDtypeFromStem(stem)`: the first of `<stem>.nii`, `.nii.gz` (→ 24), `.mgh`, `.mgz` (→ 3),
+  `_000.bfloat` (→ 9), `_000.bshort` (→ 8) that opens for reading, else -1 (`errno` from the last
+  failed open).
+- `IDnameFromStem(stem)`: the first of `<stem>` + `.nii`, `.nii.gz`, `.mgh`, `.mgz`, `.img`,
+  `.bhdr`, `_000.bfloat`, `_000.bshort`, `.w` that opens, else none. (Both: a name of 2,000 bytes
+  or more, FS-221.)
+- `bhdr_stem(name)`: for a `.bhdr` name, the name before its last dot; else none.
+  `bhdr_firstslicefname`: `<stem>_000.bfloat`, else `<stem>_000.bshort`, the first that opens; else
+  none. `bhdr_precisionstring`: `bfloat` or `bshort` likewise. `bhdr_precision`: 3 (float) or 4
+  (short) likewise, -1 when neither opens, 0 for a name that is not `.bhdr`.
+
+## 30. Bruker's study folders
+
+`checkBrukerFiles(name, flag)`: 1 when `name` exists and is a folder holding `method`, `acqp`,
+`pdata/1/2dseq`, `pdata/1/d3proc` and `pdata/1/reco` (checked in that order by status queries;
+the five full names are given back, those built before a failure included); else 0 at the first
+failure (its `errno` kept). With `flag` on: `ERROR: could not stat <name>.` or `ERROR: <name> is not
+a directory.` (standard error, a newline), `INFO: directory <name> ` and then, for each file found,
+`INFO:    method <f>`, `INFO:      acqp <f>`, `INFO:     2dseq <f> `, `INFO:    d3proc <f> ` and,
+for the reco file, `INFO:    d3proc <f> ` again (standard output, each with a newline). A full name
+of 512 bytes or more: FS-221. `is_bruker(name)`: 0 when the status query fails (`errno` kept) or
+`name` is not a folder; else `checkBrukerFiles` without messages.
+
+## 31. GE Signa's header test (`is_signa`)
+
+The file opens (`"rb"`; a failure keeps its `errno`) and gives 14,336 bytes (else 0; a folder leaves
+21; FreeSurfer leaves the file open, FS-224: no answer changes). The header is read as 16-bit
+words; the fields are at word offsets (the series block starts at word 2,048, the image block at
+2,560): image x 2,697, y 2,698, TR 2,642, TE 2,646, TI 2,648, start x 2,612, end x 2,614, start y
+2,616, end y 2,618, start z 2,620, end z 2,622, pixel size 2,699; series: field of view 2,199,
+images allocated 2,250.
+
+- **Integers** are the two bytes big-endian as a signed 16-bit number. FS-225 (rule A): FreeSurfer
+  sign-extends the second byte, so a value whose second byte is 0x80 or more reads as (that byte -
+  256) whatever the first byte; `reproduce` does the same.
+- **Floats** are Data General's: 4 bytes big-endian; sign = bit 31, exponent e = bits 24-30, fraction
+  f = bits 0-23. The fraction shifted left by 8 is normalised by shifting left until bit 31 is set
+  (k shifts; none when it is 0); the IEEE exponent is `4 (e - 64) + 126 - k` clamped to 0..255; the
+  IEEE fraction is the 23 bits after the leading one; the result (sign, exponent, fraction as a
+  `float`) is divided by 1,000 in `float`. (A zero fraction keeps the exponent: `0x40000000` gives
+  0.0005.)
+- **The test**: 1 when 2 < x < 10,240, 2 < y < 10,240, 0 < TR < 1,000,000, the field of view in
+  `double` above 0.0002 and in `float` below 300, `|start x| + |end x|`, `|start z| + |end y|` and
+  `|start y| + |end z|` (each sum in `float`, compared in `double`) above 0.000001, |TI| < 100,000,
+  |TE| < 10,000, TI > 0, images allocated ≥ 0 and the pixel size finite. NaNs fail every comparison.
+
+## 32. The DICOM format probe
+
+**FreeSurfer's DICOM reader** is CTN 3.0.6's (`larmorx_io::dicom`, queue item 3.1-16's spec) with
+FreeSurfer's two changes: the "Data Element ... longer" message's longer text and FS-94's swap. The
+reader keeps a process-wide condition stack; `COND_DumpConditions` prints it to standard error, bottom
+first, each entry's code as 8 hexadecimal columns (`%8x`), a space, its text's bytes as they are and
+a newline, then empties it.
+
+**`IsDICOM(name)`**: the answer for the last name asked is kept: the same name gives it again
+without anything else, unless `FS_DICOM_DEBUG` is set (any value), which also prints the steps. In
+order: the name is remembered (answer 0 so far); with debugging `Entering IsDICOM (<name>)`; a file
+that does not open for reading → 0 (`errno` from the open kept); a folder → 0; with debugging
+`Opening <name> as part10`; the stack is emptied; the file is opened as a part-10 file with VR
+mismatches accepted; if that fails, with debugging the condition's name (`DCM_NORMAL`,
+`DCM_ILLEGALOPTION`, `DCM_OBJECTCREATEFAILED`, `DCM_FILEOPENFAILED`, `DCM_FILEACCESSERROR`,
+`DCM_ELEMENTOUTOFORDER`, or `DCMPrintCond: <code as int> unrecognized`) and the stack dumped. Then,
+while the open has failed: the object closed (an empty handle pushes CTN's "NULL object" condition),
+with debugging `Opening as littleendian` (then `bigendian`, then `format conversion`), the file
+opened as a bare data set in implicit little endian (then big endian, then with format conversion
+alone, which CTN always refuses), with debugging the failure's name. At the end: the object closed,
+with debugging `Leaving IsDICOM (<name>)`, the stack emptied; the answer is 1 if an open succeeded.
+All debugging lines go to standard output with a newline. (A name of 1,024 bytes or more: FS-221.)
+
+**`IsSiemensDICOM(name)`**: 0 if `IsDICOM` says no. Then the object is opened again by the same
+four attempts (`IsDICOM` asked first: its kept answer, or with debugging its steps again; if it
+says no, `ERROR: <name> is not a dicom file` on standard error; the stack is not emptied between
+attempts; if no attempt succeeds the stack is dumped and the program exits with status 1; neither
+happens when `IsDICOM` has just said yes for an unchanged file). The Manufacturer element (0008,0070) is looked up in the object's top level (its
+first group 0008, its first element of that tag):
+- missing: CTN's condition "Requested element (8 70) not found in DCM_GetElementVM" is pushed, the
+  object closed; prints `WARNING: searching dicom file <name> for Manufacturer tag 0x8, 0x70` and
+  `WARNING: the result could be a mess.` (standard output); 0;
+- a sequence: `Element is of type dcm_sq, not supported` (standard error), the condition "DCM
+  Cannot retrieve value of element with SQ representation (00080070) in (DCM_GetElementValue)"
+  pushed, the object closed, then the two warnings; 0;
+- a text representation (AE AS CS DA DS DT IS LO LT OB OW PN SH UN ST TM UI) or a number (US, SS:
+  room 2 bytes; UL, SL, AT, FL: 4; FD: 8 per value): the object closed, the stack emptied; the value
+  read as text up to its first zero byte; 1 if it is `SIEMENS` or `SIEMENS `, else 0. For UN,
+  `FreeElementData: 21 unrecognized` is printed to standard error afterwards (no newline; kept, rule
+  C). A number holding more bytes than its room: FS-227 (FreeSurfer writes past its memory; both
+  modes read the value as text);
+- any other representation (OT, UT, DD, RET, context, delimiter): `AllocElementData: <its number>
+  unrecognized` (standard error), then FreeSurfer crashes (FS-228); both modes answer 0. An
+  element of undefined length (its value never read): FreeSurfer crashes (FS-228); both modes 0.
+
+## 33. Validation plan (part 4)
+
+- The probe's commands (`validation/probes/fs-io/`, the official build's functions called by name
+  in `fsio`, each case in its own process inside a fixture folder; the case's files made in its
+  `w` folder first): `sty` (every extension in three cases, odd strings, one of 1,030 bytes), `tts`
+  (-3 to 37), `mgvn` (both switch values; names with several `@` and `#`), `mid` (names in `w` and
+  in a sub-folder with a dot, every extension in several cases, `.gz` endings, no extension; the
+  file absent, a folder (a COR folder, a Bruker study complete or cut at each of its files), or
+  holding a format's header right or broken: NIfTI single and pair, ANALYZE headers of every check,
+  GE Genesis and LX, MINC, NRRD, curvature, Siemens, GE Signa (plausible headers, fields out of
+  range, second bytes of 0x80 or more, cut files), DICOM part 10 and bare in the three transfer
+  syntaxes with a Manufacturer of many values and representations, cut or with one byte changed;
+  companion `.hdr` and `.spr` files; with and without `FS_DICOM_DEBUG`), `isx` (each test on cases
+  made for it), `idf` (the stem and extension helpers on stems with each of their files, the `.bhdr`
+  helpers, `checkBrukerFiles` with its messages), `dcm` (`IsDICOM`, `IsSiemensDICOM` and
+  `mri_identify` in ten sequences, so the kept answer is used). Each prints its results, `errno`
+  and (`mid`, `dcm`) the condition stack. Lines where FreeSurfer crashes or overflows (FS-221,
+  FS-227, FS-228) are counted, not compared.
+- Measured on the replica (2026-11-13): seed 7, 72,000 cases of the 36 commands (2,000 each):
+  `reproduce` identical on 65,077 of 65,077 comparable lines; piece 4's 14,000 cases: 13,914
+  identical, 86 not compared (FreeSurfer's crashes: FS-221, FS-227, FS-228); `fix` differs only with a
+  notice. Seed 1, 3,600 portable cases: 3,243 identical, 357 not compared.

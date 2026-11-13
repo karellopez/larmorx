@@ -5,7 +5,8 @@
 //! description of the stream functions (ISO C 7.21) and glibc 2.35's behaviour as measured by the
 //! fs.io probe (`validation/probes/fs-io/`): `fopen`'s modes and `errno`, `fread` and `fwrite` of
 //! members (a short read keeps the bytes it got), `getc`, `fgets`, the end-of-file and error flags
-//! (`feof` is set by a read that finds no more bytes, never by one that ends exactly at the end),
+//! (`feof` is set by a read that finds no more bytes, never by one that ends exactly at the end;
+//! a directory opens for reading and every read of it fails with `EISDIR`, on every platform),
 //! `fseek`, `rewind` and `ftell` (measured by `validation/investigations/glibc-stdio-probe/`), and
 //! `scanf`'s input ([`Stream`], one byte of lookahead).
 //!
@@ -62,6 +63,10 @@ pub struct CFile {
     error: bool,
     /// The bytes given to the program so far (reading).
     taken: u64,
+    /// A directory opened for reading: every read fails with `EISDIR` (as on Linux and macOS).
+    is_dir: bool,
+    /// The `errno` the last failed read set.
+    read_errno: Option<i32>,
 }
 
 /// `fopen`'s mode: (read, write, append, truncate, exclusive), or `None` (`EINVAL`).
@@ -115,11 +120,18 @@ impl CFile {
             o.truncate(true);
         }
         match o.open(&path) {
-            Ok(file) => Ok(CFile::new(Backing::File(file), r, w)),
+            Ok(file) => {
+                let is_dir = file.metadata().is_ok_and(|m| m.is_dir());
+                let mut f = CFile::new(Backing::File(file), r, w);
+                f.is_dir = is_dir;
+                Ok(f)
+            }
             Err(e) => {
                 #[cfg(not(unix))]
                 if r && !w && path.is_dir() {
-                    return Ok(CFile::from_bytes(Vec::new()));
+                    let mut f = CFile::from_bytes(Vec::new());
+                    f.is_dir = true;
+                    return Ok(f);
                 }
                 Err(log::errno_of(&e).unwrap_or(5))
             }
@@ -137,6 +149,8 @@ impl CFile {
             eof: false,
             error: false,
             taken: 0,
+            is_dir: false,
+            read_errno: None,
         }
     }
 
@@ -186,6 +200,11 @@ impl CFile {
         if !self.flush_output() {
             return false;
         }
+        if self.is_dir {
+            self.error = true;
+            self.read_errno = Some(21);
+            return false;
+        }
         self.rbuf.resize(BUFSIZ, 0);
         self.rpos = 0;
         loop {
@@ -200,9 +219,10 @@ impl CFile {
                     return true;
                 }
                 Err(e) if e.kind() == std::io::ErrorKind::Interrupted => {}
-                Err(_) => {
+                Err(e) => {
                     self.rbuf.clear();
                     self.error = true;
+                    self.read_errno = Some(log::errno_of(&e).unwrap_or(5));
                     return false;
                 }
             }
@@ -364,6 +384,12 @@ impl CFile {
         let mut errno = 0;
         self.fseek(&mut errno, 0, 0);
         self.error = false;
+    }
+
+    /// The `errno` the last failed read set (`EISDIR`, 21, for a directory), `None` when no read
+    /// failed: what C's `errno` holds after it, until something else sets it.
+    pub fn read_errno(&self) -> Option<i32> {
+        self.read_errno
     }
 
     /// How many bytes the program has read from the stream.

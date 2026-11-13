@@ -1439,6 +1439,14 @@ defects! {
         "DTIparsePulseSeqName of a name with 100 characters or more before or after its # overflows a buffer: a crash or wrong values";
     FS_220 = "FS-220", "FreeSurfer", true,
         "DTIbvecChangeSpace of gradient directions with fewer than 3 columns reads and writes past each row: it changes the next rows' numbers, and past the matrix's last number it reads memory contents and writes outside the matrix";
+    FS_285 = "FS-285", "FreeSurfer", true,
+        "reading a volume-geometry block (the text block of linear transform and surface files) whose line starts with a word of 64 bytes or more writes the word past its buffer: memory corruption, a crash or wrong values";
+    FS_286 = "FS-286", "FreeSurfer", true,
+        "reading a volume-geometry block whose line has a second word of 2 bytes or more (not the usual =) writes the word past its 2-byte buffer: memory corruption, a crash or wrong values";
+    FS_287 = "FS-287", "FreeSurfer", true,
+        "reading a volume-geometry block, a blank line counts as a repeat of the line before it and takes one of the block's eight places: the block's last line (the centre, cras) is then not read and the line after the block is";
+    FS_288 = "FS-288", "FreeSurfer", true,
+        "reading a volume-geometry block whose first line is blank compares memory contents with the block's keys";
 }
 
 /// The register entry with ID `id`.

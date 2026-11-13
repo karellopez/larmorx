@@ -55,7 +55,7 @@ fn mask_count(g: &mut Globals, err: &mut dyn Write, mri: &Mri, mask: &Mri) -> Re
                 if v > 0.5 {
                     above += 1;
                 }
-                if !(v < 0.5) {
+                if v.partial_cmp(&0.5) != Some(std::cmp::Ordering::Less) {
                     used += 1;
                 }
             }
@@ -495,13 +495,15 @@ pub fn mri_fdr2vwth(
                     } else {
                         let raw = rows::read(g, WHAT, it.vol, sl, rr, cc, MRI_FLOAT).f();
                         match fdr_value(&libm, widen(raw), signid, log10flag) {
-                            Some(x) if !(x > th) => Some(raw),
+                            Some(x) if x.partial_cmp(&th) != Some(std::cmp::Ordering::Greater) => {
+                                Some(raw)
+                            }
                             _ => None,
                         }
                     };
                     let v = Num::F(keep.unwrap_or(valnull));
                     let o: &mut Mri = match &mut it.out {
-                        FdrOut::Given(o) => &mut **o,
+                        FdrOut::Given(o) => o,
                         _ => &mut *it.vol,
                     };
                     rows::write(g, WHAT, o, i64::from(s), rr, cc, MRI_FLOAT, v);

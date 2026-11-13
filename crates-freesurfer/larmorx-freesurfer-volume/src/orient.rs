@@ -201,7 +201,7 @@ pub fn mri_get_voxel_to_voxel_xform(
 /// <g>`, `  vs <g> <g> <g>` on standard output and, when the variable is set, `  changing voxel
 /// size to scale` and the voxel sizes set to the scales. Then the direction cosines are the columns
 /// divided by the voxel sizes (`float`), the centre is column 4 plus the first three columns times
-/// half the extent (`float`; `m14 + ((m11 ci + m12 cj) + m13 ck)`), `ras_good_flag` 1, and the
+/// half the extent (`float`; `((m11 ci + m12 cj) + m13 ck) + m14`), `ras_good_flag` 1, and the
 /// cached matrices recomputed (`MRIreInitCache`); `NO_ERROR`. FS-464: a matrix smaller than 3 x 4
 /// is an error.
 pub fn mri_set_voxel_to_ras_xform(
@@ -274,10 +274,11 @@ pub fn mri_set_voxel_to_ras_xform(
     let ci = (f64::from(vg.width) / 2.0) as f32;
     let cj = (f64::from(vg.height) / 2.0) as f32;
     let ck = (f64::from(vg.depth) / 2.0) as f32;
+    // the official build adds column 4 last, the sum the destination (a NaN's payload shows it)
     let centre = |r: i32| {
         add(
-            e(r, 4),
             add(add(mul(e(r, 1), ci), mul(e(r, 2), cj)), mul(e(r, 3), ck)),
+            e(r, 4),
         )
     };
     (vg.c_r, vg.c_a, vg.c_s) = (centre(1), centre(2), centre(3));

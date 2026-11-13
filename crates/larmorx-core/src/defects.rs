@@ -1654,11 +1654,11 @@ defects! {
     FS_468 = "FS-468", "FreeSurfer", true,
         "the clipping of bright white matter (MRIclipBrightWM) stores every voxel through a byte: a value below 0 or above 255, or NaN, becomes the low byte of its 32-bit truncation (0 for NaN and beyond the 32-bit range)";
     FS_469 = "FS-469", "FreeSurfer", true,
-        "the partial-volume count of a label (MRIvoxelsInLabelWithPartialVolumeEffects) reads, for a voxel on the label's border whose own label is negative or not below the label limit, that label's mean outside the table of means: memory contents";
+        "the partial-volume count of a label (MRIvoxelsInLabelWithPartialVolumeEffects) weighs a voxel on the label's border whose own label is negative or not below the label limit with a mean taken from memory contents";
     FS_470 = "FS-470", "FreeSurfer", true,
         "the partial-volume count of a label (MRIvoxelsInLabelWithPartialVolumeEffects) given no intensity volume reads the first border voxel's intensity from no volume: the program crashes";
     FS_471 = "FS-471", "FreeSurfer", true,
-        "the partial-volume count of a label (MRIvoxelsInLabelWithPartialVolumeEffects) sets aside three tables of the label limit's size on the stack at every voxel it counts: a negative limit, or one whose tables pass the stack (about 699,000 labels with Linux's default 8 MiB stack), crashes the program";
+        "the partial-volume count of a label (MRIvoxelsInLabelWithPartialVolumeEffects) crashes the program for a negative label limit, and for a very large one (from about 699,000 labels with Linux's default 8 MiB stack)";
     FS_472 = "FS-472", "FreeSurfer", true,
         "a constant fill (MRIconst) or a normalisation of each voxel's frames (MRInormalizeSequence) of a byte, short or unsigned short volume stores a value past the type's range as the low bits of its integer: it wraps";
     FS_473 = "FS-473", "FreeSurfer", true,

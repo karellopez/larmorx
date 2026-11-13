@@ -108,3 +108,27 @@ No third-party code in these lines (the audit of `docs/freesurfer/third-party.md
   `MRIfillBox` (16373-16404), `MRImaskZero` (16518-16533), `MRIclipBrightWM` (17744-17776); `WM_MIN_VAL`
   (`include/mri.h`), `DEFAULT_DESIRED_WHITE_MATTER_VALUE` (`include/mrinorm.h`). Changes: FS-468 (clamped bytes), rule
   A; FS-467 (a bin of its own), both modes; FS-12's rule for the `(int)` truncations.
+- `src/labels.rs` (3.1-37; relay 20): `utils/mri.cpp` `MRIvoxelsInLabelWithPartialVolumeEffects` (14346-14583),
+  its label windows kept as sorted maps of the labels met (the same reads and `float` sums as `MRIcomputeLabelNbhd`),
+  operand orders from the official build (`volume += vox_vol`; `vox_vol * pv + volume`). Changes: FS-469 (an own label
+  outside the limit takes its window mean), both modes; FS-470, FS-471 (crashes: errors; tables past the stack counted).
+- `src/frames.rs` (3.1-37; relay 20): `utils/mri.cpp` `MRIrandn` (13718-13751), `MRIconst` (13926-13999),
+  `MRInormalizeSequence` (14005-14043), `MRInormalizeFrames`, `MRInormalizeFramesMean`, `MRInormalizeFramesFirst`
+  (15945-16020), `MRIsort`, `CompareDoubles` (16076-16134; the C library's `qsort` through
+  `larmorx_core::glibc_qsort`), `MRIreverseSliceOrder` (15547-15586), `MRIcloneDifferentType` (16406-16416). Changes:
+  FS-472 (clamped narrow stores), rule A; FS-473 (b-table entries past the rows left 0), both modes.
+- `src/order.rs` (3.1-37; relay 20): `utils/mri.cpp` `compare_sort_mri`, `MRIorderIndices` (16441-16480),
+  `MRIcomputeVoxelPermutation` (16482-16516, fs.core's `randomNumber`). Changes: FS-474 (whole coordinates, clamped
+  values), rule A.
+- `src/deriv.rs` (3.1-37; relay 20): `utils/mri.cpp` `MRInonMaxSuppress` (15641-15724).
+- `src/resize.rs` (3.1-37; relay 20): `utils/mri.cpp` `MRIextractRegionAndPad` (15726-15769).
+- `src/combine.rs` (3.1-37; relay 20): `utils/mri.cpp` `MRIrms` (16643-16675; the official build's operand order in
+  the last frame), `MRIcomputeVolumeFractions` (16690-16774), `MRIcombineDistanceTransforms` (17386-17412),
+  `MRIapplyDiffVect`, `MRIdiff2Vect` (17899-17996), `MRIestimateTIV` (15892-15911); `utils/mri2.cpp` `MRIdimMismatch`
+  (1346-1353). Changes: FS-476, FS-477, FS-478, rule A; FS-475 (label 0 left out), both modes; FS-479 (an error).
+- `src/voxops.rs` (3.1-37; relay 20): `utils/mri2.cpp` `mri_framepower` (417-466; `sqrtf`, `powf`), `mri_binarize`
+  (476-546), `mri_reshape` (653-734), `MRIsqrt`, `MRImax` (1781-1835), `MRImultiplyConst`, `MRIaddConst` (1866-1912),
+  `MRIframeBinarize` (1922-1958), `MRIvote` (2063-2149), `MRIsquare`, `MRIsquareRoot` (2401-2466), `MRIcrop`
+  (2643-2708), `MRIreverseSlices` (2748-2799), `MRIcutEndSlices` (2801-2838), `MRIsegIdListNot0`, `MRIsegIdList`
+  (2873-2928), `MRIhalfCosBias` (3077-3100); operand orders from the official build's object `mri2.cpp.o` (the unit
+  oracle's `libutils.a`). Changes: FS-480, FS-481, rule A.

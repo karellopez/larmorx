@@ -439,3 +439,61 @@ declares the image functions; `include/image.h` 297-337 the pixel macros.
 - `MRIstats`, `MRIsetVoxelToRasXform`, `MRIcalcCRASforSampledVolume` and `MRIfindNearestNonzeroLocation`
   give FreeSurfer's NaN bits in the C expressions' operand orders (no object-code reading was needed: the
   probe's special floats agreed on every case).
+
+## 13. Partial-volume counts, frames, orders, fractions and difference lists (3.1-37 piece c; relay 20)
+Source: `utils/mri.cpp` 14346-14583 (`MRIvoxelsInLabelWithPartialVolumeEffects`), 13718-13751 (`MRIrandn`),
+13926-14043 (`MRIconst`, `MRInormalizeSequence`), 15547-15586 (`MRIreverseSliceOrder`), 15641-15769
+(`MRInonMaxSuppress`, `MRIextractRegionAndPad`), 15892-16020 (`MRIestimateTIV`, `MRInormalizeFrames*`),
+16076-16134 (`MRIsort`, `CompareDoubles`), 16406-16516 (`MRIcloneDifferentType`, `MRIorderIndices`,
+`MRIcomputeVoxelPermutation`), 16643-16774 (`MRIrms`, `MRIcomputeVolumeFractions`), 17386-17412
+(`MRIcombineDistanceTransforms`), 17899-17996 (`MRIapplyDiffVect`, `MRIdiff2Vect`); `utils/mri2.cpp` 1346-1353
+(`MRIdimMismatch`). Operand orders from the official build's disassembly (`mri.cpp.o`).
+- **FS-469** (a, memory): `float mean_label = label_means[vox_label]` with the voxel's own label outside
+  `[0, maxlabels)`: the load (made unconditionally after the two `MRIcomputeLabelNbhd` calls) reads the stack
+  around the VLAs. Both modes take that label's mean over the 15 x 15 x 15 window (the value a larger table would
+  hold), noted; the probe counts these cases.
+- **FS-470** (a, crash): `MRIgetVoxVal(mri_vals, ...)` with `mri_vals == NULL` at the first border voxel weighed.
+- **FS-471** (a, crash): `int nbr_label_counts[maxlabels], label_counts[maxlabels]; float label_means[maxlabels]`
+  are allocated (with stack-clash probes) at every voxel past the label and segborder checks: a negative
+  `maxlabels` probes pages without end (SIGSEGV); tables beyond the stack crash the same way. Negative: an error;
+  large: counted (the port's windows are sparse), noted.
+- The MRIsegBorder path (`segborder`): a border voxel of another label is weighed only when one of frames 1.. holds
+  `label` (`float ==`).
+- **FS-472** (c, rule A): `(BUFTYPE)nint(val)`, `(short)nint(val)`, `(unsigned short)nint(val)` in `MRIconst` and
+  the `MRISseq_vox(...) / norm` stores of `MRInormalizeSequence` keep the `int`'s low bits.
+- **FS-473** (a, memory): `MRIreverseSliceOrder` copies `bvals->rptr[f+1][1]` and `bvecs->rptr[f+1][k+1]` for every
+  frame: a table of fewer rows is read through row pointers past its `rptr` array (the probe saw SIGSEGV).
+- `MRIreverseSliceOrder`'s `double val` between `MRIgetVoxVal` and `MRIsetVoxVal` is dropped by GCC (a signalling
+  NaN stays signalling); `MRIsort`'s `double` array is not (quieted).
+- **FS-474** (c, rule A): `SORT_VOXEL` holds `unsigned char x, y, z, val`.
+- **FS-475** (a, memory): `MRIgetVoxVal(mri_fractions, xs, ys, zs, label - 1)` for label 0 reads frame -1
+  (`slices[z - depth]`); the write corrupts memory (the probe saw SIGSEGV). Both modes leave label 0 out.
+- **FS-476** (c, rule A): the second pass tests `label < mri_fractions->nframes`, the first `<=`.
+- **FS-477** (c, rule A): `c>mri1->width` (not `>=`) in `MRIapplyDiffVect`.
+- **FS-478** (c, rule A): in place (`mri1 == mri2`), `CTABfree(&mri2->ct)` frees `mri1->ct` before
+  `CTABdeepCopy(mri1->ct)`, which then prints `CTABdeepCopy: ct was NULL` and returns NULL.
+- **FS-479** (a, crash): `MatrixDeterminant(atlas_lta->xforms[0].m_L)` of an LTA with no transform.
+- `MRIrms`: GCC splits the frame loop; in the last frame (when it is not the first) the sum is `vout + vin * vin`
+  (`vout` the destination), else `vin * vin + vout`: only the NaN payload of two NaNs shows it.
+- `MRIrandn`: `PDFgaussian() * stddev + avg` (the draw the destination). `MRInormalizeFrames`: `mean += val`,
+  `var += val * val`, `var / n - mean * mean`, `(val - mean) / std`, as written.
+- `MRIdistanceTransform` waits for fs.filter's `MRIextractDistanceMap` (3.1-42).
+- `MRIvoxelsInLabelWithPartialVolumeEffects` writes the border volume to `b.mgz` under `DIAG_VERBOSE_ON` with
+  `DIAG_WRITE`: not modelled (no `MRIwrite` in fs.volume).
+
+## 14. Voxelwise operations of mri2.cpp (3.1-37 piece d, part 1; relay 20)
+Source: `utils/mri2.cpp` 417-734 (`mri_framepower`, `mri_binarize`, `mri_reshape`), 1781-1958 (`MRIsqrt`,
+`MRImax`, `MRImultiplyConst`, `MRIaddConst`, `MRIframeBinarize`), 2063-2149 (`MRIvote`), 2401-2466 (`MRIsquare`,
+`MRIsquareRoot`), 2643-2838 (`MRIcrop`, `MRIreverseSlices`, `MRIcutEndSlices`), 2873-2928 (`MRIsegIdListNot0`,
+`MRIsegIdList`), 3077-3100 (`MRIhalfCosBias`). Operand orders from `mri2.cpp.o` of the unit oracle's `libutils.a`.
+- `mri_framepower`: C++'s `sqrt(float)` and `pow(float, float)` are `sqrtf` and `powf`; the branch meant for a
+  power of 2 tests 0.5 again (dead; `powf(v, 2)` gives the same bits as `v * v`).
+- `MRImax`: `std::max(double, double)` of two floats compiled to `comiss` on the floats (no conversion: a signalling
+  NaN passes).
+- `MRIhalfCosBias`: `w = (cos(pi s / (depth - 1)) * alpha + (2 - alpha)) * 0.5`, the voxel `v * w` (`v` the
+  destination); glibc's `cos`.
+- **FS-480** (c, rule A): `MRIvote`'s last-run check has no `Exclude0` test.
+- **FS-481** (c, rule A): `mri_reshape`'s `MRI_LONG` case uses `MRILseq_vox` (`long32`) on both volumes.
+
+- `MRIsetVoxelToRasXform` (section 12, corrected in relay 20): the centre is `((m11 ci + m12 cj) + m13 ck) + m14`,
+  the sum the destination (the probe's `revs` found it: a NaN direction cosine with an infinite voxel size).

@@ -15,17 +15,18 @@ mod cases;
 use larmorx_core::defects::UpstreamDefects;
 use sha2::{Digest, Sha256};
 
-/// Recorded 2026-11-13 (121 commands: transform.cpp's VOL_GEOM functions and `LTAreadEx` with
+/// Recorded 2026-11-14 ( transform.cpp's VOL_GEOM functions and `LTAreadEx` with
 /// `USE_AVERAGE305` unset, `true` or empty, 3.1-35's voxel arithmetic, coordinates and geometry,
 /// moves and head box, `MRIaverage`, 3.1-36's samplers, resolution, planes, fills, resampling by whole
 /// factors and changes of type, frame-range samplers, the trilinear kernel and splatting, derivatives,
 /// gradients, neighbour counts and linear transforms, 3.1-37's resampling onto a template, 3.1-38's
 /// value replacement, the CMA labels and segmentation functions; relay 19: 3.1-37's statistics,
-/// orientation strings, voxel-to-RAS matrices, neighbourhoods and labels, and 3.1-35's 2-D images):
-/// 2,420 cases, 2,254 lines identical, 166 hashed as `SKIP`.
-const N: usize = 2420;
-const OFFICIAL_SHA256: &str = "3834ef65feb37ff13903d5bf1458c793ceae37307d8779a87e70c4b755ef40a7";
-const SKIPPED: usize = 166;
+/// orientation strings, voxel-to-RAS matrices, neighbourhoods and labels, and 3.1-35's 2-D images;
+/// relay 20, 151 commands: the partial-volume count, 3.1-37's pieces c and d's first part):
+/// 3,020 cases, 2,813 lines identical, 207 hashed as `SKIP`.
+const N: usize = 3020;
+const OFFICIAL_SHA256: &str = "0b75c43a5ca8662cac67b4bce54b64c9d718499cda9360cecd3086fb190d45d3";
+const SKIPPED: usize = 207;
 
 /// `check.py`'s `SKIP`.
 const SKIP: [&str; 38] = [

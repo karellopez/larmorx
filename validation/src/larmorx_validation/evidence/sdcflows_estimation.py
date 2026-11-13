@@ -2107,7 +2107,7 @@ def export(ctx: core.Context) -> dict:
         *trial_tables,
     ]
     bench = ctx.repo / BENCH
-    return {
+    doc = {
         "schema": 1,
         "tool": TOOL,
         "title": "sdcflows' field-map estimation: PEPOLAR, direct and fieldmap-less, the masks "
@@ -2143,6 +2143,322 @@ def export(ctx: core.Context) -> dict:
         "tables": tables,
         "examples": examples,
     }
+    return present(doc)
+
+
+# ---------------------------------------------------------------------- the presentation
+
+from larmorx_validation.evidence.sdcflows_fieldmap import _NUMBER, _diff, _found, _want
+
+TRIAL_DATE = TRIALS[0][:10]
+
+
+def _page(program: str = "", software: str = "sdcflows", version: str = "2.17.1"):
+    from larmorx_validation.evidence import present as present_
+
+    return present_.Page(software, program, version, part="estimation", texts=TEXTS)
+
+
+#: The page's own rewordings (applied before the guide's words). In this page's texts LARMORX
+#: names the port (the replica) but where it names the project's replicas underneath, its
+#: reference setup or its switch; the replicas of the libraries are replicas; the comparisons
+#: of the originals with themselves by what they are; the part's own words by what they mean.
+TEXTS = [
+    (r"\bLARMORX's replicas and ports\b", "LARMORX's replicas"),
+    (r"\bthe replicas and ports\b", "the replicas"),
+    (r"\bLARMORX's port of it\b", "LARMORX's replica of it"),
+    (r"\bby LARMORX's port\b", "by the replica"),
+    (r"\ba LARMORX mistake\b", "a mistake of the replica's"),
+    (r"\bLARMORX reproduce ([\d,]+), default ([\d,]+)", r"the replica in `reproduce` \1, in `fix` \2"),
+    (r"\bits own oracle run\b", "its own run"),
+    (r"\bsdcflows' own oracle runs\b", "sdcflows' own runs"),
+    (r"\b(\d+) of (\d+) oracle references\b", r"\1 of \2 references from fMRIPrep's runs"),
+    (r"\bwhere this machine's oracle is ANTs 2\.6\.5 built with\b", "where the repository's build "
+     "is ANTs 2.6.5, made with"),
+    (r"\bLARMORX in both modes\b", "the replica in `fix` and in `reproduce`"),
+    (r"^seed, LARMORX commit$", "seed, the replica's commit"),
+    (r"\bThe default masks larger\b", "The masks of `fix` larger"),
+    (r"\bThe second trial\b", "The second run"),
+    (r"\bin the trial\b", "in the run"),
+    (r"(?<![\w`/-])LARMORX(?!'s replicas|'s reference|'s replica of|_| has a switch)", "larmorx"),
+    (r"\blarmorx's reference\b", "LARMORX's reference"),
+    (r"\bthe default mode's differ\b", "those of `fix`, the default, differ"),
+    (r"^The original against itself, a reference row: ", "For reference, the original against "
+     "itself: "),
+    (r"^The originals against each other, a reference row: ", "For reference, the originals "
+     "against each other: "),
+    (r"^The version step, a reference row \(the originals against each other\): ",
+     "For reference, the step between the originals' versions: "),
+    (r"^The libraries' step, a reference row \(the original against itself\): ",
+     "For reference, the originals' own step between releases of the libraries: "),
+    (r"\bin both modes \(no correction of the register applies to this call\)",
+     "in `fix` and in `reproduce` (no correction by default applies to this call)"),
+    (r"\bits default mode checked by D13's rule\b", "its default, `fix`, checked by the rule of "
+     "the corrections by default"),
+    (r"\bD13's rule: clamped\b", "the rule of the corrections by default: clamped"),
+    (r"^the part's contract: ", "the contract of every program: "),
+    (r"\bevery public function of the part's families\b", "every public function of these "
+     "families"),
+    (r"\(the field maps' part B, (\d{4}-\d\d-\d\d)\)", r"(\1)"),
+    (r"\bthe part's runs\b", "the runs"),
+    (r"\bthe short runs before the trials and of the trials themselves\b", "the short runs before "
+     "the two runs and of the two runs themselves"),
+    (r"^Differential random testing \(", "The replica's random testing ("),
+]  # fmt: skip
+
+_SAME_STEP = r"\b(?:reference row|the originals' own step)\b"
+
+
+def _ids(ex: dict, i: str) -> list[str]:
+    """The register's entries a comparison's reason names, in its order."""
+    return list(dict.fromkeys(re.findall(r"\b[A-Z]+-\d+\b", _diff(ex, i)["reason"] or "")))
+
+
+def _and(xs: list[str]) -> str:
+    return xs[0] if len(xs) == 1 else ", ".join(xs[:-1]) + " and " + xs[-1]
+
+
+def _shows_app(ex: dict) -> tuple[str, list[str]]:
+    """sdcflows' BIDS app whole: every output and file sdcflows', fMRIPrep's own derivatives
+    within the original's variability, the corrections by default."""
+    _want(ex, lx_sdc="bit-identical", lxf_fmriprep="within-variability", lx14_lx1="bit-identical",
+          fix_lx14="d13", sdc4_sdc1=None, fmriprep_sdc=None)  # fmt: skip
+    _found(ex, "lx-sdc", r"\(and every derivative file, byte for byte")
+    nodes = _found(ex, "lxf-fmriprep", r"fMRIPrep's N4 node ran at (\d+) threads with glibc's "
+                   r"exp and log, LARMORX's at one thread with correctly rounded maths")  # fmt: skip
+    fixed = _ids(ex, "fix-lx14")
+    n = _NUMBER[len(ex["outputs"])]
+    return (
+        f"In `reproduce` the replica's BIDS app gives every value of sdcflows 2.17.1's {n} "
+        "outputs and every derivative file byte for byte, at 1 and 14 threads alike, with "
+        "LARMORX's replicas of the programs underneath. Run as fMRIPrep ran the stage, it holds "
+        "fMRIPrep's own derivatives within the original's own variability: fMRIPrep's N4 ran at "
+        f"{nodes.group(1)} threads with glibc's maths, the replica's at one thread with correctly "
+        f"rounded maths. In `fix`, its default, it corrects {_and(fixed)}."
+    ), ["lx-sdc"]
+
+
+def _shows_syn(ex: dict) -> tuple[str, list[str]]:
+    """The fieldmap-less estimation: ANTs' one-thread registration with correctly rounded maths
+    byte for byte, fMRIPrep's own field within ANTs' own spread."""
+    _want(ex, lx_ants="bit-identical", lx_fmriprep="within-variability", fix_lx="d13",
+          g1_cr1=None, g4_g1=None, g4b_g4a=None, fmriprep_g4=None)  # fmt: skip
+    warp = _found(ex, "lx-ants", r"warp is ANTs' byte for byte \(([\d,]+) values\), at (\d+) "
+                  r"threads").groups()  # fmt: skip
+    band, near = _found(ex, "lx-fmriprep", r"differ from each other by up to ([\d.]+) Hz .*?"
+                        r"\(at most ([\d.]+) Hz from LARMORX's").groups()  # fmt: skip
+    fixed = _ids(ex, "fix-lx")
+    return (
+        "In `reproduce` the replica gives every value of ANTs 2.6.5's registration at one thread "
+        "with correctly rounded maths, followed by sdcflows' steps, at "
+        f"{warp[1]} threads: its warp is ANTs' byte for byte ({warp[0]} values). fMRIPrep's own "
+        "field, made by its image's ANTs 2.6.2.dev1 at four threads with glibc's maths, lies "
+        f"within ANTs' own spread on this call: ANTs' runs differ from each other by up to {band} "
+        f"Hz, and fMRIPrep's field is at most {near} Hz from the replica's. In `fix`, its "
+        f"default, the replica corrects {_and(fixed)}."
+    ), ["lx-ants"]
+
+
+def _shows_masker(ex: dict) -> tuple[str, list[str]]:
+    _want(ex, lx_sdc="bit-identical", lxf_fmriprep="bit-identical", lx14_lx1="bit-identical",
+          fmriprep_sdc=None)  # fmt: skip
+    _found(ex, "lx14-lx1", r"no correction of the register applies to this call")
+    libs = _found(ex, "lxf-fmriprep", r"With (numpy [\d.]+)'s sums and (SciPy [\d.]+)'s").groups()
+    n = _NUMBER[len(ex["outputs"])]
+    return (
+        f"In `reproduce` the replica gives every value of sdcflows 2.17.1's {n} outputs, at 1 and "
+        "14 threads and in `fix` alike, and with fMRIPrep's libraries "
+        f"({libs[0]}, {libs[1]}) it writes fMRIPrep's own masker files, every value. No "
+        "correction by default changes this call."
+    ), ["lx-sdc"]
+
+
+def _shows_epi(ex: dict) -> tuple[str, list[str]]:
+    _want(ex, lx_sdc="bit-identical", fix_lx="d13")
+    m = _found(ex, "fix-lx", r"sdcflows' mask holds ([\d,]+) voxels \(Dice ([\d.]+) with "
+               r"fMRIPrep's brain mask\), the corrected one ([\d,]+) \(Dice ([\d.]+)\)")  # fmt: skip
+    a, da, b, db = m.groups()
+    fixed = _ids(ex, "fix-lx")
+    return (
+        "In `reproduce` the replica gives sdcflows 2.17.1's mask, every voxel. In `fix`, its "
+        f"default, it corrects SciPy's watershed ({_and(fixed)}): the object's region no longer "
+        f"stops early, and the mask grows from {a} to {b} voxels, its Dice coefficient with "
+        f"fMRIPrep's brain mask from {da} to {db}."
+    ), ["lx-sdc"]
+
+
+#: "What this shows" of each worked example (the writing guide, section 4), from its own
+#: verdicts and reasons; beside it the replica's verdict against the original.
+SHOWS = {
+    "app-ds006736": _shows_app,
+    "app-ds005752": _shows_app,
+    "syn-ds000228": _shows_syn,
+    "masker-ds002603": _shows_masker,
+    "epi-mask-ds003592": _shows_epi,
+}
+#: Each example's program (the BIDS app's examples: the page's sdcflows; the fieldmap-less
+#: estimation's original is ANTs' registration, sdcflows' steps after it).
+PAGES = {
+    "syn-ds000228": ("antsRegistration", "ANTs", "2.6.5"),
+    "masker-ds002603": ("brain_masker", "sdcflows", "2.17.1"),
+    "epi-mask-ds003592": ("epi_mask", "sdcflows", "2.17.1"),
+}
+#: Comparisons the shapes name otherwise, per example.
+DIFFS = {
+    "app-ds006736": {
+        "fmriprep-sdc": ("fMRIPrep's output − sdcflows 2.17.1, 1 thread",
+                         "the original against itself: versions 2.15.1 and 2.17.1, with their "
+                         "libraries"),
+    },
+    "app-ds005752": {
+        "fmriprep-sdc": ("fMRIPrep's output − sdcflows 2.17.1, 1 thread",
+                         "the original against itself: versions 2.15.1 and 2.17.1, with their "
+                         "libraries"),
+    },
+    "syn-ds000228": {
+        "lx-ants": ("replica (14 threads) − ANTs antsRegistration 2.6.5, 1 thread, correctly "
+                    "rounded maths", "the replica against the original: correctly rounded maths"),
+        "g4b-g4a": ("ANTs antsRegistration 2.6.5, 4 threads, glibc's maths: the second run − the "
+                    "first", "the original against itself: two runs of the same command"),
+        "fmriprep-g4": ("fMRIPrep's output (ANTs 2.6.2.dev1) − ANTs antsRegistration 2.6.5, both "
+                        "at 4 threads with glibc's maths",
+                        "the original against itself: fMRIPrep's build and the repository's"),
+    },
+    "masker-ds002603": {
+        "lx14-lx1": ("replica: 14 threads, fix − 1 thread, reproduce",
+                     "the replica against itself: 1 and 14 threads, fix and reproduce"),
+        "fmriprep-sdc": ("fMRIPrep's output − sdcflows brain_masker 2.17.1, the newest releases",
+                         "the original against itself: fMRIPrep's libraries and the newest "
+                         "releases"),
+    },
+}  # fmt: skip
+#: The record's threshold, in each example's metrics note (the records' own words).
+THRESHOLD = (
+    "The records' threshold: in `reproduce`, every output bit-identical to the originals' (or "
+    "fMRIPrep's own files), their messages, warnings and exit statuses too."
+)
+#: The case categories (the records' check scripts), as the page names them.
+CATEGORIES = {
+    "check_app": "sdcflows' BIDS app",
+    "check_skimage": "scikit-image and the brain masker",
+    "check_pepolar": "PEPOLAR",
+    "check_epi_mask": "epi_mask and the watershed",
+    "check_match_histogram": "histogram matching",
+    "check_syn_preprocessing": "the fieldmap-less preprocessing",
+    "check_syn_sdc": "the fieldmap-less estimation",
+    "check_estimators": "the estimators of a BIDS dataset",
+    "check_derivatives": "the derivatives",
+    "check_ndimage": "SciPy's ndimage",
+    "check_numpy": "numpy",
+    "check_scipy_inv": "SciPy's inv",
+    "check_regrid": "regridding and Gaussian filters",
+    "check_merge": "niworkflows' IntraModalMerge",
+    "check_masker_steps": "the brain masker's steps",
+    "check_workflows": "the field-map workflows",
+    "relay22/audit_contract": "the per-program contract",
+    "check_qwarp_steps": "3dQwarp's Python steps",
+    "check_fmap_stage": "fMRIPrep's field-map stage",
+    "check_unwarp": "the unwarping",
+    "check_bold_fmap": "fMRIPrep's BOLD field-map nodes",
+    "check_bold_steps": "fMRIPrep's BOLD field-map steps",
+    "check_bold_stage": "fMRIPrep's BOLD field-map stages",
+    "check_nipype": "nipype's command lines",
+}
+#: The originals the page compares with, in titles.
+ORIGINALS = "sdcflows 2.17.1, niworkflows 1.15.4, SciPy, scikit-image and numpy"
+#: The tables' titles by the guide's pattern.
+TABLE_TITLES = {
+    "records": "The replica's records against the originals: " + ORIGINALS + " (every case "
+    "passes)",
+    "app-runs": "sdcflows' BIDS app whole on the eight datasets of its own runs, the replica "
+    "against the original: sdcflows 2.17.1",
+    "stage": "fMRIPrep's field-map derivatives, the replica's stage run as fMRIPrep ran it against "
+    "fMRIPrep's output",
+    "epi-mask": "epi_mask on four BOLD references, the original and the replica's fix against "
+    "fMRIPrep's brain masks: sdcflows `epi_mask` 2.17.1",
+    "corrections": "Corrections by default, the replica: the originals' defects (SDC-12 to SDC-46, "
+    "PIPE-18 to PIPE-40, SCI-06 to SCI-32, SKI-01 to SKI-04)",
+    "step": "Changes, the originals against themselves: numpy 2.3.5 / SciPy 1.15.3 and numpy "
+    "2.5.4 / SciPy 1.18.1",
+    "memory": "Peak memory, the replica against the originals (MiB, the memory rule's calls, one "
+    "thread)",
+    "trial": "Random testing, the replica against the originals: " + ORIGINALS + " (the two runs "
+    "of {date})",
+    "triage": "The replica's differences from the originals in the runs of {date}, triaged",
+}
+#: The tables' columns: each run as the panels name it.
+COLUMNS = {
+    "Tier": "Comparison",
+    "LARMORX (s)": "replica (s)",
+    "LARMORX's stage": "the replica's stage",
+    "default: voxels": "fix: voxels",
+    "named by default": "named by fix",
+    "What LARMORX does": "What the replica does",
+    "The original": "the original",
+    "LARMORX, reproduce": "replica, reproduce",
+    "LARMORX, default": "replica, fix",
+    "LARMORX ÷ the original": "replica ÷ the original",
+}
+#: The speed chart's series, as the page names them.
+SPEED_LABELS = {
+    "the original, 1 thread": "the original, 1 thread",
+    "LARMORX, 1 thread": "replica, 1 thread",
+    "LARMORX, 14 threads": "replica, 14 threads",
+}
+#: The record's implementation: its id (the case explorer's) and port.
+PORTS = {"port": "replica"}
+
+
+def _labels(ex: dict) -> None:
+    """The labels' old forms that the shapes read in lower case ("LARMORX (port), 1 thread",
+    "LARMORX − sdcflows 2.17.1"), fMRIPrep's files by its output (its version is in the panel's
+    second line), the replicas underneath by their name."""
+    for p in ex["panels"]:
+        if p.get("sub"):
+            p["sub"] = re.sub(r"\bLARMORX's replicas and ports\b", "LARMORX's replicas", p["sub"])
+            p["sub"] = re.sub(r"\bthe replicas and ports\b", "the replicas", p["sub"])
+    for d in ex["diffs"]:
+        d["label"] = re.sub(r"(?<![\w`/-])LARMORX\b", "larmorx", d["label"])
+        d["label"] = re.sub(r"\bfMRIPrep \d[\d.]*'s own (files?)\b", r"fMRIPrep's own \1",
+                            d["label"])
+
+
+def present(doc: dict) -> dict:
+    """sdcflows' PEPOLAR, direct and fieldmap-less estimation in the writing guide's words and
+    order: texts, ports and order only."""
+    from larmorx_validation.evidence import present as present_
+
+    page = _page()
+    for ex in doc["examples"]:
+        line, verdicts = SHOWS[ex["id"]](ex)
+        program, software, version = PAGES.get(ex["id"], ("", "sdcflows", "2.17.1"))
+        own = _page(program, software, version)
+        _labels(ex)
+        present_.example(own, ex, shows=line, verdicts=verdicts, diffs=DIFFS.get(ex["id"]))
+        note = ex.get("metrics_note") or ""
+        if THRESHOLD in note:
+            raise ValueError(f"{ex['id']}: the threshold is in its note already")
+        ex["metrics_note"] = f"{note} {THRESHOLD}".strip()
+    for im in doc["implementations"]:
+        present_.implementation(page, im, "standard comparison", port=PORTS[im["id"]])
+        im["title"] = f"Agreement, replica against the originals: {ORIGINALS}"
+        im["label"] = f"replica against the originals: {ORIGINALS} (standard comparison)"
+    present_.speed(
+        page,
+        doc.get("speed"),
+        "Seconds per call (the median of three runs, one run for the BIDS app) on a log scale; "
+        "the factor is the original's time divided by the replica's, both on one thread.",
+        labels=SPEED_LABELS,
+    )
+    if doc.get("speed"):
+        doc["speed"]["title"] = f"Speed, the replica against the originals: {ORIGINALS}"
+    present_.finish(page, doc, CATEGORIES, ports=PORTS)
+    for t in doc.get("tables", []):
+        for c in t["columns"]:
+            c["label"] = COLUMNS.get(c["label"], c["label"])
+        if t["id"] in TABLE_TITLES:
+            t["title"] = TABLE_TITLES[t["id"]].format(date=TRIAL_DATE)
+    return doc
 
 
 if __name__ == "__main__":  # compute the cache entries only

@@ -695,6 +695,8 @@ def example(
     out, target = {}, {}
     for d in ex["diffs"]:
         pa, pb = port_of(d["a"]), port_of(d["b"])
+        if d["id"] in (diffs or {}):  # the page names it (below): its shape need not be read
+            continue
         role, target[d["id"]] = attempt(
             _role, page, d, pa, pb, by_id, info, fallback=("?", "the original")
         )

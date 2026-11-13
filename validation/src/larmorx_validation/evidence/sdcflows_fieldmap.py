@@ -1885,6 +1885,10 @@ TEXTS = [
     (r"^Differential random testing's trial of this part \(", "The replica's random-testing run ("),
     (r"\bbefore the trial \(the same day\)", "before this run (the same day)"),
     (r"\(the trial of (\d{4}-\d\d-\d\d)\)", r"(the random-testing run of \1)"),
+    (r"; larmorx's Shepperd formula gave other last bits and zero signs before relay 7\)",
+     "; the replica's own Shepperd formula, used at first, gave other last bits and zero signs)"),
+    (r"\bthe default's result checked by D13's rule\b", "the result of `fix` checked by the rule "
+     "of the corrections by default"),
     (r" \(relay \d+\)", ""),
 ]  # fmt: skip
 

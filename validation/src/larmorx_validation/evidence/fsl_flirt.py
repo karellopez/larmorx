@@ -1765,6 +1765,8 @@ TEXTS = [
      "A random-testing run of the clean room"),
     (r"\bEvery differing case of the trial\b", "Every differing case of the run"),
     (r"\bThe reproducer is a finding of the trial\b", "The reproducer is a finding of the run"),
+    # the benchmark's machine, shared: with other runs (an agent is the project's own word)
+    (r"\bshared with another agent's runs\b", "shared with other runs"),
 ]  # fmt: skip
 #: The page's examples and speed: FLIRT's `flirt`; its agreement charts and random testing cover
 #: every program of FSL's FLIRT package, named as a part of FSL.

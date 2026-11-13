@@ -1,5 +1,5 @@
 {
- "dossier": "2026-11-13-freesurfer-cleanroom-1-relay-1",
+ "dossier": "2026-11-13-freesurfer-batch-3",
  "edits": [
   {
    "added": null,
@@ -121,11 +121,11 @@
   }
  ],
  "evidence": {
-  "accesses": 367030,
-  "agents": 375,
+  "accesses": 369165,
+  "agents": 376,
   "archive_checksums_differ": 0,
-  "archive_checksums_matched": 512,
-  "archived_files": 512,
+  "archive_checksums_matched": 521,
+  "archived_files": 521,
   "archives": {
    "2026-11-05-session-transcripts": {
     "files": 244,
@@ -203,6 +203,10 @@
     "files": 24,
     "sha256": "270fabe579ae46ec980c98fa1944da5c901164127803af20dc15e52efe4767ba"
    },
+   "2026-11-13-session-transcripts-freesurfer-batch-3": {
+    "files": 15,
+    "sha256": "73e5980ac8331c33b24749f758aeb3167982404a5b0d44e8692e1687bed9f76c"
+   },
    "2026-11-13-session-transcripts-freesurfer-cleanroom-1-relay-1": {
     "files": 43,
     "sha256": "d9deda02c9c0a21b4c19d92cfbec7330ef631d30857aa81e49c22bacf3c1580a"
@@ -212,30 +216,30 @@
     "sha256": "246d88c724835fe011c7d0aab2f547b65d18afed6245cba44d391d971eae2e8a"
    }
   },
-  "commits_printed": 3503,
-  "distinct_transcripts": 379,
+  "commits_printed": 3538,
+  "distinct_transcripts": 380,
   "first_record": "2026-10-09 11:38 UTC",
   "gaps": {
-   "agents_without_worktree": 273,
+   "agents_without_worktree": 274,
    "bad_lines": 0,
-   "calls_without_result": 50,
-   "compaction_parent_missing": 4,
+   "calls_without_result": 53,
+   "compaction_parent_missing": 5,
    "compactions": 78,
    "refused_calls": 1660,
    "refused_calls_restricted_accesses": 734,
    "request_only_calls": 0,
    "results_without_call": 0,
-   "unresolved_paths": 8456
+   "unresolved_paths": 8478
   },
-  "last_record": "2026-11-13 03:36 UTC",
-  "live_files": 379,
-  "live_files_also_archived": 376,
+  "last_record": "2026-11-13 04:37 UTC",
+  "live_files": 380,
+  "live_files_also_archived": 377,
   "sessions": 4,
-  "tool_calls": 105651,
+  "tool_calls": 106207,
   "tool_calls_by_tool": [
    [
     "Agent",
-    377
+    378
    ],
    [
     "Artifact",
@@ -247,7 +251,7 @@
    ],
    [
     "Bash",
-    90303
+    90818
    ],
    [
     "CronCreate",
@@ -259,7 +263,7 @@
    ],
    [
     "Edit",
-    4461
+    4466
    ],
    [
     "EnterWorktree",
@@ -271,7 +275,7 @@
    ],
    [
     "Read",
-    2713
+    2725
    ],
    [
     "ReadNotifications",
@@ -279,7 +283,7 @@
    ],
    [
     "SendMessage",
-    122
+    123
    ],
    [
     "SendUserFile",
@@ -291,7 +295,7 @@
    ],
    [
     "SubagentHandback",
-    397
+    399
    ],
    [
     "TaskOutput",
@@ -299,11 +303,11 @@
    ],
    [
     "TaskStop",
-    284
+    287
    ],
    [
     "ToolSearch",
-    225
+    226
    ],
    [
     "WebFetch",
@@ -315,12 +319,12 @@
    ],
    [
     "Write",
-    6434
+    6450
    ]
   ],
-  "transcript_bytes": 10116482237,
-  "transcript_files": 891,
-  "unique_paths": 76222
+  "transcript_bytes": 10412017552,
+  "transcript_files": 901,
+  "unique_paths": 76570
  },
  "levels": [
   [
@@ -401,7 +405,7 @@
  "made_from": {
   "scan": "scan",
   "similarity_commit": "6e18b57d-dirty",
-  "verdicts_repository": "164105e0"
+  "verdicts_repository": "1e90a76c"
  },
  "overview": {
   "agents_by_role": [
@@ -415,7 +419,7 @@
    ],
    [
     "documentation",
-    25
+    26
    ],
    [
     "integration",
@@ -10559,7 +10563,7 @@
    "slips": [],
    "verdict": {
     "status": "clean, with notes",
-    "words": ""
+    "words": "clean: written from specs/burkardt-spline.md and black-box runs of FreeSurfer's spline; the replica workspace's file names and build caches seen in build output only"
    }
   },
   {
@@ -10669,7 +10673,7 @@
    "slips": [],
    "verdict": {
     "status": "clean, with notes",
-    "words": ""
+    "words": "clean: written from specs/ranlux.md and black-box runs of FreeSurfer's functions and mri_volsynth; the replica workspace's file names and build caches seen in build output only; a slip declared by the implementer (larmorx-core's provenance lines on VXL's generator and POSIX's drand48, which name how FreeSurfer calls them) unrelated to RANLUX"
    }
   },
   {
@@ -10733,7 +10737,7 @@
    "slips": [],
    "verdict": {
     "status": "clean",
-    "words": ""
+    "words": "clean: written from specs/glibc-random.md and black-box runs of the C library; two slips declared by the implementer, neither of restricted content (four file names of another family's probe folder printed by git diff --stat; FreeSurfer 6.0.0's help text from a program an unquoted heredoc ran)"
    }
   },
   {

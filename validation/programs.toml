@@ -227,7 +227,6 @@ group = "afni"
 name = "3dTshift"
 command = "larmorx afni 3dTshift"
 python = "lx.afni.tshift"
-does = "Slice-timing correction of a series."
 api = "docs/api/afni-tshift.md"
 evidence = "/evidence/afni-tshift/"
 records = { replica = ["afni-tshift-replica"], clean-room = ["afni-tshift"] }

@@ -58,6 +58,20 @@ def _make_head4d(path: Path) -> None:
     _save(path, *_head((40, 48, 40, 4)))
 
 
+def _make_bold(path: Path) -> None:
+    _save(path, *_head((40, 48, 40, 8)))
+
+
+def _make_slice_timing(path: Path) -> None:
+    """The times of 40 slices acquired interleaved (even slices first) within 2 s, 0.05 s apart,
+    on one line separated by tabs, as fMRIPrep writes a ``-tpattern`` file."""
+    order = list(range(0, 40, 2)) + list(range(1, 40, 2))
+    times = [0.0] * 40
+    for n, k in enumerate(order):
+        times[k] = n * 5 / 100
+    path.write_text("\t".join(str(t) for t in times) + "\n", encoding="utf-8")
+
+
 def _make_matrix(path: Path) -> None:
     path.write_text("1 0 0 0\n0 1 0 0\n0 0 1 0\n0 0 0 1\n", encoding="utf-8")
 
@@ -108,6 +122,12 @@ def _make_log(path: Path) -> None:
 KINDS: dict[str, Kind] = {
     "head": Kind("a synthetic head of 40 × 48 × 40 voxels of 4 mm", _make_head),
     "head4d": Kind("a synthetic series of 4 such heads", _make_head4d),
+    "bold": Kind("a synthetic series of 8 heads of 40 × 48 × 40 voxels of 4 mm", _make_bold),
+    "slice-timing": Kind(
+        "the times of 40 slices acquired interleaved within 2 s, on one line, as fMRIPrep writes "
+        "them",
+        _make_slice_timing,
+    ),
     "matrix": Kind("the identity as a 4 × 4 text matrix", _make_matrix),
     "coords": Kind("two coordinates, one `x y z` per line", _make_coords),
     "points": Kind("eight points in millimetres, one `x y z` per line", _make_points),

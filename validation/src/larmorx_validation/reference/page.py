@@ -100,7 +100,7 @@ def read_row(cells: list[str], header: list[str], params: set[str]) -> Row:
     for span in _spans(first):
         for w in span.split():
             w = w.split("=", 1)[0]
-            if re.fullmatch(r"--?[\w][\w-]*", w):
+            if re.fullmatch(r"--?[\w][\w+.-]*", w):  # AFNI's `-rlt+`
                 options.append(w)
             elif re.fullmatch(r"[A-Z][A-Z0-9_]{2,}", w):
                 variables.append(w)

@@ -724,6 +724,13 @@ def test_glibc_source_dates_and_the_rules_table():
             "R11",
         ),
         (
+            f"{WT}/validation/investigations/freesurfer-surfio/accessors.py",
+            "read",
+            "restricted",
+            "R11",
+        ),
+        (f"{WT}/validation/probes/fs-surfio/README.md", "read", "restricted", "R14"),
+        (
             f"{WT}/validation/investigations/freesurfer-cleanroom-random-spline/README.md",
             "read",
             "repo",

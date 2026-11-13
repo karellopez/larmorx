@@ -698,6 +698,13 @@ def test_glibc_source_dates_and_the_rules_table():
             "restricted",
             "R11",
         ),
+        (
+            f"{WT}/validation/investigations/glibc-qsort-spec-check/model.py",
+            "read",
+            "restricted",
+            "R11",
+        ),
+        (f"{WT}/validation/investigations/glibc-qsort-probe/README.md", "read", "repo", None),
         (f"{WT}/validation/investigations/freesurfer-ranlux-probe/README.md", "read", "repo", None),
         (f"{WT}/validation/investigations/glibc-random-probe/README.md", "read", "repo", None),
         (f"{WT}/docs/findings/afni-volreg-clean-room.md", "read", "repo", None),

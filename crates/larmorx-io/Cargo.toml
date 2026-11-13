@@ -8,6 +8,7 @@ repository.workspace = true
 
 [dependencies]
 bytemuck.workspace = true
+bzip2.workspace = true
 crc32fast.workspace = true
 flate2.workspace = true
 larmorx-core.workspace = true

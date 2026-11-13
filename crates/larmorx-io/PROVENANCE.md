@@ -148,3 +148,56 @@ crate `larmorx-hdf5`:
 
 `itk_transform_names.rs` lists the transform classes registered with ITK's factory in the ANTs
 2.6.5 build, copied from the oracle's own message for an unknown class.
+
+## MNI transform files (`src/xfm/`; FreeSurfer's foundations, item 3.1-14, 2026-11-12/13)
+
+**Ported** from MINC 1.5.1's volume_io (the release tarball `minc-1.5.1.tar.gz`, SHA-256
+`0b41d5bb1b178c62792c9e4fbd8ddd971d1a90aad7c257ff00bcbdddc3998afe`, pinned at
+`<workspace>/tags/minc-1.5.1`; © 1993-1995 David MacDonald and 1993-2000 Peter Neelin, McConnell
+Brain Imaging Centre, Montreal Neurological Institute, McGill University; MNI's permissive notice,
+`LICENSES/LicenseRef-MNI.txt`; the files' SPDX `Apache-2.0 AND LicenseRef-MNI`):
+
+| larmorx | MINC 1.5.1 `volume_io/` |
+|---|---|
+| `xfm/read.rs`: `CStream`, `get_nonwhite`, `skip_expected`, `input_string`, `keyword_and_equal`, `input_real`, `input_int`, `input_reals`, `unget_string`, `input_one_transform`, `input_transform`, `input_transform_file` | `MNI_formats/mni_io.c` (`mni_get_nonwhite_character`, `mni_skip_expected_character`, `mni_input_string`, `mni_input_keyword_and_equal_sign`, `mni_input_real`, `mni_input_int`, `mni_input_reals`, `unget_string`), `MNI_formats/gen_xf_io.c` (`input_one_transform`, `input_transform`, `input_transform_file`), `Prog_utils/files.c` (`input_character`, `unget_character`) |
+| `xfm/write.rs` | `MNI_formats/gen_xf_io.c` (`output_one_transform`, `output_transform`, `output_transform_file`), `MNI_formats/mni_io.c` (`output_comments`) |
+| `xfm/mod.rs`: `GeneralTransform` and its methods, `general_transform_point`, `handle_internal_error` | `MNI_formats/gen_xfs.c` (`create_linear_transform`, `get_transform_type`, `get_n_concated_transforms`, `get_nth_general_transform`, `get_linear_transform_ptr`, `get_inverse_linear_transform_ptr`, `transform_or_invert_point`, `copy_and_invert_transform`, `create_inverse_general_transform`, `invert_general_transform`, `concat_general_transforms`), `Prog_utils/print.c` (`handle_internal_error`, `abort_if_allowed`) |
+| `xfm/mod.rs`: `make_identity_transform`, `close_to_identity`, `concat_transforms`, `homogenous_transform_point`, `transform_point`, `compute_transform_inverse` | `Geometry/transforms.c`, `Geometry/inverse.c` |
+| `xfm/gaussian.rs` | `Geometry/gaussian.c` (`scaled_maximal_pivoting_gaussian_elimination`, `..._real`, `invert_square_matrix`) |
+| `xfm/files.rs` | `Prog_utils/files.c` (`expand_filename`, `get_user_home_directory`, `file_exists`, `remove_directories_from_filename`, `has_no_extension`, `extract_directory`, `file_exists_as_compressed`, `open_file`, `open_file_with_default_suffix`, `print_system_error`), `Prog_utils/string.c` (`equal_strings`, `string_ends_in`, `concat_char_to_string`) |
+
+The numbers are read with `larmorx_core::cscan` (C's `sscanf("%lf")`, from the C standard and
+glibc's behaviour) and written with `larmorx_core::cfmt` (`%.15g`). Decompression is in memory
+(flate2 for gzip, the `bzip2` crate's pure-Rust backend for bzip2) where volume_io runs `gunzip`
+and `bunzip2` (FS-71). FreeSurfer's copy (`packages/minc`) was not read: its changes are measured
+by the probe and kept out of this crate (`Dialect`; `docs/findings/minc-xfm.md`). Defects FS-71 to
+FS-75 (`larmorx_core::defects`).
+
+**Identical to MINC 1.5.1** (its files built from the tarball with GCC 8.4.0 and FreeSurfer's flags)
+and, through a dialect holding FreeSurfer's changes, **to FreeSurfer 8.2.0's `libminc.a`** as the
+unit oracle built it: `validation/probes/fs-minc-nifti` (families `xfm`, `ops`, `write`), numbers in
+`docs/findings/minc-xfm.md`.
+
+## nifticlib's file names and znzlib (`src/nifti/niftilib.rs`, `src/znz.rs`; item 3.1-15, 2026-11-13)
+
+**Ported** from nifticlib 2.0.0 (`nifticlib-2.0.0.tar.gz`, SHA-256
+`a3e988e6a32ec57833056f6b09f940c69e79829028da121ff2c5c6f7f94a7f88`, pinned at
+`<workspace>/tags/nifticlib-2.0.0`; public domain: Robert W Cox's `nifti1_io.c`, Mark Jenkinson's
+`znzlib.c`) and zlib 1.2.11's file layer (`zlib-1.2.11.tar.gz`, SHA-256
+`c3e5e9fdd5004dcb542feda5ee4f0ff0744628baf8ed2dd5d66f8ca1197cb1a1`, pinned at
+`<workspace>/tags/zlib-1.2.11`; © 1995-2017 Jean-loup Gailly and Mark Adler, the zlib licence;
+`znz.rs`'s SPDX `Apache-2.0 AND Zlib`; altered: translated into Rust, inflate and deflate from
+zlib-rs through flate2):
+
+| larmorx | Upstream |
+|---|---|
+| `niftilib::find_file_extension`, `is_gzfile`, `makebasename`, `validfilename`, `is_complete_filename`, `fileexists`, `findhdrname`, `is_nifti_file`, `NiftiOptions` | `niftilib/nifti1_io.c` (`nifti_find_file_extension`, `nifti_is_gzfile`, `nifti_makebasename`, `nifti_validfilename`, `nifti_is_complete_filename`, `nifti_fileexists`, `nifti_findhdrname`, `is_nifti_file`, `compare_strlist`, `is_mixedcase`, `is_uppercase`, `make_uppercase`, `fileext_compare`, `fileext_n_compare`, `g_opts`), `nifti1.h` (`NIFTI_VERSION`, `NIFTI_ONEFILE`) |
+| `znz::ZnzFile` | `znzlib/znzlib.c` (`znzopen`, `Xznzclose`, `znzread`, `znzwrite`, `znzseek`, `znzrewind`, `znztell`, `znzputs`, `znzgets`, `znzflush`, `znzeof`, `znzputc`, `znzgetc`) |
+| `znz::GzFile` | zlib 1.2.11 `gzlib.c` (`gz_reset`, `gz_open`, `gzrewind`, `gzseek64`, `gztell64`, `gzeof`, `gz_error`), `gzread.c` (`gz_load`, `gz_avail`, `gz_look`, `gz_decomp`, `gz_fetch`, `gz_skip`, `gz_read`, `gzread`, `gzgetc`), `gzwrite.c` (`gz_init`, `gz_comp`, `gz_zero`, `gz_write`, `gzwrite`, `gzputc`, `gzflush`), `gzclose.c` and `gzclose_r`/`gzclose_w` |
+| `znz::StdioFile` | C's `fopen`, `fread`, `fwrite`, `fseek`, `ftell`, `feof`, `fgetc` by their description (ISO C 7.21) and glibc's behaviour (no glibc code) |
+
+The decompressed bytes are zlib's; the compressed bytes a writer makes are zlib-rs's (a deflate
+with zlib's own bytes is FreeSurfer's item P-17). Defects FS-76 and FS-77 (nifticlib; FS-77 with
+its `reproduce`) and FS-78 (zlib 1.2.11), `larmorx_core::defects`. FreeSurfer's copy differs by
+behaviour in the extensions (`NiftiOptions`) and in its znzlib (one `gzread` per call; the probe's
+`Flavour::FreeSurfer`), measured, not ported here (`docs/findings/nifti-znz.md`).

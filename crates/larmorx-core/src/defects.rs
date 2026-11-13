@@ -1091,6 +1091,22 @@ defects! {
         "OpenSvdcmp passes a matrix with infinite or NaN entries to VNL's singular value decomposition, whose LINPACK ssvdc can loop for ever on such a matrix: the SVD functions (MatrixSVD, the SVD inverses and pseudo-inverses, the condition numbers) hang on some of them";
     FS_49 = "FS-49", "FreeSurfer", true,
         "freadInt and freadDouble at the end of the file return a value they never read (the stack's contents; freadInt prints nothing): MatrixReadFrom of a short file fills the matrix's type, sizes or elements with memory contents";
+    FS_71 = "FS-71", "MINC volume_io", true,
+        "a compressed input (.gz, .Z, .z, or a missing name whose compressed file exists) is decompressed by running gunzip -c, then bunzip2 -c, through the shell with the file name unquoted: a name with a blank or shell syntax fails, reads other files or runs commands";
+    FS_72 = "FS-72", "MINC volume_io", true,
+        "a thin-plate spline's Points or Displacements list that reaches the end of the .xfm file after white space without its ';' is read forever (the same pushed-back character each time), the list growing until memory runs out";
+    FS_73 = "FS-73", "MINC volume_io", true,
+        "a thin-plate spline's Number_Dimensions of 0 divides by zero (the program crashes) and a negative one sizes its arrays negatively";
+    FS_74 = "FS-74", "MINC volume_io", true,
+        "a thin-plate spline with an empty Points list frees a pointer that was never set (a crash or heap damage), and the writer writes such a list with no ';', so the file cannot be read back";
+    FS_75 = "FS-75", "MINC volume_io", true,
+        "a file name that starts with a $VAR (or ~) whose value is empty writes through a null pointer (expand_filename has not allocated its result yet): the program crashes";
+    FS_76 = "FS-76", "nifticlib", true,
+        "znzread or znzwrite on a compressed file with a member size of 0 divides by zero (nmemb - remain/size): a crash, or whatever the compiled code makes of it";
+    FS_77 = "FS-77", "nifticlib", true,
+        "znzread on a compressed file that ends inside a member counts that member as read (nmemb - remain/size rounds the missing members down): a caller checking the count takes a short read for a complete one";
+    FS_78 = "FS-78", "zlib 1.2.11", true,
+        "gzseek forward (or gzflush or gzclose after it) before the first gzwrite fills the gap with memory zlib never set instead of zeros: gz_zero clears its buffer once, before allocating it";
     FS_100 = "FS-100", "FreeSurfer", true,
         "the gamma draw converts its shape's integer part to a 32-bit unsigned integer, which C leaves undefined outside [0, 2^32): a shape of 2^32 or more gives a value of the wrong size, NaN and +inf the value of a shape below 1, and a negative shape or -inf a draw that does not return in practice";
     FS_101 = "FS-101", "FreeSurfer", true,

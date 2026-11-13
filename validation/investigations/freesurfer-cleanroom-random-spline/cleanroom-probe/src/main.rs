@@ -16,6 +16,7 @@
 //! differs from larmorx's correctly rounded `tan`: the system's `tan` run as a black box, through
 //! Rust's `f64::tan`), `bench <seed> <count>` (the generator's speed, nothing printed).
 
+mod glibc;
 mod spline;
 
 use larmorx_core::UpstreamDefects;
@@ -258,7 +259,7 @@ fn run(args: &[String]) -> Result<(), String> {
     let mut hits: Vec<usize> = Vec::new();
     let stdout = std::io::stdout();
     let mut out = BufWriter::with_capacity(1 << 16, stdout.lock());
-    let usage = "usage: cleanroom-probe [--reproduce] [--system-tan] [--tan-hits FILE] raw|dist|mixed|infer-mixed|tan-list|bench|cases|d3|set1 ...";
+    let usage = "usage: cleanroom-probe [--reproduce] [--system-tan] [--tan-hits FILE] raw|dist|mixed|infer-mixed|tan-list|bench|cases|d3|set1|glibc ...";
     match args.first().map(String::as_str) {
         Some("raw") if args.len() == 3 => {
             let mut r = opts.generator(parse_seed(&args[1])?);
@@ -413,6 +414,7 @@ fn run(args: &[String]) -> Result<(), String> {
             let _ = out.flush();
         }
         Some("cases" | "d3" | "set1") => return spline::run(args, &mut out, opts.mode),
+        Some("glibc") => return glibc::run(&args[1..], &mut out),
         _ => return Err(usage.to_string()),
     }
     if let Some(path) = &opts.tan_hits {

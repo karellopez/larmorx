@@ -986,6 +986,94 @@ void run_case()
     fflush(stdout);
     oi(r != NULL && r == dst);
     put_vol(r);
+  } else if (cmd == "stats") {
+    MRI *m = get_vol();
+    if (geti()) {
+      fflush(stdout);
+      int r = MRIprintStats(m, stdout);
+      fflush(stdout);
+      oi(r);
+    } else {
+      float mn, mx, mean, sd;
+      int n = -7;
+      uint32_t u = 0x7fa5a5a5u;
+      memcpy(&mn, &u, 4); memcpy(&mx, &u, 4); memcpy(&mean, &u, 4); memcpy(&sd, &u, 4);
+      oi(MRIstats(m, &mn, &mx, &n, &mean, &sd));
+      oi(n); of(mn); of(mx); of(mean); of(sd);
+    }
+  } else if (cmd == "type2s") {
+    os(MRItype2str(geti()));
+  } else if (cmd == "cropbb") {
+    MRI *m = get_vol();
+    MRI_REGION b;
+    b.x = geti(); b.y = geti(); b.z = geti(); b.dx = geti(); b.dy = geti(); b.dz = geti();
+    oi(MRIcropBoundingBox(m, &b));
+    oi(b.x); oi(b.y); oi(b.z); oi(b.dx); oi(b.dy); oi(b.dz);
+  } else if (cmd == "crass") {
+    MRI *src = get_vol();
+    MRI *dst = get_vol();
+    if (geti()) Gdiag |= DIAG_SHOW | DIAG_VERBOSE;
+    double r = 0, a = 0, ss = 0;
+    MRIcalcCRASforSampledVolume(src, dst, &r, &a, &ss);
+    fflush(stderr);
+    od(r); od(a); od(ss);
+    oam(src->i_to_r__);
+    om(src->r_to_i__);
+  } else if (cmd == "chkostr") {
+    std::string o = gethex();
+    char *e = MRIcheckOrientationString(o.c_str());
+    if (e) { ohex(std::string(e)); free(e); }
+    else out += "NULL ";
+  } else if (cmd == "o2dc") {
+    MRI *m = get_vol();
+    std::string o = gethex();
+    fflush(stdout);
+    oi(MRIorientationStringToDircos(m, o.c_str()));
+    fflush(stdout);
+    put_geom(m, false);
+  } else if (cmd == "s44") {
+    MATRIX *m = NULL;
+    int rows = geti(), cols = geti(), cplx = geti();
+    if (rows > 0) m = MatrixAlloc(rows, cols, cplx ? MATRIX_COMPLEX : MATRIX_REAL);
+    float v[16];
+    for (int i = 0; i < 16; i++) v[i] = getf();
+    oi(stuff_four_by_four(m, v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7], v[8], v[9], v[10], v[11], v[12], v[13], v[14], v[15]));
+    if (m && cplx) {
+      oi(m->rows); oi(m->cols);
+      for (int r = 1; r <= m->rows; r++)
+        for (int c = 1; c <= m->cols; c++) { of(MATRIX_CELT_REAL(m, r, c)); of(MATRIX_CELT_IMAG(m, r, c)); }
+    } else {
+      om(m);
+    }
+  } else if (cmd == "vx2rx") {
+    MRI *src = get_vol();
+    MRI *dst = geti() ? get_vol() : NULL;
+    MATRIX *mv = geti() ? get_list() : NULL;
+    MATRIX *mr = geti() ? get_list() : NULL;
+    fflush(stdout);
+    MATRIX *r = MRIvoxelXformToRasXform(src, dst, mv, mr);
+    fflush(stdout);
+    oi(r != NULL && r == mr);
+    om(r);
+  } else if (cmd == "v2v") {
+    MRI *src = get_vol();
+    MRI *dst = get_vol();
+    fflush(stdout);
+    MATRIX *r = MRIgetVoxelToVoxelXform(src, dst);
+    fflush(stdout);
+    om(r);
+  } else if (cmd == "setv2r") {
+    MRI *m = get_vol();
+    int e = geti();
+    std::string ev = gethex();
+    if (e) setenv("FS_SetVoxToRasXform_Change_VoxSize", ev.c_str(), 1);
+    MATRIX *x = get_list();
+    fflush(stdout);
+    errno = 0;
+    oi(MRIsetVoxelToRasXform(m, x));
+    fflush(stdout);
+    oi(errno);
+    put_vol(m);
   } else {
     fail("unknown command");
   }

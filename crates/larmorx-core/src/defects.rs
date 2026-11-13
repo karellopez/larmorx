@@ -1529,8 +1529,18 @@ defects! {
         "resampling a volume by voting onto a template whose orientation is unknown (no good RAS and no principal slice direction) or whose voxel-to-RAS matrix does not invert crashes";
     FS_328 = "FS-328", "FreeSurfer", true,
         "resampling a volume of 64-bit integers (long) onto a template writes each voxel as a 32-bit integer at the voxel's index: it changes halves of other voxels";
+    FS_329 = "FS-329", "FreeSurfer", true,
+        "the statistics of a volume of 64-bit integers (MRIstats, MRIprintStats) read 32-bit integers at the voxels' indices: halves of the first voxels instead of the voxels";
+    FS_330 = "FS-330", "FreeSurfer", true,
+        "the printed statistics (MRIprintStats) of a volume without voxels, or of a type the statistics do not read (bitmap, tensor, RGB, complex), are values never written: memory contents";
     FS_461 = "FS-461", "FreeSurfer", true,
         "replacing a value in a byte volume (MRIreplaceValues, MRIreplaceValuesUchar) replaces it in the first frame only; the other frames of a new or other destination are not written";
+    FS_462 = "FS-462", "FreeSurfer", true,
+        "the centre of a volume sampled by a whole factor (MRIcalcCRASforSampledVolume) divides by the sampled volume's extent: an extent of 0 ends the program";
+    FS_463 = "FS-463", "FreeSurfer", true,
+        "the check of an orientation string (MRIcheckOrientationString, MRIorientationStringToDircos) reads three characters, past the end of a string of fewer than two: memory contents";
+    FS_464 = "FS-464", "FreeSurfer", true,
+        "setting a volume's geometry from a voxel-to-RAS matrix (MRIsetVoxelToRasXform) reads rows 1 to 3 and columns 1 to 4, past the elements of a smaller matrix: memory contents";
 }
 
 /// The register entry with ID `id`.

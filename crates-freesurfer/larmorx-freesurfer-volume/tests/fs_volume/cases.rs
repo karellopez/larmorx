@@ -28,12 +28,14 @@ use larmorx_freesurfer_volume::cma as cm;
 use larmorx_freesurfer_volume::coords as co;
 use larmorx_freesurfer_volume::deriv as dv;
 use larmorx_freesurfer_volume::ltaread as lr;
+use larmorx_freesurfer_volume::orient as orn;
 use larmorx_freesurfer_volume::resample as rsm;
 use larmorx_freesurfer_volume::resize as rs;
 use larmorx_freesurfer_volume::rotate as rt;
 use larmorx_freesurfer_volume::sample as sm;
 use larmorx_freesurfer_volume::seq as sq;
 use larmorx_freesurfer_volume::skull as sk;
+use larmorx_freesurfer_volume::stats as st;
 use larmorx_freesurfer_volume::vgeom;
 use larmorx_freesurfer_volume::xform as xf;
 
@@ -429,6 +431,32 @@ fn fval(g: &mut Gen) -> f32 {
         return f32::from_bits(g.pick(&FTAB));
     }
     g.pick(&[0.0, 1.0, 2.0, 0.5, -1.0, 100.0, 127.5, 255.0, 3.0, 0.25])
+}
+
+/// A matrix's tokens (`fsvolume.cpp`'s `get_list`): rows, cols, the elements row by row (a
+/// voxel-to-RAS-like matrix most of the time).
+fn mat_toks(g: &mut Gen, t: &mut Vec<String>, rows: i64, cols: i64) {
+    t.push(rows.to_string());
+    t.push(cols.to_string());
+    let like = g.chance(2);
+    for r in 0..rows {
+        for c in 0..cols {
+            let v = if like && !g.chance(12) {
+                if r == 3 {
+                    if c == 3 { 1.0 } else { 0.0 }
+                } else if c == 3 {
+                    num(g, -128, 128, 4)
+                } else if r == c {
+                    g.pick(&[1.0f32, -1.0, 2.0, 0.5, 1.5, 0.0])
+                } else {
+                    g.pick(&[0.0f32, 0.0, 0.0, 0.25, -0.5, 1.0])
+                }
+            } else {
+                num(g, -9, 9, 4)
+            };
+            t.push(fx(v));
+        }
+    }
 }
 
 fn frame_of(g: &mut Gen, s: Shape) -> i64 {
@@ -1502,6 +1530,126 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
                     t.push(fx(fval(&mut g)));
                 }
             }
+            "stats" => {
+                let mut s = shape(&mut g);
+                if g.chance(3) {
+                    s.ty = g.pick(&[2, 3, 3]);
+                }
+                if g.chance(4) {
+                    s.nf = g.int(1, 3);
+                }
+                if !g.chance(12) {
+                    s.hdr = false;
+                }
+                vol_of(&mut g, &mut t, s);
+                t.push(i64::from(g.chance(3)).to_string());
+            }
+            "type2s" => t.push(g.int(-1, 12).to_string()),
+            "cropbb" => {
+                vol(&mut g, &mut t);
+                for _ in 0..3 {
+                    t.push(g.int(-3, 5).to_string());
+                }
+                for _ in 0..3 {
+                    t.push(g.pick(&[0i64, 1, 2, 4, 9, -1, 2147483647]).to_string());
+                }
+            }
+            "crass" => {
+                let mut s = shape(&mut g);
+                (s.w, s.h, s.d) = (g.int(1, 9), g.int(1, 9), g.int(1, 6));
+                s.hdr = g.chance(3);
+                s.drop = true;
+                vol_of(&mut g, &mut t, s);
+                let mut o = shape(&mut g);
+                (o.w, o.h, o.d) = (g.int(1, 4), g.int(1, 4), g.int(1, 3));
+                o.hdr = true;
+                vol_of(&mut g, &mut t, o);
+                t.push(i64::from(g.chance(6)).to_string());
+            }
+            "chkostr" | "o2dc" => {
+                if cmd == "o2dc" {
+                    let mut s = shape(&mut g);
+                    s.hdr = true;
+                    vol_of(&mut g, &mut t, s);
+                }
+                let letters = b"LRAPISlrapisXb ";
+                let len = if g.chance(12) {
+                    g.pick(&[1usize, 2, 4, 5])
+                } else {
+                    3
+                };
+                let mut o: Vec<u8> = (0..len)
+                    .map(|_| letters[g.below(letters.len() as u64) as usize])
+                    .collect();
+                if g.chance(2) {
+                    // a valid string, sometimes
+                    let axes = [[b'L', b'R'], [b'P', b'A'], [b'I', b'S']];
+                    let mut order = [0usize, 1, 2];
+                    for k in (1..3).rev() {
+                        order.swap(k, g.below(k as u64 + 1) as usize);
+                    }
+                    o = order.iter().map(|&a| axes[a][g.below(2) as usize]).collect();
+                    if g.chance(4) {
+                        o[0] = o[0].to_ascii_lowercase();
+                    }
+                }
+                if g.chance(30) {
+                    o[0] = 0xe9;
+                }
+                t.push(hex(&o));
+            }
+            "s44" => {
+                let (r, c) = if g.chance(5) {
+                    g.pick(&[(0, 0), (3, 4), (4, 3), (5, 5), (1, 16)])
+                } else {
+                    (4, 4)
+                };
+                t.push(r.to_string());
+                t.push(c.to_string());
+                t.push(i64::from(g.chance(6)).to_string());
+                for _ in 0..16 {
+                    t.push(fx(num(&mut g, -9, 9, 4)));
+                }
+            }
+            "vx2rx" | "v2v" => {
+                let s = vol(&mut g, &mut t);
+                if cmd == "v2v" {
+                    let o = like(&mut g, s);
+                    vol_of(&mut g, &mut t, o);
+                } else {
+                    let d = g.chance(2);
+                    t.push(i64::from(d).to_string());
+                    if d {
+                        let o = like(&mut g, s);
+                        vol_of(&mut g, &mut t, o);
+                    }
+                    let mv = !g.chance(15);
+                    t.push(i64::from(mv).to_string());
+                    if mv {
+                        let (r, c) = if g.chance(10) { (3, 4) } else { (4, 4) };
+                        mat_toks(&mut g, &mut t, r, c);
+                    }
+                    let mr = g.chance(3);
+                    t.push(i64::from(mr).to_string());
+                    if mr {
+                        let (r, c) = if g.chance(8) { (4, 3) } else { (4, 4) };
+                        mat_toks(&mut g, &mut t, r, c);
+                    }
+                }
+            }
+            "setv2r" => {
+                let mut s = shape(&mut g);
+                if !g.chance(8) {
+                    s.hdr = true;
+                }
+                vol_of(&mut g, &mut t, s);
+                let e = g.chance(4);
+                t.push(i64::from(e).to_string());
+                let txt: &[u8] = g.pick(&[&b"0.5"[..], b"1e-9", b"abc", b"1000", b" 0.01x", b"nan"]);
+                t.push(hex(txt));
+                let (r, c) = if g.chance(12) { (5, 6) } else { (4, 4) };
+                mat_toks(&mut g, &mut t, r, c);
+            }
             "lxf" | "rsmat" => {
                 let mut s = shape(&mut g);
                 if g.chance(3) {
@@ -1835,7 +1983,7 @@ fn perturb(g: &mut Gen, v: &mut [String], e: &mut [String]) {
 }
 
 /// The probe's commands, in the order the generator cycles through them.
-pub const COMMANDS: [&str; 95] = [
+pub const COMMANDS: [&str; 105] = [
     "vgwrite",
     "vgread",
     "vgread",
@@ -1931,6 +2079,16 @@ pub const COMMANDS: [&str; 95] = [
     "rsmat",
     "rsfill",
     "repval",
+    "stats",
+    "type2s",
+    "cropbb",
+    "crass",
+    "chkostr",
+    "o2dc",
+    "s44",
+    "vx2rx",
+    "v2v",
+    "setv2r",
 ];
 
 /// One buffer both streams write into, in order (FreeSurfer's standard output and error go to
@@ -3214,6 +3372,161 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
                 _ => None,
             };
             o.ret(&r, given);
+        }
+        "stats" => {
+            let m = get_vol(cx, t)?;
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            if t.i() != 0 {
+                let r = st::mri_print_stats(g, a, b, &m)?;
+                o.i(i64::from(r));
+            } else {
+                let q = f32::from_bits(0x7fa5_a5a5);
+                let mut s = st::Stats {
+                    min: q,
+                    max: q,
+                    n_voxels: -7,
+                    mean: q,
+                    std: q,
+                };
+                o.i(i64::from(st::mri_stats(g, &m, &mut s)));
+                o.i(i64::from(s.n_voxels));
+                for v in [s.min, s.max, s.mean, s.std] {
+                    o.f(v);
+                }
+            }
+        }
+        "type2s" => {
+            o.0 += st::mri_type2str(t.i());
+            o.0 += " ";
+        }
+        "cropbb" => {
+            let m = get_vol(cx, t)?;
+            let mut r = MriRegion {
+                x: t.i(),
+                y: t.i(),
+                z: t.i(),
+                dx: t.i(),
+                dy: t.i(),
+                dz: t.i(),
+            };
+            o.i(i64::from(st::mri_crop_bounding_box(&m, &mut r)));
+            for v in [r.x, r.y, r.z, r.dx, r.dy, r.dz] {
+                o.i(i64::from(v));
+            }
+        }
+        "crass" => {
+            let mut src = get_vol(cx, t)?;
+            let dst = get_vol(cx, t)?;
+            if t.i() != 0 {
+                cx.g.gdiag |= larmorx_freesurfer_core::diag::DIAG_SHOW
+                    | larmorx_freesurfer_core::diag::DIAG_VERBOSE;
+            }
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let (r, aa, ss) = st::mri_calc_cras_for_sampled_volume(g, a, b, &mut src, &dst)?;
+            for v in [r, aa, ss] {
+                o.d(v);
+            }
+            o.am(src.vg.i_to_r.as_ref());
+            o.m(src.vg.r_to_i.as_ref());
+        }
+        "chkostr" => {
+            let s = t.hex();
+            match orn::check_orientation_string(g, &s) {
+                Some(e) => o.hex(&e),
+                None => o.0 += "NULL ",
+            }
+        }
+        "o2dc" => {
+            let mut m = get_vol(cx, t)?;
+            let s = t.hex();
+            let (g, a) = (&mut cx.g, &mut cx.a);
+            o.i(i64::from(orn::orientation_string_to_dircos(g, a, &mut m, &s)));
+            o.geom_v(&m.vg, false);
+        }
+        "s44" => {
+            let (rows, cols, cplx) = (t.i(), t.i(), t.i());
+            let ty = if cplx != 0 {
+                mx::MATRIX_COMPLEX
+            } else {
+                mx::MATRIX_REAL
+            };
+            let mut m = if rows > 0 {
+                mx::matrix_alloc(g, a, b, rows, cols, ty)?
+            } else {
+                None
+            };
+            let mut v = [0.0f32; 16];
+            for x in v.iter_mut() {
+                *x = t.f();
+            }
+            o.i(i64::from(orn::stuff_four_by_four(g, b, m.as_mut(), &v)));
+            match (&m, cplx != 0) {
+                (Some(m), true) => {
+                    o.i(i64::from(m.rows));
+                    o.i(i64::from(m.cols));
+                    for r in 1..=m.rows {
+                        for c in 1..=m.cols {
+                            let (re, im) = m.celt(r, c);
+                            o.f(re);
+                            o.f(im);
+                        }
+                    }
+                }
+                _ => o.m(m.as_ref()),
+            }
+        }
+        "vx2rx" => {
+            let src = get_vol(cx, t)?;
+            let dst = if t.i() != 0 {
+                Some(get_vol(cx, t)?)
+            } else {
+                None
+            };
+            let mv = (t.i() != 0).then(|| get_list(t));
+            let mut mr = (t.i() != 0).then(|| get_list(t));
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = orn::mri_voxel_xform_to_ras_xform(
+                g,
+                a,
+                b,
+                &src,
+                dst.as_ref(),
+                mv.as_ref(),
+                mr.as_mut(),
+            )?;
+            o.i(i64::from(matches!(r, Ret::Given)));
+            match r {
+                Ret::New(m) => o.m(Some(&m)),
+                Ret::Given => o.m(mr.as_ref()),
+                Ret::Null => o.m(None),
+            }
+        }
+        "v2v" => {
+            let src = get_vol(cx, t)?;
+            let dst = get_vol(cx, t)?;
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = orn::mri_get_voxel_to_voxel_xform(g, a, b, &src, &dst)?;
+            o.m(r.as_ref());
+        }
+        "setv2r" => {
+            let mut m = get_vol(cx, t)?;
+            let e = t.i() != 0;
+            let ev = t.hex();
+            let env = if e {
+                Environment::from_pairs([(
+                    "FS_SetVoxToRasXform_Change_VoxSize",
+                    String::from_utf8(ev).expect("ASCII"),
+                )])
+            } else {
+                Environment::default()
+            };
+            let x = get_list(t);
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            g.errno = 0;
+            let r = orn::mri_set_voxel_to_ras_xform(g, a, b, &env, &mut m, &x)?;
+            o.i(i64::from(r));
+            o.i(i64::from(cx.g.errno));
+            o.vol(Some(&m));
         }
         "rsmat" => {
             let src = get_vol(cx, t)?;

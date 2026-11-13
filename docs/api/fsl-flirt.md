@@ -397,8 +397,9 @@ stage-4 cost's sinc table is the same with either `cos` (all 201 entries), so it
 ## Not yet
 
 The coordinate programs' `-warp` (FNIRT's warp fields, refused until FSL's warp-field libraries are
-ported); `standard_space_roi`, `flirt_average` and `epi_reg` (scripts of FSL's other programs: not
-ported). Known differences: with NaN or infinite input voxels in `reproduce` mode (FSL-14), the sign of
+ported); `flirt_average` and `epi_reg` (scripts of FSL's other programs: not ported).
+`standard_space_roi`, which needs FSL's other programs too, is ported with BET: the replica's since
+2026-11-04, the clean room's since 2026-11-05 ([fsl-bet.md](fsl-bet.md)). Known differences: with NaN or infinite input voxels in `reproduce` mode (FSL-14), the sign of
 NaN results can differ from FSL's (`nan` against `-nan`; the values are NaN in both); FSL-91's and
 FSL-92's `reproduce` runs (every cost equal) and the weighted `woods` registration of the
 record part from FSL's paths (the catch-up's findings, above).

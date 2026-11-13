@@ -1123,6 +1123,8 @@ defects! {
         "setting the inflated surface's name (mris_register -inflated) builds the name of its curvature file in a buffer of 1,024 bytes: a name of 1,022 bytes or more ends the program with a buffer-overflow abort (signal 6)";
     FS_112 = "FS-112", "FreeSurfer", true,
         "adding a command line to a surface that already holds 1,000 prints an error and then stores the line past the end of the list, over the count of lines, which becomes a memory address";
+    FS_113 = "FS-113", "FreeSurfer", true,
+        "scaling a surface by a negative factor (and the scale-then-translate operation with a negative factor) leaves its bounding box upside down: the low end above the high end";
 }
 
 /// The register entry with ID `id`.

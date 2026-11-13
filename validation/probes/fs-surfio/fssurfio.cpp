@@ -3,8 +3,9 @@
 // mrisurf_base.h, mrisurf_topology.h, mrisurf_sphere_interp.h, mrisurf_base.cpp's status texts,
 // modVnum, MRISvertexCoord2XYZ_float/_double) and the MRIS and MRIS_MP views' accessors; since
 // relay 6 also mrisurf.cpp's MRISaddCommandLine, mrisVertexHash (with mrisVertexVSize) and
-// MRISdiffSimple, and mrisurf_base.cpp's temporaries, per-vertex floats and file-name setters;
-// called case by case, linked with the unit oracle's libutils as the official programs are
+// MRISdiffSimple, and mrisurf_base.cpp's temporaries, per-vertex floats and file-name setters,
+// and (`surf`) mrisurf_metricProperties.cpp's coordinate operations with the distances' storage
+// (mrisurf_base.cpp) and MRISreverseFaceOrder; called case by case, linked with the unit oracle's libutils as the official programs are
 // (build.sh).
 // CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS: it names FreeSurfer's functions (running it is a
 // black-box run of FreeSurfer's code).
@@ -39,6 +40,12 @@
 #include "mrisurf_SurfaceFromMRIS_MP_generated.h"
 #include "mrisurf_base.h"
 #include "mrisurf_sphere_interp.h"
+#include "matrix.h"
+#include "mrisutils.h"
+
+// declared in utils/ only (mrisurf_deform.h) or nowhere (the MRIS_MP overload), defined in libutils
+int mrisFlipPatch(MRIS *mris);
+void MRISrotate(MRIS_MP *mris, float alpha, float beta, float gamma);
 
 const char *Progname = "fssurfio";
 
@@ -293,6 +300,149 @@ void view_case()
   oi(mp->status); oi(mp->patch);
 }
 
+// `surf`: an MRIS from the case (coordinates, rip flags, neighbourhoods, distances with their
+// storage, faces, the box), a sequence of the coordinate and distance operations, then its state.
+void dump_surface(MRIS *m)
+{
+  for (int vno = 0; vno < m->nvertices; vno++) {
+    VERTEX *v = &m->vertices[vno];
+    of(v->x); of(v->y); of(v->z); of(v->origx); of(v->origy); of(v->origz);
+    of(v->cx); of(v->cy); of(v->cz);
+    for (int o = 0; o < 2; o++) {
+      float *d = o ? v->dist_orig : v->dist;
+      int cap = o ? v->dist_orig_capacity : v->dist_capacity;
+      void *st = o ? m->dist_orig_storage[vno] : m->dist_storage[vno];
+      oi(d != NULL); oi(st != NULL); oi(cap);
+      if (d) for (int k = 0; k < cap; k++) of(d[k]);
+    }
+    VERTEX_TOPOLOGY *vt = &m->vertices_topology[vno];
+    for (int k = 0; k < vt->num; k++) oi(vt->n[k]);
+  }
+  for (int fno = 0; fno < m->nfaces; fno++) for (int k = 0; k < 3; k++) oi(m->faces[fno].v[k]);
+  oi(m->dist_alloced_flags); oi(m->dist_nsize); oi(m->origxyz_status); oi(m->status);
+  of(m->xlo); of(m->ylo); of(m->zlo); of(m->xhi); of(m->yhi); of(m->zhi);
+  of(m->xctr); of(m->yctr); of(m->zctr);
+}
+
+void surf_case()
+{
+  if (geti()) setenv("FREESURFER_reportLogicErrors", "1", 1);
+  int nv = geti(), nf = geti();
+  MRIS *m = MRISalloc(nv, nf);
+  m->status = (MRIS_Status)geti();
+  m->origxyz_status = (MRIS_Status)geti();
+  m->dist_alloced_flags = (char)geti();
+  m->dist_nsize = (char)geti();
+  for (int vno = 0; vno < nv; vno++) {
+    VERTEX *v = &m->vertices[vno];
+    VERTEX_TOPOLOGY *vt = &m->vertices_topology[vno];
+    v->x = getf(); v->y = getf(); v->z = getf();
+    v->origx = getf(); v->origy = getf(); v->origz = getf();
+    v->cx = getf(); v->cy = getf(); v->cz = getf();
+    v->tx = getf(); v->ty = getf(); v->tz = getf();
+    v->nx = getf(); v->ny = getf(); v->nz = getf();
+    v->dx = getf(); v->dy = getf(); v->dz = getf();
+    v->ripflag = (char)geti();
+    vt->vnum = (short)geti(); vt->v2num = (short)geti(); vt->v3num = (short)geti();
+    vt->vtotal = (short)geti(); vt->nsizeMax = (uchar)geti();
+    int num = geti();
+    vt->num = (uchar)num;
+    free(vt->f); free(vt->n);
+    vt->f = arr<int>(num); vt->n = arr<uchar>(num);
+    for (int k = 0; k < num; k++) { vt->f[k] = geti(); vt->n[k] = (uchar)geti(); }
+    for (int o = 0; o < 2; o++) {
+      // the buffer: -1 none, else its length, the capacity, whether the field points at it
+      int len = geti();
+      float *buf = NULL;
+      int cap = 0, valid = 0;
+      if (len >= 0) {
+        buf = arr<float>(len);
+        cap = geti(); valid = geti();
+        for (int k = 0; k < len; k++) buf[k] = getf();
+      }
+      void **st = o ? &m->dist_orig_storage[vno] : &m->dist_storage[vno];
+      *st = buf;
+      *(float **)(o ? &v->dist_orig : &v->dist) = valid ? buf : NULL;
+      *(int *)(o ? &v->dist_orig_capacity : &v->dist_capacity) = valid ? cap : 0;
+    }
+  }
+  for (int fno = 0; fno < nf; fno++) for (int k = 0; k < 3; k++) m->faces[fno].v[k] = geti();
+  m->xlo = getf(); m->ylo = getf(); m->zlo = getf(); m->xhi = getf(); m->yhi = getf();
+  m->zhi = getf(); m->xctr = getf(); m->yctr = getf(); m->zctr = getf();
+  int nops = geti();
+  for (int k = 0; k < nops; k++) {
+    std::string op = next();
+    static bool later1, later2;
+    if (op == "S") { int vno = geti(); float x = getf(), y = getf(), z = getf();
+      MRISsetXYZwkr(m, vno, x, y, z, "probe.cpp", 7, &later1); }
+    else if (op == "O") { int vno = geti(); float x = getf(), y = getf(), z = getf();
+      MRISsetOriginalXYZwkr(m, vno, x, y, z, "probe.cpp", 8, &later2); }
+    else if (op == "I") {
+      std::vector<float> a(3 * (nv > 0 ? nv : 1));
+      for (int i = 0; i < 3 * nv; i++) a[i] = getf();
+      MRISimportXYZ(m, &a[0], &a[nv], &a[2 * nv]);
+    }
+    else if (op == "E") { float *px, *py, *pz; MRISexportXYZ(m, &px, &py, &pz);
+      for (int i = 0; i < nv; i++) { of(px[i]); of(py[i]); of(pz[i]); } }
+    else if (op == "C") {
+      int n2 = geti();
+      MRIS *b = MRISalloc(n2, 0);
+      for (int i = 0; i < n2; i++) { b->vertices[i].x = getf(); b->vertices[i].y = getf(); b->vertices[i].z = getf(); }
+      MRIScopyXYZ(m, b);
+    }
+    else if (op == "F") MRISsetOriginalXYZfromXYZ(m);
+    else if (op == "R") { int w = geti(); double sd = 0; od(MRISavgVetexRadius(m, w ? &sd : NULL)); od(sd); }
+    else if (op == "M") {
+      int which = geti();
+      std::vector<float> a(3 * (nv > 0 ? nv : 1));
+      for (int i = 0; i < 3 * nv; i++) a[i] = getf();
+      float *loc[3] = {&a[0], &a[nv], &a[2 * nv]};
+      oi(MRISimportVertexCoords(m, loc, which));
+    }
+    else if (op == "V") { int d = geti(), r = geti(), w = geti(); oi(MRISreverseCoords(m, d, r, w)); }
+    else if (op == "W") { int w = geti(), r = geti(); oi(MRISreverse(m, w, r)); }
+    else if (op == "K") oi(MRISscale(m, getd()));
+    else if (op == "P") oi(mrisFlipPatch(m));
+    else if (op == "T") { float a = getf(), b = getf(), c = getf(); oi(MRIStranslate(m, a, b, c)); }
+    else if (op == "Q") { double w[6]; for (int i = 0; i < 6; i++) w[i] = getd();
+      MRISscaleThenTranslate(m, w[0], w[1], w[2], w[3], w[4], w[5]); }
+    else if (op == "A") { float a = getf(), b = getf(), c = getf(); oi(MRISanisotropicScale(m, a, b, c)); }
+    else if (op == "Z") { float a = getf(), b = getf(), c = getf(); MRISrotate(m, m, a, b, c); }
+    else if (op == "Y") { MRIS_MP *mp = (MRIS_MP *)calloc(1, sizeof(MRIS_MP)); MRISMP_ctr(mp);
+      MRISrotate(mp, 0.1f, 0.2f, 0.3f); }
+    else if (op == "X") {
+      int r = geti(), c = geti();
+      MATRIX *M = r > 0 ? MatrixAlloc(r, c, MATRIX_REAL) : NULL;
+      for (int i = 1; i <= r; i++) for (int j = 1; j <= c; j++) *MATRIX_RELT(M, i, j) = getf();
+      oi(MRISmatrixMultiply(m, M));
+    }
+    else if (op == "H") oi(MRISsphericalCoords(m));
+    else if (op == "G") { float a = getf(), b = getf(), c = getf(); MRISmoveOrigin(m, a, b, c); }
+    else if (op == "N") MRIScenter(m, m);
+    else if (op == "L") { double a, b, c; MRIScenterCOG2(m, &a, &b, &c); od(a); od(b); od(c); }
+    else if (op == "U") MRIScenterCOG(m);
+    else if (op == "B") { float a = getf(), b = getf(); MRISblendXYZandTXYZ(m, a, b); }
+    else if (op == "D") MRISblendXYZandNXYZ(m, getf());
+    else if (op == "J") MRIStranslate_along_vertex_dxdydz(m, m, getd());
+    else if (op == "Dm") oi(mrisComputeSurfaceDimensions(m));
+    else if (op == "md") MRISmakeDist(m, geti());
+    else if (op == "mo") MRISmakeDistOrig(m, geti());
+    else if (op == "gd") { int vno = geti(); MRISgrowDist(m, vno, geti()); }
+    else if (op == "go") { int vno = geti(); MRISgrowDistOrig(m, vno, geti()); }
+    else if (op == "sd") {
+      int vno = geti(), cap = geti(), ncap = geti();
+      float *p = mrisStealDistStore(m, vno, cap);
+      for (int i = 0; i < cap; i++) p[i] = getf();
+      mrisSetDist(m, vno, p, ncap);
+    }
+    else if (op == "fd") MRISfreeDistsButNotOrig(m);
+    else if (op == "fo") MRISfreeDistOrigs(m);
+    else fail("surf op");
+  }
+  out += "| ";
+  dump_surface(m);
+}
+
 void run_case()
 {
   std::string cmd = next();
@@ -487,6 +637,8 @@ void run_case()
     std::vector<float *> ps;
     for (int k = 0; k < n; k++) { ps.push_back(MRISmakeFloatPerVertex(m)); oi(ps.back() != NULL); oi(m->nverticesFrozen); }
     for (float *&p : ps) { MRISfreeFloatPerVertex(m, &p); oi(p != NULL); oi(m->nverticesFrozen); }
+  } else if (cmd == "surf") {
+    surf_case();
   } else if (cmd == "names") {
     int n = geti();
     keep.reserve(n);

@@ -13,7 +13,7 @@ every case (``SKIP`` lists the defects whose cases are counted, not compared: no
 differ only where a defect it corrects changed the result (its notices). Prints the counts and the
 hash the port's recorded test checks (``tests/fs_surfio_official.rs``).
 
-    python -P validation/probes/fs-surfio/check.py --seed 1 --n 630 [--json out.json]
+    python -P validation/probes/fs-surfio/check.py --seed 1 --n 660 [--json out.json]
 """
 
 from __future__ import annotations

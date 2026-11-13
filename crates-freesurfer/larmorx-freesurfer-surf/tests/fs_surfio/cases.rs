@@ -16,6 +16,8 @@ use larmorx_core::defects::{FS_03, FS_111, UpstreamDefects};
 use larmorx_freesurfer_core::diag::DIAG_VERBOSE;
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::Fatal;
+use larmorx_freesurfer_core::matrix::Matrix;
+use larmorx_freesurfer_core::run::Environment;
 use larmorx_freesurfer_surf::aaa::{self, MrisStatus, SurfGlobals};
 use larmorx_freesurfer_surf::base;
 use larmorx_freesurfer_surf::mris::{Face, Mris, Vertex, VertexTopology};
@@ -24,6 +26,7 @@ use larmorx_freesurfer_surf::mrisurf;
 use larmorx_freesurfer_surf::surfbase::{self, MrisTempAssigned};
 use larmorx_freesurfer_surf::topology;
 use larmorx_freesurfer_surf::views::{self, MetricSurface, MpView};
+use larmorx_freesurfer_surf::{coords, dist};
 
 pub struct Gen(u64);
 
@@ -98,10 +101,10 @@ fn ix(t: &mut Vec<String>, v: i64) {
     t.push(v.to_string());
 }
 
-const COMMANDS: [&str; 21] = [
+const COMMANDS: [&str; 22] = [
     "coord", "vnum", "nbr", "modvnum", "norm", "close", "proj", "sign", "status", "sortcmp",
     "angles", "split", "vec3", "view", "fixarea", "addcmd", "vhash", "diff", "temps", "fpv",
-    "names",
+    "names", "surf",
 ];
 
 /// A byte string's token: `h` and the bytes in hex.
@@ -225,6 +228,199 @@ fn surface_tokens(t: &mut Vec<String>, g: &mut Gen, with_ro: bool) {
     ix(t, g.int(-1, 2));
     if with_ro {
         ix(t, g.int(0, 1));
+    }
+}
+
+/// A small float: k/4 for k in [-400, 400], or a special one now and then.
+fn small(g: &mut Gen) -> u32 {
+    if g.chance(10) {
+        f32bits(g)
+    } else {
+        (g.int(-400, 400) as f32 / 4.0).to_bits()
+    }
+}
+
+fn surf_tokens(t: &mut Vec<String>, g: &mut Gen) {
+    ix(t, i64::from(g.chance(3)));
+    let nv = g.int(0, 5);
+    let nf = if nv == 0 { 0 } else { g.int(0, 3) };
+    ix(t, nv);
+    ix(t, nf);
+    for v in [g.int(0, 9), g.int(0, 9), g.int(0, 3), g.int(0, 3)] {
+        ix(t, v);
+    }
+    let mut vsizes = Vec::new();
+    for _ in 0..nv {
+        for _ in 0..18 {
+            fx(t, g);
+        }
+        ix(t, i64::from(g.chance(6)));
+        let (vnum, v2num, v3num, vtotal) = (g.int(0, 5), g.int(0, 8), g.int(0, 10), g.int(0, 6));
+        let nsize_max = g.int(0, 3);
+        for v in [vnum, v2num, v3num, vtotal, nsize_max] {
+            ix(t, v);
+        }
+        let num = g.int(0, 4);
+        ix(t, num);
+        for _ in 0..num {
+            ix(t, g.int(-1, nf));
+            ix(t, g.int(0, 2));
+        }
+        let count = match nsize_max {
+            1 => vnum,
+            2 => v2num,
+            3 => v3num,
+            _ => 0,
+        };
+        let vsize = count.max(vtotal);
+        vsizes.push(vsize);
+        for k in 0..2 {
+            // no buffer at all only where growing it cannot keep values FreeSurfer never wrote
+            // (the distances' first vtotal: memory realloc leaves undefined)
+            if g.chance(4) && (k == 1 || vtotal == 0) {
+                ix(t, -1);
+                continue;
+            }
+            let len = vsize + g.int(0, 3);
+            ix(t, len);
+            ix(t, g.int(0, len));
+            ix(t, i64::from(!g.chance(4)));
+            for _ in 0..len {
+                t.push(format!("{:08x}", small(g)));
+            }
+        }
+    }
+    for _ in 0..nf {
+        for _ in 0..3 {
+            ix(t, g.int(0, nv - 1));
+        }
+    }
+    for _ in 0..9 {
+        fx(t, g);
+    }
+    let nops = g.int(1, 5);
+    ix(t, nops);
+    let ops: &[&str] = if nv > 0 {
+        &[
+            "S", "O", "I", "E", "C", "F", "R", "M", "V", "W", "K", "P", "T", "Q", "A", "Z", "Y",
+            "X", "H", "G", "N", "L", "U", "B", "D", "J", "Dm", "md", "mo", "gd", "go", "sd", "fd",
+            "fo",
+        ]
+    } else {
+        &[
+            "E", "F", "R", "K", "T", "Q", "A", "Z", "H", "N", "L", "Dm", "fd", "fo",
+        ]
+    };
+    let f3 = |t: &mut Vec<String>, g: &mut Gen| {
+        for _ in 0..3 {
+            t.push(format!("{:08x}", small(g)));
+        }
+    };
+    for _ in 0..nops {
+        let op = g.pick(ops);
+        t.push(op.to_owned());
+        match op {
+            "S" | "O" => {
+                ix(t, g.int(-1, nv));
+                f3(t, g);
+            }
+            "I" => {
+                for _ in 0..3 * nv {
+                    t.push(format!("{:08x}", small(g)));
+                }
+            }
+            "C" => {
+                let n2 = if g.chance(6) { nv + 1 } else { nv };
+                ix(t, n2);
+                for _ in 0..3 * n2 {
+                    t.push(format!("{:08x}", small(g)));
+                }
+            }
+            "R" => ix(t, g.int(0, 1)),
+            "M" => {
+                ix(t, g.pick(&[4, 4, 0, 3, 7]));
+                for _ in 0..3 * nv {
+                    t.push(format!("{:08x}", small(g)));
+                }
+            }
+            "V" => {
+                ix(t, g.int(0, 3));
+                ix(t, g.int(0, 1));
+                ix(t, g.pick(&[4, 3, 0, 0, 5]));
+            }
+            "W" => {
+                ix(t, g.int(0, 3));
+                ix(t, g.int(0, 1));
+            }
+            "K" | "J" => {
+                if g.chance(2) {
+                    t.push(format!("{:016x}", (g.int(-16, 16) as f64 / 8.0).to_bits()));
+                } else {
+                    dx(t, g);
+                }
+            }
+            "T" | "G" => f3(t, g),
+            "Q" => {
+                for _ in 0..6 {
+                    if g.chance(2) {
+                        t.push(format!("{:016x}", (g.int(-16, 16) as f64 / 8.0).to_bits()));
+                    } else {
+                        dx(t, g);
+                    }
+                }
+            }
+            "A" => {
+                if g.chance(4) {
+                    for _ in 0..3 {
+                        t.push("3f800000".to_owned());
+                    }
+                } else {
+                    f3(t, g);
+                }
+            }
+            "Z" => {
+                for _ in 0..3 {
+                    let a = if g.chance(8) {
+                        f32bits(g)
+                    } else {
+                        (g.int(-700, 700) as f32 / 100.0).to_bits()
+                    };
+                    t.push(format!("{a:08x}"));
+                }
+            }
+            "X" => {
+                let (r, c) = g.pick(&[(4, 4), (4, 4), (4, 4), (3, 4), (4, 3), (0, 0)]);
+                ix(t, r);
+                ix(t, c);
+                for _ in 0..r * c {
+                    t.push(format!("{:08x}", small(g)));
+                }
+            }
+            "B" => {
+                for _ in 0..2 {
+                    t.push(format!("{:08x}", small(g)));
+                }
+            }
+            "D" => t.push(format!("{:08x}", small(g))),
+            "md" | "mo" => ix(t, g.int(0, nv - 1)),
+            "gd" | "go" => {
+                ix(t, g.int(0, nv - 1));
+                ix(t, g.int(0, 8));
+            }
+            "sd" => {
+                // a buffer at least the vertex's size in use (a later grow keeps its first
+                // vtotal values)
+                let vno = g.int(0, nv - 1);
+                ix(t, vno);
+                let cap = vsizes[vno as usize].max(1) + g.int(0, 3);
+                ix(t, cap);
+                ix(t, g.int(0, cap));
+                for _ in 0..cap {
+                    t.push(format!("{:08x}", small(g)));
+                }
+            }
+            _ => {}
+        }
     }
 }
 
@@ -482,6 +678,7 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
                 ix(&mut t, g.int(-2, 3));
                 ix(&mut t, g.int(0, 4));
             }
+            "surf" => surf_tokens(&mut t, &mut g),
             "names" => {
                 let n = g.int(1, 5);
                 ix(&mut t, n);
@@ -618,6 +815,10 @@ fn mris_alloc(nv: usize, nf: usize) -> Mris {
         vertices: Some(vec![Vertex::default(); nv]),
         vertices_topology: Some(vec![VertexTopology::default(); nv]),
         faces: Some(vec![Face::default(); nf]),
+        dist_storage: Some(vec![None; nv]),
+        dist_orig_storage: Some(vec![None; nv]),
+        nsize: 1,
+        max_nsize: 1,
         ..Mris::default()
     }
 }
@@ -951,6 +1152,296 @@ fn view_case(t: &mut Toks, o: &mut Out) {
     o.i(i64::from(mp.patch));
 }
 
+fn dump_surface(m: &Mris, o: &mut Out) {
+    for vno in 0..m.nvertices as usize {
+        let v = m.vertex(vno);
+        for x in [v.x, v.y, v.z, v.origx, v.origy, v.origz, v.cx, v.cy, v.cz] {
+            o.f(x);
+        }
+        for k in 0..2 {
+            let (d, cap, st) = if k == 1 {
+                (
+                    &v.dist_orig,
+                    v.dist_orig_capacity,
+                    &m.dist_orig_storage.as_ref().unwrap()[vno],
+                )
+            } else {
+                (
+                    &v.dist,
+                    v.dist_capacity,
+                    &m.dist_storage.as_ref().unwrap()[vno],
+                )
+            };
+            o.i(i64::from(d.is_some()));
+            o.i(i64::from(d.is_some() || st.is_some()));
+            o.i(i64::from(cap));
+            if let Some(d) = d {
+                for x in &d[..cap as usize] {
+                    o.f(*x);
+                }
+            }
+        }
+        let vt = m.topology(vno);
+        for k in 0..usize::from(vt.num) {
+            o.i(i64::from(vt.n.as_ref().unwrap()[k]));
+        }
+    }
+    for fno in 0..m.nfaces as usize {
+        for k in 0..3 {
+            o.i(i64::from(m.face(fno).v[k]));
+        }
+    }
+    o.i(i64::from(m.dist_alloced_flags));
+    o.i(i64::from(m.dist_nsize));
+    o.i(i64::from(m.origxyz_status.0));
+    o.i(i64::from(m.status.0));
+    for x in [
+        m.xlo, m.ylo, m.zlo, m.xhi, m.yhi, m.zhi, m.xctr, m.yctr, m.zctr,
+    ] {
+        o.f(x);
+    }
+}
+
+fn surf_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
+    let env = if t.i() != 0 {
+        Environment::from_pairs([("FREESURFER_reportLogicErrors", "1")])
+    } else {
+        Environment::from_pairs::<&str, &str>([])
+    };
+    let (nv, nf) = (t.i(), t.i());
+    let mut m = mris_alloc(nv as usize, nf as usize);
+    m.status = MrisStatus(t.i());
+    m.origxyz_status = MrisStatus(t.i());
+    m.dist_alloced_flags = t.i() as i8;
+    m.dist_nsize = t.i() as i8;
+    for vno in 0..nv as usize {
+        {
+            let v = m.vertex_mut(vno);
+            let mut f = || t.f();
+            (v.x, v.y, v.z) = (f(), f(), f());
+            (v.origx, v.origy, v.origz) = (f(), f(), f());
+            (v.cx, v.cy, v.cz) = (f(), f(), f());
+            (v.tx, v.ty, v.tz) = (f(), f(), f());
+            (v.nx, v.ny, v.nz) = (f(), f(), f());
+            (v.dx, v.dy, v.dz) = (f(), f(), f());
+            v.ripflag = t.i() as i8;
+        }
+        {
+            let vt = m.topology_mut(vno);
+            vt.vnum = t.i() as i16;
+            vt.v2num = t.i() as i16;
+            vt.v3num = t.i() as i16;
+            vt.vtotal = t.i() as i16;
+            vt.nsizeMax = t.i() as u8;
+            let num = t.i();
+            vt.num = num as u8;
+            let (mut f, mut n) = (Vec::new(), Vec::new());
+            for _ in 0..num {
+                f.push(t.i());
+                n.push(t.i() as u8);
+            }
+            vt.f = Some(f);
+            vt.n = Some(n);
+        }
+        for k in 0..2 {
+            let len = t.i();
+            if len < 0 {
+                continue;
+            }
+            let (cap, valid) = (t.i(), t.i() != 0);
+            let buf: Vec<f32> = (0..len).map(|_| t.f()).collect();
+            let v = m.vertex_mut(vno);
+            let (d, c) = if k == 1 {
+                (&mut v.dist_orig, &mut v.dist_orig_capacity)
+            } else {
+                (&mut v.dist, &mut v.dist_capacity)
+            };
+            if valid {
+                *d = Some(buf);
+                *c = cap;
+            } else {
+                let st = if k == 1 {
+                    &mut m.dist_orig_storage
+                } else {
+                    &mut m.dist_storage
+                };
+                st.as_mut().unwrap()[vno] = Some(buf);
+            }
+        }
+    }
+    for fno in 0..nf as usize {
+        for k in 0..3 {
+            m.face_mut(fno).v[k] = t.i();
+        }
+    }
+    (m.xlo, m.ylo, m.zlo, m.xhi, m.yhi, m.zhi) = (t.f(), t.f(), t.f(), t.f(), t.f(), t.f());
+    (m.xctr, m.yctr, m.zctr) = (t.f(), t.f(), t.f());
+    let nops = t.i();
+    let g = &mut cx.g;
+    let mut io = coords::Io {
+        out: &mut cx.a,
+        err: &mut cx.b,
+        env: &env,
+    };
+    let nvu = nv as usize;
+    let three = |t: &mut Toks, n: usize| -> Vec<f32> { (0..3 * n).map(|_| t.f()).collect() };
+    for _ in 0..nops {
+        match t.next() {
+            "S" => {
+                let vno = t.i();
+                let (x, y, z) = (t.f(), t.f(), t.f());
+                coords::set_xyz(g, &mut io, &mut m, vno, x, y, z, "probe.cpp", 7)?;
+            }
+            "O" => {
+                let vno = t.i();
+                let (x, y, z) = (t.f(), t.f(), t.f());
+                coords::set_original_xyz(g, &mut io, &mut m, vno, x, y, z, "probe.cpp", 8)?;
+            }
+            "I" => {
+                let a = three(t, nvu);
+                coords::import_xyz(
+                    g,
+                    &mut io,
+                    &mut m,
+                    &a[..nvu],
+                    &a[nvu..2 * nvu],
+                    &a[2 * nvu..],
+                )?;
+            }
+            "E" => {
+                let (px, py, pz) = coords::export_xyz(g, &mut io, &m)?;
+                for i in 0..nvu {
+                    o.f(px[i]);
+                    o.f(py[i]);
+                    o.f(pz[i]);
+                }
+            }
+            "C" => {
+                let n2 = t.i() as usize;
+                let mut b = mris_alloc(n2, 0);
+                for i in 0..n2 {
+                    let v = b.vertex_mut(i);
+                    (v.x, v.y, v.z) = (t.f(), t.f(), t.f());
+                }
+                coords::copy_xyz(g, &mut io, &mut m, &b)?;
+            }
+            "F" => coords::set_original_xyz_from_xyz(&mut m),
+            "R" => {
+                let (avg, sd) = coords::avg_vertex_radius(&m, t.i() != 0);
+                o.d(avg);
+                o.d(sd.unwrap_or(0.0));
+            }
+            "M" => {
+                let which = t.i();
+                let a = three(t, nvu);
+                let loc = [&a[..nvu], &a[nvu..2 * nvu], &a[2 * nvu..]];
+                let r = coords::import_vertex_coords(g, &mut io, &mut m, loc, which)?;
+                o.i(i64::from(r));
+            }
+            "V" => {
+                let (d, r, w) = (t.i(), t.i(), t.i());
+                o.i(i64::from(coords::reverse_coords(
+                    g, &mut io, &mut m, d, r, w,
+                )?));
+            }
+            "W" => {
+                let (w, r) = (t.i(), t.i());
+                o.i(i64::from(coords::reverse(g, &mut io, &mut m, w, r)?));
+            }
+            "K" => {
+                let s = t.d();
+                o.i(i64::from(coords::scale(g, &mut m, s)));
+            }
+            "P" => o.i(i64::from(coords::flip_patch(&mut m))),
+            "T" => {
+                let (a, b, c) = (t.f(), t.f(), t.f());
+                o.i(i64::from(coords::translate(&mut m, a, b, c)));
+            }
+            "Q" => {
+                let w: Vec<f64> = (0..6).map(|_| t.d()).collect();
+                coords::scale_then_translate(g, &mut m, w[0], w[1], w[2], w[3], w[4], w[5]);
+            }
+            "A" => {
+                let (a, b, c) = (t.f(), t.f(), t.f());
+                o.i(i64::from(coords::anisotropic_scale(&mut m, a, b, c)));
+            }
+            "Z" => {
+                let (a, b, c) = (t.f(), t.f(), t.f());
+                coords::rotate(g, &mut m, a, b, c);
+            }
+            "Y" => return Err(coords::rotate_mp(g, &mut io)),
+            "X" => {
+                let (r, c) = (t.i(), t.i());
+                let mat = (r > 0).then(|| {
+                    let mut mm = Matrix::real(r, c);
+                    for i in 1..=r {
+                        for j in 1..=c {
+                            mm.set_relt(i, j, t.f());
+                        }
+                    }
+                    mm
+                });
+                o.i(i64::from(coords::matrix_multiply(
+                    g,
+                    &mut io,
+                    &mut m,
+                    mat.as_ref(),
+                )?));
+            }
+            "H" => o.i(i64::from(coords::spherical_coords(&mut m))),
+            "G" => {
+                let (a, b, c) = (t.f(), t.f(), t.f());
+                coords::move_origin(&mut m, a, b, c);
+            }
+            "N" => coords::center(&mut m),
+            "L" => {
+                let (a, b, c) = coords::center_cog2(&mut m);
+                o.d(a);
+                o.d(b);
+                o.d(c);
+            }
+            "U" => coords::center_cog(&mut m),
+            "B" => {
+                let (a, b) = (t.f(), t.f());
+                coords::blend_xyz_and_txyz(&mut m, a, b);
+            }
+            "D" => {
+                let a = t.f();
+                coords::blend_xyz_and_nxyz(&mut m, a);
+            }
+            "J" => {
+                let dt = t.d();
+                coords::translate_along_vertex_dxdydz(&mut m, dt);
+            }
+            "Dm" => o.i(i64::from(coords::compute_surface_dimensions(&mut m))),
+            "md" => dist::make_dist(&mut m, t.i() as usize),
+            "mo" => dist::make_dist_orig(&mut m, t.i() as usize),
+            "gd" => {
+                let (vno, min) = (t.i() as usize, t.i());
+                dist::grow_dist(&mut m, vno, min);
+            }
+            "go" => {
+                let (vno, min) = (t.i() as usize, t.i());
+                dist::grow_dist_orig(&mut m, vno, min);
+            }
+            "sd" => {
+                let (vno, cap, ncap) = (t.i() as usize, t.i(), t.i());
+                let mut p = dist::steal_dist_store(&mut m, vno, cap);
+                for x in p.iter_mut() {
+                    *x = t.f();
+                }
+                dist::set_dist(g, io.out, io.err, &mut m, vno, p, ncap)?;
+            }
+            "fd" => dist::free_dists_but_not_orig(&mut m),
+            "fo" => dist::free_dist_origs(&mut m),
+            op => panic!("surf op {op}"),
+        }
+    }
+    o.0 += "| ";
+    dump_surface(&m, o);
+    Ok(())
+}
+
 fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
     let cmd = t.next();
     match cmd {
@@ -1244,6 +1735,7 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
                 o.i(i64::from(m.nverticesFrozen));
             }
         }
+        "surf" => surf_case(cx, t, o)?,
         "names" => {
             let n = t.i();
             for _ in 0..n {

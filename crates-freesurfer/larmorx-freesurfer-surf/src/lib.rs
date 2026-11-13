@@ -25,10 +25,15 @@
 //! - [`surfbase`]: `mrisurf_base.cpp`'s borrowed temporaries, per-vertex floats and the
 //!   integrator's file names (FS-111).
 //! - [`mrisurf`]: `mrisurf.cpp`'s command lines (FS-112), the vertex hash, `MRISdiffSimple`.
+//! - [`dist`]: the neighbour distances' storage (`mrisurf_base.cpp`).
+//! - [`coords`]: the coordinate operations (`mrisurf_metricProperties.cpp`'s first part: setting,
+//!   importing, copying, reversing, scaling (FS-113), moving, rotating, the bounding box).
 #![forbid(unsafe_code)]
 
 pub mod aaa;
 pub mod base;
+pub mod coords;
+pub mod dist;
 pub mod mris;
 pub mod mris_mp;
 pub mod mrisurf;

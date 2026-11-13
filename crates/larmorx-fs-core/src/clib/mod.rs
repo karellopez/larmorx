@@ -7,6 +7,8 @@
 
 mod strerror_table;
 
+pub mod glob;
+
 use larmorx_core::cscan;
 
 pub use larmorx_core::cscan::is_c_space;

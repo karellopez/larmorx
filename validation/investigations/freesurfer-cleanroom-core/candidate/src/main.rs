@@ -163,6 +163,16 @@ fn batch_call(p: &mut Process, a: &[&str]) -> Result<String, Stop> {
             hex(&p.file_name_extension(cs(&s)))
         }
         "fileexists" => format!("{} 1", i32::from(files::file_exists(cs(&unhex(arg(1)))))),
+        "fromwildcard" => hex(&clib::glob::file_name_from_wildcard(cs(&unhex(arg(1))))),
+        "glob" => {
+            let (r, v) = clib::glob::glob(cs(&unhex(arg(1))));
+            let mut o = r.to_string();
+            for x in v {
+                o.push(' ');
+                o.push_str(&hex(&x));
+            }
+            o
+        }
         "stricmp" => {
             let (x, y) = (unhex(arg(1)), unhex(arg(2)));
             p.stricmp(cs(&x), cs(&y)).to_string()

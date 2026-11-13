@@ -1665,6 +1665,16 @@ defects! {
         "the reversal of a volume's slices (MRIreverseSliceOrder) copies one b-value and b-vector per frame from tables of fewer rows than frames past their rows: a crash or memory contents";
     FS_474 = "FS-474", "FreeSurfer", true,
         "the order of a volume's voxels by value (MRIorderIndices) keeps each voxel's coordinates and value in bytes: a coordinate past 255 wraps, and a value outside 0 to 255 or NaN becomes the low byte of its 32-bit truncation";
+    FS_475 = "FS-475", "FreeSurfer", true,
+        "the partial-volume fractions of a segmentation (MRIcomputeVolumeFractions) count a voxel of label 0 into the frame before the first (labels are frame plus 1): FreeSurfer reads and writes outside the volume: a crash or memory contents";
+    FS_476 = "FS-476", "FreeSurfer", true,
+        "the partial-volume fractions of a segmentation (MRIcomputeVolumeFractions) never mark the last label in their second pass (voxels no segmentation voxel reached), which accepts labels below the frame count only";
+    FS_477 = "FS-477", "FreeSurfer", true,
+        "the application of a list of voxel differences (MRIapplyDiffVect) accepts a column, row or slice equal to the volume's extent and writes past the volume";
+    FS_478 = "FS-478", "FreeSurfer", true,
+        "a list of voxel differences applied in place (MRIapplyDiffVect) frees the volume's colour table before copying it: the volume loses it, with the error 'CTABdeepCopy: ct was NULL'";
+    FS_479 = "FS-479", "FreeSurfer", true,
+        "the intracranial volume estimate from a transform file (MRIestimateTIV) reads the first linear transform of a file that holds none: the program crashes";
 }
 
 /// The register entry with ID `id`.

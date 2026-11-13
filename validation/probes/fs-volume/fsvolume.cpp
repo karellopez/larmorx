@@ -30,6 +30,7 @@
 #include <vector>
 
 #include "cma.h"
+#include "colortab.h"
 #include "diag.h"
 #include "error.h"
 #include "image.h"
@@ -1400,6 +1401,97 @@ void run_case()
     for (short v : xs) oi(v);
     for (short v : ys) oi(v);
     for (short v : zs) oi(v);
+  } else if (cmd == "rms") {
+    MRI *in = get_vol();
+    fill_paint(in);
+    MRI *o = get_vol();
+    fflush(stdout);
+    MRIrms(in, o);
+    fflush(stdout);
+    put_vol(o);
+  } else if (cmd == "vfrac") {
+    MRI *src = get_vol();
+    MATRIX *m = get_list();
+    MRI *seg = get_vol();
+    fill_paint(seg);
+    MRI *fr = get_vol();
+    fill_paint(fr);
+    fflush(stdout);
+    oi(MRIcomputeVolumeFractions(src, m, seg, fr));
+    fflush(stdout);
+    put_vol(fr);
+  } else if (cmd == "cdt") {
+    MRI *a = get_vol();
+    fill_paint(a);
+    MRI *b = get_vol();
+    fill_paint(b);
+    MRI *d = geti() ? get_vol() : NULL;
+    fflush(stdout);
+    MRI *r = MRIcombineDistanceTransforms(a, b, d);
+    fflush(stdout);
+    oi(r != NULL && r == d);
+    put_vol(r);
+  } else if (cmd == "diffv") {
+    MRI *a = get_vol();
+    fill_paint(a);
+    MRI *b = get_vol();
+    fill_paint(b);
+    MRI *mask = geti() ? get_vol() : NULL;
+    if (mask) fill_paint(mask);
+    double thresh = getd();
+    MRI *amask = geti() ? get_vol() : NULL;
+    if (amask) fill_paint(amask);
+    int mode = geti();  // the application's destination: 0 new, 1 a volume, 2 in place
+    MRI *dst = mode == 1 ? get_vol() : NULL;
+    if (geti()) {
+      setRandomSeed(1);  // CTABalloc draws random colours
+      a->ct = CTABalloc(2);
+    }
+    int extra = geti();
+    std::vector<std::vector<double>> more;
+    for (int i = 0; i < extra; i++) {
+      std::vector<double> v(5);
+      for (double &d : v) d = getd();
+      more.push_back(v);
+    }
+    fflush(stdout);
+    std::vector<std::vector<double>> *dv = MRIdiff2Vect(a, b, thresh, mask);
+    fflush(stdout);
+    if (!dv) {
+      out += "NULL ";
+    } else {
+      oi((long long)dv->size());
+      for (auto &row : *dv)
+        for (double d : row) od(d);
+      for (auto &v : more) dv->push_back(v);
+      int napply = -1;
+      MRI *to = mode == 2 ? a : dst;
+      fflush(stdout);
+      MRI *r = MRIapplyDiffVect(a, amask, *dv, &napply, to);
+      fflush(stdout);
+      oi(napply);
+      oi(r != NULL && r == to);
+      put_vol(r);
+    }
+  } else if (cmd == "tiv") {
+    std::string dir = scratch.substr(0, scratch.rfind('/'));
+    if (chdir(dir.c_str())) fail("chdir");
+    std::string name = "fsvol-lta" + gethex();
+    std::string bytes = gethex();
+    int have = geti();
+    int avg = geti();
+    if (avg) setenv("USE_AVERAGE305", avg == 1 ? "true" : "", 1);
+    else unsetenv("USE_AVERAGE305");
+    double scale = getd();
+    unlink(name.c_str());
+    if (have) spill(name, bytes);
+    double det = -7.0;
+    errno = 0;
+    fflush(stdout);
+    double icv = MRIestimateTIV((char *)name.c_str(), scale, &det);
+    fflush(stdout);
+    od(icv);
+    od(det);
   } else {
     fail("unknown command");
   }

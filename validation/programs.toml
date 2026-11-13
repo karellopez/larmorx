@@ -58,7 +58,7 @@ summary = "Field-map estimation: the B-spline fit, PEPOLAR, direct and fieldmap-
 id = "fmriprep"
 name = "fMRIPrep"
 original = "fMRIPrep's own steps, and the libraries they call"
-summary = "fMRIPrep's one-shot BOLD resampler and its field-map steps, SciPy's and scikit-image's routines under them, and the confounds, being ported."
+summary = "fMRIPrep's one-shot BOLD resampler, its field-map steps and its confound estimation, and SciPy's and scikit-image's routines under them."
 
 [[group]]
 id = "larmorx"
@@ -603,7 +603,7 @@ original = "fMRIPrep 25.2.7"
 group = "fmriprep"
 name = "confounds"
 python = "lx.confounds"
-does = "fMRIPrep's confound estimation, ported step by step: today nipype's DVARS."
+does = "fMRIPrep's confound estimation, ported step by step: CompCor, DVARS, framewise displacement, the motion parameters and the rest of fMRIPrep's confounds file."
 api = "docs/api/confounds.md"
 records = { replica = [] }
 original = "nipype 1.12.0, niworkflows 1.15.4 and fMRIPrep 25.2.7"

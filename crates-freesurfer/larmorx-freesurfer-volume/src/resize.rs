@@ -1156,7 +1156,9 @@ pub fn mri_change_type(
             for j in 0..h {
                 for k in 0..d {
                     let val = mri_get_vox_val(g, err, src, i, j, k, frame, 0)?;
-                    if !(f64::from(val).abs() < 1e-15) {
+                    // DZERO(val): fabs(val) < 1e-15 (NaN is not zero)
+                    let dzero = f64::from(val).abs() < 1e-15;
+                    if !dzero {
                         nonzero += 1;
                     }
                     let mut bin = to_int(

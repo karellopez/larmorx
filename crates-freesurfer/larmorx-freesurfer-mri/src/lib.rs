@@ -20,8 +20,10 @@
 //! larmorx (Apache-2.0) never links this crate. `PROVENANCE.md` lists what is translated.
 #![forbid(unsafe_code)]
 
+pub mod copy;
 pub mod ctab;
 pub mod mri;
+pub mod tkreg;
 pub mod vol_geom;
 pub mod voxel;
 

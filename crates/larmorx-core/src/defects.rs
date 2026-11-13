@@ -1135,6 +1135,16 @@ defects! {
         "a seed whose 24 seeded values are all 0 (2147483563, -2147483563 and other multiples of 2147483563) makes the random generator give 0 for ever (its initial carry is 0): flat draws are constant and most other draws never return";
     FS_103 = "FS-103", "FreeSurfer", true,
         "the cubic spline's check that the knots increase strictly is false for a NaN knot, so a NaN knot is accepted and the spline's values become NaN";
+    FS_161 = "FS-161", "FreeSurfer", true,
+        "MRIcopy of a tensor or complex volume into one of the same type copies only the first width bytes of each row (a quarter or an eighth of its voxels' bytes), leaving the rest of the destination as it was";
+    FS_162 = "FS-162", "FreeSurfer", true,
+        "MRIcopy from float to short, unsigned short or unsigned char, and from short to unsigned char, wraps values outside the destination type's range around (40000 becomes -25536 in short, -5 becomes 251 in unsigned char) where the rest of FreeSurfer clips them";
+    FS_163 = "FS-163", "FreeSurfer", true,
+        "MRIcopy into a given volume of another extent or frame count puts the source's rows in other places, or writes past the destination (a crash or another object's corruption)";
+    FS_164 = "FS-164", "FreeSurfer", true,
+        "MRItkReg2Native of a registration matrix that cannot be inverted (singular) returns the uninverted native product, or a matrix of infinities, with no message";
+    FS_165 = "FS-165", "FreeSurfer", true,
+        "MRIfixTkReg of a registration matrix with four columns and another number of rows crashes";
 }
 
 /// The register entry with ID `id`.

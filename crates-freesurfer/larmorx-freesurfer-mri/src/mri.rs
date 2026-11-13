@@ -175,8 +175,9 @@ pub struct MriRegion {
     pub dz: i32,
 }
 
-/// `MRI::Shape`.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+/// `MRI::Shape`. Two shapes are equal when their extents and frame counts are (`operator==`
+/// compares the four as a vector; `size` is not compared).
+#[derive(Clone, Copy, Debug, Default)]
 pub struct Shape {
     pub width: i64,
     pub height: i64,
@@ -184,6 +185,15 @@ pub struct Shape {
     pub nframes: i64,
     pub size: i64,
 }
+
+impl PartialEq for Shape {
+    fn eq(&self, o: &Shape) -> bool {
+        (self.width, self.height, self.depth, self.nframes)
+            == (o.width, o.height, o.depth, o.nframes)
+    }
+}
+
+impl Eq for Shape {}
 
 impl Shape {
     /// `MRI::Shape::Shape(shape)` of 3 or 4 extents: a message on standard output for another
@@ -352,6 +362,97 @@ pub fn intent_code(name: &str) -> i32 {
         "WARP_INV" => MGZ_INTENT_WARPMAP_INV,
         "TIME_SERIES" => MGZ_INTENT_TIME_SERIES,
         _ => MGZ_INTENT_UNKNOWN,
+    }
+}
+
+/// `SAMPLE_NEAREST` and the other interpolation codes (`mri.h`).
+pub const SAMPLE_NEAREST: i32 = 0;
+pub const SAMPLE_TRILINEAR: i32 = 1;
+pub const SAMPLE_SINC: i32 = 2;
+pub const SAMPLE_CUBIC: i32 = 3;
+pub const SAMPLE_WEIGHTED: i32 = 4;
+pub const SAMPLE_CUBIC_BSPLINE: i32 = 5;
+pub const SAMPLE_VOTE: i32 = 6;
+
+/// C's `strncasecmp(a, b, n) == 0` in the C locale (ASCII letters folded; a string ends at its
+/// end or at a NUL).
+fn ncase_eq(a: &[u8], b: &[u8], n: usize) -> bool {
+    for i in 0..n {
+        let x = a.get(i).copied().unwrap_or(0).to_ascii_lowercase();
+        let y = b.get(i).copied().unwrap_or(0).to_ascii_lowercase();
+        if x != y {
+            return false;
+        }
+        if x == 0 {
+            return true;
+        }
+    }
+    true
+}
+
+/// `MRIinterpCode(name)`: the interpolation code of a method by its first three letters (any
+/// case): `nea`rest, `tri`linear or `tli`, `sin`c, `cub`ic (the cubic B-spline); -1 for others.
+pub fn mri_interp_code(name: &str) -> i32 {
+    let s = name.as_bytes();
+    if ncase_eq(s, b"nearest", 3) {
+        return SAMPLE_NEAREST;
+    }
+    if ncase_eq(s, b"trilinear", 3) || ncase_eq(s, b"tli", 3) {
+        return SAMPLE_TRILINEAR;
+    }
+    if ncase_eq(s, b"sinc", 3) {
+        return SAMPLE_SINC;
+    }
+    if ncase_eq(s, b"cubic", 3) {
+        return SAMPLE_CUBIC_BSPLINE;
+    }
+    -1
+}
+
+/// `MRIinterpString(code)`: `nearest`, `trilinear`, `sinc`, `cubic` (the B-spline code), `None`
+/// (`NULL`) for the others.
+pub fn mri_interp_string(code: i32) -> Option<&'static str> {
+    match code {
+        SAMPLE_NEAREST => Some("nearest"),
+        SAMPLE_TRILINEAR => Some("trilinear"),
+        SAMPLE_SINC => Some("sinc"),
+        SAMPLE_CUBIC_BSPLINE => Some("cubic"),
+        _ => None,
+    }
+}
+
+/// `MRIprecisionCode(name)`: the voxel type named `uchar`, `short`, `ushrt`, `int`, `long` or
+/// `float` (any case); -1 for others.
+pub fn mri_precision_code(name: &str) -> i32 {
+    let s = name.as_bytes();
+    let is = |w: &[u8]| s.len() == w.len() && ncase_eq(s, w, w.len());
+    if is(b"uchar") {
+        MRI_UCHAR
+    } else if is(b"short") {
+        MRI_SHORT
+    } else if is(b"ushrt") {
+        MRI_USHRT
+    } else if is(b"int") {
+        MRI_INT
+    } else if is(b"long") {
+        MRI_LONG
+    } else if is(b"float") {
+        MRI_FLOAT
+    } else {
+        -1
+    }
+}
+
+/// `MRIprecisionString(code)`: the name of those six types, `None` (`NULL`) for the others.
+pub fn mri_precision_string(code: i32) -> Option<&'static str> {
+    match code {
+        MRI_UCHAR => Some("uchar"),
+        MRI_SHORT => Some("short"),
+        MRI_USHRT => Some("ushrt"),
+        MRI_INT => Some("int"),
+        MRI_LONG => Some("long"),
+        MRI_FLOAT => Some("float"),
+        _ => None,
     }
 }
 

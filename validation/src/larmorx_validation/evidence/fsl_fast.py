@@ -2297,7 +2297,8 @@ def _named(ex: dict, i: str, ids: list[str]) -> None:
         raise ValueError(f"{ex['id']}: {i} names {got}, not {ids}")
 
 
-def _differ(ex: dict, i: str, out: str) -> str:
+def _moved(ex: dict, i: str, out: str) -> str:
+    """How many values of an output a comparison finds different."""
     return f"{_diff(ex, i)['metrics'][out]['differ']:,}"
 
 
@@ -2325,8 +2326,8 @@ def _shows_call(where: str):
             f"{where}, the replica and the clean room both give FSL's files, every value, and "
             "the same partial-volume maps as fMRIPrep's own. In `fix`, their default, both "
             "correct FSL-202 (a class variance that loses most of its digits): the replica's segmentation "
-            f"moves by {_differ(ex, 'fix-replica', 'seg')} voxels and its mixel types by "
-            f"{_differ(ex, 'fix-replica', 'mixeltype')}, and {_LAST_BITS}."
+            f"moves by {_moved(ex, 'fix-replica', 'seg')} voxels and its mixel types by "
+            f"{_moved(ex, 'fix-replica', 'mixeltype')}, and {_LAST_BITS}."
         ), ["replica-fsl", "original-fsl"]
 
     return shows
@@ -2357,7 +2358,7 @@ def _shows_priors(ex: dict) -> tuple[str, list[str]]:
     return (
         "From FSL's tissue priors, the replica and the clean room both give FSL's files, every "
         "value. In `fix`, their default, both round the registered priors (FSL-09) and correct "
-        f"FSL-202, which moves {_differ(ex, 'fix-replica', 'seg')} voxels of the segmentation, "
+        f"FSL-202, which moves {_moved(ex, 'fix-replica', 'seg')} voxels of the segmentation, "
         "and the two defaults give the same values, every one."
     ), ["replica-fsl", "original-fsl"]
 

@@ -185,6 +185,33 @@ impl VolGeom {
     }
 }
 
+/// `initVolGeom(vg)` (`utils/transform.cpp`): not valid, 256 voxels in each direction of 1 mm,
+/// the coronal direction cosines, the centre at 0 and the name `unknown` (copied over the old
+/// name: the bytes after it stay); `ras_good_flag`, the shears and the cached matrices are left
+/// as they are.
+pub fn init_vol_geom(vg: &mut VolGeom) {
+    vg.valid = 0;
+    vg.width = 256;
+    vg.height = 256;
+    vg.depth = 256;
+    vg.xsize = 1.0;
+    vg.ysize = 1.0;
+    vg.zsize = 1.0;
+    vg.x_r = -1.0;
+    vg.x_a = 0.0;
+    vg.x_s = 0.0;
+    vg.y_r = 0.0;
+    vg.y_a = 0.0;
+    vg.y_s = -1.0;
+    vg.z_r = 0.0;
+    vg.z_a = 1.0;
+    vg.z_s = 0.0;
+    vg.c_r = 0.0;
+    vg.c_a = 0.0;
+    vg.c_s = 0.0;
+    vg.fname.strcpy_bytes(b"unknown");
+}
+
 /// `MatrixPrint(stdout, m)` (precision 5): the matrix on standard output.
 fn print_matrix(g: &mut Globals, out: &mut dyn Write, err: &mut dyn Write, m: &Matrix) {
     let mut buf = Vec::new();

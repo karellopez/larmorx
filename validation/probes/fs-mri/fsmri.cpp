@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // fs.mri's probe: FreeSurfer 8.2.0's MRI structure (mri.h, mri.cpp, transform.cpp's VOL_GEOM
-// helpers, colortab.cpp's CTABdeepCopy; the tkregister and FSL matrices, coordinates, MRIcopy)
+// helpers, colortab.cpp's CTABdeepCopy; the tkregister and FSL matrices, coordinates, MRIcopy;
+// MRIboundingBox and the linear transform array's LTAalloc, LTAcopy, LTcopy, LTAfree)
 // called case by case, linked with the unit oracle's
 // libutils as the official programs are (build.sh). CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS:
 // it names FreeSurfer's functions (running it is a black-box run of FreeSurfer's code).
@@ -315,6 +316,74 @@ void set_header(MRI *m)
   if (geti()) m->ct = get_ctab(0);
 }
 
+// voxels of frame 0 set by the case: count, then column row slice value
+void set_voxels(MRI *m)
+{
+  int k = geti();
+  for (int i = 0; i < k; i++) {
+    int c = geti(), r = geti(), sl = geti();
+    float v = getf();
+    MRIsetVoxVal(m, c, r, sl, 0, v);
+  }
+}
+// a volume of the case with its voxels: get_mri, fill flag and seed, voxels set
+MRI *get_filled_mri()
+{
+  MRI *m = get_mri();
+  int fill = geti();
+  unsigned seed = (unsigned)geti();
+  if (fill) fill_chunk(m, seed);
+  set_voxels(m);
+  return m;
+}
+// a transform of the case: centre, sigma, three optional matrices, type, label, the two
+// geometries each with a flag that computes its cached matrices
+void set_lt(LT *lt)
+{
+  lt->x0 = getf(); lt->y0 = getf(); lt->z0 = getf(); lt->sigma = getf();
+  MATRIX **ms[] = {&lt->m_L, &lt->m_dL, &lt->m_last_dL};
+  for (MATRIX **m : ms) {
+    MatrixFree(m);
+    *m = get_opt_matrix();
+  }
+  lt->type = geti();
+  lt->label = geti();
+  set_geom(&lt->src);
+  if (geti()) MRIreInitCache(&lt->src);
+  set_geom(&lt->dst);
+  if (geti()) MRIreInitCache(&lt->dst);
+}
+LTA *get_lta()
+{
+  int n = geti();
+  LTA *l = LTAalloc(n, NULL);
+  l->type = geti();
+  l->fscale = getf();
+  strcpy(l->subject, gets().c_str());
+  for (int i = 0; i < n; i++) {
+    set_lt(&l->xforms[i]);
+    set_lt(&l->inv_xforms[i]);
+  }
+  return l;
+}
+void put_lt(const LT *lt)
+{
+  of(lt->x0); of(lt->y0); of(lt->z0); of(lt->sigma);
+  om(lt->m_L); om(lt->m_dL); om(lt->m_last_dL);
+  oi(lt->type); oi(lt->label);
+  put_geom(&lt->src);
+  put_geom(&lt->dst);
+}
+void put_lta(const LTA *l)
+{
+  if (!l) { out += "NULL "; return; }
+  oi(l->num_xforms); oi(l->type); of(l->fscale); os(l->subject);
+  for (int i = 0; i < l->num_xforms; i++) {
+    put_lt(&l->xforms[i]);
+    put_lt(&l->inv_xforms[i]);
+  }
+}
+
 void run_case()
 {
   std::string cmd = next();
@@ -587,6 +656,30 @@ void run_case()
     oi(MRI::intentCode(next()));
   } else if (cmd == "sizeof") {
     oi((long long)MRIsizeof(geti()));
+  } else if (cmd == "bbox") {
+    MRI *m = get_filled_mri();
+    int thresh = geti();
+    MRI_REGION b = {-7, -7, -7, -7, -7, -7};
+    oi(MRIboundingBox(m, thresh, &b));
+    oi(b.x); oi(b.y); oi(b.z); oi(b.dx); oi(b.dy); oi(b.dz);
+  } else if (cmd == "ltaalloc") {
+    int n = geti();
+    MRI *m = geti() ? get_filled_mri() : NULL;
+    LTA *l = LTAalloc(n, m);
+    put_lta(l);
+    oi(LTAfree(&l));
+    oi(l == NULL);
+  } else if (cmd == "ltacopy") {
+    LTA *src = get_lta();
+    LTA *dst = geti() ? get_lta() : NULL;
+    LTA *r = LTAcopy(src, dst);
+    oi(r != NULL);
+    oi(dst != NULL && r == dst);
+    put_lta(r ? r : dst);
+  } else if (cmd == "ltcopy0") {
+    LTA *l = LTAalloc(1, NULL);
+    set_lt(&l->xforms[0]);
+    oi(LTcopy(&l->xforms[0], NULL) == NULL);
   } else {
     fail("unknown command");
   }

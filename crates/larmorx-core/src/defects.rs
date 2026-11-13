@@ -1203,6 +1203,14 @@ defects! {
         "the first version's binary colour table writers store the table's entry count, empty places included, but only its non-empty entries: a table with empty places is read back with its last entries taken from what follows it (kept: the first version's format, which FreeSurfer writes only for tables read from first-version files, has no empty places)";
     FS_193 = "FS-193", "FreeSurfer", true,
         "the length FStagsIO gives a GCA morph's geometry tag in FreeSurfer's NIfTI extension counts the two file names whole, while the geometry's writer stores at most 512 bytes of each: with a longer name the extension's lengths are wrong";
+    FS_195 = "FS-195", "FreeSurfer", true,
+        "copying a linear transform array (LTAcopy) does not copy each transform's own type and label: a new copy's transforms have type -1 (unknown) and label 0, a given destination keeps its own";
+    FS_196 = "FS-196", "FreeSurfer", true,
+        "copying a linear transform array onto one whose transforms lack a matrix, or have smaller ones, loses that matrix's copy: the destination keeps no matrix, or its old numbers";
+    FS_197 = "FS-197", "FreeSurfer", true,
+        "freeing no linear transform array (LTAfree of a null array) crashes";
+    FS_198 = "FS-198", "FreeSurfer", true,
+        "copying a linear transform array from one whose transforms lack a matrix onto one that has it leaves the destination's matrix unusable: using or freeing the copy later crashes or reads garbage";
 }
 
 /// The register entry with ID `id`.

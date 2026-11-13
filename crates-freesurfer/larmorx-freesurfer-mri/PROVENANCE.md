@@ -51,6 +51,17 @@ kind `copy_and_invert_transform bad kind` and `exit(1)`).
 | `utils/transform.cpp` 567, 580 | `VGtkreg2RAS`, `VGras2tkreg` | `tkreg.rs` |
 | `packages/minc/minc_volume_io.c` 397-430, 716 | FreeSurfer's `get_linear_transform_ptr`, `get_inverse_linear_transform_ptr`, `copy_general_transform` (FreeSurfer's changes to MINC 1.5.1's volume_io; the transform itself is `larmorx_io::xfm`) | `mri.rs` |
 
+## FreeSurfer files and functions translated (track A relay 12: the linear transform array, early)
+
+Taken early from `fs.volume`'s item 3.1-39 for the surfaces' `MRIS::lta` (the orchestrator,
+2026-11-13); the rest of `transform.cpp` stays in `fs.volume`.
+
+| FreeSurfer file | What | Here |
+|---|---|---|
+| `include/transform.h` | `TransformType`, `LINEAR_TRANSFORM` (`LT`), `LINEAR_TRANSFORM_ARRAY` (`LTA`; its `get_matrix` method stays in fs.volume), the transform type numbers | `lta.rs` |
+| `utils/transform.cpp` 160, 185, 305, 630, 812 | `LTAcopy`, `LTcopy`, `initVolGeom`, `LTAalloc`, `LTAfree` | `lta.rs`, `vol_geom.rs` (`init_vol_geom`) |
+| `utils/mri.cpp` 3014 | `MRIboundingBox` | `voxel.rs` |
+
 ## Changes from the originals
 
 - The voxels are one contiguous buffer (FreeSurfer's `chunk`); its fallback of separate slices,
@@ -74,3 +85,8 @@ kind `copy_and_invert_transform bad kind` and `exit(1)`).
   C++'s copy constructor does. The colour table's names are byte strings (`Vec<u8>`: any bytes a file
   holds) and its entries are boxed (`Option<Box<ColorTableEntry>>`, 8 bytes per empty place, as C's
   array of pointers); `MRI::pedir` is a byte string.
+- (relay 12) An `LTA`'s two transform arrays are vectors of `num_xforms` transforms (`num_xforms`
+  kept as a field); a transform's matrices are `Option<Matrix>`. D13: FS-195 (the copy's type and
+  label: copied by default), FS-196 (a missing or smaller destination matrix: the copy kept by
+  default), FS-197 (`LTAfree` of nothing: nothing freed, both modes), FS-198 (a copy from a missing
+  matrix: the destination's dropped, both modes); FS-58 for `MRIboundingBox` of a header.

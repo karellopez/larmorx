@@ -379,6 +379,12 @@ ITEM_NOTES = {
     "mod:fs.labels:1": "colortab.cpp's binary readers and writers (CTABreadFromBinary,"
     " CTABwriteIntoBinary, their versions 1 and 2, the znz forms) were taken early by"
     " [[mod:fs.io:1]]'s second piece (track A, relay 11)",
+    "mod:fs.mri:1": "it also took transform.cpp's linear transform array (LTA, LINEAR_TRANSFORM,"
+    " LTAalloc, LTAcopy, LTcopy, LTAfree, initVolGeom) and mri.cpp's MRIboundingBox early from"
+    " [[mod:fs.volume:5]], for the surfaces' MRIS::lta (track A, relay 12)",
+    "mod:fs.volume:5": "transform.cpp's linear transform array (LTA, LINEAR_TRANSFORM, LTAalloc,"
+    " LTAcopy, LTcopy, LTAfree, initVolGeom) and mri.cpp's MRIboundingBox were taken early by"
+    " [[mod:fs.mri:1]] (track A, relay 12)",
 }
 # Modules whose functions always go to the module's own item (never to a program's).
 OWN_ITEM = {"gpl.gsl", "fs.spline"}

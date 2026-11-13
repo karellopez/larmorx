@@ -20,6 +20,7 @@ use larmorx_freesurfer_core::ret::Ret;
 use larmorx_freesurfer_core::run::Environment;
 use larmorx_freesurfer_mri::copy::mri_copy;
 use larmorx_freesurfer_mri::ctab::{ColorTable, ColorTableEntry, ctab_deep_copy, ctab_free};
+use larmorx_freesurfer_mri::lta::{self, LinearTransform, Lta};
 use larmorx_freesurfer_mri::mri::{self as m, Mri};
 use larmorx_freesurfer_mri::tkreg as tk;
 use larmorx_freesurfer_mri::vol_geom::{self as vgm, VolGeom};
@@ -373,6 +374,108 @@ fn perturbed(g: &mut Gen, a: &[String]) -> Vec<String> {
     b
 }
 
+/// `set_voxels`' tokens: up to three voxels of frame 0 (none for a volume without voxels).
+fn voxels(g: &mut Gen, t: &mut Vec<String>, ext: [i64; 3], hdr: bool) {
+    let k = if hdr { 0 } else { g.int(0, 3) };
+    t.push(k.to_string());
+    for _ in 0..k {
+        for e in ext {
+            t.push(g.int(0, e - 1).to_string());
+        }
+        t.push(fx(g.pick(&[
+            0.0,
+            70.0,
+            71.0,
+            70.5,
+            69.99,
+            255.0,
+            f32::NAN,
+            -1.0,
+            1000.0,
+            -40000.0,
+        ])));
+    }
+}
+
+/// `get_filled_mri`'s tokens: a small volume (unsupported types and volumes without voxels too),
+/// its fill and its voxels.
+fn filled_vol(g: &mut Gen, t: &mut Vec<String>) {
+    let ext = [g.int(1, 4), g.int(1, 4), g.int(1, 4)];
+    let ty = g.pick(&[0, 0, 1, 2, 3, 3, 4, 6, 7, 9, 10, 10]);
+    let hdr = g.chance(10);
+    for v in [ext[0], ext[1], ext[2], ty, g.int(1, 2), i64::from(hdr)] {
+        t.push(v.to_string());
+    }
+    t.push(g.int(0, 1).to_string());
+    t.push(g.int(0, 250).to_string());
+    voxels(g, t, ext, hdr);
+}
+
+fn thresh(g: &mut Gen) -> i64 {
+    g.pick(&[
+        70,
+        70,
+        70,
+        0,
+        -1,
+        69,
+        100,
+        255,
+        1_000_000,
+        i64::from(i32::MIN),
+        i64::from(i32::MAX),
+    ])
+}
+
+/// A transform's optional matrix: mostly 4 x 4, now and then of another size, missing once in
+/// `null_k`.
+fn lt_matrix(g: &mut Gen, t: &mut Vec<String>, null_k: u64) {
+    if g.chance(null_k) {
+        t.push("0".into());
+        return;
+    }
+    t.push("1".into());
+    let (rows, cols) = if g.chance(10) {
+        g.pick(&[(3, 3), (5, 5), (4, 1), (2, 4)])
+    } else {
+        (4, 4)
+    };
+    t.push(rows.to_string());
+    t.push(cols.to_string());
+    for _ in 0..rows * cols {
+        t.push(fx(num(g, -50, 50, 4)));
+    }
+}
+
+/// `set_lt`'s tokens.
+fn lt(g: &mut Gen, t: &mut Vec<String>, null_k: u64) {
+    for _ in 0..3 {
+        t.push(fx(num(g, -128, 128, 2)));
+    }
+    t.push(fx(g.pick(&[10000.0, 10000.0, 1.0, 0.5, 0.0])));
+    for _ in 0..3 {
+        lt_matrix(g, t, null_k);
+    }
+    t.push(g.pick(&[-1, -1, 0, 1, 2, 14, 21]).to_string());
+    t.push(g.pick(&[0, 0, 17, 2]).to_string());
+    for _ in 0..2 {
+        geom(g, t);
+        t.push(g.int(0, 1).to_string());
+    }
+}
+
+/// `get_lta`'s tokens for `n` transforms (a matrix missing once in `null_k`: rarely in a copy's
+/// source, where FreeSurfer's copy onto a matrix then reads freed memory, FS-198).
+fn lta_toks(g: &mut Gen, t: &mut Vec<String>, n: i64, null_k: u64) {
+    t.push(n.to_string());
+    t.push(g.pick(&[0, 1, 1, 2, 14, 21]).to_string());
+    t.push(fx(g.pick(&[0.0, 0.1, 1.0, 0.15])));
+    t.push(word(g));
+    for _ in 0..2 * n {
+        lt(g, t, null_k);
+    }
+}
+
 /// `n` case lines from `seed`.
 pub fn generate(seed: u64, n: usize) -> Vec<String> {
     let mut g = Gen::new(seed);
@@ -420,6 +523,12 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
         "copy",
         "copy",
         "shape",
+        "bbox",
+        "bbox",
+        "ltaalloc",
+        "ltacopy",
+        "ltacopy",
+        "ltcopy0",
     ];
     (0..n)
         .map(|i| {
@@ -689,6 +798,36 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
                         t.push(v.to_string());
                     }
                 }
+                "bbox" => {
+                    filled_vol(g, &mut t);
+                    t.push(thresh(g).to_string());
+                }
+                "ltaalloc" => {
+                    let n = if g.chance(8) {
+                        g.pick(&[-1, -2, i64::from(i32::MIN)])
+                    } else {
+                        g.int(0, 3)
+                    };
+                    t.push(n.to_string());
+                    if g.chance(2) {
+                        t.push("1".into());
+                        filled_vol(g, &mut t);
+                    } else {
+                        t.push("0".into());
+                    }
+                }
+                "ltacopy" => {
+                    let n = g.pick(&[0, 1, 1, 1, 2, 3]);
+                    lta_toks(g, &mut t, n, 60);
+                    if g.chance(3) {
+                        t.push("0".into());
+                    } else {
+                        t.push("1".into());
+                        let m = if g.chance(6) { g.int(0, 3) } else { n };
+                        lta_toks(g, &mut t, m, 12);
+                    }
+                }
+                "ltcopy0" => lt(g, &mut t, 12),
                 _ => t.push(g.int(-1, 11).to_string()),
             }
             t.join(" ")
@@ -804,6 +943,32 @@ impl Out {
         self.am(v.i_to_r.as_ref());
         self.m(v.r_to_i.as_ref());
         self.m(v.register_mat.as_ref());
+    }
+    fn lt(&mut self, l: &LinearTransform) {
+        for v in [l.x0, l.y0, l.z0, l.sigma] {
+            self.f(v);
+        }
+        self.m(l.m_l.as_ref());
+        self.m(l.m_dl.as_ref());
+        self.m(l.m_last_dl.as_ref());
+        self.i(i64::from(l.ltype));
+        self.i(i64::from(l.label));
+        self.geom(&l.src, true);
+        self.geom(&l.dst, true);
+    }
+    fn lta(&mut self, l: Option<&Lta>) {
+        let Some(l) = l else {
+            self.0 += "NULL ";
+            return;
+        };
+        self.i(i64::from(l.num_xforms));
+        self.i(i64::from(l.ltype));
+        self.f(l.fscale);
+        self.s(&l.subject.to_string_lossy());
+        for i in 0..l.num_xforms.max(0) as usize {
+            self.lt(&l.xforms[i]);
+            self.lt(&l.inv_xforms[i]);
+        }
     }
     fn header(&mut self, x: &Mri) {
         for v in [x.vg.width, x.vg.height, x.vg.depth, x.nframes, x.mtype] {
@@ -974,6 +1139,51 @@ impl Ctx {
     }
     fn opt_matrix(&mut self, t: &mut Toks) -> Option<Matrix> {
         (t.i() != 0).then(|| self.matrix(t))
+    }
+    fn filled_mri(&mut self, t: &mut Toks) -> Result<Mri, Fatal> {
+        let mut x = self.mri(t)?;
+        let (fl, seed) = (t.i(), t.i() as u32);
+        if fl != 0 {
+            fill(&mut x, seed);
+        }
+        let k = t.i();
+        for _ in 0..k {
+            let (c, r, s) = (t.i(), t.i(), t.i());
+            let v = t.f();
+            voxel::mri_set_vox_val(&mut self.g, &mut self.b, &mut x, c, r, s, 0, v, 0)?;
+        }
+        Ok(x)
+    }
+    fn set_lt(&mut self, t: &mut Toks, l: &mut LinearTransform) -> Result<(), Fatal> {
+        l.x0 = t.f();
+        l.y0 = t.f();
+        l.z0 = t.f();
+        l.sigma = t.f();
+        l.m_l = self.opt_matrix(t);
+        l.m_dl = self.opt_matrix(t);
+        l.m_last_dl = self.opt_matrix(t);
+        l.ltype = t.i();
+        l.label = t.i();
+        for k in 0..2 {
+            let v = if k == 0 { &mut l.src } else { &mut l.dst };
+            self.set_geom(t, v);
+            if t.i() != 0 {
+                vgm::reinit_cache(&mut self.g, &mut self.a, &mut self.b, v)?;
+            }
+        }
+        Ok(())
+    }
+    fn lta(&mut self, t: &mut Toks) -> Result<Lta, Fatal> {
+        let n = t.i();
+        let mut l = lta::lta_alloc(&mut self.g, &mut self.a, &mut self.b, n, None)?;
+        l.ltype = t.i();
+        l.fscale = t.f();
+        l.subject = CName::new(t.s().as_bytes());
+        for i in 0..n.max(0) as usize {
+            self.set_lt(t, &mut l.xforms[i])?;
+            self.set_lt(t, &mut l.inv_xforms[i])?;
+        }
+        Ok(l)
     }
     fn ctab(&mut self, t: &mut Toks, depth: u32) -> ColorTable {
         let n = t.i();
@@ -1512,6 +1722,60 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
         "sizeof" => {
             let s = m::mri_sizeof(t.i());
             o.i(if s == usize::MAX { -1 } else { s as i64 });
+        }
+        "bbox" => {
+            let x = cx.filled_mri(t)?;
+            let th = t.i();
+            let (r, b) = voxel::mri_bounding_box(&mut cx.g, &mut cx.b, &x, th)?;
+            for v in [r, b.x, b.y, b.z, b.dx, b.dy, b.dz] {
+                o.i(i64::from(v));
+            }
+        }
+        "ltaalloc" => {
+            let n = t.i();
+            let x = if t.i() != 0 {
+                Some(cx.filled_mri(t)?)
+            } else {
+                None
+            };
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let l = lta::lta_alloc(g, a, b, n, x.as_ref())?;
+            o.lta(Some(&l));
+            let mut p = Some(l);
+            o.i(i64::from(lta::lta_free(g, &mut p)));
+            o.i(i64::from(p.is_none()));
+        }
+        "ltacopy" => {
+            let src = cx.lta(t)?;
+            let dst = if t.i() != 0 { Some(cx.lta(t)?) } else { None };
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            match dst {
+                None => match lta::lta_copy(g, a, b, &src, None)? {
+                    Ret::New(l) => {
+                        o.i(1);
+                        o.i(0);
+                        o.lta(Some(&l));
+                    }
+                    _ => {
+                        o.i(0);
+                        o.i(0);
+                        o.lta(None);
+                    }
+                },
+                Some(mut d) => {
+                    let ok = !lta::lta_copy(g, a, b, &src, Some(&mut d))?.is_null();
+                    o.i(i64::from(ok));
+                    o.i(i64::from(ok));
+                    o.lta(Some(&d));
+                }
+            }
+        }
+        "ltcopy0" => {
+            let mut l = lta::lta_alloc(&mut cx.g, &mut cx.a, &mut cx.b, 1, None)?;
+            cx.set_lt(t, &mut l.xforms[0])?;
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = lta::lt_copy(g, a, b, &l.xforms[0], None)?;
+            o.i(i64::from(!r));
         }
         c => panic!("unknown command {c}"),
     }

@@ -5,7 +5,8 @@ is a black-box run of FreeSurfer's code).
 
 - `fsmri.cpp` → `<workspace>/oracles/freesurfer-8.2.0-probes/fs-mri/fsmri` (`build.sh
   <workspace>`): FreeSurfer's `MRI` structure (`mri.h`, `mri.cpp`, `transform.cpp`'s geometry
-  helpers, `colortab.cpp`'s deep copy) linked with the unit oracle's libraries as the official
+  helpers, `colortab.cpp`'s deep copy; `MRIboundingBox` and the linear transform array's
+  `LTAalloc`, `LTAcopy`, `LTcopy`, `LTAfree`) linked with the unit oracle's libraries as the official
   programs are. One line per case: every case runs in a child process whose standard output and
   error go to a scratch file beside the cases; `<result> | <text>` with the text C-escaped, or
   `EXIT <status> | <text>`, `CRASH <signal> | <text>`.
@@ -32,3 +33,11 @@ debug and release; the port's 43,000 lines identical with and without the emulat
 `tk2nat`, `fsl2tk` and `tk2fsl` cases are drawn finite: they print the float determinant and an
 inverse written in place, whose NaN bits the port does not reproduce yet (larmorx-core's VXL).
 The big run: `check.py --seed 7 --n 43000` inside `boxed.sh 8` (about 8 minutes).
+
+Measured 2026-11-13 (track A relay 12, 49 commands: `bbox`, `ltaalloc`, `ltacopy`, `ltcopy0` added):
+seed 7, 49,000 cases (`check.py --seed 7 --n 49000` inside `boxed.sh 8`, about 10 minutes): 46,410 of
+46,410 comparable lines identical with `reproduce` (2,590 not comparable; `ltacopy`'s FS-198 lines,
+where FreeSurfer prints a matrix it freed, are skipped like FS-53's), the four new commands 5,625 of
+5,625; `fix` different only with a notice. Seed 1, 980 cases: 922 identical, 58 not comparable, hash
+`ecce606b6218d98ab5325c5e7234805bf08d4da20179bd9caaad57cb4a4793e5`, passing with AArch64's NaN
+emulated in debug and release; the port's 49,000 lines identical with and without the emulation.

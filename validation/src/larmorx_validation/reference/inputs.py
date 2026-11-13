@@ -66,11 +66,40 @@ def _make_coords(path: Path) -> None:
     path.write_text("10 20 30\n5 6 7\n", encoding="utf-8")
 
 
+#: Eight points in millimetres, no four of them in one plane.
+_POINTS = (
+    (10, 20, 30),
+    (-15, 25, 40),
+    (30, -10, 20),
+    (5, 5, -25),
+    (-20, -30, 10),
+    (25, 30, -5),
+    (0, -20, -15),
+    (-10, 10, 35),
+)
+
+
+def _make_points(path: Path, shift: tuple[int, int, int] = (0, 0, 0)) -> None:
+    rows = [" ".join(str(v + s) for v, s in zip(p, shift, strict=True)) for p in _POINTS]
+    path.write_text("\n".join(rows) + "\n", encoding="utf-8")
+
+
+def _make_points_moved(path: Path) -> None:
+    _make_points(path, (2, -3, 4))
+
+
+def _make_log(path: Path) -> None:
+    path.write_text("start\nfirst value 1\nmiddle\nsecond value 2\nend\n", encoding="utf-8")
+
+
 KINDS: dict[str, Kind] = {
     "head": Kind("a synthetic head of 40 × 48 × 40 voxels of 4 mm", _make_head),
     "head4d": Kind("a synthetic series of 4 such heads", _make_head4d),
     "matrix": Kind("the identity as a 4 × 4 text matrix", _make_matrix),
     "coords": Kind("two coordinates, one `x y z` per line", _make_coords),
+    "points": Kind("eight points in millimetres, one `x y z` per line", _make_points),
+    "points-moved": Kind("the same eight points moved by 2, −3 and 4 mm", _make_points_moved),
+    "log": Kind("a text of five lines, two of them with the word `value`", _make_log),
 }
 
 

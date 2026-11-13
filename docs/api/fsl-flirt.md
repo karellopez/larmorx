@@ -8,10 +8,10 @@ boundary-based registration (BBR), and its matrix tool. Also FLIRT's other progr
 below), with every schedule command (`alignpaxes` and any parameter-subset mask) and `-debug`.
 
 The ports come first. One section per program follows: `flirt`, `convert_xfm`, `avscale`, the
-three coordinate programs, `rmsdiff` and `makerot`, then the other programs and scripts in their
-table. Each program's section is the source of its reference
-page on the documentation site (`python -m larmorx_validation reference`), with its options table
-checked against the code. What the programs share comes after them, and the page's dates are in
+three coordinate programs, `rmsdiff`, `makerot`, `midtrans`, `pointflirt`, `applyxfm4D` and the
+scripts `pairreg`, `extracttxt` and `aff2rigid`. Each program's section is the source of its
+reference page on the documentation site (`python -m larmorx_validation reference`), with its
+options table checked against the code. What the programs share comes after them, and the page's dates are in
 its [History](#history).
 
 ## Ports
@@ -53,6 +53,11 @@ boundary-based registration (BBR). It finds a transform of 6, 7, 9 or 12 degrees
 applies a given matrix (`-applyxfm`, `-applyisoxfm`), and writes the 4 × 4 matrix from the
 input's FSL millimetres to the reference's (`-omat`) and, on request, the input resampled onto the
 reference's grid (`-out`).
+
+Its schedules may use `alignpaxes` (the rotation between the two images' principal axes, with the
+centres of gravity aligned) and `setoption paramsubset` with any finite mask (its pseudo-inverse
+by the SVD, as FSL's); `-debug` writes FLIRT's debug volumes (the pyramid, the weights and, with
+`-cost bbr`, BBR's `debug` volume).
 
 ### Python (`flirt`)
 
@@ -514,32 +519,380 @@ Both ports are complete, as for `avscale` (above): FSL-76 corrected by default (
 `reproduce`, named), FSL-77 refused by default (FSL's reading with `reproduce`, named in both
 modes).
 
-## FLIRT's other programs and scripts (part 3)
+## `midtrans`
 
-```python
-mid = lx.fsl.midtrans(["A2temp.mat", "B2temp.mat", "C2temp.mat"])    # 4 x 4 to the middle
-aff = lx.fsl.pointflirt(in_points, ref_points)                         # N x 3 each, mm
-lx.fsl.applyxfm4d("bold.nii.gz", "boldref.nii.gz", "out.nii.gz", "mats_dir")  # MAT_0000n
-pair = lx.fsl.pairreg("b1_brain.nii.gz", "b2_brain.nii.gz", "b1.nii.gz", "b2.nii.gz")
-text = lx.fsl.extracttxt("value", "log.txt", 3, -1)
-rigid = lx.fsl.aff2rigid("T1w2MNI.mat")                                 # 6-parameter 4 x 4
+<!-- reference
+program: midtrans
+group: fsl
+original: FSL 6.0.7.23
+python: larmorx.fsl.midtrans
+command-line: crates/larmorx-fsl/src/cli/midtrans.rs
+records: {replica: [fsl-flirt-replica], clean-room: [fsl-flirt]}
+evidence: fsl-flirt
+-->
+
+`midtrans` finds the transform from a template space to the "middle" of several transforms into
+that space. The middle is FSL's Procrustes average of the transforms, about the MNI origin or about
+the centre of gravity of a template image (`--template`). With `--separate`, each transform
+composed with it is written too.
+
+### Python (`midtrans`)
+
+`lx.fsl.midtrans(transforms, *, template=None, separate=None, implementation="auto", upstream_defects="fix")`
+
+`transforms` are 4 × 4 arrays or matrix files, at least two; `template` is a path or an `lx.Image`.
+The result is the 4 × 4 transform from the template space to the middle.
+
+### Options of `midtrans`
+
+| `midtrans` option | Python | Notes |
+|---|---|---|
+| `transform1` `transform2` `...` | `transforms` | at least two |
+| `-o`, `--out` | the result | |
+| `--template` | `template` | an image: the average about its centre of gravity (about the MNI origin without one) |
+| `--separate` | `separate` | a basename: each transform composed with the middle, written to `<basename>0001.mat` and on |
+| `--debug`, `-v`, `--verbose`, `-h`, `--help` | command line only | `-v` and `--debug` print every stage |
+
+### Examples of `midtrans`
+
+<!-- inputs: A2temp.mat=matrix B2temp.mat=matrix C2temp.mat=matrix -->
+
+```python example
+import larmorx as lx
+
+mid = lx.fsl.midtrans(["A2temp.mat", "B2temp.mat", "C2temp.mat"])
+mid.shape  # -> (4, 4)
 ```
 
-| Program | Command line | `lx.fsl` | Notes |
-|---|---|---|---|
-| `midtrans [-o file] [--template img] [--separate prefix] [--debug] [-v] t1 t2 ...` | `larmorx fsl midtrans` | `midtrans(transforms, *, template, separate)` → 4 × 4 | the transform from the template space to the "middle" of the transforms (FSL's Procrustes average about the MNI origin or the template's centre of gravity); `--separate` writes each transform composed with it; an error after the arguments exits 1 (FSL 0: **FSL-78**) |
-| `pointflirt -i file -r file [-o file] [--vox --invol=img --refvol=img] [-v]` | `larmorx fsl pointflirt` | `pointflirt(in_points, ref_points, *, in_image, ref_image)` → 4 × 4 | the least-squares affine matrix mapping the input points onto the reference points (mm; voxels scaled by the images' voxel sizes with `--vox`); a warning when the points do not determine it; a file of exactly three points is read with one point per column (as FSL) |
-| `applyxfm4D in ref out mats [-singlematrix] [-fourdigit] [-userprefix p] [-interp m] [-3D] [-v]` | `larmorx fsl applyxfm4D` | `applyxfm4d(in, ref, out, transforms, *, single_matrix, four_digit, user_prefix, interp, three_d)` | each volume resampled onto the reference's grid through one matrix or one per volume (`MAT_0000n`, `MAT_nnnn`, `<prefix>nnnn`), sinc (default), trilinear, nearest neighbour or spline, in the input's data type (char, short, int, float, double); integer outputs rounded and clamped (**FSL-09**); spline on integer images computed as on float ones (**FSL-79**); `-3D` sinc with the rectangular kernel the program asks for (**FSL-80**); uint8 values read as stored (**FSL-111**: FSL reads them as signed char) |
-| `pairreg brain1 brain2 skull1 skull2 outmat [flirt args]` | `larmorx fsl pairreg` | `pairreg(brain1, brain2, skull1, skull2, *, flirt_args)` → 4 × 4 | brain-to-brain registration refined with the skulls (three FLIRT runs with FSL's `pairreg` schedules, in-process) |
-| `extracttxt word file [count [start]]` | `larmorx fsl extracttxt` | `extracttxt(word, file, trailing_lines, relative_start)` → str | the lines from the first match (a basic regular expression), or `count` of them from `start` lines after it; FSL's messages for ranges before the first line |
-| `aff2rigid in.mat out.mat` | `larmorx fsl aff2rigid` | `aff2rigid(matrix)` → 4 × 4 | the 6-parameter matrix keeping the anterior commissure, the AC-PC line and the mid-sagittal plane of an input-to-standard matrix; FSL 6.0.7.23's script stops with a Python error before writing (**FSL-81**): computed by default, FSL's error with `reproduce` |
+```bash example
+larmorx fsl midtrans -o temp2mid.mat A2temp.mat B2temp.mat C2temp.mat
+```
 
-`flirt`'s schedules may now use `alignpaxes` (the rotation between the two images' principal axes,
-with the centres of gravity aligned) and `setoption paramsubset` with any finite mask (its
-pseudo-inverse by the SVD, as FSL's); `-debug` writes FLIRT's debug volumes (the pyramid, the
-weights and, with `-cost bbr`, BBR's `debug` volume).
+### Ports of `midtrans`
 
-## The clean-room original (part 1, 2026-11-02)
+Both ports are complete: every option, usage, message, exit status and failure case of
+`specs/flirt.md` §15.5, with every stage that `-v` and `--debug` print. An error after the
+arguments exits with status 1 (FSL exits 0: **FSL-78**, corrected by default and named). The clean
+room uses a transform whose determinant is not finite (FSL's test is `|det| < 1e-6`), and refuses
+transforms whose averages reach beyond double precision, such as a scale of 1e200 or a translation
+of 1e300, with exit status 1 in both modes (**FSL-241**: FSL writes rows of NaN, or reports its
+failed decomposition as a matrix-size error, and exits 0).
+
+The replica's record holds 12 cases of `midtrans`: 8 identical to FSL, 4 where both refuse alike.
+The clean room's holds 14: 8 within its thresholds, 4 refused alike, and the 2 of FSL-241.
+
+## `pointflirt`
+
+<!-- reference
+program: pointflirt
+group: fsl
+original: FSL 6.0.7.23
+python: larmorx.fsl.pointflirt
+command-line: crates/larmorx-fsl/src/cli/pointflirt.rs
+records: {replica: [fsl-flirt-replica], clean-room: [fsl-flirt]}
+evidence: fsl-flirt
+-->
+
+`pointflirt` finds the affine matrix that maps one set of points onto another, in the
+least-squares sense. The points are in millimetres, or in voxels with `--vox`, scaled by the two
+images' voxel sizes. It warns when the points do not determine the matrix, and a file of exactly
+three points is read with one point per column, as FSL reads it.
+
+### Python (`pointflirt`)
+
+`lx.fsl.pointflirt(in_points, ref_points, *, in_image=None, ref_image=None, implementation="auto")`
+
+`in_points` and `ref_points` are N × 3 arrays or text files of rows `x y z`, as many points in
+each; `in_image` and `ref_image` are paths or `lx.Image` objects, given both or neither. The
+result is the 4 × 4 matrix.
+
+### Options of `pointflirt`
+
+| `pointflirt` option | Python | Notes |
+|---|---|---|
+| `-i`, `-r` | `in_points`, `ref_points` | the input's and the reference's points |
+| `-o`, `--out` | the result | |
+| `--vox` | `in_image`, `ref_image` given | voxel coordinates; needs `--invol` and `--refvol` |
+| `--invol`, `--refvol` | `in_image`, `ref_image` | the images whose voxel sizes scale the points |
+| `-v`, `--verbose`, `-h`, `--help` | command line only | |
+
+### Examples of `pointflirt`
+
+<!-- inputs: in.txt=points ref.txt=points-moved -->
+
+```python example
+import larmorx as lx
+
+# The second file holds the first's points moved by 2, -3 and 4 mm.
+aff = lx.fsl.pointflirt("in.txt", "ref.txt")
+aff[:3, 3].round(6).tolist()  # -> [2.0, -3.0, 4.0]
+```
+
+```bash example
+larmorx fsl pointflirt -i in.txt -r ref.txt -o in2ref.mat
+```
+
+### Ports of `pointflirt`
+
+Both ports are complete: every option, usage, message, exit status and failure case of
+`specs/flirt.md` §15.6, with its transposition rule, `--vox` and the nullspace warning. Two
+coordinate files both empty or missing are refused in both modes (**FSL-204**: FSL crashes after
+its `Could not open matrix file` lines): `larmorx-nc: error: pointflirt: no points in the
+coordinate files (FSL-204)`, exit status 1, the clean room after `-v`'s headings, as FSL prints
+them. The clean room reads a `nan` word as 0 (the fit of the points as read) and stops on an
+overflow as FSL's SVD does.
+
+The replica's record holds 14 cases of `pointflirt`: 7 identical to FSL, 6 where both refuse
+alike, and 1 of FSL-204. The clean room's holds 17: 8 within its thresholds, 7 refused alike, and
+the 2 of FSL-204.
+
+## `applyxfm4D`
+
+<!-- reference
+program: applyxfm4D
+group: fsl
+original: FSL 6.0.7.23
+python: larmorx.fsl.applyxfm4d
+command-line: crates/larmorx-fsl/src/cli/applyxfm4d.rs
+records: {replica: [fsl-flirt-replica], clean-room: [fsl-flirt]}
+evidence: fsl-flirt
+-->
+
+`applyxfm4D` resamples each volume of a series onto a reference's grid, through one matrix or one
+per volume. The matrices are one file (`-singlematrix`) or a directory of files named `MAT_0000n`,
+`MAT_nnnn` (`-fourdigit`) or `<prefix>nnnn` (`-userprefix`). The interpolation is sinc (the
+default), trilinear, nearest neighbour or spline, and the output keeps the input's data type
+(char, short, int, float, double).
+
+### Python (`applyxfm4D`)
+
+`lx.fsl.applyxfm4d(in_image, ref_image, out_image, transforms, *, single_matrix=False, four_digit=False, user_prefix=None, interp="sinc", three_d=False, implementation="auto", upstream_defects="fix")`
+
+The images and `transforms` are paths. The output's extension chooses its format (`.nii.gz`,
+`.nii`, `.hdr` or `.img`; none: `.nii.gz`). The result is the path written.
+
+### Options of `applyxfm4D`
+
+| `applyxfm4D` option | Python | Notes |
+|---|---|---|
+| `<input volume>` `<ref volume>` `<output volume>` | `in_image`, `ref_image`, `out_image` | |
+| `<transformation matrix file/dir>` | `transforms` | a directory of `MAT_0000n` files, or one file with `-singlematrix` |
+| `-singlematrix`, `--singlematrix` | `single_matrix` | one matrix for every volume |
+| `-fourdigit`, `--fourdigit` | `four_digit` | the files named `MAT_nnnn` |
+| `-userprefix`, `--userprefix` | `user_prefix` | the files named `<prefix>nnnn` |
+| `-interp`, `--interp` | `interp` | `sinc` (default), `trilinear`, `nearestneighbour` (or `nn`), `spline` |
+| `-3D`, `--3D`, `-3d`, `--3d` | `three_d` | one volume; with sinc, the rectangular kernel the program asks for (**FSL-80**) |
+| `-v`, `--v`, `-verbose`, `--verbose` | command line only | |
+
+### Examples of `applyxfm4D`
+
+<!-- inputs: bold.nii.gz=head4d boldref.nii.gz=head bold2ref.mat=matrix -->
+
+```python example
+import larmorx as lx
+
+path = lx.fsl.applyxfm4d(
+    "bold.nii.gz", "boldref.nii.gz", "bold_on_ref.nii.gz", "bold2ref.mat", single_matrix=True
+)
+```
+
+```bash example
+larmorx fsl applyxfm4D bold.nii.gz boldref.nii.gz bold_on_ref.nii.gz bold2ref.mat -singlematrix
+```
+
+### Ports of `applyxfm4D`
+
+Both ports are complete: every option, usage, message, exit status and failure case of
+`specs/flirt.md` §15.7, on FLIRT's shared resampling (no blur, as FSL). FSL's defects are corrected
+by default, and FSL's behaviour comes with `upstream_defects="reproduce"`:
+
+- **FSL-09**: integer outputs are rounded to the nearest and clamped (FSL truncates).
+- **FSL-79**: spline interpolation of an integer image is computed as for a float image (FSL keeps
+  the spline's coefficients and values in the image's type); named where the output changes.
+- **FSL-80**: `-3D` with sinc uses the rectangular kernel of width 9 that the program asks for
+  (FSL uses a blackman kernel of width 7); named where the output changes.
+- **FSL-111**: a uint8 image's values are read as stored (FSL reads them as signed char, its
+  values 128 to 255 as `v − 256`); named where a written value changes.
+- **FSL-75**: the background value of a volume 3 voxels wide is taken from the whole border.
+- **FSL-11**: with `FSLOUTPUTTYPE` unset, the images are written as `.nii.gz` and FSL-11 is named
+  (FSL stops at its first image); command line only, as the Python function sets the type itself.
+
+With a reference that has neither form, the output carries the input's form through the first
+matrix, as a registration's `-out` does.
+
+The replica's record holds 25 cases of `applyxfm4D`: 19 identical to FSL, 6 where both refuse
+alike. The clean room's holds 25: 20 within its thresholds, 5 refused alike.
+
+## `pairreg`
+
+<!-- reference
+program: pairreg
+group: fsl
+original: FSL 6.0.7.23
+python: larmorx.fsl.pairreg
+command-line: crates/larmorx-fsl/src/cli/pairreg.rs
+records: {replica: [fsl-flirt-replica], clean-room: [fsl-flirt]}
+evidence: fsl-flirt
+-->
+
+`pairreg` is a script that registers one brain to another and refines the result with the two
+heads' skulls. It runs FLIRT three times, with FSL's schedules `pairreg1.sch` to `pairreg3.sch`:
+the brains first, then the skulls, then the brains again; `brain1` and `skull1` are the references.
+
+### Python (`pairreg`)
+
+`lx.fsl.pairreg(brain1, brain2, skull1, skull2, *, flirt_args=None, implementation="auto", upstream_defects="fix")`
+
+The images are paths; `flirt_args` is a list of FLIRT's options. The result is the 4 × 4 matrix
+from `brain2` to `brain1`.
+
+### Options of `pairreg`
+
+| `pairreg` arguments | Python | Notes |
+|---|---|---|
+| `brain1` `brain2` `skull1` `skull2` | `brain1`, `brain2`, `skull1`, `skull2` | `brain1` and `skull1` the references |
+| `outputmatrix` | the result | |
+| `[extra flirt args]` | `flirt_args` | passed to every FLIRT run |
+
+### Examples of `pairreg`
+
+<!-- inputs: b1_brain.nii.gz=head b2_brain.nii.gz=head b1.nii.gz=head b2.nii.gz=head -->
+
+```python example
+import larmorx as lx
+
+pair = lx.fsl.pairreg("b1_brain.nii.gz", "b2_brain.nii.gz", "b1.nii.gz", "b2.nii.gz")
+pair.shape  # -> (4, 4)
+```
+
+```bash example
+larmorx fsl pairreg b1_brain.nii.gz b2_brain.nii.gz b1.nii.gz b2.nii.gz b2_to_b1.mat
+```
+
+### Ports of `pairreg`
+
+Both ports are complete: every usage, message, exit status and failure case of `specs/flirt.md`
+§15.8. The clean room runs its own `flirt` three times and one `convert_xfm -fixscaleskew`, in
+this process, and carries FSL's three schedules itself: it needs no `$FSLDIR`. `-v` echoes FSL's
+lines, and a step that aborts is followed by the shell's `Aborted` line. Arguments that the
+script's shell would split or expand are refused.
+
+The replica's record holds 3 cases of `pairreg`: 2 identical to FSL, 1 where both refuse alike.
+The clean room's holds 5: 4 within its thresholds, 1 refused alike.
+
+## `extracttxt`
+
+<!-- reference
+program: extracttxt
+group: fsl
+original: FSL 6.0.7.23
+python: larmorx.fsl.extracttxt
+command-line: crates/larmorx-fsl/src/cli/extracttxt.rs
+records: {replica: [fsl-flirt-replica], clean-room: [fsl-flirt]}
+evidence: fsl-flirt
+-->
+
+`extracttxt` is a script that prints the lines of a text file from the first line that matches a
+word. The word is a basic regular expression, as grep reads it. With a count, it prints that many
+lines, from a given number of lines after the match (before it, when the number is negative), and
+FSL's messages for ranges before the first line.
+
+### Python (`extracttxt`)
+
+`lx.fsl.extracttxt(search_word, file, trailing_lines=None, relative_start=None, *, implementation="auto")`
+
+The result is the text printed, as a string. `relative_start` needs `trailing_lines`.
+
+### Options of `extracttxt`
+
+| `extracttxt` arguments | Python | Notes |
+|---|---|---|
+| `search_word` | `search_word` | a basic regular expression |
+| `file` | `file` | |
+| `num_trailing_lines` | `trailing_lines` | without it, every line to the end |
+| `relative_start` | `relative_start` | lines after the match, or before it when negative |
+
+### Examples of `extracttxt`
+
+<!-- inputs: log.txt=log -->
+
+```python example
+import larmorx as lx
+
+# Three lines, from the line before the first that holds "value".
+text = lx.fsl.extracttxt("value", "log.txt", 3, -1)
+text  # -> 'start\nfirst value 1\nmiddle\n'
+```
+
+```bash example
+larmorx fsl extracttxt value log.txt 3 -1
+```
+
+### Ports of `extracttxt`
+
+Both ports are complete: every usage, message, exit status and failure case of `specs/flirt.md`
+§15.8. The clean room has its own POSIX basic regular expressions (with GNU grep's extensions) and
+the script's dc and sed arithmetic, messages included. GNU sed's usage text, which a range read as
+sed's options prints, is not reproduced: one LARMORX line takes its place. Refused, as the spec
+says: arguments that the script's shell would split or expand, counts and starts that are not
+integers, and files with NUL bytes.
+
+The replica's record holds 13 cases of `extracttxt`: 8 identical to FSL, 5 where both refuse
+alike. The clean room's holds 12: 8 within its thresholds, 4 refused alike.
+
+## `aff2rigid`
+
+<!-- reference
+program: aff2rigid
+group: fsl
+original: FSL 6.0.7.23
+python: larmorx.fsl.aff2rigid
+command-line: crates/larmorx-fsl/src/cli/aff2rigid.rs
+records: {replica: [fsl-flirt-replica], clean-room: [fsl-flirt]}
+evidence: fsl-flirt
+-->
+
+`aff2rigid` is a script that turns FLIRT's 12-parameter matrix from an image to standard space
+into a 6-parameter (rigid) one. The rigid matrix keeps, in order of decreasing accuracy, the
+anterior commissure, the AC-PC line and the mid-sagittal plane.
+
+### Python (`aff2rigid`)
+
+`lx.fsl.aff2rigid(matrix, *, implementation="auto", upstream_defects="fix")`
+
+`matrix` is a 4 × 4 array or a matrix file. The result is the 4 × 4 rigid matrix.
+
+### Options of `aff2rigid`
+
+| `aff2rigid` arguments | Python | Notes |
+|---|---|---|
+| `<input2standard mat>` | `matrix` | FLIRT's matrix from the image to standard space |
+| `<output mat>` | the result | |
+
+### Examples of `aff2rigid`
+
+<!-- inputs: T1w2MNI.mat=matrix -->
+
+```python example
+import larmorx as lx
+
+rigid = lx.fsl.aff2rigid("T1w2MNI.mat")
+rigid.shape  # -> (4, 4)
+```
+
+```bash example
+larmorx fsl aff2rigid T1w2MNI.mat T1w2MNI_rigid.mat
+```
+
+### Ports of `aff2rigid`
+
+FSL 6.0.7.23's script stops with a Python `NameError` under NumPy 2, before it writes the matrix
+(**FSL-81**). Both ports compute the matrix as the script defines it by default, and stop with
+FSL's traceback with `upstream_defects="reproduce"`; the clean room's matrix is identical to the
+replica's. Each record holds 3 cases of `aff2rigid`: its usage, and two matrices (fMRIPrep's
+initial one among them) on which the ports, with `reproduce`, stop as FSL does.
+
+## The clean room (part 1, 2026-11-02)
 
 `lx.fsl.flirt(..., implementation="clean-room")`, `lx.fsl.convert_xfm(..., implementation="clean-room")`,
 `larmorx --implementation clean-room fsl flirt|convert_xfm` (crate `larmorx-fsl`, module
@@ -591,8 +944,8 @@ precision, FSL-09, FSL-75, FSL-79 (the spline's coefficients per pass in the ima
 by default) and FSL-111 (a uint8 image's values read as stored by default, as signed char with
 `reproduce`); with a reference that has neither form, the output carries the input's form through
 the first matrix (as a registration's `-out` does, observed); `pairreg` as three
-runs of the original's `flirt` and one `convert_xfm -fixscaleskew` in this process, FSL's three
-schedules carried by the original (since 2026-11-05: no `$FSLDIR` needed; `-v` echoes FSL's lines);
+runs of the clean room's `flirt` and one `convert_xfm -fixscaleskew` in this process, FSL's three
+schedules carried by the clean room (since 2026-11-05: no `$FSLDIR` needed; `-v` echoes FSL's lines);
 `extracttxt` with its own POSIX basic regular expressions (GNU grep's extensions) and the script's
 dc and sed arithmetic, messages included (GNU sed's usage text, which a range read as sed's options
 prints, is not reproduced: one larmorx line instead); `aff2rigid`'s matrix computed by default
@@ -618,10 +971,10 @@ final debug call with BBR's volume `debug`
 ([findings](../findings/fsl-flirt-clean-room.md), "The verbose levels and -debug"). At level 5 and
 more the evaluation lines follow the optimisation's path, so their count differs from FSL's where
 the matrices differ in their last digits. The suite's 22 cases of these options (13 of the
-original's own): every line, exit status and file FSL's.
+clean room's own): every line, exit status and file FSL's.
 
 **Status: `experimental`.** Its record: [`docs/validation/fsl-flirt.md`](../validation/fsl-flirt.md)
-(the replica suite's cases, the original's own and its permanent cases, against FSL 6.0.7.23;
+(the replica suite's cases, the clean room's own and its permanent cases, against FSL 6.0.7.23;
 re-made 2026-11-05 from `a835ddd`): 238 of 240 compared cases within thresholds, 89 more rejected
 by both alike, 10 where FLIRT crashes or never finishes or writes what the specification cannot
 define; the 2 it misses are two weighted registrations whose paths part at their costs' last bits
@@ -638,11 +991,11 @@ ill-posed registrations); what the spec does not say is in
 [`docs/findings/fsl-flirt-clean-room.md`](../findings/fsl-flirt-clean-room.md).
 
 **Speed** ([benchmark report](../benchmarks/fsl-flirt.md): one run each on a shared machine,
-the original on at most 14 threads): fMRIPrep's boundary-based call on the standard tier's three
+the clean room on at most 14 threads): fMRIPrep's boundary-based call on the standard tier's three
 oracle runs 1.2 to 1.3 times FSL's speed on one thread and 12 to 14 times on 14 (ds005040: FSL
-47 s, the replica 57 s, the original 39 s and 3.8 s); the default 12-dof registration of a BOLD
-reference to its T1w at FSL's speed on one thread (FSL 0.97 s, the original 1.10 s) and 3.2 times
-on 14 (0.30 s); BBR with a field map and its mask 3.2 and 36 times (FSL 256 s, the original 81 s
+47 s, the replica 57 s, the clean room 39 s and 3.8 s); the default 12-dof registration of a BOLD
+reference to its T1w at FSL's speed on one thread (FSL 0.97 s, the clean room 1.10 s) and 3.2 times
+on 14 (0.30 s); BBR with a field map and its mask 3.2 and 36 times (FSL 256 s, the clean room 81 s
 and 7.0 s); `-applyxfm` 1.9 and 5.6 times. The same bits at any thread count: the correlation
 ratio's bins are summed in parallel with each bin's additions in the sampling order, the search's
 grid points, the boundary pairs and the field map's searches run in parallel and are collected in
@@ -666,7 +1019,7 @@ refused in both modes), each named in both modes. `lx.mri.hmc`'s `-cost corratio
 woods` now use the same sums (`specs/mcflirt.md` appendix A).
 
 **The clean-room catch-up, programs and messages (2026-11-05).** `specs/flirt.md` §14's answers
-of 2026-11-03 (items 1 to 8 of `docs/next-steps.md`'s list for the original): the search's free
+of 2026-11-03 (items 1 to 8 of `docs/next-steps.md`'s list for the clean room): the search's free
 optimisations print at its lowered level (confirmed: `verbose/5`, `verbose/7`); with `-anglerep
 quaternion` and `reproduce` a starting point outside the unit ball is composed once and keeps only
 its scale (the identity at 6 dof: no translations), FSL-90's message prints at every such
@@ -715,7 +1068,7 @@ Corrected by default, FSL's behaviour with `upstream_defects="reproduce"`
   applyxfm4D).
 - **FSL-11**: with `FSLOUTPUTTYPE` unset FSL's flirt and applyxfm4D stop with FSL's message at
   their first image (exit 1; `-omat` alone writes no image, and runs; with `-out` the matrix is
-  written first). Both implementations, the clean-room original and the replica, write the images
+  written first). Both ports, the clean room and the replica, write the images
   as `NIFTI_GZ` (`.nii.gz`: the bytes `FSLOUTPUTTYPE=NIFTI_GZ` gives) and name FSL-11 on one line
   per command, in the same words (the replica's line starts `larmorx-nc:`); `reproduce` stops as
   FSL does. Command line only: the Python functions set the type themselves.
@@ -741,15 +1094,15 @@ refused by default, exit status 1; FLIRT registers on constant costs), **FSL-92*
 reference of one voxel: refused by default), **FSL-93** (a header voxel size of 0: counted as 1 for
 the base scale by default, as reading the image counts it; FLIRT's base scale is then 0 and it never
 finishes, so `reproduce` refuses; `-basescale 0` refused in both modes). Each named in both modes
-(`upstream defect FSL-9n (flirt) corrected: ...`); the clean-room original follows in its part 2.
+(`upstream defect FSL-9n (flirt) corrected: ...`); the clean room follows in its part 2.
 
 Refused in both modes (FLIRT's behaviour is undefined): **FSL-204** (`pointflirt` with two
 coordinate files both empty or missing: FSL crashes after its `Could not open matrix file` lines;
 `larmorx-nc: error: pointflirt: no points in the coordinate files (FSL-204)`, exit 1; the replica
-since 2026-11-03, the clean-room original since 2026-11-05 after `-v`'s headings, as FSL prints
+since 2026-11-03, the clean room since 2026-11-05 after `-v`'s headings, as FSL prints
 them), **FSL-241** (`midtrans` with transforms whose averages reach beyond double precision, a scale
 of 1e200 or a translation of 1e300: FSL writes rows of NaN, or reports its failed decomposition as a
-matrix-size error, and exits 0; the clean-room original refuses, exit 1, since 2026-11-05: rule B,
+matrix-size error, and exits 0; the clean room refuses, exit 1, since 2026-11-05: rule B,
 FSL's values not specified), FSL-21/FSL-66 (`-bins` giving no or negative
 bins at a scale), FSL-70 (a schedule matrix name FLIRT cannot interpret), FSL-71 (`bbrstep` below 1
 with BBR: FLIRT never finishes), FSL-72 (a schedule `read` of a file that is not numbers: FLIRT reads
@@ -776,7 +1129,7 @@ of its type's range.
 FSL's FLIRT calls glibc 2.35's `sinf`, `cosf` and `atan2f` (the rotations' compositions and
 decompositions), `exp` (the pyramid's and BBR's Gaussians), `cos` (the sinc window) and `logf` (the
 mutual-information costs), which are not correctly rounded (`specs/flirt.md` §3, §5, §9.2, §12). The
-clean-room original computes them correctly rounded by default and takes glibc's with
+clean room computes them correctly rounded by default and takes glibc's with
 `upstream_defects="reproduce"` (`larmorx_core::math`'s `*_glibc` functions, proved bit for bit
 against glibc 2.35; the user's decision of 2026-11-04: glibc's bits for `reproduce` only). A
 registration is an iterative fit: one function value's last bit can move its matrix's last digits,

@@ -1645,6 +1645,10 @@ defects! {
         "the check of an orientation string (MRIcheckOrientationString, MRIorientationStringToDircos) reads three characters, past the end of a string of fewer than two: memory contents";
     FS_464 = "FS-464", "FreeSurfer", true,
         "setting a volume's geometry from a voxel-to-RAS matrix (MRIsetVoxelToRasXform) reads rows 1 to 3 and columns 1 to 4, past the elements of a smaller matrix: memory contents";
+    FS_465 = "FS-465", "FreeSurfer", true,
+        "the conversions between a volume's slice and a 2-D image (MRItoImage, MRItoImageView, ImageToMRI) write or read past the image's pixels when a given image is smaller than the slice or of a narrower pixel format, or when the image holds fewer frames or pixels than its header counts: memory contents";
+    FS_466 = "FS-466", "FreeSurfer", true,
+        "an RGB image's frames after the first are read into a volume (ImageToMRI) one byte per pixel from the start instead of three: they overlap the first frame";
 }
 
 /// The register entry with ID `id`.

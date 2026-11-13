@@ -32,6 +32,8 @@
 #include "cma.h"
 #include "diag.h"
 #include "error.h"
+#include "image.h"
+#include "mri_circulars.h"
 #include "matrix.h"
 #include "mri.h"
 #include "transform.h"
@@ -219,6 +221,35 @@ void put_vol(const MRI *m)
   } else {
     out += "nochunk ";
   }
+}
+
+// an image of the case: rows cols format frames seed xsize ysize (ImageAlloc, then its pixels)
+IMAGE *get_img()
+{
+  int rows = geti(), cols = geti(), format = geti(), nf = geti();
+  unsigned seed = (unsigned)geti();
+  IMAGE *I = ImageAlloc(rows, cols, format, nf);
+  size_t n = (size_t)I->sizeimage * (size_t)I->num_frame;
+  if (I->image) {
+    unsigned char *b = I->image;
+    if (format == PFFLOAT) {
+      for (size_t i = 0; i < n / 4; i++) memcpy(b + 4 * i, &FTAB[(i * 7 + seed) % NF], 4);
+    } else {
+      for (size_t k = 0; k < n; k++) b[k] = (unsigned char)((k * 37u + seed * 101u + (k >> 3) * 13u) & 0xffu);
+    }
+  }
+  I->xsize = getf();
+  I->ysize = getf();
+  return I;
+}
+
+void put_img(const IMAGE *I)
+{
+  if (!I) { out += "NULL "; return; }
+  oi(I->rows); oi(I->cols); oi(I->orows); oi(I->ocols); oi(I->num_frame); oi(I->pixel_format);
+  oi(I->sizepix); oi((long long)I->sizeimage); of(I->xsize); of(I->ysize);
+  if (I->image) ohex(std::string((const char *)I->image, (size_t)I->sizeimage * (size_t)I->num_frame));
+  else out += "nopix ";
 }
 
 // the destination of f(src, dst, ...): 0 NULL, 1 a volume of the case, 2 the source itself
@@ -1074,6 +1105,30 @@ void run_case()
     fflush(stdout);
     oi(errno);
     put_vol(m);
+  } else if (cmd == "toimgv") {
+    MRI *m = get_vol();
+    IMAGE *I = geti() ? get_img() : NULL;
+    int slice = geti(), view = geti(), frame = geti();
+    fflush(stdout);
+    IMAGE *r = MRItoImageView(m, I, slice, view, frame);
+    fflush(stdout);
+    put_img(r);
+  } else if (cmd == "toimg") {
+    MRI *m = get_vol();
+    IMAGE *I = geti() ? get_img() : NULL;
+    int slice = geti();
+    fflush(stdout);
+    IMAGE *r = MRItoImage(m, I, slice);
+    fflush(stdout);
+    oi(r != NULL && r == I);
+    put_img(r);
+  } else if (cmd == "img2mri") {
+    IMAGE *I = get_img();
+    fflush(stdout);
+    MRI *m = ImageToMRI(I);
+    fflush(stdout);
+    put_vol(m);
+    of(I->xsize); of(I->ysize);
   } else {
     fail("unknown command");
   }

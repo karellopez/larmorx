@@ -20,6 +20,7 @@ use larmorx_freesurfer_core::matrix::Matrix;
 use larmorx_freesurfer_core::ret::Ret;
 use larmorx_freesurfer_core::run::Environment;
 use larmorx_freesurfer_io::cfile::CFile;
+use larmorx_freesurfer_io::image as im;
 use larmorx_freesurfer_mri::mri::{self as mm, Mri, MriRegion};
 use larmorx_freesurfer_mri::vol_geom::VolGeom;
 use larmorx_freesurfer_mri::vol_geom::reinit_cache;
@@ -27,6 +28,7 @@ use larmorx_freesurfer_volume::arith::{self as ar, Pair, Tri};
 use larmorx_freesurfer_volume::cma as cm;
 use larmorx_freesurfer_volume::coords as co;
 use larmorx_freesurfer_volume::deriv as dv;
+use larmorx_freesurfer_volume::image as img;
 use larmorx_freesurfer_volume::ltaread as lr;
 use larmorx_freesurfer_volume::orient as orn;
 use larmorx_freesurfer_volume::resample as rsm;
@@ -456,6 +458,16 @@ fn mat_toks(g: &mut Gen, t: &mut Vec<String>, rows: i64, cols: i64) {
             };
             t.push(fx(v));
         }
+    }
+}
+
+/// An image's tokens (`fsvolume.cpp`'s `get_img`): rows cols format frames seed xsize ysize.
+fn img_toks(g: &mut Gen, t: &mut Vec<String>, rows: i64, cols: i64, format: i64, nf: i64) {
+    for v in [rows, cols, format, nf, g.int(0, 255)] {
+        t.push(v.to_string());
+    }
+    for _ in 0..2 {
+        t.push(fx(g.pick(&[1.0f32, 1.0, 0.0, 2.5, 1e-20, -0.0, 0.9375])));
     }
 }
 
@@ -1650,6 +1662,68 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
                 let (r, c) = if g.chance(12) { (5, 6) } else { (4, 4) };
                 mat_toks(&mut g, &mut t, r, c);
             }
+            "toimgv" | "toimg" => {
+                let mut s = shape(&mut g);
+                (s.w, s.h, s.d) = (g.int(1, 4), g.int(1, 4), g.int(1, 3));
+                if !g.chance(15) {
+                    s.hdr = false;
+                }
+                if cmd == "toimg" && !g.chance(6) {
+                    s.ty = g.pick(&[0, 1, 3]);
+                }
+                let at = t.len();
+                vol_of(&mut g, &mut t, s);
+                if !g.chance(6) {
+                    // a principal direction: the cosines a signed permutation
+                    let base = at + 7;
+                    let mut order = [0usize, 1, 2];
+                    for k in (1..3).rev() {
+                        order.swap(k, g.below(k as u64 + 1) as usize);
+                    }
+                    for col in 0..3 {
+                        for row in 0..3 {
+                            let v = if order[col] == row {
+                                g.pick(&[1.0f32, -1.0])
+                            } else {
+                                0.0
+                            };
+                            t[base + 8 + 3 * col + row] = fx(v);
+                        }
+                    }
+                }
+                let given = g.chance(4);
+                t.push(i64::from(given).to_string());
+                if given {
+                    let format = if cmd == "toimg" {
+                        g.pick(&[0i64, 2, 3, 0, 1])
+                    } else {
+                        g.pick(&[0i64, 0, 0, 3])
+                    };
+                    let (r, c) = if g.chance(3) {
+                        (g.int(1, 4), g.int(1, 4))
+                    } else if cmd == "toimg" {
+                        (s.h, s.w)
+                    } else {
+                        g.pick(&[(s.h, s.w), (s.d, s.w), (s.h, s.d), (s.d, s.h)])
+                    };
+                    img_toks(&mut g, &mut t, r, c, format, 1);
+                }
+                t.push(g.pick(&[-1i64, -1, 0, 1, 2, 5, -7]).to_string());
+                if cmd == "toimgv" {
+                    t.push(g.pick(&[0i64, 1, 2, 0, 1, 2, 3, -1]).to_string());
+                    t.push(g.pick(&[0i64, 0, 0, 1, s.nf]).to_string());
+                }
+            }
+            "img2mri" => {
+                let format = if g.chance(20) {
+                    g.pick(&[6i64, 4])
+                } else {
+                    g.pick(&[0i64, 1, 2, 3, 35])
+                };
+                let nf = if g.chance(6) { g.pick(&[0i64, 2, 3]) } else { 1 };
+                let (r, c) = (g.int(1, 4), g.int(1, 4));
+                img_toks(&mut g, &mut t, r, c, format, nf);
+            }
             "lxf" | "rsmat" => {
                 let mut s = shape(&mut g);
                 if g.chance(3) {
@@ -1983,7 +2057,7 @@ fn perturb(g: &mut Gen, v: &mut [String], e: &mut [String]) {
 }
 
 /// The probe's commands, in the order the generator cycles through them.
-pub const COMMANDS: [&str; 105] = [
+pub const COMMANDS: [&str; 108] = [
     "vgwrite",
     "vgread",
     "vgread",
@@ -2089,6 +2163,9 @@ pub const COMMANDS: [&str; 105] = [
     "vx2rx",
     "v2v",
     "setv2r",
+    "toimgv",
+    "toimg",
+    "img2mri",
 ];
 
 /// One buffer both streams write into, in order (FreeSurfer's standard output and error go to
@@ -2343,6 +2420,51 @@ impl Out {
             Ret::New(m) => self.vol(Some(m)),
             Ret::Given => self.vol(given),
             Ret::Null => self.vol(None),
+        }
+    }
+}
+
+/// An image of the case (`fsvolume.cpp`'s `get_img`).
+fn get_img(cx: &mut Ctx, t: &mut Toks) -> Result<im::Image, Fatal> {
+    let (rows, cols, format, nf) = (t.i(), t.i(), t.i(), t.i());
+    let seed = t.i() as u32 as u64;
+    let mut i = im::image_alloc(&mut cx.g, &mut cx.b, rows, cols, format, nf, 0)?;
+    if let Some(b) = i.image.as_mut() {
+        if format == im::PFFLOAT {
+            for k in 0..b.len() / 4 {
+                let v = FTAB[((k as u64 * 7 + seed) % FTAB.len() as u64) as usize];
+                b[4 * k..4 * k + 4].copy_from_slice(&v.to_le_bytes());
+            }
+        } else {
+            for (k, x) in b.iter_mut().enumerate() {
+                let k = k as u64;
+                *x = ((k * 37 + seed * 101 + (k >> 3) * 13) & 0xff) as u8;
+            }
+        }
+    }
+    i.xsize = t.f();
+    i.ysize = t.f();
+    Ok(i)
+}
+
+impl Out {
+    fn img(&mut self, i: Option<&im::Image>) {
+        let Some(i) = i else {
+            self.0 += "NULL ";
+            return;
+        };
+        for v in [i.rows, i.cols, i.orows, i.ocols, i.num_frame, i.pixel_format, i.sizepix] {
+            self.i(i64::from(v));
+        }
+        self.i(i.sizeimage as i64);
+        self.f(i.xsize);
+        self.f(i.ysize);
+        match &i.image {
+            Some(b) => {
+                let n = (i.sizeimage as usize).saturating_mul(i.num_frame.max(0) as usize);
+                self.hex(&b[..n.min(b.len())]);
+            }
+            None => self.0 += "nopix ",
         }
     }
 }
@@ -3527,6 +3649,38 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
             o.i(i64::from(r));
             o.i(i64::from(cx.g.errno));
             o.vol(Some(&m));
+        }
+        "toimgv" | "toimg" => {
+            let m = get_vol(cx, t)?;
+            let mut given = if t.i() != 0 {
+                Some(get_img(cx, t)?)
+            } else {
+                None
+            };
+            let slice = t.i();
+            let (g, b) = (&mut cx.g, &mut cx.b);
+            let r = if cmd == "toimgv" {
+                let (view, frame) = (t.i(), t.i());
+                img::mri_to_image_view(g, b, &m, given.as_mut(), slice, view, frame)?
+            } else {
+                img::mri_to_image(g, b, &m, given.as_mut(), slice)?
+            };
+            if cmd == "toimg" {
+                o.i(i64::from(matches!(r, Ret::Given)));
+            }
+            match r {
+                Ret::New(i) => o.img(Some(&i)),
+                Ret::Given => o.img(given.as_ref()),
+                Ret::Null => o.img(None),
+            }
+        }
+        "img2mri" => {
+            let mut im = get_img(cx, t)?;
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let m = img::image_to_mri(g, a, b, &mut im)?;
+            o.vol(Some(&m));
+            o.f(im.xsize);
+            o.f(im.ysize);
         }
         "rsmat" => {
             let src = get_vol(cx, t)?;

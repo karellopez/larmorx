@@ -103,6 +103,9 @@ nothing in it.
   not show, and every paragraph, list item or cell that offers `--upstream-defects`,
   `--n-threads` or `--implementation` without "next release" (`option` lines: 0.1.0rc1 has
   only the environment variables).
+- `dirty_provenance.py <site>`: every benchmark report and figures-cache entry the site's
+  evidence files cite whose LARMORX commit ends in `-dirty` (made from a modified checkout),
+  with its page; the list behind the follow-up in `docs/next-steps.md` (relay 21).
 - `panel_runs_check.py <site>`: every fMRIPrep run an evidence page names in its data panel's
   cases and worked examples is one of the panel's fourteen (`fmriprep_nodes.PANEL_RUNS`); run it
   after every export, beside `summary_check.py`. Since relay 15 `fmriprep_nodes` reads only

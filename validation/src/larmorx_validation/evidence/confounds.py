@@ -70,6 +70,9 @@ SHOWN = (
     ("ds000256-sub-CTS203-noreconall", "bold_task_restfixationnofeedback_wf"),
     ("ds004958-sub-fsm64ps-noreconall", "bold_task_rest_wf"),
 )
+#: A further run shown (its outputs kept as every workflow's; no thread check, no Gaussian
+#: items): an older adult's multi-echo run, whose default negates ten CompCor columns (GLIBC-07).
+SHOWN_MORE = (("ds003592-sub-280-noreconall", "bold_ses_1_task_rest_echo_1_wf"),)
 #: The memory rule's calls (``tests/parity/test_memory_peak.py``'s ``CONFOUNDS_CASES``).
 MEMORY_CALLS = (
     ("acompcor-ds000005", "acompcor", "ds000005-sub-01-noreconall"),
@@ -533,6 +536,16 @@ def _files_table(st: dict[str, dict]) -> dict:
         signs = sum(bool(c.get("sign")) for c in s["fix_vs_new"]["columns"].values() if c["differ"])
         v, why = _file_verdict(s)
         shape = s["bold"]["shape"]
+        nv = s["new_vs_e3"]
+        if nv["only_a"] or nv["only_b"]:
+            tot["added"] = tot.get("added", 0) + len(nv["only_a"])
+            tot["removed"] = tot.get("removed", 0) + len(nv["only_b"])
+            step = (f"The step adds {len(nv['only_a'])} column(s) ({', '.join(nv['only_a'])}) and "
+                    f"removes {len(nv['only_b'])} ({', '.join(nv['only_b'])}): FD crosses its "
+                    "threshold at other volumes with fMRIPrep 25.2.7's motion parameters.")  # fmt: skip
+            why = f"{why} {step}" if v != "bit-identical" else step
+        elif v == "bit-identical":
+            why = ""
         tot["files"] += 1
         tot["cells"] += cells
         tot["e3"] += n_e3
@@ -556,7 +569,7 @@ def _files_table(st: dict[str, dict]) -> dict:
                 common.cell(signs, "count"),
             ],
             "verdict": v,
-            "sub": why if v != "bit-identical" else "",
+            **({"sub": why} if why else {}),
         })  # fmt: skip
     rows.insert(0, {
         "head": f"the {tot['files']} files",
@@ -566,7 +579,8 @@ def _files_table(st: dict[str, dict]) -> dict:
                   common.cell(tot["step"], "count"), common.cell(tot["fix"], "count"),
                   common.cell(tot["sign"], "count")],
         "sub": f"{tot['same']} files identical column by column, {tot['d4']} once glibc's atan2 "
-        "(D4) is taken from fMRIPrep's own motion table",
+        "(D4) is taken from fMRIPrep's own motion table; the step adds "
+        f"{tot.get('added', 0)} motion-outlier columns and removes {tot.get('removed', 0)}",
     })  # fmt: skip
     return common.table(
         "files",
@@ -600,7 +614,37 @@ def _files_table(st: dict[str, dict]) -> dict:
     )
 
 
-def _families_table(st: dict[str, dict]) -> dict:
+#: The CompCor nodes' components files (every component, retained or not).
+COMPONENTS = ("acompcor/acompcor.tsv", "crowncompcor/crown_compcor.tsv", "tcompcor/tcompcor.tsv")
+
+
+def _components(ctx: core.Context, st: dict[str, dict]) -> dict[str, int]:
+    """GLIBC-07 on the CompCor nodes' own components files: the default against reproduce (both
+    with the newest releases): files, files with a negated column, columns negated, columns
+    moved by one unit in the 10th decimal."""
+    from larmorx_validation.evidence.confounds_run import columns
+
+    ent = workflows_entry(ctx)
+    out = {"files": 0, "negated_files": 0, "negated": 0, "decimal": 0, "changed_files": 0}
+    for s in st.values():
+        d = ent.dir / _label(s["workflow"])
+        for rel in COMPONENTS:
+            c = columns(
+                d / "fix" / "bold_confounds_wf" / rel, d / "new" / "bold_confounds_wf" / rel
+            )
+            out["files"] += 1
+            diff = [x for x in c["columns"].values() if x["differ"]]
+            neg = [x for x in diff if x.get("sign")]
+            out["negated"] += len(neg)
+            out["negated_files"] += bool(neg)
+            out["changed_files"] += bool(diff)
+            out["decimal"] += sum(
+                1 for x in diff if not x.get("sign") and x["max_abs"] <= 1.0000001e-10
+            )
+    return out
+
+
+def _families_table(st: dict[str, dict], comp: dict[str, int]) -> dict:
     agg: dict[str, dict] = {}
     for s in st.values():
         for fam, r in _fam_rows(s).items():
@@ -616,6 +660,11 @@ def _families_table(st: dict[str, dict]) -> dict:
             a["decimal"] += len(r.get("fix", {}).get("decimal", []))
             a["max_fix_rel"] = max(a["max_fix_rel"], r.get("fix", {}).get("max_rel", 0.0))
             a["max_step"] = max(a["max_step"], r.get("step", {}).get("max_abs", 0.0))
+    moved: dict[str, list[int]] = {}
+    for s in st.values():
+        for k, names in ((0, s["new_vs_e3"]["only_a"]), (1, s["new_vs_e3"]["only_b"])):
+            for name in names:
+                moved.setdefault(family(name), [0, 0])[k] += 1
     order = list(GROUPS)
     rows = []
     for fam in sorted(agg, key=lambda f: (order.index(group(f)), f)):
@@ -637,6 +686,9 @@ def _families_table(st: dict[str, dict]) -> dict:
         sub = f"{GROUPS[g]}. reproduce: {why}."
         if a["step"]:
             sub += f" The step: {STEP[g]}."
+        if fam in moved:
+            sub += (f" The step adds {moved[fam][0]} such columns and removes {moved[fam][1]} over "
+                    "the 36 files (FD crosses its threshold at other volumes).")  # fmt: skip
         if fix:
             sub += f" The default: {fix}."
         rows.append({
@@ -666,7 +718,14 @@ def _families_table(st: dict[str, dict]) -> dict:
         "(reproduce with fMRIPrep 25.2.6's releases against fMRIPrep's own files); the step is "
         "the originals' own change from fMRIPrep 25.2.6's releases to the newest (a yardstick, "
         "no verdict); the default's changes are the D13 corrections named with each run "
-        "(PD-01 and GLIBC-07 in the tables; PIPE-41 adds the five signals' entries to each JSON).",
+        "(PD-01 and GLIBC-07 in the tables; PIPE-41 adds the five signals' entries to each JSON). "
+        "Negated: the confounds files keep the retained components only; over the CompCor nodes' "
+        f"own components files (every component, {comp['files']} files; the default against "
+        "reproduce, both with the newest releases: the findings count the same with fMRIPrep "
+        "25.2.6's releases, whose LAPACK leaves other signs free) the default changes "
+        f"{comp['changed_files']} files, negates {comp['negated']} columns in "
+        f"{comp['negated_files']} of them and moves {comp['decimal']} columns by one unit in the "
+        "10th decimal (GLIBC-07: docs/findings/confounds-compcor.md).",
     )
 
 
@@ -760,6 +819,12 @@ DATA = {
         "subject": "sub-fsm64ps",
         "licence": "CC0-1.0",
         "what": "multiband 8, 600 volumes",
+    },
+    "ds003592-sub-280-noreconall": {
+        "dataset": "OpenNeuro ds003592 (Spreng et al.)",
+        "subject": "sub-280",
+        "licence": "CC0-1.0",
+        "what": "an older adult's multi-echo run (the optimally combined series)",
     },
 }
 
@@ -966,8 +1031,9 @@ def _example_run(ctx: core.Context, st: dict[str, dict], run: str, bold_run: str
         "fmriprep": wf,
         "larmorx": d / "e3" / "bold_confounds_wf",
         "larmorx-fix": d / "fix" / "bold_confounds_wf",
-        "larmorx-fix-1": d / "fix-1" / "bold_confounds_wf",
     }
+    if (d / "fix-1").is_dir():
+        files["larmorx-fix-1"] = d / "fix-1" / "bold_confounds_wf"
     arrays = {
         pid: {oid: common.load(str(_one(base, pat))) for oid, pat, _l in MASKS}
         for pid, base in files.items()
@@ -1001,13 +1067,15 @@ def _example_run(ctx: core.Context, st: dict[str, dict], run: str, bold_run: str
            "larmorx (default) − fMRIPrep 25.2.6's own file", common.ROLE_FMRIPREP),
         dd("fix-lx", "larmorx-fix", "larmorx", "check", "larmorx: default − reproduce mode",
            common.ROLE_SELF),
-        dd("fix1-fix", "larmorx-fix-1", "larmorx-fix", "check",
-           "larmorx: 1 thread − 8 threads (default)", common.ROLE_SELF),
     ]  # fmt: skip
+    if "larmorx-fix-1" in arrays:
+        diffs.append(dd("fix1-fix", "larmorx-fix-1", "larmorx-fix", "check",
+                        "larmorx: 1 thread − 8 threads (default)", common.ROLE_SELF))  # fmt: skip
     outputs = [{"id": oid, "label": label, "unit": ""} for oid, _p, label in MASKS]
-    common.compare_all(ex, diffs, outputs, full={"larmorx-fix-1": arrays["larmorx-fix-1"]})
+    full = {"larmorx-fix-1": arrays["larmorx-fix-1"]} if "larmorx-fix-1" in arrays else {}
+    common.compare_all(ex, diffs, outputs, full=full)
     same = common.identical(diffs)
-    if "fix1_vs_fix" in s:  # every file of the run, not only the masks
+    if "fix1_vs_fix" in s and "fix1-fix" in same:  # every file of the run, not only the masks
         same["fix1-fix"] = same["fix1-fix"] and not s["fix1_vs_fix"]["differ"]
     _mask_verdicts(diffs, same)
     at, _k = common.centre_view(ex)
@@ -1726,7 +1794,7 @@ def export(ctx: core.Context) -> dict:
     ents = entries(ctx)
     st = _stats(ctx)
     cases = _cases(ctx, recs)
-    examples = [_example_run(ctx, st, run, bold_run) for run, bold_run in SHOWN]
+    examples = [_example_run(ctx, st, run, bold_run) for run, bold_run in SHOWN + SHOWN_MORE]
     examples.insert(1, _example_gaussian(ctx, st))
     for ex in examples:
         _check_default(ex)
@@ -1734,7 +1802,7 @@ def export(ctx: core.Context) -> dict:
     tables = [
         _records_table(recs),
         _files_table(st),
-        _families_table(st),
+        _families_table(st, _components(ctx, st)),
         _nodes_table(st),
         _gaussian_table(ctx, st),
         _corrections_table(ctx),

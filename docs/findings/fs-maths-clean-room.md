@@ -11,13 +11,14 @@ this file is open to everyone. The comparisons and the tools are in
 
 ## The comparison
 
-- **What:** all 24 groups of the spec's §23.2 (26,707 calls, seed 7), on the probe (plainly, again,
-  and in two guard runs) and on the clean room's candidate, in both modes, on main as of `c9ab2a4e`
-  (the main package's VNL ports in the official build's operand order). `reproduce`: 25,773
-  identical, 672 where FreeSurfer did not finish, 249 memory lines, 13 others: the lines FS-47 and
-  FS-48 refuse (below). `fix`: 22,560 identical, 672 not finished, 383 memory, 3,092 corrected by a
-  noted defect, none other.
-- **How we know:** *validated* (`compare.py compare`, both modes, 2026-11-13).
+- **What:** all 24 groups of the spec's §23.2 as amended on 2026-11-13 (28,168 calls, seed 7; the
+  fixed batches `mmake-sizes`, `mmake-sizes-old`, `affine-nan`, `eigen-nonfinite`, `svd-nonfinite`,
+  `mfiles-cut` and `mfiles-end` included), on the probe (plainly, again, and in two guard runs) and on
+  the clean room's candidate, in both modes. `reproduce`: 26,676 identical, 1,121 where FreeSurfer
+  did not finish, 361 memory lines, 10 lines of `svd` that differ in the bits of NaNs only (§17.4:
+  the official build's LINPACK kernels), none other. `fix`: 22,898 identical, 1,121 not finished, 502
+  memory, 3,647 corrected by a noted defect, none other.
+- **How we know:** *validated* (`compare.py compare`, both modes, 2026-11-13, relay 6).
 
 ## The minimizers (§13)
 
@@ -39,8 +40,11 @@ Which NaN a result keeps depends on the order of the operands of the official bu
 were fitted on the probe (`mproduct`, `affine`, `mvectors`, `harith` groups), and every line of
 those groups is identical:
 
-- `AffineMV`: `A[i]·x0`, `x1·A[4+i]`, `x2·A[8+i]`, `A[12+i]·x3`; `AffineMM`: `B[k+4j]·A[i+4k]`,
-  summed left to right.
+- `AffineMV` and `AffineMM` (now the spec's §3): in every product the vector's number (the second
+  matrix's) first, summed left to right. The first fit (`A[i]·x0` and `A[12+i]·x3`, the matrix's
+  number first in the first and last products) matched every line of the first `affine` batch but
+  differs on 6 of the 33 lines of the fixed batch `affine-nan` (two NaNs of different payloads in each
+  product), which the spec's order matches.
 - `MatrixMultiplyD`'s complex sums: the term first (`term + (double) re`); `MatrixMultiply`'s float
   sums in blocks of four (`v + p0`, `p1 + v`, `p2 + v`, `v + p3`, then `v + p`; the spec's §16).
 - `VectorTripleProduct`'s order (a fit over its NaN cases).
@@ -53,8 +57,33 @@ those groups is identical:
 
 - **What:** FreeSurfer reads each number of a binary matrix file into one stack slot that it then
   byte-swaps in place: a short read keeps the slot's other bytes from the previous number, swapped
-  (not zeros, as the spec first said; the spec writer amends §18.2).
-- **How we know:** *validated* (`mfiles` identical in `reproduce`; a fit over every short-read case).
+  (not zeros, as the spec first said; §18.2 amended to this at `e3acdd40`).
+- **How we know:** *validated* (`mfiles` identical in `reproduce`, the fixed batch `mfiles-cut` too:
+  every byte of the header, of the first element and of later ones; a fit over every short-read case).
+
+## `errno` at the end of the input (§18.1)
+
+- **What:** the first rule implemented (an item that meets the end sets `errno` to 0 unless an
+  earlier item of the call ended there) differs on 7 of the 24 lines of the fixed batch `mfiles-end`
+  (the ASCII read's last element overflowing at the file's very end: the probe keeps the `errno` from
+  before it, 0). The amended rule (the call keeps `errno`'s value at its first meeting of the end, 0
+  when a conversion's skip of white space meets it, and every later meeting sets it back; an item
+  meets the end before its own `ERANGE`) gives every line; the ASCII read is one call per element
+  (`%f` then white space, complex `%f %f` then white space) and one call for each row's white space.
+- **How we know:** *validated* (`mfiles` identical in `reproduce`, 2026-11-13).
+
+## FS-13's sizes (§2.2)
+
+- **What:** the fixed batches `mmake-sizes` and `mmake-sizes-old` (372 calls each: every row count
+  around -16 and -9, every product around -2, real, complex and an unknown type, both allocation
+  forms, both allocators) give the amended rule's outcomes in `reproduce`: the matrices of no element
+  FreeSurfer makes (the probe prints `max(0, k rows cols + 2)` floats of their arrays), the record's
+  type, rows and columns as the first floats of an array under rows -9 to -16 (its type plus 65,536
+  in a caller's buffer), the buffer's block with every size modulo 2^64, the old allocator's two
+  lines and exit; FreeSurfer's crashes refused. 74 lines are memory lines (the record's two
+  addresses, 0 in the clean room).
+- **How we know:** *validated* (`mmake` identical in `reproduce` but the memory lines and those
+  where FreeSurfer crashed, 2026-11-13).
 
 ## FS-30 cannot occur with the C library's generator
 
@@ -85,22 +114,28 @@ those groups is identical:
 - **How we know:** *measured* (`compare.py`, the probe on that line; the golden cases under
   `validation/probes/fsl-mcflirt-affine-trace/nan_trap.c`'s emulation, debug and release).
 
-## The defects the spec's rule refuses in both modes
+## FS-47 and FS-48: the matrices VNL never finishes (§17, amended)
 
-- **What:** `eigen` 5 and `svd` 8 lines differ in `reproduce` only: FS-47 and FS-48 refuse, in both
-  modes as the spec says, non-finite matrices that VNL usually never finishes; FreeSurfer finishes
-  these rare ones (a 2 x 2 with an infinity, the 1 x 1 infinity of `MatrixNSConditionNumber`'s
-  product, two pseudo-inverses of NaN matrices). The orchestrator's decision (2026-11-13): the spec
-  writer states which matrices never return and which FreeSurfer finishes (their result under
-  `reproduce`).
+- **What:** with an infinite or NaN entry, the clean room asks the main package's ports whether VNL
+  would never return (`symmetric_eigensystem_f32_full(..).never_returns()`, `vnl_svd_f32_full(..)
+  .never_returns()`): there it refuses in both modes (the eigensystem's error; the SVD's failure lines
+  with `info` min(rows + 1, cols)), and every line where FreeSurfer never returned (`TIMEOUT`) carries
+  that refusal; elsewhere `reproduce` gives VNL's result (a 2 x 2 with an infinity, the 1 x 1
+  infinity of `MatrixNSConditionNumber`'s product, LINPACK's failures with their `info`) and `fix`
+  refuses, noted. Before the amendment (both modes refused every such matrix) 5 lines of `eigen` and
+  8 of `svd` differed in `reproduce`; now none, the batches `eigen-nonfinite` (236 lines) and
+  `svd-nonfinite` (360) included. 10 lines of `svd` differ in the bits of NaNs in U only (the
+  allowance of §17.4: the port's BLAS kernels do not yet follow the official build's order).
+- **How we know:** *validated* (`compare.py compare`, both modes).
 
 ## Golden cases and platforms
 
 - **What:** `tests/golden_maths.rs`, every command of the probe's grammar on seeded arguments in both
-  modes (16 SHA-256, 0.08 s in a debug build), identical in debug and release builds on x86-64 and
-  under the AArch64 NaN emulation of both (198 to 205 NaN signs flipped by the emulation, none
+  modes (16 SHA-256, 0.08 s in a debug build; since relay 6 also negative sizes through `malloc2` and
+  §18.1's end of the input on memory streams), identical in debug and release builds on x86-64 and
+  under the AArch64 NaN emulation of both (202 to 280 NaN signs flipped by the emulation, none
   reaching a result).
-- **How we know:** *measured* (2026-11-13).
+- **How we know:** *measured* (2026-11-13, again after relay 6's changes).
 
 ## Speed (indicative)
 

@@ -28,7 +28,8 @@ Python), or `docs/parts/`. Its only inputs were:
 `src/maths/` (FreeSurfer 8.2.0's mathematics, `fs.maths`, queue item C3.1-02) and `src/clib/printf.rs`
 were written by the same clean-room implementers, under the same restrictions as above, from
 [`specs/freesurfer-maths.md`](../../specs/freesurfer-maths.md) as of commit `a59c9d0e` (2026-11-13),
-never from Numerical Recipes' code. Its inputs:
+brought to its amendments of commit `3a1ef09e` (2026-11-13: §2.2, §3, §17, §18.1, §18.2), never
+from Numerical Recipes' code. Its inputs:
 
 | Input | What it gave |
 |---|---|
@@ -41,8 +42,8 @@ never from Numerical Recipes' code. Its inputs:
 
 `src/mri/` (FreeSurfer 8.2.0's volume structure, `fs.mri`, the MRI-structure part of queue item
 C3.1-05) was written by the same clean-room implementers, under the same restrictions as above, from
-[`specs/freesurfer-mri.md`](../../specs/freesurfer-mri.md) as of commit `278e0be0` (2026-11-13). Its
-inputs:
+[`specs/freesurfer-mri.md`](../../specs/freesurfer-mri.md) as of commit `278e0be0` (2026-11-13),
+brought to its amendments of commit `023bbf8a` (2026-11-13: §3, §6, §9, §13). Its inputs:
 
 | Input | What it gave |
 |---|---|

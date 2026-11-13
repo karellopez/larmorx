@@ -28,7 +28,7 @@ The golden cases: `cargo test -p larmorx-fs-core --test golden_mri` (record with
 NAN_TRAP_DIR=<scratch>/nt`, the library built from `validation/probes/fsl-mcflirt-affine-trace/nan_trap.c`
 as that folder's README says. The defects' own tests: `cargo test -p larmorx-fs-core --test defects_mri`.
 
-## Results (2026-11-13, seed 7; the probe's reference hashes are the spec's §23.2)
+## Results (2026-11-13, seed 7, every group again after relay 6: the spec as amended at `023bbf8a`; the probe's reference hashes are the spec's §23.2)
 
 `compare.py` per group: calls, then identical / FreeSurfer did not finish / memory / defect
 corrected / **unexplained**, in each mode.
@@ -36,12 +36,12 @@ corrected / **unexplained**, in each mode.
 | Group | Calls | reproduce | fix |
 |---|---|---|---|
 | alloc | 1,014 | 1,014 / 0 / 0 / 0 / **0** | 883 / 0 / 0 / 131 / **0** |
-| matrices | 930 | 874 / 28 / 7 / 21 / **0** | 874 / 28 / 7 / 21 / **0** |
+| matrices | 999 | 943 / 28 / 7 / 21 / **0** | 943 / 28 / 7 / 21 / **0** |
 | voxels | 1,000 | 902 / 76 / 22 / 0 / **0** | 747 / 76 / 32 / 145 / **0** |
 | headers | 590 | 589 / 0 / 1 / 0 / **0** | 415 / 0 / 1 / 174 / **0** |
 | ctabs | 252 | 252 / 0 / 0 / 0 / **0** | 19 / 0 / 52 / 181 / **0** |
 | geometry | 620 | 594 / 20 / 0 / 6 / **0** | 522 / 20 / 0 / 78 / **0** |
-| tkreg | 530 | 507 / 13 / 10 / 0 / **0** | 411 / 13 / 10 / 96 / **0** |
+| tkreg | 595 | 572 / 13 / 10 / 0 / **0** | 411 / 13 / 10 / 161 / **0** |
 | registrations | 1,080 | 1,074 / 6 / 0 / 0 / **0** | 709 / 6 / 0 / 365 / **0** |
 | coords | 300 | 300 / 0 / 0 / 0 / **0** | 146 / 0 / 0 / 154 / **0** |
 | printing | 600 | 600 / 0 / 0 / 0 / **0** | 600 / 0 / 0 / 0 / **0** |
@@ -50,17 +50,20 @@ corrected / **unexplained**, in each mode.
 | shapes | 100 | 100 / 0 / 0 / 0 / **0** | 100 / 0 / 0 / 0 / **0** |
 | bbox | 500 | 483 / 17 / 0 / 0 / **0** | 431 / 17 / 0 / 52 / **0** |
 | lta | 911 | 817 / 5 / 89 / 0 / **0** | 349 / 5 / 89 / 468 / **0** |
+| all | 9,379 | 9,026 / 191 / 135 / 27 / **0** | 6,656 / 191 / 202 / 2,330 / **0** |
 
 - **reproduce**: every line identical but those where FreeSurfer crashed (the candidate finished),
   the memory lines (FreeSurfer read memory it did not write or own: FS-53, FS-57, FS-60, FS-198,
   FS-264), and FS-264's refusals in the batches `matrices-sizes` and `geometry-sizes` (its error
-  holds in both modes). The 17 lines of `tkreg-sizes` with a larger matrix (FS-331) are identical:
-  `reproduce` gives FreeSurfer's result.
+  holds in both modes). The 17 lines of `tkreg-sizes` with a larger matrix and the 65 of the fixed
+  batch `tkreg-given` (FS-331, non-finite numbers where the inverse leaves the given matrix's own)
+  are identical: `reproduce` gives FreeSurfer's result. The fixed batch `matrices-shear` (69 lines,
+  §3's 4 x 4 product on the right) is identical in both modes.
 - **fix**: no unexplained line; the corrected lines carry their defects' notices (FS-01, FS-12,
   FS-17, FS-52 to FS-60, FS-161 to FS-166, FS-195 to FS-198, FS-264, FS-331).
 - Golden cases: 13 groups x 2 modes, 26 hashes, 0.03 s, identical in debug and release builds and
   under the AArch64 NaN emulation of both.
-- Defect tests: 17 tests, every defect of the spec's §24 and FS-331 in both modes.
+- Defect tests: 18 tests, every defect of the spec's §24 in both modes (FS-252 and FS-331's check included).
 - Speed (`speed.py`, two runs, indicative): the bounding box of a 160³ float or int volume 0.2-0.8 ms
   a call against 2.3-4.4 ms in the probe (5 to 18 times faster); `MRIfixTkReg` 0.04-0.05 ms against
   0.11-0.14 ms (2 to 3.7 times).

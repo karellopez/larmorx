@@ -80,20 +80,28 @@ pub(super) fn mpg_tokens(t: &mut Vec<String>, g: &mut Gen) {
     }
     // the mask: none, one voxel per vertex, or one more or fewer
     let mw = match g.below(6) {
-        0 | 1 | 2 => 0,
+        0..=2 => 0,
         3 if nv > 1 => nv + g.pick(&[1, -1]),
         _ => nv,
     };
     ix(t, mw);
     for _ in 0..mw {
-        let x: f32 = if g.chance(4) { 0.0 } else { g.pick(&[1.0, 0.5, 0.25, 2.0]) };
+        let x: f32 = if g.chance(4) {
+            0.0
+        } else {
+            g.pick(&[1.0, 0.5, 0.25, 2.0])
+        };
         t.push(format!("{:08x}", x.to_bits()));
     }
     // MRISfaceNormalFace's test delta
     let dv = if g.chance(8) { g.int(-1, 3) } else { -1 };
     ix(t, dv);
     for _ in 0..3 {
-        let x = if dv >= 0 { g.int(-4, 4) as f64 / 16.0 } else { 0.0 };
+        let x = if dv >= 0 {
+            g.int(-4, 4) as f64 / 16.0
+        } else {
+            0.0
+        };
         t.push(format!("{:016x}", x.to_bits()));
     }
     let nops = g.int(1, 5);
@@ -106,7 +114,14 @@ pub(super) fn mpg_tokens(t: &mut Vec<String>, g: &mut Gen) {
             3 => t.push("fm".into()),
             4 => {
                 t.push("fnf".into());
-                ix(t, if g.chance(8) { g.pick(&[-1, nf]) } else { g.int(0, (nf - 1).max(0)) });
+                ix(
+                    t,
+                    if g.chance(8) {
+                        g.pick(&[-1, nf])
+                    } else {
+                        g.int(0, (nf - 1).max(0))
+                    },
+                );
                 ix(t, g.int(0, 3));
             }
             5 => t.push("em".into()),
@@ -117,17 +132,38 @@ pub(super) fn mpg_tokens(t: &mut Vec<String>, g: &mut Gen) {
             }
             8 | 9 => {
                 t.push("est".into());
-                ix(t, if g.chance(10) { g.pick(&[-1, 3]) } else { g.int(0, 2) });
+                ix(
+                    t,
+                    if g.chance(10) {
+                        g.pick(&[-1, 3])
+                    } else {
+                        g.int(0, 2)
+                    },
+                );
                 ix(t, g.int(0, 1));
             }
             10 => {
                 t.push("cst".into());
-                ix(t, if g.chance(10) { g.pick(&[-1, 2]) } else { g.int(0, 1) });
+                ix(
+                    t,
+                    if g.chance(10) {
+                        g.pick(&[-1, 2])
+                    } else {
+                        g.int(0, 1)
+                    },
+                );
                 ix(t, g.int(0, 1));
             }
             11 => {
                 t.push("ovl".into());
-                ix(t, if g.chance(10) { g.pick(&[-1, 3]) } else { g.int(0, 2) });
+                ix(
+                    t,
+                    if g.chance(10) {
+                        g.pick(&[-1, 3])
+                    } else {
+                        g.int(0, 2)
+                    },
+                );
                 ix(t, g.int(0, 1));
             }
             12 | 13 => t.push("pq".into()),
@@ -288,7 +324,9 @@ pub(super) fn mpg_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
                 if s.edges.is_none() {
                     props10::mris_edges(&mut io, &mut s);
                 }
-                o.i(i64::from(props10::mris_edge_metric(g, sg, &mut io, &mut s)?));
+                o.i(i64::from(props10::mris_edge_metric(
+                    g, sg, &mut io, &mut s,
+                )?));
                 for e in s.edges.iter().flatten() {
                     for x in [e.len, e.u[0], e.u[1], e.u[2], e.area[0], e.area[1]] {
                         o.d(x);

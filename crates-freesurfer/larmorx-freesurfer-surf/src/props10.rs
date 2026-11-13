@@ -298,8 +298,8 @@ pub fn mris_corners(g: &mut Globals, io: &mut Io, surf: &mut Mris) -> Result<i32
         let v = vt.v.as_deref().unwrap_or(&[]);
         for nthedge in 0..2 {
             let mut hit = false;
-            for k in 0..tot.min(v.len()) {
-                if v[k] != c.vtxno[nthedge + 1] {
+            for (k, &nb) in v.iter().enumerate().take(tot) {
+                if nb != c.vtxno[nthedge + 1] {
                     continue;
                 }
                 let Some(&en) = vt.e.as_deref().and_then(|e| e.get(k)) else {
@@ -407,14 +407,14 @@ pub fn mris_face_normal_face(
     }
     if let Some(pc) = pc {
         let m = pc.get_or_insert_with(|| DMatrix::zeros(3, 1));
-        for k in 0..3 {
-            m.set(k as i32 + 1, 1, c[k].to_f64());
+        for (k, x) in c.iter().enumerate() {
+            m.set(k as i32 + 1, 1, x.to_f64());
         }
     }
     let f = surf.face_mut(faceno as usize);
     let norm = f.norm.get_or_insert_with(|| DMatrix::zeros(3, 1));
-    for k in 0..3 {
-        norm.set(k as i32 + 1, 1, (c[k] / cl).to_f64());
+    for (k, &x) in c.iter().enumerate() {
+        norm.set(k as i32 + 1, 1, (x / cl).to_f64());
     }
     0
 }
@@ -519,7 +519,9 @@ pub fn mris_edge_metric_edge(
         ) else {
             g.notices.add(
                 &FS_538,
-                format!("MRISedgeMetricEdge: edge {edgeno}'s face has no normal (FreeSurfer crashes)"),
+                format!(
+                    "MRISedgeMetricEdge: edge {edgeno}'s face has no normal (FreeSurfer crashes)"
+                ),
             );
             return Err(Fatal::Exit(139));
         };
@@ -538,12 +540,8 @@ pub fn mris_edge_metric_edge(
         surf.edges.as_mut().expect("the edges")[edgeno as usize] = e;
         return Ok(1);
     }
-    if e.dot > 1.0 {
-        e.dot = 1.0;
-    }
-    if e.dot < -1.0 {
-        e.dot = -1.0;
-    }
+    // `if (dot > 1) dot = 1; if (dot < -1) dot = -1;` (a NaN stays)
+    e.dot = e.dot.clamp(-1.0, 1.0);
     e.angle = degrees(e.dot);
     surf.edges.as_mut().expect("the edges")[edgeno as usize] = e;
     Ok(0)
@@ -568,10 +566,7 @@ pub fn mris_edge_metric(
 pub fn mris_corner_metric_corner(surf: &mut Mris, cornerno: i32) -> f64 {
     let c = &surf.corners.as_ref().expect("the corners")[cornerno as usize];
     let edges = surf.edges.as_ref().expect("the edges");
-    let (u1, u2) = (
-        edges[c.edgeno[0] as usize].u,
-        edges[c.edgeno[1] as usize].u,
-    );
+    let (u1, u2) = (edges[c.edgeno[0] as usize].u, edges[c.edgeno[1] as usize].u);
     let (d0, d1) = (f64::from(c.edgedir[0]), f64::from(c.edgedir[1]));
     // the official build's order: (u1 d0)(u2 d1) for x and y, (d1 u2)(d0 u1) for z, each added
     // to the sum as `term + sum`
@@ -620,19 +615,17 @@ pub fn mris_triangle_area_stats(
             area.push(f64::from(surf.face(fno).area));
         }
     }
-    Ok(dlist_stats(io.out, Some(area.as_slice()), area.len() as i32))
+    Ok(dlist_stats(
+        io.out,
+        Some(area.as_slice()),
+        area.len() as i32,
+    ))
 }
 
 /// FS-538's correction where a statistic reads the faces' normals: every face's normal computed
 /// again, noted when one was missing or changes (FreeSurfer uses the last ones computed, from
 /// older coordinates, or crashes when there are none).
-fn refresh_normals(
-    g: &mut Globals,
-    sg: &SurfGlobals,
-    io: &mut Io,
-    surf: &mut Mris,
-    who: &str,
-) {
+fn refresh_normals(g: &mut Globals, sg: &SurfGlobals, io: &mut Io, surf: &mut Mris, who: &str) {
     let old: Vec<Option<DMatrix>> = (0..nfaces(surf))
         .map(|f| surf.face(f).norm.clone())
         .collect();
@@ -727,7 +720,11 @@ pub fn mris_edge_stats(
             }
         });
     }
-    Ok(dlist_stats(io.out, Some(metric.as_slice()), metric.len() as i32))
+    Ok(dlist_stats(
+        io.out,
+        Some(metric.as_slice()),
+        metric.len() as i32,
+    ))
 }
 
 /// `MRIScornerStats(surf, metricid, mask, NULL)`: the corners first when there are none
@@ -774,7 +771,11 @@ pub fn mris_corner_stats(
             }
         });
     }
-    Ok(dlist_stats(io.out, Some(metric.as_slice()), metric.len() as i32))
+    Ok(dlist_stats(
+        io.out,
+        Some(metric.as_slice()),
+        metric.len() as i32,
+    ))
 }
 
 /// `MRISmaxEdgeStatToOverlay(surf, metricid, mask)`: the face metric, the edges when there are
@@ -859,12 +860,7 @@ fn quality_stats(
 /// FS-536: a statistic without elements (`DListStats` gave `NULL`): FreeSurfer crashes when it
 /// prints it, after the groups before it (`reproduce`: those written, then the crash); larmorx
 /// prints none of the summary and the printer returns 1.
-fn empty_list(
-    g: &mut Globals,
-    fp: &mut dyn Write,
-    printed: &str,
-    who: &str,
-) -> Result<i32, Fatal> {
+fn empty_list(g: &mut Globals, fp: &mut dyn Write, printed: &str, who: &str) -> Result<i32, Fatal> {
     g.notices.add(
         &FS_536,
         format!("{who}: a statistic has no element (FreeSurfer crashes printing it)"),

@@ -107,14 +107,22 @@ fn fs535_corners_after_a_stopped_edge_table() {
         assert_eq!(props10::mris_edges(&mut io, &mut s), 1);
         let got = props10::mris_corners(&mut r.g, &mut io, &mut s);
         let text = String::from_utf8_lossy(&r.out).into_owned();
-        assert!(text.starts_with("ERROR: MRISedges(): not enough faces 0 1 k=1\n"), "{text}");
+        assert!(
+            text.starts_with("ERROR: MRISedges(): not enough faces 0 1 k=1\n"),
+            "{text}"
+        );
         if mode.reproduce() {
             assert!(matches!(got, Err(Fatal::Exit(139))));
         } else {
             assert!(matches!(got, Ok(1)));
             assert!(s.corners.is_none() && s.ncorners == 0);
         }
-        assert!(r.g.notices.as_slice().iter().any(|n| n.defect.id == "FS-535"));
+        assert!(
+            r.g.notices
+                .as_slice()
+                .iter()
+                .any(|n| n.defect.id == "FS-535")
+        );
     }
 }
 
@@ -127,7 +135,10 @@ fn tetrahedron_tables() {
     let mut io = r.io();
     assert_eq!(props10::mris_edges(&mut io, &mut s), 0);
     let mut g = Globals::new(UpstreamDefects::Fix);
-    assert!(matches!(props10::mris_corners(&mut g, &mut io, &mut s), Ok(0)));
+    assert!(matches!(
+        props10::mris_corners(&mut g, &mut io, &mut s),
+        Ok(0)
+    ));
     assert_eq!(s.ncorners, 12);
     for vno in 0..4 {
         assert_eq!(s.topology(vno).e.as_ref().map(Vec::len), Some(3));
@@ -156,15 +167,27 @@ fn fs538_edge_metric_without_normals() {
         if mode.reproduce() {
             assert!(matches!(got, Err(Fatal::Exit(139))));
             let text = String::from_utf8_lossy(&r.out).into_owned();
-            assert!(text.contains("ERROR: MRISedgeMetricEdge(): edgeno=0 DoGrad=0\n"), "{text}");
+            assert!(
+                text.contains("ERROR: MRISedgeMetricEdge(): edgeno=0 DoGrad=0\n"),
+                "{text}"
+            );
         } else {
             assert!(matches!(got, Ok(0)));
             for e in s.edges.as_ref().unwrap() {
                 assert!((e.dot + 1.0 / 3.0).abs() < 1e-12, "{}", e.dot);
-                assert!((e.angle - 109.471_220_634_490_7).abs() < 1e-9, "{}", e.angle);
+                assert!(
+                    (e.angle - 109.471_220_634_490_7).abs() < 1e-9,
+                    "{}",
+                    e.angle
+                );
             }
         }
-        assert!(r.g.notices.as_slice().iter().any(|n| n.defect.id == "FS-538"));
+        assert!(
+            r.g.notices
+                .as_slice()
+                .iter()
+                .any(|n| n.defect.id == "FS-538")
+        );
     }
 }
 

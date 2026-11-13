@@ -294,7 +294,9 @@ def main(argv: list[str] | None = None) -> int:
                 first_differ.append(case[:200])
         if f != c:
             fix_differ[cmd] += 1
-            if not fids and (libm_case(cmd, case.split()) or (cmd in ACOS and acos_last_bits(c, f))):
+            if not fids and (
+                libm_case(cmd, case.split()) or (cmd in ACOS and acos_last_bits(c, f))
+            ):
                 fix_libm[cmd] += 1
             elif not fids:
                 fix_unexplained[cmd] += 1

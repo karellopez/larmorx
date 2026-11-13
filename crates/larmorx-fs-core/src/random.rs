@@ -63,13 +63,6 @@ pub fn process_comm() -> Vec<u8> {
 }
 
 /// The clock's seconds, for FS-04's `reproduce`.
-fn clock_seconds() -> i64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs() as i64)
-        .unwrap_or(0)
-}
-
 impl Process {
     /// `setRandomSeed(seed)`.
     pub fn set_random_seed(&mut self, seed: i64) {
@@ -125,7 +118,7 @@ impl Process {
         }
         let seed = if self.mode.reproduce() {
             self.note(&FS_04, "the random numbers seeded from the clock");
-            -((clock_seconds() as i32).unsigned_abs() as i64)
+            -((self.now() as i32).unsigned_abs() as i64)
         } else {
             self.note(
                 &FS_04,

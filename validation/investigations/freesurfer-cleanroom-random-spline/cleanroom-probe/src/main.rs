@@ -408,7 +408,7 @@ fn run(args: &[String]) -> Result<(), String> {
             );
             let _ = out.flush();
         }
-        Some("cases" | "d3" | "set1") => return spline::run(args, &mut out),
+        Some("cases" | "d3" | "set1") => return spline::run(args, &mut out, opts.mode),
         _ => return Err(usage.to_string()),
     }
     if let Some(path) = &opts.tan_hits {

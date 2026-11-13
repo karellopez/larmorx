@@ -468,3 +468,24 @@ FreeSurfer's copy has them) for that element only.
 `sty`, `tts`, `mgvn`, `mid`, `isx`, `idf`, `dcm` (validation/probes/fs-io/fsio.cpp's `run_piece4` and
 `setup`; the port's side `tests/fs_io/piece4.rs`). Each file case makes its files in the fixture's
 `w` folder (removed first). Results: below, "Measured (piece 4)".
+
+### Measured (piece 4, 2026-11-13, the probe `validation/probes/fs-io/`, unit oracle's build)
+
+- Seed 7, 72,000 cases (36 commands x 2,000; boxed 12 GiB, about 45 minutes): `reproduce` identical on
+  65,077 of 65,077 comparable lines (1,743 with memory digits); 3,770 lines of memory contents or
+  addresses compared apart (2,074 equal); 3,153 not comparable. Piece 4's 14,000 cases: 13,914
+  identical, 86 not compared (`dcm` 77: FS-227 and FS-228, FreeSurfer's `CRASH 11`; `sty` 8: FS-221's
+  1,030-byte extension, `CRASH 6`; `mid` 1). `fix` differs only with a notice (piece 4's: FS-225 19,
+  FS-226 7, FS-223 2).
+- Coverage of the first 7,000 piece-4 cases (`<scratch>/A/r14/p4stats.py`): `mri_identify` returned
+  every format it can give (-1, 0-12, 14-18, 20-30, 32-34; 13, 19, 31 and 35 never come out of it);
+  each `isx` test said yes on cases made for it (curvature 5, Signa 7, Bruker 12, NIfTI-1 pair 6,
+  ANALYZE 4, ...); `dcm`: `IsDICOM` yes and no, its kept answer, `IsSiemensDICOM` 1 and 0 with 135
+  warnings, 16 sequences and 45 unhandled representations, with and without `FS_DICOM_DEBUG`.
+- Seed 1, 3,600 portable cases (`tests/fs_io_official.rs`): 3,243 identical (98 with memory digits),
+  357 hashed as SKIP, SHA-256 1caecb5a...; passing in debug and release and under AArch64's NaN
+  emulation (NAN_TRAP_ARM=1 with NAN_TRAP_DIR; 64 flips each).
+- What the first runs taught (fixed): (1) CTN's condition stack printed through larmorx-io's text
+  streams turned a broken VR code's byte into U+FFFD: the port dumps it byte for byte; (2) `IDisCurv`
+  and `is_signa` of a folder leave `errno` 21 from the failed read: `CFile` now keeps a failed read's
+  error (and fails a folder's reads on every platform).

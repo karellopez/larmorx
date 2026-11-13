@@ -901,4 +901,7 @@ first group 0008, its first element of that tag):
   `mri_identify` in ten sequences, so the kept answer is used). Each prints its results, `errno`
   and (`mid`, `dcm`) the condition stack. Lines where FreeSurfer crashes or overflows (FS-221,
   FS-227, FS-228) are counted, not compared.
-- Measured (2026-11-13): see `docs/findings/freesurfer-io.md`, Part 4.
+- Measured on the replica (2026-11-13): seed 7, 72,000 cases of the 36 commands (2,000 each):
+  `reproduce` identical on 65,077 of 65,077 comparable lines; piece 4's 14,000 cases: 13,914
+  identical, 86 not compared (FreeSurfer's crashes: FS-221, FS-227, FS-228); `fix` differs only with a
+  notice. Seed 1, 3,600 portable cases: 3,243 identical, 357 not compared.

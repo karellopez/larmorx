@@ -29,6 +29,7 @@ use larmorx_freesurfer_volume::cma as cm;
 use larmorx_freesurfer_volume::coords as co;
 use larmorx_freesurfer_volume::deriv as dv;
 use larmorx_freesurfer_volume::image as img;
+use larmorx_freesurfer_volume::labels as lb;
 use larmorx_freesurfer_volume::ltaread as lr;
 use larmorx_freesurfer_volume::orient as orn;
 use larmorx_freesurfer_volume::resample as rsm;
@@ -1724,6 +1725,134 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
                 let (r, c) = (g.int(1, 4), g.int(1, 4));
                 img_toks(&mut g, &mut t, r, c, format, nf);
             }
+            "smpar" | "erasebp" | "nbhd" | "nearnz" | "lmeans" | "mkpos" | "mlbv" | "lnbhd"
+            | "linbhd" | "lbbox" | "fillbox" | "mskz" | "clipwm" => {
+                let labels = [0.0f32, 1.0, 2.0, 3.0, 3.0, 7.0, 2.0, -1.0, 250.0];
+                let mut s = shape(&mut g);
+                if !g.chance(12) {
+                    s.hdr = false;
+                }
+                if cmd == "smpar" {
+                    if !g.chance(5) {
+                        s.ty = 4;
+                    }
+                    (s.w, s.h, s.d) = (g.int(1, 5), g.int(1, 5), g.int(1, 4));
+                }
+                if cmd == "clipwm" && g.chance(2) {
+                    s.ty = 0;
+                }
+                vol_of(&mut g, &mut t, s);
+                let painted = !matches!(cmd, "erasebp" | "mkpos" | "fillbox" | "mskz" | "lmeans");
+                if painted {
+                    paint(&mut g, &mut t, s, &labels);
+                }
+                let wsz = |g: &mut Gen| g.pick(&[3i64, 3, 1, 5, 0, -1, 2]);
+                let pt = |g: &mut Gen, s: Shape| {
+                    if g.chance(10) {
+                        [g.int(-3, 6), g.int(-3, 6), g.int(-3, 6)]
+                    } else {
+                        [g.int(0, s.w - 1), g.int(0, s.h - 1), g.int(0, s.d - 1)]
+                    }
+                };
+                let label = |g: &mut Gen| g.pick(&[0i64, 1, 2, 3, 7, -1, 250, 5]);
+                match cmd {
+                    "smpar" => t.push(g.pick(&[1i64, 2, 3, 4, 8, 13, 26, 27, 0]).to_string()),
+                    "erasebp" => t.push(g.pick(&[0i64, 1, 1, 2, 5, -1]).to_string()),
+                    "nbhd" => {
+                        t.push(g.int(0, 3).to_string());
+                        t.push(wsz(&mut g).to_string());
+                        for v in pt(&mut g, s) {
+                            t.push(v.to_string());
+                        }
+                        t.push(frame_of(&mut g, s).to_string());
+                        t.push(fx(fval(&mut g)));
+                    }
+                    "nearnz" => {
+                        t.push(wsz(&mut g).to_string());
+                        for v in pt(&mut g, s) {
+                            let d = if g.chance(3) { 0.0 } else { g.pick(&[0.25f64, -0.4, 0.5, 0.49]) };
+                            t.push(dx(v as f64 + d));
+                        }
+                        t.push(i64::from(!g.chance(4)).to_string());
+                    }
+                    "lmeans" => {
+                        let o = like(&mut g, s);
+                        vol_of(&mut g, &mut t, o);
+                        paint(&mut g, &mut t, o, &labels);
+                        t.push(label(&mut g).to_string());
+                        t.push(g.int(0, 4).to_string());
+                        for v in pt(&mut g, s) {
+                            t.push(v.to_string());
+                        }
+                        t.push(g.pick(&[0i64, 1, 1, 2, 5, -1]).to_string());
+                        t.push(i64::from(!g.chance(4)).to_string());
+                    }
+                    "mkpos" | "mlbv" => {
+                        let d = g.chance(4);
+                        t.push(i64::from(d).to_string());
+                        if d {
+                            let o = like(&mut g, s);
+                            vol_of(&mut g, &mut t, o);
+                        }
+                        if cmd == "mlbv" {
+                            t.push(label(&mut g).to_string());
+                            t.push(g.pick(&[1i64, 255, 9]).to_string());
+                            t.push(i64::from(g.chance(2)).to_string());
+                        }
+                    }
+                    "lnbhd" => {
+                        let v = g.chance(2);
+                        t.push(i64::from(v).to_string());
+                        if v {
+                            let o = like(&mut g, s);
+                            vol_of(&mut g, &mut t, o);
+                        }
+                        for v in pt(&mut g, s) {
+                            t.push(v.to_string());
+                        }
+                        t.push(g.pick(&[1i64, 1, 0, 2]).to_string());
+                        t.push(g.pick(&[8i64, 4, 1, 256]).to_string());
+                    }
+                    "linbhd" => {
+                        for v in pt(&mut g, s) {
+                            t.push(v.to_string());
+                        }
+                        t.push(g.pick(&[1i64, 1, 0, 2]).to_string());
+                        t.push(label(&mut g).to_string());
+                        t.push(g.pick(&[-1i64, -1, 0, 1, 2, 3]).to_string());
+                    }
+                    "lbbox" => t.push(label(&mut g).to_string()),
+                    "fillbox" => {
+                        for _ in 0..3 {
+                            t.push(g.int(-2, 4).to_string());
+                        }
+                        for _ in 0..3 {
+                            t.push(g.pick(&[0i64, 1, 2, 3, 9, -1]).to_string());
+                        }
+                        t.push(fx(fval(&mut g)));
+                    }
+                    "mskz" => {
+                        let o = like(&mut g, s);
+                        vol_of(&mut g, &mut t, o);
+                        paint(&mut g, &mut t, o, &labels);
+                        let mode = g.pick(&[0i64, 0, 1, 2]);
+                        t.push(mode.to_string());
+                        if mode == 1 {
+                            let o = like(&mut g, s);
+                            vol_of(&mut g, &mut t, o);
+                        }
+                    }
+                    _ => {
+                        // clipwm: the white-matter volume
+                        let mut o = like(&mut g, s);
+                        if g.chance(2) {
+                            o.ty = 0;
+                        }
+                        vol_of(&mut g, &mut t, o);
+                        paint(&mut g, &mut t, o, &[0.0, 5.0, 4.0, 110.0, 250.0]);
+                    }
+                }
+            }
             "lxf" | "rsmat" => {
                 let mut s = shape(&mut g);
                 if g.chance(3) {
@@ -2057,7 +2186,7 @@ fn perturb(g: &mut Gen, v: &mut [String], e: &mut [String]) {
 }
 
 /// The probe's commands, in the order the generator cycles through them.
-pub const COMMANDS: [&str; 108] = [
+pub const COMMANDS: [&str; 121] = [
     "vgwrite",
     "vgread",
     "vgread",
@@ -2166,6 +2295,19 @@ pub const COMMANDS: [&str; 108] = [
     "toimgv",
     "toimg",
     "img2mri",
+    "smpar",
+    "erasebp",
+    "nbhd",
+    "nearnz",
+    "lmeans",
+    "mkpos",
+    "mlbv",
+    "lnbhd",
+    "linbhd",
+    "lbbox",
+    "fillbox",
+    "mskz",
+    "clipwm",
 ];
 
 /// One buffer both streams write into, in order (FreeSurfer's standard output and error go to
@@ -3681,6 +3823,190 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
             o.vol(Some(&m));
             o.f(im.xsize);
             o.f(im.ysize);
+        }
+        "smpar" => {
+            let m = painted(cx, t)?;
+            let count = t.i();
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = lb::mri_smooth_parcellation(g, a, b, &m, count)?;
+            o.vol(r.as_ref());
+        }
+        "erasebp" => {
+            let mut m = get_vol(cx, t)?;
+            let border = t.i();
+            let (g, b) = (&mut cx.g, &mut cx.b);
+            o.i(i64::from(lb::mri_erase_border_planes(g, b, &mut m, border)?));
+            o.vol(Some(&m));
+        }
+        "nbhd" => {
+            let m = painted(cx, t)?;
+            let (which, wsize, x, y, z, frame, thresh) =
+                (t.i(), t.i(), t.i(), t.i(), t.i(), t.i(), t.f());
+            let (g, b) = (&mut cx.g, &mut cx.b);
+            let r = match which {
+                0 => lb::mri_max_in_nbhd(g, b, &m, wsize, x, y, z, frame)?,
+                1 => lb::mri_count_nonzero_in_nbhd(g, b, &m, wsize, x, y, z)?,
+                2 => lb::mri_are_nonzero_in_nbhd(g, b, &m, wsize, x, y, z)?,
+                _ => lb::mri_count_thresh_in_nbhd(g, b, &m, wsize, x, y, z, thresh)?,
+            };
+            o.i(i64::from(r));
+        }
+        "nearnz" => {
+            let m = painted(cx, t)?;
+            let (wsize, xr, yr, zr, want) = (t.i(), t.d(), t.d(), t.d(), t.i() != 0);
+            let mut p = (-9, -9, -9);
+            let (g, b) = (&mut cx.g, &mut cx.b);
+            let r = lb::mri_find_nearest_nonzero_location(
+                g,
+                b,
+                &m,
+                wsize,
+                xr,
+                yr,
+                zr,
+                want.then_some(&mut p),
+            )?;
+            o.f(r);
+            for v in [p.0, p.1, p.2] {
+                o.i(i64::from(v));
+            }
+        }
+        "lmeans" => {
+            let src = get_vol(cx, t)?;
+            let lab = painted(cx, t)?;
+            let (label, which, x0, y0, z0, whalf, want) =
+                (t.i(), t.i(), t.i(), t.i(), t.i(), t.i(), t.i() != 0);
+            let mut sd = -7.0f64;
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            match which {
+                0 => {
+                    let v = lb::mri_mean_in_label_multispectral(g, a, b, &src, &lab, label)?;
+                    o.m(v.as_ref());
+                }
+                1 => o.d(lb::mri_mean_in_label(g, b, &src, &lab, label)?),
+                2 => {
+                    let p = want.then_some(&mut sd);
+                    o.d(lb::mri_mean_and_std_in_label(g, b, &src, &lab, label, p)?);
+                    o.d(sd);
+                }
+                3 => {
+                    let p = want.then_some(&mut sd);
+                    o.d(lb::mri_mean_in_label_in_region(
+                        g, b, &src, &lab, label, x0, y0, z0, whalf, p,
+                    )?);
+                    o.d(sd);
+                }
+                _ => o.d(lb::mri_max_in_label_in_region(
+                    g, b, &src, &lab, label, x0, y0, z0, whalf,
+                )?),
+            }
+        }
+        "mkpos" | "mlbv" => {
+            let src = if cmd == "mlbv" {
+                painted(cx, t)?
+            } else {
+                get_vol(cx, t)?
+            };
+            let mut dst = if t.i() != 0 {
+                Some(get_vol(cx, t)?)
+            } else {
+                None
+            };
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = if cmd == "mkpos" {
+                lb::mri_make_positive(g, a, b, &src, dst.as_mut())?
+            } else {
+                let (label, mark, six) = (t.i(), t.i(), t.i() != 0);
+                lb::mri_mark_label_border_voxels(g, a, b, &src, dst.as_mut(), label, mark, six)?
+            };
+            o.ret(&r, dst.as_ref());
+        }
+        "lnbhd" => {
+            let lab = painted(cx, t)?;
+            let vals = if t.i() != 0 {
+                Some(get_vol(cx, t)?)
+            } else {
+                None
+            };
+            let (x, y, z, whalf, maxl) = (t.i(), t.i(), t.i(), t.i(), t.i());
+            let mut counts = vec![-5i32; maxl as usize];
+            let mut means = vec![-5.0f32; maxl as usize];
+            let (g, b) = (&mut cx.g, &mut cx.b);
+            let v = vals.as_ref().map(|m| (m, means.as_mut_slice()));
+            let r = lb::mri_compute_label_nbhd(g, b, &lab, v, x, y, z, &mut counts, whalf)?;
+            o.i(i64::from(r));
+            for c in &counts {
+                o.i(i64::from(*c));
+            }
+            if vals.is_some() {
+                for f in &means {
+                    o.f(*f);
+                }
+            }
+        }
+        "linbhd" => {
+            let m = painted(cx, t)?;
+            let (x, y, z, whalf, label, which) = (t.i(), t.i(), t.i(), t.i(), t.i(), t.i());
+            let (g, b) = (&mut cx.g, &mut cx.b);
+            let r = if which < 0 {
+                lb::mri_labels_in_nbhd(g, b, &m, x, y, z, whalf, label)?
+            } else {
+                lb::mri_labels_in_planar_nbhd(g, b, &m, x, y, z, whalf, label, which)?
+            };
+            o.i(i64::from(r));
+        }
+        "lbbox" => {
+            let m = painted(cx, t)?;
+            let label = t.i();
+            let mut r = MriRegion {
+                x: 0,
+                y: 0,
+                z: 0,
+                dx: 0,
+                dy: 0,
+                dz: 0,
+            };
+            let (g, b) = (&mut cx.g, &mut cx.b);
+            o.i(i64::from(lb::mri_label_bounding_box(g, b, &m, label, &mut r)?));
+            for v in [r.x, r.y, r.z, r.dx, r.dy, r.dz] {
+                o.i(i64::from(v));
+            }
+        }
+        "fillbox" => {
+            let mut m = get_vol(cx, t)?;
+            let r = MriRegion {
+                x: t.i(),
+                y: t.i(),
+                z: t.i(),
+                dx: t.i(),
+                dy: t.i(),
+                dz: t.i(),
+            };
+            let v = t.f();
+            let (g, b) = (&mut cx.g, &mut cx.b);
+            o.i(i64::from(lb::mri_fill_box(g, b, &mut m, &r, v)?));
+            o.vol(Some(&m));
+        }
+        "mskz" => {
+            let mut src = get_vol(cx, t)?;
+            let mask = painted(cx, t)?;
+            let (mode, mut dst) = dst_mode(cx, t)?;
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let p = pair(mode, &mut src, &mut dst);
+            let r = lb::mri_mask_zero(g, a, b, p, &mask)?;
+            let given = match mode {
+                1 => dst.as_ref(),
+                2 => Some(&src),
+                _ => None,
+            };
+            o.ret(&r, given);
+        }
+        "clipwm" => {
+            let mut t1 = painted(cx, t)?;
+            let wm = painted(cx, t)?;
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            o.i(i64::from(lb::mri_clip_bright_wm(g, a, b, &mut t1, &wm)?));
+            o.vol(Some(&t1));
         }
         "rsmat" => {
             let src = get_vol(cx, t)?;

@@ -17,6 +17,7 @@ pub mod cma;
 pub mod coords;
 pub mod deriv;
 pub mod image;
+pub mod labels;
 pub mod ltaread;
 pub mod orient;
 pub mod resample;

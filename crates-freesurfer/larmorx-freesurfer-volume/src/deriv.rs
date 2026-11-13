@@ -335,7 +335,7 @@ pub fn sample_volume_gradient_frame(
 
 /// Which index table a neighbour count reads.
 #[derive(Clone, Copy)]
-enum Axis {
+pub(crate) enum Axis {
     X,
     Y,
     Z,
@@ -344,7 +344,7 @@ enum Axis {
 /// `mri->xi[i]` (or `yi`, `zi`): the coordinate `i` clamped to the volume's extent on that axis;
 /// past the table (more than `MAX_INDEX` outside) FreeSurfer reads memory it does not own
 /// (FS-323): an error.
-fn index(
+pub(crate) fn index(
     g: &mut Globals,
     err: &mut dyn Write,
     what: &str,

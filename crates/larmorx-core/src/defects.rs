@@ -1649,6 +1649,10 @@ defects! {
         "the conversions between a volume's slice and a 2-D image (MRItoImage, MRItoImageView, ImageToMRI) write or read past the image's pixels when a given image is smaller than the slice or of a narrower pixel format, or when the image holds fewer frames or pixels than its header counts: memory contents";
     FS_466 = "FS-466", "FreeSurfer", true,
         "an RGB image's frames after the first are read into a volume (ImageToMRI) one byte per pixel from the start instead of three: they overlap the first frame";
+    FS_467 = "FS-467", "FreeSurfer", true,
+        "the smoothing of a parcellation (MRIsmoothParcellation) counts its neighbours' labels in an array indexed by the label: a negative label is counted outside the array: memory contents";
+    FS_468 = "FS-468", "FreeSurfer", true,
+        "the clipping of bright white matter (MRIclipBrightWM) stores every voxel through a byte: a value below 0 or above 255, or NaN, becomes the low byte of its 32-bit truncation (0 for NaN and beyond the 32-bit range)";
 }
 
 /// The register entry with ID `id`.

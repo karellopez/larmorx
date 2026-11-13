@@ -1129,6 +1129,141 @@ void run_case()
     fflush(stdout);
     put_vol(m);
     of(I->xsize); of(I->ysize);
+  } else if (cmd == "smpar") {
+    MRI *m = get_vol();
+    paint(m);
+    int count = geti();
+    fflush(stdout);
+    MRI *r = MRIsmoothParcellation(m, count);
+    fflush(stdout);
+    put_vol(r);
+  } else if (cmd == "erasebp") {
+    MRI *m = get_vol();
+    int b = geti();
+    fflush(stdout);
+    oi(MRIeraseBorderPlanes(m, b));
+    fflush(stdout);
+    put_vol(m);
+  } else if (cmd == "nbhd") {
+    MRI *m = get_vol();
+    paint(m);
+    int which = geti(), wsize = geti(), x = geti(), y = geti(), z = geti();
+    int frame = geti();
+    float thresh = getf();
+    fflush(stdout);
+    int r = 0;
+    if (which == 0) r = MRImaxInNbhd(m, wsize, x, y, z, frame);
+    else if (which == 1) r = MRIcountNonzeroInNbhd(m, wsize, x, y, z);
+    else if (which == 2) r = MRIareNonzeroInNbhd(m, wsize, x, y, z);
+    else r = MRIcountThreshInNbhd(m, wsize, x, y, z, thresh);
+    fflush(stdout);
+    oi(r);
+  } else if (cmd == "nearnz") {
+    MRI *m = get_vol();
+    paint(m);
+    int wsize = geti();
+    double xr = getd(), yr = getd(), zr = getd();
+    int want = geti();
+    int xv = -9, yv = -9, zv = -9;
+    fflush(stdout);
+    float r = MRIfindNearestNonzeroLocation(m, wsize, xr, yr, zr, want ? &xv : NULL, want ? &yv : NULL, want ? &zv : NULL);
+    fflush(stdout);
+    of(r); oi(xv); oi(yv); oi(zv);
+  } else if (cmd == "lmeans") {
+    MRI *src = get_vol();
+    MRI *lab = get_vol();
+    paint(lab);
+    int label = geti(), which = geti();
+    int x0 = geti(), y0 = geti(), z0 = geti(), whalf = geti(), want = geti();
+    double sd = -7.0;
+    fflush(stdout);
+    if (which == 0) {
+      VECTOR *v = MRImeanInLabelMultispectral(src, lab, label);
+      fflush(stdout);
+      om(v);
+    } else if (which == 1) {
+      od(MRImeanInLabel(src, lab, label));
+    } else if (which == 2) {
+      od(MRImeanAndStdInLabel(src, lab, label, want ? &sd : NULL));
+      od(sd);
+    } else if (which == 3) {
+      od(MRImeanInLabelInRegion(src, lab, label, x0, y0, z0, whalf, want ? &sd : NULL));
+      od(sd);
+    } else {
+      od(MRImaxInLabelInRegion(src, lab, label, x0, y0, z0, whalf));
+    }
+  } else if (cmd == "mkpos") {
+    MRI *src = get_vol();
+    MRI *dst = geti() ? get_vol() : NULL;
+    fflush(stdout);
+    MRI *r = MRImakePositive(src, dst);
+    fflush(stdout);
+    oi(r != NULL && r == dst);
+    put_vol(r);
+  } else if (cmd == "mlbv") {
+    MRI *src = get_vol();
+    paint(src);
+    MRI *dst = geti() ? get_vol() : NULL;
+    int label = geti(), mark = geti(), six = geti();
+    fflush(stdout);
+    MRI *r = MRImarkLabelBorderVoxels(src, dst, label, mark, six);
+    fflush(stdout);
+    oi(r != NULL && r == dst);
+    put_vol(r);
+  } else if (cmd == "lnbhd") {
+    MRI *lab = get_vol();
+    paint(lab);
+    MRI *vals = geti() ? get_vol() : NULL;
+    int x = geti(), y = geti(), z = geti(), whalf = geti(), maxl = geti();
+    std::vector<int> counts(maxl, -5);
+    std::vector<float> means(maxl, -5.0f);
+    fflush(stdout);
+    oi(MRIcomputeLabelNbhd(lab, vals, x, y, z, counts.data(), vals ? means.data() : NULL, whalf, maxl));
+    fflush(stdout);
+    for (int c : counts) oi(c);
+    if (vals) for (float f : means) of(f);
+  } else if (cmd == "linbhd") {
+    MRI *m = get_vol();
+    paint(m);
+    int x = geti(), y = geti(), z = geti(), whalf = geti(), label = geti(), which = geti();
+    fflush(stdout);
+    int r = which < 0 ? MRIlabelsInNbhd(m, x, y, z, whalf, label) : MRIlabelsInPlanarNbhd(m, x, y, z, whalf, label, which);
+    fflush(stdout);
+    oi(r);
+  } else if (cmd == "lbbox") {
+    MRI *m = get_vol();
+    paint(m);
+    MRI_REGION b;
+    oi(MRIlabelBoundingBox(m, geti(), &b));
+    oi(b.x); oi(b.y); oi(b.z); oi(b.dx); oi(b.dy); oi(b.dz);
+  } else if (cmd == "fillbox") {
+    MRI *m = get_vol();
+    MRI_REGION b;
+    b.x = geti(); b.y = geti(); b.z = geti(); b.dx = geti(); b.dy = geti(); b.dz = geti();
+    float v = getf();
+    fflush(stdout);
+    oi(MRIfillBox(m, &b, v));
+    fflush(stdout);
+    put_vol(m);
+  } else if (cmd == "mskz") {
+    MRI *src = get_vol();
+    MRI *mask = get_vol();
+    paint(mask);
+    MRI *dst = get_dst(src);
+    fflush(stdout);
+    MRI *r = MRImaskZero(src, mask, dst);
+    fflush(stdout);
+    oi(r != NULL && r == dst);
+    put_vol(r);
+  } else if (cmd == "clipwm") {
+    MRI *t1 = get_vol();
+    paint(t1);
+    MRI *wm = get_vol();
+    paint(wm);
+    fflush(stdout);
+    oi(MRIclipBrightWM(t1, wm));
+    fflush(stdout);
+    put_vol(t1);
   } else {
     fail("unknown command");
   }

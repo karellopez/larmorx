@@ -582,6 +582,8 @@ def _classify_repo(rel: str, op: str) -> Class:
                 "validation/investigations/freesurfer-gsl-replica-check/",
                 "validation/investigations/freesurfer-spline-replica-check/",
                 "validation/investigations/freesurfer-surfio/",
+                # track A's checks of fs.core (they run the replica): closed (2026-11-13)
+                "validation/investigations/freesurfer-core/",
                 # the replay tool and the unit oracle's harness, written from FreeSurfer's source: a FreeSurfer
                 # clean-room implementer runs them (black box) but never reads them (2026-11-12)
                 "validation/src/larmorx_validation/freesurfer/",

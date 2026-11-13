@@ -1565,6 +1565,24 @@ defects! {
         "reading an MGH volume whose talairach tag's text has no NUL byte (and fewer than 1,024 bytes) takes the transform's name on past the text from memory never written: a garbled name, so the transform is not found or another file is read";
     FS_422 = "FS-422", "FreeSurfer", true,
         "reading an MNI transform file (regio_read_mincxfm) whose first line is not MNI Transform File leaves the file open: a program that reads many runs out of file descriptors";
+    FS_423 = "FS-423", "FreeSurfer", true,
+        "reading a label file whose first line's text after vox2ras= is 100 bytes or more writes the text past the label's coordinate-space field: memory corruption, wrong label fields or a crash when the label is freed";
+    FS_424 = "FS-424", "FreeSurfer", true,
+        "reading a label file whose point count is 0 while point lines follow writes those points outside the label's memory: memory corruption or a crash (the label returned has no points)";
+    FS_425 = "FS-425", "FreeSurfer", true,
+        "reading a label file whose point count is larger than its point lines gives a label whose missing points are vertex 0 at (0, 0, 0) with statistic 0, without a message";
+    FS_426 = "FS-426", "FreeSurfer", true,
+        "a label of more points than the machine's memory holds (a point count read from a file, or a label allocated or enlarged to it) gives an error message, a crash or a label depending on the machine's memory";
+    FS_427 = "FS-427", "FreeSurfer", true,
+        "reading, writing or making a label, a label name, subject name or subjects directory longer than FreeSurfer's 1,024-byte name buffers is written past them, or read on past its end: memory corruption, a garbled name or a crash";
+    FS_428 = "FS-428", "FreeSurfer", true,
+        "writing a label, a write error (a full disk) closes the file twice: a crash or memory corruption after the error message";
+    FS_429 = "FS-429", "FreeSurfer", true,
+        "copying a label into a given label with fewer places than the source's points writes the points past the given label's memory: memory corruption or a crash";
+    FS_430 = "FS-430", "FreeSurfer", true,
+        "the annotation tables (a table file, or one set from a colour table): a name of 100 bytes or more, or a table path of 1,024 bytes or more, is written past its buffer or read on past its end: memory corruption, a garbled name or a crash";
+    FS_431 = "FS-431", "FreeSurfer", true,
+        "removing a point outside a point set (fsPointSet::remove) is undefined behaviour: memory corruption or a crash";
     FS_285 = "FS-285", "FreeSurfer", true,
         "reading a volume-geometry block (the text block of linear transform and surface files) whose line starts with a word of 64 bytes or more writes the word past its buffer: memory corruption, a crash or wrong values";
     FS_286 = "FS-286", "FreeSurfer", true,

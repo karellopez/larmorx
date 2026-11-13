@@ -26,6 +26,7 @@ pub mod fstagsio;
 pub mod gifti;
 pub mod identify;
 pub mod image;
+pub mod label;
 pub mod matfile;
 pub mod minc;
 pub mod mosaic;

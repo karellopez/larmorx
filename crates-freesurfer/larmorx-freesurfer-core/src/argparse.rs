@@ -530,6 +530,16 @@ impl ArgumentParser {
         Ok(p)
     }
 
+    /// The configured names (and the unknown ones `parse` added), in the port's order.
+    pub fn keys(&self) -> Vec<&str> {
+        self.index.iter().map(|(k, _)| k.as_str()).collect()
+    }
+
+    /// `strip(name)` (one leading dash, and a second for names longer than 3 bytes).
+    pub fn strip(name: &str) -> &str {
+        strip(name)
+    }
+
     fn find(&self, key: &str) -> Option<usize> {
         self.index.iter().find(|(k, _)| k == key).map(|&(_, n)| n)
     }
@@ -831,13 +841,19 @@ impl ArgumentParser {
                     )
                 };
                 let ok = if active.scalar() {
-                    match active.argtype {
-                        ArgType::Int => stoi(element).map(Value::Int),
-                        ArgType::Float => stof(element).map(Value::Float),
-                        ArgType::Bool => stob(element).map(Value::Bool),
-                        _ => Some(Value::Str(element.clone())),
+                    // `castTo<T>()` of the slot: a slot of another type (an argument whose name is
+                    // empty takes index[""], the first argument's) throws, as a bad number does
+                    let slot = &mut self.variables[n].1;
+                    match (active.argtype, slot) {
+                        (ArgType::Int, Value::Int(x)) => stoi(element).map(|v| *x = v),
+                        (ArgType::Float, Value::Float(x)) => stof(element).map(|v| *x = v),
+                        (ArgType::Bool, Value::Bool(x)) => stob(element).map(|v| *x = v),
+                        (ArgType::String | ArgType::Unknown, Value::Str(x)) => {
+                            *x = element.clone();
+                            Some(())
+                        }
+                        _ => None,
                     }
-                    .map(|v| self.variables[n].1 = v)
                 } else {
                     let slot = &mut self.variables[n].1;
                     match (active.argtype, slot) {
@@ -906,5 +922,50 @@ impl ArgumentParser {
             }
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// `std::stoi` and `std::stof` on the probe's words (piece 9 compared them with FreeSurfer's
+    /// official code: `validation/probes/fs-io`, seed 13).
+    #[test]
+    fn numbers_as_libstdcxx_reads_them() {
+        assert_eq!(stoi(" 7"), Some(7));
+        assert_eq!(stoi("+4"), Some(4));
+        assert_eq!(stoi("12abc"), Some(12));
+        assert_eq!(stoi("2147483648"), None);
+        assert_eq!(stoi("-2147483649"), None);
+        assert_eq!(stoi("99999999999999999999"), None);
+        assert_eq!(stoi(""), None);
+        assert_eq!(stoi("x"), None);
+        let bits = |s: &str| stof(s).map(f32::to_bits);
+        assert_eq!(bits("1.5"), Some(0x3fc0_0000));
+        assert_eq!(bits("1e40"), None);
+        assert_eq!(bits("1e-40"), None);
+        assert_eq!(bits("0x1p-149"), Some(1));
+        assert_eq!(bits("0x"), Some(0));
+        assert_eq!(bits(".5"), Some(0x3f00_0000));
+        assert_eq!(bits("."), None);
+        assert_eq!(bits("e5"), None);
+        assert_eq!(bits("nan(12)"), Some(0x7fc0_000c));
+        assert_eq!(bits("-nan(0x7)"), Some(0xffc0_0007));
+        assert_eq!(bits("nan(abc)"), Some(0x7fc0_0000));
+        assert_eq!(bits("-Infinity"), Some(0xff80_0000));
+        assert_eq!(stob("YES"), Some(true));
+        assert_eq!(stob("False"), Some(false));
+        assert_eq!(stob("2"), None);
+    }
+
+    #[test]
+    fn names_without_their_dashes() {
+        assert_eq!(strip("--input"), "input");
+        assert_eq!(strip("-i"), "i");
+        assert_eq!(strip("--"), "-");
+        assert_eq!(strip("-ab"), "ab");
+        assert_eq!(strip("-abcd"), "abcd");
+        assert_eq!(strip(""), "");
     }
 }

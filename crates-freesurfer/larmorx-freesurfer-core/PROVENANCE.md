@@ -48,6 +48,7 @@ built for the official binaries with GCC 8.4.0 (`docs/freesurfer/variation.md`).
 | `pdf` | `utils/pdf.cpp` 26-61 | `PDFtodSeed`, `PDFgaussian`; FS-29, FS-30 |
 | `spline` (3.1-54, `fs.spline`) | `utils/numerics.cpp` 1287-1312, 1417-1535, 1572-1611, 1648-1680; `include/numerics.h` 28-30 | `OpenSpline`, `OpenSplint`, `SplineCubicSet`, `SplineCubicValue`, `d3_np_fs` (John Burkardt's routines, below), `SPLINE_USE_QUADRATIC`, `SPLINE_USE_FIRST_DERIVATIVE`, `SPLINE_USE_SECOND_DERIVATIVE`; FS-103 |
 | `sse` | none (larmorx's own) | SSE2's NaN rules for the official build's arithmetic (the porting guide's "NaN bits are part of the output") |
+| `argparse` (3.1-21, track A relay 18) | `utils/argparse.cpp`, `include/argparse.h` (FreeSurfer's own, derived from Hilton Bristow's argparse; 23 % of its tokens shared with hbristow/argparse 43edb8ac, track C's count) | `ArgumentParser` (`addArgument` twice, `addHelp`, `parse`, `exists`, `retrieve`, `unstrip`, `insertArgument`), `Argument` (its constructors, `validate`, `canonicalName`, `typeName`), `verifyOption`, `strip`, `stob`; libstdc++'s `std::stoi` and `std::stof` (from the C++ standard and glibc's documented `strtol`/`strtof`, the scanner of `cscan`); FS-411 |
 | `ret` | none (larmorx's own) | the result of a function with an optional output (`T *F(..., T *dst)`) |
 | `cstd` | none (larmorx's own) | the C library's `atoi`, `atof`, `sscanf`'s `%lx`, `printf`'s `%W.Pf` and one `double` conversion `%f`, `%e`, `%g` with flags (`%e`/`%g` with 3.1-25's `TSV::print`), x86-64's double-to-int conversion, written from the C standard and glibc's documented behaviour |
 | `cglob`, `ctime`, `system` | none (larmorx's own) | the C library's `glob` and `fnmatch` (from POSIX), `gmtime_r`, `localtime` and `strftime("%c")` in the C locale (from POSIX's `TZ`, RFC 8536's TZif files and two behaviours of glibc 2.35 measured against it, `validation/investigations/freesurfer-core/ctime_probe.py`: 180,240 cases, 0 differ), `getpwuid(geteuid())`, `uname`, `getcwd` (from `/proc`, `/etc/passwd` and the environment); no C library source |
@@ -189,3 +190,12 @@ empty solution). Validation: `validation/investigations/freesurfer-spline-replic
   as the official build lays out their variables, track E's amended spec §18.2).
 - `numerics.rs`: `OpenEigenSystem`'s FS-47 and `OpenSvdcmp`'s FS-48 under `reproduce` (the main package's
   `vnl_eigen::symmetric_eigensystem_f32_full`, `vnl_svd_f32::vnl_svd_f32_full`).
+
+## Relay 18 (track A)
+
+- `argparse.rs`: the name index (`std::unordered_map`) kept in the order the names are added: FreeSurfer's order is
+  libstdc++'s hash buckets (the system's C++ library decides them), which only the duplicate-name message and
+  `unstrip`'s choice between two names that strip alike depend on (no configuration of the seven programs has two;
+  the probe compares those lines apart). `Any`'s held values as `Value`, `castTo`'s `bad_cast` as a type check;
+  `outputHelpXml` passed in (`HelpFn`; `output_help_xml` gives its NULL and empty-text answers, the XML renderer of
+  `utils/fsPrintHelp.cpp` not ported yet); `exit(0)` as `Fatal::Exit(0)`.

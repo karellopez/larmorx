@@ -31,7 +31,7 @@
 
 use std::io::Write;
 
-use larmorx_core::defects::{FS_405, FS_406, FS_407, FS_408, FS_409, FS_410};
+use larmorx_core::defects::{FS_405, FS_406, FS_407, FS_408, FS_409, FS_410, FS_412};
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{
     ERROR_BADPARM, ERROR_NO_MEMORY, ERROR_NOMEMORY, ERROR_UNSUPPORTED, Fatal, NO_ERROR, error_exit,
@@ -853,6 +853,42 @@ fn scaled(g: &mut Globals, n: i32, scale: f32) -> i32 {
     nint(g, f64::from(n as f32 * scale))
 }
 
+/// FS-412: whether `rows * scale` or `cols * scale` leaves the `int` range (or is NaN), where
+/// FreeSurfer goes on with -2147483648 extents. The default refuses such a scale (an error, as for
+/// any input that makes no sense): `true` when the caller must stop.
+fn bad_scale(
+    g: &mut Globals,
+    err: &mut dyn Write,
+    what: &str,
+    rows: i32,
+    cols: i32,
+    scale: f32,
+) -> bool {
+    let out = |n: i32| {
+        let x = f64::from(n as f32 * scale);
+        x.is_nan() || x + 0.5 >= 2_147_483_648.0 || x - 0.5 <= -2_147_483_649.0
+    };
+    if !(out(rows) || out(cols)) {
+        return false;
+    }
+    g.notices.add(
+        &FS_412,
+        format!("{what}: a scale of {scale} on {rows} x {cols} pixels gives extents beyond the int range"),
+    );
+    if g.notices.reproduce() {
+        return false;
+    }
+    if what != "ImageRescale" {
+        error_printf(
+            g,
+            err,
+            ERROR_BADPARM,
+            &format!("{what}: scale {scale} gives extents beyond the int range\n"),
+        );
+    }
+    true
+}
+
 /// `ISPOW2(x)` (`macros.h`), decided exactly (see the module's notes): a positive power of two;
 /// 0 and -0 too, as FreeSurfer's `nint(-inf)` is -2147483648 under `reproduce` and the default's
 /// clamped -2147483648 alike (FS-12 noted); +infinity only under the default's clamped `nint`,
@@ -924,6 +960,14 @@ pub fn image_rescale(
     out: Option<Image>,
     scale: f32,
 ) -> Result<Image, Fatal> {
+    if out.is_none() && bad_scale(g, err, "ImageRescale", in_image.rows, in_image.cols, scale) {
+        error_exit(
+            g,
+            err,
+            ERROR_BADPARM,
+            &format!("ImageRescale: scale {scale} gives extents beyond the int range\n"),
+        )?;
+    }
     let cols = scaled(g, in_image.cols, scale);
     let rows = scaled(g, in_image.rows, scale);
     let mut out = match out {
@@ -1035,6 +1079,16 @@ pub fn image_scale_down(
     out: &mut Image,
     scale: f32,
 ) -> Result<i32, Fatal> {
+    if bad_scale(
+        g,
+        err,
+        "ImageScaleDown",
+        in_image.rows,
+        in_image.cols,
+        scale,
+    ) {
+        return Ok(-1);
+    }
     let r = scaled(g, in_image.rows, scale);
     let c = scaled(g, in_image.cols, scale);
     if image_check_size(in_image, Some(out), r, c, in_image.num_frame) == 0 {
@@ -1217,6 +1271,9 @@ pub fn image_scale_up(
     out: &mut Image,
     scale: f32,
 ) -> Result<i32, Fatal> {
+    if bad_scale(g, err, "ImageScaleUp", in_image.rows, in_image.cols, scale) {
+        return Ok(-1);
+    }
     let r = scaled(g, in_image.rows, scale);
     let c = scaled(g, in_image.cols, scale);
     if image_check_size(in_image, Some(out), r, c, in_image.num_frame) == 0 {

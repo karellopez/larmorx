@@ -791,6 +791,13 @@ scales a multi-frame image.
   (1226) ignores `ImageCopy`'s result; `ImageCopy` frees an `outImage` with fewer pixels or frames
   and copies into a new one; `ImageRescale` then sets the freed image's sizes and returns it.
   Unreached (its only caller passes no output).
+- **FS-412** (class a, rule B: the default refuses the scale with an error; `reproduce` goes on).
+  `ImageScaleUp`/`ImageScaleDown`/`ImageRescale` compute `nint((float)rows * scale)`: beyond the int
+  range or NaN, `nint`'s `(int)` gives -2147483648 (FS-12), `ImageCheckSize`'s 64-bit products wrap
+  (`INT_MIN * INT_MIN * frames` is 0 or -2^62 or 2^62 ...), so the check can pass and the loops run over
+  -2147483648 extents (nothing done) or `ImageRescale`'s `ImageAlloc` fails. Found by the port: with
+  FS-12's default clamp the same products let a scale of 1e30 loop 2^31 times per pixel (a case of seed
+  13 never ended), so the default refuses such scales before any of that.
 - **FS-410** (class c, rule A: the default exits with `ERROR_NO_MEMORY`). `ImageAlloc` (75):
   `ErrorExit(Gerror, ...)` after `ImageAllocBuffer` returns `ERROR_NO_MEMORY` without setting
   `Gerror`: the code is the previous error's, usually `NO_ERROR` (0), so `exit(0)`. Measured: the

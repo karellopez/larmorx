@@ -1565,4 +1565,9 @@ integer ranges; scales 0.5, 0.25, 0.125, 0.75, 0.3, 0.4999999, 1, 1.5 to 4, NaN,
 negative), each image printed as its fields, its pixel sizes' bits and its bytes (in hex up to 128,
 else their FNV-1a 64 hash; `sizeimage × frames` of them, at most the buffer). Lines with FS-405 or
 FS-409 are counted, not compared. Measured (2026-11-13): seed 11, 1,068 piece-8 cases: `reproduce`
-identical on 949, 0 different (119 counted); `fix` differs only where a defect is noted.
+identical on 949, 0 different (119 counted); seed 13, 5,292: identical on 4,605, 0 different (687
+counted); `fix` differs only where a defect is noted. FS-412: a scale whose extents leave the int range
+(or NaN): FreeSurfer goes on with -2147483648 extents (nothing scaled, or `ImageRescale`'s allocation
+fails); the default refuses it: `ImageScaleUp`/`ImageScaleDown` print `<function>: scale <s> gives
+extents beyond the int range` + newline and return -1, `ImageRescale` without an output ends the
+program with that message (code -4).

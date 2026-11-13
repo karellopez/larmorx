@@ -55,6 +55,7 @@
 #include "matfile.h"
 #include "registerio.h"
 #include "image.h"
+#include "argparse.h"
 
 // gifti.cpp's two file-local helpers, compiled into the probe by gifti_statics.cpp
 giiDataArray *fsio_gifti_alloc_and_add_darray(gifti_image *image);
@@ -610,8 +611,73 @@ void print_img(IMAGE *I)
   else fnv_bytes(I->image, n);
 }
 
+
+// piece 9: FreeSurfer's ArgumentParser (argparse.cpp, fs.core)
+std::string hexstr() { std::vector<unsigned char> b = unhex(next()); return std::string(b.begin(), b.end()); }
+void ostdstr(const std::string &v)
+{
+  out += "x";
+  obytes(std::vector<unsigned char>(v.begin(), v.end()));
+  if (v.empty()) { out.pop_back(); out.pop_back(); out += " "; }
+}
+const unsigned char help9[] = "<help><name>probe</name><synopsis>probe [options]</synopsis></help>";
+
+void run_piece9(const std::string &cmd)
+{
+  if (cmd != "apa") fail("unknown command");
+  fwide(stderr, -1);
+  ArgumentParser parser;
+  int nconf = (int)geti();
+  for (int i = 0; i < nconf; i++) {
+    std::string k = next();
+    if (k == "H") {
+      int mode = (int)geti();
+      if (mode == 1) parser.addHelp(help9, 0);
+      else parser.addHelp(help9, sizeof help9 - 1);
+    } else if (k == "A1") {
+      std::string name = hexstr();
+      char nargs = (char)geti();
+      ArgType t = (ArgType)geti();
+      bool req = geti() != 0;
+      parser.addArgument(name, nargs, t, req);
+    } else {
+      std::string sn = hexstr();
+      std::string name = hexstr();
+      char nargs = (char)geti();
+      ArgType t = (ArgType)geti();
+      bool req = geti() != 0;
+      parser.addArgument(sn, name, nargs, t, req);
+    }
+  }
+  int nargv = (int)geti();
+  std::vector<std::string> args;
+  for (int i = 0; i < nargv; i++) args.push_back(hexstr());
+  std::vector<char *> av;
+  for (std::string &a : args) av.push_back(&a[0]);
+  av.push_back(NULL);
+  out += "parsed ";
+  fflush(stdout);
+  parser.parse(args.size(), av.data());
+  int nq = (int)geti();
+  for (int i = 0; i < nq; i++) {
+    std::string k = next();
+    std::string name = hexstr();
+    if (k == "E") { oi(parser.exists(name)); continue; }
+    std::string t = next();
+    if (t == "i") oi(parser.retrieve<int>(name));
+    else if (t == "f") of(parser.retrieve<float>(name));
+    else if (t == "b") oi(parser.retrieve<bool>(name));
+    else if (t == "s") ostdstr(parser.retrieve<std::string>(name));
+    else if (t == "I") { std::vector<int> v = parser.retrieve<std::vector<int>>(name); oi((long long)v.size()); for (int x : v) oi(x); }
+    else if (t == "F") { std::vector<float> v = parser.retrieve<std::vector<float>>(name); oi((long long)v.size()); for (float x : v) of(x); }
+    else if (t == "B") { std::vector<bool> v = parser.retrieve<std::vector<bool>>(name); oi((long long)v.size()); for (bool x : v) oi(x); }
+    else { std::vector<std::string> v = parser.retrieve<std::vector<std::string>>(name); oi((long long)v.size()); for (std::string &x : v) ostdstr(x); }
+  }
+}
+
 void run_piece8(const std::string &cmd)
 {
+  if (cmd == "apa") { run_piece9(cmd); return; }
   fwide(stderr, -1);
   Gerror = (int)geti();
   if (cmd == "ial") {
@@ -675,7 +741,8 @@ void run_piece8(const std::string &cmd)
     else ImageReduce1d(a, b, k.data(), len, axis);
     print_img(b);
   } else {
-    fail("unknown command");
+    run_piece9(cmd);
+    return;
   }
   oi(Gerror);
 }

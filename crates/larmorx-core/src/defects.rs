@@ -1543,6 +1543,8 @@ defects! {
         "ImageAlloc, when the pixels cannot be allocated, ends the program with the code of FreeSurfer's previous error, 0 when there was none: a program that ran out of memory exits with status 0 (success)";
     FS_411 = "FS-411", "FreeSurfer", true,
         "a newer-style FreeSurfer program without a help text (mri_brainvol_stats) run without a required input prints, before its error, a help line chosen by memory never written: No xml string passed. when that memory holds 0, otherwise an XML parser's message";
+    FS_412 = "FS-412", "FreeSurfer", true,
+        "ImageScaleUp, ImageScaleDown and ImageRescale with a scale that makes the image's rows or columns beyond the 32-bit integer range (or NaN) go on with extents of -2147483648: nothing is scaled, or the image cannot be allocated, with no message about the scale";
     FS_285 = "FS-285", "FreeSurfer", true,
         "reading a volume-geometry block (the text block of linear transform and surface files) whose line starts with a word of 64 bytes or more writes the word past its buffer: memory corruption, a crash or wrong values";
     FS_286 = "FS-286", "FreeSurfer", true,

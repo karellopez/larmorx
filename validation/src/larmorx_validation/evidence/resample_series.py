@@ -902,6 +902,23 @@ SPEED_LABELS = {
 PORTS = {"port": "replica"}
 
 
+def _poster_of_identical(ex: dict, pid: str) -> None:
+    """The still poster of a panel added to the default view (the reviewer's round 25, L): the
+    poster of a panel the example compares it with and finds identical in every value shown (a
+    poster is drawn from the shown slice's values alone, with the example's one range, so
+    identical values give the same image, already in the blobs); an error if there is none."""
+    posters = ex["poster"]["panels"]
+    if pid in posters:
+        return
+    for d in ex["diffs"]:
+        other = d["b"] if d["a"] == pid else d["a"] if d["b"] == pid else None
+        shown = d.get("display") or {}
+        if other in posters and shown and all(m.get("differ") == 0 for m in shown.values()):
+            posters[pid] = posters[other]
+            return
+    raise ValueError(f"{ex['id']}: no poster for {pid} and no identical panel to take it from")
+
+
 def present(doc: dict) -> dict:
     """fMRIPrep's one-shot resampler in the writing guide's words and order: texts, ports and
     order only."""
@@ -923,6 +940,7 @@ def present(doc: dict) -> dict:
                 shown.insert(
                     shown.index("fmriprep") if "fmriprep" in shown else 1, "fmriprep-newest"
                 )
+            _poster_of_identical(ex, "fmriprep-newest")
             note = ex.get("metrics_note") or ""
             if "record's threshold" in note:
                 raise ValueError(f"{ex['id']}: the threshold is in its note already")

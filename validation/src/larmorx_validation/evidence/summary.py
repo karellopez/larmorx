@@ -357,7 +357,7 @@ def export(ctx: core.Context) -> dict:
         "note": "Each program's counts are its evidence page's verdicts, case by case: each case's "
         "verdict is decided from what its record reports and measures (bit-identical to the "
         "original as built, identical once it uses correctly rounded maths, within the "
-        "original's own variability, an expected divergence, rejected by both, an open "
-        "difference).",
+        "original's own variability (for LARMORX's own NIfTI reader, nibabel's), a deliberate "
+        "correction, an expected divergence, rejected by both, an open difference).",
         "pilot": sorted(TOOLS),
     }

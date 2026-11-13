@@ -266,6 +266,27 @@ _LARMORX = re.compile(r"(?<![\w`/.-])larmorx(?![\w`/:-]|\.\w)")
 #: The comparisons' runner by what it is (the writing guide: "parity" on pages users read).
 _RUNNER = re.compile(r"\bthe parity runner\b")
 
+#: The triage's development words on a page users read (the reviewer's round 25, I): a "trial"
+#: is a random-testing run, a clean room's work is its own, from its specification, and a run is
+#: named by its date, not its folder.
+_TRIAL = [
+    (re.compile(r"\bthe trial of (\d{4}-\d{2}-\d{2})"), r"the random-testing run of \1"),
+    (re.compile(r"\bthe trial against\b"), "the random-testing run against"),
+    (
+        re.compile(r"\bthat part's (?:30-minute )?trial\b"),
+        "that part's random-testing run of half an hour",
+    ),
+    (re.compile(r"\bthe version trial of\b"), "the random-testing run with the new versions, of"),
+    (re.compile(r"\bthe clean-room agent's\b"), "the clean room's own, from its specification"),
+    (re.compile(r" \(oracles/difftest/(\d{4}-\d{2}-\d{2})-[\w-]+\)"), r" (its run of \1)"),
+]
+
+
+def _trial(text: str) -> str:
+    for pat, rep in _TRIAL:
+        text = pat.sub(rep, text)
+    return text
+
 
 def _prose(text: str) -> str:
     """A triage explanation in the guide's words, its code spans kept as they are."""
@@ -274,7 +295,7 @@ def _prose(text: str) -> str:
         part
         if i % 2
         else _LARMORX.sub(
-            "LARMORX", _RUNNER.sub("the comparison's runner", words.reword(part) or "")
+            "LARMORX", _RUNNER.sub("the comparison's runner", _trial(words.reword(part) or ""))
         )
         for i, part in enumerate(parts)
     )

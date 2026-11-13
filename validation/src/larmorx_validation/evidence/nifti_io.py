@@ -411,6 +411,7 @@ TEXTS = [
     # the quick check, by what it is (the guide's "Other words")
     (r"\bThe smoke-tier\b", "The quick check's"),
     (r"\bthe smoke-tier\b", "the quick check's"),
+    (r"\bfor smoke tests\b", "for the quick check"),
     # numpy's long double is 64 bits on macOS on Apple silicon and on Windows; on Linux aarch64
     # it is IEEE quad precision (numpy's documentation of ``numpy.longdouble``; the reviewer's
     # round 24, minor 11)

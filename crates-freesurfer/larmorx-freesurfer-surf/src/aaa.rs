@@ -65,24 +65,20 @@ pub fn copy_angles_per_triangle(dst: &mut AnglesPerTriangle, src: &AnglesPerTria
 }
 
 /// `cmpAnglesPerTriangle(dst, src)`: `memcmp` of the two arrays' 12 bytes (their bits, so `-0` and
-/// `+0` differ and equal NaNs compare equal). glibc 2.35's x86-64 `memcmp` for 12 bytes (the
-/// `movbe` variants its ifunc picks on AVX2 and AVX-512 machines) returns -1 or 1 from the first
-/// differing 8-byte, then 4-byte, word read big-endian, 0 when equal (observed on the reference
-/// machine through the probe, `specs/freesurfer-surfio.md` §3); the replica returns that.
+/// `+0` differ and equal NaNs compare equal): 0 when equal, else the difference of the first
+/// differing bytes as unsigned values (`dst`'s minus `src`'s), which is what glibc 2.35's x86-64
+/// `memcmp` returns for 12 bytes (observed through the probe on the reference machine:
+/// `specs/freesurfer-surfio.md` §3). FreeSurfer's callers compare it with 0, or print it.
 pub fn cmp_angles_per_triangle(dst: &AnglesPerTriangle, src: &AnglesPerTriangle) -> i32 {
-    let bytes = |a: &AnglesPerTriangle| {
-        let mut b = [0u8; 12];
-        for (k, v) in a.iter().enumerate() {
-            b[4 * k..4 * k + 4].copy_from_slice(&v.to_bits().to_le_bytes());
+    for (a, b) in dst.iter().zip(src) {
+        let (a, b) = (a.to_bits().to_le_bytes(), b.to_bits().to_le_bytes());
+        for k in 0..4 {
+            if a[k] != b[k] {
+                return i32::from(a[k]) - i32::from(b[k]);
+            }
         }
-        b
-    };
-    let (a, b) = (bytes(dst), bytes(src));
-    match a.cmp(&b) {
-        std::cmp::Ordering::Less => -1,
-        std::cmp::Ordering::Equal => 0,
-        std::cmp::Ordering::Greater => 1,
     }
+    0
 }
 
 /// `FloatXYZ` (`include/base.h`).

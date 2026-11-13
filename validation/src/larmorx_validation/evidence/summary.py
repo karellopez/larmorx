@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
-"""The Validation page's summary: every tool ported so far × its implementations × how many
-of its record's cases have each verdict (``static/evidence/summary.json``).
+"""The Validation page's summary: every program ported so far × its ports × how many of its
+record's cases have each verdict (``static/evidence/summary.json``), in the writing guide's
+words (``docs/writing-guide.md``: each port named replica or clean room, LARMORX's own by that
+name, every page at its /evidence/ address).
 
 Every tool counts its own evidence's verdicts, case by case (``static/evidence/<tool>.json``:
 each case's verdict decided from its record's reported and measured values). A tool whose page
@@ -20,71 +22,71 @@ from larmorx_validation.evidence import TOOLS, core
 #: implementations (label, record, status, the part-1 figures module and agreement figure).
 PAGES = [
     (
-        "/tools/ants-registration/",
+        "/evidence/ants-registration/",
         "antsRegistration",
         "ants",
-        [("port", "ants-registration", "validated", None, None)],
+        [("replica", "ants-registration", "validated", None, None)],
     ),
     (
-        "/tools/ants-n4/",
+        "/evidence/ants-n4/",
         "N4BiasFieldCorrection",
         "ants",
-        [("port", "ants-n4", "validated", None, None)],
+        [("replica", "ants-n4", "validated", None, None)],
     ),
     (
-        "/tools/ants-denoise/",
+        "/evidence/ants-denoise/",
         "DenoiseImage",
         "ants",
-        [("port", "ants-denoise", "validated", None, None)],
+        [("replica", "ants-denoise", "validated", None, None)],
     ),
     (
-        "/tools/ants-apply-transforms/",
+        "/evidence/ants-apply-transforms/",
         "antsApplyTransforms",
         "ants",
-        [("port", "ants-apply-transforms", "validated", None, None)],
+        [("replica", "ants-apply-transforms", "validated", None, None)],
     ),
     (
-        "/tools/ants-programs/",
+        "/evidence/ants-programs/",
         "ImageMath and the filters",
         "ants",
         [
             (
-                "ImageMath (port)",
+                "ImageMath, replica",
                 "ants-image-math",
                 "validated",
                 None,
                 None,
             ),
             (
-                "ThresholdImage (port)",
+                "ThresholdImage, replica",
                 "ants-threshold-image",
                 "validated",
                 None,
                 None,
             ),
             (
-                "MultiplyImages (port)",
+                "MultiplyImages, replica",
                 "ants-multiply-images",
                 "validated",
                 None,
                 None,
             ),
             (
-                "SmoothImage (port)",
+                "SmoothImage, replica",
                 "ants-smooth-image",
                 "validated",
                 None,
                 None,
             ),
             (
-                "ResampleImage (port)",
+                "ResampleImage, replica",
                 "ants-resample-image",
                 "validated",
                 None,
                 None,
             ),
             (
-                "ResampleImageBySpacing (port)",
+                "ResampleImageBySpacing, replica",
                 "ants-resample-image-by-spacing",
                 "validated",
                 None,
@@ -93,13 +95,13 @@ PAGES = [
         ],
     ),
     (
-        "/tools/ants-ai/",
+        "/evidence/ants-ai/",
         "antsAI, antsAffineInitializer",
         "ants",
         [
-            ("antsAI (port)", "ants-ai", "validated", None, None),
+            ("antsAI, replica", "ants-ai", "validated", None, None),
             (
-                "antsAffineInitializer (port)",
+                "antsAffineInitializer, replica",
                 "ants-affine-initializer",
                 "validated",
                 None,
@@ -108,159 +110,159 @@ PAGES = [
         ],
     ),
     (
-        "/tools/ants-atropos/",
+        "/evidence/ants-atropos/",
         "Atropos",
         "ants",
-        [("port", "ants-atropos", "validated", None, None)],
+        [("replica", "ants-atropos", "validated", None, None)],
     ),
     (
-        "/tools/itk-hdf5/",
+        "/evidence/itk-hdf5/",
         "ITK transform files",
         "ants",
-        [("port", "itk-hdf5", "validated", None, None)],
+        [("replica", "itk-hdf5", "validated", None, None)],
     ),
     (
-        "/tools/afni-tshift/",
+        "/evidence/afni-tshift/",
         "3dTshift",
         "afni",
         [
-            ("clean-room original", "afni-tshift", "validated", None, None),
-            ("larmorx replica", "afni-tshift-replica", "validated", None, None),
+            ("clean room", "afni-tshift", "validated", None, None),
+            ("replica (larmorx)", "afni-tshift-replica", "validated", None, None),
         ],
     ),
     (
-        "/tools/afni-automask/",
+        "/evidence/afni-automask/",
         "3dAutomask",
         "afni",
         [
-            ("clean-room original", "afni-automask", "validated", None, None),
-            ("larmorx replica", "afni-automask-replica", "validated", None, None),
+            ("clean room", "afni-automask", "validated", None, None),
+            ("replica (larmorx)", "afni-automask-replica", "validated", None, None),
         ],
     ),
     (
-        "/tools/afni-unifize/",
+        "/evidence/afni-unifize/",
         "3dUnifize",
         "afni",
         [
-            ("clean-room original", "afni-unifize", "validated", None, None),
-            ("larmorx replica", "afni-unifize-replica", "validated", None, None),
+            ("clean room", "afni-unifize", "validated", None, None),
+            ("replica (larmorx)", "afni-unifize-replica", "validated", None, None),
         ],
     ),
     (
-        "/tools/afni-volreg/",
+        "/evidence/afni-volreg/",
         "3dvolreg",
         "afni",
         [
-            ("clean-room original", "afni-volreg-original", "experimental", None, None),
-            ("larmorx replica", "afni-volreg-replica", "validated", None, None),
+            ("clean room", "afni-volreg-original", "experimental", None, None),
+            ("replica (larmorx)", "afni-volreg-replica", "validated", None, None),
         ],
     ),
     (
-        "/tools/fsl-bet/",
+        "/evidence/fsl-bet/",
         "BET",
         "fsl",
         [
-            ("clean-room original", "fsl-bet", "experimental", None, None),
-            ("larmorx-nc replica", "fsl-bet-replica-full", "validated", None, None),
-            ("larmorx-nc replica, FSL 6.0.7.23", "fsl-bet-replica", "validated", None, None),
+            ("clean room", "fsl-bet", "experimental", None, None),
+            ("replica (larmorx-nc)", "fsl-bet-replica-full", "validated", None, None),
+            ("replica (larmorx-nc), FSL 6.0.7.23", "fsl-bet-replica", "validated", None, None),
         ],
     ),
     (
-        "/tools/mri-hmc/",
+        "/evidence/mri-hmc/",
         "Head-motion correction",
         "fsl",
         [
-            ("clean-room original", "mri-hmc", "experimental", None, None),
-            ("larmorx-nc replica", "fsl-mcflirt-replica-full", "validated", None, None),
-            ("larmorx-nc replica, FSL 6.0.7.23", "fsl-mcflirt-replica", "validated", None, None),
+            ("clean room", "mri-hmc", "experimental", None, None),
+            ("replica (larmorx-nc)", "fsl-mcflirt-replica-full", "validated", None, None),
+            ("replica (larmorx-nc), FSL 6.0.7.23", "fsl-mcflirt-replica", "validated", None, None),
         ],
     ),
     (
-        "/tools/fsl-flirt/",
+        "/evidence/fsl-flirt/",
         "FLIRT",
         "fsl",
         [
-            ("clean-room original", "fsl-flirt", "experimental", None, None),
-            ("larmorx-nc replica", "fsl-flirt-replica", "experimental", None, None),
+            ("clean room", "fsl-flirt", "experimental", None, None),
+            ("replica (larmorx-nc)", "fsl-flirt-replica", "experimental", None, None),
         ],
     ),
     (
-        "/tools/fsl-fast/",
+        "/evidence/fsl-fast/",
         "FAST",
         "fsl",
         [
-            ("clean-room original", "fsl-fast", "experimental", None, None),
-            ("larmorx-nc replica", "fsl-fast-replica", "experimental", None, None),
+            ("clean room", "fsl-fast", "experimental", None, None),
+            ("replica (larmorx-nc)", "fsl-fast-replica", "experimental", None, None),
         ],
     ),
     (
-        "/tools/fsl-topup/",
+        "/evidence/fsl-topup/",
         "topup and applytopup",
         "fsl",
         [
-            ("clean-room original", "fsl-topup", "experimental", None, None),
-            ("larmorx-nc replica", "fsl-topup-replica", "experimental", None, None),
+            ("clean room", "fsl-topup", "experimental", None, None),
+            ("replica (larmorx-nc)", "fsl-topup-replica", "experimental", None, None),
         ],
     ),
     (
-        "/tools/fsl-maths/",
+        "/evidence/fsl-maths/",
         "fslmaths",
         "fsl",
         [
-            ("clean-room original", "fsl-maths", "experimental", None, None),
-            ("larmorx-nc replica", "fsl-maths-replica", "experimental", None, None),
+            ("clean room", "fsl-maths", "experimental", None, None),
+            ("replica (larmorx-nc)", "fsl-maths-replica", "experimental", None, None),
         ],
     ),
     (
-        "/tools/fsl-stats/",
+        "/evidence/fsl-stats/",
         "fslstats",
         "fsl",
         [
-            ("clean-room original", "fsl-stats", "experimental", None, None),
-            ("larmorx-nc replica", "fsl-stats-replica", "experimental", None, None),
+            ("clean room", "fsl-stats", "experimental", None, None),
+            ("replica (larmorx-nc)", "fsl-stats-replica", "experimental", None, None),
         ],
     ),
     (
-        "/tools/fsl-prelude/",
+        "/evidence/fsl-prelude/",
         "prelude",
         "fsl",
         [
-            ("clean-room original", "fsl-prelude", "experimental", None, None),
-            ("larmorx-nc replica", "fsl-prelude-replica", "experimental", None, None),
+            ("clean room", "fsl-prelude", "experimental", None, None),
+            ("replica (larmorx-nc)", "fsl-prelude-replica", "experimental", None, None),
         ],
     ),
     (
-        "/tools/resample-series/",
+        "/evidence/resample-series/",
         "One-shot BOLD resampler",
-        "larmorx",
-        [("port", "resample-series", "validated", None, None)],
+        "fmriprep",
+        [("replica", "resample-series", "validated", None, None)],
     ),
     (
-        "/tools/sdcflows-fieldmap/",
+        "/evidence/sdcflows-fieldmap/",
         "sdcflows' field-map estimation",
-        "larmorx",
-        [("port", "sdcflows-fieldmap", "validated", None, None)],
+        "sdcflows",
+        [("replica", "sdcflows-fieldmap", "validated", None, None)],
     ),
     (
-        "/tools/tedana-t2smap/",
+        "/evidence/tedana-t2smap/",
         "t2smap",
-        "larmorx",
+        "tedana",
         [
-            ("clean-room original", "tedana-t2smap-original", "experimental", None, None),
-            ("larmorx-gpl replica", "tedana-t2smap-replica", "experimental", None, None),
+            ("clean room", "tedana-t2smap-original", "experimental", None, None),
+            ("replica (larmorx-gpl)", "tedana-t2smap-replica", "experimental", None, None),
         ],
     ),
     (
-        "/tools/sdcflows-estimation/",
+        "/evidence/sdcflows-estimation/",
         "sdcflows' PEPOLAR, direct and fieldmap-less estimation",
-        "larmorx",
-        [("port", "sdcflows-estimation", "validated", None, None)],
+        "sdcflows",
+        [("replica", "sdcflows-estimation", "validated", None, None)],
     ),
     (
-        "/tools/nifti-io/",
+        "/evidence/nifti-io/",
         "NIfTI I/O",
         "larmorx",
-        [("own implementation", "nifti-io", "validated", None, None)],
+        [("LARMORX's own", "nifti-io", "validated", None, None)],
     ),
 ]
 STATE = {
@@ -352,9 +354,10 @@ def export(ctx: core.Context) -> dict:
     return {
         "schema": 1,
         "tools": tools,
-        "note": "Every tool counts its evidence page's verdicts, case by case: each case's verdict "
-        "is decided from what its record reports and measures (identical to the unmodified "
-        "original, identical once it uses correctly rounded maths, within the original's own "
-        "variability, an expected divergence, rejected by both, an open difference).",
+        "note": "Each program's counts are its evidence page's verdicts, case by case: each case's "
+        "verdict is decided from what its record reports and measures (bit-identical to the "
+        "original as built, identical once it uses correctly rounded maths, within the "
+        "original's own variability (for LARMORX's own NIfTI reader, nibabel's), a deliberate "
+        "correction, an expected divergence, rejected by both, an open difference).",
         "pilot": sorted(TOOLS),
     }

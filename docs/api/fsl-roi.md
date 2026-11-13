@@ -139,4 +139,4 @@ The validation: the BET records (`docs/validation/fsl-bet.md` for the original,
 cases of FSL-211 to FSL-215. The original's `standard_space_roi` is FSL's bit for bit where its
 FLIRT gives FSL's matrix (an adult's T1w, a Philips T1w and a T2w with the defaults); elsewhere
 its matrices are within FLIRT's 12-dof threshold and, given FSL's matrix, every file is FSL's
-(`docs/findings/fsl-bet-original.md`, "standard_space_roi and fslroi").
+(`docs/findings/fsl-bet-clean-room.md`, "standard_space_roi and fslroi").

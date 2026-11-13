@@ -8,6 +8,7 @@ report. Everything is computed in this process (nibabel and larmorx), no cache e
 from __future__ import annotations
 
 import hashlib
+import re
 import tempfile
 from pathlib import Path
 
@@ -17,6 +18,14 @@ from larmorx_validation.evidence import common, core
 from larmorx_validation.figures import records
 
 TOOL = "nifti-io"
+
+
+def _page_():
+    from larmorx_validation.evidence import present as present_
+
+    return present_.Page("nibabel", "", "5.4.2")
+
+
 FILES = [
     (
         "openneuro/ds000005/sub-01/func/sub-01_task-mixedgamblestask_run-01_bold.nii.gz",
@@ -343,7 +352,7 @@ def export(ctx: core.Context) -> dict:
     )
     impl["agreement"] = core.agreement(common.flat_verdicts(cases, "port"), cats)
     n_open = len({r["category"] for r in rec.results if r["category"].startswith("openneuro-ds")})
-    return {
+    doc = {
         "schema": 1,
         "tool": TOOL,
         "title": "NIfTI I/O",
@@ -362,3 +371,119 @@ def export(ctx: core.Context) -> dict:
         "tables": tables,
         "examples": [],
     }
+    return present(doc)
+
+
+# ---------------------------------------------------------------------- the presentation
+
+#: LARMORX's own work, against the program it is compared with by its name (the writing guide,
+#: sections 1 and 4): never "the original", never a port.
+OWN = "LARMORX's own"
+AGAINST = "LARMORX's own reader and writer against nibabel 5.4.2"
+#: The case categories, as the page names them (the record's sources keep their names).
+CATEGORIES = {
+    "synthetic/dtypes": "synthetic: data types",
+    "synthetic/header": "synthetic: header fields",
+    "synthetic/layouts": "synthetic: file layouts",
+    "synthetic/malformed": "synthetic: malformed files",
+    "synthetic/orientation": "synthetic: orientations",
+    "synthetic/scaling": "synthetic: scale factors",
+    "synthetic/shapes": "synthetic: shapes",
+    "synthetic/transforms": "synthetic: transform images",
+}
+#: The speed chart's series, as the page names them; LARMORX's own in the clean room's colour
+#: and line under its own mark (the guide's section 5).
+SPEED = {
+    "nibabel|read": ("nibabel 5.4.2, read", "original"),
+    "larmorx (threads=1)|read": (f"{OWN}, read, 1 thread", "own"),
+    "larmorx (threads=all)|read": (f"{OWN}, read, all threads", "own-open"),
+    "SimpleITK|read": ("SimpleITK 2.5.6, read", "original-open"),
+}
+_TITLE = re.compile(
+    r"^(.*): every header field and the data, as nibabel 5\.4\.2 and larmorx read them$"
+)
+
+
+#: The page's own rewordings of the record's texts (applied first): the words of developer
+#: documents on a page users read (the guide, section 1).
+TEXTS = [
+    (r"\bfor brain-extraction parity\b", "for the comparison of brain extractions"),
+    # the quick check, by what it is (the guide's "Other words")
+    (r"\bThe smoke-tier\b", "The quick check's"),
+    (r"\bthe smoke-tier\b", "the quick check's"),
+    (r"\bfor smoke tests\b", "for the quick check"),
+    # numpy's long double is 64 bits on macOS on Apple silicon and on Windows; on Linux aarch64
+    # it is IEEE quad precision (numpy's documentation of ``numpy.longdouble``; the reviewer's
+    # round 24, minor 11)
+    (r"\(arm64, Windows\)", "(macOS on Apple silicon, Windows)"),
+    (r"\(arm64,\s+Windows\)", "(macOS on Apple silicon, Windows)"),
+    (r"\b64-bit on arm64 and Windows\b", "64-bit on macOS on Apple silicon and Windows"),
+]
+#: The verdicts in this page's words: nibabel is never "the original" (the guide, section 1).
+VERDICT_LABELS = {"within-variability": "Within nibabel's own variability"}
+
+
+def _text(s: str | None, code: bool = True) -> str | None:
+    """A text in the guide's words, a bare "larmorx" the project, LARMORX."""
+    from larmorx_validation.evidence import present as present_
+
+    for pat, rep in TEXTS:
+        s = re.sub(pat, rep, s) if s else s
+    return present_.text(_page_(), s, code=code, port="both")
+
+
+def present(doc: dict) -> dict:
+    """NIfTI I/O's page in the writing guide's words: texts and the marks only (the page has no
+    worked example: its tables, cases, agreement and speed)."""
+    from larmorx_validation.evidence import words
+
+    for im in doc["implementations"]:
+        im["title"] = f"Agreement, {AGAINST}"
+        im["comparison"] = "standard comparison"
+        im["label"] = f"{AGAINST} (standard comparison)"
+        im["short"] = OWN
+        im["port"] = "own"
+    for t in doc["tables"]:
+        m = _TITLE.match(t["title"])
+        if not m:
+            raise ValueError(f"{t['id']}: a title of another shape: {t['title']!r}")
+        t["title"] = (
+            f"Every header field and the data, LARMORX's own reader against nibabel 5.4.2: "
+            f"{m.group(1)}"
+        )
+        t["note"] = _text(t.get("note"))
+        for i, c in enumerate(t["columns"]):
+            if c == "larmorx":
+                t["columns"][i] = OWN
+            elif isinstance(c, dict) and c.get("label") == "larmorx":
+                c["label"] = OWN
+        for r in t["rows"]:
+            r["head"] = _text(r.get("head"))
+            for c in r["cells"]:
+                if "text" in c:
+                    c["text"] = _text(c["text"])
+    for c in doc["cases"]:
+        c["description"] = _text(c.get("description"), code=False)
+        for r in c["results"].values():
+            r["reason"] = _text(r.get("reason"))
+    sp = doc.get("speed")
+    if sp:
+        sp["title"] = "Speed, LARMORX's own reader against nibabel 5.4.2 and SimpleITK 2.5.6"
+        sp["caption"] = (
+            "Seconds to read a gzipped file into memory (the median of repeated runs) on a log "
+            "scale; the factor is nibabel's time divided by LARMORX's own at one thread. "
+            "SimpleITK, another library that reads NIfTI, is the open square."
+        )
+        for ser in sp["series"]:
+            ser["label"], ser["mark"] = SPEED[ser["id"]]
+            ser["port"] = ser["mark"].removesuffix("-open")
+        sp["note"] = _text(sp.get("note"))
+    doc["random_testing"] = {
+        "title": f"Random testing, {AGAINST}",
+        "names": {"port": OWN},
+    }
+    used = list(dict.fromkeys(c["category"] for c in doc["cases"]))
+    doc["category_labels"] = {c: CATEGORIES.get(c, c) for c in used}
+    doc["verdict_labels"] = dict(VERDICT_LABELS)
+    doc["presentation"] = words.PRESENTATION
+    return doc

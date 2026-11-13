@@ -21,6 +21,7 @@ from pathlib import Path
 import numpy as np
 
 from larmorx_validation.evidence import common, core
+from larmorx_validation.evidence import present as present_
 from larmorx_validation.figures import cache as fcache
 from larmorx_validation.figures import records
 
@@ -959,6 +960,7 @@ def export(ctx: core.Context) -> dict:
     reg = core.register(ctx.repo)
     rec = records.load(ctx.repo, TOOL)
     cases = _cases(ctx)
+    common.difftest_descriptions(ctx.repo, cases, "ants-registration")
     from larmorx_validation.evidence import ants_panel
 
     prec = ants_panel.panel_record(ctx.repo, TOOL)
@@ -967,7 +969,7 @@ def export(ctx: core.Context) -> dict:
     inventory = ants_panel.inventory_table(prec, "panel-nodes", "antsRegistration")
     examples = [_example(ctx, k, reg) for k in EXAMPLES] + ants_panel.examples(ctx, TOOL)
     corrections, corrections_source = _corrections_tables(ctx)
-    return {
+    doc = {
         "schema": 1,
         "tool": TOOL,
         "title": "antsRegistration",
@@ -992,6 +994,121 @@ def export(ctx: core.Context) -> dict:
         "tables": corrections + ([inventory] if inventory else []) + ants_panel.tables(ctx, TOOL),
         "examples": examples,
     }
+    return present(doc)
+
+
+#: The page in the writing guide's words (evidence/present.py). The guide's order keeps the
+#: row against correctly rounded maths after the one against ANTs as built; the reasons name it.
+PAGE = present_.Page(
+    software="ANTs",
+    program="antsRegistration",
+    version="2.6.5",
+    texts=[
+        (r"\(next row\)", "(the row against correctly rounded maths)"),
+        (r"\bthe oracle has\b", "ANTs 2.6.5 has"),
+    ],
+)
+
+#: Each worked example's "What this shows" line and the verdict beside it, from the example's
+#: own metrics (the warped T1w's largest difference over every voxel), its field table (how far
+#: a voxel's displacement moves, over the template's brain) and its facts; the data panel's
+#: lines are written from their own verdicts (present.panel_shows).
+SHOWS = {
+    "template-syn": (
+        "In `reproduce`, on 1 and 12 threads, the replica gives ANTs' one-thread result with "
+        "correctly rounded maths bit for bit: the warped T1w, every value of the displacement "
+        "field and all 865 lines of its output (addresses, times and paths masked, as the record compares them). ANTs as built differs only where glibc's `exp`, "
+        "`log`, `sin` or `cos` is not correctly rounded, and the optimiser's iterations carry "
+        "the change: up to 117 in the warped T1w, and a voxel's displacement moves by up to "
+        "1.08 mm in the brain. ANTs' own thread counts move its result further: up to 240 and "
+        "1.49 mm, 4 threads against one. No correction by default changes this call.",
+        ["lx-ants1"],
+    ),
+    "template-bsplinesyn": (
+        "In `reproduce`, on 1 and 12 threads, the replica gives ANTs' one-thread result with "
+        "correctly rounded maths bit for bit: the warped T1w, the B-spline smoothed field and "
+        "all 857 lines of its output (addresses, times and paths masked, as the record compares them). ANTs as built differs only where glibc's maths is not "
+        "correctly rounded: up to 57 in the warped T1w, and a voxel's displacement moves by up "
+        "to 0.51 mm in the brain. ANTs' own thread counts move its result further: up to 232 at "
+        "2 threads and 1.05 mm at 4 threads, against one. No correction by default changes "
+        "this call.",
+        ["lx-ants1"],
+    ),
+    "template-tvf": (
+        "In `reproduce`, on 1 and 12 threads, the replica gives ANTs' one-thread result with "
+        "correctly rounded maths bit for bit: the warped T1w, the field integrated from the "
+        "velocity field and all 988 lines of its output (addresses, times and paths masked, as the record compares them). ANTs as built differs only where "
+        "glibc's maths is not correctly rounded: up to 53 in the warped T1w, and a voxel's "
+        "displacement moves by up to 0.27 mm in the brain. ANTs' own thread counts move its "
+        "result further: up to 283 and 0.92 mm, 4 threads against one. No correction by "
+        "default changes this call.",
+        ["lx-ants1"],
+    ),
+}
+TITLES = {"template-syn": "sMRIPrep's registration of a real T1w to MNI space"}
+#: The record's categories as the page names them.
+CATEGORIES = {
+    "smoke": "first checks",
+    "transforms": "linear transforms",
+    "metrics": "image metrics",
+    "sampling": "metric sampling",
+    "initial": "initial transforms",
+    "dimensions-2d": "2D images",
+    "dimensions-4d": "4D images",
+    "outputs": "outputs",
+    "point-sets": "point-set metrics",
+    "syn": "SyN",
+    "syn-point-sets": "SyN with point sets",
+    "bspline-syn": "B-spline SyN",
+    "displacement-field": "displacement-field stages",
+    "bspline": "B-spline stages",
+    "exponential": "exponential stages",
+    "bspline-exponential": "B-spline exponential stages",
+    "time-varying": "time-varying velocity fields",
+    "time-varying-bspline": "time-varying B-spline velocity fields",
+    "corrections": "corrections of defects",
+    "real": "real images: fMRIPrep's calls",
+    "real-syn-small": "real images: fMRIPrep's calls, every third voxel",
+    "real-linear": "real images: the template registration's linear stages",
+    "real-bsplinesyn-small": "real images: B-spline SyN, every third voxel",
+    "real-exponential-small": "real images: an exponential stage, every third voxel",
+    "real-bspline-exponential-small": "real images: a B-spline exponential stage, every third "
+    "voxel",
+    "real-time-varying-small": "real images: a time-varying velocity field, every third voxel",
+    "real-time-varying-bspline-small": "real images: a time-varying B-spline velocity field, "
+    "every third voxel",
+    "panel-fmriprep-small": "data panel: fMRIPrep's calls, every third voxel",
+}
+
+
+def present(doc: dict) -> dict:
+    """antsRegistration's page in the writing guide's words and order: texts, ports and order
+    only."""
+    for ex in doc["examples"]:
+        if ex["id"] in SHOWS:
+            shows, verdicts = SHOWS[ex["id"]]
+        else:
+            shows, verdicts = present_.panel_shows(PAGE, ex)
+        present_.example(PAGE, ex, shows=shows, verdicts=verdicts, title=TITLES.get(ex["id"]))
+    for im in doc["implementations"]:
+        present_.implementation(PAGE, im, "standard comparison and data panel")
+    band = doc.get("dots", {}).get("band")
+    if band:
+        present_.dots(
+            PAGE,
+            band,
+            "Variability, the replica against the original and the original against itself "
+            f"between thread counts: {present_.original_name(PAGE)}, the largest change in a "
+            f"transform parameter in each of the {len(band['rows'])} cases (log scale; 0 at the "
+            "left edge)",
+            {
+                "band": "the original against itself: 2, 4 and 8 threads against 1",
+                "larmorx": "the replica against the original: ANTs at 1 thread, as built",
+            },
+        )
+    present_.random_testing(PAGE, doc, {"port": "replica"})
+    runs = tuple(t["id"] for t in doc.get("tables", []) if t["id"].endswith("-transforms"))
+    return present_.finish(PAGE, doc, CATEGORIES, runs=runs)
 
 
 if __name__ == "__main__":  # compute the cache entries only

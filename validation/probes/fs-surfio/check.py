@@ -11,7 +11,8 @@ whose ``MRIScomputeMetricProperties`` is a stub) by the oracle-output cache at o
 the port on the same cases with ``--upstream-defects`` ``reproduce`` and ``fix``, and compares the
 lines (the result and the text FreeSurfer's code printed): ``reproduce`` must give FreeSurfer's on
 every case (``SKIP`` lists the defects whose cases are counted, not compared: FreeSurfer reads
-memory it never wrote, FS-121, FS-123, FS-06, FS-167); ``fix`` may
+memory it never wrote, FS-121, FS-123, FS-06, FS-167, FS-49, FS-140, FS-144, FS-151, or outside
+what it owns, FS-154, FS-157, FS-158, FS-160); ``fix`` may
 differ only where a defect it corrects changed the result (its notices), or where the default's
 correctly rounded ``sinf``/``cosf`` replace glibc's (a ``surf`` case that rotates, ``Z``) or its
 correctly rounded ``atan2f`` (a ``posn`` case that computes the canonical coordinates' angles,
@@ -19,7 +20,7 @@ correctly rounded ``atan2f`` (a ``posn`` case that computes the canonical coordi
 ``larmorx_core::math::Libm``'s quiet choice; counted as ``fix_libm``. Prints the counts and the hash the port's recorded test
 checks (``tests/fs_surfio_official.rs``).
 
-    python -P validation/probes/fs-surfio/check.py --seed 1 --n 900 [--json out.json]
+    python -P validation/probes/fs-surfio/check.py --seed 1 --n 990 [--json out.json]
 """
 
 from __future__ import annotations
@@ -43,9 +44,23 @@ from larmorx_validation.oracle_cache.store import workspace  # noqa: E402
 
 # FreeSurfer reads memory it never wrote or does not own in these cases (the metric properties'
 # copy's unwritten normals and areas, FS-121; the faster computation's ripped faces and empty box,
-# FS-123; the table arctangent of a NaN, FS-06; a number a file ends before, FS-167, the `sfile`
-# readers): counted, never compared
-SKIP: tuple[str, ...] = ("FS-121", "FS-123", "FS-06", "FS-167")
+# FS-123; the table arctangent of a NaN, FS-06; a number a file ends before, FS-167 and FS-49, the
+# `sfile` and `cfile` readers; a decimation count that cannot be read, FS-140; a first VTK vertex
+# that cannot be read, FS-144): counted, never compared
+SKIP: tuple[str, ...] = (
+    "FS-121",
+    "FS-123",
+    "FS-06",
+    "FS-167",
+    "FS-49",
+    "FS-140",
+    "FS-144",
+    "FS-151",
+    "FS-154",
+    "FS-157",
+    "FS-158",
+    "FS-160",
+)
 SKIP_WHEN_REFUSED: tuple[str, ...] = ("FS-114",)
 
 

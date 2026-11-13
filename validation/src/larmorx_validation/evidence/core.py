@@ -143,7 +143,10 @@ def write_tool(ctx: Context, tool: str, doc: dict) -> Path:
 
 
 def _clean(v):
-    """JSON without NaN (null) and with numpy scalars as Python numbers."""
+    """JSON without NaN (null), with numpy scalars as Python numbers, and without a
+    machine-specific path in any string (the page is published: ``figures.cache.machine_paths``)."""
+    from larmorx_validation.figures.cache import machine_paths
+
     if isinstance(v, dict):
         return {k: _clean(x) for k, x in v.items()}
     if isinstance(v, list | tuple):
@@ -152,6 +155,8 @@ def _clean(v):
         v = v.item()
     if isinstance(v, float) and not math.isfinite(v):
         return None
+    if isinstance(v, str):
+        return machine_paths(v)
     return v
 
 

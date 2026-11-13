@@ -44,7 +44,7 @@ band of FSL-202's corrected variance on one channel (fMRIPrep's calls: the same 
 replica's default); several channels have no FSL-202, so there the two defaults lie FSL's own
 last-bit band apart (`multi/s3`, `multi/s2-n4`: to every digit FSL against FSL with correctly
 rounded maths), and `multi/s2-manualseg-cycle`, whose defaults both correct FSL-98's cycle, is
-the expected divergence measured in [the findings](../findings/fsl-fast-original.md). The evidence (fMRIPrep's call on three
+the expected divergence measured in [the findings](../findings/fsl-fast-clean-room.md). The evidence (fMRIPrep's call on three
 T1w brains in an image viewer with both implementations, the bias field, the priors, three
 channels, every case with its verdict, the speed) is FAST's page on the documentation site.
 
@@ -183,7 +183,7 @@ library buffers it: where FAST aborts, the lines it had not flushed (the k-means
 partial-volume heading) are lost there too (`specs/fast.md` §7). It is compared with FSL by its
 own parity suite (`fsl-fast`, the replica suite's cases and its own, `specs/fast.md` §11's
 thresholds), and its default with the replica's default; the observations of FSL's behaviour
-that the spec does not state are in [the findings](../findings/fsl-fast-original.md). Built for
+that the spec does not state are in [the findings](../findings/fsl-fast-clean-room.md). Built for
 speed (`specs/fast.md` §10; [the benchmark](../benchmarks/fsl-fast.md)): every per-voxel quantity
 is kept for the brain mask's voxels only; the steps where voxels are independent run in parallel
 (`n_threads`); the MRF sweeps and the mixel sweep keep FAST's in-place order and run as a pipeline
@@ -202,7 +202,7 @@ channels").
 Its record ([fsl-fast](../validation/fsl-fast.md)), golden cases (`cli.fsl.fast`, `.bias`,
 `.multi`, `.priors`, `.reproduce`, `py.fsl.fast`), memory test (fMRIPrep's call at 152 MiB
 against FSL's 707) and thread test are in place; its random-testing trial (25 minutes, 9,005
-realistic cases) is triaged in [the findings](../findings/fsl-fast-original.md).
+realistic cases) is triaged in [the findings](../findings/fsl-fast-clean-room.md).
 
 ## Not yet
 

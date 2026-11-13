@@ -348,7 +348,7 @@ program. `corratio` and `leastsquares` agree within the thresholds on ds000005, 
 spec describes them only in outline; `mutualinfo` and `normmi` follow the spec's appendix B
 exactly since 2026-10-29.
 
-**Random phantoms** (2026-10-29, [findings](../findings/mri-hmc-original.md)): on the 782
+**Random phantoms** (2026-10-29, [findings](../findings/mri-hmc-clean-room.md)): on the 782
 random phantoms where random testing found the estimates beyond the thresholds (small images
 moved by 5° to 30°: a cost with several minima), the corrected series is as well aligned as
 mcflirt's for every cost (temporal standard deviation, median ratio 1.000). `cost="normmi"`
@@ -362,7 +362,7 @@ decimals, as with `normcorr`.
 the spec writer's answers of 2026-11-06): the weighted correlation's count takes each point's
 weight into its first running total as the point is visited (each row's total before), which
 follows mcflirt's evaluated matrices longer on every recorded run traced
-([findings](../findings/mri-hmc-original.md)); `cost="leastsquares"` is FLIRT's `leastsq` (three
+([findings](../findings/mri-hmc-clean-room.md)); `cost="leastsquares"` is FLIRT's `leastsq` (three
 single-precision levels; double sums before).
 
 **Centres of mass** (the clean-room catch-up, 2026-11-05; `specs/mcflirt.md` §6.1): both of

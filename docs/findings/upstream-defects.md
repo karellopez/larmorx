@@ -535,7 +535,7 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | FSL-08 † | mcflirt `-stats`, `-meanvol` | end slices left 0; names with the extension inside (the `-stats` images and `-meanvol`'s `_mean_reg`) | c, e | none | corrected by default (`upstream_defects`, 2026-10-11); the replica names it for `-meanvol` alone too (2026-10-25, random testing `fsl-mcflirt:20261025:616`) | – |
 | FSL-09 † | mcflirt, flirt (writing an output in another data type) | output types: int8 → uint8, truncation, no clamping | c, a | none | corrected by default (`upstream_defects`, 2026-10-11): int8 kept, rounded and clamped; `reproduce` truncates and wraps as x86-64 does; FLIRT's replica names it also for values out of the output type's range (a negative `-setbackground` into uint8), 2026-11-01; applyxfm4D (FLIRT part 3, 2026-11-01): the same correction, int8 kept; the clean-room original of FLIRT the same (2026-11-02) | – |
 | FSL-10 † | mcflirt | units forced to mm and s: a TR in ms becomes s | c | ms-unit inputs | corrected by default (`upstream_defects`, 2026-10-11) | – |
-| FSL-11 † | every FSL program that writes an image (mcflirt, flirt, applyxfm4D, bet2, bet, betsurf, fast, topup, applytopup, fslmaths, fslroi, standard_space_roi, prelude) | `FSLOUTPUTTYPE` unset: stops with an error at its first image (exit 1), after what it wrote before (mcflirt: the matrices and the `.par` file; flirt: its `-omat` matrix; betsurf: the inner skull's mesh); `standard_space_roi`'s script goes on after its steps stop there and exits 0 without an image | e | none | writes `.nii.gz` (the bytes `FSLOUTPUTTYPE=NIFTI_GZ` gives) and names FSL-11 on one line per command, saying what FSL's program does instead: every FSL tool's clean-room original and `larmorx-nc` replica since 2026-11-11, in one text (`larmorx_core::defects::fsl11_notice`; FLIRT's and mcflirt's wrote `.nii.gz` without a notice since 2026-11-02); `reproduce` prints FSL's message and stops where FSL does, checked against FSL 6.0.7.23's own runs for every tool (`tests/parity/test_fsl_output_types_original.py`, `test_fsl_output_types_replica.py`) | – (decided 2026-10-23: larmorx's behaviour kept; extended to every FSL tool 2026-11-11) |
+| FSL-11 † | every FSL program that writes an image (mcflirt, flirt, applyxfm4D, bet2, bet, betsurf, fast, topup, applytopup, fslmaths, fslroi, standard_space_roi, prelude) | `FSLOUTPUTTYPE` unset: stops with an error at its first image (exit 1), after what it wrote before (mcflirt: the matrices and the `.par` file; flirt: its `-omat` matrix; betsurf: the inner skull's mesh); `standard_space_roi`'s script goes on after its steps stop there and exits 0 without an image | e | none | writes `.nii.gz` (the bytes `FSLOUTPUTTYPE=NIFTI_GZ` gives) and names FSL-11 on one line per command, saying what FSL's program does instead: every FSL tool's clean-room original and `larmorx-nc` replica since 2026-11-11, in one text (`larmorx_core::defects::fsl11_notice`; FLIRT's and mcflirt's wrote `.nii.gz` without a notice since 2026-11-02); `reproduce` prints FSL's message and stops where FSL does, checked against FSL 6.0.7.23's own runs for every tool (`tests/parity/test_fsl_output_types_clean_room.py`, `test_fsl_output_types_replica.py`) | – (decided 2026-10-23: larmorx's behaviour kept; extended to every FSL tool 2026-11-11) |
 | FSL-12 † | mcflirt | impossible inputs abort after the whole estimation | a | none | refuses first | – |
 | FSL-13 † | mcflirt | `.mat` directory quirks without `-mats` | e | none | corrected by default (`upstream_defects`, 2026-10-11) | – |
 | FSL-14 † | mcflirt, flirt | one NaN voxel makes the volume's matrix NaN | c | rare | corrected by default (`upstream_defects`, 2026-10-11); FLIRT's replica names it whenever the pair's volumes hold NaN or infinite values (silent where they lie outside the cost's points), 2026-11-01; FLIRT's clean-room original: non-finite values left out of the costs by default (2026-11-02) | – |
@@ -1068,7 +1068,7 @@ base and the first volume even when they are one, the nearest-neighbour shift's 
 `-maxite 66` and `AFNI_ROTA_ZPAD`, `-maxdisp1D -`'s `-_delt` file. The AFNI tools' shared entries
 apply as in 3dTshift (AFNI-01 on `-tshift`'s path, -11, -12, -18, -21, -26; GLIBC-07). 3dvolreg's
 clean-room original (`crates/larmorx-afni`, 2026-11-08, from `specs/3dvolreg.md` and black-box runs of
-AFNI and the replica; [afni-volreg-original.md](afni-volreg-original.md)) handles every one as the
+AFNI and the replica; [afni-volreg-clean-room.md](afni-volreg-clean-room.md)) handles every one as the
 replica does (the same defaults, `reproduce` and refusals), and the shared entries as 3dTshift's
 original; its random-testing
 trial met AFNI-97 on AFNI's runaway Fourier first passes (small uint8 or int16 series with `-Fourier
@@ -1096,7 +1096,7 @@ entries: NP-03 (numpy's float32 `log` kernel; switch and notice), NP-04 (numpy's
 as tedana's, not defects: `--debug`'s help promising a TSV log file, the dropout mask appended twice,
 RepLGR lines that go nowhere (the findings).
 **t2smap's clean-room original** (`crates/larmorx-tedana`, `lx.tedana.t2smap(implementation="clean-room")`,
-2026-11-11 and 12; [tedana-t2smap-original.md](tedana-t2smap-original.md)): every TED entry as the replica
+2026-11-11 and 12; [tedana-t2smap-clean-room.md](tedana-t2smap-clean-room.md)): every TED entry as the replica
 (the same defaults and notices, `larmorx_core::defects`), each with `reproduce` giving tedana's files,
 messages and exit status (the fitted numbers within `specs/t2smap.md` §17.3, its own solvers; tedana's bits
 at TED-46's voxels). New, found by its black-box probe and random testing and corrected by both
@@ -5038,8 +5038,9 @@ it links).
 - **D13 / gap:** decided 2026-10-23 (decision log): larmorx's behaviour kept (the safer one). Was: **decide** (item 5).
 
 ### NIB-04 qform precision depends on the platform — (d)
-- **What:** nibabel computes the qform in `numpy.longdouble`: 80-bit on Linux x86-64, 64-bit
-  elsewhere.
+- **What:** nibabel computes the qform in `numpy.longdouble`: 80-bit on Linux x86-64 and on Intel
+  macOS, IEEE quad precision (128-bit) on Linux aarch64, 64-bit on macOS on Apple silicon and on
+  Windows (numpy's documentation of `numpy.longdouble`; the record measured Linux x86-64).
 - **Evidence:** validated (within 1e-9 mm).
 - **fMRIPrep:** none.
 - **larmorx:** f64 everywhere (`lx.load`). `lx.io.load_nibabel` and `lx.io.nibabel_affine`

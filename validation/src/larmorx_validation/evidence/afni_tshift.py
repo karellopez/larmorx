@@ -18,7 +18,7 @@ from pathlib import Path
 
 import numpy as np
 
-from larmorx_validation.evidence import afni_step, core
+from larmorx_validation.evidence import afni_pages, afni_step, common, core
 from larmorx_validation.figures import cache as fcache
 from larmorx_validation.figures import records
 
@@ -1074,7 +1074,7 @@ def _provenance(info: dict) -> list[str]:
         f"Data: {DATA['dataset']}, {DATA['subject']}, {DATA['licence']}; fMRIPrep 25.2.6's "
         f"oracle run `{RUN}` for its own output and the brain mask",
         "Inputs: " + "; ".join(f"{k} (sha256 {v}…)" for k, v in sha.items()),
-        f"Runs: figures cache entry `{TOOL}/{CASE}`, computed {info['computed']} with larmorx "
+        f"Runs: figures cache entry `{TOOL}/{CASE}`, {common.computed(info)} with larmorx "
         f"`{info['larmorx_commit'][:12]}`, {vers.get('afni', '?').replace('AFNI_', 'AFNI ')}, "
         f"{(vers.get('larmorx-replica') or vers.get('larmorx-gpl', '?'))}; every command, its environment, threads and exit "
         "status are in its `RUN_INFO.json`",
@@ -1165,7 +1165,7 @@ def export(ctx: core.Context) -> dict:
             }
         )
     bench = records.load_bench(ctx.repo, TOOL)
-    return {
+    doc = {
         "schema": 1,
         "tool": TOOL,
         "title": "3dTshift",
@@ -1182,6 +1182,48 @@ def export(ctx: core.Context) -> dict:
         "speed": _speed(bench),
         "examples": [_example_run(ctx, e, reg, step), _example_neg(ctx, e, reg, step)],
     }
+    return present(doc)
+
+
+PAGE = afni_pages.page("3dTshift")
+
+#: Each worked example's "What this shows" line and the verdicts beside it, one per port.
+SHOWS: afni_pages.Shows = {
+    "fmriprep-stc": lambda ex: (
+        "On fMRIPrep's call the replica gives AFNI's values, every one, in both releases, on 1 "
+        "and 12 threads, and fMRIPrep's own output. The clean room differs from AFNI in 189 "
+        "stored values, each by one unit of the scale factor, within the record's thresholds: "
+        "AFNI shifts in float32 with its own FFT, the clean room in double precision. No "
+        "correction by default changes this call.",
+        ["replica-afni26", "original-afni26"],
+    ),
+    "afni-01": lambda ex: (
+        "Stored with a negative scale factor, the same values come out of AFNI sign-flipped and "
+        "scaled, in both releases (AFNI-01). In `fix`, their default, both ports correct it "
+        "with a warning: the replica gives AFNI's result on the usual encoding, the clean room "
+        "its own. In `reproduce` the replica gives AFNI's result, defect included, and the "
+        "clean room does too, but for 2 values off by one stored unit.",
+        ["replica-neg-afni-neg", "original-neg-afni-neg"],
+    ),
+}
+
+
+def present(doc: dict) -> dict:
+    """3dTshift's page in the writing guide's words and order: texts, ports and order only."""
+    return afni_pages.present(
+        doc,
+        PAGE,
+        SHOWS,
+        "Seconds for the whole command (reading, shifting, writing), the median of repeated "
+        "runs, on a log scale. The factor is how many times faster the clean room is than AFNI, "
+        "both on one thread.",
+        {
+            "AFNI (single-threaded)": "AFNI 3dTshift, 1 thread",
+            "original, 1 thread": "clean room, 1 thread",
+            "original, 12 threads": "clean room, 12 threads",
+        },
+        "",
+    )
 
 
 if __name__ == "__main__":  # compute the cache entry only

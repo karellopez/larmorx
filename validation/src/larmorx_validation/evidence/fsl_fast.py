@@ -34,7 +34,8 @@ from pathlib import Path
 
 import numpy as np
 
-from larmorx_validation.evidence import common, core
+from larmorx_validation.evidence import common, core, fsl_pages
+from larmorx_validation.evidence import present as present_
 from larmorx_validation.figures import cache as fcache
 from larmorx_validation.figures import records
 
@@ -1008,7 +1009,7 @@ def _counts(x: dict, outputs: list[str], labels: dict[str, str], y: dict | None 
     return "; ".join(parts) + (f"; {more} more" if more > 0 else "")
 
 
-FINDINGS = "docs/findings/fsl-fast-original.md"
+FINDINGS = "docs/findings/fsl-fast-clean-room.md"
 REGISTER = "docs/findings/upstream-defects.md"
 #: The clean-room catch-up's trial of the original (2026-11-05), and its findings in categories
 #: (``validation/investigations/cleanroom-fast/trial_catchup_categories.py``'s ``--json`` output).
@@ -2175,7 +2176,7 @@ def trial_catchup(ctx: core.Context) -> tuple[list[dict], dict]:
         "(`validation/investigations/cleanroom-fast/trial_catchup_categories.py`, its output "
         f"`{CATCHUP_TRIAGE}`), each category's cause established by replaying the findings "
         "(`replay_findings.py`, with glibc's functions in the default: `glibc_default.patch`) and "
-        'by probes (`probe.py --finding --diff`; `docs/findings/fsl-fast-original.md`, "The '
+        'by probes (`probe.py --finding --diff`; `docs/findings/fsl-fast-clean-room.md`, "The '
         "catch-up's random-testing trial\"); the triage's entries: "
         "`validation/difftest/triage.toml`. The reproducer is a finding of the trial "
         "(`difftest --replay`).",
@@ -2208,7 +2209,7 @@ def export(ctx: core.Context) -> dict:
     entries.append(co)
     tc, tcprov = trial_catchup(ctx)
     bench, chart = speed(ctx)
-    return {
+    doc = {
         "schema": 1,
         "tool": TOOL,
         "title": "FAST",
@@ -2246,6 +2247,244 @@ def export(ctx: core.Context) -> dict:
         + [_example_real(ctx, ex_id) for ex_id in REAL]
         + [_example_fmriprep(ctx, *x) for x in FMRIPREP[1:]],
     }
+    return present(doc)
+
+
+# ------------------------------------------------------------------- the writing guide's words
+
+#: FAST's own rewordings, before the FSL pages' (:mod:`fsl_pages`): "the trial" of random
+#: testing is a random-testing run (the guide's section 1); a count of one value in the singular;
+#: the priors' fact in the modes' names.
+TEXTS = [
+    (r"\bDifferential random testing's trial of the clean-room original\b",
+     "A random-testing run of the clean room"),
+    (r"\bthe 2026-11-03 trial's cases drawn again\b",
+     "the cases of the random-testing run of 2026-11-03 drawn again"),
+    (r"\bEvery differing case of the trial\b", "Every differing case of the run"),
+    (r"\bThe reproducer is a finding of the trial\b", "The reproducer is a finding of the run"),
+    (r"\b1 values differ\b", "1 value differs"),
+    (r"\bits reproduce mode writes FSL's bytes; its default mode other values\b",
+     "its `reproduce` writes FSL's bytes; its default, `fix`, other values"),
+    (r"\breproduce mode FSL's bytes, default mode ([\d,]+) values\b",
+     r"`reproduce` FSL's bytes, `fix` \1 values"),
+    (r"\bwhose reproduce run itself parts\b", "whose run in `reproduce` itself parts"),
+    # the benchmark's FSL time: its run in the cache, not run again
+    (r"\bFSL's time is its run the oracle cache stored, not re-run\b",
+     "FSL's time is that of its run stored in the cache of the original's runs, not run again"),
+]  # fmt: skip
+#: The page's program: FSL's `fast`; a clean room's random-testing tables: a bare "larmorx"
+#: there is the clean room.
+PAGE = fsl_pages.page("fast", texts=TEXTS)
+TRIAL = fsl_pages.page("fast", port="clean-room", texts=TEXTS)
+
+
+def _diff(ex: dict, i: str) -> dict:
+    return next(d for d in ex["diffs"] if d["id"] == i)
+
+
+def _want(ex: dict, **verdicts: str) -> None:
+    """Raise unless each comparison (``original_fsl`` for ``original-fsl``) has its verdict."""
+    for i, v in verdicts.items():
+        got = _diff(ex, i.replace("_", "-"))["verdict"]
+        if got != v:
+            raise ValueError(f"{ex['id']}: {i.replace('_', '-')} is {got}, not {v}")
+
+
+def _named(ex: dict, i: str, ids: list[str]) -> None:
+    """Raise unless the comparison's reason names exactly these defects of FSL."""
+    got = list(dict.fromkeys(re.findall(r"\bFSL-\d+\b", _diff(ex, i)["reason"])))
+    if got != ids:
+        raise ValueError(f"{ex['id']}: {i} names {got}, not {ids}")
+
+
+def _moved(ex: dict, i: str, out: str) -> str:
+    """How many values of an output a comparison finds different."""
+    return f"{_diff(ex, i)['metrics'][out]['differ']:,}"
+
+
+#: The two defaults against each other on a single-channel call: the correctly rounded
+#: functions' last bits alone (the comparison's reason: "no further, in any output, than FSL
+#: itself moves when only those functions' last bits change").
+_LAST_BITS = (
+    "the two defaults differ only by the correctly rounded functions' last bits, within FSL's "
+    "own band"
+)
+
+
+def _shows_call(where: str):
+    """fMRIPrep's call: both ports FSL's bytes and fMRIPrep's own maps; both defaults FSL-202."""
+
+    def shows(ex: dict) -> tuple[str, list[str]]:
+        _want(
+            ex, replica_fsl="bit-identical", original_fsl="bit-identical",
+            replica_own="bit-identical", original_own="bit-identical", fix_replica="d13",
+            ofix_rfix="within-variability",
+        )  # fmt: skip
+        _named(ex, "fix-replica", ["FSL-202"])
+        _named(ex, "ofix-original", ["FSL-202"])
+        return (
+            f"{where}, the replica and the clean room both give FSL's files, every value, and "
+            "the same partial-volume maps as fMRIPrep's own. In `fix`, their default, both "
+            "correct FSL-202 (a class variance that loses most of its digits): the replica's segmentation "
+            f"moves by {_moved(ex, 'fix-replica', 'seg')} voxels and its mixel types by "
+            f"{_moved(ex, 'fix-replica', 'mixeltype')}, and {_LAST_BITS}."
+        ), ["replica-fsl", "original-fsl"]
+
+    return shows
+
+
+def _shows_bias(ex: dict) -> tuple[str, list[str]]:
+    _want(
+        ex, replica_fsl="bit-identical", original_fsl="bit-identical", fix_replica="d13",
+        ofix_rfix="within-variability",
+    )  # fmt: skip
+    _named(ex, "fix-replica", ["FSL-202"])
+    if not {"bias", "restore"} <= set(_diff(ex, "original-fsl")["metrics"]):
+        raise ValueError(f"{ex['id']}: no bias field compared")
+    return (
+        "With the bias field estimated, the replica and the clean room both give FSL's bias "
+        "field, corrected image and classes, every value. In `fix`, their default, both correct "
+        f"FSL-202, and {_LAST_BITS}."
+    ), ["replica-fsl", "original-fsl"]
+
+
+def _shows_priors(ex: dict) -> tuple[str, list[str]]:
+    _want(
+        ex, replica_fsl="bit-identical", original_fsl="bit-identical", fix_replica="d13",
+        ofix_rfix="bit-identical",
+    )  # fmt: skip
+    _named(ex, "fix-replica", ["FSL-09", "FSL-202"])
+    _named(ex, "ofix-original", ["FSL-09", "FSL-202"])
+    return (
+        "From FSL's tissue priors, the replica and the clean room both give FSL's files, every "
+        "value. In `fix`, their default, both round the registered priors (FSL-09) and correct "
+        f"FSL-202, which moves {_moved(ex, 'fix-replica', 'seg')} voxels of the segmentation, "
+        "and the two defaults give the same values, every one."
+    ), ["replica-fsl", "original-fsl"]
+
+
+_OWN = re.compile(
+    r"Partial volume: GM: ([\d,]+) values differ \(at most [\d.]+\), FSL's own ([\d,]+)"
+)
+
+
+def _shows_multi(ex: dict) -> tuple[str, list[str]]:
+    _want(
+        ex, replica_fsl="bit-identical", fix_replica="bit-identical",
+        original_fsl="within-variability", ofix_cr="within-variability", ofix_rfix="open",
+    )  # fmt: skip
+    m = _diff(ex, "original-fsl")["metrics"]
+    pves = [m[f"pve_{k}"] for k in range(3)]
+    if any(x["max_abs"] > 0.0100001 for x in pves) or any(
+        m[o]["differ"] for o in m if not o.startswith("pve_")
+    ):
+        raise ValueError(f"{ex['id']}: the clean room's reproduce beyond one step of 0.01")
+    own = _OWN.search(_diff(ex, "ofix-rfix")["reason"])
+    if not own:
+        raise ValueError(f"{ex['id']}: ofix-rfix's reason without its grey-matter count")
+    return (
+        "With three channels, the replica gives FSL's files, every value, and no correction by "
+        "default changes them. The clean room computes each class's 3 × 3 covariance with its "
+        f"own arithmetic: in `reproduce` {sum(x['differ'] for x in pves)} partial-volume values "
+        "lie one step of 0.01 from FSL's, within FSL's own band. Its default lies just beyond "
+        f"that band from the replica's default ({own.group(1)} grey-matter values against FSL's "
+        f"{own.group(2)}), so that comparison stays open."
+    ), ["replica-fsl", "original-fsl"]
+
+
+#: "What this shows" of each worked example (the writing guide, section 4), from its own
+#: verdicts, reasons and metrics; beside it the verdicts of the two ports against FSL.
+SHOWS = {
+    "fmriprep-fast": _shows_call("On fMRIPrep's own call"),
+    "bias-field": _shows_bias,
+    "priors": _shows_priors,
+    "multi-channel": _shows_multi,
+    "panel-ds000228-child": _shows_call("On the data panel's 3.5-year-old"),
+    "panel-ds005003-glioma": _shows_call("On the data panel's glioma patient"),
+}
+#: The case categories of FAST's records, as the page names them.
+CATEGORIES = {
+    "fmriprep": "fMRIPrep's calls",
+    "real": "real images",
+    "opt": "options and images",
+    "multi": "several channels",
+    "priors": "FSL's tissue priors",
+    "err": "errors and odd values",
+    "original": "the clean room's own cases",
+}
+#: The examples' tables: each column's and row's run as the panels and comparisons name it.
+_COLUMNS = {
+    "replica (reproduce)": "replica, reproduce",
+    "replica (default)": "replica, fix",
+    "original (reproduce)": "clean room, reproduce",
+    "original (default)": "clean room, fix",
+    "original − FSL, correctly rounded maths": "clean room − FSL fast, correctly rounded maths",
+    "original (default) − FSL, correctly rounded maths":
+        "clean room, fix − FSL fast, correctly rounded maths",
+}  # fmt: skip
+_ROWS = {
+    "FSL 6.0.7.23": "FSL fast 6.0.7.23",
+    "replica (reproduce)": "replica, reproduce",
+    "replica (default)": "replica, fix",
+    "fMRIPrep's own (its image's FSL)": "fMRIPrep's output (FSL in its image)",
+    "FSL 6.0.7.23, correctly rounded maths": "FSL fast 6.0.7.23, correctly rounded maths",
+    "clean-room original (reproduce)": "clean room, reproduce",
+    "clean-room original (default)": "clean room, fix",
+}
+#: The tables' titles by the guide's pattern.
+_TITLES = {
+    "files": "Every image FAST writes, both ports against the original: FSL `fast` 6.0.7.23",
+    "volumes": "The tissue volumes of the partial-volume maps, both ports against the "
+    "original: FSL `fast` 6.0.7.23 (ml)",
+    "trial-catchup": "Random testing, the clean room against the original: FSL `fast` 6.0.7.23 "
+    "({cases:,} random calls, {date})",
+    "trial-catchup-triage": "The clean room's differences from the original in that run, by "
+    "category",
+}
+
+
+def present(doc: dict) -> dict:
+    """FAST's page in the writing guide's words and order: texts, ports and order only."""
+    note = (doc.get("speed") or {}).get("note")
+    fsl_pages.present(
+        doc,
+        PAGE,
+        SHOWS,
+        "Seconds for fMRIPrep's whole call (reading the T1w brain, segmenting, writing its twelve "
+        "images), one run each, on a log scale. The factor is how many times faster the clean "
+        "room is than FSL, both on one thread.",
+        {
+            "FSL 6.0.7.23 (single-threaded)": "FSL fast 6.0.7.23, 1 thread",
+            "replica (single-threaded)": "replica, 1 thread",
+            "clean-room original, 1 thread": "clean room, 1 thread",
+            "clean-room original, 14 threads": "clean room, 14 threads",
+        },
+        categories=CATEGORIES,
+        tables={"trial-catchup": TRIAL, "trial-catchup-triage": TRIAL},
+    )
+    if doc.get("speed"):  # its build is LARMORX's at a commit, not a port's
+        doc["speed"]["note"] = present_.text(PAGE, note, port="both")
+    fsl_pages.replica_threshold(doc)  # the reviewer's round 18, minor 2
+    for ex in doc["examples"]:
+        for t in ex.get("tables") or []:
+            kind = t["id"].rsplit("-", 1)[1]
+            t["title"] = _TITLES[kind]
+            for c in t["columns"]:
+                c["label"] = _COLUMNS.get(c["label"], c["label"])
+            if kind == "volumes":
+                for r in t["rows"]:
+                    r["head"] = _ROWS[r["head"]]
+    for t in doc.get("tables", []):
+        if t["id"] == "trial-catchup":  # the run's length, from its row (the guide: its duration)
+            minutes = next(r for r in t["rows"] if r["head"].startswith("length"))["cells"][0]["v"]
+            t["note"] = t["note"].replace(
+                "A random-testing run of the clean room after",
+                f"A random-testing run of the clean room, {minutes:.0f} minutes long, after",
+            )
+        m = re.search(r"the trial of (\d{4}-\d\d-\d\d)", t["title"])
+        cases = t["rows"][0]["cells"][0].get("v") if t["id"] == "trial-catchup" else 0
+        t["title"] = _TITLES[t["id"]].format(date=m.group(1) if m else "", cases=cases)
+    return doc
 
 
 if __name__ == "__main__":  # compute the cache entries only (``refresh WHY``: refresh_replica;

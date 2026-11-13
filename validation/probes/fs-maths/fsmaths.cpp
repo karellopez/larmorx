@@ -26,10 +26,13 @@
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <vector>
 
 #include "affine.h"
+#include "fnv_hash.h"
+#include "fnvhash.h"
 #include "diag.h"
 #include "dmatrix.h"
 #include "error.h"
@@ -1036,6 +1039,33 @@ void run_case(const char *tmpfile)
     n.z = getf();
     float x2 = getf(), y2 = getf(), z2 = getf(), norm = getf();
     putf(XYZApproxAngle_knownLength(&n, x2, y2, z2, norm));
+  }
+  else if (cmd == "fnvh") {
+    // fnv_hash n times from a counter; FnvHash of a file's bytes: its value, fnv_add's, its printed
+    // form, and the files its two writes make
+    int i = geti(), k = geti(), counter = geti();
+    double lo = getd(), hi = getd();
+    int n = geti();
+    for (int m = 0; m < n; m++) putf(fnv_hash(i, k, &counter, lo, hi));
+    puti(counter);
+    puthexfile(next(), REL_FILE);
+    std::vector<unsigned char> b;
+    FILE *fp = fopen(REL_FILE, "rb");
+    for (int ch; (ch = fgetc(fp)) != EOF;) b.push_back((unsigned char)ch);
+    fclose(fp);
+    FnvHash h;
+    h.add(b.data(), b.size());
+    char t[64];
+    snprintf(t, sizeof t, "%lu %016lx ", h.value, fnv_add(fnv_init(), b.data(), b.size()));
+    line_out += t;
+    std::ostringstream os;
+    os << h;
+    line_out += os.str() + " ";
+    h.write(REL_FILE);
+    putfile(REL_FILE);
+    h.write(REL_FILE, "sfx");
+    putfile(REL_FILE);
+    remove(REL_FILE);
   }
   else if (cmd == "mgauss") {
     int len = geti();

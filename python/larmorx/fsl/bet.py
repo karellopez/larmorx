@@ -1,10 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
 """``bet`` and ``betsurf``: FSL's brain extraction and its skull and scalp surfaces (FSL
-6.0.7.23's ``bet``, ``bet2`` and ``betsurf``). Each has two implementations: the bit-exact
-replica from ``larmorx-nc``, run as a separate program (``docs/licensing.md``), and the
-clean-room original of this package (``crates/larmorx-fsl``, written from ``specs/bet.md``),
-run in this process; ``implementation="auto"`` runs the replica when it is installed, else the
-original.
+6.0.7.23's ``bet``, ``bet2`` and ``betsurf``). Each has two ports: the replica from
+``larmorx-nc``, run as a separate program (``docs/licensing.md``), and the clean room of this
+package (``crates/larmorx-fsl``, written from ``specs/bet.md``), run in this process;
+``implementation="auto"`` runs the replica when it is installed, else the clean room.
 
 ``bet`` deforms a tessellated sphere onto the brain's surface (S. M. Smith, Human Brain Mapping
 17(3), 2002) and returns the brain, its mask, the surface's outline and mesh, and an approximate
@@ -17,16 +16,16 @@ The variations ``-S``, ``-B``, ``-A`` and ``-A2`` run FLIRT, ``standard_space_ro
 ``fslmaths`` and ``fslstats`` (``bet`` does, in FSL) and read FSL's standard images
 (``MNI152_T1_2mm``, its dilated brain mask, the eye mask): from ``fsl_data`` (a directory laid
 out as ``$FSLDIR/data``; the variable ``LARMORX_FSL_DATA`` otherwise; when given, the only
-place). Otherwise the clean-room original reads them from the copy larmorx-nc installs (read as
+place). Otherwise the clean room reads them from the copy larmorx-nc installs (read as
 data), else ``$FSLDIR/data``, else from larmorx's data cache, filled once by a checksum-verified
 download of FSL's ``fsl-data_standard`` package (``larmorx fetch fsl-standard`` fetches it ahead);
 the replica reads ``$FSLDIR/data``, else its own copy. They are FSL's data under the FSL Licence
 (non-commercial use): this package never ships them.
 
-FSL's deterministic defects are corrected by default (D13, ``docs/api/upstream-defects.md``);
+FSL's deterministic defects are corrected by default (``docs/api/upstream-defects.md``);
 ``upstream_defects="reproduce"`` gives FSL's output. FSL's environment variables are settings of
-the call, never read from the process environment (CLAUDE.md rule 6): the outputs are NIfTI-1
-files read back here, and FSL's programs are never looked for on the ``PATH``."""
+the call, never read from the process environment: the outputs are NIfTI-1 files read back here,
+and FSL's programs are never looked for on the ``PATH``."""
 
 from __future__ import annotations
 
@@ -59,7 +58,7 @@ VARIATIONS = ("robust", "small_fov", "fmri", "eyes", "bias", "surfaces", "surfac
 Variation = Literal["robust", "small_fov", "fmri", "eyes", "bias", "surfaces", "surfaces_t2"]
 
 #: The ``tanh`` of BET's smoothness weight (GLIBC-06): glibc's bits (FSL's, the default) or the
-#: correctly rounded one (the clean-room original's ``--tanh=correctly-rounded``).
+#: correctly rounded one (the clean room's ``--tanh=correctly-rounded``).
 TANHS = ("glibc", "correctly-rounded")
 
 Tanh = Literal["glibc", "correctly-rounded"]
@@ -76,7 +75,7 @@ _FLAGS = {
 #: The variations that run FSL's other programs and read FSL's standard images.
 _STANDARD = ("eyes", "bias", "surfaces", "surfaces_t2")
 
-#: The variables the original's search of FSL's standard images reads (``specs/bet.md`` §5.4):
+#: The variables the clean room's search of FSL's standard images reads (``specs/bet.md`` §5.4):
 #: larmorx's data cache and the package's source, the user's cache directories, ``PATH`` for
 #: the download's ``curl`` or ``wget``.
 _DATA_VARIABLES = (
@@ -124,7 +123,8 @@ class BetResult:
     skull
         An approximate skull (int16; ``-s``).
     mesh
-        The brain's surface (``-e``).
+        The brain's surface (``-e``): its ``vertices`` ``(n, 3)`` in FSL's millimetre coordinates
+        and its ``triangles`` ``(m, 3)``.
     surfaces
         The inner skull, outer skull and scalp surfaces, their masks, the skull's mask and the
         surfaces' outlines (``"surfaces"`` and ``"surfaces_t2"``: betsurf ``-o -m -s``).
@@ -147,11 +147,12 @@ class BetsurfResult:
     inskull, outskull, outskin
         The inner skull, outer skull and scalp surfaces.
     inskull_mask, outskull_mask, outskin_mask
-        Their masks (int16, 1 inside), with ``masks=True``.
+        Their masks on the T1's grid (int16, 1 inside), with ``masks=True`` (``-m``).
     skull_mask
-        The skull between the two skull surfaces (int16), with ``skull_mask=True``.
+        The skull between the two skull surfaces, on the T1's grid (int16), with
+        ``skull_mask=True`` (``-s``).
     inskull_outline, outskull_outline, outskin_outline
-        The surfaces drawn as 1 on the T1's grid (int16), with ``outlines=True``.
+        The surfaces drawn as 1 on the T1's grid (int16), with ``outlines=True`` (``-o``).
     """
 
     inskull: Surface
@@ -294,7 +295,7 @@ def _run_original(
     upstream_defects: str,
     data: dict[str, str | None] | None = None,
 ) -> None:
-    """Runs the clean-room original of ``fsl tool`` in this process, in ``tmp``, with FSL's
+    """Runs the clean room of ``fsl tool`` in this process, in ``tmp``, with FSL's
     settings of this call (NIfTI-1 outputs; no FSL program on the ``PATH``; ``data``: where FSL's
     standard images are, for ``-S``, ``-B``, ``-A``, ``-A2``, which find no FSL program there
     either); its notices and FSL's warnings become Python warnings; a failure raises
@@ -319,7 +320,7 @@ def _run_original(
     if code != 0:
         tail = "\n".join(err.strip().splitlines()[-20:])
         raise RuntimeError(
-            f"larmorx fsl {tool} (the clean-room original) failed with exit code {code}:\n{tail}"
+            f"larmorx fsl {tool} (the clean room) failed with exit code {code}:\n{tail}"
         )
 
 
@@ -387,29 +388,29 @@ def bet(
     tanh
         The ``tanh`` of the surface's smoothness weight: ``"glibc"`` (default: glibc 2.35's
         bits, which FSL calls, so that the surface is FSL's) or ``"correctly-rounded"``
-        (CORE-MATH's; the clean-room original only, as larmorx's own ``--tanh`` option:
-        GLIBC-06, ``docs/api/upstream-defects.md``). Where a surface self-intersects and is
+        (CORE-MATH's; the clean room only, as LARMORX's own ``--tanh`` option: GLIBC-06,
+        ``docs/api/upstream-defects.md``). Where a surface self-intersects and is
         found again, the last bit of ``tanh`` can change the result.
     fsl_data
         Where ``"eyes"``, ``"bias"``, ``"surfaces"`` and ``"surfaces_t2"`` read FSL's standard
         images: a directory laid out as ``$FSLDIR/data`` (default: the variable
-        ``LARMORX_FSL_DATA``; else, for the clean-room original, larmorx-nc's copy, then
+        ``LARMORX_FSL_DATA``; else, for the clean room, larmorx-nc's copy, then
         ``$FSLDIR/data``, then larmorx's data cache, filled once by a checksum-verified download;
         for the replica ``$FSLDIR/data``, then its own copy).
     implementation
         ``"auto"`` (default): the replica in ``larmorx-nc`` when it is installed, else the
-        clean-room original (always the original with ``tanh="correctly-rounded"``);
-        ``"replica"``: the replica (:class:`~larmorx.ReplicaNotFoundError` without it);
-        ``"clean-room"``: the clean-room original (FSL's behaviour within the thresholds of its
-        validation record, ``docs/validation/fsl-bet.md``).
+        clean room (always the clean room with ``tanh="correctly-rounded"``); ``"replica"``: the
+        replica (:class:`~larmorx.ReplicaNotFoundError` without it); ``"clean-room"``: the clean
+        room (FSL's behaviour within the thresholds of its validation record,
+        ``docs/validation/fsl-bet.md``).
     upstream_defects
-        ``"fix"`` (default) or ``"reproduce"`` (FSL's output); a
+        ``"fix"`` (default) or ``"reproduce"`` (FSL's output); an
         :class:`~larmorx.UpstreamDefectWarning` names each defect that changed the result.
 
     Returns
     -------
     BetResult
-        Each image's :attr:`~larmorx.Image.implementation` names the implementation that ran.
+        Each image's :attr:`~larmorx.Image.implementation` names the port that ran.
 
     Raises
     ------
@@ -419,7 +420,7 @@ def bet(
         The replica failed (its message says why: FSL's own errors, and the cases where FSL's
         result is undefined).
     RuntimeError
-        The clean-room original failed (its message says why, as the replica's does).
+        The clean room failed (its message says why, as the replica's does).
     """
     _defects.check(upstream_defects)
     n_threads = _threads(n_threads)
@@ -487,7 +488,7 @@ def bet(
     if tanh != "glibc":
         if implementation == "replica":
             raise ValueError(
-                "tanh='correctly-rounded' is the clean-room original's option (the replica is "
+                "tanh='correctly-rounded' is the clean room's option (the replica is "
                 "FSL's, glibc's tanh): use implementation='auto' or 'clean-room'"
             )
         implementation = "clean-room"
@@ -503,7 +504,7 @@ def bet(
         if os.environ.get("FSLDIR"):
             env["FSLDIR"] = os.environ["FSLDIR"]
         if selected is None:
-            # the original's search reads larmorx-nc's copy as data when its program is found,
+            # the clean room's search reads larmorx-nc's copy as data when its program is found,
             # and its cache; PATH for the download's curl or wget (no FSL program is run from it)
             original_data = dict(env)
             try:
@@ -596,12 +597,12 @@ def betsurf(
     precision
         Retessellate the surfaces this many times for 100 more iterations each (``-p``).
     n_threads, implementation, upstream_defects
-        As for :func:`bet` (the original's record: ``docs/validation/fsl-bet.md``).
+        As for :func:`bet` (the clean room's record: ``docs/validation/fsl-bet.md``).
 
     Returns
     -------
     BetsurfResult
-        Each image's :attr:`~larmorx.Image.implementation` names the implementation that ran.
+        Each image's :attr:`~larmorx.Image.implementation` names the port that ran.
 
     Raises
     ------
@@ -610,7 +611,7 @@ def betsurf(
     larmorx.ReplicaError
         The replica failed (its message says why).
     RuntimeError
-        The clean-room original failed (its message says why, as the replica's does).
+        The clean room failed (its message says why, as the replica's does).
     """
     _defects.check(upstream_defects)
     n_threads = _threads(n_threads)

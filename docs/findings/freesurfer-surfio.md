@@ -651,3 +651,204 @@ one caller, `MRIScomputeSSE_asThoughGradientApplied` (`mrisurf_deform.cpp` 993-1
   emulation in both modes (70,295 and 70,313 flips). Seed 1 (900 cases of 30 commands): 894
   identical, 6 `SKIP`; hash `d927ce4b...` passing in debug and release and under `NAN_TRAP_ARM=1`
   with `NAN_TRAP_DIR` set (1,925 and 13,214 NaNs flipped).
+
+## 14. Queue item 3.1-48, part a: per-vertex value files and other formats (relay 12)
+
+What `utils/mrisurf_io.cpp` lines 2861-6287 hold, what was ported (`src/curvio.rs`, `src/formats.rs`,
+`src/scanf.rs`; spec part 9, §56-65) and what waits.
+
+- **The probe reaches the file-local functions** (`static` in `mrisurf_io.cpp`: `__mrisreadcurvoldformat`
+  has no symbol at all, inlined into its callers; `MRISreadCurvatureIntoArray`,
+  `MRISreadNewCurvatureIntoArray`, `__MRISapplyFSGIIread`/`write` are local `t` symbols) through
+  `validation/probes/fs-surfio/io_statics.cpp`, which includes `mrisurf_io.cpp` and is compiled with
+  that file's own command from the unit oracle's `compile_commands.json` (track A's model,
+  `fs-io/gifti_statics.cpp`); the probe then takes every `mrisurf_io.cpp` function from that object.
+  Checked: the seed-1 hash of relay 11 (`d927ce4b...`, 900 cases, `sfile`'s 30 included) is unchanged
+  with it.
+- **FS-136** (`mrisReadAsciiCurvatureFile` line 788): `ErrorReturn(..., "%s could not open file %s.\n",
+  mrisReadAsciiCurvatureFile, fname)` passes the function itself to `%s`: `printf` prints the bytes of
+  its machine code up to the first 0 (`endbr64`, the six pushes, `mov %rdi,%rbx`, `mov %rsi,%rdi`, `sub
+  $0x438,%rsp` up to its `00`), the same in the unit oracle's `mrisurf_io.cpp.o` (`objdump -d`) and in
+  the probe's copy. Rule A: the name.
+- **FS-138** (`MRISreadNewCurvatureIntoArray` line 5920): `ErrorReturn(ERROR_BADFILE, (ERROR_BADFILE,
+  "MRISreadNewCurvatureIntoArray(%s): fopen failed"))`: the `%s` has no argument; `ErrorPrintf` prints
+  the `errno` line, then `vsnprintf` reads a pointer from the register of the absent argument: a
+  segmentation fault in the probe, every time (what it holds depends on the caller). Reached directly
+  by `MRISreadNewCurvatureVector` with a missing file (`MRISreadCurvatureIntoArray` reopens a file it
+  has just opened). Rule A; `reproduce` crashes after the `errno` line.
+- **FS-137** (`mrisReadAsciiCurvatureFile`): `if (!cp) break;` (the source's own comment: `???should
+  check if the vno match???`). Rule B.
+- **FS-139, FS-140** (`MRISreadDecimation`): `int k, d, ndec;` — `d` is not initialised, `fscanf(fptr,
+  "%d", &d)` leaves it when it fails (FS-140: the count; a stack slot of the frame), each later failed
+  `fscanf` leaves the last value (the count for the first vertex); the binary branch's `char c =
+  fgetc(fptr)` turns `EOF` into -1, not `'\0'`, so every missing byte is "decimated". Both errors
+  return 0 through `ErrorReturn(0, ...)` with an extra argument `d` the format never prints (kept:
+  rule C, an error FreeSurfer reports, 0 decimated).
+- **FS-141, FS-142** (`MRISwriteGeo`, `MRISwriteICO`): Geo's `int vnos[300000]` is a stack array
+  written only for unripped vertices and read for every unripped face's vertices (an unripped face
+  of a ripped vertex reads a value never written; more than 300,000 vertices write past it); ICO
+  numbers vertices with `actual_vno` but writes `face->v[n] + 1`. The probe skips Geo's case (`G`);
+  ICO's is defined and compared.
+- **FS-143, FS-144** (`MRISreadVTK` lines 2958-2966): `float x,y,z; fscanf(fp, "%f %f %f", &x, &y,
+  &z);` inside the loop, the return value unchecked: the three are stack slots that keep the last
+  values assigned (observed: every comparable case with a short vertex identical with the model
+  "keep the number read before"); the first vertex's are memory contents (FS-144, skipped).
+- **FS-145** (`MRISreadVTK` lines 3061-3076): `cp = fgetl(...)` after `POINT_DATA` and per field, then
+  `sscanf(cp, ...)` without a test: `sscanf(NULL, ...)` faults (`CRASH 11` in the probe). **FS-146**:
+  `if (fscanf(fp, "%f", &f))` is true for `EOF` (-1), so `f` stays `0.0`. **FS-147**:
+  `mris->vertices_topology[vno].num++` on a `uchar` (and the same in the other readers of the
+  surface, `mrisReadTriangleFile`, the quadrangle reader, `mrisReadAsciiFile`, `mrisReadGeoFile`:
+  their ports will note FS-147 too; `MRISreadOverAlloc_new` then allocates `num` faces per vertex and
+  writes one per face: a wrapped count writes past the allocation).
+- **FS-148, FS-149** (`MRISbuildFileName_read` lines 5660-5708): `*(dot - 1)`, `*(dot - 2)` before the
+  name; `sprintf(fname, "%s/%s%s", ...)` and `strcpy(fname, sname)` into the caller's `char *`
+  (unchecked: `_FORTIFY_SOURCE` checks only buffers whose size the compiler sees). The same in
+  `__MRISapplyFSGIIwrite`'s `sprintf(file_to_write, ...)`; its and `__MRISapplyFSGIIread`'s local
+  `char gii[1024]` is checked (FS-126's abort). The names of `MRISreadCurvatureVector`,
+  `MRISreadFloatFile`, `MRISreadNewCurvatureVector`, `MRISreadBinaryAreas` are FS-126's (`snprintf` with
+  the `Truncation` line; `strcpy` into a local `char[STRLEN]`: checked, abort) and FS-134's
+  (`FileNamePath` into a local `fpref[STRLEN]`, unchecked).
+- **`scanf`'s `errno`** (`src/scanf.rs`, `validation/investigations/glibc-scanf-probe/scanf_errno.c`, open): the
+  readers' error messages print `errno`, and glibc's `scanf` changes it at the end of the input in
+  ways fs.core's `cscan::Call` did not model: a later read of the same call restores the `errno` of
+  the first end (so `1e99`'s `ERANGE` is undone by a following directive), the white space before a
+  conversion is skipped with `errno` 0, and `inf` looks one character on while `nan` and `infinity`
+  do not. Found by the probe: a `nan` ending a curvature line left `errno` 0 in FreeSurfer's
+  message; the first model (any conversion that ends the input counts) printed the earlier
+  `ENOENT`. The model is the measured behaviour, no glibc code; fs.core's `Call` could take it (for
+  track A).
+- **The official build's operand orders** (`objdump -dr -C` of the unit oracle's `mrisurf_io.cpp.o`
+  and `mrisurf_metricProperties.cpp.o`): `MatlabPlotFace`'s centre `cx += v1->x` is `cvtss2sd
+  0x18(%r15),%xmm0; addsd 0x10(%rsp),%xmm0` (the corner on the left), `/ 3` is `divsd` with the sum on
+  the left; the normal's end `cx + NormLen * snorm[k]` is `mulsd %xmm4,%xmm5` (`snorm` on the left)
+  then `addsd %xmm7,%xmm5` (the product on the left); `MatlabPlotVertex` likewise (`nx * NormLen`, then
+  `+ x`). The out-of-line `mrisNormalFace` (the one `MatlabPlotFace` calls; its copies inlined into
+  `MRIScomputeNormals` are relay 10's) computes the cross product's second component as `v0[2] *
+  v1[0] - v1[2] * v0[0]` (`mulss %xmm3,%xmm2; mulss %xmm1,%xmm4; subss %xmm4,%xmm2`), each product's
+  operands the other way round from the source's `v1[0]*v0[2] - v0[0]*v1[2]`; its final normalisation
+  sums the squares as `n2² + (n1² + n0²)` (the same value; a NaN sum never divides). Before these,
+  13 of 6,000 NaN-heavy `cfile` cases differed (all in the plots); after, none.
+- **Taken early from fs.surf** (queue items 3.4-02 and 3.4-03, the same crate): `MRISvalidVertices`
+  (`mrisurf_topology.cpp` 306-316) and `mrisValidFaces` (1836-1846), the writers' counts
+  (`topology::valid_vertices`, `valid_faces`).
+- **What waits, and on which item** (3.1-48's other functions and 3.1-49's `mrisurf_io.cpp` part):
+  - fs.io's format identification `mri_identify` (3.1-27: `IDextensionFromName`, `mri_identify`):
+    `MRISfileNameType` and so `MRISread`, `MRISreadOverAlloc`, `MRISfastRead`, `MRISwrite`,
+    `MRISwrite_new`, `MRISwriteVertexLocations`, `MRISreadVerticesOnly`, `MRISwritePatchAscii`;
+    `MRISreadCurvatureFile_getfilename` and so `MRISreadCurvatureFile`, `MRISreadBinaryCurvature`,
+    `MRISreadNewCurvatureFile`, `MRISreadMarked`; `MRISwriteValues` (and so `MRISwriteCropped`,
+    `MRISwriteAreaErrorToValFile`); `MRISwriteCurvature_getfilename`/`MRISwriteCurvature` (and so
+    `MRISwriteMarked`, `MRISwriteArea`); the annotation file names.
+  - transform.cpp's `readVolGeom`, `writeVolGeom`, `vg_i_to_r`, `TkrVox2RASfromVolGeom` (3.1-39, track
+    A; small: the text block of a surface file's volume geometry) and a stream `rewind`/`fseek` in
+    fs.io's `CFile` (track A): `mrisReadTriangleFile`, `__MRISreadQuadrangleFile` (`rewind` for the
+    oldest format), `MRISwriteTriangularSurface`, `__MRISwriteQuadrangleFile`,
+    `__MRISwriteTriangularSurfaceTags`: the main surface reader and writers. `LTAreadEx` and
+    `MRIreadHeader`, `getVolGeom` (3.1-39/3.1-28): `mrisReadTransform`.
+  - fs.surf (wave 3.4, this crate): `mrisCompleteTopology` (3.4-03), `mrisCheckVertexFaceTopology`,
+    `MRISsetNeighborhoodSizeAndDist`/`MRISresetNeighborhoodSize` (3.1-50's lines: mine), `ICOreadOverAlloc`
+    (icosahedron.cpp, 3.4-01), `MRIScopyMRI`/`MRIcopyMRIS` (mrisurf_mri.cpp), `MRISPread` and
+    `MRISfromParameterizationBarycentric` (mrisp.cpp), `SetSurfHopList` (`MatlabPlotVertexNbhd`):
+    `MRISread`'s completion and `MRISreadParameterizationToSurface`, `MRISwriteField`.
+  - fs.io's volume I/O (3.1-28: `MRIread`, `MRIwrite`): `__mrisreadcurvmri`, `MRISwriteField`, the group
+    average area of `MRISread`. gifti.cpp (3.1-26: `mrisReadGIFTIfile`, `MRISwriteGIFTI`): the GIFTI
+    branches. STL (`mrisurf_io_stl.cpp`, 3.1-49, mine): next.
+- **Measured (relay 12).** `cfile` alone, seeds 7, 13 and 17: 2,000 cases each, every comparable one
+  identical with `reproduce` (83, 89 and 81 counted, not compared). The whole probe, seed 7 (62,000
+  cases of 31 commands): 61,334 identical with `reproduce`, 666 counted, not compared (455 `mprop`, 125
+  `sfile`, 81 `cfile`, 5 `metric`), the default different only with notices or the correctly rounded
+  maths (71 `posn`, 4 `surf`), the port's lines identical under AArch64's NaN emulation in both modes
+  (67,516 and 67,552 flips). Seed 1 (930 cases): 919 identical, 11 `SKIP`; hash `17da0559...` passing
+  in debug and release and under `NAN_TRAP_ARM=1` with `NAN_TRAP_DIR` set (2,897 and 12,690 flips).
+
+## 15. Queue items 3.1-48 part b and 3.1-49's STL: the raw surface readers, STL (relay 13)
+
+What was ported (`src/surfread.rs`, `src/stl.rs`; spec part 10, §66-72), the defects found and how
+they were decided, from `utils/mrisurf_io.cpp` 3342-3518, 4341-4410, 5387-5492 and
+`utils/mrisurf_io_stl.cpp`.
+
+- **The probe reaches the file-local readers** through `io_statics.cpp`'s wrappers (relay 12's
+  model): `mrisReadAsciiFile`, `mrisReadGeoFile`, `mrisReadGeoFilePositions`,
+  `mrisReadTriangleFileVertexPositionsOnly`, `mrisReadTriangleFilePositions`, `quadCombine`.
+  `mrisReadSTL` and `mrisWriteSTL` are external symbols of libutils, declared only in
+  `mrisurf_io.cpp`; the probe declares them itself.
+- **Unchecked `scanf` calls (FS-151, FS-152).** `mrisReadAsciiFile`: `sscanf(cp, "%d %d\n",
+  &nvertices, &nfaces)` unchecked (uninitialised locals: FS-151); per vertex `float x,y,z;
+  fscanf(fp, "%f  %f  %f  %d\n", &x, &y, &z, &rip)` unchecked, `rip` a function-scope `int` shared
+  with the faces' `fscanf(fp, "%d\n", &rip)`; the face vertices `fscanf(fp, "%d ", &face->v[n])`
+  straight into the face (0 from `MRISalloc`'s `bzero`). `mrisReadGeoFile` and
+  `mrisReadGeoFilePositions`: `float x,y,z; fscanf(fp, "%e %e %e", ...)` unchecked. The loop
+  variables are address-taken stack slots that keep their last values (observed, as `MRISreadVTK`'s,
+  FS-143): `vertex 4 x 6` after `vertex 1 2 3` gives `4 2 3`. The first vertex's unread values are
+  memory contents (FS-151; counted, not compared). `mrisReadAsciiSTL`: the `v` and `f` cases'
+  `float x, y, z` share one set of slots in the official build (`objdump -dr -C` of the unit
+  oracle's `mrisurf_io_stl.cpp.o`: both `sscanf` calls pass `0x98(%rsp)`, `0x9c(%rsp)`,
+  `0xa0(%rsp)`; observed: `facet normal` with no numbers after `vertex 4 2 3` gets the normal
+  `4 2 3`). Decided by rule B (a file whose numbers stop or hold something else makes no sense; the
+  readers report success with made-up values): a clear error by default.
+- **FS-150**: `cp = fgetl(...)` then `sscanf(cp, ...)` with `cp` `NULL` for a file with no line that
+  is not blank or a comment (`sscanf(NULL, ...)`: `strlen(NULL)`, signal 11; observed `CRASH 11`).
+  Rule B.
+- **FS-153**: `vertices_per_face = nedges / nfaces;` (`int`): `nfaces` 0 (or -1 with `INT_MIN`
+  edges) raises SIGFPE (observed `CRASH 8`). Rule B.
+- **FS-154**: `mrisReadGeoFile`'s face loop `face->v[n]--; mris->vertices_topology[face->v[n]].num++`
+  with no range check: 0 in the file (or a number that cannot be read, or a last vertex without its
+  `-`: `fscanf(fp, "-%d\n", ...)` fails at the digit) gives -1, an index above the count writes past
+  the array (the probe's small cases did not crash; what the write changes depends on the heap's
+  layout). Rule B; counted, not compared.
+- **FS-155**: `mrisReadGeoFilePositions` reads `mris->nvertices` coordinates whatever the file's
+  counts (it reads them only for the edges-per-face test). `mrisReadTriangleFilePositions` compares
+  both counts; rule B, as that reader does.
+- **FS-156**: `mriss->vertices = calloc(nvertices, sizeof(SMALL_VERTEX)); if (!mriss->nvertices)`
+  tests the count, not the pointer: a negative count's `calloc` fails (`ENOMEM`, observed in the
+  next message's `errno` line) and the function returns the surface with `NULL` vertices and the
+  negative count; a count of 0 gets the allocation message. Rule B: the message the test meant.
+- **FS-147** (relay 12's) holds for `mrisReadAsciiFile` and `mrisReadGeoFile` too (`uchar num`);
+  for the STL reader the wrapped count is also the size of the face lists `buildSurface` allocates
+  (`calloc(vt->num, ...)`) and then fills with every face: **FS-157**, a heap overflow; rule B,
+  counted, not compared.
+- **FS-158** (`pointHash`): `int hx = 1000.0f * logf(abs(x) + 1.0f)` is the float `abs` (`andps`),
+  `addss`, glibc's `logf` (PLT), `mulss` by 1000, `cvttss2si` (NaN and infinity give `INT_MIN`);
+  `imul` by 2017, 1029, 1159 (wrapping), `xor`, then C's `%` by 2^20 (`cltd; shr $0xc; add; and
+  $0xfffff; sub`: the remainder keeps the dividend's sign). Finite coordinates give at most
+  `1000 * logf(FLT_MAX) = 88722`, products below 2^28: never negative. One or three `INT_MIN`
+  terms make the hash negative, and the remainder negative unless its low 20 bits are 0:
+  `hashTable[negative]` reads (and, for a new key, writes) the bytes before the vector's buffer.
+  The chain never changes which vertex a point is (equality is tested on the coordinates), so the
+  port uses a map and computes the index (glibc's `logf`, `larmorx_core::math::logf_glibc`) only for
+  the notice. Rule A (the lookup corrected; the result where FreeSurfer is defined unchanged).
+- **FS-159**: `buildSurface` reads `vertices[3*faceNo + k]` for every facet; a facet of fewer than
+  three corners leaves fewer than `3 * nfaces` entries and the vector's value-initialised `nullptr`
+  is dereferenced (`keyPtr->vertexNo`, observed `CRASH 11` with no output). Rule B.
+- **FS-160**: `unsigned int fileSizeIfBinary = 84 + ntriangles * 50;` wraps; a file whose size
+  matches a wrapped product is read as binary and `readFloat`'s `stream.read` fails past the end,
+  leaving the uninitialised `float value` (memory). Rule B. Not generated by the probe (the counts
+  involved, about 86 million triangles, would need gigabytes).
+- **`mrisReadSTL`'s size test for short files** (no defect): `stlfile.read(header, 80)` and the
+  count's `read` on a file of fewer than 84 bytes set `failbit`; `seekg(0, end)` then fails and
+  `tellg` returns -1, so `fileSize` is 2^32 - 1, odd, never `84 + 50 n` (even): such files are
+  always text, whatever the uninitialised `ntriangles` holds.
+- **Not defects, noted**: `mrisReadAsciiSTL` never closes its `FILE` (and its `fopen` is unchecked:
+  `mrisReadSTL` opened the file just before); `buildSurface`'s third `ErrorExit` passes `vt->n` (a
+  pointer) to `%d`, reachable only when `calloc` of a byte count below 256 fails; the ASCII STL
+  reader decides a line by its first character only (`vertices 1 2 3` is a vertex line whose
+  numbers cannot be read: FS-152).
+- **`mrisReadTriangleFile*`'s `fscanf(fp, "\n")`** after the creator's line also eats count bytes
+  that are white space (a vertex count whose first big-endian byte is 9 to 13 or 32: 150,994,944 or
+  more vertices); the port does the same through its `scanf` model. Not reachable with real surfaces.
+- **Measured.** `sread`: seed 7, 1,000 cases (one ended by the official probe's 5-second alarm under
+  the machine's load, identical when rerun alone) and seed 13, 2,000: every comparable case
+  identical with `reproduce` (92 and 156 counted, not compared), the default different only with
+  notices. `stl`: seed 7, 1,000 cases identical with `reproduce` (105 counted, not compared), the
+  default different only with notices. Seed 1 (990 cases of 33 commands): 980 identical, 10 `SKIP`,
+  hash `2543d270...` (`tests/fs_surfio_official.rs`), passing under `NAN_TRAP_ARM=1` with
+  `NAN_TRAP_DIR` set in debug (7,746 flips) and release (17,227).
+  The whole probe, seed 7 (66,000 cases of 33 commands): 65,018 identical with `reproduce`, 982
+  counted, not compared (435 `mprop`, 198 `stl`, 151 `sread`, 115 `sfile`, 81 `cfile`, 2 `metric`),
+  the default different only with notices or the correctly rounded maths (65 `posn`, 7 `surf`), the
+  port's lines identical under AArch64's NaN emulation in both modes (74,230 and 74,272 flips).
+- **What still waits** (as §14): `mri_identify` (track A's 3.1-27) for `MRISread`/`MRISwrite` and the
+  `*_getfilename` functions (3.1-49's `mrisurf_io.cpp` 6690-6921); `readVolGeom` and friends (track
+  C's 3.1-39) and `CFile`'s `rewind`/`fseek` (track A) for `mrisReadTriangleFile`,
+  `__MRISreadQuadrangleFile`, `__MRISwriteQuadrangleFile`, `MRISwriteTriangularSurface`,
+  `__MRISwriteTriangularSurfaceTags` (3.1-49's `mrisurf_io.cpp` 6314-6689).

@@ -4,7 +4,7 @@
 original; with a stand-in for the built-in replica (``builtin_stub``) the wrappers pass AFNI's
 options, settings and D13's choice to it and read its outputs back. The replica itself is
 checked by its own golden tests and by the parity suites against AFNI; the originals by
-``test_afni_masks_original.py``, the golden tests and the parity suites."""
+``test_afni_masks_clean_room.py``, the golden tests and the parity suites."""
 
 from __future__ import annotations
 

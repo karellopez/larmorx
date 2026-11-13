@@ -20,7 +20,7 @@ code: none in these files (FreeSurfer's own: Bruce Fischl, Douglas Greve).
 | `packages/nifti/znzlib.c` (FreeSurfer's copy of znzlib, public domain) | `znzread`, `znzwrite` (the compressed branch: one `gzread`/`gzwrite`, the count over the member size) | `fio::fs_znzread`, `fs_znzwrite`, on `larmorx_io::znz`'s zlib layer |
 | `utils/bfileio.cpp` | `byteswapbufdouble` (51), `byteswapbuffloat` (81), `byteswapbufshort` (103) | `bfileio` |
 | `utils/MRIio_old.cpp` | `MGHprint_error` (29), `lcalloc` (44) | `mriio_old` |
-| (larmorx's own) | C's `FILE` as these functions use it: `fopen`'s modes and `errno`, `fread`/`fwrite` of members, `getc`, `fgets`, `feof`, `ferror`, `fclose`, `scanf`'s input; written from ISO C 7.21 and glibc 2.35's measured behaviour | `cfile` |
+| (larmorx's own) | C's `FILE` as these functions use it: `fopen`'s modes and `errno`, `fread`/`fwrite` of members, `getc`, `fgets`, `feof`, `ferror`, `fclose`, `fseek`, `rewind`, `ftell`, `scanf`'s input; written from ISO C 7.21 and glibc 2.35's measured behaviour (`validation/investigations/glibc-stdio-probe/` for the seeks) | `cfile` |
 
 Queue item 3.1-25, piece 2 (track A, relay 11), with tags.cpp (3.1-30) and colortab.cpp's binary
 tables (3.1-33) taken early (the orchestrator's decision of 2026-11-13). Audited for third-party
@@ -41,6 +41,22 @@ The one-number readers and writers the inventory does not list as reached (`putf
 `fwrite1`, `fwrite4`, `fwriteShort`, `freadShort`, the other `Ex` readers, `fwriteDouble`, `znzread2/3/4`,
 `znzwrite1/2/3/4`, `znzreadDoubleEx`, `znzreadShortEx`) are translated all the same (relay 12): the
 surface files' readers and writers (`fs.surfio`, `mrisurf_io.cpp`) and `vlabels.cpp` call them.
+
+Queue item 3.1-25, piece 3 (track A, relay 13). Audited for third-party code: none (fscnpy.cpp and
+fscnpy.h without an author line; gifti.cpp by Kevin Teich and Nick Schmansky; dti.cpp by Douglas
+Greve; the General Hospital Corporation's copyright). gifti.cpp's helpers work on gifticlib's
+structures through `larmorx_io::gifti` (track C's port of gifticlib 1.12, public domain).
+
+| file (FreeSurfer 8.2.0) | functions (lines) | module |
+|---|---|---|
+| `utils/fscnpy.cpp`, `include/fscnpy.h` | `fscnpy::fscnpy` (8), `~fscnpy` (29: Rust's drop), `npy2mri` (67), `__parse_header_dictionary` (215), `__getmritype` (371), `__getarchendian` (416: `<`, every supported platform), `__contiguousreorder` (470) | `fscnpy` |
+| `utils/gifti.cpp` | `gifti_alloc_and_add_darray` (47), `gifti_get_DA_value_2D` (69-212) | `gifti` |
+| `utils/dti.cpp` | `DTIwriteBValues` (848), `DTIwriteBVectors` (931), `DTIparsePulseSeqName` (980), `DTIbvecChangeSpace` (1083) | `dti` |
+| (larmorx's own) | `fscnpy::ShapeVec`: libstdc++'s `std::vector<int>` as `npy2mri` uses it (`push_back`'s growth by doubling with new places unwritten, `pop_back`, `erase(begin())`), from the C++ standard's and libstdc++'s documented behaviour, for FS-206 | `fscnpy` |
+
+Not translated: `fscnpy::read` (no caller), `fscnpy::write` (empty), `exec_progress_callback` (freeview's
+progress bar: nothing without its callback); the rest of gifti.cpp (3.1-26) and of dti.cpp (the items
+that reach it).
 
 Not reached by any default-path program, so not translated: `MGHopen_file`, `fio_NLines`, `fio_pushd`, `fio_popd`, `fio_fullpath`, `fio_mkdirp`,
 `fio_FileHasCarriageReturn`, `makelocallink`, `TSV::IsTSVExt` (`mri_glmfit` only); `lmalloc`,
@@ -69,3 +85,30 @@ Not reached by any default-path program, so not translated: `MGHopen_file`, `fio
 - `CFile::tell` (`ftell`) for `TAGwriteStart`'s position.
 - `lcalloc` returns a vector of the caller's element type (`nmemb` elements; the C `size` is checked
   for the product's overflow).
+- Piece 3: FS-199 to FS-220 (`docs/findings/freesurfer-io.md` Part 3; FS-206 in
+  `larmorx-freesurfer-mri`). `npy2mri` reads the header into a heap buffer of the bytes the file gives
+  (zeros after them), whatever its length; its parse runs on that buffer with FreeSurfer's NUL writes
+  and stops at its end. Its messages go to the caller's standard output; its exits are
+  `Fatal::Exit(1)`. The volume's voxels are copied into `Mri::chunk`. `gifti_get_DA_value_2D` reads
+  the data's little-endian bytes (zeros past them: gifticlib's arrays always hold their values).
+  `DTIbvecChangeSpace` copies `bvec` before the in-place product. The b-value writers write the
+  file's text at once.
+
+Queue item 3.1-27, piece 1 (track A, relay 14): the volume format probe, with the pieces it needs
+taken early (mri_identify.cpp's lines 697-1195 from 3.1-28, `MRIgetVolumeName` from mriio.cpp
+(3.1-28), signa.cpp's header test from 3.1-30, DICOMRead.cpp's format-probe functions, which stay in
+fs.io by the orchestrator's decision of 2026-11-13). Audited for third-party code: mri_identify.cpp
+(Christian Haselgrove), signa.cpp (GE's `mvtsunf` conversion inside `ghf`, as FreeSurfer carries it),
+Bruker.cpp, DICOMRead.cpp (Sebastien Gicquel, Douglas Greve): FreeSurfer's own, the General Hospital
+Corporation's copyright; the DICOM reader they call is CTN 3.0.6's (`larmorx_io::dicom`, Apache-2.0
+AND LicenseRef-CTN, the main package's crate, used as a dependency).
+
+| file (FreeSurfer 8.2.0) | functions (lines) | module |
+|---|---|---|
+| `utils/mri_identify.cpp`, `include/mri_identify.h` | `type_to_string` (47), `string_to_type` (146), `mri_identify` (201), `IDtypeFromStem` (394), `IDstemFromName` (423), `IDextensionFromName` (486), `IDnameFromStem` (537), `is_cor` (571), `is_brik` (594), `is_siemens` (608), `is_genesis` (664), `is_ge_lx` (697), `is_analyze` (723), `is_mnc` (764), `is_mgh` (802), `is_bshort` (817), `is_bfloat` (829), `is_bhdr` (840), `bhdr_stem` (854), `bhdr_firstslicefname` (878), `bhdr_precisionstring` (909), `bhdr_precision` (942), `is_sdt` (967), `is_gdf` (998), `is_otl` (1011), `is_ximg` (1024), `is_nifti1` (1026), `is_nii` (1071), `is_nrrd` (1112), `IDisCurv` (1195); the magic numbers; `include/mri.h`'s format numbers (1516-1553) | `identify` |
+| `utils/mriio.cpp` | `MRIgetVolumeName` (472); `include/mri.h`'s `MRIIO_Strip_Pound` (2033) | `identify::mri_get_volume_name`; `larmorx_freesurfer_core::globals::Globals::mriio_strip_pound` |
+| `utils/Bruker.cpp` | `checkBrukerFiles` (201), `is_bruker` (834) | `bruker` |
+| `utils/signa.cpp`, `include/signa.h` | `ghc` (69), `ghi` (77), `ghf` (93), `get_signa_header_info` (144), `is_signa` (179); the header's offsets and `HINFO` | `signa` |
+| `utils/DICOMRead.cpp` | `IsDICOM` (5410), `IsSiemensDICOM` (1479), `GetObjectFromFile` (1207), `GetElementFromFile` (1164), `AllocElementData` (1252) and `FreeElementData` (1408) for the Manufacturer element, `DCMPrintCond` (5523); `IsDICOM`'s static answer | `dicom_probe`; the state in `Globals::dicom` |
+| `packages/dicom/dcm.c` (FreeSurfer's copy of CTN 3.0.6) | `DCM_GetElement` (2699) with `locateElement` (6601), `DCM_GetElementValue` (950) for one element of the object's top level read into memory; FreeSurfer's two changes to CTN's behaviour (the "Data Element ... longer" message, the 4-byte swap in pairs) as `dicom_probe::FsDialect` | `dicom_probe` |
+| (larmorx's own) | `COND_DumpConditions`'s output byte for byte (`dicom_probe::dump_conditions`: larmorx-io's `CondStack::dump` goes through text streams); `CFile`'s reads of a folder failing with `EISDIR` on every platform and the failed read's `errno` | `dicom_probe`, `cfile` |

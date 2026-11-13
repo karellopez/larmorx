@@ -44,6 +44,17 @@
 #include "fio.h"
 #include "MRIio_old.h"
 #include "znzlib.h"
+#include "dti.h"
+#include "fscnpy.h"
+#include "gifti_io.h"
+#include "mri_identify.h"
+#include "DICOMRead.h"
+#include "Bruker.h"
+#include "signa.h"
+
+// gifti.cpp's two file-local helpers, compiled into the probe by gifti_statics.cpp
+giiDataArray *fsio_gifti_alloc_and_add_darray(gifti_image *image);
+double fsio_gifti_get_DA_value_2D(giiDataArray *da, int row, int col);
 
 const char *Progname = "fsio";
 
@@ -310,6 +321,259 @@ int ***labels_alloc(int x0, int y0, int z0)
   return l;
 }
 bool more() { return pos < toks.size(); }
+
+// ---- piece 3: .npy volumes, gifti.cpp's two helpers, dti.cpp's b-value files and names ----
+// a fixture name, or `-` for the file x.npy written in the fixture from the hex token that follows
+// (a name relative to the fixture: messages that print it read the same on both sides)
+std::string where_of(const char *w, const char *hexdata)
+{
+  if (strcmp(w, "-") == 0) {
+    std::vector<unsigned char> b = unhex(hexdata);
+    FILE *fp = fopen("x.npy", "wb");
+    if (!fp) fail("cannot write x.npy");
+    if (!b.empty()) fwrite(b.data(), 1, b.size(), fp);
+    fclose(fp);
+    return "x.npy";
+  }
+  return w;
+}
+// a file's bytes, or N when there is no such file
+void ofile(const std::string &name)
+{
+  struct stat st;
+  if (stat(name.c_str(), &st) != 0 || !S_ISREG(st.st_mode)) { out += "N "; return; }
+  obytes(read_file(name));
+}
+MATRIX *read_rmat()
+{
+  int rows = (int)geti(), cols = (int)geti();
+  if (rows < 0) return NULL;
+  MATRIX *m = MatrixAlloc(rows, cols, MATRIX_REAL);
+  for (int r = 1; r <= rows; r++)
+    for (int c = 1; c <= cols; c++) m->rptr[r][c] = getf();
+  return m;
+}
+void print_rmat(const MATRIX *m)
+{
+  if (!m) { out += "N "; return; }
+  oi(m->rows); oi(m->cols);
+  for (int r = 1; r <= m->rows; r++)
+    for (int c = 1; c <= m->cols; c++) of(m->rptr[r][c]);
+}
+
+// piece 4 (3.1-27): the format probe. A case's files are made in the fixture's folder `w`
+// (removed first): `-`, or entries separated by `,`: `D<hex name>` a folder, `F<hex name>:<size>`
+// a file of that many zero bytes, then `+<offset>:<hex bytes>` patches.
+int rm_entry(const char *p, const struct stat *, int, struct FTW *);
+void setup(const char *spec)
+{
+  nftw("w", rm_entry, 16, FTW_DEPTH | FTW_PHYS);
+  if (mkdir("w", 0700)) fail("cannot make w");
+  if (strcmp(spec, "-") == 0) return;
+  std::string all(spec);
+  size_t p = 0;
+  while (p <= all.size()) {
+    size_t q = all.find(',', p);
+    if (q == std::string::npos) q = all.size();
+    std::string e = all.substr(p, q - p);
+    p = q + 1;
+    if (e.empty()) continue;
+    if (e[0] == 'D') {
+      std::vector<unsigned char> n = unhex(e.c_str() + 1);
+      if (mkdir(std::string(n.begin(), n.end()).c_str(), 0700)) fail("cannot make a folder");
+      continue;
+    }
+    size_t c = e.find(':');
+    std::vector<unsigned char> n = unhex(e.substr(1, c - 1).c_str());
+    size_t plus = e.find('+', c);
+    long size = strtol(e.substr(c + 1, plus == std::string::npos ? std::string::npos : plus - c - 1).c_str(), NULL, 10);
+    std::vector<unsigned char> b(size, 0);
+    while (plus != std::string::npos) {
+      size_t c2 = e.find(':', plus);
+      size_t nx = e.find('+', plus + 1);
+      long off = strtol(e.substr(plus + 1, c2 - plus - 1).c_str(), NULL, 10);
+      std::vector<unsigned char> h = unhex(e.substr(c2 + 1, nx == std::string::npos ? std::string::npos : nx - c2 - 1).c_str());
+      for (size_t k = 0; k < h.size(); k++)
+        if (off + (long)k < (long)b.size()) b[off + k] = h[k];
+      plus = nx;
+    }
+    FILE *fp = fopen(std::string(n.begin(), n.end()).c_str(), "wb");
+    if (!fp) fail("cannot write a case file");
+    if (!b.empty()) fwrite(b.data(), 1, b.size(), fp);
+    fclose(fp);
+  }
+}
+
+void run_piece4(const std::string &cmd)
+{
+  if (cmd == "sty") {
+    bool n;
+    std::string s = getstr(&n);
+    oi(string_to_type(s.c_str()));
+  } else if (cmd == "tts") {
+    char *r = type_to_string((int)geti());
+    ostr(r);
+    free(r);
+  } else if (cmd == "mgvn") {
+    MRIIO_Strip_Pound = (int)geti();
+    bool n;
+    std::string s = getstr(&n);
+    static char buf[1 << 16];
+    MRIgetVolumeName(s.c_str(), buf);
+    ostr(buf);
+    MRIIO_Strip_Pound = 1;
+  } else if (cmd == "mid" || cmd == "isx" || cmd == "idf" || cmd == "dcm") {
+    std::string fn = cmd == "mid" ? "" : next();
+    int dbg = (cmd == "mid" || cmd == "dcm") ? (int)geti() : 0;
+    bool n;
+    std::string name = getstr(&n);
+    setup(next());
+    if (dbg) setenv("FS_DICOM_DEBUG", "1", 1);
+    char *c = (char *)name.c_str();
+    errno = 0;
+    if (cmd == "mid") {
+      oi(mri_identify(c));
+    } else if (cmd == "dcm") {
+      for (char k : fn) {
+        if (k == 'd') oi(IsDICOM(c));
+        else if (k == 's') oi(IsSiemensDICOM(c));
+        else if (k == 'm') oi(mri_identify(c));
+        else fail("unknown dcm step");
+      }
+    } else if (cmd == "isx") {
+      int r;
+      if (fn == "cor") r = is_cor(c);
+      else if (fn == "brik") r = is_brik(c);
+      else if (fn == "siemens") r = is_siemens(c);
+      else if (fn == "genesis") r = is_genesis(c);
+      else if (fn == "gelx") r = is_ge_lx(c);
+      else if (fn == "analyze") r = is_analyze(c);
+      else if (fn == "mnc") r = is_mnc(c);
+      else if (fn == "mgh") r = is_mgh(c);
+      else if (fn == "bshort") r = is_bshort(c);
+      else if (fn == "bfloat") r = is_bfloat(c);
+      else if (fn == "bhdr") r = is_bhdr(c);
+      else if (fn == "sdt") r = is_sdt(c);
+      else if (fn == "gdf") r = is_gdf(c);
+      else if (fn == "otl") r = is_otl(c);
+      else if (fn == "ximg") r = is_ximg(c);
+      else if (fn == "nifti1") r = is_nifti1(c);
+      else if (fn == "nii") r = is_nii(c);
+      else if (fn == "nrrd") r = is_nrrd(c);
+      else if (fn == "curv") r = IDisCurv(c);
+      else if (fn == "signa") r = is_signa(c);
+      else if (fn == "bruker") r = is_bruker(c);
+      else fail("unknown test");
+      oi(r);
+    } else {
+      if (fn == "stem") { char *r = IDstemFromName(c); ostr(r); free(r); }
+      else if (fn == "ext") { char *r = IDextensionFromName(c); ostr(r); free(r); }
+      else if (fn == "name") { char *r = IDnameFromStem(c); ostr(r); free(r); }
+      else if (fn == "type") oi(IDtypeFromStem(c));
+      else if (fn == "bstem") { char *r = bhdr_stem(c); ostr(r); free(r); }
+      else if (fn == "bfirst") { char *r = bhdr_firstslicefname(c); ostr(r); free(r); }
+      else if (fn == "bprecs") { char *r = bhdr_precisionstring(c); ostr(r); free(r); }
+      else if (fn == "bprec") oi(bhdr_precision(c));
+      else if (fn == "bruk") {
+        static char f[5][4096];
+        memset(f, 0, sizeof f);
+        oi(checkBrukerFiles(c, f[0], f[1], f[2], f[3], f[4], 1));
+        for (int k = 0; k < 5; k++) ostr(f[k]);
+      } else fail("unknown helper");
+    }
+    oi(errno);
+    if (cmd == "dcm" || cmd == "mid") COND_DumpConditions();
+  } else {
+    fail("unknown command");
+  }
+}
+
+void run_piece3(const std::string &cmd)
+{
+  if (cmd == "npy") {
+    int verbose = (int)geti();
+    const char *w = next();
+    std::string path = where_of(w, next());
+    fscnpy *c = new fscnpy();
+    MRI *m = c->npy2mri(path.c_str(), verbose != 0);
+    if (!m) { out += "N "; return; }
+    oi(m->width); oi(m->height); oi(m->depth); oi(m->nframes); oi(m->type);
+    oi((long long)m->bytes_per_vox); oi((long long)m->bytes_total);
+    obytes(std::vector<unsigned char>((unsigned char *)m->chunk,
+                                      (unsigned char *)m->chunk + (m->chunk ? m->bytes_total : 0)));
+  } else if (cmd == "gda") {
+    int verb = (int)geti();
+    int isnull = (int)geti();
+    int n = (int)geti();
+    gifti_set_verb(verb);
+    gifti_image *im = isnull ? NULL : (gifti_image *)calloc(1, sizeof(gifti_image));
+    giiDataArray *da = NULL;
+    for (int k = 0; k < n; k++) {
+      da = fsio_gifti_alloc_and_add_darray(im);
+      oi(da != NULL);
+      if (im) { oi(im->numDA); oi(da != NULL && da == im->darray[im->numDA - 1]); }
+    }
+    if (da) {
+      oi(da->intent); oi(da->datatype); oi(da->ind_ord); oi(da->num_dim);
+      for (int i = 0; i < 6; i++) oi(da->dims[i]);
+      oi(da->encoding); oi(da->endian); oi(da->ext_fname != NULL); oi(da->ext_offset);
+      oi(da->meta.length); oi(da->numCS); oi(da->data != NULL); oi(da->nvals); oi(da->nbyper);
+      oi(da->ex_atrs.length);
+    }
+    gifti_set_verb(1);
+  } else if (cmd == "gdv") {
+    int isnull = (int)geti(), hasdata = (int)geti();
+    giiDataArray *da = isnull ? NULL : (giiDataArray *)calloc(1, sizeof(giiDataArray));
+    int ind_ord = (int)geti(), num_dim = (int)geti(), d0 = (int)geti(), d1 = (int)geti();
+    int datatype = (int)geti(), row = (int)geti(), col = (int)geti();
+    std::vector<unsigned char> b = unhex(next());
+    if (da) {
+      da->ind_ord = ind_ord; da->num_dim = num_dim; da->dims[0] = d0; da->dims[1] = d1;
+      da->datatype = datatype;
+      if (hasdata) {
+        // room after the values: a read FreeSurfer makes beyond them stays in the probe's memory
+        da->data = calloc(b.size() + 64, 1);
+        memcpy(da->data, b.data(), b.size());
+      }
+    }
+    double v = fsio_gifti_get_DA_value_2D(da, row, col);
+    od(v);
+  } else if (cmd == "bvw") {
+    std::string which = next();
+    MATRIX *m = read_rmat();
+    const char *w = next();
+    std::string path = strcmp(w, "-") == 0 ? dat : std::string(w);
+    if (strcmp(w, "-") == 0) unlink(dat.c_str());
+    int r = which == "v" ? DTIwriteBValues(m, path.c_str()) : DTIwriteBVectors(m, path.c_str());
+    oi(r);
+    ofile(path);
+  } else if (cmd == "psn") {
+    bool n;
+    std::string s = getstr(&n);
+    uint64_t u = 0x7ff8deadbeef0001ull;
+    double b;
+    memcpy(&b, &u, 8);
+    int nth = -7777;
+    oi(DTIparsePulseSeqName(s.c_str(), &b, &nth));
+    od(b);
+    oi(nth);
+  } else if (cmd == "bcs") {
+    Gdiag_no = (int)geti();
+    int space = (int)geti(), desired = (int)geti();
+    MRI *mri = MRIallocHeader(1, 1, 1, MRI_UCHAR, 1);
+    float *f[] = {&mri->x_r, &mri->x_a, &mri->x_s, &mri->y_r, &mri->y_a, &mri->y_s,
+                  &mri->z_r, &mri->z_a, &mri->z_s};
+    for (float *p : f) *p = getf();
+    mri->bvec_space = space;
+    mri->bvecs = read_rmat();
+    oi(DTIbvecChangeSpace(mri, desired));
+    oi(mri->bvec_space);
+    print_rmat(mri->bvecs);
+    Gdiag_no = -1;
+  } else {
+    run_piece4(cmd);
+  }
+}
 
 void run_piece2(const std::string &cmd)
 {
@@ -630,7 +894,7 @@ void run_piece2(const std::string &cmd)
     obytes(std::vector<unsigned char>(line, line + strlen(line)));
     if (!line[0]) { out.pop_back(); out.pop_back(); out += " "; }
   } else {
-    fail("unknown command");
+    run_piece3(cmd);
   }
 }
 

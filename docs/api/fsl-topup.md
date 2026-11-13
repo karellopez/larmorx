@@ -45,7 +45,7 @@ which both minimisations diverge; the inputs refused for FSL-124 and FSL-134), 0
 fMRIPrep's calls: ds001600 within the thresholds, ds005040 within FSL's own band of a last-bit
 change (the field's p99 0.61 Hz against FSL at `--nthr=4`'s 0.64). Random testing's trial (14,400
 cases, the replica trial's draws) is triaged case by case in
-[the findings](../findings/fsl-topup-original.md) (finding 36; its open items closed by the
+[the findings](../findings/fsl-topup-clean-room.md) (finding 36; its open items closed by the
 catch-up of 2026-11-04, findings 37 to 44); the catch-up's trial of 2026-11-05 (17,535 cases,
 13,300 agree) and FSL-242 in findings 45 to 47.
 

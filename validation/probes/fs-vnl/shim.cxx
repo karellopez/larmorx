@@ -39,8 +39,31 @@ struct Callback : public vnl_cost_function {
 };
 
 template <unsigned N, class T> T det_fixed(const T *m) { return vnl_det(vnl_matrix_fixed<T, N, N>(m)); }
+template <unsigned N, class T> void inst_inverse(const T *m, T *out);
 template <unsigned N, class T> void inverse_fixed(const T *m, T *out) {
   vnl_inverse(vnl_matrix_fixed<T, N, N>(m)).copy_out(out);
+}
+}  // namespace
+
+// vnl_inverse's stand-alone instances (order/inst.cxx, compiled by build.sh with these flags and
+// renamed to these names): byte for byte the instances FreeSurfer's libutils holds where it holds
+// one (float 3 x 3 and 4 x 4, double 3 x 3; order/orders.py checks it).
+vnl_matrix_fixed<float, 2, 2> fv_inst_inverse(vnl_matrix_fixed<float, 2, 2> const &);
+vnl_matrix_fixed<float, 3, 3> fv_inst_inverse(vnl_matrix_fixed<float, 3, 3> const &);
+vnl_matrix_fixed<float, 4, 4> fv_inst_inverse(vnl_matrix_fixed<float, 4, 4> const &);
+vnl_matrix_fixed<double, 2, 2> fv_inst_inverse(vnl_matrix_fixed<double, 2, 2> const &);
+vnl_matrix_fixed<double, 3, 3> fv_inst_inverse(vnl_matrix_fixed<double, 3, 3> const &);
+vnl_matrix_fixed<double, 4, 4> fv_inst_inverse(vnl_matrix_fixed<double, 4, 4> const &);
+namespace {
+template <unsigned N, class T> void inst_inverse(const T *m, T *out) {
+  fv_inst_inverse(vnl_matrix_fixed<T, N, N>(m)).copy_out(out);
+}
+template <class T> T determinant_rows(int n, const T *m) {
+  switch (n) {
+    case 2: return vnl_determinant<T>(m, m + 2);
+    case 3: return vnl_determinant<T>(m, m + 3, m + 6);
+    default: return vnl_determinant<T>(m, m + 4, m + 8, m + 12);
+  }
 }
 }  // namespace
 
@@ -83,6 +106,24 @@ void fv_inverse_fixed_f64(int n, const double *m, double *out) {
     default: inverse_fixed<4>(m, out); break;
   }
 }
+// --- family `order`: the instances' NaNs, bit for bit -----------------------------------------
+void fv_order_inverse_f32(int n, const float *m, float *out) {
+  switch (n) {
+    case 2: inst_inverse<2>(m, out); break;
+    case 3: inst_inverse<3>(m, out); break;
+    default: inst_inverse<4>(m, out); break;
+  }
+}
+void fv_order_inverse_f64(int n, const double *m, double *out) {
+  switch (n) {
+    case 2: inst_inverse<2>(m, out); break;
+    case 3: inst_inverse<3>(m, out); break;
+    default: inst_inverse<4>(m, out); break;
+  }
+}
+float fv_order_determinant_rows_f32(int n, const float *m) { return determinant_rows(n, m); }
+double fv_order_determinant_rows_f64(int n, const double *m) { return determinant_rows(n, m); }
+
 float fv_determinant_f32(int n, const float *m, int balance) {
   return vnl_determinant<float>(vnl_matrix<float>(m, n, n), balance != 0);
 }

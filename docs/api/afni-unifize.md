@@ -170,7 +170,7 @@ The replica is bit-identical to AFNI on every compared case. The clean-room orig
 CORE-MATH's) where AFNI calls glibc 2.35's, which is not correctly rounded on some arguments
 (2.8 % of float arguments): squashed values can differ in their last bit. AFNI run with
 CORE-MATH's correctly rounded functions preloaded gives the original's bytes
-([findings](../findings/afni-masks-original.md)). `-EPI`'s radius uses a correctly rounded
+([findings](../findings/afni-masks-clean-room.md)). `-EPI`'s radius uses a correctly rounded
 `cbrtf` by default and glibc 2.35's bits with `reproduce` (GLIBC-05, above).
 
 ## Speed
@@ -182,7 +182,7 @@ image's sorted values) and slides the ball from voxel to voxel, adding and remov
 surfaces; the two percentiles come from block counts and the values between them are read in
 ascending order, which gives the spec's float sum exactly. Planes run in parallel, with the same
 result at any thread count; the inversion's percentile and `-GM`'s medians are selections, not
-sorts. Informal timings (2026-10-24, a shared machine; [findings](../findings/afni-masks-original.md#informal-timings-2026-10-24-not-a-benchmark-report)):
+sorts. Informal timings (2026-10-24, a shared machine; [findings](../findings/afni-masks-clean-room.md#informal-timings-2026-10-24-not-a-benchmark-report)):
 fMRIPrep's call on a 64 × 64 × 34 BOLD reference takes AFNI 93 s at one thread and 22 s at six,
 the replica 39 s and 8.7 s, the original 3.8 s and 0.94 s; a T1w (half-size path) 67 s and 24 s,
 35 s and 15 s, 9.3 s and 2.7 s. There is no benchmark report yet.

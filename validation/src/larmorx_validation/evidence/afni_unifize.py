@@ -20,7 +20,7 @@ from pathlib import Path
 import numpy as np
 
 from larmorx_validation.evidence import afni_automask as am
-from larmorx_validation.evidence import afni_step, common, core
+from larmorx_validation.evidence import afni_pages, afni_step, common, core
 from larmorx_validation.figures import cache as fcache
 from larmorx_validation.figures import records
 
@@ -751,7 +751,7 @@ def export(ctx: core.Context) -> dict:
     o, ot = original_entry(ctx), t1w_original_entry(ctx)
     step = afni_step.ensure(e, ["afni-1", "t2up100-afni"], ctx.compute)
     tstep = afni_step.ensure(t, ["afni-1"], ctx.compute)
-    return {
+    doc = {
         "schema": 1,
         "tool": TOOL,
         "title": "3dUnifize",
@@ -774,6 +774,55 @@ def export(ctx: core.Context) -> dict:
             _example_t2up(ctx, e, o, reg, step),
         ],
     }
+    return present(doc)
+
+
+PAGE = afni_pages.page("3dUnifize")
+
+
+def _tanhf(ex: dict, data: str, also: str) -> tuple[str, list[str]]:
+    big = afni_pages.largest(ex, "original-afni26")
+    return (
+        f"{data} the replica gives AFNI's values, every one, in both releases and on 1 and 6 "
+        f"threads{also}. The clean room gives AFNI's values with correctly rounded maths; AFNI "
+        "as built differs from it only where glibc's tanhf is not correctly rounded (largest "
+        f"difference {big}). No correction by default changes this call.",
+        ["replica-afni26", "original-afni26"],
+    )
+
+
+#: Each worked example's "What this shows" line and the verdicts beside it, one per port.
+SHOWS: afni_pages.Shows = {
+    "fmriprep-unifize": lambda ex: _tanhf(ex, "On fMRIPrep's call", ", and fMRIPrep's own output"),
+    "t1w-unifize": lambda ex: _tanhf(
+        ex, "On a real T1w, with no options,", ", its output and its scale image"
+    ),
+    "afni-45": lambda ex: (
+        "At -T2up 100 AFNI reads one past the sorted values, memory it never wrote, which held "
+        "0 here: every value inverts to 0, and so does the output, in both releases (AFNI-45). "
+        "In `fix`, their default, the replica and the clean room invert about the largest "
+        "value, the 100th percentile, and warn; in `reproduce` both give AFNI's result, the "
+        "read filled with 0 as AFNI read it on this machine.",
+        ["replica-afni", "original-afni"],
+    ),
+}
+
+
+def present(doc: dict) -> dict:
+    """3dUnifize's page in the writing guide's words and order: texts, ports and order only."""
+    return afni_pages.present(
+        doc,
+        PAGE,
+        SHOWS,
+        "Seconds for the whole program, informal timings of 2026-10-24.",
+        {
+            "AFNI 25.2.09, 1 thread": "AFNI 3dUnifize 25.2.09, 1 thread",
+            "AFNI 25.2.09, 6 threads": "AFNI 3dUnifize 25.2.09, 6 threads",
+            "clean-room original, 1 thread": "clean room, 1 thread",
+            "clean-room original, 6 threads": "clean room, 6 threads",
+        },
+        "25.2.09",
+    )
 
 
 if __name__ == "__main__":  # compute the cache entries only

@@ -16,7 +16,7 @@ clean-room implementers, so they never build it.
 |---|---|
 | `fs_mri_probe.cpp` | the probe: a batch of calls from a file, each in a child process of its own; its commands below |
 | `build.sh` | builds it with the unit oracle's compiler (Ubuntu's GCC 8.4.0) and FreeSurfer's flags against `<workspace>/oracles/freesurfer-8.2.0-unit` (queue item 3.1-02): `build.sh <workspace> <output>` (the spec writer's or the orchestrator's step, not the implementer's) |
-| `compare.py` | the comparison loop of the spec's §23: 15 groups of seeded cases (about 10,300 calls), run on the probe (four times: plainly, plainly again in another process and in two guard runs, through the oracle-output cache) and on a candidate program that takes the same commands; `list`, `refs`, `compare` |
+| `compare.py` | the comparison loop of the spec's §23: 15 groups of seeded cases (9,245 calls in 22 batches), run on the probe (four times: plainly, plainly again in another process and in two guard runs, through the oracle-output cache) and on a candidate program that takes the same commands; `list`, `refs`, `compare` |
 
 The prebuilt probe: `<workspace>/oracles/freesurfer-8.2.0-unit/probes/fs_mri_probe`; its guard runs
 use the fs.maths probe's guard allocator, `guard_malloc.so` beside it
@@ -114,3 +114,60 @@ The spec's sections in brackets.
 | `ltacopy LTA D` | `LTAcopy(src, dst)`, D `none` or an LTA [§21] | `given`/`new`/`null`, the result, then D when it is not the result |
 | `ltcopy LTA D` | `LTcopy` of the first array's first transform into D's first (`null`: none) | `given`/`other`/`null`, the result |
 | `ltafreenull` | `LTAfree` of a missing array | its value |
+
+## The comparison loop
+
+```sh
+# the cases, one line each (and the calls per group)
+python -P compare.py list --scratch <scratch>/mri
+# the probe's reference hashes per group (the spec's §23 quotes them)
+PYTHONPATH=validation/src scripts/orchestration/boxed.sh 8 python -P \
+  validation/investigations/freesurfer-mri-probe/compare.py refs \
+  --probe <workspace>/oracles/freesurfer-8.2.0-unit/probes/fs_mri_probe --scratch <scratch>/mri
+# a candidate against the probe, in each mode
+PYTHONPATH=validation/src scripts/orchestration/boxed.sh 8 python -P \
+  validation/investigations/freesurfer-mri-probe/compare.py compare \
+  --probe <workspace>/oracles/freesurfer-8.2.0-unit/probes/fs_mri_probe \
+  --candidate <the candidate> --scratch <scratch>/mri --mode reproduce   # then --mode fix
+```
+
+**The candidate** is the clean room's own program taking `batch <file>` with the lines above and
+printing the same lines (its library behind the commands; each line's streams its own, a line that
+ends the program `EXIT <status>`). It runs with `LARMORX_UPSTREAM_DEFECTS` set to the mode, in the
+same working directory and environment as the probe. Its standard error may hold larmorx's defect
+notices (`upstream defect <ID> ...` lines): the loop takes them out before comparing and keeps their
+IDs. The cases are generated from `--seed` (default 7) into `<scratch>/batch`, each line given 10
+seconds (`@10`); the working directory is `<scratch>/work`.
+
+**The guard runs.** Each batch runs on the probe four times: plainly; plainly again, in another
+process, with `MALLOC_PERTURB_` 0; and with `LD_PRELOAD` set to `guard_malloc.so`,
+`MALLOC_GUARD_=over` and `MALLOC_PERTURB_` 90, then `MALLOC_GUARD_=under` and 165 (the fs.maths
+probe's README says what each shows). A line whose four results are not the same read memory
+FreeSurfer did not write or does not own: a **memory** line. The batch `alloc-limits` (extents or
+frame counts that are not positive, types without a size) runs plainly only (twice): its wrapped
+sizes are more than the guard allocator can map. A memory line, or one where FreeSurfer crashed,
+counts in the reference hash by its place only (`<memory>`).
+
+**What may differ.** A line is compared byte for byte (the result, both streams). A difference is
+allowed on a line where (1) FreeSurfer did not finish (`TIMEOUT`, `CRASH`) and the candidate did;
+(2) a **memory** line; (3) in the batches `matrices-sizes`, `geometry-sizes` and `tkreg-sizes`, a
+line where the candidate noted FS-264 (its correction holds in both modes); (4) in `--mode fix`, a
+line where the candidate noted a defect. Every other difference is unexplained: exit status 1, the
+first three of each group printed. The loop prints, per group, the identical lines and those of
+each allowed kind, and the IDs the candidate noted on the allowed lines.
+
+## Results (2026-11-13, the reference machine: glibc 2.35, Linux 6.8, x86-64)
+
+- `refs`, seed 7, the prebuilt probe (commit `2d660905`) with the fs.maths probe's guard allocator:
+  the hashes quoted in the spec's §23.2 (9,245 calls; 408 memory or crashed lines, 619 that end the
+  program, none where FreeSurfer never returns); identical through the oracle-output cache (cold),
+  from it (warm) and without it, and in two more passes in separate processes, which classify every
+  line alike. An earlier pass with the probe's own 2-second alarm saw one guard run's call run out
+  of time under load: hence `@10`.
+- `compare` with the probe as its own candidate, both modes: no unexplained difference; memory lines
+  whose contents changed from process to process: `voxels` 18, `headers` 1, `copies` 2, `lta` 88.
+- What the batches of other sizes showed (FS-264, the spec's §3): the writers into a given matrix
+  and `RASFromSurfaceRAS_` crash with fewer than 4 rows, and change other elements with 4 x 1 and
+  4 x 3; `MRIsetVox2RASFromMatrix` crashes on 1 x 4 and reads memory with 3 x 3 and 4 x 1; matrices
+  larger than 4 x 4 are used by their top-left 4 x 4.
+- About 2 to 3 minutes for a cold `refs` (most of it the guard runs), seconds warm.

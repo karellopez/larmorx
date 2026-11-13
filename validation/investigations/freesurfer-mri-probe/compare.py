@@ -89,6 +89,7 @@ class Batch:
     env: dict[str, str] = field(default_factory=dict)
     never: str = ""  # why the probe's runs are never cached
     guards: bool = True  # False: the plain runs only (allocations of sizes the guard cannot make)
+    both: str = ""  # a defect whose correction holds in both modes: a line noting it may differ
 
 
 class Gen:
@@ -377,7 +378,7 @@ class Gen:
             sizes.append(f"setv2r {self.vol(r)} {self.geom(r)} {m}")
         return [
             Batch("matrices", "matrices", lines),
-            Batch("matrices", "matrices-sizes", sizes),
+            Batch("matrices", "matrices-sizes", sizes, both="FS-264"),
         ]
 
     def voxels(self) -> list[Batch]:
@@ -489,7 +490,7 @@ class Gen:
         sizes = [f"tomat {self.geom(r)} {self.mopt(r, p_null=0.0, odd=1.0)}" for _ in range(40)]
         return [
             Batch("geometry", "geometry", lines),
-            Batch("geometry", "geometry-sizes", sizes),
+            Batch("geometry", "geometry-sizes", sizes, both="FS-264"),
         ]
 
     def tkreg(self) -> list[Batch]:
@@ -506,7 +507,7 @@ class Gen:
         for _ in range(40):
             m = self.mopt(r, p_null=0.0, odd=1.0)
             sizes.append(f"ras2s {self.vol(r, hdr=0.7)} {self.geom(r)} {m}")
-        return [Batch("tkreg", "tkreg", lines), Batch("tkreg", "tkreg-sizes", sizes)]
+        return [Batch("tkreg", "tkreg", lines), Batch("tkreg", "tkreg-sizes", sizes, both="FS-264")]
 
     def registrations(self) -> list[Batch]:
         r = self.rng("registrations")
@@ -944,6 +945,10 @@ def main() -> int:
                 noted.update(ids)
                 continue
             if a.mode == "fix" and ids:
+                t["defect corrected"] += 1
+                noted.update(ids)
+                continue
+            if b.both and b.both in ids:
                 t["defect corrected"] += 1
                 noted.update(ids)
                 continue

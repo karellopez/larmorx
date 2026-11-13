@@ -581,6 +581,20 @@ limit): 93,205 values, 0 differences; every call the port says never returns (22
 `pythag` pairs, 2,001 eigensystems, 129 SVDs) still computing in VNL at the limit. The `linalg`
 family's numbers are unchanged (20,000 cases, 7,764,649 values, 0 differences).
 
+**The NaNs' bits of the float SVD and the real eigensystem** (2026-11-13, track C relay 14):
+`vnl_svd_f32` and `vnl_eigen::real_eigensystem` compute every operation that can meet a NaN through
+`ItkReal::sse_*` (x86-64's NaN rules on every platform; the real eigensystem's debug and release
+builds had given different NaN signs), in the operand order of ITK 4.13.2's netlib as GCC 8.4.0
+compiled it, read from its object code (LINPACK's `ssvdc`, built with `-ffloat-store`; `srotg`;
+EISPACK's `elmhes`, `hqr2`, `cdiv`) and, for the vectorized `srot`, by running it on NaNs with
+distinct payloads (`validation/probes/fs-vnl/order/svd/`). The BLAS kernels are `vnl_qr`'s. In the
+real eigensystem GCC's per-statement choices are a table of numbered sites (`ORDER`). ITK-117 is
+new. The check (`validation/probes/fs-vnl`): family `svdnan`, 68,500 cases, 2,962,513 values, 0
+differences; family `eignan`, 17,302 eigensystems, 16,790 identical, the others differing in NaNs'
+bits only (docs/findings/vnl-netlib.md, F-VNLN-5). Digest tests
+`vnl_svd_f32::tests::nan_bits_are_x86_64s`, `vnl_eigen::tests::real_eigensystem_nan_bits_are_x86_64s`
+(under `NAN_TRAP_ARM=1`, debug and release).
+
 ## RANLUX389 and FreeSurfer's random distributions (`src/ranlux/`; FreeSurfer's foundations, item 3.1-05, 2026-11-13)
 
 **Clean-room implementation from [`specs/ranlux.md`](../../specs/ranlux.md)** (Apache-2.0; the spec

@@ -1,5 +1,5 @@
 {
- "dossier": "2026-11-13-freesurfer-batch-9",
+ "dossier": "2026-11-13-freesurfer-batch-10",
  "edits": [
   {
    "added": null,
@@ -121,11 +121,11 @@
   }
  ],
  "evidence": {
-  "accesses": 405087,
-  "agents": 426,
+  "accesses": 416713,
+  "agents": 441,
   "archive_checksums_differ": 0,
-  "archive_checksums_matched": 631,
-  "archived_files": 631,
+  "archive_checksums_matched": 659,
+  "archived_files": 659,
   "archives": {
    "2026-11-05-session-transcripts": {
     "files": 244,
@@ -215,6 +215,14 @@
     "files": 12,
     "sha256": "6a78dea187545f6a58952ebcc818f7f811d46a86f9527ea5a4b14ce90bc19a20"
    },
+   "2026-11-13-session-transcripts-docs-revision-step-2a": {
+    "files": 38,
+    "sha256": "bc9cad857de4f02e5462f1f54a7923cc70d65de2dc78e8549c2260a741cc4a07"
+   },
+   "2026-11-13-session-transcripts-freesurfer-batch-10": {
+    "files": 26,
+    "sha256": "1720b7b7202669fa893392fac2a783869ac6affee5e26652a17ef1b6f7d9014a"
+   },
    "2026-11-13-session-transcripts-freesurfer-batch-3": {
     "files": 15,
     "sha256": "73e5980ac8331c33b24749f758aeb3167982404a5b0d44e8692e1687bed9f76c"
@@ -252,30 +260,30 @@
     "sha256": "246d88c724835fe011c7d0aab2f547b65d18afed6245cba44d391d971eae2e8a"
    }
   },
-  "commits_printed": 3907,
-  "distinct_transcripts": 430,
+  "commits_printed": 4041,
+  "distinct_transcripts": 445,
   "first_record": "2026-10-09 11:38 UTC",
   "gaps": {
-   "agents_without_worktree": 322,
+   "agents_without_worktree": 337,
    "bad_lines": 0,
-   "calls_without_result": 75,
+   "calls_without_result": 77,
    "compaction_parent_missing": 9,
    "compactions": 79,
-   "refused_calls": 1693,
-   "refused_calls_restricted_accesses": 741,
+   "refused_calls": 1700,
+   "refused_calls_restricted_accesses": 742,
    "request_only_calls": 0,
    "results_without_call": 0,
-   "unresolved_paths": 8821
+   "unresolved_paths": 9108
   },
-  "last_record": "2026-11-13 15:30 UTC",
-  "live_files": 430,
-  "live_files_also_archived": 424,
+  "last_record": "2026-11-13 18:47 UTC",
+  "live_files": 445,
+  "live_files_also_archived": 441,
   "sessions": 4,
-  "tool_calls": 115718,
+  "tool_calls": 118991,
   "tool_calls_by_tool": [
    [
     "Agent",
-    428
+    443
    ],
    [
     "Artifact",
@@ -287,7 +295,7 @@
    ],
    [
     "Bash",
-    99744
+    102837
    ],
    [
     "CronCreate",
@@ -299,7 +307,7 @@
    ],
    [
     "Edit",
-    4502
+    4524
    ],
    [
     "EnterWorktree",
@@ -311,7 +319,7 @@
    ],
    [
     "Read",
-    2879
+    2918
    ],
    [
     "ReadNotifications",
@@ -319,7 +327,7 @@
    ],
    [
     "SendMessage",
-    143
+    154
    ],
    [
     "SendUserFile",
@@ -331,7 +339,7 @@
    ],
    [
     "SubagentHandback",
-    453
+    470
    ],
    [
     "TaskOutput",
@@ -339,11 +347,11 @@
    ],
    [
     "TaskStop",
-    309
+    320
    ],
    [
     "ToolSearch",
-    237
+    240
    ],
    [
     "WebFetch",
@@ -355,12 +363,12 @@
    ],
    [
     "Write",
-    6686
+    6748
    ]
   ],
-  "transcript_bytes": 12918612085,
-  "transcript_files": 1061,
-  "unique_paths": 82115
+  "transcript_bytes": 13439766003,
+  "transcript_files": 1104,
+  "unique_paths": 83418
  },
  "levels": [
   [
@@ -441,7 +449,7 @@
  "made_from": {
   "scan": "scan",
   "similarity_commit": "6e18b57d-dirty",
-  "verdicts_repository": "d42715de"
+  "verdicts_repository": "ba49c242"
  },
  "overview": {
   "agents_by_role": [
@@ -451,11 +459,11 @@
    ],
    [
     "clean-room implementer",
-    94
+    95
    ],
    [
     "documentation",
-    37
+    40
    ],
    [
     "integration",
@@ -467,28 +475,28 @@
    ],
    [
     "replica author",
-    132
+    136
    ],
    [
     "spec writer",
-    29
+    36
    ]
   ],
   "attributed_by": [
    [
     "printed",
-    277
+    291
    ],
    [
     "subject",
-    23
+    24
    ]
   ],
-  "commits": 300,
+  "commits": 315,
   "commits_by_role": [
    [
     "clean-room implementer",
-    296
+    311
    ],
    [
     "integration",
@@ -499,7 +507,7 @@
     3
    ]
   ],
-  "implementers": 94,
+  "implementers": 95,
   "register_restricted_lines": 1489,
   "single_file_scopes": {
    "checked": 72,
@@ -4713,6 +4721,31 @@
    ],
    "shown": "nan_trap.c's first 40 lines (its header comment, includes and static state) and build.sh's gcc line that builds libnan_trap.so",
    "time": "2026-11-13 11:50 UTC"
+  },
+  {
+   "agent": "a95b98a0326dc825f",
+   "declared": "no",
+   "description": "FreeSurfer clean room 2 relay 5 (fs.mri)",
+   "files": [
+    "<workspace>/oracles/freesurfer-8.2.0-unit/probes/crates/larmorx-fs-core/src/mri/copy.rs",
+    "<workspace>/oracles/freesurfer-8.2.0-unit/probes/crates/larmorx-fs-core/src/mri/geom.rs",
+    "<workspace>/oracles/freesurfer-8.2.0-unit/probes/crates/larmorx-fs-core/src/mri/tkreg.rs",
+    "<workspace>/oracles/freesurfer-8.2.0-unit/probes/crates/larmorx-fs-core/src/mri/volume.rs"
+   ],
+   "judged": true,
+   "judgement": "not restricted material: a scanner false positive (relative paths of the implementer's own worktree resolved against a stale working directory)",
+   "kind": "restricted material",
+   "line": 635,
+   "nature": "the clean room's own code; no file of the unit oracle's folder exists at those paths",
+   "register": null,
+   "rules": [
+    [
+     "R03 content (FreeSurfer)",
+     7
+    ]
+   ],
+   "shown": "the implementer's own changed files (crates/larmorx-fs-core/src/mri/*.rs and its tests) in `git status --short` and a clippy message on its own copy.rs, from `cargo fmt` and `cargo clippy` run in its own worktree; the scanner resolved the relative paths against the unit oracle's probes folder, where an earlier command of the relay had run the prebuilt probe",
+   "time": "2026-11-13 17:30 UTC"
   }
  ],
  "tools": [
@@ -10686,68 +10719,92 @@
     {
      "group": "the behaviour specs (specs/)",
      "run": 0,
-     "seen": 28,
+     "seen": 52,
      "written": 0
     },
     {
      "group": "the clean-room code",
-     "run": 0,
-     "seen": 293,
-     "written": 64
+     "run": 15,
+     "seen": 473,
+     "written": 119
     },
     {
      "group": "larmorx's other files (records, documents, tests, permissive ports)",
-     "run": 186,
-     "seen": 337,
-     "written": 21
+     "run": 310,
+     "seen": 569,
+     "written": 99
     },
     {
      "group": "the original programs, run or named as black boxes",
-     "run": 83,
-     "seen": 0,
+     "run": 98,
+     "seen": 1,
      "written": 0
     },
     {
      "group": "oracle outputs and inputs",
      "run": 0,
-     "seen": 34,
-     "written": 10
+     "seen": 52,
+     "written": 14
     },
     {
      "group": "the agent's own scratch notes, task outputs and memory",
-     "run": 319,
-     "seen": 166,
-     "written": 54
+     "run": 468,
+     "seen": 273,
+     "written": 76
     },
     {
      "group": "the system, the home directory, the workspace and the archive",
-     "run": 2,
-     "seen": 12,
-     "written": 0
+     "run": 10,
+     "seen": 28,
+     "written": 8
     },
     {
      "group": "restricted material (by rule and kind below)",
-     "run": 1,
-     "seen": 6,
-     "written": 3
+     "run": 21,
+     "seen": 15,
+     "written": 9
     }
    ],
    "cannot_see": {
     "compactions": 0,
-    "listings": 59,
-    "program_runs": 394,
-    "unresolved": 38,
-    "without_worktree": 3
+    "listings": 102,
+    "program_runs": 695,
+    "unresolved": 259,
+    "without_worktree": 4
    },
-   "commits": 19,
+   "commits": 34,
    "commits_by_role": [
     [
      "clean-room implementer",
-     19
+     34
     ]
    ],
    "family": "FreeSurfer",
-   "findings": [],
+   "findings": [
+    {
+     "agent": "a95b98a0326dc825f",
+     "declared": "no",
+     "description": "FreeSurfer clean room 2 relay 5 (fs.mri)",
+     "files": [
+      "<workspace>/oracles/freesurfer-8.2.0-unit/probes/crates/larmorx-fs-core/src/mri/copy.rs",
+      "<workspace>/oracles/freesurfer-8.2.0-unit/probes/crates/larmorx-fs-core/src/mri/geom.rs",
+      "<workspace>/oracles/freesurfer-8.2.0-unit/probes/crates/larmorx-fs-core/src/mri/tkreg.rs",
+      "<workspace>/oracles/freesurfer-8.2.0-unit/probes/crates/larmorx-fs-core/src/mri/volume.rs"
+     ],
+     "judged": true,
+     "judgement": "not restricted material: a scanner false positive (relative paths of the implementer's own worktree resolved against a stale working directory)",
+     "line": 635,
+     "nature": "the clean room's own code; no file of the unit oracle's folder exists at those paths",
+     "rules": [
+      [
+       "R03 content",
+       7
+      ]
+     ],
+     "shown": "the implementer's own changed files (crates/larmorx-fs-core/src/mri/*.rs and its tests) in `git status --short` and a clippy message on its own copy.rs, from `cargo fmt` and `cargo clippy` run in its own worktree; the scanner resolved the relative paths against the unit oracle's probes folder, where an earlier command of the relay had run the prebuilt probe",
+     "time": "2026-11-13 17:30 UTC"
+    }
+   ],
    "first": "2026-11-13",
    "id": "FreeSurfer/fs-core",
    "implementers": [
@@ -10774,8 +10831,15 @@
     },
     {
      "agent": "a431e0382b41bdb2b",
-     "commits": 1,
+     "commits": 7,
      "description": "FreeSurfer clean room 2 relay 4 (fs.maths rest)",
+     "first": "2026-11-13",
+     "last": "2026-11-13"
+    },
+    {
+     "agent": "a95b98a0326dc825f",
+     "commits": 9,
+     "description": "FreeSurfer clean room 2 relay 5 (fs.mri)",
      "first": "2026-11-13",
      "last": "2026-11-13"
     }
@@ -10787,8 +10851,24 @@
     {
      "after": 0,
      "agents": 1,
-     "before": 1,
+     "before": 7,
+     "level": "content",
+     "rule": "R03",
+     "scope": "this family"
+    },
+    {
+     "after": 0,
+     "agents": 2,
+     "before": 7,
      "level": "names",
+     "rule": "R03",
+     "scope": "this family"
+    },
+    {
+     "after": 0,
+     "agents": 1,
+     "before": 20,
+     "level": "build",
      "rule": "R03",
      "scope": "this family"
     },
@@ -10801,9 +10881,9 @@
      "scope": "this family"
     },
     {
-     "after": 0,
-     "agents": 1,
-     "before": 2,
+     "after": 4,
+     "agents": 3,
+     "before": 4,
      "level": "names",
      "rule": "R10",
      "scope": "another family"
@@ -10837,10 +10917,11 @@
    "slips": [
     35,
     36,
-    37
+    37,
+    38
    ],
    "verdict": {
-    "status": "clean, with notes",
+    "status": "reviewed (every finding judged)",
     "words": "clean: written from specs/freesurfer-core.md and black-box runs of FreeSurfer's compiled functions (the prebuilt fs_core_probe), FreeSurfer 8.2.0's official programs and the C library; no content of FreeSurfer's source, the replica or a document written from the source seen; reads beyond the brief only of another family's generic C (the AArch64 NaN emulation's build line and two README rows in FSL's mcflirt probe folder), judged no contamination"
    }
   },

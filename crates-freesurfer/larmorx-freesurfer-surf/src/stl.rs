@@ -489,8 +489,13 @@ pub fn read_stl(
     filename: &str,
 ) -> Result<Option<Mris>, Fatal> {
     let filename = c_str(filename);
-    let Ok(mut fp) = open(dir, filename, "rb") else {
-        return Ok(None);
+    let mut fp = match open(dir, filename, "rb") {
+        Ok(fp) => fp,
+        Err(e) => {
+            // the stream's failed open leaves `errno` (seen by a later error's message)
+            g.errno = e;
+            return Ok(None);
+        }
     };
     let mut bytes = Vec::new();
     let mut buf = [0u8; 65536];
@@ -536,11 +541,15 @@ pub fn read_stl(
 /// `mrisWriteSTL(mris, filename)`: a binary STL file: an 80-byte header (`freesurfer mesh`, then
 /// zeros), the face count, per face its cached normal (`getFaceNorm`: a deferred one computed)
 /// and its three vertices' coordinates (little-endian floats) and the two bytes `0` and NUL.
-/// `false` (no message) when the file cannot be created.
-pub fn write_stl(dir: Option<&Path>, mris: &mut Mris, filename: &str) -> bool {
+/// `false` (no message, `errno` left as the failed open set it) when the file cannot be created.
+pub fn write_stl(g: &mut Globals, dir: Option<&Path>, mris: &mut Mris, filename: &str) -> bool {
     let filename = c_str(filename);
-    let Ok(mut fp) = open(dir, filename, "wb") else {
-        return false;
+    let mut fp = match open(dir, filename, "wb") {
+        Ok(f) => f,
+        Err(e) => {
+            g.errno = e;
+            return false;
+        }
     };
     let mut b = Vec::with_capacity(84 + 50 * nonneg(mris.nfaces));
     let mut header = [0u8; 80];

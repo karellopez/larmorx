@@ -471,16 +471,18 @@ impl CondStack {
         if self.ptr >= 0 {
             self.stderr_oriented = true;
         }
-        for (c, t) in self.entries().to_vec() {
-            out.err(&format!(
-                "{:8x} {}\n",
-                c as u32,
-                String::from_utf8_lossy(&t)
-            ));
+        for (c, t) in self.entries() {
+            let mut line = format!("{:8x} ", *c as u32).into_bytes();
+            line.extend_from_slice(t);
+            line.push(b'\n');
+            out.err_bytes(&line);
         }
     }
 
     /// `COND_DumpConditions`: the stack printed to standard error, bottom first, then emptied.
+    /// Each entry's code in 8 hexadecimal columns, a space, its text's bytes as they are (through
+    /// [`Streams::err_bytes`]: unchanged on a byte stream such as [`larmorx_core::cfmt::Writers`],
+    /// so a message that holds a file's bytes that are not UTF-8 is printed as CTN prints it).
     pub fn dump(&mut self, out: &mut dyn Streams) {
         self.dump_to(out);
         self.ptr = -1;

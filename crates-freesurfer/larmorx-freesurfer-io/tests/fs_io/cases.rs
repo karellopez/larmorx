@@ -31,6 +31,8 @@ mod piece2;
 mod piece3;
 #[path = "piece4.rs"]
 mod piece4;
+#[path = "piece5.rs"]
+mod piece5;
 
 /// The cases' random numbers.
 pub struct Gen(u64);
@@ -247,6 +249,7 @@ pub fn generate(seed: u64, n: usize, portable: bool) -> Vec<String> {
     kinds.extend(piece2::KINDS);
     kinds.extend(piece3::KINDS);
     kinds.extend(piece4::KINDS);
+    kinds.extend(piece5::KINDS);
     for i in 0..n {
         let kind = kinds[i % kinds.len()];
         if piece2::KINDS.contains(&kind) {
@@ -259,6 +262,10 @@ pub fn generate(seed: u64, n: usize, portable: bool) -> Vec<String> {
         }
         if piece4::KINDS.contains(&kind) {
             lines.push(piece4::generate(&mut g, kind, portable).join(" "));
+            continue;
+        }
+        if piece5::KINDS.contains(&kind) {
+            lines.push(piece5::generate(&mut g, kind, portable).join(" "));
             continue;
         }
         let mut t: Vec<String> = vec![kind.into()];
@@ -612,6 +619,11 @@ pub fn run_line(line: &str, mode: UpstreamDefects, w: &Work) -> (String, Vec<&'s
             let mut o2 = shared.clone();
             let mut e2 = shared.clone();
             return piece4::run(&t, &mut g, &mut o2, &mut e2, &mut o, w, &mut extra);
+        }
+        if piece5::KINDS.contains(&t[0]) {
+            let mut o2 = shared.clone();
+            let mut e2 = shared.clone();
+            return piece5::run(&t, &mut g, &mut o2, &mut e2, &mut o, w, &mut extra);
         }
         match t[0] {
             "rd" => {

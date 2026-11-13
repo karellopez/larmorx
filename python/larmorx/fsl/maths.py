@@ -12,14 +12,12 @@ combines for each BOLD reference; :func:`collapse`, :func:`apply_mask`, :func:`b
 :func:`smooth`, :func:`spatial_filter` and :func:`threshold`: the goodvoxels mask of
 ``--project-goodvoxels``).
 
-Two implementations (``docs/licensing.md``): the bit-exact replica from ``larmorx-nc``, run as
-a separate program on one thread, and the clean-room original (Apache-2.0, written from
-``specs/fslmaths.md``, run in this process on ``n_threads`` threads, its results the same at any
-thread count); ``implementation="auto"`` runs the replica when it is installed, the original
-otherwise. The original takes the command line, every data type, the binary operations,
-thresholds, masks, voxelwise functions, ``-rand``, ``-seed``, ``-index`` and ``-grid`` so far;
-its other operations (kernels and filters, the reductions, the statistics, ``-randn``) come with
-its next parts and raise ``RuntimeError`` until then. FSL's deterministic defects are corrected
+Two ports (``docs/licensing.md``): the bit-exact replica from ``larmorx-nc``, run as a separate
+program on one thread, and the clean room (Apache-2.0, written from ``specs/fslmaths.md``, run in
+this process on ``n_threads`` threads, its results the same at any thread count);
+``implementation="auto"`` runs the replica when it is installed, the clean room otherwise. The
+clean room takes every operation of fslmaths' usage text and the hidden ones
+(``docs/api/fsl-maths.md``). FSL's deterministic defects are corrected
 by default (D13, ``docs/api/fsl-maths.md``); ``upstream_defects="reproduce"`` gives FSL's
 results. FSL's environment variables are settings of the call, never read from the process
 environment (CLAUDE.md rule 6): the program writes NIfTI-1 (``FSLOUTPUTTYPE=NIFTI``).
@@ -286,7 +284,7 @@ def _run(
     if odt is not None:
         args += ["-odt", odt]
     if selected is None:
-        # the clean-room original, in this process (its notices become warnings)
+        # the clean room, in this process (its notices become warnings)
         env = [("FSLOUTPUTTYPE", "NIFTI"), (_defects.ENV, upstream_defects)]
         if n_threads > 0:
             env.append(("OMP_NUM_THREADS", str(n_threads)))
@@ -364,14 +362,36 @@ def fslmaths(
     Python arguments; :func:`tensor_decomp` and :func:`roc` also return the files those
     operations write.
 
-    ``n_threads`` is the clean-room original's thread count (0: all; its results are the same
-    at any count); the replica runs on one thread. ``implementation`` chooses between them
-    (``"auto"``: the replica when ``larmorx-nc`` is installed, else the original).
+    ``n_threads`` is the clean room's thread count (0: all; its results are the same at any
+    count); the replica runs on one thread. ``implementation`` chooses between them (``"auto"``:
+    the replica when ``larmorx-nc`` is installed, else the clean room).
 
     Raises ``ValueError`` for invalid arguments, :class:`larmorx.ReplicaError` when the replica
-    fails and ``RuntimeError`` when the original fails (their messages are in the error), and
+    fails and ``RuntimeError`` when the clean room fails (their messages are in the error), and
     :class:`larmorx.ReplicaNotFoundError` for ``implementation="replica"`` without
     ``larmorx-nc``.
+
+    Parameters
+    ----------
+    image
+        The first input: a path, an :class:`~larmorx.Image`, a nibabel image or an ``(array,
+        affine)`` pair.
+    *operations
+        fslmaths' operations and their operands in its own words, applied left to right
+        (``"-mul"``, an image, ``"-kernel"``, ``"gauss"``, 2.5, ``"-Tmean"``, ...).
+    dt
+        ``-dt``: the type the operations compute in (:data:`DATATYPES`).
+    odt
+        ``-odt``: the output's type (:data:`DATATYPES`).
+    n_threads
+        Threads (0 = all) for the in-memory images and the clean room's operations; the
+        replica runs on one thread; the same results at any count.
+    implementation
+        ``"auto"`` (default): the replica when ``larmorx-nc`` is installed, else the clean room;
+        ``"replica"`` or ``"clean-room"`` (``"original"``, 0.1.0rc1's spelling, still works).
+    upstream_defects
+        ``"fix"`` (default) or ``"reproduce"``: FSL's defects corrected, or FSL's behaviour
+        (``docs/api/fsl-maths.md``, "Defects of the original, corrected by default").
     """
     with tempfile.TemporaryDirectory(prefix="larmorx-fslmaths-") as tmp:
         return _run(

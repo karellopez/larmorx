@@ -256,13 +256,17 @@ FreeSurfer's clean-room implementers).
   `DCM_NOGROUPLENGTH` and `DCM_ACCEPTVRMISMATCH`; `DCM_FORMATCONVERSION` without a byte order
   (CTN refuses it: "illegal stream option"). The options no caller reaches (`DCM_DELETEONCLOSE`,
   `DCM_USELENGTHTOEND`, `DCM_ALLOWREPEATELEMENTS` / `DCM_TRYFILENAMECHANGE`, `DCM_EFILM`, a format
-  conversion with a byte order) return `read::Unsupported`; streams (`DCM_ReadStream`) and the
+  conversion with a byte order) return `read::Unsupported`; `open_file_named` opens one path and
+  shows another name (the bytes the C caller passed) in the messages and the object, for programs
+  run in process with their own working directory; streams (`DCM_ReadStream`) and the
   element access functions are not ported here (item 3.1-56 reads elements on this reader).
 - CTN's global state is a value (`CondStack`): the condition stack, and `errno` and the
   descriptors as CTN's calls leave them (a read with a negative count, a descriptor closed twice,
   glibc's first `perror` on a write-only standard error), so `perror`'s texts are CTN's; errno
-  texts are glibc's on every platform. Texts printed to the streams are UTF-8 (other bytes
-  replaced); the condition stack keeps the bytes.
+  texts are glibc's on every platform. The condition stack keeps the bytes, and its dumps
+  (`CondStack::dump`, the overflow dump in `push`) print them unchanged through
+  `Streams::err_bytes` on a byte stream (`larmorx_core::cfmt::Writers`); a text-only stream gets
+  U+FFFD for bytes that are not UTF-8.
 - The C arithmetic is kept: 32-bit lengths that wrap, `fileSize`'s `int`, the group lengths
   recomputed, the transfer syntax applied when the object's size reaches the meta group's end, a
   delimiter at any level ending the data set, the explicit VR code compared as a C string (the

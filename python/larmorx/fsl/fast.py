@@ -3,10 +3,10 @@
 random field fitted by expectation-maximisation, with a bias field and partial-volume
 estimation, on one image or several channels.
 
-Two implementations (``docs/licensing.md``): the bit-exact replica from ``larmorx-nc``, run as a
-separate program, and the clean-room original of this package (Apache-2.0, written from
-``specs/fast.md``, run in this process); ``implementation="auto"`` runs the replica when
-``larmorx-nc`` is installed, else the original. The original segments any number of channels
+Two ports (``docs/licensing.md``): the bit-exact replica from ``larmorx-nc``, run as a separate
+program, and the clean room of this package (Apache-2.0, written from ``specs/fast.md``, run in
+this process); ``implementation="auto"`` runs the replica when ``larmorx-nc`` is installed, else
+the clean room. The clean room segments any number of channels
 (the replica up to ``MAX_CHANNELS``: FSL's results beyond follow OpenBLAS's kernels for larger
 matrices) and registers the tissue priors with larmorx's FLIRT in this process.
 
@@ -41,7 +41,7 @@ ImageType = Literal["T1", "T2", "PD"]
 _TYPES = {"T1": 1, "T2": 2, "PD": 3}
 
 #: The most channels the replica segments (``-S``; FAST's own limit is the command line; the
-#: original has none).
+#: clean room has none).
 MAX_CHANNELS = 8
 
 
@@ -128,7 +128,7 @@ def _finite(name: str, value: float, *, positive: bool = False) -> str:
 def _run_original(
     args: list[str], tmp: str, settings: dict[str, str], n_threads: int, upstream_defects: str
 ) -> str:
-    """The clean-room original in this process, in ``tmp``, with FSL's settings of this call;
+    """The clean room in this process, in ``tmp``, with FSL's settings of this call;
     its notices become Python warnings; a failure raises ``RuntimeError``. Its standard
     output."""
     env = [*settings.items(), (_defects.ENV, upstream_defects)]
@@ -195,9 +195,20 @@ def fast(
     ``fast(t1w_brain, bias_iterations=0, no_bias=True, probabilities=True, segments=True)``.
 
     Raises ``ValueError`` for invalid arguments, :class:`larmorx.ReplicaError` when the replica
-    fails and ``RuntimeError`` when the original does (FAST's message is in the error), and
+    fails and ``RuntimeError`` when the clean room does (FAST's message is in the error), and
     :class:`larmorx.ReplicaNotFoundError` for ``implementation="replica"`` without
     ``larmorx-nc``.
+
+    Parameters
+    ----------
+    n_threads
+        Threads (0 = all); the results do not depend on it.
+    implementation
+        ``"auto"`` (default): the replica when ``larmorx-nc`` is installed, else the clean room;
+        ``"replica"`` or ``"clean-room"`` (``"original"``, 0.1.0rc1's spelling, still works).
+    upstream_defects
+        ``"fix"`` (default) or ``"reproduce"``: FSL's defects corrected, or FSL's behaviour
+        (``docs/api/fsl-fast.md``, "Defects of the original, corrected by default").
     """
     n_threads = _threads(n_threads)
     channels = list(images) if isinstance(images, (list, tuple)) and len(images) != 0 else [images]

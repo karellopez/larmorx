@@ -41,7 +41,7 @@ fn coord_text(g: &mut Gen) -> String {
 /// An ASCII surface (`MRISwriteAscii`'s format and variations): the counts, `x  y  z  rip` per
 /// vertex, `a b c rip` per face; now and then a header that cannot be read, a face of a vertex
 /// out of range, a vertex of more than 255 faces, a cut file or one of no line.
-fn ascii_surface(g: &mut Gen) -> Vec<u8> {
+pub(super) fn ascii_surface(g: &mut Gen) -> Vec<u8> {
     let mut s = String::new();
     if g.chance(30) {
         return g
@@ -119,7 +119,7 @@ fn geo_num(g: &mut Gen) -> String {
 /// face count again, six coordinates per line, faces `a b -c` from 1), with variations: a header
 /// that cannot be read, a face count of 0, edges that are not three per face, vertex numbers out
 /// of range or a last vertex not negative, a cut file, a file of no line.
-fn geo_surface(g: &mut Gen, nv: i64, nf: i64, many: bool) -> Vec<u8> {
+pub(super) fn geo_surface(g: &mut Gen, nv: i64, nf: i64, many: bool) -> Vec<u8> {
     if g.chance(30) {
         return g.pick(&["", "# nothing\n"]).as_bytes().to_vec();
     }

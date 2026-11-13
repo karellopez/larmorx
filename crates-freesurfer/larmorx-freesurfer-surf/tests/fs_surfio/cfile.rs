@@ -241,7 +241,7 @@ fn decimation(g: &mut Gen, nv: i64) -> Vec<u8> {
 /// A VTK file for a surface of `nv` vertices and `faces` (the reader's checks met mostly): the
 /// header, `POINTS`, the coordinates, `POLYGONS`, the faces, and now and then `POINT_DATA` with
 /// fields; each part now and then malformed, cut or missing (FS-143 to FS-147).
-fn vtk(g: &mut Gen, nv: i64, faces: &[[i64; 3]]) -> Vec<u8> {
+pub(super) fn vtk(g: &mut Gen, nv: i64, faces: &[[i64; 3]]) -> Vec<u8> {
     let mut s = String::new();
     if g.chance(2) {
         s += "# vtk DataFile Version 1.0\n";

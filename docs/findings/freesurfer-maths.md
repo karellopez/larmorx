@@ -724,6 +724,20 @@ passing under `NAN_TRAP_ARM=1` with `NAN_TRAP_DIR` in debug (8,295 flips) and re
   moves, `fnv_add` for `mrisVertexHash`; D keeps local copies until it switches), `mri.cpp`'s
   `MRI::hash`, `realm.cpp`.
 
+## `AffineMV`'s and `AffineMM`'s NaNs (track A relay 15, from track C's relay 11)
+
+`include/affine.h`'s SSE branch is `static inline`: its compiled order is that of each place it is
+inlined. Track C measured `MRIcalcCRASforExtractedVolume`'s copy (`objdump -dr` of the unit oracle's
+`mri.cpp.o`, docs/findings/freesurfer-volume.md §3): each product `mulps` with the vector's broadcast
+number in the destination register, each sum with the running sum there, the fourth product (by 1)
+folded away (`x + c3` has the bits of `x + c3 * 1`: a NaN `c3` is quieted either way). The translation
+used plain Rust arithmetic, whose NaNs made from numbers (`inf - inf`, `0 * inf`) take AArch64's sign
+under the ARM emulation. Now `crate::sse` in that order (`affine.rs`'s `combine`); `AffineMM` takes the
+same order (not measured: no inlined copy measured yet). Test: `tests/affine_nan.rs`, 20,000 seeded
+products of matrices and vectors with zeros, infinities and NaNs of both signs and with payloads,
+hash `0x5297abf083b3d8b8`, passing in debug and release and under `NAN_TRAP_ARM=1` with
+`NAN_TRAP_DIR` (287,019 NaNs corrected by the emulation).
+
 ## The register's texts before the open-files rewrite (2026-11-13)
 
 The orchestrator's rule of 2026-11-13 ("open files carry behaviour only", the foundations' brief):

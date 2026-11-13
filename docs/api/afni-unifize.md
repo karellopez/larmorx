@@ -5,55 +5,54 @@ T1-weighted volume made uniform across space and scaled to about 1000 (or, with 
 T2-weighted one; with `-EPI`, of an EPI series), as AFNI's `3dUnifize` computes it (26.3.05;
 first 25.2.09).
 
-**AFNI versions** (2026-10-29): both implementations follow AFNI 26.3.05 and are validated against it (the clean-room original since its alignment the same day). The two releases differ, for these programs, in two corrections larmorx already made by default (AFNI-03, header slice code 2; AFNI-05, 3dTshift's `-no_detrend`): AFNI 26.3.05 behaves as larmorx corrected them, so `reproduce` now gives the same result as the default where they apply, and neither is named ([findings](../findings/afni-relicensing-26.md) for the new licence).
+**AFNI versions** (2026-10-29): both ports follow AFNI 26.3.05 and are validated against it (the clean room since its alignment the same day). The two releases differ, for these programs, in two corrections larmorx already made by default (AFNI-03, header slice code 2; AFNI-05, 3dTshift's `-no_detrend`): AFNI 26.3.05 behaves as larmorx corrected them, so `reproduce` now gives the same result as the default where they apply, and neither is named ([findings](../findings/afni-relicensing-26.md) for the new licence).
 
-**Two implementations, both in `pip install larmorx`.** The bit-exact **replica**, translated
-from AFNI's source (`crates/larmorx-afni-replica`; Apache-2.0, with CC BY 4.0's attribution for the code of the Medical College of Wisconsin, which AFNI 26.3.05 releases under CC BY 4.0 ([NOTICE](../../NOTICE), [licensing](../licensing.md)); with fdlibm's `tanhf` as glibc 2.35 runs
-it; until 2026-10-29 the separate GPL package `larmorx-gpl`), and the clean-room **original**
-(`crates/larmorx-afni`, Apache-2.0), built for speed and written from
-[`specs/3dUnifize.md`](../../specs/3dUnifize.md) and black-box runs of AFNI only
-([PROVENANCE](../../crates/larmorx-afni/PROVENANCE.md)). `implementation="auto"` (the default, and
-`larmorx afni 3dUnifize`) runs the replica, in the same process; `"replica"` or `"clean-room"` (`"original"`, 0.1.0rc1's spelling, still works)
-(`--implementation` before the family, or `LARMORX_IMPLEMENTATION`) forces one.
+The ports come first, then the program's section, the source of its reference page on the
+documentation site (`python -m larmorx_validation reference`), with its options table checked
+against the code; then `-EPI`'s cube root, AFNI's defects as both ports correct them, the
+differences by design, the known last-bit differences and the clean room's speed.
 
-**`-EPI`'s radius and the cube root's last bit** (2026-10-29). `-EPI` sets its radius from the
-voxel volume with the C library's `cbrtf`; AFNI's Linux builds take glibc's, whose code is
-LGPL-2.1 and not part of larmorx, and whose result is one unit in the last place from the
-correctly rounded one on about one input in ten. For most voxel sizes nothing changes; glibc's
-last bit changes the ball of neighbours for 80 volumes and the printed radius for 43 in
-[1, 100) mm³ ([findings](../findings/afni-relicensing-26.md), "The C library's maths"). Each
-image's `implementation` names the one that ran.
+## Ports
 
-**Decided by the user on 2026-10-30, and done in the clean-room original the same day:** the
-default keeps the correctly rounded cube root (`larmorx_core::math::cbrtf`, CORE-MATH's, the more
-accurate), and `reproduce` takes a clean-room cube root with glibc 2.35's bits
-(`larmorx_core::math::cbrtf_glibc`, written from [`specs/cbrtf.md`](../../specs/cbrtf.md) only and
-proved equal to the system's `cbrtf` on all 2^32 float inputs, NaN bits included:
-[the proof](../../validation/investigations/cleanroom-cbrtf/README.md)), so the original's
-`reproduce` gives AFNI's radius, ball and message on every voxel size. By default the original
-names **GLIBC-05** (glibc 2.35's `cbrtf` is not correctly rounded) exactly where glibc's last bit
-would have changed the result: the ball of neighbours within the grid's reach (the only offsets
-ever used) or the radius printed with one decimal, with the radius each cube root gives and what
-differs; `reproduce` names it too ("reproduced", AFNI's radius). **The replica the same since
-2026-10-30:** its `-EPI` radius takes `cbrtf_glibc` with `reproduce` (AFNI's radius, ball and
-message on every voxel size: checked on every float32 voxel volume, `crates-gpl/tools/cbrtf-measure`)
-and the correctly rounded cube root by default, with the same GLIBC-05 notice, word for word; its
-last-bit warning of 2026-10-29 (a line ending in `(larmorx)`) is gone.
+`3dUnifize` has two ports, both in `pip install larmorx`:
 
-**Status: `validated`**, both, against AFNI 26.3.05 itself (the original against AFNI 25.2.09 until 2026-10-29):
-- the original ([record](../validation/afni-unifize.md), 129 cases, none failing; GLIBC-05's 5
-  since 2026-10-30): AFNI's exit status and messages in every case; in 44 of the 99 compared
-  cases that write outputs every output is AFNI's, bit for bit (data and NIfTI header); in the
-  other 55 the headers are AFNI's and some squashed values differ in their last bit (at most
-  8.7e-8 of the largest value; the threshold is 1e-5), because AFNI's `tanhf` is glibc's and the
-  original's is correctly rounded: AFNI run with CORE-MATH's correctly rounded functions preloaded
-  gives the original's bytes in all 55. fMRIPrep's own outputs of 22 oracle BOLD references: 1
-  bit for bit, the other 21 AFNI's oracle output with the same last-bit differences. Its result
-  does not depend on the thread count (nor does AFNI's: 1 and 6 threads, and fMRIPrep's build,
-  give the oracle's bytes);
-- the replica ([record](../validation/afni-unifize-replica.md)): every compared case, bit for bit.
+- **The replica** is bit-exact, translated from AFNI's source (`crates/larmorx-afni-replica`;
+  Apache-2.0, with CC BY 4.0's attribution for the code of the Medical College of Wisconsin,
+  which AFNI 26.3.05 releases under CC BY 4.0 ([NOTICE](../../NOTICE),
+  [licensing](../licensing.md)); with fdlibm's `tanhf` as glibc 2.35 runs it; until 2026-10-29
+  the separate GPL package `larmorx-gpl`).
+- **The clean room** (`crates/larmorx-afni`, Apache-2.0) is built for speed and written from
+  [`specs/3dUnifize.md`](../../specs/3dUnifize.md) and black-box runs of AFNI only
+  ([PROVENANCE](../../crates/larmorx-afni/PROVENANCE.md)).
 
-## Quick start
+`implementation="auto"` (the default, and `larmorx afni 3dUnifize`) runs the replica, in the same
+process; `"replica"` or `"clean-room"` (`"original"`, 0.1.0rc1's spelling, still works)
+(`--implementation` before the family, or `LARMORX_IMPLEMENTATION`) forces one. Each image's
+`implementation` names the one that ran.
+
+## `3dUnifize`
+
+<!-- reference
+program: 3dUnifize
+group: afni
+original: AFNI 26.3.05
+python: larmorx.afni.unifize
+command-line: crates/larmorx-afni/src/cli/unifize.rs
+records: {replica: [afni-unifize-replica], clean-room: [afni-unifize]}
+evidence: afni-unifize
+-->
+
+`3dUnifize` makes the white-matter intensity of a T1-weighted volume uniform across space and
+scales it to about 1000 (or, with `-T2`, of a T2-weighted one; with `-EPI`, of an EPI series).
+
+### Python (`3dUnifize`)
+
+`lx.afni.unifize(image, *, t2=False, t2_percentile=98.5, gm=False, radius=18.3, percentiles=(70.0, 80.0), clfrac=0.2, duplo=True, epi=False, squash=True, save_scale=False, save_automask=False, n_threads=1, implementation="auto", upstream_defects="fix", afni_settings=None)`
+
+Returns an `UnifizeResult`: `image` (float32; with `epi=True` every volume), `scale` (with
+`save_scale=True`) and `automasked` (with `save_automask=True`). `lx.afni.fmriprep_unifize_options()`
+gives fMRIPrep's arguments. The arguments are checked before anything runs (`ValueError`, with
+3dUnifize's ranges); with the clean room, AFNI's fatal errors (no automask) are `ValueError`s too.
 
 ```python
 import larmorx as lx
@@ -66,22 +65,11 @@ uni.image   # float32, white matter about 1000
 r = lx.afni.unifize("sub-01_T1w.nii.gz", save_scale=True, n_threads=6)
 ```
 
-```bash
-larmorx afni 3dUnifize -clfrac 0.2 -rbt 18.3 65.0 90.0 -prefix uni.nii.gz -T2 -input ref.nii.gz
-```
-
-## `lx.afni.unifize(image, *, t2=False, t2_percentile=98.5, gm=False, radius=18.3, percentiles=(70.0, 80.0), clfrac=0.2, duplo=True, epi=False, squash=True, save_scale=False, save_automask=False, n_threads=1, implementation="auto", upstream_defects="fix", afni_settings=None)`
-
-Returns an `UnifizeResult`: `image` (float32; with `epi=True` every volume), `scale` (with
-`save_scale=True`) and `automasked` (with `save_automask=True`). `lx.afni.fmriprep_unifize_options()`
-gives fMRIPrep's arguments. The arguments are checked before anything runs (`ValueError`, with
-3dUnifize's ranges); with the original, AFNI's fatal errors (no automask) are `ValueError`s too.
-
-### Option mapping
+### Options of `3dUnifize`
 
 | AFNI option | Python | Notes |
 |---|---|---|
-| `-prefix p` | the result's `image` | NIfTI only; AFNI's default `Unifized` is its own format, refused |
+| `-prefix p` | the result | its `image`; NIfTI only; AFNI's default `Unifized` is its own format, refused |
 | `-input d`, `-inset d`, or the last argument | `image` | |
 | `-T2` | `t2=True` (or 1) | invert the contrast, unifize, invert back |
 | `-T2 -T2` | `t2=2` | no inversion back; bright edges clipped |
@@ -93,11 +81,74 @@ gives fMRIPrep's arguments. The arguments are checked before anything runs (`Val
 | `-noduplo`, `-nodouble` | `duplo=False` | the half-size copy is only used above a million voxels |
 | `-EPI` | `epi=True` | implies `-T2` (once, whatever `-T2` gave) and `-noduplo`, turns off `-GM`, sets the radius from the voxel size |
 | `-nosquash`, `-oink` | `squash=False` | |
-| `-ssave s`, `-amsave a` | `save_scale`, `save_automask` | |
+| `-ssave s`, `-amsave a` | `save_scale`, `save_automask` | the result's `scale` and `automasked` |
 | `-quiet`, `-verb` | (always quiet) | warnings become Python warnings |
 | `-useall` | – | disabled in AFNI 25.2.09 and 26.3.05 (a warning) |
-| global options, `AFNI_*` | `afni_settings` | as for 3dAutomask |
+| `-overwrite`, `-Dname=value`, `-ok_1D_text`, `-skip_afnirc`; `AFNI_*` | `afni_settings` | AFNI's global options, anywhere on the command line, and AFNI's variables, as for 3dAutomask |
 | `OMP_NUM_THREADS` | `n_threads` | the result does not depend on it, in AFNI or larmorx |
+
+### Examples of `3dUnifize`
+
+<!-- inputs: ref.nii.gz=head -->
+
+```python example
+import larmorx as lx
+
+# As fMRIPrep's BOLD reference workflow calls 3dUnifize (-clfrac 0.2 -rbt 18.3 65.0 90.0 -T2).
+uni = lx.afni.unifize("ref.nii.gz", **lx.afni.fmriprep_unifize_options())
+uni.image.data.dtype  # -> dtype('float32')
+```
+
+```bash example
+larmorx afni 3dUnifize -clfrac 0.2 -rbt 18.3 65.0 90.0 -prefix uni.nii.gz -T2 -input ref.nii.gz
+```
+
+### Ports of `3dUnifize`
+
+Both are `validated` against AFNI 26.3.05 itself (the clean room against AFNI 25.2.09 until
+2026-10-29), each in a standard comparison of 2026-10-30:
+
+- **The replica** ([its record](../validation/afni-unifize-replica.md)): 127 cases, 106 within
+  its thresholds, 19 rejected by both alike, 2 expected divergences (AFNI's default prefix, its
+  own format, which LARMORX refuses; a slab where AFNI reads memory it never wrote, AFNI-47);
+  every one of the 97 compared cases that write an output is AFNI's bit for bit (data and NIfTI
+  header), with AFNI's exit status and messages.
+- **The clean room** ([its record](../validation/afni-unifize.md)): 129 cases, none failing: 108
+  within its thresholds, 19 rejected by both alike, the same 2 expected divergences (GLIBC-05's 5
+  cases since 2026-10-30). AFNI's exit status and messages in every case; in 44 of the 99
+  compared cases that write outputs every output is AFNI's, bit for bit (data and NIfTI header);
+  in the other 55 the headers are AFNI's and some squashed values differ in their last bit (at
+  most 8.7e-8 of the largest value; the threshold is 1e-5), because AFNI's `tanhf` is glibc's and
+  the clean room's is correctly rounded: AFNI run with CORE-MATH's correctly rounded functions
+  preloaded gives the clean room's bytes in all 55. fMRIPrep's own outputs of 22 BOLD references
+  of fMRIPrep's runs: 1 bit for bit, the other 21 AFNI's output with the same last-bit
+  differences. Its result does not depend on the thread count (nor does AFNI's: 1 and 6 threads,
+  and fMRIPrep's build, give AFNI's bytes).
+
+## `-EPI`'s radius and the cube root's last bit
+
+`-EPI` sets its radius from the
+voxel volume with the C library's `cbrtf`; AFNI's Linux builds take glibc's, whose code is
+LGPL-2.1 and not part of larmorx, and whose result is one unit in the last place from the
+correctly rounded one on about one input in ten. For most voxel sizes nothing changes; glibc's
+last bit changes the ball of neighbours for 80 volumes and the printed radius for 43 in
+[1, 100) mm³ ([findings](../findings/afni-relicensing-26.md), "The C library's maths").
+
+**Decided by the user on 2026-10-30, and done in the clean room the same day:** the
+default keeps the correctly rounded cube root (`larmorx_core::math::cbrtf`, CORE-MATH's, the more
+accurate), and `reproduce` takes a clean-room cube root with glibc 2.35's bits
+(`larmorx_core::math::cbrtf_glibc`, written from [`specs/cbrtf.md`](../../specs/cbrtf.md) only and
+proved equal to the system's `cbrtf` on all 2^32 float inputs, NaN bits included:
+[the proof](../../validation/investigations/cleanroom-cbrtf/README.md)), so the clean room's
+`reproduce` gives AFNI's radius, ball and message on every voxel size. By default the clean room
+names **GLIBC-05** (glibc 2.35's `cbrtf` is not correctly rounded) exactly where glibc's last bit
+would have changed the result: the ball of neighbours within the grid's reach (the only offsets
+ever used) or the radius printed with one decimal, with the radius each cube root gives and what
+differs; `reproduce` names it too ("reproduced", AFNI's radius). **The replica the same since
+2026-10-30:** its `-EPI` radius takes `cbrtf_glibc` with `reproduce` (AFNI's radius, ball and
+message on every voxel size: checked on every float32 voxel volume, `crates-gpl/tools/cbrtf-measure`)
+and the correctly rounded cube root by default, with the same GLIBC-05 notice, word for word; its
+last-bit warning of 2026-10-29 (a line ending in `(larmorx)`) is gone.
 
 ## Upstream defects (D13)
 
@@ -116,7 +167,7 @@ Corrected by default, reproduced with `upstream_defects="reproduce"`, by both im
   or twice (also clip the bright edges) (AFNI-48; ...)`, exit 1); `reproduce` gives AFNI's
   result and names AFNI-48 after the output. With `-EPI` (which implies one `-T2`) any number
   of `-T2` runs as in AFNI. Both implementations word it the same.
-- **AFNI-75** (random testing, 2026-10-25; the replica, and the clean-room original since
+- **AFNI-75** (random testing, 2026-10-25; the replica, and the clean room since
   2026-10-30, `specs/3dUnifize.md` §9.1): `-EPI` sets the radius from the voxel size with no
   upper bound (AFNI prints "-EPI changes -Urad to N voxels"); on micrometre voxels N is
   thousands and the ball of neighbours AFNI builds first needs terabytes, so AFNI fills the
@@ -128,11 +179,11 @@ Corrected by default, reproduced with `upstream_defects="reproduce"`, by both im
   the voxels and the likely cause (micrometre units), naming AFNI-75 (exit 1, nothing written;
   the Python API raises the same message): the two refuse the same calls with the same words.
   Every case that fits is unchanged; `reproduce` attempts it as AFNI does: the replica builds
-  the whole ball, the original only the ball's lines that reach the grid (the same values; 3 µm
+  the whole ball, the clean room only the ball's lines that reach the grid (the same values; 3 µm
   voxels on a 24 × 24 × 16 series: 0.01 s, 5 MiB).
 - **AFNI-01**: `-EPI`'s median volume drops a negative `scl_slope`, so its sign is wrong and the
   output is all zeros; the default applies the factor.
-- **GLIBC-05** (the clean-room original and the replica, 2026-10-30; `specs/cbrtf.md`): `-EPI`'s radius is 18.3
+- **GLIBC-05** (the clean room and the replica, 2026-10-30; `specs/cbrtf.md`): `-EPI`'s radius is 18.3
   mm over the cube root of the voxel volume, which AFNI takes from glibc 2.35's `cbrtf`, not
   correctly rounded (one unit in the last place on 10.6 % of float inputs). The default uses the
   correctly rounded cube root and names GLIBC-05 where glibc's would have changed the ball of
@@ -165,11 +216,11 @@ error by default). The elapsed time printed is larmorx's own.
 
 ## Known last-bit differences
 
-The replica is bit-identical to AFNI on every compared case. The clean-room original's squash
+The replica is bit-identical to AFNI on every compared case. The clean room's squash
 (values above 1300) uses a correctly rounded `tanhf` (`larmorx_core::math::tanhf`, a port of
 CORE-MATH's) where AFNI calls glibc 2.35's, which is not correctly rounded on some arguments
 (2.8 % of float arguments): squashed values can differ in their last bit. AFNI run with
-CORE-MATH's correctly rounded functions preloaded gives the original's bytes
+CORE-MATH's correctly rounded functions preloaded gives the clean room's bytes
 ([findings](../findings/afni-masks-clean-room.md)). `-EPI`'s radius uses a correctly rounded
 `cbrtf` by default and glibc 2.35's bits with `reproduce` (GLIBC-05, above).
 
@@ -177,19 +228,19 @@ CORE-MATH's correctly rounded functions preloaded gives the original's bytes
 
 The local white-matter intensity (the ball's percentile mean at every voxel) dominates
 3dUnifize's time: AFNI gathers and sorts every ball (about 25,000 values at the default radius).
-The original keeps the ball's values as counts per rank (each distinct value's position in the
+The clean room keeps the ball's values as counts per rank (each distinct value's position in the
 image's sorted values) and slides the ball from voxel to voxel, adding and removing only its two
 surfaces; the two percentiles come from block counts and the values between them are read in
 ascending order, which gives the spec's float sum exactly. Planes run in parallel, with the same
 result at any thread count; the inversion's percentile and `-GM`'s medians are selections, not
 sorts. Informal timings (2026-10-24, a shared machine; [findings](../findings/afni-masks-clean-room.md#informal-timings-2026-10-24-not-a-benchmark-report)):
 fMRIPrep's call on a 64 × 64 × 34 BOLD reference takes AFNI 93 s at one thread and 22 s at six,
-the replica 39 s and 8.7 s, the original 3.8 s and 0.94 s; a T1w (half-size path) 67 s and 24 s,
+the replica 39 s and 8.7 s, the clean room 3.8 s and 0.94 s; a T1w (half-size path) 67 s and 24 s,
 35 s and 15 s, 9.3 s and 2.7 s. There is no benchmark report yet.
 
 ## Rust
 
-The original's Rust API is `larmorx_afni::unifize`: `run(image, options, mode, settings,
+The clean room's Rust API is `larmorx_afni::unifize`: `run(image, options, mode, settings,
 n_threads)` on an `AfniImage` with `UnifizeOptions`; its steps `unifize::{wmi, duplo}`,
 `invert`, `grey_matter`, `clip_edges`, `median_volume`, `epi_radius(steps, mode)` and
 `epi_cbrtf_notice(steps, dims, mode)` (GLIBC-05); the command line is `cli::unifize::main`. The

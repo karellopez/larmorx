@@ -156,6 +156,15 @@ shown = "nan_trap.c's first 40 lines (its header comment, includes and static st
 nature = "generic C written for larmorx (Apache-2.0, no FSL code) in FSL's probe folder; the build line declared by the implementer as one line beyond the brief"
 judgement = "no contamination: nan_trap.c is allowed by the brief, the build line is a compiler command, and neither holds FreeSurfer's or FSL's code"
 
+[[access]]
+agent = "a95b98a0326dc825f"
+line = 635
+time = "2026-11-13T17:30:00Z"
+declared = "no"
+shown = "the implementer's own changed files (crates/larmorx-fs-core/src/mri/*.rs and its tests) in `git status --short` and a clippy message on its own copy.rs, from `cargo fmt` and `cargo clippy` run in its own worktree; the scanner resolved the relative paths against the unit oracle's probes folder, where an earlier command of the relay had run the prebuilt probe"
+nature = "the clean room's own code; no file of the unit oracle's folder exists at those paths"
+judgement = "not restricted material: a scanner false positive (relative paths of the implementer's own worktree resolved against a stale working directory)"
+
 # ------------------------------------------------- implementers: files their briefs forbade
 
 [[access]]

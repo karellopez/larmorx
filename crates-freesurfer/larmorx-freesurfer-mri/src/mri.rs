@@ -16,7 +16,7 @@
 
 use std::io::Write;
 
-use larmorx_core::defects::{FS_55, FS_56, FS_60, FS_206};
+use larmorx_core::defects::{FS_55, FS_56, FS_60, FS_206, FS_252};
 use larmorx_freesurfer_core::cname::CName;
 use larmorx_freesurfer_core::diag::{DIAG_SHOW, verbose_on};
 use larmorx_freesurfer_core::globals::Globals;
@@ -980,7 +980,8 @@ pub fn mri_copy_pulse_parameters(src: &Mri, dst: &mut Mri) -> i32 {
 /// `origRas2Vox` (when `src` has them), the command lines and the colour table (when `src` has
 /// one). `dst`'s own counts and sizes are recomputed from its extent and type. FS-56: FreeSurfer
 /// loses `register_mat` when `dst` has none (by default it is copied); FS-60: a `dst` that owned a
-/// transform keeps pointers into the freed transform when `src` has none (both modes drop them).
+/// transform keeps pointers into the freed transform when `src` has none (both modes drop them);
+/// FS-252: a `src` without its voxel-to-RAS matrix crashes FreeSurfer (both modes copy none).
 pub fn mri_copy_header(
     g: &mut Globals,
     out: &mut dyn Write,
@@ -1102,7 +1103,14 @@ pub fn mri_copy_header(
     d.path_to_t1 = src.path_to_t1.clone();
     d.fname_format = src.fname_format.clone();
     d.gdf_image_stem = src.gdf_image_stem.clone();
-    // AffineMatrixCopy(src->i_to_r__, dst->i_to_r__): the source's 16 floats
+    // AffineMatrixCopy(src->i_to_r__, dst->i_to_r__): the source's 16 floats; a source without
+    // them crashes FreeSurfer (FS-252): both modes copy none
+    if src.vg.i_to_r.is_none() {
+        g.notices.add(
+            &FS_252,
+            "MRIcopyHeader from a volume without a voxel-to-RAS matrix (FreeSurfer crashes): none copied",
+        );
+    }
     d.vg.i_to_r = src.vg.i_to_r;
     let old = d.vg.r_to_i.take();
     d.vg.r_to_i = copy_opt(g, out, err, src.vg.r_to_i.as_ref(), old)?;

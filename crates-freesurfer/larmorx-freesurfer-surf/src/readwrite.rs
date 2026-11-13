@@ -22,11 +22,14 @@ use larmorx_freesurfer_core::log::{
     ERROR_UNSUPPORTED, Fatal, NO_ERROR,
 };
 use larmorx_freesurfer_core::matrix_ops::matrix_inverse;
+use larmorx_freesurfer_core::run::Environment;
 use larmorx_freesurfer_core::utils::{file_exists, file_name_path, resolve};
 use larmorx_freesurfer_io::fio::{
     fio_extension, fio_file_exists_readable, fread_float, fread2, fread3,
 };
-use larmorx_freesurfer_io::identify::{MRI_MGH_FILE, NII_FILE};
+use larmorx_freesurfer_io::identify::{MRI_MGH_FILE, MRI_VOLUME_TYPE_UNKNOWN, NII_FILE};
+use larmorx_freesurfer_io::mriio;
+use larmorx_freesurfer_io::registerio::{self, NoLta, Register};
 use larmorx_freesurfer_mri::lta::LINEAR_RAS_TO_RAS;
 use larmorx_freesurfer_mri::vol_geom::VolGeom;
 use larmorx_freesurfer_volume::ltaread::{LtaIo, RegisterDat, lta_read_ex};
@@ -339,37 +342,50 @@ pub const RIGHT_HEMISPHERE: i32 = 1;
 pub const NO_HEMISPHERE: i32 = 2;
 pub const BOTH_HEMISPHERES: i32 = 3;
 
-/// fs.io's functions `LTAreadEx` and `mrisReadTransform` call: `MRIreadHeader` (for a volume a
-/// `.xfm`'s comment names, or a regular file `mri/orig`) and `regio_read_register` (never reached
-/// here: the transform is always an `.xfm`). Track A ports them (fs.io's `mriio.cpp`, item 3.1-28,
-/// and `registerio.cpp`, 3.1-34); until then reaching them is out of range.
-struct PendingLtaIo;
+/// fs.io's readers behind track C's `LtaIo` (`LTAreadEx`'s calls): `MRIreadHeader` (track A's
+/// `mriio::mri_read_header`, any format, with the program's environment) for a transform whose
+/// comment names a volume or for `mri/orig`, and `regio_read_register` (track A's `registerio`;
+/// an `.lta` registration is refused with its message, as `MRISread`'s transform is always
+/// `talairach.xfm`, never a register file).
+struct FsLtaIo<'e> {
+    env: &'e Environment,
+}
 
-impl LtaIo for PendingLtaIo {
+impl LtaIo for FsLtaIo<'_> {
     fn read_header(
         &mut self,
-        _g: &mut Globals,
-        _out: &mut dyn Write,
-        _err: &mut dyn Write,
-        _dir: Option<&Path>,
+        g: &mut Globals,
+        out: &mut dyn Write,
+        err: &mut dyn Write,
+        dir: Option<&Path>,
         name: &str,
     ) -> Result<Option<VolGeom>, Fatal> {
-        panic!(
-            "mrisReadTransform: reading the header of {name} needs MRIreadHeader (fs.io, not yet ported)"
+        Ok(
+            mriio::mri_read_header(g, out, err, self.env, dir, name, MRI_VOLUME_TYPE_UNKNOWN)?
+                .map(|m| m.vg),
         )
     }
 
     fn read_register(
         &mut self,
-        _g: &mut Globals,
-        _out: &mut dyn Write,
-        _err: &mut dyn Write,
-        _dir: Option<&Path>,
+        g: &mut Globals,
+        out: &mut dyn Write,
+        err: &mut dyn Write,
+        dir: Option<&Path>,
         name: &str,
     ) -> Result<Option<RegisterDat>, Fatal> {
-        panic!(
-            "mrisReadTransform: reading {name} needs regio_read_register (fs.io, not yet ported)"
-        )
+        let mut reg = Register::default();
+        if registerio::regio_read_register(g, out, err, dir, name, &mut reg, &mut NoLta)? != 0 {
+            return Ok(None);
+        }
+        Ok(reg.r.map(|r| RegisterDat {
+            subject: reg.subject.unwrap_or_default(),
+            inplaneres: reg.inplaneres,
+            betplaneres: reg.betplaneres,
+            intensity: reg.intensity,
+            r,
+            float2int: reg.float2int,
+        }))
     }
 }
 
@@ -418,7 +434,7 @@ pub fn read_transform(
     if !file_exists(dir, &transform_fname) {
         return Ok(ERROR_NO_FILE);
     }
-    let mut lio = PendingLtaIo;
+    let mut lio = FsLtaIo { env: io.env };
     let Some(lta) = lta_read_ex(g, io.out, io.err, dir, &transform_fname, &mut lio)? else {
         mris.lta = None;
         log::error_printf(

@@ -1031,3 +1031,150 @@ def test_a_metrics_note_names_the_replicas_record():
     )
     with pytest.raises(ValueError, match="the metrics note's two thresholds changed"):
         fsl_pages.replica_threshold(doc)
+
+
+def _families_like(clean: str = "divergence") -> dict:
+    """fslmaths' one call per family in its shapes: FSL's fslmaths, the replica in larmorx-nc,
+    the clean room (the old texts' "original"), fifteen calls, one on FSL's FFT path."""
+
+    def panel(i, role, label, sub=""):
+        return {"id": i, "role": role, "label": label, "sub": sub, "arrays": {"all": {"blob": i}}}
+
+    def diff(i, a, b, kind, verdict, label, reason):
+        return {"id": i, "a": a, "b": b, "kind": kind, "label": label, "role_label": "x",
+                "metrics": {}, "verdict": verdict, "reason": reason}  # fmt: skip
+
+    fft = (
+        "14 of 15 outputs FSL's bit for bit; `mean.nii.gz -kernel sphere 21 -fmean`: max |Δ| 2e-07 "
+        "of FSL's largest value (§21: at most 1e-5), 75.7% of the voxels within 4 units in the last "
+        "place (§21: at least 99 %): within §21's bound and below its share, an expected divergence "
+        "as the record's on FSL's FFT path: FSL convolves this kernel by its FFT in single "
+        "precision, whose rounding is relative to the image's largest values; against the exact "
+        "result (computed in float64 from §10.2's definition; 15 × 15 × 13 kernel of 1313 voxels) "
+        "FSL's FFT lies within 1.5e-07 of the largest value (median 1.6e-08), the original's direct "
+        "sum (its products in double precision, rounded once) within 7.9e-08 (median 3.4e-09): the "
+        "original is the closer of the two (findings 31)."
+    )
+    same = "No correction of the register applies to these calls: both modes give the same values."
+    return {
+        "id": "families",
+        "title": "One call per operation family, on a real series",
+        "summary": "Each was given to FSL 6.0.7.23, to the larmorx-nc replica in its reproduce and "
+        "default modes, and to LARMORX's clean-room original in its reproduce mode at 14 threads "
+        "and at one and in its default mode.",
+        "facts": [],
+        "metrics_note": "Δ is A − B. The record's threshold: every file fslmaths writes "
+        "bit-identical. The clean room's record (fsl-maths) holds it to specs/fslmaths.md §21.",
+        "provenance": [],
+        "outputs": [{"id": f"o{i}"} for i in range(15)],
+        "panels": [
+            panel("mean", "input", "ds005040 BOLD series' mean over time"),
+            panel("fsl", "original", "FSL 6.0.7.23, fslmaths", "the conda installation, as built"),
+            panel("replica", "larmorx", "larmorx-nc replica", "reproduce mode"),
+            panel("replica-fix", "larmorx", "larmorx-nc replica", "default mode (D13 corrections)"),
+            panel(
+                "original", "larmorx", "LARMORX clean-room original", "reproduce mode, 14 threads"
+            ),
+            panel(
+                "original-1", "larmorx", "LARMORX clean-room original", "reproduce mode, 1 thread"
+            ),
+            panel(
+                "original-fix",
+                "larmorx",
+                "LARMORX clean-room original",
+                "default mode (D13 corrections), 14 threads",
+            ),
+        ],
+        "diffs": [
+            diff(
+                "replica-fsl",
+                "replica",
+                "fsl",
+                "main",
+                "bit-identical",
+                "replica − FSL 6.0.7.23",
+                "The same values, every one.",
+            ),
+            diff(
+                "fix-replica",
+                "replica-fix",
+                "replica",
+                "check",
+                "bit-identical",
+                "replica, default − reproduce mode",
+                same,
+            ),
+            diff(
+                "original-fsl",
+                "original",
+                "fsl",
+                "main",
+                clean,
+                "clean-room original − FSL 6.0.7.23",
+                fft,
+            ),
+            diff(
+                "original1-original",
+                "original-1",
+                "original",
+                "check",
+                "bit-identical",
+                "clean-room original, 1 thread − 14 threads",
+                "The same values.",
+            ),
+            diff(
+                "ofix-original",
+                "original-fix",
+                "original",
+                "check",
+                "bit-identical",
+                "clean-room original, default − reproduce mode",
+                same,
+            ),
+        ],
+        "default": {"panels": ["fsl", "replica", "original"], "diffs": ["replica-fsl"]},
+        "tables": [],
+    }
+
+
+def test_fslmaths_page_says_its_fft_call_from_the_reason_and_its_runs_in_the_guides_words():
+    """S10: fslmaths' "What this shows" line on the operation families gives the FFT call's
+    numbers from its reason (2 × 10⁻⁷, 10⁻⁵, 75.7 %, the exact result's 1.5 × 10⁻⁷ and
+    7.9 × 10⁻⁸) and refuses a verdict it does not say; the summary's modes in the guide's words
+    without a stray comma; the random-testing tables named by their runs, lengths and dates; the
+    metrics note names the replica's record (every file fslmaths writes)."""
+    from larmorx_validation.evidence import fsl_maths, fsl_pages
+
+    ex = _families_like()
+    line, verdicts = fsl_maths.SHOWS["families"](ex)
+    assert "The clean room gives FSL's values in 14 of them" in line
+    assert "up to 2 × 10⁻⁷ of FSL's largest value, within the bound of 10⁻⁵" in line
+    assert "75.7 % of the voxels" in line and "below the 99 % asked" in line
+    assert "FSL's FFT lies within 1.5 × 10⁻⁷" in line and "clean room within 7.9 × 10⁻⁸" in line
+    assert verdicts == ["replica-fsl", "original-fsl"]
+    out = present.example(fsl_maths.PAGE, ex, shows=line, verdicts=verdicts)
+    assert out["summary"].endswith(
+        "in `reproduce` at 14 threads and at one and in `fix`, its default."
+    )
+    assert ",." not in out["summary"] and ",;" not in out["summary"]
+    d = {x["id"]: x for x in out["diffs"]}
+    assert d["original-fsl"]["label"] == "clean room − FSL fslmaths 6.0.7.23"
+    doc = {"examples": [out]}
+    fsl_pages.replica_threshold(doc)
+    assert "The replica's record's threshold: every file fslmaths writes" in out["metrics_note"]
+    with pytest.raises(ValueError, match="original-fsl is open, not divergence"):
+        fsl_maths.SHOWS["families"](_families_like(clean="open"))
+    trial = {"id": "trial", "title": "Random testing: the trial of 2026-11-03",
+             "note": "A random-testing run of the replica (seed `s`, larmorx `0427fad149ac`): x.",
+             "columns": [{"label": ""}, {"label": "Cases"}],
+             "rows": [{"head": "Random cases", "cells": [{"v": 114906}]},
+                      {"head": "length (minutes; 13 jobs)", "cells": [{"v": 24.0}]}]}  # fmt: skip
+    page = {"examples": [], "tables": [trial]}
+    fsl_maths.present_tables(page, "fslmaths")
+    assert trial["title"] == (
+        "Random testing, the replica against the original: FSL `fslmaths` 6.0.7.23 (114,906 random "
+        "calls, 2026-11-03)"
+    )
+    assert trial["note"].startswith(
+        "A random-testing run of the replica, fslmaths and fslstats at once, 24 minutes long (seed"
+    )

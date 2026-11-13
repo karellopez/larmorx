@@ -728,3 +728,86 @@ Measured (the probe's piece 7, `tests/fs_io/piece7.rs`): seed 11, 763 cases: `re
 648, 0 different, 85 counted (FS-259, FS-403), 30 apart (FS-401); seed 13, 3,815 cases: 3,221
 identical, 0 different, 426 counted, 168 apart; `fix` differs only with FS-402 (39) or FS-404 (16)
 noted.
+
+## Part 8: FreeSurfer's 2-D images (3.1-26's line 65 and 3.1-27's image.cpp 104-3815, relay 18 of track A)
+
+Restricted (FreeSurfer's source lines). `utils/image.cpp` (the 14 functions the programs reach, of
+the file's 73: `ImageAlloc` 65, `ImageAllocBuffer` 104, `ImageFree` 136, `ImageCopy` 384,
+`ImageClearArea` 526, `ImageCheckSize` 977, `ImageSetSize` 1005, `ImageCopyFrames` 1021,
+`ImageRescale` 1217, `ImageScaleDown` 1241, `ImageScaleUp` 1368, `init_header` 3748, `h_copy` 3808,
+`free_header` 3815), `utils/hips.cpp` 4-5 and 42-47 (the globals and the conversion stubs) and
+`utils/filter.cpp` 713-1041 (`ImageConvolve1d`, `ImageReduce`, `ImageReduce1d`, which
+`ImageScaleDown` calls; ported into `larmorx-freesurfer-io::image` because fs.filter's crate sits
+above fs.io). Callers in the reach (the callgraph of `<scratch>/A/r8/edges.json`): `MRItoImageView`,
+`MRItoImage` (mri.cpp, track C's fs.volume), `mrisp.cpp` (`MRISPalloc`, `MRISPread`, `MRISPclone`,
+`MRIStoParameterization(s)`, `MRISgradientToParameterization`), `filter.cpp`'s `ImageReduce`,
+`mrimorph.cpp`'s `mriWriteImageView` (the only `ImageRescale` caller: `mri_em_register`'s
+diagnostic image views, `scale = target_size / rows`); `mriio.cpp`'s `mri_read` and `MRIwriteType`
+free images. None of them passes `imagebufsize` (always 0), converts formats in `ImageCopy` or
+`ImageCopyFrames` (`mrisp.cpp`'s `ImageCopyFrames(Ip, Itmp, 0, Ip->num_frame, 0)`: floats), or
+scales a multi-frame image.
+
+### Code generation (the official object, `oracles/freesurfer-8.2.0-unit/build/fs/utils/CMakeFiles/utils.dir/`)
+- `ImageReduce1d`: `movss pixel, %xmm0; mulss k[i], %xmm0; addss %xmm0, %xmm1` (the total the
+  destination: `total + pixel * k`). `ImageConvolve1d`: the same `addss` order (`mulss`'s order
+  does not matter: the kernel is never NaN). No vectorised float reductions in either.
+- `ImageClearArea`'s `(char)val`, `ImageScaleDown`'s and `ImageScaleUp`'s `(unsigned char)float`:
+  `cvttss2si` into 32 bits, the low byte stored. `ImageScaleUp`'s `(int)((float)outCol / scale)`:
+  `cvttss2si` (and `cvttps2dq` in the vectorised byte loop: the same results).
+- `ImageCopyFrames`' `(float)unsigned int`: `cvtsi2ss` of the zero-extended 64-bit value (scalar)
+  and `cvtdq2ps` halves (vectorised): both the correctly rounded conversion.
+- `ISPOW2` (`macros.h` 118, with `exp2(f)` defined as `pow(2.0, f)` there): `log2f`, `nint`,
+  `pow`; `nint(log2(1.0 / scale))` with double `log2`. The relocations of `ImageScaleDown`: `log2f`,
+  `log2`, `pow`, `nint` (14 calls).
+
+### Mechanisms
+- **FS-405** (class a; both modes skip the write and read 0, noted; counted, not compared). No
+  function checks a frame, an area or a pixel place against the buffer: `ImageClearArea` with a
+  `frame` at or beyond `num_frame`, or extents in use beyond the stored ones;
+  `ImageAllocBuffer`'s `hmemset(I->image, 0, I->sizeimage * I->num_frame)` after `calloc(npix)` of a
+  given smaller `imagebufsize`; `ImageCopy`'s `h_copy` of `Isrc->numpix * Isrc->sizepix` bytes into a
+  new image allocated from `Isrc->rows`/`cols` (not `orows`/`ocols`), or with a frame count of 0;
+  `ImageCopyFrames`' frame places; the scales' coordinates; `ImageConvolve1d`/`ImageReduce1d` on
+  images whose extents in use pass the stored ones; `h_copy`'s `int bytes` (a frame of 2 GiB or more:
+  a short or negative `memmove`); `while (size--)` with a negative `size`; `ImageScaleDown`'s
+  power-of-two path with 0 reductions copies `ImageCopy(inImage, outImage)` of every frame from the
+  advanced pointer (frames past the end), and its `ImageCopy` frees a caller's output smaller than
+  the reduction (use after free). Seed 11: of the 119 counted lines, 51 crash in FreeSurfer, 20 end
+  with other bytes, 48 happen to agree.
+- **FS-406** (class a, undefined conversions; `reproduce` x86-64's `cvttss2si` results, the default
+  clamps, CLAUDE.md's rule for undefined float-to-integer conversions).
+- **FS-407** (class c, rule A). `ImageCopyFrames` (1088-1110): the byte-to-float and byte-to-int
+  branches write `IMAGEFseq_pix(outImage, 0, 0, frameno)` / `IMAGEIseq_pix(outImage, 0, 0,
+  frameno)`, and the int branches `IMAGEFpix(outImage, 0, 0) + pix_per_frame * frameno` etc.,
+  where the same-format branches use `dst_frame + frameno - start`. Unreached by the programs (no
+  caller converts).
+- **FS-408** (class c, rule A: the default reduces every frame and keeps the output's frame count;
+  `reproduce` stops after the first). `ImageScaleDown` (1316-1327) reassigns `inImage` to the
+  reduction (`inImage = ImageReduce(Itmp, NULL)`, one frame), and the frame loop's condition `frame <
+  inImage->num_frame` then ends the loop after frame 0; `ImageCopy(inImage, outImage)` sets
+  `outImage->num_frame` to the reduction's 1. The end of the function restores `inImage->image` on
+  the leaked reduction (the caller's input is never advanced on that path, its `firstpix` untouched).
+- **FS-409** (class a, use after free; both modes return the copy, noted; counted). `ImageRescale`
+  (1226) ignores `ImageCopy`'s result; `ImageCopy` frees an `outImage` with fewer pixels or frames
+  and copies into a new one; `ImageRescale` then sets the freed image's sizes and returns it.
+  Unreached (its only caller passes no output).
+- **FS-410** (class c, rule A: the default exits with `ERROR_NO_MEMORY`). `ImageAlloc` (75):
+  `ErrorExit(Gerror, ...)` after `ImageAllocBuffer` returns `ERROR_NO_MEMORY` without setting
+  `Gerror`: the code is the previous error's, usually `NO_ERROR` (0), so `exit(0)`. Measured: the
+  probe's `ial` of 2^53 bytes with `Gerror` 0 ends with status 0 after `error: Cannot allocate
+  memory` and the message.
+
+### Behaviours kept (rule C, both modes; no ID)
+- `init_header` (3748) has no case for `PFCOMPLEX` (4) and `PFDBLCOM` (7): they take `sizepix` 1
+  (`default:` with `PFBYTE`), so a complex image gets a byte per pixel. Nothing in the reach makes a
+  complex image (MRISP, MRItoImage: floats and bytes), so a correction would change no result
+  (rule C: measured to bring no gain); the spec says so.
+- `init_header` with `alloc` (`ImageAllocHeader`, unreached) sets `firstpix` before allocating
+  (NULL).
+- The HIPS conversions are stubs (`error: hips is not supported`, 0): `ImageCopy` between formats
+  copies nothing after the message. FreeSurfer removed HIPS deliberately; kept.
+- `ImageReduce`'s `static IMAGE *Itmp` and `ImageConvolve1d`'s `static` index tables: only memory
+  differs (the port makes them each call); the tables are pure functions of the extents and the
+  length.
+- `ImageScaleDown`'s byte-to-byte bounds check prints `in: %d, %d --> out: %d, %d!` and `exit(2)`;
+  negative places are not checked (FS-405).

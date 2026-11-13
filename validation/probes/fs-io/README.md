@@ -78,6 +78,16 @@ number on C streams and znz files, `fio_dirname`, `fio_basename`, `fio_extension
   ParaVision's `##$NAME=value` form (most complete; missing, odd, CR LF, overlong and cut lines; unsupported types; 2dseq
   files of the right length, half, a byte more). `SKIP` for FS-259 and FS-403, `VARY` for FS-401 (values never written).
   Seed 13, 3,815 piece-7 cases: `reproduce` identical on 3,221, 0 different.
+- Piece 8 (relay 18): FreeSurfer's 2-D images (`image.cpp`, `filter.cpp`'s pyramid reduction). Each case starts with
+  `Gerror`'s value and ends by printing it: `ial` (`ImageAlloc`), `icp` (`ImageCopy`), `ica` (`ImageClearArea`), `ick`
+  (`ImageCheckSize`), `iss` (`ImageSetSize`), `icf` (`ImageCopyFrames`), `irs` (`ImageRescale`), `isd`/`isu`
+  (`ImageScaleDown`/`ImageScaleUp` called directly), `ird` (`ImageReduce`), `ic1`/`ir1` (`ImageConvolve1d`/
+  `ImageReduce1d` with a given kernel); an image is given as `ImageAlloc`'s arguments, its extents in use (-7: as
+  allocated), its pixel sizes and its bytes (`N`: none), built by `tests/fs_io/piece8.rs` (up to 13 by 13 pixels and 3
+  frames, every format, odd extents, frames and buffers, floats of every kind) and printed as its fields and its bytes
+  (hex up to 128, else FNV-1a 64; the probe keeps the length of the buffers it made and forgets an image FreeSurfer is
+  about to free). `SKIP` for FS-405 (outside the pixels) and FS-409 (an image used after it is freed). Seed 11, 1,068
+  piece-8 cases: `reproduce` identical on 949, 0 different.
 - `matfile_scipy.py`: 400 matrices written by SciPy's `savemat` (version 4; version 5 plain and
   compressed; doubles, singles, signed and unsigned 8- to 32-bit integers, complex) read by the port's
   `MatlabRead`: the default (`fix`) must read each as SciPy wrote it; FreeSurfer's reading

@@ -1406,3 +1406,163 @@ voxels, `IM_SIT` after `IM_SIZ`, 2dseq files of the right length, half of it, a 
 longer, a missing file. Lines with FS-259 or FS-403 are counted, not compared; those with FS-401
 compared apart. Measured (2026-11-13): seed 13, 3,815 cases: `reproduce` identical on 3,221, 0
 different (426 counted, 168 apart); `fix` differs only where FS-402 or FS-404 is noted.
+
+## 56. Conventions of part 8 (2-D images)
+
+FreeSurfer's 2-D image (`IMAGE`, HIPS's image header) has: the frame count, the stored extents
+(`orows`, `ocols`) and the extents in use (`rows`, `cols`), a first row and column (`frow`,
+`fcol`, 0 in every image these functions make), the pixel format, `numcolor` (0), the pixel count
+`numpix` and the bytes of one frame `sizeimage` (both 64-bit unsigned), the bytes per pixel
+`sizepix`, the pixels (one buffer, or none), a flag `imdealloc`, the first pixel's place
+`firstpix` (an offset into the pixels, or none) and two float pixel sizes `xsize`, `ysize`. The
+formats and their bytes per pixel: 0 bytes (1), 1 shorts (2), 2 integers (4), 3 floats (4), 6
+doubles (8), 35 and 41 RGB/BGR (3), 36, 37, 42, 43 RGB with a zero byte (4), 50 and 51 pyramids (4);
+every other format (4 and 7, the complex ones, included) 1. Pixels are placed row by row with the
+stored width: pixel `(x, y)` of frame `f` is element `f × ocols × orows + y × ocols + x` (64-bit
+arithmetic); bytes are little-endian, floats IEEE single precision with their bits kept. When a
+function below reads or writes outside the pixels FreeSurfer has (a frame, an area or a size the
+image does not have, a buffer given smaller than the frames), FreeSurfer corrupts memory, crashes
+or reads memory contents: FS-405 (both modes: nothing written there, 0 read, noted). Errors that
+"return" print `error: <message>` (with FS-01's NUL byte under `reproduce`) and set `Gerror`
+(`specs/freesurfer-core.md`'s `ErrorPrintf`); errors that "end the program" are `ErrorExit` with the
+code given.
+
+## 57. Making an image (`ImageAlloc`, `ImageFree`)
+
+`ImageAlloc(rows, cols, format, frames, bufsize)`: a header with the frames, both pairs of
+extents, the format and its pixel size, `numpix = rows × cols` and `sizeimage = numpix ×
+sizepix` (each in 64-bit unsigned arithmetic of the sign-extended numbers, wrapping: `rows = cols
+= -1` gives one pixel), pixel sizes 0. No pixels when `sizeimage` is 0 (`imdealloc` 0). Otherwise
+`bufsize` bytes (0: `sizeimage × frames`, wrapping) of zeros, `imdealloc` 1, `firstpix` at the
+first pixel (0); a buffer given smaller than `sizeimage × frames` is cleared past its end by
+FreeSurfer (FS-405). When the bytes cannot be had (more than 128 TiB, or the machine refuses):
+`errno` ENOMEM, then the program ends with `ImageAlloc: could not allocate <rows>x<cols> buffer`
+and a newline as its message (after `Cannot allocate memory`) and FreeSurfer's previous error code
+as its code: 0 when there was none, an exit status of 0 (FS-410: the default exits with -2, status
+254; with exceptions on and code 0 FreeSurfer goes on with an image without pixels).
+`ImageFree` of no image ends the program (`ImageFree: null pointer`, code -4).
+
+## 58. Sizes (`ImageCheckSize`, `ImageSetSize`)
+
+`ImageCheckSize(in, out, rows, cols, frames)`: 0 for no output; otherwise 1 when `out.numpix ×
+out.frames ≥ rows × cols × frames` (64-bit signed, wrapping), a 0 argument meaning the input's
+value; the pixel sizes play no part. `ImageSetSize(I, rows, cols)`: when `ImageCheckSize(I, I,
+rows, cols, 0)` holds, both pairs of extents become `rows`, `cols`, the first row and column 0,
+`numpix = rows × cols` and `sizeimage = rows × cols × sizepix` computed in 32-bit signed
+arithmetic (wrapping) and sign-extended; 1. Otherwise nothing changes; 0.
+
+## 59. Copying (`ImageCopy`)
+
+`ImageCopy(src, dst)`: a `dst` with fewer pixels (`numpix`) or frames than `src` is freed and, as
+for no `dst`, a new one made by `ImageAlloc(src.rows, src.cols, src.format, src.frames, 0)`. Then
+`dst` takes `src`'s extents in use (`rows`, `cols`; not the stored ones) and, frame by frame (each
+frame's start `sizeimage` bytes after the last, in each image): when the formats agree,
+`numpix × sizepix` of `src`'s bytes (in 32-bit signed arithmetic: a frame of 2 GiB or more is
+copied short, or not at all) into `dst`; otherwise, for a `dst` of doubles, floats, complex,
+double complex, integers or bytes, the line `error: hips is not supported` on standard error and
+nothing copied (the HIPS conversions are gone: kept, nothing calls them); another `dst` format ends
+the program (`ImageCopy <src>--><dst>, unsupported conversion` and a newline, code -3). Finally
+both images' `firstpix` are their first pixel and `dst`'s frame count is `src`'s.
+
+## 60. Clearing an area (`ImageClearArea`)
+
+`ImageClearArea(I, r0, c0, rows, cols, val, frame)`: `r0`, `c0` raised to 0; a negative `rows`
+or `cols` means the image's; the area ends at `min(I.rows, r0 + rows)` and `min(I.cols, c0 + cols)`
+(32-bit additions); `frame` < 0 means every frame. Floats are set to `val`; bytes to `(char)val`
+(truncated towards 0; beyond -128 to 127, and NaN, FS-406: `reproduce` the low byte of
+-2147483648 or of the integer part, the default clamps to -128 and 127, NaN 0). Another format: the
+error `ImageClearArea: unsupported image format <f>` (no newline) at the first row, returns -3. 0.
+
+## 61. Copying frames (`ImageCopyFrames`)
+
+`ImageCopyFrames(in, out, start, n, dst)`: unless `ImageCheckSize(in, out, 0, 0, dst + n)`, the
+error `ImageCopyFrames: outImage not large enough` + newline, -1. Each source frame `k` from `start`
+to `start + n - 1` (each of `in.rows × in.cols` pixels) goes to output frame `dst + k - start`:
+doubles and floats into the same format only (another ends the program: `ImageCopyFrames:
+unsupported image pixel format <in> -> <out>` + newline, code -3), bytes into bytes, bytes
+converted into floats and unsigned integers, integers into floats (rounded to nearest), integers
+and bytes (the integer's low byte), RGB into RGB (the whole run of `n` frames at once, again for
+each frame); another pair ends the program with that message (without the newline for bytes,
+integers and RGB, with it for the other input formats). FS-407: FreeSurfer writes the converted
+frames, and integers into integers, at the output frame of the source frame's number (`k`), placed
+for bytes as frames `k × ocols × orows` (32-bit for unsigned integers) and for integers at `k ×
+in.rows × in.cols` pixels; the default writes them at frame `dst + k - start` placed as the other
+copies. Finally `ImageSetSize(out, in.rows, in.cols)`; 0.
+
+## 62. Scaling (`ImageRescale`, `ImageScaleUp`, `ImageScaleDown`)
+
+`nint(x)` is FreeSurfer's rounding (`specs/freesurfer-core.md`: `x + 0.5` truncated, `x - 0.5`
+below 0; FS-12 beyond the int range); products and quotients are single precision unless said.
+- `ImageRescale(in, out, s)`: `cols' = nint(in.cols × s)`, `rows' = nint(in.rows × s)`; no `out`:
+  `ImageAlloc(rows', cols', in.format, in.frames, 0)`. `s` = 1: `ImageCopy`; `s` > 1:
+  `ImageScaleUp`; otherwise (NaN included) `ImageScaleDown`. Then `out.xsize = in.xsize / s`,
+  `out.ysize = in.ysize / s` (x86-64's NaN rules). FS-409: with `s` = 1 and an `out` too small for
+  §59, FreeSurfer returns the image it freed; both modes return the copy.
+- `ImageScaleUp(in, out, s)`: unless `ImageCheckSize(in, out, nint(in.rows × s), nint(in.cols ×
+  s), in.frames)`, the error `ImageScaleUp: output image not large enough <in.rows> x <in.cols> ->
+  <out.rows> x <out.cols>` + newline, -1. `out.cols`, `out.rows` (not the stored ones) become
+  `nint(in.cols × s)`, `nint(in.rows × s)`. Per frame (each `sizeimage` bytes on, in each image):
+  bytes into bytes: output pixel `(c, r)` (written one after another from the frame's start, `rows`
+  by `cols` of the new extents) takes input pixel `((int)(c / s), (int)(r / s))` (FS-406 beyond the
+  int range: `reproduce` -2147483648, the default clamps, NaN 0); bytes into floats, floats into
+  bytes or floats, integers into anything: input pixel `k` (the input's pixels one after another,
+  `in.rows` by `in.cols`) at `(c, r)` fills the output block of rows `nint(r × s)` to `nint(r × s +
+  s)` (excluded) and columns `nint(c × s)` to `nint(c × s + s)`, each output row placed by
+  `out.ocols`, as a float, as `(unsigned char)` of the float (defined from -1 to 256 excluded; beyond
+  and NaN FS-406: `reproduce` the low byte of `cvttss2si`'s result, the default clamps to 0 and 255,
+  NaN 0), as the float's bits, or as the integer's 4 bytes (4 bytes per output pixel whatever its
+  format). Other pairs: `ImageScaleUp: unsupported output pixel format <f>` + newline, -1 (byte or
+  float input), `ImageScaleUp: unsupported input pixel format <f>` + newline, -2. Both images'
+  `firstpix` end at their first pixel; 0.
+- `ImageScaleDown(in, out, s)`: unless `ImageCheckSize(in, out, nint(in.rows × s), nint(in.cols ×
+  s), in.frames)`, the error `ImageScaleDown: output image not big enough` + newline, -1; then
+  `ImageSetSize(out, nint(in.rows × s), nint(in.cols × s))`. Per frame, output pixel `(c, r)` (one
+  after another, `out.rows` by `out.cols`) takes input pixel `(nint(c / s), nint(r / s))` (the
+  quotient in single precision, then doubled): bytes into floats; bytes into bytes, where an input
+  place at or beyond the input's extents prints `in: <r'>, <c'> --> out: <r>, <c>!` + newline on
+  standard error and ends the program with status 2; floats into bytes (§62's byte conversion);
+  floats into floats: when `1 / s` (single precision) is a power of two (`ISPOW2`: a positive power
+  of two; also ±0 under `reproduce` and the default alike), the input is reduced `nint(log2(1 /
+  s))` times (the quotient and logarithm in double precision) by `ImageReduce` (§63) and copied
+  into the output by `ImageCopy` (§59, so the output takes the reduction's extents and its single
+  frame count); FS-408: FreeSurfer does this for the first frame only (its loop then ends: the
+  output keeps one frame); the default reduces every frame and keeps the output's frame count. With
+  0 reductions or fewer the input is copied by `ImageCopy` from the frame's place. Otherwise the
+  nearest pixel as above (the float's bits). Other pairs: `ImageScaleDown: unsupported output pixel
+  format <f>` + newline, -1 (byte or float input); `ImageScaleDown: unsupported pixel format <f>` +
+  newline, -2. The output's `firstpix` ends at its first pixel, the input's too unless it was
+  reduced; 0.
+
+## 63. The pyramid reduction (`ImageReduce`, `ImageConvolve1d`, `ImageReduce1d`)
+
+The kernel `k = (0.25 − 0.4/2, 0.25, 0.4, 0.25, 0.25 − 0.4/2)` in single precision (`0.25 − 0.2`
+rounded once). `ImageConvolve1d(I, J, k, axis)` (`len` the kernel's length, `h = len / 2`): every
+pixel of `J`, written one after another from its first (`I.cols` by `I.rows`), is the single-
+precision sum `total = total + k[i] × p` (from 0, `i` from 0, the total the first operand of the
+addition: a NaN total stays) of `I`'s pixels at the place `i − h` from it along the axis, places
+before 0 taken at 0 and beyond the extent at its last; horizontally (axis 1) a row's pixels are
+placed by `I.ocols`, vertically (axis 0) the rows by `I.cols`. A negative `I.cols + 2h` or
+`I.rows + 2h` ends the program (`ImageConvolve1d: could not allocate LUT` + newline, code -2, after
+`Cannot allocate memory`). `ImageReduce1d(I, J, k, axis)` (`h = (len − 1) / 2`): `J`'s pixel `(x,
+y)` (placed by `J.ocols`; `J.cols` by `J.rows` of them) is the sum `total = total + p × k[i]` over
+`I`'s pixels `(2x + i − h, 2y)` horizontally or `(2x, 2y + i − h)` vertically, the moving coordinate
+clamped to `I`'s extent, placed by `I.ocols`. `ImageReduce(src, dst)`: a float image of `src.rows`
+by `src.cols` (FreeSurfer keeps one between calls; only memory differs), `ImageConvolve1d(src,
+tmp, k, vertical)`, then `ImageReduce1d(tmp, dst', k, horizontal)` where `dst'` is `dst` set to
+`src.rows / 2` by `src.cols / 2` (integer halves; `ImageSetSize`) when `ImageCheckSize(src, dst,
+rows / 2, cols / 2, 0)` holds, else a new one-frame float image of those extents (a given `dst`
+freed). Returns `dst'`.
+
+## 64. Validation plan (part 8)
+
+The probe's commands (`validation/probes/fs-io/`, piece 8), each with `Gerror`'s value first and
+`Gerror` printed last: `ial` (`ImageAlloc`: extents from -1 to 13, every format, 0 to 3 and -1
+frames, given buffers, sizes that wrap, 2^53 bytes), `icp`, `ica`, `ick`, `iss`, `icf`, `irs`,
+`isd`, `isu`, `ird`, `ic1`, `ir1` on images made by `ImageAlloc` (extents up to 13 by 13, 0 to 3
+frames, extents in use changed by 1 now and then, buffers given short or long, pixels of every
+kind: floats with NaN payloads, infinities, -0, subnormal numbers, values beyond the byte and
+integer ranges; scales 0.5, 0.25, 0.125, 0.75, 0.3, 0.4999999, 1, 1.5 to 4, NaN, infinities, 0,
+negative), each image printed as its fields, its pixel sizes' bits and its bytes (in hex up to 128,
+else their FNV-1a 64 hash; `sizeimage × frames` of them, at most the buffer). Lines with FS-405 or
+FS-409 are counted, not compared. Measured (2026-11-13): seed 11, 1,068 piece-8 cases: `reproduce`
+identical on 949, 0 different (119 counted); `fix` differs only where a defect is noted.

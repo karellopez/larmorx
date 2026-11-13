@@ -146,7 +146,7 @@ fn fixed(dir: &Path) -> Vec<(String, Vec<u8>)> {
         make::element(&mut o, 0x7fe0_0010, *b"OB", 0xffff_ffff, &body, le(true));
         v.push((format!("special-fragment-{odd:x}"), o));
     }
-    for depth in [8usize, 399, 401, 2000] {
+    for depth in [8usize, 128, 129, 2000] {
         let mut inner = Vec::new();
         id(&mut inner, le(false));
         for _ in 0..depth {
@@ -259,8 +259,14 @@ fn main() {
             let pr = port::run(&case.path, &case.script, dialect);
             let t = totals.entry(lib.name.to_string()).or_default();
             *t.entry("cases".into()).or_default() += 1;
-            let same = c.end == ffi::End::Exit(0) && c.dump == pr.dump && c.out == pr.out && c.err == pr.err;
-            let explained: Vec<&str> = pr.notices.iter().copied().filter(|id| id.starts_with("FS-9")).collect();
+            // the streams take text: bytes that are not UTF-8 are replaced on both sides
+            let lossy = |b: &[u8]| String::from_utf8_lossy(b).into_owned().into_bytes();
+            let same = c.end == ffi::End::Exit(0) && c.dump == pr.dump && lossy(&c.out) == pr.out && lossy(&c.err) == pr.err;
+            // the defects that leave the original's result undefined (memory never written, writes
+            // past memory, crashes) or that the port bounds (FS-97); FS-94 and FS-96 are exact in
+            // reproduce
+            const UNDEFINED: [&str; 7] = ["FS-90", "FS-91", "FS-92", "FS-93", "FS-95", "FS-97", "FS-98"];
+            let explained: Vec<&str> = pr.notices.iter().copied().filter(|id| UNDEFINED.contains(id)).collect();
             let verdict = if pr.unsupported {
                 "unsupported".to_string()
             } else if same {
@@ -271,8 +277,11 @@ fn main() {
                 "DIFFERENT".to_string()
             };
             *t.entry(verdict.clone()).or_default() += 1;
-            if !same && pr.notices.iter().all(|id| !id.starts_with("FS-9")) {
+            if !same && explained.is_empty() {
                 failures += 1;
+            }
+            if std::env::var("LXPROBE_SHOW_EXPLAINED").is_ok() && verdict.starts_with("explained") {
+                println!("-- case {n} {} vs {}: {verdict} {:?}", case.name, lib.name, pr.details);
             }
             let show = only.is_some() || (verdict == "DIFFERENT" && shown < 12);
             if show {
@@ -292,10 +301,10 @@ fn main() {
                         }
                     }
                 }
-                if c.out != pr.out {
+                if lossy(&c.out) != pr.out {
                     println!("  stdout C   : {:?}\n  stdout port: {:?}", String::from_utf8_lossy(&c.out), String::from_utf8_lossy(&pr.out));
                 }
-                if c.err != pr.err {
+                if lossy(&c.err) != pr.err {
                     println!("  stderr C   : {:?}\n  stderr port: {:?}", String::from_utf8_lossy(&c.err), String::from_utf8_lossy(&pr.err));
                 }
             }

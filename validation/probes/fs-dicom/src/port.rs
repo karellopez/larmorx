@@ -56,7 +56,7 @@ fn dump_object(b: &mut Vec<u8>, o: Option<&DcmObject>) {
     put_u64(b, o.pixel_offset);
     put_u32(b, o.pixel_bits_allocated as u32);
     put_u32(b, o.pixel_representation as u32);
-    put_u32(b, o.fd_open as u32);
+    put_u32(b, o.fd.is_some() as u32);
     put_s(b, &o.file_name);
     put_u32(b, o.preamble_flag as u32);
     b.extend_from_slice(&o.preamble);
@@ -81,7 +81,7 @@ fn dump_object(b: &mut Vec<u8>, o: Option<&DcmObject>) {
             put_u32(b, e.byte_order as u32);
             put_u64(b, e.data_offset as u64);
             put_u64(b, e.current_offset as u64);
-            put_u64(b, e.allocated_data_length);
+            put_u64(b, e.allocated_data_length & 0xffff_ffff);
             put_u64(b, e.original_data_length);
             put_u64(b, e.padded_data_length);
             put_u32(b, e.fragment_flag as u32);
@@ -94,6 +94,7 @@ fn dump_object(b: &mut Vec<u8>, o: Option<&DcmObject>) {
                     }
                 }
                 Data::OnDisk => b.push(b'Z'),
+                Data::Unread => b.push(b'U'),
                 Data::Bytes(v) => {
                     b.push(b'D');
                     put_u32(b, v.len() as u32);
@@ -110,6 +111,7 @@ pub struct PortRun {
     pub out: Vec<u8>,
     pub err: Vec<u8>,
     pub notices: Vec<&'static str>,
+    pub details: Vec<String>,
     pub unsupported: bool,
 }
 
@@ -183,6 +185,7 @@ pub fn run(file: &Path, ops: &[i64], dialect: &dyn Dialect) -> PortRun {
         out: out.text(Stream::Out).into_bytes(),
         err: out.text(Stream::Err).into_bytes(),
         notices: notices.as_slice().iter().map(|n| n.defect.id).collect(),
+        details: notices.as_slice().iter().map(|n| format!("{}: {}", n.defect.id, n.detail)).collect(),
         unsupported,
     }
 }

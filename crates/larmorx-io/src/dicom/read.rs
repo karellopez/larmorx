@@ -25,7 +25,7 @@ use super::{
 
 /// The deepest nesting of sequences read (FS-97): CTN recurses once per level and exhausts the
 /// thread's stack somewhere past this, depending on the stack's size.
-pub const MAX_NESTING: i32 = 400;
+pub const MAX_NESTING: i32 = 128;
 
 /// The bytes of a file name CTN's object keeps (`fileName[1024]`, FS-90).
 const FILE_NAME_KEPT: usize = 1023;
@@ -49,7 +49,7 @@ impl std::error::Error for Unsupported {}
 struct Reader<'a> {
     name: &'a [u8],
     file: File,
-    errno: i32,
+    fd: i32,
     dialect: &'a dyn Dialect,
     stack: &'a mut CondStack,
     out: &'a mut dyn Streams,
@@ -63,17 +63,6 @@ struct El {
     representation: Vr,
     description: String,
     length: u32,
-}
-
-fn os_text(errno: i32) -> String {
-    if errno == 0 {
-        return "Success".to_owned();
-    }
-    let s = std::io::Error::from_raw_os_error(errno).to_string();
-    match s.rfind(" (os error ") {
-        Some(i) => s[..i].to_owned(),
-        None => s,
-    }
 }
 
 impl Reader<'_> {
@@ -92,7 +81,7 @@ impl Reader<'_> {
                 Ok(k) => n += k,
                 Err(e) if e.kind() == std::io::ErrorKind::Interrupted => {}
                 Err(e) => {
-                    self.errno = e.raw_os_error().unwrap_or(5);
+                    self.stack.errno = errno_of(&e);
                     if n == 0 {
                         return -1;
                     }
@@ -108,8 +97,26 @@ impl Reader<'_> {
     }
 }
 
-fn close(obj: &mut Option<DcmObject>) {
-    *obj = None;
+/// `DCM_CloseObject` on an object: its descriptor closed, then its sequences' items', in order.
+fn close_tree(o: &DcmObject, stack: &mut CondStack) {
+    if let Some(fd) = o.fd {
+        stack.close_fd(fd);
+    }
+    for g in &o.groups {
+        for e in &g.elements {
+            if let Data::Sequence(items) = &e.data {
+                for it in items {
+                    close_tree(it, stack);
+                }
+            }
+        }
+    }
+}
+
+fn close(r: &mut Reader, obj: &mut Option<DcmObject>) {
+    if let Some(o) = obj.take() {
+        close_tree(&o, r.stack);
+    }
 }
 
 fn get_u16(b: &[u8], order: i32) -> u16 {
@@ -182,7 +189,8 @@ pub fn open_file(
     }
     let file = match File::open(name) {
         Ok(f) => f,
-        Err(_) => {
+        Err(e) => {
+            stack.errno = errno_of(&e);
             let m = dialect.message(DCM_FILEOPENFAILED);
             return Ok(stack.push(
                 DCM_FILEOPENFAILED,
@@ -201,10 +209,11 @@ pub fn open_file(
     if size == 0 {
         return Ok(DCM_FILEACCESSERROR);
     }
+    let fd = stack.open_fd();
     let mut r = Reader {
         name: &name_bytes,
         file,
-        errno: 0,
+        fd,
         dialect,
         stack,
         out,
@@ -213,6 +222,9 @@ pub fn open_file(
     let mut offset = 0i64;
     let mut remain_open = false;
     let cond = read_file1(&mut r, size, &mut offset, 0, options, None, object, None, &mut remain_open);
+    if cond != DCM_NORMAL || !remain_open {
+        r.stack.close_fd(fd);
+    }
     if cond != DCM_NORMAL {
         let n = r.name.to_vec();
         return Ok(r.push(DCM_FILEOPENFAILED, &[Arg::Str(&n), Arg::Str(b"DCM_OpenFile")]));
@@ -228,11 +240,11 @@ pub fn close_object(
     out: &mut dyn Streams,
     notices: &mut Notices,
 ) -> Condition {
-    if object.is_none() {
+    let Some(o) = object.take() else {
         let m = dialect.message(DCM_NULLOBJECT);
         return stack.push(DCM_NULLOBJECT, m, &[Arg::Str(b"DCM_CloseObject")], out, notices);
-    }
-    *object = None;
+    };
+    close_tree(&o, stack);
     DCM_NORMAL
 }
 
@@ -334,6 +346,23 @@ fn read_file1(
             return flag;
         }
         if e.representation == Vr::Un && e.length == UNSPECIFIED_LENGTH {
+            e.representation = Vr::Sq;
+        }
+        if e.length == UNSPECIFIED_LENGTH
+            && e.representation != Vr::Sq
+            && e.tag != TAG_PIXEL_DATA
+            && tag_group(e.tag) != 0xfffe
+            && r.notices.fix()
+        {
+            // FS-91 corrected: only a sequence has an undefined length here
+            r.notices.add(
+                &defects::FS_91,
+                format!(
+                    "({:04x},{:04x}) of undefined length read as a sequence",
+                    tag_group(e.tag),
+                    tag_element(e.tag)
+                ),
+            );
             e.representation = Vr::Sq;
         }
         if e.tag == TAG_ITEM_DELIMITATION || e.tag == TAG_SEQUENCE_DELIMITATION {
@@ -480,7 +509,7 @@ fn read_preamble(
         return DCM_STREAMCOMPLETE;
     }
     if *size < PREAMBLE_LENGTH as u32 + 4 && known {
-        close(object);
+        close(r, object);
         let s = *size;
         return r.push(DCM_ILLEGALSTREAMLENGTH, &[Arg::U32(s), Arg::Str(b"readPreamble")]);
     }
@@ -526,15 +555,14 @@ fn read_group_element(
         return DCM_STREAMCOMPLETE;
     }
     if *size < 4 && known {
-        close(object);
+        close(r, object);
         let s = *size;
         return r.push(DCM_ILLEGALSTREAMLENGTH, &[Arg::U32(s), Arg::Str(b"readFile")]);
     }
     let mut buf = [0u8; 4];
     let n = r.read(&mut buf);
     if n != 4 {
-        let text = os_text(r.errno);
-        r.out.err(&format!(": {text}\n"));
+        r.stack.perror("", r.out);
         r.out.out(&format!("Bytes read: {}\n", n as i32));
         let name = r.name.to_vec();
         return r.push(
@@ -586,7 +614,7 @@ fn read_vr_length(
         return DCM_STREAMCOMPLETE;
     }
     if *size < 4 && known {
-        close(object);
+        close(r, object);
         let s = *size;
         return r.push(DCM_ILLEGALSTREAMLENGTH, &[Arg::U32(s), Arg::Str(b"readVRLength")]);
     }
@@ -642,7 +670,7 @@ fn read_vr_length(
             calculated = true;
         } else {
             if *size < 4 && known {
-                close(object);
+                close(r, object);
                 let s = *size;
                 return r.push(
                     DCM_ILLEGALSTREAMLENGTH,
@@ -660,7 +688,7 @@ fn read_vr_length(
         e.length = get_u32(&buf, byte_order);
     }
     if (e.length & 1) != 0 && e.length != UNSPECIFIED_LENGTH {
-        close(object);
+        close(r, object);
         let (g, el, l) = (tag_group(e.tag), tag_element(e.tag), e.length);
         return r.push(
             DCM_UNEVENELEMENTLENGTH,
@@ -673,7 +701,7 @@ fn read_vr_length(
         );
     }
     if e.length != UNSPECIFIED_LENGTH && e.length > *size {
-        close(object);
+        close(r, object);
         let (g, el, l, s) = (tag_group(e.tag), tag_element(e.tag), e.length, *size);
         return r.push(
             DCM_ELEMENTLENGTHERROR,
@@ -981,31 +1009,34 @@ fn read_data(
             item.padded_data_length = l1 as u64;
         }
         if let Some(o) = object.as_mut() {
-            o.fd_open = true;
+            o.fd = Some(r.fd);
         }
     } else {
         let length = item.length;
-        if length == UNSPECIFIED_LENGTH || (length as i32) < 0 {
-            if length == UNSPECIFIED_LENGTH {
-                r.notices.add(
-                    &defects::FS_91,
-                    format!(
-                        "({:04x},{:04x}) of undefined length is no sequence",
-                        tag_group(e.tag),
-                        tag_element(e.tag)
-                    ),
-                );
+        if (length as i32) < 0 {
+            // read(fd, value, (int) length): a negative count fails (EINVAL) and reads nothing;
+            // the check compares its -1 with (int) length, equal for an undefined length (FS-91)
+            r.stack.errno = EINVAL;
+            if length != UNSPECIFIED_LENGTH {
+                close(r, object);
+                let name = r.name.to_vec();
+                return Err(r.push(DCM_FILEACCESSERROR, &[Arg::Str(&name), Arg::Str(b"readFile")]));
             }
-            // CTN reads the rest of the file into the value (or past it: FS-91) and fails: the
-            // failure only, without the read
-            close(object);
-            let name = r.name.to_vec();
-            return Err(r.push(DCM_FILEACCESSERROR, &[Arg::Str(&name), Arg::Str(b"readFile")]));
+            r.notices.add(
+                &defects::FS_91,
+                format!(
+                    "({:04x},{:04x}) of undefined length kept with a value never read",
+                    tag_group(e.tag),
+                    tag_element(e.tag)
+                ),
+            );
+            item.data = Data::Unread;
+            return Ok(finish_data(size, file_offset, scanned, object, item));
         }
         let mut data = vec![0u8; length as usize];
         let n = r.read(&mut data);
         if n != length as i64 {
-            close(object);
+            close(r, object);
             let name = r.name.to_vec();
             return Err(r.push(DCM_FILEACCESSERROR, &[Arg::Str(&name), Arg::Str(b"readFile")]));
         }
@@ -1018,6 +1049,18 @@ fn read_data(
         }
         item.data = Data::Bytes(data);
     }
+    Ok(finish_data(size, file_offset, scanned, object, item))
+}
+
+/// The end of `readData`: the sizes and offsets advanced by the value's length, its padded
+/// length counted into the object.
+fn finish_data(
+    size: &mut u32,
+    file_offset: &mut i64,
+    scanned: Option<&mut u32>,
+    object: &mut Option<DcmObject>,
+    mut item: ElementItem,
+) -> ElementItem {
     if *size != UNSPECIFIED_LENGTH {
         *size = size.wrapping_sub(item.original_data_length as u32);
     }
@@ -1034,7 +1077,7 @@ fn read_data(
     if let Some(o) = object.as_mut() {
         o.object_size = o.object_size.wrapping_add(item.padded_data_length);
     }
-    Ok(item)
+    item
 }
 
 /// `swapATGroupElement` (a little-endian machine): the two 16-bit halves of each 4-byte tag

@@ -161,12 +161,13 @@ impl Vr {
             (Vr::Ob, b"OB"),
             (Vr::Ow, b"OW"),
             (Vr::Dt, b"DT"),
-            (Vr::Dlm, b""),
+            // CTN's source writes the delimiter's code as one control byte, 0x1E
+            (Vr::Dlm, b"\x1e"),
         ]
     }
 
     /// The representation an explicit VR's two bytes name, compared as C strings (the code ends
-    /// at a zero byte, so a first byte 0 names the delimiter's empty code).
+    /// at a zero byte: a first byte 0 names none, 0x1E alone the delimiter).
     pub fn from_code(code: [u8; 2]) -> Option<Vr> {
         let n = code.iter().position(|&c| c == 0).unwrap_or(2);
         let s = &code[..n];
@@ -271,8 +272,8 @@ pub struct DcmObject {
     pub pixel_offset: u64,
     pub pixel_bits_allocated: u16,
     pub pixel_representation: u16,
-    /// Whether the object keeps the file open (its pixel data stay on disk).
-    pub fd_open: bool,
+    /// The descriptor the object keeps when its pixel data stay in the file (`fd`, -1 for none).
+    pub fd: Option<i32>,
     pub file_name: Vec<u8>,
     pub preamble_flag: bool,
     pub preamble: [u8; PREAMBLE_LENGTH],
@@ -322,6 +323,9 @@ pub enum Data {
     OnDisk,
     /// A sequence's items.
     Sequence(Vec<DcmObject>),
+    /// The value of an element of undefined length that CTN reads as no sequence (FS-91, in
+    /// `reproduce`): its read fails and is taken for complete, the value is memory never written.
+    Unread,
 }
 
 impl DcmObject {
@@ -339,7 +343,7 @@ impl DcmObject {
             pixel_offset: 0,
             pixel_bits_allocated: 0,
             pixel_representation: 0xffff,
-            fd_open: false,
+            fd: None,
             file_name: Vec::new(),
             preamble_flag: false,
             preamble: [0; PREAMBLE_LENGTH],

@@ -205,7 +205,7 @@ impl Gen {
             }
             let v = value(rng, vr, enc);
             let code = if enc.explicit && rng.chance(0.03) {
-                *rng.pick(&[*b"OB", *b"UN", *b"XX", *b"ob", *b"\0\0", *b"  ", *b"US", *b"SQ"])
+                *rng.pick(&[*b"OB", *b"UN", *b"XX", *b"ob", *b"\0\0", *b"  ", *b"US", *b"SQ", *b"\x1e\0", *b"OW"])
             } else {
                 vr_code(vr)
             };

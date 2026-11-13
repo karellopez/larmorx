@@ -279,6 +279,48 @@ pub fn c_format(format: &[u8], args: &[Arg]) -> Vec<u8> {
     out
 }
 
+/// glibc's message of `errno` (`strerror`, Linux's numbers), the same on every platform.
+pub fn os_text(errno: i32) -> String {
+    match errno {
+        0 => "Success",
+        1 => "Operation not permitted",
+        2 => "No such file or directory",
+        4 => "Interrupted system call",
+        5 => "Input/output error",
+        9 => "Bad file descriptor",
+        12 => "Cannot allocate memory",
+        13 => "Permission denied",
+        20 => "Not a directory",
+        21 => "Is a directory",
+        22 => "Invalid argument",
+        24 => "Too many open files",
+        36 => "File name too long",
+        40 => "Too many levels of symbolic links",
+        _ => return format!("Unknown error {errno}"),
+    }
+    .to_owned()
+}
+
+/// The Linux `errno` of an I/O error (by its kind, so that every platform gives Linux's).
+pub fn errno_of(e: &std::io::Error) -> i32 {
+    use std::io::ErrorKind::*;
+    match e.kind() {
+        NotFound => 2,
+        PermissionDenied => 13,
+        Interrupted => 4,
+        OutOfMemory => 12,
+        NotADirectory => 20,
+        IsADirectory => 21,
+        InvalidInput => 22,
+        InvalidFilename => 36,
+        _ => 5,
+    }
+}
+
+/// `errno` values CTN's calls leave (Linux's).
+pub const EBADF: i32 = 9;
+pub const EINVAL: i32 = 22;
+
 /// The stack's size (`MAXEDB`).
 pub const MAXEDB: usize = 100;
 /// CTN's formatting buffer (`COND_PushCondition`'s `buffer[1024]`).
@@ -286,12 +328,24 @@ pub const FORMAT_BUFFER: usize = 1024;
 /// The bytes of a text the stack keeps.
 pub const TEXT_KEPT: usize = 256;
 
-/// CTN's condition stack (`condition.c`'s `EDBStack` and `stackPtr`): one per process in C, one
-/// per value here. Entries above the top stay as they were (the overflow rule exposes entry 0).
+/// CTN's process state: its condition stack (`condition.c`'s `EDBStack` and `stackPtr`; entries
+/// above the top stay as they were, the overflow rule exposes entry 0), and the C library's
+/// `errno` and file descriptors as CTN's own calls leave them (a read that fails, a descriptor
+/// closed twice: the text a later `perror` prints). One per process in C, one per value here.
 #[derive(Clone, Debug)]
 pub struct CondStack {
     entries: Vec<(Condition, Vec<u8>)>,
     ptr: i32,
+    /// `errno` (0 at the start: "Success").
+    pub errno: i32,
+    /// Whether standard error is open for reading too (a terminal), or for writing only (a file
+    /// or a pipe, the default): glibc's first `perror` on a stream nothing has written to yet
+    /// reopens it with `fdopen(dup(2), "w+")`, which leaves `EINVAL` in `errno` when it is
+    /// write-only.
+    pub stderr_read_write: bool,
+    /// Whether anything was written to standard error (its stream's orientation is set).
+    pub stderr_oriented: bool,
+    fds: Vec<i32>,
 }
 
 impl Default for CondStack {
@@ -305,6 +359,30 @@ impl CondStack {
         CondStack {
             entries: vec![(0, Vec::new()); MAXEDB],
             ptr: -1,
+            errno: 0,
+            stderr_read_write: false,
+            stderr_oriented: false,
+            fds: Vec::new(),
+        }
+    }
+
+    /// A descriptor `open` gives (the lowest free one after the standard streams).
+    pub fn open_fd(&mut self) -> i32 {
+        let mut fd = 3;
+        while self.fds.contains(&fd) {
+            fd += 1;
+        }
+        self.fds.push(fd);
+        fd
+    }
+
+    /// `close(fd)`: `EBADF` in `errno` when it is not open.
+    pub fn close_fd(&mut self, fd: i32) {
+        match self.fds.iter().position(|&f| f == fd) {
+            Some(i) => {
+                self.fds.remove(i);
+            }
+            None => self.errno = EBADF,
         }
     }
 
@@ -342,6 +420,7 @@ impl CondStack {
         if self.ptr >= MAXEDB as i32 - 2 {
             self.dump_to(out);
             out.err("CONDITION Stack overflow\n");
+            self.stderr_oriented = true;
             self.ptr = 0;
         }
         cond
@@ -374,9 +453,26 @@ impl CondStack {
         }
     }
 
-    fn dump_to(&self, out: &mut dyn Streams) {
-        for (c, t) in self.entries() {
-            out.err(&format!("{:8x} {}\n", *c as u32, String::from_utf8_lossy(t)));
+    /// `perror(prefix)`: the message of `errno` on standard error, and what glibc leaves in it.
+    pub fn perror(&mut self, prefix: &str, out: &mut dyn Streams) {
+        let text = os_text(self.errno);
+        if prefix.is_empty() {
+            out.err(&format!("{text}\n"));
+        } else {
+            out.err(&format!("{prefix}: {text}\n"));
+        }
+        if !self.stderr_oriented && !self.stderr_read_write {
+            self.errno = EINVAL;
+        }
+        self.stderr_oriented = true;
+    }
+
+    fn dump_to(&mut self, out: &mut dyn Streams) {
+        if self.ptr >= 0 {
+            self.stderr_oriented = true;
+        }
+        for (c, t) in self.entries().to_vec() {
+            out.err(&format!("{:8x} {}\n", c as u32, String::from_utf8_lossy(&t)));
         }
     }
 

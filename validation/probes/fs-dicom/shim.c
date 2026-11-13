@@ -45,7 +45,9 @@ static void dump_element(gb *b, PRV_ELEMENT_ITEM *it) {
     put_u32(b, (unsigned) it->byteOrder);
     put_u64(b, (unsigned long long) it->dataOffset);
     put_u64(b, (unsigned long long) it->currentOffset);
-    put_u64(b, (unsigned long long) it->allocatedDataLength);
+    /* its low 32 bits: FreeSurfer's copy computes the room of an undefined length's value in 64
+     * bits (0x100000000), CTN 3.0.6 in 32 (0); nothing reads it back */
+    put_u64(b, (unsigned long long) (it->allocatedDataLength & 0xffffffffu));
     put_u64(b, (unsigned long long) it->originalDataLength);
     put_u64(b, (unsigned long long) it->paddedDataLength);
     put_u32(b, (unsigned) it->fragmentFlag);

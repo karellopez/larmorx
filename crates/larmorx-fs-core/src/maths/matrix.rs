@@ -167,7 +167,12 @@ impl Process {
     /// `MatrixAlloc(rows, cols, type)` (§2.2): a matrix of zeros; an unknown type with rows is
     /// an error (nothing returned); FS-13 (a negative size, or more numbers than an `int` holds)
     /// ends the program with status 1 after its two lines, in both modes.
-    pub fn matrix_alloc(&mut self, rows: i32, cols: i32, kind: i32) -> Result<Option<Matrix>, Stop> {
+    pub fn matrix_alloc(
+        &mut self,
+        rows: i32,
+        cols: i32,
+        kind: i32,
+    ) -> Result<Option<Matrix>, Stop> {
         if rows >= 1 && kind != MATRIX_REAL && kind != MATRIX_COMPLEX {
             self.error_printf(
                 codes::BAD_PARM,
@@ -210,7 +215,12 @@ impl Process {
 
     /// `MatrixAlloc2(rows, cols, type, buffer)` (§2.2): as [`Process::matrix_alloc`], the matrix
     /// marked as in the caller's buffer when the default allocator's block fits 192 bytes.
-    pub fn matrix_alloc2(&mut self, rows: i32, cols: i32, kind: i32) -> Result<Option<Matrix>, Stop> {
+    pub fn matrix_alloc2(
+        &mut self,
+        rows: i32,
+        cols: i32,
+        kind: i32,
+    ) -> Result<Option<Matrix>, Stop> {
         let mut m = self.matrix_alloc(rows, cols, kind)?;
         let old = self.old_allocator();
         if let Some(m) = m.as_mut() {
@@ -274,7 +284,10 @@ impl Process {
                     "a complex matrix copied as FreeSurfer copies it: half its values, shifted",
                 );
             } else {
-                self.note(&FS_14, "both parts of every element of a complex matrix copied");
+                self.note(
+                    &FS_14,
+                    "both parts of every element of a complex matrix copied",
+                );
                 for r in 1..=input.rows {
                     for c in 1..=input.cols {
                         let (re, im) = input.pair(r, c);
@@ -327,7 +340,10 @@ impl Process {
             Accumulate::Double => ("MatrixMultiplyD()", "MatrixMultiplyD"),
             Accumulate::Float => ("MatrixMultiply()", "MatrixMultiply"),
         };
-        for (which, m, line_d, line_f) in [("m1", m1.is_none(), 597, 725), ("m2", m2.is_none(), 601, 729)] {
+        for (which, m, line_d, line_f) in [
+            ("m1", m1.is_none(), 597, 725),
+            ("m2", m2.is_none(), 601, 729),
+        ] {
             if m {
                 match acc {
                     Accumulate::Double => {
@@ -343,7 +359,10 @@ impl Process {
                             )
                             .as_bytes(),
                         );
-                        self.error_exit(codes::BAD_PARM, format!("{short}: {which} is null\n").as_bytes())?;
+                        self.error_exit(
+                            codes::BAD_PARM,
+                            format!("{short}: {which} is null\n").as_bytes(),
+                        )?;
                     }
                 }
                 return Ok(Returned::Nothing);
@@ -361,10 +380,15 @@ impl Process {
                 }
                 Accumulate::Float => {
                     self.put_out(
-                        format!("{name}: m1/m2 dim mismatch\n break {BUILD_ROOT}/utils/matrix.cpp:733\n")
-                            .as_bytes(),
+                        format!(
+                            "{name}: m1/m2 dim mismatch\n break {BUILD_ROOT}/utils/matrix.cpp:733\n"
+                        )
+                        .as_bytes(),
                     );
-                    let msg = format!("{short}: m1 cols {} does not match m2 rows {}\n", a.cols, b.rows);
+                    let msg = format!(
+                        "{short}: m1 cols {} does not match m2 rows {}\n",
+                        a.cols, b.rows
+                    );
                     self.error_printf(codes::BAD_PARM, msg.as_bytes());
                 }
             }
@@ -376,7 +400,9 @@ impl Process {
                 Accumulate::Double => ("m1/m2 dim mismatch", 623),
                 Accumulate::Float => ("m3 dim mismatch", 748),
             };
-            p.put_out(format!("{name}: {text}\n break {BUILD_ROOT}/utils/matrix.cpp:{line}\n").as_bytes());
+            p.put_out(
+                format!("{name}: {text}\n break {BUILD_ROOT}/utils/matrix.cpp:{line}\n").as_bytes(),
+            );
             let msg = format!(
                 "{short}: ({} x {}) * ({} x {}) != ({} x {})\n",
                 a.rows, a.cols, b.rows, b.cols, o.rows, o.cols
@@ -459,9 +485,15 @@ impl Process {
         }
         if held {
             if reproduce {
-                self.note(&FS_15, "the complex product added onto the output's earlier contents");
+                self.note(
+                    &FS_15,
+                    "the complex product added onto the output's earlier contents",
+                );
             } else {
-                self.note(&FS_15, "the complex product started from 0, not the output's earlier contents");
+                self.note(
+                    &FS_15,
+                    "the complex product started from 0, not the output's earlier contents",
+                );
             }
         }
         true
@@ -469,14 +501,35 @@ impl Process {
 }
 
 /// One element of a complex product (§2.5 step 6, §8.1 step 5): the sums from `re`, `im`.
-fn complex_element(a: &Matrix, b: &Matrix, r: i32, c: i32, re: f32, im: f32, acc: Accumulate) -> (f32, f32) {
+fn complex_element(
+    a: &Matrix,
+    b: &Matrix,
+    r: i32,
+    c: i32,
+    re: f32,
+    im: f32,
+    acc: Accumulate,
+) -> (f32, f32) {
     let (mut re, mut im) = (re, im);
     for i in 1..=a.cols {
-        let (ar, ai) = if a.is_complex() { a.pair(r, i) } else { (a.at(r, i), 0.0) };
-        let (br, bi) = if b.is_complex() { b.pair(i, c) } else { (b.at(i, c), 0.0) };
+        let (ar, ai) = if a.is_complex() {
+            a.pair(r, i)
+        } else {
+            (a.at(r, i), 0.0)
+        };
+        let (br, bi) = if b.is_complex() {
+            b.pair(i, c)
+        } else {
+            (b.at(i, c), 0.0)
+        };
         match acc {
             Accumulate::Double => {
-                let (x, y, u, v) = (sse::widen(ar), sse::widen(ai), sse::widen(br), sse::widen(bi));
+                let (x, y, u, v) = (
+                    sse::widen(ar),
+                    sse::widen(ai),
+                    sse::widen(br),
+                    sse::widen(bi),
+                );
                 let (t_re, t_im) = if !a.is_complex() {
                     (sse::mul64(x, u), sse::mul64(x, v))
                 } else if !b.is_complex() {

@@ -26,6 +26,7 @@ pub mod nr;
 pub mod pdf;
 pub mod primes;
 pub mod rfields;
+pub mod svd;
 
 use larmorx_core::defects::{FS_17, GLIBC_07};
 use larmorx_core::drand48::Drand48;
@@ -106,19 +107,44 @@ impl Process {
 
     /// A double function of the C library (§1, §7): larmorx's correctly rounded one by default,
     /// glibc 2.35's with `reproduce`; GLIBC-07 noted where the two differ.
-    pub(crate) fn libm(&mut self, name: &str, x: f64, cr: fn(f64) -> f64, glibc: fn(f64) -> f64) -> f64 {
+    pub(crate) fn libm(
+        &mut self,
+        name: &str,
+        x: f64,
+        cr: fn(f64) -> f64,
+        glibc: fn(f64) -> f64,
+    ) -> f64 {
         let (a, b) = (cr(x), glibc(x));
-        self.libm_pick(name, a.to_bits() != b.to_bits() && !(a.is_nan() && b.is_nan()), a, b)
+        self.libm_pick(
+            name,
+            a.to_bits() != b.to_bits() && !(a.is_nan() && b.is_nan()),
+            a,
+            b,
+        )
     }
 
     /// `pow` as [`Process::libm`].
     pub(crate) fn libm_pow(&mut self, x: f64, y: f64) -> f64 {
-        let (a, b) = (larmorx_core::math::pow(x, y), larmorx_core::math::pow_glibc(x, y));
-        self.libm_pick("pow", a.to_bits() != b.to_bits() && !(a.is_nan() && b.is_nan()), a, b)
+        let (a, b) = (
+            larmorx_core::math::pow(x, y),
+            larmorx_core::math::pow_glibc(x, y),
+        );
+        self.libm_pick(
+            "pow",
+            a.to_bits() != b.to_bits() && !(a.is_nan() && b.is_nan()),
+            a,
+            b,
+        )
     }
 
     /// A float function of the C library (`expf`, `sinf`, `cosf`) as [`Process::libm`].
-    pub(crate) fn libmf(&mut self, name: &str, x: f32, cr: fn(f32) -> f32, glibc: fn(f32) -> f32) -> f32 {
+    pub(crate) fn libmf(
+        &mut self,
+        name: &str,
+        x: f32,
+        cr: fn(f32) -> f32,
+        glibc: fn(f32) -> f32,
+    ) -> f32 {
         let (a, b) = (cr(x), glibc(x));
         let differ = a.to_bits() != b.to_bits() && !(a.is_nan() && b.is_nan());
         if differ {
@@ -136,9 +162,15 @@ impl Process {
 
     fn note_glibc07(&mut self, name: &str) {
         if self.mode().reproduce() {
-            self.note(&GLIBC_07, format!("glibc's {name}, not correctly rounded, gave this result's last bit"));
+            self.note(
+                &GLIBC_07,
+                format!("glibc's {name}, not correctly rounded, gave this result's last bit"),
+            );
         } else {
-            self.note(&GLIBC_07, format!("{name} correctly rounded (glibc's differs in the last place)"));
+            self.note(
+                &GLIBC_07,
+                format!("{name} correctly rounded (glibc's differs in the last place)"),
+            );
         }
     }
 

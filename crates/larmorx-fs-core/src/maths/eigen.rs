@@ -60,41 +60,82 @@ fn sort_by_magnitude(v: &[f32]) -> Vec<usize> {
     idx
 }
 
+/// [`sort_by_magnitude`] for the SVD's values.
+pub(crate) fn sort_by_magnitude_pub(v: &[f32]) -> Vec<usize> {
+    sort_by_magnitude(v)
+}
+
 impl Process {
     /// `OpenEigenSystem(a, n, values, vectors)` (§17.1; FS-42, FS-47).
     pub fn open_eigen_system(&mut self, a: &[f32], n: usize) -> Eigen {
         if n == 0 {
-            return Eigen { status: 0, values: None, vectors: None };
+            return Eigen {
+                status: 0,
+                values: None,
+                vectors: None,
+            };
         }
         // the entries the tridiagonalisation reads: the upper triangle as stored
         let nonfinite = (0..n).any(|r| (r..n).any(|c| !a[r * n + c].is_finite()));
         if n >= 2 && nonfinite {
-            self.note(&FS_47, "a symmetric eigensystem VNL never returns on (an infinite or NaN entry) refused");
+            self.note(
+                &FS_47,
+                "a symmetric eigensystem VNL never returns on (an infinite or NaN entry) refused",
+            );
             self.error_printf(
                 codes::BAD_PARM,
                 b"OpenEigenSystem: VNL's eigensystem never returns on this matrix (an infinite or NaN entry)\n",
             );
-            return Eigen { status: codes::BAD_PARM, values: None, vectors: None };
+            return Eigen {
+                status: codes::BAD_PARM,
+                values: None,
+                vectors: None,
+            };
         }
         let e = vnl_eigen::symmetric_eigensystem_f32_full(&a[..n * n], n);
         if e.ierr != 0 {
             self.put_err(format!("vnl_symmetric_eigensystem: ierr = {}\n", e.ierr).as_bytes());
             if self.mode().reproduce() {
-                self.note(&FS_42, "the eigensystem did not converge: success reported, the vectors memory (0)");
-                return Eigen { status: 0, values: Some(e.values), vectors: Some(vec![0.0; n * n]) };
+                self.note(
+                    &FS_42,
+                    "the eigensystem did not converge: success reported, the vectors memory (0)",
+                );
+                return Eigen {
+                    status: 0,
+                    values: Some(e.values),
+                    vectors: Some(vec![0.0; n * n]),
+                };
             }
-            self.note(&FS_42, "the eigensystem did not converge: a failure, the vectors not written");
-            let msg = format!("OpenEigenSystem: the eigensystem did not converge (ierr {})\n", e.ierr);
+            self.note(
+                &FS_42,
+                "the eigensystem did not converge: a failure, the vectors not written",
+            );
+            let msg = format!(
+                "OpenEigenSystem: the eigensystem did not converge (ierr {})\n",
+                e.ierr
+            );
             self.error_printf(codes::BAD_PARM, msg.as_bytes());
-            return Eigen { status: codes::BAD_PARM, values: Some(e.values), vectors: None };
+            return Eigen {
+                status: codes::BAD_PARM,
+                values: Some(e.values),
+                vectors: None,
+            };
         }
-        Eigen { status: 0, values: Some(e.values), vectors: Some(e.vectors) }
+        Eigen {
+            status: 0,
+            values: Some(e.values),
+            vectors: Some(e.vectors),
+        }
     }
 
     /// `OpenNonSymmetricEigenSystem(a, n, values, vectors)` (§17.2; ITK-110 to ITK-112, FS-41).
     pub fn open_non_symmetric_eigen_system(&mut self, a: &[f32], n: usize) -> Eigen {
         if n == 0 {
-            return Eigen { status: 0, values: None, vectors: None };
+            return Eigen {
+                status: 0,
+                values: None,
+                vectors: None,
+            };
         }
         if n * n * 8 > 8 << 20 {
             self.note(&FS_41, "a non-symmetric eigensystem of more than 8 MiB computed (FreeSurfer's stack copy crashes)");
@@ -107,25 +148,39 @@ impl Process {
                     codes::BAD_PARM,
                     b"OpenNonSymmetricEigenSystem: VNL's eigensystem never returns on this matrix (an infinite or NaN entry)\n",
                 );
-                Eigen { status: codes::BAD_PARM, values: None, vectors: None }
+                Eigen {
+                    status: codes::BAD_PARM,
+                    values: None,
+                    vectors: None,
+                }
             }
             Ok(e) => {
                 if e.ierr != 0 {
-                    self.put_err(vnl_eigen::real_eigensystem_failure_message(&ad, n, e.ierr).as_bytes());
+                    self.put_err(
+                        vnl_eigen::real_eigensystem_failure_message(&ad, n, e.ierr).as_bytes(),
+                    );
                 }
                 for nt in &e.notices {
                     self.note(nt.defect, nt.detail.clone());
                 }
                 let values = e.d_re.iter().map(|&v| sse::narrow(v)).collect();
                 let vectors = e.vreal.iter().map(|&v| sse::narrow(v)).collect();
-                Eigen { status: 0, values: Some(values), vectors: Some(vectors) }
+                Eigen {
+                    status: 0,
+                    values: Some(values),
+                    vectors: Some(vectors),
+                }
             }
         }
     }
 
     /// `MatrixEigenSystem(m, values, vectors)` (§17.3): the eigensystem of a symmetric (exactly)
     /// or non-symmetric matrix, the values sorted by decreasing magnitude.
-    pub fn matrix_eigen_system(&mut self, m: &Matrix, out: Option<&mut Matrix>) -> Result<(Returned<Matrix>, Option<Vec<f32>>), Stop> {
+    pub fn matrix_eigen_system(
+        &mut self,
+        m: &Matrix,
+        out: Option<&mut Matrix>,
+    ) -> Result<(Returned<Matrix>, Option<Vec<f32>>), Stop> {
         let sym = m.rows == m.cols && {
             let mut s = true;
             for r in 1..=m.rows {
@@ -173,7 +228,11 @@ impl Process {
             },
             Some(o) => {
                 let ok = o.rows >= n as i32 && o.cols >= n as i32;
-                if !self.fits("MatrixEigenSystem", "the vectors' matrix is smaller than n x n", ok) {
+                if !self.fits(
+                    "MatrixEigenSystem",
+                    "the vectors' matrix is smaller than n x n",
+                    ok,
+                ) {
                     return Ok((Returned::Nothing, Some(sorted)));
                 }
                 o

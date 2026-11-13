@@ -4,9 +4,9 @@
 use larmorx_fs_core::maths::affine::{self, AffineVector};
 use larmorx_fs_core::maths::dmatrix::{DMatrix, StreamSel};
 use larmorx_fs_core::maths::elements::{self, Region};
+use larmorx_fs_core::maths::matrix::Matrix;
 use larmorx_fs_core::maths::mfiles::CStream;
 use larmorx_fs_core::maths::rfields;
-use larmorx_fs_core::maths::matrix::Matrix;
 use larmorx_fs_core::maths::{Output, Returned};
 use larmorx_fs_core::numbers::ListStats;
 use larmorx_fs_core::{Process, Stop};
@@ -23,7 +23,11 @@ fn product(
     o: Out<Option<Matrix>>,
     float: bool,
 ) -> Result<(), Stop> {
-    let f = if float { Process::matrix_multiply } else { Process::matrix_multiply_d };
+    let f = if float {
+        Process::matrix_multiply
+    } else {
+        Process::matrix_multiply_d
+    };
     match o {
         Out::New | Out::Obj(None) => {
             let r = f(p, a.as_ref(), b.as_ref(), None)?;
@@ -199,7 +203,9 @@ pub fn call(p: &mut Process, l: &mut Line, c: &str) -> Result<bool, Stop> {
             let a = l.getm(p)?.expect("a matrix");
             let b = l.getm(p)?.expect("a matrix");
             let o = l.getm_out(p)?;
-            mout(l, Some(&a), Some(&b), o, |o| p.matrix_add_sub(&a, &b, o, c == "msub"))?;
+            mout(l, Some(&a), Some(&b), o, |o| {
+                p.matrix_add_sub(&a, &b, o, c == "msub")
+            })?;
         }
         "mscale" => {
             let a = l.getm(p)?.expect("a matrix");
@@ -241,12 +247,16 @@ pub fn call(p: &mut Process, l: &mut Line, c: &str) -> Result<bool, Stop> {
             let a = l.getm(p)?.expect("a matrix");
             let o = l.getm_out(p)?;
             let (rows, cols) = (l.geti(), l.geti());
-            mout(l, Some(&a), None, o, |o| p.matrix_reshape(&a, o, rows, cols))?;
+            mout(l, Some(&a), None, o, |o| {
+                p.matrix_reshape(&a, o, rows, cols)
+            })?;
         }
         "mcolscale" => {
             let a = l.getm(p)?.expect("a matrix");
             let o = l.getm_out(p)?;
-            mout(l, Some(&a), None, o, |o| p.matrix_normalize_col_scale(&a, o))?;
+            mout(l, Some(&a), None, o, |o| {
+                p.matrix_normalize_col_scale(&a, o)
+            })?;
         }
         "mnormcol" => {
             let a = l.getm(p)?.expect("a matrix");
@@ -257,7 +267,9 @@ pub fn call(p: &mut Process, l: &mut Line, c: &str) -> Result<bool, Stop> {
                 Out::First | Out::Second => Some(a.clone()),
                 Out::Obj(Some(m)) => Some(m),
             };
-            mout(l, Some(&a), None, o, |o| p.matrix_normalize_col(&a, o, s.as_mut()))?;
+            mout(l, Some(&a), None, o, |o| {
+                p.matrix_normalize_col(&a, o, s.as_mut())
+            })?;
             if s.is_some() {
                 l.putm(s.as_ref());
             }
@@ -280,7 +292,9 @@ pub fn call(p: &mut Process, l: &mut Line, c: &str) -> Result<bool, Stop> {
             let a = l.getm(p)?.expect("a matrix");
             let b = l.getm(p)?.expect("a matrix");
             let o = l.getm_out(p)?;
-            mout(l, Some(&a), Some(&b), o, |o| p.matrix_real_to_complex(&a, &b, o))?;
+            mout(l, Some(&a), Some(&b), o, |o| {
+                p.matrix_real_to_complex(&a, &b, o)
+            })?;
         }
         // -- §8.4, §8.5
         "mrotation" => {
@@ -305,7 +319,9 @@ pub fn call(p: &mut Process, l: &mut Line, c: &str) -> Result<bool, Stop> {
             let a = l.getm(p)?.expect("a matrix");
             let b = l.getm(p)?.expect("a matrix");
             let o = l.getm_out(p)?;
-            mout(l, Some(&a), Some(&b), o, |o| p.vector_cross_product(&a, &b, o))?;
+            mout(l, Some(&a), Some(&b), o, |o| {
+                p.vector_cross_product(&a, &b, o)
+            })?;
         }
         "vtriple" => {
             let a = l.getm(p)?.expect("a matrix");
@@ -353,7 +369,9 @@ pub fn call(p: &mut Process, l: &mut Line, c: &str) -> Result<bool, Stop> {
             let a = l.getm(p)?.expect("a matrix");
             let b = l.getm(p)?.expect("a matrix");
             let o = l.getm_out(p)?;
-            mout(l, Some(&a), Some(&b), o, |o| p.matrix_similarity_transform(&a, &b, o))?;
+            mout(l, Some(&a), Some(&b), o, |o| {
+                p.matrix_similarity_transform(&a, &b, o)
+            })?;
         }
         "mgaussian" => {
             let n = l.geti();
@@ -367,7 +385,9 @@ pub fn call(p: &mut Process, l: &mut Line, c: &str) -> Result<bool, Stop> {
             let (s1, s2, w1) = (l.getf(), l.getf(), l.getf());
             let norm = l.geti();
             let o = l.getm_out(p)?;
-            mout(l, None, None, o, |o| p.gaussian_matrix2(n, s1, s2, w1, norm, o))?;
+            mout(l, None, None, o, |o| {
+                p.gaussian_matrix2(n, s1, s2, w1, norm, o)
+            })?;
         }
         // -- §8.8
         "minverse" => {
@@ -392,7 +412,11 @@ pub fn call(p: &mut Process, l: &mut Line, c: &str) -> Result<bool, Stop> {
         // -- §9, §10
         "primes" | "pfactors" => {
             let n = l.geti();
-            let v = if c == "primes" { p.get_primes(n) } else { p.get_prime_factors(n) };
+            let v = if c == "primes" {
+                p.get_primes(n)
+            } else {
+                p.get_prime_factors(n)
+            };
             match v {
                 None => l.out("null"),
                 Some(v) => {
@@ -485,6 +509,52 @@ pub fn call(p: &mut Process, l: &mut Line, c: &str) -> Result<bool, Stop> {
                 l.putf(vals.as_ref().and_then(|v| v.get(i).copied()).unwrap_or(7.0));
             }
         }
+        // -- §17.4, §17.5
+        "msvd" => {
+            let mut a = l.getm(p)?.expect("a matrix");
+            let mut w = l.getm(p)?.expect("a matrix");
+            let o = l.getm_out(p)?;
+            match o {
+                Out::Obj(Some(mut v)) => {
+                    let r = p.matrix_svd(&mut a, &mut w, Some(&mut v))?;
+                    l.putm_res(&r, Some(&v));
+                }
+                _ => {
+                    let r = p.matrix_svd(&mut a, &mut w, None)?;
+                    l.putm_res(&r, None);
+                }
+            }
+            l.putm(Some(&a));
+            l.putm(Some(&w));
+        }
+        "msvdvalues" => {
+            let a = l.getm(p)?.expect("a matrix");
+            let n = l.geti();
+            let mut ev = vec![7.0f32; n.max(1) as usize];
+            let v = p.matrix_svd_eigen_values(&a, &mut ev);
+            l.putf(v);
+            for x in ev.iter().take(n.max(0) as usize) {
+                l.putf(*x);
+            }
+        }
+        "mcond" | "mnscond" => {
+            let a = l.getm(p)?.expect("a matrix");
+            let v = if c == "mcond" {
+                p.matrix_condition_number(&a)
+            } else {
+                p.matrix_ns_condition_number(&a)?
+            };
+            l.putf(v);
+        }
+        "msvdinverse" | "mpinverse" | "msvdpinverse" => {
+            let a = l.getm(p)?.expect("a matrix");
+            let o = l.getm_out(p)?;
+            mout(l, Some(&a), None, o, |o| match c {
+                "msvdinverse" => p.matrix_svd_inverse(&a, o),
+                "mpinverse" => p.matrix_pseudo_inverse(&a, o),
+                _ => p.matrix_svd_pseudo_inverse(&a, o),
+            })?;
+        }
         // -- §18
         "mreadtxt" | "mreadtxtmissing" => {
             let name = l.getx();
@@ -531,7 +601,11 @@ pub fn call(p: &mut Process, l: &mut Line, c: &str) -> Result<bool, Stop> {
         }
         "mwriteasc" | "mwritebin" => {
             let a = l.getm(p)?.expect("a matrix");
-            let b = if c == "mwriteasc" { p.matrix_ascii_write(&a) } else { p.matrix_write_into(&a) };
+            let b = if c == "mwriteasc" {
+                p.matrix_ascii_write(&a)
+            } else {
+                p.matrix_write_into(&a)
+            };
             l.puti(0);
             l.out(crate::hexbytes(&b));
         }
@@ -642,7 +716,9 @@ pub fn call(p: &mut Process, l: &mut Line, c: &str) -> Result<bool, Stop> {
             let b = l.getdm(p)?;
             let o = l.getdm_out(p)?;
             let (v1, v2) = (l.getd(), l.getd());
-            dout(l, &a, b.as_ref(), o, |a, b, o| p.dmatrix_add_mul(a, b, v1, v2, o));
+            dout(l, &a, b.as_ref(), o, |a, b, o| {
+                p.dmatrix_add_mul(a, b, v1, v2, o)
+            });
         }
         "dadd" | "dsub" => {
             let a = l.getdm(p)?.expect("a matrix");
@@ -651,7 +727,11 @@ pub fn call(p: &mut Process, l: &mut Line, c: &str) -> Result<bool, Stop> {
             let sub = c == "dsub";
             dout(l, &a, Some(&b), o, |a, b, o| {
                 let b = b.expect("b");
-                if sub { p.dmatrix_subtract(a, b, o) } else { p.dmatrix_add(a, b, o) }
+                if sub {
+                    p.dmatrix_subtract(a, b, o)
+                } else {
+                    p.dmatrix_add(a, b, o)
+                }
             });
         }
         "dscale" => {
@@ -704,7 +784,9 @@ pub fn call(p: &mut Process, l: &mut Line, c: &str) -> Result<bool, Stop> {
             let a = l.getdm(p)?.expect("a matrix");
             let b = l.getdm(p)?.expect("a matrix");
             let o = l.getdm_out(p)?;
-            dout(l, &a, Some(&b), o, |a, b, o| p.dmatrix_multiply(a, b.expect("b"), o));
+            dout(l, &a, Some(&b), o, |a, b, o| {
+                p.dmatrix_multiply(a, b.expect("b"), o)
+            });
         }
         "ddot" => {
             let a = l.getdm(p)?.expect("a matrix");

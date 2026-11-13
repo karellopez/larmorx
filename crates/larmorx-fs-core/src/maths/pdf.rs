@@ -26,12 +26,20 @@ impl Process {
             }
             if r2 == 0.0 {
                 if self.mode().fix() {
-                    self.note(&FS_30, "both uniform draws exactly 0.5: drawn again instead of a NaN");
+                    self.note(
+                        &FS_30,
+                        "both uniform draws exactly 0.5: drawn again instead of a NaN",
+                    );
                     continue;
                 }
                 self.note(&FS_30, "both uniform draws exactly 0.5 gave NaN (0 / 0)");
             }
-            let l = self.libm("log", r2, larmorx_core::math::log, larmorx_core::math::log_glibc);
+            let l = self.libm(
+                "log",
+                r2,
+                larmorx_core::math::log,
+                larmorx_core::math::log_glibc,
+            );
             let f = sse::sqrt64(sse::div64(sse::mul64(-2.0, l), r2));
             return sse::mul64(v1, f);
         }

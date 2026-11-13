@@ -86,7 +86,12 @@ impl Process {
     }
 
     /// `DMatrixAlloc(rows, cols, type)` (§4).
-    pub fn dmatrix_alloc(&mut self, rows: i32, cols: i32, kind: i32) -> Result<Option<DMatrix>, Stop> {
+    pub fn dmatrix_alloc(
+        &mut self,
+        rows: i32,
+        cols: i32,
+        kind: i32,
+    ) -> Result<Option<DMatrix>, Stop> {
         if kind == super::matrix::MATRIX_COMPLEX {
             self.put_out(b"ERROR: DMatrixAlloc(): complex types not supported\n");
             return Ok(None);
@@ -97,7 +102,9 @@ impl Process {
         }
         let n = i64::from(rows) * i64::from(cols);
         if n < -2 || n > i64::from(i32::MAX) {
-            self.put_out(format!("ERROR: DMatrixAlloc({rows}, {cols}): allocation failed\n").as_bytes());
+            self.put_out(
+                format!("ERROR: DMatrixAlloc({rows}, {cols}): allocation failed\n").as_bytes(),
+            );
             return Ok(None);
         }
         if rows < -1 {
@@ -130,7 +137,10 @@ impl Process {
                 } else if (kind == check::COLS || kind == check::SAME) && a.cols != b.cols {
                     Some((format!("cols mismatch {}, {}", a.cols, b.cols), 324))
                 } else if kind == check::MULT && a.cols != b.rows {
-                    Some((format!("cols of m1 mismatch rows of m2 {}, {}", a.cols, b.rows), 329))
+                    Some((
+                        format!("cols of m1 mismatch rows of m2 {}, {}", a.cols, b.rows),
+                        329,
+                    ))
                 } else {
                     None
                 }
@@ -141,7 +151,9 @@ impl Process {
         };
         let mut b = b"ERROR: ".to_vec();
         b.extend_from_slice(prefix);
-        b.extend_from_slice(format!(" {what}\nbreak {BUILD_ROOT}/utils/dmatrix.cpp:{line}\n").as_bytes());
+        b.extend_from_slice(
+            format!(" {what}\nbreak {BUILD_ROOT}/utils/dmatrix.cpp:{line}\n").as_bytes(),
+        );
         self.put_stream(stream, &b);
         1
     }
@@ -156,7 +168,15 @@ impl Process {
         v2: f64,
         out: Option<&mut DMatrix>,
     ) -> Returned<DMatrix> {
-        if m2.is_some() && self.dmatrix_check_dims(Some(m1), m2, check::SAME, Some(StreamSel::Out), b"DMatrixAddMul(): ") != 0 {
+        if m2.is_some()
+            && self.dmatrix_check_dims(
+                Some(m1),
+                m2,
+                check::SAME,
+                Some(StreamSel::Out),
+                b"DMatrixAddMul(): ",
+            ) != 0
+        {
             return Returned::Nothing;
         }
         let mut fresh;
@@ -167,7 +187,14 @@ impl Process {
                 (&mut fresh, true)
             }
         };
-        if self.dmatrix_check_dims(Some(m1), Some(o), check::SAME, Some(StreamSel::Out), b"DMatrixAddMul(): ") != 0 {
+        if self.dmatrix_check_dims(
+            Some(m1),
+            Some(o),
+            check::SAME,
+            Some(StreamSel::Out),
+            b"DMatrixAddMul(): ",
+        ) != 0
+        {
             return Returned::Nothing;
         }
         let term = |val: f64, v: f64, x: f64| {
@@ -197,22 +224,41 @@ impl Process {
     }
 
     /// `DMatrixAdd(m1, m2, out)`.
-    pub fn dmatrix_add(&mut self, m1: &DMatrix, m2: &DMatrix, out: Option<&mut DMatrix>) -> Returned<DMatrix> {
+    pub fn dmatrix_add(
+        &mut self,
+        m1: &DMatrix,
+        m2: &DMatrix,
+        out: Option<&mut DMatrix>,
+    ) -> Returned<DMatrix> {
         self.dmatrix_add_mul(m1, Some(m2), 1.0, 1.0, out)
     }
 
     /// `DMatrixSubtract(m1, m2, out)`.
-    pub fn dmatrix_subtract(&mut self, m1: &DMatrix, m2: &DMatrix, out: Option<&mut DMatrix>) -> Returned<DMatrix> {
+    pub fn dmatrix_subtract(
+        &mut self,
+        m1: &DMatrix,
+        m2: &DMatrix,
+        out: Option<&mut DMatrix>,
+    ) -> Returned<DMatrix> {
         self.dmatrix_add_mul(m1, Some(m2), 1.0, -1.0, out)
     }
 
     /// `DMatrixScalarMul(m, v, out)`.
-    pub fn dmatrix_scalar_mul(&mut self, m: &DMatrix, v: f64, out: Option<&mut DMatrix>) -> Returned<DMatrix> {
+    pub fn dmatrix_scalar_mul(
+        &mut self,
+        m: &DMatrix,
+        v: f64,
+        out: Option<&mut DMatrix>,
+    ) -> Returned<DMatrix> {
         self.dmatrix_add_mul(m, None, v, 0.0, out)
     }
 
     /// `DMatrixCopy(src, out)` (§4).
-    pub fn dmatrix_copy(&mut self, src: Option<&DMatrix>, out: Option<&mut DMatrix>) -> Returned<DMatrix> {
+    pub fn dmatrix_copy(
+        &mut self,
+        src: Option<&DMatrix>,
+        out: Option<&mut DMatrix>,
+    ) -> Returned<DMatrix> {
         let Some(src) = src else {
             self.put_out(b"ERROR: DMatrixCopy(): msrc is NULL\n");
             return Returned::Nothing;
@@ -220,7 +266,14 @@ impl Process {
         match out {
             None => Returned::New(src.clone()),
             Some(o) => {
-                if self.dmatrix_check_dims(Some(src), Some(o), check::SAME, Some(StreamSel::Out), b"DMatrixCopy(): ") != 0 {
+                if self.dmatrix_check_dims(
+                    Some(src),
+                    Some(o),
+                    check::SAME,
+                    Some(StreamSel::Out),
+                    b"DMatrixCopy(): ",
+                ) != 0
+                {
                     return Returned::Nothing;
                 }
                 o.data.copy_from_slice(&src.data);
@@ -230,7 +283,11 @@ impl Process {
     }
 
     /// `DMatrixTranspose(in, out)` (§4); `Output::First` is the same matrix as both (refused).
-    pub fn dmatrix_transpose(&mut self, m: &DMatrix, out: Output<'_, DMatrix>) -> Returned<DMatrix> {
+    pub fn dmatrix_transpose(
+        &mut self,
+        m: &DMatrix,
+        out: Output<'_, DMatrix>,
+    ) -> Returned<DMatrix> {
         let mut fresh;
         let (o, new) = match out {
             Output::First | Output::Second => {
@@ -244,11 +301,23 @@ impl Process {
             }
         };
         if m.rows != o.cols {
-            self.put_out(format!("DMatrixTranspose(): ERROR: row/col mismatch {} {}\n", m.rows, o.cols).as_bytes());
+            self.put_out(
+                format!(
+                    "DMatrixTranspose(): ERROR: row/col mismatch {} {}\n",
+                    m.rows, o.cols
+                )
+                .as_bytes(),
+            );
             return Returned::Nothing;
         }
         if m.cols != o.rows {
-            self.put_out(format!("DMatrixTranspose(): ERROR: col/row mismatch {} {}\n", m.cols, o.rows).as_bytes());
+            self.put_out(
+                format!(
+                    "DMatrixTranspose(): ERROR: col/row mismatch {} {}\n",
+                    m.cols, o.rows
+                )
+                .as_bytes(),
+            );
             return Returned::Nothing;
         }
         for r in 1..=m.rows {
@@ -292,8 +361,20 @@ impl Process {
 
     /// `DMatrixMultiply(m1, m2, m3)` (§4, §12): each element the x87 extended sum from 0 of the
     /// double products, rounded to double.
-    pub fn dmatrix_multiply(&mut self, m1: &DMatrix, m2: &DMatrix, m3: Option<&mut DMatrix>) -> Returned<DMatrix> {
-        if self.dmatrix_check_dims(Some(m1), Some(m2), check::MULT, Some(StreamSel::Out), b"DMatrixMultiply(): ") != 0 {
+    pub fn dmatrix_multiply(
+        &mut self,
+        m1: &DMatrix,
+        m2: &DMatrix,
+        m3: Option<&mut DMatrix>,
+    ) -> Returned<DMatrix> {
+        if self.dmatrix_check_dims(
+            Some(m1),
+            Some(m2),
+            check::MULT,
+            Some(StreamSel::Out),
+            b"DMatrixMultiply(): ",
+        ) != 0
+        {
             return Returned::Nothing;
         }
         let mut fresh;
@@ -336,7 +417,14 @@ impl Process {
     /// `DVectorDot(v1, v2)` (§4, §12): the extended sum of the extended products of the first
     /// columns, rounded to double; `-10e10` when the sizes differ.
     pub fn dvector_dot(&mut self, v1: &DMatrix, v2: &DMatrix) -> f64 {
-        if self.dmatrix_check_dims(Some(v1), Some(v2), check::SAME, Some(StreamSel::Out), b"DDVectorDot(): ") != 0 {
+        if self.dmatrix_check_dims(
+            Some(v1),
+            Some(v2),
+            check::SAME,
+            Some(StreamSel::Out),
+            b"DDVectorDot(): ",
+        ) != 0
+        {
             return -10e10;
         }
         let mut s = F80::ZERO;
@@ -362,11 +450,23 @@ impl Process {
             (Some(f), Some(d)) => (f, d),
         };
         if f.rows != d.rows {
-            self.put_out(format!("ERROR: DMatrixCompareFMatrix(): row mismatch {} {}\n", f.rows, d.rows).as_bytes());
+            self.put_out(
+                format!(
+                    "ERROR: DMatrixCompareFMatrix(): row mismatch {} {}\n",
+                    f.rows, d.rows
+                )
+                .as_bytes(),
+            );
             return -1.0;
         }
         if f.cols != d.cols {
-            self.put_out(format!("ERROR: DMatrixCompareFMatrix(): col mismatch {} {}\n", f.cols, d.cols).as_bytes());
+            self.put_out(
+                format!(
+                    "ERROR: DMatrixCompareFMatrix(): col mismatch {} {}\n",
+                    f.cols, d.cols
+                )
+                .as_bytes(),
+            );
             return -1.0;
         }
         let mut mx = 0.0f64;
@@ -382,7 +482,11 @@ impl Process {
     }
 
     /// `DMatrixCopyFMatrix(mf, out)` (§4): the values widened.
-    pub fn dmatrix_copy_fmatrix(&mut self, mf: Option<&Matrix>, out: Option<&mut DMatrix>) -> Returned<DMatrix> {
+    pub fn dmatrix_copy_fmatrix(
+        &mut self,
+        mf: Option<&Matrix>,
+        out: Option<&mut DMatrix>,
+    ) -> Returned<DMatrix> {
         let Some(f) = mf else {
             self.put_out(b"ERROR: DMatrixCopyFMatrix(): mf is NULL\n");
             return Returned::Nothing;
@@ -396,11 +500,23 @@ impl Process {
             }
         };
         if f.rows != o.rows {
-            self.put_out(format!("ERROR: DMatrixCopyFMatrix(): row mismatch {} {}\n", f.rows, o.rows).as_bytes());
+            self.put_out(
+                format!(
+                    "ERROR: DMatrixCopyFMatrix(): row mismatch {} {}\n",
+                    f.rows, o.rows
+                )
+                .as_bytes(),
+            );
             return Returned::Nothing;
         }
         if f.cols != o.cols {
-            self.put_out(format!("ERROR: DMatrixCopyFMatrix(): col mismatch {} {}\n", f.cols, o.cols).as_bytes());
+            self.put_out(
+                format!(
+                    "ERROR: DMatrixCopyFMatrix(): col mismatch {} {}\n",
+                    f.cols, o.cols
+                )
+                .as_bytes(),
+            );
             return Returned::Nothing;
         }
         for r in 1..=f.rows {
@@ -417,7 +533,13 @@ impl Process {
     }
 
     /// `DMatrixConstVal(v, rows, cols, out)` (§4): every element `v` (a new matrix when none).
-    pub fn dmatrix_const_val(&mut self, v: f64, rows: i32, cols: i32, out: Option<&mut DMatrix>) -> Result<Returned<DMatrix>, Stop> {
+    pub fn dmatrix_const_val(
+        &mut self,
+        v: f64,
+        rows: i32,
+        cols: i32,
+        out: Option<&mut DMatrix>,
+    ) -> Result<Returned<DMatrix>, Stop> {
         // 0 (either sign) is the zeroing
         let v = if v == 0.0 { 0.0 } else { v };
         match out {
@@ -426,7 +548,8 @@ impl Process {
                 Ok(Returned::Output)
             }
             None => {
-                let Some(mut o) = self.dmatrix_alloc(rows, cols, super::matrix::MATRIX_REAL)? else {
+                let Some(mut o) = self.dmatrix_alloc(rows, cols, super::matrix::MATRIX_REAL)?
+                else {
                     return Ok(Returned::Nothing);
                 };
                 o.data.iter_mut().for_each(|x| *x = v);
@@ -436,7 +559,12 @@ impl Process {
     }
 
     /// `DMatrixZero(rows, cols, out)`: the constant 0.
-    pub fn dmatrix_zero(&mut self, rows: i32, cols: i32, out: Option<&mut DMatrix>) -> Result<Returned<DMatrix>, Stop> {
+    pub fn dmatrix_zero(
+        &mut self,
+        rows: i32,
+        cols: i32,
+        out: Option<&mut DMatrix>,
+    ) -> Result<Returned<DMatrix>, Stop> {
         self.dmatrix_const_val(0.0, rows, cols, out)
     }
 

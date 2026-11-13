@@ -24,7 +24,11 @@ fn one(
     l: &mut Line,
     mut h: Histogram,
     o: Out<Option<Histogram>>,
-    f: impl FnOnce(&mut Process, &mut Histogram, Output<'_, Histogram>) -> Result<Returned<Histogram>, Stop>,
+    f: impl FnOnce(
+        &mut Process,
+        &mut Histogram,
+        Output<'_, Histogram>,
+    ) -> Result<Returned<Histogram>, Stop>,
 ) -> Result<(), Stop> {
     match o {
         Out::New => {
@@ -109,7 +113,11 @@ pub fn call(p: &mut Process, l: &mut Line, c: &str) -> Result<bool, Stop> {
             let mut a = l.geth(p)?.expect("a histogram");
             let mut b = l.geth(p)?;
             let o = l.geth_out(p)?;
-            let f = if c == "hadd" { Process::histo_add } else { Process::histo_subtract };
+            let f = if c == "hadd" {
+                Process::histo_add
+            } else {
+                Process::histo_subtract
+            };
             match o {
                 Out::New | Out::Obj(None) => {
                     let r = f(p, &mut a, b.as_mut(), Output::New)?;
@@ -143,7 +151,9 @@ pub fn call(p: &mut Process, l: &mut Line, c: &str) -> Result<bool, Stop> {
             let h = l.geth(p)?.expect("a histogram");
             let o = l.geth_out(p)?;
             let (s, off) = (l.getf(), l.getf());
-            let r = |p: &mut Process, h: &mut Histogram, o: Output<'_, Histogram>| p.histo_linear_scale(h, o, s, off);
+            let r = |p: &mut Process, h: &mut Histogram, o: Output<'_, Histogram>| {
+                p.histo_linear_scale(h, o, s, off)
+            };
             one_no_input(p, l, h, o, r)?;
         }
         "hclearbins" => {
@@ -390,7 +400,11 @@ fn one_no_input(
     l: &mut Line,
     mut h: Histogram,
     o: Out<Option<Histogram>>,
-    f: impl FnOnce(&mut Process, &mut Histogram, Output<'_, Histogram>) -> Result<Returned<Histogram>, Stop>,
+    f: impl FnOnce(
+        &mut Process,
+        &mut Histogram,
+        Output<'_, Histogram>,
+    ) -> Result<Returned<Histogram>, Stop>,
 ) -> Result<(), Stop> {
     match o {
         Out::New | Out::Obj(None) => {

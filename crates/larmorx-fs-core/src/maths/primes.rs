@@ -11,7 +11,9 @@ impl Process {
     /// `nmax < 1`.
     pub fn get_primes(&mut self, nmax: i32) -> Option<Vec<i32>> {
         if nmax < 1 {
-            self.put_out(format!("ERROR: GetPrimes: cannot compute primes for {nmax}\n").as_bytes());
+            self.put_out(
+                format!("ERROR: GetPrimes: cannot compute primes for {nmax}\n").as_bytes(),
+            );
             return None;
         }
         let n = nmax as usize;
@@ -47,13 +49,20 @@ impl Process {
         let f = self.get_prime_factors(n)?;
         if f.is_empty() {
             if self.mode().reproduce() {
-                self.note(&FS_32, "1 has no prime factor: the empty list's first element read (0)");
+                self.note(
+                    &FS_32,
+                    "1 has no prime factor: the empty list's first element read (0)",
+                );
                 return Some(0);
             }
             self.note(&FS_32, "1 has no prime factor: 1 returned");
             return Some(1);
         }
-        let candidates: Vec<i32> = if less { f.iter().copied().filter(|&x| x < p).collect() } else { f.clone() };
+        let candidates: Vec<i32> = if less {
+            f.iter().copied().filter(|&x| x < p).collect()
+        } else {
+            f.clone()
+        };
         if candidates.is_empty() {
             return Some(f[0]);
         }

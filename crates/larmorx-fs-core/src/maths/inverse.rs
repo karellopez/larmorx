@@ -34,17 +34,28 @@ impl Process {
         let n = m.rows.max(0) as usize;
         if n == 0 {
             if self.mode().reproduce() {
-                self.note(&FS_33, "the determinant of a 0 x 0 matrix read from memory never allocated (0)");
+                self.note(
+                    &FS_33,
+                    "the determinant of a 0 x 0 matrix read from memory never allocated (0)",
+                );
                 return 0.0;
             }
-            self.note(&FS_33, "the determinant of a 0 x 0 matrix is the empty product, 1");
+            self.note(
+                &FS_33,
+                "the determinant of a 0 x 0 matrix is the empty product, 1",
+            );
             return 1.0;
         }
         vnl_fixed::determinant::<f32>(&numbers_rm(m), n)
     }
 
     /// `MatrixQRdecomposition(m, Q, R)` (§8.8): 0, or 1 after its line.
-    pub fn matrix_qr_decomposition(&mut self, m: Option<&Matrix>, q: Option<&mut Matrix>, r: Option<&mut Matrix>) -> i32 {
+    pub fn matrix_qr_decomposition(
+        &mut self,
+        m: Option<&Matrix>,
+        q: Option<&mut Matrix>,
+        r: Option<&mut Matrix>,
+    ) -> i32 {
         let fail = |p: &mut Process, what: &str| {
             p.put_out(format!("QRdecomposition(): {what}\n").as_bytes());
             1
@@ -127,13 +138,20 @@ impl Process {
     }
 
     /// `MatrixInverse(m, out)` (§8.8; FS-28 for an output of another size or type, FS-33).
-    pub fn matrix_inverse(&mut self, m: Option<&Matrix>, out: Option<&mut Matrix>) -> Result<Returned<Matrix>, Stop> {
+    pub fn matrix_inverse(
+        &mut self,
+        m: Option<&Matrix>,
+        out: Option<&mut Matrix>,
+    ) -> Result<Returned<Matrix>, Stop> {
         let Some(m) = m else {
             self.error_exit(codes::BAD_PARM, b"MatrixInverse: NULL input matrix!\n")?;
             return Ok(Returned::Nothing);
         };
         if m.rows != m.cols {
-            let msg = format!("MatrixInverse: matrix ({} x {}) is not square\n", m.rows, m.cols);
+            let msg = format!(
+                "MatrixInverse: matrix ({} x {}) is not square\n",
+                m.rows, m.cols
+            );
             self.error_printf(codes::BAD_PARM, msg.as_bytes());
             return Ok(Returned::Nothing);
         }
@@ -150,7 +168,11 @@ impl Process {
             },
             Some(o) => {
                 let ok = o.same_size(m) && o.kind == m.kind;
-                if !self.fits("MatrixInverse", "the output is not of the matrix's size and type", ok) {
+                if !self.fits(
+                    "MatrixInverse",
+                    "the output is not of the matrix's size and type",
+                    ok,
+                ) {
                     return Ok(Returned::Nothing);
                 }
                 o
@@ -171,7 +193,10 @@ impl Process {
                 }
             }
             let Some(inv) = self.real_inverse(&big, k) else {
-                self.note(&FS_33, "a singular complex matrix: nothing returned (FreeSurfer crashes)");
+                self.note(
+                    &FS_33,
+                    "a singular complex matrix: nothing returned (FreeSurfer crashes)",
+                );
                 return Ok(Returned::Nothing);
             };
             let mut ok = true;

@@ -59,7 +59,11 @@ impl Histogram {
 
     /// Bin `b`'s count, 0 outside the arrays.
     pub fn count(&self, b: i32) -> f32 {
-        if self.inside(b) { self.counts[b as usize] } else { 0.0 }
+        if self.inside(b) {
+            self.counts[b as usize]
+        } else {
+            0.0
+        }
     }
 
     /// Sets bin `b`'s value (dropped outside).
@@ -159,7 +163,10 @@ impl Process {
     /// A count written with FS-22 noted outside (dropped).
     fn hset(&mut self, h: &mut Histogram, b: i32, v: f32) {
         if !h.inside(b) {
-            self.note(&FS_22, "a write to a histogram's bin outside its arrays dropped");
+            self.note(
+                &FS_22,
+                "a write to a histogram's bin outside its arrays dropped",
+            );
         }
         h.set_count(b, v);
     }
@@ -184,7 +191,11 @@ impl Process {
 
     /// `HISTOrealloc(h, n)`: absent, a new one; else new zeroed arrays of n bins, `max_bins =
     /// nbins = n`, the other fields kept.
-    pub fn histo_realloc(&mut self, h: Option<&mut Histogram>, n: i32) -> Result<Returned<Histogram>, Stop> {
+    pub fn histo_realloc(
+        &mut self,
+        h: Option<&mut Histogram>,
+        n: i32,
+    ) -> Result<Returned<Histogram>, Stop> {
         match h {
             None => Ok(Returned::New(self.histo_alloc(n)?)),
             Some(h) => {
@@ -212,7 +223,10 @@ impl Process {
     /// The copy's fields into `dst` (FS-21: a dst too small is grown, in both modes).
     fn copy_fields(&mut self, src: &Histogram, dst: &mut Histogram) {
         if dst.grow(src.nbins) {
-            self.note(&FS_21, "a histogram output with fewer bins allocated than the copy grown to hold it");
+            self.note(
+                &FS_21,
+                "a histogram output with fewer bins allocated than the copy grown to hold it",
+            );
         }
         dst.nbins = src.nbins;
         dst.bin_size = src.bin_size;
@@ -225,7 +239,11 @@ impl Process {
     }
 
     /// `HISTOcopy(src, dst)` (§5.2).
-    pub fn histo_copy(&mut self, src: &mut Histogram, dst: Output<'_, Histogram>) -> Result<Returned<Histogram>, Stop> {
+    pub fn histo_copy(
+        &mut self,
+        src: &mut Histogram,
+        dst: Output<'_, Histogram>,
+    ) -> Result<Returned<Histogram>, Stop> {
         match dst {
             Output::New => {
                 let mut d = self.histo_alloc(src.nbins)?;
@@ -242,7 +260,11 @@ impl Process {
 
     /// The working histogram of a function whose output starts as a copy of `src` (none for
     /// `src` itself): a new one, the given one with `src` copied in, or `src`.
-    fn work_copy(&mut self, src: &Histogram, dst: &Output<'_, Histogram>) -> Result<Histogram, Stop> {
+    fn work_copy(
+        &mut self,
+        src: &Histogram,
+        dst: &Output<'_, Histogram>,
+    ) -> Result<Histogram, Stop> {
         Ok(match dst {
             Output::New => {
                 let mut d = self.histo_alloc(src.nbins)?;
@@ -259,7 +281,11 @@ impl Process {
     }
 
     /// `HISTOclear(src, dst)`.
-    pub fn histo_clear(&mut self, src: &mut Histogram, dst: Output<'_, Histogram>) -> Result<Returned<Histogram>, Stop> {
+    pub fn histo_clear(
+        &mut self,
+        src: &mut Histogram,
+        dst: Output<'_, Histogram>,
+    ) -> Result<Returned<Histogram>, Stop> {
         let clear = |d: &mut Histogram| {
             for b in d.used() {
                 d.set_bin(b, 0.0);
@@ -280,7 +306,11 @@ impl Process {
     }
 
     /// `HISTOclearCounts(src, dst)` (FS-18).
-    pub fn histo_clear_counts(&mut self, src: &mut Histogram, dst: Output<'_, Histogram>) -> Result<Returned<Histogram>, Stop> {
+    pub fn histo_clear_counts(
+        &mut self,
+        src: &mut Histogram,
+        dst: Output<'_, Histogram>,
+    ) -> Result<Returned<Histogram>, Stop> {
         let reproduce = self.mode().reproduce();
         let clear = |p: &mut Process, d: &mut Histogram| {
             let others = d.used().skip(1).any(|b| d.count(b) != 0.0);
@@ -296,7 +326,11 @@ impl Process {
             Output::New => {
                 let mut d = self.histo_alloc(src.nbins)?;
                 let others = src.used().skip(1).any(|b| src.bin(b) != 0.0);
-                let upto = if reproduce { src.nbins.min(1) } else { src.nbins };
+                let upto = if reproduce {
+                    src.nbins.min(1)
+                } else {
+                    src.nbins
+                };
                 for b in 0..upto.max(0) {
                     d.set_bin(b, src.bin(b));
                 }
@@ -318,14 +352,26 @@ impl Process {
 
     fn note_fs18(&mut self, reproduce: bool, what: &str) {
         if reproduce {
-            self.note(&FS_18, format!("only the first of the histogram's {what} handled"));
+            self.note(
+                &FS_18,
+                format!("only the first of the histogram's {what} handled"),
+            );
         } else {
-            self.note(&FS_18, format!("every one of the histogram's {what} handled, not only the first"));
+            self.note(
+                &FS_18,
+                format!("every one of the histogram's {what} handled, not only the first"),
+            );
         }
     }
 
     /// `HISTOinit(h, n, lo, hi)` (§5.2, §21).
-    pub fn histo_init(&mut self, h: Option<&mut Histogram>, n: i32, lo: f64, hi: f64) -> Result<Returned<Histogram>, Stop> {
+    pub fn histo_init(
+        &mut self,
+        h: Option<&mut Histogram>,
+        n: i32,
+        lo: f64,
+        hi: f64,
+    ) -> Result<Returned<Histogram>, Stop> {
         let mut fresh = None;
         let h: &mut Histogram = match h {
             None => fresh.insert(self.histo_alloc(n)?),
@@ -416,7 +462,10 @@ impl Process {
         let alias = matches!(dst, Output::First | Output::Second);
         let new_h2 = b.is_none() && matches!(dst, Output::New);
         if b.is_none() && !matches!(dst, Output::New) {
-            self.note(&FS_22, "no second histogram with a given output: zeros added");
+            self.note(
+                &FS_22,
+                "no second histogram with a given output: zeros added",
+            );
         }
         let blocks = !alias && !new_h2 && n > 3 && !subtract;
         let mut out = Vec::with_capacity(n.max(0) as usize);
@@ -438,7 +487,10 @@ impl Process {
         }
         let write = |p: &mut Process, d: &mut Histogram| {
             if d.grow(n) {
-                p.note(&FS_21, "a histogram output with fewer bins allocated than the result grown to hold it");
+                p.note(
+                    &FS_21,
+                    "a histogram output with fewer bins allocated than the result grown to hold it",
+                );
             }
             d.nbins = n;
             for (i, &v) in out.iter().enumerate() {
@@ -498,7 +550,11 @@ impl Process {
     }
 
     /// `HISTOmakePDF(src, dst)` (§5.3, §21; FS-23).
-    pub fn histo_make_pdf(&mut self, src: &mut Histogram, dst: Output<'_, Histogram>) -> Result<Returned<Histogram>, Stop> {
+    pub fn histo_make_pdf(
+        &mut self,
+        src: &mut Histogram,
+        dst: Output<'_, Histogram>,
+    ) -> Result<Returned<Histogram>, Stop> {
         let mut fresh = None;
         let d: &mut Histogram = match dst {
             Output::New => {
@@ -509,9 +565,15 @@ impl Process {
             }
             Output::Given(d) => {
                 if self.mode().reproduce() {
-                    self.note(&FS_23, "the output histogram's own counts normalised, not the source's");
+                    self.note(
+                        &FS_23,
+                        "the output histogram's own counts normalised, not the source's",
+                    );
                 } else {
-                    self.note(&FS_23, "the source copied into the output histogram before normalising");
+                    self.note(
+                        &FS_23,
+                        "the source copied into the output histogram before normalising",
+                    );
                     self.copy_fields(src, d);
                 }
                 d
@@ -552,7 +614,11 @@ impl Process {
     }
 
     /// `HISTOcumsum(h, out)`: the double running sum of the counts.
-    pub fn histo_cumsum(&mut self, h: &mut Histogram, out: Output<'_, Histogram>) -> Result<Returned<Histogram>, Stop> {
+    pub fn histo_cumsum(
+        &mut self,
+        h: &mut Histogram,
+        out: Output<'_, Histogram>,
+    ) -> Result<Returned<Histogram>, Stop> {
         let counts: Vec<f32> = h.used().map(|b| h.count(b)).collect();
         let mut w = self.work_copy(h, &out)?;
         let mut s = 0.0f64;
@@ -583,7 +649,11 @@ impl Process {
     }
 
     /// `HISTOabs(h, out)` (§5.3, §21; FS-50).
-    pub fn histo_abs(&mut self, h: &mut Histogram, out: Output<'_, Histogram>) -> Result<Returned<Histogram>, Stop> {
+    pub fn histo_abs(
+        &mut self,
+        h: &mut Histogram,
+        out: Output<'_, Histogram>,
+    ) -> Result<Returned<Histogram>, Stop> {
         let src = h.clone();
         let (mut mx, mut mn) = (0.0f64, 1e10f64);
         for b in src.used() {
@@ -605,7 +675,10 @@ impl Process {
         let outside = !(x > -2147483649.0 && x < 2147483648.0);
         // nint's own rounding (x is an integer or not finite here)
         if outside && self.mode().fix() {
-            self.note(&FS_50, "a bin count beyond the int range refused (no 2^31-bin allocation)");
+            self.note(
+                &FS_50,
+                "a bin count beyond the int range refused (no 2^31-bin allocation)",
+            );
             let msg = format!(
                 "HISTOabs: absolute values from {} to {} in bins of {} need {} bins: outside the int range (an infinite range, or a bin size of 0 or NaN)",
                 larmorx_core::cfmt::f(mn, 6),
@@ -617,7 +690,10 @@ impl Process {
             return Ok(Returned::Nothing);
         }
         if outside {
-            self.note(&FS_50, "a bin count beyond the int range: the allocation of -2147483648 bins failed");
+            self.note(
+                &FS_50,
+                "a bin count beyond the int range: the allocation of -2147483648 bins failed",
+            );
         }
         let n = self.nint(x);
         let mut a = match &out {
@@ -637,7 +713,10 @@ impl Process {
         a.min = sse::narrow(mn);
         a.max = sse::narrow(mx);
         for b in 0..n.max(0) {
-            let v = sse::narrow(sse::add64(sse::widen(sse::mul32(b as f32, src.bin_size)), mn));
+            let v = sse::narrow(sse::add64(
+                sse::widen(sse::mul32(b as f32, src.bin_size)),
+                mn,
+            ));
             a.set_bin(b, v);
         }
         // the counts of `h` as they are now: zeros when the output is `h` itself, reallocated
@@ -653,7 +732,11 @@ impl Process {
 }
 
 /// The working histogram written back where the output belongs.
-fn put_back(w: Histogram, dst: Output<'_, Histogram>, first: &mut Histogram) -> Returned<Histogram> {
+fn put_back(
+    w: Histogram,
+    dst: Output<'_, Histogram>,
+    first: &mut Histogram,
+) -> Returned<Histogram> {
     match dst {
         Output::New => Returned::New(w),
         Output::Given(d) => {
@@ -687,16 +770,29 @@ enum Cdf {
 
 impl Process {
     /// `HISTOmakeCDF(src, dst)` (§5.3): from the absolute-value histogram of `src`.
-    pub fn histo_make_cdf(&mut self, src: &mut Histogram, dst: Output<'_, Histogram>) -> Result<Returned<Histogram>, Stop> {
+    pub fn histo_make_cdf(
+        &mut self,
+        src: &mut Histogram,
+        dst: Output<'_, Histogram>,
+    ) -> Result<Returned<Histogram>, Stop> {
         self.histo_cdf(src, dst, Cdf::Forward)
     }
 
     /// `HISTOmakeReverseCDF(src, dst)`.
-    pub fn histo_make_reverse_cdf(&mut self, src: &mut Histogram, dst: Output<'_, Histogram>) -> Result<Returned<Histogram>, Stop> {
+    pub fn histo_make_reverse_cdf(
+        &mut self,
+        src: &mut Histogram,
+        dst: Output<'_, Histogram>,
+    ) -> Result<Returned<Histogram>, Stop> {
         self.histo_cdf(src, dst, Cdf::Reverse)
     }
 
-    fn histo_cdf(&mut self, src: &mut Histogram, dst: Output<'_, Histogram>, kind: Cdf) -> Result<Returned<Histogram>, Stop> {
+    fn histo_cdf(
+        &mut self,
+        src: &mut Histogram,
+        dst: Output<'_, Histogram>,
+        kind: Cdf,
+    ) -> Result<Returned<Histogram>, Stop> {
         let mut s0 = src.clone();
         let a = match self.histo_abs(&mut s0, Output::New)? {
             Returned::New(a) => a,
@@ -785,7 +881,9 @@ impl Process {
     /// `HISTOfillHoles(h)` (§5.3, §21): returns 0.
     pub fn histo_fill_holes(&mut self, h: &mut Histogram) -> i32 {
         let n = h.nbins;
-        let filled: Vec<bool> = (0..n.max(0)).map(|b| b >= 1 && b <= n - 2 && h.count(b) > 0.0).collect();
+        let filled: Vec<bool> = (0..n.max(0))
+            .map(|b| b >= 1 && b <= n - 2 && h.count(b) > 0.0)
+            .collect();
         let first = filled.iter().position(|&f| f);
         let last = filled.iter().rposition(|&f| f);
         if let (Some(f0), Some(l0)) = (first, last) {
@@ -802,7 +900,10 @@ impl Process {
                     let change = if old == 0.0 {
                         1.0
                     } else {
-                        sse::div64(sse::sub64(f64::from(new), f64::from(old)).abs(), f64::from(old).abs())
+                        sse::div64(
+                            sse::sub64(f64::from(new), f64::from(old)).abs(),
+                            f64::from(old).abs(),
+                        )
                     };
                     if change > most {
                         most = change;
@@ -814,7 +915,10 @@ impl Process {
             }
         }
         if n < 2 {
-            self.note(&FS_22, "a histogram of fewer than 2 bins: the end bins' neighbours read as 0");
+            self.note(
+                &FS_22,
+                "a histogram of fewer than 2 bins: the end bins' neighbours read as 0",
+            );
         }
         if n >= 1 {
             if h.count(0) == 0.0 {
@@ -832,7 +936,12 @@ impl Process {
     // ---- §5.4: smoothing
 
     /// `HISTOsmooth(src, dst, sigma)` (§5.4, §21).
-    pub fn histo_smooth(&mut self, src: &mut Histogram, dst: Output<'_, Histogram>, sigma: f32) -> Result<Returned<Histogram>, Stop> {
+    pub fn histo_smooth(
+        &mut self,
+        src: &mut Histogram,
+        dst: Output<'_, Histogram>,
+        sigma: f32,
+    ) -> Result<Returned<Histogram>, Stop> {
         let in_place = matches!(dst, Output::First | Output::Second);
         let mut w = match &dst {
             Output::New => {
@@ -900,7 +1009,12 @@ impl Process {
             let af = f.abs();
             let v = if af <= two {
                 let q = sse::div32(sse::mul32(-f, f), sse::mul32(two, sigma));
-                sse::narrow(self.libm("exp", f64::from(q), larmorx_core::math::exp, larmorx_core::math::exp_glibc))
+                sse::narrow(self.libm(
+                    "exp",
+                    f64::from(q),
+                    larmorx_core::math::exp,
+                    larmorx_core::math::exp_glibc,
+                ))
             } else if af <= four {
                 let base = sse::sub64(4.0, sse::div64(f64::from(af), sse::widen(sigma)));
                 sse::mul32(c, sse::narrow(self.libm_pow(base, 4.0)))
@@ -1000,7 +1114,13 @@ impl Process {
 
     /// `HISTOfindValley(h, wsize, i0, i1)`: counts compared as integers (FS-17).
     pub fn histo_find_valley(&mut self, h: &Histogram, wsize: i32, i0: i32, i1: i32) -> i32 {
-        let ints: Vec<i32> = h.used().map(|b| h.count(b)).collect::<Vec<f32>>().into_iter().map(|c| self.to_int(f64::from(c))).collect();
+        let ints: Vec<i32> = h
+            .used()
+            .map(|b| h.count(b))
+            .collect::<Vec<f32>>()
+            .into_iter()
+            .map(|c| self.to_int(f64::from(c)))
+            .collect();
         let mut m = 0;
         for &c in &ints {
             if c > m {
@@ -1038,7 +1158,14 @@ impl Process {
     }
 
     /// `HISTOfindLastPeakInRegion(h, wsize, pct, i0, i1)`.
-    pub fn histo_find_last_peak_in_region(&mut self, h: &Histogram, wsize: i32, pct: f32, i0: i32, i1: i32) -> i32 {
+    pub fn histo_find_last_peak_in_region(
+        &mut self,
+        h: &Histogram,
+        wsize: i32,
+        pct: f32,
+        i0: i32,
+        i1: i32,
+    ) -> i32 {
         let m = self.largest(h);
         let (b0, mut b1) = self.region_bins(h, i0, i1);
         if b1 == -1 {
@@ -1410,7 +1537,10 @@ impl Process {
         let (lo, size) = if lo >= hi {
             (h.min, h.bin_size)
         } else {
-            (lo, sse::div32(sse::sub32(hi, lo), sse::sub32(h.nbins as f32, 1.0)))
+            (
+                lo,
+                sse::div32(sse::sub32(hi, lo), sse::sub32(h.nbins as f32, 1.0)),
+            )
         };
         let x = sse::div32(sse::sub32(v, lo), size);
         let bin = self.nint(f64::from(x));
@@ -1435,7 +1565,10 @@ impl Process {
                 if reproduce {
                     self.note(&FS_20, "a sample exactly at a bin's position not counted");
                 } else {
-                    self.note(&FS_20, "a sample exactly at a bin's position counted with weight 1");
+                    self.note(
+                        &FS_20,
+                        "a sample exactly at a bin's position counted with weight 1",
+                    );
                     let c = sse::add32(h.count(bn), 1.0);
                     h.set_count(bn, c);
                     return bin;
@@ -1461,7 +1594,10 @@ impl Process {
             if reproduce {
                 self.note(&FS_19, "a sample outside the histogram placed by its bin number against the lower intensity");
             } else {
-                self.note(&FS_19, "a sample outside the histogram counted in the nearest end bin");
+                self.note(
+                    &FS_19,
+                    "a sample outside the histogram counted in the nearest end bin",
+                );
             }
         }
         if let Some(t) = target {
@@ -1546,7 +1682,12 @@ impl Process {
             let c = h.count(b);
             if c > 0.0 {
                 let p = sse::div64(sse::widen(c), t);
-                let lp = self.libm("log", p, larmorx_core::math::log, larmorx_core::math::log_glibc);
+                let lp = self.libm(
+                    "log",
+                    p,
+                    larmorx_core::math::log,
+                    larmorx_core::math::log_glibc,
+                );
                 e = sse::sub64(e, sse::mul64(p, lp));
             }
         }
@@ -1556,13 +1697,20 @@ impl Process {
     /// `HISTOcorrelate(h1, h2)` (§5.6, §21).
     pub fn histo_correlate(&mut self, h1: &Histogram, h2: &Histogram) -> Result<f64, Stop> {
         if h2.nbins > 256 {
-            self.error_exit(codes::UNSUPPORTED, b"histoComputeLinearFitCorrelation: only 256 bins allowed")?;
+            self.error_exit(
+                codes::UNSUPPORTED,
+                b"histoComputeLinearFitCorrelation: only 256 bins allowed",
+            )?;
         }
         let (mut s, mut n1, mut n2) = (0.0f64, 0.0f64, 0.0f64);
         for b in h1.used() {
             let c1 = sse::widen(h1.count(b));
             let k = self.histo_find_bin(h2, h1.bin(b));
-            let c2 = if k >= 0 && k < h2.nbins { sse::widen(h2.count(k)) } else { 0.0 };
+            let c2 = if k >= 0 && k < h2.nbins {
+                sse::widen(h2.count(k))
+            } else {
+                0.0
+            };
             s = sse::add64(sse::mul64(c2, c1), s);
             n1 = sse::add64(sse::mul64(c1, c1), n1);
             n2 = sse::add64(sse::mul64(c2, c2), n2);
@@ -1583,13 +1731,21 @@ impl Process {
         for b1 in h1.used() {
             let c1 = sse::widen(h1.count(b1));
             let k = self.nint(sse::add64(sse::mul64(f64::from(b1), a), b));
-            let c2 = if k >= 0 && k < h2.nbins { sse::widen(h2.count(k)) } else { 0.0 };
+            let c2 = if k >= 0 && k < h2.nbins {
+                sse::widen(h2.count(k))
+            } else {
+                0.0
+            };
             s = sse::add64(sse::mul64(c1, c2), s);
         }
         for b2 in h2.used() {
             let c2 = sse::widen(h2.count(b2));
             let k = self.nint(sse::div64(sse::sub64(f64::from(b2), b), a));
-            let c1 = if k >= 0 && k < h1.nbins { sse::widen(h1.count(k)) } else { 0.0 };
+            let c1 = if k >= 0 && k < h1.nbins {
+                sse::widen(h1.count(k))
+            } else {
+                0.0
+            };
             s = sse::add64(sse::mul64(c2, c1), s);
         }
         s
@@ -1659,7 +1815,11 @@ pub struct RobustFit {
 
 impl Process {
     /// `HISTOrobustGaussianFit(h, q)` (§5.7; FS-24, FS-51).
-    pub fn histo_robust_gaussian_fit(&mut self, h: &mut Histogram, q: f64) -> Result<RobustFit, Stop> {
+    pub fn histo_robust_gaussian_fit(
+        &mut self,
+        h: &mut Histogram,
+        q: f64,
+    ) -> Result<RobustFit, Stop> {
         if !(h.bin_size > 0.0) {
             h.bin_size = 1.0;
         }
@@ -1667,21 +1827,37 @@ impl Process {
         let mut h0 = h.clone();
         let s = match self.histo_smooth(&mut h0, Output::New, sigma_s)? {
             Returned::New(s) => s,
-            _ => return Ok(RobustFit { status: codes::BAD_PARM, offset: None, sigma: None }),
+            _ => {
+                return Ok(RobustFit {
+                    status: codes::BAD_PARM,
+                    offset: None,
+                    sigma: None,
+                });
+            }
         };
         let p = self.histo_find_highest_peak_in_region(&s, 0, s.nbins);
         let m = sse::widen(self.hb(&s, p));
         let mut h1 = h.clone();
-        let Returned::New(z) = self.histo_linear_scale(&mut h1, Output::New, 1.0, sse::narrow(-m))? else {
+        let Returned::New(z) =
+            self.histo_linear_scale(&mut h1, Output::New, 1.0, sse::narrow(-m))?
+        else {
             unreachable!("a new histogram")
         };
         let mut z1 = z.clone();
         let Returned::New(a) = self.histo_abs(&mut z1, Output::New)? else {
-            return Ok(RobustFit { status: codes::BAD_PARM, offset: None, sigma: None });
+            return Ok(RobustFit {
+                status: codes::BAD_PARM,
+                offset: None,
+                sigma: None,
+            });
         };
         let mut z2 = z.clone();
         let Returned::New(c) = self.histo_make_cdf(&mut z2, Output::New)? else {
-            return Ok(RobustFit { status: codes::BAD_PARM, offset: None, sigma: None });
+            return Ok(RobustFit {
+                status: codes::BAD_PARM,
+                offset: None,
+                sigma: None,
+            });
         };
         let plots = self.gdiag & DIAG_WRITE != 0 && self.gdiag & DIAG_VERBOSE != 0;
         if plots {
@@ -1707,7 +1883,11 @@ impl Process {
         }
         if z.nbins <= 0 {
             self.error_printf(codes::BAD_PARM, b"HISTOrobustGaussianFit: 0 length cdf");
-            return Ok(RobustFit { status: codes::BAD_PARM, offset: Some(m), sigma: None });
+            return Ok(RobustFit {
+                status: codes::BAD_PARM,
+                offset: Some(m),
+                sigma: None,
+            });
         }
         let mut lo = self.histo_find_bin(&z, -theta);
         let mut hi = self.histo_find_bin(&z, theta);
@@ -1715,7 +1895,10 @@ impl Process {
         while lo >= hi {
             let (l, u) = ((lo - 1).max(0), (hi + 1).min(n - 1));
             if l == lo && u == hi {
-                self.note(&FS_24, "the fit's window could not grow (one bin): the loop stopped");
+                self.note(
+                    &FS_24,
+                    "the fit's window could not grow (one bin): the loop stopped",
+                );
                 break;
             }
             lo = l;
@@ -1740,7 +1923,11 @@ impl Process {
                 larmorx_core::cfmt::f(delta, 6)
             );
             self.error_printf(codes::BAD_PARM, msg.as_bytes());
-            return Ok(RobustFit { status: codes::BAD_PARM, offset: Some(m), sigma: None });
+            return Ok(RobustFit {
+                status: codes::BAD_PARM,
+                offset: Some(m),
+                sigma: None,
+            });
         }
         while sigma <= sigma_max {
             let r = sse::mul64(sigma, root);
@@ -1772,7 +1959,11 @@ impl Process {
             }
             self.histo_plot(&fit, b"hp.plt");
         }
-        Ok(RobustFit { status: 0, offset: Some(m), sigma: best.map(|(_, s)| s) })
+        Ok(RobustFit {
+            status: 0,
+            offset: Some(m),
+            sigma: best.map(|(_, s)| s),
+        })
     }
 
     /// `exp(-z z / two_ss)` for Z's bins `lo..=hi`, `z` the bin value less `shift`.
@@ -1781,7 +1972,12 @@ impl Process {
         for b in lo..=hi {
             let zv = sse::sub64(sse::widen(z.bin(b)), shift);
             let x = sse::div64(sse::mul64(-zv, zv), two_ss);
-            g.push(self.libm("exp", x, larmorx_core::math::exp, larmorx_core::math::exp_glibc));
+            g.push(self.libm(
+                "exp",
+                x,
+                larmorx_core::math::exp,
+                larmorx_core::math::exp_glibc,
+            ));
         }
         g
     }
@@ -1802,7 +1998,10 @@ impl Process {
                     format!(
                         "{}  {}\n",
                         larmorx_core::cfmt::f(sse::widen(h.bin(b)), 6),
-                        larmorx_core::cfmt::pad(&larmorx_core::cfmt::f(sse::widen(h.count(b)), 10), 10)
+                        larmorx_core::cfmt::pad(
+                            &larmorx_core::cfmt::f(sse::widen(h.count(b)), 10),
+                            10
+                        )
                     )
                     .as_bytes(),
                 );

@@ -41,7 +41,12 @@ fn body_g(v: f64, prec: usize, alt: bool) -> String {
         return format!("{:.*}", p - 1, 0.0);
     }
     let sci = format!("{:.*e}", p - 1, v);
-    let x: i32 = sci.split_once('e').expect("an exponent").1.parse().expect("an exponent");
+    let x: i32 = sci
+        .split_once('e')
+        .expect("an exponent")
+        .1
+        .parse()
+        .expect("an exponent");
     if x < -4 || x >= p as i32 {
         body_e(v, p - 1, true)
     } else {
@@ -66,7 +71,11 @@ fn convert(spec: Spec, conv: u8, v: f64) -> String {
         match conv.to_ascii_lowercase() {
             b'f' => {
                 let s = cfmt::f(a, prec);
-                if spec.alt && prec == 0 { format!("{s}.") } else { s }
+                if spec.alt && prec == 0 {
+                    format!("{s}.")
+                } else {
+                    s
+                }
             }
             b'e' => body_e(a, prec, spec.alt),
             _ => body_g(a, prec, spec.alt),

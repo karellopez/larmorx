@@ -20,13 +20,17 @@ impl Process {
             return true;
         }
         if self.mode().reproduce() {
-            self.note(&FS_25, format!("{name}: a complex matrix addressed as a real one"));
+            self.note(
+                &FS_25,
+                format!("{name}: a complex matrix addressed as a real one"),
+            );
             true
         } else {
             self.note(&FS_25, format!("{name}: a complex matrix refused"));
             self.error_printf(
                 codes::BAD_PARM,
-                format!("{name}: a complex matrix (the function handles real matrices only)\n").as_bytes(),
+                format!("{name}: a complex matrix (the function handles real matrices only)\n")
+                    .as_bytes(),
             );
             false
         }
@@ -39,7 +43,10 @@ impl Process {
             return true;
         }
         if self.mode().reproduce() {
-            self.note(&FS_28, format!("{name}: {what}: filled at FreeSurfer's places"));
+            self.note(
+                &FS_28,
+                format!("{name}: {what}: filled at FreeSurfer's places"),
+            );
             true
         } else {
             self.note(&FS_28, format!("{name}: {what}: refused"));
@@ -71,7 +78,11 @@ impl Process {
     // ---- §8.2
 
     /// `MatrixIdentity(n, m)`.
-    pub fn matrix_identity(&mut self, n: i32, m: Option<&mut Matrix>) -> Result<Returned<Matrix>, Stop> {
+    pub fn matrix_identity(
+        &mut self,
+        n: i32,
+        m: Option<&mut Matrix>,
+    ) -> Result<Returned<Matrix>, Stop> {
         match m {
             None => {
                 let Some(mut o) = self.new_matrix(n, n, MATRIX_REAL)? else {
@@ -86,7 +97,11 @@ impl Process {
                 if !self.real_only("MatrixIdentity", o) {
                     return Ok(Returned::Nothing);
                 }
-                if !self.fits("MatrixIdentity", "the given matrix is smaller than the identity", o.rows >= n && o.cols >= n) {
+                if !self.fits(
+                    "MatrixIdentity",
+                    "the given matrix is smaller than the identity",
+                    o.rows >= n && o.cols >= n,
+                ) {
                     return Ok(Returned::Nothing);
                 }
                 self.clear_matrix(o);
@@ -99,7 +114,11 @@ impl Process {
     }
 
     /// `MatrixTranspose(in, out)`.
-    pub fn matrix_transpose(&mut self, m: &Matrix, out: Option<&mut Matrix>) -> Result<Returned<Matrix>, Stop> {
+    pub fn matrix_transpose(
+        &mut self,
+        m: &Matrix,
+        out: Option<&mut Matrix>,
+    ) -> Result<Returned<Matrix>, Stop> {
         if !self.real_only("MatrixTranspose", m) {
             return Ok(Returned::Nothing);
         }
@@ -112,7 +131,11 @@ impl Process {
             },
             Some(o) => {
                 let ok = o.rows == m.cols && o.cols == m.rows;
-                if !self.fits("MatrixTranspose", "the output is not the transpose's size", ok) {
+                if !self.fits(
+                    "MatrixTranspose",
+                    "the output is not the transpose's size",
+                    ok,
+                ) {
                     return Ok(Returned::Nothing);
                 }
                 o
@@ -168,8 +191,18 @@ impl Process {
     }
 
     /// `MatrixAdd(m1, m2, out)` (`subtract`: `MatrixSubtract`).
-    pub fn matrix_add_sub(&mut self, m1: &Matrix, m2: &Matrix, out: Option<&mut Matrix>, subtract: bool) -> Result<Returned<Matrix>, Stop> {
-        let (name, op) = if subtract { ("MatrixSubtract", "-") } else { ("MatrixAdd", "+") };
+    pub fn matrix_add_sub(
+        &mut self,
+        m1: &Matrix,
+        m2: &Matrix,
+        out: Option<&mut Matrix>,
+        subtract: bool,
+    ) -> Result<Returned<Matrix>, Stop> {
+        let (name, op) = if subtract {
+            ("MatrixSubtract", "-")
+        } else {
+            ("MatrixAdd", "+")
+        };
         if !self.real_only(name, m1) || !self.real_only(name, m2) {
             return Ok(Returned::Nothing);
         }
@@ -187,15 +220,29 @@ impl Process {
             name,
             m1,
             out,
-            |o| format!("{name}: incompatable matrices {r1} x {c1} = {} x {}\n", o.rows, o.cols),
+            |o| {
+                format!(
+                    "{name}: incompatable matrices {r1} x {c1} = {} x {}\n",
+                    o.rows, o.cols
+                )
+            },
             |r, c, x| {
-                if subtract { sse::sub32(x, b.at(r, c)) } else { sse::add32(x, b.at(r, c)) }
+                if subtract {
+                    sse::sub32(x, b.at(r, c))
+                } else {
+                    sse::add32(x, b.at(r, c))
+                }
             },
         )
     }
 
     /// `MatrixScalarMul(in, v, out)`.
-    pub fn matrix_scalar_mul(&mut self, m: &Matrix, v: f32, out: Option<&mut Matrix>) -> Result<Returned<Matrix>, Stop> {
+    pub fn matrix_scalar_mul(
+        &mut self,
+        m: &Matrix,
+        v: f32,
+        out: Option<&mut Matrix>,
+    ) -> Result<Returned<Matrix>, Stop> {
         if !self.real_only("MatrixScalarMul", m) {
             return Ok(Returned::Nothing);
         }
@@ -204,13 +251,22 @@ impl Process {
             "MatrixScalarMul",
             m,
             out,
-            |o| format!("MatrixScalarMul: incompatable matrices {r1} x {c1} != {} x {}\n", o.rows, o.cols),
+            |o| {
+                format!(
+                    "MatrixScalarMul: incompatable matrices {r1} x {c1} != {} x {}\n",
+                    o.rows, o.cols
+                )
+            },
             |_, _, x| sse::mul32(x, v),
         )
     }
 
     /// `MatrixSquareElts(in, out)`.
-    pub fn matrix_square_elts(&mut self, m: &Matrix, out: Option<&mut Matrix>) -> Result<Returned<Matrix>, Stop> {
+    pub fn matrix_square_elts(
+        &mut self,
+        m: &Matrix,
+        out: Option<&mut Matrix>,
+    ) -> Result<Returned<Matrix>, Stop> {
         if !self.real_only("MatrixSquareElts", m) {
             return Ok(Returned::Nothing);
         }
@@ -219,7 +275,12 @@ impl Process {
             "MatrixSquareElts",
             m,
             out,
-            |o| format!("MatrixSquareElts: incompatable matrices {r1} x {c1} != {} x {}\n", o.rows, o.cols),
+            |o| {
+                format!(
+                    "MatrixSquareElts: incompatable matrices {r1} x {c1} != {} x {}\n",
+                    o.rows, o.cols
+                )
+            },
             |_, _, x| sse::mul32(x, x),
         )
     }
@@ -228,9 +289,15 @@ impl Process {
     pub fn matrix_clear(&mut self, m: &mut Matrix) -> Returned<Matrix> {
         if m.is_complex() {
             if self.mode().reproduce() {
-                self.note(&FS_25, "MatrixClear: a complex matrix cleared as FreeSurfer clears it (part of it)");
+                self.note(
+                    &FS_25,
+                    "MatrixClear: a complex matrix cleared as FreeSurfer clears it (part of it)",
+                );
             } else {
-                self.note(&FS_25, "MatrixClear: every float of a complex matrix cleared");
+                self.note(
+                    &FS_25,
+                    "MatrixClear: every float of a complex matrix cleared",
+                );
             }
         }
         self.clear_matrix(m);
@@ -238,7 +305,11 @@ impl Process {
     }
 
     /// `MatrixDiag(d, out)`.
-    pub fn matrix_diag(&mut self, d: &Matrix, out: Option<&mut Matrix>) -> Result<Returned<Matrix>, Stop> {
+    pub fn matrix_diag(
+        &mut self,
+        d: &Matrix,
+        out: Option<&mut Matrix>,
+    ) -> Result<Returned<Matrix>, Stop> {
         if !self.real_only("MatrixDiag", d) {
             return Ok(Returned::Nothing);
         }
@@ -253,7 +324,10 @@ impl Process {
             Some(o) => {
                 self.clear_matrix(o);
                 if o.rows != n || o.cols != n {
-                    let msg = format!("MatrixDiag: incompatable matrices {n} x {n} != {} x {}\n", o.rows, o.cols);
+                    let msg = format!(
+                        "MatrixDiag: incompatable matrices {n} x {n} != {} x {}\n",
+                        o.rows, o.cols
+                    );
                     self.error_printf(codes::BAD_PARM, msg.as_bytes());
                     return Ok(Returned::Nothing);
                 }
@@ -350,7 +424,13 @@ impl Process {
     }
 
     /// `MatrixConstVal(v, rows, cols, X)`.
-    pub fn matrix_const_val(&mut self, v: f32, rows: i32, cols: i32, x: Option<&mut Matrix>) -> Result<Returned<Matrix>, Stop> {
+    pub fn matrix_const_val(
+        &mut self,
+        v: f32,
+        rows: i32,
+        cols: i32,
+        x: Option<&mut Matrix>,
+    ) -> Result<Returned<Matrix>, Stop> {
         let mut fresh = None;
         let o: &mut Matrix = match x {
             None => match self.new_matrix(rows, cols, MATRIX_REAL)? {
@@ -376,7 +456,12 @@ impl Process {
     }
 
     /// `MatrixZero(rows, cols, X)`.
-    pub fn matrix_zero(&mut self, rows: i32, cols: i32, x: Option<&mut Matrix>) -> Result<Returned<Matrix>, Stop> {
+    pub fn matrix_zero(
+        &mut self,
+        rows: i32,
+        cols: i32,
+        x: Option<&mut Matrix>,
+    ) -> Result<Returned<Matrix>, Stop> {
         self.matrix_const_val(0.0, rows, cols, x)
     }
 
@@ -411,7 +496,13 @@ impl Process {
     }
 
     /// `MatrixReshape(src, dst, rows, cols)`.
-    pub fn matrix_reshape(&mut self, src: &Matrix, dst: Option<&mut Matrix>, rows: i32, cols: i32) -> Result<Returned<Matrix>, Stop> {
+    pub fn matrix_reshape(
+        &mut self,
+        src: &Matrix,
+        dst: Option<&mut Matrix>,
+        rows: i32,
+        cols: i32,
+    ) -> Result<Returned<Matrix>, Stop> {
         if !self.real_only("MatrixReshape", src) {
             return Ok(Returned::Nothing);
         }
@@ -432,7 +523,10 @@ impl Process {
                 if k >= total {
                     break 'outer;
                 }
-                let (dr, dc) = ((k / i64::from(cols)) as i32 + 1, (k % i64::from(cols)) as i32 + 1);
+                let (dr, dc) = (
+                    (k / i64::from(cols)) as i32 + 1,
+                    (k % i64::from(cols)) as i32 + 1,
+                );
                 o.set(dr, dc, s.at(r, c));
                 k += 1;
             }
@@ -458,7 +552,11 @@ impl Process {
     }
 
     /// `MatrixNormalizeColScale(m, scale)`.
-    pub fn matrix_normalize_col_scale(&mut self, m: &Matrix, scale: Option<&mut Matrix>) -> Result<Returned<Matrix>, Stop> {
+    pub fn matrix_normalize_col_scale(
+        &mut self,
+        m: &Matrix,
+        scale: Option<&mut Matrix>,
+    ) -> Result<Returned<Matrix>, Stop> {
         if !self.real_only("MatrixNormalizeColScale", m) {
             return Ok(Returned::Nothing);
         }
@@ -471,7 +569,11 @@ impl Process {
             },
             Some(o) => {
                 let ok = o.rows >= 1 && o.cols >= m.cols;
-                if !self.fits("MatrixNormalizeColScale", "the scale row is smaller than the matrix's columns", ok) {
+                if !self.fits(
+                    "MatrixNormalizeColScale",
+                    "the scale row is smaller than the matrix's columns",
+                    ok,
+                ) {
                     return Ok(Returned::Nothing);
                 }
                 o
@@ -514,7 +616,11 @@ impl Process {
         let len = Process::col_lengths(&src);
         if let Some(s) = scale {
             let ok = s.rows >= 1 && s.cols >= m.cols;
-            if self.fits("MatrixNormalizeCol", "the scale row is smaller than the matrix's columns", ok) {
+            if self.fits(
+                "MatrixNormalizeCol",
+                "the scale row is smaller than the matrix's columns",
+                ok,
+            ) {
                 for (c, &l) in len.iter().enumerate() {
                     s.set(1, c as i32 + 1, l);
                 }
@@ -576,7 +682,10 @@ impl Process {
     ) -> Result<Returned<Matrix>, Stop> {
         let name = which.name();
         if dr < 1 || dc < 1 {
-            self.error_printf(codes::BAD_PARM, format!("{name}: bad destination ({dr},{dc})\n").as_bytes());
+            self.error_printf(
+                codes::BAD_PARM,
+                format!("{name}: bad destination ({dr},{dc})\n").as_bytes(),
+            );
             return Ok(Returned::Nothing);
         }
         let (er, ec) = (sr + rows - 1, sc + cols - 1);
@@ -612,9 +721,15 @@ impl Process {
         let reproduce = self.mode().reproduce();
         if which == Region::Whole && s.is_complex() != o.is_complex() {
             if reproduce {
-                self.note(&FS_27, "a region between a real and a complex matrix copied at FreeSurfer's places");
+                self.note(
+                    &FS_27,
+                    "a region between a real and a complex matrix copied at FreeSurfer's places",
+                );
             } else {
-                self.note(&FS_27, "a region between a real and a complex matrix refused");
+                self.note(
+                    &FS_27,
+                    "a region between a real and a complex matrix refused",
+                );
                 self.error_printf(
                     codes::BAD_PARM,
                     b"MatrixCopyRegion: a region between a real and a complex matrix\n",
@@ -624,16 +739,28 @@ impl Process {
         }
         if which != Region::Whole && !s.is_complex() && rows > 0 && cols > 0 {
             if reproduce {
-                self.note(&FS_27, "a real source's parts read as a complex matrix's (beyond the array: 0)");
+                self.note(
+                    &FS_27,
+                    "a real source's parts read as a complex matrix's (beyond the array: 0)",
+                );
             } else {
-                self.note(&FS_27, "a real source's real part its element, its imaginary part 0");
+                self.note(
+                    &FS_27,
+                    "a real source's real part its element, its imaginary part 0",
+                );
             }
         }
         if which == Region::Real && o.is_complex() && rows > 0 && cols > 0 {
             if reproduce {
-                self.note(&FS_26, "the real-part copy into a complex destination copied the imaginary parts");
+                self.note(
+                    &FS_26,
+                    "the real-part copy into a complex destination copied the imaginary parts",
+                );
             } else {
-                self.note(&FS_26, "the real-part copy into a complex destination copied the real parts");
+                self.note(
+                    &FS_26,
+                    "the real-part copy into a complex destination copied the real parts",
+                );
             }
         }
         // the parts of the source at (r, c), as FreeSurfer reads them (a complex matrix's)
@@ -700,11 +827,21 @@ impl Process {
     }
 
     /// `MatrixRealToComplex(re, im, out)` (FS-25, FS-28).
-    pub fn matrix_real_to_complex(&mut self, re: &Matrix, im: &Matrix, out: Option<&mut Matrix>) -> Result<Returned<Matrix>, Stop> {
-        if !self.real_only("MatrixRealToComplex", re) || !self.real_only("MatrixRealToComplex", im) {
+    pub fn matrix_real_to_complex(
+        &mut self,
+        re: &Matrix,
+        im: &Matrix,
+        out: Option<&mut Matrix>,
+    ) -> Result<Returned<Matrix>, Stop> {
+        if !self.real_only("MatrixRealToComplex", re) || !self.real_only("MatrixRealToComplex", im)
+        {
             return Ok(Returned::Nothing);
         }
-        if !self.fits("MatrixRealToComplex", "the imaginary parts' matrix is smaller than the real parts'", im.rows >= re.rows && im.cols >= re.cols) {
+        if !self.fits(
+            "MatrixRealToComplex",
+            "the imaginary parts' matrix is smaller than the real parts'",
+            im.rows >= re.rows && im.cols >= re.cols,
+        ) {
             return Ok(Returned::Nothing);
         }
         let (a, b) = (re.clone(), im.clone());
@@ -716,7 +853,11 @@ impl Process {
             },
             Some(o) => {
                 let ok = o.is_complex() && o.rows >= re.rows && o.cols >= re.cols;
-                if !self.fits("MatrixRealToComplex", "the output is real or smaller than the real parts' matrix", ok) {
+                if !self.fits(
+                    "MatrixRealToComplex",
+                    "the output is real or smaller than the real parts' matrix",
+                    ok,
+                ) {
                     return Ok(Returned::Nothing);
                 }
                 o
@@ -738,7 +879,13 @@ impl Process {
     // ---- §8.4, §8.5
 
     /// `MatrixAllocRotation(n, angle, which)` (`m` absent) and `MatrixReallocRotation` (given).
-    pub fn matrix_rotation(&mut self, n: i32, angle: f32, which: i32, m: Option<&mut Matrix>) -> Result<Returned<Matrix>, Stop> {
+    pub fn matrix_rotation(
+        &mut self,
+        n: i32,
+        angle: f32,
+        which: i32,
+        m: Option<&mut Matrix>,
+    ) -> Result<Returned<Matrix>, Stop> {
         let mut fresh = None;
         let o: &mut Matrix = match m {
             None => match self.matrix_identity(n, None)? {
@@ -747,8 +894,18 @@ impl Process {
             },
             Some(o) => o,
         };
-        let c = self.libmf("cosf", angle, larmorx_core::math::cosf, larmorx_core::math::cosf_glibc);
-        let s = self.libmf("sinf", angle, larmorx_core::math::sinf, larmorx_core::math::sinf_glibc);
+        let c = self.libmf(
+            "cosf",
+            angle,
+            larmorx_core::math::cosf,
+            larmorx_core::math::cosf_glibc,
+        );
+        let s = self.libmf(
+            "sinf",
+            angle,
+            larmorx_core::math::sinf,
+            larmorx_core::math::sinf_glibc,
+        );
         let ns = -s;
         match which {
             0 => {
@@ -785,11 +942,17 @@ impl Process {
             return true;
         }
         if self.mode().reproduce() {
-            self.note(&FS_31, format!("{name}: {what} read past its elements (beyond the array: 0)"));
+            self.note(
+                &FS_31,
+                format!("{name}: {what} read past its elements (beyond the array: 0)"),
+            );
             true
         } else {
             self.note(&FS_31, format!("{name}: {what} refused"));
-            self.error_printf(codes::BAD_PARM, format!("{name}: {what} is not a 3-vector\n").as_bytes());
+            self.error_printf(
+                codes::BAD_PARM,
+                format!("{name}: {what} is not a 3-vector\n").as_bytes(),
+            );
             false
         }
     }
@@ -809,16 +972,31 @@ impl Process {
 
     /// `VectorDot(v1, v2)` (`distance`: `VectorDistance`, the squared distance).
     pub fn vector_dot_dist(&mut self, v1: &Matrix, v2: &Matrix, distance: bool) -> f32 {
-        let name = if distance { "VectorDistance" } else { "VectorDot" };
+        let name = if distance {
+            "VectorDistance"
+        } else {
+            "VectorDot"
+        };
         if !self.real_only(name, v1) || !self.real_only(name, v2) {
             return 0.0;
         }
         if v2.rows < v1.rows {
             if self.mode().reproduce() {
-                self.note(&FS_31, format!("{name}: the second vector read to the first's length (beyond the array: 0)"));
+                self.note(
+                    &FS_31,
+                    format!(
+                        "{name}: the second vector read to the first's length (beyond the array: 0)"
+                    ),
+                );
             } else {
-                self.note(&FS_31, format!("{name}: a second vector shorter than the first refused"));
-                self.error_printf(codes::BAD_PARM, format!("{name}: the second vector is shorter than the first\n").as_bytes());
+                self.note(
+                    &FS_31,
+                    format!("{name}: a second vector shorter than the first refused"),
+                );
+                self.error_printf(
+                    codes::BAD_PARM,
+                    format!("{name}: the second vector is shorter than the first\n").as_bytes(),
+                );
                 return 0.0;
             }
         }
@@ -842,7 +1020,12 @@ impl Process {
     }
 
     /// `VectorCrossProduct(v1, v2, out)`.
-    pub fn vector_cross_product(&mut self, v1: &Matrix, v2: &Matrix, out: Option<&mut Matrix>) -> Result<Returned<Matrix>, Stop> {
+    pub fn vector_cross_product(
+        &mut self,
+        v1: &Matrix,
+        v2: &Matrix,
+        out: Option<&mut Matrix>,
+    ) -> Result<Returned<Matrix>, Stop> {
         if v1.rows != 3 && v1.cols != 1 {
             self.error_printf(codes::BAD_PARM, b"VectorCrossProduct: must be 3-vectors");
             return Ok(Returned::Nothing);
@@ -890,7 +1073,11 @@ impl Process {
                 return 0.0;
             }
         }
-        for (v, w) in [(v1, "the first vector"), (v2, "the second vector"), (v3, "the third vector")] {
+        for (v, w) in [
+            (v1, "the first vector"),
+            (v2, "the second vector"),
+            (v3, "the third vector"),
+        ] {
             if !self.vector3_ok("VectorTripleProduct", v, w) {
                 return 0.0;
             }
@@ -914,13 +1101,18 @@ impl Process {
                 return 0.0;
             }
         }
-        if !self.vector3_ok("Vector3Angle", v1, "the first vector") || !self.vector3_ok("Vector3Angle", v2, "the second vector") {
+        if !self.vector3_ok("Vector3Angle", v1, "the first vector")
+            || !self.vector3_ok("Vector3Angle", v2, "the second vector")
+        {
             return 0.0;
         }
         let len = |v: &Matrix| {
             let (x, y, z) = Process::xyz(v);
             let (x, y, z) = (sse::widen(x), sse::widen(y), sse::widen(z));
-            sse::sqrt64(sse::add64(sse::add64(sse::mul64(x, x), sse::mul64(y, y)), sse::mul64(z, z)))
+            sse::sqrt64(sse::add64(
+                sse::add64(sse::mul64(x, x), sse::mul64(y, y)),
+                sse::mul64(z, z),
+            ))
         };
         let mut norm = sse::mul64(len(v1), len(v2));
         if norm.abs() < f64::from(f32::EPSILON) {
@@ -928,7 +1120,10 @@ impl Process {
         }
         let (x1, y1, z1) = Process::xyz(v1);
         let (x2, y2, z2) = Process::xyz(v2);
-        let dot = sse::add32(sse::add32(sse::mul32(x1, x2), sse::mul32(y1, y2)), sse::mul32(z1, z2));
+        let dot = sse::add32(
+            sse::add32(sse::mul32(x1, x2), sse::mul32(y1, y2)),
+            sse::mul32(z1, z2),
+        );
         let dot = sse::widen(dot);
         if dot.abs() > norm {
             norm = dot.abs();
@@ -955,12 +1150,18 @@ fn sse_sqrt32(x: f32) -> f32 {
 /// `XYZ_NORMALIZED_LOAD(v, len, x, y, z)` (§8.5): the unit vector and the length.
 pub fn xyz_normalized_load(x: f32, y: f32, z: f32) -> ([f32; 3], f32) {
     let (a, b, c) = (sse::widen(x), sse::widen(y), sse::widen(z));
-    let len = sse::narrow(sse::sqrt64(sse::add64(sse::add64(sse::mul64(a, a), sse::mul64(b, b)), sse::mul64(c, c))));
+    let len = sse::narrow(sse::sqrt64(sse::add64(
+        sse::add64(sse::mul64(a, a), sse::mul64(b, b)),
+        sse::mul64(c, c),
+    )));
     if len == 0.0 {
         return ([1.0, 0.0, 0.0], len);
     }
     let inv = sse::div32(1.0, len);
-    ([sse::mul32(x, inv), sse::mul32(y, inv), sse::mul32(z, inv)], len)
+    (
+        [sse::mul32(x, inv), sse::mul32(y, inv), sse::mul32(z, inv)],
+        len,
+    )
 }
 
 /// `XYZApproxAngle_knownLength(n, x2, y2, z2, norm)` (§8.5).
@@ -987,7 +1188,12 @@ impl Process {
 
     /// `MatrixPrint(fp, m, precision)` to standard output or error (`None`: the C library's
     /// NULL stream, which FreeSurfer reports and replaces with standard output).
-    pub fn matrix_print(&mut self, to_err: Option<bool>, m: Option<&Matrix>, precision: i32) -> i32 {
+    pub fn matrix_print(
+        &mut self,
+        to_err: Option<bool>,
+        m: Option<&Matrix>,
+        precision: i32,
+    ) -> i32 {
         let to_err = match to_err {
             Some(e) => e,
             None => {
@@ -1006,7 +1212,9 @@ impl Process {
         'rows: for r in 1..=m.rows {
             for c in 1..=m.cols {
                 match m.kind {
-                    MATRIX_REAL => b.extend_from_slice(&sprintf_f64(fmt.as_bytes(), sse::widen(m.at(r, c)))),
+                    MATRIX_REAL => {
+                        b.extend_from_slice(&sprintf_f64(fmt.as_bytes(), sse::widen(m.at(r, c))))
+                    }
                     MATRIX_COMPLEX => {
                         let (re, im) = m.pair(r, c);
                         b.extend_from_slice(&sprintf_f64(b"% 2.3f", sse::widen(re)));
@@ -1017,7 +1225,10 @@ impl Process {
                     t => {
                         self.write_to(to_err, &b);
                         b.clear();
-                        self.error_printf(codes::BAD_PARM, format!("MatrixPrint: unknown type {t}\n").as_bytes());
+                        self.error_printf(
+                            codes::BAD_PARM,
+                            format!("MatrixPrint: unknown type {t}\n").as_bytes(),
+                        );
                         status = codes::BAD_PARM;
                         break 'rows;
                     }
@@ -1033,7 +1244,11 @@ impl Process {
     }
 
     fn write_to(&mut self, to_err: bool, b: &[u8]) {
-        if to_err { self.put_err(b) } else { self.put_out(b) }
+        if to_err {
+            self.put_err(b)
+        } else {
+            self.put_out(b)
+        }
     }
 
     /// `MatrixPrintFmt(stdout, fmt, m)`.
@@ -1065,7 +1280,12 @@ impl Process {
     }
 
     /// `MatrixSimilarityTransform(src, mul, dst)`: `mul (src mulᵀ)` with the float products.
-    pub fn matrix_similarity_transform(&mut self, src: &Matrix, mul: &Matrix, dst: Option<&mut Matrix>) -> Result<Returned<Matrix>, Stop> {
+    pub fn matrix_similarity_transform(
+        &mut self,
+        src: &Matrix,
+        mul: &Matrix,
+        dst: Option<&mut Matrix>,
+    ) -> Result<Returned<Matrix>, Stop> {
         let t = match self.matrix_transpose(mul, None)? {
             Returned::New(t) => t,
             _ => return Ok(Returned::Nothing),
@@ -1078,7 +1298,13 @@ impl Process {
     }
 
     /// `GaussianMatrix(n, std, norm, G)` (§8.7).
-    pub fn gaussian_matrix(&mut self, n: i32, std: f32, norm: i32, g: Option<&mut Matrix>) -> Result<Returned<Matrix>, Stop> {
+    pub fn gaussian_matrix(
+        &mut self,
+        n: i32,
+        std: f32,
+        norm: i32,
+        g: Option<&mut Matrix>,
+    ) -> Result<Returned<Matrix>, Stop> {
         let mut fresh = None;
         let o: &mut Matrix = match g {
             None => match self.new_matrix(n, n, MATRIX_REAL)? {
@@ -1094,13 +1320,21 @@ impl Process {
             }
         };
         let var = sse::mul32(std, std);
-        let mut f = sse::narrow(sse::mul64(sse::sqrt64(2.0 * std::f64::consts::PI), sse::widen(std)));
+        let mut f = sse::narrow(sse::mul64(
+            sse::sqrt64(2.0 * std::f64::consts::PI),
+            sse::widen(std),
+        ));
         // expf(-(d d) / (2 var)) for every distance d of the matrix, -(n - 1)..n - 1
         let mut e = Vec::new();
         for d in -(n - 1).max(0)..n.max(1) {
             let d = d as f32;
             let x = sse::div32(-sse::mul32(d, d), sse::mul32(2.0, var));
-            e.push(self.libmf("expf", x, larmorx_core::math::expf, larmorx_core::math::expf_glibc));
+            e.push(self.libmf(
+                "expf",
+                x,
+                larmorx_core::math::expf,
+                larmorx_core::math::expf_glibc,
+            ));
         }
         let off = (n - 1).max(0);
         let g = |d: i32, f: f32| sse::div32(e[(d + off) as usize], f);
@@ -1132,7 +1366,15 @@ impl Process {
     }
 
     /// `GaussianMatrix2(n, s1, s2, w1, norm, G)`: `w1 G1 + (1 - w1) G2`.
-    pub fn gaussian_matrix2(&mut self, n: i32, s1: f32, s2: f32, w1: f32, norm: i32, g: Option<&mut Matrix>) -> Result<Returned<Matrix>, Stop> {
+    pub fn gaussian_matrix2(
+        &mut self,
+        n: i32,
+        s1: f32,
+        s2: f32,
+        w1: f32,
+        norm: i32,
+        g: Option<&mut Matrix>,
+    ) -> Result<Returned<Matrix>, Stop> {
         let g1 = match self.gaussian_matrix(n, s1, norm, None)? {
             Returned::New(m) => m,
             _ => return Ok(Returned::Nothing),

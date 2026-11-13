@@ -67,7 +67,10 @@ impl Process {
         let n = (nh - nl + 1).max(0) as usize;
         let mut data = Vec::new();
         if data.try_reserve_exact(n).is_err() {
-            self.error_exit(codes::NO_FILE, format!("could not allocate vector({nl}, {nh})").as_bytes())?;
+            self.error_exit(
+                codes::NO_FILE,
+                format!("could not allocate vector({nl}, {nh})").as_bytes(),
+            )?;
         }
         data.resize(n, 0.0);
         Ok(NrVector { nl, nh, data })
@@ -79,9 +82,18 @@ impl Process {
         let n = (rows * cols) as usize;
         let mut data = Vec::new();
         if data.try_reserve_exact(n).is_err() {
-            self.error_exit(codes::NO_FILE, format!("could not allocate matrix({rows}, {cols})").as_bytes())?;
+            self.error_exit(
+                codes::NO_FILE,
+                format!("could not allocate matrix({rows}, {cols})").as_bytes(),
+            )?;
         }
         data.resize(n, 0.0);
-        Ok(NrMatrix { nrl, nrh, ncl, nch, data })
+        Ok(NrMatrix {
+            nrl,
+            nrh,
+            ncl,
+            nch,
+            data,
+        })
     }
 }

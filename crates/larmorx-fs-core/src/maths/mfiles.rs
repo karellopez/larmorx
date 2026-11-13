@@ -92,10 +92,13 @@ fn word(s: &mut CStream, w: &[u8]) -> bool {
 /// A run of digits (hexadecimal or decimal): how many were read.
 fn digits(s: &mut CStream, hex: bool) -> usize {
     let mut n = 0;
-    while s
-        .peek()
-        .is_some_and(|c| if hex { c.is_ascii_hexdigit() } else { c.is_ascii_digit() })
-    {
+    while s.peek().is_some_and(|c| {
+        if hex {
+            c.is_ascii_hexdigit()
+        } else {
+            c.is_ascii_digit()
+        }
+    }) {
         s.pos += 1;
         n += 1;
     }
@@ -124,7 +127,11 @@ fn scan_f(s: &mut CStream) -> (Scan, Option<i32>) {
             {
                 return (Scan::Matching, None);
             }
-            let v = if neg { f32::NEG_INFINITY } else { f32::INFINITY };
+            let v = if neg {
+                f32::NEG_INFINITY
+            } else {
+                f32::INFINITY
+            };
             return (Scan::Value(v, s.peek().is_none()), None);
         }
         Some(b'n' | b'N') => {
@@ -273,7 +280,11 @@ fn scan_ddd(line: &[u8], errno: &mut i32) -> Vec<i32> {
                 .map(|&c| c as char)
                 .collect();
             let d = digits.trim_start_matches('0');
-            let limit = if v == i64::MAX { "9223372036854775807" } else { "9223372036854775808" };
+            let limit = if v == i64::MAX {
+                "9223372036854775807"
+            } else {
+                "9223372036854775808"
+            };
             if d.len() > 19 || (d.len() == 19 && d > limit) {
                 *errno = ERANGE;
             }
@@ -398,17 +409,24 @@ impl Process {
             line
         };
         let mut errno = self.errno;
-        let v = header.as_deref().map(|l| scan_ddd(l, &mut errno)).unwrap_or_default();
+        let v = header
+            .as_deref()
+            .map(|l| scan_ddd(l, &mut errno))
+            .unwrap_or_default();
         self.errno = errno;
         if v.len() < 3 {
-            self.error_printf(codes::BAD_FILE, b"MatrixAsciiReadFrom: could not scanf parms");
+            self.error_printf(
+                codes::BAD_FILE,
+                b"MatrixAsciiReadFrom: could not scanf parms",
+            );
             return Ok(Returned::Nothing);
         }
         let (kind, rows, cols) = (v[0], v[1], v[2]);
-        let mut fresh = match self.reader_matrix("MatrixAsciiReadFrom", kind, rows, cols, m.as_deref())? {
-            Ok(f) => f,
-            Err(r) => return Ok(r),
-        };
+        let mut fresh =
+            match self.reader_matrix("MatrixAsciiReadFrom", kind, rows, cols, m.as_deref())? {
+                Ok(f) => f,
+                Err(r) => return Ok(r),
+            };
         let target: &mut Matrix = match (fresh.as_mut(), m) {
             (Some(f), _) => f,
             (None, Some(g)) => g,
@@ -452,7 +470,11 @@ impl Process {
     }
 
     /// `MatrixReadFrom(fp, m)`: the binary reader (§18.2; FS-49).
-    pub fn matrix_read_from(&mut self, s: &mut CStream, m: Option<&mut Matrix>) -> Result<Returned<Matrix>, Stop> {
+    pub fn matrix_read_from(
+        &mut self,
+        s: &mut CStream,
+        m: Option<&mut Matrix>,
+    ) -> Result<Returned<Matrix>, Stop> {
         let reproduce = self.mode().reproduce();
         // FreeSurfer reads each number into one stack slot that it then byte-swaps in place: a
         // short read leaves the slot's other bytes as the previous number left them, swapped
@@ -477,10 +499,11 @@ impl Process {
                 "a binary matrix file that ends early: the missing bytes are the previous number's, swapped",
             );
         }
-        let mut fresh = match self.reader_matrix("MatrixReadFrom", kind, rows, cols, m.as_deref())? {
-            Ok(f) => f,
-            Err(r) => return Ok(r),
-        };
+        let mut fresh =
+            match self.reader_matrix("MatrixReadFrom", kind, rows, cols, m.as_deref())? {
+                Ok(f) => f,
+                Err(r) => return Ok(r),
+            };
         let target: &mut Matrix = match (fresh.as_mut(), m) {
             (Some(f), _) => f,
             (None, Some(g)) => g,
@@ -525,7 +548,10 @@ impl Process {
 
     fn ends_early(&mut self) -> Returned<Matrix> {
         self.note(&FS_49, "a binary matrix file that ends early refused");
-        self.error_printf(codes::BAD_FILE, b"MatrixReadFrom: the file ends before the matrix does");
+        self.error_printf(
+            codes::BAD_FILE,
+            b"MatrixReadFrom: the file ends before the matrix does",
+        );
         Returned::Nothing
     }
 

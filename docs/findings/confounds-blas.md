@@ -97,8 +97,15 @@ is not what was built: its CI checks out `v0.3.28`.)
   with `max(m, n) > 298`. The undefined class can also **hang**: once `DORGLQ` of 600 × 600 with 450
   reflectors spun at 100 % of a core for 11 minutes inside numpy's library (it had crashed in an
   earlier run: it depends on the memory around the buffer). Every crash and hang of the checks fell
-  in the predicted class; the cases of that class that did not crash were still identical to
-  larmorx told `GEMM_Q = 512` (`gemm_q=512`, for validating here only). larmorx's default is 256.
+  in the predicted class; the cases of that class that did not crash were mostly identical to
+  larmorx told `GEMM_Q = 512` (`gemm_q=512`, for validating here only), **but not always: numpy's
+  result there follows memory it never wrote, and changes from run to run** (`check_gesdd.py`'s `svd`
+  section at the machine's 512, four runs of 2026-11-13 (`oracles/logs/confounds-r3b-zen-svd.log`):
+  three with one build of the TOLMUL fix, 83 of 92, 96 of 96 and 92 of 92 of the class's path-3 cases
+  that did not crash identical, with 234, 230 and 242 crashes; one with a build from before the fix, 96
+  of 96 with 238; every defined case identical in each). So the suites report
+  the class's tallies as values, as the scripts do, and check the defined cases and that every crash
+  is in the class. larmorx's default is 256.
   `lstsq` with `min(m, n) <= 25` (every `cosine_filter`) never reaches it; `DGEBRD`'s products have
   depth 32 and never reach it.
 

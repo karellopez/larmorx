@@ -413,6 +413,12 @@ _TOTAL_TABLE = re.compile(
 )
 _TOTAL_OF = re.compile(r"^TOTAL (?P<k>\d+) of (?P<n>\d+) identical\b.*?(?P<control>\[control:.*)?$")
 _INFO = ("INFO ", "apart:", "note:", "numpy ")
+#: The linear algebra scripts' tag of a case numpy's own library leaves undefined (NP-09).
+UNDEFINED = "[undefined in the original]"
+UNDEFINED_REPORTED = (
+    "reported: undefined in the original (NP-09: numpy's result follows memory it never wrote, "
+    "and changes from run to run); the defined cases and the crashes' class are the checks"
+)
 #: The scripts' timing lines: not part of a record (they change from run to run; the speed is
 #: the benchmarks').
 _TIMING = ("seconds:", "larmorx's seconds", "time ", "TIME ")
@@ -503,10 +509,16 @@ def parse(stdout: str, control: bool = False) -> _Parsed:
         if m := _LA.match(s):
             k, n = int(m["k"]), int(m["n"])
             crashed = int(m["c"] or 0)
+            # The undefined class (NP-09: numpy 2.5.4's kernel reads past its stack buffer at
+            # GEMM_Q 512) is reported, as the scripts report it: numpy's result there follows
+            # whatever that memory holds, and changes from run to run (4 runs of check_gesdd's
+            # svd section, 2026-11-13: 83 of 92, 96 of 96, 96 of 96 and 92 of 92 identical).
+            undefined = UNDEFINED in m["name"]
             out.add(
                 m["name"],
-                passed=k == n,
+                passed=k == n or undefined,
                 value=f"{k}/{n}",
+                threshold=UNDEFINED_REPORTED if undefined else None,
                 metric="identical cases",
                 detail=(
                     f"{crashed} cases crashed in numpy's OpenBLAS (the undefined class)"

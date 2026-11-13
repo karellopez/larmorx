@@ -38,7 +38,8 @@ from pathlib import Path
 
 import numpy as np
 
-from larmorx_validation.evidence import common, core
+from larmorx_validation.evidence import common, core, fsl_pages
+from larmorx_validation.evidence import present as present_
 from larmorx_validation.figures import cache as fcache
 from larmorx_validation.figures import records
 
@@ -2472,7 +2473,7 @@ def export(ctx: core.Context) -> dict:
     to, toprov = trial_original(ctx)
     tc, tcprov = trial_catchup(ctx)
     bench, chart = speed(ctx)
-    return {
+    doc = {
         "schema": 1,
         "tool": TOOL,
         "title": "topup and applytopup",
@@ -2514,6 +2515,418 @@ def export(ctx: core.Context) -> dict:
         ]
         + [_example_real(ctx, ex_id, classified) for ex_id in REAL],
     }
+    return present(doc)
+
+
+# ------------------------------------------------------------------- the writing guide's words
+
+#: topup's own rewordings, before the FSL pages' (:mod:`fsl_pages`): "the trial" of random
+#: testing is a random-testing run (the guide's section 1); the comparisons in the texts by
+#: their new labels; the benchmark's machine, shared with other work.
+TEXTS = [
+    (r"\bDifferential random testing's trial of this part\b", "A random-testing run of the replica"),
+    (r"\bDifferential random testing's trial of the clean-room original\b",
+     "A random-testing run of the clean room"),
+    (r"\bthe replica trial's cases drawn again\b", "the cases of the replica's run drawn again"),
+    (r"\bas the replica's trial above\b", "as the replica's run above"),
+    (r"\bthe earlier trials' cases drawn again\b", "the earlier runs' cases drawn again"),
+    (r"\(the trial started before the commit\)", "(the run started before the commit)"),
+    (r"\bEvery differing case of the trial\b", "Every differing case of the run"),
+    (r"\b([Tt])he reproducer is a finding of the trial\b", r"\1he reproducer is a finding of the run"),
+    (r"\*replica, default − reproduce mode\*", "*replica, fix − reproduce*"),
+    (r"\bits reproduce mode takes FSL's forward differences\b",
+     "its `reproduce` takes FSL's forward differences"),
+    (r"\bshared with another agent's work\b", "shared with other work"),
+    (r"; trial of (\d{4}-\d\d-\d\d), the drawn case\)", r"; the random-testing run of \1, the drawn case)"),
+    (r"\bfixed during the trial's triage\b", "fixed during the run's triage"),
+]  # fmt: skip
+#: The page's topup calls; applytopup's three examples name their own program; the agreement
+#: charts, the speed chart and random testing cover both programs.
+PAGE = fsl_pages.page("topup", texts=TEXTS)
+APPLY = fsl_pages.page("applytopup", texts=TEXTS)
+CHARTS = fsl_pages.page("", programs=("topup", "applytopup"), texts=TEXTS)
+#: The random-testing tables: the replica's run, and the clean room's (a bare "larmorx" there is
+#: the clean room).
+TRIAL_REPLICA = fsl_pages.page("", programs=("topup", "applytopup"), texts=TEXTS)
+TRIAL_CLEAN = fsl_pages.page("", programs=("topup", "applytopup"), port="clean-room", texts=TEXTS)
+
+
+def _diff(ex: dict, i: str) -> dict:
+    return next(d for d in ex["diffs"] if d["id"] == i)
+
+
+def _want(ex: dict, **verdicts: str) -> None:
+    """Raise unless each comparison (``original_fsl`` for ``original-fsl``) has its verdict."""
+    for i, v in verdicts.items():
+        got = _diff(ex, i.replace("_", "-"))["verdict"]
+        if got != v:
+            raise ValueError(f"{ex['id']}: {i.replace('_', '-')} is {got}, not {v}")
+
+
+def _ids(ex: dict, i: str) -> list[str]:
+    """The defects of FSL a comparison's reason names, in its order."""
+    return list(dict.fromkeys(re.findall(r"\bFSL-\d+\b", _diff(ex, i)["reason"])))
+
+
+def _named(ex: dict, i: str, ids: list[str]) -> None:
+    """Raise unless the comparison's reason names exactly these defects of FSL."""
+    if (got := _ids(ex, i)) != ids:
+        raise ValueError(f"{ex['id']}: {i} names {got}, not {ids}")
+
+
+def _found(ex: dict, i: str, pat: str) -> re.Match[str]:
+    m = re.search(pat, _diff(ex, i)["reason"])
+    if not m:
+        raise ValueError(f"{ex['id']}: {i}'s reason without {pat!r}")
+    return m
+
+
+def _sci(v: float) -> str:
+    """A number as a sentence gives it, two significant digits: 0.000307 as 3.1 × 10⁻⁴."""
+    if v == 0 or 1e-3 <= abs(v) < 1e5:
+        return f"{v:.2g}"
+    m, e = f"{v:.1e}".split("e")
+    sup = str.maketrans("-0123456789", "⁻⁰¹²³⁴⁵⁶⁷⁸⁹")
+    return f"{m} × 10{str(int(e)).translate(sup)}"
+
+
+def _relative(ex: dict) -> str:
+    """The clean room's relative difference from FSL at the 99th percentile of the brain."""
+    m = _found(ex, "original-fsl", r"relative difference inside the brain, 99th percentile "
+               r"([0-9.e+-]+) \(§12: ([0-9.e+-]+)\)")  # fmt: skip
+    return (
+        f"{_sci(float(m.group(1)))} relative at the 99th percentile of the brain, its "
+        f"threshold {_sci(float(m.group(2)))}"
+    )
+
+
+#: The clean room's band comparison on fMRIPrep's call: each metric beyond FSL's band.
+_BEYOND = re.compile(r"in (\d+) metric\(s\): (.*)\.$")
+_CORRELATION = re.compile(
+    r"correlation inside the brain ([0-9.]+) \(§12: [0-9.]+; FSL's own ([0-9.]+)\)"
+)
+
+
+def _shows_ds005040(ex: dict) -> tuple[str, list[str]]:
+    """fMRIPrep's call on ds005040: the replica FSL's bytes; the clean room within FSL's thread
+    band but for the field's correlation."""
+    _want(
+        ex, replica_fsl="bit-identical", replica_own="bit-identical",
+        replica4_replica="bit-identical", fix_replica="bit-identical", original_fsl="open",
+        original_own="open", original1_original="bit-identical", ofix_original="bit-identical",
+    )  # fmt: skip
+    hz = _found(ex, "fsl4-fsl", r"the field by up to ([0-9.]+) Hz").group(1)
+    m = _found(ex, "original-fsl", _BEYOND.pattern)
+    corr = list(_CORRELATION.finditer(m.group(2)))
+    if not len(corr) == len(re.findall(r"\(§12: ", m.group(2))) == int(m.group(1)):
+        raise ValueError(f"{ex['id']}: the clean room beyond FSL's band in other metrics")
+    if len({(c.group(1), c.group(2)) for c in corr}) != 1:
+        raise ValueError(f"{ex['id']}: the field's correlations differ")
+    return (
+        "On fMRIPrep's own call, the replica gives FSL's files, every value, at one thread and "
+        "at four, and the same values as fMRIPrep's own. FSL itself moves at four threads "
+        f"(FSL-116: its field by up to {hz} Hz), the yardstick. The clean room, the same at 1 "
+        "and 14 threads, lies within that band in every metric of its record but the field's "
+        f"correlation with FSL's ({corr[0].group(1)}, where FSL's own at four threads is "
+        f"{corr[0].group(2)}), so the comparison stays open. No correction by default changes "
+        "this call, in either port."
+    ), ["replica-fsl", "original-fsl"]
+
+
+def _shows_ds001600(ex: dict) -> tuple[str, list[str]]:
+    """fMRIPrep's call on ds001600: the replica FSL's bytes, the clean room within FSL's band."""
+    _want(
+        ex, replica_fsl="bit-identical", replica_own="bit-identical",
+        replica4_replica="bit-identical", fix_replica="bit-identical",
+        original_fsl="within-variability", original_own="within-variability",
+        original1_original="bit-identical", ofix_original="bit-identical",
+    )  # fmt: skip
+    return (
+        "On fMRIPrep's call on ds001600's pair, the replica gives FSL's files, every value, at "
+        "one thread and at four, and the same values as fMRIPrep's own. The clean room, the "
+        "same at 1 and 14 threads, is within FSL's own thread band in every metric of its "
+        "record. No correction by default changes this call, in either port."
+    ), ["replica-fsl", "original-fsl"]
+
+
+def _shows_membrane(ex: dict) -> tuple[str, list[str]]:
+    _want(
+        ex, replica_fsl="bit-identical", fix_replica="d13", original_fsl="open",
+        original1_original="bit-identical", ofix_original="d13",
+    )  # fmt: skip
+    _named(ex, "fix-replica", ["FSL-117", "FSL-201"])
+    _named(ex, "ofix-original", ["FSL-117", "FSL-201"])
+    clean = _diff(ex, "original-fsl")["metrics"]["field"]["max_abs"]
+    moved = _diff(ex, "fix-replica")["metrics"]["field"]["max_abs"]
+    return (
+        "With the membrane energy and Levenberg-Marquardt, the replica gives FSL's files, every "
+        "value, and the clean room is within its record's thresholds, its field at most "
+        f"{_sci(clean)} Hz from FSL's. In `fix`, their default, both correct FSL-117 (the "
+        "energy's Hessian in other units than its cost) and FSL-201 (the movements' "
+        f"derivatives: this call estimates them), which moves the replica's field by up to "
+        f"{_sci(moved)} Hz."
+    ), ["replica-fsl", "original-fsl"]
+
+
+def _row(ex: dict, head: str) -> dict[str, float]:
+    """A run's row of the movements table, by its columns' labels."""
+    t = next(t for t in ex["tables"] if t["id"].endswith("-movements"))
+    r = next(r for r in t["rows"] if r["head"] == head)
+    return {c["label"]: x.get("v") for c, x in zip(t["columns"][1:], r["cells"], strict=True)}
+
+
+def _moved(row: dict[str, float], against: str) -> str:
+    mm, rad = (row[f"|Δ| {k} vs {against}"] for k in ("translation", "rotation"))
+    return f"{_sci(mm)} mm and {_sci(rad)} rad"
+
+
+def _shows_movements(ex: dict) -> tuple[str, list[str]]:
+    _want(
+        ex, replica_fsl="bit-identical", fix_replica="d13", original_fsl="divergence",
+        original1_original="bit-identical", ofix_original="d13",
+    )  # fmt: skip
+    _named(ex, "fix-replica", ["FSL-201"])
+    _named(ex, "ofix-original", ["FSL-201"])
+    rfix = _moved(_row(ex, "replica (default)"), "FSL")
+    cfix = _moved(_row(ex, "original (default)"), "the replica's default")
+    crep = _moved(_row(ex, "original (reproduce)"), "FSL")
+    return (
+        "With the movements estimated, the replica gives FSL's files, every value. In `fix`, "
+        "their default, both take the exact rotation derivatives (FSL-201): the replica's "
+        f"movements lie {rfix} from FSL's, the clean room's within {cfix} of the replica's. "
+        "In `reproduce` the clean room takes FSL's forward differences but ends "
+        f"{crep} from FSL, whose path here depends on its inputs' last bits: an expected "
+        "divergence."
+    ), ["replica-fsl", "original-fsl"]
+
+
+def _shows_lsr(ex: dict) -> tuple[str, list[str]]:
+    _want(
+        ex, replica_fsl="bit-identical", fix_replica="d13", original_fsl="open",
+        original1_original="bit-identical", ofix_original="bit-identical",
+    )  # fmt: skip
+    _named(ex, "fix-replica", ["FSL-132"])
+    m = _diff(ex, "fix-replica")["metrics"]["hifi"]
+    return (
+        "For applytopup's least-squares restoration, the replica gives FSL's image, every "
+        "value; its default, `fix`, resamples the first image with the spline interpolation "
+        f"asked for (FSL-132), which changes {m['differ']:,} values by at most "
+        f"{_sci(m['max_abs'])}. The clean room is within its record's thresholds "
+        f"({_relative(ex)}), and its `fix` and `reproduce` give the same values on this call."
+    ), ["replica-fsl", "original-fsl"]
+
+
+def _shows_jac(ex: dict) -> tuple[str, list[str]]:
+    _want(
+        ex, replica_fsl="bit-identical", fix_replica="d13", original_fsl="open",
+        original1_original="bit-identical", ofix_original="d13",
+    )  # fmt: skip
+    _named(ex, "fix-replica", ["FSL-132"])
+    _named(ex, "ofix-original", ["FSL-132"])
+    m = _diff(ex, "fix-replica")["metrics"]["hifi"]
+    n = ex["metrics_note"]
+    total = re.search(r"over all ([\d,]+) voxels", n)
+    if not total or int(total.group(1).replace(",", "")) != m["differ"]:
+        raise ValueError(f"{ex['id']}: FSL-132 does not change every value")
+    return (
+        "For applytopup's Jacobian modulation, the replica gives FSL's image, every value, and "
+        f"the clean room is within its record's thresholds ({_relative(ex)}). In `fix`, their "
+        "default, both resample the image with the spline interpolation asked for (FSL-132), "
+        f"which changes all {m['differ']:,} values of the replica's image."
+    ), ["replica-fsl", "original-fsl"]
+
+
+def _shows_vb3d(ex: dict) -> tuple[str, list[str]]:
+    _want(
+        ex, replica_fsl="bit-identical", fix_replica="d13", original_fsl="open",
+        original1_original="bit-identical", ofix_original="d13",
+    )  # fmt: skip
+    _named(ex, "fix-replica", ["FSL-132", "FSL-143"])
+    _named(ex, "ofix-original", ["FSL-143"])
+    return (
+        "With vb3D, the replica gives FSL's image, every value, diverging as FSL's does, and the "
+        f"clean room's `reproduce` follows it within its record's thresholds ({_relative(ex)}). "
+        "In `fix`, their default, both give the prior its full weight (FSL-143), and the "
+        "restoration stays in the input's range; the replica's also resamples the first image "
+        "with the spline interpolation asked for (FSL-132)."
+    ), ["replica-fsl", "original-fsl"]
+
+
+#: "What this shows" of each worked example (the writing guide, section 4), from its own
+#: verdicts, reasons, metrics and tables; beside it the verdicts of the two ports against FSL.
+SHOWS = {
+    "fmriprep-ds005040": _shows_ds005040,
+    "fmriprep-ds001600": _shows_ds001600,
+    "membrane": _shows_membrane,
+    "movements": _shows_movements,
+    "lsr": _shows_lsr,
+    "jac": _shows_jac,
+    "vb3d": _shows_vb3d,
+}
+#: applytopup's examples, on its own page.
+APPLY_EXAMPLES = ("lsr", "jac", "vb3d")
+#: The case categories of topup's records, as the page names them.
+CATEGORIES = {
+    "fmriprep": "fMRIPrep's calls",
+    "opt": "options",
+    "cfg": "configuration files",
+    "debug": "--debug, --trace and --profile",
+    "thr": "thread counts",
+    "err": "errors and messages",
+    "at": "applytopup",
+}
+#: The examples' tables: each column's and row's run as the panels and comparisons name it.
+_COLUMNS = {
+    "replica (reproduce)": "replica, reproduce",
+    "replica --nthr=4": "replica, reproduce, --nthr=4",
+    "replica (default)": "replica, fix",
+    "FSL --nthr=4": "FSL topup 6.0.7.23, --nthr=4",
+    "fMRIPrep's own": "fMRIPrep's output",
+    "original (reproduce)": "clean room, reproduce",
+    "original (default)": "clean room, fix",
+    "Original − FSL": "clean room − FSL topup 6.0.7.23",
+    "FSL --nthr=4 − FSL": "FSL topup, --nthr=4 − --nthr=1",
+}
+_ROWS = {
+    "FSL 6.0.7.23": "FSL topup 6.0.7.23",
+    "replica (reproduce)": "replica, reproduce",
+    "replica (default)": "replica, fix",
+    "original (reproduce)": "clean room, reproduce",
+    "original (default)": "clean room, fix",
+}
+#: The tables' titles by the guide's pattern ({program}: the example's).
+_TITLES = {
+    "files": "Every file {program} writes, both ports against the original: FSL `{program}` "
+    "6.0.7.23{threads}",
+    "band": "FSL's own thread band, the original against itself: FSL `topup` 6.0.7.23 at "
+    "`--nthr=4` and at one thread",
+    "original-band": "The record's metrics, the clean room against the original: FSL `topup` "
+    "6.0.7.23, beside FSL's own thread band",
+    "movements": "The movements estimated, both ports against the original: FSL `topup` "
+    "6.0.7.23 (the moving volume against the first)",
+    "trial": "Random testing, the replica against the original: FSL `topup` and `applytopup` "
+    "6.0.7.23 ({cases:,} random calls, {date})",
+    "trial-original": "Random testing, the clean room against the original: FSL `topup` and "
+    "`applytopup` 6.0.7.23 ({cases:,} random calls, {date})",
+    "trial-original-triage": "The clean room's differences from the original in the run of {date}, "
+    "by category",
+    "trial-catchup": "Random testing after the catch-up, the clean room against the original: "
+    "FSL `topup` and `applytopup` 6.0.7.23 ({cases:,} random calls, {date})",
+    "trial-catchup-triage": "The clean room's differences from the original in the run of {date} "
+    "(after the catch-up), by category",
+}
+#: The clean room's sentence of each summary of the record's cases, which the summary's last
+#: words gave as "the same correction" whatever its default did on the call: said from its
+#: comparison of `fix` with `reproduce`.
+_CLEAN = (
+    " LARMORX's clean-room original runs the same call in its reproduce mode (at 14 threads and "
+    "at one) and its default mode"
+)
+
+
+def _clean_sentence(ex: dict) -> None:
+    s = ex["summary"]
+    i = s.find(_CLEAN)
+    if i < 0:
+        raise ValueError(f"{ex['id']}: the summary's sentence on the clean room is gone")
+    tail = s[i + len(_CLEAN) :]
+    head = (
+        s[:i] + " LARMORX's clean room runs the same call in `reproduce` (at 14 threads and "
+        "at one) and in `fix`, its default"
+    )
+    if ex["id"] == "movements":
+        if (
+            tail
+            != ", FSL's forward differences in the first and the exact derivatives in the second."
+        ):
+            raise ValueError(f"{ex['id']}: the summary's last words changed")
+        ex["summary"] = (
+            head + ": FSL's forward differences in the first, the exact derivatives in the second."
+        )
+        return
+    if tail != ", which makes the same correction.":
+        raise ValueError(f"{ex['id']}: the summary's last words changed")
+    fix = _diff(ex, "ofix-original")
+    if fix["verdict"] == "bit-identical":
+        said = ": on this call the two give the same values."
+    else:
+        ids, theirs = _ids(ex, "ofix-original"), _ids(ex, "fix-replica")
+        names = " and ".join(ids)
+        if ids == theirs:
+            said = f", which corrects {names} as the replica's does."
+        elif set(ids) < set(theirs):
+            said = f", which corrects {names}."
+        else:
+            raise ValueError(f"{ex['id']}: the clean room's default corrects {ids}")
+    ex["summary"] = head + said
+
+
+def present(doc: dict) -> dict:
+    """topup's page in the writing guide's words and order: texts, ports and order only."""
+    for ex in doc["examples"]:
+        if not ex["id"].startswith("fmriprep-"):
+            _clean_sentence(ex)
+    note = (doc.get("speed") or {}).get("note")
+    fsl_pages.present(
+        doc,
+        PAGE,
+        SHOWS,
+        "Seconds for the whole call (reading the images, estimating the field or restoring the "
+        "images, writing every output), one run each, on a log scale. The factor is how many "
+        "times faster the clean room is than FSL, both on one thread.",
+        {
+            "FSL 6.0.7.23, one thread (as fMRIPrep runs it)":
+                "FSL 6.0.7.23, 1 thread (as fMRIPrep runs topup)",
+            "FSL 6.0.7.23, --nthr=14": "FSL 6.0.7.23, --nthr=14",
+            "replica (one thread)": "replica, 1 thread",
+            "clean-room original, 1 thread": "clean room, 1 thread",
+            "clean-room original, 14 threads": "clean room, 14 threads",
+        },
+        categories=CATEGORIES,
+        charts=CHARTS,
+        tables={
+            "trial": TRIAL_REPLICA,
+            **{t: TRIAL_CLEAN for t in ("trial-original", "trial-original-triage",
+                                         "trial-catchup", "trial-catchup-triage")},
+        },
+        examples={x: APPLY for x in APPLY_EXAMPLES},
+        speed_page=CHARTS,
+    )  # fmt: skip
+    if doc.get("speed"):  # its build is LARMORX's at a commit, not a port's
+        doc["speed"]["note"] = present_.text(PAGE, note, port="both")
+    for ex in doc["examples"]:
+        program = "applytopup" if ex["id"] in APPLY_EXAMPLES else "topup"
+        threads = "" if program == "applytopup" else " on one thread"
+        for t in ex.get("tables") or []:
+            kind = t["id"].removeprefix(f"{ex['id']}-")
+            t["title"] = _TITLES[kind].format(program=program, threads=threads)
+            for c in t["columns"]:
+                c["label"] = _COLUMNS.get(c["label"], c["label"])
+            if kind == "movements":
+                for r in t["rows"]:
+                    r["head"] = _ROWS[r["head"]]
+    dates = {}
+    for t in doc.get("tables", []):
+        if t["id"] in ("trial", "trial-original", "trial-catchup"):  # its length, from its row
+            minutes = next(r for r in t["rows"] if r["head"].startswith("length"))["cells"][0]["v"]
+            run = "the replica" if t["id"] == "trial" else "the clean room"
+            old = f"A random-testing run of {run}"
+            i = t["note"].find(old)
+            if i != 0:
+                raise ValueError(f"{t['id']}: its note's first words changed")
+            rest = t["note"][len(old) :]
+            comma = "" if rest.startswith(" (") else ","
+            t["note"] = f"{old}, {minutes:.0f} minutes long{comma}{rest}"
+            m = re.search(r"the trial of (\d{4}-\d\d-\d\d)", t["title"])
+            if not m:
+                raise ValueError(f"{t['id']}: its title without its date")
+            dates[t["id"]] = m.group(1)
+            date = m.group(1)
+        else:  # a run's triage, after its table
+            date = dates[t["id"].removesuffix("-triage")]
+        cases = t["rows"][0]["cells"][0].get("v") if "triage" not in t["id"] else 0
+        t["title"] = _TITLES[t["id"]].format(date=date, cases=cases)
+    return doc
 
 
 if __name__ == "__main__":  # compute the cache entries only:

@@ -96,27 +96,33 @@ def present(
     charts: present_.Page | None = None,
     diffs: dict[str, tuple[str, str]] | None = None,
     tables: dict[str, present_.Page] | None = None,
+    examples: dict[str, present_.Page] | None = None,
+    speed_page: present_.Page | None = None,
 ) -> dict:
     """One FSL page: each worked example (its "What this shows" line from ``shows``), the
     agreement charts by their records' ports (``charts``: the page that names what the records
     cover, by default ``pg``), the speed chart, the cases and their categories (``categories``:
     the page's own, beside :data:`CATEGORIES`); ``diffs``: a comparison's label and role where
     its shape names the program twice ("FSL's result − its initial alignment"); ``tables``: a
-    page table's own page (a clean room's trial, where a bare "larmorx" is the clean room)."""
+    page table's own page (a clean room's trial, where a bare "larmorx" is the clean room);
+    ``examples``: a worked example's own page, where its call is of another program of the page
+    (applytopup's on topup's page); ``speed_page``: the page that names what the speed chart
+    covers, by default ``pg``."""
     for ex in doc["examples"]:
         for p in ex["panels"]:
             if p["role"] == "larmorx" and p.get("sub"):
                 p["sub"] = _CRATE.sub("(", p["sub"])
         line, verdicts = shows[ex["id"]](ex)
         mine = {k: v for k, v in (diffs or {}).items() if any(d["id"] == k for d in ex["diffs"])}
-        present_.example(pg, ex, shows=line, verdicts=verdicts, diffs=mine or None)
+        own = (examples or {}).get(ex["id"], pg)
+        present_.example(own, ex, shows=line, verdicts=verdicts, diffs=mine or None)
         for f in ex.get("facts", []):
             if f["label"] == "Original":  # the clean room's matrix against FSL's
                 f["label"] = "Clean room"
     for im in doc["implementations"]:
         present_.implementation(charts or pg, im, "standard comparison", port=PORTS[im["id"]])
     present_.speed(
-        pg,
+        speed_page or pg,
         doc.get("speed"),
         speed_caption,
         marks={"larmorx": "clean-room", "larmorx-open": "clean-room-open"},

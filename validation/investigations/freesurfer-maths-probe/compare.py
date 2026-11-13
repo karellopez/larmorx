@@ -955,6 +955,7 @@ class Runner:
         self.guard = probe.parent / "guard_malloc.so"
         self.work = scratch / "work"
         self.work.mkdir(parents=True, exist_ok=True)
+        self.save: Path | None = None
         self.cache = None
         if use_cache:
             try:
@@ -984,27 +985,27 @@ class Runner:
         return p.stdout
 
     def probe_runs(self, b: Batch, path: Path) -> tuple[list[bytes], list[bool]]:
-        """The probe's lines, and which of them depend on memory FreeSurfer does not own."""
+        """The probe's lines, and which of them depend on memory FreeSurfer does not own: those
+        whose results differ between the plain run, a second plain run in another process (the
+        stack below each call zeroed: MALLOC_PERTURB_=0, which leaves glibc's allocator as it is)
+        and the two guard runs."""
         env = dict(BASE_ENV, **b.env)
-        plain = parse(
-            self._run([str(self.probe), "batch", str(path)], env, b.never, "freesurfer-maths-probe")
-        )
-        guarded = []
+        argv = [str(self.probe), "batch", str(path)]
+        plain = parse(self._run(argv, env, b.never, "freesurfer-maths-probe"))
+        others = [
+            parse(
+                self._run(argv, dict(env, MALLOC_PERTURB_="0"), b.never, "freesurfer-maths-probe")
+            )
+        ]
         for fill in GUARDS:
             genv = dict(env, LD_PRELOAD=str(self.guard), MALLOC_PERTURB_=fill)
-            guarded.append(
-                parse(
-                    self._run(
-                        [str(self.probe), "batch", str(path)],
-                        genv,
-                        b.never,
-                        "freesurfer-maths-probe",
-                    )
-                )
-            )
-        g0, g1 = guarded
+            others.append(parse(self._run(argv, genv, b.never, "freesurfer-maths-probe")))
+        if self.save is not None:
+            self.save.mkdir(parents=True, exist_ok=True)
+            for k, lines in enumerate([plain, *others]):
+                (self.save / f"{b.name}.{k}.txt").write_bytes(b"".join(ln + b"\n" for ln in lines))
         memory = [
-            not (mask(b, plain[i]) == mask(b, g0[i]) == mask(b, g1[i])) for i in range(len(plain))
+            any(mask(b, o[i]) != mask(b, plain[i]) for o in others) for i in range(len(plain))
         ]
         return plain, memory
 
@@ -1055,6 +1056,7 @@ def main() -> int:
     ap.add_argument("--seed", type=int, default=7)
     ap.add_argument("--no-cache", action="store_true")
     ap.add_argument("--dump", type=Path, help="refs: also write each group's lines here")
+    ap.add_argument("--save", type=Path, help="refs: also write every run's lines here")
     a = ap.parse_args()
     groups = [g for g in a.groups.split(",") if g]
     unknown = [g for g in groups if g not in GROUPS]
@@ -1075,6 +1077,7 @@ def main() -> int:
     if a.probe is None:
         ap.error("--probe is needed")
     runner = Runner(a.probe.resolve(), scratch, not a.no_cache)
+    runner.save = a.save
     if a.command == "refs":
         digest: dict[str, hashlib._Hash] = {}
         counts: dict[str, Counter[str]] = {}
@@ -1084,12 +1087,14 @@ def main() -> int:
             d = digest.setdefault(b.group, hashlib.sha256())
             c = counts.setdefault(b.group, Counter())
             for ln, mem in zip(plain, memory, strict=True):
-                # a memory line's bytes may change from run to run: only its place counts
-                d.update(b"<memory>\n" if mem else mask(b, ln) + b"\n")
+                # a memory line, or one where FreeSurfer crashed, may change from run to run (a crash
+                # is often a read further outside an array): only its place counts
                 head = ln.split(b" ", 1)[0].decode()
+                unstable = mem or head == "CRASH"
+                d.update(b"<memory>\n" if unstable else mask(b, ln) + b"\n")
                 c["calls"] += 1
-                c["memory"] += mem
-                c[head] += head in ("TIMEOUT", "CRASH", "EXIT")
+                c["unstable"] += unstable
+                c[head] += head in ("TIMEOUT", "EXIT")
             if a.dump:
                 a.dump.mkdir(parents=True, exist_ok=True)
                 with (a.dump / f"{b.group}.txt").open("ab") as f:
@@ -1100,8 +1105,8 @@ def main() -> int:
         for g in groups:
             c = counts[g]
             print(
-                f"{g:10s} {c['calls']:6d} calls {c['memory']:5d} memory {c['EXIT']:4d} exit "
-                f"{c['CRASH']:4d} crash {c['TIMEOUT']:4d} timeout  {digest[g].hexdigest()}"
+                f"{g:10s} {c['calls']:6d} calls {c['unstable']:5d} memory-or-crash "
+                f"{c['EXIT']:4d} exit {c['TIMEOUT']:4d} timeout  {digest[g].hexdigest()}"
             )
         return 0
     if a.candidate is None:

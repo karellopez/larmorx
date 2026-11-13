@@ -1,5 +1,5 @@
 {
- "dossier": "2026-11-13-freesurfer-batch-9",
+ "dossier": "2026-11-13-docs-revision-step-2a",
  "edits": [
   {
    "added": null,
@@ -121,11 +121,11 @@
   }
  ],
  "evidence": {
-  "accesses": 405087,
-  "agents": 426,
+  "accesses": 412746,
+  "agents": 434,
   "archive_checksums_differ": 0,
-  "archive_checksums_matched": 631,
-  "archived_files": 631,
+  "archive_checksums_matched": 647,
+  "archived_files": 647,
   "archives": {
    "2026-11-05-session-transcripts": {
     "files": 244,
@@ -215,6 +215,10 @@
     "files": 12,
     "sha256": "6a78dea187545f6a58952ebcc818f7f811d46a86f9527ea5a4b14ce90bc19a20"
    },
+   "2026-11-13-session-transcripts-docs-revision-step-2a": {
+    "files": 38,
+    "sha256": "bc9cad857de4f02e5462f1f54a7923cc70d65de2dc78e8549c2260a741cc4a07"
+   },
    "2026-11-13-session-transcripts-freesurfer-batch-3": {
     "files": 15,
     "sha256": "73e5980ac8331c33b24749f758aeb3167982404a5b0d44e8692e1687bed9f76c"
@@ -252,30 +256,30 @@
     "sha256": "246d88c724835fe011c7d0aab2f547b65d18afed6245cba44d391d971eae2e8a"
    }
   },
-  "commits_printed": 3907,
-  "distinct_transcripts": 430,
+  "commits_printed": 4002,
+  "distinct_transcripts": 438,
   "first_record": "2026-10-09 11:38 UTC",
   "gaps": {
-   "agents_without_worktree": 322,
+   "agents_without_worktree": 330,
    "bad_lines": 0,
-   "calls_without_result": 75,
+   "calls_without_result": 77,
    "compaction_parent_missing": 9,
    "compactions": 79,
-   "refused_calls": 1693,
+   "refused_calls": 1697,
    "refused_calls_restricted_accesses": 741,
    "request_only_calls": 0,
    "results_without_call": 0,
-   "unresolved_paths": 8821
+   "unresolved_paths": 9097
   },
-  "last_record": "2026-11-13 15:30 UTC",
-  "live_files": 430,
-  "live_files_also_archived": 424,
+  "last_record": "2026-11-13 17:22 UTC",
+  "live_files": 438,
+  "live_files_also_archived": 434,
   "sessions": 4,
-  "tool_calls": 115718,
+  "tool_calls": 117844,
   "tool_calls_by_tool": [
    [
     "Agent",
-    428
+    436
    ],
    [
     "Artifact",
@@ -287,7 +291,7 @@
    ],
    [
     "Bash",
-    99744
+    101749
    ],
    [
     "CronCreate",
@@ -299,7 +303,7 @@
    ],
    [
     "Edit",
-    4502
+    4514
    ],
    [
     "EnterWorktree",
@@ -311,7 +315,7 @@
    ],
    [
     "Read",
-    2879
+    2911
    ],
    [
     "ReadNotifications",
@@ -319,7 +323,7 @@
    ],
    [
     "SendMessage",
-    143
+    149
    ],
    [
     "SendUserFile",
@@ -331,7 +335,7 @@
    ],
    [
     "SubagentHandback",
-    453
+    464
    ],
    [
     "TaskOutput",
@@ -339,11 +343,11 @@
    ],
    [
     "TaskStop",
-    309
+    314
    ],
    [
     "ToolSearch",
-    237
+    239
    ],
    [
     "WebFetch",
@@ -355,12 +359,12 @@
    ],
    [
     "Write",
-    6686
+    6731
    ]
   ],
-  "transcript_bytes": 12918612085,
-  "transcript_files": 1061,
-  "unique_paths": 82115
+  "transcript_bytes": 13201402922,
+  "transcript_files": 1085,
+  "unique_paths": 82984
  },
  "levels": [
   [
@@ -441,7 +445,7 @@
  "made_from": {
   "scan": "scan",
   "similarity_commit": "6e18b57d-dirty",
-  "verdicts_repository": "d42715de"
+  "verdicts_repository": "4fc362e4"
  },
  "overview": {
   "agents_by_role": [
@@ -451,11 +455,11 @@
    ],
    [
     "clean-room implementer",
-    94
+    95
    ],
    [
     "documentation",
-    37
+    39
    ],
    [
     "integration",
@@ -467,28 +471,28 @@
    ],
    [
     "replica author",
-    132
+    134
    ],
    [
     "spec writer",
-    29
+    32
    ]
   ],
   "attributed_by": [
    [
     "printed",
-    277
+    289
    ],
    [
     "subject",
-    23
+    24
    ]
   ],
-  "commits": 300,
+  "commits": 313,
   "commits_by_role": [
    [
     "clean-room implementer",
-    296
+    309
    ],
    [
     "integration",
@@ -499,7 +503,7 @@
     3
    ]
   ],
-  "implementers": 94,
+  "implementers": 95,
   "register_restricted_lines": 1489,
   "single_file_scopes": {
    "checked": 72,
@@ -10686,64 +10690,64 @@
     {
      "group": "the behaviour specs (specs/)",
      "run": 0,
-     "seen": 28,
+     "seen": 51,
      "written": 0
     },
     {
      "group": "the clean-room code",
-     "run": 0,
-     "seen": 293,
-     "written": 64
+     "run": 9,
+     "seen": 459,
+     "written": 117
     },
     {
      "group": "larmorx's other files (records, documents, tests, permissive ports)",
-     "run": 186,
-     "seen": 337,
-     "written": 21
+     "run": 310,
+     "seen": 561,
+     "written": 98
     },
     {
      "group": "the original programs, run or named as black boxes",
-     "run": 83,
-     "seen": 0,
+     "run": 96,
+     "seen": 1,
      "written": 0
     },
     {
      "group": "oracle outputs and inputs",
      "run": 0,
-     "seen": 34,
-     "written": 10
+     "seen": 52,
+     "written": 14
     },
     {
      "group": "the agent's own scratch notes, task outputs and memory",
-     "run": 319,
-     "seen": 166,
-     "written": 54
+     "run": 464,
+     "seen": 268,
+     "written": 76
     },
     {
      "group": "the system, the home directory, the workspace and the archive",
-     "run": 2,
-     "seen": 12,
-     "written": 0
+     "run": 10,
+     "seen": 27,
+     "written": 8
     },
     {
      "group": "restricted material (by rule and kind below)",
-     "run": 1,
-     "seen": 6,
-     "written": 3
+     "run": 15,
+     "seen": 8,
+     "written": 9
     }
    ],
    "cannot_see": {
     "compactions": 0,
-    "listings": 59,
-    "program_runs": 394,
-    "unresolved": 38,
-    "without_worktree": 3
+    "listings": 102,
+    "program_runs": 677,
+    "unresolved": 258,
+    "without_worktree": 4
    },
-   "commits": 19,
+   "commits": 32,
    "commits_by_role": [
     [
      "clean-room implementer",
-     19
+     32
     ]
    ],
    "family": "FreeSurfer",
@@ -10774,8 +10778,15 @@
     },
     {
      "agent": "a431e0382b41bdb2b",
-     "commits": 1,
+     "commits": 7,
      "description": "FreeSurfer clean room 2 relay 4 (fs.maths rest)",
+     "first": "2026-11-13",
+     "last": "2026-11-13"
+    },
+    {
+     "agent": "a95b98a0326dc825f",
+     "commits": 7,
+     "description": "FreeSurfer clean room 2 relay 5 (fs.mri)",
      "first": "2026-11-13",
      "last": "2026-11-13"
     }
@@ -10786,9 +10797,17 @@
    "restricted": [
     {
      "after": 0,
-     "agents": 1,
-     "before": 1,
+     "agents": 2,
+     "before": 7,
      "level": "names",
+     "rule": "R03",
+     "scope": "this family"
+    },
+    {
+     "after": 0,
+     "agents": 1,
+     "before": 14,
+     "level": "build",
      "rule": "R03",
      "scope": "this family"
     },
@@ -10801,9 +10820,9 @@
      "scope": "this family"
     },
     {
-     "after": 0,
-     "agents": 1,
-     "before": 2,
+     "after": 2,
+     "agents": 2,
+     "before": 4,
      "level": "names",
      "rule": "R10",
      "scope": "another family"

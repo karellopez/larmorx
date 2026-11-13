@@ -3,8 +3,8 @@
 **Closed to FreeSurfer clean-room implementers** (source-derived: it names FreeSurfer's files and
 lines; the behaviour is in `specs/freesurfer-maths.md`). Written by the replica author of queue
 items 3.1-23 and 3.1-24 (FreeSurfer's foundations, track A). Defect IDs FS-13 to FS-24 (this
-part), decided by rules A to D (CLAUDE.md, D13); the register's entries are in the orchestrator's
-handoff. Every claim below is from the source of the 8.2.0 tag and, where a number is given, from
+part 1) and FS-25 to FS-33 (part 2, items 3.1-24 and 3.1-23's inverse), decided by rules A to D (CLAUDE.md, D13); the
+register's entries are in the orchestrator's handoff. Every claim below is from the source of the 8.2.0 tag and, where a number is given, from
 the probe `validation/probes/fs-maths/` (FreeSurfer's own functions from the unit oracle's build).
 
 ## The measurement
@@ -148,3 +148,151 @@ MIN(nbins - 1, max_bin + 1)` stay 0 and 0, and the loop `while (min_bin >= max_b
   turns four `-0` products into `+0`).
 - `noteMatrixAlloced` (`matrix.cpp` 117-146) returns at line 119 (`if (1) return;`): no
   statistics, no exit handler.
+
+# Part 2 (item 3.1-24, first piece)
+
+## The measurement, part 2
+
+`check.py --seed 7 --n 62000` (2026-11-12): 62,000 cases of 62 commands, the 13 new ones
+(`MatrixMultiply` real and complex; the element-wise operations on real matrices with zeros, values
+around `1e-11`, infinities and NaNs; the same operations on complex matrices; the three region copies
+with every combination of types and given or new destinations; `MatrixRealToComplex`; rotations;
+the vector functions with `XYZ_NORMALIZED_LOAD` and `XYZApproxAngle_knownLength`; `Vector3Angle`;
+`GaussianMatrix` and `GaussianMatrix2`; `MatrixSimilarityTransform`; `MatrixPrint` and
+`MatrixPrintFmt`; `GetPrimes`, `GetPrimeFactors` and the closest factors; `PDFgaussian` after
+`srand48`). The port with `reproduce`: **61,138 of 61,138 comparable lines identical**; 862 read
+outside FreeSurfer's arrays (855 FS-22 as before, 7 region copies of a real source read as complex
+past its end, FS-27/FS-16). No angle differed in its last bit (2,000 cases through `acos`, which the
+port takes correctly rounded). The default differs on 4,035 lines, each with its defect's notice
+(FS-25 1,000, FS-15, FS-14, FS-18, FS-19, FS-20, FS-26 6, FS-27 4, FS-28 3, FS-32 16), except 14
+rotations (`sinf`/`cosf`), 3 Gaussian draws and 6 entropies (`log`), where the correctly rounded
+function moved a last bit. Seed 1, 620 cases: 607 identical, 13 not comparable; SHA-256
+`ed7e3de2...` in `tests/fs_maths_official.rs`.
+
+After main's VNL merge (2026-11-13), with `MatrixInverse`, `MatrixDeterminant` and
+`MatrixQRdecomposition` (two more commands, `minv` and `mqr`: real matrices of 1 to 7 rows, a sixth
+of them singular, so the closed forms and `vnl_qr<float>`'s inverse are both reached; invertible
+complex ones of 1 to 3 rows, whose real form of up to 6 rows goes through `vnl_qr<float>`):
+`check.py --seed 7 --n 64000`: **63,173 of 63,173 comparable lines identical** with `reproduce`
+(827 not comparable: 817 FS-22, 10 FS-16); the default differs on 4,271 lines, all with notices
+but 19 rotations, 4 Gaussian draws and 10 entropies (the correctly rounded `sinf`, `cosf`, `log`).
+Seed 1, 640 cases: 627 identical, 13 not comparable, SHA-256 `bb0da3da...`. A singular complex
+matrix crashes FreeSurfer's probe (FS-33), so the generator keeps them out.
+
+## C++'s `float` overloads (a porting trap, not a defect)
+
+`utils/matrix.cpp` is C++: `<cmath>` overloads `exp`, `sin`, `cos`, `sqrt` for `float`, so
+`GaussianMatrix`'s `exp(-(d * d) / (2 * var))` (3586, 3596; `d`, `var` floats) is `expf` and its
+`/ f` a float division, and `MatrixReallocRotation`'s `cos(angle)`, `sin(angle)` (1937-1938, `angle`
+a float) are `cosf` and `sinf`. Evaluated in double (as the C reading suggests) 6 of the first 10
+Gaussian mixtures differed in a last bit; with the `float` functions all agree. Every libm call of a
+`float` argument in FreeSurfer's C++ files is the `float` function (`sqrt` of a float too, which
+gives the same bits as the double one rounded).
+
+## NaN bits (the porting guide's rule)
+
+One `MatrixTrace` of a diagonal holding `inf`, `-inf` and a NaN gave `0xffc00000` in FreeSurfer
+and `0x7fc00000` in the first port: `inf + -inf` is SSE's default NaN (sign set), and adding the
+input's NaN then passes on the left operand's (the accumulator's) NaN, while LLVM had swapped the
+operands. The float matrices' arithmetic now follows SSE2's rules explicitly
+(`larmorx-freesurfer-core::sse`), with which all 1,000 `melt` cases agree. `histo` and `dmatrix`
+(part 1) do not use them yet: their probe had no NaN inputs (left for the item's next piece).
+
+## FS-25: real-only operations given a complex matrix (rule B; `MatrixClear` rule A)
+
+`MatrixIdentity`, `MatrixTranspose`, `MatrixAdd`, `MatrixSubtract`, `MatrixScalarMul`,
+`MatrixSquareElts`, `MatrixDiag`, `MatrixConstVal`, `MatrixReshape`, `MatrixTrace`, `MatrixSumElts`,
+`MatrixIsSymmetric`, `MatrixIsZero`, `MatrixCheck`, `MatrixNormalizeCol*`, `VectorLen`,
+`VectorDot`, `VectorDistance`, the cross and triple products and `Vector3Angle` index `rptr[r][c]`
+whatever the type (e.g. 1102, 1131, 1165, 1193), the real-element access of a complex matrix
+(part 1, FS-14): they read and write half the floats, shifted, with no message. They have no
+complex code path, so the input makes no sense to them: rule B, a clear error by default
+(`<function>: a complex matrix (the function handles real matrices only)`). `MatrixClear` (1232-1241)
+is meant for any matrix (`MatrixIdentity` and `MatrixDiag` clear with it) and clears `cols + 1`
+floats from `rptr[row]`, a complex matrix's first half-row and a little more: rule A, every float.
+FreeSurfer's complex matrices come from `MatrixRealToComplex` and `MatrixAlloc(..., MATRIX_COMPLEX)`
+(`MatrixInverse`'s complex path, `image.cpp`'s HIPS images): no program of recon-all or fMRIPrep
+passes one to these functions. Measured: the 1,000 `mcplx` cases agree with `reproduce`.
+
+## FS-26: `MatrixCopyRealRegion` copies the imaginary parts into a complex matrix (rule A)
+
+1483-1485: `case MATRIX_COMPLEX: MATRIX_CELT_IMAG(mDst, drow, dcol) = MATRIX_CELT_IMAG(mSrc, ...)`,
+the imaginary-part copy's text (1534-1536) pasted. Called that way by `MatrixInverse`'s complex path
+(225-226, the two real blocks of its 2n x 2n real form: there `mTmp` is real, so the real case is
+taken and FS-26 is not reached) and by nothing else known; default the real parts.
+
+## FS-27: the part copies read a real source as complex (rule A); the region copy between types (rule B)
+
+`MatrixCopyRealRegion` and `MatrixCopyImagRegion` read `MATRIX_CELT_REAL`/`_IMAG(mSrc, ...)`
+whatever `mSrc`'s type (1481, 1532). `dct.cpp` 139-141 (`DCTcopy`, `mri_dct_align`) passes real
+column vectors: each value is read from the next element's place, the last one past the array (heap
+memory beyond the numbers, which `posix_memalign` does not clear). The input makes sense (a real
+matrix's real part is itself): rule A. `MatrixCopyRegion` (1391-1439) copies with the destination's
+access only (`RELT` for a real one, `CELT` for a complex one): between types it reads one layout
+through the other, a request with no meaning: rule B.
+
+## FS-28: outputs filled without checking that they fit (rule B)
+
+The region copies check `rows > drows || cols > dcols` (1423, 1473, 1524) but not the destination offset: a
+region from `(dest_row, dest_col)` beyond the destination's last row or column is written into the
+next rows (inside the array) or past its end, and with no destination given only `(1, 1)` fits.
+`MatrixTranspose` (1086-1106) writes `mOut->rptr[col][row]` into a given output of any size;
+`MatrixIdentity` (1072-1084) writes `(i, i)` up to `n` into a smaller given matrix;
+`MatrixRealToComplex` (1586-1602) checks neither `mImag` nor `mOut`; `MatrixNormalizeColScale`
+(3428-3446) neither `scale`. A caller's mistake that FreeSurfer turns into silent corruption or a
+crash: rule B. Measured: 3 of the 1,000 random region cases.
+
+## FS-29: `PDFtodSeed`'s clock (nondeterminism)
+
+`pdf.cpp` 32-41: `tv_sec + tv_usec` of `gettimeofday`. `mri_vol2vol`, `mri_glmfit`, `mri_mvglmfit`,
+`mris_apply_reg`, `mri_segreg` (bbregister), `mri_gtmpvc` take it when no seed is given (their
+`SynthSeed < 0` or `seed == 0`), and `RFspecSetSeed` (randomfields.cpp 103) for a negative seed:
+no two runs agree. Nondeterminism is never reproduced by default: the fixed seed 1.
+
+## FS-30: `PDFgaussian`'s zero radius (rule A)
+
+`pdf.cpp` 49-60: the loop rejects only `r2 > 1.0`, so `r2 = 0` (both `2 drand48() - 1` exactly 0,
+i.e. two draws of exactly 0.5) gives `0 * sqrt(-2 log(0) / 0) = 0 * inf`, NaN. Marsaglia's method
+(and Numerical Recipes' `gasdev`) rejects `r2 = 0`. Possible only where the 48-bit state reaches
+`2^47` twice in a row; not met in the measured draws.
+
+## FS-31: unchecked vector lengths (rule B)
+
+`VectorCrossProduct` (2534) and `VectorTripleProduct` (2586) test `v1->rows != 3 && v1->cols != 1`
+(meant `||`): a 1- or 2-row column vector passes and `VECTOR_ELT(v, 3)` reads a row pointer beyond
+the array; `v2`, `v3` and `vdst` are never tested. `VectorDot` (2303-2312) and `VectorDistance`
+(2342-2355) loop over `v1->rows` and read `v2` as far. Rule B. (A 1 x 3 row vector is refused by the
+test, as FreeSurfer refuses it: kept.)
+
+## FS-32: the closest prime factor of 1 (rule A)
+
+`prime.cpp` 188-209 and 214-235: `GetPrimeFactors(1)` returns an empty list (`calloc(0, ...)`), and
+`dmin = abs(pfactors[0] - P)` and `fclosest = pfactors[0]` read past it; glibc's `calloc` clears the
+whole minimal chunk, so FreeSurfer gets 0 (measured in the 16 probe cases with N = 1). Reached by
+`mri_surf2surf` (1179) and `mri_vol2surf` (815-818) for a surface of one vertex, which then reshape
+by a factor of 0. 1, no reshaping, is the sensible answer: rule A.
+
+## FS-33: 0 x 0 matrices and singular complex inverses (memory errors and a crash: never reproduced)
+
+`numerics.cpp` 1091-1153 (`OpenLUMatrixInverse`): `if (r <= 4 && r == cols)` with `r == 0` falls to
+the `else` branch, `vnl_matrix_fixed<float, 4, 4> m(vnlMatrix)`, which copies 16 floats from the
+empty matrix's data (VNL's assertion compiled out), and `copy_out(oInverse->data)` writes 16 floats
+into an output with none. 1198-1219 (`OpenMatrixDeterminant`): 0 rows is not 1 to 4, so
+`vnl_determinant` runs `vnl_qr` on the empty matrix and reads its factor's `(0, 0)`. `matrix.cpp`
+240-242 (`MatrixInverse`, complex): `mInv = MatrixInverse(mTmp, NULL)` is NULL for a singular
+matrix and is copied from at once (`MatrixCopyRegion(mInv, ...)` reads `mInv->rows`): a crash. The
+memory errors depend on the heap: both modes give the empty inverse (what FreeSurfer returns unless
+that memory makes a zero determinant) and the determinant 1 (the empty product) by default, 0 with
+`reproduce`; the crash is never reproduced (nothing returned). No program is known to invert or take
+the determinant of an empty matrix.
+
+## Kept as FreeSurfer has them (rule C), part 2
+
+- `VectorDistance` returns the **squared** distance (2342-2355): its callers use it so.
+- `GaussianMatrix`'s `norm == 1` scales by the centre row's sum, not each row's (FreeSurfer's own
+  header comment before 3563 and the comment at 3581-3582 say so and add `norm == 2` for the other).
+- `MatrixDiag` clears a given output before checking its size (1372-1376): a wrong-sized output
+  comes back cleared as well as refused.
+- `MatrixPrint` flushes standard output, not its own stream (878).
+- The cross product's test refuses a 1 x 3 row vector.
+

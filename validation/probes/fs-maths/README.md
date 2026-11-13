@@ -36,10 +36,23 @@ Run (the unit oracle built):
 
 ```
 validation/probes/fs-maths/build.sh
-scripts/orchestration/boxed.sh 8 python -P validation/probes/fs-maths/check.py --seed 7 --n 47000
+scripts/orchestration/boxed.sh 8 python -P validation/probes/fs-maths/check.py --seed 7 --n 64000
 ```
 
 Measured 2026-11-12: seed 7, 49,000 cases: 48,185 of 48,185 comparable lines identical with
 `reproduce`, 815 FS-22; the default differs on 2,348 lines, all with a defect's notice but 13
 entropies (the correctly rounded `log`). Seed 1, 490 cases: 481 identical, 9 FS-22, hash
 `394127d7bcefb0a2849cdac19b2465fb05c1ace98069d89983a22fb95e224054`.
+
+Measured 2026-11-12 (item 3.1-24, first piece): seed 7, 62,000 cases of 62 commands: 61,138 of
+61,138 comparable lines identical with `reproduce`, 862 not comparable (855 FS-22, 7 FS-16); the
+default differs on 4,035 lines, all with a defect's notice but 14 rotations, 3 Gaussian draws and 6
+entropies (the correctly rounded `sinf`, `cosf`, `log`). Seed 1, 620 cases: 607 identical, 13 not
+comparable, hash `ed7e3de20c30f3c02cf8425fc20f8b5ab530fa45a21c0e22b524ee62e36a3b28`.
+
+Measured 2026-11-13 (with the inverse, determinant and QR factors): seed 7, 64,000 cases of 64
+commands: 63,173 of 63,173 comparable lines identical with `reproduce` (827 not comparable: 817
+FS-22, 10 FS-16); the default differs on 4,271 lines, all with a defect's notice but 19 rotations,
+4 Gaussian draws and 10 entropies. Seed 1, 640 cases: 627 identical, 13 not comparable, hash
+`bb0da3dafb4cc3d5a3810a49f2e624a30912bf5302523e52a0b814c4af82ef04`. Complex matrices given to
+`minv` are invertible: FreeSurfer crashes on a singular one (FS-33).

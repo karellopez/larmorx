@@ -23,7 +23,9 @@ use larmorx_freesurfer_core::dmatrix::{self, DMatrix};
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::histo::{self as h, Histogram};
 use larmorx_freesurfer_core::matrix::{self as m, MATRIX_COMPLEX, MATRIX_REAL, Matrix};
+use larmorx_freesurfer_core::matrix_ops::{self as mo, Region};
 use larmorx_freesurfer_core::ret::Ret;
+use larmorx_freesurfer_core::{pdf, prime};
 
 /// splitmix64.
 pub struct Gen(u64);
@@ -200,6 +202,67 @@ fn put_mat(s: &mut Vec<String>, g: &mut Gen, rows: i64, cols: i64, complex: bool
     }
 }
 
+/// A matrix's values of one kind (seeded integers and exact divisions only): ordinary, all zero,
+/// tiny (around MatrixIsZero's 1e-11), or with an infinity or a NaN.
+fn put_mat_kind(s: &mut Vec<String>, g: &mut Gen, rows: i64, cols: i64, complex: bool) {
+    s.push(rows.to_string());
+    s.push(cols.to_string());
+    let n = rows * cols * if complex { 2 } else { 1 };
+    let kind = g.below(10);
+    for _ in 0..n {
+        let v = match kind {
+            0 => 0.0f32,
+            1 => g.pick(&[0.0f32, 1e-12, -5e-12, 2e-11, -1e-10]),
+            2 => g.pick(&[f32::INFINITY, f32::NAN, -f32::INFINITY, 1.0, -0.0]),
+            _ => {
+                if g.below(8) == 0 {
+                    0.0
+                } else {
+                    g.f(-1000, 1000, 64)
+                }
+            }
+        };
+        s.push(fx(v));
+    }
+}
+
+/// The float index (from `data[0]`) of every float the region copies write in a `drows` x
+/// `dcols` destination of type `dt`, or `None` when the C code would not write (an error first).
+#[allow(clippy::too_many_arguments)]
+fn region_writes(
+    srows: i64,
+    scols: i64,
+    drows: i64,
+    dcols: i64,
+    dt: i64,
+    (sr, sc, rows, cols, dr, dc): (i64, i64, i64, i64, i64, i64),
+) -> Option<Vec<i64>> {
+    if dc < 1 || dr < 1 {
+        return None;
+    }
+    let (er, ec) = (sr + rows - 1, sc + cols - 1);
+    if sr < 1 || sr > srows || sc < 1 || sc > scols || er > srows || ec > scols {
+        return None;
+    }
+    if rows > drows || cols > dcols {
+        return None;
+    }
+    let mut w = Vec::new();
+    for i in 0..rows {
+        for j in 0..cols {
+            let (r, c) = (dr + i, dc + j);
+            if dt == 1 {
+                w.push((r - 1) * dcols + c - 1);
+            } else {
+                let b = 2 * (r - 1) * dcols + 2 * c - 2;
+                w.push(b);
+                w.push(b + 1);
+            }
+        }
+    }
+    Some(w)
+}
+
 const COMMANDS: &[&str] = &[
     "smooth",
     "smoothip",
@@ -250,6 +313,21 @@ const COMMANDS: &[&str] = &[
     "dmat",
     "dmmul",
     "dliststats",
+    "mmf",
+    "melt",
+    "mcplx",
+    "mregion",
+    "mr2c",
+    "mrot",
+    "mvec",
+    "v3angle",
+    "mgauss",
+    "msim",
+    "mprint",
+    "primes",
+    "pdfg",
+    "minv",
+    "mqr",
 ];
 
 /// One case line of command `cmd`.
@@ -522,6 +600,185 @@ fn case(g: &mut Gen, cmd: &str) -> String {
                 s.push(dx(base + g.d(-100, 100, 1 << 16)));
             }
         }
+        "mmf" => {
+            let (t1, t2) = g.pick(&[(1, 1), (1, 1), (1, 2), (2, 1), (2, 2)]);
+            s.push(t1.to_string());
+            s.push(t2.to_string());
+            let (r, k, c) = (g.int(1, 6), g.int(1, 6), g.int(1, 6));
+            put_mat(&mut s, g, r, k, t1 == 2);
+            put_mat(&mut s, g, k, c, t2 == 2);
+        }
+        "melt" => {
+            let (r, c) = (g.int(1, 5), g.int(1, 5));
+            let (r, c) = if g.below(3) == 0 { (r, r) } else { (r, c) };
+            put_mat_kind(&mut s, g, r, c, false);
+            put_mat(&mut s, g, r, c, false);
+            let x = g.f(-10, 10, 64);
+            s.push(fx(g.pick(&[0.0f32, 1.0, -1.0, 0.5, x])));
+            s.push(g.int(0, r.min(c)).to_string());
+            let k1 = g.int(1, 2 * r * c + 2);
+            s.push(k1.to_string());
+            s.push(g.int(1, 6).to_string());
+        }
+        "mcplx" => {
+            let (r, c) = (g.int(1, 4), g.int(1, 4));
+            put_mat(&mut s, g, r, c, true);
+            let x = g.f(-10, 10, 64);
+            s.push(fx(g.pick(&[0.0f32, 1.0, -2.0, x])));
+        }
+        "mregion" => loop {
+            let mut t = vec![cmd.to_owned()];
+            let which = g.int(0, 2);
+            let st = g.int(1, 2);
+            let (srows, scols) = (g.int(1, 5), g.int(1, 5));
+            let given = g.below(3) != 0;
+            let dt = g.int(1, 2);
+            let (drows, dcols) = (g.int(1, 6), g.int(1, 6));
+            let rows = g.int(0, srows);
+            let cols = g.int(0, scols);
+            let sr = g.int(0, srows + 1);
+            let sc = g.int(0, scols + 1);
+            let (dr, dc) = if given {
+                (g.int(0, 4), g.int(0, 4))
+            } else if g.below(10) == 0 {
+                (1, 0)
+            } else {
+                (1, 1)
+            };
+            let (gr, gc, gt) = if given {
+                (drows, dcols, dt)
+            } else {
+                (rows, cols, st)
+            };
+            let n = gr * gc * if gt == 2 { 2 } else { 1 };
+            if let Some(w) = region_writes(srows, scols, gr, gc, gt, (sr, sc, rows, cols, dr, dc))
+                && w.iter().any(|&i| i < 0 || i >= n)
+            {
+                continue;
+            }
+            t.push(which.to_string());
+            t.push(st.to_string());
+            put_mat(&mut t, g, srows, scols, st == 2);
+            t.push(i64::from(given).to_string());
+            if given {
+                t.push(dt.to_string());
+                put_mat(&mut t, g, drows, dcols, dt == 2);
+            }
+            for v in [sr, sc, rows, cols, dr, dc] {
+                t.push(v.to_string());
+            }
+            return t.join(" ");
+        },
+        "mr2c" => {
+            let (r, c) = (g.int(1, 5), g.int(1, 5));
+            put_mat(&mut s, g, r, c, false);
+            put_mat(&mut s, g, r, c, false);
+            put_mat(&mut s, g, r, c, true);
+        }
+        "mrot" => {
+            let n = g.int(3, 5);
+            s.push(n.to_string());
+            s.push(fx(g.f(-7, 7, 4096)));
+            s.push(g.int(0, 3).to_string());
+            put_mat(&mut s, g, n, n, false);
+        }
+        "mvec" => {
+            let n = g.int(3, 6);
+            put_mat(&mut s, g, n, 1, false);
+            let n2 = g.int(n, 6);
+            put_mat(&mut s, g, n2, 1, false);
+            let n3 = g.int(3, 6);
+            put_mat(&mut s, g, n3, 1, false);
+            let x = g.f(0, 2000, 64);
+            s.push(fx(g.pick(&[0.0f32, 1.0, x])));
+        }
+        "v3angle" => {
+            let n = g.int(3, 5);
+            let near = g.below(3) == 0;
+            s.push(n.to_string());
+            s.push("1".to_owned());
+            let a: Vec<f32> = (0..n).map(|_| g.f(-100, 100, 64)).collect();
+            for &v in &a {
+                s.push(fx(v));
+            }
+            s.push(n.to_string());
+            s.push("1".to_owned());
+            for &v in &a {
+                // a nearly parallel vector, or another one
+                let w = if near {
+                    v + g.f(-1, 1, 64) / 64.0
+                } else {
+                    g.f(-100, 100, 64)
+                };
+                s.push(fx(w));
+            }
+        }
+        "mgauss" => {
+            s.push(g.int(0, 12).to_string());
+            s.push(fx(g.f(0, 4, 8)));
+            s.push(fx(g.f(0, 8, 8)));
+            s.push(fx(g.f(0, 1, 16)));
+            s.push(g.int(0, 2).to_string());
+        }
+        "msim" => {
+            let (n, k) = (g.int(1, 5), g.int(1, 5));
+            put_mat(&mut s, g, n, n, false);
+            put_mat(&mut s, g, k, n, false);
+        }
+        "mprint" => {
+            let t = if g.below(4) == 0 { 2 } else { 1 };
+            s.push(t.to_string());
+            let (r, c) = (g.int(0, 4), g.int(0, 4));
+            put_mat_kind(&mut s, g, r, c, t == 2);
+            s.push(g.int(0, 8).to_string());
+        }
+        "primes" => {
+            s.push(g.int(1, 3000).to_string());
+            let n = match g.below(4) {
+                0 => g.pick(&[
+                    1, 2, 3, 4, 6, 8, 97, 1024, 163842, 40962, 10242, 65536, 99991,
+                ]),
+                1 => g.int(1, 64),
+                _ => g.int(1, 400_000),
+            };
+            s.push(n.to_string());
+            s.push(g.int(0, 120).to_string());
+        }
+        "pdfg" => {
+            s.push(g.int(-2_000_000_000, 2_000_000_000).to_string());
+            s.push(g.int(1, 12).to_string());
+        }
+        "minv" => {
+            let t = if g.below(4) == 0 { 2 } else { 1 };
+            let n = if t == 2 { g.int(1, 3) } else { g.int(1, 7) };
+            let mut m = vec![cmd.to_owned(), t.to_string()];
+            put_mat(&mut m, g, n, n, t == 2);
+            // a complex matrix must be invertible: FreeSurfer crashes on a singular one (FS-33),
+            // so no zero element and no repeated row; a real one is sometimes singular (the first
+            // row repeated)
+            if t == 2 {
+                for v in m.iter_mut().skip(4) {
+                    if v == "00000000" {
+                        *v = fx(1.0);
+                    }
+                }
+                // a diagonally dominant real part keeps [A -C; C A] well conditioned
+                for i in 0..n as usize {
+                    m[4 + 2 * (i * n as usize + i)] = fx(4096.0 + i as f32);
+                }
+            }
+            if t == 1 && g.below(6) == 0 && n > 1 {
+                let w = (if t == 2 { 2 } else { 1 } * n) as usize;
+                for j in 0..w {
+                    m[4 + w + j] = m[4 + j].clone();
+                }
+            }
+            return m.join(" ");
+        }
+        "mqr" => {
+            let (r, c) = (g.int(1, 6), g.int(1, 6));
+            put_mat(&mut s, g, r, c, false);
+        }
         _ => unreachable!("{cmd}"),
     }
     s.join(" ")
@@ -634,6 +891,17 @@ impl Out {
         for &v in &mm.store()[..n] {
             self.f(v);
         }
+    }
+    fn mn(&mut self, r: &Ret<Matrix>, given: Option<&Matrix>) {
+        match (r, given) {
+            (Ret::New(mm), _) => self.mraw(mm),
+            (Ret::Given, Some(mm)) => self.mraw(mm),
+            _ => self.0.push("NULL".to_owned()),
+        }
+    }
+    fn mt(&mut self, gl: &mut Globals, t: &mut Toks) -> Matrix {
+        let ty = t.i() as i16;
+        t.m(gl, ty)
     }
     fn dm(&mut self, d: Option<&DMatrix>) {
         match d {
@@ -1031,6 +1299,270 @@ pub fn run_line(line: &str, mode: UpstreamDefects, tmp: &Path) -> (String, Vec<&
             for x in st {
                 o.d(x);
             }
+        }
+        "mmf" => {
+            let (t1, t2) = (t.i() as i16, t.i() as i16);
+            let a = t.m(g, t1);
+            let b = t.m(g, t2);
+            let r = m::matrix_multiply(g, &mut so, &mut se, Some(&a), Some(&b), None).unwrap();
+            o.mn(&r, None);
+            if let Ret::New(mut c) = r {
+                let a2 = m::matrix_copy(g, &mut so, &mut se, Some(&a), None)
+                    .unwrap()
+                    .unwrap_new();
+                let r2 = m::matrix_multiply(g, &mut so, &mut se, Some(&a2), Some(&b), Some(&mut c))
+                    .unwrap();
+                o.mn(&r2, Some(&c));
+            } else {
+                o.0.push("NULL".to_owned());
+            }
+        }
+        "melt" => {
+            let a = t.m(g, MATRIX_REAL);
+            let b = t.m(g, MATRIX_REAL);
+            let sv = t.f();
+            let (k, k1, k2) = (t.i(), t.i(), t.i());
+            let (r, c) = (a.rows, a.cols);
+            let x = mo::matrix_transpose(g, &mut so, &mut se, &a, None).unwrap();
+            o.mn(&x, None);
+            let x = mo::matrix_add(g, &mut so, &mut se, &a, &b, None).unwrap();
+            o.mn(&x, None);
+            let x = mo::matrix_subtract(g, &mut so, &mut se, &a, &b, None).unwrap();
+            o.mn(&x, None);
+            let x = mo::matrix_scalar_mul(g, &mut so, &mut se, &a, sv, None).unwrap();
+            o.mn(&x, None);
+            let x = mo::matrix_square_elts(g, &mut so, &mut se, &a, None).unwrap();
+            o.mn(&x, None);
+            let mut cl = a.clone();
+            mo::matrix_clear(g, &mut cl);
+            o.mraw(&cl);
+            let x = mo::matrix_identity(g, &mut so, &mut se, r, None).unwrap();
+            o.mn(&x, None);
+            let mut tt = a.clone();
+            let x = mo::matrix_identity(g, &mut so, &mut se, k, Some(&mut tt)).unwrap();
+            o.mn(&x, Some(&tt));
+            let x = mo::matrix_diag(g, &mut so, &mut se, &a, None).unwrap();
+            o.mn(&x, None);
+            o.i(mo::matrix_is_symmetric(g, &mut se, &a));
+            if r == c {
+                let at = mo::matrix_transpose(g, &mut so, &mut se, &a, None)
+                    .unwrap()
+                    .unwrap_new();
+                let sym = mo::matrix_add(g, &mut so, &mut se, &a, &at, None)
+                    .unwrap()
+                    .unwrap_new();
+                o.i(mo::matrix_is_symmetric(g, &mut se, &sym));
+            }
+            o.f(mo::matrix_trace(g, &mut se, &a));
+            o.d(mo::matrix_sum_elts(g, &mut se, &a));
+            o.i(mo::matrix_is_zero(g, &mut se, &a));
+            o.i(mo::matrix_check(g, &mut se, &a));
+            let x = mo::matrix_const_val(g, &mut so, &mut se, sv, r, c, None).unwrap();
+            o.mn(&x, None);
+            let x = mo::matrix_normalize_col_scale(g, &mut so, &mut se, &a, None).unwrap();
+            o.mn(&x, None);
+            let x = mo::matrix_normalize_col(g, &mut so, &mut se, &a, None, None).unwrap();
+            o.mn(&x, None);
+            let x = mo::matrix_reshape(g, &mut so, &mut se, &a, None, c, r).unwrap();
+            o.mn(&x, None);
+            let mut d = Matrix::real(k1, k2);
+            mo::matrix_reshape(g, &mut so, &mut se, &a, Some(&mut d), 0, 0).unwrap();
+            o.mraw(&d);
+        }
+        "mcplx" => {
+            let a = t.m(g, MATRIX_COMPLEX);
+            let sv = t.f();
+            let x = mo::matrix_transpose(g, &mut so, &mut se, &a, None).unwrap();
+            o.mn(&x, None);
+            let x = mo::matrix_add(g, &mut so, &mut se, &a, &a, None).unwrap();
+            o.mn(&x, None);
+            let x = mo::matrix_scalar_mul(g, &mut so, &mut se, &a, sv, None).unwrap();
+            o.mn(&x, None);
+            let x = mo::matrix_square_elts(g, &mut so, &mut se, &a, None).unwrap();
+            o.mn(&x, None);
+            let mut cl = a.clone();
+            mo::matrix_clear(g, &mut cl);
+            o.mraw(&cl);
+            o.f(mo::matrix_trace(g, &mut se, &a));
+            o.d(mo::matrix_sum_elts(g, &mut se, &a));
+            o.i(mo::matrix_is_zero(g, &mut se, &a));
+            let x = mo::matrix_diag(g, &mut so, &mut se, &a, None).unwrap();
+            o.mn(&x, None);
+            let mut cp = m::matrix_copy(g, &mut so, &mut se, Some(&a), None)
+                .unwrap()
+                .unwrap_new();
+            let x = mo::matrix_const_val(g, &mut so, &mut se, sv, 0, 0, Some(&mut cp)).unwrap();
+            o.mn(&x, Some(&cp));
+        }
+        "mregion" => {
+            let which = match t.i() {
+                0 => Region::All,
+                1 => Region::Real,
+                _ => Region::Imag,
+            };
+            let src = o.mt(g, &mut t);
+            let given = t.i() != 0;
+            let mut dst = if given { Some(o.mt(g, &mut t)) } else { None };
+            let v: Vec<i32> = (0..6).map(|_| t.i()).collect();
+            let r = mo::matrix_copy_region(
+                g,
+                &mut so,
+                &mut se,
+                which,
+                &src,
+                dst.as_mut(),
+                v[0],
+                v[1],
+                v[2],
+                v[3],
+                v[4],
+                v[5],
+            )
+            .unwrap();
+            o.mn(&r, dst.as_ref());
+            if let Some(d) = &dst {
+                o.mraw(d);
+            }
+        }
+        "mr2c" => {
+            let a = t.m(g, MATRIX_REAL);
+            let b = t.m(g, MATRIX_REAL);
+            let mut c = t.m(g, MATRIX_COMPLEX);
+            let x = mo::matrix_real_to_complex(g, &mut so, &mut se, &a, &b, None).unwrap();
+            o.mn(&x, None);
+            let x = mo::matrix_real_to_complex(g, &mut so, &mut se, &a, &b, Some(&mut c)).unwrap();
+            o.mn(&x, Some(&c));
+        }
+        "mrot" => {
+            let n = t.i();
+            let angle = t.f();
+            let which = t.i();
+            let x = mo::matrix_alloc_rotation(g, &mut so, &mut se, n, angle, which).unwrap();
+            o.mn(&x, None);
+            let mut mm = t.m(g, MATRIX_REAL);
+            let x =
+                mo::matrix_realloc_rotation(g, &mut so, &mut se, n, angle, which, Some(&mut mm))
+                    .unwrap();
+            o.mn(&x, Some(&mm));
+        }
+        "mvec" => {
+            let v1 = t.m(g, MATRIX_REAL);
+            let v2 = t.m(g, MATRIX_REAL);
+            let v3 = t.m(g, MATRIX_REAL);
+            let norm = t.f();
+            o.f(mo::vector_len(g, &mut se, &v1));
+            o.f(mo::vector_dot(g, &mut se, &v1, &v2));
+            o.f(mo::vector_distance(g, &mut se, &v1, &v2));
+            let x = mo::vector_cross_product(g, &mut so, &mut se, &v1, &v2, None).unwrap();
+            o.mn(&x, None);
+            o.f(mo::vector_triple_product(g, &mut se, &v1, &v2, &v3));
+            let (xyz, len) = mo::xyz_normalized_load(v1.relt(1, 1), v1.relt(2, 1), v1.relt(3, 1));
+            o.f(xyz.x);
+            o.f(xyz.y);
+            o.f(xyz.z);
+            o.f(len);
+            o.f(mo::xyz_approx_angle_known_length(
+                &xyz,
+                v2.relt(1, 1),
+                v2.relt(2, 1),
+                v2.relt(3, 1),
+                norm,
+            ));
+        }
+        "v3angle" => {
+            let v1 = t.m(g, MATRIX_REAL);
+            let v2 = t.m(g, MATRIX_REAL);
+            o.d(mo::vector3_angle(g, &mut se, &v1, &v2));
+        }
+        "mgauss" => {
+            let len = t.i();
+            let (s1, s2, w1) = (t.f(), t.f(), t.f());
+            let norm = t.i();
+            let x = mo::gaussian_matrix(g, &mut so, &mut se, len, s1, norm, None).unwrap();
+            o.mn(&x, None);
+            let x = mo::gaussian_matrix2(g, &mut so, &mut se, len, s1, s2, w1, norm, None).unwrap();
+            o.mn(&x, None);
+        }
+        "msim" => {
+            let a = t.m(g, MATRIX_REAL);
+            let b = t.m(g, MATRIX_REAL);
+            let x = mo::matrix_similarity_transform(g, &mut so, &mut se, &a, &b, None).unwrap();
+            o.mn(&x, None);
+        }
+        "mprint" => {
+            let a = o.mt(g, &mut t);
+            let prec = t.i();
+            let mut f = Vec::new();
+            o.i(mo::matrix_print(
+                g,
+                Some(&mut f),
+                &mut so,
+                &mut se,
+                Some(&a),
+                prec,
+            ));
+            o.i(mo::matrix_print_fmt(
+                g,
+                Some(&mut f),
+                &mut so,
+                &mut se,
+                "%10f",
+                Some(&a),
+            ));
+            let _ = std::fs::write(tmp, &f);
+            o.file(tmp);
+            let _ = std::fs::remove_file(tmp);
+        }
+        "primes" => {
+            let (nmax, n, p) = (t.i(), t.i(), t.i());
+            let pr = prime::get_primes(&mut so, nmax).unwrap();
+            o.i(pr.len() as i32);
+            o.0.push(pr.iter().map(|&x| i64::from(x)).sum::<i64>().to_string());
+            if let Some(&last) = pr.last() {
+                o.i(last);
+            }
+            let f = prime::get_prime_factors(&mut so, n).unwrap();
+            o.i(f.len() as i32);
+            for &x in &f {
+                o.i(x);
+            }
+            o.i(prime::get_closest_prime_factor(g, &mut so, n, p, false).unwrap());
+            o.i(prime::get_closest_prime_factor(g, &mut so, n, p, true).unwrap());
+        }
+        "pdfg" => {
+            let seed = t.i();
+            let k = t.i();
+            g.drand48.srand48(i64::from(seed));
+            for _ in 0..k {
+                o.d(pdf::pdf_gaussian(g));
+            }
+        }
+        "minv" => {
+            let a = o.mt(g, &mut t);
+            let x = mo::matrix_inverse(g, &mut so, &mut se, Some(&a), None).unwrap();
+            o.mn(&x, None);
+            let mut out = m::matrix_alloc(g, &mut so, &mut se, a.rows, a.cols, a.mtype)
+                .unwrap()
+                .unwrap();
+            let r = mo::matrix_inverse(g, &mut so, &mut se, Some(&a), Some(&mut out)).unwrap();
+            o.0.push(if r.is_null() { "NULL" } else { "OK" }.to_owned());
+            o.mraw(&out);
+            o.f(mo::matrix_determinant(g, &mut se, &a));
+        }
+        "mqr" => {
+            let a = t.m(g, MATRIX_REAL);
+            let mut q = Matrix::real(a.rows, a.rows);
+            let mut r = Matrix::real(a.rows, a.cols);
+            o.i(mo::matrix_qr_decomposition(
+                g,
+                &mut so,
+                &mut se,
+                Some(&a),
+                Some(&mut q),
+                Some(&mut r),
+            ));
+            o.mraw(&q);
+            o.mraw(&r);
         }
         _ => panic!("unknown case {cmd}"),
     }

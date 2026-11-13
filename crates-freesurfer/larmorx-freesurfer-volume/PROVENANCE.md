@@ -132,3 +132,17 @@ No third-party code in these lines (the audit of `docs/freesurfer/third-party.md
   (2643-2708), `MRIreverseSlices` (2748-2799), `MRIcutEndSlices` (2801-2838), `MRIsegIdListNot0`, `MRIsegIdList`
   (2873-2928), `MRIhalfCosBias` (3077-3100); operand orders from the official build's object `mri2.cpp.o` (the unit
   oracle's `libutils.a`). Changes: FS-480, FS-481, rule A.
+- `src/vol2vol.rs` (3.1-37; relay 21): `utils/mri2.cpp` `MRIvol2Vol` (877-1051), `MRIvol2VolTLKernel` (1233-1302),
+  `MRImaskAndUpsample` (1304-1344), `MRIvol2VolDelta` (2580-2641), `MRIvol2VolVSM` (3102-3266); `utils/transform.cpp`
+  `TransformRegDat2LTA` (4417-4452, 3.1-40 taken early); operand orders from the official `mri2.cpp.o`. Changes:
+  FS-482 (0 for a shift never written, both modes); cubic B-splines and `LTAchangeType` port errors until ported.
+- `src/pca.rs` (3.1-37; relay 21): `utils/mri2.cpp` `MRIfdr2vwth` (1402-1574), `MRIcovarianceMatrix` (1576-1641),
+  `MRIpca` (1643-1744), `PrintPCAStats`, `WritePCAStats` (1746-1779); `utils/sig.cpp` `fdr2vwth`, `doublecompar`
+  (53-110). Changes: FS-483 (rule A), FS-484 (an error); `log10` glibc's in both modes.
+- `src/region.rs` (3.1-38; relay 21): `utils/region.cpp` `REGIONalloc` (49-57), `REGIONclear`, `REGIONcopy` (116-133),
+  `REGIONgetBoundingBoxM` (299-334), `REGIONgetBoundingBox` (344-379), `REGIONgetBoundingBoxEqOdd` (387-492),
+  `REGIONprint` (495-499); `FZERO`'s 1e-5 of this file.
+- `src/mrivoxel.rs` (3.1-38; relay 21): `utils/mrivoxel.cpp` `MRIvoxelDx`, `MRIvoxelDy`, `MRIvoxelDz` (55-148),
+  `MRIvoxelMean` (174-205), `MRIvoxelDirection` (316-384), `MRIvoxelGradientDir2ndDerivative` (393-433); operand
+  orders from `mrivoxel.cpp.o`. Changes: FS-485 (the window not cut by default), FS-486 (0 for a sample never
+  written, both modes).

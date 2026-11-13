@@ -1275,3 +1275,161 @@ volumes, a given border volume with neighbour labels in its later frames), `rand
 (section 39). Expected: identical with `reproduce` but where FreeSurfer reads or writes memory it does not own or
 crashes (FS-53, FS-58, FS-163, FS-290, FS-469, FS-470, FS-471, FS-473, FS-475, FS-479), counted and not compared;
 the default differs only with a notice (GLIBC-07 for `powf` and `cos`).
+
+## 41. Volume-to-volume resampling (3.1-37, piece d, part 2)
+- The target voxel `(ct, rt, st)` maps to the source point `M (ct, rt, st, 1)`, `M` the target-to-source
+  voxel matrix (single precision). In `MRIvol2Vol` and `MRIvol2VolTLKernel` each coordinate is
+  `((m1 ct + m2 rt) + m3 st) + m4` with every product and sum rounded to `float`; for NaN operands the
+  official build's order matters: `MRIvol2Vol` sums rows 1 and 2 as `(p1 + p2) + p3` and row 3 as `p3 + (p2 +
+  p1)`; `MRIvol2VolTLKernel` sums rows 1 and 3 as `(p1 + p2) + p3` and row 2 as `p3 + (p1 + p2)` (each `+ m4`
+  last, the first operand's NaN kept when both are NaN). `MRIvol2VolVSM` multiplies `M` by the column `(ct,
+  rt, st, 1)` (`MatrixMultiply`'s single-precision accumulation). `M` absent: the inverse of the source's scanner
+  voxel-to-RAS matrix times the target's (a singular source geometry ends the program: `MatrixMultiply(): m1 is
+  null`).
+- A coordinate's nearest voxel is `nint` of it (`MRIvol2Vol` uses `nint2`, which rounds `x + 0.49999999` for `x
+  >= 0`, when the source is one voxel thick in some direction); outside the source the target voxel is left as it
+  was. `MRIvol2Vol` tests the column first, then computes and tests the row, then the slice; `MRIvol2VolVSM`
+  rounds all three before testing.
+- `MRIvol2Vol(src, targ, M, interp, param)`: frame counts must agree (`ERROR: MRIvol2vol: source and target have
+  different number of frames`, 1). With `Gdiag_no > 0`: `MRIvol2Vol: Vt2s Matrix (<1 if computed>)` and the
+  matrix (`% 2.5f`). Methods: `SAMPLE_NEAREST` (0: the nearest voxel's frames, `MRIgetVoxVal`), `SAMPLE_TRILINEAR`
+  (1: `MRIsampleSeqVolume` of every frame at once into one value vector), `SAMPLE_SINC` (2: `MRIsincSampleVolume`
+  with half-width `nint(param)`, frame 0's sample for every frame), `SAMPLE_CUBIC_BSPLINE` (5: needs the B-spline
+  module, not yet ported: an error); another prints `ERROR: MRIvol2vol: interpolation method <m> unknown` and ends
+  the program with status 1 at the first target voxel that maps inside. The values go into the target with
+  `MRIsetVoxVal`; the value vector keeps its contents from voxel to voxel (zeros at first), so frames a sampler
+  did not write repeat the previous voxel's. Returns 0.
+- `MRIvol2VolTLKernel(src, targ, M)`: for each target voxel that maps inside, the eight trilinear weights of its
+  source point (`MRItrilinKernel`, section 27) go into the target's frames 0 to 7 (as `float`; a target with fewer
+  frames writes past them: memory). Returns `NULL` always (an 8-frame `float` work volume with the target's header
+  is made and discarded).
+- `MRIvol2VolVSM(src, targ, M, interp, param, vsm, vsmlta, pedir)`: as `MRIvol2Vol` (messages `ERROR:
+  MRIvol2volVSM(): source and target have different number of frames`, `ERROR: MRIvol2volVSM: interpolation
+  method <m> unknown`; with `DIAG_VERBOSE` first `Using MRIvol2VolVSM` and `MRIvol2VolVSM interp=<i>,
+  param=<%g>, pedir=<p>`), with a voxel-shift map: with `vsm` given, `|pedir|` must be 1, 2 or 3 (`ERROR:
+  MRIvol2volVSM: pedir=<p>, must be +/-1, +/-2, +/-3`, exit 1). At each target voxel that maps inside: `cvsm =
+  floor(c)`, `rvsm = floor(r)` (single precision) must satisfy `0 <= cvsm`, `cvsm + 1 < width`, the same for rows
+  (the source's extent); the shift map's frame-0 values at `(cvsm, rvsm)`, `(cvsm+1, rvsm)`, `(cvsm, rvsm+1)`,
+  `(cvsm+1, rvsm+1)` on the voxel's slice must each have magnitude at least `FLT_MIN` (1.17549435e-38), else the
+  voxel is skipped; the shift is `MRIsampleSeqVolume` of the map's frame 0 at the point (kept in one `float` across
+  voxels: a map type the sampler refuses leaves the previous value, and at the first such voxel a value never
+  written: FS-482, both modes 0, noted); a shift of 0 skips the voxel; else `coordinate[|pedir|] += shift * (pedir
+  < 0 ? -1 : 1)` (single precision), then with `vsmlta` the point is mapped by its voxel-to-voxel matrix
+  (`MatrixMultiplyD`; a transform of another type is converted with `LTAchangeType`, section of 3.1-39, not yet
+  ported: an error), and the nearest voxel is tested again (column, row, slice in turn). Then sampled as
+  `MRIvol2Vol`. Returns 0.
+- `MRIvol2VolDelta(mov, targ, R)`: a new 3-frame `float` volume of the target's extent with its header
+  (`MRIcopyHeader`); `R` absent: `MRItkRegMtx(targ, mov)`. With `T` the target's tkregister voxel-to-RAS matrix and
+  `T2 = R T` (single-precision products), each voxel's frames are `(T x - T2 x)` component by component (`x = (ct,
+  rt, st, 1)`, products by `MatrixMultiply`, the difference in `float`).
+- `TransformRegDat2LTA(targ, mov, R)`: a one-transform LTA of type `LINEAR_VOX_TO_VOX` (0), both its type fields 0,
+  source geometry the target's, destination the moving volume's (`getVolGeom`), matrix `(inv(Tmov) R) Ttarg`
+  (`MatrixMultiply` twice); `R` absent: the identity with the scanner voxel-to-RAS matrices, given: with the
+  tkregister ones.
+- `MRImaskAndUpsample(src, mask, factor, npad, conserve, &lta)`: the bounding box (`REGIONgetBoundingBox`,
+  section 43) of the mask, or of the source when there is none, padded by `npad`; with `Gdiag_no > 0`, `
+  mask-and-upsample bounding box <%g of (float) w h d / (dx dy dz)> ` and the box (`REGIONprint`); the box cut out
+  of the source (`MRIextractRegion`; its failure gives `NULL`); with a factor above 1 upsampled
+  (`MRIupsampleNConserve` with `conserve`, else `MRIupsampleN`); `lta = TransformRegDat2LTA(src, result, NULL)`.
+
+## 42. Frame covariance, PCA and the false discovery rate (3.1-37, piece d, part 3)
+- `MRIcovarianceMatrix(mri, mask)`: with a mask, its voxel count is the number of frame-0 values above 0.5
+  (FS-483: the sums take the voxels not below 0.5; by default the count does too, noted where they differ); 0
+  prints `ERROR: no voxels in mask` and gives `NULL`. Without, the count is `width * height * depth`. The frames x
+  frames single-precision matrix: for `f1 <= f2`, the `double` sum over the voxels (columns outermost, then rows,
+  slices; with a mask only those not below 0.5) of `v2 * v1` (`MRIgetVoxVal` of frames `f2` and `f1` widened to
+  `double`; the product added as `product + sum`), divided by the count, stored as `float` at `(f1, f2)` and `(f2,
+  f1)`.
+- `MRIpca(D, &U, &S, &V, mask)`: the covariance (its `NULL` gives 1, nothing else set); a volume without frames
+  crashes in the decomposition (FS-484: an error in both modes). `U` = a copy of it decomposed by `MatrixSVD` (the
+  copy becomes `U`, the singular values into a row vector `S2` of the frame count). For `c = 1 .. min(voxels,
+  frames)`: `S2[c] *= count` (single precision, the count as `float`), `S[c] = sqrtf(S2[c])`, stop after the first
+  `S2[c] < FLT_EPSILON` (1.1920929e-7); the kept dimensions `k` are those before the stop (at least 1). `S` has the
+  frame count's entries (0 beyond). `W[f][c] = U[f][c] / sqrtf(S2[c])` (single precision) for `c <= k`. `V` is a
+  new `float` volume with `k` frames and `D`'s header: at each voxel (with a mask, not below 0.5) the row of its
+  frames times `W` (`MatrixMultiply`) into `V`'s frames, each squared in `float` and added in `double` to its
+  frame's sum (`square + sum`); then every such voxel of frame `f` divided by `sqrt(sum_f)` (`double`). Returns 0.
+- `PrintPCAStats(fp, S)`: for `n` from 1: `%3d   %8.2f %9.2f   %6.2f  %6.2f ` and a newline, of `n`, `v = S[n]^2`
+  (`float`), the running sum (`double`, `sum + v`), `100 v / total` and `100 sum / total` (`total` the sum of all
+  `v`, `total + v`). `WritePCAStats(fname, S)`: the same into the file, opened for writing and never closed (its
+  lines reach the file when the program ends); an open failure prints `ERROR: opening <fname>` and gives 1; else 0.
+- `fdr2vwth(p, n, fdr)`: `p` sorted ascending by the C library's `qsort` with a comparator returning -1 for `a <
+  b`, 0 for `a == b`, else +1 (a NaN is greater than everything, itself included); the last `p[i]` (from the end)
+  with `p[i] < (fdr / n) (i + 1)`, else `0.9 p[0]`.
+- `MRIfdr2vwth(vols, n, frames, fdr, sign, log10flag, masks, &vwth, outs, debug)`: each input must have the frame
+  (`ERROR: MRIfdr2vwth: frame = <f>, must be < nframes = <n>`), be `float` (`... input volume is not of type
+  MRI_FLOAT`); an output must be `float` (`... output volume is not of type MRI_FLOAT`) of the input's extent (`...
+  output/input dimension mismatch`), a mask of the input's extent (`... mask/input dimension mismatch`); each gives
+  1. The values: every voxel of each input's frame (read directly as `float`, widened) inside its mask (not below
+  0.5) whose sign fits (`sign` -1: not above 0; +1: not below 0; else any), as `|v|` or with `log10flag` `pow(10,
+  -|v|)` (glibc's `pow` with `reproduce`, correctly rounded by default: GLIBC-07). None: `ERROR: MRIfdr2vwth: no
+  matching voxels found`, 1. `vwth = fdr2vwth(values)`; with `debug`, `MRIfdr2vwth: np = <np>, nv = <total voxels>
+  sign=<s>` before and `MRIfdr2vwth: vwth = <%lf>, log10(vwhth) = <%lf of -log10(vwth)>` after. Each output's frame
+  0 (written directly) gets the input's frame value where it passes (mask, sign, value not above `vwth`), else 1 (0
+  with `log10flag`). With `log10flag` the returned `vwth` is `-log10` of the threshold (`log10`: glibc 2.35's,
+  section 44). Returns 0.
+
+## 43. Regions (3.1-38: region.cpp)
+- `REGIONalloc` zeros; `REGIONclear` sets every field to 0; `REGIONcopy` copies; `REGIONprint`: `x y z  dx dy dz`
+  and a newline (two spaces in the middle).
+- `REGIONgetBoundingBox(mask, npad)`: the extremes of the columns, rows and slices of the frame-0 voxels whose
+  magnitude is not below `1e-5` (the comparison in `double`; a NaN counts; with none, minimum 1000000 and maximum
+  0); start `max(min - npad, 0)`, size `min(max - min + 2 npad, extent - start)` (32-bit integers).
+  `REGIONgetBoundingBoxM(mask, npad[6])`: the same with pads `npad[0]`, `npad[1]` before and after the columns,
+  `[2]`, `[3]` the rows, `[4]`, `[5]` the slices.
+- `REGIONgetBoundingBoxEqOdd(mask, npad)`: the box, printed as `Volume size: <w> <h> <d>, OrigRegion: ` and the box;
+  `dx > height`: `ERROR: REGIONgetBoundingBoxEqOdd(): dx is bigger than MRI height`, `dy > width`: `... dy is bigger
+  than MRI width` (`NULL`). `dx == dy` with `dz` odd: the box. An even `dz` (C's `%`) grows by one when `dz <
+  depth`, else starts one slice earlier (`z > 0`) and grows by one, else `ERROR: REGIONgetBoundingBoxEqOdd(): cannot
+  make z odd: z=<z>, dz=<dz>, nz=<d>` (`NULL`). Equal sides: the box. Else with `dxy = max(dx, dy)`: if `x + dxy <=
+  width` and `y + dxy <= height` both sides become `dxy`; else `delta = |dx - dy|`, `delta1 = delta / 2`, `delta2 =
+  delta - delta1`: the smaller side (say x) starts `delta1` earlier and grows by `delta` when `x - delta1 > 0` and
+  `x + dx + delta2 <= width`; else it takes the larger side's size, at 0 when `x` is below the room after the box
+  (`width - (x + dx)`), else ending at the edge, printed as `Volume size: <w> <h> <d>, xAsymRegion: ` (or
+  `yAsymRegion`) and the box.
+
+## 44. Voxel neighbourhood measures (3.1-38: mrivoxel.cpp) and `log10`
+- Coordinates go through the volume's index tables (each coordinate clamped to the extent; more than the tables'
+  margin outside is memory FreeSurfer does not own: an error). Values are frame 0's `MRIgetVoxVal`.
+- `MRIvoxelDx(x, y, z)`: with `x' = xi[x]`, `xm = xi[x'-1]`, `xp = xi[x'+1]`, `y' = yi[y]`, `ym`, `yp`, `z' = zi[z]`:
+  `left = e2 + (2 f + e1)` with `f = v(xm, y', z')`, `e1 = v(xm, ym, z')`, `e2 = v(xm, yp, z')` (`2 f` as `f + f`;
+  single precision, the operands in that order for NaNs), `right` the same at `xp`; `(right - left) * 0.125`.
+  `MRIvoxelDy`: `top` with `f = v(xm, ym)`, `e1 = v(x', ym)`, `e2 = v(xp, ym)` (the previous column weighted twice,
+  as FreeSurfer writes it), `bottom` the same on row `yp`; `(bottom - top) * 0.125`. `MRIvoxelDz`: the same on
+  slices `zm`, `zp` of row `y'`.
+- `MRIvoxelMean(x0, y0, z0, wsize, frame)`: the `float` mean (`v + total`, then `/ count`) of the frame's voxels in
+  the cube `[c - wsize/2, c + wsize/2]` cut to the volume (`MRIgetVoxVal`); 0 for an empty cube.
+- `MRIvoxelDirection(x0, y0, z0, wsize)`: `wsize > 7`: the error `MRIvoxelDirection: window size <w> too big`, 0.
+  With `h = wsize / 2`: the gradients (`Dx`, `Dy`, `Dz`) of the cube's voxels in order (slices, rows, columns), and
+  `g0` the voxel's own; the sum (`dir + term`) over the cube's offsets `(x, y, z)` in `[-h, h]` (same order) of `t1 *
+  t2` with `t1 = x g0x + y g0y + z g0z`, `t2 = gx g0x + gy g0y + gz g0z` (single precision), times `1 / 27000`. The
+  official build's operand orders per element of a row (a row of four or more: the first four as `t1 = (y g0y + x
+  g0x) + z g0z`, `t2 = (gx g0x + gy g0y) + gz g0z`, `t1 * t2`; then the fifth `t2 * t1` with `t1 = (x g0x + y g0y) +
+  z g0z`; the sixth `t1 * (gz g0z + (gx g0x + gy g0y))`; the seventh as the first four; a row of three or fewer
+  takes the fifth, sixth, seventh patterns), each product's NaN its first factor's. FS-485: within `h` of the
+  volume's last column, row or slice FreeSurfer stops the window there but reads a full cube (offsets paired with
+  other voxels' gradients, the last entries never written); by default the window is not cut (the index tables
+  clamp it), noted in both modes.
+- `MRIvoxelGradientDir2ndDerivative(x0, y0, z0, wsize)`: `g0`, `len = sqrtf((gx^2 + gy^2) + gz^2)`; below `1e-5`
+  the result is 0; `u = g0 / len`; `d2 = (float)((wsize - 1) * v0)` (`v0` the voxel's `MRIsampleVolume`, in
+  `double`); for `d = 1, 2, .. <= wsize / 2` (`float`): `d2 = (float)(d2 - sample(p0 + d u))`, then the same at `p0 -
+  d u` (each point coordinate `c0 + u d` or `c0 - u d` in `float`); `d2 / (float)wsize`. A sample the sampler does
+  not write (a type it refuses) is the previous one; before any, FS-486 (0 in both modes, noted).
+- `FZERO`'s threshold differs by source file: `1e-5` in `region.cpp` and `mrivoxel.cpp`, `FLT_EPSILON`
+  (1.1920929e-7) in `mri2.cpp` (measured from the official object code).
+- `log10` (glibc 2.35 on x86-64, `MRIfdr2vwth`): `n = ilogb(x)` adjusted to `k + (k < 0)` with the mantissa scaled
+  into [1, 2) (or [0.5, 1) for negative exponents), `z = n log10_2lo + ivln10 ln(m)` then `z + n log10_2hi`
+  (`ivln10 = 0x3FDBCB7B1526E50E`, `log10_2hi = 0x3FD34413509F6000`, `log10_2lo = 0x3D59FEF311F12B36`, each
+  operation one IEEE double operation, `ln` glibc's own natural logarithm); `x <= 0`: `-inf` for a zero, the
+  positive quiet NaN `0x7ff8000000000000` for a negative number or `-inf`; a NaN: itself quieted. larmorx has no
+  correctly rounded `log10`: both modes use these bits.
+
+## 45. Validation plan (sections 41 to 44)
+The probe's commands `vv`, `vvsm`, `vvk`, `vvd`, `maskup` (section 41), `cov`, `mpca`, `pcast`, `fdr` (section 42),
+`rgbb` (section 43), `vxn` (section 44): generated volumes of every type (some without voxels or frames), 4 x 4
+matrices (voxel-to-voxel-like, or anything, or absent), voxel-shift maps and transforms, masks with values 0, 0.5, 1,
+p-value and -log10 volumes with given, absent or in-place outputs, PCA statistics written to standard output or a
+file (or a path that cannot be opened), points inside, near the faces and outside. Expected: identical with
+`reproduce` but where FreeSurfer reads or writes memory it does not own or crashes (FS-53, FS-58, FS-290, FS-323,
+FS-482, FS-484, FS-485, FS-486, and the decompositions that never return: FS-47, FS-48), counted and not compared;
+the default differs only with a notice (FS-483, FS-485, GLIBC-07 for `pow`).

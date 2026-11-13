@@ -148,3 +148,15 @@ different only with notices (GLIBC-07 for `powf` and `cos`). Seed 1, 3,020 cases
 builds agree on 47,000 cases in both modes. `check.py`'s `SKIP` adds FS-469, FS-470, FS-471, FS-473, FS-475 and
 FS-479. `diffv` seeds the generator before `CTABalloc` (its random colours otherwise print `<program> supposed to be
 reproducible but seed not set`).
+
+Measured 2026-11-14 (part 11, relay 21: 3.1-37 piece d's rest and 3.1-38's first files: `vv`, `vvsm`, `vvk`, `vvd`,
+`maskup`, `cov`, `mpca`, `pcast`, `fdr`, `rgbb`, `vxn`; 162 commands; logs `oracles/logs/fs-found-c-r21-*.log`): the
+resampling commands at seeds 7 and 13, 2,000 cases each: 1,976 and 1,957 identical with `reproduce`, 0 different;
+the PCA and FDR commands seed 7, 1,000 cases: 934 identical, 0 different; seed 13, 3,000 cases: 2,829 identical, 0
+different (after FS-484); the regions and voxel measures with `maskup`, seeds 7 and 13, 3,000 cases each: 2,277 and
+2,262 identical, 0 different (after `FZERO`'s 1e-5 threshold in `region.cpp` and `mrivoxel.cpp`, which a complex
+volume's 5.4e-7 voxel showed); `fix` different only with notices. Seed 1, 3,240 cases: 2,992 identical, 248 not
+comparable, hash `f38160d248ccc2da57ad5e1109d8b8e978231de8a9466a4c1693df2b08ee243c`, passing with AArch64's NaN
+emulated in debug and release (`oracles/logs/fs-found-c-r21-trap-volume.log`); the port's debug and release builds
+agree on 11,000 cases of the new commands in both modes. `check.py`'s `SKIP` adds FS-482, FS-484, FS-485, FS-486.
+`pcast` calls `fflush(NULL)` after `WritePCAStats` (the file it leaves open reaches the disk at the program's end).

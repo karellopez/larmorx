@@ -14,6 +14,7 @@ programs' bits and every crate shares one translation (decision log, "glibc's ex
 | `atanf_glibc`, `atan2f_glibc` | `__atanf`, `__ieee754_atan2f` (one build) | fdlibm, Sun's notice |
 | `tanhf_glibc`, `expm1f_glibc` (2026-11-13) | `__tanhf`, `__expm1f` (one build) | fdlibm, Sun's notice (`s_tanhf.c` `dacb3c557d21…`, `s_expm1f.c` `b3b864ad6abe…`) |
 | `acosf_glibc` (2026-11-13) | `acosf@@GLIBC_2.2.5`: `__ieee754_acosf` behind glibc's SVID wrapper (one build) | fdlibm, Sun's notice (`e_acosf.c` `60a8c9b2d144…`); the wrapper's NaN for `\|x\| > 1` (`0x7fc00000`) measured, its code (LGPL) not translated |
+| `log10_glibc` (2026-11-14) | `log10@@GLIBC_2.2.5`: `__ieee754_log10` over the FMA build's `__ieee754_log`, behind glibc's SVID wrapper (one build) | fdlibm, Sun's notice (`e_log10.c` `55570c500ba6…`); the wrapper's results for `x <= 0` (`-inf`, `0x7ff8000000000000`) measured, its code (LGPL) not translated |
 
 The default everywhere stays correctly rounded (`larmorx_core::math::sinf`, ...); these are for
 `reproduce` and the replicas. glibc's LGPL functions (the double `sin`, `cos`, `tan`, `asin`,
@@ -30,7 +31,7 @@ current symbol versions: `logf@@GLIBC_2.27`, `exp@@GLIBC_2.29`, ...), and compar
   `logf`, `expf`, `atanf`, `tanhf`, `expm1f`, `acosf`, against glibc; `sinf_glibc`, `cosf_glibc` and their SSE2 builds
   against the AFNI replicas' translation (before it became a re-export); and counts where glibc's
   two builds differ.
-- `verify pairs`, `verify double`: `powf`, `atan2f`, `exp`, `log`, `pow` on the seeded families
+- `verify pairs`, `verify double`: `powf`, `atan2f`, `exp`, `log`, `log10`, `pow` on the seeded families
   of `verifier/src/samples.rs` (the ranges the tools meet: BET's exponents, TFCE's powers, FAST's
   energies, rotation angles, probabilities, image intensities, the overflow and underflow limits,
   subnormals, tiny and huge exponents, random bit patterns; more than 10^9 arguments per
@@ -57,6 +58,7 @@ re-exports (`4d223de`); afterwards both sides are the same function.
 | `copy-2026-11-04.txt` | `glibc-float-verify copy` at `4d223de`: 44 checks against the FSL replica core | 0 differ |
 | `sse2-2026-11-04.json` | `sse2` (glibc's SSE2 builds forced) | 0 differ; the builds differ on 34 inputs (12 `sinf`, 22 `cosf`) |
 | `result-float-2026-11-13.json` | `verify float` at larmorx `d4862a00` (with `tanhf`, `expm1f`, `acosf`, and the AFNI replica's `tanhf` and `expm1f`; 6 threads): 18 checks, 77,309,411,328 comparisons | 0 differ; 71.0 s |
+| `result-double-2026-11-14.json` | `verify double` with `log10` (built at larmorx `75d3251b`'s parent with the new function, 6 threads): 30 checks, 5,905,610,830 comparisons | 0 differ; 21.4 s |
 
 Per function (identical of compared; NaN results identical of NaN results):
 
@@ -71,6 +73,7 @@ Per function (identical of compared; NaN results identical of NaN results):
 | `atan2f_glibc` | 1,342,177,280 sampled + 30,276 special pairs | the same |
 | `exp_glibc`, `log_glibc` | 1,610,612,736 sampled + 174 special each | the same |
 | `pow_glibc` | 1,073,741,824 sampled + 30,276 special pairs | the same |
+| `log10_glibc` | 1,610,612,736 sampled + 174 special | – (new, 2026-11-14) |
 
 The replicas' outputs did not move: after the switch to re-exports, the FSL replicas' unit tests
 and golden test (`crates-nc`, `cargo test --workspace`) and the AFNI replicas' unit tests and

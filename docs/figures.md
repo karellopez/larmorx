@@ -198,6 +198,16 @@ with itself (thread counts, builds, versions) carry no verdict: they are the yar
    figures from `static/figures/<tool>/`. Export, build (0 problems), run the number check, and
    look at every component: desktop and phone, light and dark, several slices and compare modes.
 
+**In the writing guide's words and layout** (the documentation revision, 2026-11-13): the evidence
+page is now `content/evidence/<tool>.md` (an older page's `content/tools/<tool>.md` stays as a
+redirect), laid out as `bet`'s, and the module's `present()` (`evidence/present.py`; the model
+`evidence/ants_n4.py`) gives every text the words of [the writing guide](writing-guide.md): its
+four words (§1), each figure titled by what it compares ("what against what: program, version",
+§4), the original, the replica and the clean room side by side in each worked example with its
+"What this shows" line and its verdict, the colours of §5. The program's reference page comes
+from its API page's reference block (`python -m larmorx_validation reference`;
+[porting-guide.md](porting-guide.md) §11).
+
 ## The part-1 figures (no page uses them since part 2b)
 
 `python -m larmorx_validation figures <tool>|all --out <site>/static/figures` draws a tool's

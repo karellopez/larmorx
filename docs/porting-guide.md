@@ -680,5 +680,16 @@ Mandatory for every tool (PLAN.md §4, rule 7). Copy the models.
 | 14 | Random testing: a difftest descriptor (option grammar, input generators, implementations, exact checks) and a short trial night (`difftest --tools <tool> --budget 0.5`, boxed) before the gates; every difference triaged in `validation/difftest/triage.toml` (2026-10-25) | `validation/src/larmorx_validation/difftest/tools/` | [validation/difftest.md](validation/difftest.md) |
 | 15 | Memory: the tool's peak memory on a mid-size call at most the original's (plus the interpreter's few MiB), a case in `tests/parity/test_memory_peak.py` (user, 2026-10-25) | `tests/parity/test_memory_peak.py` | `validation/investigations/difftest/memory_pair.py` |
 
+**The API page and the site's pages** (the documentation revision, 2026-11-13): a new tool's API
+page (item 5) and its pages on the documentation site (item 13) are written in the words and the
+layout of [the writing guide](writing-guide.md): its four words (original, port, replica, clean
+room) and its tone (§1, §2); on the API page one section per program, opened by its reference block
+(`<!-- reference ... -->`), with the Python call, the options table, examples the tests run and
+the ports, from which `python -m larmorx_validation reference` writes the program's reference page
+and checks the table against the code (`validation/src/larmorx_validation/reference/apipage.py`
+says how the page is written; [api/afni-automask.md](api/afni-automask.md) is the model); and the
+evidence page, whose texts the tool's evidence module gives through `present()` in the guide's
+words ([figures.md](figures.md), "Add a tool").
+
 How the code is laid out, and how to add an ImageMath group or a replica:
 [architecture.md](architecture.md).

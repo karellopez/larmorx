@@ -110,6 +110,18 @@ nothing in it.
   the workspace's folder or its parent's, an agent's worktree or scratch folder, the account's or
   the machine's name (read from the machine, never written here). Step 1's merge check (relay 27,
   after `figures.cache.machine_paths` and the eight pages exported again: 0; the site before, 42).
+- `merge_inventory.py`: the judgement of step 1's inventory against the published site (relay 28).
+  `site_inventory.py` marks a page NO when a shown number's pointer changed, which also happens when
+  a number only moved (a table's rows reordered, a list's entries shifted by a new one, the default
+  view showing another comparison of the same value). `shown <before> <after>` compares every page's
+  shown numbers as a multiset of texts (what is shown fewer times after); `anchors <before> <after>`
+  checks that every anchor of every old page now a redirect lands on its new page; `json <before>
+  <after>` compares one evidence file with its lists matched by identity, or by their numbers for
+  rows without one (every number and field gone, by path; texts counted). Step 1's result: no page
+  shows a number less but the three records made again (3dTshift's replica, antsRegistration with
+  its thread band measured again, antsAI) and Validation's summary of them; 7,325 anchors of the 29
+  old pages, all landing; the 28 evidence files lose no number or field but those (the old `groups`
+  are the presenter's `order.groups`, every comparison kept).
 - `panel_runs_check.py <site>`: every fMRIPrep run an evidence page names in its data panel's
   cases and worked examples is one of the panel's fourteen (`fmriprep_nodes.PANEL_RUNS`); run it
   after every export, beside `summary_check.py`. Since relay 15 `fmriprep_nodes` reads only

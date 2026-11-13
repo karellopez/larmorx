@@ -444,3 +444,113 @@ first). The probe reads them into locals first.
   `gethostname`, and a NULL `strtok` result for an empty or all-dots host name).
 - **The probe's artefact** (not FreeSurfer's): an empty `std::vector`'s `data()` is NULL, which
   `MRISsetRegistrationSigmas` reads as "reset to the defaults"; the probe allocates one more place.
+
+## 12. Queue items 3.1-51 and 3.1-52: the metric properties' three computations (relay 10)
+
+`MRIScomputeMetricProperties(MRIS*)` (`mrisurf_metricProperties.cpp` 1844-1881) reads three
+environment variables at every call (no script of 8.2.0 sets any): `FS_FASTER_MP` sends the call to
+`MRIScomputeMetricPropertiesFaster` (`mrisurf_metricProperties_faster.cpp`) and returns before the
+call counter; otherwise `useOld = FREESURFER_OLD_...` and `useNew = FREESURFER_NEW_... || !useOld`.
+The default (`useNew` alone) frees the distances (`MRISfreeDistsButNotOrig`), loads an `MRIS_MP`
+(`MRISMP_load(&mp, mris)`, no outputs), computes on it (`MRIScomputeMetricProperties(MRIS_MP*)`,
+`_fast.h` 1154) and unloads (`MRISMP_unload(mris, &mp, false)`). `useOld` alone runs
+`MRIScomputeMetricPropertiesWkr` (`_slow.h` 711) on the surface; both set: both run and the unload
+only compares (`check` true). `MRISMP_copy` and `MRISMP_load`'s `loadOutputs`/`dx` arguments have
+one caller, `MRIScomputeSSE_asThoughGradientApplied` (`mrisurf_deform.cpp` 993-1031), which sets
+`useNewBehaviour = false;` unconditionally: never reached in 8.2.0 (ported, not probed).
+
+- **The unload never writes the faces' angles back (FS-120).** `MRISMP_unload`'s face loop handles
+  `orig_area`, `orig_angle` and the normal as special cases (`ELTX`) and copies `MRIS_MP__LIST_F_OUT`
+  by `ELT` only: of that list only `area` is an `ELT` (`normSet`, `norm`, `angle` are `ELTX`), so
+  `face->angle` keeps its old value (observed: the probe's dump after `mp` shows the case's angles;
+  `MRISMP_copy` does copy `f_angle`, "not so special"; the check mode compares no angle either).
+  Readers of `face->angle` after a default computation: `mrisComputeAngleAreaTerms`-type SSE terms
+  (`mrisurf_sseTerms.cpp` 2457, the templated 2890), `mrisurf_compute_dxyz.cpp` 572-587,
+  `MRISwriteTriangleProperties` (`mrisurf_io.cpp` 266), `geodesics.cpp` 76, `mris_errors`. With every
+  computation leaving the angles stale, `MRISstoreMetricProperties` copies them into `orig_angle`, so
+  `deltaAngle(angle, orig_angle)` is 0 unless something else (the old or faster computation,
+  `MRIScomputeTriangleProperties` called directly, a triangle file) set them: the angle terms of
+  `mris_sphere` and `mris_register` see no change. Rule A (FreeSurfer's two other computations set
+  the angles; the omission is a slip of the generated lists); measuring its effect on the sphere and
+  the registration belongs to their ports (rule D's evidence). `reproduce` leaves the angles.
+- **What the copy never writes (FS-121).** `MRISMP_load` `malloc`s the `V_OUT` and `F_OUT` arrays
+  and fills them only with `loadOutputs`. (1) `v_nx/ny/nz` are written by `MRISMP_computeNormals` only
+  when a vertex's normal is found (`!count || mrisNormalize(snorm) > 0`); a vertex still pending
+  after the fifth trial (NaN or infinite coordinates; or degenerate faces with coordinates so large
+  that 0.001 moves round away) keeps the malloc's contents, which the unload copies into
+  `v->nx..nz` (and `mrismp_OrientPlane` reads `v_nz`). The old computation leaves such a vertex's
+  normal unchanged. (2) `mrismp_OrientPlane` sums `f_area` over all of a vertex's faces, ripped ones
+  too, but `MRISMP_computeTriangleProperties` never writes a ripped face's `f_area`: memory contents
+  in a plane's vertex area (observed: the official output changes from run to run, e.g. `4453a748`
+  then `c1f5912d` for one area; in the check mode it prints `no:3  v->area  30.661219 !=
+  25927592685962668213346764849152.000000`). The port starts the copy's normals and face areas as the
+  surface's (what the old computation reads), in both modes, with the notice; the probe counts these
+  cases, never compares them.
+- **The comparison lines (FS-122).** `comparisonWkr` compares with `lhs == rhs`; the unload always
+  runs `comparison(-1, 1, mris->N==mp->N)` for `MRIS_MP__LIST_MRIS_IN` and `comparison(vno, v->N,
+  mp->v_N[vno])` for `MRIS_MP__LIST_V_IN` (`ripflag`, `whitex..z`, `pialx..z`, `wnx..z`), even when not
+  checking: a NaN there prints `no:<vno>  v->whitex  nan != nan  during
+  count_MRIScomputeMetricProperties_calls:<n>` (up to 11 per part, the part's counter reset for the
+  vertices and the faces) and, once per process, `b <...>/utils/mrisurf_metricProperties_fast.h:335
+  needed`; a NaN radius prints `no:-1  1  1.000000 != 0.000000`. The expression text is the macro
+  argument as written (`#LHS`), so `cmpAnglesPerTriangle(f->orig_angle,mp->f_orig_angle[fno])`,
+  `fNorm->orig_area`, `mris_dist[n]`. Rule A: equal bit patterns are equal; `reproduce` prints.
+- **The faster calculator (FS-123, FS-124, FS-125).** `new float[n]` leaves `face_areas`,
+  `face_normals`, `face_angles` of ripped faces as memory contents (the face loop `continue`s), and
+  the vertex loop sums every face of the vertex (no ripflag test), as `orientPlane`'s vertex loop
+  does: memory contents in the vertex areas and normals next to a ripped face; `computeDimensions`
+  reads `vertices[0..2]` of a surface with no vertex (`new float[0]`). The port fills 0 (the same
+  sums as skipping) and gives an empty surface the default box, in both modes, with FS-123's notice.
+  A vertex whose normal has no length is marked by `vertex_areas[vno] = -1`; after the fifth trial
+  the loop ends without recomputing, so `transfer` writes area -1 and, for `origarea < 0`,
+  `abs(-1)` (the `<cmath>` float `abs`: `andps` in the object) = 1, and the normal of no length
+  (rule C, FS-124: an opt-in route; no value is right for a normal that cannot be computed).
+  `reduction(+:total_area)` is OpenMP's own reduction (not ROMP's): the per-thread partial sums are
+  combined in completion order, so the total's last bits depend on the threads (FS-125, never
+  reproduced; the port gives the one-thread sum, faces in order). A vertex whose own face list lacks
+  it reads `angles[3]` (the next face's first angle; past the array for the last face) with
+  `FS_WEIGHTS_NORMS_BY_ANGLE`: the probe never generates such a list with the weights.
+- **Reproducible sums.** The ROMP loops (`romp_for_begin.h`, `ROMP_Distributor_begin/end`,
+  `romp_support.cpp` 459-501) sum each of at most 128 ranges from 0 and add the ranges' sums in order
+  to the variable's start (`sum = sum + partial`, the accumulator first, as the object shows):
+  `MRIScomputeTriangleProperties`' total area (both instances), `MRIScomputeAvgInterVertexDist`'s
+  three sums (both, and the faster calculator's), the ellipsoid's and the faster plane's three area
+  sums. The other parallel loops are independent per face or vertex (the retry list is sorted with
+  `qsort`/`int_compare` of distinct vertex numbers: ascending), so one thread's results are every
+  thread count's.
+- **Operand orders read from the unit oracle's objects** (`mrisurf_metricProperties.cpp.o`,
+  `mrisurf_metricProperties_faster.cpp.o`; `objdump -dr -C`):
+  - `x *= -1.0f` is a sign flip (`xorps`) everywhere (face area, normal, angles, a plane's `nz`): a
+    NaN's sign flips and it stays signalling. `neg_area += -area` is `neg_area - area` (`subss`); the
+    faster `neg_area -= area` likewise.
+  - The term comes first (`term + partial`) in the ROMP sums of the total area (triangle
+    properties, both orientations, both instances, the faster face loop's OpenMP sum), the negative
+    area and its original area (ellipsoid, faster plane and ellipsoid); `Sum2 += d*d` is `d*d +
+    Sum2`, `Sum += d` and `N += 1` keep the accumulator first. The float sums of the plane
+    orientation: `total = area + total`, `neg = neg - area`, `neg_orig = neg_orig + orig`; a
+    vertex's area and normal sums keep the accumulator first, but the faster weighted sum is
+    `fn*angle + acc` (the third product `angle*fn`).
+  - `mrisFaceAreaNormal`/`mrismp_setFaceAreaNormal`/`mrisNormalFace`/`mrisTriangleArea`'s
+    `-v12[1]*v20[2] + v20[1]*v12[2]` is `v20[1]*v12[2] - v12[1]*v20[2]` (no negation; likewise the
+    third component), the second component as written.
+  - `MRIScomputeTriangleProperties_extracted.h`: `V3_CROSS_PRODUCT`'s first product is `b.z*a.y`;
+    `V3_LEN` of the area `sqrt(z² + (x² + y²))`, of `V3_NORMALIZE` `sqrt((y² + x²) + z²)`; the
+    normalize's third product `n.z*s` in `MRIScomputeTriangleProperties` and `s*n.z` in
+    `MRISMP_computeTriangleProperties` (the only difference of the two instances); `V3_DOT(a, b)`
+    `a.z*b.z + (a.x*b.x + a.y*b.y)`; `VectorTripleProduct` out of line (fs.core's order).
+  - `MRISMP_computeVertexDistancesWkr`'s plane formula stores `sqrt(zd² + (yd² + xd²))`, as the
+    `MRIS` worker (relay 7); the sphere's formula calls `XYZApproxAngle_knownLength` out of line.
+  - The faster calculator: the face normal `a x b` with the second component's second product `b2*a0`
+    (also in the angles' `b x a`), its length `(x² + y²) + z²`; the corner's `vec_dot(c, fnorm)`
+    `c2n2 + (c1n1 + c0n0)` and `vec_dot(a, b)` `(b1a1 + a0b0) + b2a2`; a vertex normal's length and the
+    straight-line distance `z² + (x² + y²)`; `moveVertexRandomly`'s hash `f*(2r) - r` (the same
+    value as `(HI-LO)*f + LO`) added as `random + pos`; `area /= 2.0` is `area * 0.5`.
+- **Callers ported with the computation**: `MRISsmoothSurface`'s last step, `mrisDisturbVertices`,
+  `MRISrecenter`, `MRISscaleBrainArea`, `MRISscaleVertexCoordinates`, `MRISscaleBrain` (its
+  `cheapAssert(mris_src == mris_dst)`: one surface in the port).
+- **Not ported here**: `mrisSampleMinimizationEnergy`, `mrisSampleNormalEnergy`,
+  `mrisSampleSpringEnergy`, `mrisSampleParallelEnergy(AtVertex)` and `MRISsampleFaceCoordsCanonical`
+  (`_slow.h` 734-1008: the surface hash `MHT` and `MRISsampleFaceCoords`, fs.surf); the rest of
+  3.1-51's lines (`mrisurf_metricProperties.cpp` 9465-13617: gradients' averaging, second
+  fundamental forms, curvature uses, radii, `MRISbinarizeVolume`, orientation marks, the surface
+  checks, smoothing kernels, `MRISclone`, the statistics prints): later relays.

@@ -774,7 +774,9 @@ void posn_case()
 // their face-normal cache), the environment's switches of MRIScomputeMetricProperties, then 1 to
 // 4 of its operations (MRIScomputeMetricProperties, MRIScomputeTriangleProperties,
 // MRIScomputeNormals, MRIScomputeAvgInterVertexDist, MRISupdateEllipsoidSurface,
-// mrisOrientSurface, mrisOrientPlane, mrisComputeSurfaceDimensions), then its state.
+// mrisOrientSurface, mrisOrientPlane, mrisComputeSurfaceDimensions, and the callers
+// MRISsmoothSurface, mrisDisturbVertices, MRISrecenter, MRISscaleBrainArea,
+// MRISscaleVertexCoordinates, MRISscaleBrain), then its state.
 void dump_mprop(MRIS *m)
 {
   for (int vno = 0; vno < m->nvertices; vno++) {
@@ -830,6 +832,7 @@ void mprop_case()
   if (envs & 8) setenv("FS_WEIGHTS_NORMS_BY_ANGLE", "1", 1);
   if (envs & 16) setenv("FREESURFER_fastApproxAtan2f_use_atanf2", "1", 1);
   if (envs & 32) setenv("FREESURFER_reportLogicErrors", "1", 1);
+  if (envs & 64) setenv("FREESURFER_SEED", "1234", 1);
   if (geti()) Gdiag |= DIAG_SHOW | DIAG_VERBOSE;
   UnitizeNormalFace = geti();
   MRISsetFixVertexAreaValue(geti());
@@ -908,6 +911,12 @@ void mprop_case()
     else if (op == "os") oi(mrisOrientSurface(m));
     else if (op == "op") oi(mrisOrientPlane(m));
     else if (op == "sd") oi(mrisComputeSurfaceDimensions(m));
+    else if (op == "ss") { int n = geti(); float st = getf(); MRISsmoothSurface(m, n, st); }
+    else if (op == "dv") mrisDisturbVertices(m, getd());
+    else if (op == "rc") { int mv = geti(); int tg = geti(); MRISrecenter(m, mv, tg); }
+    else if (op == "sb") oi(MRISscaleBrainArea(m));
+    else if (op == "sv") oi(MRISscaleVertexCoordinates(m, getd()));
+    else if (op == "sB") MRISscaleBrain(m, m, getf());
     else fail("mprop op");
   }
   out += "| ";

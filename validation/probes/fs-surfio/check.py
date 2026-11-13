@@ -10,7 +10,8 @@ oracle's build, linked as the official programs are; ``metric``'s cases through 
 whose ``MRIScomputeMetricProperties`` is a stub) by the oracle-output cache at one thread, runs
 the port on the same cases with ``--upstream-defects`` ``reproduce`` and ``fix``, and compares the
 lines (the result and the text FreeSurfer's code printed): ``reproduce`` must give FreeSurfer's on
-every case (``SKIP`` lists the defects whose cases are counted, not compared: none); ``fix`` may
+every case (``SKIP`` lists the defects whose cases are counted, not compared: FreeSurfer reads
+memory it never wrote, FS-121, FS-123, FS-06); ``fix`` may
 differ only where a defect it corrects changed the result (its notices), or where the default's
 correctly rounded ``sinf``/``cosf`` replace glibc's (a ``surf`` case that rotates, ``Z``) or its
 correctly rounded ``atan2f`` (a ``posn`` case that computes the canonical coordinates' angles,
@@ -18,7 +19,7 @@ correctly rounded ``atan2f`` (a ``posn`` case that computes the canonical coordi
 ``larmorx_core::math::Libm``'s quiet choice; counted as ``fix_libm``. Prints the counts and the hash the port's recorded test
 checks (``tests/fs_surfio_official.rs``).
 
-    python -P validation/probes/fs-surfio/check.py --seed 1 --n 720 [--json out.json]
+    python -P validation/probes/fs-surfio/check.py --seed 1 --n 870 [--json out.json]
 """
 
 from __future__ import annotations
@@ -40,7 +41,10 @@ sys.path.insert(0, str(REPO / "validation" / "src"))
 from larmorx_validation import oracle_cache  # noqa: E402
 from larmorx_validation.oracle_cache.store import workspace  # noqa: E402
 
-SKIP: tuple[str, ...] = ()
+# FreeSurfer reads memory it never wrote or does not own in these cases (the metric properties'
+# copy's unwritten normals and areas, FS-121; the faster computation's ripped faces and empty box,
+# FS-123; the table arctangent of a NaN, FS-06): counted, never compared
+SKIP: tuple[str, ...] = ("FS-121", "FS-123", "FS-06")
 SKIP_WHEN_REFUSED: tuple[str, ...] = ("FS-114",)
 
 

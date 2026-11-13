@@ -88,6 +88,34 @@ pub(super) fn mprop_tokens(t: &mut Vec<String>, g: &mut Gen) {
         envs |= 32;
     }
     let weights = envs & 8 != 0;
+    // the operations first: a random move needs the seed (bit 64)
+    let nops = g.int(1, 4);
+    let ops = [
+        "mp", "mp", "mp", "mp", "tp", "cn", "ad", "an", "ue", "os", "op", "sd", "ss", "dv", "rc",
+        "sb", "sv", "sB",
+    ];
+    let mut opt: Vec<String> = Vec::new();
+    for _ in 0..nops {
+        let op = g.pick(&ops);
+        opt.push(op.to_owned());
+        match op {
+            "ss" => {
+                ix(&mut opt, g.int(0, 3));
+                opt.push(format!("{:08x}", g.pick(&[0.5f32, 0.25, 1.0, 1.5, -0.5]).to_bits()));
+            }
+            "dv" => {
+                envs |= 64;
+                opt.push(format!("{:016x}", g.pick(&[0.001f64, 0.5, 2.0]).to_bits()));
+            }
+            "rc" => {
+                ix(&mut opt, g.pick(&[2, 8, 9, 7, 2]));
+                ix(&mut opt, if g.chance(8) { 2 } else { 3 });
+            }
+            "sv" => opt.push(format!("{:016x}", g.pick(&[1.5f64, 0.5, -1.0, 1.0]).to_bits())),
+            "sB" => opt.push(format!("{:08x}", g.pick(&[1.5f32, 0.5, 2.0, 1.0]).to_bits())),
+            _ => {}
+        }
+    }
     ix(t, envs);
     ix(t, i64::from(g.chance(6)));
     ix(t, g.pick(&[1, 1, 1, 0]));
@@ -218,12 +246,8 @@ pub(super) fn mprop_tokens(t: &mut Vec<String>, g: &mut Gen) {
         floats(t, g, 4, heavy);
         ix(t, g.pick(&[0, 0, 0, 1, 2, 3]));
     }
-    let nops = g.int(1, 4);
     ix(t, nops);
-    let ops = ["mp", "mp", "mp", "mp", "tp", "cn", "ad", "an", "ue", "os", "op", "sd"];
-    for _ in 0..nops {
-        t.push(g.pick(&ops).to_owned());
-    }
+    t.extend(opt);
 }
 
 fn dump_mprop(m: &Mris, o: &mut Out) {
@@ -295,12 +319,17 @@ pub(super) fn mprop_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), 
         "FREESURFER_fastApproxAtan2f_use_atanf2",
         "FREESURFER_reportLogicErrors",
     ];
+    let seed = envs & 64 != 0;
     let pairs: Vec<(&str, &str)> = names
         .iter()
         .enumerate()
         .filter(|(k, _)| envs & (1 << k) != 0)
         .map(|(_, n)| (*n, "1"))
         .collect();
+    let mut pairs = pairs;
+    if seed {
+        pairs.push(("FREESURFER_SEED", "1234"));
+    }
     let env = Environment::from_pairs(pairs);
     if t.i() != 0 {
         cx.g.gdiag |= DIAG_SHOW | DIAG_VERBOSE;
@@ -425,6 +454,27 @@ pub(super) fn mprop_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), 
             "os" => o.i(i64::from(mp_slow::orient_surface(sg, &mut m))),
             "op" => o.i(i64::from(mp_slow::orient_plane(sg, &mut m))),
             "sd" => o.i(i64::from(coords::compute_surface_dimensions(&mut m))),
+            "ss" => {
+                let (n, st) = (t.i(), t.f());
+                mp::smooth_surface(g, sg, &mut io, &mut m, n, st)?;
+            }
+            "dv" => {
+                let a = t.d();
+                mp::disturb_vertices(g, sg, &mut io, &mut m, a)?;
+            }
+            "rc" => {
+                let (mv, tg) = (t.i(), t.i());
+                mp::recenter(g, sg, &mut io, &mut m, mv, tg)?;
+            }
+            "sb" => o.i(i64::from(mp::scale_brain_area(g, sg, &mut io, &mut m)?)),
+            "sv" => {
+                let s = t.d();
+                o.i(i64::from(mp::scale_vertex_coordinates(g, &mut m, s)));
+            }
+            "sB" => {
+                let s = t.f();
+                mp::scale_brain(&mut m, s);
+            }
             op => panic!("mprop op {op}"),
         }
     }

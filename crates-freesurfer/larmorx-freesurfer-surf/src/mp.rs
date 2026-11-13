@@ -1672,3 +1672,148 @@ pub fn compute_metric_properties(
     mp_dtr(&mut mp);
     Ok(0)
 }
+
+// ---- the callers that compute the metric properties (3.1-49's and 3.1-51's lines) -------------
+
+/// `MRISsmoothSurface(mris, niter, step)`: [`crate::metric::smooth_surface_positions`], then the
+/// metric properties ([`compute_metric_properties`]).
+pub fn smooth_surface(
+    g: &mut Globals,
+    sg: &mut SurfGlobals,
+    io: &mut Io,
+    mris: &mut Mris,
+    niter: i32,
+    step: f32,
+) -> Result<(), Fatal> {
+    crate::metric::smooth_surface_positions(g, io, mris, niter, step)?;
+    compute_metric_properties(g, sg, io, mris)?;
+    Ok(())
+}
+
+/// `mrisDisturbVertices(mris, amount)`: the distances freed; each vertex's x, then y, moved by
+/// `randomNumber(-amount, amount)` (in double, rounded to `float`); the metric properties.
+pub fn disturb_vertices(
+    g: &mut Globals,
+    sg: &mut SurfGlobals,
+    io: &mut Io,
+    mris: &mut Mris,
+    amount: f64,
+) -> Result<(), Fatal> {
+    dist::free_dists_but_not_orig(mris);
+    for vno in 0..usz(mris.nvertices) {
+        for k in 0..2 {
+            let r = larmorx_freesurfer_core::random::random_number(
+                g, io.env, io.out, io.err, -amount, amount,
+            )?;
+            let v = mris.vertex_mut(vno);
+            let c = if k == 0 { &mut v.x } else { &mut v.y };
+            *c = add64(f64::from(*c), r) as f32;
+        }
+    }
+    compute_metric_properties(g, sg, io, mris)?;
+    Ok(())
+}
+
+/// `MRISrecenter(mris, which_move, which_target)`: the metric properties; the radius
+/// `sqrt(total_area / 4 pi)`; the `which_move` coordinates saved and the `which_target` ones
+/// restored into the current ones; `MRIScenterSphere`; `rescaling canonical coordinates to use
+/// r=<radius %2.1f>`; each unripped vertex's current coordinates scaled to the radius by its
+/// `which_target` coordinates' length (`radius (x / r)` in double); the mean of `target - move`
+/// over the unripped vertices added to their canonical coordinates (a target other than the
+/// canonical coordinates: `ErrorExit(ERROR_UNSUPPORTED, "MRISrecenter: movable vertices
+/// <which_move> not supported")` at the first unripped vertex); the `which_move` coordinates
+/// restored; the metric properties.
+pub fn recenter(
+    g: &mut Globals,
+    sg: &mut SurfGlobals,
+    io: &mut Io,
+    mris: &mut Mris,
+    which_move: i32,
+    which_target: i32,
+) -> Result<(), Fatal> {
+    use crate::views::{CANONICAL_VERTICES, vertex_coord2xyz_double};
+    compute_metric_properties(g, sg, io, mris)?;
+    let radius = sqrt64(div64(
+        f64::from(mris.total_area),
+        4.0 * std::f64::consts::PI,
+    ));
+    crate::positions::save_vertex_positions(g, io, mris, which_move)?;
+    crate::positions::restore_vertex_positions(g, io, mris, which_target)?;
+    crate::metric::center_sphere(g, io, mris)?;
+    let _ = writeln!(
+        io.out,
+        "rescaling canonical coordinates to use r={}",
+        fmt_f(radius, 2, 1)
+    );
+    for vno in 0..usz(mris.nvertices) {
+        if mris.vertex(vno).ripflag != 0 {
+            continue;
+        }
+        let (xt, yt, zt) = vertex_coord2xyz_double(g, io.err, mris.vertex(vno), which_target)?;
+        let r = sqrt64(add64(add64(mul64(xt, xt), mul64(yt, yt)), mul64(zt, zt)));
+        let v = mris.vertex_mut(vno);
+        v.x = mul64(radius, div64(f64::from(v.x), r)) as f32;
+        v.y = mul64(radius, div64(f64::from(v.y), r)) as f32;
+        v.z = mul64(radius, div64(f64::from(v.z), r)) as f32;
+    }
+    let (mut tx, mut ty, mut tz) = (0.0f64, 0.0f64, 0.0f64);
+    let mut n = 0i32;
+    for vno in 0..usz(mris.nvertices) {
+        if mris.vertex(vno).ripflag != 0 {
+            continue;
+        }
+        let (xm, ym, zm) = vertex_coord2xyz_double(g, io.err, mris.vertex(vno), which_move)?;
+        let (xt, yt, zt) = vertex_coord2xyz_double(g, io.err, mris.vertex(vno), which_target)?;
+        n += 1;
+        tx = add64(tx, sub64(xt, xm));
+        ty = add64(ty, sub64(yt, ym));
+        tz = add64(tz, sub64(zt, zm));
+    }
+    let nf = f64::from(n);
+    (tx, ty, tz) = (div64(tx, nf), div64(ty, nf), div64(tz, nf));
+    for vno in 0..usz(mris.nvertices) {
+        if mris.vertex(vno).ripflag != 0 {
+            continue;
+        }
+        if which_target != CANONICAL_VERTICES {
+            larmorx_freesurfer_core::log::error_exit(
+                g,
+                io.err,
+                larmorx_freesurfer_core::log::ERROR_UNSUPPORTED,
+                &format!("MRISrecenter: movable vertices {which_move} not supported"),
+            )?;
+        }
+        let v = mris.vertex_mut(vno);
+        v.cx = add64(f64::from(v.cx), tx) as f32;
+        v.cy = add64(f64::from(v.cy), ty) as f32;
+        v.cz = add64(f64::from(v.cz), tz) as f32;
+    }
+    crate::positions::restore_vertex_positions(g, io, mris, which_move)?;
+    compute_metric_properties(g, sg, io, mris)?;
+    Ok(())
+}
+
+/// `MRISscaleVertexCoordinates(mris, scale)`: `MRISscale`.
+pub fn scale_vertex_coordinates(g: &mut Globals, mris: &mut Mris, scale: f64) -> i32 {
+    crate::coords::scale(g, mris, scale)
+}
+
+/// `MRISscaleBrain(mris, mris, scale)` (the source and destination one surface, as FreeSurfer
+/// asserts): `MRISanisotropicScale` by `scale` on each axis.
+pub fn scale_brain(mris: &mut Mris, scale: f32) {
+    crate::coords::anisotropic_scale(mris, scale, scale, scale);
+}
+
+/// `MRISscaleBrainArea(mris)`: the surface scaled by `sqrt(orig_area / (total_area + neg_area))`
+/// (in `float`; [`scale_brain`]), then the metric properties. Returns `NO_ERROR`.
+pub fn scale_brain_area(
+    g: &mut Globals,
+    sg: &mut SurfGlobals,
+    io: &mut Io,
+    mris: &mut Mris,
+) -> Result<i32, Fatal> {
+    let scale = sqrt(div(mris.orig_area, add(mris.total_area, mris.neg_area)));
+    scale_brain(mris, scale);
+    compute_metric_properties(g, sg, io, mris)?;
+    Ok(0)
+}

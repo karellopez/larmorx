@@ -928,3 +928,281 @@ Measured 2026-11-13 (relay 9): seed 17, 1,000 cases of each command: identical w
 seed 19, 1,000 `life` cases: 170 failed assertions (FS-03), 40 with FS-117, 387 with a skipped
 operation; 1,000 `misc` cases: 165 FS-118 ends, 7 FS-119 ends; the default differs only with those
 notices. The probe's whole run and the seed-1 hash: the probe's README.
+
+## 38. Computing the metric properties: the three routes
+
+**Computing the metric properties** of a surface (its normals, areas, angles, bounding box,
+neighbour distances and their mean) is chosen by the environment at every call (no FreeSurfer
+script sets these variables):
+
+- `FS_FASTER_MP` set: the **faster computation** (§44); nothing is counted.
+- Otherwise the call is **counted** (a process-wide count from 1, printed by §43's lines), then:
+  - neither `FREESURFER_OLD_MRIScomputeMetricProperties` nor
+    `FREESURFER_NEW_MRIScomputeMetricProperties` set, or only the second: the **default
+    computation**: the distances (not the original ones) are freed (§15), a **copy** of the
+    surface's values is taken (§39), the computation runs on the copy (§40-42) and the copy is
+    **written back** (§43);
+  - only the first set: the **old computation** on the surface itself (§40-42 with the surface's
+    own fields, §42's old form);
+  - both set: the copy is taken first, the copy's computation and then the old one run, and the copy
+    is **compared** with the surface instead of written back (§43): the surface keeps the old
+    computation's results.
+
+Returns 0. Each computation in order: the vertex normals and areas (§40, which may move degenerate
+vertices), the bounding box (§16's, from 10000/-10000), the distances at `nsize` hops (§20's
+computing; `dist_nsize` becomes `nsize`; the copy's distances are made in the copy, §39), the faces'
+areas, normals and angles and the vertices' areas from them (§41), `avg_vertex_area = total_area ⊘
+nvertices` (f, the count converted to float; `nvertices` 0 gives an infinity or a NaN), the mean
+neighbour distance and its deviation (§41), the orientation (§42); last, for a parameterized sphere
+(5), a rigid body (6) or a sphere (4), `total_area = ((π ⊗ radius) ⊗ radius) ⊗ 4` (d, rounded to
+float; π the double nearest).
+
+## 39. The copy
+
+The copy holds: the kind, the original coordinates' kind, the counts, `nsize`, `radius`,
+`dist_nsize`; each face's three vertex numbers, rip flag, cached original area (read through §27's
+"read the normal": a deferred face is computed then) and original angles, and a "normal set" flag
+(cleared); each vertex's rip flag, size in use (§5), white and pial coordinates, white normal,
+current coordinates, border flag, canonical coordinates, curvature, original area and face number,
+and empty distances (capacity 0). Its normals and face areas start as the surface's (FS-121 below),
+its vertex areas, a plane's vertex signs and the faces' normals and angles as 0.
+
+The copy's distances: **making** a vertex's distances in the copy gives it room for the larger of
+its capacity and its size in use: the buffer it has when large enough; else that buffer grown (its
+values kept); else the surface's stored buffer for that vertex when the surface's distances of that
+vertex are free (§15: the values it holds kept up to the shorter length, the surface's storage then
+empty), else a new buffer; the new capacity is the larger value. Values past those written are
+outside the behaviour.
+
+## 40. The vertex normals and areas
+
+**Faces first:** each ripped face makes its three vertices border vertices (`border` 1); each other
+face with at least one unripped vertex gets as its normal (the copy's; the surface's cached normal
+in the old computation, §27's "set the normal") the cross product of `a = p2 ⊖ p0` and `b = p1 ⊖ p2`
+(f, `p0 p1 p2` its corners in order): `((a.y ⊗ b.z) ⊖ (b.y ⊗ a.z), (b.x ⊗ a.z) ⊖ (a.x ⊗ b.z),
+(a.x ⊗ b.y) ⊖ (b.x ⊗ a.y))`.
+
+**Then the vertices,** in up to five rounds (round `t` = 0 to 4) over a list that starts as every
+unripped vertex in order. For a vertex, over its faces in its list order (`f[n]`, the vertex at
+corner `c = n[n]` of face `f[n]`), skipping ripped faces, with `q0`, `q1`, `q` the corners `c - 1`,
+`c + 1`, `c` (cyclically): its **corner normal**, the cross product above of `a = q ⊖ q0` and `b = q1
+⊖ q` each first made unit length (§6's normalisation: `len = sqrt((x⊗x ⊕ y⊗y) ⊕ z⊗z)` (f), divided
+when `len > 0`), and that product made unit length too while `UnitizeNormalFace` is set (1, the
+default); and its **corner area**, half the length of the same cross product of the unnormalised
+`a` and `b`: `sqrt((d1⊗d1 ⊕ d2⊗d2) ⊕ d3⊗d3) ⊘ 2` (f). The vertex's normal is the sum of its corner
+normals (`s ⊕= n` per component, from 0) and its area the sum of its corner areas (f, from 0). When
+the vertex has no unripped face, or the normal's length (§6, with the normalisation applied) is
+`> 0`: the area becomes `area ⊘ 3` (with `fix_vertex_area`, the default; else `⊘ 2`; in double,
+rounded to float), the original area becomes it too when it is negative, and the normal is stored
+(unit length; zero for no face). Otherwise the vertex is kept for the next round.
+
+After a round with vertices kept, in ascending vertex order: with `DIAG_VERBOSE` set and the kind a
+spherical patch, a parameterized sphere or a sphere, `vertex <vno>: degenerate normal` on standard
+error; the vertex's `x`, then `y`, plus `h(t, vno, k)` with `k` a counter from 0 for that vertex
+(f); then, unless the kind is a plane (2) or a patch (1), its `z`, and for each of its 1-hop
+neighbours (with `DIAG_SHOW` and `DIAG_VERBOSE` set, `   k=<vno %5d> <n> nbr = <nbr %5d> / <vnum>`
+on standard output) the neighbour's `x`, `y`, `z` plus the next three `h`, and its unripped faces'
+normals recomputed as above. The next round retries only these vertices (not their neighbours). A
+vertex still kept after the fifth round keeps the normal it had (the default computation: FS-121).
+
+`h(i, k, c)`: the FNV-1a hash of the 12 bytes of the three unsigned 32-bit integers `i`, `k`, `c`
+(little-endian; 64-bit arithmetic: from `0x811c9dc5`, per byte `hash = (hash xor byte) × 16777619
+mod 2^64`), `f = (hash mod 2^32) / 4294967295` (d), the move `(0.002 × f) − 0.001` rounded to float
+(d; only numbers are involved).
+
+## 41. Faces' areas, normals and angles; the mean distance
+
+For each unripped face (`p0 p1 p2` its corners), with `a = p1 ⊖ p0`, `b = p2 ⊖ p0` (f):
+- `n = ((b.z ⊗ a.y) ⊖ (a.z ⊗ b.y), (a.z ⊗ b.x) ⊖ (a.x ⊗ b.z), (a.x ⊗ b.y) ⊖ (a.y ⊗ b.x))`;
+- the **area** `sqrt((n.z⊗n.z) ⊕ ((n.x⊗n.x) ⊕ (n.y⊗n.y))) ⊗ 0.5` (f);
+- the **normal** `n ⊗ s` per component with `L = sqrt(((n.y⊗n.y) ⊕ (n.x⊗n.x)) ⊕ (n.z⊗n.z))`, `s = 1`
+  when `|L| < FLT_EPSILON` else `1 ⊘ L`; its third component `n.z ⊗ s` in the old computation and `s
+  ⊗ n.z` in the copy's (the first two `n.x ⊗ s`, `n.y ⊗ s`); stored as the face's normal (the copy's;
+  the cached one in the old computation);
+- the **angle at corner `k`** (0, 1, 2), with `o` the corner, `u` and `w` the corners `(p2, p1)`,
+  `(p0, p2)`, `(p1, p0)` for `k` = 0, 1, 2, `A = u ⊖ o`, `B = w ⊖ o` (f): `fast_atan2(T, D)` with
+  `T` the triple product `(B x A) . normal` as `specs/freesurfer-maths.md` defines it for three
+  3-vectors (its `v1 = B`, `v2 = A`, `v3 = normal`) and `D = (A.z ⊗ B.z) ⊕ ((A.x ⊗ B.x) ⊕ (A.y ⊗ B.y))`
+  (f); `fast_atan2` is the table arctangent of `specs/freesurfer-core.md` (the C library's `atan2f`
+  with `FREESURFER_fastApproxAtan2f_use_atanf2` set; its table read with a NaN or two infinities is
+  FS-06).
+
+The **total area** is the reproducible sum (below) of the unripped faces' areas in double (each
+term added as `area ⊕ partial`), rounded to float. Each unripped vertex's **area** is the float sum
+(from 0, `acc ⊕ area`) of its unripped faces' areas, then `⊘ 3` (or `⊘ 2`) as §40.
+
+**The mean neighbour distance**: over each unripped vertex and each of its first `vnum` neighbours
+that is unripped, its distance `d` widened, the reproducible sums `S ⊕= d`, `S2 = (d ⊗ d) ⊕ S2`,
+`N ⊕= 1` (d); `avg = S ⊘ N`, `std = sqrt(((S2 ⊘ N) ⊖ (avg ⊗ avg)) ⊗ N ⊘ (N ⊖ 1))` (d); the surface's
+`avg_vertex_dist` and `std_vertex_dist` (no pair: 0/0, a NaN).
+
+**Reproducible sums**: the index range `0..count` is cut into `m = min(count, 128)` consecutive
+ranges, the `i`-th (from 0) holding `(remaining) / (m - i)` indices (integer division, `remaining`
+the indices not yet given); each range is summed from 0 in index order, then the ranges' sums are
+added in order to the variable's start value (0), the accumulator on the left. The result does not
+depend on the number of threads.
+
+## 42. The orientation
+
+For a rigid body (6), parameterized sphere (5), sphere (4), ellipsoid (3) or spherical patch (7)
+(never an unoriented sphere, 8, nor any other kind): each unripped face whose normal points inwards,
+`(((x0 ⊕ x1) ⊕ x2) ⊗ n.x ⊕ ((y0 ⊕ y1) ⊕ y2) ⊗ n.y) ⊕ ((z0 ⊕ z1) ⊕ z2) ⊗ n.z < 0` (f), gets its area,
+normal and three angles negated (the sign bit flipped, also of a NaN, which stays signalling); then
+the reproducible sums (d, each term on the left: `term ⊕ partial`) over the unripped faces: of the
+non-negative areas into `total_area`, of the negated negative ones (the area negated as a float,
+then widened) into `neg_area`, of their cached original areas into `neg_orig_area` (each rounded
+to float).
+
+For a plane (2): each unripped face whose normal's z is negative gets its area, normal and angles
+negated (sign flips); the float sums from 0 over the unripped faces: `total_area = area ⊕ total`
+for a non-negative area, else `neg_area = neg_area ⊖ area` and `neg_orig_area = neg_orig_area ⊕
+orig_area` (the cached original area). Then each unripped vertex: a negative normal z is negated
+(sign flip) and `neg` becomes 1, else `neg` 0; its area becomes the float sum (`acc ⊕ area`) of the
+areas of **all** its faces, ripped ones included, then `⊘ 3` (or `⊘ 2`). A ripped face's area is the
+surface's (the copy's is the one it started with, FS-121).
+
+The **old computation's** forms of the face, normal and orientation steps are the same on the
+surface's fields and cached normals (each read through §27's "read the normal").
+
+## 43. Writing the copy back, and the comparison lines
+
+**Writing back** (not checking): `avg_vertex_dist`; a comparison (below) of `1` with whether each
+of the kind, the original coordinates' kind, the two counts, `nsize`, `radius` and the topology are
+equal (`no:-1  1  1.000000 != 0.000000 ...` when not: a NaN radius, FS-122); `dist_nsize`, `xlo`,
+`xhi`, `ylo`, `yhi`, `zlo`, `zhi`, `xctr`, `yctr`, `zctr`, `total_area`, `avg_vertex_area`,
+`std_vertex_dist`, `neg_orig_area`, `neg_area`. Then each vertex not ripped (in the copy and the
+surface): a plane's sign; its distances moved into the surface with the copy's capacity (§15's
+"setting the distances": a capacity below the surface's is the failed assertion
+`<BUILD_ROOT>/utils/mrisurf_base.cpp:334 newCapacity >= v->dist_capacity`); comparisons of `v->ripflag`,
+`v->whitex` ... `v->whitez`, `v->pialx` ... `v->pialz`, `v->wnx` ... `v->wnz` with the copy's (equal
+unless a NaN: FS-122); `x y z border cx cy cz curv origarea fno area nx ny nz` copied. Each face not
+ripped: its cached original area set (bit 2 cleared) and original angles set from the copy; its
+cached normal set when the copy set one; its `area` copied. **The faces' angles are not copied**
+(FS-120): they keep what the surface held.
+
+**Comparing** (both routes ran): the faces' vertex numbers (`0` against the difference of the first
+differing bytes of the two triples, as `memcmp`), `mris->avg_vertex_dist`, the inputs as above;
+`mris->dist_nsize`, `mris->xlo` ... `mris->neg_area` against the copy's; per vertex `v->neg`, the
+first `vtotal` distances (`mris_dist[n]`; `vtotal` above the surface's capacity is the failed
+assertion `<BUILD_ROOT>/utils/mrisurf_metricProperties_fast.h:390 vtotal <= v->dist_capacity`), the
+inputs, then `v->x` ... `v->nz`; per face `fNorm->orig_area`,
+`cmpAnglesPerTriangle(f->orig_angle,mp->f_orig_angle[fno])` (the byte difference of §4 against 0),
+`fNorm->nx`, `fNorm->ny`, `fNorm->nz` (when the copy set a normal), `f->ripflag`, `f->area`; nothing
+is written.
+
+**A comparison** of `lhs` and `rhs` (doubles) prints, when `lhs != rhs`, on standard output `no:<no>
+<expr>  <lhs> != <rhs>  during count_MRIScomputeMetricProperties_calls:<calls>` (two spaces around
+the expression and before `during`; `%f` numbers; `<no>` the vertex or face number or -1), at most
+11 per part (a count of the differences, the vertices' and the faces' parts each from 0); the first
+line of the process is followed by `b <BUILD_ROOT>/utils/mrisurf_metricProperties_fast.h:335
+needed`.
+
+- **FS-120** (corrected by default, rule A): the default computation leaves the faces' angles
+  stale; larmorx writes the copy's angles back (as the other two computations set them); `reproduce`
+  leaves them.
+- **FS-121** (both modes): what the copy never computes is memory contents in FreeSurfer: the normal
+  of a vertex kept after the fifth round (copied into the surface) and a ripped face's area in a
+  plane's vertex areas. larmorx gives such a vertex the normal it had and such a face the surface's
+  area, in both modes, with a notice; these values are outside what can be compared.
+- **FS-122** (corrected by default, rule A): a comparison of two NaNs with the same bits prints
+  nothing in larmorx; `reproduce` prints FreeSurfer's line.
+
+## 44. The faster computation (`FS_FASTER_MP`)
+
+The vertices' positions and rip flags and the faces are taken from the surface; every vertex's
+distances (ripped too) are made (§15: zeros of the size in use); each ripped face makes its vertices
+border vertices. `FS_WEIGHTS_NORMS_BY_ANGLE` set: the vertex normals are weighted by the corner
+angles. The fix value is 3 with `fix_vertex_area` set, else 2.
+
+**Normals, areas, angles,** in up to five rounds (`t` = 0 to 4): the total (d) from 0; every vertex
+area and normal 0; each unripped face (`p0 p1 p2`): `a = p1 ⊖ p0`, `b = p2 ⊖ p0`, `n = ((a.y ⊗ b.z)
+⊖ (a.z ⊗ b.y), (a.z ⊗ b.x) ⊖ (b.z ⊗ a.x), (a.x ⊗ b.y) ⊖ (a.y ⊗ b.x))`, `L = sqrt(((n.x⊗n.x) ⊕
+(n.y⊗n.y)) ⊕ (n.z⊗n.z))`, the normal `n ⊘ L` per component when `L > 0` (else `n`), the area `L ⊗
+0.5`, the total `area ⊕ total` (d); the angle at corner `k` with `(A, B)` = `(p2 ⊖ p0, p1 ⊖ p0)`,
+`(p0 ⊖ p1, p2 ⊖ p1)`, `(p1 ⊖ p2, p0 ⊖ p2)`: `c = B x A` in the form of `n` (with `B` first),
+`fast_atan2((c.z ⊗ m.z) ⊕ ((c.y ⊗ m.y) ⊕ (c.x ⊗ m.x)), ((B.y ⊗ A.y) ⊕ (A.x ⊗ B.x)) ⊕ (B.z ⊗ A.z))`
+(`m` the face's unit normal). `total_area` becomes the total (rounded). Each unripped vertex: over
+all its faces (ripped too), area `acc ⊕ face area`; normal `acc ⊕ face normal` per component, or
+with the weights `(fn.x ⊗ w) ⊕ acc`, `(fn.y ⊗ w) ⊕ acc`, `(w ⊗ fn.z) ⊕ acc` (`w` the face's angle at
+the vertex's corner); area `⊘` the fix value (f); `len = sqrt((z⊗z) ⊕ ((x⊗x) ⊕ (y⊗y)))`: when `len >
+0` the normal `⊘ len`, else the vertex is **bad**: its area becomes -1. With no bad vertex the
+round loop ends. Otherwise, in vertex order, each bad vertex moves (below) with a counter from 0, then
+each of its 1-hop neighbours with the same counter going on; the vertices are marked as moved and
+the next round runs (after the fifth round the loop ends without recomputing: FS-124 below).
+**Moving** vertex `v`: `x ⊕= h(t, v, k)`, `y ⊕=` the next, and `z ⊕=` the next for a surface other
+than a plane or a patch, else `z ⊕= 0` (`+0`, which turns `-0` into `+0`).
+
+**The bounding box** from the first vertex's position (low and high ends), then every other vertex
+as §16's; the centre `0.5f ⊗ (float)((double)lo ⊕ (double)hi)`.
+
+**The distances** of each unripped vertex to its first `vtotal` neighbours (no assertion on the
+kind): a sphere (4) or parameterized sphere (5): §20's sphere formula (the zero count of §20 and its
+logic problem are not part of this computation); any other kind: `sqrt((zd⊗zd) ⊕ ((xd⊗xd) ⊕
+(yd⊗yd)))` (f). **The mean distance** and its deviation as §41.
+
+`avg_vertex_area` as §38; **the orientation** for the kinds of §42's first paragraph: a face points
+inwards when `((((x0 ⊕ x1) ⊕ x2) ⊗ n.x) ⊕ (((y0 ⊕ y1) ⊕ y2) ⊗ n.y)) ⊕ (((z0 ⊕ z1) ⊕ z2) ⊗ n.z) < 0`;
+for a plane (2), when the normal's z is negative; such a face's area, normal and angles are negated
+(sign flips); the reproducible sums over the unripped faces: `total_area = area ⊕ partial` for a
+non-negative area, else `neg_area = neg_area ⊖ area` (the accumulator first) and `neg_orig_area =
+orig_area ⊕ partial` (the cached original area); a plane's unripped vertices then as §42 (the
+normal's z sign-flipped with `neg`; the area the float sum over all its faces `⊘` the fix value).
+The sphere's area of §38.
+
+**Written back:** each unripped vertex's position (when moved), normal and area, and its original
+area `|area|` when negative; each unripped face's cached normal, angles and area; `dist_nsize`
+becomes `nsize`.
+
+- **FS-123** (both modes): FreeSurfer adds memory contents for a ripped face to its vertices' areas
+  and normals, and takes the bounding box of a surface with no vertex from memory it does not own;
+  larmorx counts a ripped face with area and normal 0 (the sums as without it) and gives an empty
+  surface §16's box (10000 low, -10000 high), with a notice.
+- **FS-124** (kept, rule C): a vertex still bad after the fifth round has area -1 (its original area
+  1 when it was negative) and a normal of no length.
+- **FS-125**: with several threads FreeSurfer's total area of the face loop depends on the order the
+  threads finish; larmorx sums the faces in order (one thread's value).
+
+## 45. Callers that compute the metric properties
+
+- **Smoothing a surface** `niter` times by `step`: §18's smoothing, then the metric properties.
+- **Disturbing the vertices** by `amount`: the distances freed; each vertex's `x`, then `y`, plus
+  `randomNumber(-amount, amount)` (`specs/freesurfer-core.md`'s generator; `FREESURFER_SEED`), in
+  double rounded to float; then the metric properties.
+- **Recentring** with the sets `move` and `target`: the metric properties; `radius = sqrt(total_area
+  ⊘ 4π)` (d); the current positions saved into `move` and restored from `target` (§25); §19's centring;
+  `rescaling canonical coordinates to use r=<radius %2.1f>` on standard output; each unripped
+  vertex's current coordinates `radius ⊗ (x ⊘ r)` (d, rounded), `r` the length (d) of its `target`
+  coordinates; `t = Σ (target ⊖ move)` (d) over the unripped vertices divided by their count; each
+  unripped vertex's canonical coordinates `c ⊕ t` (d, rounded), or, for a target other than the
+  canonical set, the fatal error `MRISrecenter: movable vertices <move> not supported` (code -3) at
+  the first unripped vertex; the current positions restored from `move`; the metric properties.
+- **Scaling to the original area**: the surface scaled about its box's centre (§16's anisotropic
+  scaling, the same factor on each axis) by `sqrt(orig_area ⊘ (total_area ⊕ neg_area))` (f); the
+  metric properties. Returns 0. **Scaling the coordinates** by `s`: §16's scaling. **Scaling the
+  brain** by `s`: §16's anisotropic scaling by `s` on each axis.
+
+## 46. Validation plan, part 7
+
+The probe's `mprop` command: a surface of 0 to 10 vertices (none one case in 20) with a mesh of up
+to `2 nv` random faces (three distinct corners, a repeated one in one face in ten), each vertex's
+faces and corners from the faces (one vertex in 15 lists one more face at a random corner, never
+with the weights), its 1- to 3-hop rings in order as neighbours (`vnum`, `v2num`, `v3num`
+cumulative, `vtotal` one of them, `nsizeMax` not above it), the positions on a rough sphere (1/16
+steps; one vertex in eight at another vertex's place; specials now and then), the original
+coordinates mostly the current ones, the other sets, normals, curvature and areas any (the original
+area -1 one case in three), border, sign, face number and rip flags; the distances in every state of
+§17 (a buffer at least the size in use when there is one); each face's rip flag, area, angles,
+original angles, cache entry and byte; the kinds (all ten, an invalid one in 25), `nsize` 1 to 3
+(0 or 4 one in 30), `dist_alloced_flags`, `dist_nsize`, `radius`, `total_area`, `avg_vertex_dist`;
+the switches (old alone one case in 12, old and new one in 12, the faster one in 6 with the weights
+half the time, new alone rarely; the table arctangent's `atan2f` one in 15, one in 3 for the
+NaN-heavy third of the cases; `FREESURFER_reportLogicErrors` one in 4), `DIAG_SHOW`+`DIAG_VERBOSE`
+one in 6, `UnitizeNormalFace` 0 one in 4, `fix_vertex_area` 0 one in 3; then 1 to 4 of: computing
+the metric properties (most often), the triangle properties, the normals, the mean distance (with
+and without its deviation; skipped with `G` where a vertex would read distances it does not have),
+the ellipsoid's and the surface's and the plane's orientation, the bounding box, and §45's callers;
+then the state (each vertex's position, normal, area, original area, canonical x, curvature,
+border, sign, face number and distances; each face's area, angles, original angles, cache entry and
+byte; the box, the areas, the mean distance and deviation, `dist_nsize`, `dist_alloced_flags`).
+Cases where larmorx notes FS-121, FS-123 or FS-06 (FreeSurfer reads memory it never wrote or does
+not own) are counted, not compared.

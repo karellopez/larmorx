@@ -3138,7 +3138,7 @@ the ill-conditioned count increases. Otherwise `c = A⁻¹ (Uᵀ z)` (two `Matri
 `Q = [[c1 + c1, c2 + c2], [c2 + c2, c3 + c3]]`. When `cond >= 500000` (a NaN is not): `k1 = kmax`,
 `k2 = kmin`, `K = k1 k2`, `H = (k1 + k2) * 0.5`, and nothing else for this vertex. Otherwise
 `MatrixEigenSystem(Q)` gives the eigenvalues and eigenvectors; when it fails, `MatrixSVDEigenValues(Q)`
-gives `k1`, `k2` (its values 0 and 1), with `K` and `H` as above, nothing else for this vertex, and the
+gives `k1`, `k2` (its first and second values), with `K` and `H` as above, nothing else for this vertex, and the
 ill-conditioned count increases. **A matrix with a NaN or infinite entry:** see the fs.maths spec's
 FS-48 (`MatrixConditionNumber` and `MatrixSVDInverse` refuse it; on some FreeSurfer hangs).
 

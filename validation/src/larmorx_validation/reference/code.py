@@ -105,9 +105,11 @@ def usage_options(usage: str) -> list[Option]:
         else:
             parts = re.split(r"\s{2,}", s, maxsplit=1)
             head, desc = parts[0], parts[1] if len(parts) > 1 else ""
-        first, _, arg = head.partition(" ")
-        spellings = [w for w in first.split(",") if w.startswith("-")]
-        out.append(Option(spellings, arg.strip(), desc.strip().lstrip("-").strip()))
+        m = re.match(rf"({_SPELLING}(?:,\s*{_SPELLING})*)\s*(.*)$", head)
+        if not m:
+            continue
+        spellings = re.split(r",\s*", m.group(1))
+        out.append(Option(spellings, m.group(2).strip(), desc.strip().lstrip("-").strip()))
     return out
 
 
@@ -119,9 +121,9 @@ def usage_synopsis(usage: str, program: str) -> list[str]:
             cands = [line.split("Usage:", 1)[1], *lines[i + 1 :]]
             out = []
             for c in cands:
-                if out and not c.strip():
-                    break
                 words = c.split()
+                if out and (not words or words[0] != program):
+                    break  # a blank line or an example ("e.g. ...") ends it
                 if words and words[0] == program:
                     out.append(" ".join(words))
             return out
@@ -136,12 +138,15 @@ def specs_options(text: str, name: str = "SPECS") -> list[Option]:
     out = []
     for entry in _top_level(re.sub(r"//[^\n]*", "", m.group(1))):
         short = re.search(r"Some\('(.)'\)|^\s*\w+\('(.)'", entry)
-        long = re.search(r'Some\("([^"]+)"\)|\(\s*\'.\'\s*,\s*"([^"]+)"', entry)
+        long = re.search(
+            r'Some\("([^"]+)"\)|\(\s*\'.\'\s*,\s*"([^"]+)"|(?:Some\(\'.\'\)|None),\s*"([^"]+)"',
+            entry,
+        )
         spellings = []
         if short:
             spellings.append("-" + (short.group(1) or short.group(2)))
         if long:
-            spellings.append("--" + (long.group(1) or long.group(2)))
+            spellings.append("--" + (long.group(1) or long.group(2) or long.group(3)))
         if spellings:
             out.append(Option(spellings))
     return out
@@ -248,16 +253,142 @@ def command_line(repo: Path, rel: str, program: str, command: str | None = None)
     elif family in ("larmorx-afni", "larmorx-mri"):
         cl = spaced(repo, rel, program, command)
     else:
-        text = (repo / rel).read_text(encoding="utf-8")
-        usage = rust_string(text, "USAGE")
-        parser = specs_options(text) + match_options(text)
-        merged = _merge((usage_options(usage) if usage else []) + parser)
+        text = (repo / rel).read_text(encoding="utf-8").split("\n#[cfg(test)]", 1)[0]
+        usage, extra = rust_string(text, "USAGE"), []
+        if usage is None:
+            usage, extra = formatted_usage(repo, rel, text, program)
+        parser = specs_options(text) + match_options(text) + tuple_arms(text, program)
+        parser += listed_options(text)
+        listed = (usage_options(usage) or spaced_usage_options(usage)) if usage else []
+        merged = _merge(listed + parser)
         synopsis = usage_synopsis(usage, program) if usage else []
         parsed = {s for o in parser for s in o.spellings}
         synopsis = [command + s[len(program) :] for s in synopsis]
-        cl = CommandLine(rel, usage, synopsis, merged, parsed)
+        cl = CommandLine(rel, usage, synopsis, merged, parsed, extra=extra)
     cl.port = _port_of(rel)
     return cl
+
+
+def listed_options(text: str) -> list[Option]:
+    """The options a parser lists or compares with, outside its match arms: arrays of
+    spellings (``let no_arg = ["-help", ...];``), comparisons (``option == "--allparams"``), and
+    arms on the name with its dashes taken off (``w.strip_prefix("--").or_else(||
+    w.strip_prefix('-'))``, then ``Some("singlematrix") =>``: ``-singlematrix`` and
+    ``--singlematrix``)."""
+    words = []
+    for m in re.finditer(r'=\s*&?\[((?:\s*"-[^"]*",?)+)\s*\];', text):
+        words += re.findall(r'"(-[^"]*)"', m.group(1))
+    words += re.findall(r'==\s*"(-[^"]*)"', text) + re.findall(r'"(-[^"]*)"\s*==', text)
+    out = [Option([w]) for w in dict.fromkeys(words) if re.fullmatch(_NAMED, w)]
+    if 'strip_prefix("--")' in text and "strip_prefix('-')" in text:
+        for m in re.finditer(r'Some\(((?:"[\w]+"\s*\|\s*)*"[\w]+")\) =>', text):
+            for w in re.findall(r'"(\w+)"', m.group(1)):
+                out.append(Option([f"-{w}", f"--{w}"]))
+    return out
+
+
+def _variant_names(text: str) -> dict[str, str]:
+    """The programs' names by their variant (``Program::Img2Img => "img2imgcoord"``): the first
+    string each variant gives, as ``fn name`` does before any message."""
+    out: dict[str, str] = {}
+    for variant, name in re.findall(r"(\w+::\w+) => \"([^\"]+)\"", text):
+        out.setdefault(variant, name)
+    return out
+
+
+def tuple_arms(text: str, program: str) -> list[Option]:
+    """The options of a parser shared by several programs, whose arms match the option with the
+    program (``("-v", Program::Img2Img) =>``, ``("-xfm" | "-premat", _) =>``): those that
+    ``program`` takes, the variants named by the file's ``fn name`` (``Program::Img2Img =>
+    "img2imgcoord"``)."""
+    names = _variant_names(text)
+    out, seen = [], set()
+    for line in text.split("\n"):
+        if "=>" not in line:
+            continue
+        head = line.split("=>", 1)[0]
+        for m in re.finditer(r'\(((?:"-[^"]*"\s*\|\s*)*"-[^"]*"),\s*([^()]*?)\)', head):
+            who = [w.strip() for w in m.group(2).split("|")]
+            if "_" not in who and program not in {names.get(w) for w in who}:
+                continue
+            for w in re.findall(r'"(-[^"]*)"', m.group(1)):
+                if re.fullmatch(_NAMED, w) and w not in seen:
+                    seen.add(w)
+                    out.append(Option([w]))
+    return out
+
+
+def _brace_body(text: str, start: int) -> str:
+    """The text of the block whose ``{`` is the first at or after ``start``."""
+    i = text.index("{", start)
+    depth = 0
+    for j in range(i, len(text)):
+        if text[j] == "{":
+            depth += 1
+        elif text[j] == "}":
+            depth -= 1
+            if depth == 0:
+                return text[i + 1 : j]
+    raise ValueError("unbalanced braces")
+
+
+def _rust_format(fmt: str, values: dict[str, str]) -> str:
+    """A Rust ``format!`` string with its named arguments: ``{{`` and ``}}`` as braces."""
+
+    def sub(m: re.Match) -> str:
+        if m.group(0) in ("{{", "}}"):
+            return m.group(0)[0]
+        return values[m.group(1)]
+
+    return re.sub(r"\{\{|\}\}|\{(\w+)\}", sub, fmt)
+
+
+def formatted_usage(repo: Path, rel: str, text: str, program: str) -> tuple[str | None, list[str]]:
+    """A usage text a function formats (``fn usage(...) -> String { format!("...", bins =
+    o.bins) }``; for a file of several programs, the arm of ``program``), its values filled in:
+    the program's name, and a field of the options (``o.bins``) with its default (the crate's
+    ``impl Default for Options``); and the files read for the defaults."""
+    m = re.search(r"fn usage\([^)]*\) -> String", text)
+    if not m:
+        return None, []
+    body = _brace_body(text, m.end())
+    names = _variant_names(text)
+    calls = list(re.finditer(r"(?:(\w+::\w+) => )?format!\(", body))
+    call = next((c for c in calls if c.group(1) is None or names.get(c.group(1)) == program), None)
+    if call is None:
+        return None, []
+    inner, _ = _call_args(body, call.end() - 1)
+    lit = re.match(r'\s*"((?:[^"\\]|\\.)*)"', inner, re.S)
+    fmt = _unescape(lit.group(1))
+    values, extra = {}, []
+    for name in set(re.findall(r"(?<!\{)\{(\w+)\}", fmt)):
+        named = re.search(rf"\b{name} = (\w+)\.(\w+)", inner)
+        if named:
+            value, where = _default_field(repo, rel, named.group(2))
+            if value is None:
+                return None, []
+            values[name] = value
+            extra.append(where)
+        elif re.search(rf"let {name} = self\.name\(\);", body):
+            values[name] = program
+        else:
+            return None, []
+    return _rust_format(fmt, values), sorted(set(extra))
+
+
+def _default_field(repo: Path, rel: str, name: str) -> tuple[str | None, str]:
+    """The default of the options' field ``name`` (``bins: 256`` in the crate's ``impl
+    Default for Options``), and the file that holds it."""
+    crate = Path(*Path(rel).parts[:2]) / "src"
+    for f in sorted((repo / crate).rglob("*.rs")):
+        t = f.read_text(encoding="utf-8")
+        m = re.search(r"impl Default for Options \{", t)
+        if not m:
+            continue
+        d = re.search(rf"\b{name}: (-?[\d.]+|\"[^\"]*\"),", _brace_body(t, m.start()))
+        if d:
+            return d.group(1).strip('"'), f.relative_to(repo).as_posix()
+    return None, ""
 
 
 # ------------------------------------------------------------------------------------------------
@@ -368,8 +499,15 @@ def ants(repo: Path, rel: str, program: str, command: str) -> CommandLine:
 # ------------------------------------------------------------------------------------------------
 # AFNI's clean rooms and `mri hmc`: usage texts in columns, parsers of their own
 
-#: An option's spelling (``-TR``, ``-rlt+``, ``-2d``, ``-wsinc5``, ``--tanh``).
-_SPELLING = r"--?(?:[A-Za-z][\w+.-]*|\d[A-Za-z][\w+.-]*)"
+#: An option's spelling in a usage text (``-TR``, ``-rlt+``, ``-2d``, ``-wsinc5``, ``--tanh``,
+#: betsurf's ``-1``).
+_SPELLING = r"--?(?:[A-Za-z][\w+.-]*|\d[\w+.-]*)"
+#: An option's spelling in a parser's code, where ``"-1"`` is a number.
+_NAMED = r"--?(?:[A-Za-z][\w+.-]*|\d[A-Za-z][\w+.-]*)"
+
+
+#: An option's values in a usage text: ``<f>``, ``{a,b}``, several (``<min> <max>``).
+_VALUES = r"(?:<[^>]*>|\{[^}]*\})(?: (?:<[^>]*>|\{[^}]*\}))*"
 
 
 def spaced_usage_options(usage: str) -> list[Option]:
@@ -391,7 +529,7 @@ def spaced_usage_options(usage: str) -> list[Option]:
             if words and all(re.fullmatch(_SPELLING, w) for w in words):
                 last = [Option([s]) for s in spellings + words]
             else:
-                a = re.match(r"^\s*(<[^>]*>|\{[^}]*\})\s*(.*)$", rest) or re.match(
+                a = re.match(rf"^\s*({_VALUES})\s*(.*)$", rest) or re.match(
                     r"^ (\S+)(?:\s{2,}(.*))?$", rest
                 )
                 arg, desc = (a.group(1), a.group(2) or "") if a else ("", rest)
@@ -411,9 +549,9 @@ def _option_literals(text: str) -> tuple[set[str], set[str]]:
     (``b"-verb"``, ``starts_with("-D")``)."""
     code = re.sub(r'const [A-Z_]+: &str\s*=\s*(concat!\()?"(?:[^"\\]|\\.)*"', "", text, flags=re.S)
     code = re.sub(r"//[^\n]*", "", code)
-    exact = {s for s in re.findall(r'(?<![b\w])"([^"\\]*)"', code) if re.fullmatch(_SPELLING, s)}
-    prefixes = set(re.findall(rf'b"({_SPELLING})"', code))
-    prefixes |= set(re.findall(rf'starts_with\("({_SPELLING})"\)', code))
+    exact = {s for s in re.findall(r'(?<![b\w])"([^"\\]*)"', code) if re.fullmatch(_NAMED, s)}
+    prefixes = set(re.findall(rf'b"({_NAMED})"', code))
+    prefixes |= set(re.findall(rf'starts_with\("({_NAMED})"\)', code))
     return exact, prefixes
 
 
@@ -421,7 +559,7 @@ def _str_arrays(text: str) -> list[str]:
     """The spellings of the parser's lists of options (``const FLAGS: &[&str] = &[...]``)."""
     out = []
     for m in re.finditer(r"\bconst \w+: &\[&str\] = &\[(.*?)\];", text, re.S):
-        out += [s for s in _rust_strings(m.group(1)) if re.fullmatch(_SPELLING, s)]
+        out += [s for s in _rust_strings(m.group(1)) if re.fullmatch(_NAMED, s)]
     return out
 
 

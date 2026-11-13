@@ -457,8 +457,8 @@ def examples(ctx: core.Context, rec_new, rec_orig) -> list[dict]:
             }
         )
         doc["provenance"].append(
-            f"Runs of the clean-room original: figures cache entry `{TOOL}/{e.case}`, computed "
-            f"{info.get('computed')} with larmorx `{info['larmorx_commit'][:12]}`; "
+            f"Runs of the clean-room original: figures cache entry `{TOOL}/{e.case}`, "
+            f"{common.computed(info)} with larmorx `{info['larmorx_commit'][:12]}`; "
             f"{info['versions']['larmorx']}; every command, its environment and exit status in "
             "its `RUN_INFO.json`"
         )

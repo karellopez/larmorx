@@ -943,8 +943,8 @@ def _texts(ex: dict, oinfo: dict, sentence: str) -> None:
             f["text"] += ("; LARMORX's clean-room original (crate larmorx-afni, Apache-2.0, "
                           f"experimental), from larmorx at commit `{oinfo['larmorx_commit'][:12]}`")  # fmt: skip
     ex["provenance"].append(
-        f"Runs of the clean-room original: figures cache entry `{TOOL}/{CASE}`, computed "
-        f"{oinfo['computed']} with larmorx `{oinfo['larmorx_commit'][:12]}` (python -m larmorx with "
+        f"Runs of the clean-room original: figures cache entry `{TOOL}/{CASE}`, "
+        f"{common.computed(oinfo)} with larmorx `{oinfo['larmorx_commit'][:12]}` (python -m larmorx with "
         "LARMORX_IMPLEMENTATION=original: default mode at 14 threads and at one, reproduce mode at "
         "14; on the volumes stored LPS both modes), on the replica's entry's inputs; every "
         "command, its environment, threads and exit status are in its `RUN_INFO.json`"

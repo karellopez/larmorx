@@ -405,8 +405,8 @@ def runs(
 def original_provenance(o: fcache.Entry) -> str:
     info = o.info()
     return (
-        f"Runs of the clean-room original: figures cache entry `{o.tool}/{o.case}`, computed "
-        f"{info['computed']} with larmorx `{info['larmorx_commit'][:12]}` (default mode at 1 and "
+        f"Runs of the clean-room original: figures cache entry `{o.tool}/{o.case}`, "
+        f"{common.computed(info)} with larmorx `{info['larmorx_commit'][:12]}` (default mode at 1 and "
         "6 threads, reproduce mode at 1)"
     )
 

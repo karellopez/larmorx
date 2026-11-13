@@ -905,3 +905,24 @@ def test_the_clean_rooms_exporter_hides_any_failure_of_the_replicas_presenter(mo
         afni_volreg_clean_room.present({})
     assert "replica's module" not in str(e.value)
     assert e.value.__cause__ is None and e.value.__suppress_context__
+
+
+def test_a_cache_entrys_runs_made_again_are_dated():
+    """Round 17's finding 7: the provenance line's commit is the last run's, so the line says
+    which runs were made again and when last."""
+    from larmorx_validation.evidence import common
+
+    info = {"computed": "2026-11-02T21:04:08+00:00", "runs": [{"label": x} for x in "abcd"]}
+    assert common.computed(info) == "computed 2026-11-02T21:04:08+00:00"
+    info["rerun"] = [
+        {"computed": "2026-11-04T12:36:56+00:00", "labels": ["a", "b"]},
+        {"computed": "2026-11-07T02:05:04+00:00", "labels": ["b", "c"]},
+    ]
+    assert common.computed(info) == (
+        "computed 2026-11-02T21:04:08+00:00; 3 of its 4 runs made again since, last on "
+        "2026-11-07T02:05:04+00:00,"
+    )
+    info["rerun"].append({"computed": "2026-11-08T00:00:00+00:00", "labels": ["d"]})
+    assert common.computed(info).endswith(
+        "; its runs made again since, last on 2026-11-08T00:00:00+00:00,"
+    )

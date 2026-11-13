@@ -18,7 +18,7 @@ from pathlib import Path
 
 import numpy as np
 
-from larmorx_validation.evidence import afni_pages, afni_step, core
+from larmorx_validation.evidence import afni_pages, afni_step, common, core
 from larmorx_validation.figures import cache as fcache
 from larmorx_validation.figures import records
 
@@ -1074,7 +1074,7 @@ def _provenance(info: dict) -> list[str]:
         f"Data: {DATA['dataset']}, {DATA['subject']}, {DATA['licence']}; fMRIPrep 25.2.6's "
         f"oracle run `{RUN}` for its own output and the brain mask",
         "Inputs: " + "; ".join(f"{k} (sha256 {v}…)" for k, v in sha.items()),
-        f"Runs: figures cache entry `{TOOL}/{CASE}`, computed {info['computed']} with larmorx "
+        f"Runs: figures cache entry `{TOOL}/{CASE}`, {common.computed(info)} with larmorx "
         f"`{info['larmorx_commit'][:12]}`, {vers.get('afni', '?').replace('AFNI_', 'AFNI ')}, "
         f"{(vers.get('larmorx-replica') or vers.get('larmorx-gpl', '?'))}; every command, its environment, threads and exit "
         "status are in its `RUN_INFO.json`",

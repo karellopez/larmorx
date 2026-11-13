@@ -1795,6 +1795,10 @@ defects! {
         "the frame covariance and PCA of a masked volume (MRIcovarianceMatrix, MRIpca) count the mask voxels above 0.5 but sum every voxel not below 0.5: a mask voxel of exactly 0.5 (or NaN) enters the sums and not the count";
     FS_484 = "FS-484", "FreeSurfer", true,
         "the frame PCA of a volume without frames (MRIpca) crashes in the singular value decomposition of its empty covariance";
+    FS_485 = "FS-485", "FreeSurfer", true,
+        "the gradient-direction measure of a voxel (MRIvoxelDirection) cuts its window at the volume's far faces but reads it back as a full cube: the gradients pair with the wrong offsets and the last entries were never written (memory contents)";
+    FS_486 = "FS-486", "FreeSurfer", true,
+        "the second derivative along the gradient (MRIvoxelGradientDir2ndDerivative) of a volume whose type the trilinear sampler refuses subtracts a sample never written: memory contents";
 }
 
 /// The register entry with ID `id`.

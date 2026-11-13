@@ -21,6 +21,7 @@ pub mod frames;
 pub mod image;
 pub mod labels;
 pub mod ltaread;
+pub mod mrivoxel;
 pub mod order;
 pub mod orient;
 pub mod pca;

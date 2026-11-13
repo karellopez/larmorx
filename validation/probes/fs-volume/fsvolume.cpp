@@ -38,6 +38,7 @@
 #include "matrix.h"
 #include "mri.h"
 #include "mri2.h"
+#include "region.h"
 #include "transform.h"
 #include "utils.h"
 
@@ -1789,6 +1790,41 @@ void run_case()
     od(vwth);
     for (int i = 0; i < n; i++)
       if (passout && outs[i]) put_vol(outs[i]);
+  } else if (cmd == "rgbb") {
+    MRI *m = get_vol();
+    fill_paint(m);
+    int kind = geti();
+    int p[6] = {0, 0, 0, 0, 0, 0};
+    int npad = 0;
+    if (kind == 1)
+      for (int &x : p) x = geti();
+    else
+      npad = geti();
+    fflush(stdout);
+    MRI_REGION *r = kind == 0 ? REGIONgetBoundingBox(m, npad)
+                    : kind == 1 ? REGIONgetBoundingBoxM(m, p)
+                                : REGIONgetBoundingBoxEqOdd(m, npad);
+    fflush(stdout);
+    if (!r) {
+      out += "NULL ";
+    } else {
+      oi(r->x); oi(r->y); oi(r->z); oi(r->dx); oi(r->dy); oi(r->dz);
+    }
+  } else if (cmd == "vxn") {
+    MRI *m = get_vol();
+    fill_paint(m);
+    int n = geti();
+    for (int i = 0; i < n; i++) {
+      int x = geti(), y = geti(), z = geti(), w = geti(), f = geti();
+      fflush(stdout);
+      of(MRIvoxelDx(m, x, y, z));
+      of(MRIvoxelDy(m, x, y, z));
+      of(MRIvoxelDz(m, x, y, z));
+      of(MRIvoxelMean(m, x, y, z, w, f));
+      of(MRIvoxelDirection(m, x, y, z, w));
+      of(MRIvoxelGradientDir2ndDerivative(m, x, y, z, w));
+      fflush(stdout);
+    }
   } else {
     fail("unknown command");
   }

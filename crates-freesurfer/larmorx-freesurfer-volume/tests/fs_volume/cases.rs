@@ -33,9 +33,11 @@ use larmorx_freesurfer_volume::frames as fr;
 use larmorx_freesurfer_volume::image as img;
 use larmorx_freesurfer_volume::labels as lb;
 use larmorx_freesurfer_volume::ltaread as lr;
+use larmorx_freesurfer_volume::mrivoxel as mv;
 use larmorx_freesurfer_volume::order as od;
 use larmorx_freesurfer_volume::orient as orn;
 use larmorx_freesurfer_volume::pca as pc;
+use larmorx_freesurfer_volume::region as rg;
 use larmorx_freesurfer_volume::resample as rsm;
 use larmorx_freesurfer_volume::resize as rs;
 use larmorx_freesurfer_volume::rotate as rt;
@@ -2490,6 +2492,39 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
                 t.push(i64::from(!g.chance(4)).to_string());
                 t.push(i64::from(!g.chance(4)).to_string());
             }
+            "rgbb" | "vxn" => {
+                let mut s = shape(&mut g);
+                s.hdr = s.hdr && g.chance(6);
+                if (cmd == "rgbb" && g.chance(2)) || (cmd == "vxn" && !g.chance(4)) {
+                    (s.w, s.h, s.d) = (g.int(1, 9), g.int(1, 9), g.int(1, 6));
+                }
+                vol_of(&mut g, &mut t, s);
+                let vals: &[f32] = &[0.0, 0.0, 1.0, 2.0, 3.0, -1.0, 4.0, 0.5, 100.0, 1e-9];
+                fill_paint(&mut g, &mut t, s, &[&[0.0, 1.0, 2.0]], &[vals]);
+                if cmd == "rgbb" {
+                    let kind = g.int(0, 2);
+                    t.push(kind.to_string());
+                    let pads = if kind == 1 { 6 } else { 1 };
+                    for _ in 0..pads {
+                        t.push(g.pick(&[0, 1, 2, -1, 3, 0]).to_string());
+                    }
+                } else {
+                    let n = g.int(1, 4);
+                    t.push(n.to_string());
+                    for _ in 0..n {
+                        let ws = g.pick(&[3, 3, 1, 5, 7, 8, 2, -3, 0, 4]);
+                        let wh = (ws / 2).max(0);
+                        // inside, the window clear of the far faces (FS-485), or anywhere
+                        let inner = !g.chance(4);
+                        for e in [s.w, s.h, s.d] {
+                            let hi = if inner { (e - 1 - wh).max(0) } else { e };
+                            t.push(g.int(if inner { 0 } else { -1 }, hi).to_string());
+                        }
+                        t.push(ws.to_string());
+                        t.push(frame_of(&mut g, s).to_string());
+                    }
+                }
+            }
             c => panic!("no generator for {c}"),
         }
         lines.push(t.join(" "));
@@ -2826,7 +2861,7 @@ fn perturb(g: &mut Gen, v: &mut [String], e: &mut [String]) {
 }
 
 /// The probe's commands, in the order the generator cycles through them.
-pub const COMMANDS: [&str; 160] = [
+pub const COMMANDS: [&str; 162] = [
     "vgwrite",
     "vgread",
     "vgread",
@@ -2987,6 +3022,8 @@ pub const COMMANDS: [&str; 160] = [
     "mpca",
     "pcast",
     "fdr",
+    "rgbb",
+    "vxn",
 ];
 
 /// One buffer both streams write into, in order (FreeSurfer's standard output and error go to
@@ -5500,6 +5537,51 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
                         _ => {}
                     }
                 }
+            }
+        }
+        "rgbb" => {
+            let mut m = get_vol(cx, t)?;
+            fill_painted(cx, t, &mut m)?;
+            let kind = t.i();
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = match kind {
+                0 => {
+                    let npad = t.i();
+                    Some(rg::region_get_bounding_box(g, b, &m, npad)?)
+                }
+                1 => {
+                    let p = [t.i(), t.i(), t.i(), t.i(), t.i(), t.i()];
+                    Some(rg::region_get_bounding_box_m(g, b, &m, p)?)
+                }
+                _ => {
+                    let npad = t.i();
+                    rg::region_get_bounding_box_eq_odd(g, a, b, &m, npad)?
+                }
+            };
+            match r {
+                None => o.0 += "NULL ",
+                Some(r) => {
+                    for v in [r.x, r.y, r.z, r.dx, r.dy, r.dz] {
+                        o.i(i64::from(v));
+                    }
+                }
+            }
+        }
+        "vxn" => {
+            let mut m = get_vol(cx, t)?;
+            fill_painted(cx, t, &mut m)?;
+            let n = t.i();
+            let (g, b) = (&mut cx.g, &mut cx.b);
+            for _ in 0..n {
+                let (x, y, z, w, f) = (t.i(), t.i(), t.i(), t.i(), t.i());
+                o.f(mv::mri_voxel_dx(g, b, &m, x, y, z)?);
+                o.f(mv::mri_voxel_dy(g, b, &m, x, y, z)?);
+                o.f(mv::mri_voxel_dz(g, b, &m, x, y, z)?);
+                o.f(mv::mri_voxel_mean(g, b, &m, x, y, z, w, f)?);
+                o.f(mv::mri_voxel_direction(g, b, &m, x, y, z, w)?);
+                o.f(mv::mri_voxel_gradient_dir_2nd_derivative(
+                    g, b, &m, x, y, z, w,
+                )?);
             }
         }
         c => panic!("unknown command {c}"),

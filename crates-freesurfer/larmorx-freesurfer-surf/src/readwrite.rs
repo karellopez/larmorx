@@ -9,22 +9,28 @@
 //! always takes) and `mrisReadTransform` (3519-3791, 4214-4277, 4617-4750), on fs.surf's pieces
 //! taken early ([`crate::nbhd`], [`crate::ico`]). FS-351, FS-356, FS-359, FS-360.
 
+use std::io::Write;
 use std::path::Path;
 
 use larmorx_core::defects::{FS_351, FS_356, FS_359, FS_360};
 use larmorx_freesurfer_core::chklc::chklc;
 use larmorx_freesurfer_core::cstd::fmt_f;
-use larmorx_freesurfer_core::diag::verbose_on;
+use larmorx_freesurfer_core::diag::{DIAG_SHOW, verbose_on};
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{
-    self, ERROR_BADFILE, ERROR_NO_FILE, ERROR_NOFILE, ERROR_NOMEMORY, ERROR_UNSUPPORTED, Fatal,
-    NO_ERROR,
+    self, ERROR_BADFILE, ERROR_BADPARM, ERROR_NO_FILE, ERROR_NOFILE, ERROR_NOMEMORY,
+    ERROR_UNSUPPORTED, Fatal, NO_ERROR,
 };
-use larmorx_freesurfer_core::utils::{file_exists, file_name_path};
+use larmorx_freesurfer_core::matrix_ops::matrix_inverse;
+use larmorx_freesurfer_core::utils::{file_exists, file_name_path, resolve};
 use larmorx_freesurfer_io::fio::{
     fio_extension, fio_file_exists_readable, fread_float, fread2, fread3,
 };
 use larmorx_freesurfer_io::identify::{MRI_MGH_FILE, NII_FILE};
+use larmorx_freesurfer_mri::lta::LINEAR_RAS_TO_RAS;
+use larmorx_freesurfer_mri::vol_geom::VolGeom;
+use larmorx_freesurfer_volume::ltaread::{LtaIo, RegisterDat, lta_read_ex};
+use larmorx_freesurfer_volume::vgeom::get_vol_geom;
 
 use crate::aaa::{SurfGlobals, VERTICES_PER_FACE};
 use crate::alloc;
@@ -333,11 +339,38 @@ pub const RIGHT_HEMISPHERE: i32 = 1;
 pub const NO_HEMISPHERE: i32 = 2;
 pub const BOTH_HEMISPHERES: i32 = 3;
 
-/// `LTAreadEx` (fs.volume's `transform.cpp`, queue item 3.1-39, track C's): reached only when the
-/// surface's subject has `mri/transforms/talairach.xfm`; until it is ported, reaching it is out
-/// of range.
-fn lta_read_ex_pending(fname: &str) -> ! {
-    panic!("mrisReadTransform: reading {fname} needs LTAreadEx (fs.volume, not yet ported)")
+/// fs.io's functions `LTAreadEx` and `mrisReadTransform` call: `MRIreadHeader` (for a volume a
+/// `.xfm`'s comment names, or a regular file `mri/orig`) and `regio_read_register` (never reached
+/// here: the transform is always an `.xfm`). Track A ports them (fs.io's `mriio.cpp`, item 3.1-28,
+/// and `registerio.cpp`, 3.1-34); until then reaching them is out of range.
+struct PendingLtaIo;
+
+impl LtaIo for PendingLtaIo {
+    fn read_header(
+        &mut self,
+        _g: &mut Globals,
+        _out: &mut dyn Write,
+        _err: &mut dyn Write,
+        _dir: Option<&Path>,
+        name: &str,
+    ) -> Result<Option<VolGeom>, Fatal> {
+        panic!(
+            "mrisReadTransform: reading the header of {name} needs MRIreadHeader (fs.io, not yet ported)"
+        )
+    }
+
+    fn read_register(
+        &mut self,
+        _g: &mut Globals,
+        _out: &mut dyn Write,
+        _err: &mut dyn Write,
+        _dir: Option<&Path>,
+        name: &str,
+    ) -> Result<Option<RegisterDat>, Fatal> {
+        panic!(
+            "mrisReadTransform: reading {name} needs regio_read_register (fs.io, not yet ported)"
+        )
+    }
 }
 
 /// `MRIread` (fs.io's volume reader) and `MRIScopyMRI`: reached only when a group-average area
@@ -349,12 +382,26 @@ fn mri_read_pending(fname: &str) -> ! {
 /// `mrisReadTransform(mris, mris_fname)` (with `MRISreadTransform`, its public name): the
 /// subject's Talairach transform, `<the surface name's folder>/../mri/transforms/talairach.xfm`
 /// (`FileNamePath`'s folder, `.` without one; FS-356: a surface name of 300 bytes or more is taken
-/// whole). Without that file, nothing (`ERROR_NO_FILE`); with it, `LTAreadEx` (fs.volume, not yet
-/// ported: reaching it panics).
+/// whole). Without that file (`fopen` fails), nothing (`ERROR_NO_FILE`). Else `LTAreadEx` (fs.volume,
+/// track C's `ltaread`): a transform it cannot read gives `mrisReadTransform: could not read xform
+/// file '<name>'` (`ERROR_NOFILE`) and `ERROR_NO_FILE`; one whose type is not `LINEAR_RAS_TO_RAS`
+/// ends the program (`the transform is not RAS-TO-RAS.  not supported.`, `ERROR_BADPARM`). The
+/// first transform's source centre, when its source geometry is not valid: the surface's own
+/// (`vg`), when valid; else that of `<folder>/../mri/orig` when it is a regular file whose header
+/// reads (then the source geometry and the surface's `vg` both become that volume's: `getVolGeom`);
+/// else 0. With a valid source geometry and a valid surface geometry whose centres differ by
+/// 1e-5 or more in a coordinate (`FZERO` with FreeSurfer's `FLT_EPSILON` as glibc's `float.h`
+/// defines it), two `WARNING:` lines on standard error. A destination geometry that is not valid
+/// takes MNI's average_305 centre (-0.0950, -16.5100, 9.7500, as `float`) when `USE_AVERAGE305` is
+/// set. Then the cached matrices: `SRASToTalSRAS_` ([`formats::get_sras_to_tal_sras`]) and its
+/// inverse `TalSRASToSRAS_` (`MatrixInverse`), `free_transform` 1. With `Gdiag`'s `DIAG_SHOW` and
+/// `DIAG_VERBOSE`, the `INFO:` lines on standard error. `MRIreadHeader` (track A's) is a placeholder
+/// that panics, reached only for an `.xfm` naming an existing volume or a regular `mri/orig`.
 pub fn read_transform(
     g: &mut Globals,
+    io: &mut Io,
     dir: Option<&Path>,
-    _mris: &mut Mris,
+    mris: &mut Mris,
     mris_fname: &str,
 ) -> Result<i32, Fatal> {
     if mris_fname.len() >= 300 {
@@ -371,7 +418,111 @@ pub fn read_transform(
     if !file_exists(dir, &transform_fname) {
         return Ok(ERROR_NO_FILE);
     }
-    lta_read_ex_pending(&transform_fname)
+    let mut lio = PendingLtaIo;
+    let Some(lta) = lta_read_ex(g, io.out, io.err, dir, &transform_fname, &mut lio)? else {
+        mris.lta = None;
+        log::error_printf(
+            g,
+            io.err,
+            ERROR_NOFILE,
+            &format!("mrisReadTransform: could not read xform file '{transform_fname}'"),
+        );
+        return Ok(ERROR_NO_FILE);
+    };
+    if lta.ltype != LINEAR_RAS_TO_RAS {
+        mris.lta = Some(lta);
+        log::error_exit(
+            g,
+            io.err,
+            ERROR_BADPARM,
+            "the transform is not RAS-TO-RAS.  not supported.",
+        )?;
+    } else {
+        mris.lta = Some(lta);
+    }
+    let show = g.gdiag & DIAG_SHOW != 0 && verbose_on(g);
+    let lt = &mut mris.lta.as_mut().expect("the transform just read").xforms[0];
+    if lt.src.valid == 0 {
+        if mris.vg.valid != 0 {
+            if show {
+                let _ = io.err.write_all(b"INFO: found the orig volume info on ");
+                let _ = io.err.write_all(mris.vg.fname.c_bytes());
+                let _ = io.err.write_all(b" in the surface data.\n");
+            }
+            lt.src.c_r = mris.vg.c_r;
+            lt.src.c_a = mris.vg.c_a;
+            lt.src.c_s = mris.vg.c_s;
+        } else {
+            let orig_fname = format!("{fpref}/../mri/orig");
+            let regular = std::fs::metadata(resolve(dir, &orig_fname)).is_ok_and(|m| m.is_file());
+            let orig = if regular {
+                lio.read_header(g, io.out, io.err, dir, &orig_fname)?
+            } else {
+                None
+            };
+            if let Some(orig) = orig {
+                get_vol_geom(&orig, &mut lt.src);
+                get_vol_geom(&orig, &mut mris.vg);
+                if show {
+                    let _ = io.err.write_all(
+                        b"INFO: found the orig volume (mri/orig) to get c_(ras) information for src\n",
+                    );
+                    let _ = io.err.write_all(b"INFO: added info to the surface.\n");
+                }
+            } else {
+                if show {
+                    let _ = io.err.write_all(
+                        b"INFO: cannot find mri/orig volume to get c_(ras) information.\n\
+                          INFO: transform src volume information cannot be found. assume c_(ras) = 0\n\
+                          INFO: destination surface points may be shifted in the volume.\n\
+                          INFO: you should put the src info in the transform.\n",
+                    );
+                }
+                lt.src.c_r = 0.0;
+                lt.src.c_a = 0.0;
+                lt.src.c_s = 0.0;
+            }
+        }
+    } else if mris.vg.valid != 0 {
+        let fz = |d: f32| f64::from(d).abs() < f64::from(f32::EPSILON);
+        if !fz(lt.src.c_r - mris.vg.c_r)
+            || !fz(lt.src.c_a - mris.vg.c_a)
+            || !fz(lt.src.c_s - mris.vg.c_s)
+        {
+            let f = |x: f32| fmt_f(f64::from(x), 0, 6);
+            let _ = write!(
+                io.err,
+                "WARNING: the source volume info is not consistent between the info contained\n\
+                 WARNING: in the surface data ({},{},{}) and that of the transform ({},{},{}).\n",
+                f(mris.vg.c_r),
+                f(mris.vg.c_a),
+                f(mris.vg.c_s),
+                f(lt.src.c_r),
+                f(lt.src.c_a),
+                f(lt.src.c_s)
+            );
+        }
+    }
+    if lt.dst.valid == 0 {
+        if show {
+            let _ = io.err.write_all(
+                b"INFO: transform dst volume information cannot be found.\n\
+                  INFO: if the target is MNI average_305, then you can do 'setenv USE_AVERAGE305 true'\n\
+                  INFO: otherwise c_(ras) is set to 0. destination surface points may be shifted.\n",
+            );
+        }
+        if io.env.get("USE_AVERAGE305").is_some() {
+            lt.dst.c_r = -0.0950_f64 as f32;
+            lt.dst.c_a = -16.5100_f64 as f32;
+            lt.dst.c_s = 9.7500_f64 as f32;
+        }
+    }
+    let lt = &mris.lta.as_ref().expect("the transform just read").xforms[0];
+    mris.SRASToTalSRAS_ = formats::get_sras_to_tal_sras(g, io, lt)?;
+    mris.TalSRASToSRAS_ =
+        matrix_inverse(g, io.out, io.err, mris.SRASToTalSRAS_.as_ref(), None)?.into_new();
+    mris.free_transform = 1;
+    Ok(NO_ERROR)
 }
 
 /// The hemisphere a surface name gives (`MRISreadOverAlloc_new`): from the first byte of its last
@@ -641,7 +792,7 @@ pub fn read_over_alloc(
     coords::compute_surface_dimensions(&mut mris);
     metric::compute_vertex_distances(g, io, &mut mris)?;
     mp_slow::compute_normals(g, sg, io, &mut mris);
-    read_transform(g, dir, &mut mris, fname)?;
+    read_transform(g, io, dir, &mut mris, fname)?;
     mris.radius = metric::average_radius(&mris);
     mp::compute_metric_properties(g, sg, io, &mut mris)?;
     metric::store_current_positions(g, io, &mut mris)?;

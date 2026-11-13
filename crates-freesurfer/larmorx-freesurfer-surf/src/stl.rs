@@ -489,8 +489,13 @@ pub fn read_stl(
     filename: &str,
 ) -> Result<Option<Mris>, Fatal> {
     let filename = c_str(filename);
-    let Ok(mut fp) = open(dir, filename, "rb") else {
-        return Ok(None);
+    let mut fp = match open(dir, filename, "rb") {
+        Ok(fp) => fp,
+        Err(e) => {
+            // the stream's failed open leaves `errno` (seen by a later error's message)
+            g.errno = e;
+            return Ok(None);
+        }
     };
     let mut bytes = Vec::new();
     let mut buf = [0u8; 65536];

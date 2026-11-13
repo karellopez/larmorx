@@ -2295,8 +2295,9 @@ Then, for every reader but the icosahedron:
    the surface's number of hops (1: §20), the vertex normals (§40's computation on the surface).
 6. The **Talairach transform**: with the name's folder `P` (the text before its last `/`, `.`
    without one; a name of 300 bytes or more: FS-356), when `P/../mri/transforms/talairach.xfm`
-   can be opened, it is read (fs.volume's transform reader, with the subject's `mri/orig` header
-   when the transform holds no source geometry; not part of this item yet); otherwise nothing.
+   can be opened (a folder of that name can), it is read by fs.volume's transform reader (`specs/
+   freesurfer-volume.md`, reading transforms: an `.xfm` by its name; its messages as that reader
+   gives them) and completed as §92 says; otherwise nothing.
 7. `radius` the mean radius (§90); the metric properties (§38); the current coordinates stored as
    the temporary set (§25's `TMP_VERTICES`: `tx`, `ty`, `tz`).
 8. When `<name>.avg.area.mgh` is readable (`Gdiag_no` >= 0 with verbose diagnostics first prints
@@ -2482,8 +2483,64 @@ vertices whose centre has 1,320 within 3 hops; one in 40 the same file read by a
 without the conversion, `MRISfastRead`) of those names or, one in 30, of a name without a file (`.asc`,
 `.tri`, `.stl`, `.geo`, `.vtk`, a volume name, `.MGH`). Each surface read is printed in full
 (counts, kind, room, hemisphere, name, `useRealRAS`, `orig_xyzspace`, patch, status, sizes, the
-distances' sizes and flags, `avg_nbrs`, `radius`, the group-average flag, the transform's presence,
-the volume geometry, box, centre, area totals; per vertex its coordinates, normal, area, original
+distances' sizes and flags, `avg_nbrs`, `radius`, the group-average flag, the transform's presence
+(with a transform, from relay 17, §93: its type, count, first transform's type, source and
+destination geometries and matrix, and the two Talairach matrices), the volume geometry, box, centre, area totals; per vertex its coordinates, normal, area, original
 area, curvature, temporary set, border, rip flag, mark, face list with places, the four counts and
 two sizes, the neighbour list and both distance lists to its size in use; per face its vertices, rip
 flag, area, angles and cached normal). Observed (relay 16): see the probe README.
+
+## 92. The Talairach transform of a surface read
+
+When the transform reader gives nothing, `mrisReadTransform: could not read xform file '<the
+transform's name>'` is an error (`ERROR_NOFILE`; with `errno` set, its text first, as every error)
+and the read goes on without a transform. A transform whose type is not RAS to RAS (an `.xfm` is
+always RAS to RAS) ends the program: `the transform is not RAS-TO-RAS.  not supported.` (code -4).
+Otherwise the surface keeps it and, with `D` = Gdiag's show and verbose bits both set, its first
+transform's source and destination are completed:
+
+- **Source not valid:** with the surface's own volume geometry valid, the source's centre
+  (`c_r`, `c_a`, `c_s`) becomes the surface's (`D`: `INFO: found the orig volume info on <the
+  geometry's file name> in the surface data.` on standard error); without it, when
+  `P/../mri/orig` is a regular file (not a folder: the usual COR folder is not read) whose header
+  can be read, the source and the surface's geometry both become that volume's (width, height,
+  depth, voxel sizes, axes, centre, file name, valid; `D`: `INFO: found the orig volume (mri/orig)
+  to get c_(ras) information for src` and `INFO: added info to the surface.`); else the source's
+  centre is 0, 0, 0 (`D`: four lines `INFO: cannot find mri/orig volume to get c_(ras)
+  information.`, `INFO: transform src volume information cannot be found. assume c_(ras) = 0`,
+  `INFO: destination surface points may be shifted in the volume.`, `INFO: you should put the src
+  info in the transform.`). Nothing else of the source changes (it stays not valid).
+- **Source valid** and the surface's geometry valid: when one of the three centre coordinates
+  differs by 1e-5 or more (the `float` difference, compared as a double: `fabs(d) < FLT_EPSILON`
+  false, `FLT_EPSILON` the C library's 2^-23 here; a NaN difference counts as differing), two lines
+  on standard error: `WARNING: the source volume info is not consistent between the info
+  contained` and `WARNING: in the surface data (<s_r>,<s_a>,<s_s>) and that of the transform
+  (<t_r>,<t_a>,<t_s>).` (each `%f`, the surface's first). Nothing changes.
+- **Destination not valid** (`D`: `INFO: transform dst volume information cannot be found.`,
+  `INFO: if the target is MNI average_305, then you can do 'setenv USE_AVERAGE305 true'`, `INFO:
+  otherwise c_(ras) is set to 0. destination surface points may be shifted.`): with the
+  environment variable `USE_AVERAGE305` set (to anything), its centre becomes (-0.0950, -16.5100,
+  9.7500), each the `float` nearest the decimal's `double` (it stays not valid). (With that variable
+  the transform reader itself has already given a destination average_305's whole geometry: see
+  its spec.)
+
+Then the surface's Talairach matrix is §64's `getSRASToTalSRAS` of the first transform (nothing
+when it cannot be made), its inverse that matrix's inverse by fs.core's `MatrixInverse` (nothing
+for a singular matrix or one with a non-finite element, with that function's messages), and the
+surface records that it owns the transform (`free_transform` 1). The read's other steps (§86) do
+not use the transform.
+
+## 93. Validation plan, part 14
+
+The probe's `srd` command (§91) from relay 17: each work folder also holds `mri/transforms`; one
+case in three gives the subject a `talairach.xfm` (and then two of three surfaces are put in `d/`,
+whose transform it is): one in 25 random bytes, otherwise MINC's text with its first line right (4
+in 6) or not, 0 to 3 comment lines (FreeSurfer's `%Generated by ... src <a> dst <b>`, minctracc's
+command line, MINC's GUI lines, `% avi2talxfm`, a blank line, `%`) naming volumes that do not
+exist (a name containing `average_305` gives that brain's geometry), the `Transform_Type` lines or
+not, and three rows of four numbers (one in 12 two rows; one in 20 a singular matrix; one number in
+60 a word). The probe never sets `USE_AVERAGE305` (the transform reader of fs.volume reads it from
+the process's environment) and never writes `mri/orig` as a file. Hand cases (the probe README): the
+surfaces with a valid geometry of seed 7, each with eight transforms (a source of average_305, a
+destination of it, both, neither, singular, NaN and infinite numbers, a wrong first line, two rows)
+and Gdiag's bits off and on. Observed (relay 17): see the probe README.

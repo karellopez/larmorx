@@ -2148,7 +2148,8 @@ void tri_case()
 // (with a subfolder d): Gdiag's bits, the environment (a mask: mrisCompleteTopology_new,
 // MRISfindNeighborsAtVertex_new, MRISfindNeighborsAtVertex_old, TRIANGULARSURFACE_NOEXTRA_READ,
 // FS_SKIP_TAGS, FS_GII=.gii, FREESURFER_always_check_vv, FS_FASTER_MP; the licence check's side door
-// always set), the case's input files, 1 or 2 reads (`r <name> <dotkr>`: MRISread; `f <name>`:
+// always set), the case's input files (with folders d and mri/transforms, where a case may put the
+// subject's talairach.xfm for the surfaces in d), 1 or 2 reads (`r <name> <dotkr>`: MRISread; `f <name>`:
 // MRISfastRead), each surface read printed in full: its counts, type, room, hemisphere, name,
 // coordinate spaces, sizes, distances' state, mean neighbour count, radius, group-average flag,
 // transform, volume geometry, box, metric totals; per vertex its coordinates, normal, area, original
@@ -2163,6 +2164,20 @@ void dump_srd_surface(MRIS *s)
   oi(s->patch); oi(s->status); oi(s->nsize); oi(s->max_nsize); oi(s->dist_nsize);
   oi(s->dist_orig_nsize); oi(s->dist_alloced_flags); of(s->avg_nbrs); od(s->radius);
   oi(s->group_avg_vtxarea_loaded); oi(s->lta != NULL); oi(s->free_transform);
+  if (s->lta) {
+    // relay 17: the Talairach transform MRISread found (its type, count, first transform's type,
+    // source and destination geometries and matrix) and the two matrices cached from it
+    oi(s->lta->type); oi(s->lta->num_xforms);
+    LT *lt = &s->lta->xforms[0];
+    oi(lt->type);
+    dump_vg(&lt->src);
+    dump_vg(&lt->dst);
+    for (MATRIX *mt : {lt->m_L, s->SRASToTalSRAS_, s->TalSRASToSRAS_}) {
+      if (!mt) { out += "NULL "; continue; }
+      for (int r = 1; r <= 4; r++)
+        for (int c = 1; c <= 4; c++) of(*MATRIX_RELT(mt, r, c));
+    }
+  }
   dump_vg(&s->vg);
   float b[10] = {s->xlo, s->ylo, s->zlo, s->xhi, s->yhi, s->zhi, s->xctr, s->yctr, s->zctr,
                  s->total_area};
@@ -2207,6 +2222,8 @@ void srd_case()
   clear_dir(workdir, true);
   if (chdir(workdir.c_str()) != 0) fail("chdir");
   mkdir("d", 0700);
+  mkdir("mri", 0700);
+  mkdir("mri/transforms", 0700);
   int gd = geti();
   if (gd & 1) Gdiag |= DIAG_SHOW;
   if (gd & 2) Gdiag |= DIAG_VERBOSE;

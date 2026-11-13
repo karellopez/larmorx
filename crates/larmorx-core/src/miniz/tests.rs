@@ -78,7 +78,7 @@ fn run(
             ip += r.consumed;
             op += r.produced;
             ret = r.ret;
-            if ret != MZ_OK || flush == MZ_FINISH {
+            if ret != MZ_OK || flush == MZ_FINISH || (r.consumed == 0 && r.produced == 0) {
                 break;
             }
         },
@@ -181,9 +181,10 @@ fn fs281_truncated_with_no_more_input() {
     let (_, out, _, _, ids) = run(cut, false, 0, 200, 0, Reproduce);
     assert_eq!(ids, vec!["FS-281"]);
     assert!(out.starts_with(b"ab"));
-    // with more input to come, the same cut only waits for it
+    // with more input to come, the same cut only waits for it (a call with no input then says
+    // it cannot go on: MZ_BUF_ERROR)
     let (ret, out, _, _, ids) = run(cut, false, 1, 200, 200, Fix);
-    assert_eq!(ret, MZ_OK);
+    assert_eq!(ret, MZ_BUF_ERROR);
     assert!(ids.is_empty() && out.starts_with(b"ab"));
 }
 
@@ -324,4 +325,4 @@ fn digest_of_generated_streams() {
     assert_eq!(h, DIGEST, "{h:#018x}");
 }
 
-const DIGEST: u64 = 0;
+const DIGEST: u64 = 0x01bd_8f8d_e15f_f052;

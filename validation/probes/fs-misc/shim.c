@@ -72,7 +72,7 @@ int probe_inflate(const unsigned char *in, long in_len, int window_bits, int how
       ret = mz_inflate(&s, flush);
       ip += ai - s.avail_in;
       op += ao - s.avail_out;
-      if (ret != MZ_OK || flush == MZ_FINISH) break;
+      if (ret != MZ_OK || flush == MZ_FINISH || (ai == s.avail_in && ao == s.avail_out)) break;
     }
   }
   *out_len = op;

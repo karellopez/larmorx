@@ -63,3 +63,12 @@ the missing end-of-block code (the stream simply never ends).
 - The probe `validation/probes/fs-misc` (README there; closed: its `facts.cpp` includes
   FreeSurfer's headers): miniz 1.15 r4 and FreeSurfer 8.2.0's copy compiled by GCC 8.4.0 against
   `larmorx_core::miniz`; numbers below.
+
+## The probe's numbers
+
+Scale 1 (`<workspace>/oracles/logs/fs-found-c-r8-misc-probe-1.log`, VERIFY-PASS): 6,000 streams,
+24,000 inflate runs per implementation: miniz 1.15 r4 and FreeSurfer 8.2.0's copy identical in
+all 24,000; `reproduce` identical to miniz in 23,960 (the other 40: FS-282's writes past the
+buffer, never reproduced); `fix` identical to miniz in the 19,576 runs where it named no defect
+(the others named FS-281 903, FS-282 1,278, FS-283 1,032, FS-284 1,211 times); `mz_uncompress`
+1,000 runs identical.

@@ -12,7 +12,7 @@ use crate::cfmt::Streams;
 
 /// A handler: the default Unix one, none (`TIFFSet...Handler(NULL)`: nothing written), or the
 /// caller's own (module, message, streams).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+#[derive(Clone, Copy, Debug, Default)]
 pub enum Handler {
     #[default]
     Unix,
@@ -21,7 +21,7 @@ pub enum Handler {
 }
 
 /// The two library-wide handlers (`_TIFFerrorHandler`, `_TIFFwarningHandler`).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct TiffMessages {
     pub error: Handler,
     pub warning: Handler,
@@ -94,11 +94,14 @@ mod tests {
             "Fax3Decode: a.tif: Bad code word at scanline 7 (x 12).\nWarning, unknown field with \
              tag 50000 (0xc350) ignored.\n.\n"
         );
-        assert_eq!(t.set_error_handler(Handler::None), Handler::Unix);
+        assert!(matches!(t.set_error_handler(Handler::None), Handler::Unix));
         fn mine(m: Option<&str>, s: &str, st: &mut dyn Streams) {
             st.out(&format!("[{}|{s}]", m.unwrap_or("-")));
         }
-        assert_eq!(t.set_warning_handler(Handler::Custom(mine)), Handler::Unix);
+        assert!(matches!(
+            t.set_warning_handler(Handler::Custom(mine)),
+            Handler::Unix
+        ));
         let mut c = Captured::default();
         t.error(Some("m"), "x", &mut c);
         t.warning(Some("m"), "y", &mut c);

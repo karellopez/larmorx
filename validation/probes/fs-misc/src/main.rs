@@ -91,7 +91,12 @@ fn c_run(lib: &Lib, input: &[u8], wb: i32, how: i32, room: usize, piece: usize) 
         )
     };
     out.truncate(n as usize);
-    Obs { ret, out, total_in: ti, adler: ad }
+    Obs {
+        ret,
+        out,
+        total_in: ti,
+        adler: ad,
+    }
 }
 
 fn rust_run(
@@ -133,14 +138,25 @@ fn rust_run(
             ip += r.consumed;
             op += r.produced;
             ret = r.ret;
-            if ret != miniz::MZ_OK || flush == miniz::MZ_FINISH {
+            if ret != miniz::MZ_OK
+                || flush == miniz::MZ_FINISH
+                || (r.consumed == 0 && r.produced == 0)
+            {
                 break;
             }
         },
     }
     out.truncate(op);
     let ids = s.notices.as_slice().iter().map(|n| n.defect.id).collect();
-    (Obs { ret, out, total_in: s.total_in, adler: s.adler }, ids)
+    (
+        Obs {
+            ret,
+            out,
+            total_in: s.total_in,
+            adler: s.adler,
+        },
+        ids,
+    )
 }
 
 /// A random stream of 1 to 4 blocks (stored, fixed, dynamic), sometimes with one undefined
@@ -166,7 +182,11 @@ fn random_stream(rng: &mut Rng, max_len: usize, odd: bool) -> (Vec<u8>, Vec<u8>)
             let at = rng.below(toks.len() as u64 + 1) as usize;
             let t = match rng.below(5) {
                 0 => Tok::Raw(286 + rng.below(2) as u32, 0, Some((rng.below(4) as u32, 0))),
-                1 => Tok::Raw(257 + rng.below(20) as u32, 0, Some((30 + rng.below(2) as u32, 0))),
+                1 => Tok::Raw(
+                    257 + rng.below(20) as u32,
+                    0,
+                    Some((30 + rng.below(2) as u32, 0)),
+                ),
                 2 => Tok::Match(3 + rng.below(20) as u32, 1 + rng.below(40_000) as u32),
                 3 => Tok::Raw(257, 0, None),
                 _ => Tok::Bits(rng.below(256) as u32, 1 + rng.below(8) as u32),
@@ -178,7 +198,9 @@ fn random_stream(rng: &mut Rng, max_len: usize, odd: bool) -> (Vec<u8>, Vec<u8>)
         } else {
             let (ll, mut dl) = streams::lengths_for(rng, &toks);
             if odd && rng.below(3) == 0 {
-                dl = vec![1 + rng.below(15) as u32];
+                let n = dl.len();
+                dl = vec![0; n];
+                dl[0] = 1 + rng.below(15) as u32;
             }
             let rle = rng.below(2) == 1;
             streams::dynamic(&mut b, rng, &toks, &ll, &dl, rle, last);
@@ -192,7 +214,9 @@ fn main() {
     let args: Vec<String> = std::env::args().collect();
     let dir = Path::new(&args[1]);
     let scale: u64 = args.get(2).map_or(1, |s| s.parse().unwrap());
-    let only: Option<u64> = std::env::var("LXPROBE_ONLY_CASE").ok().map(|s| s.parse().unwrap());
+    let only: Option<u64> = std::env::var("LXPROBE_ONLY_CASE")
+        .ok()
+        .map(|s| s.parse().unwrap());
     let up = load(&dir.join("libup.so"));
     let fsl = load(&dir.join("libfs.so"));
     let mut fails = 0u64;
@@ -206,7 +230,11 @@ fn main() {
         let odd = case % 3 == 2;
         let (raw, data) = random_stream(&mut rng, if case % 50 == 0 { 70_000 } else { 700 }, odd);
         let zlib = case % 2 == 1;
-        let mut input = if zlib { streams::zlib(&raw, &data) } else { raw };
+        let mut input = if zlib {
+            streams::zlib(&raw, &data)
+        } else {
+            raw
+        };
         match case % 7 {
             1 => input.truncate(rng.below(input.len() as u64 + 1) as usize),
             2 => {
@@ -238,12 +266,22 @@ fn main() {
             if r == a {
                 repro_same += 1;
             } else if ids.contains(&"FS-282") && r.ret == miniz::MZ_DATA_ERROR {
-                *explained.entry("reproduce: FS-282 past the buffer".into()).or_default() += 1;
+                *explained
+                    .entry("reproduce: FS-282 past the buffer".into())
+                    .or_default() += 1;
             } else {
                 fails += 1;
                 eprintln!(
                     "case {case} how {how}/{piece} room {room}: reproduce differs {:?} vs C ret {} out {} ti {} ad {:#x}; rust ret {} out {} ti {} ad {:#x}",
-                    ids, a.ret, a.out.len(), a.total_in, a.adler, r.ret, r.out.len(), r.total_in, r.adler
+                    ids,
+                    a.ret,
+                    a.out.len(),
+                    a.total_in,
+                    a.adler,
+                    r.ret,
+                    r.out.len(),
+                    r.total_in,
+                    r.adler
                 );
             }
             let (x, ids) = rust_run(&input, wb, how, room, piece, Fix);
@@ -255,7 +293,9 @@ fn main() {
                     eprintln!("case {case} how {how}/{piece}: fix without a notice differs");
                 }
             } else {
-                *explained.entry(format!("fix: {}", ids.join("+"))).or_default() += 1;
+                *explained
+                    .entry(format!("fix: {}", ids.join("+")))
+                    .or_default() += 1;
             }
         }
     }
@@ -271,16 +311,28 @@ fn main() {
         let mut co = vec![0u8; room + 16];
         let mut n: c_long = 0;
         // SAFETY: buffers of the lengths passed.
-        let cr = unsafe { (up.uncompress)(z.as_ptr(), z.len() as c_long, co.as_mut_ptr(), room as c_long, &mut n) };
+        let cr = unsafe {
+            (up.uncompress)(
+                z.as_ptr(),
+                z.len() as c_long,
+                co.as_mut_ptr(),
+                room as c_long,
+                &mut n,
+            )
+        };
         let mut ro = vec![0u8; room];
         let mut len = room as u64;
         let (rr, notes) = miniz::uncompress(&mut ro, &mut len, &z, Reproduce);
         unc.0 += 1;
-        let same = cr == rr && (cr != miniz::MZ_OK || (len == n as u64 && ro[..len as usize] == co[..len as usize]));
+        let same = cr == rr
+            && (cr != miniz::MZ_OK
+                || (len == n as u64 && ro[..len as usize] == co[..len as usize]));
         if same {
             unc.1 += 1;
         } else if notes.contains(&larmorx_core::defects::FS_282) {
-            *explained.entry("uncompress: FS-282 past the buffer".into()).or_default() += 1;
+            *explained
+                .entry("uncompress: FS-282 past the buffer".into())
+                .or_default() += 1;
         } else {
             fails += 1;
             eprintln!("uncompress case {case}: C {cr} n {n}, rust {rr} len {len}");
@@ -292,7 +344,11 @@ fn main() {
     let mut recs = Vec::new();
     let mut want = Vec::new();
     for k in 0..20_000 * scale {
-        let n = if k < 300 { k as usize } else { rng.below(3000) as usize };
+        let n = if k < 300 {
+            k as usize
+        } else {
+            rng.below(3000) as usize
+        };
         let bytes: Vec<u8> = (0..n).map(|_| rng.below(256) as u8).collect();
         recs.extend_from_slice(&(n as u32).to_le_bytes());
         recs.extend_from_slice(&bytes);
@@ -315,7 +371,9 @@ fn main() {
             0 => None,
             _ => Some(format!("Mod{}", rng.below(1000))),
         };
-        let msg: String = (0..rng.below(80)).map(|_| (b' ' + rng.below(95) as u8) as char).collect();
+        let msg: String = (0..rng.below(80))
+            .map(|_| (b' ' + rng.below(95) as u8) as char)
+            .collect();
         lines.push_str(&format!("{}\t{}\n", module.as_deref().unwrap_or("-"), msg));
         t.error(module.as_deref(), &msg, &mut expect);
         t.warning(module.as_deref(), &msg, &mut expect);
@@ -342,7 +400,9 @@ fn main() {
         eprintln!("constants differ:\n{consts}");
     }
 
-    println!("inflate: {runs} runs; miniz 1.15 = FreeSurfer's copy in {same_up_fs}; reproduce = miniz in {repro_same}; fix without a notice = miniz in {fix_same}");
+    println!(
+        "inflate: {runs} runs; miniz 1.15 = FreeSurfer's copy in {same_up_fs}; reproduce = miniz in {repro_same}; fix without a notice = miniz in {fix_same}"
+    );
     println!("uncompress: {} runs, reproduce = miniz in {}", unc.0, unc.1);
     for (k, v) in &explained {
         println!("  explained {k}: {v}");
@@ -350,7 +410,14 @@ fn main() {
     println!("fnv: {} records, identical {fnv_same}", want.len());
     println!("tiff: {} messages, identical {tiff_same}", 2 * 2000 * scale);
     println!("constants identical {consts_same}");
-    println!("{}", if fails == 0 { "VERIFY-PASS" } else { "VERIFY-FAIL" });
+    println!(
+        "{}",
+        if fails == 0 {
+            "VERIFY-PASS"
+        } else {
+            "VERIFY-FAIL"
+        }
+    );
     std::process::exit(if fails == 0 { 0 } else { 1 });
 }
 
@@ -367,5 +434,8 @@ fn run_facts(exe: &Path, mode: &str, stdin: &[u8]) -> (String, String) {
     let w = std::thread::spawn(move || input.write_all(&data));
     let o = child.wait_with_output().unwrap();
     w.join().unwrap().unwrap();
-    (String::from_utf8_lossy(&o.stdout).into_owned(), String::from_utf8_lossy(&o.stderr).into_owned())
+    (
+        String::from_utf8_lossy(&o.stdout).into_owned(),
+        String::from_utf8_lossy(&o.stderr).into_owned(),
+    )
 }

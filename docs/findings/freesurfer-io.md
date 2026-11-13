@@ -372,3 +372,99 @@ relay 13. The behaviour is in `specs/freesurfer-io.md` §19-24; the defect texts
   `.npy` cases now read `x.npy` in the fixture on both; (3) in the first full run two piece-2 cases
   (`ctr`, `ztr`) ended by the probe's 5-second alarm (`CRASH 14`) while six agents loaded the machine;
   run alone, both gave the port's lines at once.
+
+## Part 4: the volume format probe (3.1-27, piece 1)
+
+**Restricted** (closed to FreeSurfer clean-room implementers: it cites FreeSurfer's source). Track A,
+relay 14. The behaviour is in `specs/freesurfer-io.md` §25-33; the defect texts (behaviour only) in
+`larmorx_core::defects` (FS-221 to FS-228). Ported: `utils/mri_identify.cpp` whole (lines 47-1208;
+697-1195 taken early from 3.1-28 because `mri_identify` calls every test), `MRIgetVolumeName`
+(mriio.cpp 472-486, from 3.1-28), `checkBrukerFiles` and `is_bruker` (Bruker.cpp 201-260, 834-849),
+`ghc`, `ghi`, `ghf`, `get_signa_header_info`, `is_signa` (signa.cpp 69-198, from 3.1-30), `IsDICOM`,
+`IsSiemensDICOM`, `GetObjectFromFile`, `GetElementFromFile`, `AllocElementData`, `FreeElementData`
+and `DCMPrintCond` as the Manufacturer element reaches them (DICOMRead.cpp 1164-1460, 1479-1522,
+5410-5549), `DCM_GetElement` and `DCM_GetElementValue` (CTN's dcm.c 949-1100, 2699-2717, as
+FreeSurfer's copy has them) for that element only.
+
+### Mechanisms of FS-221 to FS-228
+
+- **FS-221.** Fixed buffers filled by `strcpy`/`strcat`/`sprintf` without a bound: `mri_identify`'s
+  `char fname[STRLEN]` (MRIgetVolumeName's `strcpy(name_only, string)`, mri_identify.cpp 203-209,
+  mriio.cpp 476), `string_to_type`'s `char ls[STRLEN]` (154), `is_analyze`'s `hfname[STRLEN]` (`strcpy`
+  731 and `strcat(".hdr")` 739), `is_sdt`'s `header_fname[STR_LEN]` (980, 983-985), `is_nifti1`'s
+  `fname_stem[STRLEN]` (1036), `IsDICOM`'s `static char file[1024]` (DICOMRead.cpp 5417, filled 5430: a static, so it
+  overwrites the next statics), `is_bruker`'s five `char ...File[512]` (Bruker.cpp 837-841, filled by
+  `checkBrukerFiles`' `strcpy`+`strcat` 214-252), `IDtypeFromStem`'s and `IDnameFromStem`'s `char
+  tmpstr[2000]` (`sprintf("%s.nii")` ... `"%s_000.bfloat"`), `bhdr_precisionstring`'s and
+  `bhdr_precision`'s `tmpstr[2000]`. The official build aborts on the stack protector's canary for
+  `string_to_type` of 1,030 bytes (probe: `CRASH 6`). Every name the C functions then use is still the
+  whole string (the copy keeps its terminator past the buffer), so both modes use it whole; the probe
+  counts these lines, never compares them.
+- **FS-222.** `is_mnc` (mri_identify.cpp 776-781): `for (dot--; *dot != '.' && dot > fname; dot--)`
+  starts one byte before a dot at the name's start and reads it before testing `dot > fname`, then
+  compares from there; the compared text's second byte is the name's dot against `m`, so the answer is
+  always "no". The port starts at the name.
+- **FS-223.** `is_mgh` (802-815) compares `fname`, not `ext`, with `.mgh`/`.mgz`/`.mgh.gz` (its comment
+  describes the extension); `ext` is computed and unused. No caller in FreeSurfer 8.2.0.
+- **FS-224.** `is_signa` (signa.cpp 189): `if ((ret = fread(h, ...)) != HLENGTH) return (0);` before
+  `fclose(fp)`.
+- **FS-225.** `ghi` (signa.cpp 77-91): `num = (num << 8) | *(header + 2*offset + i)` with `char` signed
+  on x86-64 (the official build's `movsbl`): the second byte's sign extension ORs ones into the high
+  bits. The first byte's sign extension is a 16-bit signed reading, so the correction keeps it.
+- **FS-226.** `IDextensionFromName` (486-535) `strncpy`s the last 3/4/6/11 bytes into `ext` and
+  compares them with `nii` ... without looking at the byte before (`IDstemFromName` compares `.nii`
+  with the dot). Callers: `MRISfileNameType` (mrisurf_io.cpp 2561: a name it takes for a volume is
+  read and written as a volume), mri_convert's frame splitting, mri_surf2surf, mrisutils.
+- **FS-227.** `AllocElementData` (DICOMRead.cpp 1252-1305) gives US/SS 2 bytes, UL/SL/AT/FL 4, FD
+  `multiplicity` x 8 (`calloc`), then `DCM_GetElementValue` `memcpy`s the element's whole length into it
+  (dcm.c 1059): a longer value writes past the allocation (within glibc's minimum chunk of 24
+  usable bytes the answer is the text up to the first zero; beyond, memory). The comparison is
+  `strcmp(e->d.string, "SIEMENS")` on the union's pointer.
+- **FS-228.** Representations `AllocElementData` has no case for (OT, UT, DD, RET, CTX, DLM) leave
+  `d.ot` NULL after its message; `DCM_GetElementValue` then `memcpy`s into NULL (a value of 1 byte or
+  more) or returns normally and `strcmp(NULL, ...)` faults (length 0): SIGSEGV either way (probe:
+  `CRASH 11`). A string representation with an undefined length (CTN keeps the value unread, FS-91)
+  allocates `length + 17` = 16 bytes (32-bit wrap) and writes `d.string[0xffffffff]`.
+
+### Other facts
+
+- `FreeElementData` (1408-1460) has no case for UN (which `AllocElementData` handles as text): it
+  prints `FreeElementData: 21 unrecognized` without a newline and leaks the value. A Manufacturer
+  stored as UN (explicit VR files) prints it on every `IsSiemensDICOM`: kept in both modes (rule C, no
+  result depends on it), noted here only.
+- `checkBrukerFiles` prints `INFO:    d3proc %s` for the reco file too (a copied line, 256): kept.
+- `IDtypeFromStem` does not look for `.img` while `IDnameFromStem` does; `IDtypeFromStem` has no caller.
+- `is_sdt` replaces the extension found anywhere in the name (`a.d/s` looks for `a.spr`): FreeSurfer's
+  convention for extensions throughout the file; kept.
+- `ghf`: the union's `long ii` is 8 bytes; only its low 4 are written before `thing.ii >> 24`, `&
+  sign_bit` and `& dmantissa`, which use bits 0-31 only: the uninitialised high half never reaches the
+  result. A zero fraction keeps the exponent (GE's `mvtsunf`): `0x40000000` is 0.0005, not 0.
+- `is_signa`'s sums: `fabs(float)` is libstdc++'s `float` overload (the official build's `andps` and
+  `addss`), compared with the `double` literal after `cvtss2sd`.
+- `IsDICOM`'s fourth attempt (`DCM_FORMATCONVERSION | DCM_ACCEPTVRMISMATCH`) is always refused by CTN
+  before the file is opened (no byte order). After a failed attempt the reader may already have closed
+  the object, so the next `DCM_CloseObject` pushes "NULL object passed to routine DCM_CloseObject"
+  (track C's finding, docs/findings/freesurfer-permissive.md); the stack is emptied at the end.
+- `GetObjectFromFile` (DICOMRead.cpp 1207-1243) repeats the four opens with `options | DCM_ACCEPTVRMISMATCH`
+  and does not empty the stack between them; `GetElementFromFile` empties it only on success, so a
+  missing Manufacturer leaves the failed attempts' conditions and "Requested element (8 70) not found
+  in DCM_GetElementVM" on the stack (the probe dumps it after each case).
+- `errno`: most tests set it to 0 after a failed `fopen` or short `fread`; `is_cor`, `is_bruker` and
+  `checkBrukerFiles` keep `stat`'s error; `IDisCurv`, `is_signa` and `IsDICOM` keep `fopen`'s, and
+  `IDisCurv` and `is_signa` keep the failed read's (21 for a folder). The port's `CFile` now fails a
+  folder's reads with `EISDIR` on every platform (on Windows it used to give an empty file) and keeps
+  the read's error (`read_errno`).
+- Two points for larmorx-io (track C's `larmorx_io::dicom`, told through the orchestrator): (1)
+  `CondStack::dump` writes the stack's texts through `cfmt::Streams` (`&str`), so a message holding a
+  byte that is not UTF-8 (a broken VR code, `DCM Unrecognized VR code (P\xbd)`) prints U+FFFD; the
+  port prints the stack with its own byte-exact dump (`dicom_probe::dump_conditions`); (2) `open_file`
+  uses one path both to open the file and in CTN's messages: the port passes the name joined to the
+  program's folder, so CTN's messages show that path where FreeSurfer shows the name as given (only
+  with `FS_DICOM_DEBUG` or in a dumped stack; the probe shows them relative to its fixture). A variant
+  taking the name for the messages would close both.
+
+### The probe's piece-4 commands
+
+`sty`, `tts`, `mgvn`, `mid`, `isx`, `idf`, `dcm` (validation/probes/fs-io/fsio.cpp's `run_piece4` and
+`setup`; the port's side `tests/fs_io/piece4.rs`). Each file case makes its files in the fixture's
+`w` folder (removed first). Results: below, "Measured (piece 4)".

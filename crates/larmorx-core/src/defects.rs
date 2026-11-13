@@ -1555,6 +1555,12 @@ defects! {
         "the discrete curvatures (MRIScomputeSecondFundamentalFormDiscrete, mris_curvature's), at a vertex whose faces do not form one fan around it (a vertex on the surface's border, two fans meeting at one vertex), read before the vertex's face list and can write past their own list (an undefined result or a crash) before reporting the vertex";
     FS_373 = "FS-373", "FreeSurfer", true,
         "the discrete curvatures' sign of two faces (FACES_Hcurvature_determineSign), given a face that names one vertex twice, read the vertex before the surface's first (an undefined sign)";
+    FS_374 = "FS-374", "FreeSurfer", true,
+        "the area errors as a surface's curvature (MRISuseAreaErrors) divide each vertex's area change by zero instead of its face count: every vertex's value is infinite or not a number";
+    FS_375 = "FS-375", "FreeSurfer", true,
+        "the principal curvatures and their functions as a surface's curvature (MRISuseK1Curvature, MRISuseK2Curvature, MRISusePrincipalCurvatureFunction; mris_curvature_stats) give a range that includes the first vertex's previous curvature value, which no vertex has any more (a range wider than the values, or not a number)";
+    FS_376 = "FS-376", "FreeSurfer", true,
+        "the principal curvatures and their functions as a surface's curvature (MRISuseK1Curvature, MRISuseK2Curvature, MRISusePrincipalCurvatureFunction), on a surface without vertices, read memory outside the surface (an undefined range)";
     FS_221 = "FS-221", "FreeSurfer", true,
         "the volume format probe (mri_identify, the format tests and the volume-name helpers) misbehaves for a file name of 1,024 bytes or more (a Bruker study's file names of 512 or more, the stem helpers' names of 2,000 or more): its answer is undefined and the program can crash";
     FS_222 = "FS-222", "FreeSurfer", true,

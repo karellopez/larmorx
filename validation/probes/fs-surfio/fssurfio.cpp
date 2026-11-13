@@ -2780,6 +2780,127 @@ void mpd_case()
   }
 }
 
+// ---- relay 20: mpe, the rest of 3.1-51 (mrisurf_metricProperties.cpp 9395-13617) ----------------
+
+// the probe's functions of k1 and k2 for MRISusePrincipalCurvatureFunction
+float upf0(float k1, float k2) { (void)k2; return k1 + 1.0f; }
+float upf1(float k1, float k2) { (void)k1; return k2 * 0.5f; }
+float upf2(float k1, float k2) { return k1 > k2 ? k1 : k2; }
+
+void dump_curv_only(MRIS *s)
+{
+  of(s->min_curv); of(s->max_curv);
+  for (int vno = 0; vno < s->nvertices; vno++) of(s->vertices[vno].curv);
+}
+
+// mpe: Gdiag's bits (1 show, 2 verbose), a surface file read by MRISread (d/lh.s0), the status
+// (-1: the read's), Kmin, Kmax, Hmin, Hmax or not, for each vertex a mask (1 ripped, 2 marked: a
+// number, 4 current position, 8 normal, 16 curv, 32 k1 and k2, 64 K and H, 128 area, 256 original
+// position) with its values, for each face a mask (1 ripped, 2 area, 4 cached original area, 8
+// cached normal) with its values, then the operations, each printing what it gives
+void mpe_case()
+{
+  mkdir(workdir.c_str(), 0700);
+  clear_dir(workdir, true);
+  if (chdir(workdir.c_str()) != 0) fail("chdir");
+  mkdir("d", 0700);
+  int gd = geti();
+  if (gd & 1) Gdiag |= DIAG_SHOW;
+  if (gd & 2) Gdiag |= DIAG_VERBOSE;
+  setenv("SURFER_SIDEDOOR", "1", 1);
+  std::string bytes = geth();
+  FILE *fp = fopen("d/lh.s0", "wb");
+  if (!fp) fail("the surface file");
+  fwrite(bytes.data(), 1, bytes.size(), fp);
+  fclose(fp);
+  errno = 0;
+  MRIS *s = MRISread("d/lh.s0");
+  if (!s) { out += "NULL "; return; }
+  int nv = geti(), nf = geti();
+  if (nv != s->nvertices || nf != s->nfaces) { oi(s->nvertices); oi(s->nfaces); out += "COUNTS "; return; }
+  int status = geti();
+  if (status >= 0) s->status = (MRIS_Status)status;
+  if (geti()) { s->Kmin = getf(); s->Kmax = getf(); s->Hmin = getf(); s->Hmax = getf(); }
+  for (int vno = 0; vno < nv; vno++) {
+    VERTEX *v = &s->vertices[vno];
+    int m = geti();
+    if (m & 1) v->ripflag = 1;
+    if (m & 2) v->marked = geti();
+    if (m & 4) { v->x = getf(); v->y = getf(); v->z = getf(); }
+    if (m & 8) { v->nx = getf(); v->ny = getf(); v->nz = getf(); }
+    if (m & 16) v->curv = getf();
+    if (m & 32) { v->k1 = getf(); v->k2 = getf(); }
+    if (m & 64) { v->K = getf(); v->H = getf(); }
+    if (m & 128) v->area = getf();
+    if (m & 256) { v->origx = getf(); v->origy = getf(); v->origz = getf(); }
+  }
+  for (int fno = 0; fno < nf; fno++) {
+    int m = geti();
+    if (m & 1) s->faces[fno].ripflag = 1;
+    if (m & 2) s->faces[fno].area = getf();
+    if (m & 4) setFaceOrigArea(s, fno, getf());
+    if (m & 8) { float a = getf(), b = getf(), c = getf(); setFaceNorm(s, fno, a, b, c); }
+  }
+  int nops = geti();
+  for (int k = 0; k < nops; k++) {
+    std::string op = next();
+    out += op + " ";
+    if (op == "ssn") {
+      oi(MRISsmoothSurfaceNormals(s, geti()));
+      for (int vno = 0; vno < s->nvertices; vno++) {
+        VERTEX *v = &s->vertices[vno];
+        of(v->nx); of(v->ny); of(v->nz); of(v->tdx); of(v->tdy); of(v->tdz);
+      }
+    } else if (op == "cbn") {
+      oi(mrisComputeBoundaryNormals(s));
+    } else if (op == "cmc") {
+      oi(MRIScomputeMeanCurvature(s));
+      of(s->min_curv); of(s->max_curv);
+      for (int vno = 0; vno < s->nvertices; vno++) {
+        VERTEX *v = &s->vertices[vno];
+        of(v->H); of(v->e1x); of(v->e1y); of(v->e1z); of(v->e2x); of(v->e2y); of(v->e2z);
+      }
+    } else if (op == "uae" || op == "ugc" || op == "umc" || op == "upc" || op == "uk1" || op == "uk2" || op == "upf") {
+      int r;
+      if (op == "uae") r = MRISuseAreaErrors(s);
+      else if (op == "ugc") r = MRISuseGaussianCurvature(s);
+      else if (op == "umc") r = MRISuseMeanCurvature(s);
+      else if (op == "upc") r = MRISusePrincipalCurvature(s);
+      else if (op == "uk1") r = MRISuseK1Curvature(s);
+      else if (op == "uk2") r = MRISuseK2Curvature(s);
+      else {
+        int w = geti();
+        r = MRISusePrincipalCurvatureFunction(s, w == 0 ? upf0 : w == 1 ? upf1 : upf2);
+      }
+      oi(r);
+      dump_curv_only(s);
+    } else if (op == "cci") {
+      double ici = 7, fi = 7;
+      MRIScomputeCurvatureIndices(s, &ici, &fi);
+      od(ici); od(fi);
+    } else if (op == "mxr") {
+      od(MRISmaxRadius(s));
+      of(s->xlo); of(s->ylo); of(s->zlo); of(s->xhi); of(s->yhi); of(s->zhi);
+    } else if (op == "cac") {
+      if (geti()) {
+        double sigma = 7;
+        od(MRIScomputeAverageCurvature(s, &sigma));
+        od(sigma);
+      } else {
+        od(MRIScomputeAverageCurvature(s, NULL));
+      }
+      oi(errno);
+    } else if (op == "mnv") {
+      oi(MRISmarkNegativeVertices(s, geti()));
+      for (int vno = 0; vno < s->nvertices; vno++) oi(s->vertices[vno].marked);
+    } else if (op == "rnv") {
+      oi(MRISripNegativeVertices(s));
+      for (int vno = 0; vno < s->nvertices; vno++) oi(s->vertices[vno].ripflag);
+      for (int fno = 0; fno < s->nfaces; fno++) oi(s->faces[fno].ripflag);
+    } else fail("mpe op");
+  }
+}
+
 void run_case()
 {
   std::string cmd = next();
@@ -3012,6 +3133,8 @@ void run_case()
     mpc_case();
   } else if (cmd == "mpd") {
     mpd_case();
+  } else if (cmd == "mpe") {
+    mpe_case();
   } else if (cmd == "names") {
     int n = geti();
     keep.reserve(n);

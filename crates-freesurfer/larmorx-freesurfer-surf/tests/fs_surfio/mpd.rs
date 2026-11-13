@@ -23,7 +23,7 @@ fn fh(t: &mut Vec<String>, g: &mut Gen, heavy: bool) {
 /// The icosahedron subdivided `levels` times, on a sphere of radius `r` (each new vertex the edge's
 /// midpoint scaled to `r` with `float`'s square root, so the inputs are the same on every
 /// platform), each coordinate moved by `k/64` now and then.
-fn ico(g: &mut Gen, levels: u32, r: f32) -> Mesh {
+pub(super) fn ico(g: &mut Gen, levels: u32, r: f32) -> Mesh {
     let mut v: Vec<[f32; 3]> = ICOSA_V.to_vec();
     let mut f: Vec<[i64; 3]> = ICOSA_F.to_vec();
     for _ in 0..levels {
@@ -62,7 +62,7 @@ fn ico(g: &mut Gen, levels: u32, r: f32) -> Mesh {
 }
 
 /// An open `w` by `h` grid of squares split into triangles (alternately), its heights `k/16`.
-fn grid(g: &mut Gen, w: i64, h: i64) -> Mesh {
+pub(super) fn grid(g: &mut Gen, w: i64, h: i64) -> Mesh {
     let mut v = Vec::new();
     for j in 0..h {
         for i in 0..w {

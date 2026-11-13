@@ -20,6 +20,15 @@ const TWO_32: f64 = 4_294_967_296.0;
 /// 2⁶³: from there x86-64's conversion to a 64-bit integer gives its "integer indefinite".
 const TWO_63: f64 = 9_223_372_036_854_775_808.0;
 
+/// A shape as the notices and errors write it: Rust's shortest form, in exponent form from 10¹⁶.
+pub(super) fn shape_text(a: f64) -> String {
+    if a.is_finite() && a.abs() >= 1e16 {
+        format!("{a:e}")
+    } else {
+        format!("{a}")
+    }
+}
+
 /// The square root with SSE's NaNs: a NaN passed on quieted, the default NaN for a negative
 /// number (`sqrtsd`).
 #[inline]
@@ -137,8 +146,9 @@ impl Ranlux {
             self.notices.add(
                 &FS_100,
                 format!(
-                    "FreeSurfer's gamma draw takes the shape {a}, which is not a finite number, \
-                     for a shape below 1"
+                    "FreeSurfer's gamma draw takes the shape {}, which is not a finite number, \
+                     for a shape below 1",
+                    shape_text(a)
                 ),
             );
             return Ok(mul_f64(self.g_frac(a)?, b));
@@ -170,8 +180,9 @@ impl Ranlux {
             self.notices.add(
                 &FS_100,
                 format!(
-                    "FreeSurfer's gamma draw truncates the shape {a} to 32 bits ({truncated}) \
-                     and gives a value of the wrong size; larmorx uses the whole shape"
+                    "FreeSurfer's gamma draw truncates the shape {} to 32 bits ({truncated}) \
+                     and gives a value of the wrong size; larmorx uses the whole shape",
+                    shape_text(a)
                 ),
             );
             let gl = self.g_large(fl)?;
@@ -185,8 +196,9 @@ impl Ranlux {
         self.notices.add(
             &FS_100,
             format!(
-                "FreeSurfer's gamma draw truncates the shape {a} to 32 bits ({truncated}) and \
-                 gives a value of the wrong size"
+                "FreeSurfer's gamma draw truncates the shape {} to 32 bits ({truncated}) and \
+                 gives a value of the wrong size",
+                shape_text(a)
             ),
         );
         if truncated == 0 {

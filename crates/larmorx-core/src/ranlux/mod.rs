@@ -80,10 +80,16 @@ impl DrawError {
 impl fmt::Display for DrawError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            DrawError::ShapeNotFinite(a) => {
-                write!(f, "FS-100: the gamma shape {a} is not a finite number")
-            }
-            DrawError::ShapeNegative(a) => write!(f, "FS-100: the gamma shape {a} is negative"),
+            DrawError::ShapeNotFinite(a) => write!(
+                f,
+                "FS-100: the gamma shape {} is not a finite number",
+                dist::shape_text(*a)
+            ),
+            DrawError::ShapeNegative(a) => write!(
+                f,
+                "FS-100: the gamma shape {} is negative",
+                dist::shape_text(*a)
+            ),
             DrawError::NeverReturns { seed, draw } => {
                 write!(f, "FS-101: with seed {seed} FreeSurfer's {draw} never returns")
             }

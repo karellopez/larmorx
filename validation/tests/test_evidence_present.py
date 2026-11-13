@@ -1178,3 +1178,98 @@ def test_fslmaths_page_says_its_fft_call_from_the_reason_and_its_runs_in_the_gui
     assert trial["note"].startswith(
         "A random-testing run of the replica, fslmaths and fslstats at once, 24 minutes long (seed"
     )
+
+
+def _prelude_diffs(fix_reason: str, nan_reason: str) -> dict:
+    """prelude's FSL-272 example in its shapes: its comparisons, their verdicts and reasons."""
+    ids = {
+        "nan-nonan": (None, nan_reason),
+        "replica-fsl": ("bit-identical", "The same values, every one."),
+        "fix-nonan": ("bit-identical", "The default gives FSL's own result without the NaN."),
+        "fix-replica": ("d13", "FSL-272, corrected by default with a notice: " + fix_reason),
+        "original-fsl": ("bit-identical", "The same values, every one."),
+        "ofix-nonan": ("bit-identical", "The clean room's default gives FSL's own result."),
+        "original-replica": ("bit-identical", "The two ports give the same values."),
+        "ofix-rfix": ("bit-identical", "The two ports give the same values."),
+        "original1-original": ("bit-identical", "The thread count changes nothing."),
+        "ofix-original": ("d13", "FSL-272, corrected by default with a notice, as the replica's."),
+    }
+    return {"id": "fsl272", "diffs": [{"id": i, "verdict": v, "reason": r}
+                                       for i, (v, r) in ids.items()]}  # fmt: skip
+
+
+def test_preludes_page_says_its_corrections_from_the_reasons_and_both_thresholds():
+    """S11: prelude's FSL-272 example says what the defect does from its comparison of FSL with
+    itself (the mask's voxels, the constant offset, the others and their share) and refuses a
+    verdict it does not say; every metrics note gives the replica's record's threshold, then the
+    clean room's record's."""
+    from larmorx_validation.evidence import fsl_prelude
+
+    nan = (
+        "The defect's effect, FSL against itself (no verdict): ... Of the 265,356 mask voxels, its "
+        "result differs from its own result without the NaN by whole cycles of 2π: -1 in 95. Most "
+        "move by +1 cycle(s), one constant offset of the map; 6,612 voxels (2.5 %) by another "
+        "number, regions unwrapped whole cycles wrong relative to their neighbours."
+    )
+    ex = _prelude_diffs("the extrema over the values that are numbers.", nan)
+    line, verdicts = fsl_prelude.SHOWS["fsl272"](ex)
+    assert "most of the mask's 265,356 voxels move by one whole cycle" in line
+    assert "6,612 (2.5 %) by another number" in line
+    assert verdicts == ["replica-fsl", "original-fsl"]
+    ex["diffs"][2]["verdict"] = "open"
+    with pytest.raises(ValueError, match="fix-nonan is open, not bit-identical"):
+        fsl_prelude.SHOWS["fsl272"](ex)
+    note = "Δ is A − B in radians. " + fsl_prelude._THRESHOLD
+    doc = {"examples": [{"id": "ex", "metrics_note": note}]}
+    fsl_prelude.both_thresholds(doc)
+    out = doc["examples"][0]["metrics_note"]
+    assert "The replica's record's threshold: every file prelude writes bit-identical" in out
+    assert "The clean room's record (fsl-prelude) holds it to specs/prelude.md §11's" in out
+    with pytest.raises(ValueError, match="threshold sentence changed"):
+        fsl_prelude.both_thresholds(doc)
+
+
+def test_preludes_clean_room_exporter_hides_any_failure_of_the_replicas_presenter(monkeypatch):
+    """S11: prelude's clean room's exporter calls the replica's ``present`` as a black box, as
+    3dvolreg's does: any failure is reported without its message."""
+    from larmorx_validation.evidence import fsl_prelude, fsl_prelude_clean_room
+
+    def fail(doc):
+        raise ValueError("a panel of another shape: 'a label of the replica's page'")
+
+    monkeypatch.setattr(fsl_prelude, "present", fail)
+    with pytest.raises(RuntimeError, match="a documentation agent must look") as e:
+        fsl_prelude_clean_room.present({})
+    assert "label" not in str(e.value)
+    assert e.value.__cause__ is None and e.value.__suppress_context__
+
+
+def test_the_head_motion_tables_rows_go_in_the_guides_order_with_their_cells():
+    """S11: the comparisons' table under mri-hmc's motion chart: every row renamed and moved into
+    the guide's order (the original against itself, fMRIPrep's output, the replica, the clean
+    room) with its own cells and second line, each group's first row separated, the replica's
+    records' threshold after the clean room's; a table of other rows is refused."""
+    from larmorx_validation.evidence import mri_hmc
+
+    old = [o for o, _ in mri_hmc.STATS_ROWS]
+    rows = [{"head": h, "cells": [{"v": i}], "class": "is-sep" if i == 3 else None}
+            for i, h in enumerate(reversed(old))]  # fmt: skip
+    rows[0]["sub"] = "a second line"
+    t = {
+        "rows": rows,
+        "note": "The record's thresholds: 95th percentile ≤ 0.1 mm. The shaded rows.",
+    }
+    mri_hmc._stats(t)
+    assert [r["head"] for r in t["rows"]] == [n for _, n in mri_hmc.STATS_ROWS]
+    by = {r["head"]: r for r in t["rows"]}
+    for i, h in enumerate(reversed(old)):
+        new = dict(mri_hmc.STATS_ROWS)[h]
+        assert by[new]["cells"] == [{"v": i}]
+    assert by[mri_hmc.STATS_ROWS[-1][1]]["sub"] == "a second line"
+    seps = [r["head"] for r in t["rows"] if "is-sep" in (r.get("class") or "")]
+    assert seps == [dict(mri_hmc.STATS_ROWS)[g] for g in mri_hmc._GROUPS]
+    assert t["note"].startswith(
+        "The record's thresholds: 95th percentile ≤ 0.1 mm. The replica's records' threshold"
+    )
+    with pytest.raises(ValueError, match="holds other rows"):
+        mri_hmc._stats({"rows": [{"head": "another"}], "note": ""})

@@ -1699,6 +1699,18 @@ _CLEAN_THRESHOLD = (
 )
 
 
+def both_thresholds(doc: dict) -> None:
+    """Each example's metrics note gives the replica's record's threshold and then the clean
+    room's record's (the reviewer's round 17, finding 1, and round 18, minor 2); a note without
+    the replica's sentence is refused."""
+    for ex in doc["examples"]:
+        n = ex.get("metrics_note") or ""
+        if n.count(_THRESHOLD) != 1:
+            raise ValueError(f"{ex['id']}: the metrics note's threshold sentence changed")
+        ex["metrics_note"] = n.replace(_THRESHOLD, f"{_THRESHOLD} {_CLEAN_THRESHOLD}")
+    fsl_pages.replica_threshold(doc)
+
+
 def present(doc: dict) -> dict:
     """prelude's page in the writing guide's words and order: texts, ports and order only (the
     clean room's module, :mod:`fsl_prelude_clean_room`, calls it on the page it extended)."""
@@ -1718,12 +1730,7 @@ def present(doc: dict) -> dict:
     )  # fmt: skip
     if doc.get("speed"):  # its build is LARMORX's at a commit, not a port's
         doc["speed"]["note"] = present_.text(PAGE, note, port="both")
-    for ex in doc["examples"]:  # both records' thresholds (the reviewer's round 17, finding 1)
-        n = ex.get("metrics_note") or ""
-        if n.count(_THRESHOLD) != 1:
-            raise ValueError(f"{ex['id']}: the metrics note's threshold sentence changed")
-        ex["metrics_note"] = n.replace(_THRESHOLD, f"{_THRESHOLD} {_CLEAN_THRESHOLD}")
-    fsl_pages.replica_threshold(doc)  # the reviewer's round 18, minor 2
+    both_thresholds(doc)
     present_tables(doc)
     return doc
 

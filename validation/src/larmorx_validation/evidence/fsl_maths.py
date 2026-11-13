@@ -1641,8 +1641,14 @@ TEXTS = [
      "the clean room finishes and names it, correcting it by default"),
     (r"\btakes glibc's sincos from LARMORX's clean-room implementation of its behavioural "
      r"specification\b",
-     "takes them from LARMORX's implementation of glibc's sincos, written from a behavioural "
+     "takes them from LARMORX's own version of glibc's sincos, written from a behavioural "
      "specification of glibc's code"),
+    # "implementation" is the option's name, not a port's (the reviewer's round 20, minor 2)
+    (r"\bLARMORX's implementation of glibc's sin and cos\b",
+     "LARMORX's own version of glibc's sin and cos"),
+    (r"\bfrom LARMORX's implementation of glibc's code written from its behavioural "
+     r"specification\b",
+     "from LARMORX's own version of glibc's code, written from its behavioural specification"),
     (r"\bthe fsl-stats page has the four calls in its record\b",
      "fslstats' evidence page has the four calls in its record"),
     (r"\(the fslmaths page shows those fourteen calls\)",

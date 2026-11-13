@@ -195,10 +195,22 @@ by column** (float `i + 4j` is row i, column j, from 0).
   (a transposition of the row-major numbers); **to a matrix** the reverse. A matrix that is not 4 x 4:
   `SetAffineMatrix: Bad matrix size` (or `GetAffineMatrix: ...`) + `\n` on standard error and an
   abort (exit status 134), in both modes (FreeSurfer's own check).
-- **Matrix × vector:** each output element i = `((A[i] x0 + A[4 + i] x1) + A[8 + i] x2) + A[12 + i]
-  x3` in float, the sum **starting from the first product** (not from 0: four products of -0 give
+- **Matrix × vector:** each output element i = `((x0 A[i] + x1 A[4 + i]) + x2 A[8 + i]) + x3 A[12 +
+  i]` in float, the sum **starting from the first product** (not from 0: four products of -0 give
   -0).
-- **Matrix × matrix:** output column j = the matrix × vector of the second matrix's column j.
+- **Matrix × matrix:** output column j = the matrix × vector of the second matrix's column j: element
+  (i, j) = `((B[4j] A[i] + B[4j + 1] A[4 + i]) + B[4j + 2] A[8 + i]) + B[4j + 3] A[12 + i]`.
+- **NaN operands** (x86-64's rules of §7; the order matters only where two NaNs meet): in each
+  product the vector's number (for the matrix product the second matrix's number) is the **left**
+  operand, so of two NaNs its NaN passes on, quieted; in each sum the **running sum** is the left
+  operand. A NaN made from numbers (0 times an infinity, the sum of opposite infinities) is the
+  default NaN with the sign bit set, then passes on by the same rules (**(observed)**: the fixed batch
+  `affine-nan`, two NaNs of different payloads in each of the four products and in each sum, quiet,
+  signalling and mixed, and a NaN made from numbers meeting a NaN operand; every `affine` line of
+  the group, 154, as this order: `models.py affine` beside the probe; the order with the matrix's
+  number first in the first and the last product differs on 6 of `affine-nan`'s lines). FreeSurfer
+  builds these helpers into each function that uses them; the order above is the official build's
+  where it was measured, and a spec whose function uses the helpers with another order says so.
 - **Get a vector:** its first three floats. **Floor of a vector:** `(int) floor(v)` of each of the first
   three (FS-17).
 - A new affine matrix is all zeros (FreeSurfer's is not cleared; its callers set it).
@@ -1263,7 +1275,7 @@ it, and again from the cache:
 | `hfiles` | 5.8 | 62 | 0 | 0 | 0 | `8ae7f99741fe6f2fb95a5de15cf1e6ef3a680fd4e12cf0bec60d4ed2a1145b3f` |
 | `mmake` | 2.2 to 2.4 | 356 | 2 | 2 | 0 | `06cedef9465553f35894e0a276e548f627648f42b7737682b15189924b474d15` |
 | `mproduct` | 2.5, 8.1, 16 | 1,202 | 20 | 2 | 0 | `4f285237bdaa014c350f7011104306f2b6f55ade4b4867700d4d17db05d65c5d` |
-| `affine` | 3 | 243 | 2 | 0 | 0 | `514bd8d32cd528c6ed8a062d5ba38f1797a8c218b3940d1dfe902cb239198cfb` |
+| `affine` | 3 | 276 | 2 | 0 | 0 | `b6c634cae9ef4cbf608faf76b9f7c897a1e9118a9a7948876f02221b662dcb43` |
 | `dmatrix` | 4, 12 | 2,904 | 8 | 1 | 1 | `719f4ea4e5bf36174a84e21120f0c7dd87fb4a1086981864ab7daf8acfc040b4` |
 | `melements` | 8.2 | 3,500 | 31 | 0 | 0 | `e60f3eb349c7fed12395e0f494d8d38a4f6789ad19f1ed782f5cecb7717c68c0` |
 | `mregions` | 8.3 | 880 | 83 | 0 | 0 | `c50b1b9f577cc67267a4d837f5e912d4f777409d8237b05c0a1ed9bbfb500742` |
@@ -1278,12 +1290,14 @@ it, and again from the cache:
 | `svd` | 17.4, 17.5 | 2,280 | 354 | 0 | 142 | `af777aba4138e1ab5d48ba2ee4e4cc8477a2f3d0abc1d9334c05d1a10c40aad7` |
 | `mfiles` | 18 | 699 | 28 | 0 | 1 | `ac865eb3e87ec634b6e1580d41005a8da591aff62d674f3463bf984a0b38f157` |
 | `rfields` | 19 | 16 | 0 | 0 | 0 | `6f26117e696800de35160344e0a49825b4ff992d68dc6a500ca215703240ce15` |
-| all | | 27,367 | 1,373 | 41 | 299 | |
+| all | | 27,400 | 1,373 | 41 | 299 | |
 
 The groups `eigen`, `svd` and `mfiles` gained the batches `eigen-nonfinite`, `svd-nonfinite` and
 `mfiles-cut` (§17, §18.2; generators of their own, the groups' other cases unchanged) on 2026-11-13;
 their three hashes are from then (through the cache, from it and without it, identical, every line
-classified alike), the others from the first runs. `mfiles`' one `TIMEOUT` is a memory line (an empty
+classified alike), the others from the first runs. The group `affine` gained the fixed batch
+`affine-nan` (§3's operand order) on 2026-11-13 (the spec finisher's relay 5): its hash from then
+(cold, warm and without the cache identical; the probe as its own candidate identical in both modes). `mfiles`' one `TIMEOUT` is a memory line (an empty
 file read into a new matrix: its sizes come from memory) that ends otherwise in some processes.
 
 ### 23.3 The comparison

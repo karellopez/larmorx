@@ -466,7 +466,41 @@ class Gen:
             f"affineset {self.mat(r, 3, 4)}",
             f"affineget {self.mat(r, 4, 3)} " + " ".join(["3f800000"] * 16),
         ]
-        return [Batch("affine", "affine", L)]
+        return [Batch("affine", "affine", L), Batch("affine", "affine-nan", self.affine_nan())]
+
+    @staticmethod
+    def affine_nan() -> list[str]:
+        """§3's operand order (fixed cases): two NaNs of different payloads meeting in one product
+        (the matrix's column j against the vector's number j, and against the second matrix's row j)
+        and in each sum (the running sum against the next product), with quiet, signalling and mixed
+        NaNs; and a NaN made from numbers (0 times infinity) meeting a NaN operand."""
+        one = "3f800000"
+
+        def mat(cols: dict[int, str], rows: dict[int, str] | None = None) -> str:
+            m = [[cols.get(c, one) for c in range(4)] for _ in range(4)]
+            for rr, v in (rows or {}).items():
+                m[rr] = [v] * 4
+            return "1 4 4 " + " ".join(x for row in m for x in row)
+
+        L = []
+        for p1, p2 in (
+            ("7fc00001", "ffc00002"),
+            ("7f800003", "ff800004"),
+            ("ffc00005", "7f800006"),
+        ):
+            for j in range(4):
+                v = [one] * 4
+                v[j] = p2
+                L.append(f"affine {mat({j: p1})} {mat({}, {j: p2})} {' '.join(v)}")
+            for k in (1, 2, 3):
+                L.append(f"affine {mat({0: p1, k: p2})} {mat({})} {' '.join([one] * 4)}")
+            for k in (2, 3):
+                L.append(f"affine {mat({k - 1: p1, k: p2})} {mat({})} {' '.join([one] * 4)}")
+            for k in (0, 3):
+                v = [one] * 4
+                v[k] = "00000000"
+                L.append(f"affine {mat({k: '7f800000', 2: p2})} {mat({})} {' '.join(v)}")
+        return L
 
     def dmatrix(self) -> list[Batch]:
         r = self.rng("dmatrix")

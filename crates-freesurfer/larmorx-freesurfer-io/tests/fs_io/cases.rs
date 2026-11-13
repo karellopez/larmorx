@@ -558,6 +558,19 @@ fn replace_all(b: &[u8], from: &[u8], to: &[u8]) -> Vec<u8> {
     r
 }
 
+/// `b` without the fixture's path before a name in it, in each form the port can print: joined by
+/// the platform (`<fix>\name` on Windows), by a `/` (MINC's and FreeSurfer's own joins), or with
+/// every `\` turned into `/` (the glob's absolute names).
+pub(super) fn strip_fix(b: &[u8], fix: &Path) -> Vec<u8> {
+    let f = fix.to_string_lossy().into_owned();
+    let fwd = f.replace('\\', "/");
+    let mut r = b.to_vec();
+    for p in [format!("{f}\\"), format!("{f}/"), format!("{fwd}/")] {
+        r = replace_all(&r, p.as_bytes(), b"");
+    }
+    r
+}
+
 /// The C escaping of `fsio`'s text.
 fn escape(b: &[u8]) -> String {
     let mut r = String::new();
@@ -1092,14 +1105,9 @@ pub fn run_line(line: &str, mode: UpstreamDefects, w: &Work) -> (String, Vec<&'s
         .borrow()
         .windows(32)
         .any(|w| w == b"has an entry that is not a numbe");
-    let mut raw = shared.0.borrow().clone();
-    if piece4::KINDS.contains(&t[0]) || piece6::KINDS.contains(&t[0]) {
-        // CTN's messages name the file by the port's path into the fixture; fsio runs in the
-        // fixture and names it from there
-        let mut prefix = w.fix.to_string_lossy().into_owned().into_bytes();
-        prefix.push(std::path::MAIN_SEPARATOR as u8);
-        raw = replace_all(&raw, &prefix, b"");
-    }
+    // messages that name a file by the port's path into the fixture (CTN's, MINC's, ...): fsio
+    // runs in the fixture and names it from there
+    let raw = strip_fix(&shared.0.borrow(), &w.fix);
     // as fsio: messages beyond 1 MiB shown by their length
     let text = if raw.len() > 1 << 20 {
         format!("BIGTEXT {}", raw.len())

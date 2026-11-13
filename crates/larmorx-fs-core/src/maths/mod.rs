@@ -16,10 +16,11 @@
 
 pub mod affine;
 pub mod dmatrix;
+pub mod elements;
 pub mod histo;
 pub mod matrix;
 
-use larmorx_core::defects::FS_17;
+use larmorx_core::defects::{FS_17, GLIBC_07};
 use larmorx_core::drand48::Drand48;
 
 use crate::process::Process;
@@ -93,6 +94,44 @@ impl Process {
             }
         } else {
             x.trunc() as i32
+        }
+    }
+
+    /// A double function of the C library (§1, §7): larmorx's correctly rounded one by default,
+    /// glibc 2.35's with `reproduce`; GLIBC-07 noted where the two differ.
+    pub(crate) fn libm(&mut self, name: &str, x: f64, cr: fn(f64) -> f64, glibc: fn(f64) -> f64) -> f64 {
+        let (a, b) = (cr(x), glibc(x));
+        self.libm_pick(name, a.to_bits() != b.to_bits() && !(a.is_nan() && b.is_nan()), a, b)
+    }
+
+    /// `pow` as [`Process::libm`].
+    pub(crate) fn libm_pow(&mut self, x: f64, y: f64) -> f64 {
+        let (a, b) = (larmorx_core::math::pow(x, y), larmorx_core::math::pow_glibc(x, y));
+        self.libm_pick("pow", a.to_bits() != b.to_bits() && !(a.is_nan() && b.is_nan()), a, b)
+    }
+
+    /// A float function of the C library (`expf`, `sinf`, `cosf`) as [`Process::libm`].
+    pub(crate) fn libmf(&mut self, name: &str, x: f32, cr: fn(f32) -> f32, glibc: fn(f32) -> f32) -> f32 {
+        let (a, b) = (cr(x), glibc(x));
+        let differ = a.to_bits() != b.to_bits() && !(a.is_nan() && b.is_nan());
+        if differ {
+            self.note_glibc07(name);
+        }
+        if self.mode().reproduce() { b } else { a }
+    }
+
+    fn libm_pick(&mut self, name: &str, differ: bool, cr: f64, glibc: f64) -> f64 {
+        if differ {
+            self.note_glibc07(name);
+        }
+        if self.mode().reproduce() { glibc } else { cr }
+    }
+
+    fn note_glibc07(&mut self, name: &str) {
+        if self.mode().reproduce() {
+            self.note(&GLIBC_07, format!("glibc's {name}, not correctly rounded, gave this result's last bit"));
+        } else {
+            self.note(&GLIBC_07, format!("{name} correctly rounded (glibc's differs in the last place)"));
         }
     }
 

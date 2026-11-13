@@ -3,6 +3,7 @@
 
 use larmorx_fs_core::maths::affine::{self, AffineVector};
 use larmorx_fs_core::maths::dmatrix::{DMatrix, StreamSel};
+use larmorx_fs_core::maths::elements::{self, Region};
 use larmorx_fs_core::maths::matrix::Matrix;
 use larmorx_fs_core::maths::{Output, Returned};
 use larmorx_fs_core::numbers::ListStats;
@@ -83,6 +84,34 @@ fn dout(
     }
 }
 
+/// An operation with an output resolved as the probe's `getm_out(a, b)`: `self` is `a`, `other`
+/// is `b` (the input copied first, the matrix itself the output); prints the result and O.
+fn mout(
+    l: &mut Line,
+    a: Option<&Matrix>,
+    b: Option<&Matrix>,
+    o: Out<Option<Matrix>>,
+    f: impl FnOnce(Option<&mut Matrix>) -> Result<Returned<Matrix>, Stop>,
+) -> Result<(), Stop> {
+    match o {
+        Out::New | Out::Obj(None) => {
+            let r = f(None)?;
+            l.putm_res(&r, None);
+        }
+        Out::First | Out::Second => {
+            let src = if matches!(o, Out::First) { a } else { b };
+            let mut x = src.cloned();
+            let r = f(x.as_mut())?;
+            l.putm_res(&r, x.as_ref());
+        }
+        Out::Obj(Some(mut d)) => {
+            let r = f(Some(&mut d))?;
+            l.putm_res(&r, Some(&d));
+        }
+    }
+    Ok(())
+}
+
 fn stream(l: &mut Line) -> Option<StreamSel> {
     match l.tok() {
         "out" => Some(StreamSel::Out),
@@ -143,6 +172,200 @@ pub fn call(p: &mut Process, l: &mut Line, c: &str) -> Result<bool, Stop> {
             let b = l.getm(p)?;
             let o = l.getm_out(p)?;
             product(p, l, a, b, o, c == "mmul")?;
+        }
+        // -- §8.2
+        "midentity" => {
+            let n = l.geti();
+            let o = l.getm_out(p)?;
+            mout(l, None, None, o, |o| p.matrix_identity(n, o))?;
+        }
+        "mtranspose" | "msquare" | "mdiag" | "mclone" => {
+            let a = l.getm(p)?.expect("a matrix");
+            if c == "mclone" {
+                let m = p.matrix_clone(&a)?;
+                l.putm(m.as_ref());
+                return Ok(true);
+            }
+            let o = l.getm_out(p)?;
+            mout(l, Some(&a), None, o, |o| match c {
+                "mtranspose" => p.matrix_transpose(&a, o),
+                "msquare" => p.matrix_square_elts(&a, o),
+                _ => p.matrix_diag(&a, o),
+            })?;
+        }
+        "madd" | "msub" => {
+            let a = l.getm(p)?.expect("a matrix");
+            let b = l.getm(p)?.expect("a matrix");
+            let o = l.getm_out(p)?;
+            mout(l, Some(&a), Some(&b), o, |o| p.matrix_add_sub(&a, &b, o, c == "msub"))?;
+        }
+        "mscale" => {
+            let a = l.getm(p)?.expect("a matrix");
+            let o = l.getm_out(p)?;
+            let v = l.getf();
+            mout(l, Some(&a), None, o, |o| p.matrix_scalar_mul(&a, v, o))?;
+        }
+        "mclear" => {
+            let mut a = l.getm(p)?.expect("a matrix");
+            let r = p.matrix_clear(&mut a);
+            l.putm_res(&r, Some(&a));
+        }
+        "msymmetric" | "miszero" | "mcheck" => {
+            let a = l.getm(p)?.expect("a matrix");
+            let v = match c {
+                "msymmetric" => p.matrix_is_symmetric(&a),
+                "miszero" => p.matrix_is_zero(&a),
+                _ => p.matrix_check(&a),
+            };
+            l.puti(i64::from(v));
+        }
+        "mtrace" => {
+            let a = l.getm(p)?.expect("a matrix");
+            let v = p.matrix_trace(&a);
+            l.putf(v);
+        }
+        "msum" => {
+            let a = l.getm(p)?.expect("a matrix");
+            let v = p.matrix_sum_elts(&a);
+            l.putd(v);
+        }
+        "mconst" | "mzero" => {
+            let v = if c == "mconst" { l.getf() } else { 0.0 };
+            let (rows, cols) = (l.geti(), l.geti());
+            let o = l.getm_out(p)?;
+            mout(l, None, None, o, |o| p.matrix_const_val(v, rows, cols, o))?;
+        }
+        "mreshape" => {
+            let a = l.getm(p)?.expect("a matrix");
+            let o = l.getm_out(p)?;
+            let (rows, cols) = (l.geti(), l.geti());
+            mout(l, Some(&a), None, o, |o| p.matrix_reshape(&a, o, rows, cols))?;
+        }
+        "mcolscale" => {
+            let a = l.getm(p)?.expect("a matrix");
+            let o = l.getm_out(p)?;
+            mout(l, Some(&a), None, o, |o| p.matrix_normalize_col_scale(&a, o))?;
+        }
+        "mnormcol" => {
+            let a = l.getm(p)?.expect("a matrix");
+            let o = l.getm_out(p)?;
+            let s = l.getm_out(p)?;
+            let mut s = match s {
+                Out::New | Out::Obj(None) => None,
+                Out::First | Out::Second => Some(a.clone()),
+                Out::Obj(Some(m)) => Some(m),
+            };
+            mout(l, Some(&a), None, o, |o| p.matrix_normalize_col(&a, o, s.as_mut()))?;
+            if s.is_some() {
+                l.putm(s.as_ref());
+            }
+        }
+        // -- §8.3
+        "mregion" | "mrealregion" | "mimagregion" => {
+            let a = l.getm(p)?.expect("a matrix");
+            let o = l.getm_out(p)?;
+            let v: Vec<i32> = (0..6).map(|_| l.geti()).collect();
+            let which = match c {
+                "mregion" => Region::Whole,
+                "mrealregion" => Region::Real,
+                _ => Region::Imag,
+            };
+            mout(l, Some(&a), None, o, |o| {
+                p.matrix_copy_region(which, &a, o, v[0], v[1], v[2], v[3], v[4], v[5])
+            })?;
+        }
+        "mr2c" => {
+            let a = l.getm(p)?.expect("a matrix");
+            let b = l.getm(p)?.expect("a matrix");
+            let o = l.getm_out(p)?;
+            mout(l, Some(&a), Some(&b), o, |o| p.matrix_real_to_complex(&a, &b, o))?;
+        }
+        // -- §8.4, §8.5
+        "mrotation" => {
+            let n = l.geti();
+            let angle = l.getf();
+            let which = l.geti();
+            let o = l.getm_out(p)?;
+            mout(l, None, None, o, |o| p.matrix_rotation(n, angle, which, o))?;
+        }
+        "vlen" => {
+            let a = l.getm(p)?.expect("a matrix");
+            let v = p.vector_len(&a);
+            l.putf(v);
+        }
+        "vdot" | "vdist" => {
+            let a = l.getm(p)?.expect("a matrix");
+            let b = l.getm(p)?.expect("a matrix");
+            let v = p.vector_dot_dist(&a, &b, c == "vdist");
+            l.putf(v);
+        }
+        "vcross" => {
+            let a = l.getm(p)?.expect("a matrix");
+            let b = l.getm(p)?.expect("a matrix");
+            let o = l.getm_out(p)?;
+            mout(l, Some(&a), Some(&b), o, |o| p.vector_cross_product(&a, &b, o))?;
+        }
+        "vtriple" => {
+            let a = l.getm(p)?.expect("a matrix");
+            let b = l.getm(p)?.expect("a matrix");
+            let d = l.getm(p)?.expect("a matrix");
+            let v = p.vector_triple_product(&a, &b, &d);
+            l.putf(v);
+        }
+        "v3angle" => {
+            let a = l.getm(p)?.expect("a matrix");
+            let b = l.getm(p)?.expect("a matrix");
+            let v = p.vector3_angle(&a, &b);
+            l.putd(v);
+        }
+        "xyznorm" => {
+            let (x, y, z) = (l.getf(), l.getf(), l.getf());
+            let (v, len) = elements::xyz_normalized_load(x, y, z);
+            for k in v {
+                l.putf(k);
+            }
+            l.putf(len);
+        }
+        "xyzangle" => {
+            let n = [l.getf(), l.getf(), l.getf()];
+            let (x, y, z, norm) = (l.getf(), l.getf(), l.getf(), l.getf());
+            let v = elements::xyz_approx_angle_known_length(n, x, y, z, norm);
+            l.putf(v);
+        }
+        // -- §8.6, §8.7
+        "mprint" => {
+            let s = stream(l);
+            let a = l.getm(p)?;
+            let prec = l.geti();
+            let to_err = s.map(|s| s == StreamSel::Err);
+            let v = p.matrix_print(to_err, a.as_ref(), prec);
+            l.puti(i64::from(v));
+        }
+        "mprintfmt" => {
+            let fmt = l.getx();
+            let a = l.getm(p)?;
+            let v = p.matrix_print_fmt(&fmt, a.as_ref());
+            l.puti(i64::from(v));
+        }
+        "msimilarity" => {
+            let a = l.getm(p)?.expect("a matrix");
+            let b = l.getm(p)?.expect("a matrix");
+            let o = l.getm_out(p)?;
+            mout(l, Some(&a), Some(&b), o, |o| p.matrix_similarity_transform(&a, &b, o))?;
+        }
+        "mgaussian" => {
+            let n = l.geti();
+            let sd = l.getf();
+            let norm = l.geti();
+            let o = l.getm_out(p)?;
+            mout(l, None, None, o, |o| p.gaussian_matrix(n, sd, norm, o))?;
+        }
+        "mgaussian2" => {
+            let n = l.geti();
+            let (s1, s2, w1) = (l.getf(), l.getf(), l.getf());
+            let norm = l.geti();
+            let o = l.getm_out(p)?;
+            mout(l, None, None, o, |o| p.gaussian_matrix2(n, s1, s2, w1, norm, o))?;
         }
         // -- §3
         "affine" => {

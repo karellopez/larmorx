@@ -894,17 +894,16 @@ impl Process {
         let four = sse::mul32(4.0, sigma);
         let e2 = sse::narrow(std::f64::consts::E * std::f64::consts::E);
         let c = sse::div32(1.0, sse::mul32(16.0, e2));
-        let reproduce = self.mode().reproduce();
         let mut k = Vec::with_capacity(len as usize);
         for x in 0..len {
             let f = (x - half) as f32;
             let af = f.abs();
             let v = if af <= two {
                 let q = sse::div32(sse::mul32(-f, f), sse::mul32(two, sigma));
-                sse::narrow(exp64(f64::from(q), reproduce))
+                sse::narrow(self.libm("exp", f64::from(q), larmorx_core::math::exp, larmorx_core::math::exp_glibc))
             } else if af <= four {
                 let base = sse::sub64(4.0, sse::div64(f64::from(af), sse::widen(sigma)));
-                sse::mul32(c, sse::narrow(pow64(base, 4.0, reproduce)))
+                sse::mul32(c, sse::narrow(self.libm_pow(base, 4.0)))
             } else {
                 0.0
             };
@@ -1319,31 +1318,18 @@ impl Process {
     }
 }
 
-/// `exp` of the C library: correctly rounded, glibc 2.35's with `reproduce`.
-fn exp64(x: f64, reproduce: bool) -> f64 {
-    if reproduce {
-        larmorx_core::math::exp_glibc(x)
-    } else {
-        larmorx_core::math::exp(x)
+/// The fit's scale (§5.7 step 8): `(Σ counts[b] / g_b) / n` over the bins whose
+/// `g_b = (1 / r) e_b` is above 1e-3 (`e` from bin `lo`).
+fn gauss_scale(z: &Histogram, e: &[f64], r: f64, lo: i32) -> f64 {
+    let (mut sum, mut cnt) = (0.0f64, 0i32);
+    for (k, &eb) in e.iter().enumerate() {
+        let gb = sse::mul64(sse::div64(1.0, r), eb);
+        if gb > 1e-3 {
+            sum = sse::add64(sum, sse::div64(sse::widen(z.count(lo + k as i32)), gb));
+            cnt += 1;
+        }
     }
-}
-
-/// `pow`, likewise.
-fn pow64(x: f64, y: f64, reproduce: bool) -> f64 {
-    if reproduce {
-        larmorx_core::math::pow_glibc(x, y)
-    } else {
-        larmorx_core::math::pow(x, y)
-    }
-}
-
-/// `log`, likewise.
-fn log64(x: f64, reproduce: bool) -> f64 {
-    if reproduce {
-        larmorx_core::math::log_glibc(x)
-    } else {
-        larmorx_core::math::log(x)
-    }
+    sse::div64(sum, f64::from(cnt))
 }
 
 /// A two-dimensional histogram, for `HISTO2DfindBin1`, `HISTO2DfindBin2` and `HISTO2DgetCount`
@@ -1555,13 +1541,13 @@ impl Process {
     /// `HISTOgetEntropy(h)` (§5.6, §21).
     pub fn histo_get_entropy(&mut self, h: &Histogram) -> f64 {
         let t = sse::widen(self.histo_total(h));
-        let reproduce = self.mode().reproduce();
         let mut e = 0.0f64;
         for b in h.used() {
             let c = h.count(b);
             if c > 0.0 {
                 let p = sse::div64(sse::widen(c), t);
-                e = sse::sub64(e, sse::mul64(p, log64(p, reproduce)));
+                let lp = self.libm("log", p, larmorx_core::math::log, larmorx_core::math::log_glibc);
+                e = sse::sub64(e, sse::mul64(p, lp));
             }
         }
         e
@@ -1744,7 +1730,6 @@ impl Process {
         let delta = sse::widen(sse::div32(h.bin_size, 10.0));
         let sigma_max = sse::widen(sse::div32(sse::mul32(a.nbins as f32, a.bin_size), 2.0));
         let root = sse::sqrt64(2.0 * std::f64::consts::PI);
-        let reproduce = self.mode().reproduce();
         let mut best: Option<(f64, f64)> = None;
         let mut sigma = delta;
         if sigma <= sigma_max && !(sse::add64(sigma, delta) > sigma) {
@@ -1760,22 +1745,12 @@ impl Process {
         while sigma <= sigma_max {
             let r = sse::mul64(sigma, root);
             let two_ss = sse::mul64(sse::mul64(2.0, sigma), sigma);
-            let g = |b: i32| {
-                let zv = sse::widen(z.bin(b));
-                exp64(sse::div64(sse::mul64(-zv, zv), two_ss), reproduce)
-            };
-            let (mut sum, mut cnt) = (0.0f64, 0i32);
-            for b in lo..=hi {
-                let gb = sse::mul64(sse::div64(1.0, r), g(b));
-                if gb > 1e-3 {
-                    sum = sse::add64(sum, sse::div64(sse::widen(z.count(b)), gb));
-                    cnt += 1;
-                }
-            }
-            let scale = sse::div64(sum, f64::from(cnt));
+            let g = self.gauss_exps(&z, 0.0, two_ss, lo, hi);
+            let scale = gauss_scale(&z, &g, r, lo);
             let mut err = 0.0f64;
             for b in lo..=hi {
-                let d = sse::sub64(sse::mul64(sse::div64(scale, r), g(b)), sse::widen(z.count(b)));
+                let gb = g[(b - lo) as usize];
+                let d = sse::sub64(sse::mul64(sse::div64(scale, r), gb), sse::widen(z.count(b)));
                 err = sse::add64(err, sse::mul64(d, d));
             }
             if best.is_none_or(|(e, _)| err < e) {
@@ -1787,30 +1762,28 @@ impl Process {
             // the fitted curve, its scale recomputed with z - m, over Z's bins
             let r = sse::mul64(sg, root);
             let two_ss = sse::mul64(sse::mul64(2.0, sg), sg);
-            let g = |b: i32| {
-                let zv = sse::sub64(sse::widen(z.bin(b)), m);
-                exp64(sse::div64(sse::mul64(-zv, zv), two_ss), reproduce)
-            };
-            let (mut sum, mut cnt) = (0.0f64, 0i32);
-            for b in lo..=hi {
-                let gb = sse::mul64(sse::div64(1.0, r), g(b));
-                if gb > 1e-3 {
-                    sum = sse::add64(sum, sse::div64(sse::widen(z.count(b)), gb));
-                    cnt += 1;
-                }
-            }
-            let scale = sse::div64(sum, f64::from(cnt));
-            let curve: Vec<f32> = z
-                .used()
-                .map(|b| sse::narrow(sse::mul64(sse::div64(scale, r), g(b))))
-                .collect();
+            let g = self.gauss_exps(&z, m, two_ss, lo, hi);
+            let scale = gauss_scale(&z, &g, r, lo);
+            let all = self.gauss_exps(&z, m, two_ss, 0, z.nbins - 1);
             let mut fit = z.clone();
-            for (b, &v) in curve.iter().enumerate() {
-                fit.set_count(b as i32, v);
+            for b in z.used() {
+                let v = sse::narrow(sse::mul64(sse::div64(scale, r), all[b as usize]));
+                fit.set_count(b, v);
             }
             self.histo_plot(&fit, b"hp.plt");
         }
         Ok(RobustFit { status: 0, offset: Some(m), sigma: best.map(|(_, s)| s) })
+    }
+
+    /// `exp(-z z / two_ss)` for Z's bins `lo..=hi`, `z` the bin value less `shift`.
+    fn gauss_exps(&mut self, z: &Histogram, shift: f64, two_ss: f64, lo: i32, hi: i32) -> Vec<f64> {
+        let mut g = Vec::new();
+        for b in lo..=hi {
+            let zv = sse::sub64(sse::widen(z.bin(b)), shift);
+            let x = sse::div64(sse::mul64(-zv, zv), two_ss);
+            g.push(self.libm("exp", x, larmorx_core::math::exp, larmorx_core::math::exp_glibc));
+        }
+        g
     }
 
     // ---- §5.8: files

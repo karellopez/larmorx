@@ -11,10 +11,18 @@ built for the official binaries with GCC 8.4.0 (`docs/freesurfer/variation.md`).
 
 ## FreeSurfer files and functions translated
 
-None yet: the crate was created empty by queue item 3.1-01 (`docs/freesurfer/queue.md`). Each
-item that brings code adds its files and functions here, with the third-party code it found in
-them (CLAUDE.md rule 3: each ported file is audited for third-party code first).
+| FreeSurfer file | What | Item | Here |
+|---|---|---|---|
+| `utils/transform.cpp` 285-603 | `vg_print`, `getVolGeom`, `copyVolGeom`, `writeVolGeom`, `readVolGeom`, `vg_i_to_r`, `vg_r_to_i`, `TkrVox2RASfromVolGeom`, `vg_isEqual`, `vg_isNotEqualThresh` (taken first from 3.1-39 for the surface readers) | 3.1-39 | `vgeom.rs` |
+
+No third-party code in these lines (the audit of `docs/freesurfer/third-party.md`). `readVolGeom`'s
+`sscanf` calls are modelled on glibc 2.35's behaviour measured as a black box (the open
+`validation/investigations/glibc-scanf-probe/`; the conversions themselves are
+`larmorx-freesurfer-core`'s `cscan`), no glibc code.
 
 ## Changes from the originals
 
-None yet.
+- `readVolGeom`: FS-285 to FS-288 (`docs/findings/freesurfer-volume.md` §1): the words are read whole
+  (FS-285, FS-286; `reproduce` compares what the official build compares after FS-286's overflow);
+  a line with no word is neither counted nor read by default (FS-287); before any word, no key in
+  both modes (FS-288).

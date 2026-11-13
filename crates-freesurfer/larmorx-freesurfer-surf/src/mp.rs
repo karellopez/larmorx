@@ -1393,6 +1393,7 @@ fn mp_compute_triangle_properties(
 /// `MRIScomputeAvgInterVertexDist` sums them (reproducible sums of `d`, `d²` and the count, in
 /// double) and computes them: `Sum / N`, `sqrt(N (Sum2 / N - Avg²) / (N - 1))`.
 pub(crate) fn avg_dist(
+    errno: &mut i32,
     mris: &Mris,
     ripped: &dyn Fn(usize) -> bool,
     dist: &dyn Fn(usize, usize) -> f32,
@@ -1424,19 +1425,28 @@ pub(crate) fn avg_dist(
     let sum2 = romp_total(0.0, &s2);
     let n = romp_total(0.0, &c);
     let avg = div64(sum, n);
-    let std = sqrt64(div64(
+    let arg = div64(
         mul64(n, sub64(div64(sum2, n), mul64(avg, avg))),
         sub64(n, 1.0),
-    ));
-    (avg, std)
+    );
+    (avg, sqrt64_errno(errno, arg))
+}
+
+/// glibc's `sqrt` of a `double` (the compiled `sqrtsd` falls back on it for a NaN result): `errno`
+/// `EDOM` for an argument below 0 (a variance that rounding made negative, or one divided by 0).
+pub(crate) fn sqrt64_errno(errno: &mut i32, x: f64) -> f64 {
+    if x < 0.0 {
+        *errno = 33;
+    }
+    sqrt64(x)
 }
 
 /// `MRISMP_computeAvgInterVertexDist(mp, &mp->std_vertex_dist)`.
-fn mp_compute_avg_inter_vertex_dist(mp: &mut MrisMp, mris: &Mris) {
+fn mp_compute_avg_inter_vertex_dist(errno: &mut i32, mp: &mut MrisMp, mris: &Mris) {
     let (avg, std) = {
         let rip = shared(&mp.v_ripflag, "v_ripflag");
         let d = arr(&mp.v_dist, "v_dist");
-        avg_dist(mris, &|v| rip[v] != 0, &|v, m| {
+        avg_dist(errno, mris, &|v| rip[v] != 0, &|v, m| {
             d[v].as_ref().expect("the copy's distances are NULL")[m]
         })
     };
@@ -1622,7 +1632,7 @@ pub fn compute_metric_properties_mp(
     mp.dist_nsize = mp.nsize;
     mp_compute_triangle_properties(g, sg, io, mp, mris);
     mp.avg_vertex_area = f64::from(div(mp.total_area, mp.nvertices as f32));
-    mp_compute_avg_inter_vertex_dist(mp, mris);
+    mp_compute_avg_inter_vertex_dist(&mut g.errno, mp, mris);
     mp_orient_surface(g, sg, mp, mris);
     if takes_sphere_area(mp.status) {
         mp.total_area = sphere_area(mp.radius);

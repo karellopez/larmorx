@@ -90,6 +90,7 @@ pub mod mrisurf;
 pub mod names;
 pub mod nbhd;
 pub mod positions;
+pub mod props;
 pub mod readwrite;
 pub mod scanf;
 pub mod sfile;

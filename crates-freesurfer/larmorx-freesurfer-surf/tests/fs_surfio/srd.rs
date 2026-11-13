@@ -18,9 +18,9 @@ use super::*;
 use larmorx_freesurfer_surf::readwrite;
 
 /// A mesh: vertex coordinates and faces (vertex numbers from 0).
-struct Mesh {
-    v: Vec<[f32; 3]>,
-    f: Vec<[i64; 3]>,
+pub(super) struct Mesh {
+    pub(super) v: Vec<[f32; 3]>,
+    pub(super) f: Vec<[i64; 3]>,
 }
 
 /// The icosahedron's coordinate (the golden ratio as the generator writes it: its float is the case's).
@@ -69,7 +69,7 @@ const ICOSA_F: [[i64; 3]; 20] = [
 /// short), a cube, a fan (closed into a cone now and then), a strip, two tetrahedra sharing a
 /// vertex, random faces of a few vertices; its coordinates the shape's (scaled and moved), or any
 /// now and then; its vertices renumbered and faces turned now and then.
-fn mesh(g: &mut Gen, heavy: bool) -> Mesh {
+pub(super) fn mesh(g: &mut Gen, heavy: bool) -> Mesh {
     let mut m = match g.below(10) {
         0 => Mesh {
             v: vec![
@@ -272,7 +272,7 @@ fn be3(b: &mut Vec<u8>, v: i64) {
     b.extend_from_slice(&(v as u32).to_be_bytes()[1..]);
 }
 
-fn be4(b: &mut Vec<u8>, v: i64) {
+pub(super) fn be4(b: &mut Vec<u8>, v: i64) {
     b.extend_from_slice(&(v as i32).to_be_bytes());
 }
 

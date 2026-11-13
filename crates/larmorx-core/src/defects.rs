@@ -1531,6 +1531,12 @@ defects! {
         "the icosahedron reader (ICOread, and MRISread of a .tri or .ico file), given a surface that is not closed (a vertex with more neighbours than faces) or a vertex of more than 255 faces, writes past the vertex's neighbour or face list (memory corruption or a crash)";
     FS_362 = "FS-362", "FreeSurfer", true,
         "the icosahedron reader (ICOread, and MRISread of a .tri or .ico file), given a vertex or face count it cannot read, a vertex or face number outside the counts, or a face whose vertices are not all among the file's vertices (a face line missing, or holding 0), writes or reads outside its arrays (memory corruption or a crash)";
+    FS_363 = "FS-363", "FreeSurfer", true,
+        "the surface library's plane fit (mrisComputeOptimalPlane) fits its plane through the origin instead of the vertices' mean, includes ripped vertices, and returns the centre (0, 0, 0)";
+    FS_364 = "FS-364", "FreeSurfer", true,
+        "MRIShistoThresholdCurvature (mris_curvature's outlier removal) of a surface whose unripped curvatures are all equal, or one of which is not finite (NaN, infinite), writes far outside its 1,000-bin histogram: a segmentation fault";
+    FS_365 = "FS-365", "FreeSurfer", true,
+        "MRIShistoThresholdCurvature of a surface with no unripped vertex reads memory before its histogram (no effect on the result)";
     FS_221 = "FS-221", "FreeSurfer", true,
         "the volume format probe (mri_identify, the format tests and the volume-name helpers) misbehaves for a file name of 1,024 bytes or more (a Bruker study's file names of 512 or more, the stem helpers' names of 2,000 or more): its answer is undefined and the program can crash";
     FS_222 = "FS-222", "FreeSurfer", true,

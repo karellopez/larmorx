@@ -64,6 +64,9 @@ int mrisOrientPlane(MRIS *mris);
 // mrisurf_io.cpp's functions of queue item 3.1-48 that no header declares, and its file-local
 // ones through io_statics.cpp (which builds mrisurf_io.cpp into the probe)
 MATRIX *getSRASToTalSRAS(LT *lt);
+int mrisComputeOptimalPlane(MRIS *mris, int *vertices, int nvertices, double *pxn, double *pyn,
+                            double *pzn, double *pxc, double *pyc, double *pzc);
+int mrisCalculateCanonicalFaceCentroid(MRIS *mris, int fno, float *px, float *py, float *pz);
 int fssurfio_read_curvature_into_array(const char *fname, int size, float **out);
 int fssurfio_read_new_curvature_into_array(const char *fname, int size, float **out);
 int fssurfio_read_curv_old_format(MRIS *mris, const char *fname, MRI *curvmri);
@@ -2259,6 +2262,138 @@ void srd_case()
   }
 }
 
+
+// ---- relay 17: mpb, the metric properties of 3.1-50 part b ----------------------------------------
+
+void dump_mpb_vertices(MRIS *s)
+{
+  of(s->min_curv); of(s->max_curv);
+  for (int vno = 0; vno < s->nvertices; vno++) {
+    VERTEX *v = &s->vertices[vno];
+    float c[13] = {v->curv, v->e1x, v->e1y, v->e1z, v->e2x, v->e2y, v->e2z,
+                   v->pe1x, v->pe1y, v->pe1z, v->pe2x, v->pe2y, v->pe2z};
+    for (float x : c) of(x);
+  }
+}
+
+// mpb: Gdiag's bits (1 show, 2 verbose, 4 write), the environment (1: FS_FASTER_MP), a surface file
+// read by MRISread (d/lh.s0), then its original area or not, for each vertex an override mask (1 ripped, 2 original, 4 white,
+// 8 pial, 16 target, 32 canonical, 64 curvature, 128 normal) with its values, for each face a mask
+// (1 ripped, 2 area) with its value, then the operations, each printing what it gives and, for the
+// curvature edits and the tangent planes, every vertex's curvature and planes
+void mpb_case()
+{
+  mkdir(workdir.c_str(), 0700);
+  clear_dir(workdir, true);
+  if (chdir(workdir.c_str()) != 0) fail("chdir");
+  mkdir("d", 0700);
+  int gd = geti();
+  if (gd & 1) Gdiag |= DIAG_SHOW;
+  if (gd & 2) Gdiag |= DIAG_VERBOSE;
+  if (gd & 4) Gdiag |= DIAG_WRITE;
+  int env = geti();
+  if (env & 1) setenv("FS_FASTER_MP", "1", 1);
+  setenv("SURFER_SIDEDOOR", "1", 1);
+  std::string bytes = geth();
+  FILE *fp = fopen("d/lh.s0", "wb");
+  if (!fp) fail("the surface file");
+  fwrite(bytes.data(), 1, bytes.size(), fp);
+  fclose(fp);
+  errno = 0;
+  MRIS *s = MRISread("d/lh.s0");
+  if (!s) { out += "NULL "; return; }
+  int nv = geti(), nf = geti();
+  if (nv != s->nvertices || nf != s->nfaces) { oi(s->nvertices); oi(s->nfaces); out += "COUNTS "; return; }
+  if (geti()) s->orig_area = getf();
+  for (int vno = 0; vno < nv; vno++) {
+    VERTEX *v = &s->vertices[vno];
+    int m = geti();
+    if (m & 1) v->ripflag = 1;
+    if (m & 2) { v->origx = getf(); v->origy = getf(); v->origz = getf(); }
+    if (m & 4) { v->whitex = getf(); v->whitey = getf(); v->whitez = getf(); }
+    if (m & 8) { v->pialx = getf(); v->pialy = getf(); v->pialz = getf(); }
+    if (m & 16) { v->targx = getf(); v->targy = getf(); v->targz = getf(); }
+    if (m & 32) { v->cx = getf(); v->cy = getf(); v->cz = getf(); }
+    if (m & 64) v->curv = getf();
+    if (m & 128) { v->nx = getf(); v->ny = getf(); v->nz = getf(); }
+  }
+  for (int fno = 0; fno < nf; fno++) {
+    int m = geti();
+    if (m & 1) s->faces[fno].ripflag = 1;
+    if (m & 2) s->faces[fno].area = getf();
+  }
+  int nops = geti();
+  for (int k = 0; k < nops; k++) {
+    std::string op = next();
+    out += op + " ";
+    if (op == "vc") {
+      int a = geti(), b = geti();
+      VECTOR *vv = VectorAlloc(3, MATRIX_REAL);
+      oi(VERTICES_commonInFaces_find(&s->faces[a], &s->faces[b], vv));
+      for (int i = 1; i <= 3; i++) of(VECTOR_ELT(vv, i));
+      VectorFree(&vv);
+    } else if (op == "ce") {
+      int a = geti(), b = geti();
+      of(FACES_commonEdgeLength_find(s, &s->faces[a], &s->faces[b]));
+    } else if (op == "tp") {
+      oi(mrisComputeTangentPlanes(s));
+      dump_mpb_vertices(s);
+    } else if (op == "st") {
+      oi(MRISstoreTangentPlanes(s, geti()));
+      dump_mpb_vertices(s);
+    } else if (op == "op") {
+      int n = geti();
+      std::vector<int> list(n > 0 ? n : 1);
+      for (int i = 0; i < n; i++) list[i] = geti();
+      double r[6] = {7, 7, 7, 7, 7, 7};
+      oi(mrisComputeOptimalPlane(s, list.data(), n, &r[0], &r[1], &r[2], &r[3], &r[4], &r[5]));
+      for (double x : r) od(x);
+    } else if (op == "fc") {
+      int f = geti(), which = geti();
+      float x = 7, y = 7, z = 7;
+      if (which) mrisCalculateCanonicalFaceCentroid(s, f, &x, &y, &z);
+      else mrisCalculateFaceCentroid(s, f, &x, &y, &z);
+      of(x); of(y); of(z);
+    } else if (op == "fa") {
+      double sg = 7, mn = 7, mx = 7;
+      od(MRIScomputeFaceAreaStats(s, &sg, &mn, &mx)); od(sg); od(mn); od(mx);
+    } else if (op == "vs" || op == "ts") {
+      double sg = 7, mn = 7, mx = 7;
+      int a = 7, b = 7;
+      if (op == "vs") od(MRIScomputeVertexSpacingStats(s, &sg, &mn, &mx, &a, &b, geti()));
+      else od(MRIScomputeTotalVertexSpacingStats(s, &sg, &mn, &mx, &a, &b));
+      od(sg); od(mn); od(mx); oi(a); oi(b);
+    } else if (op == "nf") {
+      oi(MRIScountNegativeFaces(s)); oi(MRIScountNegativeTriangles(s));
+    } else if (op == "pt") {
+      fflush(stdout);
+      oi(MRISprintTessellationStats(s, stdout));
+      fflush(stdout);
+    } else if (op == "cv") {
+      float x = getf(), y = getf(), z = getf(), d = 7;
+      oi(MRISfindClosestVertex(s, x, y, z, &d, geti())); of(d);
+    } else if (op == "cl") {
+      float x = getf(), y = getf(), z = getf();
+      oi(MRISfindClosestOriginalVertex(s, x, y, z));
+      oi(MRISfindClosestCanonicalVertex(s, x, y, z));
+      oi(MRISfindClosestWhiteVertex(s, x, y, z));
+    } else {
+      if (op == "sc") MRISsetCurvature(s, getf());
+      else if (op == "tr") MRIStrinarizeCurvature(s, getf());
+      else if (op == "sl") MRISscaleCurvature(s, getf());
+      else if (op == "bi") {
+        float t = getf(), lo = getf(), hi = getf();
+        MRISbinarizeCurvature(s, t, lo, hi, geti());
+      }
+      else if (op == "th") { float t = getf(); MRISthresholdCurvature(s, t, geti()); }
+      else if (op == "nz") { int d = geti(); fflush(stdout); MRISnormalizeField(s, d, geti()); fflush(stdout); }
+      else if (op == "hc") { float t = getf(); fflush(stdout); MRIShistoThresholdCurvature(s, t); fflush(stdout); }
+      else fail("mpb op");
+      dump_mpb_vertices(s);
+    }
+  }
+}
+
 void run_case()
 {
   std::string cmd = next();
@@ -2485,6 +2620,8 @@ void run_case()
     swr_case();
   } else if (cmd == "srd") {
     srd_case();
+  } else if (cmd == "mpb") {
+    mpb_case();
   } else if (cmd == "names") {
     int n = geti();
     keep.reserve(n);

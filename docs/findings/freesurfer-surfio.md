@@ -1081,3 +1081,48 @@ name `<name>.gii`).
 - **Timeouts**: with `TRIANGULARSURFACE_NOEXTRA_READ` set, a triangle file that has its creator's
   line gives counts of billions read from its text; the official probe then runs past its 5-second
   alarm (FS-354's family, as `tri` found): `srd` does not set that variable.
+
+## 19. Queue item 3.1-48's transform and 3.1-50 part b's first group (relay 17)
+
+**`mrisReadTransform` (mrisurf_io.cpp 4618-4745) on track C's `LTAreadEx`.** recon-all's subjects
+reach neither `MRIreadHeader` call: their `talairach.xfm`'s second line is `% avi2talxfm` (no volume
+named: `mincGetVolInfo` gives two invalid geometries) and their surfaces carry a valid geometry (the
+source centre is taken from it). The `fprintf` of the warning promotes the `float` centres (`%f`);
+`FZERO` compares the `float` difference's absolute value (`andps`) with glibc's `FLT_EPSILON` as a
+`float` (`comiss` with the object's constant 0x34000000, 2^-23: macros.h's 1e-5 is not used). `USE_AVERAGE305`'s centre literals are `double` constants stored into
+`float`s. Found by `srd` seed 13: `mrisReadSTL`'s `std::ifstream` that cannot open leaves `errno`
+(`ENOENT`), which a later `ErrorPrintf` prints (`No such file or directory`) first.
+
+**3.1-50 part b, first group (`props.rs`).** Compiled operand orders (objdump of the unit oracle's
+`mrisurf_metricProperties.cpp.o`; they decide which NaN's payload a result carries):
+- Every `sqrt(SQR(a.x - b.x) + SQR(a.y - b.y) + SQR(a.z - b.z))` of this group (the vertex-spacing
+  statistics' five cases, `MRIScomputeTotalVertexSpacingStats`, `MRISfindClosest*Vertex`,
+  `FACES_commonEdgeLength_find`'s `V3_LEN`, `MRISprintTessellationStats`) is `dz² + (dx² + dy²)`,
+  `sqrtss` (no call: the sum is never negative).
+- `mrisCalculateFaceCentroid`: `(v1 + v2) * 0.5f`, then `(m + v0) * 0.5f` (the division by 2.0f
+  folded into a product, the same value; `m` the destination of the second sum).
+- `mrisComputeTangentPlanes`: `e1 = n x v` with the first product of x as `v.z n.y` (as fs.mp's
+  triangle properties); `e2 = n x e1` with x as `e1.z n.y - e1.y n.z`; `V3_NORMALIZE` as
+  `sqrt((y² + x²) + z²)`, then `x s`, `y s`, `s z`; `V3_LEN_IS_ZERO` as `(x² + y²) + z²` widened;
+  `VectorLen` out of line (`(0 + x²) + y² + z²`); the `V3_LEN(v_e1) < 0.5` test as `z² + (x² + y²)`
+  (only a `DiagBreak`).
+- `MRIScomputeFaceAreaStats`: `area = (double)f->area * area_scale`; min and max as `minsd`/`maxsd`
+  (the same as the comparisons, NaN keeping the old value); the vertex-spacing statistics'
+  `dist *= dist_scale` with `dist_scale = 1.0f` folded away; their `min_dist` as `minsd`.
+- The two variances' `sqrt` is glibc's call: a negative value (rounding) sets `errno` to `EDOM`,
+  printed by a later error (`Numerical argument out of domain`, found by `mpb` seed 7).
+
+**Defects.** FS-363: `mrisComputeOptimalPlane` (no caller in FreeSurfer 8.2.0) sums the unripped
+positions into `xc`, `yc`, `zc`, then its second loop's initialiser sets them back to 0 and fills the
+scatter matrix from every listed vertex, ripped ones too, and returns `xc = yc = zc = 0`.
+FS-364: `MRIShistoThresholdCurvature` (mris_curvature's `-thresh`): `curv_scale = 999 / (max - min)`
+is infinite when every unripped curvature is equal (or the range starts at 1000/-1000 with all
+curvatures equal to the start), `curv_scale * 0` a NaN, `nint(NaN)` `INT_MIN` (FS-12): `counts[bin]++`
+writes 8 GiB before the array (a segmentation fault, `CRASH 11` in the probe); likewise a NaN or
+infinite curvature. Not a defect: `VERTICES_commonInFaces_find` with three common vertices writes
+element 3 of its 3-vector (within it).
+
+**Probe.** `mpb` (fssurfio.cpp `mpb_case`, tests/fs_surfio/mpb.rs): a surface read by `MRISread`;
+`MRISread` leaves `orig_area` 0, so the face-area statistics' scale is 0 and every area 0 unless the
+case sets it (half the cases do; the long-edge lines of `MRISprintTessellationStats` need it and the
+meshes scaled by 12, one case in five).

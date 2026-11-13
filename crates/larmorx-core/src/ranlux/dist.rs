@@ -7,7 +7,7 @@
 use super::{DrawError, Ranlux};
 use crate::defects::FS_100;
 use crate::math::x86_nan::{DEFAULT_NAN_F64, add_f64, div_f64, mul_f64, sub_f64};
-use crate::math::{exp_glibc, log_glibc, tan};
+use crate::math::{exp_glibc, log_glibc};
 
 /// π rounded to binary64 (§5: `0x400921fb54442d18`).
 const PI_D: f64 = f64::from_bits(0x4009_21fb_5444_2d18);
@@ -240,7 +240,7 @@ impl Ranlux {
         loop {
             let (y, sy, t) = loop {
                 let u = self.uniform();
-                let y = tan(PI_D * u);
+                let y = (self.tan)(PI_D * u);
                 let sy = mul_f64(s, y);
                 let t = sub_f64(add_f64(sy, a), 1.0);
                 if t <= 0.0 {

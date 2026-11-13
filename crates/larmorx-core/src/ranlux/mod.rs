@@ -113,6 +113,9 @@ pub struct Ranlux {
     /// a non-zero value report [`DrawError::NeverReturns`].
     zero_forever: bool,
     notices: Notices,
+    /// The tangent of the large-shape gamma draw: [`crate::math::tan`] (§6), replaced only by
+    /// validation ([`Ranlux::set_tan`]).
+    tan: fn(f64) -> f64,
 }
 
 impl Ranlux {
@@ -127,6 +130,7 @@ impl Ranlux {
             seed,
             zero_forever: false,
             notices: Notices::new(mode),
+            tan: crate::math::tan,
         };
         r.reseed(seed);
         r
@@ -175,6 +179,14 @@ impl Ranlux {
                 );
             }
         }
+    }
+
+    /// Replaces the tangent the large-shape gamma draw takes (§6) by `tan`. For validation only:
+    /// with the C library's `tan`, run as a black box, every bit of every draw is FreeSurfer's,
+    /// which shows that the correctly rounded tangent is the only cause of a difference.
+    #[doc(hidden)]
+    pub fn set_tan(&mut self, tan: fn(f64) -> f64) {
+        self.tan = tan;
     }
 
     /// The seed the generator was last seeded with, as given.

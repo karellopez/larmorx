@@ -13,7 +13,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use larmorx_core::defects::{
-    FS_03, FS_111, FS_116, FS_118, FS_119, FS_126, FS_138, FS_145, FS_150, FS_153,
+    FS_03, FS_111, FS_116, FS_118, FS_119, FS_126, FS_138, FS_145, FS_150, FS_153, FS_159,
     UpstreamDefects,
 };
 use larmorx_freesurfer_core::diag::{DIAG_SHOW, DIAG_VERBOSE};
@@ -41,6 +41,8 @@ mod mprop;
 mod sfile;
 #[path = "sread.rs"]
 mod sread;
+#[path = "stl.rs"]
+mod stl;
 
 /// The generator's state, and whether it may make names of about 1,024 bytes (not with seed 1,
 /// the platform-independent set: file systems differ on such names).
@@ -117,11 +119,11 @@ fn ix(t: &mut Vec<String>, v: i64) {
     t.push(v.to_string());
 }
 
-const COMMANDS: [&str; 32] = [
+const COMMANDS: [&str; 33] = [
     "coord", "vnum", "nbr", "modvnum", "norm", "close", "proj", "sign", "status", "sortcmp",
     "angles", "split", "vec3", "view", "fixarea", "addcmd", "vhash", "diff", "temps", "fpv",
     "names", "surf", "metric", "posn", "life", "meta", "misc", "edges", "mprop", "sfile", "cfile",
-    "sread",
+    "sread", "stl",
 ];
 
 /// A byte string's token: `h` and the bytes in hex.
@@ -997,6 +999,7 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
             "sfile" => sfile::sfile_tokens(&mut t, &mut g),
             "cfile" => cfile::cfile_tokens(&mut t, &mut g),
             "sread" => sread::sread_tokens(&mut t, &mut g),
+            "stl" => stl::stl_tokens(&mut t, &mut g),
             "names" => {
                 let n = g.int(1, 5);
                 ix(&mut t, n);
@@ -2654,6 +2657,7 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
         "sfile" => sfile::sfile_case(cx, t, o)?,
         "cfile" => cfile::cfile_case(cx, t, o)?,
         "sread" => sread::sread_case(cx, t, o)?,
+        "stl" => stl::stl_case(cx, t, o)?,
         "names" => {
             let n = t.i();
             for _ in 0..n {
@@ -2728,7 +2732,8 @@ pub fn run_line_with(
                     || cx.g.notices.contains(&FS_116)
                     || cx.g.notices.contains(&FS_138)
                     || cx.g.notices.contains(&FS_145)
-                    || cx.g.notices.contains(&FS_150)) =>
+                    || cx.g.notices.contains(&FS_150)
+                    || cx.g.notices.contains(&FS_159)) =>
         {
             "CRASH 11".to_owned()
         }

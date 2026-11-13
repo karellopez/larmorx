@@ -53,6 +53,7 @@
 //! - [`formats`]: the VTK reader, the movie.byu and icosahedron writers, the Talairach matrix, the
 //!   MATLAB plots (FS-141..FS-147).
 //! - [`scanf`]: one C `scanf` call (the text readers' numbers, `errno` at the input's end).
+//! - [`stl`]: STL surfaces, read (binary or text) and written (FS-151, FS-152, FS-157..FS-160).
 //! - [`surfread`]: the file-local surface readers (ASCII, movie.byu and its positions, the
 //!   triangle file's positions) and the old writer's quadrangles (FS-147, FS-150..FS-156).
 #![forbid(unsafe_code)]
@@ -78,6 +79,7 @@ pub mod mrisurf;
 pub mod positions;
 pub mod scanf;
 pub mod sfile;
+pub mod stl;
 pub mod surfbase;
 pub mod surfread;
 pub mod topology;

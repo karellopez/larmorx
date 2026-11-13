@@ -1242,9 +1242,9 @@ defects! {
     FS_150 = "FS-150", "FreeSurfer", true,
         "the ASCII and movie.byu surface readers (and the movie.byu positions reader) given a file with no line that is not blank or a comment end the program with a segmentation fault (signal 11)";
     FS_151 = "FS-151", "FreeSurfer", true,
-        "the ASCII surface reader given a first line whose two counts cannot be read, and the ASCII and movie.byu surface and position readers given a first vertex whose numbers cannot be read, take the missing values from memory contents";
+        "the ASCII surface reader given a first line whose two counts cannot be read, the ASCII and movie.byu surface and position readers given a first vertex whose numbers cannot be read, and the text STL reader given a first vertex or facet line whose numbers cannot be read, take the missing values from memory contents";
     FS_152 = "FS-152", "FreeSurfer", true,
-        "the ASCII and movie.byu surface and position readers given a vertex or face whose numbers cannot be read (the file ends early, or holds something else there) give it the values read before it (the previous vertex's coordinates, the last rip flag read, an ASCII face's vertex 0) and report success";
+        "the ASCII and movie.byu surface and position readers and the text STL reader given a vertex, face or facet whose numbers cannot be read (the file ends early, or holds something else there) give it the values read before it (the previous vertex's coordinates, the last rip flag read, an ASCII face's vertex 0; in an STL file the numbers of the line before, vertex or facet) and report success";
     FS_153 = "FS-153", "FreeSurfer", true,
         "the movie.byu surface and position readers given a first line with a face count of 0 end the program with an arithmetic exception (signal 8)";
     FS_154 = "FS-154", "FreeSurfer", true,
@@ -1253,6 +1253,14 @@ defects! {
         "the movie.byu positions reader takes coordinates from a file of another surface (other vertex and face counts) without a message: the first vertices of a larger surface, or of a smaller one the last coordinates repeated";
     FS_156 = "FS-156", "FreeSurfer", true,
         "the vertex-positions reader of a binary triangle file given a negative vertex count returns a surface of that count with no vertices, as if it had read it";
+    FS_157 = "FS-157", "FreeSurfer", true,
+        "the STL reader given a vertex of more than 255 faces writes its face lists past their allocation (memory corruption or a crash)";
+    FS_158 = "FS-158", "FreeSurfer", true,
+        "the STL reader given a vertex with a NaN or infinite coordinate (one or three of them) looks it up in memory before its hash table: a crash, or a wrong vertex";
+    FS_159 = "FS-159", "FreeSurfer", true,
+        "the STL reader given a facet of fewer than three vertices ends the program with a segmentation fault (signal 11)";
+    FS_160 = "FS-160", "FreeSurfer", true,
+        "the STL reader takes a file for binary when its triangle count times 50, wrapped around 2^32, plus 84 is its size, and then reads the triangles past the file's end from memory contents";
     FS_161 = "FS-161", "FreeSurfer", true,
         "MRIcopy of a tensor or complex volume into one of the same type copies only the first width bytes of each row (a quarter or an eighth of its voxels' bytes), leaving the rest of the destination as it was";
     FS_162 = "FS-162", "FreeSurfer", true,

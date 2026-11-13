@@ -14,10 +14,8 @@
 //! `core/vnl/algo/vnl_qr.hxx`, `v3p/netlib/linpack/{dqrdc,dqrsl}.c` and the BLAS kernels of
 //! [`crate::vnl_svd`].
 //!
-//! [`Qr`] is the same decomposition for `vnl_qr<float>` and `vnl_qr<double>` as FreeSurfer 8.2.0
-//! calls it through ITK 4.13.2's VNL (numerics.cpp's `OpenLUMatrixInverse` above 4 × 4 and
-//! `OpenQRdecomposition`; `vnl_determinant` above 4 × 4; `mri_robust_register`'s regression):
-//! LINPACK's `sqrdc`/`dqrdc` and `sqrsl`/`dqrsl`, `Q()`, `R()`, `determinant()`, `solve`,
+//! [`Qr`] is the same decomposition for `vnl_qr<float>` and `vnl_qr<double>` as ITK 4.13.2's VNL
+//! computes it (also `vnl_determinant`'s above 4 × 4): LINPACK's `sqrdc`/`dqrdc` and `sqrsl`/`dqrsl`, `Q()`, `R()`, `determinant()`, `solve`,
 //! `QtB`, `inverse()` and `tinverse()`. For `float`, f2c's single-precision BLAS return
 //! `doublereal`: `snrm2` rounds `scale · sqrt(ssq)` (a double square root) to float once,
 //! `sdot`'s float sum is widened exactly, and `sqrdc`'s norm downdate `qraux *= sqrt(t)` is a

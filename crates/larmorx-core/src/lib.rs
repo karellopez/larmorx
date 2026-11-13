@@ -16,7 +16,14 @@
 //!   [`vnl_eigen`]: vnl's symmetric and real eigensystems (EISPACK); [`vnl_fixed`]: vnl's
 //!   closed-form determinants and inverses of small matrices; [`vnl_random`]: vnl's
 //!   subtract-with-borrow random numbers (FreeSurfer's `-seed` generator).
+//! - [`cscan`]: C's `sscanf` conversions `%lf` and `%d` and `strtod`, as the C library reads them.
 //! - [`drand48`]: POSIX's 48-bit random numbers, as the C library gives them.
+//! - [`glibc_random`]: the C library's `rand`, `srand`, `random` and `srandom`, as glibc 2.35
+//!   gives them (a clean room of `specs/glibc-random.md`).
+//! - [`cubic_spline`]: the cubic spline of FreeSurfer's intensity normalisation (a clean room of
+//!   `specs/burkardt-spline.md`).
+//! - [`ranlux`]: RANLUX389 and the random distributions FreeSurfer draws from (a clean room of
+//!   `specs/ranlux.md`).
 //! - [`numpy`]: numpy's sums, means, variances, percentiles and weighted averages over one axis
 //!   in numpy's own order (and SciPy's `scoreatpercentile`), for replicas of Python programs.
 //! - [`x87`]: the x87's 80-bit extended arithmetic (`long double` on x86-64 Linux) in software,
@@ -32,10 +39,13 @@ pub mod alloc;
 pub mod array;
 pub mod cfmt;
 pub mod cli;
+pub mod cscan;
+pub mod cubic_spline;
 pub mod defects;
 pub mod drand48;
 pub mod eigen_sym;
 pub mod element;
+pub mod glibc_random;
 pub mod grid;
 pub mod image;
 pub mod itk_real;
@@ -44,6 +54,7 @@ pub mod math;
 pub mod numpy;
 pub mod parallel;
 pub mod python;
+pub mod ranlux;
 pub mod rotation;
 pub mod vnl_cholesky;
 #[cfg(test)]

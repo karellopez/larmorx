@@ -979,6 +979,12 @@ defects! {
         "EISPACK's balanc (vnl_real_eigensystem) never returns on a matrix with an infinite or NaN entry, or entries so large that a row's or column's scaled sum overflows, in the part it balances";
     ITK_113 = "ITK-113", "VXL", true,
         "vnl_qr::solve (and inverse) of a matrix with one row whose entry is 0 never writes the solution (LINPACK's info is 1 and VNL's vector is uninitialised): memory contents";
+    ITK_114 = "ITK-114", "VXL", true,
+        "vnl_brent_minimizer (and vnl_brent and vnl_powell, which use it) can loop for ever, coming back to the same points: on a bracket with an infinite end where the cost is NaN or not lower than at the best point (the golden-section step lands on that end again and again), or whose ends are so large that their sum overflows (the midpoint is infinite, the stopping test never passes, two points take turns)";
+    ITK_115 = "ITK-115", "VXL", true,
+        "vnl_symmetric_eigensystem never returns on many matrices with an infinite or NaN entry: EISPACK's pythag loops for ever when its second argument is NaN or both are infinite (its iteration starts from a NaN ratio and never meets its stopping test), and tql2 makes such calls, once after reading and writing one element past its arrays (when a NaN is left at the end of the subdiagonal)";
+    ITK_116 = "ITK-116", "VXL", true,
+        "vnl_svd (LINPACK's svdc) can loop for ever on a matrix with an infinite or NaN entry: its deflation and splitting steps do not count towards the iteration limit, and they can come back to the same singular values and superdiagonal again and again";
     ANTS_110 = "ANTS-110", "antsAI", true,
         "the blob alignment keeps the blob pairs whose displacements have about the same length as the others' (the squared distance between a pair's fixed and moving blob over another pair's), not those whose distances to the other blobs are preserved between the images, as its comment and ImageMath's MatchBlobs say";
     ANTS_111 = "ANTS-111", "antsAI", true,
@@ -1059,6 +1065,60 @@ defects! {
         "MatrixInverse and MatrixDeterminant of a 0 x 0 matrix read memory VNL never allocated (the inverse goes through the 4 x 4 closed form and copies 16 floats past its output; the determinant reads the empty QR factor's first element), and MatrixInverse of a singular complex matrix crashes (it copies from the NULL inverse of its real form)";
     FS_31 = "FS-31", "FreeSurfer", true,
         "FreeSurfer's vector functions do not check their vectors' lengths (VectorCrossProduct's and VectorTripleProduct's test lets column vectors of one or two elements through and never tests the other vectors; VectorDot and VectorDistance read the second vector to the first's length): elements read outside the vectors";
+    FS_34 = "FS-34", "FreeSurfer", true,
+        "OpenPowell and OpenPowell2 accept no initial directions (a NULL matrix) but then write the final directions through it: a crash";
+    FS_35 = "FS-35", "FreeSurfer", false,
+        "fs_powell returns FAILED_USER_REQUEST where VNL's Powell, which it copies, returns FAILED_TOO_MANY_ITERATIONS (its iteration limit), so OpenPowell's exit and OpenPowell2's message and return value 1 for too many iterations never happen (kept: FreeSurfer's change keeps programs from exiting at the limit)";
+    FS_36 = "FS-36", "FreeSurfer", false,
+        "OpenPowell's tolerance argument sets VNL's x tolerance, which Powell's method never reads: every call stops at VNL's default relative tolerance on the cost, 1e-10 (kept: the programs' results depend on it)";
+    FS_37 = "FS-37", "FreeSurfer", true,
+        "fs_lbfgs records its best point only from the second evaluation on and reports the last value evaluated: without an improvement on the starting point a successful run empties the parameters (OpenDFPMin then crashes) and a failed one leaves them at the line search's last trial point with the previous run's end value; otherwise the end value can be a worse point's";
+    FS_38 = "FS-38", "FreeSurfer", true,
+        "OpenDFPMin repeats the minimization while the cost improved by more than the tolerance relative to the caller's first value, never to the previous pass's (its comment: keep iterating if the error is not significantly better), so it repeats until a pass fails or FreeSurfer crashes (FS-37)";
+    FS_39 = "FS-39", "FreeSurfer", true,
+        "OpenDFPMin returns FAILED_USER_REQUEST without writing the parameters, the iteration count or the final value when an L-BFGS pass reaches its evaluation limit: the progress made is dropped and the caller reads its own unset count";
+    FS_40 = "FS-40", "FreeSurfer", true,
+        "MatrixSVDEigenValues and MatrixConditionNumber read the singular values up to the matrix's row count where the decomposition has as many as its columns: for a matrix with more rows than columns they read past the vector (memory the program does not own), and the eigenvalues and the condition number (1e8 where that memory holds 0) depend on it";
+    FS_41 = "FS-41", "FreeSurfer", true,
+        "OpenNonSymmetricEigenSystem copies the matrix into a variable-length array on the stack (8 bytes an element): a non-symmetric matrix of about a thousand rows or more overflows the default 8 MiB stack, a crash";
+    FS_42 = "FS-42", "FreeSurfer", true,
+        "OpenEigenSystem ignores VNL's failure (EISPACK's tql2 not converging, as on a matrix with NaN entries): it returns success with eigenvectors VNL never wrote (memory contents)";
+    FS_43 = "FS-43", "FreeSurfer", true,
+        "MatrixSVD allocates V with as many rows and columns as the matrix has rows where the decomposition's V has as many as its columns (with more rows than columns V's numbers land in the wrong places), and ignores a failed decomposition (fewer rows than columns, or LINPACK not converging): V comes back unchanged, zeros for a new one, with no message";
+    FS_44 = "FS-44", "FreeSurfer", true,
+        "MatrixSVDInverse of a matrix with more rows than columns allocates the transpose of U as a square matrix and reads the singular values and writes their inverses up to the row count, past their vectors: FreeSurfer crashes or ends the program";
+    FS_45 = "FS-45", "FreeSurfer", true,
+        "MatrixPseudoInverse of a matrix with fewer rows than columns crashes when the pseudo-inverse of its transpose is NULL (a zero matrix) or cannot be written into the caller's output, which it passes on although that has the other shape; an output of the inner shape is filled, freed, and a new matrix returned";
+    FS_46 = "FS-46", "FreeSurfer", true,
+        "MatrixSVDPseudoInverse never writes a given output (it returns a new matrix), ignores a failed decomposition (a pseudo-inverse of infinities from the unset singular values), and of a zero matrix with fewer rows than columns crashes transposing the NULL inner result";
+    FS_47 = "FS-47", "FreeSurfer", true,
+        "OpenEigenSystem passes a matrix with infinite or NaN entries to VNL's symmetric eigensystem, whose EISPACK pythag never returns on a NaN or on two infinite arguments: MatrixEigenSystem of a symmetric matrix with infinite entries (and the helper's symmetric path with NaN ones) hangs";
+    FS_48 = "FS-48", "FreeSurfer", true,
+        "OpenSvdcmp passes a matrix with infinite or NaN entries to VNL's singular value decomposition, whose LINPACK ssvdc can loop for ever on such a matrix: the SVD functions (MatrixSVD, the SVD inverses and pseudo-inverses, the condition numbers) hang on some of them";
+    FS_49 = "FS-49", "FreeSurfer", true,
+        "freadInt and freadDouble at the end of the file return a value they never read (the stack's contents; freadInt prints nothing): MatrixReadFrom of a short file fills the matrix's type, sizes or elements with memory contents";
+    FS_71 = "FS-71", "MINC volume_io", true,
+        "a compressed input (.gz, .Z, .z, or a missing name whose compressed file exists) is decompressed by running gunzip -c, then bunzip2 -c, through the shell with the file name unquoted: a name with a blank or shell syntax fails, reads other files or runs commands";
+    FS_72 = "FS-72", "MINC volume_io", true,
+        "a thin-plate spline's Points or Displacements list that reaches the end of the .xfm file after white space without its ';' is read forever (the same pushed-back character each time), the list growing until memory runs out";
+    FS_73 = "FS-73", "MINC volume_io", true,
+        "a thin-plate spline's Number_Dimensions of 0 divides by zero (the program crashes) and a negative one sizes its arrays negatively";
+    FS_74 = "FS-74", "MINC volume_io", true,
+        "a thin-plate spline with an empty Points list frees a pointer that was never set (a crash or heap damage), and the writer writes such a list with no ';', so the file cannot be read back";
+    FS_75 = "FS-75", "MINC volume_io", true,
+        "a file name that starts with a $VAR (or ~) whose value is empty writes through a null pointer (expand_filename has not allocated its result yet): the program crashes";
+    FS_76 = "FS-76", "nifticlib", true,
+        "znzread or znzwrite on a compressed file with a member size of 0 divides by zero (nmemb - remain/size): a crash, or whatever the compiled code makes of it";
+    FS_77 = "FS-77", "nifticlib", true,
+        "znzread on a compressed file that ends inside a member counts that member as read (nmemb - remain/size rounds the missing members down): a caller checking the count takes a short read for a complete one";
+    FS_78 = "FS-78", "zlib 1.2.11", true,
+        "gzseek forward (or gzflush or gzclose after it) before the first gzwrite fills the gap with memory zlib never set instead of zeros: gz_zero clears its buffer once, before allocating it";
+    FS_100 = "FS-100", "FreeSurfer", true,
+        "the gamma draw converts its shape's integer part to a 32-bit unsigned integer, which C leaves undefined outside [0, 2^32): a shape of 2^32 or more gives a value of the wrong size, NaN and +inf the value of a shape below 1, and a negative shape or -inf a draw that does not return in practice";
+    FS_101 = "FS-101", "FreeSurfer", true,
+        "a seed whose 24 seeded values are all 0 (2147483563, -2147483563 and other multiples of 2147483563) makes the random generator give 0 for ever (its initial carry is 0): flat draws are constant and most other draws never return";
+    FS_103 = "FS-103", "FreeSurfer", true,
+        "the cubic spline's check that the knots increase strictly is false for a NaN knot, so a NaN knot is accepted and the spline's values become NaN";
 }
 
 /// The register entry with ID `id`.

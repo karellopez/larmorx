@@ -12,9 +12,9 @@
 //! `XYZ_NORMALIZED_LOAD`, `XYZApproxAngle_knownLength`, `MatrixCheck`, `MatrixReshape`,
 //! `MatrixTrace`, `MatrixConstVal`, `MatrixZero`, `MatrixSumElts`, `MatrixNormalizeColScale`,
 //! `MatrixNormalizeCol`, `MatrixSimilarityTransform`, `GaussianMatrix2`, `GaussianMatrix`) and
-//! the `MatrixClone` macro. The product (`MatrixMultiply`) is in [`crate::matrix`]; the functions
-//! that call VXL (determinant, eigensystems, SVD, inverses) come with the main package's `float`
-//! VNL routines.
+//! the `MatrixClone` macro. The product (`MatrixMultiply`) is in [`crate::matrix`]; the eigensystems,
+//! SVD, condition numbers and pseudo-inverses in [`crate::matrix_decomp`] (the determinant, inverse
+//! and QR factors are here).
 //!
 //! Every expression keeps C's types: `float` sums stay `float` (each step rounded), `double`
 //! ones `double`; elements are addressed as the C macros address them (`rptr[r][c]`), so where a
@@ -71,7 +71,7 @@ pub fn fzero(f: f64) -> bool {
 
 /// FS-25 for a function written for real matrices: `true` (refused, after the error) by default
 /// when an operand is complex; with `reproduce` it notes FS-25 and the caller goes on.
-fn real_only(g: &mut Globals, err: &mut dyn Write, func: &str, ms: &[&Matrix]) -> bool {
+pub(crate) fn real_only(g: &mut Globals, err: &mut dyn Write, func: &str, ms: &[&Matrix]) -> bool {
     if !ms.iter().any(|m| m.mtype == MATRIX_COMPLEX) {
         return false;
     }
@@ -95,7 +95,7 @@ fn real_only(g: &mut Globals, err: &mut dyn Write, func: &str, ms: &[&Matrix]) -
 
 /// FS-28 for an output that does not fit: `true` (refused, after the error) by default; with
 /// `reproduce` it notes FS-28 and the caller fills it as FreeSurfer does.
-fn unfit(g: &mut Globals, err: &mut dyn Write, func: &str, what: &str) -> bool {
+pub(crate) fn unfit(g: &mut Globals, err: &mut dyn Write, func: &str, what: &str) -> bool {
     if g.notices.reproduce() {
         g.notices.add(
             &FS_28,
@@ -125,7 +125,7 @@ fn short_vector(g: &mut Globals, err: &mut dyn Write, func: &str, what: &str) ->
 /// The output of `T *F(..., MATRIX *mOut)`: the caller's, or a new matrix of `rows` x `cols` of
 /// `mtype` (`None`: `MatrixAlloc` returned `NULL`, an unknown type).
 #[allow(clippy::too_many_arguments)]
-fn output<'a>(
+pub(crate) fn output<'a>(
     g: &mut Globals,
     out: &mut dyn Write,
     err: &mut dyn Write,
@@ -144,7 +144,7 @@ fn output<'a>(
     })
 }
 
-fn done(fresh: Option<Matrix>) -> Ret<Matrix> {
+pub(crate) fn done(fresh: Option<Matrix>) -> Ret<Matrix> {
     match fresh {
         Some(m) => Ret::New(m),
         None => Ret::Given,

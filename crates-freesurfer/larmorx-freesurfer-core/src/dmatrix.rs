@@ -16,6 +16,11 @@
 //! array, two unused numbers before the first, rows one-based. `DMatrixAddMul`'s OpenMP loop
 //! over the rows computes each element alone, so its result does not depend on the threads.
 //!
+//! NaNs: the `double` products and sums follow SSE2's rules ([`crate::sse`]: a NaN made from
+//! numbers is the default NaN with its sign set; of two NaN operands the C expression's left
+//! one), the `long double` ones the x87's (`F80`), so a NaN's bits are the official build's on
+//! every platform (the fs-maths probe's NaN and infinity inputs).
+//!
 //! Messages: FreeSurfer's, including `DMatrixAlloc`'s `ERROR: DMatrixAlloc(): types 1 not
 //! recognized` for any type other than real and complex (it prints `MATRIX_REAL`, not the type
 //! it was given: kept, a message only).
@@ -30,6 +35,7 @@ use crate::globals::Globals;
 use crate::log::{self, ERROR_BADPARM, ERROR_NO_MEMORY, Fatal, NO_ERROR};
 use crate::matrix::{MATRIX_COMPLEX, MATRIX_REAL, Matrix};
 use crate::ret::Ret;
+use crate::sse;
 
 /// `utils/dmatrix.cpp`'s path in the official build (`__FILE__`).
 pub fn dmatrix_cpp() -> String {
@@ -264,7 +270,7 @@ pub fn dmatrix_multiply(
         for col in 1..=m3.cols {
             let mut val = F80::ZERO;
             for i in 1..=m1.cols {
-                val += F80::from_f64(m1.get(row, i) * m2.get(i, col));
+                val += F80::from_f64(sse::mul64(m1.get(row, i), m2.get(i, col)));
             }
             m3.set(row, col, val.to_f64());
         }
@@ -283,11 +289,27 @@ pub fn dvector_dot(out: &mut dyn Write, v1: Option<&DMatrix>, v2: Option<&DMatri
         return -10e10;
     }
     let (v1, v2) = (v1.expect("checked"), v2.expect("checked"));
+    // The official code (GCC 8.4.0): `fldl v2[i]; fmull v1[i]; faddp`. `fld` makes a signalling
+    // NaN quiet; `fmul`'s memory operand keeps it signalling, so of it and a quiet NaN the
+    // x87 takes the quiet one (the fs-maths probe's NaN inputs).
     let mut dot = F80::ZERO;
     for i in 1..=v1.rows {
-        dot += F80::from_f64(v1.get(i, 1)) * F80::from_f64(v2.get(i, 1));
+        dot += F80::from_f64(v2.get(i, 1)) * f80_m64(v1.get(i, 1));
     }
     dot.to_f64()
+}
+
+/// A `double` as an x87 instruction's memory operand (`fmul m64fp`, `fadd m64fp`): exact, a
+/// signalling NaN kept signalling (unlike `fld`, [`F80::from_f64`], which makes it quiet).
+fn f80_m64(x: f64) -> F80 {
+    let b = x.to_bits();
+    let frac = b & ((1u64 << 52) - 1);
+    let signalling = (b >> 52) & 0x7ff == 0x7ff && frac != 0 && frac >> 51 == 0;
+    if !signalling {
+        return F80::from_f64(x);
+    }
+    let sign = u128::from(b >> 63) << 79;
+    F80::from_bits(sign | (0x7fffu128 << 64) | (1u128 << 63) | (u128::from(frac) << 11))
 }
 
 /// `DMatrixPrintFmt(fp, fmt, mat)`: each row's elements in `fmt` (a `%f` format), two spaces
@@ -550,21 +572,24 @@ pub fn dmatrix_add_mul(
     }
     for row in 1..=m1.rows {
         for col in 1..=m1.cols {
+            // NaN operands as the official build's code takes them (measured by the fs-maths
+            // probe): `val += v * m[r][c]` is `(m[r][c] * v) + val`, `val += m[r][c]` is
+            // `val + m[r][c]`.
             let mut val = 0.0f64;
             if v1 != 0.0 {
                 if v1 != 1.0 {
-                    val += v1 * m1.get(row, col);
+                    val = sse::add64(sse::mul64(m1.get(row, col), v1), val);
                 } else {
-                    val += m1.get(row, col);
+                    val = sse::add64(val, m1.get(row, col));
                 }
             }
             if let Some(m2) = m2
                 && v2 != 0.0
             {
                 if v2 != 1.0 {
-                    val += v2 * m2.get(row, col);
+                    val = sse::add64(sse::mul64(m2.get(row, col), v2), val);
                 } else {
-                    val += m2.get(row, col);
+                    val = sse::add64(val, m2.get(row, col));
                 }
             }
             m_out.set(row, col, val);

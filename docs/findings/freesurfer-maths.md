@@ -3,7 +3,8 @@
 **Closed to FreeSurfer clean-room implementers** (source-derived: it names FreeSurfer's files and
 lines; the behaviour is in `specs/freesurfer-maths.md`). Written by the replica author of queue
 items 3.1-23 and 3.1-24 (FreeSurfer's foundations, track A). Defect IDs FS-13 to FS-24 (this
-part 1) and FS-25 to FS-33 (part 2, items 3.1-24 and 3.1-23's inverse), decided by rules A to D (CLAUDE.md, D13); the
+part 1), FS-25 to FS-33 (part 2, items 3.1-24 and 3.1-23's inverse), FS-34 to FS-39 (part 3) and FS-40 to
+FS-49 (part 4, the rest of item 3.1-24), decided by rules A to D (CLAUDE.md, D13); the
 register's entries are in the orchestrator's handoff. Every claim below is from the source of the 8.2.0 tag and, where a number is given, from
 the probe `validation/probes/fs-maths/` (FreeSurfer's own functions from the unit oracle's build).
 
@@ -296,3 +297,293 @@ the determinant of an empty matrix.
 - `MatrixPrint` flushes standard output, not its own stream (878).
 - The cross product's test refuses a 1 x 3 row vector.
 
+
+# Part 3 (item 3.1-23's minimizers; the double matrices' NaNs)
+
+## The measurement, part 3
+
+`validation/probes/fs-maths/` gained `powell`, `powell2` and `dfpmin` (`OpenPowell`, `OpenPowell2`,
+`OpenDFPMin` on four seeded float costs given as C function pointers: a positive-definite
+quadratic, Rosenbrock's, the quadratic rounded down to multiples of 1/q with the quadratic's
+gradient, weighted absolute values; the iteration callback `powell_iteration_func`, the step
+function and the user callback; every evaluation and callback hashed; standard output and error
+captured byte for byte; `OpenDFPMin` in a child process, since FreeSurfer crashes there, FS-37),
+and NaNs and infinities among the double matrices' inputs (`dmat`, `dmmul`, `dliststats`).
+2026-11-13, seed 7, 67,000 cases of 67 commands: `reproduce` identical on 66,042 of 66,042
+comparable lines; 958 not comparable (827 FS-22, 131 `dfpmin` lines with VNL's L-BFGS printout of
+the vectors under `DIAG_VERBOSE`, ITK-106, which prints the double before each vector: a heap
+header in FreeSurfer, 0 in the port; 906 of the 958 were identical anyway). The default differs only
+with a defect's notice, but the known correctly rounded `sinf`/`cosf`/`log` last bits (33 lines).
+All comparable `powell`, `powell2` and `dfpmin` lines identical (1,000, 1,000 and 869), including
+every evaluated point and the printed text. FreeSurfer **crashed** in 29 of the 1,000 `OpenDFPMin`
+cases (FS-37; 42 of 1,000 in an earlier draw of the cases). Seed 1, 670 cases (the recorded test,
+`tests/fs_maths_official.rs`): 657 identical, 13 not comparable.
+
+The official code's own variation: run 8 times on the same 67,000 cases, one `robust` line
+differed between runs and one run crashed (signal 11) in another `robust` case: both are FS-22
+cases (`HISTOrobustGaussianFit` reading outside its arrays, already not compared), whose reads
+depend on the heap's layout. Since then `fsmaths` runs `robust`, like `dfpmin`, in a child process.
+
+On x86 with AArch64's NaN emulated (`nan_trap.c`, `NAN_TRAP_ARM=1`, `NAN_TRAP_DIR` set): the
+recorded test passes in debug and release builds; the probe's 67,000 lines are identical with and
+without the trap in `fix`, and in `reproduce` but for 17 `dfpmin` lines of the verbose L-BFGS
+printout (ITK-105/ITK-106, below; they are among those not compared).
+
+## The double matrices' NaN operands (measured; a porting trap, not a defect)
+
+With two NaN operands SSE2 returns the first source operand's, so the order GCC chose matters.
+Measured on 3,000 cases with NaNs of both signs, payloads and a signalling NaN: `DMatrixAddMul`'s
+`val += v * m[r][c]` is computed as `(m[r][c] * v) + val` (the element's NaN in the product, the
+product's in the sum; not the left-operand order §7 of the spec found for the float matrices),
+`val += m[r][c]` (factor exactly 1) as `val + m[r][c]`; `DMatrixMultiply`'s products as `m1 * m2`.
+`DVectorDot` (dmatrix.cpp 712) is `fldl v2[i]; fmull v1[i]; faddp` (the official `dmatrix.cpp.o`):
+`fld` makes a signalling NaN quiet, `fmul`'s memory operand keeps it signalling, and of a quiet and
+a signalling NaN the x87 returns the quiet one, so `v1`'s signalling NaN loses to `v2`'s quiet one
+(the port's first version, loading both, gave the signalling one's payload: 1 of 1,000 cases).
+`DListStats` loads its values (`fldl`) and squares them in SSE; its minimum and maximum are
+`minsd`/`maxsd` with the C comparisons' NaN behaviour. All 3,000 cases identical after the change.
+
+## FS-34: the Powell wrappers write the directions through `NULL` (a crash, never reproduced)
+
+`numerics.cpp` 1001-1003 and 1059-1061 accept `ioInitialDirection == NULL` (the identity), but
+1018 and 1074 write the final directions through it unconditionally: a segmentation fault. Every
+caller in the tree passes a matrix. Both modes write nothing (noted).
+
+## FS-35: `fs_powell`'s return codes (rule C: kept)
+
+VNL's Powell (ITK 4.13.2 `vnl_powell.cxx` 127, 175) returns `TOO_MANY_ITERATIONS` when its
+iteration limit ends the loop and `FAILED_USER_REQUEST` only when `report_iter` asks to stop (173).
+FreeSurfer's copy returns `FAILED_USER_REQUEST` in both places (`fs_powell.cpp` 192, 224) and
+ignores `report_iter`. So `OpenPowell`'s `ErrorExit(..., "powell exceeding maximum iterations.")`
+(1007) and `OpenPowell2`'s `powell exceeded maximum iterations` with return 1 (1076-1079) never
+run. The change looks deliberate (with VNL's code, a program whose Powell reached 2000 iterations
+in `OpenPowell` would exit); every caller (`mri_segreg`, `mrimorph.cpp`, `mri_hires_register`,
+...) ignores `OpenPowell2`'s value. Kept in both modes, documented.
+
+## FS-36: `OpenPowell`'s tolerance has no effect (rule C: kept)
+
+`numerics.cpp` 991 `set_x_tolerance(iTolerance)`: VNL's Powell and FreeSurfer's copy read only
+`ftol` (default 1e-10) for their stop, never `xtol`; `fs_powell.cpp` 95's comment says otherwise.
+Every `OpenPowell` call (`mrimorph.cpp`'s, `mri_hires_register`'s, ...) therefore stops at a
+relative change of 1e-10 of the cost, whatever it asks; with float costs that means "no change at
+all". Honouring the tolerance would change those programs' results; nothing says which they were
+tuned for: kept, documented.
+
+## FS-37: `fs_lbfgs`' best point (rule A; its crash never reproduced)
+
+`fs_lbfgs.cpp` 87-115: `best_f` starts at the first value but `best_x` stays empty until a value
+below it; 166-171 on success `x = best_x` and `end_error_ = f` (the last value evaluated); 173-198
+on failure the same only `if (best_x.size() != 0)` ("an DJ addition"). So:
+
+- a run that converges without improving on its start (an accepted line-search step whose value
+  equals the start's: L-BFGS's sufficient-decrease test `f <= f0 + 1e-4 stp g'd` holds with
+  equality when the term is below `f0`'s last bit, common with float costs) returns **empty**
+  parameters; `OpenDFPMin` then either runs the next pass on them (the bridge copies nothing, the
+  cost function reads stale stack floats, `lbfgs_` dereferences the null data pointer) or converts
+  them back (`ConvertFromVNLDoubleToFloat` reads the empty vector): a crash either way. Measured: 29
+  of 1,000 probe cases (`CRASH` lines, signal 11). `mrimorph.cpp` 6743 has `if (iter == 0) break;
+  // parms can be corrupted if no step taken`.
+- a failed run without an improvement leaves `x` at the line search's last trial point (netlib's
+  `mcsrch` returns with it) and `end_error_` at the previous pass's value;
+- otherwise `end_error_` is the last value evaluated, which can be a worse trial point's than the
+  best point returned.
+
+Rule A: the starting point is the best until a smaller value, every return gives the best point and
+its value. `reproduce` gives FreeSurfer's, but where it empties the parameters: there the starting
+point, and `OpenDFPMin` stops (the crash is never reproduced). This changes `mri_em_register`'s
+quasi-Newton passes (`mrimorph.cpp` 5728, 6719) where a pass ends without improvement.
+
+## FS-38: `OpenDFPMin`'s passes (rule A)
+
+`numerics.cpp` 885-896: `previousValue` is set once, from the caller's `*oFinalFunctionReturn`,
+and the loop continues while `(previousValue - currentValue) / previousValue > iTolerance`; its
+comment says "keep iterating if the error isn't significantly better", i.e. than the previous
+pass's. As written the improvement only grows, so the passes repeat until one fails (or FreeSurfer
+crashes, FS-37); a NaN ratio (a cost of 0) continues too. With FS-37 corrected, a pass that cannot
+improve returns the same point and value forever, so the loop must compare with the previous pass:
+rule A (the intent written beside it; without it the corrected driver would not end). Default:
+continue only while the pass improved on the previous one by more than the tolerance relative to it
+(a NaN stops); `reproduce`: FreeSurfer's. Noted where the decisions differ (70 of 1,000 probe cases).
+
+## FS-39: `OpenDFPMin` at the evaluation limit (rule A)
+
+`numerics.cpp` 905-924: `FAILED_USER_REQUEST` (`fs_lbfgs`' 2,000-evaluation limit, 189) matches
+none of the branches: the parameters, the iteration count and the final value are not written,
+and the code 9 is returned, which `mrimorph.cpp` ignores ("retval is not to be trusted"); its
+`iter` is then an unset local. Rule A: written as for `ERROR_FAILURE`. Not met in the probe.
+
+## For the main package's VNL (track C), found here
+
+- VXL's `write50` (L-BFGS's printout under `IPRINT(2) = 1`, ITK-105) divides 0 by 0 for a vector of
+  zeros with `reproduce`: x86 prints `-nan`, an AArch64 run of the port `nan` (17 probe lines under
+  the emulation; they are lines ITK-106 already makes non-comparable). Using SSE's default NaN there
+  (`-nan` on every platform) would make the port's `reproduce` output the same everywhere.
+- On a cost that falls without end along a line, `vnl_bracket_minimum` runs into infinities and
+  makes NaNs from them (`inf - inf`); their sign differs on AArch64, so the points handed to the cost
+  function differ in their NaN bits (an earlier version of the probe's absolute-value cost, with
+  cross terms, showed it in 17 Powell cases; the results were the same). FreeSurfer's costs are
+  bounded; noted only.
+
+# Part 4: the decompositions, the matrix files and the random-field specifications (item 3.1-24)
+
+Defect IDs FS-40 to FS-49. The probe's eight new commands (`meig`, `msvd`, `msvdinv`, `mpinv`,
+`mrdtxt`, `mrdasc`, `mrdbin`, `mwr`; `validation/probes/fs-maths/`) and the C library's conversions
+(`validation/probes/fs-maths/scanf/`).
+
+## The measurement, part 4
+
+`check.py --seed 7 --n 75000` (2026-11-13): 75,000 cases of 75 commands (the eight new ones 1,000
+each). The port with `reproduce`: **73,122 of 73,122 comparable lines identical**; 1,878 not compared
+(`msvd` 464, `startpeak` 308, `robust` 278, `meig` 194, `nextpeak` 153, `dfpmin` 125, `mrdbin` 119,
+`msvdinv` 74, `mpinv` 67, ...): FreeSurfer's reads of memory it does not own or never wrote (FS-22,
+FS-16, FS-42, FS-49, ITK-106, ITK-110, ITK-111) and 313 matrices with infinite or NaN entries the
+port refuses (FS-47, FS-48): on 97 of them FreeSurfer never returned (the probe's `TIMEOUT`), on 174
+its line equals the port's all the same (the SVD's failure lines), on 42 FreeSurfer finished with
+results the port does not compute. The default differs from FreeSurfer only with a defect's notice
+(FS-43 381, FS-46 151, FS-44 95, FS-45 54 among the new ones), but for 8 rotations, 1 Gaussian draw
+and 10 entropies (the correctly rounded `sinf`, `cosf`, `log`). FreeSurfer's crashes are the lines
+`CRASH`, matched by the port's `reproduce` (FS-44: every tall `MatrixSVDInverse` whose decomposition
+succeeds; FS-45, FS-46). Seed 1, 750 cases: 723 identical, 27 not compared, hash `6cebc7a8...`
+(`tests/fs_maths_official.rs`), passing with AArch64's NaN emulated in debug and release builds.
+
+## The float product's NaN operands (measured; a porting trap, not a defect)
+
+`MatrixMultiply_wkr`'s real loop (`matrix.cpp` 760-770, `val += *r1++ * *r2`) is vectorised by
+GCC 8.4.0 for 4 or more terms (the unit oracle's `matrix.cpp.o`): `mulps` with `m2`'s gathered
+column as the destination (each product `b × a`), then the four lanes summed as `val + p0`,
+`p1 + val`, `p2 + val`, `val + p3`; the terms after the last block, and all of 3 or fewer, as
+`val + (b × a)`. The values are the same in any order, but of two NaNs SSE keeps the first
+operand's, so a NaN sum's sign followed `m2` and the lane order: the probe's `MatrixNSConditionNumber`
+of matrices with NaNs and infinities printed `nan` where the port's earlier `val + (a × b)` printed
+`-nan` (the products of `inf × 0` make x86's default NaN, negative). Ported as measured
+(`matrix::dot_float`). The double product (`MatrixMultiplyD`) is not vectorised: `(a × b)` then
+`val + p`, as the port had it.
+
+## FS-40: the singular values read to the row count (rule A)
+
+`matrix.cpp` 1810-1824 (`MatrixSVDEigenValues`) and 2481-2486 (`MatrixConditionNumber`) loop
+`for (row = 2; row <= rows; ...)` and `i < nevalues` (`nevalues = m->rows`) over `v_w`, a 1 x cols
+vector: for more rows than columns they read past its numbers (the allocation's rounding: memory
+`bzero` never cleared, `matrix.cpp` 1188-1189's `MatrixAlloc_new`). Where that memory holds 0, the
+condition number is 1e8 ("something big") for every tall matrix, and the extra eigenvalues are
+whatever it holds. Rule A: the cols values; the extra eigenvalues 0 (the `memset` before). Callers:
+`mrisurf_metricProperties.cpp` 10607 and 11009, `mrisurf_defect.cpp` 1018 (`m_Q`: square 3 x 3
+there), `mris_compute_layer_intensities` through `MatrixNSConditionNumber` (square products): no
+tall matrix on a default path known. `MatrixConditionNumber` of fewer rows than columns fails the
+decomposition and gives 1e8 (kept, rule C: the "something big" the callers test against a limit;
+`MatrixNSConditionNumber` is the function for such matrices).
+
+## FS-41: `OpenNonSymmetricEigenSystem`'s copy on the stack (a crash, never reproduced)
+
+`numerics.cpp` 951: `double data[icData * icData]`, a variable-length array: above the default
+8 MiB stack (about 1,024 rows) the program crashes. The callers' non-symmetric matrices are small
+(3 x 3 covariances that are not exactly symmetric); both modes compute, noted.
+
+## FS-42: `OpenEigenSystem` ignores VNL's failure (memory contents)
+
+`numerics.cpp` 930-943 constructs `vnl_symmetric_eigensystem<float>` and copies `V` and `D`;
+ITK 4.13.2's `vnl_symmetric_eigensystem_compute` (`vnl_symmetric_eigensystem.hxx` 114-118) writes
+`ierr = <i>` and returns before filling `V` when EISPACK's `tql2` does not converge, and the
+constructor ignores it: `V` is a fresh, uninitialised `vnl_matrix`. Rule B: an error by default
+(`MatrixEigenSystem` returns `NULL`, its documented failure); `reproduce` fills the vectors with 0.
+Not reached by finite matrices in the probe (FS-47 refuses the non-finite ones first).
+
+## FS-47: VNL's symmetric eigensystem never returns on non-finite matrices (a hang, never reproduced)
+
+EISPACK's `pythag` (`v3p/netlib/eispack/pythag.c`, VNL) iterates `t = r + 4` until `t == 4`: with
+`p = max(|a|, |b|)` NaN (f2c's `max` keeps the second argument when the comparison fails: `pythag(x,
+NaN)` and `pythag(NaN, NaN)`, or two infinities, `r = inf / inf`) it never ends. `tql2` calls it on
+the tridiagonal matrix of any matrix with infinite or NaN entries in the triangle `tred2` reads, so
+FreeSurfer's `MatrixEigenSystem` of a symmetric matrix with infinities (a NaN fails the exact
+symmetry test and goes to the non-symmetric path, which hangs in `balanc`, ITK-112) never returns.
+Measured: of the probe's symmetric-path cases with infinities or NaNs, most never returned (the
+probe's 2-second alarm, `TIMEOUT`); some did (a NaN only on the diagonal of a 2 x 2: `pythag(NaN, 1)`
+returns, f2c's `max(NaN, 1)` being 1). Both modes refuse every such matrix with an error (rule B;
+the hang never reproduced), so the matrices FreeSurfer does finish are not reproduced: they wait for
+the main package's eigensystem to report a loop that never ends (below).
+
+## FS-48: VNL's SVD never returns on some non-finite matrices (a hang, never reproduced)
+
+LINPACK's `ssvdc` (VNL's `vnl_svd<float>`) loops for ever on some matrices with infinite and NaN
+entries (probe case `mpinv 4 3 3 80000000 ff800000 3f800000 80000000 7fc00000 7f800000 80000000
+7fc00000 7fc00000`: `MatrixSVDPseudoInverse` and `msvd` of the same matrix never return, FreeSurfer
+and the main package's port alike); on most it fails to converge (VNL's `suspicious return value`
+lines, `info` = min(rows + 1, cols) on every measured case) and on a few it succeeds (a 1 x 1
+infinity). `OpenSvdcmp` hands any matrix to it. Both modes give the failure lines and
+`ERROR_BADPARM` for every matrix with an infinite or NaN entry without decomposing it (rule B). The
+callers' matrices are finite (Jacobians, covariances, design matrices).
+
+## FS-43: `MatrixSVD`'s V and its ignored failure (rule A, rule B)
+
+`matrix.cpp` 1779-1788: `mV = MatrixAlloc(mA->rows, mA->rows, ...)` where `vnl_svd`'s V is cols x
+cols (`OpenSvdcmp` copies its cols² numbers into the first floats of the rows x rows matrix, so for
+a tall matrix V's rows are misplaced), and `OpenSvdcmp`'s `ERROR_BADPARM` (fewer rows than columns,
+or LINPACK's failure) is not checked: V comes back unchanged, mA and v_z too, with no message. The
+function's own comment says V is cols x cols. Rule A (cols x cols) and rule B (an error). Callers on
+default paths: `mri2.cpp` 1673 (`MRIpca`: the square temporal covariance matrix), `lta_convert` 1043 (a
+given V): square or given; no change known on fMRIPrep's paths.
+
+## FS-44: `MatrixSVDInverse` of a tall matrix (rule A; a crash, never reproduced)
+
+`matrix.cpp` 1880-1912: `m_Ut = MatrixAlloc2(cols, cols, ...)` (its comment says cols x rows), the
+loops `for (row = 1; row <= rows; ...)` over `v_w` (cols numbers) and `m_w->rptr[row][row]` (a cols x
+cols matrix): for more rows than columns the row pointers past the last row are 0 (`bzero` of the
+pointer block's padding) and the write crashes; measured: every tall case whose decomposition
+succeeded gave `CRASH`. Rule A: the decomposition's sizes, which give the pseudo-inverse. Callers'
+matrices are square (`MatrixPseudoInverse`'s `mᵀm`, covariances, `rbf.cpp`'s `GᵀG`).
+
+## FS-45: `MatrixPseudoInverse` of a wide matrix with an output (rule A; crashes, never reproduced)
+
+`matrix.cpp` 2796-2804: for fewer rows than columns the caller's `m_pseudo_inv` (cols x rows, the
+result's shape) is passed to the pseudo-inverse of the transpose (rows x cols): `MatrixMultiply`
+refuses it (`m3 dim mismatch`, `NULL`) and `MatrixTranspose(NULL, NULL)` crashes; an output of the
+inner shape is filled, then freed by `MatrixFree(&mT)` (the caller's pointer dangles) and a new
+matrix is returned. The same crash for a wide zero matrix with no output (its inner pseudo-inverse is
+`NULL`). Callers passing an output (`mri_cnr`, `mri_train`, `mri_ms_fitparms`,
+`mris_intensity_profile`) pass tall design matrices; no default path known.
+
+## FS-46: `MatrixSVDPseudoInverse`'s output, failure and empty inner result (rule A, rule B; a crash never reproduced)
+
+`matrix.cpp` 3613-3658: `m_pseudo_inv = MatrixMultiply(m_tmp, m_Ur, NULL)` ignores the caller's
+matrix; `OpenSvdcmp`'s return is not checked (the singular values stay 0: `0 / 0` keeps every one,
+`1 / 0` inverts them to infinities); for a wide zero matrix the inner `NULL` is transposed (a crash).
+Every caller passes `NULL` (`mri_vol2surf` 2431, `class_array.cpp` 777, `gcamorph.cpp` 12350 and
+12784). Rule A (the output written) and rule B (an error for the failure).
+
+## FS-49: `freadInt` and `freadDouble` at the end of the file (memory contents)
+
+`fio.cpp` 169-193: `fread` of a missing item leaves the local `d` or `i` as the stack held it (a
+partial item keeps the bytes it read); `freadDouble` prints `freadDouble: fread failed`, `freadInt`
+tests `fread(...) < 0`, which a `size_t` never is, and prints nothing. `MatrixReadFrom` of a short
+file therefore takes its type, sizes or elements from the stack (the probe's cut files: memory
+contents, counted and not compared; a garbage size can end the program, FS-13, so `mrdbin` runs in a
+child process). Rule B: an error by default; `reproduce` reads the missing bytes as 0. The
+readers that use them come with `fs.io` (item 3.1-26), where the same applies.
+
+## The C library's `%f` (measured; larmorx's own reader)
+
+glibc 2.35's `scanf` departs from C11's "longest prefix of a matching sequence" (7.21.6.2 ¶9)
+in measured ways the readers depend on: `1e` and `1e+` read 1 (the marker and sign consumed, no
+failure), so `100ergs` reads 100; `0x` without digits fails unless a point follows (`0x.` reads 0
+and leaves a following `p`); `inf` stops before a non-`i` letter, an unfinished `infinity` fails and
+consumes the letter that broke it (as an unfinished `inf` or `nan` does; numbers leave it unread);
+`nan(...)` is never read beyond `nan`; underflow sets `ERANGE` after rounding (`0x1.fffffep-127` sets
+it, `0x1.ffffffp-127` does not), and so does any inexact subnormal result, exactly representable
+ones not; a conversion that meets the end of the input before its item sets `errno` to 0 (unless an
+earlier item of the same call ended there), which is why `MatrixReadTxt`'s `could not scan value`
+after an `ERANGE` read prints no `Numerical result out of range` when the file simply ended.
+`cscan.rs` reproduces each; `scanf_probe.c` and its companions are the measurements.
+
+## For the main package's VNL (track C), found here, part 4
+
+- **EISPACK's `pythag` with NaN** (`larmorx_core::vnl_eigen::pythag`): it uses Rust's `f64::max` and
+  `min`, which ignore a NaN, where f2c's `max(a, b)` is `a >= b ? a : b` (the second argument when
+  the comparison fails) and `abs` keeps NaN: `pythag(x, NaN)` returns about `x √2` in the port and
+  never returns in VNL; and the port's `pythag` too loops for ever on `pythag(NaN, NaN)` and two
+  infinities, so `symmetric_eigensystem` hangs on such input (ImageMomentsCalculator, antsAI would as
+  well). A version that follows f2c's macros and reports the loop (as `BalancNeverReturns` does for
+  `balanc`) would let FS-47's matrices that FreeSurfer finishes be reproduced; a VXL defect ID is
+  track C's.
+- **LINPACK's `ssvdc` never returning** (`larmorx_core::vnl_svd_f32`): the port loops on the matrix
+  above as VNL does. A report of the loop, and the `info` of a failure (`vnl_svd_f32` returns `None`
+  without it; the double version has `vnl_svd_info`), would let FS-48 follow VNL exactly.

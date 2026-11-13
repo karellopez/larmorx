@@ -138,7 +138,12 @@ FreeSurfer's evaluation **does not extrapolate**: outside the knots it gives the
 - **NaNs** follow x86-64's SSE rules as in `specs/ranlux.md` §7 (a NaN made from numbers is the
   default NaN, binary32 bits `0xffc00000`; one NaN operand is passed on quieted; of two, the first of
   the pair). Where two NaN operands can meet, the first is the left operand as written in §3 and §4,
-  except §4's `m · U_{i−1}`, which is `U_{i−1} · m`; in §5 the operations after `K` take the nested
+  except §4's two products with the super-diagonal: `m · U_{i−1}` (step 3), which is `U_{i−1} · m`,
+  and `U_i · x_{i+1}` (step 4), which is `x_{i+1} · U_i` **(observed**, 2026-11-13: `fs_spline_probe
+  d3` on a system whose `U₀` and `x₁` are NaNs of different payloads, `2 00000000 40000000 40400000
+  7fc00111 40a00000 00000000 40e00000 7fc00222` (`U₀` = `7fc00111`, `b₁` = `7fc00222`), gives `x
+  7fc00222 7fc00222`: `x₀` carries `x₁`'s payload, not `U₀`'s; the same on 300 seeded systems with
+  NaNs of six payloads in `U`, `L`, `D` and `B`**)**; in §5 the operations after `K` take the nested
   part first: for the value `d(K·δ)`, then `+ 0.5·M_j`, `· δ`, `+ G`, `· δ`, `+ y_j`; for the first
   derivative `d(0.5·I / h) · δ`, then `+ M_j`, `· δ`, `+ G`; for the second `f(δ·I) / h`, then `+ M_j`
   **(observed**: the NaN cases of §9.1, values with two different payloads**)**. A binary64 NaN rounded
@@ -187,6 +192,27 @@ Through the probe `fs_spline_probe` (built by `build.sh <workspace> <output> fs_
 against the unit oracle's libraries, which reproduce the official programs' code) and the official
 programs; suites run them through the oracle-output cache.
 
+**The probe's formats** (every float as the 8 hexadecimal digits of its binary32 bits, fields
+separated by blanks, one case per line):
+
+- `fs_spline_probe cases`, standard input: `n ibcbeg ybcbeg ibcend ybcend m t₀ … t_{n−1} y₀ … y_{n−1}
+  x₀ … x_{m−1}` (`n`, `ibcbeg`, `ibcend`, `m` in decimal; `ybcbeg`, `ybcend`, the knots `t`, the
+  values `y` and the `m` evaluation points `x` as bits). Output per case: a line `ypp` and the `n`
+  second derivatives of `SplineCubicSet(n, t, y, ibcbeg, ybcbeg, ibcend, ybcend)`; then one line per
+  evaluation point, `val` and three floats: the value, the first and the second derivative written by
+  `SplineCubicValue` (the two derivative outputs start as `7fc00bad`, so an output left unwritten
+  shows); then a line `wrap` with the `n` second derivatives of `OpenSpline(t, y, n, ybcbeg, ybcend)`
+  (always first-derivative ends: `ibcbeg` and `ibcend` do not apply) followed by `OpenSplint`'s `m`
+  values at the same points.
+- `fs_spline_probe d3`, standard input: `n a₀ … a_{3n−1} b₀ … b_{n−1}` (`n` decimal; the band of
+  §2's `A` column by column, three entries per column: `a_{3j} = U_{j−1}`, `a_{3j+1} = D_j`,
+  `a_{3j+2} = L_{j+1}`, so `a₀` and `a_{3n−1}` are never read and may be 0; then the right-hand side
+  `B`; all as bits). Output: a line `x` and the `n` solution values, or `null` when it
+  refuses (a zero diagonal entry).
+- `fs_spline_probe set1 n ibcbeg ibcend t… y…` (decimal arguments, the end values 0): one call of
+  `SplineCubicSet`, for the messages and the exit status of §7; prints `ypp` and the second
+  derivatives when it returns.
+
 1. **`cases`** (every float as its bits): seeded random cases, compared bit for bit (second
    derivatives, value, both derivative outputs with the sentinel `0x7fc00bad` showing unwritten
    outputs, and the wrappers): `n` from 2 to 80; knots strictly increasing (integer row positions as
@@ -197,7 +223,9 @@ programs; suites run them through the oracle-output cache.
    values of different payloads and a NaN beginning value, one in 77 with an infinite value (§6).
    **(observed**, 2026-11-12: the spec writer's model of this spec equals the probe on 20,001 seeded cases (400 of them with NaN values), every evaluation point of each, 1,000 systems of item 2 and the nine messages of item 3, bit for bit and byte for byte**)**.
 2. **`d3`**: systems with a zero (+0, −0) diagonal entry (refused), with a diagonal that becomes 0
-   during the elimination, and random diagonally dominant and non-dominant systems.
+   during the elimination, and random diagonally dominant and non-dominant systems; and systems
+   whose super-diagonal, sub-diagonal, diagonal and right-hand side hold NaNs of different payloads,
+   so that the products of steps 3 and 4 meet two NaNs (§6's operand order; the example there).
 3. **Messages** (`set1`): E1 to E5 (E5 through two knots one subnormal step apart, `2⁻¹⁴⁹`, whose
    `Δt/3` rounds to 0 under condition 1), standard output byte for byte and the exit status.
 4. **`mri_normalize`**: the unit oracle's `mri_normalize` (track B: the official program's bytes but

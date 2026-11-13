@@ -218,6 +218,28 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | ITK-98 | ITK `BSplineInterpolateImageFunction` | the mirror boundary is applied once: on an axis too short for the spline's support (2 voxels for orders 3 and 4, 2 or 3 for order 5) a support index stays outside the axis and the coefficient image is read outside its buffer (memory it never wrote) | a | none (fMRIPrep's images have no such axis) | the mirror repeated by default (the decomposition's whole-sample mirror, the exact continuation); `reproduce` keeps ITK's single mirror with those reads as 0; named in both modes in ResampleImage and antsApplyTransforms (2026-10-25) | notice in antsRegistration's warped outputs and the N-D resampler |
 | ITK-99 | the same as ITK-97 | the same with a linear offset before or past the derivative array: written outside it (memory it does not own) | a | none | dropped in both modes, named | – |
 | ITK-100 | ITK `MattesMutualInformationImageToImageMetricv4` (antsRegistration, antsAI) | the threader's joint histogram images are created at a stage's first evaluation and kept: a later level whose analysis region has one intensity (a bin size of 0) never reaches `ImageBase::SetSpacing`'s exception, which the first level gives; the bin size is used silently, the bin indices NaN or infinite and clamped, the metric 0 | e (rule B, 2026-10-25) | none (fMRIPrep's masks hold more than one intensity) | an error by default, as the first level gives, named; `reproduce` uses it as ITK does (the metric 0), named | – |
+| ITK-103 | VXL's L-BFGS (`lbfgs.c`) | the line search's first stage steps from the unmodified function values where Nocedal's Fortran passes the modified ones (`FXM`, `FYM`), then rebuilds them from stale ones | c (rule D then C, 2026-11-12) | none | VXL's kept in both modes (no run of 200,000 changed); Nocedal's on request (`LbfgsGlobal::nocedal_first_stage`), named | – |
+| ITK-104 | VXL's L-BFGS | `ys` reset to 0 on every call (saved in the Fortran): a caller's diagonal (`DIAGCO`) gets an infinite `1/ys` | c (rule A, 2026-11-12) | none | kept between calls; `reproduce` resets it, named | – |
+| ITK-105 | VXL's L-BFGS (`write50`) | printed vectors scaled from a signed value that last exceeded the running maximum; a zero vector divided by 0 | f | none | scaled by the largest magnitude, a zero vector unscaled; `reproduce` VXL's text, named | – |
+| ITK-106 | VXL's L-BFGS (`lb1_`) | the printed vectors start at the double before each array (memory it does not own) and drop the last element | a | none | the vectors; `reproduce` VXL's window with that value as 0, named | – |
+| ITK-107 | VXL `vnl_inverse` (2 × 2 to 4 × 4) | a zero determinant returns an uninitialised `vnl_matrix_fixed`: memory | a | none | the zero matrix | – |
+| ITK-108 | VXL `vnl_cholesky` | `rcond_` uninitialised and unset for a matrix that is not positive definite: `rcond()` and its message give memory | a | none | `None`, the message prints 0, named | – |
+| ITK-109 | VXL `vnl_cholesky::determinant` (LINPACK `dpodi`) | the mantissa's loops never end when it is not finite (a non-finite factor, or a square that overflows) | a | none | the non-finite mantissa, or the square in two steps; both modes, named | – |
+| ITK-110 | VXL `vnl_real_eigensystem` | `Vreal`'s columns of a complex pair are never written: memory | a | none | 0, flagged and named | – |
+| ITK-111 | VXL `vnl_real_eigensystem` | after a failed `hqr2`, `D` and `V` are built from eigenvalues never found: memory | a | none | 0, named | – |
+| ITK-112 | EISPACK `balanc` (`vnl_real_eigensystem`) | never returns on an infinite or NaN off-diagonal entry, or an overflowing row or column sum, in the part it balances | a | none | an error (rule B); both modes | – |
+| ITK-113 | VXL `vnl_qr::solve` (LINPACK `xqrsl`) | one row whose entry is 0: the solution is never written (memory) | a | none | 0, `info` 1 | – |
+| ITK-114 | VXL `vnl_brent_minimizer` (and `vnl_brent`, `vnl_powell`) | the loop can come back to a state it had been in and repeat for ever: a bracket with an infinite end where the cost is NaN or not lower, or ends whose sum overflows (an infinite midpoint, two points taking turns) | a | none | stopped at the best point (cycle detection on the loop's state), named; both modes | – |
+| ITK-115 | EISPACK `pythag` (`vnl_symmetric_eigensystem`'s `tql2`) | never returns on a NaN second argument or two infinities, which a matrix with an infinite or NaN entry usually gives it (once after `tql2` reads and writes one element past its arrays) | a | none | stopped, `ierr` the eigenvalue being worked on, named; both modes | – |
+| ITK-116 | LINPACK `ssvdc` (`vnl_svd<float>`) | the deflation and splitting steps do not count towards the iteration limit and can repeat for ever on a matrix with an infinite entry | a | none | stopped with `info` = m, as at the limit, named; both modes | – |
+| FS-71 | MINC volume_io `open_file` | a compressed input is decompressed by `system("gunzip -c <name> > <tmp>")` (then `bunzip2`) with the name unquoted: a blank or shell syntax fails, reads other files or runs commands | a | none | gzip and bzip2 in memory, a notice for a name the shell would split; never reproduced | – |
+| FS-72 | MINC volume_io `mni_input_reals` | a thin-plate spline's list that reaches the end of the file after white space without its `;` is read forever | a | none | `Expected ';', found end of file.`, named | – |
+| FS-73 | MINC volume_io `input_one_transform` | `Number_Dimensions = 0` divides by zero; a negative one sizes arrays negatively | a | none | an error message (rule B), named | – |
+| FS-74 | MINC volume_io `input_one_transform`, `output_one_transform` | an empty `Points` list frees a pointer never set; the writer writes such a list without its `;` | a | none | a spline with no points; the writer writes the `;`, named | – |
+| FS-75 | MINC volume_io `expand_filename` | a name that starts with a `$VAR` (or `~`) whose value is empty writes through a null pointer | a | none | expands to nothing, named | – |
+| FS-76 | nifticlib `znzread`, `znzwrite` | a member size of 0 on a compressed file computes `0/0` | a | none | 0, named | – |
+| FS-77 | nifticlib `znzread` | a compressed read that ends inside a member counts that member as read (`nmemb - remain/size`) | c (rule A, 2026-11-13) | none | the complete members; `reproduce` nifticlib's count, named | – |
+| FS-78 | zlib 1.2.11 `gz_zero` (`gzseek` then `gzputc`, `gzflush`, `gzclose`) | a forward seek before the first write fills the gap with memory zlib never set instead of zeros | a | none | zeros, named; never reproduced (memory) | – |
 | HDF-01 | HDF5 1.12 `H5T__conv_f_f` | non-native floats converted with state carried from one element to the next | c | none (fMRIPrep's are native floats) | corrected by default (`upstream_defects`, 2026-10-16) | – |
 | PIPE-01 | nipype, niworkflows | `shrink_factor=2` dropped: the BOLD reference's N4 shrinks by 4 | c | every run | not a tool defect | later (decided 2026-10-23: when larmorprepx is built) |
 | PIPE-02 | fMRIPrep `ResampleSeries`, OpenBLAS | volumes corrupted when OpenBLAS runs threads | b | outside fMRIPrep's image | thread-independent | – |
@@ -601,18 +623,18 @@ to add (since 2026-10-25: "Random testing's gaps", below); – = nothing to do. 
 | FSL-272 † | prelude | the phase range check (more than 3π refused) and the rewrap to [−π, π] (beyond 1.001π) take the image's maximum and minimum from its first value on: a NaN first value (the first voxel of a masked or divided phase map) makes both NaN, so a phase from 0 to 2π is not rewrapped and is unwrapped with whole cycles wrong in some regions, and a phase of any range is not refused (measured with FSL's runs, `validation/investigations/prelude-spec/fsl272_measure.py`: fMRIPrep's seven prelude calls and a synthetic map moved to [0, 2π) with the first value NaN: 7 of 8 unwrapped whole cycles from FSL's own result without the NaN, in 0.1 to 100 % of the mask, up to 18.8 rad; a 4π range processed, exit 0) | c | none for fMRIPrep's calls (sdcflows' `au2rads` rescales the phase to [0, 2π] from its minimum and maximum, so a NaN anywhere would make every value NaN); other users' phase maps in [0, 2π] with a NaN first voxel | rule D measured, then A: the replica (2026-11-06) takes the extrema of the values that are not NaN by default (the rewrap, or FSL's range error with status 255, as without the NaN), FSL's with `reproduce`, named when the two decide differently; the clean-room original the same in both modes since 2026-11-06 (record `fsl-prelude`), from `specs/prelude.md` §4.2 and §9.1 (suite cases `opt/nan-first-twopi`, `opt/nan-first-range`; the site's example on ds002603's map: the default gives FSL's own result without the NaN bit for bit) | – |
 | FSL-273 † | applytopup | `--method=jac` divides the field's derivatives by the field's own voxel sizes (a coefficient field's intent parameters, a field image's header) while the displacement it applies is laid at the images' voxel indices in the images' voxel sizes: a field of the images' shape whose voxel sizes differ from the images' gets a Jacobian determinant scaled along each encoded axis by their ratio (`dx/fx`, `dy/fy`; a field image `dx/fx`, `dx/fy` with FSL-134), not the Jacobian of the displacement applied, so the intensities are modulated wrongly (black box: FSL's outputs on one image's data stored with 6, 4 and 3 mm voxels are `S (1 + c g)` with `c = dy/fy`, `validation/investigations/spec-answers-4/jac_scales.py`) | c | none on fMRIPrep's calls (sdcflows applies its own field; topup's coefficients are on the images' grid) | rule A: the replica (2026-11-06) computes the Jacobian of the mapping applied by default (the same numbers wherever the voxel sizes agree), FSL's scales with `reproduce`, named when an encoded axis' voxel sizes differ (suite cases `at/jac-coef-aniso`, `at/jac-field-aniso`); the clean-room original: a field image already so, a coefficient field since 2026-11-07 (PRELUDE's clean-room original part: scale 1 by default, FSL's `dx / fx` with `reproduce`, named; `at/jac-coef-aniso`; `validation/investigations/cleanroom-topup/jac_fsl273.py`) | – |
 
-**Counts** (543 entries, recounted from the table on 2026-11-12, after `t2smap`'s clean-room part (TED-31 and TED-46 new; TED-32 to TED-45, TED-47 to TED-55 and FSL-280 to FSL-289 unused); before it the field maps' part B (SDC-12 to SDC-46, PIPE-18 to PIPE-40, SCI-06 to SCI-32 and SKI-01 to SKI-04 new; SDC-47 to SDC-55 and SCI-33 to SCI-40 unused); before it tedana's `t2smap` replica (TED-01 to TED-18, NP-03 and NP-04 new; TED-19 to TED-30 unused) and the field maps' part A (SDC-01 to SDC-11 new)
+**Counts** (565 entries, recounted from the table on 2026-11-13, after FreeSurfer's foundations, track C's relays 2 to 4 (ITK-103 to ITK-116 and FS-71 to FS-78 new; FreeSurfer's FS-01 to FS-51 and FS-100 to FS-104 are in `larmorx_core::defects` and enter this table with their tracks' handoffs); before it `t2smap`'s clean-room part (TED-31 and TED-46 new; TED-32 to TED-45, TED-47 to TED-55 and FSL-280 to FSL-289 unused); before it the field maps' part B (SDC-12 to SDC-46, PIPE-18 to PIPE-40, SCI-06 to SCI-32 and SKI-01 to SKI-04 new; SDC-47 to SDC-55 and SCI-33 to SCI-40 unused); before it tedana's `t2smap` replica (TED-01 to TED-18, NP-03 and NP-04 new; TED-19 to TED-30 unused) and the field maps' part A (SDC-01 to SDC-11 new)
 (`scripts/orchestration/register_counts.py`); an entry with two classes counts under its first; "c (c? until …)"
 entries, decided, count as (c)):
 
 | Class | Entries | of them questionable (c?) |
 |---|---|---|
-| (a) crash, undefined behaviour, out of bounds | 119 | |
+| (a) crash, undefined behaviour, out of bounds | 137 | |
 | (b) race, nondeterminism | 17 | |
-| (c) deterministic bug that changes results | 272 | 14 |
+| (c) deterministic bug that changes results | 275 | 14 |
 | (d) imprecision | 27 | |
 | (e) command-line or parsing quirk | 79 | |
-| (f) documentation or message only | 27 | |
+| (f) documentation or message only | 28 | |
 | explained, not a defect | 2 | |
 
 The gap column today (2026-11-10): no **decide**; no **yes** (FSL-67 measured in FLIRT's part 2 and
@@ -3460,6 +3482,277 @@ ANTs v2.6.5 and ITK v5.4.5 unless stated. Details in [ants-cli.md](ants-cli.md),
   refuses), with a notice naming ITK-100; `reproduce` uses the bin size as ITK does, named
   (`larmorx_registration::metric::mattes::check_joint_pdf_spacing`; unit test
   `a_later_level_zero_bin_size_is_used_as_itk_uses_it`). Decided by rule B on 2026-10-25.
+- **D13 / gap:** none.
+
+### ITK-101 A copy of `vnl_random` returns uninitialised memory from `normal()` — (a)
+- **What:** `vnl_random`'s copy constructor and `operator=` (`core/vnl/vnl_random.cxx` 29-54 in ITK
+  4.13.2, the same in 5.4.5) copy `mz_previous_normal_flag` but not `mz_previous_normal`, so a copy
+  made between the two halves of a polar pair returns uninitialised memory from its next `normal()`
+  or `normal64()`.
+- **Evidence:** read (`docs/findings/vnl-random.md`, F-VNLR-2).
+- **fMRIPrep:** none. **FreeSurfer:** none on its default paths (`docs/findings/freesurfer-permissive.md`, closed to FreeSurfer's clean-room implementers).
+- **larmorx:** `larmorx_core::vnl_random::VnlRandom`'s `Clone` copies the cached number; no
+  `reproduce` switch (memory contents are never reproduced, D13). Found 2026-11-12 (FreeSurfer's
+  foundations, item 3.1-04).
+- **D13 / gap:** none.
+
+### ITK-102 `vnl_random::lrand32(lower, upper)` overflows `int` — (a)
+- **What:** the range is `upper - lower + 1` computed in `int` (`vnl_random.cxx` 179-191 in ITK
+  4.13.2, the same in 5.4.5): beyond `2^31 - 1` it overflows (undefined behaviour; with GCC a range
+  of `2^32` divides by zero, and one from `2^31` to `2^32 - 1` makes the rejection loop never end),
+  and `lower > upper`
+  (the assertion is off under `NDEBUG`) divides by zero or never returns.
+- **Evidence:** read (`docs/findings/vnl-random.md`, F-VNLR-3).
+- **fMRIPrep:** none. **FreeSurfer:** none on its default paths.
+- **larmorx:** `VnlRandom::lrand32_range` computes the range in 64 bits, accepts every draw for the
+  full range of `int`, and refuses `lower > upper` (a panic, as the assertion); no `reproduce`
+  switch (a division by zero and a loop without end are never reproduced, D13). Found 2026-11-12.
+- **D13 / gap:** none.
+
+### ITK-103 VXL's L-BFGS line search drops Nocedal's modified function values — (c)
+- **What:** in `mcsrch_`'s first stage, when the function decreased but not enough (`stage1 && f
+  <= fx && f > ftest1`), Nocedal's Fortran calls `MCSTEP(STX, FXM, DGXM, STY, FYM, DGYM, STP, FM,
+  DGM, ...)`; VXL's edited translation (`v3p/netlib/opt/lbfgs.c`, ITK 4.13.2 and 5.4.5) keeps the
+  state in a struct and its `mcstep_` reads the struct's `fx`, `fy` (the unmodified values) and
+  writes the new ones there, after which `fx = fxm + stx·dgtest` is rebuilt from the stale `fxm`.
+- **Evidence:** read (`docs/findings/vnl-netlib.md`, F-VNLN-2); measured on the port, which
+  reproduces VXL bit for bit (`validation/probes/fs-vnl`): 200,000 smooth problems at memory 7,
+  line-search accuracy 0.1 and `xtol` 1e-16, and at VNL's defaults, Nocedal's first stage changed
+  no run (the same
+  12,952,884 evaluations, final values and line-search failures); in the probe's 600,000 mixed
+  problems (some with wrong gradients) it changed 137 runs: more evaluations in 114, fewer in none,
+  a lower final value in 13 and a higher one in 11, the same 176,646 line-search failures.
+- **fMRIPrep:** none. **FreeSurfer:** its L-BFGS minimizations (`docs/findings/freesurfer-permissive.md`, closed to FreeSurfer's clean-room implementers).
+- **larmorx:** rule D, then C (a correction measured to bring no gain): VXL's behaviour in both
+  modes; Nocedal's on request (`larmorx_core::vnl_lbfgs::LbfgsGlobal::nocedal_first_stage` with
+  `fix`), named where it changes the search's state. Found 2026-11-12 (FreeSurfer's foundations,
+  item 3.1-07).
+- **D13 / gap:** – (decided 2026-11-12 by the rules: VXL's kept, Nocedal's opt-in).
+
+### ITK-104 VXL's L-BFGS resets `ys` on every call — (c)
+- **What:** `v3p/netlib/opt/lbfgs.c` (ITK 4.13.2, the same in 5.4.5) declares `ys` a local
+  initialised to 0; Nocedal's Fortran `SAVE`s it. With `DIAGCO` true the routine returns
+  `IFLAG = 2` for the caller's diagonal and resumes at `L100`, which computes `1/ys`: infinite.
+- **Evidence:** read (`docs/findings/vnl-netlib.md`, F-VNLN-3); `validation/probes/fs-vnl` reaches
+  it with a caller's diagonal (bit-identical under `reproduce`).
+- **fMRIPrep:** none. **FreeSurfer:** none (it never supplies the diagonal, as `vnl_lbfgs` does not).
+- **larmorx:** `larmorx_core::vnl_lbfgs::lbfgs` keeps `ys` between calls (rule A); `reproduce`
+  resets it, both named. Found 2026-11-12 (FreeSurfer's foundations, item 3.1-07).
+- **D13 / gap:** none.
+
+### ITK-105 VXL's L-BFGS scales its printed vectors from a signed value — (f)
+- **What:** `write50` (`lbfgs.c`) keeps the value that last exceeded the running maximum in
+  magnitude with its sign (`if (fabs(v[i]) > vmax) vmax = v[i]`), so a negative one makes later
+  smaller magnitudes "larger"; a vector of zeros gives `log(0)`, a scale of 0 and `-nan` values.
+  Printed text only (`IPRINT(2) >= 1`).
+- **Evidence:** read (F-VNLN-4); the probe compares the text under `reproduce`.
+- **fMRIPrep:** none. **FreeSurfer:** a diagnostic print only (`docs/findings/freesurfer-permissive.md`, closed to FreeSurfer's clean-room implementers).
+- **larmorx:** the scale from the largest magnitude, a zero vector unscaled (rule A); `reproduce`
+  VXL's, named. Found 2026-11-12.
+- **D13 / gap:** none.
+
+### ITK-106 VXL's L-BFGS prints its vectors from the double before each array — (a)
+- **What:** `lb1_` decrements `x` and `g` for Fortran's indexing and passes the decremented
+  pointers to `write50`, which indexes from 0: "VECTOR X=", "GRADIENT VECTOR G=" and "FINAL POINT
+  X=" start with the double before each array (memory the routine does not own) and drop the last
+  element.
+- **Evidence:** verified (`validation/probes/fs-vnl`: VXL printed `0.00000` and once
+  `9.881313e-323 x` there; F-VNLN-4).
+- **fMRIPrep:** none. **FreeSurfer:** a diagnostic print only.
+- **larmorx:** prints the vectors (rule A); `reproduce` prints VXL's window with the value before
+  the array as 0 (memory contents are never reproduced, D13), named. Found 2026-11-12.
+- **D13 / gap:** none.
+
+### ITK-107 `vnl_inverse` of a singular fixed matrix returns memory — (a)
+- **What:** `vnl_inverse(vnl_matrix_fixed<T, n, n>)` for n = 2, 3, 4 (`core/vnl/vnl_inverse.h`)
+  returns `vnl_matrix_fixed<T, n, n>()` when the determinant is 0 (its assertion is compiled out by
+  `NDEBUG`), and that constructor initialises nothing.
+- **Evidence:** read (F-VNLN-6).
+- **fMRIPrep:** none. **FreeSurfer:** a matrix square root of a singular 3 × 3 block (`docs/findings/freesurfer-permissive.md`, closed to FreeSurfer's clean-room implementers).
+- **larmorx:** `larmorx_core::vnl_fixed::inverse*` give the zero matrix (as before for double);
+  no `reproduce` (memory). Found 2026-11-12.
+- **D13 / gap:** none.
+
+### ITK-108 `vnl_cholesky::rcond()` of a matrix that is not positive definite is memory — (a)
+- **What:** `rcond_` is never initialised; `dpoco` sets it only when the factorization succeeds,
+  so `rcond()` and the `estimate_condition` mode's message (`vnl_cholesky: rcond=... so N
+  dimensions of non-posdeffness`) give memory contents otherwise.
+- **Evidence:** read (F-VNLN-6); the probe compares the message up to the value.
+- **fMRIPrep:** none. **FreeSurfer:** none on its default paths.
+- **larmorx:** `rcond()` is `None` there and the message prints 0, with a notice; no `reproduce`
+  (memory). Found 2026-11-12.
+- **D13 / gap:** none.
+
+### ITK-109 `vnl_cholesky::determinant()` never returns on a non-finite mantissa — (a)
+- **What:** LINPACK's `dpodi` (job 10) keeps `det[0]` in [1, 10) with `goto` loops on
+  `det[0] >= 1` and `det[0] < 10`: an infinite or NaN diagonal entry of the factor, or one whose
+  square times the mantissa overflows (above about 1.3e154 from finite numbers), never leaves them.
+- **Evidence:** read (F-VNLN-7).
+- **fMRIPrep:** none. **FreeSurfer:** none on its default paths.
+- **larmorx:** stops there: the non-finite mantissa itself, or for a finite factor the square in
+  two steps (the true value); both modes (a loop without end is never reproduced, D13), named.
+  Found 2026-11-12.
+- **D13 / gap:** none.
+
+### ITK-110 `vnl_real_eigensystem` never writes `Vreal`'s complex columns — (a)
+- **What:** `Vreal` is allocated uninitialised and written only for real eigenvalues
+  (`vnl_real_eigensystem.cxx` 54-69): the two columns of a complex pair are memory contents.
+- **Evidence:** read; verified (the probe skips 35,808 such columns at scale 1, F-VNLN-6).
+- **fMRIPrep:** none. **FreeSurfer:** a non-symmetric eigensystem with complex eigenvalues (`docs/findings/freesurfer-permissive.md`, closed to FreeSurfer's clean-room implementers).
+- **larmorx:** those columns are 0, flagged (`vreal_written`) and named; no `reproduce` (memory).
+  Found 2026-11-12.
+- **D13 / gap:** none.
+
+### ITK-111 A failed `hqr2` leaves `vnl_real_eigensystem` reading unwritten eigenvalues — (a)
+- **What:** when EISPACK's `hqr2` fails after 30·n iterations it returns `ierr` without the
+  eigenvalues it has not found; `vnl_real_eigensystem` prints its message and builds `D` and `V`
+  from `wr`, `wi` anyway, vectors allocated uninitialised.
+- **Evidence:** read (F-VNLN-6).
+- **fMRIPrep:** none. **FreeSurfer:** none known (non-converging matrices).
+- **larmorx:** those eigenvalues are 0, named; the message as VNL prints it; no `reproduce`
+  (memory). Found 2026-11-12.
+- **D13 / gap:** none.
+
+### ITK-112 EISPACK's `balanc` never returns on non-finite entries — (a)
+- **What:** `balanc`'s scaling loops (`L210`, `L230`: `goto` loops on `c >= g` and `c < g`) never
+  end when a row or column sum of the part it balances is infinite or NaN (an infinite or NaN
+  off-diagonal entry, or entries near the largest double): every `vnl_real_eigensystem` hangs.
+- **Evidence:** read (F-VNLN-7).
+- **fMRIPrep:** none. **FreeSurfer:** a non-symmetric eigensystem of such a matrix.
+- **larmorx:** `vnl_eigen::real_eigensystem` returns an error (rule B: the input makes no sense);
+  both modes (a loop without end is never reproduced, D13). Found 2026-11-12.
+- **D13 / gap:** none.
+
+### ITK-113 `vnl_qr::solve` of one row with a zero entry returns memory — (a)
+- **What:** LINPACK's `xqrsl` with `ju = 0` (one row) returns `info = 1` without writing the
+  solution when the entry is 0; `vnl_qr::solve` (and `inverse`) return their uninitialised vector.
+- **Evidence:** read; verified (the probe skips 64 such solutions at scale 1).
+- **fMRIPrep:** none. **FreeSurfer:** none on its default paths.
+- **larmorx:** the solution is 0, `info` 1; no `reproduce` (memory). Found 2026-11-12.
+- **D13 / gap:** none.
+
+### ITK-114 `vnl_brent_minimizer` can loop for ever — (a)
+- **What:** the loop ends only when the point is within the tolerance of the bracket's midpoint.
+  On a bracket with an infinite end where the cost is NaN or not lower than at the best point, the
+  golden-section step lands on that end again and nothing changes; on a bracket whose ends sum
+  beyond the double range the midpoint is infinite and two points a tolerance apart take turns.
+  `vnl_powell` on a cost that falls without end makes such brackets. Either way the loop's state
+  comes back and repeats for ever.
+- **Evidence:** verified (`validation/probes/fs-vnl`, family `unbounded`: 662 of 17,000
+  minimizations on falling costs; VNL is not called for them).
+- **fMRIPrep:** none. **FreeSurfer:** none on the costs its programs minimize (bounded).
+- **larmorx:** the port keeps the loop's state and finds the repetition (Brent's cycle detection);
+  it stops at the best point with a notice, in both modes (a hang is never reproduced, D13).
+  Found 2026-11-13.
+- **D13 / gap:** none.
+
+### ITK-115 EISPACK's `pythag` never returns on NaNs and two infinities — (a)
+- **What:** `pythag(a, b)` iterates on `r = (min/max)^2` (f2c's macros) until `4 + r == 4`; a NaN
+  `b`, two NaNs or two infinities make `r` NaN and the loop never ends. `vnl_symmetric_eigensystem`
+  passes it the subdiagonal entries of the matrix's tridiagonal form, so a matrix with an infinite
+  or NaN entry usually hangs it; when an earlier step leaves a NaN at the end of the subdiagonal,
+  `tql2` first reads and writes one element past its arrays and then makes such a call.
+- **Evidence:** verified (`validation/probes/fs-vnl`, family `nonfinite`: every one of 2,001
+  eigensystems and 222 sampled `pythag` pairs the port says never return was still computing in
+  VNL at the time limit).
+- **fMRIPrep:** none. **FreeSurfer:** a symmetric eigensystem of such a matrix (none on its
+  default paths).
+- **larmorx:** `pythag` returns nothing there and the eigensystem stops, `ierr` the eigenvalue it
+  was working on, with a notice (`never_returns`), in both modes. Found 2026-11-13.
+- **D13 / gap:** none.
+
+### ITK-116 LINPACK's `ssvdc` can loop for ever on infinite entries — (a)
+- **What:** only the QR steps count towards the limit of 1,000 iterations; the deflation and
+  splitting steps do not, and on a matrix with an infinite entry they can come back to the same
+  singular values and superdiagonal again and again.
+- **Evidence:** verified (`validation/probes/fs-vnl`, family `nonfinite`: 129 of 2,003 matrices,
+  all still computing in VNL at the time limit).
+- **fMRIPrep:** none. **FreeSurfer:** a float SVD of such a matrix (none on its default paths).
+- **larmorx:** the port finds the repetition and stops with `info` set to the current `m`, as at
+  the iteration limit, with a notice, in both modes. Found 2026-11-13.
+- **D13 / gap:** none.
+
+## FreeSurfer's bundled libraries: MINC's volume_io, nifticlib, zlib
+
+Found in FreeSurfer's foundations, items 3.1-14 and 3.1-15 (2026-11-12/13), in the upstreams the
+permissive ports follow (MINC 1.5.1, nifticlib 2.0.0, zlib 1.2.11); FreeSurfer's own copies, measured
+by behaviour, are in `docs/findings/minc-xfm.md` and `nifti-znz.md`. The check:
+`validation/probes/fs-minc-nifti`.
+
+### FS-71 Compressed inputs through the shell — (a)
+- **What:** `open_file` (volume_io `Prog_utils/files.c`) decompresses a name ending in `.z`, `.Z` or
+  `.gz` (or a missing name whose compressed file exists) with `system("gunzip -c %s > %s")`, then
+  `bunzip2 -c`, into a temporary file, the name unquoted.
+- **Evidence:** read.
+- **fMRIPrep:** none. **FreeSurfer:** none on its default paths (`docs/findings/freesurfer-permissive.md`, closed to FreeSurfer's clean-room implementers).
+- **larmorx:** gzip and bzip2 decompressed in memory (`compress`'s `.Z` and `pack`'s `.z` are not
+  decoded: the failure message); a notice when the name holds a character the shell would split or
+  interpret. Not reproduced (it depends on the shell and on other files). Found 2026-11-12.
+- **D13 / gap:** none.
+
+### FS-72 A spline's number list read forever — (a)
+- **What:** `mni_input_reals` loops until `mni_input_real` returns `ERROR`; at the end of the file
+  after white space it returns `END_OF_FILE` each time (the white space pushed back and read again),
+  so the list grows until memory runs out.
+- **Evidence:** read; verified (the probe never runs MINC on such files: 390 of 20,000, with FS-73
+  and FS-74).
+- **fMRIPrep:** none. **FreeSurfer:** none on its default paths.
+- **larmorx:** the list stops there, `Expected ';', found end of file.`, named. Found 2026-11-12.
+- **D13 / gap:** none.
+
+### FS-73 `Number_Dimensions` of 0 or less — (a)
+- **What:** `input_one_transform` divides the number of values read by `Number_Dimensions` (a crash
+  at 0) and sizes its arrays with it (negative sizes below 0).
+- **Evidence:** read.
+- **fMRIPrep:** none. **FreeSurfer:** none.
+- **larmorx:** `input_transform(): Number_Dimensions must be positive (it is <n>).` (rule B), named.
+  Found 2026-11-12.
+- **D13 / gap:** none.
+
+### FS-74 An empty `Points` list — (a)
+- **What:** reading frees `points_1d`, never set when the list is empty; writing a spline with no
+  points writes no `;` after `Points =`, so the file cannot be read back.
+- **Evidence:** read.
+- **fMRIPrep:** none. **FreeSurfer:** none.
+- **larmorx:** a spline with no points (its affine part, which the format allows: rule A); the
+  writer writes the `;` on a line of its own; named. Found 2026-11-12.
+- **D13 / gap:** none.
+
+### FS-75 An empty expansion at the start of a file name — (a)
+- **What:** `expand_filename` grows its result only for characters it copies; a `$VAR` (or `~`)
+  whose value is empty, first in the name, `strcpy`s into a result never allocated.
+- **Evidence:** verified (MINC 1.5.1 built from its tarball crashes; 327 of 40,000 generated names).
+- **fMRIPrep:** none. **FreeSurfer:** none on its default paths.
+- **larmorx:** expands to nothing, named. Found 2026-11-13.
+- **D13 / gap:** none.
+
+### FS-76 A member size of 0 in znzlib — (a)
+- **What:** `znzread`/`znzwrite` on a compressed file return `nmemb - remain/size` with `size` 0.
+- **Evidence:** verified (the probe's first run stopped with SIGFPE).
+- **fMRIPrep:** none. **FreeSurfer:** none.
+- **larmorx:** 0, named. Found 2026-11-13.
+- **D13 / gap:** none.
+
+### FS-77 A partly read member counted as read — (c)
+- **What:** `znzread` on a compressed file returns `nmemb - remain/size`: with 7 bytes left, 4
+  members of 2 bytes come back as 4 (and the warning `** znzread: read short by 1 bytes`); with
+  more than one member missing the count is still one too many whenever the shortfall is not a
+  whole number of members.
+- **Evidence:** verified (nifticlib 2.0.0 built from its tarball).
+- **fMRIPrep:** none. **FreeSurfer:** none on its default paths (`docs/findings/freesurfer-permissive.md`, closed to FreeSurfer's clean-room implementers).
+- **larmorx:** the complete members (rule A), named; `reproduce` gives nifticlib's count. Found
+  2026-11-13.
+- **D13 / gap:** none.
+
+### FS-78 zlib 1.2.11 writes unset memory for a gap before the first write — (a)
+- **What:** `gz_zero` clears its input buffer once, on its first pass, which comes before
+  `gz_comp` allocates the buffer when nothing was written yet; every later pass sends the buffer's
+  unset contents (`gzseek` forward, then `gzputc`, `gzflush` or `gzclose`; `gzwrite` allocates
+  first, so it writes zeros).
+- **Evidence:** verified (the system's zlib 1.2.11: 77 of 2,000 write scripts in the probe's
+  scale-1 run).
+- **fMRIPrep:** none. **FreeSurfer:** none on its default paths.
+- **larmorx:** zeros, named; never reproduced (memory contents). Found 2026-11-13.
 - **D13 / gap:** none.
 
 ## fMRIPrep and its libraries

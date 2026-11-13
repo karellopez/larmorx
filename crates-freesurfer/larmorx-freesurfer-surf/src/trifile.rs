@@ -21,7 +21,6 @@
 // The loops index as FreeSurfer's C does (one vertex number for several arrays).
 #![allow(clippy::needless_range_loop)]
 
-use std::io::Write;
 use std::path::Path;
 
 use larmorx_core::defects::{
@@ -39,14 +38,12 @@ use larmorx_freesurfer_core::ret::Ret;
 use larmorx_freesurfer_core::timer::current_date_time;
 use larmorx_freesurfer_io::cfile::CFile;
 use larmorx_freesurfer_io::fio::{
-    fread_float, fread_int, fread_int_ex, fread_long, fread1, fread2, fread3, fwrite_float,
-    fwrite_int, fwrite3,
+    fread_float, fread_int, fread_int_ex, fread1, fread2, fread3, fwrite_float, fwrite_int, fwrite3,
 };
 use larmorx_freesurfer_io::tags::{
-    TAG_CMDLINE, TAG_GROUP_AVG_SURFACE_AREA, TAG_OLD_COLORTABLE, TAG_OLD_MGH_XFORM,
-    TAG_OLD_SURF_GEOM, TAG_OLD_USEREALRAS, TAG_SURF_DATASPACE, TAG_SURF_MATRIXDATA,
-    TAG_SURF_TRANSFORMEDSPACE, tag_skip, tag_write, tag_write_end, tag_write_matrix,
-    tag_write_start,
+    TAG_CMDLINE, TAG_GROUP_AVG_SURFACE_AREA, TAG_OLD_SURF_GEOM, TAG_OLD_USEREALRAS,
+    TAG_SURF_DATASPACE, TAG_SURF_MATRIXDATA, TAG_SURF_TRANSFORMEDSPACE, tag_read_start, tag_skip,
+    tag_write, tag_write_end, tag_write_matrix, tag_write_start,
 };
 use larmorx_freesurfer_volume::vgeom::{
     read_vol_geom, tkr_vox2ras_from_vol_geom, vg_i_to_r, write_vol_geom,
@@ -98,26 +95,6 @@ fn room(g: &mut Globals, x: f64) -> i32 {
         return if x > 0.0 { i32::MAX } else { i32::MIN };
     }
     x.trunc() as i32
-}
-
-/// `TAGreadStart(fp, &len)` as fs.io's, without its note that the tag number came from memory
-/// contents where the file ended in it: the number is not used then (the end of the file ends the
-/// loop). The tag (0 at the end of the file, `len` then untouched) and its data length:
-/// `TAG_OLD_MGH_XFORM`'s 32-bit length less one, none for `TAG_OLD_SURF_GEOM`,
-/// `TAG_OLD_USEREALRAS` and `TAG_OLD_COLORTABLE`, a 64-bit length for the others.
-fn tag_start(g: &mut Globals, err: &mut dyn Write, fp: &mut CFile, len: &mut i64) -> i32 {
-    let mut b = [0u8; 4];
-    let got = fp.read_bytes(&mut b);
-    if fp.feof() || got < 4 {
-        return 0;
-    }
-    let tag = i32::from_be_bytes(b);
-    match tag {
-        TAG_OLD_MGH_XFORM => *len = i64::from(fread_int(g, fp)) - 1,
-        TAG_OLD_SURF_GEOM | TAG_OLD_USEREALRAS | TAG_OLD_COLORTABLE => *len = 0,
-        _ => *len = fread_long(g, err, fp),
-    }
-    tag
 }
 
 /// `fread(buf, 1, len, fp)` into a zeroed block of `len + 1` bytes, then the block as a C string:
@@ -272,7 +249,7 @@ fn read_tags(
     }
     let mut len: i64 = 0;
     loop {
-        let tag = tag_start(g, io.err, fp, &mut len);
+        let tag = tag_read_start(g, io.err, fp, &mut len);
         if tag == 0 {
             return Ok(true);
         }

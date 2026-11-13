@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//! A pure-Rust XML parser in expat 2.0.1's place for gifticlib (FreeSurfer's foundations, item
-//! 3.1-09, the W3 rule): not a port of expat, but the same events and the same failures, from
+//! A pure-Rust XML parser in expat 2.0.1's place for gifticlib
+//! (not a port of expat, but the same events and the same failures), from
 //! expat's behaviour (its tokenizers' and processors' rules as `xmltok_impl.c` and `xmlparse.c`
 //! define them; MIT, `PROVENANCE.md`), proved by differential tests against expat in
 //! `validation/probes/fs-gifti`.

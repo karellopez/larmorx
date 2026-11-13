@@ -203,7 +203,7 @@ settings a program can change (`allow_upper_fext` and the compressed extensions)
 other programs' copies are not in this crate (`docs/findings/freesurfer-permissive.md`, closed to
 FreeSurfer's clean-room implementers).
 
-## GIFTI: gifticlib 1.12 and an XML parser in expat 2.0.1's place (FreeSurfer's foundations, 3.1-09 to 3.1-12)
+## GIFTI: gifticlib 1.12 and an XML parser in expat 2.0.1's place
 
 | larmorx file | Upstream | Licence |
 |---|---|---|
@@ -219,4 +219,4 @@ FreeSurfer's clean-room implementers).
 - D13: FS-80 to FS-85 (`gifti::defects`); `Dialect` holds the two points where a program built on
   gifticlib changes it.
 - Checks: `src/gifti/tests.rs`, `src/xml.rs`'s tests; the differential probe against gifticlib
-  and expat (`validation/probes/fs-gifti`) follows (NOTES of FreeSurfer's foundations, track C).
+  and expat (`validation/probes/fs-gifti`) follows.

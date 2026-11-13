@@ -566,7 +566,7 @@ rounded here, ties to even, subnormals included. `validation/probes/fs-minc-nift
 compares it with glibc's `sscanf("%lf")`, `sscanf("%d")` and `strtod`: 400,000 generated strings of
 each, 0 differences (scale 1, 2026-11-13; `docs/findings/minc-xfm.md`).
 
-## `cfmt::f80_f`: C's `%Lf` of an x86-64 `long double` (FreeSurfer's foundations, 3.1-12)
+## `cfmt::f80_f`: C's `%Lf` of an x86-64 `long double`
 
 Written from the C standard's description of `%f` (ISO C 7.21.6.1) and glibc's spellings of the
 special values, for gifticlib's writer of `NIFTI_TYPE_FLOAT128` and `COMPLEX256` data: the exact

@@ -119,10 +119,9 @@ fn to_int_bits(g: &mut Globals, value: f64) -> i32 {
 /// `(unsigned int) value` as x86-64 converts a `double`: through a 64-bit integer
 /// (`cvttsd2si` with a 64-bit result: beyond its range or NaN `INT64_MIN`), its low 32 bits.
 fn to_uint32_bits(g: &mut Globals, value: f64) -> u32 {
-    if value.is_nan()
-        || value >= 9.223_372_036_854_775_808e18
-        || value < -9.223_372_036_854_775_808e18
-    {
+    // 2^63: the 64-bit conversion's range
+    let lim = (1u64 << 63) as f64;
+    if value.is_nan() || value >= lim || value < -lim {
         g.notices.add(
             &larmorx_core::defects::FS_17,
             format!("gifti_set_DA_value_2D: (unsigned int) {value}, outside the range: an undefined conversion"),
@@ -937,7 +936,8 @@ fn write_surface(
     }
     // FZERO: |x| < FLT_EPSILON
     let area = mris.group_avg_surface_area;
-    if !(f64::from(area).abs() < f64::from(f32::EPSILON)) {
+    let fzero = f64::from(area).abs() < f64::from(f32::EPSILON);
+    if !fzero {
         let s = cfmt::f(f64::from(area), 20);
         add_meta(
             gx,

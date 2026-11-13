@@ -1594,7 +1594,7 @@ defects! {
     FS_394 = "FS-394", "FreeSurfer", false,
         "the GIFTI reader's statistics overlays (data arrays of the other intents read as overlays) keep only the first array of each run of one intent, never add the last run to the overlay list, and write the third and later arrays of a run outside their one-frame volume: a file of statistics arrays gives no statistics overlay, or one with only its first array";
     FS_395 = "FS-395", "FreeSurfer", true,
-        "the GIFTI reader compares the file's Version with \"1\" without checking that the file gave one: a GIFTI file without a Version attribute crashes the program (gifticlib itself accepts it)";
+        "the GIFTI readers (of surfaces, of volumes, and the count of a file's overlays) compare the file's Version with \"1\" without checking that the file gave one: a GIFTI file without a Version attribute crashes the program (gifticlib itself accepts it)";
     FS_396 = "FS-396", "FreeSurfer", true,
         "the GIFTI reader reads a NIFTI_INTENT_LABEL array's values without checking that gifticlib gave it any (an array gifticlib could not decode, such as ASCII UINT32 values): the program crashes";
     FS_397 = "FS-397", "FreeSurfer", true,

@@ -2044,6 +2044,8 @@ TEXTS = [
     (r", 8 the budget of its relay, on a machine shared with two other agents' work",
      ", 8 the threads it was given, on a machine shared with other work"),
     (r"\ba machine shared with another agent's work\b", "a machine shared with other work"),
+    (r"\bThe clean-room original, the fast implementation,", "The clean room, the port built for "
+     "speed,"),
     (r"\bTrial (2026-11-11-t2smap-original-2)\b", r"The run \1"),
     (r"^the trial: random cases\b", "the run: random cases"),
     (r"\bThe trial \(seed `t2smap-trial`", "The run (seed `t2smap-trial`"),

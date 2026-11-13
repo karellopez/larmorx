@@ -16,8 +16,11 @@ first part, §14-16): the neighbour distances' storage and the coordinate operat
 computing and checking the neighbour distances, the areas, triangle corners and coordinate sets,
 the curvature operations and saved coordinates; **part 5** (queue item 3.1-50's part a,
 §25-29): the saved vertex positions and normals, the canonical angles, the face-normal cache, the
-original area and storing and restoring the metric properties. Later parts: reading and writing
-surfaces, curvatures, patches and overlays (3.1-47, 3.1-48), the metric properties every read
+original area and storing and restoring the metric properties; **part 6** (queue item 3.1-47's
+part a, §30-37): a surface's room, counts and life, the metadata copy, the dumps, rip flags and
+arrays, the curvature names and registration scales, the extra gradients and NaN check, the column
+printing and progress bar, the vector searches and sort comparisons, whether two edges cross. Later
+parts: reading and writing surfaces, curvatures, patches and overlays (3.1-47's part b, 3.1-48), the metric properties every read
 computes (3.1-49 to 3.1-52); the midline marking, the label normal and the coordinate copy (they
 need the volume structure).
 
@@ -711,3 +714,217 @@ assertion of §25, 766 fatal errors); the default differs only where a notice sa
 FS-03, FS-12, FS-115, FS-116) or in the angles of §26 (347 cases, correctly rounded `atan2f`);
 seed 7, the probe's whole run of 48,024 cases (2,001 `posn`), the same; the seed-1 hash of every
 command's 30 cases is in the probe's README.
+
+## 30. A surface's room, counts and life
+
+A surface has **room** for `max_vertices` vertices and `max_faces` faces and uses the first
+`nvertices` and `nfaces` of them (all `int`). The vertex room holds, per place, a vertex (§2), its
+neighbourhood, and the two kept distance buffers of §15; the face room holds, per place, a face
+and its face-normal cache entry and deferral byte (§27). Every place a surface gains is zero in
+every field (no list, no buffer, numbers 0); a place that leaves the room is gone.
+
+**Making a surface** with room `max_vertices`, `max_faces` and counts `nvertices`, `nfaces`: every
+field of the surface zero (every list absent, every name empty, the volume geometry's every
+number 0 — its voxel sizes and direction cosines too, not the 1 and -1 a fresh geometry has —
+no colour table, no transform, no matrices), then "changing the room of both" below with those four
+numbers, then the neighbourhood size and its maximum (`nsize`, `max_nsize`) 1. The plain form gives
+room for exactly the counts.
+
+**Changing the vertex room** to `m` with `n` in use: `m` is raised to the present room when below
+it (the vertex room never shrinks). Then, in this order, failed assertions (§1) at
+`<BUILD_ROOT>/utils/mrisurf_base.cpp` with these lines and tests: 521 `nvertices >= 0` (`n`
+negative), 522 `max_vertices >= nvertices` (`m < n`), 523 `!mris->nverticesFrozen` (the frozen
+count below is not 0). The room becomes `m`: the places from the **old count in use** (not the old
+room) up to `m` are zeroed — vertices that had been dropped from use by lowering the count lose
+their fields here — except that a zeroed vertex's distance buffers stay kept (§15: absent, with
+the buffer reused by the next making or growing); the kept-buffer places past the old room are
+empty. Then `nvertices` = `n`, `max_vertices` = `m`, and the result is "done" (1).
+The **zero-room rule** (FS-117): the official program's arrays behave as the system's memory
+reallocation does, for which an array that exists, given zero places, ceases to exist, while an
+array that does not exist, given zero places, comes to exist empty. So, at room 0 (only possible
+when the room already was 0): if the vertex array exists, it ceases to exist and the result is
+"failed" (0) with the counts and room unchanged (nothing else changes); if it does not exist, it
+comes to exist and the other three per-place arrays (neighbourhoods, both kept-buffer lists),
+which exist, cease to exist; the result is "done". Every surface made has every array (a surface
+made with no vertex has empty ones), so the first change to room 0 fails, the next succeeds, and
+so on alternately.
+- FS-117 (corrected by default, rule A): larmorx keeps empty arrays (the result "done", every
+  array existing), with FS-117's notice whenever an existing array would have ceased to exist;
+  `reproduce` gives the alternation.
+
+**Changing the face room** to `m` with `n` in use: failed assertions at lines 579 `nfaces >= 0`
+and 580 `max_faces >= nfaces`. The face room becomes **exactly** `m` (it can shrink: the faces past
+`m` are dropped); the places from the old count in use up to `m` are zeroed (the face, its cache
+entry and byte); `nfaces` = `n`, `max_faces` = `m`; the result is "done". The zero-room rule: the
+three per-place face arrays always exist on a surface made (with no face too), so a change to room
+0 makes the face array cease to exist and fails the assertion at line 584 `mris->faces` (FS-117:
+any change of a surface's face room to 0 ends the program). (Lines 588 `mris->faceNormCacheEntries`
+and 592 `mris->faceNormDeferredEntries` would follow for the other two arrays.) larmorx's default
+keeps empty arrays and goes on, with FS-117's notice; `reproduce` gives the assertion.
+"Allocating the faces" with `n` is the change to room `n` with `n` in use.
+
+**Changing the room of both** (`max_vertices`, `max_faces`, `nvertices`, `nfaces`): failed
+assertions at lines 634 `nvertices >= 0` and 635 `nfaces >= 0` first; each room raised to its
+count when not above it; then the vertex room's change (its result ignored) and the face room's.
+The plain form ("reallocating to counts") gives the counts as the rooms.
+
+**The counts alone**: growing the vertex count to `n` (assertion 559 `nvertices <=
+mris->max_vertices`); truncating it, and recording vertices as removed (both: assertion `mris->nvertices
+>= nvertices`, at 565 and 571); growing the face count (613 `nfaces <= mris->max_faces`); truncating
+it and recording faces as removed (619 and 625 `mris->nfaces >= nfaces`). Each sets the count;
+negative counts pass these assertions, and a later change of room on a surface with a negative
+count is outside the behaviour (the official program zeroes memory before its arrays). **The frozen
+count**: acquiring adds 1, releasing subtracts 1 (no check).
+
+**Copying the metadata** from a source into a target (a new surface made with the source's counts
+when no target is given): the kind of surface made (`type`), its kind (`status`), the hemisphere;
+the volume geometry (assigned as fs.mri's geometry assignment does, `specs/freesurfer-mri.md`);
+when the source has a transform array, a copy of it (as many transforms, its type, scale, subject
+and transforms) replaces the target's; each of the two Talairach matrices the source has replaces
+the target's with a copy; whatever the source lacks, the target keeps. `free_transform` is not
+copied. The result is the target.
+
+**Destroying** a surface prints nothing: its lists, buffers, colour table, command lines and
+matrices go; its transform array and Talairach matrices only when `free_transform` is set
+(otherwise they are someone else's). Freeing a surface destroys it and leaves "no surface".
+
+**The dumps** (to a given stream; each `%f` is C's six-decimal form of the float widened to double):
+- a vertex `v`: `vno:<v> ripflag:<r> marked:<m> nsizeCur:<c> nsizeMax:<x> vnum:<a> v2num:<b>
+  v3num:<c3> vtotal:<t> nsizeCur:<c> nsizeMax:<x> x:%f y:%f z:%f`, then for each `i` below the
+  vertex's size in use (§5's `s`) ` [<i>] v:<neighbour> dist:%f dist_orig:%f` (`-1.000000` for
+  absent distances), a newline, then for each face around it ` [<i>] f:<face> n:<position>`, a
+  newline (`ripflag` as a signed number; a neighbour list shorter than `s` is outside the
+  behaviour);
+- a face `f`: `fno:<f> ripflag:<r> marked:<m>` and a newline, ` [0] v:<a> [1] v:<b> [2] v:<c>` and
+  a newline;
+- the shape: `mrisDumpShape {`, `nvertices:<n> nfaces:<n> max_nsize:<n> nsize:<n>`, the first ten
+  vertices' and the first ten faces' dumps, `} // mrisDumpShape`, each on its line.
+
+## 31. Rip flags and the arrays
+
+- **Exporting** the faces' (vertices') rip flags: a new list of the in-use faces' (vertices')
+  `ripflag`; a negative count gives no list, a count of 0 an empty one. **Importing** sets each
+  in-use face's (vertex's) `ripflag` from a list of at least that many.
+- **Counting** the ripped vertices: the in-use vertices whose `ripflag` is not 0. **Storing** the
+  rip flags copies each in-use vertex's and face's `ripflag` into `oripflag`; **restoring** copies
+  back; **unripping** sets every in-use `ripflag` to 0. Each returns 0 (but the count).
+- **The arrays** (new lists of `3 × count` numbers): the in-use vertices' `x, y, z`; their normals
+  `nx, ny, nz`; the in-use faces' three vertex numbers; the faces' cached normals, each read as
+  "read the normal" of §27 (a deferred face's normal computed first). A negative count is outside
+  the behaviour (the official program throws `std::bad_array_new_length`).
+
+## 32. The curvature names and the registration's scales
+
+Process-wide: three surface names (`inflated`, `smoothwm`, `smoothwm`) and three curvature names
+(`inflated.H`, `sulc`, none; §12 changes them too).
+- **Setting the curvature name** `k` (0 to 2) to a copy of a name (up to its first NUL) returns 0;
+  `k` above 2 prints `ERROR: MRISsetCurvatureName() nth=<k> > 2` and a newline on standard output
+  and returns 1; a negative `k` is outside the behaviour (FreeSurfer's callers give 0, 1 and 2).
+- **Printing the curvature names** on standard output (whatever stream is given): for `k` 0 to 2,
+  `<k> <curvature name>` when it exists, else `<k> <surface name> (computed)` when that exists,
+  else nothing; each with a newline. Returns 0.
+- **The registration's blurring scales**: four floats (4, 2, 1, 0.5) and their count, a `double`
+  (4). Setting them to a caller's list and count makes the list the scales (the official program
+  keeps the caller's list itself, so later changes the caller makes to it show; FreeSurfer's
+  callers make none) and the count, widened, the count; setting "none" restores the four defaults.
+  Returns 0.
+
+## 33. Extra gradients and the NaN check
+
+- **Allocating the extra gradients**: when the surface has none, three lists of one float per
+  in-use vertex, all 0 (empty with no vertex); with a negative vertex count the allocation fails:
+  `error: Cannot allocate memory`, `error: MRISallocExtraGradients: could allocate gradient
+  vectors` (with FS-01's NUL before the newline under `reproduce`) and the end of the program
+  (`ERROR_NO_MEMORY`, exit status 254). Returns 0.
+- **The NaN check**: for each in-use vertex, `odx`, `ody`, `odz`, `dx`, `dy`, `dz` in that order;
+  the first NaN (exponent all ones, fraction not 0) is a failed assertion
+  `<BUILD_ROOT>/utils/mrisurf_base.cpp:1587 !devIsnan(f)`.
+
+## 34. Column printing and the progress bar
+
+All on standard error, flushed; widths count bytes; texts end at their first NUL.
+- **A status line** (`left`, `right` texts): `left` right-aligned in 50 bytes (printed only when
+  not empty), then ` [ <right> ]` and a newline right-aligned in 30 bytes (only when `right` is not
+  empty).
+  - FS-119 (corrected by default, rule A): the official program first writes ` [ <right> ]` and the
+    newline into a 16,384-byte buffer the official build checks: a `right` of 16,378 bytes or more
+    prints only `*** buffer overflow detected ***: terminated` and a newline, and ends with signal 6.
+    larmorx prints the line whole, noting FS-119; `reproduce` gives the abort (exit status 134).
+- **A number line** (an integer, or a float as `%f`): `left` right-aligned in 50 bytes (a single
+  blank right-aligned when `left` is empty), then ` [ <number> ]` and a newline right-aligned in 30.
+- **The progress bar** at vertex `v` of a loop over the surface's `N` vertices: `p` = the integer
+  part of `0.05 × N` (in double); at `v` = 0 the message right-aligned in 50 bytes (when there is
+  one) and ` [`; then a `#` when `v mod p` (C's remainder) is `p - 1`; then, at `v = N - 1`, `] `
+  and, with a message, `[ ok ]` and a newline. Returns 1.
+  - FS-118 (corrected by default, rule A): with `p` 0 (fewer than 20 vertices) the official program
+    divides by zero and ends with signal 8 at its first call, after what `v` = 0 prints. larmorx
+    prints no `#` then, noting FS-118; `reproduce` ends with exit status 136.
+
+## 35. Vector searches, the sign, the sort comparisons
+
+- **Searching a column vector** (a float matrix of `r` rows) for a value `t`: "first not equal"
+  returns, as a signed 16-bit number, the 0-based index `i` of the first row whose element `(i + 1,
+  1)` is not equal to `t` (a NaN is never equal), 0 when every element equals it (so a first-row
+  difference and none both give 0, although FreeSurfer's comment promises the 1-based index); "first
+  equal" returns the 1-based row of the first element equal to `t`, 0 when none.
+- **The sign** of a float: -1 when it is below 0, else 1 (NaN: 1).
+- **Comparing two vertices for sorting** (a vertex number and `x y z`): by `y`, then `x`, then
+  `z`: -1 when the first's is below, 1 when above, and 1 when every pair is neither (never 0).
+  **Comparing two faces** (a face number and three vertex numbers): by the first, second, third
+  vertex number likewise, 1 for equal faces.
+
+## 36. Whether two edges cross on the sphere
+
+Two edges (vertex number pairs `(p1, p2)`, `(q1, q2)`) of a surface, on the canonical coordinates
+`cx, cy, cz` (each float widened to double; every operation (d) unless marked (f)). The result is 0
+or 1.
+
+- When the edges share a vertex number (either end with either end): 0.
+- `u0 = p1`, `u1 = p2`, `u2 = q1`, `u3 = q2`; `n0 = u0 × u1`, `n1 = u2 × u3` with `(a × b)_0 =
+  a1⊗b2 ⊖ b1⊗a2`, `(a × b)_1 = a2⊗b0 ⊖ b2⊗a0`, `(a × b)_2 = a0⊗b1 ⊖ b0⊗a1`; the dot product `a·b =
+  (a0⊗b0 ⊕ a1⊗b1) ⊕ a2⊗b2`; `a0 = u0·n1`, `a1 = u1·n1`, `a2 = u2·n0`, `a3 = u3·n0`.
+- When any of `|a0|`, `|a1|`, `|a2|`, `|a3|` is below `1e-7` (a double), the **stable form**
+  decides instead: `og0 = (p1 ⊕ p2) ⊘ 2` with the sum (f) of the two floats, then widened, divided
+  (d); `n0 = og0 × (p2 ⊖ p1)` with the difference (f), widened; likewise `og1`, `n1` from `q1, q2`;
+  `u0 = p1 ⊖ og1`, `u1 = p2 ⊖ og1`, `u2 = q1 ⊖ og0`, `u3 = q2 ⊖ og0` (d); `a0..a3` as before; then
+  the decision below with these values.
+- **The decision**: `a = a0⊗a1`, `b = a2⊗a3`. When `a > 0`: 0. When `a < 0`: 0 when `b > 0`, else
+  1. Otherwise (0 or NaN): 0 when `b > 0`, 1 when `b < 0`; otherwise `u = ((u0 ⊕ u1) ⊕ u2) ⊕ u3`
+  (each coordinate), `n2 = u × n0`, `c_k = u_k·n2` for `k` 0 to 3, and the result is whether
+  `max(c2, c3) >= min(c0, c1)` and `min(c2, c3) <= max(c0, c1)`, with `min(x, y)` = `x < y ? x :
+  y` and `max(x, y)` = `x > y ? x : y` (so a NaN picks the second argument). Only comparisons leave
+  the computation: a NaN's bits never matter.
+
+## 37. Validation plan, part 6
+
+The probe's commands `life`, `meta`, `misc` and `edges` (each a black-box run case by case):
+- `life`: a surface made by the plain or the room form (counts 0 to 6 and 0 to 4, rooms to 8 and
+  6, a negative count one case in 40), then 1 to 8 of: changing the vertex room, the face room
+  (room 0 one time in 15), both, both by counts, the six count operations, acquiring and releasing
+  the frozen count, setting a vertex's coordinates, motion and normals (any floats, specials
+  included), rip flag and mark, its neighbourhood lists, making its distances (filled with `i + 1 +
+  10 v`), setting a face, its cache entry and byte, exporting, importing (flags `(7i + s) mod 3 - 1`
+  for faces, `(5i + s) mod 3 - 1` for vertices), counting, storing, restoring, unripping, the three
+  plain arrays, the face-normal array, the extra gradients, the NaN check, the three dumps; the
+  generator follows the counts so that about one operation in 15 breaks an assertion; then the
+  state (the counts, rooms, frozen count, the ring sizes, `dist_alloced_flags`, which arrays exist,
+  every vertex place's coordinates, flags, neighbourhood counts and distances, every face place's
+  corners, flags, cache entry and byte) and the free. An operation that would read or write past what
+  the surface holds prints `G` and is skipped.
+- `meta`: a source (counts, kinds, hemisphere, `free_transform`, every geometry number, a name of
+  up to 20 printable bytes, 0 to 3 transforms of a type, the two matrices or not) copied into a new
+  surface or into a given one (made the same way); the result's state.
+- `misc`: 1 to 6 of: setting a curvature name (`k` 0 to 4), printing them, setting the scales (or
+  the defaults) and printing the count and the scales, a status line (texts of 0 to 60 bytes with
+  NULs, backslashes and high bytes now and then, a `right` of 16,376 to 17,000 bytes one time in
+  40), the two number lines, the progress bar over a range of vertices of a surface of 0 to 120 (one
+  in three below 20), the two searches (0 to 6 rows, half of them the value), the sign, both sort
+  comparisons both ways (with equal coordinates and numbers often).
+- `edges`: 4 to 6 vertices whose canonical coordinates are on a grid of quarters (zeros and
+  collinear points: the decision's last branch), in steps of 1e-5 (the stable form) or any float;
+  1 to 6 pairs of edges (shared vertices often).
+
+Measured 2026-11-13 (relay 9): seed 17, 1,000 cases of each command: identical with `reproduce`;
+seed 19, 1,000 `life` cases: 170 failed assertions (FS-03), 40 with FS-117, 387 with a skipped
+operation; 1,000 `misc` cases: 165 FS-118 ends, 7 FS-119 ends; the default differs only with those
+notices. The probe's whole run and the seed-1 hash: the probe's README.

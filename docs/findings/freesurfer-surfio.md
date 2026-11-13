@@ -3,7 +3,8 @@
 **Closed to FreeSurfer clean-room implementers** (it names FreeSurfer's files, functions and lines;
 the behaviour is `specs/freesurfer-surfio.md`). Queue items 3.1-45 and 3.1-46's structure, replica in
 `crates-freesurfer/larmorx-freesurfer-surf` (track D, relay 5, 2026-11-13); §7 the rest of 3.1-46
-without a volume, §8 queue item 3.1-49's coordinate operations (relay 6).
+without a volume, §8 queue item 3.1-49's coordinate operations (relay 6), §9 its parts b and c (relay
+7), §10 queue item 3.1-50's part a (relay 8), §11 queue item 3.1-47's part a (relay 9).
 
 ## 1. The generated views are storage maps
 
@@ -371,3 +372,75 @@ first). The probe reads them into locals first.
   878 `G`); with the default, 347 cases differ only in `theta`/`phi` (correctly rounded `atan2f`:
   on the grid of k/4 for k in [-400, 400], glibc 2.35's `atan2f` differs from the correctly rounded
   value in 101,400 of 641,601 argument pairs, 15.8 %), every other difference with a notice.
+
+## 11. Queue item 3.1-47, part a: the surface's life, rip flags, arrays, column printing, edges (relay 9)
+
+- **glibc's `realloc` to 0 bytes (FS-117).** glibc 2.35's `__libc_realloc` frees a non-NULL block
+  given 0 bytes and returns NULL (`REALLOC_ZERO_BYTES_FREES`, 1 by default), while `realloc(NULL,
+  0)` is `malloc(0)`, a valid pointer. `MRISctr`'s `bzero` leaves every array NULL, so a surface
+  made with 0 vertices or 0 faces holds `malloc(0)` arrays; the next `MRISreallocFaces(mris, 0, *)`
+  frees `faces` and fails `cheapAssert(mris->faces)` (line 584: observed, `CRASH 11`, also for
+  `MRISreallocVerticesAndFaces(mris, n, 0)` on a surface made with no face). `MRISreallocVertices`
+  keeps `max_vertices` at least the old room, so room 0 only follows room 0: the first call frees
+  `vertices`, returns false (the counts untouched; `MRISoverAllocVerticesAndFaces` ignores the
+  result); the second `malloc(0)`s it and frees `vertices_topology`, `dist_storage` and
+  `dist_orig_storage` (no NULL check on those three); and so on (observed). Rule A: empty arrays
+  kept; `reproduce` = `alloc::c_realloc`'s glibc model. Callers: `mrisutils.cpp` 3675/3783 (upsampled
+  surfaces), `mris_topology.cpp` 534/735/1132 (the topology fixer's copies), `mrisurf_io.cpp` 2998
+  (VTK, after `nfaces <= 0` is refused): every recon-all surface has faces, so no impact known.
+- **`MRISreallocVertices`' zeroing** starts at the old `nvertices`, not the old `max_vertices`: a
+  vertex dropped by `MRIStruncateNVertices` loses its fields at the next reallocation. The vertices'
+  `dist`/`dist_orig` pointers are `dist_storage[vno]`'s buffers; `bzero` NULLs the pointers and the
+  storage keeps the buffers (`alloc::zero_vertex` moves the valid buffer back to the storage, the
+  model of §8). A negative `nvertices` (only through `MRISgrowNVertices`/`MRIStruncateNVertices`
+  with a negative count, which no caller passes) makes `bzero` write before the array: out of range
+  (a panic; the probe guards it). `notifyActiveRealmTreesChangedNFacesNVertices` loops over the
+  active realm trees (fs.surf, not yet ported): no tree is ever registered, the port asserts it.
+- **`MRISctr`'s `bzero` of `MRIS` zeroes its `VOL_GEOM`** (a C++ struct with member initialisers:
+  `xsize = 1`, `x_r = -1`, ...): `MRISoverAlloc` uses `malloc`, so no constructor runs and a new
+  surface's geometry is all zeros (`mris::zeroed_vol_geom`; observed through `meta`).
+  `MRIScopyMetadata` uses `VOL_GEOM`'s `operator=` (fs.mri's `VolGeom::assign`, FS-59's case), copies
+  `lta` with `LTAcopy(src, NULL)` and the matrices with `MatrixCopy(src, NULL)` (the target's old
+  ones leaked), never `free_transform`.
+- **`MRIS::lta` is a placeholder** (`src/lta.rs`, the orchestrator's decision of 2026-11-13): the
+  surface code only copies (`LTAcopy`: `LTAalloc(num_xforms, NULL)`, then `type`, `fscale`,
+  `subject`, each `LTcopy` of `xforms` and `inv_xforms`) and frees it (`LTAfree`, in `MRISdtr` only
+  when `free_transform`); the probe's `meta` checks `num_xforms` and `type` after the copy. Track
+  A's `LTA` (fs.volume's 3.1-40, brought into `larmorx-freesurfer-mri`) replaces the module.
+- **`MRISdtr`** frees nothing observable: `CTABfree` only when `ct` is set (no message), the vertex
+  and face destructors (`VERTEX_TOPOLOGYdtr`, `VERTEXdtr`, `FACEdtr`, `MRIS_EDGEdtr` (not `gradU`),
+  `MRIS_CORNERdtr`) for the in-use places, `lta`/`SRASToTalSRAS_`/`TalSRASToSRAS_` only with
+  `free_transform`, `cmdlines[i]` for `i < ncmds` (FS-112's 1,000 kept in both modes, so the
+  overflowed count never reaches it), `dist_storage[vno]` for `vno < max_vertices`. Its only callers
+  are `MRISfree` and `utils/test/topology_test.c`.
+- **`cprints`' 16,384-byte static buffer (FS-119)**: `sprintf(pch_right, " [ %s ]\n", right)` is
+  `__sprintf_chk(pch_right, 1, 16384, ...)` in the unit oracle's `mrisurf_base.cpp.o` (the
+  official programs import `__sprintf_chk` too): 16,377 bytes print, 16,378 abort with `*** buffer
+  overflow detected ***: terminated` before the left column (observed). Callers:
+  `mris_curvature_stats.cpp` 449-671, 2422-2431 (surface, label and texture names: user input) and
+  `mris_calc.cpp`; recon-all's names are short: no impact known. `cprintd`/`cprintf` cannot overflow.
+- **`MRIS_vertexProgress_print` (FS-118)**: `fivePerc = 0.05 * totalVertices` (int) and `avertex %
+  fivePerc` is an `idiv` (unit oracle object): SIGFPE for 1 to 19 vertices at the first call, after
+  the message and ` [` (observed, `CRASH 8`). Callers: `mrisurf_metricProperties.cpp` 6279, 6330,
+  6424 (`MRIScomputeSecondFundamentalFormDiscrete`'s helpers: mris_curvature_stats' discrete
+  curvatures) and `mrisurf_topology.cpp` 3188 (`MRIS_facesAtVertices_reorder`); recon-all's
+  surfaces have more than 100,000 vertices: no impact known.
+- **`MRISallocExtraGradients`** with a negative count: the three `calloc((size_t)n, 4)` overflow and
+  fail with `errno` ENOMEM, so `ErrorExit` prints `Cannot allocate memory` first (observed; the port
+  sets `g.errno`).
+- **`VECTOR_elementIndex_findNotEqual`** returns the 0-based `i` while its comment promises the
+  1-based index; no caller in 8.2.0 (nor of `VECTOR_elementIndex_find`, `signum_eval`,
+  `MRIScheckForNans`, `MRISget*Array`): kept as written (rule C: nothing can rely on a correction).
+- **`edgesIntersect`**: `include/mrisurf_base.h` 268 defines `SPHERE_INTERSECTION` 1, so the
+  sphere version and `edgesIntersectStable` are compiled (the "original version" with
+  `mrisComputeCanonicalEdgeBasis` is not). In the stable version `(v1->cx + v2->cx) / 2.0` adds the
+  two floats in float before widening, and `v2->cx - v1->cx` subtracts in float; the rest is
+  double. Only comparisons leave the functions, so the NaN operand order is irrelevant; the probe's
+  `edges` (quarter grids for the aligned branch, 1e-5 steps for the stable one) is identical.
+- **Not ported here**: `vlst_alloc`, `vlst_free`, `vlst_enough_data`, `vlst_add_to_list`
+  (`VOXEL_LIST`, `utils/voxlist.cpp`: fs.volume); `mrisDirectionTriangleIntersection` and
+  `mrisAllNormalDirectionCurrentTriangleIntersections` (`MHTacqBucket`: fs.surf's surface hash;
+  `triangle_ray_intersect`: `utils/tritri.cpp`); `slprints` (no caller in 8.2.0; the clock and
+  `gethostname`, and a NULL `strtok` result for an empty or all-dots host name).
+- **The probe's artefact** (not FreeSurfer's): an empty `std::vector`'s `data()` is NULL, which
+  `MRISsetRegistrationSigmas` reads as "reset to the defaults"; the probe allocates one more place.

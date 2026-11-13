@@ -1176,7 +1176,7 @@ defects! {
     FS_116 = "FS-116", "FreeSurfer", true,
         "reading a face's original area while it is still marked to be computed later prints NYI and crashes the program on purpose (a segmentation fault)";
     FS_117 = "FS-117", "FreeSurfer", true,
-        "reallocating a surface to no faces (a surface with no face reallocated again included) fails an assertion and ends the program, and reallocating to no vertices a surface with room for none loses its vertex array and reports a failure: the system's reallocation to zero bytes frees the arrays";
+        "reallocating a surface to no faces (also a surface that already has none) fails an assertion and ends the program, and reallocating to no vertices a surface with room for none leaves it without its vertex array (or, the next time, without its other per-vertex arrays) and reports a failure";
     FS_118 = "FS-118", "FreeSurfer", true,
         "the progress bar over a surface's vertices (discrete curvatures, the faces' geometric order) ends the program with an arithmetic exception (signal 8) for a surface of fewer than 20 vertices";
     FS_119 = "FS-119", "FreeSurfer", true,

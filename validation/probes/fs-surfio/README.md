@@ -29,7 +29,14 @@
   positions and normals, the canonical angles and mean canonical radius, the folding, the
   face-normal cache's reads, writes, deferral and recomputation, the original area, storing and
   restoring the metric properties, the old and current positions; then the surface's whole state;
-  storing or restoring the metric properties past a buffer prints `G`), 24 commands. `build.sh` also builds
+  storing or restoring the metric properties past a buffer prints `G`), 24 commands; since relay 9
+  (queue item 3.1-47 part a) `life` (a surface made by `MRISalloc` or `MRISoverAlloc`, 1 to 8 of
+  its reallocations, count changes, frozen count, vertex, neighbourhood, distance and face
+  settings, rip-flag operations, arrays, extra gradients, NaN check and dumps; then its state and
+  `MRISfree`), `meta` (`MRIScopyMetadata` into a new or a given surface, with an `LTAalloc`
+  transform array and the Talairach matrices), `misc` (the curvature names, the registration
+  sigmas, `cprints`/`cprintd`/`cprintf`, `MRIS_vertexProgress_print`, the vector searches,
+  `signum_eval`, the two sort comparisons) and `edges` (`edgesIntersect`), 28 commands. `build.sh` also builds
   `fssurfio-mpstub`: the same probe with a stub `MRIScomputeMetricProperties` (it writes `MP`),
   linked first with `--allow-multiple-definition` so the library's own call (`MRISsmoothSurface`'s
   last step) reaches it; `check.py` runs `metric`'s cases through it.
@@ -40,6 +47,17 @@
   cache at one thread, the port in both modes, the comparison (`reproduce` identical; `fix`
   different only with a notice), and the hash the test checks. Run it inside
   `scripts/orchestration/boxed.sh`.
+
+Measured 2026-11-13 (relay 9, 28 commands): seed 7, 56,000 cases: all identical with `reproduce`
+(4,584 of them failed assertions, FS-03; 63 FS-117, 319 FS-118, 16 FS-119); `fix` differs only with
+the notices of FS-01, FS-03, FS-12, FS-111, FS-113, FS-115, FS-116, FS-117, FS-118 and FS-119, in 4
+`surf` cases that rotate and in 51 `posn` cases that compute the canonical angles (`fix_libm`); the
+port's outputs byte-identical with and without AArch64's NaN emulated (3,904 and 3,926 NaNs
+flipped), both modes (log `<workspace>/oracles/logs/fs-surfio-relay9-seed7.log`). Seed 1, 840
+cases: all identical, hash `83e0ed801db07e93238b22842a6e01f0a8741c6b03241e10a390b6f89fda4096` (the
+test), with the emulation too, debug and release. (`misc`'s first run differed on `ss 0 0` cases:
+the probe's own empty `std::vector` gave `MRISsetRegistrationSigmas` a NULL list, which resets the
+defaults; the probe now allocates one more place.)
 
 Measured 2026-11-13 (relay 8, 24 commands): seed 7, 48,024 cases: 48,021 identical with
 `reproduce`, 3 counted, not compared (FS-114, as below); `fix` differs only with the notices of
@@ -85,5 +103,5 @@ operand order is each caller's compiled code (`docs/findings/freesurfer-surfio.m
 
 ```
 validation/probes/fs-surfio/build.sh <workspace>
-scripts/orchestration/boxed.sh 8 python -P validation/probes/fs-surfio/check.py --seed 7 --n 48024
+scripts/orchestration/boxed.sh 10 python -P validation/probes/fs-surfio/check.py --seed 7 --n 56000
 ```

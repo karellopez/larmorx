@@ -372,3 +372,449 @@ relay 13. The behaviour is in `specs/freesurfer-io.md` §19-24; the defect texts
   `.npy` cases now read `x.npy` in the fixture on both; (3) in the first full run two piece-2 cases
   (`ctr`, `ztr`) ended by the probe's 5-second alarm (`CRASH 14`) while six agents loaded the machine;
   run alone, both gave the port's lines at once.
+
+## Part 4: the volume format probe (3.1-27, piece 1)
+
+**Restricted** (closed to FreeSurfer clean-room implementers: it cites FreeSurfer's source). Track A,
+relay 14. The behaviour is in `specs/freesurfer-io.md` §25-33; the defect texts (behaviour only) in
+`larmorx_core::defects` (FS-221 to FS-228). Ported: `utils/mri_identify.cpp` whole (lines 47-1208;
+697-1195 taken early from 3.1-28 because `mri_identify` calls every test), `MRIgetVolumeName`
+(mriio.cpp 472-486, from 3.1-28), `checkBrukerFiles` and `is_bruker` (Bruker.cpp 201-260, 834-849),
+`ghc`, `ghi`, `ghf`, `get_signa_header_info`, `is_signa` (signa.cpp 69-198, from 3.1-30), `IsDICOM`,
+`IsSiemensDICOM`, `GetObjectFromFile`, `GetElementFromFile`, `AllocElementData`, `FreeElementData`
+and `DCMPrintCond` as the Manufacturer element reaches them (DICOMRead.cpp 1164-1460, 1479-1522,
+5410-5549), `DCM_GetElement` and `DCM_GetElementValue` (CTN's dcm.c 949-1100, 2699-2717, as
+FreeSurfer's copy has them) for that element only.
+
+### Mechanisms of FS-221 to FS-228
+
+- **FS-221.** Fixed buffers filled by `strcpy`/`strcat`/`sprintf` without a bound: `mri_identify`'s
+  `char fname[STRLEN]` (MRIgetVolumeName's `strcpy(name_only, string)`, mri_identify.cpp 203-209,
+  mriio.cpp 476), `string_to_type`'s `char ls[STRLEN]` (154), `is_analyze`'s `hfname[STRLEN]` (`strcpy`
+  731 and `strcat(".hdr")` 739), `is_sdt`'s `header_fname[STR_LEN]` (980, 983-985), `is_nifti1`'s
+  `fname_stem[STRLEN]` (1036), `IsDICOM`'s `static char file[1024]` (DICOMRead.cpp 5417, filled 5430: a static, so it
+  overwrites the next statics), `is_bruker`'s five `char ...File[512]` (Bruker.cpp 837-841, filled by
+  `checkBrukerFiles`' `strcpy`+`strcat` 214-252), `IDtypeFromStem`'s and `IDnameFromStem`'s `char
+  tmpstr[2000]` (`sprintf("%s.nii")` ... `"%s_000.bfloat"`), `bhdr_precisionstring`'s and
+  `bhdr_precision`'s `tmpstr[2000]`. The official build aborts on the stack protector's canary for
+  `string_to_type` of 1,030 bytes (probe: `CRASH 6`). Every name the C functions then use is still the
+  whole string (the copy keeps its terminator past the buffer), so both modes use it whole; the probe
+  counts these lines, never compares them.
+- **FS-222.** `is_mnc` (mri_identify.cpp 776-781): `for (dot--; *dot != '.' && dot > fname; dot--)`
+  starts one byte before a dot at the name's start and reads it before testing `dot > fname`, then
+  compares from there; the compared text's second byte is the name's dot against `m`, so the answer is
+  always "no". The port starts at the name.
+- **FS-223.** `is_mgh` (802-815) compares `fname`, not `ext`, with `.mgh`/`.mgz`/`.mgh.gz` (its comment
+  describes the extension); `ext` is computed and unused. No caller in FreeSurfer 8.2.0.
+- **FS-224.** `is_signa` (signa.cpp 189): `if ((ret = fread(h, ...)) != HLENGTH) return (0);` before
+  `fclose(fp)`.
+- **FS-225.** `ghi` (signa.cpp 77-91): `num = (num << 8) | *(header + 2*offset + i)` with `char` signed
+  on x86-64 (the official build's `movsbl`): the second byte's sign extension ORs ones into the high
+  bits. The first byte's sign extension is a 16-bit signed reading, so the correction keeps it.
+- **FS-226.** `IDextensionFromName` (486-535) `strncpy`s the last 3/4/6/11 bytes into `ext` and
+  compares them with `nii` ... without looking at the byte before (`IDstemFromName` compares `.nii`
+  with the dot). Callers: `MRISfileNameType` (mrisurf_io.cpp 2561: a name it takes for a volume is
+  read and written as a volume), mri_convert's frame splitting, mri_surf2surf, mrisutils.
+- **FS-227.** `AllocElementData` (DICOMRead.cpp 1252-1305) gives US/SS 2 bytes, UL/SL/AT/FL 4, FD
+  `multiplicity` x 8 (`calloc`), then `DCM_GetElementValue` `memcpy`s the element's whole length into it
+  (dcm.c 1059): a longer value writes past the allocation (within glibc's minimum chunk of 24
+  usable bytes the answer is the text up to the first zero; beyond, memory). The comparison is
+  `strcmp(e->d.string, "SIEMENS")` on the union's pointer.
+- **FS-228.** Representations `AllocElementData` has no case for (OT, UT, DD, RET, CTX, DLM) leave
+  `d.ot` NULL after its message; `DCM_GetElementValue` then `memcpy`s into NULL (a value of 1 byte or
+  more) or returns normally and `strcmp(NULL, ...)` faults (length 0): SIGSEGV either way (probe:
+  `CRASH 11`). A string representation with an undefined length (CTN keeps the value unread, FS-91)
+  allocates `length + 17` = 16 bytes (32-bit wrap) and writes `d.string[0xffffffff]`.
+
+### Other facts
+
+- `FreeElementData` (1408-1460) has no case for UN (which `AllocElementData` handles as text): it
+  prints `FreeElementData: 21 unrecognized` without a newline and leaks the value. A Manufacturer
+  stored as UN (explicit VR files) prints it on every `IsSiemensDICOM`: kept in both modes (rule C, no
+  result depends on it), noted here only.
+- `checkBrukerFiles` prints `INFO:    d3proc %s` for the reco file too (a copied line, 256): kept.
+- `IDtypeFromStem` does not look for `.img` while `IDnameFromStem` does; `IDtypeFromStem` has no caller.
+- `is_sdt` replaces the extension found anywhere in the name (`a.d/s` looks for `a.spr`): FreeSurfer's
+  convention for extensions throughout the file; kept.
+- `ghf`: the union's `long ii` is 8 bytes; only its low 4 are written before `thing.ii >> 24`, `&
+  sign_bit` and `& dmantissa`, which use bits 0-31 only: the uninitialised high half never reaches the
+  result. A zero fraction keeps the exponent (GE's `mvtsunf`): `0x40000000` is 0.0005, not 0.
+- `is_signa`'s sums: `fabs(float)` is libstdc++'s `float` overload (the official build's `andps` and
+  `addss`), compared with the `double` literal after `cvtss2sd`.
+- `IsDICOM`'s fourth attempt (`DCM_FORMATCONVERSION | DCM_ACCEPTVRMISMATCH`) is always refused by CTN
+  before the file is opened (no byte order). After a failed attempt the reader may already have closed
+  the object, so the next `DCM_CloseObject` pushes "NULL object passed to routine DCM_CloseObject"
+  (track C's finding, docs/findings/freesurfer-permissive.md); the stack is emptied at the end.
+- `GetObjectFromFile` (DICOMRead.cpp 1207-1243) repeats the four opens with `options | DCM_ACCEPTVRMISMATCH`
+  and does not empty the stack between them; `GetElementFromFile` empties it only on success, so a
+  missing Manufacturer leaves the failed attempts' conditions and "Requested element (8 70) not found
+  in DCM_GetElementVM" on the stack (the probe dumps it after each case).
+- `errno`: most tests set it to 0 after a failed `fopen` or short `fread`; `is_cor`, `is_bruker` and
+  `checkBrukerFiles` keep `stat`'s error; `IDisCurv`, `is_signa` and `IsDICOM` keep `fopen`'s, and
+  `IDisCurv` and `is_signa` keep the failed read's (21 for a folder). The port's `CFile` now fails a
+  folder's reads with `EISDIR` on every platform (on Windows it used to give an empty file) and keeps
+  the read's error (`read_errno`).
+- Two points for larmorx-io (track C's `larmorx_io::dicom`, told through the orchestrator): (1)
+  `CondStack::dump` writes the stack's texts through `cfmt::Streams` (`&str`), so a message holding a
+  byte that is not UTF-8 (a broken VR code, `DCM Unrecognized VR code (P\xbd)`) prints U+FFFD; the
+  port prints the stack with its own byte-exact dump (`dicom_probe::dump_conditions`); (2) `open_file`
+  uses one path both to open the file and in CTN's messages: the port passes the name joined to the
+  program's folder, so CTN's messages show that path where FreeSurfer shows the name as given (only
+  with `FS_DICOM_DEBUG` or in a dumped stack; the probe shows them relative to its fixture). A variant
+  taking the name for the messages would close both.
+
+### The probe's piece-4 commands
+
+`sty`, `tts`, `mgvn`, `mid`, `isx`, `idf`, `dcm` (validation/probes/fs-io/fsio.cpp's `run_piece4` and
+`setup`; the port's side `tests/fs_io/piece4.rs`). Each file case makes its files in the fixture's
+`w` folder (removed first). Results: below, "Measured (piece 4)".
+
+### Measured (piece 4, 2026-11-13, the probe `validation/probes/fs-io/`, unit oracle's build)
+
+- Seed 7, 72,000 cases (36 commands x 2,000; boxed 12 GiB, about 45 minutes): `reproduce` identical on
+  65,077 of 65,077 comparable lines (1,743 with memory digits); 3,770 lines of memory contents or
+  addresses compared apart (2,074 equal); 3,153 not comparable. Piece 4's 14,000 cases: 13,914
+  identical, 86 not compared (`dcm` 77: FS-227 and FS-228, FreeSurfer's `CRASH 11`; `sty` 8: FS-221's
+  1,030-byte extension, `CRASH 6`; `mid` 1). `fix` differs only with a notice (piece 4's: FS-225 19,
+  FS-226 7, FS-223 2).
+- Coverage of the first 7,000 piece-4 cases (`<scratch>/A/r14/p4stats.py`): `mri_identify` returned
+  every format it can give (-1, 0-12, 14-18, 20-30, 32-34; 13, 19, 31 and 35 never come out of it);
+  each `isx` test said yes on cases made for it (curvature 5, Signa 7, Bruker 12, NIfTI-1 pair 6,
+  ANALYZE 4, ...); `dcm`: `IsDICOM` yes and no, its kept answer, `IsSiemensDICOM` 1 and 0 with 135
+  warnings, 16 sequences and 45 unhandled representations, with and without `FS_DICOM_DEBUG`.
+- Seed 1, 3,600 portable cases (`tests/fs_io_official.rs`): 3,243 identical (98 with memory digits),
+  357 hashed as SKIP, SHA-256 1caecb5a...; passing in debug and release and under AArch64's NaN
+  emulation (NAN_TRAP_ARM=1 with NAN_TRAP_DIR; 64 flips each).
+- What the first runs taught (fixed): (1) CTN's condition stack printed through larmorx-io's text
+  streams turned a broken VR code's byte into U+FFFD: the port dumps it byte for byte; (2) `IDisCurv`
+  and `is_signa` of a folder leave `errno` 21 from the failed read: `CFile` now keeps a failed read's
+  error (and fails a folder's reads on every platform).
+
+## Part 5: mosaics and MATLAB files (3.1-27, piece 2)
+
+**Restricted** (closed to FreeSurfer clean-room implementers: it cites FreeSurfer's source). Track A,
+relay 15. The behaviour is in `specs/freesurfer-io.md` §34-39; the defect texts (behaviour only) in
+`larmorx_core::defects` (FS-229 to FS-248, FS-250, FS-251; FS-249 was not used). FS-245 marks every
+result that depends on memory contents (the cause noted with its own defect as well): larmorx keeps
+one notice per defect, so a "memory" detail of a defect already noted for another reason was lost
+and such lines were compared (one in the seed-7 run: a compressed stream cut by the file's end, which
+FreeSurfer decodes on into its uninitialised buffer). Ported: `utils/mosaic.cpp` whole, `utils/matfile.cpp` whole.
+
+### Code generation
+
+- `VolSS2MosSS`/`MosSS2VolSS` (official object code): the `floor()` calls on integer quotients are
+  folded away; the tile column is the `idiv` remainder; the bounds `x > n - 1` are compiled as
+  `n <= x` (they differ from the source only for `n` = -2^31); the order of the divisions is
+  `ncmos % ncvol`, `nrmos % nrvol`, then `svol / (ncmos / ncvol)` (`MosSS2VolSS`: `cmos / ncvol`,
+  `rmos / nrvol`); each `idiv` faults on 0 or on -2^31 / -1 (FS-229, `SIGFPE`: probe `CRASH 8`).
+- matfile.cpp passes its `long32` fields to `%ld` zero-extended (`mov 0x4(%rbx),%edx`): -1 prints
+  4294967295. `(char)real_matrix[row][col]` is `cvttsd2si` to 32 bits and the low byte (FS-244).
+  `(long32)fval` is `cvttss2si` (FS-234).
+
+### Mechanisms
+
+- **FS-229.** `ncmos % ncvol` and the other divisions of mosaic.cpp 79, 89, 100 and 104 (`VolSS2MosSS`), 145,
+  155, 166, 170 and 171 (`MosSS2VolSS`) have no zero check.
+- **FS-230.** `DIFFERENT_ENDIAN(mf)` (matfile.cpp 47) is `mf->type != MATFILE_PC` for every version
+  but 5, `MATFILE_PC` being 0: only type 0 (little-endian, double, full) is taken as this machine's
+  order. `MatReadHeader0` (458-501) and `MatReadHeader`'s version 4 part (1023-1052) then call
+  `swapBytes` (503-509: type, rows, columns, name length; not `imagf`), and `readMatFile` swaps the
+  numbers. MATLAB's own rule is the thousands digit of the type (0 little-endian, 1 big-endian).
+- **FS-231.** `readMatFile` 386-388: `nitems = fread(&sval, 1, sizeof(short), fp); if (nitems !=
+  sizeof(char))`: a 2-byte read fails the test. With 1 byte left the read passes and `sval`'s other
+  byte is the uninitialised local's.
+- **FS-232.** `readMatFile` 397 and `znzreadMatFile` 723-724 read `sizeof(long)` (8) bytes per
+  32-bit element; the swap is `swapLong32(lval)`, of its low 32 bits.
+- **FS-233.** `char bval` and `short sval` (signed on x86-64) for every 8- and 16-bit type, `long` of
+  4 file bytes never for unsigned 32-bit; the version 5 comments of 320-335 have signed and unsigned
+  the wrong way round, both mapped alike.
+- **FS-234.** `fval = (float)swapLong32((long32)fval)` (414, 731).
+- **FS-235.** The imaginary loop (433-452) reads only `MAT_DOUBLE` and for the other types assigns
+  `dval`, an uninitialised local in `readMatFile` (315; 1.0 in `znzreadMatFile`, 676, swapped again at
+  every element of the other byte order).
+- **FS-236.** `mf->imagf = (long)(m & ctmp[3])` (939) with `m = 1 << 4` and `ctmp` the flags word's
+  bytes: the complex flag is bit 11 of the word (byte 1 in little-endian order), and `ctmp[3]` is its
+  high byte; `znzMatReadHeader` (1123-1124) tests `unbuff[18]` likewise and then overwrites `imagf` (1127).
+  The imaginary numbers follow the real ones directly in `readMatFile`, without the real part's
+  padding and the imaginary part's tag.
+- **FS-237.** After the name, `fread(&(mf->type), 1, 4)` (1005) and `fseek(fp, 4, SEEK_CUR)` (1011)
+  take a small numbers element's word as the type and skip its data.
+- **FS-238.** `padding = 8 - ((int)mf->namlen - (int)mf->namlen / 8 * 8)` (985).
+- **FS-239.** The small form's `memmove(&namlen_temp, &mf->namlen, sizeof(short))` (993) keeps the
+  word's low half, the element type (1); names are `calloc(namlen)` with no room for a zero (980,
+  995, 1140, 1152) and printed with `%s` (1014, 1160).
+- **FS-240.** `znzMatReadHeader` (1061-1169): `memmove(&(mf->mrows), &unbuff[32], sizeof(long))` and
+  the same for `ncols`, `namlen` and `type` copy 8 bytes into 4-byte fields (`imagf`, `version`,
+  `mrows` overwritten); `test_data[0] == 0 && test_data[1] == 0` (1137) is false for every name tag
+  MATLAB writes (its type 1 is in byte 0), so the small branch runs, whose `DIFFERENT_ENDIAN` (1149)
+  reads `mf->type`, never set by `MatlabRead2`'s uninitialised `MATFILE mf` (768) when the clobbered
+  version is not 5; `padding = 48 + ((((int)mf->namlen - 1) / 8) + 1)` (1142) counts blocks, not
+  bytes; `size_unbuff = 100 * size` (1109) bounds the decoding; `znzreadMatFile` reads at the fixed
+  offset 56 (712-750). The line of 1158-1165 is an `ErrorPrintf(DIAG_VERBOSE, ...)`: printed always.
+- **FS-241.** `MatlabRead2`'s `MATFILE mf` (768) and `MatReadHeader`'s `dt` and `tmp` (869, 871) are
+  uninitialised; `fread(...) != 1 && ferror(fp)` (its version 5 reads, 911-1008) reports errors only,
+  so at the end of the file they stay as they were.
+- **FS-242.** `MatlabRead2` never closes `fp` (uncompressed) or `znzfp` (792; `fp` 781); `MatFileRead` never
+  closes `fp` (153).
+- **FS-243.** `matAlloc` (286-307), the names' `calloc` (480, 980, 995, 1040, 1140, 1152), `malloc(size)`
+  (1102) and `calloc(size_unbuff)` (1110) of sizes from the file; `matFree(NULL, rows)` after a failed
+  `matAlloc` (MatFileRead 200) dereferences a null pointer; under the probe's 1 GiB address space the
+  official build also throws `std::bad_alloc` from `ErrorPrintf`'s formatting (probe `CRASH 6`).
+- **FS-244.** `bval = (char)real_matrix[row][col]` (190).
+- **FS-246.** `MatReadHeader` reads two dimensions at 160 and 164 and then the name tag at 168, which
+  is the third dimension's place for a 3-D array.
+- **FS-248.** `MLFC`'s `varname[1000]` and `varmtx[1000]` (matfile.h) are filled by
+  `mlfc->nvars++` (570-613) without a bound.
+- **FS-250.** `MatFileRead` ignores `MatReadHeader0`'s `NULL` (158).
+- **FS-251.** `if ((a == (char)EOF) || ...)` (888) and `if (c == (char)EOF)` (572) compare `char`s
+  with -1.
+
+### Decisions
+
+Rules (CLAUDE.md, D13): FS-229 B (both modes return 1 with a clear message; the crash is never
+reproduced); FS-230 to FS-238 and FS-240 A (the default reads MATLAB's formats by their
+definition); FS-239 A (messages: the whole name); FS-241 B (a clear error, `NULL`); FS-242
+resource leak (both modes close; no answer changes, no notice); FS-243 crash or machine-dependent
+(not reproduced; larmorx refuses above 256 MiB of numbers as a failed allocation, both modes);
+FS-244 A (saturation, the rule of FS-02); FS-245 memory contents (both modes 0, never
+compared); FS-246 B; FS-247 A; FS-248 A (all kept); FS-250 C (no
+caller; kept in both modes); FS-251 C (no valid file holds 0xff there; kept in both modes).
+
+### Who calls these
+
+`MatlabRead` is `MatrixRead` (matrix.cpp 1064), `mri_glmfit`'s design matrices (`--X`), the
+ANALYZE reader's orientation file beside an `.img` (mriio.cpp 5066); `MatlabWrite` is `MatrixWrite`
+and the ANALYZE writer's `.mat` (mriio.cpp 5563, 5861); `ReadMatlabFileVariable` is `fsgdf.cpp` 340.
+recon-all's volumes are `.mgz` and NIfTI, and fMRIPrep reads none of these files: no fMRIPrep impact
+known. The mosaic functions serve the Siemens DICOM reader (fs.dicomread, 3.7).
+
+### Measured
+
+- The probe (`validation/probes/fs-io/`, piece 5): seed 9, 3,500 cases of `mvm`, `mmv`, `mck`, `mlw`,
+  `mlr`, `mfr`, `mrc`: `reproduce` identical on 2,990 of 2,990 comparable lines; 308 not compared
+  (FreeSurfer's crashes: `SIGFPE`, `SIGSEGV` after `matAlloc` fails, `std::bad_alloc` thrown while
+  formatting an error under the probe's 1 GiB, prints passing the 5 seconds), 202 compared apart
+  (memory contents); `fix` differs only with notices. Seed 1, 4,300 portable cases of the 43
+  commands: 3,836 identical, 464 hashed as `SKIP` (`e8e6a116...`, `tests/fs_io_official.rs`, passing
+  in debug and release and under `NAN_TRAP_ARM=1` with `NAN_TRAP_DIR`).
+- Seed 7, 86,000 cases of the 43 commands: `reproduce` identical on 76,947 of 76,949 comparable lines
+  (1,699 with memory digits); 4,496 not compared, 4,555 compared apart. The two others are a
+  `VOL_GEOM::read` and an `FStagsIO` case of piece 2 where the official build was stopped by the
+  probe's 5-second alarm (`CRASH 14`) while this relay built and tested beside the run; run again
+  alone they are identical (the oracle-output cache keeps the timed-out lines). Piece 5's 14,000
+  cases: 11,902 compared, all identical, 1,276 not compared, 822 compared apart; `fix` differs only
+  with notices.
+- SciPy's files (`matfile_scipy.py`, 400 matrices: version 4, version 5, compressed; doubles, singles,
+  signed and unsigned 8- to 32-bit integers, complex): FreeSurfer reads 51 of 136 version 4 matrices
+  right (the little-endian doubles, and the big-endian ones), 33 of 136 version 5 and 0 of 128
+  compressed; the default reads all 400 as SciPy wrote them.
+- The probe's harness: a matrix of more than 65,536 numbers is printed as an FNV-1a hash of its floats
+  (`FSIO_HASH_MIN` sets the limit for the official side, to print one whole); the first build of that
+  hash in `fsio.cpp` had the 64-bit offset basis with a digit dropped, found by computing the hash of
+  the official numbers in Python (the port's was right).
+
+
+## Part 6: reading volumes and registration files (relay 16 of track A, for track D's surfaces)
+
+**Source-derived (FreeSurfer 8.2.0's `utils/mriio.cpp` 109, 488-1105, 10853-11245, 12195-12420;
+`utils/registerio.cpp` 43-162; `utils/resample.cpp` 109-118; `packages/minc/minc_gaussian.c`,
+`minc_volume_io.c`): closed to FreeSurfer's clean-room implementers.**
+
+- `mri_read` finds the last `@` and the last `#` on the whole name with `strrchr` before it writes
+  a NUL at either: so in `x.mgz@mgz#0` the format's text ends at the `#` (`mgz`) and in
+  `x.mgz#0@mgz` the frames' text ends at the `@`.
+- `nan_inf_check` on a volume read without voxels: `MRIFseq_vox` through `slices`, which
+  `MRIallocHeader` never allocates: a crash for a float volume with a frame list (FS-255; reached
+  by `MRIreadHeader`/`MRIreadInfo` of `name#n`).
+- `mghRead`'s header skip in a compressed file ends with `znzread(buf, total_bytes - count, 1,
+  fp)`: for a volume without voxels the member size is 0, and FreeSurfer's `znzread` divides the
+  bytes read by it (SIGFPE, measured: the probe's `CRASH 8`; FS-76's mechanism, nifticlib's).
+- `MRI::initSlices` advances the row pointer only for uchar, short, unsigned short, RGB, int, long,
+  float and (by the byte count) float complex: a tensor (and bitmap, double complex) volume's rows
+  all point at the chunk's start, so `mghRead`'s `MRIFseq_vox` writes overwrite one row.
+- `mghRead`'s `buf = calloc(bytes, ...)` with a negative `int` byte count fails (`errno` ENOMEM,
+  measured), and `znzread` into the null buffer of a compressed file returns -1 (zlib's
+  `(int)len < 0` check, which also sets the stream's error so every later read fails: the TR, the
+  tags); the replica gives `larmorx_io::znz::GzFile::gzread_too_long` for that state.
+- `FS_MGZIO_USEVOXELBUFREAD`: `bufsrc = &MRIseq_vox(mri, 0, 0, 0, start_frame)` dereferences
+  `slices[start_frame * depth]`: past the one-frame volume for a frame after the first, and a
+  crash for a volume without slices (`slices` of 0 entries; measured `CRASH 11`) (FS-256).
+- `MRITAGread` is called by `mghRead` with its defaults (`ras_xform` NULL): the
+  `TAG_RAS_XFORM_EXTRA` case has no `niftiheaderext` check and calls `read_ras_xform_extra(NULL)`
+  (FS-253).
+- `TAG_MGH_XFORM`: `fstagsio.read_data(mri->transform_fname, len)` reads `len` bytes into the
+  1,024-byte field (FS-254 past it; `transform_fname` is followed by the `General_transform`);
+  `sprintf(tmpstr, "%s/transforms/talairach.xfm", fio_dirname(fname))` into 1,000 bytes (FS-254).
+  The file is read with `input_transform_file`, FreeSurfer's copy (`packages/minc`), whose
+  `create_linear_transform` uses `minc_volume_io.c`'s static `compute_transform_inverse` (no
+  identity check; `minc_inverse.c`'s global one checks the first product against the identity and
+  exits) on `minc_gaussian.c`'s `invert_4x4_matrix` (`invert_4x4_matrix_wkr_fast`; `doPrint` is
+  false in the build).
+- `TAG_CMDLINE` and `TAG_PEDIR`: `calloc(len + 1)` then `read_data(.., len)` and `[len] = 0`: a
+  length of -1 gives an empty string after writing one byte before the allocation; below -1 or
+  beyond memory a null buffer and a crash (FS-257). `TAG_FIELDSTRENGTH` reads `sizeof(float)`
+  bytes whatever the tag's length (no defect ID: FreeSurfer always writes 4; a file with another
+  length is then read as further tags, both modes).
+- `regio_read_register`'s `char tmp[1000]` takes `fscanf("%s")` without a width (FS-258); the `.lta`
+  branch reads `lta->xforms[0]` without checking `num_xforms` (FS-258) and calls `LTAread` and
+  `TransformLTA2RegDat` (transform.cpp, fs.volume: the replica takes them through
+  `registerio::RegisterLta`). `perror` (glibc 2.35) duplicates standard error's descriptor and
+  `fdopen`s it `"w+"` while standard error is not yet oriented: on a descriptor open for writing
+  only that fails with EINVAL and `errno` stays EINVAL (measured in the probe's child, whose
+  standard error is a file opened `O_WRONLY`); the probe orients standard error first.
+- `chklc()` in `MRIreadType`/`MRIread` exits 255 without `FREESURFER_HOME` (the licence check, a
+  runtime matter larmorx's replica does not have: `larmorx-freesurfer-core::chklc` returns 1); the
+  probe calls `mri_read` directly for its `mrd` command.
+- Measured (2026-11-13, the probe's piece 6): seed 3, 310 cases; seed 5, 1,250; seed 11, 2,500:
+  `reproduce` identical on 1,777 of 1,778 comparable lines (572 not compared: formats not ported,
+  `.lta`, crashes, skips beyond 256 MiB; 150 compared apart), the one other FS-256's crash, since
+  noted.
+
+## Part 7: Bruker's readers (3.1-27, relay 17 of track A)
+
+Restricted (FreeSurfer's source lines). `utils/Bruker.cpp` 146-849.
+
+- **FS-259** (class a; both modes the whole strings, noted). `splitParameterValue` (261) `strcpy`s the
+  name into the caller's `Parameter[256]` and the whole remainder after `=` (its newline included,
+  before the loop that cuts it) into `Value[128]`; the three readers' buffers are stack arrays
+  (`char line[512]; char Parameter[256]; char Value[128];`), so a name of 256 bytes or more or a
+  remainder of 128 or more writes over the neighbouring locals. Measured: none (undefined); the
+  probe's own buffers are 8,192 bytes, so such lines are counted, not compared.
+- **FS-260** (class a, resource leak; both modes close, no notice, as FS-242). `readBrukerReco` never
+  calls `fclose` on success (its last lines compute the sizes and return); `readBrukerD3proc` (338)
+  and `readBrukerReco` (753) return without it on an unsupported type; `readBrukerVolume` (807) on an
+  unknown one.
+- **FS-401** (class a, memory never written; both modes 0, noted; the probe marks such lines
+  `VARY`). `brukerRead`'s `width`, `height`, `depth`, `TR`, `TE`, `TI`, `flip_angle` and every
+  `BrukerTransform bTran` field (stack, no initialiser) that `d3proc`, `reco` or `acqp` does not set:
+  `MRIalloc` then gets sizes and a type from the stack, the geometry and times likewise.
+- **FS-402** (class c, rule A: default the type's size; `reproduce` FreeSurfer's). `readBrukerVolume`
+  (813): `fread(mri->slices[k][j], sizeof(short), mri->width, fp)` for every type. A `_32BIT_SGN_INT`
+  study (`MRI_INT`) gets `2 * width` bytes at each row's start and zeros after (MRIalloc's); a byte
+  volume (only through FS-401's type) overlaps the next row and its last row writes `width` bytes
+  past the chunk.
+- **FS-403** (class a, crash; both modes NULL, noted; counted, not compared). A short read in
+  `readBrukerVolume` (814-818) closes the file and `MRIfree(&mri)` on its own copy of the pointer;
+  `brukerRead` (194) then `MRIfree(&mri)` on the caller's copy: a double free (glibc aborts; the probe
+  sees signal 6).
+- **FS-404** (class c, rule A: default byte-swapped for `bigEndian`; `reproduce` as read).
+  `readBrukerReco` does not read `$RECO_byte_order` and `readBrukerVolume`'s `swap_bytes_flag` is
+  always 0 ("this was not needed"): ParaVision's big-endian studies (older SGI-era data) are read in
+  little-endian order. The default reads ParaVision's parameter.
+
+Behaviours kept (rule C, both modes):
+- `readBrukerD3proc` (318-327): two `else if (!strcmp(Parameter, "$IM_SIT"))` branches; the first,
+  `sscanf(Value, "%d", pz)`, makes the second (frames, `ERROR: nframes %d but one is supported.`)
+  unreachable, so the depth is the later of `$IM_SIZ` and `$IM_SIT`. It looks deliberate (the first
+  branch placed before the older one: a 2-D multi-slice study's slices are counted in `IM_SIT`), and
+  no study at hand shows whether correcting it helps (rule D would measure it on real ParaVision
+  data: none in the data panel). Kept in both modes; the spec says so.
+- `$RECO_wordtype` compares 13 characters (`strncmp(..., 13)`: `_16BIT_SGN_IN`), so `_16BIT_SGN_INX`
+  is taken for short; harmless.
+- Messages kept as printed: `ERROR: value must follow RECO_size` for a missing `$RECO_ft_size` line,
+  `ERROR: float value must follow ACQ_slice_offset` for the gradient matrix, the reco file's check
+  line `INFO:    d3proc <reco>` (§30), the open failures without a newline, `OWNER` at the end of the
+  file printing the stale buffer.
+- `$ACQ_flip_angle`'s conversion runs even when `sscanf` read nothing (the old value converted).
+- `buildVoxToRASTransform` passes the transform's doubles to `stuff_four_by_four`'s `float`
+  parameters: the geometry is single precision (`MatrixMultiply` of floats).
+- Object code (the unit oracle's `Bruker.cpp.o`, GCC 8.4.0 `-O3`): `readBrukerReco`'s voxel size is
+  `fov * 10.0` (the third axis `10.0 * fov[2]`: the same for every input, one NaN operand at most),
+  then `/ size`; the offset `(ft_size - 1) * (-vox)` then `* 0.5` (the source's `/ 2.`; equal for
+  every input). larmorx computes `mul64(fov, 10)`, `div64(., size)`, `mul64(-vox, ft - 1)`,
+  `div64(., 2)`: the same bits, NaNs included.
+
+Measured (the probe's piece 7, `tests/fs_io/piece7.rs`): seed 11, 763 cases: `reproduce` identical on
+648, 0 different, 85 counted (FS-259, FS-403), 30 apart (FS-401); seed 13, 3,815 cases: 3,221
+identical, 0 different, 426 counted, 168 apart; `fix` differs only with FS-402 (39) or FS-404 (16)
+noted.
+
+## Part 8: FreeSurfer's 2-D images (3.1-26's line 65 and 3.1-27's image.cpp 104-3815, relay 18 of track A)
+
+Restricted (FreeSurfer's source lines). `utils/image.cpp` (the 14 functions the programs reach, of
+the file's 73: `ImageAlloc` 65, `ImageAllocBuffer` 104, `ImageFree` 136, `ImageCopy` 384,
+`ImageClearArea` 526, `ImageCheckSize` 977, `ImageSetSize` 1005, `ImageCopyFrames` 1021,
+`ImageRescale` 1217, `ImageScaleDown` 1241, `ImageScaleUp` 1368, `init_header` 3748, `h_copy` 3808,
+`free_header` 3815), `utils/hips.cpp` 4-5 and 42-47 (the globals and the conversion stubs) and
+`utils/filter.cpp` 713-1041 (`ImageConvolve1d`, `ImageReduce`, `ImageReduce1d`, which
+`ImageScaleDown` calls; ported into `larmorx-freesurfer-io::image` because fs.filter's crate sits
+above fs.io). Callers in the reach (the callgraph of `<scratch>/A/r8/edges.json`): `MRItoImageView`,
+`MRItoImage` (mri.cpp, track C's fs.volume), `mrisp.cpp` (`MRISPalloc`, `MRISPread`, `MRISPclone`,
+`MRIStoParameterization(s)`, `MRISgradientToParameterization`), `filter.cpp`'s `ImageReduce`,
+`mrimorph.cpp`'s `mriWriteImageView` (the only `ImageRescale` caller: `mri_em_register`'s
+diagnostic image views, `scale = target_size / rows`); `mriio.cpp`'s `mri_read` and `MRIwriteType`
+free images. None of them passes `imagebufsize` (always 0), converts formats in `ImageCopy` or
+`ImageCopyFrames` (`mrisp.cpp`'s `ImageCopyFrames(Ip, Itmp, 0, Ip->num_frame, 0)`: floats), or
+scales a multi-frame image.
+
+### Code generation (the official object, `oracles/freesurfer-8.2.0-unit/build/fs/utils/CMakeFiles/utils.dir/`)
+- `ImageReduce1d`: `movss pixel, %xmm0; mulss k[i], %xmm0; addss %xmm0, %xmm1` (the total the
+  destination: `total + pixel * k`). `ImageConvolve1d`: the same `addss` order (`mulss`'s order
+  does not matter: the kernel is never NaN). No vectorised float reductions in either.
+- `ImageClearArea`'s `(char)val`, `ImageScaleDown`'s and `ImageScaleUp`'s `(unsigned char)float`:
+  `cvttss2si` into 32 bits, the low byte stored. `ImageScaleUp`'s `(int)((float)outCol / scale)`:
+  `cvttss2si` (and `cvttps2dq` in the vectorised byte loop: the same results).
+- `ImageCopyFrames`' `(float)unsigned int`: `cvtsi2ss` of the zero-extended 64-bit value (scalar)
+  and `cvtdq2ps` halves (vectorised): both the correctly rounded conversion.
+- `ISPOW2` (`macros.h` 118, with `exp2(f)` defined as `pow(2.0, f)` there): `log2f`, `nint`,
+  `pow`; `nint(log2(1.0 / scale))` with double `log2`. The relocations of `ImageScaleDown`: `log2f`,
+  `log2`, `pow`, `nint` (14 calls).
+
+### Mechanisms
+- **FS-405** (class a; both modes skip the write and read 0, noted; counted, not compared). No
+  function checks a frame, an area or a pixel place against the buffer: `ImageClearArea` with a
+  `frame` at or beyond `num_frame`, or extents in use beyond the stored ones;
+  `ImageAllocBuffer`'s `hmemset(I->image, 0, I->sizeimage * I->num_frame)` after `calloc(npix)` of a
+  given smaller `imagebufsize`; `ImageCopy`'s `h_copy` of `Isrc->numpix * Isrc->sizepix` bytes into a
+  new image allocated from `Isrc->rows`/`cols` (not `orows`/`ocols`), or with a frame count of 0;
+  `ImageCopyFrames`' frame places; the scales' coordinates; `ImageConvolve1d`/`ImageReduce1d` on
+  images whose extents in use pass the stored ones; `h_copy`'s `int bytes` (a frame of 2 GiB or more:
+  a short or negative `memmove`); `while (size--)` with a negative `size`; `ImageScaleDown`'s
+  power-of-two path with 0 reductions copies `ImageCopy(inImage, outImage)` of every frame from the
+  advanced pointer (frames past the end), and its `ImageCopy` frees a caller's output smaller than
+  the reduction (use after free). Seed 11: of the 119 counted lines, 51 crash in FreeSurfer, 20 end
+  with other bytes, 48 happen to agree.
+- **FS-406** (class a, undefined conversions; `reproduce` x86-64's `cvttss2si` results, the default
+  clamps, CLAUDE.md's rule for undefined float-to-integer conversions).
+- **FS-407** (class c, rule A). `ImageCopyFrames` (1088-1110): the byte-to-float and byte-to-int
+  branches write `IMAGEFseq_pix(outImage, 0, 0, frameno)` / `IMAGEIseq_pix(outImage, 0, 0,
+  frameno)`, and the int branches `IMAGEFpix(outImage, 0, 0) + pix_per_frame * frameno` etc.,
+  where the same-format branches use `dst_frame + frameno - start`. Unreached by the programs (no
+  caller converts).
+- **FS-408** (class c, rule A: the default reduces every frame and keeps the output's frame count;
+  `reproduce` stops after the first). `ImageScaleDown` (1316-1327) reassigns `inImage` to the
+  reduction (`inImage = ImageReduce(Itmp, NULL)`, one frame), and the frame loop's condition `frame <
+  inImage->num_frame` then ends the loop after frame 0; `ImageCopy(inImage, outImage)` sets
+  `outImage->num_frame` to the reduction's 1. The end of the function restores `inImage->image` on
+  the leaked reduction (the caller's input is never advanced on that path, its `firstpix` untouched).
+- **FS-409** (class a, use after free; both modes return the copy, noted; counted). `ImageRescale`
+  (1226) ignores `ImageCopy`'s result; `ImageCopy` frees an `outImage` with fewer pixels or frames
+  and copies into a new one; `ImageRescale` then sets the freed image's sizes and returns it.
+  Unreached (its only caller passes no output).
+- **FS-412** (class a, rule B: the default refuses the scale with an error; `reproduce` goes on).
+  `ImageScaleUp`/`ImageScaleDown`/`ImageRescale` compute `nint((float)rows * scale)`: beyond the int
+  range or NaN, `nint`'s `(int)` gives -2147483648 (FS-12), `ImageCheckSize`'s 64-bit products wrap
+  (`INT_MIN * INT_MIN * frames` is 0 or -2^62 or 2^62 ...), so the check can pass and the loops run over
+  -2147483648 extents (nothing done) or `ImageRescale`'s `ImageAlloc` fails. Found by the port: with
+  FS-12's default clamp the same products let a scale of 1e30 loop 2^31 times per pixel (a case of seed
+  13 never ended), so the default refuses such scales before any of that.
+- **FS-410** (class c, rule A: the default exits with `ERROR_NO_MEMORY`). `ImageAlloc` (75):
+  `ErrorExit(Gerror, ...)` after `ImageAllocBuffer` returns `ERROR_NO_MEMORY` without setting
+  `Gerror`: the code is the previous error's, usually `NO_ERROR` (0), so `exit(0)`. Measured: the
+  probe's `ial` of 2^53 bytes with `Gerror` 0 ends with status 0 after `error: Cannot allocate
+  memory` and the message.
+
+### Behaviours kept (rule C, both modes; no ID)
+- `init_header` (3748) has no case for `PFCOMPLEX` (4) and `PFDBLCOM` (7): they take `sizepix` 1
+  (`default:` with `PFBYTE`), so a complex image gets a byte per pixel. Nothing in the reach makes a
+  complex image (MRISP, MRItoImage: floats and bytes), so a correction would change no result
+  (rule C: measured to bring no gain); the spec says so.
+- `init_header` with `alloc` (`ImageAllocHeader`, unreached) sets `firstpix` before allocating
+  (NULL).
+- The HIPS conversions are stubs (`error: hips is not supported`, 0): `ImageCopy` between formats
+  copies nothing after the message. FreeSurfer removed HIPS deliberately; kept.
+- `ImageReduce`'s `static IMAGE *Itmp` and `ImageConvolve1d`'s `static` index tables: only memory
+  differs (the port makes them each call); the tables are pure functions of the extents and the
+  length.
+- `ImageScaleDown`'s byte-to-byte bounds check prints `in: %d, %d --> out: %d, %d!` and `exit(2)`;
+  negative places are not checked (FS-405).

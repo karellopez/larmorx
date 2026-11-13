@@ -1441,6 +1441,110 @@ defects! {
         "DTIparsePulseSeqName of a name with 100 characters or more before or after its # overflows a buffer: a crash or wrong values";
     FS_220 = "FS-220", "FreeSurfer", true,
         "DTIbvecChangeSpace of gradient directions with fewer than 3 columns reads and writes past each row: it changes the next rows' numbers, and past the matrix's last number it reads memory contents and writes outside the matrix";
+    FS_221 = "FS-221", "FreeSurfer", true,
+        "the volume format probe (mri_identify, the format tests and the volume-name helpers) misbehaves for a file name of 1,024 bytes or more (a Bruker study's file names of 512 or more, the stem helpers' names of 2,000 or more): its answer is undefined and the program can crash";
+    FS_222 = "FS-222", "FreeSurfer", true,
+        "is_mnc, for a name whose only dot is its first character followed by gz (.gz), reads one byte of memory outside the name (its answer is not changed)";
+    FS_223 = "FS-223", "FreeSurfer", true,
+        "is_mgh compares the whole file name with .mgh, .mgz and .mgh.gz instead of the name's end, so no ordinary name is recognised as MGH (no program calls it)";
+    FS_224 = "FS-224", "FreeSurfer", true,
+        "is_signa leaves a file shorter than a GE Signa header (14,336 bytes) open: a program that probes many such files runs out of file descriptors";
+    FS_225 = "FS-225", "FreeSurfer", true,
+        "a GE Signa header's 16-bit integer whose low byte is 0x80 or more reads as that byte minus 256 whatever its high byte (a matrix of 128 reads as -128), so such Signa files are not recognised and their fields are wrong";
+    FS_226 = "FS-226", "FreeSurfer", true,
+        "IDextensionFromName takes a name's last letters as its volume extension without the dot before them: a name ending in nii, mgz, mgh, img, bhdr or nii.gz without a dot (brainnii) is taken for a volume of that format, so a surface file so named is read or written as a volume";
+    FS_227 = "FS-227", "FreeSurfer", true,
+        "IsSiemensDICOM, for a DICOM file whose Manufacturer element (0008,0070) is stored with a numeric representation (US, SS, UL, SL, FL, FD, AT) and holds more bytes than one such number, corrupts memory: the answer depends on memory contents and the program can crash";
+    FS_228 = "FS-228", "FreeSurfer", true,
+        "IsSiemensDICOM crashes on a DICOM file whose Manufacturer element (0008,0070) has a representation it does not handle (OT, UT, DD, a retired, context or delimiter representation) or an undefined length";
+    FS_229 = "FS-229", "FreeSurfer", true,
+        "VolSS2MosSS and MosSS2VolSS (a volume's voxel to a mosaic's pixel and back) crash with a division by zero for an image of no columns or rows, VolSS2MosSS also for a mosaic of no columns, and both for sizes of -2147483648 with -1";
+    FS_230 = "FS-230", "FreeSurfer", true,
+        "the .mat readers take every version 4 matrix that is not of little-endian doubles (the type code not 0) for the other byte order: its sizes and numbers are read byte-swapped (wrong sizes, a failed read or an exit)";
+    FS_231 = "FS-231", "FreeSurfer", true,
+        "the .mat readers fail on every matrix of 16-bit integers (could not read val[0, 0]); a file ending one byte into such a number reads it with its other byte from memory";
+    FS_232 = "FS-232", "FreeSurfer", true,
+        "the .mat readers read 8 bytes for each 32-bit integer: the numbers combine two of the file's (or one byte-swapped), and the read fails half-way";
+    FS_233 = "FS-233", "FreeSurfer", true,
+        "the .mat readers read unsigned 8-, 16- and 32-bit integers as signed: values of 128, 32768 or 2147483648 and above come out negative";
+    FS_234 = "FS-234", "FreeSurfer", true,
+        "the .mat readers convert single-precision numbers of the other byte order to integers before swapping their bytes: the values are wrong";
+    FS_235 = "FS-235", "FreeSurfer", true,
+        "the .mat readers read the imaginary part of a complex matrix only for doubles: for other types it is memory contents (or 1) instead of the file's numbers";
+    FS_236 = "FS-236", "FreeSurfer", true,
+        "MatlabRead never sees the complex flag of a version 5 matrix (it tests another bit): a complex matrix comes back real, and its imaginary part is read without skipping its element's tag";
+    FS_237 = "FS-237", "FreeSurfer", true,
+        "MatlabRead does not recognise numbers MATLAB stores in a version 5 small element (4 bytes or fewer: one single-precision number, one 32-bit integer, up to four bytes): unsupported matlab format and zeros";
+    FS_238 = "FS-238", "FreeSurfer", true,
+        "MatlabRead skips 8 bytes too many after a version 5 variable name whose length is a multiple of 8 (an empty name included): the matrix's type and numbers are read from the wrong place";
+    FS_239 = "FS-239", "FreeSurfer", true,
+        "MatlabRead's verbose messages show a version 5 variable name of 4 characters or fewer cut to its first character, and a longer one followed by memory contents";
+    FS_240 = "FS-240", "FreeSurfer", true,
+        "MatlabRead reads compressed (MATLAB 7, the default save format) variables wrongly: the rows, type and complex flag come from the wrong bytes, the byte order from memory never written, numbers from a fixed place and past the variable, and the decoding stops at 100 times the compressed size";
+    FS_241 = "FS-241", "FreeSurfer", true,
+        "MatlabRead, given a version 5 file that ends inside a variable's header, goes on with sizes, type and flags from memory never written";
+    FS_242 = "FS-242", "FreeSurfer", true,
+        "MatlabRead and MatFileRead leave the .mat file open (a compressed one twice): a program reading many files runs out of file descriptors";
+    FS_243 = "FS-243", "FreeSurfer", true,
+        "the .mat readers allocate whatever sizes a file states before reading it: a negative or huge size crashes the program or depends on the machine's memory";
+    FS_244 = "FS-244", "FreeSurfer", true,
+        "MatFileRead's bytes of numbers outside -128 to 127 wrap (300 gives 44), and of numbers beyond the 32-bit range or NaN are 0";
+    FS_245 = "FS-245", "FreeSurfer", true,
+        "the .mat readers' results depend on memory contents for some files (a 16-bit number cut by the file's end, the imaginary part of a matrix that is not of doubles, a compressed variable, a version 5 header cut by the file's end, a name printed past its end): values taken from memory never written or read past their buffers";
+    FS_246 = "FS-246", "FreeSurfer", true,
+        "MatlabRead, given a version 5 array of three or more dimensions, reads its name and type from the third dimension's place: wrong results";
+    FS_247 = "FS-247", "FreeSurfer", true,
+        "MatlabWrite of a complex matrix writes its real and imaginary parts interleaved as the first half of a real matrix";
+    FS_248 = "FS-248", "FreeSurfer", true,
+        "ReadMatlabFileContents of a file of more than 1,000 variables writes past its lists (a crash or corruption)";
+    FS_249 = "FS-249", "FreeSurfer", true,
+        "reading a volume (mri_read, MRIreadHeader) whose name is 1,024 bytes or more once the working directory is put before it writes past FreeSurfer's name buffers: the result is undefined and the program can crash";
+    FS_250 = "FS-250", "FreeSurfer", true,
+        "MatFileRead goes on after a header it could not read, with the sizes read so far (or 0)";
+    FS_251 = "FS-251", "FreeSurfer", true,
+        "the .mat readers take a byte 0xff for the end of the file: a version 5 file with 0xff in its first four bytes is refused, a version 4 variable whose first byte is 0xff ends the reading";
+    FS_252 = "FS-252", "FreeSurfer", true,
+        "MRIcopyHeader crashes when the source volume's voxel-to-RAS matrix has not been computed (FreeSurfer's own volumes always have it)";
+    FS_253 = "FS-253", "FreeSurfer", true,
+        "reading an MGH or MGZ volume that holds the NIfTI header extension's RAS-transform tag (tag 9) crashes";
+    FS_254 = "FS-254", "FreeSurfer", true,
+        "reading an MGH or MGZ volume whose talairach-transform tag holds 1,024 bytes or more, or whose folder's name is 975 bytes or more, writes past FreeSurfer's name buffers: the transform's name and the volume after it are undefined and the program can crash";
+    FS_255 = "FS-255", "FreeSurfer", true,
+        "reading only the header of a float volume (MRIreadHeader, MRIreadInfo) with a frame list (name#0) crashes";
+    FS_256 = "FS-256", "FreeSurfer", true,
+        "with FS_MGZIO_USEVOXELBUFREAD set, reading one frame after the first of an MGH volume writes past the one-frame volume FreeSurfer makes for it, and reading a volume without slices (no frames, or a depth of 0) crashes";
+    FS_257 = "FS-257", "FreeSurfer", true,
+        "an MGH volume's command-line or phase-encoding tag whose length is negative or larger than the machine can allocate crashes FreeSurfer or corrupts its memory";
+    FS_258 = "FS-258", "FreeSurfer", true,
+        "regio_read_register writes past its buffer for a subject or method name of 1,000 bytes or more in a register.dat, and gives sizes from memory contents for an .lta without transforms";
+    FS_259 = "FS-259", "FreeSurfer", true,
+        "reading a Bruker study, a parameter line (##name=value in acqp, reco or d3proc) whose name is 256 bytes or more or whose value is 128 bytes or more writes past FreeSurfer's buffers: memory corruption, a crash or wrong values";
+    FS_260 = "FS-260", "FreeSurfer", true,
+        "reading a Bruker study leaves its reco file open (and d3proc or reco on an unsupported data type, 2dseq on an unknown one): a program that reads many studies runs out of file descriptors";
+    FS_401 = "FS-401", "FreeSurfer", true,
+        "reading a Bruker study whose files lack a value FreeSurfer uses (the sizes in d3proc; the transposition, field of view, sizes, data type in reco; TR, TE, TI, the flip angle, the offsets or the gradient matrix in acqp) takes it from memory contents: the volume's size, type, times or geometry are undefined";
+    FS_402 = "FS-402", "FreeSurfer", true,
+        "reading a Bruker study's voxels takes 2 bytes per voxel whatever the data type: a 32-bit volume (RECO_wordtype _32BIT_SGN_INT) gets only the first half of each row from the file and zeros after it";
+    FS_403 = "FS-403", "FreeSurfer", true,
+        "reading a Bruker study whose 2dseq file is shorter than the volume crashes (the volume is freed twice)";
+    FS_404 = "FS-404", "FreeSurfer", true,
+        "reading a Bruker study ignores RECO_byte_order: a big-endian 2dseq is read in the machine's byte order, so its values are wrong";
+    FS_405 = "FS-405", "FreeSurfer", true,
+        "FreeSurfer's 2-D image functions (allocating, clearing an area, copying frames, scaling, the pyramid reduction) read and write outside an image's pixels when given a frame, an area, a size or a buffer the image does not have: memory corruption, a crash or memory contents";
+    FS_406 = "FS-406", "FreeSurfer", true,
+        "FreeSurfer's 2-D image functions turn a float beyond the target type's range, or NaN, into a pixel byte or a pixel coordinate without a check: a fill value or a float pixel beyond the byte range becomes the low byte of -2147483648 or of its integer part, a coordinate -2147483648";
+    FS_407 = "FS-407", "FreeSurfer", true,
+        "ImageCopyFrames, converting frames (bytes into floats or integers, integers into anything), writes each frame into the output frame of the same number, not into the destination frame it was given";
+    FS_408 = "FS-408", "FreeSurfer", true,
+        "ImageScaleDown of a float image of more than one frame by a power of two (0.5, 0.25, ...) reduces only the first frame: the output's other frames are left as they were";
+    FS_409 = "FS-409", "FreeSurfer", true,
+        "ImageRescale by 1 with a given output smaller than its input returns that output after freeing it, without the copy: memory contents or a crash";
+    FS_410 = "FS-410", "FreeSurfer", true,
+        "ImageAlloc, when the pixels cannot be allocated, ends the program with the code of FreeSurfer's previous error, 0 when there was none: a program that ran out of memory exits with status 0 (success)";
+    FS_411 = "FS-411", "FreeSurfer", true,
+        "a newer-style FreeSurfer program without a help text (mri_brainvol_stats) run without a required input prints, before its error, a help line chosen by memory never written: No xml string passed. when that memory holds 0, otherwise an XML parser's message";
+    FS_412 = "FS-412", "FreeSurfer", true,
+        "ImageScaleUp, ImageScaleDown and ImageRescale with a scale that makes the image's rows or columns beyond the 32-bit integer range (or NaN) go on with extents of -2147483648: nothing is scaled, or the image cannot be allocated, with no message about the scale";
     FS_285 = "FS-285", "FreeSurfer", true,
         "reading a volume-geometry block (the text block of linear transform and surface files) whose line starts with a word of 64 bytes or more writes the word past its buffer: memory corruption, a crash or wrong values";
     FS_286 = "FS-286", "FreeSurfer", true,

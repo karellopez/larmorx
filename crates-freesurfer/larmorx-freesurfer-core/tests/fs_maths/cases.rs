@@ -428,6 +428,7 @@ const COMMANDS: &[&str] = &[
     "powell2",
     "dfpmin",
     "xyzang",
+    "fnvh",
 ];
 
 /// The minimizers' problems (`fsmaths.cpp`'s `Problem`, the same float expressions): 0 a
@@ -1113,6 +1114,41 @@ fn case(g: &mut Gen, cmd: &str) -> String {
             s.push(fx(g.f(-7, 7, 4096)));
             s.push(g.int(0, 3).to_string());
             put_mat(&mut s, g, n, n, false);
+        }
+        "fnvh" => {
+            s.push(
+                g.pick(&[0i64, 1, -1, 7, 123_456, -2_000_000_000, 2_147_483_647])
+                    .to_string(),
+            );
+            s.push(g.int(-5, 100_000).to_string());
+            let n = g.int(0, 4);
+            s.push(
+                g.pick(&[0i64, 1, 99, -7, 2_147_483_647 - 4, -2_147_483_648])
+                    .to_string(),
+            );
+            for _ in 0..2 {
+                s.push(dx(g.pick(&[
+                    -0.001f64,
+                    0.001,
+                    0.0,
+                    -0.0,
+                    1.0,
+                    -1.0,
+                    1e300,
+                    -1e300,
+                    f64::NAN,
+                    f64::INFINITY,
+                    0.1,
+                ])));
+            }
+            s.push(n.to_string());
+            let len = g.int(0, 40) as usize;
+            let b: Vec<u8> = (0..len).map(|_| g.below(256) as u8).collect();
+            s.push(if b.is_empty() {
+                "-".to_owned()
+            } else {
+                b.iter().map(|c| format!("{c:02x}")).collect()
+            });
         }
         "xyzang" => {
             // a unit vector and a vector of known length, NaNs of several payloads and both signs
@@ -2169,6 +2205,43 @@ pub fn run_line(line: &str, mode: UpstreamDefects, tmp: &Path) -> (String, Vec<&
             let v2 = t.m(g, MATRIX_REAL);
             o.d(mo::vector3_angle(g, &mut se, &v1, &v2));
         }
+        "fnvh" => {
+            let (i, k, mut counter) = (t.i(), t.i(), t.i());
+            let (lo, hi) = (t.d(), t.d());
+            let n = t.i();
+            for _ in 0..n {
+                o.f(larmorx_freesurfer_core::fnv::fnv_hash(
+                    i,
+                    k,
+                    &mut counter,
+                    lo,
+                    hi,
+                ));
+            }
+            o.i(counter);
+            let hexb = t.next();
+            let b: Vec<u8> = if hexb == "-" {
+                Vec::new()
+            } else {
+                (0..hexb.len() / 2)
+                    .map(|j| u8::from_str_radix(&hexb[2 * j..2 * j + 2], 16).unwrap())
+                    .collect()
+            };
+            let mut h = larmorx_freesurfer_core::fnv::FnvHash::new();
+            h.add_bytes(&b);
+            let fs =
+                larmorx_freesurfer_core::fnv::fnv_add(larmorx_freesurfer_core::fnv::fnv_init(), &b);
+            o.0.push(h.value.to_string());
+            o.0.push(format!("{fs:016x}"));
+            o.0.push(h.to_string());
+            let dir = tmp.parent().unwrap_or(Path::new("."));
+            let file = dir.join("fsmaths-file.tmp");
+            h.write(Some(dir), "fsmaths-file.tmp");
+            o.file(&file);
+            h.write_with_suffix(Some(dir), "fsmaths-file.tmp", "sfx");
+            o.file(&file);
+            let _ = std::fs::remove_file(&file);
+        }
         "xyzang" => {
             let n = mo::Xyz {
                 x: t.f(),
@@ -2586,6 +2659,16 @@ pub fn run_line(line: &str, mode: UpstreamDefects, tmp: &Path) -> (String, Vec<&
         _ => panic!("unknown case {cmd}"),
     }
     let _ = so.flush();
-    let ids = gl.notices.as_slice().iter().map(|n| n.defect.id).collect();
+    let mut ids: Vec<&'static str> = gl.notices.as_slice().iter().map(|n| n.defect.id).collect();
+    // FS-47 and FS-48 where FreeSurfer hangs (VNL never returns): not comparable; FS-49 where a
+    // number took a byte of memory FreeSurfer never wrote
+    for n in gl.notices.as_slice() {
+        if matches!(n.defect.id, "FS-47" | "FS-48") && n.detail.contains("hangs") {
+            ids.push("HANG");
+        }
+        if n.defect.id == "FS-49" && n.detail.contains("memory") {
+            ids.push("MEM49");
+        }
+    }
     (o.0.join(" "), ids)
 }

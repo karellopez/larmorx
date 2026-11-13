@@ -150,6 +150,13 @@ no range check; beyond the `int` range or NaN `cvttsd2si` gives `INT_MIN`. Defau
 - `randomNumber` widens `OpenRan1`'s `float` (`drand64` rounded) to `double` before `* range + low`;
   a draw rounded up to `1.0f` can give a value above `hi`, reported with `ErrorPrintf(ERROR_BADPARM,
   "randomNumber(%2.1f, %2.1f) - %2.1f\n", ...)` (FS-01's NUL, two newlines) and returned anyway.
+  Infinite or NaN bounds (relay 17, track D's relay 18 report): the official object code computes
+  `hi - low` (`hi` in the destination), then the draw times that (the draw in the destination), then
+  plus `low` (the product in the destination), in SSE2: `randomNumber(inf, inf)` is SSE's default
+  NaN, `-nan`, where AArch64's arithmetic gives `nan`. The replica uses `crate::sse` in that order;
+  `tests/random_nan.rs` checks the unit oracle's output for 64 pairs of eight bounds
+  (`validation/probes/fs-maths/random_number_nan.py`) and a payload hash, both passing under
+  `NAN_TRAP_ARM=1` in debug and release (the earlier plain arithmetic failed both there).
 - `OpenRan1` (`utils/numerics.cpp` 1256-1279, item 3.1-24 brought forward) constructs its
   `vnl_random` with seed 0 at its first call and stops a program that calls it from an OpenMP thread
   other than 0.
@@ -234,3 +241,33 @@ underneath, the casts), are kept here verbatim; the sections above give their ev
 - **FS-10**: the unique-integer helpers (count, list and most frequent value of a list) given an empty list read the integer past its end and report one item
 - **FS-11**: the case-insensitive string comparison (stricmp) and the file-name extension helper copy their argument into a 1,024-byte buffer on the stack with no check: a longer string overflows it
 - **FS-12**: nint and nint2 (FreeSurfer's rounding to an integer) convert values beyond the int range, and NaN, with no check, an undefined conversion that gives -2147483648 on x86-64
+
+## argparse (3.1-21, relay 18 of track A)
+
+Restricted (FreeSurfer's source lines). `utils/argparse.cpp`, `include/argparse.h`.
+
+- **FS-411** (class a, memory never written; both modes print `No xml string passed.`, noted).
+  `ArgumentParser`'s `helptext` (`const unsigned char *`) has no initialiser and is set only by `addHelp`;
+  `parse` (316-325) calls `outputHelpXml(helptext, helptextsize)` before `missing required input`
+  whatever the size, so `mri_brainvol_stats` (no `addHelp`; its parser a local in `main`) passes memory
+  never written: `NULL` gives `No xml string passed.`, another value `xmlParseMemory(p, 0)`, which
+  returns no document for a size of 0 (`Document not parsed successfully. `). Measured on the official
+  `mri_brainvol_stats` 8.2.0 without arguments and with `--sd x`: `No xml string passed.`, then the
+  error, status 2.
+- Behaviours kept (rule C, no ID; none reachable from the seven programs' configurations, which have
+  no positional arguments and no short-only flags):
+  - `addArgument("-x")` (a short name only): `Argument("-x", "")` tests `name[0]` of the empty name (its
+    NUL), so the argument is positional and required.
+  - `parse`'s look-ahead for a variable positional argument (269-283) does `arguments[index[future]]`
+    for every later word starting with `-`: `operator[]` inserts an unknown word into the index with
+    the value 0 (`--all-info`), so such a word (a negative number) is then a known name, and naming it
+    sets `--all-info`.
+  - An argument with an empty canonical name (a positional `addArgument("")`) stores its inputs through
+    `index[""]` (inserted, 0): `castTo` of `--all-info`'s bool throws `bad_cast`, caught as `input ...
+    cannot be converted`.
+  - `std::stof` fails (`out_of_range`) on a tiny inexact number (glibc's `strtof` sets `ERANGE`), e.g.
+    `1e-40`; `nan(5)` keeps its payload (glibc's `strtof`).
+  - The order of the name index (`std::unordered_map<std::string, size_t>`): the duplicate message's
+    name and `unstrip`'s choice; libstdc++'s order depends on the runtime library's rehash policy.
+- Measured with the fs.io probe's piece 9 (`apa`): seed 13, 2,352 cases, `reproduce` identical on 2,265,
+  0 different; 61 counted (an XML help rendered), 26 apart (order or time).

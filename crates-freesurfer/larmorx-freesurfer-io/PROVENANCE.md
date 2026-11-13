@@ -93,3 +93,86 @@ Not reached by any default-path program, so not translated: `MGHopen_file`, `fio
   the data's little-endian bytes (zeros past them: gifticlib's arrays always hold their values).
   `DTIbvecChangeSpace` copies `bvec` before the in-place product. The b-value writers write the
   file's text at once.
+
+Queue item 3.1-27, piece 1 (track A, relay 14): the volume format probe, with the pieces it needs
+taken early (mri_identify.cpp's lines 697-1195 from 3.1-28, `MRIgetVolumeName` from mriio.cpp
+(3.1-28), signa.cpp's header test from 3.1-30, DICOMRead.cpp's format-probe functions, which stay in
+fs.io by the orchestrator's decision of 2026-11-13). Audited for third-party code: mri_identify.cpp
+(Christian Haselgrove), signa.cpp (GE's `mvtsunf` conversion inside `ghf`, as FreeSurfer carries it),
+Bruker.cpp, DICOMRead.cpp (Sebastien Gicquel, Douglas Greve): FreeSurfer's own, the General Hospital
+Corporation's copyright; the DICOM reader they call is CTN 3.0.6's (`larmorx_io::dicom`, Apache-2.0
+AND LicenseRef-CTN, the main package's crate, used as a dependency).
+
+| file (FreeSurfer 8.2.0) | functions (lines) | module |
+|---|---|---|
+| `utils/mri_identify.cpp`, `include/mri_identify.h` | `type_to_string` (47), `string_to_type` (146), `mri_identify` (201), `IDtypeFromStem` (394), `IDstemFromName` (423), `IDextensionFromName` (486), `IDnameFromStem` (537), `is_cor` (571), `is_brik` (594), `is_siemens` (608), `is_genesis` (664), `is_ge_lx` (697), `is_analyze` (723), `is_mnc` (764), `is_mgh` (802), `is_bshort` (817), `is_bfloat` (829), `is_bhdr` (840), `bhdr_stem` (854), `bhdr_firstslicefname` (878), `bhdr_precisionstring` (909), `bhdr_precision` (942), `is_sdt` (967), `is_gdf` (998), `is_otl` (1011), `is_ximg` (1024), `is_nifti1` (1026), `is_nii` (1071), `is_nrrd` (1112), `IDisCurv` (1195); the magic numbers; `include/mri.h`'s format numbers (1516-1553) | `identify` |
+| `utils/mriio.cpp` | `MRIgetVolumeName` (472); `include/mri.h`'s `MRIIO_Strip_Pound` (2033) | `identify::mri_get_volume_name`; `larmorx_freesurfer_core::globals::Globals::mriio_strip_pound` |
+| `utils/Bruker.cpp` | `checkBrukerFiles` (201), `is_bruker` (834); since relay 17 `brukerRead` (146), `splitParameterValue` (261), `readBrukerD3proc` (290), `buildVoxToRASTransform` (346), `readBrukerAcqp` (532), `readBrukerReco` (657), `readBrukerVolume` (771), `include/Bruker.h`'s `BrukerTransform` | `bruker` |
+| `utils/signa.cpp`, `include/signa.h` | `ghc` (69), `ghi` (77), `ghf` (93), `get_signa_header_info` (144), `is_signa` (179); the header's offsets and `HINFO` | `signa` |
+| `utils/DICOMRead.cpp` | `IsDICOM` (5410), `IsSiemensDICOM` (1479), `GetObjectFromFile` (1207), `GetElementFromFile` (1164), `AllocElementData` (1252) and `FreeElementData` (1408) for the Manufacturer element, `DCMPrintCond` (5523); `IsDICOM`'s static answer | `dicom_probe`; the state in `Globals::dicom` |
+| `packages/dicom/dcm.c` (FreeSurfer's copy of CTN 3.0.6) | `DCM_GetElement` (2699) with `locateElement` (6601), `DCM_GetElementValue` (950) for one element of the object's top level read into memory; FreeSurfer's two changes to CTN's behaviour (the "Data Element ... longer" message, the 4-byte swap in pairs) as `dicom_probe::FsDialect` | `dicom_probe` |
+| (larmorx's own) | `COND_DumpConditions`'s output byte for byte (`dicom_probe::dump_conditions`: larmorx-io's `CondStack::dump` goes through text streams); `CFile`'s reads of a folder failing with `EISDIR` on every platform and the failed read's `errno` | `dicom_probe`, `cfile` |
+
+Queue item 3.1-27, piece 2 (track A, relay 15): mosaics and MATLAB files. Audited for third-party
+code: mosaic.cpp (Douglas Greve) and matfile.cpp (Bruce Fischl): FreeSurfer's own, the General
+Hospital Corporation's copyright. matfile.cpp calls the system zlib's `uncompress` (zlib 1.2.11 on
+the official build's Ubuntu): larmorx decodes with `flate2` on `zlib-rs` (Zlib licence, a dependency
+already in the lock file), its results mapped to `uncompress`'s (`Z_OK`, `Z_BUF_ERROR`,
+`Z_DATA_ERROR`).
+
+| file (FreeSurfer 8.2.0) | functions (lines) | module |
+|---|---|---|
+| `utils/mosaic.cpp`, `include/mosaic.h` | `VolSS2MosSS` (72), `MosSS2VolSS` (129), `CheckMosaic` (205) | `mosaic` |
+| `utils/matfile.cpp`, `include/matfile.h` | `Matlab_Install_printf` (55), `MatlabWrite` (61), `MatlabRead` (68), `MatFileRead` (141), `MatFileWrite` (206), `matFree` (276), `matAlloc` (286), `readMatFile` (310), `MatReadHeader0` (458), `swapBytes` (503), `ReadMatlabFileVariable` (516), `ReadMatlabFileContents` (545), `MLFCprint` (628), `MLFCfree` (645), `znzreadMatFile` (671), `MatlabRead2` (765), `MatReadHeader` (863), `znzMatReadHeader` (1061); the `MAT_*`, `MATFILE_*` constants, `MATFILE`, `MLFC` | `matfile` |
+
+Changes for piece 2: the official build's integer arithmetic for mosaics (GCC 8.4.0 at `-O3`: the
+bounds as `x >= n`, the remainder from the division); C's `ungetc` modelled by a push-back stack over
+`CFile` (`matfile::Pb`), a relative seek counting the bytes given back; `matAlloc`'s rows held flat;
+`MATFILE`'s fields never written tracked by a mask (0 in their place, noted); the decoded buffer of a
+compressed variable read with glibc's allocation sizes (zero within, memory contents beyond, noted);
+`MatlabRead2`'s and `MatFileRead`'s files closed (FS-242). The corrected readers (`fix`) are larmorx's
+own: MATLAB's version 4 and 5 formats read by their definition (MATLAB's MAT-file format document).
+
+## FreeSurfer files and functions translated (part 6, relay 16: reading volumes and registration files)
+
+| FreeSurfer file | What | Here |
+|---|---|---|
+| `utils/mriio.cpp` 204-257, 488-1105 | `setDirectionCosine`, `mri_read`, `nan_inf_check`, `MRIreadType`, `MRIreadInfo`, `MRIreadHeader` (taken early from 3.1-28) | `mriio.rs` |
+| `utils/mriio.cpp` 10853-11245, 12195-12420 | `local_buffer_to_image`, `mghRead`, `MRITAGread` (taken early from 3.1-30) | `mriio.rs` |
+| `utils/registerio.cpp` 43-162 | `regio_read_register` (taken early from 3.1-34; its `.lta` branch through `RegisterLta`) | `registerio.rs` |
+| `utils/resample.cpp` 109-118 | `float2int_code` | `registerio.rs` |
+| `packages/minc/minc_gaussian.c` 157-290, `minc_volume_io.c` (its changes to MINC 1.5.1's reader: messages, transform types, tokens, `~user`) | `invert_4x4_matrix`, FreeSurfer's volume_io dialect of `larmorx_io::xfm` (MNI's notice: `LicenseRef-MNI`) | `minc.rs` |
+
+Third-party code: `packages/minc` is MNI's volume_io reworked by FreeSurfer (MNI's permissive notice); `minc.rs`
+carries both licence names. No other third-party code in these lines.
+
+Changes for part 7 (relay 17, Bruker's readers): `BrukerTransform`'s and the readers' outputs held as
+`Option`s (`None`: never written, FS-401, 0 in both modes); the line buffer as the C string `fgets`
+gives (its first NUL ends it); the `sscanf` calls through `larmorx_freesurfer_core::cscan::Scanf`;
+`stuff_four_by_four`'s float rounding and `MatrixMultiply` through fs.core's `matrix_multiply` (the
+in-place products as copies, as `MatrixMultiplyD` does); the voxel size and offset in the official
+object code's operation order (`fov * 10 / size`; `-vox * (ft_size - 1) * 0.5`, the halving equal
+to the source's `/ 2.`); the files closed where FreeSurfer leaves them open (FS-260);
+`exec_progress_callback` a no-op (no FreeSurfer program sets a progress callback). The defaults of
+FS-402 and FS-404 are larmorx's own: the voxels read by their type's size and in `$RECO_byte_order`'s
+order (ParaVision's documented parameter).
+
+
+## FreeSurfer files and functions translated (part 8, relay 18: FreeSurfer's 2-D images)
+
+| FreeSurfer file | What | Here |
+|---|---|---|
+| `utils/image.cpp` 65-145, 384-468, 526-569, 977-1500, 3748-3822; `include/image.h`, `include/hips.h` (the `IMAGE` header, the formats, the pixel macros) | `ImageAlloc` (65, 3.1-26's line), `ImageAllocBuffer`, `ImageFree`, `ImageCopy`, `ImageClearArea`, `ImageCheckSize`, `ImageSetSize`, `ImageCopyFrames`, `ImageRescale`, `ImageScaleDown`, `ImageScaleUp`, `init_header`, `h_copy`, `free_header` (the reached 14 of the file's 73 functions) | `image.rs` |
+| `utils/hips.cpp` 4-5, 42-47 | `hips_cplxtor`, `hips_rtocplx` (fs.core's globals), the conversion stubs `h_tob` ... `h_toi` | `image.rs` |
+| `utils/filter.cpp` 713-1041 | `ImageConvolve1d`, `ImageReduce` with its kernel, `ImageReduce1d` (fs.filter's, here because `ImageScaleDown` calls them and fs.filter's crate sits above fs.io) | `image.rs` |
+| `include/macros.h` 35, 118 | `exp2` as `pow(2.0, f)`, `ISPOW2` (decided exactly: `ispow2`, `nint_log2`) | `image.rs` |
+
+Changes for part 8: the pixels one `Vec<u8>` of the length FreeSurfer allocates, the pointer walks
+(`image += sizeimage` per frame, restored at the end) as byte offsets, every pixel access checked
+(FS-405: both modes skip the write and read 0); floats as their little-endian bytes; the sums in the
+official object's operand order through `larmorx_freesurfer_core::sse`; `ImageReduce`'s `static`
+work image and `ImageConvolve1d`'s `static` index tables made each call (only memory differs);
+`ISPOW2` and `nint(log2(1 / scale))` decided without `log2f`/`log2`/`pow` (exact for the values they
+meet: a power of two's logarithm is exact in glibc, and the count is computed only next to one).
+The defaults of FS-406 (clamped conversions), FS-407 (the destination frame), FS-408 (every frame
+reduced), FS-409 (the copy returned) and FS-410 (`ERROR_NO_MEMORY`) are larmorx's own.

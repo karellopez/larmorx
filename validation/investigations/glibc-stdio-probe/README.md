@@ -1,6 +1,27 @@
-# glibc-stdio-probe: `fseek`, `rewind` and `ftell` on C streams
+# glibc-stdio-probe: `fseek`, `rewind`, `ftell`, and `scanf` at the end of its input
 
 **Open** (it calls the C library only; no glibc or FreeSurfer code).
+
+Two black-box measurements of glibc 2.35 (Ubuntu 22.04):
+
+- `scanf_end.c`: `sscanf` and `fscanf` at and near the end of their input, 20 formats (the ones
+  FreeSurfer's text readers use: `%d %d %d\n`, `%f %f   `, `%f  `, `\n`, `%s`, `%f`, `%lf`, `%d`,
+  `%f %d`, `%s %f %f`, `%*s %d`, ...) on 53 inputs (empty, white space, numbers, overflows,
+  `nan`, `inf`, `infinity`, words, broken numbers): the return value and `errno` (5 before each
+  call), and for `fscanf` the position after the call and the end-of-file flag; 2,120 lines.
+  `crates-freesurfer/larmorx-freesurfer-core/tests/data/glibc_scanf_end.txt` is its output, which
+  `larmorx-freesurfer-core`'s `cscan_end` test (`sscanf` on `cscan::Scanf`) and
+  `larmorx-freesurfer-io`'s `cfile_scanf` test (`fscanf` on `CFile`) reproduce line for line. The
+  rules they show (with `validation/investigations/glibc-scanf-probe/`): the first time a call
+  meets the end of its input it remembers `errno` as it is then, and every later attempt of the
+  same call to read a character sets `errno` back to that value; an end met while a conversion
+  skips the white space before its item is remembered as 0; a number and `inf` look one
+  character past themselves, a complete `nan` or `infinity` does not; a format of white space
+  only returns 0, never `EOF`.
+
+      gcc -O0 -Wno-format-extra-args -o scanf_end scanf_end.c && mkdir w && ./scanf_end w
+
+- `fseek_probe.c` (below).
 
 `fseek_probe.c` measures glibc 2.35's `fseek`, `rewind` and `ftell` as a black box: for streams
 open for reading, writing, both and appending, a directory and an empty file, each call's return

@@ -29,6 +29,18 @@ use larmorx_io::znz::ZnzFile;
 mod piece2;
 #[path = "piece3.rs"]
 mod piece3;
+#[path = "piece4.rs"]
+mod piece4;
+#[path = "piece5.rs"]
+mod piece5;
+#[path = "piece6.rs"]
+mod piece6;
+#[path = "piece7.rs"]
+mod piece7;
+#[path = "piece8.rs"]
+mod piece8;
+#[path = "piece9.rs"]
+mod piece9;
 
 /// The cases' random numbers.
 pub struct Gen(u64);
@@ -228,6 +240,25 @@ const FORMATS: [&str; 20] = [
     "% .2f", "%012.3e", "%.0f", "%d", "%f%f", "%s", "%Lf", "%a",
 ];
 
+/// The indices of seed 1's 4,800 portable cases that take more than 0.25 s of CPU each in a debug
+/// build (`tests/fs_io_heavy.rs`; re-measured whenever the generators change: 2026-11-13, track A
+/// relay 18, with pieces 8 and 9: a 100,000-entry colour table and a .mat file whose corrupted
+/// header makes the readers allocate and hash millions of numbers, 1.8 of the 2.8 s). The
+/// recorded test (`fs_io_official.rs`) leaves them to the probe's runs (`check.py --portable`
+/// without `--light`, every seed's full runs), which keep them.
+pub const HEAVY_SEED1: [usize; 2] = [485, 4664];
+
+/// The recorded test's cases: seed 1's 4,800 portable cases without [`HEAVY_SEED1`].
+#[allow(dead_code)]
+pub fn recorded_cases() -> Vec<String> {
+    generate(1, 4800, true)
+        .into_iter()
+        .enumerate()
+        .filter(|(i, _)| !HEAVY_SEED1.contains(i))
+        .map(|(_, l)| l)
+        .collect()
+}
+
 /// `n` case lines of seed `seed`; `portable`: only the cases whose results are the same on every
 /// platform (no permissions, links, overlong names or huge allocations).
 pub fn generate(seed: u64, n: usize, portable: bool) -> Vec<String> {
@@ -244,6 +275,12 @@ pub fn generate(seed: u64, n: usize, portable: bool) -> Vec<String> {
     };
     kinds.extend(piece2::KINDS);
     kinds.extend(piece3::KINDS);
+    kinds.extend(piece4::KINDS);
+    kinds.extend(piece5::KINDS);
+    kinds.extend(piece6::KINDS);
+    kinds.extend(piece7::KINDS);
+    kinds.extend(piece8::KINDS);
+    kinds.extend(piece9::KINDS);
     for i in 0..n {
         let kind = kinds[i % kinds.len()];
         if piece2::KINDS.contains(&kind) {
@@ -252,6 +289,30 @@ pub fn generate(seed: u64, n: usize, portable: bool) -> Vec<String> {
         }
         if piece3::KINDS.contains(&kind) {
             lines.push(piece3::generate(&mut g, kind, portable).join(" "));
+            continue;
+        }
+        if piece4::KINDS.contains(&kind) {
+            lines.push(piece4::generate(&mut g, kind, portable).join(" "));
+            continue;
+        }
+        if piece5::KINDS.contains(&kind) {
+            lines.push(piece5::generate(&mut g, kind, portable).join(" "));
+            continue;
+        }
+        if piece6::KINDS.contains(&kind) {
+            lines.push(piece6::generate(&mut g, kind, portable).join(" "));
+            continue;
+        }
+        if piece7::KINDS.contains(&kind) {
+            lines.push(piece7::generate(&mut g, kind, portable).join(" "));
+            continue;
+        }
+        if piece8::KINDS.contains(&kind) {
+            lines.push(piece8::generate(&mut g, kind, portable).join(" "));
+            continue;
+        }
+        if piece9::KINDS.contains(&kind) {
+            lines.push(piece9::generate(&mut g, kind, portable).join(" "));
             continue;
         }
         let mut t: Vec<String> = vec![kind.into()];
@@ -467,6 +528,22 @@ pub fn generate(seed: u64, n: usize, portable: bool) -> Vec<String> {
     lines
 }
 
+/// `b` with every `from` replaced by `to`.
+fn replace_all(b: &[u8], from: &[u8], to: &[u8]) -> Vec<u8> {
+    let mut r = Vec::with_capacity(b.len());
+    let mut i = 0;
+    while i < b.len() {
+        if !from.is_empty() && b[i..].starts_with(from) {
+            r.extend_from_slice(to);
+            i += from.len();
+        } else {
+            r.push(b[i]);
+            i += 1;
+        }
+    }
+    r
+}
+
 /// The C escaping of `fsio`'s text.
 fn escape(b: &[u8]) -> String {
     let mut r = String::new();
@@ -584,6 +661,36 @@ pub fn run_line(line: &str, mode: UpstreamDefects, w: &Work) -> (String, Vec<&'s
             let mut o2 = shared.clone();
             let mut e2 = shared.clone();
             return piece3::run(&t, &mut g, &mut o2, &mut e2, &mut o, w, &mut extra);
+        }
+        if piece4::KINDS.contains(&t[0]) {
+            let mut o2 = shared.clone();
+            let mut e2 = shared.clone();
+            return piece4::run(&t, &mut g, &mut o2, &mut e2, &mut o, w, &mut extra);
+        }
+        if piece5::KINDS.contains(&t[0]) {
+            let mut o2 = shared.clone();
+            let mut e2 = shared.clone();
+            return piece5::run(&t, &mut g, &mut o2, &mut e2, &mut o, w, &mut extra);
+        }
+        if piece6::KINDS.contains(&t[0]) {
+            let mut o2 = shared.clone();
+            let mut e2 = shared.clone();
+            return piece6::run(&t, &mut g, &mut o2, &mut e2, &mut o, w, &mut extra);
+        }
+        if piece7::KINDS.contains(&t[0]) {
+            let mut o2 = shared.clone();
+            let mut e2 = shared.clone();
+            return piece7::run(&t, &mut g, &mut o2, &mut e2, &mut o, w, &mut extra);
+        }
+        if piece8::KINDS.contains(&t[0]) {
+            let mut o2 = shared.clone();
+            let mut e2 = shared.clone();
+            return piece8::run(&t, &mut g, &mut o2, &mut e2, &mut o, w, &mut extra);
+        }
+        if piece9::KINDS.contains(&t[0]) {
+            let mut o2 = shared.clone();
+            let mut e2 = shared.clone();
+            return piece9::run(&t, &mut g, &mut o2, &mut e2, &mut o, w, &mut extra);
         }
         match t[0] {
             "rd" => {
@@ -961,14 +1068,20 @@ pub fn run_line(line: &str, mode: UpstreamDefects, w: &Work) -> (String, Vec<&'s
         .borrow()
         .windows(32)
         .any(|w| w == b"has an entry that is not a numbe");
-    let raw = shared.0.borrow();
+    let mut raw = shared.0.borrow().clone();
+    if piece4::KINDS.contains(&t[0]) || piece6::KINDS.contains(&t[0]) {
+        // CTN's messages name the file by the port's path into the fixture; fsio runs in the
+        // fixture and names it from there
+        let mut prefix = w.fix.to_string_lossy().into_owned().into_bytes();
+        prefix.push(std::path::MAIN_SEPARATOR as u8);
+        raw = replace_all(&raw, &prefix, b"");
+    }
     // as fsio: messages beyond 1 MiB shown by their length
     let text = if raw.len() > 1 << 20 {
         format!("BIGTEXT {}", raw.len())
     } else {
         escape(&raw)
     };
-    drop(raw);
     let result = match res {
         Ok(()) => o.0.trim_end().to_owned(),
         Err(status) => format!("EXIT {status}"),

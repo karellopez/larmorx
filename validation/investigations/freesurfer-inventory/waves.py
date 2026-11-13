@@ -374,8 +374,19 @@ ITEM_NOTES = {
     "mod:fs.io:1": "its second piece also took tags.cpp's reached functions (from [[mod:fs.io:6]])"
     " and colortab.cpp's binary colour tables (from [[mod:fs.labels:1]]), which FStagsIO calls"
     " (track A, relay 11)",
+    "mod:fs.io:2": "gifti.cpp's lines 213-2857 (the GIFTI surface and overlay readers and writers,"
+    " which work on the surface structure) are ported in larmorx-freesurfer-surf by fs.surfio's"
+    " replica track (the orchestrator's decision, 2026-11-13); its two helpers (lines 47-69) were"
+    " done by [[mod:fs.io:1]]'s third piece",
+    "mod:fs.io:3": "its first piece (track A, relay 14) took the whole format probe: mri_identify.cpp"
+    " with its lines 697-1195 and MRIgetVolumeName from [[mod:fs.io:4]], signa.cpp's header test"
+    " (ghc, ghi, ghf, get_signa_header_info, is_signa) from [[mod:fs.io:6]], and DICOMRead.cpp's"
+    " format-probe functions (IsDICOM, IsSiemensDICOM and the Manufacturer element's reading)",
+    "mod:fs.io:4": "mri_identify.cpp's lines 697-1195 and mriio.cpp's MRIgetVolumeName were taken"
+    " early by [[mod:fs.io:3]]'s first piece (track A, relay 14)",
     "mod:fs.io:6": "tags.cpp's reached functions were taken early by [[mod:fs.io:1]]'s second"
-    " piece (track A, relay 11)",
+    " piece (track A, relay 11); signa.cpp's header test (ghc, ghi, ghf, get_signa_header_info,"
+    " is_signa) by [[mod:fs.io:3]]'s first piece (track A, relay 14)",
     "mod:fs.labels:1": "colortab.cpp's binary readers and writers (CTABreadFromBinary,"
     " CTABwriteIntoBinary, their versions 1 and 2, the znz forms) were taken early by"
     " [[mod:fs.io:1]]'s second piece (track A, relay 11)",

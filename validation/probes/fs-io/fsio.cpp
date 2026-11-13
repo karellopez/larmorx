@@ -47,6 +47,15 @@
 #include "dti.h"
 #include "fscnpy.h"
 #include "gifti_io.h"
+#include "mri_identify.h"
+#include "DICOMRead.h"
+#include "Bruker.h"
+#include "signa.h"
+#include "mosaic.h"
+#include "matfile.h"
+#include "registerio.h"
+#include "image.h"
+#include "argparse.h"
 
 // gifti.cpp's two file-local helpers, compiled into the probe by gifti_statics.cpp
 giiDataArray *fsio_gifti_alloc_and_add_darray(gifti_image *image);
@@ -357,6 +366,645 @@ void print_rmat(const MATRIX *m)
     for (int c = 1; c <= m->cols; c++) of(m->rptr[r][c]);
 }
 
+// piece 4 (3.1-27): the format probe. A case's files are made in the fixture's folder `w`
+// (removed first): `-`, or entries separated by `,`: `D<hex name>` a folder, `F<hex name>:<size>`
+// a file of that many zero bytes, then `+<offset>:<hex bytes>` patches.
+int rm_entry(const char *p, const struct stat *, int, struct FTW *);
+void setup(const char *spec)
+{
+  nftw("w", rm_entry, 16, FTW_DEPTH | FTW_PHYS);
+  if (mkdir("w", 0700)) fail("cannot make w");
+  if (strcmp(spec, "-") == 0) return;
+  std::string all(spec);
+  size_t p = 0;
+  while (p <= all.size()) {
+    size_t q = all.find(',', p);
+    if (q == std::string::npos) q = all.size();
+    std::string e = all.substr(p, q - p);
+    p = q + 1;
+    if (e.empty()) continue;
+    if (e[0] == 'D') {
+      std::vector<unsigned char> n = unhex(e.c_str() + 1);
+      if (mkdir(std::string(n.begin(), n.end()).c_str(), 0700)) fail("cannot make a folder");
+      continue;
+    }
+    size_t c = e.find(':');
+    std::vector<unsigned char> n = unhex(e.substr(1, c - 1).c_str());
+    size_t plus = e.find('+', c);
+    long size = strtol(e.substr(c + 1, plus == std::string::npos ? std::string::npos : plus - c - 1).c_str(), NULL, 10);
+    std::vector<unsigned char> b(size, 0);
+    while (plus != std::string::npos) {
+      size_t c2 = e.find(':', plus);
+      size_t nx = e.find('+', plus + 1);
+      long off = strtol(e.substr(plus + 1, c2 - plus - 1).c_str(), NULL, 10);
+      std::vector<unsigned char> h = unhex(e.substr(c2 + 1, nx == std::string::npos ? std::string::npos : nx - c2 - 1).c_str());
+      for (size_t k = 0; k < h.size(); k++)
+        if (off + (long)k < (long)b.size()) b[off + k] = h[k];
+      plus = nx;
+    }
+    FILE *fp = fopen(std::string(n.begin(), n.end()).c_str(), "wb");
+    if (!fp) fail("cannot write a case file");
+    if (!b.empty()) fwrite(b.data(), 1, b.size(), fp);
+    fclose(fp);
+  }
+}
+
+// piece 5 (3.1-27): mosaics and MATLAB files
+void print_anymat(const MATRIX *m)
+{
+  if (!m) { out += "N "; return; }
+  oi(m->rows); oi(m->cols); oi(m->type);
+  // more than 65,536 numbers: FNV-1a (64 bits) of the floats' bytes in memory order
+  static long hash_min = getenv("FSIO_HASH_MIN") ? atol(getenv("FSIO_HASH_MIN")) : 65536;
+  bool big = (long)m->rows * m->cols > hash_min;
+  uint64_t h = 0xcbf29ce484222325ull;
+  auto put = [&](float f) {
+    if (!big) { of(f); return; }
+    unsigned char b[4];
+    memcpy(b, &f, 4);
+    for (unsigned char x : b) { h ^= x; h *= 1099511628211ull; }
+  };
+  for (int r = 1; r <= m->rows; r++)
+    for (int c = 1; c <= m->cols; c++) {
+      if (m->type == MATRIX_COMPLEX) { put(MATRIX_CELT_REAL(m, r, c)); put(MATRIX_CELT_IMAG(m, r, c)); }
+      else put(*MATRIX_RELT(m, r, c));
+    }
+  if (big) { char t[32]; snprintf(t, sizeof t, "fnv%016" PRIx64 " ", h); out += t; }
+}
+
+
+// piece 6 (relay 16): reading volumes (MRIreadHeader, MRIreadInfo, MRIreadType, mghRead) and
+// registration files (regio_read_register). Names are printed with the fixture's path removed and
+// escaped (the port's fixture is elsewhere).
+std::string fixpfx;
+}
+MRI *mri_read(const char *fname, int type, int volume_flag, int start_frame, int end_frame,
+              std::vector<MRI *> *mrivector);
+int splitParameterValue(char *sWholeLine, char *sParameter, char *sValue);
+namespace {
+void oname(const char *s)
+{
+  if (!s) { out += "N "; return; }
+  std::string t(s);
+  for (size_t at; !fixpfx.empty() && (at = t.find(fixpfx)) != std::string::npos;) t.erase(at, fixpfx.size());
+  out += "n";
+  char b[8];
+  for (unsigned char c : t) {
+    if (c <= 0x20 || c > 0x7e || c == '\\') { snprintf(b, sizeof b, "\\x%02x", c); out += b; }
+    else out += (char)c;
+  }
+  out += " ";
+}
+void fnv_bytes(const unsigned char *b, size_t n)
+{
+  uint64_t h = 0xcbf29ce484222325ull;
+  for (size_t i = 0; i < n; i++) { h ^= b[i]; h *= 1099511628211ull; }
+  char t[32];
+  snprintf(t, sizeof t, "fnv%016" PRIx64 " ", h);
+  out += t;
+}
+void print_t(const Transform *t)
+{
+  if (!t) { out += "N "; return; }
+  for (int i = 0; i < 4; i++)
+    for (int j = 0; j < 4; j++) od(Transform_elem(*t, i, j));
+}
+// a VOL_GEOM of an MRI's morph fields: valid and the extent are memory contents until a morph tag
+// sets them (VOL_GEOM's constructor leaves them), so they are not printed
+void print_vg6(const VOL_GEOM &v)
+{
+  const float f[] = {v.xsize, v.ysize, v.zsize, v.x_r, v.x_a, v.x_s, v.y_r, v.y_a, v.y_s,
+                     v.z_r, v.z_a, v.z_s, v.c_r, v.c_a, v.c_s, v.s_r, v.s_a, v.s_s};
+  for (float x : f) of(x);
+  oname(v.fname);
+}
+void print_mri6(const MRI *m)
+{
+  if (!m) { out += "N "; return; }
+  oi(m->width); oi(m->height); oi(m->depth); oi(m->nframes); oi(m->type); oi(m->imnr0); oi(m->imnr1);
+  const float f[] = {m->xsize, m->ysize, m->zsize, m->x_r, m->x_a, m->x_s, m->y_r, m->y_a, m->y_s,
+                     m->z_r, m->z_a, m->z_s, m->c_r, m->c_a, m->c_s};
+  for (float x : f) of(x);
+  oi(m->ras_good_flag);
+  const float g[] = {m->xstart, m->xend, m->ystart, m->yend, m->zstart, m->zend, m->fov, m->thick, m->ps,
+                     m->tr, m->te, m->ti};
+  for (float x : g) of(x);
+  od(m->flip_angle); of(m->FieldStrength);
+  oi(m->dof); oi(m->version); oi(m->intent);
+  oi(m->ncmds);
+  for (int i = 0; i < m->ncmds; i++) oname(m->cmdlines[i]);
+  oname(m->transform_fname); oi(m->free_transform);
+  print_t(m->linear_transform); print_t(m->inverse_linear_transform);
+  oname(m->pedir);
+  print_rmat(m->AutoAlign); print_rmat(m->origRas2Vox);
+  oi(m->warpFieldFormat); oi(m->gcamorphSpacing); od(m->gcamorphExp_k);
+  print_vg6(m->gcamorph_image_vg); print_vg6(m->gcamorph_atlas_vg);
+  print_rmat(m->gcamorphAffine);
+  if (!m->gcamorphLabel) out += "N ";
+  else {
+    std::vector<unsigned char> b;
+    for (int c = 0; c < m->width; c++)
+      for (int r = 0; r < m->height; r++)
+        for (int k = 0; k < m->depth; k++) {
+          int v = m->gcamorphLabel[c][r][k];
+          unsigned char t[4];
+          memcpy(t, &v, 4);
+          b.insert(b.end(), t, t + 4);
+        }
+    fnv_bytes(b.data(), b.size());
+  }
+  oname(m->fname);
+  if (!m->i_to_r__) out += "N ";
+  else for (int i = 0; i < 16; i++) of(m->i_to_r__->mat[i]);
+  print_rmat(m->r_to_i__);
+  if (!m->chunk || !m->ischunked) out += "nochunk ";
+  else fnv_bytes((const unsigned char *)m->chunk, m->bytes_total);
+}
+void set_env6(int bits)
+{
+  if (bits & 1) setenv("FS_SKIP_TAGS", "1", 1);
+  if (bits & 2) setenv("FS_MGZIO_USEVOXELBUFREAD", "1", 1);
+}
+
+// piece 7: Bruker ParaVision studies
+void bt_init(BrukerTransform &b)
+{
+  memset(&b, 0, sizeof b);
+  b.transposition = -7;
+  for (int i = 0; i < 3; i++) {
+    b.fov[i] = -7; b.size[i] = -7; b.ft_size[i] = -7; b.vox_size[i] = -7; b.offset[i] = -7;
+  }
+  b.read_offset = b.phase1_offset = b.slice_offset = -7;
+  for (double &x : b.grad_matrix) x = -7;
+  b.type = -7;
+  b.dim = -7;
+}
+void print_bt(const BrukerTransform &b)
+{
+  oi(b.transposition);
+  for (double x : b.fov) od(x);
+  for (int x : b.size) oi(x);
+  for (int x : b.ft_size) oi(x);
+  for (double x : b.vox_size) od(x);
+  for (double x : b.offset) od(x);
+  od(b.read_offset); od(b.phase1_offset); od(b.slice_offset);
+  for (double x : b.grad_matrix) od(x);
+  oi(b.type); oi(b.dim);
+}
+void ocstr(const char *s)
+{
+  out += "x";
+  if (!*s) { out += " "; return; }
+  obytes(std::vector<unsigned char>(s, s + strlen(s)));
+}
+
+
+// piece 8: FreeSurfer's 2-D images (image.cpp, filter.cpp's reduction)
+std::vector<std::pair<IMAGE *, unsigned long>> imlens;  // the probe's images and their bytes
+// the bytes the probe knows an image's pixels have (false: an image FreeSurfer made)
+bool img_len(IMAGE *I, unsigned long *len)
+{
+  for (auto &p : imlens)
+    if (p.first == I) { *len = p.second; return true; }
+  return false;
+}
+// an image: ImageAlloc(rows, cols, format, frames, bufsize), its extents (not the stored ones)
+// set when not -7, its pixel sizes, then its bytes from hex
+IMAGE *mkimg()
+{
+  if (strcmp(toks[pos].c_str(), "N") == 0) { pos++; return NULL; }
+  int rows = (int)geti(), cols = (int)geti(), fmt = (int)geti(), nf = (int)geti();
+  unsigned long bs = strtoull(next(), NULL, 10);
+  int sr = (int)geti(), sc = (int)geti();
+  float xs = getf(), ys = getf();
+  std::vector<unsigned char> b = unhex(next());
+  IMAGE *I = ImageAlloc(rows, cols, fmt, nf, bs);
+  unsigned long len = I->image ? (bs ? bs : I->sizeimage * (unsigned long)(long)I->num_frame) : 0;
+  if (sr != -7) I->rows = sr;
+  if (sc != -7) I->cols = sc;
+  I->xsize = xs;
+  I->ysize = ys;
+  if (I->image) memcpy(I->image, b.data(), b.size() < len ? b.size() : len);
+  imlens.push_back({I, len});
+  return I;
+}
+// an image FreeSurfer is about to free (its address may come back for a new image)
+void forget(IMAGE *I)
+{
+  for (auto &p : imlens)
+    if (p.first == I) p.first = NULL;
+}
+void print_img(IMAGE *I)
+{
+  if (!I) { out += "N "; return; }
+  oi(I->num_frame); oi(I->orows); oi(I->ocols); oi(I->rows); oi(I->cols); oi(I->frow); oi(I->fcol);
+  oi(I->pixel_format); oi(I->numcolor); oi((long long)I->numpix); oi(I->sizepix);
+  oi((long long)I->sizeimage); oi(I->imdealloc);
+  if (!I->firstpix) out += "N ";
+  else oi((long long)(I->firstpix - I->image));
+  of(I->xsize); of(I->ysize);
+  if (!I->image) { out += "B- "; return; }
+  unsigned long n = I->sizeimage * (unsigned long)(long)I->num_frame;
+  unsigned long known = 0;
+  if (img_len(I, &known) && known < n) n = known;
+  if (n <= 128) obytes(std::vector<unsigned char>(I->image, I->image + n));
+  else fnv_bytes(I->image, n);
+}
+
+
+// piece 9: FreeSurfer's ArgumentParser (argparse.cpp, fs.core)
+std::string hexstr() { std::vector<unsigned char> b = unhex(next()); return std::string(b.begin(), b.end()); }
+void ostdstr(const std::string &v)
+{
+  out += "x";
+  obytes(std::vector<unsigned char>(v.begin(), v.end()));
+  if (v.empty()) { out.pop_back(); out.pop_back(); out += " "; }
+}
+const unsigned char help9[] = "<help><name>probe</name><synopsis>probe [options]</synopsis></help>";
+
+void run_piece9(const std::string &cmd)
+{
+  if (cmd != "apa") fail("unknown command");
+  fwide(stderr, -1);
+  ArgumentParser parser;
+  int nconf = (int)geti();
+  for (int i = 0; i < nconf; i++) {
+    std::string k = next();
+    if (k == "H") {
+      int mode = (int)geti();
+      if (mode == 1) parser.addHelp(help9, 0);
+      else parser.addHelp(help9, sizeof help9 - 1);
+    } else if (k == "A1") {
+      std::string name = hexstr();
+      char nargs = (char)geti();
+      ArgType t = (ArgType)geti();
+      bool req = geti() != 0;
+      parser.addArgument(name, nargs, t, req);
+    } else {
+      std::string sn = hexstr();
+      std::string name = hexstr();
+      char nargs = (char)geti();
+      ArgType t = (ArgType)geti();
+      bool req = geti() != 0;
+      parser.addArgument(sn, name, nargs, t, req);
+    }
+  }
+  int nargv = (int)geti();
+  std::vector<std::string> args;
+  for (int i = 0; i < nargv; i++) args.push_back(hexstr());
+  std::vector<char *> av;
+  for (std::string &a : args) av.push_back(&a[0]);
+  av.push_back(NULL);
+  out += "parsed ";
+  fflush(stdout);
+  parser.parse(args.size(), av.data());
+  int nq = (int)geti();
+  for (int i = 0; i < nq; i++) {
+    std::string k = next();
+    std::string name = hexstr();
+    if (k == "E") { oi(parser.exists(name)); continue; }
+    std::string t = next();
+    if (t == "i") oi(parser.retrieve<int>(name));
+    else if (t == "f") of(parser.retrieve<float>(name));
+    else if (t == "b") oi(parser.retrieve<bool>(name));
+    else if (t == "s") ostdstr(parser.retrieve<std::string>(name));
+    else if (t == "I") { std::vector<int> v = parser.retrieve<std::vector<int>>(name); oi((long long)v.size()); for (int x : v) oi(x); }
+    else if (t == "F") { std::vector<float> v = parser.retrieve<std::vector<float>>(name); oi((long long)v.size()); for (float x : v) of(x); }
+    else if (t == "B") { std::vector<bool> v = parser.retrieve<std::vector<bool>>(name); oi((long long)v.size()); for (bool x : v) oi(x); }
+    else { std::vector<std::string> v = parser.retrieve<std::vector<std::string>>(name); oi((long long)v.size()); for (std::string &x : v) ostdstr(x); }
+  }
+}
+
+void run_piece8(const std::string &cmd)
+{
+  if (cmd == "apa") { run_piece9(cmd); return; }
+  fwide(stderr, -1);
+  Gerror = (int)geti();
+  if (cmd == "ial") {
+    int rows = (int)geti(), cols = (int)geti(), fmt = (int)geti(), nf = (int)geti();
+    unsigned long bs = strtoull(next(), NULL, 10);
+    IMAGE *I = ImageAlloc(rows, cols, fmt, nf, bs);
+    imlens.push_back({I, I->image ? (bs ? bs : I->sizeimage * (unsigned long)(long)I->num_frame) : 0});
+    print_img(I);
+  } else if (cmd == "icp") {
+    IMAGE *s = mkimg();
+    IMAGE *d = mkimg();
+    if (d && (d->numpix < s->numpix || d->num_frame < s->num_frame)) forget(d);
+    IMAGE *r = ImageCopy(s, d);
+    print_img(s); print_img(r);
+  } else if (cmd == "ica") {
+    IMAGE *I = mkimg();
+    int r0 = (int)geti(), c0 = (int)geti(), rows = (int)geti(), cols = (int)geti();
+    float val = getf();
+    int frame = (int)geti();
+    oi(ImageClearArea(I, r0, c0, rows, cols, val, frame)); print_img(I);
+  } else if (cmd == "ick") {
+    IMAGE *a = mkimg();
+    IMAGE *b = mkimg();
+    int rows = (int)geti(), cols = (int)geti(), nf = (int)geti();
+    oi(ImageCheckSize(a, b, rows, cols, nf));
+  } else if (cmd == "iss") {
+    IMAGE *I = mkimg();
+    int rows = (int)geti(), cols = (int)geti();
+    oi(ImageSetSize(I, rows, cols)); print_img(I);
+  } else if (cmd == "icf") {
+    IMAGE *a = mkimg();
+    IMAGE *b = mkimg();
+    int start = (int)geti(), nf = (int)geti(), dst = (int)geti();
+    oi(ImageCopyFrames(a, b, start, nf, dst)); print_img(b);
+  } else if (cmd == "irs") {
+    IMAGE *a = mkimg();
+    IMAGE *b = mkimg();
+    float scale = getf();
+    IMAGE *r = ImageRescale(a, b, scale);
+    print_img(a); print_img(r);
+  } else if (cmd == "isd" || cmd == "isu") {
+    IMAGE *a = mkimg();
+    IMAGE *b = mkimg();
+    float scale = getf();
+    int r = cmd == "isd" ? ImageScaleDown(a, b, scale) : ImageScaleUp(a, b, scale);
+    oi(r); print_img(a); print_img(b);
+  } else if (cmd == "ird") {
+    IMAGE *a = mkimg();
+    IMAGE *b = mkimg();
+    if (b && !ImageCheckSize(a, b, a->rows / 2, a->cols / 2, 0)) forget(b);
+    IMAGE *r = ImageReduce(a, b);
+    print_img(r);
+  } else if (cmd == "ic1" || cmd == "ir1") {
+    IMAGE *a = mkimg();
+    IMAGE *b = mkimg();
+    int axis = (int)geti();
+    int len = (int)geti();
+    std::vector<float> k(len);
+    for (float &x : k) x = getf();
+    if (cmd == "ic1") ImageConvolve1d(a, b, k.data(), len, axis);
+    else ImageReduce1d(a, b, k.data(), len, axis);
+    print_img(b);
+  } else {
+    run_piece9(cmd);
+    return;
+  }
+  oi(Gerror);
+}
+
+void run_piece7(const std::string &cmd)
+{
+  if (cmd == "bsp") {
+    std::vector<unsigned char> raw = unhex(next());
+    static char line[8192], P[8192], V[8192];
+    memset(line, 0, sizeof line);
+    memcpy(line, raw.data(), raw.size() < sizeof line - 1 ? raw.size() : sizeof line - 1);
+    int r = splitParameterValue(line, P, V);
+    oi(r);
+    if (r) { ocstr(P); ocstr(V); ocstr(line); }
+  } else if (cmd == "bd3" || cmd == "brc" || cmd == "bacq") {
+    bool nn;
+    std::string name = getstr(&nn);
+    setup(next());
+    errno = 0;
+    BrukerTransform b;
+    bt_init(b);
+    if (cmd == "bd3") {
+      int x = -7, y = -7, z = -7, type = -7, nf = -7;
+      int r = readBrukerD3proc((char *)name.c_str(), &x, &y, &z, &type, &nf);
+      oi(r); oi(x); oi(y); oi(z); oi(type); oi(nf);
+    } else if (cmd == "brc") {
+      int r = readBrukerReco((char *)name.c_str(), &b);
+      oi(r); print_bt(b);
+    } else {
+      double TR = -7, TE = -7, TI = -7, flip = -7;
+      int r = readBrukerAcqp((char *)name.c_str(), &TR, &TE, &TI, &flip, &b);
+      oi(r); od(TR); od(TE); od(TI); od(flip); print_bt(b);
+    }
+    oi(errno);
+  } else if (cmd == "bvx") {
+    int w = (int)geti(), h = (int)geti(), d = (int)geti();
+    BrukerTransform b;
+    bt_init(b);
+    b.transposition = (int)geti();
+    b.dim = (int)geti();
+    for (double &x : b.vox_size) x = getd();
+    for (double &x : b.offset) x = getd();
+    b.read_offset = getd(); b.phase1_offset = getd(); b.slice_offset = getd();
+    for (double &x : b.grad_matrix) x = getd();
+    MRI *m = MRIallocHeader(w, h, d, MRI_SHORT, 1);
+    buildVoxToRASTransform(m, &b);
+    const float f[] = {m->c_r, m->c_a, m->c_s, m->x_r, m->x_a, m->x_s, m->y_r, m->y_a, m->y_s,
+                       m->z_r, m->z_a, m->z_s, m->xsize, m->ysize, m->zsize};
+    for (float x : f) of(x);
+    oi(m->ras_good_flag);
+  } else if (cmd == "bkr" || cmd == "bmr") {
+    int rv = 1;
+    if (cmd == "bkr") { Gdiag = strtoull(next(), NULL, 16); rv = (int)geti(); }
+    bool nn;
+    std::string name = getstr(&nn);
+    setup(next());
+    errno = 0;
+    MRI *m = cmd == "bkr" ? brukerRead((char *)name.c_str(), rv)
+                          : mri_read(name.c_str(), BRUKER_FILE, TRUE, -1, -1, NULL);
+    print_mri6(m);
+    oi(errno);
+    Gdiag = 0;
+  } else {
+    run_piece8(cmd);
+  }
+}
+
+void run_piece6(const std::string &cmd)
+{
+  char cwd[4096];
+  if (getcwd(cwd, sizeof cwd)) fixpfx = std::string(cwd) + "/";
+  // standard error byte-oriented, as in a program that has written to it: glibc's perror then
+  // leaves errno alone (on an unoriented, write-only standard error it sets EINVAL)
+  fwide(stderr, -1);
+  if (cmd == "mrh" || cmd == "mri" || cmd == "mrd" || cmd == "mgr") {
+    Gdiag = strtoull(next(), NULL, 16);
+    if (cmd != "mgr") MRIIO_Strip_Pound = (int)geti();
+    set_env6((int)geti());
+    int type = -1, rv = 0, frame = -1;
+    if (cmd == "mrh" || cmd == "mrd") type = (int)geti();
+    if (cmd == "mgr") { rv = (int)geti(); frame = (int)geti(); }
+    bool nn;
+    std::string name = getstr(&nn);
+    setup(next());
+    errno = 0;
+    MRI *m = NULL;
+    if (cmd == "mrh") m = MRIreadHeader(name.c_str(), type);
+    else if (cmd == "mri") m = MRIreadInfo(name.c_str());
+    else if (cmd == "mrd") m = mri_read(name.c_str(), type, TRUE, -1, -1, NULL);
+    else m = mghRead(name.c_str(), rv, frame);
+    print_mri6(m);
+    oi(errno);
+  } else if (cmd == "rrr") {
+    bool nn;
+    std::string name = getstr(&nn);
+    setup(next());
+    errno = 0;
+    char *subject = NULL;
+    float ip = -7, bp = -7, in = -7;
+    MATRIX *R = NULL;
+    int f2i = -7;
+    int r = regio_read_register(name.c_str(), &subject, &ip, &bp, &in, &R, &f2i);
+    oi(r); oname(subject); of(ip); of(bp); of(in); print_rmat(R); oi(f2i);
+    oi(errno);
+  } else {
+    run_piece7(cmd);
+  }
+}
+
+void run_piece5(const std::string &cmd)
+{
+  if (cmd == "mvm" || cmd == "mmv") {
+    int a[7];
+    for (int &v : a) v = (int)geti();
+    int null_oob = (int)geti();
+    int x = -7, y = -7, z = -7, oob = 7;
+    int r;
+    if (cmd == "mvm")
+      r = VolSS2MosSS(a[0], a[1], a[2], a[3], a[4], a[5], a[6], &x, &y, null_oob ? NULL : &oob);
+    else
+      r = MosSS2VolSS(a[0], a[1], a[2], a[3], a[4], a[5], a[6], &x, &y, &z, null_oob ? NULL : &oob);
+    oi(r); oi(x); oi(y); oi(z); oi(oob);
+  } else if (cmd == "mck") {
+    oi(CheckMosaic());
+  } else if (cmd == "mlw") {
+    bool n;
+    std::string name = getstr(&n);
+    int rows = (int)geti(), cols = (int)geti(), cplx = (int)geti();
+    MATRIX *m = MatrixAlloc(rows, cols, cplx ? MATRIX_COMPLEX : MATRIX_REAL);
+    for (int r = 1; r <= rows; r++)
+      for (int c = 1; c <= cols; c++) {
+        if (cplx) { MATRIX_CELT_REAL(m, r, c) = getf(); MATRIX_CELT_IMAG(m, r, c) = getf(); }
+        else *MATRIX_RELT(m, r, c) = getf();
+      }
+    bool fn_null;
+    std::string fname = getstr(&fn_null);
+    setup(next());
+    errno = 0;
+    oi(MatlabWrite(m, fname.c_str(), n ? NULL : name.c_str()));
+    ofile(fname);
+    MatrixFree(&m);
+  } else if (cmd == "mlr" || cmd == "mfr" || cmd == "mrc") {
+    Gdiag = strtoull(next(), NULL, 16);
+    Gdiag_no = (int)geti();
+    int type = cmd == "mfr" ? (int)geti() : 0;
+    bool vn = true;
+    std::string var = cmd == "mrc" ? getstr(&vn) : "";
+    bool fn_null;
+    std::string fname = getstr(&fn_null);
+    setup(next());
+    errno = 0;
+    if (cmd == "mlr") {
+      MATRIX *m = MatlabRead(fname.c_str());
+      print_anymat(m);
+      if (m) MatrixFree(&m);
+    } else if (cmd == "mfr") {
+      MATFILE *mf = MatFileRead(fname.c_str(), type);
+      if (!mf) out += "N ";
+      else {
+        oi(mf->type); oi(mf->mrows); oi(mf->ncols); oi(mf->imagf); oi(mf->namlen); oi(mf->version);
+        long n = (long)mf->mrows * mf->ncols * (type == MAT_FLOAT ? 4 : 1);
+        if (!mf->data || n < 0) out += "N ";
+        else obytes(std::vector<unsigned char>(mf->data, mf->data + n));
+      }
+    } else {
+      MLFC *c = ReadMatlabFileContents(fname.c_str());
+      if (!c) out += "N ";
+      else { oi(c->nvars); MLFCprint(stdout, c); MLFCfree(&c); }
+      if (!vn) print_anymat(ReadMatlabFileVariable(fname.c_str(), var.c_str()));
+    }
+    oi(errno);
+    Gdiag = 0;
+    Gdiag_no = -1;
+  } else {
+    run_piece6(cmd);
+  }
+}
+
+void run_piece4(const std::string &cmd)
+{
+  if (cmd == "sty") {
+    bool n;
+    std::string s = getstr(&n);
+    oi(string_to_type(s.c_str()));
+  } else if (cmd == "tts") {
+    char *r = type_to_string((int)geti());
+    ostr(r);
+    free(r);
+  } else if (cmd == "mgvn") {
+    MRIIO_Strip_Pound = (int)geti();
+    bool n;
+    std::string s = getstr(&n);
+    static char buf[1 << 16];
+    MRIgetVolumeName(s.c_str(), buf);
+    ostr(buf);
+    MRIIO_Strip_Pound = 1;
+  } else if (cmd == "mid" || cmd == "isx" || cmd == "idf" || cmd == "dcm") {
+    std::string fn = cmd == "mid" ? "" : next();
+    int dbg = (cmd == "mid" || cmd == "dcm") ? (int)geti() : 0;
+    bool n;
+    std::string name = getstr(&n);
+    setup(next());
+    if (dbg) setenv("FS_DICOM_DEBUG", "1", 1);
+    char *c = (char *)name.c_str();
+    errno = 0;
+    if (cmd == "mid") {
+      oi(mri_identify(c));
+    } else if (cmd == "dcm") {
+      for (char k : fn) {
+        if (k == 'd') oi(IsDICOM(c));
+        else if (k == 's') oi(IsSiemensDICOM(c));
+        else if (k == 'm') oi(mri_identify(c));
+        else fail("unknown dcm step");
+      }
+    } else if (cmd == "isx") {
+      int r;
+      if (fn == "cor") r = is_cor(c);
+      else if (fn == "brik") r = is_brik(c);
+      else if (fn == "siemens") r = is_siemens(c);
+      else if (fn == "genesis") r = is_genesis(c);
+      else if (fn == "gelx") r = is_ge_lx(c);
+      else if (fn == "analyze") r = is_analyze(c);
+      else if (fn == "mnc") r = is_mnc(c);
+      else if (fn == "mgh") r = is_mgh(c);
+      else if (fn == "bshort") r = is_bshort(c);
+      else if (fn == "bfloat") r = is_bfloat(c);
+      else if (fn == "bhdr") r = is_bhdr(c);
+      else if (fn == "sdt") r = is_sdt(c);
+      else if (fn == "gdf") r = is_gdf(c);
+      else if (fn == "otl") r = is_otl(c);
+      else if (fn == "ximg") r = is_ximg(c);
+      else if (fn == "nifti1") r = is_nifti1(c);
+      else if (fn == "nii") r = is_nii(c);
+      else if (fn == "nrrd") r = is_nrrd(c);
+      else if (fn == "curv") r = IDisCurv(c);
+      else if (fn == "signa") r = is_signa(c);
+      else if (fn == "bruker") r = is_bruker(c);
+      else fail("unknown test");
+      oi(r);
+    } else {
+      if (fn == "stem") { char *r = IDstemFromName(c); ostr(r); free(r); }
+      else if (fn == "ext") { char *r = IDextensionFromName(c); ostr(r); free(r); }
+      else if (fn == "name") { char *r = IDnameFromStem(c); ostr(r); free(r); }
+      else if (fn == "type") oi(IDtypeFromStem(c));
+      else if (fn == "bstem") { char *r = bhdr_stem(c); ostr(r); free(r); }
+      else if (fn == "bfirst") { char *r = bhdr_firstslicefname(c); ostr(r); free(r); }
+      else if (fn == "bprecs") { char *r = bhdr_precisionstring(c); ostr(r); free(r); }
+      else if (fn == "bprec") oi(bhdr_precision(c));
+      else if (fn == "bruk") {
+        static char f[5][4096];
+        memset(f, 0, sizeof f);
+        oi(checkBrukerFiles(c, f[0], f[1], f[2], f[3], f[4], 1));
+        for (int k = 0; k < 5; k++) ostr(f[k]);
+      } else fail("unknown helper");
+    }
+    oi(errno);
+    if (cmd == "dcm" || cmd == "mid") COND_DumpConditions();
+  } else {
+    run_piece5(cmd);
+  }
+}
+
 void run_piece3(const std::string &cmd)
 {
   if (cmd == "npy") {
@@ -440,7 +1088,7 @@ void run_piece3(const std::string &cmd)
     print_rmat(mri->bvecs);
     Gdiag_no = -1;
   } else {
-    fail("unknown command");
+    run_piece4(cmd);
   }
 }
 
@@ -1000,6 +1648,7 @@ std::string escape(const std::string &s)
 }
 
 const char *MARK = "\n@@RESULT ";
+std::string realfix;
 
 int rm_entry(const char *p, const struct stat *, int, struct FTW *)
 {
@@ -1041,6 +1690,8 @@ int main(int argc, char *argv[])
   dat = std::string(argv[1]) + ".dat";
   std::string fix = std::string(argv[1]) + ".fix";
   make_fixture(fix);
+  char rp[4096];
+  realfix = realpath(fix.c_str(), rp) ? std::string(rp) : fix;
   FILE *fp = fopen(argv[1], "r");
   if (!fp) fail("cannot open the cases");
   std::vector<std::string> lines;
@@ -1101,6 +1752,15 @@ int main(int argc, char *argv[])
       result = "CRASH " + std::to_string(WTERMSIG(status));
     } else {
       result = "EXIT " + std::to_string(WEXITSTATUS(status));
+    }
+    // piece 6: the fixture's path removed from the messages (the port's fixture is elsewhere)
+    {
+      static const char *p6[] = {"mrh", "mri", "mrd", "mgr", "rrr"};
+      std::string c0 = line.substr(0, line.find_first_of(" \t\n"));
+      for (const char *k : p6)
+        if (c0 == k)
+          for (const std::string &pf : {realfix + "/", fix + "/"})
+            for (size_t at; (at = text.find(pf)) != std::string::npos;) text.erase(at, pf.size());
     }
     // messages beyond 1 MiB are shown by their length (the port does the same)
     if (text.size() > (1u << 20)) text = "BIGTEXT " + std::to_string(text.size());

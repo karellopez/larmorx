@@ -38,7 +38,7 @@ use crate::cfile::CFile;
 
 /// A read of `n` bytes that the file ended after `got`: the missing bytes are 0 here, memory
 /// contents in FreeSurfer (`defect`).
-fn memory(g: &mut Globals, defect: &'static Defect, what: &str, got: usize, n: usize) {
+pub(crate) fn memory(g: &mut Globals, defect: &'static Defect, what: &str, got: usize, n: usize) {
     g.notices.add(
         defect,
         format!(
@@ -260,7 +260,8 @@ pub fn fs_znzread(fp: &mut ZnzFile, buf: &mut [u8], size: usize, nmemb: usize) -
         }
         let len = (size as i32).wrapping_mul(nmemb as i32);
         if len < 0 {
-            return -1;
+            // gzread's unsigned length does not fit an int: zlib's stream error, kept
+            return i64::from(gz.gzread_too_long());
         }
         let len = (len as usize).min(buf.len());
         let r = gz.gzread(&mut buf[..len]);

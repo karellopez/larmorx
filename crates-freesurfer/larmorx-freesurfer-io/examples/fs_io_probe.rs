@@ -4,6 +4,8 @@
 //! The port's side of the fs.io probe (`validation/probes/fs-io/`):
 //!
 //!     fs_io_probe cases <seed> <n> [portable]  the case file, on standard output
+//!     fs_io_probe recorded                     the recorded test's cases (seed 1's 4,800 portable
+//!                                              ones without the heavy ones, `cases::HEAVY_SEED1`)
 //!     fs_io_probe run <cases> fix|reproduce    one line per case: the output, a tab, the
 //!                                              defects the port noted (comma-separated); the
 //!                                              files in <cases>.port/
@@ -21,6 +23,11 @@ fn main() {
             let n: usize = args[3].parse().expect("n");
             let portable = args.get(4).map(String::as_str) == Some("portable");
             for line in cases::generate(seed, n, portable) {
+                println!("{line}");
+            }
+        }
+        Some("recorded") if args.len() == 2 => {
+            for line in cases::recorded_cases() {
                 println!("{line}");
             }
         }
@@ -45,7 +52,9 @@ fn main() {
             let _ = std::fs::remove_dir_all(&base);
         }
         _ => {
-            eprintln!("usage: fs_io_probe cases <seed> <n> [portable] | run <cases> fix|reproduce");
+            eprintln!(
+                "usage: fs_io_probe cases <seed> <n> [portable] | recorded | run <cases> fix|reproduce"
+            );
             std::process::exit(2);
         }
     }

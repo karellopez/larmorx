@@ -22,7 +22,7 @@ use std::path::{Path, PathBuf};
 
 use larmorx_core::defects::FS_49;
 
-use crate::cscan::{self, Bytes, Call, Reader, Stream};
+use crate::cscan::{Bytes, Call, Reader, Scanf, Stream};
 use crate::cstd;
 use crate::globals::Globals;
 use crate::log::{self, ERROR_BADFILE, ERROR_BADPARM, ERROR_NO_FILE, Fatal, NO_ERROR};
@@ -158,14 +158,21 @@ pub fn matrix_ascii_read_from(
     fp: &mut dyn BufRead,
     m: Option<&mut Matrix>,
 ) -> Result<Ret<Matrix>, Fatal> {
+    // `sscanf(cp, "%d %d %d\n", &type, &rows, &cols) != 3`
     let parms = utils::fgetl(fp, 199).and_then(|line| {
         let mut b = Bytes::new(&line);
-        let mut call = Call::new();
+        let mut sc = Scanf::new(&mut b);
         let mut v = [0i32; 3];
-        for x in v.iter_mut() {
-            *x = call.i32(&mut b, &mut g.errno)?;
+        for (k, x) in v.iter_mut().enumerate() {
+            if k > 0 {
+                sc.text(&mut g.errno, b" ");
+            }
+            if let Some(d) = sc.d(&mut g.errno, true) {
+                *x = d;
+            }
         }
-        Some(v)
+        sc.text(&mut g.errno, b"\n");
+        (sc.finish(&mut g.errno) == 3).then_some(v)
     });
     let Some([mtype, rows, cols]) = parms else {
         log::error_printf(
@@ -215,30 +222,41 @@ pub fn matrix_ascii_read_from(
                 );
             };
             if m.mtype == MATRIX_COMPLEX {
+                // `fscanf(fp, "%f %f   ", &re, &im) != 2`: each value assigned as it is read
                 let i = rptr(m, row) + 2 * col as isize;
-                let mut call = Call::new();
-                let Some(re) = call.f32(&mut st, &mut g.errno) else {
+                let mut sc = Scanf::new(&mut st);
+                let re = sc.f(&mut g.errno, true);
+                sc.text(&mut g.errno, b" ");
+                let im = sc.f(&mut g.errno, true);
+                sc.text(&mut g.errno, b"   ");
+                let n = sc.finish(&mut g.errno);
+                if let Some(re) = re {
+                    write_at(g, m, i, re);
+                }
+                if let Some(im) = im {
+                    write_at(g, m, i + 1, im);
+                }
+                if n != 2 {
                     fail(g, err);
                     return Ok(Ret::Null);
-                };
-                write_at(g, m, i, re);
-                cscan::skip_space(&mut st);
-                let Some(im) = call.f32(&mut st, &mut g.errno) else {
-                    fail(g, err);
-                    return Ok(Ret::Null);
-                };
-                write_at(g, m, i + 1, im);
-                cscan::skip_space(&mut st);
+                }
             } else {
-                let Some(v) = scan_value(g, &mut st) else {
+                // `fscanf(fp, "%f  ", &x) != 1`
+                let mut sc = Scanf::new(&mut st);
+                let v = sc.f(&mut g.errno, true);
+                sc.text(&mut g.errno, b"  ");
+                let n = sc.finish(&mut g.errno);
+                let Some(v) = v.filter(|_| n == 1) else {
                     fail(g, err);
                     return Ok(Ret::Null);
                 };
                 write_relt(g, m, row, col, v);
-                cscan::skip_space(&mut st);
             }
         }
-        cscan::skip_space(&mut st);
+        // `fscanf(fp, "\n")`: 0 (it assigns nothing; a read error is not possible on this path)
+        let mut sc = Scanf::new(&mut st);
+        sc.text(&mut g.errno, b"\n");
+        sc.finish(&mut g.errno);
     }
     Ok(match fresh {
         Some(x) => Ret::New(x),
@@ -279,10 +297,6 @@ fn read_full(fp: &mut dyn Read, b: &mut [u8]) -> usize {
 /// FS-49 for a read past the file's end: `true` (refused, after the error) by default.
 fn short_file(g: &mut Globals, err: &mut dyn Write) -> bool {
     if g.notices.reproduce() {
-        g.notices.add(
-            &FS_49,
-            "MatrixReadFrom: the file ends before the matrix: the missing bytes read as 0 (FreeSurfer's are memory contents)",
-        );
         return false;
     }
     log::error_printf(
@@ -298,12 +312,81 @@ fn short_file(g: &mut Globals, err: &mut dyn Write) -> bool {
     true
 }
 
+/// The stack slot `freadDouble` and `freadInt` read into, as the official build has it when
+/// `MatrixReadFrom` calls them (track E's amended spec §18.2): `freadDouble`'s `double` is bytes
+/// 0 to 7 (it stores the swapped value back, so the slot holds the value least significant byte
+/// first), `freadInt`'s `int` bytes 4 to 7 (the file's bytes, in file order). A short read leaves
+/// the rest of the slot as the call before left it; `known[i]` is false for a byte that is memory
+/// FreeSurfer never wrote (0 here).
+struct Slot {
+    b: [u8; 8],
+    known: [bool; 8],
+    /// A number took a byte from memory.
+    memory: bool,
+    /// The file ended before the matrix.
+    short: bool,
+}
+
+impl Slot {
+    fn new() -> Slot {
+        Slot {
+            b: [0; 8],
+            known: [false; 8],
+            memory: false,
+            short: false,
+        }
+    }
+
+    /// `freadInt`: the file's bytes over bytes 4 to 7, read big-endian.
+    fn int(&mut self, fp: &mut dyn Read) -> i32 {
+        let mut t = [0u8; 4];
+        let k = read_full(fp, &mut t);
+        self.b[4..4 + k].copy_from_slice(&t[..k]);
+        self.known[4..4 + k].fill(true);
+        if k < 4 {
+            self.short = true;
+            self.memory |= self.known[4 + k..].iter().any(|&x| !x);
+        }
+        i32::from_be_bytes(self.b[4..8].try_into().unwrap())
+    }
+
+    /// `freadDouble`: the file's bytes over bytes 0 to 7 read big-endian, then the slot reversed
+    /// (the value stored back).
+    fn double(&mut self, g: &mut Globals, err: &mut dyn Write, fp: &mut dyn Read) -> f64 {
+        let mut t = [0u8; 8];
+        let k = read_full(fp, &mut t);
+        if k != 8 {
+            log::error_printf(g, err, ERROR_BADFILE, "freadDouble: fread failed");
+            self.short = true;
+            self.memory |= self.known[k..].iter().any(|&x| !x);
+        }
+        self.b[..k].copy_from_slice(&t[..k]);
+        self.known[..k].fill(true);
+        let v = f64::from_be_bytes(self.b);
+        self.b.reverse();
+        self.known.reverse();
+        v
+    }
+
+    /// `MatrixAlloc` between the header and the elements: the slot becomes memory.
+    fn clobbered(&mut self) {
+        self.b = [0; 8];
+        self.known = [false; 8];
+    }
+}
+
 /// `MatrixReadFrom(fp, m)`: a matrix in `MatrixWriteInto`'s binary form: its type, rows and
 /// columns as big-endian `int`s, then each element as a big-endian `double` (a complex one as two),
 /// each rounded to `float`. Into `m` when given (it must have the file's type and sizes: otherwise
 /// the error `MatrixReadFrom: specified matrix does not match file` and `m` returned unchanged);
 /// else a new matrix (`MatrixReadFrom: could not allocate matrix` and `Null` for an unknown type).
-/// FS-49 for a file that ends early.
+///
+/// **FS-49:** a file that ends early. By default the error `MatrixReadFrom: the file ends before
+/// the matrix does` and `Null`. With `reproduce` FreeSurfer's numbers: each number cut short keeps
+/// the bytes the number before it left in the same place ([`Slot`]: an integer the previous
+/// integer's file bytes, a double the previous double's value least significant byte first; the
+/// first element after a matrix `MatrixReadFrom` made, and the first integer, memory: 0 here,
+/// noted as memory).
 pub fn matrix_read_from(
     g: &mut Globals,
     out: &mut dyn Write,
@@ -311,26 +394,31 @@ pub fn matrix_read_from(
     fp: &mut dyn Read,
     m: Option<&mut Matrix>,
 ) -> Result<Ret<Matrix>, Fatal> {
-    let (mtype, a) = fread_int(fp);
-    let (rows, b) = fread_int(fp);
-    let (cols, c) = fread_int(fp);
-    if !(a && b && c) && short_file(g, err) {
+    let mut slot = Slot::new();
+    let mtype = slot.int(fp);
+    let rows = slot.int(fp);
+    let cols = slot.int(fp);
+    if slot.short && short_file(g, err) {
         return Ok(Ret::Null);
     }
     let mut fresh = None;
     let m: &mut Matrix = match m {
-        None => match matrix_alloc(g, out, err, rows, cols, mtype as i16)? {
-            Some(x) => fresh.insert(x),
-            None => {
-                log::error_printf(
-                    g,
-                    err,
-                    ERROR_BADFILE,
-                    "MatrixReadFrom: could not allocate matrix",
-                );
-                return Ok(Ret::Null);
+        None => {
+            slot.clobbered();
+            match matrix_alloc(g, out, err, rows, cols, mtype as i16)? {
+                Some(x) => fresh.insert(x),
+                None => {
+                    log::error_printf(
+                        g,
+                        err,
+                        ERROR_BADFILE,
+                        "MatrixReadFrom: could not allocate matrix",
+                    );
+                    fs49_reproduced(g, &slot);
+                    return Ok(Ret::Null);
+                }
             }
-        },
+        }
         Some(x) => {
             if x.rows != rows || x.cols != cols || i32::from(x.mtype) != mtype {
                 log::error_printf(
@@ -339,22 +427,22 @@ pub fn matrix_read_from(
                     ERROR_BADFILE,
                     "MatrixReadFrom: specified matrix does not match file",
                 );
+                fs49_reproduced(g, &slot);
                 return Ok(Ret::Given);
             }
             x
         }
     };
-    let mut noted = false;
-    for row in 1..=m.rows {
+    let mut refused = false;
+    'rows: for row in 1..=m.rows {
         for col in 1..=m.cols {
             let n = if m.mtype == MATRIX_COMPLEX { 2 } else { 1 };
             for k in 0..n {
-                let (d, ok) = fread_double(g, err, fp);
-                if !ok && !noted {
-                    noted = true;
-                    if short_file(g, err) {
-                        return Ok(Ret::Null);
-                    }
+                let was_short = slot.short;
+                let d = slot.double(g, err, fp);
+                if slot.short && !was_short && short_file(g, err) {
+                    refused = true;
+                    break 'rows;
                 }
                 if m.mtype == MATRIX_COMPLEX {
                     let i = rptr(m, row) + 2 * col as isize + k;
@@ -365,10 +453,29 @@ pub fn matrix_read_from(
             }
         }
     }
+    if refused {
+        return Ok(Ret::Null);
+    }
+    fs49_reproduced(g, &slot);
     Ok(match fresh {
         Some(x) => Ret::New(x),
         None => Ret::Given,
     })
+}
+
+/// FS-49's notice under `reproduce` for a file that ended early (`memory` when a number took a
+/// byte FreeSurfer never wrote).
+fn fs49_reproduced(g: &mut Globals, slot: &Slot) {
+    if slot.short && g.notices.reproduce() {
+        g.notices.add(
+            &FS_49,
+            if slot.memory {
+                "MatrixReadFrom: the file ends before the matrix: FreeSurfer's numbers, some bytes memory contents (0 here)"
+            } else {
+                "MatrixReadFrom: the file ends before the matrix: FreeSurfer's numbers from the earlier numbers' bytes"
+            },
+        );
+    }
 }
 
 /// `MatrixWriteTxt(fname, mat)`: each row on a line, each element as `%+4.5f` and a space.

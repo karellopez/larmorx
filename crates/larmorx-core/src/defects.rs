@@ -1545,6 +1545,22 @@ defects! {
         "a newer-style FreeSurfer program without a help text (mri_brainvol_stats) run without a required input prints, before its error, a help line chosen by memory never written: No xml string passed. when that memory holds 0, otherwise an XML parser's message";
     FS_412 = "FS-412", "FreeSurfer", true,
         "ImageScaleUp, ImageScaleDown and ImageRescale with a scale that makes the image's rows or columns beyond the 32-bit integer range (or NaN) go on with extents of -2147483648: nothing is scaled, or the image cannot be allocated, with no message about the scale";
+    FS_413 = "FS-413", "FreeSurfer", true,
+        "reading a text colour table, an entry line whose structure number is negative, or is the table's largest while its name holds a #, is stored outside the table: memory corruption, a crash or another object's values (a smaller number with a # in its name is read as an entry)";
+    FS_414 = "FS-414", "FreeSurfer", true,
+        "reading a text colour table's tissue-type lines (#ctTType): a line of vertical tabs, form feeds or carriage returns only, or a #ctTType line with nothing after the keyword, crashes FreeSurfer; a #ctTType line whose structure number, name, colour or transparency does not read takes that value from an earlier such line or from memory never written, and one whose structure number is negative or does not read can be stored outside the table";
+    FS_415 = "FS-415", "FreeSurfer", true,
+        "reading a text colour table without tissue-type lines leaves the file open: a program that reads many tables runs out of file descriptors";
+    FS_416 = "FS-416", "FreeSurfer", true,
+        "reading the default colour table (CTABreadDefault), and adding a tissue-type schema without a table, crash when FreeSurfer's environment cannot be read: FREESURFER_HOME not set, its FreeSurferColorLUT.txt missing or unreadable, or a wrong FS_DESIRED_BVEC_SPACE";
+    FS_417 = "FS-417", "FreeSurfer", true,
+        "a table of random colours of no entries (CTABalloc of 0), and drawing new colours for or counting the repeated colours of a table with empty places, crash FreeSurfer";
+    FS_418 = "FS-418", "FreeSurfer", true,
+        "merging a colour table with more places into a smaller one (CTABmerge) writes past the smaller table: memory corruption or a crash";
+    FS_419 = "FS-419", "FreeSurfer", false,
+        "the tissue-type schemas' table of tissue classes keeps the random float colours it was made with: its float colours do not match its integer ones (kept: no FreeSurfer program reads them)";
+    FS_420 = "FS-420", "FreeSurfer", true,
+        "a text colour table whose largest structure number (or tissue-type number) is beyond the machine's memory, or a table of random colours of such a count, gives an error message, a crash or a table depending on the machine's memory";
     FS_285 = "FS-285", "FreeSurfer", true,
         "reading a volume-geometry block (the text block of linear transform and surface files) whose line starts with a word of 64 bytes or more writes the word past its buffer: memory corruption, a crash or wrong values";
     FS_286 = "FS-286", "FreeSurfer", true,

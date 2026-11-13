@@ -16,6 +16,7 @@
 pub mod bfileio;
 pub mod bruker;
 pub mod cfile;
+pub mod colortab;
 pub mod colortab_bin;
 pub mod dicom_probe;
 pub mod dti;

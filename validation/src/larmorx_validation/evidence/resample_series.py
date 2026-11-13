@@ -819,7 +819,9 @@ PANELS = {
     "pipe-03": {
         "fix": ("replica", "larmorx, Apache-2.0 · fix (the default), PIPE-03 corrected: the "
                 "derivative along the BOLD's phase-encoding axis, in its voxels"),
-        "reproduce": ("replica", "larmorx, Apache-2.0 · reproduce, fMRIPrep's factor: 1 + "
+        # named by what it holds, so that the verdict beside "What this shows" reads "the
+        # replica against fMRIPrep's factor"
+        "reproduce": ("fMRIPrep's factor", "larmorx, Apache-2.0 · reproduce: 1 + "
                       "np.gradient(vsm, axis=pe) on the target grid, bit-identical to "
                       "fMRIPrep's in the record"),
     },

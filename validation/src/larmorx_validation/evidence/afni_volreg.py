@@ -1311,9 +1311,15 @@ def present(doc: dict) -> dict:
             if spec.get("stats"):
                 _rows(spec["stats"], new)
                 spec["stats"]["title"] = TITLES.get(spec["stats"]["id"], spec["stats"]["title"])
+    from larmorx_validation.evidence.difftest import CHECK_WORDS
+
     for t in doc.get("tables", []):
         _rows(t, {})
         t["title"] = TITLES.get(t["id"], t["title"])
+        for r in t.get("rows") or []:  # the random-testing run's checks, in words
+            for c in r.get("cells") or []:
+                if c.get("text") in CHECK_WORDS:
+                    c["text"] = CHECK_WORDS[c["text"]]
     present_.dots(
         pg,
         doc["dots"]["speed-replica"],

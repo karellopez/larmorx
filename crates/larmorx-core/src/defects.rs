@@ -1474,7 +1474,7 @@ defects! {
     FS_237 = "FS-237", "FreeSurfer", true,
         "MatlabRead does not recognise numbers MATLAB stores in a version 5 small element (4 bytes or fewer: one single-precision number, one 32-bit integer, up to four bytes): unsupported matlab format and zeros";
     FS_238 = "FS-238", "FreeSurfer", true,
-        "MatlabRead skips 8 bytes too many after a version 5 variable name whose length is a multiple of 8: the matrix's type and numbers are read from the wrong place";
+        "MatlabRead skips 8 bytes too many after a version 5 variable name whose length is a multiple of 8 (an empty name included): the matrix's type and numbers are read from the wrong place";
     FS_239 = "FS-239", "FreeSurfer", true,
         "MatlabRead's verbose messages show a version 5 variable name of 4 characters or fewer cut to its first character, and a longer one followed by memory contents";
     FS_240 = "FS-240", "FreeSurfer", true,

@@ -205,7 +205,7 @@ fn v4_var(g: &mut Gen, portable: bool) -> Vec<u8> {
 }
 
 fn pad8(b: &mut Vec<u8>, from: usize) {
-    while (b.len() - from) % 8 != 0 {
+    while !(b.len() - from).is_multiple_of(8) {
         b.push(0);
     }
 }
@@ -490,7 +490,8 @@ fn print_anymat(o: &mut Out, m: Option<&Matrix>) {
             h = h.wrapping_mul(0x0000_0100_0000_01b3);
         }
     };
-    for r in 1..=m.rows {
+    let rows = if m.cols > 0 { m.rows } else { 0 };
+    for r in 1..=rows {
         for c in 1..=m.cols {
             if m.mtype == MATRIX_COMPLEX {
                 let (a, b) = m.celt(r, c);
@@ -664,14 +665,27 @@ fn answer(
                         None => o.0.push_str("N "),
                         Some(c) => {
                             o.i(c.vars.len() as i64);
-                            let mut sink = Vec::new();
-                            matfile::mlfc_print(g, &mut sink, out, err, &c);
-                            // FreeSurfer prints some 3 MB a second: beyond 4 MiB it passes the
-                            // probe's 5 seconds
-                            if sink.len() > 4 << 20 {
+                            // FreeSurfer prints some 3 MB a second: beyond 4 MiB (at least 8 bytes a
+                            // number) it may pass the probe's 5 seconds, so not compared (nor printed)
+                            let numbers: i64 = c
+                                .vars
+                                .iter()
+                                .map(|(_, m)| {
+                                    i64::from(m.rows.max(0))
+                                        * i64::from(m.cols.max(0))
+                                        * i64::from(m.mtype)
+                                })
+                                .sum();
+                            if numbers * 8 > 4 << 20 {
                                 extra.push("SKIP");
+                            } else {
+                                let mut sink = Vec::new();
+                                matfile::mlfc_print(g, &mut sink, out, err, &c);
+                                if sink.len() > 4 << 20 {
+                                    extra.push("SKIP");
+                                }
+                                let _ = out.write_all(&sink);
                             }
-                            let _ = out.write_all(&sink);
                         }
                     }
                     if let Some(v) = var {

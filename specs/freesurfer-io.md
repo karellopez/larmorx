@@ -1088,3 +1088,9 @@ than the machine allows: FS-243 (larmorx refuses above 256 MiB of numbers as suc
   -1, 0, 1. Lines where FreeSurfer crashes or its outcome depends on the machine (FS-13, FS-229,
   FS-243, FS-248) are counted, not compared; those where it reads memory (FS-231, FS-235, FS-239 to
   FS-241 "memory", the addresses of `DIAG_SHOW` with `DIAG_VERBOSE`) are compared apart.
+- Measured on the replica (2026-11-13): seed 9, 3,500 cases of the seven commands (500 each):
+  `reproduce` identical on 2,990 of 2,990 comparable lines (308 not compared, 202 compared apart);
+  `fix` differs only with a notice. Seed 1, 4,300 portable cases of the 43 commands: 3,836
+  identical, 464 not compared. `matfile_scipy.py`: the default reads 400 of 400 matrices SciPy wrote
+  (version 4: 136, version 5: 136, compressed: 128) as written; FreeSurfer's reading gets 51, 33 and
+  0 of them right.

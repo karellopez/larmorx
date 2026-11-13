@@ -1201,10 +1201,10 @@ fn v5_fixed(
     if pb.read(&mut g.errno, &mut name) != name.len() {
         return short_header(g, err);
     }
-    if !nsmall && nbytes % 8 == 0 && nbytes > 0 {
+    if !nsmall && nbytes % 8 == 0 {
         g.notices.add(
             &FS_238,
-            "a version 5 name of a multiple of 8 bytes (FreeSurfer skips 8 bytes too many)",
+            "a version 5 name of a multiple of 8 bytes, none included (FreeSurfer skips 8 bytes too many)",
         );
     }
     mf.namlen = nbytes as i32;
@@ -1666,7 +1666,9 @@ fn to_matrix(
     let Some(mut mat) = matrix_alloc(g, out, err, rows, cols, ty)? else {
         return Ok(None);
     };
-    for row in 1..=rows {
+    // (no numbers when either size is 0: FreeSurfer's empty row loop does nothing)
+    let rows_with_numbers = if cols > 0 { rows } else { 0 };
+    for row in 1..=rows_with_numbers {
         for col in 1..=cols {
             let (r, c) = ((row - 1) as usize, (col - 1) as usize);
             let re = real.as_ref().map_or(0.0, |m| m[r][c]) as f32;

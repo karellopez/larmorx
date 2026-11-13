@@ -583,3 +583,22 @@ ANALYZE reader's orientation file beside an `.img` (mriio.cpp 5066); `MatlabWrit
 and the ANALYZE writer's `.mat` (mriio.cpp 5563, 5861); `ReadMatlabFileVariable` is `fsgdf.cpp` 340.
 recon-all's volumes are `.mgz` and NIfTI, and fMRIPrep reads none of these files: no fMRIPrep impact
 known. The mosaic functions serve the Siemens DICOM reader (fs.dicomread, 3.7).
+
+### Measured
+
+- The probe (`validation/probes/fs-io/`, piece 5): seed 9, 3,500 cases of `mvm`, `mmv`, `mck`, `mlw`,
+  `mlr`, `mfr`, `mrc`: `reproduce` identical on 2,990 of 2,990 comparable lines; 308 not compared
+  (FreeSurfer's crashes: `SIGFPE`, `SIGSEGV` after `matAlloc` fails, `std::bad_alloc` thrown while
+  formatting an error under the probe's 1 GiB, prints passing the 5 seconds), 202 compared apart
+  (memory contents); `fix` differs only with notices. Seed 1, 4,300 portable cases of the 43
+  commands: 3,836 identical, 464 hashed as `SKIP` (`e8e6a116...`, `tests/fs_io_official.rs`, passing
+  in debug and release and under `NAN_TRAP_ARM=1` with `NAN_TRAP_DIR`).
+- SciPy's files (`matfile_scipy.py`, 400 matrices: version 4, version 5, compressed; doubles, singles,
+  signed and unsigned 8- to 32-bit integers, complex): FreeSurfer reads 51 of 136 version 4 matrices
+  right (the little-endian doubles, and the big-endian ones), 33 of 136 version 5 and 0 of 128
+  compressed; the default reads all 400 as SciPy wrote them.
+- The probe's harness: a matrix of more than 65,536 numbers is printed as an FNV-1a hash of its floats
+  (`FSIO_HASH_MIN` sets the limit for the official side, to print one whole); the first build of that
+  hash in `fsio.cpp` had the 64-bit offset basis with a digit dropped, found by computing the hash of
+  the official numbers in Python (the port's was right).
+

@@ -15,8 +15,9 @@ use super::mpd::{grid, ico};
 use super::srd::{be4, mesh};
 use super::*;
 
+use larmorx_freesurfer_core::diag::DIAG_WRITE;
 use larmorx_freesurfer_core::sse;
-use larmorx_freesurfer_surf::{facenorm, props5, readwrite};
+use larmorx_freesurfer_surf::{facenorm, props5, props6, readwrite};
 
 fn fh(t: &mut Vec<String>, g: &mut Gen, heavy: bool) {
     t.push(format!("{:08x}", smallish(g, heavy)));
@@ -33,7 +34,14 @@ fn fs(t: &mut Vec<String>, g: &mut Gen, heavy: bool) {
 
 pub(super) fn mpe_tokens(t: &mut Vec<String>, g: &mut Gen) {
     let heavy = g.chance(5);
-    ix(t, g.int(0, 3));
+    ix(
+        t,
+        if g.chance(6) {
+            g.int(4, 7)
+        } else {
+            g.int(0, 3)
+        },
+    );
     let r = g.pick(&[1.0, 10.0, 100.0, 50.0]);
     let m = match g.below(10) {
         0 | 1 => {
@@ -151,6 +159,7 @@ pub(super) fn mpe_tokens(t: &mut Vec<String>, g: &mut Gen) {
         let op = g.pick(&[
             "ssn", "ssn", "cbn", "cmc", "cmc", "cmc", "uae", "uae", "ugc", "umc", "upc", "uk1",
             "uk1", "uk2", "upf", "upf", "cci", "cci", "mxr", "mxr", "cac", "cac", "mnv", "rnv",
+            "sff", "sff", "sff", "sff", "sff", "sff",
         ]);
         t.push(op.to_owned());
         match op {
@@ -158,6 +167,14 @@ pub(super) fn mpe_tokens(t: &mut Vec<String>, g: &mut Gen) {
             "upf" => ix(t, g.int(0, 2)),
             "cac" => ix(t, i64::from(g.chance(4))),
             "mnv" => ix(t, g.int(-1, 3)),
+            "sff" => {
+                let pct = if g.chance(3) {
+                    -1.0
+                } else {
+                    g.pick(&[0.999, 0.99, 0.9, 0.5, 0.0, 1.0, 0.75, f64::NAN])
+                };
+                t.push(format!("{:016x}", f64::to_bits(pct)));
+            }
             _ => {}
         }
     }
@@ -168,6 +185,22 @@ fn dump_curv(o: &mut Out, s: &Mris) {
     o.f(s.max_curv);
     for vno in 0..s.nvertices.max(0) as usize {
         o.f(s.vertex(vno).curv);
+    }
+}
+
+/// A file's length and FNV-1a hash (`NOFILE` when there is none), the file then removed.
+fn file_hash(o: &mut Out, path: &std::path::Path) {
+    match std::fs::read(path) {
+        Ok(b) => {
+            let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+            for c in &b {
+                h ^= u64::from(*c);
+                h = h.wrapping_mul(0x0000_0100_0000_01b3);
+            }
+            o.s(&format!("{}:{h:016x}", b.len()));
+            let _ = std::fs::remove_file(path);
+        }
+        Err(_) => o.s("NOFILE"),
     }
 }
 
@@ -191,6 +224,9 @@ pub(super) fn mpe_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
     }
     if gd & 2 != 0 {
         cx.g.gdiag |= DIAG_VERBOSE;
+    }
+    if gd & 4 != 0 {
+        cx.g.gdiag |= DIAG_WRITE;
     }
     let env = Environment::from_pairs(vec![("SURFER_SIDEDOOR".to_owned(), "1".to_owned())]);
     std::fs::write(dir.join("d/lh.s0"), t.h()).expect("the surface file");
@@ -352,6 +388,29 @@ pub(super) fn mpe_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
                 }
                 for fno in 0..s.nfaces.max(0) as usize {
                     o.i(i64::from(s.face(fno).ripflag));
+                }
+            }
+            "sff" => {
+                let pct = t.d();
+                o.i(i64::from(
+                    props6::compute_second_fundamental_form_thresholded(
+                        g, sg, &mut io, d, &mut s, pct,
+                    )?,
+                ));
+                for x in [s.Kmin, s.Kmax, s.Hmin, s.Hmax] {
+                    o.f(x);
+                }
+                o.d(s.Ktotal);
+                for vno in 0..s.nvertices.max(0) as usize {
+                    let v = s.vertex(vno);
+                    for x in [
+                        v.k1, v.k2, v.K, v.H, v.e1x, v.e1y, v.e1z, v.e2x, v.e2y, v.e2z,
+                    ] {
+                        o.f(x);
+                    }
+                }
+                for name in ["curv.dat", "k1.plt", "k2.plt"] {
+                    file_hash(o, &dir.join(name));
                 }
             }
             _ => panic!("mpe op {op}"),

@@ -2787,13 +2787,29 @@ float upf0(float k1, float k2) { (void)k2; return k1 + 1.0f; }
 float upf1(float k1, float k2) { (void)k1; return k2 * 0.5f; }
 float upf2(float k1, float k2) { return k1 > k2 ? k1 : k2; }
 
+// a file's length and FNV-1a hash (NOFILE when there is none), the file then removed
+void file_hash(const char *name)
+{
+  FILE *f = fopen(name, "rb");
+  if (!f) { out += "NOFILE "; return; }
+  uint64_t h = 14695981039346656037ULL;
+  long n = 0;
+  int c;
+  while ((c = fgetc(f)) != EOF) { h ^= (unsigned char)c; h *= 1099511628211ULL; n++; }
+  fclose(f);
+  char b[48];
+  snprintf(b, sizeof b, "%ld:%016" PRIx64 " ", n, h);
+  out += b;
+  remove(name);
+}
+
 void dump_curv_only(MRIS *s)
 {
   of(s->min_curv); of(s->max_curv);
   for (int vno = 0; vno < s->nvertices; vno++) of(s->vertices[vno].curv);
 }
 
-// mpe: Gdiag's bits (1 show, 2 verbose), a surface file read by MRISread (d/lh.s0), the status
+// mpe: Gdiag's bits (1 show, 2 verbose, 4 write), a surface file read by MRISread (d/lh.s0), the status
 // (-1: the read's), Kmin, Kmax, Hmin, Hmax or not, for each vertex a mask (1 ripped, 2 marked: a
 // number, 4 current position, 8 normal, 16 curv, 32 k1 and k2, 64 K and H, 128 area, 256 original
 // position) with its values, for each face a mask (1 ripped, 2 area, 4 cached original area, 8
@@ -2807,6 +2823,7 @@ void mpe_case()
   int gd = geti();
   if (gd & 1) Gdiag |= DIAG_SHOW;
   if (gd & 2) Gdiag |= DIAG_VERBOSE;
+  if (gd & 4) Gdiag |= DIAG_WRITE;
   setenv("SURFER_SIDEDOOR", "1", 1);
   std::string bytes = geth();
   FILE *fp = fopen("d/lh.s0", "wb");
@@ -2897,6 +2914,16 @@ void mpe_case()
       oi(MRISripNegativeVertices(s));
       for (int vno = 0; vno < s->nvertices; vno++) oi(s->vertices[vno].ripflag);
       for (int fno = 0; fno < s->nfaces; fno++) oi(s->faces[fno].ripflag);
+    } else if (op == "sff") {
+      double pct = getd();
+      oi(MRIScomputeSecondFundamentalFormThresholded(s, pct));
+      of(s->Kmin); of(s->Kmax); of(s->Hmin); of(s->Hmax); od(s->Ktotal);
+      for (int vno = 0; vno < s->nvertices; vno++) {
+        VERTEX *v = &s->vertices[vno];
+        float c[10] = {v->k1, v->k2, v->K, v->H, v->e1x, v->e1y, v->e1z, v->e2x, v->e2y, v->e2z};
+        for (float x : c) of(x);
+      }
+      for (const char *name : {"curv.dat", "k1.plt", "k2.plt"}) file_hash(name);
     } else fail("mpe op");
   }
 }

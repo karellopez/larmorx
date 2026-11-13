@@ -1561,6 +1561,10 @@ defects! {
         "the principal curvatures and their functions as a surface's curvature (MRISuseK1Curvature, MRISuseK2Curvature, MRISusePrincipalCurvatureFunction; mris_curvature_stats) give a range that includes the first vertex's previous curvature value, which no vertex has any more (a range wider than the values, or not a number)";
     FS_376 = "FS-376", "FreeSurfer", true,
         "the principal curvatures and their functions as a surface's curvature (MRISuseK1Curvature, MRISuseK2Curvature, MRISusePrincipalCurvatureFunction), on a surface without vertices, read memory outside the surface (an undefined range)";
+    FS_377 = "FS-377", "FreeSurfer", true,
+        "the principal curvatures' outlier removal (MRIScomputeSecondFundamentalFormThresholded with a threshold of 0 or more; mris_curvature -thresh) of a surface whose unripped principal curvatures k1 (or k2) are all equal, or one of which is not finite (NaN, infinite), writes far outside its 1,000-bin histogram: a segmentation fault";
+    FS_378 = "FS-378", "FreeSurfer", true,
+        "the principal curvatures' outlier removal (MRIScomputeSecondFundamentalFormThresholded with a threshold of 0 or more) of a surface with no unripped vertex reads memory before its histograms (no effect on the result)";
     FS_221 = "FS-221", "FreeSurfer", true,
         "the volume format probe (mri_identify, the format tests and the volume-name helpers) misbehaves for a file name of 1,024 bytes or more (a Bruker study's file names of 512 or more, the stem helpers' names of 2,000 or more): its answer is undefined and the program can crash";
     FS_222 = "FS-222", "FreeSurfer", true,

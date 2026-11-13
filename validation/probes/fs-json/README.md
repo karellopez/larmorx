@@ -31,3 +31,8 @@ Run (about 5 minutes at scale 5 on the main machine):
 validation/probes/fs-json/build.sh <out>
 scripts/orchestration/boxed.sh 8 bash -c "cd <out> && ./fs-json <out> 5"
 ```
+
+Results: Scale 5 (2026-11-13, the final code; log `<workspace>/oracles/logs/fs-found-c-r7-json-probe-5.log`), against
+nlohmann/json 3.2.0 and against FreeSurfer's copy alike: 15,010 documents parsed strictly and 15,010 as
+`operator>>`, 75,050 dumps, 45,030 stream writes, 3,753 accessor scripts and 999,904 doubles printed:
+every record identical (0 different, 0 explained).

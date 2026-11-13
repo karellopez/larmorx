@@ -62,4 +62,7 @@ foundations, items 3.1-19 and 3.1-20).
 | FS-99 | the indent string (512 characters) is doubled, with spaces, each time an indent passes it (past 512 characters a tab indent becomes spaces; an indent step larger than the doubled string reads past its memory); the writer and the destructor recurse once per level (a value nested deeply enough exhausts the stack) | c (rule A) for the padding, a for the rest | the indent character kept (`reproduce`: spaces); no read past, no recursion; named |
 
 ## The numbers (the probe, 2026-11-13)
-See the probe's README and the log `<workspace>/oracles/logs/fs-found-c-r7-json-probe-5.log`.
+Scale 5 (2026-11-13, the final code; log `<workspace>/oracles/logs/fs-found-c-r7-json-probe-5.log`), against
+nlohmann/json 3.2.0 and against FreeSurfer's copy alike: 15,010 documents parsed strictly and 15,010 as
+`operator>>`, 75,050 dumps, 45,030 stream writes, 3,753 accessor scripts and 999,904 doubles printed:
+every record identical (0 different, 0 explained).

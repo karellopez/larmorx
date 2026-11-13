@@ -133,14 +133,15 @@ the six characters of temporary names become `XXXXXX`; the memory and time repor
 
 **What may differ.** A run whose case names a defect (`[FS-xx]` in `list`) may differ in `--mode
 fix`: there larmorx corrects FreeSurfer. Where the corrected output follows from the inputs the loop
-checks it itself: FS-261 and FS-262, the byte reversal of every item; FS-12 (the batch
-`numbers-fs12`, every rounding of the group whose value leaves the int range), the saturated values
-on standard output (NaN 0; the notices on standard error are not compared); the finite check's batch
-`numbers-fs01` (FS-01), the probe's standard output and its standard error without the NUL byte. A
-failed check prints the first line where the candidate differs from the corrected output. A run marked `memory` (FS-08, FS-09, FS-10) shows what
-FreeSurfer read outside the memory it wrote (the guard, or whatever lay there): it may differ in both
-modes. Every other run must be identical, byte for byte, in both modes. Exit status 1 when a
-difference is unexplained; the first three of each group are printed.
+checks it itself: FS-261 and FS-176 (FS-262 until 2026-11-13: a duplicate, retired), the byte
+reversal of every item; FS-12 (the batch `numbers-fs12`, every rounding of the group whose value
+leaves the int range), the saturated values on standard output (NaN 0; the notices on standard error
+are not compared); the finite check's batch `numbers-fs01` (FS-01), the probe's standard output and
+its standard error without the NUL byte. A failed check prints the first line where the candidate
+differs from the corrected output. A run marked `memory` (FS-08, FS-09, FS-10) shows what FreeSurfer
+read outside the memory it wrote (the guard, or whatever lay there): it may differ in both modes.
+Every other run must be identical, byte for byte, in both modes. Exit status 1 when a difference is
+unexplained; the first three of each group are printed.
 
 **The probe's runs** go through the oracle-output cache (one thread, the family `freesurfer`), except
 those that vary from run to run (the clock, the time, temporary names, memory reports, the user and

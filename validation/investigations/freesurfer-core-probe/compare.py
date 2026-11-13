@@ -187,7 +187,7 @@ class Gen:
             r.getrandbits(40) for _ in range(50)
         ]
         cases.append(
-            self.batch("swaps", "swaplong64", [f"swaplong64 {v}" for v in long64], tag="FS-262")
+            self.batch("swaps", "swaplong64", [f"swaplong64 {v}" for v in long64], tag="FS-176")
         )
         buf = []
         for nbytes in (1, 2, 4, 8):
@@ -1174,10 +1174,10 @@ def serial(r: Result) -> bytes:
 
 def fix_expected(case: Case, probe: Result) -> tuple[bytes, bytes | None] | None:
     """The corrected outputs (standard output, and standard error where it is defined), from the
-    inputs: FS-261 and FS-262 the byte reversal, FS-12 the saturated rounding, FS-01's batch the
+    inputs: FS-261 and FS-176 the byte reversal, FS-12 the saturated rounding, FS-01's batch the
     probe's lines without the NUL byte."""
     path = Path(case.args[1]) if case.args[0] == "batch" else None
-    if path is None or case.tag not in ("FS-261", "FS-262", "FS-12", "FS-01"):
+    if path is None or case.tag not in ("FS-261", "FS-176", "FS-12", "FS-01"):
         return None
     if case.tag == "FS-01":
         return probe.out, probe.err.replace(b"\x00\n", b"\n")

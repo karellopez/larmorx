@@ -231,7 +231,7 @@ count, the result to reproduce is that thread count's.
 - **One value:** swapping a 16-bit (signed or unsigned), 32-bit (integer or float) or 64-bit float
   value reverses its bytes; bit patterns are kept (NaN payloads and signalling NaNs included,
   **(observed)**: the `swaps` group). "Is this a little-endian machine" answers 1.
-- **FS-262. A 64-bit integer:** FreeSurfer reverses the bytes, then rounds the reversed value (a
+- **FS-176. A 64-bit integer:** FreeSurfer reverses the bytes, then rounds the reversed value (a
   signed 64-bit integer) to the nearest double (ties to even) and converts it back, truncating (a
   value rounded up to 2^63 gives -2^63). The result differs from the exact reversal only when the
   reversed value needs more than 53 significant bits, which never happens for values below 2^40
@@ -240,7 +240,9 @@ count, the result to reproduce is that thread count's.
   `swaplong64 72057594037927937` (0x0100000000000001) gives 72057594037927936;
   `swaplong64 81985529216486895` (0x0123456789abcdef) gives -1167088121787636992, the exact reversal
   being -1167088121787636991. Rule A. **Default:** the exact reversal; **reproduce:** FreeSurfer's
-  rounding. Noted when they differ.
+  rounding. Noted when they differ. (fs.io's 64-bit readers and writers share this rounding and
+  this defect, `specs/freesurfer-io.md` §2-4; FS-262, the ID this swap had first, is retired: a
+  duplicate of FS-176.)
 - **A buffer of n items of k bytes each** (k = 1, 2, 4 or 8): k = 1 leaves it; another k writes
   `ERROR: ByteSwapBuf: nBytesPerItem = <k> not supported` + `\n` on standard output and answers 1,
   the buffer unchanged; otherwise it answers 0.
@@ -608,7 +610,7 @@ error and the files a case names, byte for byte, after the masks of the README.
   FreeSurfer read memory it never wrote, the probe's guard or whatever lay there).
 - `--mode fix`: every run without a defect identical; a run marked with a defect may differ (the
   notice, the corrected value), and where the corrected output follows from the inputs the loop
-  checks it itself: for FS-261 and FS-262 the byte reversal of every item, for FS-12 (`numbers-fs12`)
+  checks it itself: for FS-261 and FS-176 the byte reversal of every item, for FS-12 (`numbers-fs12`)
   the saturated values on standard output (NaN 0), for the finite check (`numbers-fs01`, FS-01) the
   probe's standard output and its standard error without the NUL byte.
 - Then the cases the probe cannot show (both modes defined by larmorx, or a crash): FS-03's exit
@@ -628,7 +630,7 @@ the system's time-zone files; the others on nothing but the probe.
 
 | Group | Runs | Calls | What | SHA-256 |
 |---|---:|---:|---|---|
-| swaps | 3 | 833 | §6: every swap on edge and random values, FS-262 (`swaplong64`), FS-261 (`byteswapbuf`, every k and n) | `62e1e91acc209996f091cd31ae54d99bc3f551f7613e0a63852ce915e66b4581` |
+| swaps | 3 | 833 | §6: every swap on edge and random values, FS-176 (`swaplong64`), FS-261 (`byteswapbuf`, every k and n) | `62e1e91acc209996f091cd31ae54d99bc3f551f7613e0a63852ce915e66b4581` |
 | cmdargs | 1 | 230 | §7 | `5c761bb5079e99b50601d71c3daf5b7debe16c074fc0841b7adafd5e0125841d` |
 | strings | 1 | 4,670 | §10's string and file-name helpers on 325 strings (white space, `/`, `#`, `@`, `.`, high bytes) | `c6f74d1c9bafea60c7685682d3019b95f6795530ee815ca88c54d13c660edac1` |
 | fgetl | 1 | 300 | §10's line reader: comments, blank lines, long lines, sizes 2 to 200 | `ab086d6391f392b5f1dfe24f8527ce93eed66c4339f8277d42578cd69a8d9f85` |
@@ -679,7 +681,7 @@ messages, `--version` and `--all-info` (time stamps, user and host masked).
 ### 20.6 Golden cases
 
 One case per path in the cross-platform golden suite (CLAUDE.md rule 10): the swaps (FS-261 and
-FS-262 defaults), the string and file-name helpers, the rounding and list helpers, the selections
+FS-176 defaults), the string and file-name helpers, the rounding and list helpers, the selections
 and median, the arctangent table's SHA-256 and a few hundred pairs, the reproducible sums, the
 seeded draws for three seeds, the version options' plans (FS-07 default), the messages' bytes
 (FS-01 default); no file system, clock or environment beyond what each case sets.
@@ -720,6 +722,6 @@ seeded draws for three seeds, the version options' plans (FS-07 default), the me
 | FS-10 | the integer lists of an empty list | memory | no items | one item of value 0 |
 | FS-11 | 1,024-byte buffers of the compare and extension helpers | overflow | the whole string (both modes) | the whole string |
 | FS-12 | `nint`, `nint2` beyond the int range or NaN | undefined conversion | saturated, NaN 0 | -2147483648 |
+| FS-176 | 64-bit integer swaps round through a double (fs.io's 64-bit readers and writers too) | A | the exact reversal | the rounding |
 | FS-261 | buffer swaps reverse only the first ⌈n/k⌉ items | A | every item | the first ⌈n/k⌉ |
-| FS-262 | 64-bit integer swaps round through a double | A | the exact reversal | the rounding |
 | FS-263 | with exceptions on, a nonzero fatal error aborts | A | the code reaches the caller | abort, 134 |

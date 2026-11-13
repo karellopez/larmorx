@@ -470,7 +470,6 @@ group = "fsl"
 name = "fslstats"
 command = "larmorx fsl fslstats"
 python = "lx.fsl.fslstats"
-does = "Prints statistics of an image, per volume, per label and as JSON."
 api = "docs/api/fsl-stats.md"
 evidence = "/evidence/fsl-stats/"
 records = { replica = ["fsl-stats-replica"], clean-room = ["fsl-stats"] }

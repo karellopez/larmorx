@@ -21,7 +21,7 @@ correctly rounded ``atan2f`` (a ``posn`` case that computes the canonical coordi
 ``larmorx_core::math::Libm``'s quiet choice; counted as ``fix_libm``. Prints the counts and the hash the port's recorded test
 checks (``tests/fs_surfio_official.rs``).
 
-    python -P validation/probes/fs-surfio/check.py --seed 1 --n 1110 [--json out.json]
+    python -P validation/probes/fs-surfio/check.py --seed 1 --n 1170 [--json out.json]
 """
 
 from __future__ import annotations
@@ -51,7 +51,11 @@ from larmorx_validation.oracle_cache.store import workspace  # noqa: E402
 # vertex beyond the surface's room, FS-352; counts read from text after a long creator line, whose
 # allocations the machine's memory decides, FS-354; a name past a buffer, FS-356; MRISread's
 # neighbour lists past their end, FS-357 to FS-360; the icosahedron reader's writes outside its
-# arrays, FS-361, FS-362): counted, never compared
+# arrays, FS-361, FS-362; the brute-force triangle distance's endless loop, ended by the probe's
+# alarm, FS-367; the closest-vertex searches' and the spherical-triangle test's arrays, FS-370,
+# FS-371; the faces' walk around a vertex and the curvature sign of a face naming a vertex twice,
+# FS-372, FS-373; an MGH volume header without voxels read for a transform's volume, FS-76, whose
+# division by zero the official build turns into a crash): counted, never compared
 SKIP: tuple[str, ...] = (
     "FS-121",
     "FS-123",
@@ -75,6 +79,12 @@ SKIP: tuple[str, ...] = (
     "FS-360",
     "FS-361",
     "FS-362",
+    "FS-367",
+    "FS-370",
+    "FS-371",
+    "FS-372",
+    "FS-373",
+    "FS-76",
 )
 SKIP_WHEN_REFUSED: tuple[str, ...] = ("FS-114",)
 
@@ -86,12 +96,13 @@ STUB_COMMANDS = ("metric",)
 def libm_case(cmd: str, toks: list[str]) -> bool:
     """Whether the case runs a function whose default takes correctly rounded maths where
     FreeSurfer's binary takes glibc's: a `surf` rotation (`Z`: `sinf`, `cosf`), a `posn`
-    canonical-coordinates step (`cc`, or `sv 3`: `atan2f`)."""
+    canonical-coordinates step (`cc`, or `sv 3`: `atan2f`), an `mpd` case (the discrete
+    curvatures' and the pseudo-normal's `acosf`)."""
     if cmd == "surf":
         return "Z" in toks
     if cmd == "posn":
         return "cc" in toks or any(a == "sv" and b == "3" for a, b in itertools.pairwise(toks))
-    return False
+    return cmd == "mpd"
 
 
 def probe_binary(ws: Path, name: str = "fssurfio") -> Path:

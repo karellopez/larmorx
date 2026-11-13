@@ -2660,3 +2660,386 @@ counts, the tessellation statistics, the closest vertices (current, canonical, u
 three others), and every curvature edit; each prints its result and, for the edits and the planes,
 every vertex's curvature, `e1`, `e2`, `pe1`, `pe2` and the surface's curvature range. Observed
 (relay 17): the probe README.
+
+## 96. Metric properties, part b, second group (queue item 3.1-50; relay 18)
+
+Arithmetic in `float` unless said; "compiled as" gives the operand order where a NaN's payload
+depends on it (the first operand's NaN wins in SSE). `FZERO(x)` is `|x| < 2^-23` (for a `double`
+too), `DZERO(x)` is `|x| < 1e-15`; a NaN is never zero by either.
+
+- **Projection onto a triangle's plane** (`project_point_to_plane(point, V0, V1, V2, proj, pe1,
+  pe2)`, all `double`): `e1 = V1 - V0`, `len = sqrt((x² + y²) + z²)`, `e1 = e1 / len` (a division
+  per component); `DZERO(len)`: `point = V0 + V1`, `proj = (point + V2) / 3`, returns -1 (the
+  basis outputs untouched). `e2 = V2 - V0`, made unit the same way; `DZERO`: the same with -2.
+  `d = e1 . e2` (`(x x + y y) + z z`), `tmp = (e1.x d, e1.y d, d e1.z)`, `e2 = e2 - tmp`, its
+  length; `DZERO`: -1 as above; else `e2 = e2 / len`. The basis is copied into `pe1`, `pe2` when
+  given. `point = point - V0` (in place); `d1 = e1 . point` (as written), `d2` compiled as `(p.y
+  e2.y + p.x e2.x) + p.z e2.z`; `proj = (e2 d2 + e1 d1) + V0` per component (`e1 d1` as `e1.k d1`,
+  `e2 d2` as `e2.k d2`). Returns 0.
+- **Barycentric coordinates** (`face_barycentric_coords(V0, V1, V2, cx, cy, cz, &l1, &l2, &l3)`,
+  `double`): the projection of `(cx, cy, cz)`; a negative answer: a third each (`1.0 / 3`) and -3.
+  With `proj` and the basis: `x = proj . e1`, `y = proj . e2` (as written); the corners' coordinates
+  compiled as `x1 = e1.z V0.z + (e1.y V0.y + e1.x V0.x)`, `x2 = (e1.x V1.x + e1.y V1.y) + e1.z V1.z`,
+  `x3 = (e1.y V2.y + e1.x V2.x) + e1.z V2.z`, `y1 = (e2.y V0.y + e2.x V0.x) + e2.z V0.z`, `y2 = V1.z
+  e2.z + (e2.x V1.x + V1.y e2.y)`, `y3 = (V2.x e2.x + V2.y e2.y) + V2.z e2.z`; `det = (x1 - x3)(y2 -
+  y3) - (y1 - y3)(x2 - x3)`; `DZERO(det)`: -2 with the coordinates of **FS-366** (the original gives
+  0, 0, 0; the default a third each, noted). `l1 = ((x3 - x2)(y - y3) + (y2 - y3)(x - x3)) / det`,
+  `l2 = ((y3 - y1)(x - x3) + (x1 - x3)(y - y3)) / det`, `l3 = (1 - l1) - l2`. Returns 1 when all
+  three are strictly between 0 and 1; else, with `d = min(l, 1 - l)` (`l < 1 - l ? l : 1 - l`)
+  narrowed to `float` for each, -1 when one `d` is below 0 and not `FZERO`, else 0. The coordinates
+  are always written. The surface form `face_barycentric_coords(mris, fno, which, cx, cy, cz, ...)`
+  takes the face's three corners in the coordinate set `which` (`MRISvertexCoord2XYZ_float`, its
+  refusal of an unsupported set ending the program) widened to `double`.
+- **Samples on a face.** `MRISsampleFaceCoords(mris, fno, x, y, z, which_coords, which_bary, &px,
+  &py, &pz)`: the barycentric coordinates in the set `which_bary` (a third each when negative), the
+  outputs set to 0, then per corner `p = (double)(coord) * l + (double)p` narrowed to `float`, for
+  x, y and z of the set `which_coords`; returns the barycentric answer. `MRISsampleFace(mris, fno,
+  which, x, y, z, val0, val1, val2)` (`double`): the barycentric coordinates in `which` whatever
+  their answer (FS-366's applies), then `val = 0`, per corner `val + val_k l_k` (compiled as `val_k
+  l_k`); each corner's coordinates of `which` are read once more (so an unsupported set ends the
+  program). `MRISsampleFaceNormal(mris, fno, x, y, z, &px, &py, &pz)`: per corner the canonical
+  distance `d`: each difference `(double)c - x` narrowed, `sqrt(dz² + (dx² + dy²))`; `dtotal` the
+  sum (as `d + dtotal`) of those not below 0; outputs set to 0; per corner `w = 1 - (d + d) /
+  dtotal` (`d` recomputed), skipped when below 0, else `px = nx w + px`, `py = ny w + py`, `pz = w nz
+  + pz`; returns 0.
+- **`MRISrmsTPHeight(mris)`** (`double`): 0 for status `MRIS_PLANE`. Otherwise the tangent planes
+  are recomputed (§94), then over every unripped vertex with `vtotal > 0` and each of its first
+  `vtotal` unripped neighbours: `x, y, z` the neighbour's current position minus the vertex's (in
+  `float`, widened); `d = (x² + y²) + z²`, skipped when `FZERO(d)`; `dot = (x nx + y ny) + z nz`
+  (the vertex's normal widened); the sum as `dot² / d + sum`; returns `sqrt(sum / count)` (a NaN,
+  0/0, with no term).
+- **Analytic distances.** For `which` `MRIS_SPHERE` (4) or `MRIS_PARAMETERIZED_SPHERE` (5): a
+  circumference `c`, computed at the first unripped vertex where it is still `FZERO` (and kept from
+  then on) as `(float)(sqrt(oz² + (ox² + oy²)) * 2 pi)` of that vertex's original position; the
+  distance to a neighbour is `(float)((double)(angle c) / 2 pi)` with `angle` the `float` magnitude
+  of fs.core's `Vector3Angle` of the two original positions (as 3-vectors) and the product in
+  `float` as `angle c`. Any other `which`: the straight original-position distance `sqrt(zd² + (xd²
+  + yd²))` (`d = v - vn`). **`MRIScomputeAnalyticDistanceError(mris, which, fp)`**: over the
+  unripped vertices' first `vtotal` unripped neighbours (index `n`), `odist` as above; the sums (in
+  `double`, each as `sum + term`) of `dist_orig[n] - odist` (its magnitude and itself; the
+  difference in `float`), the same for `dist[n]`, and `odist` (its magnitude for a sphere); each
+  mean over the count; `pct = mean_error / mean`, `pct_orig = mean_orig_error / mean`; prints `mean
+  orig = %2.3f mm (%%%2.2f), final = %2.3f mm (%%%2.2f)` (mean orig error, `pct_orig 100`, mean
+  error, `pct 100`) and `signed mean orig error = %2.3f, final mean error = %2.3f` on standard output;
+  with `fp`, `FS_DISTURB_DISTANCES` read with `atof` (0 without it), the percent distance error (an
+  earlier part of this spec; its assertions apply) and the line `%2.3f  %2.3f  %2.3f  %2.3f  %2.3f
+  %2.3f  %2.3f` (two blanks between): `(valid 100) / nvertices` in `float`, the disturbance, `100
+  pct_orig`, the mean orig error, `100 pct`, the mean error, the percent distance error. Returns
+  `pct` (NaNs with no neighbour). **`MRISstoreAnalyticDistances(mris, which)`**: each unripped
+  vertex's `dist_orig[n]` set to `odist` for its unripped neighbours; returns 0.
+  **`MRISdisturbOriginalDistances(mris, max_pct)`**: each unripped vertex's first `vtotal`
+  original distances `(float)((double)d * (r + 1))`, `r = randomNumber(-max_pct / 100, max_pct /
+  100)` (fs.core's, one draw per distance, its seeding message on first use); returns 0.
+- **`MRIScomputeHausdorffDistance(mris, mode)`** (`mode` unused; `double`): over each unripped
+  vertex's first `vnum` unripped neighbours: when `vn.val v.val < 0` (in `float`), the zero's
+  fraction from `v`: for `vn.val < 0` `1 - f(vn.val, v.val)`, else `f(v.val, vn.val)`, where `f(a,
+  b) = (double)(-a / (b - a))` in `float`; the term `dist |v.val2| + (1 - dist) |vn.val2|` (the
+  magnitudes in `float`, widened); when `v.val2 vn.val2 < 0`, the same with `val2` for the fraction
+  and the term `|v.val| dist + |vn.val| (1 - dist)`; the mean of the terms (each added as `sum +
+  term`), 0 without any.
+- **Curvature ratio** (`MRISuseCurvatureRatio`): per unripped vertex `k1` the principal curvature
+  of larger magnitude (`|k1| > |k2|`, else swapped); where `k2` is not `FZERO`, `curv = |k1 / k2|`
+  and the extremes from 10000 (min) and -10000 (max) updated (`curv < min`, `curv > max`); then
+  where `k2` is `FZERO`: `curv = 0` when `k1` is too, else the smallest ratio for `k1 < 0` and the
+  largest otherwise. **Contrast** (`MRISuseCurvatureContrast`): `m` the smallest `k1` or `k2` of the
+  unripped vertices (from 10000); per unripped vertex `k1 >= k2` (`k1 > k2`, else swapped), both less
+  `m`, `curv = (k1 - k2) / (k1 + k2)`, extremes as above. Both set `min_curv`, `max_curv`.
+- **Brute-force distance to a triangle** (`MinDistToTriangleBF(p1, p2, p3, ptest, pmin, dL)`,
+  `double`): `dmin = 1e11`; `l1` from 0 while below 1 by `dL` (`l1 + dL`), within it `l2` the same;
+  `l3 = 1 - (l2 + l1)`; skipped outside [0, 1]; `r = (p1 l1 + p2 l2) + p3 l3` for x and y, `l3 p3.z +
+  (l1 p1.z + l2 p2.z)` for z; `d = sqrt(((pr.x² + 0) + pr.y²) + pr.z²)`, `pr = ptest - r`; a smaller
+  `d` is kept with `pmin = r`; returns `dmin` (`pmin` untouched when nothing is below 1e11).
+  **FS-367**: a step below 2^-52 (zero, negative) can loop for ever in the original; both modes
+  refuse it (`MinDistToTriangleBF: step <dL> is too small` on standard error). `StuffVertexCoords`
+  and `StuffFaceCoords` give a vertex's (a face corner's) current position widened.
+
+## 97. Metric properties, part b, third group: normals, closest vertices, thickness, curvature bookkeeping
+
+- **Face normals of a set** (`mrisOrigNormalFace`, `mrisWhiteNormalFace`, `mrisPialNormalFace`;
+  `(mris, fno, n, norm)`): with corner `n` of the face, `n0` the corner before it (2 for 0) and
+  `n1` the one after (0 for 2), in the set's positions: `v0 = P(n) - P(n0)`, `v1 = P(n1) - P(n)`,
+  each made unit (`mrisNormalize`: `d = sqrt((x² + y²) + z²)`, divided when `d > 0`); `norm =
+  (v0.y v1.z - v1.y v0.z, v0.z v1.x - v1.z v0.x, v0.x v1.y - v1.x v0.y)`, not normalised.
+  **Vertex normals of a set** (`mrisComputeOrigNormal`, `...White...`, `...Pial...`; `(mris, vno,
+  norm)`): `norm` set to 0, the face normals of the vertex's unripped faces (in its face order,
+  with its corner index) added (`norm + face`); none: -4 (`ERROR_BADPARM`); else normalised with
+  `d = sqrt(z² + (x² + y²))` (divided when `d > 0`) and 0.
+- **`MRIScomputeNormal(mris, which, vno, &nx, &ny, &nz)`**: the same sum over unripped faces with
+  the current set's face normal (`mrisNormalFace`, an earlier part of this spec) for `which` 4, and
+  the set's above for 0 (original), 9 (white) and 7 (pial); any other `which` ends the program at
+  the first unripped face: `MRIScomputeNormal: which = <which> not supported` (`ERROR_BADPARM`).
+  None: -4, the outputs untouched; else normalised with `(x² + y²) + z²` and widened, 0.
+- **`MRIScomputeSurfaceNormals(mris, which, navgs)`**: `MRISsaveVertexPositions(TMP_VERTICES)` and
+  `MRISrestoreVertexPositions(which)` (an earlier part of this spec, with their refusals); each
+  unripped vertex's normal of the set (`which` 9: `wn`, 7: `pn`, 0: `on`, any other: the current
+  normal `n`) set to `MRIScomputeNormal`'s answer narrowed. **FS-369**: a vertex without an unripped
+  face gets, in the original, the previous unripped vertex's answer (0 for the first); by default it
+  keeps its normal (noted). Then `navgs` times: for each unripped vertex `t` = its normal, plus each
+  unripped immediate neighbour's (`vnum`), each sum `(float)((double)t + (double)n)`; `len` the
+  `float` `sqrt((x² + y²) + z²)` widened; unless `FZERO(len)` (a NaN divides), `t = (float)((double)t
+  / len)`; kept in `tdx..tdz`; after all vertices each unripped vertex's normal set to it. At the end
+  `MRISrestoreVertexPositions(which)` again: **FS-368** (rule D, kept by default): the surface is left
+  at the set's positions, not the saved current ones; the correction (restoring the temporary set)
+  is on request (a switch, noted). Returns 0.
+- **Closest-vertex searches** (`MRISfindClosestOrigVertices(mris, nbhd)`,
+  `MRISfindClosestPialVerticesCanonicalCoords(mris, nbhd)`, and both passes of the thickness): for a
+  vertex `v`, the starting distance `sqrt(z² + (x² + y²))` of its own offset (named below), `v`
+  marked 1 and listed; for `ns` from 1 to `nbhd`: for each listed vertex (in list order; the list
+  grows during the ring and the ring walks the list as it was at its start) that is unripped and
+  not marked below `ns - 1` (marked 0 counts as unmarked), each immediate neighbour (`vnum`) that is
+  unripped and unmarked is listed and marked `ns`; then, with `d` its offset (below), skipped when
+  `(d.x n.x + d.y n.y) + d.z n.z < 0` (`n` the vertex's normal) or when the neighbour's normal dotted
+  with `n` is below 0; else `dist = sqrt((x² + y²) + z²)` of `d`; when `dist < min`, `min`, its ring
+  and vertex are kept (with verbose diagnostics and the ring equal to `nbhd`: `<vno> --> <nb> =
+  %2.3f` on standard output). At the end every listed unripped vertex's mark is set to 0. The
+  orig search: offset from `v`'s original position to the neighbour's current one, current normals;
+  the vertex's curvature set to the nearest vertex's number (as a `float`). The pial search: from
+  `v`'s white position to the neighbour's pial one, white normals; curvature as above and `v`'s
+  current position set to the nearest vertex's canonical one. Both then print `<count> vertices at
+  <n> distance` for `n` from 0 to `nbhd` (the counts of the nearest rings). **FS-370**: the
+  original keeps 100 counts and 100,000 listed vertices: a size of 100 or more, or more than 100,000
+  listed, reads and writes outside them; both modes count and list all (noted).
+- **Cortical thickness** (`MRISmeasureCorticalThickness(mris, nbhd, max_thick)`): pass 1 over all
+  vertices (`<vno> of <nvertices> vertices processed` at every multiple of 25,000, 0 included):
+  ripped: curvature 0; else the orig search with the vertex's own offset `x - origx` (and its
+  Gdiag_no line `vno=%d A %3d %6d (%g,%g,%g) (%g,%g,%g) %g %g`: original position, current
+  position, `dist`, the smallest so far); the distance above `max_thick` becomes it (counted as a
+  white-to-gray truncation); stored in the curvature. Pass 2 (the same progress lines): unripped
+  vertices only; the search from the neighbours' original positions to the vertex's current one
+  (offset `x - vn.origx`, current normals; Gdiag_no line with `B` and the neighbour's original
+  position); with verbose diagnostics and `|curv - dist| > 4`, `v %d, white->gray=%2.2f,
+  gray->white=%2.2f`; truncated likewise (gray-to-white); curvature `(dist + curv) * 0.5`; Gdiag_no:
+  `vno = %d, final measurment %g`. Then `thickness calculation complete, <w>:<g> truncations.` and
+  the ring counts (both passes counted). Returns 0.
+- **Curvature bookkeeping.** `mrisTrackTotalDistance(mris)` / `...New(mris)`: each unripped vertex's
+  curvature `nc + curv` with `nc = (d.x nx + d.y ny) + d.z nz` of its step `d` (`dx..dz`; the new form
+  `odx..odz`). `MRIStotalVariationDifference(mris)` (`double`): the sum of `(delta delta) area`,
+  `delta = |k1 - k2|` in `float`, widened; after each term a sum that is not finite prints the
+  error `curvature at vertex <vno> is not finite!` (fs.core's `ErrorPrintf`). `MRIStotalVariation`:
+  the same with `delta = k1² + k2²` in `float`, the term `delta area`. `MRIScurvatureError(mris,
+  Kd)`: the sum of `((k - Kd)²) area` for `k1` then `k2` of each unripped vertex, `double`.
+  `MRISuseCurvatureDifference`: curvature `|k1 - k2|`; `...Max`: `k1` when `|k1| > |k2|`, else `k2`,
+  and `kmin = %2.2f, kmax = %2.2f` on standard output; `...Min`: `k2` when `|k1| > |k2|`, else
+  `k1`; `...Stretch`: the largest of 0 and `dist[n] s - dist_orig[n]` over the first `vtotal`
+  neighbours, `s = sqrt(orig_area / total_area)` in `float` (glibc's `sqrtf`: `errno` `EDOM` for a
+  negative ratio); all four keep the unripped extremes from 100000 (min) and -100000 (max) in
+  `min_curv`, `max_curv`. `MRISuseNegCurvature`: 1 for an unripped vertex with a face of negative
+  area, else 0; extremes 0 and 1.
+- **Point in a spherical triangle** (`containsAnotherVertexOnSphere(mris, vno0, vno1, vno2, mode)`,
+  `double` from the canonical positions): for each rotation of the triangle (`(0,1,2)`, `(1,2,0)`,
+  `(2,0,1)`) as `(V0, V1, V2)`: `o = (float)(V1.c + V2.c) / 2`, `t = V2.c - V1.c` (in `float`),
+  `n = o x t` (`F_CROSS`), `sign = (V0.c - o) . n`. The candidates: the immediate neighbours of
+  `vno0` (other than `vno1`, `vno2`), of `vno1` (other than `vno0`, `vno2`) and of `vno2` (other than
+  `vno0`, `vno1`), unmarked ones only, with `mode` only those whose `fixedval` is set; each marked
+  as listed, all unmarked after. Returns 1 for the first candidate with `sign ((p - o) . n) >= 0`
+  for all three edges, else 0. **FS-371**: the original keeps 1,000 candidates; more write past
+  them; both modes list all (noted).
+
+## 98. Validation plan, part 16
+
+The probe's `mpc` command (`validation/probes/fs-surfio/`): an empty work folder with `d`; Gdiag's
+bits; `FREESURFER_SEED` always (1 to 10^6) and `FS_DISTURB_DISTANCES` one in three (`3.5`, `-2`,
+`1e1`, `abc`, `0x1p3`, `nan`, `12.75x`, `inf`); a binary triangle file of `srd`'s meshes read by
+`MRISread`; the status set one in three (2, 4, 0, 5, 1); the original area one in two; per vertex
+(after `MRISmakeDistOrig`) a mask: ripped one in 8; original, canonical, pial, white, current
+positions, values, principal curvatures, normals, white normals, steps, old steps, area each one
+in 2 to 5; mark (1 to 3) one in 12; `fixedval` one in 2; up to 8 original and current distances
+(those past `vtotal` dropped); per face ripped one in 8 and its area one in 4; then 1 to 6
+operations of this part (barycentric coordinates on a face, of any triangle with now and then two
+equal or nearly equal corners, the projection; the samples; the RMS height; the analytic distances
+for statuses 0, 2, 4, 5 with and without `fp`; storing and disturbing them; the zero-crossing
+distance; ratio and contrast; the brute-force distance with steps 0.05 to 1, and one in ten a NaN,
+infinity, 0, -0.25, 1e-20 or 2; the stuffed coordinates; the vertex normals of every set and an
+unsupported one; the surface normals of sets 4, 9, 7, 0, 3 with 0 to 3 averages; the three searches
+with sizes 0 to 4 (one in 40: 100, 101, -1) and `max_thick` up to 10; the curvature bookkeeping;
+the spherical-triangle test on a face's corners or three random vertices, `mode` one in three);
+each prints its result and the fields it changes (curvatures and extremes, normals of every set
+with the positions, original distances, marks, `errno` after the curvature choices). A case in
+which the original reads memory outside its arrays (FS-370, FS-371) or would loop (FS-367, ended by
+the probe's alarm) is counted, not compared. Observed (relay 18): the probe README.
+
+## 99. The discrete curvatures and the angle-weighted vertex normal (queue item 3.1-50; relay 19)
+
+These are `mris_curvature`'s discrete curvatures (its `-discrete` option) and the topology fixer's
+vertex normal. Every quantity is a `float` unless said; a `float` sum is accumulated in order, one
+term at a time; "a NaN kept" means a NaN argument passes through the limiting unchanged. A
+**cached face normal** is the one the triangle properties (§21) store for the face. The **arc
+cosine of a `float`** (`acosf`) is glibc's with `reproduce` and the correctly rounded one by
+default (§99.9); a NaN argument gives itself (quieted) in both.
+
+**99.1 The face's place of a vertex** (`FACE_vertexIndex_find(face, vno)`): the **last** of the
+face's three places (0 to 2) holding `vno`; -1 when none does. **The vertex off a shared edge**
+(`FACE_vertexIndexAtMask_find(face, common)`), with `common` the three numbers §94's common-vertex
+search gives for two faces (their common vertices in the first face's order, as `float`s, -1 for
+the rest): the first of the face's vertex numbers that is not among them (compared as `float`s);
+-1 when all are.
+
+**99.2 The marks** (`MRISsetMarks(mris, m)`, `MRISclearMarks(mris)` = mark 0): every unripped
+vertex's mark becomes `m` (stored as a 16-bit integer); ripped vertices keep theirs. Return 0.
+`MRIScountAllMarked(mris)`: the number of vertices, ripped ones included, whose mark is above 0.
+`MRISdilateMarked(mris, n)`: `n` times: every unripped vertex's `tx` becomes 0; then each unripped
+vertex's `tx` becomes, as a `float`, the largest of its own mark and its 1-hop neighbours' marks
+(ripped neighbours included); then each unripped vertex's mark becomes its `tx` (truncated). Return
+0. (`tx` is left holding that value.)
+
+**99.3 The faces in order around a vertex** (`MRIS_facesAtVertices_reorder(mris)`): when any
+vertex, ripped ones included, has a mark above 0, the program ends with the failed assertion
+`MRIScountAllMarked(apmris) == 0` (§3's assertion, its source line 3178 of
+`utils/mrisurf_topology.cpp`). Otherwise a newline on standard error, then for every vertex
+(ripped ones too) the progress bar (§47) with the message `Determining geometric order for vno
+faces...` and the vertex's **walk**:
+- A vertex without faces ends the program: on standard error two newlines, `FATAL ERROR
+  encountered in function ''FACES_aroundVertex_reorder'.`, a newline, `Mesh structural error.
+  Vertex <vno> has no faces.` and two newlines; exit status 1.
+- The walk places the vertex's faces (its face list, places `0 .. num-1`) in a sequence: place 0
+  first. Step `i` (from 0) takes the face last placed (the sequence's entry `i`) and looks at the
+  places `(i + j) mod num` for `j = 0, 1, ...`: the first face that shares exactly two vertices
+  with it (§94's common-vertex count; a face never shares exactly two with itself) and is not yet
+  in the sequence is placed next; the walk ends when all are placed. A step that places nothing
+  leaves the next step without a face: see FS-372.
+- The program counts its walks; when `BEVIN_TESTING_dumpFacesAroundVertex` is set at the moment
+  the count (before this walk) equals a limit (first 1; doubled each time it is used), the faces are
+  dumped (below) — i.e. at the 2nd, 3rd, 5th, 9th, ... walk of the program while it is set.
+- When not every face was placed: the dump, then the error message `FACES_aroundVertex_reorder:
+  packed / faces mismatch; vertex = <vno>, faces = <num>, packed = <placed>` (§2's error report,
+  code -4); the vertex is marked (1) and its lists are unchanged. Otherwise its face list becomes
+  the faces in the walk's order and its face-place list (`n`) each face's place of the vertex
+  (§99.1's search from the first place; 255 when absent).
+- **The dump**, on standard output: `Dumping faces around vno:<vno>`, then per face of the vertex
+  (list order) `  vi:<vno> is face:<fno> with vertices` (the vertex's number, as FreeSurfer
+  prints it, not the face's place) and ` <v>` for each of its three vertices, then a newline.
+Then the marks are dilated once (§99.2). Returns the last vertex's walk's result: 1, or -4 when it
+failed.
+
+**FS-372** (class a: out of bounds). In FreeSurfer, after a step that places nothing (a vertex on
+the surface's border whose walk did not start at an end of its faces, two fans of faces meeting at
+the vertex, a face sharing only one vertex with the rest), the next step starts from a sequence
+entry that was never written and reads before the vertex's face list; what follows depends on
+memory contents (garbage faces, writes past the sequence, a crash). larmorx stops the walk at that
+step in both modes, so the vertex fails as above (dump, message, mark), and notes FS-372. Closed
+surfaces (every vertex's faces one closed fan) are never affected.
+
+**99.4 The curvature sign of two faces** (`FACES_Hcurvature_determineSign(mris, fo, fi)`): the
+faces must share exactly two vertices, else the program ends: `FACES_Hcurvature_determineSign:
+During call <c>, the passed faces do not share an edge` (code -4; `c` the number of this function's
+earlier calls in the program that completed). With `O` and `I` the current positions of each face's
+vertex off the shared edge (§99.1), `nO`, `nI` the faces' cached normals: `dN = |(O + nO) - (I +
+nI)|` and `dA = |(O - nO) - (I - nI)|`, each component `(P + n) - (Q + m)` in `float` and the length
+`sqrt(z² + (x² + y²))` in `float`; the result is +1 when `dN < dA`, else -1 (a NaN gives -1). The
+completed-call count then increases. **FS-373** (class a): when every vertex of a face is on the
+shared edge (a face that names one vertex twice), FreeSurfer uses the position of the vertex before
+the surface's first (memory outside the vertices); larmorx ends the program in both modes with
+`FACES_Hcurvature_determineSign: a face has no vertex off the shared edge (a vertex named twice)`
+(code -4) and notes FS-373.
+
+**99.5 The face angles at a vertex** (`VERTEX_faceAngles_determine(mris, vno, angles)`): with `a` =
+the vertex's normal (`nx`, `ny`, `nz`) and `|a| = sqrt(az² + (ax² + ay²))`, for each face of the
+vertex (list order), `f` its cached normal, `|f| = sqrt((fx² + fy²) + fz²)`: `errno` set to 0;
+`r = ((fy ay + fx ax) + fz az) / (|f| |a|)`; `r` above 1 taken as 1, below -1 as -1 (a NaN kept);
+the angle `acosf(r)` stored at the face's place. (FreeSurfer then checks `errno` and would print
+`VERTEX_faceAngles_determine: acos error - angle set to zero for vertex = <vno>, face = <k>.` and
+use 0; `acosf` of a number in [-1, 1] or a NaN never sets it.) Returns the face count. **Its
+extremes** (`VERTEX_faceMinMaxAngles_determine(mris, vno, &imin, &min, &imax, &max)`): a vertex
+without faces ends the program (`VERTEX_faceMinMaxAngles_determine: error with determining face
+angles.`, code -4); otherwise `min` and `max` start at the first angle, and for each later place `k`
+an angle below `min` (above `max`) replaces it and sets `imin = k` (`imax = k`); the indices are
+written only then (the caller's values stay otherwise). Returns the face count.
+
+**99.6 The angle between two faces** (`FACES_angleNormal_find(mris, fi, fj)`): `i`, `j` the faces'
+cached normals, `|i| = sqrt(iz² + (ix² + iy²))`, `|j| = sqrt((jx² + jy²) + jz²)`; when either length,
+as a `double`, is above 1.0001, the program ends: `FACES_angleNormal_find: face normal not unit
+length -- Ni: <|i|>, Nj: <|j|>` (each `%f`) and a newline (code -4). Then the sign `s` (§99.4, which
+may end the program), `r = ((ix jx + iy jy) + iz jz) / (|j| |i|)` limited as in §99.5, and the result
+`acosf(r) · s` (`s` as a `float`).
+
+**99.7 The discrete K and H** (`MRIS_discreteKH_compute(mris)`): for every vertex the progress bar
+(`Determining KH curvatures...`). A marked vertex (mark not 0) gets `K = H = 0` and is skipped.
+Otherwise, over its faces in list order with `F_k` the face at place `k` and `G_k` the next
+(`k + 1`, the last with the first): the angle `θ_k` = §99.6 of (`F_k`, `G_k`); the length `e_k` of
+their shared edge (§94's `FACES_commonEdgeLength_find`, which ends the program when they do not
+share exactly two vertices); `A = A + area(F_k)`; `F_k`'s place of the vertex (§99.1; -1 ends the
+program: `MRIS_discreteKH_compute:`, a newline, a tab and `angleIndex lookup failure for vertex
+<vno>, face <k>`, code -4); `D = D + angle(F_k)[place]`; `S = θ_k e_k + S`. Then, in `double`, `K =
+q · (2π - D)` with `q = 3 / A` computed in `float` and `H = S · (0.75 / A)`; the vertex keeps both
+as `float`s. The first vertex (number 0), when unmarked, sets `Kmin = Kmax` to its `K` and `Hmin =
+Hmax` to its `H` (else they start at 0); every unmarked vertex then raises `Kmax` (`Hmax`) when its
+`double` value is above it, lowers `Kmin` (`Hmin`) when below (the stored `float`s); `Ktotal = (K ·
+area) + Ktotal` in `double`, kept as a `float` (`area` the vertex's). The surface's `Kmin`, `Kmax`,
+`Hmin`, `Hmax` and `Ktotal` are set at the end. Returns 0.
+
+**99.8 The principal curvatures** (`MRIS_discretek1k2_compute(mris, signed)`): for every vertex
+(ripped ones too) the progress bar (`Determining k1k2 curvatures...`); `d = H H - K` (a negative `d`
+counted and taken as 0; a NaN kept), `s = sqrt(d)`, `A = H + s`, `B = H - s`; with `signed`, `k1 =
+A ≥ B ? A : B` and `k2 = A ≤ B ? A : B`; without, the same comparisons of `|A|` and `|B|`; a NaN
+makes both `B`. With a count above 0 at the end: `cprintd("deltaViolations", count)` (§47). Returns
+0. **The second fundamental form, discrete** (`MRIScomputeSecondFundamentalFormDiscrete(mris,
+signed)`): the marks cleared (§99.2), the triangle properties (§21), the faces in order (§99.3, its
+result not used), §99.7 and §99.8; returns 0. **The obsolete H sign**
+(`MRIS_Hcurvature_determineSign(mris)`, not in FreeSurfer's headers): per vertex the progress bar
+(`Determining H sign for vertex faces...`) and the sum of §99.4 over its consecutive faces (the last
+with the first; none for a vertex without faces); `undefval` 1 when the sum is 0 or more, else -1.
+Returns 1.
+
+**99.9 The arc cosine of a `float` by default** (`acosf` with correctly rounded maths): the correctly
+rounded `double` arc cosine of the argument rounded to `float` (ties to even), except for the two
+floats in [-1, 1] where that `double` lies exactly halfway between two floats: `0x328885a3` gives
+`0x3fc90fdb` and `0x39826222` gives `0x3fc907b5` (the true values lie above the halfway points;
+established on all 2,130,706,434 floats in [-1, 1]: `validation/investigations/acosf-double-rounding/`).
+glibc's (`reproduce`) differs from it on 0.25 % of floats (`docs/findings/freesurfer-libm.md`).
+
+**99.10 The angle-weighted vertex normal** (`computeVertexPseudoNormal(mris, vno, norm, verbose)`):
+`norm` starts at 0, 0, 0; for each face of the vertex (list order), with `n0` the face-place list's
+entry (`n`), `n1` the next place (`n0 = 2` gives 0) and `n2` the previous (`n0 = 0` gives 2), `a_k`
+the face's vertex at place `k`:
+- when `a_n0` is not `vno`, or `a_n1` or `a_n2` is, or `a_n1 = a_n2`, and `verbose` is 3 or more, on
+  standard error (no newlines between): `error for vno in face <f>` when `a_n0 ≠ vno`, `error for vn1
+  in face <f>` when `a_n1 = vno`, `error for vn2 in face <f>` when `a_n2 = vno`, `error for vn in face
+  <f>` when `a_n2 = a_n1`, then `face <f> (<a_n0>,<a_n1>,<a_n2>) != (<vno>)` and a newline; with
+  `verbose` 3 also `computeVertexPseudoNormal: SHOULD NOT HAPPEN` and a newline; with 4 the program
+  ends with that message (`ERROR_BADPARM`). The face is used all the same.
+- `v1`, `v2`: the original positions of `a_n1` and `a_n2` less the vertex's (`float`); `r = (((v1x v2x
+  + v1y v2y) + v1z v2z) / |v1|) / |v2|` with `|v| = sqrt(vz² + (vx² + vy²))`; `α = r` above 1 → 1, `r`
+  of 0 or below → 0 (`+0`), a NaN kept; `α = acosf(α)`; `norm_c = n_c α + norm_c` for each component,
+  `n` the face's cached normal.
+The result is not normalized.
+
+## 100. Validation plan, part 17
+
+The probe's `mpd` command (relay 19): an empty work folder with `d`; Gdiag's show and verbose bits;
+`BEVIN_TESTING_dumpFacesAroundVertex` one case in six; a binary triangle file read by `MRISread`:
+the icosahedron subdivided once (42 vertices, 80 faces; 2 cases in 3) or twice (162, 320; 1 in 12)
+on a sphere of radius 1, 10, 50 or 100 (each coordinate moved by k/64 one time in 12), an open grid
+of 3 to 6 by 3 to 6 vertices with heights k/16 (1 in 12), or one of `srd`'s small meshes (1 in 12);
+per vertex a mask (ripped 1 in 40, a mark of -1 to 2 1 in 50, current position 1 in 25, normal 1 in
+12, original position 1 in 10, `K` and `H` 1 in 8, area 1 in 12; in half the cases each four times
+rarer), values as `mpc`'s (one case in five with NaNs and infinities one value in four); per face
+(ripped 1 in 40, area, angles and cached normal 1 in 12 to 15; the normal's components k/16 mostly);
+then 1 to 3 operations: the discrete second fundamental form (signed or not), the faces' order, KH,
+k1k2 (signed or not), the sign and the angle of two faces (sharing an edge 4 in 5, else any two),
+a vertex's face angles and their extremes, the obsolete H sign, the pseudo-normal (verbose 0, or 0 to
+4 one in three), the face-place helpers, the dilation (0 to 2), clearing the marks. Each prints its
+result and what it changes (`K`, `H`, `k1`, `k2`, marks, the extremes and `Ktotal`; the face and
+place lists; `undefval`; `tx`). A case noting FS-372 or FS-373, or FS-76 (an MGH header without
+voxels read for a transform's volume, §101), is counted, not compared. With the default, a case may
+differ from FreeSurfer's only by the arc cosine (§99.9): the probe's `check.py` counts those apart
+(`fix_libm`). Observed (relay 19): the probe README.
+
+## 101. The transform's volumes, validated (relay 19)
+
+§92's source geometry from `mri/orig` and the transform reader's source and destination volumes
+(its spec) are read with the volume library's `MRIreadHeader` (any format it recognizes; fs.io's).
+The probe's `srd` command (part 14) now writes, for a case with a transform, each of the volumes
+`orig.mgz` (the name the v8 stream's `%Generated by ... src <a> dst <b>` line gives), `t1.mnc.mgz`
+and `v.mnc.mgh` (minctracc's and the other comment lines need `.mnc` in a name) one time in four
+missing, as an MGH file (version 1, or 2 one in 15; each dimension 1 to 4, or -1 or 0 one in 20; one
+frame; `UCHAR`, `FLOAT`, `INT`, `SHORT` or 77; the RAS flag 1, 0 or -1; voxel sizes k/4, axes a
+signed permutation or any, centre k/8, each value one in 25 NaN, infinite, 0, -0 or 1e30; the voxels;
+one file in 12 cut), gzip-compressed one time in two for `.mgz`; and one case in three with a
+transform a regular file `mri/orig` (an MGH file, or random bytes one in five). Half the comment
+lines name those volumes. A message naming the work folder's absolute path (the volume reader's
+direction-cosine message) is compared with the path written `<w>` on both sides. A regular
+`mri/orig` without an extension is never recognized as an MGH volume (the format is found by the
+name, and no content test of the volume library recognizes MGH), so its read gives `ERROR: could
+not determine type of <name>` and the centre stays 0; FreeSurfer's subjects have `mri/orig` as a
+folder, which is not read. Observed (relay 19): seeds 7, 13 and 17 (2,000 cases each): reproduce
+identical on every compared case; 66 compared outputs carry a geometry read from a volume header.

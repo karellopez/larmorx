@@ -17,6 +17,7 @@ pub mod cma;
 pub mod coords;
 pub mod deriv;
 pub mod ltaread;
+pub mod resample;
 pub mod resize;
 pub mod rotate;
 mod rows;

@@ -17,7 +17,7 @@
 
 use std::io::Write;
 
-use larmorx_core::defects::{FS_291, FS_292, FS_293, FS_294, FS_295, FS_296, FS_297};
+use larmorx_core::defects::{FS_291, FS_292, FS_293, FS_294, FS_295, FS_296, FS_297, FS_461};
 use larmorx_freesurfer_core::affine::{AffineMatrix, set_affine_matrix};
 use larmorx_freesurfer_core::diag::{DIAG_SHOW, DIAG_VERBOSE};
 use larmorx_freesurfer_core::globals::Globals;
@@ -1860,4 +1860,154 @@ pub fn mri_average(
     }
     v.d().dof = v.d().dof.wrapping_add(1);
     Ok(v.done())
+}
+
+// ---- utils/mriset.cpp (3.1-38) ---------------------------------------------------------------
+
+/// `MRIcheckVolDims(mri1, mri2)`: with both volumes, a height, width or depth that differs ends
+/// the program (`ERROR: <Progname>-MRIcheckVolDims: volume1 height=<h1> != volume2 height=<h2>.`,
+/// then width, then depth).
+fn check_vol_dims(g: &mut Globals, err: &mut dyn Write, v: &Vols) -> Result<(), Fatal> {
+    if !v.has_dst() {
+        return Ok(());
+    }
+    let (a, b) = (v.a(), v.dref());
+    for (what, x, y) in [
+        ("height", a.vg.height, b.vg.height),
+        ("width", a.vg.width, b.vg.width),
+        ("depth", a.vg.depth, b.vg.depth),
+    ] {
+        if x != y {
+            let msg = format!(
+                "ERROR: {}-MRIcheckVolDims: volume1 {what}={x} != volume2 {what}={y}.\n",
+                g.progname
+            );
+            log::error_exit(g, err, ERROR_BADPARM, &msg)?;
+        }
+    }
+    Ok(())
+}
+
+/// `MRIreplaceValues(mri_src, mri_dst, in_val, out_val)`: the source with every voxel `FEQUAL` to
+/// `in_val` (`|v - in_val| < FLT_EPSILON` in `float`) replaced by `out_val`, written with
+/// `MRIsetVoxVal` (z outermost, then y, x, frames); a byte source and destination go to
+/// [`mri_replace_values_uchar`] with `nint` of both values as bytes. Without a destination, a
+/// clone of the source (`MRIclone`); a destination of another extent ends the program
+/// (`MRIcheckVolDims`). (FreeSurfer runs the slices in parallel; each voxel is its own.)
+pub fn mri_replace_values(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    p: Pair,
+    in_val: f32,
+    out_val: f32,
+) -> Result<Ret<Mri>, Fatal> {
+    let (mut v, _) = Vols::of_pair(p);
+    replace_values(g, out, err, &mut v, in_val, out_val)?;
+    Ok(v.done())
+}
+
+/// `MRIreplaceValuesUchar(mri_src, mri_dst, in_val, out_val)`: as [`mri_replace_values`] on byte
+/// volumes, through the row pointers; a source or destination of another type goes to
+/// [`mri_replace_values`] with the bytes as `float`s. FS-461: FreeSurfer replaces in frame 0
+/// only (the other frames of the destination as they were); the default replaces in every frame.
+pub fn mri_replace_values_uchar(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    p: Pair,
+    in_val: u8,
+    out_val: u8,
+) -> Result<Ret<Mri>, Fatal> {
+    let (mut v, _) = Vols::of_pair(p);
+    replace_values_uchar(g, out, err, &mut v, in_val, out_val)?;
+    Ok(v.done())
+}
+
+fn replace_values(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    v: &mut Vols,
+    in_val: f32,
+    out_val: f32,
+) -> Result<(), Fatal> {
+    check_vol_dims(g, err, v)?;
+    let (w, h, d) = (v.a().vg.width, v.a().vg.height, v.a().vg.depth);
+    clone_into(g, out, err, v)?;
+    if v.a().mtype == MRI_UCHAR && v.dref().mtype == MRI_UCHAR {
+        // (BUFTYPE)nint(...): the int's low byte
+        let o = nint(g, f64::from(out_val)) as u8;
+        let i = nint(g, f64::from(in_val)) as u8;
+        return replace_values_uchar(g, out, err, v, i, o);
+    }
+    let nf = v.a().nframes;
+    for z in 0..d {
+        for y in 0..h {
+            for x in 0..w {
+                for f in 0..nf {
+                    let mut val = getv(g, err, v, true, x, y, z, f)?;
+                    if fequal(val, in_val) {
+                        val = out_val;
+                    }
+                    setv(g, err, v, x, y, z, f, val)?;
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn replace_values_uchar(
+    g: &mut Globals,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    v: &mut Vols,
+    in_val: u8,
+    out_val: u8,
+) -> Result<(), Fatal> {
+    check_vol_dims(g, err, v)?;
+    let (w, h, d) = (v.a().vg.width, v.a().vg.height, v.a().vg.depth);
+    clone_into(g, out, err, v)?;
+    if v.a().mtype != MRI_UCHAR || v.dref().mtype != MRI_UCHAR {
+        return replace_values(g, out, err, v, f32::from(in_val), f32::from(out_val));
+    }
+    let nf = v.a().nframes;
+    if nf > 1 {
+        g.notices.add(
+            &FS_461,
+            "MRIreplaceValues of a byte volume replaces in its first frame only",
+        );
+    }
+    let frames = if g.notices.reproduce() { 1 } else { nf };
+    const W: &str = "MRIreplaceValuesUchar";
+    for f in 0..frames {
+        for z in 0..d {
+            for y in 0..h {
+                let sl = i64::from(z) + i64::from(f) * i64::from(d);
+                for x in 0..w {
+                    let Num::I(b) = rows::read(g, W, v.a(), sl, i64::from(y), i64::from(x), MRI_UCHAR)
+                    else {
+                        unreachable!("a byte")
+                    };
+                    let val = if b == i64::from(in_val) {
+                        out_val
+                    } else {
+                        b as u8
+                    };
+                    rows::write(
+                        g,
+                        W,
+                        v.d(),
+                        sl,
+                        i64::from(y),
+                        i64::from(x),
+                        MRI_UCHAR,
+                        Num::I(i64::from(val)),
+                    );
+                }
+            }
+        }
+    }
+    Ok(())
 }

@@ -20,7 +20,7 @@
 
 use larmorx_core::defects::{FS_123, FS_124};
 use larmorx_freesurfer_core::globals::Globals;
-use larmorx_freesurfer_core::sse::{add, add64, div, div64, mul, mul64, sqrt, sqrt64, sub, sub64};
+use larmorx_freesurfer_core::sse::{add, add64, div, div64, mul, mul64, sqrt, sub, sub64};
 use larmorx_freesurfer_core::utils::fast_approx_atan2f;
 
 use crate::aaa::{MrisStatus, SurfGlobals, get_fix_vertex_area_value};
@@ -351,7 +351,7 @@ impl Calc {
 
     /// `computeAverageVertexDistance()`: the reproducible sums of the 1-hop distances between
     /// unripped neighbours; `avg_vertex_dist` their mean, `std_vertex_dist` their deviation.
-    fn average_vertex_distance(&self, mris: &mut Mris) {
+    fn average_vertex_distance(&self, g: &mut Globals, mris: &mut Mris) {
         let (mut s, mut s2, mut c) = (Vec::new(), Vec::new(), Vec::new());
         for (lo, hi) in romp_partials(0, self.nvertices as i32) {
             let (mut sum, mut sum2, mut n) = (0.0f64, 0.0f64, 0.0f64);
@@ -381,10 +381,13 @@ impl Calc {
             romp_total(0.0, &c),
         );
         let avg = div64(sum, n);
-        let std = sqrt64(div64(
-            mul64(n, sub64(div64(sum2, n), mul64(avg, avg))),
-            sub64(n, 1.0),
-        ));
+        let std = crate::mp::sqrt64_errno(
+            &mut g.errno,
+            div64(
+                mul64(n, sub64(div64(sum2, n), mul64(avg, avg))),
+                sub64(n, 1.0),
+            ),
+        );
         mris.avg_vertex_dist = avg;
         mris.std_vertex_dist = std;
     }
@@ -522,7 +525,7 @@ pub fn compute_metric_properties_faster(
     c.normals_areas_angles(g, io, mris);
     c.dimensions(g, mris);
     c.vertex_distances(mris);
-    c.average_vertex_distance(mris);
+    c.average_vertex_distance(g, mris);
     mris.avg_vertex_area = f64::from(div(mris.total_area, mris.nvertices as f32));
     if orients_as_ellipsoid(mris.status) {
         c.orient_ellipsoid(mris);

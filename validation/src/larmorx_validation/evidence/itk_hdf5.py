@@ -15,6 +15,7 @@ from pathlib import Path
 import numpy as np
 
 from larmorx_validation.evidence import common, core
+from larmorx_validation.evidence import present as present_
 from larmorx_validation.figures import cache as fcache
 from larmorx_validation.figures import records
 
@@ -431,9 +432,7 @@ def export(ctx: core.Context) -> dict:
     objects = _objects_table(src)
     transforms, _ = _transforms_table(e.dir, src)
     written, _ = _written_table(e.dir, src)
-    for t in (objects, transforms, written):
-        t["title"] = t["title"]
-    return {
+    doc = {
         "schema": 1,
         "tool": TOOL,
         "title": "ITK transform files",
@@ -465,6 +464,55 @@ def export(ctx: core.Context) -> dict:
         "tables": [objects, transforms, written],
         "examples": [],
     }
+    return present(doc)
+
+
+# ----------------------------------------------------------------- the writing guide's words
+
+#: ITK's transform files: the replica ports a part of ITK (its transform reading and writing,
+#: and the parts of HDF5 1.12.1 they use), not a program
+PAGE = present_.Page(
+    "ITK",
+    "",
+    "5.4.5",
+    part="transform files",
+    texts=[(r"; by default it stores\b", "; in `fix`, its default, it stores")],
+)
+
+#: The record's categories, by what their files are and what is done with them.
+CATEGORIES = {
+    "errors": "files refused",
+    "hdf5": "HDF5's storage features",
+    "read/catalog": "reading: the test data's files",
+    "read/fmriprep-25.2.6": "reading: fMRIPrep 25.2.6's files",
+    "read/h5py": "reading: files h5py wrote",
+    "read/itk": "reading: files ITK wrote",
+    "write": "writing",
+}
+
+#: The tables' columns, the original first ("h5py ↔ replica").
+COLUMNS = {
+    "Values (larmorx's reading)": "Values (the replica's reading)",
+    "h5py ↔ larmorx": "h5py ↔ replica",
+    "ITK ↔ larmorx": "ITK ↔ replica",
+}
+
+
+def present(doc: dict) -> dict:
+    """ITK transform files' page in the writing guide's words: texts and the port only (the
+    page has no worked example: its tables, cases and agreement)."""
+    for t in doc["tables"]:
+        for c in t["columns"]:
+            if isinstance(c, dict):
+                c["label"] = COLUMNS.get(c["label"], c["label"])
+        t["columns"] = [COLUMNS.get(c, c) if isinstance(c, str) else c for c in t["columns"]]
+    for im in doc["implementations"]:
+        present_.implementation(PAGE, im, "standard comparison")
+        # the record compares the reading with h5py's too: the HDF5 library is the original of
+        # the files' format
+        im["title"] += ", and HDF5 as h5py reads it"
+    present_.random_testing(PAGE, doc, {"port": "replica"})
+    return present_.finish(PAGE, doc, CATEGORIES)
 
 
 if __name__ == "__main__":

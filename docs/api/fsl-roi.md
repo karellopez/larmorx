@@ -1,43 +1,178 @@
 # fslroi and standard_space_roi (regions of an image)
 
-`lx.fsl.fslroi` (command line `larmorx fsl fslroi`): FSL 6.0.7.23's `fslroi`, a box of an image
-(`xmin xsize ymin ysize zmin zsize`), a range of its volumes (`tmin tsize`) or both, in the
-image's own data type, its header's transforms moved to the box's corner; a size of -1 is the
-rest of the axis, and the box may reach outside the image (zeros there). The indices are NIfTI
-voxel indices, from 0.
+`lx.fsl.fslroi` and `lx.fsl.standard_space_roi` (command line `larmorx fsl fslroi`, `larmorx fsl
+standard_space_roi`): FSL 6.0.7.23's `fslroi`, which takes a box, a range of volumes or both out
+of an image, and FLIRT's script `standard_space_roi` (fsl-flirt 2111.4), which masks an image or
+cuts it down with a standard space's field of view or mask, taken into the image's space.
 
-`lx.fsl.standard_space_roi` (command line `larmorx fsl standard_space_roi`): FLIRT's script
-(fsl-flirt 2111.4), which registers the input to a standard-space reference with FLIRT
-(`MNI152_T1_2mm` unless `-ssref` gives another), takes the reference's field of view (less its
-outer voxel) or a standard-space mask back into the input's space with the inverse matrix, and
-masks the input with it and/or cuts the input down to its bounding box. `bet -S` and `bet -B`
-run it (`-b -d`, `-maskFOV -roiNONE -d`).
+The ports come first. One section per program follows, then FSL's standard images, which
+`standard_space_roi` reads, and FSL's defects as both ports correct them. Each program's section
+is the source of its reference page on the documentation site (`python -m larmorx_validation
+reference`), with its options table checked against the code. The page's dates are in its
+[History](#history).
 
-**Implementations.** FSL is distributed under the FSL Licence (non-commercial use only), so
-larmorx keeps its FSL tools in two implementations ([licensing](../licensing.md)):
-- the **clean-room original** (since 2026-11-05; `crates/larmorx-fsl`, `larmorx_fsl::cli::fslroi`
-  and `::ssroi`, Apache-2.0, written from
-  [`specs/standard_space_roi.md`](../../specs/standard_space_roi.md), FSL's documentation and
-  black-box runs of FSL 6.0.7.23: [PROVENANCE](../../crates/larmorx-fsl/PROVENANCE.md)), in this
-  process; `standard_space_roi` runs the original's own FLIRT, `convert_xfm`, `fslmaths`,
-  `fslstats` and `fslroi`, and fslpy's `imcp`, in the same process: no FSL installation is
-  needed;
-- the bit-exact **replica** (2026-11-04), `larmorx-nc fsl fslroi` and `larmorx-nc fsl
-  standard_space_roi` (package `larmorx-nc`, under the FSL Licence's terms:
-  [PROVENANCE](../../crates-nc/larmorx-nc-flirt/PROVENANCE.md)), which runs every program in the
-  replica's own process.
+## Ports
 
-`implementation="auto"` runs the replica when its program is found, else the clean-room
-original; `"clean-room"` (`"original"`, 0.1.0rc1's spelling, still works) and `"replica"` choose. The command line follows
-`--implementation` (before the family) or `LARMORX_IMPLEMENTATION` the same way.
+FSL is distributed under the FSL Licence (non-commercial use only), so each program has two
+ports, a replica and a clean room, in different packages ([licensing](../licensing.md)):
 
-**Built for speed** (the original): the registration to the reference is almost all of
-`standard_space_roi`'s time; besides it, without `-d` the temporary images are written
-uncompressed (they are removed at the end), and when the field of view is both the mask and the
-region it is resampled into the input's space once. `fslroi` converts the stored values once (or
-moves them, where the type is kept) and copies the box row by row in parallel.
+- **The clean room** (`crates/larmorx-fsl`, `larmorx_fsl::cli::fslroi` and `::ssroi`, Apache-2.0)
+  is written from [`specs/standard_space_roi.md`](../../specs/standard_space_roi.md), FSL's
+  documentation and black-box runs of FSL 6.0.7.23 ([PROVENANCE](../../crates/larmorx-fsl/PROVENANCE.md)),
+  and runs in this process. Its `standard_space_roi` runs the clean room's own FLIRT,
+  `convert_xfm`, `fslmaths`, `fslstats` and `fslroi`, and fslpy's `imcp`, in the same process: no
+  FSL installation is needed.
+- **The replica** is bit-exact: `larmorx-nc fsl fslroi` and `larmorx-nc fsl standard_space_roi`,
+  in the package `larmorx-nc` (`crates-nc/`), under the FSL Licence's terms. It runs every program
+  in the replica's own process.
 
-**Status: `experimental`** (the records come with BET's options, in the same part).
+`implementation="auto"` runs the replica when its program is found, else the clean room;
+`"clean-room"` (`"original"`, 0.1.0rc1's spelling, still works) and `"replica"` choose. The
+command line follows `--implementation` (before the family) or `LARMORX_IMPLEMENTATION` the same
+way.
+
+## `fslroi`
+
+<!-- reference
+program: fslroi
+group: fsl
+original: FSL 6.0.7.23
+python: larmorx.fsl.fslroi
+command-line: crates/larmorx-fsl/src/cli/fslroi.rs
+records: {replica: [fsl-bet-replica], clean-room: [fsl-bet]}
+evidence: fsl-bet
+-->
+
+`fslroi` takes a box of an image (`xmin xsize ymin ysize zmin zsize`), a range of its volumes
+(`tmin tsize`) or both. The result keeps the image's own data type, and its header's transforms
+move to the box's corner. A size of -1 is the rest of the axis, and the box may reach outside the
+image (zeros there). The indices are NIfTI voxel indices, from 0.
+
+### Python (`fslroi`)
+
+`lx.fsl.fslroi(image, *, x=None, y=None, z=None, t=None, n_threads=1, implementation="auto", upstream_defects="fix")`
+
+`image` is a path or an `lx.Image`; `x`, `y`, `z` and `t` are `(min, size)` pairs. Only `t`, only
+space (`x`, `y`, `z`) or all four; an axis of space not given is whole, `(0, -1)`. The result is
+an `lx.Image`.
+
+### Options of `fslroi`
+
+| `fslroi` arguments | Python | Notes |
+|---|---|---|
+| `<input>` | `image` | |
+| `<output>` | the result | |
+| `<tmin> <tsize>` | `t=(tmin, tsize)` | a range of volumes |
+| `<xmin> <xsize> <ymin> <ysize> <zmin> <zsize>` | `x`, `y`, `z` | a box; an axis not given in Python: `(0, -1)` |
+| all ten numbers | `x`, `y`, `z`, `t` | both |
+
+### Examples of `fslroi`
+
+<!-- inputs: bold.nii.gz=head4d -->
+
+```python example
+import larmorx as lx
+
+first = lx.fsl.fslroi("bold.nii.gz", t=(0, 2))
+first.shape  # -> (40, 48, 40, 2)
+```
+
+```bash example
+larmorx fsl fslroi bold.nii.gz bold_first2 0 2
+```
+
+### Ports of `fslroi`
+
+Both ports are complete. FSL's defects are corrected by default, and `reproduce` gives FSL's
+behaviour: fslroi exits with status 1 after the errors it reports (**FSL-215**), an int8 input is
+written as int8 (**FSL-217**), and with `FSLOUTPUTTYPE` unset the image is written as `.nii.gz`
+(**FSL-11**). The clean room is built for speed: it converts the stored values once (or moves
+them, where the type is kept) and copies the box row by row in parallel.
+
+Both records are BET's, as these programs came with BET's options. The replica's holds 26 cases
+of `fslroi`: 24 identical to FSL, 2 where both refuse alike. The clean room's holds 26: 24 within
+its thresholds, 2 refused alike.
+
+## `standard_space_roi`
+
+<!-- reference
+program: standard_space_roi
+group: fsl
+original: FSL 6.0.7.23
+python: larmorx.fsl.standard_space_roi
+command-line: crates/larmorx-fsl/src/cli/ssroi.rs
+parser: parse
+records: {replica: [fsl-bet-replica], clean-room: [fsl-bet]}
+evidence: fsl-bet
+-->
+
+`standard_space_roi` is a script that masks an image or cuts it down with a region of a standard
+space. It registers the input to a standard-space reference with FLIRT (`MNI152_T1_2mm` unless
+`-ssref` gives another), takes the reference's field of view (less its outer voxel) or a
+standard-space mask back into the input's space with the inverse matrix, and masks the input with
+it and/or cuts the input down to its bounding box. `bet -S` and `bet -B` run it (`-b -d`,
+`-maskFOV -roiNONE -d`).
+
+### Python (`standard_space_roi`)
+
+`lx.fsl.standard_space_roi(image, *, mask=None, roi=None, reference=None, alt_input=None, betpremask=False, flirt_args=None, fsl_data=None, n_threads=1, implementation="auto", upstream_defects="fix")`
+
+The images are paths or `lx.Image` objects.
+
+### Options of `standard_space_roi`
+
+| `standard_space_roi` option | Python | Notes |
+|---|---|---|
+| `<input>` `<output>` | `image`, the result | |
+| `-maskFOV`, `-maskMASK <mask>`, `-maskNONE` | `mask="fov"`, `mask=<image>`, `mask="none"` | `None`: the script's default |
+| `-roiFOV`, `-roiMASK <mask>`, `-roiNONE` | `roi="fov"`, `roi=<image>`, `roi="none"` | |
+| `-ssref <ref>` | `reference` | |
+| `-altinput <image>` | `alt_input` | |
+| `-b` | `betpremask=True` | given before `mask` and `roi` |
+| `-d` | always | the matrices are returned: `to_standard`, `from_standard` |
+| FLIRT's options after the script's | `flirt_args=[...]` | |
+| `LARMORX_FSL_DATA` | `fsl_data` | where [FSL's standard images](#fsls-standard-images) are |
+
+The script's own rules hold: the last `-mask*` and `-roi*` given win, `-b` sets the mask, its 0.5
+threshold and `-roiNONE` (a later `-maskMASK` keeps the threshold), every option of the script
+comes before FLIRT's, and an option the script does not know ends its options (FLIRT gets it and
+the rest).
+
+### Examples of `standard_space_roi`
+
+<!-- inputs: T1w.nii.gz=head std.nii.gz=head -->
+
+```python example
+import larmorx as lx
+
+r = lx.fsl.standard_space_roi("T1w.nii.gz", reference="std.nii.gz")
+r.to_standard.shape  # -> (4, 4)
+```
+
+```bash example
+larmorx fsl standard_space_roi T1w.nii.gz T1w_roi -ssref std.nii.gz
+```
+
+### Ports of `standard_space_roi`
+
+Both ports are complete. FSL's defects are corrected by default, and `reproduce` gives FSL's
+behaviour: **FSL-11**, and **FSL-211** to **FSL-214** (the script's names, cleanup, `maskthr` and
+failures). The clean room converts an input of another file type than `FSLOUTPUTTYPE` as fslpy's
+`imcp` does with nibabel (the same header and data in the output's file layout and compression: a
+`.nii.gz` input becomes FSL's `.nii` byte for byte, the record's `ssroi/phantom-none-convert`);
+the replica refuses that case clearly (exit 1) in both modes. The clean room is built for speed:
+the registration to the reference is almost all of `standard_space_roi`'s time; besides it,
+without `-d` the temporary images are written uncompressed (they are removed at the end), and
+when the field of view is both the mask and the region it is resampled into the input's space
+once.
+
+Both records are BET's, as these programs came with BET's options. The replica's holds 25 cases
+of `standard_space_roi`: 16 identical to FSL, 8 where both refuse alike, and the conversion the
+replica refuses. The clean room's holds 25: 17 within its thresholds, 8 refused alike. Its
+`standard_space_roi` is FSL's bit for bit where its FLIRT gives FSL's matrix (an adult's T1w, a
+Philips T1w and a T2w with the defaults); elsewhere its matrices are within FLIRT's 12-dof
+threshold and, given FSL's matrix, every file is FSL's
+([findings](../findings/fsl-bet-clean-room.md), "standard_space_roi and fslroi").
 
 ## FSL's standard images
 
@@ -48,7 +183,7 @@ moves them, where the type is kept) and copies the box row by row in parallel.
 `larmorx` package (Apache-2.0) never ships them. `-ssref` (and masks given with `-maskMASK`,
 `-roiMASK`) need none of them.
 
-**The original** looks for each, in this order (`specs/bet.md` §5.4):
+**The clean room** looks for each, in this order (`specs/bet.md` §5.4):
 1. the directory the call names: `fsl_data=` in Python, `LARMORX_FSL_DATA` otherwise (laid out
    as `$FSLDIR/data`: `<dir>/standard/MNI152_T1_2mm.nii.gz`, any of FSL's image extensions); when
    it is given, nothing else is searched;
@@ -72,7 +207,7 @@ moves them, where the type is kept) and copies the box row by row in parallel.
 Files from larmorx-nc's copy and from the cache must match FSL's checksums (a damaged file is
 refused, naming it); files from the named directory or `$FSLDIR` are used as they are (another
 FSL release's images give that release's results, as in FSL). When none has the image, the
-original refuses before running anything (exit 1), naming the image and every place looked
+clean room refuses before running anything (exit 1), naming the image and every place looked
 (`larmorx fsl standard_space_roi: FSL's standard image MNI152_T1_2mm was not found (looked in:
 ...)`).
 
@@ -81,39 +216,19 @@ own copy (`crates-nc/wheel-data/data/share/larmorx-nc/fsl-data/`, installed by i
 refuses likewise (`larmorx-nc: error: standard_space_roi: FSL's data image
 standard/MNI152_T1_2mm was not found: ...`, exit 1).
 
-## Options
+## Defects of the original, corrected by default
 
-| `fslroi` | Python (`lx.fsl.fslroi(image, ...)`) |
-|---|---|
-| `<tmin> <tsize>` | `t=(tmin, tsize)` |
-| `<xmin> <xsize> <ymin> <ysize> <zmin> <zsize>` | `x=`, `y=`, `z=` (an axis not given: `(0, -1)`) |
-| all ten numbers | `x=`, `y=`, `z=`, `t=` |
-
-| `standard_space_roi` | Python (`lx.fsl.standard_space_roi(image, ...)`) |
-|---|---|
-| `-maskFOV`, `-maskMASK <mask>`, `-maskNONE` | `mask="fov"`, `mask=<image>`, `mask="none"` (`None`: the script's default) |
-| `-roiFOV`, `-roiMASK <mask>`, `-roiNONE` | `roi="fov"`, `roi=<image>`, `roi="none"` |
-| `-ssref <ref>` | `reference=` |
-| `-altinput <image>` | `alt_input=` |
-| `-b` | `betpremask=True` (given before `mask` and `roi`) |
-| `-d` | always (the matrices are returned: `to_standard`, `from_standard`) |
-| FLIRT's options after the script's | `flirt_args=[...]` |
-
-The script's own rules hold: the last `-mask*` and `-roi*` given win, `-b` sets the mask, its 0.5
-threshold and `-roiNONE` (a later `-maskMASK` keeps the threshold), every option of the script
-comes before FLIRT's, and an option the script does not know ends its options (FLIRT gets it and
-the rest).
-
-## Deliberate differences (D13; `LARMORX_UPSTREAM_DEFECTS=reproduce` gives FSL's)
+Corrected by default; `upstream_defects="reproduce"` (the command line's `--upstream-defects
+reproduce`, or `LARMORX_UPSTREAM_DEFECTS=reproduce`) gives FSL's behaviour.
 
 - **FSL-11** (`fslroi`, `standard_space_roi`): with `FSLOUTPUTTYPE` unset FSL's fslroi stops with
   FSL's message at its output (exit 1), and standard_space_roi's script goes on after its FLIRT
-  stops there (exit 0, no output). Both implementations, the clean-room original and the replica,
-  write the images as `NIFTI_GZ` (`.nii.gz`: the bytes `FSLOUTPUTTYPE=NIFTI_GZ` gives) and name
-  FSL-11 on one line per command, in the same words (the replica's line starts `larmorx-nc:`),
-  which say what FSL's program does (for standard_space_roi: "FSL's standard_space_roi writes no
-  image (its steps stop with an error at their first image) and exits 0"); `reproduce` stops as
-  FSL does. Command line only: the Python functions set the type themselves.
+  stops there (exit 0, no output). Both ports, the clean room and the replica, write the images
+  as `NIFTI_GZ` (`.nii.gz`: the bytes `FSLOUTPUTTYPE=NIFTI_GZ` gives) and name FSL-11 on one line
+  per command, in the same words (the replica's line starts `larmorx-nc:`), which say what FSL's
+  program does (for standard_space_roi: "FSL's standard_space_roi writes no image (its steps stop
+  with an error at their first image) and exits 0"); `reproduce` stops as FSL does. Command line
+  only: the Python functions set the type themselves.
 - **FSL-211** (`standard_space_roi`): the script expands its arguments unquoted; by default each
   name is one name, whatever its blanks; `reproduce` splits them as the shell does (with the
   shell's `[: too many arguments`). A name with `*`, `?` or `[` in `reproduce` is refused: the
@@ -128,15 +243,13 @@ the rest).
   bytes as uint8, so a negative value becomes 128 to 255); named whenever the input is int8, with
   the number of negative values; `reproduce` writes FSL's uint8 (named where a value is negative).
 
-**imcp's conversion.** `standard_space_roi -maskNONE -roiNONE` copies its input with fslpy's
-`imcp`, which converts an input of another file type than `FSLOUTPUTTYPE` with nibabel. The
-original converts it (the same header and data in the output's file layout and compression: a
-`.nii.gz` input becomes FSL's `.nii` byte for byte, the record's `ssroi/phantom-none-convert`);
-the replica refuses that case clearly (exit 1) in both modes.
-
-The validation: the BET records (`docs/validation/fsl-bet.md` for the original,
+The validation: the BET records (`docs/validation/fsl-bet.md` for the clean room,
 `fsl-bet-replica.md` for the replica), categories `ssroi/` and `fslroi/` and the `defects/`
-cases of FSL-211 to FSL-215. The original's `standard_space_roi` is FSL's bit for bit where its
-FLIRT gives FSL's matrix (an adult's T1w, a Philips T1w and a T2w with the defaults); elsewhere
-its matrices are within FLIRT's 12-dof threshold and, given FSL's matrix, every file is FSL's
-(`docs/findings/fsl-bet-original.md`, "standard_space_roi and fslroi").
+cases of FSL-211 to FSL-215.
+
+## History
+
+- **The replica** (2026-11-04), with BET's options:
+  [PROVENANCE](../../crates-nc/larmorx-nc-flirt/PROVENANCE.md).
+- **The clean room** (2026-11-05).
+- **Status: `experimental`**; the records came with BET's options, in the same part.

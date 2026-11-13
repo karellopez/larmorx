@@ -129,6 +129,42 @@ shown = "1 heading of the register's restricted FSL section (FSL-50), after the 
 nature = "the title of a defect entry"
 judgement = "a title only, after the work; declared"
 
+[[access]]
+agent = "ae9c2a891819fe812"
+line = 264
+time = "2026-11-13T11:49:00Z"
+declared = "partly"
+shown = "two rows of FSL's mcflirt probe folder's README (validation/probes/fsl-mcflirt-affine-trace/: nan_trap.c's row, which names the FreeSurfer probe folder fs-vnl in one clause, and the row of FSL's decompose_aff and rotmat2euler on NaN affines), printed by a grep for nan_trap's build line"
+nature = "FSL's family (mcflirt's replica probes), not the tool's; the folder name fs-vnl without content"
+judgement = "no contamination of substance: another family's probe descriptions, read for the AArch64 NaN emulation the brief named (nan_trap.c and the README's build line allowed); the README rows beyond the build line undeclared"
+
+[[access]]
+agent = "ae9c2a891819fe812"
+line = 267
+time = "2026-11-13T11:50:00Z"
+declared = "partly"
+shown = "five rows of the same README (cost_trace.cc's row, a pointer to docs/findings/fsl-mcflirt.md's NaN section by its title, nan_trap.c's and nan_sites.py's rows, the build command's line), printed by a grep for the build line"
+nature = "FSL's family, not the tool's; a findings file's section title without its content"
+judgement = "no contamination of substance: the same search as line 264, another family's probe descriptions only"
+
+[[access]]
+agent = "ae9c2a891819fe812"
+line = 271
+time = "2026-11-13T11:50:30Z"
+declared = "yes"
+shown = "nan_trap.c's first 40 lines (its header comment, includes and static state) and build.sh's gcc line that builds libnan_trap.so"
+nature = "generic C written for larmorx (Apache-2.0, no FSL code) in FSL's probe folder; the build line declared by the implementer as one line beyond the brief"
+judgement = "no contamination: nan_trap.c is allowed by the brief, the build line is a compiler command, and neither holds FreeSurfer's or FSL's code"
+
+[[access]]
+agent = "a95b98a0326dc825f"
+line = 635
+time = "2026-11-13T17:30:00Z"
+declared = "no"
+shown = "the implementer's own changed files (crates/larmorx-fs-core/src/mri/*.rs and its tests) in `git status --short` and a clippy message on its own copy.rs, from `cargo fmt` and `cargo clippy` run in its own worktree; the scanner resolved the relative paths against the unit oracle's probes folder, where an earlier command of the relay had run the prebuilt probe"
+nature = "the clean room's own code; no file of the unit oracle's folder exists at those paths"
+judgement = "not restricted material: a scanner false positive (relative paths of the implementer's own worktree resolved against a stale working directory)"
+
 # ------------------------------------------------- implementers: files their briefs forbade
 
 [[access]]
@@ -403,6 +439,7 @@ judgement = "plumbing in larmorx's own words, nothing AFNI-derived; the only edi
 "GNU/glibc_qsort" = "clean: written from specs/glibc-qsort.md and black-box runs of the C library; no restricted material seen (the build log's crate names only)"
 "FreeSurfer/ranlux" = "clean: written from specs/ranlux.md and black-box runs of FreeSurfer's functions and mri_volsynth; the replica workspace's file names and build caches seen in build output only; a slip declared by the implementer (larmorx-core's provenance lines on VXL's generator and POSIX's drand48, which name how FreeSurfer calls them) unrelated to RANLUX"
 "FreeSurfer/cubic_spline" = "clean: written from specs/burkardt-spline.md and black-box runs of FreeSurfer's spline; the replica workspace's file names and build caches seen in build output only"
+"FreeSurfer/fs-core" = "clean: FreeSurfer's core services, mathematics and volume structure, written from specs/freesurfer-core.md, specs/freesurfer-maths.md and specs/freesurfer-mri.md and black-box runs of FreeSurfer's compiled functions (the prebuilt probes), FreeSurfer 8.2.0's official programs and the C library; no content of FreeSurfer's source, the replica or a document written from the source seen; reads beyond the briefs only of another family's generic C (the AArch64 NaN emulation's build line and two README rows in FSL's mcflirt probe folder) and a count of the maths probe folder's lines, judged no contamination; one scanner false positive (its own files)"
 "tedana/t2smap" = "clean: seven clean relays wrote it from specs/t2smap.md and black-box runs of tedana; no content of tedana's source or of the replica seen before or during the work (names, builds, black-box runs of the replica program and licence files only; one declared slip of another family: the header bytes of the PyPI larmorx-nc program); its shared runs with the replica (23.5 % of tokens, read at the merge of 2026-11-12) are tedana's observable texts (messages, log locations, the help, dataset_description.json) written through the same main-package APIs (argparse, the defect notices, PyError)"
 
 # ------------------------------------------------- what the evidence cannot see

@@ -55,7 +55,7 @@ case in an empty work folder `<cases>.d` with a subfolder `d`: its input files, 
 `MRIScopyMarksToAnnotation`, `MRISmaxMarked`, `MRISwriteAscii`, `MRISwriteNormalsAscii`, `MRISwriteVTK`,
 `MRISwriteCurvVTK` on names relative to the folder, each passed with two NUL bytes before it; `G` where
 FreeSurfer would read memory it does not own; then the state and every file in the folder with its
-bytes; the port's side in `tests/fs_surfio/sfile.rs`, in a temporary folder), 30 commands. `build.sh` also builds
+bytes; the port's side in `tests/fs_surfio/sfile.rs`, in a temporary folder), 30 commands; since relay 12 (queue item 3.1-48 part a) `cfile` (as `sfile`: an empty work folder, the input files, a surface from `MRISalloc`, `FS_POSIX`, `FS_GII`, `Gdiag`; then 1 to 3 of `mrisReadAsciiCurvatureFile`, `mrisWriteAsciiCurvatureFile`, `__mrisreadcurvoldformat`, `MRISreadCurvatureVector`, `MRISreadNewCurvatureVector`, `MRISreadCurvatureIntoArray`, `MRISreadNewCurvatureIntoArray`, `MRISreadFloatFile`, `MRISreadBinaryAreas`, `MRISbuildFileName_read`, `MRISwriteDecimation`, `MRISreadDecimation`, `__MRISapplyFSGIIread`, `__MRISapplyFSGIIwrite`, `MRISreadVTK` into a new or the case's surface, `MRISwriteGeo`, `MRISwriteICO`, `getSRASToTalSRAS`, `MatlabPlotFace`, `MatlabPlotVertex`, `UnitizeNormalFace`, a volume of the values given to the readers that take one; `G` where FreeSurfer would write past its caller's buffer or read a number it never wrote; then the state and the folder's files; the port's side in `tests/fs_surfio/cfile.rs`), 31 commands; since relay 13 (queue items 3.1-48 part b and 3.1-49's STL) `sread` (as `cfile`, with `FREESURFER_reportLogicErrors` set one case in two: `mrisReadAsciiFile`, `mrisReadGeoFile`, `mrisReadGeoFilePositions`, `mrisReadTriangleFileVertexPositionsOnly`, `mrisReadTriangleFilePositions` through `io_statics.cpp`'s wrappers, and `quadCombine`; a surface a reader returns printed in full; the port's side in `tests/fs_surfio/sread.rs`) and `stl` (`mrisReadSTL` on text and binary STL files, `mrisWriteSTL` on the case's surface; the port's side in `tests/fs_surfio/stl.rs`), 33 commands; since relay 14 (queue item 3.1-48) `tri` (as `stl`, with the environment from the case: `TRIANGULARSURFACE_NOEXTRA_READ` and `_WRITE` together, `FS_SKIP_TAGS`, `USER`, `LOGNAME`, and always `FREESURFER_REPLACEMENT_FOR_CREATION_TIME_STRING`: `mrisReadTriangleFile` and `__MRISreadQuadrangleFile` through `io_statics.cpp`'s wrappers on generated files or on the files a writer of the case wrote, `MRISwriteTriangularSurface` and `__MRISwriteQuadrangleFile` on the case's surface with its volume geometry, Talairach matrix, group-average area and command lines; a surface a reader returns printed in full; the port's side in `tests/fs_surfio/tri.rs`), 34 commands; since relay 15 (queue item 3.1-48) `fnam` (an empty work folder with `d`, `d/s` and `label`, `FS_POSIX` and `FS_GII` from the case, up to 5 curvature, GIFTI and annotation files, a surface from `MRISalloc` with a hemisphere and a name; then 1 to 4 of `MRISfileNameType`, `MRISwriteCurvature_getfilename`, `MRISreadCurvatureFile_getfilename`, `MRISwriteAnnotation_getfilename`, `MRISreadAnnotation_getfilename` with and without a surface, each answer and the chosen name; the port's side in `tests/fs_surfio/fnam.rs`) and `swr` (as `tri`, with `TRIANGULARSURFACE_NOEXTRA_WRITE`, `USER`, the creation time's replacement and `SURFER_SIDEDOOR` (FreeSurfer's licence check skipped, as the port needs no key): `MRISwrite` in every format but GIFTI, `MRISwriteVertexLocations`, `MRISwritePatchAscii`, `MRISreadVerticesOnly` on a surface with white and pial sets, rip flags and borders; then its current coordinates and the folder's files; the port's side in `tests/fs_surfio/swr.rs`), 36 commands; since relay 16 (queue item 3.1-48 with fs.surf's pieces taken early) `srd` (an empty work folder with `d`, `Gdiag`, the environment from the case: `mrisCompleteTopology_new`, `MRISfindNeighborsAtVertex_new` and `_old`, `FS_SKIP_TAGS`, `FS_GII=.gii`, `FREESURFER_always_check_vv`, `FS_FASTER_MP`, and always `SURFER_SIDEDOOR`; one or two input files, closed and open meshes in every format a name chooses (binary triangle with or without tags, each quadrangle form, ASCII, movie.byu, STL, VTK, the icosahedron format) or another reader's random file, now and then the same file by a name of 300 or more bytes; then one or two `MRISread` (with or without the conversion to tkregister space) or `MRISfastRead`, each surface printed in full; the port's side in `tests/fs_surfio/srd.rs`; since relay 17 every work folder also holds `mri/transforms`, a third of the cases a `talairach.xfm` there (MINC's text in many forms, or random bytes) and the transform printed with the surface), 37 commands; since relay 17 (queue item 3.1-50 part b) `mpb` (a binary triangle file of `srd`'s meshes read by `MRISread`, the original area set or not, per-vertex and per-face overrides, then 1 to 6 of the common vertices and edge of two faces, the tangent planes and their store, the plane fit, the face centroids, the face-area, vertex-spacing and total statistics, the negative-face counts, `MRISprintTessellationStats`, the closest vertices, the curvature edits with `MRIShistoThresholdCurvature`; the port's side in `tests/fs_surfio/mpb.rs`), 38 commands; since relay 18 (queue item 3.1-50 part b, second and third groups) `mpc` (as `mpb`, with `FREESURFER_SEED` and `FS_DISTURB_DISTANCES` from the case, the status set or not, `MRISmakeDistOrig` for every vertex, per-vertex overrides of the original, canonical, pial, white and current positions, values, principal curvatures, normals, white normals, steps, areas, marks, `fixedval` and up to 8 original and current distances, per-face rip flags and areas; then 1 to 6 of the barycentric coordinates (on a face, of any triangle) and `project_point_to_plane`, the face samples, `MRISrmsTPHeight`, the analytic distances, `MRIScomputeHausdorffDistance`, the curvature ratio and contrast, `MinDistToTriangleBF`, the stuffed coordinates, the vertex normals of each set, `MRIScomputeSurfaceNormals`, the closest-vertex searches, `MRISmeasureCorticalThickness`, the curvature bookkeeping and `containsAnotherVertexOnSphere`; the port's side in `tests/fs_surfio/mpc.rs`), 39 commands. `io_statics.cpp` builds `mrisurf_io.cpp` into both probes with that file's own compile command from the unit oracle's `compile_commands.json`, so the probe reaches its file-local functions (`__mrisreadcurvoldformat`, the curvature arrays, the `FS_GII` helpers); every `mrisurf_io.cpp` function then runs from that object (relay 11's seed-1 hash unchanged with it). `validation/investigations/glibc-scanf-probe/scanf_errno.c` (open) measures glibc's `sscanf`/`fscanf` return values and `errno` at the end of the input, the model of `src/scanf.rs`. `build.sh` also builds
   `fssurfio-mpstub`: the same probe with a stub `MRIScomputeMetricProperties` (it writes `MP`),
   linked first with `--allow-multiple-definition` so the library's own call (`MRISsmoothSurface`'s
   last step) reaches it; `check.py` runs `metric`'s cases through it.
@@ -66,6 +66,102 @@ bytes; the port's side in `tests/fs_surfio/sfile.rs`, in a temporary folder), 30
   cache at one thread, the port in both modes, the comparison (`reproduce` identical; `fix`
   different only with a notice), and the hash the test checks. Run it inside
   `scripts/orchestration/boxed.sh`.
+
+Measured 2026-11-13 (relay 16, 37 commands): `srd` alone, seeds 7 (1,000 cases), 13 and 17 (2,000
+each): every comparable case identical with `reproduce` (273, 526 and 535 counted, not compared: FS-121's
+unwritten normals, the memory-dependent FS-357 to FS-362, the other readers' families; 1, 2 and 3 cases
+past the official probe's 5-second alarm, all of FS-354's or FS-151's families), `fix` different only with
+notices; 2,712 surfaces read and printed in full among them, every reader and both environment
+switches reached (failed assertions where FreeSurfer's code asserts: a surface without edges,
+`mrisCompleteTopology_new` on a closed surface, the old search). The whole probe at seed 7, 7,400 cases:
+7,244 identical with `reproduce`, 156 counted, not compared, 0 different; `fix` different only with
+notices (and 5 `posn` cases of correctly rounded maths). Seed 1, 1,110 cases: 1,078 identical, 32
+`SKIP`, hash `31bb549125934b62c47bd5df2e01bbd2e6852c51cef2bac3fad5d4a51b90f1b1` (the test), passing in
+debug and release, plain and under the AArch64 NaN emulation (3,518 and 21,790 flips); `srd`, `tri`,
+`stl` and `sread` at seed 7 identical under the emulation in both modes. Logs:
+`oracles/logs/fs-surfio-relay16-*`.
+
+Measured 2026-11-13 (relay 17, 38 commands): `srd` with the transforms, seeds 7 (1,000 cases), 13 and 17
+(2,000 each): 0 differ with `reproduce` after one fix (the STL reader's failed open now leaves `errno`);
+46 of seed 7's first reads hold a transform; hand cases (the 27 seed-7 surfaces with a valid geometry
+in `d/`, each with eight transforms, `Gdiag` off and on): 432 cases, 0 differ, 80 counted (FS-121),
+every branch of the transform's completion reached. `mpb`, seeds 7 (1,000), 13 and 17 (2,000 each):
+0 differ with `reproduce` (82, 159 and 152 counted, not compared: FS-121, FS-123 of the metric
+properties), the default different only with notices; the official build's operand orders and its
+`errno` (glibc's `sqrt`/`sqrtf` for a negative variance, the vertex-spacing statistics' discarded
+scale, the metric properties' inter-vertex deviation) were taken from the object code and gdb.
+
+Measured 2026-11-13 (relay 19, 40 commands): `mpd` (the discrete curvatures, the faces' order around
+a vertex, the pseudo-normal), seeds 7 (1,000 cases), 13 and 17 (2,000 each): 0 differ with
+`reproduce` (61, 104 and 113 counted, not compared: FS-372's walks around vertices whose faces are
+not one fan, FS-121 of the read); the default differs from the official build only by the arc
+cosine (`acosf`, correctly rounded by default: 84, 193 and 191 cases, `fix_libm`; with glibc's
+`acosf` put into the default by hand, 0 of the 1,000 seed-7 cases differ). `srd` with the volumes
+a transform names (`orig.mgz`, `t1.mnc.mgz`, `v.mnc.mgh`, MGH files) and a regular `mri/orig`:
+seeds 7, 13 and 17 (2,000 each): 0 differ with `reproduce` (one seed-17 case counted: FS-76, an MGH
+header without voxels, which the official build turns into a crash), 66 compared surfaces with a
+geometry read from a volume header, 67 reads of `mri/orig` that cannot determine its type. The whole
+probe at seed 7 (8,000 cases): 7,803 identical, 197 counted, 0 different (the default: only notices
+and the libm cases, `mpd` 11 and `posn` 8); seed 1 (1,200 cases): 1,161 identical, 39 counted, hash
+`fef1c552...`, passing in debug and release and under AArch64's NaN emulation (3,576 and 43,861 NaNs
+flipped); the seed-7 `srd`, `mpd`, `mpc`, `tri` and `stl` outputs identical under the emulation but
+for relay 18's two `mpc` `dd` cases (fs.core's `randomNumber`, reported). The work folder's absolute
+path is written `<w>` in both probes' outputs (a volume reader's message names it).
+
+Measured 2026-11-13 (relay 18, 39 commands): `mpc`, seeds 7 (1,000 cases), 13 and 17 (2,000 each): 0 differ
+with `reproduce` (34, 59 and 62 counted, not compared: FS-121 of the read, FS-367's endless loops ended by
+the probe's 5-s alarm, FS-370's arrays), the default different only with notices (FS-366, FS-369 and the
+errors' FS-01/FS-03). The whole probe at seed 7 (7,800 cases): 7,606 identical, 194 counted, 0 different;
+seed 1 (1,170 cases): 1,137 identical, 33 counted, hash `90fbb5e2...`, passing in debug and release and under
+AArch64's NaN emulation. Under the emulation one seed-7 `mpc` case differs (`MRISdisturbOriginalDistances`
+with an infinite percentage: fs.core's `randomNumber` makes `inf - inf` in plain arithmetic, so its NaN takes
+the platform's default sign; reported to fs.core's track). The official build's operand orders were read from
+`mrisurf_metricProperties.cpp.o` and `tritri.cpp.o`.
+Seed 1: 1,140 cases, 1,116 identical, 24 counted, hash `209163ba486662e79d7931add4d23f34aec8757e0fc8d377a0386266e91e76d3`.
+
+Measured 2026-11-13 (relay 15, 36 commands): `fnam` alone, seeds 7 (1,000 cases), 13 and 17 (2,000
+each): every comparable case identical with `reproduce` (14, 37 and 40 counted, not compared: FS-356),
+`fix` different only with notices; `swr` alone, seeds 7 (1,000), 13 and 17 (2,000 each): every
+comparable case identical (9, 13 and 11 counted, not compared), `fix` different only with notices
+(the first run found that `mrisWriteSTL`'s failed open leaves `errno` for later messages: fixed in the
+port); `stl` seed 7 unchanged. The whole probe at seed 7, 7,200 cases: 7,090 identical with
+`reproduce`, 110 counted, not compared, 0 different; `fix` different only with notices (and 7 `posn`
+cases of correctly rounded maths). Seed 1, 1,080 cases: 1,064 identical, 16 `SKIP`, hash
+`c2ea12117f4b024167aed9c765687f2ca1a6c4ee4155f6c5538f657b82d33eca` (the test), passing in debug and
+release, plain and under the AArch64 NaN emulation (1,160 and 10,285 flips); `fnam`, `swr`, `tri`
+and `stl` at seed 7 identical under the emulation in both modes. Logs:
+`oracles/logs/fs-surfio-relay15-*`.
+
+Measured 2026-11-13 (relay 14, 34 commands): `tri` alone, seeds 7 (1,000 cases), 13 (1,000) and 17
+(2,000): every comparable case identical with `reproduce` (36, 54 and 80 counted, not compared), the
+default different only with notices. After fs.core's `cscan::Scanf` and `fnv` replaced the crate's own
+copies: seed 7, 13,600 cases: 13,408 identical with `reproduce`, 192 counted, not compared (74 `mprop`,
+40 `stl`, 35 `sread`, 24 `sfile`, 12 `tri`, 7 `cfile`), 0 different; `fix` differs only with notices or
+the correctly rounded maths (11 `posn`, 3 `surf`). Seed 1, 1,020 cases: 1,006 identical, 14 `SKIP`, hash
+`2f2c8b35e113ed57bd95020d54b261cce294d85550d1894bc5805c06ed2072f1` (the test), passing in debug and
+release with the emulation (1,779 and 17,035 flips); `tri` and `sread` seed 7 identical under the
+emulation in both modes. Logs `oracles/logs/fs-surfio-relay14-seed1.log`, `-seed7-switch.log`,
+`-nantrap.log`.
+
+Measured 2026-11-13 (relay 13, 33 commands): seed 7, 66,000 cases: 65,018 identical with `reproduce`,
+982 counted, not compared (435 `mprop`, 198 `stl`, 151 `sread`, 115 `sfile`, 81 `cfile`, 2 `metric`);
+`fix` differs only with notices or the correctly rounded maths (65 `posn`, 7 `surf`); the port's outputs
+identical under AArch64's NaN emulation in both modes (74,230 and 74,272 NaNs flipped). `sread` alone:
+seed 7, 1,000 cases and seed 13, 2,000; `stl` alone: seed 7, 1,000: every comparable case identical with
+`reproduce`, the default different only with notices. Seed 1, 990 cases: 980 identical, 10 `SKIP`, hash
+`2543d2708fc953a9ec60e5dff31e85b7799e1a20285c2514b338e30f7b7abdaf` (the test), passing in debug and
+release with the emulation (7,746 and 17,227 flips). Log `oracles/logs/fs-surfio-relay13-seed7.log`.
+
+Measured 2026-11-13 (relay 12, 31 commands): seed 7, 62,000 cases: 61,334 identical with `reproduce`,
+666 counted, not compared (455 `mprop`, 125 `sfile`, 81 `cfile`, 5 `metric`); `fix` differs only with
+notices or the correctly rounded maths (71 `posn`, 4 `surf`); the port's outputs identical under
+AArch64's NaN emulation in both modes (67,516 and 67,552 NaNs flipped). `cfile` alone, seeds 7, 13 and
+17: 2,000 cases each, every comparable one identical (before the plots' operand orders were read from
+the object code, 13 of the 6,000 differed, all in `MatlabPlotFace`/`MatlabPlotVertex`; before the
+measured `scanf` end-of-input rule, 1 of seed 17's). Seed 1, 930 cases: 919 identical, 11 `SKIP`, hash
+`17da05597cae13550e267517b2858b9932266b37ca7d64ab7894779a948bc7b6` (the test), passing under
+`NAN_TRAP_ARM=1` with `NAN_TRAP_DIR` in debug and release (2,897 and 12,690 flips). Log
+`oracles/logs/fs-surfio-relay12-seed7.log`.
 
 Measured 2026-11-13 (relay 11, 30 commands): seed 7, 60,000 cases: 59,497 identical with `reproduce`,
 503 counted, not compared (404 `mprop` cases of FS-121, FS-123, FS-06; 99 `sfile` cases of FS-167, the
@@ -145,5 +241,5 @@ operand order is each caller's compiled code (`docs/findings/freesurfer-surfio.m
 
 ```
 validation/probes/fs-surfio/build.sh <workspace>
-scripts/orchestration/boxed.sh 10 python -P validation/probes/fs-surfio/check.py --seed 7 --n 56000
+scripts/orchestration/boxed.sh 12 python -P validation/probes/fs-surfio/check.py --seed 7 --n 66000
 ```

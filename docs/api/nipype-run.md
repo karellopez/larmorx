@@ -1,13 +1,39 @@
 # nipype's interface runner: `larmorx nipype run`
 
-`larmorx nipype run` (and `lx.nipype.run`) is nipype 1.12.0's `nipypecli run` for the
-interfaces larmorx has ported: it lists a module's interfaces, prints an interface's help, and
-runs one interface from the shell, in the current folder, without nipype, click or traits. The
-same arguments, listing, help, printed inputs and outputs, files, messages and exit statuses as
-nipype's own command line (nipype 1.12.0 with niworkflows 1.15.4 and fMRIPrep 25.2.7, the newest
-releases), checked case by case against it. It serves the modules of fMRIPrep's confound
-estimation:
+`larmorx nipype run` (and `lx.nipype.run`): nipype 1.12.0's `nipypecli run` for the interfaces
+larmorx has ported, without nipype, click or traits.
 
+The port comes first, then the program's section, the source of its reference page on the
+documentation site (`python -m larmorx_validation reference`), with its options table checked
+against the code; then the command line in full, the defects of nipype's command line, the other
+Python functions and how the port is built and checked.
+
+## Ports
+
+`nipypecli run` has one port, in `pip install larmorx` (a Python program of the Python package,
+not of the standalone `larmorx` program): **the replica** (`python/larmorx/nipype/`;
+Apache-2.0 AND BSD-3-Clause), ported from nipype 1.12.0's `scripts/cli.py` and the parts of nipype
+it runs, with niworkflows 1.15.4 and fMRIPrep 25.2.7's interfaces (the newest releases).
+
+## `nipypecli run`
+
+<!-- reference
+program: nipypecli run
+group: fmriprep
+original: nipype 1.12.0
+software: nipype
+command: larmorx nipype run
+python: larmorx.nipype.run
+command-line: python/larmorx/nipype/_run.py
+records: {replica: [confounds-nipype]}
+evidence: confounds
+-->
+
+`nipypecli run` lists a module's interfaces, prints an interface's help, and runs one interface
+from the shell, in the current folder. larmorx's gives the same arguments, listing, help, printed
+inputs and outputs, files, messages and exit statuses as nipype's own command line (nipype 1.12.0
+with niworkflows 1.15.4 and fMRIPrep 25.2.7, the newest releases), checked case by case against
+it, for the modules of fMRIPrep's confound estimation:
 | Module | Interfaces larmorx runs | Listed, not run |
 |---|---|---|
 | `nipype.algorithms.confounds` | `ACompCor`, `CompCor`, `TCompCor`, `ComputeDVARS`, `FramewiseDisplacement`, `NonSteadyStateDetector`, `TSNR` | `BaseInterface`, `SimpleInterface` (nipype's base classes) |
@@ -29,6 +55,59 @@ help as nipype does; running it is an error (`error: larmorx has not ported ...`
 `robust_average`) but not run here yet: they run FSL's `mcflirt` and AFNI's `3dvolreg` as
 programs whose messages nipype relays through its log, line by line, which larmorx's ports in this
 process do not print (a follow-up).
+
+
+### Python (`nipypecli run`)
+
+`lx.nipype.run(argv=None, *, prog="larmorx nipype run", upstream_defects=None, n_threads=None, env=None)`
+
+Runs `nipypecli run` with `argv` (the arguments after `run`; by default `sys.argv[1:]`) and
+returns its exit status: 0, 2 for a usage error (click's or argparse's), 1 for an error. It
+writes to `sys.stdout` and `sys.stderr`, and the interface's files to the current folder.
+
+### Options of `nipypecli run`
+
+| nipype's option | Python | Notes |
+|---|---|---|
+| `--list` | `argv` | `Available Interfaces:` and the names of the interface classes in the module's namespace, sorted (those it imports included), four blanks before each; the same as the module alone |
+| (the module, the interface and its inputs) | `argv` | the module alone lists its interfaces, an interface alone prints its help; its inputs: the mandatory inputs positional, in name order (lists with one or more values), the others `--name value` (lists with zero or more), booleans `--name` (they set true) |
+| `-h`, `--help` | `argv` | a flag the command never reads (click's): `run <module> <Interface> -h` prints the help because the flag leaves no input; `--` passes `-h` to argparse |
+| (the command's name) | `prog` | the name in the messages (nipype's is `nipypecli run`) |
+| (the environment) | `env` | the environment read (default `os.environ`) |
+| `OMP_NUM_THREADS` | `n_threads` | the threads of larmorx's computations (the results do not depend on them); default every logical CPU |
+| `LARMORX_UPSTREAM_DEFECTS` | `upstream_defects` | `fix` (the default) or `reproduce`: D13's mode, which also chooses how the command line itself behaves ([The defects of nipype's command line](#the-defects-of-nipypes-command-line)) |
+
+### Examples of `nipypecli run`
+
+<!-- inputs: bold.nii.gz=head4d -->
+
+```python example
+import larmorx as lx
+
+# nipype's TSNR on a series: the mean, the standard deviation and their ratio, in this folder.
+lx.nipype.run(["nipype.algorithms.confounds", "TSNR", "bold.nii.gz"])  # -> 0
+```
+
+```bash example
+larmorx nipype run --list nipype.algorithms.confounds
+larmorx nipype run nipype.algorithms.confounds TSNR bold.nii.gz
+```
+
+### Ports of `nipypecli run`
+
+**The replica: status `experimental`**, checked against nipype's own `nipypecli run`
+(`validation/investigations/confounds/check_nipype_cli.py`, the newest environment; finding
+[confounds-nipype-cli.md](../findings/confounds-nipype-cli.md)): the exit status, standard
+output, standard error and every file written, byte for byte, with `reproduce`, and with the
+default (identical but where a correction applies: then against nipype's interface run through its
+Python API on the same inputs); the click layer, all 61 helps at two widths, argparse's and traits'
+errors, every interface larmorx runs with its options, and fMRIPrep's real calls of the confounds
+nodes of three reference runs (single-band, multiband with 280 volumes, multi-echo): 226 of 226
+cases, 51 real calls among them (15 of which nipype's command line refuses: PIPE-81, PIPE-82); the
+parity suite `confounds-nipype` runs the check as its cases `cli-quick-e1` and `cli-full-e1`
+(the record [confounds-nipype](../validation/confounds-nipype.md), standard tier, 2026-11-13: 25 of 25
+cases, `cli-quick-e1` among them, 18 of 18 checks). The
+golden case `cli.nipype.run`; `tests/python/test_nipype_run.py`.
 
 ## The command line
 
@@ -88,11 +167,10 @@ of labels`, as with nipype's command line.
 The interfaces' own defects are those of their functions (the confounds' page): their corrections
 apply here too, with their notices, and `reproduce` gives nipype's files.
 
-## Python
+## The other Python functions
 
 | larmorx | nipype | Notes |
 |---|---|---|
-| `lx.nipype.run(argv=None, *, prog="larmorx nipype run", upstream_defects=None, n_threads=None, env=None)` → exit status | `nipype.scripts.cli:cli` (`nipypecli run`) | `argv`: the arguments after `run` (default `sys.argv[1:]`); `prog` the command's name in the messages; `upstream_defects` defaults to `LARMORX_UPSTREAM_DEFECTS` (else `"fix"`), `n_threads` to `OMP_NUM_THREADS` (else every logical CPU); `env` the environment read (default `os.environ`); writes to `sys.stdout` and `sys.stderr`, the interface's files to the current folder |
 | `lx.nipype.list_interfaces(module)` → names | `nipype.scripts.instance.list_interfaces` | the names `--list` prints; `ValueError` for a module not served |
 | `lx.nipype.ported_interfaces()` → `{module: names}` | | the interfaces `run` runs |
 | `lx.nipype.MODULES` | | the nine modules |
@@ -110,17 +188,3 @@ parser with Python's argparse from those calls (so the help is argparse's, as ni
 click's parsing of `run`, traits' validation and messages, nipype's `run_instance`,
 `_check_mandatory_inputs` and printing, and calls the ported function
 (`python/larmorx/nipype/_run.py`, `_adapters.py`).
-
-**Status: `experimental`.** Checked against nipype's own `nipypecli run`
-(`validation/investigations/confounds/check_nipype_cli.py`, the newest environment; finding
-[confounds-nipype-cli.md](../findings/confounds-nipype-cli.md)): the exit status, standard
-output, standard error and every file written, byte for byte, with `reproduce`, and with the
-default (identical but where a correction applies: then against nipype's interface run through its
-Python API on the same inputs); the click layer, all 61 helps at two widths, argparse's and traits'
-errors, every interface larmorx runs with its options, and fMRIPrep's real calls of the confounds
-nodes of three reference runs (single-band, multiband with 280 volumes, multi-echo): 226 of 226
-cases, 51 real calls among them (15 of which nipype's command line refuses: PIPE-81, PIPE-82); the
-parity suite `confounds-nipype` runs the check as its cases `cli-quick-e1` and `cli-full-e1`
-(the record [confounds-nipype](../validation/confounds-nipype.md), standard tier, 2026-11-13: 25 of 25
-cases, `cli-quick-e1` among them, 18 of 18 checks). The
-golden case `cli.nipype.run`; `tests/python/test_nipype_run.py`.

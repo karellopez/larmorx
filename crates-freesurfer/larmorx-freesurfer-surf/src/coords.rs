@@ -36,9 +36,11 @@ use larmorx_freesurfer_core::diag;
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{self, ERROR_UNSUPPORTED, Fatal};
 use larmorx_freesurfer_core::matrix::{self, Matrix};
+use larmorx_freesurfer_core::matrix_ops::matrix_inverse;
 use larmorx_freesurfer_core::run::Environment;
 use larmorx_freesurfer_core::sse;
 use larmorx_freesurfer_core::utils::cope_with_logic_problem2;
+use larmorx_freesurfer_volume::vgeom::{tkr_vox2ras_from_vol_geom, vg_i_to_r};
 
 use crate::dist;
 use crate::mris::Mris;
@@ -892,4 +894,40 @@ pub fn translate_along_vertex_dxdydz(mris: &mut Mris, dt: f64) {
         }
         (v.x, v.y, v.z) = (t(v.x, v.dx), t(v.y, v.dy), t(v.z, v.dz));
     }
+}
+
+/// `MRIStkr2Scanner(mris)` (`utils/mrisutils.cpp` lines 2375-2390, taken with `MRISread`'s
+/// [`scanner2tkr`]): nothing when `useRealRAS` is set; otherwise the coordinates multiplied
+/// ([`matrix_multiply`]) by `vg_i_to_r(vg) * inverse(TkrVox2RASfromVolGeom(vg))` (FreeSurfer's
+/// float matrices; an inverse that cannot be made gives no matrix, which ends the program at
+/// the multiplication), then `useRealRAS` 1. Returns 0.
+pub fn tkr2scanner(g: &mut Globals, io: &mut Io, mris: &mut Mris) -> Result<i32, Fatal> {
+    if mris.useRealRAS != 0 {
+        return Ok(0);
+    }
+    let s = vg_i_to_r(g, io.out, io.err, &mris.vg)?;
+    let t = tkr_vox2ras_from_vol_geom(g, io.out, io.err, &mris.vg)?;
+    let tinv = matrix_inverse(g, io.out, io.err, Some(&t), None)?.into_new();
+    let m = matrix::matrix_multiply(g, io.out, io.err, Some(&s), tinv.as_ref(), None)?.into_new();
+    matrix_multiply(g, io, mris, m.as_ref())?;
+    mris.useRealRAS = 1;
+    Ok(0)
+}
+
+/// `MRISscanner2Tkr(mris)` (`utils/mrisutils.cpp` lines 2400-2418): nothing when `useRealRAS` is
+/// 0; otherwise the coordinates multiplied ([`matrix_multiply`]) by
+/// `TkrVox2RASfromVolGeom(vg) * inverse(vg_i_to_r(vg))` (scanner to tkregister space; an inverse
+/// that cannot be made gives no matrix, which ends the program at the multiplication), then
+/// `useRealRAS` 0. Returns 0.
+pub fn scanner2tkr(g: &mut Globals, io: &mut Io, mris: &mut Mris) -> Result<i32, Fatal> {
+    if mris.useRealRAS == 0 {
+        return Ok(0);
+    }
+    let s = vg_i_to_r(g, io.out, io.err, &mris.vg)?;
+    let sinv = matrix_inverse(g, io.out, io.err, Some(&s), None)?.into_new();
+    let t = tkr_vox2ras_from_vol_geom(g, io.out, io.err, &mris.vg)?;
+    let q = matrix::matrix_multiply(g, io.out, io.err, Some(&t), sinv.as_ref(), None)?.into_new();
+    matrix_multiply(g, io, mris, q.as_ref())?;
+    mris.useRealRAS = 0;
+    Ok(0)
 }

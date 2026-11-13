@@ -81,7 +81,7 @@ def implementation_name(implementation: str, *, warn: bool = True) -> str:
         if warn:
             warnings.warn(
                 "implementation='original' is the old spelling of implementation='clean-room' "
-                "(larmorx's clean-room original); use 'clean-room'",
+                "(larmorx's clean room); use 'clean-room'",
                 DeprecationWarning,
                 skip_file_prefixes=(_PACKAGE_DIR,),
             )
@@ -253,7 +253,7 @@ def select(family: str, tool: str, implementation: str) -> Selected | None:
                 f"with {replica.install}"
             )
             raise NotImplementedError(
-                f"larmorx has no clean-room original of {family} {tool} yet (it is to be "
+                f"larmorx has no clean room of {family} {tool} yet (it is to be "
                 f"written from its spec in specs/); its bit-exact replica {where} and use "
                 f"implementation='auto' or 'replica'"
             )
@@ -265,7 +265,7 @@ def select(family: str, tool: str, implementation: str) -> Selected | None:
         return Selected(replica, program)
     if not replica.original:
         raise ReplicaNotFoundError(
-            f"larmorx has no clean-room original of {family} {tool} yet, and its replica's "
+            f"larmorx has no clean room of {family} {tool} yet, and its replica's "
             f"{replica.program} program was not found ({replica.env}, "
             f"{', '.join(search_dirs()) or 'no scripts directory'}, PATH). Install the "
             f"{replica.package} package ({replica.licence}) with: {replica.install}"

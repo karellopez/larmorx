@@ -12,7 +12,10 @@ use std::io::Write;
 use std::rc::Rc;
 use std::sync::Arc;
 
-use larmorx_core::defects::{FS_03, FS_111, FS_116, FS_118, FS_119, FS_126, UpstreamDefects};
+use larmorx_core::defects::{
+    FS_03, FS_111, FS_116, FS_118, FS_119, FS_126, FS_138, FS_145, FS_150, FS_153, FS_159, FS_348,
+    FS_350, FS_351, FS_364, UpstreamDefects,
+};
 use larmorx_freesurfer_core::diag::{DIAG_SHOW, DIAG_VERBOSE};
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::Fatal;
@@ -28,12 +31,32 @@ use larmorx_freesurfer_surf::topology;
 use larmorx_freesurfer_surf::views::{self, MetricSurface, MpView};
 use larmorx_freesurfer_surf::{coords, dist, facenorm, metric, positions};
 
+#[path = "cfile.rs"]
+mod cfile;
+#[path = "fnam.rs"]
+mod fnam;
 #[path = "life.rs"]
 mod life;
+#[path = "mpb.rs"]
+mod mpb;
+#[path = "mpc.rs"]
+mod mpc;
+#[path = "mpd.rs"]
+mod mpd;
 #[path = "mprop.rs"]
 mod mprop;
 #[path = "sfile.rs"]
 mod sfile;
+#[path = "srd.rs"]
+mod srd;
+#[path = "sread.rs"]
+mod sread;
+#[path = "stl.rs"]
+mod stl;
+#[path = "swr.rs"]
+mod swr;
+#[path = "tri.rs"]
+mod tri;
 
 /// The generator's state, and whether it may make names of about 1,024 bytes (not with seed 1,
 /// the platform-independent set: file systems differ on such names).
@@ -110,10 +133,11 @@ fn ix(t: &mut Vec<String>, v: i64) {
     t.push(v.to_string());
 }
 
-const COMMANDS: [&str; 30] = [
+const COMMANDS: [&str; 40] = [
     "coord", "vnum", "nbr", "modvnum", "norm", "close", "proj", "sign", "status", "sortcmp",
     "angles", "split", "vec3", "view", "fixarea", "addcmd", "vhash", "diff", "temps", "fpv",
-    "names", "surf", "metric", "posn", "life", "meta", "misc", "edges", "mprop", "sfile",
+    "names", "surf", "metric", "posn", "life", "meta", "misc", "edges", "mprop", "sfile", "cfile",
+    "sread", "stl", "tri", "fnam", "swr", "srd", "mpb", "mpc", "mpd",
 ];
 
 /// A byte string's token: `h` and the bytes in hex.
@@ -987,6 +1011,16 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
             "edges" => life::edges_tokens(&mut t, &mut g),
             "mprop" => mprop::mprop_tokens(&mut t, &mut g),
             "sfile" => sfile::sfile_tokens(&mut t, &mut g),
+            "cfile" => cfile::cfile_tokens(&mut t, &mut g),
+            "sread" => sread::sread_tokens(&mut t, &mut g),
+            "stl" => stl::stl_tokens(&mut t, &mut g),
+            "tri" => tri::tri_tokens(&mut t, &mut g),
+            "fnam" => fnam::fnam_tokens(&mut t, &mut g),
+            "swr" => swr::swr_tokens(&mut t, &mut g),
+            "srd" => srd::srd_tokens(&mut t, &mut g),
+            "mpb" => mpb::mpb_tokens(&mut t, &mut g),
+            "mpc" => mpc::mpc_tokens(&mut t, &mut g),
+            "mpd" => mpd::mpd_tokens(&mut t, &mut g),
             "names" => {
                 let n = g.int(1, 5);
                 ix(&mut t, n);
@@ -1092,6 +1126,9 @@ struct Ctx {
     sg: SurfGlobals,
     a: Shared,
     b: Shared,
+    /// The case's work folder, when it has one whose absolute path a message may give (relay 19:
+    /// written `<w>`, as the official probe writes its own).
+    work: Option<String>,
 }
 
 /// `set_coords`'s 45 floats.
@@ -2642,6 +2679,16 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
         "edges" => life::edges_case(cx, t, o)?,
         "mprop" => mprop::mprop_case(cx, t, o)?,
         "sfile" => sfile::sfile_case(cx, t, o)?,
+        "cfile" => cfile::cfile_case(cx, t, o)?,
+        "sread" => sread::sread_case(cx, t, o)?,
+        "stl" => stl::stl_case(cx, t, o)?,
+        "tri" => tri::tri_case(cx, t, o)?,
+        "fnam" => fnam::fnam_case(cx, t, o)?,
+        "swr" => swr::swr_case(cx, t, o)?,
+        "srd" => srd::srd_case(cx, t, o)?,
+        "mpb" => mpb::mpb_case(cx, t, o)?,
+        "mpc" => mpc::mpc_case(cx, t, o)?,
+        "mpd" => mpd::mpd_case(cx, t, o)?,
         "names" => {
             let n = t.i();
             for _ in 0..n {
@@ -2698,6 +2745,7 @@ pub fn run_line_with(
         sg,
         a: shared.clone(),
         b: shared.clone(),
+        work: None,
     };
     let mut t = Toks {
         t: line.split_whitespace().collect(),
@@ -2705,14 +2753,40 @@ pub fn run_line_with(
     };
     let mut o = Out::default();
     let res = case(&mut cx, &mut t, &mut o);
-    let text = escape(&shared.0.borrow());
+    let work = |b: &[u8]| -> Vec<u8> {
+        let Some(w) = cx.work.as_deref().filter(|w| !w.is_empty()) else {
+            return b.to_vec();
+        };
+        let (w, mut r, mut i) = (w.as_bytes(), Vec::new(), 0);
+        while i < b.len() {
+            if b[i..].starts_with(w) {
+                r.extend_from_slice(b"<w>");
+                i += w.len();
+            } else {
+                r.push(b[i]);
+                i += 1;
+            }
+        }
+        r
+    };
+    let text = escape(&work(&shared.0.borrow()));
+    o.0 = String::from_utf8(work(o.0.as_bytes())).expect("the output's text");
     let result = match res {
         Ok(()) => o.0.trim_end().to_owned(),
         // FS-03 reproduced: FreeSurfer's failed assertion faults on purpose (signal 11)
         // FS-116 reproduced likewise: reading a deferred face's original area faults on purpose
         Err(Fatal::Exit(139))
             if mode.reproduce()
-                && (cx.g.notices.contains(&FS_03) || cx.g.notices.contains(&FS_116)) =>
+                && (cx.g.notices.contains(&FS_03)
+                    || cx.g.notices.contains(&FS_116)
+                    || cx.g.notices.contains(&FS_138)
+                    || cx.g.notices.contains(&FS_145)
+                    || cx.g.notices.contains(&FS_150)
+                    || cx.g.notices.contains(&FS_159)
+                    || cx.g.notices.contains(&FS_348)
+                    || cx.g.notices.contains(&FS_350)
+                    || cx.g.notices.contains(&FS_351)
+                    || cx.g.notices.contains(&FS_364)) =>
         {
             "CRASH 11".to_owned()
         }
@@ -2725,8 +2799,12 @@ pub fn run_line_with(
         {
             "CRASH 6".to_owned()
         }
-        // FS-118 reproduced: the progress bar's modulo by 0 (signal 8)
-        Err(Fatal::Exit(136)) if mode.reproduce() && cx.g.notices.contains(&FS_118) => {
+        // FS-118 and FS-153 reproduced: the progress bar's modulo by 0, the movie.byu reader's
+        // division by 0 (signal 8)
+        Err(Fatal::Exit(136))
+            if mode.reproduce()
+                && (cx.g.notices.contains(&FS_118) || cx.g.notices.contains(&FS_153)) =>
+        {
             "CRASH 8".to_owned()
         }
         Err(f) => format!("EXIT {}", f.status()),

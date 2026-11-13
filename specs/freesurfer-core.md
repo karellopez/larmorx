@@ -231,7 +231,7 @@ count, the result to reproduce is that thread count's.
 - **One value:** swapping a 16-bit (signed or unsigned), 32-bit (integer or float) or 64-bit float
   value reverses its bytes; bit patterns are kept (NaN payloads and signalling NaNs included,
   **(observed)**: the `swaps` group). "Is this a little-endian machine" answers 1.
-- **FS-262. A 64-bit integer:** FreeSurfer reverses the bytes, then rounds the reversed value (a
+- **FS-176. A 64-bit integer:** FreeSurfer reverses the bytes, then rounds the reversed value (a
   signed 64-bit integer) to the nearest double (ties to even) and converts it back, truncating (a
   value rounded up to 2^63 gives -2^63). The result differs from the exact reversal only when the
   reversed value needs more than 53 significant bits, which never happens for values below 2^40
@@ -240,7 +240,9 @@ count, the result to reproduce is that thread count's.
   `swaplong64 72057594037927937` (0x0100000000000001) gives 72057594037927936;
   `swaplong64 81985529216486895` (0x0123456789abcdef) gives -1167088121787636992, the exact reversal
   being -1167088121787636991. Rule A. **Default:** the exact reversal; **reproduce:** FreeSurfer's
-  rounding. Noted when they differ.
+  rounding. Noted when they differ. (fs.io's 64-bit readers and writers share this rounding and
+  this defect, `specs/freesurfer-io.md` §2-4; FS-262, the ID this swap had first, is retired: a
+  duplicate of FS-176.)
 - **A buffer of n items of k bytes each** (k = 1, 2, 4 or 8): k = 1 leaves it; another k writes
   `ERROR: ByteSwapBuf: nBytesPerItem = <k> not supported` + `\n` on standard output and answers 1,
   the buffer unchanged; otherwise it answers 0.
@@ -354,7 +356,8 @@ with a notice. (Not probed: an overflow would make the probe's own results meani
 - **Rounding** `nint(x)`: x + 0.5 (x - 0.5 below 0) in double, truncated toward zero; `nint2(x)`: the
   same with x + 0.49999999 at or above 0 (`nint2(0.5)` is 0, `nint(-0.5)` is -1). **FS-12:** beyond the
   32-bit range, or NaN, FreeSurfer gives -2147483648 (**(observed)** the group `numbers`, file
-  `numbers-fs12`). **Default:** saturated (NaN 0), with a notice; **reproduce:** -2147483648.
+  `numbers-fs12`, which holds every such call of the group; 2^31 - 0.5 is one: x + 0.5 is 2^31).
+  **Default:** saturated (NaN 0), with a notice; **reproduce:** -2147483648.
 - **Standard deviation from sums** (Σx, Σx², n): mean = Σx/n; `sqrt((Σx² - 2·mean·Σx + n·mean·mean)
   / (n - 1))`, evaluated left to right in double (`2·mean·Σx` is `(2·mean)·Σx`; n = 1 divides by 0).
 - **Comparisons** for sorting: integers -1, 0, 1; floats -1, 1, or 0 when equal **or either is NaN**.
@@ -470,12 +473,26 @@ platform `Linux`; compiler `GCC` `8.4.0` (**(observed)** `versionstrings`, `alli
 - **Local time** follows the program's `TZ`: unset, the zone file `/etc/localtime`; empty, UTC;
   otherwise (one leading `:` dropped) a zone file (an absolute path, or a name under `TZDIR`, else
   `/usr/share/zoneinfo`; RFC 8536's format, its footer rule after the last transition, before the
-  first transition the first standard-time type) and, when no file can be read, a POSIX `TZ` string
-  (a `dst` name without a rule takes `M3.2.0,M11.1.0`, change times 02:00 by default), else UTC. A
-  POSIX rule applies to the **UTC** year, and **before 1970 the change times of 1970** are used
-  (glibc 2.35, **(observed)**: `TZ=EST5EDT,M3.2.0,M11.1.0` is never in daylight time before 1970,
-  `AEST-10AEDT,M10.1.0,M4.1.0/3` always; the group `time` compares 24 zones at 435 times each,
-  `gmtime`, `localtime` and `%c`).
+  first transition the first standard-time type) and, when no file can be read, a POSIX `TZ` string,
+  else UTC. A POSIX rule applies to the **UTC** year, and **before 1970 the change times of 1970** are
+  used (glibc 2.35, **(observed)**: `TZ=EST5EDT,M3.2.0,M11.1.0` is never in daylight time before 1970,
+  `AEST-10AEDT,M10.1.0,M4.1.0/3` always).
+- **A `dst` name without a rule** (`TZ=ABC3DEF`; the daylight offset one hour east of the standard
+  one unless given) takes the zone file `posixrules` (found as a zone name is: under `TZDIR`, else
+  `/usr/share/zoneinfo`) when it can be read: its transitions, each a change to standard or daylight
+  time as the file's type for it is, with the `TZ` string's names and offsets; each transition's
+  instant moved by the `TZ` string's offset minus the file's, both those in force just before it (the
+  daylight ones when the time before it was daylight time and the file does not mark the transition
+  as given in standard time, else the standard ones; a transition the file marks as given in UT not
+  moved); before its first transition the `TZ` string's standard time; **after its last transition
+  the file's own footer rule, with the file's own names and offsets**. Only where no `posixrules`
+  can be read: `M3.2.0,M11.1.0`, change times 02:00 local. **(observed)** on the reference machine
+  (its `posixrules` is New York's file, transitions until 2037): `TZ=ABC3DEF` is in daylight time
+  from 2006-04-02 09:00 to 2006-10-29 08:00 UTC (New York's 07:00 and 06:00, moved by the 2 hours
+  between the offsets) and on 1960-07-07, not on 2006-03-20; in 2040 it changes at New York's 07:00
+  and 06:00 UTC and shows `EST`/`EDT` with -5 and -4 hours; with `TZDIR` naming a folder without
+  `posixrules`, it follows `M3.2.0,M11.1.0` (daylight time on 2006-03-20, none before 1970). The group
+  `time` compares 26 zones (these two included) at 451 times each, `gmtime`, `localtime` and `%c`.
 - **Timers:** elapsed time from a clock in nanoseconds; milliseconds truncated, seconds, minutes and
   hours as `ns / 1e9`, `/ 6e10`, `/ 3.6e12` in double. An interval line: `<file>:<line> interval took
   <ms> msec` + `\n` on standard output. (FreeSurfer's clock is the wall clock; timings never reach a
@@ -606,8 +623,11 @@ error and the files a case names, byte for byte, after the masks of the README.
 - `--mode reproduce`: **every run identical**, except the runs marked `memory` (FS-08, FS-09, FS-10:
   FreeSurfer read memory it never wrote, the probe's guard or whatever lay there).
 - `--mode fix`: every run without a defect identical; a run marked with a defect may differ (the
-  notice, the corrected value), and for FS-261 and FS-262 the loop checks the corrected values itself
-  (the byte reversal of every item).
+  notice, the corrected value), and where the corrected output follows from the inputs the loop
+  checks it itself: for FS-261 and FS-176 the byte reversal of every item, for FS-12 (`numbers-fs12`)
+  the saturated values on standard output (NaN 0), for the finite check (`numbers-fs01`, FS-01) and
+  the environment record without a package (`fsenv`, `FREESURFER_HOME=/nonexistent`, FS-01) the
+  probe's standard output and its standard error without the NUL byte.
 - Then the cases the probe cannot show (both modes defined by larmorx, or a crash): FS-03's exit
   status 1, FS-04's seed -1, FS-05's error line, FS-06's values against `atan2f` on NaN, infinite and
   overflowing pairs, FS-11 on strings of 1,024 bytes and more, FS-263's error value: the clean room's
@@ -617,28 +637,31 @@ error and the files a case names, byte for byte, after the masks of the README.
 
 `compare.py refs --seed 7` on the prebuilt probe (2026-11-13, the reference machine; SHA-256 of
 each group's masked results in order; identical through the cache, without it, and on a second
-run). The `time` group depends on the machine's `/etc/localtime` (its first zone is TZ unset) and on
+run; the group `numbers` again after its rounding and finite-check calls moved to batches of their
+own, the group `time` after its two zones without a rule were added). The hashes hold for the whole list of groups: one random sequence runs through the groups in
+order, so `--groups` with a part of the list generates other cases (they compare as well, with other
+hashes). The `time` group depends on the machine's `/etc/localtime` (its first zone is TZ unset) and on
 the system's time-zone files; the others on nothing but the probe.
 
 | Group | Runs | Calls | What | SHA-256 |
 |---|---:|---:|---|---|
-| swaps | 3 | 833 | §6: every swap on edge and random values, FS-262 (`swaplong64`), FS-261 (`byteswapbuf`, every k and n) | `62e1e91acc209996f091cd31ae54d99bc3f551f7613e0a63852ce915e66b4581` |
+| swaps | 3 | 833 | §6: every swap on edge and random values, FS-176 (`swaplong64`), FS-261 (`byteswapbuf`, every k and n) | `62e1e91acc209996f091cd31ae54d99bc3f551f7613e0a63852ce915e66b4581` |
 | cmdargs | 1 | 230 | §7 | `5c761bb5079e99b50601d71c3daf5b7debe16c074fc0841b7adafd5e0125841d` |
 | strings | 1 | 4,670 | §10's string and file-name helpers on 325 strings (white space, `/`, `#`, `@`, `.`, high bytes) | `c6f74d1c9bafea60c7685682d3019b95f6795530ee815ca88c54d13c660edac1` |
 | fgetl | 1 | 300 | §10's line reader: comments, blank lines, long lines, sizes 2 to 200 | `ab086d6391f392b5f1dfe24f8527ce93eed66c4339f8277d42578cd69a8d9f85` |
-| numbers | 2 | 1,388 | §11: IEEE tests, angles, rounding (FS-12 apart), deviations, comparisons, list statistics, the finite check | `53d902b8e900a853e74fc0c4ac486646878a12c54b805dac18cbd9bdeb7994a1` |
+| numbers | 3 | 1,388 | §11: IEEE tests, angles, rounding, deviations, comparisons, list statistics; FS-12's roundings and the finite check (§5, its C-style errors: FS-01) in batches of their own | `e59cdd00962b3357196dbe7155958bf40255da02e063f1b1d89e67d628c2b7a2` |
 | lists | 2 | 303 | §11's integer lists (FS-10 apart) | `d0917c004a3c0998e9c0405265aea5ec52456fbf6b811cc59fcc6b100f763e60` |
 | select | 2 | 2,137 | §11's selections and median with ties, NaNs, zeros, infinities (FS-09 apart) | `b932a2116df85719a7baa6a314f4ca18be6b1fd3b51e7e9fd07ce224a3957276` |
 | atan2 | 3 | 120,054 | §12: `(i, 100000)` for every table index, 20,000 random pairs, signed zeros, the `atan2f` switch | `2bd50151bb181e72fa2ea8d021c0c57dde8023341f378dd3c0a015e61bdb84ab` |
 | romp | 2 | 708 | §19's levels, pieces and sums (1 and 8 threads) | `5ba96f5fd86e169cf448c12364e808b04893ca2d245051053f3c31b237edf853` |
 | clib | 1 | 370 | the C library's readings §2, §4, §9 and §15 rely on: `strerror`, `atoi`, `atof`, `%lx`, `%d`, `stol` | `5b4d0b4d2633e5f379d0163ecb6b814f29ea705a34bac2c387ba333c1fbaf96b` |
-| time | 24 | 31,320 | §14: `gmtime`, `localtime`, `%c` in 24 zones (zone files, POSIX rules, unreadable names) | `d5a48a4bc6f897db839d1d3f636c7fa8b2b3bbf3726ce8a42c8d554d4ce91140` |
+| time | 26 | 35,178 | §14: `gmtime`, `localtime`, `%c` in 26 zones (zone files, POSIX rules, a daylight name without a rule with and without `posixrules`, unreadable names) | `d532ad87e384da97be0ce8e04af36c97a88983bdd55e6141ef429e5560f557a0` |
 | files | 1 | 34 | §10's file existence and wildcards on a small tree | `bdd5c3e1318ad004926129e66839c5c1c43f709b8843218b5f6ba207e9aa18df` |
 | init | 27 | 27 | §4 (FS-02 included) | `ea9c12da2d0372d2e27c4ba104db66f2c981c611e6614b8a3ab4404fb202ed6e` |
 | messages | 72 | 72 | §2, §3, §5 (FS-01, FS-03, FS-263), the error log, HIPS | `9d47b1773af33de00cafed87333934d73ba3161cb62c84bde1f81e48aaf0666d` |
 | random | 36 | 36 | §9: 21 seeds, reseeding, ranges, permutations, `FREESURFER_SEED` (FS-04, FS-05) | `37d801a215a260eb086c55459f5d33f195214a2ac57ebadeb5a19a01151bb4bb` |
 | version | 139 | 139 | §13: 127 argument lists (FS-07), stamps, the date string | `07004daeeed7aa67ec6d13bdfa3cd0a76186a42284caf742738b17e98e16701f` |
-| fsenv | 18 | 18 | §15 (FS-08) | `7e85be0e7e40424c9dd2c38fbabc87ae04fd76909dfd1509488f4aeb4d490396` |
+| fsenv | 18 | 18 | §15 (FS-08; FS-01 in the colour table's error without a package) | `7e85be0e7e40424c9dd2c38fbabc87ae04fd76909dfd1509488f4aeb4d490396` |
 | logic | 7 | 7 | §17 | `90d5854f75b15b63a7104fcf977f2d9c0574ec8550e87f3ebae19804cd5b0ec4` |
 | temp | 37 | 37 | §18: each variable set to a writable, unwritable, missing, file and empty value | `9de571991793d2afbd6d343dded69b1e9de75f11e90d375ded48118a60835967` |
 | usage | 5 | 5 | §16 (formats) | `38a3e55a0bc7847d14e401269dc3ca92d613ab47f9cbb831e97f0c6e8f5a849e` |
@@ -673,7 +696,7 @@ messages, `--version` and `--all-info` (time stamps, user and host masked).
 ### 20.6 Golden cases
 
 One case per path in the cross-platform golden suite (CLAUDE.md rule 10): the swaps (FS-261 and
-FS-262 defaults), the string and file-name helpers, the rounding and list helpers, the selections
+FS-176 defaults), the string and file-name helpers, the rounding and list helpers, the selections
 and median, the arctangent table's SHA-256 and a few hundred pairs, the reproducible sums, the
 seeded draws for three seeds, the version options' plans (FS-07 default), the messages' bytes
 (FS-01 default); no file system, clock or environment beyond what each case sets.
@@ -714,6 +737,6 @@ seeded draws for three seeds, the version options' plans (FS-07 default), the me
 | FS-10 | the integer lists of an empty list | memory | no items | one item of value 0 |
 | FS-11 | 1,024-byte buffers of the compare and extension helpers | overflow | the whole string (both modes) | the whole string |
 | FS-12 | `nint`, `nint2` beyond the int range or NaN | undefined conversion | saturated, NaN 0 | -2147483648 |
+| FS-176 | 64-bit integer swaps round through a double (fs.io's 64-bit readers and writers too) | A | the exact reversal | the rounding |
 | FS-261 | buffer swaps reverse only the first ⌈n/k⌉ items | A | every item | the first ⌈n/k⌉ |
-| FS-262 | 64-bit integer swaps round through a double | A | the exact reversal | the rounding |
 | FS-263 | with exceptions on, a nonzero fatal error aborts | A | the code reaches the caller | abort, 134 |

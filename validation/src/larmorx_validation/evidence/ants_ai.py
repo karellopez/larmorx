@@ -11,11 +11,13 @@ and two copies with known transforms (``ants_ai_blobs``); the records' cases.
 from __future__ import annotations
 
 import re
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
 
 from larmorx_validation.evidence import ants_ai_blobs, common, core
+from larmorx_validation.evidence import present as present_
 from larmorx_validation.figures import cache as fcache
 from larmorx_validation.figures import records
 
@@ -501,7 +503,7 @@ def _example(ctx: core.Context, reg: dict) -> dict:
                 "antsAffineInitializer: larmorx default − reproduce",
                 "init-larmorx-fix",
                 "init-larmorx",
-                sub=", ".join(named["init-larmorx-fix"]) + " corrected (D13)"
+                sub=", ".join(named["init-larmorx-fix"]) + " corrected by default"
                 if named["init-larmorx-fix"]
                 else "no correction applies",
             ),
@@ -768,6 +770,7 @@ def _record_cases(rec, impl: str, program: str, module: str) -> list[dict]:
 def export(ctx: core.Context) -> dict:
     reg = core.register(ctx.repo)
     cases = _cases(ctx)
+    common.difftest_descriptions(ctx.repo, cases, "ants-ai", "antsAI/")
     a116, a116_sources = ants_ai_blobs.a116_table(ctx)
     from larmorx_validation.evidence import ants_panel
 
@@ -790,7 +793,7 @@ def export(ctx: core.Context) -> dict:
                 name=name,
             )
         )
-    return {
+    doc = {
         "schema": 1,
         "tool": TOOL,
         "title": "antsAI, antsAffineInitializer",
@@ -818,6 +821,177 @@ def export(ctx: core.Context) -> dict:
             *ants_panel.examples(ctx, TOOL),
         ],
     }
+    return present(doc)
+
+
+# ------------------------------------------------------------------ the writing guide's words
+
+PAGE = present_.Page(
+    software="ANTs",
+    program="antsAI",
+    version="2.6.5",
+    programs=("antsAI", "antsAffineInitializer"),
+)
+#: The page's two programs, for what covers them both (the random-testing panel).
+BOTH = replace(PAGE, program="")
+#: The program of each worked example and table whose calls are not antsAI's.
+OTHER = {
+    "panel-init-stroke": "antsAffineInitializer",
+    "panel-init-stroke-transforms": "antsAffineInitializer",
+}
+#: Each worked example's "What this shows" line and the verdict beside it, from the example's
+#: own metrics, reasons and tables; the data panel's lines from their own verdicts
+#: (present.panel_shows).
+SHOWS = {
+    "init-aff": (
+        "In `reproduce`, on 1 and 8 threads, the replica of antsAI writes ANTs' one-thread "
+        "transform byte for byte, as built and with correctly rounded maths, and so does the "
+        "replica of antsAffineInitializer with niworkflows' arguments. fMRIPrep's transform, "
+        "ANTs 2.6.2's at 8 threads, sends the template's brain at most 2.5e-13 mm from the "
+        "replica's, where ANTs 2.6.5's own 8 and 1 threads differ by 3.2e-13 mm; the placed "
+        "images are the same bytes. No correction by default changes antsAI's call; "
+        "antsAffineInitializer's default, `fix`, corrects ANTS-54 and ITK-21 here and moves the "
+        "brain by up to 0.059 mm (mean 0.054 mm) from `reproduce`.",
+        ["lx-ants1"],
+    ),
+    "blobs-found": (
+        "In `reproduce` the replica finds ANTs' 30 blobs bit for bit: each at the same voxel, "
+        "with the same radius and the same Laplacian value as ANTs' own code finds them. Its "
+        "default, `fix`, corrects ANTS-112 to keep the strongest maxima; here the largest "
+        "scales fill the list before ANTs' early threshold can drop one, so both lists are the "
+        "same.",
+        ["lx-ants"],
+    ),
+    "blobs-shift": (
+        "In `reproduce`, on 6 threads, the replica writes ANTs' transform file byte for byte, "
+        "with the same blobs, correlations, pairs and landmarks as ANTs' own code. Its default, "
+        "`fix`, changes the pairs and landmarks (ANTS-116): it keeps 13 landmarks of 13 pairs, "
+        "ANTs 10 of 11. Both transforms send the copy where the truth does (4.1e-15 and "
+        "1.8e-15 mm off at most), so the placed images are the same.",
+        ["lx-ants"],
+    ),
+    "blobs-rotated": (
+        "ANTs keeps no landmark (ANTS-110) and writes a transform of NaNs (ANTS-114); the "
+        "replica's `reproduce` writes the same file. Its default, `fix`, keeps the pairs whose "
+        "distances are preserved and finds a rotation of 8.18° (the truth: 8.00°), which sends "
+        "the brain at most 1.2 mm (mean 0.62 mm) from where the true transform does.",
+        [],
+    ),
+}
+TITLES = {
+    "init-aff": "In sMRIPrep: the initial transform of the brain extraction",
+    "blobs-found": "The blobs ANTs and the replica find in a T1w",
+    "blobs-shift": "Blob alignment of a T1w and its shifted copy",
+}
+#: The comparisons of the initial transform: each named by its program's original (the
+#: labels name antsAI's runs and antsAffineInitializer's alike as "ANTs") and by fMRIPrep's
+#: output.
+DIFFS = {
+    "init-aff": {
+        "lx-ants1": (
+            "replica − ANTs antsAI 2.6.5, 1 thread (placed T1w)",
+            "the replica against the original",
+        ),
+        "lx-fmriprep": (
+            "replica − fMRIPrep's output (placed T1w)",
+            "the replica against fMRIPrep's output",
+        ),
+        "init-lx-ants": (
+            "replica − ANTs antsAffineInitializer 2.6.5 (placed T1w)",
+            "the replica against the original",
+        ),
+        "ants8-ants1": (
+            "ANTs antsAI 2.6.5, 8 threads − 1 thread (placed T1w)",
+            "the original against itself: 1 and 8 threads",
+        ),
+        "fmriprep-ants8": (
+            "fMRIPrep's output − ANTs antsAI 2.6.5, 8 threads (placed T1w)",
+            "the original against itself: fMRIPrep's run and the repository's build",
+        ),
+    },
+}
+#: The rows and columns of the examples' own tables that name a run in the old words, as the
+#: comparisons name them.
+ROWS = {
+    "antsAI: ANTs 8 threads − 1 thread": "ANTs antsAI, 8 threads − 1 thread",
+    "antsAI: fMRIPrep − ANTs 2.6.5, 8 threads": "fMRIPrep's output − ANTs antsAI 2.6.5, 8 threads",
+    "antsAI: replica 1 thread − 8 threads": "replica, 1 thread − 8 threads",
+    "antsAI: replica default − reproduce": "replica, fix − reproduce",
+    "antsAI: replica − ANTs with CORE-MATH": "replica − ANTs antsAI, correctly rounded maths",
+    "antsAI: replica − ANTs, 1 thread": "replica − ANTs antsAI, 1 thread",
+    "antsAI: replica − fMRIPrep's own": "replica − fMRIPrep's output",
+    "antsAffineInitializer: ANTs 8 threads − 1 thread": (
+        "ANTs antsAffineInitializer, 8 threads − 1 thread"
+    ),
+    "antsAffineInitializer: replica default − reproduce": (
+        "replica of antsAffineInitializer, fix − reproduce"
+    ),
+    "antsAffineInitializer: replica − ANTs": "replica − ANTs antsAffineInitializer",
+    "antsAffineInitializer: replica − ANTs with CORE-MATH": (
+        "replica − ANTs antsAffineInitializer, correctly rounded maths"
+    ),
+    "replica (reproduce) − ANTs with CORE-MATH": (
+        "replica, reproduce − ANTs antsAI, correctly rounded maths"
+    ),
+    "replica (reproduce) − ANTs, 1 thread": "replica, reproduce − ANTs antsAI, 1 thread",
+    "replica 1 thread − 6 threads": "replica, 1 thread − 6 threads",
+    "replica's default − ANTs": "replica, fix − ANTs antsAI",
+    "replica's default − the true transform": "replica, fix − the true transform",
+    "ANTs with CORE-MATH − as built": "ANTs antsAI: correctly rounded maths − as built",
+    "replica (reproduce)": "replica, reproduce",
+    "replica's default": "replica, fix",
+    "replica − fMRIPrep": "replica − fMRIPrep's output",
+}
+#: antsAffineInitializer's run of niworkflows' call, whose label does not give its mode (the
+#: module runs it in reproduce, at 8 threads: _compute).
+PANELS = {
+    "init-aff": {
+        "init-larmorx": (
+            "antsAffineInitializer: replica",
+            "larmorx, Apache-2.0 · reproduce, 8 threads · niworkflows' arguments; the T1w placed "
+            "by its transform · against ANTs antsAffineInitializer 2.6.5",
+        ),
+    },
+}
+#: The record's categories as the page names them.
+CATEGORIES = {
+    "initial": "initial alignments",
+    "search": "the multi-start search",
+    "messages": "messages",
+    "random": "random sampling",
+    "blobs": "the blob alignment",
+}
+
+
+def present(doc: dict) -> dict:
+    """antsAI's page in the writing guide's words and order: texts, ports and order only."""
+    for ex in doc["examples"]:
+        page = replace(PAGE, program=OTHER.get(ex["id"], PAGE.program))
+        if ex["id"] in SHOWS:
+            shows, verdicts = SHOWS[ex["id"]]
+        else:
+            shows, verdicts = present_.panel_shows(page, ex)
+        present_.example(
+            page,
+            ex,
+            shows=shows,
+            verdicts=verdicts,
+            title=TITLES.get(ex["id"]),
+            panels=PANELS.get(ex["id"]),
+            diffs=DIFFS.get(ex["id"]),
+        )
+        for t in ex.get("tables") or []:
+            for c in t.get("columns", []):
+                c["label"] = ROWS.get(c["label"], c["label"])
+            for r in t["rows"]:
+                r["head"] = ROWS.get(r.get("head"), r.get("head"))
+    for im in doc["implementations"]:
+        page = replace(PAGE, program=IMPLS[im["id"]][0])
+        present_.implementation(page, im, "standard comparison and data panel")
+    present_.random_testing(BOTH, doc, {"port": "replica"})
+    runs = tuple(t["id"] for t in doc["tables"] if t["id"].endswith("-transforms"))
+    pages = {k: replace(PAGE, program=v) for k, v in OTHER.items()}
+    return present_.finish(PAGE, doc, CATEGORIES, runs=runs, pages=pages)
 
 
 if __name__ == "__main__":

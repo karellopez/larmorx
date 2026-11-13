@@ -3,10 +3,10 @@
 ``std2imgcoord`` and ``img2stdcoord`` (coordinates mapped between images), ``rmsdiff`` (the
 deviation between two matrices) and ``makerot`` (a rotation matrix), FSL 6.0.7.23's.
 
-Each has two implementations (``docs/licensing.md``): the bit-exact replica from ``larmorx-nc``
-(FSL Licence), run as a separate program, and the clean-room original (Apache-2.0, written from
+Each has two ports (``docs/licensing.md``): the bit-exact replica from ``larmorx-nc`` (FSL
+Licence), run as a separate program, and the clean room (Apache-2.0, written from
 ``specs/flirt.md``), run in this process; ``implementation="auto"`` runs the replica when it is
-installed, else the original. The results are what the programs print, parsed: FSL prints matrices and parameters with 6 decimals, and coordinates with 6
+installed, else the clean room. The results are what the programs print, parsed: FSL prints matrices and parameters with 6 decimals, and coordinates with 6
 significant digits (with 6 decimals once a matrix was printed in verbose mode), and so do these.
 """
 
@@ -22,7 +22,7 @@ import numpy as np
 from larmorx import _replica
 from larmorx._defects import UpstreamDefectsName
 from larmorx._replica import ImplementationName
-from larmorx.fsl.bet import _write_image
+from larmorx.fsl.bet import _threads, _write_image
 from larmorx.fsl.flirt import _matrix_file, _run
 
 __all__ = [
@@ -36,10 +36,10 @@ __all__ = [
 ]
 
 
-def _image_file(image: Any, tmp: str, name: str) -> str:
+def _image_file(image: Any, tmp: str, name: str, n_threads: int = 1) -> str:
     """A path as given (absolute), or an in-memory image (:class:`larmorx.Image` or an array)
     written into ``tmp``."""
-    return _write_image(image, tmp, name, 1)
+    return _write_image(image, tmp, name, n_threads)
 
 
 def _coords_file(coords: Any, tmp: str) -> str:
@@ -57,12 +57,39 @@ def _coords_file(coords: Any, tmp: str) -> str:
 
 @dataclass(frozen=True)
 class AvscaleResult:
-    """``avscale``'s decomposition of ``matrix`` (``matrix = rotation * skew * scale``, the
-    rotation's angles about x, y, z in radians and the translation about ``centre``), as it
-    prints them (6 decimals): the rotation-and-translation matrix, the angles and translations
-    (``all_params``), scales, skews, their average, the determinant, whether the left-right
-    order is kept, and the two half transforms; with ``inverted_eddies`` the check matrix and
-    the inverted eddy-current matrix. ``stdout`` is the program's text."""
+    """``avscale``'s decomposition of ``matrix`` (``matrix = rotation * skew * scale``), as it
+    prints them (6 decimals, or 6 significant digits where FSL prints those).
+
+    Attributes
+    ----------
+    rotation_translation
+        The rotation-and-translation matrix (4 x 4).
+    rotations
+        The rotation's angles about x, y and z, in radians (``all_params``; else ``None``).
+    translations
+        The translation about the centre of gravity of ``volume``, or about the origin without
+        one (``all_params``; else ``None``).
+    scales
+        The scales along x, y and z.
+    skews
+        The skews.
+    average_scale
+        The scales' average.
+    determinant
+        The matrix's determinant.
+    left_right_preserved
+        Whether the left-right order is kept.
+    forward_half
+        The forward half transform (the matrix's square root).
+    backward_half
+        The backward half transform.
+    matrix_check
+        The check matrix (``inverted_eddies``; else ``None``).
+    inverted_eddy
+        The inverted eddy-current matrix (``inverted_eddies``; else ``None``).
+    stdout
+        The program's text.
+    """
 
     rotation_translation: np.ndarray
     rotations: np.ndarray | None
@@ -99,14 +126,26 @@ def avscale(
     *,
     all_params: bool = False,
     inverted_eddies: bool = False,
+    n_threads: int = 1,
     implementation: ImplementationName = "auto",
 ) -> AvscaleResult:
     """FSL's ``avscale``: ``matrix`` (4 x 4 array or file) decomposed, its translations about the
     centre of gravity of ``volume`` (a path or :class:`larmorx.Image`; the origin without one).
     ``all_params`` also returns the rotation angles and translations; ``inverted_eddies`` the
-    eddy-current inversion (the two options are exclusive, as on the command line)."""
+    eddy-current inversion (the two options are exclusive, as on the command line).
+
+    Parameters
+    ----------
+    n_threads
+        Threads (0 = all), given to the program as ``OMP_NUM_THREADS``; the result does not
+        depend on it.
+    implementation
+        ``"auto"`` (default): the replica when ``larmorx-nc`` is installed, else the clean room;
+        ``"replica"`` or ``"clean-room"`` (``"original"``, 0.1.0rc1's spelling, still works).
+    """
     if all_params and inverted_eddies:
         raise ValueError("avscale takes one of all_params and inverted_eddies")
+    n_threads = _threads(n_threads)
     selected = _replica.select("fsl", "avscale", implementation)
     with tempfile.TemporaryDirectory(prefix="larmorx-avscale-") as tmp:
         args = []
@@ -116,8 +155,8 @@ def avscale(
             args.append("--inverteddies")
         args.append(_matrix_file(matrix, tmp, "in"))
         if volume is not None:
-            args.append(_image_file(volume, tmp, "vol"))
-        process = _run(selected, args, tmp, 1, "fix", program="avscale")
+            args.append(_image_file(volume, tmp, "vol", n_threads))
+        process = _run(selected, args, tmp, n_threads, "fix", program="avscale")
     text = process.stdout
     lines = text.splitlines()
     scales = _values(lines, "Scales (x,y,z) = ")
@@ -146,10 +185,10 @@ def avscale(
     )
 
 
-def _coords(tool: str, args: list[str], implementation: str) -> np.ndarray:
+def _coords(tool: str, args: list[str], implementation: str, n_threads: int) -> np.ndarray:
     selected = _replica.select("fsl", tool, implementation)
     with tempfile.TemporaryDirectory(prefix=f"larmorx-{tool}-") as tmp:
-        process = _run(selected, args, tmp, 1, "fix", program=tool)
+        process = _run(selected, args, tmp, n_threads, "fix", program=tool)
     if process.returncode != 0:
         raise RuntimeError(f"{tool} failed (exit {process.returncode}):\n{process.stderr}")
     rows = []
@@ -170,18 +209,35 @@ def img2imgcoord(
     *,
     xfm: Any = None,
     mm: bool = False,
+    n_threads: int = 1,
     implementation: ImplementationName = "auto",
 ) -> np.ndarray:
     """FSL's ``img2imgcoord``: ``coords`` (N x 3, or a file of rows ``x y z``) in ``src``'s voxels
     (NIfTI's), or millimetres with ``mm``, mapped through ``xfm`` (FLIRT's matrix from ``src`` to
-    ``dest``; the identity without one) to ``dest``'s; returned as N x 3."""
+    ``dest``; the identity without one) to ``dest``'s; returned as N x 3.
+
+    Parameters
+    ----------
+    n_threads
+        Threads (0 = all), given to the program as ``OMP_NUM_THREADS``; the result does not
+        depend on it.
+    implementation
+        ``"auto"`` (default): the replica when ``larmorx-nc`` is installed, else the clean room;
+        ``"replica"`` or ``"clean-room"`` (``"original"``, 0.1.0rc1's spelling, still works).
+    """
+    n_threads = _threads(n_threads)
     with tempfile.TemporaryDirectory(prefix="larmorx-coords-") as tmp:
-        args = ["-src", _image_file(src, tmp, "src"), "-dest", _image_file(dest, tmp, "dest")]
+        args = [
+            "-src",
+            _image_file(src, tmp, "src", n_threads),
+            "-dest",
+            _image_file(dest, tmp, "dest", n_threads),
+        ]
         if xfm is not None:
             args += ["-xfm", _matrix_file(xfm, tmp, "xfm")]
         args.append("-mm" if mm else "-vox")
         args.append(_coords_file(coords, tmp))
-        return _coords("img2imgcoord", args, implementation)
+        return _coords("img2imgcoord", args, implementation, n_threads)
 
 
 def std2imgcoord(
@@ -191,21 +247,33 @@ def std2imgcoord(
     *,
     xfm: Any = None,
     vox: bool = False,
+    n_threads: int = 1,
     implementation: ImplementationName = "auto",
 ) -> np.ndarray:
     """FSL's ``std2imgcoord``: ``coords`` (N x 3, or a file) in ``std``'s millimetres (its
     sform or qform; without ``std``, the voxel sizes of a 1 mm grid) mapped through the inverse
     of ``xfm`` (FLIRT's matrix from ``img`` to ``std``) to ``img``'s millimetres, or its NIfTI
-    voxels with ``vox``; returned as N x 3."""
+    voxels with ``vox``; returned as N x 3.
+
+    Parameters
+    ----------
+    n_threads
+        Threads (0 = all), given to the program as ``OMP_NUM_THREADS``; the result does not
+        depend on it.
+    implementation
+        ``"auto"`` (default): the replica when ``larmorx-nc`` is installed, else the clean room;
+        ``"replica"`` or ``"clean-room"`` (``"original"``, 0.1.0rc1's spelling, still works).
+    """
+    n_threads = _threads(n_threads)
     with tempfile.TemporaryDirectory(prefix="larmorx-coords-") as tmp:
-        args = ["-img", _image_file(img, tmp, "img")]
+        args = ["-img", _image_file(img, tmp, "img", n_threads)]
         if std is not None:
-            args += ["-std", _image_file(std, tmp, "std")]
+            args += ["-std", _image_file(std, tmp, "std", n_threads)]
         if xfm is not None:
             args += ["-xfm", _matrix_file(xfm, tmp, "xfm")]
         args.append("-vox" if vox else "-mm")
         args.append(_coords_file(coords, tmp))
-        return _coords("std2imgcoord", args, implementation)
+        return _coords("std2imgcoord", args, implementation, n_threads)
 
 
 def img2stdcoord(
@@ -215,20 +283,32 @@ def img2stdcoord(
     *,
     xfm: Any = None,
     mm: bool = False,
+    n_threads: int = 1,
     implementation: ImplementationName = "auto",
 ) -> np.ndarray:
     """FSL's ``img2stdcoord``: ``coords`` (N x 3, or a file) in ``img``'s NIfTI voxels, or its
     millimetres with ``mm``, mapped through ``xfm`` (FLIRT's matrix from ``img`` to ``std``) to
-    ``std``'s millimetres; returned as N x 3."""
+    ``std``'s millimetres; returned as N x 3.
+
+    Parameters
+    ----------
+    n_threads
+        Threads (0 = all), given to the program as ``OMP_NUM_THREADS``; the result does not
+        depend on it.
+    implementation
+        ``"auto"`` (default): the replica when ``larmorx-nc`` is installed, else the clean room;
+        ``"replica"`` or ``"clean-room"`` (``"original"``, 0.1.0rc1's spelling, still works).
+    """
+    n_threads = _threads(n_threads)
     with tempfile.TemporaryDirectory(prefix="larmorx-coords-") as tmp:
-        args = ["-img", _image_file(img, tmp, "img")]
+        args = ["-img", _image_file(img, tmp, "img", n_threads)]
         if std is not None:
-            args += ["-std", _image_file(std, tmp, "std")]
+            args += ["-std", _image_file(std, tmp, "std", n_threads)]
         if xfm is not None:
             args += ["-xfm", _matrix_file(xfm, tmp, "xfm")]
         args.append("-mm" if mm else "-vox")
         args.append(_coords_file(coords, tmp))
-        return _coords("img2stdcoord", args, implementation)
+        return _coords("img2stdcoord", args, implementation, n_threads)
 
 
 def rmsdiff(
@@ -237,21 +317,33 @@ def rmsdiff(
     ref: Any,
     mask: Any = None,
     *,
+    n_threads: int = 1,
     implementation: ImplementationName = "auto",
 ) -> float | tuple[float, float]:
     """FSL's ``rmsdiff``: the RMS deviation (mm) between two matrices (4 x 4 arrays or files)
     over a sphere of radius 80 mm about ``ref``'s centre of gravity; with ``mask``, the largest
-    and the RMS displacement over the mask's voxels, as ``(largest, rms)``."""
+    and the RMS displacement over the mask's voxels, as ``(largest, rms)``.
+
+    Parameters
+    ----------
+    n_threads
+        Threads (0 = all), given to the program as ``OMP_NUM_THREADS``; the result does not
+        depend on it.
+    implementation
+        ``"auto"`` (default): the replica when ``larmorx-nc`` is installed, else the clean room;
+        ``"replica"`` or ``"clean-room"`` (``"original"``, 0.1.0rc1's spelling, still works).
+    """
+    n_threads = _threads(n_threads)
     selected = _replica.select("fsl", "rmsdiff", implementation)
     with tempfile.TemporaryDirectory(prefix="larmorx-rmsdiff-") as tmp:
         args = [
             _matrix_file(matrix1, tmp, "m1"),
             _matrix_file(matrix2, tmp, "m2"),
-            _image_file(ref, tmp, "ref"),
+            _image_file(ref, tmp, "ref", n_threads),
         ]
         if mask is not None:
-            args.append(_image_file(mask, tmp, "mask"))
-        process = _run(selected, args, tmp, 1, "fix", program="rmsdiff")
+            args.append(_image_file(mask, tmp, "mask", n_threads))
+        process = _run(selected, args, tmp, n_threads, "fix", program="rmsdiff")
     if process.returncode != 0:
         raise RuntimeError(f"rmsdiff failed (exit {process.returncode}):\n{process.stderr}")
     values = [float(v) for v in process.stdout.split()]
@@ -266,6 +358,7 @@ def makerot(
     centre: Any = None,
     *,
     cov: Any = None,
+    n_threads: int = 1,
     upstream_defects: UpstreamDefectsName = "fix",
     implementation: ImplementationName = "auto",
 ) -> np.ndarray:
@@ -274,7 +367,21 @@ def makerot(
     or through the centre of the image ``cov`` (half its extent in mm). The axis is divided by
     its length (FSL divides by the square root of it, FSL-76; ``upstream_defects="reproduce"``
     gives FSL's matrix); an axis or centre of other than three values is an error here (FSL-77
-    is about the command line, where one word holds them)."""
+    is about the command line, where one word holds them).
+
+    Parameters
+    ----------
+    n_threads
+        Threads (0 = all), given to the program as ``OMP_NUM_THREADS``; the result does not
+        depend on it.
+    implementation
+        ``"auto"`` (default): the replica when ``larmorx-nc`` is installed, else the clean room;
+        ``"replica"`` or ``"clean-room"`` (``"original"``, 0.1.0rc1's spelling, still works).
+    upstream_defects
+        ``"fix"`` (default) or ``"reproduce"``: FSL's defects corrected, or FSL's behaviour
+        (``docs/api/fsl-flirt.md``, "Defects of the original, corrected by default").
+    """
+    n_threads = _threads(n_threads)
     selected = _replica.select("fsl", "makerot", implementation)
 
     def three(v: Any, what: str) -> str:
@@ -290,10 +397,10 @@ def makerot(
         if centre is not None:
             args.append("--centre=" + three(centre, "centre"))
         if cov is not None:
-            args.append("--cov=" + _image_file(cov, tmp, "cov"))
+            args.append("--cov=" + _image_file(cov, tmp, "cov", n_threads))
         out = os.path.join(tmp, "rot.mat")
         args += ["-o", out]
-        p = _run(selected, args, tmp, 1, upstream_defects, program="makerot")
+        p = _run(selected, args, tmp, n_threads, upstream_defects, program="makerot")
         if p.returncode != 0 or not os.path.isfile(out):
             raise RuntimeError(f"makerot failed (exit {p.returncode}):\n{p.stderr}")
         return np.loadtxt(out)

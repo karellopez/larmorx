@@ -16,7 +16,7 @@ program, translated from tedana 26.0.3), against tedana itself and fMRIPrep 25.2
   testing's trial and its check, and the benchmark.
 - fMRIPrep's own files against tedana 25.0.1 run here in fMRIPrep's image with numpy's AVX-512
   kernels off and on (fMRIPrep's runs had them on), on its four curve-fit calls (2026-11-12).
-- The clean-room original's part (``tedana_t2smap_original.extend``, its implementer's module:
+- The clean-room original's part (``tedana_t2smap_clean_room.extend``, its implementer's module:
   its worked example, its record's cases as ``original/<case>``, its tables), and its series on
   the speed chart from its benchmark.
 
@@ -34,10 +34,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import shlex
 import shutil
 import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -580,6 +582,277 @@ def _link(links: dict[str, str], ids) -> list[dict]:
     return [{"label": i, "href": links[i]} for i in ids if i in links]
 
 
+# ------------------------------------------------------------------ the clean room's runs
+
+#: The clean room's runs on each shown call (the documentation revision, 2026-11-13: the
+#: examples showed tedana and the replica only): LARMORX's clean room (crate larmorx-tedana)
+#: through its binding, as its own example runs it (``tedana_t2smap_clean_room.RUNNER`` and its
+#: settings, a black box), in `reproduce` at one thread and in `fix` at eight and at one. Each:
+#: the run's id here, its D13 mode, its threads, its label in the clean room's own example.
+CLEAN_RUNS = [
+    ("clean-reproduce", "reproduce", 1, "original-reproduce"),
+    ("clean", "fix", 8, "original"),
+    ("clean-1", "fix", 1, "original-1"),
+]
+#: A shown call whose clean-room runs the clean room's own example made: the same call (its
+#: echoes' and mask's SHA-256 those of the call's entry, checked when the example is made), so
+#: no run is made twice.
+CLEAN_ELSEWHERE = {"ds003592-sub-280-rest-curvefit": "fmriprep-ds003592-curvefit-original"}
+_CLEAN_NOTICE = re.compile(r"^larmorx: upstream defect (\S+) \((\w+)\) (corrected|reproduced)")
+
+
+def _clean_description(name: str) -> str:
+    return (
+        f"fMRIPrep's t2smap call {name}: LARMORX's clean room (crate larmorx-tedana) through "
+        "its binding, reproduce at 1 thread, fix at 8 and at 1"
+    )
+
+
+def _compute_clean(name: str):
+    def compute(e: fcache.Entry) -> None:
+        from larmorx_validation.evidence import tedana_t2smap_clean_room as cr
+
+        args = call_args(name)
+        p = parse(args)
+        for i, f in enumerate(p["echoes"]):
+            e.input(f"echo {i + 1} (fMRIPrep's)", f)
+        e.input("mask (fMRIPrep's dilated BOLD mask)", p["mask"])
+        unset = [k for k in os.environ if k.startswith(("NPY_", "OPENBLAS_", "OMP_"))]
+        notices: dict[str, list[str]] = {}
+        for label, mode, n, _theirs in CLEAN_RUNS:
+            d = e.dir / label
+            if d.is_dir():
+                shutil.rmtree(d)
+            d.mkdir()
+            words = [*args, "--n-threads", str(n), "--out-dir", "out"]
+            e.run(label, [sys.executable, "-c", cr.RUNNER, *words], env=cr._settings(mode),
+                  unset=unset, cwd=d)  # fmt: skip
+            log = (e.dir / f"{label}.log").read_text(encoding="utf-8")
+            notices[label] = sorted(
+                {m.group(1) for x in log.splitlines() if (m := _CLEAN_NOTICE.match(x))}
+            )
+        e.finish(
+            versions={"larmorx": "the clean room (crate larmorx-tedana) through "
+                      "larmorx._core.tedana_t2smap_cleanroom, as the clean room's own example "
+                      "runs it"},
+            notices=notices,
+            threads={label: str(n) for label, _m, n, _t in CLEAN_RUNS},
+            node=str(node_dir(name).relative_to(common.oracles() / "fmriprep-25.2.6")),
+            settings="fMRIPrep 25.2.6's t2smap call of the run (its node's command.txt), with "
+            "--n-threads and --out-dir out in each run's folder; the clean room's settings of "
+            "its own example (tedana_t2smap_clean_room._settings: the D13 mode)",
+        )  # fmt: skip
+
+    return compute
+
+
+def clean_entry(ctx: core.Context, name: str) -> tuple[fcache.Entry, dict[str, str]]:
+    """The clean room's runs of the shown call ``name``: its entry and each run's folder name
+    there (the clean room's own example's entry where it holds the same call)."""
+    if name in CLEAN_ELSEWHERE:
+        from larmorx_validation.evidence import tedana_t2smap_clean_room as cr
+
+        e = cr.entry(ctx)
+        if e.case != CLEAN_ELSEWHERE[name]:
+            raise ValueError(f"the clean room's example is {e.case}, not {CLEAN_ELSEWHERE[name]}")
+        return e, {label: theirs for label, _m, _n, theirs in CLEAN_RUNS}
+    e = fcache.entry(
+        ctx.figures_context(), TOOL, f"clean-room-{name}", _clean_description(name),
+        _compute_clean(name),
+    )  # fmt: skip
+    return e, {label: label for label, *_ in CLEAN_RUNS}
+
+
+def _same_inputs(call: dict, clean: dict) -> None:
+    """The clean room's runs read the call's own echoes and mask (their SHA-256)."""
+
+    def shas(info: dict) -> list[str]:
+        return [
+            v.rsplit("sha256 ", 1)[1].rstrip(")")
+            for k, v in info["inputs"].items()
+            if k.startswith(("echo", "mask", "fMRIPrep's dilated"))
+        ]
+
+    if shas(call) != shas(clean):
+        raise ValueError(f"{call['case']}: the clean room's runs read other inputs")
+
+
+def _clean_part(ctx: core.Context, name: str, e: fcache.Entry) -> dict:
+    """The clean room's runs of a shown call: their folders, notices, entry and its info."""
+    ce, folders = clean_entry(ctx, name)
+    info = ce.info()
+    _same_inputs(e.info(), info)
+    notices = info.get("notices", {})
+    return {
+        "entry": ce,
+        "info": info,
+        "dirs": {label: ce.dir / folders[label] for label in folders},
+        "notices": {label: [n for n in notices.get(folders[label], []) if n] for label in folders},
+    }
+
+
+def _clean_maps(part: dict, label: str) -> dict[str, np.ndarray]:
+    d = part["dirs"][label] / "out"
+    return {oid: _stored(d / f) for oid, f, _l, _u in MAPS if (d / f).is_file()}
+
+
+#: The clean room's panels: id, label, second line (in the shapes the presenter reads).
+CLEAN_PANELS = {
+    "clean-reproduce": ("larmorx (clean room), 1 thread", "reproduce mode"),
+    "clean": ("larmorx (clean room), 8 threads", "default mode (D13 corrections)"),
+}
+
+
+def _clean_diffs() -> list[dict]:
+    d = common.d
+    return [
+        d("cr-ted", "clean-reproduce", "tedana", "main",
+          "clean-room original (reproduce) − tedana 26.0.3", common.ROLE_LX),
+        d("cr1-cr", "clean-1", "clean", "check", "clean-room original, 1 thread − 8 threads",
+          common.ROLE_SELF),
+        d("crfix-cr", "clean", "clean-reproduce", "check",
+          "clean-room original: default − reproduce mode", common.ROLE_SELF),
+        d("crfix-rfix", "clean", "replica-fix", "check",
+          "clean-room original − replica, both default", common.ROLE_SELF),
+        d("crfix-fmriprep", "clean", "fmriprep", "fmriprep",
+          "clean-room original, default − fMRIPrep 25.2.6's own file", common.ROLE_FMRIPREP),
+    ]  # fmt: skip
+
+
+def _check_tedana(e: fcache.Entry, other: Path) -> tuple[bool, str, tuple[int, int] | None]:
+    """check.py (§17.3, the clean room's suite) of a run's folder against tedana's run of the
+    call's entry. That run's folder holds tedana's files as the oracle-output cache gave them
+    back, without the empty ``figures`` folder tedana writes (the clean room's own example's
+    tedana run has it, and both ports write it): the check reads tedana's files from a folder
+    that links each of them and holds that empty folder, so it compares the files, not the
+    replay's folder."""
+    import tempfile
+
+    from larmorx_validation.evidence import tedana_t2smap_clean_room as cr
+
+    src = e.dir / "tedana" / "out"
+    if (src / "figures").is_dir():
+        return cr._check(e.dir / "tedana", other)
+    with tempfile.TemporaryDirectory(prefix="t2smap-tedana-") as tmp:
+        out = Path(tmp) / "tedana" / "out"
+        out.mkdir(parents=True)
+        for f in src.iterdir():
+            (out / f.name).symlink_to(f)
+        (out / "figures").mkdir()
+        return cr._check(out.parent, other)
+
+
+def _clean_verdicts(diffs: list[dict], part: dict, e: fcache.Entry, links: dict,
+                    capped: int | None, series: bool = False) -> None:  # fmt: skip
+    """The clean room's comparisons' verdicts and reasons: with tedana and between the two
+    ports' defaults by specs/t2smap.md §17.3's check.py (the clean room's suite, as its own
+    example judges them), the rest from their metrics and the runs' notices."""
+    from larmorx_validation.evidence import tedana_t2smap_clean_room as cr
+
+    same = common.identical(diffs)
+    fixed = part["notices"]["clean"]
+
+    def counted(c: tuple[int, int] | None) -> str:
+        return f"{c[0]:,} of {c[1]:,} compared values identical" if c else "values compared"
+
+    for x in diffs:
+        i = x["id"]
+        if i not in {"cr-ted", "cr1-cr", "crfix-cr", "crfix-rfix", "crfix-fmriprep"}:
+            continue
+        n, total = _count(x), _ncomp(x)
+        x["links"] = []
+        if i == "cr-ted":
+            ok, det, cnt = _check_tedana(e, part["dirs"]["clean-reproduce"])
+            x["verdict"] = "bit-identical" if same[i] else ("within-variability" if ok else "open")
+            x["reason"] = common.clip(
+                f"specs/t2smap.md §17.3 by its check.py, over the run's files: {counted(cnt)}; "
+                f"the curve fit's {cr.BC} share {cr._share(det)} of the fit voxels (the clean "
+                "room's own trust-region solver, its log-linear fit in closed form: the fitted "
+                "numbers within the thresholds, not bit for bit)",
+                420,
+            )
+            x["links"] = [{"label": "§17.3", "href": cr.SPEC}]
+        elif i == "cr1-cr":
+            x["verdict"], x["reason"] = (
+                ("bit-identical", "The same bits at 1 and 8 threads.") if same[i]
+                else ("open", f"{n:,} values differ between 1 and 8 threads."))  # fmt: skip
+        elif i == "crfix-cr":
+            if same[i]:
+                x["verdict"] = "bit-identical"
+                x["reason"] = "No correction of the register changes this call's values."
+            else:
+                x["verdict"] = "d13"
+                cap = f" TED-05 caps {capped:,} voxels of the full T2* map." if capped else ""
+                x["reason"] = common.clip(
+                    "The default's corrections, each named by its notice: "
+                    + ("; ".join(f"{t} ({cr.WHAT.get(t, 'see the register')})" for t in fixed)
+                       or "none")
+                    + f": {n:,} of {total:,} values change.{cap}",
+                    420,
+                )  # fmt: skip
+                x["links"] = _link(links, fixed)
+        elif i == "crfix-rfix":
+            ok, det, cnt = cr._check(e.dir / "replica-fix", part["dirs"]["clean"])
+            x["verdict"] = "bit-identical" if same[i] else ("within-variability" if ok else "open")
+            x["reason"] = common.clip(
+                f"The two ports' defaults by §17.3 (check.py), over the run's files: "
+                f"{counted(cnt)}; the {cr.BC} share {cr._share(det)}.",
+                400,
+            )
+            x["links"] = [{"label": "§17.3", "href": cr.SPEC}]
+        else:  # crfix-fmriprep
+            x["verdict"] = "d13" if fixed else "within-variability"
+            how = (
+                "The combination weighs the echoes with the full T2* map, which the default "
+                "caps as tedana 25.0.1 did (TED-05)."
+                if series
+                else "The full T2* map's cap (TED-05) is tedana 25.0.1's behaviour again."
+            )
+            x["reason"] = common.clip(
+                "tedana's own step from 25.0.1 to 26.0.3, the default's corrections "
+                f"({', '.join(fixed) or 'none'}) and the clean room's own solvers, within "
+                f"§17.3's thresholds of tedana 26.0.3: {n:,} of {total:,} values differ. {how}",
+                420,
+            )
+            x["links"] = _link(links, fixed)
+
+
+def _clean_provenance(part: dict) -> str:
+    """The provenance line of the clean room's runs (their entry, when, with which commit)."""
+    info = part["info"]
+    line = next(
+        x for x in common.provenance(info, f"{TOOL}/{part['entry'].case}", []) if
+        x.startswith("Runs: ")
+    )  # fmt: skip
+    return "The clean room's runs: " + line.removeprefix("Runs: ")
+
+
+def _clean_fact(name: str, part: dict) -> dict:
+    """The fact that names the clean room's runs of an example."""
+    where = (
+        "; these are the runs of its own example below, the same call"
+        if name in CLEAN_ELSEWHERE
+        else ""
+    )
+    return {
+        "label": "Clean room",
+        "text": "LARMORX's clean room (crate larmorx-tedana, experimental) through its binding "
+        "`larmorx._core.tedana_t2smap_cleanroom`, as its own example runs it, at commit "
+        f"`{part['info']['larmorx_commit'][:12]}`{where}",
+    }
+
+
+#: The metrics notes' sentences on the two records' thresholds: the replica's, then the clean
+#: room's, by which its comparisons here are judged.
+CLEAN_NOTE = (
+    "The replica's record holds each call to tedana 26.0.3's files, messages and exit status "
+    "bit for bit in `reproduce`. "
+    "The clean room's comparisons with tedana 26.0.3 and with the replica's default are judged "
+    "over the runs' files by specs/t2smap.md §17.3's check.py, its record's thresholds (tedana's "
+    "files as stored for the call, with the empty `figures` folder tedana writes)."
+)
+
+
 # ------------------------------------------------------------------------- the examples
 
 
@@ -846,25 +1119,35 @@ def _example_maps(ctx: core.Context, name: str, links: dict) -> dict:
     for pid in ("tedana", "replica", "replica-14", "replica-fix", "tedana-avx512", "tedana-shared"):
         role, label, sub = PANELS[pid]
         ex.add(exm.Panel(pid, role, label, sub, {o["id"]: runs[pid][o["id"]] for o in outputs}))
+    part = _clean_part(ctx, name, e)
+    clean = {label: _clean_maps(part, label) for label, *_ in CLEAN_RUNS}
+    for pid, (label, sub) in CLEAN_PANELS.items():
+        ex.add(
+            exm.Panel(pid, "larmorx", label, sub, {o["id"]: clean[pid][o["id"]] for o in outputs})
+        )
     node = node_dir(name)
     full = {
         "tedana-threads4": runs["tedana-threads4"],
         "tedana-25": runs["tedana-25"],
         "tedana-25-avx512": runs["tedana-25-avx512"],
         "fmriprep": {"t2s": _stored(node / FMRIPREP_FILES["t2s"])},
+        "clean-1": clean["clean-1"],
     }
-    diffs = _diffs()
+    diffs = _diffs() + _clean_diffs()
     common.compare_all(ex, diffs, outputs, full=full)
     named = _named(e)
     capped = _capped(runs["replica-14"]["t2s"], runs["replica-fix"]["t2s"])
     _verdicts(diffs, named, links, capped, p["fittype"], _fmriprep_host(name))
+    _clean_verdicts(
+        diffs, part, e, links, _capped(clean["clean-reproduce"]["t2s"], clean["clean"]["t2s"])
+    )
     at = _peak(ex, "replica-fix", "replica-14", "t2s")
     default = {
         "output": "t2s",
         "plane": "axial",
         "voxel": at,
-        "panels": ["echo1", "tedana", "replica", "replica-fix"],
-        "diffs": ["rep-ted", "fix-rep", "avx-ted"],
+        "panels": ["echo1", "tedana", "replica", "replica-fix", "clean-reproduce", "clean"],
+        "diffs": ["rep-ted", "fix-rep", "avx-ted", "cr-ted"],
         "compare": {"a": "tedana", "b": "replica"},
     }
     out = common.finish(
@@ -889,7 +1172,9 @@ def _example_maps(ctx: core.Context, name: str, links: dict) -> dict:
         "and the confounds table are in the table of every file below). "
         "tedana 26.0.3 and the replica compute every map; fMRIPrep's own T2* map (tedana 25.0.1, "
         "the only map fMRIPrep keeps) and further runs of tedana are compared with them value by "
-        "value.",
+        "value. LARMORX's clean room computes every map too, in `reproduce` at one thread and in "
+        "`fix`, its default, at eight threads and at one; its comparisons with tedana 26.0.3 and "
+        "with the replica's default are judged by specs/t2smap.md §17.3's thresholds.",
         "facts": [
             {
                 "label": "Data",
@@ -920,6 +1205,7 @@ def _example_maps(ctx: core.Context, name: str, links: dict) -> dict:
                 f"program, at commit `{info['larmorx_commit'][:12]}`; numpy's OpenBLAS on its "
                 "Haswell kernels, one thread",
             },
+            _clean_fact(name, part),
             {"label": "Grid", "text": common.describe_grid(mimg, grid.shape)},
         ],
         **out,
@@ -933,8 +1219,11 @@ def _example_maps(ctx: core.Context, name: str, links: dict) -> dict:
         "metrics_note": f"Δ is A − B over all {n_vox:,} voxels of each output file, not only "
         "those shown; fMRIPrep keeps the full T2* map only, so its comparisons cover that map; "
         "tedana at four threads and tedana 25.0.1 are compared over their files; the RMSE map "
-        "and the confounds table in the table of every file.",
-        "provenance": common.provenance(info, f"{TOOL}/{e.case}", [data]),
+        "and the confounds table in the table of every file. " + CLEAN_NOTE,
+        "provenance": [
+            *common.provenance(info, f"{TOOL}/{e.case}", [data]),
+            _clean_provenance(part),
+        ],
     }
 
 
@@ -970,12 +1259,16 @@ def _example_series(ctx: core.Context, links: dict) -> dict:
     node = node_dir(name)
     files = {label: _out(e, label) / OPTCOM for label, *_ in RUNS}
     files["fmriprep"] = node / OPTCOM
+    part = _clean_part(ctx, name, e)
+    files.update({label: part["dirs"][label] / "out" / OPTCOM for label, *_ in CLEAN_RUNS})
     full = {k: _stored(v) for k, v in files.items()}
     for pid in ("tedana", "replica", "replica-14", "replica-fix", "fmriprep", "tedana-avx512"):
         role, label, sub = PANELS[pid]
         ex.add(exm.Panel(pid, role, label, sub, {"optcom": vols(full[pid])}))
+    for pid, (label, sub) in CLEAN_PANELS.items():
+        ex.add(exm.Panel(pid, "larmorx", label, sub, {"optcom": vols(full[pid])}))
     outputs = [{"id": "optcom", "label": "Optimally combined series", "unit": ""}]
-    diffs = _diffs()
+    diffs = _diffs() + _clean_diffs()
     panels = {q.id for q in ex.panels}
     for x in diffs:
         x["metrics"] = {"optcom": core.compare(full[x["a"]], full[x["b"]])}
@@ -983,6 +1276,7 @@ def _example_series(ctx: core.Context, links: dict) -> dict:
             x["display"] = {"optcom": ex.compare(x["a"], x["b"], "optcom")["display"]}
     named = _named(e)
     _verdicts(diffs, named, links, None, p["fittype"], _fmriprep_host(name), series=True)
+    _clean_verdicts(diffs, part, e, links, None, series=True)
     for x in diffs:
         if x["id"] == "fix-fmriprep":
             x["reason"] = x["reason"].replace(
@@ -998,8 +1292,8 @@ def _example_series(ctx: core.Context, links: dict) -> dict:
         "plane": "axial",
         "voxel": at[:3],
         "t": t0,
-        "panels": ["echo1", "tedana", "replica", "fmriprep"],
-        "diffs": ["rep-ted", "fix-rep", "rep-fmriprep"],
+        "panels": ["echo1", "tedana", "replica", "fmriprep", "clean-reproduce", "clean"],
+        "diffs": ["rep-ted", "fix-rep", "rep-fmriprep", "cr-ted"],
         "compare": {"a": "tedana", "b": "replica"},
     }
     out = common.finish(
@@ -1017,7 +1311,9 @@ def _example_series(ctx: core.Context, links: dict) -> dict:
         f"{len(p['echoes'])} echoes in every voxel and volume, each echo weighted by TE · "
         "exp(−TE / T2*) with the voxel's full T2* map (Posse et al., 1999), over the echoes of "
         f"good signal of the adaptive mask. {len(shown)} of the {n} volumes are shown; the "
-        "metrics cover every volume. fMRIPrep's own combined series (tedana 25.0.1) is a panel.",
+        "metrics cover every volume. fMRIPrep's own combined series (tedana 25.0.1) is a panel. "
+        "LARMORX's clean room combines the echoes too, in `reproduce` at one thread and in "
+        "`fix`, its default, at eight threads and at one.",
         "facts": [
             {
                 "label": "Data",
@@ -1031,6 +1327,7 @@ def _example_series(ctx: core.Context, links: dict) -> dict:
                 "text": "tedana 26.0.3 (both kept environments), tedana 25.0.1 (fMRIPrep's "
                 f"image), larmorx-gpl at commit `{info['larmorx_commit'][:12]}`",
             },
+            _clean_fact(name, part),
             {"label": "Grid", "text": common.describe_grid(eimg, grid.shape)},
         ],
         **out,
@@ -1043,8 +1340,11 @@ def _example_series(ctx: core.Context, links: dict) -> dict:
         ],
         "metrics_note": f"Δ is A − B over all {n_val:,} values of the "
         f"{' × '.join(map(str, full['tedana'].shape))} series (every volume); runs that are no "
-        "panel are compared over their files.",
-        "provenance": common.provenance(info, f"{TOOL}/{e.case}", [data]),
+        "panel are compared over their files. " + CLEAN_NOTE,
+        "provenance": [
+            *common.provenance(info, f"{TOOL}/{e.case}", [data]),
+            _clean_provenance(part),
+        ],
     }
 
 
@@ -1604,7 +1904,8 @@ def _cases(ctx: core.Context, rec) -> list[dict]:
 
 
 def entries(ctx: core.Context) -> list[fcache.Entry]:
-    return [*(call_entry(ctx, n) for n in SHOWN), memory_entry(ctx), t25_entry(ctx)]
+    return [*(call_entry(ctx, n) for n in SHOWN), memory_entry(ctx), t25_entry(ctx),
+            *(clean_entry(ctx, n)[0] for n in SHOWN if n not in CLEAN_ELSEWHERE)]  # fmt: skip
 
 
 def _check_default(ex: dict) -> None:
@@ -1689,9 +1990,346 @@ def export(ctx: core.Context) -> dict:
     }
     # The clean-room original's part (its own module, written by its implementer: its example,
     # its record's cases as original/<case>, its implementation, its tables, its provenance).
-    from larmorx_validation.evidence import tedana_t2smap_original
+    from larmorx_validation.evidence import tedana_t2smap_clean_room
 
-    return tedana_t2smap_original.extend(ctx, doc)
+    return present(tedana_t2smap_clean_room.extend(ctx, doc))
+
+
+# ---------------------------------------------------------------------- the presentation
+
+
+def _page():
+    from larmorx_validation.evidence import present as present_
+
+    return present_.Page(
+        "tedana",
+        "t2smap",
+        "26.0.3",
+        port="replica",
+        packages={"replica": "larmorx-gpl, GPL-3.0", "clean-room": "larmorx, Apache-2.0"},
+        texts=TEXTS,
+    )
+
+
+#: The page's own rewordings (applied before the guide's words): LARMORX's reference setup is
+#: both ports'; "the row above" named by what that row compares; the clean room's texts that
+#: call it "the original" (its module's words: there "the original" is the clean room, "tedana"
+#: the original); D13, a decision's number, by what it is.
+TEXTS = [
+    (r"\blarmorx's reference\b", "LARMORX's reference"),
+    (r"^larmorx \(replica\) at `--n-threads 4`$", "larmorx at `--n-threads 4`"),
+    (r"\(the row above\)", "(the replica's `reproduce` against fMRIPrep's output)"),
+    (r"\bthe original holds tedana's\b", "the clean room holds tedana's"),
+    (r"\(the original's own trust-region solver\b", "(the clean room's own trust-region solver"),
+    (r"\bThe two implementations' defaults\b", "The two ports' defaults"),
+    (r"\btedana and the original's reproduce stop\b", "tedana and the clean room's `reproduce` stop"),
+    (r"\(LARMORX against itself\)", "(the clean room against itself)"),
+    (r"\(the original's test, its log\)", "(the clean room's test, its log)"),
+    (r"\bthe verdict: the original's files\b", "the verdict: the clean room's files"),
+    (r"\(A\) the original's reproduce against tedana, \(B\) its default against the replica's, "
+     r"both by the original's suite\b",
+     "(A) the clean room's `reproduce` against tedana, (B) its `fix` against the replica's, both "
+     "by the clean room's comparison suite"),
+    (r"\bthe clean-room part's branch\b", "the branch the clean room was written on"),
+    (r"\bby the clean-room part\)", "while the clean room was written)"),
+    (r"\bfound by the replica, ", "found while the replica was written, "),
+    (r"\(D13's rule\)", "(the rule of the corrections by default)"),
+    (r"\bits default checked by D13's rule\b", "its `fix` checked by the rule of the corrections by "
+     "default"),
+    (r"\bthe default by D13's rule\b", "`fix` as the rule of the corrections expects"),
+    (r"\(the record's D13 list\)", "(the record's list of what `fix` changed)"),
+    (r"\bthe original's solver is its own\b", "the clean room's solver is its own"),
+    (r"\bthose whose default mode named\b", "those whose `fix` named"),
+    (r"\(relay 3c, (2026-11-11)", r"(\1"),
+    (r"\bin both modes\b", "in `fix` and in `reproduce`"),
+    (r", 8 the budget of its relay, on a machine shared with two other agents' work",
+     ", 8 the threads it was given, on a machine shared with other work"),
+    (r"\ba machine shared with another agent's work\b", "a machine shared with other work"),
+    (r"\bThe clean-room original, the fast implementation,", "The clean room, the port built for "
+     "speed,"),
+    (r"\bTrial (2026-11-11-t2smap-original-2)\b", r"The run \1"),
+    (r"^the trial: random cases\b", "the run: random cases"),
+    (r"\bThe trial \(seed `t2smap-trial`", "The run (seed `t2smap-trial`"),
+]  # fmt: skip
+
+
+def _diff(ex: dict, i: str) -> dict:
+    return next(d for d in ex["diffs"] if d["id"] == i)
+
+
+def _want(ex: dict, **verdicts: str | None) -> None:
+    """Raise unless each comparison (``rep_ted`` for ``rep-ted``) has its verdict."""
+    for i, v in verdicts.items():
+        got = _diff(ex, i.replace("_", "-")).get("verdict")
+        if got != v:
+            raise ValueError(f"{ex['id']}: {i.replace('_', '-')} is {got}, not {v}")
+
+
+def _found(ex: dict, i: str, pat: str) -> re.Match[str]:
+    m = re.search(pat, _diff(ex, i)["reason"])
+    if not m:
+        raise ValueError(f"{ex['id']}: {i}'s reason without {pat!r}")
+    return m
+
+
+def _ids(ex: dict, i: str) -> list[str]:
+    """The register's entries a comparison's reason names, in its order."""
+    return list(dict.fromkeys(re.findall(r"\b(?:TED|NP|GLIBC)-\d+\b", _diff(ex, i)["reason"])))
+
+
+def _and(xs: list[str]) -> str:
+    return xs[0] if len(xs) == 1 else ", ".join(xs[:-1]) + " and " + xs[-1]
+
+
+#: check.py's counts in a reason: the values identical, then the (b)/(c) share.
+_CHECKED = (
+    r"([\d,]+) of ([\d,]+) compared values identical; the (?:curve fit's )?\(b\)/\\\(c\) share "
+    r"([\d.]+%)"
+)
+_SPLIT = r"\(([\d,]+) of ([\d,]+) values\)"
+
+
+def _machine(ex: dict) -> str:
+    """Which of tedana 25.0.1's two runs here gives fMRIPrep's own file bit for bit: numpy's
+    AVX-512 kernels on or off, as in fMRIPrep's run."""
+    same = [i for i in ("t25-fmriprep", "t25off-fmriprep")
+            if re.search(r"every one of the [\d,]+ values is the same", _diff(ex, i)["reason"])]  # fmt: skip
+    if len(same) != 1:
+        raise ValueError(f"{ex['id']}: tedana 25.0.1 here gives fMRIPrep's file in {same}")
+    return "on" if same[0] == "t25-fmriprep" else "off"
+
+
+def _both(ex: dict, series: bool) -> str:
+    """The sentences on the two ports of a call shown by tedana and the replica."""
+    _want(ex, rep_ted="bit-identical", rep14_rep="bit-identical", fix_rep="d13",
+          rep_fmriprep="within-variability", cr_ted="within-variability", cr1_cr="bit-identical",
+          crfix_cr="d13", crfix_rfix="within-variability", crfix_fmriprep="d13")  # fmt: skip
+    a, b, s = _found(ex, "cr-ted", _CHECKED).groups()
+    a2, b2, s2 = _found(ex, "crfix-rfix", _CHECKED).groups()
+    rep, cr = _ids(ex, "fix-rep"), _ids(ex, "crfix-cr")
+    if not cr or not set(cr) <= set(rep):
+        raise ValueError(f"{ex['id']}: the clean room's corrections {cr}, the replica's {rep}")
+    extra = [i for i in rep if i not in cr]
+    if extra and not set(extra) <= {"NP-03", "GLIBC-07"}:
+        raise ValueError(f"{ex['id']}: the replica's other corrections {extra}")
+    what = "combined series" if series else "maps"
+    out = (
+        f"In `reproduce` the replica gives every value of tedana 26.0.3's {what}, at 1 and 14 "
+        "threads alike, and the clean room holds them within the thresholds of specs/t2smap.md "
+        f"§17.3: {a} of the {b} values of the run's files are identical, and {s} of the curve "
+        "fit's voxels are judged by the fit's own objective (its files are the same at 1 and 8 "
+        f"threads). In `fix`, their default, both correct {_and(cr)}"
+        + (f" and the replica also the maths entries {_and(extra)}" if extra else "")
+        + f"; the two defaults agree by the same thresholds ({a2} of {b2} values identical, "
+        f"{s2})."
+    )  # fmt: skip
+    n, total = _found(ex, "rep-fmriprep", _SPLIT).groups()
+    kernels = _machine(ex)
+    out += (
+        f" fMRIPrep's own {'combined series' if series else 'T2* map'}, made by tedana 25.0.1, "
+        f"differs from the replica's `reproduce` in {n} of its {total} values, tedana's own step "
+        "between its versions; run here in fMRIPrep's image with numpy's AVX-512 kernels "
+        f"{kernels}, as in fMRIPrep's run, tedana 25.0.1 gives it bit for bit."
+    )
+    return out
+
+
+def _shows_maps(ex: dict) -> tuple[str, list[str]]:
+    return _both(ex, series=False), ["rep-ted", "cr-ted"]
+
+
+def _shows_series(ex: dict) -> tuple[str, list[str]]:
+    return _both(ex, series=True), ["rep-ted", "cr-ted"]
+
+
+def _shows_clean(ex: dict) -> tuple[str, list[str]]:
+    """The clean room's own example: both modes and both thread counts beside tedana and the
+    replica's default."""
+    _want(ex, orepro_tedana="within-variability", original_tedana="d13", replica_tedana="d13",
+          original_replica="within-variability", original1_original="bit-identical")  # fmt: skip
+    a, b, s = _found(ex, "orepro-tedana", _CHECKED).groups()
+    a2, b2, s2 = _found(ex, "original-replica", _CHECKED).groups()
+    cr, rep = _ids(ex, "original-tedana"), _ids(ex, "replica-tedana")
+    if not cr or not set(cr) <= set(rep):
+        raise ValueError(f"{ex['id']}: the clean room's corrections {cr}, the replica's {rep}")
+    extra = [i for i in rep if i not in cr]
+    return (
+        "In `reproduce` the clean room holds tedana 26.0.3's maps within the thresholds of "
+        f"specs/t2smap.md §17.3: {a} of the {b} values of the run's files are identical, and "
+        f"{s} of the curve fit's voxels are judged by the fit's own objective. In `fix`, its "
+        f"default, it corrects {_and(cr)}, as the replica's default does"
+        + (f" (which also corrects the maths entry {_and(extra)})" if extra else "")
+        + f", and the two defaults agree by the same thresholds ({a2} of {b2} values identical, "
+        f"{s2}); its files are the same at 1 and 8 threads."
+    ), ["replica-tedana", "orepro-tedana"]  # fmt: skip
+
+
+SHOWS = {
+    "maps-ds003592": _shows_maps,
+    "optcom-ds003592": _shows_series,
+    "maps-ds000258": _shows_maps,
+    "fmriprep-ds003592-curvefit-original": _shows_clean,
+}
+#: Comparisons the shapes name otherwise: tedana's step between its versions (its old label
+#: names fMRIPrep's image first).
+DIFFS = {
+    "t25-ted": ("tedana t2smap 25.0.1 (fMRIPrep's image, here) − 26.0.3",
+                "the original against itself: versions 25.0.1 and 26.0.3"),
+}  # fmt: skip
+#: The examples' titles where the old one names the clean room in the old words.
+TITLES = {
+    "fmriprep-ds003592-curvefit-original": "fMRIPrep's multi-echo call: the clean room beside "
+    "tedana and the replica",
+}
+#: Each example's sentence on the replica's record's threshold, before the clean room's.
+REPLICA_THRESHOLD = (
+    "The replica's record holds each call to tedana 26.0.3's files, messages and exit status "
+    "bit for bit in `reproduce`."
+)
+#: The case categories of the two records, as the page names them.
+CATEGORIES = {
+    "probe": "the specification's probe",
+    "syn": "synthetic inputs",
+    "fail": "failures and refusals",
+    "spread": "tedana's own variability",
+    "threads": "thread counts",
+}
+#: The tables' titles by the guide's pattern.
+TABLE_TITLES = {
+    "calls": "fMRIPrep's calls, the replica against the original: tedana `t2smap` 26.0.3 "
+    "(values that differ)",
+    "fmriprep-tedana-25": "fMRIPrep's output against the original run here: tedana `t2smap` "
+    "25.0.1 (values that differ)",
+    "spread": "The original against itself, and the replica at four threads: tedana `t2smap` "
+    "26.0.3 (values that differ from its reference setup)",
+    "corrections": "Corrections by default, both ports: tedana `t2smap` 26.0.3's defects and the "
+    "maths entries",
+    "files": "Every file of the two calls shown, the replica against the original: tedana "
+    "`t2smap` 26.0.3 (values that differ)",
+    "memory": "Peak memory, the replica against the original: tedana `t2smap` 26.0.3 (MiB, one "
+    "thread)",
+    "trial": "Random testing, the replica against the original: tedana `t2smap` 26.0.3 (the run "
+    "of 2026-11-08 and the check of the final build)",
+    "triage": "The replica's differences from the original in the run of 2026-11-08, triaged",
+    "fmriprep-calls-original": "fMRIPrep's calls, the clean room against the original: tedana "
+    "`t2smap` 26.0.3 (A, in `reproduce`) and against the replica (B, both `fix`)",
+    "difftest-original": "Random testing, the clean room against the original: tedana `t2smap` "
+    "26.0.3 (A) and against the replica (B) ({cases:,} random calls, {date})",
+    "speed-original": "Speed, both ports against the original: tedana `t2smap` 26.0.3 (wall time "
+    "of fMRIPrep's calls in seconds, the best of two runs)",
+    "memory-original": "Peak memory, the clean room against the original: tedana `t2smap` 26.0.3 "
+    "(MiB, fMRIPrep's ds003592 curve-fit call)",
+}
+#: The tables' columns: each run as the panels name it.
+COLUMNS = {
+    "Replica vs tedana 26.0.3": "replica, reproduce, against tedana 26.0.3",
+    "Default vs reproduce": "replica, fix against reproduce",
+    "vs larmorx's default": "against the replica's fix",
+    "larmorx's default": "both ports' fix",
+    "replica − tedana 26.0.3": "replica − tedana 26.0.3",
+    "14 − 1 thread": "replica: 14 − 1 thread",
+    "default − reproduce": "replica: fix − reproduce",
+    "larmorx, reproduce": "replica, reproduce",
+    "larmorx, default": "replica, fix",
+    "larmorx ÷ tedana": "replica ÷ tedana",
+    "replica, 1 thread": "replica, fix, 1 thread",
+    "replica, 8": "replica, fix, 8",
+    "original reproduce, 1": "clean room, reproduce, 1",
+    "original default, 1": "clean room, fix, 1",
+    "original default, 8": "clean room, fix, 8",
+    "the original": "the clean room",
+    "Trial": "Run",
+}
+#: The rows that name the clean room "the original" (its memory table).
+_ROWS = [(r"^the original, ", "the clean room, "), (r" thread\(s\)$", " thread(s)")]
+#: The speed chart's series, as the page names them.
+SPEED_LABELS = {
+    "tedana 26.0.3, 1 thread": "tedana t2smap 26.0.3, 1 thread",
+    "larmorx (replica), reproduce, 1 thread": "replica, reproduce, 1 thread",
+    "larmorx (replica), reproduce, 14 threads": "replica, reproduce, 14 threads",
+    "larmorx (replica), default, 1 thread": "replica, fix, 1 thread",
+    "larmorx (replica), default, 14 threads": "replica, fix, 14 threads",
+    "larmorx (clean-room original), default, 1 thread": "clean room, fix, 1 thread",
+    "larmorx (clean-room original), default, 8 threads": "clean room, fix, 8 threads",
+}
+#: The records' implementations: their ids (the case explorer's) and ports.
+PORTS = {"replica": "replica", "original": "clean-room"}
+
+
+def present(doc: dict) -> dict:
+    """t2smap's page in the writing guide's words and order: texts, ports and order only."""
+    from dataclasses import replace
+
+    from larmorx_validation.evidence import present as present_
+
+    page = _page()
+    clean = replace(page, port="clean-room")
+    for ex in doc["examples"]:
+        line, verdicts = SHOWS[ex["id"]](ex)
+        own = clean if ex["id"] == CASE_CLEAN else page
+        panels = {
+            p["id"]: ("fMRIPrep's output",
+                      f"{p['label']}: {p['sub'].replace('in the oracle run', 'in its run')}")
+            for p in ex["panels"] if p["role"] == "fmriprep"
+        }  # fmt: skip
+        shown = {p["id"] for p in ex["panels"]}
+        hidden = (
+            any("fmriprep" in (d["a"], d["b"]) for d in ex["diffs"]) and "fmriprep" not in shown
+        )
+        present_.example(own, ex, shows=line, verdicts=verdicts, title=TITLES.get(ex["id"]),
+                         runs={"fmriprep": "fmriprep"} if hidden else None,
+                         panels=panels or None,
+                         diffs={k: v for k, v in DIFFS.items() if any(
+                             d["id"] == k for d in ex["diffs"])} or None)  # fmt: skip
+        note = ex.get("metrics_note") or ""
+        if REPLICA_THRESHOLD not in note:  # the clean room's example: its module's note
+            ex["metrics_note"] = f"{note} {REPLICA_THRESHOLD}".strip()
+    for im in doc["implementations"]:
+        comparison = "standard comparison" if im["id"] == "replica" else "full comparison"
+        present_.implementation(page, im, comparison, port=PORTS[im["id"]])
+    note = (doc.get("speed") or {}).get("note")
+    present_.speed(
+        page,
+        doc.get("speed"),
+        "Seconds per call (wall time) on a log scale; the factor is tedana's time divided by "
+        "the replica's at 14 threads.",
+        marks={"larmorx": "clean-room", "larmorx-open": "clean-room-open"},
+        labels=SPEED_LABELS,
+    )
+    if doc.get("speed"):  # about both ports
+        doc["speed"]["note"] = present_.text(page, note, port="both")
+    tables = {t: clean for t in ("fmriprep-calls-original", "difftest-original",
+                                 "speed-original", "memory-original")}  # fmt: skip
+    trial_rows = {}
+    for t in doc.get("tables", []):
+        if t["id"] == "difftest-original":
+            m = re.match(r"([\d,]+) random cases \(30 minutes", t["rows"][0]["head"])
+            if not m:
+                raise ValueError("difftest-original: its first row's head changed")
+            trial_rows[t["id"]] = int(m.group(1).replace(",", ""))
+    present_.finish(page, doc, CATEGORIES, pages=tables, ports=PORTS)
+    for t in doc.get("tables", []):
+        for c in t["columns"]:
+            c["label"] = COLUMNS.get(c["label"], c["label"])
+        if t["id"] == "memory-original":
+            for r in t["rows"]:
+                for pat, rep in _ROWS:
+                    r["head"] = re.sub(pat, rep, r["head"])
+        if t["id"] in TABLE_TITLES:
+            t["title"] = TABLE_TITLES[t["id"]].format(
+                cases=trial_rows.get(t["id"], 0), date=_trial_date()
+            )
+    return doc
+
+
+#: The clean room's own example (its module's id).
+CASE_CLEAN = "fmriprep-ds003592-curvefit-original"
+
+
+def _trial_date() -> str:
+    from larmorx_validation.evidence import tedana_t2smap_clean_room as cr
+
+    return cr.TRIAL[:10]
 
 
 if __name__ == "__main__":  # compute the cache entries only: python -m ... [--refresh]

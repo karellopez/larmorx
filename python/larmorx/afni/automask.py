@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 """``3dAutomask``: a brain mask from an EPI series or a skull-stripped anatomical (the
-bit-exact replica of AFNI 26.3.05's program, or its clean-room original).
+bit-exact replica of AFNI 26.3.05's program, or its clean room).
 
 ``implementation="auto"`` (the default) runs the replica (part of larmorx, in this process);
 ``"replica"`` and ``"clean-room"`` force one. Both give AFNI's masks bit for bit on the parity cases
@@ -112,8 +112,8 @@ def automask(
     n_threads
         Threads (0 = all); the result does not depend on it.
     implementation
-        ``"auto"`` (default) and ``"replica"``: the bit-exact replica; ``"clean-room"``: the
-        clean-room original.
+        ``"auto"`` (default) and ``"replica"``: the bit-exact replica; ``"clean-room"``
+        (``"original"``, 0.1.0rc1's spelling, still works): the clean room.
     upstream_defects
         ``"fix"`` (default) or ``"reproduce"`` (AFNI's output); a
         :class:`~larmorx.UpstreamDefectWarning` names each defect that changed the result.
@@ -130,7 +130,7 @@ def automask(
     Raises
     ------
     ValueError
-        Invalid arguments; with the original, AFNI's fatal errors (no mask of a plane smaller
+        Invalid arguments; with the clean room, AFNI's fatal errors (no mask of a plane smaller
         than 16 × 16, an empty mask).
     larmorx.ReplicaError
         The replica was found but failed.

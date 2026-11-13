@@ -7,46 +7,38 @@ operations: `lx.ants.image_arithmetic`, `add_to_zero`, `negative_image`,
 `morphological_erode`, `morphological_open`, `morphological_close`, `grayscale_dilate`,
 `grayscale_erode`, `grayscale_open`, `grayscale_close`, `fill_holes`, `pad_image`,
 `largest_component`, `distance_map`, `maurer_distance`, `extract_contours`,
-`threshold_at_mean`, `replace_voxel_value`. Command line
-`larmorx ants ImageMath`. Rust: `larmorx_ants::image_math` (operations),
-`larmorx_ants::cli::image_math` (the dispatcher), `larmorx_image` (ITK filters).
-A replica of ANTs 2.6.5 on ITK 5.4.5 (Apache-2.0).
+`threshold_at_mean`, `replace_voxel_value`. Command line `larmorx ants ImageMath`. The
+operations of ANTs 2.6.5's `ImageMath` that fMRIPrep, sMRIPrep and sdcflows call.
 
-**Status: `validated`** for the operations below, against ImageMath itself (see the
-[validation record](../validation/ants-image-math.md)): 327 cases, 301 outputs compared,
-296 bit-identical; every output has ANTs' exact header bytes. Of the 5 others, 3 are `^`,
-where ANTs calls glibc's `powf`, which is not correctly rounded; larmorx's is, so up to 35
-of 35,840 voxels differ by one ulp ([why](../findings/platform-math.md#powf)); 2 are
-grayscale morphology on an image made to hold `-0.0` next to `+0.0`, where only the sign of
-a zero result differs ([why](../findings/ants-morphology.md#grayscale-morphology)). Every
-Gaussian case (`G`, `Laplacian`, `Grad`, `UnsharpMask`; 47 compared, in 2, 3 and 4
-dimensions, fMRIPrep's `Laplacian 1.5 1` on real T1w, boldref and template images included)
-is bit-identical, and so is every other morphology case (95 compared: `MD`, `ME`, `MO`,
-`MC`, `GD`, `GE`, `GO`, `GC`, `FillHoles`, `PadImage` in 2, 3 and 4 dimensions, sMRIPrep's
-`MD 2/5`, `ME 2/10`, `FillHoles 2` and `PadImage ±10` on real masks included), and
-every component and distance-map case (59 compared: `GetLargestComponent`, `D`,
-`MaurerDistance`, `ExtractContours`, `ThresholdAtMean`, `ReplaceVoxelValue`, in 2, 3 and
-4 dimensions, on real masks and probability maps too). Compared with ANTs' defects reproduced
-(`LARMORX_UPSTREAM_DEFECTS=reproduce`); the record's "D13 fix pass" lists what larmorx's
-default changes. One more case, `FillHoles 0.5` with a hole on the first slice, compares
-everything but the values, which ANTs takes from memory outside the image (ANTS-19).
+The port comes first, then the program's section, the source of its reference page on the
+documentation site (`python -m larmorx_validation reference`), with its options table checked
+against the code; then the speed, the typed functions, the command line's behaviour, the
+behaviour worth knowing and ANTs' defects as the port corrects them.
 
-**Speed** ([benchmark](../benchmarks/ants-programs.md)): fMRIPrep's
-`TruncateImageIntensity 0.01 0.999 256` on a raw T1w takes 234 ms on one thread and 83 ms on
-12, against 388 ms and 175 ms for ANTs; `addtozero`, `Normalize`, `RescaleImage` and
-`ImageMath 4 m` are 1.3–2.7× faster on one thread and up to 5× with threads. Reading the
-gzipped input is most of the time. The Gaussian operations
-([benchmark](../benchmarks/ants-gaussian.md)): fMRIPrep's `Laplacian 1.5 1` on a raw T1w takes
-351 ms on one thread and 128 ms on 12, against 1.23 s and 277 ms for ANTs (7 ms against 52 ms
-on a boldref); `Grad 1` 306 ms against 1.23 s; `G 2` 119 ms against 716 ms. The morphology
-operations ([benchmark](../benchmarks/ants-morphology.md)) on a 1 mm brain mask: `ME 10`
-278 ms on one thread and 72 ms on 12, against 956 ms for ANTs (which does not gain from
-threads here); `MD 2` 130 ms against 248 ms; `FillHoles 2` 68 ms against 2.91 s;
-`GetLargestComponent` 55 ms against 240 ms; `D` 547 ms against 2.90 s (both sequential);
-`MaurerDistance` 213 ms against 518 ms (58 ms against 115 ms on 12 threads); `GD 2` on a
-raw T1w 170 ms against 1.84 s.
+## Ports
 
-**Implemented operations** (the others answer "not supported yet"):
+`ImageMath` has one port, in `pip install larmorx`: **the replica** (`crates/larmorx-ants`,
+`crates/larmorx-image`; Apache-2.0; Rust `larmorx_ants::image_math` (operations),
+`larmorx_ants::cli::image_math` (the dispatcher), `larmorx_image` (ITK filters)), translated
+from ANTs 2.6.5 on ITK 5.4.5 (Apache-2.0).
+
+## `ImageMath`
+
+<!-- reference
+program: ImageMath
+group: ants
+original: ANTs 2.6.5
+python: larmorx.ants.image_math
+command-line: crates/larmorx-ants/src/cli/image_math/mod.rs
+records: {replica: [ants-image-math]}
+evidence: ants-programs
+-->
+
+`ImageMath` applies one operation to an image (and to a second image or numbers): arithmetic,
+intensity clipping and scaling, Gaussian filters, binary and grayscale morphology, hole filling,
+padding, connected components and distance maps.
+
+The implemented operations (the others answer "not supported yet"):
 
 | Group | Operations |
 |---|---|
@@ -59,15 +51,21 @@ raw T1w 170 ms against 1.84 s.
 All of them run in 2, 3 and 4 dimensions, as in ANTs; the Gaussian and morphology operations
 work in all of the image's dimensions (a 4D image along time too).
 
-**On the data panel** ([record](../validation/ants-image-math-panel.md), 2026-10-27): every
-ImageMath node of the fourteen finished fMRIPrep oracle runs (378 nodes, 365 distinct calls:
-sMRIPrep's brain extraction and template steps, the BOLD references' and field maps' masks),
-each replayed from its node with its inputs, and nine calls on the panel's images (truncation of
-the 7 T MP2RAGE, a FLAIR and a 1.5 T float T1w, Laplacians of a glioma's and an older adult's
-T2w, the stroke lesion mask's components, morphology and holes, a 600-volume multiband-8 series
-times a scalar): **374 of 374 bit-identical, header bytes included**.
+### Python (`ImageMath`)
 
-## Quick start
+`lx.ants.image_math(operation, *operands, dimension=3, n_threads=1, upstream_defects="fix")`
+
+Runs `ImageMath <dimension> <output> <operation> <operands...>` with images held in memory:
+`lx.Image` objects, nibabel images and `(array, affine)` pairs are passed without files;
+paths, numbers and strings are passed as on the command line (numbers as their shortest
+round-trip text). Returns the image the operation writes, in the type and geometry ANTs
+gives it. Raises `lx.ants.ImageMathError` with the program's messages when it fails or writes
+nothing. `lx.ants.image_math_operations()` lists the implemented operations.
+
+In-memory images are placed by their affine (the spatial axes) and their header's
+repetition time (a fourth axis; spacing 1 without a header); files are read as ITK reads
+them. Each operation also has a typed function, `lx.ants.truncate_image_intensity` and the
+others the API page lists under "Typed functions".
 
 ```python
 import larmorx as lx
@@ -91,22 +89,83 @@ largest = lx.ants.largest_component(mask)
 dist = lx.ants.maurer_distance(mask)  # signed, mm, negative inside
 ```
 
-```bash
-larmorx ants ImageMath 3 t1_trunc.nii.gz TruncateImageIntensity sub-01_T1w.nii.gz 0.01 0.999 256
+### Options of `ImageMath`
+
+| ANTs argument (positional) | Python | Notes |
+|---|---|---|
+| 1 `ImageDimension` (2, 3, 4) | `dimension=3` | a path is read in that many dimensions |
+| 2 `outputImage` | the result | in the type and geometry ANTs gives it |
+| 3 `operation` | `operation` | ImageMath's name, case-sensitive (the implemented operations are listed above the Python call) |
+| 4 and after: the operands | `operands` | images (paths, `lx.Image`, nibabel images, `(array, affine)`), numbers and strings, in the operation's order |
+| `ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS` (or `NSLOTS`, as ITK reads them) | `n_threads` | the result does not depend on it |
+
+### Examples of `ImageMath`
+
+<!-- inputs: t1w.nii.gz=head mask.nii.gz=head-mask -->
+
+```python example
+import larmorx as lx
+
+# fMRIPrep's clipping of the T1w's intensities, through the command line's code.
+clipped = lx.ants.image_math("TruncateImageIntensity", "t1w.nii.gz", 0.01, 0.999, 256)
+clipped.shape  # -> (40, 48, 40)
+# sMRIPrep's dilation of a mask by 2 voxels, through its typed function.
+dilated = lx.ants.morphological_dilate("mask.nii.gz", 2)
+dilated.data.dtype  # -> dtype('float32')
 ```
 
-## `lx.ants.image_math(operation, *operands, dimension=3, n_threads=1, upstream_defects="fix")`
+```bash example
+larmorx ants ImageMath 3 clipped.nii.gz TruncateImageIntensity t1w.nii.gz 0.01 0.999 256
+larmorx ants ImageMath 3 laplacian.nii.gz Laplacian t1w.nii.gz 1.5 1
+larmorx ants ImageMath 3 dilated.nii.gz MD mask.nii.gz 2
+larmorx ants ImageMath 3 filled.nii.gz FillHoles mask.nii.gz 2
+```
 
-Runs `ImageMath <dimension> <output> <operation> <operands...>` with images held in memory:
-`lx.Image` objects, nibabel images and `(array, affine)` pairs are passed without files;
-paths, numbers and strings are passed as on the command line (numbers as their shortest
-round-trip text). Returns the image the operation writes, in the type and geometry ANTs
-gives it. Raises `lx.ants.ImageMathError` with the program's messages when it fails or writes
-nothing. `lx.ants.image_math_operations()` lists the implemented operations.
+### Ports of `ImageMath`
 
-In-memory images are placed by their affine (the spatial axes) and their header's
-repetition time (a fourth axis; spacing 1 without a header); files are read as ITK reads
-them.
+**The replica: status `validated`** for the implemented operations, against ImageMath itself
+(its [record](../validation/ants-image-math.md), 2026-10-24): 334 cases, 308 outputs compared,
+303 bit-identical, 24 rejected by both alike; every output has ANTs' exact header bytes. Of the 5
+others, 3 are `^`, where ANTs calls glibc's `powf`, which is not correctly rounded; larmorx's is,
+so up to 35 of 35,840 voxels differ by one ulp ([why](../findings/platform-math.md#powf)); 2 are
+grayscale morphology on an image made to hold `-0.0` next to `+0.0`, where only the sign of a
+zero result differs ([why](../findings/ants-morphology.md#grayscale-morphology)). Every Gaussian
+case (`G`, `Laplacian`, `Grad`, `UnsharpMask`; 47 compared, in 2, 3 and 4 dimensions, fMRIPrep's
+`Laplacian 1.5 1` on real T1w, boldref and template images included) is bit-identical, and so is
+every other morphology case (100 compared: `MD`, `ME`, `MO`, `MC`, `GD`, `GE`, `GO`, `GC`,
+`FillHoles`, `PadImage` in 2, 3 and 4 dimensions, sMRIPrep's `MD 2/5`, `ME 2/10`, `FillHoles 2`
+and `PadImage ±10` on real masks included), and every component and distance-map case (61
+compared: `GetLargestComponent`, `D`, `MaurerDistance`, `ExtractContours`, `ThresholdAtMean`,
+`ReplaceVoxelValue`, in 2, 3 and 4 dimensions, on real masks and probability maps too).
+Compared with ANTs' defects reproduced (`LARMORX_UPSTREAM_DEFECTS=reproduce`); the record's "D13
+fix pass" lists what larmorx's default changes. One more case, `FillHoles 0.5` with a hole on the
+first slice, compares everything but the values, which ANTs takes from memory outside the image
+(ANTS-19).
+
+**On the data panel** ([record](../validation/ants-image-math-panel.md), 2026-10-27): every
+ImageMath node of the fourteen finished fMRIPrep oracle runs (378 nodes, 365 distinct calls:
+sMRIPrep's brain extraction and template steps, the BOLD references' and field maps' masks),
+each replayed from its node with its inputs, and nine calls on the panel's images (truncation of
+the 7 T MP2RAGE, a FLAIR and a 1.5 T float T1w, Laplacians of a glioma's and an older adult's
+T2w, the stroke lesion mask's components, morphology and holes, a 600-volume multiband-8 series
+times a scalar): **374 of 374 bit-identical, header bytes included**.
+
+## Speed
+
+From the [benchmark](../benchmarks/ants-programs.md): fMRIPrep's
+`TruncateImageIntensity 0.01 0.999 256` on a raw T1w takes 234 ms on one thread and 83 ms on
+12, against 388 ms and 175 ms for ANTs; `addtozero`, `Normalize`, `RescaleImage` and
+`ImageMath 4 m` are 1.3–2.7× faster on one thread and up to 5× with threads. Reading the
+gzipped input is most of the time. The Gaussian operations
+([benchmark](../benchmarks/ants-gaussian.md)): fMRIPrep's `Laplacian 1.5 1` on a raw T1w takes
+351 ms on one thread and 128 ms on 12, against 1.23 s and 277 ms for ANTs (7 ms against 52 ms
+on a boldref); `Grad 1` 306 ms against 1.23 s; `G 2` 119 ms against 716 ms. The morphology
+operations ([benchmark](../benchmarks/ants-morphology.md)) on a 1 mm brain mask: `ME 10`
+278 ms on one thread and 72 ms on 12, against 956 ms for ANTs (which does not gain from
+threads here); `MD 2` 130 ms against 248 ms; `FillHoles 2` 68 ms against 2.91 s;
+`GetLargestComponent` 55 ms against 240 ms; `D` 547 ms against 2.90 s (both sequential);
+`MaurerDistance` 213 ms against 518 ms (58 ms against 115 ms on 12 threads); `GD 2` on a
+raw T1w 170 ms against 1.84 s.
 
 ## Typed functions
 

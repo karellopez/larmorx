@@ -77,6 +77,28 @@ def b64(u: int) -> str:
     return f"{u & 0xFFFFFFFFFFFFFFFF:016x}"
 
 
+def nint_fs(v: float, cmd: str) -> int | None:
+    """``nint``/``nint2`` as the spec's §11 states them (in double, truncated toward zero); None where
+    the value is NaN or outside the 32-bit range (FS-12)."""
+    if v != v:
+        return None
+    y = v + (0.49999999 if cmd == "nint2" else 0.5) if v >= 0 else v - 0.5
+    if y in (INF, -INF):
+        return None
+    n = int(y)
+    return n if -(2**31) <= n <= 2**31 - 1 else None
+
+
+def nint_fixed(v: float, cmd: str) -> int:
+    """FS-12's corrected default: the rounded value saturated to the int range, NaN 0."""
+    n = nint_fs(v, cmd)
+    if n is not None:
+        return n
+    if v != v:
+        return 0
+    return 2**31 - 1 if v > 0 else -(2**31)
+
+
 # ---- the groups ---------------------------------------------------------------------------------
 
 
@@ -165,7 +187,7 @@ class Gen:
             r.getrandbits(40) for _ in range(50)
         ]
         cases.append(
-            self.batch("swaps", "swaplong64", [f"swaplong64 {v}" for v in long64], tag="FS-262")
+            self.batch("swaps", "swaplong64", [f"swaplong64 {v}" for v in long64], tag="FS-176")
         )
         buf = []
         for nbytes in (1, 2, 4, 8):
@@ -339,8 +361,10 @@ class Gen:
         near += [r.uniform(-1e6, 1e6) for _ in range(150)] + [
             r.randint(-1000, 1000) + 0.5 for _ in range(50)
         ]
+        beyond = []  # FS-12's calls (the rounded value outside the int range): a batch of their own
         for v in near:
-            lines += [f"nint {f64(v)}", f"nint2 {f64(v)}"]
+            for cmd in ("nint", "nint2"):
+                (lines if nint_fs(v, cmd) is not None else beyond).append(f"{cmd} {f64(v)}")
         for _ in range(150):
             n = r.choice([0, 1, 2, 3, 10, -1, r.randint(2, 100)])
             xsum = r.uniform(-100, 100)
@@ -364,9 +388,9 @@ class Gen:
             "dliststats 3 null",
             f"dliststats 1 {f64(5.0)}",
         ]
-        for v in (1.0, INF, -INF, NAN, 0.0):
-            lines.append(f"checkfinite {xs('place')} {f64(v)}")
         cases = [self.batch("numbers", "numbers", lines)]
+        finite = [f"checkfinite {xs('place')} {f64(v)}" for v in (1.0, INF, -INF, NAN, 0.0)]
+        cases.append(self.batch("numbers", "numbers-fs01", finite, tag="FS-01"))
         out = [
             2.0**31,
             2.0**31 - 0.5,
@@ -383,7 +407,7 @@ class Gen:
             self.batch(
                 "numbers",
                 "numbers-fs12",
-                [f"nint {f64(v)}" for v in out] + [f"nint2 {f64(v)}" for v in out],
+                [f"nint {f64(v)}" for v in out] + [f"nint2 {f64(v)}" for v in out] + beyond,
                 tag="FS-12",
             )
         )
@@ -564,16 +588,26 @@ class Gen:
             "CET-1CEST,M3.5.0,M10.5.0/3",
             "No/Such_Zone",
             "/usr/share/zoneinfo/Asia/Tokyo",
+            "ABC3DEF",  # a daylight name without a rule: the zone file posixrules
+            ("ABC3DEF", "no-zones"),  # the same where no posixrules can be read: M3.2.0,M11.1.0
         ]
         times = [0, -1, 2**31 - 1, -(2**31), 86400 * 365 * 30, -2208988800, 4102444800]
         times += [r.randint(-2208988800, 4102444800) for _ in range(150)]
         times += [1735689600 + 7 * 3600 * k for k in range(0, 2 * 365 * 24 // 7, 9)]
+        # either side of New York's changes of 2006 and 2040, and two hours later
+        for day in (1143936000, 1162080000, 2215036800, 2235600000):
+            times += [day + 3600 * h + 1800 for h in (5, 6, 7, 8)]
+        empty = self.work / "no-zones"
+        empty.mkdir(exist_ok=True)
         cases = []
         for i, z in enumerate(zones):
             lines = []
             for t in times:
                 lines += [f"gmtime {t}", f"localtime {t}", f"strftimec {t}"]
-            env = {} if z is None else {"TZ": z}
+            if isinstance(z, tuple):
+                env = {"TZ": z[0], "TZDIR": str(empty)}
+            else:
+                env = {} if z is None else {"TZ": z}
             cases.append(
                 self.batch(
                     "time",
@@ -849,7 +883,13 @@ class Gen:
         never = "prints the working directory, the user and the machine"
         cases = [
             Case("fsenv", ["fsenv"]),
-            Case("fsenv", ["fsenv"], env={"FREESURFER_HOME": "/nonexistent"}, never=never),
+            Case(
+                "fsenv",
+                ["fsenv"],
+                env={"FREESURFER_HOME": "/nonexistent"},
+                never=never,
+                tag="FS-01",
+            ),
         ]
         cases.append(Case("fsenv", ["fsenv"], env={"FREESURFER_HOME": home}, never=never))
         for b in ("1", "2", "3", "0", "-1", "4294967297", " 2", "2x", "+2", "4294967298"):
@@ -1148,15 +1188,21 @@ def serial(r: Result) -> bytes:
 # ---- the corrected defaults the loop can check itself (fix mode) ----------------------------------
 
 
-def fix_expected(case: Case, probe_out: bytes) -> bytes | None:
-    """FS-261 and FS-262: the corrected outputs, from the inputs (the byte reversal)."""
+def fix_expected(case: Case, probe: Result) -> tuple[bytes, bytes | None] | None:
+    """The corrected outputs (standard output, and standard error where it is defined), from the
+    inputs: FS-261 and FS-176 the byte reversal, FS-12 the saturated rounding, FS-01 (the finite
+    check's batch and the fsenv run without a colour table) the probe's output without the NUL byte."""
+    if case.tag == "FS-01" and case.group in ("numbers", "fsenv"):
+        return probe.out, probe.err.replace(b"\x00\n", b"\n")
     path = Path(case.args[1]) if case.args[0] == "batch" else None
-    if path is None or case.tag not in ("FS-261", "FS-262"):
+    if path is None or case.tag not in ("FS-261", "FS-176", "FS-12"):
         return None
     lines = []
     for line in path.read_text(encoding="latin-1").splitlines():
         t = line.split()
-        if t[0] == "swaplong64":
+        if t[0] in ("nint", "nint2"):
+            lines.append(str(nint_fixed(struct.unpack(">d", bytes.fromhex(t[1]))[0], t[0])))
+        elif t[0] == "swaplong64":
             v = int(t[1]) & 0xFFFFFFFFFFFFFFFF
             s = int.from_bytes(v.to_bytes(8, "little"), "big")
             lines.append(str(s - (1 << 64) if s >> 63 else s))
@@ -1170,7 +1216,7 @@ def fix_expected(case: Case, probe_out: bytes) -> bytes | None:
             else:
                 lines.append(f"ERROR: ByteSwapBuf: nBytesPerItem = {k} not supported")
                 lines.append(f"1 {xs(data)}")
-    return ("\n".join(lines) + "\n").encode()
+    return ("\n".join(lines) + "\n").encode(), None
 
 
 # ---- the commands -------------------------------------------------------------------------------
@@ -1290,32 +1336,42 @@ def main() -> int:
         if serial(p) == serial(q):
             t[1] += 1
             continue
-        expected = fix_expected(c, p.out) if a.mode == "fix" else None
+        expected = fix_expected(c, p) if a.mode == "fix" else None
         if expected is not None:
-            if q.out == expected and q.status == p.status:
+            out, err = expected
+            if q.out == out and q.status == p.status and err in (None, q.err):
                 t[2] += 1
                 continue
-            what = "the corrected value is not the byte reversal"
+            what = {
+                "FS-12": "the corrected value is not the saturated rounding",
+                "FS-01": "not the probe's output without the NUL byte",
+            }.get(c.tag, "the corrected value is not the byte reversal")
         elif c.memory or (a.mode == "fix" and c.tag):
             t[2] += 1
             print(f"  allowed ({c.tag or 'memory'}): {describe(c)}")
             continue
         else:
             what = "unexplained"
+        # a checked correction is shown against the corrected output it should have printed
+        want = p
+        if expected is not None:
+            err = q.err if expected[1] is None else expected[1]
+            want = Result(p.status, expected[0], err, p.files)
         t[3] += 1
-        t[5] += max(1, differing_lines(p.out, q.out)) if c.args[0] == "batch" else 1
+        t[5] += max(1, differing_lines(want.out, q.out)) if c.args[0] == "batch" else 1
         bad += 1
         if t[3] <= 3:
             print(f"DIFFERS ({what}): {describe(c)}")
             if p.status != q.status:
                 print(f"    status: probe {p.status}, candidate {q.status}")
             for name, x, y in (
-                ("stdout", p.out, q.out),
-                ("stderr", p.err, q.err),
-                ("files", p.files, q.files),
+                ("stdout", want.out, q.out),
+                ("stderr", want.err, q.err),
+                ("files", want.files, q.files),
             ):
                 if x != y:
-                    print(f"    {name}: {first_difference(x, y)}")
+                    side = "probe" if expected is None else "corrected"
+                    print(f"    {name}: {first_difference(x, y).replace('probe', side, 1)}")
     print(
         f"mode {a.mode}: group, runs (calls): identical, allowed differences, unexplained"
         " differences (calls differing)"

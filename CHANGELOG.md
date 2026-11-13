@@ -95,6 +95,12 @@ The changes on `main` since 0.1.0rc1, for the next release.
   maps' and the confounds' ANTs, TOPUP and BET steps) get each file name whole, so a dataset, working directory
   or output folder whose path holds a blank works; `--upstream-defects reproduce` keeps nipype's line and its
   failure. The command lines `command.txt` records are nipype's, unchanged.
+- **`n_threads` on every program's Python call**: FLIRT's other programs and scripts
+  (`lx.fsl.convert_xfm`, `avscale`, `img2imgcoord`, `img2stdcoord`, `std2imgcoord`, `applyxfm4d`,
+  `makerot`, `midtrans`, `rmsdiff`, `pointflirt`, `aff2rigid`, `extracttxt`, `pairreg`),
+  `lx.fsl.fslroi`, `lx.fsl.standard_space_roi`, `lx.ants.distance_map` and
+  `lx.ants.apply_transforms_to_points` take `n_threads=1` (0 = all) as every other call does; the
+  results do not depend on it, and a negative count is a `ValueError`.
 
 ### Deprecated
 

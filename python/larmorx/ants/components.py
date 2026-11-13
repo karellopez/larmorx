@@ -56,15 +56,16 @@ def largest_component(
     return result(data, a)
 
 
-def distance_map(image: Any) -> Image:
+def distance_map(image: Any, *, n_threads: int = 1) -> Image:
     """``ImageMath d out D in``: ITK's Danielsson distance map, the distance in millimetres
     from every voxel to the nearest non-zero voxel (0 on them).
 
     Danielsson's propagation is not exactly Euclidean (it can miss the nearest voxel by a
     fraction of a voxel); larmorx replays ITK's sweeps in the same order, so it gives the
-    same values. It runs on one thread, as ITK's does.
+    same values. It runs on one thread, as ITK's does: ``n_threads`` reaches only the reading of
+    a path.
     """
-    a = float_input(image)
+    a = float_input(image, n_threads)
     data = _core.ants_distance_map(np.asfortranarray(a.data), list(a.spacing))
     return result(data, a)
 

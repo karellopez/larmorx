@@ -31,6 +31,25 @@ flags=(-DHAVE_OPENGL -DHAVE_OPENMP -DHAVE_ZLIB -DITK_USE_SYSTEM_ZLIB -DLinux -DU
   -Wno-cpp -Wno-restrict -Wno-format-overflow -Wno-sign-compare -Wno-unused-result
   -Wno-unused-parameter -Wno-bool-compare -Wno-unused-but-set-variable -fPIC -fdata-sections
   -ffunction-sections -O3 -DNDEBUG -std=c++11 "-fmacro-prefix-map=$s=$official")
+# since relay 12: mrisurf_io.cpp built into the probe (io_statics.cpp includes it) with
+# mrisurf_io.cpp's own compile command from the unit oracle's build (its compile_commands.json: the
+# same compiler, flags, definitions and prefix map), the source and output replaced and the
+# file's folder added to the include path, so that the probe reaches its file-local functions
+mapfile -d '' iocmd < <(python3 -I - "$b/compile_commands.json" "$here/io_statics.cpp" \
+  "$out/io_statics.o" "$s/utils" <<'PY'
+import json, shlex, sys
+cc, src, obj, inc = sys.argv[1:]
+cmd = next(e["command"] for e in json.load(open(cc)) if e["file"].endswith("/utils/mrisurf_io.cpp"))
+a = shlex.split(cmd)
+o = a.index("-o")
+del a[o:o + 2]
+c = a.index("-c")
+del a[c:c + 2]
+a += ["-I" + inc, "-o", obj, "-c", src]
+sys.stdout.write("\0".join(a) + "\0")
+PY
+)
+"${iocmd[@]}"
 libs=("$b/utils/libutils.a")
 for p in jpeg/libjpeg tiff/libtiff xml2/libxml2 minc/libminc netcdf/libnetcdf nrrdio/libnrrdio \
   dicom/libdicom cephes/libcephes nifti/libnifti dcm2niix/libdcm2niixfs gifti/libgifti expat/libexpat; do
@@ -45,10 +64,11 @@ for variant in fssurfio fssurfio-mpstub; do
   if [ "$variant" = fssurfio-mpstub ]; then extra=(-DPROBE_MP_STUB); link=(-Wl,--allow-multiple-definition); fi
   "$gcc" "${flags[@]}" "${extra[@]}" -c "$here/fssurfio.cpp" -o "$out/$variant.o"
   "$gcc" -fopenmp -fdata-sections -ffunction-sections -Wl,--gc-sections "${link[@]}" -O3 "$out/$variant.o" \
-    -o "$out/$variant" "${libs[@]}" /usr/lib/x86_64-linux-gnu/libz.so -lm \
+    "$out/io_statics.o" -o "$out/$variant" "${libs[@]}" /usr/lib/x86_64-linux-gnu/libz.so -lm \
     "$ws/oracles/toolchains/gcc-8.4-ubuntu/usr/lib/gcc/x86_64-linux-gnu/8/libgomp.so" \
     /lib/x86_64-linux-gnu/libpthread.a -lcrypt -lrt
 done
-sha256sum "$out/fssurfio" "$out/fssurfio-mpstub" "$here/fssurfio.cpp" > "$out/BUILD_INFO.txt"
+sha256sum "$out/fssurfio" "$out/fssurfio-mpstub" "$here/fssurfio.cpp" "$here/io_statics.cpp" \
+  > "$out/BUILD_INFO.txt"
 "$gcc" --version | head -1 >> "$out/BUILD_INFO.txt"
 echo "built $out/fssurfio and $out/fssurfio-mpstub"

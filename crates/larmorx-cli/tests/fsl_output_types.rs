@@ -17,7 +17,7 @@
 //! (`fsl mcflirt`, `mri hmc`), the calls that write no image, mcflirt's files before it stops,
 //! FSL-09's three names. Every FSL tool's calls (bet2, bet, betsurf, fslroi, applyxfm4D, topup,
 //! applytopup, pairreg, ... besides these), each compared with FSL 6.0.7.23's own run, are in
-//! `tests/parity/test_fsl_output_types_original.py` (this machine; the parity smoke tier, at
+//! `tests/parity/test_fsl_output_types_clean_room.py` (this machine; the parity smoke tier, at
 //! every merge), as `tests/parity/test_fsl_output_types_replica.py` for the replicas.
 
 use std::collections::BTreeMap;
@@ -205,7 +205,7 @@ const TOPUP_FOR_APPLYTOPUP: [&str; 9] = [
 ];
 
 /// The calls that write an image, one per code path (every FSL tool's:
-/// `tests/parity/test_fsl_output_types_original.py`), with the program FSL-11's line names and
+/// `tests/parity/test_fsl_output_types_clean_room.py`), with the program FSL-11's line names and
 /// FSL's exit status when the variable is unset.
 fn image_calls() -> Vec<(&'static str, Vec<&'static str>, i32)> {
     vec![

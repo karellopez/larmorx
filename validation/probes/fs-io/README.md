@@ -24,6 +24,17 @@ number on C streams and znz files, `fio_dirname`, `fio_basename`, `fio_extension
   formats' rules, then cut or changed). The port marks `SKIP` where FreeSurfer crashes or its result depends on
   the machine (FS-179, FS-181, FS-183, FS-185, FS-188 past the entry, FS-189, FS-191, skips beyond 256 MiB) and
   `VARY` where it reads memory contents (FS-49 and FS-167 in these commands, FS-180, FS-187, FS-192).
+- Piece 3 (relay 13): the commands `npy` (`fscnpy::npy2mri` on generated `.npy` files: NumPy's headers of
+  every version, alignment, key order and value FreeSurfer meets, then cut or changed; the volume's extents,
+  type, sizes and voxel bytes), `gda` and `gdv` (gifti.cpp's `static` helpers `gifti_alloc_and_add_darray`
+  and `gifti_get_DA_value_2D`, reached through `gifti_statics.cpp`, which compiles FreeSurfer's gifti.cpp
+  itself into `fsio` with gifti.cpp's own compile command from the unit oracle's `compile_commands.json`),
+  `bvw` (`DTIwriteBValues`, `DTIwriteBVectors`), `psn` (`DTIparsePulseSeqName`), `bcs`
+  (`DTIbvecChangeSpace` on a header with direction cosines and gradients); the port's side in
+  `tests/fs_io/piece3.rs`. `SKIP` where FreeSurfer crashes or reads past what it was given (FS-199,
+  FS-200, FS-201, FS-203, FS-204, FS-205, FS-207 without a shape, FS-211, FS-217, FS-219), `VARY` where its
+  result is memory contents or an address (FS-202, FS-206 past the list's storage, FS-207, FS-209, FS-214,
+  FS-218 and FS-220 past the matrix).
 - `scanf_lf.c`: glibc's `sscanf("%lf")` as a black box (bits, `errno`, bytes read), the measurements
   behind `larmorx-freesurfer-core::cscan`'s `%lf` test.
 
@@ -31,8 +42,8 @@ Run (inside a memory box; the port and FreeSurfer run on generated inputs):
 
     validation/probes/fs-io/build.sh <workspace>
     scripts/orchestration/boxed.sh 6 python -P validation/probes/fs-io/check.py --seed 1 --n 1100
-    scripts/orchestration/boxed.sh 6 python -P validation/probes/fs-io/check.py --seed 1 --n 1000 --portable
-    scripts/orchestration/boxed.sh 8 python -P validation/probes/fs-io/check.py --seed 7 --n 22000
+    scripts/orchestration/boxed.sh 10 python -P validation/probes/fs-io/check.py --seed 1 --n 2800 --portable
+    scripts/orchestration/boxed.sh 12 python -P validation/probes/fs-io/check.py --seed 7 --n 58000
 
 The portable run's hash (`official_sha256_skip`) is `tests/fs_io_official.rs`'s, checked on every
 platform. Results (2026-11-13): `docs/findings/freesurfer-io.md`.

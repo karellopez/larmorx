@@ -27,6 +27,8 @@ use larmorx_io::znz::ZnzFile;
 
 #[path = "piece2.rs"]
 mod piece2;
+#[path = "piece3.rs"]
+mod piece3;
 
 /// The cases' random numbers.
 pub struct Gen(u64);
@@ -241,10 +243,15 @@ pub fn generate(seed: u64, n: usize, portable: bool) -> Vec<String> {
         ]
     };
     kinds.extend(piece2::KINDS);
+    kinds.extend(piece3::KINDS);
     for i in 0..n {
         let kind = kinds[i % kinds.len()];
         if piece2::KINDS.contains(&kind) {
             lines.push(piece2::generate(&mut g, kind).join(" "));
+            continue;
+        }
+        if piece3::KINDS.contains(&kind) {
+            lines.push(piece3::generate(&mut g, kind, portable).join(" "));
             continue;
         }
         let mut t: Vec<String> = vec![kind.into()];
@@ -572,6 +579,11 @@ pub fn run_line(line: &str, mode: UpstreamDefects, w: &Work) -> (String, Vec<&'s
             let mut o2 = shared.clone();
             let mut e2 = shared.clone();
             return piece2::run(&t, &mut g, &mut o2, &mut e2, &mut o, w, &mut extra);
+        }
+        if piece3::KINDS.contains(&t[0]) {
+            let mut o2 = shared.clone();
+            let mut e2 = shared.clone();
+            return piece3::run(&t, &mut g, &mut o2, &mut e2, &mut o, w, &mut extra);
         }
         match t[0] {
             "rd" => {

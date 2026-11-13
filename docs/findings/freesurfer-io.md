@@ -250,3 +250,104 @@ item 3.1-30) and colortab.cpp's binary readers and writers (3.1-33), which FStag
   table of millions of empty places printed one mark per place made 33 MB lines that ran check.py out
   of its 8 GiB box: the probe prints the non-empty entries with their indices, and messages beyond 1
   MiB by their length (`BIGTEXT`).
+
+## Part 3: fscnpy.cpp, gifti.cpp 47-212, dti.cpp's b-value files (3.1-25, piece 3)
+
+**Restricted** (closed to FreeSurfer clean-room implementers: it cites FreeSurfer's source). Track A,
+relay 13. The behaviour is in `specs/freesurfer-io.md` §19-24; the defect texts (behaviour only) in
+`larmorx_core::defects` (FS-199 to FS-220).
+
+### fscnpy (FS-199 to FS-213)
+
+- The object's layout (fscnpy.h, x86-64): `__magic_string` (a pointer, 0-7), `__header_len_bytes[2] =
+  {2, 4}` (8-15), `__major_version` (16), `__minor_version` (17), two bytes of padding, `__header_len`
+  (`size_t`, 24-31), ... `mriio.cpp` 799 makes it with `new` (heap memory never written but for what
+  the constructor sets).
+- **FS-199/FS-200.** fscnpy.cpp 234 `fread(&__header_len, 1, __header_len_bytes[__major_version-1], fp)`:
+  major 3 reads `__header_len_bytes[2]`, the four bytes at offset 16: major (3), minor, the two padding
+  bytes: 3 + 256 x minor (+ the padding's) bytes into the 8-byte `__header_len`. Version 3.0 (padding
+  0) reads 3 of the 4 length bytes; the header text then starts at the length's fourth byte (0) and
+  the `dict` buffer lacks the header's last byte, its `'\n'`, so the parse of line 249 runs past it
+  (measured: NumPy's own version 3.0 file crashes the probe, `CRASH 11`). Majors 0 (the high half of
+  `__magic_string`, a PIE address: about 21,000 bytes into an 8-byte field), 4 and up (padding,
+  `__header_len` itself, `__endian`...) are memory or nonsense; measured: version 0 crashes.
+- **FS-201/FS-202.** 237 `char dict[__header_len]` is a variable-length array on the stack (up to 4 GiB
+  for version 2); 238's short read leaves its rest unwritten. 241-245: `restheader`, another VLA.
+- **FS-203.** 249 `for (; *currpos != '\n'; currpos++)`: the scan ends only at a newline seen where an
+  item starts; 255's key scan stops at a newline but 320's increment then steps over it; 282 `while
+  (*currpos != ',')` and 292 `while (!isdigit(*currpos))` and the shape loop 296-317 have no end test
+  at all; 267-270 read two bytes and step two without looking.
+- **FS-204.** 298-307: `value` is reset to NULL after each element; a `,` or `)` before the next digit
+  calls `atoi(NULL)` (SIGSEGV). NumPy writes a one-dimensional shape as `(3,)`: every 1-D `.npy`
+  crashes FreeSurfer (measured).
+- **FS-205.** 338 `while (__shape[__ndims-1] == 1)` has no `__ndims > 0` test: an all-ones shape pops
+  to empty and reads `__shape[-1]` (the malloc chunk's size field, not 1), then 346 `while
+  (__shape[0] == 1)` reads the stale 1 and calls `erase(begin())` on an empty vector: libstdc++'s
+  move of `end - (begin + 1) = -1` elements, `memmove` of `(size_t) -4` bytes (measured: `CRASH 11`).
+- **FS-206** (fs.mri, mri.cpp 108-129). `MRI::Shape::Shape(const std::vector<int>&)` prints its
+  message for a count other than 3 or 4 and still reads `shape[0]`, `shape[1]`, `shape[2]`: past the
+  vector's elements for fewer than 3. In npy2mri the vector is `__shape` after the squeeze: its
+  storage (libstdc++: growth 1, 2, 4, 8 by `_M_realloc_insert`, new places unwritten; `pop_back`
+  leaves the place; `erase(begin())` moves the rest down and leaves the last place) still holds the
+  dropped extents, so `(1, 3, 4, 1)` gives depth 4 (measured: `3 x 4 x 4 x 1`, the verbose line) and
+  `(2, 4, 1)` depth 1; a place beyond the storage or left by a growth is heap memory (measured 0 for
+  `(2, 3)`: a volume without voxels). `larmorx_freesurfer_mri::mri::Mri::new_beyond` takes those
+  places (`fscnpy::ShapeVec` models the vector); `Mri::new` (lists made for the call: their storage
+  ends at their elements) gives memory, 0 with `reproduce`.
+- **FS-207.** `__endian`, `__dtype_char`, `__dtype_len`, `__fortran_order` are not set by the
+  constructor (8-26): a header without `'descr'` or `'fortran_order'` leaves them as heap memory; an
+  empty `__shape` reads `__shape[-1]` from a NULL data pointer (crash).
+- **FS-208.** 126-127: `__dtype_len == 8` calls `byteswapbuffloat` (4-byte groups), not
+  `byteswapbufdouble`.
+- **FS-209.** 521 prints `%p` of `data_src` and `data_dst` (heap addresses: ASLR).
+- **FS-210.** 288 `__fortran_order = !strcmp(value, "False") ? false : true`.
+- **FS-211.** 111 `size_t bytes_per_slice = __dtype_len * mri->width * mri->height` multiplies ints.
+- **FS-212.** 118's short `fread`s are only counted (printed with `verbose`).
+- **FS-213.** 241-246 skip `16 - total % 16` bytes when the total is not a multiple of 16; NumPy's
+  `read_array_header` reads the data right after `header_len` bytes (its writer pads inside the
+  header: `_wrap_header`, to `ARRAY_ALIGN` = 64 bytes in NumPy 2.3.5's `_format_impl.py`; the format's
+  version 1.0 text asks for 16).
+- Kept (not defects): `'|'` (and any order byte but `'<'`) counts as "different endian" (only 1-byte
+  types carry `'|'`, and they are not swapped); keys are compared with their quotes, so a header
+  written with double quotes has none of them (FS-207); unknown keys are skipped with the first byte
+  of their value; a repeated `'shape'` appends; `array contiguous reordering ...` is printed for every
+  C-order array, verbose or not; `__getarchendian` is `'<'` on every platform larmorx supports;
+  `exec_progress_callback` (131) does nothing without freeview's callback; `fscnpy::read` (39-64: no
+  caller; its short-read test compares items with bytes) and `fscnpy::write` (empty) are not ported.
+
+### gifti.cpp 47-212 (FS-214 to FS-216)
+
+- Both functions are `static` (no symbol in `libutils.a`): the probe compiles gifti.cpp itself into
+  `fsio` (`gifti_statics.cpp`, with gifti.cpp's own compile command from the unit oracle's
+  `compile_commands.json`) and calls them through two wrappers.
+- **FS-214.** 75: `fprintf(stderr, "... data=%p\n", da)` passes the array, not its data.
+- **FS-215.** 175-180: the COMPLEX64 case reads `*((double *)(da->data) + ...)`.
+- **FS-216.** 143-201: `(dim0_index * dims_1)` and `(dim1_index * dims_0)` are int products added to
+  the pointer.
+- `NIFTI_TYPE_INT8` reads through `char` (signed on x86-64 Linux; unsigned on AArch64 Linux, not an
+  official FreeSurfer platform): the port reads `i8`. `gifti_add_empty_darray`'s failures are out of
+  memory only.
+
+### dti.cpp (FS-217 to FS-220)
+
+- **FS-217.** 853-858 and 936-940 open the file, then 859/942 read `bvals->rows` of a NULL matrix
+  (measured: `CRASH 11`, the file left empty). `MRIwriteType` (mriio.cpp 1268-1290) calls
+  `DTIwriteBVectors(mri->bvecs, ...)` whenever `mri->bvals` is set: a volume with b-values and no
+  gradients crashes there.
+- **FS-218.** 859 `bvals->rptr[n][1]`, 942 `rptr[n][1..3]`: `rptr[n] + c` runs into row `n + 1`; past
+  `data + rows x cols` it reads MatrixAlloc_new's block (matrix.cpp 418-421: rounded up to 64 bytes,
+  only `nelts` floats zeroed, 476-477) or beyond: memory.
+- **FS-219.** 985 `char tmpstr[100]`, filled by 991-996 and 1003-1008 without a bound (Ubuntu's GCC
+  builds with the stack protector: an overflow that reaches the canary aborts).
+- **FS-220.** 1127-1131 `bvec->rptr[i][1] = vol->bvecs->rptr[f][i]` and back for `i = 1..3`.
+- `DTIparsePulseSeqName` has no caller in FreeSurfer 8.2.0 (the inventory lists it in 3.1-25 as part
+  of dti.cpp's reached object); `DTIbvecChangeSpace` is called by the DICOM readers (DICOMRead.cpp 578,
+  6048, queue item 3.7-14) with `FSENVgetenv`'s desired space; `MatrixMultiplyD(M, bvec, bvec)` is in
+  place (the port copies the input, as FreeSurfer's MatrixMultiplyD does).
+- `%d` of a number beyond `int` (`sscanf`, glibc): the low 32 bits of the `long` (measured:
+  `999999999999` gives -727379969), as `larmorx_core::cscan::sscanf_i32` gives.
+
+### The probe's piece-3 commands
+
+`npy`, `gda`, `gdv`, `bvw`, `psn`, `bcs` (validation/probes/fs-io/fsio.cpp; the port's side
+`tests/fs_io/piece3.rs`). Results: below, "Measured (piece 3)".

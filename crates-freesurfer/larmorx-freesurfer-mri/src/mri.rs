@@ -506,26 +506,25 @@ fn missing_extents(g: &mut Globals, sh: &mut Shape, len: usize, beyond: &[Option
     let fs: Vec<Option<i32>> = (len..3)
         .map(|i| beyond.get(i - len).copied().flatten())
         .collect();
-    if fs.iter().all(|v| *v == Some(1)) {
-        return;
-    }
-    let shown: Vec<String> = fs
-        .iter()
-        .map(|v| v.map_or("memory never written".to_owned(), |x| x.to_string()))
-        .collect();
     let reproduce = g.notices.reproduce();
-    g.notices.add(
-        &FS_206,
-        format!(
-            "a shape of {len} extents: FreeSurfer takes the missing ones from past the list ({}){}",
-            shown.join(", "),
-            if reproduce {
-                ", 0 where memory was never written"
-            } else {
-                "; taken as 1"
-            }
-        ),
-    );
+    if fs.iter().any(|v| *v != Some(1)) {
+        let shown: Vec<String> = fs
+            .iter()
+            .map(|v| v.map_or("memory never written".to_owned(), |x| x.to_string()))
+            .collect();
+        g.notices.add(
+            &FS_206,
+            format!(
+                "a shape of {len} extents: FreeSurfer takes the missing ones from past the list ({}){}",
+                shown.join(", "),
+                if reproduce {
+                    ", 0 where memory was never written"
+                } else {
+                    "; taken as 1"
+                }
+            ),
+        );
+    }
     for (k, v) in fs.iter().enumerate() {
         let x = i64::from(if reproduce { v.unwrap_or(0) } else { 1 });
         match len + k {

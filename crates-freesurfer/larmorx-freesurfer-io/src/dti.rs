@@ -53,16 +53,16 @@ fn write_columns(
     let reproduce = g.notices.reproduce();
     if let Some(m) = m
         && m.cols < ncols
+        && !reproduce
     {
         g.notices.add(
             &FS_218,
             format!(
-                "{what} of a matrix of {} columns: FreeSurfer writes the next rows' numbers in the {ncols} columns it writes, and memory contents past the matrix{}",
-                m.cols,
-                if reproduce { "" } else { "; refused" }
+                "{what} of a matrix of {} columns: FreeSurfer writes the next rows' numbers in the {ncols} columns it writes, and memory contents past the matrix; refused",
+                m.cols
             ),
         );
-        if !reproduce {
+        {
             let _ = writeln!(
                 out,
                 "ERROR: {what}(): the matrix has {} columns, {ncols} needed",
@@ -96,12 +96,17 @@ fn write_columns(
             text.push_str(if c < ncols { sep } else { "\n" });
         }
     }
-    if memory {
+    if m.cols < ncols {
         g.notices.add(
             &FS_218,
             format!(
-                "{what} of a matrix of {} columns: FreeSurfer writes memory contents past the matrix's last number; written as 0",
-                m.cols
+                "{what} of a matrix of {} columns: FreeSurfer writes the next rows' numbers in the {ncols} columns it writes{}",
+                m.cols,
+                if memory {
+                    ", and memory contents past the matrix's last number (written as 0)"
+                } else {
+                    ""
+                }
             ),
         );
     }
@@ -240,15 +245,14 @@ pub fn dti_bvec_change_space(
     }
     let reproduce = g.notices.reproduce();
     let cols = vol.bvecs.as_ref().map_or(3, |m| m.cols);
-    if cols < 3 {
+    if cols < 3 && !reproduce {
         g.notices.add(
             &FS_220,
             format!(
-                "gradient directions of {cols} columns: FreeSurfer reads and writes three numbers a row, across the rows and past the matrix{}",
-                if reproduce { "" } else { "; refused" }
+                "gradient directions of {cols} columns: FreeSurfer reads and writes three numbers a row, across the rows and past the matrix; refused"
             ),
         );
-        if !reproduce {
+        {
             let _ = writeln!(
                 out,
                 "ERROR: DTIbvecChangeSpace(): bvecs have {cols} columns, 3 needed"
@@ -302,11 +306,16 @@ pub fn dti_bvec_change_space(
             }
         }
     }
-    if memory {
+    if cols < 3 {
         g.notices.add(
             &FS_220,
             format!(
-                "gradient directions of {cols} columns: FreeSurfer reads memory contents past the matrix and writes outside it; read as 0, the writes dropped"
+                "gradient directions of {cols} columns: FreeSurfer reads and writes three numbers a row, across the rows{}",
+                if memory {
+                    ", and memory contents past the matrix (read as 0) and outside it (the writes dropped)"
+                } else {
+                    ""
+                }
             ),
         );
     }

@@ -11,7 +11,9 @@ Status: **part 1** (§1-9, queue item 3.1-25's first piece): the binary readers 
 number, the file-name helpers and file tests, the tab-separated tables, the byte swaps of a buffer,
 the zeroed allocation that ends the program. **Part 2** (§10-18, the item's second piece): FreeSurfer's
 tags, the matrix tags, the binary colour tables, a volume geometry's stored form, the tags of an
-`.mgz` and of FreeSurfer's NIfTI header extension (`FStagsIO`). Later parts: the volume formats.
+`.mgz` and of FreeSurfer's NIfTI header extension (`FStagsIO`). **Part 3** (§19-24, the item's third
+piece): NumPy `.npy` volumes, two GIFTI helpers, the diffusion files, names and gradient spaces.
+Later parts: the volume formats.
 
 ## 1. Conventions
 
@@ -464,3 +466,211 @@ Each writer starts with the tag number and, where the tag has one (§14), the da
   identical on 40,710 of 40,710 comparable lines (2,070 with memory digits), 3,003 lines of memory
   contents compared apart, 2,287 not comparable; `fix` differs only with a notice. Seed 1, 2,200
   portable cases: 1,927 identical, 273 not comparable.
+
+## 19. Conventions of part 3
+
+Part 3 (queue item 3.1-25's third piece): NumPy `.npy` volumes (§20, §21), two helpers over
+gifticlib's GIFTI structures (§22), the b-value and gradient files, pulse-sequence names and
+gradient spaces of diffusion data (§23). §1's conventions hold. "Exits" means the program ends with
+status 1 after the message. "Prints" is standard output; GIFTI's messages go to standard error.
+Every machine larmorx supports is little-endian: the machine's byte-order mark is `<`.
+
+## 20. Reading a `.npy` file into a volume (`npy2mri`)
+
+The input is a file name (relative to the program's directory) and a `verbose` switch (off when
+`MRIread` reads a `.npy`). In order:
+
+1. **Opening.** A file that cannot be opened for reading: prints `Error reading numpy file <name>`
+   and exits. A directory opens (its reads give nothing).
+2. **Magic.** The first 6 bytes must be `\x93NUMPY`; anything else (fewer bytes included): prints
+   `Error <name> is not npy file` and exits.
+3. **Version.** One byte major, one byte minor (0 when the file ends first). The header length that
+   follows is a little-endian unsigned number of 2 bytes for major 1 and 4 bytes for major 2.
+   Major 3 (NumPy's version for headers with non-ASCII text, a 4-byte length): FS-199 (rule A) reads
+   4 bytes; with `reproduce`, version 3.0 reads 3 bytes (the header text then starts one byte early
+   and lacks its last byte); version 3.x with x > 0 crashes FreeSurfer (both modes 4 bytes). Any
+   other major (0, 4-255): FS-200 (rule B, both modes): prints `Error <name>: npy format version
+   <major>.<minor> is not supported` and exits (FreeSurfer: a crash or a header from memory
+   contents). A length the file cuts short keeps the bytes it got as its low bytes.
+4. **Header text.** The next `header_len` bytes. A file that ends inside them: the missing bytes are
+   zeros (FS-202, both modes; FreeSurfer: memory contents), noted when the parse reaches them. A
+   header of 7 MiB or more is read whole (FS-201: FreeSurfer keeps it on its stack and crashes from
+   about 8 MiB, its stack's default size).
+5. **Alignment.** If `6 + 2 + <length's size> + header_len` is not a multiple of 16: FS-213 (rule A)
+   reads the data right after the header, as NumPy does; `reproduce` first skips the bytes up to the
+   next multiple of 16 (FreeSurfer's reading). NumPy's files are always aligned (to 16 or 64).
+6. **Parse** (FreeSurfer's own reading of NumPy's dictionary, not a Python parser). The text is
+   scanned from its first byte until a newline byte is met where a new item would start:
+   - The bytes `{`, `}`, `,` and space are skipped there. Anything else starts a **key**, which runs
+     to the next `:` or newline. A key that ends at a newline is not a key: the scan moves past that
+     newline (and so goes on after it). At a `:`, the colon is replaced by a NUL byte, the spaces
+     after it are skipped, and the key is compared as a C string (up to its first NUL byte) with
+     the three quoted names below; other keys are ignored. In every case the scan then skips the
+     one byte where it stands (for an ignored key: the first byte of its value) and continues.
+   - `'descr'`: the byte after the spaces is skipped (the opening quote); the next byte is the
+     **byte order**, the one after it the **kind**, and the decimal digits after those the **item
+     size** (C's `atoi` of that run: 0 for none; a value beyond `int` keeps its low 32 bits); the
+     byte after the digits (the closing quote, or whatever is there, even a newline) becomes NUL.
+   - `'fortran_order'`: the value runs to the next `,` (no newline stops it), which becomes NUL;
+     the value is the text up to its first NUL. `False` gives C order; `True` Fortran order;
+     anything else is FS-210 (rule B: prints `Error <name>: npy header's fortran_order is <value>,
+     not True or False` and exits; `reproduce` takes it as Fortran order, FreeSurfer's reading).
+   - `'shape'`: bytes are skipped up to the first decimal digit (which may lie far beyond the
+     parenthesis); from there each `,` or `)` ends an element (the element is `atoi` of the text
+     from its first digit, so `3L` is 3; a byte that is neither a digit, `,` nor `)` is passed
+     over), the separator becoming NUL, and `)` ends the shape, after which the scan skips one more
+     byte. An element with no digit before its separator (the `,)` of NumPy's one-dimensional
+     `(3,)`, `(3, )`, `(3,,4)`) is FS-204: FreeSurfer crashes; a clean room skips the element in
+     both modes (so `(3,)` is one extent). A repeated `'shape'` appends its elements.
+   - A key, value or scan that reaches the end of the header text without finishing is FS-203:
+     FreeSurfer reads past the header (a crash, or values from memory contents); a clean room stops
+     the parse there in both modes (what was read so far is kept).
+7. **Missing items** (after the parse; FS-207). No shape element at all: FS-205/FS-207, both modes:
+   prints `Error <name>: npy header has no shape` and exits (FreeSurfer crashes). No `'descr'` or no
+   `'fortran_order'`: rule B, prints `Error <name>: npy header has no descr` (or `fortran_order`) and
+   exits; `reproduce` takes the byte order, kind and size as 0 and the order as C order (FreeSurfer:
+   memory contents).
+8. **Verbose report** (only with `verbose`), each a line: `archendian : < (little endian)`, `NPY
+   version: <major>.<minor>`, `NPY header_len: <header_len>`, `NPY dict.descr : <order byte><kind
+   byte><size>` (the two bytes as they are, a NUL included), `NPY dict.fortran_order: True|False`,
+   then `NPY dict.shape: {` followed by ` <e>, ` for each element and `}`.
+9. **Squeeze.** Trailing extents of 1 are dropped, then leading ones; any drop marks the shape
+   "squeezed". FS-205: an array whose extents are all 1 crashes FreeSurfer; a clean room keeps one
+   extent (1) in both modes.
+10. **Verbose report**, continued: `NPY shape dimension: <n> (squeezed) ( <e>, ... )` (the
+    parenthesis holds the word `squeezed` or nothing; each extent followed by `, `), then `Data is
+    in different endian. Need to swap bytes` when the byte order byte is not `<` (so also for `|`,
+    `=` and `>`), else `Data is in same endian`.
+11. More than 4 extents left: prints `numpy file contains <n>D data. Cannot fit them in MRI
+    structure.` and exits.
+12. **Type.** Kind `f` size 4: float; `i` size 2: short, 4: int, 8: long (8 bytes); `u` size 1:
+    unsigned char, 2: unsigned short. Kind `f`, `i` or `u` with another size: prints `WARN: !!!
+    unsupported __dtype_char=<kind byte>, __dtype_len=<size>`; any other kind: `WARN: !!!
+    unsupported __dtype_char=<kind byte>!!!`; the type is then -1 and the volume's construction
+    refuses it (`specs/freesurfer-mri.md`: FS-55, by default the error `unsupported MRI data type:
+    -1`; with `reproduce` FreeSurfer's failed allocation, `could not allocate memory for slice 1
+    out of <n>`, unless the volume has no voxels). So float64, int8, bool, complex, Unicode and
+    object arrays are not read.
+13. **The volume** is made from the extents (width, height, depth, frames; 3 or 4 extents; its
+    messages for another count and for an extent not above 0, `specs/freesurfer-mri.md`). Fewer
+    than 3 extents (a two- or one-dimensional array, or one the squeeze shortened) is FS-206: each
+    missing extent is 1 by default (rule A: a two-dimensional array is one slice). With
+    `reproduce` each is what FreeSurfer reads past its list of extents: the list keeps, past its
+    elements, the elements its squeeze dropped or moved (the list's storage grows by doubling: 1,
+    2, 4, 8 places, and a growth leaves the new places unwritten; dropping a trailing extent leaves
+    it in its place, dropping the leading one moves the rest down one place and leaves the last
+    place as it was), so `(1, 3, 4, 1)` gives 3 x 4 x 4 and `(1, 1, 2)` gives 2 x 2 x 2; a place
+    never written (beyond the storage, or left by a growth) is memory contents: 0 with the notice
+    (FreeSurfer's runs gave 0). Verbose: `MRI dimensions: <w> x <h> x <d> x <frames>` and `
+    type: <UCHAR|SHORT|USHRT|INT|LONG|BITMAP|TENSOR|FLOAT|UNKNOWN> (<type>)` (ten spaces before
+    `type`).
+14. **Data.** For each frame, each slice: `item size x width x height` bytes are read into the
+    slice (bytes the file does not give stay 0). FS-211: FreeSurfer computes that count in 32 bits
+    (a slice of 2 GiB or more is read wrongly); a clean room uses 64 bits in both modes. When the
+    byte order byte is not `<`, each slice's items are reversed: size 2 in pairs, size 4 in groups
+    of 4; size 8 is FS-208 (rule A: groups of 8; `reproduce` groups of 4, FreeSurfer's: every value
+    wrong). Verbose: `<bytes> bytes read`. FS-212: fewer bytes than the array has is rule B: prints
+    `Error <name>: <got> bytes of data read, <expected> expected` and exits; `reproduce` keeps the
+    zeros silently.
+15. **Order.** A Fortran-order array is the volume as read. A C-order array (shape `(a, b, c[,
+    d])`) is moved into FreeSurfer's order: prints `array contiguous reordering ...`, makes a second
+    volume of the same extents (its messages again) and copies voxel `[i, j, k, l]` of the array
+    (at item `l + d (k + c (j + b i))` of the data read) to voxel `(i, j, k, l)` of the volume. A
+    type outside the six above prints `Unsupported datatype, no array contiguous reordering` and
+    gives no volume. Verbose: for each copied voxel, in the volume's order, two lines `memcpy(<src>,
+    <dst>, <bytes per voxel>)` and `      offset_voxel = <item>, offset_bytes = <item x bytes>`;
+    FreeSurfer prints the two memory addresses there (FS-209: they differ from run to run); a clean
+    room prints the byte offsets in the two volumes in C's `%p` form (`(nil)` for 0, else `0x` and
+    lower-case hexadecimal), in both modes.
+16. The result is the volume (its other fields those of a new volume).
+
+## 21. `.npy` in the validation plan
+
+The probe's command `npy` (§24) reads generated files: NumPy's headers (versions 1.0, 1.1, 2.0, 3.0,
+3.1 and 0, 4, 7; aligned to 64, 16, 1 and 7 bytes; keys reordered, missing, repeated or unknown;
+fortran orders `True`, `False` and odd values; shapes of 0 to 5 extents with 1s, 0, -1 and
+`4294967297`, `L` suffixes; 25 type strings: every supported one in both byte orders and float64,
+bool, int8, complex, float16, Unicode, `=` and `|u2`; header lengths changed), the data patterned or
+random, then cut, mutated, shortened or extended; and fixture names (a missing file, a directory, a
+text file); verbose on small arrays.
+
+## 22. Two GIFTI helpers
+
+On gifticlib's image and data-array structures (the clean room's GIFTI port, `larmorx_io::gifti`):
+
+- **Add an empty data array** (`gifti_alloc_and_add_darray`): no image: prints `** gifti_alloc_and_add_darray:
+  NULL image` and gives nothing. Else gifticlib's add of one empty array (its messages at its
+  verbosity: `++ alloc darray[<n>] (+1)` above 3, `-- clearing DataArray` above 5) and the new last
+  array is the result (every field 0, no data, no metadata); a failed add (out of memory) prints
+  `** gifti_alloc_and_add_darray: gifti_add_empty_darray failed` and gives nothing.
+- **A value as a double** (`gifti_get_DA_value_2D`, array, row, column): each failure exits after its
+  message:
+  - no array or no data: `** gifti_get_DA_value_2D, invalid params: data=(nil)` (FS-214: for an
+    array without data FreeSurfer prints the array's memory address in place of `(nil)`; a clean
+    room prints `(nil)` in both modes);
+  - one dimension: the column must be 0 (else `** gifti_get_DA_value_2D, array dim is 1 but trying
+    to access 2D data element (col=<col>)`), the second extent is taken as 1; another dimension
+    than 1 or 2: `** gifti_get_DA_value_2D, array dim is <n>`;
+  - the index order must be row-major (1) or column-major (2), else `** gifti_get_DA_value_2D,
+    unknown ind_ord: <n>`; then `** gifti_get_DA_value_2D, invalid params: dim0_index=<row>
+    (max=<extent 0>), dim1_index=<col> (max=<extent 1>)` unless `0 <= row < extent 0` and `0 <= col
+    < extent 1`;
+  - the element is `row x extent 1 + col` (row-major) or `row + col x extent 0` (column-major), read
+    from the little-endian data as unsigned 8-bit, signed 16-bit, signed 32-bit, float, double,
+    signed 8-bit, unsigned 16-bit or unsigned 32-bit and converted exactly to a double; any other
+    type: `** gifti_get_DA_value_2D, unsupported type <type>-unknown, or can't convert to double`.
+    COMPLEX64 is FS-215 (rule B: that message by default; `reproduce` reads its 8-byte values as
+    doubles, FreeSurfer's). FS-216: FreeSurfer computes the product in 32 bits (elements beyond
+    2^31 are read from the wrong place); a clean room uses 64 bits in both modes.
+
+## 23. Diffusion files and names
+
+- **B-values file** (`DTIwriteBValues`, matrix, name): opened for writing (else prints `ERROR:
+  DTIwriteBValues(): could not open <name> for writing`, result 1); each row's first number as C's
+  `%f` (6 decimals; `nan`, `-nan`, `inf`, `-inf`) and a newline; result 0.
+- **Gradient file** (`DTIwriteBVectors`): the same with each row's first three numbers as `%16.14f`
+  separated by one space (`ERROR: DTIwriteBVectors(): ...` on failure).
+- Both: no matrix is FS-217 (FreeSurfer makes the file, then crashes; a clean room leaves the file
+  empty, prints `ERROR: <function>(): no matrix` and gives 1, in both modes). A matrix with fewer
+  columns than written (none for b-values, fewer than 3 for gradients) is FS-218: rule B, prints
+  `ERROR: <function>(): the matrix has <n> columns, <k> needed` and gives 1 before opening the file;
+  with `reproduce` the numbers FreeSurfer writes: a row's missing columns are the next numbers of
+  the matrix in row order (the next row's), and past the matrix's last number 0 (FreeSurfer: memory
+  contents).
+- **Pulse-sequence name** (`DTIparsePulseSeqName`, name `ep_b<b>#<n>`): a name of fewer than 7
+  bytes, or with no `#` from its fifth byte on: result 1, the outputs unchanged. Else the text from
+  the fifth byte to the `#` is read with C's `sscanf("%lf")` (the b-value set only when a number is
+  read) and the text after the `#` with `%d` (the direction set only when a number is read; a value
+  beyond `int` keeps its low 32 bits); result 0. The first four bytes are not checked. FS-219: a
+  part of 100 bytes or more overflows FreeSurfer's buffer (a crash or wrong values); a clean room
+  reads it whole in both modes.
+- **Gradient space** (`DTIbvecChangeSpace`, volume, desired space): prints `DTIbvecChangeSpace():
+  <current> <desired>`; no gradients: prints `ERROR: DTIbvecChangeSpace(): bvec is NULL`, result 1;
+  the desired space already: result 0; a desired space other than 1 (scanner) or 2 (voxel): prints
+  `ERROR: DTIbvecChangeSpace(): desired_bvec_space = <b>, must be 1 or 2`, result 1. Else `M` is the
+  4 x 4 matrix of the direction cosines (columns `x`, `y`, `z`, 1 at (4, 4), float) for space 1, its
+  inverse (`specs/freesurfer-maths.md`'s matrix inverse, float) for space 2; with `Gdiag_no` above 0
+  it prints `DTIbvecChangeSpace(): transforming gradient directions from <current> to <desired>`,
+  `M------------------------------`, the matrix (`MatrixPrint`, 5 decimals) and
+  `------------------------------`. Each row's first three numbers with a fourth 1 are multiplied by
+  `M` (each sum in double, in column order, stored as float) and stored back; the volume's space
+  becomes the desired one; result 0. Direction cosines without an inverse: the inverse's message,
+  then the product's `MatrixMultiplyD(): m1 is null` error ends the program (for a matrix with rows).
+  FS-220: fewer than 3 columns is rule B (prints `ERROR: DTIbvecChangeSpace(): bvecs have <n>
+  columns, 3 needed`, result 1); with `reproduce` FreeSurfer's reading and writing across the rows
+  in row order (a row's three numbers run into the next row's; past the matrix's last number reads
+  give 0 and writes are dropped: FreeSurfer reads memory contents and writes outside the matrix).
+
+## 24. Validation plan (part 3)
+
+- The probe's commands `npy` (§21), `gda` (verbosity 0-7, no image, 1-4 additions), `gdv` (both
+  index orders and invalid ones, 0-3 dimensions, extents 0-5, rows and columns from -1 past the
+  extents, every type code gifticlib names and unknown ones, data present or absent), `bvw` (both
+  writers, 0-4 rows, 0-4 columns, every float class, unwritable and directory names), `psn` (names
+  of `ep_b` and other prefixes, numbers in every `%lf` and `%d` spelling, missing `#`, parts of
+  98-150 bytes, random bytes) and `bcs` (`Gdiag_no` 0, 1, -1, every current and desired space,
+  direction cosines in steps of 1/8 and singular ones, gradients of 1-4 columns, 0-4 rows, every
+  float class). Lines whose FreeSurfer result depends on memory or addresses (FS-202, FS-206 where
+  a place was never written, FS-207, FS-209, FS-214, FS-218 and FS-220 past the matrix) are compared
+  and counted apart; FreeSurfer's crashes (FS-199, FS-200, FS-201, FS-203, FS-204, FS-205, FS-207
+  without a shape, FS-211, FS-217, FS-219) are counted, not compared.

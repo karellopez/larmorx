@@ -250,8 +250,12 @@ impl Line {
         self.puti(i64::from(m.kind));
         self.puti(i64::from(m.rows));
         self.puti(i64::from(m.cols));
-        for i in 0..m.numbers() + 2 {
-            self.putf(m.read(Some(i as i64)));
+        // The probe's count: `rows cols` (twice for complex) in an int, from the float before
+        // the two unused ones; none when that is below -2 (a matrix of a negative size, §2.2).
+        let k = if m.is_complex() { 2 } else { 1 };
+        let n = i64::from(m.rows) * i64::from(m.cols) * k + 2;
+        for i in 0..n.max(0) {
+            self.putf(m.read(Some(i)));
         }
     }
 

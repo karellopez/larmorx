@@ -165,52 +165,17 @@ impl Process {
     }
 
     /// `MatrixAlloc(rows, cols, type)` (§2.2): a matrix of zeros; an unknown type with rows is
-    /// an error (nothing returned); FS-13 (a negative size, or more numbers than an `int` holds)
-    /// ends the program with status 1 after its two lines, in both modes.
+    /// an error (nothing returned). FS-13 (a negative count, or a product beyond an `int`): by
+    /// default the two lines and the end of the program (status 1); with `reproduce`,
+    /// FreeSurfer's matrix where it makes one, its two lines and exit where the old allocator
+    /// gives them, the default's refusal where FreeSurfer crashes.
     pub fn matrix_alloc(
         &mut self,
         rows: i32,
         cols: i32,
         kind: i32,
     ) -> Result<Option<Matrix>, Stop> {
-        if rows >= 1 && kind != MATRIX_REAL && kind != MATRIX_COMPLEX {
-            self.error_printf(
-                codes::BAD_PARM,
-                format!("MatrixAlloc: unknown type {kind}\n").as_bytes(),
-            );
-            return Ok(None);
-        }
-        let old = self.old_allocator();
-        let per = if kind == MATRIX_COMPLEX { 2 } else { 1 };
-        let numbers = i64::from(rows) * i64::from(cols) * per + 2;
-        if rows < 0 || cols < 0 || numbers > i64::from(i32::MAX) {
-            self.note(
-                &FS_13,
-                "a matrix of a negative size or of more numbers than an int holds: the program ends with status 1",
-            );
-            return Err(self.matrix_alloc_failed(rows, cols));
-        }
-        let len = numbers as usize + if kind == MATRIX_COMPLEX && !old { 2 } else { 0 };
-        let mut data = Vec::new();
-        if data.try_reserve_exact(len).is_err() {
-            return Err(self.matrix_alloc_failed(rows, cols));
-        }
-        data.resize(len, 0.0);
-        Ok(Some(Matrix {
-            kind,
-            rows,
-            cols,
-            data,
-            in_buf: false,
-        }))
-    }
-
-    /// The two lines of a failed allocation and the end of the program (status 1).
-    fn matrix_alloc_failed(&mut self, rows: i32, cols: i32) -> Stop {
-        self.put_out(format!("MatrixAlloc({rows}, {cols}): Using mmap'd tmpfile\n").as_bytes());
-        self.put_err(format!("MatrixAlloc({rows}, {cols}): allocation failed\n").as_bytes());
-        self.flush();
-        Stop::Exit(1)
+        self.allocate(rows, cols, kind, false)
     }
 
     /// `MatrixAlloc2(rows, cols, type, buffer)` (§2.2): as [`Process::matrix_alloc`], the matrix
@@ -221,16 +186,113 @@ impl Process {
         cols: i32,
         kind: i32,
     ) -> Result<Option<Matrix>, Stop> {
-        let mut m = self.matrix_alloc(rows, cols, kind)?;
+        self.allocate(rows, cols, kind, true)
+    }
+
+    /// Both allocation forms (§2.2); `buffer` for `MatrixAlloc2`.
+    fn allocate(
+        &mut self,
+        rows: i32,
+        cols: i32,
+        kind: i32,
+        buffer: bool,
+    ) -> Result<Option<Matrix>, Stop> {
         let old = self.old_allocator();
-        if let Some(m) = m.as_mut() {
-            let up = |b: i64| (b + 63) / 64 * 64;
-            let per = if kind == MATRIX_COMPLEX { 2 } else { 1 };
-            let floats = (i64::from(rows) * i64::from(cols) + 2) * per;
-            let block = up(40) + up((i64::from(rows) + 1) * 8) + up(floats * 4);
-            m.in_buf = !old && block <= 192;
+        let complex = kind == MATRIX_COMPLEX;
+        let known = kind == MATRIX_REAL || complex;
+        let k: i64 = if complex { 2 } else { 1 };
+        let rc = i64::from(rows) * i64::from(cols);
+        let int = |x: i64| i32::try_from(x).is_ok();
+        let beyond = !int(rc) || !int(k * (rc + 2));
+        if rows < 0 || cols < 0 || beyond {
+            // What FreeSurfer does with the size (§2.2's FS-13).
+            #[derive(PartialEq)]
+            enum Fs {
+                Made,
+                Exit,
+                Crash,
+            }
+            let fs = if beyond {
+                Fs::Crash
+            } else if old {
+                if k * rc + 2 < 0 {
+                    Fs::Exit
+                } else if rows <= -2 {
+                    Fs::Crash
+                } else {
+                    Fs::Made
+                }
+            } else if rows >= -16 && rc >= -2 {
+                Fs::Made
+            } else {
+                Fs::Crash
+            };
+            if self.mode().fix() || fs != Fs::Made {
+                self.note(
+                    &FS_13,
+                    "a matrix of a negative size or of more numbers than an int holds: refused, the program ends with status 1",
+                );
+                return Err(self.matrix_alloc_failed(rows, cols));
+            }
+            self.note(
+                &FS_13,
+                "a matrix of a negative size: FreeSurfer's matrix of no element",
+            );
         }
-        Ok(m)
+        if rows >= 1 && !known {
+            self.error_printf(
+                codes::BAD_PARM,
+                format!("MatrixAlloc: unknown type {kind}\n").as_bytes(),
+            );
+            return Ok(None);
+        }
+        // §2.1's length; non-negative here (a negative count gives a length of 0 or more).
+        let len = if complex {
+            2 * rc + if old { 2 } else { 4 }
+        } else {
+            rc + 2
+        };
+        let len = usize::try_from(len).unwrap_or(0);
+        let mut data = Vec::new();
+        if data.try_reserve_exact(len).is_err() {
+            return Err(self.matrix_alloc_failed(rows, cols));
+        }
+        data.resize(len, 0.0);
+        // The default allocator's block (each size modulo 2^64 before each rounding up).
+        let up = |b: u64| b.wrapping_add(63) & !63;
+        let pointers = 64u64.wrapping_add(8u64.wrapping_mul((i64::from(rows) + 1) as u64));
+        let numbers = (4 * k * (rc + 2)) as u64;
+        let block = up(pointers).wrapping_add(up(numbers));
+        let in_buf = buffer && !old && block <= 192;
+        if !old && (-16..=-9).contains(&rows) {
+            // The array lies over the matrix's own record (FS-13, `reproduce` only).
+            let tag = kind + if in_buf { 65_536 } else { 0 };
+            let record = [tag, rows, cols, 0];
+            for (d, v) in data.iter_mut().zip(record) {
+                *d = f32::from_bits(v as u32);
+            }
+            if len > 4 {
+                self.note(
+                    &FS_13,
+                    "the array over the matrix's record: its four floats of memory contents 0",
+                );
+            }
+        }
+        Ok(Some(Matrix {
+            kind,
+            rows,
+            cols,
+            data,
+            in_buf,
+        }))
+    }
+
+    /// The two lines of a failed allocation and the end of the program (status 1).
+    fn matrix_alloc_failed(&mut self, rows: i32, cols: i32) -> Stop {
+        self.put_out(format!("MatrixAlloc({rows}, {cols}): Using mmap'd tmpfile\n").as_bytes());
+        self.put_err(format!("MatrixAlloc({rows}, {cols}): allocation failed\n").as_bytes());
+        self.flush();
+        Stop::Exit(1)
     }
 
     /// `MatrixFree(&m)` (§2.3): the caller's matrix becomes none; returns 0.

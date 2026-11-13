@@ -63,21 +63,29 @@ impl CStream {
     }
 }
 
-/// How one `%f` conversion ended.
+/// How one `%f` item ended.
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum Scan {
-    /// A value; `eof`: the item ended at the end of the input.
-    Value(f32, bool),
+    /// A value.
+    Value(f32),
     /// A matching failure.
     Matching,
-    /// The end of the input before the item.
-    Input,
+}
+
+/// The item's look at the next character; `met` set when it looks past the end of the input
+/// (§18.1: the item meets the end).
+fn look(s: &CStream, met: &mut bool) -> Option<u8> {
+    let c = s.peek();
+    if c.is_none() {
+        *met = true;
+    }
+    c
 }
 
 /// A word matched letter by letter, any case: a letter that does not match is read.
-fn word(s: &mut CStream, w: &[u8]) -> bool {
+fn word(s: &mut CStream, w: &[u8], met: &mut bool) -> bool {
     for &x in w {
-        match s.peek() {
+        match look(s, met) {
             Some(c) if c.to_ascii_lowercase() == x => s.pos += 1,
             Some(_) => {
                 s.pos += 1;
@@ -90,9 +98,9 @@ fn word(s: &mut CStream, w: &[u8]) -> bool {
 }
 
 /// A run of digits (hexadecimal or decimal): how many were read.
-fn digits(s: &mut CStream, hex: bool) -> usize {
+fn digits(s: &mut CStream, hex: bool, met: &mut bool) -> usize {
     let mut n = 0;
-    while s.peek().is_some_and(|c| {
+    while look(s, met).is_some_and(|c| {
         if hex {
             c.is_ascii_hexdigit()
         } else {
@@ -105,25 +113,22 @@ fn digits(s: &mut CStream, hex: bool) -> usize {
     n
 }
 
-/// The C library's `%f` on a stream (§18.1): the outcome and the `errno` it sets (`Some`).
-fn scan_f(s: &mut CStream) -> (Scan, Option<i32>) {
-    s.skip_space();
-    if s.peek().is_none() {
-        return (Scan::Input, None);
-    }
+/// The item of the C library's `%f` (§18.1), its white space already skipped: the outcome and
+/// the `errno` it sets (`Some`); `met` when it looked past the end of the input.
+fn scan_f(s: &mut CStream, met: &mut bool) -> (Scan, Option<i32>) {
     let start = s.pos;
     let mut neg = false;
-    if let Some(c @ (b'+' | b'-')) = s.peek() {
+    if let Some(c @ (b'+' | b'-')) = look(s, met) {
         neg = c == b'-';
         s.pos += 1;
     }
-    match s.peek() {
+    match look(s, met) {
         Some(b'i' | b'I') => {
-            if !word(s, b"inf") {
+            if !word(s, b"inf", met) {
                 return (Scan::Matching, None);
             }
-            if let Some(b'i' | b'I') = s.peek()
-                && !word(s, b"inity")
+            if let Some(b'i' | b'I') = look(s, met)
+                && !word(s, b"inity", met)
             {
                 return (Scan::Matching, None);
             }
@@ -132,56 +137,56 @@ fn scan_f(s: &mut CStream) -> (Scan, Option<i32>) {
             } else {
                 f32::INFINITY
             };
-            return (Scan::Value(v, s.peek().is_none()), None);
+            return (Scan::Value(v), None);
         }
         Some(b'n' | b'N') => {
-            if !word(s, b"nan") {
+            if !word(s, b"nan", met) {
                 return (Scan::Matching, None);
             }
             let v = f32::from_bits(if neg { 0xffc0_0000 } else { 0x7fc0_0000 });
-            return (Scan::Value(v, s.peek().is_none()), None);
+            return (Scan::Value(v), None);
         }
         _ => {}
     }
     let hex = s.peek() == Some(b'0') && matches!(s.bytes.get(s.pos + 1), Some(b'x' | b'X'));
     if hex {
         s.pos += 2;
-        let mut n = digits(s, true);
+        let mut n = digits(s, true, met);
         let mut point = false;
-        if s.peek() == Some(b'.') {
+        if look(s, met) == Some(b'.') {
             s.pos += 1;
             point = true;
-            n += digits(s, true);
+            n += digits(s, true, met);
         }
         if n == 0 {
             if !point {
                 return (Scan::Matching, None);
             }
             let v = if neg { -0.0 } else { 0.0 };
-            return (Scan::Value(v, s.peek().is_none()), None);
+            return (Scan::Value(v), None);
         }
-        if let Some(b'p' | b'P') = s.peek() {
+        if let Some(b'p' | b'P') = look(s, met) {
             s.pos += 1;
-            if let Some(b'+' | b'-') = s.peek() {
+            if let Some(b'+' | b'-') = look(s, met) {
                 s.pos += 1;
             }
-            digits(s, false);
+            digits(s, false, met);
         }
     } else {
-        let mut n = digits(s, false);
-        if s.peek() == Some(b'.') {
+        let mut n = digits(s, false, met);
+        if look(s, met) == Some(b'.') {
             s.pos += 1;
-            n += digits(s, false);
+            n += digits(s, false, met);
         }
         if n == 0 {
             return (Scan::Matching, None);
         }
-        if let Some(b'e' | b'E') = s.peek() {
+        if let Some(b'e' | b'E') = look(s, met) {
             s.pos += 1;
-            if let Some(b'+' | b'-') = s.peek() {
+            if let Some(b'+' | b'-') = look(s, met) {
                 s.pos += 1;
             }
-            digits(s, false);
+            digits(s, false, met);
         }
     }
     let text = &s.bytes[start..s.pos];
@@ -197,7 +202,7 @@ fn scan_f(s: &mut CStream) -> (Scan, Option<i32>) {
             errno = Some(ERANGE);
         }
     }
-    (Scan::Value(v, s.peek().is_none()), errno)
+    (Scan::Value(v), errno)
 }
 
 /// Whether a hexadecimal number's reading is exact (53 significant bits at most); a decimal one
@@ -221,60 +226,83 @@ fn hex_exact(text: &[u8]) -> bool {
     }
 }
 
-/// One `fscanf` call's `errno` bookkeeping (§18.1): an item that meets the end of the input sets
-/// `errno` to 0 unless an earlier item of the call ended there.
+/// One `scanf` call's reading (§18.1): the first time the call meets the end of its input it
+/// keeps `errno`'s value (0 when that meeting is a conversion's skip of white space), and every
+/// later meeting sets `errno` back to it; each call starts afresh.
 struct Call {
-    ended: bool,
+    kept: Option<i32>,
 }
 
 impl Call {
     fn new() -> Call {
-        Call { ended: false }
+        Call { kept: None }
     }
 
+    /// The call meets the end of its input; `skip`: in a conversion's skip of white space.
+    fn meet(&mut self, p: &mut Process, skip: bool) {
+        let errno = p.errno;
+        p.errno = *self.kept.get_or_insert(if skip { 0 } else { errno });
+    }
+
+    /// A conversion's skip of white space; false at the end of the input (an input failure).
+    fn skip(&mut self, p: &mut Process, s: &mut CStream) -> bool {
+        s.skip_space();
+        if s.peek().is_none() {
+            self.meet(p, true);
+            return false;
+        }
+        true
+    }
+
+    /// White space in the format that reads (not just before a conversion).
+    fn ws(&mut self, p: &mut Process, s: &mut CStream) {
+        s.skip_space();
+        if s.peek().is_none() {
+            self.meet(p, false);
+        }
+    }
+
+    /// A `%f` conversion: its value, or none (an input or matching failure).
     fn f(&mut self, p: &mut Process, s: &mut CStream) -> Option<f32> {
-        let (r, e) = scan_f(s);
+        if !self.skip(p, s) {
+            return None;
+        }
+        let mut met = false;
+        let (r, e) = scan_f(s, &mut met);
+        if met {
+            self.meet(p, false);
+        }
         if let Some(e) = e {
             p.errno = e;
         }
         match r {
-            Scan::Value(v, eof) => {
-                self.ended |= eof;
-                Some(v)
-            }
+            Scan::Value(v) => Some(v),
             Scan::Matching => None,
-            Scan::Input => {
-                if !self.ended {
-                    p.errno = 0;
-                }
-                None
-            }
         }
     }
-}
 
-/// `sscanf(line, "%d %d %d")`'s values (as many as it assigned), `errno` updated (§18.1).
-fn scan_ddd(line: &[u8], errno: &mut i32) -> Vec<i32> {
-    let mut out = Vec::new();
-    let mut i = 0;
-    let mut ended = false;
-    for _ in 0..3 {
-        while i < line.len() && is_c_space(line[i]) {
-            i += 1;
+    /// A `%d` conversion (a 64-bit `long` kept to its low 32 bits): its value, or none.
+    fn d(&mut self, p: &mut Process, s: &mut CStream) -> Option<i32> {
+        if !self.skip(p, s) {
+            return None;
         }
-        if i >= line.len() {
-            if !ended {
-                *errno = 0;
-            }
-            break;
+        let mut met = false;
+        let start = s.pos;
+        if let Some(b'+' | b'-') = look(s, &mut met) {
+            s.pos += 1;
         }
-        let (v, used) = cscan::strtol10(&line[i..]);
-        if used == 0 {
-            break;
+        let n = digits(s, false, &mut met);
+        if met {
+            self.meet(p, false);
         }
+        if n == 0 {
+            return None;
+        }
+        let item = &s.bytes[start..s.pos];
+        let (v, _) = cscan::strtol10(item);
         if v == i64::MAX || v == i64::MIN {
             // beyond the long range: its limit and ERANGE
-            let digits: String = line[i..i + used]
+            let digits: String = item
                 .iter()
                 .filter(|c| c.is_ascii_digit())
                 .map(|&c| c as char)
@@ -286,14 +314,23 @@ fn scan_ddd(line: &[u8], errno: &mut i32) -> Vec<i32> {
                 "9223372036854775808"
             };
             if d.len() > 19 || (d.len() == 19 && d > limit) {
-                *errno = ERANGE;
+                p.errno = ERANGE;
             }
         }
-        i += used;
-        if i >= line.len() {
-            ended = true;
+        Some(v as i32)
+    }
+}
+
+/// `sscanf(line, "%d %d %d")`'s values (as many as it assigned), `errno` updated (§18.1).
+fn scan_ddd(p: &mut Process, line: &[u8]) -> Vec<i32> {
+    let mut s = CStream::new(line.to_vec());
+    let mut call = Call::new();
+    let mut out = Vec::new();
+    for _ in 0..3 {
+        match call.d(p, &mut s) {
+            Some(v) => out.push(v),
+            None => break,
         }
-        out.push(v as i32);
     }
     out
 }
@@ -408,12 +445,10 @@ impl Process {
             s.pos += cur.position() as usize;
             line
         };
-        let mut errno = self.errno;
-        let v = header
-            .as_deref()
-            .map(|l| scan_ddd(l, &mut errno))
-            .unwrap_or_default();
-        self.errno = errno;
+        let v = match header.as_deref() {
+            Some(l) => scan_ddd(self, l),
+            None => Vec::new(),
+        };
         if v.len() < 3 {
             self.error_printf(
                 codes::BAD_FILE,
@@ -434,28 +469,30 @@ impl Process {
         };
         for r in 1..=rows {
             for c in 1..=cols {
+                // One call: `%f` and white space (complex: `%f`, white space, `%f`, white
+                // space); the white space before a conversion reads nothing itself.
                 let mut call = Call::new();
                 if kind == MATRIX_COMPLEX {
                     let Some(re) = call.f(self, s) else {
                         return Ok(self.scan_element_failed(r, c));
                     };
-                    s.skip_space();
                     let Some(im) = call.f(self, s) else {
                         let p = target.complex_place(r, c);
                         target.write(p, re);
                         return Ok(self.scan_element_failed(r, c));
                     };
-                    s.skip_space();
+                    call.ws(self, s);
                     target.set_pair(r, c, re, im);
                 } else {
                     let Some(x) = call.f(self, s) else {
                         return Ok(self.scan_element_failed(r, c));
                     };
-                    s.skip_space();
+                    call.ws(self, s);
                     target.set(r, c, x);
                 }
             }
-            s.skip_space();
+            // White space after each row: a call of its own.
+            Call::new().ws(self, s);
         }
         Ok(match fresh {
             Some(f) => Returned::New(f),

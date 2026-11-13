@@ -99,7 +99,7 @@ differs from the correctly rounded one (`libm_rates.c`, glibc 2.35 against CORE-
 | `sin`, `cos`, `sincos` | IBM's Accurate Mathematical Library (LGPL) | `sin_glibc`, `cos_glibc`, `sincos_glibc` (clean room of `specs/glibc-dbl.md`) | | done |
 | `tanh`, `atanf`, `atan2f` | fdlibm (Sun's notice) | `tanh_glibc`, `atanf_glibc`, `atan2f_glibc` | | done |
 | `tanhf` | fdlibm (`s_tanhf.c`, Sun's notice; it calls `expm1f`, fdlibm's `s_expm1f.c`; one build on x86-64, no FMA) | `tanhf` (correctly rounded) only | 2.76 % of all floats | **needed** (§3): a translation of both, the `tanh_glibc` route (no spec): netlib's fdlibm 5.3 has no float versions; the float ones with Sun's notice are NetBSD's 1995 files (`$NetBSD: s_tanhf.c,v 1.4`), which glibc carries; checked on all 2³² floats against glibc 2.35 |
-| `log10f`, `acosf`, `asinf` | fdlibm (Sun's notice) | none | 0.69 % of all floats; 0.25 %, 0.22 % of the floats in [−1, 1] | **not needed** (§3): the correctly rounded `acosf` reproduces every step on two heads (up to 128 million calls, 7.3 million of them different); `log10f` and `asinf` are never called on the measured paths |
+| `log10f`, `acosf`, `asinf` | fdlibm (Sun's notice) | none | 0.69 % of all floats; 0.25 %, 0.22 % of the floats in [−1, 1] | **`acosf` needed** (§3): the correctly rounded `acosf` changes `mris_curvature_stats`'s curvature files and statistics on both heads (about 1,000 of 730,000 calls different), though it reproduces `mris_fix_topology` (7.3 million of 128 million different); the route is `tanhf`'s: a translation of fdlibm's `e_acosf.c` as glibc 2.35 carries it (Sun's notice; no x86-64 variant of the scalar function), checked on all 2³² floats. `log10f` and `asinf` are never called on the measured paths |
 | `log10` | fdlibm (`e_log10.c`, Sun's notice) | none | 3.26 % (log-uniform 2⁻⁴⁰ to 2⁴¹) | **not needed** (§3): `mri_robust_register`'s and `mri_robust_template`'s 136 to 208 calls give the correctly rounded value |
 | `log2`, `log2f` | Arm's code (glibc's `e_log2.c`, `e_log2f.c`; MIT in Arm's Optimized Routines v19.11) | none | 0.017 %; 0.0073 % of all floats | **not needed** (§3): the correctly rounded `log2` gives `mri_coreg`'s registration exactly on two heads (34 and 40 million calls, about 1,500 different); `log2f` is never called |
 | `acos`, `asin`, `atan`, `tan` | IBM (LGPL; tables of searched points) | correctly rounded `acos`, `asin`, `tan`, `atan2` | 0.05 %, 0.08 %, 0.07 %, 0.19 % (`glibc-dbl.md` §10.3) | **decided: correctly rounded in `reproduce` too** (the user, 2026-11-04, `glibc-dbl.md` §9: their tables are glibc data); §3 measured no cost on the default paths (`acos`: every step on two heads; `asin`: 2 calls; `atan`, `tan`: never called) |
@@ -163,9 +163,13 @@ unreached functions: no call in these steps.
 | `mri_watershed` (12) | every function of the shim | **DIFFERS**: `brainmask.auto.mgz`, 10,878 of 16,777,216 voxels, by at most 178 |
 | `mri_watershed` (12) | `tanhf` alone | **DIFFERS**: the same 10,878 voxels |
 | `mri_watershed` (12) | `atan2` alone | REPRODUCED |
+| `rca-surfreg` (62: `mris_register`), `mris_place_surface` (69 to 72) | every function of the shim (`acos`: 3.2 and 3.4 million calls, about 12,000 different each; 2.6 million, about 4,500 different each) | REPRODUCED |
+| `mris_curvature_stats` (85, 86) | every function of the shim, and `acosf` alone | **DIFFERS**: `?h.smoothwm.{H,K1,K2,S,C,BE,FI}.crv`, 188 to 415 of about 122,000 values each (by at most 2·10⁻⁵ for `H`, `K1`, `K2`, `C`, 0.0024 for `S`, `BE`, `FI`), and `lh.curv.stats`, 3 of 220 lines (the natural surface integrals); `K` identical |
+| `mris_curvature_stats` (85, 86), second head | `acosf` alone (714,972 and 727,548 calls, 1,216 and 1,280 different; the count-mode replay reproduces) | **DIFFERS** likewise (308 to 355 values per file; 1 line of `lh.curv.stats`) |
 
-So on this head **only glibc's `tanhf` decides results**, in `mri_watershed`'s skull strip (through
-`MRISFineSegmentation` and `MRISCorrectSurface`): `reproduce` needs a `tanhf_glibc`. In
+So on this head **glibc's `tanhf` and `acosf` decide results**: `tanhf` in `mri_watershed`'s skull
+strip (through `MRISFineSegmentation` and `MRISCorrectSurface`), `acosf` in `mris_curvature_stats`
+(recon-all's `-curvstats` outputs): `reproduce` needs a `tanhf_glibc` and an `acosf_glibc`. In
 `mris_fix_topology` the 151,512 different `tanhf` values and 3.3 million different `acosf` values
 change no file; the correctly rounded `acos` (up to 438 million calls, 760,000 of them different) and
 `atan2` gave FreeSurfer's files on every step.
@@ -186,7 +190,8 @@ values differed from glibc's in 1,503,766 of 578,903,915 `acos` calls (`mris_sph
 | `mris_fix_topology` (37, 38; 8,576,175 and 9,197,675 calls, 217,529 and 214,342 differing) | `tanhf` | REPRODUCED |
 
 So the second head confirms the first: glibc's `tanhf` decides `mri_watershed`'s mask (fewer voxels
-on this smaller head), and nothing else measured needs glibc's bits.
+on this smaller head) and glibc's `acosf` `mris_curvature_stats`'s files (the table above), and
+nothing else measured needs glibc's bits.
 
 ### fMRIPrep's calls
 

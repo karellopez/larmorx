@@ -272,7 +272,7 @@ also = "larmorx mri hmc"
 python = "lx.mri.hmc"
 does = "Head-motion correction of a 4D series, with mcflirt's algorithm, options and output files."
 api = "docs/api/mri-hmc.md"
-evidence = "/tools/mri-hmc/"
+evidence = "/evidence/mri-hmc/"
 records = { replica = ["fsl-mcflirt-replica", "fsl-mcflirt-replica-full"], clean-room = ["mri-hmc"] }
 
 [[program]]
@@ -519,7 +519,7 @@ command = "larmorx fsl prelude"
 python = "lx.fsl.prelude"
 does = "Unwraps a phase image inside a mask (PRELUDE)."
 api = "docs/api/fsl-prelude.md"
-evidence = "/tools/fsl-prelude/"
+evidence = "/evidence/fsl-prelude/"
 records = { replica = ["fsl-prelude-replica"], clean-room = ["fsl-prelude"] }
 
 # ----------------------------------------------------------------------------------------- tedana

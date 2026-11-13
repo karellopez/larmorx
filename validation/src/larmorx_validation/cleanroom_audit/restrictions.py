@@ -581,6 +581,7 @@ def _classify_repo(rel: str, op: str) -> Class:
                 # x87-extended) are closed by the probe rule's family (_probe_family)
                 "validation/investigations/freesurfer-gsl-replica-check/",
                 "validation/investigations/freesurfer-spline-replica-check/",
+                "validation/investigations/freesurfer-surfio/",
                 # the replay tool and the unit oracle's harness, written from FreeSurfer's source: a FreeSurfer
                 # clean-room implementer runs them (black box) but never reads them (2026-11-12)
                 "validation/src/larmorx_validation/freesurfer/",

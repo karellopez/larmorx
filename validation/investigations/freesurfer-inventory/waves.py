@@ -148,16 +148,38 @@ MODULES: list[tuple[str, str, str, str, list[str]]] = [
         ],
     ),
     (
+        "fs.mri",
+        "larmorx-freesurfer-mri",
+        "replica",
+        "the MRI structure, below fs.io (the orchestrator's decision on 3.1-25, 2026-11-13: the"
+        " data structure low, the functions that read files above it): the volume and its"
+        " geometry (VOL_GEOM, MRI, its frames), allocation, free, header copies, the voxel-to-RAS"
+        " matrices, voxel access, the colour table's structure an MRI carries",
+        [r"^include/mri\.h$"],
+    ),
+    (
         "fs.io",
         "larmorx-freesurfer-io",
         "replica",
         "volume formats: MRIread/MRIwrite (MGH/MGZ, NIfTI, ANALYZE, the format probe, the other"
         " readers), FreeSurfer's tags, .mat, .npy, GIFTI volumes",
         [
-            r"^utils/(mriio|fio|fstagsio|tags|matfile|fscnpy|mri_identify|DICOMRead|DICOMRead2|"
+            r"^utils/(mriio|fio|fstagsio|tags|matfile|fscnpy|mri_identify|"
             r"signa|Bruker|bfileio|dti|mosaic|MRIio_old|selxavgio|image|gifti|dtk\.fs|fsgdf|"
             r"imageio|corio|afni|nifti_io|mghendian)\.cpp$",
         ],
+    ),
+    (
+        "fs.dicomread",
+        "larmorx-freesurfer-io",
+        "replica",
+        "DICOM input (the orchestrator's decision on 3.1-25, 2026-11-13: moved to the completeness"
+        " items, after CTN's element reading [[w3:perm.dicom:elements]]): DICOMRead.cpp's loaders"
+        " (sdcmLoadVolume and the DICOM series readers, the Siemens, GE and Philips parameters,"
+        " the mosaic and slice order), no default path reads DICOM; the format probe's pieces"
+        " (IsDICOM, IsSiemensDICOM) stay in fs.io; SiemensAsciiTagEx's run of the strings"
+        " program decided at its item by measurement",
+        [r"^utils/(DICOMRead|DICOMRead2)\.cpp$"],
     ),
     (
         "fs.labels",
@@ -173,8 +195,9 @@ MODULES: list[tuple[str, str, str, str, list[str]]] = [
         "fs.volume",
         "larmorx-freesurfer-volume",
         "replica",
-        "the MRI structure, voxels and frames, conforming, regions, voxel lists, resampling,"
-        " transforms (LTA, .xfm, FSL matrices), the Talairach helpers, warp fields, CMA labels",
+        "voxels and frames on the MRI structure (fs.mri), conforming, regions, voxel lists,"
+        " resampling, transforms (LTA, .xfm, FSL matrices), the Talairach helpers, warp fields,"
+        " CMA labels",
         [
             r"^utils/(mri|mri2|mriset|mrivoxel|mri_conform|mrihisto|region|voxlist|mriprob|"
             r"resample|transform|talairachex|warpfield|mriTransform|cma|mosaic2)\.cpp$",
@@ -309,9 +332,42 @@ MODULES: list[tuple[str, str, str, str, list[str]]] = [
 
 # Single functions of a file that belong to another module than the file's ("file:line:name").
 FUNCTION_MODULES: list[tuple[str, str]] = [
+    (
+        r"^utils/mri\.cpp:\d+:(MRI::(Shape::Shape|MRI|~MRI|initSlices|initIndices|"
+        r"initGCAMorphLabel|hash|intentName|intentCode)|MRIfree|MRIalloc|MRIallocSequence|"
+        r"MRIallocHeader|MRIxfmCRS2XYZ|MRImatrixOf\w+|extract_[ir]_to_[ir]|"
+        r"MRIsetVox2RASFromMatrix|MRIxfmCRS2XYZ(tkreg|fsl)|MRItkReg2Native|MRItkRegMtx\w*|"
+        r"MRIvoxToVoxFromTkRegMtx|MRIfixTkReg|MRIfsl2TkReg|MRItkreg2FSL|MtxCRS1toCRS0|"
+        r"MRIp0ToCRAS|MRIhfs2Sphinx|MRIsizeof|MRIptr2dbl|MRIdbl2ptr|MRIgetVoxD[xyz]|"
+        r"MRI[gs]etVoxVal2?|MRIinterp(Code|String)|MRIprecision(Code|String)|MRIreInitCache|"
+        r"MRIcopyHeader|MRIcopyVolGeom(To|From)MRI|MRIcopyPulseParameters|MRIvoxelToWorld|"
+        r"MRIworldToVoxel(Index)?|MRIcopy|RASFromSurfaceRAS_)$",
+        "fs.mri",
+    ),
+    # the VOL_GEOM helpers the structure's inline methods call
+    (
+        r"^utils/transform\.cpp:\d+:(MRIallocFromVolGeom|useVolGeomToMRI|VGtkreg2RAS|VGras2tkreg)$",
+        "fs.mri",
+    ),
+    # the colour table an MRI carries: freed and deep-copied with it (its reading stays in fs.labels)
+    (r"^utils/colortab\.cpp:\d+:(CTABfree|CTABdeepCopy)$", "fs.mri"),
+    # the structure's methods that read or write files: above it, in fs.io
+    (r"^include/mri\.h:\d+:VOL_GEOM::(read|write)$", "fs.io"),
+    (r"^utils/mri\.cpp:\d+:MRI::write$", "fs.io"),
+    # the format probe's pieces of DICOMRead.cpp stay in fs.io (with mri_identify)
+    (
+        r"^utils/DICOMRead\.cpp:\d+:(IsDICOM|IsSiemensDICOM|GetElementFromFile|FreeElementData)$",
+        "fs.io",
+    ),
     (r"^utils/numerics\.cpp:\d+:sc_\w+$", "gpl.gsl"),
     (r"^utils/numerics\.cpp:\d+:(SplineCubicSet|SplineCubicValue|d3_np_fs)$", "fs.spline"),
 ]
+# Files whose functions a module's pieces take beside another file's (sorted as if they were in
+# it): the format probe's pieces with mri_identify (the orchestrator's decision on 3.1-25).
+BIN_WITH = {
+    "utils/Bruker.cpp": "utils/mri_identify.cpp",
+    "utils/DICOMRead.cpp": "utils/mri_identify.cpp",
+}
 # Modules whose functions always go to the module's own item (never to a program's).
 OWN_ITEM = {"gpl.gsl", "fs.spline"}
 
@@ -529,7 +585,9 @@ MODULE_WAVE = {
     "fs.core": "3.1",
     "fs.maths": "3.1",
     "fs.io": "3.1",
+    "fs.dicomread": "3.7",
     "fs.labels": "3.1",
+    "fs.mri": "3.1",
     "fs.volume": "3.1",
     "fs.bspline": "3.2",
     "fs.filter": "3.1",
@@ -759,14 +817,25 @@ W3: dict[str, list[tuple[str, str, str, str]]] = {
     "perm.dicom": [
         (
             "probe",
-            r"^packages/dicom/",
+            r"^packages/dicom/(?!dcm\.c:\d+:(DCM_GetElement|DCM_GetElementValue|locateElement)$)",
             "W3 parser",
             "the DICOM probe: a pure-Rust check in CTN's place that answers as DCM_OpenFile does"
             " for IsDICOM, the format probe of every volume reader (the part-10 preamble and"
             " 'DICM', the elements it reads, implicit and explicit VR, little and big endian, the"
             " condition messages a failed open prints); CTN's dcm.c, dictionaries, lst.c and"
             " condition stack are the behaviour, not ported; DICOM input itself later (no default"
-            " path reads DICOM)",
+            " path reads DICOM: [[mod:fs.dicomread:1]])",
+        ),
+        (
+            "elements",
+            r"^packages/dicom/",
+            "W3 parser",
+            "CTN's element reading (the orchestrator's decision on 3.1-25, 2026-11-13): the"
+            " elements DICOMRead asks for, by group and element, with their values as"
+            " DCM_GetElement and DCM_GetElementValue give them (implicit and explicit VR, both"
+            " byte orders, sequences and their items, multiple values, the failure conditions and"
+            " messages) on the pure-Rust reader of [[w3:perm.dicom:probe]]; before DICOM input"
+            " ([[mod:fs.dicomread:1]]); IsSiemensDICOM's Manufacturer element in fs.io uses it",
         ),
     ],
     "perm.json": [
@@ -800,8 +869,17 @@ W3_CHECKS = {
     " (generated values: every type, extreme numbers); then the replays of the programs that"
     " write the format",
 }
+# Module items whose inputs are not the generic ones.
+MODULE_INPUTS = {
+    "fs.dicomread": "3.1 (fs.io's format probe, CTN's element reading [[w3:perm.dicom:elements]]);"
+    " DICOM series to read (OpenNeuro's sourcedata, the scanners' public samples)",
+}
 # Module items whose checks are not the generic ones.
 MODULE_CHECKS = {
+    "fs.dicomread": "DICOM series of every vendor and layout the readers handle (Siemens mosaic and"
+    " not, GE, Philips, enhanced multi-frame, diffusion) against the unit oracle's loaders: the"
+    " same volumes, headers and messages; then mri_convert's and recon-all -i's DICOM inputs"
+    " through the oracle-output cache",
     "gpl.gsl": "streams against the unit oracle's sc_rng_* and sc_ran_* for many seeds; then"
     " the bit-exact reference of the clean room (3.1-05)",
     "fs.spline": "SplineCubicSet and SplineCubicValue against the unit oracle; mri_normalize's"
@@ -1256,11 +1334,15 @@ def run_main() -> int:
         f, line, _name = r.split(":", 2)
         return f, int(line) if line.isdigit() else 0
 
+    def bin_key(r: str) -> tuple[str, str, int]:
+        f, line = fun_key(r)
+        return BIN_WITH.get(f, f), f, line
+
     def bins(item: str) -> list[tuple[int, str, list[str]]]:
         """Relay-sized pieces of an item: its functions in file and line order, at most the
         budget each (one function larger than it alone); a label naming each file, with the
         lines of its functions when a file is cut between pieces."""
-        funs = sorted(item_funs[item], key=fun_key)
+        funs = sorted(item_funs[item], key=bin_key)
         raw: list[list[str]] = []
         cur: list[str] = []
         n = 0
@@ -1362,9 +1444,12 @@ def run_main() -> int:
                         "what": f"{label}: {names}",
                         "lines": n,
                         "files": fl,
-                        "inputs": "the 3.1 items before it"
-                        if wave == "3.1"
-                        else f"3.1; {mid}'s programs below",
+                        "inputs": MODULE_INPUTS.get(
+                            mid,
+                            "the 3.1 items before it"
+                            if wave == "3.1"
+                            else f"3.1; {mid}'s programs below",
+                        ),
                         "checks": MODULE_CHECKS.get(
                             mid,
                             "unit checks against the unit oracle; then the replays of the"
@@ -1373,21 +1458,29 @@ def run_main() -> int:
                         ),
                     }
                 )
-            if (
-                kind == "replica" and mid != "fs.spline"
-            ):  # the spline's clean room: extra:spline-clean
+            if kind == "replica" and mid not in (
+                "fs.spline",
+                "fs.mri",
+            ):  # the spline's clean room: extra:spline-clean; the structure's: fs.volume's
                 clean[wave].append(
                     {
                         "key": f"clean:mod:{mid}",
-                        "what": f"`{mid}`'s clean room ({title})",
+                        "what": f"`{mid}`'s clean room ({title})"
+                        + (
+                            " with the MRI structure ([[mod:fs.mri:1]]: one clean room, as before"
+                            " the structure became an item of its own)"
+                            if mid == "fs.volume"
+                            else ""
+                        ),
                         "crate": "larmorx-io"
-                        if mid in ("fs.io", "fs.labels")
+                        if mid in ("fs.io", "fs.labels", "fs.dicomread")
                         else "larmorx-fs-surf"
                         if mid.startswith(("fs.surf", "fs.deform", "fs.defect"))
                         else "larmorx-fs-gca"
                         if mid == "fs.gca"
                         else "larmorx-fs-core",
-                        "lines": mod_total[mid],
+                        "lines": mod_total[mid]
+                        + (mod_total["fs.mri"] if mid == "fs.volume" else 0),
                     }
                 )
         # the earlier waves' option paths into this wave's modules

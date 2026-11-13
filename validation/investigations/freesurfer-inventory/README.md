@@ -37,6 +37,18 @@ Their results are in `docs/freesurfer/` (closed too).
           <workspace>/tags/freesurfer-8.2.0 <scratch>/cmake.json \
           --toml docs/freesurfer/programs.toml [--core] [--calls-only] --json <scratch>/<view>.json
 
+  `--edges <json>` also writes the call edges the walk followed (caller -> callees, the union over
+  the programs), the input of `layering.py`.
+- `layering.py`: the crates' layers against the call graph (waves.md §4, "Calls against the layers";
+  the orchestrator's decision on 3.1-25, 2026-11-13). Without options it prints every pair of
+  modules whose reached functions call a module of a crate above their own (edges and callee
+  lines); `--from fs.io --into fs.volume [--closure] [--names]` lists the callees (and what they
+  call inside the target, transitively), with their lines and callers. It is what placed the MRI
+  structure (`fs.mri`) below `fs.io`.
+
+      python -P validation/investigations/freesurfer-inventory/layering.py \
+          <scratch>/core.json <scratch>/edges.json --from fs.mri --into fs.volume --closure --names
+
 - `report_code.py`: code.md's tables (Markdown on standard output) and `docs/freesurfer/code.toml`
   from the build graph and the three call-graph views (full, core, core calls-only); the commands
   in code.md §6.

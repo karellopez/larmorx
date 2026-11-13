@@ -133,10 +133,12 @@ key = "mod:fs.io:6"
 [[id]]
 id = "3.1-31"
 key = "mod:fs.io:7"
+retired = "the orchestrator's decision on 3.1-25 (2026-11-13): DICOM input left fs.io for the completeness items (fs.dicomread, 3.7) and the MRI structure became 3.1-55, so fs.io is six pieces (3.1-25 to 3.1-30 hold what remains, in the same file order)"
 
 [[id]]
 id = "3.1-32"
 key = "mod:fs.io:8"
+retired = "the orchestrator's decision on 3.1-25 (2026-11-13): DICOM input left fs.io for the completeness items (fs.dicomread, 3.7) and the MRI structure became 3.1-55, so fs.io is six pieces (3.1-25 to 3.1-30 hold what remains, in the same file order)"
 
 [[id]]
 id = "3.1-33"
@@ -173,6 +175,7 @@ key = "mod:fs.volume:6"
 [[id]]
 id = "3.1-41"
 key = "mod:fs.volume:7"
+retired = "the orchestrator's decision on 3.1-25 (2026-11-13): the MRI structure, its allocation, free, header copies and geometry left fs.volume for 3.1-55 (fs.mri, the crate larmorx-freesurfer-mri below fs.io), so fs.volume is six pieces (3.1-35 to 3.1-40 hold the rest, in the same file order)"
 
 [[id]]
 id = "3.1-42"
@@ -225,6 +228,14 @@ key = "mod:gpl.gsl:1"
 [[id]]
 id = "3.1-54"
 key = "mod:fs.spline:1"
+
+[[id]]
+id = "3.1-55"
+key = "mod:fs.mri:1"
+
+[[id]]
+id = "3.1-56"
+key = "w3:perm.dicom:elements"
 
 [[id]]
 id = "3.2-01"
@@ -935,6 +946,18 @@ id = "3.7-13"
 key = "prog:fs-check-os"
 
 [[id]]
+id = "3.7-14"
+key = "mod:fs.dicomread:1"
+
+[[id]]
+id = "3.7-15"
+key = "mod:fs.dicomread:2"
+
+[[id]]
+id = "3.7-16"
+key = "paths:fs.dicomread"
+
+[[id]]
 id = "C3.1-00"
 key = "clean:extra:crates"
 
@@ -1407,6 +1430,10 @@ key = "clean:prog:fs-check-version"
 [[id]]
 id = "C3.7-08"
 key = "clean:prog:fs-check-os"
+
+[[id]]
+id = "C3.7-09"
+key = "clean:mod:fs.dicomread"
 
 [[id]]
 id = "CP-01"

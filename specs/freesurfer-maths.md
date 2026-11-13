@@ -256,7 +256,14 @@ Reading bin b with b < 0 or b ≥ the allocation is **FS-22** (§1's out-of-rang
   1e10), in double; when `mn ≥ mx`, `mn = mx 0.9`. out is reallocated (§5.2) to `nint(ceil((mx - mn)
   / bin_size) + 1)` bins (FS-12), `bin_size` = h's, `min = (float) mn`, `max = (float) mx`, bin b's
   value `(float)((double)((float) b bin_size) + mn)`; then each of h's counts is added (float) at the
-  bin **Find bin** (§5.5) gives for `|value|` (FS-22 outside).
+  bin **Find bin** (§5.5) gives for `|value|` (FS-22 outside). **FS-50:** when the bin count is
+  outside the `int` range (an infinite range of absolute values, a bin size of 0 or NaN),
+  FreeSurfer's conversion gives -2147483648 and the allocation fails: the error `HISTOalloc(-2147483648):
+  could not allocate histogram` (after `Cannot allocate memory`), and the program ends with status
+  254. **Default:** the program ends with status 252 (code -4) and the error `HISTOabs: absolute values
+  from <mn> to <mx> in bins of <bin_size> need <n> bins: outside the int range (an infinite range, or
+  a bin size of 0 or NaN)` (the numbers as `%f`, n as the shortest decimal), never a 2³¹-bin
+  allocation; **reproduce:** FreeSurfer's.
 - **Cumulative distributions** (src, dst): first the absolute-value histogram A of src; dst absent: a
   copy of src. **Forward:** for each dst bin b in order whose value v ≥ 0: T = the double sum of A's
   counts whose `|value| ≤ v` (A's bins in order), `dst.counts[b] = (float) T`; a bin with v < 0 gets
@@ -407,7 +414,11 @@ from 0; when it is exactly 0 a peak search returns -1.
    the scale `s = (Σ counts[b] / g_b) / n` over the bins b = lo..hi with `g_b = (1 / r) exp(-z z / ((2
    σ) σ)) > 1e-3`, z = Z's bin value (n of them; n = 0 gives a division by 0, IEEE); the error `E =
    Σ (s / r exp(-z z / ((2σ) σ)) - counts[b])²` over lo..hi; σ is kept when `E < E_best` or no σ is
-   kept yet (the first).
+   kept yet (the first). **FS-51:** when the search cannot advance (σ ≤ σ_max and σ + δ not above σ:
+   an infinite bin size, where δ and σ_max are both infinite, or one so small that a tenth of it
+   rounds to 0) FreeSurfer never returns. **Both modes:** the error `HISTOrobustGaussianFit: the bin
+   size <bin_size> gives no search over sigma (steps of <δ>)` (both `%f`; FreeSurfer's error report,
+   code -4), status -4, the offset m set, σ not set (FS-51 noted).
 9. With the diagnostic bits of step 3, the fitted curve (the scale recomputed with `z - m`) is
    written as the plot `hp.plt`. Returns status 0, the offset m and the kept σ.
 
@@ -1071,3 +1082,51 @@ volume come with the generator's distributions and the volumes.
 - **The C library's conversions:** `validation/probes/fs-maths/scanf/` (black-box runs of glibc 2.35:
   each input's return value, assigned bits, `errno` and the bytes read), its measurements as the unit
   tests of the port.
+
+## 21. Conventions, part 5: the histograms' NaN operands
+
+§7's NaN rules hold for the histograms (a NaN made from numbers is SSE's default NaN, sign set; of
+two NaN operands the first, quieted), with the official build's operand order where two NaNs (or an
+infinity and its negative, or 0 and an infinity) meet, measured on quiet and signalling NaNs of both
+signs with and without payloads and on infinities among the counts, the bin values, the header
+(`bin_size`, `min`, `max`) and the scalar inputs:
+
+- **Sum** (§5.3): with dst absent or separate (not an input) and 4 or more bins, the bins in blocks
+  of four `h1 + h2`; the 1 to 3 bins after the last block `h2 + h1`, `h2 + h1`, `h1 + h2`. With 3
+  bins or fewer, or dst an input (h1 or h2), or h2 the new output: `h1 + h2` throughout.
+  **Difference:** `h1 - h2`.
+- **Linear scale:** each bin `(v s) + o`, `min` `(min s) + o`, but `max` `o + (max s)` and the bin
+  size `s bin_size`.
+- **Totals** (total in a region, total): with 4 or more terms, blocks of four `T + c0`, `T + c1`,
+  `c2 + T`, `c3 + T`, then the rest `T + c`. **Density** (§5.3): its float sum in blocks of four
+  `c0 + T`, `T + c1`, `c2 + T`, `T + c3`, then `T + c`; each count `c / T`. **Threshold sum:** `T + c`.
+- **Double sums** (cumulative distributions, sum to 1, running sum): `S + c`; the divisions `c / S`.
+- **Smoothing** (§5.4): `norm + k`, the product `k × count`, `total + product`; `total / norm`.
+- **Fill holes, soap bubble:** the mean of two `(c[b-1] + c[b+1]) × 0.5` (fill holes), `(c[b] +
+  c[b±1]) × 0.5` (soap bubble's ends), `((c[b] + c[b+1]) + c[b-1]) / 3` (its middle bins: the bin's
+  own count first).
+- **Absolute values:** each count `A.count + h.count`; a bin value `(double)(b × bin_size) + mn` (`0
+  × ∞` the default NaN).
+- **Histogram of bins** and **init**: a bin value `(double)(bin_size × n) + min`.
+- **Correlation:** `(c2 c1) + Σ`, `(c1 c1) + N1`, `(c2 c2) + N2` (the products first), the result
+  `Σ / (sqrt(N2) sqrt(N1))`. **Linear-fit correlation:** `(c1 c2) + Σ` over h1's bins, `(c2 c1) + Σ`
+  over h2's.
+- **Entropy:** `p = c / T`, `H - (p log p)`.
+- **Comparisons** are IEEE's (a NaN compares false): a NaN count is a candidate of the current-peak
+  search's backward scan (`count < min_count` is false for it), a NaN never replaces a largest or
+  smallest value; a NaN or infinite bin position or sample becomes a bin number through FS-12 or FS-17
+  (-2147483648 with `reproduce`).
+
+## 22. Validation plan, part 5
+
+- **Against the official code** (`validation/probes/fs-maths/`): the histograms' cases carry
+  non-finite values in about a third of the histograms: quiet NaNs `0x7fc00000`, `0xffc00000`,
+  `0x7fc12345`, `0xffd00001`, signalling ones `0x7f800001`, `0xff812345`, and both infinities, in one
+  to three counts (a quarter of the histograms), a bin value between the ends (one in eight), the
+  bin size, minimum or maximum (one in 24), and the scalar inputs (samples, values to find, scale and
+  offset, thresholds, σ). Each histogram case runs in a child process with a 2-second alarm: `CRASH`
+  where FreeSurfer's bin number from a NaN (-2147483648) addresses unmapped memory (FS-22, not
+  compared), `TIMEOUT` where it never returns (FS-51, compared), `EXIT <status>` where its code ends
+  the program (FS-50's failed allocation, compared).
+- **Every platform:** seed 1's hash with AArch64's NaN emulated (the port's output the same with and
+  without the emulation) in debug and release builds.

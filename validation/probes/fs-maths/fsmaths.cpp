@@ -556,8 +556,12 @@ void run_forked(const char *tmpfile, unsigned seconds)
   close(fd[0]);
   int status = 0;
   waitpid(pid, &status, 0);
-  if (WIFSIGNALED(status)) {
-    line_out = WTERMSIG(status) == SIGALRM ? "TIMEOUT " : "CRASH ";
+  if (WIFSIGNALED(status) || (WIFEXITED(status) && WEXITSTATUS(status) != 0)) {
+    // a signal, or FreeSurfer's code ended the program (ErrorExit: EXIT and its status)
+    if (WIFSIGNALED(status))
+      line_out = WTERMSIG(status) == SIGALRM ? "TIMEOUT " : "CRASH ";
+    else
+      line_out = "EXIT " + std::to_string(WEXITSTATUS(status)) + " ";
     std::string t = std::string(tmpfile);
     remove((t + ".out").c_str());
     remove((t + ".err").c_str());
@@ -566,11 +570,32 @@ void run_forked(const char *tmpfile, unsigned seconds)
     line_out = got;
 }
 
+// the histograms' commands: their cases carry NaNs and infinities (bin numbers from them are
+// INT_MIN, FS-17, read and written far outside the arrays), so each runs in a child process with
+// a 2-second alarm (their cases take microseconds; TIMEOUT where FreeSurfer never returns)
+const char *const HIST_CMDS[] = {"smooth", "smoothip", "smoothinto", "lastpeak", "firstpeak", "valley",
+  "lastpeakreg", "highest", "addsample", "prevvalley", "nextvalley", "nextpeak", "prevpeak", "startpeak",
+  "endpeak", "currentpeak", "fillholes", "totalreg", "clearzero", "findbin", "correlate", "linfit",
+  "linscale", "threshsum", "makepdf", "bins", "count", "init", "initgiven", "median", "cdf", "robust",
+  "abs", "entropy", "soap", "fwhm", "sumnorm", "cumsum", "clearbins", "addsub", "clearcounts", "copy",
+  "plot"};
+
+bool is_hist_cmd(const std::string &cmd)
+{
+  for (const char *c : HIST_CMDS)
+    if (cmd == c) return true;
+  return false;
+}
+
 void run_case(const char *tmpfile)
 {
   std::string cmd = next();
-  if (!in_child && (cmd == "dfpmin" || cmd == "robust")) {
+  if (!in_child && cmd == "dfpmin") {
     run_forked(tmpfile, 600);
+    return;
+  }
+  if (!in_child && is_hist_cmd(cmd)) {
+    run_forked(tmpfile, 2);
     return;
   }
   // the eigensystems and SVDs of matrices with infinite or NaN entries: VNL never returns on many
@@ -1228,10 +1253,19 @@ int main(int argc, char *argv[])
     dir = slash == std::string::npos ? std::string(".") : dir.substr(0, slash ? slash : 1);
     if (chdir(dir.c_str()) != 0) fail("cannot enter the cases' directory");
   }
+  // every case read first and the file closed: a child process that FreeSurfer's code ends with
+  // exit() flushes the stdio streams it inherited, and glibc's flush of an input stream moves the
+  // file offset the parent shares back to that stream's position (the parent then read the
+  // following cases again)
   FILE *fp = fopen(argv[1], "r");
   if (!fp) fail("cannot open the cases");
+  std::vector<std::string> lines;
   static char buf[1 << 20];
-  while (fgets(buf, sizeof buf, fp)) {
+  while (fgets(buf, sizeof buf, fp)) lines.push_back(buf);
+  fclose(fp);
+  for (const std::string &line : lines) {
+    if (line.size() >= sizeof buf) fail("a case longer than the buffer");
+    memcpy(buf, line.c_str(), line.size() + 1);
     toks.clear();
     pos = 0;
     for (char *t = strtok(buf, " \t\n"); t; t = strtok(NULL, " \t\n")) toks.push_back(t);
@@ -1244,6 +1278,5 @@ int main(int argc, char *argv[])
     printf("%s\n", line_out.c_str());
     fflush(stdout);
   }
-  fclose(fp);
   return 0;
 }

@@ -1,0 +1,16 @@
+[package]
+name = "larmorx-freesurfer-mri"
+description = "FreeSurfer 8.2.0's replica for larmorx: the MRI structure below the readers that build it (fs.mri): VOL_GEOM and MRI, allocation, free, header copies, the voxel-to-RAS matrices, voxel access and the colour table's structure an MRI carries (FreeSurfer's licence)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+larmorx-core.workspace = true
+larmorx-freesurfer-core.workspace = true
+larmorx-io.workspace = true
+
+[dev-dependencies]
+sha2.workspace = true

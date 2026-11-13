@@ -4,7 +4,7 @@
 lines; the behaviour is in `specs/freesurfer-maths.md`). Written by the replica author of queue
 items 3.1-23 and 3.1-24 (FreeSurfer's foundations, track A). Defect IDs FS-13 to FS-24 (this
 part 1), FS-25 to FS-33 (part 2, items 3.1-24 and 3.1-23's inverse), FS-34 to FS-39 (part 3) and FS-40 to
-FS-49 (part 4, the rest of item 3.1-24), decided by rules A to D (CLAUDE.md, D13); the
+FS-49 (part 4, the rest of item 3.1-24) and FS-50 to FS-51 (part 5, the histograms' NaN and infinite inputs), decided by rules A to D (CLAUDE.md, D13); the
 register's entries are in the orchestrator's handoff. Every claim below is from the source of the 8.2.0 tag and, where a number is given, from
 the probe `validation/probes/fs-maths/` (FreeSurfer's own functions from the unit oracle's build).
 
@@ -587,3 +587,145 @@ after an `ERANGE` read prints no `Numerical result out of range` when the file s
 - **LINPACK's `ssvdc` never returning** (`larmorx_core::vnl_svd_f32`): the port loops on the matrix
   above as VNL does. A report of the loop, and the `info` of a failure (`vnl_svd_f32` returns `None`
   without it; the double version has `vnl_svd_info`), would let FS-48 follow VNL exactly.
+
+# Part 5: the histograms with NaN and infinite inputs (item 3.1-23, track A relay 7)
+
+Defect IDs FS-50 and FS-51. The probe's histogram cases now carry NaNs (quiet and signalling, both
+signs, with payloads) and infinities in about a third of the histograms (counts, bin values between
+the ends, the bin size, minimum or maximum) and in the scalar inputs (samples, values to find, scale
+and offset, thresholds, sigma), from a second generator that never draws from the first, so every
+other command's cases are as before (`specs/freesurfer-maths.md` §22).
+
+## The measurement, part 5
+
+`check.py --seed 7 --n 75000` (2026-11-13): 75,000 cases of 75 commands. The port with `reproduce`:
+**73,035 of 73,035 comparable lines identical**; 1,965 not compared (`msvd` 464, `startpeak` 314,
+`robust` 306, `meig` 194, `nextpeak` 152, `dfpmin` 125, `mrdbin` 119, `msvdinv` 74, `mpinv` 67,
+`nextvalley` 41, `prevvalley` 40, `cdf` 29, `abs` 24, `mregion` 9, `prevpeak` 7): memory FreeSurfer
+does not own or never wrote (FS-22, FS-16, FS-42, FS-49, ITK-106, ITK-110, ITK-111; with NaN inputs
+FreeSurfer's bin number -2147483648 reads or writes 8 GiB below the array: the probe's `CRASH` lines,
+`HISTOabs` and the cumulative distributions writing, the robust fit and the searches reading) and the
+313 non-finite matrices of FS-47 and FS-48 (as in part 4). The default differs from FreeSurfer only
+with a defect's notice (among the histograms FS-12 456, FS-19 481, FS-20 311, FS-18 1,000, FS-50 117,
+FS-17 77), but for 8 rotations, 9 entropies and 1 Gaussian draw (the correctly rounded `sinf`,
+`cosf`, `log`). The non-finite subset alone (16,968 histogram cases with a NaN or an infinity):
+16,575 of 16,575 comparable identical. Seed 1, 750 cases: 723 identical, 27 not compared, hash
+`b6452da0...` (`tests/fs_maths_official.rs`), passing with AArch64's NaN emulated (nan_trap.c,
+`NAN_TRAP_ARM=1` with `NAN_TRAP_DIR`) in debug and release builds; the port's lines for the 16,968
+non-finite cases are the same with and without the emulation in both modes.
+
+## The histograms' NaN operands (measured; a porting trap, not a defect)
+
+GCC 8.4.0 compiled `histo.cpp`'s arithmetic with commutative operands swapped and some loops
+vectorised (the unit oracle's `histo.cpp.o`); the values are the same, but of two NaNs SSE keeps the
+first operand's, and Rust's `+` leaves the order to LLVM (it differs between builds and targets), so
+every operation where two NaNs, an infinity and its negative, or 0 and an infinity can meet goes
+through `sse` in the official order (`specs/freesurfer-maths.md` §21):
+
+- `HISTOadd` (`histo.cpp` 402-424, `*pcdst++ = *pc1++ + *pc2++`): with a separate output and 4 or
+  more bins, `addps` with `h1`'s counts as the destination, then the 1 to 3 bins left `h2 + h1`,
+  `h2 + h1`, `h1 + h2` (the tail's loads alternate); with the output one of the inputs (the alias
+  check of the vectorised loop fails) or 3 bins or fewer, one bin at a time `h1 + h2`. FreeSurfer's
+  callers add in place (`HISTOadd(h1, h2, h1)`: `mrisurf_mri.cpp` 8163, 8175, 8994, 9006,
+  `mrihisto.cpp` 169; `HISTOadd(h1, h2, h2)`: `mrihisto.cpp` 1328, `gca.cpp` 15590, 15600, 16513,
+  16522): `histo_add_into_first`, `histo_add_into_second`.
+- `HISTOtotalInRegion` (1250-1260) and `HISTOmakePDF`'s total: vectorised sums in blocks of four,
+  `T + c0`, `T + c1`, `c2 + T`, `c3 + T` and `c0 + T`, `T + c1`, `c2 + T`, `T + c3` (`sse::sum_blocks`).
+- `HISTOlinearScale` (1425-1437): `max` as `offset + (max × scale)` and the bin size `scale ×
+  bin_size`; `HISTOsoapBubbleZeros` (1886-1917): the middle bins' `(c[b+1] + c[b] + c[b-1]) / 3` as
+  `((c[b] + c[b+1]) + c[b-1]) / 3`; `HISTOcorrelate` (1336-1362) and
+  `histoComputeLinearFitCorrelation` (1364-1394): the products in the destination (`(c2 × c1) + Σ`);
+  `HISTOfillHoles`' and the soap bubble's `/ 2` as `× 0.5`.
+- `HISTOabs`' bin values `b × bin_size` with an infinite bin size: `0 × ∞` is the default NaN (sign set
+  on x86, clear on AArch64): through `sse` on every platform, as `HISTObins` and `HISTOinit` for one bin.
+
+One translation error the NaNs found: `HISTOfindCurrentPeak`'s backward scan (1179-1196) skips a bin
+with `if (center_val < min_count) continue;`, which the port had written as `center >= min_count`:
+the same for numbers, but a NaN count is a candidate in FreeSurfer (its comparisons with the window
+all false, so it is a peak). Fixed (37 of 16,968 non-finite cases had differed).
+
+## FS-50: `HISTOabs` of an infinite range (rule B: a clear error)
+
+`histo.cpp` 1818-1842: `HISTOrealloc(habs, nint(ceil((mx - mn) / h->bin_size) + 1))` with an
+infinite largest absolute value (an infinite bin value), or a bin size of 0 or NaN, converts an
+infinity or a NaN to `int` (undefined; `cvttsd2si` gives -2147483648, FS-12): `calloc` of
+-2147483648 floats fails and `HISTOalloc` ends the program, `Cannot allocate memory` and
+`HISTOalloc(-2147483648): could not allocate histogram`, status 254 (measured: the probe's `EXIT 254`
+lines, `abs` and the cumulative distributions, which start with `HISTOabs`). FS-12's correction
+(saturation) would ask for 2³¹ bins, 16 GiB (measured: an unboxed run reached about 70 GB before the
+correction existed). The default ends the program with an error that names the cause, `HISTOabs:
+absolute values from <mn> to <mx> in bins of <bin_size> need <n> bins: outside the int range (an
+infinite range, or a bin size of 0 or NaN)`, status 252 (`ERROR_BADPARM`); `reproduce` gives
+FreeSurfer's. A NaN bin value is never the largest or smallest (`fabs(NaN) > mx` is false), so it
+never causes this.
+
+## FS-51: the robust Gaussian fit's search over sigma that cannot advance (a hang, never reproduced)
+
+`histo.cpp` 1717-1748: `for (sigma = delta_sigma; sigma <= max_sigma; sigma += delta_sigma)` with
+`delta_sigma = h->bin_size / 10` and `max_sigma = habs->nbins * habs->bin_size / 2`: with an
+infinite bin size both are infinite (the bin size `<= 0` check lets it through), `inf <= inf` holds
+and `inf + inf` stays infinite, so FreeSurfer never returns (measured: the probe's `TIMEOUT` lines,
+4 of seed 7's robust fits); a bin size so small that a tenth of it rounds to 0 stops the search the
+same way. Both modes (the hang is never reproduced): the error `HISTOrobustGaussianFit: the bin size
+<s> gives no search over sigma (steps of <d>)`, status `ERROR_BADPARM`, the offset set and sigma
+not. FreeSurfer's callers (`mri_normalize.cpp` 1846, `gca.cpp` 11677, `mrisurf_mri.cpp` 8169, 8177,
+9000, 9008, `gcamorph.cpp` 16965, `mrifilter.cpp` 5508: histograms of intensities) pass finite bin
+sizes, so no default path is known to reach it.
+
+## The probe's fork and the shared file offset (a probe finding)
+
+Every histogram case now runs in a child process (`fsmaths.cpp`'s `run_forked`). Where FreeSurfer's
+code ends the child with `exit()` (FS-50's `HISTOalloc`), glibc's exit flushes the stdio streams the
+child inherited, and the flush of an input stream sets the file offset to the stream's logical
+position; the offset is shared with the parent, whose stream had read ahead, so the parent read the
+following cases again (each `EXIT` line followed by a repeated one, every later line misaligned).
+`fsmaths` now reads every case before the first child (the earlier forked commands never ended
+with `exit()`, so their measurements stand).
+
+## The register's texts before the open-files rewrite (2026-11-13)
+
+The orchestrator's rule of 2026-11-13 ("open files carry behaviour only", the foundations' brief):
+`crates/larmorx-core/src/defects.rs` is open to FreeSurfer's clean-room implementers, so its texts
+describe only what a caller sees (inputs, outputs, messages, exit status). The texts it held
+before, with the mechanisms they named (pointers, which function passes what, the libraries
+underneath, the casts), are kept here verbatim; the sections above give their evidence.
+
+- **FS-13**: MatrixAlloc of a negative size, or of more numbers than an int holds, crashes or corrupts memory after printing that it uses an mmap'd file (the new allocator reads a file pointer it never set or clears memory with a wrapped size), or exits
+- **FS-14**: MatrixCopy copies a complex matrix float by float through its real-element pointers: of each row it copies as many floats as the matrix has columns, starting at the float before the row's first pair, so half the values are lost and the rest are shifted
+- **FS-15**: MatrixMultiply and MatrixMultiplyD of complex matrices add the product onto the output's earlier contents (they never clear the output): a given output, or one that is also an input, gives a wrong product
+- **FS-16**: FreeSurfer's float matrices are addressed outside their arrays where types and sizes do not match (a complex product written into a real output writes past its end): memory the program does not own
+- **FS-17**: FreeSurfer's matrices and histograms convert floats and doubles beyond the int range, and NaN, to int with no check (bins, counts compared as integers, floor of a vector), an undefined conversion that gives -2147483648 on x86-64
+- **FS-18**: HISTOclearCounts clears only the first count of the histogram (and, making a new histogram, copies only the first bin's value): the counts it is meant to reset keep accumulating
+- **FS-19**: HISTOaddSample decides where a sample outside the range goes by comparing its bin number with the range's lower intensity: below a negative lower intensity it is dropped, above the range with a lower intensity beyond the bin count it is counted in the first bin; a NaN sample is counted in the first bin
+- **FS-20**: HISTOaddSample gives a sample exactly at a bin's value the weight 0 in both neighbouring bins, so it is not counted at all (with a bin size of 1 and integer intensities, no sample is counted)
+- **FS-21**: HISTOcopy, HISTOadd, HISTOsubtract and HISTOcumsum write past the arrays of an output histogram that has fewer bins allocated than the result: memory the program does not own
+- **FS-22**: FreeSurfer's histogram searches and helpers read and write bins outside the histogram's arrays when given a start bin outside it (a search's -1 passed on), when a peak window reaches past an end, and for histograms of 0 or 1 bins: memory the program does not own
+- **FS-23**: HISTOmakePDF given an output histogram other than its source normalises the output's own counts instead of the source's
+- **FS-24**: HISTOrobustGaussianFit of a histogram of one bin never returns: the loop that widens its window cannot widen it
+- **FS-25**: FreeSurfer's real-only matrix operations (identity, transpose, sums, differences, scalar products, squares, diagonals, constants, reshapes, traces, element sums, symmetry and zero tests, column norms, vector lengths and products) address a complex matrix's floats as if it were real, and MatrixClear clears only part of a complex matrix: wrong values, no message
+- **FS-26**: MatrixCopyRealRegion into a complex destination copies the source's imaginary parts instead of its real parts
+- **FS-27**: MatrixCopyRealRegion and MatrixCopyImagRegion read a real source as if it were complex (DCTcopy passes real vectors: each value comes from the next element, the last from beyond the array), and MatrixCopyRegion between a real and a complex matrix addresses one through the other's layout
+- **FS-28**: matrix functions that fill a caller's output do not check that it fits (the region copies' destination region, MatrixTranspose's and MatrixRealToComplex's output, MatrixIdentity's given matrix, MatrixDiag's and MatrixNormalizeColScale's): elements are written into other rows or outside the array
+- **FS-29**: PDFtodSeed seeds from the clock (seconds plus microseconds): the programs and random fields that take it when no seed is given never repeat a run
+- **FS-30**: PDFgaussian divides zero by zero when both of its uniform draws give exactly 0 (drand48 returned 0.5 twice): it returns NaN
+- **FS-31**: FreeSurfer's vector functions do not check their vectors' lengths (VectorCrossProduct's and VectorTripleProduct's test lets column vectors of one or two elements through and never tests the other vectors; VectorDot and VectorDistance read the second vector to the first's length): elements read outside the vectors
+- **FS-32**: GetClosestPrimeFactor and GetClosestPrimeFactorLess of 1, which has no prime factor, read the first element of the empty factor list (0 from glibc's calloc): mri_surf2surf and mri_vol2surf reshape a one-vertex surface by a factor of 0
+- **FS-33**: MatrixInverse and MatrixDeterminant of a 0 x 0 matrix read memory VNL never allocated (the inverse goes through the 4 x 4 closed form and copies 16 floats past its output; the determinant reads the empty QR factor's first element), and MatrixInverse of a singular complex matrix crashes (it copies from the NULL inverse of its real form)
+- **FS-34**: OpenPowell and OpenPowell2 accept no initial directions (a NULL matrix) but then write the final directions through it: a crash
+- **FS-35**: fs_powell returns FAILED_USER_REQUEST where VNL's Powell, which it copies, returns FAILED_TOO_MANY_ITERATIONS (its iteration limit), so OpenPowell's exit and OpenPowell2's message and return value 1 for too many iterations never happen (kept: FreeSurfer's change keeps programs from exiting at the limit)
+- **FS-36**: OpenPowell's tolerance argument sets VNL's x tolerance, which Powell's method never reads: every call stops at VNL's default relative tolerance on the cost, 1e-10 (kept: the programs' results depend on it)
+- **FS-37**: fs_lbfgs records its best point only from the second evaluation on and reports the last value evaluated: without an improvement on the starting point a successful run empties the parameters (OpenDFPMin then crashes) and a failed one leaves them at the line search's last trial point with the previous run's end value; otherwise the end value can be a worse point's
+- **FS-38**: OpenDFPMin repeats the minimization while the cost improved by more than the tolerance relative to the caller's first value, never to the previous pass's (its comment: keep iterating if the error is not significantly better), so it repeats until a pass fails or FreeSurfer crashes (FS-37)
+- **FS-39**: OpenDFPMin returns FAILED_USER_REQUEST without writing the parameters, the iteration count or the final value when an L-BFGS pass reaches its evaluation limit: the progress made is dropped and the caller reads its own unset count
+- **FS-40**: MatrixSVDEigenValues and MatrixConditionNumber read the singular values up to the matrix's row count where the decomposition has as many as its columns: for a matrix with more rows than columns they read past the vector (memory the program does not own), and the eigenvalues and the condition number (1e8 where that memory holds 0) depend on it
+- **FS-41**: OpenNonSymmetricEigenSystem copies the matrix into a variable-length array on the stack (8 bytes an element): a non-symmetric matrix of about a thousand rows or more overflows the default 8 MiB stack, a crash
+- **FS-42**: OpenEigenSystem ignores VNL's failure (EISPACK's tql2 not converging, as on a matrix with NaN entries): it returns success with eigenvectors VNL never wrote (memory contents)
+- **FS-43**: MatrixSVD allocates V with as many rows and columns as the matrix has rows where the decomposition's V has as many as its columns (with more rows than columns V's numbers land in the wrong places), and ignores a failed decomposition (fewer rows than columns, or LINPACK not converging): V comes back unchanged, zeros for a new one, with no message
+- **FS-44**: MatrixSVDInverse of a matrix with more rows than columns allocates the transpose of U as a square matrix and reads the singular values and writes their inverses up to the row count, past their vectors: FreeSurfer crashes or ends the program
+- **FS-45**: MatrixPseudoInverse of a matrix with fewer rows than columns crashes when the pseudo-inverse of its transpose is NULL (a zero matrix) or cannot be written into the caller's output, which it passes on although that has the other shape; an output of the inner shape is filled, freed, and a new matrix returned
+- **FS-46**: MatrixSVDPseudoInverse never writes a given output (it returns a new matrix), ignores a failed decomposition (a pseudo-inverse of infinities from the unset singular values), and of a zero matrix with fewer rows than columns crashes transposing the NULL inner result
+- **FS-47**: OpenEigenSystem passes a matrix with infinite or NaN entries to VNL's symmetric eigensystem, whose EISPACK pythag never returns on a NaN or on two infinite arguments: MatrixEigenSystem of a symmetric matrix with infinite entries (and the helper's symmetric path with NaN ones) hangs
+- **FS-48**: OpenSvdcmp passes a matrix with infinite or NaN entries to VNL's singular value decomposition, whose LINPACK ssvdc can loop for ever on such a matrix: the SVD functions (MatrixSVD, the SVD inverses and pseudo-inverses, the condition numbers) hang on some of them
+- **FS-49**: freadInt and freadDouble at the end of the file return a value they never read (the stack's contents; freadInt prints nothing): MatrixReadFrom of a short file fills the matrix's type, sizes or elements with memory contents
+- **FS-50**: HISTOabs of a histogram whose absolute bin values span an infinite range, or whose bin size is 0 or NaN, asks for a number of bins outside the int range: the undefined conversion gives -2147483648 on x86-64, the allocation fails and the program ends with 'could not allocate histogram' (a saturated conversion would ask for 2^31 bins)
+- **FS-51**: HISTOrobustGaussianFit never returns when its search over sigma cannot advance: an infinite bin size (the search starts at infinity, below an infinite limit), or one so small that a tenth of it rounds to 0

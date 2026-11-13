@@ -253,7 +253,18 @@ name = "larmorx-freesurfer-io"
 version = "0.1.0-rc.1"
 dependencies = [
  "larmorx-freesurfer-core",
+ "larmorx-freesurfer-mri",
  "larmorx-io",
+]
+
+[[package]]
+name = "larmorx-freesurfer-mri"
+version = "0.1.0-rc.1"
+dependencies = [
+ "larmorx-core",
+ "larmorx-freesurfer-core",
+ "larmorx-io",
+ "sha2",
 ]
 
 [[package]]
@@ -305,6 +316,7 @@ version = "0.1.0-rc.1"
 dependencies = [
  "larmorx-freesurfer-core",
  "larmorx-freesurfer-io",
+ "larmorx-freesurfer-mri",
 ]
 
 [[package]]

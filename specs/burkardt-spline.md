@@ -138,7 +138,12 @@ FreeSurfer's evaluation **does not extrapolate**: outside the knots it gives the
 - **NaNs** follow x86-64's SSE rules as in `specs/ranlux.md` §7 (a NaN made from numbers is the
   default NaN, binary32 bits `0xffc00000`; one NaN operand is passed on quieted; of two, the first of
   the pair). Where two NaN operands can meet, the first is the left operand as written in §3 and §4,
-  except §4's `m · U_{i−1}`, which is `U_{i−1} · m`; in §5 the operations after `K` take the nested
+  except §4's two products with the super-diagonal: `m · U_{i−1}` (step 3), which is `U_{i−1} · m`,
+  and `U_i · x_{i+1}` (step 4), which is `x_{i+1} · U_i` **(observed**, 2026-11-13: `fs_spline_probe
+  d3` on a system whose `U₀` and `x₁` are NaNs of different payloads, `2 00000000 40000000 40400000
+  7fc00111 40a00000 00000000 40e00000 7fc00222` (`U₀` = `7fc00111`, `b₁` = `7fc00222`), gives `x
+  7fc00222 7fc00222`: `x₀` carries `x₁`'s payload, not `U₀`'s; the same on 300 seeded systems with
+  NaNs of six payloads in `U`, `L`, `D` and `B`**)**; in §5 the operations after `K` take the nested
   part first: for the value `d(K·δ)`, then `+ 0.5·M_j`, `· δ`, `+ G`, `· δ`, `+ y_j`; for the first
   derivative `d(0.5·I / h) · δ`, then `+ M_j`, `· δ`, `+ G`; for the second `f(δ·I) / h`, then `+ M_j`
   **(observed**: the NaN cases of §9.1, values with two different payloads**)**. A binary64 NaN rounded
@@ -218,7 +223,9 @@ separated by blanks, one case per line):
    values of different payloads and a NaN beginning value, one in 77 with an infinite value (§6).
    **(observed**, 2026-11-12: the spec writer's model of this spec equals the probe on 20,001 seeded cases (400 of them with NaN values), every evaluation point of each, 1,000 systems of item 2 and the nine messages of item 3, bit for bit and byte for byte**)**.
 2. **`d3`**: systems with a zero (+0, −0) diagonal entry (refused), with a diagonal that becomes 0
-   during the elimination, and random diagonally dominant and non-dominant systems.
+   during the elimination, and random diagonally dominant and non-dominant systems; and systems
+   whose super-diagonal, sub-diagonal, diagonal and right-hand side hold NaNs of different payloads,
+   so that the products of steps 3 and 4 meet two NaNs (§6's operand order; the example there).
 3. **Messages** (`set1`): E1 to E5 (E5 through two knots one subnormal step apart, `2⁻¹⁴⁹`, whose
    `Δt/3` rounds to 0 under condition 1), standard output byte for byte and the exit status.
 4. **`mri_normalize`**: the unit oracle's `mri_normalize` (track B: the official program's bytes but

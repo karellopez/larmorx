@@ -37,6 +37,8 @@ mod piece5;
 mod piece6;
 #[path = "piece7.rs"]
 mod piece7;
+#[path = "piece8.rs"]
+mod piece8;
 
 /// The cases' random numbers.
 pub struct Gen(u64);
@@ -238,11 +240,11 @@ const FORMATS: [&str; 20] = [
 
 /// The indices of seed 1's 4,800 portable cases that take more than 0.25 s of CPU each in a debug
 /// build (`tests/fs_io_heavy.rs`; re-measured whenever the generators change: 2026-11-13, track A
-/// relay 17, with piece 7: one .mat file whose corrupted header makes the readers allocate and
-/// hash millions of numbers, 2.9 of the 4.3 s). The recorded test (`fs_io_official.rs`) leaves
+/// relay 18, with piece 8: four .mat files whose corrupted headers make the readers allocate and
+/// hash millions of numbers, 10.2 of the 11.5 s). The recorded test (`fs_io_official.rs`) leaves
 /// them to the probe's runs (`check.py --portable` without `--light`, every seed's full runs),
 /// which keep them.
-pub const HEAVY_SEED1: [usize; 1] = [3821];
+pub const HEAVY_SEED1: [usize; 4] = [2284, 2679, 3801, 4331];
 
 /// The recorded test's cases: seed 1's 4,800 portable cases without [`HEAVY_SEED1`].
 #[allow(dead_code)]
@@ -275,6 +277,7 @@ pub fn generate(seed: u64, n: usize, portable: bool) -> Vec<String> {
     kinds.extend(piece5::KINDS);
     kinds.extend(piece6::KINDS);
     kinds.extend(piece7::KINDS);
+    kinds.extend(piece8::KINDS);
     for i in 0..n {
         let kind = kinds[i % kinds.len()];
         if piece2::KINDS.contains(&kind) {
@@ -299,6 +302,10 @@ pub fn generate(seed: u64, n: usize, portable: bool) -> Vec<String> {
         }
         if piece7::KINDS.contains(&kind) {
             lines.push(piece7::generate(&mut g, kind, portable).join(" "));
+            continue;
+        }
+        if piece8::KINDS.contains(&kind) {
+            lines.push(piece8::generate(&mut g, kind, portable).join(" "));
             continue;
         }
         let mut t: Vec<String> = vec![kind.into()];
@@ -667,6 +674,11 @@ pub fn run_line(line: &str, mode: UpstreamDefects, w: &Work) -> (String, Vec<&'s
             let mut o2 = shared.clone();
             let mut e2 = shared.clone();
             return piece7::run(&t, &mut g, &mut o2, &mut e2, &mut o, w, &mut extra);
+        }
+        if piece8::KINDS.contains(&t[0]) {
+            let mut o2 = shared.clone();
+            let mut e2 = shared.clone();
+            return piece8::run(&t, &mut g, &mut o2, &mut e2, &mut o, w, &mut extra);
         }
         match t[0] {
             "rd" => {

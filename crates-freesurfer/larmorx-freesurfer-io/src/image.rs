@@ -507,6 +507,8 @@ fn copy_frames(
     }
     reset_firstpix(src);
     reset_firstpix(dst);
+    // `Isrc->num_frame = Idst->num_frame = nframes`: the output takes the source's frame count
+    dst.num_frame = nframes;
     Ok(())
 }
 
@@ -1055,6 +1057,8 @@ pub fn image_scale_down(
     let place = |g: &mut Globals, n: i32| nint(g, f64::from(n as f32 / scale));
     // the input after the power-of-two reduction of frame 0 (FreeSurfer's `inImage` from then on)
     let mut reduced = false;
+    // the output's frames, which each reduction's copy sets to 1 (the default keeps them all)
+    let out_frames = out.num_frame;
     for frame in 0..in_image.num_frame.max(0) {
         let ioff = frame_off(in_image, frame);
         let ooff = frame_off(out, frame);
@@ -1191,6 +1195,8 @@ pub fn image_scale_down(
     }
     if !reduced {
         reset_firstpix(in_image);
+    } else if in_image.num_frame > 1 && !g.notices.reproduce() {
+        out.num_frame = out_frames;
     }
     reset_firstpix(out);
     Ok(0)

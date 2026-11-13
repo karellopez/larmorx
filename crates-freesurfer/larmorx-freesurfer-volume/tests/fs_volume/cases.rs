@@ -1235,7 +1235,13 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
                 }
                 vol_of(&mut g, &mut t, s);
                 if cmd == "sseq" || cmd == "sxyz" {
-                    t.push(dx(g.pick(&[0.0, 0.0, -5.5, f64::from_bits(0x7ff8_0000_0000_1234), 1e300])));
+                    t.push(dx(g.pick(&[
+                        0.0,
+                        0.0,
+                        -5.5,
+                        f64::from_bits(0x7ff8_0000_0000_1234),
+                        1e300,
+                    ])));
                 }
                 let n = 4;
                 t.push(n.to_string());
@@ -1267,7 +1273,9 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
                                     -3e9,
                                 ])
                             } else {
-                                g.pick(&[0.5, 1.0, 100.0, 255.7, -3.25, 40000.0, 70000.0, -0.0, 2.5e9])
+                                g.pick(&[
+                                    0.5, 1.0, 100.0, 255.7, -3.25, 40000.0, 70000.0, -0.0, 2.5e9,
+                                ])
                             }));
                         }
                         "sseq" => {
@@ -1304,7 +1312,11 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
                         t.push(kind.to_string());
                         let edge = g.chance(4);
                         for (k, m) in [(s.w, 3), (s.h, 2), (s.d, 2)] {
-                            let v = if edge { g.int(-m, k + m - 1) } else { g.int(0, (k - 1).max(0)) };
+                            let v = if edge {
+                                g.int(-m, k + m - 1)
+                            } else {
+                                g.int(0, (k - 1).max(0))
+                            };
                             t.push(v.to_string());
                         }
                         let a = match kind {
@@ -1318,7 +1330,13 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
                         t.push(fx(fval(&mut g)));
                     }
                 } else {
-                    t.push(dx(g.pick(&[1.0, 1.0, -1.0, 0.5, f64::from_bits(0x7ff8_0000_0000_0042)])));
+                    t.push(dx(g.pick(&[
+                        1.0,
+                        1.0,
+                        -1.0,
+                        0.5,
+                        f64::from_bits(0x7ff8_0000_0000_0042),
+                    ])));
                     let n = 4;
                     t.push(n.to_string());
                     for _ in 0..n {
@@ -1334,13 +1352,33 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
                             t.push(dx(if g.chance(12) {
                                 g.pick(&[f64::NAN, f64::INFINITY, 1e10, -1e10])
                             } else {
-                                g.pick(&[0.0, 1.0, -1.0, 0.5, 0.7071067811865476, -0.25, 2.0])
+                                g.pick(&[
+                                    0.0,
+                                    1.0,
+                                    -1.0,
+                                    0.5,
+                                    std::f64::consts::FRAC_1_SQRT_2,
+                                    -0.25,
+                                    2.0,
+                                ])
                             }));
                         }
                         t.push(dx(if g.chance(150) {
                             g.pick(&[1e308, f64::INFINITY])
                         } else {
-                            g.pick(&[0.0, 0.0, 1e-8, 0.5, 1.0, 2.0, 3.3, -1.0, f64::NAN, 1e300, 0.2])
+                            g.pick(&[
+                                0.0,
+                                0.0,
+                                1e-8,
+                                0.5,
+                                1.0,
+                                2.0,
+                                3.3,
+                                -1.0,
+                                f64::NAN,
+                                1e300,
+                                0.2,
+                            ])
                         }));
                     }
                 }
@@ -1361,7 +1399,15 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
                     lines.push(t.join(" "));
                     continue;
                 }
-                t.push(dx(g.pick(&[0.0, 0.0, 0.0, 5.0, -2.5, 1e-9, f64::from_bits(0x7ff8_0000_0000_0077)])));
+                t.push(dx(g.pick(&[
+                    0.0,
+                    0.0,
+                    0.0,
+                    5.0,
+                    -2.5,
+                    1e-9,
+                    f64::from_bits(0x7ff8_0000_0000_0077),
+                ])));
                 if g.chance(4) {
                     t.push("1".into());
                     let o = like(&mut g, s);
@@ -1387,7 +1433,9 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
                                 (1, _, 3) => g.pick(&[0.0, 1.0, -0.5, 0.25, 2.0]),
                                 (1, _, _) => 0.0,
                                 (2, 2, _) if g.chance(3) => 0.0,
-                                (4, _, _) if g.chance(20) => f32::from_bits(g.pick(&[0x7fc00000, 0x7f800000])),
+                                (4, _, _) if g.chance(20) => {
+                                    f32::from_bits(g.pick(&[0x7fc00000, 0x7f800000]))
+                                }
                                 _ => num(&mut g, -20, 20, 10),
                             };
                             t.push(fx(v));
@@ -2895,7 +2943,9 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
                     let (x, y, z, fb, fe, k) = (t.i(), t.i(), t.i(), t.i(), t.i(), t.i());
                     let mut v = vec![-7.0f32; (fe - fb).max(1) as usize];
                     let r = if k != 0 {
-                        sq::sample_volume_frame_xyz_int_n_range_floats(g, b, &m, x, y, z, fb, fe, &mut v)?
+                        sq::sample_volume_frame_xyz_int_n_range_floats(
+                            g, b, &m, x, y, z, fb, fe, &mut v,
+                        )?
                     } else {
                         sq::sample_volume_frame_type_xyz_int_n_range_nearest_floats(
                             g, b, &m, x, y, z, fb, fe, &mut v,

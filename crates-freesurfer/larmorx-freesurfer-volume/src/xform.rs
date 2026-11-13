@@ -24,10 +24,10 @@
 use std::io::Write;
 
 use larmorx_core::defects::FS_325;
+use larmorx_freesurfer_core::diag::{DIAG_SHOW, DIAG_VERBOSE};
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{self, ERROR_BADPARM, ERROR_UNSUPPORTED, Fatal, NO_ERROR};
 use larmorx_freesurfer_core::matrix::{MATRIX_REAL, Matrix, matrix_alloc, matrix_multiply};
-use larmorx_freesurfer_core::diag::{DIAG_SHOW, DIAG_VERBOSE};
 use larmorx_freesurfer_core::matrix_ops::{matrix_determinant, matrix_inverse, matrix_print};
 use larmorx_freesurfer_core::ret::Ret;
 use larmorx_freesurfer_core::utils::nint;
@@ -38,7 +38,9 @@ use larmorx_freesurfer_mri::voxel::mri_set_vox_val;
 use crate::arith::{mri_clear, mri_clone};
 use crate::coords::get_slice_direction;
 use crate::resize::{MRI_CORONAL, MRI_HORIZONTAL, MRI_SAGITTAL};
-use crate::sample::{SAMPLE_CUBIC_BSPLINE, SAMPLE_NEAREST, SAMPLE_TRILINEAR, sample_volume_frame_type};
+use crate::sample::{
+    SAMPLE_CUBIC_BSPLINE, SAMPLE_NEAREST, SAMPLE_TRILINEAR, sample_volume_frame_type,
+};
 
 /// An unused bit pattern (a signalling NaN no arithmetic makes) marking a sample not written.
 const UNWRITTEN: u64 = 0x7ff4_dead_beef_0002;
@@ -107,7 +109,12 @@ pub fn mri_linear_transform_interp(
         );
     }
     let Some(ainv) = matrix_inverse(g, out, err, ma, None)?.into_new() else {
-        log::error_printf(g, err, ERROR_BADPARM, "MRIlinearTransform: xform is singular");
+        log::error_printf(
+            g,
+            err,
+            ERROR_BADPARM,
+            "MRIlinearTransform: xform is singular",
+        );
         return Ok(Ret::Null);
     };
     let mut fresh = None;
@@ -294,7 +301,10 @@ pub fn mri_get_resample_matrix(
     let dest_mat = extract_i_to_r(g, out, err, &template.vg)?;
     let src_det = matrix_determinant(g, err, &src_mat);
     let dest_det = matrix_determinant(g, err, &dest_mat);
-    for (det, m, which) in [(src_det, &src_mat, "source"), (dest_det, &dest_mat, "destination")] {
+    for (det, m, which) in [
+        (src_det, &src_mat, "source"),
+        (dest_det, &dest_mat, "destination"),
+    ] {
         if det == 0.0 {
             g.errno = 0;
             log::error_printf(

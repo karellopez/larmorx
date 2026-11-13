@@ -94,11 +94,7 @@ fn clamp_point(mri: &Mri, x: f64, y: f64, z: f64) -> (f64, f64, f64) {
         };
         if v < 0.0 { 0.0 } else { v }
     };
-    (
-        c(x, mri.vg.width),
-        c(y, mri.vg.height),
-        c(z, mri.vg.depth),
-    )
+    (c(x, mri.vg.width), c(y, mri.vg.height), c(z, mri.vg.depth))
 }
 
 /// macros.h's `MAX(a, b)`: `a >= b ? a : b`.
@@ -137,8 +133,10 @@ pub fn sample_volume_derivative_scale(
     let (x, y, z) = clamp_point(mri, x, y, z);
     let step = max(0.25, sigma / 5.0);
     if (2.0 * sigma) == f64::INFINITY {
-        g.notices
-            .add(&FS_324, format!("{WHAT} with the scale {sigma} never returns"));
+        g.notices.add(
+            &FS_324,
+            format!("{WHAT} with the scale {sigma} never returns"),
+        );
         log::error_exit(
             g,
             err,
@@ -371,7 +369,9 @@ fn index(
             g,
             err,
             ERROR_BADPARM,
-            &format!("{what}: the voxel index {i} lies past the volume's index tables (FreeSurfer reads memory it does not own)\n"),
+            &format!(
+                "{what}: the voxel index {i} lies past the volume's index tables (FreeSurfer reads memory it does not own)\n"
+            ),
         )?;
     }
     Ok(Mri::index(t, i))
@@ -400,6 +400,7 @@ fn faces(
 
 /// The window neighbours of `(x, y, z)` (the voxel itself excluded), z outermost, then y, then
 /// x, each through its index table, `-whalf..=whalf` on each axis.
+#[allow(clippy::too_many_arguments)]
 fn window(
     g: &mut Globals,
     err: &mut dyn Write,
@@ -488,7 +489,16 @@ pub fn neighbors_in_window(
     wsize: i32,
     val: i32,
 ) -> Result<i32, Fatal> {
-    let p = window(g, err, "MRIneighborsInWindow", mri, x, y, z, (wsize - 1) / 2)?;
+    let p = window(
+        g,
+        err,
+        "MRIneighborsInWindow",
+        mri,
+        x,
+        y,
+        z,
+        (wsize - 1) / 2,
+    )?;
     count(g, err, mri, &p, 0, &mut |_, v| v == val as f32)
 }
 
@@ -522,7 +532,9 @@ pub fn neighbors_in_range(
     hi_val: f32,
 ) -> Result<i32, Fatal> {
     let p = faces(g, err, "MRIneighborsInRange", mri, x0, y0, z0)?;
-    count(g, err, mri, &p, frame, &mut |_, v| v >= low_val && v <= hi_val)
+    count(g, err, mri, &p, frame, &mut |_, v| {
+        v >= low_val && v <= hi_val
+    })
 }
 
 /// `MRIneighbors3x3(mri, x, y, z, val)`: the 26 neighbours whose value rounds to `val`.
@@ -569,14 +581,7 @@ fn count_bytes_below(
 /// x + 1, y + 1, y - 1, z + 1, z - 1 as they are) whose byte (`MRIvox`, whatever the volume's
 /// type) is below `min_val`; a neighbour outside the volume reads another voxel or memory
 /// FreeSurfer does not own ([`crate::rows`]: FS-289, FS-290).
-pub fn neighbors_off(
-    g: &mut Globals,
-    mri: &Mri,
-    x0: i32,
-    y0: i32,
-    z0: i32,
-    min_val: i32,
-) -> i32 {
+pub fn neighbors_off(g: &mut Globals, mri: &Mri, x0: i32, y0: i32, z0: i32, min_val: i32) -> i32 {
     let p = [
         (x0 - 1, y0, z0),
         (x0 + 1, y0, z0),

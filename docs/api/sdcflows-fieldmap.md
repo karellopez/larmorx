@@ -650,33 +650,33 @@ reads (default `os.environ`). The Python functions under it:
 
 ### Options of `sdcflows`
 
-| `sdcflows` | Python | In `sdcflows_workflow` | What |
-|---|---|---|---|
-| `bids_dir` | `argv` | `run_app([...])`; `sdcflows_workflow(layout, ...)` | the dataset (argparse's `Path does not exist: <...>.` otherwise), indexed with the app's ignore patterns (only `sub-<label>` folders, without `beh`, `pet`, `perf`, `meg`, `eeg`, `ieeg`, `micr`, `nirs`), without the BIDS validator; no `dataset_description.json`: pybids' `BIDSValidationError` (exit status 1) |
-| `output_dir` | `argv` | `output_dir=` | the derivatives in `output_dir/sdcflows/sub-<label>/fmap/` (as `init_fmap_derivatives_wf` writes them, named by all the estimator's sources), and an empty `logs/`; the same folder as `bids_dir`: argparse's error with sdcflows' suggestion (`<bids_dir>/derivatives/sdcflows_2.17.1`) |
-| `analysis_level` (`participant`, `group`, one or more) | `argv` | - | only `participant`; `group`: sdcflows' `ValueError: Analysis level can only be 'participant'` (exit status 1) |
-| `-h`, `--help` | `argv` | - | the usage and the help (argparse's, exit status 0) |
-| `--version` | `argv` | - | `SDCFlows 2.17.1` |
-| `-v`, `--verbose` (repeated) | `argv` | `logger=` | the log level, 25 less 5 per `-v` (10 from `-vvv`): sdcflows' `cli` lines on standard output in its format (`<yymmdd-HH:MM:SS>,<ms> cli IMPORTANT:` then the message: "Running SDCFlows 2.17.1: ...", "Finished all workload"), the search's debug lines at `-vvv` |
-| `--participant-label` | `argv` | `participant_label=` | labels with or without `sub-`, sorted and unique; labels not in the dataset: argparse's error (sorted: SDC-34); the indexed folders are those whose name starts with a label's (sdcflows' pattern: `01` also indexes `sub-010`) |
-| `--session-label` | `argv` | `sessions=` | SDC-30 |
-| `--bids-filter-file PATH` | `argv` | `bids_filters=` (the file's `fmap` entry) | SDC-31, SDC-33 |
-| `--bids-database-dir PATH` | `argv` | - | must exist (argparse's error); pybids' database is not read: the dataset is indexed again, in memory, and no database is written (sdcflows writes one in `output_dir/.bids_db` or `work_dir/.bids_db-<run>`) |
-| `--bids-database-wipe` | `argv` | - | recorded (no database) |
-| `--nprocs N` | `argv` | - | at least 1 (argparse's `Argument can't be less than one.`; a non-integer: `invalid _min_one value`, SDC-34); recorded: the estimators run one after the other (nipype runs `N` processes at once; the results are the same); `1 < N < --omp-nthreads`: sdcflows' warning "Per-process threads (--omp-nthreads=...) exceed total threads (--nthreads/--n_cpus=...)" |
-| `--omp-nthreads N` | `argv` | `omp_nthreads=`, `n_threads=` | each step's threads (default `OMP_NUM_THREADS`, else the CPUs) |
-| `--mem-gb` | `argv` | - | sdcflows' units (`G` by default, `T`, `M`, `K`, `B`, powers of ten); recorded, nipype's memory limit has no counterpart; SDC-33 |
-| `--debug`, `--sloppy` | `argv` | `debug=`, `sloppy=` | SDC-32 |
-| `--pdb` | `argv` | - | an error prints Python's whole traceback (and a blank line), and opens `pdb` on it when standard input, output and error are terminals (niworkflows' `setup_exceptionhook`); nipype's `Linear` plugin recorded |
-| `-w`, `--work-dir` | `argv` | `work_dir=` | default `./work`: the nodes' files (`sdcflows_wf/wf_<id>/`, `sdcflows_wf/fmap_derivatives_<id>/`) and the run's settings, `.sdcflows.<8 characters>.toml` (sdcflows' sections and keys, written as toml 0.10.2 writes them: `toml_dumps`; `[environment]` without nipype's and TemplateFlow's versions, with `larmorx_version`; `bids_database_dir` only when given); inside `bids_dir`: argparse's error |
-| `-n`, `--dry-run` | `argv` | - | the estimators listed, as sdcflows lists them (each participant, each estimator, each source's phase-encoding direction and path), exit status 0 |
-| `--no-fmapless` | `argv` | `fmapless=False` | no fieldmap-less estimators; with them (the default): SDC-29 |
-| `--use-plugin FILE` | `argv` | - | SDC-35, SDC-33 |
-| `--notrack` | `argv` | - | recorded; larmorx never sends usage information |
-| `LARMORX_UPSTREAM_DEFECTS` | `upstream_defects` | `upstream_defects=` | `fix` (default) or `reproduce` (D13) |
-| (larmorx's own) `--implementation` (before the family) or `LARMORX_IMPLEMENTATION` | `env` | `prelude_implementation=`, `topup_implementation=`, `volreg_implementation=` | `auto` (default), `replica`, `clean-room` (`original`, 0.1.0rc1's spelling, still works): FSL's `prelude` and `topup`, AFNI's `3dvolreg` |
-| `LARMORX_SDCFLOWS_LIBRARIES` | `env` | `numpy_version=`, `scipy_version=`; nibabel's `set_qform` LAPACK (`larmorx.io.nibabel_header.use_lapack`, for the run) | `newest` (numpy 2.5.4, SciPy 1.18.1, LAPACK 3.12.1; default) or `shared` (numpy 2.3.5, SciPy 1.15.3, LAPACK 3.12.0) |
-| `FSLDIR` | `env` | `fsldir=` | FSL's topup configurations (decision D9: `topup_config_file`) |
+| `sdcflows` | Python (`run_app`) | What (and `sdcflows_workflow`'s argument) |
+|---|---|---|
+| `bids_dir` | `argv` | the dataset (argparse's `Path does not exist: <...>.` otherwise), indexed with the app's ignore patterns (only `sub-<label>` folders, without `beh`, `pet`, `perf`, `meg`, `eeg`, `ieeg`, `micr`, `nirs`), without the BIDS validator; no `dataset_description.json`: pybids' `BIDSValidationError` (exit status 1) (`sdcflows_workflow(layout, ...)`) |
+| `output_dir` | `argv` | the derivatives in `output_dir/sdcflows/sub-<label>/fmap/` (as `init_fmap_derivatives_wf` writes them, named by all the estimator's sources), and an empty `logs/`; the same folder as `bids_dir`: argparse's error with sdcflows' suggestion (`<bids_dir>/derivatives/sdcflows_2.17.1`) (`sdcflows_workflow`'s `output_dir=`) |
+| `analysis_level` (`participant`, `group`, one or more) | `argv` | only `participant`; `group`: sdcflows' `ValueError: Analysis level can only be 'participant'` (exit status 1) |
+| `-h`, `--help` | `argv` | the usage and the help (argparse's, exit status 0) |
+| `--version` | `argv` | `SDCFlows 2.17.1` |
+| `-v`, `--verbose` (repeated) | `argv` | the log level, 25 less 5 per `-v` (10 from `-vvv`): sdcflows' `cli` lines on standard output in its format (`<yymmdd-HH:MM:SS>,<ms> cli IMPORTANT:` then the message: "Running SDCFlows 2.17.1: ...", "Finished all workload"), the search's debug lines at `-vvv` (`sdcflows_workflow`'s `logger=`) |
+| `--participant-label` | `argv` | labels with or without `sub-`, sorted and unique; labels not in the dataset: argparse's error (sorted: SDC-34); the indexed folders are those whose name starts with a label's (sdcflows' pattern: `01` also indexes `sub-010`) (`sdcflows_workflow`'s `participant_label=`) |
+| `--session-label` | `argv` | SDC-30 (`sdcflows_workflow`'s `sessions=`) |
+| `--bids-filter-file PATH` | `argv` | SDC-31, SDC-33 (`sdcflows_workflow`'s `bids_filters=` (the file's `fmap` entry)) |
+| `--bids-database-dir PATH` | `argv` | must exist (argparse's error); pybids' database is not read: the dataset is indexed again, in memory, and no database is written (sdcflows writes one in `output_dir/.bids_db` or `work_dir/.bids_db-<run>`) |
+| `--bids-database-wipe` | `argv` | recorded (no database) |
+| `--nprocs N` | `argv` | at least 1 (argparse's `Argument can't be less than one.`; a non-integer: `invalid _min_one value`, SDC-34); recorded: the estimators run one after the other (nipype runs `N` processes at once; the results are the same); `1 < N < --omp-nthreads`: sdcflows' warning "Per-process threads (--omp-nthreads=...) exceed total threads (--nthreads/--n_cpus=...)" |
+| `--omp-nthreads N` | `argv` | each step's threads (default `OMP_NUM_THREADS`, else the CPUs) (`sdcflows_workflow`'s `omp_nthreads=`, `n_threads=`) |
+| `--mem-gb` | `argv` | sdcflows' units (`G` by default, `T`, `M`, `K`, `B`, powers of ten); recorded, nipype's memory limit has no counterpart; SDC-33 |
+| `--debug`, `--sloppy` | `argv` | SDC-32 (`sdcflows_workflow`'s `debug=`, `sloppy=`) |
+| `--pdb` | `argv` | an error prints Python's whole traceback (and a blank line), and opens `pdb` on it when standard input, output and error are terminals (niworkflows' `setup_exceptionhook`); nipype's `Linear` plugin recorded |
+| `-w`, `--work-dir` | `argv` | default `./work`: the nodes' files (`sdcflows_wf/wf_<id>/`, `sdcflows_wf/fmap_derivatives_<id>/`) and the run's settings, `.sdcflows.<8 characters>.toml` (sdcflows' sections and keys, written as toml 0.10.2 writes them: `toml_dumps`; `[environment]` without nipype's and TemplateFlow's versions, with `larmorx_version`; `bids_database_dir` only when given); inside `bids_dir`: argparse's error (`sdcflows_workflow`'s `work_dir=`) |
+| `-n`, `--dry-run` | `argv` | the estimators listed, as sdcflows lists them (each participant, each estimator, each source's phase-encoding direction and path), exit status 0 |
+| `--no-fmapless` | `argv` | no fieldmap-less estimators; with them (the default): SDC-29 (`sdcflows_workflow`'s `fmapless=False`) |
+| `--use-plugin FILE` | `argv` | SDC-35, SDC-33 |
+| `--notrack` | `argv` | recorded; larmorx never sends usage information |
+| `LARMORX_UPSTREAM_DEFECTS` | `upstream_defects` | `fix` (default) or `reproduce` (D13) (`sdcflows_workflow`'s `upstream_defects=`) |
+| (larmorx's own) `--implementation` (before the family) or `LARMORX_IMPLEMENTATION` | `env` | `auto` (default), `replica`, `clean-room` (`original`, 0.1.0rc1's spelling, still works): FSL's `prelude` and `topup`, AFNI's `3dvolreg` (`sdcflows_workflow`'s `prelude_implementation=`, `topup_implementation=`, `volreg_implementation=`) |
+| `LARMORX_SDCFLOWS_LIBRARIES` | `env` | `newest` (numpy 2.5.4, SciPy 1.18.1, LAPACK 3.12.1; default) or `shared` (numpy 2.3.5, SciPy 1.15.3, LAPACK 3.12.0) (`sdcflows_workflow`'s `numpy_version=`, `scipy_version=`; nibabel's `set_qform` LAPACK (`larmorx.io.nibabel_header.use_lapack`, for the run)) |
+| `FSLDIR` | `env` | FSL's topup configurations (decision D9: `topup_config_file`) (`sdcflows_workflow`'s `fsldir=`) |
 
 Exit statuses: 0; 2, argparse's errors (with the usage); 64 (`os.EX_USAGE`) when no estimator is
 found, with sdcflows' "Workflow did not generate any jobs. Please check your inputs are valid."

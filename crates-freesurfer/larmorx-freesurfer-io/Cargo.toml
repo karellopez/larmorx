@@ -9,4 +9,5 @@ repository.workspace = true
 
 [dependencies]
 larmorx-freesurfer-core.workspace = true
+larmorx-freesurfer-mri.workspace = true
 larmorx-io.workspace = true

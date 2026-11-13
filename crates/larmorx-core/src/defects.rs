@@ -1095,6 +1095,24 @@ defects! {
         "HISTOabs of a histogram whose absolute bin values span an infinite range, or whose bin size is 0 or NaN, ends the program with 'could not allocate histogram' (the bin count it needs is beyond the int range)";
     FS_51 = "FS-51", "FreeSurfer", true,
         "HISTOrobustGaussianFit never returns for an infinite bin size, or one so small that a tenth of it rounds to 0";
+    FS_52 = "FS-52", "FreeSurfer", true,
+        "MRIgetVoxVal and MRIsetVoxVal do not check that a voxel index lies in the volume (but for negative columns, rows and slices when reading): a column, row, slice or frame beyond the volume reads or writes another voxel of it (a column past the end of a row is the next row's first voxel), and writing at a negative index writes an earlier voxel";
+    FS_53 = "FS-53", "FreeSurfer", true,
+        "MRIgetVoxVal and MRIsetVoxVal at an index beyond the volume's whole buffer read memory contents or write outside the volume (a crash or another object's corruption), and so do writes and complex-voxel accesses at a row or slice index outside the volume";
+    FS_54 = "FS-54", "FreeSurfer", true,
+        "MRIsetVoxVal of an MRI_LONG volume rounds the value to an int (-2147483648 beyond the int range) and also stores it as a 4-byte int into half of another voxel of the row (the voxel at half its column), corrupting that voxel";
+    FS_55 = "FS-55", "FreeSurfer", true,
+        "a volume of a type MRIsizeof does not size (MRI_BITMAP, MRI_DOUBLE_COMPLEX, unknown type codes) is not refused as an unsupported type: its allocation fails with 'could not allocate memory for slice 1 out of N' (or, with no voxels, succeeds with impossible sizes)";
+    FS_56 = "FS-56", "FreeSurfer", true,
+        "MRIcopyHeader onto a volume without a registration matrix does not copy the source's: the copy has none";
+    FS_57 = "FS-57", "FreeSurfer", true,
+        "CTABdeepCopy does not copy a colour table's idbase (the copy has 0) nor its entries' voxel counts (memory contents)";
+    FS_58 = "FS-58", "FreeSurfer", true,
+        "reading or writing a voxel of a volume made without voxels (MRIallocHeader, a header read alone) crashes";
+    FS_59 = "FS-59", "FreeSurfer", true,
+        "assigning a geometry (VOL_GEOM) that has no cached voxel-to-RAS matrices onto one that has them keeps the destination's old matrices, computed from its old geometry";
+    FS_60 = "FS-60", "FreeSurfer", true,
+        "MRIcopyHeader onto a volume that owns a transform, from a volume without one, frees that transform but leaves the destination pointing at it (its use or the volume's end then crashes)";
     FS_100 = "FS-100", "FreeSurfer", true,
         "the gamma draw converts its shape's integer part to a 32-bit unsigned integer, which C leaves undefined outside [0, 2^32): a shape of 2^32 or more gives a value of the wrong size, NaN and +inf the value of a shape below 1, and a negative shape or -inf a draw that does not return in practice";
     FS_101 = "FS-101", "FreeSurfer", true,

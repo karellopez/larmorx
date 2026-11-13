@@ -14,6 +14,7 @@
 //! the symmetric and the real eigensystems, Cholesky), `nonfinite` (EISPACK's `pythag`, the
 //! symmetric eigensystems and LINPACK's `ssvdc` on infinities and NaNs, VNL in a child process
 //! with a time limit, where it can loop for ever), `order` (the closed forms' NaNs bit for bit), `qrnan` (LINPACK's QR and its BLAS kernels on NaNs and
+//! other special entries, bit for bit), `svdnan` (LINPACK's float SVD, `srot` and `srotg` on NaNs and
 //! other special entries, bit for bit), `fft` (`vnl_fft_1d<double>`); `--only itk103` measures ITK-103's correction on the port alone
 //! (not part of the default run). Prints the
 //! counts per family and `VERIFY-PASS` or `VERIFY-FAIL` (exit status 1).
@@ -24,6 +25,7 @@ mod checks_min;
 mod checks_nonfinite;
 mod checks_order;
 mod checks_qrnan;
+mod checks_svdnan;
 mod ffi;
 
 use std::fmt::Write as _;
@@ -236,6 +238,11 @@ fn main() {
     if want("qrnan") {
         let mut t = Tally::new("qrnan");
         checks_qrnan::run(&lib, scale, &mut t);
+        tallies.push(t);
+    }
+    if want("svdnan") {
+        let mut t = Tally::new("svdnan");
+        checks_svdnan::run(&lib, scale, &mut t);
         tallies.push(t);
     }
     if want("fft") {

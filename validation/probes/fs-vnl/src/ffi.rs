@@ -87,6 +87,9 @@ lib! {
     k_dscal: "v3p_netlib_dscal_" => unsafe extern "C" fn(*const c_long, *const f64, *mut f64, *const c_long) -> c_int,
     k_snrm2: "v3p_netlib_snrm2_" => unsafe extern "C" fn(*const c_long, *const f32, *const c_long) -> f64,
     k_dnrm2: "v3p_netlib_dnrm2_" => unsafe extern "C" fn(*const c_long, *const f64, *const c_long) -> f64,
+    // and the float SVD's rotations (family `svdnan`)
+    k_srot: "v3p_netlib_srot_" => unsafe extern "C" fn(*const c_long, *mut f32, *const c_long, *mut f32, *const c_long, *const f32, *const f32) -> c_int,
+    k_srotg: "v3p_netlib_srotg_" => unsafe extern "C" fn(*mut f32, *mut f32, *mut f32, *mut f32) -> c_int,
 }
 
 /// Captures what a call writes to file descriptors 1 and 2 (the C library's and libstdc++'s

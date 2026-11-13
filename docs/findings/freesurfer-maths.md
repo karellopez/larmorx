@@ -569,10 +569,15 @@ and leaves a following `p`); `inf` stops before a non-`i` letter, an unfinished 
 consumes the letter that broke it (as an unfinished `inf` or `nan` does; numbers leave it unread);
 `nan(...)` is never read beyond `nan`; underflow sets `ERANGE` after rounding (`0x1.fffffep-127` sets
 it, `0x1.ffffffp-127` does not), and so does any inexact subnormal result, exactly representable
-ones not; a conversion that meets the end of the input before its item sets `errno` to 0 (unless an
-earlier item of the same call ended there), which is why `MatrixReadTxt`'s `could not scan value`
-after an `ERANGE` read prints no `Numerical result out of range` when the file simply ended.
-`cscan.rs` reproduces each; `scanf_probe.c` and its companions are the measurements.
+ones not; a conversion that meets the end of the input before its item sets `errno` to 0, or, when
+an earlier item of the same call ended at the end of the input, to the value `errno` had when that
+item met it (before that item's own `ERANGE`: `sscanf("-1877   1e40", "%f %f %f %f")` with `errno` 7
+before leaves 7, not 34; `"1e-50 3"` leaves 34; measured by track C's
+`validation/probes/fs-volume/scanf_word_errno.c`); directives that meet it change nothing. This is why
+`MatrixReadTxt`'s `could not scan value` after an `ERANGE` read prints no `Numerical result out of
+range` when the file simply ended. `cscan.rs` reproduces each (its `EndRule` keeps the `errno` of the
+moment the call first met the end, which gives this rule); `scanf_probe.c` and its companions are the
+measurements.
 
 ## For the main package's VNL (track C), found here, part 4
 

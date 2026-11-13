@@ -5,67 +5,51 @@
 //! (`vnl_determinant` of 1 to 4 rows, which uses the same expressions), `core/vnl/vnl_inverse.h`
 //! (`vnl_inverse` of `vnl_matrix_fixed<T, 2..4, 2..4>` and of a `vnl_matrix` of up to 4 rows).
 //!
-//! Each expression is evaluated left to right as C++ evaluates it (no fused multiply-adds),
-//! so the results are bit-identical to vnl's on every platform.
+//! Each expression is evaluated as C++ evaluates it (left to right, no fused multiply-adds),
+//! so the numbers are bit-identical to vnl's on every platform. **NaNs too:** where two NaNs
+//! meet, x86-64 passes on the first operand's, and which operand of a `+` or `*` comes first is
+//! the compiler's choice. The private module `sse` holds the expressions with the operands in
+//! the order GCC 8.4.0 gives ITK 4.13.2's instances (read from their object code), each operation
+//! through [`ItkReal::sse_add`] and its kin, so NaN results carry x86-64's signs and payloads on
+//! every platform. The `float` and `double` instances share the determinants' and the 3 x 3
+//! inverse's order; the 2 x 2 and 4 x 4 inverses have one each ([`ItkReal::vnl_inverse2`]).
 //!
 //! The functions are generic over `float` and `double` ([`ItkReal`]), as `vnl_matrix_fixed<T, n,
 //! n>` is; each operation is in that type (ITK 4.13.2's `vnl_det.hxx` and `vnl_inverse.h`, the
 //! same expressions as 5.4.5's). [`determinant`] of more than 4 rows is
 //! `vnl_determinant<T>`'s QR determinant ([`crate::vnl_qr::Qr`]), and
-//! [`determinant_balanced`] its `balance` form. `vnl_inverse` of a matrix whose determinant is 0
-//! returns VNL's uninitialised `vnl_matrix_fixed` (its assertion is compiled out): memory
-//! contents, given here as the zero matrix (ITK-107).
+//! [`determinant_balanced`] its `balance` form (their NaNs follow `vnl_qr`'s port, not checked
+//! against x86-64's). `vnl_inverse` of a matrix whose determinant is 0 returns VNL's
+//! uninitialised `vnl_matrix_fixed` (its assertion is compiled out): memory contents, given here
+//! as the zero matrix (ITK-107).
+
+#[doc(hidden)]
+pub mod cases;
+pub(crate) mod sse;
 
 /// `vnl_det(row0, row1)`.
 #[inline]
 pub fn det2<T: ItkReal>(m: &[[T; 2]; 2]) -> T {
-    m[0][0] * m[1][1] - m[0][1] * m[1][0]
+    sse::det2(&m[0], &m[1])
 }
 
 /// `vnl_det(row0, row1, row2)`.
 #[inline]
 pub fn det3<T: ItkReal>(m: &[[T; 3]; 3]) -> T {
-    let (r0, r1, r2) = (&m[0], &m[1], &m[2]);
-    r0[0] * r1[1] * r2[2] - r0[0] * r2[1] * r1[2] - r1[0] * r0[1] * r2[2]
-        + r1[0] * r2[1] * r0[2]
-        + r2[0] * r0[1] * r1[2]
-        - r2[0] * r1[1] * r0[2]
+    sse::det3(&m[0], &m[1], &m[2])
 }
 
 /// `vnl_det(row0, row1, row2, row3)`.
-#[rustfmt::skip]
+#[inline]
 pub fn det4<T: ItkReal>(m: &[[T; 4]; 4]) -> T {
-    let (r0, r1, r2, r3) = (&m[0], &m[1], &m[2], &m[3]);
-    r0[0]*r1[1]*r2[2]*r3[3]
-    - r0[0]*r1[1]*r3[2]*r2[3]
-    - r0[0]*r2[1]*r1[2]*r3[3]
-    + r0[0]*r2[1]*r3[2]*r1[3]
-    + r0[0]*r3[1]*r1[2]*r2[3]
-    - r0[0]*r3[1]*r2[2]*r1[3]
-    - r1[0]*r0[1]*r2[2]*r3[3]
-    + r1[0]*r0[1]*r3[2]*r2[3]
-    + r1[0]*r2[1]*r0[2]*r3[3]
-    - r1[0]*r2[1]*r3[2]*r0[3]
-    - r1[0]*r3[1]*r0[2]*r2[3]
-    + r1[0]*r3[1]*r2[2]*r0[3]
-    + r2[0]*r0[1]*r1[2]*r3[3]
-    - r2[0]*r0[1]*r3[2]*r1[3]
-    - r2[0]*r1[1]*r0[2]*r3[3]
-    + r2[0]*r1[1]*r3[2]*r0[3]
-    + r2[0]*r3[1]*r0[2]*r1[3]
-    - r2[0]*r3[1]*r1[2]*r0[3]
-    - r3[0]*r0[1]*r1[2]*r2[3]
-    + r3[0]*r0[1]*r2[2]*r1[3]
-    + r3[0]*r1[1]*r0[2]*r2[3]
-    - r3[0]*r1[1]*r2[2]*r0[3]
-    - r3[0]*r2[1]*r0[2]*r1[3]
-    + r3[0]*r2[1]*r1[2]*r0[3]
+    sse::det4(&m[0], &m[1], &m[2], &m[3])
 }
 
 /// `vnl_determinant<T>(M, balance)`: with `balance`, more than 4 rows are first balanced by
 /// five rounds of dividing each row, then each column, by its RMS (where positive), the
 /// divisors multiplied into `scalings`, and the result is `T(scalings)·det` of the balanced
-/// matrix; `balance` changes nothing up to 4 rows.
+/// matrix (an RMS that is NaN or not positive leaves its row or column alone); `balance` changes
+/// nothing up to 4 rows.
 pub fn determinant_balanced<T: ItkReal>(m: &[T], n: usize, balance: bool) -> T {
     if n <= 4 || !balance {
         return determinant(m, n);
@@ -87,8 +71,8 @@ pub fn determinant_balanced<T: ItkReal>(m: &[T], n: usize, balance: bool) -> T {
         for i in 0..n {
             let rn = rms(&mut (0..n).map(|j| tmp[i * n + j]));
             if rn > T::ZERO {
-                scalings = scalings * rn;
-                let s = T::ONE / rn;
+                scalings = scalings.sse_mul(rn);
+                let s = T::ONE.sse_div(rn);
                 for j in 0..n {
                     tmp[i * n + j] = tmp[i * n + j] * s;
                 }
@@ -97,15 +81,16 @@ pub fn determinant_balanced<T: ItkReal>(m: &[T], n: usize, balance: bool) -> T {
         for j in 0..n {
             let rn = rms(&mut (0..n).map(|i| tmp[i * n + j]));
             if rn > T::ZERO {
-                scalings = scalings * rn;
-                let s = T::ONE / rn;
+                scalings = scalings.sse_mul(rn);
+                let s = T::ONE.sse_div(rn);
                 for i in 0..n {
                     tmp[i * n + j] = tmp[i * n + j] * s;
                 }
             }
         }
     }
-    scalings * crate::vnl_qr::qr_determinant(&tmp, n)
+    // `T(scalings) * balanced_det`, the operands in the other order in both instances
+    crate::vnl_qr::qr_determinant(&tmp, n).sse_mul(scalings)
 }
 
 /// `vnl_determinant<T>(M)` of an `n × n` matrix (row-major): the closed forms up to 4 rows,
@@ -126,94 +111,37 @@ pub fn determinant<T: ItkReal>(m: &[T], n: usize) -> T {
 /// `vnl_inverse(vnl_matrix_fixed<T, 2, 2>)`: the zero matrix for a zero determinant (VNL returns
 /// an uninitialised matrix, its assertion compiled out: ITK-107).
 pub fn inverse2<T: ItkReal>(m: &[[T; 2]; 2]) -> [[T; 2]; 2] {
-    let mut det = det2(m);
+    let det = det2(m);
     if det == T::ZERO {
         return [[T::ZERO; 2]; 2];
     }
-    det = T::ONE / det;
-    [
-        [m[1][1] * det, -m[0][1] * det],
-        [-m[1][0] * det, m[0][0] * det],
-    ]
+    T::vnl_inverse2(m, det)
 }
 
 /// `vnl_inverse(vnl_matrix_fixed<T, 3, 3>)`.
 pub fn inverse3<T: ItkReal>(m: &[[T; 3]; 3]) -> [[T; 3]; 3] {
-    let mut det = det3(m);
+    let det = det3(m);
     if det == T::ZERO {
         return [[T::ZERO; 3]; 3];
     }
-    det = T::ONE / det;
-    [
-        [
-            (m[1][1] * m[2][2] - m[1][2] * m[2][1]) * det,
-            (m[2][1] * m[0][2] - m[2][2] * m[0][1]) * det,
-            (m[0][1] * m[1][2] - m[0][2] * m[1][1]) * det,
-        ],
-        [
-            (m[1][2] * m[2][0] - m[1][0] * m[2][2]) * det,
-            (m[0][0] * m[2][2] - m[0][2] * m[2][0]) * det,
-            (m[1][0] * m[0][2] - m[1][2] * m[0][0]) * det,
-        ],
-        [
-            (m[1][0] * m[2][1] - m[1][1] * m[2][0]) * det,
-            (m[0][1] * m[2][0] - m[0][0] * m[2][1]) * det,
-            (m[0][0] * m[1][1] - m[0][1] * m[1][0]) * det,
-        ],
-    ]
+    sse::inverse3(m, det)
 }
 
 /// `vnl_inverse(vnl_matrix_fixed<T, 4, 4>)`: the adjugate's entries, then the matrix times
-/// `1 / det`.
-#[rustfmt::skip]
+/// `1 / det` (`vnl_matrix_fixed::operator*`, whose last row takes the operands the other way).
 pub fn inverse4<T: ItkReal>(m: &[[T; 4]; 4]) -> [[T; 4]; 4] {
-    let mut det = det4(m);
+    let det = det4(m);
     if det == T::ZERO {
         return [[T::ZERO; 4]; 4];
     }
-    det = T::ONE / det;
-    let m = |i: usize, j: usize| m[i][j];
-    let mut d = [T::ZERO; 16];
-    d[0] =  m(1,1)*m(2,2)*m(3,3) - m(1,1)*m(2,3)*m(3,2) - m(2,1)*m(1,2)*m(3,3)
-          + m(2,1)*m(1,3)*m(3,2) + m(3,1)*m(1,2)*m(2,3) - m(3,1)*m(1,3)*m(2,2);
-    d[1] = -m(0,1)*m(2,2)*m(3,3) + m(0,1)*m(2,3)*m(3,2) + m(2,1)*m(0,2)*m(3,3)
-          - m(2,1)*m(0,3)*m(3,2) - m(3,1)*m(0,2)*m(2,3) + m(3,1)*m(0,3)*m(2,2);
-    d[2] =  m(0,1)*m(1,2)*m(3,3) - m(0,1)*m(1,3)*m(3,2) - m(1,1)*m(0,2)*m(3,3)
-          + m(1,1)*m(0,3)*m(3,2) + m(3,1)*m(0,2)*m(1,3) - m(3,1)*m(0,3)*m(1,2);
-    d[3] = -m(0,1)*m(1,2)*m(2,3) + m(0,1)*m(1,3)*m(2,2) + m(1,1)*m(0,2)*m(2,3)
-          - m(1,1)*m(0,3)*m(2,2) - m(2,1)*m(0,2)*m(1,3) + m(2,1)*m(0,3)*m(1,2);
-    d[4] = -m(1,0)*m(2,2)*m(3,3) + m(1,0)*m(2,3)*m(3,2) + m(2,0)*m(1,2)*m(3,3)
-          - m(2,0)*m(1,3)*m(3,2) - m(3,0)*m(1,2)*m(2,3) + m(3,0)*m(1,3)*m(2,2);
-    d[5] =  m(0,0)*m(2,2)*m(3,3) - m(0,0)*m(2,3)*m(3,2) - m(2,0)*m(0,2)*m(3,3)
-          + m(2,0)*m(0,3)*m(3,2) + m(3,0)*m(0,2)*m(2,3) - m(3,0)*m(0,3)*m(2,2);
-    d[6] = -m(0,0)*m(1,2)*m(3,3) + m(0,0)*m(1,3)*m(3,2) + m(1,0)*m(0,2)*m(3,3)
-          - m(1,0)*m(0,3)*m(3,2) - m(3,0)*m(0,2)*m(1,3) + m(3,0)*m(0,3)*m(1,2);
-    d[7] =  m(0,0)*m(1,2)*m(2,3) - m(0,0)*m(1,3)*m(2,2) - m(1,0)*m(0,2)*m(2,3)
-          + m(1,0)*m(0,3)*m(2,2) + m(2,0)*m(0,2)*m(1,3) - m(2,0)*m(0,3)*m(1,2);
-    d[8] =  m(1,0)*m(2,1)*m(3,3) - m(1,0)*m(2,3)*m(3,1) - m(2,0)*m(1,1)*m(3,3)
-          + m(2,0)*m(1,3)*m(3,1) + m(3,0)*m(1,1)*m(2,3) - m(3,0)*m(1,3)*m(2,1);
-    d[9] = -m(0,0)*m(2,1)*m(3,3) + m(0,0)*m(2,3)*m(3,1) + m(2,0)*m(0,1)*m(3,3)
-          - m(2,0)*m(0,3)*m(3,1) - m(3,0)*m(0,1)*m(2,3) + m(3,0)*m(0,3)*m(2,1);
-    d[10] = m(0,0)*m(1,1)*m(3,3) - m(0,0)*m(1,3)*m(3,1) - m(1,0)*m(0,1)*m(3,3)
-          + m(1,0)*m(0,3)*m(3,1) + m(3,0)*m(0,1)*m(1,3) - m(3,0)*m(0,3)*m(1,1);
-    d[11] = -m(0,0)*m(1,1)*m(2,3) + m(0,0)*m(1,3)*m(2,1) + m(1,0)*m(0,1)*m(2,3)
-          - m(1,0)*m(0,3)*m(2,1) - m(2,0)*m(0,1)*m(1,3) + m(2,0)*m(0,3)*m(1,1);
-    d[12] = -m(1,0)*m(2,1)*m(3,2) + m(1,0)*m(2,2)*m(3,1) + m(2,0)*m(1,1)*m(3,2)
-          - m(2,0)*m(1,2)*m(3,1) - m(3,0)*m(1,1)*m(2,2) + m(3,0)*m(1,2)*m(2,1);
-    d[13] = m(0,0)*m(2,1)*m(3,2) - m(0,0)*m(2,2)*m(3,1) - m(2,0)*m(0,1)*m(3,2)
-          + m(2,0)*m(0,2)*m(3,1) + m(3,0)*m(0,1)*m(2,2) - m(3,0)*m(0,2)*m(2,1);
-    d[14] = -m(0,0)*m(1,1)*m(3,2) + m(0,0)*m(1,2)*m(3,1) + m(1,0)*m(0,1)*m(3,2)
-          - m(1,0)*m(0,2)*m(3,1) - m(3,0)*m(0,1)*m(1,2) + m(3,0)*m(0,2)*m(1,1);
-    d[15] = m(0,0)*m(1,1)*m(2,2) - m(0,0)*m(1,2)*m(2,1) - m(1,0)*m(0,1)*m(2,2)
-          + m(1,0)*m(0,2)*m(2,1) + m(2,0)*m(0,1)*m(1,2) - m(2,0)*m(0,2)*m(1,1);
-    std::array::from_fn(|i| std::array::from_fn(|j| d[i * 4 + j] * det))
+    T::vnl_inverse4(m, det)
 }
 
 /// `vnl_inverse` of an `n × n` `vnl_matrix` (row-major), `n` from 1 to 4.
 pub fn inverse<T: ItkReal>(m: &[T], n: usize) -> Vec<T> {
     assert_eq!(m.len(), n * n, "not an n × n matrix");
     match n {
-        1 => vec![T::ONE / m[0]],
+        1 => vec![T::ONE.sse_div(m[0])],
         2 => inverse2(&[[m[0], m[1]], [m[2], m[3]]])
             .iter()
             .flatten()
@@ -272,4 +200,72 @@ mod tests {
         assert_eq!(det3(&m3), determinant(&m3.concat(), 3));
         assert_eq!(det4(&m4), determinant(&m4.concat(), 4));
     }
+
+    /// Where two NaNs meet, the result is the first operand's: `[[A, 1], [1, B]]` has the
+    /// determinant `A·B - 1 = A`, and its inverse's first entry is `m(1,1) · (1/det)` in the
+    /// `float` instance (`B`) and `(1/det) · m(1,1)` in the `double` one (`A`).
+    #[test]
+    fn the_float_and_double_inverses_take_their_own_operand_order() {
+        let (a, b) = (f32::from_bits(0x7fc0_0001), f32::from_bits(0xffc0_0002));
+        let i = inverse2(&[[a, 1.0], [1.0, b]]);
+        assert_eq!(det2(&[[a, 1.0], [1.0, b]]).to_bits(), 0x7fc0_0001);
+        assert_eq!(
+            i.concat().iter().map(|x| x.to_bits()).collect::<Vec<_>>(),
+            [0xffc0_0002, 0x7fc0_0001, 0x7fc0_0001, 0x7fc0_0001]
+        );
+        let (a, b) = (
+            f64::from_bits(0x7ff8_0000_0000_0001),
+            f64::from_bits(0xfff8_0000_0000_0002),
+        );
+        let i = inverse2(&[[a, 1.0], [1.0, b]]);
+        assert_eq!(i[0][0].to_bits(), 0x7ff8_0000_0000_0001);
+        // a NaN made from numbers is x86-64's (sign set), not AArch64's
+        let inf = f32::INFINITY;
+        assert_eq!(det2(&[[inf, inf], [1.0, 1.0]]).to_bits(), 0xffc0_0000);
+    }
+
+    /// The closed forms' NaNs, bit for bit, on every platform: a digest of the determinants and
+    /// inverses of `cases`' matrices (NaN signs and payloads hashed exactly), recorded on Linux
+    /// x86-64, where the probe `validation/probes/fs-vnl` (family `order`) shows every value
+    /// identical to VNL's own instances. `LARMORX_PRINT_DIGESTS=1` prints it.
+    #[test]
+    fn nan_bits_are_x86_64s() {
+        use crate::x87::cases::SplitMix64;
+        let mut rng = SplitMix64::new(0x0de7_0bad_5eed);
+        let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+        let mut word = |w: u64| {
+            for b in w.to_le_bytes() {
+                h = (h ^ u64::from(b)).wrapping_mul(0x0100_0000_01b3);
+            }
+        };
+        let mut nans = 0;
+        for n in 1..=4 {
+            for _ in 0..2000 {
+                let m = cases::matrix_f32(&mut rng, n);
+                let d = determinant(&m, n);
+                word(u64::from(d.to_bits()));
+                if d != 0.0 {
+                    for x in inverse(&m, n) {
+                        nans += usize::from(x.is_nan());
+                        word(u64::from(x.to_bits()));
+                    }
+                }
+                let m = cases::matrix_f64(&mut rng, n);
+                let d = determinant(&m, n);
+                word(d.to_bits());
+                if d != 0.0 {
+                    for x in inverse(&m, n) {
+                        nans += usize::from(x.is_nan());
+                        word(x.to_bits());
+                    }
+                }
+            }
+        }
+        if std::env::var_os("LARMORX_PRINT_DIGESTS").is_some() {
+            println!("NAN_BITS = {h:#018x} ({nans} NaN entries of inverses)");
+        }
+        assert_eq!(h, NAN_BITS);
+    }
+
+    const NAN_BITS: u64 = 0x39ff_7891_bbbd_e925;
 }

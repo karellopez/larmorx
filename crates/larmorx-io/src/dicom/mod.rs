@@ -48,7 +48,7 @@ pub mod read;
 mod tests;
 
 pub use cond::{CondStack, Condition};
-pub use read::{close_object, open_file};
+pub use read::{close_object, open_file, open_file_named};
 
 /// CTN's value representations (`DCM_VALUEREPRESENTATION`), with its numbers.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

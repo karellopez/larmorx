@@ -1065,8 +1065,9 @@ class Runner:
         clear_files(case)
         env = environment(case)
         if self.cache is not None and not case.files:
-            # FreeSurfer reads variables the key of its family leaves out (DIAG, PROFILE, TMPDIR, ...):
-            # such a run is never cached, or two runs that differ only by them would share an entry
+            # a run setting a variable the key of FreeSurfer's family leaves out is never cached, or two
+            # runs that differ only by it would share an entry (none since 2026-11-13: the key holds
+            # every variable FreeSurfer reads, DIAG, PROFILE, TMPDIR, ...)
             unkeyed = sorted(k for k in case.env if not self.env_matters(k, "freesurfer", env))
             never = case.never or (f"sets {', '.join(unkeyed)}, outside the key" if unkeyed else "")
             pol = self.cache.Policy(threads=1, family="freesurfer", never=never)

@@ -160,8 +160,35 @@ def compute_dvars(
                 ]
             )
         raise
+    if upstream_defects == "fix" and any(n[0] in _EXACT for n in notices):
+        notices = _shown(notices, (std, nstd, vxstd), mfunc, remove_zerovariance, variance_tol,
+                         intensity_normalization, numpy_version, scipy_version, n_threads)  # fmt: skip
     _defects.warn(notices)
     return DvarsResult(std=std, nstd=nstd, vxstd=vxstd, voxels=voxels, ar1=ar1)
+
+
+#: The corrections whose notice names a condition (a degenerate voxel, a floating-point warning):
+#: named only where the corrected series differ from nipype's.
+_EXACT = ("PIPE-46", "PIPE-47", "PIPE-50")
+
+
+def _same(a: np.ndarray, b: np.ndarray) -> bool:
+    return a.dtype == b.dtype and a.shape == b.shape and bool(np.array_equal(a, b, equal_nan=True))
+
+
+def _shown(notices, fixed, mfunc, rz, tol, norm, numpy_version, scipy_version, n_threads):
+    """``notices`` without PIPE-46, PIPE-47 and PIPE-50 when nipype's own result (``reproduce``)
+    is the corrected one (e.g. every voxel constant: NaN both ways)."""
+    try:
+        rep = _core.nipype_compute_dvars(
+            mfunc, bool(rz), float(tol), float(norm), str(numpy_version), str(scipy_version),
+            "reproduce", n_threads,
+        )  # fmt: skip
+    except Exception:  # nipype stops there (SciPy 1.18's LinAlgError, a RuntimeWarning): shown
+        return notices
+    if all(_same(a, b) for a, b in zip(fixed, rep[:3], strict=True)):
+        return [n for n in notices if n[0] not in _EXACT]
+    return notices
 
 
 @dataclass(frozen=True)
@@ -188,8 +215,9 @@ def _gen_fname(in_file: str, suffix: str, out_dir: str) -> str:
 
 
 def _savetxt(path: str, rows: list[str]) -> None:
-    """``np.savetxt``'s text: one line per row, written in text mode as numpy writes it."""
-    with open(path, "w", encoding="utf-8") as f:
+    """``np.savetxt``'s text: one line per row (Linux's line ends on every platform: numpy's
+    text mode writes ``\r\n`` on Windows)."""
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
         f.write("".join(r + "\n" for r in rows))
 
 

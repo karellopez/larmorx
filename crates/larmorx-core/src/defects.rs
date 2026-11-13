@@ -375,12 +375,88 @@ defects! {
         "the index matches the entity patterns against each file's absolute path, so the folders above the dataset give its files entities: below a folder named func, sub-pilot or run-2 every file gets datatype func, subject pilot or run 2, and with the derivatives configuration (whose den-, res-, desc-, ... patterns have no separator before them) below golden-x or andres-lab every file gets den or res";
     PIPE_40 = "PIPE-40", "niworkflows IntraModalMerge", true,
         "with to_ras the series is reoriented to RAS but in_mask is not, so grand_mean_scaling indexes the RAS series with the mask on the input's grid: numpy's IndexError when the shapes differ, a mirrored or permuted mask when they agree";
+    PIPE_41 = "PIPE-41", "fMRIPrep init_bold_confs_wf", true,
+        "merge_confound_metadata's third input is set to the tissue signals' metadata (Method: Mean for global_signal, csf, white_matter, csf_wm and tcompcor) and then connected to the crown's metadata, which replaces it: the confounds' JSON never describes those five columns";
+    PIPE_43 = "PIPE-43", "niworkflows parse_formula", true,
+        "the variables of each group of a model formula, and the columns others stands for, are ordered as a Python set of strings, whose order changes between processes (the per-process hash seed), so ExpandModel writes the expansion's columns of a variable in another order from one run to the next (x_power2 before or after x_derivative1_power2); never reproduced";
+    PIPE_44 = "PIPE-44", "nipype compute_noise_components", true,
+        "a mask that gives no component (an empty mask with components_criterion 'all') ends the loop over the masks (break): the masks after it are skipped, their components and metadata lost, and when no component was found failure_mode='NaN' stops with ValueError: need at least one array to concatenate instead of returning";
+    PIPE_45 = "PIPE-45", "nipype compute_noise_components", true,
+        "only the voxels whose float sum over time is NaN are zeroed: a voxel holding an infinity (and no NaN) reaches the pre-filter and the SVD, which then fails, so every component of the mask is NaN with failure_mode='NaN' (or ValueError: array must not contain infs or NaNs), while a finite voxel whose float32 sum overflows both ways is zeroed";
     PIPE_46 = "PIPE-46", "nipype compute_dvars", true,
         "the voxel-wise standardisation, which runs whatever DVARS the caller asked for, turns numpy's floating-point warnings into errors: a voxel whose predicted difference SD is 0 (a robust SD of 0, kept by remove_zerovariance=False, or an AR(1) estimate of exactly 1) stops the whole computation with RuntimeWarning: divide by zero (or invalid value) encountered in divide, and every DVARS series is lost";
     PIPE_47 = "PIPE-47", "nipype compute_dvars", true,
         "an AR(1) estimate above 1, which the float32 FFT's rounding gives for a series whose lag-1 autocorrelation is just below 1, makes the predicted difference SD the square root of a negative number: NaN, so every standardised and voxel-wise DVARS value is NaN, without an error";
     PIPE_50 = "PIPE-50", "nipype compute_dvars", true,
         "a voxel whose demeaned series is all zeros (a constant voxel, kept by remove_zerovariance=False) has the AR(1) Yule-Walker equation 0 a = 0: with SciPy 1.15 nitime's solve returns NaN, which makes every standardised and voxel-wise DVARS value NaN without an error; with SciPy 1.18 it stops with LinAlgError (\"A singular matrix detected.\")";
+    PIPE_51 = "PIPE-51", "nipype TSNR", true,
+        "the maps of a series stored as integers (tSNR, mean, standard deviation, the detrended series) are written in that integer type, quantized by nibabel's scaling (256 levels for uint8, 65,536 for int16): the check meant to switch the header to float32 for integer data never fires, as the data are float32 by then";
+    PIPE_52 = "PIPE-52", "nipype regress_poly", true,
+        "the non-constant regressors it returns (CompCor's Legendre pre-filter file) are X[:, :-1], the constant and every polynomial but the highest, not the polynomials of degree 1 to d";
+    PIPE_53 = "PIPE-53", "nipype regress_poly, cosine_filter", true,
+        "an axis other than the last takes that axis' length as the series' length but reshapes the data in memory order to rows of that length, so the series regressed are runs of consecutive values across voxels and volumes, without an error";
+    PIPE_54 = "PIPE-54", "nipype compute_noise_components", true,
+        "a components_criterion of 0 ends the loop over the masks at the first one, and a negative one other than -1 ('all') slices columns off the end of each mask's components (u[:, :-2]) while marking none retained in the metadata; a count given as a float (6.0) stops with TypeError when an SVD fails with failure_mode='NaN'";
+    PIPE_55 = "PIPE-55", "nipype compute_noise_components", true,
+        "an empty mask with a failure_mode other than 'error' returns an empty pre-filter basis, so when it is the last mask the cosine or polynomial basis is lost (CompCor's pre-filter file then holds no basis column)";
+    PIPE_56 = "PIPE-56", "nipype CompCor", true,
+        "the repetition time read from the header is converted from milliseconds but not from microseconds (xyzt_units usec): it is taken as that many seconds, which gives a cosine basis of millions of columns";
+    PIPE_57 = "PIPE-57", "nipype compute_noise_components", true,
+        "a filter_type other than 'cosine', 'polynomial' and False silently filters nothing, not even the mean, and a float32 series is then decomposed in single precision";
+    PIPE_58 = "PIPE-58", "nipype compute_noise_components", true,
+        "mask_names shorter than the masks silently drops the masks without a name (zip): their components and metadata are not computed";
+    PIPE_59 = "PIPE-59", "nipype compute_noise_components", true,
+        "an SVD that fails with failure_mode='NaN' is replaced by T NaN singular values whatever the decomposition's size min(T, N), and with components_criterion 'all' by one NaN component while all T values are marked retained (CompCor's metadata then names every one after the first component)";
+    PIPE_60 = "PIPE-60", "nipy rotation_vec2mat", true,
+        "the angle of a rotation vector given as integers is the square root of its sum of squares computed in the vector's own type, which wraps around silently (a component of an int8 vector from 12, int16 from 182, int32 from 46,341; an int64 vector when the sum passes 2^63, from about 1.75e9 per component), so nipype's normalize_mc_params(params, 'NIPY') of such a row is another rotation or numpy's LinAlgError";
+    PIPE_61 = "PIPE-61", "niworkflows AddTSVHeader", true,
+        "numpy's loadtxt squeezes a table of one row to a vector, which savetxt writes as one column (the row's values one under the other), and a table of one value to a scalar, which savetxt refuses (ValueError: Expected 1D or 2D array, got 0D array instead)";
+    PIPE_62 = "PIPE-62", "niworkflows AddTSVHeader", true,
+        "a header with another number of names than the table's columns is written as given, so the file's header and rows disagree";
+    PIPE_63 = "PIPE-63", "fMRIPrep GatherConfounds", true,
+        "a shorter table is aligned with the last rows (its missing rows first), but pandas' concat joins the row labels without sorting them: when an earlier table is the shorter one (no signals table, a DVARS table first), the first volume's row is written last and every other row one volume early";
+    PIPE_64 = "PIPE-64", "niworkflows parse_formula", true,
+        "the shorthands (wm, gsr, rps, fd, acc, tcc, dv, dvall, nss, spikes, others) are replaced as text, anywhere and again inside every group: a name that holds one is rewritten (std_dvars becomes std_std_dvarsars), dvall becomes std_dvarsall (dv is replaced first), a shorthand that matches no column leaves an empty term (IndexError: string index out of range), and the names others leaves out lose every d<digits> and ^<digits> in them";
+    PIPE_65 = "PIPE-65", "niworkflows parse_formula", true,
+        "a term's operators are read with regular expressions over the whole term: text around a group other than a derivative before it and an exponent after it is ignored (foo(a), (a)b and d1x(a) give a's columns), an exponent after a group that holds another single-caret exponent fails with TypeError (((a)^2)^3), and a name that starts like a derivative or ends like an exponent (d1a, a^2) is taken for an operator without its group (TypeError)";
+    PIPE_66 = "PIPE-66", "niworkflows parse_formula", true,
+        "a variable reached by two terms of the formula (a + (a)^^2) is repeated: twice in parse_formula's table and four times in ExpandModel's file (pandas selects every column of a repeated name each time it is named), and a group that repeats one fails with pandas' ValueError (Shape of passed values ...)";
+    PIPE_67 = "PIPE-67", "niworkflows spike_regressors", true,
+        "each lag is added to the volumes the earlier lags flagged, so lags [1, 2] (or [0, 1, 2]) flag the third volume after a spike too";
+    PIPE_68 = "PIPE-68", "niworkflows spike_regressors", true,
+        "minimum_contiguous counts the last run of unflagged volumes one volume longer than it is (its end is taken one past the table), so a final run one volume shorter than the minimum is not flagged";
+    PIPE_69 = "PIPE-69", "niworkflows spike_regressors", true,
+        "a criterion other than '<' and '>' is skipped without an error (when every criterion is: TypeError: reduce() of empty iterable with no initial value)";
+    PIPE_70 = "PIPE-70", "niworkflows NormalizeMotionParams", true,
+        "numpy's loadtxt squeezes a table of one row to a vector, which numpy's apply_along_axis refuses (AxisError: axis 1 is out of bounds for array of dimension 1)";
+    PIPE_71 = "PIPE-71", "nitransforms load", true,
+        "a transform file of one transform is loaded as one Affine, whose 4 x 4 matrix fMRIPrep's FSLMotionParams and FSLRMSDeviation then take as a series of four (its rows): a one-volume series stops with numpy's AxisError (axis2: axis 1 is out of bounds for array of dimension 1)";
+    PIPE_72 = "PIPE-72", "fMRIPrep FSLMotionParams", true,
+        "a reference image whose centre of gravity is undefined (a constant image under 25.2.7, whose weights value - min are all zero; a sum of zero under 25.2.6; a NaN or infinite voxel) gives NaN or infinite translations in every row without an error, which FramewiseDisplacement turns into n/a everywhere";
+    PIPE_73 = "PIPE-73", "nitransforms ITKLinearTransform", true,
+        "every ITK text transform is read in single precision (numpy's genfromtxt with dtype f4), the double-precision ones (AffineTransform_double_3_3) too, so their parameters are rounded to float32";
+    PIPE_74 = "PIPE-74", "fMRIPrep _binary_union", true,
+        "the masks are cast to int64 with numpy's cast, undefined in C for NaN, infinities and values beyond int64's range: on x86-64 they become the most negative int64, so a voxel of +inf or 1e19 (or a uint64 value from 2**63) is outside the union";
+    PIPE_75 = "PIPE-75", "fMRIPrep _binary_union", true,
+        "masks of different shapes are broadcast without an error (a mask of shape (X, Y, 1) is taken for every slice of an (X, Y, Z) one)";
+    PIPE_76 = "PIPE-76", "fMRIPrep acompcor_masks", true,
+        "with is_aseg the grey-matter map is cast to uint8 with numpy's cast before the test > 0: integers wrap (-1 is 255, inside; 256 is 0, outside) and floats out of int32's range or NaN are undefined in C (on x86-64 0, outside; a float in range keeps its truncated int32's low byte: 300.0 is 44)";
+    PIPE_77 = "PIPE-77", "niworkflows BinaryDilation", true,
+        "a negative radius (traits.Int takes it) dilates with scikit-image's ball of that radius, an arbitrary footprint: -1 is one false element, so the dilated mask is empty; -2 the cross of radius 1";
+    PIPE_78 = "PIPE-78", "niworkflows SignalExtraction", true,
+        "a class label holding a tab or a line break is written as it is, which breaks the table's columns or rows";
+    PIPE_80 = "PIPE-80", "nipype command lines", true,
+        "some file names are written into the command line unquoted (the files inside ANTs' bracketed arguments: ApplyTransforms' --transform [ f, 1 ] and --output, Registration's --metric, --masks, --initial-moving-transform and --output, N4BiasFieldCorrection's and DenoiseImage's [ out, extra ]; ApplyTransforms' --transform f, MultiImageMaths' operands, TOPUP's --datain file), and the line runs through the shell, so a file name with a blank is split into several words (one with a quote breaks the line); BET's input name is made relative after it is quoted, so a name that needs quotes is taken relative to the process's folder: the program gets other file names and fails";
+    PIPE_81 = "PIPE-81", "nipype command line", true,
+        "nipypecli run gives an input of a compound trait (traits.Either) the argparse type of the input before it in name order, a variable left from the loop's previous iteration (CompCor's num_components reads text, so a number of components is refused; save_pre_filter and save_metadata read a float, so a file name or True is refused), and cannot build the parser of an interface whose first input is compound (UnboundLocalError: niworkflows' TSV2JSON) or that has a list of compound items (AttributeError: niworkflows' DictMerge, fMRIPrep's FMRISummary)";
+    PIPE_82 = "PIPE-82", "nipype command line", true,
+        "nipypecli run reads an input's text by the type of its default value, not by its trait: a float input whose default is an integer reads only integers (CompCor's high_pass_cutoff, FramewiseDisplacement's radius), and the texts of a tuple (aCompCorMasks' bold_zooms, RegridToZooms' zooms, the plots' figsize), an optional dictionary or an enumeration's values that are not text (CompCor's pre_filter False, GenerateSamplingReference's xform_code) reach the trait unconverted and are refused whatever is given; a list of booleans reads every text but the empty one as true";
+    PD_01 = "PD-01", "pandas read_csv", true,
+        "the default float parser (precise_xstrtod) keeps at most 17 digit characters, the leading zeros of 0.00... included, accumulates them in a double and divides by one power of ten, so most values to_csv writes (their shortest repr, up to 17 significant digits) are read back as another double, one or more units in the last place off";
+    PD_02 = "PD-02", "pandas to_json", true,
+        "the 10-decimal formatting of doubles (ujson) multiplies the fraction by 1e10 in floating point, truncates it and rounds the remainder, ties of an even last digit down and of a last digit 0 up, so some values are written with another 10th decimal than the correctly rounded one";
+    PD_03 = "PD-03", "pandas read_csv", true,
+        "an integer column with missing values marks them with int64's minimum before turning them into NaN, so a value equal to -9223372036854775808 in it is read as NaN";
     SCI_02 = "SCI-02", "SciPy ndimage", true,
         "NaN and out-of-range values written to an integer output are converted as x86-64 converts them (C leaves the conversion undefined)";
     SCI_03 = "SCI-03", "SciPy ndimage", true,
@@ -1032,7 +1108,7 @@ defects! {
     FS_16 = "FS-16", "FreeSurfer", true,
         "matrix functions given an output whose type or size differs from the result's (a complex product into a real matrix) write outside the output: memory the program does not own";
     FS_17 = "FS-17", "FreeSurfer", true,
-        "FreeSurfer's matrices and histograms give -2147483648 on x86-64 where they turn a float or double beyond the int range, or NaN, into an integer (bin numbers, counts compared as integers, the floor of a vector); the C conversion is undefined there";
+        "FreeSurfer's matrices and histograms give -2147483648 where a float or double beyond the 32-bit integer range, or NaN, becomes an integer (bin numbers, counts compared as integers, the floor of a vector)";
     FS_18 = "FS-18", "FreeSurfer", true,
         "HISTOclearCounts resets only the first count of the histogram (and, making a new histogram, copies only the first bin's value): the counts it is meant to reset keep accumulating";
     FS_19 = "FS-19", "FreeSurfer", true,
@@ -1066,13 +1142,13 @@ defects! {
     FS_31 = "FS-31", "FreeSurfer", true,
         "FreeSurfer's vector functions do not check their vectors' lengths (VectorCrossProduct and VectorTripleProduct accept column vectors of one or two elements and never check the other vectors; VectorDot and VectorDistance take the second vector to the first's length): values are read from outside the vectors";
     FS_34 = "FS-34", "FreeSurfer", true,
-        "OpenPowell and OpenPowell2 called with no initial directions (NULL) crash when they return the final directions";
+        "OpenPowell and OpenPowell2 called with no initial directions crash at the end of the minimization";
     FS_35 = "FS-35", "FreeSurfer", false,
-        "fs_powell reports FAILED_USER_REQUEST, not FAILED_TOO_MANY_ITERATIONS, when it reaches its iteration limit, so OpenPowell's exit and OpenPowell2's message and return value 1 for too many iterations never happen (kept: FreeSurfer's change keeps programs from exiting at the limit)";
+        "OpenPowell and OpenPowell2 never report too many iterations: at the iteration limit OpenPowell does not end the program, and OpenPowell2 neither prints its message nor returns 1 (kept: FreeSurfer's change keeps programs from exiting at the limit)";
     FS_36 = "FS-36", "FreeSurfer", false,
         "OpenPowell's tolerance argument has no effect: every call stops at a relative tolerance of 1e-10 on the cost (kept: the programs' results depend on it)";
     FS_37 = "FS-37", "FreeSurfer", true,
-        "fs_lbfgs never returns its starting point as the best one: when no evaluation improves on it, a successful run returns empty parameters (OpenDFPMin then crashes) and a failed one returns the line search's last trial point with the previous run's end value; and the end value it reports is the last one evaluated, which can be a worse point's";
+        "OpenDFPMin's L-BFGS passes never take the starting point as the best one: when no evaluation improves on it, a successful pass gives empty parameters (OpenDFPMin then crashes) and a failed one the line search's last trial point with the previous pass's end value; and the end value a pass reports is the last one evaluated, which can be a worse point's";
     FS_38 = "FS-38", "FreeSurfer", true,
         "OpenDFPMin repeats its minimization while the cost is better than the caller's starting value by more than the tolerance, never comparing with the previous pass's, so it repeats until a pass fails or crashes (FS-37)";
     FS_39 = "FS-39", "FreeSurfer", true,
@@ -1096,7 +1172,7 @@ defects! {
     FS_48 = "FS-48", "FreeSurfer", true,
         "the SVD functions (MatrixSVD, the SVD inverses and pseudo-inverses, the condition numbers) never return for some matrices with infinite or NaN entries";
     FS_49 = "FS-49", "FreeSurfer", true,
-        "freadInt and freadDouble at the end of a file return memory contents (freadInt prints nothing), so MatrixReadFrom of a file that ends early fills the matrix's type, sizes or elements with memory contents";
+        "freadInt and freadDouble at the end of a file return memory contents (freadInt prints nothing), and MatrixReadFrom of a file that ends early fills the matrix's type, sizes or elements with memory contents";
     FS_50 = "FS-50", "FreeSurfer", true,
         "HISTOabs of a histogram whose absolute bin values span an infinite range, or whose bin size is 0 or NaN, ends the program with 'could not allocate histogram' (the bin count it needs is beyond the int range)";
     FS_51 = "FS-51", "FreeSurfer", true,
@@ -1157,6 +1233,34 @@ defects! {
         "an error reported inside a multibyte character (a non-ASCII character in an XML declaration's pseudo-attribute) makes the line count step over the error position and read past the document: the program crashes";
     FS_87 = "FS-87", "gifticlib", true,
         "at verbosity 6 and 7 the GIFTI reader's messages about a MatrixData buffer show the Data element's buffer and length instead, including memory never written";
+    FS_90 = "FS-90", "CTN", true,
+        "a condition message of 1,024 bytes or more (a long file name in it) overflows the buffer it is formatted in, and a file name of 1,024 bytes or more overflows the object's copy of it: the program crashes or its memory is corrupted";
+    FS_91 = "FS-91", "CTN", true,
+        "an element of undefined length that is neither a sequence nor pixel data (a sequence the 2002 dictionary types otherwise, a stray item) is read with a count of -1, which fails, and the failure is taken for a complete read: the element is kept with a value never written, the remaining length grows by one and the value's bytes are read as the next elements (an item's delimiter there ends the data set early)";
+    FS_92 = "FS-92", "CTN", true,
+        "Bits Allocated, Pixel Representation, the file meta group's length, the transfer syntax and the Waveform Data Representation are read from their values whatever their length and representation: a shorter value, a sequence or a transfer syntax without its zero byte is read past its end, from memory never written";
+    FS_93 = "FS-93", "CTN", true,
+        "a group length element shorter than 4 bytes is given the group's 4-byte length, and a Waveform Data Representation longer than 16 bytes is copied into a 17-byte field: both write past their memory";
+    FS_94 = "FS-94", "CTN (FreeSurfer's copy)", true,
+        "FreeSurfer's copy swaps the 4-byte integers (UL, SL) of big-endian data in 2-byte pairs instead of reversing them: every such value read from a big-endian file is wrong";
+    FS_95 = "FS-95", "CTN", true,
+        "a UL or SL value of big-endian data whose length is not a multiple of 4 is swapped 4 bytes at a time past its end, its 32-bit count wrapping: the program crashes";
+    FS_96 = "FS-96", "CTN", true,
+        "FD and FL values (64- and 32-bit floating point) of big-endian data are left in the file's byte order: every such value read from a big-endian file is wrong";
+    FS_97 = "FS-97", "CTN", true,
+        "sequences are read by recursion, one level per nesting: a file nesting them deeply enough exhausts the stack and the program crashes";
+    FS_98 = "FS-98", "CTN", true,
+        "a fragment of encapsulated pixel data whose length is odd (or over the remaining count) closes the object, and the reader then writes through the closed object: the program crashes";
+    FS_99 = "FS-99", "nlohmann/json", true,
+        "the pretty printer's indent string (512 characters) is doubled once, with spaces, when an indent passes it (past 512 characters a tab indent becomes spaces; an indent more than twice the string's length is read past its memory), and the writer and the value's destructor recurse once per nesting level: a value nested deeply enough exhausts the stack";
+    FS_281 = "FS-281", "miniz 1.15", true,
+        "a deflate stream that ends early, read with no more input to come (the zlib stream API's MZ_FINISH, mz_uncompress), is padded with zero bytes, which are decoded as if they were the stream's: a truncated stream can be accepted with bytes it never held";
+    FS_282 = "FS-282", "miniz 1.15", true,
+        "the length symbols 286 and 287 and the distance symbols 30 and 31, which deflate does not define, are accepted: such a length copies 3 bytes and moves the output by 3 (past the end of the buffer when fewer than 3 bytes are left), such a distance copies the byte under the cursor";
+    FS_283 = "FS-283", "miniz 1.15", true,
+        "a Huffman code with no codes or a single code is accepted whatever its length, and a bit pattern it gives no symbol to is decoded as symbol 0 (from the lookup table without taking any bits)";
+    FS_284 = "FS-284", "miniz 1.15", true,
+        "in the zlib-style stream API, a match farther back than the output so far (or of distance 0 before 32 KiB were output) copies from the 32 KiB dictionary where nothing was written yet: memory never written";
     FS_100 = "FS-100", "FreeSurfer", true,
         "the gamma draw converts its shape's integer part to a 32-bit unsigned integer, which C leaves undefined outside [0, 2^32): a shape of 2^32 or more gives a value of the wrong size, NaN and +inf the value of a shape below 1, and a negative shape or -inf a draw that does not return in practice";
     FS_101 = "FS-101", "FreeSurfer", true,
@@ -1275,8 +1379,6 @@ defects! {
         "the rows of a tensor volume, as code that goes through a volume row by row sees them (MRIcopy), all start at its first voxel: such code reads and writes only the volume's first row";
     FS_261 = "FS-261", "FreeSurfer", true,
         "the byte-order swap of a buffer of n items of 2, 4 or 8 bytes (ByteSwapBuf) reverses only the first n/2, n/4 or n/8 items (rounded up) and leaves the rest as they were";
-    FS_262 = "FS-262", "FreeSurfer", true,
-        "the byte-order swap of a 64-bit integer (swapLong64) returns the reversed value rounded to a double's 53 significant bits (only values whose reversed form needs more bits change; none below 2^40)";
     FS_263 = "FS-263", "FreeSurfer", true,
         "with exceptions switched on, a fatal error with a nonzero code aborts the program (exit status 134, after the C++ library's terminate message) instead of passing the code to the program's handler";
     FS_167 = "FS-167", "FreeSurfer", true,
@@ -1296,7 +1398,7 @@ defects! {
     FS_174 = "FS-174", "FreeSurfer", true,
         "an allocation that fails in lcalloc ends the program with exit status 0, as if it had succeeded, after printing Cannot calloc()";
     FS_176 = "FS-176", "FreeSurfer", true,
-        "the readers and writers of a 64-bit integer (freadLong, fwriteLong, znzreadLong, znzwriteLong) round it to a double's 53 significant bits: a number read comes back rounded (-2^63 where the rounding reaches 2^63), and a number written is stored with the low bits of its first bytes changed, whenever its byte-reversed form needs more than 53 bits (most negative numbers, and numbers whose last bytes are not zero)";
+        "the byte-order swap of a 64-bit integer (swapLong64) and the readers and writers of a 64-bit integer (freadLong, fwriteLong, znzreadLong, znzwriteLong) round it to a double's 53 significant bits: a number swapped or read comes back rounded (-2^63 where the rounding reaches 2^63), and a number written is stored with the low bits of its first bytes changed, whenever its byte-reversed form needs more than 53 bits (most negative numbers, and numbers whose last bytes are not zero)";
     FS_175 = "FS-175", "FreeSurfer", true,
         "byteswapbufshort, byteswapbuffloat and byteswapbufdouble given a byte count that is not a multiple of the number's size reverse the bytes of a whole last number past the count: past the end of a buffer that ends at the count (memory the program does not own)";
     FS_177 = "FS-177", "FreeSurfer", true,
@@ -1343,6 +1445,58 @@ defects! {
         "freeing no linear transform array (LTAfree of a null array) crashes";
     FS_198 = "FS-198", "FreeSurfer", true,
         "copying a linear transform array from one whose transforms lack a matrix onto one that has it leaves the destination's matrix unusable: using or freeing the copy later crashes or reads garbage";
+    FS_199 = "FS-199", "FreeSurfer", true,
+        "npy2mri (reading a NumPy .npy file) reads the header length of a file of format version 3.0 from 3 bytes instead of NumPy's 4: the header text starts a byte early and lacks its last byte, and the reading runs on past it (a crash or a header from memory contents); versions 3.1 and later crash";
+    FS_200 = "FS-200", "FreeSurfer", true,
+        "npy2mri of a .npy file of format version 0 or 4 to 255 reads its header length with a size taken from memory contents: a crash or a header read from memory contents";
+    FS_201 = "FS-201", "FreeSurfer", true,
+        "npy2mri of a .npy file whose header length is about 8 MiB or more (the program's default stack size; version 2 headers may give up to 4 GiB) crashes";
+    FS_202 = "FS-202", "FreeSurfer", true,
+        "npy2mri of a .npy file that ends inside its header takes the header's missing bytes from memory contents";
+    FS_203 = "FS-203", "FreeSurfer", true,
+        "npy2mri reads past a .npy header that has no newline, or whose descr, fortran_order or shape value or a key without a colon runs to its end: memory contents beyond the header (a crash, or a type, order or shape read from memory)";
+    FS_204 = "FS-204", "FreeSurfer", true,
+        "npy2mri crashes on a shape with an empty element: every one-dimensional array as NumPy writes it, (3,), and shapes such as (3, ) or (3,,4)";
+    FS_205 = "FS-205", "FreeSurfer", true,
+        "npy2mri crashes on an array whose extents are all 1 (a single value of any number of dimensions) or that has none";
+    FS_206 = "FS-206", "FreeSurfer", true,
+        "a volume made from fewer than 3 extents (a two- or one-dimensional .npy array, or one whose leading or trailing extents of 1 npy2mri drops) gets its missing extents from memory: for an array whose extents of 1 were dropped, a dropped or earlier extent (an array of shape (1, 3, 4, 1) becomes a volume of 3 x 4 x 4 voxels, (1, 1, 2) one of 2 x 2 x 2), otherwise memory contents (often 0: a volume without voxels)";
+    FS_207 = "FS-207", "FreeSurfer", true,
+        "npy2mri of a .npy header without a descr or a fortran_order entry takes the data type or the order from memory contents, and of one without a shape entry crashes";
+    FS_208 = "FS-208", "FreeSurfer", true,
+        "npy2mri reverses the bytes of a big-endian array of 8-byte integers in 4-byte halves: every value is wrong";
+    FS_209 = "FS-209", "FreeSurfer", true,
+        "npy2mri's verbose output for a C-order array prints memory addresses, which differ from run to run";
+    FS_210 = "FS-210", "FreeSurfer", true,
+        "npy2mri takes any fortran_order value other than False (such as 0, false or a misspelling) as True: the voxels are placed transposed";
+    FS_211 = "FS-211", "FreeSurfer", true,
+        "npy2mri reads a slice of 2 GiB or more wrongly or past the volume's memory (its byte count does not fit 32 bits)";
+    FS_212 = "FS-212", "FreeSurfer", true,
+        "npy2mri of a .npy file shorter than its array leaves the missing voxels 0 without a message";
+    FS_213 = "FS-213", "FreeSurfer", true,
+        "npy2mri of a .npy header whose length does not make the data start at a multiple of 16 bytes skips the bytes up to the next multiple: the voxels are shifted by those bytes (NumPy reads the data right after the header)";
+    FS_214 = "FS-214", "FreeSurfer", true,
+        "gifti_get_DA_value_2D's message for a GIFTI data array without data prints the array's memory address as data= (it differs from run to run), not the data's (nil)";
+    FS_215 = "FS-215", "FreeSurfer", true,
+        "gifti_get_DA_value_2D reads a COMPLEX64 array's values as 8-byte doubles: each value is a meaningless number made of a value's real and imaginary parts";
+    FS_216 = "FS-216", "FreeSurfer", true,
+        "gifti_get_DA_value_2D reads the elements of an array of more than 2^31 values beyond the 2^31st from the wrong place";
+    FS_217 = "FS-217", "FreeSurfer", true,
+        "DTIwriteBValues and DTIwriteBVectors given no matrix create (or empty) the file and crash";
+    FS_218 = "FS-218", "FreeSurfer", true,
+        "DTIwriteBVectors of a matrix with fewer than 3 columns, and DTIwriteBValues of one without columns, write the next rows' numbers in each row's missing columns and, past the matrix's last number, memory contents";
+    FS_219 = "FS-219", "FreeSurfer", true,
+        "DTIparsePulseSeqName of a name with 100 characters or more before or after its # overflows a buffer: a crash or wrong values";
+    FS_220 = "FS-220", "FreeSurfer", true,
+        "DTIbvecChangeSpace of gradient directions with fewer than 3 columns reads and writes past each row: it changes the next rows' numbers, and past the matrix's last number it reads memory contents and writes outside the matrix";
+    FS_285 = "FS-285", "FreeSurfer", true,
+        "reading a volume-geometry block (the text block of linear transform and surface files) whose line starts with a word of 64 bytes or more writes the word past its buffer: memory corruption, a crash or wrong values";
+    FS_286 = "FS-286", "FreeSurfer", true,
+        "reading a volume-geometry block whose line has a second word of 2 bytes or more (not the usual =) writes the word past its 2-byte buffer: memory corruption, a crash or wrong values";
+    FS_287 = "FS-287", "FreeSurfer", true,
+        "reading a volume-geometry block, a blank line counts as a repeat of the line before it and takes one of the block's eight places: the block's last line (the centre, cras) is then not read and the line after the block is";
+    FS_288 = "FS-288", "FreeSurfer", true,
+        "reading a volume-geometry block whose first line is blank compares memory contents with the block's keys";
 }
 
 /// The register entry with ID `id`.

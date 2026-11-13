@@ -66,7 +66,7 @@
 // against dqrdc.c and dqrsl.c.
 #![allow(clippy::needless_range_loop)]
 
-use crate::itk_real::ItkReal;
+use crate::itk_real::{ItkReal, Precision};
 use crate::vnl_svd::{d_sign, daxpy, ddot, dnrm2, dscal};
 
 /// The message vnl prints on standard error when `solve` meets a zero diagonal entry of `R`
@@ -221,7 +221,7 @@ impl VnlQr {
 /// ask LINPACK for the solution, so `info` stays 0).
 pub const QTB_RANK_DEFICIENT: &str = "Modules/ThirdParty/VNL/src/vxl/core/vnl/algo/vnl_qr.hxx: vnl_qr<T>::QtB() -- matrix is rank-deficient by ";
 
-/// f2c's `abs(x)`: `x >= 0 ? x : -x`.
+/// f2c's `abs(x)`: `x >= 0 ? x : -x` (a NaN's sign is flipped, as C's negation flips it).
 #[inline]
 fn abs_m<T: ItkReal>(x: T) -> T {
     if x >= T::ZERO { x } else { -x }
@@ -234,67 +234,175 @@ fn sign_t<T: ItkReal>(a: T, b: T) -> T {
     if b >= T::ZERO { x } else { -x }
 }
 
+#[inline]
+fn single<T: ItkReal>() -> bool {
+    matches!(T::PRECISION, Precision::Float)
+}
+
+// The operand order of every `+` and `*` of the kernels below is the official build's (ITK
+// 4.13.2's netlib compiled by GCC 8.4.0 at `-O3`, SSE2): of two NaN operands x86-64 passes on the
+// first source's, and a NaN made from numbers is the default NaN with the sign bit set, which the
+// `sse_*` operations give on every platform. GCC keeps the source's expression trees (no
+// reassociation) but chooses, per statement and per unrolled or vectorized position, which operand
+// of a commutative operation comes first; the tables are those choices, read from the object code
+// by running it on NaNs with distinct payloads (validation/probes/fs-vnl, family `qrnan`, checks
+// every length to 300). `N` / `x` / `a`: the source's left operand first; `S` / `y`: the right one.
+
+/// `sdot`'s remainder loop (`n % 5` products, before the unrolled loop), by its length: which
+/// operand of each product comes first (`x` or `y`) and of each sum (`N` the running sum, `S` the
+/// product).
+const SDOT_REM: [(&[u8], &[u8]); 5] = [
+    (b"", b""),
+    (b"x", b"N"),
+    (b"xx", b"NN"),
+    (b"xxy", b"NNN"),
+    (b"yyyy", b"NSNS"),
+];
+/// `ddot`'s remainder loop.
+const DDOT_REM: [(&[u8], &[u8]); 5] = [
+    (b"", b""),
+    (b"y", b"N"),
+    (b"xx", b"NN"),
+    (b"xxy", b"NNN"),
+    (b"xxyy", b"NNNN"),
+];
+/// `sdot`'s unrolled loop as GCC vectorizes it: four blocks of five (20 products) at a time, the
+/// products `y·x`, the sums in this order.
+const SDOT_GROUP: &[u8] = b"NSSSSNSSSNSSSSNSNNSN";
+/// The blocks of five left after the groups (at most three), each in its own code: products and
+/// sums.
+const SDOT_BLOCKS: [&[u8]; 3] = [b"xxxxx", b"xyyyx", b"yyyyy"];
+/// `ddot`'s vectorized loop: two blocks of five (10 products) at a time, the products `y·x`.
+const DDOT_GROUP: &[u8] = b"NNNSNSNNSN";
+/// The sums of a block of five run alone (`sdot` and `ddot`).
+const DOT_BLOCK_SUMS: &[u8] = b"NNNSS";
+
 /// `snrm2`/`dnrm2` (unit stride): the scaled sum of squares in `T`, the norm `scale·sqrt(ssq)`
-/// in double rounded to `T`; one element: `abs`.
-fn nrm2_t<T: ItkReal>(x: &[T]) -> T {
+/// in double rounded to `T`; one element: `abs`. In the official build `ssq·(r·r)` is
+/// `(r·r)·ssq` and the norm `sqrt(ssq)·scale` (neither ever meets two NaNs). `snrm2` returns its
+/// `float` as a `double`, which quiets a signalling NaN (`abs` of one element passes it on
+/// unchanged); `dnrm2` returns it as it is.
+#[doc(hidden)]
+pub fn nrm2_t<T: ItkReal>(x: &[T]) -> T {
     match x.len() {
         0 => T::ZERO,
-        1 => abs_m(x[0]),
+        1 => {
+            let v = abs_m(x[0]);
+            // a NaN plus 0 is the NaN quieted (x86_nan), written out so no compiler folds the
+            // float-double-float round trip away
+            if single::<T>() && v.to_f64().is_nan() {
+                v.sse_add(T::ZERO)
+            } else {
+                v
+            }
+        }
         _ => {
             let (mut scale, mut ssq) = (T::ZERO, T::ONE);
             for &xi in x {
                 if xi != T::ZERO {
                     let absxi = abs_m(xi);
                     if scale < absxi {
-                        let r = scale / absxi;
-                        ssq = ssq * (r * r) + T::ONE;
+                        let r = scale.sse_div(absxi);
+                        ssq = r.sse_mul(r).sse_mul(ssq).sse_add(T::ONE);
                         scale = absxi;
                     } else {
-                        let r = absxi / scale;
-                        ssq = ssq + r * r;
+                        let r = absxi.sse_div(scale);
+                        ssq = ssq.sse_add(r.sse_mul(r));
                     }
                 }
             }
-            T::from_f64(scale.to_f64() * ssq.to_f64().sqrt())
+            T::from_f64(ssq.to_f64().sqrt().sse_mul(scale.to_f64()))
         }
     }
 }
 
-/// `sdot`/`ddot` (unit stride) with the reference BLAS's unrolling by five.
-fn dot_t<T: ItkReal>(x: &[T], y: &[T]) -> T {
+/// `sdot`/`ddot` (unit stride) with the reference BLAS's unrolling by five: `t + x[i]·y[i]` left
+/// to right, each operation in the official build's operand order (the tables above).
+#[doc(hidden)]
+pub fn dot_t<T: ItkReal>(x: &[T], y: &[T]) -> T {
     let n = x.len();
     let m = n % 5;
     let mut t = T::ZERO;
+    let step = |t: T, i: usize, mul: u8, add: u8| {
+        let p = if mul == b'x' {
+            x[i].sse_mul(y[i])
+        } else {
+            y[i].sse_mul(x[i])
+        };
+        if add == b'N' {
+            t.sse_add(p)
+        } else {
+            p.sse_add(t)
+        }
+    };
+    let (rem, group) = if single::<T>() {
+        (SDOT_REM[m], SDOT_GROUP)
+    } else {
+        (DDOT_REM[m], DDOT_GROUP)
+    };
     for i in 0..m {
-        t = t + x[i] * y[i];
+        t = step(t, i, rem.0[i], rem.1[i]);
     }
     let mut i = m;
+    while i + group.len() <= n {
+        for (k, &add) in group.iter().enumerate() {
+            t = step(t, i + k, b'y', add);
+        }
+        i += group.len();
+    }
+    let mut block = 0;
     while i + 5 <= n {
-        t = t
-            + x[i] * y[i]
-            + x[i + 1] * y[i + 1]
-            + x[i + 2] * y[i + 2]
-            + x[i + 3] * y[i + 3]
-            + x[i + 4] * y[i + 4];
+        let muls = if single::<T>() {
+            SDOT_BLOCKS[block]
+        } else {
+            b"yyyyy"
+        };
+        for k in 0..5 {
+            t = step(t, i + k, muls[k], DOT_BLOCK_SUMS[k]);
+        }
         i += 5;
+        block += 1;
     }
     t
 }
 
-/// `saxpy`/`daxpy`: `y += a·x`, nothing when `a == 0`.
-fn axpy_t<T: ItkReal>(a: T, x: &[T], y: &mut [T]) {
+/// `saxpy`/`daxpy`: `y += a·x`, nothing when `a == 0`. The official build adds `a·x + y`, and
+/// multiplies `x·a` for the second and third elements of the remainder loop (`n % 4`), `a·x`
+/// elsewhere.
+#[doc(hidden)]
+pub fn axpy_t<T: ItkReal>(a: T, x: &[T], y: &mut [T]) {
     if a == T::ZERO {
         return;
     }
-    for (yi, &xi) in y.iter_mut().zip(x) {
-        *yi = *yi + a * xi;
+    let m = y.len() % 4;
+    for (i, (yi, &xi)) in y.iter_mut().zip(x).enumerate() {
+        let p = if i == 0 || i >= m {
+            a.sse_mul(xi)
+        } else {
+            xi.sse_mul(a)
+        };
+        *yi = p.sse_add(*yi);
     }
 }
 
-/// `sscal`/`dscal`: `x = a·x`.
-fn scal_t<T: ItkReal>(a: T, x: &mut [T]) {
-    for xi in x {
-        *xi = a * *xi;
+/// `sscal`/`dscal`: `x = a·x`. The official build multiplies `x·a` except in a remainder loop of
+/// four (`n % 5 == 4`): `a·x` there in `sscal`, for its last two elements in `dscal`.
+#[doc(hidden)]
+pub fn scal_t<T: ItkReal>(a: T, x: &mut [T]) {
+    let m = x.len() % 5;
+    let from = if m != 4 {
+        usize::MAX
+    } else if single::<T>() {
+        0
+    } else {
+        2
+    };
+    for (i, xi) in x.iter_mut().enumerate() {
+        *xi = if i < m && i >= from {
+            a.sse_mul(*xi)
+        } else {
+            xi.sse_mul(a)
+        };
     }
 }
 
@@ -346,12 +454,13 @@ impl<T: ItkReal> Qr<T> {
             if x[ll] != T::ZERO {
                 nrmxl = sign_t(nrmxl, x[ll]);
             }
-            scal_t(T::ONE / nrmxl, &mut x[ll..ll + len]);
-            x[ll] = x[ll] + T::ONE;
+            scal_t(T::ONE.sse_div(nrmxl), &mut x[ll..ll + len]);
+            x[ll] = x[ll].sse_add(T::ONE);
             for j in l + 1..=p {
                 let lj = at(l, j);
-                // -dot / x(l, l): a double quotient of two T values rounded to T, which is T's.
-                let t = -dot_t(&x[ll..ll + len], &x[lj..lj + len]) / x[ll];
+                // -dot / x(l, l): a double quotient of two T values rounded to T, which is T's
+                // (its NaN too).
+                let t = (-dot_t(&x[ll..ll + len], &x[lj..lj + len])).sse_div(x[ll]);
                 let (head, tail) = x.split_at_mut(lj);
                 axpy_t(t, &head[ll..ll + len], &mut tail[..len]);
             }
@@ -371,18 +480,20 @@ impl<T: ItkReal> Qr<T> {
         self.x[i + self.n * j]
     }
 
-    /// `determinant()`: `R(0, 0)·Π(−R(i, i))` over the square part, in `T`, left to right.
+    /// `determinant()`: `R(0, 0)·Π(−R(i, i))` over the square part, in `T`, left to right (the
+    /// running product the first operand).
     pub fn determinant(&self) -> T {
         let m = self.n.min(self.p);
         let mut det = self.xat(0, 0);
         for i in 1..m {
-            det = det * -self.xat(i, i);
+            det = det.sse_mul(-self.xat(i, i));
         }
         det
     }
 
     /// `Q()`: the `rows × rows` orthogonal factor (row-major), the Householder reflections applied
-    /// to the identity from the last one, as VNL accumulates them (in `T`).
+    /// to the identity from the last one, as VNL accumulates them (in `T`; the official build
+    /// computes `w[i] += (v[j]·scale)·Q(j, i)` and `Q(i, j) -= w[j]·v[i]`).
     pub fn q(&self) -> Vec<T> {
         let (m, n) = (self.n, self.p);
         let mut q = vec![T::ZERO; m * m];
@@ -396,22 +507,22 @@ impl<T: ItkReal> Qr<T> {
                 continue;
             }
             v[k] = self.qraux[k];
-            let mut sq = v[k] * v[k];
+            let mut sq = v[k].sse_mul(v[k]);
             for j in k + 1..m {
                 v[j] = self.xat(j, k);
-                sq = sq + v[j] * v[j];
+                sq = sq.sse_add(v[j].sse_mul(v[j]));
             }
             if sq > T::ZERO {
-                let scale = T::from_f64(2.0) / sq;
+                let scale = T::from_f64(2.0).sse_div(sq);
                 for i in k..m {
                     w[i] = T::ZERO;
                     for j in k..m {
-                        w[i] = w[i] + scale * v[j] * q[j * m + i];
+                        w[i] = w[i].sse_add(v[j].sse_mul(scale).sse_mul(q[j * m + i]));
                     }
                 }
                 for i in k..m {
                     for j in k..m {
-                        q[i * m + j] = q[i * m + j] - v[i] * w[j];
+                        q[i * m + j] = q[i * m + j].sse_sub(w[j].sse_mul(v[i]));
                     }
                 }
             }
@@ -447,7 +558,7 @@ impl<T: ItkReal> Qr<T> {
             qty[0] = y[0];
             if solve {
                 if x[at(1, 1)] != T::ZERO {
-                    b[0] = y[0] / x[at(1, 1)];
+                    b[0] = y[0].sse_div(x[at(1, 1)]);
                 } else {
                     // VNL's solution is never written: memory contents, 0 here (ITK-113).
                     info = 1;
@@ -463,7 +574,7 @@ impl<T: ItkReal> Qr<T> {
             let temp = x[jj];
             x[jj] = qraux[j - 1];
             let len = n - j + 1;
-            let t = -dot_t(&x[jj..jj + len], &qty[j - 1..j - 1 + len]) / x[jj];
+            let t = (-dot_t(&x[jj..jj + len], &qty[j - 1..j - 1 + len])).sse_div(x[jj]);
             axpy_t(t, &x[jj..jj + len], &mut qty[j - 1..j - 1 + len]);
             x[jj] = temp;
         }
@@ -480,7 +591,7 @@ impl<T: ItkReal> Qr<T> {
                     info = j;
                     break;
                 }
-                b[j - 1] = b[j - 1] / d;
+                b[j - 1] = b[j - 1].sse_div(d);
                 if j == 1 {
                     continue;
                 }
@@ -613,4 +724,83 @@ mod tests {
             assert_eq!(old, new);
         }
     }
+
+    /// The NaNs of the generic QR and its kernels are x86-64's (the official build's operand
+    /// order, its default NaN), on every platform: a digest of tagged-NaN kernel calls of every
+    /// length to 60 and of the factors, determinants, `Qᵀb`, solutions and inverses of seeded
+    /// matrices with NaNs, infinities and extreme entries, recorded on Linux x86-64 where the
+    /// probe (validation/probes/fs-vnl, family `qrnan`) matched ITK 4.13.2's own build.
+    #[test]
+    fn nan_bits_are_x86_64s() {
+        use crate::vnl_fixed::cases;
+        use crate::x87::cases::SplitMix64;
+        fn run<T: ItkReal>(
+            rng: &mut SplitMix64,
+            word: &mut dyn FnMut(u64),
+            nan: fn(u32) -> T,
+            bits: fn(T) -> u64,
+            square: fn(&mut SplitMix64, usize) -> Vec<T>,
+        ) {
+            for n in 1..=60usize {
+                let x: Vec<T> = (0..n).map(|i| nan(1 + i as u32)).collect();
+                let y: Vec<T> = (0..n).map(|i| nan(0x1000 + i as u32)).collect();
+                word(bits(dot_t(&x, &y)));
+                word(bits(nrm2_t(&x)));
+                let mut z = y.clone();
+                axpy_t(nan(0x3000), &x, &mut z);
+                z.iter().for_each(|&v| word(bits(v)));
+                let mut z = x.clone();
+                scal_t(nan(0x3000), &mut z);
+                z.iter().for_each(|&v| word(bits(v)));
+            }
+            for _ in 0..3000 {
+                let (r, c) = (1 + rng.below(9) as usize, 1 + rng.below(9) as usize);
+                let big = square(rng, r.max(c));
+                let m: Vec<T> = (0..r * c)
+                    .map(|i| big[(i / c) * r.max(c) + i % c])
+                    .collect();
+                let b: Vec<T> = (0..r).map(|i| big[i]).collect();
+                let qr = Qr::new(&m, r, c);
+                for v in qr.q().into_iter().chain(qr.r()).chain(qr.qtb(&b)) {
+                    word(bits(v));
+                }
+                word(bits(qr.determinant()));
+                if r >= c {
+                    let (sol, info) = qr.solve(&b);
+                    sol.into_iter().for_each(|v| word(bits(v)));
+                    word(info as u64);
+                }
+                if r == c {
+                    qr.inverse().0.into_iter().for_each(|v| word(bits(v)));
+                }
+            }
+        }
+        let mut rng = SplitMix64::new(0x9a7a_0e5d_1a5e);
+        let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+        let mut word = |w: u64| {
+            for b in w.to_le_bytes() {
+                h = (h ^ u64::from(b)).wrapping_mul(0x0100_0000_01b3);
+            }
+        };
+        run::<f32>(
+            &mut rng,
+            &mut word,
+            |t| f32::from_bits(0x7fc0_0000 | t),
+            |v| u64::from(v.to_bits()),
+            cases::matrix_f32,
+        );
+        run::<f64>(
+            &mut rng,
+            &mut word,
+            |t| f64::from_bits(0x7ff8_0000_0000_0000 | u64::from(t)),
+            f64::to_bits,
+            cases::matrix_f64,
+        );
+        if std::env::var_os("LARMORX_PRINT_DIGESTS").is_some() {
+            println!("QR_NAN_BITS = {h:#018x}");
+        }
+        assert_eq!(h, QR_NAN_BITS);
+    }
+
+    const QR_NAN_BITS: u64 = 0x0151_9e2f_7355_76b0;
 }

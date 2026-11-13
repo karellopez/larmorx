@@ -93,9 +93,11 @@ def upstream_defects() -> list[tuple[str, str, str, bool]]:
     fixed_by_default)``."""
 
 def nifti_read(
-    path: str, scaling: str = "auto", n_threads: int = 1
+    path: str, scaling: str = "auto", n_threads: int = 1, volumes: int | None = None
 ) -> tuple[np.ndarray, np.ndarray, dict[str, Any], list[str], bool]:
-    """Read a NIfTI file: ``(data, affine, header fields, fixes applied, scaled)``."""
+    """Read a NIfTI file: ``(data, affine, header fields, fixes applied, scaled)``; ``volumes``
+    keeps the first volumes along the fourth axis only (nibabel's ``dataobj[:, :, :, :volumes]``,
+    the header's shape set to the data's)."""
 
 def nifti_read_header(path: str, fix: bool = False) -> Any:
     """Read a NIfTI header: the fields as stored, or ``(fields, fixes)`` with nibabel's
@@ -2129,3 +2131,155 @@ def nipype_compute_dvars(
     """nipype's ``compute_dvars`` on the masked series ``mfunc`` (float32, one row per voxel in
     the mask's C order): ``(dvars_stdz, dvars_nstd, dvars_vx_stdz, ar1, voxels, notices)``, or
     nipype's error (``larmorx.confounds.compute_dvars`` is the public form)."""
+
+# --- the confounds' part, relay 2f: nipype's CompCor numerics ----------------------------------
+
+def nipype_cosine_drift(
+    period_cut: float, frametimes: np.ndarray, upstream_defects: str = "fix"
+) -> tuple[np.ndarray, list[tuple[str, str, str, str]]]:
+    """nipype's ``_cosine_drift(period_cut, frametimes)``: the ``T × order`` basis (the constant
+    last) and the notices (GLIBC-07)."""
+
+def nipype_regress_poly(
+    degree: int,
+    data: np.ndarray,
+    remove_mean: bool = True,
+    numpy: str = "2.5.4",
+    upstream_defects: str = "fix",
+    n_threads: int = 1,
+    fortran: bool = False,
+) -> tuple[np.ndarray, np.ndarray | None, list[tuple[str, str, str, str]]]:
+    """nipype's ``regress_poly`` of a 2-D float32 or float64 array (one series per row; ``fortran``:
+    nipype holds the rows in Fortran order, so ``data.T`` is C-ordered):
+    ``(residuals, basis or None, notices)`` (``larmorx.confounds.regress_poly`` is the public
+    form)."""
+
+def nipype_cosine_filter(
+    data: np.ndarray,
+    timestep: float,
+    period_cut: float,
+    remove_mean: bool = True,
+    numpy: str = "2.5.4",
+    scipy: str = "1.18.1",
+    upstream_defects: str = "fix",
+    n_threads: int = 1,
+) -> tuple[np.ndarray, np.ndarray | None, list[tuple[str, str, str, str]]]:
+    """nipype's ``cosine_filter`` of a 2-D float32 or float64 array (one series per row):
+    ``(residuals, basis or None, notices)`` (``larmorx.confounds.cosine_filter`` is the public
+    form)."""
+
+def nipype_tcompcor_mask(
+    rows: np.ndarray, percentile_threshold: float = 0.02, numpy: str = "2.5.4", n_threads: int = 1
+) -> np.ndarray:
+    """``TCompCor._process_masks`` for one mask's rows (float32 or float64): the high-variance
+    voxels."""
+
+def nipype_compute_noise_components(
+    masks: list[np.ndarray],
+    t: int,
+    criterion: float | str,
+    criterion_is_int: bool,
+    filter_type: str,
+    degree: int,
+    period_cut: float,
+    repetition_time: float | None,
+    failure_mode: str,
+    numpy: str = "2.5.4",
+    scipy: str = "1.18.1",
+    upstream_defects: str = "fix",
+    n_threads: int = 1,
+    mismatch: str | None = None,
+) -> tuple[
+    np.ndarray,
+    bool,
+    np.ndarray | None,
+    list[tuple[int, np.ndarray, np.ndarray, np.ndarray, int, bool]],
+    list[tuple[str, str, str, str]],
+]:
+    """nipype's ``compute_noise_components`` on each mask's rows: ``(components, float32,
+    basis or None, metadata per mask, notices)`` (``larmorx.confounds.compute_noise_components``
+    is the public form)."""
+
+def nipy_motion_params(
+    rows: np.ndarray, numpy: str = "2.5.4", upstream_defects: str = "fix"
+) -> tuple[np.ndarray, np.ndarray | None]:
+    """nipype's ``normalize_mc_params(row, "NIPY")`` of every row of an ``n × k`` float64 table
+    (nipy 0.6.1's ``to_matrix44`` and ``aff2euler``): ``(params, other)``, the ``n × 6``
+    parameters and, where a row differs in the other mode, that mode's (GLIBC-07); numpy's
+    ``IndexError`` or ``LinAlgError`` for the first row nipy cannot compute
+    (``larmorx.confounds.normalize_mc_params`` and ``framewise_displacement`` are the public
+    forms)."""
+
+def pandas_try_double(
+    tokens: list[str], pandas_version: str = "3.0.6"
+) -> tuple[np.ndarray, np.ndarray] | None:
+    """pandas' ``read_csv`` float conversion of one column's tokens (``precise_xstrtod``,
+    pandas 3.0.x or 2.2.x; the default missing values, the infinity words): ``(pandas' values,
+    the correctly rounded values)``, or ``None`` when a token is not a float
+    (``larmorx.confounds._tables`` is its caller)."""
+
+def numpy_power_f64(
+    a: np.ndarray, exponent: float, upstream_defects: str = "fix"
+) -> tuple[np.ndarray, int]:
+    """numpy's float64 ``a ** exponent`` for a non-negative integral exponent (niworkflows'
+    ``exponential_terms``): ``(values, differ)``, ``1`` for 0, ``x * x`` for 2, otherwise the
+    correctly rounded ``pow`` (``"fix"``) or glibc 2.35's (``"reproduce"``: numpy's on CPUs
+    without AVX-512), and how many values differ between the two (GLIBC-07)
+    (``larmorx.niworkflows.confounds`` is its caller)."""
+
+def nitransforms_itk_to_ras(params: np.ndarray, offsets: np.ndarray) -> np.ndarray:
+    """nitransforms' ``ITKLinearTransform.to_ras()`` of each row of ITK's 12 parameters
+    (``n × 12``) with its fixed parameters (``n × 3``): the ``n × 16`` RAS matrices (C order)
+    (``larmorx.confounds.motion`` is its caller)."""
+
+def numpy_first_singular4(mats: np.ndarray) -> int | None:
+    """The index of the first of ``n × 16`` matrices numpy's ``inv`` finds singular, or
+    ``None``."""
+
+def numpy_det4_is_positive(affine: np.ndarray) -> bool:
+    """numpy's ``det(affine) > 0`` of a ``1 × 16`` matrix (OpenBLAS's LU factors)."""
+
+def nitransforms_fsl_from_ras(ras: np.ndarray, affine: np.ndarray, shape0: int) -> np.ndarray:
+    """nitransforms' ``FSLLinearTransformArray.from_ras(ras, reference=img, moving=img)`` of
+    ``n × 16`` RAS matrices for an image of affine ``affine`` (``1 × 16``) and ``shape0`` voxels
+    along its first axis: the ``n × 16`` FSL parameters; numpy's ``LinAlgError("Singular
+    matrix")`` where its ``inv`` raises."""
+
+def scipy_rotation_from_matrix(
+    mats: np.ndarray, numpy: str = "2.5.4", order: str = "C"
+) -> tuple[np.ndarray | None, int | None]:
+    """SciPy's ``Rotation.from_matrix`` of ``n × 9`` matrices (stored in ``order``, as SciPy's
+    float64 copy): ``(quats, None)`` (``n × 4``, ``(x, y, z, w)``) or ``(None, i)`` for the
+    first matrix whose determinant is at most 0; numpy's ``LinAlgError("SVD did not
+    converge")`` for a matrix that is not finite."""
+
+def scipy_rotation_as_euler(quats: np.ndarray, seq: str) -> tuple[np.ndarray, int]:
+    """SciPy's ``Rotation.as_euler(seq)`` of ``n × 4`` quaternions with the correctly rounded
+    ``atan2`` and ``hypot``: ``(angles, gimbal)``, the ``n × 3`` angles in radians and how many
+    rotations were in gimbal lock."""
+
+def fmriprep_motion_params(
+    fsl: np.ndarray,
+    zooms: list[float],
+    com: list[float],
+    fmriprep: str = "25.2.7",
+    numpy: str = "2.5.4",
+) -> tuple[np.ndarray | None, int, int | None]:
+    """fMRIPrep's ``FSLMotionParams`` arithmetic on ``n × 16`` FSL matrices with the
+    reference's float32 zooms and centre of mass: ``(params, gimbal, None)`` (``n × 6``) or
+    ``(None, 0, i)`` for SciPy's non-positive determinant of matrix ``i``
+    (``larmorx.confounds.fsl_motion_params`` is the public form)."""
+
+def fmriprep_rms_deviation(fsl: np.ndarray, center: list[float]) -> np.ndarray:
+    """fMRIPrep's ``FSLRMSDeviation`` values (``n``, NaN first) of ``n × 16`` FSL matrices about
+    ``center`` (``larmorx.confounds.fsl_rms_deviation`` is the public form)."""
+
+# niworkflows' SignalExtraction means (the confounds' part, relay 2g-iv;
+# larmorx_confounds::signals).
+def niworkflows_signal_means(
+    data: np.ndarray, mask: np.ndarray, numpy_version: str = "2.5.4", n_threads: int = 1
+) -> np.ndarray:
+    """``data[mask, :].mean(axis=0)`` of a C- or Fortran-contiguous 4-D float32 or float64
+    series over the voxels of a 3-D boolean mask (in its C order), as numpy ``numpy_version``
+    sums them: the ``T`` float64 means (NaN for an empty mask)
+    (``larmorx.niworkflows.images.signal_extraction`` is the public form)."""

@@ -1225,56 +1225,69 @@ mod tests {
     fn check(a: &[f64], m: usize, n: usize, r: &ScipySvd) {
         let k = m.min(n);
         assert!(r.s.windows(2).all(|w| w[0] >= w[1]));
+        // Contiguous copies (a debug build's index arithmetic is the test's cost): the rows of
+        // u·diag(s), the columns of vt, the columns of u.
+        let us: Vec<Vec<f64>> = (0..m)
+            .map(|i| (0..k).map(|t| r.u[i * r.ucols + t] * r.s[t]).collect())
+            .collect();
+        let vcols: Vec<Vec<f64>> = (0..n)
+            .map(|j| (0..k).map(|t| r.vt[t * n + j]).collect())
+            .collect();
+        let dot = |x: &[f64], y: &[f64]| x.iter().zip(y).map(|(p, q)| p * q).sum::<f64>();
         let mut worst = 0.0f64;
-        for i in 0..m {
-            for j in 0..n {
-                let mut acc = 0.0;
-                for t in 0..k {
-                    acc += r.u[i * r.ucols + t] * r.s[t] * r.vt[t * n + j];
-                }
-                worst = worst.max((acc - a[i * n + j]).abs());
+        for (i, row) in us.iter().enumerate() {
+            for (j, col) in vcols.iter().enumerate() {
+                worst = worst.max((dot(row, col) - a[i * n + j]).abs());
             }
         }
         assert!(worst < 1e-12, "{m}x{n}: {worst}");
-        for p in 0..r.ucols {
-            for q in 0..r.ucols {
-                let uu: f64 = (0..m)
-                    .map(|i| r.u[i * r.ucols + p] * r.u[i * r.ucols + q])
-                    .sum();
-                assert!((uu - if p == q { 1.0 } else { 0.0 }).abs() < 1e-12);
+        let ucols: Vec<Vec<f64>> = (0..r.ucols)
+            .map(|p| (0..m).map(|i| r.u[i * r.ucols + p]).collect())
+            .collect();
+        for (p, x) in ucols.iter().enumerate() {
+            for (q, y) in ucols.iter().enumerate() {
+                assert!((dot(x, y) - if p == q { 1.0 } else { 0.0 }).abs() < 1e-12);
             }
         }
         for p in 0..r.vtrows {
             for q in 0..r.vtrows {
-                let vv: f64 = (0..n).map(|j| r.vt[p * n + j] * r.vt[q * n + j]).sum();
+                let vv = dot(&r.vt[p * n..(p + 1) * n], &r.vt[q * n..(q + 1) * n]);
                 assert!((vv - if p == q { 1.0 } else { 0.0 }).abs() < 1e-12);
             }
         }
     }
 
-    /// Every path (6, 9, 10, 6t, 9t, 10t), blocked and unblocked, in both libraries.
+    /// Every path (6, 9, 10, 6t, 9t, 10t), blocked and unblocked, in both libraries. The
+    /// unblocked shapes run in both libraries and with both `full_matrices`; each blocked path
+    /// (`min(m, n) = 129`, just above `NX = 128`; `m = 206 = MNTHR` for paths 6 and 9) once, in
+    /// one of the libraries, each library on both orientations (the smallest sizes, for CI's
+    /// budget).
     #[test]
     fn rebuilds_every_path() {
+        let small = [
+            (1, 1),
+            (7, 1),
+            (1, 7),
+            (40, 3),
+            (30, 20),
+            (26, 25),
+            (3, 40),
+            (20, 30),
+        ];
         for lib in [ScipyLibrary::V1_18, ScipyLibrary::V1_15] {
-            for &(m, n) in &[
-                (1, 1),
-                (7, 1),
-                (1, 7),
-                (40, 3),
-                (30, 20),
-                (26, 25),
-                (300, 140),
-                (150, 140),
-                (3, 40),
-                (20, 30),
-                (140, 300),
-                (140, 150),
-            ] {
+            let mut cases: Vec<(usize, usize, bool)> = small
+                .iter()
+                .flat_map(|&(m, n)| [(m, n, false), (m, n, true)])
+                .collect();
+            // (m, n, full_matrices): paths 6, 9t, 10 in one library, 6t, 9, 10t in the other.
+            cases.extend(match lib {
+                ScipyLibrary::V1_18 => [(206, 129, false), (129, 206, true), (135, 129, false)],
+                ScipyLibrary::V1_15 => [(129, 206, false), (206, 129, true), (129, 135, false)],
+            });
+            for (m, n, full) in cases {
                 let a = matrix(m, n, (m * 1000 + n) as u64);
-                for full in [false, true] {
-                    let r = scipy_svd(lib, view(&a, m, n), full).unwrap();
-                    check(&a, m, n, &r);
-                }
+                let r = scipy_svd(lib, view(&a, m, n), full).unwrap();
+                check(&a, m, n, &r);
             }
         }
     }

@@ -143,6 +143,14 @@ how = "clean-room original, `experimental` (2026-11-12: every option, message, e
 validation = "original: [{tedana-t2smap-original.pass} of {tedana-t2smap-original.compared}](record:tedana-t2smap-original) compared cases within `specs/t2smap.md` §17.3's thresholds against tedana 26.0.3 (`reproduce`: exit status, messages and files tedana's) and the replica's default (by default): fMRIPrep's {tedana-t2smap-original.fmriprep} multi-echo calls on three oracle runs, every option, data type, image format and failure, threads; {tedana-t2smap-original.expected} expected divergence (a chaotic curve fit of noise voxels); 25 % of tedana's peak memory; replica: [{tedana-t2smap-replica.pass} of {tedana-t2smap-replica.compared}](record:tedana-t2smap-replica) compared cases bit-identical to tedana 26.0.3 in both kept library environments (every file, message and exit status): fMRIPrep's {tedana-t2smap-replica.fmriprep} multi-echo calls on three oracle runs (also against fMRIPrep's own files), every option, data type and failure; {tedana-t2smap-replica.both} more rejected by both alike; 44 % of tedana's peak memory on fMRIPrep's calls, [3.0 to 4.2 times its speed](repo:docs/benchmarks/tedana-t2smap.md) at 14 threads on fMRIPrep's curve-fit calls"
 
 [[tool]]
+id = "confounds"
+title = "fMRIPrep's confound estimation (CompCor, DVARS, framewise displacement, the motion parameters and RMS deviation, the masks and tissue signals, the confounds table and its JSON; nipype's confounds module and `nipypecli run`; numpy's and SciPy's linear algebra and FFTs under them)"
+eco = "larmorx"
+use = ["larmorx nipype run", "lx.confounds", "lx.niworkflows", "lx.nipype.run", "larmorx.pipelines.larmorprepx.confounds.bold_confounds"]
+how = "port (fMRIPrep 25.2.7's confounds workflow and interfaces, with 25.2.6's for the step; nipype 1.12.0's `algorithms/confounds.py` and command line; niworkflows 1.15.4's confound interfaces; nitime 0.12.1, nipy 0.6.1, pandas 3.0.6 and 2.2.3; numpy 2.5.4, 2.3.5 and 2.2.6's and SciPy 1.18.1 and 1.15's linear algebra (OpenBLAS's level 1 to 3 kernels, LAPACK 3.12.1's and 3.12.0's SVD and least-squares paths) and single-precision FFTs, in Rust)"
+validation = "[{confounds-linalg.cases}](record:confounds-linalg) and [{confounds-linalg-full.cases}](record:confounds-linalg-full) cases of numpy's and SciPy's linear algebra, [{confounds-nipype.cases}](record:confounds-nipype) and [{confounds-nipype-full.cases}](record:confounds-nipype-full) of nipype's confounds module and command line, [{confounds-fmriprep.cases}](record:confounds-fmriprep) of fMRIPrep's and niworkflows' steps and the workflow, every one bit-identical to the originals (every array, file, table cell, header, warning, message and exit status) in numpy 2.5.4, 2.3.5 and fMRIPrep 25.2.6's 2.2.6: fMRIPrep's 36 confounds files of 21 oracle runs column by column and their JSON byte for byte, from LARMORX's workflow run as fMRIPrep ran it; PIPE-41 to PIPE-83, PD-01 to PD-03, NP-09, NP-10 and SCI-41: 29 corrected by default (two undefined conversions clamped) and 12 refused, 41 with `reproduce`; the 26 Python nodes [1.1 to 1.4 times as fast](repo:docs/benchmarks/confounds.md) as fMRIPrep's at one thread and 1.5 to 1.6 at eight on three oracle runs (numpy's SVD and least squares, ported, still slower: a speed item), at most 0.96 of the originals' peak memory"
+
+[[tool]]
 id = "afni-tshift"
 title = "3dTshift (slice timing)"
 eco = "afni"
@@ -406,6 +414,36 @@ id = "tedana-t2smap-replica"
 larmorx = "`larmorx-gpl tedana t2smap` (`crates-gpl/larmorx-gpl-tedana`); `lx.tedana.t2smap` and `larmorx tedana t2smap` (the replica, GNU GPL version 3)"
 reference = "tedana 26.0.3's t2smap as a program, in both kept library environments (numpy 2.5.4 with OpenBLAS 0.3.34 and SciPy 1.18.1; numpy 2.3.5 with OpenBLAS 0.3.30 and SciPy 1.15.3; OpenBLAS on its Haswell kernels, numpy's AVX-512 kernels off, one BLAS thread); fMRIPrep's calls also against fMRIPrep 25.2.6's own files (tedana 25.0.1)"
 status = "`experimental` ({tedana-t2smap-replica.pass} of {tedana-t2smap-replica.compared} compared cases bit-identical in both environments, fMRIPrep's {tedana-t2smap-replica.fmriprep} calls included; {tedana-t2smap-replica.both} rejected by both, with the same messages and status)"
+
+[[record]]
+id = "confounds-linalg"
+larmorx = "`larmorx_transform::openblas` (OpenBLAS's level 1 to 3 routines) and `numpy_linalg` (LAPACK's QR, LQ, bidiagonal, divide-and-conquer and `DGESVD` paths; numpy's `svd`, `pinv` and `lstsq`; SciPy's `gesvd` and nipype's `fallback_svd`), `larmorx_core::numpy`'s reductions, CORE-MATH's `hypot` (through `_core`'s validation bindings)"
+reference = "numpy 2.3.5 (OpenBLAS 0.3.30, LAPACK 3.12.0), numpy 2.5.4 (OpenBLAS 0.3.34.106, LAPACK 3.12.1; `OPENBLAS_L2_SIZE=512`, and at the machine's depth block of 512 for the undefined class, NP-09) and fMRIPrep 25.2.6's numpy 2.2.6, and SciPy 1.18.1's and 1.15.3's own OpenBLAS (0.3.31-22, 0.3.28), in-process on OpenBLAS's Haswell kernels at one thread; the other release told apart in every negative control"
+status = "`experimental` ({confounds-linalg.pass} of {confounds-linalg.compared} cases bit-identical, the routines' illegal arguments and refusals included)"
+
+[[record]]
+id = "confounds-linalg-full"
+larmorx = "the same, the full tiers: every routine up to CompCor's largest real shapes (280 × 60,968, 597 × 30,453), both LAPACK releases"
+reference = "the same environments, the full tiers of `check_svd.py`, `check_gesdd.py`, `check_gelsd.py` and `check_gesvd.py` (after the `DBDSQR` tolerance's correction)"
+status = "`experimental` ({confounds-linalg-full.pass} of {confounds-linalg-full.compared} cases bit-identical; in numpy 2.5.4 at the machine's depth block of 512 every defined case identical and every crash in NP-09's class)"
+
+[[record]]
+id = "confounds-nipype"
+larmorx = "`lx.confounds` (nipype's CompCor, DVARS with nitime's AR(1) and SciPy's FFTs, TSNR, `NonSteadyStateDetector`, `FramewiseDisplacement` with nipy's `NIPY` source), niworkflows' robust CompCor wrappers, `larmorx nipype run` (`lx.nipype.run`)"
+reference = "nipype 1.12.0, nitime 0.12.1, nipy 0.6.1 and niworkflows in-process in the newest and the shared releases and in fMRIPrep 25.2.6's image (nitime 0.11), fMRIPrep's own CompCor, DVARS, FD and detector node files of the oracle runs, and `nipypecli run` itself (226 command lines, fMRIPrep's 51 real calls of three oracle runs among them)"
+status = "`experimental` ({confounds-nipype.pass} of {confounds-nipype.compared} cases bit-identical, random testing's permanent cases included)"
+
+[[record]]
+id = "confounds-nipype-full"
+larmorx = "`lx.confounds`' CompCor, the full tier: fMRIPrep's 108 real CompCor nodes (36 each of aCompCor, crownCompCor and tCompCor)"
+reference = "nipype 1.12.0 run here and fMRIPrep's own node files, in numpy 2.5.4, 2.3.5 and fMRIPrep 25.2.6's image"
+status = "`experimental` ({confounds-nipype-full.pass} of {confounds-nipype-full.compared} cases bit-identical)"
+
+[[record]]
+id = "confounds-fmriprep"
+larmorx = "`lx.confounds` and `lx.niworkflows`' confound steps (the masks, the tissue signals, the motion parameters and RMS deviation, the tables, the model expansion and spike regressors), `larmorx.pipelines.larmorprepx.confounds.bold_confounds`"
+reference = "fMRIPrep 25.2.7 (its confounds workflow is 25.2.6's file), niworkflows and pandas in-process in the newest and the shared releases and in fMRIPrep 25.2.6's image, nipype's graph of fMRIPrep's workflow for eight option sets, and fMRIPrep 25.2.6's own node files and confounds files of 21 oracle runs"
+status = "`experimental` ({confounds-fmriprep.pass} of {confounds-fmriprep.compared} cases bit-identical: fMRIPrep's 36 confounds files column by column and their JSON byte for byte under `reproduce`, random testing's permanent cases included)"
 
 [[record]]
 id = "numpy-linalg"

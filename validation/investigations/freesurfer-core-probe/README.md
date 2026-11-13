@@ -139,9 +139,10 @@ difference is unexplained; the first three of each group are printed.
 **The probe's runs** go through the oracle-output cache (one thread, the family `freesurfer`), except
 those that vary from run to run (the clock, the time, temporary names, memory reports, the user and
 the machine, the time-zone files, a directory tree), those whose results are files, and those that
-set variables the cache's key for FreeSurfer's family leaves out (`DIAG`, `DIAG_NO`, `PROFILE`,
-`IMAGE_SIZE`, `TMPDIR`, ...: two such runs would otherwise share an entry). `--no-cache` runs them
-directly.
+set a variable the cache's key for FreeSurfer's family leaves out (two such runs would otherwise
+share an entry; since 2026-11-13 the key holds every variable FreeSurfer reads, `DIAG`, `DIAG_NO`,
+`PROFILE`, `IMAGE_SIZE`, `TMPDIR` and the others, so none of the loop's cases is left out for
+that). `--no-cache` runs them directly.
 
 ## Results (2026-11-13, the reference machine: glibc 2.35, Linux 6.8, x86-64)
 

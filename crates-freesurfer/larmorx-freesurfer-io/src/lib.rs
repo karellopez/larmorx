@@ -16,7 +16,10 @@
 pub mod bfileio;
 pub mod cfile;
 pub mod colortab_bin;
+pub mod dti;
 pub mod fio;
+pub mod fscnpy;
 pub mod fstagsio;
+pub mod gifti;
 pub mod mriio_old;
 pub mod tags;

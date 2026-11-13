@@ -207,3 +207,13 @@ Every kernel larmorx reproduces is the same source in 0.3.34 (`dgemm_kernel_4x8_
 and SkylakeX. Measured: the `numpy-linalg` suite against numpy 2.5.4 on the Haswell kernels
 (`--python newest`): every case as against 2.3.5 (27 pass, the same expected divergence), so
 `larmorx_transform::openblas` needs no change.
+
+**Two corrections (2026-11-11, the confounds' part; [confounds-blas.md](confounds-blas.md)):** numpy 2.5.4's
+scipy-openblas64 0.3.34.106.0 is not the 0.3.34 release but v0.3.34 and 106 commits
+(`OpenBLAS-0.3.34-106-g446c436e`, its `openblas_commit.txt`; the level 2 and 3 files the release's but
+cancellation hooks and `!buffer` checks: the same arithmetic). And from 0.3.31 `kernel/setparam-ref.c` sets
+`dgemm_p = dgemm_q = 512` for every core's table on AMD CPUs with an L2 of 1 MiB, an L3 a multiple of 32 MiB
+and AVX-512, so on the main machine numpy 2.5.4 under `OPENBLAS_CORETYPE=Haswell` blocks products deeper
+than 256 by 512, not Haswell's 256 (`P` and `Q` above are the table's, not what runs there), and can crash
+(NP-09); `OPENBLAS_L2_SIZE=512` switches the block off. The 4 × 4 products of this file are far below
+either depth: unchanged.

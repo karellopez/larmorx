@@ -76,6 +76,26 @@ Where FreeSurfer calls them (the call sites the cards name):
   NaN entries): with `symmetric_eigensystem_f32_full` and `vnl_svd_f32_full` they can follow
   FreeSurfer on the matrices it finishes. LINPACK's `info` on a failed SVD, which track A measured as
   `min(rows + 1, cols)` on every failing case, is the `m` of `ssvdc`'s loop when it stops.
+- The closed forms' NaNs (relay 9, 2026-11-13; vnl-netlib.md F-VNLN-5; track A's request: MatrixDeterminant of a
+  geometry with an infinite cosine and a NaN centre gave `nan` in FreeSurfer and `-nan` in the port, tk2nat, fsl2tk and
+  tk2fsl were drawn finite until now). FreeSurfer's `libutils` holds VNL's inline `vnl_inverse<float>` 3 x 3 and 4 x 4 and
+  `vnl_inverse<double>` 3 x 3 out of line in `numerics.cpp.o` (byte for byte the stand-alone instances `order/inst.cxx`
+  makes with FreeSurfer's flags, relocations included: `orders.py`'s SAME-BYTES); `OpenLUMatrixInverse` calls the 3 x 3
+  and 4 x 4 ones after its own `vnl_det` test, and inlines the 2 x 2 `float` inverse (its code at 0x295..0x305 of the
+  function: the stand-alone 2 x 2's order, `m(1,1)·(1/det)`); `OpenMatrixDeterminant` calls `vnl_det<float>` of 2 to 4
+  rows (libitkvnl's instances) and `vnl_determinant<float>(vnl_matrix)` otherwise; `MatrixSqrt` calls
+  `vnl_inverse<double>` 3 x 3 (and so `vnl_det<double>` of 3 rows); `mri.cpp.o` calls `vnl_determinant<double>(vnl_matrix)`.
+  No other object of `libutils` instantiates `vnl_det`, `vnl_determinant` or `vnl_inverse`. The official stripped
+  programs hold the same code: the bytes of `vnl_det<float>` 2 to 4 rows and of the two `float` inverses (relocated fields
+  as wildcards) are in all 10 programs searched (`mri_robust_register`, `mri_coreg`, `mri_convert`, `mri_info`,
+  `mri_vol2vol`, `mris_make_surfaces`, `mri_ca_register`, `mri_normalize`, `mri_segstats`, `mris_sphere`), the `double`
+  ones in 1 (`orders.py --official`). The programs' own objects (not in the unit oracle) may inline these templates in
+  other orders: each program's replica checks its own NaNs.
+- The QR's NaNs (relay 10, 2026-11-13; vnl-netlib.md F-VNLN-5): `OpenLUMatrixInverse` and `OpenMatrixDeterminant` above 4 x 4
+  (`vnl_qr<float>`'s inverse and `vnl_determinant<float>`), `OpenQRdecomposition` (`Q()`, `R()`) and `mri.cpp.o`'s
+  `vnl_determinant<double>` above 4 rows now give the official build's NaN bits (libitkvnl_algo's `vnl_qr` instances and
+  libitkv3p_netlib's kernels, the ones FreeSurfer's programs link): track A's probe cases of these functions may draw
+  non-finite matrices.
 - The unit oracle's VNL (`validation/probes/fs-vnl`) is ITK 4.13.2 built with ITK's Release flags
   (`-O3 -DNDEBUG -msse2 -mfpmath=sse`, FreeSurfer's ITK configuration); `shim.cxx` is compiled with
   FreeSurfer's own flags for `utils/numerics.cpp`.
@@ -173,11 +193,127 @@ Where FreeSurfer calls them (the call sites the cards name):
   numbers. FreeSurfer reads and writes GIFTI through `gifti_read_image`, `gifti_write_image` and
   `gifti_valid_gifti_image` (its `utils/gifti.cpp`, track A).
 
+## CTN's DICOM library (item 3.1-16)
+
+- FreeSurfer 8.2.0's `packages/dicom` is CTN 3.0.6's object library (`dcm.c`, `dcmdict.c`,
+  `dcmcond.c`, `dcmsupport.c`, `condition.c`, `lst.c`, `ctnthread.c`) reformatted, with casts, a
+  note "Modified Dec 15 2014 by DNG to handle double and float" (`DCM_DumpElements` and the
+  element union's `fl`/`fd`: nothing the reading reaches) and three changes the reading reaches,
+  measured by the probe: (1) `swapInPlace` swaps UL and SL of big-endian data in 2-byte pairs (the
+  4-byte reversal kept under `#if 0`, with a comment on UL values whose length is not a multiple
+  of 4): FS-94, which also makes FS-95's crash unreachable in FreeSurfer; (2) the
+  `DCM_ELEMENTLENGTHERROR` message's continuation line carries 35 spaces ("... of" + 36 blanks +
+  "data in stream or file in %s", the line splice of a reformatted source); (3) `newElementItem`
+  computes the room with a `long`, so an undefined length (FS-91) allocates 4 GiB + 152 bytes
+  where CTN 3.0.6 allocates 152 (neither is ever written). The dictionary is CTN 3.0.6's, entry for
+  entry (`gen_dict.sh` compares them); the platform header defines `LONGSIZE 32` with `U32` an
+  `unsigned int` (the same types as CTN on Linux x86-64), no threads.
+- `IsDICOM` (its `utils/DICOMRead.cpp`, track A's `fs.io`) opens a file four times, as
+  `mri_identify` asks for every volume it cannot tell by name: `DCM_PART10FILE`,
+  `DCM_ORDERLITTLEENDIAN`, `DCM_ORDERBIGENDIAN`, `DCM_FORMATCONVERSION`, each with
+  `DCM_ACCEPTVRMISMATCH`, closing the object after each failure and clearing the condition stack
+  before and after (`COND_PopCondition(1)`). The fourth attempt can never succeed (no byte order:
+  "DCM illegal stream option: Byte order"), and after a failed attempt the close finds the handle
+  empty when the reader had closed the object ("NULL object passed to routine DCM_CloseObject").
+  With `FS_DICOM_DEBUG` set it prints the conditions (`DCMPrintCond`, and `COND_DumpConditions`
+  after the first attempt, which empties the stack). `GetObjectFromFile` repeats the four opens
+  with the caller's options and dumps the stack when all fail; `mri_probedicom` opens three ways.
+  None of FreeSurfer's calls passes another option the port does not follow.
+- A file that is DICOM to CTN in its implicit little-endian attempt is any file whose first bytes
+  read as ascending tags with lengths that fit: a NIfTI-1 header is not (its 348 makes
+  (015c,0000) of length 0, then (0000,0000) out of order), nor is an MGH header (its version and
+  width, read as a tag and a length, run past the file). FreeSurfer asks `IsDICOM` only for names
+  `mri_identify` cannot place by their extension.
+- The probe `validation/probes/fs-dicom` compares the port with the unit oracle's `libdicom.a`
+  through the probe's `FsDialect` (the two changes above): its README has the numbers.
+
+## nlohmann/json (items 3.1-19 and 3.1-20)
+
+- FreeSurfer 8.2.0's `include/json.h` is nlohmann/json 3.2.0's single header (its version macros
+  say 3.2.0) with later type traits backported (`void_t`, `is_detected`, `is_basic_json` in the
+  conversions) and one change of behaviour: `operator[]`'s `type_error.305` reads "cannot use
+  operator[] with a string argument with <type>" for a key and "... with a numeric argument with
+  <type>" for an index (3.2.0: "cannot use operator[] with <type>"); the lexer, parser,
+  serializer and Grisu2 are 3.2.0's line for line. The probe's `FsDialect`
+  (`validation/probes/fs-json/src/main.rs`) is the model for track A's dialect.
+- Callers: `utils/pointset.cpp` (`loadfsPointSet`: `is >> j`, `j["vox2ras"]` to a string, a
+  range-for over `j["points"]`, `coord["x"]` to `double`, `point["legacy_stat"]`);
+  `mris_reposition_surface` and `utils/targetpointset.cpp`, `utils/mrisurf_sseTerms.cpp`
+  (`MRISpointSetLocationError`), `mris_place_surface` (`istream >> j`, `["points"].size()`,
+  `js_pts[i]["coordinates"]["x"].get<float>()`, `js["vox2ras"].get<std::string>()`): reading
+  Freeview's point sets, always through `operator>>` (not strict: what follows the value is
+  ignored). `mri_seg_overlap` writes its report with `out << std::setw(4) << json` (pretty, indent
+  4, `std::map` order: "inputs", "measures", "names"; numbers by Grisu2). `fsPointSet::save`
+  writes its JSON by hand with `std::ofstream` (not this library).
+
+## miniz, libtiff, NrrdIO, Cephes and the FNV hash (item 3.1-18); argparse (item 3.1-21)
+
+What the queue's reach numbers (`docs/freesurfer/code.toml`, the call graph's foundations) count for
+these files, checked against the build (relay 8, 2026-11-13; the call graph:
+`validation/investigations/freesurfer-inventory/callgraph.py --core --why`):
+
+- **miniz** (`packages/dcm2niix/miniz.c`, 65 programs by the call graph): the call graph resolves
+  `compress2` in `gifti_xml.c` (`ewrite_data`) and `uncompress` in `utils/matfile.cpp`
+  (`znzMatReadHeader`) to miniz's `#define compress2 mz_compress2` and `#define uncompress
+  mz_uncompress`; but those macros live only inside `nii_dicom_batch.cpp`, the one file that
+  includes `miniz.c` (with `MiniZ` defined, as FreeSurfer's build does: `BUILD_SCRIBBLE` off), and
+  the official programs import `compress2`, `deflate`, `inflate` from the system's zlib (`nm -D
+  mri_cc`). miniz's code is linked into every program with dcm2niix (the wrapper reaches
+  `nii_dicom_batch.cpp`), and runs on one path: `geProtocolBlock` (GE's gzip-compressed protocol
+  block, read when dcm2niix converts a GE DICOM series: `mz_inflateInit2(-15)`, one
+  `mz_inflate(MZ_SYNC_FLUSH)` with the whole block after its gzip header and before its 8-byte
+  trailer, `avail_out` the trailer's ISIZE, success only on `MZ_STREAM_END`, the CRC never
+  checked). miniz's compressor runs only in dcm2niix's writers (`writeNiiGz`, the MGH and JNIfTI
+  writers) when `opts.isGz` is set, which `dcm2niix_fswrapper` sets false: never in FreeSurfer.
+  So only the inflater is ported (`larmorx_core::miniz`). FreeSurfer's copy is miniz 1.15 r4
+  (GitHub richgel999/miniz commit 28f5066e, 2013-10-14) with a 5-line note on top, three comment
+  spellings and three `#pragma unused` lines in the ZIP functions (`diff`).
+- **libtiff** (`tif_error.c`, `tif_unix.c`, `tif_fax3.c`, 7 programs): the call graph matches
+  `extension(...)` in `mri_cc.cpp`'s `find_corpus_callosum` to `tif_fax3.c`'s file-local macro
+  `#define extension(a0) Fax3Extension(module, tif, a0)`: not a call. libtiff runs only when a
+  program reads a TIFF volume (`mri_read`'s TIFF type), an unused format. FreeSurfer's three files
+  are libtiff 3.6.1's (`diff`: identical); its `tiffvers.h` says 3.6.1 (2003-12-26).
+- **NrrdIO** (`754.c`'s `airFloatQNaN`, 65 programs): reached through `AIR_NAN` in
+  `simple.c`'s `ERROR` macro, which the call graph matches to MINC's `ERROR` in
+  `minc_volume_io.c`: not a call. NrrdIO runs only reading NRRD files (unused). FreeSurfer
+  builds it with `TEEM_QNANHIBIT=1` (its CMake file); its NrrdIO is Teem 1.9.0's.
+- **Cephes** (`const.c`'s `PI`, 65 programs): `utils/mri.cpp` (`ham_sinc`) writes `PI`, which
+  FreeSurfer's `include/const.h` defines as `M_PI`; the call graph matched it to Cephes' global
+  `double PI`. No Cephes function is on a default path. The global's bits are `M_PI`'s
+  (0x400921fb54442d18, the probe): nothing to port.
+- **FNV** (`include/fnv_hash.h`, 39 programs; `include/fnvhash.h`, 65): both are FreeSurfer's
+  files, not a third party's: `fnv_hash.h` carries MGH's FreeSurfer notice ("Original Author:
+  Bevin Brett", 2021), `fnvhash.h` no notice. They implement FNV-1a with the 32-bit offset basis
+  and prime in an `unsigned long` (64 bits on Linux: the multiplication wraps modulo 2^64, the
+  high bits carry on). Callers: `utils/mrisurf.cpp`'s surface hashes (`fnv_init`, `fnv_add` over
+  the vertices', faces' and surface's members), `utils/mrisurf_metricProperties_slow.h`'s
+  `fnv_hash(trial, k, &random_counter, -RAN, RAN)` (FreeSurfer's own mapping of the hash of three
+  `unsigned int`s to a float in [LO, HI]: `(double)(hash & 0xffffffff) / (double)0xffffffff`, then
+  `(float)((HI-LO)*f + LO)`), and `utils/gcamorph.cpp`'s `__m3zWrite` (`FnvHash::add` over the
+  morph's data; `FnvHash::write` writes the decimal value and `std::endl`). larmorx-core has the
+  algorithm (`larmorx_core::fnv::fnv1a_32_wide`, from FNV's public description); `fnv_hash`'s
+  float mapping and `FnvHash::write`'s file are FreeSurfer's: track A's, in crates-freesurfer.
+  The audit's TP-13 calls both files the FNV hash (public domain): the algorithm is; the files
+  are FreeSurfer's.
+- **argparse** (`include/argparse.h`, `utils/argparse.cpp`, 7 programs): "contains code that was
+  derived from the ArgumentParser project by Hilton Bristow" (BSD-3-Clause). Measured against
+  Bristow's last commit (github.com/hbristow/argparse 43edb8ac, `argparse.hpp`, 434 lines):
+  923 of FreeSurfer's 3,968 tokens (23 %; comments and layout ignored; the tool
+  `<scratch>/C/tools/toksim.py` of relays 3 and 6) are in the same order as Bristow's 2,904. The
+  shared part is the class's shape (the `Any` holder, `insertArgument`'s index map, `retrieve`);
+  the behaviour a caller sees (argument types and their checks, `stob`, the XML help, the error
+  messages through `log.h`'s `fs::fatal`, `exists`, `strip`/`unstrip`) is FreeSurfer's. So item
+  3.1-21 is FreeSurfer's code: its replica belongs in crates-freesurfer (track A); a port of
+  Bristow's upstream alone would serve no program. Relay 8 ported nothing of it (handoff).
+
 ## The probes that name FreeSurfer's internals (for the clean-room audit's restriction table)
 
 `validation/probes/fs-vnl` (its shim's comments: FreeSurfer's call sites and flags),
 `validation/probes/x87-extended` (`patterns.cpp`: FreeSurfer's `long double` patterns),
 `validation/probes/fs-random` (FreeSurfer's seeds and its `drand64` cast),
 `validation/probes/fs-minc-nifti` (`ProbeFs`, `Flavour::FreeSurfer`: FreeSurfer's copies' changes)
-and `validation/probes/fs-gifti` (`dialect.rs`: FreeSurfer's two GIFTI changes) are closed to
+`validation/probes/fs-gifti` (`dialect.rs`: FreeSurfer's two GIFTI changes) and
+`validation/probes/fs-dicom` (`port.rs`'s `FsDialect`: FreeSurfer's changes to CTN) and
+`validation/probes/fs-json` (`FsDialect`: its `json.h`'s messages) and
+`validation/probes/fs-misc` (`facts.cpp` includes FreeSurfer's FNV headers) are closed to
 FreeSurfer's clean-room implementers, as this file is.

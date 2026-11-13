@@ -45,6 +45,7 @@ from typing import Any
 import numpy as np
 
 import larmorx as lx
+import larmorx.pipelines.larmorprepx.confounds  # lx.pipelines, for NAMESPACES
 import larmorx.pipelines.larmorprepx.estimators  # lx.pipelines, for NAMESPACES
 import larmorx.pipelines.larmorprepx.fieldmaps  # lx.pipelines, for NAMESPACES
 from larmorx import _core
@@ -1043,8 +1044,11 @@ NAMESPACES = (
     "lx.tedana",
     "lx.skimage",
     "lx.niworkflows",
+    "lx.confounds",
+    "lx.nipype",
     "lx.pipelines.larmorprepx.fieldmaps",
     "lx.pipelines.larmorprepx.estimators",
+    "lx.pipelines.larmorprepx.confounds",
     "lx.bids",
     "lx",
 )
@@ -8584,6 +8588,94 @@ def _(ctx: Context) -> dict[str, Any]:
 
 
 @case(
+    "cli.nipype.run",
+    covers=(
+        "cli:nipype run",
+        "lx.nipype.run",
+        "lx.nipype.list_interfaces",
+        "lx.nipype.ported_interfaces",
+    ),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """nipype's interface runner (``larmorx nipype run``, nipype's ``nipypecli run``) on the
+    confounds' 4-volume series: a module's listing, an interface's help at 80 columns, nipype's
+    ``ComputeDVARS`` with every file, ``ACompCor`` with a number of components (PIPE-81's
+    correction: nipype's command line reads it as text) and fMRIPrep's ``aCompCorMasks`` with
+    its zooms (PIPE-82's: a tuple's text), each one's printed inputs and outputs and files; the
+    corrections' refusals under ``reproduce``; the listing and the ported interfaces in Python."""
+    import contextlib
+    import io
+
+    from larmorx.cli import run
+
+    inputs = Path(ctx.file("conf_bold.nii.gz")).parent
+    bold, mask = ctx.file("conf_bold.nii.gz"), ctx.file("conf_bold_mask.nii.gz")
+    tpms = [ctx.file("conf_gm.nii.gz"), ctx.file("conf_wm.nii.gz"), ctx.file("conf_csf.nii.gz")]
+    calls = {
+        "list": ["--list", "fmriprep.interfaces.confounds"],
+        "help": ["nipype.algorithms.confounds", "ComputeDVARS"],
+        "dvars": ["nipype.algorithms.confounds", "ComputeDVARS", bold, mask, "--save_all",
+                  "--save_nstd", "--save_vxstd"],
+        "acompcor": ["nipype.algorithms.confounds", "ACompCor", bold, "--mask_files", mask,
+                     "--num_components", "2", "--pre_filter", "cosine", "--repetition_time", "2"],
+        "masks": ["fmriprep.interfaces.confounds", "aCompCorMasks", "2,2,2.5", "--in_vfs", *tpms],
+    }  # fmt: skip
+    out: dict[str, Any] = {}
+    columns = os.environ.get("COLUMNS")
+    os.environ["COLUMNS"] = "80"
+    try:
+        for mode in ("fix", REPRODUCE):
+            for name, args in calls.items():
+                folder = Path(ctx.out(f"{mode}/{name}"))
+                folder.mkdir(parents=True)
+                stdout, stderr = io.StringIO(), io.StringIO()
+                with (
+                    contextlib.chdir(folder),
+                    contextlib.redirect_stdout(stdout),
+                    contextlib.redirect_stderr(stderr),
+                    warnings.catch_warnings(record=True) as caught,
+                ):
+                    warnings.simplefilter("always")
+                    here = os.getcwd()  # the folder as the interfaces see it (Windows' long form)
+                    code = run(["larmorx", "--upstream-defects", mode, "--n-threads", "1",
+                                "nipype", "run", *args])  # fmt: skip
+
+                def text(t: str, folder: Path = folder, here: str = here) -> str:
+                    # each folder as the run prints it: as given, resolved (nipype resolves
+                    # some inputs: macOS' /private/var, Windows' long names) and inside a
+                    # printed list, whose repr doubles a Windows backslash; then the
+                    # platform's separators (a list's doubled one first)
+                    for d, name in (
+                        (here, "<cwd>"),
+                        (str(folder), "<cwd>"),
+                        (os.path.realpath(folder), "<cwd>"),
+                        (str(inputs), "<inputs>"),
+                        (os.path.realpath(inputs), "<inputs>"),
+                    ):
+                        t = t.replace(d.replace("\\", "\\\\"), name).replace(d, name)
+                    return t.replace("\\\\", "/").replace("\\", "/")
+
+                key = f"{mode}.{name}"
+                out[f"{key}.code"] = np.array([code])
+                out[f"{key}.stdout"] = text(stdout.getvalue())
+                out[f"{key}.stderr"] = text(stderr.getvalue())
+                out[f"{key}.notices"] = _conf_notices(caught)
+                for f in sorted(folder.rglob("*")):
+                    rel = f.relative_to(folder).as_posix()
+                    out[f"{key}.{rel}"] = (
+                        Nifti(str(f)) if ".nii" in f.name else _text(str(f), folder)
+                    )
+    finally:
+        if columns is None:
+            os.environ.pop("COLUMNS", None)
+        else:
+            os.environ["COLUMNS"] = columns
+    out["list_interfaces"] = "\n".join(lx.nipype.list_interfaces("niworkflows.interfaces.nibabel"))
+    out["ported"] = json.dumps(lx.nipype.ported_interfaces(), sort_keys=True)
+    return out
+
+
+@case(
     "py.larmorprepx.fmap_estimation",
     covers=(
         "lx.pipelines.larmorprepx.estimators.precomputed_fieldmaps",
@@ -9241,3 +9333,1055 @@ def _(ctx: Context) -> dict[str, Any]:
         **_t2smap_run(ctx, "exact", "-d", *names, *T2SMAP_TES, *m, *curve, "--debug"),
         **_t2smap_run(ctx, "two", *two),
     }
+
+
+# ================================================================================================
+# fMRIPrep's confound estimation (the confounds' part, relay 2h-ii, 2026-11-12): nipype's,
+# niworkflows' and fMRIPrep's steps (lx.confounds, lx.niworkflows) and larmorprepx's workflow
+# ================================================================================================
+
+#: The thread count of the confounds' cases (their results do not depend on it: each case was
+#: run at 1, 2 and 4 threads when it was added).
+CONFOUNDS_THREADS = 2
+
+#: The T1w grid of the confounds' anatomy: 32 x 30 x 28 voxels of 1.5 mm (axis-aligned).
+CONF_T1 = (32, 30, 28)
+
+
+def _conf_t1_affine() -> np.ndarray:
+    return affine(CONF_T1, (1.5, 1.5, 1.5), (0.5, -0.75, 1.0), oblique=False)
+
+
+@functools.cache
+def conf_tissues() -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """FAST-like partial-volume maps on ``CONF_T1`` (float32): grey matter in a shell near the
+    brain's edge (a half-volume ring on each side, values 0-0.04 inside the white matter, under
+    fMRIPrep's 0.05), white matter inside it, CSF in the centre and in the outer ring; and the
+    brain mask (uint8)."""
+    e = {k: ellipsoid(CONF_T1, k, 20) for k in (7, 16, 17, 18, 19)}
+    inner = e[16] & ~e[7]
+    ring = e[17] & ~e[16]
+    outer = e[19] & ~e[18]
+    gm = 1.0 * (e[18] & ~e[17]) + 0.5 * ring + 0.5 * outer + ints(70, CONF_T1, 0, 5) / 100 * inner
+    wm = 1.0 * inner + 0.5 * ring
+    csf = 1.0 * e[7] + 0.5 * outer
+    return (
+        gm.astype(np.float32),
+        wm.astype(np.float32),
+        csf.astype(np.float32),
+        e[19].astype(np.uint8),
+    )
+
+
+@functools.cache
+def conf_bold_mask() -> np.ndarray:
+    """The BOLD mask on ``bold()``'s grid (uint8)."""
+    return ellipsoid(SHAPE4[:3], 8, 10).astype(np.uint8)
+
+
+def _conf_union_odd() -> np.ndarray:
+    """A float32 mask for ``_binary_union``: 0.5 (truncated to 0: outside) in an ellipsoid,
+    +inf, 1e19 and NaN in three corners, outside the BOLD mask (PIPE-74)."""
+    v = np.where(ellipsoid(SHAPE4[:3], 6, 10), np.float32(0.5), np.float32(0))
+    v[:2, :2, :2] = np.inf
+    v[-2:, :2, :2] = 1e19
+    v[:2, -2:, -2:] = np.nan
+    return v.astype(np.float32)
+
+
+def _conf_labels() -> np.ndarray:
+    """A label image on the BOLD grid (int16): 1, 2, 3 and 4 in nested and shifted ellipsoids."""
+    shape = SHAPE4[:3]
+    v = ellipsoid(shape, 8, 10).astype(np.int16) + ellipsoid(shape, 5, 10, shift=2)
+    return v + 2 * ellipsoid(shape, 3, 10, shift=-3)
+
+
+def _write_float_hmc(path: Path) -> None:
+    """``HMC_PARAMS`` as single-precision ITK affine transforms (``AffineTransform_float_3_3``)."""
+    text = itk_text(HMC_PARAMS).replace("MatrixOffsetTransformBase_double", "AffineTransform_float")
+    path.write_bytes(text.encode())
+
+
+def _write_int16_bold(path: Path) -> None:
+    """``bold()`` stored as int16 (its values rounded, ``scl_slope`` 0.5): TSNR's PIPE-51."""
+    img = bold()
+    data = np.asfortranarray(np.floor(img.data.astype(np.float64) * 2 + 0.5).astype(np.int16))
+    fields = img.header.replace(datatype=4, bitpix=16, scl_slope=0.5, scl_inter=0.0).to_dict()
+    _core.nifti_write(os.fspath(path), data, fields, 2, 1)
+
+
+_WRITERS.update(
+    {
+        "conf_bold.nii.gz": lambda p: lx.save(bold(), p),
+        "conf_bold_i16.nii": _write_int16_bold,
+        "conf_bold_mask.nii.gz": lambda p: lx.save((conf_bold_mask(), bold().affine), p),
+        "conf_boldref.nii.gz": lambda p: lx.save(
+            lx.Image(np.asfortranarray(bold().data[..., 0]), bold().affine), p
+        ),
+        "conf_boldref.nii": lambda p: lx.save(
+            lx.Image(np.asfortranarray(bold().data[..., 0]), bold().affine), p
+        ),
+        "conf_gm.nii.gz": lambda p: lx.save((conf_tissues()[0], _conf_t1_affine()), p),
+        "conf_wm.nii.gz": lambda p: lx.save((conf_tissues()[1], _conf_t1_affine()), p),
+        "conf_csf.nii.gz": lambda p: lx.save((conf_tissues()[2], _conf_t1_affine()), p),
+        "conf_t1w_mask.nii.gz": lambda p: lx.save((conf_tissues()[3], _conf_t1_affine()), p),
+        "conf_roi1.nii.gz": lambda p: lx.save(
+            (ellipsoid(SHAPE4[:3], 5, 10, shift=2).astype(np.uint8), bold().affine), p
+        ),
+        "conf_roi2.nii.gz": lambda p: lx.save(
+            (ellipsoid(SHAPE4[:3], 5, 10, shift=-2).astype(np.uint8), bold().affine), p
+        ),
+        "conf_empty.nii.gz": lambda p: lx.save((np.zeros(SHAPE4[:3], np.uint8), bold().affine), p),
+        "conf_nss.nii.gz": lambda p: lx.save(
+            bold().with_data(np.asfortranarray(bold().data * np.array([3, 1, 1, 1], np.float32))), p
+        ),
+        "conf_const.nii": lambda p: lx.save(
+            lx.Image(np.full((6, 5, 4, 4), 7.0, np.float32), affine((6, 5, 4), (3.0, 3.0, 3.0))), p
+        ),
+        "conf_hmc_one.txt": lambda p: p.write_bytes(itk_text(HMC_PARAMS[1:2]).encode()),
+        "conf_union_odd.nii": lambda p: lx.save((_conf_union_odd(), bold().affine), p),
+        "conf_labels.nii.gz": lambda p: lx.save((_conf_labels(), bold().affine), p),
+        "conf_hmc_float.txt": _write_float_hmc,
+    }
+)
+
+
+def _conf_dir(ctx: Context, name: str) -> str:
+    """A node's folder in the case's directory (nipype's working directory)."""
+    os.makedirs(ctx.out(name), exist_ok=True)
+    return ctx.out(name)
+
+
+def _conf_text(path: str) -> bytes:
+    """A table's text (a gzipped one decompressed: its header holds the time of writing)."""
+    return _raw(path)
+
+
+def _conf_notices(caught: list[Any]) -> str:
+    """The notices raised, in order: each defect's ID, program and mode."""
+    return "\n".join(
+        f"{w.message.entry} {w.message.tool} {w.message.mode}"
+        for w in caught
+        if isinstance(w.message, lx.UpstreamDefectWarning)
+    )
+
+
+def _conf_nan(name: str, a: Any) -> dict[str, Any]:
+    """An array output with its NaNs apart (numpy's NaNs carry the processor's sign: where they
+    are, and the array with 0 there)."""
+    a = np.asarray(a)
+    if a.dtype.kind != "f" or not np.isnan(a).any():
+        return {name: a}
+    nan = np.isnan(a)
+    return {name: np.where(nan, 0, a), f"{name}.nan": nan}
+
+
+def _conf_files(root: str, where: Path) -> dict[str, Any]:
+    """Every file under ``root``: NIfTI files by header and data, tables and JSON by their
+    (decompressed) text, and the list of names."""
+    out: dict[str, Any] = {"files": files_under(root)}
+    for p in sorted(Path(root).rglob("*")):
+        if not p.is_file():
+            continue
+        rel = p.relative_to(root).as_posix()
+        if rel.endswith((".nii", ".nii.gz")) and not rel.endswith(".tsv.nii.gz"):
+            out[rel] = Nifti(os.fspath(p))
+        else:
+            out[rel] = _conf_text(os.fspath(p)).replace(os.fspath(where).encode(), b"<dir>")
+    return out
+
+
+def _conf_cell(v: Any) -> str:
+    """A value as pandas' ``to_csv`` writes it: ``n/a``, an integer, a float's ``repr``."""
+    if v is None:
+        return "n/a"
+    if isinstance(v, (int, np.integer)) and not isinstance(v, bool):
+        return str(int(v))
+    return repr(float(v))
+
+
+def _conf_series_table(path: str, columns: dict[str, list[Any]]) -> str:
+    """A tab-separated table (pandas' text: ``n/a`` for missing values, Python's ``repr``)."""
+    names = list(columns)
+    rows = ["\t".join(names)]
+    for i in range(len(columns[names[0]])):
+        rows.append("\t".join(_conf_cell(columns[n][i]) for n in names))
+    Path(path).write_text("\n".join(rows) + "\n", encoding="utf-8")
+    return path
+
+
+#: Six volumes of FSL-ordered motion parameters (rotations in radians, then translations in mm):
+#: multiples of 1/1000 and 1/100.
+CONF_FSL_PARAMS = [
+    [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+    [0.002, -0.001, 0.003, 0.12, -0.05, 0.31],
+    [0.004, 0.0, -0.002, 0.25, 0.08, -0.4],
+    [-0.003, 0.005, 0.001, -0.6, 0.9, 0.05],
+    [0.001, -0.004, 0.006, 0.02, -0.33, 0.17],
+    [0.0, 0.002, -0.005, 0.71, 0.04, -0.28],
+]
+
+
+def _conf_params_text(rows: list[list[float]], index: bool = False) -> str:
+    lines = []
+    for i, row in enumerate(rows):
+        values = [repr(float(v)) for v in row]
+        lines.append("  ".join([str(i), *values] if index else values))
+    return "\n".join(lines) + "\n"
+
+
+def _conf_confounds_table(path: str) -> str:
+    """fMRIPrep's ``concat`` table on six volumes: the signals, DVARS, FD, RMSD, CompCor and
+    cosine columns, a non-steady-state outlier, the motion parameters (the first row's DVARS, FD
+    and RMSD ``n/a``)."""
+    n = 6
+    v = ints(71, (n, 12), 0, 1000)
+    cols: dict[str, list[Any]] = {
+        "global_signal": [600 + v[i, 0] / 8 for i in range(n)],
+        "csf": [700 + v[i, 1] / 16 for i in range(n)],
+        "white_matter": [500 + v[i, 2] / 32 for i in range(n)],
+        "csf_wm": [550 + v[i, 3] / 64 for i in range(n)],
+        "tcompcor": [800 + v[i, 4] / 4 for i in range(n)],
+        "std_dvars": [None, 1.25, 1.75, 0.5, 2.5, 0.75],
+        "dvars": [None] + [20 + v[i, 5] / 50 for i in range(1, n)],
+        "framewise_displacement": [None, 0.25, 0.75, 0.125, 0.5, 1.5],
+        "rmsd": [None] + [v[i, 6] / 1000 for i in range(1, n)],
+        "t_comp_cor_00": [(v[i, 7] - 500) / 1000 for i in range(n)],
+        "a_comp_cor_00": [(v[i, 8] - 500) / 1000 for i in range(n)],
+        "a_comp_cor_01": [(v[i, 9] - 500) / 1000 for i in range(n)],
+        "cosine00": [(v[i, 10] - 500) / 2000 for i in range(n)],
+        "non_steady_state_outlier00": [1.0] + [0.0] * (n - 1),
+    }
+    for k, name in enumerate(("rot_x", "rot_y", "rot_z", "trans_x", "trans_y", "trans_z")):
+        cols[name] = [CONF_FSL_PARAMS[i][k] for i in range(n)]
+    return _conf_series_table(path, cols)
+
+
+# --- nipype's DVARS ---------------------------------------------------------------------------
+
+
+@case(
+    "py.confounds.dvars",
+    covers=(
+        "lx.confounds.compute_dvars",
+        "lx.confounds.DvarsResult.as_tuple",
+        "lx.confounds.compute_dvars_node",
+    ),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """nipype's DVARS on the 4-volume series: ``compute_dvars`` of the files (newest libraries:
+    numpy 2.5.4's percentiles, SciPy 1.18.1's ducc0 FFTs for nitime's AR(1)) and of the images in
+    memory with fMRIPrep 25.2.6's libraries (numpy 2.2.6, SciPy 1.15.2's pocketfft), without the
+    intensity normalisation, the zero-variance voxels removed; ``ComputeDVARS``' four files
+    (``save_all``) with ``reproduce``."""
+    t = CONFOUNDS_THREADS
+    series, mask = ctx.file("conf_bold.nii.gz"), ctx.file("conf_bold_mask.nii.gz")
+    out: dict[str, Any] = {}
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        r = lx.confounds.compute_dvars(series, mask, n_threads=t)
+        for k, a in zip(("std", "nstd", "vxstd"), r.as_tuple(), strict=True):
+            out.update(_conf_nan(f"newest.{k}", a))
+        img = lx.Image(bold().data, bold().affine)
+        old = lx.confounds.compute_dvars(
+            img, lx.Image(conf_bold_mask(), bold().affine), remove_zerovariance=True,
+            intensity_normalization=0, variance_tol=1e-7, numpy_version="2.2.6",
+            scipy_version="1.15.2", n_threads=t,
+        )  # fmt: skip
+        for k in ("std", "nstd", "vxstd", "voxels", "ar1"):
+            out.update(_conf_nan(f"2526.{k}", getattr(old, k)))
+        node = lx.confounds.compute_dvars_node(
+            series, mask, save_nstd=True, save_vxstd=True, save_all=True, out_dir=_conf_dir(ctx, "node"),
+            upstream_defects=REPRODUCE, n_threads=t,
+        )  # fmt: skip
+    for k in ("out_std", "out_nstd", "out_vxstd", "out_all"):
+        out[f"node.{k}"] = _conf_text(getattr(node, k))
+    out["node.avg"] = [node.avg_std, node.avg_nstd, node.avg_vxstd]
+    out["notices"] = _conf_notices(caught)
+    return out
+
+
+# --- nipype's CompCor -------------------------------------------------------------------------
+
+
+def _conf_compcor(prefix: str, r: Any) -> dict[str, Any]:
+    """A ``CompCorResult``'s files (masks by header and data) and arrays."""
+    out: dict[str, Any] = {}
+    for k in ("components_file", "pre_filter_file", "metadata_file"):
+        if getattr(r, k) is not None:
+            out[f"{prefix}.{k}"] = _conf_text(getattr(r, k))
+    for i, m in enumerate(r.high_variance_masks or ()):
+        out[f"{prefix}.mask{i}"] = Nifti(m)
+    out.update(_conf_nan(f"{prefix}.components", r.components))
+    if r.basis is not None:
+        out.update(_conf_nan(f"{prefix}.basis", r.basis))
+    return out
+
+
+@case(
+    "py.confounds.compcor",
+    covers=(
+        "lx.confounds.compcor",
+        "lx.confounds.acompcor",
+        "lx.confounds.tcompcor",
+        "lx.niworkflows.robust_acompcor",
+        "lx.niworkflows.robust_tcompcor",
+    ),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """nipype's CompCor interfaces on the 4-volume series: ``ACompCor`` over the union of two
+    masks with the Legendre pre-filter of degree 1, two components, the first volume ignored
+    (three left: a degree 2 would fit them exactly), every file saved; ``TCompCor`` with the cosine pre-filter (the repetition time given), its
+    high-variance mask at the 10 % threshold and 70 % of the variance; ``CompCor`` without a
+    pre-filter over the intersection, every component, the repetition time from the header;
+    each mask apart (``"none"``) with an empty third (PIPE-44 and PIPE-55 with
+    ``failure_mode="NaN"``, both modes); niworkflows' ``RobustACompCor`` and ``RobustTCompCor``
+    as fMRIPrep sets them (``reproduce``: glibc's ``cos``)."""
+    t = CONFOUNDS_THREADS
+    series = ctx.file("conf_bold.nii.gz")
+    rois = [ctx.file("conf_roi1.nii.gz"), ctx.file("conf_roi2.nii.gz")]
+    empty = ctx.file("conf_empty.nii.gz")
+    out: dict[str, Any] = {}
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        a = lx.confounds.acompcor(
+            series, rois, merge_method="union", num_components=2, regress_poly_degree=1,
+            ignore_initial_volumes=1, save_pre_filter=True, save_metadata="meta.tsv",
+            components_file="a.tsv", out_dir=_conf_dir(ctx, "acompcor"), n_threads=t,
+        )  # fmt: skip
+        out.update(_conf_compcor("acompcor", a))
+        tc = lx.confounds.tcompcor(
+            series, ctx.file("conf_bold_mask.nii.gz"), percentile_threshold=0.1,
+            variance_threshold=0.7, pre_filter="cosine", repetition_time=2.0, high_pass_cutoff=8,
+            save_pre_filter=True,
+            save_metadata=True, mask_names=["brain"], out_dir=_conf_dir(ctx, "tcompcor"),
+            n_threads=t,
+        )  # fmt: skip
+        out.update(_conf_compcor("tcompcor", tc))
+        c = lx.confounds.compcor(
+            series, rois, merge_method="intersect", num_components="all", pre_filter=False,
+            header_prefix="cc_", save_metadata=True, out_dir=_conf_dir(ctx, "compcor"), n_threads=t,
+        )  # fmt: skip
+        out.update(_conf_compcor("compcor", c))
+        for mode in ("fix", REPRODUCE):
+            n = lx.confounds.acompcor(
+                series, [rois[0], empty, rois[1], empty], merge_method="none",
+                num_components="all", pre_filter="cosine", high_pass_cutoff=8,
+                mask_names=["a", "empty", "b", "empty2"], save_pre_filter=True,
+                save_metadata=True, failure_mode="NaN", out_dir=_conf_dir(ctx, f"none-{mode}"),
+                upstream_defects=mode, n_threads=t,
+            )  # fmt: skip
+            out.update(_conf_compcor(f"none.{mode}", n))
+        ra = lx.niworkflows.robust_acompcor(
+            series, rois, components_file="acompcor.tsv", header_prefix="a_comp_cor_",
+            pre_filter="cosine", save_pre_filter=True, save_metadata=True, mask_names=["CSF", "WM"],
+            merge_method="none", failure_mode="NaN", variance_threshold=0.5,
+            out_dir=_conf_dir(ctx, "robust_acompcor"), upstream_defects=REPRODUCE, n_threads=t,
+        )  # fmt: skip
+        out.update(_conf_compcor("robust_acompcor", ra))
+        rt = lx.niworkflows.robust_tcompcor(
+            series, ctx.file("conf_bold_mask.nii.gz"), components_file="tcompcor.tsv",
+            header_prefix="t_comp_cor_", pre_filter="cosine", save_pre_filter=True,
+            save_metadata=True, percentile_threshold=0.02, failure_mode="NaN",
+            variance_threshold=0.5, out_dir=_conf_dir(ctx, "robust_tcompcor"),
+            upstream_defects=REPRODUCE, n_threads=t,
+        )  # fmt: skip
+        out.update(_conf_compcor("robust_tcompcor", rt))
+    out["notices"] = _conf_notices(caught)
+    return out
+
+
+@case(
+    "py.confounds.noise",
+    covers=(
+        "lx.confounds.compute_noise_components",
+        "lx.confounds.regress_poly",
+        "lx.confounds.cosine_filter",
+        "lx.confounds.cosine_drift",
+        "lx.confounds.full_rank",
+        "lx.confounds.compute_tstd",
+        "lx.confounds.fallback_svd",
+        "lx.confounds.combine_mask_files",
+    ),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """The functions under CompCor: ``compute_noise_components`` on the series in memory (the
+    cosine filter, a variance criterion, two masks; the Legendre filter of degree 2 with a count;
+    no filter with ``"all"``); numpy's thin SVD (``fallback_svd``) on its four ``DGESDD`` paths
+    above LAPACK's blocking size (130 and 200 or 250 rows and columns: OpenBLAS's blocked QR, LQ
+    and bidiagonal reduction, the divide-and-conquer SVD) with numpy 2.5.4's and 2.3.5's LAPACK;
+    ``regress_poly`` of degree 3 with numpy 2.5.4's and 2.2.6's Legendre values, with and
+    without the mean; ``cosine_filter`` of 100 volumes (three cosines) and ``cosine_drift`` of
+    50 cosines in both modes (GLIBC-07: glibc's ``cos`` under ``reproduce``); ``full_rank`` of a rank-deficient design (regularized) and of a full
+    one; ``compute_tstd`` with zero and NaN deviations; ``combine_mask_files`` by index, union,
+    intersection and none."""
+    t = CONFOUNDS_THREADS
+    rois = [ctx.file("conf_roi1.nii.gz"), ctx.file("conf_roi2.nii.gz")]
+    data = np.asarray(bold().data)
+    out: dict[str, Any] = {}
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        for tag, kw in (
+            ("cosine", {"components_criterion": 0.6, "filter_type": "cosine", "period_cut": 8,
+                        "repetition_time": 2.0}),
+            ("poly", {"components_criterion": 2, "filter_type": "polynomial", "degree": 2}),
+            ("none", {"components_criterion": "all", "filter_type": False}),
+        ):  # fmt: skip
+            comps, basis, meta = lx.confounds.compute_noise_components(
+                data, rois, mask_names=["a", "b"], n_threads=t, **kw
+            )
+            out.update(_conf_nan(f"cnc.{tag}.components", comps))
+            out.update(_conf_nan(f"cnc.{tag}.basis", basis))
+            out[f"cnc.{tag}.metadata"] = json.dumps(
+                {k: [repr(x) for x in np.asarray(v).tolist()] for k, v in meta.items()}
+            )
+        for shape in ((130, 250), (130, 200), (250, 130), (200, 130)):
+            m, n = shape
+            a = (ints(72 + m + n, shape, -500, 501) / 64).astype(np.float64)
+            for nv in ("2.5.4", "2.3.5"):
+                u, sv, vt = lx.confounds.fallback_svd(a, full_matrices=False, numpy_version=nv, n_threads=t)  # fmt: skip
+                out[f"svd.{m}x{n}.{nv}.u"] = u
+                out[f"svd.{m}x{n}.{nv}.s"] = sv
+                out[f"svd.{m}x{n}.{nv}.vt"] = vt
+        series = (ints(73, (40, 12), 0, 2000) / 16).astype(np.float64)
+        for nv in ("2.5.4", "2.2.6"):
+            for rm in (True, False):
+                res, x = lx.confounds.regress_poly(3, series, remove_mean=rm, numpy_version=nv, n_threads=t)  # fmt: skip
+                out[f"regress_poly.{nv}.{rm}.residuals"] = res
+                out[f"regress_poly.{nv}.{rm}.regressors"] = x
+        long = (ints(74, (200, 100), 0, 4000) / 32).astype(np.float64)
+        filtered, drift = lx.confounds.cosine_filter(long, 2.0, 128, n_threads=t)
+        out["cosine_filter.residuals"] = filtered
+        out["cosine_filter.basis"] = drift
+        frametimes = np.arange(100, dtype=np.float64) * 2.0
+        for mode in ("fix", REPRODUCE):
+            out[f"cosine_drift.{mode}"] = lx.confounds.cosine_drift(8, frametimes, upstream_defects=mode)  # fmt: skip
+        design = np.stack([np.ones(30), np.arange(30.0), 2 * np.arange(30.0) + 1], axis=1)
+        reg_x, cond = lx.confounds.full_rank(design, n_threads=t)
+        out["full_rank.deficient"] = reg_x
+        out["full_rank.deficient.c"] = [cond]
+        full_x, full_c = lx.confounds.full_rank(long[:6].T.copy(), n_threads=t)
+        out["full_rank.full"] = full_x
+        out["full_rank.full.c"] = [full_c]
+        tstd = (ints(75, (5, 8), 0, 50) / 4).astype(np.float64)
+        tstd[:, 2] = 3.0
+        tstd[1, 5] = np.nan
+        out["compute_tstd"] = lx.confounds.compute_tstd(tstd, 1.0)
+        out["compute_tstd.axis1"] = lx.confounds.compute_tstd(tstd, 2.0, axis=-1)
+        for tag, kw in (("index", {"mask_index": 1}), ("union", {"mask_method": "union"}),
+                        ("intersect", {"mask_method": "intersect"}), ("none", {"mask_method": "none"})):  # fmt: skip
+            for i, img in enumerate(lx.confounds.combine_mask_files(rois, **kw)):
+                out[f"combine.{tag}.{i}"] = np.asarray(img.data)
+                out[f"combine.{tag}.{i}.affine"] = img.affine
+    out["notices"] = _conf_notices(caught)
+    return out
+
+
+# --- nipype's TSNR, NonSteadyStateDetector and FramewiseDisplacement ---------------------------
+
+
+@case("py.confounds.tsnr", covers=("lx.confounds.tsnr",))
+def _(ctx: Context) -> dict[str, Any]:
+    """nipype's ``TSNR``: the 4-volume float32 series alone; the series and a 3-D volume after it
+    (five volumes) with the Legendre polynomials of degree 1 and 2 removed (the detrended
+    series); the int16 series (``scl_slope`` 0.5) in both modes (PIPE-51: float32 maps by
+    default, int16 with nibabel's scaling under ``reproduce``)."""
+    t = CONFOUNDS_THREADS
+    out: dict[str, Any] = {}
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        runs = {
+            "plain": (ctx.file("conf_bold.nii.gz"), None, "fix"),
+            "poly2": ([ctx.file("conf_bold.nii.gz"), ctx.file("conf_boldref.nii")], 2, "fix"),
+            "i16.fix": (ctx.file("conf_bold_i16.nii"), None, "fix"),
+            "i16.reproduce": (ctx.file("conf_bold_i16.nii"), 1, REPRODUCE),
+        }
+        for tag, (src, degree, mode) in runs.items():
+            r = lx.confounds.tsnr(
+                src, degree, out_dir=_conf_dir(ctx, tag), upstream_defects=mode, n_threads=t
+            )
+            for k in ("tsnr_file", "mean_file", "stddev_file", "detrended_file"):
+                if getattr(r, k) is not None:
+                    out[f"{tag}.{k}"] = Nifti(getattr(r, k))
+    out["notices"] = _conf_notices(caught)
+    return out
+
+
+@case("py.confounds.nonsteady", covers=("lx.confounds.nonsteady_state_detector",))
+def _(ctx: Context) -> dict[str, Any]:
+    """nipype's ``NonSteadyStateDetector``: the float32 series (its means in float32), the series
+    with a bright first volume (one volume to discard), the int16 series with a scale (its means
+    in float64) and a constant series in both modes (PIPE-23: a median absolute deviation of 0)."""
+    t = CONFOUNDS_THREADS
+    out: dict[str, Any] = {}
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        for tag, name, mode in (
+            ("f32", "conf_bold.nii.gz", "fix"),
+            ("bright", "conf_nss.nii.gz", "fix"),
+            ("i16", "conf_bold_i16.nii", "fix"),
+            ("const.fix", "conf_const.nii", "fix"),
+            ("const.reproduce", "conf_const.nii", REPRODUCE),
+        ):
+            r = lx.confounds.nonsteady_state_detector(
+                ctx.file(name), upstream_defects=mode, n_threads=t
+            )
+            out[f"{tag}.n"] = [r.n_volumes_to_discard]
+            out[f"{tag}.global_signal"] = r.global_signal
+    out["notices"] = _conf_notices(caught)
+    return out
+
+
+@case(
+    "py.confounds.framewise",
+    covers=("lx.confounds.framewise_displacement", "lx.confounds.normalize_mc_params"),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """nipype's ``FramewiseDisplacement`` from six volumes' parameters of every source: FSL's,
+    SPM's (the same numbers), AFNI's with an index column and FS-FAST's (degrees), nipy's affine
+    parameters in both modes (6 values; 12 with log-scales and a second rotation: glibc's or the
+    correctly rounded ``sin``, ``cos`` and ``exp``, GLIBC-07) with a radius of 40 mm; and
+    ``normalize_mc_params`` of single rows, an int8 rotation vector whose squares wrap
+    (PIPE-60)."""
+    out: dict[str, Any] = {}
+    fsl = CONF_FSL_PARAMS
+    afni = [[r[5] * 100, r[3] * 100, r[4] * 100, r[0] * 50, r[1] * 50, r[2] * 50] for r in fsl]
+    nipy6 = [[r[3], r[4], r[5], r[0], r[1], r[2]] for r in fsl]
+    nipy12 = [
+        [*r, (k - 2) / 100, k / 200, -k / 400, r[3] / 2, -r[5] / 4, r[4]]
+        for k, r in enumerate(nipy6)
+    ]
+    tables = {
+        "fsl": ("FSL", _conf_params_text(fsl), "fix"),
+        "spm": ("SPM", _conf_params_text(nipy6), "fix"),
+        "afni": ("AFNI", _conf_params_text(afni, index=True), "fix"),
+        "fsfast": ("FSFAST", _conf_params_text(afni), "fix"),
+        "nipy6": ("NIPY", _conf_params_text(nipy6), "fix"),
+        "nipy12.fix": ("NIPY", _conf_params_text(nipy12), "fix"),
+        "nipy12.reproduce": ("NIPY", _conf_params_text(nipy12), REPRODUCE),
+    }
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        for tag, (source, text, mode) in tables.items():
+            path = ctx.out(f"{tag}.par")
+            Path(path).write_text(text)
+            r = lx.confounds.framewise_displacement(
+                path, source, radius=40.0, out_file=f"fd_{tag}.txt", out_dir=ctx.dir,
+                upstream_defects=mode,
+            )  # fmt: skip
+            out[f"{tag}.file"] = _conf_text(r.out_file)
+            out[f"{tag}.fd"] = r.fd
+            out[f"{tag}.average"] = [r.fd_average]
+        rows = {
+            "fsl": (np.array(fsl[3]), "fsl", "fix"),
+            "afni7": (np.array([4.0, *afni[2]]), "AFNI", "fix"),
+            "nipy7": (np.array([*nipy6[4], 1.25]), "NIPY", "fix"),
+            "nipy12.2526": (np.array(nipy12[5]), "NIPY", REPRODUCE),
+            "nipy.int8": (np.array([1, 2, 3, 12, 0, 0], np.int8), "NIPY", "fix"),
+        }
+        for tag, (row, source, mode) in rows.items():
+            nv = "2.2.6" if tag.endswith("2526") else "2.5.4"
+            out[f"normalize.{tag}"] = lx.confounds.normalize_mc_params(
+                row, source, numpy_version=nv, upstream_defects=mode
+            )
+    out["notices"] = _conf_notices(caught)
+    return out
+
+
+# --- fMRIPrep's table steps, motion parameters and masks ----------------------------------------
+
+
+def _conf_metadata_table(path: str) -> str:
+    """aCompCor's ``component_metadata.tsv``: CSF, WM and combined components, some dropped; two
+    values with 11 decimals whose 10-decimal JSON values ujson rounds otherwise (PD-02)."""
+    rows = [
+        ("a_comp_cor_00", "CSF", 10.5, 0.6, 0.6, True),
+        ("a_comp_cor_01", "CSF", 6.25, 0.3, 0.9, True),
+        ("dropped_0", "CSF", 2.125, 0.1, 1.0, False),
+        ("a_comp_cor_02", "WM", 8.123456789, "0.50000000025", 0.75, True),
+        ("dropped_1", "WM", 4.5, "0.50000000095", 1.0, False),
+        ("a_comp_cor_03", "combined", 12.75, 0.55, 0.55, True),
+        ("a_comp_cor_04", "combined", 7.5, 0.3, 0.85, True),
+    ]
+    head = "component\tmask\tsingular_value\tvariance_explained\tcumulative_variance_explained\tretained"  # fmt: skip
+    lines = [head] + ["\t".join(f"{v:.10f}" if isinstance(v, float) else str(v) for v in r) for r in rows]  # fmt: skip
+    Path(path).write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return path
+
+
+@case(
+    "py.confounds.tables",
+    covers=(
+        "lx.confounds.fmriprep_framewise_displacement",
+        "lx.confounds.filter_dropped",
+        "lx.confounds.rename_acompcor",
+        "lx.confounds.gather_confounds",
+        "lx.niworkflows.framewise_displacement",
+    ),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """fMRIPrep's table steps on pandas' reading and writing (pandas 3.0.6 and 2.2.3, both
+    modes: PD-01's correctly rounded reading by default): ``FramewiseDisplacement`` of a motion
+    table and of a gzipped one (niworkflows' copy too), ``FilterDropped`` and
+    ``RenameACompCor`` of aCompCor's metadata, ``GatherConfounds`` of every input (the shorter
+    DVARS tables aligned at the end) and without the signals (PIPE-63: the rows in volume order,
+    fMRIPrep's order under ``reproduce``)."""
+    out: dict[str, Any] = {}
+    cols = {
+        n: [CONF_FSL_PARAMS[i][k] for i in range(6)]
+        for k, n in enumerate(("rot_x", "rot_y", "rot_z", "trans_x", "trans_y", "trans_z"))
+    }
+    motion = _conf_series_table(ctx.out("motion.tsv"), cols)
+    Path(ctx.out("motion.tsv.gz")).write_bytes(gzip.compress(Path(motion).read_bytes(), mtime=0))
+    meta = _conf_metadata_table(ctx.out("component_metadata.tsv"))
+    v = ints(76, (6, 5), 0, 1000)
+    comps = _conf_series_table(
+        ctx.out("acompcor.tsv"),
+        {f"a_comp_cor_{k:02d}": [(v[i, k] - 500) / 997 for i in range(6)] for k in range(5)},
+    )
+    signals = _conf_series_table(
+        ctx.out("signals.tsv"),
+        {"GlobalSignal": [600 + v[i, 0] / 3 for i in range(6)],
+         "CSF": [700 + v[i, 1] / 7 for i in range(6)], "white matter": [500.5] * 6},
+    )  # fmt: skip
+    dvars = ctx.out("dvars.tsv")
+    Path(dvars).write_text(
+        "dvars\n" + "".join(f"{_conf_cell(20 + v[i, 2] / 9)}\n" for i in range(5))
+    )
+    std_dvars = ctx.out("std_dvars.tsv")
+    Path(std_dvars).write_text(
+        "std_dvars\n" + "".join(f"{_conf_cell(v[i, 3] / 333)}\n" for i in range(5))
+    )
+    cos = _conf_series_table(ctx.out("cos.tsv"), {"Cosine00": [(v[i, 4] - 500) / 101 for i in range(6)]})  # fmt: skip
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        for pv in ("3.0.6", "2.2.3"):
+            for mode in ("fix", REPRODUCE):
+                tag = f"{pv}.{mode}"
+                d = _conf_dir(ctx, tag)
+                kw = {"out_dir": d, "pandas_version": pv, "upstream_defects": mode}
+                fd = lx.confounds.fmriprep_framewise_displacement(motion, **kw)
+                out[f"{tag}.fd"] = _conf_text(fd)
+                fdz = lx.confounds.fmriprep_framewise_displacement(motion + ".gz", radius=40, **kw)
+                out[f"{tag}.fd.gz"] = _conf_text(fdz)
+                out[f"{tag}.fd.name"] = Path(fdz).name
+                filt = lx.confounds.filter_dropped(meta, **kw)
+                out[f"{tag}.filtered"] = _conf_text(filt)
+                ren = lx.confounds.rename_acompcor(comps, meta, **kw)
+                out[f"{tag}.renamed.components"] = _conf_text(ren.components_file)
+                out[f"{tag}.renamed.metadata"] = _conf_text(ren.metadata_file)
+                g = lx.confounds.gather_confounds(
+                    signals=signals, dvars=dvars, std_dvars=std_dvars, fd=fd, acompcor=ren.components_file,
+                    cos_basis=cos, motion=motion, **kw,
+                )  # fmt: skip
+                out[f"{tag}.gathered"] = _conf_text(g.confounds_file)
+                out[f"{tag}.gathered.list"] = "\n".join(g.confounds_list)
+                d63 = _conf_dir(ctx, f"{tag}.pipe63")
+                g63 = lx.confounds.gather_confounds(
+                    dvars=dvars, fd=fd, motion=motion, out_dir=d63, pandas_version=pv,
+                    upstream_defects=mode,
+                )  # fmt: skip
+                out[f"{tag}.pipe63"] = _conf_text(g63.confounds_file)
+        nw = lx.niworkflows.framewise_displacement(motion, out_dir=_conf_dir(ctx, "niworkflows"))
+        out["niworkflows.fd"] = _conf_text(nw)
+    out["notices"] = _conf_notices(caught)
+    return out
+
+
+@case(
+    "py.confounds.motion",
+    covers=(
+        "lx.confounds.fsl_motion_params",
+        "lx.confounds.fsl_rms_deviation",
+        "lx.niworkflows.fsl_motion_params",
+        "lx.niworkflows.fsl_rms_deviation",
+    ),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """fMRIPrep's ``FSLMotionParams`` and ``FSLRMSDeviation`` of the four head-motion transforms
+    (ITK text, double precision) against the series' first volume: fMRIPrep 25.2.7's form
+    (newest numpy) with a gzipped table for a ``.nii.gz`` reference, 25.2.6's form with numpy
+    2.2.6 in both modes (PIPE-73: the transforms read in single precision under
+    ``reproduce``), the single-precision transforms, one transform alone (PIPE-71); niworkflows'
+    copies (1.15.4: 25.2.7's form, 1.15.2: 25.2.6's)."""
+    t = CONFOUNDS_THREADS
+    hmc, ref, refgz = ctx.file("hmc.txt"), ctx.file("conf_boldref.nii"), ctx.file("conf_boldref.nii.gz")  # fmt: skip
+    out: dict[str, Any] = {}
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        runs = {
+            "2527": (hmc, refgz, "25.2.7", "2.5.4", "fix"),
+            "2526.fix": (hmc, ref, "25.2.6", "2.2.6", "fix"),
+            "2526.reproduce": (hmc, ref, "25.2.6", "2.2.6", REPRODUCE),
+            "float": (ctx.file("conf_hmc_float.txt"), ref, "25.2.7", "2.5.4", "fix"),
+            "one": (ctx.file("conf_hmc_one.txt"), ref, "25.2.7", "2.5.4", "fix"),
+        }
+        for tag, (x, r, fv, nv, mode) in runs.items():
+            d = _conf_dir(ctx, tag)
+            mp = lx.confounds.fsl_motion_params(
+                x, r, out_dir=d, fmriprep_version=fv, numpy_version=nv, upstream_defects=mode,
+                n_threads=t,
+            )  # fmt: skip
+            out[f"{tag}.motion"] = _conf_text(mp.out_file)
+            out[f"{tag}.motion.name"] = Path(mp.out_file).name
+            out[f"{tag}.params"] = mp.params
+            rd = lx.confounds.fsl_rms_deviation(x, r, out_dir=d, upstream_defects=mode)
+            out[f"{tag}.rmsd"] = _conf_text(rd.out_file)
+            out.update(_conf_nan(f"{tag}.rmsd.values", rd.rmsd))
+        for nv in ("1.15.4", "1.15.2"):
+            d = _conf_dir(ctx, f"niworkflows-{nv}")
+            mp = lx.niworkflows.fsl_motion_params(hmc, ref, out_dir=d, niworkflows_version=nv, n_threads=t)  # fmt: skip
+            out[f"niworkflows.{nv}.motion"] = _conf_text(mp.out_file)
+        rd = lx.niworkflows.fsl_rms_deviation(hmc, ref, out_dir=_conf_dir(ctx, "niworkflows-rmsd"))
+        out["niworkflows.rmsd"] = _conf_text(rd.out_file)
+    out["notices"] = _conf_notices(caught)
+    return out
+
+
+@case(
+    "py.confounds.masks",
+    covers=(
+        "lx.confounds.binary_union",
+        "lx.confounds.acompcor_masks",
+        "lx.confounds.acompcor_masks_node",
+        "lx.confounds.mask2vf",
+        "lx.confounds.get_zooms",
+    ),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """fMRIPrep's masks: the union of two masks, and of the BOLD mask with a float32 one holding
+    0.5 (truncated: outside) and +inf in both modes (PIPE-74); the aCompCor masks from the
+    partial-volume maps and through the segmentation path (``mask2vf``'s Gaussian with the BOLD
+    voxel sizes; ``aCompCorMasks`` too); ``mask2vf`` to an array and to a file; ``_get_zooms``
+    of the series and of a 3-D image."""
+    t = CONFOUNDS_THREADS
+    tpms = [ctx.file("conf_gm.nii.gz"), ctx.file("conf_wm.nii.gz"), ctx.file("conf_csf.nii.gz")]
+    zooms = lx.confounds.get_zooms(ctx.file("conf_bold.nii.gz"))
+    out: dict[str, Any] = {
+        "zooms.bold": list(zooms),
+        "zooms.t1": list(lx.confounds.get_zooms(tpms[0])),
+    }
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        u = lx.confounds.binary_union(
+            ctx.file("conf_roi1.nii.gz"), ctx.file("conf_roi2.nii.gz"),
+            out_dir=_conf_dir(ctx, "union"), n_threads=t,
+        )  # fmt: skip
+        out["union"] = Nifti(u)
+        for mode in ("fix", REPRODUCE):
+            u = lx.confounds.binary_union(
+                ctx.file("conf_bold_mask.nii.gz"), ctx.file("conf_union_odd.nii"),
+                out_dir=_conf_dir(ctx, f"union-{mode}"), n_threads=t, upstream_defects=mode,
+            )  # fmt: skip
+            out[f"union.{mode}"] = Nifti(u)
+        for aseg in (False, True):
+            masks = lx.confounds.acompcor_masks(
+                tpms, aseg, zooms if aseg else None, out_dir=_conf_dir(ctx, f"acc-{aseg}"),
+                n_threads=t,
+            )  # fmt: skip
+            for i, m in enumerate(masks):
+                out[f"acc.{aseg}.{i}"] = Nifti(m)
+                out[f"acc.{aseg}.{i}.name"] = Path(m).name
+        node = lx.confounds.acompcor_masks_node(
+            tpms, zooms, is_aseg=True, out_dir=_conf_dir(ctx, "node"), n_threads=t
+        )
+        for i, m in enumerate(node.out_masks):
+            out[f"node.{i}"] = Nifti(m)
+        out["mask2vf.array"] = lx.confounds.mask2vf(tpms[2], [3.0, 3.0, 3.25], n_threads=t)
+        f = lx.confounds.mask2vf(tpms[1], out_file=ctx.out("wm_vf.nii.gz"), n_threads=t)
+        out["mask2vf.file"] = Nifti(f)
+    out["notices"] = _conf_notices(caught)
+    return out
+
+
+# --- niworkflows' confound model, table and morphology steps -------------------------------------
+
+
+@case(
+    "py.niworkflows.confounds",
+    covers=(
+        "lx.niworkflows.expand_model",
+        "lx.niworkflows.parse_formula",
+        "lx.niworkflows.temporal_derivatives",
+        "lx.niworkflows.exponential_terms",
+        "lx.niworkflows.ConfoundTable.as_dict",
+        "lx.niworkflows.spike_regressors",
+        "lx.niworkflows.spike_regressors_node",
+        "lx.niworkflows.normalize_motion_params",
+    ),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """niworkflows' confound model on a six-volume ``concat`` table: ``ExpandModel`` with
+    fMRIPrep's formula (pandas 3.0.6 and 2.2.3) and with derivatives 1 and 2, cubes (glibc's or
+    the correctly rounded ``pow``: GLIBC-07) and the shorthands ``acc``, ``tcc``, ``nss``,
+    ``dvall`` (PIPE-64: niworkflows' ``KeyError: 'std_dvarsall'`` under ``reproduce``); ``parse_formula``, ``temporal_derivatives`` and
+    ``exponential_terms`` on the table in memory (an int64 column too); ``SpikeRegressors`` with
+    fMRIPrep's thresholds and with lags 0 to 2 and a minimum run of 2 in both modes, and
+    ``spike_regressors`` of a spike with lags 1 and 2 and a minimum run of 4 in both modes
+    (PIPE-67, PIPE-68), and a mask of two criteria without concatenating; ``NormalizeMotionParams``
+    of FSL's and AFNI's parameters (with the index column) and of one row in both modes
+    (PIPE-70)."""
+    table = _conf_confounds_table(ctx.out("confounds.tsv"))
+    out: dict[str, Any] = {}
+
+    def frame(prefix: str, ct: Any) -> None:
+        out[f"{prefix}.names"] = "\n".join(ct.names)
+        for name, col in ct.as_dict().items():
+            out.update(_conf_nan(f"{prefix}.{name}", np.asarray(col)))
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        for pv in ("3.0.6", "2.2.3"):
+            e = lx.niworkflows.expand_model(table, out_dir=_conf_dir(ctx, f"expand-{pv}"), pandas_version=pv)  # fmt: skip
+            out[f"expand.{pv}"] = _conf_text(e)
+        formula = "d1-2(rps + wm)^3 + (acc + tcc)^^2 + nss + dvall"
+        for mode in ("fix", REPRODUCE):
+            try:
+                e = lx.niworkflows.expand_model(
+                    table, formula, output_file="model.tsv", out_dir=_conf_dir(ctx, f"model-{mode}"),
+                    upstream_defects=mode,
+                )  # fmt: skip
+                out[f"model.{mode}"] = _conf_text(e)
+            except KeyError as error:  # PIPE-64 reproduced: `dvall` read as `std_dvarsall`
+                out[f"model.{mode}"] = f"{type(error).__name__}: {error}"
+            s = lx.niworkflows.spike_regressors_node(
+                table, lags=(0, 1, 2), minimum_contiguous=2, out_dir=_conf_dir(ctx, f"spikes-{mode}"),
+                upstream_defects=mode,
+            )  # fmt: skip
+            out[f"spikes.{mode}"] = _conf_text(s)
+        s = lx.niworkflows.spike_regressors_node(table, out_dir=_conf_dir(ctx, "spikes"))
+        out["spikes.fmriprep"] = _conf_text(s)
+        data = {
+            "a": np.array([1.5, 2.25, -0.75, 4.0, 0.125, -3.5, 2.0, 0.5]),
+            "b": np.array([3, -1, 4, 1, -5, 9, 2, -6], np.int64),
+            "framewise_displacement": np.array([np.nan, 0.75, *[0.25] * 6]),
+            "std_dvars": np.array([np.nan, *[1.25] * 7]),
+        }
+        variables, parsed = lx.niworkflows.parse_formula("dd1(a + b)^^2 + others", data)
+        out["parse.variables"] = "\n".join(variables)
+        frame("parse", parsed)
+        frame("derivatives", lx.niworkflows.temporal_derivatives([1, 2], ["a", "b"], data).data)
+        frame("powers", lx.niworkflows.exponential_terms([2, 3], ["a", "b"], data).data)
+        for mode in ("fix", REPRODUCE):
+            frame(
+                f"spike_regressors.{mode}",
+                lx.niworkflows.spike_regressors(
+                    data, lags=[1, 2], minimum_contiguous=4, upstream_defects=mode
+                ),
+            )
+        frame(
+            "spike_regressors.mask",
+            lx.niworkflows.spike_regressors(
+                data, {"a": ("<", 0.0), "b": (">", 3.5)}, header_prefix="spike", concatenate=False,
+                output="mask",
+            ),
+        )  # fmt: skip
+        fsl = Path(ctx.out("fsl.par"))
+        fsl.write_text(_conf_params_text(CONF_FSL_PARAMS))
+        afni = Path(ctx.out("afni.1D"))
+        afni.write_text(_conf_params_text([[100 * v for v in r] for r in CONF_FSL_PARAMS], index=True))  # fmt: skip
+        one = Path(ctx.out("one.par"))
+        one.write_text(_conf_params_text(CONF_FSL_PARAMS[2:3]))
+        for tag, path, fmt, mode in (("fsl", fsl, "FSL", "fix"), ("afni", afni, "AFNI", "fix"),
+                                     ("one", one, "FSL", "fix")):  # fmt: skip
+            n = lx.niworkflows.normalize_motion_params(
+                path, format=fmt, out_dir=_conf_dir(ctx, f"normalize-{tag}"), upstream_defects=mode
+            )
+            out[f"normalize.{tag}"] = _conf_text(n)
+    out["notices"] = _conf_notices(caught)
+    return out
+
+
+@case(
+    "py.niworkflows.utility",
+    covers=(
+        "lx.niworkflows.add_tsv_header",
+        "lx.niworkflows.dict_merge",
+        "lx.niworkflows.tsv2json",
+    ),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """niworkflows' utilities: ``AddTSVHeader`` of DVARS-like tables (several rows; one row in
+    both modes: PIPE-61), ``DictMerge`` (later values win), ``TSV2JSON`` of aCompCor's metadata
+    as fMRIPrep formats it (the mask column dropped, ``Method`` added, snake and camel case) to a
+    dictionary and to a file with pandas 3.0.6 and 2.2.3 in both modes (PD-01, PD-02)."""
+    v = ints(77, (5, 3), 0, 10000)
+    many = Path(ctx.out("dvars_nstd.tsv"))
+    many.write_text("".join(f"{v[i, 0] / 7:0.6f}\t{v[i, 1] / 9:0.6f}\n" for i in range(5)))
+    row = Path(ctx.out("dvars_one.tsv"))
+    row.write_text(f"{v[0, 2] / 11:0.6f}\t{v[1, 2] / 13:0.6f}\t{v[2, 2] / 3:0.6f}\n")
+    meta = _conf_metadata_table(ctx.out("component_metadata.tsv"))
+    out: dict[str, Any] = {}
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        h = lx.niworkflows.add_tsv_header(many, ["dvars", "std"], out_dir=_conf_dir(ctx, "many"))
+        out["header.many"] = _conf_text(h)
+        for mode in ("fix", REPRODUCE):
+            h = lx.niworkflows.add_tsv_header(
+                row, ["a", "b", "c"] if mode == "fix" else ["a"], out_dir=_conf_dir(ctx, f"one-{mode}"),
+                upstream_defects=mode,
+            )  # fmt: skip
+            out[f"header.one.{mode}"] = _conf_text(h)
+        merged = lx.niworkflows.dict_merge(
+            [{"a": 1, "b": {"x": 2}}, {"c": [3.5]}, {"a": "later", "d": None}]
+        )
+        out["dict_merge"] = json.dumps(merged)
+        for pv in ("3.0.6", "2.2.3"):
+            for mode in ("fix", REPRODUCE):
+                kw = {"pandas_version": pv, "upstream_defects": mode}
+                d = lx.niworkflows.tsv2json(
+                    meta, "component", output=None, drop_columns=["mask"],
+                    additional_metadata={"Method": "tCompCor"}, enforce_case=True, **kw,
+                )  # fmt: skip
+                out[f"tsv2json.{pv}.{mode}"] = json.dumps(d)
+                f = lx.niworkflows.tsv2json(
+                    meta, "component", additional_metadata={"Method": "aCompCor"},
+                    out_dir=_conf_dir(ctx, f"json-{pv}-{mode}"), **kw,
+                )  # fmt: skip
+                out[f"tsv2json.{pv}.{mode}.file"] = _conf_text(f)
+    out["notices"] = _conf_notices(caught)
+    return out
+
+
+@case(
+    "py.niworkflows.morphology",
+    covers=(
+        "lx.niworkflows.binary_dilation",
+        "lx.niworkflows.binary_subtraction",
+        "lx.niworkflows.image_binary_dilation",
+        "lx.niworkflows.signal_extraction",
+    ),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """niworkflows' morphology and signals: ``BinaryDilation`` of the BOLD mask by ``ball(2)``,
+    ``BinarySubtraction`` (the crown), ``image_binary_dilation`` by ``ball(1.5)`` and by
+    ``ball(-2)`` under ``reproduce`` (PIPE-77: scikit-image's footprint of a negative radius);
+    ``SignalExtraction`` of the series in three probability maps and the tCompCor-like mask
+    (numpy 2.5.4's and 2.2.6's summation) and in a label image (its values in ascending order)."""
+    t = CONFOUNDS_THREADS
+    mask = ctx.file("conf_bold_mask.nii.gz")
+    out: dict[str, Any] = {}
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        dilated = lx.niworkflows.binary_dilation(
+            mask, out_dir=_conf_dir(ctx, "dilated"), n_threads=t
+        )
+        out["dilated"] = Nifti(dilated)
+        crown = lx.niworkflows.binary_subtraction(dilated, mask, out_dir=_conf_dir(ctx, "crown"), n_threads=t)  # fmt: skip
+        out["crown"] = Nifti(crown)
+        roi = ellipsoid(SHAPE4[:3], 6, 10, shift=1)
+        out["dilate.1.5"] = lx.niworkflows.image_binary_dilation(roi, 1.5, n_threads=t)
+        out["dilate.-2"] = lx.niworkflows.image_binary_dilation(roi, -2, n_threads=t, upstream_defects=REPRODUCE)  # fmt: skip
+        maps = [mask, ctx.file("conf_roi1.nii.gz"), ctx.file("conf_roi2.nii.gz"), ctx.file("conf_empty.nii.gz")]  # fmt: skip
+        labels = ["global_signal", "csf", "white_matter", "nothing"]
+        for nv in ("2.5.4", "2.2.6"):
+            s = lx.niworkflows.signal_extraction(
+                ctx.file("conf_bold.nii.gz"), maps, labels, out_file=f"signals-{nv}.tsv",
+                out_dir=_conf_dir(ctx, "signals"), numpy_version=nv, n_threads=t,
+            )  # fmt: skip
+            out[f"signals.{nv}"] = _conf_text(s)
+        s = lx.niworkflows.signal_extraction(
+            ctx.file("conf_bold.nii.gz"), ctx.file("conf_labels.nii.gz"), ["one", "two", "three", "four"],
+            out_dir=_conf_dir(ctx, "labels"), n_threads=t,
+        )  # fmt: skip
+        out["signals.labels"] = _conf_text(s)
+    out["notices"] = _conf_notices(caught)
+    return out
+
+
+@case("py.skimage.ball.negative", covers=("lx.skimage.ball",))
+def _(ctx: Context) -> dict[str, Any]:
+    """scikit-image's ``ball`` of negative radii (numpy's ``mgrid`` with a complex step of
+    ``int(abs(step))`` points: -1 one false element, -2 the cross of radius 1, -3 the ball of
+    radius 2; the confounds' part, 2026-11-12), strict and not."""
+    return {
+        "ball-1": lx.skimage.ball(-1),
+        "ball-2": lx.skimage.ball(-2),
+        "ball-3": lx.skimage.ball(-3),
+        "ball-2.5": lx.skimage.ball(-2.5, strict_radius=False),
+    }
+
+
+# --- larmorprepx: fMRIPrep's confounds workflow of a BOLD run ---------------------------------
+
+
+def _conf_workflow(ctx: Context, mode: str, **kw: Any) -> dict[str, Any]:
+    """``bold_confounds`` on the 4-volume series (``bold()``, its first volume the head-motion
+    reference, ``HMC_PARAMS``' transforms, ``COREG_PARAMS``' coregistration) with the T1w mask
+    and maps of ``conf_tissues``, ``ds_confounds`` into a derivatives folder: every node's file
+    (the workflow's folder), the derivatives, the metadata, the description and the
+    reportlets' inputs (paths by name)."""
+    tpms = [ctx.file("conf_gm.nii.gz"), ctx.file("conf_wm.nii.gz"), ctx.file("conf_csf.nii.gz")]
+    pc = lx.pipelines.larmorprepx.confounds
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        r = pc.bold_confounds(
+            ctx.file("conf_bold.nii.gz"), ctx.file("conf_bold_mask.nii.gz"),
+            ctx.file("conf_boldref.nii.gz"), ctx.file("hmc.txt"), 0, ctx.file("conf_t1w_mask.nii.gz"),
+            tpms, ctx.file("coreg.txt"), out_dir=ctx.out("wf"), fmriprep_dir=ctx.out("derivatives"),
+            source_file="sub-01/func/sub-01_task-rest_echo-1_bold.nii.gz", n_threads=CONFOUNDS_THREADS,
+            upstream_defects=mode, **kw,
+        )  # fmt: skip
+    out = _conf_files(ctx.out("wf"), ctx.dir)
+    out.update(
+        {f"derivatives/{k}": v for k, v in _conf_files(ctx.out("derivatives"), ctx.dir).items()}
+    )
+    out["metadata"] = json.dumps(r.confounds_metadata)
+    out["description"] = r.description
+
+    def name(v: Any) -> Any:
+        """A path by its name in the case's folder (an input file by its own name)."""
+        if isinstance(v, tuple):
+            return [name(x) for x in v]
+        if not (isinstance(v, str) and os.path.isabs(v)):
+            return v
+        p = Path(v)
+        return p.relative_to(ctx.dir).as_posix() if p.is_relative_to(ctx.dir) else p.name
+
+    report = {k: name(v) for k, v in vars(r.report_inputs).items()}
+    out["report_inputs"] = json.dumps(report, sort_keys=True)
+    out["result.files"] = "\n".join(
+        name(p) for p in (r.confounds_file, *r.acompcor_masks, r.tcompcor_mask, r.crown_mask)
+    )
+    out["nodes"] = "\n".join(r.nodes)
+    out["notices"] = _conf_notices(caught)
+    return out
+
+
+@case(
+    "py.larmorprepx.confounds",
+    covers=(
+        "lx.pipelines.larmorprepx.confounds.bold_confounds",
+        "lx.pipelines.larmorprepx.confounds.ds_confounds",
+        "lx.pipelines.larmorprepx.confounds.select_cols",
+        "lx.pipelines.larmorprepx.confounds.bold_confounds_description",
+    ),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """fMRIPrep's confounds workflow (``init_bold_confs_wf`` with ``ds_confounds``) with the
+    newest libraries and larmorx's corrections (PIPE-41: the tissue signals' metadata kept), the
+    BIDS ``RepetitionTime`` given, the echo entity dismissed; ``select_cols`` of the gathered
+    table and fMRIPrep's description with FreeSurfer."""
+    out = _conf_workflow(ctx, "fix", metadata={"RepetitionTime": 2.0})
+    pc = lx.pipelines.larmorprepx.confounds
+    out["select_cols"] = "\n".join(pc.select_cols(ctx.out("wf/concat/confounds.tsv")))
+    out["description.freesurfer"] = pc.bold_confounds_description(0.9, 2.0, freesurfer=True)
+    return out
+
+
+@case(
+    "py.larmorprepx.confounds.reproduce",
+    covers=("lx.pipelines.larmorprepx.confounds.bold_confounds",),
+)
+def _(ctx: Context) -> dict[str, Any]:
+    """The workflow as fMRIPrep 25.2.6's image runs it (fMRIPrep 25.2.6, niworkflows 1.15.2, numpy
+    2.2.6, SciPy 1.15.2, pandas 2.2.3) with ``upstream_defects="reproduce"``: the repetition
+    time from the series' header, every component kept (``--return-all-components``),
+    FreeSurfer's aseg path for the aCompCor masks (PIPE-79), other spike thresholds, the echo
+    entity kept (``--echo-idx 1``)."""
+    return _conf_workflow(
+        ctx, REPRODUCE, metadata={}, regressors_all_comps=True, regressors_dvars_th=1.0,
+        regressors_fd_th=0.2, freesurfer=True, echo_idx=1, fmriprep_version="25.2.6",
+        niworkflows_version="1.15.2", numpy_version="2.2.6", scipy_version="1.15.2",
+        pandas_version="2.2.3",
+    )  # fmt: skip

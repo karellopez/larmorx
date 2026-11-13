@@ -16,7 +16,7 @@
 
 use std::io::Write;
 
-use larmorx_core::defects::{FS_55, FS_56, FS_60};
+use larmorx_core::defects::{FS_55, FS_56, FS_60, FS_206};
 use larmorx_freesurfer_core::cname::CName;
 use larmorx_freesurfer_core::diag::{DIAG_SHOW, verbose_on};
 use larmorx_freesurfer_core::globals::Globals;
@@ -199,7 +199,8 @@ impl Eq for Shape {}
 
 impl Shape {
     /// `MRI::Shape::Shape(shape)` of 3 or 4 extents: a message on standard output for another
-    /// count and for each extent that is not positive (the shape is made anyway).
+    /// count and for each extent that is not positive (the shape is made anyway; an extent a
+    /// shorter list lacks is 0 here, set by [`Mri::new_beyond`]: FS-206).
     pub fn new(out: &mut dyn Write, shape: &[i32]) -> Shape {
         let dims = shape.len();
         if dims != 3 && dims != 4 {
@@ -498,6 +499,47 @@ fn size_t(v: i32) -> u64 {
     v as i64 as u64
 }
 
+/// FS-206: the extents a shape of `len` (fewer than 3) extents lacks, set in `sh` (made by
+/// [`Shape::new`] with 0 there): 1 by default; with `reproduce` what FreeSurfer reads past the
+/// list (`beyond`, 0 where memory was never written). Noted when FreeSurfer's value is not 1.
+fn missing_extents(g: &mut Globals, sh: &mut Shape, len: usize, beyond: &[Option<i32>]) {
+    let fs: Vec<Option<i32>> = (len..3)
+        .map(|i| beyond.get(i - len).copied().flatten())
+        .collect();
+    let reproduce = g.notices.reproduce();
+    if fs.iter().any(|v| *v != Some(1)) {
+        let shown: Vec<String> = fs
+            .iter()
+            .map(|v| v.map_or("memory never written".to_owned(), |x| x.to_string()))
+            .collect();
+        g.notices.add(
+            &FS_206,
+            format!(
+                "a shape of {len} extents: FreeSurfer takes the missing ones from past the list ({}){}",
+                shown.join(", "),
+                if reproduce {
+                    ", 0 where memory was never written"
+                } else {
+                    "; taken as 1"
+                }
+            ),
+        );
+    }
+    for (k, v) in fs.iter().enumerate() {
+        let x = i64::from(if reproduce { v.unwrap_or(0) } else { 1 });
+        match len + k {
+            0 => sh.width = x,
+            1 => sh.height = x,
+            _ => sh.depth = x,
+        }
+    }
+    sh.size = sh
+        .width
+        .wrapping_mul(sh.height)
+        .wrapping_mul(sh.depth)
+        .wrapping_mul(sh.nframes);
+}
+
 impl Mri {
     /// The entry `i` (from `-MAX_INDEX`) of an index table.
     pub fn index(table: &[i32], i: i32) -> i32 {
@@ -513,6 +555,10 @@ impl Mri {
     /// `for <n> slices`), an index table of negative size; a type `MRIsizeof` does not know
     /// (FS-55) is refused by default (`unsupported MRI data type: <type>`), with `reproduce`
     /// allocated as FreeSurfer tries to.
+    ///
+    /// A shape of fewer than 3 extents (FS-206): each missing extent is 1 by default; with
+    /// `reproduce`, what FreeSurfer reads past the list: [`Mri::new_beyond`]'s `beyond`, here
+    /// nothing (a list made for the call ends its storage), so 0 with the notice.
     pub fn new(
         g: &mut Globals,
         out: &mut dyn Write,
@@ -521,7 +567,28 @@ impl Mri {
         dtype: i32,
         alloc: bool,
     ) -> Result<Mri, Fatal> {
-        let shape = Shape::new(out, shape);
+        Mri::new_beyond(g, out, err, shape, &[], dtype, alloc)
+    }
+
+    /// [`Mri::new`] for a list of extents whose storage holds more places than the list has:
+    /// `beyond[k]` is what the place `shape.len() + k` holds (an earlier extent the storage
+    /// still has), `None` for memory never written (and every place past `beyond`). FreeSurfer
+    /// reads the missing extents of a shape of fewer than 3 there (FS-206: 1 by default; with
+    /// `reproduce` those values, 0 for memory never written).
+    pub fn new_beyond(
+        g: &mut Globals,
+        out: &mut dyn Write,
+        err: &mut dyn Write,
+        shape: &[i32],
+        beyond: &[Option<i32>],
+        dtype: i32,
+        alloc: bool,
+    ) -> Result<Mri, Fatal> {
+        let mut sh = Shape::new(out, shape);
+        if shape.len() < 3 {
+            missing_extents(g, &mut sh, shape.len(), beyond);
+        }
+        let shape = sh;
         let mut vg = VolGeom {
             width: shape.width as i32,
             height: shape.height as i32,

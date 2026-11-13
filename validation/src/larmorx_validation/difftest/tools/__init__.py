@@ -58,6 +58,9 @@ TOOLS: dict[str, tuple[str, str]] = {
     "ndimage-skimage": ("fieldmaps_b", "NDIMAGE"),
     "niworkflows-helpers": ("fieldmaps_b", "NIWORKFLOWS"),
     "sdcflows-estimation": ("fieldmaps_b", "ESTIMATION"),
+    "confounds-linalg": ("confounds", "LINALG"),
+    "confounds-nipype": ("confounds", "NIPYPE"),
+    "confounds-fmriprep": ("confounds", "FMRIPREP"),
 }
 
 #: Tools that test the harness itself: run only when named, never part of ``all``.

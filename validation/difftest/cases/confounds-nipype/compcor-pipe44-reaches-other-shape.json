@@ -1,0 +1,278 @@
+{
+ "defect": null,
+ "description": "random testing: DN fix pass",
+ "expect": "pass",
+ "found": {
+  "detail": "D13 fix pass: no defect named: no values; fix: ValueError: Inputs for CompCor, timeseries and mask, do not have matching spatial dimensions ((7, 9, 13) and (7, 9, 12),; reproduce: ValueError: No components found changed",
+  "n": 31615,
+  "seed": "confounds-trial",
+  "shrink_moves": [],
+  "signature": [
+   "DN fix pass"
+  ]
+ },
+ "id": "compcor-pipe44-reaches-other-shape",
+ "implementations": [
+  "port"
+ ],
+ "reason": "",
+ "recipe": {
+  "extra": {
+   "call": "compcor",
+   "kind": "ACompCor",
+   "kw": {
+    "failure_mode": "error",
+    "header_prefix": "a_comp_cor_",
+    "merge_method": "none",
+    "num_components": "all",
+    "pre_filter": "polynomial",
+    "regress_poly_degree": 1,
+    "save_pre_filter": true
+   },
+   "threads": 1
+  },
+  "features": {
+   "a refused input": false,
+   "axis0": 1.05,
+   "axis1": 1.25,
+   "axis2": 0.75,
+   "blobs": 6,
+   "call": "compcor",
+   "centre0": -6.0,
+   "centre1": -4.0,
+   "centre2": 0.0,
+   "components_file": false,
+   "content": "blobs",
+   "criterion": "all",
+   "dtype": "int16",
+   "extreme": false,
+   "failure_mode": "error",
+   "header_prefix": true,
+   "header_prefix value": "a_comp_cor_",
+   "ignore_initial_volumes": false,
+   "interface": "ACompCor",
+   "mask 4-D": false,
+   "mask axis0 change": 0,
+   "mask axis1 change": 0,
+   "mask axis2 change": -1,
+   "mask binary": true,
+   "mask dtype": "uint8",
+   "mask other grid": true,
+   "mask scale": 1.0,
+   "mask suffix": ".nii.gz",
+   "mask_names": false,
+   "masks": 2,
+   "merging": "none",
+   "orientation": "plumb",
+   "origin0": -7.25,
+   "origin1": -12.25,
+   "origin2": 16.5,
+   "pre_filter": "polynomial",
+   "qfac": 1,
+   "qform_code": 4,
+   "range": "plain",
+   "regress_poly_degree": 1,
+   "repetition_time": false,
+   "save_metadata": false,
+   "save_pre_filter": true,
+   "series dtype": "float32",
+   "series suffix": ".nii.gz",
+   "sform": "same",
+   "sform_code": 1,
+   "shape": "7x9x13x27",
+   "signal": true,
+   "signal amplitude": 1.0,
+   "signal period": 10,
+   "size": 28.5,
+   "spacing0": 2.5,
+   "spacing1": 4.0,
+   "spacing2": 2.0,
+   "threads": 1,
+   "tr": 0.5,
+   "tunits": "unknown",
+   "units": "unknown"
+  },
+  "groups": [
+   {
+    "args": [
+     "compcor"
+    ],
+    "name": "compcor",
+    "optional": false
+   }
+  ],
+  "inputs": {
+   "mask0": {
+    "content": {
+     "seed": 613603380,
+     "type": "zeros"
+    },
+    "dtype": "int16",
+    "geometry": {
+     "origin": [
+      -7.25,
+      -12.25,
+      16.5
+     ],
+     "qfac": 1,
+     "qform_code": 4,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      2.5,
+      4.0,
+      2.0
+     ],
+     "units": "unknown"
+    },
+    "scaling": null,
+    "shape": [
+     7,
+     9,
+     13
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   },
+   "mask1": {
+    "content": {
+     "axes": [
+      1.05,
+      1.25,
+      0.75
+     ],
+     "centre": [
+      -6.0,
+      -4.0,
+      0.0
+     ],
+     "n": 6,
+     "seed": 1348851976,
+     "size": 28.5,
+     "type": "blobs"
+    },
+    "dtype": "uint8",
+    "geometry": {
+     "origin": [
+      -7.25,
+      -12.25,
+      16.5
+     ],
+     "qfac": 1,
+     "qform_code": 4,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      2.5,
+      4.0,
+      2.0
+     ],
+     "units": "unknown"
+    },
+    "scaling": null,
+    "shape": [
+     7,
+     9,
+     12
+    ],
+    "suffix": ".nii.gz",
+    "values": {
+     "binarize": true
+    }
+   },
+   "series": {
+    "content": {
+     "axes": [
+      0.95,
+      1.05,
+      1.1
+     ],
+     "centre": [
+      2.0,
+      -3.0,
+      -3.5
+     ],
+     "n": 4,
+     "seed": 1997813202,
+     "size": 23.0,
+     "type": "blobs"
+    },
+    "dtype": "float32",
+    "geometry": {
+     "origin": [
+      -7.25,
+      -12.25,
+      16.5
+     ],
+     "qfac": 1,
+     "qform_code": 4,
+     "quaternion": [
+      1,
+      0,
+      0,
+      0
+     ],
+     "sform": "same",
+     "sform_code": 1,
+     "spacing": [
+      2.5,
+      4.0,
+      2.0
+     ],
+     "units": "unknown"
+    },
+    "scaling": null,
+    "shape": [
+     7,
+     9,
+     13,
+     27
+    ],
+    "signal": {
+     "amplitude": 1.0,
+     "period": 10
+    },
+    "suffix": ".nii.gz",
+    "timing": {
+     "slice_code": 0,
+     "tr": 0.5,
+     "tunits": "unknown"
+    },
+    "values": {
+     "offset": 0.0,
+     "scale": 1.0
+    }
+   }
+  },
+  "n": 31615,
+  "options": [
+   "2 masks",
+   "ACompCor",
+   "all",
+   "compcor",
+   "pre_filter polynomial"
+  ],
+  "seed": "confounds-trial",
+  "tool": "confounds-nipype"
+ },
+ "rule": null,
+ "status": "fixed",
+ "suite": "confounds-nipype",
+ "tier": "smoke",
+ "tool": "confounds-nipype"
+}

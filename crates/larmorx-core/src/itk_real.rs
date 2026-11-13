@@ -18,7 +18,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::defects::UpstreamDefects;
 use crate::element::RealElement;
-use crate::{linalg, math, vnl_svd_f32};
+use crate::math::x86_nan;
+use crate::{linalg, math, vnl_fixed, vnl_svd_f32};
 
 /// The computation type of an ITK pipeline: `double` (ANTs' default) or `float`
 /// (`--float 1`).
@@ -93,6 +94,28 @@ pub trait ItkReal:
     /// `itk::Matrix<T, 3, 3>::GetInverse`: vnl's determinant compared with 0, then vnl's SVD
     /// inverse in `T` (`None` where ITK throws).
     fn itk_inverse3(m: &[[Self; 3]; 3]) -> Option<[[Self; 3]; 3]>;
+
+    /// `self + b` as x86-64's SSE adds (`addss`/`addsd`, `self` the first source): the IEEE sum,
+    /// and where it is NaN the NaN x86-64 gives, on every platform (`self`'s quieted, else `b`'s,
+    /// else the default NaN with the sign bit set; [`crate::math`]'s `x86_nan`).
+    fn sse_add(self, b: Self) -> Self;
+
+    /// `self - b` with x86-64's NaN ([`ItkReal::sse_add`]).
+    fn sse_sub(self, b: Self) -> Self;
+
+    /// `self * b` with x86-64's NaN, `self` the first source ([`ItkReal::sse_add`]).
+    fn sse_mul(self, b: Self) -> Self;
+
+    /// `self / b` with x86-64's NaN ([`ItkReal::sse_add`]).
+    fn sse_div(self, b: Self) -> Self;
+
+    /// `vnl_inverse` of a 2 x 2 `vnl_matrix_fixed<T>` whose determinant `det` is not 0, in the
+    /// operand order of `T`'s instance ([`crate::vnl_fixed::inverse2`]; the `float` and `double`
+    /// instances differ).
+    fn vnl_inverse2(m: &[[Self; 2]; 2], det: Self) -> [[Self; 2]; 2];
+
+    /// `vnl_inverse` of a 4 x 4 `vnl_matrix_fixed<T>` ([`ItkReal::vnl_inverse2`]).
+    fn vnl_inverse4(m: &[[Self; 4]; 4], det: Self) -> [[Self; 4]; 4];
 }
 
 /// x86-64's `cvtsd2si` / `cvtss2si` with a 64-bit destination: round to nearest (ties to
@@ -173,6 +196,34 @@ impl ItkReal for f64 {
     fn itk_inverse3(m: &[[f64; 3]; 3]) -> Option<[[f64; 3]; 3]> {
         linalg::inverse3_itk(m)
     }
+
+    #[inline]
+    fn sse_add(self, b: f64) -> f64 {
+        x86_nan::add_f64(self, b)
+    }
+
+    #[inline]
+    fn sse_sub(self, b: f64) -> f64 {
+        x86_nan::sub_f64(self, b)
+    }
+
+    #[inline]
+    fn sse_mul(self, b: f64) -> f64 {
+        x86_nan::mul_f64(self, b)
+    }
+
+    #[inline]
+    fn sse_div(self, b: f64) -> f64 {
+        x86_nan::div_f64(self, b)
+    }
+
+    fn vnl_inverse2(m: &[[f64; 2]; 2], det: f64) -> [[f64; 2]; 2] {
+        vnl_fixed::sse::inverse2_f64(m, det)
+    }
+
+    fn vnl_inverse4(m: &[[f64; 4]; 4], det: f64) -> [[f64; 4]; 4] {
+        vnl_fixed::sse::inverse4_f64(m, det)
+    }
 }
 
 impl ItkReal for f32 {
@@ -216,6 +267,34 @@ impl ItkReal for f32 {
             return None;
         }
         vnl_svd_f32::vnl_inverse3_f32(m)
+    }
+
+    #[inline]
+    fn sse_add(self, b: f32) -> f32 {
+        x86_nan::add_f32(self, b)
+    }
+
+    #[inline]
+    fn sse_sub(self, b: f32) -> f32 {
+        x86_nan::sub_f32(self, b)
+    }
+
+    #[inline]
+    fn sse_mul(self, b: f32) -> f32 {
+        x86_nan::mul_f32(self, b)
+    }
+
+    #[inline]
+    fn sse_div(self, b: f32) -> f32 {
+        x86_nan::div_f32(self, b)
+    }
+
+    fn vnl_inverse2(m: &[[f32; 2]; 2], det: f32) -> [[f32; 2]; 2] {
+        vnl_fixed::sse::inverse2_f32(m, det)
+    }
+
+    fn vnl_inverse4(m: &[[f32; 4]; 4], det: f32) -> [[f32; 4]; 4] {
+        vnl_fixed::sse::inverse4_f32(m, det)
     }
 }
 

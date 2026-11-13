@@ -1,0 +1,18 @@
+[package]
+name = "fs-dicom"
+description = "larmorx-io's DICOM reader (CTN 3.0.6's DCM_OpenFile for files, its conditions and condition stack) against the originals: CTN 3.0.6 built from its pinned source and FreeSurfer 8.2.0's copy as the unit oracle built it (GCC 8.4.0, FreeSurfer's flags)"
+version = "0.0.1"
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+
+# Its own workspace: a measurement tool, never part of larmorx's build (it calls libraries compiled
+# from the originals through the dynamic loader).
+[workspace]
+
+[dependencies]
+larmorx-core = { path = "../../../crates/larmorx-core" }
+larmorx-io = { path = "../../../crates/larmorx-io" }
+
+[profile.release]
+debug = false

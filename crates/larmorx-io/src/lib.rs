@@ -11,12 +11,14 @@
 //! - [`znz`]: znzlib's files, plain or gzip (nifticlib 2.0.0 over zlib 1.2.11's file layer).
 //! - [`xfm`]: MNI transform files (`.xfm`), read and written as MINC 1.5.1's volume_io does.
 //!
+//! - [`dicom`]: DICOM files opened as CTN 3.0.6's object library opens them (`DCM_OpenFile`).
 //! - [`gifti`]: GIFTI files, read and written as gifticlib 1.12 does, over [`xml`], a pure-Rust
 //!   parser with expat 2.0.1's events and failures.
 //!
 //! MGH/MGZ, CIFTI-2 and FreeSurfer surfaces follow.
 #![forbid(unsafe_code)]
 
+pub mod dicom;
 pub mod gifti;
 pub mod gzip;
 pub mod itk_hdf5;

@@ -2,21 +2,70 @@
 
 Written by the replica author of queue items 3.1-23 and 3.1-24 as their spec writer
 (`docs/porting-guide.md` §1): behaviour, maths, conventions, messages and the validation plan, from
-FreeSurfer 8.2.0's source and the official build's outputs, never code or routines. A clean-room
-implementer writes the clean room from this file, black-box runs of the official programs (and of
-the probe `validation/probes/fs-maths/`, a black-box run of FreeSurfer's code) and the cited
-standards only.
+FreeSurfer 8.2.0's source and the official build's outputs, never code or routines. Made ready for
+the clean room by the spec finisher (FreeSurfer's foundations, track E, relay 2, 2026-11-13): the
+black-box validation plan (§23) with its open probe, a read-through as a clean-room reader, the gaps
+filled from the source as behaviour (§0, §3, §5.1, §18.2, §19), the defects' texts in
+`larmorx_core::defects` checked. What black-box runs confirmed is marked **(observed)**, with the
+probe command or the comparison group behind it.
 
-Status: **part 1** (§1-6): the float matrices' storage, allocation, copy and double-accumulated
-product; the 4 x 4 affine helpers; the double matrices with their long-double products; the
-histograms. **Part 2** (§7-11, queue items 3.1-24, first piece, and 3.1-23's inverse): the NaN conventions; the
-float product; the element-wise operations, regions, vectors, printing, rotations and Gaussian
-matrices; the inverse, determinant and QR factors; prime factors; the Gaussian draws and the
-time-of-day seed. **Part 3** (§12-15, item 3.1-23's minimizers): the double matrices' NaN operands;
-the cost-function bridge, Powell's method with given directions, the L-BFGS driver and its
-observer, `OpenPowell`, `OpenPowell2`, `OpenDFPMin`; Numerical Recipes' 1-based vectors and
-matrices. To come: the eigensystems, the SVD and what uses them, the matrices' text and binary
-files, the random fields.
+**Whoever implements it must not open:** FreeSurfer's source (`<workspace>/tags/freesurfer-8.2.0`,
+any other copy, the installed package's scripts, Python and libraries), the replica crates
+(`crates-freesurfer/`, among them `larmorx-freesurfer-core`), the documents written from FreeSurfer's
+source (`docs/freesurfer/`, `docs/findings/freesurfer-*.md`), the replica's probes and checks
+(`validation/probes/fs-*`, among them `validation/probes/fs-maths/` and its `scanf/`,
+`validation/probes/x87-extended/`, `validation/investigations/freesurfer-core/`), the unit oracle's
+build tree and tools (`<workspace>/oracles/freesurfer-8.2.0-unit/` except running
+`probes/fs_maths_probe` and loading `probes/guard_malloc.so` beside it;
+`validation/investigations/freesurfer-unit-oracle/`), the replay tool's and the unit oracle's Python
+(`validation/src/larmorx_validation/freesurfer/`, `freesurfer_unit.py`: run, never read),
+`docs/parts/` and the scratch folders of FreeSurfer's parts. **It may read** this spec,
+`specs/freesurfer-core.md` (§1's process state, the error functions, `nint`), `specs/ranlux.md`, the
+standards and papers cited (IEEE 754-2008, C11, POSIX's `drand48`, LINPACK's and EISPACK's guides,
+Powell 1964 and Brent 1973 for the line minimizations, Nocedal 1980 and Liu and Nocedal 1989 for
+L-BFGS; not Numerical Recipes' code, whose licence restricts it: §13 and §14 say what is needed),
+the main package's open code and documentation (for example
+`larmorx_core::vnl_minimize`, `larmorx_core::vnl_lbfgs`, the VNL ports, `larmorx_core::x87`,
+`larmorx_core::math`, `larmorx_core::cscan`, `larmorx_core::cfmt`, `larmorx_core::defects`), the open
+probe folder `validation/investigations/freesurfer-maths-probe/` (calls only: its README says how to
+run it), and run as black boxes the prebuilt probe `<workspace>/oracles/freesurfer-8.2.0-unit/probes/fs_maths_probe`
+(with the guard allocator beside it), the official FreeSurfer 8.2.0 programs and the C library.
+
+Status: complete for the functions of §0 (queue items 3.1-23 and 3.1-24): the float matrices'
+storage, allocation, copy and products; the 4 x 4 affine helpers; the double matrices; the
+histograms; the element-wise operations, regions, vectors, printing, rotations, Gaussian matrices;
+the inverse, determinant and QR factors; primes; the Gaussian draws and the time-of-day seed; the
+minimizers; Numerical Recipes' 1-based arrays; the eigensystems, the SVD and what uses them; the
+matrices' files; the random-field specifications (their draws come with the volumes).
+
+## 0. The functions covered
+
+FreeSurfer's names, as the probe calls them (§23; README.md of the probe folder lists each command),
+and where they are specified:
+
+| Section | FreeSurfer's functions |
+|---|---|
+| §2, §8.1, §16 | `MatrixAlloc` (and its old allocator, `FREESURFER_MatrixAlloc_old`), `MatrixAlloc2` (a caller's buffer), `MatrixFree`, `MatrixCopy`, `MatrixMultiplyD`, `MatrixMultiply` |
+| §3 | `SetAffineVector`, `GetAffineVector`, `GetFloorAffineVector`, `SetAffineMatrix`, `GetAffineMatrix`, `AffineMV`, `AffineMM` |
+| §4, §12 | `DMatrixAlloc`, `DMatrixCheckDims`, `DMatrixAddMul`, `DMatrixAdd`, `DMatrixSubtract`, `DMatrixScalarMul`, `DMatrixCopy`, `DMatrixTranspose`, `DMatrixPrint`, `DMatrixPrintFmt`, `DMatrixMultiply`, `DVectorDot`, `DMatrixCompareFMatrix`, `DMatrixCopyFMatrix`, `DMatrixConstVal`, `DMatrixZero`, `DMatrixMaxAbs`, `DListStats` |
+| §5, §21 | `HISTOalloc`, `HISTOrealloc`, `HISTOfree`, `HISTOcopy`, `HISTOclear`, `HISTOclearCounts`, `HISTOinit`, `HISTObins`, `HISTOadd`, `HISTOsubtract`, `HISTOlinearScale`, `HISTOmakePDF`, `HISTOsumNorm`, `HISTOcumsum`, `HISTOclearBins`, `HISTOabs`, `HISTOmakeCDF`, `HISTOmakeReverseCDF`, `HISTOsoapBubbleZeros`, `HISTOfillHoles`, `HISTOsmooth`, `HISTOfindLastPeak`, `HISTOfindFirstPeak`, `HISTOfindValley`, `HISTOfindLastPeakInRegion`, `HISTOfindHighestPeakInRegion`, `HISTOfindPreviousValley`, `HISTOfindNextValley`, `HISTOfindNextPeak`, `HISTOfindPreviousPeak`, `HISTOfindStartOfPeak`, `HISTOfindEndOfPeak`, `HISTOfindCurrentPeak`, `HISTOfindBin`, `HISTOgetCount`, `HISTOfindBinWithCount`, `HISTOvalToBin`, `HISTOcount`, `HISTO2DfindBin1`, `HISTO2DfindBin2`, `HISTO2DgetCount`, `HISTOaddSample`, `HISTOtotalInRegion`, `HISTOtotal`, `HISTOclearZeroBin`, `HISTOthreshSum`, `HISTOfindMedian`, `HISTOgetEntropy`, `HISTOcorrelate`, `HISTOfindLinearFit`, `HISTOcomputeFWHM`, `HISTOrobustGaussianFit`, `HISTOplot`, `HISTOwriteTxt` |
+| §8.2 | `MatrixIdentity`, `MatrixTranspose`, `MatrixAdd`, `MatrixSubtract`, `MatrixScalarMul`, `MatrixSquareElts`, `MatrixClear`, `MatrixDiag`, `MatrixIsSymmetric`, `MatrixIsZero`, `MatrixCheck`, `MatrixTrace`, `MatrixSumElts`, `MatrixConstVal`, `MatrixZero`, `MatrixClone` (`VectorClone`), `MatrixReshape`, `MatrixNormalizeColScale`, `MatrixNormalizeCol` |
+| §8.3 | `MatrixCopyRegion`, `MatrixCopyRealRegion`, `MatrixCopyImagRegion`, `MatrixRealToComplex` |
+| §8.4, §8.5 | `MatrixAllocRotation`, `MatrixReallocRotation`, `VectorLen`, `VectorDot`, `VectorDistance`, `VectorCrossProduct`, `VectorTripleProduct`, `Vector3Angle`, `XYZ_NORMALIZED_LOAD`, `XYZApproxAngle_knownLength` |
+| §8.6, §8.7 | `MatrixPrint`, `MatrixPrintFmt`, `MatrixSimilarityTransform`, `GaussianMatrix`, `GaussianMatrix2` |
+| §8.8 | `MatrixInverse`, `MatrixDeterminant`, `MatrixQRdecomposition` |
+| §9, §10 | `GetPrimes`, `GetPrimeFactors`, `GetClosestPrimeFactor`, `GetClosestPrimeFactorLess`, `PDFgaussian`, `PDFtodSeed` |
+| §13 | `OpenPowell`, `OpenPowell2` (with the iteration callback `powell_iteration_func`), `OpenDFPMin` |
+| §14 | `vector`, `matrix`, `free_vector`, `free_matrix` |
+| §17 | `OpenEigenSystem`, `OpenNonSymmetricEigenSystem`, `MatrixEigenSystem`, the eigensystem helper `MatrixCalculateEigenSystemHelper`, `MatrixSVD`, `MatrixSVDEigenValues`, `MatrixConditionNumber`, `MatrixNSConditionNumber`, `MatrixSVDInverse`, `MatrixPseudoInverse`, `MatrixSVDPseudoInverse` |
+| §18 | `MatrixReadTxt`, `MatrixWriteTxt`, `MatrixAsciiWriteInto`, `MatrixAsciiReadFrom`, `MatrixWriteInto`, `MatrixReadFrom` |
+| §19 | `RFname2Code`, `RFspecInit`, `RFspecSetSeed` |
+
+**Not covered** (no program on FreeSurfer's default paths reaches them; a later item specifies one
+if a program does): the other functions these files hold (among them `HISTOcrunch`, `HISTOinvert`,
+`HISTOnormalize`, `HISTOcompose`, the other two-dimensional histogram functions, `MatrixSqrt`,
+`MatrixToeplitz`, `MatrixCovariance`, `MatrixMahalanobisDistance`, `DMatrixDRand48`, `PDFerlang`,
+`PDFloadCDF`), the random fields' draws (`RFsynth`, `RFdrawVal`, with the volumes).
 
 ## 1. Conventions
 
@@ -82,7 +131,8 @@ allocator never uses the buffer.
 
 ### 2.3 Freeing
 
-Freeing sets the caller's matrix to none and returns 0.
+Freeing sets the caller's matrix to none and returns 0 (none given: 0 too, **(observed)** `mfree null`). A
+matrix in a caller's buffer (§2.2) is set to none the same way (`malloc2`: `0 none`).
 
 ### 2.4 Copy
 
@@ -146,7 +196,8 @@ by column** (float `i + 4j` is row i, column j, from 0).
   x3` in float, the sum **starting from the first product** (not from 0: four products of -0 give
   -0).
 - **Matrix × matrix:** output column j = the matrix × vector of the second matrix's column j.
-- **Floor of a vector:** `(int) floor(v)` of each of the first three (FS-17).
+- **Get a vector:** its first three floats. **Floor of a vector:** `(int) floor(v)` of each of the first
+  three (FS-17).
 - A new affine matrix is all zeros (FreeSurfer's is not cleared; its callers set it).
 
 ## 4. Double matrices
@@ -206,7 +257,10 @@ The layout of §2.1 with doubles, real only.
 practice), `bins[b]` (a float value per bin, its position), `counts[b]` (a float count per bin),
 `bin_size`, `min`, `max` (floats). A new histogram of n bins: `max_bins = nbins = n`, zeros
 everywhere. n negative: the program ends, code -2, `HISTOalloc(<n>): could not allocate
-histogram` (reallocation: `HISTOrealloc(<n>): ...`). "The histogram's bins" below are `0..nbins-1`.
+histogram` (reallocation: `HISTOrealloc(<n>): ...`; **(observed)** `halloc -1`: exit status 254,
+standard error `error: Cannot allocate memory` + `\n` + `error: HISTOalloc(-1): could not allocate
+histogram` + NUL + `\n`, the C-style error of `specs/freesurfer-core.md` §2 after the system's message). Freeing sets the caller's histogram to none and
+returns 0 (none given: 0 too, **(observed)** `hfree null`). "The histogram's bins" below are `0..nbins-1`.
 Reading bin b with b < 0 or b ≥ the allocation is **FS-22** (§1's out-of-range rule).
 
 ### 5.2 Making and copying
@@ -329,7 +383,7 @@ from 0; when it is exactly 0 a peak search returns -1.
   (float); from `b0 - 1` down to v, the first bin whose count is below t; else `v - 1` (v = -1 makes
   the scan read bin -1, FS-22). **End of peak** (h, b0, p): the next valley v of b0; b0 itself when
   ≥ `nbins`; from `b0 + 1` up to v, the first bin below t; else **the last bin** (kept as FreeSurfer
-  has it: the test `nbins ≥ b` always holds).
+  has it: never `v + 1`, the mirror of the start's `v - 1`).
 - **Current peak** (h, b0, wsize, pct): the highest peak of the whole histogram (-1 when none); the
   minimum `pct ×` its count; the float sums of the counts in `[b0 - whalf, b0)` and `(b0, b0 + whalf]`
   inside the histogram; when the later sum is larger, forward from `b0 - whalf` (from 0): the first
@@ -432,20 +486,11 @@ from 0; when it is exactly 0 a peak search returns -1.
 
 ## 6. Validation plan, part 1
 
-- **Against the official code, function by function** (`validation/probes/fs-maths/`): `fsmaths`
-  runs FreeSurfer's own functions from the unit oracle's build (queue item 3.1-02: the official
-  build's library, byte-identical programs) on seeded cases of 47 commands (every function of §2-5:
-  the in-place forms, the outputs given and absent, the defects' cases), each number as its bits.
-  Measured 2026-11-12: 49,000 cases of 49 commands, `reproduce` identical on all 48,185 comparable
-  ones (815 read outside FreeSurfer's arrays: FS-22, not comparable; in 768 of them FreeSurfer's
-  memory happened to hold 0); `fix` differs only where FS-14, FS-15, FS-18, FS-19 or FS-20 changed
-  the result, and in 13 entropies, where the correctly rounded `log` moved the last bit. The
-  SHA-256 of the official outputs of seed 1 (490 cases) is checked by the port's test on every
-  platform.
-- **The defects' two modes**: the port's unit tests (`crates-freesurfer/larmorx-freesurfer-core`).
-- **The replays** of the first programs that use these functions (`mri_normalize`, `mri_segment`,
-  `mris_make_surfaces`, `mri_ca_register`'s histograms, `mri_em_register`), with `reproduce`, on the
-  recorded heads (queue: the programs' items).
+In §23 (the groups `hmake`, `harith`, `hsmooth`, `hsearch`, `hstats`, `hrobust`, `hfiles`, `mmake`,
+`mproduct`, `affine`, `dmatrix`), with the replays of the first programs that use these functions
+(`mri_normalize`, `mri_segment`, `mris_make_surfaces`, `mri_ca_register`'s histograms,
+`mri_em_register`) when they are ported.
+
 
 ## 7. Conventions, part 2
 
@@ -459,7 +504,7 @@ from 0; when it is exactly 0 a peak search returns -1.
   argument is the `float` function (`expf`, `sinf`, `cosf`, `sqrtf`), of a `double` the `double` one.
   `expf`, `sinf`, `cosf`, `log` are correctly rounded by default and glibc 2.35's (x86-64, its FMA
   build) with `reproduce`; `acos` is correctly rounded in both modes (glibc's `acos` differs from it on
-  about 0.1 % of arguments: queue item 3.1-08).
+  about 0.1 % of arguments; a later part of larmorx brings glibc's).
 - **Complex operands.** The operations of §8.2-8.6 not marked otherwise were written for real
   matrices: they address a complex matrix as if real (§2.1). **FS-25:** **default:** such an operand
   is refused: an error, code -4, `<function>: a complex matrix (the function handles real matrices
@@ -612,7 +657,7 @@ Vectors are matrices whose first column is read (element i is (i, 1)).
   Each real element as `printf("% 2.<p>f")` (a negative p as 6), a complex one `% 2.3f + % 2.3f i`;
   two spaces between elements, `;` + `\n` after each row; a type neither real nor complex: at its
   first element an error, `MatrixPrint: unknown type <t>` + `\n`, returns -4. Returns 0.
-- **Print with a format** (fp, fmt, m): the same, each element with `fmt` (FreeSurfer passes
+- **Print with a format** (fp, fmt, m): the same, each element with `fmt` (for example
   `%10f`), complex `<fmt> + <fmt> i`, `\n` after each row (no `;`).
 
 ### 8.7 Similarity transform and Gaussian matrices
@@ -623,16 +668,16 @@ Vectors are matrices whose first column is read (element i is (i, 1)).
   `ERROR: GaussianMatrix: dimension mismatch` + `\n` on standard output, nothing returned. var = std
   std (float); f = `(float)(sqrt(2π) std)` in double. With g(d) = `expf(-(d d) / (2 var)) / f` in
   float: norm 1: f = f / Σ g(c - n/2) for c = 0..n-1 (float sum from 0; n/2 integer division) — so
-  the centre row sums to 1, not every row (FreeSurfer's own comment says so); then row r, column c
+  the centre row sums to 1, not every row; then row r, column c
   (from 0) = g(c - r), the row's float sum S kept; norm 2: each element of the row / S in float.
 - **Mixture** (n, s1, s2, w1, norm, G): `w1 G1 + (1 - w1) G2` (1 - w1 in float), the two matrices
   scaled (§8.2) then added (§8.2, into `G`).
 
 ### 8.8 Inverse, determinant, QR factors
 
-The decompositions are ITK 4.13.2's VNL in **float** (the main package's ports, queue item 3.1-07:
-`vnl_det` and `vnl_inverse` of 2 to 4 rows, `vnl_determinant`, `vnl_qr<float>`), on the matrix's
-numbers row by row.
+The decompositions are ITK 4.13.2's VNL in **float** (the main package's ports, `larmorx_core::vnl_fixed`
+and `larmorx_core::vnl_qr`: `vnl_det` and `vnl_inverse` of 2 to 4 rows, `vnl_determinant`,
+`vnl_qr<float>`), on the matrix's numbers row by row.
 
 - **Determinant** (m): 0 when not square; one element: itself; 2 to 4 rows: VNL's closed-form
   determinant in float; more: VNL's QR determinant in float. **FS-33:** a 0 x 0 matrix: FreeSurfer
@@ -686,24 +731,16 @@ numbers row by row.
 
 ## 11. Validation plan, part 2
 
-- **Against the official code** (`validation/probes/fs-maths/`, 62 commands, the 13 new ones: the
-  float product, the element-wise operations on real matrices with zeros, tiny values, infinities
-  and NaNs, the same operations on complex matrices, the regions of all types and destinations, real
-  to complex, rotations, vectors and angles, Gaussian matrices, similarity transforms, printing,
-  primes and factors, the Gaussian draws; inverses of real matrices of 1 to 7 rows and of complex ones
-  of 1 to 3, singular ones included, determinants and QR factors). A case whose official run reads
-  outside its arrays
-  (FS-22, FS-16) is counted, not compared. The angles go through `acos`: a difference there is
-  allowed only as one unit in the last place, counted apart. Measured: see the findings
-  (`docs/findings/freesurfer-maths.md`, "Part 2").
-- **The replays** of the programs that use these functions with `reproduce` on the recorded heads.
+In §23 (the groups `melements`, `mregions`, `mvectors`, `mprint`, `minverse`, `primes`, `draws`,
+`mproduct`'s float products). The angles go through `acos` (§7): there a difference of one unit in
+the last place is allowed in both modes until glibc's `acos` is in the main package.
 
 
 ## 12. Conventions, part 3: the double matrices' NaN operands
 
-§7's NaN rules hold, with the official build's operand order measured where two NaNs meet (the
-fs-maths probe's NaN inputs: infinities, quiet NaNs of both signs with and without payloads, a
-signalling NaN):
+§7's NaN rules hold, with the official build's operand order measured where two NaNs meet (on
+infinities, quiet NaNs of both signs with and without payloads, a signalling NaN among the inputs;
+§23's `dmatrix` group):
 
 - **Weighted sum** (§4): for a factor other than 0 and 1 the term is `(element × factor) + val` (of
   two NaNs, the element's in the product and the product's in the sum); for a factor of exactly 1
@@ -794,7 +831,8 @@ step; value and gradient at `x`; on the first evaluation the start value and the
 this value; later, a value **strictly below** the best: the best point = `x`, the best value = it,
 and the observer is told (below). Then one call of `lbfgs` (no caller diagonal; `eps = gtol`, `xtol
 = 1e-16`; IPRINT (1, 1) when the diagnostic bits hold `DIAG_VERBOSE`, else (1, 0) with trace and
-(-1, 0) without; its text on standard output); the iteration count goes up; with verbose and not
+(-1, 0) without; its text on standard output, as `larmorx_core::vnl_lbfgs` prints it: with IPRINT (1, 1)
+the vectors' printout holds memory the program does not own, ITK-106, a **memory** line of §23); the iteration count goes up; with verbose and not
 trace `<iflag>:<value %g> ` on standard error. `iflag` 0: success; negative: failure; else the
 evaluation count goes up, and above `maxfev` (as an `int`) the failure code becomes
 FAILED_USER_REQUEST: failure. (With verbose and not trace, `done` + newline at the end.)
@@ -861,23 +899,10 @@ releases them. An allocation failure ends the program (code -1, `could not alloc
 
 ## 15. Validation plan, part 3
 
-- **Against the official code** (`validation/probes/fs-maths/`, 67 commands): `powell`, `powell2`,
-  `dfpmin` on four seeded float costs (a positive-definite quadratic, Rosenbrock's, the quadratic
-  rounded down to multiples of 1/q with the quadratic's gradient, weighted absolute values), 1 to 6
-  parameters for Powell and 2 to 12 for DFP, identity, scaled or sheared directions, the settings of
-  the programs (bbregister's 36 iterations, `ftol` 1e-8, ...), verbose runs, the iteration callback,
-  the step function and user callback, the caller's first value or 0 or twice it; every evaluation
-  of the cost and gradient and every callback hashed, standard output and error compared byte for
-  byte. FreeSurfer's `OpenDFPMin` crashes on FS-37: its cases run in a child process and a crash is
-  the line `CRASH` (the port's `reproduce` gives `CRASH` where FreeSurfer empties the parameters).
-  The double matrices' cases carry NaNs and infinities (§12). Lines whose official bytes depend on
-  memory FreeSurfer does not own are counted, not compared (FS-22, FS-16, and VNL's L-BFGS printout
-  of the vectors under `DIAG_VERBOSE`, ITK-106).
-- **Every platform:** the hash of seed 1's lines, checked with AArch64's NaN emulated on x86
-  (`validation/probes/fsl-mcflirt-affine-trace/nan_trap.c`, `NAN_TRAP_ARM=1` with `NAN_TRAP_DIR` set)
-  in debug and release builds.
-- **The replays** of `mri_em_register` (OpenDFPMin, OpenPowell), `mri_segreg`/`bbregister`
-  (OpenPowell2) with `reproduce` on the recorded heads, when they are ported.
+In §23 (the groups `minimizers`, `nr`, `dmatrix`'s NaN operands), with the replays of
+`mri_em_register` (`OpenDFPMin`, `OpenPowell`) and `mri_segreg`/`bbregister` (`OpenPowell2`) when
+they are ported.
+
 
 ## 16. Conventions, part 4: the float product's NaN operands
 
@@ -889,8 +914,8 @@ first); with 4 or more terms the sums go in blocks of four, `val + p0`, `p1 + va
 
 ## 17. Decompositions
 
-All on ITK 4.13.2's VNL (the main package's ports, queue item 3.1-07), on the matrix's numbers row
-by row.
+All on ITK 4.13.2's VNL (the main package's ports: `larmorx_core::vnl_eigen`, `larmorx_core::vnl_svd_f32`),
+on the matrix's numbers row by row.
 
 ### 17.1 Symmetric eigensystem (n x n numbers, values, vectors)
 
@@ -1054,34 +1079,25 @@ nothing.
 - **Text write** (file name, m): not openable: an error `MatrixWriteTxt(<name>) - file open failed` +
   `\n`, code -1, returned. Each row: each element `%+4.5f` and a space, then `\n`. Real only (FS-25).
   Success.
+- **Binary write** (stream, m): the type, rows and columns as big-endian 32-bit integers, then each
+  element row by row as a big-endian double widened from its float (complex: the real part, then the
+  imaginary part); returns 0 (`mwritebin`).
 
 ## 19. Random-field specifications
 
 A specification holds a name, a code, up to 20 parameters, a mean, a standard deviation, a generator
 and a seed. **Name to code:** `uniform` 1, `gaussian` 2, `z` 3, `t` 4, `F` 5, `chi2` 6, any other -1
-(stored and returned). **Init** (seed): a cleared specification with a new generator (RANLUX389,
-`specs/ranlux.md`), then **set seed** (seed): 0 takes the time-of-day seed (§10, FS-29), any other is
-kept; the generator is set to it. The draws (`RFsynth`, `RFdrawVal`) and the global statistics of a
+(stored and returned). **Init** (seed): a cleared specification (no name, code 0, no parameters, mean
+and deviation 0) with a new generator (RANLUX389, `specs/ranlux.md`), then **set seed** (seed): 0
+takes the time-of-day seed (§10, FS-29), any other is kept; the generator is set to it; it returns 0
+(**(observed)** `rfinit`). The draws (`RFsynth`, `RFdrawVal`) and the global statistics of a
 volume come with the generator's distributions and the volumes.
 
 ## 20. Validation plan, part 4
 
-- **Against the official code** (`validation/probes/fs-maths/`, 75 commands; the 8 new ones):
-  `meig` (symmetric matrices, symmetric but one element, general and upper-triangular ones, symmetric
-  ones with infinities and NaNs through the symmetric path only; new and given outputs; both paths
-  called directly), `msvd` (the SVD eigenvalues, both condition numbers, the SVD with a new and a given
-  V, on matrices of 1 to 6 rows and columns: zeros, tiny values, infinities and NaNs), `msvdinv` and
-  `mpinv` (the SVD inverse and both pseudo-inverses, new and given outputs of both shapes, singular and
-  zero matrices), `mrdtxt`, `mrdasc`, `mrdbin`, `mwr` (the four readers and both writers on generated
-  files: numbers in every form above, the special and broken ones, comments, blank lines, long lines,
-  files cut short; `errno` and the bytes read compared). The decompositions run in a child process with
-  a 2-second alarm: the line `TIMEOUT` where FreeSurfer never returns, `CRASH` where it crashes; lines
-  that depend on memory FreeSurfer never wrote (FS-42, ITK-110, ITK-111, FS-49) and the non-finite
-  matrices the port refuses (FS-47, FS-48) are counted, not compared.
-- **Every platform:** seed 1's hash with AArch64's NaN emulated in debug and release builds.
-- **The C library's conversions:** `validation/probes/fs-maths/scanf/` (black-box runs of glibc 2.35:
-  each input's return value, assigned bits, `errno` and the bytes read), its measurements as the unit
-  tests of the port.
+In §23 (the groups `eigen`, `svd`, `mfiles`, `rfields`). §18.1's conversions are glibc 2.35's, as
+the main package's `larmorx_core::cscan` gives them.
+
 
 ## 21. Conventions, part 5: the histograms' NaN operands
 
@@ -1119,14 +1135,116 @@ signs with and without payloads and on infinities among the counts, the bin valu
 
 ## 22. Validation plan, part 5
 
-- **Against the official code** (`validation/probes/fs-maths/`): the histograms' cases carry
-  non-finite values in about a third of the histograms: quiet NaNs `0x7fc00000`, `0xffc00000`,
-  `0x7fc12345`, `0xffd00001`, signalling ones `0x7f800001`, `0xff812345`, and both infinities, in one
-  to three counts (a quarter of the histograms), a bin value between the ends (one in eight), the
-  bin size, minimum or maximum (one in 24), and the scalar inputs (samples, values to find, scale and
-  offset, thresholds, σ). Each histogram case runs in a child process with a 2-second alarm: `CRASH`
-  where FreeSurfer's bin number from a NaN (-2147483648) addresses unmapped memory (FS-22, not
-  compared), `TIMEOUT` where it never returns (FS-51, compared), `EXIT <status>` where its code ends
-  the program (FS-50's failed allocation, compared).
-- **Every platform:** seed 1's hash with AArch64's NaN emulated (the port's output the same with and
-  without the emulation) in debug and release builds.
+In §23 (the histogram groups carry non-finite values among the counts, the bin values, the header and
+the scalar inputs).
+
+## 23. Validation plan (black box)
+
+### 23.1 The probe
+
+The open probe folder `validation/investigations/freesurfer-maths-probe/` holds the probe's source
+(calls of the functions of §0 by name), a guard allocator and the comparison loop; its README lists
+every command, its arguments and what it prints, the encodings (every float and double as its bits)
+and the four test costs of the minimizers. The implementer runs the prebuilt probe
+`<workspace>/oracles/freesurfer-8.2.0-unit/probes/fs_maths_probe` (FreeSurfer 8.2.0's library as the
+official build compiles it: the unit oracle, GCC 8.4.0 and FreeSurfer's flags) with
+`guard_malloc.so` beside it, and never builds them. Each call runs in a child process of its own with
+an alarm: its line is the printed result, or `EXIT <status>` where FreeSurfer's error functions end
+the program, `CRASH <signal>`, `TIMEOUT` where FreeSurfer never returns; then its standard output
+and standard error.
+
+### 23.2 The groups and their reference hashes
+
+`compare.py refs` (seed 7) runs each group's batch on the probe four times: plainly, plainly again in
+another process (the stack below each call zeroed), and in the two guard runs (the guard allocator
+with an inaccessible page right after each allocation, fill byte 90, then right before it, fill byte
+165). A line whose four results are not the same depends on memory FreeSurfer does not own (a
+**memory** line: a read past an array's end or before its start crashes in one guard run and reads
+the fill byte in the other; memory never written or freed, contents that follow the process's
+addresses, the stack's fill where nothing wrote). The hash is the
+SHA-256 of the group's plain lines, each memory line and each line where FreeSurfer crashed as
+`<memory>` (such a line may be either from one run to the next), the clock's digits masked. **(observed)** on
+the reference machine (glibc 2.35, Linux 6.8, x86-64), through the oracle-output cache and without
+it, and again from the cache:
+
+| Group | § | Calls | Memory or crash | EXIT | TIMEOUT | SHA-256 |
+|---|---|---|---|---|---|---|
+| `hmake` | 5.1, 5.2 | 632 | 38 | 3 | 0 | `f0f701cd2f25ee6a1d531c5a50ae3b0b06ca75b6b1fe39e136a7c4d2404146a7` |
+| `harith` | 5.3, 21 | 4,364 | 34 | 28 | 0 | `9dd8b0231e076d6d842ab058965e65c3dc7bfde90d4b47401f20f0bcb839eb8e` |
+| `hsmooth` | 5.4 | 450 | 0 | 0 | 0 | `6849da4e3bca2b357f0279e90cdb6b2a39879aa6fe321eced7411f5253a47ed9` |
+| `hsearch` | 5.5 | 3,360 | 249 | 0 | 0 | `d56865eae1fc05166fffc44424405f680c10f6502bbf975232cb9dcb63d28e8e` |
+| `hstats` | 5.6 | 1,651 | 48 | 1 | 0 | `b967819d9feb9a0d3e22e29d8a9fc596ad1cac8278a8a25f9fb8e2598b375689` |
+| `hrobust` | 5.7 | 74 | 29 | 2 | 2 | `0d5172c5fb31984cf4de204efdfe496a890bba4ae89b2fc85d35573b55d38830` |
+| `hfiles` | 5.8 | 62 | 0 | 0 | 0 | `8ae7f99741fe6f2fb95a5de15cf1e6ef3a680fd4e12cf0bec60d4ed2a1145b3f` |
+| `mmake` | 2.2 to 2.4 | 356 | 2 | 2 | 0 | `06cedef9465553f35894e0a276e548f627648f42b7737682b15189924b474d15` |
+| `mproduct` | 2.5, 8.1, 16 | 1,202 | 20 | 2 | 0 | `4f285237bdaa014c350f7011104306f2b6f55ade4b4867700d4d17db05d65c5d` |
+| `affine` | 3 | 243 | 2 | 0 | 0 | `514bd8d32cd528c6ed8a062d5ba38f1797a8c218b3940d1dfe902cb239198cfb` |
+| `dmatrix` | 4, 12 | 2,904 | 8 | 1 | 1 | `719f4ea4e5bf36174a84e21120f0c7dd87fb4a1086981864ab7daf8acfc040b4` |
+| `melements` | 8.2 | 3,500 | 31 | 0 | 0 | `e60f3eb349c7fed12395e0f494d8d38a4f6789ad19f1ed782f5cecb7717c68c0` |
+| `mregions` | 8.3 | 880 | 83 | 0 | 0 | `c50b1b9f577cc67267a4d837f5e912d4f777409d8237b05c0a1ed9bbfb500742` |
+| `mvectors` | 8.4, 8.5 | 1,602 | 172 | 0 | 0 | `22123ebdb26ee3c5817014a14a633a0eca6b2b81ec32d38d2dd48d0a159435eb` |
+| `mprint` | 8.6, 8.7 | 363 | 0 | 1 | 0 | `99f11898d09954688429163f63a6dae14d07aaeb034ee8620dbe0c59efa72127` |
+| `minverse` | 8.8 | 862 | 10 | 1 | 0 | `f17057e0444970110a0051cfe1638031987eb2b9fbf05a6b31fdc8ea6f0b5935` |
+| `primes` | 9 | 215 | 2 | 0 | 0 | `7161c5f85f0251b95dcb00423c7ea90119bd46deff0750af6a77ff640cf5859c` |
+| `draws` | 10 | 6 | 0 | 0 | 0 | `01ada774a50680e6d429d614299f85e24c0306153fa7e0a361735f51ffe275a4` |
+| `minimizers` | 13 | 181 | 11 | 0 | 0 | `cbea1be24fc233c0f353a05041189aee308c5501359f6fad0e016c9135ffd2e4` |
+| `nr` | 14 | 5 | 0 | 0 | 0 | `ba8b8aea531d281110a5a52a4a2455fe313fc4e8b3a5a4ce6b1e1cc19eaad69d` |
+| `eigen` | 17.1 to 17.3 | 1,224 | 252 | 0 | 67 | `412ed24373f176563833ec5949aa291bc2841571bcc1bc5a94aabb82e0266a4c` |
+| `svd` | 17.4, 17.5 | 1,920 | 335 | 0 | 102 | `ca9b948a736de0a31ca64713426304fdbac223254054dfe40d3e785321cae86d` |
+| `mfiles` | 18 | 635 | 1 | 0 | 0 | `e8ab918477d85396d2d7c0f8e040499d134ecc8d49200dcde7300b11718ac045` |
+| `rfields` | 19 | 16 | 0 | 0 | 0 | `6f26117e696800de35160344e0a49825b4ff992d68dc6a500ca215703240ce15` |
+| all | | 26,707 | 1,327 | 41 | 172 | |
+
+### 23.3 The comparison
+
+`compare.py compare --candidate <program> --mode reproduce` (then `--mode fix`) runs every case on
+the clean room's program, which takes the probe's commands and prints the same lines, with
+`LARMORX_UPSTREAM_DEFECTS` set to the mode; its defect notices (`upstream defect <ID> ...` on
+standard error) are taken out and their IDs kept. Every line must be identical, byte for byte, but:
+
+- a line where FreeSurfer did not finish (`TIMEOUT`, `CRASH`): the candidate's line must not be
+  one (the defects of those cases say what the clean room gives: FS-13, FS-22, FS-24, FS-31, FS-33,
+  FS-34, FS-37, FS-41, FS-44 to FS-48, FS-51, ITK-112);
+- a **memory** line (FreeSurfer reads what it does not own, among others FS-16, FS-21, FS-22, FS-27,
+  FS-31 to FS-33, FS-40, FS-42, FS-49, ITK-106, ITK-110, ITK-111; the clean room reads 0 there, §1);
+- in `--mode fix`, a line where the candidate noted a defect (the corrected result).
+
+The loop prints, per group, the identical lines and those of each allowed kind, and the IDs noted on
+the allowed lines; exit status 1 for any other difference.
+
+**(observed)** with the probe as its own candidate (`--candidate` the prebuilt probe, `--mode
+reproduce`): no unexplained difference; 26,610 of the 26,707 lines identical, 71 memory lines whose
+contents changed from process to process and 26 where FreeSurfer crashed in one process and not in
+the other (all in `svd`: a pseudo-inverse's freed output, FS-45). Two runs of `refs` in separate
+processes classify every line alike.
+
+### 23.4 Beyond the probe
+
+- **The replays** of the programs that use these functions (`mri_normalize`, `mri_segment`,
+  `mris_make_surfaces`, `mri_ca_register`, `mri_em_register`, `mri_segreg`/`bbregister`) with
+  `reproduce`, on the recorded heads, when they are ported.
+- **Every platform:** the clean room's own golden checks (its results on the other five platforms
+  are its Linux results; a NaN's bits as x86-64 gives them, §7).
+
+## 24. The defects (index)
+
+Where each defect of this module is specified (its two modes there):
+
+| Defect | § | Defect | § | Defect | § |
+|---|---|---|---|---|---|
+| FS-13 | 2.2 | FS-26 | 8.3 | FS-39 | 13.6 |
+| FS-14 | 2.4 | FS-27 | 8.3 | FS-40 | 17.5 |
+| FS-15 | 2.5 | FS-28 | 7 | FS-41 | 17.2 |
+| FS-16 | 2.5 | FS-29 | 10 | FS-42 | 17.1 |
+| FS-17 | 1 | FS-30 | 10 | FS-43 | 17.5 |
+| FS-18 | 5.2 | FS-31 | 8.5 | FS-44 | 17.5 |
+| FS-19 | 5.6 | FS-32 | 9 | FS-45 | 17.5 |
+| FS-20 | 5.6 | FS-33 | 8.8 | FS-46 | 17.5 |
+| FS-21 | 5.2 | FS-34 | 13.4 | FS-47 | 17.1 |
+| FS-22 | 5.1 | FS-35 | 13.2 | FS-48 | 17.4 |
+| FS-23 | 5.3 | FS-36 | 13.4 | FS-49 | 18.2 |
+| FS-24 | 5.7 | FS-37 | 13.3 | FS-50 | 5.3 |
+| FS-25 | 7 | FS-38 | 13.6 | FS-51 | 5.7 |
+
+VNL's own (the main package's ports carry them): ITK-106 (§13.3), ITK-110, ITK-111, ITK-112 (§17.2).
+FS-12 (`nint`) is `specs/freesurfer-core.md`'s.

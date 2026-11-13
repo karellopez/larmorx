@@ -3,15 +3,15 @@
 ``standard_space_roi`` script (an image masked and cut down to a standard space's field of
 view or mask, taken into the image's space through FLIRT), FSL 6.0.7.23's.
 
-Both have two implementations (``docs/licensing.md``): the clean-room original (since
-2026-11-05, ``larmorx_fsl::cli``, written from ``specs/standard_space_roi.md``, in this
-process) and the bit-exact replica (``larmorx-nc``, FSL Licence, run as a separate program).
-``implementation="auto"`` runs the replica when its program is found, else the original. A run
+Both have two ports (``docs/licensing.md``): the clean room (since 2026-11-05,
+``larmorx_fsl::cli``, written from ``specs/standard_space_roi.md``, in this process) and the
+bit-exact replica (``larmorx-nc``, FSL Licence, run as a separate program).
+``implementation="auto"`` runs the replica when its program is found, else the clean room. A run
 that fails raises :class:`RuntimeError` with its messages.
 
 ``standard_space_roi`` reads FSL's standard images (``MNI152_T1_2mm`` and, for
 ``betpremask``, ``MNI152_T1_2mm_brain_mask_dil``) unless ``reference`` and the masks are given.
-The original finds them (``specs/bet.md`` §5.4) in ``fsl_data`` (a directory laid out as
+The clean room finds them (``specs/bet.md`` §5.4) in ``fsl_data`` (a directory laid out as
 ``$FSLDIR/data``; the variable ``LARMORX_FSL_DATA`` otherwise; when given, the only place), else
 in the copy larmorx-nc installs (read as data), else ``$FSLDIR/data``, else in larmorx's data
 cache, filled once by a checksum-verified download of FSL's ``fsl-data_standard`` package
@@ -43,7 +43,7 @@ FSL_DATA_ENV = "LARMORX_FSL_DATA"
 Region = tuple[int, int] | None
 
 
-#: The variables the original's search of FSL's standard images reads (``specs/bet.md`` §5.4):
+#: The variables the clean room's search of FSL's standard images reads (``specs/bet.md`` §5.4):
 #: larmorx's data cache and the package's source, the user's cache directories, ``PATH`` for
 #: the download's ``curl`` or ``wget``.
 _DATA_VARIABLES = (
@@ -64,7 +64,7 @@ def _run(
     upstream_defects: str,
     env: dict[str, str | None],
 ):
-    """Runs ``fsl tool`` (the original in this process, or the replica's program) in ``tmp``;
+    """Runs ``fsl tool`` (the clean room in this process, or the replica's program) in ``tmp``;
     returns the implementation and ``(exit status, standard output, standard error)``."""
     _defects.check(upstream_defects)
     selected = _replica.select("fsl", tool, implementation)
@@ -111,7 +111,17 @@ def fslroi(
     """FSL's ``fslroi``: the region of ``image`` given as ``(min, size)`` per axis (indices from
     0, a size of -1 the rest of the axis; an axis not given whole), in the image's own type.
     Only ``t`` (``fslroi <in> <out> <tmin> <tsize>``), only space (``x``, ``y``, ``z``) or all
-    four; the spatial indices are NIfTI voxel indices."""
+    four; the spatial indices are NIfTI voxel indices.
+
+    Parameters
+    ----------
+    implementation
+        ``"auto"`` (default): the replica when ``larmorx-nc`` is installed, else the clean room;
+        ``"replica"`` or ``"clean-room"`` (``"original"``, 0.1.0rc1's spelling, still works).
+    upstream_defects
+        ``"fix"`` (default) or ``"reproduce"``: FSL's defects corrected, or FSL's behaviour
+        (``docs/api/fsl-roi.md``, "Upstream defects").
+    """
     spatial = (x, y, z)
     if t is None and all(a is None for a in spatial):
         raise ValueError("fslroi needs a region: x, y, z and/or t")
@@ -164,7 +174,18 @@ def standard_space_roi(
     into the image's space; ``None`` is the script's default (``"fov"``, or ``betpremask``'s).
     ``alt_input`` is masked and cut instead of ``image``; ``betpremask`` is ``-b`` (the dilated
     MNI152 brain mask, thresholded at 0.5, and no cut), given before ``mask`` and ``roi``;
-    ``flirt_args`` go to the first FLIRT run."""
+    ``flirt_args`` go to the first FLIRT run; ``fsl_data`` is the directory of FSL's standard
+    images (``docs/api/fsl-roi.md``, "FSL's standard images").
+
+    Parameters
+    ----------
+    implementation
+        ``"auto"`` (default): the replica when ``larmorx-nc`` is installed, else the clean room;
+        ``"replica"`` or ``"clean-room"`` (``"original"``, 0.1.0rc1's spelling, still works).
+    upstream_defects
+        ``"fix"`` (default) or ``"reproduce"``: FSL's defects corrected, or FSL's behaviour
+        (``docs/api/fsl-roi.md``, "Upstream defects").
+    """
     args: list[str] = []
     with tempfile.TemporaryDirectory(prefix="larmorx-ssroi-") as tmp:
         src = _write_image(image, tmp, "in", 1)

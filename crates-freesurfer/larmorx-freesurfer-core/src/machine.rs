@@ -47,7 +47,8 @@ pub fn swap_int(i: i32) -> i32 {
 pub fn swap_long64(g: &mut Globals, l: i64) -> i64 {
     let s = l.swap_bytes();
     let via = s as f64;
-    let back = if via >= 9.223_372_036_854_775_808e18 {
+    // 2^63, the first double beyond the long long range
+    let back = if via >= 2f64.powi(63) {
         i64::MIN
     } else {
         via as i64

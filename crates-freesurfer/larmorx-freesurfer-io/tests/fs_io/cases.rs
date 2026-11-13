@@ -73,7 +73,7 @@ fn unhex(s: &str) -> Vec<u8> {
 fn enc(s: Option<&[u8]>) -> String {
     match s {
         None => "N".into(),
-        Some(b) if b.is_empty() => "x".into(),
+        Some([]) => "x".into(),
         Some(b) => format!("x{}", hex(b)),
     }
 }
@@ -208,7 +208,7 @@ fn tsv_content(g: &mut Gen) -> String {
         for c in 0..n {
             t.extend_from_slice(tsv_number(g).as_bytes());
             if c + 1 < n {
-                t.push(g.pick(&[b'\t', b'\t', b' ', b'\n']));
+                t.push(g.pick(b"\t\t \n"));
             }
         }
         if r + 1 < rows || g.chance(2) {
@@ -493,7 +493,7 @@ pub fn make_fixture(fix: &Path) {
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(fix.join("nr"), std::fs::Permissions::from_mode(0)).unwrap();
+        std::fs::set_permissions(fix.join("nr"), std::fs::Permissions::from_mode(0o000)).unwrap();
         std::fs::set_permissions(fix.join("ro"), std::fs::Permissions::from_mode(0o500)).unwrap();
         std::os::unix::fs::symlink("f", fix.join("ln")).unwrap();
         std::os::unix::fs::symlink("d", fix.join("dln")).unwrap();

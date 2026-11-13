@@ -135,6 +135,10 @@ fixture directory, and prints FreeSurfer's results; `check.py` compares them wit
 (`examples/fs_io_probe.rs`, `tests/fs_io/cases.rs`) through the oracle-output cache. Seed 1, 1,100
 cases: `reproduce` identical on 1,000 of 1,000 comparable lines (98 with memory digits), 12 `VARY`
 lines identical, 88 `SKIP` (53 FS-175, 32 tables, 3 FS-169); `fix` differs only with notices (FS-01
-31, FS-167 31, FS-49 4, FS-172 2, FS-174 71, FS-176 47). Portable seed 1, 1,000 cases: 911 identical,
+31, FS-167 31, FS-49 4, FS-172 2, FS-174 71, FS-176 47). Seed 7, 22,000 cases (log
+`<workspace>/oracles/logs/fs-io-probe-seed7.log`): `reproduce` identical on 20,279 of 20,279
+comparable lines (2,150 with memory digits), 268 `VARY` lines identical (164 `fio_dirname`, 104
+empty tables), 1,453 `SKIP` (864 FS-175, 519 tables, 70 FS-169); `fix` differs only with notices
+(FS-01 831, FS-49 207, FS-167 729, FS-171 1, FS-172 44, FS-174 1,162, FS-176 810). Portable seed 1, 1,000 cases: 911 identical,
 89 hashed as `SKIP`, hash `ce3ddcd0...` (`tests/fs_io_official.rs`), passing with AArch64's NaN
 emulated (`nan_trap.c`, `NAN_TRAP_ARM=1`, `NAN_TRAP_DIR` set: 0 NaNs to flip) in debug and release.

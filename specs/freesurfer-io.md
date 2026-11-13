@@ -202,5 +202,6 @@ returning 1 (`%a` too, which C defines but larmorx does not print). Returns 0.
   counted, not compared.
 - Measured on the replica (2026-11-13): seed 1, 1,100 cases, `reproduce` identical on 1,000 of 1,000
   comparable lines (98 with memory digits), 12 varying lines identical, 88 not comparable; seed 7,
-  22,000 cases: `docs/findings/freesurfer-io.md`. `fix` differs only with a notice (FS-01, FS-49,
-  FS-167, FS-172, FS-174, FS-176).
+  22,000 cases: identical on 20,279 of 20,279 comparable lines (2,150 with memory digits), 268
+  varying lines identical, 1,453 not comparable. `fix` differs only with a notice (FS-01, FS-49,
+  FS-167, FS-171, FS-172, FS-174, FS-176).

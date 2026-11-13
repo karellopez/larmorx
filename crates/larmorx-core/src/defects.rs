@@ -1529,6 +1529,18 @@ defects! {
         "reading a Bruker study whose 2dseq file is shorter than the volume crashes (the volume is freed twice)";
     FS_404 = "FS-404", "FreeSurfer", true,
         "reading a Bruker study ignores RECO_byte_order: a big-endian 2dseq is read in the machine's byte order, so its values are wrong";
+    FS_405 = "FS-405", "FreeSurfer", true,
+        "FreeSurfer's 2-D image functions (allocating, clearing an area, copying frames, scaling, the pyramid reduction) read and write outside an image's pixels when given a frame, an area, a size or a buffer the image does not have: memory corruption, a crash or memory contents";
+    FS_406 = "FS-406", "FreeSurfer", true,
+        "FreeSurfer's 2-D image functions turn a float beyond the target type's range, or NaN, into a pixel byte or a pixel coordinate without a check: a fill value or a float pixel beyond the byte range becomes the low byte of -2147483648 or of its integer part, a coordinate -2147483648";
+    FS_407 = "FS-407", "FreeSurfer", true,
+        "ImageCopyFrames, converting frames (bytes into floats or integers, integers into anything), writes each frame into the output frame of the same number, not into the destination frame it was given";
+    FS_408 = "FS-408", "FreeSurfer", true,
+        "ImageScaleDown of a float image of more than one frame by a power of two (0.5, 0.25, ...) reduces only the first frame: the output's other frames are left as they were";
+    FS_409 = "FS-409", "FreeSurfer", true,
+        "ImageRescale by 1 into a given output smaller than its input copies into a new image it then drops, and writes into and returns the output it has freed: memory contents or a crash";
+    FS_410 = "FS-410", "FreeSurfer", true,
+        "ImageAlloc, when the pixels cannot be allocated, ends the program with the code of FreeSurfer's previous error, 0 when there was none: a program that ran out of memory exits with status 0 (success)";
     FS_285 = "FS-285", "FreeSurfer", true,
         "reading a volume-geometry block (the text block of linear transform and surface files) whose line starts with a word of 64 bytes or more writes the word past its buffer: memory corruption, a crash or wrong values";
     FS_286 = "FS-286", "FreeSurfer", true,

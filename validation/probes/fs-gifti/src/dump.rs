@@ -45,6 +45,22 @@ impl D {
         self.i(s.len() as i32);
         self.raw(s);
     }
+    /// The port's dump with its "any" bytes taken from `theirs` (where it has them): its text
+    /// then differs from the original's only where the dumps really differ.
+    pub fn filled(&self, theirs: &[u8]) -> Vec<u8> {
+        self.b
+            .iter()
+            .enumerate()
+            .map(|(k, &x)| {
+                if self.any[k] {
+                    *theirs.get(k).unwrap_or(&x)
+                } else {
+                    x
+                }
+            })
+            .collect()
+    }
+
     /// Whether `theirs` matches (every byte not marked "any" equal; the same length).
     pub fn matches(&self, theirs: &[u8]) -> bool {
         self.b.len() == theirs.len()

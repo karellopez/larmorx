@@ -539,16 +539,16 @@ impl Gifti {
         let verb = self.xml_verb;
         let name = fname.to_string_lossy().into_owned();
         if verb > 1 {
-            let mut s = format!(
+            // three writes, as gifticlib's: the size's own messages come between them
+            out.err(&format!(
                 "++ writing gifti image ({} data) to '{name}'",
                 if write_data { "with" } else { "no" }
-            );
+            ));
             if write_data {
                 let mb = self.gim_da_size(gim, true, out);
-                s += &format!(" ({} DA elements = {mb} MB)", gim.num_da);
+                out.err(&format!(" ({} DA elements = {mb} MB)", gim.num_da));
             }
-            s.push('\n');
-            out.err(&s);
+            out.err("\n");
         }
         if verb > 2 {
             let mut s = format!(

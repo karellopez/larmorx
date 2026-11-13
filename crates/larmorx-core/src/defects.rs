@@ -1030,7 +1030,9 @@ defects! {
     FS_85 = "FS-85", "gifticlib", true,
         "a GIFTI element outside the element it belongs to (Data, MatrixData, a coordinate system outside a DataArray, a Name or Value outside an MD, a dimension past Dim7 when writing) is read or written through a null or out-of-range pointer: the program crashes or reads memory it never wrote";
     FS_86 = "FS-86", "gifticlib", true,
-        "character data (white space included) after a CDATA section or a child element inside a GIFTI Name, Value, Label, DataSpace or TransformedSpace is written through a null pointer: the program crashes";
+        "character data (white space included) after a CDATA section or a child element inside a GIFTI Name, Value, Label, DataSpace or TransformedSpace, or inside one of them outside its parent, is written through a null pointer: the program crashes";
+    FS_87 = "FS-87", "gifticlib", true,
+        "at verbosity 6 and 7 the GIFTI reader's messages about a MatrixData buffer show the Data element's buffer and length instead, including memory never written";
 }
 
 /// The register entry with ID `id`.

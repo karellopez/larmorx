@@ -151,22 +151,40 @@ fn depth_prefix(depth: i32, show: bool) -> String {
     }
 }
 
-/// `%.*s` with C's precision (a byte count), as text.
+/// `%.*s` with C's precision (a byte count; a 0 byte ends the string first), as text.
 fn prec(s: &[u8], n: usize) -> String {
-    lossy(&s[..n.min(s.len())])
+    let s = &s[..n.min(s.len())];
+    lossy(&s[..s.iter().position(|&c| c == 0).unwrap_or(s.len())])
 }
 
-/// zlib's `uncompress` into a buffer of `out.len()` bytes: (status, bytes written).
+/// zlib's `uncompress` into a buffer of `out.len()` bytes: (status, bytes written). As zlib
+/// 1.2.11's `uncompress2`: `inflate` without flushing until the stream ends, the output is full
+/// (`Z_BUF_ERROR`, -5) or the input is used up (`Z_DATA_ERROR`, -3).
 fn uncompress(out: &mut [u8], src: &[u8]) -> (i32, usize) {
     let mut z = Decompress::new(true);
-    let r = z.decompress(src, out, FlushDecompress::Finish);
-    let n = z.total_out() as usize;
-    match r {
-        Ok(Status::StreamEnd) => (0, n),
-        Ok(_) if n == out.len() && (z.total_in() as usize) < src.len() => (-5, n),
-        Ok(_) if n == out.len() => (-5, n),
-        Ok(_) => (-3, n),
-        Err(_) => (-3, n),
+    loop {
+        let (i0, o0) = (z.total_in() as usize, z.total_out() as usize);
+        let r = z.decompress(&src[i0..], &mut out[o0..], FlushDecompress::None);
+        let (i1, n) = (z.total_in() as usize, z.total_out() as usize);
+        match r {
+            Ok(Status::StreamEnd) => return (0, n),
+            Err(_) => return (-3, n),
+            Ok(_) if n == out.len() => {
+                // zlib still reads a trailer that needs no output space
+                let i2 = z.total_in() as usize;
+                let r = z.decompress(&src[i2..], &mut [], FlushDecompress::None);
+                return (
+                    if matches!(r, Ok(Status::StreamEnd)) {
+                        0
+                    } else {
+                        -5
+                    },
+                    n,
+                );
+            }
+            Ok(_) if i1 == i0 && n == o0 => return (-3, n),
+            Ok(_) => {}
+        }
     }
 }
 
@@ -1177,7 +1195,11 @@ impl Reader<'_> {
             }
             let zin = self.zdata[..(self.dind.max(0) as usize).min(self.zdata.len())].to_vec();
             let dst = self.da(i).data.as_mut().expect("data");
-            let (rv, olen) = uncompress(dst, &zin);
+            // through a scratch buffer: zlib-rs may write past what it reports as produced (its
+            // copies run in blocks), zlib never does; only the bytes produced reach the data
+            let mut tmp = vec![0u8; dst.len()];
+            let (rv, olen) = uncompress(&mut tmp, &zin);
+            dst[..olen].copy_from_slice(&tmp[..olen]);
             let olen = olen as i64;
             if rv != 0 {
                 self.out.err(&format!("** uncompress fails for DA[{i}]\n"));
@@ -1738,25 +1760,34 @@ impl Reader<'_> {
                 self.doff = 0;
             }
             if self.doff > 0 {
+                // gifticlib shows the Data element's buffer and its length here, not the
+                // MatrixData buffer it moves (FS-87); corrected: the MatrixData buffer's.
+                let blen = if self.fix { xlen } else { self.dlen };
                 if self.verb > 5 {
-                    // gifticlib prints the Data buffer's length here.
                     self.out.err(&format!(
-                        "++ A2X: move {} bytes from {} (blen {})\n",
+                        "++ A2X: move {} bytes from {} (blen {blen})\n",
                         self.doff,
-                        self.dlen as i64 - unused as i64 - self.doff as i64,
-                        self.dlen
+                        blen as i64 - unused as i64 - self.doff as i64,
                     ));
                 }
                 let from = xlen - (unused + 1) - self.doff;
                 self.xdata.copy_within(from..from + self.doff, 0);
                 if self.verb > 6 {
-                    let s = if self.ddata.is_empty() {
+                    let s = if self.fix {
+                        prec(&self.xdata, self.doff)
+                    } else if self.ddata.is_empty() {
                         if self.doff >= 6 {
                             "(null)".to_owned()
                         } else {
                             String::new()
                         }
                     } else {
+                        if self.ddata_init < self.doff {
+                            self.notices.add(
+                                &d::FS_87,
+                                "the MatrixData reader's verbosity-7 message shows the Data buffer, partly memory never written (shown from zeros)",
+                            );
+                        }
                         prec(&self.ddata, self.doff)
                     };
                     self.out.err(&format!("   bytes are '{s}'\n"));

@@ -493,6 +493,13 @@ pub fn read(up: &Lib, fs: &Lib, work: &Work, n: u64) -> Tally {
         std::fs::write(work.dir.join("case.gii"), &case.file).unwrap();
         let wenc = [-1, 0, 0, 0, 1, 2, 3, 4][g.below(8) as usize];
         let wdata = !g.chance(6);
+        if let Some(only) = std::env::var("LXPROBE_ONLY_CASE")
+            .ok()
+            .and_then(|v| v.parse::<u64>().ok())
+            && only != case_no
+        {
+            continue;
+        }
         for (lib, dialect) in [
             (up, &Gifticlib as &dyn Dialect),
             (fs, &ProbeFs as &dyn Dialect),
@@ -534,7 +541,7 @@ pub fn read(up: &Lib, fs: &Lib, work: &Work, n: u64) -> Tally {
             let crashy = p.notices.contains(&d::FS_84)
                 || p.notices.contains(&d::FS_85)
                 || p.notices.contains(&d::FS_86);
-            let garbage = crashy || p.notices.contains(&d::FS_80);
+            let garbage = crashy || p.notices.contains(&d::FS_80) || p.notices.contains(&d::FS_87);
             match c.end {
                 End::Exit(0) => {}
                 e => {
@@ -558,14 +565,30 @@ pub fn read(up: &Lib, fs: &Lib, work: &Work, n: u64) -> Tally {
                 continue;
             }
             t.values += 1;
-            if !p.dump.matches(&c.dump) {
-                let a = dump::read_text(&p.dump.b);
+            if std::env::var("LXPROBE_ONLY_CASE").is_ok() {
+                let _ = std::fs::write(
+                    work.dir.join(format!("dump-port-{}.bin", lib.name)),
+                    &p.dump.b,
+                );
+                let _ = std::fs::write(work.dir.join(format!("dump-c-{}.bin", lib.name)), &c.dump);
+            }
+            if !p.dump.matches(&c.dump) && std::env::var("LXPROBE_IGNORE_VALUES").is_err() {
+                let a = dump::read_text(&p.dump.filled(&c.dump));
                 let b = dump::read_text(&c.dump);
+                let at = (0..p.dump.b.len().max(c.dump.len()))
+                    .find(|&k| {
+                        k >= p.dump.b.len()
+                            || k >= c.dump.len()
+                            || (!p.dump.any[k] && p.dump.b[k] != c.dump[k])
+                    })
+                    .unwrap_or(0);
                 t.diff(&|| {
                     format!(
-                        "case {case_no} vs {} (set {:?}): values\n  {}",
+                        "case {case_no} vs {} (set {:?}): values (first byte {at} of {} / {})\n  {}",
                         lib.name,
                         case.set,
+                        p.dump.b.len(),
+                        c.dump.len(),
                         dump::first_difference(&a, &b)
                     )
                 });

@@ -13,7 +13,7 @@
 //! check of [`Gifti::valid_gifti_image`] and the coordinate-system intent check of the reader);
 //! [`Gifticlib`] is gifticlib's own behaviour. A replica of such a program supplies its own.
 //!
-//! D13's corrections of gifticlib's defects are named in [`defects`] (FS-80 to FS-86); the
+//! D13's corrections of gifticlib's defects are named in [`defects`] (FS-80 to FS-87); the
 //! source is `gifti_io.c` and `gifti_xml.c` of gifticlib's history at version 1.12
 //! (`PROVENANCE.md`).
 
@@ -57,6 +57,11 @@ pub mod defects {
     /// null pointer (the program crashes). Both modes: the text is appended to the element's, as
     /// it is without the CDATA section, with a notice.
     pub const TEXT_AFTER_CDATA: &str = "FS-86";
+    /// The `MatrixData` reader's messages at verbosity 6 and 7 show the `Data` element's buffer
+    /// and its length instead of the matrix's own (memory never written when that buffer is
+    /// new). Corrected: the matrix buffer's; reproduced: the `Data` buffer's, its never-written
+    /// bytes from zeros, with a notice.
+    pub const XFORM_MESSAGE_BUFFER: &str = "FS-87";
 }
 
 // NIfTI-1's codes (nifti1.h).
@@ -1326,12 +1331,27 @@ impl Gifti {
         if self.verb > 5 {
             out.err("++ copying giiDataArray...\n");
         }
+        let v = self.verb;
+        let nvp = |p: &NvPairs, out: &mut dyn Streams| {
+            if v > 6 {
+                out.err(&format!("++ copy_nvp, length {}\n", p.len()));
+            }
+        };
+        nvp(&orig.meta, out);
+        if orig.num_cs() > 0 && v > 6 {
+            for cs in &orig.coordsys {
+                if cs.is_some() {
+                    out.err("++ copy_CS\n");
+                }
+            }
+        }
         let mut n = orig.clone();
         if !(orig.data.is_some() && get_data) {
             n.data = None;
-        } else if self.verb > 5 {
+        } else if v > 5 {
             out.err("++ copy_DA, adding data\n");
         }
+        nvp(&orig.ex_atrs, out);
         n
     }
 

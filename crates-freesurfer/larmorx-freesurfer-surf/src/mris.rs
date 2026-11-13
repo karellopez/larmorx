@@ -13,18 +13,21 @@
 //! allocated; FreeSurfer's counts (`num`, `vtotal`, `dist_capacity`, `nvertices`, ...) stay fields
 //! of their own, as in C.
 //!
-//! Not yet here (they wait for their modules' structures, which are other items): `MRIS::lta`
-//! (`LTA *`, fs.volume's transforms), `MRIS::ct` (`COLOR_TABLE *`) and `MRIS::vg` (`VOL_GEOM`), and
-//! `MRIS::mri_sras2vox` (`MRI *`) (fs.mri, queue item 3.1-55). Nothing in queue items 3.1-45 and
-//! 3.1-46 reads them; the reading and writing of surfaces (3.1-47) adds them.
+//! Since queue item 3.1-47 the structure is whole: `MRIS::vg` is fs.mri's [`VolGeom`], `MRIS::ct`
+//! its [`ColorTable`], `MRIS::lta` the transform array of [`crate::lta`] (a placeholder until
+//! fs.mri carries FreeSurfer's `LTA`; [`crate::lta`] is the one place that changes), and
+//! `MRIS::mri_sras2vox` (`MRI *`, a volume the surface points at but does not own) an [`Opaque`].
 
 use larmorx_freesurfer_core::dmatrix::DMatrix;
 use larmorx_freesurfer_core::matrix::Matrix;
+use larmorx_freesurfer_mri::ctab::ColorTable;
+use larmorx_freesurfer_mri::vol_geom::VolGeom;
 
 use crate::aaa::{
     AnglesPerTriangle, FaceNormCacheEntry, FaceNormDeferredEntry, MAX_CMDS, MriCorner, MriEdge,
     MrisAreaLabel, MrisStatus, Opaque, Strip, VerticesPerFace,
 };
+use crate::lta::Lta;
 
 /// `FACE` (`face_type_`).
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -197,8 +200,7 @@ pub struct Vertex {
     pub ripflag: i8,
 }
 
-/// `MRIS` (`MRI_SURFACE`), with the fields that wait for other items left out (the module's
-/// documentation).
+/// `MRIS` (`MRI_SURFACE`).
 #[allow(non_snake_case)]
 #[derive(Clone, Debug, PartialEq)]
 pub struct Mris {
@@ -253,6 +255,8 @@ pub struct Mris {
     pub zeros: i32,
     pub hemisphere: i32,
     pub initialized: i32,
+    /// `lta` (`LTA *`).
+    pub lta: Option<Lta>,
     pub SRASToTalSRAS_: Option<Matrix>,
     pub TalSRASToSRAS_: Option<Matrix>,
     pub free_transform: i32,
@@ -297,8 +301,12 @@ pub struct Mris {
     pub dx2: Option<Vec<f32>>,
     pub dy2: Option<Vec<f32>>,
     pub dz2: Option<Vec<f32>>,
+    /// `ct` (`COLOR_TABLE *`).
+    pub ct: Option<ColorTable>,
     pub orig_xyzspace: i32,
     pub useRealRAS: i32,
+    /// `vg`: the geometry of the volume the surface was made from (valid when `vg.valid` is 1).
+    pub vg: VolGeom,
     /// `cmdlines[MAX_CMDS]` (`char *` each: the bytes before the NUL).
     pub cmdlines: Vec<Option<Vec<u8>>>,
     pub ncmds: i32,
@@ -307,12 +315,49 @@ pub struct Mris {
     pub triangle_links_removed: i32,
     pub user_parms: Opaque,
     pub m_sras2vox: Option<Matrix>,
+    /// `mri_sras2vox` (`MRI *`): the volume `m_sras2vox` is for; the surface does not own it.
+    pub mri_sras2vox: Opaque,
     pub mht: Opaque,
     pub temps: Opaque,
 }
 
+/// A `VOL_GEOM` whose bytes are all zero (`bzero` of a surface, `MRISctr`): no C++ initialiser
+/// runs, so its voxel sizes and direction cosines are 0, not [`VolGeom::default`]'s.
+pub fn zeroed_vol_geom() -> VolGeom {
+    VolGeom {
+        valid: 0,
+        width: 0,
+        height: 0,
+        depth: 0,
+        xsize: 0.0,
+        ysize: 0.0,
+        zsize: 0.0,
+        ras_good_flag: 0,
+        x_r: 0.0,
+        x_a: 0.0,
+        x_s: 0.0,
+        y_r: 0.0,
+        y_a: 0.0,
+        y_s: 0.0,
+        z_r: 0.0,
+        z_a: 0.0,
+        z_s: 0.0,
+        c_r: 0.0,
+        c_a: 0.0,
+        c_s: 0.0,
+        s_r: 0.0,
+        s_a: 0.0,
+        s_s: 0.0,
+        fname: String::new(),
+        i_to_r: None,
+        r_to_i: None,
+        register_mat: None,
+    }
+}
+
 impl Default for Mris {
-    /// Every field zero, every pointer `NULL` (FreeSurfer's surfaces start from `calloc`).
+    /// Every field zero, every pointer `NULL`, as `MRISctr`'s `bzero` leaves a surface (the
+    /// volume geometry's bytes too: [`zeroed_vol_geom`]).
     fn default() -> Self {
         Mris {
             nverticesFrozen: 0,
@@ -360,6 +405,7 @@ impl Default for Mris {
             zeros: 0,
             hemisphere: 0,
             initialized: 0,
+            lta: None,
             SRASToTalSRAS_: None,
             TalSRASToSRAS_: None,
             free_transform: 0,
@@ -402,8 +448,10 @@ impl Default for Mris {
             dx2: None,
             dy2: None,
             dz2: None,
+            ct: None,
             orig_xyzspace: 0,
             useRealRAS: 0,
+            vg: zeroed_vol_geom(),
             cmdlines: vec![None; MAX_CMDS],
             ncmds: 0,
             group_avg_surface_area: 0.0,
@@ -411,6 +459,7 @@ impl Default for Mris {
             triangle_links_removed: 0,
             user_parms: Opaque::default(),
             m_sras2vox: None,
+            mri_sras2vox: Opaque::default(),
             mht: Opaque::default(),
             temps: Opaque::default(),
         }

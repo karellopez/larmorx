@@ -342,7 +342,15 @@ pub struct SurfGlobals {
     /// `curvature_names[3]` (`"inflated.H"`, `"sulc"`, `NULL`): the curvature files read instead
     /// (line 938).
     pub curvature_names: [Option<Vec<u8>>; 3],
+    /// `sigmas` (`mrisurf_base.cpp` line 969): the spherical registration's blurring scales
+    /// ([`SIGMAS_DEFAULT`] until `MRISsetRegistrationSigmas`).
+    pub sigmas: Vec<f32>,
+    /// `nsigmas` (a `double`, line 970): their count.
+    pub nsigmas: f64,
 }
+
+/// `sigmas_default` (`mrisurf_base.cpp` line 962).
+pub const SIGMAS_DEFAULT: [f32; 4] = [4.0, 2.0, 1.0, 0.5];
 
 impl Default for SurfGlobals {
     fn default() -> Self {
@@ -359,6 +367,8 @@ impl Default for SurfGlobals {
                 Some(b"smoothwm".to_vec()),
             ],
             curvature_names: [Some(b"inflated.H".to_vec()), Some(b"sulc".to_vec()), None],
+            sigmas: SIGMAS_DEFAULT.to_vec(),
+            nsigmas: SIGMAS_DEFAULT.len() as f64,
         }
     }
 }

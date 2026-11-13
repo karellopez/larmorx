@@ -33,13 +33,24 @@
 //!   storing and restoring the metric properties.
 //! - [`positions`]: the saved vertex positions and normals (FS-115), the canonical coordinates.
 //! - [`facenorm`]: the face-normal cache (FS-116).
+//! - [`lta`]: `MRIS::lta`'s type (a placeholder until fs.mri carries FreeSurfer's `LTA`).
+//! - [`alloc`]: a surface's life: allocation, reallocation (FS-117), the metadata copy,
+//!   destruction, the dumps.
+//! - [`basemisc`]: the rip flags, the arrays, the curvature names, the registration's scales, the
+//!   extra gradients, the NaN check, the column printing (FS-119), the vector searches, the
+//!   progress bar (FS-118), the sort comparisons.
+//! - [`edges`]: whether two edges cross on the sphere.
 #![forbid(unsafe_code)]
 
 pub mod aaa;
+pub mod alloc;
 pub mod base;
+pub mod basemisc;
 pub mod coords;
 pub mod dist;
+pub mod edges;
 pub mod facenorm;
+pub mod lta;
 pub mod metric;
 pub mod mris;
 pub mod mris_mp;

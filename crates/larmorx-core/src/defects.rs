@@ -1175,6 +1175,12 @@ defects! {
         "restoring the target or layer-IV coordinates of a spherical patch sets its canonical coordinates to the temporary coordinates, not to the restored ones";
     FS_116 = "FS-116", "FreeSurfer", true,
         "reading a face's original area while it is still marked to be computed later prints NYI and crashes the program on purpose (a segmentation fault)";
+    FS_117 = "FS-117", "FreeSurfer", true,
+        "reallocating a surface to no faces (a surface with no face reallocated again included) fails an assertion and ends the program, and reallocating to no vertices a surface with room for none loses its vertex array and reports a failure: the system's reallocation to zero bytes frees the arrays";
+    FS_118 = "FS-118", "FreeSurfer", true,
+        "the progress bar over a surface's vertices (discrete curvatures, the faces' geometric order) ends the program with an arithmetic exception (signal 8) for a surface of fewer than 20 vertices";
+    FS_119 = "FS-119", "FreeSurfer", true,
+        "column printing of a status text of 16,378 bytes or more (mris_curvature_stats' and mris_calc's messages, which show file and surface names) ends the program with a buffer-overflow abort (signal 6) before anything is printed";
     FS_161 = "FS-161", "FreeSurfer", true,
         "MRIcopy of a tensor or complex volume into one of the same type copies only the first width bytes of each row (a quarter or an eighth of its voxels' bytes), leaving the rest of the destination as it was";
     FS_162 = "FS-162", "FreeSurfer", true,

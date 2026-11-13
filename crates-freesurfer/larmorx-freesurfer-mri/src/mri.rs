@@ -274,7 +274,8 @@ pub struct Mri {
     pub ti: f32,
     pub flip_angle: f64,
     pub field_strength: f32,
-    pub pedir: Option<String>,
+    /// `pedir`: the phase-encoding direction (a C string: its bytes; `None` for `NULL`).
+    pub pedir: Option<Vec<u8>>,
     pub orig_ras2vox: Option<Matrix>,
     pub location: f32,
     pub bvec_space: i32,

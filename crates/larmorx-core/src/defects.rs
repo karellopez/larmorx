@@ -1167,6 +1167,40 @@ defects! {
         "the readers and writers of a 64-bit integer (freadLong, fwriteLong, znzreadLong, znzwriteLong) round it to a double's 53 significant bits: a number read comes back rounded (-2^63 where the rounding reaches 2^63), and a number written is stored with the low bits of its first bytes changed, whenever its byte-reversed form needs more than 53 bits (most negative numbers, and numbers whose last bytes are not zero)";
     FS_175 = "FS-175", "FreeSurfer", true,
         "byteswapbufshort, byteswapbuffloat and byteswapbufdouble given a byte count that is not a multiple of the number's size reverse the bytes of a whole last number past the count: past the end of a buffer that ends at the count (memory the program does not own)";
+    FS_177 = "FS-177", "FreeSurfer", true,
+        "TAGskip, znzTAGskip and FStagsIO::skip_tag, when they cannot allocate a tag's data length (a negative length always), end the program with a message that shows the length's low 32 bits as an unsigned number (-1 shows as 4294967295)";
+    FS_178 = "FS-178", "FreeSurfer", true,
+        "the readers that skip a tag's data (TAGskip, znzTAGskip, FStagsIO::skip_tag, and FStagsIO::read_mri_frames' bytes after the frames) first allocate the tag's whole length: a length the machine cannot allocate ends the program, or crashes the frames' reader, even where the file holds only a few bytes: the outcome depends on the machine's memory";
+    FS_179 = "FS-179", "FreeSurfer", true,
+        "the readers of a matrix tag (TAGreadMatrix, znzReadMatrix, FStagsIO::read_matrix) overflow a buffer on the stack when the text's first word is longer than it (1,599 bytes for TAGreadMatrix, 99 for the other two)";
+    FS_180 = "FS-180", "FreeSurfer", true,
+        "znzReadMatrix and FStagsIO::read_matrix, when the 1,600 bytes of a matrix tag hold no NUL byte (or the file ends inside them and the bytes it gives hold none), read the matrix's text on past them: numbers that reach the end of those bytes continue with memory contents";
+    FS_181 = "FS-181", "FreeSurfer", true,
+        "the matrix tag writers (TAGwriteMatrix, znzWriteMatrix, FStagsIO::write_matrix in both forms) given a matrix smaller than 4 x 4 write numbers read from outside it";
+    FS_182 = "FS-182", "FreeSurfer", true,
+        "TAGmakeCommandLineString appends the program's arguments to the caller's buffer without knowing its size: a command line longer than the buffer (4,096 bytes in mri_segment) overflows it";
+    FS_183 = "FS-183", "FreeSurfer", true,
+        "FStagsIO::read_scan_parameters with a tag length below the parameters' 20 bytes, or one the machine cannot allocate, reads the phase-encoding direction into an allocation of the wrong size or into none: a crash, memory overwritten with the rest of the file, or no direction";
+    FS_184 = "FS-184", "FreeSurfer", true,
+        "the length FStagsIO gives a GCA morph's label tag is computed in 32-bit int arithmetic: a volume whose voxel count times 4 reaches 2^31 gets a wrapped, wrong length";
+    FS_185 = "FS-185", "FreeSurfer", true,
+        "VOL_GEOM::read of a geometry in FreeSurfer's NIfTI extension skips the part of a name beyond its first 512 bytes through a stack array of that size: a name length beyond the stack (8 MiB on Linux by default) crashes the program";
+    FS_186 = "FS-186", "FreeSurfer", true,
+        "VOL_GEOM::read does not end the name it reads: in a geometry that held a longer name, a name read from FreeSurfer's NIfTI extension (or the end of a file inside it) keeps the earlier name's rest after it, a name of length 0 leaves the earlier name, and a name of 512 bytes or more read from an .mgz continues with the earlier name's bytes after its first 512";
+    FS_187 = "FS-187", "FreeSurfer", true,
+        "the binary colour table readers take a name whose bytes in the file hold no NUL byte (a name length of 0, a name the file ends inside, or 1,023 bytes or more copied into an entry) with memory contents after it";
+    FS_188 = "FS-188", "FreeSurfer", true,
+        "the first version's binary colour table readers given a structure name length of 1,024 or more write a NUL byte that many bytes into a 1,024-byte name: into the entry's other fields below its size (no visible effect), into another object's memory beyond";
+    FS_189 = "FS-189", "FreeSurfer", true,
+        "the second version's binary colour table readers given a structure number at or beyond the table's entry count read and write the table's list of entries outside it (a crash or another object's corruption)";
+    FS_190 = "FS-190", "FreeSurfer", true,
+        "znzCTABreadFromBinaryV2 reads at most 1,023 bytes of a name (the table's file name or an entry's) and does not skip the rest: the other bytes of a longer name are read as the numbers that follow";
+    FS_191 = "FS-191", "FreeSurfer", true,
+        "the binary colour table readers allocate the entries (and, in the first version, every entry) and each name's length plus one before reading them: a count or a length beyond what the machine can allocate gives an error message, a crash (the first version's message reads the freed table), or a table, depending on the machine's memory";
+    FS_192 = "FS-192", "FreeSurfer", true,
+        "the binary colour table readers given a file that ends inside the table take the missing numbers from memory contents (the first version reads as many entries as its count says) and return a table";
+    FS_193 = "FS-193", "FreeSurfer", true,
+        "the length FStagsIO gives a GCA morph's geometry tag in FreeSurfer's NIfTI extension counts the two file names whole, while the geometry's writer stores at most 512 bytes of each: with a longer name the extension's lengths are wrong";
 }
 
 /// The register entry with ID `id`.

@@ -896,7 +896,7 @@ impl Out {
             return;
         };
         self.i(i64::from(ct.nentries()));
-        self.s(&ct.fname);
+        self.s(&String::from_utf8_lossy(&ct.fname));
         self.i(i64::from(ct.version));
         self.i(i64::from(ct.idbase));
         self.s(&ct.tissue_type_schema);
@@ -905,7 +905,7 @@ impl Out {
                 None => self.0 += "0 ",
                 Some(e) => {
                     self.0 += "1 ";
-                    self.s(&e.name);
+                    self.s(&String::from_utf8_lossy(&e.name));
                     for v in [e.ri, e.gi, e.bi, e.ai] {
                         self.i(i64::from(v));
                     }
@@ -978,7 +978,7 @@ impl Ctx {
     fn ctab(&mut self, t: &mut Toks, depth: u32) -> ColorTable {
         let n = t.i();
         let mut ct = ColorTable {
-            fname: t.s(),
+            fname: t.s().into_bytes(),
             version: t.i(),
             idbase: t.i(),
             tissue_type_schema: t.s(),
@@ -989,8 +989,8 @@ impl Ctx {
                 ct.entries.push(None);
                 continue;
             }
-            ct.entries.push(Some(ColorTableEntry {
-                name: t.s(),
+            ct.entries.push(Some(Box::new(ColorTableEntry {
+                name: t.s().into_bytes(),
                 ri: t.i(),
                 gi: t.i(),
                 bi: t.i(),
@@ -1001,7 +1001,7 @@ impl Ctx {
                 af: t.f(),
                 tissue_type: t.i(),
                 count: t.i(),
-            }));
+            })));
         }
         if depth == 0 && t.i() != 0 {
             ct.ctab_tissue_type = Some(Box::new(self.ctab(t, 1)));

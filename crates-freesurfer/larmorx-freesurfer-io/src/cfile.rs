@@ -300,6 +300,16 @@ impl CFile {
         }
     }
 
+    /// `ftell(fp)`: the program's position in the file (the bytes read but not yet given to the
+    /// program and those written but not yet in the file counted as glibc does); -1 when the
+    /// position cannot be had.
+    pub fn tell(&mut self) -> i64 {
+        match self.f.seek(SeekFrom::Current(0)) {
+            Ok(p) => p as i64 - (self.rbuf.len() - self.rpos) as i64 + self.wbuf.len() as i64,
+            Err(_) => -1,
+        }
+    }
+
     /// How many bytes the program has read from the stream.
     pub fn taken(&self) -> u64 {
         self.taken

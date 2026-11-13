@@ -15,8 +15,8 @@ use larmorx_freesurfer_core::log::{self, ERROR_BADPARM, NO_ERROR};
 /// `COLOR_TABLE_ENTRY` (`CTE`).
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct ColorTableEntry {
-    /// `name` (`STRLEN`).
-    pub name: String,
+    /// `name` (`STRLEN` in C): the C string's bytes (without its NUL; any bytes a file holds).
+    pub name: Vec<u8>,
     pub ri: i32,
     pub gi: i32,
     pub bi: i32,
@@ -30,11 +30,13 @@ pub struct ColorTableEntry {
     pub count: i32,
 }
 
-/// `COLOR_TABLE` (`CT`): `entries` has `nentries` places, some empty (`NULL`).
+/// `COLOR_TABLE` (`CT`): `entries` has `nentries` places, some empty (`NULL`); each entry is boxed, as
+/// C's array of pointers to entries (8 bytes for an empty place).
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct ColorTable {
-    pub entries: Vec<Option<ColorTableEntry>>,
-    pub fname: String,
+    pub entries: Vec<Option<Box<ColorTableEntry>>>,
+    /// `fname` (`STRLEN` in C): the C string's bytes.
+    pub fname: Vec<u8>,
     pub version: i32,
     /// `idbase`: added to the structure number when writing.
     pub idbase: i32,
@@ -97,7 +99,7 @@ pub fn ctab_deep_copy(
                     "a colour table's copy without its entries' voxel counts",
                 );
             }
-            ColorTableEntry {
+            Box::new(ColorTableEntry {
                 name: e.name.clone(),
                 ri: e.ri,
                 gi: e.gi,
@@ -109,7 +111,7 @@ pub fn ctab_deep_copy(
                 af: e.af,
                 tissue_type: e.tissue_type,
                 count: if reproduce { 0 } else { e.count },
-            }
+            })
         }));
     }
     if let Some(t) = &ct.ctab_tissue_type {

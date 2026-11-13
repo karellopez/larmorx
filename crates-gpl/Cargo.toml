@@ -9,6 +9,8 @@
 # Workbench's replicas (GPL-2.0-or-later). Since 2026-10-29 the AFNI replicas live in the main
 # package (crates/larmorx-afni-replica); the verification tools that need their earlier
 # translations of glibc's LGPL code stay here (tools/glibc-reference) and are not packaged.
+# Since 2026-11-13 also GSL 1.8's generators as FreeSurfer 8.2.0 transcribes them (larmorx-gpl-gsl,
+# GPL-3.0-or-later, a library in no program: the bit-exact reference of larmorx_core::ranlux).
 [workspace]
 resolver = "3"
 members = [

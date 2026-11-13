@@ -43,7 +43,7 @@ unexplained.
 | mregions | 880 | 871 / 3 / 6 / 0 / **0** | 69 / 3 / 80 / 728 / **0** |
 | mvectors | 1,602 | 1,430 / 172 / 0 / 0 / **0** | 1,382 / 172 / 0 / 48 / **0** |
 | mprint | 363 | 363 / 0 / 0 / 0 / **0** | 360 / 0 / 0 / 3 / **0** |
-| minverse | 862 | 818 / 10 / 0 / 0 / **34** | 774 / 10 / 0 / 51 / **27** |
+| minverse | 862 | 852 / 10 / 0 / 0 / **0** | 801 / 10 / 0 / 51 / **0** |
 | primes | 215 | 215 / 0 / 0 / 0 / **0** | 213 / 0 / 2 / 0 / **0** |
 | draws | 6 | 6 / 0 / 0 / 0 / **0** | 6 / 0 / 0 / 0 / **0** |
 | nr | 5 | 5 / 0 / 0 / 0 / **0** | 5 / 0 / 0 / 0 / **0** |
@@ -53,17 +53,15 @@ unexplained.
 | rfields | 16 | 16 / 0 / 0 / 0 / **0** | 16 / 0 / 0 / 0 / **0** |
 | minimizers | 181 | 179 / 2 / 0 / 0 / **0** | 160 / 2 / 9 / 10 / **0** |
 
-Totals: `reproduce` 25,739 of 26,707 identical (672 not finished, 249 memory, 47 below); `fix`
-22,533 identical (672 not finished, 383 memory, 3,092 corrected by a noted defect, 27 below).
+Totals (on main `c9ab2a4e`, whose VNL ports follow the official build's operand order):
+`reproduce` 25,773 of 26,707 identical (672 not finished, 249 memory, 13 below); `fix` 22,560
+identical (672 not finished, 383 memory, 3,092 corrected by a noted defect), none unexplained.
 
 The differences left, all understood:
 
-- **minverse, 34 (reproduce) and 27 (fix):** every value identical; the lines differ only in the
-  bits of NaNs (the sign of a default NaN, which input NaN survives) where NaN inputs go through
-  VNL's routines in float (`vnl_det`/`vnl_inverse` of 2 to 4 rows, `vnl_qr<float>`): larmorx-core's
-  ports evaluate the C++ source's operand order, the official build (GCC 8.4.0) another for some
-  commutative operations. The spec (§8.8) names the main package's ports, without an operand
-  order of its own.
+- **minverse** (before main `c9ab2a4e`: 34 lines in `reproduce`, 27 in `fix`): NaN bits only, from
+  VNL's float routines on NaN inputs while the main package's ports followed the C++ source's
+  operand order; identical since the ports follow the official build's.
 - **eigen, 5, and svd, 8 (reproduce only):** FS-47 and FS-48 refuse, in both modes as the spec says,
   matrices with infinite or NaN entries that VNL usually never finishes, "the rare such matrices
   FreeSurfer does finish refused too" (a 2 x 2 with an infinity, the 1 x 1 infinity of
@@ -87,9 +85,8 @@ byte-swaps in place, so a short read keeps the previous number's other bytes, sw
   `FS_CORE_GOLDEN_DUMP=<folder>` writes each case's bytes). Identical in debug and release builds
   and under the AArch64 NaN emulation (`validation/probes/fsl-mcflirt-affine-trace/nan_trap.c`, built
   as `libnan_trap.so`; run the test binary with `LD_PRELOAD=<scratch>/libnan_trap.so NAN_TRAP_ARM=1
-  NAN_TRAP_DIR=<scratch>/nt`). The inverse, determinant, QR factors and `OpenEigenSystem` /
-  `OpenNonSymmetricEigenSystem` get finite arguments: VNL's ports in the main package do not yet
-  give the official build's NaN bits there (the findings).
+  NAN_TRAP_DIR=<scratch>/nt`). `OpenEigenSystem` and `OpenNonSymmetricEigenSystem` get finite
+  arguments: VNL's eigensystem port does not yet give the official build's NaN bits (the findings).
 - `cargo test -p larmorx-fs-core --test defects_maths`: each defect of the spec's §24 noted in both
   modes on a line of the comparison's own batches (the shortest), the two modes' results different
   where the correction changes them; FS-29, FS-35 and FS-36 (kept, not noted), FS-39 at the driver.

@@ -12,10 +12,11 @@ this file is open to everyone. The comparisons and the tools are in
 ## The comparison
 
 - **What:** all 24 groups of the spec's §23.2 (26,707 calls, seed 7), on the probe (plainly, again,
-  and in two guard runs) and on the clean room's candidate, in both modes. `reproduce`:
-  25,739 identical, 672 where FreeSurfer did not finish, 249 memory
-  lines, 47 others: `minverse`'s 34 NaN-bit lines and the 13 lines FS-47 and FS-48 refuse (below). `fix`: 22,533 identical, 672 not finished, 383 memory, 3,092 corrected by a noted
-  defect, 27 others: `minverse`'s NaN-bit lines (below).
+  and in two guard runs) and on the clean room's candidate, in both modes, on main as of `c9ab2a4e`
+  (the main package's VNL ports in the official build's operand order). `reproduce`: 25,773
+  identical, 672 where FreeSurfer did not finish, 249 memory lines, 13 others: the lines FS-47 and
+  FS-48 refuse (below). `fix`: 22,560 identical, 672 not finished, 383 memory, 3,092 corrected by a
+  noted defect, none other.
 - **How we know:** *validated* (`compare.py compare`, both modes, 2026-11-13).
 
 ## The minimizers (§13)
@@ -67,20 +68,21 @@ those groups is identical:
 ## VNL's decompositions on NaN inputs (the main package's ports)
 
 - **What:** with NaN or infinite entries, `MatrixInverse`, `MatrixDeterminant` and
-  `MatrixQRdecomposition` (VNL's fixed-size routines and QR in float) give results whose NaN bits
-  differ from the official build's on some lines (`minverse`: 34 lines in `reproduce`, 27 in `fix`,
-  every value identical; the main package's ports follow the C++ source's operand order, the
-  official build another) and between x86-64 and the AArch64 NaN emulation. The orchestrator's
-  decision (2026-11-13): the ports gain the official build's order with x86-64's NaN rules.
-- **What else:** `OpenNonSymmetricEigenSystem` of a matrix with a NaN entry that FreeSurfer finishes
-  (`oeigenns 4 41700000 3f800000 4106db6e 42752492 40a00000 40e00000 c0dc0000 42b8db6e 41200000
-  41200000 7fc00000 40400000 41980000 c2740000 41a00000 3f800000`): the official build's
+  `MatrixQRdecomposition` (VNL's fixed-size routines and QR in float) gave results whose NaN bits
+  differed from the official build's (`minverse`: 34 lines in `reproduce`, 27 in `fix`, every value
+  identical) and between x86-64 and the AArch64 NaN emulation, while the main package's ports
+  followed the C++ source's operand order. Since the ports follow the official build's order with
+  x86-64's NaN rules (main `c9ab2a4e`), every `minverse` line is identical in `reproduce` (852 and
+  10 not finished) and none is unexplained in `fix`; the golden cases give these three commands
+  special values again, identical on every build and under the emulation.
+- **What remains:** `OpenNonSymmetricEigenSystem` of a matrix with a NaN entry that FreeSurfer
+  finishes (`oeigenns 4 41700000 3f800000 4106db6e 42752492 40a00000 40e00000 c0dc0000 42b8db6e
+  41200000 41200000 7fc00000 40400000 41980000 c2740000 41a00000 3f800000`): the official build's
   eigenvectors are `0 0 0 0 0 0 NaN NaN …`, the clean room's (through
   `larmorx_core::vnl_eigen::real_eigensystem`) all NaN, and their signs differ between larmorx's
-  debug and release builds (an optimisation changes a NaN's sign inside the port).
-- **So:** the golden cases give those five commands finite arguments until the ports follow the
-  official build's NaN rules.
-- **How we know:** *measured* (the probe on that line; the golden cases under
+  debug and release builds (an optimisation changes a NaN's sign inside the port). The golden cases
+  give `oeigen` and `oeigenns` finite arguments until that port follows the official build too.
+- **How we know:** *measured* (`compare.py`, the probe on that line; the golden cases under
   `validation/probes/fsl-mcflirt-affine-trace/nan_trap.c`'s emulation, debug and release).
 
 ## The defects the spec's rule refuses in both modes

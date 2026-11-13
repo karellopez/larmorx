@@ -25,11 +25,11 @@ use sha2::{Digest, Sha256};
 const GOLDEN: &[(&str, &str)] = &[
     (
         "decomp.fix",
-        "85c473d42c3c94a444cc6197b4c7e1a53f62581b681f4d4b2afea38d4db95d3f",
+        "6ae2acb902a47fe15d2a43187416900c0e1f741503704d595c123e25a4049729",
     ),
     (
         "decomp.reproduce",
-        "cfcc4d109729124b282218e98f47f3ad47508146db506efec9cc63c15579d3be",
+        "d2dc663d60ef80a0adad995c3251754ddb10e5d2d630851bf1503ec0444a56cd",
     ),
     (
         "dmatrix.fix",
@@ -715,18 +715,17 @@ const DMATRIX: &[(&str, Make)] = &[
     }),
 ];
 
-/// The decompositions (§8.8, §17). The inverse, determinant and QR factors and the eigensystems
-/// of `OpenEigenSystem` and `OpenNonSymmetricEigenSystem` (VNL's routines in the main package,
-/// whose NaN results are not yet the official build's on every platform and build) get finite
-/// arguments only.
+/// The decompositions (§8.8, §17). The eigensystems of `OpenEigenSystem` and
+/// `OpenNonSymmetricEigenSystem` (VNL's routines in the main package, whose NaN results are not
+/// yet the official build's on every build) get finite arguments only.
 const DECOMP: &[(&str, Make)] = &[
-    ("minverse", |g| format!("{} {}", g.msq(false), g.om(false))),
-    ("mdet", |g| g.msq(false)),
+    ("minverse", |g| format!("{} {}", g.msq(true), g.om(true))),
+    ("mdet", |g| g.msq(true)),
     ("mqr", |g| {
         let n = g.int(1, 4);
-        let a = g.mk(1, n, n, false);
-        let q = g.mk(1, n, n, false);
-        let r = g.mk(1, n, n, false);
+        let a = g.mk(1, n, n, true);
+        let q = g.mk(1, n, n, true);
+        let r = g.mk(1, n, n, true);
         format!("{a} {q} {r}")
     }),
     ("oeigen", |g| {

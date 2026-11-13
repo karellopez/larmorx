@@ -1722,6 +1722,73 @@ void run_case()
     fflush(stdout);
     put_vol(r);
     put_lta(r ? l : NULL);
+  } else if (cmd == "cov" || cmd == "mpca") {
+    MRI *a = get_vol();
+    fill_paint(a);
+    MRI *mask = NULL;
+    if (geti()) {
+      mask = get_vol();
+      fill_paint(mask);
+    }
+    fflush(stdout);
+    if (cmd == "cov") {
+      MATRIX *m = MRIcovarianceMatrix(a, mask);
+      fflush(stdout);
+      om(m);
+    } else {
+      MATRIX *U = NULL;
+      VECTOR *S = NULL;
+      MRI *V = NULL;
+      int r = MRIpca(a, &U, &S, &V, mask);
+      fflush(stdout);
+      oi(r);
+      om(U);
+      om(S);
+      put_vol(V);
+    }
+  } else if (cmd == "pcast") {
+    int n = geti();
+    MATRIX *S = MatrixAlloc(1, n, MATRIX_REAL);
+    for (int i = 1; i <= n; i++) S->rptr[1][i] = getf();
+    int mode = geti();
+    std::string dir = scratch.substr(0, scratch.rfind('/'));
+    if (chdir(dir.c_str())) fail("chdir");
+    unlink("fsvol-pca.dat");
+    fflush(stdout);
+    int r = mode == 0 ? PrintPCAStats(stdout, S)
+                      : WritePCAStats((char *)(mode == 2 ? "fsvol-nodir/pca.dat" : "fsvol-pca.dat"), S);
+    // the program's end flushes the file WritePCAStats leaves open
+    fflush(NULL);
+    oi(r);
+    ohex(slurp("fsvol-pca.dat"));
+    unlink("fsvol-pca.dat");
+  } else if (cmd == "fdr") {
+    int n = geti();
+    std::vector<MRI *> vols(n), masks(n), outs(n);
+    std::vector<int> frames(n);
+    for (int i = 0; i < n; i++) {
+      vols[i] = get_vol();
+      fill_paint(vols[i]);
+      frames[i] = geti();
+      masks[i] = NULL;
+      if (geti()) {
+        masks[i] = get_vol();
+        fill_paint(masks[i]);
+      }
+      int mode = geti();
+      outs[i] = mode == 1 ? get_vol() : mode == 2 ? vols[i] : NULL;
+    }
+    double fdr = getd();
+    int sign = geti(), lg = geti(), dbg = geti(), passmask = geti(), passout = geti();
+    double vwth = -7;
+    fflush(stdout);
+    int r = MRIfdr2vwth(vols.data(), n, frames.data(), fdr, sign, lg, passmask ? masks.data() : NULL, &vwth,
+                        passout ? outs.data() : NULL, dbg);
+    fflush(stdout);
+    oi(r);
+    od(vwth);
+    for (int i = 0; i < n; i++)
+      if (passout && outs[i]) put_vol(outs[i]);
   } else {
     fail("unknown command");
   }

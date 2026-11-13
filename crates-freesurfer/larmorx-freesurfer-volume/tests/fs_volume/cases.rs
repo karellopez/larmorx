@@ -35,6 +35,7 @@ use larmorx_freesurfer_volume::labels as lb;
 use larmorx_freesurfer_volume::ltaread as lr;
 use larmorx_freesurfer_volume::order as od;
 use larmorx_freesurfer_volume::orient as orn;
+use larmorx_freesurfer_volume::pca as pc;
 use larmorx_freesurfer_volume::resample as rsm;
 use larmorx_freesurfer_volume::resize as rs;
 use larmorx_freesurfer_volume::rotate as rt;
@@ -2417,6 +2418,78 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
                     }
                 }
             }
+            "cov" | "mpca" => {
+                let mut s = shape(&mut g);
+                s.hdr = s.hdr && g.chance(4);
+                if g.chance(2) {
+                    s.nf = g.int(1, 5);
+                }
+                vol_of(&mut g, &mut t, s);
+                let vals: &[f32] = &[0.0, 1.0, 2.0, 3.0, -1.0, 4.0, 0.5, 100.0, -7.0];
+                fill_paint(&mut g, &mut t, s, &[&[0.0, 1.0, 2.0, 5.0]], &[vals]);
+                let m = g.chance(2);
+                t.push(i64::from(m).to_string());
+                if m {
+                    let o = like(&mut g, s);
+                    vol_of(&mut g, &mut t, o);
+                    let mv: &[f32] = &[0.0, 1.0, 0.5, 0.75, 1.0];
+                    fill_paint(&mut g, &mut t, o, &[mv], &[mv]);
+                }
+            }
+            "pcast" => {
+                let n = g.int(1, 6);
+                t.push(n.to_string());
+                for _ in 0..n {
+                    let v = if g.chance(10) {
+                        fval(&mut g)
+                    } else {
+                        g.pick(&[0.0f32, 1.0, 2.5, 10.0, 1e-3, -1.0, 1e20, 3.3, 0.7])
+                    };
+                    t.push(fx(v));
+                }
+                t.push(g.pick(&[0, 1, 1, 2]).to_string());
+            }
+            "fdr" => {
+                let n = if g.chance(4) { g.int(2, 3) } else { 1 };
+                t.push(n.to_string());
+                let pv: &[f32] = &[
+                    0.001, 0.01, 0.04, 0.05, 0.2, 0.5, 0.9, 1.0, 2.0, 3.0, -2.0, -0.5, 0.0, 1.3,
+                ];
+                for _ in 0..n {
+                    let mut s = shape(&mut g);
+                    s.hdr = s.hdr && g.chance(4);
+                    if !g.chance(8) {
+                        s.ty = 3;
+                    }
+                    vol_of(&mut g, &mut t, s);
+                    fill_paint(&mut g, &mut t, s, &[pv], &[pv]);
+                    t.push(frame_of(&mut g, s).to_string());
+                    let m = g.chance(3);
+                    t.push(i64::from(m).to_string());
+                    if m {
+                        let o = like(&mut g, s);
+                        vol_of(&mut g, &mut t, o);
+                        let mv: &[f32] = &[0.0, 1.0, 0.5, 1.0];
+                        fill_paint(&mut g, &mut t, o, &[mv], &[mv]);
+                    }
+                    let mode = g.pick(&[0, 1, 1, 2]);
+                    t.push(mode.to_string());
+                    if mode == 1 {
+                        let mut o = like(&mut g, s);
+                        if !g.chance(8) {
+                            o.ty = 3;
+                        }
+                        o.hdr = o.hdr && g.chance(4);
+                        vol_of(&mut g, &mut t, o);
+                    }
+                }
+                t.push(dx(g.pick(&[0.05, 0.01, 0.2, 0.0, 1.0, 0.5])));
+                t.push(g.pick(&[0, 1, -1, 0, 2]).to_string());
+                t.push(i64::from(g.chance(2)).to_string());
+                t.push(i64::from(g.chance(5)).to_string());
+                t.push(i64::from(!g.chance(4)).to_string());
+                t.push(i64::from(!g.chance(4)).to_string());
+            }
             c => panic!("no generator for {c}"),
         }
         lines.push(t.join(" "));
@@ -2753,7 +2826,7 @@ fn perturb(g: &mut Gen, v: &mut [String], e: &mut [String]) {
 }
 
 /// The probe's commands, in the order the generator cycles through them.
-pub const COMMANDS: [&str; 156] = [
+pub const COMMANDS: [&str; 160] = [
     "vgwrite",
     "vgread",
     "vgread",
@@ -2910,6 +2983,10 @@ pub const COMMANDS: [&str; 156] = [
     "vvk",
     "vvd",
     "maskup",
+    "cov",
+    "mpca",
+    "pcast",
+    "fdr",
 ];
 
 /// One buffer both streams write into, in order (FreeSurfer's standard output and error go to
@@ -5313,6 +5390,115 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
                 None => {
                     o.vol(None);
                     o.lta(None);
+                }
+            }
+        }
+        "cov" | "mpca" => {
+            let mut a = get_vol(cx, t)?;
+            fill_painted(cx, t, &mut a)?;
+            let mask = if t.i() != 0 {
+                let mut m = get_vol(cx, t)?;
+                fill_painted(cx, t, &mut m)?;
+                Some(m)
+            } else {
+                None
+            };
+            let (g, a_, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            if cmd == "cov" {
+                let m = pc::mri_covariance_matrix(g, a_, b, &a, mask.as_ref())?;
+                o.m(m.as_ref());
+            } else {
+                let (r, p) = pc::mri_pca(g, a_, b, &a, mask.as_ref())?;
+                o.i(i64::from(r));
+                o.m(p.as_ref().map(|p| &p.u));
+                o.m(p.as_ref().map(|p| &p.s));
+                o.vol(p.as_ref().map(|p| &p.v));
+            }
+        }
+        "pcast" => {
+            let n = t.i();
+            let mut sv = Matrix::real(1, n);
+            for i in 1..=n {
+                let v = t.f();
+                sv.set_relt(1, i, v);
+            }
+            let mode = t.i();
+            static CALLS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+            let call = CALLS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            let dir = std::env::temp_dir()
+                .join(format!("larmorx-fsvol-pca-{}-{call}", std::process::id()));
+            std::fs::create_dir_all(&dir).expect("a scratch folder");
+            let r = match mode {
+                0 => pc::print_pca_stats(&mut cx.a, &sv),
+                1 => pc::write_pca_stats(&mut cx.a, Some(&dir), "fsvol-pca.dat", &sv),
+                _ => pc::write_pca_stats(&mut cx.a, Some(&dir), "fsvol-nodir/pca.dat", &sv),
+            };
+            o.i(i64::from(r));
+            let bytes = std::fs::read(dir.join("fsvol-pca.dat")).unwrap_or_default();
+            o.hex(&bytes);
+            let _ = std::fs::remove_dir_all(&dir);
+        }
+        "fdr" => {
+            let n = t.i();
+            let mut vols = Vec::new();
+            let mut frames = Vec::new();
+            let mut masks = Vec::new();
+            let mut outs = Vec::new();
+            for _ in 0..n {
+                let mut v = get_vol(cx, t)?;
+                fill_painted(cx, t, &mut v)?;
+                vols.push(v);
+                frames.push(t.i());
+                masks.push(if t.i() != 0 {
+                    let mut m = get_vol(cx, t)?;
+                    fill_painted(cx, t, &mut m)?;
+                    Some(m)
+                } else {
+                    None
+                });
+                let mode = t.i();
+                outs.push((
+                    mode,
+                    if mode == 1 {
+                        Some(get_vol(cx, t)?)
+                    } else {
+                        None
+                    },
+                ));
+            }
+            let fdr = t.d();
+            let (sign, lg, dbg) = (t.i(), t.i() != 0, t.i() != 0);
+            let (passmask, passout) = (t.i() != 0, t.i() != 0);
+            let mut vwth = -7.0f64;
+            let r = {
+                let mut items: Vec<pc::FdrVol> = vols
+                    .iter_mut()
+                    .zip(frames.iter())
+                    .zip(masks.iter())
+                    .zip(outs.iter_mut())
+                    .map(|(((v, &frame), m), (mode, ov))| pc::FdrVol {
+                        vol: v,
+                        frame,
+                        mask: if passmask { m.as_ref() } else { None },
+                        out: match (passout, *mode, ov.as_mut()) {
+                            (true, 1, Some(o)) => pc::FdrOut::Given(o),
+                            (true, 2, _) => pc::FdrOut::Same,
+                            _ => pc::FdrOut::None,
+                        },
+                    })
+                    .collect();
+                let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+                pc::mri_fdr2vwth(g, a, b, &mut items, fdr, sign, lg, &mut vwth, dbg)?
+            };
+            o.i(i64::from(r));
+            o.d(vwth);
+            if passout {
+                for (i, (mode, ov)) in outs.iter().enumerate() {
+                    match mode {
+                        1 => o.vol(ov.as_ref()),
+                        2 => o.vol(Some(&vols[i])),
+                        _ => {}
+                    }
                 }
             }
         }

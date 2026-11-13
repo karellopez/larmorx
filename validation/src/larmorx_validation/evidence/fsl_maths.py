@@ -30,8 +30,9 @@ from pathlib import Path
 
 import numpy as np
 
-from larmorx_validation.evidence import common, core
+from larmorx_validation.evidence import common, core, fsl_pages
 from larmorx_validation.evidence import fsl_maths_clean_room as fo
+from larmorx_validation.evidence import present as present_
 from larmorx_validation.figures import cache as fcache
 from larmorx_validation.figures import records
 
@@ -1569,7 +1570,7 @@ def export(ctx: core.Context) -> dict:
     gt, _gprov = _glibc_table(ctx)
     gto = _glibc_table_original(ctx)
     bench, chart, bt = fo.speed(ctx, "fslmaths")
-    return {
+    doc = {
         "schema": 1,
         "tool": TOOL,
         "title": "fslmaths",
@@ -1603,6 +1604,308 @@ def export(ctx: core.Context) -> dict:
             _example_families(ctx),
         ],
     }
+    return present(doc)
+
+
+# ------------------------------------------------------------------- the writing guide's words
+
+#: fslmaths' and fslstats' own rewordings, before the FSL pages' (:mod:`fsl_pages`): random
+#: testing's trials are random-testing runs (the guide's section 1); the benchmark's machine,
+#: shared with other work; the benchmark report's steps by their dates (its relay 5 on
+#: 2026-11-03, its relays 7 and 7b on 2026-11-04) and the kernel's correction by its finding
+#: (findings 23, as the report names it).
+TEXTS = [
+    (r"\bin its reproduce mode at 14 threads and at one and in its default mode\b",
+     "in `reproduce` at 14 threads and at one and in `fix`, its default"),
+    (r"\bDifferential random testing's trial of this part\b", "A random-testing run of the replica"),
+    (r"\bDifferential random testing's trial of the clean-room originals\b",
+     "A random-testing run of the clean rooms"),
+    (r"\bthe replica trial's streams drawn again, so the replica trial's runs of FSL\b",
+     "the streams of the replica's run drawn again, so that run's calls of FSL"),
+    (r"\bThe check run before the trial found\b", "The check made before the run found"),
+    (r"^differing at the trial \(each triaged below\)$",
+     "differing in the run (each explained in the note)"),
+    (r"^differing at the trial \(each one triaged below\)$",
+     "differing in the run (each one triaged below)"),
+    (r"\bEvery differing case of the trial\b", "Every differing case of the run"),
+    (r"\bthe reproducer is a finding of the trial\b", "the reproducer is a finding of the run"),
+    (r"\bwhile another agent worked beside it\b", "while other work ran beside it"),
+    (r"\bwith another agent's work beside it\b", "with other work beside it"),
+    (r"\bsince relay 7b's double sum\b", "since the double sums of 2026-11-04"),
+    (r"\bsince relay 6's kernel correction\b", "since the Gaussian kernel's correction of findings 23"),
+    (r"\(relay 7's check, below; at relay 5 ", "(checked again on 2026-11-04; on 2026-11-03 "),
+    (r", the user's decision of (\d{4}-\d\d-\d\d)\)", r", as decided on \1)"),
+    (r"\bthe original finishes and names it \(rule A\)",
+     "the clean room finishes and names it, correcting it by default"),
+    (r"\btakes glibc's sincos from LARMORX's clean-room implementation of its behavioural "
+     r"specification\b",
+     "takes them from LARMORX's implementation of glibc's sincos, written from a behavioural "
+     "specification of glibc's code"),
+    (r"\bthe fsl-stats page has the four calls in its record\b",
+     "fslstats' evidence page has the four calls in its record"),
+    (r"\(the fslmaths page shows those fourteen calls\)",
+     "(fslmaths' evidence page shows those fourteen calls)"),
+    (r"\bEach fslstats call on FSL's output of the node before it \(through the oracle cache\) and "
+     r"the larmorx-nc replica's and the clean-room original's \(reproduce mode, 14 threads\) on "
+     r"the same file\b",
+     "Each fslstats call, by FSL on its output of the node before it (through the cache of the "
+     "original's runs), and by the replica (larmorx-nc) and the clean room (`reproduce`, 14 "
+     "threads) on the same file"),
+]  # fmt: skip
+#: The page's fslmaths calls; the clean room's random-testing tables (a bare "larmorx" there is
+#: the clean room).
+PAGE = fsl_pages.page("fslmaths", texts=TEXTS)
+TRIAL_CLEAN = fsl_pages.page("fslmaths", port="clean-room", texts=TEXTS)
+
+
+def _diff(ex: dict, i: str) -> dict:
+    return next(d for d in ex["diffs"] if d["id"] == i)
+
+
+def want(ex: dict, **verdicts: str) -> None:
+    """Raise unless each comparison (``original_fsl`` for ``original-fsl``) has its verdict."""
+    for i, v in verdicts.items():
+        got = _diff(ex, i.replace("_", "-"))["verdict"]
+        if got != v:
+            raise ValueError(f"{ex['id']}: {i.replace('_', '-')} is {got}, not {v}")
+
+
+def _found(ex: dict, i: str, pat: str) -> re.Match[str]:
+    m = re.search(pat, _diff(ex, i)["reason"])
+    if not m:
+        raise ValueError(f"{ex['id']}: {i}'s reason without {pat!r}")
+    return m
+
+
+def _sci(v: float) -> str:
+    """A number as a sentence gives it: 2e-07 as 2 × 10⁻⁷, 1e-05 as 10⁻⁵."""
+    g = f"{v:.2g}"
+    if "e" not in g:
+        return g
+    m, e = g.split("e")
+    sup = str.maketrans("-0123456789", "⁻⁰¹²³⁴⁵⁶⁷⁸⁹")
+    power = f"10{str(int(e)).translate(sup)}"
+    return power if m == "1" else f"{m} × {power}"
+
+
+#: Every comparison of fslmaths' worked examples that changes nothing: the replica's and the
+#: clean room's `fix` against `reproduce`, the clean room's 1 thread against 14.
+_SAME = {"fix_replica": "bit-identical", "original1_original": "bit-identical",
+         "ofix_original": "bit-identical"}  # fmt: skip
+
+
+def _row(ex: dict, table: str, head: str) -> list[dict]:
+    t = next(t for t in ex["tables"] if t["id"] == table)
+    return next(r for r in t["rows"] if r["head"] == head)["cells"]
+
+
+def _shows_combine(ex: dict) -> tuple[str, list[str]]:
+    """fMRIPrep's combine_masks call: both ports FSL's mask and fMRIPrep's own, as on every
+    call of the records (the table)."""
+    want(ex, replica_fsl="bit-identical", replica_own="bit-identical",
+         original_fsl="bit-identical", original_own="bit-identical", **_SAME)  # fmt: skip
+    t = next(t for t in ex["tables"] if t["id"] == "combine-calls")
+    cells = [c.get("text") for r in t["rows"] for c in r["cells"][-3:]]
+    if set(cells) != {"identical", "the same values"} or len(t["rows"]) != 4:
+        raise ValueError(f"{ex['id']}: a call of the records that is not FSL's")
+    return (
+        "On fMRIPrep's own call, both ports give FSL's mask, every value, and the same values as "
+        "fMRIPrep's own output; the clean room the same at 1 and 14 threads. So do the records' "
+        "four combine_masks calls on three fMRIPrep runs (the table below the viewer). No "
+        "correction by default changes this call, in either port."
+    ), ["replica-fsl", "original-fsl"]
+
+
+def _shows_goodvoxels(ex: dict) -> tuple[str, list[str]]:
+    """fMRIPrep's goodvoxels mask: every one of the fourteen calls FSL's, and the four numbers
+    fslstats prints between them."""
+    want(ex, replica_fsl="bit-identical", original_fsl="bit-identical", **_SAME)
+    t = next(t for t in ex["tables"] if t["id"] == "goodvoxels-stats")
+    for r in t["rows"]:
+        texts = [c.get("text") for c in r["cells"][:3]]
+        if len(set(texts)) != 1:
+            raise ValueError(f"{ex['id']}: {r['head']} printed otherwise")
+    n = len(ex["outputs"])
+    if n != 14:
+        raise ValueError(f"{ex['id']}: {n} calls, not fourteen")
+    return (
+        "Each of the fourteen calls of fMRIPrep's goodvoxels mask gives FSL's output, every value, "
+        "in both ports, and the clean room the same at 1 and 14 threads; the four numbers "
+        "fslstats prints between them are FSL's text in both (the table below the viewer). No "
+        "correction by default changes these calls, in either port."
+    ), ["replica-fsl", "original-fsl"]
+
+
+def _shows_families(ex: dict) -> tuple[str, list[str]]:
+    """One call per family: the replica FSL's in all fifteen; the clean room FSL's in fourteen,
+    the FFT convolution an expected divergence that lies closer to the exact result."""
+    want(ex, replica_fsl="bit-identical", original_fsl="divergence", **_SAME)
+    n = len(ex["outputs"])
+    m = _found(ex, "original-fsl", rf"^(\d+) of {n} outputs FSL's bit for bit; `([^`]*)`: max "
+               r"\|Δ\| ([0-9.e+-]+) of FSL's largest value \(§21: at most ([0-9.e+-]+)\), "
+               r"([0-9.]+)% of the voxels within 4 units in the last place \(§21: at least "
+               r"(\d+) %\)")  # fmt: skip
+    if int(m.group(1)) != n - 1 or "-kernel sphere" not in m.group(2):
+        raise ValueError(f"{ex['id']}: the clean room differs in another call")
+    kernel = _found(ex, "original-fsl", r"(\d+ × \d+ × \d+) kernel of (\d+) voxels")
+    exact = _found(ex, "original-fsl", r"FSL's FFT lies within ([0-9.e+-]+) of the largest value "
+                   r".*, the original's direct sum .* within ([0-9.e+-]+) \(median")  # fmt: skip
+    _found(ex, "original-fsl", r"FSL convolves this kernel by its FFT in single precision")
+    _found(ex, "original-fsl", r"the original is the closer of the two")
+    return (
+        f"The replica gives FSL's output in all {n} calls, every value. The clean room gives "
+        f"FSL's values in {m.group(1)} of them, at 1 and 14 threads. The other is the mean filter "
+        f"with the {kernel.group(1)} spherical kernel ({int(kernel.group(2)):,} voxels), which "
+        "FSL convolves by its FFT in single precision and the clean room by a direct sum in "
+        f"double precision: they differ by up to {_sci(float(m.group(3)))} of FSL's largest "
+        f"value, within the bound of {_sci(float(m.group(4)))}, with {m.group(5)} % of the "
+        f"voxels within 4 units in the last place, below the {m.group(6)} % asked (an expected "
+        f"divergence). Against the exact result FSL's FFT lies within "
+        f"{_sci(float(exact.group(1)))} of the largest value and the clean room within "
+        f"{_sci(float(exact.group(2)))}. No correction by default changes these calls, in "
+        "either port."
+    ), ["replica-fsl", "original-fsl"]
+
+
+#: "What this shows" of each worked example (the writing guide, section 4), from its own
+#: verdicts, reasons and tables; beside it the verdicts of the two ports against FSL.
+SHOWS = {
+    "combine": _shows_combine,
+    "goodvoxels": _shows_goodvoxels,
+    "families": _shows_families,
+}
+#: The case categories of fslmaths' records, as the page names them.
+CATEGORIES = {
+    "fmriprep": "fMRIPrep's calls",
+    "cli": "the command line",
+    "io": "reading images",
+    "dt": "data types",
+    "d13": "defects of FSL",
+    "op": "arithmetic with numbers and images",
+    "thr": "thresholds",
+    "fn": "voxelwise functions",
+    "morph": "morphology",
+    "dilall": "-dilall",
+    "conv": "kernels and filters",
+    "sub": "subsampling",
+    "edge": "-edge",
+    "dog": "-dog_edge",
+    "fillh": "-fillh",
+    "norm": "intensity normalisation",
+    "tensor": "-tensor_decomp",
+    "dim": "reductions along a dimension",
+    "stat": "p-values, ranks and z",
+    "roi": "-roi",
+    "bptf": "-bptf",
+    "tfce": "-tfce",
+    "tfceS": "-tfceS",
+    "roc": "-roc",
+    "orig": "the clean room's own cases",
+}
+#: The tables' columns: each run as the panels name it.
+COLUMNS = {
+    "Replica against FSL 6.0.7.23": "replica against FSL fslmaths 6.0.7.23",
+    "Clean-room original against FSL 6.0.7.23": "clean room against FSL fslmaths 6.0.7.23",
+    "FSL 6.0.7.23 prints": "FSL fslstats 6.0.7.23 prints",
+    "The clean-room original prints": "The clean room prints",
+    "Reproduce mode: values that differ from FSL's": "reproduce: values that differ from FSL's",
+    "Default mode: values that differ from FSL's": "fix: values that differ from FSL's",
+    "Named by the default": "Named by fix",
+    "The original's function": "The clean room's function",
+    "Default against the replica's default (correctly rounded)":
+        "fix against the replica's fix (correctly rounded)",
+    "Replica": "replica (1 thread)",
+    "Original, 1 thread": "clean room (1 thread)",
+    "Original, 14 threads": "clean room (14 threads)",
+    "Against FSL": "The clean room's checks",
+    "Replica (reproduce)": "replica, reproduce",
+    "Replica (default)": "replica, fix",
+    "Clean-room original (reproduce)": "clean room, reproduce",
+    "Clean-room original (default)": "clean room, fix",
+    "Original, 1 thread against 14": "clean room, 1 thread against 14",
+}  # fmt: skip
+#: The tables' titles by the guide's pattern ({program}: the page's; {cases}, {date}: a
+#: random-testing run's).
+TITLES = {
+    "combine-calls": "fMRIPrep's `combine_masks` calls, both ports against the original: FSL "
+    "`fslmaths` 6.0.7.23 (the records' four calls)",
+    "goodvoxels-stats": "The numbers between the steps, both ports against the original: FSL "
+    "`fslstats` 6.0.7.23 (its four calls)",
+    "families-calls": "One call per family, the replica against the original: FSL `fslmaths` "
+    "6.0.7.23",
+    "families-calls-original": "One call per family, the clean room against the original: FSL "
+    "`fslmaths` 6.0.7.23 (§21's metric of the sums)",
+    "glibc-double": "glibc's double functions on a real image, the replica against the original: "
+    "FSL `fslmaths` 6.0.7.23 (GLIBC-07)",
+    "glibc-double-original": "glibc's double functions on a real image, the clean room against the "
+    "original: FSL `fslmaths` 6.0.7.23 (GLIBC-07)",
+    "trial": "Random testing, the replica against the original: FSL `{program}` 6.0.7.23 "
+    "({cases:,} random calls, {date})",
+    "trial-original": "Random testing, the clean room against the original: FSL `{program}` "
+    "6.0.7.23 ({cases:,} random calls, {date})",
+    "trial-original-triage": "The clean room's differences from the original in the run of {date}, "
+    "by category",
+    "benchmark": "Wall-clock seconds and peak memory, both ports against the original: FSL "
+    "`{program}` 6.0.7.23 (the benchmark report)",
+}
+#: The speed chart's series, as the pages name them ({program}: the page's).
+SPEED_LABELS = {
+    "FSL 6.0.7.23 (single-threaded)": "FSL {program} 6.0.7.23, 1 thread",
+    "replica (single-threaded)": "replica, 1 thread",
+    "clean-room original, 1 thread": "clean room, 1 thread",
+    "clean-room original, 14 threads": "clean room, 14 threads",
+}
+
+
+def present_tables(doc: dict, program: str) -> None:
+    """The page's tables (``program``: fslmaths or fslstats) by the guide's pattern: titles,
+    columns, and each random-testing run's length (from its row) and date (from its title)."""
+    tables = [t for ex in doc["examples"] for t in ex.get("tables") or []]
+    dates = {}
+    for t in doc.get("tables", []):
+        if t["id"] in ("trial", "trial-original"):
+            m = re.search(r"the trial of (\d{4}-\d\d-\d\d)", t["title"])
+            if not m:
+                raise ValueError(f"{t['id']}: its title without its date")
+            dates[t["id"]] = m.group(1)
+            row = next(r for r in t["rows"] if r["head"].startswith("length"))
+            minutes = row["cells"][0]["v"]
+            run = "the replica" if t["id"] == "trial" else "the clean rooms"
+            old = f"A random-testing run of {run}"
+            if not t["note"].startswith(old + " ("):
+                raise ValueError(f"{t['id']}: its note's first words changed")
+            rest = t["note"][len(old) :].replace(", both programs at once)", ")", 1)
+            t["note"] = f"{old}, fslmaths and fslstats at once, {minutes:.0f} minutes long{rest}"
+        tables.append(t)
+    for t in tables:
+        if t["id"] in TITLES:
+            date = dates.get(t["id"].removesuffix("-triage"), "")
+            cases = t["rows"][0]["cells"][0].get("v") if t["id"].startswith("trial") else 0
+            t["title"] = TITLES[t["id"]].format(program=program, date=date, cases=cases or 0)
+        for c in t["columns"]:
+            c["label"] = COLUMNS.get(c["label"], c["label"])
+
+
+def present(doc: dict) -> dict:
+    """fslmaths' page in the writing guide's words and order: texts, ports and order only."""
+    note = (doc.get("speed") or {}).get("note")
+    fsl_pages.present(
+        doc,
+        PAGE,
+        SHOWS,
+        "Seconds for the whole call (reading the images, computing, writing every output), one "
+        "run each, on a log scale. The factor is how many times faster the clean room is than "
+        "FSL, both on one thread.",
+        {k: v.format(program="fslmaths") for k, v in SPEED_LABELS.items()},
+        categories=CATEGORIES,
+        tables={t: TRIAL_CLEAN for t in ("glibc-double-original", "trial-original",
+                                         "trial-original-triage")},
+    )  # fmt: skip
+    if doc.get("speed"):  # its build is LARMORX's at a commit, not a port's
+        doc["speed"]["note"] = present_.text(PAGE, note, port="both")
+    fsl_pages.replica_threshold(doc)  # the reviewer's round 18, minor 2
+    present_tables(doc, "fslmaths")
+    return doc
 
 
 if __name__ == "__main__":  # compute the cache entries only:

@@ -39,6 +39,7 @@ use crate::cstd;
 use crate::globals::Globals;
 use crate::log::{self, ERROR_BADPARM, Fatal, NO_ERROR};
 use crate::run::Environment;
+use crate::sse;
 
 /// The generator `OpenRan1` draws from: VXL's `vnl_random` (`larmorx_core::vnl_random`).
 pub trait Ran1Source: std::fmt::Debug + Send {
@@ -316,9 +317,12 @@ pub fn random_number(
             }
         }
     }
-    let range = hi - low;
+    // x86-64's NaN rules in the official build's operand order (`crate::sse`): `hi - low`, the
+    // draw times that, then plus `low` (an infinite range made from `inf - inf` is SSE's default
+    // NaN, whose sign AArch64 would clear).
+    let range = sse::sub64(hi, low);
     let idum = g.random.idum;
-    let val = f64::from(g.random.ran1.draw(idum)) * range + low;
+    let val = sse::add64(sse::mul64(f64::from(g.random.ran1.draw(idum)), range), low);
     g.random.nrgcalls += 1;
     if val < low || val > hi {
         let f = |x: f64| cstd::fmt_f(f64::from(x as f32), 2, 1);

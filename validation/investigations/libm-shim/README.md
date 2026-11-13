@@ -8,6 +8,7 @@ no glibc code, no FreeSurfer code.
 |---|---|
 | `libm_shim.c` | the shim: for `acos`, `asin`, `atan`, `atan2`, `tan`, `log10`, `log2`, `hypot`, `erf`, `erfc`, `expm1`, `log1p`, `tgamma`, `acosf`, `asinf`, `log10f`, `log2f`, `tanhf`, `hypotf` (and `csqrt`, counted only) it counts the calls and the calls whose C-library value differs from the correctly rounded one; `LARMORX_LIBM_SHIM=count` (default) returns the C library's value, `cr` the correctly rounded one (for the functions in `LARMORX_LIBM_SHIM_FUNCS`, comma-separated, or all); one line per function and process at exit in `LARMORX_LIBM_SHIM_LOG` (`program pid mode function calls differing`) |
 | `build_shim.sh` | `build_shim.sh <workspace> <output folder>`: `libm_shim.so` |
+| `summarize.py` | `python -P summarize.py <shim log> [--differing]`: the log summed by program and function (processes, calls, differing; `atan2`'s 100,001-call table shown apart) |
 | `fmriprep_calls.sh` | fMRIPrep's and sMRIPrep's FreeSurfer calls, which recon-all's recordings do not hold (`mri_coreg` and `bbregister` with fMRIPrep's options, `mri_robust_register`, `mris_expand`, `mris_convert`, `lta_convert`, `mri_vol2surf` to fsnative and fsaverage5, `mri_robust_template` with two images), under the shim on a finished subject, one thread, one folder per mode; its header has the usage |
 
 `LARMORX_LIBM_SHIM=ulp` (2026-11-13) returns the C library's value moved by one unit in the last

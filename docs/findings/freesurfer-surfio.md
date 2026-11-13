@@ -1127,3 +1127,68 @@ element 3 of its 3-vector (within it).
 `MRISread` leaves `orig_area` 0, so the face-area statistics' scale is 0 and every area 0 unless the
 case sets it (half the cases do; the long-edge lines of `MRISprintTessellationStats` need it and the
 meshes scaled by 12, one case in five).
+
+## 20. Queue item 3.1-50 part b's second and third groups (relay 18)
+
+Ported: `src/props2.rs`, `src/props3.rs`, `src/props4.rs` (PROVENANCE rows `props2` to `props4`);
+behaviour in `specs/freesurfer-surfio.md` §96-98. Operand orders read from the unit oracle's
+`mrisurf_metricProperties.cpp.o` and `tritri.cpp.o` (objdump; `<scratch>/D/relay18/fn.sh` and `ar.sh`
+print one function), where a NaN's payload can reach an output:
+
+- `project_point_to_plane` (tritri.cpp): `SCALAR_MUL(e1, 1.0 / norm, e1)` expands to `v[0]*1.0 /
+  norm` (the macro's argument is not parenthesised): a division, GCC folding the `* 1.0`; `tmp =
+  e1 * d1` with the third element as `d1 * e1[2]`; `d2 = DOT(e2, point)` as `(p1 e2_1 + p0 e2_0) +
+  p2 e2_2`; `proj = (e2 d2 + e1 d1) + V0`.
+- `face_barycentric_coords`: `x1` as `e1.z V0.z + (e1.y V0.y + e1.x V0.x)`, `x2` as written with
+  `e1` first in each product, `x3` as `(e1.y V2.y + e1.x V2.x) + e1.z V2.z`, `y1` as `(e2.y V0.y +
+  e2.x V0.x) + e2.z V0.z`, `y2` as `V1.z e2.z + (e2.x V1.x + V1.y e2.y)`, `y3` with the corner first;
+  `l1`'s numerator as `(x3 - x2)(y - y3) + (y2 - y3)(x - x3)`.
+- `MRISsampleFaceCoords`: `(double)xv * l + (double)px` per axis; `MRISsampleFace`: `val + val_k
+  l_k`; `MRISsampleFaceNormal`: the distance as `sqrt(dz² + (dx² + dy²))`, `dtotal` as `d + dtotal`,
+  `2 d` as `d + d`, the sums as `nx w + px`, `ny w + py`, `w nz + pz`.
+- `MRISrmsTPHeight`: `dot` as `x nx + y ny + z nz` (the offset first), the sum as `dot²/d + sum`.
+- The analytic distances: the straight distance as `sqrt(zd² + (xd² + yd²))`; the circumference
+  from `sqrt(z² + (x² + y²))`; `circumference * angle` as `angle circumference`.
+- `MRIScomputeHausdorffDistance`: `-a + b` compiled as `b - a` (the zero's fraction), the second
+  product test as `v.val2 vn.val2`, the val2 crossing's term as `|v.val| dist + |vn.val| (1 - dist)`.
+- `MinDistToTriangleBF`: `l1 + l2` as `l2 + l1`; `r` for x and y as `(p1 l1 + p2 l2) + p3 l3` with
+  the corner first, for z as `l3 p3.z + (l1 p1.z + l2 p2.z)`; `d` starts as `pr0² + 0.0`.
+- The three face normals of a set (out-of-line `.isra` clones): `v0 = P(n) - P(n0)`, `v1 = P(n1) -
+  P(n)`, unit by `(x² + y²) + z²`, the cross product as `v0.y v1.z - v1.y v0.z`, `v0.z v1.x - v1.z
+  v0.x`, `v0.x v1.y - v1.x v0.y` (the source writes `-v1[1] v0[2] + v0[1] v1[2]`: GCC turns `-a + b`
+  into `b - a`). The vertex normals of a set inline `mrisNormalize` as `sqrt(z² + (x² + y²))`;
+  `MRIScomputeNormal`'s copy keeps `(x² + y²) + z²`.
+- `MRISmeasureCorticalThickness`: the starting distance as `sqrt(dz² + (dx² + dy²))` in both passes,
+  the final mean as `(min_dist + curv) * 0.5`.
+- `mrisTrackTotalDistance(New)`: `nc + curv`; the total variations and the curvature error:
+  `delta² area` (the area last), `var + term`.
+
+**Defects.** FS-366: `face_barycentric_coords`' degenerate branch writes `*pl1 = *pl2 = *pl3 = 1 /
+3` (integer division: 0) where the other degenerate branch writes `1.0 / 3`; `MRISsampleFace` uses
+the coordinates whatever the answer (0 for such a face), `MRISsampleFaceCoords` replaces them by a
+third. FS-367: `MinDistToTriangleBF`'s loops advance by `dL` with no check: 0, a negative step, or
+one below half an ulp of the loop variable never ends (the probe's 5-s alarm, `CRASH 14`); its only
+caller passes 0.2. FS-368: `MRIScomputeSurfaceNormals` calls `MRISsaveVertexPositions(mris,
+TMP_VERTICES)` first and `MRISrestoreVertexPositions(mris, which)` last (not `TMP_VERTICES`):
+the surface's current positions are left at the set `which`. Its callers (mris_deform, and
+`MRISminimizeThicknessFunctional`, which calls it for the white then the pial set and so continues
+from the pial positions) may rely on it: rule D, kept by default, the correction on request.
+FS-369: its `nx`, `ny`, `nz` are declared once outside the vertex loop; `MRIScomputeNormal` returns
+`ERROR_BADPARM` without writing them for a vertex whose faces are all ripped, so that vertex gets
+the previous unripped vertex's normal (0 for the first). FS-370: `vlist[100000]` and
+`nbr_count[100]` on the stack in the three searches: a size of 100 prints `nbr_count[100]` (a
+stack word: `7 vertices at 100 distance` observed); a ring of 100 or more writes it. FS-371:
+`vertices[1000]` in `containsAnotherVertexOnSphere`.
+
+**Not ported yet (waiting on other items):** `computeVertexPseudoNormal` (mris_fix_topology's
+defect code; with fs.surf's topology items), the discrete curvatures (`FACES_Hcurvature_determineSign`
+to `MRIScomputeSecondFundamentalFormDiscrete`, 5945-6473: they need fs.surf's
+`MRIS_facesAtVertices_reorder`, `FACE_vertexIndexAtMask_find`, `MRISdilateMarked`), the MHT users
+(`MRISmeasureDistanceBetweenSurfaces`, `MRISdistanceBetweenSurfacesExact`, `ClosestVertex`), the
+LABEL user `MRIScomputeAllDistances` (`MRISdistanceTransform`), the ashburner energies
+(`INTEGRATION_PARMS`), the HISTOGRAM distributions and the MRI samplers (8419-8837).
+
+**Probe.** `mpc` (fssurfio.cpp `mpc_case`, tests/fs_surfio/mpc.rs): `MRISmakeDistOrig` for every
+vertex first (zeroed, so no uninitialised original distance is read); `FREESURFER_SEED` always set
+(the disturbance's `randomNumber`); a vertex without neighbours keeps a null distance array (the
+port's `None`, read as empty).

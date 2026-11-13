@@ -62,6 +62,8 @@ void mrisDumpVertex(FILE *file, MRIS const *mris, int vno);
 int signum_eval(float af);
 int mrisOrientSurface(MRIS *mris);
 int mrisOrientPlane(MRIS *mris);
+int mrisTrackTotalDistance(MRIS *mris);
+int mrisTrackTotalDistanceNew(MRIS *mris);
 // mrisurf_io.cpp's functions of queue item 3.1-48 that no header declares, and its file-local
 // ones through io_statics.cpp (which builds mrisurf_io.cpp into the probe)
 MATRIX *getSRASToTalSRAS(LT *lt);
@@ -2486,6 +2488,10 @@ void mpc_case()
     if (m & 4096) { v->x = getf(); v->y = getf(); v->z = getf(); }
     if (m & 8192) { v->wnx = getf(); v->wny = getf(); v->wnz = getf(); }
     if (m & 16384) v->marked = geti();
+    if (m & 32768) { v->dx = getf(); v->dy = getf(); v->dz = getf(); }
+    if (m & 65536) { v->odx = getf(); v->ody = getf(); v->odz = getf(); }
+    if (m & 131072) v->area = getf();
+    if (m & 262144) v->fixedval = 1;
     for (int bit : {1024, 2048}) {
       if (m & bit) {
         int k = geti();
@@ -2499,8 +2505,11 @@ void mpc_case()
       }
     }
   }
-  for (int fno = 0; fno < nf; fno++)
-    if (geti()) s->faces[fno].ripflag = 1;
+  for (int fno = 0; fno < nf; fno++) {
+    int m = geti();
+    if (m & 1) s->faces[fno].ripflag = 1;
+    if (m & 2) s->faces[fno].area = getf();
+  }
   int nops = geti();
   for (int k = 0; k < nops; k++) {
     std::string op = next();
@@ -2577,6 +2586,33 @@ void mpc_case()
       double p[3] = {7, 7, 7};
       StuffVertexCoords(s, geti(), p);
       for (double d : p) od(d);
+    } else if (op == "tt") {
+      if (geti()) oi(mrisTrackTotalDistanceNew(s));
+      else oi(mrisTrackTotalDistance(s));
+      dump_curv(s);
+    } else if (op == "tv") {
+      int d = geti();
+      fflush(stdout);
+      double r = d ? MRIStotalVariationDifference(s) : MRIStotalVariation(s);
+      fflush(stdout);
+      od(r);
+    } else if (op == "ke") {
+      od(MRIScurvatureError(s, getd()));
+    } else if (op == "uk") {
+      int kind = geti();
+      fflush(stdout);
+      if (kind == 0) oi(MRISuseCurvatureDifference(s));
+      else if (kind == 1) oi(MRISuseCurvatureMax(s));
+      else if (kind == 2) oi(MRISuseCurvatureMin(s));
+      else if (kind == 3) oi(MRISuseCurvatureStretch(s));
+      else oi(MRISuseNegCurvature(s));
+      fflush(stdout);
+      dump_curv(s);
+      oi(errno);
+    } else if (op == "ca") {
+      int a = geti(), b = geti(), c = geti(), m = geti();
+      oi(containsAnotherVertexOnSphere(s, a, b, c, m));
+      dump_marks(s);
     } else if (op == "cn") {
       int w = geti(), vno = geti();
       double n[3] = {7, 7, 7};

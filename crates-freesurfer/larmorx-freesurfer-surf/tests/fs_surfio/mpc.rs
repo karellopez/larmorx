@@ -15,7 +15,7 @@ use super::srd::{be4, mesh};
 use super::*;
 
 use larmorx_freesurfer_core::diag::DIAG_WRITE;
-use larmorx_freesurfer_surf::{dist, props2, props3, readwrite};
+use larmorx_freesurfer_surf::{dist, props2, props3, props4, readwrite};
 
 fn fh(t: &mut Vec<String>, g: &mut Gen, heavy: bool) {
     t.push(format!("{:08x}", smallish(g, heavy)));
@@ -126,6 +126,10 @@ pub(super) fn mpc_tokens(t: &mut Vec<String>, g: &mut Gen) {
             (4096, 4),
             (8192, 3),
             (16384, 12),
+            (32768, 4),
+            (65536, 4),
+            (131072, 3),
+            (262144, 2),
         ] {
             if g.chance(k) {
                 mask |= bit;
@@ -161,6 +165,16 @@ pub(super) fn mpc_tokens(t: &mut Vec<String>, g: &mut Gen) {
         if mask & 16384 != 0 {
             ix(t, g.int(1, 3));
         }
+        for bit in [32768, 65536] {
+            if mask & bit != 0 {
+                for _ in 0..3 {
+                    fh(t, g, heavy);
+                }
+            }
+        }
+        if mask & 131072 != 0 {
+            fh(t, g, heavy);
+        }
         for bit in [1024, 2048] {
             if mask & bit != 0 {
                 let k = g.int(0, 8);
@@ -175,8 +189,13 @@ pub(super) fn mpc_tokens(t: &mut Vec<String>, g: &mut Gen) {
             }
         }
     }
+    let faces: Vec<[i64; 3]> = m.f.clone();
     for _ in 0..nf {
-        ix(t, i64::from(g.chance(8)));
+        let mask = i64::from(g.chance(8)) | (2 * i64::from(g.chance(4)));
+        ix(t, mask);
+        if mask & 2 != 0 {
+            fh(t, g, heavy);
+        }
     }
     let nops = g.int(1, 6);
     ix(t, nops);
@@ -185,15 +204,17 @@ pub(super) fn mpc_tokens(t: &mut Vec<String>, g: &mut Gen) {
             &[
                 "fb", "fr", "pp", "sc", "sf", "sn", "rh", "ae", "sa", "dd", "hd", "ur", "uc", "md",
                 "sv", "sfc", "fb", "sc", "sf", "ae", "fr", "cn", "cs", "su", "co", "cp", "ct",
-                "ct", "su", "cn",
+                "ct", "su", "cn", "tt", "tv", "ke", "uk", "ca", "ca", "uk",
             ]
         } else if nv > 0 {
             &[
                 "fr", "pp", "rh", "ae", "sa", "dd", "hd", "ur", "uc", "md", "sv", "cn", "cs", "su",
-                "co", "cp", "ct",
+                "co", "cp", "ct", "tt", "tv", "ke", "uk",
             ]
         } else {
-            &["fr", "pp", "rh", "ae", "sa", "dd", "hd", "ur", "uc", "md"]
+            &[
+                "fr", "pp", "rh", "ae", "sa", "dd", "hd", "ur", "uc", "md", "tt", "tv", "ke", "uk",
+            ]
         };
         let op = g.pick(ops);
         t.push(op.to_owned());
@@ -268,6 +289,21 @@ pub(super) fn mpc_tokens(t: &mut Vec<String>, g: &mut Gen) {
                 t.push(format!("{:016x}", dl.to_bits()));
             }
             "sv" => ix(t, g.int(0, nv - 1)),
+            "tt" | "tv" => ix(t, i64::from(g.chance(2))),
+            "ke" => dh(t, g, heavy),
+            "uk" => ix(t, g.int(0, 4)),
+            "ca" => {
+                let f = faces[g.below(nf as u64) as usize];
+                let tri = if g.chance(5) {
+                    [g.int(0, nv - 1), g.int(0, nv - 1), g.int(0, nv - 1)]
+                } else {
+                    f
+                };
+                for x in tri {
+                    ix(t, x);
+                }
+                ix(t, i64::from(g.chance(3)));
+            }
             "cn" => {
                 ix(t, g.pick(&[4, 0, 9, 7, 4, 9, 3]));
                 ix(t, g.int(0, nv - 1));
@@ -458,6 +494,18 @@ pub(super) fn mpc_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
         if m & 16384 != 0 {
             v.marked = t.i() as i16;
         }
+        if m & 32768 != 0 {
+            [v.dx, v.dy, v.dz] = f3(t);
+        }
+        if m & 65536 != 0 {
+            [v.odx, v.ody, v.odz] = f3(t);
+        }
+        if m & 131072 != 0 {
+            v.area = t.f();
+        }
+        if m & 262144 != 0 {
+            v.fixedval = 1;
+        }
         for (bit, orig) in [(1024, true), (2048, false)] {
             if m & bit != 0 {
                 let k = t.i();
@@ -472,8 +520,12 @@ pub(super) fn mpc_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
         }
     }
     for fno in 0..nf as usize {
-        if t.i() != 0 {
+        let m = t.i();
+        if m & 1 != 0 {
             s.face_mut(fno).ripflag = 1;
+        }
+        if m & 2 != 0 {
+            s.face_mut(fno).area = t.f();
         }
     }
     let nops = t.i();
@@ -601,6 +653,37 @@ pub(super) fn mpc_case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fa
                 for x in props2::stuff_vertex_coords(&s, t.i() as usize) {
                     o.d(x);
                 }
+            }
+            "tt" => {
+                o.i(i64::from(props4::track_total_distance(&mut s, t.i() != 0)));
+                dump_curv(o, &s);
+            }
+            "tv" => {
+                let r = if t.i() != 0 {
+                    props4::total_variation_difference(g, &mut io, &s)
+                } else {
+                    props4::total_variation(g, &mut io, &s)
+                };
+                o.d(r);
+            }
+            "ke" => o.d(props4::curvature_error(&s, t.d())),
+            "uk" => {
+                o.i(i64::from(match t.i() {
+                    0 => props4::use_curvature_difference(&mut s),
+                    1 => props4::use_curvature_max(&mut io, &mut s),
+                    2 => props4::use_curvature_min(&mut s),
+                    3 => props4::use_curvature_stretch(g, &mut s),
+                    _ => props4::use_neg_curvature(&mut s),
+                }));
+                dump_curv(o, &s);
+                o.i(i64::from(g.errno));
+            }
+            "ca" => {
+                let (a, b, c, m) = (t.i(), t.i(), t.i(), t.i());
+                o.i(i64::from(props4::contains_another_vertex_on_sphere(
+                    g, &mut s, a, b, c, m,
+                )));
+                dump_marks(o, &s);
             }
             "cn" => {
                 let (w, v) = (t.i(), t.i() as usize);

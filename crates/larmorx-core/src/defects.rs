@@ -1545,6 +1545,8 @@ defects! {
         "the averaged surface normals of a coordinate set other than the current one (MRIScomputeSurfaceNormals of the white, pial or original positions) leave the surface's current positions at that set's positions instead of the positions it had (kept until the effect on its callers is measured; the correction is on request)";
     FS_369 = "FS-369", "FreeSurfer", true,
         "the averaged surface normals (MRIScomputeSurfaceNormals) give a vertex whose faces are all ripped the normal of the vertex processed before it (0 for the first)";
+    FS_371 = "FS-371", "FreeSurfer", true,
+        "the topology fixer's point-in-spherical-triangle test (containsAnotherVertexOnSphere) lists the triangle's neighbours in 1,000 places: more than 1,000 write past the list (memory corruption or a crash)";
     FS_370 = "FS-370", "FreeSurfer", true,
         "the closest-vertex searches across the cortex and the cortical thickness (MRISfindClosestOrigVertices, MRISfindClosestPialVerticesCanonicalCoords, MRISmeasureCorticalThickness) with a neighbourhood size of 100 or more, or a search reaching more than 100,000 vertices, read and write outside their arrays (wrong counts or a crash)";
     FS_221 = "FS-221", "FreeSurfer", true,

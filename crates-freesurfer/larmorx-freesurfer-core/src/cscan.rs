@@ -1041,6 +1041,75 @@ mod tests {
         }
     }
 
+    /// `validation/probes/fs-volume/scanf_word_errno.c`'s measurements (track C's relay 15; glibc
+    /// 2.35, `errno` 7 before each call): every row of its output, for `"%*s %s"`, `"%*s %f"`,
+    /// `"%f %f %f %f"` and `"%f"`, through [`Scanf`] (the return value and `errno` after).
+    #[test]
+    fn word_and_number_calls_at_the_end_of_the_input() {
+        let run = |input: &str, f: &dyn Fn(&mut Scanf, &mut i32)| {
+            let mut b = Bytes::new(input.as_bytes());
+            let mut sc = Scanf::new(&mut b);
+            let mut errno = 7;
+            f(&mut sc, &mut errno);
+            (sc.finish(&mut errno), errno)
+        };
+        let word_s = |sc: &mut Scanf, e: &mut i32| {
+            sc.s(e, usize::MAX, false);
+            sc.text(e, b" ");
+            sc.s(e, usize::MAX, true);
+        };
+        let word_f = |sc: &mut Scanf, e: &mut i32| {
+            sc.s(e, usize::MAX, false);
+            sc.text(e, b" ");
+            sc.f(e, true);
+        };
+        let ffff = |sc: &mut Scanf, e: &mut i32| {
+            for k in 0..4 {
+                if k > 0 {
+                    sc.text(e, b" ");
+                }
+                sc.f(e, true);
+            }
+        };
+        let f1 = |sc: &mut Scanf, e: &mut i32| {
+            sc.f(e, true);
+        };
+        // (input, %*s %s, %*s %f): the probe's first table
+        for (input, s, f) in [
+            ("fscale", (-1, 7), (-1, 7)),
+            ("fscale ", (-1, 0), (-1, 0)),
+            ("fscale\n", (-1, 0), (-1, 0)),
+            ("fscale 1e40", (1, 7), (1, 34)),
+            ("fscale 1e40\n", (1, 7), (1, 34)),
+            ("subject", (-1, 7), (-1, 7)),
+            ("subject ", (-1, 0), (-1, 0)),
+            ("subject x", (1, 7), (0, 7)),
+            ("subject x\n", (1, 7), (0, 7)),
+            ("", (-1, 0), (-1, 0)),
+            (" ", (-1, 0), (-1, 0)),
+            ("fscale x", (1, 7), (0, 7)),
+        ] {
+            assert_eq!(run(input, &word_s), s, "%*s %s on {input:?}");
+            assert_eq!(run(input, &word_f), f, "%*s %f on {input:?}");
+        }
+        // (input, %f %f %f %f, %f, %*s %f): the probe's second table
+        for (input, four, one, word) in [
+            ("-1877   1e40", (2, 7), (1, 7), (1, 34)),
+            ("-1877   1e40 ", (2, 0), (1, 7), (1, 34)),
+            ("1e40", (1, 7), (1, 34), (-1, 7)),
+            ("1e40 ", (1, 0), (1, 34), (-1, 0)),
+            ("5 1e40", (2, 7), (1, 7), (1, 34)),
+            ("1e-50", (1, 7), (1, 34), (-1, 7)),
+            ("1e-50 3", (2, 34), (1, 34), (1, 7)),
+            ("fscale 1e40", (0, 7), (0, 7), (1, 34)),
+            ("1 2", (2, 7), (1, 7), (1, 7)),
+        ] {
+            assert_eq!(run(input, &ffff), four, "%f %f %f %f on {input:?}");
+            assert_eq!(run(input, &f1), one, "%f on {input:?}");
+            assert_eq!(run(input, &word_f), word, "%*s %f on {input:?}");
+        }
+    }
+
     /// `validation/investigations/glibc-scanf-probe/scanf_errno.c`'s measurements (track D's: the
     /// surface readers' formats; glibc 2.35, `errno` 5 before each call): the return value and
     /// `errno` after.

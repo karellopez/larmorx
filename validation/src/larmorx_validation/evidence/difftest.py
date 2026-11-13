@@ -276,7 +276,10 @@ _TRIAL = [
         re.compile(r"\bthat part's (?:30-minute )?trial\b"),
         "that part's random-testing run of half an hour",
     ),
-    (re.compile(r"\bthe version trial of\b"), "the random-testing run with the new versions, of"),
+    (
+        re.compile(r"\bthe version trial of (\d{4}-\d{2}-\d{2})"),
+        r"the random-testing run of \1 with the newest versions",
+    ),
     (re.compile(r"\bthe clean-room agent's\b"), "the clean room's own, from its specification"),
     (re.compile(r" \(oracles/difftest/(\d{4}-\d{2}-\d{2})-[\w-]+\)"), r" (its run of \1)"),
 ]

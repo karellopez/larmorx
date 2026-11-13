@@ -19,7 +19,6 @@
 use std::io::Write;
 use std::path::Path;
 
-use larmorx_core::cfmt::Streams;
 use larmorx_core::defects::{
     Defect, FS_49, FS_167, FS_168, FS_169, FS_170, FS_171, FS_172, FS_173,
 };
@@ -28,22 +27,11 @@ use larmorx_freesurfer_core::cstd;
 use larmorx_freesurfer_core::fio::Tsv;
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::log::{self, ERROR_BADFILE};
+use larmorx_freesurfer_core::machine;
 use larmorx_freesurfer_core::utils;
 use larmorx_io::znz::ZnzFile;
 
 use crate::cfile::CFile;
-
-/// znzlib's warnings (`** znzread: read short by ...`) on the program's standard error.
-pub struct ErrStream<'a>(pub &'a mut dyn Write);
-
-impl Streams for ErrStream<'_> {
-    fn out(&mut self, text: &str) {
-        let _ = self.0.write_all(text.as_bytes());
-    }
-    fn err(&mut self, text: &str) {
-        let _ = self.0.write_all(text.as_bytes());
-    }
-}
 
 /// A read of `n` bytes that the file ended after `got`: the missing bytes are 0 here, memory
 /// contents in FreeSurfer (`defect`).
@@ -114,7 +102,7 @@ pub fn fread_int(g: &mut Globals, fp: &mut CFile) -> i32 {
 }
 
 /// `freadLong(fp)`: a big-endian `long long`; `freadLong: fread failed` when the file does not
-/// hold it (FS-167).
+/// hold it (FS-167; FS-176: FreeSurfer rounds it through a `double`).
 pub fn fread_long(g: &mut Globals, err: &mut dyn Write, fp: &mut CFile) -> i64 {
     let (ret, b, got) = fread_n(fp, [0u8; 8]);
     if got < 8 {
@@ -123,7 +111,7 @@ pub fn fread_long(g: &mut Globals, err: &mut dyn Write, fp: &mut CFile) -> i64 {
     if ret != 1 {
         log::error_printf(g, err, ERROR_BADFILE, "freadLong: fread failed");
     }
-    i64::from_be_bytes(b)
+    machine::swap_long64(g, i64::from_le_bytes(b))
 }
 
 /// `freadIntEx(&i, fp)`: reads into the caller's `int`, then reverses its bytes, also when the
@@ -165,9 +153,9 @@ pub fn fwrite_int(fp: &mut CFile, v: i32) -> i32 {
     fp.fwrite(&v.to_be_bytes(), 4, 1) as i32
 }
 
-/// `fwriteLong(v, fp)`: a big-endian `long long`.
-pub fn fwrite_long(fp: &mut CFile, v: i64) -> i32 {
-    fp.fwrite(&v.to_be_bytes(), 8, 1) as i32
+/// `fwriteLong(v, fp)`: a big-endian `long long` (FS-176).
+pub fn fwrite_long(g: &mut Globals, fp: &mut CFile, v: i64) -> i32 {
+    fp.fwrite(&machine::swap_long64(g, v).to_le_bytes(), 8, 1) as i32
 }
 
 /// `fwriteFloat(f, fp)`: a big-endian `float`.
@@ -175,16 +163,64 @@ pub fn fwrite_float(fp: &mut CFile, f: f32) -> i32 {
     fp.fwrite(&f.to_be_bytes(), 4, 1) as i32
 }
 
+/// `znzread(buf, size, nmemb, fp)` as FreeSurfer's own copy of znzlib (`packages/nifti/znzlib.c`,
+/// older than nifticlib 2.0.0, which `larmorx_io::znz::ZnzFile::read` follows) defines it: a
+/// compressed file is read with one `gzread` of `size * nmemb` bytes (an `int` product) and the
+/// count is the bytes read over `size` (complete members; no warning; -1 for zlib's error); a
+/// plain file with `fread`. A member size of 0 divides by zero in FreeSurfer (FS-76); 0 here.
+pub fn fs_znzread(fp: &mut ZnzFile, buf: &mut [u8], size: usize, nmemb: usize) -> i64 {
+    if let Some(gz) = fp.gz() {
+        if size == 0 {
+            return 0;
+        }
+        let len = (size as i32).wrapping_mul(nmemb as i32);
+        if len < 0 {
+            return -1;
+        }
+        let len = (len as usize).min(buf.len());
+        let r = gz.gzread(&mut buf[..len]);
+        return if r < 0 {
+            -1
+        } else {
+            i64::from(r) / size as i64
+        };
+    }
+    match fp.stdio() {
+        Some(p) => {
+            let total = size.saturating_mul(nmemb).min(buf.len());
+            p.fread(&mut buf[..total], size, nmemb) as i64
+        }
+        None => 0,
+    }
+}
+
+/// `znzwrite(buf, size, nmemb, fp)` as FreeSurfer's copy defines it: one `gzwrite` of
+/// `size * nmemb` bytes, its count over `size`; `fwrite` for a plain file.
+pub fn fs_znzwrite(fp: &mut ZnzFile, buf: &[u8], size: usize, nmemb: usize) -> i64 {
+    let total = size.saturating_mul(nmemb).min(buf.len());
+    if let Some(gz) = fp.gz() {
+        if size == 0 {
+            return 0;
+        }
+        let r = gz.gzwrite(&buf[..total]);
+        return if r < 0 {
+            -1
+        } else {
+            i64::from(r) / size as i64
+        };
+    }
+    match fp.stdio() {
+        Some(p) => p.fwrite(&buf[..total], size, nmemb) as i64,
+        None => 0,
+    }
+}
+
 /// `znzread(&x, N, 1, fp)` into memory holding `init`: the count returned (-1 for zlib's error),
 /// the memory after it and how many bytes the file gave (from the file's position).
-fn znzread_n<const N: usize>(
-    fp: &mut ZnzFile,
-    err: &mut dyn Write,
-    init: [u8; N],
-) -> (i32, [u8; N], usize) {
+fn znzread_n<const N: usize>(fp: &mut ZnzFile, init: [u8; N]) -> (i32, [u8; N], usize) {
     let mut b = init;
     let before = fp.tell();
-    let ret = fp.read(&mut b, N, 1, &mut ErrStream(err));
+    let ret = fs_znzread(fp, &mut b, N, 1);
     let after = fp.tell();
     let got = if before >= 0 && after >= before {
         ((after - before) as usize).min(N)
@@ -205,8 +241,8 @@ fn znz_failed(g: &mut Globals, err: &mut dyn Write, fp: &ZnzFile, ret: i32, what
 }
 
 /// `znzread1(&v, fp)`: one unsigned byte; the count read and the value.
-pub fn znzread1(g: &mut Globals, err: &mut dyn Write, fp: &mut ZnzFile) -> (i32, i32) {
-    let (ret, b, got) = znzread_n(fp, err, [0u8; 1]);
+pub fn znzread1(g: &mut Globals, fp: &mut ZnzFile) -> (i32, i32) {
+    let (ret, b, got) = znzread_n(fp, [0u8; 1]);
     if got < 1 {
         memory(g, &FS_167, "znzread1", got, 1);
     }
@@ -216,7 +252,7 @@ pub fn znzread1(g: &mut Globals, err: &mut dyn Write, fp: &mut ZnzFile) -> (i32,
 /// `znzreadDouble(fp)`: a big-endian `double` (`znzreadDouble: znzread failed`: see
 /// [`znz_failed`]; FS-167).
 pub fn znz_read_double(g: &mut Globals, err: &mut dyn Write, fp: &mut ZnzFile) -> f64 {
-    let (ret, b, got) = znzread_n(fp, err, [0u8; 8]);
+    let (ret, b, got) = znzread_n(fp, [0u8; 8]);
     if got < 8 {
         memory(g, &FS_167, "znzreadDouble", got, 8);
     }
@@ -226,7 +262,7 @@ pub fn znz_read_double(g: &mut Globals, err: &mut dyn Write, fp: &mut ZnzFile) -
 
 /// `znzreadInt(fp)`: a big-endian `int` (`znzreadInt: znzread failed`; FS-167).
 pub fn znz_read_int(g: &mut Globals, err: &mut dyn Write, fp: &mut ZnzFile) -> i32 {
-    let (ret, b, got) = znzread_n(fp, err, [0u8; 4]);
+    let (ret, b, got) = znzread_n(fp, [0u8; 4]);
     if got < 4 {
         memory(g, &FS_167, "znzreadInt", got, 4);
     }
@@ -236,17 +272,17 @@ pub fn znz_read_int(g: &mut Globals, err: &mut dyn Write, fp: &mut ZnzFile) -> i
 
 /// `znzreadLong(fp)`: a big-endian `long long` (`znzreadLong: znzread failed`; FS-167).
 pub fn znz_read_long(g: &mut Globals, err: &mut dyn Write, fp: &mut ZnzFile) -> i64 {
-    let (ret, b, got) = znzread_n(fp, err, [0u8; 8]);
+    let (ret, b, got) = znzread_n(fp, [0u8; 8]);
     if got < 8 {
         memory(g, &FS_167, "znzreadLong", got, 8);
     }
     znz_failed(g, err, fp, ret, "znzreadLong: znzread failed");
-    i64::from_be_bytes(b)
+    machine::swap_long64(g, i64::from_le_bytes(b))
 }
 
 /// `znzreadShort(fp)`: a big-endian `short` (`znzreadShort: znzread failed`; FS-167).
 pub fn znz_read_short(g: &mut Globals, err: &mut dyn Write, fp: &mut ZnzFile) -> i16 {
-    let (ret, b, got) = znzread_n(fp, err, [0u8; 2]);
+    let (ret, b, got) = znzread_n(fp, [0u8; 2]);
     if got < 2 {
         memory(g, &FS_167, "znzreadShort", got, 2);
     }
@@ -256,15 +292,15 @@ pub fn znz_read_short(g: &mut Globals, err: &mut dyn Write, fp: &mut ZnzFile) ->
 
 /// `znzreadFloatEx(&f, fp)`: reads into the caller's `float`, then reverses its bytes (as
 /// [`fread_int_ex`]); the count read.
-pub fn znz_read_float_ex(err: &mut dyn Write, fp: &mut ZnzFile, pf: &mut f32) -> i32 {
-    let (ret, b, _) = znzread_n(fp, err, pf.to_le_bytes());
+pub fn znz_read_float_ex(fp: &mut ZnzFile, pf: &mut f32) -> i32 {
+    let (ret, b, _) = znzread_n(fp, pf.to_le_bytes());
     *pf = f32::from_be_bytes(b);
     ret
 }
 
 /// `znzreadIntEx(&i, fp)`: as [`znz_read_float_ex`] for an `int`.
-pub fn znz_read_int_ex(err: &mut dyn Write, fp: &mut ZnzFile, pi: &mut i32) -> i32 {
-    let (ret, b, _) = znzread_n(fp, err, pi.to_le_bytes());
+pub fn znz_read_int_ex(fp: &mut ZnzFile, pi: &mut i32) -> i32 {
+    let (ret, b, _) = znzread_n(fp, pi.to_le_bytes());
     *pi = i32::from_be_bytes(b);
     ret
 }
@@ -272,7 +308,7 @@ pub fn znz_read_int_ex(err: &mut dyn Write, fp: &mut ZnzFile, pi: &mut i32) -> i
 /// `znzreadFloat(fp)`: a big-endian `float`; `freadFloat: fread failed` whenever the read fails,
 /// at the end of the file too (FS-167).
 pub fn znz_read_float(g: &mut Globals, err: &mut dyn Write, fp: &mut ZnzFile) -> f32 {
-    let (ret, b, got) = znzread_n(fp, err, [0u8; 4]);
+    let (ret, b, got) = znzread_n(fp, [0u8; 4]);
     if ret != 1 {
         log::error_printf(g, err, ERROR_BADFILE, "freadFloat: fread failed");
     }
@@ -282,38 +318,38 @@ pub fn znz_read_float(g: &mut Globals, err: &mut dyn Write, fp: &mut ZnzFile) ->
     f32::from_be_bytes(b)
 }
 
-fn znzwrite_bytes(fp: &mut ZnzFile, err: &mut dyn Write, b: &[u8]) -> i32 {
-    fp.write(b, b.len(), 1, &mut ErrStream(err)) as i32
+fn znzwrite_bytes(fp: &mut ZnzFile, b: &[u8]) -> i32 {
+    fs_znzwrite(fp, b, b.len(), 1) as i32
 }
 
 /// `znzwriteShort(s, fp)`: a big-endian `short`; the count written.
-pub fn znz_write_short(err: &mut dyn Write, fp: &mut ZnzFile, s: i16) -> i32 {
-    znzwrite_bytes(fp, err, &s.to_be_bytes())
+pub fn znz_write_short(fp: &mut ZnzFile, s: i16) -> i32 {
+    znzwrite_bytes(fp, &s.to_be_bytes())
 }
 
 /// `znzwriteUShort(s, fp)`.
-pub fn znz_write_ushort(err: &mut dyn Write, fp: &mut ZnzFile, s: u16) -> i32 {
-    znzwrite_bytes(fp, err, &s.to_be_bytes())
+pub fn znz_write_ushort(fp: &mut ZnzFile, s: u16) -> i32 {
+    znzwrite_bytes(fp, &s.to_be_bytes())
 }
 
 /// `znzwriteInt(v, fp)`.
-pub fn znz_write_int(err: &mut dyn Write, fp: &mut ZnzFile, v: i32) -> i32 {
-    znzwrite_bytes(fp, err, &v.to_be_bytes())
+pub fn znz_write_int(fp: &mut ZnzFile, v: i32) -> i32 {
+    znzwrite_bytes(fp, &v.to_be_bytes())
 }
 
-/// `znzwriteLong(v, fp)`.
-pub fn znz_write_long(err: &mut dyn Write, fp: &mut ZnzFile, v: i64) -> i32 {
-    znzwrite_bytes(fp, err, &v.to_be_bytes())
+/// `znzwriteLong(v, fp)` (FS-176).
+pub fn znz_write_long(g: &mut Globals, fp: &mut ZnzFile, v: i64) -> i32 {
+    znzwrite_bytes(fp, &machine::swap_long64(g, v).to_le_bytes())
 }
 
 /// `znzwriteFloat(f, fp)`.
-pub fn znz_write_float(err: &mut dyn Write, fp: &mut ZnzFile, f: f32) -> i32 {
-    znzwrite_bytes(fp, err, &f.to_be_bytes())
+pub fn znz_write_float(fp: &mut ZnzFile, f: f32) -> i32 {
+    znzwrite_bytes(fp, &f.to_be_bytes())
 }
 
 /// `znzwriteDouble(d, fp)`.
-pub fn znz_write_double(err: &mut dyn Write, fp: &mut ZnzFile, d: f64) -> i32 {
-    znzwrite_bytes(fp, err, &d.to_be_bytes())
+pub fn znz_write_double(fp: &mut ZnzFile, d: f64) -> i32 {
+    znzwrite_bytes(fp, &d.to_be_bytes())
 }
 
 /// The bytes of a C string: up to its first NUL.

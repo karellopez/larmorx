@@ -2,14 +2,18 @@
 // Part of larmorx-freesurfer (FreeSurfer's licence; see crates-freesurfer/LICENSE). Copyright
 // 2026 Karel Lopez Vilaret.
 //! FreeSurfer's byte-order swaps (`fs.core`, queue item 3.1-22), translated from FreeSurfer
-//! 8.2.0's `utils/machine.cpp`: `swapDouble`, `swapLong32`, `swapFloat`, `swapShort`, `swapInt`.
-//! Each reverses the bytes of its value (`swapDouble` by four pair exchanges, the 32-bit ones by
-//! swapping the bytes of each 16-bit half and then the halves): the result is the value's bytes
-//! in reverse order, bit patterns kept (a float's NaN payload included).
+//! 8.2.0's `utils/machine.cpp`: `swapDouble`, `swapLong32`, `swapFloat`, `swapShort`, `swapInt`,
+//! and (with `fs.io`'s 64-bit readers and writers, queue item 3.1-25) `swapLong64`. Each reverses
+//! the bytes of its value (`swapDouble` by four pair exchanges, the 32-bit ones by swapping the
+//! bytes of each 16-bit half and then the halves): the result is the value's bytes in reverse
+//! order, bit patterns kept (a float's NaN payload included); `swapLong64` then passes its result
+//! through a `double` (FS-176).
 //!
-//! Not reached by any default-path program, so not translated: `swapLong64` (it returns the
-//! swapped 64-bit integer through a `double`, which loses the bits beyond 53: a defect to
-//! register when a program reaches it) and `swapUShort`.
+//! Not reached by any default-path program, so not translated: `swapUShort`.
+
+use larmorx_core::defects::FS_176;
+
+use crate::globals::Globals;
 
 /// `swapDouble`.
 pub fn swap_double(d: f64) -> f64 {
@@ -34,6 +38,36 @@ pub fn swap_short(s: i16) -> i16 {
 /// `swapInt`.
 pub fn swap_int(i: i32) -> i32 {
     i.swap_bytes()
+}
+
+/// `swapLong64(l)`: the bytes of `l` reversed. FreeSurfer stores the result in a `double` before
+/// returning it as a `long long` (FS-176): rounded to 53 significant bits (to nearest, ties to
+/// even), and -2^63 where the rounding reaches 2^63 (x86-64's conversion). By default the exact
+/// result; `reproduce` gives FreeSurfer's. A notice where the two differ.
+pub fn swap_long64(g: &mut Globals, l: i64) -> i64 {
+    let s = l.swap_bytes();
+    let via = s as f64;
+    let back = if via >= 9.223_372_036_854_775_808e18 {
+        i64::MIN
+    } else {
+        via as i64
+    };
+    if back != s {
+        if g.notices.reproduce() {
+            g.notices.add(
+                &FS_176,
+                format!("swapLong64: {s:#018x} became {back:#018x} through a double"),
+            );
+            return back;
+        }
+        g.notices.add(
+            &FS_176,
+            format!(
+                "swapLong64: {s:#018x} kept exact (FreeSurfer's {back:#018x} through a double)"
+            ),
+        );
+    }
+    s
 }
 
 #[cfg(test)]

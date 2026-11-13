@@ -20,5 +20,6 @@ pub mod resize;
 pub mod rotate;
 mod rows;
 pub mod sample;
+pub mod seq;
 pub mod skull;
 pub mod vgeom;

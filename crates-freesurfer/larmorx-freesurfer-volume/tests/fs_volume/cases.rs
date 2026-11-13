@@ -30,6 +30,7 @@ use larmorx_freesurfer_volume::ltaread as lr;
 use larmorx_freesurfer_volume::resize as rs;
 use larmorx_freesurfer_volume::rotate as rt;
 use larmorx_freesurfer_volume::sample as sm;
+use larmorx_freesurfer_volume::seq as sq;
 use larmorx_freesurfer_volume::skull as sk;
 use larmorx_freesurfer_volume::vgeom;
 
@@ -1222,6 +1223,68 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
                     }
                 }
             }
+            "splat" | "sseq" | "sxyz" | "tkern" => {
+                let mut s = shape(&mut g);
+                if g.chance(3) {
+                    s.ty = 3;
+                }
+                if !g.chance(4) {
+                    s.hdr = false;
+                }
+                vol_of(&mut g, &mut t, s);
+                if cmd == "sseq" || cmd == "sxyz" {
+                    t.push(dx(g.pick(&[0.0, 0.0, -5.5, f64::from_bits(0x7ff8_0000_0000_1234), 1e300])));
+                }
+                let n = 4;
+                t.push(n.to_string());
+                for _ in 0..n {
+                    if cmd == "sxyz" {
+                        for k in [s.w, s.h, s.d] {
+                            t.push(g.int(-2, k + 1).to_string());
+                        }
+                        let fb = g.int(0, s.nf.max(0));
+                        t.push(fb.to_string());
+                        t.push(g.int(fb - 1, s.nf + 1).to_string());
+                        t.push(g.int(0, 1).to_string());
+                        continue;
+                    }
+                    for k in [s.w, s.h, s.d] {
+                        t.push(dx(scoord(&mut g, k)));
+                    }
+                    match cmd {
+                        "splat" => {
+                            t.push(frame_of(&mut g, s).max(0).to_string());
+                            t.push(dx(if g.chance(6) {
+                                g.pick(&[
+                                    f64::NAN,
+                                    f64::from_bits(0x7ff4_0000_0000_0abc),
+                                    f64::from_bits(0xfff8_0000_0000_0001),
+                                    f64::INFINITY,
+                                    -f64::INFINITY,
+                                    1e10,
+                                    -3e9,
+                                ])
+                            } else {
+                                g.pick(&[0.5, 1.0, 100.0, 255.7, -3.25, 40000.0, 70000.0, -0.0, 2.5e9])
+                            }));
+                        }
+                        "sseq" => {
+                            let first = g.int(0, s.nf.max(0));
+                            t.push(first.to_string());
+                            t.push(g.int(first - 1, s.nf + 1).to_string());
+                            t.push(
+                                if g.chance(30) {
+                                    5
+                                } else {
+                                    g.pick(&[-1, -1, -1, 1, 0, 0, 2, 3, 4, 6])
+                                }
+                                .to_string(),
+                            );
+                        }
+                        _ => {}
+                    }
+                }
+            }
             c => panic!("no generator for {c}"),
         }
         lines.push(t.join(" "));
@@ -1495,7 +1558,7 @@ fn perturb(g: &mut Gen, v: &mut [String], e: &mut [String]) {
 }
 
 /// The probe's commands, in the order the generator cycles through them.
-pub const COMMANDS: [&str; 84] = [
+pub const COMMANDS: [&str; 88] = [
     "vgwrite",
     "vgread",
     "vgread",
@@ -1580,6 +1643,10 @@ pub const COMMANDS: [&str; 84] = [
     "mft",
     "lim",
     "chtype",
+    "splat",
+    "sseq",
+    "sxyz",
+    "tkern",
 ];
 
 /// One buffer both streams write into, in order (FreeSurfer's standard output and error go to
@@ -2678,6 +2745,65 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
             let mut fp = a.clone();
             let r = co::mri_dump(g, a, b, &m, &mut fp)?;
             o.i(i64::from(r));
+        }
+        "splat" => {
+            let mut m = get_vol(cx, t)?;
+            let n = t.i();
+            let (g, b) = (&mut cx.g, &mut cx.b);
+            for i in 0..n {
+                let (x, y, z, frame, val) = (t.d(), t.d(), t.d(), t.i(), t.d());
+                let r = if frame == 0 && i % 2 == 1 {
+                    sq::interpolate_into_volume(g, b, &mut m, x, y, z, val)
+                } else {
+                    sq::interpolate_into_volume_frame(g, b, &mut m, x, y, z, frame, val)
+                };
+                o.i(i64::from(r));
+            }
+            o.vol(Some(&m));
+        }
+        "sseq" | "sxyz" => {
+            let mut m = get_vol(cx, t)?;
+            m.outside_val = t.d();
+            let n = t.i();
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            for _ in 0..n {
+                let (r, v) = if cmd == "sseq" {
+                    let (x, y, z, first, last, ty) = (t.d(), t.d(), t.d(), t.i(), t.i(), t.i());
+                    let mut v = vec![-7.0f32; (last + 1).max(1) as usize];
+                    let r = if ty < 0 {
+                        sq::sample_seq_volume(g, b, &m, x, y, z, &mut v, first, last)?
+                    } else {
+                        sq::sample_seq_volume_type(g, a, b, &m, x, y, z, &mut v, first, last, ty)?
+                    };
+                    (r, v)
+                } else {
+                    let (x, y, z, fb, fe, k) = (t.i(), t.i(), t.i(), t.i(), t.i(), t.i());
+                    let mut v = vec![-7.0f32; (fe - fb).max(1) as usize];
+                    let r = if k != 0 {
+                        sq::sample_volume_frame_xyz_int_n_range_floats(g, b, &m, x, y, z, fb, fe, &mut v)?
+                    } else {
+                        sq::sample_volume_frame_type_xyz_int_n_range_nearest_floats(
+                            g, b, &m, x, y, z, fb, fe, &mut v,
+                        )?
+                    };
+                    (r, v)
+                };
+                o.i(i64::from(r));
+                for f in v {
+                    o.f(f);
+                }
+            }
+        }
+        "tkern" => {
+            let m = get_vol(cx, t)?;
+            let n = t.i();
+            for _ in 0..n {
+                let (x, y, z) = (t.d(), t.d(), t.d());
+                o.i(1);
+                for w in sq::trilin_kernel(&m, x, y, z) {
+                    o.d(w);
+                }
+            }
         }
         c => panic!("unknown command {c}"),
     }

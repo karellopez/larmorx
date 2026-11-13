@@ -1511,6 +1511,10 @@ defects! {
         "the mean of a frame's voxels above a threshold is the mean of frame 0's whatever the frame asked for";
     FS_319 = "FS-319", "FreeSurfer", true,
         "upsampling with the sum conserved of a volume whose change to floats fails (a robust range that is empty after the histogram) goes on with no volume and crashes";
+    FS_320 = "FS-320", "FreeSurfer", true,
+        "trilinear splatting of a value into an integer volume (MRIinterpolateIntoVolume) adds each corner's rounded share to the voxel in the voxel's type: a sum beyond the type's range wraps around (bytes, shorts, 32-bit integers)";
+    FS_321 = "FS-321", "FreeSurfer", true,
+        "trilinear splatting of a value into a volume of 64-bit integers (long) adds into 32-bit integers at the voxel's index: it changes halves of other voxels";
 }
 
 /// The register entry with ID `id`.

@@ -42,6 +42,7 @@ extern double vg_isEqual_Threshold;
 double ham_sinc(double x, double fullwidth);
 int MRIcubicSampleVolumeFrame(MRI *mri, double x, double y, double z, int frame, double *pval);
 int MRIsincSampleVolumeFrame(MRI *mri, double x, double y, double z, int frame, int hw, double *pval);
+int MRIsampleSeqVolume(const MRI *mri, double x, double y, double z, float *valvect, int firstframe, int lastframe);
 
 const char *Progname = "fsvolume";
 
@@ -836,6 +837,52 @@ void run_case()
     fflush(stdout);
     put_vol(r);
     put_vol(m);
+  } else if (cmd == "splat") {
+    MRI *m = get_vol();
+    int n = geti();
+    for (int i = 0; i < n; i++) {
+      double x = getd(), y = getd(), z = getd();
+      int frame = geti();
+      double val = getd();
+      oi(frame == 0 && i % 2 ? MRIinterpolateIntoVolume(m, x, y, z, val)
+                             : MRIinterpolateIntoVolumeFrame(m, x, y, z, frame, val));
+    }
+    put_vol(m);
+  } else if (cmd == "sseq" || cmd == "sxyz") {
+    MRI *m = get_vol();
+    m->outside_val = getd();
+    int n = geti();
+    for (int i = 0; i < n; i++) {
+      int r;
+      std::vector<float> v;
+      if (cmd == "sseq") {
+        double x = getd(), y = getd(), z = getd();
+        int first = geti(), last = geti(), type = geti();
+        v.assign(last + 1 > 0 ? last + 1 : 1, -7.0f);
+        fflush(stdout);
+        r = type < 0 ? MRIsampleSeqVolume(m, x, y, z, v.data(), first, last)
+                     : MRIsampleSeqVolumeType(m, x, y, z, v.data(), first, last, type);
+        fflush(stdout);
+      } else {
+        int x = geti(), y = geti(), z = geti(), fb = geti(), fe = geti(), k = geti();
+        v.assign(fe - fb > 0 ? fe - fb : 1, -7.0f);
+        r = k ? MRIsampleVolumeFrame_xyzInt_nRange_floats(m, x, y, z, fb, fe, v.data())
+              : MRIsampleVolumeFrameType_xyzInt_nRange_SAMPLE_NEAREST_floats(m, x, y, z, fb, fe, v.data());
+      }
+      oi(r);
+      for (float f : v) of(f);
+    }
+  } else if (cmd == "tkern") {
+    MRI *m = get_vol();
+    int n = geti();
+    for (int i = 0; i < n; i++) {
+      double x = getd(), y = getd(), z = getd();
+      double k[8];
+      for (int j = 0; j < 8; j++) k[j] = -7;
+      double *r = MRItrilinKernel(m, x, y, z, k);
+      oi(r == k);
+      for (int j = 0; j < 8; j++) od(k[j]);
+    }
   } else {
     fail("unknown command");
   }

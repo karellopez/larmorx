@@ -22,11 +22,12 @@ use sha2::{Digest, Sha256};
 /// gradients, neighbour counts and linear transforms, 3.1-37's resampling onto a template, 3.1-38's
 /// value replacement, the CMA labels and segmentation functions; relay 19: 3.1-37's statistics,
 /// orientation strings, voxel-to-RAS matrices, neighbourhoods and labels, and 3.1-35's 2-D images;
-/// relay 20, 151 commands: the partial-volume count, 3.1-37's pieces c and d's first part):
-/// 3,020 cases, 2,813 lines identical, 207 hashed as `SKIP`.
-const N: usize = 3020;
-const OFFICIAL_SHA256: &str = "0b75c43a5ca8662cac67b4bce54b64c9d718499cda9360cecd3086fb190d45d3";
-const SKIPPED: usize = 207;
+/// relay 20, 151 commands: the partial-volume count, 3.1-37's pieces c and d's first part; relay
+/// 21, 162 commands: piece d's volume-to-volume resampling, PCA and FDR, 3.1-38's regions and
+/// voxel measures): 3,240 cases, 2,992 lines identical, 248 hashed as `SKIP`.
+const N: usize = 3240;
+const OFFICIAL_SHA256: &str = "f38160d248ccc2da57ad5e1109d8b8e978231de8a9466a4c1693df2b08ee243c";
+const SKIPPED: usize = 248;
 
 /// `check.py`'s `SKIP`.
 const SKIP: [&str; 42] = [

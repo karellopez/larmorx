@@ -5324,266 +5324,8 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
             let m = xf::mri_get_resample_matrix(g, a, b, &src, &tmpl)?;
             o.m(m.as_ref());
         }
-        "vv" | "vvsm" => {
-            let mut src = get_vol(cx, t)?;
-            fill_painted(cx, t, &mut src)?;
-            src.outside_val = t.d();
-            let mut targ = get_vol(cx, t)?;
-            fill_painted(cx, t, &mut targ)?;
-            let m = get_m44(t);
-            let (interp, param) = (t.i(), t.f());
-            if t.i() != 0 {
-                cx.g.gdiag_no = 1;
-            }
-            if t.i() != 0 {
-                cx.g.gdiag |= larmorx_freesurfer_core::diag::DIAG_VERBOSE;
-            }
-            let (mut vsm, mut lta, mut pedir) = (None, None, 0);
-            if cmd == "vvsm" {
-                if t.i() != 0 {
-                    let mut v = get_vol(cx, t)?;
-                    fill_painted(cx, t, &mut v)?;
-                    v.outside_val = t.d();
-                    vsm = Some(v);
-                }
-                if t.i() != 0 {
-                    let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
-                    let mut l = larmorx_freesurfer_mri::lta::lta_alloc(g, a, b, 1, None)?;
-                    let ty = t.i();
-                    l.ltype = ty;
-                    l.xforms[0].ltype = ty;
-                    let ml = l.xforms[0].m_l.as_mut().expect("LTAalloc's matrix");
-                    for r in 1..=4 {
-                        for c in 1..=4 {
-                            ml.set_relt(r, c, t.f());
-                        }
-                    }
-                    lta = Some(l);
-                }
-                pedir = t.i();
-            }
-            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
-            let r = if cmd == "vv" {
-                v2::mri_vol2vol(g, a, b, &src, &mut targ, m.as_ref(), interp, param)?
-            } else {
-                v2::mri_vol2vol_vsm(
-                    g,
-                    a,
-                    b,
-                    &src,
-                    &mut targ,
-                    m.as_ref(),
-                    interp,
-                    param,
-                    vsm.as_ref(),
-                    lta.as_ref(),
-                    pedir,
-                )?
-            };
-            o.i(i64::from(r));
-            o.vol(Some(&targ));
-        }
-        "vvk" => {
-            let mut src = get_vol(cx, t)?;
-            fill_painted(cx, t, &mut src)?;
-            let mut targ = get_vol(cx, t)?;
-            fill_painted(cx, t, &mut targ)?;
-            let m = get_m44(t);
-            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
-            v2::mri_vol2vol_tl_kernel(g, a, b, &src, &mut targ, m.as_ref())?;
-            o.i(1);
-            o.vol(Some(&targ));
-        }
-        "vvd" => {
-            let mov = get_vol(cx, t)?;
-            let targ = get_vol(cx, t)?;
-            let m = get_m44(t);
-            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
-            let r = v2::mri_vol2vol_delta(g, a, b, &mov, &targ, m.as_ref())?;
-            o.vol(r.as_ref());
-        }
-        "maskup" => {
-            let mut src = get_vol(cx, t)?;
-            fill_painted(cx, t, &mut src)?;
-            let mask = if t.i() != 0 {
-                let mut m = get_vol(cx, t)?;
-                fill_painted(cx, t, &mut m)?;
-                Some(m)
-            } else {
-                None
-            };
-            let (up, npad, cons) = (t.i(), t.i(), t.i() != 0);
-            if t.i() != 0 {
-                cx.g.gdiag_no = 1;
-            }
-            let env = Environment::default();
-            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
-            match v2::mri_mask_and_upsample(g, a, b, &env, &mut src, mask.as_ref(), up, npad, cons)?
-            {
-                Some((m, l)) => {
-                    o.vol(Some(&m));
-                    o.lta(l.as_ref());
-                }
-                None => {
-                    o.vol(None);
-                    o.lta(None);
-                }
-            }
-        }
-        "cov" | "mpca" => {
-            let mut a = get_vol(cx, t)?;
-            fill_painted(cx, t, &mut a)?;
-            let mask = if t.i() != 0 {
-                let mut m = get_vol(cx, t)?;
-                fill_painted(cx, t, &mut m)?;
-                Some(m)
-            } else {
-                None
-            };
-            let (g, a_, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
-            if cmd == "cov" {
-                let m = pc::mri_covariance_matrix(g, a_, b, &a, mask.as_ref())?;
-                o.m(m.as_ref());
-            } else {
-                let (r, p) = pc::mri_pca(g, a_, b, &a, mask.as_ref())?;
-                o.i(i64::from(r));
-                o.m(p.as_ref().map(|p| &p.u));
-                o.m(p.as_ref().map(|p| &p.s));
-                o.vol(p.as_ref().map(|p| &p.v));
-            }
-        }
-        "pcast" => {
-            let n = t.i();
-            let mut sv = Matrix::real(1, n);
-            for i in 1..=n {
-                let v = t.f();
-                sv.set_relt(1, i, v);
-            }
-            let mode = t.i();
-            static CALLS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
-            let call = CALLS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-            let dir = std::env::temp_dir()
-                .join(format!("larmorx-fsvol-pca-{}-{call}", std::process::id()));
-            std::fs::create_dir_all(&dir).expect("a scratch folder");
-            let r = match mode {
-                0 => pc::print_pca_stats(&mut cx.a, &sv),
-                1 => pc::write_pca_stats(&mut cx.a, Some(&dir), "fsvol-pca.dat", &sv),
-                _ => pc::write_pca_stats(&mut cx.a, Some(&dir), "fsvol-nodir/pca.dat", &sv),
-            };
-            o.i(i64::from(r));
-            let bytes = std::fs::read(dir.join("fsvol-pca.dat")).unwrap_or_default();
-            o.hex(&bytes);
-            let _ = std::fs::remove_dir_all(&dir);
-        }
-        "fdr" => {
-            let n = t.i();
-            let mut vols = Vec::new();
-            let mut frames = Vec::new();
-            let mut masks = Vec::new();
-            let mut outs = Vec::new();
-            for _ in 0..n {
-                let mut v = get_vol(cx, t)?;
-                fill_painted(cx, t, &mut v)?;
-                vols.push(v);
-                frames.push(t.i());
-                masks.push(if t.i() != 0 {
-                    let mut m = get_vol(cx, t)?;
-                    fill_painted(cx, t, &mut m)?;
-                    Some(m)
-                } else {
-                    None
-                });
-                let mode = t.i();
-                outs.push((
-                    mode,
-                    if mode == 1 {
-                        Some(get_vol(cx, t)?)
-                    } else {
-                        None
-                    },
-                ));
-            }
-            let fdr = t.d();
-            let (sign, lg, dbg) = (t.i(), t.i() != 0, t.i() != 0);
-            let (passmask, passout) = (t.i() != 0, t.i() != 0);
-            let mut vwth = -7.0f64;
-            let r = {
-                let mut items: Vec<pc::FdrVol> = vols
-                    .iter_mut()
-                    .zip(frames.iter())
-                    .zip(masks.iter())
-                    .zip(outs.iter_mut())
-                    .map(|(((v, &frame), m), (mode, ov))| pc::FdrVol {
-                        vol: v,
-                        frame,
-                        mask: if passmask { m.as_ref() } else { None },
-                        out: match (passout, *mode, ov.as_mut()) {
-                            (true, 1, Some(o)) => pc::FdrOut::Given(o),
-                            (true, 2, _) => pc::FdrOut::Same,
-                            _ => pc::FdrOut::None,
-                        },
-                    })
-                    .collect();
-                let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
-                pc::mri_fdr2vwth(g, a, b, &mut items, fdr, sign, lg, &mut vwth, dbg)?
-            };
-            o.i(i64::from(r));
-            o.d(vwth);
-            if passout {
-                for (i, (mode, ov)) in outs.iter().enumerate() {
-                    match mode {
-                        1 => o.vol(ov.as_ref()),
-                        2 => o.vol(Some(&vols[i])),
-                        _ => {}
-                    }
-                }
-            }
-        }
-        "rgbb" => {
-            let mut m = get_vol(cx, t)?;
-            fill_painted(cx, t, &mut m)?;
-            let kind = t.i();
-            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
-            let r = match kind {
-                0 => {
-                    let npad = t.i();
-                    Some(rg::region_get_bounding_box(g, b, &m, npad)?)
-                }
-                1 => {
-                    let p = [t.i(), t.i(), t.i(), t.i(), t.i(), t.i()];
-                    Some(rg::region_get_bounding_box_m(g, b, &m, p)?)
-                }
-                _ => {
-                    let npad = t.i();
-                    rg::region_get_bounding_box_eq_odd(g, a, b, &m, npad)?
-                }
-            };
-            match r {
-                None => o.0 += "NULL ",
-                Some(r) => {
-                    for v in [r.x, r.y, r.z, r.dx, r.dy, r.dz] {
-                        o.i(i64::from(v));
-                    }
-                }
-            }
-        }
-        "vxn" => {
-            let mut m = get_vol(cx, t)?;
-            fill_painted(cx, t, &mut m)?;
-            let n = t.i();
-            let (g, b) = (&mut cx.g, &mut cx.b);
-            for _ in 0..n {
-                let (x, y, z, w, f) = (t.i(), t.i(), t.i(), t.i(), t.i());
-                o.f(mv::mri_voxel_dx(g, b, &m, x, y, z)?);
-                o.f(mv::mri_voxel_dy(g, b, &m, x, y, z)?);
-                o.f(mv::mri_voxel_dz(g, b, &m, x, y, z)?);
-                o.f(mv::mri_voxel_mean(g, b, &m, x, y, z, w, f)?);
-                o.f(mv::mri_voxel_direction(g, b, &m, x, y, z, w)?);
-                o.f(mv::mri_voxel_gradient_dir_2nd_derivative(
-                    g, b, &m, x, y, z, w,
-                )?);
-            }
-        }
+        "vv" | "vvsm" | "vvk" | "vvd" | "maskup" | "cov" | "mpca" | "pcast" | "fdr" | "rgbb"
+        | "vxn" => piece_d_and_regions(cx, t, o, cmd)?,
         c => panic!("unknown command {c}"),
     }
     Ok(())
@@ -5618,6 +5360,319 @@ impl lr::LtaIo for NoIo {
     ) -> Result<Option<lr::RegisterDat>, Fatal> {
         panic!("regio_read_register({name}) is fs.io's")
     }
+}
+
+/// The commands of relay 21 (3.1-37's piece d rest, 3.1-38's regions and voxel measures), out of
+/// [`case`] to keep its frame small (the debug build's test threads).
+#[inline(never)]
+fn piece_d_and_regions(cx: &mut Ctx, t: &mut Toks, o: &mut Out, cmd: &str) -> Result<(), Fatal> {
+    match cmd {
+        "vv" | "vvsm" => r21_vv(cx, t, o, cmd)?,
+        "vvk" => r21_vvk(cx, t, o, cmd)?,
+        "vvd" => r21_vvd(cx, t, o, cmd)?,
+        "maskup" => r21_maskup(cx, t, o, cmd)?,
+        "cov" | "mpca" => r21_cov(cx, t, o, cmd)?,
+        "pcast" => r21_pcast(cx, t, o, cmd)?,
+        "fdr" => r21_fdr(cx, t, o, cmd)?,
+        "rgbb" => r21_rgbb(cx, t, o, cmd)?,
+        "vxn" => r21_vxn(cx, t, o, cmd)?,
+        c => panic!("unknown command {c}"),
+    }
+    Ok(())
+}
+
+#[inline(never)]
+fn r21_vv(cx: &mut Ctx, t: &mut Toks, o: &mut Out, cmd: &str) -> Result<(), Fatal> {
+    let _ = cmd;
+    let mut src = get_vol(cx, t)?;
+    fill_painted(cx, t, &mut src)?;
+    src.outside_val = t.d();
+    let mut targ = get_vol(cx, t)?;
+    fill_painted(cx, t, &mut targ)?;
+    let m = get_m44(t);
+    let (interp, param) = (t.i(), t.f());
+    if t.i() != 0 {
+        cx.g.gdiag_no = 1;
+    }
+    if t.i() != 0 {
+        cx.g.gdiag |= larmorx_freesurfer_core::diag::DIAG_VERBOSE;
+    }
+    let (mut vsm, mut lta, mut pedir) = (None, None, 0);
+    if cmd == "vvsm" {
+        if t.i() != 0 {
+            let mut v = get_vol(cx, t)?;
+            fill_painted(cx, t, &mut v)?;
+            v.outside_val = t.d();
+            vsm = Some(v);
+        }
+        if t.i() != 0 {
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let mut l = larmorx_freesurfer_mri::lta::lta_alloc(g, a, b, 1, None)?;
+            let ty = t.i();
+            l.ltype = ty;
+            l.xforms[0].ltype = ty;
+            let ml = l.xforms[0].m_l.as_mut().expect("LTAalloc's matrix");
+            for r in 1..=4 {
+                for c in 1..=4 {
+                    ml.set_relt(r, c, t.f());
+                }
+            }
+            lta = Some(l);
+        }
+        pedir = t.i();
+    }
+    let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+    let r = if cmd == "vv" {
+        v2::mri_vol2vol(g, a, b, &src, &mut targ, m.as_ref(), interp, param)?
+    } else {
+        v2::mri_vol2vol_vsm(
+            g,
+            a,
+            b,
+            &src,
+            &mut targ,
+            m.as_ref(),
+            interp,
+            param,
+            vsm.as_ref(),
+            lta.as_ref(),
+            pedir,
+        )?
+    };
+    o.i(i64::from(r));
+    o.vol(Some(&targ));
+    Ok(())
+}
+
+#[inline(never)]
+fn r21_vvk(cx: &mut Ctx, t: &mut Toks, o: &mut Out, cmd: &str) -> Result<(), Fatal> {
+    let _ = cmd;
+    let mut src = get_vol(cx, t)?;
+    fill_painted(cx, t, &mut src)?;
+    let mut targ = get_vol(cx, t)?;
+    fill_painted(cx, t, &mut targ)?;
+    let m = get_m44(t);
+    let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+    v2::mri_vol2vol_tl_kernel(g, a, b, &src, &mut targ, m.as_ref())?;
+    o.i(1);
+    o.vol(Some(&targ));
+    Ok(())
+}
+
+#[inline(never)]
+fn r21_vvd(cx: &mut Ctx, t: &mut Toks, o: &mut Out, cmd: &str) -> Result<(), Fatal> {
+    let _ = cmd;
+    let mov = get_vol(cx, t)?;
+    let targ = get_vol(cx, t)?;
+    let m = get_m44(t);
+    let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+    let r = v2::mri_vol2vol_delta(g, a, b, &mov, &targ, m.as_ref())?;
+    o.vol(r.as_ref());
+    Ok(())
+}
+
+#[inline(never)]
+fn r21_maskup(cx: &mut Ctx, t: &mut Toks, o: &mut Out, cmd: &str) -> Result<(), Fatal> {
+    let _ = cmd;
+    let mut src = get_vol(cx, t)?;
+    fill_painted(cx, t, &mut src)?;
+    let mask = if t.i() != 0 {
+        let mut m = get_vol(cx, t)?;
+        fill_painted(cx, t, &mut m)?;
+        Some(m)
+    } else {
+        None
+    };
+    let (up, npad, cons) = (t.i(), t.i(), t.i() != 0);
+    if t.i() != 0 {
+        cx.g.gdiag_no = 1;
+    }
+    let env = Environment::default();
+    let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+    match v2::mri_mask_and_upsample(g, a, b, &env, &mut src, mask.as_ref(), up, npad, cons)? {
+        Some((m, l)) => {
+            o.vol(Some(&m));
+            o.lta(l.as_ref());
+        }
+        None => {
+            o.vol(None);
+            o.lta(None);
+        }
+    }
+    Ok(())
+}
+
+#[inline(never)]
+fn r21_cov(cx: &mut Ctx, t: &mut Toks, o: &mut Out, cmd: &str) -> Result<(), Fatal> {
+    let _ = cmd;
+    let mut a = get_vol(cx, t)?;
+    fill_painted(cx, t, &mut a)?;
+    let mask = if t.i() != 0 {
+        let mut m = get_vol(cx, t)?;
+        fill_painted(cx, t, &mut m)?;
+        Some(m)
+    } else {
+        None
+    };
+    let (g, a_, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+    if cmd == "cov" {
+        let m = pc::mri_covariance_matrix(g, a_, b, &a, mask.as_ref())?;
+        o.m(m.as_ref());
+    } else {
+        let (r, p) = pc::mri_pca(g, a_, b, &a, mask.as_ref())?;
+        o.i(i64::from(r));
+        o.m(p.as_ref().map(|p| &p.u));
+        o.m(p.as_ref().map(|p| &p.s));
+        o.vol(p.as_ref().map(|p| &p.v));
+    }
+    Ok(())
+}
+
+#[inline(never)]
+fn r21_pcast(cx: &mut Ctx, t: &mut Toks, o: &mut Out, cmd: &str) -> Result<(), Fatal> {
+    let _ = cmd;
+    let n = t.i();
+    let mut sv = Matrix::real(1, n);
+    for i in 1..=n {
+        let v = t.f();
+        sv.set_relt(1, i, v);
+    }
+    let mode = t.i();
+    static CALLS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    let call = CALLS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let dir = std::env::temp_dir().join(format!("larmorx-fsvol-pca-{}-{call}", std::process::id()));
+    std::fs::create_dir_all(&dir).expect("a scratch folder");
+    let r = match mode {
+        0 => pc::print_pca_stats(&mut cx.a, &sv),
+        1 => pc::write_pca_stats(&mut cx.a, Some(&dir), "fsvol-pca.dat", &sv),
+        _ => pc::write_pca_stats(&mut cx.a, Some(&dir), "fsvol-nodir/pca.dat", &sv),
+    };
+    o.i(i64::from(r));
+    let bytes = std::fs::read(dir.join("fsvol-pca.dat")).unwrap_or_default();
+    o.hex(&bytes);
+    let _ = std::fs::remove_dir_all(&dir);
+    Ok(())
+}
+
+#[inline(never)]
+fn r21_fdr(cx: &mut Ctx, t: &mut Toks, o: &mut Out, cmd: &str) -> Result<(), Fatal> {
+    let _ = cmd;
+    let n = t.i();
+    let mut vols = Vec::new();
+    let mut frames = Vec::new();
+    let mut masks = Vec::new();
+    let mut outs = Vec::new();
+    for _ in 0..n {
+        let mut v = get_vol(cx, t)?;
+        fill_painted(cx, t, &mut v)?;
+        vols.push(v);
+        frames.push(t.i());
+        masks.push(if t.i() != 0 {
+            let mut m = get_vol(cx, t)?;
+            fill_painted(cx, t, &mut m)?;
+            Some(m)
+        } else {
+            None
+        });
+        let mode = t.i();
+        outs.push((
+            mode,
+            if mode == 1 {
+                Some(get_vol(cx, t)?)
+            } else {
+                None
+            },
+        ));
+    }
+    let fdr = t.d();
+    let (sign, lg, dbg) = (t.i(), t.i() != 0, t.i() != 0);
+    let (passmask, passout) = (t.i() != 0, t.i() != 0);
+    let mut vwth = -7.0f64;
+    let r = {
+        let mut items: Vec<pc::FdrVol> = vols
+            .iter_mut()
+            .zip(frames.iter())
+            .zip(masks.iter())
+            .zip(outs.iter_mut())
+            .map(|(((v, &frame), m), (mode, ov))| pc::FdrVol {
+                vol: v,
+                frame,
+                mask: if passmask { m.as_ref() } else { None },
+                out: match (passout, *mode, ov.as_mut()) {
+                    (true, 1, Some(o)) => pc::FdrOut::Given(o),
+                    (true, 2, _) => pc::FdrOut::Same,
+                    _ => pc::FdrOut::None,
+                },
+            })
+            .collect();
+        let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+        pc::mri_fdr2vwth(g, a, b, &mut items, fdr, sign, lg, &mut vwth, dbg)?
+    };
+    o.i(i64::from(r));
+    o.d(vwth);
+    if passout {
+        for (i, (mode, ov)) in outs.iter().enumerate() {
+            match mode {
+                1 => o.vol(ov.as_ref()),
+                2 => o.vol(Some(&vols[i])),
+                _ => {}
+            }
+        }
+    }
+    Ok(())
+}
+
+#[inline(never)]
+fn r21_rgbb(cx: &mut Ctx, t: &mut Toks, o: &mut Out, cmd: &str) -> Result<(), Fatal> {
+    let _ = cmd;
+    let mut m = get_vol(cx, t)?;
+    fill_painted(cx, t, &mut m)?;
+    let kind = t.i();
+    let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+    let r = match kind {
+        0 => {
+            let npad = t.i();
+            Some(rg::region_get_bounding_box(g, b, &m, npad)?)
+        }
+        1 => {
+            let p = [t.i(), t.i(), t.i(), t.i(), t.i(), t.i()];
+            Some(rg::region_get_bounding_box_m(g, b, &m, p)?)
+        }
+        _ => {
+            let npad = t.i();
+            rg::region_get_bounding_box_eq_odd(g, a, b, &m, npad)?
+        }
+    };
+    match r {
+        None => o.0 += "NULL ",
+        Some(r) => {
+            for v in [r.x, r.y, r.z, r.dx, r.dy, r.dz] {
+                o.i(i64::from(v));
+            }
+        }
+    }
+    Ok(())
+}
+
+#[inline(never)]
+fn r21_vxn(cx: &mut Ctx, t: &mut Toks, o: &mut Out, cmd: &str) -> Result<(), Fatal> {
+    let _ = cmd;
+    let mut m = get_vol(cx, t)?;
+    fill_painted(cx, t, &mut m)?;
+    let n = t.i();
+    let (g, b) = (&mut cx.g, &mut cx.b);
+    for _ in 0..n {
+        let (x, y, z, w, f) = (t.i(), t.i(), t.i(), t.i(), t.i());
+        o.f(mv::mri_voxel_dx(g, b, &m, x, y, z)?);
+        o.f(mv::mri_voxel_dy(g, b, &m, x, y, z)?);
+        o.f(mv::mri_voxel_dz(g, b, &m, x, y, z)?);
+        o.f(mv::mri_voxel_mean(g, b, &m, x, y, z, w, f)?);
+        o.f(mv::mri_voxel_direction(g, b, &m, x, y, z, w)?);
+        o.f(mv::mri_voxel_gradient_dir_2nd_derivative(
+            g, b, &m, x, y, z, w,
+        )?);
+    }
+    Ok(())
 }
 
 /// The samplers' commands: each point's result and value.

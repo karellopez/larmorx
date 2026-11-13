@@ -9,8 +9,9 @@ through ``fsmaths`` (``build.sh``: FreeSurfer's histograms, matrices, double mat
 helpers from the unit oracle's build, linked as the official programs are) by the oracle-output
 cache at one thread, runs the port on the same cases with ``--upstream-defects`` ``reproduce``
 and ``fix``, and compares the lines: ``reproduce`` must give FreeSurfer's bits on every case, but
-those where FreeSurfer reads outside its arrays (FS-22, FS-16: the port notes it; such lines
-are counted, not compared); ``fix`` may differ only where a defect it corrects changed the result
+those where FreeSurfer reads outside its arrays (FS-22, FS-16, ITK-106: the port notes it; such
+lines are counted, not compared; a case where FreeSurfer crashes, ``OpenDFPMin``'s FS-37, is the
+line ``CRASH`` on both sides); ``fix`` may differ only where a defect it corrects changed the result
 (its notices) or where the correctly rounded maths moved a last bit (``log`` in the entropy).
 Prints the counts, the hash the port's recorded test checks (``tests/fs_maths_official.rs``),
 and writes ``--json``.
@@ -35,6 +36,17 @@ sys.path.insert(0, str(REPO / "validation" / "src"))
 
 from larmorx_validation import oracle_cache  # noqa: E402
 from larmorx_validation.oracle_cache.store import workspace  # noqa: E402
+
+#: Defects whose lines are counted, not compared: FreeSurfer reads or writes memory it does not
+#: own (FS-22, FS-16; FS-49: a binary matrix file read past its end; ITK-106: VXL's L-BFGS printout of ``OpenDFPMin`` under ``DIAG_VERBOSE``
+#: prints the double before its vectors, a heap header in FreeSurfer, 0 in the port; FS-42,
+#: ITK-110, ITK-111: eigenvectors and eigenvalues VNL never wrote, memory contents in FreeSurfer).
+SKIP = ("FS-22", "FS-16", "ITK-106", "FS-42", "ITK-110", "ITK-111", "FS-47", "FS-48", "FS-49")
+
+#: Of those, the matrices with infinite or NaN entries the port refuses (FS-47, FS-48: VNL's
+#: eigensystem and SVD never return on many of them in FreeSurfer, the probe's TIMEOUT; on the
+#: others FreeSurfer's lines are its own): counted apart, with how many lines agree all the same.
+NONFINITE = ("FS-47", "FS-48")
 
 #: Commands whose results go through the C library's ``acos``: the port uses the correctly
 #: rounded one in both modes (glibc's is not ported yet, queue item 3.1-08), so a line may differ
@@ -139,15 +151,20 @@ def main(argv: list[str] | None = None) -> int:
     rep, fix = port_lines("reproduce"), port_lines("fix")
     assert len(official) == len(rep) == len(fix) == len(cases)
     equal, differ, skipped, skip_same = Counter(), Counter(), Counter(), 0
+    nonfinite = Counter()
     acos_differ = Counter()
     fix_differ, fix_unexplained, fix_ids = Counter(), Counter(), Counter()
     hashed = hashlib.sha256()
     first_differ = []
     for case, c, (r, ids), (f, fids) in zip(cases, official, rep, fix, strict=True):
         cmd = case.split()[0]
-        if "FS-22" in ids or "FS-16" in ids:
+        if any(x in ids for x in SKIP):
             skipped[cmd] += 1
             skip_same += c == r
+            if any(x in ids for x in NONFINITE):
+                nonfinite["refused"] += 1
+                nonfinite["official_timeout"] += c == "TIMEOUT"
+                nonfinite["equal"] += c == r
             hashed.update(b"SKIP\n")
             continue
         hashed.update(c.encode() + b"\n")
@@ -174,6 +191,7 @@ def main(argv: list[str] | None = None) -> int:
         "reproduce_differ_acos_last_bit": dict(acos_differ),
         "fs22_skipped": dict(skipped),
         "fs22_skipped_official_equal_to_zero_fill": skip_same,
+        "nonfinite_refused": dict(nonfinite),
         "fix_differ": dict(fix_differ),
         "fix_differ_without_notice": dict(fix_unexplained),
         "fix_notices": dict(fix_ids),

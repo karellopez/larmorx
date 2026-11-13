@@ -12,8 +12,11 @@ product; the 4 x 4 affine helpers; the double matrices with their long-double pr
 histograms. **Part 2** (§7-11, queue items 3.1-24, first piece, and 3.1-23's inverse): the NaN conventions; the
 float product; the element-wise operations, regions, vectors, printing, rotations and Gaussian
 matrices; the inverse, determinant and QR factors; prime factors; the Gaussian draws and the
-time-of-day seed. To come: the eigensystems, the SVD and what uses them, the matrices' text and
-binary files, the other numerics wrappers (Powell, L-BFGS, DFP), the random fields.
+time-of-day seed. **Part 3** (§12-15, item 3.1-23's minimizers): the double matrices' NaN operands;
+the cost-function bridge, Powell's method with given directions, the L-BFGS driver and its
+observer, `OpenPowell`, `OpenPowell2`, `OpenDFPMin`; Numerical Recipes' 1-based vectors and
+matrices. To come: the eigensystems, the SVD and what uses them, the matrices' text and binary
+files, the random fields.
 
 ## 1. Conventions
 
@@ -684,3 +687,387 @@ numbers row by row.
   (`docs/findings/freesurfer-maths.md`, "Part 2").
 - **The replays** of the programs that use these functions with `reproduce` on the recorded heads.
 
+
+## 12. Conventions, part 3: the double matrices' NaN operands
+
+§7's NaN rules hold, with the official build's operand order measured where two NaNs meet (the
+fs-maths probe's NaN inputs: infinities, quiet NaNs of both signs with and without payloads, a
+signalling NaN):
+
+- **Weighted sum** (§4): for a factor other than 0 and 1 the term is `(element × factor) + val` (of
+  two NaNs, the element's in the product and the product's in the sum); for a factor of exactly 1
+  `val + element` (`val`'s NaN). The product (§4) multiplies `m1(r, i) × m2(i, c)` (`m1`'s NaN) in
+  double before widening.
+- **x87 sums** (the product's and the dot product's accumulations, the list statistics): the x87's
+  rules: an invalid operation gives the *real indefinite* (sign set, significand `0xC000…0`); of a
+  quiet and a signalling NaN the quiet one; of two of a kind the larger significand, on equal ones
+  the positive. A double is widened either by loading (a signalling NaN made quiet first) or as an
+  instruction's memory operand (kept signalling). **Dot product:** `v2`'s element is loaded and
+  multiplied by `v1`'s as the memory operand, so a signalling NaN in `v1` against a quiet NaN in
+  `v2` gives `v2`'s. **Product:** each double product (never signalling) is added as a memory
+  operand. **List statistics** (the count, mean, standard deviation, minimum, maximum of a list of
+  doubles: the extended sums of the values, loaded, and of their double squares; the mean the sum
+  over the count rounded to double; the deviation the extended square root of `sum2 / n - mean²`,
+  `mean²` in double, rounded to double): the minimum keeps the current one unless the value is
+  smaller, the maximum unless it is larger (a NaN never replaces either; a NaN first value stays).
+
+## 13. The minimizers
+
+FreeSurfer's programs hand the minimizers C functions over **1-based** `float` arrays (Numerical
+Recipes' indexing): parameters at `p[1..n]`. Their element 0 is never set by FreeSurfer (unset stack
+memory; 0 for the iteration callback below); a function receives a fresh copy each call, so what
+it writes into it is lost. The minimizers themselves run in double precision and are VNL's (ITK
+4.13.2), available in the main package (`larmorx_core::vnl_minimize`: `vnl_nonlinear_minimizer`'s
+counters, `vnl_brent`, `vnl_bracket_minimum`, `vnl_brent_minimizer`; `larmorx_core::vnl_lbfgs`:
+netlib's `lbfgs` as VXL translated it, with its printed text).
+
+### 13.1 The cost-function bridge
+
+Value at `x` (n doubles): each `x[i]` rounded to float into `p[i + 1]`, the function called, its
+float result widened. Gradient at `x`: the same copy, the gradient function writes `g[1..n]` (n + 1
+floats, element 0 never read), widened. "Compute" is the value, then the gradient. The bridge's
+number of unknowns is the `n` it is built with (the L-BFGS driver reads it; Powell's does not).
+
+### 13.2 Powell's method with given directions
+
+Settings (VNL's defaults): `ftol` 1e-10, `maxfev` 2000 (a `long`; the loop bound is it converted to
+an unsigned 32-bit number), line tolerance 1e-4, initial step 1.0, verbose off. Inputs: `p` (n
+doubles, updated) and the directions, an n x n matrix whose **columns** are the directions (updated
+and given back). An evaluation *report* keeps VNL's counters: the first value starts the start and
+end values, a smaller later value lowers the end value; the evaluation count goes up.
+
+1. `fret = f(p)`, reported. `pt = p`. Standard output: `fs_powell::minimize`, `  nparams <n>`,
+   `  maxfev <maxfev>`, `  ftol   <%f of ftol>`, `  linmin_xtol_   <%f of the line tolerance>`, each
+   with a newline.
+2. While the iteration count (from 0) is below the bound:
+   - `fp = fret`, `ibig = 0`, `del = 0`; `  powell nthiter <count>: fret = <%f>` + newline.
+   - The iteration callback, when a program has set one: a float copy of `p` at `[1..n]` (`[0]` = 0)
+     and `n`.
+   - For each direction `i` (column `i`): verbose `    param <%3d of i>  nthiter <%2d of the count>`;
+     `fptt = fret`; a **line minimization** along the column from `p` with the initial step (below),
+     giving `xx` and `fret`; verbose `  min xx=<%g>, fret=<%g>`; `p[k] = p[k] + xx × column[k]`; if
+     `|fptt - fret| > del`: `del = |fptt - fret|`, `ibig = i`; verbose `  i = <i>  fp=<%f> fret=<%f>`.
+   - Verbose: `  niters <count>  fp=<%f> fret=<%f>` and `  check: <%f of 2|fp - fret|> <= <%f of
+     ftol (|fp| + |fret|)>`.
+   - If `2 |fp - fret| <= ftol (|fp| + |fret|)`: verbose `  converged`; return **CONVERGED_FTOL**.
+   - `ptt = 2 p - pt`, `xit = p - pt`, `pt = p` (element by element); `fptt = f(ptt)`; **`fret`** is
+     reported (not `fptt`, as VNL).
+   - If `fptt < fp` and `t = 2 (fp - 2 fret + fptt) (fp - fret - del)² - del (fp - fptt)² < 0`: a line
+     minimization along `xit` with step 1 (no verbose lines) gives `fret`; `p += xx xit`; column
+     `ibig` becomes column `n - 1`'s and column `n - 1` becomes `xit`.
+   - The iteration count goes up; verbose: `Iter <count, width 4>, Eval <evaluations, width 4>: Best
+     F = <end value, %g in width 10>` + newline on **standard error**.
+3. Verbose `  niters <count>`; return **FAILED_USER_REQUEST** (**FS-35**, kept in both modes: VNL's
+   Powell returns FAILED_TOO_MANY_ITERATIONS here; FreeSurfer's copy changed it, so the wrappers'
+   handling of that code never runs).
+
+**Line minimization** along `d` from `x0` with step `s`: the one-dimensional function `λ ↦ f(x0 + λ
+d)` (element by element, each evaluation reported); VNL's bracketing from 0 and `s` (as `vnl_brent`'s
+`bracket_minimum` is called with `ax = 0`, `xx = s`, `bx = 0`: it brackets from `bx` and `xx` and
+returns the bracket with `ax` its upper end, `xx` its interior point, `bx` its lower end; verbose
+`  bracketing` before and `  bracket ax=<%g> xx=<%g> bx=<%g>` after, in the iterations' first
+loop only), then VNL's Brent minimizer on (`bx`, `xx`, `ax`) to the line tolerance; its minimum is
+`xx`, its value `fret`.
+
+### 13.3 The L-BFGS driver and its observer
+
+Settings: memory `m` 5, line-search accuracy 0.9, default step 1.0, `gtol` 1e-5, `maxfev` 2000,
+verbose and trace off. `n` is the bridge's number of unknowns. Workspace `n (2m + 1) + 2m` doubles,
+a diagonal and a gradient of `n`. The evaluation and iteration counts are set to 0 (the end value
+is not). With verbose: `vnl_lbfgs: n = <n>, memory = <m>, Workspace = <length>[ <length / 128 / 1024,
+%g> MB], ErrorScale = 1, xnorm = <%g of the square root of the sum of x²>` + newline on standard
+error; with verbose and not trace, `vnl_lbfgs: ` there too.
+
+Loop: before each call, the line search's `gtol` = the accuracy and its initial step = the default
+step; value and gradient at `x`; on the first evaluation the start value and the best value are
+this value; later, a value **strictly below** the best: the best point = `x`, the best value = it,
+and the observer is told (below). Then one call of `lbfgs` (no caller diagonal; `eps = gtol`, `xtol
+= 1e-16`; IPRINT (1, 1) when the diagnostic bits hold `DIAG_VERBOSE`, else (1, 0) with trace and
+(-1, 0) without; its text on standard output); the iteration count goes up; with verbose and not
+trace `<iflag>:<value %g> ` on standard error. `iflag` 0: success; negative: failure; else the
+evaluation count goes up, and above `maxfev` (as an `int`) the failure code becomes
+FAILED_USER_REQUEST: failure. (With verbose and not trace, `done` + newline at the end.)
+
+The returns, **FS-37**: FreeSurfer records no best point before the first improvement. Success:
+the end value is the **last** value evaluated and `x` the best point, or **empty** where no
+improvement happened (`OpenDFPMin` then crashes). Failure: with an improvement the end value is the
+last value and `x` the best point; without one `x` stays where `lbfgs` left it (the line search's
+last trial point) and the end value is unchanged (the previous run's). **Default:** the starting
+point is the best until a smaller value; every return gives the best point and the best value.
+**Reproduce:** FreeSurfer's, but the empty parameters: there the starting point (and `OpenDFPMin`
+stops: §13.6). Noted when the two differ.
+
+The **observer** counts best points (from 0): each one is handed to the program's step function
+(the count so far, the best value rounded to float, a float copy of the point at `[1..n]`) and then
+its user callback (the copy), and the count goes up.
+
+### 13.4 `OpenPowell`
+
+(parameters `p[1..n]`, directions `xi[1..n][1..n]` or none, `n`, tolerance, iterations out, final
+value out, the cost function). Powell (§13.2) with VNL's defaults; **FS-36** (kept): the tolerance
+sets VNL's x tolerance, which Powell never reads (the stop is always `ftol` 1e-10). Starts from the
+widened parameters and the widened directions (`xi[r + 1][c + 1]` is element `(r, c)`), or the
+identity without them. A result of FAILED_TOO_MANY_ITERATIONS ends the program (code -4, `powell
+exceeding maximum iterations.`), of ERROR_FAILURE, ERROR_DODGY_INPUT or a tolerance code likewise
+(`powell error.`): never, FS-35. Otherwise the iteration count (as `int`), the end value (rounded to
+float), the parameters and the directions are rounded back. **FS-34:** without directions
+FreeSurfer writes them through the null pointer and crashes; both modes write nothing (noted).
+
+### 13.5 `OpenPowell2`
+
+(parameters, directions, `n`, `ftol`, line tolerance, maximum iterations, iterations out, final
+value out, the cost function). Powell with `ftol`, the line tolerance and `maxfev` = the maximum
+iterations; verbose (and trace) when `Gdiag_no > 0`. The count, end value, parameters and directions
+are always written back (FS-34 without directions); then FAILED_TOO_MANY_ITERATIONS prints `powell
+exceeded maximum iterations` + newline and returns 1, the error codes print `powell error <code>`
+and return 1 (never: FS-35); else 0.
+
+### 13.6 `OpenDFPMin`
+
+(parameters, `n`, tolerance, iterations out, final value in and out, value function, gradient
+function, step function and its data, user callback). The L-BFGS driver (§13.3) with memory 7,
+accuracy 0.1, `gtol` = the tolerance (its x and f tolerances, 0.001 and 0.1, are not read); one
+observer for the whole call. Passes: the driver from the current parameters while the last pass
+succeeded and the stop test says continue. **FS-38:** FreeSurfer stops when `(first - current) /
+first <= tolerance` in float, `first` the caller's final value on entry, `current` the pass's end
+value rounded to float (never the previous pass's; a NaN continues), so it repeats until a pass
+fails. **Default:** stops unless `(previous - current) / previous > tolerance` (`previous` the
+caller's value for the first pass, then each pass's end value; a NaN stops). Noted where the two
+decide differently. Success: the observer's count, the end value and the parameters written, 0
+returned. Failure: the driver's failure code; ERROR_FAILURE (-1) writes the same and returns -1;
+ERROR_DODGY_INPUT ends the program (code -4, `quasi-Newton minimization (lbfsg) dodgy input`), the
+tolerance codes likewise (`... tolerances too small`): never. **FS-39:** FAILED_USER_REQUEST (9, the
+evaluation limit): FreeSurfer writes nothing (the caller's count stays unset); **default:** written
+as for -1. Noted either way. Returns the code.
+
+## 14. Numerical Recipes' vectors and matrices
+
+`vector(nl, nh)`: floats indexed `nl..nh`, in one block with one float more before `nl`;
+`matrix(nrl, nrh, ncl, nch)`: rows `nrl..nrh` of columns `ncl..nch`, all rows one block (row after
+row) with one float more before the first. The values are unset (every caller sets them); freeing
+releases them. An allocation failure ends the program (code -1, `could not allocate vector(<nl>,
+<nh>)`, `could not allocate matrix(<rows>, <cols>)`, `... array`).
+
+## 15. Validation plan, part 3
+
+- **Against the official code** (`validation/probes/fs-maths/`, 67 commands): `powell`, `powell2`,
+  `dfpmin` on four seeded float costs (a positive-definite quadratic, Rosenbrock's, the quadratic
+  rounded down to multiples of 1/q with the quadratic's gradient, weighted absolute values), 1 to 6
+  parameters for Powell and 2 to 12 for DFP, identity, scaled or sheared directions, the settings of
+  the programs (bbregister's 36 iterations, `ftol` 1e-8, ...), verbose runs, the iteration callback,
+  the step function and user callback, the caller's first value or 0 or twice it; every evaluation
+  of the cost and gradient and every callback hashed, standard output and error compared byte for
+  byte. FreeSurfer's `OpenDFPMin` crashes on FS-37: its cases run in a child process and a crash is
+  the line `CRASH` (the port's `reproduce` gives `CRASH` where FreeSurfer empties the parameters).
+  The double matrices' cases carry NaNs and infinities (§12). Lines whose official bytes depend on
+  memory FreeSurfer does not own are counted, not compared (FS-22, FS-16, and VNL's L-BFGS printout
+  of the vectors under `DIAG_VERBOSE`, ITK-106).
+- **Every platform:** the hash of seed 1's lines, checked with AArch64's NaN emulated on x86
+  (`validation/probes/fsl-mcflirt-affine-trace/nan_trap.c`, `NAN_TRAP_ARM=1` with `NAN_TRAP_DIR` set)
+  in debug and release builds.
+- **The replays** of `mri_em_register` (OpenDFPMin, OpenPowell), `mri_segreg`/`bbregister`
+  (OpenPowell2) with `reproduce` on the recorded heads, when they are ported.
+
+## 16. Conventions, part 4: the float product's NaN operands
+
+The float product (§8.1) gives the same values in any order, but when two NaNs meet, which one a
+sum or product keeps follows the official build's operand order (SSE2's rule, §7: of two NaNs the
+first operand's, quieted): each product is `m2(i, c) × m1(r, i)` (the second matrix's element
+first); with 4 or more terms the sums go in blocks of four, `val + p0`, `p1 + val`, `p2 + val`,
+`val + p3`, and the terms after the last block (or all of 3 or fewer) as `val + p`.
+
+## 17. Decompositions
+
+All on ITK 4.13.2's VNL (the main package's ports, queue item 3.1-07), on the matrix's numbers row
+by row.
+
+### 17.1 Symmetric eigensystem (n x n numbers, values, vectors)
+
+`vnl_symmetric_eigensystem<float>`: the matrix converted to double, EISPACK's `rs` (Householder
+tridiagonalisation of the lower triangle of the transposed array, that is the upper triangle as
+stored, then the QL method), the eigenvalues in ascending order and the eigenvectors as the columns
+of the vector matrix (row by row), rounded to float. No rows: nothing written, success.
+
+- **FS-42:** when the QL method does not converge within 30 iterations for an eigenvalue, VNL
+  writes `vnl_symmetric_eigensystem: ierr = <i>` + `\n` on standard error, keeps the eigenvalues as
+  they stand and never writes the vectors; FreeSurfer copies them (memory) and reports success.
+  **Default:** the eigenvalues written, the vectors not, an error `OpenEigenSystem: the eigensystem
+  did not converge (ierr <i>)` + `\n`, code -4, failure. **Reproduce:** the vectors 0, success.
+- **FS-47:** with an infinite or NaN entry among those the tridiagonalisation reads, of 2 rows or
+  more, EISPACK's hypotenuse routine usually never returns (FreeSurfer hangs). **Both modes:** an
+  error `OpenEigenSystem: VNL's eigensystem never returns on this matrix (an infinite or NaN entry)`
+  + `\n`, code -4, nothing written, failure (the rare such matrices FreeSurfer does finish are
+  refused too).
+
+### 17.2 Non-symmetric eigensystem (n x n numbers, values, vectors)
+
+`vnl_real_eigensystem` of the matrix converted to double (EISPACK's `rg`: balancing, reduction to
+Hessenberg form, the QR method with vectors, back-transformation): the eigenvalues' real parts and
+the real eigenvector matrix (row by row), rounded to float; success. The columns of a complex pair
+are 0 (VNL never writes them: memory contents in FreeSurfer, ITK-110); when the QR method fails,
+VNL's ` *** vnl_real_eigensystem: Failed on <i>th eigenvalue` + `\n` and the matrix on standard
+error, and the eigenvalues it did not find are 0 (ITK-111). **ITK-112:** an infinite or NaN entry
+(or sums that overflow) in the part the balancing reads: FreeSurfer hangs; **both modes:** an error
+`OpenNonSymmetricEigenSystem: VNL's eigensystem never returns on this matrix (an infinite or NaN
+entry)` + `\n`, code -4, failure. **FS-41:** FreeSurfer copies the matrix to the stack (8 bytes an
+element): above 8 MiB (about 1,024 rows) it crashes; both modes compute it, noted.
+
+### 17.3 Eigensystem of a matrix (m, values, vectors)
+
+Not square: nothing returned (values untouched). Real only (FS-25). Symmetric when every element
+equals its mirror exactly (a NaN never does): §17.1, else §17.2; a failure: nothing returned. The
+eigenvalues are then sorted by decreasing magnitude, a stable merge sort where an element goes before
+another unless its magnitude is smaller (equal magnitudes keep their order; NaN orders as such a sort
+gives them), and the vectors put in the same order as the columns of the output (a new n x n matrix
+when none is given; FS-28: a given one smaller than n x n). The values array holds n floats.
+
+### 17.4 Singular value decomposition (A, w, V)
+
+`vnl_svd<float>` (LINPACK's `ssvdc`, economy size, the singular values' absolute values, none zeroed):
+rows ≥ cols required (else failure, nothing written); no columns: success, nothing written. U (rows
+x cols) replaces A's numbers, the cols singular values go into w's numbers from the first, V (cols x
+cols) into V's numbers from the first, row by row whatever their sizes (beyond an array: FS-16).
+LINPACK not converging: on standard error `<ITK root>/Modules/ThirdParty/VNL/src/vxl/core/vnl/algo/vnl_svd.hxx:
+suspicious return value (<info>) from SVDC` + `\n`, the same path + `: M is <rows>x<cols>` + `\n`,
+then `M = [ ...` + `\n` and each row's elements as `%8d ` for an exact zero or `%8.5f ` otherwise
+(C's `nan`, `-nan`, `inf`), the last row followed by ` ]`, each row + `\n`; failure, nothing written.
+`<ITK root>` is the official build's `/home/rd521/4.13.2_ubuntu20/itk/4.13.2/src/ITK`; `<info>` is
+min(rows + 1, cols) on every failing case measured. **FS-48:** on some matrices with infinite or NaN
+entries LINPACK never returns (FreeSurfer hangs); **both modes:** every such matrix gives the failure
+lines above without being decomposed (FreeSurfer's rare successes on them, a 1 x 1 infinity, are
+refused too).
+
+### 17.5 The SVD functions
+
+- **SVD** (A, w, V): real only (FS-25). **FS-43:** FreeSurfer allocates a new V rows x rows and
+  ignores a failure (V returned unchanged, zeros for a new one, no message). **Default:** a new V is
+  cols x cols, a given one of another size is refused (FS-28), a failure gives an error `MatrixSVD:
+  the decomposition failed (a <r> x <c> matrix: fewer rows than columns, or one LINPACK cannot
+  decompose)` + `\n`, code -4, nothing returned. **Reproduce:** as FreeSurfer. Returns V.
+- **SVD eigenvalues** (m, values): the first rows values cleared; a failure returns FreeSurfer's last
+  error code as a float. Else the singular values sorted as §17.3 into the values, and the condition
+  number: the first value as the minimum and maximum, then the others' magnitudes; 1e8 when the
+  minimum is below `FLT_EPSILON`, else maximum / minimum (float). **FS-40:** FreeSurfer reads rows
+  singular values where there are cols; **default:** cols (the other eigenvalues 0); **reproduce:**
+  rows (memory read as 0, FS-16).
+- **Condition number** (m): 1e10 when every element is within 1e-11 of 0 (NaN counts as 0); else the
+  decomposition's failure ignored (the singular values 0: 1e8, kept, rule C) and the condition number
+  as above, FS-40 likewise. Complex: 1e8 by default after the error (FS-25).
+- **Condition number of any shape** (m): square: as above; more rows: of mᵀm; fewer: of mmᵀ (float
+  products §8.1).
+- **SVD inverse** (m, out): nothing returned when every element is within 1e-11 of 0, or the
+  decomposition fails. Else w_max the largest singular magnitude, the threshold `(float)(1e-4 ×
+  w_max)`, each singular value below it inverted to 0, the others to `1.0f / w`; the result `V ×
+  (W⁻¹ × Uᵀ)` (float products) into `out` (a new matrix when none; a given one of another size:
+  §8.1's messages, nothing returned). **FS-44:** more rows than columns: FreeSurfer crashes (after a
+  successful decomposition); **default:** the same with the decomposition's sizes (the pseudo-inverse,
+  cols x rows); **reproduce:** nothing returned (the crash never reproduced).
+- **Pseudo-inverse** (m, out): fewer rows than columns: the transpose of the pseudo-inverse of mᵀ.
+  Else `(mᵀm)⁻¹ mᵀ` (float products), the inverse §8.8 or, when it gives nothing, the SVD inverse;
+  nothing returned when both give nothing; into `out` (§8.1's messages for another size). **FS-45:**
+  for fewer rows than columns FreeSurfer passes `out` to the inner pseudo-inverse (the other shape:
+  §8.1's messages, then a crash transposing nothing; an `out` of the inner shape is filled, freed and a
+  new matrix returned); it also crashes when the inner pseudo-inverse is nothing (a zero matrix).
+  **Default:** the inner one new, its transpose into `out` (FS-28), nothing returned for an empty
+  inner result. **Reproduce:** an `out` of the inner shape filled and a new transpose returned;
+  nothing returned where FreeSurfer crashes.
+- **SVD pseudo-inverse** (m, out): fewer rows than columns: the transpose of the SVD pseudo-inverse of
+  mᵀ. Else nothing returned when every element is within 1e-11 of 0; r the index of the first
+  singular value whose ratio to the first (float division, compared in double) is below 1e-4, minus
+  one (all: cols); the result `V_r × diag(1.0f / w_1..r) × U_rᵀ` (the first r columns of V and U;
+  float products). **FS-46:** FreeSurfer returns a new matrix whatever `out`, ignores a failed
+  decomposition (the singular values 0: a result of infinities and NaN) and crashes for fewer rows than
+  columns when the inner result is nothing. **Default:** into `out`; a failure an error
+  `MatrixSVDPseudoInverse: the decomposition failed (a <r> x <c> matrix LINPACK cannot decompose)` +
+  `\n`, code -4, nothing returned; an empty inner result: nothing returned. **Reproduce:** as
+  FreeSurfer, nothing returned where it crashes.
+
+## 18. Matrix files
+
+### 18.1 The C library's `%f` and `%d` (as glibc 2.35 reads them, measured)
+
+`%f`: white space skipped (the C locale's six characters); the end of the input there: an input
+failure. Then an optional sign, and:
+
+- `inf` in any case (a letter that does not match is read, then a matching failure); after it, when the
+  next letter is `i`, the rest of `infinity` must follow (a mismatch read, then a matching failure);
+  the value ±infinity.
+- `nan` in any case (a mismatch read, then a matching failure); never a parenthesised part; the value
+  the quiet NaN `0x7fc00000`, `0xffc00000` with `-`.
+- `0x` or `0X`: hexadecimal digits, an optional point and more digits; no digit at all: a matching
+  failure (the next character unread) unless a point was read, then the value 0 with no exponent read;
+  then an optional `p`/`P`, sign and decimal digits (none: exponent 0).
+- Otherwise decimal digits, an optional point and digits (no digit at all: a matching failure, the
+  next character unread); an optional `e`/`E`, sign and digits (none: exponent 0, the marker and sign
+  read all the same: `100ergs` reads 100 and leaves `rgs`).
+
+The value correctly rounded to float (nearest, ties to even, subnormals included). `errno` becomes
+`ERANGE` (34) on overflow (±infinity) and on underflow: the result inexact and its magnitude, rounded
+to 24 bits with an unbounded exponent, below 2⁻¹²⁶. A number's mismatching character stays unread.
+
+`%d`: white space, an optional sign, decimal digits (none: a matching failure); the value as a 64-bit
+`long` (beyond its range: its limit and `ERANGE`), kept to its low 32 bits.
+
+`errno` at the end of the input: a conversion that meets it before its item sets `errno` to 0, unless
+an earlier item of the same call ended at the end of the input; directives that meet it change
+nothing.
+
+### 18.2 Reading and writing
+
+- **Text read** (file name): not openable: an error `MatrixReadTxt(<name>) - file open failed` + `\n`
+  (with `errno`'s text first), code -1, nothing returned. The first piece of line (`fgets` of 999
+  bytes: up to 998 bytes or the new line) absent: an error `MatrixReadTxt: could not read 1st line from
+  <name>` + `\n`, code -4. Columns: the number of white-space-separated items of that piece; fewer than
+  1: nothing returned, no message. Rows: 1 + the number of further pieces of line (a longer line counts
+  as several). A new real matrix; from the file's start, each element row by row by one `%f`; one that
+  fails: an error `MatrixReadTxT: could not scan value [<row>][<col>]` + `\n`, code -4, nothing
+  returned.
+- **ASCII write** (stream, m): `<type> <rows> <cols>` + `\n`; each row: a complex element `%+f %+f`
+  and three spaces, any other `%+f` and two spaces; `\n` after each row. Success.
+- **ASCII read** (stream, m): the first line that is not blank or a comment (199 bytes at most, `#`
+  starts a comment) read as `%d %d %d` (fewer: an error `MatrixAsciiReadFrom: could not scanf parms`,
+  code -5, nothing returned; text after them ignored). No `m`: a new matrix of that type and size
+  (FS-13; an unknown type: the allocator's error, then `MatrixAsciiReadFrom: could not allocate
+  matrix`, code -5, nothing returned); a given `m` of another type or size: an error
+  `MatrixAsciiReadFrom: specified matrix does not match file`, code -5, `m` returned unchanged. Then
+  row by row: each element `%f` and white space (complex: `%f`, white space, `%f`, white space), a
+  failure: an error `MatrixAsciiReadFrom: could not scan element (<row>, <col>)`, code -5, nothing
+  returned (a given `m` keeps what was read); white space after each row. The messages without a
+  trailing new line.
+- **Binary read** (stream, m): the type, rows and columns as big-endian 32-bit integers, then each
+  element as a big-endian double (complex: two) rounded to float; a matrix and a given `m` as the ASCII
+  read (`MatrixReadFrom: could not allocate matrix`, `MatrixReadFrom: specified matrix does not match
+  file`). A double cut short prints `freadDouble: fread failed` (code -5). **FS-49:** a file that ends
+  early gives FreeSurfer the stack's bytes; **default:** an error `MatrixReadFrom: the file ends before
+  the matrix does`, code -5, nothing returned; **reproduce:** the missing bytes 0.
+- **Text write** (file name, m): not openable: an error `MatrixWriteTxt(<name>) - file open failed` +
+  `\n`, code -1, returned. Each row: each element `%+4.5f` and a space, then `\n`. Real only (FS-25).
+  Success.
+
+## 19. Random-field specifications
+
+A specification holds a name, a code, up to 20 parameters, a mean, a standard deviation, a generator
+and a seed. **Name to code:** `uniform` 1, `gaussian` 2, `z` 3, `t` 4, `F` 5, `chi2` 6, any other -1
+(stored and returned). **Init** (seed): a cleared specification with a new generator (RANLUX389,
+`specs/ranlux.md`), then **set seed** (seed): 0 takes the time-of-day seed (§10, FS-29), any other is
+kept; the generator is set to it. The draws (`RFsynth`, `RFdrawVal`) and the global statistics of a
+volume come with the generator's distributions and the volumes.
+
+## 20. Validation plan, part 4
+
+- **Against the official code** (`validation/probes/fs-maths/`, 75 commands; the 8 new ones):
+  `meig` (symmetric matrices, symmetric but one element, general and upper-triangular ones, symmetric
+  ones with infinities and NaNs through the symmetric path only; new and given outputs; both paths
+  called directly), `msvd` (the SVD eigenvalues, both condition numbers, the SVD with a new and a given
+  V, on matrices of 1 to 6 rows and columns: zeros, tiny values, infinities and NaNs), `msvdinv` and
+  `mpinv` (the SVD inverse and both pseudo-inverses, new and given outputs of both shapes, singular and
+  zero matrices), `mrdtxt`, `mrdasc`, `mrdbin`, `mwr` (the four readers and both writers on generated
+  files: numbers in every form above, the special and broken ones, comments, blank lines, long lines,
+  files cut short; `errno` and the bytes read compared). The decompositions run in a child process with
+  a 2-second alarm: the line `TIMEOUT` where FreeSurfer never returns, `CRASH` where it crashes; lines
+  that depend on memory FreeSurfer never wrote (FS-42, ITK-110, ITK-111, FS-49) and the non-finite
+  matrices the port refuses (FS-47, FS-48) are counted, not compared.
+- **Every platform:** seed 1's hash with AArch64's NaN emulated in debug and release builds.
+- **The C library's conversions:** `validation/probes/fs-maths/scanf/` (black-box runs of glibc 2.35:
+  each input's return value, assigned bits, `errno` and the bytes read), its measurements as the unit
+  tests of the port.

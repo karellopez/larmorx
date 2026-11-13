@@ -12,11 +12,20 @@
 // Written for LARMORX (Apache-2.0); the binary it builds links FreeSurfer's code and stays on
 // the machine that built it.
 
+#include <fcntl.h>
+#include <signal.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+#include <algorithm>
+#include <cerrno>
 #include <cinttypes>
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <iostream>
 #include <string>
 #include <vector>
 
@@ -25,13 +34,20 @@
 #include "dmatrix.h"
 #include "error.h"
 #include "histo.h"
+#include "log.h"
 #include "matrix.h"
+#include "numerics.h"
 #include "pdf.h"
 #include "prime.h"
 #include "utils.h"
 
 // declared in utils/matrix.cpp only (external linkage)
 int MatrixIsSymmetric(MATRIX *matrix);
+MATRIX *MatrixCalculateEigenSystemHelper(MATRIX *m, float *evalues, MATRIX *m_evectors, int isSymmetric);
+MATRIX *MatrixSVDPseudoInverse(MATRIX *m, MATRIX *m_pseudo_inv);
+
+// defined in utils/fs_powell.cpp (oct_register_mosaic declares it so)
+extern void (*powell_iteration_func)(float *p, int nparms);
 
 const char *Progname = "fsmaths";
 
@@ -195,9 +211,377 @@ void putfile(const char *path)
   line_out += " ";
 }
 
+// the file the I/O commands read and write, in the working directory (the cases' directory)
+const char *REL_FILE = "fsmaths-file.tmp";
+
+// a file's bytes from a hexadecimal token ("-" for none), written to path
+void puthexfile(const char *hex, const char *path)
+{
+  FILE *fp = fopen(path, "wb");
+  if (!fp) fail("cannot write the scratch file");
+  if (strcmp(hex, "-") != 0)
+    for (size_t i = 0; hex[i] && hex[i + 1]; i += 2) {
+      char b[3] = {hex[i], hex[i + 1], 0};
+      fputc((int)strtol(b, NULL, 16), fp);
+    }
+  fclose(fp);
+}
+
+// ---- the minimizers' cases (OpenPowell, OpenPowell2, OpenDFPMin) ----
+// A seeded cost of n parameters (1-based, as FreeSurfer's callers index them), in float, the
+// same expressions as the port's side (tests/fs_maths/cases.rs): 0 a quadratic, 1 Rosenbrock's,
+// 2 the quadratic rounded down to a multiple of 1/q (its gradient the quadratic's), 3 weighted
+// absolute values (bounded below: with cross terms it would fall without end, the bracketing
+// would run into infinities). Every call is hashed (FNV-1a over the bits).
+struct Problem {
+  int kind = 0, n = 0;
+  float f0 = 0, b = 0, q = 1;
+  float a[16] = {0}, c[16] = {0};
+  bool iter_set = false;
+  uint64_t hash = 0xcbf29ce484222325ULL;
+  int nf = 0, ng = 0, ni = 0, ns = 0, nu = 0;
+} P;
+
+void fnv(uint32_t v)
+{
+  for (int k = 0; k < 4; k++) {
+    P.hash ^= (v >> (8 * k)) & 0xff;
+    P.hash *= 0x100000001b3ULL;
+  }
+}
+
+uint32_t bits(float f)
+{
+  uint32_t u;
+  memcpy(&u, &f, 4);
+  return u;
+}
+
+void hashp(const float *p, int from)
+{
+  for (int i = from; i <= P.n; i++) fnv(bits(p[i]));
+}
+
+float cost(float p[])
+{
+  int n = P.n;
+  float s = P.f0;
+  if (P.kind == 1) {
+    for (int i = 1; i < n; i++) {
+      float t = p[i + 1] - p[i] * p[i];
+      float u = 1.0f - p[i];
+      s = s + 100.0f * t * t + u * u;
+    }
+  }
+  else {
+    for (int i = 1; i <= n; i++) {
+      float d = p[i] - P.c[i];
+      if (P.kind == 3)
+        s = s + P.a[i] * fabsf(d);
+      else
+        s = s + P.a[i] * d * d;
+    }
+    if (P.kind != 3)
+      for (int i = 1; i < n; i++) s = s + P.b * ((p[i] - P.c[i]) * (p[i + 1] - P.c[i + 1]));
+    if (P.kind == 2) s = floorf(s * P.q) / P.q;
+  }
+  P.nf++;
+  fnv(1);
+  hashp(p, 1);
+  fnv(bits(s));
+  return s;
+}
+
+void gradient(float p[], float g[])
+{
+  int n = P.n;
+  for (int i = 1; i <= n; i++) g[i] = 0.0f;
+  if (P.kind == 1) {
+    for (int i = 1; i < n; i++) {
+      float t = p[i + 1] - p[i] * p[i];
+      float u = 1.0f - p[i];
+      g[i] = g[i] + (-400.0f * t * p[i] - 2.0f * u);
+      g[i + 1] = g[i + 1] + 200.0f * t;
+    }
+  }
+  else {
+    for (int i = 1; i <= n; i++) {
+      float d = p[i] - P.c[i];
+      float gi;
+      if (P.kind == 3)
+        gi = P.a[i] * (d > 0.0f ? 1.0f : (d < 0.0f ? -1.0f : 0.0f));
+      else
+        gi = 2.0f * P.a[i] * d;
+      if (i > 1 && P.kind != 3) gi = gi + P.b * (p[i - 1] - P.c[i - 1]);
+      if (i < n && P.kind != 3) gi = gi + P.b * (p[i + 1] - P.c[i + 1]);
+      g[i] = gi;
+    }
+  }
+  P.ng++;
+  fnv(2);
+  hashp(p, 1);
+  hashp(g, 1);
+}
+
+void iteration(float *p, int nparms)
+{
+  P.ni++;
+  fnv(3);
+  fnv((uint32_t)nparms);
+  hashp(p, 0);
+}
+
+void step(int itno, float sse, void *parms, float *p)
+{
+  (void)parms;
+  P.ns++;
+  fnv(4);
+  fnv((uint32_t)itno);
+  fnv(bits(sse));
+  hashp(p, 1);
+}
+
+void user(float p[])
+{
+  P.nu++;
+  fnv(5);
+  hashp(p, 1);
+}
+
+// the problem's tokens: kind n f0 b q a[1..n] c[1..n]
+void getproblem()
+{
+  P = Problem();
+  P.kind = geti();
+  P.n = geti();
+  P.f0 = getf();
+  P.b = getf();
+  P.q = getf();
+  for (int i = 1; i <= P.n; i++) P.a[i] = getf();
+  for (int i = 1; i <= P.n; i++) P.c[i] = getf();
+}
+
+void puthash()
+{
+  char b[32];
+  snprintf(b, sizeof b, "%016" PRIx64 " ", P.hash);
+  line_out += b;
+}
+
+// standard output and error captured into files beside the cases while FreeSurfer runs
+struct Capture {
+  int so, se;
+  std::string fo, fe;
+};
+
+void cap_begin(Capture &c, const char *tmp)
+{
+  fflush(stdout);
+  fflush(stderr);
+  std::cerr.flush();
+  c.fo = std::string(tmp) + ".out";
+  c.fe = std::string(tmp) + ".err";
+  c.so = dup(1);
+  c.se = dup(2);
+  int fo = open(c.fo.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0600);
+  int fe = open(c.fe.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0600);
+  dup2(fo, 1);
+  dup2(fe, 2);
+  close(fo);
+  close(fe);
+}
+
+// VNL's messages name their source file (__FILE__): the unit oracle's ITK tree is written as the
+// official build's, /home/rd521/4.13.2_ubuntu20/itk/4.13.2/src/ITK (strings of the official
+// mri_ca_register), on every line that starts with a path into ITK's VNL
+std::string official_itk(const std::string &s)
+{
+  const std::string key = "/Modules/ThirdParty/VNL/";
+  std::string r;
+  size_t i = 0;
+  while (i < s.size()) {
+    size_t e = s.find('\n', i);
+    size_t end = e == std::string::npos ? s.size() : e + 1;
+    std::string line = s.substr(i, end - i);
+    size_t k = line.find(key);
+    if (k != std::string::npos && !line.empty() && line[0] == '/')
+      line = "/home/rd521/4.13.2_ubuntu20/itk/4.13.2/src/ITK" + line.substr(k);
+    r += line;
+    i = end;
+  }
+  return r;
+}
+
+void putcap(const std::string &path)
+{
+  FILE *fp = fopen(path.c_str(), "rb");
+  std::string raw, h;
+  int ch;
+  char b[4];
+  while (fp && (ch = fgetc(fp)) != EOF) raw += (char)ch;
+  raw = official_itk(raw);
+  for (unsigned char c : raw) {
+    snprintf(b, sizeof b, "%02x", c);
+    h += b;
+  }
+  if (fp) fclose(fp);
+  remove(path.c_str());
+  line_out += h.empty() ? "- " : h + " ";
+}
+
+void cap_end(Capture &c)
+{
+  fflush(stdout);
+  fflush(stderr);
+  std::cerr.flush();
+  dup2(c.so, 1);
+  dup2(c.se, 2);
+  close(c.so);
+  close(c.se);
+  putcap(c.fo);
+  putcap(c.fe);
+}
+
+void putcounts()
+{
+  puti(P.nf);
+  puti(P.ng);
+  puti(P.ni);
+  puti(P.ns);
+  puti(P.nu);
+  puthash();
+}
+
+void run_minimizer(const std::string &cmd, const char *tmpfile)
+{
+  getproblem();
+  int n = P.n;
+  float *p = vector(1, n);
+  for (int i = 1; i <= n; i++) p[i] = getf();
+  if (cmd == "dfpmin") {
+    float tol = getf();
+    int init = geti();
+    int verbose = geti();
+    int stepf = geti(), userf = geti();
+    float f = cost(p);
+    float fret = init == 0 ? f : (init == 1 ? 0.0f : 2.0f * f);
+    int iter = -7;
+    unsigned long gdiag = Gdiag;
+    if (verbose) Gdiag |= DIAG_VERBOSE;
+    Capture c;
+    cap_begin(c, tmpfile);
+    int r = OpenDFPMin(p, n, tol, &iter, &fret, cost, gradient, stepf ? step : NULL, NULL, userf ? user : NULL);
+    Gdiag = gdiag;
+    puti(r);
+    puti(iter);
+    putf(fret);
+    for (int i = 1; i <= n; i++) putf(p[i]);
+    putcounts();
+    cap_end(c);
+    free_vector(p, 1, n);
+    return;
+  }
+  float **xi = matrix(1, n, 1, n);
+  for (int r = 1; r <= n; r++)
+    for (int k = 1; k <= n; k++) xi[r][k] = getf();
+  int iter = -7;
+  float fret = -7.0f;
+  Capture c;
+  if (cmd == "powell") {
+    float tol = getf();
+    P.iter_set = geti() != 0;
+    powell_iteration_func = P.iter_set ? iteration : NULL;
+    cap_begin(c, tmpfile);
+    OpenPowell(p, xi, n, tol, &iter, &fret, cost);
+  }
+  else {
+    float ftol = getf(), lin = getf();
+    int maxit = geti(), gno = geti();
+    P.iter_set = geti() != 0;
+    powell_iteration_func = P.iter_set ? iteration : NULL;
+    int save = Gdiag_no;
+    Gdiag_no = gno;
+    cap_begin(c, tmpfile);
+    int r = OpenPowell2(p, xi, n, ftol, lin, maxit, &iter, &fret, cost);
+    Gdiag_no = save;
+    puti(r);
+  }
+  powell_iteration_func = NULL;
+  puti(iter);
+  putf(fret);
+  for (int i = 1; i <= n; i++) putf(p[i]);
+  for (int r = 1; r <= n; r++)
+    for (int k = 1; k <= n; k++) putf(xi[r][k]);
+  putcounts();
+  cap_end(c);
+  free_matrix(xi, 1, n, 1, n);
+  free_vector(p, 1, n);
+}
+
+void run_case(const char *tmpfile);
+bool in_child = false;
+
+// a case that may crash FreeSurfer runs in a child process (OpenDFPMin: FS-37; the robust
+// Gaussian fit, whose reads outside its arrays, FS-22, sometimes reach unmapped memory): its line,
+// or CRASH when the child dies of a signal (TIMEOUT when its alarm ends it)
+void run_forked(const char *tmpfile, unsigned seconds)
+{
+  int fd[2];
+  if (pipe(fd) != 0) fail("pipe");
+  fflush(stdout);
+  fflush(stderr);
+  pid_t pid = fork();
+  if (pid < 0) fail("fork");
+  if (pid == 0) {
+    close(fd[0]);
+    alarm(seconds);
+    line_out.clear();
+    in_child = true;
+    pos = 0;
+    run_case(tmpfile);
+    size_t off = 0;
+    while (off < line_out.size()) {
+      ssize_t w = write(fd[1], line_out.data() + off, line_out.size() - off);
+      if (w <= 0) break;
+      off += (size_t)w;
+    }
+    close(fd[1]);
+    _exit(0);
+  }
+  close(fd[1]);
+  std::string got;
+  char buf[65536];
+  ssize_t k;
+  while ((k = read(fd[0], buf, sizeof buf)) > 0) got.append(buf, (size_t)k);
+  close(fd[0]);
+  int status = 0;
+  waitpid(pid, &status, 0);
+  if (WIFSIGNALED(status)) {
+    line_out = WTERMSIG(status) == SIGALRM ? "TIMEOUT " : "CRASH ";
+    std::string t = std::string(tmpfile);
+    remove((t + ".out").c_str());
+    remove((t + ".err").c_str());
+  }
+  else
+    line_out = got;
+}
+
 void run_case(const char *tmpfile)
 {
   std::string cmd = next();
+  if (!in_child && (cmd == "dfpmin" || cmd == "robust")) {
+    run_forked(tmpfile, 600);
+    return;
+  }
+  // the eigensystems and SVDs of matrices with infinite or NaN entries: VNL never returns on many
+  // of them (EISPACK's pythag and balanc, LINPACK's ssvdc loop for ever: FS-47, ITK-112, FS-48),
+  // and MatrixSVDInverse, MatrixPseudoInverse and MatrixSVDPseudoInverse crash on some shapes
+  // (FS-44 to FS-46): TIMEOUT after 2 s (their other cases take microseconds)
+  // (and MatrixReadFrom of a file that ends early: its sizes are the stack's contents, FS-49)
+  if (!in_child && (cmd == "meig" || cmd == "msvd" || cmd == "msvdinv" || cmd == "mpinv" || cmd == "mrdbin")) {
+    run_forked(tmpfile, 2);
+    return;
+  }
   if (cmd == "smooth") {
     HISTOGRAM *h = geth();
     float s = getf();
@@ -682,6 +1066,147 @@ void run_case(const char *tmpfile)
     putm_raw(q);
     putm_raw(r);
   }
+  else if (cmd == "meig") {
+    // MatrixEigenSystem (new and given outputs) when `full`, and the helper with isSymmetric 1
+    // (OpenEigenSystem whatever the matrix: FS-42's NaN cases) and 0
+    int full = geti();
+    MATRIX *a = getm(MATRIX_REAL);
+    int n = a->rows > 0 ? a->rows : 1;
+    std::vector<float> ev((size_t)n, 7.0f);
+    Capture c;
+    cap_begin(c, tmpfile);
+    if (full) {
+      putm_n(MatrixEigenSystem(a, ev.data(), NULL));
+      for (int i = 0; i < n; i++) putf(ev[i]);
+      MATRIX *o = MatrixAlloc(a->rows, a->rows, MATRIX_REAL);
+      std::fill(ev.begin(), ev.end(), 7.0f);
+      MATRIX *r = MatrixEigenSystem(a, ev.data(), o);
+      line_out += r ? "OK " : "NULL ";
+      putm_raw(o);
+      for (int i = 0; i < n; i++) putf(ev[i]);
+      std::fill(ev.begin(), ev.end(), 7.0f);
+      putm_n(MatrixCalculateEigenSystemHelper(a, ev.data(), NULL, 0));
+      for (int i = 0; i < n; i++) putf(ev[i]);
+    }
+    std::fill(ev.begin(), ev.end(), 7.0f);
+    putm_n(MatrixCalculateEigenSystemHelper(a, ev.data(), NULL, 1));
+    for (int i = 0; i < n; i++) putf(ev[i]);
+    cap_end(c);
+  }
+  else if (cmd == "msvd") {
+    MATRIX *a = getm(MATRIX_REAL);
+    int rows = a->rows, cols = a->cols;
+    std::vector<float> ev((size_t)(rows > 0 ? rows : 1), 7.0f);
+    Capture c;
+    cap_begin(c, tmpfile);
+    putf(MatrixSVDEigenValues(a, ev.data()));
+    for (int i = 0; i < rows; i++) putf(ev[i]);
+    putf(MatrixConditionNumber(a));
+    putf(MatrixNSConditionNumber(a));
+    MATRIX *u = MatrixCopy(a, NULL);
+    VECTOR *z = VectorAlloc(cols, MATRIX_REAL);
+    putm_n(MatrixSVD(u, z, NULL));
+    putm_raw(u);
+    putm_raw(z);
+    MATRIX *u2 = MatrixCopy(a, NULL);
+    VECTOR *z2 = VectorAlloc(cols, MATRIX_REAL);
+    MATRIX *v2 = MatrixAlloc(cols, cols, MATRIX_REAL);
+    line_out += MatrixSVD(u2, z2, v2) ? "OK " : "NULL ";
+    putm_raw(v2);
+    putm_raw(u2);
+    putm_raw(z2);
+    cap_end(c);
+  }
+  else if (cmd == "msvdinv") {
+    MATRIX *a = getm(MATRIX_REAL);
+    Capture c;
+    cap_begin(c, tmpfile);
+    putm_n(MatrixSVDInverse(a, NULL));
+    MATRIX *o = MatrixAlloc(a->cols, a->rows, MATRIX_REAL);
+    line_out += MatrixSVDInverse(a, o) ? "OK " : "NULL ";
+    putm_raw(o);
+    cap_end(c);
+  }
+  else if (cmd == "mpinv") {
+    // one call: 0 MatrixPseudoInverse(a, NULL), 1 with a cols x rows output, 2 with a rows x
+    // cols one (the inner shape for fewer rows than columns: FreeSurfer frees it, so it is not
+    // printed), 3 MatrixSVDPseudoInverse(a, NULL), 4 with a cols x rows output
+    int which = geti();
+    MATRIX *a = getm(MATRIX_REAL);
+    Capture c;
+    cap_begin(c, tmpfile);
+    MATRIX *o = NULL;
+    if (which == 1 || which == 4) o = MatrixAlloc(a->cols, a->rows, MATRIX_REAL);
+    if (which == 2) o = MatrixAlloc(a->rows, a->cols, MATRIX_REAL);
+    MATRIX *r = which < 3 ? MatrixPseudoInverse(a, o) : MatrixSVDPseudoInverse(a, o);
+    if (r == o && o) {
+      line_out += "GIVEN ";
+      putm_raw(o);
+    }
+    else {
+      putm_n(r);
+      if (o && which != 2) putm_raw(o);
+    }
+    cap_end(c);
+  }
+  else if (cmd == "mrdtxt") {
+    // MatrixReadTxt of a file (its bytes in hexadecimal); errno after it
+    // (by a name relative to the cases' directory, the working directory: the messages print it)
+    puthexfile(next(), REL_FILE);
+    errno = 0;
+    Capture c;
+    cap_begin(c, tmpfile);
+    putm_n(MatrixReadTxt(REL_FILE, NULL));
+    puti(errno);
+    cap_end(c);
+    remove(REL_FILE);
+  }
+  else if (cmd == "mrdasc" || cmd == "mrdbin") {
+    // MatrixAsciiReadFrom or MatrixReadFrom of a file, into a new matrix or a given one of the
+    // type and sizes the case names; errno and the bytes read after it
+    int given = geti();
+    int t = geti(), r = geti(), cc = geti();
+    puthexfile(next(), REL_FILE);
+    Capture c;
+    cap_begin(c, tmpfile);
+    MATRIX *o = given ? MatrixAlloc(r, cc, t) : NULL;
+    FILE *fp = fopen(REL_FILE, "rb");
+    errno = 0;
+    MATRIX *res = cmd == "mrdasc" ? MatrixAsciiReadFrom(fp, o) : MatrixReadFrom(fp, o);
+    if (res && res == o) {
+      line_out += "GIVEN ";
+      putm_raw(o);
+    }
+    else {
+      putm_n(res);
+      if (o) putm_raw(o);
+    }
+    puti(errno);
+    puti((int)ftell(fp));
+    cap_end(c);
+    fclose(fp);
+    remove(REL_FILE);
+  }
+  else if (cmd == "mwr") {
+    // MatrixAsciiWriteInto and MatrixWriteTxt of a matrix: the files' bytes
+    MATRIX *a = getmt();
+    FILE *fp = fopen(REL_FILE, "wb");
+    puti(MatrixAsciiWriteInto(fp, a));
+    fclose(fp);
+    putfile(REL_FILE);
+    Capture c;
+    cap_begin(c, tmpfile);
+    puti(MatrixWriteTxt(REL_FILE, a));
+    cap_end(c);
+    putfile(REL_FILE);
+    remove(REL_FILE);
+  }
+  else if (cmd == "powell" || cmd == "powell2") {
+    run_minimizer(cmd, tmpfile);
+  }
+  else if (cmd == "dfpmin") {
+    run_minimizer(cmd, tmpfile);
+  }
   else
     fail("unknown case");
 }
@@ -696,6 +1221,13 @@ int main(int argc, char *argv[])
   }
   // the scratch file of the commands that write files: beside the cases, removed after use
   std::string tmp = std::string(argv[1]) + ".tmp";
+  if (argv[1][0] != '/') fail("the cases must be given by an absolute path");
+  {
+    std::string dir = std::string(argv[1]);
+    size_t slash = dir.rfind('/');
+    dir = slash == std::string::npos ? std::string(".") : dir.substr(0, slash ? slash : 1);
+    if (chdir(dir.c_str()) != 0) fail("cannot enter the cases' directory");
+  }
   FILE *fp = fopen(argv[1], "r");
   if (!fp) fail("cannot open the cases");
   static char buf[1 << 20];
@@ -705,6 +1237,8 @@ int main(int argc, char *argv[])
     for (char *t = strtok(buf, " \t\n"); t; t = strtok(NULL, " \t\n")) toks.push_back(t);
     if (toks.empty()) continue;
     line_out.clear();
+    Gerror = NO_ERROR;
+    errno = 0;
     run_case(tmp.c_str());
     if (!line_out.empty() && line_out.back() == ' ') line_out.pop_back();
     printf("%s\n", line_out.c_str());

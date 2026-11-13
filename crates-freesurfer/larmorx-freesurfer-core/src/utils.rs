@@ -389,7 +389,7 @@ pub fn dlist_stats(out: &mut dyn Write, dlist: Option<&[f64]>, nlist: i32) -> Op
     let (mut min, mut max) = (list[0], list[0]);
     for &x in list {
         sum += F80::from_f64(x);
-        sum2 += F80::from_f64(x * x);
+        sum2 += F80::from_f64(crate::sse::mul64(x, x));
         if min > x {
             min = x;
         }
@@ -399,7 +399,9 @@ pub fn dlist_stats(out: &mut dyn Write, dlist: Option<&[f64]>, nlist: i32) -> Op
     }
     let n = F80::from(nlist);
     let mean = (sum / n).to_f64();
-    let stddev = (sum2 / n - F80::from_f64(mean * mean)).sqrt().to_f64();
+    let stddev = (sum2 / n - F80::from_f64(crate::sse::mul64(mean, mean)))
+        .sqrt()
+        .to_f64();
     Some([f64::from(nlist), mean, stddev, min, max])
 }
 

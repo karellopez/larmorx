@@ -1059,6 +1059,38 @@ defects! {
         "MatrixInverse and MatrixDeterminant of a 0 x 0 matrix read memory VNL never allocated (the inverse goes through the 4 x 4 closed form and copies 16 floats past its output; the determinant reads the empty QR factor's first element), and MatrixInverse of a singular complex matrix crashes (it copies from the NULL inverse of its real form)";
     FS_31 = "FS-31", "FreeSurfer", true,
         "FreeSurfer's vector functions do not check their vectors' lengths (VectorCrossProduct's and VectorTripleProduct's test lets column vectors of one or two elements through and never tests the other vectors; VectorDot and VectorDistance read the second vector to the first's length): elements read outside the vectors";
+    FS_34 = "FS-34", "FreeSurfer", true,
+        "OpenPowell and OpenPowell2 accept no initial directions (a NULL matrix) but then write the final directions through it: a crash";
+    FS_35 = "FS-35", "FreeSurfer", false,
+        "fs_powell returns FAILED_USER_REQUEST where VNL's Powell, which it copies, returns FAILED_TOO_MANY_ITERATIONS (its iteration limit), so OpenPowell's exit and OpenPowell2's message and return value 1 for too many iterations never happen (kept: FreeSurfer's change keeps programs from exiting at the limit)";
+    FS_36 = "FS-36", "FreeSurfer", false,
+        "OpenPowell's tolerance argument sets VNL's x tolerance, which Powell's method never reads: every call stops at VNL's default relative tolerance on the cost, 1e-10 (kept: the programs' results depend on it)";
+    FS_37 = "FS-37", "FreeSurfer", true,
+        "fs_lbfgs records its best point only from the second evaluation on and reports the last value evaluated: without an improvement on the starting point a successful run empties the parameters (OpenDFPMin then crashes) and a failed one leaves them at the line search's last trial point with the previous run's end value; otherwise the end value can be a worse point's";
+    FS_38 = "FS-38", "FreeSurfer", true,
+        "OpenDFPMin repeats the minimization while the cost improved by more than the tolerance relative to the caller's first value, never to the previous pass's (its comment: keep iterating if the error is not significantly better), so it repeats until a pass fails or FreeSurfer crashes (FS-37)";
+    FS_39 = "FS-39", "FreeSurfer", true,
+        "OpenDFPMin returns FAILED_USER_REQUEST without writing the parameters, the iteration count or the final value when an L-BFGS pass reaches its evaluation limit: the progress made is dropped and the caller reads its own unset count";
+    FS_40 = "FS-40", "FreeSurfer", true,
+        "MatrixSVDEigenValues and MatrixConditionNumber read the singular values up to the matrix's row count where the decomposition has as many as its columns: for a matrix with more rows than columns they read past the vector (memory the program does not own), and the eigenvalues and the condition number (1e8 where that memory holds 0) depend on it";
+    FS_41 = "FS-41", "FreeSurfer", true,
+        "OpenNonSymmetricEigenSystem copies the matrix into a variable-length array on the stack (8 bytes an element): a non-symmetric matrix of about a thousand rows or more overflows the default 8 MiB stack, a crash";
+    FS_42 = "FS-42", "FreeSurfer", true,
+        "OpenEigenSystem ignores VNL's failure (EISPACK's tql2 not converging, as on a matrix with NaN entries): it returns success with eigenvectors VNL never wrote (memory contents)";
+    FS_43 = "FS-43", "FreeSurfer", true,
+        "MatrixSVD allocates V with as many rows and columns as the matrix has rows where the decomposition's V has as many as its columns (with more rows than columns V's numbers land in the wrong places), and ignores a failed decomposition (fewer rows than columns, or LINPACK not converging): V comes back unchanged, zeros for a new one, with no message";
+    FS_44 = "FS-44", "FreeSurfer", true,
+        "MatrixSVDInverse of a matrix with more rows than columns allocates the transpose of U as a square matrix and reads the singular values and writes their inverses up to the row count, past their vectors: FreeSurfer crashes or ends the program";
+    FS_45 = "FS-45", "FreeSurfer", true,
+        "MatrixPseudoInverse of a matrix with fewer rows than columns crashes when the pseudo-inverse of its transpose is NULL (a zero matrix) or cannot be written into the caller's output, which it passes on although that has the other shape; an output of the inner shape is filled, freed, and a new matrix returned";
+    FS_46 = "FS-46", "FreeSurfer", true,
+        "MatrixSVDPseudoInverse never writes a given output (it returns a new matrix), ignores a failed decomposition (a pseudo-inverse of infinities from the unset singular values), and of a zero matrix with fewer rows than columns crashes transposing the NULL inner result";
+    FS_47 = "FS-47", "FreeSurfer", true,
+        "OpenEigenSystem passes a matrix with infinite or NaN entries to VNL's symmetric eigensystem, whose EISPACK pythag never returns on a NaN or on two infinite arguments: MatrixEigenSystem of a symmetric matrix with infinite entries (and the helper's symmetric path with NaN ones) hangs";
+    FS_48 = "FS-48", "FreeSurfer", true,
+        "OpenSvdcmp passes a matrix with infinite or NaN entries to VNL's singular value decomposition, whose LINPACK ssvdc can loop for ever on such a matrix: the SVD functions (MatrixSVD, the SVD inverses and pseudo-inverses, the condition numbers) hang on some of them";
+    FS_49 = "FS-49", "FreeSurfer", true,
+        "freadInt and freadDouble at the end of the file return a value they never read (the stack's contents; freadInt prints nothing): MatrixReadFrom of a short file fills the matrix's type, sizes or elements with memory contents";
     FS_100 = "FS-100", "FreeSurfer", true,
         "the gamma draw converts its shape's integer part to a 32-bit unsigned integer, which C leaves undefined outside [0, 2^32): a shape of 2^32 or more gives a value of the wrong size, NaN and +inf the value of a shape below 1, and a negative shape or -inf a draw that does not return in practice";
     FS_101 = "FS-101", "FreeSurfer", true,

@@ -12,7 +12,8 @@
 //! FreeSurfer's code addresses within its arrays, except where FreeSurfer's own searches read
 //! past them (FS-22): the port notes those, and their lines are compared as `SKIP`.
 
-#![allow(dead_code)]
+// The minimizers' problems keep the C expressions (`s = s + ...`) and its 1-based loops.
+#![allow(dead_code, clippy::needless_range_loop, clippy::assign_op_pattern)]
 
 use std::io::Write;
 use std::path::Path;
@@ -20,10 +21,14 @@ use std::path::Path;
 use larmorx_core::defects::UpstreamDefects;
 use larmorx_freesurfer_core::affine::{self, AffineMatrix, AffineVector};
 use larmorx_freesurfer_core::dmatrix::{self, DMatrix};
+use larmorx_freesurfer_core::fs_vnl::FsFunctions;
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_freesurfer_core::histo::{self as h, Histogram};
 use larmorx_freesurfer_core::matrix::{self as m, MATRIX_COMPLEX, MATRIX_REAL, Matrix};
+use larmorx_freesurfer_core::matrix_decomp as md;
+use larmorx_freesurfer_core::matrix_io as mio;
 use larmorx_freesurfer_core::matrix_ops::{self as mo, Region};
+use larmorx_freesurfer_core::numerics::{self as nu, NrMatrix, NrVector};
 use larmorx_freesurfer_core::ret::Ret;
 use larmorx_freesurfer_core::{pdf, prime};
 
@@ -328,9 +333,327 @@ const COMMANDS: &[&str] = &[
     "pdfg",
     "minv",
     "mqr",
+    "meig",
+    "msvd",
+    "msvdinv",
+    "mpinv",
+    "mrdtxt",
+    "mrdasc",
+    "mrdbin",
+    "mwr",
+    "powell",
+    "powell2",
+    "dfpmin",
+];
+
+/// The minimizers' problems (`fsmaths.cpp`'s `Problem`, the same float expressions): 0 a
+/// quadratic, 1 Rosenbrock's, 2 the quadratic rounded down to a multiple of `1/q` (its gradient
+/// the quadratic's), 3 weighted absolute values (bounded below; every problem is, so no
+/// minimizer runs into infinities). Every call is hashed (FNV-1a over the bits) and counted.
+struct Problem {
+    kind: i32,
+    n: usize,
+    f0: f32,
+    b: f32,
+    q: f32,
+    a: Vec<f32>,
+    c: Vec<f32>,
+    iter_set: bool,
+    step_set: bool,
+    user_set: bool,
+    hash: u64,
+    nf: i32,
+    ng: i32,
+    ni: i32,
+    ns: i32,
+    nu: i32,
+}
+
+impl Problem {
+    fn fnv(&mut self, v: u32) {
+        for k in 0..4 {
+            self.hash ^= u64::from((v >> (8 * k)) & 0xff);
+            self.hash = self.hash.wrapping_mul(0x100_0000_01b3);
+        }
+    }
+    fn hashp(&mut self, p: &[f32], from: usize) {
+        for i in from..=self.n {
+            self.fnv(p[i].to_bits());
+        }
+    }
+}
+
+impl FsFunctions for Problem {
+    fn function(&mut self, p: &[f32]) -> f32 {
+        let n = self.n;
+        let mut s = self.f0;
+        if self.kind == 1 {
+            for i in 1..n {
+                let t = p[i + 1] - p[i] * p[i];
+                let u = 1.0f32 - p[i];
+                s = s + 100.0f32 * t * t + u * u;
+            }
+        } else {
+            for i in 1..=n {
+                let d = p[i] - self.c[i];
+                if self.kind == 3 {
+                    s = s + self.a[i] * d.abs();
+                } else {
+                    s = s + self.a[i] * d * d;
+                }
+            }
+            if self.kind != 3 {
+                for i in 1..n {
+                    s = s + self.b * ((p[i] - self.c[i]) * (p[i + 1] - self.c[i + 1]));
+                }
+            }
+            if self.kind == 2 {
+                s = (s * self.q).floor() / self.q;
+            }
+        }
+        self.nf += 1;
+        self.fnv(1);
+        self.hashp(p, 1);
+        self.fnv(s.to_bits());
+        s
+    }
+    fn gradient(&mut self, p: &[f32], g: &mut [f32]) {
+        let n = self.n;
+        for gi in g.iter_mut().take(n + 1).skip(1) {
+            *gi = 0.0;
+        }
+        if self.kind == 1 {
+            for i in 1..n {
+                let t = p[i + 1] - p[i] * p[i];
+                let u = 1.0f32 - p[i];
+                g[i] = g[i] + (-400.0f32 * t * p[i] - 2.0f32 * u);
+                g[i + 1] = g[i + 1] + 200.0f32 * t;
+            }
+        } else {
+            for i in 1..=n {
+                let d = p[i] - self.c[i];
+                let mut gi = if self.kind == 3 {
+                    self.a[i]
+                        * if d > 0.0 {
+                            1.0f32
+                        } else if d < 0.0 {
+                            -1.0
+                        } else {
+                            0.0
+                        }
+                } else {
+                    2.0f32 * self.a[i] * d
+                };
+                if i > 1 && self.kind != 3 {
+                    gi = gi + self.b * (p[i - 1] - self.c[i - 1]);
+                }
+                if i < n && self.kind != 3 {
+                    gi = gi + self.b * (p[i + 1] - self.c[i + 1]);
+                }
+                g[i] = gi;
+            }
+        }
+        self.ng += 1;
+        self.fnv(2);
+        self.hashp(p, 1);
+        self.hashp(g, 1);
+    }
+    fn powell_iteration(&mut self, p: &[f32], nparms: i32) {
+        if !self.iter_set {
+            return;
+        }
+        self.ni += 1;
+        self.fnv(3);
+        self.fnv(nparms as u32);
+        self.hashp(p, 0);
+    }
+    fn step(&mut self, itno: i32, sse: f32, p: &[f32]) {
+        if !self.step_set {
+            return;
+        }
+        self.ns += 1;
+        self.fnv(4);
+        self.fnv(itno as u32);
+        self.fnv(sse.to_bits());
+        self.hashp(p, 1);
+    }
+    fn user_callback(&mut self, p: &[f32]) {
+        if !self.user_set {
+            return;
+        }
+        self.nu += 1;
+        self.fnv(5);
+        self.hashp(p, 1);
+    }
+}
+
+/// A problem's tokens: kind n f0 b q a[1..n] c[1..n] (n at most 12; a positive definite
+/// quadratic: |b| < the smallest a / 2).
+fn put_problem(s: &mut Vec<String>, g: &mut Gen, kind: i64, n: i64) {
+    s.push(kind.to_string());
+    s.push(n.to_string());
+    let f0 = g.int(0, 4000) as f32 / 4.0;
+    s.push(fx(g.pick(&[0.0f32, 1.0, f0])));
+    s.push(fx(g.int(-6, 6) as f32 / 32.0));
+    s.push(fx(g.pick(&[1.0f32, 4.0, 64.0, 4096.0])));
+    for _ in 0..n {
+        s.push(fx(g.int(4, 32) as f32 / 8.0));
+    }
+    for _ in 0..n {
+        s.push(fx(g.int(-32, 32) as f32 / 8.0));
+    }
+}
+
+/// A minimizer case: the problem, the starting point (never the quadratics' centre on its first
+/// coordinate: a zero gradient makes L-BFGS divide by 0), the directions for Powell.
+fn minimizer_case(g: &mut Gen, cmd: &str) -> String {
+    let kind = g.pick(&[0i64, 0, 1, 2, 2, 3]);
+    let n = match cmd {
+        "dfpmin" => g.pick(&[2i64, 3, 4, 6, 12]),
+        _ => g.pick(&[1i64, 2, 3, 4, 6]),
+    };
+    let n = if kind == 1 { n.max(2) } else { n };
+    let mut s = vec![cmd.to_owned()];
+    put_problem(&mut s, g, kind, n);
+    let c1 = f32::from_bits(u32::from_str_radix(&s[6 + n as usize], 16).unwrap());
+    for i in 0..n {
+        let mut v = g.int(-64, 64) as f32 / 8.0;
+        if i == 0 && v == c1 {
+            v += 0.5;
+        }
+        s.push(fx(v));
+    }
+    match cmd {
+        "dfpmin" => {
+            s.push(fx(g.pick(&[1e-2f32, 1e-4, 1e-6])));
+            s.push(g.pick(&[0, 0, 0, 1, 2]).to_string());
+            s.push(if g.below(8) == 0 { "1" } else { "0" }.to_owned());
+            s.push(g.below(2).to_string());
+            s.push(g.below(2).to_string());
+        }
+        _ => {
+            let dkind = g.below(4);
+            for r in 0..n {
+                for k in 0..n {
+                    let v = match dkind {
+                        0 | 1 => {
+                            if r == k {
+                                1.0f32
+                            } else {
+                                0.0
+                            }
+                        }
+                        2 => {
+                            if r == k {
+                                g.int(1, 4) as f32 / 2.0
+                            } else {
+                                0.0
+                            }
+                        }
+                        _ => {
+                            if r == k {
+                                1.0
+                            } else if r > k {
+                                g.int(-4, 4) as f32 / 8.0
+                            } else {
+                                0.0
+                            }
+                        }
+                    };
+                    s.push(fx(v));
+                }
+            }
+            if cmd == "powell" {
+                s.push(fx(g.pick(&[1e-4f32, 1e-2, 1e-6])));
+            } else {
+                s.push(fx(g.pick(&[1e-1f32, 1e-2, 1e-3, 1e-4, 1e-6, 1e-8])));
+                s.push(fx(g.pick(&[1e-1f32, 1e-2, 1e-3])));
+                s.push(g.pick(&[0, 1, 2, 4, 36, 36]).to_string());
+                s.push(if g.below(6) == 0 { "1" } else { "0" }.to_owned());
+            }
+            s.push(g.below(2).to_string());
+        }
+    }
+    s.join(" ")
+}
+
+/// The special doubles of the double matrices' cases: infinities, quiet NaNs of both signs
+/// with and without a payload, a signalling NaN.
+const SPECIAL64: [f64; 6] = [
+    f64::INFINITY,
+    f64::NEG_INFINITY,
+    f64::from_bits(0x7ff8_0000_0000_0000),
+    f64::from_bits(0xfff8_0000_0000_0005),
+    f64::from_bits(0x7ff8_0000_0000_0123),
+    f64::from_bits(0x7ff0_0000_0000_0042),
 ];
 
 /// One case line of command `cmd`.
+/// A number as text, in one of the forms FreeSurfer's files hold or a reader may meet: integers,
+/// fixed and exponent forms, `%+4.5f`'s, and (rarely) the C library's special and edge forms.
+fn num_token(g: &mut Gen) -> String {
+    match g.below(40) {
+        0 => g
+            .pick(&[
+                "inf",
+                "-inf",
+                "nan",
+                "-nan",
+                "INFINITY",
+                "1e40",
+                "-1e40",
+                "1e-40",
+                "1e-50",
+                "0x1p-149",
+                "0x1.8p3",
+                "1e",
+                "100ergs",
+                "5.",
+                ".5",
+                "+.5",
+                "1.17549435e-38",
+                "3.40282357e38",
+                "0x.",
+                "1e+",
+            ])
+            .to_owned(),
+        1 => g
+            .pick(&["abc", ".", "-", "1,5", "nan(1)", "infin", "0x", "e5"])
+            .to_owned(),
+        k => {
+            let v = g.f(-1000, 1000, 64);
+            match k % 4 {
+                0 => g.int(-1000, 1000).to_string(),
+                1 => format!("{v:.3}"),
+                2 => format!("{v:+.5}"),
+                _ => format!("{v:e}"),
+            }
+        }
+    }
+}
+
+fn hex_text(t: &[u8]) -> String {
+    if t.is_empty() {
+        return "-".to_owned();
+    }
+    t.iter().map(|b| format!("{b:02x}")).collect()
+}
+
+/// A matrix text file: rows of numbers with varied separators and line ends.
+fn matrix_text(g: &mut Gen, rows: i64, cols: i64) -> String {
+    let mut text = String::new();
+    for _ in 0..rows {
+        for c in 0..cols {
+            if c > 0 || g.below(6) == 0 {
+                text.push_str(g.pick(&[" ", "  ", "\t", " \t "]));
+            }
+            text.push_str(&num_token(g));
+        }
+        text.push_str(g.pick(&["\n", "\n", "\r\n", " \n", "\n\n"]));
+    }
+    text
+}
+
 fn case(g: &mut Gen, cmd: &str) -> String {
     let mut s = vec![cmd.to_owned()];
     let nb = nbins(g);
@@ -562,11 +885,16 @@ fn case(g: &mut Gen, cmd: &str) -> String {
         }
         "dmat" => {
             let (r, c) = (g.int(1, 5), g.int(1, 5));
+            // a third of the cases with NaNs (of both signs, payloads, a signalling one) and
+            // infinities among the numbers and the factors
+            let special = g.below(3) == 0;
             for _ in 0..2 {
                 s.push(r.to_string());
                 s.push(c.to_string());
                 for _ in 0..r * c {
-                    let v = if g.below(6) == 0 {
+                    let v = if special && g.below(4) == 0 {
+                        g.pick(&SPECIAL64)
+                    } else if g.below(6) == 0 {
                         g.pick(&[0.0, -0.0])
                     } else {
                         g.d(-1000, 1000, 1024)
@@ -575,19 +903,30 @@ fn case(g: &mut Gen, cmd: &str) -> String {
                 }
             }
             let r = g.d(-10, 10, 64);
-            s.push(dx(g.pick(&[0.0, 1.0, -1.0, 2.5, r])));
+            let sp = g.pick(&SPECIAL64);
+            let v = if special && g.below(3) == 0 { sp } else { r };
+            s.push(dx(g.pick(&[0.0, 1.0, -1.0, 2.5, v])));
             let r = g.d(-10, 10, 64);
-            s.push(dx(g.pick(&[0.0, 1.0, -1.0, 0.25, r])));
+            let sp = g.pick(&SPECIAL64);
+            let v = if special && g.below(3) == 0 { sp } else { r };
+            s.push(dx(g.pick(&[0.0, 1.0, -1.0, 0.25, v])));
         }
         "dmmul" => {
             let (r, k, c) = (g.int(1, 6), g.int(1, 6), g.int(1, 6));
             let n = g.int(1, 12);
+            let special = g.below(3) == 0;
             for (rows, cols) in [(r, k), (k, c), (n, 1), (n, 1)] {
                 s.push(rows.to_string());
                 s.push(cols.to_string());
                 for _ in 0..rows * cols {
                     let big = g.pick(&[1.0, 1e8, 1e-6, 3.0]);
-                    let v = g.d(-1000, 1000, 1 << 20) * big;
+                    let v = if special && g.below(4) == 0 {
+                        g.pick(&SPECIAL64)
+                    } else if special && g.below(4) == 0 {
+                        0.0
+                    } else {
+                        g.d(-1000, 1000, 1 << 20) * big
+                    };
                     s.push(dx(v));
                 }
             }
@@ -596,7 +935,12 @@ fn case(g: &mut Gen, cmd: &str) -> String {
             let n = g.int(1, 40);
             s.push(n.to_string());
             let base = g.pick(&[0.0, 1e6, -250.0, 1e12]);
+            let special = g.below(4) == 0;
             for _ in 0..n {
+                if special && g.below(5) == 0 {
+                    s.push(dx(g.pick(&SPECIAL64)));
+                    continue;
+                }
                 s.push(dx(base + g.d(-100, 100, 1 << 16)));
             }
         }
@@ -779,6 +1123,163 @@ fn case(g: &mut Gen, cmd: &str) -> String {
             let (r, c) = (g.int(1, 6), g.int(1, 6));
             put_mat(&mut s, g, r, c, false);
         }
+        "meig" => {
+            // 0, 1 symmetric; 2 symmetric but one element (FreeSurfer's exact test: the
+            // non-symmetric path); 3 any; 4 symmetric with infinities and NaNs (only the helper's
+            // symmetric path: a NaN fails the symmetry test, and the non-symmetric path never
+            // returns on such a matrix, ITK-112); 5 upper triangular (real eigenvalues)
+            let n = g.int(1, 6) as usize;
+            let kind = g.below(6);
+            let cols = if g.below(10) == 0 { n + 1 } else { n };
+            let mut a = vec![0.0f32; n * cols];
+            for v in a.iter_mut() {
+                *v = if g.below(8) == 0 {
+                    0.0
+                } else {
+                    g.f(-1000, 1000, 64)
+                };
+            }
+            if kind == 4 {
+                for v in a.iter_mut() {
+                    if g.below(3) == 0 {
+                        *v = g.pick(&[f32::INFINITY, -f32::INFINITY, f32::NAN, 1.0, -0.0]);
+                    }
+                }
+            }
+            if cols == n {
+                for i in 0..n {
+                    for j in 0..i {
+                        match kind {
+                            3 => {}
+                            5 => a[i * n + j] = 0.0,
+                            _ => a[i * n + j] = a[j * n + i],
+                        }
+                    }
+                }
+                if kind == 2 && n > 1 {
+                    a[n - 1] += 1.0 / 64.0;
+                }
+            }
+            s.push(i64::from(kind != 4).to_string());
+            s.push(n.to_string());
+            s.push(cols.to_string());
+            s.extend(a.iter().map(|&v| fx(v)));
+        }
+        "msvd" => {
+            let (r, c) = (g.int(1, 6), g.int(1, 6));
+            put_mat_kind(&mut s, g, r, c, false);
+        }
+        "msvdinv" | "mpinv" => {
+            if cmd == "mpinv" {
+                s.push(g.int(0, 4).to_string());
+            }
+            let (r, c) = if g.below(3) != 0 {
+                let n = g.int(1, 5);
+                (n, n)
+            } else {
+                (g.int(1, 5), g.int(1, 5))
+            };
+            let at = s.len();
+            put_mat_kind(&mut s, g, r, c, false);
+            // sometimes singular: the second row a copy of the first
+            if r > 1 && g.below(4) == 0 {
+                for j in 0..c as usize {
+                    s[at + 2 + c as usize + j] = s[at + 2 + j].clone();
+                }
+            }
+        }
+        "mrdtxt" => {
+            let (r, c) = (g.int(1, 5), g.int(1, 5));
+            let mut text = matrix_text(g, r, c);
+            match g.below(10) {
+                0 => text = String::new(),
+                1 => text = format!("  \t\n{text}"),
+                2 => {
+                    while text.ends_with('\n') {
+                        text.pop();
+                    }
+                }
+                3 => {
+                    // a first line longer than fgets' 998 bytes
+                    let long: String = (0..250).map(|i| format!("{} ", i % 10)).collect();
+                    text = format!("{long}\n{text}");
+                }
+                _ => {}
+            }
+            s.push(hex_text(text.as_bytes()));
+        }
+        "mrdasc" => {
+            let t = g.pick(&[1, 1, 1, 2, 2, 3]);
+            let (r, c) = (g.int(0, 4), g.int(0, 4));
+            let given = i64::from(g.below(3) == 0);
+            let (gt, gr, gc) = if g.below(4) == 0 {
+                (g.pick(&[1, 2]), g.int(0, 4), g.int(0, 4))
+            } else {
+                (t, r, c)
+            };
+            let mut text = String::new();
+            for _ in 0..g.below(3) {
+                text.push_str(g.pick(&["# a comment\n", "\n", "   \n", "  # x 1 2\n"]));
+            }
+            text.push_str(&match g.below(12) {
+                0 => "1 2\n".to_owned(),
+                1 => "x 1 1\n".to_owned(),
+                2 => format!("{t} {r} {c} 9 # trailing\n"),
+                _ => format!("{t}{}{r} {c}\n", g.pick(&[" ", "\t", "  "])),
+            });
+            let per = if t == 2 { 2 } else { 1 };
+            text.push_str(&matrix_text(g, r, c * per));
+            if g.below(8) == 0 {
+                // the file ends early
+                let cut = g.below(text.len() as u64 + 1) as usize;
+                text.truncate(cut);
+            }
+            s.extend([given, gt, gr, gc].iter().map(i64::to_string));
+            s.push(hex_text(text.as_bytes()));
+        }
+        "mrdbin" => {
+            let t = g.pick(&[1, 1, 1, 2, 2, 3]);
+            let (r, c) = (g.int(0, 4), g.int(0, 4));
+            let given = i64::from(g.below(3) == 0);
+            let (gt, gr, gc) = if g.below(4) == 0 {
+                (g.pick(&[1, 2]), g.int(0, 4), g.int(0, 4))
+            } else {
+                (t, r, c)
+            };
+            let mut b = Vec::new();
+            for v in [t, r, c] {
+                b.extend_from_slice(&(v as i32).to_be_bytes());
+            }
+            let per = if t == 2 { 2 } else { 1 };
+            for _ in 0..r * c * per {
+                let v = if g.below(10) == 0 {
+                    g.pick(&[
+                        f64::INFINITY,
+                        f64::NAN,
+                        1e300,
+                        1e-300,
+                        -0.0,
+                        3.4028235677973366e38,
+                    ])
+                } else {
+                    g.d(-1000, 1000, 64)
+                };
+                b.extend_from_slice(&v.to_be_bytes());
+            }
+            if g.below(8) == 0 {
+                let cut = g.below(b.len() as u64 + 1) as usize;
+                b.truncate(cut);
+            }
+            s.extend([given, gt, gr, gc].iter().map(i64::to_string));
+            s.push(hex_text(&b));
+        }
+        "mwr" => {
+            let t = if g.below(4) == 0 { 2 } else { 1 };
+            s.push(t.to_string());
+            let (r, c) = (g.int(0, 4), g.int(0, 4));
+            put_mat_kind(&mut s, g, r, c, t == 2);
+        }
+        "powell" | "powell2" | "dfpmin" => return minimizer_case(g, cmd),
         _ => unreachable!("{cmd}"),
     }
     s.join(" ")
@@ -846,6 +1347,37 @@ impl<'a> Toks<'a> {
             *v = self.f();
         }
         mm
+    }
+    fn problem(&mut self) -> Problem {
+        let kind = self.i();
+        let n = self.i() as usize;
+        let (f0, b, q) = (self.f(), self.f(), self.f());
+        let mut a = vec![0.0f32; n + 1];
+        let mut c = vec![0.0f32; n + 1];
+        for v in a.iter_mut().skip(1) {
+            *v = self.f();
+        }
+        for v in c.iter_mut().skip(1) {
+            *v = self.f();
+        }
+        Problem {
+            kind,
+            n,
+            f0,
+            b,
+            q,
+            a,
+            c,
+            iter_set: false,
+            step_set: false,
+            user_set: false,
+            hash: 0xcbf2_9ce4_8422_2325,
+            nf: 0,
+            ng: 0,
+            ni: 0,
+            ns: 0,
+            nu: 0,
+        }
     }
     fn dm(&mut self) -> DMatrix {
         let (rows, cols) = (self.i(), self.i());
@@ -915,6 +1447,20 @@ impl Out {
             }
         }
     }
+    fn counts(&mut self, pr: &Problem) {
+        for v in [pr.nf, pr.ng, pr.ni, pr.ns, pr.nu] {
+            self.i(v);
+        }
+        self.0.push(format!("{:016x}", pr.hash));
+    }
+    fn cap(&mut self, bytes: &[u8]) {
+        if bytes.is_empty() {
+            self.0.push("-".to_owned());
+        } else {
+            self.0
+                .push(bytes.iter().map(|b| format!("{b:02x}")).collect::<String>());
+        }
+    }
     fn file(&mut self, p: &Path) {
         match std::fs::read(p) {
             Ok(bytes) => {
@@ -935,6 +1481,15 @@ fn new_h(r: Ret<Histogram>) -> Histogram {
 
 /// The port's output line for `line` in `mode`, and the IDs of the defects it noted. `tmp`: a
 /// scratch file for the commands that write files.
+/// Whether FreeSurfer's code crashes on this case (`reproduce` notes it, and the probe's line is
+/// `CRASH`): FS-44, FS-45, FS-46.
+fn crashed(g: &Globals, mode: UpstreamDefects) -> bool {
+    mode == UpstreamDefects::Reproduce
+        && g.notices.as_slice().iter().any(|x| {
+            matches!(x.defect.id, "FS-44" | "FS-45" | "FS-46") && x.detail.contains("crashes")
+        })
+}
+
 pub fn run_line(line: &str, mode: UpstreamDefects, tmp: &Path) -> (String, Vec<&'static str>) {
     let mut t = Toks {
         t: line.split_whitespace().collect(),
@@ -1563,6 +2118,321 @@ pub fn run_line(line: &str, mode: UpstreamDefects, tmp: &Path) -> (String, Vec<&
             ));
             o.mraw(&q);
             o.mraw(&r);
+        }
+        "meig" => {
+            let full = t.i();
+            let a = t.m(g, MATRIX_REAL);
+            let n = a.rows.max(1) as usize;
+            let mut ev = vec![7.0f32; n];
+            let (mut co, mut ce) = (Vec::new(), Vec::new());
+            if full != 0 {
+                let r = md::matrix_eigen_system(g, &mut co, &mut ce, &a, &mut ev, None).unwrap();
+                o.mn(&r, None);
+                ev.iter().for_each(|&x| o.f(x));
+                let mut out = Matrix::real(a.rows, a.rows);
+                ev.fill(7.0);
+                let r = md::matrix_eigen_system(g, &mut co, &mut ce, &a, &mut ev, Some(&mut out))
+                    .unwrap();
+                o.0.push(if r.is_null() { "NULL" } else { "OK" }.to_owned());
+                o.mraw(&out);
+                ev.iter().for_each(|&x| o.f(x));
+                ev.fill(7.0);
+                let r = md::matrix_calculate_eigen_system_helper(
+                    g, &mut co, &mut ce, &a, &mut ev, None, false,
+                )
+                .unwrap();
+                o.mn(&r, None);
+                ev.iter().for_each(|&x| o.f(x));
+            }
+            ev.fill(7.0);
+            let r = md::matrix_calculate_eigen_system_helper(
+                g, &mut co, &mut ce, &a, &mut ev, None, true,
+            )
+            .unwrap();
+            o.mn(&r, None);
+            ev.iter().for_each(|&x| o.f(x));
+            o.cap(&co);
+            o.cap(&ce);
+            // FreeSurfer never returns (the probe's child is stopped by its alarm)
+            if mode == UpstreamDefects::Reproduce
+                && g.notices.contains(&larmorx_core::defects::ITK_112)
+            {
+                o.0 = vec!["TIMEOUT".to_owned()];
+            }
+        }
+        "msvd" => {
+            let a = t.m(g, MATRIX_REAL);
+            let (rows, cols) = (a.rows, a.cols);
+            let (mut co, mut ce) = (Vec::new(), Vec::new());
+            let mut ev = vec![7.0f32; rows.max(1) as usize];
+            o.f(md::matrix_svd_eigen_values(g, &mut co, &mut ce, &a, &mut ev).unwrap());
+            ev[..rows as usize].iter().for_each(|&x| o.f(x));
+            o.f(md::matrix_condition_number(g, &mut co, &mut ce, &a).unwrap());
+            o.f(md::matrix_ns_condition_number(g, &mut co, &mut ce, &a).unwrap());
+            let mut u = m::matrix_copy(g, &mut co, &mut ce, Some(&a), None)
+                .unwrap()
+                .unwrap_new();
+            let mut z = Matrix::real(cols, 1);
+            let r = md::matrix_svd(g, &mut co, &mut ce, &mut u, &mut z, None).unwrap();
+            o.mn(&r, None);
+            o.mraw(&u);
+            o.mraw(&z);
+            let mut u2 = m::matrix_copy(g, &mut co, &mut ce, Some(&a), None)
+                .unwrap()
+                .unwrap_new();
+            let mut z2 = Matrix::real(cols, 1);
+            let mut v2 = Matrix::real(cols, cols);
+            let r = md::matrix_svd(g, &mut co, &mut ce, &mut u2, &mut z2, Some(&mut v2)).unwrap();
+            o.0.push(if r.is_null() { "NULL" } else { "OK" }.to_owned());
+            o.mraw(&v2);
+            o.mraw(&u2);
+            o.mraw(&z2);
+            o.cap(&co);
+            o.cap(&ce);
+        }
+        "msvdinv" => {
+            let a = t.m(g, MATRIX_REAL);
+            let (mut co, mut ce) = (Vec::new(), Vec::new());
+            let r = md::matrix_svd_inverse(g, &mut co, &mut ce, &a, None).unwrap();
+            if crashed(g, mode) {
+                o.0.push("CRASH".to_owned());
+            } else {
+                o.mn(&r, None);
+                let mut out = Matrix::real(a.cols, a.rows);
+                let r = md::matrix_svd_inverse(g, &mut co, &mut ce, &a, Some(&mut out)).unwrap();
+                o.0.push(if r.is_null() { "NULL" } else { "OK" }.to_owned());
+                o.mraw(&out);
+                o.cap(&co);
+                o.cap(&ce);
+            }
+        }
+        "mpinv" => {
+            let which = t.i();
+            let a = t.m(g, MATRIX_REAL);
+            let (mut co, mut ce) = (Vec::new(), Vec::new());
+            let mut out = match which {
+                1 | 4 => Some(Matrix::real(a.cols, a.rows)),
+                2 => Some(Matrix::real(a.rows, a.cols)),
+                _ => None,
+            };
+            let r = if which < 3 {
+                md::matrix_pseudo_inverse(g, &mut co, &mut ce, &a, out.as_mut()).unwrap()
+            } else {
+                md::matrix_svd_pseudo_inverse(g, &mut co, &mut ce, &a, out.as_mut()).unwrap()
+            };
+            if crashed(g, mode) {
+                o.0.push("CRASH".to_owned());
+            } else {
+                match r {
+                    Ret::Given => {
+                        o.0.push("GIVEN".to_owned());
+                        o.mraw(out.as_ref().unwrap());
+                    }
+                    r => {
+                        o.mn(&r, None);
+                        if let Some(x) = out.as_ref().filter(|_| which != 2) {
+                            o.mraw(x);
+                        }
+                    }
+                }
+                o.cap(&co);
+                o.cap(&ce);
+            }
+        }
+        "mrdtxt" | "mrdasc" | "mrdbin" => {
+            let dir = tmp.parent().unwrap_or(Path::new("."));
+            let file = dir.join("fsmaths-file.tmp");
+            let (mut given, mut gt, mut gr, mut gc) = (0, 1, 0, 0);
+            if cmd != "mrdtxt" {
+                (given, gt, gr, gc) = (t.i(), t.i(), t.i(), t.i());
+            }
+            let hex = t.next();
+            let bytes: Vec<u8> = if hex == "-" {
+                Vec::new()
+            } else {
+                (0..hex.len() / 2)
+                    .map(|i| u8::from_str_radix(&hex[2 * i..2 * i + 2], 16).unwrap())
+                    .collect()
+            };
+            let (mut co, mut ce) = (Vec::new(), Vec::new());
+            if cmd == "mrdtxt" {
+                std::fs::write(&file, &bytes).unwrap();
+                let r = mio::matrix_read_txt(g, &mut co, &mut ce, Some(dir), "fsmaths-file.tmp")
+                    .unwrap();
+                o.mn(&r, None);
+                o.i(g.errno);
+                let _ = std::fs::remove_file(&file);
+            } else {
+                let mut om = if given != 0 {
+                    m::matrix_alloc(g, &mut co, &mut ce, gr, gc, gt as i16).unwrap()
+                } else {
+                    None
+                };
+                g.errno = 0;
+                let mut rd: &[u8] = &bytes;
+                let r = if cmd == "mrdasc" {
+                    mio::matrix_ascii_read_from(g, &mut co, &mut ce, &mut rd, om.as_mut()).unwrap()
+                } else {
+                    mio::matrix_read_from(g, &mut co, &mut ce, &mut rd, om.as_mut()).unwrap()
+                };
+                match r {
+                    Ret::Given => {
+                        o.0.push("GIVEN".to_owned());
+                        o.mraw(om.as_ref().unwrap());
+                    }
+                    r => {
+                        o.mn(&r, None);
+                        if let Some(x) = om.as_ref() {
+                            o.mraw(x);
+                        }
+                    }
+                }
+                o.i(g.errno);
+                o.i((bytes.len() - rd.len()) as i32);
+            }
+            o.cap(&co);
+            o.cap(&ce);
+        }
+        "mwr" => {
+            let a = o.mt(g, &mut t);
+            let dir = tmp.parent().unwrap_or(Path::new("."));
+            let file = dir.join("fsmaths-file.tmp");
+            let mut buf = Vec::new();
+            o.i(mio::matrix_ascii_write_into(g, &mut buf, &a));
+            std::fs::write(&file, &buf).unwrap();
+            o.file(&file);
+            let (mut co, mut ce) = (Vec::new(), Vec::new());
+            o.i(mio::matrix_write_txt(
+                g,
+                &mut ce,
+                Some(dir),
+                "fsmaths-file.tmp",
+                &a,
+            ));
+            o.cap(&co);
+            co.clear();
+            o.cap(&ce);
+            o.file(&file);
+            let _ = std::fs::remove_file(&file);
+        }
+        "powell" | "powell2" | "dfpmin" => {
+            let mut pr = t.problem();
+            let n = pr.n;
+            let mut p = NrVector::new(1, n as i64);
+            for i in 1..=n as i64 {
+                p[i] = t.f();
+            }
+            let (mut co, mut ce) = (Vec::new(), Vec::new());
+            if cmd == "dfpmin" {
+                let tol = t.f();
+                let init = t.i();
+                let verbose = t.i();
+                pr.step_set = t.i() != 0;
+                pr.user_set = t.i() != 0;
+                let f = pr.function(p.as_slice());
+                let mut fret = match init {
+                    0 => f,
+                    1 => 0.0,
+                    _ => 2.0 * f,
+                };
+                let mut iter = -7;
+                let gdiag = g.gdiag;
+                if verbose != 0 {
+                    g.gdiag |= larmorx_freesurfer_core::diag::DIAG_VERBOSE;
+                }
+                let r = nu::open_dfp_min(
+                    g,
+                    &mut co,
+                    &mut ce,
+                    p.as_mut_slice(),
+                    n as i32,
+                    tol,
+                    &mut iter,
+                    &mut fret,
+                    &mut pr,
+                )
+                .unwrap();
+                g.gdiag = gdiag;
+                if mode == UpstreamDefects::Reproduce
+                    && g.notices
+                        .as_slice()
+                        .iter()
+                        .any(|x| x.defect.id == "FS-37" && x.detail.contains("crashes"))
+                {
+                    o.0.push("CRASH".to_owned());
+                } else {
+                    o.i(r);
+                    o.i(iter);
+                    o.f(fret);
+                    for i in 1..=n as i64 {
+                        o.f(p[i]);
+                    }
+                    o.counts(&pr);
+                    o.cap(&co);
+                    o.cap(&ce);
+                }
+            } else {
+                let mut xi = NrMatrix::new(1, n as i64, 1, n as i64);
+                for r in 1..=n as i64 {
+                    for k in 1..=n as i64 {
+                        xi[(r, k)] = t.f();
+                    }
+                }
+                let mut iter = -7;
+                let mut fret = -7.0f32;
+                if cmd == "powell" {
+                    let tol = t.f();
+                    pr.iter_set = t.i() != 0;
+                    nu::open_powell(
+                        g,
+                        &mut co,
+                        &mut ce,
+                        p.as_mut_slice(),
+                        Some(&mut xi),
+                        n as i32,
+                        tol,
+                        &mut iter,
+                        &mut fret,
+                        &mut pr,
+                    )
+                    .unwrap();
+                } else {
+                    let (ftol, lin) = (t.f(), t.f());
+                    let (maxit, gno) = (t.i(), t.i());
+                    pr.iter_set = t.i() != 0;
+                    let save = g.gdiag_no;
+                    g.gdiag_no = gno;
+                    let r = nu::open_powell2(
+                        g,
+                        &mut co,
+                        &mut ce,
+                        p.as_mut_slice(),
+                        Some(&mut xi),
+                        n as i32,
+                        ftol,
+                        lin,
+                        maxit,
+                        &mut iter,
+                        &mut fret,
+                        &mut pr,
+                    );
+                    g.gdiag_no = save;
+                    o.i(r);
+                }
+                o.i(iter);
+                o.f(fret);
+                for i in 1..=n as i64 {
+                    o.f(p[i]);
+                }
+                for r in 1..=n as i64 {
+                    for k in 1..=n as i64 {
+                        o.f(xi[(r, k)]);
+                    }
+                }
+                o.counts(&pr);
+                o.cap(&co);
+                o.cap(&ce);
+            }
         }
         _ => panic!("unknown case {cmd}"),
     }

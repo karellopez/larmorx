@@ -20,7 +20,7 @@ code: none in these files (FreeSurfer's own: Bruce Fischl, Douglas Greve).
 | `packages/nifti/znzlib.c` (FreeSurfer's copy of znzlib, public domain) | `znzread`, `znzwrite` (the compressed branch: one `gzread`/`gzwrite`, the count over the member size) | `fio::fs_znzread`, `fs_znzwrite`, on `larmorx_io::znz`'s zlib layer |
 | `utils/bfileio.cpp` | `byteswapbufdouble` (51), `byteswapbuffloat` (81), `byteswapbufshort` (103) | `bfileio` |
 | `utils/MRIio_old.cpp` | `MGHprint_error` (29), `lcalloc` (44) | `mriio_old` |
-| (larmorx's own) | C's `FILE` as these functions use it: `fopen`'s modes and `errno`, `fread`/`fwrite` of members, `getc`, `fgets`, `feof`, `ferror`, `fclose`, `scanf`'s input; written from ISO C 7.21 and glibc 2.35's measured behaviour | `cfile` |
+| (larmorx's own) | C's `FILE` as these functions use it: `fopen`'s modes and `errno`, `fread`/`fwrite` of members, `getc`, `fgets`, `feof`, `ferror`, `fclose`, `fseek`, `rewind`, `ftell`, `scanf`'s input; written from ISO C 7.21 and glibc 2.35's measured behaviour (`validation/investigations/glibc-stdio-probe/` for the seeks) | `cfile` |
 
 Queue item 3.1-25, piece 2 (track A, relay 11), with tags.cpp (3.1-30) and colortab.cpp's binary
 tables (3.1-33) taken early (the orchestrator's decision of 2026-11-13). Audited for third-party

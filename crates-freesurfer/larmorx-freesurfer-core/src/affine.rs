@@ -8,10 +8,14 @@
 //!
 //! The official build compiles the SSE branch (`AFFINE_MATRIX_USE_SSE`: GCC above 3, no
 //! `mcheck`, not ARM64): the matrix is stored column by column, and `AffineMV` computes each
-//! element as `((A0 x0 + A1 x1) + A2 x2) + A3 x3` in `float`, starting from the first product
+//! element as `((x0 A0 + x1 A1) + x2 A2) + x3 A3` in `float`, starting from the first product
 //! (the plain C branch starts from 0, so where all four products are -0 it gives +0; the SSE
 //! branch, the one built, gives -0). `AffineMM` is `AffineMV` column by column. There is no fused
-//! multiply-add (x86-64's baseline instructions have none).
+//! multiply-add (x86-64's baseline instructions have none). NaNs follow x86-64's rules
+//! (`crate::sse`) in the official build's operand order, measured where FreeSurfer inlines
+//! `AffineMV` (`MRIcalcCRASforExtractedVolume`'s object code: each product with the vector's
+//! number in the destination register, each sum with the running sum there; the fourth product,
+//! by 1, folded away, which gives the same bits); `AffineMM` takes the same order.
 //!
 //! `SetAffineMatrix` and `GetAffineMatrix` stop the program (`abort`, exit status 134) when the
 //! `MATRIX` is not 4 x 4, after `<function>: Bad matrix size` on standard error: FreeSurfer's own
@@ -26,6 +30,7 @@ use larmorx_core::defects::FS_17;
 use crate::globals::Globals;
 use crate::log::Fatal;
 use crate::matrix::Matrix;
+use crate::sse;
 
 /// `kAffineVectorSize`, `kAffineMatrixSize`.
 pub const AFFINE_VECTOR_SIZE: usize = 4;
@@ -138,14 +143,15 @@ pub fn affine_matrix_copy(src: &AffineMatrix, dst: Option<AffineMatrix>) -> Affi
     d
 }
 
-/// One column of the SSE code: `((c0 v0 + c1 v1) + c2 v2) + c3 v3`, lane by lane.
+/// One column of the SSE code: `((v0 c0 + v1 c1) + v2 c2) + v3 c3`, lane by lane, with SSE's
+/// NaNs in the official operand order (the vector's number, then the running sum, first).
 fn combine(a: &[f32; 16], v: [f32; 4]) -> [f32; 4] {
     let mut res = [0.0f32; 4];
     for (i, r) in res.iter_mut().enumerate() {
-        let mut acc = a[i] * v[0];
-        acc += a[4 + i] * v[1];
-        acc += a[8 + i] * v[2];
-        acc += a[12 + i] * v[3];
+        let mut acc = sse::mul(v[0], a[i]);
+        acc = sse::add(acc, sse::mul(v[1], a[4 + i]));
+        acc = sse::add(acc, sse::mul(v[2], a[8 + i]));
+        acc = sse::add(acc, sse::mul(v[3], a[12 + i]));
         *r = acc;
     }
     res

@@ -22,8 +22,9 @@ build tree and tools (`<workspace>/oracles/freesurfer-8.2.0-unit/` except runnin
 `docs/parts/` and the scratch folders of FreeSurfer's parts. **It may read** this spec,
 `specs/freesurfer-core.md` (§1's process state, the error functions, `nint`), `specs/ranlux.md`, the
 standards and papers cited (IEEE 754-2008, C11, POSIX's `drand48`, LINPACK's and EISPACK's guides,
-Numerical Recipes in C, 2nd edition, for the 1-based arrays and Powell's method, Nocedal 1980 and Liu
-and Nocedal 1989 for L-BFGS), the main package's open code and documentation (for example
+Powell 1964 and Brent 1973 for the line minimizations, Nocedal 1980 and Liu and Nocedal 1989 for
+L-BFGS; not Numerical Recipes' code, whose licence restricts it: §13 and §14 say what is needed),
+the main package's open code and documentation (for example
 `larmorx_core::vnl_minimize`, `larmorx_core::vnl_lbfgs`, the VNL ports, `larmorx_core::x87`,
 `larmorx_core::math`, `larmorx_core::cscan`, `larmorx_core::cfmt`, `larmorx_core::defects`), the open
 probe folder `validation/investigations/freesurfer-maths-probe/` (calls only: its README says how to

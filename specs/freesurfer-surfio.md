@@ -14,7 +14,9 @@ per-vertex scratch arrays and the integrator's file names; **part 3** (queue ite
 first part, §14-16): the neighbour distances' storage and the coordinate operations; **part 4**
 (queue item 3.1-49's parts b and c, §18-24): averaging and smoothing positions, centring a sphere,
 computing and checking the neighbour distances, the areas, triangle corners and coordinate sets,
-the curvature operations and saved coordinates. Later parts: reading and writing
+the curvature operations and saved coordinates; **part 5** (queue item 3.1-50's part a,
+§25-29): the saved vertex positions and normals, the canonical angles, the face-normal cache, the
+original area and storing and restoring the metric properties. Later parts: reading and writing
 surfaces, curvatures, patches and overlays (3.1-47, 3.1-48), the metric properties every read
 computes (3.1-49 to 3.1-52); the midline marking, the label normal and the coordinate copy (they
 need the volume structure).
@@ -571,3 +573,141 @@ count in use, checking or the percent error over distances shorter than the coun
 cases identical with `reproduce` but FS-114's (FreeSurfer's never return: the probe's 5-second
 alarm, `CRASH 14`, against larmorx's refusal; counted, not compared); the probe's whole-run numbers
 are in `validation/probes/fs-surfio/README.md`.
+
+## 25. Saved vertex positions and normals
+
+**Saving the current positions** into a set (the kinds of §3, with 10 target and 11 layer IV):
+- original (0): the original distances are freed (§15's "freeing the original distances"), the
+  original coordinates' kind becomes the surface's kind, and every vertex's `origx, origy, origz`
+  its `x, y, z`;
+- temporary (2), canonical (3), inflated (5), flattened (6), pial (7), second temporary (8),
+  white (9), target (`targx targy targz`, 10), layer IV (`l4x l4y l4z`, 11): every vertex's triple
+  becomes its `x, y, z` (bits copied, ripped vertices too);
+- any other kind (1, 4 current, 12 and above, negative): a failed assertion
+  `<BUILD_ROOT>/utils/mrisurf_metricProperties.cpp:3230 false` when the surface has a vertex (§1;
+  nothing happens without one).
+
+After saving into the canonical set the canonical angles are computed (§26). Returns 0.
+
+**Restoring positions** from a set: with the original set (0) first the check that the surface's
+kind and the original coordinates' kind use the same distance formula (§4: when not, the debug
+message `using incompatible <kind> and <kind>`, shown with `DIAG_VERBOSE`; a kind outside the list
+is §4's fatal error); then `dist_nsize` becomes 0 and every vertex's `x, y, z` (ripped too)
+becomes the set's triple: target, white, layer IV, pial, inflated, flattened, canonical, original,
+second temporary, and the **temporary set for any other kind** (current 4, 1, 12, negative...).
+On a **spherical patch** (kind 7) every unripped vertex's canonical triple then becomes the same
+triple (white, pial, inflated, flattened, original, second temporary, temporary or any other: the
+temporary set; the canonical set: unchanged), except for the target and layer-IV sets:
+
+- **FS-115** (corrected by default, rule A): for the target and layer-IV sets the original
+  surface sets the canonical triple to the **temporary** set (they are missing from the second
+  list), so `cx, cy, cz` differ from the restored `x, y, z`. larmorx sets them to the restored
+  set, as for every other named set, and notes FS-115 when a vertex's canonical triple differs by
+  it; `reproduce` gives the temporary set.
+
+Then the bounding box and centre are recomputed from the current coordinates (§16's
+`mrisComputeSurfaceDimensions`). Returns 0. Restoring the old positions is restoring the temporary
+set; storing the current positions is saving into it.
+
+**Saving the normals** (`nx, ny, nz`) into the temporary set (2), the second temporary set (8),
+the pial normals (`pnx pny pnz`, 7) or the white normals (`wnx wny wnz`, 9); **restoring** them
+from the temporary, second temporary or pial normals. Any other kind, and restoring from the white
+normals (9), is the fatal error `MRISsaveNormals: unsupported which <n>` (`ERROR_BADPARM`, code -2,
+exit status 254; FS-01's NUL with `reproduce`; restoring names the saving function too) at the
+first vertex, nothing without vertices. Return 0.
+
+## 26. Canonical angles, the mean canonical radius, folding
+
+**The mean canonical radius**: the canonical coordinates' bounding box in double (from 10000 and
+-10000; each coordinate above the high end or below the low end replacing it, so a NaN never
+enters), its centre `c = (lo ⊕ hi) ⊗ 0.5` (d), and the mean over every vertex (ripped too) of
+`sqrt((dx⊗dx ⊕ dy⊗dy) ⊕ dz⊗dz)` with `dx = cx ⊖ c_x` (d), summed `r ⊕= …` (d) and divided by the
+vertex count (d): `0 ⊘ 0`, the default NaN, without a vertex.
+
+**The canonical angles**: the surface's radius becomes the mean canonical radius, then
+`nint(radius)` (§1 of `specs/freesurfer-core.md`: FS-12 for NaN and values beyond `int`) as a
+float `r`, and `radius` that float widened. For every vertex (ripped too): `theta = atan2f(cy,
+cx)` and, when `theta < 0`, `theta = 2π ⊕ theta` in double (π as a double) rounded to float;
+`d = (r⊗r) ⊖ (cz⊗cz)` (f), 0 when below 0 (a NaN stays), `phi = atan2f(sqrt(d), cz)`. The
+official build's `atan2f(y, x)` is glibc 2.35's (`larmorx_core::math::atan2f_glibc` gives its
+bits); larmorx's default takes the correctly rounded value instead (the double `atan2` rounded to
+float: class (d) of the porting guide, no notice; on the probe's arguments of §29 about one call in
+six differs), `reproduce` glibc's. Of NaN arguments both give the NaN of `x ⊕ y` (f), `x` being
+the second argument (`cx`, or `cz`). Returns 0.
+
+**Folding**: `Σ ⊕= (area ⊗ (k1 ⊖ k2)) ⊗ (k1 ⊖ k2)` (d, each float widened) over the unripped
+vertices, from 0.
+
+## 27. The face-normal cache
+
+Each face has a cache entry (`nx, ny, nz`, `orig_area`, floats) and a deferral byte: bit 1 "the
+normal is to be computed", bit 2 "the original area is to be computed" (any other bits count as
+"deferred" for reading the normal only).
+
+**A face's normal and original area from its corners' original coordinates** (`v1, v2, v3` the
+face's three vertices in order; every operation (f)): `a = v2 ⊖ v1`, `b = v3 ⊖ v1` (each
+coordinate), `n = a × b` with `nx = (ay⊗bz) ⊖ (by⊗az)`, `ny = (az⊗bx) ⊖ (bz⊗ax)`, `nz = (ax⊗by) ⊖
+(bx⊗ay)`, `len = sqrt((nx⊗nx ⊕ ny⊗ny) ⊕ nz⊗nz)`. When `|len| < FLT_EPSILON` (a NaN is not):
+`a = (v3 ⊖ v2) ⊗ 100`, `b = (v1 ⊖ v2) ⊗ 100` (the product of the float difference and 100, one
+rounding), `n = a × b` as before, `len` as before, and when that is also below `FLT_EPSILON` the
+length is taken as 1 (`n` kept as it is). The result is `n ⊘ len` (each coordinate) and `len ⊘ 2`
+for the original area. A vertex number outside the surface is outside the behaviour (FreeSurfer
+reads out of its array).
+
+The operations:
+
+| Operation | Behaviour |
+|---|---|
+| set the normal | the entry's `nx, ny, nz`; bit 1 cleared |
+| set the original area | the entry's `orig_area`; bit 2 cleared |
+| compute the face's normal | both computed from the original coordinates and set (both bits cleared) |
+| read the normal (the entry) | when the byte is nonzero: the normal computed and stored, the original area too when bit 2 is set (otherwise the stored area kept), the byte 0; then the entry |
+| read the original area | the stored area, when bit 2 is clear; see FS-116 |
+| defer every face | every face's byte becomes 3 (with or without the variable `FREESURFER_deferSetFaceNorms_parallel`, read once per process: the same bytes) |
+| recompute every face | every face's normal and area computed and stored, every byte 0 |
+| undefer | every face with a nonzero byte gets both computed and stored (whatever its bits), byte 0 |
+
+- **FS-116** (corrected by default, rule A): reading the original area of a face whose bit 2 is
+  set prints `<BUILD_ROOT>/utils/mrisurf_metricProperties.cpp:7747 NYI` and a newline on standard
+  error and ends the program with a deliberate segmentation fault (signal 11). larmorx computes the
+  area as the cache would (half the length above), stores it, clears bit 2 (bit 1 stays) and
+  returns it, noting FS-116; `reproduce` prints the message and ends with exit status 139.
+
+## 28. The original area, storing and restoring the metric properties
+
+- **The original area** of the surface: the sum (f, from 0, in face order) of the unripped faces'
+  cached original areas, each read through "read the normal" of §27 (so a deferred face is computed
+  first, and its normal too). **Setting the original area** stores it in the surface's
+  `orig_area`.
+- **Storing the metric properties**: for every unripped vertex, `origarea` becomes `area`; when it
+  has distances (§15: in use), its original distances are made when it has none (§15's "making the
+  original distances": zeroed, the size in use) and the first `vsize` of them (§5's size in use)
+  become the distances' (bits copied); then for every unripped face, the cached original area
+  becomes the face's `area` (bit 2 cleared) and its original angles its angles; the surface's
+  `orig_area` becomes `total_area`. Returns 0. Reading or writing past a distance buffer's
+  capacity is outside the behaviour.
+- **Restoring the metric properties**: for every unripped vertex, `area` becomes `origarea` and the
+  first `vsize` distances the original distances' (a vertex in use without both buffers is outside
+  the behaviour: FreeSurfer writes through a null pointer); then for every unripped face, `area`
+  becomes the cached original area ("read the original area": FS-116 when deferred) and its angles
+  its original angles; the surface's `total_area` becomes `orig_area`. Returns 0.
+
+## 29. Validation plan, part 5
+
+The probe's `posn` command: a surface of 0 to 6 vertices and up to 4 faces from the case (every
+coordinate set and the normals, `k1`, `k2`, `area`, `origarea`, `theta`, `phi`, rip flags, the
+neighbour counts, distances in every state as §17, each face's corners (one face in six with two
+equal corners), area, angles, original angles, rip flag, cache entry and deferral byte (0 to 3, 4,
+6, -1)), the kinds (the spherical patch in one case of three, the rest as §24), `dist_alloced_flags`,
+the hop counts, the radius (any double), total and original areas; one case in three NaN-heavy as
+§24, one in four with original coordinates in steps of 2^-14 (so that a face's first cross product
+is shorter than `FLT_EPSILON` and its second is not); then 1 to 6 of §25-28's operations (the kinds
+valid mostly, 1, 4, 12 and -1 now and then); then the whole state (every coordinate set, the
+angles, areas, distances, each face's area, angles, cache entry and byte, the radius, the areas,
+the kinds, the hop counts, the bounding box). Storing or restoring the metric properties where it
+would read or write past a buffer prints `G` and is skipped on both sides. Measured 2026-11-13:
+seed 13, 10,000 `posn` cases identical with `reproduce` (602 of them FS-116's crash, 206 the
+assertion of §25, 766 fatal errors); the default differs only where a notice says why (FS-01,
+FS-03, FS-12, FS-115, FS-116) or in the angles of §26 (347 cases, correctly rounded `atan2f`);
+seed 7, the probe's whole run of 48,024 cases (2,001 `posn`), the same; the seed-1 hash of every
+command's 30 cases is in the probe's README.

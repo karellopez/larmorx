@@ -24,7 +24,12 @@
   smoothing, `MRIScenterSphere`, the neighbour distances' computation and checks, the percent
   distance error, the areas, the triangle corners and coordinate sets, the curvature operations,
   the saved coordinates; an operation that would read or write past what the case allocated
-  prints `G` and is skipped on both sides), 23 commands. `build.sh` also builds
+  prints `G` and is skipped on both sides), 23 commands; since relay 8 `posn` (a surface from
+  the case with its face-normal cache, 1 to 6 of 21 operations: saving and restoring the vertex
+  positions and normals, the canonical angles and mean canonical radius, the folding, the
+  face-normal cache's reads, writes, deferral and recomputation, the original area, storing and
+  restoring the metric properties, the old and current positions; then the surface's whole state;
+  storing or restoring the metric properties past a buffer prints `G`), 24 commands. `build.sh` also builds
   `fssurfio-mpstub`: the same probe with a stub `MRIScomputeMetricProperties` (it writes `MP`),
   linked first with `--allow-multiple-definition` so the library's own call (`MRISsmoothSurface`'s
   last step) reaches it; `check.py` runs `metric`'s cases through it.
@@ -35,6 +40,18 @@
   cache at one thread, the port in both modes, the comparison (`reproduce` identical; `fix`
   different only with a notice), and the hash the test checks. Run it inside
   `scripts/orchestration/boxed.sh`.
+
+Measured 2026-11-13 (relay 8, 24 commands): seed 7, 48,024 cases: 48,021 identical with
+`reproduce`, 3 counted, not compared (FS-114, as below); `fix` differs only with the notices of
+FS-01, FS-03, FS-12, FS-111, FS-113, FS-115 and FS-116, in 7 `surf` cases that rotate and in 76
+`posn` cases that compute the canonical angles (the default's correctly rounded `atan2f`: `fix_libm`
+counts both); the port's outputs byte-identical with and without AArch64's NaN emulated (32,380
+NaNs flipped), both modes. Seed 13, 10,000 `posn` cases alone: all identical with `reproduce` (602
+of them FS-116's deliberate crash, `CRASH 11`). Seed 1, 720 cases: all identical, hash
+`15533dfff68f232f97a985423d16c9fc84d53dcc5b71b99be897d3e66856a825` (the test), with the emulation
+too, debug and release. (A first seed-7 run with `--n 48000` overlapped a second one on the same
+cases file, so the two `fssurfio` processes shared `<cases>.out`: its oracle-cache entry is
+disputed and never served; never run two probes on one cases file at once.)
 
 Measured 2026-11-13 (relay 7, 23 commands): seed 7, 46,000 cases: 45,997 identical with
 `reproduce`, 3 counted, not compared (FS-114: FreeSurfer's `MRIScenterSphere` never returns on a
@@ -68,5 +85,5 @@ operand order is each caller's compiled code (`docs/findings/freesurfer-surfio.m
 
 ```
 validation/probes/fs-surfio/build.sh <workspace>
-scripts/orchestration/boxed.sh 8 python -P validation/probes/fs-surfio/check.py --seed 7 --n 46000
+scripts/orchestration/boxed.sh 8 python -P validation/probes/fs-surfio/check.py --seed 7 --n 48024
 ```

@@ -311,3 +311,63 @@ first). The probe reads them into locals first.
   `MRIScenterSphere_new` is a failed assertion, never called. Brought forward from 3.1-50:
   `mrisComputeCurvatureMinMax` (9113-9136); from `mrisurf_vals.cpp`: `MRISextractCurvatureVector`
   (677-685).
+
+## 10. Queue item 3.1-50, part a: saved positions and normals, canonical angles, the face-normal cache (relay 8)
+
+- **GCC 8.4's code keeps the C order everywhere here** (`objdump -dr -C` of the unit oracle's
+  `mrisurf_metricProperties.cpp.o`): `computeDefectFaceNormal_calculate_template<SurfaceFromMRIS::
+  XYZPositionM::Surface>` is one out-of-line function that `getFaceNorm`, `computeDefectFaceNormal`
+  and `recomputeOrUndeferFaceNorms`' OpenMP body all call (no per-site inlining); its differences,
+  `F_CROSS`' products and differences and the squared length are in the macro's order; `len / 2.0f`
+  is `len * 0.5f`; the second try's `100.0 * (v3 - v2)` (a double product) is compiled as the
+  float product `(v3 - v2) * 100.0f` (the same value: the exact product of a float and 100 fits in
+  a double, so both round once); `sqrt` of the float sum is `sqrtss` with `sqrtf`'s call only on the
+  negative branch. `MRISaverageCanonicalRadius`: the bounding box's `if (x > xhi) xhi = x` is
+  `maxsd` with the coordinate as the destination (`(x > xhi) ? x : xhi`, so a NaN never enters and
+  `-0` against `+0` keeps the old end, as in C), `(lo + hi) / 2.0f` is `* 0.5`, the radius sum
+  `radius + sqrt(...)` with `radius` the destination, the count `n` incremented per vertex (so the
+  division is by `nvertices`, and `0.0 / 0.0` without vertices: `pxor` both, the default NaN).
+  `MRIScomputeCanonicalCoordinates`: `r * r` once before the loop; `theta + 2π` with `theta` the
+  destination; `r*r - z*z` in float; `atan2f` called through the PLT (glibc's). `MRIScomputeFolding`:
+  `((area * d) * d)` added to the sum, `d = k1 - k2` in double. `MRIScomputeOrigArea`: `orig_area +
+  fNorm->orig_area`.
+- **FS-115** (`MRISrestoreVertexPositions`, lines 3299-3343): the second `switch`, for spherical
+  patches, has no `TARGET_VERTICES` and no `LAYERIV_VERTICES` case, so they fall to `default:` =
+  `TMP_VERTICES` (`cx = tx`), while the first `switch` restored `x = targx` (or `l4x`). The only
+  callers that restore the target set are `mris_make_surfaces`, `mris_place_surface`,
+  `mrisurf_mri.cpp` (8816, 9559) and `mrisurf_timeStep.cpp` (2307), on white and pial surfaces,
+  never spherical patches; no caller restores the layer-IV set. Rule A: the restored set (as every
+  other named set); notice when a vertex's canonical triple changes by it. The first `switch`'s
+  `default:` beside `case TMP_VERTICES:` (any unnamed kind restores the temporary set) is kept
+  (rule C): `MRIScomputeSurfaceNormals` (6474) saves the current positions in the temporary set and
+  then restores its argument's kind, so with `CURRENT_VERTICES` that `default:` gives back the
+  current positions; pipelines may rely on it. (`mrisurf_io.cpp` 4290, which restores its
+  argument's kind before writing a surface, would write the temporary set for `CURRENT_VERTICES`:
+  its callers pass named sets.)
+- **FS-116** (`getFaceOrigArea`, line 7747): `fprintf(stderr, "%s:%d NYI\n", __FILE__, __LINE__)`
+  then `*(int*)(-1) = 0`, when the deferral byte has bit 2. The bit is set only by
+  `mrisurf_deferSetFaceNorms` (called from `mrisurf_defect.cpp` 1874, for the topology fixer's
+  defect surfaces, which `mrisurf_undeferSetFaceNorms` (3242) or `getFaceNorm` clear later); the
+  callers of `getFaceOrigArea` (`MRISrestoreMetricProperties`, `mrisurf_io.cpp` 163's
+  `MRISreadTriangleProperties`) do not meet a deferred face on the recorded paths. Rule A: the area
+  computed as `getFaceNorm` would (`computeDefectFaceNormal_calculate`'s fourth output), stored
+  with `setFaceOrigArea` (bit 2 cleared, bit 1 kept: computing the normal early could change it if
+  the original coordinates move before its first read).
+- **Kept and documented (rule C):** `MRISrestoreNormals(WHITE_VERTICES)` is an error though
+  `MRISsaveNormals(WHITE_VERTICES)` works (the restore's `case WHITE_VERTICES:` is grouped with the
+  unsupported ones), and both functions' message says `MRISsaveNormals` (a copied line; messages
+  are kept). `MRISsaveVertexPositions`' `cheapAssert(false)` and the normals' `ErrorExit` are inside
+  the vertex loop, so a surface without vertices accepts any kind.
+- **`mrisurf_deferSetFaceNorms`' two paths** (`static` `use_parallel` from
+  `FREESURFER_deferSetFaceNorms_parallel`, read once per process): the `memset(..., 3, nfaces)` and
+  the OpenMP loop store the same bytes; `CHECK_DEFERED_NORMS` is not defined in the build, so its
+  checks are not compiled. The port keeps one loop.
+- **`MRISrestoreMetricProperties`** writes `v->dist[n] = v->dist_orig[n]` for `n < vsize` with no
+  test of either pointer: a vertex in use whose distances were freed after
+  `MRISstoreMetricProperties` (for example by `MRISsetXYZ`'s callers that free them) crashes. The
+  port panics there (an invalid access), the probe's `G` keeps the cases inside the buffers.
+- **The probe** (`posn`, `validation/probes/fs-surfio/`): seed 13, 10,000 cases identical with
+  `reproduce` (602 FS-116 crashes, 206 assertions of `MRISsaveVertexPositions`, 766 fatal errors,
+  878 `G`); with the default, 347 cases differ only in `theta`/`phi` (correctly rounded `atan2f`:
+  on the grid of k/4 for k in [-400, 400], glibc 2.35's `atan2f` differs from the correctly rounded
+  value in 101,400 of 641,601 argument pairs, 15.8 %), every other difference with a notice.

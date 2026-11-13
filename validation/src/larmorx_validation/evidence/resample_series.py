@@ -460,8 +460,25 @@ def _native(ctx: core.Context, reg: dict) -> dict:
             f"Δ is A − B over all {n_vox:,} values of the {' × '.join(map(str, fdata.shape))} "
             "series (every volume), not only the volumes and brain shown."
         ),
-        "provenance": common.provenance(info, f"{TOOL}/{CASE}", [common.DS005040]),
+        "provenance": common.provenance(
+            info,
+            f"{TOOL}/{CASE}",
+            [common.DS005040],
+            extra=[_numerics_runs(ctx)],
+        ),
     }
+
+
+def _numerics_runs(ctx: core.Context) -> str:
+    """The Runs line of the entry whose two runs of fMRIPrep's resampler are the original's
+    panels "fMRIPrep ResampleSeries 26.0.0.dev1" (the reviewer's round 24, minor 7)."""
+    ninfo = numerics_entry(ctx).info()
+    return (
+        f"Runs: figures cache entry `{TOOL}/{NUMERICS_CASE}` (fMRIPrep's resampler with the "
+        f"newest numerical releases and with the shared environment's), {common.computed(ninfo)} "
+        f"with larmorx `{ninfo['larmorx_commit'][:12]}`; every command, its environment, threads "
+        "and exit status are in its `RUN_INFO.json`"
+    )
 
 
 def _jacobian(ctx: core.Context, reg: dict) -> dict:
@@ -705,7 +722,11 @@ def export(ctx: core.Context) -> dict:
             "exporter": core.tree_hash(ctx.repo, "validation/src/larmorx_validation/evidence"),
             "records": rec.source(),
             "benchmarks": bench.source() if bench else [],
-            "cache": [fcache.provenance(entry(ctx)), fcache.provenance(jacobian_entry(ctx))],
+            "cache": [
+                fcache.provenance(entry(ctx)),
+                fcache.provenance(numerics_entry(ctx)),
+                fcache.provenance(jacobian_entry(ctx)),
+            ],
             "command": f"python -m larmorx_validation evidence {TOOL} --site <site>",
         },
         "implementations": [
@@ -894,6 +915,13 @@ def present(doc: dict) -> dict:
             known=("reference",) if ex["id"] == "pipe-03" else (), split=True,
         )  # fmt: skip
         if ex["id"] == "fmriprep-native":  # PIPE-03's example measures, against no threshold
+            # the original of the main comparison shown by default (the reviewer's round 24,
+            # minor 6): its panel beside fMRIPrep's own output
+            shown = ex["default"]["panels"]
+            if "fmriprep-newest" not in shown:
+                shown.insert(
+                    shown.index("fmriprep") if "fmriprep" in shown else 1, "fmriprep-newest"
+                )
             note = ex.get("metrics_note") or ""
             if "record's threshold" in note:
                 raise ValueError(f"{ex['id']}: the threshold is in its note already")

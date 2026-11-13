@@ -354,7 +354,7 @@ def export(ctx: core.Context) -> dict:
     return {
         "schema": 1,
         "tools": tools,
-        "note": "Every program counts its evidence page's verdicts, case by case: each case's "
+        "note": "Each program's counts are its evidence page's verdicts, case by case: each case's "
         "verdict is decided from what its record reports and measures (bit-identical to the "
         "original as built, identical once it uses correctly rounded maths, within the "
         "original's own variability, an expected divergence, rejected by both, an open "

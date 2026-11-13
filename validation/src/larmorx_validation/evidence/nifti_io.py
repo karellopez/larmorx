@@ -406,7 +406,20 @@ _TITLE = re.compile(
 
 #: The page's own rewordings of the record's texts (applied first): the words of developer
 #: documents on a page users read (the guide, section 1).
-TEXTS = [(r"\bfor brain-extraction parity\b", "for the comparison of brain extractions")]
+TEXTS = [
+    (r"\bfor brain-extraction parity\b", "for the comparison of brain extractions"),
+    # the quick check, by what it is (the guide's "Other words")
+    (r"\bThe smoke-tier\b", "The quick check's"),
+    (r"\bthe smoke-tier\b", "the quick check's"),
+    # numpy's long double is 64 bits on macOS on Apple silicon and on Windows; on Linux aarch64
+    # it is IEEE quad precision (numpy's documentation of ``numpy.longdouble``; the reviewer's
+    # round 24, minor 11)
+    (r"\(arm64, Windows\)", "(macOS on Apple silicon, Windows)"),
+    (r"\(arm64,\s+Windows\)", "(macOS on Apple silicon, Windows)"),
+    (r"\b64-bit on arm64 and Windows\b", "64-bit on macOS on Apple silicon and Windows"),
+]
+#: The verdicts in this page's words: nibabel is never "the original" (the guide, section 1).
+VERDICT_LABELS = {"within-variability": "Within nibabel's own variability"}
 
 
 def _text(s: str | None, code: bool = True) -> str | None:
@@ -470,5 +483,6 @@ def present(doc: dict) -> dict:
     }
     used = list(dict.fromkeys(c["category"] for c in doc["cases"]))
     doc["category_labels"] = {c: CATEGORIES.get(c, c) for c in used}
+    doc["verdict_labels"] = dict(VERDICT_LABELS)
     doc["presentation"] = words.PRESENTATION
     return doc

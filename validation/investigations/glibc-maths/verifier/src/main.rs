@@ -315,7 +315,7 @@ fn sse2(m: &Libm, threads: usize, out: Option<&str>) {
 
 /// Every float input of the one-argument float functions.
 fn float_checks(m: &Libm, threads: usize, checks: &mut Vec<Check>) {
-    let names: [(&'static str, &'static str); 16] = [
+    let names: [(&'static str, &'static str); 18] = [
         ("sinf_glibc", "glibc sinf"),
         ("cosf_glibc", "glibc cosf"),
         ("sincosf_glibc (sine)", "glibc sincosf"),
@@ -328,6 +328,14 @@ fn float_checks(m: &Libm, threads: usize, checks: &mut Vec<Check>) {
         (
             "acosf_glibc",
             "glibc acosf (acosf@@GLIBC_2.2.5, its SVID wrapper)",
+        ),
+        (
+            "tanhf_glibc",
+            "larmorx-afni-replica fdlibm::tanhf (the earlier translation)",
+        ),
+        (
+            "expm1f_glibc",
+            "larmorx-afni-replica fdlibm::expm1f (the earlier translation)",
         ),
         (
             "sinf_glibc",
@@ -360,7 +368,7 @@ fn float_checks(m: &Libm, threads: usize, checks: &mut Vec<Check>) {
             let x = f32::from_bits(i as u32);
             let what = || format!("{i:#010x}");
             let (gs, gc) = m.sincos(x);
-            let pairs: [(f32, f32); 14] = [
+            let pairs: [(f32, f32); 16] = [
                 ((m.sinf)(x), lx::sinf_glibc(x)),
                 ((m.cosf)(x), lx::cosf_glibc(x)),
                 (gs, lx::sincosf_glibc(x).0),
@@ -371,6 +379,8 @@ fn float_checks(m: &Libm, threads: usize, checks: &mut Vec<Check>) {
                 ((m.tanhf)(x), lx::tanhf_glibc(x)),
                 ((m.expm1f)(x), lx::expm1f_glibc(x)),
                 ((m.acosf)(x), lx::acosf_glibc(x)),
+                (larmorx_afni_replica::fdlibm::tanhf(x), lx::tanhf_glibc(x)),
+                (larmorx_afni_replica::fdlibm::expm1f(x), lx::expm1f_glibc(x)),
                 (afni::sinf(x), lx::sinf_glibc(x)),
                 (afni::cosf(x), lx::cosf_glibc(x)),
                 (afni::sse2::sinf(x), lx::sinf_glibc_sse2(x)),
@@ -381,14 +391,14 @@ fn float_checks(m: &Libm, threads: usize, checks: &mut Vec<Check>) {
             }
             let (s2, c2) = lx::sincosf_glibc_sse2(x);
             let (rs, rc) = (lx::sinf_glibc_sse2(x), lx::cosf_glibc_sse2(x));
-            v[14].count(
+            v[16].count(
                 b32(rs) << 32 | b32(rc),
                 rs.is_nan(),
                 b32(s2) << 32 | b32(c2),
                 what,
             );
             // Where the SSE2 build differs from the FMA build (a count, not a failure).
-            v[15].count(
+            v[17].count(
                 b32(lx::sinf_glibc(x)) << 32 | b32(lx::cosf_glibc(x)),
                 false,
                 b32(rs) << 32 | b32(rc),

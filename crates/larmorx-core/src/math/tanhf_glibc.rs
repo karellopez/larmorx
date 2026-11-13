@@ -253,4 +253,24 @@ mod tests {
             assert_eq!(expm1f_glibc(x).to_bits(), expm1, "expm1f({x})");
         }
     }
+
+    /// FNV-1a of every 4099th input's result (the inputs `0, 4099, 8198, ...` up to 2^32 - 1),
+    /// recorded from glibc 2.35 on Linux x86-64 (`validation/investigations/glibc-maths/`,
+    /// `glibc-maths-verify hashes`), so every platform is checked against glibc's bits.
+    fn stride_hash(f: fn(f32) -> f32) -> u64 {
+        let mut h = 0xcbf2_9ce4_8422_2325u64;
+        let mut x = 0u64;
+        while x <= u64::from(u32::MAX) {
+            h = (h ^ u64::from(f(f32::from_bits(x as u32)).to_bits()))
+                .wrapping_mul(0x0100_0000_01b3);
+            x += 4099;
+        }
+        h
+    }
+
+    #[test]
+    fn matches_glibc_on_a_stride() {
+        assert_eq!(stride_hash(tanhf_glibc), 0x9ac0_48e4_5dab_0e6e);
+        assert_eq!(stride_hash(expm1f_glibc), 0x4dce_e0f8_8de6_fdd1);
+    }
 }

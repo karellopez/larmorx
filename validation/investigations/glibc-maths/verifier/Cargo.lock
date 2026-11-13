@@ -15,6 +15,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "95832e849adfb21180ccb6826a99da14e5d266ae5c2e668e1602cf234f153797"
 
 [[package]]
+name = "bzip2"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f3a53fac24f34a81bc9954b5d6cfce0c21e18ec6959f44f56e8e90e4bb7c346c"
+dependencies = [
+ "libbz2-rs-sys",
+]
+
+[[package]]
 name = "cfg-if"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -80,7 +89,7 @@ dependencies = [
 
 [[package]]
 name = "larmorx-afni-replica"
-version = "0.0.1"
+version = "0.1.0-rc.1"
 dependencies = [
  "larmorx-core",
  "larmorx-io",
@@ -91,10 +100,9 @@ dependencies = [
 
 [[package]]
 name = "larmorx-core"
-version = "0.0.1"
+version = "0.1.0-rc.1"
 dependencies = [
  "bytemuck",
- "libm",
  "ndarray",
  "num-complex",
  "rayon",
@@ -103,7 +111,7 @@ dependencies = [
 
 [[package]]
 name = "larmorx-hdf5"
-version = "0.0.1"
+version = "0.1.0-rc.1"
 dependencies = [
  "flate2",
  "larmorx-core",
@@ -113,19 +121,19 @@ dependencies = [
 
 [[package]]
 name = "larmorx-interp"
-version = "0.0.1"
+version = "0.1.0-rc.1"
 dependencies = [
  "larmorx-core",
- "libm",
  "rayon",
  "thiserror",
 ]
 
 [[package]]
 name = "larmorx-io"
-version = "0.0.1"
+version = "0.1.0-rc.1"
 dependencies = [
  "bytemuck",
+ "bzip2",
  "crc32fast",
  "flate2",
  "larmorx-core",
@@ -137,7 +145,7 @@ dependencies = [
 
 [[package]]
 name = "larmorx-transform"
-version = "0.0.1"
+version = "0.1.0-rc.1"
 dependencies = [
  "larmorx-core",
  "larmorx-interp",
@@ -145,6 +153,12 @@ dependencies = [
  "rayon",
  "thiserror",
 ]
+
+[[package]]
+name = "libbz2-rs-sys"
+version = "0.2.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "32f454fd6831a29c0e827ed075bca2a15be201bd57f4168f0fd1041124eab17e"
 
 [[package]]
 name = "libm"

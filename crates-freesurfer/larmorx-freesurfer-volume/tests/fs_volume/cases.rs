@@ -21,7 +21,9 @@ use larmorx_freesurfer_io::cfile::CFile;
 use larmorx_freesurfer_mri::mri::{self as mm, Mri, MriRegion};
 use larmorx_freesurfer_mri::vol_geom::VolGeom;
 use larmorx_freesurfer_mri::vol_geom::reinit_cache;
+use larmorx_freesurfer_core::matrix as mx;
 use larmorx_freesurfer_volume::arith::{self as ar, Pair, Tri};
+use larmorx_freesurfer_volume::coords as co;
 use larmorx_freesurfer_volume::vgeom;
 
 /// The cases' random numbers.
@@ -618,6 +620,89 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
                     t.push(g.int(-1, 2).to_string());
                 }
             }
+            "dsign" => {
+                t.push(dx(g.pick(&[1.0, -1.0, 0.0, 2.5, f64::NAN, 1e300, -0.0, 0.1])));
+            }
+            "sras" | "spt" | "ostr" | "vtal" => {
+                let mut s = shape(&mut g);
+                s.drop = true;
+                vol_of(&mut g, &mut t, s);
+                match cmd {
+                    "sras" => t.push(g.int(0, 3).to_string()),
+                    "spt" => {
+                        t.push(g.int(0, 2).to_string());
+                        for _ in 0..3 {
+                            t.push(dx(coord(&mut g)));
+                        }
+                    }
+                    "vtal" => {
+                        let lt = g.chance(2);
+                        t.push(i64::from(lt).to_string());
+                        if lt {
+                            for i in 0..16 {
+                                let v = if g.chance(30) {
+                                    g.pick(&[f64::NAN, f64::INFINITY, -0.0, 1e300])
+                                } else if i >= 12 {
+                                    g.pick(&[0.0, 0.0, 0.0, 1.0, 0.5, 2.0])
+                                } else {
+                                    g.pick(&[1.0, 0.0, -1.0, 0.98, 1.1, 0.05, -12.5, 30.0])
+                                };
+                                t.push(dx(if i == 15 && v == 0.0 && g.chance(2) {
+                                    1.0
+                                } else {
+                                    v
+                                }));
+                            }
+                        }
+                        for _ in 0..3 {
+                            t.push(dx(coord(&mut g)));
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            "com" | "pca" => {
+                vol(&mut g, &mut t);
+                t.push(g.pick(&[0, 0, 1, 10, 100, 200, 255]).to_string());
+            }
+            "cmph" => {
+                let mut a = Vec::new();
+                vol(&mut g, &mut a);
+                let ea = hdr_extra(&mut g);
+                t.extend(a.iter().cloned());
+                t.extend(ea.iter().cloned());
+                let mode = g.pick(&[0, 1, 1, 1, 2]);
+                t.push(mode.to_string());
+                if mode == 1 {
+                    if g.chance(4) {
+                        vol(&mut g, &mut t);
+                        t.extend(hdr_extra(&mut g));
+                    } else {
+                        let mut b = a.clone();
+                        let mut eb = ea.clone();
+                        for _ in 0..g.int(0, 2) {
+                            perturb(&mut g, &mut b, &mut eb);
+                        }
+                        t.extend(b);
+                        t.extend(eb);
+                    }
+                }
+            }
+            "dump" => {
+                vol(&mut g, &mut t);
+                t.push(fx(num(&mut g, -300, 300, 4)));
+                t.push(g.int(-1, 3).to_string());
+                for _ in 0..3 {
+                    t.push(g.pick(&NAMES).to_owned());
+                }
+                let reg = g.chance(3);
+                t.push(i64::from(reg).to_string());
+                if reg {
+                    for _ in 0..16 {
+                        t.push(fx(num(&mut g, -50, 50, 8)));
+                    }
+                }
+            }
             c => panic!("no generator for {c}"),
         }
         lines.push(t.join(" "));
@@ -625,8 +710,54 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
     lines
 }
 
+/// A point's coordinate in the cases.
+fn coord(g: &mut Gen) -> f64 {
+    if g.chance(30) {
+        return g.pick(&[f64::NAN, f64::INFINITY, -f64::INFINITY, 1e10, -0.0]);
+    }
+    g.pick(&[0.0, 1.0, -1.0, 2.5, 128.0, -30.25, 0.5, 3.0, 17.75])
+}
+
+/// `cmph`'s header fields beyond the volume's: field of view, location, `ptype`.
+fn hdr_extra(g: &mut Gen) -> Vec<String> {
+    vec![
+        fx(g.pick(&[0.0, 256.0, 240.0, 1e-9])),
+        fx(g.pick(&[0.0, 1.5, -2.0])),
+        g.pick(&[0, 0, 1, 2]).to_string(),
+    ]
+}
+
+/// One small change to a copy of a volume's tokens or its header fields (a float nudged, an
+/// integer changed).
+fn perturb(g: &mut Gen, v: &mut [String], e: &mut [String]) {
+    if g.chance(4) {
+        let k = g.below(3) as usize;
+        e[k] = if k == 2 {
+            g.int(0, 3).to_string()
+        } else {
+            let x = f32::from_bits(u32::from_str_radix(&e[k], 16).unwrap());
+            fx(x + g.pick(&[1e-8f32, 1e-6, 1e-3, 0.5]))
+        };
+        return;
+    }
+    // the floats of the geometry (tokens 11 to 13 sizes, 15 to 29 cosines and centre) and the
+    // header (33 to 43), the flip angle (44, a double), ras_good_flag (14)
+    let k = g.pick(&[11, 12, 13, 14, 15, 18, 24, 26, 33, 36, 38, 41, 42, 43, 44]);
+    v[k] = match k {
+        14 => g.int(0, 1).to_string(),
+        44 => {
+            let x = f64::from_bits(u64::from_str_radix(&v[k], 16).unwrap());
+            dx(x + g.pick(&[1e-9, 1e-7, 1e-3]))
+        }
+        _ => {
+            let x = f32::from_bits(u32::from_str_radix(&v[k], 16).unwrap());
+            fx(x + g.pick(&[1e-8f32, 1e-6, 1e-3, 0.5]))
+        }
+    };
+}
+
 /// The probe's commands, in the order the generator cycles through them.
-pub const COMMANDS: [&str; 37] = [
+pub const COMMANDS: [&str; 46] = [
     "vgwrite",
     "vgread",
     "vgread",
@@ -664,6 +795,15 @@ pub const COMMANDS: [&str; 37] = [
     "lrange",
     "extract",
     "cras",
+    "dsign",
+    "sras",
+    "spt",
+    "ostr",
+    "vtal",
+    "com",
+    "pca",
+    "cmph",
+    "dump",
 ];
 
 /// One buffer both streams write into, in order (FreeSurfer's standard output and error go to
@@ -1183,9 +1323,147 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
             o.am(src.vg.i_to_r.as_ref());
             o.m(src.vg.r_to_i.as_ref());
         }
+        "dsign" => {
+            let v = t.d();
+            o.d(co::set_sample_volume_derivative_sign(g, a, v));
+        }
+        "sras" => {
+            let mut m = get_vol(cx, t)?;
+            let k = t.i();
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = match k {
+                0 => Some(co::surface_ras_from_voxel(g, a, b, &mut m.vg)?),
+                1 => co::voxel_from_surface_ras(g, a, b, &mut m.vg)?,
+                2 => co::surface_ras_from_ras(g, a, b, &m.vg)?,
+                _ => co::get_surface_ras_to_voxel_matrix(g, a, b, &mut m.vg)?,
+            };
+            o.m(r.as_ref());
+            o.am(m.vg.i_to_r.as_ref());
+            o.m(m.vg.r_to_i.as_ref());
+        }
+        "spt" => {
+            let mut m = get_vol(cx, t)?;
+            let k = t.i();
+            let (x, y, z) = (t.d(), t.d(), t.d());
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let (r, p) = match k {
+                0 => co::ras_to_surface_ras(g, a, b, &m.vg, x, y, z)?,
+                1 => co::voxel_to_surface_ras(g, a, b, &mut m.vg, x, y, z)?,
+                _ => co::surface_ras_to_voxel(g, a, b, &mut m.vg, x, y, z)?,
+            };
+            o.i(i64::from(r));
+            for v in p {
+                o.d(v);
+            }
+            o.am(m.vg.i_to_r.as_ref());
+            o.m(m.vg.r_to_i.as_ref());
+        }
+        "ostr" => {
+            let m = get_vol(cx, t)?;
+            let (r, s3) = co::dircos_to_orientation_string(&m.vg);
+            o.i(i64::from(r));
+            o.hex(&[s3[0], s3[1], s3[2], 0]);
+            o.0 += co::slice_direction_name(&m.vg);
+            o.0 += " ";
+            o.i(i64::from(co::get_slice_direction(&m.vg)));
+        }
+        "vtal" => {
+            let mut m = get_vol(cx, t)?;
+            if t.i() != 0 {
+                let mut tr = [[0.0f64; 4]; 4];
+                for row in tr.iter_mut() {
+                    for v in row.iter_mut() {
+                        *v = t.d();
+                    }
+                }
+                m.linear_transform = Some(tr);
+            }
+            let (x, y, z) = (t.d(), t.d(), t.d());
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let (r, p) = co::voxel_to_talairach(g, a, b, &mut m, x, y, z)?;
+            o.i(i64::from(r));
+            for v in p.unwrap_or([-7.0; 3]) {
+                o.d(v);
+            }
+            o.am(m.vg.i_to_r.as_ref());
+            o.m(m.vg.r_to_i.as_ref());
+        }
+        "com" | "pca" => {
+            let m = get_vol(cx, t)?;
+            let th = t.i() as u8;
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            if cmd == "com" {
+                let (r, means) = co::center_of_mass(g, b, &m, th)?;
+                o.i(i64::from(r));
+                for v in means {
+                    o.d(v);
+                }
+            } else {
+                let mut ev = mx::matrix_alloc(g, a, b, 3, 3, mx::MATRIX_REAL)?.expect("3 x 3");
+                let mut evalues = [-7.0f32; 3];
+                let (r, means, _) =
+                    co::principle_components(g, a, b, &m, Some(&mut ev), &mut evalues, th)?;
+                o.i(i64::from(r));
+                for v in means {
+                    o.d(v);
+                }
+                for v in evalues {
+                    o.f(v);
+                }
+                o.m(Some(&ev));
+            }
+        }
+        "cmph" => {
+            let mut va = get_vol(cx, t)?;
+            hdr_fields(t, &mut va);
+            let mode = t.i();
+            let vb = if mode == 1 {
+                let mut v = get_vol(cx, t)?;
+                hdr_fields(t, &mut v);
+                Some(v)
+            } else {
+                None
+            };
+            let b2 = match mode {
+                1 => vb.as_ref(),
+                2 => Some(&va),
+                _ => None,
+            };
+            o.i(i64::from(co::compare_headers(Some(&va), b2)));
+            o.i(i64::from(co::compare_headers(b2, Some(&va))));
+        }
+        "dump" => {
+            let mut m = get_vol(cx, t)?;
+            m.fov = t.f();
+            m.brightness = t.i();
+            m.subject_name = t.s();
+            m.path_to_t1 = t.s();
+            m.fname_format = t.s();
+            if t.i() != 0 {
+                let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+                let mut r = mx::matrix_alloc(g, a, b, 4, 4, mx::MATRIX_REAL)?.expect("4 x 4");
+                for i in 1..=4 {
+                    for j in 1..=4 {
+                        r.set_relt(i, j, t.f());
+                    }
+                }
+                m.vg.register_mat = Some(r);
+            }
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let mut fp = a.clone();
+            let r = co::mri_dump(g, a, b, &m, &mut fp)?;
+            o.i(i64::from(r));
+        }
         c => panic!("unknown command {c}"),
     }
     Ok(())
+}
+
+/// `cmph`'s header fields beyond the volume's tokens.
+fn hdr_fields(t: &mut Toks, m: &mut Mri) {
+    m.fov = t.f();
+    m.location = t.f();
+    m.ptype = t.i();
 }
 
 fn escape(b: &[u8]) -> String {

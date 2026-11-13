@@ -7,9 +7,11 @@ implementer writes the clean room (queue C3.1-05 and on) from this file, black-b
 official programs (and of the probe `validation/probes/fs-volume/`, a black-box run of FreeSurfer's
 code), `specs/freesurfer-mri.md` (the structure these functions work on) and the cited standards.
 
-Status: **part 1** (§1-5): the volume-geometry text block of linear transform and surface files,
+Status: **parts 1 to 3** (§1-17): part 1 (§1-5) the volume-geometry text block of linear transform and surface files,
 the geometry's copies, matrices, comparison and printer (3.1-39's first piece, taken first for the
-surface readers).
+surface readers); part 2 (§6-12) 3.1-35's voxel arithmetic; part 3 (§13-17) 3.1-35's coordinates and
+geometry. Not yet: `MRIfindApproximateSkullBoundingBox`, `MRItranslate`, the rotations and
+`MRItoImageView` (they need the samplers of 3.1-36 and the image structure).
 
 ## 1. Conventions
 
@@ -313,3 +315,96 @@ infinities, NaNs of both signs and with payloads), the destination new, given (o
 another shape and type) or a source, cached matrices kept stale, recomputed or dropped. Expected:
 identical with `reproduce` but where FreeSurfer reads or writes memory it does not own or crashes
 (FS-53, FS-58, FS-290, FS-294; FS-288 for part 1), which are counted, not compared.
+
+## 13. Coordinates and geometry (part 3): tkregister RAS
+
+The *tkregister vox2ras* of a geometry is `specs/freesurfer-mri.md`'s (`MRIxfmCRS2XYZtkreg`), its
+*vox2ras* the scanner one with base 0 and no shear; products are `MatrixMultiply`'s (`float`
+accumulation) and inverses `MatrixInverse`'s (none when an element of the result is not finite).
+
+- `surfaceRASFromVoxel_(vg)`: first the cached matrices are computed where missing (the forward one
+  from the vox2ras, the inverse from its inverse, possibly none) and kept in the geometry; the
+  result is a new tkregister vox2ras. With `Gdiag_no > 0` and `DIAG_VERBOSE` on, `surfaceRASFromVoxel_()
+  vox2ras --------------------` and the matrix (`MatrixPrint`, 5 decimals) on standard output.
+- `voxelFromSurfaceRAS_(vg)` and `GetSurfaceRASToVoxelMatrix(vg)`: the same cache filling, then the
+  inverse of the tkregister vox2ras, or none; the diagnostic `voxelFromSurfaceRAS_() ras2vox
+  --------------------` and the matrix (for none, `MatrixPrint`'s error `MatrixPrint: mat = NULL!`).
+- `surfaceRASFromRAS_(vg)`: `tkregister vox2ras * inverse(vox2ras)`, the cache untouched. A vox2ras
+  that cannot be inverted ends the program in the product (`MatrixMultiply(): m2 is null`, status 1).
+- `MRIRASToSurfaceRAS(vg, x, y, z, ...)`, `MRIvoxelToSurfaceRAS`, `MRIsurfaceRASToVoxel`: the point
+  `(x, y, z, 1)`, each coordinate rounded to `float`, multiplied by the matrix above
+  (`surfaceRASFromRAS_`, `surfaceRASFromVoxel_`, `voxelFromSurfaceRAS_` respectively, with their
+  cache filling); the three first elements widened to `double`; `NO_ERROR`. No inverse in
+  `MRIsurfaceRASToVoxel` ends the program (`MatrixMultiply(): m1 is null`).
+
+## 14. Orientation, slice direction, Talairach
+
+- `MRIdircosToOrientationString(vg, ostr)`: with `ras_good_flag` 0, `???` and 1. Otherwise for each
+  axis (columns `x`, `y`, `z` of the direction cosines; components R, A, S compared as `float`
+  absolute values): `R`/`L` (by the sign of R, `L` for 0 or NaN) when |R| is larger than both |A|
+  and |S|; else `A`/`P` when |A| > |S|; else `S`/`I` (`I` unless S > 0). A NaN component never wins
+  a comparison. The fourth byte is 0; returns 0.
+- `MRIsliceDirectionName(vg)`: from the third letter, `sagittal` (L, R), `coronal` (A, P), `axial`
+  (S, I); `unknown` when `ras_good_flag` is 0. `getSliceDirection(vg)`: `MRI_CORONAL` (0),
+  `MRI_SAGITTAL` (1), `MRI_AXIAL` (2), `MRI_UNDEFINED` (-1) for `unknown`.
+- `MRIvoxelToTalairach(mri, x, y, z, ...)`: a volume whose slice direction is not coronal gives the
+  error `MRIvoxelToTalairachVoxel: unsupported slice direction <d>` and `ERROR_UNSUPPORTED`, the
+  outputs untouched. Otherwise the voxel's scanner RAS (`MRIvoxelToWorld`, `specs/freesurfer-mri.md`:
+  `float` arithmetic, the cache filled) and, when the volume has a linear Talairach transform (a
+  MINC `Transform`, 4 x 4 doubles `T`), the point through it: `x' = ((T00 x + T01 y) + T02 z) + T03`
+  (the same for rows 1 and 2), the weight `w = T33 + ((x T30 + y T31) + z T32)` (operands in that
+  order: the first operand's NaN is the one passed on), and `x', y', z'` divided by `w` unless `w`
+  is 0 or 1 (a NaN weight divides). Without a transform the scanner RAS itself; `NO_ERROR`.
+
+## 15. Centre of mass, principal components
+
+- `MRIindexNotInVolume(mri, c, r, s)`: 0 when every coordinate is in `[0, extent - 1]`; else -1 when
+  each coordinate rounded to nearest (ties to even) as a `float` is in `[0, extent)`; else 1 (NaN
+  coordinates give 1).
+- `MRIsampleVolumeType(..., SAMPLE_NEAREST)`: 1 above gives `outside_val`. Otherwise the voxel of
+  frame 0 at the coordinates rounded by `nint` (half away from zero; FS-12 for numbers outside
+  `int`), each clamped to `[0, extent - 1]`, as a `float` (an `int` voxel rounded to `float`); a
+  type other than uchar, short, ushort, int, float gives 0 and the error `MRIsampleVolumeType:
+  unsupported volume type <t>` (`ERROR_UNSUPPORTED`).
+- `MRIcenterOfMass(mri, means, threshold)`: over the voxels in z, y, x order, each sampled as above
+  (so an unsupported type prints its error once per voxel), those above `threshold` (a byte)
+  accumulate in `double`: `weight += v`, `mx += x * v` (x converted to `float`, then `double`), the
+  same for y and z. A positive weight gives `means = (mx, my, mz) / weight`; otherwise zeros.
+  `NO_ERROR`. A volume without voxels reads memory it does not own (FS-290).
+- `MRIprincipleComponents(mri, evectors, evalues, means, threshold)`: the same means from
+  `MRIgetVoxVal` (frame 0); then for each voxel above the threshold, in the same order, the column
+  `((x - mx) v, (y - my) v, (z - mz) v)` computed in `double` and stored as `float`, its outer
+  product with itself (`MatrixTranspose`, `MatrixMultiply`) added to the covariance (`MatrixAdd`,
+  `float`); with a positive weight the covariance multiplied by `(float)(1 / weight)`
+  (`MatrixScalarMul`); then `MatrixEigenSystem(covariance, evalues, evectors)`
+  (`specs/freesurfer-maths.md`); `NO_ERROR`. FreeSurfer never returns for a covariance with
+  infinite or NaN entries (FS-47, ITK-112: an error by default and in `reproduce`).
+
+## 16. Header comparison, dump, derivative sign
+
+- `MRIcompareHeaders(a, b)`: 1 when either is absent; 1 when any of the voxel sizes, field of view,
+  slice thickness, pixel size, `xstart`..`zend`, TR, TE, TI, direction cosines and centre differ by
+  `FLT_EPSILON` or more (computed in `float`; a NaN difference differs), the flip angle likewise in
+  `double`, or `ptype`, the location (a `float` compared exactly: a NaN differs) or
+  `ras_good_flag` differ; else 0.
+- `MRIvolumeDeterminant(mri)`: the determinant (`MatrixDeterminant`) of the 4 x 4 matrix with rows
+  `(x_r, y_r, z_r, 0)`, `(x_a, y_a, z_a, 0)`, `(x_s, y_s, z_s, 0)`, `(0, 0, 0, 1)`, as a `float`.
+- `MRIdump(mri, fp)`: lines `%6.6s = <value>` (the name right-aligned in 6 columns and cut to 6
+  characters: `nframe` for nframes) for `fname`, `height`, `width`, `depth`, `nframes`, `imnr0`,
+  `imnr1`, `xnum` (the width), `ynum` (the height), `fov`, `thick`, `xstart`, `xend`, `ystart`,
+  `yend`, `zstart`, `zend` (floats `%f`), `type`, `xsize`, `ysize`, `zsize`, then `x ras`, `y ras`,
+  `z ras`, `c ras` with three `%f` each; then `det(xyz_ras) = <%f>`, `ras_good_flag = <d>`,
+  `brightness = <d>`, `subject_name = <s>`, `path_to_t1 = <s>`, `fname_format = <s>`, and when the
+  volume has a registration matrix `register_mat = ` and the matrix (`MatrixPrint`). `NO_ERROR`.
+- `MRIsetSampleVolumeDerivativeSign(s)`: the process's derivative sign (1 at the start) set to `s`,
+  `Settting MRIsampleVolumeDerivativeSign to <%g>` (three t's) on standard output; returns `s`.
+
+## 17. Validation plan (part 3)
+
+The probe's commands `dsign`, `sras` (the four matrices), `spt` (the three point conversions),
+`ostr`, `vtal` (with and without a transform of finite or special entries), `com`, `pca`, `cmph`
+(against nothing, itself, another volume or a copy with one field nudged by 1e-8 to 0.5), `dump`
+(with and without a registration matrix), on part 2's volumes with their cached matrices kept,
+recomputed or dropped and coordinates including NaN, infinities and 1e10. Expected: identical with
+`reproduce` but where FreeSurfer reads memory it does not own or never returns (FS-53, FS-58,
+FS-290, FS-47, FS-48, ITK-112, ITK-115, ITK-116), counted and not compared.

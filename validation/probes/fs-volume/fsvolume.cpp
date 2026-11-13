@@ -429,6 +429,92 @@ void run_case()
     od(r); od(a); od(s);
     oam(src->i_to_r__);
     om(src->r_to_i__);
+  } else if (cmd == "dsign") {
+    od(MRIsetSampleVolumeDerivativeSign(getd()));
+  } else if (cmd == "sras") {
+    MRI *m = get_vol();
+    int k = geti();
+    MATRIX *r;
+    if (k == 0) r = surfaceRASFromVoxel_(m);
+    else if (k == 1) r = voxelFromSurfaceRAS_(m);
+    else if (k == 2) r = surfaceRASFromRAS_(m);
+    else r = GetSurfaceRASToVoxelMatrix(m);
+    om(r);
+    oam(m->i_to_r__);
+    om(m->r_to_i__);
+  } else if (cmd == "spt") {
+    MRI *m = get_vol();
+    int k = geti();
+    double x = getd(), y = getd(), z = getd(), a = -7, b = -7, c = -7;
+    int r;
+    if (k == 0) r = MRIRASToSurfaceRAS(m, x, y, z, &a, &b, &c);
+    else if (k == 1) r = MRIvoxelToSurfaceRAS(m, x, y, z, &a, &b, &c);
+    else r = MRIsurfaceRASToVoxel(m, x, y, z, &a, &b, &c);
+    oi(r); od(a); od(b); od(c);
+    oam(m->i_to_r__);
+    om(m->r_to_i__);
+  } else if (cmd == "ostr") {
+    MRI *m = get_vol();
+    char o[4] = {'x', 'x', 'x', 'x'};
+    oi(MRIdircosToOrientationString(m, o));
+    ohex(std::string(o, 4));
+    os(MRIsliceDirectionName(m));
+    oi(getSliceDirection(m));
+  } else if (cmd == "vtal") {
+    MRI *m = get_vol();
+    if (geti()) {
+      m->linear_transform = (Transform *)calloc(1, sizeof(Transform));
+      for (int i = 0; i < 4; i++)
+        for (int j = 0; j < 4; j++) Transform_elem(*m->linear_transform, i, j) = getd();
+    }
+    double x = getd(), y = getd(), z = getd(), a = -7, b = -7, c = -7;
+    oi(MRIvoxelToTalairach(m, x, y, z, &a, &b, &c));
+    od(a); od(b); od(c);
+    oam(m->i_to_r__);
+    om(m->r_to_i__);
+  } else if (cmd == "com" || cmd == "pca") {
+    MRI *m = get_vol();
+    BUFTYPE th = (BUFTYPE)geti();
+    double means[3] = {-7, -7, -7};
+    if (cmd == "com") {
+      oi(MRIcenterOfMass(m, means, th));
+      od(means[0]); od(means[1]); od(means[2]);
+    } else {
+      MATRIX *ev = MatrixAlloc(3, 3, MATRIX_REAL);
+      float evalues[3] = {-7, -7, -7};
+      oi(MRIprincipleComponents(m, ev, evalues, means, th));
+      od(means[0]); od(means[1]); od(means[2]);
+      of(evalues[0]); of(evalues[1]); of(evalues[2]);
+      om(ev);
+    }
+  } else if (cmd == "cmph") {
+    MRI *a = get_vol();
+    a->fov = getf(); a->location = getf(); a->ptype = geti();
+    int mode = geti();
+    MRI *b = NULL;
+    if (mode == 1) {
+      b = get_vol();
+      b->fov = getf(); b->location = getf(); b->ptype = geti();
+    } else if (mode == 2) {
+      b = a;
+    }
+    oi(MRIcompareHeaders(a, b));
+    oi(MRIcompareHeaders(b, a));
+  } else if (cmd == "dump") {
+    MRI *m = get_vol();
+    m->fov = getf();
+    m->brightness = geti();
+    strcpy(m->subject_name, gets().c_str());
+    strcpy(m->path_to_t1, gets().c_str());
+    strcpy(m->fname_format, gets().c_str());
+    if (geti()) {
+      m->register_mat = MatrixAlloc(4, 4, MATRIX_REAL);
+      for (int i = 1; i <= 4; i++)
+        for (int j = 1; j <= 4; j++) m->register_mat->rptr[i][j] = getf();
+    }
+    fflush(stdout);
+    oi(MRIdump(m, stdout));
+    fflush(stdout);
   } else {
     fail("unknown command");
   }

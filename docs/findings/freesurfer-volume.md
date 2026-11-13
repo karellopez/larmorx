@@ -114,3 +114,26 @@ waits for `MRIsampleVolumeFrameType` (9434, 3.1-36).
   check: a source without a cached voxel-to-RAS matrix crashes the official build (observed:
   `SIGSEGV` at `MRIcopyHeader+0x39c`, `movdqu (%r12)` with `r12 = 0`); the port copies `None`. The
   probe avoids such sources except for `cras`.
+
+## 4. Coordinates and geometry (3.1-35 part 3)
+
+- **MINC's `transform_point` as built** (FreeSurfer's copy, `packages/minc/minc_volume_io.c`, in the
+  unit oracle's `libminc.a`; `objdump -d` of `transform_point`, the static `homogenous_transform_point`
+  inlined with `w = 1`): rows 0 to 2 are `((T[i][0] x + T[i][1] y) + T[i][2] z) + T[i][3]` with the
+  matrix element as the first operand of each product (the C order); the weight is computed from
+  `x T[3][0]`, `y T[3][1]`, `z T[3][2]` (coordinate first: GCC multiplies into the coordinate
+  registers) and `T[3][3]` added last as the first operand (`T[3][3] + sum`). The order decides which
+  NaN passes on when two meet; `coords::transform_point_fs` follows it with SSE's NaN rules.
+  `larmorx_io::xfm::homogenous_transform_point` (MINC 1.5.1, plain arithmetic) is not used here.
+- **`MRIprincipleComponents` on a volume with infinite voxels** builds a covariance with infinite
+  or NaN entries; FreeSurfer's `MatrixEigenSystem` then never returns (the probe's child is killed
+  by its 5 s alarm, `CRASH 14`): 2 of 100 `pca` cases at seed 7. The port gives track A's error
+  (FS-47, ITK-112); `check.py` and the hash test count these as not comparable.
+- `MRIsurfaceRASToVoxel` keeps two static vectors across calls; the second call multiplies into the
+  first call's result vector: same size, no effect on the numbers.
+- `MRIdump`'s `%6.6s` cuts `nframes` to `nframe`. The probe sets `fname_format`, `subject_name` and
+  `path_to_t1` in every `dump` case (`mri.h` declares these arrays without an initialiser).
+- Measured: seed 7, 4,600 cases (100 per command, all 46 commands): 4,365 identical with
+  `reproduce`, 233 not comparable, the 2 `pca` hangs above (before they were added to the skipped
+  defects), 0 other differences; `fix` different only with notices. Seed 1, 920 cases: 862
+  identical, 58 not comparable, hash `772e44de...`.

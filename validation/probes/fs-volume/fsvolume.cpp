@@ -37,6 +37,7 @@
 #include "mri_circulars.h"
 #include "matrix.h"
 #include "mri.h"
+#include "mri2.h"
 #include "transform.h"
 #include "utils.h"
 
@@ -336,6 +337,27 @@ MATRIX *get_list()
   for (int r = 1; r <= rows; r++)
     for (int c = 1; c <= cols; c++) m->rptr[r][c] = getf();
   return m;
+}
+
+// a 4 x 4 matrix of the case or NULL: a flag, then the 16 elements row by row
+MATRIX *get_m44()
+{
+  if (!geti()) return NULL;
+  MATRIX *m = MatrixAlloc(4, 4, MATRIX_REAL);
+  for (int r = 1; r <= 4; r++)
+    for (int c = 1; c <= 4; c++) m->rptr[r][c] = getf();
+  return m;
+}
+
+// an LTA's type, its first transform's type, matrix and geometries
+void put_lta(const LTA *l)
+{
+  if (!l) { out += "NULL "; return; }
+  oi(l->type);
+  oi(l->xforms[0].type);
+  om(l->xforms[0].m_L);
+  put_geom(&l->xforms[0].src);
+  put_geom(&l->xforms[0].dst);
 }
 
 void run_case()
@@ -1631,6 +1653,75 @@ void run_case()
     fflush(stdout);
     oi(r != NULL && r == d);
     put_vol(r);
+  } else if (cmd == "vv" || cmd == "vvsm") {
+    MRI *src = get_vol();
+    fill_paint(src);
+    src->outside_val = getd();
+    MRI *targ = get_vol();
+    fill_paint(targ);
+    MATRIX *M = get_m44();
+    int interp = geti();
+    float param = getf();
+    if (geti()) Gdiag_no = 1;
+    if (geti()) Gdiag |= DIAG_VERBOSE;
+    MRI *vsm = NULL;
+    LTA *lta = NULL;
+    int pedir = 0;
+    if (cmd == "vvsm") {
+      if (geti()) {
+        vsm = get_vol();
+        fill_paint(vsm);
+        vsm->outside_val = getd();
+      }
+      if (geti()) {
+        lta = LTAalloc(1, NULL);
+        lta->type = lta->xforms[0].type = geti();
+        for (int r = 1; r <= 4; r++)
+          for (int c = 1; c <= 4; c++) lta->xforms[0].m_L->rptr[r][c] = getf();
+      }
+      pedir = geti();
+    }
+    fflush(stdout);
+    int r = cmd == "vv" ? MRIvol2Vol(src, targ, M, interp, param)
+                         : MRIvol2VolVSM(src, targ, M, interp, param, vsm, lta, pedir);
+    fflush(stdout);
+    oi(r);
+    put_vol(targ);
+  } else if (cmd == "vvk") {
+    MRI *src = get_vol();
+    fill_paint(src);
+    MRI *targ = get_vol();
+    fill_paint(targ);
+    MATRIX *M = get_m44();
+    fflush(stdout);
+    MRI *r = MRIvol2VolTLKernel(src, targ, M);
+    fflush(stdout);
+    oi(r == NULL);
+    put_vol(targ);
+  } else if (cmd == "vvd") {
+    MRI *mov = get_vol();
+    MRI *targ = get_vol();
+    MATRIX *R = get_m44();
+    fflush(stdout);
+    MRI *r = MRIvol2VolDelta(mov, targ, R);
+    fflush(stdout);
+    put_vol(r);
+  } else if (cmd == "maskup") {
+    MRI *src = get_vol();
+    fill_paint(src);
+    MRI *mask = NULL;
+    if (geti()) {
+      mask = get_vol();
+      fill_paint(mask);
+    }
+    int up = geti(), npad = geti(), cons = geti();
+    if (geti()) Gdiag_no = 1;
+    LTA *l = NULL;
+    fflush(stdout);
+    MRI *r = MRImaskAndUpsample(src, mask, up, npad, cons, &l);
+    fflush(stdout);
+    put_vol(r);
+    put_lta(r ? l : NULL);
   } else {
     fail("unknown command");
   }

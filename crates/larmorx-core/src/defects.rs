@@ -1789,6 +1789,8 @@ defects! {
         "the vote over each voxel's sorted frames (MRIvote) told to exclude zeros still takes a last run of zeros when it is the longest";
     FS_481 = "FS-481", "FreeSurfer", true,
         "the reshape of a volume of 64-bit integers (mri_reshape) copies 32-bit integers at the voxels' indices: halves of the first voxels, the rest left 0";
+    FS_482 = "FS-482", "FreeSurfer", true,
+        "the resampling with a voxel-shift map (MRIvol2VolVSM) shifts by the last value the map's sampler wrote; for a map of a type the sampler refuses, at the first voxel a value never written: memory contents";
 }
 
 /// The register entry with ID `id`.

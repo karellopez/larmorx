@@ -460,7 +460,6 @@ group = "fsl"
 name = "fslmaths"
 command = "larmorx fsl fslmaths"
 python = "lx.fsl.fslmaths"
-does = "An image calculator: a chain of operations applied from left to right (maths, thresholds, masks, filters, reductions, statistics, TFCE)."
 api = "docs/api/fsl-maths.md"
 evidence = "/evidence/fsl-maths/"
 records = { replica = ["fsl-maths-replica"], clean-room = ["fsl-maths"] }

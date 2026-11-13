@@ -1892,7 +1892,7 @@ def run(
             warn_lines(err)
             if code != 0:
                 raise RuntimeError(
-                    f"larmorx fsl {tool} (the clean-room original) failed with exit code "
+                    f"larmorx fsl {tool} (the clean room) failed with exit code "
                     f"{code}: {(err + out).strip()[-2000:]}"
                 )
             return cmd
@@ -1911,7 +1911,7 @@ def run(
         if _replica.implementation_name(implementation, warn=False) == "clean-room":
             raise NotImplementedError(
                 f"{program}'s command line runs through its built-in replica here "
-                "(implementation='auto' or 'replica'); its clean-room original has a typed API "
+                "(implementation='auto' or 'replica'); its clean room has a typed API "
                 f"(larmorx.afni)"
             )
         from larmorx.afni import _common

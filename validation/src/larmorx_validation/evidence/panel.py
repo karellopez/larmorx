@@ -4,7 +4,9 @@ is there, its licence and citation, and the defacing check of its anatomical ima
 larmorx-testdata (``panel.toml`` and the catalog; ``docs/panel.md`` there).
 
 ``python -m larmorx_validation evidence panel --site <site>`` writes ``static/evidence/panel.json``
-(``all`` does it too); the page ``content/data-panel.md`` draws it with ``{{ ev.panel() }}``."""
+(``all`` does it too); the page ``content/validation/data-panel.md`` draws it with
+``{{ ev.panel_table() }}`` and its kin. The catalog's texts are shown in the writing guide's words
+(``_words``: the original's runs, programs)."""
 
 from __future__ import annotations
 
@@ -12,6 +14,20 @@ import tomllib
 from pathlib import Path
 
 from larmorx_validation.evidence import core, credits
+
+#: The catalog's words (larmorx-testdata's panel.toml, written before the writing guide) and the
+#: guide's (docs/writing-guide.md, section 1), applied where the page shows them.
+_WORDS = (
+    ("An fMRIPrep 25.2.6 oracle run", "An fMRIPrep 25.2.6 run"),
+    ("the oracle run reads", "fMRIPrep's run reads"),
+    ("every tool's reference case", "every program's reference case"),
+)
+
+
+def _words(text: str) -> str:
+    for old, new in _WORDS:
+        text = text.replace(old, new)
+    return text
 
 
 def _testdata_root() -> Path:
@@ -55,12 +71,12 @@ def export(ctx: core.Context) -> dict:
                 "age": str(d.get("age", "")),
                 "sex": d.get("sex", ""),
                 "scanner": d.get("scanner", ""),
-                "role": d["role"],
+                "role": _words(d["role"]),
                 "covers": d["covers"],
                 "fmriprep_run": d.get("fmriprep_run", ""),
                 "fmriprep_options": d.get("fmriprep_options", "--fs-no-reconall"),
                 "fmriprep_status": run_status(d.get("fmriprep_run", "")),
-                "note": d.get("note", ""),
+                "note": _words(d.get("note", "")),
                 "files": len(files),
                 "images": len(images),
                 "bytes": sum(e.size for e in files),
@@ -79,7 +95,9 @@ def export(ctx: core.Context) -> dict:
     return {
         "approved": doc["panel"]["approved"],
         "summary": doc["panel"]["summary"],
-        "criteria": [{"id": c[0], "label": c[1], "group": c[2]} for c in doc["panel"]["criteria"]],
+        "criteria": [
+            {"id": c[0], "label": _words(c[1]), "group": c[2]} for c in doc["panel"]["criteria"]
+        ],
         "datasets": datasets,
         "totals": {
             "files": sum(d["files"] for d in datasets),

@@ -3,26 +3,56 @@
 `lx.afni.automask` (command line `larmorx afni 3dAutomask`): a brain mask from an EPI series or
 a skull-stripped anatomical, as AFNI's `3dAutomask` makes it (26.3.05; first 25.2.09).
 
-**AFNI versions** (2026-10-29): both implementations follow AFNI 26.3.05 and are validated against it (the clean-room original since its alignment the same day). The two releases differ, for these programs, in two corrections larmorx already made by default (AFNI-03, header slice code 2; AFNI-05, 3dTshift's `-no_detrend`): AFNI 26.3.05 behaves as larmorx corrected them, so `reproduce` now gives the same result as the default where they apply, and neither is named ([findings](../findings/afni-relicensing-26.md) for the new licence).
+**AFNI versions** (2026-10-29): both ports follow AFNI 26.3.05 and are validated against it (the clean room since its alignment the same day). The two releases differ, for these programs, in two corrections larmorx already made by default (AFNI-03, header slice code 2; AFNI-05, 3dTshift's `-no_detrend`): AFNI 26.3.05 behaves as larmorx corrected them, so `reproduce` now gives the same result as the default where they apply, and neither is named ([findings](../findings/afni-relicensing-26.md) for the new licence).
 
-**Two implementations, both in `pip install larmorx`.** The bit-exact **replica**, translated
-from AFNI's source (`crates/larmorx-afni-replica`; Apache-2.0, with CC BY 4.0's attribution for the code of the Medical College of Wisconsin, which AFNI 26.3.05 releases under CC BY 4.0 ([NOTICE](../../NOTICE), [licensing](../licensing.md)); until 2026-10-29 the separate GPL
-package `larmorx-gpl`), and the clean-room **original** (`crates/larmorx-afni`, Apache-2.0),
-built for speed and written from [`specs/3dAutomask.md`](../../specs/3dAutomask.md) and black-box
-runs of AFNI only ([PROVENANCE](../../crates/larmorx-afni/PROVENANCE.md)). `implementation="auto"`
-(the default, and `larmorx afni 3dAutomask`) runs the replica, in the same process;
-`implementation="replica"` or `"clean-room"` (`"original"`, 0.1.0rc1's spelling, still works) (`--implementation` on the command line, or `LARMORX_IMPLEMENTATION`) forces one. Each image's `implementation` names the one
-that ran.
+The ports come first, then the program's section, the source of its reference page on the
+documentation site (`python -m larmorx_validation reference`), with its options table checked
+against the code; then AFNI's defects as both ports correct them, the differences by design, the
+known last-bit differences and the clean room's speed.
 
-**Status: `validated`**, both, against AFNI 26.3.05 itself (the original against AFNI 25.2.09 until 2026-10-29):
-- the original ([record](../validation/afni-automask.md)): every output of 80 of the 81 compared
-  cases that write one is AFNI's, bit for bit (data and NIfTI header), with AFNI's exit status and
-  messages in every case; the other one, fMRIPrep's call on ds005454's BOLD reference, has AFNI's
-  data and a header that differs only where AFNI reads its own header extension of the input
-  (AFNI-10, below); fMRIPrep's own masks of all 7 oracle BOLD references, bit for bit;
-- the replica ([record](../validation/afni-automask-replica.md)): every compared case, bit for bit.
+## Ports
 
-## Quick start
+`3dAutomask` has two ports, both in `pip install larmorx`:
+
+- **The replica** is bit-exact, translated from AFNI's source (`crates/larmorx-afni-replica`;
+  Apache-2.0, with CC BY 4.0's attribution for the code of the Medical College of Wisconsin,
+  which AFNI 26.3.05 releases under CC BY 4.0 ([NOTICE](../../NOTICE),
+  [licensing](../licensing.md)); until 2026-10-29 the separate GPL package `larmorx-gpl`).
+- **The clean room** (`crates/larmorx-afni`, Apache-2.0) is built for speed and written from
+  [`specs/3dAutomask.md`](../../specs/3dAutomask.md) and black-box runs of AFNI only
+  ([PROVENANCE](../../crates/larmorx-afni/PROVENANCE.md)).
+
+`implementation="auto"` (the default, and `larmorx afni 3dAutomask`) runs the replica, in the
+same process; `implementation="replica"` or `"clean-room"` (`"original"`, 0.1.0rc1's spelling,
+still works) (`--implementation` on the command line, or `LARMORX_IMPLEMENTATION`) forces one.
+Each image's `implementation` names the one that ran.
+
+## `3dAutomask`
+
+<!-- reference
+program: 3dAutomask
+group: afni
+original: AFNI 26.3.05
+python: larmorx.afni.automask
+command-line: crates/larmorx-afni/src/cli/automask.rs
+records: {replica: [afni-automask-replica], clean-room: [afni-automask]}
+evidence: afni-automask
+-->
+
+`3dAutomask` makes a brain mask from an EPI series or a skull-stripped anatomical image.
+
+### Python (`3dAutomask`)
+
+`lx.afni.automask(image, *, clfrac=0.5, gradual=True, peels=1, neighbours=17, nn=None, exterior_clip=False, dilate=0, erode=0, si=None, apply=False, depth=False, n_threads=1, implementation="auto", upstream_defects="fix", afni_settings=None)`
+
+Returns an `AutomaskResult`: `mask` (uint8, 3D; 2D for a plane), `masked` (with `apply=True`;
+the input's storage type, its values as `lx.load` reads them) and `depth` (with `depth=True`;
+int16). `image` is a path (read with AFNI's NIfTI rules) or an in-memory image (2D, 3D or 4D;
+uint8, int16 and float32 kept, other types float32). The arguments are checked before anything
+runs (`ValueError`); with the clean room, AFNI's fatal errors (no mask of a plane smaller than
+16 × 16, an empty mask) are `ValueError`s too. AFNI's variables are settings of the call
+(`afni_settings`, as for [`lx.afni.tshift`](afni-tshift.md#afnis-settings-in-python)); the
+process environment is never read.
 
 ```python
 import larmorx as lx
@@ -34,29 +64,14 @@ r.masked    # the input, 0 outside the mask
 r.mask.implementation   # Implementation(kind='replica', package='larmorx', ...)
 ```
 
-```bash
-larmorx afni 3dAutomask -apply_prefix uni_xform_masked.nii.gz -dilate 1 \
-    -prefix uni_xform_mask.nii.gz uni_xform.nii.gz
-```
-
-## `lx.afni.automask(image, *, clfrac=0.5, gradual=True, peels=1, neighbours=17, nn=None, exterior_clip=False, dilate=0, erode=0, si=None, apply=False, depth=False, n_threads=1, implementation="auto", upstream_defects="fix", afni_settings=None)`
-
-Returns an `AutomaskResult`: `mask` (uint8, 3D; 2D for a plane), `masked` (with `apply=True`;
-the input's storage type, its values as `lx.load` reads them) and `depth` (with `depth=True`;
-int16). `image` is a path (read with AFNI's NIfTI rules) or an in-memory image (2D, 3D or 4D;
-uint8, int16 and float32 kept, other types float32). The arguments are checked before anything
-runs (`ValueError`); with the original, AFNI's fatal errors (no mask of a plane smaller than
-16 × 16, an empty mask) are `ValueError`s too. AFNI's variables are settings of the call
-(`afni_settings`, as for [`lx.afni.tshift`](afni-tshift.md#afnis-settings-in-python)); the
-process environment is never read.
-
-### Option mapping
+### Options of `3dAutomask`
 
 | AFNI option | Python | Notes |
 |---|---|---|
-| `-prefix p` | the result's `mask` | the command line writes NIfTI only (`.nii`, `.nii.gz`); AFNI's default `automask` is its own format, refused |
-| `-apply_prefix p` | `apply=True` → `masked` | alone (no `-prefix`) it is the only output |
-| `-depth p` | `depth=True` → `depth` | from the mask before `-dilate`, `-erode` and `-SI` |
+| the last word (`dataset`) | `image` | the input: a path, or an in-memory image in Python |
+| `-prefix p` | the result | its `mask`; the command line writes NIfTI only (`.nii`, `.nii.gz`); AFNI's default `automask` is its own format, refused |
+| `-apply_prefix p` | `apply=True` | the result's `masked`; alone (no `-prefix`) it is the only output |
+| `-depth p` | `depth=True` | the result's `depth`, from the mask before `-dilate`, `-erode` and `-SI` |
 | `-clfrac c`, `-mfrac c` | `clfrac` | 0.1 to 0.9 |
 | `-nograd` | `gradual=False` | any option starting with `-nogr` |
 | `-peels p` | `peels` | 0 turns the peeling off (AFNI-43; AFNI peels once) |
@@ -67,9 +82,42 @@ process environment is never read.
 | `-SI hh` | `si` | millimetres, along the superior axis |
 | `-q` | (always) | the Python wrapper runs quietly; its warnings become Python warnings |
 | `-overwrite`, `-Dname=value`, `-ok_1D_text`, `-skip_afnirc` | `afni_settings` | AFNI's global options, anywhere on the command line |
-| `OMP_NUM_THREADS` | `n_threads` | the result does not depend on it (AFNI's 3dAutomask is single-threaded; the original runs its passes in parallel) |
+| `OMP_NUM_THREADS` | `n_threads` | the result does not depend on it (AFNI's 3dAutomask is single-threaded; the clean room runs its passes in parallel) |
 | `LARMORX_UPSTREAM_DEFECTS` | `upstream_defects` | `fix` (default) or `reproduce` |
-| `--implementation` or `LARMORX_IMPLEMENTATION` | `implementation` | `auto`, `replica` or `clean-room` |
+| `LARMORX_IMPLEMENTATION` | `implementation` | `auto`, `replica` or `clean-room` (`--implementation` before the family) |
+
+### Examples of `3dAutomask`
+
+<!-- inputs: uni_xform.nii.gz=head -->
+
+```python example
+import larmorx as lx
+
+# As fMRIPrep calls 3dAutomask on its unifized BOLD reference.
+r = lx.afni.automask("uni_xform.nii.gz", dilate=1, apply=True)
+r.mask.data.dtype  # -> dtype('uint8')
+```
+
+```bash example
+larmorx afni 3dAutomask -apply_prefix uni_xform_masked.nii.gz -dilate 1 -prefix uni_xform_mask.nii.gz uni_xform.nii.gz
+```
+
+### Ports of `3dAutomask`
+
+Both are `validated` against AFNI 26.3.05 itself (the clean room against AFNI 25.2.09 until
+2026-10-29), each in a standard comparison of 2026-10-30:
+
+- **The replica** ([its record](../validation/afni-automask-replica.md)): 125 cases, 105 within its
+  thresholds, 19 rejected by both alike, 1 expected divergence (AFNI's default prefix, its own
+  format, which LARMORX refuses); every one of the 101 compared cases that write an output is
+  AFNI's bit for bit (data and NIfTI header), with AFNI's exit status and messages.
+- **The clean room** ([its record](../validation/afni-automask.md)): 130 cases, 110 within its
+  thresholds, 19 rejected by both alike, the same expected divergence. Of the 106 compared cases
+  that write an output, 92 are AFNI's bit for bit (data and NIfTI header), with AFNI's exit
+  status and messages; the other 14, fMRIPrep's calls on BOLD references of the data panel, have
+  AFNI's data and a header that differs only where AFNI reads its own header extension of the
+  input (AFNI-10). fMRIPrep's masks of all 22 BOLD references in the record: AFNI's data, bit for
+  bit.
 
 ## Upstream defects (D13)
 
@@ -117,13 +165,13 @@ it shapes fMRIPrep's BOLD masks).
 - An existing output is an error by default (AFNI-11; `-overwrite` and `AFNI_DECONFLICT` as in
   AFNI); any output name is accepted (AFNI-12).
 - Where AFNI crashes (AFNI-40), larmorx refuses with one line.
-- The original ignores AFNI's own header extension in an AFNI-written input (AFNI-10, as
-  3dTshift's original does); AFNI takes the geometry from its attributes (7 significant digits),
+- The clean room ignores AFNI's own header extension in an AFNI-written input (AFNI-10, as
+  3dTshift's clean room does); AFNI takes the geometry from its attributes (7 significant digits),
   so on such an input (fMRIPrep's 3dAutomask reads 3dUnifize's output) the output header's
   sform can differ from AFNI's in the 7th digit (ds005454: voxel sizes 1.40000034 against the
   header's 1.39999998 mm, the origin by up to 3.8e-5 mm). The data are AFNI's; AFNI run on the
-  input without its extension writes the original's header byte for byte
-  ([findings](../findings/afni-masks-original.md)). The replica reproduces AFNI's reading.
+  input without its extension writes the clean room's header byte for byte
+  ([findings](../findings/afni-masks-clean-room.md)). The replica reproduces AFNI's reading.
 
 ## Known last-bit differences
 
@@ -133,19 +181,19 @@ steps the spec states exactly).
 
 ## Speed
 
-The original decides every pass of the mask operations voxel by voxel in parallel over z planes
+The clean room decides every pass of the mask operations voxel by voxel in parallel over z planes
 (the result does not depend on the thread count), finds clusters by run-based union-find, and
 replaces two of AFNI's repeated sweeps (the exterior clip, the depth) by breadth-first searches
-with the same results ([findings](../findings/afni-masks-original.md), "Speed"). AFNI's
+with the same results ([findings](../findings/afni-masks-clean-room.md), "Speed"). AFNI's
 3dAutomask is single-threaded. Its time is mostly reading and writing compressed NIfTI: in
 informal timings (2026-10-24, a shared machine) fMRIPrep's call on ds005454's BOLD reference took
-1.6 s in AFNI, 1.9 s in the replica and 1.7 s in the original at one thread, 0.72 s in the
-original at six ([findings](../findings/afni-masks-original.md#informal-timings-2026-10-24-not-a-benchmark-report)).
+1.6 s in AFNI, 1.9 s in the replica and 1.7 s in the clean room at one thread, 0.72 s in the
+clean room at six ([findings](../findings/afni-masks-clean-room.md#informal-timings-2026-10-24-not-a-benchmark-report)).
 There is no benchmark report yet.
 
 ## Rust
 
-The original's Rust API is `larmorx_afni::automask`: `run(image, options, mode, settings,
+The clean room's Rust API is `larmorx_afni::automask`: `run(image, options, mode, settings,
 n_threads)` on an `AfniImage` (`larmorx_afni::dataset::read_as`), with `AutomaskOptions`; the mask
 of a float image is `form_mask(v, dims, settings, log)` (3dUnifize uses it), its steps in
 `automask::{clip, cluster, morph, program}`; the command line is `cli::automask::main`. The

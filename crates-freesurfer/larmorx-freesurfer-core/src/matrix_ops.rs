@@ -23,7 +23,8 @@
 //! in both modes). A C library function of a `float` argument is C++'s `float` overload (`expf`,
 //! `sinf`, `cosf`, `sqrtf`), as `<cmath>` declares them; of a `double`, the `double` one. `expf`,
 //! `sinf` and `cosf` are larmorx's correctly rounded ones by default and glibc 2.35's with
-//! `reproduce` (`larmorx_core::math::Libm`); `acos` is the correctly rounded one in both modes
+//! `reproduce` (`larmorx_core::math::Libm`), GLIBC-07 noted in both modes where the two differ on
+//! a value computed (`cstd::note_glibc07`); `acos` is the correctly rounded one in both modes
 //! (glibc's `acos` is not ported yet: queue item 3.1-08).
 //!
 //! Defects (`larmorx_core::defects`; the findings in `docs/findings/freesurfer-maths.md`):
@@ -965,9 +966,10 @@ pub fn matrix_realloc_rotation(
         }
     };
     // C++'s float overloads: cosf and sinf
-    let libm = Libm::quiet(g.mode());
+    let libm = Libm::new(g.mode());
     let c = libm.cosf(angle);
     let s = libm.sinf(angle);
+    cstd::note_glibc07(g, &libm, "cosf and sinf");
     let cells: [(i32, i32, f32); 4] = match which {
         X_ROTATION => [(2, 2, c), (2, 3, s), (3, 2, -s), (3, 3, c)],
         Y_ROTATION => [(1, 1, c), (1, 3, -s), (3, 1, s), (3, 3, c)],
@@ -1601,7 +1603,7 @@ pub fn gaussian_matrix(
             x
         }
     };
-    let libm = Libm::quiet(g.mode());
+    let libm = Libm::new(g.mode());
     let var = sse::mul(std, std);
     let mut f = sse::mul64((2.0 * std::f64::consts::PI).sqrt(), f64::from(std)) as f32;
     // C++'s float overload of exp: expf of the float argument, then a float division
@@ -1630,6 +1632,7 @@ pub fn gaussian_matrix(
             }
         }
     }
+    cstd::note_glibc07(g, &libm, "expf");
     Ok(done(fresh))
 }
 

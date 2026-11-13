@@ -1,30 +1,43 @@
 # ResampleImage
 
-`lx.ants.resample_image` (command line `larmorx ants ResampleImage`; Rust
-`larmorx_ants::resample_image`, `larmorx_ants::resample`, `larmorx_interp`). A replica of ANTs
-2.6.5 on ITK 5.4.5 (Apache-2.0): ITK's `ResampleImageFilter` with an identity transform onto a
-grid with a new spacing or size, in any of ANTs' eight pixel types, without smoothing.
+`lx.ants.resample_image` (command line `larmorx ants ResampleImage`): an image resampled with
+ITK's `ResampleImageFilter` and an identity transform onto a grid with a new spacing or size, in
+any of ANTs' eight pixel types, without smoothing, as ANTs 2.6.5's `ResampleImage` computes it.
 
-**Status: `validated`** against ResampleImage itself (see the
-[validation record](../validation/ants-resample-image.md)): 57 cases, 47 outputs compared,
-all bit-identical with ANTs' exact header bytes: the eight pixel types, every interpolator (B-spline
-orders 0 to 5, Gaussian, windowed sinc), by spacing and by size, in 2, 3 and 4 dimensions,
-and a size of 1 (ANTS-29 below). One expected divergence: B-spline, Gaussian and windowed-sinc
-interpolation of 2D and 4D images are not supported yet. Compared with ANTs' defects reproduced
-(`LARMORX_UPSTREAM_DEFECTS=reproduce`); the record's "D13 fix pass" lists what larmorx's
-default changes.
+The port comes first, then the program's section, the source of its reference page on the
+documentation site (`python -m larmorx_validation reference`), with its options table checked
+against the code; then the speed, how the port reads the seventh argument, the behaviour worth
+knowing and ANTs' defects as the port corrects them.
 
-**Speed** ([benchmark](../benchmarks/ants-gaussian.md)): the 1 mm MNI template to 2 mm (linear)
-takes 91 ms against 431 ms for ANTs; a raw T1w to 1 mm by B-spline as `unsigned short` 1.49 s
-on one thread and 334 ms on 12, against 3.17 s and 947 ms; a boldref to 1.5 mm by windowed sinc
-1.80 s and 329 ms, against 7.05 s and 1.21 s.
+## Ports
 
-**On the data panel** ([record](../validation/ants-resample-image-panel.md), 2026-10-26): fMRIPrep
-25.2.6 never calls `ResampleImage`; on the panel's images (the 82-year-old's FLAIR to 1 mm,
-linear; the 7 T MP2RAGE to 1 mm, B-spline; a glioma's T2w to 0.8 mm, windowed sinc; the stroke's
-lesion mask to a size, nearest): **4 of 4 bit-identical, header bytes included**.
+`ResampleImage` has one port, in `pip install larmorx`: **the replica** (`crates/larmorx-ants`,
+`crates/larmorx-interp`; Apache-2.0; Rust `larmorx_ants::resample_image`,
+`larmorx_ants::resample`, `larmorx_interp`), translated from ANTs 2.6.5 on ITK 5.4.5
+(Apache-2.0).
 
-## Quick start
+## `ResampleImage`
+
+<!-- reference
+program: ResampleImage
+group: ants
+original: ANTs 2.6.5
+python: larmorx.ants.resample_image
+command-line: crates/larmorx-ants/src/cli/resample_image.rs
+records: {replica: [ants-resample-image]}
+evidence: ants-programs
+-->
+
+`ResampleImage` resamples an image onto a grid with a new spacing or a new size, keeping its
+origin and direction, by linear, nearest-neighbour, Gaussian, windowed-sinc or B-spline
+interpolation, and writes it in one of ANTs' eight pixel types.
+
+### Python (`ResampleImage`)
+
+`lx.ants.resample_image(image, spacing=None, *, size=None, interpolation="linear", sigma=None, alpha=1.0, window="hamming", order=3, pixel_type="float", dimension=None, n_threads=1, upstream_defects="fix")`
+
+Returns an `lx.Image` in `pixel_type`'s type. Give `spacing` or `size`, one value or one per
+axis.
 
 ```python
 import larmorx as lx
@@ -34,34 +47,72 @@ on_grid = lx.ants.resample_image(t1w, size=[128, 128, 96], interpolation="bsplin
 labels = lx.ants.resample_image(seg, 1.0, interpolation="nearest", pixel_type="short")
 ```
 
-```bash
-larmorx ants ResampleImage 3 sub-01_T1w.nii.gz t1w_2mm.nii.gz 2
-larmorx ants ResampleImage 3 t1w.nii.gz on_grid.nii.gz 128x128x96 1 4
-larmorx ants ResampleImage 3 t1w.nii.gz sinc.nii.gz 1.5 0 3 w 3
-larmorx ants ResampleImage 3 t1w.nii.gz smooth.nii.gz 2 0 2 1.5x1.5x1.5 2 1
-```
+### Options of `ResampleImage`
 
-(the third with the windowed sinc's Welch window, as unsigned short; the fourth with a Gaussian,
-as unsigned char.)
-
-## Option mapping
-
-| ResampleImage | Python | Notes |
+| ANTs argument (positional) | Python | Notes |
 |---|---|---|
-| `imageDimension` (2, 3, 4) | `dimension` (default: the image's) | a path is read in that many dimensions |
-| `inputImage`, `outputImage` | `image`, the returned `lx.Image` | the output keeps the input's origin and direction |
-| `MxNxO` with `0` (default) | `spacing` (one value or one per axis) | size `int(old spacing · old size / spacing + 0.5)` |
-| `MxNxO` with `1` | `size=` (one value or one per axis) | spacing `old · (old size − 1) / (size − 1)` |
-| interpolation `0` (default) / `1` | `interpolation="linear"` / `"nearest"` | any dimension |
-| `2 [sigma] [alpha]` | `"gaussian"`, `sigma=`, `alpha=1.0` | sigma in mm, default the input spacing; 3D |
-| `3 [window]` | `"sinc"`, `window="hamming"` | `c`osine, `w`elch, `b`lackman, `l`anczos, `h`amming (the first letter); radius 3; outside the image the nearest edge voxel; 3D |
-| `4 [order]` | `"bspline"`, `order=3` | orders 0 to 5 (others are 3); 3D |
-| `pixeltype` 0 to 7, after the interpolator's parameters | `pixel_type="char"`, `"uchar"`, `"short"`, `"ushort"`, `"int"`, `"uint"`, `"float"` (default), `"double"` | the type the image is read as and written in; see "The seventh argument" |
-| `ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS` (or `NSLOTS`, as ITK reads them) | `n_threads` | results do not depend on it |
+| 1 `imageDimension` (2, 3, 4) | `dimension` (default: the image's) | a path is read in that many dimensions |
+| 2 `inputImage`, 3 `outputImage` | `image`, the result | the output keeps the input's origin and direction |
+| 4 `MxNxO`, 5 `0` (default) | `spacing` (one value or one per axis) | size `int(old spacing · old size / spacing + 0.5)` |
+| 4 `MxNxO`, 5 `1` | `size=` (one value or one per axis) | spacing `old · (old size − 1) / (size − 1)` |
+| 6 interpolation `0` (default) / `1` | `interpolation="linear"` / `"nearest"` | any dimension |
+| 6 `2`, then `sigma` and `alpha` | `"gaussian"`, `sigma=`, `alpha=1.0` | sigma in mm, default the input spacing; 3D |
+| 6 `3`, then the window | `"sinc"`, `window="hamming"` | `c`osine, `w`elch, `b`lackman, `l`anczos, `h`amming (the first letter); radius 3; outside the image the nearest edge voxel; 3D |
+| 6 `4`, then the order | `"bspline"`, `order=3` | orders 0 to 5 (others are 3); 3D |
+| `pixeltype` 0 to 7, after the interpolator's parameters | `pixel_type="char"`, `"uchar"`, `"short"`, `"ushort"`, `"int"`, `"uint"`, `"float"` (default), `"double"` | the type the image is read as and written in; ANTs reads it as the seventh argument whatever the interpolator ([the seventh argument](#the-seventh-argument)) |
+| `ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS` (or `NSLOTS`, as ITK reads them) | `n_threads` | the result does not depend on it |
 
 Values are clamped to the pixel type's range and truncated toward zero for integer types (ITK's
 `CastPixelWithBoundsChecking`); reading converts as a C++ `static_cast`, values out of the
-type's range clamped (ANTS-06 below). Points outside the input get 0.
+type's range clamped (ANTS-06). Points outside the input get 0.
+
+### Examples of `ResampleImage`
+
+<!-- inputs: t1w.nii.gz=head -->
+
+```python example
+import larmorx as lx
+
+# The 4 mm head to 2 mm, linear; to a size of 20 x 24 x 20 by B-spline.
+fine = lx.ants.resample_image("t1w.nii.gz", 2.0)
+fine.shape  # -> (80, 96, 80)
+coarse = lx.ants.resample_image("t1w.nii.gz", size=[20, 24, 20], interpolation="bspline")
+coarse.shape  # -> (20, 24, 20)
+```
+
+```bash example
+larmorx ants ResampleImage 3 t1w.nii.gz t1w_2mm.nii.gz 2
+larmorx ants ResampleImage 3 t1w.nii.gz on_grid.nii.gz 20x24x20 1 4
+larmorx ants ResampleImage 3 t1w.nii.gz nearest_short.nii.gz 3 0 1 2
+larmorx ants ResampleImage 3 t1w.nii.gz sinc.nii.gz 3 0 3 w 3
+larmorx ants ResampleImage 3 t1w.nii.gz smooth.nii.gz 2 0 2 1.5x1.5x1.5 2 1
+```
+
+(The third as `short` with nearest-neighbour interpolation; the fourth with the windowed sinc's
+Welch window, as unsigned short; the fifth with a Gaussian, as unsigned char.)
+
+### Ports of `ResampleImage`
+
+**The replica: status `validated`** against ResampleImage itself (its
+[record](../validation/ants-resample-image.md), 2026-10-24): 57 cases, 47 outputs compared, all
+bit-identical with ANTs' exact header bytes: the eight pixel types, every interpolator (B-spline
+orders 0 to 5, Gaussian, windowed sinc), by spacing and by size, in 2, 3 and 4 dimensions, and a
+size of 1 (ANTS-29); 8 rejected by both alike. One expected divergence: B-spline, Gaussian and
+windowed-sinc interpolation of 2D and 4D images are not supported yet. Compared with ANTs'
+defects reproduced (`LARMORX_UPSTREAM_DEFECTS=reproduce`); the record's "D13 fix pass" lists
+what larmorx's default changes.
+
+**On the data panel** ([record](../validation/ants-resample-image-panel.md), 2026-10-26):
+fMRIPrep 25.2.6 never calls `ResampleImage`; on the panel's images (the 82-year-old's FLAIR to 1
+mm, linear; the 7 T MP2RAGE to 1 mm, B-spline; a glioma's T2w to 0.8 mm, windowed sinc; the
+stroke's lesion mask to a size, nearest): **4 of 4 bit-identical, header bytes included**.
+
+## Speed
+
+From the [benchmark](../benchmarks/ants-gaussian.md): the 1 mm MNI template to 2 mm (linear)
+takes 91 ms against 431 ms for ANTs; a raw T1w to 1 mm by B-spline as `unsigned short` 1.49 s on
+one thread and 334 ms on 12, against 3.17 s and 947 ms; a boldref to 1.5 mm by windowed sinc
+1.80 s and 329 ms, against 7.05 s and 1.21 s.
 
 ## The seventh argument
 

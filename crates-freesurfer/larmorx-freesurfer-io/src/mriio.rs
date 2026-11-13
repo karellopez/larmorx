@@ -300,7 +300,6 @@ fn not_ported(mtype: i32) -> Option<&'static str> {
         GIFTI_FILE => "GIFTI",
         IMAGE_FILE => "image",
         MGH_ANNOT => "annotation",
-        BRUKER_FILE => "Bruker",
         _ => return None,
     })
 }
@@ -447,6 +446,8 @@ pub fn mri_read(
         mgh_read(g, out, err, env, dir, &copy, volume_flag, -1)?
     } else if mtype == identify::NPY_FILE {
         crate::fscnpy::npy2mri(g, out, err, dir, &copy, false)?
+    } else if mtype == identify::BRUKER_FILE {
+        crate::bruker::bruker_read(g, out, err, dir, &copy, volume_flag)?
     } else if let Some(name) = not_ported(mtype) {
         let _ = writeln!(
             err,

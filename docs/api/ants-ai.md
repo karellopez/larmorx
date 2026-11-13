@@ -1,60 +1,51 @@
 # antsAI
 
-`lx.ants.ai` (command line `larmorx ants antsAI`; Rust `larmorx_ants::ai` and the crate
-`larmorx-registration`). A replica of ANTs 2.6.5's `antsAI` on ITK 5.4.5 (Apache-2.0): the
-linear transform that best aligns two images, from an initial alignment (centres of mass,
-principal axes, or the images' geometric centres or centres of mass alone) and a multi-start
-search over rotations about the principal axes and translations on a grid, each start point
-refined by a few conjugate-gradient iterations, with the `Mattes`, `GC` and `MI` metrics,
-`None`/`Regular`/`Random` sampling and masks, in 2D and 3D, and the blob alignment (`-b`:
-ANTs' multi-scale Laplacian-of-Gaussian blob detector, patch correlations, landmark fits;
-[below](#blob-alignment)). fMRIPrep runs it in sMRIPrep's brain extraction and in the BOLD
-reference's skull-stripping (`init_aff`), without blobs.
+`lx.ants.ai` (command line `larmorx ants antsAI`): the linear transform that best aligns two
+images, as ANTs 2.6.5's `antsAI` finds it.
 
-**Status: `validated`** against `antsAI` itself (the
-[validation record](../validation/ants-ai.md), standard tier): every compared case identical to
-ANTs 2.6.5 at one thread (exit status, standard output with every printed metric value,
-standard error, the transform file byte for byte), most against the unmodified binary, the
-rest once glibc's not-correctly-rounded `cbrt` is replaced by CORE-MATH's (CLAUDE.md rule 5).
-fMRIPrep 25.2.6's own `init_aff` command lines, with fMRIPrep's seed, give fMRIPrep's
-transforms within ANTs' 8-thread band: all ten `init_aff` nodes of the five oracle runs (full tier) within 1.5e-9 of fMRIPrep's files, nine of them within 1.3e-12.
+The port comes first, then the program's section, the source of its reference page on the
+documentation site (`python -m larmorx_validation reference`), with its options table checked
+against the code; then memory and speed, the output transform, ANTs' and ITK's defects as the
+port corrects them, and the blob alignment.
 
-| Tier | Cases | Identical to the unmodified ANTs | Identical with CORE-MATH | Rejected by both | Expected divergences | Failures |
-|---|---|---|---|---|---|---|
-| standard | 102 | 51 | 1 | 46 | 4 | 0 |
-| full ([record](../validation/ants-ai-full.md)) | 110 | 59 | 1 | 46 | 4 | 0 |
+## Ports
 
-"Rejected by both" includes the cases where ANTs aborts or crashes: everything ANTs printed
-before it stopped is identical, and larmorx then exits 1 with one more line. The expected
-divergences: two loops ANTs never finishes (larmorx refuses) and two clock-seeded runs
-(ANTS-58). **ANTs' own thread band** (6 cases): up to 2e-13 in a transform parameter; larmorx
-gives the one-thread result at any thread count.
+`antsAI` has one port, in `pip install larmorx`: **the replica** (`crates/larmorx-ants`,
+`crates/larmorx-registration`; Apache-2.0; Rust `larmorx_ants::ai`), translated from ANTs
+2.6.5's `antsAI` on ITK 5.4.5 (Apache-2.0). **Results do not depend on threads.** ANTs' do, by
+about 1e-13 in a parameter (its metrics sum per work unit); larmorx always gives ANTs'
+one-thread result. **`Random` sampling is never repeatable in ANTs** (its voxels are drawn from
+the clock, whatever the seed; so are `Regular` sampling's perturbations with `--random-seed 0`,
+ANTS-58); larmorx seeds them from the seed.
 
-**Results do not depend on threads.** ANTs' do, by about 1e-13 in a parameter (its metrics sum
-per work unit); larmorx always gives ANTs' one-thread result. **`Random` sampling is never
-repeatable in ANTs** (its voxels are drawn from the clock, whatever the seed; so are `Regular`
-sampling's perturbations with `--random-seed 0`, ANTS-58); larmorx seeds them from the seed.
+## `antsAI`
 
-**Memory and speed** (2026-10-28, [benchmark](../benchmarks/ants-ai.md)): the images are kept
-in float, as ANTs keeps them, so the peak is ANTs' (95 MiB against 92 to 96 on a 128 × 128 × 96
-head, it was 126; 717 against 754 on the 7 T MP2RAGE and the 1 mm MNI template). With `Mattes`
-(fMRIPrep's metric) the search computes each sampled point's fixed side once and its moving
-side in batches: 1.8 to 2 times as fast as ANTs at one thread, 6 to 7 times at eight
-([findings](../findings/ants-ai.md), "Memory and speed (2026-10-28)").
+<!-- reference
+program: antsAI
+group: ants
+original: ANTs 2.6.5
+python: larmorx.ants.ai
+command-line: crates/larmorx-ants/src/cli/ai.rs
+records: {replica: [ants-ai]}
+evidence: ants-ai
+-->
 
-**On the data panel** ([record](../validation/ants-ai-panel.md), 2026-10-26): all 36 antsAI
-nodes of the fourteen finished fMRIPrep oracle runs (the brain extraction's `init_aff` in every
-run, the BOLD reference's in 22 runs; the 3.5-year-old, the glioma, the stroke, 1.5 T, 7 T,
-multiband-8 and multi-echo among them), with fMRIPrep's seed, and four images fMRIPrep never gives
-it (a FLAIR, a glioma's T2w, an older adult's T2w, the 7 T MP2RAGE, with sMRIPrep's options):
-**40 of 40 identical to ANTs 2.6.5 at one thread** (38 as built, 2 with CORE-MATH). Against
-fMRIPrep's own transforms (ANTs 2.6.2 at 6 or 8 threads): 31 within 1e-8 in a parameter, five
-further, by up to 6.8 mm over a 100 mm cube. Those five are ANTs' own spread above one thread:
-fMRIPrep's ANTs at one thread gives exactly larmorx's transform, and both ANTs builds at
-fMRIPrep's thread count land, run to run, on fMRIPrep's file, on the one-thread result or
-elsewhere ([findings](../findings/ants-ai.md), "On the data panel").
+`antsAI` finds the linear transform that best aligns two images. It starts from an initial
+alignment (centres of mass, principal axes, or the images' geometric centres or centres of mass
+alone) and searches from many start points, over rotations about the principal axes and
+translations on a grid, each start point refined by a few conjugate-gradient iterations, with
+the `Mattes`, `GC` and `MI` metrics, `None`/`Regular`/`Random` sampling and masks, in 2D and
+3D; or it aligns blobs (`-b`: ANTs' multi-scale Laplacian-of-Gaussian blob detector, patch
+correlations, landmark fits; [Blob alignment](#blob-alignment)). fMRIPrep runs it in sMRIPrep's
+brain extraction and in the BOLD reference's skull-stripping (`init_aff`), without blobs.
 
-## Quick start
+### Python (`antsAI`)
+
+`lx.ants.ai(fixed, moving, *, transform="Rigid", gradient_step=0.1, metric="Mattes", bins=32, sampling="None", sampling_percentage=1.0, align_principal_axes=False, blobs=None, search_factor=20.0, arc_fraction=1.0, translation_search_grid=None, iterations=0, convergence_threshold=1e-6, convergence_window=5, fixed_mask=None, moving_mask=None, dimension=None, random_seed=None, n_threads=1, upstream_defects="fix")`
+
+Returns an `AIResult`: `transform` (an `ItkTransform`, fixed to moving, read back from the file
+the port writes), `start_points`, `values` and `best_value` (the search's start points and their
+metric values) and `log` (ANTs' verbose output: Python always runs verbose).
 
 ```python
 import larmorx as lx
@@ -71,31 +62,87 @@ res.transform            # an ItkTransform (AffineTransform_double_3_3), fixed -
 res.start_points, res.best_value, res.values[:3]
 ```
 
-```bash
-larmorx ants antsAI -d 3 -m Mattes[template.nii.gz,t1w.nii.gz,32,Regular,0.25] \
-    -x template_mask.nii.gz -t Affine[0.1] -s [15,0.1] -g [40,0x40x40] -c [10,1e-6,10] \
-    -o initialization.mat -v 1
-```
+### Options of `antsAI`
 
-## Option mapping
-
-| antsAI | Python | Notes |
+| ANTs option | Python | Notes |
 |---|---|---|
-| `-d 2/3` | `dimension` | default: the fixed image's |
-| `-m Mattes[f,m,bins,sampling,p]` | `fixed`, `moving`, `metric="Mattes"`, `bins`, `sampling`, `sampling_percentage` | `GC[f,m,radius,...]` (the third parameter is read but unused), `MI[f,m,bins,...]` (joint-histogram MI, smoothing variance 1); the images are read from `-m` whatever the metric |
-| `-t Rigid[step]` | `transform="Rigid"`, `gradient_step=step` | `Affine`, `Similarity`; `AlignGeometricCenters`, `AlignCentersOfMass` (no step) |
-| `-p 0/1` | `align_principal_axes` | start from the principal axes' rotation (Wahba's problem) |
-| `-b n` / `-b [n,m]` | `blobs=n` / `blobs=(n, m)` | the initial transform from `n` blobs per image and up to `m` matched pairs (`m = n` by default); fewer than 3 blobs: ANTs' error; `-p` is then ignored ([blob alignment](#blob-alignment)) |
-| `-s [factor,arc]` / `-s factor` | `search_factor` (degrees), `arc_fraction` | angles `−180°·arc` to `180°·arc` in steps of `factor`, about each axis |
-| `-g [step,AxBxC]` | `translation_search_grid=(step, (A, B, C))` | translations of the start points, in mm (ignored by `Rigid`/`Similarity` in 2D and `Similarity` in 3D in ANTs: ANTS-52) |
-| `-c [n,threshold,window]` / `-c n` | `iterations`, `convergence_threshold`, `convergence_window` | defaults 0, 1e-6, **5** (the help says 10: ANTS-59); 0 iterations: the initial alignment only |
-| `-x mask` / `-x [fixed,moving]` | `fixed_mask`, `moving_mask` | a mask that cannot be read is no mask |
-| `-o out.mat` | `AIResult.transform` | `.mat`, `.txt`, `.tfm` or an HDF5 name; Python reads the file back |
+| `-d 2/3`, `--dimensionality` | `dimension` | default: the fixed image's |
+| `-m Mattes[f,m,bins,sampling,p]`, `--metric` | `fixed`, `moving`, `metric="Mattes"`, `bins`, `sampling`, `sampling_percentage` | `GC[f,m,radius,...]` (the third parameter is read but unused), `MI[f,m,bins,...]` (joint-histogram MI, smoothing variance 1); the images are read from `-m` whatever the metric |
+| `-t Rigid[step]`, `--transform` | `transform="Rigid"`, `gradient_step=step` | `Affine`, `Similarity`; `AlignGeometricCenters`, `AlignCentersOfMass` (no step) |
+| `-p 0/1`, `--align-principal-axes` | `align_principal_axes` | start from the principal axes' rotation (Wahba's problem) |
+| `-b n` / `-b [n,m]`, `--align-blobs` | `blobs=n` / `blobs=(n, m)` | the initial transform from `n` blobs per image and up to `m` matched pairs (`m = n` by default); fewer than 3 blobs: ANTs' error; `-p` is then ignored ([Blob alignment](#blob-alignment)) |
+| `-s [factor,arc]` / `-s factor`, `--search-factor` | `search_factor` (degrees), `arc_fraction` | angles `−180°·arc` to `180°·arc` in steps of `factor`, about each axis |
+| `-g [step,AxBxC]`, `--translation-search-grid` | `translation_search_grid=(step, (A, B, C))` | translations of the start points, in mm (ignored by `Rigid`/`Similarity` in 2D and `Similarity` in 3D in ANTs: ANTS-52) |
+| `-c [n,threshold,window]` / `-c n`, `--convergence` | `iterations`, `convergence_threshold`, `convergence_window` | defaults 0, 1e-6, **5** (the help says 10: ANTS-59); 0 iterations: the initial alignment only |
+| `-x mask` / `-x [fixed,moving]`, `--masks` | `fixed_mask`, `moving_mask` | a mask that cannot be read is no mask |
+| `-o out.mat`, `--output` | the result | its `transform`; `.mat`, `.txt`, `.tfm` or an HDF5 name; Python reads the file back |
 | `--random-seed N` / `ANTS_RANDOM_SEED` | `random_seed` | default 1234; 0: ANTs from the clock, larmorx 121212 |
-| `-v 1` | `AIResult.log`, `.start_points`, `.values`, `.best_value` | Python always runs verbose; errors are explained with or without `-v` (ANTS-45) |
+| `-v 1`, `--verbose` | the result | its `log`, `start_points`, `values` and `best_value`: Python always runs verbose; errors are explained with or without `-v` (ANTS-45) |
 | `-h`, `--help` | – | the short and long menus, as ANTs prints them |
 | `ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS`, `NSLOTS` | `n_threads` | the result does not depend on it |
 | `LARMORX_UPSTREAM_DEFECTS` | `upstream_defects=` | ANTS-52, -53, -55, -110, -111, -112, -114, ITK-18, -19, -60 ([upstream defects](upstream-defects.md)) |
+
+### Examples of `antsAI`
+
+<!-- inputs: fixed.nii.gz=head moving.nii.gz=head -->
+
+```python example
+import larmorx as lx
+
+# A rigid search from the centres of mass: 30-degree steps over the whole circle.
+res = lx.ants.ai("fixed.nii.gz", "moving.nii.gz", transform="Rigid", search_factor=30,
+                 random_seed=1)
+res.transform.name  # -> 'Euler3DTransform_double_3_3'
+```
+
+```bash example
+larmorx ants antsAI -d 3 -m Mattes[fixed.nii.gz,moving.nii.gz,32,Regular,0.25] -t Rigid[0.1] -s [30,1] -c 0 -o initialization.mat --random-seed 1
+```
+
+### Ports of `antsAI`
+
+**The replica: status `validated`** against `antsAI` itself (its
+[record](../validation/ants-ai.md), 2026-10-28, standard tier: 132 cases, 76 pass, 52 rejected by
+both alike, 4 expected divergences): every compared case identical to ANTs 2.6.5 at one thread
+(exit status, standard output with every printed metric value, standard error, the transform
+file byte for byte), 75 of 76 against the unmodified binary, the other once glibc's
+not-correctly-rounded `cbrt` is replaced by CORE-MATH's (CLAUDE.md rule 5). fMRIPrep 25.2.6's own
+`init_aff` command lines, with fMRIPrep's seed, give fMRIPrep's transforms within ANTs' 8-thread
+band: all ten `init_aff` nodes of the five oracle runs (full tier) within 1.5e-9 of fMRIPrep's
+files, nine of them within 1.3e-12.
+
+| Tier | Cases | Identical to the unmodified ANTs | Identical with CORE-MATH | Rejected by both | Expected divergences | Failures |
+|---|---|---|---|---|---|---|
+| standard (2026-10-28) | 132 | 75 | 1 | 52 | 4 | 0 |
+| full ([record](../validation/ants-ai-full.md), 2026-10-24) | 144 | 86 | 1 | 53 | 4 | 0 |
+
+"Rejected by both" includes the cases where ANTs aborts or crashes: everything ANTs printed
+before it stopped is identical, and larmorx then exits 1 with one more line. The expected
+divergences: two loops ANTs never finishes (larmorx refuses) and two clock-seeded runs
+(ANTS-58). **ANTs' own thread band** (6 cases): up to 2e-13 in a transform parameter in five,
+and 0.137 in the BOLD reference of ds000005's run 1 in the standard record of 2026-10-28; larmorx
+gives the one-thread result at any thread count.
+
+**On the data panel** ([record](../validation/ants-ai-panel.md), 2026-10-26): all 36 antsAI
+nodes of the fourteen finished fMRIPrep oracle runs (the brain extraction's `init_aff` in every
+run, the BOLD reference's in 22 runs; the 3.5-year-old, the glioma, the stroke, 1.5 T, 7 T,
+multiband-8 and multi-echo among them), with fMRIPrep's seed, and four images fMRIPrep never gives
+it (a FLAIR, a glioma's T2w, an older adult's T2w, the 7 T MP2RAGE, with sMRIPrep's options):
+**40 of 40 identical to ANTs 2.6.5 at one thread** (38 as built, 2 with CORE-MATH). Against
+fMRIPrep's own transforms (ANTs 2.6.2 at 6 or 8 threads): 31 within 1e-8 in a parameter, five
+further, by up to 6.8 mm over a 100 mm cube. Those five are ANTs' own spread above one thread:
+fMRIPrep's ANTs at one thread gives exactly larmorx's transform, and both ANTs builds at
+fMRIPrep's thread count land, run to run, on fMRIPrep's file, on the one-thread result or
+elsewhere ([findings](../findings/ants-ai.md), "On the data panel").
+
+## Memory and speed
+
+From the [benchmark](../benchmarks/ants-ai.md) (2026-10-28): the images are kept in float, as
+ANTs keeps them, so the peak is ANTs' (95 MiB against 92 to 96 on a 128 × 128 × 96 head, it was
+126; 717 against 754 on the 7 T MP2RAGE and the 1 mm MNI template). With `Mattes` (fMRIPrep's
+metric) the search computes each sampled point's fixed side once and its moving side in batches:
+1.8 to 2 times as fast as ANTs at one thread, 6 to 7 times at eight
+([findings](../findings/ants-ai.md), "Memory and speed (2026-10-28)").
 
 ## The output transform
 

@@ -38,10 +38,12 @@
 #include "utils.h"
 
 extern double vg_isEqual_Threshold;
+extern double MRIsampleVolumeDerivativeSign;
 // defined in mri.cpp, not declared in its headers
 double ham_sinc(double x, double fullwidth);
 int MRIcubicSampleVolumeFrame(MRI *mri, double x, double y, double z, int frame, double *pval);
 int MRIsincSampleVolumeFrame(MRI *mri, double x, double y, double z, int frame, int hw, double *pval);
+int MRIsampleSeqVolume(const MRI *mri, double x, double y, double z, float *valvect, int firstframe, int lastframe);
 
 const char *Progname = "fsvolume";
 
@@ -757,6 +759,208 @@ void run_case()
     unlink((subj + "/stats/brainvol.stats").c_str());
     rmdir((subj + "/stats").c_str());
     rmdir(subj.c_str());
+  } else if (cmd == "setres") {
+    MRI *m = get_vol();
+    float a = getf(), b = getf(), c = getf();
+    oi(MRIsetResolution(m, a, b, c));
+    put_vol(m);
+  } else if (cmd == "vfill") {
+    MRI *m = get_vol();
+    oi(MRIvalueFill(m, getf()));
+    put_vol(m);
+  } else if (cmd == "fillfg") {
+    MRI *src = get_vol();
+    MRI *dst = get_dst(src);
+    int sx = geti(), sy = geti(), sz = geti(), th = geti(), fv = geti();
+    int npix = -7;
+    MRI *r = MRIfillFG(src, dst, sx, sy, sz, th, fv, &npix);
+    oi(npix);
+    oi(r != NULL && r == dst);
+    put_vol(r);
+  } else if (cmd == "explane") {
+    MRI *src = get_vol();
+    MRI *dst = geti() ? get_vol() : NULL;
+    int o = geti(), w = geti();
+    MRI *r = MRIextractPlane(src, dst, o, w);
+    oi(r != NULL && r == dst);
+    put_vol(r);
+  } else if (cmd == "fillplane") {
+    MRI *mask = get_vol();
+    MRI *dst = get_vol();
+    int o = geti(), w = geti(), fv = geti();
+    MRI *r = MRIfillPlane(mask, dst, o, w, fv);
+    oi(r == dst);
+    put_vol(dst);
+  } else if (cmd == "ups") {
+    MRI *src = get_vol();
+    MRI *dst = geti() ? get_vol() : NULL;
+    int k = geti(), n = geti();
+    fflush(stdout);
+    MRI *r = k == 0 ? MRIupsampleN(src, dst, n) : k == 1 ? MRIupsample2(src, dst) : MRIupsampleNConserve(src, dst, n);
+    fflush(stdout);
+    oi(r != NULL && r == dst);
+    put_vol(r);
+  } else if (cmd == "dns2" || cmd == "dnsn") {
+    MRI *src = get_vol();
+    MRI *dst = geti() ? get_vol() : NULL;
+    MRI *r;
+    if (cmd == "dns2") {
+      r = MRIdownsample2(src, dst);
+    } else {
+      float fc = getf(), fr = getf(), fs = getf();
+      int keep = geti();
+      fflush(stdout);
+      r = MRIdownsampleN(src, dst, fc, fr, fs, keep);
+      fflush(stdout);
+    }
+    oi(r != NULL && r == dst);
+    put_vol(r);
+  } else if (cmd == "mft") {
+    MRI *m = get_vol();
+    int f = geti();
+    float th = getf();
+    od(MRImeanFrameThresh(m, f, th));
+  } else if (cmd == "lim") {
+    MRI *m = get_vol();
+    float a = getf(), b = getf();
+    oi(MRIlimits(m, &a, &b));
+    of(a);
+    of(b);
+  } else if (cmd == "chtype") {
+    MRI *m = get_vol();
+    int seq = geti(), dt = geti();
+    float lo = getf(), hi = getf();
+    int ns = geti();
+    if (geti()) setenv("FS_FORCE_BIN_CHECK", "1", 1);
+    else unsetenv("FS_FORCE_BIN_CHECK");
+    fflush(stdout);
+    MRI *r = seq ? MRISeqchangeType(m, dt, lo, hi, ns) : MRIchangeType(m, dt, lo, hi, ns);
+    fflush(stdout);
+    put_vol(r);
+    put_vol(m);
+  } else if (cmd == "splat") {
+    MRI *m = get_vol();
+    int n = geti();
+    for (int i = 0; i < n; i++) {
+      double x = getd(), y = getd(), z = getd();
+      int frame = geti();
+      double val = getd();
+      oi(frame == 0 && i % 2 ? MRIinterpolateIntoVolume(m, x, y, z, val)
+                             : MRIinterpolateIntoVolumeFrame(m, x, y, z, frame, val));
+    }
+    put_vol(m);
+  } else if (cmd == "sseq" || cmd == "sxyz") {
+    MRI *m = get_vol();
+    m->outside_val = getd();
+    int n = geti();
+    for (int i = 0; i < n; i++) {
+      int r;
+      std::vector<float> v;
+      if (cmd == "sseq") {
+        double x = getd(), y = getd(), z = getd();
+        int first = geti(), last = geti(), type = geti();
+        v.assign(last + 1 > 0 ? last + 1 : 1, -7.0f);
+        fflush(stdout);
+        r = type < 0 ? MRIsampleSeqVolume(m, x, y, z, v.data(), first, last)
+                     : MRIsampleSeqVolumeType(m, x, y, z, v.data(), first, last, type);
+        fflush(stdout);
+      } else {
+        int x = geti(), y = geti(), z = geti(), fb = geti(), fe = geti(), k = geti();
+        v.assign(fe - fb > 0 ? fe - fb : 1, -7.0f);
+        r = k ? MRIsampleVolumeFrame_xyzInt_nRange_floats(m, x, y, z, fb, fe, v.data())
+              : MRIsampleVolumeFrameType_xyzInt_nRange_SAMPLE_NEAREST_floats(m, x, y, z, fb, fe, v.data());
+      }
+      oi(r);
+      for (float f : v) of(f);
+    }
+  } else if (cmd == "tkern") {
+    MRI *m = get_vol();
+    int n = geti();
+    for (int i = 0; i < n; i++) {
+      double x = getd(), y = getd(), z = getd();
+      double k[8];
+      for (int j = 0; j < 8; j++) k[j] = -7;
+      double *r = MRItrilinKernel(m, x, y, z, k);
+      oi(r == k);
+      for (int j = 0; j < 8; j++) od(k[j]);
+    }
+  } else if (cmd == "deriv" || cmd == "grad") {
+    MRI *m = get_vol();
+    MRIsampleVolumeDerivativeSign = getd();
+    int n = geti();
+    for (int i = 0; i < n; i++) {
+      double x = getd(), y = getd(), z = getd();
+      int kind = geti();
+      if (cmd == "deriv") {
+        double dx = getd(), dy = getd(), dz = getd(), sigma = getd(), mag = -7;
+        fflush(stdout);
+        oi(kind ? MRIsampleVolumeDerivativeScale(m, x, y, z, dx, dy, dz, &mag, sigma)
+                : MRIsampleVolumeDerivative(m, x, y, z, dx, dy, dz, &mag));
+        fflush(stdout);
+        od(mag);
+      } else {
+        int frame = geti();
+        double a = -7, b = -7, c = -7;
+        fflush(stdout);
+        oi(kind ? MRIsampleVolumeGradientFrame(m, x, y, z, &a, &b, &c, frame)
+                : MRIsampleVolumeGradient(m, x, y, z, &a, &b, &c));
+        fflush(stdout);
+        od(a); od(b); od(c);
+      }
+    }
+  } else if (cmd == "nbrs") {
+    MRI *m = get_vol();
+    int n = geti();
+    for (int i = 0; i < n; i++) {
+      int kind = geti(), x = geti(), y = geti(), z = geti(), a = geti(), b = geti();
+      float lo = getf(), hi = getf();
+      int r;
+      fflush(stdout);
+      switch (kind) {
+      case 0: r = MRIneighborsOn(m, x, y, z, a); break;
+      case 1: r = MRIneighborsOn3x3(m, x, y, z, a); break;
+      case 2: r = MRIneighborsInWindow(m, x, y, z, a, b); break;
+      case 3: r = MRIneighbors(m, x, y, z, a); break;
+      case 4: r = MRIneighborsInRange(m, x, y, z, a, lo, hi); break;
+      case 5: r = MRIneighbors3x3(m, x, y, z, a); break;
+      case 6: r = MRIneighborsOff(m, x, y, z, a); break;
+      default: r = MRIneighborsOff3x3(m, x, y, z, a); break;
+      }
+      fflush(stdout);
+      oi(r);
+    }
+  } else if (cmd == "lxf") {
+    MRI *src = get_vol();
+    src->outside_val = getd();
+    MRI *dst = geti() ? get_vol() : NULL;
+    int kind = geti(), interp = geti();
+    MATRIX *A = NULL;
+    if (geti()) {
+      A = MatrixAlloc(4, 4, MATRIX_REAL);
+      for (int i = 1; i <= 4; i++)
+        for (int j = 1; j <= 4; j++) A->rptr[i][j] = getf();
+    }
+    fflush(stdout);
+    MRI *r;
+    switch (kind) {
+    case 0: r = MRIlinearTransformInterp(src, dst, A, interp); break;
+    case 1: r = MRIlinearTransform(src, dst, A); break;
+    case 2: r = MRIinverseLinearTransform(src, dst, A); break;
+    case 3: r = MRIapplyRASlinearTransformInterp(src, dst, A, interp); break;
+    case 4: r = MRIapplyRASlinearTransform(src, dst, A); break;
+    default: r = MRIapplyRASinverseLinearTransform(src, dst, A); break;
+    }
+    fflush(stdout);
+    oi(r != NULL && r == dst);
+    put_vol(r);
+  } else if (cmd == "rsmat") {
+    MRI *src = get_vol();
+    MRI *tmpl = get_vol();
+    if (geti()) Gdiag |= DIAG_SHOW | DIAG_VERBOSE;
+    fflush(stdout);
+    MATRIX *m = MRIgetResampleMatrix(src, tmpl);
+    fflush(stdout);
+    om(m);
   } else {
     fail("unknown command");
   }

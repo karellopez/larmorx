@@ -16,16 +16,16 @@ monoexponential fit (``fittype="curvefit"``), and uses the full T2* map and the 
 tedana is LGPL-2.1, so ``t2smap`` has two implementations. Its bit-exact replica is the
 ``larmorx-gpl`` package's program (GNU GPL version 3), which this wrapper runs as a separate
 process with t2smap's own options, in a directory of its own, and whose files it reads back
-(:class:`T2smapResult`). Its clean-room original (``crates/larmorx-tedana``, Apache-2.0, written
+(:class:`T2smapResult`). Its clean room (``crates/larmorx-tedana``, Apache-2.0, written
 from ``specs/t2smap.md``; built for speed) runs in this process with the same options and the same
 files: ``implementation="auto"`` runs the replica when ``larmorx-gpl`` is installed, else the
-clean-room original; ``"replica"`` runs the replica or raises
+clean room; ``"replica"`` runs the replica or raises
 :class:`larmorx.ReplicaNotFoundError` with the command that installs it; ``"clean-room"`` runs
-the original. tedana's deterministic defects are corrected by default (D13,
+the clean room. tedana's deterministic defects are corrected by default (D13,
 ``docs/api/upstream-defects.md``), each named by an :class:`larmorx.UpstreamDefectWarning` where
 it changes a result; ``upstream_defects="reproduce"`` gives tedana's files: bit for bit by the
 replica (its maths too: numpy's own float32 logarithm and the C library's exp and log, which the
-default replaces by correctly rounded functions), and by the clean-room original with tedana's
+default replaces by correctly rounded functions), and by the clean room with tedana's
 defects exactly and its fitted numbers within the spec's thresholds (its §17.3). ``libraries``
 chooses the numpy and SciPy whose arithmetic is reproduced: ``"newest"`` (numpy 2.5.4, SciPy
 1.18.1) or ``"shared"`` (numpy 2.3.5, SciPy 1.15.3); the results do not depend on ``n_threads``.
@@ -129,7 +129,7 @@ class T2smapResult:
         tedana's log (its standard error, without larmorx's notice lines).
     implementation
         What computed them (:class:`larmorx.Implementation`: the ``larmorx-gpl`` replica, or
-        larmorx's clean-room original).
+        larmorx's clean room).
     """
 
     t2star: Image
@@ -252,7 +252,7 @@ def t2smap(
     (``--n-threads``; 0: all logical CPUs) never changes the results.
 
     ``implementation`` (``"auto"``, ``"replica"``, ``"clean-room"``; module docstring) chooses
-    the replica or the clean-room original. A run that fails raises :class:`RuntimeError` with
+    the replica or the clean room. A run that fails raises :class:`RuntimeError` with
     tedana's messages (:class:`larmorx.ReplicaError`, a :class:`RuntimeError`, for the replica);
     ``ValueError`` for arguments t2smap's command line would refuse.
     """
@@ -366,7 +366,7 @@ def t2smap(
 def _run_original(
     args: list[str], cwd: str, n_threads: int, upstream_defects: str, libraries: str
 ) -> subprocess.CompletedProcess[str]:
-    """The clean-room original's run in this process (without the GIL), in ``cwd``, with the
+    """The clean room's run in this process (without the GIL), in ``cwd``, with the
     wrapper's settings as its whole environment (never this process's: CLAUDE.md rule 6);
     :class:`RuntimeError` with its messages unless it exits with 0."""
     env = [(LIBRARIES_ENV, libraries), (_defects.ENV, upstream_defects)]
@@ -376,7 +376,7 @@ def _run_original(
     if code != 0:
         tail = "\n".join(err.strip().splitlines()[-20:])
         raise RuntimeError(
-            f"larmorx tedana t2smap (the clean-room original) failed with exit code {code}:\n{tail}"
+            f"larmorx tedana t2smap (the clean room) failed with exit code {code}:\n{tail}"
         )
     return subprocess.CompletedProcess(["larmorx", "tedana", "t2smap", *args], code, out, err)
 

@@ -13,6 +13,8 @@ the site never computes a number of its own. The guide: ``docs/figures.md``.
 
 from __future__ import annotations
 
+from larmorx_validation import renamed
+
 #: Evidence pages: tool -> module in this package (each has ``export(ctx) -> dict``).
 TOOLS: dict[str, str] = {
     "ants-registration": "ants_registration",
@@ -26,16 +28,16 @@ TOOLS: dict[str, str] = {
     "afni-tshift": "afni_tshift",
     "afni-automask": "afni_automask",
     "afni-unifize": "afni_unifize",
-    # the replica's page (afni_volreg) with the clean-room original's panels, cases and speed
-    "afni-volreg": "afni_volreg_original",
+    # the replica's page (afni_volreg) with the clean room's panels, cases and speed
+    "afni-volreg": "afni_volreg_clean_room",
     "fsl-bet": "fsl_bet",
     "fsl-flirt": "fsl_flirt",
     "fsl-fast": "fsl_fast",
     "fsl-topup": "fsl_topup",
     "fsl-maths": "fsl_maths",
     "fsl-stats": "fsl_stats",
-    # the replica's page (fsl_prelude) with the clean-room original's panels, cases and speed
-    "fsl-prelude": "fsl_prelude_original",
+    # the replica's page (fsl_prelude) with the clean room's panels, cases and speed
+    "fsl-prelude": "fsl_prelude_clean_room",
     "mri-hmc": "mri_hmc",
     "resample-series": "resample_series",
     "sdcflows-fieldmap": "sdcflows_fieldmap",
@@ -48,6 +50,23 @@ TOOLS: dict[str, str] = {
 
 #: Targets of ``evidence`` that are not a tool.
 OTHER = ("summary", "panel", "sizes", "difftest", "all")
+
+#: Modules renamed by the documentation revision (2026-11-12): ``<name>_original`` named a clean
+#: room, ``<name>_clean_room`` now. The old names still import (``from larmorx_validation.evidence import
+#: <name>_original``), for the investigations that use them; history stays as written.
+_RENAMED = {
+    f"{m}_original": f"{m}_clean_room"
+    for m in ("afni_volreg", "fsl_bet_options", "fsl_maths", "fsl_prelude", "tedana_t2smap")
+}
+renamed.alias(__name__, _RENAMED)
+
+
+def __getattr__(name: str):
+    if name in _RENAMED:
+        import importlib
+
+        return importlib.import_module(f"{__name__}.{_RENAMED[name]}")
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def main(args) -> int:

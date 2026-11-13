@@ -21,6 +21,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use larmorx_core::defects::{FS_29, FS_30};
 use larmorx_core::math::Libm;
 
+use crate::cstd;
 use crate::globals::Globals;
 
 /// The seed [`pdf_tod_seed`] returns by default (FS-29).
@@ -47,7 +48,7 @@ pub fn pdf_tod_seed(g: &mut Globals) -> u64 {
 /// `PDFgaussian()`: `v1 = 2 drand48() - 1`, `v2 = 2 drand48() - 1` until `r2 = v1² + v2²` is at
 /// most 1, then `v1 sqrt(-2 log(r2) / r2)`, all in `double` (FS-30 for `r2 = 0`).
 pub fn pdf_gaussian(g: &mut Globals) -> f64 {
-    let libm = Libm::quiet(g.mode());
+    let libm = Libm::new(g.mode());
     loop {
         let v1 = 2.0 * g.drand48.drand48() - 1.0;
         let v2 = 2.0 * g.drand48.drand48() - 1.0;
@@ -66,7 +67,9 @@ pub fn pdf_gaussian(g: &mut Globals) -> f64 {
                 "PDFgaussian: a radius of 0 gives NaN, as FreeSurfer",
             );
         }
-        return v1 * (-2.0 * libm.log(r2) / r2).sqrt();
+        let v = v1 * (-2.0 * libm.log(r2) / r2).sqrt();
+        cstd::note_glibc07(g, &libm, "log");
+        return v;
     }
 }
 

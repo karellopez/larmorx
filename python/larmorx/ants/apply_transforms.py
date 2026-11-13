@@ -235,6 +235,7 @@ def apply_transforms_to_points(
     *,
     invert: Sequence[bool] | None = None,
     coordinates: Literal["lps", "ras"] = "lps",
+    n_threads: int = 1,
 ) -> np.ndarray:
     """Map points through ``transforms`` (``antsApplyTransformsToPoints``).
 
@@ -242,8 +243,11 @@ def apply_transforms_to_points(
     unchanged). ANTs works in LPS millimetres; with ``coordinates="ras"`` the points are
     given and returned in RAS+. Transforms map points the way ``apply_transforms`` maps output
     voxels to input positions, so to move points from the moving image to the fixed image, give
-    the inverse transforms, as with ANTs.
+    the inverse transforms, as with ANTs. The points are mapped on one thread: ``n_threads``
+    (0 = all) is accepted as by every program's call, and the result does not depend on it.
     """
+    if int(n_threads) < 0:
+        raise ValueError(f"n_threads must be 0 (all) or positive, not {n_threads}")
     pts = np.array(points, dtype=np.float64, ndmin=2)
     if pts.ndim != 2 or pts.shape[1] < 3:
         raise ValueError(f"points must have shape (n, 3) or more columns, not {pts.shape}")

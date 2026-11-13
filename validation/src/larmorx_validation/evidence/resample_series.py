@@ -460,8 +460,25 @@ def _native(ctx: core.Context, reg: dict) -> dict:
             f"Δ is A − B over all {n_vox:,} values of the {' × '.join(map(str, fdata.shape))} "
             "series (every volume), not only the volumes and brain shown."
         ),
-        "provenance": common.provenance(info, f"{TOOL}/{CASE}", [common.DS005040]),
+        "provenance": common.provenance(
+            info,
+            f"{TOOL}/{CASE}",
+            [common.DS005040],
+            extra=[_numerics_runs(ctx)],
+        ),
     }
+
+
+def _numerics_runs(ctx: core.Context) -> str:
+    """The Runs line of the entry whose two runs of fMRIPrep's resampler are the original's
+    panels "fMRIPrep ResampleSeries 26.0.0.dev1" (the reviewer's round 24, minor 7)."""
+    ninfo = numerics_entry(ctx).info()
+    return (
+        f"Runs: figures cache entry `{TOOL}/{NUMERICS_CASE}` (fMRIPrep's resampler with the "
+        f"newest numerical releases and with the shared environment's), {common.computed(ninfo)} "
+        f"with larmorx `{ninfo['larmorx_commit'][:12]}`; every command, its environment, threads "
+        "and exit status are in its `RUN_INFO.json`"
+    )
 
 
 def _jacobian(ctx: core.Context, reg: dict) -> dict:
@@ -697,7 +714,7 @@ def export(ctx: core.Context) -> dict:
         "logical CPUs).",
         inputs=list(SPEED_LABELS),
     )
-    return {
+    doc = {
         "schema": 1,
         "tool": TOOL,
         "title": "One-shot BOLD resampler",
@@ -705,7 +722,12 @@ def export(ctx: core.Context) -> dict:
             "exporter": core.tree_hash(ctx.repo, "validation/src/larmorx_validation/evidence"),
             "records": rec.source(),
             "benchmarks": bench.source() if bench else [],
-            "cache": [fcache.provenance(entry(ctx)), fcache.provenance(jacobian_entry(ctx))],
+            # the run of its original last: the list keeps its earlier order
+            "cache": [
+                fcache.provenance(entry(ctx)),
+                fcache.provenance(jacobian_entry(ctx)),
+                fcache.provenance(numerics_entry(ctx)),
+            ],
             "command": f"python -m larmorx_validation evidence {TOOL} --site <site>",
         },
         "implementations": [
@@ -718,6 +740,224 @@ def export(ctx: core.Context) -> dict:
         "speed": speed,
         "examples": [_native(ctx, reg), _jacobian(ctx, reg)],
     }
+    return present(doc)
+
+
+# ---------------------------------------------------------------------- the presentation
+
+#: The original the record compares with: fMRIPrep's development version as installed in each
+#: Python environment (the record's "Reference" line, the benchmark report's packages).
+VERSION = "26.0.0.dev1"
+ORIGINAL = f"fMRIPrep ResampleSeries {VERSION}"
+
+
+def _page():
+    from larmorx_validation.evidence import present as present_
+
+    return present_.Page("fMRIPrep", "ResampleSeries", VERSION, texts=TEXTS)
+
+
+#: The page's own rewordings (applied before the guide's words): the step between two releases
+#: of numpy and SciPy, the releases the replica follows, fMRIPrep's resampler by its version.
+TEXTS = [
+    (r"^The version step, a reference row \(the original against itself\): ",
+     "For reference, the original's own step between two releases of numpy and SciPy: "),
+    (r"\blarmorx's reference since\b", "the releases the replica follows since"),
+    (r", the version step a reference row$", "; the step between the two, for reference"),
+    (r"\bfMRIPrep's resampler ran here too on the node's inputs\b",
+     f"fMRIPrep's resampler ({VERSION}, at commit 21a490fb) ran here too on the node's inputs"),
+    # a case where both refuse: each run's error, the replica's by its name
+    (r"; larmorx: (\w+Error): ", r"; the replica: \1: "),
+]  # fmt: skip
+
+
+def _diff(ex: dict, i: str) -> dict:
+    return next(d for d in ex["diffs"] if d["id"] == i)
+
+
+def _want(ex: dict, **verdicts: str | None) -> None:
+    """Raise unless each comparison (``lx_fmriprep`` for ``lx-fmriprep``) has its verdict."""
+    for i, v in verdicts.items():
+        got = _diff(ex, i.replace("_", "-")).get("verdict")
+        if got != v:
+            raise ValueError(f"{ex['id']}: {i.replace('_', '-')} is {got}, not {v}")
+
+
+def _found(ex: dict, i: str, pat: str):
+    import re
+
+    m = re.search(pat, _diff(ex, i).get("reason") or "")
+    if not m:
+        raise ValueError(f"{ex['id']}: {i}'s reason without {pat!r}")
+    return m
+
+
+def _shows_native(ex: dict) -> tuple[str, list[str]]:
+    """fMRIPrep's native resampling: every value fMRIPrep's, in reproduce and in fix."""
+    _want(ex, lx_fmriprep="bit-identical", lx_newest="bit-identical", lx1_lx8="bit-identical",
+          fix_lx="bit-identical", newest_shared=None)  # fmt: skip
+    n = _found(ex, "lx-fmriprep", r"\bEvery value of the (\d+) volumes\b").group(1)
+    _found(ex, "newest-shared", r"\bthe same values\b")
+    return (
+        f"In `reproduce` the replica gives every value of the {n} resampled volumes as "
+        "fMRIPrep's resampler gives them with numpy 2.5.4 and SciPy 1.18.1, at 1 and 8 threads "
+        "alike, and as fMRIPrep 25.2.6 wrote them in its own run. On the BOLD's own grid `fix` "
+        "gives the same bytes: PIPE-03 changes nothing there. fMRIPrep's resampler gives the "
+        "same values with both releases of numpy and SciPy."
+    ), ["lx-newest"]
+
+
+def _shows_jacobian(ex: dict) -> tuple[str, list[str]]:
+    """PIPE-03 on the MNI grid: each factor's distance from the reference, from the reasons."""
+    _want(ex, fix_repro="d13", fix_ref=None, repro_ref=None)
+    num = r"([\d.e+-]+)"
+    m = _found(ex, "repro-ref", rf"by a median {num} \(99th percentile {num}\) in the brain")
+    f = _found(ex, "fix-ref", rf"a median {num} \(99th percentile {num}\)")
+    return (
+        "On the MNI grid, `reproduce` gives fMRIPrep's factor, which departs from the factor on "
+        f"the BOLD's own grid by a median {m.group(1)} in the brain ({m.group(2)} at the 99th "
+        "percentile). In `fix`, its default, the replica corrects PIPE-03 and stays within a "
+        f"median {f.group(1)} of it ({f.group(2)} at the 99th percentile), the size of the "
+        "interpolation that carries the reference to this grid."
+    ), ["fix-repro"]
+
+
+SHOWS = {"fmriprep-native": _shows_native, "pipe-03": _shows_jacobian}
+
+_NEWEST = "numpy 2.5.4 (OpenBLAS 0.3.34), SciPy 1.18.1"
+_SHARED = "numpy 2.3.5 (OpenBLAS 0.3.30), SciPy 1.15.3"
+#: The panels the shapes name otherwise: fMRIPrep's resampler run again here is the original
+#: (its role says fMRIPrep's output); the replica's runs where their labels have another shape.
+PANELS = {
+    "fmriprep-native": {
+        "larmorx": ("replica", "larmorx, Apache-2.0 · 8 threads, reproduce · against "
+                    f"{ORIGINAL} with numpy 2.5.4 and SciPy 1.18.1, and fMRIPrep's output"),
+        "fmriprep-newest": (ORIGINAL, f"{_NEWEST}: the newest releases "
+                            "(oracles/python-newest), which the replica follows · run here on "
+                            "the node's inputs"),
+        "fmriprep-shared": (ORIGINAL, f"{_SHARED}: the shared environment's releases · run "
+                            "here on the node's inputs"),
+    },
+    "pipe-03": {
+        "fix": ("replica", "larmorx, Apache-2.0 · fix (the default), PIPE-03 corrected: the "
+                "derivative along the BOLD's phase-encoding axis, in its voxels"),
+        # named by what it holds, so that the verdict beside "What this shows" reads "the
+        # replica against fMRIPrep's factor"
+        "reproduce": ("fMRIPrep's factor", "larmorx, Apache-2.0 · reproduce: 1 + "
+                      "np.gradient(vsm, axis=pe) on the target grid, bit-identical to "
+                      "fMRIPrep's in the record"),
+    },
+}  # fmt: skip
+#: Each panel's port where its role says another.
+PANEL_PORTS = {
+    "fmriprep-native": {"fmriprep-newest": "original", "fmriprep-shared": "original"},
+    "pipe-03": {"fix": "replica", "reproduce": "replica"},
+}
+_REFERENCE = "a reference computed another way: the factor on the BOLD's own grid"
+#: The comparisons the shapes name otherwise.
+DIFFS = {
+    "fmriprep-native": {
+        "lx-fmriprep": ("replica − fMRIPrep's output", "the replica against fMRIPrep's output"),
+        "lx-newest": (f"replica − {ORIGINAL}", "the replica against the original"),
+        "newest-shared": ("fMRIPrep ResampleSeries: numpy 2.5.4 / SciPy 1.18.1 − numpy 2.3.5 / "
+                          "SciPy 1.15.3",
+                          "the original against itself: two releases of numpy and SciPy"),
+    },
+    "pipe-03": {
+        "fix-ref": ("replica, fix − the factor on the BOLD's own grid",
+                    f"the replica against {_REFERENCE}"),
+        "repro-ref": ("replica, reproduce (fMRIPrep's factor) − the factor on the BOLD's own grid",
+                      f"the replica against {_REFERENCE}"),
+        "fix-repro": ("replica: fix − reproduce (PIPE-03)",
+                      "the replica against itself: fix and reproduce (PIPE-03)"),
+    },
+}  # fmt: skip
+#: The record's threshold, in each example's metrics note (the record's own words).
+THRESHOLD = (
+    "The record's threshold: the same shape and data type, every value within 10⁻⁶ times the "
+    "reference's largest absolute value and the affine within 10⁻⁶ mm; bit-identity reported for "
+    "every comparison."
+)
+#: The case categories, as the page names them.
+CATEGORIES = {
+    "ndimage": "SciPy's map_coordinates and spline filters",
+    "interpolation": "interpolation orders and modes",
+    "nitransforms": "transform files (nitransforms)",
+    "native": "onto the BOLD reference",
+    "phase-encoding": "phase-encoding axes",
+    "anatomical": "onto an anatomical grid",
+    "standard": "onto a template's grid",
+    "3d": "single volumes",
+    "threads": "thread counts",
+    "fmriprep-real": "a real run (ds000005)",
+}
+#: The speed chart's series, as the page names them.
+SPEED_LABELS = {
+    "fMRIPrep, 1 thread": f"{ORIGINAL}, 1 thread",
+    "fMRIPrep, 12 threads": f"{ORIGINAL}, 12 threads",
+    "larmorx, 1 thread": "replica, 1 thread",
+    "larmorx, 12 threads": "replica, 12 threads",
+}
+#: The record's implementation: its id (the case explorer's) and port.
+PORTS = {"port": "replica"}
+
+
+def _poster_of_identical(ex: dict, pid: str) -> None:
+    """The still poster of a panel added to the default view (the reviewer's round 25, L): the
+    poster of a panel the example compares it with and finds identical in every value shown (a
+    poster is drawn from the shown slice's values alone, with the example's one range, so
+    identical values give the same image, already in the blobs); an error if there is none."""
+    posters = ex["poster"]["panels"]
+    if pid in posters:
+        return
+    for d in ex["diffs"]:
+        other = d["b"] if d["a"] == pid else d["a"] if d["b"] == pid else None
+        shown = d.get("display") or {}
+        if other in posters and shown and all(m.get("differ") == 0 for m in shown.values()):
+            posters[pid] = posters[other]
+            return
+    raise ValueError(f"{ex['id']}: no poster for {pid} and no identical panel to take it from")
+
+
+def present(doc: dict) -> dict:
+    """fMRIPrep's one-shot resampler in the writing guide's words and order: texts, ports and
+    order only."""
+    from larmorx_validation.evidence import present as present_
+
+    page = _page()
+    for ex in doc["examples"]:
+        line, verdicts = SHOWS[ex["id"]](ex)
+        present_.example(
+            page, ex, shows=line, verdicts=verdicts, panels=PANELS[ex["id"]],
+            panel_ports=PANEL_PORTS[ex["id"]], diffs=DIFFS[ex["id"]],
+            known=("reference",) if ex["id"] == "pipe-03" else (), split=True,
+        )  # fmt: skip
+        if ex["id"] == "fmriprep-native":  # PIPE-03's example measures, against no threshold
+            # the original of the main comparison shown by default (the reviewer's round 24,
+            # minor 6): its panel beside fMRIPrep's own output
+            shown = ex["default"]["panels"]
+            if "fmriprep-newest" not in shown:
+                shown.insert(
+                    shown.index("fmriprep") if "fmriprep" in shown else 1, "fmriprep-newest"
+                )
+            _poster_of_identical(ex, "fmriprep-newest")
+            note = ex.get("metrics_note") or ""
+            if "record's threshold" in note:
+                raise ValueError(f"{ex['id']}: the threshold is in its note already")
+            ex["metrics_note"] = f"{note} {THRESHOLD}".strip()
+    for im in doc["implementations"]:
+        present_.implementation(page, im, "standard comparison", port=PORTS[im["id"]])
+        # the record compares with nitransforms and SciPy too, in-process
+        im["title"] += ", nitransforms 25.1.0 and SciPy 1.18.1"
+    present_.speed(
+        page,
+        doc.get("speed"),
+        "Seconds per resampling, without the file I/O (the median of repeated runs), on a log "
+        "scale; the factor is fMRIPrep's time divided by the replica's, both on one thread.",
+        labels=SPEED_LABELS,
+    )
+    present_.random_testing(page, doc, dict(PORTS))
+    return present_.finish(page, doc, CATEGORIES, ports=PORTS)
 
 
 if __name__ == "__main__":

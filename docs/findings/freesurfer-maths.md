@@ -569,10 +569,20 @@ and leaves a following `p`); `inf` stops before a non-`i` letter, an unfinished 
 consumes the letter that broke it (as an unfinished `inf` or `nan` does; numbers leave it unread);
 `nan(...)` is never read beyond `nan`; underflow sets `ERANGE` after rounding (`0x1.fffffep-127` sets
 it, `0x1.ffffffp-127` does not), and so does any inexact subnormal result, exactly representable
-ones not; a conversion that meets the end of the input before its item sets `errno` to 0 (unless an
-earlier item of the same call ended there), which is why `MatrixReadTxt`'s `could not scan value`
-after an `ERANGE` read prints no `Numerical result out of range` when the file simply ended.
-`cscan.rs` reproduces each; `scanf_probe.c` and its companions are the measurements.
+ones not; a conversion that meets the end of the input before its item sets `errno` to 0, or, when
+an earlier item of the same call ended at the end of the input, to the value `errno` had when that
+item met it (before that item's own `ERANGE`: `sscanf("-1877   1e40", "%f %f %f %f")` with `errno` 7
+before leaves 7, not 34; `"1e-50 3"` leaves 34; measured by track C's
+`validation/probes/fs-volume/scanf_word_errno.c`). Every later attempt of the same call to read sets
+`errno` back to that value, white space at the format's end included (`sscanf("1e40", "%f ")` with
+`errno` 7 leaves 7, without the blank 34; white space just before a conversion reads nothing itself);
+a call whose only reading meets the end at once (`fscanf(fp, "\n")` at the end of a file) leaves
+`errno` alone (track E's measurement, specs/freesurfer-maths.md §18.1: 9,008 `sscanf` calls, all
+given by `cscan::Scanf`, `validation/probes/fs-maths/scanf_errno_cases.py`). This is why
+`MatrixReadTxt`'s `could not scan value` after an `ERANGE` read prints no `Numerical result out of
+range` when the file simply ended. `cscan.rs` reproduces each (its `EndRule` keeps the `errno` of the
+moment the call first met the end, which gives this rule); `scanf_probe.c` and its companions are the
+measurements.
 
 ## For the main package's VNL (track C), found here, part 4
 
@@ -811,3 +821,15 @@ underneath, the casts), are kept here verbatim; the sections above give their ev
   marked `MEM49` (not compared); the others are compared.
 - The fs-maths probe's recorded hash: seed 1, 770 cases, 748 identical (one more than before: an
   FS-49 line now compared), 22 `SKIP`.
+
+## GLIBC-07 at the C library's sites (relay 17)
+
+The fs-maths probe's seed-7 run (15,400 cases) showed 3 `mrot` lines whose default (`fix`) output
+differed from the official one by one unit in the last place of `cosf` or `sinf` without a notice:
+the correctly rounded default against glibc 2.35's bits, which `reproduce` gives. fs.core now notes
+GLIBC-07 in both modes wherever the two choices give another value on an argument it evaluated
+(`cstd::note_glibc07` with `Libm::new`'s witness), as the clean room does: `MatrixReallocRotation`
+(`cosf`, `sinf`), `GaussianMatrix` (`expf`), `HISTOsmooth`'s kernel (`exp`, `pow`),
+`HISTOrobustGaussianFit` (`exp`), `HISTOgetEntropy` (`log`), `PDFgaussian` (`log`). Measured: seed 7,
+15,400 cases: `reproduce` identical on 15,064, 0 different; `fix` differs without a notice on none
+(the 3 `mrot` lines carry GLIBC-07); the recorded seed-1 hash unchanged (fba798ad...).

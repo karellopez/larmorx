@@ -14,7 +14,7 @@ readout time and phase-encoding direction of the BOLD run (`distortion_params`).
 A port in the main package, with sdcflows 2.17.1's `grid_bspline_weights` and
 `ensure_positive_cosines` (part A's collocation, `crates/larmorx-sdcflows`), nitransforms
 25.1.0's chain and resampling and nibabel 5.4.2's orientation and header arithmetic (MIT); a
-clean-room original comes later (the user, 2026-11-06).
+clean room comes later (the user, 2026-11-06).
 
 **Status: `experimental`**: every node of the oracle runs made on the old laptop is
 **bit-identical** in both kept environments (numpy 2.3.5 / SciPy 1.15.3 and numpy 2.5.4 / SciPy

@@ -71,6 +71,13 @@ number on C streams and znz files, `fio_dirname`, `fio_basename`, `fio_extension
   messages lose the fixture's path), and standard error is oriented first (glibc's `perror` then leaves `errno` alone).
   `SKIP` for formats not ported yet, `.lta` names (fs.volume's `LTAread`), crashes (FS-76, FS-249, FS-253 to FS-258) and
   skips beyond 256 MiB (FS-178); `VARY` for numbers from memory (FS-49, FS-167).
+- Piece 7 (relay 17): Bruker ParaVision studies. `bsp` (`splitParameterValue` on one line), `bd3`, `brc`, `bacq`
+  (`readBrukerD3proc`, `readBrukerReco`, `readBrukerAcqp` on a generated file, the caller's values at -7), `bvx`
+  (`buildVoxToRASTransform` of a given transform on a header of given extents), `bkr` (`brukerRead`, header or voxels)
+  and `bmr` (`mri_read` of the study, type 18); the parameter files and studies built by `tests/fs_io/piece7.rs` from
+  ParaVision's `##$NAME=value` form (most complete; missing, odd, CR LF, overlong and cut lines; unsupported types; 2dseq
+  files of the right length, half, a byte more). `SKIP` for FS-259 and FS-403, `VARY` for FS-401 (values never written).
+  Seed 13, 3,815 piece-7 cases: `reproduce` identical on 3,221, 0 different.
 - `matfile_scipy.py`: 400 matrices written by SciPy's `savemat` (version 4; version 5 plain and
   compressed; doubles, singles, signed and unsigned 8- to 32-bit integers, complex) read by the port's
   `MatlabRead`: the default (`fix`) must read each as SciPy wrote it; FreeSurfer's reading
@@ -83,8 +90,10 @@ Run (inside a memory box; the port and FreeSurfer run on generated inputs):
     validation/probes/fs-io/build.sh <workspace>
     scripts/orchestration/boxed.sh 6 python -P validation/probes/fs-io/check.py --seed 1 --n 1100
     scripts/orchestration/boxed.sh 10 python -P validation/probes/fs-io/check.py --seed 1 --n 4800 --portable
+    scripts/orchestration/boxed.sh 10 python -P validation/probes/fs-io/check.py --seed 1 --n 4800 --portable --light
     scripts/orchestration/boxed.sh 12 python -P validation/probes/fs-io/check.py --seed 7 --n 86000
     scripts/orchestration/boxed.sh 6 python -P validation/probes/fs-io/matfile_scipy.py
 
-The portable run's hash (`official_sha256_skip`) is `tests/fs_io_official.rs`'s, checked on every
-platform. Results (2026-11-13): `docs/findings/freesurfer-io.md`.
+The light run's hash (`official_sha256_skip` with `--light`: the portable cases without the six that
+take seconds in a debug build, `cases::HEAVY_SEED1`, measured by `tests/fs_io_heavy.rs`) is
+`tests/fs_io_official.rs`'s, checked on every platform; the portable run keeps the six. Results (2026-11-13): `docs/findings/freesurfer-io.md`.

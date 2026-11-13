@@ -438,6 +438,7 @@ std::string fixpfx;
 }
 MRI *mri_read(const char *fname, int type, int volume_flag, int start_frame, int end_frame,
               std::vector<MRI *> *mrivector);
+int splitParameterValue(char *sWholeLine, char *sParameter, char *sValue);
 namespace {
 void oname(const char *s)
 {
@@ -523,6 +524,101 @@ void set_env6(int bits)
   if (bits & 2) setenv("FS_MGZIO_USEVOXELBUFREAD", "1", 1);
 }
 
+// piece 7: Bruker ParaVision studies
+void bt_init(BrukerTransform &b)
+{
+  memset(&b, 0, sizeof b);
+  b.transposition = -7;
+  for (int i = 0; i < 3; i++) {
+    b.fov[i] = -7; b.size[i] = -7; b.ft_size[i] = -7; b.vox_size[i] = -7; b.offset[i] = -7;
+  }
+  b.read_offset = b.phase1_offset = b.slice_offset = -7;
+  for (double &x : b.grad_matrix) x = -7;
+  b.type = -7;
+  b.dim = -7;
+}
+void print_bt(const BrukerTransform &b)
+{
+  oi(b.transposition);
+  for (double x : b.fov) od(x);
+  for (int x : b.size) oi(x);
+  for (int x : b.ft_size) oi(x);
+  for (double x : b.vox_size) od(x);
+  for (double x : b.offset) od(x);
+  od(b.read_offset); od(b.phase1_offset); od(b.slice_offset);
+  for (double x : b.grad_matrix) od(x);
+  oi(b.type); oi(b.dim);
+}
+void ocstr(const char *s)
+{
+  out += "x";
+  if (!*s) { out += " "; return; }
+  obytes(std::vector<unsigned char>(s, s + strlen(s)));
+}
+
+void run_piece7(const std::string &cmd)
+{
+  if (cmd == "bsp") {
+    std::vector<unsigned char> raw = unhex(next());
+    static char line[8192], P[8192], V[8192];
+    memset(line, 0, sizeof line);
+    memcpy(line, raw.data(), raw.size() < sizeof line - 1 ? raw.size() : sizeof line - 1);
+    int r = splitParameterValue(line, P, V);
+    oi(r);
+    if (r) { ocstr(P); ocstr(V); ocstr(line); }
+  } else if (cmd == "bd3" || cmd == "brc" || cmd == "bacq") {
+    bool nn;
+    std::string name = getstr(&nn);
+    setup(next());
+    errno = 0;
+    BrukerTransform b;
+    bt_init(b);
+    if (cmd == "bd3") {
+      int x = -7, y = -7, z = -7, type = -7, nf = -7;
+      int r = readBrukerD3proc((char *)name.c_str(), &x, &y, &z, &type, &nf);
+      oi(r); oi(x); oi(y); oi(z); oi(type); oi(nf);
+    } else if (cmd == "brc") {
+      int r = readBrukerReco((char *)name.c_str(), &b);
+      oi(r); print_bt(b);
+    } else {
+      double TR = -7, TE = -7, TI = -7, flip = -7;
+      int r = readBrukerAcqp((char *)name.c_str(), &TR, &TE, &TI, &flip, &b);
+      oi(r); od(TR); od(TE); od(TI); od(flip); print_bt(b);
+    }
+    oi(errno);
+  } else if (cmd == "bvx") {
+    int w = (int)geti(), h = (int)geti(), d = (int)geti();
+    BrukerTransform b;
+    bt_init(b);
+    b.transposition = (int)geti();
+    b.dim = (int)geti();
+    for (double &x : b.vox_size) x = getd();
+    for (double &x : b.offset) x = getd();
+    b.read_offset = getd(); b.phase1_offset = getd(); b.slice_offset = getd();
+    for (double &x : b.grad_matrix) x = getd();
+    MRI *m = MRIallocHeader(w, h, d, MRI_SHORT, 1);
+    buildVoxToRASTransform(m, &b);
+    const float f[] = {m->c_r, m->c_a, m->c_s, m->x_r, m->x_a, m->x_s, m->y_r, m->y_a, m->y_s,
+                       m->z_r, m->z_a, m->z_s, m->xsize, m->ysize, m->zsize};
+    for (float x : f) of(x);
+    oi(m->ras_good_flag);
+  } else if (cmd == "bkr" || cmd == "bmr") {
+    int rv = 1;
+    if (cmd == "bkr") { Gdiag = strtoull(next(), NULL, 16); rv = (int)geti(); }
+    bool nn;
+    std::string name = getstr(&nn);
+    setup(next());
+    errno = 0;
+    MRI *m = cmd == "bkr" ? brukerRead((char *)name.c_str(), rv)
+                          : mri_read(name.c_str(), BRUKER_FILE, TRUE, -1, -1, NULL);
+    print_mri6(m);
+    oi(errno);
+    Gdiag = 0;
+  } else {
+    fail("unknown command");
+  }
+}
+
 void run_piece6(const std::string &cmd)
 {
   char cwd[4096];
@@ -561,7 +657,7 @@ void run_piece6(const std::string &cmd)
     oi(r); oname(subject); of(ip); of(bp); of(in); print_rmat(R); oi(f2i);
     oi(errno);
   } else {
-    fail("unknown command");
+    run_piece7(cmd);
   }
 }
 

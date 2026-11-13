@@ -3,10 +3,10 @@
 and boundary-based registration (BBR), and its matrix tool (FSL 6.0.7.23's ``flirt`` and
 ``convert_xfm``).
 
-Each has two implementations (``docs/licensing.md``): the bit-exact replica from ``larmorx-nc``
-(FSL Licence), run as a separate program, and the clean-room original (Apache-2.0, written from
+Each has two ports (``docs/licensing.md``): the bit-exact replica from ``larmorx-nc`` (FSL
+Licence), run as a separate program, and the clean room (Apache-2.0, written from
 ``specs/flirt.md``), run in this process; ``implementation="auto"`` runs the replica when it is
-installed, else the original.
+installed, else the clean room.
 
 FLIRT's matrices map the input's FSL millimetres (voxel index times voxel size, in radiological
 order) onto the reference's, as FSL writes them (``-omat``); they are returned as 4 x 4 float64
@@ -50,9 +50,18 @@ _DTYPES = ("char", "short", "int", "float", "double")
 
 @dataclass(frozen=True)
 class FlirtResult:
-    """What ``flirt`` computed: the 4 x 4 matrix (input FSL mm to reference FSL mm), the input
-    resampled onto the reference's grid (``None`` unless ``out`` was asked for), and FLIRT's
-    standard output (its verbose lines, a schedule's ``print``)."""
+    """What ``flirt`` computed.
+
+    Attributes
+    ----------
+    matrix
+        The 4 x 4 matrix from the input's FSL millimetres to the reference's, as ``-omat``
+        writes it.
+    image
+        The input resampled onto the reference's grid; ``None`` unless ``out``.
+    stdout
+        FLIRT's standard output: its verbose lines and a schedule's ``print``.
+    """
 
     matrix: np.ndarray
     image: Image | None
@@ -115,7 +124,7 @@ def _run(
     extra_env: tuple[tuple[str, str], ...] = (),
 ):
     if selected is None:
-        # the clean-room original, in this process, with FSL's settings of this call
+        # the clean room, in this process, with FSL's settings of this call
         env = [("FSLOUTPUTTYPE", "NIFTI"), ("PATH", tmp), (_defects.ENV, upstream_defects)]
         env.extend(extra_env)
         if n_threads > 0:
@@ -195,8 +204,17 @@ def flirt(
 
     Raises ``ValueError`` for invalid arguments and ``RuntimeError`` when FLIRT ends without a
     matrix (FLIRT reports its errors with exit status 0; the message is in the error).
-    ``implementation``: ``"auto"`` (the replica when ``larmorx-nc`` is installed, else the
-    clean-room original), ``"replica"`` or ``"clean-room"``.
+
+    Parameters
+    ----------
+    n_threads
+        Threads (0 = all); the results do not depend on it.
+    implementation
+        ``"auto"`` (default): the replica when ``larmorx-nc`` is installed, else the clean room;
+        ``"replica"`` or ``"clean-room"`` (``"original"``, 0.1.0rc1's spelling, still works).
+    upstream_defects
+        ``"fix"`` (default) or ``"reproduce"``: FSL's defects corrected, or FSL's behaviour
+        (``docs/api/fsl-flirt.md``, "Defects of the original, corrected by default").
     """
     n_threads = _threads(n_threads)
     _choice("cost", cost, COSTS)
@@ -309,11 +327,23 @@ def convert_xfm(
     concat: Any = None,
     fix_scale_skew: Any = None,
     inverse: bool = False,
+    n_threads: int = 1,
     implementation: ImplementationName = "auto",
 ) -> np.ndarray:
     """FSL's ``convert_xfm``: ``matrix`` (4 x 4 array or file) with ``fix_scale_skew``'s scales and
     skews, then ``concat @ matrix``, then inverted; returned as a 4 x 4 array (as FSL writes it:
-    10 significant digits)."""
+    10 significant digits).
+
+    Parameters
+    ----------
+    n_threads
+        Threads (0 = all), given to the program as ``OMP_NUM_THREADS``; the result does not
+        depend on it.
+    implementation
+        ``"auto"`` (default): the replica when ``larmorx-nc`` is installed, else the clean room;
+        ``"replica"`` or ``"clean-room"`` (``"original"``, 0.1.0rc1's spelling, still works).
+    """
+    n_threads = _threads(n_threads)
     selected = _replica.select("fsl", "convert_xfm", implementation)
     with tempfile.TemporaryDirectory(prefix="larmorx-xfm-") as tmp:
         args = ["-omat", "out.mat"]
@@ -324,7 +354,7 @@ def convert_xfm(
         if inverse:
             args.append("-inverse")
         args.append(_matrix_file(matrix, tmp, "in"))
-        p = _run(selected, args, tmp, 1, "fix", program="convert_xfm")
+        p = _run(selected, args, tmp, n_threads, "fix", program="convert_xfm")
         mat = os.path.join(tmp, "out.mat")
         if not os.path.isfile(mat):
             tail = "\n".join(p.stderr.strip().splitlines()[-20:])

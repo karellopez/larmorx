@@ -5,7 +5,7 @@ volume, as AFNI 26.3.05's program does.
 ``implementation="auto"`` (the default) and ``"replica"`` run the bit-exact replica (part of
 larmorx, in this process), which gives AFNI's registered series, parameters, matrices and
 displacements bit for bit (``docs/validation/afni-volreg-replica.md``); ``"clean-room"`` runs the
-clean-room original (Apache-2.0, written from ``specs/3dvolreg.md``, built for speed), which
+clean room (Apache-2.0, written from ``specs/3dvolreg.md``, built for speed), which
 gives AFNI's results within the thresholds of the spec (§14.3).
 
 AFNI's deterministic defects are corrected by default (D13, ``docs/api/upstream-defects.md``):
@@ -181,8 +181,8 @@ def volreg(
     n_threads
         Threads (0 = all); the result does not depend on it.
     implementation
-        ``"auto"`` (default) and ``"replica"``: the bit-exact replica; ``"clean-room"``: the
-        clean-room original.
+        ``"auto"`` (default) and ``"replica"``: the bit-exact replica; ``"clean-room"``
+        (``"original"``, 0.1.0rc1's spelling, still works): the clean room.
     upstream_defects
         ``"fix"`` (default) or ``"reproduce"`` (AFNI's output); a
         :class:`~larmorx.UpstreamDefectWarning` names each defect that changed the result.
@@ -201,7 +201,7 @@ def volreg(
     Raises
     ------
     ValueError
-        Invalid arguments; with the original, AFNI's fatal errors (a base with fewer than 100
+        Invalid arguments; with the clean room, AFNI's fatal errors (a base with fewer than 100
         non-zero voxels, mismatched grids, ...).
     larmorx.ReplicaError
         The replica ran and failed (AFNI's fatal errors: a base with fewer than 100 non-zero
@@ -240,7 +240,7 @@ def volreg(
                     raise TypeError(f"{flag[1:]} must be a path to a NIfTI file of AFNI's")
                 args += [flag, os.path.abspath(os.fspath(value))]
         path = lambda name: os.path.join(tmp, name)  # noqa: E731
-        # Relative names for the replica (run in tmp), absolute ones for the original (run in
+        # Relative names for the replica (run in tmp), absolute ones for the clean room (run in
         # this process).
         out = path if selected is None else (lambda name: name)
         outputs = ["-prefix", out("out.nii"), "-1Dfile", out("p.1D")]
@@ -281,7 +281,7 @@ def volreg(
 def _run_original(
     args: list[str], n_threads: int, upstream_defects: str, settings: dict[str, str]
 ) -> None:
-    """Runs the clean-room original's command line in this process; its warnings become Python
+    """Runs the clean room's command line in this process; its warnings become Python
     warnings, a failure a ``ValueError`` with AFNI's message."""
     code, _, stderr = _core.afni_volreg_cli(
         args,
@@ -295,9 +295,7 @@ def _run_original(
             warnings.warn(_defects.parse_line(text) or text, stacklevel=4)
     if code != 0:
         errors = [ln for ln in stderr.splitlines() if ln.startswith("**")]
-        raise ValueError(
-            "3dvolreg (clean-room original) failed: " + (" ".join(errors) or stderr.strip())
-        )
+        raise ValueError("3dvolreg (clean room) failed: " + (" ".join(errors) or stderr.strip()))
 
 
 def fmriprep_volreg_options() -> dict[str, Any]:

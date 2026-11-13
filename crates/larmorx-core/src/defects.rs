@@ -614,7 +614,7 @@ defects! {
     GLIBC_06 = "GLIBC-06", "glibc 2.35", true,
         "tanh (double precision) is not correctly rounded: about one argument in five gets a result one unit in the last place from the exact value, and FSL's bet2 takes its surface's smoothness weight from it at every step, so where such a last bit survives (most of all where a self-intersecting surface is rerun, which amplifies it) the surface and the brain mask are other than the exact tanh gives";
     GLIBC_07 = "GLIBC-07", "glibc 2.35", true,
-        "the mathematical functions FSL's and AFNI's programs call are not correctly rounded: the double-precision sin, cos, tan, asin, acos, atan, exp, log and pow (on image intensities, between 0.02 % (log) and 0.21 % (tan) of the arguments get a result one unit in the last place from the exact value) and the single-precision sinf, cosf, atan2f, expf, logf and powf; so fslmaths' -sin, -cos, -tan, -asin, -acos, -atan, -exp, -log and -pow of a double image (-dt double) differ in that last place on those voxels (a float image, the default, keeps the same values), its kernels, -bptf, -tfce and -roc, fslstats' -e and -E and 3dTshift's -wsinc5 and -wsinc9 weights (about 1 % of them) can take another last bit, and the iterative programs (FLIRT and its programs, mcflirt's mutual-information costs, FAST, topup's smoothing, bet2's powers, betsurf's blurring) another path; nor is sincos, which gives the twiddle factors of fslmaths' FFT convolution (through cexp): of the transform lengths 1 to 256, 80 hold a factor one unit in the last place from the exact one, so a few voxels of such a convolution differ in their last place; and numpy's float64 exp and log are the C library's on x86-64 CPUs without AVX-512 (and SciPy's powers C's pow), which tedana's t2smap takes for its S0, its curve fit's model, the T2* floor, the RMSE and the combination's weights";
+        "the mathematical functions FSL's and AFNI's programs call are not correctly rounded: the double-precision sin, cos, tan, asin, acos, atan, exp, log and pow (on image intensities, between 0.02 % (log) and 0.21 % (tan) of the arguments get a result one unit in the last place from the exact value) and the single-precision sinf, cosf, atan2f, expf, logf and powf; so fslmaths' -sin, -cos, -tan, -asin, -acos, -atan, -exp, -log and -pow of a double image (-dt double) differ in that last place on those voxels (a float image, the default, keeps the same values), its kernels, -bptf, -tfce and -roc, fslstats' -e and -E and 3dTshift's -wsinc5 and -wsinc9 weights (about 1 % of them) can take another last bit, and the iterative programs (FLIRT and its programs, mcflirt's mutual-information costs, FAST, topup's smoothing, bet2's powers, betsurf's blurring) another path; nor is sincos, which gives the twiddle factors of fslmaths' FFT convolution (through cexp): of the transform lengths 1 to 256, 80 hold a factor one unit in the last place from the exact one, so a few voxels of such a convolution differ in their last place; and numpy's float64 exp and log are the C library's on x86-64 CPUs without AVX-512 (and SciPy's powers C's pow), which tedana's t2smap takes for its S0, its curve fit's model, the T2* floor, the RMSE and the combination's weights; and FreeSurfer's matrices and histograms call cosf and sinf (rotations), expf (Gaussian matrices), exp, pow and log (the histograms' smoothing, robust fit and entropy) and log (Gaussian draws)";
     AFNI_01 = "AFNI-01", "AFNI", true,
         "a negative scl_slope is dropped where a voxel's series is read (THD_extract_array) but applied elsewhere: 3dTshift's shifted slices come out sign-flipped and scaled, 3dAutomask averages several sub-bricks without the factor, 3dUnifize -EPI's median volume has the wrong sign";
     AFNI_02 = "AFNI-02", "AFNI", true,
@@ -1102,7 +1102,7 @@ defects! {
     FS_12 = "FS-12", "FreeSurfer", true,
         "nint and nint2 (FreeSurfer's rounding to an integer) give -2147483648 for values beyond the 32-bit integer range and for NaN";
     FS_13 = "FS-13", "FreeSurfer", true,
-        "MatrixAlloc of a negative size, or of more numbers than an int holds, crashes or corrupts memory after printing that it uses an mmap'd file, or exits";
+        "MatrixAlloc of a negative size, or of more numbers than an int holds: for some negative sizes an empty matrix (whose stored numbers can show the matrix's own record, two memory addresses included), for the others a crash, or (with the old allocator) a message that it uses an mmap'd file and an exit";
     FS_14 = "FS-14", "FreeSurfer", true,
         "MatrixCopy of a complex matrix copies, of each row, only as many floats as the row has columns, starting one float before the row's first pair, into the same places of the copy: half the values are missing and the rest are misplaced";
     FS_15 = "FS-15", "FreeSurfer", true,
@@ -1170,11 +1170,11 @@ defects! {
     FS_46 = "FS-46", "FreeSurfer", true,
         "MatrixSVDPseudoInverse never writes a given output (it returns a new matrix), returns a pseudo-inverse of infinities when the decomposition fails, and crashes for a zero matrix with fewer rows than columns";
     FS_47 = "FS-47", "FreeSurfer", true,
-        "MatrixEigenSystem of a symmetric matrix with infinite entries, and MatrixCalculateEigenSystemHelper's symmetric case of a matrix with NaN entries, never return";
+        "MatrixEigenSystem of a symmetric matrix with infinite entries, and MatrixCalculateEigenSystemHelper's symmetric case of a matrix with infinite or NaN entries in its upper triangle, never return on many such matrices (VNL's ITK-115), and on the others return the values VNL computes, though such a matrix has no eigensystem";
     FS_48 = "FS-48", "FreeSurfer", true,
         "the SVD functions (MatrixSVD, the SVD inverses and pseudo-inverses, the condition numbers) never return for some matrices with infinite or NaN entries";
     FS_49 = "FS-49", "FreeSurfer", true,
-        "freadInt and freadDouble at the end of a file return memory contents (freadInt prints nothing), and MatrixReadFrom of a file that ends early fills the matrix's type, sizes or elements with memory contents";
+        "freadInt and freadDouble at the end of a file keep, for the bytes they could not read, bytes of the number read before them (memory contents where none was read; freadInt prints nothing), and MatrixReadFrom of a file that ends early fills the matrix's type, sizes or elements with them";
     FS_50 = "FS-50", "FreeSurfer", true,
         "HISTOabs of a histogram whose absolute bin values span an infinite range, or whose bin size is 0 or NaN, ends the program with 'could not allocate histogram' (the bin count it needs is beyond the int range)";
     FS_51 = "FS-51", "FreeSurfer", true,
@@ -1196,7 +1196,7 @@ defects! {
     FS_59 = "FS-59", "FreeSurfer", true,
         "assigning a geometry (VOL_GEOM) that has no cached voxel-to-RAS matrices onto one that has them keeps the destination's old matrices, computed from its old geometry";
     FS_60 = "FS-60", "FreeSurfer", true,
-        "MRIcopyHeader onto a volume that owns a transform, from a volume without one, frees that transform but leaves the destination pointing at it (its use or the volume's end then crashes)";
+        "MRIcopyHeader onto a volume that owns a transform, from a volume without one, frees that transform yet the destination still shows it as its own: its matrices are then freed memory (using them, or the volume's end, crashes or reads garbage)";
     FS_71 = "FS-71", "MINC volume_io", true,
         "a compressed input (.gz, .Z, .z, or a missing name whose compressed file exists) is decompressed by running gunzip -c, then bunzip2 -c, through the shell with the file name unquoted: a name with a blank or shell syntax fails, reads other files or runs commands";
     FS_72 = "FS-72", "MINC volume_io", true,
@@ -1378,11 +1378,15 @@ defects! {
     FS_165 = "FS-165", "FreeSurfer", true,
         "MRIfixTkReg of a registration matrix with four columns and another number of rows crashes";
     FS_166 = "FS-166", "FreeSurfer", true,
-        "the rows of a tensor volume, as code that goes through a volume row by row sees them (MRIcopy), all start at its first voxel: such code reads and writes only the volume's first row";
+        "MRIcopy of a tensor volume copies every row from the source's first voxel onto the destination's first voxel: only the destination's first row changes, and it becomes the source's first row";
     FS_261 = "FS-261", "FreeSurfer", true,
         "the byte-order swap of a buffer of n items of 2, 4 or 8 bytes (ByteSwapBuf) reverses only the first n/2, n/4 or n/8 items (rounded up) and leaves the rest as they were";
     FS_263 = "FS-263", "FreeSurfer", true,
         "with exceptions switched on, a fatal error with a nonzero code aborts the program (exit status 134, after the C++ library's terminate message) instead of passing the code to the program's handler";
+    FS_264 = "FS-264", "FreeSurfer", true,
+        "the 4 x 4 matrix helpers (MRImatrixOfDirectionCosines, MRImatrixOfVoxelSizes, MRImatrixOfTranslations, a geometry's toMatrix and RASFromSurfaceRAS_ given a matrix to fill; MRIsetVox2RASFromMatrix given its matrix) given a matrix with fewer than 4 rows or columns write or read past its elements: a crash, memory contents, or other elements of the matrix changed";
+    FS_331 = "FS-331", "FreeSurfer", true,
+        "RASFromSurfaceRAS_ (and VGtkreg2RAS) given a matrix larger than 4 x 4 to fill computes the tkregister matrix's inverse into it as if it were 4 x 4 and the product into it again: a 4 x N matrix (N > 4) gets the numbers laid out across its rows, the program ends when one of the matrix's first 4 x 4 numbers left unwritten is not finite, and one of more than 4 rows gives nothing after a size-mismatch error";
     FS_167 = "FS-167", "FreeSurfer", true,
         "the binary readers of one number (fread1, fread2, freadLong, freadFloat, and znzread1, znzreadShort, znzreadInt, znzreadLong, znzreadFloat, znzreadDouble) at the end of a file return a number whose missing bytes are memory contents";
     FS_168 = "FS-168", "FreeSurfer", true,
@@ -1491,14 +1495,6 @@ defects! {
         "DTIparsePulseSeqName of a name with 100 characters or more before or after its # overflows a buffer: a crash or wrong values";
     FS_220 = "FS-220", "FreeSurfer", true,
         "DTIbvecChangeSpace of gradient directions with fewer than 3 columns reads and writes past each row: it changes the next rows' numbers, and past the matrix's last number it reads memory contents and writes outside the matrix";
-    FS_285 = "FS-285", "FreeSurfer", true,
-        "reading a volume-geometry block (the text block of linear transform and surface files) whose line starts with a word of 64 bytes or more writes the word past its buffer: memory corruption, a crash or wrong values";
-    FS_286 = "FS-286", "FreeSurfer", true,
-        "reading a volume-geometry block whose line has a second word of 2 bytes or more (not the usual =) writes the word past its 2-byte buffer: memory corruption, a crash or wrong values";
-    FS_287 = "FS-287", "FreeSurfer", true,
-        "reading a volume-geometry block, a blank line counts as a repeat of the line before it and takes one of the block's eight places: the block's last line (the centre, cras) is then not read and the line after the block is";
-    FS_288 = "FS-288", "FreeSurfer", true,
-        "reading a volume-geometry block whose first line is blank compares memory contents with the block's keys";
     FS_346 = "FS-346", "FreeSurfer", true,
         "the binary triangle and quadrangle surface readers given a command-line tag whose length is -1 read the rest of the file into a block of no bytes: memory corruption or a crash when more than a few bytes follow";
     FS_347 = "FS-347", "FreeSurfer", true,
@@ -1585,6 +1581,40 @@ defects! {
         "IsSiemensDICOM, for a DICOM file whose Manufacturer element (0008,0070) is stored with a numeric representation (US, SS, UL, SL, FL, FD, AT) and holds more bytes than one such number, corrupts memory: the answer depends on memory contents and the program can crash";
     FS_228 = "FS-228", "FreeSurfer", true,
         "IsSiemensDICOM crashes on a DICOM file whose Manufacturer element (0008,0070) has a representation it does not handle (OT, UT, DD, a retired, context or delimiter representation) or an undefined length";
+    FS_249 = "FS-249", "FreeSurfer", true,
+        "reading a volume (mri_read, MRIreadHeader) whose name is 1,024 bytes or more once the working directory is put before it writes past FreeSurfer's name buffers: the result is undefined and the program can crash";
+    FS_253 = "FS-253", "FreeSurfer", true,
+        "reading an MGH or MGZ volume that holds the NIfTI header extension's RAS-transform tag (tag 9) crashes";
+    FS_254 = "FS-254", "FreeSurfer", true,
+        "reading an MGH or MGZ volume whose talairach-transform tag holds 1,024 bytes or more, or whose folder's name is 975 bytes or more, writes past FreeSurfer's name buffers: the transform's name and the volume after it are undefined and the program can crash";
+    FS_255 = "FS-255", "FreeSurfer", true,
+        "reading only the header of a float volume (MRIreadHeader, MRIreadInfo) with a frame list (name#0) crashes";
+    FS_256 = "FS-256", "FreeSurfer", true,
+        "with FS_MGZIO_USEVOXELBUFREAD set, reading one frame after the first of an MGH volume writes past the one-frame volume FreeSurfer makes for it, and reading a volume without slices (no frames, or a depth of 0) crashes";
+    FS_257 = "FS-257", "FreeSurfer", true,
+        "an MGH volume's command-line or phase-encoding tag whose length is negative or larger than the machine can allocate crashes FreeSurfer or corrupts its memory";
+    FS_258 = "FS-258", "FreeSurfer", true,
+        "regio_read_register writes past its buffer for a subject or method name of 1,000 bytes or more in a register.dat, and gives sizes from memory contents for an .lta without transforms";
+    FS_259 = "FS-259", "FreeSurfer", true,
+        "reading a Bruker study, a parameter line (##name=value in acqp, reco or d3proc) whose name is 256 bytes or more or whose value is 128 bytes or more writes past FreeSurfer's buffers: memory corruption, a crash or wrong values";
+    FS_260 = "FS-260", "FreeSurfer", true,
+        "reading a Bruker study leaves its reco file open (and d3proc or reco on an unsupported data type, 2dseq on an unknown one): a program that reads many studies runs out of file descriptors";
+    FS_401 = "FS-401", "FreeSurfer", true,
+        "reading a Bruker study whose files lack a value FreeSurfer uses (the sizes in d3proc; the transposition, field of view, sizes, data type in reco; TR, TE, TI, the flip angle, the offsets or the gradient matrix in acqp) takes it from memory contents: the volume's size, type, times or geometry are undefined";
+    FS_402 = "FS-402", "FreeSurfer", true,
+        "reading a Bruker study's voxels takes 2 bytes per voxel whatever the data type: a 32-bit volume (RECO_wordtype _32BIT_SGN_INT) gets only the first half of each row from the file and zeros after it";
+    FS_403 = "FS-403", "FreeSurfer", true,
+        "reading a Bruker study whose 2dseq file is shorter than the volume crashes (the volume is freed twice)";
+    FS_404 = "FS-404", "FreeSurfer", true,
+        "reading a Bruker study ignores RECO_byte_order: a big-endian 2dseq is read in the machine's byte order, so its values are wrong";
+    FS_285 = "FS-285", "FreeSurfer", true,
+        "reading a volume-geometry block (the text block of linear transform and surface files) whose line starts with a word of 64 bytes or more writes the word past its buffer: memory corruption, a crash or wrong values";
+    FS_286 = "FS-286", "FreeSurfer", true,
+        "reading a volume-geometry block whose line has a second word of 2 bytes or more (not the usual =) writes the word past its 2-byte buffer: memory corruption, a crash or wrong values";
+    FS_287 = "FS-287", "FreeSurfer", true,
+        "reading a volume-geometry block, a blank line counts as a repeat of the line before it and takes one of the block's eight places: the block's last line (the centre, cras) is then not read and the line after the block is";
+    FS_288 = "FS-288", "FreeSurfer", true,
+        "reading a volume-geometry block whose first line is blank compares memory contents with the block's keys";
     FS_289 = "FS-289", "FreeSurfer", true,
         "the volume operations that walk a second volume (or the destination, or a frame they are given) with the first volume's extent and frames read and write other voxels of a smaller volume";
     FS_290 = "FS-290", "FreeSurfer", true,
@@ -1669,26 +1699,12 @@ defects! {
         "MatlabWrite of a complex matrix writes its real and imaginary parts interleaved as the first half of a real matrix";
     FS_248 = "FS-248", "FreeSurfer", true,
         "ReadMatlabFileContents of a file of more than 1,000 variables writes past its lists (a crash or corruption)";
-    FS_249 = "FS-249", "FreeSurfer", true,
-        "reading a volume (mri_read, MRIreadHeader) whose name is 1,024 bytes or more once the working directory is put before it writes past FreeSurfer's name buffers: the result is undefined and the program can crash";
     FS_250 = "FS-250", "FreeSurfer", true,
         "MatFileRead goes on after a header it could not read, with the sizes read so far (or 0)";
     FS_251 = "FS-251", "FreeSurfer", true,
         "the .mat readers take a byte 0xff for the end of the file: a version 5 file with 0xff in its first four bytes is refused, a version 4 variable whose first byte is 0xff ends the reading";
     FS_252 = "FS-252", "FreeSurfer", true,
         "MRIcopyHeader crashes when the source volume's voxel-to-RAS matrix has not been computed (FreeSurfer's own volumes always have it)";
-    FS_253 = "FS-253", "FreeSurfer", true,
-        "reading an MGH or MGZ volume that holds the NIfTI header extension's RAS-transform tag (tag 9) crashes";
-    FS_254 = "FS-254", "FreeSurfer", true,
-        "reading an MGH or MGZ volume whose talairach-transform tag holds 1,024 bytes or more, or whose folder's name is 975 bytes or more, writes past FreeSurfer's name buffers: the transform's name and the volume after it are undefined and the program can crash";
-    FS_255 = "FS-255", "FreeSurfer", true,
-        "reading only the header of a float volume (MRIreadHeader, MRIreadInfo) with a frame list (name#0) crashes";
-    FS_256 = "FS-256", "FreeSurfer", true,
-        "with FS_MGZIO_USEVOXELBUFREAD set, reading one frame after the first of an MGH volume writes past the one-frame volume FreeSurfer makes for it, and reading a volume without slices (no frames, or a depth of 0) crashes";
-    FS_257 = "FS-257", "FreeSurfer", true,
-        "an MGH volume's command-line or phase-encoding tag whose length is negative or larger than the machine can allocate crashes FreeSurfer or corrupts its memory";
-    FS_258 = "FS-258", "FreeSurfer", true,
-        "regio_read_register writes past its buffer for a subject or method name of 1,000 bytes or more in a register.dat, and gives sizes from memory contents for an .lta without transforms";
     FS_311 = "FS-311", "FreeSurfer", true,
         "the segmentation functions (left-right label swaps, the ribbon fix, one-hot encoding, the brain volume corrections) turn a voxel value or a label list entry that is NaN or beyond the 32-bit integer range into the label -2147483648";
     FS_312 = "FS-312", "FreeSurfer", true,
@@ -1699,6 +1715,26 @@ defects! {
         "reading the cached brain volume statistics (stats/brainvol.stats) aborts on a line that names a measure, holds no number and ends in white space";
     FS_315 = "FS-315", "FreeSurfer", true,
         "the left-right swap of a segmentation by label lists reads the lists past their end when they hold fewer numbers than rows";
+    FS_316 = "FS-316", "FreeSurfer", true,
+        "the flood fill of a byte volume from a seed clamps a seed row or slice at or past the volume's height or depth to the volume's width minus one";
+    FS_317 = "FS-317", "FreeSurfer", true,
+        "downsampling by factors and the change of a volume's type with rescaling convert a number beyond the 32-bit integer range, or NaN, to the integer -2147483648 (the extent, the windows, the histogram's bins and counts)";
+    FS_318 = "FS-318", "FreeSurfer", true,
+        "the mean of a frame's voxels above a threshold is the mean of frame 0's whatever the frame asked for";
+    FS_319 = "FS-319", "FreeSurfer", true,
+        "upsampling with the sum conserved of a volume whose change to floats fails (a robust range that is empty after the histogram) goes on with no volume and crashes";
+    FS_320 = "FS-320", "FreeSurfer", true,
+        "trilinear splatting of a value into an integer volume (MRIinterpolateIntoVolume) adds each corner's rounded share to the voxel in the voxel's type: a sum beyond the type's range wraps around (bytes, shorts, 32-bit integers)";
+    FS_321 = "FS-321", "FreeSurfer", true,
+        "trilinear splatting of a value into a volume of 64-bit integers (long) adds into 32-bit integers at the voxel's index: it changes halves of other voxels";
+    FS_322 = "FS-322", "FreeSurfer", true,
+        "the directional derivatives and gradients of a volume of a type the trilinear sampler refuses (RGB, complex) use sample values never written: memory contents";
+    FS_323 = "FS-323", "FreeSurfer", true,
+        "the neighbour counts of a voxel more than 500 voxels outside the volume read its boundary index tables past their ends: memory contents";
+    FS_324 = "FS-324", "FreeSurfer", true,
+        "the directional derivative at a scale (MRIsampleVolumeDerivativeScale) with an infinite scale, or one whose double overflows, never returns";
+    FS_325 = "FS-325", "FreeSurfer", true,
+        "the linear transform of a volume (MRIlinearTransformInterp) stores, where a sample fails (sinc sampling, a type the trilinear sampler refuses), the last sample that succeeded, and before the first a value never written: memory contents";
 }
 
 /// The register entry with ID `id`.

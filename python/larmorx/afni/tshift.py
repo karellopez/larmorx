@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 """``3dTshift``: slice-timing correction (the bit-exact replica of AFNI 26.3.05's program, or its
-clean-room re-implementation).
+clean room).
 
 AFNI's deterministic defects are corrected by default (D13, ``docs/api/upstream-defects.md``),
 by either implementation: a negative ``scl_slope`` (AFNI-01), float32 data with a slope and an
@@ -262,8 +262,8 @@ def tshift(
     implementation
         ``"auto"`` (default) and ``"replica"``: the bit-exact replica (part of larmorx, run in
         this process on temporary NIfTI files, with the arguments AFNI's program takes);
-        ``"clean-room"``: the clean-room original. The two differ only in the last bits of some
-        values (``docs/validation/afni-tshift.md``).
+        ``"clean-room"`` (``"original"``, 0.1.0rc1's spelling, still works): the clean room. The
+        two differ only in the last bits of some values (``docs/validation/afni-tshift.md``).
     upstream_defects
         ``"fix"`` (default) corrects AFNI's defects (AFNI-01, -02, -07, -16, and with
         ``afni_settings`` AFNI-23); ``"reproduce"`` gives AFNI's output. A
@@ -305,7 +305,7 @@ def tshift(
         ``afni_settings`` is not a mapping of strings to strings.
     larmorx.ReplicaError
         The replica failed (an error AFNI's program reports). larmorx does not fall back to the
-        original then.
+        clean room then.
     """
     _check(slice_times, tr, tzero, slice, ignore, method, restore, detrend)
     _defects.check(upstream_defects)
@@ -332,7 +332,7 @@ def tshift(
     selected = _replica.select("afni", "3dTshift", implementation)
     if selected is not None:
         return _tshift_replica(selected, image, times, options, settings)
-    # The original reads the settings the replica receives (``_SETTINGS_FIXED`` is applied in
+    # The clean room reads the settings the replica receives (``_SETTINGS_FIXED`` is applied in
     # Rust), and an absolute path, as the replica does.
     pairs = sorted(settings.items()) or None
     if isinstance(image, (str, os.PathLike)):

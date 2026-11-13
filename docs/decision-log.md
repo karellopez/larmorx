@@ -2562,3 +2562,47 @@ The part's decisions, from its notes ("FROM THE ORCHESTRATOR", 2026-11-11 to 13;
 - **The records `experimental`** (since 2026-11-12 `validated` needs the final validation phase's extensive
   evidence); **the site page from the export only** (2026-11-13: the documentation revision rebuilds every page in a
   new layout; its writer adds the confounds' page after the merge).
+
+## 2026-11-13: the documentation revision published in two steps (the user)
+- **The user's decision** ("Yes let's follow the recommendation", 2026-11-13, on the orchestrator's recommendation):
+  the documentation revision ([documentation-plan.md](documentation-plan.md)) is published in two steps instead of
+  once at its end.
+- **Step 1 (2026-11-13):** on the documentation site, every evidence page in the writing guide's words and layout
+  at its new address (`/evidence/<page>/`; each old `/tools/<page>/` a redirect that keeps every anchor), t2smap's
+  clean room in its three worked examples, the Programs page with BET's three reference pages, the home page,
+  Getting started (the old Installation), Concepts with Why Rust and Python under it, About, the header,
+  Validation reorganised with the data panel under it, the roadmap in the new words, the 404 page, the random-testing
+  tables brought up to date, and no machine's folder names in any published file; in this repository the writing
+  guide ([writing-guide.md](writing-guide.md)), the evidence modules' shared presenter, and the files named
+  `*-original*` that hold a clean room renamed `*-clean-room*` (a pointer file at each old name; history and the
+  records keep their names until they are made again).
+- **Step 2 (the next day):** a reference page for every program, the repository's documents, API pages and the
+  wrappers' printed lines in the new words, `programs.py`'s rule for `validated`, the list of the clean rooms'
+  printed lines in the old words (for a clean-room agent), the confounds' evidence and reference pages (after the
+  confounds part's merge), and its merge material.
+- **Between the steps** the pages not yet rewritten keep their form and stay reachable, and nothing the site shows
+  gets worse: step 1's inventory against the published site (b768293a) keeps every page's shown numbers, tables,
+  figures, viewers, images and links, each moved page paired with its new address; the only numbers that changed
+  are those of the three records made again since (3dTshift's replica, antsRegistration, antsAI), which the pages
+  show as their records now say.
+
+## 2026-11-13 (evening): the documentation's step 2 reduced, no reviewer; no new parallel chains, then one agent at a time (the user)
+- **The documentation revision without its critical reviewer** (the user: "having a reviewer just make the things
+  slower, and consumes a lot of tokens"): the writer checks each chunk itself with the automated checks (the site's
+  build, the reference check, the inventory against the published site, the summary, site-path and panel-run
+  checks, the gates), every number from the current records, the words rules, no restricted link.
+- **Step 2 reduced to what the site's readers see** (the user: "yes please", on the orchestrator's recommendation):
+  a reference page for every program, the confounds' evidence and reference pages, the wrappers' missing
+  `n_threads` (CLAUDE.md rule 5) and their printed messages, one paragraph in the porting guide's per-tool
+  checklist and `docs/figures.md` naming the writing guide and the shared presenter as how a new tool's pages are
+  made, and a lean merge. Moved to the final validation phase: the repository's other documents, the findings', the
+  code's and the tests' words, `programs.py`'s rule for `validated`, the list of the clean rooms' printed lines in
+  the old words, the site's small layout items.
+- **No new parallel chains** (the user: "DO not parellel more things, we only have until saturday 23:00 to work
+  like that and still have a 61% of weekly usage, reached. After that we will have to continue the old way just to
+  save usage"): the chains already running continue until the weekly reset of Saturday 2026-11-14 23:00 (no second
+  FreeSurfer clean-room chain); from the reset on, one agent at a time, by the order in
+  [next-steps.md](next-steps.md), "Side by side, then one agent at a time".
+- **Continuity** (the user: "make sure you save the progress and information"): the relays' notes, briefs, handoffs
+  and reviews, kept in the orchestrator session's scratch folder that is cleared at boot, are mirrored hourly into
+  `<workspace>/archive/orchestration-notes/` and to the USB disk.

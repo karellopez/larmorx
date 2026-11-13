@@ -1822,7 +1822,7 @@ def export(ctx: core.Context) -> dict:
         _memory_table(ctx),
         *trial_tables,
     ]
-    return {
+    doc = {
         "schema": 1,
         "tool": TOOL,
         "title": "sdcflows' field-map estimation",
@@ -1850,6 +1850,279 @@ def export(ctx: core.Context) -> dict:
         "tables": tables,
         "examples": examples,
     }
+    return present(doc)
+
+
+# ---------------------------------------------------------------------- the presentation
+
+
+def _page(program: str = ""):
+    from larmorx_validation.evidence import present as present_
+
+    return present_.Page("sdcflows", program, "2.17.1", part="field-map estimation", texts=TEXTS)
+
+
+#: The page's own rewordings (applied before the guide's words): LARMORX's reference setup;
+#: PRELUDE's port in the workflow, the clean room, by its name; the originals' step between two
+#: releases of the libraries; the register's corrections and the modes by what they are; the
+#: random-testing run by its name; a step of the part's work by nothing.
+TEXTS = [
+    (r"\blarmorx's reference\b", "LARMORX's reference"),
+    (r"PRELUDE included \(lx\.fsl\.prelude's clean-room original, written from the "
+     r"specification\)", "with PRELUDE's clean room (`lx.fsl.prelude`, written from its "
+     "specification)"),
+    (r"\(PRELUDE: lx\.fsl\.prelude's clean-room original\)", "(PRELUDE's clean room)"),
+    (r"\bwith lx\.fsl\.prelude's clean-room original\b", "with PRELUDE's clean room "
+     "(`lx.fsl.prelude`)"),
+    (r"^The version step, a reference row(?: \(the original against itself\))?: ",
+     "For reference, the originals' own step between two releases of the libraries: "),
+    (r"\bNo correction of the register applies\b", "No correction by default applies"),
+    (r"\bboth modes give the same values\b", "`fix` and `reproduce` give the same values"),
+    (r"\bat 1 and 14 threads and in both modes\b", "at 1 and 14 threads, in `fix` and in "
+     "`reproduce`"),
+    (r"\bThe default names (SDC-\d+), (SDC-\d+);", r"`fix` names \1 and \2;"),
+    (r"\bits default mode checked by D13's rule\b", "its default, `fix`, checked by the rule of "
+     "the corrections by default"),
+    (r"^Differential random testing's trial of this part \(", "The replica's random-testing run ("),
+    (r"\bbefore the trial \(the same day\)", "before this run (the same day)"),
+    (r"\(the trial of (\d{4}-\d\d-\d\d)\)", r"(the random-testing run of \1)"),
+    (r"; larmorx's Shepperd formula gave other last bits and zero signs before relay 7\)",
+     "; the replica's own Shepperd formula, used at first, gave other last bits and zero signs)"),
+    (r"\bthe default's result checked by D13's rule\b", "the result of `fix` checked by the rule "
+     "of the corrections by default"),
+    (r" \(relay \d+\)", ""),
+]  # fmt: skip
+
+
+def _diff(ex: dict, i: str) -> dict:
+    return next(d for d in ex["diffs"] if d["id"] == i)
+
+
+def _want(ex: dict, **verdicts: str | None) -> None:
+    """Raise unless each comparison (``lx_sdc`` for ``lx-sdc``) has its verdict."""
+    for i, v in verdicts.items():
+        got = _diff(ex, i.replace("_", "-")).get("verdict")
+        if got != v:
+            raise ValueError(f"{ex['id']}: {i.replace('_', '-')} is {got}, not {v}")
+
+
+def _found(ex: dict, i: str, pat: str) -> re.Match[str]:
+    m = re.search(pat, _diff(ex, i)["reason"] or "")
+    if not m:
+        raise ValueError(f"{ex['id']}: {i}'s reason without {pat!r}")
+    return m
+
+
+def _note(ex: dict, pat: str) -> re.Match[str]:
+    m = re.search(pat, ex.get("metrics_note") or "")
+    if not m:
+        raise ValueError(f"{ex['id']}: its metrics note without {pat!r}")
+    return m
+
+
+def _sci(v: float) -> str:
+    """A number as a sentence gives it, two significant digits: 9.2e-05 as 9.2 × 10⁻⁵."""
+    if v == 0 or 1e-3 <= abs(v) < 1e5:
+        return f"{v:.3g}"
+    m, e = f"{v:.1e}".split("e")
+    sup = str.maketrans("-0123456789", "⁻⁰¹²³⁴⁵⁶⁷⁸⁹")
+    return f"{m} × 10{str(int(e)).translate(sup)}"
+
+
+_NUMBER = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"]
+#: The step's reason, "every one" of the values the same with both releases of the libraries.
+_SAME_STEP = r"\bsame values\b"
+
+
+def _shows_estimator(ex: dict) -> tuple[str, list[str]]:
+    """A phase-difference estimator: every output sdcflows', fMRIPrep's own files, the whole
+    workflow with PRELUDE's clean room."""
+    _want(ex, lx_sdc="bit-identical", lx_fmriprep="bit-identical", wf_fmriprep="bit-identical",
+          lx14_lx1="bit-identical", fix_lx="bit-identical", newest_shared=None)  # fmt: skip
+    _found(ex, "newest-shared", _SAME_STEP)
+    n = _NUMBER[len(ex["outputs"])]
+    return (
+        f"In `reproduce` the replica gives every value of sdcflows 2.17.1's {n} outputs (the "
+        "phase difference in radians, the field map in Hz, the fitted field and the fitting "
+        "error), at 1 and 14 threads alike, and fMRIPrep's own files of this estimator hold the "
+        "same values. Its whole workflow, with PRELUDE's clean room, gives fMRIPrep's field map "
+        "in every voxel. No correction by default changes this call, and sdcflows gives the "
+        "same values with both releases of the libraries."
+    ), ["lx-sdc"]
+
+
+def _shows_coefficients(ex: dict) -> tuple[str, list[str]]:
+    _want(ex, lx_sdc="bit-identical", lx_fmriprep="bit-identical", lx14_lx1="bit-identical",
+          fix_lx="bit-identical", newest_shared=None)  # fmt: skip
+    n = _note(ex, r"over all ([\d,]+) coefficients").group(1)
+    return (
+        f"In `reproduce` the replica gives every one of sdcflows 2.17.1's {n} coefficients, at 1 "
+        "and 14 threads alike, and fMRIPrep's own coefficient file holds the same values. No "
+        "correction by default changes this call."
+    ), ["lx-sdc"]
+
+
+def _shows_apply(ex: dict) -> tuple[str, list[str]]:
+    _want(ex, lx_sdc="bit-identical", lx14_lx1="bit-identical", fix_lx="d13",
+          newest_shared=None)  # fmt: skip
+    vols = _found(ex, "lx-sdc", r"\bEvery value of the (\d+) unwarped volumes\b").group(1)
+    m = _found(ex, "fix-lx", r"changes by ([\d.]+) Hz RMS \(largest ([\d.]+) Hz\) inside the "
+               r"brain mask; the unwarped series by ([\d.]+) RMS over all its values \(largest "
+               r"([\d.]+); the series' range (\d+)\)")  # fmt: skip
+    field, field_max, series, series_max, rng = m.groups()
+    return (
+        f"In `reproduce` the replica gives every value of sdcflows 2.17.1's {vols} unwarped "
+        "volumes, at 1 and 14 threads alike. In `fix`, its default, it corrects SDC-02: "
+        "fMRIPrep's registration rotates the series' grid against the coefficients' grid, where "
+        "sdcflows' weights are exact only for aligned grids. The field on the series' grid "
+        f"changes by {field} Hz RMS inside the brain mask ({field_max} Hz at most), and the "
+        f"series by {series} RMS over all its values ({series_max} at most, in a range of "
+        f"{int(rng):,})."
+    ), ["lx-sdc"]
+
+
+def _shows_sdc10(ex: dict) -> tuple[str, list[str]]:
+    _want(ex, lx_sdc="bit-identical", fix_lx="d13", sdc_exact=None, fix_exact=None,
+          newest_shared=None)  # fmt: skip
+    m = _found(ex, "sdc-exact", r"by ([\d.]+) Hz RMS \(median [\d.]+, largest ([\d.]+) Hz\) in "
+               r"the ([\d,]+) voxels of the BOLD brain mask")  # fmt: skip
+    rms, most, n = m.groups()
+    m2 = _found(ex, "fix-exact", r"([\d.e+-]+) Hz RMS, largest ([\d.e+-]+) Hz")
+    return (
+        "In `reproduce` the replica gives sdcflows 2.17.1's field, every value. That field "
+        f"departs from the known answer, the exact field, by {rms} Hz RMS in the {n} voxels of "
+        f"the BOLD brain mask ({most} Hz at most): it is the field where the target lies before "
+        "its registration. In `fix`, its default, the replica corrects SDC-10 and gives the "
+        f"exact field within {_sci(float(m2.group(2)))} Hz ({_sci(float(m2.group(1)))} Hz RMS), "
+        "its float32 sums of the B-splines taken in another order."
+    ), ["lx-sdc"]
+
+
+#: "What this shows" of each worked example (the writing guide, section 4), from its own
+#: verdicts, reasons and notes; beside it the replica's verdict against sdcflows.
+SHOWS = {
+    **{f"estimator-{k}": _shows_estimator for k in SHOWN},
+    "coefficients-ds005454": _shows_coefficients,
+    "apply-ds005454": _shows_apply,
+    "sdc10-ds002603": _shows_sdc10,
+}
+#: Each example's program, where it shows one (the estimators run several nodes: the page's).
+PROGRAMS = {
+    "coefficients-ds005454": "BSplineApprox",
+    "apply-ds005454": "ApplyCoeffsField",
+    "sdc10-ds002603": "B0FieldTransform.fit",
+}
+#: Comparisons the shapes name otherwise: fMRIPrep's files (its version in the panel's second
+#: line), the whole workflow with PRELUDE's clean room.
+DIFFS = {
+    "lx-fmriprep": ("replica − fMRIPrep's output", "the replica against fMRIPrep's output"),
+    "wf-fmriprep": ("replica, whole workflow with PRELUDE's clean room − fMRIPrep's output",
+                    "the replica against fMRIPrep's output"),
+}  # fmt: skip
+#: The panels the shapes name otherwise: the SDC-10 example's ports name their mode in the label.
+SDC10_PANELS = {
+    "larmorx": (
+        "replica",
+        "larmorx, Apache-2.0 · reproduce · sdcflows' result · against "
+        "sdcflows B0FieldTransform.fit 2.17.1",
+    ),
+    "larmorx-fix": (
+        "replica",
+        "larmorx, Apache-2.0 · fix (the default), SDC-10 corrected: the "
+        "grid built and sampled where the transform puts the target",
+    ),
+}
+#: The record's threshold, in each example's metrics note (the record's own words).
+THRESHOLD = (
+    "The record's threshold: in `reproduce`, every array, file (decompressed), header, warning "
+    "and message bit-identical to sdcflows 2.17.1's."
+)
+#: The case categories, as the page names them.
+CATEGORIES = {"sdcflows": "comparison scripts"}
+#: The tables' titles by the guide's pattern.
+TABLE_TITLES = {
+    "estimators": "fMRIPrep's seven phase-difference estimators, the replica against the original "
+    "and fMRIPrep's output: sdcflows 2.17.1",
+    "sdc10": "SDC-10 on ds002603's two oblique BOLD references, the original and the replica "
+    "against the known answer: sdcflows `B0FieldTransform.fit` 2.17.1 (Hz, inside the brain mask)",
+    "sdc06": "SDC-06 on fMRIPrep's own field maps (4D, one volume), the replica against the "
+    "original: sdcflows `BSplineApprox` 2.17.1",
+    "corrections": "Corrections by default, the replica: sdcflows 2.17.1's defects (SDC-01 to "
+    "SDC-11)",
+    "step": "Changes, the original against itself: sdcflows 2.17.1 with numpy 2.3.5 / SciPy "
+    "1.15.3 and with numpy 2.5.4 / SciPy 1.18.1",
+    "memory": "Peak memory, the replica against the original: sdcflows 2.17.1 (MiB, the memory "
+    "rule's calls, one thread)",
+    "trial": "Random testing, the replica against the original: sdcflows 2.17.1's field-map "
+    "estimation (the run of {date})",
+    "triage": "The replica's differences from the original in the run of {date}, triaged",
+}
+#: The tables' columns: each run as the panels name it.
+COLUMNS = {
+    "Threads, modes, step": "Threads, fix, releases",
+    "larmorx default − exact, RMS": "replica, fix − exact, RMS",
+    "larmorx reproduce = sdcflows": "replica, reproduce = sdcflows",
+    "larmorx, reproduce mode": "replica, reproduce",
+    "larmorx, default mode": "replica, fix",
+    "larmorx, reproduce": "replica, reproduce",
+    "larmorx, default": "replica, fix",
+    "larmorx ÷ sdcflows": "replica ÷ sdcflows",
+}
+#: The speed chart's series, as the page names them.
+SPEED_LABELS = {
+    "sdcflows, 1 thread": "sdcflows 2.17.1, 1 thread",
+    "sdcflows, 14 threads (ApplyCoeffsField)": "sdcflows 2.17.1, 14 threads (ApplyCoeffsField)",
+    "larmorx, 1 thread": "replica, 1 thread",
+    "larmorx, 14 threads": "replica, 14 threads",
+}
+#: The record's implementation: its id (the case explorer's) and port.
+PORTS = {"port": "replica"}
+
+
+def present(doc: dict) -> dict:
+    """sdcflows' field-map estimation in the writing guide's words and order: texts, ports and
+    order only."""
+    from dataclasses import replace
+
+    from larmorx_validation.evidence import present as present_
+
+    page = _page()
+    for ex in doc["examples"]:
+        line, verdicts = SHOWS[ex["id"]](ex)
+        own = replace(page, program=PROGRAMS.get(ex["id"], ""), versions_in_labels=True)
+        shown = {p["id"] for p in ex["panels"]}
+        hidden = {r: "fmriprep" for r in ("fmriprep",) if r not in shown and any(
+            r in (d["a"], d["b"]) for d in ex["diffs"])}  # fmt: skip
+        if any(d["a"] == "workflow" for d in ex["diffs"]):
+            hidden["workflow"] = "replica"
+        present_.example(
+            own, ex, shows=line, verdicts=verdicts, runs=hidden or None,
+            panels=SDC10_PANELS if ex["id"] == "sdc10-ds002603" else None,
+            diffs={k: v for k, v in DIFFS.items() if any(d["id"] == k for d in ex["diffs"])}
+            or None,
+            known=("exact",) if "exact" in shown else (), split=True,
+        )  # fmt: skip
+        note = ex.get("metrics_note") or ""
+        if THRESHOLD in note:
+            raise ValueError(f"{ex['id']}: the threshold is in its note already")
+        ex["metrics_note"] = f"{note} {THRESHOLD}".strip()
+    for im in doc["implementations"]:
+        present_.implementation(page, im, "standard comparison", port=PORTS[im["id"]])
+    present_.speed(
+        page,
+        doc.get("speed"),
+        "Seconds per call (the median of three runs) on a log scale; the factor is sdcflows' time "
+        "divided by the replica's, both on one thread.",
+        labels=SPEED_LABELS,
+    )
+    date = TRIAL[:10]
+    present_.finish(page, doc, CATEGORIES, ports=PORTS)
+    for t in doc.get("tables", []):
+        for c in t["columns"]:
+            c["label"] = COLUMNS.get(c["label"], c["label"])
+        if t["id"] in TABLE_TITLES:
+            t["title"] = TABLE_TITLES[t["id"]].format(date=date)
+    return doc
 
 
 if __name__ == "__main__":  # compute the cache entries only

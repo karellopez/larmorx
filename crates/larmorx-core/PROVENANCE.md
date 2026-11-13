@@ -536,6 +536,18 @@ ITK-113, counted). The existing ports `vnl_svd_f32`, `vnl_svd::vnl_inverse`,
 in the same run. `vnl_digests.rs` checks digests of the ports' outputs on seeded inputs, recorded on
 Linux x86-64, on every platform (debug and release alike; a NaN hashed as one value).
 
+**Costs that fall without end** (2026-11-13): `vnl_minimize` computes every stored value with
+SSE's NaN rules (`math::x86_nan`), so the NaNs the minimizers make from infinities are x86-64's on
+every platform, and stops a Brent loop that comes back to an earlier state (VNL never returns
+there: ITK-114) with a notice. `validation/probes/fs-vnl`'s `unbounded` family at scale 1 (2,000
+cases; costs that fall linearly, quadratically, cubically or exponentially, or jump to infinities
+or NaNs of their own; starting points at infinities, NaNs of both signs and with payloads, near
+overflow; NaNs compared bit for bit): 74,668 values, 0 differences (17,000 minimizations, 662
+stopped by ITK-114, VNL not called for them; 2,554 NaN results, 5,068,524 points with a NaN
+coordinate); with the port computing as on AArch64 (`nan_trap.c`, `NAN_TRAP_ARM=exe`) against VNL
+on x86 and each cost capped at 10^6 calls, 74,492 values, 0 differences (the port's former plain
+arithmetic: 104). `vnl_digests.rs`'s `UNBOUNDED` digest hashes the NaN bits exactly.
+
 ## C's `sscanf` conversions and `strtod` (`src/cscan.rs`; FreeSurfer's foundations, item 3.1-14, 2026-11-12)
 
 **Original implementation**, written from the C standard's description (ISO C 7.21.6.2, 7.22.1.3,

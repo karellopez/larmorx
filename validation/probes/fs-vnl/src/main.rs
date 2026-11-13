@@ -7,7 +7,8 @@
 //! times the default counts (1). The families: `fmt` (C's `printf` against `larmorx_core::cfmt`),
 //! `min` (`vnl_bracket_minimum`, `vnl_brent_minimizer`'s four entry points, the deprecated
 //! `vnl_brent` as `fs_powell` steps with it, `vnl_powell`, every point the cost function is called
-//! at), `lbfgs` (netlib's `lbfgs_` in lock step with the port under `reproduce`: `x`, `w`, `diag`,
+//! at), `unbounded` (the same on costs that fall without end, from infinite and NaN starting
+//! points: NaNs compared bit for bit), `lbfgs` (netlib's `lbfgs_` in lock step with the port under `reproduce`: `x`, `w`, `diag`,
 //! `iflag` and the whole state after every call, and the printed text), `linalg` (the small
 //! matrices' determinants and inverses, QR in float and double, the float SVD, the SVD inverse,
 //! the symmetric and the real eigensystems, Cholesky), `fft` (`vnl_fft_1d<double>`); `--only itk103` measures ITK-103's correction on the port alone
@@ -192,6 +193,11 @@ fn main() {
     if want("min") {
         let mut t = Tally::new("min");
         checks_min::run(&lib, scale, &mut t);
+        tallies.push(t);
+    }
+    if want("unbounded") {
+        let mut t = Tally::new("unbounded");
+        checks_min::run_unbounded(&lib, scale, &mut t);
         tallies.push(t);
     }
     if want("lbfgs") {

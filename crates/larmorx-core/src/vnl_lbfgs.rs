@@ -1037,3 +1037,31 @@ fn mcstep(
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::cfmt::{Captured, Stream};
+
+    /// ITK-105's vector of zeros: with `reproduce` VXL's `write50` scales by `10^ceil(log10(0)) /
+    /// 10 = 0` and divides 0 by 0, which x86-64 prints as `-nan` (SSE's default NaN). The port
+    /// prints `-nan` on every platform (plain Rust arithmetic on AArch64 would print `nan`; this
+    /// test passes under `nan_trap.c`'s AArch64 emulation, `NAN_TRAP_ARM=1`); `fix` scales by 1.
+    #[test]
+    fn write50_of_zeros_prints_x86_64s_nan() {
+        let v = [0.0, -0.0, 0.0];
+        let mut out = Captured::default();
+        let mut call = LbfgsCall::default();
+        write50(&v, UpstreamDefects::Reproduce, &mut out, &mut call);
+        assert_eq!(
+            out.text(Stream::Out),
+            "  0.000000e+00 x\n       -nan       -nan       -nan\n"
+        );
+        assert_eq!(call.notices.len(), 1);
+        let mut out = Captured::default();
+        let mut call = LbfgsCall::default();
+        write50(&v, UpstreamDefects::Fix, &mut out, &mut call);
+        assert_eq!(out.text(Stream::Out), "    0.00000   -0.00000    0.00000\n");
+        assert_eq!(call.notices.len(), 1);
+    }
+}

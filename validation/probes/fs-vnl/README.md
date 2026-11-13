@@ -17,6 +17,7 @@ default counts, and compares every value bit for bit:
 |---|---|---|
 | `fmt` | C's `printf` `%g`, `%e`, `%f` with precisions and widths, `ostream << double` | `cfmt` |
 | `min` | `vnl_bracket_minimum`; `vnl_brent_minimizer`'s four entry points; the deprecated `vnl_brent` as FreeSurfer's `fs_powell` steps with it (`bracket_minimum(&ax, &xx, &bx)`, then `minimize_given_bounds(bx, xx, ax, tol)`) and `vnl_brent::minimize`; `vnl_powell` in 1 to 6 dimensions (tolerances, steps, `maxfev`, the verbose lines): the results and **every point the cost function is called at, in order** (the cost functions are Rust callbacks both sides call) | `vnl_minimize` |
+| `unbounded` | the same minimizers (`vnl_powell` in 1 to 4 dimensions) on costs that fall without end (linearly, quadratically, cubically, exponentially) or jump to an infinity or to NaNs of their own (quiet NaNs whose sign and payload come from the call count), from starting points at infinities, NaNs of both signs and with payloads, or near overflow: every point (as a count and a digest of their bits: a search that overflows can creep through 10^8 points) and every result **bit for bit, NaNs included**. The port runs first; where it stops a Brent loop VNL never leaves (ITK-114) VNL is not called, and the case is counted | `vnl_minimize` |
 | `lbfgs` | netlib's `lbfgs_` (VXL's f2c translation) driven by reverse communication as `fs_lbfgs` drives it, in lock step with the port under `reproduce`: after every call `x`, `diag`, `w`, `iflag`, the whole `v3p_netlib_lbfgs_global_t` state and the printed text (`IPRINT` settings, `lp`, a caller's diagonal, wrong gradients for the error paths); then the port's correction of ITK-103 against VXL's behaviour on the same problems | `vnl_lbfgs` |
 | `linalg` | `vnl_det` and `vnl_inverse` of 2 × 2 to 4 × 4 `vnl_matrix_fixed<float/double>` (`OpenLUMatrixInverse`, `OpenMatrixDeterminant`, `MatrixSqrt`); `vnl_determinant<float/double>` to 10 × 10, plain and balanced; `vnl_qr<float/double>`'s `Q`, `R`, `determinant`, `solve` (with its message), `QtB`, `inverse`; `vnl_svd<float>` as `OpenSvdcmp` reads it; `vnl_matrix_inverse<double>`; `vnl_symmetric_eigensystem<float/double>` (with its message); `vnl_real_eigensystem`'s `D`, `V`, `Vreal` (with its message); `vnl_cholesky` in its three modes with `solve`, `determinant`, `inverse`, `rcond` and its messages | `vnl_fixed`, `vnl_qr`, `vnl_svd_f32`, `vnl_svd`, `vnl_eigen`, `vnl_cholesky` |
 | `fft` | `vnl_fft_1d<double>` for the powers of 2 from 2 to 512 (N4 pads FreeSurfer's 200 histogram bins to 512), both directions | `larmorx_image::vnl_fft` |
@@ -30,7 +31,22 @@ and payloads are counted, not compared. From 1024 points the FFT's twiddle facto
 `larmorx_image`'s correctly rounded ones, not glibc's (documented there); FreeSurfer's N4 uses
 512.
 
-Prints the counts per family and `VERIFY-PASS` or `VERIFY-FAIL` (exit status 1).
+Prints the counts per family and `VERIFY-PASS` or `VERIFY-FAIL` (exit status 1). `FS_VNL_DEBUG=1`
+names each `unbounded` call on standard error before it runs; `FS_VNL_UNBOUNDED_CAP=<n>` makes each
+falling cost NaN after `n` calls (for runs under `nan_trap.c`, where every NaN made from numbers
+costs two signals).
+
+The port as on AArch64 against VNL on x86 (`validation/probes/fsl-mcflirt-affine-trace/nan_trap.c`
+built as `libnan_trap.so`; `NAN_TRAP_ARM=exe` gives AArch64's default NaN to the executable's own
+instructions only, not to `libfsvnl.so`'s):
+
+```bash
+TMPDIR=<scratch>/t FS_VNL_UNBOUNDED_CAP=1000000 NAN_TRAP_DIR=<scratch>/sites NAN_TRAP_ARM=exe \
+  LD_PRELOAD=<scratch>/libnan_trap.so <scratch>/vnl/fs-vnl <scratch>/vnl/libfsvnl.so 1 --only unbounded
+```
+
+(The probe captures the original's messages through two files in `TMPDIR`: give runs side by side
+their own.)
 
 ```bash
 bash validation/probes/fs-vnl/build.sh <scratch>/vnl

@@ -101,6 +101,27 @@ port's own `ddot` and `daxpy`. Proof: `validation/probes/fsl-mcflirt-affine-trac
 gives x86's `0xa7dcaba7d3f547ed` after it, in a debug and a release build; the whole crate's tests
 pass under it.
 
+**The minimizers on costs that fall without end** (2026-11-13). `vnl_bracket_minimum` steps
+outward by the golden ratio until the cost rises; on a cost that keeps falling its points reach
+infinity, and `inf - inf`, `0 · inf` and `inf / inf` make NaNs, which go on into the points the
+cost function is called at, the bracket, Brent's loop and Powell's directions. An AArch64 build of
+plain Rust arithmetic gives those NaNs the other sign. Every stored value of `vnl_minimize` (the
+bracket, the parabola, Brent's loop, the wrappers' `x ± 1`, Powell's updates and line points) is
+now computed with SSE's rules (`math::x86_nan`); a value that is only compared keeps plain
+arithmetic (a comparison does not see a NaN's bits). Where two NaNs meet, the C order of the
+operands is GCC 8.4.0's on every path the probe reaches. One more reason for the helpers: LLVM
+folds a plain `-1.0 * x` into a negation in release builds, which flips a NaN's sign where VXL's
+multiplication keeps it. The check (`validation/probes/fs-vnl`, family `unbounded`, scale 1:
+2,000 cases of the minimizers on costs that fall linearly, quadratically, cubically or
+exponentially, jump to an infinity or to NaNs of their own, from starting points at infinities,
+NaNs of both signs and with payloads, or near overflow; every point and result compared bit for
+bit, NaNs included): 74,668 values, 0 differences (2,554 NaN results, 5,068,524 points with a NaN
+coordinate). With the port computing as on AArch64 (`nan_trap.c`'s `NAN_TRAP_ARM=exe`: the
+executable only, VNL's library on x86) and each cost capped at 10^6 calls: 74,492 values, 0
+differences; the same port with plain arithmetic: 104 differences. `vnl_digests.rs`'s `UNBOUNDED`
+digest hashes the NaN bits exactly and passes under `NAN_TRAP_ARM=1`, debug and release (with
+plain arithmetic it fails there).
+
 ## F-VNLN-6. Values VNL never writes (ITK-107, ITK-108, ITK-110, ITK-111, ITK-113, *read*)
 
 VNL allocates `vnl_matrix`, `vnl_vector` and `vnl_matrix_fixed` of `double` and `float`
@@ -117,7 +138,7 @@ uninitialised (`vnl_c_vector_construct` does nothing for them):
 In the symmetric eigensystem, a failed `tql2` leaves `V` unset (the port returns the vectors as
 far as computed, with `ierr`).
 
-## F-VNLN-7. Loops that never end (ITK-109, ITK-112, *read*)
+## F-VNLN-7. Loops that never end (ITK-109, ITK-112, ITK-114, *read*, *verified*)
 
 - EISPACK's `balanc` (every `vnl_real_eigensystem`): `while (c < g)` and `while (c >= g)` written
   as `goto` loops on `c >= g` and `c < g`: an infinite or NaN off-diagonal entry in the balanced
@@ -125,6 +146,22 @@ far as computed, with `ierr`).
 - LINPACK's `dpodi` (`vnl_cholesky::determinant`): the mantissa's loops into [1, 10) never end on
   a non-finite mantissa, which a factor's diagonal above about 1.3e154 makes from finite numbers.
   The port takes the square in two steps there.
+- `vnl_brent_minimizer`'s loop (and so `vnl_brent` and `vnl_powell`; ITK-114, *verified*) ends
+  only when the point is within the tolerance of the bracket's midpoint. It can come back to a
+  state it had been in, and then repeats for ever: (1) a bracket with an infinite end where the
+  cost is NaN or not lower than at the best point (the golden-section step lands on the infinite
+  end, the bracket stays as it was; `vnl_powell` on a cost that falls without end makes such
+  brackets once its point is infinite and the next line's points are NaN); (2) ends so large that
+  their sum overflows: the midpoint is infinite, the test never passes, and two points a
+  tolerance apart take turns (a period of two). The port keeps the loop's state (the bracket,
+  the three best points, their costs with a NaN counted as one, the last two steps; nothing else
+  is read by the next iteration) and compares it with one saved at powers of two (Brent's cycle
+  detection): a state that comes back means VNL never returns, and the port stops there with the
+  best point and a notice, in both modes. Measured: 662 of the probe's 17,000 minimizations on
+  falling costs (VNL is not called for them). A related case ends: when only the midpoint
+  overflows and the cost is `-inf` everywhere near the point, the search creeps outward by its
+  tolerance (10^-8 of the point) for about 2·10^8 evaluations until the point overflows; VNL
+  returns then, and so does the port (identical points, seconds of computing).
 
 ## F-VNLN-8. Smaller facts (*read*, *verified* where the probe compares them)
 

@@ -979,6 +979,8 @@ defects! {
         "EISPACK's balanc (vnl_real_eigensystem) never returns on a matrix with an infinite or NaN entry, or entries so large that a row's or column's scaled sum overflows, in the part it balances";
     ITK_113 = "ITK-113", "VXL", true,
         "vnl_qr::solve (and inverse) of a matrix with one row whose entry is 0 never writes the solution (LINPACK's info is 1 and VNL's vector is uninitialised): memory contents";
+    ITK_114 = "ITK-114", "VXL", true,
+        "vnl_brent_minimizer (and vnl_brent and vnl_powell, which use it) can loop for ever, coming back to the same points: on a bracket with an infinite end where the cost is NaN or not lower than at the best point (the golden-section step lands on that end again and again), or whose ends are so large that their sum overflows (the midpoint is infinite, the stopping test never passes, two points take turns)";
     ANTS_110 = "ANTS-110", "antsAI", true,
         "the blob alignment keeps the blob pairs whose displacements have about the same length as the others' (the squared distance between a pair's fixed and moving blob over another pair's), not those whose distances to the other blobs are preserved between the images, as its comment and ImageMath's MatchBlobs say";
     ANTS_111 = "ANTS-111", "antsAI", true,

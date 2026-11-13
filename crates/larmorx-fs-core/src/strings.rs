@@ -134,12 +134,14 @@ pub fn stricmp(a: &[u8], b: &[u8]) -> i32 {
     0
 }
 
-/// `ItemsInString`: runs of bytes other than a space; -1 for an empty string.
+/// `ItemsInString`: runs of bytes other than white space; -1 for an empty string.
 pub fn items_in_string(s: &[u8]) -> i32 {
     if s.is_empty() {
         return -1;
     }
-    s.split(|&c| c == b' ').filter(|w| !w.is_empty()).count() as i32
+    s.split(|&c| is_c_space(c))
+        .filter(|w| !w.is_empty())
+        .count() as i32
 }
 
 /// `CountItemsInString`: runs of bytes other than space and tab; the count stops where a run

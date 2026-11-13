@@ -24,14 +24,34 @@ default counts, and compares every value bit for bit:
 | `lbfgs` | netlib's `lbfgs_` (VXL's f2c translation) driven by reverse communication as `fs_lbfgs` drives it, in lock step with the port under `reproduce`: after every call `x`, `diag`, `w`, `iflag`, the whole `v3p_netlib_lbfgs_global_t` state and the printed text (`IPRINT` settings, `lp`, a caller's diagonal, wrong gradients for the error paths); then the port's correction of ITK-103 against VXL's behaviour on the same problems | `vnl_lbfgs` |
 | `linalg` | `vnl_det` and `vnl_inverse` of 2 × 2 to 4 × 4 `vnl_matrix_fixed<float/double>` (`OpenLUMatrixInverse`, `OpenMatrixDeterminant`, `MatrixSqrt`); `vnl_determinant<float/double>` to 10 × 10, plain and balanced; `vnl_qr<float/double>`'s `Q`, `R`, `determinant`, `solve` (with its message), `QtB`, `inverse`; `vnl_svd<float>` as `OpenSvdcmp` reads it; `vnl_matrix_inverse<double>`; `vnl_symmetric_eigensystem<float/double>` (with its message); `vnl_real_eigensystem`'s `D`, `V`, `Vreal` (with its message); `vnl_cholesky` in its three modes with `solve`, `determinant`, `inverse`, `rcond` and its messages | `vnl_fixed`, `vnl_qr`, `vnl_svd_f32`, `vnl_svd`, `vnl_eigen`, `vnl_cholesky` |
 | `nonfinite` | EISPACK's `pythag` (20,000 pairs of infinities, NaNs of both signs and with payloads, signed zeros, huge and ordinary numbers), `vnl_symmetric_eigensystem<double/float>` of symmetric matrices with one to three infinite or NaN entries, LINPACK's `ssvdc` as `vnl_svd<float>` calls it (`info`, `U`, `W`, `V`) on matrices up to 7 × 5 with such entries. **VNL runs in a child process (`fork`) with a time limit**, as it can loop for ever there: where the port says VNL never returns (ITK-115, ITK-116) the child must still be computing at 0.3 s with at least 0.15 s of CPU time (retried alone with longer limits when the machine kept it waiting; six children at a time); where the port returns, VNL must return the same values within 20 s (a NaN compared as a NaN). `pythag`'s non-returning pairs are sampled, six of each kind of pair; the unit tests' cases come first | `vnl_eigen`, `vnl_svd_f32` |
+| `order` | `vnl_det<T>` and `vnl_determinant<T>` of 2 to 4 rows, `vnl_determinant<T>(vnl_matrix)` of 1 to 4 rows and `vnl_inverse<T>` of 2 x 2 to 4 x 4, `float` and `double`, on matrices with NaNs of both signs and random payloads (quiet and signalling), infinities, signed zeros, overflowing and underflowing numbers and subnormals (`larmorx_core::vnl_fixed::cases`), **every value bit for bit, NaNs included** (their bits follow each `+` and `*`'s operand order, read from the object code by `order/`). The inverses are `order/inst.cxx`'s stand-alone instances renamed into the shim (`build.sh`): byte for byte the ones FreeSurfer's `libutils` holds where it holds one. A zero determinant's inverse (ITK-107) is counted | `vnl_fixed` |
 | `fft` | `vnl_fft_1d<double>` for the powers of 2 from 2 to 512 (N4 pads FreeSurfer's 200 histogram bins to 512), both directions | `larmorx_image::vnl_fft` |
+
+`order/` (2026-11-13): `symexec.py` executes a function's SSE code (an `objdump` listing) symbolically
+and prints its expression trees with every operation's operands in the hardware's order;
+`orders.py <out> [--ants <ITK 5.4.5 lib dir>] [--official <FreeSurfer bin dir>] [--rust <file>]`
+extracts `vnl_det`, `vnl_determinant` and `vnl_matrix_fixed::mul` from the unit oracle's libraries
+and `numerics.cpp.o` from its `libutils.a`, compiles `inst.cxx`, checks every tree against the
+source's expression (only `+` and `*` operands swapped), the groups that must agree (float and
+double, `vnl_det` and `vnl_determinant`, `libutils`' instances and the stand-alone ones, byte for
+byte, and the 2 x 2 inverse `OpenLUMatrixInverse` inlines), and with `--rust` writes
+`crates/larmorx-core/src/vnl_fixed/sse.rs`; it ends with `ORDERS-PASS` or `ORDERS-FAIL`:
+
+```bash
+python3 -P validation/probes/fs-vnl/order/orders.py <scratch>/ord \
+  --ants <workspace>/oracles/ants-2.6.5-src/itk-build/lib \
+  --official <workspace>/oracles/freesurfer-8.2.0/root/usr/local/freesurfer/8.2.0/bin \
+  --rust crates/larmorx-core/src/vnl_fixed/sse.rs
+scripts/orchestration/boxed.sh 4 <scratch>/vnl/fs-vnl <scratch>/vnl/libfsvnl.so 1 --only order
+```
 
 Not compared, and counted: the inverses of fixed matrices whose determinant is 0 (VNL returns an
 uninitialised matrix, ITK-107), `Vreal`'s columns of complex pairs (never written, ITK-110), the
 one-row QR solutions of a zero entry (never written, ITK-113). In `linalg` a NaN is compared as a
 NaN: where two NaNs meet, x86 passes on the first operand, an order the source leaves to the
 compiler (GCC's and LLVM's differ; LLVM's debug and release builds differ too), so their signs
-and payloads are counted, not compared. From 1024 points the FFT's twiddle factors are
+and payloads are counted, not compared; the families `order` (the closed forms) and `unbounded`
+(the minimizers) compare them bit for bit. From 1024 points the FFT's twiddle factors are
 `larmorx_image`'s correctly rounded ones, not glibc's (documented there); FreeSurfer's N4 uses
 512.
 

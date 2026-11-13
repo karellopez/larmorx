@@ -76,6 +76,21 @@ Where FreeSurfer calls them (the call sites the cards name):
   NaN entries): with `symmetric_eigensystem_f32_full` and `vnl_svd_f32_full` they can follow
   FreeSurfer on the matrices it finishes. LINPACK's `info` on a failed SVD, which track A measured as
   `min(rows + 1, cols)` on every failing case, is the `m` of `ssvdc`'s loop when it stops.
+- The closed forms' NaNs (relay 9, 2026-11-13; vnl-netlib.md F-VNLN-5; track A's request: MatrixDeterminant of a
+  geometry with an infinite cosine and a NaN centre gave `nan` in FreeSurfer and `-nan` in the port, tk2nat, fsl2tk and
+  tk2fsl were drawn finite until now). FreeSurfer's `libutils` holds VNL's inline `vnl_inverse<float>` 3 x 3 and 4 x 4 and
+  `vnl_inverse<double>` 3 x 3 out of line in `numerics.cpp.o` (byte for byte the stand-alone instances `order/inst.cxx`
+  makes with FreeSurfer's flags, relocations included: `orders.py`'s SAME-BYTES); `OpenLUMatrixInverse` calls the 3 x 3
+  and 4 x 4 ones after its own `vnl_det` test, and inlines the 2 x 2 `float` inverse (its code at 0x295..0x305 of the
+  function: the stand-alone 2 x 2's order, `m(1,1)·(1/det)`); `OpenMatrixDeterminant` calls `vnl_det<float>` of 2 to 4
+  rows (libitkvnl's instances) and `vnl_determinant<float>(vnl_matrix)` otherwise; `MatrixSqrt` calls
+  `vnl_inverse<double>` 3 x 3 (and so `vnl_det<double>` of 3 rows); `mri.cpp.o` calls `vnl_determinant<double>(vnl_matrix)`.
+  No other object of `libutils` instantiates `vnl_det`, `vnl_determinant` or `vnl_inverse`. The official stripped
+  programs hold the same code: the bytes of `vnl_det<float>` 2 to 4 rows and of the two `float` inverses (relocated fields
+  as wildcards) are in all 10 programs searched (`mri_robust_register`, `mri_coreg`, `mri_convert`, `mri_info`,
+  `mri_vol2vol`, `mris_make_surfaces`, `mri_ca_register`, `mri_normalize`, `mri_segstats`, `mris_sphere`), the `double`
+  ones in 1 (`orders.py --official`). The programs' own objects (not in the unit oracle) may inline these templates in
+  other orders: each program's replica checks its own NaNs.
 - The unit oracle's VNL (`validation/probes/fs-vnl`) is ITK 4.13.2 built with ITK's Release flags
   (`-O3 -DNDEBUG -msse2 -mfpmath=sse`, FreeSurfer's ITK configuration); `shim.cxx` is compiled with
   FreeSurfer's own flags for `utils/numerics.cpp`.

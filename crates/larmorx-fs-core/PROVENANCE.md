@@ -36,3 +36,17 @@ never from Numerical Recipes' code. Its inputs:
 | The standards and papers the spec cites (IEEE 754-2008, C11, POSIX's `drand48`, Powell 1964, Brent 1973, Nocedal 1980, Liu and Nocedal 1989, LINPACK's and EISPACK's guides) | the C library's documented behaviour, the methods' definitions |
 | The open probe folder [`validation/investigations/freesurfer-maths-probe/`](../../validation/investigations/freesurfer-maths-probe/README.md) (its README, `compare.py`, and `fs_maths_probe.cpp`'s calls and test costs) and black-box runs of the prebuilt probe `fs_maths_probe` (FreeSurfer 8.2.0's compiled mathematics, with the guard allocator beside it) | the comparisons of the spec's §23 (`validation/investigations/freesurfer-cleanroom-maths/`), the operand orders measured where the spec gives none (`docs/findings/fs-maths-clean-room.md`) |
 | larmorx's own Apache-2.0 code: `larmorx_core::vnl_minimize`, `vnl_lbfgs`, `vnl_fixed`, `vnl_qr`, `vnl_eigen`, `vnl_svd_f32` (VXL's routines, permissive ports), `larmorx_core::ranlux` (a clean room), `larmorx_core::drand48`, `x87`, `cscan`, `cfmt`, `math`, `defects` | VNL's bracketing, Brent minimizer, L-BFGS and decompositions as the spec names them, the random fields' generator, the C library's generator, the extended arithmetic, the number readings and formats, the elementary functions, the defect register's entries |
+
+## Clean-room implementation from specs/freesurfer-mri.md
+
+`src/mri/` (FreeSurfer 8.2.0's volume structure, `fs.mri`, the MRI-structure part of queue item
+C3.1-05) was written by the same clean-room implementers, under the same restrictions as above, from
+[`specs/freesurfer-mri.md`](../../specs/freesurfer-mri.md) as of commit `278e0be0` (2026-11-13). Its
+inputs:
+
+| Input | What it gave |
+|---|---|
+| [`specs/freesurfer-mri.md`](../../specs/freesurfer-mri.md) | the behaviour of every function of its §0: the geometry, its copy and assignment, the scanner voxel-to-RAS matrices and their cache, the volume's allocation, freeing, sizes and intents, voxel reads, writes and derivatives, the header and colour-table copies, the tkregister and FSL matrices and registrations, world and voxel coordinates, the geometry's printing and comparisons, the interpolation and precision names, the full copy, the volume's MINC transform, shapes, the bounding box and the linear transform arrays; the defects of its §24 with their corrections and `reproduce` |
+| [`specs/freesurfer-core.md`](../../specs/freesurfer-core.md), [`specs/freesurfer-maths.md`](../../specs/freesurfer-maths.md) and this crate's clean rooms of them | the messages, `nint` and the conversions; the float matrices, their products, inverse, determinant and printing |
+| The open probe folder [`validation/investigations/freesurfer-mri-probe/`](../../validation/investigations/freesurfer-mri-probe/README.md) (its README, `compare.py`, and `fs_mri_probe.cpp`'s calls and print forms) and black-box runs of the prebuilt probe `fs_mri_probe` (FreeSurfer 8.2.0's compiled volume structure, with the fs.maths probe's guard allocator) | the comparisons of the spec's §23 (`validation/investigations/freesurfer-cleanroom-mri/`), the behaviours measured beyond the spec's text (`docs/findings/fs-mri-clean-room.md`), the new defect FS-331 |
+| larmorx's own Apache-2.0 code: `larmorx_core::defects`, `larmorx_core::drand48`, `larmorx_core::cfmt` | the defect register's entries, the C library's generator, the number formats |

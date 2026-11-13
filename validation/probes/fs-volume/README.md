@@ -95,3 +95,15 @@ comparable, hash `919eb356853935742497415be1a6e96cc024dc5e7efdff0dd7499caf1638bf
 NaN emulated in debug and release (`oracles/logs/fs-found-c-r16-trap-volume.log`). `dnsn` draws no NaN
 factor: with `reproduce` FreeSurfer's extent is then -2147483648 (FS-317), whose allocation error fs.mri's
 `Mri::new` does not model yet (`docs/findings/freesurfer-volume.md` §9, for track A).
+
+Measured 2026-11-13 (part 7, relay 17: 3.1-36's frame-range samplers, trilinear kernel and splatting
+`splat`, `sseq`, `sxyz`, `tkern`; derivatives, gradients and neighbour counts `deriv`, `grad`, `nbrs`;
+linear transforms `lxf`, `rsmat`; 93 commands; logs `oracles/logs/fs-found-c-r17-*.log`): seed 7, 8,000
+cases of `splat sseq sxyz tkern`: 7,399 identical with `reproduce`, 601 not comparable (FS-290), 0
+different (after one fix: the nearest frame-range sampler keeps a signalling NaN voxel as the official
+build does); seed 7, 9,000 cases of `deriv grad nbrs`: 7,422 identical, 1,578 not comparable (FS-53,
+FS-58, FS-290, FS-322 to FS-324), 0 different; seed 7, 5,000 cases of `lxf rsmat`: 4,923 identical, 77
+not comparable, 0 different; `fix` different only with notices. Seed 1, 1,860 cases: 1,713 identical, 147
+not comparable, hash `718b2164c1606fdac499763c22925f59159265321405289580253ec012eefa7c`, passing with
+AArch64's NaN emulated in debug and release (`oracles/logs/fs-found-c-r17-trap-volume.log`). The port's
+debug and release builds agree on 42,460 cases (seeds 1, 7 and 13).

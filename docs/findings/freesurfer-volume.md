@@ -306,3 +306,40 @@ Defects (rules of the porting guide; register rows in the handoff):
   size must be greater than 0 in every dimension`, `error: Cannot allocate memory`, `error: could not
   allocate -2147482648 elt index array` (status 254); the port reports `could not allocate memory for
   slice 1 out of 4` (status 1). The probe draws no NaN factor until fs.mri models the 32-bit product.
+
+## 10. Frame-range samplers, splatting, derivatives, neighbour counts, linear transforms (3.1-36; relay 17)
+Source: `utils/mri.cpp` 9147-9156 and 9505-9571 (`FASTER_MRI_EM_REGISTER` is defined by
+`include/faster_variants.h`, so both xyzInt samplers are compiled), 9573-9686, 9866-10186, 11003-11355,
+11356-11566, 11975-12071, 12973-12990; `utils/mriset.cpp` 2966-2982. Object code: the unit oracle's
+`mri.cpp.o` (`objdump -dr`, `<scratch>/C/r11/mri_cpp.s`).
+- **Operand orders.** `MRIinterpolateIntoVolumeFrame`'s float case: each corner `addsd voxel, share`
+  (`share` in the destination: its NaN kept), then `cvtsd2ss`. `MRIsampleSeqVolume`: the eight terms
+  summed with the running sum in the destination. The weights `((xpd * ypd) * zpd) * val` are finite
+  (the point is clamped; NaN points are unambiguously outside), so only `val` and the voxels can be NaN.
+- **Copies the compiler drops.** `MRIsampleSeqVolumeType`'s nearest path writes `valvect[f] = (double)
+  MRIFseq_vox(...)` into a `float`: GCC removes the `float -> double -> float` round trip, so a signalling
+  NaN voxel stays signalling (0x7fa12345 in, 0x7fa12345 out). The same holds in `MRIextractPlane` (relay
+  16: `val = MRIgetVoxVal(...)`, `MRIsetVoxVal(..., val)`). Rust's optimiser folds the same round trip in
+  release builds only, so the port must not write it: the debug build quieted the NaN (found by the seed-1
+  hash test, debug against release; fixed in e4668980).
+- **FS-320** (`MRIinterpolateIntoVolumeFrame`, integer types): `MRIseq_vox(...) += nint(share)`, the sum
+  in `int` stored back into the voxel type (bytes modulo 256, shorts modulo 65536; `int`'s overflow is
+  undefined in C, the official build's `add` wraps).
+- **FS-321**: `MRILseq_vox` is `((long32 *) slices[z + f depth][y])[x]`: a 64-bit volume is added into
+  as 32-bit integers at index x (byte 4x of the row), the halves of other voxels.
+- **FS-322**: `MRIsampleVolumeDerivative(Scale)` and `MRIsampleVolumeGradient(Frame)` pass `&val` (a
+  stack `double`, never initialised) to `MRIsampleVolume`/`MRIsampleVolumeFrame`, which return
+  `ERROR_UNSUPPORTED` without writing it for a type the trilinear path refuses (RGB, complex) at a point
+  that is not whole.
+- **FS-323**: `mri->xi[x0 - 1]` etc.: the tables hold `extent + 2 MAX_INDEX` entries offset by
+  `MAX_INDEX` (500).
+- **FS-324**: `for (dist = step_size; dist <= MAX(2 * sigma, step_size); dist += step_size)`: with `2 *
+  sigma` infinite, `dist` reaches infinity and stays there; the `FZERO(step_size)` break never fires.
+- **FS-325**: `MRIlinearTransformInterp`'s `double val` is declared outside the voxel loops and never
+  initialised; `MRIsampleVolumeFrameType` leaves it as it was when it fails (`SAMPLE_SINC` at a point that
+  is not whole, a type the trilinear sampler refuses), so the voxel gets the previous sample's value.
+- `MRIlinearTransformInterp` calls `nint(x1)` (and `nint(x2)`, `nint(x3)` when the earlier ones equal
+  `Gx`, `Gy`) for its diagnostic test on every voxel: their out-of-range notices (FS-12) come from there.
+- `MRIsampleVolumeDerivativeScale`'s weight for a huge sigma: `-dist * dist` overflows to `-inf`, `2 *
+  sigma * sigma` to `inf`, their quotient is SSE's default NaN, which `exp` passes on; the port computes
+  it with the SSE helpers (plain Rust arithmetic gave AArch64's positive NaN under the emulation).

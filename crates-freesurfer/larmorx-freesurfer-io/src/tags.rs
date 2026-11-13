@@ -11,7 +11,7 @@
 
 use std::io::Write;
 
-use larmorx_core::defects::{FS_177, FS_178, FS_179, FS_180, FS_181, FS_182};
+use larmorx_core::defects::{FS_49, FS_177, FS_178, FS_179, FS_180, FS_181, FS_182};
 use larmorx_freesurfer_core::cscan::{self, Bytes, Call, Stream};
 use larmorx_freesurfer_core::cstd::{fmt_f, is_space};
 use larmorx_freesurfer_core::globals::Globals;
@@ -248,10 +248,16 @@ pub fn tag_skip(
 /// `TAG_OLD_SURF_GEOM`, `TAG_OLD_USEREALRAS` and `TAG_OLD_COLORTABLE`, a 64-bit length for the
 /// others.
 pub fn tag_read_start(g: &mut Globals, err: &mut dyn Write, fp: &mut CFile, plen: &mut i64) -> i32 {
-    let tag = fio::fread_int(g, fp);
+    // freadInt's four bytes; at the end of the file the number is not used (nothing to note)
+    let mut b = [0u8; 4];
+    let got = fp.read_bytes(&mut b);
     if fp.feof() {
         return 0;
     }
+    if got < 4 {
+        fio::memory(g, &FS_49, "freadInt", got, 4);
+    }
+    let tag = i32::from_be_bytes(b);
     match tag {
         TAG_OLD_MGH_XFORM => *plen = i64::from(fio::fread_int(g, fp)) - 1,
         TAG_OLD_SURF_GEOM | TAG_OLD_USEREALRAS | TAG_OLD_COLORTABLE => *plen = 0,

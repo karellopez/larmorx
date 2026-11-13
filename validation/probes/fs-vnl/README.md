@@ -59,7 +59,11 @@ scripts/orchestration/boxed.sh 4 <scratch>/vnl/fs-vnl <scratch>/vnl/libfsvnl.so 
 
 `build.sh <out> [<unit-oracle>] [<itk-4.13.2-tag>]`: defaults `<workspace>/oracles/freesurfer-8.2.0-unit`
 and `<workspace>/tags/ITK-v4.13.2`. Meaningful on x86-64 Linux (the reference machine). One run at
-scale 1 takes about 9 s and 9 MB.
+scale 1 takes about 9 s and 9 MB without `unbounded` and `nonfinite`; with them about 6 minutes on
+a loaded machine (`unbounded`'s searches that creep through 10^8 points, `nonfinite`'s time limits
+on the calls VNL never returns from). From 4f769f17 (2026-11-13, log
+`oracles/logs/fs-found-c-r4-vnl-probe-1.log`): every family 0 differences (`unbounded` 74,668
+values, `nonfinite` 93,205).
 
 **Results**: see `crates/larmorx-core/PROVENANCE.md` (the VNL and netlib routines of 3.1-07) and
 `docs/findings/vnl-netlib.md`.

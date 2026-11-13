@@ -3,7 +3,8 @@
 **Closed to FreeSurfer clean-room implementers** (it names FreeSurfer's files, functions and lines;
 the behaviour is `specs/freesurfer-surfio.md`). Queue items 3.1-45 and 3.1-46's structure, replica in
 `crates-freesurfer/larmorx-freesurfer-surf` (track D, relay 5, 2026-11-13); §7 the rest of 3.1-46
-without a volume, §8 queue item 3.1-49's coordinate operations (relay 6).
+without a volume, §8 queue item 3.1-49's coordinate operations (relay 6), §9 its parts b and c (relay
+7), §10 queue item 3.1-50's part a (relay 8), §11 queue item 3.1-47's part a (relay 9).
 
 ## 1. The generated views are storage maps
 
@@ -258,8 +259,9 @@ first). The probe reads them into locals first.
     (`mulsd %xmm1,%xmm2`, the neighbour's coordinate in the destination), the first two `n.x*x2`,
     `n.y*y2`. fs.core's `xyz_approx_angle_known_length` takes `n.z*z2`: one probe case (seed 17: a
     NaN unit vector, from an infinite position, against a signalling NaN neighbour) differed.
-    `larmorx-freesurfer-surf`'s `metric.rs` keeps its own copy with the official order; fs.core's
-    owner is told (HANDOFF).
+    `larmorx-freesurfer-surf`'s `metric.rs` kept its own copy with the official order until fs.core
+    took it (track A's 99562005, merged in relay 11): both callers (`metric.rs`, `mp.rs`) now use
+    fs.core's.
   - `MRISpercentDistanceError`: `dist_scale = sqrt(orig_area / total_area)` is computed in float
     (`sqrtss`, then widened: a different number from the double square root of the widened
     quotient: seed 13's one numeric difference, `40a2a871fbf4fb4f` against `40a2a871fde6e735`);
@@ -311,3 +313,341 @@ first). The probe reads them into locals first.
   `MRIScenterSphere_new` is a failed assertion, never called. Brought forward from 3.1-50:
   `mrisComputeCurvatureMinMax` (9113-9136); from `mrisurf_vals.cpp`: `MRISextractCurvatureVector`
   (677-685).
+
+## 10. Queue item 3.1-50, part a: saved positions and normals, canonical angles, the face-normal cache (relay 8)
+
+- **GCC 8.4's code keeps the C order everywhere here** (`objdump -dr -C` of the unit oracle's
+  `mrisurf_metricProperties.cpp.o`): `computeDefectFaceNormal_calculate_template<SurfaceFromMRIS::
+  XYZPositionM::Surface>` is one out-of-line function that `getFaceNorm`, `computeDefectFaceNormal`
+  and `recomputeOrUndeferFaceNorms`' OpenMP body all call (no per-site inlining); its differences,
+  `F_CROSS`' products and differences and the squared length are in the macro's order; `len / 2.0f`
+  is `len * 0.5f`; the second try's `100.0 * (v3 - v2)` (a double product) is compiled as the
+  float product `(v3 - v2) * 100.0f` (the same value: the exact product of a float and 100 fits in
+  a double, so both round once); `sqrt` of the float sum is `sqrtss` with `sqrtf`'s call only on the
+  negative branch. `MRISaverageCanonicalRadius`: the bounding box's `if (x > xhi) xhi = x` is
+  `maxsd` with the coordinate as the destination (`(x > xhi) ? x : xhi`, so a NaN never enters and
+  `-0` against `+0` keeps the old end, as in C), `(lo + hi) / 2.0f` is `* 0.5`, the radius sum
+  `radius + sqrt(...)` with `radius` the destination, the count `n` incremented per vertex (so the
+  division is by `nvertices`, and `0.0 / 0.0` without vertices: `pxor` both, the default NaN).
+  `MRIScomputeCanonicalCoordinates`: `r * r` once before the loop; `theta + 2π` with `theta` the
+  destination; `r*r - z*z` in float; `atan2f` called through the PLT (glibc's). `MRIScomputeFolding`:
+  `((area * d) * d)` added to the sum, `d = k1 - k2` in double. `MRIScomputeOrigArea`: `orig_area +
+  fNorm->orig_area`.
+- **FS-115** (`MRISrestoreVertexPositions`, lines 3299-3343): the second `switch`, for spherical
+  patches, has no `TARGET_VERTICES` and no `LAYERIV_VERTICES` case, so they fall to `default:` =
+  `TMP_VERTICES` (`cx = tx`), while the first `switch` restored `x = targx` (or `l4x`). The only
+  callers that restore the target set are `mris_make_surfaces`, `mris_place_surface`,
+  `mrisurf_mri.cpp` (8816, 9559) and `mrisurf_timeStep.cpp` (2307), on white and pial surfaces,
+  never spherical patches; no caller restores the layer-IV set. Rule A: the restored set (as every
+  other named set); notice when a vertex's canonical triple changes by it. The first `switch`'s
+  `default:` beside `case TMP_VERTICES:` (any unnamed kind restores the temporary set) is kept
+  (rule C): `MRIScomputeSurfaceNormals` (6474) saves the current positions in the temporary set and
+  then restores its argument's kind, so with `CURRENT_VERTICES` that `default:` gives back the
+  current positions; pipelines may rely on it. (`mrisurf_io.cpp` 4290, which restores its
+  argument's kind before writing a surface, would write the temporary set for `CURRENT_VERTICES`:
+  its callers pass named sets.)
+- **FS-116** (`getFaceOrigArea`, line 7747): `fprintf(stderr, "%s:%d NYI\n", __FILE__, __LINE__)`
+  then `*(int*)(-1) = 0`, when the deferral byte has bit 2. The bit is set only by
+  `mrisurf_deferSetFaceNorms` (called from `mrisurf_defect.cpp` 1874, for the topology fixer's
+  defect surfaces, which `mrisurf_undeferSetFaceNorms` (3242) or `getFaceNorm` clear later); the
+  callers of `getFaceOrigArea` (`MRISrestoreMetricProperties`, `mrisurf_io.cpp` 163's
+  `MRISreadTriangleProperties`) do not meet a deferred face on the recorded paths. Rule A: the area
+  computed as `getFaceNorm` would (`computeDefectFaceNormal_calculate`'s fourth output), stored
+  with `setFaceOrigArea` (bit 2 cleared, bit 1 kept: computing the normal early could change it if
+  the original coordinates move before its first read).
+- **Kept and documented (rule C):** `MRISrestoreNormals(WHITE_VERTICES)` is an error though
+  `MRISsaveNormals(WHITE_VERTICES)` works (the restore's `case WHITE_VERTICES:` is grouped with the
+  unsupported ones), and both functions' message says `MRISsaveNormals` (a copied line; messages
+  are kept). `MRISsaveVertexPositions`' `cheapAssert(false)` and the normals' `ErrorExit` are inside
+  the vertex loop, so a surface without vertices accepts any kind.
+- **`mrisurf_deferSetFaceNorms`' two paths** (`static` `use_parallel` from
+  `FREESURFER_deferSetFaceNorms_parallel`, read once per process): the `memset(..., 3, nfaces)` and
+  the OpenMP loop store the same bytes; `CHECK_DEFERED_NORMS` is not defined in the build, so its
+  checks are not compiled. The port keeps one loop.
+- **`MRISrestoreMetricProperties`** writes `v->dist[n] = v->dist_orig[n]` for `n < vsize` with no
+  test of either pointer: a vertex in use whose distances were freed after
+  `MRISstoreMetricProperties` (for example by `MRISsetXYZ`'s callers that free them) crashes. The
+  port panics there (an invalid access), the probe's `G` keeps the cases inside the buffers.
+- **The probe** (`posn`, `validation/probes/fs-surfio/`): seed 13, 10,000 cases identical with
+  `reproduce` (602 FS-116 crashes, 206 assertions of `MRISsaveVertexPositions`, 766 fatal errors,
+  878 `G`); with the default, 347 cases differ only in `theta`/`phi` (correctly rounded `atan2f`:
+  on the grid of k/4 for k in [-400, 400], glibc 2.35's `atan2f` differs from the correctly rounded
+  value in 101,400 of 641,601 argument pairs, 15.8 %), every other difference with a notice.
+
+## 11. Queue item 3.1-47, part a: the surface's life, rip flags, arrays, column printing, edges (relay 9)
+
+- **glibc's `realloc` to 0 bytes (FS-117).** glibc 2.35's `__libc_realloc` frees a non-NULL block
+  given 0 bytes and returns NULL (`REALLOC_ZERO_BYTES_FREES`, 1 by default), while `realloc(NULL,
+  0)` is `malloc(0)`, a valid pointer. `MRISctr`'s `bzero` leaves every array NULL, so a surface
+  made with 0 vertices or 0 faces holds `malloc(0)` arrays; the next `MRISreallocFaces(mris, 0, *)`
+  frees `faces` and fails `cheapAssert(mris->faces)` (line 584: observed, `CRASH 11`, also for
+  `MRISreallocVerticesAndFaces(mris, n, 0)` on a surface made with no face). `MRISreallocVertices`
+  keeps `max_vertices` at least the old room, so room 0 only follows room 0: the first call frees
+  `vertices`, returns false (the counts untouched; `MRISoverAllocVerticesAndFaces` ignores the
+  result); the second `malloc(0)`s it and frees `vertices_topology`, `dist_storage` and
+  `dist_orig_storage` (no NULL check on those three); and so on (observed). Rule A: empty arrays
+  kept; `reproduce` = `alloc::c_realloc`'s glibc model. Callers: `mrisutils.cpp` 3675/3783 (upsampled
+  surfaces), `mris_topology.cpp` 534/735/1132 (the topology fixer's copies), `mrisurf_io.cpp` 2998
+  (VTK, after `nfaces <= 0` is refused): every recon-all surface has faces, so no impact known.
+- **`MRISreallocVertices`' zeroing** starts at the old `nvertices`, not the old `max_vertices`: a
+  vertex dropped by `MRIStruncateNVertices` loses its fields at the next reallocation. The vertices'
+  `dist`/`dist_orig` pointers are `dist_storage[vno]`'s buffers; `bzero` NULLs the pointers and the
+  storage keeps the buffers (`alloc::zero_vertex` moves the valid buffer back to the storage, the
+  model of §8). A negative `nvertices` (only through `MRISgrowNVertices`/`MRIStruncateNVertices`
+  with a negative count, which no caller passes) makes `bzero` write before the array: out of range
+  (a panic; the probe guards it). `notifyActiveRealmTreesChangedNFacesNVertices` loops over the
+  active realm trees (fs.surf, not yet ported): no tree is ever registered, the port asserts it.
+- **`MRISctr`'s `bzero` of `MRIS` zeroes its `VOL_GEOM`** (a C++ struct with member initialisers:
+  `xsize = 1`, `x_r = -1`, ...): `MRISoverAlloc` uses `malloc`, so no constructor runs and a new
+  surface's geometry is all zeros (`mris::zeroed_vol_geom`; observed through `meta`).
+  `MRIScopyMetadata` uses `VOL_GEOM`'s `operator=` (fs.mri's `VolGeom::assign`, FS-59's case), copies
+  `lta` with `LTAcopy(src, NULL)` and the matrices with `MatrixCopy(src, NULL)` (the target's old
+  ones leaked), never `free_transform`.
+- **`MRIS::lta` is a placeholder** (`src/lta.rs`, the orchestrator's decision of 2026-11-13): the
+  surface code only copies (`LTAcopy`: `LTAalloc(num_xforms, NULL)`, then `type`, `fscale`,
+  `subject`, each `LTcopy` of `xforms` and `inv_xforms`) and frees it (`LTAfree`, in `MRISdtr` only
+  when `free_transform`); the probe's `meta` checks `num_xforms` and `type` after the copy. Track
+  A's `LTA` (fs.volume's 3.1-40, brought into `larmorx-freesurfer-mri`, ba29424f) replaced it in
+  relay 11: `src/lta.rs` re-exports fs.mri's `Lta`, `LTAcopy` and `LTAfree` (FS-195..198 are
+  track A's); the probe's `meta` side builds the arrays with `LTAalloc` as the official probe does;
+  the seed-1 hash unchanged. `Mris` lost its Rust `Clone` (the real `LTA`, like C's structure, has
+  no copy but `LTAcopy`; nothing cloned a surface).
+- **`MRISdtr`** frees nothing observable: `CTABfree` only when `ct` is set (no message), the vertex
+  and face destructors (`VERTEX_TOPOLOGYdtr`, `VERTEXdtr`, `FACEdtr`, `MRIS_EDGEdtr` (not `gradU`),
+  `MRIS_CORNERdtr`) for the in-use places, `lta`/`SRASToTalSRAS_`/`TalSRASToSRAS_` only with
+  `free_transform`, `cmdlines[i]` for `i < ncmds` (FS-112's 1,000 kept in both modes, so the
+  overflowed count never reaches it), `dist_storage[vno]` for `vno < max_vertices`. Its only callers
+  are `MRISfree` and `utils/test/topology_test.c`.
+- **`cprints`' 16,384-byte static buffer (FS-119)**: `sprintf(pch_right, " [ %s ]\n", right)` is
+  `__sprintf_chk(pch_right, 1, 16384, ...)` in the unit oracle's `mrisurf_base.cpp.o` (the
+  official programs import `__sprintf_chk` too): 16,377 bytes print, 16,378 abort with `*** buffer
+  overflow detected ***: terminated` before the left column (observed). Callers:
+  `mris_curvature_stats.cpp` 449-671, 2422-2431 (surface, label and texture names: user input) and
+  `mris_calc.cpp`; recon-all's names are short: no impact known. `cprintd`/`cprintf` cannot overflow.
+- **`MRIS_vertexProgress_print` (FS-118)**: `fivePerc = 0.05 * totalVertices` (int) and `avertex %
+  fivePerc` is an `idiv` (unit oracle object): SIGFPE for 1 to 19 vertices at the first call, after
+  the message and ` [` (observed, `CRASH 8`). Callers: `mrisurf_metricProperties.cpp` 6279, 6330,
+  6424 (`MRIScomputeSecondFundamentalFormDiscrete`'s helpers: mris_curvature_stats' discrete
+  curvatures) and `mrisurf_topology.cpp` 3188 (`MRIS_facesAtVertices_reorder`); recon-all's
+  surfaces have more than 100,000 vertices: no impact known.
+- **`MRISallocExtraGradients`** with a negative count: the three `calloc((size_t)n, 4)` overflow and
+  fail with `errno` ENOMEM, so `ErrorExit` prints `Cannot allocate memory` first (observed; the port
+  sets `g.errno`).
+- **`VECTOR_elementIndex_findNotEqual`** returns the 0-based `i` while its comment promises the
+  1-based index; no caller in 8.2.0 (nor of `VECTOR_elementIndex_find`, `signum_eval`,
+  `MRIScheckForNans`, `MRISget*Array`): kept as written (rule C: nothing can rely on a correction).
+- **`edgesIntersect`**: `include/mrisurf_base.h` 268 defines `SPHERE_INTERSECTION` 1, so the
+  sphere version and `edgesIntersectStable` are compiled (the "original version" with
+  `mrisComputeCanonicalEdgeBasis` is not). In the stable version `(v1->cx + v2->cx) / 2.0` adds the
+  two floats in float before widening, and `v2->cx - v1->cx` subtracts in float; the rest is
+  double. Only comparisons leave the functions, so the NaN operand order is irrelevant; the probe's
+  `edges` (quarter grids for the aligned branch, 1e-5 steps for the stable one) is identical.
+- **Not ported here**: `vlst_alloc`, `vlst_free`, `vlst_enough_data`, `vlst_add_to_list`
+  (`VOXEL_LIST`, `utils/voxlist.cpp`: fs.volume); `mrisDirectionTriangleIntersection` and
+  `mrisAllNormalDirectionCurrentTriangleIntersections` (`MHTacqBucket`: fs.surf's surface hash;
+  `triangle_ray_intersect`: `utils/tritri.cpp`); `slprints` (no caller in 8.2.0; the clock and
+  `gethostname`, and a NULL `strtok` result for an empty or all-dots host name).
+- **The probe's artefact** (not FreeSurfer's): an empty `std::vector`'s `data()` is NULL, which
+  `MRISsetRegistrationSigmas` reads as "reset to the defaults"; the probe allocates one more place.
+
+## 12. Queue items 3.1-51 and 3.1-52: the metric properties' three computations (relay 10)
+
+`MRIScomputeMetricProperties(MRIS*)` (`mrisurf_metricProperties.cpp` 1844-1881) reads three
+environment variables at every call (no script of 8.2.0 sets any): `FS_FASTER_MP` sends the call to
+`MRIScomputeMetricPropertiesFaster` (`mrisurf_metricProperties_faster.cpp`) and returns before the
+call counter; otherwise `useOld = FREESURFER_OLD_...` and `useNew = FREESURFER_NEW_... || !useOld`.
+The default (`useNew` alone) frees the distances (`MRISfreeDistsButNotOrig`), loads an `MRIS_MP`
+(`MRISMP_load(&mp, mris)`, no outputs), computes on it (`MRIScomputeMetricProperties(MRIS_MP*)`,
+`_fast.h` 1154) and unloads (`MRISMP_unload(mris, &mp, false)`). `useOld` alone runs
+`MRIScomputeMetricPropertiesWkr` (`_slow.h` 711) on the surface; both set: both run and the unload
+only compares (`check` true). `MRISMP_copy` and `MRISMP_load`'s `loadOutputs`/`dx` arguments have
+one caller, `MRIScomputeSSE_asThoughGradientApplied` (`mrisurf_deform.cpp` 993-1031), which sets
+`useNewBehaviour = false;` unconditionally: never reached in 8.2.0 (ported, not probed).
+
+- **The unload never writes the faces' angles back (FS-120).** `MRISMP_unload`'s face loop handles
+  `orig_area`, `orig_angle` and the normal as special cases (`ELTX`) and copies `MRIS_MP__LIST_F_OUT`
+  by `ELT` only: of that list only `area` is an `ELT` (`normSet`, `norm`, `angle` are `ELTX`), so
+  `face->angle` keeps its old value (observed: the probe's dump after `mp` shows the case's angles;
+  `MRISMP_copy` does copy `f_angle`, "not so special"; the check mode compares no angle either).
+  Readers of `face->angle` after a default computation: `mrisComputeAngleAreaTerms`-type SSE terms
+  (`mrisurf_sseTerms.cpp` 2457, the templated 2890), `mrisurf_compute_dxyz.cpp` 572-587,
+  `MRISwriteTriangleProperties` (`mrisurf_io.cpp` 266), `geodesics.cpp` 76, `mris_errors`. With every
+  computation leaving the angles stale, `MRISstoreMetricProperties` copies them into `orig_angle`, so
+  `deltaAngle(angle, orig_angle)` is 0 unless something else (the old or faster computation,
+  `MRIScomputeTriangleProperties` called directly, a triangle file) set them: the angle terms of
+  `mris_sphere` and `mris_register` see no change. First classed rule A (FreeSurfer's two other
+  computations set the angles; the omission is a slip of the generated lists); **changed to rule D
+  (the orchestrator, 2026-11-13)**: the stale angles change recon-all's `mris_sphere` and
+  `mris_register` results, unmeasured and possibly relied on, so the default keeps FreeSurfer's
+  behaviour (`fixed_by_default` false, as FS-35/FS-36) until those ports measure it; the correction is
+  `SurfGlobals::fs120_write_face_angles` with `fix` (the angles copied, a notice when one changes);
+  `reproduce` leaves them. The hash test's `fs120_the_face_angles_are_written_back_only_on_request`:
+  seed 1's 120 `mprop` cases (of the 30-command set since relay 11), no FS-120 notice by default, 33
+  noted with the request, 30 of them printing other angles (in the other 3 a later step recomputes
+  them; with relay 10's 29-command set: 24 and 21).
+- **What the copy never writes (FS-121).** `MRISMP_load` `malloc`s the `V_OUT` and `F_OUT` arrays
+  and fills them only with `loadOutputs`. (1) `v_nx/ny/nz` are written by `MRISMP_computeNormals` only
+  when a vertex's normal is found (`!count || mrisNormalize(snorm) > 0`); a vertex still pending
+  after the fifth trial (NaN or infinite coordinates; or degenerate faces with coordinates so large
+  that 0.001 moves round away) keeps the malloc's contents, which the unload copies into
+  `v->nx..nz` (and `mrismp_OrientPlane` reads `v_nz`). The old computation leaves such a vertex's
+  normal unchanged. (2) `mrismp_OrientPlane` sums `f_area` over all of a vertex's faces, ripped ones
+  too, but `MRISMP_computeTriangleProperties` never writes a ripped face's `f_area`: memory contents
+  in a plane's vertex area (observed: the official output changes from run to run, e.g. `4453a748`
+  then `c1f5912d` for one area; in the check mode it prints `no:3  v->area  30.661219 !=
+  25927592685962668213346764849152.000000`). The port starts the copy's normals and face areas as the
+  surface's (what the old computation reads), in both modes, with the notice; the probe counts these
+  cases, never compares them.
+- **The comparison lines (FS-122).** `comparisonWkr` compares with `lhs == rhs`; the unload always
+  runs `comparison(-1, 1, mris->N==mp->N)` for `MRIS_MP__LIST_MRIS_IN` and `comparison(vno, v->N,
+  mp->v_N[vno])` for `MRIS_MP__LIST_V_IN` (`ripflag`, `whitex..z`, `pialx..z`, `wnx..z`), even when not
+  checking: a NaN there prints `no:<vno>  v->whitex  nan != nan  during
+  count_MRIScomputeMetricProperties_calls:<n>` (up to 11 per part, the part's counter reset for the
+  vertices and the faces) and, once per process, `b <...>/utils/mrisurf_metricProperties_fast.h:335
+  needed`; a NaN radius prints `no:-1  1  1.000000 != 0.000000`. The expression text is the macro
+  argument as written (`#LHS`), so `cmpAnglesPerTriangle(f->orig_angle,mp->f_orig_angle[fno])`,
+  `fNorm->orig_area`, `mris_dist[n]`. Rule A: equal bit patterns are equal; `reproduce` prints.
+- **The faster calculator (FS-123, FS-124, FS-125).** `new float[n]` leaves `face_areas`,
+  `face_normals`, `face_angles` of ripped faces as memory contents (the face loop `continue`s), and
+  the vertex loop sums every face of the vertex (no ripflag test), as `orientPlane`'s vertex loop
+  does: memory contents in the vertex areas and normals next to a ripped face; `computeDimensions`
+  reads `vertices[0..2]` of a surface with no vertex (`new float[0]`). The port fills 0 (the same
+  sums as skipping) and gives an empty surface the default box, in both modes, with FS-123's notice.
+  A vertex whose normal has no length is marked by `vertex_areas[vno] = -1`; after the fifth trial
+  the loop ends without recomputing, so `transfer` writes area -1 and, for `origarea < 0`,
+  `abs(-1)` (the `<cmath>` float `abs`: `andps` in the object) = 1, and the normal of no length
+  (rule C, FS-124: an opt-in route; no value is right for a normal that cannot be computed).
+  `reduction(+:total_area)` is OpenMP's own reduction (not ROMP's): the per-thread partial sums are
+  combined in completion order, so the total's last bits depend on the threads (FS-125, never
+  reproduced; the port gives the one-thread sum, faces in order). A vertex whose own face list lacks
+  it reads `angles[3]` (the next face's first angle; past the array for the last face) with
+  `FS_WEIGHTS_NORMS_BY_ANGLE`: the probe never generates such a list with the weights.
+- **Reproducible sums.** The ROMP loops (`romp_for_begin.h`, `ROMP_Distributor_begin/end`,
+  `romp_support.cpp` 459-501) sum each of at most 128 ranges from 0 and add the ranges' sums in order
+  to the variable's start (`sum = sum + partial`, the accumulator first, as the object shows):
+  `MRIScomputeTriangleProperties`' total area (both instances), `MRIScomputeAvgInterVertexDist`'s
+  three sums (both, and the faster calculator's), the ellipsoid's and the faster plane's three area
+  sums. The other parallel loops are independent per face or vertex (the retry list is sorted with
+  `qsort`/`int_compare` of distinct vertex numbers: ascending), so one thread's results are every
+  thread count's.
+- **Operand orders read from the unit oracle's objects** (`mrisurf_metricProperties.cpp.o`,
+  `mrisurf_metricProperties_faster.cpp.o`; `objdump -dr -C`):
+  - `x *= -1.0f` is a sign flip (`xorps`) everywhere (face area, normal, angles, a plane's `nz`): a
+    NaN's sign flips and it stays signalling. `neg_area += -area` is `neg_area - area` (`subss`); the
+    faster `neg_area -= area` likewise.
+  - The term comes first (`term + partial`) in the ROMP sums of the total area (triangle
+    properties, both orientations, both instances, the faster face loop's OpenMP sum), the negative
+    area and its original area (ellipsoid, faster plane and ellipsoid); `Sum2 += d*d` is `d*d +
+    Sum2`, `Sum += d` and `N += 1` keep the accumulator first. The float sums of the plane
+    orientation: `total = area + total`, `neg = neg - area`, `neg_orig = neg_orig + orig`; a
+    vertex's area and normal sums keep the accumulator first, but the faster weighted sum is
+    `fn*angle + acc` (the third product `angle*fn`).
+  - `mrisFaceAreaNormal`/`mrismp_setFaceAreaNormal`/`mrisNormalFace`/`mrisTriangleArea`'s
+    `-v12[1]*v20[2] + v20[1]*v12[2]` is `v20[1]*v12[2] - v12[1]*v20[2]` (no negation; likewise the
+    third component), the second component as written.
+  - `MRIScomputeTriangleProperties_extracted.h`: `V3_CROSS_PRODUCT`'s first product is `b.z*a.y`;
+    `V3_LEN` of the area `sqrt(z² + (x² + y²))`, of `V3_NORMALIZE` `sqrt((y² + x²) + z²)`; the
+    normalize's third product `n.z*s` in `MRIScomputeTriangleProperties` and `s*n.z` in
+    `MRISMP_computeTriangleProperties` (the only difference of the two instances); `V3_DOT(a, b)`
+    `a.z*b.z + (a.x*b.x + a.y*b.y)`; `VectorTripleProduct` out of line (fs.core's order).
+  - `MRISMP_computeVertexDistancesWkr`'s plane formula stores `sqrt(zd² + (yd² + xd²))`, as the
+    `MRIS` worker (relay 7); the sphere's formula calls `XYZApproxAngle_knownLength` out of line.
+  - The faster calculator: the face normal `a x b` with the second component's second product `b2*a0`
+    (also in the angles' `b x a`), its length `(x² + y²) + z²`; the corner's `vec_dot(c, fnorm)`
+    `c2n2 + (c1n1 + c0n0)` and `vec_dot(a, b)` `(b1a1 + a0b0) + b2a2`; a vertex normal's length and the
+    straight-line distance `z² + (x² + y²)`; `moveVertexRandomly`'s hash `f*(2r) - r` (the same
+    value as `(HI-LO)*f + LO`) added as `random + pos`; `area /= 2.0` is `area * 0.5`.
+- **Callers ported with the computation**: `MRISsmoothSurface`'s last step, `mrisDisturbVertices`,
+  `MRISrecenter`, `MRISscaleBrainArea`, `MRISscaleVertexCoordinates`, `MRISscaleBrain` (its
+  `cheapAssert(mris_src == mris_dst)`: one surface in the port).
+- **Not ported here**: `mrisSampleMinimizationEnergy`, `mrisSampleNormalEnergy`,
+  `mrisSampleSpringEnergy`, `mrisSampleParallelEnergy(AtVertex)` and `MRISsampleFaceCoordsCanonical`
+  (`_slow.h` 734-1008: the surface hash `MHT` and `MRISsampleFaceCoords`, fs.surf); the rest of
+  3.1-51's lines (`mrisurf_metricProperties.cpp` 9465-13617: gradients' averaging, second
+  fundamental forms, curvature uses, radii, `MRISbinarizeVolume`, orientation marks, the surface
+  checks, smoothing kernels, `MRISclone`, the statistics prints): later relays.
+
+## 13. Queue item 3.1-47, part b: the small file readers and writers (relay 11)
+
+`utils/mrisurf_io.cpp` 64-89 (`mris_readval_frame`, `MRISsetReadFrame`, `MRISgetReadFrame`),
+99-211 (`MRISreadTriangleProperties`), 213-275 (`MRISwriteTriangleProperties`), 343-401
+(`MRISwriteDists`), 535-584 (`MRISwriteAreaError`), 625-666 (`MRISwriteAngleError`), 668-719
+(`MRISwriteCurvatureToWFile`), 2042-2077 (`MRISreadValuesBak`), 2079-2111 (`MRISreadImagValues`),
+2113-2146 (`MRIScopyMarksToAnnotation`, `MRISmaxMarked`), 2625-2686 (`MRISwriteAscii`,
+`MRISwriteNormalsAscii`), 2794-2853 (`MRISwriteVTK`, `MRISwriteCurvVTK`); `utils/fio.cpp`'s
+`fread4`/`fwrite4` (the counts), `utils/utils.cpp` 788-808 (`FileNamePath`), `include/macros.h` 70
+(`DEGREES`). Port: `larmorx-freesurfer-surf`'s `src/sfile.rs`; probe command `sfile`.
+
+- **The counts of the triangle-property files (FS-127).** `MRISwriteTriangleProperties` writes
+  `fwrite4(mris->nvertices, fp)` (`int fwrite4(int v, FILE *fp)`: the integer's bytes, swapped),
+  `MRISreadTriangleProperties` reads `fread4(&f, fp); vnum = (int)f;` (`int fread4(float *v, FILE
+  *fp)`: a float): the integer 10's bytes are the denormal 1.4e-44, `cvttss2si` gives 0, so the
+  vertex check fails for every written file of a surface with vertices (observed: the probe's `wt`
+  then `rt` of one case, `incompatible vertex number in file d/lh.triangle_area`). The only caller
+  of the reader is under `#if AVERAGE_AREAS` in `mrisurf_integrate.cpp` 453-456 (0 in 8.2.0), and
+  the writer has no caller: neither is reached by recon-all. Rule A (read the writer's integers);
+  the conversions are `cvttss2si` (the object code: `cvttss2si 0x3c(%rsp),%r14d` and `%r15d` after
+  each `fread4`), so `reproduce` converts through x86-64's `(int)` of the float (NaN and out of range
+  -2147483648).
+- **The face count is never checked (FS-133).** The reader loops `fno < fnum` over
+  `mris->faces[fno]` and `setFaceOrigArea(mris, fno, f)` (the cache entry `fno`), past `nfaces` and
+  past `max_faces`. Rule B (refuse a count other than the surface's); `reproduce` keeps writing the
+  spare places (the arrays hold `max_faces`, zeroed above `nfaces` by `MRISreallocFaces`) and
+  refuses beyond them (writing past them is heap corruption: never reproduced). The probe's
+  generator keeps the float counts within the places (a guard would have to parse the file).
+- **The angle loop's stale counter (FS-128).** The writer's second loop is `for (vno = 0; vno <
+  mris->nfaces; vno++) { face = &mris->faces[fno]; ...}` with `fno == nfaces` from the first loop:
+  `nfaces` copies of `faces[nfaces]`'s angles (observed: a spare place's 0.1/0.2/0.3 in the probe's
+  first hand case; with `nfaces == max_faces` the bytes after the array, 0.577 three times in that
+  build, memory). Rule A. The probe skips (`G`) the writer when `nf == maxf` (memory).
+- **The hemisphere before the name (FS-129).** `cp = strrchr(name, '.'); strncpy(hemi, cp - 2,
+  2)`: a dot at index 0 or 1 reads one or two bytes before the string. The probe passes every name
+  with two NUL bytes before it (`name_tok`), which makes FreeSurfer's hemisphere empty, as
+  `reproduce` takes it (observed: `./.triangle_area`). Rule B.
+- **Names (FS-126, FS-134).** Measured on the probe (`fssurfio`, linked with the unit oracle's
+  libutils, Ubuntu's gcc-8 with its default `_FORTIFY_SOURCE`): `MRISwriteAreaError`'s `strcpy(fname,
+  name)` and `MRISwriteDists`'s `strcpy` branch abort at 1,024 bytes (`__strcpy_chk`: `*** buffer
+  overflow detected ***: terminated`, signal 6), 1,023 pass; the `snprintf` branches print
+  `<__FUNCTION__>: Truncation on line <__LINE__>` (`std::cerr`, the lines of the `cerr` statements:
+  126, 174, 236, 254, 361, 369, 377, 384) and open the cut name; `FileNamePath(mris_fname, fpref)`
+  (`utils.cpp` 792 `strcpy(pathName, fname)`, unchecked: the destination's size is unknown there)
+  overruns `fpref[STRLEN]` for names of 1,024 bytes or more: at 1,100 bytes the function went on
+  (the cut message, `could not open <first 1,023 bytes>`), at 2,100 bytes `*** stack smashing
+  detected ***` at its return. `MRISwriteDists`' `FileNamePath(mris->fname, path)` cannot overrun:
+  `MRIS::fname` is a `FixedSizeArray<char, STRLEN>`.
+- **The angle error (FS-130, FS-131).** `error /= (float)(v->num * ANGLES_PER_TRIANGLE)` is inside
+  the face loop (`divss` at 0xff, in the loop body); `i = DEGREES(error) * 100.0;` is `cvttsd2si`
+  (0x127), after `mulsd` 360, `divsd` 2π, `mulsd` 100 (the error in the destination each time).
+  Callers: `mris_errors`, `mris_flatten` (not recon-all).
+- **The largest mark (FS-132).** `max_marked = mris->vertices[0].marked;` before the loop from 1
+  (which skips ripped vertices); for `nvertices == 0` the array is `realloc(NULL, max_vertices *
+  sizeof(VERTEX))`: with `max_vertices` 0 a 0-byte block (observed: 12336, memory), else a zeroed
+  place (0). Caller: `mris_make_face_parcellation` (not recon-all).
+- **The official build's operand orders** (`objdump -dr -C` of the unit oracle's
+  `mrisurf_io.cpp.o`; `<scratch>/D/relay11/io.asm` in the session): the reader's `orig_area += f`
+  is `movss orig_area,%xmm0; addss f,%xmm0` (the sum on the left); `v->origarea +=
+  getFaceOrigArea(...)` is `addss 0x194(%r15),%xmm0` with the returned area in `%xmm0` (the face's
+  area on the left); `MRISwriteAreaError`'s two sums keep the sum on the left (`addss 0xc(%rax),%xmm1`,
+  `addss 0xc(%rbx),%xmm0`), then `subss`, `mulss` 100.0f, `cvtsi2ss` of `num`, `divss`, `nint(double)`;
+  `MRISwriteCurvatureToWFile`'s `sum += f` keeps the sum on the left (`addsd %xmm0,%xmm5`) but `sum2
+  += f * f` is `mulss %xmm1,%xmm1; cvtss2sd; addsd 0x10(%rsp),%xmm1` (the square on the left: seed
+  7's one NaN-sign difference before the fix, `stdev = nan` against `-nan`); its `sqrt` is a call
+  to the C library's (`R_X86_64_PLT32 sqrt`), made whether or not `DIAG_SHOW` prints the result:
+  glibc 2.35's wrapper sets `EDOM` for a negative argument, and a later `ErrorPrintf` of the process
+  prints it. The extremes are `minsd`/`maxsd` with the value in the destination: a NaN keeps the
+  extreme, as the C comparisons.
+- **Not ported here (wait for `mri_identify`, fs.io):** `MRISwriteValues` (its first step is
+  `mri_identify(sname)`, which probes the file's contents for every format when the extension does
+  not decide) and `MRISwriteAreaErrorToValFile` (its only output goes through `MRISwriteValues`).
+  Found while reading it: its loop reads `getFaceNorm(mris, fno)` with `fno` the vertex's face
+  **index**, not the face number (`vt->f[fno]`): the original areas of faces 0..num-1 of the
+  surface, not the vertex's (for the register when it is ported).
+- **Measured (relay 11).** Seed 7, `sfile` alone: 1,000 cases, every comparable one identical with
+  `reproduce` (49 counted, not compared: FS-167's memory digits in the readers, FS-06's table
+  arctangent in the writer's triangle properties); the default differs in 412, every one with a
+  notice. The whole probe, seed 7 (60,000 cases of 30 commands): 59,497 identical with `reproduce`,
+  503 counted, not compared (404 `mprop`, 99 `sfile`), the default different only with notices or the
+  correctly rounded maths (5 `surf`, 77 `posn`), the port's lines identical under AArch64's NaN
+  emulation in both modes (70,295 and 70,313 flips). Seed 1 (900 cases of 30 commands): 894
+  identical, 6 `SKIP`; hash `d927ce4b...` passing in debug and release and under `NAN_TRAP_ARM=1`
+  with `NAN_TRAP_DIR` set (1,925 and 13,214 NaNs flipped).

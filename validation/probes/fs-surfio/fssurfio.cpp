@@ -7,7 +7,8 @@
 // and (`surf`) mrisurf_metricProperties.cpp's coordinate operations with the distances' storage
 // (mrisurf_base.cpp) and MRISreverseFaceOrder; since relay 7 (`metric`) the averaging, the
 // sphere's centre, the neighbour distances, the areas and the curvature operations of
-// mrisurf_metricProperties.cpp; called case by case, linked with the unit oracle's libutils as
+// mrisurf_metricProperties.cpp; since relay 8 (`posn`) the saved vertex positions and normals, the
+// canonical coordinates and the face-normal cache; called case by case, linked with the unit oracle's libutils as
 // the official programs are (build.sh; `fssurfio-mpstub`, built with PROBE_MP_STUB, replaces
 // MRIScomputeMetricProperties by a stub that writes `MP`, for MRISsmoothSurface).
 // CLOSED TO FREESURFER CLEAN-ROOM IMPLEMENTERS: it names FreeSurfer's functions (running it is a
@@ -20,8 +21,10 @@
 // printable ASCII and for the backslash), or `EXIT <status> | <text>` / `CRASH <signal> | <text>`
 // when FreeSurfer's code ended the child. Floats and doubles in and out are their bits in hex.
 
+#include <dirent.h>
 #include <fcntl.h>
 #include <signal.h>
+#include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -31,6 +34,8 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <algorithm>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -45,11 +50,17 @@
 #include "mrisurf_sphere_interp.h"
 #include "matrix.h"
 #include "mrisutils.h"
+#include "transform.h"
+#include "topo_parms.h"
 
 // declared in utils/ only (mrisurf_deform.h) or nowhere (the MRIS_MP overload), defined in libutils
 int mrisFlipPatch(MRIS *mris);
 void MRISrotate(MRIS_MP *mris, float alpha, float beta, float gamma);
 int mrisCountCompressed(MRIS *mris, double min_dist);
+void mrisDumpVertex(FILE *file, MRIS const *mris, int vno);
+int signum_eval(float af);
+int mrisOrientSurface(MRIS *mris);
+int mrisOrientPlane(MRIS *mris);
 
 const char *Progname = "fssurfio";
 
@@ -623,6 +634,875 @@ void metric_case()
   dump_metric(m);
 }
 
+// `posn` (relay 8): an MRIS from the case (15 coordinate sets, k1, k2, areas, angles, rip
+// flags, neighbour counts, distances with their storage, faces with their face-normal cache),
+// a sequence of the saved positions and normals, the canonical coordinates and the face-normal
+// cache's operations (mrisurf_metricProperties.cpp's 3.1-50 part a, with the 3.1-49 functions
+// that wait for it), then its state. `sm` and `rm` print `G` and are skipped where their reads
+// or writes would leave what the case allocated (the port applies the same test).
+bool posn_guard(MRIS *m, const std::string &op)
+{
+  for (int vno = 0; vno < m->nvertices; vno++) {
+    VERTEX *v = &m->vertices[vno];
+    if (v->ripflag) continue;
+    int vs = mrisVertexVSize(m, vno);
+    if (vs <= 0) continue;
+    if (op == "sm" && v->dist &&
+        (v->dist_capacity < vs || (v->dist_orig && v->dist_orig_capacity < vs))) return false;
+    if (op == "rm" && (!v->dist || v->dist_capacity < vs || !v->dist_orig ||
+        v->dist_orig_capacity < vs)) return false;
+  }
+  return true;
+}
+
+void dump_posn(MRIS *m)
+{
+  for (int vno = 0; vno < m->nvertices; vno++) {
+    VERTEX *v = &m->vertices[vno];
+    float c[45] = {v->x, v->y, v->z, v->origx, v->origy, v->origz, v->tx, v->ty, v->tz,
+                   v->cx, v->cy, v->cz, v->infx, v->infy, v->infz, v->pialx, v->pialy, v->pialz,
+                   v->t2x, v->t2y, v->t2z, v->fx, v->fy, v->fz, v->whitex, v->whitey, v->whitez,
+                   v->nx, v->ny, v->nz, v->pnx, v->pny, v->pnz, v->wnx, v->wny, v->wnz,
+                   v->targx, v->targy, v->targz, v->l4x, v->l4y, v->l4z, v->dx, v->dy, v->dz};
+    for (float x : c) of(x);
+    of(v->theta); of(v->phi); of(v->area); of(v->origarea);
+    for (int o = 0; o < 2; o++) {
+      float *d = o ? v->dist_orig : v->dist;
+      int cap = o ? v->dist_orig_capacity : v->dist_capacity;
+      void *st = o ? m->dist_orig_storage[vno] : m->dist_storage[vno];
+      oi(d != NULL); oi(st != NULL); oi(cap);
+      if (d) for (int k = 0; k < cap; k++) of(d[k]);
+    }
+  }
+  for (int fno = 0; fno < m->nfaces; fno++) {
+    FACE *f = &m->faces[fno];
+    of(f->area);
+    for (int k = 0; k < 3; k++) of(f->angle[k]);
+    for (int k = 0; k < 3; k++) of(f->orig_angle[k]);
+    FaceNormCacheEntry *e = &m->faceNormCacheEntries[fno];
+    of(e->nx); of(e->ny); of(e->nz); of(e->orig_area);
+    oi(m->faceNormDeferredEntries[fno].deferred);
+  }
+  od(m->radius); of(m->total_area); of(m->orig_area);
+  oi(m->status); oi(m->origxyz_status); oi(m->dist_nsize); oi(m->dist_orig_nsize);
+  oi(m->dist_alloced_flags);
+  of(m->xlo); of(m->ylo); of(m->zlo); of(m->xhi); of(m->yhi); of(m->zhi);
+  of(m->xctr); of(m->yctr); of(m->zctr);
+}
+
+void posn_case()
+{
+  if (geti()) setenv("FREESURFER_reportLogicErrors", "1", 1);
+  if (geti()) Gdiag |= DIAG_SHOW | DIAG_VERBOSE;
+  int nv = geti(), nf = geti();
+  MRIS *m = MRISalloc(nv, nf);
+  m->status = (MRIS_Status)geti();
+  m->origxyz_status = (MRIS_Status)geti();
+  m->dist_alloced_flags = (char)geti();
+  m->dist_nsize = (char)geti();
+  m->dist_orig_nsize = (char)geti();
+  m->radius = getd();
+  m->total_area = getf(); m->orig_area = getf();
+  for (int vno = 0; vno < nv; vno++) {
+    VERTEX *v = &m->vertices[vno];
+    VERTEX_TOPOLOGY *vt = &m->vertices_topology[vno];
+    set_coords(v);
+    v->k1 = getf(); v->k2 = getf(); v->area = getf(); v->origarea = getf();
+    v->theta = getf(); v->phi = getf();
+    v->ripflag = (char)geti();
+    vt->vnum = (short)geti(); vt->v2num = (short)geti(); vt->v3num = (short)geti();
+    vt->vtotal = (short)geti(); vt->nsizeMax = (uchar)geti();
+    for (int o = 0; o < 2; o++) {
+      int blen = geti();
+      float *buf = NULL;
+      int cap = 0, valid = 0;
+      if (blen >= 0) {
+        buf = arr<float>(blen);
+        cap = geti(); valid = geti();
+        for (int k = 0; k < blen; k++) buf[k] = getf();
+      }
+      void **st = o ? &m->dist_orig_storage[vno] : &m->dist_storage[vno];
+      *st = buf;
+      *(float **)(o ? &v->dist_orig : &v->dist) = valid ? buf : NULL;
+      *(int *)(o ? &v->dist_orig_capacity : &v->dist_capacity) = valid ? cap : 0;
+    }
+  }
+  for (int fno = 0; fno < nf; fno++) {
+    FACE *f = &m->faces[fno];
+    for (int k = 0; k < 3; k++) f->v[k] = geti();
+    f->area = getf();
+    for (int k = 0; k < 3; k++) f->angle[k] = getf();
+    for (int k = 0; k < 3; k++) f->orig_angle[k] = getf();
+    f->ripflag = (char)geti();
+    FaceNormCacheEntry *e = &m->faceNormCacheEntries[fno];
+    e->nx = getf(); e->ny = getf(); e->nz = getf(); e->orig_area = getf();
+    m->faceNormDeferredEntries[fno].deferred = (char)geti();
+  }
+  int nops = geti();
+  for (int k = 0; k < nops; k++) {
+    std::string op = next();
+    if ((op == "sm" || op == "rm") && !posn_guard(m, op)) { out += "G "; continue; }
+    if (op == "sv") oi(MRISsaveVertexPositions(m, geti()));
+    else if (op == "rv") oi(MRISrestoreVertexPositions(m, geti()));
+    else if (op == "sn") oi(MRISsaveNormals(m, geti()));
+    else if (op == "rn") oi(MRISrestoreNormals(m, geti()));
+    else if (op == "cc") oi(MRIScomputeCanonicalCoordinates(m));
+    else if (op == "ar") od(MRISaverageCanonicalRadius(m));
+    else if (op == "fo") od(MRIScomputeFolding(m));
+    else if (op == "gn") {
+      FaceNormCacheEntry const *e = getFaceNorm(m, geti());
+      of(e->nx); of(e->ny); of(e->nz); of(e->orig_area);
+    }
+    else if (op == "sf") { int f = geti(); float a = getf(), b = getf(), c = getf(); setFaceNorm(m, f, a, b, c); }
+    else if (op == "so") { int f = geti(); setFaceOrigArea(m, f, getf()); }
+    else if (op == "go") of(getFaceOrigArea(m, geti()));
+    else if (op == "cn") computeDefectFaceNormal(m, geti());
+    else if (op == "df") mrisurf_deferSetFaceNorms(m);
+    else if (op == "rf") mrisurf_recomputeFaceNorms(m);
+    else if (op == "uf") mrisurf_undeferSetFaceNorms(m);
+    else if (op == "oa") of(MRIScomputeOrigArea(m));
+    else if (op == "sa") MRISsetOrigArea(m);
+    else if (op == "sm") oi(MRISstoreMetricProperties(m));
+    else if (op == "rm") oi(MRISrestoreMetricProperties(m));
+    else if (op == "ro") oi(MRISrestoreOldPositions(m));
+    else if (op == "st") oi(MRISstoreCurrentPositions(m));
+    else fail("posn op");
+  }
+  out += "| ";
+  dump_posn(m);
+}
+
+// `mprop` (relay 10, 3.1-51/52): an MRIS from the case (coordinates, normals, areas, flags, a
+// mesh's topology with each vertex's faces and corners, distances with their storage, faces with
+// their face-normal cache), the environment's switches of MRIScomputeMetricProperties, then 1 to
+// 4 of its operations (MRIScomputeMetricProperties, MRIScomputeTriangleProperties,
+// MRIScomputeNormals, MRIScomputeAvgInterVertexDist, MRISupdateEllipsoidSurface,
+// mrisOrientSurface, mrisOrientPlane, mrisComputeSurfaceDimensions, and the callers
+// MRISsmoothSurface, mrisDisturbVertices, MRISrecenter, MRISscaleBrainArea,
+// MRISscaleVertexCoordinates, MRISscaleBrain), then its state.
+void dump_mprop(MRIS *m)
+{
+  for (int vno = 0; vno < m->nvertices; vno++) {
+    VERTEX *v = &m->vertices[vno];
+    float c[10] = {v->x, v->y, v->z, v->nx, v->ny, v->nz, v->area, v->origarea, v->cx, v->curv};
+    for (float x : c) of(x);
+    oi(v->border); oi(v->neg); oi(v->fno);
+    for (int o = 0; o < 2; o++) {
+      float *d = o ? v->dist_orig : v->dist;
+      int cap = o ? v->dist_orig_capacity : v->dist_capacity;
+      void *st = o ? m->dist_orig_storage[vno] : m->dist_storage[vno];
+      oi(d != NULL); oi(d != NULL || st != NULL); oi(cap);
+      if (d) for (int k = 0; k < cap; k++) of(d[k]);
+    }
+  }
+  for (int fno = 0; fno < m->nfaces; fno++) {
+    FACE *f = &m->faces[fno];
+    of(f->area);
+    for (int k = 0; k < 3; k++) of(f->angle[k]);
+    for (int k = 0; k < 3; k++) of(f->orig_angle[k]);
+    FaceNormCacheEntry *e = &m->faceNormCacheEntries[fno];
+    of(e->nx); of(e->ny); of(e->nz); of(e->orig_area);
+    oi(m->faceNormDeferredEntries[fno].deferred);
+  }
+  of(m->xlo); of(m->ylo); of(m->zlo); of(m->xhi); of(m->yhi); of(m->zhi);
+  of(m->xctr); of(m->yctr); of(m->zctr);
+  of(m->total_area); od(m->avg_vertex_area); od(m->avg_vertex_dist); od(m->std_vertex_dist);
+  of(m->neg_area); of(m->neg_orig_area);
+  oi(m->dist_nsize); oi(m->dist_alloced_flags);
+}
+
+// the guard of `ad` and `an`: every unripped vertex with an unripped 1-hop neighbour has room
+// for its 1-hop distances (MRIScomputeAvgInterVertexDist reads them unchecked)
+bool avg_guard(MRIS *m)
+{
+  for (int vno = 0; vno < m->nvertices; vno++) {
+    VERTEX *v = &m->vertices[vno];
+    VERTEX_TOPOLOGY *vt = &m->vertices_topology[vno];
+    if (v->ripflag) continue;
+    bool any = false;
+    for (int k = 0; k < vt->vnum; k++) if (!m->vertices[vt->v[k]].ripflag) any = true;
+    if (any && (!v->dist || v->dist_capacity < vt->vnum)) return false;
+  }
+  return true;
+}
+
+void mprop_case()
+{
+  int envs = geti();
+  if (envs & 1) setenv("FREESURFER_OLD_MRIScomputeMetricProperties", "1", 1);
+  if (envs & 2) setenv("FREESURFER_NEW_MRIScomputeMetricProperties", "1", 1);
+  if (envs & 4) setenv("FS_FASTER_MP", "1", 1);
+  if (envs & 8) setenv("FS_WEIGHTS_NORMS_BY_ANGLE", "1", 1);
+  if (envs & 16) setenv("FREESURFER_fastApproxAtan2f_use_atanf2", "1", 1);
+  if (envs & 32) setenv("FREESURFER_reportLogicErrors", "1", 1);
+  if (envs & 64) setenv("FREESURFER_SEED", "1234", 1);
+  if (geti()) Gdiag |= DIAG_SHOW | DIAG_VERBOSE;
+  UnitizeNormalFace = geti();
+  MRISsetFixVertexAreaValue(geti());
+  int nv = geti(), nf = geti();
+  MRIS *m = MRISalloc(nv, nf);
+  m->status = (MRIS_Status)geti();
+  m->origxyz_status = (MRIS_Status)geti();
+  m->nsize = (char)geti();
+  m->dist_alloced_flags = (char)geti();
+  m->dist_nsize = (char)geti();
+  m->radius = getd();
+  m->total_area = getf();
+  m->avg_vertex_dist = getd();
+  for (int vno = 0; vno < nv; vno++) {
+    VERTEX *v = &m->vertices[vno];
+    VERTEX_TOPOLOGY *vt = &m->vertices_topology[vno];
+    v->x = getf(); v->y = getf(); v->z = getf();
+    v->origx = getf(); v->origy = getf(); v->origz = getf();
+    v->cx = getf(); v->cy = getf(); v->cz = getf();
+    v->whitex = getf(); v->whitey = getf(); v->whitez = getf();
+    v->pialx = getf(); v->pialy = getf(); v->pialz = getf();
+    v->wnx = getf(); v->wny = getf(); v->wnz = getf();
+    v->nx = getf(); v->ny = getf(); v->nz = getf();
+    v->curv = getf(); v->area = getf(); v->origarea = getf();
+    v->border = (char)geti(); v->fno = geti(); v->neg = (char)geti(); v->ripflag = (char)geti();
+    vt->vnum = (short)geti(); vt->v2num = (short)geti(); vt->v3num = (short)geti();
+    vt->vtotal = (short)geti(); vt->nsizeMax = (uchar)geti();
+    int len = geti();
+    free(vt->v);
+    vt->v = arr<int>(len);
+    for (int k = 0; k < len; k++) vt->v[k] = geti();
+    int num = geti();
+    vt->num = (uchar)num;
+    free(vt->f);
+    free(vt->n);
+    vt->f = arr<int>(num);
+    vt->n = arr<uchar>(num);
+    for (int k = 0; k < num; k++) vt->f[k] = geti();
+    for (int k = 0; k < num; k++) vt->n[k] = (uchar)geti();
+    for (int o = 0; o < 2; o++) {
+      int blen = geti();
+      float *buf = NULL;
+      int cap = 0, valid = 0;
+      if (blen >= 0) {
+        buf = arr<float>(blen);
+        cap = geti(); valid = geti();
+        for (int k = 0; k < blen; k++) buf[k] = getf();
+      }
+      void **st = o ? &m->dist_orig_storage[vno] : &m->dist_storage[vno];
+      *st = buf;
+      *(float **)(o ? &v->dist_orig : &v->dist) = valid ? buf : NULL;
+      *(int *)(o ? &v->dist_orig_capacity : &v->dist_capacity) = valid ? cap : 0;
+    }
+  }
+  for (int fno = 0; fno < nf; fno++) {
+    FACE *f = &m->faces[fno];
+    for (int k = 0; k < 3; k++) f->v[k] = geti();
+    f->ripflag = (char)geti();
+    f->area = getf();
+    for (int k = 0; k < 3; k++) f->angle[k] = getf();
+    for (int k = 0; k < 3; k++) f->orig_angle[k] = getf();
+    FaceNormCacheEntry *e = &m->faceNormCacheEntries[fno];
+    e->nx = getf(); e->ny = getf(); e->nz = getf(); e->orig_area = getf();
+    m->faceNormDeferredEntries[fno].deferred = (char)geti();
+  }
+  int nops = geti();
+  for (int k = 0; k < nops; k++) {
+    std::string op = next();
+    if (op == "mp") oi(MRIScomputeMetricProperties(m));
+    else if (op == "tp") oi(MRIScomputeTriangleProperties(m));
+    else if (op == "cn") oi(MRIScomputeNormals(m));
+    else if ((op == "ad" || op == "an") && !avg_guard(m)) out += "G ";
+    else if (op == "ad") { double sd = 0; MRIScomputeAvgInterVertexDist(m, &sd); od(sd); }
+    else if (op == "an") MRIScomputeAvgInterVertexDist(m, NULL);
+    else if (op == "ue") oi(MRISupdateEllipsoidSurface(m));
+    else if (op == "os") oi(mrisOrientSurface(m));
+    else if (op == "op") oi(mrisOrientPlane(m));
+    else if (op == "sd") oi(mrisComputeSurfaceDimensions(m));
+    else if (op == "ss") { int n = geti(); float st = getf(); MRISsmoothSurface(m, n, st); }
+    else if (op == "dv") mrisDisturbVertices(m, getd());
+    else if (op == "rc") { int mv = geti(); int tg = geti(); MRISrecenter(m, mv, tg); }
+    else if (op == "sb") oi(MRISscaleBrainArea(m));
+    else if (op == "sv") oi(MRISscaleVertexCoordinates(m, getd()));
+    else if (op == "sB") MRISscaleBrain(m, m, getf());
+    else fail("mprop op");
+  }
+  out += "| ";
+  dump_mprop(m);
+}
+
+// `life` (relay 9, 3.1-47 part a): a surface from MRISalloc or MRISoverAlloc, a sequence of its
+// reallocations, counts, settings, rip-flag operations, arrays and dumps, then its state and
+// MRISfree. An operation that would read or write past what the surface has allocated prints `G`
+// and is skipped (the port applies the same test).
+std::map<const void *, int> lens;  // the lengths of the topology arrays the case gave
+
+bool life_has_vertices(MRIS *m)
+{
+  return m->vertices && m->vertices_topology && m->dist_storage && m->dist_orig_storage;
+}
+
+// mrisDumpVertex's reads stay inside what the case allocated
+bool dump_ok(MRIS *m, int vno)
+{
+  if (vno < 0 || vno >= m->nvertices || !life_has_vertices(m)) return false;
+  VERTEX_TOPOLOGY *vt = &m->vertices_topology[vno];
+  VERTEX *v = &m->vertices[vno];
+  int vs = mrisVertexVSize(m, vno);
+  if (vs > 0) {
+    if (!vt->v || lens[vt->v] < vs) return false;
+    if (v->dist && v->dist_capacity < vs) return false;
+    if (v->dist_orig && v->dist_orig_capacity < vs) return false;
+  }
+  if (vt->num > 0 && (!vt->f || !vt->n || lens[vt->f] < vt->num)) return false;
+  return true;
+}
+
+void dump_life(MRIS *m)
+{
+  oi(m->nvertices); oi(m->max_vertices); oi(m->nfaces); oi(m->max_faces);
+  oi(m->nverticesFrozen); oi(m->nsize); oi(m->max_nsize); oi(m->dist_alloced_flags);
+  oi(m->vertices != NULL); oi(m->vertices_topology != NULL); oi(m->dist_storage != NULL);
+  oi(m->dist_orig_storage != NULL); oi(m->faces != NULL); oi(m->faceNormCacheEntries != NULL);
+  oi(m->faceNormDeferredEntries != NULL);
+  oi(m->dx2 != NULL); oi(m->dy2 != NULL); oi(m->dz2 != NULL);
+  if (life_has_vertices(m)) {
+    for (int vno = 0; vno < m->max_vertices; vno++) {
+      VERTEX *v = &m->vertices[vno];
+      VERTEX_TOPOLOGY *vt = &m->vertices_topology[vno];
+      of(v->x); of(v->y); of(v->z); of(v->odx); of(v->dz);
+      oi(v->ripflag); oi(v->oripflag); oi(v->marked);
+      oi(vt->vnum); oi(vt->vtotal); oi(vt->nsizeMax); oi(vt->nsizeCur); oi(vt->num);
+      oi(vt->v != NULL); oi(vt->f != NULL);
+      for (int o = 0; o < 2; o++) {
+        float *d = o ? v->dist_orig : v->dist;
+        int cap = o ? v->dist_orig_capacity : v->dist_capacity;
+        void *st = o ? m->dist_orig_storage[vno] : m->dist_storage[vno];
+        oi(d != NULL); oi(st != NULL); oi(cap);
+        if (d) for (int k = 0; k < cap; k++) of(d[k]);
+      }
+    }
+  }
+  if (m->faces && m->faceNormCacheEntries && m->faceNormDeferredEntries) {
+    for (int fno = 0; fno < m->max_faces; fno++) {
+      FACE *f = &m->faces[fno];
+      oi(f->v[0]); oi(f->v[1]); oi(f->v[2]); oi(f->ripflag); oi(f->oripflag); oi(f->marked);
+      FaceNormCacheEntry *e = &m->faceNormCacheEntries[fno];
+      of(e->nx); of(e->ny); of(e->nz); of(e->orig_area);
+      oi(m->faceNormDeferredEntries[fno].deferred);
+    }
+  }
+}
+
+void print_flags(char *p, int n)
+{
+  if (!p) { out += "NULL "; return; }
+  for (int k = 0; k < n; k++) oi(p[k]);
+  free(p);
+}
+
+void life_case()
+{
+  MRIS *m;
+  std::string init = next();
+  if (init == "A") {
+    int nv = geti(), nf = geti();
+    m = MRISalloc(nv, nf);
+  } else {
+    int mv = geti(), mf = geti(), nv = geti(), nf = geti();
+    m = MRISoverAlloc(mv, mf, nv, nf);
+  }
+  int nops = geti();
+  for (int k = 0; k < nops; k++) {
+    std::string op = next();
+    if (op == "rv") {
+      int a = geti(), b = geti();
+      if (m->nvertices < 0) { out += "G "; continue; }
+      oi(MRISreallocVertices(m, a, b));
+    } else if (op == "rf") {
+      int a = geti(), b = geti();
+      if (m->nfaces < 0) { out += "G "; continue; }
+      oi(MRISreallocFaces(m, a, b));
+    } else if (op == "af") {
+      int a = geti();
+      if (m->nfaces < 0) { out += "G "; continue; }
+      oi(MRISallocateFaces(m, a));
+    } else if (op == "ov") {
+      int a = geti(), b = geti(), c = geti(), d = geti();
+      if (m->nvertices < 0 || m->nfaces < 0) { out += "G "; continue; }
+      MRISoverAllocVerticesAndFaces(m, a, b, c, d);
+    } else if (op == "ra") {
+      int a = geti(), b = geti();
+      if (m->nvertices < 0 || m->nfaces < 0) { out += "G "; continue; }
+      MRISreallocVerticesAndFaces(m, a, b);
+    } else if (op == "gv") { MRISgrowNVertices(m, geti());
+    } else if (op == "tv") { MRIStruncateNVertices(m, geti());
+    } else if (op == "xv") { MRISremovedVertices(m, geti());
+    } else if (op == "gf") { MRISgrowNFaces(m, geti());
+    } else if (op == "tf") { MRIStruncateNFaces(m, geti());
+    } else if (op == "xf") { MRISremovedFaces(m, geti());
+    } else if (op == "fz") { MRISacquireNverticesFrozen(m);
+    } else if (op == "fr") { MRISreleaseNverticesFrozen(m);
+    } else if (op == "sv") {
+      int vno = geti();
+      float c[8];
+      for (float &x : c) x = getf();
+      int rip = geti(), marked = geti();
+      if (vno >= m->max_vertices || !life_has_vertices(m)) { out += "G "; continue; }
+      VERTEX *v = &m->vertices[vno];
+      v->x = c[0]; v->y = c[1]; v->z = c[2];
+      v->odx = c[3]; v->ody = c[4]; v->odz = c[5]; v->dx = c[6]; v->dy = c[7];
+      v->dz = c[0]; v->nx = c[1]; v->ny = c[2]; v->nz = c[3];
+      v->ripflag = (char)rip; v->marked = marked;
+    } else if (op == "st") {
+      int vno = geti(), vnum = geti(), vtotal = geti(), smax = geti(), scur = geti(), num = geti();
+      std::vector<int> nb(vtotal > 0 ? vtotal : 0), fs(num), ns(num);
+      for (int &x : nb) x = geti();
+      for (int &x : fs) x = geti();
+      for (int &x : ns) x = geti();
+      if (vno >= m->max_vertices || !life_has_vertices(m)) { out += "G "; continue; }
+      VERTEX_TOPOLOGY *vt = &m->vertices_topology[vno];
+      vt->vnum = (short)vnum; vt->vtotal = (short)vtotal;
+      vt->nsizeMax = (uchar)smax; vt->nsizeCur = (uchar)scur; vt->num = (uchar)num;
+      vt->v = (int *)malloc(nb.size() * sizeof(int) + 1);
+      memcpy(vt->v, nb.data(), nb.size() * sizeof(int));
+      lens[vt->v] = (int)nb.size();
+      vt->f = (int *)malloc(num * sizeof(int) + 1);
+      memcpy(vt->f, fs.data(), num * sizeof(int));
+      lens[vt->f] = num;
+      vt->n = (uchar *)malloc(num + 1);
+      for (int i = 0; i < num; i++) vt->n[i] = (uchar)ns[i];
+    } else if (op == "sd") {
+      int vno = geti();
+      if (vno >= m->nvertices || !life_has_vertices(m)) { out += "G "; continue; }
+      MRISmakeDist(m, vno);
+      VERTEX *v = &m->vertices[vno];
+      for (int i = 0; i < v->dist_capacity; i++) v->dist[i] = (float)(i + 1 + 10 * vno);
+    } else if (op == "sf") {
+      int fno = geti(), a = geti(), b = geti(), c = geti(), rip = geti(), marked = geti();
+      float n[4];
+      for (float &x : n) x = getf();
+      int deferred = geti();
+      if (fno >= m->max_faces || !m->faces) { out += "G "; continue; }
+      FACE *f = &m->faces[fno];
+      f->v[0] = a; f->v[1] = b; f->v[2] = c; f->ripflag = (char)rip; f->marked = marked;
+      FaceNormCacheEntry *e = &m->faceNormCacheEntries[fno];
+      e->nx = n[0]; e->ny = n[1]; e->nz = n[2]; e->orig_area = n[3];
+      m->faceNormDeferredEntries[fno].deferred = (char)deferred;
+    } else if (op == "ex") {
+      if (m->nfaces > 0 && !m->faces) { out += "G "; continue; }
+      if (m->nvertices > 0 && !m->vertices) { out += "G "; continue; }
+      print_flags(MRISexportFaceRipflags(m), m->nfaces);
+      print_flags(MRISexportVertexRipflags(m), m->nvertices);
+    } else if (op == "im") {
+      int s = geti();
+      if ((m->nfaces > 0 && !m->faces) || (m->nvertices > 0 && !m->vertices)) { out += "G "; continue; }
+      std::vector<char> ff(m->nfaces > 0 ? m->nfaces : 0), vf(m->nvertices > 0 ? m->nvertices : 0);
+      for (size_t i = 0; i < ff.size(); i++) ff[i] = (char)(((int)i * 7 + s) % 3 - 1);
+      for (size_t i = 0; i < vf.size(); i++) vf[i] = (char)(((int)i * 5 + s) % 3 - 1);
+      MRISimportFaceRipflags(m, ff.data());
+      MRISimportVertexRipflags(m, vf.data());
+    } else if (op == "cr") {
+      if (m->nvertices > 0 && !m->vertices) { out += "G "; continue; }
+      oi(MRIScountRipped(m));
+    } else if (op == "so" || op == "re" || op == "ur") {
+      if ((m->nfaces > 0 && !m->faces) || (m->nvertices > 0 && !m->vertices)) { out += "G "; continue; }
+      oi(op == "so" ? MRISstoreRipFlags(m) : op == "re" ? MRISrestoreRipFlags(m) : MRISunrip(m));
+    } else if (op == "ga") {
+      if ((m->nfaces > 0 && !m->faces) || (m->nvertices > 0 && !m->vertices) ||
+          m->nvertices < 0 || m->nfaces < 0) { out += "G "; continue; }
+      float *a = MRISgetVertexArray(m);
+      for (int i = 0; i < 3 * m->nvertices; i++) of(a[i]);
+      delete[] a;
+      float *b = MRISgetVertexNormalArray(m);
+      for (int i = 0; i < 3 * m->nvertices; i++) of(b[i]);
+      delete[] b;
+      int *c = MRISgetFaceArray(m);
+      for (int i = 0; i < 3 * m->nfaces; i++) oi(c[i]);
+      delete[] c;
+    } else if (op == "gn") {
+      bool ok = m->nfaces >= 0 && (m->nfaces == 0 || (m->faces && life_has_vertices(m)));
+      for (int fno = 0; ok && fno < m->nfaces; fno++)
+        for (int i = 0; i < 3; i++)
+          if (m->faces[fno].v[i] < 0 || m->faces[fno].v[i] >= m->max_vertices) ok = false;
+      if (!ok) { out += "G "; continue; }
+      float *a = MRISgetFaceNormalArray(m);
+      for (int i = 0; i < 3 * m->nfaces; i++) of(a[i]);
+      delete[] a;
+    } else if (op == "eg") {
+      oi(MRISallocExtraGradients(m));
+    } else if (op == "cn") {
+      if (m->nvertices > 0 && !m->vertices) { out += "G "; continue; }
+      MRIScheckForNans(m);
+    } else if (op == "dv") {
+      int vno = geti();
+      if (!dump_ok(m, vno)) { out += "G "; continue; }
+      mrisDumpVertex(stdout, m, vno);
+    } else if (op == "df") {
+      int fno = geti();
+      if (fno < 0 || fno >= m->nfaces || !m->faces) { out += "G "; continue; }
+      mrisDumpFace(m, fno, stdout);
+    } else if (op == "ds") {
+      bool ok = true;
+      for (int vno = 0; vno < std::min(10, m->nvertices); vno++) ok = ok && dump_ok(m, vno);
+      if (m->nfaces > 0 && !m->faces) ok = false;
+      if (!ok) { out += "G "; continue; }
+      mrisDumpShape(stdout, m);
+    } else {
+      fail("life op");
+    }
+  }
+  out += "| ";
+  dump_life(m);
+  MRISfree(&m);
+  oi(m == NULL);
+}
+
+// `meta` (relay 9): MRIScopyMetadata from a surface with a type, status, hemisphere, volume
+// geometry, transform array and Talairach matrices into a new surface or a given one.
+void set_vg(VOL_GEOM *vg)
+{
+  vg->valid = geti(); vg->width = geti(); vg->height = geti(); vg->depth = geti();
+  vg->xsize = getf(); vg->ysize = getf(); vg->zsize = getf(); vg->ras_good_flag = geti();
+  float *f[15] = {&vg->x_r, &vg->x_a, &vg->x_s, &vg->y_r, &vg->y_a, &vg->y_s, &vg->z_r, &vg->z_a,
+                  &vg->z_s, &vg->c_r, &vg->c_a, &vg->c_s, &vg->s_r, &vg->s_a, &vg->s_s};
+  for (float *p : f) *p = getf();
+  std::string name = geth();
+  snprintf(vg->fname, sizeof vg->fname, "%s", name.c_str());
+}
+
+void dump_vg(VOL_GEOM *vg)
+{
+  oi(vg->valid); oi(vg->width); oi(vg->height); oi(vg->depth);
+  of(vg->xsize); of(vg->ysize); of(vg->zsize); oi(vg->ras_good_flag);
+  float f[15] = {vg->x_r, vg->x_a, vg->x_s, vg->y_r, vg->y_a, vg->y_s, vg->z_r, vg->z_a,
+                 vg->z_s, vg->c_r, vg->c_a, vg->c_s, vg->s_r, vg->s_a, vg->s_s};
+  for (float x : f) of(x);
+  oh(vg->fname);
+  oi(vg->i_to_r__ != NULL); oi(vg->r_to_i__ != NULL);
+}
+
+void set_meta(MRIS *m)
+{
+  m->type = geti(); m->status = (MRIS_Status)geti(); m->hemisphere = geti();
+  m->free_transform = geti();
+  set_vg(&m->vg);
+  int nx = geti();
+  if (nx > 0) {
+    m->lta = LTAalloc(nx, NULL);
+    m->lta->type = geti();
+  }
+  for (int k = 0; k < 2; k++) {
+    if (!geti()) continue;
+    MATRIX *mt = MatrixAlloc(4, 4, MATRIX_REAL);
+    for (int r = 1; r <= 4; r++)
+      for (int c = 1; c <= 4; c++) *MATRIX_RELT(mt, r, c) = getf();
+    if (k) m->TalSRASToSRAS_ = mt; else m->SRASToTalSRAS_ = mt;
+  }
+}
+
+void dump_meta(MRIS *m)
+{
+  oi(m->nvertices); oi(m->nfaces); oi(m->type); oi(m->status); oi(m->hemisphere);
+  oi(m->free_transform);
+  dump_vg(&m->vg);
+  if (m->lta) { oi(m->lta->num_xforms); oi(m->lta->type); } else out += "NULL ";
+  for (MATRIX *mt : {m->SRASToTalSRAS_, m->TalSRASToSRAS_}) {
+    if (!mt) { out += "NULL "; continue; }
+    for (int r = 1; r <= 4; r++)
+      for (int c = 1; c <= 4; c++) of(*MATRIX_RELT(mt, r, c));
+  }
+}
+
+void meta_case()
+{
+  int nv = geti(), nf = geti();
+  MRIS *src = MRISalloc(nv, nf);
+  set_meta(src);
+  MRIS *dst = NULL;
+  if (geti()) {
+    int nv2 = geti(), nf2 = geti();
+    dst = MRISalloc(nv2, nf2);
+    set_meta(dst);
+  }
+  MRIS *r = MRIScopyMetadata(src, dst);
+  oi(r == dst);
+  out += "| ";
+  dump_meta(r);
+  MRISfree(&src);
+  MRISfree(&r);
+}
+
+// `misc` (relay 9): the curvature names, the registration's scales, the column printing, the
+// progress bar, the vector searches, signum_eval and the two sort comparisons.
+std::vector<std::vector<float>> keepf;
+
+void misc_case()
+{
+  int nops = geti();
+  for (int k = 0; k < nops; k++) {
+    std::string op = next();
+    if (op == "cn") {
+      int nth = geti();
+      keep.push_back(geth());
+      oi(MRISsetCurvatureName(nth, keep.back().c_str()));
+    } else if (op == "pc") {
+      oi(MRISprintCurvatureNames(stdout));
+    } else if (op == "ss") {
+      int n = geti();
+      if (n < 0) {
+        oi(MRISsetRegistrationSigmas(NULL, 0));
+      } else {
+        int len = geti();
+        keepf.emplace_back(len + 1);  // never empty: an empty vector's data() may be NULL
+        for (int i = 0; i < len; i++) keepf.back()[i] = getf();
+        oi(MRISsetRegistrationSigmas(keepf.back().data(), n));
+      }
+      od(nsigmas);
+      for (int i = 0; i < (int)nsigmas; i++) of(sigmas[i]);
+    } else if (op == "cs") {
+      std::string l = geth(), r = geth();
+      cprints(l.c_str(), r.c_str());
+    } else if (op == "cd") {
+      std::string l = geth();
+      cprintd(l.c_str(), geti());
+    } else if (op == "cf") {
+      std::string l = geth();
+      cprintf(l.c_str(), getf());
+    } else if (op == "vp") {
+      int nv = geti(), from = geti(), to = geti(), hasmsg = geti();
+      std::string msg = geth();
+      MRIS *m = MRISalloc(nv, 0);
+      for (int v = from; v <= to; v++) oi(MRIS_vertexProgress_print(m, v, hasmsg ? msg.c_str() : NULL));
+      MRISfree(&m);
+    } else if (op == "ve") {
+      int rows = geti();
+      MATRIX *v = MatrixAlloc(rows, 1, MATRIX_REAL);
+      for (int r = 1; r <= rows; r++) *MATRIX_RELT(v, r, 1) = getf();
+      float t = getf();
+      oi(VECTOR_elementIndex_findNotEqual(v, t));
+      oi(VECTOR_elementIndex_find(v, t));
+      MatrixFree(&v);
+    } else if (op == "sg") {
+      oi(signum_eval(getf()));
+    } else if (op == "vc") {
+      VERTEX_SORT a, b;
+      a.vtxno = geti(); a.x = getf(); a.y = getf(); a.z = getf();
+      b.vtxno = geti(); b.x = getf(); b.y = getf(); b.z = getf();
+      oi(CompareVertexCoords(&a, &b)); oi(CompareVertexCoords(&b, &a));
+    } else if (op == "fc") {
+      FACE_SORT a, b;
+      a.faceno = geti(); a.v0 = geti(); a.v1 = geti(); a.v2 = geti();
+      b.faceno = geti(); b.v0 = geti(); b.v1 = geti(); b.v2 = geti();
+      oi(CompareFaceVertices(&a, &b)); oi(CompareFaceVertices(&b, &a));
+    } else {
+      fail("misc op");
+    }
+  }
+}
+
+// `edges` (relay 9): edgesIntersect on pairs of edges of a surface whose canonical coordinates
+// the case gives.
+void edges_case()
+{
+  int nv = geti();
+  MRIS *m = MRISalloc(nv, 0);
+  for (int vno = 0; vno < nv; vno++) {
+    VERTEX *v = &m->vertices[vno];
+    v->cx = getf(); v->cy = getf(); v->cz = getf();
+  }
+  int n = geti();
+  for (int k = 0; k < n; k++) {
+    EDGE a, b;
+    memset(&a, 0, sizeof a);
+    memset(&b, 0, sizeof b);
+    a.vno1 = geti(); a.vno2 = geti(); b.vno1 = geti(); b.vno2 = geti();
+    oi(edgesIntersect(m, &a, &b));
+  }
+  MRISfree(&m);
+}
+
+// `sfile` (relay 11, 3.1-47 part b): the surface library's small file readers and writers
+// (mrisurf_io.cpp): MRISsetReadFrame/MRISgetReadFrame, MRISreadTriangleProperties,
+// MRISwriteTriangleProperties, MRISwriteDists, MRISwriteAreaError, MRISwriteAngleError,
+// MRISwriteCurvatureToWFile, MRISreadValuesBak, MRISreadImagValues, MRIScopyMarksToAnnotation,
+// MRISmaxMarked, MRISwriteAscii, MRISwriteNormalsAscii, MRISwriteVTK, MRISwriteCurvVTK. Each case
+// runs in an empty work folder (`<cases>.d`, with a subfolder `d`): the case's input files are
+// written first, then a surface from MRISoverAlloc with the case's vertices, faces (every
+// allocated place) and face-normal cache, then 1 to 3 operations on file names relative to the
+// folder, then the surface's state and every file in the folder (its relative name and bytes,
+// sorted by name). A name argument is passed with two NUL bytes before it (what the hemisphere's
+// scan reads for a dot at index 0 or 1). `G`: an operation that would read or write memory the
+// surface does not own (the port applies the same test).
+std::string workdir;
+
+void clear_dir(const std::string &d, bool top)
+{
+  if (DIR *dp = opendir(d.c_str())) {
+    while (struct dirent *e = readdir(dp)) {
+      std::string n = e->d_name;
+      if (n == "." || n == "..") continue;
+      std::string p = d + "/" + n;
+      struct stat st;
+      if (lstat(p.c_str(), &st) == 0 && S_ISDIR(st.st_mode)) clear_dir(p, false);
+      else unlink(p.c_str());
+    }
+    closedir(dp);
+  }
+  if (!top) rmdir(d.c_str());
+}
+
+const char *name_tok()
+{
+  std::string n = geth();
+  char *p = (char *)calloc(n.size() + 3, 1);
+  memcpy(p + 2, n.data(), n.size());
+  return p + 2;
+}
+
+void ox(const std::string &b)
+{
+  char h[4];
+  out += "x";
+  for (unsigned char c : b) {
+    snprintf(h, sizeof h, "%02x", c);
+    out += h;
+  }
+  out += " ";
+}
+
+// every regular file under the work folder, by its name relative to it ('/' between parts)
+void list_files(const std::string &d, const std::string &rel, std::vector<std::string> &files)
+{
+  if (DIR *dp = opendir(d.c_str())) {
+    while (struct dirent *e = readdir(dp)) {
+      std::string n = e->d_name;
+      if (n == "." || n == "..") continue;
+      std::string p = d + "/" + n, r = rel.empty() ? n : rel + "/" + n;
+      struct stat st;
+      if (lstat(p.c_str(), &st) != 0) continue;
+      if (S_ISDIR(st.st_mode)) list_files(p, r, files);
+      else if (S_ISREG(st.st_mode)) files.push_back(r);
+    }
+    closedir(dp);
+  }
+}
+
+void sfile_case()
+{
+  mkdir(workdir.c_str(), 0700);
+  clear_dir(workdir, true);
+  if (chdir(workdir.c_str()) != 0) fail("chdir");
+  mkdir("d", 0700);
+  errno = 0;
+  int envs = geti();
+  if (envs & 1) setenv("FS_POSIX", "1", 1);
+  if (envs & 2) {
+    std::string f = geth();
+    setenv("MRIS_READVAL_FRAME", f.c_str(), 1);
+  }
+  int gd = geti();
+  if (gd & 1) Gdiag |= DIAG_SHOW;
+  if (gd & 2) Gdiag |= DIAG_VERBOSE;
+  MRISsetFixVertexAreaValue(geti());
+  int nin = geti();
+  for (int k = 0; k < nin; k++) {
+    std::string name = geth(), bytes = geth();
+    FILE *fp = fopen(name.c_str(), "wb");
+    if (!fp) fail("an input file");
+    fwrite(bytes.data(), 1, bytes.size(), fp);
+    fclose(fp);
+  }
+  errno = 0;
+  int maxv = geti(), maxf = geti(), nv = geti(), nf = geti();
+  MRIS *m = MRISoverAlloc(maxv, maxf, nv, nf);
+  m->hemisphere = geti();
+  std::string fname = geth();
+  snprintf(m->fname.data(), STRLEN, "%s", fname.c_str());
+  for (int vno = 0; vno < nv; vno++) {
+    VERTEX *v = &m->vertices[vno];
+    VERTEX_TOPOLOGY *vt = &m->vertices_topology[vno];
+    v->x = getf(); v->y = getf(); v->z = getf();
+    v->nx = getf(); v->ny = getf(); v->nz = getf();
+    v->d = getf(); v->curv = getf(); v->val = getf(); v->valbak = getf(); v->imag_val = getf();
+    v->area = getf(); v->origarea = getf();
+    v->marked = geti(); v->annotation = geti(); v->ripflag = (char)geti();
+    int num = geti();
+    vt->num = (uchar)num;
+    free(vt->f);
+    free(vt->n);
+    vt->f = arr<int>(num);
+    vt->n = arr<uchar>(num);
+    for (int k = 0; k < num; k++) vt->f[k] = geti();
+    for (int k = 0; k < num; k++) vt->n[k] = (uchar)geti();
+  }
+  for (int fno = 0; fno < maxf; fno++) {
+    FACE *f = &m->faces[fno];
+    for (int k = 0; k < 3; k++) f->v[k] = geti();
+    f->ripflag = (char)geti();
+    f->area = getf();
+    for (int k = 0; k < 3; k++) f->angle[k] = getf();
+    for (int k = 0; k < 3; k++) f->orig_angle[k] = getf();
+    FaceNormCacheEntry *e = &m->faceNormCacheEntries[fno];
+    e->nx = getf(); e->ny = getf(); e->nz = getf(); e->orig_area = getf();
+    m->faceNormDeferredEntries[fno].deferred = (char)geti();
+  }
+  m->orig_area = getf();
+  int nops = geti();
+  for (int k = 0; k < nops; k++) {
+    std::string op = next();
+    if (op == "sf") MRISsetReadFrame(geti());
+    else if (op == "gf") oi(MRISgetReadFrame());
+    else if (op == "rt" || op == "wt") {
+      // a surface name of 1,024 bytes or more overruns FileNamePath's buffer (FS-134), and the
+      // writer reads the place after the last face past the array when there is none (FS-128)
+      const char *nm = name_tok();
+      if (strlen(nm) >= STRLEN || (op == "wt" && nf > 0 && nf == maxf)) out += "G ";
+      else if (op == "rt") oi(MRISreadTriangleProperties(m, nm));
+      else oi(MRISwriteTriangleProperties(m, nm));
+    }
+    else if (op == "wd") oi(MRISwriteDists(m, name_tok()));
+    else if (op == "wa") oi(MRISwriteAreaError(m, name_tok()));
+    else if (op == "wg") oi(MRISwriteAngleError(m, name_tok()));
+    else if (op == "wc") oi(MRISwriteCurvatureToWFile(m, name_tok()));
+    else if (op == "rb") oi(MRISreadValuesBak(m, name_tok()));
+    else if (op == "ri") oi(MRISreadImagValues(m, name_tok()));
+    else if (op == "ca") oi(MRIScopyMarksToAnnotation(m));
+    else if (op == "mm" && maxv == 0) out += "G ";  // vertex 0 past an empty array (FS-132)
+    else if (op == "mm") oi(MRISmaxMarked(m));
+    else if (op == "wA") oi(MRISwriteAscii(m, name_tok()));
+    else if (op == "wn") oi(MRISwriteNormalsAscii(m, name_tok()));
+    else if (op == "wv") oi(MRISwriteVTK(m, name_tok()));
+    else if (op == "wC") oi(MRISwriteCurvVTK(m, name_tok()));
+    else fail("sfile op");
+  }
+  out += "| ";
+  for (int vno = 0; vno < nv; vno++) {
+    VERTEX *v = &m->vertices[vno];
+    float c[6] = {v->valbak, v->imag_val, v->area, v->origarea, v->nx, v->nz};
+    for (float x : c) of(x);
+    oi(v->annotation);
+  }
+  for (int fno = 0; fno < nf; fno++) {
+    FACE *f = &m->faces[fno];
+    of(f->area);
+    for (int k = 0; k < 3; k++) of(f->angle[k]);
+    for (int k = 0; k < 3; k++) of(f->orig_angle[k]);
+    of(m->faceNormCacheEntries[fno].orig_area);
+    oi(m->faceNormDeferredEntries[fno].deferred);
+  }
+  of(m->orig_area); of(m->total_area);
+  out += "| ";
+  std::vector<std::string> files;
+  list_files(".", "", files);
+  std::sort(files.begin(), files.end());
+  for (const std::string &name : files) {
+    oh(name.c_str());
+    FILE *fp = fopen(name.c_str(), "rb");
+    if (!fp) { out += "NOFILE "; continue; }
+    std::string b;
+    int ch;
+    while ((ch = fgetc(fp)) != EOF) b += (char)ch;
+    fclose(fp);
+    ox(b);
+  }
+}
+
 void run_case()
 {
   std::string cmd = next();
@@ -821,6 +1701,20 @@ void run_case()
     surf_case();
   } else if (cmd == "metric") {
     metric_case();
+  } else if (cmd == "posn") {
+    posn_case();
+  } else if (cmd == "life") {
+    life_case();
+  } else if (cmd == "meta") {
+    meta_case();
+  } else if (cmd == "misc") {
+    misc_case();
+  } else if (cmd == "edges") {
+    edges_case();
+  } else if (cmd == "mprop") {
+    mprop_case();
+  } else if (cmd == "sfile") {
+    sfile_case();
   } else if (cmd == "names") {
     int n = geti();
     keep.reserve(n);
@@ -878,6 +1772,7 @@ int main(int argc, char *argv[])
   }
   if (argv[1][0] != '/') fail("the cases must be given by an absolute path");
   std::string scratch = std::string(argv[1]) + ".out";
+  workdir = std::string(argv[1]) + ".d";
   FILE *fp = fopen(argv[1], "r");
   if (!fp) fail("cannot open the cases");
   std::vector<std::string> lines;
@@ -935,5 +1830,6 @@ int main(int argc, char *argv[])
     printf("%s | %s\n", result.c_str(), escape(text).c_str());
   }
   unlink(scratch.c_str());
+  clear_dir(workdir, false);
   return 0;
 }

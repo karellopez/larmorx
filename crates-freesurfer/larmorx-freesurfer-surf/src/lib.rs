@@ -29,17 +29,45 @@
 //! - [`coords`]: the coordinate operations (`mrisurf_metricProperties.cpp`'s first part: setting,
 //!   importing, copying, reversing, scaling (FS-113), moving, rotating, the bounding box).
 //! - [`metric`]: averaging and smoothing the positions, the sphere's centre, the neighbour
-//!   distances, the areas, the curvature operations, the saved coordinates.
+//!   distances, the areas, the curvature operations, the saved coordinates; the original area,
+//!   storing and restoring the metric properties.
+//! - [`positions`]: the saved vertex positions and normals (FS-115), the canonical coordinates.
+//! - [`facenorm`]: the face-normal cache (FS-116).
+//! - [`lta`]: `MRIS::lta`'s type, fs.mri's `LTA` (with `LTAcopy` and `LTAfree`).
+//! - [`alloc`]: a surface's life: allocation, reallocation (FS-117), the metadata copy,
+//!   destruction, the dumps.
+//! - [`basemisc`]: the rip flags, the arrays, the curvature names, the registration's scales, the
+//!   extra gradients, the NaN check, the column printing (FS-119), the vector searches, the
+//!   progress bar (FS-118), the sort comparisons.
+//! - [`edges`]: whether two edges cross on the sphere.
+//! - [`mp`]: `MRIScomputeMetricProperties` and its default computation on the `MRIS_MP` copy
+//!   (FS-120..122), the reproducible sums.
+//! - [`mp_slow`]: the computation on the surface itself (`MRIScomputeNormals`,
+//!   `MRIScomputeTriangleProperties`, `MRIScomputeAvgInterVertexDist`, the orientations).
+//! - [`mp_faster`]: the faster computation `FS_FASTER_MP` selects (FS-123, FS-124).
+//! - [`sfile`]: `mrisurf_io.cpp`'s small file readers and writers (the read frame, the
+//!   triangle-property files, the distance, area-error, angle-error and curvature w files, the
+//!   backup and imaginary value readers, the marks, the ASCII and VTK formats; FS-126..FS-134).
 #![forbid(unsafe_code)]
 
 pub mod aaa;
+pub mod alloc;
 pub mod base;
+pub mod basemisc;
 pub mod coords;
 pub mod dist;
+pub mod edges;
+pub mod facenorm;
+pub mod lta;
 pub mod metric;
+pub mod mp;
+pub mod mp_faster;
+pub mod mp_slow;
 pub mod mris;
 pub mod mris_mp;
 pub mod mrisurf;
+pub mod positions;
+pub mod sfile;
 pub mod surfbase;
 pub mod topology;
 pub mod views;

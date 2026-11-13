@@ -1275,6 +1275,46 @@ defects! {
         "scaling a surface by a negative factor (and the scale-then-translate operation with a negative factor) leaves its bounding box upside down: the low end above the high end";
     FS_114 = "FS-114", "FreeSurfer", true,
         "centring a spherical surface that has no vertex never returns: the search for its centre keeps halving its step without end";
+    FS_115 = "FS-115", "FreeSurfer", true,
+        "restoring the target or layer-IV coordinates of a spherical patch sets its canonical coordinates to the temporary coordinates, not to the restored ones";
+    FS_116 = "FS-116", "FreeSurfer", true,
+        "reading a face's original area while it is still marked to be computed later prints NYI and crashes the program on purpose (a segmentation fault)";
+    FS_117 = "FS-117", "FreeSurfer", true,
+        "reallocating a surface to no faces (also a surface that already has none) fails an assertion and ends the program, and reallocating to no vertices a surface with room for none leaves it without its vertex array (or, the next time, without its other per-vertex arrays) and reports a failure";
+    FS_118 = "FS-118", "FreeSurfer", true,
+        "the progress bar over a surface's vertices (discrete curvatures, the faces' geometric order) ends the program with an arithmetic exception (signal 8) for a surface of fewer than 20 vertices";
+    FS_119 = "FS-119", "FreeSurfer", true,
+        "column printing of a status text of 16,378 bytes or more (mris_curvature_stats' and mris_calc's messages, which show file and surface names) ends the program with a buffer-overflow abort (signal 6) before anything is printed";
+    FS_120 = "FS-120", "FreeSurfer", false,
+        "after the default computation of a surface's metric properties (at every surface read and every deformation step) the faces' angles are not updated: they keep the values they had before (0 for a new surface), while the older and the faster computations update them (kept until its effect on mris_sphere's and mris_register's results is measured; the correction is on request)";
+    FS_121 = "FS-121", "FreeSurfer", true,
+        "the default computation of a surface's metric properties gives a vertex whose normal cannot be computed (its faces' normals sum to no length even after five small random moves, as with NaN or infinite coordinates) a normal of memory contents, and for a plane adds memory contents to the area of every vertex next to a ripped face";
+    FS_122 = "FS-122", "FreeSurfer", true,
+        "computing the metric properties of a surface with a NaN white or pial coordinate, a NaN white normal or a NaN radius prints, every time, up to 11 lines such as 'no:<vertex>  v->whitex  nan != nan  during count_MRIScomputeMetricProperties_calls:<n>' (and once 'b <file>:335  needed'), as if the value had changed";
+    FS_123 = "FS-123", "FreeSurfer", true,
+        "the faster computation of the metric properties (FS_FASTER_MP set) adds memory contents to the areas and normals of the vertices next to a ripped face, and takes the bounding box of a surface with no vertex from memory it does not own";
+    FS_124 = "FS-124", "FreeSurfer", false,
+        "the faster computation of the metric properties (FS_FASTER_MP set) gives a vertex whose normal cannot be computed in five rounds an area of -1 (and an original area of 1 when it had none) and a normal of no length";
+    FS_125 = "FS-125", "FreeSurfer", true,
+        "the faster computation of the metric properties (FS_FASTER_MP set) with several threads sums the faces' areas in an order that depends on the threads' timing, so the total area can change from run to run in its last bits";
+    FS_126 = "FS-126", "FreeSurfer", true,
+        "the surface library's distance, area-error and triangle-property files take their names in 1,024-byte buffers: a name of 1,024 bytes or more ends the program with a buffer-overflow abort (signal 6), or is cut to 1,023 bytes after the message '<function>: Truncation on line <n>', so another file is written or read";
+    FS_127 = "FS-127", "FreeSurfer", true,
+        "MRISreadTriangleProperties reads the vertex and face counts at the start of a triangle-property file as floats where MRISwriteTriangleProperties writes them as integers, so it refuses every file the writer wrote (but one of a surface without vertices) with 'incompatible vertex number in file <file>'";
+    FS_128 = "FS-128", "FreeSurfer", true,
+        "MRISwriteTriangleProperties writes, for every face, the three angles of the place after the surface's last face (a spare place's, or memory past the faces) instead of each face's own angles";
+    FS_129 = "FS-129", "FreeSurfer", true,
+        "MRISreadTriangleProperties and MRISwriteTriangleProperties with a surface name whose last dot is its first or second character take the two letters of the hemisphere from memory before the name";
+    FS_130 = "FS-130", "FreeSurfer", true,
+        "MRISwriteAngleError divides a vertex's running sum of angle differences by three times its face count after every face, so a vertex of more than one face gets less than the mean difference of its angles";
+    FS_131 = "FS-131", "FreeSurfer", true,
+        "MRISwriteAngleError writes an angle error that is NaN or beyond the 32-bit integer range (in hundredths of a degree) as -32767, as if it were the most negative error";
+    FS_132 = "FS-132", "FreeSurfer", true,
+        "MRISmaxMarked starts from vertex 0's mark even when vertex 0 is ripped, and reads it for a surface without vertices (a value from memory)";
+    FS_133 = "FS-133", "FreeSurfer", true,
+        "MRISreadTriangleProperties reads as many faces as a triangle-property file says, even more than the surface has: they go into its spare face places or past its arrays (memory corruption or a crash)";
+    FS_134 = "FS-134", "FreeSurfer", true,
+        "MRISreadTriangleProperties and MRISwriteTriangleProperties with a surface name of 1,024 bytes or more write its folder's name past a 1,024-byte buffer (the program can end with '*** stack smashing detected ***' or go on with corrupted names)";
     FS_161 = "FS-161", "FreeSurfer", true,
         "MRIcopy of a tensor or complex volume into one of the same type copies only the first width bytes of each row (a quarter or an eighth of its voxels' bytes), leaving the rest of the destination as it was";
     FS_162 = "FS-162", "FreeSurfer", true,

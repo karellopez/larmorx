@@ -550,4 +550,29 @@ mod tests {
         assert_eq!(sscanf_i32(b"x"), None);
         assert_eq!(sscanf_i32(b"+"), None);
     }
+
+    #[test]
+    fn floats_rounded_once() {
+        // glibc's strtof (validation/probes/fs-gifti's scan family: 20,000 strings, 0 differ)
+        let b = |s: &str| sscanf_f32(s.as_bytes()).map(f32::to_bits);
+        assert_eq!(b("1.0"), Some(0x3f80_0000));
+        assert_eq!(b(" 1.0x"), Some(0x3f80_0000));
+        assert_eq!(b("abc"), None);
+        assert_eq!(b(""), None);
+        // a value just above a float midpoint that a double would round onto it
+        assert_eq!(b("1.00000017881393432617187501"), Some(0x3f80_0002));
+        assert_eq!(b("1.000000178813934326171875"), Some(0x3f80_0002));
+        assert_eq!(b("1.00000017881393432617187499"), Some(0x3f80_0001));
+        assert_eq!(b("3.4028236e38"), Some(0x7f80_0000));
+        assert_eq!(b("7e-46"), Some(0)); // below half the smallest subnormal
+        assert_eq!(b("7.1e-46"), Some(0x0000_0001));
+        assert_eq!(b("1e-46"), Some(0));
+        assert_eq!(b("0x1.ffffffp127"), Some(0x7f80_0000));
+        assert_eq!(b("0x1p-149"), Some(1));
+        assert_eq!(b("-nan"), Some(0xffc0_0000));
+        assert_eq!(b("nan(0x7f)"), Some(0x7fc0_0000));
+        assert_eq!(b("-Infinity"), Some(0xff80_0000));
+        assert_eq!(strtof(b"nan(0x7f)").0.to_bits(), 0x7fc0_007f);
+    }
+
 }

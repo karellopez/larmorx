@@ -168,12 +168,58 @@ fn c_events(lib: &Lib, work: &Work, data: &[u8], pieces: &[i32]) -> Child {
     })
 }
 
+/// larmorx-io's `xml::tests::events_digest` documents and pieces (1, 7 and 64 bytes, then an
+/// empty final piece; UTF-16 in pieces of 3).
+fn fixed_docs() -> Vec<(Vec<u8>, Vec<i32>)> {
+    let docs: [&[u8]; 6] = [
+        b"<?xml version='1.0' standalone='yes'?>\r\n<!DOCTYPE g SYSTEM 'x.dtd' [<!ENTITY e 'v&#65;'><!ATTLIST g a CDATA 'd&e;' b NMTOKEN ' t '><!ELEMENT g (a|b)*><!ELEMENT a (#PCDATA|b)*><!ELEMENT b ((a,b)?,c+)><!--c--><?p d?>%q;]>\r\n<g c='1&#x20;&lt;\t2'><![CDATA[x]]y\r\n]]>t&e;&amp;&#233;<a/><?p\r\n d?><!--x\r\ny--></g>\r\n<!--e-->  ",
+        b"<a b='1' b='2'/>",
+        b"<?xml version='1.0' encoding='ISO-8859-1'?><a t='\xe9'>\xe9\xff</a>",
+        b"\xef\xbb\xbf<a>\xf0\x9f\x98\x80</a><b/>",
+        b"<a>\n<b>&undefined;</b></a>",
+        b"<!DOCTYPE a PUBLIC 'bad\tid' 's'><a/>",
+    ];
+    let mut v = Vec::new();
+    let split = |d: &[u8], size: usize| -> Vec<i32> {
+        let mut p: Vec<i32> = d.chunks(size).map(|c| c.len() as i32).collect();
+        p.push(0);
+        p
+    };
+    for d in docs {
+        for size in [1usize, 7, 64] {
+            v.push((d.to_vec(), split(d, size)));
+        }
+    }
+    let doc = "<a x='\u{e9}'>t\u{4e2d}\r\n</a>";
+    for le in [true, false] {
+        let mut b: Vec<u8> = if le {
+            vec![0xFF, 0xFE]
+        } else {
+            vec![0xFE, 0xFF]
+        };
+        for u in doc.encode_utf16() {
+            b.extend_from_slice(&if le { u.to_le_bytes() } else { u.to_be_bytes() });
+        }
+        let p = split(&b, 3);
+        v.push((b, p));
+    }
+    v
+}
+
 pub fn xml(up: &Lib, fs: &Lib, work: &Work, n: u64) -> Tally {
     let mut t = Tally::new("xml");
     let mut g = Gen::new(0x0e8a_7201);
-    for case in 0..n {
-        let data = g.bytes();
-        let pieces = g.pieces(data.len());
+    // first the documents of larmorx-io's events_digest test, in its pieces
+    let fixed = fixed_docs();
+    for case in 0..n + fixed.len() as u64 {
+        let (data, pieces) = match fixed.get(case as usize) {
+            Some(f) => f.clone(),
+            None => {
+                let d = g.bytes();
+                let p = g.pieces(d.len());
+                (d, p)
+            }
+        };
         t.cases += 1;
         let (ours, past_end) = match std::panic::catch_unwind(|| port_events(&data, &pieces)) {
             Ok(d) => d,

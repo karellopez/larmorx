@@ -132,3 +132,42 @@ fn utf16_and_latin1_reach_handlers_as_utf8() {
     assert_eq!(e, ERROR_NONE);
     assert_eq!(ev[2], "c[\u{e9}]");
 }
+
+/// The events of a fixed set of documents (every construct, the four encodings, errors), fed in
+/// pieces of 1, 7 and 64 bytes: a digest recorded on Linux x86-64 from the build whose
+/// differential probe against expat 2.0.1 passed; every platform must give it.
+#[test]
+fn events_digest() {
+    let docs: [&[u8]; 6] = [
+        b"<?xml version='1.0' standalone='yes'?>\r\n<!DOCTYPE g SYSTEM 'x.dtd' [<!ENTITY e 'v&#65;'><!ATTLIST g a CDATA 'd&e;' b NMTOKEN ' t '><!ELEMENT g (a|b)*><!ELEMENT a (#PCDATA|b)*><!ELEMENT b ((a,b)?,c+)><!--c--><?p d?>%q;]>\r\n<g c='1&#x20;&lt;\t2'><![CDATA[x]]y\r\n]]>t&e;&amp;&#233;<a/><?p\r\n d?><!--x\r\ny--></g>\r\n<!--e-->  ",
+        b"<a b='1' b='2'/>",
+        b"<?xml version='1.0' encoding='ISO-8859-1'?><a t='\xe9'>\xe9\xff</a>",
+        b"\xef\xbb\xbf<a>\xf0\x9f\x98\x80</a><b/>",
+        b"<a>\n<b>&undefined;</b></a>",
+        b"<!DOCTYPE a PUBLIC 'bad\tid' 's'><a/>",
+    ];
+    let mut text = String::new();
+    for (k, d) in docs.iter().enumerate() {
+        for size in [1usize, 7, 64] {
+            let pieces: Vec<&[u8]> = d.chunks(size).chain(std::iter::once(&b""[..])).collect();
+            let (ev, e, line) = run(&pieces);
+            text += &format!("{k}/{size}:{}|{e}|{line}\n", ev.join("|"));
+        }
+    }
+    // UTF-16, both byte orders
+    let doc = "<a x='\u{e9}'>t\u{4e2d}\r\n</a>";
+    for le in [true, false] {
+        let mut v: Vec<u8> = if le { vec![0xFF, 0xFE] } else { vec![0xFE, 0xFF] };
+        for u in doc.encode_utf16() {
+            v.extend_from_slice(&if le { u.to_le_bytes() } else { u.to_be_bytes() });
+        }
+        let pieces: Vec<&[u8]> = v.chunks(3).chain(std::iter::once(&b""[..])).collect();
+        let (ev, e, line) = run(&pieces);
+        text += &format!("u16 {le}:{}|{e}|{line}\n", ev.join("|"));
+    }
+    let mut h: u64 = 0xcbf29ce484222325;
+    for &x in text.as_bytes() {
+        h = (h ^ x as u64).wrapping_mul(0x100000001b3);
+    }
+    assert_eq!(h, 12370273149529251573, "{text}");
+}

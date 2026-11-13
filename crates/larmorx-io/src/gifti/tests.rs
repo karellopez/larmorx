@@ -166,3 +166,90 @@ fn long_double_lines() {
 fn base64_roundtrip() -> String {
     String::from_utf8(write::base64(b"ABC")).unwrap()
 }
+
+/// FNV-1a 64 of bytes.
+fn fnv(b: &[u8]) -> u64 {
+    let mut h: u64 = 0xcbf29ce484222325;
+    for &x in b {
+        h = (h ^ x as u64).wrapping_mul(0x100000001b3);
+    }
+    h
+}
+
+/// Seeded bytes (SplitMix64; plain integer arithmetic only).
+fn bytes(seed: u64, n: usize) -> Vec<u8> {
+    let mut s = seed;
+    (0..n)
+        .map(|_| {
+            s = s.wrapping_add(0x9E3779B97F4A7C15);
+            let mut z = s;
+            z = (z ^ (z >> 30)).wrapping_mul(0xBF58476D1CE4E5B9);
+            z = (z ^ (z >> 27)).wrapping_mul(0x94D049BB133111EB);
+            (z ^ (z >> 31)) as u8
+        })
+        .collect()
+}
+
+/// The writer's bytes for one array of every data type in every encoding written into the
+/// file itself (any bit pattern: NaNs, infinities, subnormals; long doubles as x87 values),
+/// and the messages at verbosity 7: digests recorded on Linux x86-64 from the build whose
+/// differential probe against gifticlib passed (validation/probes/fs-gifti); every platform
+/// must give them (the compressed bytes are zlib-rs's, the same everywhere).
+#[test]
+fn writer_digests_every_type_and_encoding() {
+    let types = [
+        NIFTI_TYPE_UINT8,
+        NIFTI_TYPE_INT16,
+        NIFTI_TYPE_INT32,
+        NIFTI_TYPE_FLOAT32,
+        NIFTI_TYPE_COMPLEX64,
+        NIFTI_TYPE_FLOAT64,
+        NIFTI_TYPE_RGB24,
+        NIFTI_TYPE_INT8,
+        NIFTI_TYPE_UINT16,
+        NIFTI_TYPE_UINT32,
+        NIFTI_TYPE_INT64,
+        NIFTI_TYPE_UINT64,
+        NIFTI_TYPE_FLOAT128,
+        NIFTI_TYPE_COMPLEX128,
+        NIFTI_TYPE_COMPLEX256,
+    ];
+    let mut all = Vec::new();
+    for (k, &t) in types.iter().enumerate() {
+        for enc in [GIFTI_ENCODING_ASCII, GIFTI_ENCODING_B64BIN, GIFTI_ENCODING_B64GZ] {
+            let mut lib = Gifti::new();
+            lib.set_verb(7);
+            lib.xml_set_verb(7);
+            let mut c = Captured::default();
+            let mut n = Notices::default();
+            let (nbyper, _) = lib.datatype_sizes(t, true, &mut c).unwrap();
+            let mut g = GiftiImage {
+                version: Some(b"1.0".to_vec()),
+                ..Default::default()
+            };
+            lib.add_empty_darray(&mut g, 1, &mut c);
+            let da = g.darray[0].as_mut().unwrap();
+            da.intent = NIFTI_INTENT_NONE;
+            da.datatype = t;
+            da.ind_ord = GIFTI_IND_ORD_ROW_MAJOR;
+            da.num_dim = 2;
+            da.dims = [3, 2, 0, 0, 0, 0];
+            da.encoding = enc;
+            da.endian = GIFTI_ENDIAN_LITTLE;
+            da.nvals = 6;
+            da.nbyper = nbyper;
+            let mut data = bytes(k as u64 * 7 + enc as u64, 6 * nbyper as usize);
+            if t == NIFTI_TYPE_FLOAT128 || t == NIFTI_TYPE_COMPLEX256 {
+                for v in data.chunks_mut(16) {
+                    v[10..].fill(0); // an x87 value in 16 bytes
+                }
+            }
+            da.data = Some(data);
+            let out = lib.write_to_bytes(&g, true, &mut c, &mut n);
+            let h = fnv(&out) ^ fnv(c.text(Stream::Err).as_bytes()).rotate_left(1);
+            all.push(format!("{t}/{enc}={h:016x}"));
+        }
+    }
+    let joined = all.join(" ");
+    assert_eq!(fnv(joined.as_bytes()), 9001464466038773048, "{joined}");
+}

@@ -679,11 +679,20 @@ mod tests {
         let (code, out, err) = run_capture(&["larmorx", "nipype", "run", "--list"]);
         assert_eq!(code, EXIT_NOT_AVAILABLE);
         assert_eq!(out, "");
-        assert!(err.contains("'nipype run' (nipype's interface runner"), "{err}");
-        assert!(err.contains("larmorx nipype run <module> <Interface>"), "{err}");
+        assert!(
+            err.contains("'nipype run' (nipype's interface runner"),
+            "{err}"
+        );
+        assert!(
+            err.contains("larmorx nipype run <module> <Interface>"),
+            "{err}"
+        );
         let (code, _, err) = run_capture(&["larmorx", "nipype", "crash"]);
         assert_eq!(code, EXIT_USAGE);
-        assert!(err.contains("unknown nipype tool 'crash' (available: run)"), "{err}");
+        assert!(
+            err.contains("unknown nipype tool 'crash' (available: run)"),
+            "{err}"
+        );
         let (_, out, _) = run_capture(&["larmorx", "--help"]);
         assert!(out.contains("nipype run"), "{out}");
     }

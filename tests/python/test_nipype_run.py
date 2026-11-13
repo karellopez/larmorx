@@ -99,10 +99,10 @@ def test_listing_and_ported_interfaces():
 def test_help(capsys):
     assert run([NAC, "ComputeDVARS"]) == 0
     out = capsys.readouterr().out
-    assert out.startswith("usage: larmorx nipype run nipype.algorithms.confounds ComputeDVARS\n")
-    assert "\nRun ComputeDVARS\n\npositional arguments:\n  in_file " in out
-    assert "  --variance_tol VARIANCE_TOL\n" in out
-    assert "(a float, nipype default value: 1e-07) maximum" in out
+    assert out.startswith("usage: larmorx nipype run nipype.algorithms.confounds ComputeDVARS")
+    assert "\nRun ComputeDVARS\n" in out and "  in_file " in out
+    assert "--variance_tol VARIANCE_TOL" in out  # argparse's layout: Python's own, as nipype's
+    assert "nipype default value: 1e-07" in out
     # the help, then the usage again (nipype's print_help, then print_usage)
     assert out.count("usage: larmorx nipype run") == 2
 

@@ -39,7 +39,7 @@ framewise displacement), [confounds-pandas.md](../findings/confounds-pandas.md),
 [confounds-masks.md](../findings/confounds-masks.md), and the arithmetic under them:
 [confounds-blas.md](../findings/confounds-blas.md) (OpenBLAS and LAPACK under numpy and SciPy),
 [confounds-numpy.md](../findings/confounds-numpy.md), [confounds-fft.md](../findings/confounds-fft.md).
-Speed: [docs/benchmarks/confounds.md](../benchmarks/confounds.md). Random testing (three tools, one drawn call
+The command line: nipype's interface runner, `larmorx nipype run` (nipype's `nipypecli run`, for these interfaces and niworkflows' around them): [nipype-run.md](nipype-run.md). Speed: [docs/benchmarks/confounds.md](../benchmarks/confounds.md). Random testing (three tools, one drawn call
 per case against nipype, niworkflows, fMRIPrep, pandas, numpy and SciPy in-process; its trial and what it found:
 [confounds-workflow.md](../findings/confounds-workflow.md), "Random testing";
 [difftest.md](../validation/difftest.md)).

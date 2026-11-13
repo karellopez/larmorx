@@ -12,6 +12,12 @@ numbers (black box: the probe's lines and the spec's text, nothing else).
         not, words, white space) and formats (``%f``, ``%d``, ``%s`` with white space between and
         after) through the C library's ``sscanf`` (a small C program compiled with ``cc``: the C
         library as a black box), each call's errno against the rule the spec states
+    python -P models.py fs13 --probe P --scratch DIR [--grid]
+        §2.2's FS-13: every line of the batches ``mmake-sizes`` and ``mmake-sizes-old`` (and with
+        ``--grid`` every row count from -20 to 2 against every column count from -20 to 2, real and
+        complex, both allocation forms, both allocators: 4,160 calls) against the outcome the spec
+        gives: a matrix (its numbers, its place in the caller's buffer), FreeSurfer's two lines and
+        exit, or a crash
 
 The probe runs through the oracle-output cache (one thread, the family ``freesurfer``) when the
 validation package is importable (``PYTHONPATH=validation/src``), else directly. Exit status 1 when a
@@ -286,16 +292,126 @@ def scanf(scratch: Path, seeds: list[int], n: int) -> int:
     return 1 if bad else 0
 
 
+# ---- §2.2: FS-13 ---------------------------------------------------------------------------------
+
+M64 = (1 << 64) - 1
+
+
+def up64(x: int) -> int:
+    return ((x + 63) & ~63) & M64
+
+
+def fs13_outcome(rows: int, cols: int, typ: int, old: bool, buf: bool):
+    """§2.2's FS-13 outcome: ("crash",), ("exit",), ("error",) for an unknown type with rows,
+    or ("matrix", printed floats (None where memory contents), in the buffer)."""
+    k = 2 if typ == 2 else 1
+    n = rows * cols
+    if old:
+        if k * n + 2 < 0:
+            return ("exit",)
+        if rows <= -2:
+            return ("crash",)
+        if typ not in (1, 2) and rows >= 1:
+            return ("error",)
+        return ("matrix", [0] * (k * n + 2), 0)
+    if rows < -16 or n < -2:
+        return ("crash",)
+    if typ not in (1, 2) and rows >= 1:
+        return ("error",)
+    pointers = up64(64 + ((rows + 1) * 8 & M64))
+    block = up64(pointers + 4 * k * (n + 2))
+    inbuf = int(buf and block <= 192)
+    printed: list[int | None] = [0] * (k * n + 2)
+    if rows <= -9:  # the array lies over the matrix's own record
+        head = [
+            typ + (inbuf << 16),
+            rows & 0xFFFFFFFF,
+            cols & 0xFFFFFFFF,
+            0,
+            None,
+            None,
+            None,
+            None,
+        ]
+        for i in range(min(len(printed), len(head))):
+            printed[i] = head[i]
+    return ("matrix", printed, inbuf)
+
+
+def fs13_check(src: list[str], out: list[bytes], old: bool) -> tuple[int, int]:
+    good = bad = 0
+    for line, o in zip(src, out, strict=True):
+        cmd, r, c, t = line.split()
+        rows, cols, typ = int(r), int(c), int(t)
+        want = fs13_outcome(rows, cols, typ, old, cmd == "malloc2")
+        res, so, se = C.decode(o)
+        tok = res.decode().split()
+        if want[0] == "crash":
+            ok = tok[0] == "CRASH"
+        elif want[0] == "exit":
+            ok = (
+                tok[:2] == ["EXIT", "1"]
+                and b"Using mmap'd tmpfile" in so
+                and b"allocation failed" in se
+            )
+        elif want[0] == "error":
+            ok = tok[0] == "null" and b"unknown type" in se
+        else:
+            printed, inbuf = want[1], want[2]
+            got = tok[3 : 3 + len(printed)]
+            ok = tok[:3] == [t, r, c] and len(got) == len(printed)
+            ok = ok and all(w is None or int(g, 16) == w for w, g in zip(printed, got, strict=True))
+            rest = tok[3 + len(printed) :]
+            ok = ok and rest == ([str(inbuf), "0", "none"] if cmd == "malloc2" else [])
+        good += ok
+        bad += not ok
+        if not ok and bad <= 3:
+            print(f"DIFFERS: {line} ({'old' if old else 'default'}): {o[:160]!r}")
+    return good, bad
+
+
+def fs13(runner, scratch: Path, grid: bool) -> int:
+    batches = [b for b in C.Gen(7).mmake() if b.name.startswith("mmake-sizes")]
+    if grid:
+        lines = [
+            f"{cmd} {r} {c} {t}"
+            for cmd in ("malloc", "malloc2")
+            for t in (1, 2)
+            for r in range(-20, 3)
+            for c in range(-20, 3)
+            if r < 0 or c < 0
+        ]
+        old_env = {"FREESURFER_MatrixAlloc_old": "1"}
+        batches += [
+            C.Batch("mmake", "fs13-grid", lines),
+            C.Batch("mmake", "fs13-grid-old", lines, env=old_env),
+        ]
+    good = bad = 0
+    for b in batches:
+        path = C.write_batch(scratch, b)
+        env = dict(C.BASE_ENV, **b.env)
+        out = C.parse(
+            runner._run([str(runner.probe), "batch", str(path)], env, "", "freesurfer-maths-probe")
+        )
+        g, x = fs13_check(b.lines, out, bool(b.env))
+        print(f"fs13: {b.name}: {g + x} calls, as §2.2 {g}, not {x}")
+        good += g
+        bad += x
+    print(f"fs13: {good + bad} calls, as §2.2 {good}, not {bad}")
+    return 1 if bad else 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    ap.add_argument("command", choices=["affine", "scanf"])
+    ap.add_argument("command", choices=["affine", "scanf", "fs13"])
     ap.add_argument("--probe", type=Path)
     ap.add_argument("--scratch", type=Path, required=True)
     ap.add_argument("--no-cache", action="store_true")
     ap.add_argument("--seeds", default="1,2")
     ap.add_argument("--n", type=int, default=3000)
+    ap.add_argument("--grid", action="store_true")
     a = ap.parse_args()
     scratch = a.scratch.resolve()
     scratch.mkdir(parents=True, exist_ok=True)
@@ -304,6 +420,8 @@ def main() -> int:
     if a.probe is None:
         ap.error("--probe is needed")
     runner = C.Runner(a.probe.resolve(), scratch, not a.no_cache)
+    if a.command == "fs13":
+        return fs13(runner, scratch, a.grid)
     return affine(runner, scratch)
 
 

@@ -417,10 +417,30 @@ class Gen:
             L.append(f"mcopy {a} {self.mat(r, max(1, rows - 1), cols, t1)}")
         L += ["mcopy null new", "mfree null"]
         old = [ln for ln in L if ln.startswith(("malloc ", "mcopy"))][:40]
+        sizes = self.mmake_sizes()
         return [
             Batch("mmake", "mmake", L),
             Batch("mmake", "mmake-old", old, env={"FREESURFER_MatrixAlloc_old": "1"}),
+            Batch("mmake", "mmake-sizes", sizes),
+            Batch("mmake", "mmake-sizes-old", sizes, env={"FREESURFER_MatrixAlloc_old": "1"}),
         ]
+
+    @staticmethod
+    def mmake_sizes() -> list[str]:
+        """FS-13 (§2.2, fixed cases): negative row and column counts around the limits of the
+        matrices FreeSurfer makes (rows -16 and -17, -8 and -9, the products -2 and -3, the caller's
+        buffer's 192 bytes), real, complex and an unknown type, through both allocation forms."""
+        rows = [-17, -16, -12, -9, -8, -3, -2, -1, 0, 1, 2]
+        cols = [-17, -6, -5, -3, -2, -1, 0, 1, 2]
+        L = []
+        for cmd in ("malloc", "malloc2"):
+            for t in (1, 2):
+                L += [f"{cmd} {r} {c} {t}" for r in rows for c in cols if r < 0 or c < 0]
+            L += [
+                f"{cmd} {r} {c} 3"
+                for r, c in ((-1, 2), (1, -2), (-3, -4), (-20, -1), (0, -1), (-12, -1))
+            ]
+        return L
 
     def mproduct(self) -> list[Batch]:
         r = self.rng("mproduct")

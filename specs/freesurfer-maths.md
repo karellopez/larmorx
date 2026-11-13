@@ -126,10 +126,35 @@ allocator never uses the buffer.
 - **Unknown type** (neither 1 nor 2) with at least one row: an error (§2 of the core spec), code
   -4, `MatrixAlloc: unknown type <type>` + `\n`; nothing returned. With 0 rows the matrix is made.
 - **FS-13.** A negative row or column count, or more numbers (with the two unused floats) than an
-  `int` holds: FreeSurfer prints `MatrixAlloc(<rows>, <cols>): Using mmap'd tmpfile` + `\n` on
-  standard output and then, depending on the sizes and the allocator, crashes, corrupts memory, or
-  writes `MatrixAlloc(<rows>, <cols>): allocation failed` + `\n` on standard error and exits with
-  status 1. **Both modes:** the two lines, exit status 1, FS-13 noted.
+  `int` holds. "The two lines" below are `MatrixAlloc(<rows>, <cols>): Using mmap'd tmpfile` + `\n`
+  on standard output, then `MatrixAlloc(<rows>, <cols>): allocation failed` + `\n` on standard
+  error. With k = 2 for a complex matrix and 1 otherwise, and the product `rows cols` taken exactly,
+  FreeSurfer does this (**(observed)**: the fixed batches `mmake-sizes` and `mmake-sizes-old` of
+  §23, and every row count from -20 to 2 against every column count from -20 to 2, real and
+  complex, through both allocation forms and both allocators: 4,904 calls as this text,
+  `models.py fs13 --grid` beside the probe):
+  - **The default allocator**, a negative count: a matrix of the given counts when `rows ≥ -16` and
+    `rows cols ≥ -2` (when its numbers fit in memory); otherwise a crash, with no message. The
+    matrix has no element; its array (§2.1's length) is zero, except for rows from -9 to -16, where
+    the array lies over the matrix's own record: as 32-bit integers its floats hold, in order, the
+    type (plus 65,536 when the matrix is in the caller's buffer), the row count, the column count, 0,
+    then four floats of memory contents (two addresses), the rest 0, as far as the array goes. With
+    the buffer form it is in the buffer when its block fits 192 bytes, the block computed as above
+    with every size taken modulo 2^64 before each rounding up: the header's 64 bytes plus the row
+    pointers' `8 (rows + 1)`, rounded up to 64 (so 64 for rows from -1 to -8, 0 for rows from -9 to
+    -16, 128 for rows from 0 to 7), plus `4 k (rows cols + 2)`, rounded up to 64.
+  - **The old allocator**: when `k rows cols + 2 < 0`, the two lines and exit status 1; otherwise,
+    when `rows ≤ -2`, a crash (the C library's abort); otherwise a matrix of the given counts, its
+    array zero, never in the buffer.
+  - **An unknown type**: as a real matrix, but where a matrix with at least one row would be made,
+    the unknown-type error above and nothing returned.
+  - **A product** `rows cols`, or `k (rows cols + 2)`, beyond an `int` (non-negative counts
+    included): a crash, or a matrix whose elements lie outside its array.
+
+  **Default:** every such size refused: the two lines, exit status 1, FS-13 noted. **`reproduce`:**
+  FreeSurfer's matrix where it makes one from a negative count (the four floats of memory contents
+  0, noted), FreeSurfer's two lines and exit where the old allocator gives them; in every other case
+  (FreeSurfer crashes, or a product beyond an `int`) the default's refusal, noted.
 - An allocation that the machine cannot give: the same two lines and exit status 1.
 
 ### 2.3 Freeing
@@ -1291,7 +1316,7 @@ it, and again from the cache:
 | `hstats` | 5.6 | 1,651 | 48 | 1 | 0 | `b967819d9feb9a0d3e22e29d8a9fc596ad1cac8278a8a25f9fb8e2598b375689` |
 | `hrobust` | 5.7 | 74 | 29 | 2 | 2 | `0d5172c5fb31984cf4de204efdfe496a890bba4ae89b2fc85d35573b55d38830` |
 | `hfiles` | 5.8 | 62 | 0 | 0 | 0 | `8ae7f99741fe6f2fb95a5de15cf1e6ef3a680fd4e12cf0bec60d4ed2a1145b3f` |
-| `mmake` | 2.2 to 2.4 | 356 | 2 | 2 | 0 | `06cedef9465553f35894e0a276e548f627648f42b7737682b15189924b474d15` |
+| `mmake` | 2.2 to 2.4 | 1,100 | 398 | 98 | 0 | `01eac361431d89fb88f63a3fe8ddce7492fcee9ab2a781e59a91c85e27676914` |
 | `mproduct` | 2.5, 8.1, 16 | 1,202 | 20 | 2 | 0 | `4f285237bdaa014c350f7011104306f2b6f55ade4b4867700d4d17db05d65c5d` |
 | `affine` | 3 | 276 | 2 | 0 | 0 | `b6c634cae9ef4cbf608faf76b9f7c897a1e9118a9a7948876f02221b662dcb43` |
 | `dmatrix` | 4, 12 | 2,904 | 8 | 1 | 1 | `719f4ea4e5bf36174a84e21120f0c7dd87fb4a1086981864ab7daf8acfc040b4` |
@@ -1308,7 +1333,7 @@ it, and again from the cache:
 | `svd` | 17.4, 17.5 | 2,280 | 354 | 0 | 142 | `af777aba4138e1ab5d48ba2ee4e4cc8477a2f3d0abc1d9334c05d1a10c40aad7` |
 | `mfiles` | 18 | 723 | 28 | 0 | 1 | `8f0ce51069988159cef0214e0f1d893466876b02e7c25233935648a8668c1886` |
 | `rfields` | 19 | 16 | 0 | 0 | 0 | `6f26117e696800de35160344e0a49825b4ff992d68dc6a500ca215703240ce15` |
-| all | | 27,424 | 1,373 | 41 | 299 | |
+| all | | 28,168 | 1,769 | 137 | 299 | |
 
 The groups `eigen`, `svd` and `mfiles` gained the batches `eigen-nonfinite`, `svd-nonfinite` and
 `mfiles-cut` (§17, §18.2; generators of their own, the groups' other cases unchanged) on 2026-11-13;
@@ -1318,7 +1343,11 @@ classified alike), the others from the first runs. The group `affine` gained the
 (cold, warm and without the cache identical; the probe as its own candidate identical in both modes).
 The group `mfiles` gained the fixed batch `mfiles-end` (§18.1's `errno` at the end of the input, 24
 calls) the same day: its hash from then (cold, warm and without the cache identical; the probe as its
-own candidate without an unexplained line in both modes). `mfiles`' one `TIMEOUT` is a memory line (an empty
+own candidate without an unexplained line in both modes). The group `mmake` gained the fixed batches
+`mmake-sizes` and `mmake-sizes-old` (FS-13's sizes, §2.2, 372 calls each: the matrices FreeSurfer
+makes, its crashes, the old allocator's exits) the same day: its hash from then (cold, warm and
+without the cache identical; the probe as its own candidate identical but the 74 lines whose arrays
+show the record's addresses, memory lines). `mfiles`' one `TIMEOUT` is a memory line (an empty
 file read into a new matrix: its sizes come from memory) that ends otherwise in some processes.
 
 ### 23.3 The comparison

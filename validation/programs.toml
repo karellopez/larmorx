@@ -192,7 +192,6 @@ group = "ants"
 name = "antsAffineInitializer"
 command = "larmorx ants antsAffineInitializer"
 python = "lx.ants.affine_initializer"
-does = "An affine transform that aligns two images' centres of mass (and principal axes), refined by a multi-start search over rotations."
 api = "docs/api/ants-affine-initializer.md"
 evidence = "/evidence/ants-ai/"
 records = { replica = ["ants-affine-initializer"] }

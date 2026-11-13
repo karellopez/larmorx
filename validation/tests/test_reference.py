@@ -501,6 +501,13 @@ def test_afni_usage_in_columns_tshift():
     assert "-verbose" in cl.parsed  # `-verb`, the prefix the parser compares
 
 
+def test_afni_usage_names_another_spelling_unifize():
+    """A usage line's "(also -oink)" names another spelling of its option, which the parser
+    accepts."""
+    _, by = _cl("crates/larmorx-afni/src/cli/unifize.rs", "3dUnifize", "larmorx afni 3dUnifize")
+    assert by["-oink"].spellings == ["-nosquash", "-oink"]
+
+
 def test_mri_hmc_as_mcflirt():
     """`mri hmc`'s usage, read for mcflirt's page: spellings separated by commas, values in
     brackets, the parser's lists of options; the synopsis with mcflirt's command."""

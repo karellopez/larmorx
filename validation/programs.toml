@@ -246,7 +246,6 @@ group = "afni"
 name = "3dUnifize"
 command = "larmorx afni 3dUnifize"
 python = "lx.afni.unifize"
-does = "Makes the white-matter intensity of a T1-weighted volume uniform across space, scaled to about 1000 (with `-T2` and `-EPI`, of T2-weighted and EPI images)."
 api = "docs/api/afni-unifize.md"
 evidence = "/evidence/afni-unifize/"
 records = { replica = ["afni-unifize-replica"], clean-room = ["afni-unifize"] }

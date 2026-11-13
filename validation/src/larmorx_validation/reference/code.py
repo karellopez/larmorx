@@ -713,6 +713,9 @@ def spaced(repo: Path, rel: str, program: str, command: str) -> CommandLine:
     arms = match_options(text) + [Option([s]) for s in _str_arrays(text)]
     found = spaced_usage_options(usage) + arms
     exact, prefixes = _option_literals(text)
+    for o in found:  # ``-nosquash  ... (also -oink)``: another spelling the parser accepts
+        for also in re.findall(r"\(also ([^)]*)\)", o.help):
+            o.spellings += [w for w in re.findall(_SPELLING, also) if w in exact]
     parsed = {s for o in arms for s in o.spellings} | exact
     extra, glued = [], set()
     if rel.startswith("crates/larmorx-afni/"):

@@ -12,6 +12,7 @@
 mod args;
 mod hist;
 mod mat;
+mod mini;
 
 use std::io::Write;
 use std::process::ExitCode;
@@ -48,7 +49,7 @@ fn hexbytes(b: &[u8]) -> String {
 /// One call: the command's printed values, or the end of the program.
 fn call(p: &mut Process, l: &mut Line) -> Result<(), Stop> {
     let c = l.tok().to_owned();
-    if hist::call(p, l, &c)? || mat::call(p, l, &c)? {
+    if hist::call(p, l, &c)? || mat::call(p, l, &c)? || mini::call(p, l, &c)? {
         return Ok(());
     }
     eprintln!("candidate: unknown command {c}");

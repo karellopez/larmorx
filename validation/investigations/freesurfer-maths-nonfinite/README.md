@@ -38,7 +38,7 @@ one directory mixed their standard errors in a first trial).
 
 - `saved`, the batches of the spec's §23 (seed 7): `oeigen` 42 never returned, each where the port
   says VNL never returns, 69 finished, each identical to the port bit for bit; the eigensystem
-  helper's symmetric path and `meigen` likewise (44 and 81); `msvd` 12 never returned (the port's),
+  helper's symmetric path and `meigen`: 44 never returned, each where the port says so, 81 finished; `msvd` 12 never returned (the port's),
   51 LINPACK failures (each with the port's `info`), 23 decompositions (9 identical, 14 differing
   only in U's NaNs' bits, W and V identical); `minverse`: 20 inverses into a given matrix, 20
   determinants, 22 QR factorizations with infinite or NaN inputs, each with the ports' bits;
@@ -47,7 +47,7 @@ one directory mixed their standard errors in a first trial).
   such lines happen to be stable), 46 files make no matrix.
 - `explore` (`oracles/logs/fs-maths-nonfinite-explore-2026-11-13.log`, 5 minutes cold): `oeigen` 154
   never returned, each where the port says so, 246 finished, each identical to the port; `meigen` 132
-  and 268 likewise; `oeigenns` 148 never returned (the port's `BalancNeverReturns`), 252 finished: 190
+  never returned, each where the port says so, 268 finished; `oeigenns` 148 never returned (the port's `BalancNeverReturns`), 252 finished: 190
   identical, 62 differing in NaNs' bits only; `msvd` 36 never returned (the port's), 276 failures with
   the port's `info`, 88 decompositions (20 identical, 68 differing in U's NaNs' bits only); `mcond`
   and `msvdpinverse` 20 never returned, 364 finished, 16 without a decomposition (every element

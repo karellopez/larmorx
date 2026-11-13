@@ -17,8 +17,11 @@ tree, which is closed to FreeSurfer's clean-room implementers, so they never bui
 | `build.sh` | builds the probe with the unit oracle's compiler (Ubuntu's GCC 8.4.0) and FreeSurfer's flags against `<workspace>/oracles/freesurfer-8.2.0-unit` (queue item 3.1-02): `build.sh <workspace> <output>` (the spec writer's or the orchestrator's step, not the implementer's) |
 | `compare.py` | the comparison loop of the spec's §20: 22 groups of cases (about 162,700 calls in 368 runs), run on the probe (through the oracle-output cache) and on a candidate program that takes the same commands; `list`, `refs`, `compare` |
 
-The prebuilt probe: `<workspace>/oracles/freesurfer-8.2.0-unit/probes/fs_core_probe`, its build in
-that folder's `BUILD_INFO.txt` (the larmorx commit, this folder's `build.sh`, the SHA-256).
+The prebuilt probe: `<workspace>/oracles/freesurfer-8.2.0-unit/probes/fs_core_probe`. Its build (the
+larmorx commit, this folder's `build.sh`, its SHA-256) is recorded in that folder's `BUILD_INFO.txt`
+for the orchestrator's check; the implementer only runs the probe (every other access to the unit
+oracle's folder, reading or hashing a file in it included, counts as opening FreeSurfer's build
+tree).
 
 ## Encodings
 

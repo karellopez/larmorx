@@ -589,7 +589,8 @@ is a failed assertion (§3: `line < 1000000`, at `<BUILD_ROOT>/utils/utils.cpp:1
 Everything here runs the original as a black box: the probe `fs_core_probe` (calls of FreeSurfer's
 compiled core functions and of the C library, built from the unit oracle's libraries, which
 reproduce the official programs' code), prebuilt in `<workspace>/oracles/freesurfer-8.2.0-unit/probes/`
-(its `BUILD_INFO.txt` line: the larmorx commit and its SHA-256), and the official programs.
+(the implementer runs it and opens nothing else there: its build, the larmorx commit and its SHA-256,
+is in that folder's `BUILD_INFO.txt` for the orchestrator's check), and the official programs.
 `validation/investigations/freesurfer-core-probe/` holds the probe's source (calls only), its
 commands and formats (README.md), the comparison loop `compare.py` and `official.sh`.
 

@@ -1146,8 +1146,8 @@ def _example_maps(ctx: core.Context, name: str, links: dict) -> dict:
         "output": "t2s",
         "plane": "axial",
         "voxel": at,
-        "panels": ["echo1", "tedana", "replica", "replica-fix", "clean-reproduce"],
-        "diffs": ["rep-ted", "fix-rep", "avx-ted"],
+        "panels": ["echo1", "tedana", "replica", "replica-fix", "clean-reproduce", "clean"],
+        "diffs": ["rep-ted", "fix-rep", "avx-ted", "cr-ted"],
         "compare": {"a": "tedana", "b": "replica"},
     }
     out = common.finish(
@@ -1292,8 +1292,8 @@ def _example_series(ctx: core.Context, links: dict) -> dict:
         "plane": "axial",
         "voxel": at[:3],
         "t": t0,
-        "panels": ["echo1", "tedana", "replica", "fmriprep", "clean-reproduce"],
-        "diffs": ["rep-ted", "fix-rep", "rep-fmriprep"],
+        "panels": ["echo1", "tedana", "replica", "fmriprep", "clean-reproduce", "clean"],
+        "diffs": ["rep-ted", "fix-rep", "rep-fmriprep", "cr-ted"],
         "compare": {"a": "tedana", "b": "replica"},
     }
     out = common.finish(
@@ -2017,6 +2017,7 @@ def _page():
 #: the original); D13, a decision's number, by what it is.
 TEXTS = [
     (r"\blarmorx's reference\b", "LARMORX's reference"),
+    (r"^larmorx \(replica\) at `--n-threads 4`$", "larmorx at `--n-threads 4`"),
     (r"\(the row above\)", "(the replica's `reproduce` against fMRIPrep's output)"),
     (r"\bthe original holds tedana's\b", "the clean room holds tedana's"),
     (r"\(the original's own trust-region solver\b", "(the clean room's own trust-region solver"),
@@ -2199,8 +2200,8 @@ TABLE_TITLES = {
     "(values that differ)",
     "fmriprep-tedana-25": "fMRIPrep's output against the original run here: tedana `t2smap` "
     "25.0.1 (values that differ)",
-    "spread": "The original against itself: tedana `t2smap` 26.0.3 (values that differ from its "
-    "reference setup)",
+    "spread": "The original against itself, and the replica at four threads: tedana `t2smap` "
+    "26.0.3 (values that differ from its reference setup)",
     "corrections": "Corrections by default, both ports: tedana `t2smap` 26.0.3's defects and the "
     "maths entries",
     "files": "Every file of the two calls shown, the replica against the original: tedana "

@@ -1513,6 +1513,8 @@ defects! {
         "the quadrangle surface reader given a quadrangle vertex number beyond the surface's room for vertices counts the face in memory outside its vertex arrays (memory corruption or a crash)";
     FS_353 = "FS-353", "FreeSurfer", true,
         "the quadrangle surface reader drops both triangles of a quadrangle whose first triangle (by the split it chooses) has two equal vertices: a single triangle the quadrangle writer stored as v0 v1 v1 v2 is lost on reading for about half of the vertex pairs";
+    FS_354 = "FS-354", "FreeSurfer", true,
+        "the binary triangle surface readers given a creator's line of more than 199 bytes (a long user name or creation date in the file's first line) read its remaining bytes as the vertex and face counts: the file's surface cannot be read";
 }
 
 /// The register entry with ID `id`.

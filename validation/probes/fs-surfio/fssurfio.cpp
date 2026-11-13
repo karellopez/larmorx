@@ -75,6 +75,9 @@ int fssurfio_read_geo_file_positions(MRIS *mris, const char *fname);
 SMALL_SURFACE *fssurfio_read_triangle_vertex_positions_only(const char *fname);
 int fssurfio_read_triangle_file_positions(MRIS *mris, const char *fname);
 bool fssurfio_quad_combine(int quad[4], int vA[3], int vB[3]);
+MRIS *fssurfio_read_triangle_file(const char *fname, double nVFMultiplier);
+MRIS *fssurfio_read_quadrangle_file(const char *fname, double nVFMultiplier);
+int fssurfio_write_quadrangle_file(MRIS *mris, const char *fname);
 // mrisurf_io_stl.cpp's reader and writer (declared in mrisurf_io.cpp only)
 MRIS *mrisReadSTL(const std::string &filename);
 bool mrisWriteSTL(const MRIS *mris, const std::string &filename);
@@ -1892,6 +1895,118 @@ void stl_case()
   }
 }
 
+// `tri` (relay 14, 3.1-48): mrisurf_io.cpp's binary triangle and quadrangle surface files:
+// mrisReadTriangleFile, __MRISreadQuadrangleFile, MRISwriteTriangularSurface (with its space tags)
+// and __MRISwriteQuadrangleFile. An empty work folder (with `d`), Gdiag's bits, the environment
+// (a mask: TRIANGULARSURFACE_NOEXTRA_READ, TRIANGULARSURFACE_NOEXTRA_WRITE, FS_SKIP_TAGS, USER,
+// LOGNAME, the last two set to the case's user name; FREESURFER_REPLACEMENT_FOR_CREATION_TIME_STRING
+// always set to the case's date), the case's input files, a surface from MRISalloc for the writers
+// (coordinates, faces, the real-RAS flag, the volume geometry, a Talairach matrix or none, the
+// group-average area, the command lines and their count), 1 to 3 operations, then every file in
+// the folder. A surface a reader returns is printed in full: counts, type, room, each vertex's
+// coordinates and face count (and, for `rq`, the first k entries of its face list, k from the
+// case), each face, the real-RAS flag, the group-average area, the volume geometry, the command
+// lines.
+void dump_tri_surface(MRIS *s, const std::vector<int> &nf)
+{
+  if (!s) { out += "NULL "; return; }
+  oi(s->nvertices); oi(s->nfaces); oi(s->type); oi(s->max_vertices); oi(s->max_faces);
+  for (int vno = 0; vno < s->nvertices; vno++) {
+    VERTEX *v = &s->vertices[vno];
+    VERTEX_TOPOLOGY *vt = &s->vertices_topology[vno];
+    of(v->x); of(v->y); of(v->z); oi(vt->num);
+    oi(vt->f != NULL);
+    int k = vno < (int)nf.size() ? nf[vno] : 0;
+    if (vt->f) for (int j = 0; j < k && j < vt->num; j++) oi(vt->f[j]);
+  }
+  for (int fno = 0; fno < s->nfaces; fno++) for (int k = 0; k < 3; k++) oi(s->faces[fno].v[k]);
+  oi(s->useRealRAS); of(s->group_avg_surface_area);
+  dump_vg(&s->vg);
+  oi(s->ncmds);
+  for (int i = 0; i < s->ncmds && i < MAX_CMDS; i++) oh(s->cmdlines[i]);
+}
+
+void tri_case()
+{
+  mkdir(workdir.c_str(), 0700);
+  clear_dir(workdir, true);
+  if (chdir(workdir.c_str()) != 0) fail("chdir");
+  mkdir("d", 0700);
+  int gd = geti();
+  if (gd & 1) Gdiag |= DIAG_SHOW;
+  if (gd & 2) Gdiag |= DIAG_VERBOSE;
+  int env = geti();
+  std::string user = geth(), date = geth();
+  if (env & 1) setenv("TRIANGULARSURFACE_NOEXTRA_READ", "1", 1);
+  if (env & 2) setenv("TRIANGULARSURFACE_NOEXTRA_WRITE", "1", 1);
+  if (env & 4) setenv("FS_SKIP_TAGS", "1", 1);
+  if (env & 8) setenv("USER", user.c_str(), 1);
+  if (env & 16) setenv("LOGNAME", user.c_str(), 1);
+  setenv("FREESURFER_REPLACEMENT_FOR_CREATION_TIME_STRING", date.c_str(), 1);
+  int nin = geti();
+  for (int k = 0; k < nin; k++) {
+    std::string name = geth(), bytes = geth();
+    FILE *fp = fopen(name.c_str(), "wb");
+    if (!fp) fail("an input file");
+    fwrite(bytes.data(), 1, bytes.size(), fp);
+    fclose(fp);
+  }
+  errno = 0;
+  int nv = geti(), nf = geti();
+  MRIS *m = MRISalloc(nv, nf);
+  for (int vno = 0; vno < nv; vno++) {
+    VERTEX *v = &m->vertices[vno];
+    v->x = getf(); v->y = getf(); v->z = getf();
+  }
+  for (int fno = 0; fno < nf; fno++) for (int k = 0; k < 3; k++) m->faces[fno].v[k] = geti();
+  m->useRealRAS = geti();
+  set_vg(&m->vg);
+  int tr = geti();
+  if (tr) {
+    int rows = geti(), cols = geti();
+    m->SRASToTalSRAS_ = MatrixAlloc(rows, cols, MATRIX_REAL);
+    for (int r = 1; r <= rows; r++) for (int c = 1; c <= cols; c++) *MATRIX_RELT(m->SRASToTalSRAS_, r, c) = getf();
+  }
+  m->group_avg_surface_area = getf();
+  int nl = geti();
+  for (int i = 0; i < nl; i++) {
+    std::string l = geth();
+    m->cmdlines[i] = (char *)calloc(l.size() + 1, 1);
+    memcpy(m->cmdlines[i], l.data(), l.size());
+  }
+  m->ncmds = geti();
+  int nops = geti();
+  for (int k = 0; k < nops; k++) {
+    std::string op = next();
+    if (op == "rt" || op == "rq") {
+      const char *nm = name_tok();
+      double mult = getd();
+      int kn = geti();
+      std::vector<int> nfl;
+      for (int j = 0; j < kn; j++) nfl.push_back(geti());
+      MRIS *s = op == "rt" ? fssurfio_read_triangle_file(nm, mult) : fssurfio_read_quadrangle_file(nm, mult);
+      dump_tri_surface(s, nfl);
+    }
+    else if (op == "wt") oi(MRISwriteTriangularSurface(m, name_tok()));
+    else if (op == "wq") oi(fssurfio_write_quadrangle_file(m, name_tok()));
+    else fail("tri op");
+  }
+  out += "| ";
+  std::vector<std::string> files;
+  list_files(".", "", files);
+  std::sort(files.begin(), files.end());
+  for (const std::string &name : files) {
+    oh(name.c_str());
+    FILE *fp = fopen(name.c_str(), "rb");
+    if (!fp) { out += "NOFILE "; continue; }
+    std::string b;
+    int ch;
+    while ((ch = fgetc(fp)) != EOF) b += (char)ch;
+    fclose(fp);
+    ox(b);
+  }
+}
+
 void run_case()
 {
   std::string cmd = next();
@@ -2110,6 +2225,8 @@ void run_case()
     sread_case();
   } else if (cmd == "stl") {
     stl_case();
+  } else if (cmd == "tri") {
+    tri_case();
   } else if (cmd == "names") {
     int n = geti();
     keep.reserve(n);

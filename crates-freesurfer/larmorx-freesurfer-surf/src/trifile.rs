@@ -58,7 +58,7 @@ use crate::coords::{self, Io};
 use crate::formats::MRIS_TRIANGULAR_SURFACE;
 use crate::mris::Mris;
 use crate::sfile::{c_str, nonneg, open};
-use crate::surfread::{count_face, quad_combine, show_counts, verbose_show};
+use crate::surfread::{count_face, quad_combine, show_counts, triangle_counts, verbose_show};
 
 /// `QUAD_FILE_MAGIC_NUMBER` (`-1 & 0x00ffffff`): the quadrangle file of shorts (hundredths).
 pub const QUAD_FILE_MAGIC_NUMBER: i32 = 0x00ff_ffff;
@@ -332,8 +332,8 @@ fn check_coordinate(g: &mut Globals, io: &mut Io, vno: i32, name: &str, c: f32) 
 /// `mrisReadTriangleFile(fname, nVFMultiplier)`: a new surface from a binary triangle file
 /// (`MRISoverAlloc` with room for `nVFMultiplier` times the counts; type
 /// `MRIS_TRIANGULAR_SURFACE`): the 3-byte magic number (not checked), unless
-/// `TRIANGULARSURFACE_NOEXTRA_READ` is set the creator's line (`fgets` of 199 bytes) and the white
-/// space after it, the vertex and face counts (big-endian `int`s; either negative: two lines
+/// `TRIANGULARSURFACE_NOEXTRA_READ` is set the creator's line (`fgets` of 199 bytes; FS-354) and
+/// the white space after it, the vertex and face counts (big-endian `int`s; either negative: two lines
 /// `<mrisurf_io.cpp>:<line> <file> freadInt returned nvertices:<n> ` on standard error, then
 /// `exit(1)`), three big-endian floats per vertex (a coordinate beyond 10000 in size, or not
 /// finite, ends the program), three vertex numbers per face (one outside the surface ends the
@@ -364,15 +364,8 @@ pub fn read_triangle_file(
             return Ok(None);
         }
     };
-    let _ = fread3(&mut fp);
-    if io.env.get("TRIANGULARSURFACE_NOEXTRA_READ").is_none() {
-        let _ = fp.fgets(200);
-        let mut sc = crate::scanf::Scanf::new(&mut fp);
-        sc.text(&mut g.errno, b"\n");
-        sc.finish(&mut g.errno);
-    }
-    let nvertices = fread_int(g, &mut fp);
-    let nfaces = fread_int(g, &mut fp);
+    let noextra = io.env.get("TRIANGULARSURFACE_NOEXTRA_READ").is_some();
+    let (nvertices, nfaces) = triangle_counts(g, &mut fp, fname, noextra);
     if nvertices < 0 || nfaces < 0 {
         let file = io_cpp();
         let _ = io.out.flush();

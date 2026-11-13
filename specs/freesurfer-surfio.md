@@ -27,8 +27,9 @@ backup and imaginary value readers, the marks, the ASCII and VTK formats); **par
 3.1-48's part a, §56-65): one `scanf` call, the curvature, float, area and decimation files, file
 names and `FS_GII`, the VTK reader, the movie.byu and icosahedron writers, the Talairach matrix,
 the MATLAB plots; **part 10** (queue items 3.1-48's part b and 3.1-49's STL, §66-72): the raw ASCII,
-movie.byu and triangle-file readers, the quadrangle of two triangles, STL read and written. Later
-parts: reading and writing surfaces through their format's identification, curvatures, patches,
+movie.byu and triangle-file readers, the quadrangle of two triangles, STL read and written; **part
+11** (queue item 3.1-48, §73-78): the binary triangle and quadrangle surface files, read and written,
+with their tags. Later parts: reading and writing surfaces through their format's identification, curvatures, patches,
 overlays and value files (3.1-47's part c, 3.1-48's rest); the midline marking, the label normal and
 the coordinate copy (they need the volume structure).
 
@@ -1906,3 +1907,185 @@ the folder. Cases noted with FS-151, FS-154, FS-157, FS-158 or FS-160 (and fs.io
 are counted, not compared. Observed (relay 13): `sread` seed 7, 1,000 cases and seed 13, 2,000;
 `stl` seed 7, 1,000: every comparable case identical with `reproduce` (92, 156 and 105 counted, not
 compared), the default different only with notices.
+
+# Part 11 (relay 14, queue item 3.1-48): the binary triangle and quadrangle surface files
+
+Part 9's and 10's conventions hold. Numbers in these files are big-endian: 3-byte unsigned numbers
+(`fread3`/`fwrite3`: a negative number written as its low 24 bits), 2-byte signed `short`s, 4-byte
+`int`s and floats, 8-byte lengths; fs.io's reading rules at the end of a file hold (FS-49, FS-167:
+the missing bytes of a number the file ends in are memory contents in FreeSurfer). The tags are
+fs.io's (`specs/freesurfer-io.md` §11-12); the volume geometry's text block is fs.volume's
+(`readVolGeom`, `writeVolGeom`: eight lines `valid = <v>  # volume info valid` (or `invalid` for
+0), `filename = <name>`, `volume = <w> <h> <d>`, `voxelsize = <x> <y> <z>`, `xras   = ...`,
+`yras   = ...`, `zras   = ...`, `cras   = ...`, the numbers as `%.15e` of the floats). A surface
+read is raw: its counts, coordinates, faces, flags and tags; completing it (topology, metric
+properties) is the caller's work (`MRISreadOverAlloc`, later).
+
+## 73. The surface readers' tags
+
+After the faces, unless `FS_SKIP_TAGS` is set, both readers read tags until `TAGreadStart` returns
+0 (the end of the file, also inside a tag number: then the number is not used):
+- 32 `GROUP_AVG_SURFACE_AREA`: one float (whatever the tag's length says) into the surface's
+  group-average area; the quadrangle reader then prints `reading group avg surface area <a / 100,
+  %2.0f> cm^2 from file`.
+- 20 `OLD_SURF_GEOM` (no length): the volume-geometry block into the surface's geometry.
+- 2 `OLD_USEREALRAS` (no length): an `int` (`freadIntEx`) into the real-RAS flag; 0 when the file
+  ends in it.
+- 3 `CMDLINE`: the next command line. When the surface holds more than 1,000 already: `<who>(<file>):
+  too many commands (<n>) in file`, exit status 254 (`ERROR_NOMEMORY`; `<who>` `MRISread` for the
+  triangle reader, `__MRISreadQuadrangleFile` for the quadrangle reader). Otherwise a zeroed block of
+  `len + 1` bytes, `len` bytes read into it (the file's bytes as far as it holds them), the line its
+  bytes before the first NUL; the count grows by one. The triangle reader, when the block cannot be
+  allocated (a length below -1, or 2^63 - 1): `MRISread(<file>): could not allocate <len> byte
+  cmdline`, exit status 254, `Cannot allocate memory` first (FS-177: FreeSurfer prints the length's
+  low 32 bits as a signed number; larmorx the length, `reproduce` the low bits).
+  - **FS-346** (a length of -1, both readers): FreeSurfer reads the rest of the file into a block of
+    no bytes (memory corruption when more than a few bytes follow: observed aborts later). larmorx
+    ends the program by default (`<who>(<file>): a command line of length -1`, exit status 251);
+    `reproduce` takes the rest of the file as the line (its bytes before a NUL; counted, not
+    compared).
+  - **FS-347** (both readers): the 1,001st command line goes past FreeSurfer's list of 1,000, over the
+    surface's command-line count and group-average area. larmorx ends the program in both modes
+    with the message above for 1,000 (`... too many commands (1000) in file`): FreeSurfer's values
+    there are a memory address.
+  - **FS-348** (the quadrangle reader): it does not check the allocation: a length that cannot be
+    allocated ends FreeSurfer with a segmentation fault (observed: signal 11). larmorx gives the
+    triangle reader's message by default; `reproduce` ends with status 139.
+- 22 `SURF_DATASPACE`, 23 `SURF_MATRIXDATA`, 24 `SURF_TRANSFORMEDSPACE` and every other tag: skipped
+  (`TAGskip`: its messages and FS-177/FS-178 hold).
+
+## 74. The triangle file, read (`mrisReadTriangleFile(fname, nVFMultiplier)`)
+
+Opens the file (`mrisReadTriangleFile(<file>): could not open file`, `ERROR_NOFILE`, `NULL`); reads
+3 bytes (the magic number, not checked); unless `TRIANGULARSURFACE_NOEXTRA_READ` is set, one line
+(`fgets` of up to 199 bytes) and the white space after it (`fscanf(fp, "\n")`: also bytes of the
+counts that happen to be white space); the vertex and face counts (`int`s). Either count negative:
+on standard error `<BUILD_ROOT>/utils/mrisurf_io.cpp:5520 <file> freadInt returned nvertices:<n> `
+and `<BUILD_ROOT>/utils/mrisurf_io.cpp:5521 <file> freadInt returned nfaces:<m> ` (each with a space
+before its newline), then exit status 1. Verbose (`DIAG_SHOW` with verbose diagnostics): `surface
+<file>: <n> vertices and <m> faces.` A new surface with room for `(int)(nVFMultiplier * n)` vertices
+and `(int)(nVFMultiplier * m)` faces (never fewer than the counts; FS-02 for a product outside the
+`int` range), `n` and `m` in use, type `MRIS_TRIANGULAR_SURFACE` (3). Per vertex three floats, set
+as `MRISsetXYZ` does, its face count 0; then a coordinate whose size is beyond 10000, or that is not
+finite, ends the program: `<program>: vertex <v> x coordinate <value>!` (`y`, `z`; `%f`;
+`ERROR_BADFILE`, exit status 251), the first in x, y, z order. Per face three `int`s; a vertex
+number below 0 or not below the vertex count ends the program: `f[<f>]->v[<k>] = <v> - out of
+range!` and its newline (exit status 251); then each of the face's three vertices counts the face
+(one byte: FS-147, `mrisReadTriangleFile(<file>): vertex <v> is in more than 255 faces`, `NULL`, by
+default). The real-RAS flag 0; then the tags (§73). Returns the surface.
+
+**FS-354**: a first line of more than 199 bytes (a long user name or creation date): FreeSurfer
+reads its remaining bytes as the counts (text: counts of many millions, whose allocations the
+machine's memory decides). larmorx reads the line to its newline by default (with the note);
+`reproduce` reads as FreeSurfer (counted, not compared). The same holds for §68's two readers.
+
+## 75. The quadrangle file, read (`__MRISreadQuadrangleFile(fname, nVFMultiplier)`)
+
+Opens the file (`__MRISreadQuadrangleFile(<file>): could not open file`, `ERROR_NOFILE`, `NULL`);
+the magic number (3 bytes): `0xffffff` (quadrangles, coordinates in hundredths), `0xfffffd`
+(quadrangles, float coordinates), anything else the old format (the file is read again from its
+start). The vertex count and the quadrangle count (3 bytes each). A vertex count of 0: `ERROR:
+MRISread: file '<file>' has 0 vertices!` + newline + `Probably trying to use a scalar data file as a
+surface!` + newline (`ERROR_BADFILE`, exit status 251). More than four quadrangles per vertex:
+`nquads=<q>,  nvertices=<n>` on standard error, then `ERROR: MRISread: file '<file>' has many more
+faces than vertices!` + newline + the same second line (exit status 251). Verbose: `reading <n>
+vertices and <2q> faces.` A new surface with room for `(int)(nVFMultiplier * n)` vertices and
+`(int)(nVFMultiplier * 2 * q)` faces, `n` vertices and no faces in use, type
+`MRIS_BINARY_QUADRANGLE_FILE` (0). Per vertex: `0xffffff`: three `short`s, each divided by 100.0 (a
+`double`) and set as a float; otherwise three floats; the old format then a face count (1 byte) and
+that many face numbers (3 bytes each) as the vertex's face list (its face count set to the file's;
+other formats 0).
+
+Per quadrangle four vertex numbers (3 bytes each, so never negative) `q0 q1 q2 q3`; `which =
+nint(sqrt(1.9 * q0) + sqrt(3.5 * q1))` (doubles, §3's face split); even: the triangles `q0 q1 q3`
+then `q2 q3 q1`; odd: `q0 q1 q2` then `q0 q2 q3`. Each triangle with no two equal vertices becomes
+the next face (its vertices stored first, then each counts the face: FS-147 as above); a triangle
+with two equal vertices is not made. **FS-353**: FreeSurfer's loop, after a first triangle with two
+equal vertices, tries the same first triangle again: the second triangle is never made. The
+quadrangle writer (§77) stores a lone triangle `v0 v1 v2` as `v0 v1 v1 v2`: read back with an odd
+split, the triangle is lost. larmorx makes the second triangle by default (noted); `reproduce` drops
+it (noted).
+- **FS-351**: a vertex number at or above the vertex count but within the surface's room is
+  accepted by FreeSurfer (counted in the room's vertex). larmorx refuses the file by default
+  (`__MRISreadQuadrangleFile(<file>): face <f> vertex <v> out of range`, `ERROR_BADFILE`, `NULL`);
+  `reproduce` accepts it.
+- **FS-352**: a vertex number beyond the room: FreeSurfer counts the face in memory outside its
+  arrays (observed: crashes). larmorx refuses it by default as above; `reproduce` stores the face
+  and does not count it (counted, not compared).
+- **FS-349**: more faces than the room (a multiplier below 1): FreeSurfer stores them past its face
+  array, then fails `cheapAssert(fno <= mris->max_faces)` (`<BUILD_ROOT>/utils/mrisurf_io.cpp:6443`,
+  FS-03). larmorx stores none past the room and fails the same check (both modes; noted).
+
+Then the face count set (`MRISgrowNFaces`), the real-RAS flag 0, the tags (§73). Returns the surface.
+The split choice means a quadrangle file read back may divide a quadrangle along its other diagonal
+than the two triangles the writer combined (FreeSurfer's design, kept).
+
+## 76. The triangle file, written (`MRISwriteTriangularSurface(mris, fname)`)
+
+The user: `USER`, else `LOGNAME`, else `UNKNOWN`. With `TRIANGULARSURFACE_NOEXTRA_WRITE` set,
+`[INFO]: NO TRIANGULARSURFACE EXTRA - created by line & cmds` on standard output. The date:
+`currentDateTime()` (`FREESURFER_REPLACEMENT_FOR_CREATION_TIME_STRING` when set, also when empty;
+else the local time as `%c`). Verbose: `writing surface file <file>, created by <user> on <date>.`
+The file is created (`fopen` `w`; failing: `MRISwriteTriangularSurface(<file>): can't create file`
+and its newline, `ERROR_BADFILE`, returned). Written: `0xfffffe` (3 bytes); unless
+`TRIANGULARSURFACE_NOEXTRA_WRITE`, `created by <user> on <date>` and two newlines; the vertex and
+face counts (`int`s); each vertex's x, y, z (floats); each face's three vertex numbers (`int`s); the
+tag 2 and the real-RAS flag (`int`s); the tag 20 and the volume-geometry block; when the
+group-average area's size is at least `FLT_EPSILON`, `writing group avg surface area <a / 100, %2.0f>
+cm^2 into surface file` on standard output and the tag 32 with length 4 and the area (float);
+unless `TRIANGULARSURFACE_NOEXTRA_WRITE`, each command line as the tag 3 with its length including
+its NUL and its bytes with the NUL (**FS-350**: a command line the surface does not hold, below its
+count: FreeSurfer crashes (signal 11) with what its stream wrote so far; larmorx skips it by
+default, `reproduce` ends with status 139); then the space tags:
+
+The space tags (`__MRISwriteTriangularSurfaceTags`): S = the geometry's scanner voxel-to-RAS
+matrix (`vg_i_to_r`), T = its tkregister voxel-to-RAS matrix (`TkrVox2RASfromVolGeom`), inverses by
+`MatrixInverse`, products by `MatrixMultiply` (their messages and failures as fs.core's).
+- Real-RAS flag not 0, geometry valid: data space `NIFTI_XFORM_SCANNER_ANAT`, matrix `T * S^-1`,
+  transformed space `NIFTI_XFORM_UNKNOWN`. Geometry not valid: the identity, both
+  `NIFTI_XFORM_SCANNER_ANAT`.
+- Real-RAS flag 0, geometry valid: `NIFTI_XFORM_UNKNOWN`, `S * T^-1`, `NIFTI_XFORM_SCANNER_ANAT`.
+  Not valid: with a Talairach matrix of 4 x 4 (`SRASToTalSRAS_`) a copy of it, `NIFTI_XFORM_UNKNOWN`
+  and `NIFTI_XFORM_TALAIRACH`; else the identity, both `NIFTI_XFORM_UNKNOWN`.
+- A matrix that cannot be made (an inverse fails: a geometry of a zero voxel size) where the two
+  spaces differ: `[ERROR] __MRISwriteTriangularSurfaceTags(): couldn't obtain MatrixData` on standard
+  output, exit status 1 (the file as the stream wrote it).
+Written: tag 22 with the data space's text (its length, no NUL), the matrix tag 23 (`TAGwriteMatrix`'s
+text), tag 24 with the transformed space's text. The file is closed; returns `NO_ERROR`.
+
+## 77. The quadrangle file, written (`__MRISwriteQuadrangleFile(mris, fname)`)
+
+The file is created (`__MRISwriteQuadrangleFile(<file>): can't create file` and its newline,
+`ERROR_BADFILE`). Written: `0xfffffd` and the vertex count (3 bytes each); the faces go in order:
+face k and face k + 1 that `quadCombine` (§69) combines become one quadrangle (k advances by two),
+else face k alone is the quadrangle `v0 v1 v1 v2`; their number (3 bytes); each vertex's x, y, z
+(floats); each quadrangle's four vertex numbers (3 bytes each); the tag 2 and the real-RAS flag; the
+tag 20 and the geometry block; the group-average area as in §76; every command line as in §76
+(FS-350; `TRIANGULARSURFACE_NOEXTRA_WRITE` does not apply here). Returns `NO_ERROR`.
+
+## 78. Validation plan, part 11
+
+The probe's `tri` command (`validation/probes/fs-surfio/`): as `stl` (§72), each case in an empty
+work folder with `d`; Gdiag's two bits each one in two; `TRIANGULARSURFACE_NOEXTRA_READ` and
+`TRIANGULARSURFACE_NOEXTRA_WRITE` together one case in six (a file read without the creator line it
+was written with gives counts from text), `FS_SKIP_TAGS` one in eight, `USER` one in two, `LOGNAME`
+one in three (a name of 1 to 12 printable bytes), the creation time's replacement always (a date,
+empty, or `x y`); 1 to 3 operations: the triangle reader on generated files (the creator line, one
+in 40 of more than 199 bytes (not with seed 1), one in 13 without its blank line; counts of 0 to 6
+vertices and 0 to 6 faces, now and then negative; coordinates mostly sixteenths, now and then
+special or beyond 10000; faces in strips of two that share an edge reversed, a vertex out of range
+one face in 25), the quadrangle reader (each magic number or none; 0 vertices or too many
+quadrangles one file in 25; shorts or floats; the old format's per-vertex face lists; quadrangles
+with a repeated middle vertex three in ten, a vertex at or past the count one in ten), both on the
+files a writer of the case wrote half the time, with multipliers 1, 1.1, 1.5, 2 (0.5 one in 40); the
+tags in any order (real-RAS flag, geometry blocks with a line now and then missing, group-average
+area, command lines with lengths exact, 0, -1, below -1, 2^63 - 1, and as the last tag shorter or
+longer, the space tags, unknown tags, a partial tag number last); cut files one in nine; the two
+writers on a surface of 0 to 6 vertices and 0 to 6 faces with a real-RAS flag of 0, 1 or 2, a volume
+geometry (invalid one in four; voxel sizes of 0 one in 30; axis-aligned or random direction
+cosines), a Talairach matrix of 4 x 4, 3 x 4, 4 x 3 or 1 x 1 or none, a group-average area of 0 (half
+the time), a whole number of quarters, a value below `FLT_EPSILON`, NaN or infinity, 0 to 3 command
+lines and a count one too large one in 30. Then every file in the folder. Cases noted with FS-346,
+FS-352 or FS-354 (and fs.io's FS-49, FS-167) are counted, not compared. Observed (relay 14): seeds 7
+(1,000 cases), 13 (1,000) and 17 (2,000): every comparable case identical with `reproduce` (36, 54 and
+80 counted, not compared), the default different only with notices.

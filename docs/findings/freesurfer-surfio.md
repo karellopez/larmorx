@@ -843,6 +843,10 @@ they were decided, from `utils/mrisurf_io.cpp` 3342-3518, 4341-4410, 5387-5492 a
   default different only with notices. Seed 1 (990 cases of 33 commands): 980 identical, 10 `SKIP`,
   hash `2543d270...` (`tests/fs_surfio_official.rs`), passing under `NAN_TRAP_ARM=1` with
   `NAN_TRAP_DIR` set in debug (7,746 flips) and release (17,227).
+  The whole probe, seed 7 (66,000 cases of 33 commands): 65,018 identical with `reproduce`, 982
+  counted, not compared (435 `mprop`, 198 `stl`, 151 `sread`, 115 `sfile`, 81 `cfile`, 2 `metric`),
+  the default different only with notices or the correctly rounded maths (65 `posn`, 7 `surf`), the
+  port's lines identical under AArch64's NaN emulation in both modes (74,230 and 74,272 flips).
 - **What still waits** (as §14): `mri_identify` (track A's 3.1-27) for `MRISread`/`MRISwrite` and the
   `*_getfilename` functions (3.1-49's `mrisurf_io.cpp` 6690-6921); `readVolGeom` and friends (track
   C's 3.1-39) and `CFile`'s `rewind`/`fseek` (track A) for `mrisReadTriangleFile`,

@@ -1256,7 +1256,7 @@ defects! {
     FS_157 = "FS-157", "FreeSurfer", true,
         "the STL reader given a vertex of more than 255 faces writes its face lists past their allocation (memory corruption or a crash)";
     FS_158 = "FS-158", "FreeSurfer", true,
-        "the STL reader given a vertex with a NaN or infinite coordinate (one or three of them) looks it up in memory before its hash table: a crash, or a wrong vertex";
+        "the STL reader given a vertex with a NaN or infinite coordinate (one or three of them) reads memory it does not own to find it: a crash, or a wrong vertex";
     FS_159 = "FS-159", "FreeSurfer", true,
         "the STL reader given a facet of fewer than three vertices ends the program with a segmentation fault (signal 11)";
     FS_160 = "FS-160", "FreeSurfer", true,

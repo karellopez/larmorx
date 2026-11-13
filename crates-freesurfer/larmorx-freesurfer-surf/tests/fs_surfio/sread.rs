@@ -44,11 +44,18 @@ fn coord_text(g: &mut Gen) -> String {
 fn ascii_surface(g: &mut Gen) -> Vec<u8> {
     let mut s = String::new();
     if g.chance(30) {
-        return g.pick(&["", "# only a comment\n", "\n \n"]).as_bytes().to_vec();
+        return g
+            .pick(&["", "# only a comment\n", "\n \n"])
+            .as_bytes()
+            .to_vec();
     }
     preamble(g, &mut s);
     let many = g.chance(25);
-    let nv = if many { 3 } else { g.pick(&[0, 1, 3, 4, 5, 6, 3, 4]) };
+    let nv = if many {
+        3
+    } else {
+        g.pick(&[0, 1, 3, 4, 5, 6, 3, 4])
+    };
     let nf: i64 = if many {
         g.pick(&[255, 256, 257])
     } else if nv >= 3 {
@@ -173,7 +180,13 @@ fn triangle_file(g: &mut Gen, nv: i64, nf: i64, heavy: bool) -> Vec<u8> {
     b.extend_from_slice(&(nf as i32).to_be_bytes());
     for _ in 0..nv.max(0) * 3 {
         let x = if g.chance(25) {
-            f32::from_bits(g.pick(&[0x7fc0_0000, 0xff80_0000, 0x461c_4400, 0xc61c_4000, 0x461c_3c00]))
+            f32::from_bits(g.pick(&[
+                0x7fc0_0000,
+                0xff80_0000,
+                0x461c_4400,
+                0xc61c_4000,
+                0x461c_3c00,
+            ]))
         } else {
             f32::from_bits(smallish(g, heavy))
         };
@@ -220,10 +233,10 @@ pub(super) fn sread_tokens(t: &mut Vec<String>, g: &mut Gen) {
         let n = name(g, k);
         let direct = creatable(&n).then(|| n.clone());
         let mut file = |g: &mut Gen, b: Vec<u8>| {
-            if let Some(d) = direct.clone() {
-                if !g.chance(8) {
-                    inputs.push((d, b));
-                }
+            if let Some(d) = direct.clone()
+                && !g.chance(8)
+            {
+                inputs.push((d, b));
             }
         };
         match op {
@@ -309,7 +322,15 @@ fn dump_read_surface(o: &mut Out, s: Option<&Mris>) {
         o.s("NULL");
         return;
     };
-    for v in [s.nvertices, s.nfaces, s.r#type, s.patch, s.status.0, s.max_vertices, s.max_faces] {
+    for v in [
+        s.nvertices,
+        s.nfaces,
+        s.r#type,
+        s.patch,
+        s.status.0,
+        s.max_vertices,
+        s.max_faces,
+    ] {
         o.i(i64::from(v));
     }
     for vno in 0..s.nvertices as usize {

@@ -67,6 +67,15 @@ bytes; the port's side in `tests/fs_surfio/sfile.rs`, in a temporary folder), 30
   different only with a notice), and the hash the test checks. Run it inside
   `scripts/orchestration/boxed.sh`.
 
+Measured 2026-11-13 (relay 13, 33 commands): seed 7, 66,000 cases: 65,018 identical with `reproduce`,
+982 counted, not compared (435 `mprop`, 198 `stl`, 151 `sread`, 115 `sfile`, 81 `cfile`, 2 `metric`);
+`fix` differs only with notices or the correctly rounded maths (65 `posn`, 7 `surf`); the port's outputs
+identical under AArch64's NaN emulation in both modes (74,230 and 74,272 NaNs flipped). `sread` alone:
+seed 7, 1,000 cases and seed 13, 2,000; `stl` alone: seed 7, 1,000: every comparable case identical with
+`reproduce`, the default different only with notices. Seed 1, 990 cases: 980 identical, 10 `SKIP`, hash
+`2543d2708fc953a9ec60e5dff31e85b7799e1a20285c2514b338e30f7b7abdaf` (the test), passing in debug and
+release with the emulation (7,746 and 17,227 flips). Log `oracles/logs/fs-surfio-relay13-seed7.log`.
+
 Measured 2026-11-13 (relay 12, 31 commands): seed 7, 62,000 cases: 61,334 identical with `reproduce`,
 666 counted, not compared (455 `mprop`, 125 `sfile`, 81 `cfile`, 5 `metric`); `fix` differs only with
 notices or the correctly rounded maths (71 `posn`, 4 `surf`); the port's outputs identical under
@@ -156,5 +165,5 @@ operand order is each caller's compiled code (`docs/findings/freesurfer-surfio.m
 
 ```
 validation/probes/fs-surfio/build.sh <workspace>
-scripts/orchestration/boxed.sh 12 python -P validation/probes/fs-surfio/check.py --seed 7 --n 62000
+scripts/orchestration/boxed.sh 12 python -P validation/probes/fs-surfio/check.py --seed 7 --n 66000
 ```

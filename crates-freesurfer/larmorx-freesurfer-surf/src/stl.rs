@@ -258,7 +258,9 @@ impl Mesher {
                     let dup = (0..nonneg(i32::from(t.vnum))).any(|n2| list.get(n2) == Some(&vn));
                     if !dup && vn >= 0 {
                         let at = topology::vnum_add(g, sg, io.err, &mut mris, v, 1) as usize;
-                        if let Some(slot) = mris.topology_mut(v).v.as_mut().and_then(|l| l.get_mut(at)) {
+                        if let Some(slot) =
+                            mris.topology_mut(v).v.as_mut().and_then(|l| l.get_mut(at))
+                        {
                             *slot = vn;
                         }
                     }
@@ -354,7 +356,8 @@ fn line_values(
 
 /// The correction's error for a line [`line_values`] refused.
 fn unreadable_line(g: &Globals, io: &mut Io, filename: &str, line: &[u8]) {
-    let mut m = format!("ASCII STL file {filename}: could not read the numbers of line ").into_bytes();
+    let mut m =
+        format!("ASCII STL file {filename}: could not read the numbers of line ").into_bytes();
     m.extend_from_slice(line);
     error_bytes(g, io, &m);
 }
@@ -388,7 +391,11 @@ fn read_ascii(
         let cp = &line[at..];
         match cp[0] {
             b'v' | b'f' => {
-                let head: &[u8] = if cp[0] == b'v' { b"vertex " } else { b"facet normal " };
+                let head: &[u8] = if cp[0] == b'v' {
+                    b"vertex "
+                } else {
+                    b"facet normal "
+                };
                 let Some([x, y, z]) = line_values(g, &mut slots, cp, head, filename) else {
                     unreadable_line(g, io, filename, &line);
                     return Ok(None);
@@ -422,7 +429,6 @@ fn read_ascii(
     }
     mesher.build_surface(g, sg, io, filename)
 }
-
 
 fn le_f32(b: &[u8], at: usize) -> Option<f32> {
     b.get(at..at + 4)

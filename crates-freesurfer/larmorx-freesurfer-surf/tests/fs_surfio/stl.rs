@@ -93,7 +93,10 @@ fn facets(g: &mut Gen, pool: &[[f32; 3]]) -> Vec<[[f32; 3]; 4]> {
 /// unrecognized line, a second solid.
 fn text_stl(g: &mut Gen, fs: &[[[f32; 3]; 4]]) -> Vec<u8> {
     if g.chance(30) {
-        return g.pick(&["", "solid x\n", "# nothing\n"]).as_bytes().to_vec();
+        return g
+            .pick(&["", "solid x\n", "# nothing\n"])
+            .as_bytes()
+            .to_vec();
     }
     let mut s = String::new();
     if g.chance(4) {
@@ -149,7 +152,11 @@ fn text_stl(g: &mut Gen, fs: &[[[f32; 3]; 4]]) -> Vec<u8> {
 /// writers do), now and then one byte longer (no longer binary: read as text).
 fn binary_stl(g: &mut Gen, fs: &[[[f32; 3]; 4]]) -> Vec<u8> {
     let mut b = Vec::new();
-    let head: &[u8] = if g.chance(3) { b"solid binary" } else { b"freesurfer mesh" };
+    let head: &[u8] = if g.chance(3) {
+        b"solid binary"
+    } else {
+        b"freesurfer mesh"
+    };
     let mut header = [0u8; 80];
     header[..head.len()].copy_from_slice(head);
     b.extend_from_slice(&header);
@@ -253,7 +260,10 @@ fn dump_stl_surface(o: &mut Out, s: Option<&Mris>) {
         for k in 0..vt.vnum.max(0) as usize {
             o.i(i64::from(list[k]));
         }
-        let (f, n) = (vt.f.as_deref().unwrap_or(&[]), vt.n.as_deref().unwrap_or(&[]));
+        let (f, n) = (
+            vt.f.as_deref().unwrap_or(&[]),
+            vt.n.as_deref().unwrap_or(&[]),
+        );
         for k in 0..usize::from(vt.num) {
             o.i(i64::from(f[k]));
             o.i(i64::from(n[k]));
@@ -267,7 +277,9 @@ fn dump_stl_surface(o: &mut Out, s: Option<&Mris>) {
         for x in [e.nx, e.ny, e.nz] {
             o.f(x);
         }
-        o.i(i64::from(s.faceNormDeferredEntries.as_ref().unwrap()[fno].deferred));
+        o.i(i64::from(
+            s.faceNormDeferredEntries.as_ref().unwrap()[fno].deferred,
+        ));
     }
 }
 

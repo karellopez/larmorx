@@ -106,12 +106,16 @@ impl<const N: usize> Kept<N> {
             let (d, text): (&'static Defect, String) = if first {
                 (
                     &FS_151,
-                    format!("{fname}: {place}'s numbers that cannot be read are refused (FreeSurfer takes memory contents; 0 here)"),
+                    format!(
+                        "{fname}: {place}'s numbers that cannot be read are refused (FreeSurfer takes memory contents; 0 here)"
+                    ),
                 )
             } else {
                 (
                     &FS_152,
-                    format!("{fname}: {place}'s numbers that cannot be read are refused (FreeSurfer keeps the ones read before)"),
+                    format!(
+                        "{fname}: {place}'s numbers that cannot be read are refused (FreeSurfer keeps the ones read before)"
+                    ),
                 )
             };
             g.notices.add(d, text);
@@ -391,7 +395,8 @@ fn geo_header(
     let (Some(nvertices), Some(nfaces), Some(nedges)) = (nvertices, nfaces, nedges) else {
         debug_assert_ne!(r, 3);
         fp.close();
-        let mut m = format!("mrisReadGeoFile({fname}): could not scan dimensions from '").into_bytes();
+        let mut m =
+            format!("mrisReadGeoFile({fname}): could not scan dimensions from '").into_bytes();
         m.extend_from_slice(&cp);
         m.push(b'\'');
         error_printf_bytes(g, io.err, ERROR_BADFILE, &m);
@@ -460,11 +465,26 @@ fn geo_coordinates(
         sc.finish(e);
         let place = format!("vertex {vno}");
         let Some(c) = xyz.take(g, got, fname, &place) else {
-            unreadable(g, io, fp.take().expect("an open stream"), who, fname, &place);
+            unreadable(
+                g,
+                io,
+                fp.take().expect("an open stream"),
+                who,
+                fname,
+                &place,
+            );
             return Ok(false);
         };
         coords::set_xyz(
-            g, io, mris, vno as i32, c[0] as f32, c[1] as f32, c[2] as f32, &file, line,
+            g,
+            io,
+            mris,
+            vno as i32,
+            c[0] as f32,
+            c[1] as f32,
+            c[2] as f32,
+            &file,
+            line,
         )?;
         if vno % 2 == 1 {
             let f = fp.as_mut().expect("an open stream");
@@ -515,7 +535,14 @@ pub fn read_geo_file(
                 sc.text(e, b"-");
             }
             let got = sc.d(e, true);
-            sc.text(e, if n == VERTICES_PER_FACE - 1 { b"\n" } else { b" " });
+            sc.text(
+                e,
+                if n == VERTICES_PER_FACE - 1 {
+                    b"\n"
+                } else {
+                    b" "
+                },
+            );
             sc.finish(e);
             match got {
                 Some(v) => mris.face_mut(fno).v[n] = v,
@@ -636,7 +663,6 @@ fn show_counts(g: &Globals, io: &mut Io, fname: &str, nvertices: i32, nfaces: i3
         );
     }
 }
-
 
 /// `mrisReadTriangleFileVertexPositionsOnly(fname)`: the vertex positions of a binary triangle
 /// file (`MRISreadVerticesOnly`'s small surface): the counts, then three big-endian floats per

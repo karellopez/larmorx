@@ -21,8 +21,8 @@ use sha2::{Digest, Sha256};
 
 /// `check.py`'s `SKIP` and `SKIP_WHEN_REFUSED`.
 const SKIP: [&str; 12] = [
-    "FS-121", "FS-123", "FS-06", "FS-167", "FS-49", "FS-140", "FS-144", "FS-151", "FS-154", "FS-157",
-    "FS-158", "FS-160",
+    "FS-121", "FS-123", "FS-06", "FS-167", "FS-49", "FS-140", "FS-144", "FS-151", "FS-154",
+    "FS-157", "FS-158", "FS-160",
 ];
 const SKIP_WHEN_REFUSED: [&str; 1] = ["FS-114"];
 

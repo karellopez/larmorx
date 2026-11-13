@@ -29,6 +29,7 @@
 #include "cmdargs.h"
 #include "diag.h"
 #include "fsenv.h"
+#include "hips.h"
 #include "log.h"
 #include "machine.h"
 #include "romp_support.h"
@@ -135,9 +136,16 @@ struct Buf {
 };
 
 // The lists of the list commands sit between two guard values, so a read just outside the list
-// shows as the guard: 7777 for integers, 7777.0f for floats.
-static const int GUARD_I = 7777;
-static const float GUARD_F = 7777.0f;
+// shows as the guard: 7777 for integers, 7777.0f for floats, unless the variable
+// FS_CORE_PROBE_GUARD gives another integer (the float guard is that integer as a float): two runs
+// with different guards tell a result that depends on memory outside the list.
+static int guard_i()
+{
+  const char *g = getenv("FS_CORE_PROBE_GUARD");
+  return g ? atoi(g) : 7777;
+}
+#define GUARD_I guard_i()
+#define GUARD_F ((float)guard_i())
 
 // ---- batch commands -------------------------------------------------------------------------
 
@@ -758,6 +766,13 @@ int main(int argc, char **argv)
   }
   if (c == "maxthreads") {
     printf("%d\n", omp_get_max_threads());
+    return 0;
+  }
+  if (c == "hips") {
+    // hips: one HIPS function with a result and one without
+    double r = h_entropy(NULL, 0, 0);
+    thin(NULL, 0, 0);
+    printf("%s\n", sd(r).c_str());
     return 0;
   }
   if (c == "threadnum") {

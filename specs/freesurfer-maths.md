@@ -6,8 +6,10 @@ FreeSurfer 8.2.0's source and the official build's outputs, never code or routin
 the clean room by the spec finisher (FreeSurfer's foundations, track E, relay 2, 2026-11-13): the
 black-box validation plan (§23) with its open probe, a read-through as a clean-room reader, the gaps
 filled from the source as behaviour (§0, §3, §5.1, §18.2, §19), the defects' texts in
-`larmorx_core::defects` checked. What black-box runs confirmed is marked **(observed)**, with the
-probe command or the comparison group behind it.
+`larmorx_core::defects` checked. Amended by its relay 4 (2026-11-13), from the clean room's
+black-box runs: §17.1, §17.2 and §17.4 (which matrices with infinite or NaN entries make FreeSurfer
+hang and which it finishes, with their results under `reproduce`). What black-box runs confirmed is
+marked **(observed)**, with the probe command or the comparison group behind it.
 
 **Whoever implements it must not open:** FreeSurfer's source (`<workspace>/tags/freesurfer-8.2.0`,
 any other copy, the installed package's scripts, Python and libraries), the replica crates
@@ -929,11 +931,32 @@ of the vector matrix (row by row), rounded to float. No rows: nothing written, s
   they stand and never writes the vectors; FreeSurfer copies them (memory) and reports success.
   **Default:** the eigenvalues written, the vectors not, an error `OpenEigenSystem: the eigensystem
   did not converge (ierr <i>)` + `\n`, code -4, failure. **Reproduce:** the vectors 0, success.
-- **FS-47:** with an infinite or NaN entry among those the tridiagonalisation reads, of 2 rows or
-  more, EISPACK's hypotenuse routine usually never returns (FreeSurfer hangs). **Both modes:** an
-  error `OpenEigenSystem: VNL's eigensystem never returns on this matrix (an infinite or NaN entry)`
-  + `\n`, code -4, nothing written, failure (the rare such matrices FreeSurfer does finish are
-  refused too).
+- **FS-47:** a matrix of 2 rows or more with an infinite or NaN entry among those the
+  tridiagonalisation reads (the upper triangle as stored, the diagonal included; an entry below the
+  diagonal is never read, so it changes nothing). VNL computes on it as on any other (IEEE arithmetic,
+  x86-64's NaNs), but EISPACK's hypotenuse `pythag(a, b)` (√(a² + b²) by an iteration that stops when
+  `4 + r == 4`) takes `p = max(|a|, |b|)` and `r = (min(|a|, |b|) / p)²` with C's `x >= y ? x : y`,
+  `x <= y ? x : y` and `x >= 0 ? x : -x`: it **never returns** when `b` is NaN, when both are
+  infinite, or both NaN (`r` is NaN and the stopping test never passes); a NaN `a` with a number `b`
+  gives `pythag(|b|, |b|)`, `pythag(NaN, 0)` is 0, one infinity gives `+inf`. The QL method calls it
+  on the tridiagonal form, the subdiagonal's entry as `b` (`docs/findings/vnl-netlib.md` F-VNLN-7,
+  open). **Which matrices make FreeSurfer hang:** exactly those on which the main package's
+  `larmorx_core::vnl_eigen::symmetric_eigensystem_f32_full` says VNL never returns (`never_returns()`,
+  its defect ITK-115): it follows VNL's operations, infinities and NaNs included, and stops at the
+  first `pythag` that would not return. **(observed)** §23's `eigen-nonfinite` batch (111 such
+  matrices: FreeSurfer never returned on 42, finished on 69) and an exploration of 400 more (154 and
+  246): FreeSurfer never returned on exactly the matrices the port names, and finished on every other
+  one with the port's values and vectors, bit for bit, NaNs included.
+  - Where VNL never returns, **both modes:** an error `OpenEigenSystem: VNL's eigensystem never
+    returns on this matrix (an infinite or NaN entry)` + `\n`, code -4, nothing written, failure
+    (FreeSurfer hangs: never reproduced).
+  - Where it returns (for example `[[inf, -4], [-4, 8]]`: the eigenvalues 8 and inf, the vectors the
+    columns of `[[0, 1], [1, 0]]`; `[[NaN, 1], [1, 2]]`; an infinity alone in its row and column),
+    **reproduce:** FreeSurfer's result: the port's values and vectors rounded to float as for a
+    finite matrix (FS-42 where the QL method stops), success. **Default:** the error above, code -4,
+    nothing written, failure, FS-47 noted (rule B: a matrix with an infinite or NaN entry has no
+    eigensystem, and whether FreeSurfer returns on it depends only on where the entries fall).
+  - A matrix of one row is computed in both modes (its entry the eigenvalue, the vector 1).
 
 ### 17.2 Non-symmetric eigensystem (n x n numbers, values, vectors)
 
@@ -943,10 +966,17 @@ the real eigenvector matrix (row by row), rounded to float; success. The columns
 are 0 (VNL never writes them: memory contents in FreeSurfer, ITK-110); when the QR method fails,
 VNL's ` *** vnl_real_eigensystem: Failed on <i>th eigenvalue` + `\n` and the matrix on standard
 error, and the eigenvalues it did not find are 0 (ITK-111). **ITK-112:** an infinite or NaN entry
-(or sums that overflow) in the part the balancing reads: FreeSurfer hangs; **both modes:** an error
-`OpenNonSymmetricEigenSystem: VNL's eigensystem never returns on this matrix (an infinite or NaN
-entry)` + `\n`, code -4, failure. **FS-41:** FreeSurfer copies the matrix to the stack (8 bytes an
-element): above 8 MiB (about 1,024 rows) it crashes; both modes compute it, noted.
+(or sums that overflow) in the part the balancing reads: the balancing never returns, exactly where
+the main package's `larmorx_core::vnl_eigen::real_eigensystem` returns `BalancNeverReturns`
+(**(observed)** an exploration of 400 matrices with infinite or NaN entries: FreeSurfer never
+returned on the 148 the port names and returned on every other one); FreeSurfer hangs; **both
+modes:** an error `OpenNonSymmetricEigenSystem: VNL's eigensystem never returns on this matrix (an
+infinite or NaN entry)` + `\n`, code -4, failure. The other matrices with such entries are computed
+in both modes as VNL computes them; the signs of NaNs in their vectors follow the official build's
+operand order, which the port does not follow yet (**(observed)** 39 of the 223 whose QR method
+succeeded differ from the port in NaNs' signs only; on §23's lines of such matrices the port's signs
+are FreeSurfer's). **FS-41:** FreeSurfer copies the matrix to the stack (8 bytes an element): above
+8 MiB (about 1,024 rows) it crashes; both modes compute it, noted.
 
 ### 17.3 Eigensystem of a matrix (m, values, vectors)
 
@@ -968,10 +998,35 @@ suspicious return value (<info>) from SVDC` + `\n`, the same path + `: M is <row
 then `M = [ ...` + `\n` and each row's elements as `%8d ` for an exact zero or `%8.5f ` otherwise
 (C's `nan`, `-nan`, `inf`), the last row followed by ` ]`, each row + `\n`; failure, nothing written.
 `<ITK root>` is the official build's `/home/rd521/4.13.2_ubuntu20/itk/4.13.2/src/ITK`; `<info>` is
-min(rows + 1, cols) on every failing case measured. **FS-48:** on some matrices with infinite or NaN
-entries LINPACK never returns (FreeSurfer hangs); **both modes:** every such matrix gives the failure
-lines above without being decomposed (FreeSurfer's rare successes on them, a 1 x 1 infinity, are
-refused too).
+LINPACK's `info` (the index of the singular value it stopped at, as the main package's
+`larmorx_core::vnl_svd_f32::vnl_svd_f32_full` gives it), min(rows + 1, cols) on every failing case
+observed.
+
+**FS-48:** a matrix with an infinite or NaN entry (the matrix handed to the decomposition: the
+condition numbers' products of finite matrices that overflow are such matrices too). LINPACK
+computes on it as on any other, but its deflation and splitting steps do not count towards its
+limit of iterations and can come back to the same singular values and superdiagonal for ever
+(ITK-116; `docs/findings/vnl-netlib.md` F-VNLN-7, open). **Which matrices make FreeSurfer hang:**
+exactly those on which `vnl_svd_f32_full` says VNL never returns (`never_returns()`). **(observed)**
+§23's `svd-nonfinite` batch (86 such matrices: FreeSurfer never returned on 12, LINPACK failed on 51
+and decomposed 23) and an exploration of 400 more (36, 276 and 88): FreeSurfer never returned on
+exactly the matrices the port names; every failure printed the port's `info`; every decomposition
+has the port's W and V bit for bit, and U's numbers but for the bits of some NaNs (below).
+
+- Where VNL never returns, **both modes:** the failure lines above with `<info>` min(rows + 1, cols),
+  failure, nothing written (FreeSurfer hangs: never reproduced).
+- Where it returns, **reproduce:** FreeSurfer's result: LINPACK's failure (the lines above with its
+  `info`, failure, nothing written) or its decomposition, written as for a finite matrix (a 1 x 1
+  `+inf`: U 1, w `inf`, V 1; `-inf`: U 1, w `inf`, V -1). **Default:** every matrix with an infinite
+  or NaN entry gives the failure lines with `<info>` min(rows + 1, cols) without being decomposed,
+  failure, nothing written, FS-48 noted (rule B: such a matrix has no singular value decomposition,
+  and whether FreeSurfer returns on it depends only on where the entries fall).
+- **The NaNs' bits** in a decomposition of such a matrix: the signs and payloads of U's NaNs follow
+  the operand order of LINPACK's BLAS kernels as the official build compiled them (the order
+  `larmorx_core::vnl_qr`'s kernels `nrm2_t`, `dot_t`, `axpy_t`, `scal_t` record for the QR), which
+  `vnl_svd_f32` does not follow yet: **(observed)** 82 of those 111 decompositions differ from the
+  port in U's NaNs' bits only (W and V identical), 29 not at all. §23's comparison allows that
+  difference on the lines of matrices with an infinite or NaN entry until the port follows them.
 
 ### 17.5 The SVD functions
 
@@ -1189,11 +1244,15 @@ it, and again from the cache:
 | `draws` | 10 | 6 | 0 | 0 | 0 | `01ada774a50680e6d429d614299f85e24c0306153fa7e0a361735f51ffe275a4` |
 | `minimizers` | 13 | 181 | 11 | 0 | 0 | `cbea1be24fc233c0f353a05041189aee308c5501359f6fad0e016c9135ffd2e4` |
 | `nr` | 14 | 5 | 0 | 0 | 0 | `ba8b8aea531d281110a5a52a4a2455fe313fc4e8b3a5a4ce6b1e1cc19eaad69d` |
-| `eigen` | 17.1 to 17.3 | 1,224 | 252 | 0 | 67 | `412ed24373f176563833ec5949aa291bc2841571bcc1bc5a94aabb82e0266a4c` |
-| `svd` | 17.4, 17.5 | 1,920 | 335 | 0 | 102 | `ca9b948a736de0a31ca64713426304fdbac223254054dfe40d3e785321cae86d` |
+| `eigen` | 17.1 to 17.3 | 1,460 | 252 | 0 | 153 | `c3ddceff612985227ad6d69acf56662aaa0584974c847c827005539ce38b17f3` |
+| `svd` | 17.4, 17.5 | 2,280 | 354 | 0 | 142 | `af777aba4138e1ab5d48ba2ee4e4cc8477a2f3d0abc1d9334c05d1a10c40aad7` |
 | `mfiles` | 18 | 635 | 1 | 0 | 0 | `e8ab918477d85396d2d7c0f8e040499d134ecc8d49200dcde7300b11718ac045` |
 | `rfields` | 19 | 16 | 0 | 0 | 0 | `6f26117e696800de35160344e0a49825b4ff992d68dc6a500ca215703240ce15` |
-| all | | 26,707 | 1,327 | 41 | 172 | |
+| all | | 27,303 | 1,346 | 41 | 298 | |
+
+The groups `eigen` and `svd` gained the batches `eigen-nonfinite` and `svd-nonfinite` (§17;
+generators of their own, the groups' other cases unchanged) on 2026-11-13; their two hashes are from
+then, the others from the first runs.
 
 ### 23.3 The comparison
 
@@ -1204,10 +1263,20 @@ standard error) are taken out and their IDs kept. Every line must be identical, 
 
 - a line where FreeSurfer did not finish (`TIMEOUT`, `CRASH`): the candidate's line must not be
   one (the defects of those cases say what the clean room gives: FS-13, FS-22, FS-24, FS-31, FS-33,
-  FS-34, FS-37, FS-41, FS-44 to FS-48, FS-51, ITK-112);
+  FS-34, FS-37, FS-41, FS-44 to FS-48, FS-51, ITK-112); in the groups `eigen` and `svd`, where
+  FreeSurfer never returned (`TIMEOUT`), the candidate's standard error must also hold the refusal of
+  §17 (`never returns on this matrix` for the eigensystems, VNL's `suspicious return value (<info>)
+  from SVDC` for the SVD), in both modes;
+- in the group `svd`, a line whose input holds an infinite or NaN number and that differs only in
+  the bits of NaNs (their signs and payloads, in the printed numbers and in VNL's printed matrix):
+  the official build's LINPACK kernels (§17.4);
 - a **memory** line (FreeSurfer reads what it does not own, among others FS-16, FS-21, FS-22, FS-27,
   FS-31 to FS-33, FS-40, FS-42, FS-49, ITK-106, ITK-110, ITK-111; the clean room reads 0 there, §1);
 - in `--mode fix`, a line where the candidate noted a defect (the corrected result).
+
+So with `--mode reproduce` the matrices with infinite or NaN entries that FreeSurfer finishes (FS-47,
+FS-48: the batches `eigen-nonfinite` and `svd-nonfinite` hold both kinds) are compared as any other
+line.
 
 The loop prints, per group, the identical lines and those of each allowed kind, and the IDs noted on
 the allowed lines; exit status 1 for any other difference.

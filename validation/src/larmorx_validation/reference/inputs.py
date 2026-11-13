@@ -88,6 +88,15 @@ def _make_points_moved(path: Path) -> None:
     _make_points(path, (2, -3, 4))
 
 
+def _make_phase(path: Path) -> None:
+    """A phase difference in radians on the head's grid: a ramp of 0.5 rad per voxel along x,
+    wrapped into [-pi, pi)."""
+    _, affine = _head()
+    ramp = np.indices((40, 48, 40), dtype=np.float64)[0] * 0.5
+    wrapped = (ramp + np.pi) % (2 * np.pi) - np.pi
+    _save(path, wrapped.astype(np.float32), affine)
+
+
 def _make_log(path: Path) -> None:
     path.write_text("start\nfirst value 1\nmiddle\nsecond value 2\nend\n", encoding="utf-8")
 
@@ -99,6 +108,7 @@ KINDS: dict[str, Kind] = {
     "coords": Kind("two coordinates, one `x y z` per line", _make_coords),
     "points": Kind("eight points in millimetres, one `x y z` per line", _make_points),
     "points-moved": Kind("the same eight points moved by 2, −3 and 4 mm", _make_points_moved),
+    "phase": Kind("a phase ramp along x, wrapped into [−pi, pi), on the head's grid", _make_phase),
     "log": Kind("a text of five lines, two of them with the word `value`", _make_log),
 }
 

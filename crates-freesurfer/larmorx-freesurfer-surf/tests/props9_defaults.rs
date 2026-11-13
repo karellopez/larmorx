@@ -137,11 +137,9 @@ fn fs526_the_vertex_kernel_is_used() {
         } else {
             assert!(v0.is_nan());
         }
-        assert_eq!(
-            s.vertex(2).undefval,
-            1,
-            "{mode:?}: the hop lists set undefval"
-        );
+        // the lists are made vertex by vertex: the last centre (2) is hop 0, the others hop 1
+        let undef: Vec<i32> = (0..3).map(|v| s.vertex(v).undefval).collect();
+        assert_eq!(undef, [1, 1, 0], "{mode:?}");
     }
 }
 

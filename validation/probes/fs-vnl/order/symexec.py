@@ -38,7 +38,7 @@ from dataclasses import dataclass, field
 
 GPR64 = ["rax", "rbx", "rcx", "rdx", "rsi", "rdi", "rbp", "rsp"] + [f"r{i}" for i in range(8, 16)]
 ALIASES = {}
-for i, r in enumerate(["ax", "bx", "cx", "dx", "si", "di", "bp", "sp"]):
+for r in ["ax", "bx", "cx", "dx", "si", "di", "bp", "sp"]:
     full = "r" + r
     ALIASES["e" + r] = (full, 4)
     ALIASES[full] = (full, 8)
@@ -129,7 +129,9 @@ def load(path: str) -> Obj:
     o = Obj(path)
     text = subprocess.run(
         ["objdump", "-d", "-r", "--no-show-raw-insn", path],
-        check=True, capture_output=True, text=True,
+        check=True,
+        capture_output=True,
+        text=True,
     ).stdout
     cur = None
     for line in text.splitlines():
@@ -156,7 +158,9 @@ def load(path: str) -> Obj:
             cur.append(Insn(int(m.group(1), 16), mnem, split_ops(ops)))
     # constants: section contents and local symbols
     secs: dict[str, bytes] = {}
-    dump = subprocess.run(["objdump", "-s", path], check=True, capture_output=True, text=True).stdout
+    dump = subprocess.run(
+        ["objdump", "-s", path], check=True, capture_output=True, text=True
+    ).stdout
     name = None
     for line in dump.splitlines():
         m = re.match(r"^Contents of section (\S+):$", line)
@@ -167,13 +171,17 @@ def load(path: str) -> Obj:
         m = re.match(r"^ ([0-9a-f]{4,}) ((?:[0-9a-f]{2,8} ?){1,4})", line)
         if m and name:
             secs[name] += bytes.fromhex(m.group(2).replace(" ", ""))
-    syms = subprocess.run(["objdump", "-t", path], check=True, capture_output=True, text=True).stdout
+    syms = subprocess.run(
+        ["objdump", "-t", path], check=True, capture_output=True, text=True
+    ).stdout
     for line in syms.splitlines():
         m = re.match(r"^([0-9a-f]+)\s+l\s+(?:\S+\s+)?(\.rodata\S*)\s+[0-9a-f]+\s+(\.LC\d+)$", line)
         if m:
             off, sec, sym = int(m.group(1), 16), m.group(2), m.group(3)
             o.consts[sym] = secs.get(sec, b"")[off:]
-            o.const_size[sym] = {".rodata.cst4": 4, ".rodata.cst8": 8, ".rodata.cst16": 16}.get(sec, 16)
+            o.const_size[sym] = {".rodata.cst4": 4, ".rodata.cst8": 8, ".rodata.cst16": 16}.get(
+                sec, 16
+            )
     return o
 
 
@@ -362,7 +370,11 @@ class Machine:
                 v = self.reg_val(src[1:])
             else:
                 a = self.addr_of(src, ins)
-                size = 8 if (dst.startswith("%r") and not dst.endswith("d")) and ALIASES[dst[1:]][1] == 8 else 4
+                size = (
+                    8
+                    if (dst.startswith("%r") and not dst.endswith("d")) and ALIASES[dst[1:]][1] == 8
+                    else 4
+                )
                 v = self.mem_int(a, size)
             if dst.startswith("%"):
                 self.set_gpr(dst[1:], v)
@@ -376,7 +388,20 @@ class Machine:
         if m == "lea":
             self.set_gpr(ops[1][1:], self.addr_of(ops[0], ins))
             return None
-        if m in ("add", "sub", "and", "or", "xor", "shl", "shr", "addl", "subl", "cmp", "test", "cmpl"):
+        if m in (
+            "add",
+            "sub",
+            "and",
+            "or",
+            "xor",
+            "shl",
+            "shr",
+            "addl",
+            "subl",
+            "cmp",
+            "test",
+            "cmpl",
+        ):
             return self.intop(m, ops, ins)
         # SSE moves
         if m in (f"movs{fs}",):
@@ -424,7 +449,7 @@ class Machine:
             else:
                 raise Unsupported(f"{m} {ops}")
             return None
-        if m in (f"mul{fs}{fs}"[: 0] or f"muls{fs}", f"adds{fs}", f"subs{fs}", f"divs{fs}"):
+        if m in (f"mul{fs}{fs}"[:0] or f"muls{fs}", f"adds{fs}", f"subs{fs}", f"divs{fs}"):
             op = {"mul": "mul", "add": "add", "sub": "sub", "div": "div"}[m[:3]]
             src, dst = ops
             d = int(dst[4:])
@@ -436,7 +461,7 @@ class Machine:
             src, dst = ops
             d = int(dst[4:])
             b = self.src_lanes(src, ins, L)
-            self.xmm[d] = [self.binop(op, x, y) for x, y in zip(self.xmm[d], b)]
+            self.xmm[d] = [self.binop(op, x, y) for x, y in zip(self.xmm[d], b, strict=False)]
             return None
         if m in ("xorps", "xorpd", "pxor"):
             src, dst = ops
@@ -445,7 +470,7 @@ class Machine:
                 self.xmm[d] = [ZERO] * L
                 return None
             b = self.src_lanes(src, ins, L)
-            self.xmm[d] = [self.xor(x, y) for x, y in zip(self.xmm[d], b)]
+            self.xmm[d] = [self.xor(x, y) for x, y in zip(self.xmm[d], b, strict=False)]
             return None
         if m in ("shufps",) and e == 4:
             imm, src, dst = ops
@@ -515,19 +540,22 @@ class Machine:
             return None
         src, dst = ops
         a, b = val(dst), val(src)
-        if base == "xor" and a == CANARY and b == CANARY:
-            r = 0
-        elif base == "xor" and src == dst:
+        if (base == "xor" and a == CANARY and b == CANARY) or (base == "xor" and src == dst):
             r = 0
         elif base == "shl" and isinstance(a, tuple) and a[0] == "cells" and b == 32 and self.e == 4:
-            r = ("cells", [ZERO] + a[1][:1])
+            r = ("cells", [ZERO, *a[1][:1]])
         elif base == "or" and isinstance(a, tuple) and isinstance(b, tuple):
             ca, cb = a[1] + [ZERO] * 2, b[1] + [ZERO] * 2
-            r = ("cells", [x if y == ZERO else y for x, y in zip(ca[:2], cb[:2])])
+            r = ("cells", [x if y == ZERO else y for x, y in zip(ca[:2], cb[:2], strict=False)])
         elif isinstance(a, int) and isinstance(b, int):
             r = {
-                "add": a + b, "sub": a - b, "and": a & b, "or": a | b, "xor": a ^ b,
-                "shl": a << b, "shr": a >> b,
+                "add": a + b,
+                "sub": a - b,
+                "and": a & b,
+                "or": a | b,
+                "xor": a ^ b,
+                "shl": a << b,
+                "shr": a >> b,
             }[base]
         else:
             raise Unsupported(f"{m} {ops} on {a!r}, {b!r}")
@@ -543,8 +571,16 @@ class Machine:
         if f is None:
             raise Unsupported(f"{m} without flags")
         if f[0] == "fcmp":  # unordered: ZF = PF = CF = 1
-            taken = {"jp": True, "jnp": False, "je": True, "jne": False, "jbe": True, "ja": False,
-                     "jb": True, "jae": False}[m]
+            taken = {
+                "jp": True,
+                "jnp": False,
+                "je": True,
+                "jne": False,
+                "jbe": True,
+                "ja": False,
+                "jb": True,
+                "jae": False,
+            }[m]
         else:
             _, a, b, kind = f
             if not (isinstance(a, int) and isinstance(b, int)):
@@ -558,8 +594,14 @@ class Machine:
                 taken = {"je": z, "jne": not z}[m]
             else:
                 ua, ub = a & ((1 << 64) - 1), b & ((1 << 64) - 1)
-                taken = {"je": a == b, "jne": a != b, "jb": ua < ub, "jae": ua >= ub,
-                         "jbe": ua <= ub, "ja": ua > ub}[m]
+                taken = {
+                    "je": a == b,
+                    "jne": a != b,
+                    "jb": ua < ub,
+                    "jae": ua >= ub,
+                    "jbe": ua <= ub,
+                    "ja": ua > ub,
+                }[m]
         self.trace.append(f"{m}->{'taken' if taken else 'not'}")
         return target if taken else None
 
@@ -587,8 +629,20 @@ def obj(path: str) -> Obj:
     return _LOADED[path]
 
 
-def execute(path, symbol, elem=4, args=(), sret=None, size=64, start=None, stop=None,
-            mem=(), out=None, xmm0=None, inline=None):
+def execute(
+    path,
+    symbol,
+    elem=4,
+    args=(),
+    sret=None,
+    size=64,
+    start=None,
+    stop=None,
+    mem=(),
+    out=None,
+    xmm0=None,
+    inline=None,
+):
     """Runs ``symbol`` of the object ``path``; returns ``[(name, tree)]``: ``("ret", tree)`` or
     the elements stored into the result (``out[i]``), and the branches taken."""
     objs = {path: obj(path)}
@@ -599,7 +653,7 @@ def execute(path, symbol, elem=4, args=(), sret=None, size=64, start=None, stop=
     mach = Machine(elem, objs, inl)
     names = ([sret] if sret else []) + list(args)
     out_base = None
-    for reg, name in zip(ARG_REGS, names):
+    for reg, name in zip(ARG_REGS, names, strict=False):
         base = mach.region(name, size)
         mach.gpr[reg] = base
         if name == sret:
@@ -624,7 +678,9 @@ def execute(path, symbol, elem=4, args=(), sret=None, size=64, start=None, stop=
 
 
 def main():
-    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     p.add_argument("obj")
     p.add_argument("symbol", help="the mangled name")
     p.add_argument("--elem", type=int, default=4)
@@ -641,8 +697,18 @@ def main():
     mem = [(m.split("@")[0], int(m.split("@")[1], 0)) for m in a.mem]
     out = int(a.out.split("@")[1], 0) if a.out else None
     res, trace = execute(
-        a.obj, a.symbol, a.elem, [n for n in a.args.split(",") if n], a.sret, a.size, a.start,
-        a.stop, mem, out, a.xmm0, dict(x.split("=", 1) for x in a.inline),
+        a.obj,
+        a.symbol,
+        a.elem,
+        [n for n in a.args.split(",") if n],
+        a.sret,
+        a.size,
+        a.start,
+        a.stop,
+        mem,
+        out,
+        a.xmm0,
+        dict(x.split("=", 1) for x in a.inline),
     )
     for name, tree in res:
         print(f"{name} = {show(tree)}")

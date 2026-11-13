@@ -32,7 +32,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import symexec as sx  # noqa: E402
+import symexec as sx
 
 HERE = Path(__file__).resolve().parent
 
@@ -64,7 +64,7 @@ def parse(text: str, n: int, det_leaf=None):
     while pos < len(text):
         mt = TOK.match(text, pos)
         if not mt:
-            raise ValueError(f"cannot parse {text[pos:pos + 20]!r}")
+            raise ValueError(f"cannot parse {text[pos : pos + 20]!r}")
         toks.append(mt.group(1))
         pos = mt.end()
         while pos < len(text) and text[pos].isspace():
@@ -132,7 +132,12 @@ def source_dets(path: Path, fn: str) -> dict[int, tuple]:
         rf"T {fn}\(T const \*row0((?:, T const \*row\d)*)\)\s*\{{\s*return(.*?);", text, re.S
     ):
         n = 1 + mt.group(1).count("row")
-        out[n] = parse(mt.group(2).replace("// the extra '+' makes it work nicely with emacs indentation.", ""), n)
+        out[n] = parse(
+            mt.group(2).replace(
+                "// the extra '+' makes it work nicely with emacs indentation.", ""
+            ),
+            n,
+        )
     return out
 
 
@@ -142,7 +147,8 @@ def source_inverses(path: Path) -> dict[int, list]:
     for n in (2, 3, 4):
         mt = re.search(
             rf"vnl_matrix_fixed<T,{n},{n}> vnl_inverse\(vnl_matrix_fixed<T,{n},{n}> const& m\)\s*\{{(.*?)\n\}}",
-            text, re.S,
+            text,
+            re.S,
         )
         body = mt.group(1)
         assert "det = T(1)/det;" in body
@@ -164,7 +170,7 @@ def canon(e):
     k = e[0]
     if k in ("add", "mul"):
         a, b = canon(e[1]), canon(e[2])
-        return (k,) + tuple(sorted([a, b], key=repr))
+        return (k, *tuple(sorted([a, b], key=repr)))
     if k in ("sub", "div"):
         return (k, canon(e[1]), canon(e[2]))
     if k == "neg":
@@ -218,7 +224,7 @@ def chain(x, n, kind) -> tuple[list[str], str]:
     if x[0] in ("add", "sub", "mul") and (is_sum(x[1]) or is_sum(x[2])):
         acc_first = is_sum(x[1])
         lets, last = chain(x[1] if acc_first else x[2], n, kind)
-        lets = lets + [f"let s = {last};"]
+        lets = [*lets, f"let s = {last};"]
         other = flat(x[2] if acc_first else x[1], n, kind)
         return lets, (f"{x[0]}(s, {other})" if acc_first else f"{x[0]}({other}, s)")
     return [], flat(x, n, kind)
@@ -283,7 +289,7 @@ def write_rust(path: Path, dets: dict, invs: dict, provenance: str):
             "_f64": "the order of the `double` instance",
         }[suffix]
         if "div" not in ops:
-            ops = ops + ["div"]
+            ops = [*ops, "div"]
         lines += [
             f"/// `vnl_inverse` of a {n} x {n} matrix whose determinant `det` is not 0: `1 / det`, then",
             f"/// the adjugate's entries times it; {which}.",
@@ -337,7 +343,9 @@ def section(path: Path, name: str) -> tuple[bytes, list[tuple[int, str, str]]]:
             continue
         if cur != ".rela" + name:
             continue
-        mt = re.match(r"^([0-9a-f]+)\s+[0-9a-f]+\s+(\S+)\s+[0-9a-f]+\s+(\S+)\s*([+-]\s*[0-9a-f]+)?", line)
+        mt = re.match(
+            r"^([0-9a-f]+)\s+[0-9a-f]+\s+(\S+)\s+[0-9a-f]+\s+(\S+)\s*([+-]\s*[0-9a-f]+)?", line
+        )
         if mt:
             target = mt.group(3)
             add = int(mt.group(4).replace(" ", ""), 16) if mt.group(4) else 0
@@ -384,7 +392,9 @@ def run(cmd, **kw):
 
 
 def main() -> int:
-    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     p.add_argument("out")
     ws = HERE.parents[4]
     if ".claude" in ws.parts:
@@ -403,8 +413,10 @@ def main() -> int:
 
     members = {
         "libitkvnl-4.13.a": [
-            "vnl_det+float-.cxx.o", "vnl_det+double-.cxx.o",
-            "vnl_matrix_fixed+float.4.4-.cxx.o", "vnl_matrix_fixed+double.4.4-.cxx.o",
+            "vnl_det+float-.cxx.o",
+            "vnl_det+double-.cxx.o",
+            "vnl_matrix_fixed+float.4.4-.cxx.o",
+            "vnl_matrix_fixed+double.4.4-.cxx.o",
         ],
         "libitkvnl_algo-4.13.a": ["vnl_determinant+float-.cxx.o", "vnl_determinant+double-.cxx.o"],
     }
@@ -413,7 +425,18 @@ def main() -> int:
     run(["ar", "x", str(unit / "build/fs/utils/libutils.a"), "numerics.cpp.o"], cwd=out)
     gxx = unit / "toolchain/bin/g++"
     inc = unit / "itk-4.13.2/include/ITK-4.13"
-    run([str(gxx), *FLAGS, "-isystem", str(inc), "-c", str(HERE / "inst.cxx"), "-o", str(out / "inst.o")])
+    run(
+        [
+            str(gxx),
+            *FLAGS,
+            "-isystem",
+            str(inc),
+            "-c",
+            str(HERE / "inst.cxx"),
+            "-o",
+            str(out / "inst.o"),
+        ]
+    )
     gver = run([str(gxx), "--version"]).stdout.splitlines()[0]
     print(f"compiler: {gver}; flags: {' '.join(FLAGS)}")
 
@@ -429,22 +452,27 @@ def main() -> int:
             fail.append(f"{label}: {len(hw)} outputs, the source {len(src)}")
             return
         n_sw = 0
-        for k, (s, h) in enumerate(zip(src, hw)):
+        for k, (s, h) in enumerate(zip(src, hw, strict=False)):
             if canon(s) != canon(h):
                 fail.append(f"{label}[{k}]: not the source's value: {sx.show(h)}")
                 return
             n_sw += swaps(s, h)
-        nops = sum(sx.show(t).count("(") for t in hw)
+        sum(sx.show(t).count("(") for t in hw)
         print(f"SAME-VALUE {label}: {len(hw)} outputs, {n_sw} operations with swapped operands")
         trees[label] = hw
 
     for t, e, tn in (("f", 4, "float"), ("d", 8, "double")):
         for n in (2, 3, 4):
             rows = [f"r{i}" for i in range(n)]
-            res, _ = sx.execute(str(out / f"vnl_det+{tn}-.cxx.o"), mangle_det("vnl_det", t, n), e, rows)
+            res, _ = sx.execute(
+                str(out / f"vnl_det+{tn}-.cxx.o"), mangle_det("vnl_det", t, n), e, rows
+            )
             check(f"vnl_det<{tn}> {n} rows", res, [src_det[n]])
             res, _ = sx.execute(
-                str(out / f"vnl_determinant+{tn}-.cxx.o"), mangle_det("vnl_determinant", t, n), e, rows
+                str(out / f"vnl_determinant+{tn}-.cxx.o"),
+                mangle_det("vnl_determinant", t, n),
+                e,
+                rows,
             )
             check(f"vnl_determinant<{tn}> {n} rows", res, [src_detm[n]])
         for n in (2, 3, 4):
@@ -456,23 +484,46 @@ def main() -> int:
     official = [("f", 4, "float", 3), ("f", 4, "float", 4), ("d", 8, "double", 3)]
     for t, e, tn, n in official:
         inline = {mangle_mul(t, 4): str(out / f"vnl_matrix_fixed+{tn}.4.4-.cxx.o")}
-        res, _ = sx.execute(str(out / "numerics.cpp.o"), mangle_inv(t, n), e, ["m"], "out", 16 * e, inline=inline)
+        res, _ = sx.execute(
+            str(out / "numerics.cpp.o"), mangle_inv(t, n), e, ["m"], "out", 16 * e, inline=inline
+        )
         check(f"vnl_inverse<{tn}> {n}x{n} libutils", res, src_inv[n])
     # the 2 x 2 inverse OpenLUMatrixInverse inlines (the matrix at rsp+0x60, the result at rsp+0xa0)
     res, _ = sx.execute(
-        str(out / "numerics.cpp.o"), "_Z19OpenLUMatrixInverseP6MATRIXS0_", 4, (), None, 16,
-        0x295, 0x305, [("m", 0x60)], 0xA0, "det",
+        str(out / "numerics.cpp.o"),
+        "_Z19OpenLUMatrixInverseP6MATRIXS0_",
+        4,
+        (),
+        None,
+        16,
+        0x295,
+        0x305,
+        [("m", 0x60)],
+        0xA0,
+        "det",
     )
     check("vnl_inverse<float> 2x2 inlined in OpenLUMatrixInverse", res, src_inv[2])
 
     if a.ants:
         aout = out / "ants"
         aout.mkdir(exist_ok=True)
-        run(["ar", "x", str(Path(a.ants) / "libitkvnl-5.4.a"), "vnl_det+float-.cxx.o", "vnl_det+double-.cxx.o"], cwd=aout)
+        run(
+            [
+                "ar",
+                "x",
+                str(Path(a.ants) / "libitkvnl-5.4.a"),
+                "vnl_det+float-.cxx.o",
+                "vnl_det+double-.cxx.o",
+            ],
+            cwd=aout,
+        )
         for t, e, tn in (("f", 4, "float"), ("d", 8, "double")):
             for n in (2, 3, 4):
                 res, _ = sx.execute(
-                    str(aout / f"vnl_det+{tn}-.cxx.o"), mangle_det("vnl_det", t, n), e, [f"r{i}" for i in range(n)]
+                    str(aout / f"vnl_det+{tn}-.cxx.o"),
+                    mangle_det("vnl_det", t, n),
+                    e,
+                    [f"r{i}" for i in range(n)],
                 )
                 check(f"ANTs oracle vnl_det<{tn}> {n} rows", res, [src_det[n]])
 
@@ -492,30 +543,57 @@ def main() -> int:
         for tn in ("float", "double"):
             same(f"vnl_det<{tn}> {n} rows", f"vnl_determinant<{tn}> {n} rows")
             if a.ants:
-                same(f"vnl_det<{tn}> {n} rows", f"ANTs oracle vnl_det<{tn}> {n} rows", required=False)
+                same(
+                    f"vnl_det<{tn}> {n} rows", f"ANTs oracle vnl_det<{tn}> {n} rows", required=False
+                )
         # the generic Rust needs float == double for 3 x 3; 2 x 2 and 4 x 4 get one function each
-        same(f"vnl_inverse<float> {n}x{n} stand-alone", f"vnl_inverse<double> {n}x{n} stand-alone", n == 3)
-    for t, e, tn, n in official:
+        same(
+            f"vnl_inverse<float> {n}x{n} stand-alone",
+            f"vnl_inverse<double> {n}x{n} stand-alone",
+            n == 3,
+        )
+    for _t, _e, tn, n in official:
         same(f"vnl_inverse<{tn}> {n}x{n} libutils", f"vnl_inverse<{tn}> {n}x{n} stand-alone")
-    same("vnl_inverse<float> 2x2 inlined in OpenLUMatrixInverse", "vnl_inverse<float> 2x2 stand-alone")
+    same(
+        "vnl_inverse<float> 2x2 inlined in OpenLUMatrixInverse",
+        "vnl_inverse<float> 2x2 stand-alone",
+    )
 
     # the stand-alone instances the probe calls are the libutils ones byte for byte
-    for t, e, tn, n in official:
+    for t, _e, tn, n in official:
         sym = ".text." + mangle_inv(t, n)
         x, y = section(out / "numerics.cpp.o", sym), section(out / "inst.o", sym)
         if x != y:
-            fail.append(f"vnl_inverse<{tn}> {n}x{n}: inst.o's bytes or relocations are not libutils'")
+            fail.append(
+                f"vnl_inverse<{tn}> {n}x{n}: inst.o's bytes or relocations are not libutils'"
+            )
         else:
-            print(f"SAME-BYTES vnl_inverse<{tn}> {n}x{n}: inst.o == libutils ({len(x[0])} bytes, {len(x[1])} relocations)")
+            print(
+                f"SAME-BYTES vnl_inverse<{tn}> {n}x{n}: inst.o == libutils ({len(x[0])} bytes, {len(x[1])} relocations)"
+            )
     if a.official:
-        programs = ["mri_robust_register", "mri_coreg", "mri_convert", "mri_info", "mri_vol2vol",
-                    "mris_make_surfaces", "mri_ca_register", "mri_normalize", "mri_segstats", "mris_sphere"]
+        programs = [
+            "mri_robust_register",
+            "mri_coreg",
+            "mri_convert",
+            "mri_info",
+            "mri_vol2vol",
+            "mris_make_surfaces",
+            "mri_ca_register",
+            "mri_normalize",
+            "mri_segstats",
+            "mris_sphere",
+        ]
         pieces = {}
-        for t, e, tn in (("f", 4, "float"), ("d", 8, "double")):
+        for t, _e, tn in (("f", 4, "float"), ("d", 8, "double")):
             for n in (2, 3, 4):
-                pieces[f"vnl_det<{tn}> {n} rows"] = section(out / f"vnl_det+{tn}-.cxx.o", ".text." + mangle_det("vnl_det", t, n))
-        for t, e, tn, n in official:
-            pieces[f"vnl_inverse<{tn}> {n}x{n}"] = section(out / "numerics.cpp.o", ".text." + mangle_inv(t, n))
+                pieces[f"vnl_det<{tn}> {n} rows"] = section(
+                    out / f"vnl_det+{tn}-.cxx.o", ".text." + mangle_det("vnl_det", t, n)
+                )
+        for t, _e, tn, n in official:
+            pieces[f"vnl_inverse<{tn}> {n}x{n}"] = section(
+                out / "numerics.cpp.o", ".text." + mangle_inv(t, n)
+            )
         seen, found = search_official(Path(a.official), programs, pieces)
         for label, k in found.items():
             print(f"OFFICIAL {label}: in {k} of {seen} official programs")

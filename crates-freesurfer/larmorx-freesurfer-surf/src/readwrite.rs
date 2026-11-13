@@ -40,6 +40,7 @@ use crate::alloc;
 use crate::coords::{self, Io};
 use crate::curvio::{apply_fsgii_read, apply_fsgii_write};
 use crate::formats::{self, MRIS_TRIANGULAR_SURFACE};
+use crate::gifti;
 use crate::ico;
 use crate::metric;
 use crate::mp;
@@ -586,17 +587,14 @@ fn read_by_type(
             .into_new()
             .map(|m| (m, -3)),
         MRIS_GIFTI_FILE => {
-            // `mrisReadGIFTIfile(fname, NULL)`: gifticlib's reader; a file it cannot open gives
-            // its message and FreeSurfer's, `None`; an existing file needs gifti.cpp's surface
-            // part (not yet ported)
-            match open(dir, fname, "r") {
-                Ok(_) => gifti_pending("MRISread"),
-                Err(e) => {
-                    g.errno = e;
-                    let _ = writeln!(io.err, "** failed to open GIFTI XML file '{fname}'");
-                    let _ = writeln!(io.err, "mrisReadGIFTIdanum: ERROR reading gifti {fname}");
-                    None
-                }
+            // `mrisReadGIFTIfile(fname, NULL)` (gifti.cpp's reader, [`gifti`]); a file that
+            // cannot be opened leaves `fopen`'s `errno`
+            if let Err(e) = open(dir, fname, "r") {
+                g.errno = e;
+            }
+            match gifti::mris_read_gifti_file(g, sg, io, dir, fname, None, None, -1, None)? {
+                gifti::GiftiRead::New(m) => Some((*m, -3)),
+                _ => None,
             }
         }
         MRI_MGH_FILE | NII_FILE => {
@@ -676,7 +674,7 @@ fn put_face(g: &mut Globals, f: &mut Vec<i32>, i: usize, fno: i32, vno: usize) {
 /// `MRISreadOverAlloc(fname, nVFMultiplier)`: FreeSurfer 8.2.0 always takes the new reader
 /// (`MRISreadOverAlloc_new`, utils/mrisurf_io.cpp lines 3542-3791). The reader the name's type
 /// chooses (`MRISfileNameType`; the licence check passes): ASCII, icosahedron (returned as its
-/// reader made it), movie.byu, STL, VTK, GIFTI (gifti.cpp's surface part: not yet ported); an MGH
+/// reader made it), movie.byu, STL, VTK, GIFTI ([`gifti::mris_read_gifti_file`]); an MGH
 /// type is the fatal error `ERROR: MRISread: cannot read surface data from file <file>!`; any other
 /// name by its 3-byte magic number: a triangle file (its reader failing: `mrisReadTriangleFile
 /// failed.` with its code), a quadrangle file (new or old), or the old format (no magic number).

@@ -1340,7 +1340,7 @@ defects! {
     FS_146 = "FS-146", "FreeSurfer", true,
         "MRISreadVTK with a file that ends before a field's values takes the missing values as 0 and reports success";
     FS_147 = "FS-147", "FreeSurfer", true,
-        "MRISreadVTK and the ASCII and movie.byu surface readers count a vertex's faces in one byte: a vertex of more than 255 faces gets its count modulo 256";
+        "MRISreadVTK and the ASCII, movie.byu and GIFTI surface readers count a vertex's faces in one byte: a vertex of more than 255 faces gets its count modulo 256";
     FS_148 = "FS-148", "FreeSurfer", true,
         "MRISbuildFileName_read with a name whose first dot is its first character, or its second after an h, and the curvature reader's file-name choice with a name whose first dot is its first or second character, read one or two bytes before the name to decide whether it names a hemisphere";
     FS_149 = "FS-149", "FreeSurfer", true,
@@ -1516,7 +1516,7 @@ defects! {
     FS_355 = "FS-355", "FreeSurfer", true,
         "the surface library's annotation reader, given an annotation name without a folder that starts with the surface's hemisphere letters (lh.aparc.annot for a left surface), adds the hemisphere again (label/lh.lh.aparc.annot), so it does not find the file the annotation writer wrote for the same name; it takes a name as naming the hemisphere only when the name is the two letters alone, in any case";
     FS_356 = "FS-356", "FreeSurfer", true,
-        "the surface library's file-type test and the curvature and annotation name builders, given a name (or a surface name) whose folder or last part is 1,024 bytes or more, write past a 1,024-byte buffer (the program can end with '*** stack smashing detected ***' or go on with corrupted names); the surface reader (MRISread), looking for the subject's Talairach transform beside a surface name of 300 bytes or more, writes past a 300-byte buffer";
+        "the surface library's file-type test and the curvature and annotation name builders, given a name (or a surface name) whose folder or last part is 1,024 bytes or more, write past a 1,024-byte buffer (the program can end with '*** stack smashing detected ***' or go on with corrupted names); the surface reader (MRISread), looking for the subject's Talairach transform beside a surface name of 300 bytes or more, writes past a 300-byte buffer; the GIFTI surface reader copies a file name of 1,024 bytes or more past the surface's 1,024-byte name";
     FS_357 = "FS-357", "FreeSurfer", true,
         "the surface library's neighbourhood search (the 2- and 3-hop neighbours MRISread and others compute), given a vertex with a ripped vertex among its known neighbours, reads its neighbour list past the part it filled: the vertex's neighbourhood then depends on memory contents (MRISread then ends with a failed assertion at the ripped vertex)";
     FS_358 = "FS-358", "FreeSurfer", true,
@@ -1565,6 +1565,36 @@ defects! {
         "the averaging of a surface's gradients (MRISaverageGradients), on a surface whose neighbour lists are not symmetric (an unripped neighbour whose own neighbours are all ripped), averages a vertex with other vertices' neighbours and reads past its list (an undefined result)";
     FS_380 = "FS-380", "FreeSurfer", true,
         "the vertex report (MRISprintVertexInfo) lists a vertex's neighbours by its face count, so for a vertex with more faces than room in its neighbour list it reads past the list (undefined numbers or a crash)";
+    FS_381 = "FS-381", "FreeSurfer", true,
+        "the GIFTI surface reader (mrisReadGIFTIfile; MRISread of a .gii surface) copies the coordinates' VolGeomFname metadata into the surface's 1,024-byte volume-geometry name as 1,024 bytes whatever its length: past a shorter name it copies memory outside the metadata (bytes that the surface's writers later write), and a name of 1,024 bytes or more is left without its end";
+    FS_382 = "FS-382", "FreeSurfer", true,
+        "the GIFTI surface reader, given a NUM_TAG_CMDLINE above 1,000 in the coordinates' metadata, says it keeps the last 1,000 command lines and then never returns";
+    FS_383 = "FS-383", "FreeSurfer", true,
+        "the GIFTI surface reader takes the face array's vertex numbers unchecked: a face naming a vertex the surface does not have (negative, or past the coordinates) is counted in memory outside the surface (an undefined result or a crash, then or later)";
+    FS_384 = "FS-384", "FreeSurfer", true,
+        "the GIFTI reader's sparse storage (a NIFTI_INTENT_NODE_INDEX array) takes its vertex numbers unchecked: a number the surface does not have stores the value in memory outside the surface";
+    FS_385 = "FS-385", "FreeSurfer", true,
+        "the GIFTI reader reads a NIFTI_INTENT_LABEL array's values as 32-bit unsigned integers whatever the array's data type: the keys of a FLOAT32 array are its numbers' bit patterns, and an array of 8- or 16-bit integers is read four bytes per value, past its data";
+    FS_386 = "FS-386", "FreeSurfer", true,
+        "the GIFTI reader looks a label array's keys up in the surface's colour table by key: a key the table has no entry for (a table the caller gives, or one made from a colour array read before the labels) is read outside the table or through an empty entry (a crash)";
+    FS_387 = "FS-387", "FreeSurfer", true,
+        "the GIFTI surface reader compares a coordinate system's DataSpace (and, for NIFTI_XFORM_UNKNOWN, its TransformedSpace) without checking that the file gave one: a coordinate system without it crashes the program";
+    FS_388 = "FS-388", "FreeSurfer", true,
+        "the GIFTI reader, asked for one data array by number (an annotation's data array), does not check the number against the file's arrays: a number past them, or negative, reads outside the image's array list (a crash)";
+    FS_389 = "FS-389", "FreeSurfer", true,
+        "the GIFTI label-table reader uses each label's key as its place in the colour table without checking its sign: a negative key writes its entry before the table (the table then holds fewer entries than labels and the reader refuses the file, or the program crashes)";
+    FS_390 = "FS-390", "FreeSurfer", false,
+        "the GIFTI reader's sparse storage (a NIFTI_INTENT_NODE_INDEX array) is refused unless it lists every vertex: the data arrays that follow it must hold one value per vertex of the surface, not one per listed vertex as the GIFTI format's sparse storage has them";
+    FS_391 = "FS-391", "FreeSurfer", true,
+        "the GIFTI reader's shape overlays (NIFTI_INTENT_SHAPE arrays read as overlays) take their data type from the array's ShapeDataType metadata: an array without it gets a data type of memory contents, and one of 256 bytes or more is written past the overlay's 256-byte field";
+    FS_392 = "FS-392", "FreeSurfer", true,
+        "the GIFTI reader's shape overlays copy the array's Name metadata as 1,024 bytes: a name of 1,024 bytes or more is left without its end and read past";
+    FS_393 = "FS-393", "FreeSurfer", true,
+        "the colour table the GIFTI reader makes from a NIFTI_INTENT_RGB_VECTOR or RGBA_VECTOR array takes each colour's alpha from memory past the three components it stored (an undefined alpha)";
+    FS_394 = "FS-394", "FreeSurfer", false,
+        "the GIFTI reader's statistics overlays (data arrays of the other intents read as overlays) keep only the first array of each run of one intent, never add the last run to the overlay list, and write the third and later arrays of a run outside their one-frame volume: a file of statistics arrays gives no statistics overlay, or one with only its first array";
+    FS_395 = "FS-395", "FreeSurfer", true,
+        "the GIFTI reader compares the file's Version with \"1\" without checking that the file gave one: a GIFTI file without a Version attribute crashes the program (gifticlib itself accepts it)";
     FS_221 = "FS-221", "FreeSurfer", true,
         "the volume format probe (mri_identify, the format tests and the volume-name helpers) misbehaves for a file name of 1,024 bytes or more (a Bruker study's file names of 512 or more, the stem helpers' names of 2,000 or more): its answer is undefined and the program can crash";
     FS_222 = "FS-222", "FreeSurfer", true,

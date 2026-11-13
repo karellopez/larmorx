@@ -402,6 +402,9 @@ pub struct SurfGlobals {
     /// `FREESURFER_MRISaverageGradients_optimize_suppress` was unset), `None` before its first
     /// call.
     pub avg_gradients_optimize: Option<bool>,
+    /// gifticlib's settings and persistent state (its globals `G` and `GXD`, `larmorx_io::gifti`):
+    /// the GIFTI readers' and writers' (`utils/gifti.cpp`, [`crate::gifti`]).
+    pub gifti: larmorx_io::gifti::Gifti,
 }
 
 /// `sigmas_default` (`mrisurf_base.cpp` line 962).
@@ -443,6 +446,7 @@ impl Default for SurfGlobals {
             around_vertex_limit: 1,
             sff_at_vertex_eigen: None,
             avg_gradients_optimize: None,
+            gifti: larmorx_io::gifti::Gifti::default(),
         }
     }
 }

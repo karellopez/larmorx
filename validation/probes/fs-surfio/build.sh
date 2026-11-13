@@ -27,7 +27,7 @@ official=${official%/utils/mri.cpp}
 [ -n "$official" ] || { echo "no official source folder in $b/utils/libutils.a" >&2; exit 1; }
 flags=(-DHAVE_OPENGL -DHAVE_OPENMP -DHAVE_ZLIB -DITK_USE_SYSTEM_ZLIB -DLinux -DUSING_DCM2NIIXFSWRAPPER
   -DUSING_MGH_NIFTI_IO -I"$s/include" -I"$b/include" -I"$s/packages/minc" -I"$s/packages/netcdf"
-  -I"$s/packages/nifti" -isystem "$itk/include/ITK-4.13" -fopenmp -fno-builtin -Wall -Wextra
+  -I"$s/packages/nifti" -I"$s/packages/gifti" -isystem "$itk/include/ITK-4.13" -fopenmp -fno-builtin -Wall -Wextra
   -Wno-cpp -Wno-restrict -Wno-format-overflow -Wno-sign-compare -Wno-unused-result
   -Wno-unused-parameter -Wno-bool-compare -Wno-unused-but-set-variable -fPIC -fdata-sections
   -ffunction-sections -O3 -DNDEBUG -std=c++11 "-fmacro-prefix-map=$s=$official")

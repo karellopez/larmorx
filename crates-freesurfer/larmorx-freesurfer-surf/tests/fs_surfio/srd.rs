@@ -419,6 +419,8 @@ fn write(g: &mut Gen, m: &Mesh, heavy: bool) -> (String, Vec<u8>) {
             (g.pick(&[".stl", ".STL"]).into(), b)
         }
         7 => (".vtk".into(), vtk(g, nv, &m.f)),
+        // relay 21: the GIFTI surface reader
+        8 => (".gii".into(), super::gii::surface_file(g, m, heavy)),
         _ => {
             // the icosahedron format: 4- or 6-number vertex lines, 3- or 4-number face lines
             let mut s = String::new();

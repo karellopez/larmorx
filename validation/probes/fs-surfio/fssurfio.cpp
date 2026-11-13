@@ -40,6 +40,7 @@
 #include <vector>
 
 #include "diag.h"
+#include "gifti.h"
 #include "error.h"
 #include "mrisurf_metricProperties.h"
 #include "mrisurf_MRIS.h"
@@ -2271,6 +2272,117 @@ void srd_case()
 }
 
 
+// ---- relay 21: gii, the GIFTI surface reader (gifti.cpp's mrisReadGIFTIdanum) -------------------
+
+// A surface as gii prints it: counts, type, hemisphere, name, real-RAS flag, volume geometry,
+// centre, group-average area, command lines, the Talairach matrix, the colour table (each entry's
+// name and colours), per vertex its coordinates, curvature, val, stat, annotation, dx dy dz and
+// face count, per face its vertices
+void dump_gii_surface(MRIS *s)
+{
+  oi(s->nvertices); oi(s->nfaces); oi(s->type); oi(s->hemisphere); oh(s->fname.data());
+  oi(s->useRealRAS);
+  dump_vg(&s->vg);
+  of(s->xctr); of(s->yctr); of(s->zctr); of(s->group_avg_surface_area);
+  oi(s->ncmds);
+  for (int k = 0; k < s->ncmds; k++) oh(s->cmdlines[k]);
+  if (!s->SRASToTalSRAS_) out += "NULL ";
+  else
+    for (int r = 1; r <= 4; r++)
+      for (int c = 1; c <= 4; c++) of(*MATRIX_RELT(s->SRASToTalSRAS_, r, c));
+  COLOR_TABLE *ct = s->ct;
+  if (!ct) out += "NULL ";
+  else {
+    oi(ct->nentries); oi(ct->version); oh(ct->fname);
+    for (int k = 0; k < ct->nentries; k++) {
+      CTE *e = ct->entries[k];
+      if (!e) { out += "- "; continue; }
+      oh(e->name); oi(e->ri); oi(e->gi); oi(e->bi); oi(e->ai);
+      of(e->rf); of(e->gf); of(e->bf); of(e->af);
+    }
+  }
+  for (int vno = 0; vno < s->nvertices; vno++) {
+    VERTEX *v = &s->vertices[vno];
+    float c[9] = {v->x, v->y, v->z, v->curv, v->val, v->stat, v->dx, v->dy, v->dz};
+    for (float x : c) of(x);
+    oi(v->annotation); oi(s->vertices_topology[vno].num);
+  }
+  for (int fno = 0; fno < s->nfaces; fno++) {
+    FACE *f = &s->faces[fno];
+    oi(f->v[0]); oi(f->v[1]); oi(f->v[2]);
+  }
+}
+
+// gii: Gdiag's bits; the case's input files; a surface kept for the reads that pass one (made by
+// MRISalloc with <n> vertices and no faces, or none); a colour table for the reads that give one
+// (its entries: present or not, name, r g b a); 1 to 3 reads `<name> <daNum> <flags>` (flags 1:
+// pass the kept surface, 2: ask for the overlays, 4: give the colour table), each printed as
+// NULL, PASSED or NEW with the surface, then the overlays (name, type, intent, shape data type,
+// format, values per vertex, the volume's size and its first slice's values)
+void gii_case()
+{
+  mkdir(workdir.c_str(), 0700);
+  clear_dir(workdir, true);
+  if (chdir(workdir.c_str()) != 0) fail("chdir");
+  mkdir("d", 0700);
+  int gd = geti();
+  if (gd & 1) Gdiag |= DIAG_SHOW;
+  if (gd & 2) Gdiag |= DIAG_VERBOSE;
+  int nin = geti();
+  for (int k = 0; k < nin; k++) {
+    std::string name = geth(), bytes = geth();
+    FILE *fp = fopen(name.c_str(), "wb");
+    if (!fp) fail("an input file");
+    fwrite(bytes.data(), 1, bytes.size(), fp);
+    fclose(fp);
+  }
+  int nkeep = geti();
+  MRIS *keep = nkeep > 0 ? MRISalloc(nkeep, 0) : NULL;
+  int nct = geti();
+  COLOR_TABLE *ctab = NULL;
+  if (nct >= 0) {
+    ctab = (COLOR_TABLE *)calloc(1, sizeof(COLOR_TABLE));
+    ctab->nentries = nct;
+    ctab->version = 2;
+    ctab->entries = (COLOR_TABLE_ENTRY **)calloc(nct + 1, sizeof(COLOR_TABLE_ENTRY *));
+    strcpy(ctab->fname, "user.ctab");
+    for (int k = 0; k < nct; k++) {
+      if (!geti()) continue;
+      CTE *e = (CTE *)calloc(1, sizeof(CTE));
+      std::string name = geth();
+      strncpy(e->name, name.c_str(), sizeof(e->name) - 1);
+      e->ri = geti(); e->gi = geti(); e->bi = geti(); e->ai = geti();
+      e->rf = e->ri / 255.0f; e->gf = e->gi / 255.0f; e->bf = e->bi / 255.0f; e->af = e->ai / 255.0f;
+      ctab->entries[k] = e;
+    }
+  }
+  errno = 0;
+  int nops = geti();
+  for (int k = 0; k < nops; k++) {
+    const char *nm = name_tok();
+    int danum = geti();
+    int flags = geti();
+    std::vector<OverlayInfoStruct> ov;
+    MRIS *in = (flags & 1) ? keep : NULL;
+    MRIS *r = mrisReadGIFTIfile(nm, in, (flags & 2) ? &ov : NULL, danum, (flags & 4) ? ctab : NULL);
+    if (!r) out += "NULL ";
+    else if (r == in) { out += "PASSED "; dump_gii_surface(r); }
+    else { out += "NEW "; dump_gii_surface(r); }
+    if (in) { out += "KEPT "; dump_gii_surface(in); }
+    oi((long long)ov.size());
+    for (OverlayInfoStruct &o : ov) {
+      if (o.__foverlay) oh(o.__foverlay); else out += "NULL ";
+      oi(o.__type); oi(o.__giftiIntent); oh(o.__shapedatatype); oi(o.__format);
+      oi(o.__nValsPerVertex);
+      MRI *m = o.__overlaymri;
+      if (!m) { out += "NULL "; continue; }
+      oi(m->width); oi(m->height); oi(m->depth); oi(m->nframes);
+      for (int x = 0; x < m->width; x++) of(MRIgetVoxVal(m, x, 0, 0, 0));
+    }
+  }
+}
+
+
 // ---- relay 17: mpb, the metric properties of 3.1-50 part b ----------------------------------------
 
 void dump_mpb_vertices(MRIS *s)
@@ -3278,6 +3390,8 @@ void run_case()
     mpd_case();
   } else if (cmd == "mpe") {
     mpe_case();
+  } else if (cmd == "gii") {
+    gii_case();
   } else if (cmd == "names") {
     int n = geti();
     keep.reserve(n);

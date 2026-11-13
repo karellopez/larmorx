@@ -79,6 +79,7 @@ pub mod dist;
 pub mod edges;
 pub mod facenorm;
 pub mod formats;
+pub mod gifti;
 pub mod ico;
 pub mod lta;
 pub mod metric;

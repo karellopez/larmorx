@@ -433,7 +433,6 @@ group = "fsl"
 name = "fast"
 command = "larmorx fsl fast"
 python = "lx.fsl.fast"
-does = "Segments a skull-stripped brain into tissue classes (by default CSF, grey matter and white matter), with a bias field and each class's partial volume."
 api = "docs/api/fsl-fast.md"
 evidence = "/evidence/fsl-fast/"
 records = { replica = ["fsl-fast-replica"], clean-room = ["fsl-fast"] }

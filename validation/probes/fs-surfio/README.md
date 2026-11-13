@@ -67,6 +67,19 @@ bytes; the port's side in `tests/fs_surfio/sfile.rs`, in a temporary folder), 30
   different only with a notice), and the hash the test checks. Run it inside
   `scripts/orchestration/boxed.sh`.
 
+Measured 2026-11-13 (relay 15, 36 commands): `fnam` alone, seeds 7 (1,000 cases), 13 and 17 (2,000
+each): every comparable case identical with `reproduce` (14, 37 and 40 counted, not compared: FS-356),
+`fix` different only with notices; `swr` alone, seeds 7 (1,000), 13 and 17 (2,000 each): every
+comparable case identical (9, 13 and 11 counted, not compared), `fix` different only with notices
+(the first run found that `mrisWriteSTL`'s failed open leaves `errno` for later messages: fixed in the
+port); `stl` seed 7 unchanged. The whole probe at seed 7, 7,200 cases: 7,090 identical with
+`reproduce`, 110 counted, not compared, 0 different; `fix` different only with notices (and 7 `posn`
+cases of correctly rounded maths). Seed 1, 1,080 cases: 1,064 identical, 16 `SKIP`, hash
+`c2ea12117f4b024167aed9c765687f2ca1a6c4ee4155f6c5538f657b82d33eca` (the test), passing in debug and
+release, plain and under the AArch64 NaN emulation (1,160 and 10,285 flips); `fnam`, `swr`, `tri`
+and `stl` at seed 7 identical under the emulation in both modes. Logs:
+`oracles/logs/fs-surfio-relay15-*`.
+
 Measured 2026-11-13 (relay 14, 34 commands): `tri` alone, seeds 7 (1,000 cases), 13 (1,000) and 17
 (2,000): every comparable case identical with `reproduce` (36, 54 and 80 counted, not compared), the
 default different only with notices. After fs.core's `cscan::Scanf` and `fnv` replaced the crate's own

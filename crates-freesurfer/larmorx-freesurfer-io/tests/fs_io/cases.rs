@@ -234,6 +234,24 @@ const FORMATS: [&str; 20] = [
     "% .2f", "%012.3e", "%.0f", "%d", "%f%f", "%s", "%Lf", "%a",
 ];
 
+/// The indices of seed 1's 4,800 portable cases that take more than 0.25 s of CPU each in a debug
+/// build (2026-11-13, track A relay 17, `tests/fs_io_heavy.rs`: 22 of the 23 s): a 100,000-entry
+/// colour table read and printed whole, and .mat files whose corrupted headers make both readers
+/// allocate and hash millions of numbers. The recorded test (`fs_io_official.rs`) leaves them to the
+/// probe's runs (`check.py --portable` without `--light`, every seed's full runs), which keep them.
+pub const HEAVY_SEED1: [usize; 6] = [815, 980, 1496, 2060, 3002, 3237];
+
+/// The recorded test's cases: seed 1's 4,800 portable cases without [`HEAVY_SEED1`] (4,794).
+#[allow(dead_code)]
+pub fn recorded_cases() -> Vec<String> {
+    generate(1, 4800, true)
+        .into_iter()
+        .enumerate()
+        .filter(|(i, _)| !HEAVY_SEED1.contains(i))
+        .map(|(_, l)| l)
+        .collect()
+}
+
 /// `n` case lines of seed `seed`; `portable`: only the cases whose results are the same on every
 /// platform (no permissions, links, overlong names or huge allocations).
 pub fn generate(seed: u64, n: usize, portable: bool) -> Vec<String> {

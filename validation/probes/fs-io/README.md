@@ -83,8 +83,10 @@ Run (inside a memory box; the port and FreeSurfer run on generated inputs):
     validation/probes/fs-io/build.sh <workspace>
     scripts/orchestration/boxed.sh 6 python -P validation/probes/fs-io/check.py --seed 1 --n 1100
     scripts/orchestration/boxed.sh 10 python -P validation/probes/fs-io/check.py --seed 1 --n 4800 --portable
+    scripts/orchestration/boxed.sh 10 python -P validation/probes/fs-io/check.py --seed 1 --n 4800 --portable --light
     scripts/orchestration/boxed.sh 12 python -P validation/probes/fs-io/check.py --seed 7 --n 86000
     scripts/orchestration/boxed.sh 6 python -P validation/probes/fs-io/matfile_scipy.py
 
-The portable run's hash (`official_sha256_skip`) is `tests/fs_io_official.rs`'s, checked on every
-platform. Results (2026-11-13): `docs/findings/freesurfer-io.md`.
+The light run's hash (`official_sha256_skip` with `--light`: the portable cases without the six that
+take seconds in a debug build, `cases::HEAVY_SEED1`, measured by `tests/fs_io_heavy.rs`) is
+`tests/fs_io_official.rs`'s, checked on every platform; the portable run keeps the six. Results (2026-11-13): `docs/findings/freesurfer-io.md`.

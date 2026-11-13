@@ -15,10 +15,13 @@ digit. ``reproduce`` must give FreeSurfer's line on every case but those the por
 FS-175), which are counted, not compared, and those it marks ``VARY`` (FreeSurfer's result
 depends on memory it freed or never wrote: FS-168, FS-170), which are compared and counted apart;
 ``fix`` may differ only where a defect it corrects changed the result (its notices).
-Prints the counts and the hash the port's recorded test checks (``tests/fs_io_official.rs``: the
-``portable`` cases, which give the same results on every platform).
+Prints the counts and the hash of the lines; with ``--light`` (seed 1, 4,800 ``portable`` cases
+only) the hash the port's recorded test checks (``tests/fs_io_official.rs``: the ``portable`` cases,
+which give the same results on every platform, without the six that take seconds in a debug build,
+``cases::HEAVY_SEED1``).
 
     python -P validation/probes/fs-io/check.py --seed 1 --n 1100 [--portable] [--json out.json]
+    python -P validation/probes/fs-io/check.py --seed 1 --n 4800 --portable --light
 """
 
 from __future__ import annotations
@@ -91,6 +94,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--n", type=int, default=1100)
     ap.add_argument("--portable", action="store_true")
+    ap.add_argument("--light", action="store_true", help="the recorded test's cases")
     ap.add_argument("--jobs", type=int, default=6)
     ap.add_argument("--json", type=Path)
     a = ap.parse_args(argv)
@@ -101,9 +105,14 @@ def main(argv: list[str] | None = None) -> int:
     port = port_binary(a.jobs)
     inputs = ws / "oracles" / "inputs" / "fs-io"
     inputs.mkdir(parents=True, exist_ok=True)
-    tag = "portable" if a.portable else "all"
+    if a.light and not (a.portable and a.seed == 1 and a.n == 4800):
+        raise SystemExit("--light is the recorded test's set: --seed 1 --n 4800 --portable")
+    tag = "light" if a.light else "portable" if a.portable else "all"
     cases_path = inputs / f"cases-{tag}-{a.seed}-{a.n}.txt"
-    gen = [str(port), "cases", str(a.seed), str(a.n)] + (["portable"] if a.portable else [])
+    if a.light:
+        gen = [str(port), "recorded"]
+    else:
+        gen = [str(port), "cases", str(a.seed), str(a.n)] + (["portable"] if a.portable else [])
     text = subprocess.run(gen, check=True, capture_output=True, text=True).stdout
     cases_path.write_text(text, encoding="utf-8")
     cases = text.splitlines()
@@ -174,6 +183,7 @@ def main(argv: list[str] | None = None) -> int:
         "seed": a.seed,
         "cases": len(cases),
         "portable": a.portable,
+        "light": a.light,
         "served": done.cached,
         "reproduce_equal": sum(equal.values()),
         "reproduce_equal_with_memory_digits": masked_lines,

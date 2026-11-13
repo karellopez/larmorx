@@ -403,6 +403,37 @@ pub fn mri_sort(
     })
 }
 
+/// `MRIsort(mri, mask, mri)`: [`mri_sort`] into the input itself (each voxel's frames read, sorted
+/// and written back).
+pub fn mri_sort_in_place(
+    g: &mut Globals,
+    err: &mut dyn Write,
+    mri: &mut Mri,
+    mask: Option<&Mri>,
+) -> Result<(), Fatal> {
+    let (nc, nr, ns, nf) = (mri.vg.width, mri.vg.height, mri.vg.depth, mri.nframes);
+    let mut vf = vec![0.0f64; usize::try_from(nf).unwrap_or(0)];
+    for s in 0..ns {
+        for r in 0..nr {
+            for c in 0..nc {
+                if let Some(mk) = mask {
+                    if mri_get_vox_val(g, err, mk, c, r, s, 0, 0)? < 0.5 {
+                        continue;
+                    }
+                }
+                for (f, v) in vf.iter_mut().enumerate() {
+                    *v = widen(mri_get_vox_val(g, err, mri, c, r, s, f as i32, 0)?);
+                }
+                qsort(&mut vf, compare_doubles);
+                for (f, &v) in vf.iter().enumerate() {
+                    mri_set_vox_val(g, err, mri, c, r, s, f as i32, v as f32, 0)?;
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 /// `(double)` of a `float` as x86-64's `cvtss2sd` makes it: a signalling NaN quieted (its payload
 /// kept), whatever the compiler folds.
 fn widen(x: f32) -> f64 {

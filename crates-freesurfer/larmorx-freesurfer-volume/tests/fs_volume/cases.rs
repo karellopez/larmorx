@@ -43,6 +43,7 @@ use larmorx_freesurfer_volume::seq as sq;
 use larmorx_freesurfer_volume::skull as sk;
 use larmorx_freesurfer_volume::stats as st;
 use larmorx_freesurfer_volume::vgeom;
+use larmorx_freesurfer_volume::voxops as vx;
 use larmorx_freesurfer_volume::xform as xf;
 
 /// The cases' random numbers.
@@ -2213,6 +2214,133 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
                     }
                 }
             }
+            "fpow" | "mbin" | "reshape" | "mmax" | "mconst" | "fbin" | "vote" | "msq" | "crop"
+            | "revs" | "cutend" | "segids" | "hcos" => {
+                let mut s = shape(&mut g);
+                s.hdr = s.hdr && g.chance(3);
+                if matches!(cmd, "vote" | "fbin" | "fpow") && g.chance(2) {
+                    s.nf = g.int(1, 6);
+                }
+                if matches!(cmd, "fpow") && g.chance(2) {
+                    s.ty = 3;
+                }
+                vol_of(&mut g, &mut t, s);
+                let vals: &[f32] = &[0.0, 1.0, 2.0, 3.0, -1.0, 4.0, 0.5, 2.0, 7.0, 100.0];
+                fill_paint(&mut g, &mut t, s, &[&[0.0, 1.0, 2.0, 4.0]], &[vals]);
+                let opt = |g: &mut Gen, t: &mut Vec<String>, s: Shape| {
+                    let d = g.chance(3);
+                    t.push(i64::from(d).to_string());
+                    if d {
+                        let o = like(g, s);
+                        vol_of(g, t, o);
+                    }
+                };
+                let mask = |g: &mut Gen, t: &mut Vec<String>, s: Shape| {
+                    let m = g.chance(3);
+                    t.push(i64::from(m).to_string());
+                    if m {
+                        let o = like(g, s);
+                        vol_of(g, t, o);
+                        let mv: &[f32] = &[0.0, 1.0, 0.5, 0.75, 0.25];
+                        fill_paint(g, t, o, &[mv], &[mv]);
+                    }
+                };
+                match cmd {
+                    "fpow" => {
+                        let n = s.nf.max(1);
+                        t.push(n.to_string());
+                        for _ in 0..n {
+                            t.push(fx(
+                                g.pick(&[1.0f32, 0.5, 2.0, 3.0, -1.0, 0.0, 0.25, 1.000001])
+                            ));
+                        }
+                    }
+                    "mbin" => {
+                        let mode = g.int(0, 2);
+                        t.push(mode.to_string());
+                        if mode == 1 {
+                            let o = like(&mut g, s);
+                            vol_of(&mut g, &mut t, o);
+                        }
+                        t.push(fx(g.pick(&[0.0f32, 1.0, 0.5, -1.0, 2.5])));
+                        let ht = g.chance(4) || !g.chance(3);
+                        t.push(i64::from(ht).to_string());
+                        if ht {
+                            let w = g.pick(&[
+                                "positive", "neg", "ABS", "Absolute", "po", "x", "negative",
+                            ]);
+                            t.push(hex(w.as_bytes()));
+                        }
+                        t.push(i64::from(g.chance(2)).to_string());
+                    }
+                    "reshape" => {
+                        let n = s.w * s.h * s.d * s.nf.max(1);
+                        let sh = if g.chance(5) {
+                            [g.int(1, 3), g.int(1, 3), g.int(1, 2), g.int(1, 2)]
+                        } else if g.chance(2) {
+                            [n, 1, 1, 1]
+                        } else {
+                            [1, n, 1, 1]
+                        };
+                        for v in sh {
+                            t.push(v.to_string());
+                        }
+                    }
+                    "mmax" => {
+                        let o = like(&mut g, s);
+                        vol_of(&mut g, &mut t, o);
+                        fill_paint(&mut g, &mut t, o, &[vals], &[vals]);
+                        opt(&mut g, &mut t, s);
+                    }
+                    "mconst" => {
+                        t.push(dx(g.pick(&[2.0, -1.5, 0.0, 1e300, 0.1])));
+                        t.push(i64::from(g.chance(2)).to_string());
+                        opt(&mut g, &mut t, s);
+                    }
+                    "fbin" => {
+                        t.push(dx(g.pick(&[0.0, 0.5, 1.0, 3.0, -1.0])));
+                        mask(&mut g, &mut t, s);
+                    }
+                    "vote" => {
+                        mask(&mut g, &mut t, s);
+                        let d = g.chance(4);
+                        t.push(i64::from(d).to_string());
+                        if d {
+                            let mut o = like(&mut g, s);
+                            if g.chance(2) {
+                                (o.nf, o.ty) = (2, s.ty);
+                            }
+                            vol_of(&mut g, &mut t, o);
+                        }
+                        t.push(i64::from(g.chance(2)).to_string());
+                    }
+                    "msq" => {
+                        t.push(g.int(0, 2).to_string());
+                        mask(&mut g, &mut t, s);
+                        opt(&mut g, &mut t, s);
+                    }
+                    "crop" => {
+                        for k in 0..2 {
+                            let _ = k;
+                            t.push(g.int(-1, s.w).to_string());
+                            t.push(g.int(-1, s.h).to_string());
+                            t.push(g.int(0, s.d).to_string());
+                        }
+                    }
+                    "revs" | "hcos" => {
+                        if cmd == "hcos" {
+                            t.push(dx(g.pick(&[0.5, 1.0, 0.0, 2.0, -1.0])));
+                        }
+                        opt(&mut g, &mut t, s);
+                    }
+                    "cutend" => t.push(g.pick(&[0i64, 1, 1, 2, -1]).to_string()),
+                    _ => {
+                        // segids
+                        t.push(frame_of(&mut g, s).to_string());
+                        t.push(i64::from(g.chance(2)).to_string());
+                    }
+                }
+            }
             c => panic!("no generator for {c}"),
         }
         lines.push(t.join(" "));
@@ -2518,7 +2646,7 @@ fn perturb(g: &mut Gen, v: &mut [String], e: &mut [String]) {
 }
 
 /// The probe's commands, in the order the generator cycles through them.
-pub const COMMANDS: [&str; 138] = [
+pub const COMMANDS: [&str; 151] = [
     "vgwrite",
     "vgread",
     "vgread",
@@ -2657,6 +2785,19 @@ pub const COMMANDS: [&str; 138] = [
     "cdt",
     "diffv",
     "tiv",
+    "fpow",
+    "mbin",
+    "reshape",
+    "mmax",
+    "mconst",
+    "fbin",
+    "vote",
+    "msq",
+    "crop",
+    "revs",
+    "cutend",
+    "segids",
+    "hcos",
 ];
 
 /// One buffer both streams write into, in order (FreeSurfer's standard output and error go to
@@ -4696,6 +4837,201 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
             let (icv, det) = r?;
             o.d(icv);
             o.d(det);
+        }
+        "fpow" => {
+            let mut m = get_vol(cx, t)?;
+            fill_painted(cx, t, &mut m)?;
+            let n = t.i();
+            let mut p = vec![1.0f32; n.max(1) as usize];
+            for v in p.iter_mut().take(n.max(0) as usize) {
+                *v = t.f();
+            }
+            let (g, b) = (&mut cx.g, &mut cx.b);
+            o.i(i64::from(vx::mri_framepower(g, b, &mut m, &p)?));
+            o.vol(Some(&m));
+        }
+        "mbin" => {
+            let mut v = get_vol(cx, t)?;
+            fill_painted(cx, t, &mut v)?;
+            let mode = t.i();
+            let mut d = if mode == 1 {
+                Some(get_vol(cx, t)?)
+            } else {
+                None
+            };
+            let th = t.f();
+            let tail = if t.i() != 0 { Some(t.hex()) } else { None };
+            let inv = t.i() != 0;
+            let mut nover = -9;
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let p = match (mode, d.as_mut()) {
+                (1, Some(d)) => Pair::Given(&v, d),
+                (2, _) => Pair::Same(&mut v),
+                _ => Pair::New(&v),
+            };
+            let r = vx::mri_binarize(g, a, b, p, th, tail.as_deref(), inv, &mut nover)?;
+            o.i(i64::from(nover));
+            o.i(i64::from(mode != 0 && matches!(r, Ret::Given)));
+            match (&r, mode) {
+                (Ret::New(m), _) => o.vol(Some(m)),
+                (Ret::Given, 1) => o.vol(d.as_ref()),
+                (Ret::Given, _) => o.vol(Some(&v)),
+                (Ret::Null, _) => o.vol(None),
+            }
+        }
+        "reshape" => {
+            let mut v = get_vol(cx, t)?;
+            fill_painted(cx, t, &mut v)?;
+            let shape = [t.i(), t.i(), t.i(), t.i()];
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = vx::mri_reshape(g, a, b, &mut v, shape)?;
+            o.vol(r.as_ref());
+            o.i(i64::from(v.nframes));
+        }
+        "mmax" => {
+            let mut v1 = get_vol(cx, t)?;
+            fill_painted(cx, t, &mut v1)?;
+            let mut v2 = get_vol(cx, t)?;
+            fill_painted(cx, t, &mut v2)?;
+            let mut d = if t.i() != 0 {
+                Some(get_vol(cx, t)?)
+            } else {
+                None
+            };
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = vx::mri_max(g, a, b, &v1, &v2, d.as_mut())?;
+            o.ret(&r, d.as_ref());
+        }
+        "mconst" => {
+            let mut v1 = get_vol(cx, t)?;
+            fill_painted(cx, t, &mut v1)?;
+            let (k, mul) = (t.d(), t.i() != 0);
+            let mut d = if t.i() != 0 {
+                Some(get_vol(cx, t)?)
+            } else {
+                None
+            };
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = vx::mri_const_op(g, a, b, &v1, k, mul, d.as_mut())?;
+            o.ret(&r, d.as_ref());
+        }
+        "fbin" => {
+            let mut v1 = get_vol(cx, t)?;
+            fill_painted(cx, t, &mut v1)?;
+            let th = t.d();
+            let mut m = if t.i() != 0 {
+                let mut m = get_vol(cx, t)?;
+                fill_painted(cx, t, &mut m)?;
+                Some(m)
+            } else {
+                None
+            };
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = vx::mri_frame_binarize(g, a, b, &v1, th, m.as_mut())?;
+            o.ret(&r, m.as_ref());
+        }
+        "vote" => {
+            let mut v1 = get_vol(cx, t)?;
+            fill_painted(cx, t, &mut v1)?;
+            let m = if t.i() != 0 {
+                let mut m = get_vol(cx, t)?;
+                fill_painted(cx, t, &mut m)?;
+                Some(m)
+            } else {
+                None
+            };
+            let mut vt = if t.i() != 0 {
+                Some(get_vol(cx, t)?)
+            } else {
+                None
+            };
+            let ex = t.i() != 0;
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = vx::mri_vote(g, a, b, &mut v1, m.as_ref(), vt.as_mut(), ex)?;
+            o.ret(&r, vt.as_ref());
+            o.vol(Some(&v1));
+        }
+        "msq" => {
+            let mut v1 = get_vol(cx, t)?;
+            fill_painted(cx, t, &mut v1)?;
+            let which = t.i();
+            let m = if t.i() != 0 {
+                let mut m = get_vol(cx, t)?;
+                fill_painted(cx, t, &mut m)?;
+                Some(m)
+            } else {
+                None
+            };
+            let mut d = if t.i() != 0 {
+                Some(get_vol(cx, t)?)
+            } else {
+                None
+            };
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = match which {
+                0 => vx::mri_square(g, a, b, &v1, m.as_ref(), d.as_mut())?,
+                1 => vx::mri_square_root(g, a, b, &v1, m.as_ref(), d.as_mut())?,
+                _ => vx::mri_sqrt(g, a, b, &v1, d.as_mut())?,
+            };
+            o.ret(&r, d.as_ref());
+        }
+        "crop" => {
+            let mut v1 = get_vol(cx, t)?;
+            fill_painted(cx, t, &mut v1)?;
+            let p1 = [t.i(), t.i(), t.i()];
+            let p2 = [t.i(), t.i(), t.i()];
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = vx::mri_crop(g, a, b, &v1, p1, p2)?;
+            o.vol(r.as_ref());
+        }
+        "revs" => {
+            let mut v1 = get_vol(cx, t)?;
+            fill_painted(cx, t, &mut v1)?;
+            let mut d = if t.i() != 0 {
+                Some(get_vol(cx, t)?)
+            } else {
+                None
+            };
+            let env = Environment::default();
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = vx::mri_reverse_slices(g, a, b, &env, &v1, d.as_mut())?;
+            o.ret(&r, d.as_ref());
+        }
+        "cutend" => {
+            let mut v1 = get_vol(cx, t)?;
+            fill_painted(cx, t, &mut v1)?;
+            let n = t.i();
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = vx::mri_cut_end_slices(g, a, b, &v1, n)?;
+            o.vol(r.as_ref());
+        }
+        "segids" => {
+            let mut v1 = get_vol(cx, t)?;
+            fill_painted(cx, t, &mut v1)?;
+            let (frame, not0) = (t.i(), t.i() != 0);
+            let (g, b) = (&mut cx.g, &mut cx.b);
+            let l = if not0 {
+                vx::mri_seg_id_list_not0(g, b, &v1, frame)?
+            } else {
+                vx::mri_seg_id_list(g, b, &v1, frame)?
+            };
+            o.i(l.len() as i64);
+            for v in l {
+                o.i(i64::from(v));
+            }
+        }
+        "hcos" => {
+            let mut v1 = get_vol(cx, t)?;
+            fill_painted(cx, t, &mut v1)?;
+            let al = t.d();
+            let mut d = if t.i() != 0 {
+                Some(get_vol(cx, t)?)
+            } else {
+                None
+            };
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = vx::mri_half_cos_bias(g, a, b, &v1, al, d.as_mut())?;
+            o.ret(&r, d.as_ref());
         }
         "ordidx" | "vperm" => {
             let mut input = get_vol(cx, t)?;

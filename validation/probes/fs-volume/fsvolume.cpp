@@ -1492,6 +1492,145 @@ void run_case()
     fflush(stdout);
     od(icv);
     od(det);
+  } else if (cmd == "fpow") {
+    MRI *m = get_vol();
+    fill_paint(m);
+    int n = geti();
+    std::vector<float> p(n > 0 ? n : 1, 1.0f);
+    for (int i = 0; i < n; i++) p[i] = getf();
+    fflush(stdout);
+    oi(mri_framepower(m, p.data()));
+    fflush(stdout);
+    put_vol(m);
+  } else if (cmd == "mbin") {
+    MRI *v = get_vol();
+    fill_paint(v);
+    int mode = geti();
+    MRI *d = mode == 1 ? get_vol() : mode == 2 ? v : NULL;
+    float th = getf();
+    int ht = geti();
+    std::string tail = ht ? gethex() : "";
+    int inv = geti();
+    int nover = -9;
+    fflush(stdout);
+    MRI *r = mri_binarize(v, th, ht ? tail.c_str() : NULL, inv, d, &nover);
+    fflush(stdout);
+    oi(nover);
+    oi(r != NULL && r == d);
+    put_vol(r);
+  } else if (cmd == "reshape") {
+    MRI *v = get_vol();
+    fill_paint(v);
+    int a = geti(), b = geti(), c = geti(), d = geti();
+    fflush(stdout);
+    MRI *r = mri_reshape(v, a, b, c, d);
+    fflush(stdout);
+    put_vol(r);
+    oi(v->nframes);
+  } else if (cmd == "mmax") {
+    MRI *a = get_vol();
+    fill_paint(a);
+    MRI *b = get_vol();
+    fill_paint(b);
+    MRI *d = geti() ? get_vol() : NULL;
+    fflush(stdout);
+    MRI *r = MRImax(a, b, d);
+    fflush(stdout);
+    oi(r != NULL && r == d);
+    put_vol(r);
+  } else if (cmd == "mconst") {
+    MRI *a = get_vol();
+    fill_paint(a);
+    double k = getd();
+    int mul = geti();
+    MRI *d = geti() ? get_vol() : NULL;
+    fflush(stdout);
+    MRI *r = mul ? MRImultiplyConst(a, k, d) : MRIaddConst(a, k, d);
+    fflush(stdout);
+    oi(r != NULL && r == d);
+    put_vol(r);
+  } else if (cmd == "fbin") {
+    MRI *a = get_vol();
+    fill_paint(a);
+    double th = getd();
+    MRI *m = geti() ? get_vol() : NULL;
+    if (m) fill_paint(m);
+    fflush(stdout);
+    MRI *r = MRIframeBinarize(a, th, m);
+    fflush(stdout);
+    oi(r != NULL && r == m);
+    put_vol(r);
+  } else if (cmd == "vote") {
+    MRI *a = get_vol();
+    fill_paint(a);
+    MRI *m = geti() ? get_vol() : NULL;
+    if (m) fill_paint(m);
+    MRI *v = geti() ? get_vol() : NULL;
+    int ex = geti();
+    fflush(stdout);
+    MRI *r = MRIvote(a, m, v, ex);
+    fflush(stdout);
+    oi(r != NULL && r == v);
+    put_vol(r);
+    put_vol(a);
+  } else if (cmd == "msq") {
+    MRI *a = get_vol();
+    fill_paint(a);
+    int which = geti();
+    MRI *m = geti() ? get_vol() : NULL;
+    if (m) fill_paint(m);
+    MRI *d = geti() ? get_vol() : NULL;
+    fflush(stdout);
+    MRI *r = which == 0 ? MRIsquare(a, m, d) : which == 1 ? MRIsquareRoot(a, m, d) : MRIsqrt(a, d);
+    fflush(stdout);
+    oi(r != NULL && r == d);
+    put_vol(r);
+  } else if (cmd == "crop") {
+    MRI *a = get_vol();
+    fill_paint(a);
+    int p[6];
+    for (int &x : p) x = geti();
+    fflush(stdout);
+    MRI *r = MRIcrop(a, p[0], p[1], p[2], p[3], p[4], p[5]);
+    fflush(stdout);
+    put_vol(r);
+  } else if (cmd == "revs") {
+    MRI *a = get_vol();
+    fill_paint(a);
+    MRI *d = geti() ? get_vol() : NULL;
+    fflush(stdout);
+    MRI *r = MRIreverseSlices(a, d);
+    fflush(stdout);
+    oi(r != NULL && r == d);
+    put_vol(r);
+  } else if (cmd == "cutend") {
+    MRI *a = get_vol();
+    fill_paint(a);
+    int n = geti();
+    fflush(stdout);
+    MRI *r = MRIcutEndSlices(a, n);
+    fflush(stdout);
+    put_vol(r);
+  } else if (cmd == "segids") {
+    MRI *a = get_vol();
+    fill_paint(a);
+    int frame = geti(), not0 = geti();
+    int n = -9;
+    fflush(stdout);
+    int *l = not0 ? MRIsegIdListNot0(a, &n, frame) : MRIsegIdList(a, &n, frame);
+    fflush(stdout);
+    oi(n);
+    for (int i = 0; i < n; i++) oi(l[i]);
+  } else if (cmd == "hcos") {
+    MRI *a = get_vol();
+    fill_paint(a);
+    double al = getd();
+    MRI *d = geti() ? get_vol() : NULL;
+    fflush(stdout);
+    MRI *r = MRIhalfCosBias(a, al, d);
+    fflush(stdout);
+    oi(r != NULL && r == d);
+    put_vol(r);
   } else {
     fail("unknown command");
   }

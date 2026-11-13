@@ -1675,6 +1675,10 @@ defects! {
         "a list of voxel differences applied in place (MRIapplyDiffVect) frees the volume's colour table before copying it: the volume loses it, with the error 'CTABdeepCopy: ct was NULL'";
     FS_479 = "FS-479", "FreeSurfer", true,
         "the intracranial volume estimate from a transform file (MRIestimateTIV) reads the first linear transform of a file that holds none: the program crashes";
+    FS_480 = "FS-480", "FreeSurfer", true,
+        "the vote over each voxel's sorted frames (MRIvote) told to exclude zeros still takes a last run of zeros when it is the longest";
+    FS_481 = "FS-481", "FreeSurfer", true,
+        "the reshape of a volume of 64-bit integers (mri_reshape) copies 32-bit integers at the voxels' indices: halves of the first voxels, the rest left 0";
 }
 
 /// The register entry with ID `id`.

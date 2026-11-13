@@ -32,4 +32,5 @@ pub mod seq;
 pub mod skull;
 pub mod stats;
 pub mod vgeom;
+pub mod voxops;
 pub mod xform;

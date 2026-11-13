@@ -176,3 +176,25 @@ work image and `ImageConvolve1d`'s `static` index tables made each call (only me
 meet: a power of two's logarithm is exact in glibc, and the count is computed only next to one).
 The defaults of FS-406 (clamped conversions), FS-407 (the destination frame), FS-408 (every frame
 reduced), FS-409 (the copy returned) and FS-410 (`ERROR_NO_MEMORY`) are larmorx's own.
+
+
+## FreeSurfer files and functions translated (part 9, relay 19: fs.labels' text colour tables and lookups)
+
+| FreeSurfer file | What | Here |
+|---|---|---|
+| `utils/colortab.cpp` 55-262, 420-571, 1245-1765, 1779-2167, 2480-2496; `include/colortab.h` (`CTAB_VERSION_TO_WRITE`, `ctabDuplicates`, `AnnotToRGB`) | `CTABreadASCII`, `CTABreadASCII2` (with `ctabDuplicates`), `CTABreadASCIIttHeader`, `CTABalloc`, `CTABunique`, `CTABcountRepeats`, `CTABrandom`, `CTABreadDefault`, `CTABgetNumberOfValidEntries`, `CTABgetNumberOfTotalEntries`, `CTABisEntryValid`, `CTABhasEntry`, `CTABrgbAtIndexi`, `CTABcopyName`, `CTABrgb2Annotation`, `CTABentryNameToIndex`, `CTABentryNameToAnnotation`, `CTABannotationAtIndex`, `CTABfindAnnotation`, `CTABfindDuplicateNames`, `CTABfindIndexFromAnnotation`, `CTABfindRGBi`, `CTABfindName`, `CTABprintASCII`, `CTABwriteFileASCII`, `TissueTypeSchema`, `TissueTypeSchemaDefault`, `TissueTypeSchemaDefaultHead`, `CTABmerge` | `colortab.rs` |
+| `include/cma.h` | the structure numbers the two schemas name (`Left_Cerebral_Cortex` 3 ... `Head_ExtraCerebral` 258) | `colortab.rs` (`tt_default`, `tt_default_head`) |
+| `utils/mriio.cpp` 12278-12310 (part 6's `MRITAGread`, changed) | the transform name's buffer: its bytes never written tracked (FS-421) | `mriio.rs` |
+
+Changes for part 9: the table's places a `Vec<Option<Box<ColorTableEntry>>>` (fs.mri's structure);
+lines read through `CFile::fgets` with FreeSurfer's 1,024-byte buffer and `fgetl`'s rules, numbers
+and names through fs.core's `cscan::Scanf` (glibc's `sscanf`, `errno` kept in `Globals`);
+`CTABreadASCIIttHeader`'s two passes over the lines read once (the last line twice, as `fgets`
+leaves its buffer at the end); `stricmp` on bytes (FS-11 noted for 1,024 bytes or more);
+`CTABprintASCII`'s `%3d` and `%-30s` written byte by byte; `ctabDuplicates` returned by
+`ctab_read_ascii2_counted` (no global); `CTABprintASCII(ct, stdout)` as `ctab_print_ascii_stdout`;
+`FSENVgetenv`'s colour-table reader given the program's globals and output (fs.core's
+`fsenv_getenv`). The defaults of FS-413 (a negative structure an error, a larger one kept), FS-414
+(a bad `#ctTType` line an error), FS-417 (empty places skipped), FS-418 (the table grown) and the
+caps of FS-420 (2^24 places, 2^20 random entries) are larmorx's own; FS-415 closes the file (no
+notice), FS-416 returns no table.

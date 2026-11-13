@@ -95,6 +95,23 @@ number on C streams and znz files, `fio_dirname`, `fio_basename`, `fio_extension
   `tests/fs_io/piece9.rs`. `SKIP` where an XML help text is rendered (FreeSurfer's help renderer, `fsPrintHelp.cpp`,
   is not ported yet), `VARY` where the answer depends on the name index's order (libstdc++'s hash order: two names
   match) or on the time (`--all-info`). Seed 13, 2,352 cases: `reproduce` identical on 2,265, 0 different.
+- Piece 10 (relay 19): fs.labels' text colour tables and lookups (`colortab.cpp`). `cra` (`CTABreadASCII2` with or
+  without the duplicate-name check; `ctabDuplicates` set to -7 before and printed after), `crt`
+  (`CTABreadASCIIttHeader`), `ctd` (`CTABreadDefault` with `FREESURFER_HOME`, `SUBJECTS_DIR`, `FS_DESIRED_BVEC_SPACE`
+  set or unset: `N` or `x<hex>`), `cal` (`setRandomSeed`, then `CTABalloc`), `cun` (`CTABunique`), `ccr`
+  (`CTABcountRepeats`), `cq` (a list of lookups: `v t e h r n a x y i f F g m d`, each answer after the function's
+  status, outputs preset to -7), `cpw` (`CTABwriteFileASCII` and the file's bytes, `Gdiag` given), `cps`
+  (`CTABprintASCII` to standard output), `cts` (`TissueTypeSchema` of a given table or of the default one), `cme`
+  (`CTABmerge`). A table is given as `<version> <nentries> <idbase> <fname> <k>` and `k` entries `<index> <name> <r>
+  <g> <b> <a> <tissue type> <count>`; printed as its fields, its non-empty entries (float colours as bits; tissue type
+  and count left out for `CTABalloc`'s entries, memory contents in FreeSurfer) and its tissue-type table after `T`;
+  `Gerror` last. Table files are built by `tests/fs_io/piece10.rs` (entry lines with every separator, sign, overflow
+  and stray character; comments, CR LF, long lines, NUL bytes, `#ctTType` lines whole and broken, lines of vertical
+  tabs and form feeds; the default table's first rows). `errno` is set to 0 after each case's files are made (making
+  them leaves `EISDIR`). `SKIP` where FreeSurfer crashes or writes outside its tables (FS-413, FS-414's crashes and
+  outside stores, FS-416, FS-417, FS-418), where the port refuses a size the machine decides (FS-420), or a name
+  overflows `stricmp` (FS-11); `VARY` for FS-414's memory never written. Seed 13, 1,664 piece-10 cases: `reproduce`
+  identical on 1,415, 0 different.
 - `matfile_scipy.py`: 400 matrices written by SciPy's `savemat` (version 4; version 5 plain and
   compressed; doubles, singles, signed and unsigned 8- to 32-bit integers, complex) read by the port's
   `MatlabRead`: the default (`fix`) must read each as SciPy wrote it; FreeSurfer's reading

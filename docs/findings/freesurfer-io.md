@@ -818,3 +818,90 @@ scales a multi-frame image.
   length.
 - `ImageScaleDown`'s byte-to-byte bounds check prints `in: %d, %d --> out: %d, %d!` and `exit(2)`;
   negative places are not checked (FS-405).
+
+## Part 9: fs.labels' text colour tables and lookups (3.1-33's first piece, relay 19 of track A)
+
+Restricted (FreeSurfer's source lines). `utils/colortab.cpp`: `CTABreadASCII` 55, `CTABreadASCII2` 70,
+`CTABreadASCIIttHeader` 191, `CTABalloc` 420, `CTABunique` 495, `CTABcountRepeats` 527, `CTABrandom`
+552, `CTABreadDefault` 1245, the counts and lookups 1267-1677 (`CTABhasEntry` 1314 too), `CTABprintASCII`
+1690, `CTABwriteFileASCII` 1720, `TissueTypeSchema` 1779, `TissueTypeSchemaDefault` 1800,
+`TissueTypeSchemaDefaultHead` 1957, `CTABmerge` 2480 (the binary tables: Part 2; `CTABfree` and
+`CTABdeepCopy`: fs.mri's `ctab`). Callers in the reach: `FSENVgetenv` (every program that reads the
+environment), `mri_segstats`, `mri_aparc2aseg`, `mri_ca_label`, `mris_volmask` (`CTABreadDefault`),
+`mri_gtmseg`, `mri_compute_volume_fractions`, `mri_label2vol`, `cma.cpp` (`TissueTypeSchema`),
+`mrisurf_defect.cpp` (`CTABalloc` + `CTABunique` + `CTABmerge` with a table sized to hold the merged
+one: `MAX(nentries, vol->ct->nentries)`), `mri_gtmseg`'s `--ctab-merge` (`CTABmerge` of a user's
+table: FS-418 reachable), `mris_make_face_parcellation` (`CTABcountRepeats`), track D's GIFTI reader
+(`CTABgetNumberOfValidEntries`, `CTABfindDuplicateNames`, `CTABrgb2Annotation`).
+
+### Mechanisms
+- FS-413: `CTABreadASCII2`'s first pass reads lines through `fgetl` (which cuts each line at its
+  first `#`), its second through `fgets` (whole lines). A name holding `#` hides its line from the
+  first pass (`sscanf` assigns 2 values), so the size `max_structure + 1` does not count it; the
+  second pass assigns 6 or 7 and indexes `ct->entries[structure]` without a bound check. A negative
+  structure (the first pass ignores it: `structure > max_structure` is false) indexes before the
+  array. Both read `ct->entries[structure]` (a heap word: a non-NULL value prints the duplicate
+  message through a wild pointer, NULL stores a fresh `malloc` there). Measured: crashes (signal 11)
+  or wrong alpha values (`-1215751936`) in the probe.
+- FS-414: `CTABreadASCIIttHeader` (a) calls `GetNthItemFromString(line, 0)` whenever
+  `CountItemsInString(line)` > 0: the latter counts items separated by `isblank` (space, tab), the
+  former by the C++ stream's white space (`isspace`): a line of `\v`, `\f` or `\r` among blanks has 1
+  item for the first and none for the second (`fs::error() << "asking for item 0, but 0 items in
+  string"`, NULL, then `strcmp(NULL, "#ctTType")`: signal 11); (b) `GetNthItemFromString(line, 1)` on
+  `#ctTType` alone (NULL into `sscanf`: signal 11); (c) `int segid` and the second pass's `structure`,
+  `name[STRLEN]`, `r`, `g`, `b`, `t` are locals that `sscanf` leaves untouched when it stops (the
+  return values are not checked): an earlier line's values, or the stack's contents before any; a
+  structure outside `[0, segidmax]` indexes `ct->entries` out of bounds. The loops are `cp = (char
+  *)1; while (cp != NULL) { cp = fgets(...); ...}`: at the end of the file `fgets` returns NULL with
+  the buffer unchanged, so the last line is processed once more (no visible effect); an empty file
+  (unreachable through `CTABreadASCII2`, which needs a structure line) would read `line[5000]`
+  uninitialised.
+- FS-415: `CTABreadASCIIttHeader` returns NULL for `nct == 0` before `fclose(fp)`.
+- FS-416: `CTABreadDefault` dereferences `fsenv->FREESURFER_HOME` after `FSENVgetenv()` without a
+  NULL check; `TissueTypeSchemaDefault(Head)` the same, and then `sprintf(ct->TissueTypeSchema, ...)`
+  on the NULL `CTABreadASCII` gives when the table does not read.
+- FS-417: `CTABrandom`, `CTABcountRepeats` read and write `ct->entries[i]->...` for every `i <
+  nentries` without a NULL check; `CTABunique` writes `ct->entries[0]` (for `CTABalloc(0)`: the
+  `calloc(0, 8)` block's first word, NULL in practice: signal 11).
+- FS-418: `CTABmerge` loops over `merge->nentries` and indexes `ct->entries[n]` without comparing
+  with `ct->nentries`.
+- FS-419: `TissueTypeSchemaDefault(Head)` overwrite `ri`, `gi`, `bi` of `CTABalloc(5|6)`'s entries but
+  not `rf`, `gf`, `bf`, which keep `CTABalloc`'s random draws (entry 0's are zeroed by `CTABunique`).
+- FS-420: `calloc(max_structure + 1, 8)` (and `calloc(segidmax + 1, 8)`, `CTABalloc`'s `malloc` per
+  entry): beyond the machine's memory `calloc` fails and the error returns (or, in `CTABalloc`, the
+  error's argument `ct->nentries` dereferences the NULL `CTABfree` left: a crash); within it, a
+  table. The probe's child has 1 GiB of address space.
+- FS-421 (fs.io, `MRITAGread`): `MRI::MRI` sets only `transform_fname[0] = '\0'`; `TAG_MGH_XFORM`
+  reads the tag's `len` bytes into the buffer with `fstagsio.read_data` without adding a NUL, so a
+  text without one continues into the buffer's never-written bytes (a fresh `new MRI`: heap
+  contents). Found by seed 1's light run once piece 10 changed the probe's heap history: the
+  official line printed `w/none.xfm` followed by an earlier case's output text.
+
+### Behaviours kept (rule C, both modes; no ID)
+- `CTABreadDefault` reads the default table twice (once inside `FSENVgetenv`, once itself): its
+  duplicate and error messages appear twice.
+- `CTABunique` reports failure (`INFO: ... could not find a unique set in <nmax> tries`, -1) when the
+  last try succeeded, and for `nmax` ≤ 0.
+- A table of only structure 0 is `badly formed` (`max_structure <= 0`).
+- `CTABalloc`'s entries' `TissueType` and `count` are never written (memory contents): no reached code
+  reads them (the probe does not print them); 0 here.
+- `CTABcopyName` (`strncpy`) leaves the caller's buffer without a NUL when the name has `name_len`
+  bytes or more; the reached callers pass `STRLEN`-sized buffers, longer than any name.
+- `CTABfindDuplicateNames` counts ordered pairs (each pair twice, three equal names six times) and
+  prints a line for each, then halves the count.
+- Signed overflow of `structure + idbase`, `255 - t`, `(b << 16) + ...`: GCC's code wraps (32-bit
+  `add`/`sub`/`shl`); the port wraps.
+
+### Code generation
+- The float colours `(float)i / 255.0`: `cvtsi2ss`, `cvtss2sd`, `divsd` by 255.0, `cvtsd2ss` (the
+  division in double, then rounded to float); `CTABcountRepeats` compares the floats with `ucomiss`
+  (no NaN possible).
+
+### Measured (piece 10, 2026-11-13, the probe `validation/probes/fs-io/`, unit oracle's build)
+- Seed 11, 330 piece-10 cases: `reproduce` identical on 279, 0 different (44 SKIP, 6 VARY).
+- Seed 13, 1,664 piece-10 cases: `reproduce` identical on 1,415, 0 different (230 SKIP: FS-416 76,
+  FS-417 52, FS-414 crashes 32, FS-413 20, FS-420 12, FS-418 8, FS-11 3; 19 VARY: FS-414's memory
+  never written). `fix` differs only where a defect is noted (FS-414's default error, FS-01).
+- Seed 1's light set with piece 10 (the recorded test): 4,796 cases, 4,164 identical (55 with
+  memory digits), 0 different, 632 SKIP or VARY; `d9fa9bda...`; the NaN trap (AArch64's NaN rules)
+  passes in debug (3,835 flips) and release (3,546).

@@ -112,6 +112,10 @@ number on C streams and znz files, `fio_dirname`, `fio_basename`, `fio_extension
   outside stores, FS-416, FS-417, FS-418), where the port refuses a size the machine decides (FS-420), or a name
   overflows `stricmp` (FS-11); `VARY` for FS-414's memory never written. Seed 13, 1,664 piece-10 cases: `reproduce`
   identical on 1,415, 0 different.
+  Registration files (3.1-34): `rpr` (`regio_print_register` to standard output), `rwr` (`regio_write_register` and
+  the file's bytes), `rrx` (`regio_read_mincxfm` with or without the file information), `rwx` (`regio_write_mincxfm`,
+  `FREESURFER_REPLACEMENT_FOR_CREATION_TIME_STRING` set, `Progname` `fsio`), `rrm` (`regio_read_registermat`); the
+  matrices as `4` and 16 float bits. Seed 13, 710 such cases: identical in both modes.
 - `matfile_scipy.py`: 400 matrices written by SciPy's `savemat` (version 4; version 5 plain and
   compressed; doubles, singles, signed and unsigned 8- to 32-bit integers, complex) read by the port's
   `MatlabRead`: the default (`fix`) must read each as SciPy wrote it; FreeSurfer's reading

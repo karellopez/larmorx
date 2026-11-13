@@ -905,3 +905,20 @@ table: FS-418 reachable), `mris_make_face_parcellation` (`CTABcountRepeats`), tr
 - Seed 1's light set with piece 10 (the recorded test): 4,796 cases, 4,164 identical (55 with
   memory digits), 0 different, 632 SKIP or VARY; `d9fa9bda...`; the NaN trap (AArch64's NaN rules)
   passes in debug (3,835 flips) and release (3,546).
+
+### Registration files, the rest (3.1-34, relay 19)
+Restricted. `utils/registerio.cpp`: `regio_print_register` 161, `regio_write_register` 207,
+`regio_read_mincxfm` 243, `regio_write_mincxfm` 322, `regio_read_registermat` 523 (callers in the
+reach: `mri_vol2vol`, `mri_surf2surf`, `bbregister`'s helpers, `mri_coreg`, `tkregister2_cmdl` (the
+`larmorx-nc` program), `talairach_avi`'s `.xfm` writers through `regio_write_mincxfm`).
+- FS-422: `regio_read_mincxfm` returns 1 after the `MNI Transform File` check without `fclose(fp)`.
+- Kept (rule C, no ID): `fgetl`'s return value is ignored, so the first line is compared and the
+  file information copied from the buffer itself (leading white space included); at the end of the
+  file the second `fgetl` leaves the first line's text, which becomes the file information;
+  `regio_write_register` returns 0 whatever `regio_print_register` returned; the messages'
+  `unrecoginized` and `Could open ... for writing`; `*R` set before the numbers are read, so a failed
+  read hands the caller a partial matrix with status 1; the file reopened without a check (a file
+  removed between the two opens crashes: not reachable).
+- Measured: seed 13, 710 piece-10 registration cases (142 of each): `reproduce` and `fix` identical
+  on all; seed 1's light set with them: 4,797 cases, 4,217 identical, 0 different, 580 SKIP or VARY
+  (`5e19ca25...`), the NaN trap passes in debug (4,084 flips) and release (3,954).

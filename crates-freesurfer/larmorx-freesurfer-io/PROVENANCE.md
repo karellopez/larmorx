@@ -184,6 +184,7 @@ reduced), FS-409 (the copy returned) and FS-410 (`ERROR_NO_MEMORY`) are larmorx'
 |---|---|---|
 | `utils/colortab.cpp` 55-262, 420-571, 1245-1765, 1779-2167, 2480-2496; `include/colortab.h` (`CTAB_VERSION_TO_WRITE`, `ctabDuplicates`, `AnnotToRGB`) | `CTABreadASCII`, `CTABreadASCII2` (with `ctabDuplicates`), `CTABreadASCIIttHeader`, `CTABalloc`, `CTABunique`, `CTABcountRepeats`, `CTABrandom`, `CTABreadDefault`, `CTABgetNumberOfValidEntries`, `CTABgetNumberOfTotalEntries`, `CTABisEntryValid`, `CTABhasEntry`, `CTABrgbAtIndexi`, `CTABcopyName`, `CTABrgb2Annotation`, `CTABentryNameToIndex`, `CTABentryNameToAnnotation`, `CTABannotationAtIndex`, `CTABfindAnnotation`, `CTABfindDuplicateNames`, `CTABfindIndexFromAnnotation`, `CTABfindRGBi`, `CTABfindName`, `CTABprintASCII`, `CTABwriteFileASCII`, `TissueTypeSchema`, `TissueTypeSchemaDefault`, `TissueTypeSchemaDefaultHead`, `CTABmerge` | `colortab.rs` |
 | `include/cma.h` | the structure numbers the two schemas name (`Left_Cerebral_Cortex` 3 ... `Head_ExtraCerebral` 258) | `colortab.rs` (`tt_default`, `tt_default_head`) |
+| `utils/registerio.cpp` 161-350, 523-534 | `regio_print_register`, `regio_write_register`, `regio_read_mincxfm`, `regio_write_mincxfm`, `regio_read_registermat` (3.1-34) | `registerio.rs` |
 | `utils/mriio.cpp` 12278-12310 (part 6's `MRITAGread`, changed) | the transform name's buffer: its bytes never written tracked (FS-421) | `mriio.rs` |
 
 Changes for part 9: the table's places a `Vec<Option<Box<ColorTableEntry>>>` (fs.mri's structure);

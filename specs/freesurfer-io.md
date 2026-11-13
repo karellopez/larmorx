@@ -15,7 +15,7 @@ tags, the matrix tags, the binary colour tables, a volume geometry's stored form
 piece): NumPy `.npy` volumes, two GIFTI helpers, the diffusion files, names and gradient spaces.
 Later parts: the volume formats (parts 4 to 7), 2-D images (part 8), and **part 9** (§65-74, queue item
 3.1-33's first piece, fs.labels): text colour tables, their lookups, random colours, tissue-type
-schemas.
+schemas; §75 (3.1-34): the rest of the registration files.
 
 ## 1. Conventions
 
@@ -1776,3 +1776,48 @@ FS-420, FS-11, or FS-414's crashes and stores outside the table are counted, not
 memory never written compared apart. Measured (2026-11-13): seed 13, 1,664 piece-10 cases:
 `reproduce` identical on 1,415, 0 different (230 counted, 19 apart); `fix` differs only where a
 defect is noted (FS-414's default error, FS-01).
+
+## 75. Registration files, the rest (`regio_print_register`, `regio_write_register`, `regio_read_mincxfm`, `regio_write_mincxfm`, `regio_read_registermat`)
+
+Queue item 3.1-34 (with §46's reader). Numbers are printed as glibc's `printf` writes them
+(`specs/freesurfer-core.md`'s formatting: correctly rounded, `nan`, `-nan`, `inf`).
+
+- `regio_print_register(stream, subject, inplaneres, betplaneres, intensity, R, method)`: the
+  subject and a newline (`subject-unknown` when none or empty); the three numbers, each `%f` and a
+  newline; `R`'s first three rows, each of its four numbers `%18.15e` followed by a space, then a
+  newline; `0 0 0 1` and a newline; the method's name and a newline: `tkregister` (2), `floor` (1),
+  `round` (0). Another method: after the matrix, `ERROR: regio_print_register: f2i code = <code>,
+  unrecoginized` (FreeSurfer's spelling) + newline on standard output, no method line, 1; else 0.
+- `regio_write_register(name, ...)`: the same into a new file (`fopen` mode `w`); 0 whatever the
+  print returned. A file that does not open: `regio_write_register: <errno's text>` + newline
+  (standard error), 1.
+- `regio_read_mincxfm(name, &R, fileinfo)`: a file that does not open: `regio_read_mincxfm: <errno's
+  text>` + newline (standard error), `ERROR: could not read <name>` + newline (standard output), 1,
+  `R` untouched. Otherwise the first line by `fgetl` with a 900-byte buffer (comment and blank lines
+  skipped; the text compared is the buffer's: the line's leading white space included, cut at its
+  first `#`, without its newline; at the end of the file the buffer holds the last line read):
+  unless its first 18 bytes are `MNI Transform File`, `ERROR: <name> does not start as 'MNI
+  Transform File'` (no newline, standard output) and 1 (FS-422: FreeSurfer leaves the file open;
+  both modes close it, no notice). The next `fgetl` gives the file information (at the end of the
+  file: the buffer as the first read left it): when asked for, it is kept and printed as a newline,
+  the text and two newlines; otherwise `Not reading in xfm fileinfo` + newline. Then the file is
+  read again: its lines counted (`fgets` with 1,000 bytes: a longer line counts as several), all
+  but the last three skipped, and twelve `%f` read from there (each a separate `fscanf`, white space
+  and line ends skipped) into rows 1-3 of a 4 x 4 matrix of zeros, then 1 at (4, 4); 0. A number that
+  does not read: `regio_read_mincxfm(): <errno's text>` and `Error reading R[<r>][<c>] from <name>`
+  (0-based) on standard error, 1, `R` the matrix read so far (no 1 at (4, 4)). Blank lines at the
+  end take the last three lines' places (the read then fails): kept.
+- `regio_write_mincxfm(name, R, fileinfo)`: `MNI Transform File`; `% <fileinfo>` when given; `% This
+  file was created by <program name>`; `% <currentDateTime()>` (`FREESURFER_REPLACEMENT_FOR_CREATION_TIME_STRING`
+  when set); an empty line; `Transform_Type = Linear;`; `Linear_Transform =`; `R`'s first three
+  rows, each number `%e` and a space, the first two rows ended by a newline, the third by `;` and a
+  newline; 0. A file that does not open: `regio_write_mincxfm: <errno's text>` (standard error),
+  `Could open <name> for writing` (standard output, FreeSurfer's words), 1.
+- `regio_read_registermat(name)`: §46's matrix, nothing when §46 gives 1.
+
+Validation: the probe's piece 10 commands `rpr`, `rwr`, `rrx`, `rwx`, `rrm` (subjects absent, empty,
+with spaces; numbers of every kind: NaN, infinities, -0, subnormal, huge; methods 0, 1, 2 and others;
+`.xfm` files whole or with comments, blank lines, indentation, CR LF, a wrong or indented first line,
+fewer rows, numbers that do not read, trailing blank lines; `register.dat` files whole or short, an
+unknown method; files and folders that do not open). Measured (2026-11-13): seed 13, 710 cases:
+`reproduce` and `fix` identical on all.

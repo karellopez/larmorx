@@ -966,18 +966,45 @@ impl Process {
         let half = (k.len() as i32) / 2;
         let n = src.nbins;
         let s0 = src.clone();
+        // Not in place: the source's counts once, each bin's two sums with plain arithmetic in
+        // their order (an operand order changes only a NaN's bits), a NaN result summed again
+        // with x86-64's NaN rules. In place, the bins already smoothed are read back.
+        let counts: Vec<f32> = if in_place {
+            Vec::new()
+        } else {
+            (0..n.max(0)).map(|j| s0.count(j)).collect()
+        };
         for b in 0..n.max(0) {
-            let (mut norm, mut total) = (0.0f32, 0.0f32);
-            for (x, &kx) in k.iter().enumerate() {
-                let j = b + x as i32 - half;
-                if j < 0 || j >= n {
-                    continue;
+            let exact = |w: &Histogram| {
+                let (mut norm, mut total) = (0.0f32, 0.0f32);
+                for (x, &kx) in k.iter().enumerate() {
+                    let j = b + x as i32 - half;
+                    if j < 0 || j >= n {
+                        continue;
+                    }
+                    let c = if in_place { w.count(j) } else { s0.count(j) };
+                    norm = sse::add32(norm, kx);
+                    total = sse::add32(total, sse::mul32(kx, c));
                 }
-                let c = if in_place { w.count(j) } else { s0.count(j) };
-                norm = sse::add32(norm, kx);
-                total = sse::add32(total, sse::mul32(kx, c));
-            }
-            w.set_count(b, sse::div32(total, norm));
+                sse::div32(total, norm)
+            };
+            let v = if in_place {
+                exact(&w)
+            } else {
+                let lo = (half - b).max(0) as usize;
+                let hi = ((n - b + half).max(0) as usize).min(k.len());
+                let (mut norm, mut total) = (0.0f32, 0.0f32);
+                if lo < hi {
+                    let j0 = (b + lo as i32 - half) as usize;
+                    for (&kx, &c) in k[lo..hi].iter().zip(&counts[j0..j0 + (hi - lo)]) {
+                        norm += kx;
+                        total += kx * c;
+                    }
+                }
+                let v = total / norm;
+                if v.is_nan() { exact(&w) } else { v }
+            };
+            w.set_count(b, v);
             w.set_bin(b, s0.bin(b));
         }
         if in_place {

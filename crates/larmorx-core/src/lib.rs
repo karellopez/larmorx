@@ -20,6 +20,8 @@
 //! - [`drand48`]: POSIX's 48-bit random numbers, as the C library gives them.
 //! - [`glibc_random`]: the C library's `rand`, `srand`, `random` and `srandom`, as glibc 2.35
 //!   gives them (a clean room of `specs/glibc-random.md`).
+//! - [`glibc_qsort`]: the C library's `qsort` and `qsort_r`, the arrangement and the comparator
+//!   calls of glibc 2.35 (a clean room of `specs/glibc-qsort.md`).
 //! - [`cubic_spline`]: the cubic spline of FreeSurfer's intensity normalisation (a clean room of
 //!   `specs/burkardt-spline.md`).
 //! - [`ranlux`]: RANLUX389 and the random distributions FreeSurfer draws from (a clean room of
@@ -45,6 +47,7 @@ pub mod defects;
 pub mod drand48;
 pub mod eigen_sym;
 pub mod element;
+pub mod glibc_qsort;
 pub mod glibc_random;
 pub mod grid;
 pub mod image;

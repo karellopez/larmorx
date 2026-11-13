@@ -1,15 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0 AND Zlib
 //! znzlib (nifticlib 2.0.0, Mark Jenkinson's "zipped or non-zipped" files, public domain): one
-//! handle for a plain file (C's stdio) or a gzip file (zlib's `gz*` functions), as FreeSurfer's MGZ
-//! and NIfTI code reads and writes through it.
+//! handle for a plain file (C's stdio) or a gzip file (zlib's `gz*` functions).
 //!
 //! The gzip side is zlib 1.2.11's file layer (`gzlib.c`, `gzread.c`, `gzwrite.c`; zlib's licence,
-//! the version Ubuntu 22.04 ships and FreeSurfer's official binaries load), translated with its
+//! the version Ubuntu 22.04 ships), translated with its
 //! buffers (8 KiB of input, 16 KiB of output) and states (`LOOK`, `COPY`, `GZIP`), so that reads,
 //! seeks, `gztell`, `gzeof` and the end of corrupt or truncated data come at the same calls as in
 //! zlib; inflate and deflate themselves are zlib-rs's (through flate2). The decompressed bytes are
 //! zlib's; the compressed bytes a writer produces are zlib-rs's at the same level (a deflate that
-//! gives zlib's own bytes is FreeSurfer's item P-17). The plain side is C's stdio, by its
+//! gives zlib's own bytes is not ported). The plain side is C's stdio, by its
 //! description (ISO C 7.21) and glibc's behaviour.
 
 use std::io::{Read, Seek, SeekFrom, Write};

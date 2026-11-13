@@ -169,13 +169,13 @@ Brain Imaging Centre, Montreal Neurological Institute, McGill University; MNI's 
 The numbers are read with `larmorx_core::cscan` (C's `sscanf("%lf")`, from the C standard and
 glibc's behaviour) and written with `larmorx_core::cfmt` (`%.15g`). Decompression is in memory
 (flate2 for gzip, the `bzip2` crate's pure-Rust backend for bzip2) where volume_io runs `gunzip`
-and `bunzip2` (FS-71). FreeSurfer's copy (`packages/minc`) was not read: its changes are measured
-by the probe and kept out of this crate (`Dialect`; `docs/findings/minc-xfm.md`). Defects FS-71 to
-FS-75 (`larmorx_core::defects`).
+and `bunzip2` (FS-71). A program's own variant of volume_io plugs in through `Dialect` (no such
+variant is in this crate; FreeSurfer's copy was not read, and what it changes is described in a
+file closed to FreeSurfer's clean-room implementers, `docs/findings/freesurfer-permissive.md`).
+Defects FS-71 to FS-75 (`larmorx_core::defects`).
 
-**Identical to MINC 1.5.1** (its files built from the tarball with GCC 8.4.0 and FreeSurfer's flags)
-and, through a dialect holding FreeSurfer's changes, **to FreeSurfer 8.2.0's `libminc.a`** as the
-unit oracle built it: `validation/probes/fs-minc-nifti` (families `xfm`, `ops`, `write`), numbers in
+**Identical to MINC 1.5.1** (its files built from the tarball with GCC 8.4.0 at `-O3`):
+`validation/probes/fs-minc-nifti` (families `xfm`, `ops`, `write`), numbers in
 `docs/findings/minc-xfm.md`.
 
 ## nifticlib's file names and znzlib (`src/nifti/niftilib.rs`, `src/znz.rs`; item 3.1-15, 2026-11-13)
@@ -197,7 +197,41 @@ zlib-rs through flate2):
 | `znz::StdioFile` | C's `fopen`, `fread`, `fwrite`, `fseek`, `ftell`, `feof`, `fgetc` by their description (ISO C 7.21) and glibc's behaviour (no glibc code) |
 
 The decompressed bytes are zlib's; the compressed bytes a writer makes are zlib-rs's (a deflate
-with zlib's own bytes is FreeSurfer's item P-17). Defects FS-76 and FS-77 (nifticlib; FS-77 with
-its `reproduce`) and FS-78 (zlib 1.2.11), `larmorx_core::defects`. FreeSurfer's copy differs by
-behaviour in the extensions (`NiftiOptions`) and in its znzlib (one `gzread` per call; the probe's
-`Flavour::FreeSurfer`), measured, not ported here (`docs/findings/nifti-znz.md`).
+with zlib's own bytes is not ported). Defects FS-76 and FS-77 (nifticlib; FS-77 with its
+`reproduce`) and FS-78 (zlib 1.2.11), `larmorx_core::defects`. `NiftiOptions` holds nifticlib's
+settings a program can change (`allow_upper_fext` and the compressed extensions); the variants of
+other programs' copies are not in this crate (`docs/findings/freesurfer-permissive.md`, closed to
+FreeSurfer's clean-room implementers).
+
+## GIFTI: gifticlib 1.12 over a translation of expat 2.0.1
+
+| larmorx file | Upstream | Licence |
+|---|---|---|
+| `src/gifti/mod.rs` | gifticlib 1.12 (`gifti_io.c`, `gifti_io.h`, `gifti_xml.h`: the structures, type and intent tables, checks, sizes, metadata, copies, the free functions' messages, displays) | public domain (Richard Reynolds, NIH/NIMH) |
+| `src/gifti/read.rs` | gifticlib 1.12 (`gifti_xml.c`: `gxml_read_image`, the element stack and callbacks, the ASCII, Base64Binary and GZipBase64Binary decoders, `gxml_data`'s state between calls; `gifti_io.c`: `gifti_read_extern_DA_data`, `gifti_check_swap`); zlib 1.2.11's `uncompress2` loop (zlib licence) over zlib-rs | public domain; Zlib |
+| `src/gifti/write.rs` | gifticlib 1.12 (`gifti_xml.c`: `gxml_write_image`, `gxml_write_gifti`, the `ewrite_*` functions, `gxml_disp_b64_data`; `gifti_io.c`: `gifti_write_image`, `gifti_write_extern_DA_data`) | public domain |
+| `src/xml/tok.rs` | expat 2.0.1 (`xmltok.c`, `xmltok_impl.c`, `xmltok_ns.c`, `asciitab.h`, `iasciitab.h`, `latin1tab.h`, `utf8tab.h`: the built-in encodings, byte types, name checks, UTF-8 conversions, every tokenizer, `getAtts`, `charRefNumber`, `updatePosition`) | MIT (expat's COPYING) |
+| `src/xml/role.rs` | expat 2.0.1 (`xmlrole.c`, `xmlrole.h`: the prolog's state machine for the document entity) | MIT |
+| `src/xml/mod.rs` | expat 2.0.1 (`xmlparse.c`: `XML_Parse`, `XML_ParseBuffer`, `XML_GetCurrentLineNumber`, `XML_ErrorString`, the prolog, content, CDATA and epilog processors, `initScan`, `processXmlDecl`, `doParseXmlDecl`, `storeAtts`, `storeAttributeValue`, `appendAttributeValue`, `storeEntityValue`, `defineAttribute`, the content-model scaffold, `reportDefault`, `normalizeLines`, `normalizePublicId`) for the configuration gifticlib uses | MIT |
+| `src/xml/nametab.rs` | expat 2.0.1 (`nametab.h`, generated from it) | MIT |
+
+- gifticlib 1.12 is the history of github.com/NIFTI-Imaging/gifti_clib at commit
+  8ec2a95bce6360c3f7f655b36767e4d04c61d77c (2012-06-15, "gifti library version 1.12, 15 June,
+  2012"; the only commit touching the library's files between 1.12 and 1.13's 7d94df8), pinned in
+  `<workspace>/tags/gifticlib-1.12` (GitHub's archive of the commit, SHA-256
+  965406c74a48a0bf1a58d6d556189da120de5e5fbb6209b145805325be9c0416). expat 2.0.1 is libexpat's
+  tag `R_2_0_1`, pinned in `<workspace>/tags/expat-2.0.1` (GitHub's archive, SHA-256
+  6a26c3fe91d2a05d05fac187c0a092e1602c335ee12b008d9fe4da30788402b9), configured as the C build
+  this follows: `XML_DTD`, `XML_NS` (compiled, unused: no namespace processing),
+  `XML_CONTEXT_BYTES` 1024.
+- The parser covers what a parser made by `XML_ParserCreate(NULL)` reaches with gifticlib's
+  handlers: no external entities are read, parameter entities are never expanded (parameter
+  entity parsing is off), internal entities are expanded in attribute values only (references in
+  content reach the default handler). An earlier parser written from expat's behaviour was
+  replaced by this translation (the probe found 49 % of generated documents parsed differently;
+  archived in `<workspace>/archive/2026-11-13-xml-adhoc-parser/`).
+- D13: FS-80 to FS-88 (`gifti::defects`; FS-88 is expat's); `Dialect` holds the two points where
+  a program built on gifticlib changes it.
+- Checks: `src/gifti/tests.rs`, `src/xml/tests.rs`; the differential probe
+  `validation/probes/fs-gifti` against gifticlib 1.12 with expat 2.0.1 and against FreeSurfer
+  8.2.0's copies (its README has the numbers).

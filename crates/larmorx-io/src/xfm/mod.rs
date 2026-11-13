@@ -17,10 +17,10 @@
 //!   [`Transform`] and `transforms.c`'s arithmetic ([`concat_transforms`], [`transform_point`],
 //!   [`make_identity_transform`]); [`compute_transform_inverse`] by `gaussian.c`'s scaled
 //!   maximal-pivoting Gaussian elimination.
-//! - [`Dialect`]: the points where a program built on volume_io changed it (FreeSurfer 8.2.0's
-//!   copy reads only linear transforms, inverts with its own 4 x 4 routine and words some messages
-//!   its own way); [`Mni`] is volume_io's own behaviour. A replica of such a program supplies its
-//!   own dialect (FreeSurfer's: `larmorx-freesurfer`).
+//! - [`Dialect`]: the points where a program built on volume_io may change it (which transform
+//!   types it reads, its 4 x 4 inverse, the wording of its messages, how it reads a token and
+//!   expands `~user`); [`Mni`] is volume_io's own behaviour. A replica of such a program supplies
+//!   its own dialect, in its own crate.
 //!
 //! Not read: the displacement volume of a `Grid_Transform` (MINC volumes are not a larmorx format
 //! yet: the reader reports it, [`Dialect::read_grid_volume`]); not applied: thin-plate splines and
@@ -46,7 +46,7 @@ pub use write::{output_transform, output_transform_file, output_transform_to_str
 use larmorx_core::cfmt::Streams;
 
 /// D13 defects of volume_io's `.xfm` code that larmorx corrects (`docs/findings/minc-xfm.md`;
-/// their register entries are `larmorx_core::defects::FS_71` to `FS_75`).
+/// their register entries are `larmorx_core::defects::FS_71` to `FS_75` and `FS_79`).
 pub mod defects {
     /// The decompression of a compressed file runs `gunzip -c <name> > <temporary>` through the
     /// shell with the name unquoted (`files.c`, `open_file`): a name with a blank fails (or reads
@@ -66,6 +66,10 @@ pub mod defects {
     /// null pointer (`expand_filename` never allocated its result). Corrected: it expands to
     /// nothing.
     pub const EMPTY_EXPANSION: &str = "FS-75";
+    /// A backslash in a file name is volume_io's escape (dropped) and only `/` separates
+    /// directories, so a Windows path loses its separators. Corrected on Windows: a backslash
+    /// separates directories (`\\` and a drive letter also start an absolute name).
+    pub const WINDOWS_BACKSLASH: &str = "FS-79";
 }
 
 /// `Transform`: a 4 x 4 matrix, `t[i][j]` = volume_io's `Transform_elem(t, i, j)` (row `i`,

@@ -979,6 +979,12 @@ defects! {
         "EISPACK's balanc (vnl_real_eigensystem) never returns on a matrix with an infinite or NaN entry, or entries so large that a row's or column's scaled sum overflows, in the part it balances";
     ITK_113 = "ITK-113", "VXL", true,
         "vnl_qr::solve (and inverse) of a matrix with one row whose entry is 0 never writes the solution (LINPACK's info is 1 and VNL's vector is uninitialised): memory contents";
+    ITK_114 = "ITK-114", "VXL", true,
+        "vnl_brent_minimizer (and vnl_brent and vnl_powell, which use it) can loop for ever, coming back to the same points: on a bracket with an infinite end where the cost is NaN or not lower than at the best point (the golden-section step lands on that end again and again), or whose ends are so large that their sum overflows (the midpoint is infinite, the stopping test never passes, two points take turns)";
+    ITK_115 = "ITK-115", "VXL", true,
+        "vnl_symmetric_eigensystem never returns on many matrices with an infinite or NaN entry: EISPACK's pythag loops for ever when its second argument is NaN or both are infinite (its iteration starts from a NaN ratio and never meets its stopping test), and tql2 makes such calls, once after reading and writing one element past its arrays (when a NaN is left at the end of the subdiagonal)";
+    ITK_116 = "ITK-116", "VXL", true,
+        "vnl_svd (LINPACK's svdc) can loop for ever on a matrix with an infinite or NaN entry: its deflation and splitting steps do not count towards the iteration limit, and they can come back to the same singular values and superdiagonal again and again";
     ANTS_110 = "ANTS-110", "antsAI", true,
         "the blob alignment keeps the blob pairs whose displacements have about the same length as the others' (the squared distance between a pair's fixed and moving blob over another pair's), not those whose distances to the other blobs are preserved between the images, as its comment and ImageMath's MatchBlobs say";
     ANTS_111 = "ANTS-111", "antsAI", true,
@@ -994,9 +1000,9 @@ defects! {
     ANTS_162 = "ANTS-162", "ANTs", true,
         "N4BiasFieldCorrection's B-spline lattice and padding, and ResampleImage's and ResampleImageBySpacing's output grids, are sized from the image's physical extent with no check: a header in metres or micrometres, or a 4D image's time axis, can make a tiny input need more memory than any machine has, which fills the machine until the process is stopped";
     FS_01 = "FS-01", "FreeSurfer", true,
-        "error messages printed in FreeSurfer's C style (ErrorPrintf, ErrorExit, ErrorReturn and the functions that report through them) end with a NUL byte before their newline, on standard error and in the error log, so recon-all.log and other logs that capture them read as binary files to grep and text tools";
+        "the error messages most of FreeSurfer's library prints (its C-style errors: ErrorPrintf, ErrorExit, ErrorReturn) end with a NUL byte before their newline, on standard error and in the error log, so recon-all.log and other logs that capture them read as binary files to grep and text tools";
     FS_02 = "FS-02", "FreeSurfer", true,
-        "a PROFILE environment variable beyond the int range, or NaN, is read as -2147483648 on x86-64 (the C conversion is undefined there)";
+        "a PROFILE environment variable beyond the 32-bit integer range, or NaN, sets the profiling level -2147483648";
     FS_03 = "FS-03", "FreeSurfer", true,
         "a failed internal assertion ends the program with a segmentation fault (exit status 139) after its message; with FREESURFER_HANG_ON_ASSERT set it first waits for ever";
     FS_04 = "FS-04", "FreeSurfer", true,
@@ -1010,13 +1016,13 @@ defects! {
     FS_08 = "FS-08", "FreeSurfer", true,
         "FSENVgetenv returns memory contents for the b-vector space when FS_DESIRED_BVEC_SPACE holds no number, and for the working directory when it cannot be read";
     FS_09 = "FS-09", "FreeSurfer", true,
-        "the median (and quick_select) of an empty list returns memory contents (the number stored just before the list)";
+        "the median (and quick_select) of an empty list returns memory contents";
     FS_10 = "FS-10", "FreeSurfer", true,
         "the unique-integer helpers (count, list and most frequent value of a list) given an empty list report one item, whose value is memory contents";
     FS_11 = "FS-11", "FreeSurfer", true,
         "the case-insensitive string comparison (stricmp) and the file-name extension helper crash or corrupt memory when given a string of more than 1,023 bytes";
     FS_12 = "FS-12", "FreeSurfer", true,
-        "nint and nint2 (FreeSurfer's rounding to an integer) give -2147483648 for values beyond the int range and NaN on x86-64 (the C conversion is undefined there)";
+        "nint and nint2 (FreeSurfer's rounding to an integer) give -2147483648 for values beyond the 32-bit integer range and for NaN";
     FS_13 = "FS-13", "FreeSurfer", true,
         "MatrixAlloc of a negative size, or of more numbers than an int holds, crashes or corrupts memory after printing that it uses an mmap'd file, or exits";
     FS_14 = "FS-14", "FreeSurfer", true,
@@ -1129,12 +1135,42 @@ defects! {
         "znzread on a compressed file that ends inside a member counts that member as read (nmemb - remain/size rounds the missing members down): a caller checking the count takes a short read for a complete one";
     FS_78 = "FS-78", "zlib 1.2.11", true,
         "gzseek forward (or gzflush or gzclose after it) before the first gzwrite fills the gap with memory zlib never set instead of zeros: gz_zero clears its buffer once, before allocating it";
+    FS_79 = "FS-79", "MINC volume_io", true,
+        "a backslash in a file name is an escape that expand_filename drops, and only '/' separates directories: a Windows path (C:\\Users\\...) loses its separators, its directory, base name and extension are misread, and a file next to it is never found";
+    FS_80 = "FS-80", "gifticlib", true,
+        "a label table whose Labels carry colours for some labels only leaves holes in its colour array (or makes it shorter than the table), and a Label whose Key attribute is missing or wrong is given no key: the writer, the validity check and the display read memory never written";
+    FS_81 = "FS-81", "gifticlib", true,
+        "Base64 data whose character data hold characters outside the alphabet (skipped and counted, the default) take the bytes carried to the next piece from the wrong place when a group of four is cut at the piece's end: the values after it are decoded from earlier text or from memory never written";
+    FS_82 = "FS-82", "gifticlib", true,
+        "NIFTI_TYPE_FLOAT128 is 6 bytes per value in gifticlib's type table (a long double takes 16): its arrays are allocated, decoded and written with 6 bytes per value, and the ASCII writer reads 16 per value, past the data";
+    FS_83 = "FS-83", "gifticlib", true,
+        "the ASCII decoder's count of a value's pieces (COMPLEX64, COMPLEX128, RGB24) persists from one array to the next, even of another file: after an array whose last value is incomplete the next array of that type starts in the middle of a value";
+    FS_84 = "FS-84", "gifticlib", true,
+        "a metadata entry without a name (an MD whose Name has no text) is compared through a null pointer by gifti_get_meta_value and, at verbosity 2 and below, gifti_add_to_meta: the program crashes";
+    FS_85 = "FS-85", "gifticlib", true,
+        "a GIFTI element outside the element it belongs to (Data, MatrixData, a coordinate system outside a DataArray, a Name or Value outside an MD, a dimension past Dim7 when writing) is read or written through a null or out-of-range pointer: the program crashes or reads memory it never wrote";
+    FS_86 = "FS-86", "gifticlib", true,
+        "character data (white space included) after a CDATA section or a child element inside a GIFTI Name, Value, Label, DataSpace or TransformedSpace, or inside one of them outside its parent, is written through a null pointer: the program crashes";
+    FS_88 = "FS-88", "expat", true,
+        "a UTF-16 document of an odd length whose last token is cut by its odd byte (white space, a name or a ']' at the end of the prolog or the content) is converted past its end: the program crashes or never returns";
+    FS_89 = "FS-89", "expat", true,
+        "an error reported inside a multibyte character (a non-ASCII character in an XML declaration's pseudo-attribute) makes the line count step over the error position and read past the document: the program crashes";
+    FS_87 = "FS-87", "gifticlib", true,
+        "at verbosity 6 and 7 the GIFTI reader's messages about a MatrixData buffer show the Data element's buffer and length instead, including memory never written";
     FS_100 = "FS-100", "FreeSurfer", true,
         "the gamma draw converts its shape's integer part to a 32-bit unsigned integer, which C leaves undefined outside [0, 2^32): a shape of 2^32 or more gives a value of the wrong size, NaN and +inf the value of a shape below 1, and a negative shape or -inf a draw that does not return in practice";
     FS_101 = "FS-101", "FreeSurfer", true,
         "a seed whose 24 seeded values are all 0 (2147483563, -2147483563 and other multiples of 2147483563) makes the random generator give 0 for ever (its initial carry is 0): flat draws are constant and most other draws never return";
     FS_103 = "FS-103", "FreeSurfer", true,
         "the cubic spline's check that the knots increase strictly is false for a NaN knot, so a NaN knot is accepted and the spline's values become NaN";
+    FS_111 = "FS-111", "FreeSurfer", true,
+        "setting the inflated surface's name (mris_register -inflated) builds the name of its curvature file in a buffer of 1,024 bytes: a name of 1,022 bytes or more ends the program with a buffer-overflow abort (signal 6)";
+    FS_112 = "FS-112", "FreeSurfer", true,
+        "adding a command line to a surface that already holds 1,000 prints an error and then stores the line past the end of the list, over the count of lines, which becomes a memory address";
+    FS_113 = "FS-113", "FreeSurfer", true,
+        "scaling a surface by a negative factor (and the scale-then-translate operation with a negative factor) leaves its bounding box upside down: the low end above the high end";
+    FS_114 = "FS-114", "FreeSurfer", true,
+        "centring a spherical surface that has no vertex never returns: the search for its centre keeps halving its step without end";
     FS_161 = "FS-161", "FreeSurfer", true,
         "MRIcopy of a tensor or complex volume into one of the same type copies only the first width bytes of each row (a quarter or an eighth of its voxels' bytes), leaving the rest of the destination as it was";
     FS_162 = "FS-162", "FreeSurfer", true,
@@ -1147,6 +1183,12 @@ defects! {
         "MRIfixTkReg of a registration matrix with four columns and another number of rows crashes";
     FS_166 = "FS-166", "FreeSurfer", true,
         "the rows of a tensor volume, as code that goes through a volume row by row sees them (MRIcopy), all start at its first voxel: such code reads and writes only the volume's first row";
+    FS_261 = "FS-261", "FreeSurfer", true,
+        "the byte-order swap of a buffer of n items of 2, 4 or 8 bytes (ByteSwapBuf) reverses only the first n/2, n/4 or n/8 items (rounded up) and leaves the rest as they were";
+    FS_262 = "FS-262", "FreeSurfer", true,
+        "the byte-order swap of a 64-bit integer (swapLong64) returns the reversed value rounded to a double's 53 significant bits (only values whose reversed form needs more bits change; none below 2^40)";
+    FS_263 = "FS-263", "FreeSurfer", true,
+        "with exceptions switched on, a fatal error with a nonzero code aborts the program (exit status 134, after the C++ library's terminate message) instead of passing the code to the program's handler";
     FS_167 = "FS-167", "FreeSurfer", true,
         "the binary readers of one number (fread1, fread2, freadLong, freadFloat, and znzread1, znzreadShort, znzreadInt, znzreadLong, znzreadFloat, znzreadDouble) at the end of a file return a number whose missing bytes are memory contents";
     FS_168 = "FS-168", "FreeSurfer", true,

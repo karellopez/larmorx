@@ -1,10 +1,11 @@
-# The x87's extended arithmetic, as FreeSurfer's binaries compute it
+# The x87's extended arithmetic, as GCC's x86-64 code computes `long double`
 
 What the machine's x87 does with `long double` on x86-64 Linux, measured for
-`larmorx_core::x87::F80` (the FreeSurfer foundations' item 3.1-03): FreeSurfer 8.2.0 computes in
-`long double` in 12 reached functions (`docs/freesurfer/variation.md` §1), which GCC 8.4.0 compiles
-into x87 instructions. Not source-derived: Intel's manual and black-box runs of the hardware and
-of GCC 8.4.0's code (`validation/probes/x87-extended`). Written 2026-11-12.
+`larmorx_core::x87::F80` (item 3.1-03 of larmorx's FreeSurfer foundations): GCC 8.4.0 compiles C
+and C++ `long double` arithmetic into x87 instructions. Not source-derived: Intel's manual and
+black-box runs of the hardware and of GCC 8.4.0's code (`validation/probes/x87-extended`). Written
+2026-11-12; which FreeSurfer functions compute in `long double`:
+`docs/findings/freesurfer-permissive.md` (closed to FreeSurfer's clean-room implementers).
 
 **F-X87-1. The mode is Linux's default and every operation rounds once** (*verified*). The control
 word of a process is `0x037f` (precision control 64 bits, round to nearest even, every exception
@@ -23,8 +24,8 @@ and so does any operand in an encoding the x87 no longer supports (pseudo-NaN, p
 unnormal), even beside a NaN. Pseudo-denormals (exponent 0, integer bit set) are read as numbers of
 exponent 1 and never written: results are canonical. **Where**: Intel SDM vol. 1, §4.8.3.5 and
 §8.2.2; measured on the reference machine (AMD Ryzen 9 7945HX). Not checked on an Intel CPU (the
-helper laptop was unreachable on 2026-11-12); the official FreeSurfer runs of this project ran on
-the AMD machine. **larmorx**: `F80` follows the rules; NaN payloads and signs are compared in the
+helper laptop was unreachable on 2026-11-12); this project's reference runs ran on the AMD
+machine. **larmorx**: `F80` follows the rules; NaN payloads and signs are compared in the
 probe.
 
 **F-X87-3. The conversions GCC 8.4.0 emits** (*verified*, `build.sh` keeps the disassembly):
@@ -50,7 +51,9 @@ indefinite for negative arguments. glibc's `llrintl` rounds to nearest even with
 indefinite out of range.
 
 **F-X87-5. The patterns depend on the extended precision** (*verified*). Six arithmetic patterns
-of FreeSurfer's `long double` functions, written as plain loops and compiled by GCC 8.4.0 with
-FreeSurfer's C++ flags, give the bits of `F80` composed in the source's order (2^20 cases each,
-0 differences), and computed in `double` instead 1.8 % to 71 % of their outputs change: a replica
-that replaced `long double` by `double` would not be exact.
+of `long double` code (sums of `double` products, a mean, variance and standard deviation, cross
+products of `float` vectors and their length, a unit vector and its gradient, `float` weights over
+their sum, squared length differences), written as plain loops and compiled by GCC 8.4.0 at `-O3`,
+give the bits of `F80` composed in the source's order (2^20 cases each, 0 differences), and
+computed in `double` instead 1.8 % to 71 % of their outputs change: a replica that replaced `long
+double` by `double` would not be exact.

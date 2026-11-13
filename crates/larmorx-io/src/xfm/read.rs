@@ -466,14 +466,10 @@ fn input_one_transform(
                 return err;
             }
             let mut volume_filename = volume_filename.expect("a token");
-            if volume_filename.first() != Some(&b'/')
+            if !Ctx::new(dialect, &mut *notices).is_absolute(&volume_filename)
                 && let Some(f) = filename
             {
-                let directory = Ctx {
-                    dialect,
-                    notices: &mut *notices,
-                }
-                .extract_directory(f);
+                let directory = Ctx::new(dialect, &mut *notices).extract_directory(f);
                 if !directory.is_empty() {
                     let mut t = directory;
                     t.push(b'/');

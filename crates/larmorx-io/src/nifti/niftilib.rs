@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //! nifticlib 2.0.0's file names (`nifti1_io.c`, public domain): the extensions it knows, the
 //! header file a name stands for, and whether a file is NIfTI-1, ANALYZE or neither, with its
-//! messages (FreeSurfer's NIfTI reader calls these).
+//! messages.
 //!
 //! The extensions are `.nii`, `.hdr`, `.img`, `.nia` and, with zlib, `.nii.gz`, `.hdr.gz`,
 //! `.img.gz`, in lower case or (with `allow_upper_fext`, nifticlib's default) all upper case; a
@@ -12,9 +12,9 @@ use larmorx_core::cfmt::Streams;
 use crate::znz::ZnzFile;
 
 /// nifticlib's global options that these functions read (`g_opts`: a debug level of 1 and
-/// upper-case extensions allowed by default), and two points where copies of nifticlib differ
-/// from 2.0.0 (FreeSurfer 8.2.0's: no upper-case `.GZ` for `nifti_is_gzfile`, and `.nia.gz`
-/// among the compressed extensions).
+/// upper-case extensions allowed by default), and two points where copies of nifticlib may
+/// differ from 2.0.0 (whether `nifti_is_gzfile` takes an upper-case `.GZ`, and whether `.nia.gz`
+/// is among the compressed extensions).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct NiftiOptions {
     pub debug: i32,

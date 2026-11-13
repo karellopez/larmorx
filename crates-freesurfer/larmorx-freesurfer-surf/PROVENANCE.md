@@ -11,10 +11,64 @@ built for the official binaries with GCC 8.4.0 (`docs/freesurfer/variation.md`).
 
 ## FreeSurfer files and functions translated
 
-None yet: the crate was created empty by queue item 3.1-01 (`docs/freesurfer/queue.md`). Each
-item that brings code adds its files and functions here, with the third-party code it found in
-them (CLAUDE.md rule 3: each ported file is audited for third-party code first).
+| Rust module | FreeSurfer file | Functions and data |
+|---|---|---|
+| `aaa` | `include/mrisurf_aaa.h`; `include/base.h` 139-141; `utils/mrisurf_base.cpp` 23-77, 122-133; `utils/mrisurf.cpp` 21-22; `include/mrisurf_base.h` 299-301 | `MAX_NEIGHBORS`, `MRIS_MAX_NEIGHBORHOOD_LINKS`, `MAX_SURFACES`, the coordinate-system and surface-name constants, `VERTICES_PER_FACE`, `ANGLES_PER_TRIANGLE`, `MAX_CMDS`, `NEW_VERSION_MAGIC_NUMBER`, `VERTEX_SULCAL`, `WHICH_FACE_SPLIT` (with fs.core's `nint`), `vertices_per_face_t`, `angles_per_triangle_t`, `copyAnglesPerTriangle`, `cmpAnglesPerTriangle` (glibc's `memcmp` result as observed: the findings §4), `MRIS_XYZ`, `MRIS_HASH`, `MRIS_Status` (as an `int`, with its `MRIS_Status_ELTS` table), `MRIS_Status_DistanceFormula`, `MRIS_Status_text`, `MRIS_Status_distanceFormula`, `areCompatible`, `checkOrigXYZCompatibleWkr`, `mris_sort_compare_float`, `MRIS_AREA_LABEL`, `FaceNormCacheEntry`, `FaceNormDeferredEntry`, `MRI_EDGE`, `MRI_CORNER`, `STRIP`, `FloatXYZ`; the globals `UnitizeNormalFace`, `RmsValErrorRecord`, `fix_vertex_area` with `MRISsetFixVertexAreaValue`/`MRISgetFixVertexAreaValue`, `mrisurf_activeRealmTreesSize` with `hasActiveRealmTrees`, as `SurfGlobals` |
+| `mris` | `include/mrisurf_FACE_VERTEX_MRIS_generated.h` 7-262 | `FACE` (`face_type_`), `VERTEX_TOPOLOGY`, `VERTEX` (`vertex_type_`), `MRIS`: every field but `lta`, `ct`, `vg` and `mri_sras2vox` (their types are fs.mri's and fs.volume's: added with the surface readers, 3.1-47); C's pointers as the module explains |
+| `mris_mp` | `include/mrisurf_MRIS_MPPropertiesInVectors.h`; `include/mrisurf_MRIS_MP.h` 13-118 | `MRIS_MP`: the arrays and values (the input arrays shared by copies as `Arc`, replacing `in_src`/`in_ref_count`); the pointers into the `MRIS` (`underlyingMRIS`, `vertices_topology`, `vertices`, `faces`, `v_dist_orig`) read through the `MRIS` a view pairs it with |
+| `views` | `include/mrisurf_SurfaceFromMRIS_MP_generated_*.h` (the `AllM` level's accessors; every level's are the same storage: `validation/investigations/freesurfer-surfio/accessors.py`), `include/mrisurf_SurfaceFromMRIS_generated_*.h` (the same accessors on `MRIS`), `include/mrisurf_SurfaceFromMRIS_MP_generated_suffix.h` lines 27-1510 (`which_coords`' cases), `include/mrisurf.h` 1025-1041; `utils/mrisurf_metricProperties.cpp` 3721-3758 | `MetricSurface` (the `MRIS_MP` views' 114 accessors but the face normal and the face-normal caches) for `Mris` and `MpView`; `which_coords_mp_cases`; the selector constants `ORIGINAL_VERTICES` ... `WHITE_NORMALS`; `MRISvertexCoord2XYZ_float`, `MRISvertexCoord2XYZ_double` (the `MRIS` views' `which_coords`) |
+| `topology` | `include/mrisurf.h` 2198-2200, 2501-2530; `include/mrisurf_topology.h` 74-84; `utils/mrisurf_topology.cpp` 360-372, 907-918 | `returnTrue` (`mrisCheckVertexFaceTopology`, `mrisCheckVertexVertexTopology`), `setVnum`, `clearVnum`, `vnumAdd`, `addVnum`, `VERTEXvnum`, `mrisVertexNeighborIndex`, `mrisVerticesAreNeighbors`, `vertexNeighbor`, `modVnum` (its `static short maxVnumSeen` in `SurfGlobals`), `mrisVertexVSize` |
+| `base` | `include/mrisurf_base.h` 112, 156-168, 179-208; `include/mrisurf_sphere_interp.h` 13-56 | `sign`, `mrisNormalize`, `closeEnough`, `project_point_onto_sphere` (`FZERO` from `include/macros.h`), `Vec3` with `+`, `-`, `*` (inner product and scale), `operator*(double, Vec3)`, `dot`, `cross` |
+| `mrisurf` | `utils/mrisurf.cpp` 87-108, 113-201, 270-273, 924-1007; `include/fnv_hash.h` 22-31; `include/mrisurf.h` 1579-1593 | `MRISaddCommandLine` (FS-112), `vertix_n_hash_add` (one surface, no difference file) as `mrisVertexHash`, `fnv_init`, `fnv_add` (larmorx-core's copy of queue item 3.1-18 replaces them when it exists), `MRISdiffSimple`, `SMALL_VERTEX`, `SMALL_SURFACE`, `MRISSfree` |
+| `dist` | `utils/mrisurf_base.cpp` 270-420 | `freeDistOrDistOrig`, `changeDistOrDistOrig`, `mrisStealDistStore`, `mrisSetDist`, `growDistOrDistOrig`, `MRISgrowDist`, `MRISgrowDistOrig`, `makeDistOrDistOrig`, `MRISmakeDist`, `MRISmakeDistOrig`, `freeDistsOrDistOrigs`, `MRISfreeDistsButNotOrig` (`MRIS` and `MRIS_MP`), `MRISfreeDistOrigs` |
+| `coords` | `utils/mrisurf_metricProperties.cpp` 58-605, 640-1006 (queue item 3.1-49, part a); `utils/mrisurf_metricProperties_slow.h` 3-35; `utils/mrisurf_topology.cpp` 1919-1936, 3124-3140; `include/mrisurf.h` 1095-1097, 2233-2237, 2366-2368 | `MRISsetXYZwkr` (`MRISsetXYZ`), `MRISmemalignNFloats`, `MRISexportXYZ`, `MRISimportXYZ`, `MRIScopyXYZ` (`SURFACE_DIMENSION_CALC_*`), `MRISsetOriginalXYZwkr` (`MRISsetOriginalXYZ`), `MRISsetOriginalXYZfromXYZ`, `MRISavgVetexRadius`, `MRISimportVertexCoords`, `MRISreverseCoords`, `MRISreverse`, `MRISscale` (FS-113), `mrisFlipPatch`, `MRIStranslate`, `MRISscaleThenTranslate` (FS-113), `MRISanisotropicScale`, `MRISrotate` (`MRIS` and `MRIS_MP`), `MRISmatrixMultiply`, `MRISsphericalCoords`, `MRISmoveOrigin`, `MRIScenter`, `MRIScalculateCenterCOG2`, `MRIScenterCOG2`, `MRIScenterCOG`, `MRISblendXYZandTXYZ`, `MRISblendXYZandNXYZ`, `MRIStranslate_along_vertex_dxdydz`, `mrisComputeSurfaceDimensions`, `mrisSetVertexFaceIndex`, `MRISreverseFaceOrder`, `REVERSE_X/Y/Z`; every NaN in the official build's operand order (`docs/findings/freesurfer-surfio.md` §8) |
+| `metric` | `utils/mrisurf_metricProperties.cpp` 1007-1290, 1304-1488, 1550-1842 (but `MRIScomputeOrigArea`, `MRISsetOrigArea`), 1884-2032, 2572-3046 (but `MRISnonmaxSuppress`, `MRISrestoreOldPositions`, `MRISstoreCurrentPositions`, `MRISstoreMetricProperties`, `MRISrestoreMetricProperties`), 3122-3165, 9113-9136 (queue item 3.1-49, parts b and c; `mrisComputeCurvatureMinMax` from 3.1-50's lines); `utils/mrisComputeVertexDistancesWkr_extracted.h` (both expansions on `MRIS`); `utils/mrisurf_vals.cpp` 677-685; `utils/matrix.cpp` 2690-2773 (`XYZApproxAngle_knownLength`, with the official build's product order: a local copy, `docs/findings/freesurfer-surfio.md` §9) | `MRISaverageVertexPositionsWkr_part1`/`_part2` (as `average_wkr_part1` and the import), `MRISaverageVertexPositions`, `MRISsmoothSurface` up to its `MRIScomputeMetricProperties` (`smooth_surface_positions`), `estimateNRG`, `estimateSquaredRadius`, `computeGradient`, `MRIScenterSphere` (`MRIScenterSphere_old`; FS-114), `MRISclearOrigDistances`, `MRISscaleDistances`, `mrisCheckDist`, `mrisCheckDistOrig`, `mrisComputeVertexDistances`, `mrisComputeOriginalVertexDistances`, `mrisComputeVertexDistancesWkr`, `mrisComputeOriginalVertexDistancesWkr`, `mrisComputeOriginalVertexDistancesIfNecessaryWkr`, `MRISpercentDistanceError`, `MRISclearOrigArea`, `MRISclearOrigAreaAndVal2`, `mrisComputeArea`, `MRISzeroNegativeAreas`, `load_orig_triangle_vertices`, `load_triangle_vertices`, `MRISextractVertexCoords`, `MRISclearCurvature`, `MRISclearCurvAndVal2`, `MRISrectifyCurvature`, `MRISscaleCurvatures`, `MRISsmoothCurvatures`, `MRISzeroMeanCurvature`, `MRISnormalizeCurvature` (glibc 2.35's `qsort` order from `specs/glibc-qsort.md`), `MRISnormalizeCurvatureVariance`, `mrisCountCompressed`, `MRISstoreMeanCurvature`, `MRISsavedXYZ`, `MRISsaveXYZ`, `MRISloadXYZ`, `MRISfreeXYZ`, `MRISpopXYZ`, `mrisComputeCurvatureMinMax`, `MRISextractCurvatureVector`; `NORM_NONE/MEAN/MEDIAN`, `DEFAULT_RADIUS`; every NaN in the official build's operand order (`docs/findings/freesurfer-surfio.md` §9) |
+| `surfbase` | `utils/mrisurf_base.cpp` 80-118, 133-157, 505-512, 937-938; `include/mrisurf.h` 117-121; `include/mrisurf_base.h` 305 | `MRIS_TempAssigned`, `MRIS_acquireTemp`, `MRIS_checkAcquiredTemp`, `MRIS_releaseTemp`, `MRISacquireNverticesFrozen`, `MRISreleaseNverticesFrozen`, `MRISmakeFloatPerVertex`, `MRISfreeFloatPerVertex`, `MRISsetInflatedFileName` (FS-111), `MRISsetSulcFileName`, `MRISsetOriginalFileName`; the globals `NEG_AREA_K`, `mrisurf_surface_names`, `curvature_names` (in `SurfGlobals`) |
+
+Not translated, on purpose (`docs/findings/freesurfer-surfio.md`):
+
+- `MRISPV` (`include/mrisurf_MRIS_PropertiesInVectors.h`) and its views
+  (`include/mrisurf_SurfaceFromMRISPV_generated_*.h`): no FreeSurfer 8.2.0 code ever creates one, so
+  none of their code can run.
+- The `MRIS` views' remaining accessors: each is one field of `Mris`, `Vertex`, `Face` or
+  `VertexTopology` (the table tool checks that every accessor reads one storage at every level).
+- `MRIS_MP`'s own `which_coords` (never called: its cases are kept as `which_coords_mp_cases`).
+- `min3` (`include/mrisurf_base.h` 119: cannot be instantiated), `square`, `square3`, `norm3`,
+  `max`, `min`, `max3` (unused templates), `MRISBaseCtr`, `MRISBaseConstCtr`, `MRISBaseToConst`
+  (unreached).
+- `mris_hash_init`, `mris_hash_add`, `mris_hash_print`, `mris_print_hash`, `mris_print_diff`
+  (`utils/mrisurf.cpp` 229-317): reached only behind `debugNonDeterminism` (a constant 0) or from
+  `utils/test/`.
+- `MRIStalairachTransform`, `MRISrotate(src, NULL, ...)`, `MRISprojectOntoTranslatedSphere`,
+  `mrisDisturbVertices` (`utils/mrisurf_metricProperties.cpp` 607-638, 712-719, 796-809,
+  866-917): with `MRISclone`, the `LTA` and the metric properties (later parts of 3.1-49 to 3.1-51).
+- `MRISripMidline`, `MRIcomputeLabelNormal`, `MRIScopyCoords` (`utils/mrisurf.cpp` 358-922): with
+  fs.mri's `MRI`, `LABEL` and `VOL_GEOM` (queue item 3.1-55); `insertActiveRealmTree`,
+  `removeActiveRealmTree` (`utils/mrisurf_base.cpp` 159-195): with fs.surf's `RealmTree`; the
+  `gMRISexternal*` hooks (`utils/mrisurf.cpp` 57-62): with fs.deform's `INTEGRATION_PARMS`.
+- `INTEGRATION_PARMS` and `ClosestVertex` (`include/mrisurf.h` 299-541, 2618-2669): with the modules
+  their members belong to (fs.deform, fs.volume's `LTA`, fs.surf's `MHT`).
+
+Third-party code in these files: none (`docs/freesurfer/third-party.md` §6: the generated headers
+and `mrisurf_sphere_interp.h` are MGH's, under FreeSurfer's licence).
 
 ## Changes from the originals
 
-None yet.
+- C's pointers are Rust values (`Option<Vec<T>>` for an array a function allocates, `None` for
+  `NULL`; vertex numbers for pointers to vertices; `Arc` for the `MRIS_MP` arrays its copies share;
+  `Opaque` for `void *`): reading a `NULL` array panics where FreeSurfer reads through a null
+  pointer.
+- A write through an `MRIS_MP` copy into one of its shared input arrays changes that copy only
+  (FreeSurfer's copies share it; no FreeSurfer code writes one).
+- The process-wide variables are fields of `SurfGlobals`, one value per run.
+- Failed assertions end the call with FS-03's exit (`larmorx-freesurfer-core::diag::assert_failed`).
+- `MRISmakeFloatPerVertex`'s array is 0 where FreeSurfer's `malloc` leaves it undefined; so are
+  the distances' values `realloc` adds where FreeSurfer does not zero them.
+- A vertex's distance buffer is in `Vertex::dist` while valid and in `Mris::dist_storage` while
+  not (FreeSurfer points the first at the second): `dist`'s module.
+- Floating-point operations that can make or meet NaNs use fs.core's `sse` helpers in the official
+  build's operand order (the same bits on every platform).
+- FS-113: after a negative scale larmorx swaps the box's ends (`reproduce` leaves them reversed).
+- FS-111 (an inflated name of 1,022 bytes or more is taken whole; `reproduce`: the official
+  build's abort message and exit status 134) and FS-112 (a command line past 1,000 is dropped in
+  both modes, the original's count becoming a memory address) (`docs/findings/freesurfer-surfio.md` §7).

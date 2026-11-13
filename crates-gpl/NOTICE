@@ -41,6 +41,20 @@ tedana 26.0.3 (TE-Dependent ANAlysis of multi-echo fMRI), Copyright 2023, The ME
   this copy (section 3).
 
 
+GSL 1.8 (the GNU Scientific Library), Copyright (C) 1996, 1997, 1998, 1999, 2000 James Theiler,
+Brian Gough (https://www.gnu.org/software/gsl/) - GNU General Public License, version 2 or (at
+your option) any later version
+  Translated: RANLUX389 (rng/ranlux.c) and the distributions of randist/flat.c, gauss.c,
+  exponential.c, gamma.c, chisq.c, fdist.c and tdist.c, as FreeSurfer 8.2.0's utils/numerics.cpp
+  transcribes them ("GSL library replacement for Freesurfer", Silvester Czanner, 2006; that file
+  carries "Copyright (c) 2021 The General Hospital Corporation (Boston, MA)") (crate
+  larmorx-gpl-gsl; PROVENANCE.md lists the functions). A library of this workspace, the bit-exact
+  reference of larmorx's clean room; it is not part of the larmorx-gpl program.
+  Modified: translated from C to Rust in 2026 by Karel Lopez Vilaret; FreeSurfer's two defects
+  there (FS-100, FS-101) are corrected by default and reproduced on request; tan is correctly
+  rounded. Distributed under the GNU General Public License, version 3 or later, as GSL 1.8's
+  "any later version" allows.
+
 Included works
 ==============
 

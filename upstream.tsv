@@ -35,6 +35,8 @@ ITK-v4.13.2	https://github.com/InsightSoftwareConsortium/ITK/archive/refs/tags/v
 minc-1.5.1	http://packages.bic.mni.mcgill.ca/tgz/minc-1.5.1.tar.gz	sha256:0b41d5bb1b178c62792c9e4fbd8ddd971d1a90aad7c257ff00bcbdddc3998afe	LicenseRef-MNI	tags
 nifticlib-2.0.0	https://sourceforge.net/projects/niftilib/files/nifticlib/nifticlib_2_0_0/nifticlib-2.0.0.tar.gz	sha256:a3e988e6a32ec57833056f6b09f940c69e79829028da121ff2c5c6f7f94a7f88	public-domain	tags
 zlib-1.2.11	https://zlib.net/fossils/zlib-1.2.11.tar.gz	sha256:c3e5e9fdd5004dcb542feda5ee4f0ff0744628baf8ed2dd5d66f8ca1197cb1a1	Zlib	tags
+gifticlib-1.12	https://github.com/NIFTI-Imaging/gifti_clib/archive/8ec2a95bce6360c3f7f655b36767e4d04c61d77c.tar.gz	sha256:965406c74a48a0bf1a58d6d556189da120de5e5fbb6209b145805325be9c0416	public-domain	tags
+expat-2.0.1	https://github.com/libexpat/libexpat/archive/refs/tags/R_2_0_1.tar.gz	sha256:6a26c3fe91d2a05d05fac187c0a092e1602c335ee12b008d9fe4da30788402b9	MIT	tags
 ITKAdaptiveDenoising	https://github.com/ntustison/ITKAdaptiveDenoising.git	24825c8d246e941334f47968553f0ae388851f0c	Apache-2.0	tags
 AFNI-25.2.09	https://github.com/afni/afni.git	b1e12b26dae2b56d362eab299520c383cf84798a	public-domain+exceptions	tags
 AFNI-26.3.05	https://github.com/afni/afni.git	07c1dcfb5fdc933d2429669826bcbddbc4047461	public-domain+exceptions	tags

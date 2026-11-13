@@ -1,16 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0 AND BSD-3-Clause
 //! vnl's random numbers (`vnl_random`): Marsaglia and Zaman's subtract-with-borrow generator on 37
 //! words of 32 bits, seeded by a linear congruential generator, and the uniform and normal
-//! numbers drawn from it. FreeSurfer's `OpenRan1` (its `-seed` option's generator) is a static
-//! `vnl_random` reseeded with the seed, returning `(float) drand64(0.0, 1.0)`.
+//! numbers drawn from it.
 //!
 //! **The order of `drand64`'s two draws.** `drand64` adds `lrand32() / 0xffffffff` and
-//! `lrand32() / 0xffffffff²`; C++ leaves the order of the two calls unspecified. Every official
-//! FreeSurfer 8.2.0 binary that holds the function (65 of the 72 default-path programs, built by
-//! GCC 8.4.0) divides the *first* call's result by `0xffffffff` (`docs/freesurfer/variation.md`
-//! §3, `validation/investigations/freesurfer-inventory/drand64_order.sh`), and so does GCC 8.4.0
-//! compiling ITK 4.13.2's file with FreeSurfer's flags (`validation/probes/fs-random`): this port
-//! draws left to right.
+//! `lrand32() / 0xffffffff²`; C++ leaves the order of the two calls unspecified. GCC 8.4.0 at
+//! `-O3` divides the *first* call's result by `0xffffffff` (ITK 4.13.2's file compiled and
+//! compared in `validation/probes/fs-random`): this port draws left to right.
 //!
 //! **The logarithm** in [`VnlRandom::normal`] and [`VnlRandom::normal64`] is the C library's in
 //! the original (glibc 2.35's on the reference machine): the caller passes it, `math::log_glibc`
@@ -21,8 +17,7 @@
 //!   passes the time if it must reproduce a clock seed);
 //! - a copy ([`Clone`]) keeps the cached second normal number; the C++ copy constructor and
 //!   assignment copy its flag but not its value, so a copy's next `normal()` returns
-//!   uninitialised memory (both ITK 4.13.2 and 5.4.5; not reached by FreeSurfer, whose generator
-//!   is never copied);
+//!   uninitialised memory (both ITK 4.13.2 and 5.4.5);
 //! - [`VnlRandom::lrand32_range`] computes the range in 64 bits and refuses `lower > upper` (the
 //!   C++ computes `upper - lower + 1` in `int`, which overflows when the range exceeds `2^31 - 1`:
 //!   a range of `2^32` divides by zero, one from `2^31` to `2^32 - 1` never returns; with
@@ -31,7 +26,7 @@
 //!
 //! Ported from VXL as bundled with ITK 4.13.2, the version FreeSurfer 8.2.0's official binaries
 //! link (`core/vnl/vnl_random.h`, `vnl_random.cxx`; identical in ITK 5.4.5 apart from the default
-//! constructor's initialisers, `docs/freesurfer/third-party.md` §8).
+//! constructor's initialisers).
 
 // Original copyright and licence (BSD-3-Clause) notice of VXL
 // (Modules/ThirdParty/VNL/src/vxl/core/vxl_copyright.h in ITK 4.13.2):
@@ -90,8 +85,8 @@ pub struct VnlRandom {
 }
 
 impl VnlRandom {
-    /// `vnl_random(seed)`: [`VnlRandom::reseed`] with `seed` (FreeSurfer passes a `long`,
-    /// converted to `unsigned long`: `seed as u64`).
+    /// `vnl_random(seed)`: [`VnlRandom::reseed`] with `seed` (a C++ `long` seed converts to
+    /// `unsigned long`: `seed as u64`).
     pub fn new(seed: u64) -> VnlRandom {
         let mut r = VnlRandom {
             linear_congruential_previous: seed,
@@ -261,8 +256,8 @@ mod tests {
         }
     }
 
-    /// ITK 4.13.2's vnl_random (its own vnl_random.cxx compiled by GCC 8.4.0 with FreeSurfer
-    /// 8.2.0's flags, with glibc 2.35's logarithm): the hashes of `sequence(seed)`'s outputs,
+    /// ITK 4.13.2's vnl_random (its own vnl_random.cxx compiled by GCC 8.4.0 at `-O3`, with
+    /// glibc 2.35's logarithm): the hashes of `sequence(seed)`'s outputs,
     /// recorded by `validation/probes/fs-random` (`fs-random --record`).
     const ORIGINAL: [(u64, u64); 5] = [
         (0x4d2, 0xd541_c4ad_b5bd_0300),

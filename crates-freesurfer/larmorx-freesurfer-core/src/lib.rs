@@ -26,6 +26,8 @@
 //! - The C library's behaviour they need, larmorx's own code: [`cstd`] (conversions), [`cglob`]
 //!   (`glob`, `fnmatch`), [`ctime`] (`gmtime`, `localtime` with the time-zone files,
 //!   `strftime("%c")`), [`system`] (the user's and the machine's names).
+//! - `fs.spline` (queue item 3.1-54): [`spline`], John Burkardt's 2006 cubic spline as FreeSurfer
+//!   changed it (`SplineCubicSet`, `SplineCubicValue`, `d3_np_fs`, `OpenSpline`, `OpenSplint`; FS-103).
 #![forbid(unsafe_code)]
 
 pub mod affine;
@@ -58,6 +60,7 @@ pub mod randomfields;
 pub mod ret;
 pub mod romp;
 pub mod run;
+pub mod spline;
 pub mod sse;
 pub mod system;
 pub mod timer;

@@ -2,7 +2,8 @@
 //! volume_io's file helpers for the `.xfm` reader and writer (`Prog_utils/files.c`,
 //! `Prog_utils/string.c`): `~` and `$VAR` expansion, the default suffix, compressed inputs.
 //!
-//! File names are bytes, as in C (on Unix exactly; elsewhere through UTF-8). volume_io decompresses
+//! File names are bytes, as in C (on Unix exactly; elsewhere through UTF-8). On Windows a backslash
+//! separates directories (volume_io's escape would drop it: FS-79). volume_io decompresses
 //! a compressed input with `gunzip -c` (then `bunzip2 -c`) through the shell into a temporary file;
 //! larmorx decompresses gzip and bzip2 data in memory ([`super::defects::SHELL_DECOMPRESSION`]);
 //! the older `compress` (`.Z`) and `pack` (`.z`) formats `gunzip` also reads are not decoded (their
@@ -83,11 +84,34 @@ pub fn expand_filename(filename: &[u8]) -> Vec<u8> {
 }
 
 /// [`expand_filename`] with a dialect's home directories; volume_io crashes on an expansion to
-/// nothing at the start of the name (FS-75), which larmorx expands to nothing.
+/// nothing at the start of the name (FS-75), which larmorx expands to nothing. On Windows a
+/// backslash is a directory separator, not volume_io's escape (FS-79; `reproduce` keeps the
+/// escape).
 pub fn expand_filename_in(
     filename: &[u8],
     dialect: &dyn Dialect,
     notices: &mut Notices,
+) -> Vec<u8> {
+    expand_with(filename, dialect, notices, cfg!(windows))
+}
+
+/// Whether a name's backslashes are directory separators: on Windows, in the corrected mode
+/// (FS-79); volume_io (and `reproduce`) takes them as escapes everywhere.
+pub(crate) fn backslash_separates(windows: bool, notices: &Notices) -> bool {
+    windows && notices.fix()
+}
+
+/// A directory separator of a name: `/`, and on Windows `\\` ([`backslash_separates`]).
+pub(crate) fn is_separator(c: u8, backslash: bool) -> bool {
+    c == b'/' || (backslash && c == b'\\')
+}
+
+/// [`expand_filename_in`] as on Windows (`windows`) or elsewhere.
+pub(crate) fn expand_with(
+    filename: &[u8],
+    dialect: &dyn Dialect,
+    notices: &mut Notices,
+    windows: bool,
 ) -> Vec<u8> {
     // C's string ends at its first NUL.
     let filename = &filename[..filename
@@ -95,6 +119,17 @@ pub fn expand_filename_in(
         .position(|&b| b == 0)
         .unwrap_or(filename.len())];
     let len = filename.len();
+    let backslash = backslash_separates(windows, notices);
+    if windows && filename.contains(&b'\\') {
+        notices.add(
+            &d::FS_79,
+            if backslash {
+                "a backslash of a Windows file name read as a directory separator (volume_io drops it as an escape)"
+            } else {
+                "a backslash of a Windows file name dropped as an escape, as volume_io does"
+            },
+        );
+    }
     let at = |i: usize| if i < len { filename[i] } else { 0 };
     let mut out = Vec::with_capacity(len);
     let mut prev_was_backslash = false;
@@ -104,7 +139,7 @@ pub fn expand_filename_in(
         if !prev_was_backslash && ((i == 0 && c == b'~') || c == b'$') {
             let tilde = c == b'~';
             let mut j = i + 1;
-            while at(j) != b'/' && at(j) != b'.' && at(j) != 0 {
+            while !is_separator(at(j), backslash) && at(j) != b'.' && at(j) != 0 {
                 j += 1;
             }
             let env = &filename[i + 1..j];
@@ -139,7 +174,7 @@ pub fn expand_filename_in(
             }
             prev_was_backslash = false;
         } else {
-            if c != b'\\' || prev_was_backslash {
+            if c != b'\\' || prev_was_backslash || backslash {
                 out.push(c);
                 prev_was_backslash = false;
             } else {
@@ -151,15 +186,43 @@ pub fn expand_filename_in(
     out
 }
 
-/// The context the helpers expand names in: a dialect and the notices.
+/// The context the helpers expand names in: a dialect, the notices and whether names follow
+/// Windows' conventions (FS-79).
 pub(crate) struct Ctx<'a> {
     pub dialect: &'a dyn Dialect,
     pub notices: &'a mut Notices,
+    pub windows: bool,
 }
 
-impl Ctx<'_> {
+impl<'a> Ctx<'a> {
+    /// The context on this platform.
+    pub(crate) fn new(dialect: &'a dyn Dialect, notices: &'a mut Notices) -> Ctx<'a> {
+        Ctx {
+            dialect,
+            notices,
+            windows: cfg!(windows),
+        }
+    }
+
     fn expand(&mut self, filename: &[u8]) -> Vec<u8> {
-        expand_filename_in(filename, self.dialect, self.notices)
+        expand_with(filename, self.dialect, self.notices, self.windows)
+    }
+
+    /// Whether `c` separates directories in this context's names.
+    pub(crate) fn separator(&self, c: u8) -> bool {
+        is_separator(c, backslash_separates(self.windows, self.notices))
+    }
+
+    /// Whether an expanded name is absolute: it starts with `/` (on Windows also with `\\` or a
+    /// drive letter and `:`).
+    pub(crate) fn is_absolute(&self, name: &[u8]) -> bool {
+        let win = backslash_separates(self.windows, self.notices);
+        match name {
+            [b'/', ..] => true,
+            [b'\\', ..] => win,
+            [l, b':', ..] => win && l.is_ascii_alphabetic(),
+            _ => false,
+        }
     }
 
     /// `file_exists`.
@@ -170,7 +233,7 @@ impl Ctx<'_> {
     /// `remove_directories_from_filename`.
     pub(crate) fn remove_directories(&mut self, filename: &[u8]) -> Vec<u8> {
         let e = self.expand(filename);
-        match e.iter().rposition(|&c| c == b'/') {
+        match e.iter().rposition(|&c| self.separator(c)) {
             Some(p) => e[p + 1..].to_vec(),
             None => e,
         }
@@ -184,7 +247,7 @@ impl Ctx<'_> {
     /// `extract_directory`.
     pub(crate) fn extract_directory(&mut self, filename: &[u8]) -> Vec<u8> {
         let e = self.expand(filename);
-        match e.iter().rposition(|&c| c == b'/') {
+        match e.iter().rposition(|&c| self.separator(c)) {
             Some(p) => e[..=p].to_vec(),
             None => b".".to_vec(),
         }
@@ -207,31 +270,19 @@ impl Ctx<'_> {
 /// `file_exists`: `fopen(expanded, "r")` succeeds.
 pub fn file_exists(filename: &[u8]) -> bool {
     let mut n = Notices::default();
-    Ctx {
-        dialect: &super::Mni,
-        notices: &mut n,
-    }
-    .file_exists(filename)
+    Ctx::new(&super::Mni, &mut n).file_exists(filename)
 }
 
 /// `remove_directories_from_filename`: what follows the expanded name's last `/`.
 pub fn remove_directories_from_filename(filename: &[u8]) -> Vec<u8> {
     let mut n = Notices::default();
-    Ctx {
-        dialect: &super::Mni,
-        notices: &mut n,
-    }
-    .remove_directories(filename)
+    Ctx::new(&super::Mni, &mut n).remove_directories(filename)
 }
 
 /// `extract_directory`: the expanded name up to and including its last `/`, or `.`.
 pub fn extract_directory(filename: &[u8]) -> Vec<u8> {
     let mut n = Notices::default();
-    Ctx {
-        dialect: &super::Mni,
-        notices: &mut n,
-    }
-    .extract_directory(filename)
+    Ctx::new(&super::Mni, &mut n).extract_directory(filename)
 }
 
 fn ends_in(s: &[u8], ending: &[u8]) -> bool {
@@ -365,7 +416,7 @@ pub fn open_file(
     streams: &mut dyn Streams,
     notices: &mut Notices,
 ) -> Result<OpenFile, ()> {
-    let mut ctx = Ctx { dialect, notices };
+    let mut ctx = Ctx::new(dialect, notices);
     let mut expanded = ctx.expand(filename);
     let mut gzipped = false;
     if io == IoType::Read {
@@ -462,10 +513,7 @@ pub fn open_file_with_default_suffix(
     streams: &mut dyn Streams,
     notices: &mut Notices,
 ) -> Result<OpenFile, ()> {
-    let mut ctx = Ctx {
-        dialect,
-        notices: &mut *notices,
-    };
+    let mut ctx = Ctx::new(dialect, &mut *notices);
     let expanded = ctx.expand(filename);
     let with_suffix = || {
         let mut u = expanded.clone();

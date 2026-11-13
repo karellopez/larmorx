@@ -302,7 +302,10 @@ dependencies = [
 name = "larmorx-freesurfer-surf"
 version = "0.1.0-rc.1"
 dependencies = [
+ "larmorx-core",
+ "larmorx-freesurfer-core",
  "larmorx-freesurfer-volume",
+ "sha2",
 ]
 
 [[package]]

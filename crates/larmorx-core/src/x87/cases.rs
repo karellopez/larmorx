@@ -115,7 +115,7 @@ pub enum Family {
     OverDiv,
     /// Denormals, pseudo-denormals and the smallest normals.
     Denormal,
-    /// Exact `double` values (the operands of FreeSurfer's `long double` sums of `double`s).
+    /// Exact `double` values (the operands of `long double` sums of `double`s).
     Doubles,
     /// Exact `float` values.
     Floats,
@@ -464,9 +464,8 @@ pub fn from_seed(from: usize) -> u64 {
     0x0087_f000_0000_0000 ^ from as u64
 }
 
-/// Arithmetic patterns of the FreeSurfer functions that compute in `long double`
-/// (`docs/freesurfer/variation.md` §1), written as plain loops: what the probe's C++ computes
-/// with GCC 8.4.0 and FreeSurfer's flags, here with [`F80`].
+/// Arithmetic patterns of code that computes in `long double`, written as plain loops: what the
+/// probe's C++ computes with GCC 8.4.0 at `-O3`, here with [`F80`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Pattern {
     /// `s += (long double)a[i] * b[i]` over `double`s, returned as `double` (DVectorDot,

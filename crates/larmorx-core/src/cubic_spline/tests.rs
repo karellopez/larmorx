@@ -96,6 +96,17 @@ fn the_probes_systems() {
     )
     .unwrap();
     assert_eq!(bits(&x), [0x7fc0_0001, 0x7fc0_0001]);
+    // §6's example: U₀ and x₁ are NaNs of different payloads; the back substitution's product
+    // is x₁ · U₀, so x₀ carries x₁'s payload (`2 00000000 40000000 40400000 7fc00111 40a00000
+    // 00000000 40e00000 7fc00222` gives `x 7fc00222 7fc00222`)
+    let x = solve_tridiagonal(
+        &[0.0, 3.0],
+        &[2.0, 5.0],
+        &[f(0x7fc0_0111), 0.0],
+        &[7.0, f(0x7fc0_0222)],
+    )
+    .unwrap();
+    assert_eq!(bits(&x), [0x7fc0_0222, 0x7fc0_0222]);
     let x = solve_tridiagonal(&[0.0], &[2.0], &[3.0], &[7.0]).unwrap();
     assert_eq!(bits(&x), [0x4060_0000]);
 }

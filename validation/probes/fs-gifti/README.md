@@ -52,4 +52,13 @@ Prints `VERIFY-PASS` or `VERIFY-FAIL` (exit status 1). Single-threaded, about 20
   reading memory never written (FS-80; masked since); 2,670 not run (FS-80, FS-84 to FS-88: memory
   never written or a crash in the original). GZipBase64Binary files written: 272, 198 of them
   byte-identical to zlib's.
-- Scale 5: see `oracles/logs/fs-found-c-r6-gifti-all-5.log` (the numbers are in the findings).
+- 2026-11-13, the code of ab4b3955, scale 5 (log `oracles/logs/fs-found-c-r6-gifti-all-5b.log`):
+  **VERIFY-PASS**. scan 100,000 strings, 0 differ; xml 20,020 documents x 2 libraries = 40,040
+  comparisons, 0 differ (12 not run: the originals crash, FS-88 and FS-89); read 30,000 (15,000
+  files x 2 libraries), 68,030 comparisons, 0 differ; 13,584 compared in part or not at all (the
+  values compared with the memory the original never wrote masked, the messages and the written
+  file not: FS-80, FS-87; nothing compared where the original crashes: FS-84 to FS-86, FS-88,
+  FS-89). GZipBase64Binary files written: 1,370, 1,044 of them byte-identical to zlib's (the rest
+  equal in content). The scale-5 run before (`...-all-5.log`, at 9b9c4990) found FS-89, a panic of
+  the port on a cut UTF-16 token, the writer's read past FLOAT128 data (named FS-85 since) and the
+  probe's own state and dump size: fixed in ab4b3955.

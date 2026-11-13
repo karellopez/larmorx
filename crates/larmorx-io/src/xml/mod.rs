@@ -2,7 +2,7 @@
 //! A pure-Rust XML parser translated from expat 2.0.1 (Copyright (c) 1998, 1999, 2000 Thai Open
 //! Source Software Center Ltd and Clark Cooper; Copyright (c) 2001-2006 Expat maintainers; MIT,
 //! `PROVENANCE.md`), for gifticlib: the paths of a parser made by `XML_ParserCreate(NULL)` with
-//! expat's own configuration as FreeSurfer builds it (`XML_DTD`, `XML_CONTEXT_BYTES` 1024), no
+//! expat built with `XML_DTD` and `XML_CONTEXT_BYTES` 1024, no
 //! namespace processing, no external entities read, no parameter entities expanded, and
 //! gifticlib's handlers (start and end tags, character data, processing instructions,
 //! comments, CDATA sections, the default handler, the XML declaration, the document type and
@@ -15,7 +15,7 @@
 //! and after the root element); attribute values normalized with their defaults from the
 //! internal subset and its entities expanded; the error codes with [`error_string`]'s texts at
 //! the line [`Parser::current_line_number`] gives. `validation/probes/fs-gifti` compares every
-//! event and error with expat 2.0.1's and FreeSurfer 8.2.0's copy on generated documents.
+//! event and error with expat 2.0.1's on generated documents.
 
 // expat's functions report a status, the error kept in the parser: `Result<_, ()>` is that status.
 #![allow(clippy::result_unit_err)]

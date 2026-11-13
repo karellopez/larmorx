@@ -74,7 +74,15 @@ Behaviour a caller sees, kept from expat:
   `.h5` files (decision log 2026-10-16); the "compress buffer (N% ...)" message at verbosity 3 and
   above shows the stream's size.
 
-## Defects (D13; the register's FS-80 to FS-88)
+## The numbers
+
+`validation/probes/fs-gifti` at scale 5 (2026-11-13): 40,040 parser comparisons with expat 2.0.1
+and FreeSurfer's copy on generated documents in pieces, 0 differ; 68,030 GIFTI comparisons with
+gifticlib 1.12 and FreeSurfer's copy (values, checks, displays, messages at every verbosity, files
+written back), 0 differ; 100,000 `sscanf("%f")` strings, 0 differ from glibc. Where an original
+reads memory it never wrote or crashes, the defined parts are compared (the probe's README).
+
+## Defects (D13; the register's FS-80 to FS-89)
 
 | ID | Where | What | larmorx |
 |---|---|---|---|
@@ -87,6 +95,7 @@ Behaviour a caller sees, kept from expat:
 | FS-86 | text elements | character data (white space included) after a CDATA section or a child element inside `Name`, `Value`, `Label`, `DataSpace` or `TransformedSpace`, or inside one of them outside its parent, is written through a null pointer (a crash): `<Name> <![CDATA[x]]> </Name>` crashes gifticlib | appended to the element's text (or dropped without a place), with a notice (both modes) |
 | FS-87 | messages | at verbosity 6 and 7 the `MatrixData` reader's buffer messages show the `Data` element's buffer and length, partly memory never written | the matrix buffer's; `reproduce` the `Data` buffer's (never-written bytes from zeros), with a notice |
 | FS-88 | expat | a UTF-16 document of an odd length whose last token is cut by its odd byte is converted past its end (a crash or a hang) | the odd byte dropped, with a notice (both modes) |
+| FS-89 | expat | an error reported inside a multibyte character (a non-ASCII character in an XML declaration's pseudo-attribute: `toAscii` stops in the middle of it) makes `XML_GetCurrentLineNumber`'s count step over it and read past the document (a crash) | the lines before it, with a notice (both modes) |
 
 Kept (rule C, behaviour only): `gifti_intent_is_valid` accepts every code; the extra empty final
 `XML_Parse`; the `%p` values in some messages (larmorx prints placeholders); expat 2.0.1's

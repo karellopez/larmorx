@@ -1204,9 +1204,10 @@ and calls with their targets):
   `FACES_angleNormal_find` call `acos` (or `acosf`) of a `float`; the object code calls `acosf` in all
   three (C++'s `acos(float)` overload). glibc's `acosf` differs from the correctly rounded one on
   0.25 % of floats (`docs/findings/freesurfer-libm.md` §3): `reproduce` takes
-  `larmorx_core::math::acosf_glibc`, the default the correctly rounded `acosf_cr`, which is CORE-MATH's
+  `larmorx_core::math::acosf_glibc`, the default the correctly rounded `larmorx_core::math::acosf`
+  (CORE-MATH's `cr_acosf`, through `Libm::acosf`, since relay 21; until then `acosf_cr`: CORE-MATH's
   `acos` in double rounded to float except at the two midpoints `validation/investigations/acosf-
-  double-rounding/` found. The probe's default differs from the official build only there (with
+  double-rounding/` found, equal to `cr_acosf` on every float in [-1, 1]). The probe's default differs from the official build only there (with
   glibc's `acosf` put into the default by hand: 0 of 1,000 seed-7 `mpd` cases differ).
 - **`MAX`/`MIN` in the pseudo-normal.** `MAX(0.0, MIN(1.0, F_DOT(v1, v2) / NORM3(v1) / NORM3(v2)))`
   takes `macros.h`'s `MAX(a, b) ((a) >= (b) ? (a) : (b))` (included before `mrisurf_base.h`, whose

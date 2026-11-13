@@ -28,7 +28,7 @@
 use std::io::Write;
 
 use larmorx_core::defects::{FS_372, FS_373};
-use larmorx_core::math::{Libm, acos, acosf_glibc};
+use larmorx_core::math::Libm;
 use larmorx_freesurfer_core::cstd::fmt_f;
 use larmorx_freesurfer_core::diag;
 use larmorx_freesurfer_core::globals::Globals;
@@ -59,26 +59,14 @@ fn faces_of(mris: &Mris, vno: usize) -> Vec<i32> {
         .map_or_else(Vec::new, |f| f[..num.min(f.len())].to_vec())
 }
 
-/// `acosf(x)`: glibc 2.35's (fdlibm's, [`acosf_glibc`]) with `reproduce`, the correctly rounded
-/// arc cosine otherwise ([`acosf_cr`]); a NaN argument gives itself quieted in both.
+/// `acosf(x)`: glibc 2.35's (fdlibm's, `larmorx_core::math::acosf_glibc`) with `reproduce`, the
+/// correctly rounded arc cosine otherwise (`larmorx_core::math::acosf`, CORE-MATH's `cr_acosf`,
+/// through [`Libm::acosf`]); a NaN argument gives itself quieted in both.
 pub fn acosf(g: &Globals, x: f32) -> f32 {
     if x.is_nan() {
         return f32::from_bits(x.to_bits() | 0x0040_0000);
     }
-    Libm::quiet(g.mode()).choose32(|| acosf_cr(x), || acosf_glibc(x))
-}
-
-/// The correctly rounded arc cosine of a `float`: the correctly rounded `double` arc cosine
-/// (`larmorx_core::math::acos`, CORE-MATH's) rounded to `float`, but for the two floats of the
-/// 2,130,706,434 in [-1, 1] whose `double` result is exactly halfway between two floats, where
-/// the true value lies above the halfway point (measured with CORE-MATH's `cr_acos` and decided
-/// at 200 bits: `validation/investigations/acosf-double-rounding/`). Outside [-1, 1] a NaN.
-pub fn acosf_cr(x: f32) -> f32 {
-    match x.to_bits() {
-        0x3288_85a3 => f32::from_bits(0x3fc9_0fdb),
-        0x3982_6222 => f32::from_bits(0x3fc9_07b5),
-        _ => acos(f64::from(x)) as f32,
-    }
+    Libm::quiet(g.mode()).acosf(x)
 }
 
 // ---- fs.surf's helpers (mrisurf_topology.cpp, mrisurf_vals.cpp) -------------------------------

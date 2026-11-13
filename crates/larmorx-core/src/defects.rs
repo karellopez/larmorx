@@ -1537,6 +1537,16 @@ defects! {
         "MRIShistoThresholdCurvature (mris_curvature's outlier removal) of a surface whose unripped curvatures are all equal, or one of which is not finite (NaN, infinite), writes far outside its 1,000-bin histogram: a segmentation fault";
     FS_365 = "FS-365", "FreeSurfer", true,
         "MRIShistoThresholdCurvature of a surface with no unripped vertex reads memory before its histogram (no effect on the result)";
+    FS_366 = "FS-366", "FreeSurfer", true,
+        "the barycentric coordinates of a point on a surface face (face_barycentric_coords; MRISsampleFace's value) are 0, 0, 0 for a face whose projected triangle is degenerate (twice its area below 1e-15) instead of a third each, as the function gives for a face whose edges have no length";
+    FS_367 = "FS-367", "FreeSurfer", true,
+        "the brute-force distance from a point to a triangle (MinDistToTriangleBF) with a step below 2^-52 (zero or negative included) can loop for ever";
+    FS_368 = "FS-368", "FreeSurfer", false,
+        "the averaged surface normals of a coordinate set other than the current one (MRIScomputeSurfaceNormals of the white, pial or original positions) leave the surface's current positions at that set's positions instead of the positions it had (kept until the effect on its callers is measured; the correction is on request)";
+    FS_369 = "FS-369", "FreeSurfer", true,
+        "the averaged surface normals (MRIScomputeSurfaceNormals) give a vertex whose faces are all ripped the normal of the vertex processed before it (0 for the first)";
+    FS_370 = "FS-370", "FreeSurfer", true,
+        "the closest-vertex searches across the cortex and the cortical thickness (MRISfindClosestOrigVertices, MRISfindClosestPialVerticesCanonicalCoords, MRISmeasureCorticalThickness) with a neighbourhood size of 100 or more, or a search reaching more than 100,000 vertices, read and write outside their arrays (wrong counts or a crash)";
     FS_221 = "FS-221", "FreeSurfer", true,
         "the volume format probe (mri_identify, the format tests and the volume-name helpers) misbehaves for a file name of 1,024 bytes or more (a Bruker study's file names of 512 or more, the stem helpers' names of 2,000 or more): its answer is undefined and the program can crash";
     FS_222 = "FS-222", "FreeSurfer", true,

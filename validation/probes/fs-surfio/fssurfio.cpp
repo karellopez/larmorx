@@ -52,6 +52,7 @@
 #include "mrisutils.h"
 #include "transform.h"
 #include "topo_parms.h"
+#include "tritri.h"
 
 // declared in utils/ only (mrisurf_deform.h) or nowhere (the MRIS_MP overload), defined in libutils
 int mrisFlipPatch(MRIS *mris);
@@ -2394,6 +2395,224 @@ void mpb_case()
   }
 }
 
+// ---- relay 18: mpc, the metric properties of 3.1-50 part b, second group -----------------------
+
+void dump_planes(MRIS *s)
+{
+  for (int vno = 0; vno < s->nvertices; vno++) {
+    VERTEX *v = &s->vertices[vno];
+    float c[6] = {v->e1x, v->e1y, v->e1z, v->e2x, v->e2y, v->e2z};
+    for (float x : c) of(x);
+  }
+}
+
+void dump_dist_orig(MRIS *s)
+{
+  for (int vno = 0; vno < s->nvertices; vno++)
+    for (int n = 0; n < s->vertices_topology[vno].vtotal; n++) of(s->vertices[vno].dist_orig[n]);
+}
+
+void dump_normals(MRIS *s)
+{
+  for (int vno = 0; vno < s->nvertices; vno++) {
+    VERTEX *v = &s->vertices[vno];
+    float c[18] = {v->x, v->y, v->z, v->nx, v->ny, v->nz, v->wnx, v->wny, v->wnz,
+                   v->pnx, v->pny, v->pnz, v->onx, v->ony, v->onz, v->tx, v->ty, v->tz};
+    for (float x : c) of(x);
+  }
+}
+
+void dump_marks(MRIS *s)
+{
+  for (int vno = 0; vno < s->nvertices; vno++) {
+    VERTEX *v = &s->vertices[vno];
+    oi(v->marked); of(v->x); of(v->y); of(v->z);
+  }
+}
+
+void dump_curv(MRIS *s)
+{
+  of(s->min_curv); of(s->max_curv);
+  for (int vno = 0; vno < s->nvertices; vno++) of(s->vertices[vno].curv);
+}
+
+// mpc: Gdiag's bits (1 show, 2 verbose, 4 write), FREESURFER_SEED, FS_DISTURB_DISTANCES or not, a
+// surface file read by MRISread (d/lh.s0), the status (-1: the read's), its original area or not,
+// for each vertex (after MRISmakeDistOrig) a mask (1 ripped, 2 original, 4 canonical, 8 val, 16
+// val2, 32 k1, 64 k2, 128 normal, 256 pial, 512 white, 1024 original distances, 2048 distances: a
+// count and that many numbers, those past vtotal dropped) with its values, for each face its rip
+// flag, then the operations, each printing what it gives
+void mpc_case()
+{
+  mkdir(workdir.c_str(), 0700);
+  clear_dir(workdir, true);
+  if (chdir(workdir.c_str()) != 0) fail("chdir");
+  mkdir("d", 0700);
+  int gd = geti();
+  if (gd & 1) Gdiag |= DIAG_SHOW;
+  if (gd & 2) Gdiag |= DIAG_VERBOSE;
+  if (gd & 4) Gdiag |= DIAG_WRITE;
+  setenv("SURFER_SIDEDOOR", "1", 1);
+  setenv("FREESURFER_SEED", std::to_string(geti()).c_str(), 1);
+  if (geti()) setenv("FS_DISTURB_DISTANCES", next(), 1);
+  std::string bytes = geth();
+  FILE *fp = fopen("d/lh.s0", "wb");
+  if (!fp) fail("the surface file");
+  fwrite(bytes.data(), 1, bytes.size(), fp);
+  fclose(fp);
+  errno = 0;
+  MRIS *s = MRISread("d/lh.s0");
+  if (!s) { out += "NULL "; return; }
+  int nv = geti(), nf = geti();
+  if (nv != s->nvertices || nf != s->nfaces) { oi(s->nvertices); oi(s->nfaces); out += "COUNTS "; return; }
+  int status = geti();
+  if (status >= 0) s->status = (MRIS_Status)status;
+  if (geti()) s->orig_area = getf();
+  for (int vno = 0; vno < nv; vno++) {
+    MRISmakeDistOrig(s, vno);
+    int vtotal = s->vertices_topology[vno].vtotal;
+    VERTEX *v = &s->vertices[vno];
+    int m = geti();
+    if (m & 1) v->ripflag = 1;
+    if (m & 2) { v->origx = getf(); v->origy = getf(); v->origz = getf(); }
+    if (m & 4) { v->cx = getf(); v->cy = getf(); v->cz = getf(); }
+    if (m & 8) v->val = getf();
+    if (m & 16) v->val2 = getf();
+    if (m & 32) v->k1 = getf();
+    if (m & 64) v->k2 = getf();
+    if (m & 128) { v->nx = getf(); v->ny = getf(); v->nz = getf(); }
+    if (m & 256) { v->pialx = getf(); v->pialy = getf(); v->pialz = getf(); }
+    if (m & 512) { v->whitex = getf(); v->whitey = getf(); v->whitez = getf(); }
+    if (m & 4096) { v->x = getf(); v->y = getf(); v->z = getf(); }
+    if (m & 8192) { v->wnx = getf(); v->wny = getf(); v->wnz = getf(); }
+    if (m & 16384) v->marked = geti();
+    for (int bit : {1024, 2048}) {
+      if (m & bit) {
+        int k = geti();
+        for (int j = 0; j < k; j++) {
+          float x = getf();
+          if (j < vtotal) {
+            if (bit == 1024) v->dist_orig[j] = x;
+            else v->dist[j] = x;
+          }
+        }
+      }
+    }
+  }
+  for (int fno = 0; fno < nf; fno++)
+    if (geti()) s->faces[fno].ripflag = 1;
+  int nops = geti();
+  for (int k = 0; k < nops; k++) {
+    std::string op = next();
+    out += op + " ";
+    if (op == "fb") {
+      int f = geti(), w = geti();
+      double x = getd(), y = getd(), z = getd(), l[3] = {7, 7, 7};
+      oi(face_barycentric_coords(s, f, w, x, y, z, &l[0], &l[1], &l[2]));
+      for (double d : l) od(d);
+    } else if (op == "fr" || op == "pp") {
+      double c[4][3];
+      for (int i = 0; i < 4; i++)
+        for (int j = 0; j < 3; j++) c[i][j] = getd();
+      if (op == "fr") {
+        double l[3] = {7, 7, 7};
+        oi(face_barycentric_coords(c[0], c[1], c[2], c[3][0], c[3][1], c[3][2], &l[0], &l[1], &l[2]));
+        for (double d : l) od(d);
+      } else {
+        double proj[3] = {7, 7, 7}, e1[3] = {7, 7, 7}, e2[3] = {7, 7, 7};
+        oi(project_point_to_plane(c[3], c[0], c[1], c[2], proj, e1, e2));
+        for (double d : proj) od(d);
+        for (double d : e1) od(d);
+        for (double d : e2) od(d);
+        for (double d : c[3]) od(d);
+      }
+    } else if (op == "sc") {
+      int f = geti();
+      double x = getd(), y = getd(), z = getd();
+      int wc = geti(), wb = geti();
+      float px = 7, py = 7, pz = 7;
+      oi(MRISsampleFaceCoords(s, f, x, y, z, wc, wb, &px, &py, &pz));
+      of(px); of(py); of(pz);
+    } else if (op == "sf") {
+      int f = geti(), w = geti();
+      double x = getd(), y = getd(), z = getd(), a = getd(), b = getd(), c = getd();
+      od(MRISsampleFace(s, f, w, x, y, z, a, b, c));
+    } else if (op == "sn") {
+      int f = geti();
+      double x = getd(), y = getd(), z = getd();
+      float px = 7, py = 7, pz = 7;
+      MRISsampleFaceNormal(s, f, x, y, z, &px, &py, &pz);
+      of(px); of(py); of(pz);
+    } else if (op == "rh") {
+      od(MRISrmsTPHeight(s));
+      dump_planes(s);
+    } else if (op == "ae") {
+      int w = geti(), withfp = geti();
+      fflush(stdout);
+      double pct = MRIScomputeAnalyticDistanceError(s, w, withfp ? stdout : NULL);
+      fflush(stdout);
+      od(pct);
+    } else if (op == "sa") {
+      od(MRISstoreAnalyticDistances(s, geti()));
+      dump_dist_orig(s);
+    } else if (op == "dd") {
+      double pct = getd();
+      fflush(stdout);
+      oi(MRISdisturbOriginalDistances(s, pct));
+      fflush(stdout);
+      dump_dist_orig(s);
+    } else if (op == "hd") {
+      od(MRIScomputeHausdorffDistance(s, geti()));
+    } else if (op == "ur" || op == "uc") {
+      oi(op == "ur" ? MRISuseCurvatureRatio(s) : MRISuseCurvatureContrast(s));
+      dump_curv(s);
+    } else if (op == "md") {
+      double p[4][3];
+      for (int i = 0; i < 4; i++)
+        for (int j = 0; j < 3; j++) p[i][j] = getd();
+      double dl = getd(), pmin[3] = {7, 7, 7};
+      od(MinDistToTriangleBF(p[0], p[1], p[2], p[3], pmin, dl));
+      for (double d : pmin) od(d);
+    } else if (op == "sv") {
+      double p[3] = {7, 7, 7};
+      StuffVertexCoords(s, geti(), p);
+      for (double d : p) od(d);
+    } else if (op == "cn") {
+      int w = geti(), vno = geti();
+      double n[3] = {7, 7, 7};
+      oi(MRIScomputeNormal(s, w, vno, &n[0], &n[1], &n[2]));
+      for (double d : n) od(d);
+    } else if (op == "cs") {
+      int set = geti(), vno = geti();
+      float n[3] = {7, 7, 7};
+      if (set == 0) oi(mrisComputeOrigNormal(s, vno, n));
+      else if (set == 1) oi(mrisComputeWhiteNormal(s, vno, n));
+      else oi(mrisComputePialNormal(s, vno, n));
+      for (float x : n) of(x);
+    } else if (op == "su") {
+      int w = geti(), navgs = geti();
+      fflush(stdout);
+      oi(MRIScomputeSurfaceNormals(s, w, navgs));
+      fflush(stdout);
+      dump_normals(s);
+    } else if (op == "co" || op == "cp" || op == "ct") {
+      int nbhd = geti();
+      fflush(stdout);
+      if (op == "co") oi(MRISfindClosestOrigVertices(s, nbhd));
+      else if (op == "cp") oi(MRISfindClosestPialVerticesCanonicalCoords(s, nbhd));
+      else { float mt = getf(); oi(MRISmeasureCorticalThickness(s, nbhd, mt)); }
+      fflush(stdout);
+      dump_curv(s);
+      dump_marks(s);
+    } else if (op == "sfc") {
+      int f = geti(), c = geti();
+      double p[3] = {7, 7, 7};
+      StuffFaceCoords(s, f, c, p);
+      for (double d : p) od(d);
+    } else fail("mpc op");
+  }
+}
+
 void run_case()
 {
   std::string cmd = next();
@@ -2622,6 +2841,8 @@ void run_case()
     srd_case();
   } else if (cmd == "mpb") {
     mpb_case();
+  } else if (cmd == "mpc") {
+    mpc_case();
   } else if (cmd == "names") {
     int n = geti();
     keep.reserve(n);

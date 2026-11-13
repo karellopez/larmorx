@@ -360,6 +360,11 @@ pub struct SurfGlobals {
     /// computations do. `false` keeps FreeSurfer's behaviour (rule D: kept until its effect on
     /// `mris_sphere` and `mris_register` is measured with their ports).
     pub fs120_write_face_angles: bool,
+    /// [`larmorx_core::defects::FS_368`]: with this set and
+    /// [`larmorx_core::defects::UpstreamDefects::Fix`], `MRIScomputeSurfaceNormals` restores the
+    /// current positions it saved. `false` keeps FreeSurfer's behaviour (rule D: the surface is
+    /// left at the positions whose normals were computed, until its callers' ports measure it).
+    pub fs368_restore_current: bool,
     /// `mris_readval_frame` (`mrisurf_io.cpp` line 64, -1): the frame `MRISreadValues` reads
     /// from a volume, `MRISsetReadFrame`'s.
     pub readval_frame: i32,
@@ -409,6 +414,7 @@ impl Default for SurfGlobals {
             mp_calls: 0,
             mp_comparisons: 0,
             fs120_write_face_angles: false,
+            fs368_restore_current: false,
             readval_frame: -1,
             add_edge_max_vnum: 20,
             complete_topology_new: None,

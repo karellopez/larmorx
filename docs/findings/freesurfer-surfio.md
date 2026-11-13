@@ -470,9 +470,15 @@ one caller, `MRIScomputeSSE_asThoughGradientApplied` (`mrisurf_deform.cpp` 993-1
   computation leaving the angles stale, `MRISstoreMetricProperties` copies them into `orig_angle`, so
   `deltaAngle(angle, orig_angle)` is 0 unless something else (the old or faster computation,
   `MRIScomputeTriangleProperties` called directly, a triangle file) set them: the angle terms of
-  `mris_sphere` and `mris_register` see no change. Rule A (FreeSurfer's two other computations set
-  the angles; the omission is a slip of the generated lists); measuring its effect on the sphere and
-  the registration belongs to their ports (rule D's evidence). `reproduce` leaves the angles.
+  `mris_sphere` and `mris_register` see no change. First classed rule A (FreeSurfer's two other
+  computations set the angles; the omission is a slip of the generated lists); **changed to rule D
+  (the orchestrator, 2026-11-13)**: the stale angles change recon-all's `mris_sphere` and
+  `mris_register` results, unmeasured and possibly relied on, so the default keeps FreeSurfer's
+  behaviour (`fixed_by_default` false, as FS-35/FS-36) until those ports measure it; the correction is
+  `SurfGlobals::fs120_write_face_angles` with `fix` (the angles copied, a notice when one changes);
+  `reproduce` leaves them. The hash test's `fs120_the_face_angles_are_written_back_only_on_request`:
+  seed 1's 120 `mprop` cases, no FS-120 notice by default, 24 noted with the request, 21 of them
+  printing other angles (in the other 3 a later step recomputes them).
 - **What the copy never writes (FS-121).** `MRISMP_load` `malloc`s the `V_OUT` and `F_OUT` arrays
   and fills them only with `loadOutputs`. (1) `v_nx/ny/nz` are written by `MRISMP_computeNormals` only
   when a vertex's normal is found (`!count || mrisNormalize(snorm) > 0`); a vertex still pending

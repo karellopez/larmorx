@@ -588,10 +588,13 @@ fn memcmp_ints(a: &[i32; 3], b: &[i32; 3]) -> i32 {
 /// when deferred) and original angles set (or compared), its normal when the copy set one, its rip
 /// flag compared (checking), its area copied or compared.
 ///
-/// FS-120 (corrected by default, rule A): FreeSurfer 8.2.0 never copies the faces' angles back,
-/// so after the default computation of the metric properties a surface's face angles are those it
+/// FS-120 (kept by default, rule D): FreeSurfer 8.2.0 never copies the faces' angles back, so
+/// after the default computation of the metric properties a surface's face angles are those it
 /// had before (0 for a new surface), where its two other computations (the old one, the faster
-/// one) set them. larmorx copies them; `reproduce` leaves them.
+/// one) set them. larmorx keeps that until its effect on `mris_sphere` and `mris_register` is
+/// measured with their ports; the correction is on request
+/// ([`SurfGlobals::fs120_write_face_angles`] with `fix`: the angles copied, with a notice when
+/// they change); `reproduce` always leaves them.
 pub fn mp_unload(
     g: &mut Globals,
     sg: &mut SurfGlobals,
@@ -813,13 +816,14 @@ pub fn mp_unload(
             c.cmp(fno as i32, a, f64::from(fa), "f->area");
         } else {
             mris.face_mut(fno).area = fa;
-            let ang = arr(&mp.f_angle, "f_angle")[fno];
-            if mris.face(fno).angle.map(f32::to_bits) != ang.map(f32::to_bits) {
-                c.g.notices.add(
-                    &FS_120,
-                    "the faces' angles computed with the metric properties are kept in the surface",
-                );
-                if c.g.notices.fix() {
+            // FS-120: the angles stay as they were unless the correction is asked for
+            if c.sg.fs120_write_face_angles && c.g.notices.fix() {
+                let ang = arr(&mp.f_angle, "f_angle")[fno];
+                if mris.face(fno).angle.map(f32::to_bits) != ang.map(f32::to_bits) {
+                    c.g.notices.add(
+                        &FS_120,
+                        "the faces' angles computed with the metric properties are kept in the surface",
+                    );
                     mris.face_mut(fno).angle = ang;
                 }
             }

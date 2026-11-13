@@ -1097,9 +1097,13 @@ the expression and before `during`; `%f` numbers; `<no>` the vertex or face numb
 line of the process is followed by `b <BUILD_ROOT>/utils/mrisurf_metricProperties_fast.h:335
 needed`.
 
-- **FS-120** (corrected by default, rule A): the default computation leaves the faces' angles
-  stale; larmorx writes the copy's angles back (as the other two computations set them); `reproduce`
-  leaves them.
+- **FS-120** (kept by default, rule D; the orchestrator's decision of 2026-11-13): the default
+  computation leaves the faces' angles stale, and larmorx's default does the same until the effect
+  on `mris_sphere`'s and `mris_register`'s results is measured with those programs' ports. The
+  correction is on request: with it and `fix`, the copy's angles are written back (as the other two
+  computations set them), with a notice when an angle changes; `reproduce` always leaves them.
+  Validation: the default and `reproduce` give FreeSurfer's angles; with the request, a later
+  read of the angles (a dump right after the computation) shows the copy's.
 - **FS-121** (both modes): what the copy never computes is memory contents in FreeSurfer: the normal
   of a vertex kept after the fifth round (copied into the surface) and a ripped face's area in a
   plane's vertex areas. larmorx gives such a vertex the normal it had and such a face the surface's

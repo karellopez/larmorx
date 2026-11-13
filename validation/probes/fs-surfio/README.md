@@ -62,7 +62,8 @@ Measured 2026-11-13 (relay 10, 29 commands): seed 7, 58,000 cases: 57,557 identi
 443 counted, not compared (440 `mprop` cases where FreeSurfer reads memory it never wrote or does not
 own: FS-121, FS-123, or the fast arctangent's table outside its range, FS-06: `check.py`'s `SKIP`; 3
 `metric` cases of FS-114); `fix` differs only with notices (FS-01, FS-03, FS-12, FS-111, FS-113,
-FS-115..FS-120, FS-122, FS-124) and in 4 `surf` and 70 `posn` cases (`fix_libm`); the port's outputs
+FS-115..FS-120, FS-122, FS-124; FS-120 only until relay 11 made it kept by default, rule D: the
+correction on request) and in 4 `surf` and 70 `posn` cases (`fix_libm`); the port's outputs
 byte-identical with and without AArch64's NaN emulated (69,001 and 69,038 NaNs flipped), both modes
 (log `<workspace>/oracles/logs/fs-surfio-relay10-seed7.log`). `mprop` alone, seeds 11, 13 and 17:
 10,000 cases, every comparable one identical (1,729 counted, not compared); the default different

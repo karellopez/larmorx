@@ -354,6 +354,12 @@ pub struct SurfGlobals {
     /// `comparisonWkr`'s `static int count` (`mrisurf_metricProperties_fast.h` line 333): the
     /// comparison lines printed so far (the first also prints `b <file>:335  needed`).
     pub mp_comparisons: i32,
+    /// FS-120's correction, on request (not FreeSurfer's; `false` by default): with
+    /// [`larmorx_core::defects::UpstreamDefects::Fix`], the default computation of the metric
+    /// properties writes the faces' angles back into the surface, as FreeSurfer's two other
+    /// computations do. `false` keeps FreeSurfer's behaviour (rule D: kept until its effect on
+    /// `mris_sphere` and `mris_register` is measured with their ports).
+    pub fs120_write_face_angles: bool,
 }
 
 /// `sigmas_default` (`mrisurf_base.cpp` line 962).
@@ -378,6 +384,7 @@ impl Default for SurfGlobals {
             nsigmas: SIGMAS_DEFAULT.len() as f64,
             mp_calls: 0,
             mp_comparisons: 0,
+            fs120_write_face_angles: false,
         }
     }
 }

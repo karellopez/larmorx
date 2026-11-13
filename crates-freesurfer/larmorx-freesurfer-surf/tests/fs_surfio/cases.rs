@@ -2676,10 +2676,20 @@ fn escape(b: &[u8]) -> String {
 
 /// The port's line for a case line, and the defects it noted.
 pub fn run_line(line: &str, mode: UpstreamDefects) -> (String, Vec<&'static str>) {
+    run_line_with(line, mode, SurfGlobals::default())
+}
+
+/// [`run_line`] with the surface library's globals `sg` (an on-request correction such as
+/// FS-120's).
+pub fn run_line_with(
+    line: &str,
+    mode: UpstreamDefects,
+    sg: SurfGlobals,
+) -> (String, Vec<&'static str>) {
     let shared = Shared::default();
     let mut cx = Ctx {
         g: Globals::new(mode),
-        sg: SurfGlobals::default(),
+        sg,
         a: shared.clone(),
         b: shared.clone(),
     };

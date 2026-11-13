@@ -501,7 +501,6 @@ group = "sdcflows"
 name = "sdcflows"
 command = "larmorx sdcflows sdcflows"
 python = "lx.sdcflows.run_app"
-does = "sdcflows' BIDS app: the field maps of a BIDS dataset, PEPOLAR, direct and fieldmap-less (SyN), with their derivatives."
 api = "docs/api/sdcflows-fieldmap.md"
 evidence = "/evidence/sdcflows-estimation/"
 records = { replica = ["sdcflows-estimation", "sdcflows-estimation-full", "sdcflows-estimation-app-shared"] }

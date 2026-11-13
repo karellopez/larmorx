@@ -75,6 +75,34 @@ def _make_echo(path: Path, factor: float) -> None:
     _save(path, (data * np.float32(factor)).astype(np.float32), affine)
 
 
+def _make_bids_pepolar(path: Path) -> None:
+    """A BIDS dataset (a folder) of one participant: two PEPOLAR images (``dir-AP`` along ``j-``,
+    ``dir-PA`` along ``j``, 2 volumes of 10 × 12 × 10 voxels of 4 mm) meant for a BOLD run of 3
+    volumes, with their sidecars; enough for sdcflows' search of estimators."""
+    import json
+
+    import larmorx as lx
+
+    fmap, func = path / "sub-01" / "fmap", path / "sub-01" / "func"
+    fmap.mkdir(parents=True)
+    func.mkdir(parents=True)
+    (path / "dataset_description.json").write_text(
+        json.dumps({"Name": "example", "BIDSVersion": "1.9.0"}), encoding="utf-8"
+    )
+    affine = np.diag([4.0, 4.0, 4.0, 1.0])
+    bold = "func/sub-01_task-rest_bold.nii.gz"
+    for d, pe in (("AP", "j-"), ("PA", "j")):
+        data = np.full((10, 12, 10, 2), 100.0, np.float32)
+        lx.save(lx.Image(data, affine), str(fmap / f"sub-01_dir-{d}_epi.nii.gz"))
+        meta = {"PhaseEncodingDirection": pe, "TotalReadoutTime": 0.05, "IntendedFor": bold}
+        (fmap / f"sub-01_dir-{d}_epi.json").write_text(json.dumps(meta), encoding="utf-8")
+    lx.save(
+        lx.Image(np.full((10, 12, 10, 3), 50.0, np.float32), affine), str(path / "sub-01" / bold)
+    )
+    meta = {"PhaseEncodingDirection": "j", "TotalReadoutTime": 0.05, "RepetitionTime": 2.0}
+    (func / "sub-01_task-rest_bold.json").write_text(json.dumps(meta), encoding="utf-8")
+
+
 def _make_slice_timing(path: Path) -> None:
     """The times of 40 slices acquired interleaved (even slices first) within 2 s, 0.05 s apart,
     on one line separated by tabs, as fMRIPrep writes a ``-tpattern`` file."""
@@ -145,6 +173,10 @@ KINDS: dict[str, Kind] = {
     ),
     "echo-2": Kind("the second echo: the first times 0.6", lambda path: _make_echo(path, 0.6)),
     "echo-3": Kind("the third echo: the first times 0.36", lambda path: _make_echo(path, 0.36)),
+    "bids-pepolar": Kind(
+        "a BIDS dataset of one participant with two PEPOLAR images and a BOLD run (a folder)",
+        _make_bids_pepolar,
+    ),
     "slice-timing": Kind(
         "the times of 40 slices acquired interleaved within 2 s, on one line, as fMRIPrep writes "
         "them",

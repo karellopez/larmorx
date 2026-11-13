@@ -40,7 +40,7 @@ use larmorx_freesurfer_core::diag::{self, DIAG_SHOW, DIAG_VERBOSE};
 use larmorx_freesurfer_core::globals::Globals;
 use larmorx_core::defects::FS_114;
 use larmorx_freesurfer_core::log::{self, ERROR_BADPARM, ERROR_UNSUPPORTED, Fatal};
-use larmorx_freesurfer_core::matrix_ops::{xyz_approx_angle_known_length, xyz_normalized_load};
+use larmorx_freesurfer_core::matrix_ops::xyz_normalized_load;
 use larmorx_freesurfer_core::sse;
 use larmorx_freesurfer_core::utils::{LogicProblemResponse, cope_with_logic_problem2};
 
@@ -448,6 +448,31 @@ pub fn scale_distances(mris: &mut Mris, scale: f32) -> i32 {
     0
 }
 
+/// `XYZApproxAngle_knownLength(n, x2, y2, z2, norm)` with the official build's operand order in
+/// every product (`utils/matrix.cpp` compiled: `n.x*x2`, `n.y*y2`, but `z2*n.z`), which fs.core's
+/// [`larmorx_freesurfer_core::matrix_ops::xyz_approx_angle_known_length`] takes as `n.z*z2`: the
+/// two differ only where both are NaNs (HANDOFF for fs.core's owner; until it changes this copy
+/// keeps the distances' NaNs the official build's).
+fn approx_angle(n: &larmorx_freesurfer_core::matrix_ops::Xyz, x2: f32, y2: f32, z2: f32, norm: f32) -> f32 {
+    let dot = sse::add64(
+        sse::add64(
+            sse::mul64(f64::from(n.x), f64::from(x2)),
+            sse::mul64(f64::from(n.y), f64::from(y2)),
+        ),
+        sse::mul64(f64::from(z2), f64::from(n.z)),
+    ) as f32;
+    let mut norm = norm;
+    if dot.abs() > norm {
+        norm = dot.abs();
+    }
+    let acos_input = f64::from(sse::div(dot, norm));
+    if acos_input < f64::from(0.99f32) {
+        larmorx_core::math::acos(acos_input) as f32
+    } else {
+        sse::sqrt64(sse::mul64(2.0, sse::sub64(1.0, acos_input))) as f32
+    }
+}
+
 /// The per-vertex values of the sphere's formula (`PerVertexInfo`).
 #[derive(Clone, Copy, Default)]
 struct PerVertexInfo {
@@ -615,9 +640,7 @@ pub fn compute_vertex_distances_wkr(
                     let mut d = 0.0f32;
                     if !vi2.ripped_or_zero_length {
                         let [x2, y2, z2] = vi2.unnormalized;
-                        let angle =
-                            xyz_approx_angle_known_length(&vi.normalized, x2, y2, z2, vi2.length)
-                                .abs();
+                        let angle = approx_angle(&vi.normalized, x2, y2, z2, vi2.length).abs();
                         d = sse::mul(angle, radius);
                     }
                     ds.push(d);

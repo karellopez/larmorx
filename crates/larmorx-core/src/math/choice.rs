@@ -194,6 +194,12 @@ impl Libm {
         self.choose32(|| super::cosf(x), || super::cosf_glibc(x))
     }
 
+    /// The arc cosine for `f32` ([`super::acosf`] or [`super::acosf_glibc`]).
+    #[inline]
+    pub fn acosf(&self, x: f32) -> f32 {
+        self.choose32(|| super::acosf(x), || super::acosf_glibc(x))
+    }
+
     /// `atan2(y, x)` for `f32`: by default the correctly rounded double [`super::atan2`] of the
     /// two rounded to `f32`; with `reproduce` [`super::atan2f_glibc`] (fdlibm's).
     #[inline]
@@ -242,7 +248,7 @@ mod tests {
         // seeded arguments: every result the chosen function's, and the witness set exactly
         // when the two differ on one of them
         let mut s = 0x243f_6a88_85a3_08d3u64;
-        let mut any = [false; 11];
+        let mut any = [false; 12];
         for _ in 0..20_000 {
             s ^= s << 13;
             s ^= s >> 7;
@@ -287,7 +293,7 @@ mod tests {
                 assert_eq!((a.to_bits(), b.to_bits()), (c.to_bits(), g.to_bits()));
                 any[k] |= c.to_bits() != g.to_bits();
             }
-            let pairs32: [(f32, f32, f32, f32); 6] = [
+            let pairs32: [(f32, f32, f32, f32); 7] = [
                 (
                     fix.expf(f),
                     rep.expf(f),
@@ -319,6 +325,12 @@ mod tests {
                     super::super::cosf_glibc(f),
                 ),
                 (
+                    fix.acosf(p - 1.5),
+                    rep.acosf(p - 1.5),
+                    super::super::acosf(p - 1.5),
+                    super::super::acosf_glibc(p - 1.5),
+                ),
+                (
                     fix.atan2f(f, p),
                     rep.atan2f(f, p),
                     super::super::atan2(f64::from(f), f64::from(p)) as f32,
@@ -331,7 +343,7 @@ mod tests {
             }
         }
         // glibc's differ somewhere on 20,000 arguments for each, so both witnesses saw it
-        assert!(any.iter().filter(|&&a| a).count() >= 8, "{any:?}");
+        assert!(any.iter().filter(|&&a| a).count() >= 9, "{any:?}");
         assert!(fix.differed() && rep.differed());
     }
 

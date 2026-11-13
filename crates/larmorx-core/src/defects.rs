@@ -1649,6 +1649,36 @@ defects! {
         "the .mat readers take a byte 0xff for the end of the file: a version 5 file with 0xff in its first four bytes is refused, a version 4 variable whose first byte is 0xff ends the reading";
     FS_252 = "FS-252", "FreeSurfer", true,
         "MRIcopyHeader crashes when the source volume's voxel-to-RAS matrix has not been computed (FreeSurfer's own volumes always have it)";
+    FS_311 = "FS-311", "FreeSurfer", true,
+        "the segmentation functions (left-right label swaps, the ribbon fix, one-hot encoding, the brain volume corrections) turn a voxel value or a label list entry that is NaN or beyond the 32-bit integer range into the label -2147483648";
+    FS_312 = "FS-312", "FreeSurfer", true,
+        "the supratentorial and cortical gray matter volume corrections count each thalamus voxel twice (the thalamus labels are tested twice since two of their names became one label)";
+    FS_313 = "FS-313", "FreeSurfer", true,
+        "the cortical gray matter volume correction subtracts the left vessel label's voxels in the ribbon but not the right vessel label's";
+    FS_314 = "FS-314", "FreeSurfer", true,
+        "reading the cached brain volume statistics (stats/brainvol.stats) aborts on a line that names a measure, holds no number and ends in white space";
+    FS_315 = "FS-315", "FreeSurfer", true,
+        "the left-right swap of a segmentation by label lists reads the lists past their end when they hold fewer numbers than rows";
+    FS_316 = "FS-316", "FreeSurfer", true,
+        "the flood fill of a byte volume from a seed clamps a seed row or slice at or past the volume's height or depth to the volume's width minus one";
+    FS_317 = "FS-317", "FreeSurfer", true,
+        "downsampling by factors and the change of a volume's type with rescaling convert a number beyond the 32-bit integer range, or NaN, to the integer -2147483648 (the extent, the windows, the histogram's bins and counts)";
+    FS_318 = "FS-318", "FreeSurfer", true,
+        "the mean of a frame's voxels above a threshold is the mean of frame 0's whatever the frame asked for";
+    FS_319 = "FS-319", "FreeSurfer", true,
+        "upsampling with the sum conserved of a volume whose change to floats fails (a robust range that is empty after the histogram) goes on with no volume and crashes";
+    FS_320 = "FS-320", "FreeSurfer", true,
+        "trilinear splatting of a value into an integer volume (MRIinterpolateIntoVolume) adds each corner's rounded share to the voxel in the voxel's type: a sum beyond the type's range wraps around (bytes, shorts, 32-bit integers)";
+    FS_321 = "FS-321", "FreeSurfer", true,
+        "trilinear splatting of a value into a volume of 64-bit integers (long) adds into 32-bit integers at the voxel's index: it changes halves of other voxels";
+    FS_322 = "FS-322", "FreeSurfer", true,
+        "the directional derivatives and gradients of a volume of a type the trilinear sampler refuses (RGB, complex) use sample values never written: memory contents";
+    FS_323 = "FS-323", "FreeSurfer", true,
+        "the neighbour counts of a voxel more than 500 voxels outside the volume read its boundary index tables past their ends: memory contents";
+    FS_324 = "FS-324", "FreeSurfer", true,
+        "the directional derivative at a scale (MRIsampleVolumeDerivativeScale) with an infinite scale, or one whose double overflows, never returns";
+    FS_325 = "FS-325", "FreeSurfer", true,
+        "the linear transform of a volume (MRIlinearTransformInterp) stores, where a sample fails (sinc sampling, a type the trilinear sampler refuses), the last sample that succeeded, and before the first a value never written: memory contents";
 }
 
 /// The register entry with ID `id`.

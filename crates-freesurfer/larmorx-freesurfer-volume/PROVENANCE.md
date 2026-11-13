@@ -24,6 +24,7 @@ built for the official binaries with GCC 8.4.0 (`docs/freesurfer/variation.md`).
 | `utils/mri.cpp` 6313-6349, 6472-6556, 6670-6735 | `MRItranslate`, `MRIrotateX_I`, `MRIrotateY_I`, `MRIrotateZ_I`, `MRIrotate_I` | 3.1-35 | `rotate.rs` |
 | `utils/mri.cpp` 2754-3011 | `MRIfindApproximateSkullBoundingBox` (`MIN_DARK`, `MAX_LIGHT`) | 3.1-35 | `skull.rs` |
 | `utils/transform.cpp` 1576-1621, 2737-3240, 3332-3365; `utils/utils.cpp` 284-304 | `TransformFileNameType`, `ltaReadRegisterDat`, `mincFindVolume`, `mincGetVolumeInfo`, `mincGetVolInfo`, `ltaMNIreadEx`, `ltaReadFileEx`, `LTAreadExType`, `LTAreadEx`, `ltaFSLread`; `fgetl`'s buffer as these functions read it | 3.1-39 | `ltaread.rs` |
+| `include/cma.h` (whole); `utils/cma.cpp` 463-1098, 1541-1645, 2117-2160 | the label numbers and the `IS_*` macros (transcribed mechanically); `IsSubCorticalGray`, `SupraTentorialVolCorrection`, `CorticalGMVolCorrection`, `MRIasegContraLatLabel`, `MRIlrswapAseg`, `MRIlrswapSeg`, `MRIfixAsegWithRibbon`, `brainVolumeStatsFilename`, `CacheBrainVolumeStats`, `ReadCachedBrainVolumeStats` (its compute step the caller's), `MRIoneHotEncode`; libstdc++'s `>> double` (`num_get`, "C" locale) as these functions read the cache | 3.1-35 | `cma.rs` |
 
 No third-party code in these lines (the audit of `docs/freesurfer/third-party.md`). `readVolGeom`'s
 `sscanf` calls are modelled on glibc 2.35's behaviour measured as a black box (the open
@@ -49,3 +50,34 @@ No third-party code in these lines (the audit of `docs/freesurfer/third-party.md
   (FS-306), both modes; the crashes and hangs errors (FS-302, FS-304, FS-305, FS-307, FS-309, FS-310).
   `MRIrotateX_I` and the others do not allocate the clone FreeSurfer loses. `MRIreadHeader` and
   `regio_read_register` (fs.io) are the caller's (`ltaread::LtaIo`).
+- The CMA labels and segmentation functions: FS-311 to FS-315 (`docs/findings/freesurfer-volume.md` §8):
+  a voxel label that is NaN or beyond `int` saturates (FS-311), a thalamus voxel counts once (FS-312),
+  `Right_vessel` counts as `Left_vessel` does (FS-313), rule A; a cache line without a number that
+  ends in white space gives no number (FS-314, an error under `reproduce`); label lists read past
+  their numbers an error (FS-315). `USE_AVERAGE305` comes from `ltaread::LtaIo::env` (the program's
+  environment), not the process's.
+- `src/resize.rs` (3.1-36; relay 16): `utils/mri.cpp` `MRIsetResolution`, `MRIvalueFill`, `MRIfillFG`,
+  `MRIextractPlane`, `MRIfillPlane`, `MRIupsampleN`, `MRIupsample2`, `MRIupsampleNConserve`,
+  `MRIdownsample2`, `MRIdownsampleN`, `MRImeanFrameThresh`, `MRIchangeType`, `MRISeqchangeType` and (from
+  3.1-37) `MRIlimits`; `include/macros.h`'s `MAX`; the official build's operand orders from the unit
+  oracle's `mri.cpp.o` (`docs/findings/freesurfer-volume.md` §9). Changes: FS-316 (the fill's seed clamped
+  by its own axis), FS-318 (the frame's mean of the frame asked for), rule A; FS-317 (out-of-range
+  conversions clamped, D13); FS-319 (an error, both modes); the fill keeps the bytes written where the
+  destination holds no voxel and reads them back (FreeSurfer reads back the memory it wrote).
+- `src/seq.rs` (3.1-36; relay 17): `utils/mri.cpp` `MRIinterpolateIntoVolume`, `MRIinterpolateIntoVolumeFrame`,
+  `MRIsampleSeqVolume`, `MRIsampleSeqVolumeType`, `MRItrilinKernel`, `MRIsampleVolumeFrame_xyzInt_nRange_floats`,
+  `MRIsampleVolumeFrameType_xyzInt_nRange_SAMPLE_NEAREST_floats` (compiled: `include/faster_variants.h`); operand
+  orders from the unit oracle's `mri.cpp.o` (`docs/findings/freesurfer-volume.md` §10). Changes: FS-320 (sums clamped
+  to the type's range), FS-321 (64-bit voxels added into whole), rule A.
+- `src/deriv.rs` (3.1-36; relay 17): `utils/mri.cpp` `MRIsampleVolumeDerivativeScale`, `MRIsampleVolumeDerivative`,
+  `MRIsampleVolumeGradient`, `MRIsampleVolumeGradientFrame`, `MRIneighborsOn`, `MRIneighborsOn3x3`,
+  `MRIneighborsInWindow`, `MRIneighbors`, `MRIneighborsInRange`, `MRIneighbors3x3`, `MRIneighborsOff`,
+  `MRIneighborsOff3x3`. Changes: FS-322 (a value never written taken as 0, both modes), FS-323 and FS-324 (errors,
+  both modes).
+- `src/xform.rs` (3.1-36, 3.1-37, 3.1-38; relay 17): `utils/mri.cpp` `MRIinverseLinearTransform`,
+  `MRIapplyRASlinearTransform`, `MRIapplyRASlinearTransformInterp`, `MRIapplyRASinverseLinearTransform`,
+  `MRIlinearTransform`, `MRIlinearTransformInterp`, `MRIgetResampleMatrix`, `MRIrasXformToVoxelXform`;
+  `utils/mriset.cpp` `MRIsetValues`. Changes: FS-325 (a value never written taken as 0, both modes); cubic B-spline
+  sampling is a port error until `fs.bspline` (wave 3.2) exists.
+- `src/resize.rs`, relay 17: `MRIextractPlane` stores the float it read (no round trip through `double`, as the
+  official build; the debug build quieted signalling NaNs before).

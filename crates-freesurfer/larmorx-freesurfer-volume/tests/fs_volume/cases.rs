@@ -18,17 +18,23 @@ use larmorx_freesurfer_core::log::Fatal;
 use larmorx_freesurfer_core::matrix as mx;
 use larmorx_freesurfer_core::matrix::Matrix;
 use larmorx_freesurfer_core::ret::Ret;
+use larmorx_freesurfer_core::run::Environment;
 use larmorx_freesurfer_io::cfile::CFile;
 use larmorx_freesurfer_mri::mri::{self as mm, Mri, MriRegion};
 use larmorx_freesurfer_mri::vol_geom::VolGeom;
 use larmorx_freesurfer_mri::vol_geom::reinit_cache;
 use larmorx_freesurfer_volume::arith::{self as ar, Pair, Tri};
+use larmorx_freesurfer_volume::cma as cm;
 use larmorx_freesurfer_volume::coords as co;
+use larmorx_freesurfer_volume::deriv as dv;
 use larmorx_freesurfer_volume::ltaread as lr;
+use larmorx_freesurfer_volume::resize as rs;
 use larmorx_freesurfer_volume::rotate as rt;
 use larmorx_freesurfer_volume::sample as sm;
+use larmorx_freesurfer_volume::seq as sq;
 use larmorx_freesurfer_volume::skull as sk;
 use larmorx_freesurfer_volume::vgeom;
+use larmorx_freesurfer_volume::xform as xf;
 
 /// The cases' random numbers.
 pub struct Gen(u64);
@@ -948,6 +954,258 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
                 t.push(hex(ext.as_bytes()));
                 t.push(hex(&bytes));
                 t.push(i64::from(kind < 3 && !g.chance(30)).to_string());
+                // USE_AVERAGE305: 0 unset, 1 `true`, 2 set and empty
+                t.push(g.below(3).to_string());
+            }
+            "cmalab" => {
+                let n = 8;
+                t.push(n.to_string());
+                for _ in 0..n {
+                    let v = if g.chance(4) {
+                        g.int(-3, 300)
+                    } else {
+                        g.pick(&CMA_LABELS)
+                    };
+                    t.push(v.to_string());
+                    let f = if g.chance(3) {
+                        fval(&mut g)
+                    } else {
+                        v as f32 + g.pick(&[0.0, 0.0, 0.5, -0.25, 1e-3])
+                    };
+                    t.push(fx(f));
+                }
+            }
+            "cmavol" | "fixrib" => {
+                let s = seg_vol(&mut g, &mut t);
+                let o = like(&mut g, s);
+                let o = Shape {
+                    hdr: o.hdr && g.chance(4),
+                    ..o
+                };
+                vol_of(&mut g, &mut t, o);
+                paint(
+                    &mut g,
+                    &mut t,
+                    o,
+                    &[0.0, 3.0, 42.0, 2.0, 41.0, 1.0, 255.0, -1.0, 0.5],
+                );
+                if cmd == "cmavol" {
+                    t.push(g.pick(&[1, 2, 1, 2, 0, 3]).to_string());
+                } else {
+                    let mode = g.pick(&[0, 1]);
+                    t.push(mode.to_string());
+                    if mode == 1 {
+                        // MRIcopy's destination: the segmentation's shape (another one is
+                        // MRIcopy's FS-163, where FreeSurfer writes outside it)
+                        vol_of(&mut g, &mut t, Shape { hdr: false, ..s });
+                    }
+                }
+            }
+            "lrswap" => {
+                seg_vol(&mut g, &mut t);
+            }
+            "lrseg" => {
+                seg_vol(&mut g, &mut t);
+                let rows = g.pick(&[1, 2, 3, 3, 4]);
+                let rows2 = if g.chance(8) { rows + 1 } else { rows };
+                for r in [rows, rows2] {
+                    let cols = if g.chance(5) { g.pick(&[0, 2]) } else { 1 };
+                    t.push(r.to_string());
+                    t.push(cols.to_string());
+                    for _ in 0..r * cols {
+                        t.push(fx(if g.chance(10) {
+                            fval(&mut g)
+                        } else {
+                            g.pick(&CMA_LABELS) as f32
+                        }));
+                    }
+                }
+            }
+            "ohe" => {
+                seg_vol(&mut g, &mut t);
+                let n = g.pick(&[0, 1, 2, 3, 4]);
+                t.push(n.to_string());
+                for _ in 0..n {
+                    t.push(g.pick(&CMA_LABELS[..12]).to_string());
+                }
+                t.push(g.pick(&[0, 1, 1, 2]).to_string());
+            }
+            "bvc" => {
+                t.push(i64::from(!g.chance(10)).to_string());
+                for _ in 0..16 {
+                    t.push(dx(if g.chance(10) {
+                        f64::from_bits(g.pick(&[
+                            0x7ff8_0000_0000_0000,
+                            0xfff8_0000_0000_0000,
+                            0x7ff0_0000_0000_0000,
+                            0x8000_0000_0000_0000,
+                        ]))
+                    } else {
+                        g.int(-1000, 2_000_000) as f64 / g.pick(&[1.0, 3.0, 7.0, 1e6, 0.001])
+                    }));
+                }
+            }
+            "bvr" => {
+                t.push("1".to_owned());
+                t.push(hex(&brainvol_text(&mut g)));
+            }
+            "setres" => {
+                vol(&mut g, &mut t);
+                for _ in 0..3 {
+                    t.push(fx(size(&mut g)));
+                }
+            }
+            "vfill" => {
+                vol(&mut g, &mut t);
+                t.push(fx(fval(&mut g)));
+            }
+            "fillfg" => {
+                let mut s = shape(&mut g);
+                if !g.chance(4) {
+                    s.ty = 0;
+                }
+                if !g.chance(8) {
+                    s.hdr = false;
+                }
+                vol_of(&mut g, &mut t, s);
+                let mode = g.pick(&[0, 0, 1, 2]);
+                t.push(mode.to_string());
+                if mode == 1 {
+                    let o = like(&mut g, s);
+                    vol_of(&mut g, &mut t, o);
+                }
+                for k in [s.w, s.h, s.d] {
+                    t.push(g.int(-1, k).to_string());
+                }
+                t.push(g.pick(&[0, 1, 50, 128, 200, 256, -1]).to_string());
+                t.push(g.pick(&[0, 1, 128, 255, 255, 256, -1, 300]).to_string());
+            }
+            "explane" => {
+                let s = vol(&mut g, &mut t);
+                if g.chance(3) {
+                    t.push("1".into());
+                    let o = like(&mut g, s);
+                    vol_of(&mut g, &mut t, o);
+                } else {
+                    t.push("0".into());
+                }
+                t.push(g.pick(&[0, 1, 2, 0, 1, 2, 3, -1]).to_string());
+                t.push(g.int(-1, 4).to_string());
+            }
+            "fillplane" => {
+                let s = vol(&mut g, &mut t);
+                let o = like(&mut g, s);
+                vol_of(&mut g, &mut t, o);
+                t.push(g.pick(&[0, 1, 2, 0, 1, 2, 3, -1]).to_string());
+                t.push(g.int(-1, 4).to_string());
+                t.push(g.pick(&[0, 1, 255, -5, 70000]).to_string());
+            }
+            "ups" => {
+                let mut s = shape(&mut g);
+                if !g.chance(6) {
+                    s.hdr = false;
+                }
+                vol_of(&mut g, &mut t, s);
+                let k = g.int(0, 2);
+                let n = if g.chance(12) {
+                    g.pick(&[0, -1])
+                } else {
+                    g.pick(&[1, 2, 2, 3])
+                };
+                if g.chance(4) {
+                    t.push("1".into());
+                    let mut o = like(&mut g, s);
+                    if g.chance(2) {
+                        let f = if k == 1 { 2 } else { n.max(1) };
+                        o.w = s.w * f;
+                        o.h = s.h * f;
+                        o.d = s.d * f;
+                    }
+                    vol_of(&mut g, &mut t, o);
+                } else {
+                    t.push("0".into());
+                }
+                t.push(k.to_string());
+                t.push(n.to_string());
+            }
+            "dns2" | "dnsn" => {
+                let mut s = shape(&mut g);
+                if !g.chance(6) {
+                    s.hdr = false;
+                }
+                // a NaN factor makes FreeSurfer's extent -2147483648 with reproduce (FS-317), whose
+                // allocation error fs.mri does not model yet (told track A): not drawn
+                let fs: [f32; 3] = if cmd == "dnsn" {
+                    let f = |g: &mut Gen| -> f32 {
+                        if g.chance(30) {
+                            -1.0
+                        } else {
+                            g.pick(&[1.0, 2.0, 2.0, 3.0, 0.5, 1.5, 2.5, 4.0])
+                        }
+                    };
+                    [f(&mut g), f(&mut g), f(&mut g)]
+                } else {
+                    [2.0; 3]
+                };
+                // extents the factors divide, mostly (FreeSurfer's windows read past the source
+                // otherwise: FS-52, FS-53)
+                let ext = |g: &mut Gen, f: f32, hi: i64| -> i64 {
+                    if f >= 1.0 && f.fract() == 0.0 && !g.chance(3) {
+                        f as i64 * g.int(1, 2)
+                    } else {
+                        g.int(1, hi)
+                    }
+                };
+                s.w = ext(&mut g, fs[0], 5);
+                s.h = ext(&mut g, fs[1], 5);
+                s.d = ext(&mut g, fs[2], 4);
+                vol_of(&mut g, &mut t, s);
+                if g.chance(4) {
+                    t.push("1".into());
+                    let mut o = like(&mut g, s);
+                    if g.chance(2) {
+                        let e = |n: i64, f: f32| ((n as f32 / f).ceil() as i64).max(0);
+                        o.w = e(s.w, fs[0]);
+                        o.h = e(s.h, fs[1]);
+                        o.d = e(s.d, fs[2]);
+                        o.nf = s.nf;
+                        if cmd == "dns2" && !g.chance(5) {
+                            o.ty = s.ty;
+                        }
+                    }
+                    vol_of(&mut g, &mut t, o);
+                } else {
+                    t.push("0".into());
+                }
+                if cmd == "dnsn" {
+                    for f in fs {
+                        t.push(fx(f));
+                    }
+                    t.push(g.int(0, 1).to_string());
+                }
+            }
+            "mft" => {
+                let s = vol(&mut g, &mut t);
+                t.push(frame_of(&mut g, s).to_string());
+                t.push(fx(fval(&mut g)));
+            }
+            "lim" => {
+                vol(&mut g, &mut t);
+                t.push(fx(fval(&mut g)));
+                t.push(fx(fval(&mut g)));
+            }
+            "chtype" => {
+                let mut s = shape(&mut g);
+                if !g.chance(6) {
+                    s.hdr = false;
+                }
+                vol_of(&mut g, &mut t, s);
+                t.push(g.int(0, 1).to_string());
+                t.push(g.pick(&[0, 0, 1, 2, 3, 3, 4, 10]).to_string());
+                t.push(fx(g.pick(&[0.0, 0.0, 0.01, 0.1, 0.5, 1.0, 2.0, f32::NAN])));
+                t.push(fx(g.pick(&[0.0, 0.999, 0.9, 1.0, 0.5, 1.5])));
+                t.push(g.pick(&[0, 0, 0, 1, 2]).to_string());
+                t.push(g.int(0, 1).to_string());
             }
             "coef" | "hsinc" => {
                 let n = 6;
@@ -967,11 +1225,318 @@ pub fn generate(seed: u64, n: usize) -> Vec<String> {
                     }
                 }
             }
+            "splat" | "sseq" | "sxyz" | "tkern" => {
+                let mut s = shape(&mut g);
+                if g.chance(3) {
+                    s.ty = 3;
+                }
+                if !g.chance(4) {
+                    s.hdr = false;
+                }
+                vol_of(&mut g, &mut t, s);
+                if cmd == "sseq" || cmd == "sxyz" {
+                    t.push(dx(g.pick(&[
+                        0.0,
+                        0.0,
+                        -5.5,
+                        f64::from_bits(0x7ff8_0000_0000_1234),
+                        1e300,
+                    ])));
+                }
+                let n = 4;
+                t.push(n.to_string());
+                for _ in 0..n {
+                    if cmd == "sxyz" {
+                        for k in [s.w, s.h, s.d] {
+                            t.push(g.int(-2, k + 1).to_string());
+                        }
+                        let fb = g.int(0, s.nf.max(0));
+                        t.push(fb.to_string());
+                        t.push(g.int(fb - 1, s.nf + 1).to_string());
+                        t.push(g.int(0, 1).to_string());
+                        continue;
+                    }
+                    for k in [s.w, s.h, s.d] {
+                        t.push(dx(scoord(&mut g, k)));
+                    }
+                    match cmd {
+                        "splat" => {
+                            t.push(frame_of(&mut g, s).max(0).to_string());
+                            t.push(dx(if g.chance(6) {
+                                g.pick(&[
+                                    f64::NAN,
+                                    f64::from_bits(0x7ff4_0000_0000_0abc),
+                                    f64::from_bits(0xfff8_0000_0000_0001),
+                                    f64::INFINITY,
+                                    -f64::INFINITY,
+                                    1e10,
+                                    -3e9,
+                                ])
+                            } else {
+                                g.pick(&[
+                                    0.5, 1.0, 100.0, 255.7, -3.25, 40000.0, 70000.0, -0.0, 2.5e9,
+                                ])
+                            }));
+                        }
+                        "sseq" => {
+                            let first = g.int(0, s.nf.max(0));
+                            t.push(first.to_string());
+                            t.push(g.int(first - 1, s.nf + 1).to_string());
+                            t.push(
+                                if g.chance(30) {
+                                    5
+                                } else {
+                                    g.pick(&[-1, -1, -1, 1, 0, 0, 2, 3, 4, 6])
+                                }
+                                .to_string(),
+                            );
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            "deriv" | "grad" | "nbrs" => {
+                let mut s = shape(&mut g);
+                if g.chance(3) {
+                    s.ty = 3;
+                }
+                if !g.chance(4) {
+                    s.hdr = false;
+                }
+                vol_of(&mut g, &mut t, s);
+                if cmd == "nbrs" {
+                    let n = 3;
+                    t.push(n.to_string());
+                    for _ in 0..n {
+                        let kind = g.int(0, 7);
+                        t.push(kind.to_string());
+                        let edge = g.chance(4);
+                        for (k, m) in [(s.w, 3), (s.h, 2), (s.d, 2)] {
+                            let v = if edge {
+                                g.int(-m, k + m - 1)
+                            } else {
+                                g.int(0, (k - 1).max(0))
+                            };
+                            t.push(v.to_string());
+                        }
+                        let a = match kind {
+                            2 => g.int(1, 5),
+                            4 => frame_of(&mut g, s).max(0),
+                            _ => g.pick(&[0, 1, 2, 100, 128, 255, -1, 3]),
+                        };
+                        t.push(a.to_string());
+                        t.push(g.pick(&[0, 1, 2, 100, 255, -1]).to_string());
+                        t.push(fx(fval(&mut g)));
+                        t.push(fx(fval(&mut g)));
+                    }
+                } else {
+                    t.push(dx(g.pick(&[
+                        1.0,
+                        1.0,
+                        -1.0,
+                        0.5,
+                        f64::from_bits(0x7ff8_0000_0000_0042),
+                    ])));
+                    let n = 4;
+                    t.push(n.to_string());
+                    for _ in 0..n {
+                        for k in [s.w, s.h, s.d] {
+                            t.push(dx(scoord(&mut g, k)));
+                        }
+                        t.push(g.int(0, 1).to_string());
+                        if cmd == "grad" {
+                            t.push(frame_of(&mut g, s).max(0).to_string());
+                            continue;
+                        }
+                        for _ in 0..3 {
+                            t.push(dx(if g.chance(12) {
+                                g.pick(&[f64::NAN, f64::INFINITY, 1e10, -1e10])
+                            } else {
+                                g.pick(&[
+                                    0.0,
+                                    1.0,
+                                    -1.0,
+                                    0.5,
+                                    std::f64::consts::FRAC_1_SQRT_2,
+                                    -0.25,
+                                    2.0,
+                                ])
+                            }));
+                        }
+                        t.push(dx(if g.chance(150) {
+                            g.pick(&[1e308, f64::INFINITY])
+                        } else {
+                            g.pick(&[
+                                0.0,
+                                0.0,
+                                1e-8,
+                                0.5,
+                                1.0,
+                                2.0,
+                                3.3,
+                                -1.0,
+                                f64::NAN,
+                                1e300,
+                                0.2,
+                            ])
+                        }));
+                    }
+                }
+            }
+            "lxf" | "rsmat" => {
+                let mut s = shape(&mut g);
+                if g.chance(3) {
+                    s.ty = 3;
+                }
+                if !g.chance(6) {
+                    s.hdr = false;
+                }
+                vol_of(&mut g, &mut t, s);
+                if cmd == "rsmat" {
+                    let o = like(&mut g, s);
+                    vol_of(&mut g, &mut t, o);
+                    t.push(i64::from(g.chance(8)).to_string());
+                    lines.push(t.join(" "));
+                    continue;
+                }
+                t.push(dx(g.pick(&[
+                    0.0,
+                    0.0,
+                    0.0,
+                    5.0,
+                    -2.5,
+                    1e-9,
+                    f64::from_bits(0x7ff8_0000_0000_0077),
+                ])));
+                if g.chance(4) {
+                    t.push("1".into());
+                    let o = like(&mut g, s);
+                    vol_of(&mut g, &mut t, o);
+                } else {
+                    t.push("0".into());
+                }
+                t.push(g.int(0, 5).to_string());
+                t.push(g.pick(&[0, 0, 1, 1, 1, 2, 3, 4]).to_string());
+                if g.chance(30) {
+                    t.push("0".into());
+                } else {
+                    t.push("1".into());
+                    let kind = g.int(0, 5);
+                    for r in 0..4 {
+                        for c in 0..4 {
+                            let v: f32 = match (kind, r, c) {
+                                (_, 3, 3) => 1.0,
+                                (_, 3, _) => 0.0,
+                                (0, r, c) if r == c => 1.0,
+                                (0, _, _) => 0.0,
+                                (1, r, c) if r == c => g.pick(&[1.0, 2.0, 0.5, -1.0, 1.5]),
+                                (1, _, 3) => g.pick(&[0.0, 1.0, -0.5, 0.25, 2.0]),
+                                (1, _, _) => 0.0,
+                                (2, 2, _) if g.chance(3) => 0.0,
+                                (4, _, _) if g.chance(20) => {
+                                    f32::from_bits(g.pick(&[0x7fc00000, 0x7f800000]))
+                                }
+                                _ => num(&mut g, -20, 20, 10),
+                            };
+                            t.push(fx(v));
+                        }
+                    }
+                }
+            }
             c => panic!("no generator for {c}"),
         }
         lines.push(t.join(" "));
     }
     lines
+}
+
+/// Labels the segmentation cases draw from: cma.h's (left and right), the parcellations', a few
+/// unknown ones.
+const CMA_LABELS: [i64; 48] = [
+    0, 2, 3, 41, 42, 4, 43, 10, 49, 17, 53, 30, 62, 5, 7, 8, 11, 12, 13, 14, 15, 16, 18, 24, 26,
+    28, 31, 46, 47, 50, 51, 52, 54, 58, 60, 63, 72, 77, 78, 79, 80, 85, 251, 255, 1001, 2035, 5001,
+    9999,
+];
+
+/// A segmentation's voxels painted: `n`, then `x y z value` of frame 0 (values from `vals`, or
+/// odd ones).
+fn paint(g: &mut Gen, t: &mut Vec<String>, s: Shape, vals: &[f32]) {
+    let n = g.int(0, (s.w * s.h * s.d).min(24));
+    t.push(n.to_string());
+    for _ in 0..n {
+        t.push(g.int(0, s.w - 1).to_string());
+        t.push(g.int(0, s.h - 1).to_string());
+        t.push(g.int(0, s.d - 1).to_string());
+        t.push(fx(if g.chance(12) { fval(g) } else { g.pick(vals) }));
+    }
+}
+
+/// A segmentation volume (rarely header only) painted with labels.
+fn seg_vol(g: &mut Gen, t: &mut Vec<String>) -> Shape {
+    let s = shape(g);
+    let s = Shape {
+        hdr: s.hdr && g.chance(4),
+        ..s
+    };
+    vol_of(g, t, s);
+    let vals: Vec<f32> = CMA_LABELS.iter().map(|&l| l as f32).collect();
+    paint(g, t, s, &vals);
+    s
+}
+
+/// A `brainvol.stats` text: `CacheBrainVolumeStats`'s lines, some changed (numbers in other forms,
+/// words missing, lines dropped or doubled, white space at the ends, CR line ends).
+fn brainvol_text(g: &mut Gen) -> Vec<u8> {
+    let names = [
+        "BrainSeg, BrainSegVol",
+        "BrainSegNotVent, BrainSegVolNotVent",
+        "SupraTentorial, SupraTentorialVol",
+        "SupraTentorialNotVent, SupraTentorialVolNotVent",
+        "SubCortGray, SubCortGrayVol",
+        "lhCortex, lhCortexVol",
+        "rhCortex, rhCortexVol",
+        "Cortex, CortexVol",
+        "TotalGray, TotalGrayVol",
+        "lhCerebralWhiteMatter, lhCerebralWhiteMatterVol",
+        "rhCerebralWhiteMatter, rhCerebralWhiteMatterVol",
+        "CerebralWhiteMatter, CerebralWhiteMatterVol",
+        "Mask, MaskVol",
+        "SupraTentorialNotVentVox, SupraTentorialVolNotVentVox",
+        "BrainSegNotVentSurf, BrainSegVolNotVentSurf",
+        "VentricleChoroidVol, VentricleChoroidVol",
+    ];
+    let mut s = String::new();
+    for name in names {
+        if g.chance(30) {
+            continue;
+        }
+        let num = if g.chance(4) {
+            g.pick(&[
+                "1e5", "-3.5", "+7", ".5", "5.", "0x10", "1e", "1e+", "1e400", "1e-400", "abc", "",
+                "007.25", "1.5.3", "inf", "nan", "4e2x", "-", "12",
+            ])
+            .to_owned()
+        } else {
+            format!("{:.12}", g.int(0, 2_000_000) as f64 / 7.0)
+        };
+        let mut line = format!("# Measure {name}, a description, {num}, mm^3");
+        if g.chance(8) {
+            line = format!("# Measure {name}, no number here");
+        }
+        if g.chance(15) {
+            line += g.pick(&[" ", "\r", "\t ", "  "]);
+        }
+        s += &line;
+        s += "\n";
+        if g.chance(20) {
+            s += &line;
+            s += "\n";
+        }
+    }
+    if g.chance(10) {
+        s.pop();
+    }
+    s.into_bytes()
 }
 
 /// A row of four numbers as a transform file writes them (sometimes odd).
@@ -1151,7 +1716,7 @@ fn perturb(g: &mut Gen, v: &mut [String], e: &mut [String]) {
 }
 
 /// The probe's commands, in the order the generator cycles through them.
-pub const COMMANDS: [&str; 65] = [
+pub const COMMANDS: [&str; 93] = [
     "vgwrite",
     "vgread",
     "vgread",
@@ -1217,6 +1782,34 @@ pub const COMMANDS: [&str; 65] = [
     "skull",
     "tftype",
     "ltaread",
+    "cmalab",
+    "cmavol",
+    "lrswap",
+    "fixrib",
+    "lrseg",
+    "ohe",
+    "bvc",
+    "bvr",
+    "setres",
+    "vfill",
+    "fillfg",
+    "explane",
+    "fillplane",
+    "ups",
+    "dns2",
+    "dnsn",
+    "mft",
+    "lim",
+    "chtype",
+    "splat",
+    "sseq",
+    "sxyz",
+    "tkern",
+    "deriv",
+    "grad",
+    "nbrs",
+    "lxf",
+    "rsmat",
 ];
 
 /// One buffer both streams write into, in order (FreeSurfer's standard output and error go to
@@ -1476,6 +2069,87 @@ impl Out {
 }
 
 /// The destination of `f(src, dst, ...)`: 0 `NULL`, 1 a volume of the case, 2 the source.
+/// A volume of the case with its painted voxels (`fsvolume.cpp`'s `paint`).
+fn painted(cx: &mut Ctx, t: &mut Toks) -> Result<Mri, Fatal> {
+    let mut m = get_vol(cx, t)?;
+    let n = t.i();
+    for _ in 0..n {
+        let (x, y, z, v) = (t.i(), t.i(), t.i(), t.f());
+        larmorx_freesurfer_mri::voxel::mri_set_vox_val(
+            &mut cx.g, &mut cx.b, &mut m, x, y, z, 0, v, 0,
+        )?;
+    }
+    Ok(m)
+}
+
+/// A label list of the case: rows, cols, the numbers row by row (`fsvolume.cpp`'s `get_list`).
+fn get_list(t: &mut Toks) -> Matrix {
+    let (rows, cols) = (t.i(), t.i());
+    let mut m = Matrix::real(rows, cols);
+    for r in 1..=rows {
+        for c in 1..=cols {
+            let v = t.f();
+            m.set_relt(r, c, v);
+        }
+    }
+    m
+}
+
+/// `cma.h`'s `IS_*` tests of a label as 0/1 characters, in its order (`fsvolume.cpp`'s `cma_bits`).
+fn cma_bits<T: cm::Label>(v: T) -> String {
+    let mut b: String = [
+        cm::is_future_wmsa(v),
+        cm::is_lh_layer(v),
+        cm::is_cc(v),
+        cm::is_rh_layer(v),
+        cm::is_layer(v),
+        cm::is_unknown(v),
+        cm::is_brain(v),
+        cm::is_wm(v),
+        cm::is_cerebral_wm(v),
+        cm::is_hypo(v),
+        cm::is_wmsa(v),
+        cm::is_wmh(v),
+        cm::is_thalamus(v),
+        cm::is_gm(v),
+        cm::is_ventral_dc(v),
+        cm::is_cerebellar_wm(v),
+        cm::is_cerebellar_gm(v),
+        cm::is_cerebellum(v),
+        cm::is_choroid(v),
+        cm::is_hippo(v),
+        cm::is_amygdala(v),
+        cm::is_mtl(v),
+        cm::is_cortex(v),
+        cm::is_lat_vent(v),
+        cm::is_csf(v),
+        cm::is_inf_lat_vent(v),
+        cm::is_ventricle(v),
+        cm::is_caudate(v),
+        cm::is_putamen(v),
+        cm::is_claustrum(v),
+        cm::is_accumbens(v),
+        cm::is_pallidum(v),
+        cm::label_with_no_topology_constraint(v),
+        cm::is_fimbria(v),
+        cm::is_gray_matter(v),
+        cm::is_white_matter(v),
+        cm::is_fluid(v),
+        cm::is_lh_class(v),
+        cm::is_rh_class(v),
+        cm::is_gray_class(v),
+        cm::is_white_class(v),
+        cm::is_csf_class(v),
+    ]
+    .iter()
+    .map(|&x| if x { '1' } else { '0' })
+    .collect();
+    for c in [cm::CSF_CLASS, cm::GM_CLASS, cm::WM_CLASS, cm::OTHER_CLASS] {
+        b.push(if cm::is_class(v, c) { '1' } else { '0' });
+    }
+    b
+}
+
 fn dst_mode(cx: &mut Ctx, t: &mut Toks) -> Result<(i32, Option<Mri>), Fatal> {
     let mode = t.i();
     let d = if mode == 1 {
@@ -1840,8 +2514,16 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
             let ext = String::from_utf8(t.hex()).expect("an ASCII name");
             let bytes = t.hex();
             let have = t.i() != 0;
-            let dir =
-                std::env::temp_dir().join(format!("larmorx-fsvol-lta-{}", std::process::id()));
+            let env = match t.i() {
+                0 => Environment::default(),
+                1 => Environment::from_pairs([("USE_AVERAGE305", "true")]),
+                _ => Environment::from_pairs([("USE_AVERAGE305", "")]),
+            };
+            // a folder of its own per call: the tests run cases in several threads at once
+            static CALLS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+            let call = CALLS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            let dir = std::env::temp_dir()
+                .join(format!("larmorx-fsvol-lta-{}-{call}", std::process::id()));
             std::fs::create_dir_all(&dir).expect("a scratch folder");
             let name = format!("fsvol-lta{ext}");
             let path = dir.join(&name);
@@ -1850,10 +2532,8 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
                 std::fs::write(&path, &bytes).expect("the case's file");
             }
             g.errno = 0;
-            let r = lr::lta_read_ex(g, a, b, Some(&dir), &name, &mut NoIo);
-            if have {
-                let _ = std::fs::remove_file(&path);
-            }
+            let r = lr::lta_read_ex(g, a, b, Some(&dir), &name, &mut NoIo(env));
+            let _ = std::fs::remove_dir_all(&dir);
             let r = r?;
             o.i(i64::from(g.errno));
             match r {
@@ -1874,6 +2554,215 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
                     o.f(lta.fscale);
                 }
             }
+        }
+        "cmalab" => {
+            let n = t.i();
+            for _ in 0..n {
+                let v = t.i();
+                let f = t.f();
+                o.0 += &format!(
+                    "{} {} {} ",
+                    cma_bits(v),
+                    cma_bits(f),
+                    cma_bits(f64::from(f))
+                );
+                o.i(i64::from(cm::is_sub_cortical_gray(v)));
+                o.i(i64::from(cm::mri_aseg_contra_lat_label(&mut cx.a, v)));
+            }
+        }
+        "cmavol" => {
+            let aseg = painted(cx, t)?;
+            let ribbon = painted(cx, t)?;
+            let hemi = t.i();
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            o.d(cm::supra_tentorial_vol_correction(g, b, &aseg, &ribbon)?);
+            o.d(cm::cortical_gm_vol_correction(
+                g, a, b, &aseg, &ribbon, hemi,
+            )?);
+        }
+        "lrswap" => {
+            let aseg = painted(cx, t)?;
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = cm::mri_lrswap_aseg(g, a, b, &aseg)?;
+            o.vol(r.as_ref());
+        }
+        "fixrib" => {
+            let aseg = painted(cx, t)?;
+            let ribbon = painted(cx, t)?;
+            let (mode, mut dst) = dst_mode(cx, t)?;
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = cm::mri_fix_aseg_with_ribbon(g, a, b, &aseg, &ribbon, dst.as_mut())?;
+            let _ = mode;
+            o.ret(&r, dst.as_ref());
+        }
+        "lrseg" => {
+            let seg = painted(cx, t)?;
+            let lh = get_list(t);
+            let rh = get_list(t);
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = cm::mri_lrswap_seg(g, a, b, &seg, &lh, &rh)?;
+            o.vol(r.as_ref());
+        }
+        "ohe" => {
+            let seg = painted(cx, t)?;
+            let n = t.i();
+            let list: Vec<i32> = (0..n).map(|_| t.i()).collect();
+            let force1 = t.i();
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = cm::mri_one_hot_encode(g, a, b, &seg, &list, force1)?;
+            o.vol(r.as_ref());
+        }
+        "bvc" | "bvr" => {
+            // a folder of its own per call: the tests run cases in several threads at once
+            static CALLS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+            let call = CALLS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            let dir = std::env::temp_dir()
+                .join(format!("larmorx-fsvol-bv-{}-{call}", std::process::id()));
+            let subj = "fsvol-subj";
+            let stats_dir = dir.join(subj).join("stats");
+            let _ = std::fs::remove_dir_all(dir.join(subj));
+            if t.i() != 0 {
+                std::fs::create_dir_all(&stats_dir).expect("the subject's stats folder");
+            }
+            std::fs::create_dir_all(&dir).expect("a scratch folder");
+            let file = stats_dir.join("brainvol.stats");
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = if cmd == "bvc" {
+                let mut stats = [0.0f64; 16];
+                for v in &mut stats {
+                    *v = t.d();
+                }
+                cm::cache_brain_volume_stats(g, b, Some(&dir), &stats, subj, ".").map(|()| {
+                    o.hex(&std::fs::read(&file).unwrap_or_default());
+                })
+            } else {
+                std::fs::write(&file, t.hex()).expect("the case's file");
+                let mut compute = |_: &mut Globals, _: &mut dyn Write, _: &mut dyn Write| {
+                    panic!("ComputeBrainVolumeStats is not reached by the cases")
+                };
+                cm::read_cached_brain_volume_stats(g, a, b, Some(&dir), subj, ".", &mut compute)
+                    .map(|stats| {
+                        for v in stats {
+                            o.d(v);
+                        }
+                    })
+            };
+            let _ = std::fs::remove_dir_all(&dir);
+            r?;
+        }
+        "setres" => {
+            let mut m = get_vol(cx, t)?;
+            let (x, y, z) = (t.f(), t.f(), t.f());
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            o.i(i64::from(rs::mri_set_resolution(g, a, b, &mut m, x, y, z)?));
+            o.vol(Some(&m));
+        }
+        "vfill" => {
+            let mut m = get_vol(cx, t)?;
+            let v = t.f();
+            o.i(i64::from(rs::mri_value_fill(
+                &mut cx.g, &mut cx.b, &mut m, v,
+            )?));
+            o.vol(Some(&m));
+        }
+        "fillfg" => {
+            let mut src = get_vol(cx, t)?;
+            let (mode, mut dst) = dst_mode(cx, t)?;
+            let (sx, sy, sz, th, fv) = (t.i(), t.i(), t.i(), t.i(), t.i());
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let p = pair(mode, &mut src, &mut dst);
+            let (r, npix) = rs::mri_fill_fg(g, a, b, p, sx, sy, sz, th, fv)?;
+            o.i(i64::from(npix));
+            let given = match mode {
+                1 => dst.as_ref(),
+                2 => Some(&src),
+                _ => None,
+            };
+            o.ret(&r, given);
+        }
+        "explane" => {
+            let src = get_vol(cx, t)?;
+            let mut dst = if t.i() != 0 {
+                Some(get_vol(cx, t)?)
+            } else {
+                None
+            };
+            let (or, at) = (t.i(), t.i());
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = rs::mri_extract_plane(g, a, b, &src, dst.as_mut(), or, at)?;
+            o.ret(&r, dst.as_ref());
+        }
+        "fillplane" => {
+            let mask = get_vol(cx, t)?;
+            let mut dst = get_vol(cx, t)?;
+            let (or, at, fv) = (t.i(), t.i(), t.i());
+            rs::mri_fill_plane(&mut cx.g, &mut cx.b, &mask, &mut dst, or, at, fv)?;
+            o.i(1);
+            o.vol(Some(&dst));
+        }
+        "ups" => {
+            let mut src = get_vol(cx, t)?;
+            let mut dst = if t.i() != 0 {
+                Some(get_vol(cx, t)?)
+            } else {
+                None
+            };
+            let (k, n) = (t.i(), t.i());
+            let env = Environment::default();
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = match k {
+                0 => rs::mri_upsample_n(g, a, b, &src, dst.as_mut(), n)?,
+                1 => rs::mri_upsample2(g, a, b, &src, dst.as_mut())?,
+                _ => rs::mri_upsample_n_conserve(g, a, b, &env, &mut src, dst.as_mut(), n)?,
+            };
+            o.ret(&r, dst.as_ref());
+        }
+        "dns2" | "dnsn" => {
+            let src = get_vol(cx, t)?;
+            let mut dst = if t.i() != 0 {
+                Some(get_vol(cx, t)?)
+            } else {
+                None
+            };
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = if cmd == "dns2" {
+                rs::mri_downsample2(g, a, b, &src, dst.as_mut())?
+            } else {
+                let (fc, fr, fs, keep) = (t.f(), t.f(), t.f(), t.i());
+                rs::mri_downsample_n(g, a, b, &src, dst.as_mut(), fc, fr, fs, keep)?
+            };
+            o.ret(&r, dst.as_ref());
+        }
+        "mft" => {
+            let m = get_vol(cx, t)?;
+            let (f, th) = (t.i(), t.f());
+            o.d(rs::mri_mean_frame_thresh(&mut cx.g, &mut cx.b, &m, f, th));
+        }
+        "lim" => {
+            let m = get_vol(cx, t)?;
+            let (mut lo, mut hi) = (t.f(), t.f());
+            o.i(i64::from(rs::mri_limits(
+                &mut cx.g, &mut cx.b, &m, &mut lo, &mut hi,
+            )?));
+            o.f(lo);
+            o.f(hi);
+        }
+        "chtype" => {
+            let mut m = get_vol(cx, t)?;
+            let (seq, dt, lo, hi, ns) = (t.i(), t.i(), t.f(), t.f(), t.i());
+            let env = if t.i() != 0 {
+                Environment::from_pairs([("FS_FORCE_BIN_CHECK", "1")])
+            } else {
+                Environment::default()
+            };
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let r = if seq != 0 {
+                rs::mri_seq_change_type(g, a, b, &env, &mut m, dt, lo, hi, ns)?
+            } else {
+                rs::mri_change_type(g, a, b, &env, &m, dt, lo, hi, ns)?
+            };
+            o.vol(r.as_ref());
+            o.vol(Some(&m));
         }
         "coef" | "hsinc" => {
             let n = t.i();
@@ -2020,6 +2909,166 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
             let r = co::mri_dump(g, a, b, &m, &mut fp)?;
             o.i(i64::from(r));
         }
+        "splat" => {
+            let mut m = get_vol(cx, t)?;
+            let n = t.i();
+            let (g, b) = (&mut cx.g, &mut cx.b);
+            for i in 0..n {
+                let (x, y, z, frame, val) = (t.d(), t.d(), t.d(), t.i(), t.d());
+                let r = if frame == 0 && i % 2 == 1 {
+                    sq::interpolate_into_volume(g, b, &mut m, x, y, z, val)
+                } else {
+                    sq::interpolate_into_volume_frame(g, b, &mut m, x, y, z, frame, val)
+                };
+                o.i(i64::from(r));
+            }
+            o.vol(Some(&m));
+        }
+        "sseq" | "sxyz" => {
+            let mut m = get_vol(cx, t)?;
+            m.outside_val = t.d();
+            let n = t.i();
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            for _ in 0..n {
+                let (r, v) = if cmd == "sseq" {
+                    let (x, y, z, first, last, ty) = (t.d(), t.d(), t.d(), t.i(), t.i(), t.i());
+                    let mut v = vec![-7.0f32; (last + 1).max(1) as usize];
+                    let r = if ty < 0 {
+                        sq::sample_seq_volume(g, b, &m, x, y, z, &mut v, first, last)?
+                    } else {
+                        sq::sample_seq_volume_type(g, a, b, &m, x, y, z, &mut v, first, last, ty)?
+                    };
+                    (r, v)
+                } else {
+                    let (x, y, z, fb, fe, k) = (t.i(), t.i(), t.i(), t.i(), t.i(), t.i());
+                    let mut v = vec![-7.0f32; (fe - fb).max(1) as usize];
+                    let r = if k != 0 {
+                        sq::sample_volume_frame_xyz_int_n_range_floats(
+                            g, b, &m, x, y, z, fb, fe, &mut v,
+                        )?
+                    } else {
+                        sq::sample_volume_frame_type_xyz_int_n_range_nearest_floats(
+                            g, b, &m, x, y, z, fb, fe, &mut v,
+                        )?
+                    };
+                    (r, v)
+                };
+                o.i(i64::from(r));
+                for f in v {
+                    o.f(f);
+                }
+            }
+        }
+        "tkern" => {
+            let m = get_vol(cx, t)?;
+            let n = t.i();
+            for _ in 0..n {
+                let (x, y, z) = (t.d(), t.d(), t.d());
+                o.i(1);
+                for w in sq::trilin_kernel(&m, x, y, z) {
+                    o.d(w);
+                }
+            }
+        }
+        "deriv" | "grad" => {
+            let m = get_vol(cx, t)?;
+            cx.g.sample_volume_derivative_sign = t.d();
+            let n = t.i();
+            let (g, b) = (&mut cx.g, &mut cx.b);
+            for _ in 0..n {
+                let (x, y, z, kind) = (t.d(), t.d(), t.d(), t.i());
+                if cmd == "deriv" {
+                    let (ddx, ddy, ddz, sigma) = (t.d(), t.d(), t.d(), t.d());
+                    let mut mag = -7.0;
+                    let r = if kind != 0 {
+                        dv::sample_volume_derivative_scale(
+                            g, b, &m, x, y, z, ddx, ddy, ddz, &mut mag, sigma,
+                        )?
+                    } else {
+                        dv::sample_volume_derivative(g, b, &m, x, y, z, ddx, ddy, ddz, &mut mag)
+                    };
+                    o.i(i64::from(r));
+                    o.d(mag);
+                } else {
+                    let frame = t.i();
+                    let (mut p, mut q, mut w) = (-7.0, -7.0, -7.0);
+                    let r = if kind != 0 {
+                        dv::sample_volume_gradient_frame(
+                            g, b, &m, x, y, z, &mut p, &mut q, &mut w, frame,
+                        )
+                    } else {
+                        dv::sample_volume_gradient(g, b, &m, x, y, z, &mut p, &mut q, &mut w)
+                    };
+                    o.i(i64::from(r));
+                    o.d(p);
+                    o.d(q);
+                    o.d(w);
+                }
+            }
+        }
+        "nbrs" => {
+            let m = get_vol(cx, t)?;
+            let n = t.i();
+            let (g, b) = (&mut cx.g, &mut cx.b);
+            for _ in 0..n {
+                let (kind, x, y, z, a1, b1) = (t.i(), t.i(), t.i(), t.i(), t.i(), t.i());
+                let (lo, hi) = (t.f(), t.f());
+                let r = match kind {
+                    0 => dv::neighbors_on(g, b, &m, x, y, z, a1)?,
+                    1 => dv::neighbors_on_3x3(g, b, &m, x, y, z, a1)?,
+                    2 => dv::neighbors_in_window(g, b, &m, x, y, z, a1, b1)?,
+                    3 => dv::neighbors(g, b, &m, x, y, z, a1)?,
+                    4 => dv::neighbors_in_range(g, b, &m, x, y, z, a1, lo, hi)?,
+                    5 => dv::neighbors_3x3(g, b, &m, x, y, z, a1)?,
+                    6 => dv::neighbors_off(g, &m, x, y, z, a1),
+                    _ => dv::neighbors_off_3x3(g, b, &m, x, y, z, a1)?,
+                };
+                o.i(i64::from(r));
+            }
+        }
+        "lxf" => {
+            let mut src = get_vol(cx, t)?;
+            src.outside_val = t.d();
+            let mut dst = if t.i() != 0 {
+                Some(get_vol(cx, t)?)
+            } else {
+                None
+            };
+            let (kind, interp) = (t.i(), t.i());
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let ma = if t.i() != 0 {
+                let mut m = mx::matrix_alloc(g, a, b, 4, 4, mx::MATRIX_REAL)?.expect("4 x 4");
+                for r in 1..=4 {
+                    for c in 1..=4 {
+                        m.set_relt(r, c, t.f());
+                    }
+                }
+                Some(m)
+            } else {
+                None
+            };
+            let (ma, d) = (ma.as_ref(), dst.as_mut());
+            let r = match kind {
+                0 => xf::mri_linear_transform_interp(g, a, b, &src, d, ma, interp)?,
+                1 => xf::mri_linear_transform(g, a, b, &src, d, ma)?,
+                2 => xf::mri_inverse_linear_transform(g, a, b, &src, d, ma)?,
+                3 => xf::mri_apply_ras_linear_transform_interp(g, a, b, &src, d, ma, interp)?,
+                4 => xf::mri_apply_ras_linear_transform(g, a, b, &src, d, ma)?,
+                _ => xf::mri_apply_ras_inverse_linear_transform(g, a, b, &src, d, ma)?,
+            };
+            o.ret(&r, dst.as_ref());
+        }
+        "rsmat" => {
+            let src = get_vol(cx, t)?;
+            let tmpl = get_vol(cx, t)?;
+            if t.i() != 0 {
+                cx.g.gdiag |= larmorx_freesurfer_core::diag::DIAG_SHOW
+                    | larmorx_freesurfer_core::diag::DIAG_VERBOSE;
+            }
+            let (g, a, b) = (&mut cx.g, &mut cx.a, &mut cx.b);
+            let m = xf::mri_get_resample_matrix(g, a, b, &src, &tmpl)?;
+            o.m(m.as_ref());
+        }
         c => panic!("unknown command {c}"),
     }
     Ok(())
@@ -2027,10 +3076,13 @@ fn case(cx: &mut Ctx, t: &mut Toks, o: &mut Out) -> Result<(), Fatal> {
 
 /// `cmph`'s header fields beyond the volume's tokens.
 /// fs.io's functions for the transform readers: never reached by the cases (they name no volume
-/// that exists and no `register.dat`).
-struct NoIo;
+/// that exists and no `register.dat`); the case's environment.
+struct NoIo(Environment);
 
 impl lr::LtaIo for NoIo {
+    fn env(&self) -> &Environment {
+        &self.0
+    }
     fn read_header(
         &mut self,
         _: &mut Globals,

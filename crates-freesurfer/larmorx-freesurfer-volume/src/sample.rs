@@ -56,7 +56,7 @@ pub const SAMPLE_CUBIC_BSPLINE: i32 = 5;
 pub const SAMPLE_VOTE: i32 = 6;
 
 /// x86-64's `(int) x` (`cvttsd2si`): `INT_MIN` for NaN and values outside the `int` range.
-fn cvtt(x: f64) -> i32 {
+pub(crate) fn cvtt(x: f64) -> i32 {
     if x.is_nan() || x >= 2_147_483_648.0 || x <= -2_147_483_649.0 {
         i32::MIN
     } else {
@@ -73,7 +73,7 @@ fn whole(x: f64) -> bool {
 
 /// The voxel `x` of row `y` of slice `sl` (`z + frame depth`) as the samplers read it, in
 /// `double`: the volume's type's element; for `MRI_LONG` FreeSurfer's `long32` (FS-298).
-fn vox(g: &mut Globals, what: &str, m: &Mri, sl: i64, y: i64, x: i64) -> f64 {
+pub(crate) fn vox(g: &mut Globals, what: &str, m: &Mri, sl: i64, y: i64, x: i64) -> f64 {
     match m.mtype {
         MRI_LONG => {
             let half = rows::read(g, what, m, sl, y, x, MRI_INT).f64();
@@ -94,7 +94,7 @@ fn vox(g: &mut Globals, what: &str, m: &Mri, sl: i64, y: i64, x: i64) -> f64 {
 }
 
 /// The types the trilinear, cubic and sinc samplers read.
-fn sampled_type(ty: i32) -> bool {
+pub(crate) fn sampled_type(ty: i32) -> bool {
     matches!(
         ty,
         MRI_UCHAR | MRI_FLOAT | MRI_SHORT | MRI_USHRT | MRI_INT | MRI_LONG

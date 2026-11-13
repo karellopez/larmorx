@@ -62,3 +62,48 @@ different (641 of the 1,000 `skull` cases find a box); 2,000 transform-reading c
 commands, log `oracles/logs/fs-found-c-r13-seed1.log`): 1,224 identical, 76 not comparable, hash
 `2499daba233eec8c8278d5d5c3b9be2d32569776f9f5d0d4a7eed9571bf94791`. Not comparable now also: FS-300 (a
 cubic window never read), FS-302 to FS-310 (crashes, hangs, memory never set).
+
+Measured 2026-11-13 (relay 15: `ltaread` sets `USE_AVERAGE305` per case, unset, `true` or empty, in
+the official child's environment and in the port's `LtaIo::env`): seed 1, 1,300 cases (log
+`oracles/logs/fs-found-c-r15-avg.log`): 1,198 identical, 102 not comparable, hash
+`571a038fdaebd6929c884ca4065eebd07e8143122f07e57fcfc9c6b71175f1c1`. Seed 7, 923 `ltaread` cases: 867
+identical, 55 not comparable, 1 different (an `errno` the port kept after `sscanf` met the end of a line:
+fixed in the next commit, `scanf_word_errno.c`). After it (log `oracles/logs/fs-found-c-r15-fixcheck.log`):
+seed 7, 3,076 `ltaread` cases: 2,908 identical, 168 not comparable, 0 different; seed 13, 6,152 `ltaread`
+and `tftype` cases: 5,691 identical, 461 not comparable, 0 different; seed 1 unchanged (hash `571a038f...`).
+`scanf_word_errno.c` (build and run with `gcc -O0 scanf_word_errno.c && ./a.out`) measures what glibc's
+`sscanf` leaves in `errno` when a conversion meets the end of the string: 0, or, after an earlier item that
+ended at the end, the value `errno` had when that item met it (before its own `ERANGE`).
+
+Measured 2026-11-13 (part 5, relay 15: the CMA labels and segmentation functions `cmalab`, `cmavol`,
+`lrswap`, `fixrib`, `lrseg`, `ohe`, `bvc`, `bvr`; 73 commands; logs `oracles/logs/fs-found-c-r15-cma3.log`
+and `-cma4.log`): seed 7, 8,000 cases of the new commands: 7,427 identical with `reproduce`, 573 not
+comparable (FS-314: FreeSurfer aborts, `CRASH 6`; FS-315: lists read past their numbers; FS-53, FS-58),
+0 different; seed 13, 16,000: 14,785 identical, 1,215 not comparable, 0 different; all 73 commands at
+seed 7, 7,300 cases: 6,841 identical, 459 not comparable, 0 different; `fix` different only with
+notices. Seed 1, 1,460 cases: 1,365 identical, 95 not comparable, hash
+`dfb6450d2777761356d5587e0e2c2b8bd737ed1d1e1b82352d58a8e59b6ac530`.
+
+Measured 2026-11-13 (part 6, relay 16: 3.1-36's resolution, planes, fills, resampling by whole factors and
+changes of type `setres`, `vfill`, `fillfg`, `explane`, `fillplane`, `ups`, `dns2`, `dnsn`, `mft`, `lim`,
+`chtype`; 84 commands; logs `oracles/logs/fs-found-c-r16-resize3.log`, `-seed7.log`, `-seed1.log`): seed 13,
+11,000 cases of the new commands: 9,164 identical with `reproduce`, 1,835 not comparable (FS-53, FS-58,
+FS-290 of the voxel access), 1 different (`MRIsetResolution`'s `thick` of +0 and -0: `macros.h`'s `MAX` is
+`a >= b ? a : b`; fixed); `fix` different only with notices. After the fix, all 84 commands at seed 7, 8,400
+cases: 7,746 identical, 654 not comparable, 0 different. Seed 1, 1,680 cases: 1,546 identical, 134 not
+comparable, hash `919eb356853935742497415be1a6e96cc024dc5e7efdff0dd7499caf1638bf6e`, passing with AArch64's
+NaN emulated in debug and release (`oracles/logs/fs-found-c-r16-trap-volume.log`). `dnsn` draws no NaN
+factor: with `reproduce` FreeSurfer's extent is then -2147483648 (FS-317), whose allocation error fs.mri's
+`Mri::new` does not model yet (`docs/findings/freesurfer-volume.md` §9, for track A).
+
+Measured 2026-11-13 (part 7, relay 17: 3.1-36's frame-range samplers, trilinear kernel and splatting
+`splat`, `sseq`, `sxyz`, `tkern`; derivatives, gradients and neighbour counts `deriv`, `grad`, `nbrs`;
+linear transforms `lxf`, `rsmat`; 93 commands; logs `oracles/logs/fs-found-c-r17-*.log`): seed 7, 8,000
+cases of `splat sseq sxyz tkern`: 7,399 identical with `reproduce`, 601 not comparable (FS-290), 0
+different (after one fix: the nearest frame-range sampler keeps a signalling NaN voxel as the official
+build does); seed 7, 9,000 cases of `deriv grad nbrs`: 7,422 identical, 1,578 not comparable (FS-53,
+FS-58, FS-290, FS-322 to FS-324), 0 different; seed 7, 5,000 cases of `lxf rsmat`: 4,923 identical, 77
+not comparable, 0 different; `fix` different only with notices. Seed 1, 1,860 cases: 1,713 identical, 147
+not comparable, hash `718b2164c1606fdac499763c22925f59159265321405289580253ec012eefa7c`, passing with
+AArch64's NaN emulated in debug and release (`oracles/logs/fs-found-c-r17-trap-volume.log`). The port's
+debug and release builds agree on 42,460 cases (seeds 1, 7 and 13).

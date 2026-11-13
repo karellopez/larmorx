@@ -30,8 +30,8 @@ evidence: ants-apply-transforms
 
 `antsApplyTransforms` resamples an image onto the grid of a reference image through a chain of
 ITK transforms (linear transforms, displacement fields, B-spline transforms and composites of
-them), or writes the chain itself as one transform ([Transform outputs](#transform-outputs)).
-fMRIPrep runs it for the masks, references, tissue maps and segmentations it moves to the
+them), or writes the chain itself as one transform. [Transform outputs](#transform-outputs)
+says how it writes the chain. fMRIPrep runs it for the masks, references, tissue maps and segmentations it moves to the
 templates and the T1w, its confounds' masks and its reports' images.
 
 ### Python (`antsApplyTransforms`)

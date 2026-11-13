@@ -106,6 +106,7 @@ pub mod props6;
 pub mod props7;
 pub mod props8;
 pub mod props9;
+pub mod props10;
 pub mod readwrite;
 pub mod scanf;
 pub mod sfile;

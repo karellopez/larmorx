@@ -1633,6 +1633,14 @@ defects! {
         "MRISsmoothKernel given hop lists made by an earlier call for fewer hops than its kernel has reads past the lists (memory contents)";
     FS_534 = "FS-534", "FreeSurfer", true,
         "with FS-525, a volume of a type smaller than a float has its later voxels read and written past the end of its memory: the values read are memory contents, and the writes corrupt the program's memory (it can crash later)";
+    FS_535 = "FS-535", "FreeSurfer", true,
+        "the surface's corner table (used by the corner-angle statistics and the surface-quality summaries) on a surface with an edge not shared by exactly two triangles (an open or non-manifold surface): the edge table stops at that edge with an error, the later edges are left as zero-length edges of vertex 0, and building the corners then crashes the program";
+    FS_536 = "FS-536", "FreeSurfer", true,
+        "the surface-quality summaries (one line, or the Area/Corner/Edge/Hinge table) crash the program when a statistic has nothing to summarise (every vertex ripped, or no triangle, edge or corner left)";
+    FS_537 = "FS-537", "FreeSurfer", true,
+        "the corner-angle statistics use the edges' directions from the last edge measurement, not from the surface's current coordinates: after the vertices move they describe the old surface, and before any edge measurement every corner reads 90 degrees";
+    FS_538 = "FS-538", "FreeSurfer", true,
+        "the edge statistics (lengths, hinge dot products and angles) and the one-line surface-quality summary use the triangles' normals from their last computation: after the vertices move the hinge values describe the old surface, and with no normals computed yet the program crashes";
     FS_221 = "FS-221", "FreeSurfer", true,
         "the volume format probe (mri_identify, the format tests and the volume-name helpers) misbehaves for a file name of 1,024 bytes or more (a Bruker study's file names of 512 or more, the stem helpers' names of 2,000 or more): its answer is undefined and the program can crash";
     FS_222 = "FS-222", "FreeSurfer", true,

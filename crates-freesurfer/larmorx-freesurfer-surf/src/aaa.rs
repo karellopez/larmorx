@@ -408,6 +408,12 @@ pub struct SurfGlobals {
     /// `mriSurfaceRASToVoxel`'s statics `try_new_way` and `try_old_way`, `None` before its first
     /// call reads `FREESURFER_mriSurfaceRASToVoxel_both` and `_old`.
     pub sras_ways: Option<(bool, bool)>,
+    /// `MRISfaceNormalFace_AddDeltaVertex` (`surfgrad.cpp`, -1): the face corner (0 to 2) whose
+    /// position `MRISfaceNormalFace` moves by [`SurfGlobals::face_normal_add_delta`] (FreeSurfer's
+    /// test of its derivatives); none below 0.
+    pub face_normal_add_delta_vertex: i32,
+    /// `MRISfaceNormalFace_AddDelta[3]` (`long double`, zeros).
+    pub face_normal_add_delta: [larmorx_core::x87::F80; 3],
 }
 
 /// `sigmas_default` (`mrisurf_base.cpp` line 962).
@@ -451,6 +457,8 @@ impl Default for SurfGlobals {
             avg_gradients_optimize: None,
             voxel_from_sras: None,
             sras_ways: None,
+            face_normal_add_delta_vertex: -1,
+            face_normal_add_delta: [larmorx_core::x87::F80::ZERO; 3],
         }
     }
 }

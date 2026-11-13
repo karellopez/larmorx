@@ -141,6 +141,35 @@ def libm_case(cmd: str, toks: list[str]) -> bool:
     return cmd == "mpd"
 
 
+#: Commands whose results go through the C library's double ``acos`` (the hinge and corner
+#: angles of ``mpg``): the port takes the correctly rounded one in both modes (the user's decision
+#: of 2026-11-04 for glibc's ``acos``, GLIBC-07), so a line may differ from FreeSurfer's in the
+#: last bits of the numbers that come from it; such lines are counted apart (every differing
+#: number at most two units in the last place away: the angle's two roundings after ``acos``),
+#: and the hash takes the port's line for them.
+ACOS = {"mpg"}
+
+
+def _ulps(a: str, b: str) -> int | None:
+    if len(a) != len(b) or len(a) not in (8, 16):
+        return None
+    try:
+        x, y = int(a, 16), int(b, 16)
+    except ValueError:
+        return None
+    if (x ^ y) >> (4 * len(a) - 1):
+        return None
+    return abs(x - y)
+
+
+def acos_last_bits(official: str, port: str) -> bool:
+    """Whether two lines differ only in numbers at most two units in the last place apart."""
+    a, b = official.split(" "), port.split(" ")
+    if len(a) != len(b) or a == b:
+        return False
+    return all(x == y or (_ulps(x, y) or 99) <= 2 for x, y in zip(a, b, strict=True))
+
+
 def probe_binary(ws: Path, name: str = "fssurfio") -> Path:
     exe = ws / "oracles" / "freesurfer-8.2.0-probes" / "fs-surfio" / name
     if not exe.is_file():
@@ -241,6 +270,7 @@ def main(argv: list[str] | None = None) -> int:
     equal, differ, skipped = Counter(), Counter(), Counter()
     fix_differ, fix_unexplained, fix_ids, rep_ids = Counter(), Counter(), Counter(), Counter()
     fix_libm = Counter()
+    acos_differ = Counter()
     hashed = hashlib.sha256()
     first_differ = []
     for case, c, (r, ids), (f, fids) in zip(cases, official, rep, fix, strict=True):
@@ -252,16 +282,19 @@ def main(argv: list[str] | None = None) -> int:
             skipped[cmd] += 1
             hashed.update(b"SKIP\n")
             continue
-        hashed.update(c.encode() + b"\n")
+        acos_only = cmd in ACOS and acos_last_bits(c, r)
+        hashed.update((r if acos_only else c).encode() + b"\n")
         if c == r:
             equal[cmd] += 1
+        elif acos_only:
+            acos_differ[cmd] += 1
         else:
             differ[cmd] += 1
             if len(first_differ) < 5:
                 first_differ.append(case[:200])
         if f != c:
             fix_differ[cmd] += 1
-            if not fids and libm_case(cmd, case.split()):
+            if not fids and (libm_case(cmd, case.split()) or (cmd in ACOS and acos_last_bits(c, f))):
                 fix_libm[cmd] += 1
             elif not fids:
                 fix_unexplained[cmd] += 1
@@ -273,6 +306,7 @@ def main(argv: list[str] | None = None) -> int:
         "served": served,
         "reproduce_equal": sum(equal.values()),
         "reproduce_differ": dict(differ),
+        "reproduce_differ_acos_last_bits": dict(acos_differ),
         "skipped": dict(skipped),
         "reproduce_notices": dict(rep_ids),
         "fix_differ": dict(fix_differ),

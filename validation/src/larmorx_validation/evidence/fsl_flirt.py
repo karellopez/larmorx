@@ -1916,6 +1916,21 @@ _TITLES = {
 }
 
 
+#: Each example's metrics note: the two records' thresholds, not the replica's alone (the
+#: reviewer's round 17, finding 1; the records' Thresholds tables, specs/flirt.md §13).
+THRESHOLDS = (
+    "The record's threshold: every file FSL writes bit-identical (images decompressed, "
+    "`descrip` left out), with FSL's exit status and messages.",
+    "The records' thresholds: every file FSL writes bit-identical (images decompressed, "
+    "`descrip` left out), with FSL's exit status and messages (the replica); FSL's exit status "
+    "and messages, the numbers in them read as numbers, the matrix FSL's text or within 0.1 mm "
+    "of it at the 95th percentile of the reference's brain (0.5 mm for registrations other "
+    "than the boundary-based and 6-dof ones), and the image from its own matrix with a "
+    "correlation of at least 0.999 with FSL's inside the reference's mask, bit-identical from "
+    "the same matrix (the clean room, specs/flirt.md §13).",
+)
+
+
 def present(doc: dict) -> dict:
     """FLIRT's page in the writing guide's words and order: texts, ports and order only."""
     note = (doc.get("speed") or {}).get("note")
@@ -1945,6 +1960,10 @@ def present(doc: dict) -> dict:
     if doc.get("speed"):  # its build is LARMORX's at a commit, not a port's
         doc["speed"]["note"] = present_.text(PAGE, note, port="both")
     for ex in doc["examples"]:
+        old, new = THRESHOLDS
+        if old not in (ex.get("metrics_note") or ""):
+            raise ValueError(f"{ex['id']}: the metrics note's threshold sentence is gone")
+        ex["metrics_note"] = ex["metrics_note"].replace(old, new)
         for t in ex.get("tables") or []:
             kind = t["id"].rsplit("-", 1)[1]
             t["title"] = _TITLES[kind]

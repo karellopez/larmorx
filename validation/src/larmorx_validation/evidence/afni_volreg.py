@@ -1251,6 +1251,20 @@ AFNI99_NOTE = (
 )
 
 
+#: The replica's examples' metrics note: the two records' thresholds, not the replica's alone
+#: (the reviewer's round 17, finding 1; the records' Thresholds tables, specs/3dvolreg.md §14.3).
+THRESHOLD = re.compile(
+    r"The record's threshold: (every output bit-identical to AFNI 26\.3\.05's \([^()]*\)), "
+    r"with its exit status and messages\."
+)
+THRESHOLDS = (
+    r"The records' thresholds: \1, with its exit status and messages (the replica); AFNI's exit "
+    "status, files, headers and messages, the motion parameters within per-volume limits "
+    "derived from each volume's own parameters, and the outputs computed from them within the "
+    "bounds those limits give (the clean room, specs/3dvolreg.md §14.3)."
+)
+
+
 def present(doc: dict) -> dict:
     """3dvolreg's page in the writing guide's words and order: texts, ports and order only."""
     pg = PAGE
@@ -1258,6 +1272,12 @@ def present(doc: dict) -> dict:
     for ex in doc["examples"]:
         if ex["id"] in EXAMPLE_TITLES:
             ex["title"] = EXAMPLE_TITLES[ex["id"]]
+        if ex["id"] in ("fmriprep-volreg", "fmriprep-boldref", "afni-99"):  # the clean room's
+            # own example has its own note
+            note, n = THRESHOLD.subn(THRESHOLDS, ex.get("metrics_note") or "")
+            if n != 1:
+                raise ValueError(f"{ex['id']}: the metrics note's threshold sentence is gone")
+            ex["metrics_note"] = note
         if ex["id"] == "afni-99":
             old, new = AFNI99_NOTE
             if old not in (ex.get("metrics_note") or ""):
